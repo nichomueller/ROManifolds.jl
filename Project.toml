@@ -3,11 +3,16 @@ uuid = "bce97e36-494f-43f8-ac88-b3a1b9c67aca"
 authors = ["Santiago Badia <santiago.badia@gmail.com>"]
 version = "0.1.0"
 
-[extras]
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+[deps]
+Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
+Gridap = "56d4f2e9-7ea1-5844-9cf6-b9c51ca7ce8e"
 
 [compat]
 julia = "1.7"
+Gridap = "0.7"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Test"]
