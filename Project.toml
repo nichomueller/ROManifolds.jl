@@ -4,12 +4,17 @@ authors = ["Santiago Badia <santiago.badia@gmail.com>"]
 version = "0.1.0"
 
 [deps]
+ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+ChainRulesTestUtils = "cdddcdb0-9152-4a09-a978-84456f9df70a"
 Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
 Gridap = "56d4f2e9-7ea1-5844-9cf6-b9c51ca7ce8e"
+Optim = "429524aa-4258-5aef-a3af-852621145aeb"
+ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
+Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [compat]
+Gridap = "0.17"
 julia = "1.7"
-Gridap = "0.7"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
