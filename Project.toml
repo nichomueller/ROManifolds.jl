@@ -9,7 +9,7 @@ Gridap = "56d4f2e9-7ea1-5844-9cf6-b9c51ca7ce8e"
 
 [compat]
 julia = "1.7"
-Gridap = "0.7"
+Gridap = "0.17"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
