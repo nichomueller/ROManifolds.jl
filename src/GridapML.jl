@@ -1,4 +1,4 @@
-module GridapML
+module Mabla
 
 using Gridap
 using Flux

@@ -1,14 +1,14 @@
 ```@meta
-CurrentModule = GridapML
+CurrentModule = Mabla
 ```
 
-# GridapML
+# Mabla
 
-Documentation for [GridapML](https://github.com/BadiaLab/GridapML.jl).
+Documentation for [Mabla](https://github.com/BadiaLab/Mabla.jl).
 
 ```@index
 ```
 
 ```@autodocs
-Modules = [GridapML]
+Modules = [Mabla]
 ```

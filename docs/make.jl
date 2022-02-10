@@ -1,16 +1,16 @@
-using GridapML
+using Mabla
 using Documenter
 
-DocMeta.setdocmeta!(GridapML, :DocTestSetup, :(using GridapML); recursive=true)
+DocMeta.setdocmeta!(Mabla, :DocTestSetup, :(using Mabla); recursive=true)
 
 makedocs(;
-    modules=[GridapML],
+    modules=[Mabla],
     authors="Santiago Badia <santiago.badia@gmail.com>",
-    repo="https://github.com/BadiaLab/GridapML.jl/blob/{commit}{path}#{line}",
-    sitename="GridapML.jl",
+    repo="https://github.com/BadiaLab/Mabla.jl/blob/{commit}{path}#{line}",
+    sitename="Mabla.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://BadiaLab.github.io/GridapML.jl",
+        canonical="https://BadiaLab.github.io/Mabla.jl",
         assets=String[],
     ),
     pages=[
@@ -19,6 +19,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/BadiaLab/GridapML.jl",
+    repo="github.com/BadiaLab/Mabla.jl",
     devbranch="main",
 )
