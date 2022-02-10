@@ -1,4 +1,4 @@
-# GridapML
+# Mabla
 
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://BadiaLab.github.io/GridapML.jl/stable)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://BadiaLab.github.io/GridapML.jl/dev)
