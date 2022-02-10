@@ -1,7 +1,7 @@
-using GridapML
+using Mabla
 using Test
 
-@testset "GridapML.jl" begin
+@testset "Mabla.jl" begin
     # Write your tests here.
 	@test 1 == 1
 end
