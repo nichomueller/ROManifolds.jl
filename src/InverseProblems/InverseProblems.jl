@@ -4,6 +4,11 @@ using Gridap
 using Gridap.FESpaces
 using ChainRulesCore
 
+import ChainRulesCore.rrule
+
+export FEStateMap
+export LossFunction
+
 # Struct that represents the FE solution of a parameterised PDE.
 # It is a map from the parameter space T to a FESpace
 struct FEStateMap{P,U <: TrialFESpace, V <: FESpace}
