@@ -39,7 +39,6 @@ function main(;cells=(10,10))
   # It returns a cell-wise value.
   # The actual objective is computed as sum(f(u))
   j(u) = ∫( abs2(u-û) )dΩ
-  J = LossFunction(∫( abs2(u-û) )dΩ, U)
 
   # Conductivity-dependent weak form
   a(q,u,v) =  ∫( ∇(v)⋅(q*∇(u)) )dΩ
@@ -126,24 +125,11 @@ function main(;cells=(10,10))
 
   #writevtk(Ω,"results",cellfields=["û"=>û,"q̂"=>q̂])
 
+  # New approach (to be dev / tested)
+
+  j(q,u) = ∫( abs2(u-û) )dΩ # No explicit dependence on q
+  qh_to_uh = FEStateMap(res,Q,U,V)
+  LossFunction(j,Q,qh_to_uh)
+
+
 end
-
-
-
-qu_to_j
-
-q_to_j + u_to_j * q_to_u
-
-u_to_j_pullback(j̄)
-
-q_to_u_pullback(ū)
-
-dj=1.0 # identity operator
-
-_, ∂j_q = q_to_j_pullback(dj)
-
-_, dj_u = u_to_j_pullback(dj)
-
-_, du_q = q_to_u_pullback(dj_u)
-
- = ∂j_q + dj_u
