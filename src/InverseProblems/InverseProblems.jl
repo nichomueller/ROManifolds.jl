@@ -1,11 +1,12 @@
 module InverseProblems
 
 using Gridap
+using Gridap.FESpaces
 using ChainRulesCore
 
 # Struct that represents the FE solution of a parameterised PDE.
 # It is a map from the parameter space T to a FESpace
-struct FEStateMap{P,T,Q} where P, U <: TrialFESpace, V <: TestFESpace
+struct FEStateMap{P,U <: TrialFESpace, V <: FESpace}
   form::Function
   param_sp::P # params (CellData)
   test::U
@@ -39,7 +40,7 @@ function ChainRulesCore.rrule(uh::FEStateMap{T},qh::T) where T <: FEFunction
   uh, qh_to_uh_pullback
 end
 
-struct LossFunction{P,U} where P,U
+struct LossFunction{P,U}
   loss::Function
   param_sp::P
   state_sp::U
@@ -80,4 +81,4 @@ function ChainRulesCore.rrule(j::LossFunction{FEFunction,FEStateMap}, qh::FEFunc
 
 end
 
-end module
+end # module

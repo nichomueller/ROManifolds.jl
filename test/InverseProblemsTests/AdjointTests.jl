@@ -14,7 +14,7 @@ dqdp(p,x) = ∇(k->q(k,x))(p)
 # Target params
 const p̂ = VectorValue(0,1,1)
 
-function main(;cells=(10,10))
+function main(;cells=(3,3))
 
   # Geometry
   domain = (0,1,0,1); cells = (10,10)
@@ -120,6 +120,12 @@ function main(;cells=(10,10))
     jp, dp
   end
 
+  return p_to_j, j_and_djdp
+
+end
+
+  p_to_j, j_and_djdp = main()
+
   @show p_to_j(p̂)
   @show j_and_djdp(p̂)
 
@@ -130,6 +136,3 @@ function main(;cells=(10,10))
   j(q,u) = ∫( abs2(u-û) )dΩ # No explicit dependence on q
   qh_to_uh = FEStateMap(res,Q,U,V)
   LossFunction(j,Q,qh_to_uh)
-
-
-end
