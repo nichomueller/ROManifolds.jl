@@ -252,13 +252,30 @@ function MDEIM(Ω_p, quantity, mat_nonaffine_map, mat_nonaffine, ϵ, norm_matrix
     else
         (i, j) = [repeat(1:R, 1, C)[:], repeat((1:C)', R, 1)[:]]
     end
-
-    vec_non
-    DEIM_idx_mat = [i[DEIM_idx], j[DEIM_idx]]
-
-
-end
-
+    function parametric_domain(x)
+        #=MODIFY
+        assumed to be a parallelepiped
+        =#
+    
+        @unpack (Ix, Iy, Iz) = x
+        return Ix, Iy, Iz
+    
+    end
+    
+    
+    function parameter_generator(Ω_p, quantity)
+        #=MODIFY
+        =#
+        
+        param = zeros(quantity, size(Ω_p)[1])
+        for i in range(1, quantity)
+            for j in range(1, size(Ω_p)[1])
+                param[i, j] = Uniform(Ω_p[j,:][1], Ω_p[j,:][2])
+            end
+        end
+        return param
+    
+    end
 
 struct RB_info{T<:String}
     
@@ -291,5 +308,30 @@ struct RB_info{T<:String}
         Wₙ = []
 
     end
+
+end
+
+function parametric_domain(x)
+    #=MODIFY
+    assumed to be a parallelepiped
+    =#
+
+    @unpack (Ix, Iy, Iz) = x
+    return Ix, Iy, Iz
+
+end
+
+
+function parameter_generator(Ω_p, quantity)
+    #=MODIFY
+    =#
+    
+    param = zeros(quantity, size(Ω_p)[1])
+    for i in range(1, quantity)
+        for j in range(1, size(Ω_p)[1])
+            param[i, j] = Uniform(Ω_p[j,:][1], Ω_p[j,:][2])
+        end
+    end
+    return param
 
 end

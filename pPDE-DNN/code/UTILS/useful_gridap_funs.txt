@@ -1,0 +1,116 @@
+-----------------------------------------------------------------------------------------------------
+Create a discrete cartesian model
+
+L = 2 # Domain length in each space dimension
+D = 2 # Number of spatial dimensions
+n = 4 # Partition (i.e., number of cells per space dimension)
+function stretching(x::Point)
+   m = zeros(length(x))
+   m[1] = x[1]^2
+   for i in 2:D
+     m[i] = x[i]
+   end
+   Point(m)
+end
+
+pmin = Point(Fill(0,D))
+pmax = Point(Fill(L,D))
+partition = Tuple(Fill(n,D))
+model = CartesianDiscreteModel(pmin,pmax,partition,map=stretching)
+
+T = Float64
+order = 1
+pol = Polytope(Fill(HEX_AXIS,D)...) --> 1D: SEGMENT, [0,1]; 2D: QUAD, [0,1]^2; 3D: HEX, [0,1]^3
+reffe = LagrangianRefFE(T,pol,order)
+
+Tₕ = Triangulation(model)
+Qₕ = CellQuadrature(Tₕ, 4*order)
+
+-----------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------
+Subtypes of the CellDatum abstract type 
+
+What does an instance of the CellDatum represent? A collection of quantities (e.g., points in a reference system, or scalar-, vector- or tensor-valued fields, or arrays made of these), once per each cell of a triangulation.
+
+Tₕ = Triangulation(model)
+Qₕ = CellQuadrature(Tₕ, 4*order)  --> this is a CellQuadrature subtype
+Qₕ_cell_point = get_cell_points(Qₕ) --> CellPoint subtype, can be used in order to evaluate CellField objects
+dv = get_fe_basis(Vₕ) --> FEBasis type, subtype of CellField 
+uₕ = FEFunction(Uₕ,rand(num_free_dofs(Uₕ))) --> CellField
+uₕ_at_Qₕ = evaluate(uₕ,Qₕ_cell_point) --> LazyArray
+
+ξₖ = get_cell_map(Tₕ) --> LazyArray
+
+
+-----------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------
+Useful functions that can be applied to CellDatum and its subtypes
+
+num_cells(Tₕ) --> number of cells in triangulation
+Qₕ_cell_data = get_data(Qₕ) --> extract quantities related to each of the cells in the triangulation; length(Qₕ_cell_data) === num_cells(Tₕ)
+DomainStyle(Qₕ) == ReferenceDomain(), DomainStyle(Qₕ) == PhysicalDomain() --> check if the FE quantities (e.g. shapes) are expressed in terms of the reference, or the physical domain
+change_domain(...) --> change DomainStyle
+
+q = Qₕ_cell_data[rand(1:num_cells(Tₕ))] --> provides an array of points (Point data type in Gridap) in the cell reference parametric space [0,1]^d and their corresponding weights
+p = get_coordinates(q)
+w = get_weights(q)
+ALTERNATIVELY:
+Qₕ_cell_point = get_cell_points(Qₕ) 
+qₖ = get_data(Qₕ_cell_point)
+
+dv = get_fe_basis(Vₕ) --> test basis
+du = get_trial_fe_basis(Uₕ) --> trial basis
+Gridap.FESpaces.BasisStyle(dv) == Gridap.FESpaces.TestBasis(), Gridap.FESpaces.BasisStyle(du) == Gridap.FESpaces.TrialBasis() --> BasisStyle attribute 
+DomainStyle(dv) == ReferenceDomain(), DomainStyle(du) == ReferenceDomain() --> because of the type hierarchy, we can call DomainStyle() on FEBasis
+dv_array = get_data(dv) --> because of the type hierarchy, we can call get_data() on FEBasis
+EVALUATION
+dv_at_Qₕ = evaluate(dv,Qₕ_cell_point) --> evaluate function for the efficient evaluation of FEBasis on CellPoint; notice that since DomainStyle(dv) == ReferenceDomain(), dv_at_Qₕ is a vector of matrices that are always the same!
+evaluate(ϕ₃ = dv_array[1][3],[Point(0,0),Point(1,0),Point(0,1),Point(1,1)]) --> evaluate the 3rd basis function defined on the 1st cell at the Points...
+BUT THIS IS NOT THE BEST OPTION; INSTEAD OF EXTRACTING POINTS, FIELDS FOR ALL CELLS AND COMPUTING THE EVALUATION, USE THE LAZY_MAP GENERIC FUNCTION, WHICH PERFORMS THE LOOP OVER THE CELLS AND EVALUATING THE CELL FIELDS AS A WHOLE
+dv_array_at_qₖ = lazy_map(evaluate,dv_array,qₖ)
+
+uₕ = FEFunction(Uₕ,rand(num_free_dofs(Uₕ))) --> builds a function belonging to the trial space, with DOFs u_i = rand(1) forall i = 1,...,Nh
+DomainStyle(uₕ) == ReferenceDomain()
+uₕ_at_Qₕ = evaluate(uₕ,Qₕ_cell_point) --> the application of evaluate via lazy_map for the cell arrays uₕ and Qₕ_cell_point
+uₕ_array = get_data(uₕ) 
+uₕ_array_at_qₖ = lazy_map(evaluate,uₕ_array,qₖ) --> use lazy_map for the evaluation at qₖ!
+σₖ = get_cell_dof_ids(Uₕ) --> global indices of the DOFs in each cell on the trial space (i.e. it's the global connectivity)
+
+ξₖ = get_cell_map(Tₕ) -> geometrical map that takes points in the parametric space and maps it to the cell in the physical space in 3D 
+X = get_node_coordinates(Tₕ) --> node coordinates of triangulation
+_Xₖ = get_cell_coordinates(Tₕ) --> cell-wise node coordinates of triangulation
+cell_node_ids = get_cell_node_ids(Tₕ) --> idx of the node coordinates of triangulation
+ϕrg = get_shapefuns(reffe) --> get shape functions
+ϕrgₖ = Fill(ϕrg,num_cells(Tₕ)) --> global cell array that has the same reference FE basis for all cells
+Xₖ = lazy_map(Broadcasting(Reindex(X)),cell_node_ids) --> another way of obtaining cell-wise node coordinates of triangulation
+ψₖ = lazy_map(linear_combination,Xₖ,ϕrgₖ) --> geometrical map = linear combination of the shape functions in the parametric space with the node coordinates
+IN OTHER WORDS: lazy_map(evaluate,ψₖ,qₖ) == lazy_map(evaluate,ξₖ,qₖ)
+∇ϕrg  = Broadcasting(∇)(ϕrg)
+∇ϕrgₖ = Fill(∇ϕrg,num_cells(model))
+J = lazy_map(linear_combination,Xₖ,∇ϕrgₖ) --> Jacobian of the map reference domain to physical domain
+ALTERNATIVELY:
+J = lazy_map(Broadcasting(∇),ψₖ)
+
+grad_dv = ∇(dv) --> write grad_dv = Gridap.∇(dv) if there are any problems
+grad_dv_array = get_data(grad_dv)
+DomainStyle(grad_dv) == ReferenceDomain()
+
+intg = ∇(uₕ)⋅∇(dv) --> integrand of the bilinear form
+res = integrate(intg,Qₕ) --> residual 
+ALTERNATIVELY:
+res = ∫( ∇(dv)⋅∇(uₕ) )*Qₕ
+
+ASSEMBLY
+assem = SparseMatrixAssembler(Uₕ,Vₕ) -->standard assembler struct for the finite element spaces at hand
+rs = ([res],[σₖ]) --> make a tuple res + connectivity
+b = allocate_vector(assem,rs) --> IMPORTANT: this allocates a vector of type assem, indexable at the indices rs 
+assemble_vector!(b,assem,rs)
+WITH MATRICES:
+rs = ([iwq],[σₖ],[σₖ])
+A = allocate_matrix(assem,rs)
+A = assemble_matrix!(A,assem,rs)
+
+
+
+
+

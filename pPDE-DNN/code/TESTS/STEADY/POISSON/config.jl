@@ -5,15 +5,18 @@ const problem_name = "POISSON"   # POISSON / STOKES / NAVIER-STOKES / BURGERS
 const approx_type = "ROM"   # ROM / DL
 const problem_dim = 3   
 const problem_nonlinearities = Dict("A" => false,  # true / false
-                                    "f" => false)  # true / false
+                                    "f" => false,  # true / false
+                                    "g" => false,  # true / false
+                                    "h" => false)  # true / false
 const number_coupled_blocks = 1
+const mesh_name = "model"
 
 @assert !(problem_name === "POISSON" && problem_type === "UNSTEADY") || (problem_name === "BURGERS" && problem_type === "STEADY")
 
 const root = "/home/user1/git_repos/pPDE-NN/code"
-const mesh_name = "geometry_name"
 
 function FEM_ROM_paths(root, problem_type, problem_name, mesh_name, problem_dim)
+    mesh_path = joinpath(root, joinpath("FEM", joinpath("models", mesh_name)))
     root_test = joinpath(root, joinpath("TESTS", problem_type * "_" * problem_name * "_" * problem_dim))
     FEM_path = joinpath(root_test, joinpath(mesh_name, "FEM_data"))
     FEM_snap_path = joinpath(FEM_path, "snapshots")
@@ -31,17 +34,20 @@ function FEM_ROM_paths(root, problem_type, problem_name, mesh_name, problem_dim)
     create_dir(gen_coords_path) 
     results_path = joinpath(ROM_path, "results")
     create_dir(results_path)
-    (paths) -> (FEM_snap_path; FEM_structures_path; FOM_files_extension; FOM_files_delimiter; basis_path; ROM_structures_path; gen_coords_path; results_path)
+    (paths) -> (mesh_path; FEM_snap_path; FEM_structures_path; FOM_files_extension; FOM_files_delimiter; basis_path; ROM_structures_path; gen_coords_path; results_path)
 end
 
-struct FOM_specifics
-    Nᵤˢ::Int64
-    #time_dimension_FOM::Int64
-    #inal_time::Float64
+struct probl_specifics
+    problem_type::String
+    problem_name::String
+    approx_type::String
+    problem_dim::Int
+    problem_nonlinearities::Dict
+    number_coupled_blocks::Int# true / false
     #time_marching_scheme::String
 end
 
-struct ROM_specifics
+struct ROM_specifics# true / false
     RB_method::String
     n_snaps::Int64
     ϵˢ_POD::Float64
@@ -55,8 +61,27 @@ struct ROM_specifics
     save_results::Bool
 end
 
-FOM_info = FOM_specifics(40000, 120, 0.3, "BDF2")
-ROM_info = ROM_specifics("S-RB", 10, 1e-5, 1e-5, false, false, 0.8, true, true, true, true)
+if problem_nonlinearities["f"] === false
+    f(x, μ) = 1.0
+else
+    f(x, μ) = μ
+end
+
+if problem_nonlinearities["g"] === false
+    g(x, μ) = 2.0
+else
+    g(x, μ) = 2.0 .* μ
+end
+
+if problem_nonlinearities["h"] === false
+    h(x, μ) = 3.0
+else
+    h(x, μ) = 3.0 .* μ
+end
+
+probl_info = probl_specifics(problem_type, problem_name, approx_type, problem_dim, problem_nonlinearities, number_coupled_blocks)
+FOM_info = FOM_specifics(FEM_ROM_paths, 1, "sides", ["circle", "triangle", "square"], f, g, h, LUSolver())
+ROM_info = ROM_specifics("S-RB", 10, 1e-5, false, false, 0.8, true, true, true, true)
 
 
 
