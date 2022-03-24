@@ -10,8 +10,9 @@ const problem_nonlinearities = Dict("A" => false,  # true / false
                                     "h" => false)  # true / false
 const number_coupled_blocks = 1
 const mesh_name = "model"
+const use_lifting = false
 
-@assert !(problem_name === "POISSON" && problem_type === "UNSTEADY") || (problem_name === "BURGERS" && problem_type === "STEADY")
+@assert !(problem_name === "BURGERS" && problem_type === "STEADY")
 
 const root = "/home/user1/git_repos/pPDE-NN/code"
 
@@ -34,10 +35,11 @@ function FEM_ROM_paths(root, problem_type, problem_name, mesh_name, problem_dim)
     create_dir(gen_coords_path) 
     results_path = joinpath(ROM_path, "results")
     create_dir(results_path)
-    (paths) -> (mesh_path; FEM_snap_path; FEM_structures_path; FOM_files_extension; FOM_files_delimiter; basis_path; ROM_structures_path; gen_coords_path; results_path)
+    return mesh_path, FEM_snap_path, FEM_structures_path, FOM_files_extension, FOM_files_delimiter, basis_path, ROM_structures_path, gen_coords_path,       results_path
 end
 
 struct probl_specifics
+    paths::String
     problem_type::String
     problem_name::String
     approx_type::String
@@ -46,6 +48,7 @@ struct probl_specifics
     number_coupled_blocks::Int# true / false
     #time_marching_scheme::String
 end
+
 
 struct ROM_specifics# true / false
     RB_method::String
@@ -56,6 +59,10 @@ struct ROM_specifics# true / false
     postprocess::Bool
     train_percentage::Float64
     import_snapshots::Bool
+    #dir_dofs_ids = get_dirichlet_dof_ids(FE_space.V₀)
+    #g_on_dir_bnd = g()
+    #interpolate_dirichlet(g, FE_space.V₀)
+    #gₕ_at_Qₕ = interpolate_dirichlet(gₕ, FE_space.Qₕ_cell_point)
     import_offline_structures::Bool
     save_offline_structures::Bool
     save_results::Bool
@@ -64,23 +71,30 @@ end
 if problem_nonlinearities["f"] === false
     f(x, μ) = 1.0
 else
-    f(x, μ) = μ
+    f(x, μ) = sin(μ .* x)
 end
 
 if problem_nonlinearities["g"] === false
     g(x, μ) = 2.0
 else
-    g(x, μ) = 2.0 .* μ
+    g(x, μ) = sin(μ .* x)
 end
 
 if problem_nonlinearities["h"] === false
     h(x, μ) = 3.0
 else
-    h(x, μ) = 3.0 .* μ
+    h(x, μ) = sin(μ .* x)
 end
 
-probl_info = probl_specifics(problem_type, problem_name, approx_type, problem_dim, problem_nonlinearities, number_coupled_blocks)
-FOM_info = FOM_specifics(FEM_ROM_paths, 1, "sides", ["circle", "triangle", "square"], f, g, h, LUSolver())
+if problem_nonlinearities["A"] === false
+    const σ = Point(rand(Uniform(0.4, 0.6)), rand(Uniform(0.4, 0.6)), rand(Uniform(0.05, 0.1)))
+    μ(x) = σ[3] + 1 / σ[3] * exp(-((x[1] - σ[1])^2 + (x[2] - σ[2])^2) / σ[3])
+else
+    μ = rand(Uniform(0.01, 10.0))
+end
+
+all_paths = FEM_ROM_paths(root, problem_type, problem_name, mesh_name, problem_dim)
+probl_info = probl_specifics(all_paths, problem_type, problem_name, approx_type, problem_dim, problem_nonlinearities, number_coupled_blocks)
 ROM_info = ROM_specifics("S-RB", 10, 1e-5, false, false, 0.8, true, true, true, true)
 
 
@@ -145,9 +159,7 @@ end
 if approx_type === "ROM"
     name_test = ROM_specifics["reduction_method"]
     ROM_path = joinpath(root_test, joinpath(mesh_name, name_test))
-    create_dir(ROM_path)
-    basis_path = joinpath(ROM_path, "basis")
-    create_dir(basis_path)
+    create_dir(ROM_path)OM_info.lin_solver
     ROM_structures_path = joinpath(ROM_path, "ROM_structures")
     create_dir(ROM_structures_path)
     gen_coords_path = joinpath(ROM_path, "gen_coords")

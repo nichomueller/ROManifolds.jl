@@ -1,4 +1,5 @@
-#include("imports.jl")
+using Pkg
+Pkg.activate(".")
 
 function create_dir(path)
     #=Create a directory at the given path
@@ -269,6 +270,9 @@ function sparse_to_full_matrix(mat, format = "csc")
     return full_mat
 
 end
+
+
+
 
 
 
