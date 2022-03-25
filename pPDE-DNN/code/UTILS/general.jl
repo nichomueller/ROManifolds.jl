@@ -58,6 +58,17 @@ function save_variable(var, var_name, extension = "csv", path = nothing)
 end
 
 
+function JLD_append(filename, var_name, var)
+    if !isfile(filename)
+        save(filename, var_name, var)
+    else
+        f = jldopen(filename, "r+")
+        write(f, var_name, var)
+        close(f)
+    end
+end
+
+
 function load_variable(var_name, extension = "csv", path = nothing, sparse = false, delimiter = nothing)
     #=Utility method, which allows to load arrays/matrices from .jld files. If the path to the text file does not exist,
     it displays an error message.
@@ -272,9 +283,46 @@ function sparse_to_full_matrix(mat, format = "csc")
 end
 
 
+function get_no_index(vec::Nothing, i::Int64)
+    #=MODIFY
+    =#
+
+    
+end
 
 
+function get_vec_index(vec::Array, i::Int64)
+    #=MODIFY
+    =#
 
+    vec[i]
+    
+end
+
+
+get_index(vec::Nothing, i::Int64) = get_no_index(vec, i)
+get_index(vec::Array, i::Int64) = get_vec_index(vec, i)
+
+
+function generate_nothing()
+    #=MODIFY
+    =#
+
+end
+
+function generate_uniformly_distributed_values(a::Float64, b::Float64, n::Int64, path::String, val_name::String)
+    #=MODIFY
+    =#
+
+    val = rand(Uniform(a, b), n)
+    JLD_append(path, val_name, val)
+
+    val
+
+end
+
+generate_value() = generate_nothing()
+generate_value(a::Float64, b::Float64, n::Int64, path::String, val_name::String) = generate_uniformly_distributed_values(a, b, n, path, val_name)
 
 
 

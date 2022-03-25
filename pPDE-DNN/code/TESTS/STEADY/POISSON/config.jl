@@ -17,6 +17,25 @@ const use_lifting = false
 const root = "/home/user1/git_repos/pPDE-NN/code"
 
 function FEM_ROM_paths(root, problem_type, problem_name, mesh_name, problem_dim)
+    nonlins = ""
+    for (key, value) in problem_nonlinearities
+        if value === true
+            nonlins *= "_" * key
+        end
+    end
+    mesh_path() = joinpath(root, joinpath("FEM", joinpath("models", mesh_name)))
+    root_test = joinpath(root, joinpath("TESTS", problem_type * "_" * problem_name * "_" * problem_dim * nonlins))
+    FEM_path = joinpath(root_test, joinpath(mesh_name, "FEM_data"))
+    FEM_snap_path() = joinpath(FEM_path, "snapshots")
+    FEM_structures_path() = joinpath(FEM_path, "FEM_structures")
+    FOM_files_extension() = "txt" 
+    FOM_files_delimiter() = ","
+    (out) -> (mesh_path; FEM_snap_path; FEM_structures_path; FOM_files_extension; FOM_files_delimiter)
+end 
+(out) -> (mesh_path; FEM_snap_path; FEM_structures_path; FOM_files_extension; FOM_files_delimiter)
+
+
+function FEM_ROM_paths(root, problem_type, problem_name, mesh_name, problem_dim)
     mesh_path = joinpath(root, joinpath("FEM", joinpath("models", mesh_name)))
     root_test = joinpath(root, joinpath("TESTS", problem_type * "_" * problem_name * "_" * problem_dim))
     FEM_path = joinpath(root_test, joinpath(mesh_name, "FEM_data"))
