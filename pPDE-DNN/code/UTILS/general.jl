@@ -1,5 +1,5 @@
-using Pkg
 Pkg.activate(".")
+include("imports.jl")
 
 function create_dir(path)
     #=Create a directory at the given path
@@ -283,7 +283,7 @@ function sparse_to_full_matrix(mat, format = "csc")
 end
 
 
-function get_no_index(vec::Nothing, i::Int64)
+function get_no_index(vec::Core.Box, i::Int64)
     #=MODIFY
     =#
 
@@ -300,7 +300,7 @@ function get_vec_index(vec::Array, i::Int64)
 end
 
 
-get_index(vec::Nothing, i::Int64) = get_no_index(vec, i)
+get_index(vec::Core.Box, i::Int64) = get_no_index(vec, i)
 get_index(vec::Array, i::Int64) = get_vec_index(vec, i)
 
 

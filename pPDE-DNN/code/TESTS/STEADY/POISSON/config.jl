@@ -14,7 +14,7 @@ const use_lifting = false
 
 @assert !(problem_name === "BURGERS" && problem_type === "STEADY")
 
-const root = "/home/user1/git_repos/pPDE-NN/code"
+const root = "/home/user1/git_repos/Mabla.jl/pPDE-NN/code"
 
 function FEM_ROM_paths(root, problem_type, problem_name, mesh_name, problem_dim)
     nonlins = ""

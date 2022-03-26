@@ -15,7 +15,7 @@ const solver = "lu"
 
 @assert !(problem_name === "BURGERS" && problem_type === "STEADY")
 
-const root = "/home/user1/git_repos/pPDE-NN/code"
+const root = "/home/user1/git_repos/Mabla.jl/pPDE-NN/code"
 
 function FEM_ROM_paths(root, problem_type, problem_name, mesh_name, problem_dim)
     nonlins = ""
@@ -24,13 +24,13 @@ function FEM_ROM_paths(root, problem_type, problem_name, mesh_name, problem_dim)
             nonlins *= "_" * key
         end
     end
-    mesh_path() = joinpath(root, joinpath("FEM", joinpath("models", mesh_name)))
-    root_test = joinpath(root, joinpath("TESTS", problem_type * "_" * problem_name * "_" * problem_dim * nonlins))
+    mesh_path = joinpath(root, joinpath("FEM", joinpath("models", mesh_name)))
+    root_test = joinpath(root, joinpath("TESTS", joinpath(problem_type, joinpath(problem_name, joinpath(string(problem_dim) * "D" * nonlins)))))
     FEM_path = joinpath(root_test, joinpath(mesh_name, "FEM_data"))
-    FEM_snap_path() = joinpath(FEM_path, "snapshots")
-    FEM_structures_path() = joinpath(FEM_path, "FEM_structures")
-    FOM_files_extension() = "txt" 
-    FOM_files_delimiter() = ","
+    FEM_snap_path = joinpath(FEM_path, "snapshots")
+    FEM_structures_path = joinpath(FEM_path, "FEM_structures")
+    FOM_files_extension = "txt" 
+    FOM_files_delimiter = ","
     (out) -> (mesh_path; FEM_snap_path; FEM_structures_path; FOM_files_extension; FOM_files_delimiter)
 end 
 (out) -> (mesh_path; FEM_snap_path; FEM_structures_path; FOM_files_extension; FOM_files_delimiter)
@@ -38,9 +38,7 @@ end
 struct problem_specifics
     problem_name::String
     problem_type::String
-    paths::Array
-    problem_type::String
-    problem_name::String
+    paths::Function
     approx_type::String
     problem_dim::Int
     problem_nonlinearities::Dict
@@ -71,7 +69,7 @@ end =#
 function get_domain(b::Bool, μᵒ = nothing)
     @assert !(b === true && μᵒ === nothing) "Provide valid parameter value for the domain deformation, or set Ω to be non-parametric"  
     if b === false
-        model = DiscreteModelFromFile(problem_info.mesh_path())    
+        model = DiscreteModelFromFile(problem_info.paths.mesh_path)    
     else
         #model = generate_cartesian_model(reference_info, deformation, μᵒ) # incomplete: implement domain deformation
         model = generate_cartesian_model(μᵒ)
@@ -84,6 +82,7 @@ function get_α(b::Bool, μᴬ::Vector)
         α(x) = sum(μᴬ)
     else
         α(x) = (b === true) * μᴬ[3] + 1 / μᴬ[3] * exp(-((x[1] - μᴬ[1])^2 + (x[2] - μᴬ[2])^2) / μᴬ[3]) + (b === false) * sum(μᴬ)
+    end
 end
 
 function get_f(b::Bool, μᶠ = nothing)
@@ -155,28 +154,42 @@ end
 function generate_parameters(problem_nonlinearities::Dict, nₛ::Int, r::Dict)
 
     if problem_nonlinearities["Ω"] === true
-        μᵒ = generate_value(r["μᵒ"][1], r["μᵒ"][2], nₛ, joinpath(all_paths.FEM_snap_path(), "params.jld"), "μᵒ")
+        μᵒ = generate_value(r["μᵒ"][1], r["μᵒ"][2], nₛ, joinpath(all_paths.FEM_snap_path, "params.jld"), "μᵒ")
+        if !isfile(joinpath(all_paths.FEM_snap_path, "params.jld"))
+            save(joinpath(all_paths.FEM_snap_path, "params.jld"), "μᵒ", μᵒ)
+        end
     else
         μᵒ = generate_value()
     end
 
     μᴬ = hcat(rand(Uniform(r["μᴬ"][1], r["μᴬ"][2]), nₛ), rand(Uniform(r["μᴬ"][3], r["μᴬ"][4]), nₛ), rand(Uniform(r["μᴬ"][5], r["μᴬ"][6]), nₛ)) 
-    JLD_append(joinpath(all_paths.FEM_snap_path(), "params.jld"), "μᴬ", μᴬ) 
+    if !isfile(joinpath(all_paths.FEM_snap_path, "params.jld"))
+        save(joinpath(all_paths.FEM_snap_path, "params.jld"), "μᴬ", μᴬ)
+    end
    
     if problem_nonlinearities["f"] === true
-        μᶠ = generate_value(r["μᶠ"][1], r["μᶠ"][2], nₛ, joinpath(all_paths.FEM_snap_path(), "params.jld"), "μᶠ")
+        μᶠ = generate_value(r["μᶠ"][1], r["μᶠ"][2], nₛ, joinpath(all_paths.FEM_snap_path, "params.jld"), "μᶠ")
+        if !isfile(joinpath(all_paths.FEM_snap_path, "params.jld"))
+            save(joinpath(all_paths.FEM_snap_path, "params.jld"), "μᶠ", μᶠ)
+        end
     else
         μᶠ = generate_value()
     end
     
     if problem_nonlinearities["g"] === true
-        μᵍ = generate_value(r["μᵍ"][1], r["μᵍ"][2], nₛ, joinpath(all_paths.FEM_snap_path(), "params.jld"), "μᵍ")
+        μᵍ = generate_value(r["μᵍ"][1], r["μᵍ"][2], nₛ, joinpath(all_paths.FEM_snap_path, "params.jld"), "μᵍ")
+        if !isfile(joinpath(all_paths.FEM_snap_path, "params.jld"))
+            save(joinpath(all_paths.FEM_snap_path, "params.jld"), "μᵍ", μᵍ)
+        end
     else
         μᵍ = generate_value()
     end
 
     if problem_nonlinearities["h"] === true
-        μʰ = generate_value(r["μʰ"][1], r["μʰ"][2], nₛ, joinpath(all_paths.FEM_snap_path(), "params.jld"), "μʰ")
+        μʰ = generate_value(r["μʰ"][1], r["μʰ"][2], nₛ, joinpath(all_paths.FEM_snap_path, "params.jld"), "μʰ")
+        if !isfile(joinpath(all_paths.FEM_snap_path, "params.jld"))
+            save(joinpath(all_paths.FEM_snap_path, "params.jld"), "μʰ", μʰ)
+        end
     else
         μʰ = generate_value()
     end

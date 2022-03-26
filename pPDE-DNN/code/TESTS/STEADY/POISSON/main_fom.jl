@@ -2,7 +2,7 @@ include("config_fom.jl")
 include("../../../FEM/FOM.jl")
 
 all_paths = FEM_ROM_paths(root, problem_type, problem_name, mesh_name, problem_dim)
-problem_info = problem_specifics(problem_name, problem_type, all_paths, problem_type, problem_name, approx_type, problem_dim, problem_nonlinearities, number_coupled_blocks, order, dirichlet_tags, neumann_tags, solver)
+problem_info = problem_specifics(problem_name, problem_type, all_paths, approx_type, problem_dim, problem_nonlinearities, number_coupled_blocks, order, dirichlet_tags, neumann_tags, solver)
 
 ranges = Dict("μᵒ" => [0., 1.], "μᴬ" => [[0.4, 0.6] [0.4, 0.6] [0.05, 0.1]], "μᶠ" => [0., 1.1], "μᵍ" => [0., 1.], "μʰ" => [0., 1.])
 params = generate_parameters(problem_nonlinearities, nₛ, ranges)
