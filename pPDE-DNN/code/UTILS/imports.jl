@@ -6,7 +6,7 @@ using Test, InteractiveUtils, TimerOutputs, BenchmarkTools, Interact, Logging, P
 using Conda, PyCall
 using Flux, Flux.Data.MNIST
 using Gridap, Gridap.FESpaces, Gridap.ReferenceFEs, Gridap.Arrays, Gridap.Geometry, Gridap.Fields, Gridap.CellData
-
+import Gridap: ∇
 py"""
 import numpy as np
 """

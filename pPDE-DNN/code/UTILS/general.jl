@@ -294,19 +294,37 @@ end
 function get_vec_index(vec::Array, i::Int64)
     #=MODIFY
     =#
-
+   
     vec[i]
+    
+end
+
+
+function get_mat_index(mat::Matrix, i::Int64, dim::Int64)
+    #=MODIFY
+    =#
+
+    if dim === 1
+        mat[i, :]
+    elseif dim === 2
+        mat[:, i]
+    else
+        @error "Exceeded dimension limit of a 2D matrix"
+    end
     
 end
 
 
 get_index(vec::Core.Box, i::Int64) = get_no_index(vec, i)
 get_index(vec::Array, i::Int64) = get_vec_index(vec, i)
+get_index(mat::Matrix, i::Int64, dim::Int64) = get_mat_index(mat, i, dim)
 
 
-function generate_nothing()
+function generate_empty_vector(n::Int64)
     #=MODIFY
     =#
+
+    Vector{Float64}(undef, n)
 
 end
 
@@ -321,7 +339,7 @@ function generate_uniformly_distributed_values(a::Float64, b::Float64, n::Int64,
 
 end
 
-generate_value() = generate_nothing()
+generate_value(n::Int64) = generate_empty_vector(n)
 generate_value(a::Float64, b::Float64, n::Int64, path::String, val_name::String) = generate_uniformly_distributed_values(a, b, n, path, val_name)
 
 
