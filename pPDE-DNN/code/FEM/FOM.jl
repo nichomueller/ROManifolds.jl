@@ -1,5 +1,3 @@
-
-
 struct FE_specifics
     Qₕ
     V₀
@@ -17,7 +15,7 @@ function assemble_stiffness(FE_space, parametric_info, problem_info)
     #=MODIFY
     =#
 
-    if problem_info.problem_nonlinearities["A"] === false
+    if problem_info.problem_nonlinearities["A"] === false 
         A = assemble_matrix(∫(∇(FE_space.ϕᵥ) ⋅ ∇(FE_space.ϕᵤ)) * FE_space.dΩ, FE_space.V, FE_space.V₀)
         save_variable(A, "A", "csv", joinpath(problem_info.paths.FEM_structures_path, "A.csv"))
     else
@@ -29,11 +27,36 @@ function assemble_stiffness(FE_space, parametric_info, problem_info)
 end
 
 
-function assemble_forcing(FE_space, parametric_info)
+function assemble_forcing(FE_space, parametric_info, problem_info)
     #=MODIFY
     =#
 
-    assemble_vector(∫( FE_space.ϕᵥ * parametric_info.f ) * FE_space.dΩ + ∫( FE_space.ϕᵥ * parametric_info.h ) * FE_space.dΓ, FE_space.V₀) 
+    F = assemble_vector(∫( FE_space.ϕᵥ * parametric_info.f ) * FE_space.dΩ + ∫( FE_space.ϕᵥ * parametric_info.h ) * FE_space.dΓ, FE_space.V₀) 
+    if problem_info.problem_nonlinearities["f"] === false && problem_info.problem_nonlinearities["h"] === false 
+        save_variable(F, "F", "csv", joinpath(problem_info.paths.FEM_structures_path, "F.csv"))
+    end
+
+    F
+
+end
+
+
+function assemble_H1_norm_matrix(FE_space, parametric_info, problem_info)
+    #=MODIFY
+    =#
+
+    if problem_info.problem_nonlinearities["A"] === false 
+        Xᵘ = assemble_matrix(∫(∇(FE_space.ϕᵥ) ⋅ (parametric_info.α * ∇(FE_space.ϕᵤ))) * FE_space.dΩ, FE_space.V, FE_space.V₀) + \
+        assemble_matrix(∫(FE_space.ϕᵥ * (parametric_info.α * FE_space.ϕᵤ)) * FE_space.dΩ, FE_space.V, FE_space.V₀)
+        
+    else # in this case, we do not consider the variable viscosity in the definition of the H1 norm matrix
+        Xᵘ = assemble_matrix(∫(∇(FE_space.ϕᵥ) ⋅ ∇(FE_space.ϕᵤ)) * FE_space.dΩ, FE_space.V, FE_space.V₀) + \
+        assemble_matrix(∫(FE_space.ϕᵥ * FE_space.ϕᵤ) * FE_space.dΩ, FE_space.V, FE_space.V₀)
+
+    end
+
+    save_variable(Xᵘ, "Xᵘ", "csv", joinpath(problem_info.paths.FEM_structures_path, "Xᵘ.csv"))
+    Xᵘ
 
 end
 
@@ -109,10 +132,10 @@ function solve_poisson_lifting(problem_info, parametric_info, FE_space, LHS, RHS
     assemble_vector!(Rₕ, assembler, rₕ)
    
     if problem_info.lin_solver === "lu"
-        lu_factors = lu(LHS[2])
-        uₕ = lu_factors.U \ (lu_factors.L \ (RHS.F .- Rₕ))
+        lu_factors = lu(LHS)
+        uₕ = lu_factors.U \ (lu_factors.L \ (RHS .- Rₕ))
     else
-        uₕ = LHS[2] \ (RHS.F .- Rₕ)
+        uₕ = LHS \ (RHS .- Rₕ)
     end
 
     uₕ

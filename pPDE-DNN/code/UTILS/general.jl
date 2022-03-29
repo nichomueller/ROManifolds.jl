@@ -1,4 +1,3 @@
-Pkg.activate(".")
 include("imports.jl")
 
 function create_dir(path)

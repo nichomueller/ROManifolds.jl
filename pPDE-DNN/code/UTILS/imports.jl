@@ -1,6 +1,6 @@
 using Pkg
 using DataFrames, Random, DataStructures, FillArrays, Tables, LinearAlgebra, Statistics, Distributions, Parameters, Classes, BlockArrays 
-using SuiteSparse, SparseArrays, Serialization, ThreadedSparseCSR, SparseMatricesCSR, LazyAlgebra, LazyAlgebra.SparseMethods
+using SuiteSparse, SparseArrays, Serialization, ThreadedSparseCSR, SparseMatricesCSR, LazyAlgebra, LazyAlgebra.SparseMethods, Arpack
 using MAT, CSV, JLD, DelimitedFiles, Arrow, CodecLz4
 using Test, InteractiveUtils, TimerOutputs, BenchmarkTools, Interact, Logging, Plots
 using Conda, PyCall

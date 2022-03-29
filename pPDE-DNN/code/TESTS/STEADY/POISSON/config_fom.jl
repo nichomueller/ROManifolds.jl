@@ -4,20 +4,19 @@ const problem_name = "POISSON"   # POISSON / STOKES / NAVIER-STOKES / BURGERS
 const problem_type = "STEADY"  # STEADY / UNSTEADY
 const approx_type = "ROM"   # ROM / DL
 const problem_dim = 3   
-const problem_nonlinearities = Dict("Ω" => false, "A" => false, "f" => false, "g" => false, "h" => false)  # true / false
+const problem_nonlinearities = Dict("Ω" => false, "A" => true, "f" => false, "g" => false, "h" => false)  # true / false
 const number_coupled_blocks = 1
 const mesh_name = "model.json"
-const nₛ = 100
+const nₛ = 10
 const order = 1
 const dirichlet_tags = ["sides"]
 const neumann_tags = ["circle", "triangle", "square"]
 const solver = "lu"
 
-@assert !(problem_name === "BURGERS" && problem_type === "STEADY")
-
 const root = "/home/user1/git_repos/Mabla.jl/pPDE-DNN/code"
 
-function FEM_ROM_paths(root, problem_type, problem_name, mesh_name, problem_dim, problem_nonlinearities)
+function FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, problem_nonlinearities)
+    @assert isdir(root) "$root is an invalid root directory"
     nonlins = ""
     for (key, value) in problem_nonlinearities
         if value === true
@@ -25,8 +24,12 @@ function FEM_ROM_paths(root, problem_type, problem_name, mesh_name, problem_dim,
         end
     end
     mesh_path = joinpath(root, joinpath("FEM", joinpath("models", mesh_name)))
+    @assert isfile(mesh_path) "$mesh_path is an invalid mesh path"
     root_test = joinpath(root, joinpath("TESTS", joinpath(problem_type, joinpath(problem_name, joinpath(string(problem_dim) * "D" * nonlins)))))
-    FEM_path = joinpath(root_test, joinpath(mesh_name, "FEM_data"))
+    create_dir(root_test)
+    cur_mesh_path = joinpath(root_test, mesh_name)
+    create_dir(cur_mesh_path)
+    FEM_path = joinpath(cur_mesh_path, "FEM_data")
     create_dir(FEM_path)
     FEM_snap_path = joinpath(FEM_path, "snapshots")
     create_dir(FEM_snap_path)
@@ -34,9 +37,9 @@ function FEM_ROM_paths(root, problem_type, problem_name, mesh_name, problem_dim,
     create_dir(FEM_structures_path)
     FOM_files_extension = "txt" 
     FOM_files_delimiter = ","
-    (out) -> (mesh_path; FEM_snap_path; FEM_structures_path; FOM_files_extension; FOM_files_delimiter)
+    _ -> (mesh_path; cur_mesh_path; FEM_snap_path; FEM_structures_path; FOM_files_extension; FOM_files_delimiter)
 end 
-(out) -> (mesh_path; FEM_snap_path; FEM_structures_path; FOM_files_extension; FOM_files_delimiter)
+(out) -> (mesh_path; cur_mesh_path; FEM_snap_path; FEM_structures_path; FOM_files_extension; FOM_files_delimiter)
 
 struct problem_specifics
     problem_name::String
@@ -50,6 +53,7 @@ struct problem_specifics
     dirichlet_tags::Array
     neumann_tags::Array
     solver::String
+    nₛ::Int
     #time_marching_scheme::String
 end
 
