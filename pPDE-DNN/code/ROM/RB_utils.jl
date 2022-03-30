@@ -186,7 +186,7 @@ function MDEIM_online(mat_nonaffine, MDEIM_mat, MDEIM_idx, save_path = nothing, 
 end
 
 
-function import_DEIM_MDEIM_structures(DEIM_MDEIM_path)
+#= function import_DEIM_MDEIM_structures(DEIM_MDEIM_path)
     #=MODIFY
     =#
 
@@ -206,4 +206,4 @@ function import_DEIM_MDEIM_structures(DEIM_MDEIM_path)
         @error "Error: cannot read the (M)DEIM structures, must run the (M)DEIM offline phase!"
     end
     
-end
+end =#

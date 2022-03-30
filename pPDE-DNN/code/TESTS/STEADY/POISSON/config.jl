@@ -1,7 +1,7 @@
 include("config_fom.jl")
 
 const RB_method = "S-GRB"
-const ϵˢ_POD = 1e-5
+const ϵˢ = 1e-5
 const training_percentage = 0.8
 const considered_snaps = convert(Int64, nₛ * training_percentage)
 #const ϵᵗ_POD::Float64
