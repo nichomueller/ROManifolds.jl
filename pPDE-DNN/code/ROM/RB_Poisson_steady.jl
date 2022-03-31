@@ -1,5 +1,6 @@
-mutable struct RB_variables_struct
-    n_vars 
+include("../UTILS/general.jl")
+
+mutable struct Poisson_RB_specifics
     Sᵘ
     Nᵤˢ
     Φₛᵘ
@@ -16,8 +17,6 @@ mutable struct RB_variables_struct
     Fₙ_idx
     RHSₙ
     Xᵘ
-    θᴬ
-    θᶠ
     offline_time
 end 
 
@@ -25,8 +24,6 @@ end
 function initialize_RB_variables_struct()
     #=MODIFY
     =#
-
-    n_vars = 1
 
     Sᵘ = Array{Float64}(undef, 0, 0)
     Nᵤˢ = 0
@@ -47,12 +44,9 @@ function initialize_RB_variables_struct()
     RHSₙ = Matrix{Float64}[]
     Xᵘ = sparse([],[],[])
     
-    θᴬ = Float64[]
-    θᶠ = Float64[]
-
     offline_time = 0.0
 
-    return RB_variables_struct(n_vars, Sᵘ, Nᵤˢ, Φₛᵘ, nₛᵘ, ũ, uₙ, û, Aₙ, Aₙ_affine, Aₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, θᴬ, θᶠ, offline_time)
+    return RB_variables_struct(Sᵘ, Nᵤˢ, Φₛᵘ, nₛᵘ, ũ, uₙ, û, Aₙ, Aₙ_affine, Aₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, offline_time)
 
 end
 #= function RB_variables_function(Nᵤˢ) 
@@ -90,10 +84,7 @@ function get_snapshot_matrix(ROM_info, RB_variables)
 
     var = "uₕ"
     try
-        Sᵘ = Matrix(CSV.read(ROM_info.FEM_snap_path * var * ".csv", DataFrame))
-        if ROM_info.nₛ < size(Sᵘ)[2]
-            Sᵘ = snaps_matrix[:, ROM_info.nₛ]
-        end
+        Sᵘ = Matrix(CSV.read(ROM_info.FEM_snap_path * var * ".csv", DataFrame))[:, 1:ROM_info.nₛ]
     catch e
         println("Error: $e. Impossible to load the snapshots matrix")
     end
@@ -101,7 +92,7 @@ function get_snapshot_matrix(ROM_info, RB_variables)
     @info "Dimension of snapshot matrix: $(size(Sᵘ))"
     
     RB_variables.Sᵘ = Sᵘ
-    RB_variables.Nᵤˢ = Nᵤˢ
+    RB_variables.Nᵤˢ = size(Sᵘ)[1]
 
 end
 
@@ -160,7 +151,7 @@ function PODs_space(ROM_info, RB_variables)
     @info "Performing the spatial POD for field u, using a tolerance of $ROM_info.ϵˢ"
 
     get_norm_matrix(ROM_info, RB_variables)
-    Φₛᵘ = POD(Sᵘ, ROM_info.ϵˢ, Xᵘ)
+    Φₛᵘ = POD(RB_variables.Sᵘ, ROM_info.ϵˢ, RB_variables.Xᵘ)
     nₛᵘ = size(Φₛᵘ)[2]
 
     return (Φₛᵘ, nₛᵘ)
@@ -195,7 +186,8 @@ function import_reduced_basis(ROM_info, RB_variables)
     @info "Importing the reduced basis"
 
     Φₛᵘ = load_variable("Φₛᵘ", "csv", joinpath(ROM_info.paths.basis_path, "Φₛᵘ"))   
-    (RB_variables.Φₛᵘ, RB_variables.nₛᵘ) = (Φₛᵘ, size(Φₛᵘ)[1])
+    RB_variables.Φₛᵘ = Φₛᵘ
+    (RB_variables.Nₛᵘ, RB_variables.nₛᵘ) = size(Φₛᵘ)
 
 end
 
@@ -410,6 +402,10 @@ function testing_phase(ROM_info, RB_variables, param_nbs)
     mean_H1_err = 0.0
     mean_online_time = 0.0
     mean_reconstruction_time = 0.0
+    set_to_zero_RB_times(RB_variables)
+
+    ũ_param = zeros(RB_variables.Nᵤˢ)
+    uₙ_param = zeros(RB_variables.nᵤˢ)
 
     if ROM_info.problem_nonlinearities["A"] === false
         params = load_variable("α", "jld", joinpath(ROM_info.paths.FEM_structures_path, "params")) 
@@ -417,6 +413,8 @@ function testing_phase(ROM_info, RB_variables, param_nbs)
 
     for param_nb in param_nbs
         @info "Considering parameter number: $param_nbs"
+
+        uₕ_test = Matrix(CSV.read(ROM_info.FEM_snap_path * var * ".csv", DataFrame))[:, param_nb]
 
         mean_online_time += @elapsed begin
             if ROM_info.problem_nonlinearities["A"] === false
@@ -430,135 +428,45 @@ function testing_phase(ROM_info, RB_variables, param_nbs)
             reconstruct_FEM_soluiton(RB_variables)
         end
 
-        mean_H1_err += compute_errors(ROM_info, RB_variables) / length(param_nbs)
+        pointwise_u_err = uₕ_test - RB_variables.ũ
+        mean_H1_err += compute_errors(RB_variables, pointwise_u_err) / length(param_nbs)
 
-        
+        ũ_param = hcat(ũ_param, RB_variables.ũ)
+        uₙ_param = hcat(uₙ_param, RB_variables.uₙ)
 
     end
 
     mean_online_time /= length(param_nbs)
     mean_reconstruction_time /= length(param_nbs)
 
-end
+    string_param_nbs = "params"
+    for param_nb in param_nbs
+        string_param_nbs *= "_" * string(param_nb)
+    end
 
+    if ROM_info.save_results
 
-function compute_errors(ROM_info, RB_variables)
-    #=MODIFY
-    =#
-
-
-
-end
-
-
-
-
-#= function get_parameters(extension, ϵ = 1e-5)
-    #=MODIFY
-    =#
-
-    @unpack (A_is_nonlin, f_is_nonlin) = problem_nonlinearities
-    
-    if A_is_nonlin == false 
-        if isdir(joinpath(FEM_structures_path), "param_A" * extension)
-            θᴬ = load_variable("param_A", extension, joinpath(FEM_structures_path), "param_A" * extension)
+        if !ROM_info.import_offline_structures
+            save_variable(RB_variables.offline_time, "offline_time", "csv", ROM_info.paths.results_path)
         end
-    end
-    if f_is_nonlin == false 
-        if isdir(joinpath(FEM_structures_path), "param_f" * extension)
-            θᶠ = load_variable("param_f", extension, joinpath(FEM_structures_path), "param_f" * extension)
-        end
-    end
-    
-    if A_is_nonlin == true 
-        
-        n_A_snaps = minimum(10, n_snaps)
 
-        @info "Importing the parametric stiffness matrix, number of parameters considered: $n_A_snaps"
-        path = FEM_snap_path
-        variable = FOM_specifics["unknowns"][1]
-        extension = FOM_files_extension
-        delimiter = FOM_files_delimiter
-        A_snap = nothing
-
-        for i_A = range(1, n_A_snaps)
-                    
-            @info "Reading parametric stiffness matrix number $i_A"
-            path_Ai = joinpath(path, joinpath(variable, joinpath("param", string(i_A))))
-            cur_A_snap = load_variable(variable, extension, path_Ai, false, delimiter)
-            
-            if A_snap === nothing
-                A_snap = cur_A_snap[:]
-            else
-                A_snap = hcat(A_snap, cur_A_snap[:])
-            end
-       
-        end
-        @info "Dimension of reshaped parametric stiffness matrix: $(size(A_snap))"
-        MDEIM(mat_nonaffine, A_snap, ϵ, nothing, true)
+        path = joinpath(ROM_info.paths.results_path, string_param_nbs)
+        save_variable(ũ_param, "ũ", "csv", path)
+        save_variable(uₙ_param, "uₙ", "csv", path)
+        save_variable(mean_H1_err, "mean_H1_err", "csv", path)
+        save_variable(mean_online_time, "mean_online_time", "csv", path)
+        save_variable(mean_reconstruction_time, "mean_reconstruction_time", "csv", path)
 
     end
-
-
-
-    if f_is_nonlin == true 
-        push!(nonlin_set, "f")
-    end
-    get_parameters_nonlin(nonlin_set)
 
 end
 
 
-function get_parameters_nonlin(nonlin_set)
+function compute_errors(RB_variables, pointwise_u_err)
     #=MODIFY
     =#
 
-    @unpack (A_is_nonlin, f_is_nonlin) = problem_nonlinearities
-
-    if A_is_nonlin === true
-
-        n_A_snaps = minimum(10, n_snaps)
-
-        for i = range(1, n_A_snaps)
-            @info "Importing the snapshot matrix, number of snapshots considered: $n_snap"
-
-            path = FEM_snap_path
-            variable = FOM_specifics["unknowns"][1]
-            extension = FOM_files_extension
-            delimiter = FOM_files_delimiter
-            snap = nothing
-
-            #=if n_snaps === nothing
-                total_snaps = parse(Int64, String(split(get_full_subdirectories(path), "param")[end]))
-                n_snaps = convert(Int64, floor(ROM_specifics["train_percentage"] .* total_snaps))
-            end=#
-
-            for i_ns = range(1, n_snaps)
-                @info "Reading snapshot number $i_ns"
-                path_i = joinpath(path, joinpath(variable, joinpath("param", string(i_ns))))
-                cur_snap = load_variable(variable, extension, path_i, false, delimiter)
-                
-                if snap === nothingalse
-                    snap = cur_snap
-                else
-                    snap = hcat(snap, cur_snap)
-                end
-
-            end
-
-            @info "Dimension of snapshot matrix: $(size(snap))"
-            snaps_matrix = snap
-            MDEIM(mat_nonaffine, S, ϵ, norm_matrix = nothing, save_to_file = false)
-
-    return load_variable("basis_space", "txt", joinpath(basis_path, "basis_space")) 
+    mynorm(pointwise_u_err, RB_variables.Xᵘ)
 
 end
 
-
-function get_affine_components()
-    #=MODIFY
-    =#
-
-    return load_variable("basis_space", "csv", joinpath(basis_path, "basis_space"))   
-
-end =#

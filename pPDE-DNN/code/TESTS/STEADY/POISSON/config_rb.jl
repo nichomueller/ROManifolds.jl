@@ -1,4 +1,4 @@
-include("config_fom.jl")
+include("config_fem.jl")
 
 const RB_method = "S-GRB"
 const ϵˢ = 1e-5

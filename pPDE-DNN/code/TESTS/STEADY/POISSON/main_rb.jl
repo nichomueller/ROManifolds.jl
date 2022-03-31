@@ -1,5 +1,5 @@
 Pkg.activate(".")
-include("config.jl")
+include("config_rb.jl")
 include("../../../ROM/RB_utils.jl")
 
 paths = FEM_ROM_paths(root, problem_type, problem_name, mesh_name, problem_dim, RB_method)

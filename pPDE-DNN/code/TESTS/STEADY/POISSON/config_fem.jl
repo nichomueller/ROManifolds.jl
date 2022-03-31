@@ -13,33 +13,42 @@ const dirichlet_tags = ["sides"]
 const neumann_tags = ["circle", "triangle", "square"]
 const solver = "lu"
 
-const root = "/home/user1/git_repos/Mabla.jl/pPDE-DNN/code"
+const root = "/home/user1/git_repos/Mabla.jl/pPDE-DNN/"
 
 function FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, problem_nonlinearities)
+
     @assert isdir(root) "$root is an invalid root directory"
+
     nonlins = ""
     for (key, value) in problem_nonlinearities
         if value === true
             nonlins *= "_" * key
         end
     end
-    mesh_path = joinpath(root, joinpath("FEM", joinpath("models", mesh_name)))
+    
+    root_tests = joinpath(root, "TESTS") 
+    create_dir(root_tests)
+    mesh_path = joinpath(root_tests, joinpath("MESHES", mesh_name))
     @assert isfile(mesh_path) "$mesh_path is an invalid mesh path"
-    root_test = joinpath(root, joinpath("TESTS", joinpath(problem_type, joinpath(problem_name, joinpath(string(problem_dim) * "D" * nonlins)))))
-    create_dir(root_test)
-    cur_mesh_path = joinpath(root_test, mesh_name)
-    create_dir(cur_mesh_path)
-    FEM_path = joinpath(cur_mesh_path, "FEM_data")
+    type_path = joinpath(root_tests, problem_type)
+    create_dir(type_path)
+    problem_path = joinpath(type_path, problem_name)
+    create_dir(problem_path)
+    problem_and_info_path = joinpath(problem_path, string(problem_dim) * "D" * nonlins)
+    create_dir(problem_and_info_path)
+    current_test = joinpath(problem_and_info_path, mesh_name)
+    create_dir(current_test)
+    FEM_path = joinpath(current_test, "FEM_data")
     create_dir(FEM_path)
     FEM_snap_path = joinpath(FEM_path, "snapshots")
     create_dir(FEM_snap_path)
     FEM_structures_path = joinpath(FEM_path, "FEM_structures")
     create_dir(FEM_structures_path)
-    FOM_files_extension = "txt" 
-    FOM_files_delimiter = ","
-    _ -> (mesh_path; cur_mesh_path; FEM_snap_path; FEM_structures_path; FOM_files_extension; FOM_files_delimiter)
+
+    _ -> (mesh_path; cur_mesh_path; FEM_snap_path; FEM_structures_path)
+
 end 
-(out) -> (mesh_path; cur_mesh_path; FEM_snap_path; FEM_structures_path; FOM_files_extension; FOM_files_delimiter)
+(out) -> (mesh_path; cur_mesh_path; FEM_snap_path; FEM_structures_path)
 
 struct problem_specifics
     problem_name::String
