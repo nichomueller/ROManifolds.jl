@@ -1,4 +1,4 @@
-function assemble_reduced_affine_components(ROM_info, RB_variables, operators = nothing)
+function assemble_reduced_affine_components(ROM_info, RB_variables::RB_problem, operators = nothing)
     #=MODIFY
     =#
 
@@ -83,7 +83,7 @@ function assemble_reduced_affine_components(ROM_info, RB_variables, operators = 
 end
 
 
-function build_RB_approximation(ROM_info, RB_variables)
+function build_RB_approximation(ROM_info, RB_variables::RB_problem)
     #=MODIFY
     =#
 

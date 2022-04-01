@@ -1,7 +1,7 @@
 include("RB_Poisson_steady.jl")
 
 
-function get_snapshot_matrix(ROM_info, RB_variables)
+function get_snapshot_matrix(ROM_info, RB_variables::RB_problem)
     #=MODIFY
     =#
 
@@ -22,7 +22,7 @@ function get_snapshot_matrix(ROM_info, RB_variables)
 end
 
 
-function PODs_time(ROM_info, RB_variables)
+function PODs_time(ROM_info, RB_variables::RB_problem)
     #=MODIFY
     =#
 

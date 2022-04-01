@@ -1,54 +1,6 @@
 include("../UTILS/general.jl")
 
-mutable struct Poisson_RB_specifics
-    Sᵘ
-    Nᵤˢ
-    Φₛᵘ
-    nₛᵘ
-    ũ
-    uₙ
-    û
-    Aₙ
-    Aₙ_affine
-    Aₙ_idx
-    LHSₙ
-    Fₙ
-    Fₙ_affine
-    Fₙ_idx
-    RHSₙ
-    Xᵘ
-    offline_time
-end 
 
-
-function initialize_RB_variables_struct()
-    #=MODIFY
-    =#
-
-    Sᵘ = Array{Float64}(undef, 0, 0)
-    Nᵤˢ = 0
-    Φₛᵘ = Array{Float64}(undef, 0, 0)
-    nₛᵘ = 0   
-    
-    ũ = Float64[]
-    uₙ = Float64[]
-    û = Float64[]
-    
-    Aₙ = Array{Float64}(undef, 0, 0)
-    Aₙ_affine = Array{Float64}(undef, 0, 0)
-    Aₙ_idx = Float64[]
-    LHSₙ = Matrix{Float64}[]
-    Fₙ = Float64[]
-    Fₙ_affine = Float64[]
-    Fₙ_idx = Float64[]
-    RHSₙ = Matrix{Float64}[]
-    Xᵘ = sparse([],[],[])
-    
-    offline_time = 0.0
-
-    return RB_variables_struct(Sᵘ, Nᵤˢ, Φₛᵘ, nₛᵘ, ũ, uₙ, û, Aₙ, Aₙ_affine, Aₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, offline_time)
-
-end
 #= function RB_variables_function(Nᵤˢ) 
     #=MODIFY
     =#
@@ -76,7 +28,7 @@ end
 _ -> (Nᵤˢ, nₛᵘ, A, A_affine, Xᵘ, F, F_affine, ũ, Aₙ, Aₙ_affine, fₙ, fₙ_affine, uₙ, basis_space, θᴬ, θᶠ) =#
 
 
-function get_snapshot_matrix(ROM_info, RB_variables)
+function get_snapshot_matrix(ROM_info, RB_variables::RB_problem)
     #=MODIFY
     =#
 
@@ -97,7 +49,7 @@ function get_snapshot_matrix(ROM_info, RB_variables)
 end
 
 
-function get_norm_matrix(ROM_info, RB_variables)
+function get_norm_matrix(ROM_info, RB_variables::RB_problem)
     #=MODIFY
     =#
 
@@ -118,7 +70,7 @@ function get_norm_matrix(ROM_info, RB_variables)
 end
 
 
-function check_norm_matrix(RB_variables)
+function check_norm_matrix(RB_variables::RB_problem)
     #=MODIFY
     =#
 
@@ -134,7 +86,7 @@ function preprocess()
 end
 
 
-function set_to_zero_RB_times(RB_variables)
+function set_to_zero_RB_times(RB_variables::RB_problem)
     #=MODIFY
     =#
 
@@ -144,7 +96,7 @@ function set_to_zero_RB_times(RB_variables)
 end
 
 
-function PODs_space(ROM_info, RB_variables)
+function PODs_space(ROM_info, RB_variables::RB_problem)
     #=MODIFY
     =#
 
@@ -159,7 +111,7 @@ function PODs_space(ROM_info, RB_variables)
 end
 
 
-function build_reduced_basis(ROM_info, RB_variables)
+function build_reduced_basis(ROM_info, RB_variables::RB_problem)
     #=MODIFY
     =#
 
@@ -179,7 +131,7 @@ function build_reduced_basis(ROM_info, RB_variables)
 end
 
 
-function import_reduced_basis(ROM_info, RB_variables)
+function import_reduced_basis(ROM_info, RB_variables::RB_problem)
     #=MODIFY
     =#
 
@@ -192,7 +144,7 @@ function import_reduced_basis(ROM_info, RB_variables)
 end
 
 
-function check_reduced_affine_components(ROM_info, RB_variables)
+function check_reduced_affine_components(ROM_info, RB_variables::RB_problem)
     #=MODIFY
     =#
 
@@ -295,7 +247,7 @@ end =#
 end =#
 
 
-function get_generalized_coordinates(ROM_info, RB_variables, snaps = nothing)
+function get_generalized_coordinates(ROM_info, RB_variables::RB_problem, snaps = nothing)
     #=MODIFY
     =#
 
@@ -324,7 +276,7 @@ function get_generalized_coordinates(ROM_info, RB_variables, snaps = nothing)
 end
 
 
-function initialize_RB_system(RB_variables)
+function initialize_RB_system(RB_variables::RB_problem)
     #=MODIFY
     =#
 
@@ -334,7 +286,7 @@ function initialize_RB_system(RB_variables)
 end
 
 
-function get_RB_system(ROM_info, RB_variables, param, FE_space = nothing, parametric_info = nothing, problem_info = nothing)
+function get_RB_system(ROM_info, RB_variables::RB_problem, param, FE_space = nothing, parametric_info = nothing, problem_info = nothing)
     #=MODIFY
     =#
 
@@ -359,7 +311,7 @@ function get_RB_system(ROM_info, RB_variables, param, FE_space = nothing, parame
 end
 
 
-function solve_RB_system(ROM_info, RB_variables; param = nothing, FE_space = nothing, parametric_info = nothing, problem_info = nothing)
+function solve_RB_system(ROM_info, RB_variables::RB_problem; param = nothing, FE_space = nothing, parametric_info = nothing, problem_info = nothing)
     #=MODIFY
     =#
 
@@ -384,7 +336,7 @@ function solve_RB_system(ROM_info, RB_variables; param = nothing, FE_space = not
 end
 
 
-function reconstruct_FEM_soluiton(RB_variables)
+function reconstruct_FEM_soluiton(RB_variables::RB_problem)
     #=MODIFY
     =#
 
@@ -395,7 +347,7 @@ function reconstruct_FEM_soluiton(RB_variables)
 end
 
 
-function testing_phase(ROM_info, RB_variables, param_nbs)
+function testing_phase(ROM_info, RB_variables::RB_problem, param_nbs)
     #=MODIFY
     =#
 
@@ -462,7 +414,7 @@ function testing_phase(ROM_info, RB_variables, param_nbs)
 end
 
 
-function compute_errors(RB_variables, pointwise_u_err)
+function compute_errors(RB_variables::RB_problem, pointwise_u_err)
     #=MODIFY
     =#
 

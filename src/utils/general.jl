@@ -9,7 +9,7 @@ function create_dir(path)
     if !isdir(path)
         mkdir(path)
     end
-    
+
 end
 
 function get_full_subdirectories(rootdir)
@@ -25,7 +25,7 @@ end
 
 function save_variable(var, var_name, extension = "csv", path = nothing)
     #=Utility method, which allows to save arrays/matrices in .jld files. If the path to the text file does not exist,
-    it displays an error message. 
+    it displays an error message.
     :param var: variable to be saved
     :type var: AbstractMatrix, AbstactVector
     :param variable_name: name with which we save the variable
@@ -37,18 +37,18 @@ function save_variable(var, var_name, extension = "csv", path = nothing)
     if path === nothing
         path = pwd() * "/" * var_name * "." * extension
     end
-    
+
     try
         if extension == "jld"
             save(path, var_name, var)
-        else extension == "jld"            
+        else extension == "jld"
             if issparse(var)
                 i, j, v = findnz(var)
                 df = DataFrame([:i => i, :j => j, :v => v])
                 CSV.write(path, df)
             else
                 CSV.write(path, Tables.table(var))
-            end 
+            end
         end
     catch e
         println("Error: $e. Impossible to save the desired variable")
@@ -87,7 +87,7 @@ function load_variable(var_name, extension = "csv", path = nothing, sparse = fal
 
     try
         if extension == "jld"
-            var = load(path, var_name)  
+            var = load(path, var_name)
 
         elseif extension == "csv"
             var = Matrix(CSV.read(path, DataFrame))
@@ -126,7 +126,7 @@ function load_variable(var_name, extension = "csv", path = nothing, sparse = fal
         println("Error: $e. Impossible to load the desired variable")
     end
 
-    
+
 
 end
 
@@ -147,7 +147,7 @@ function mydot(vec1, vec2, norm_matrix = nothing)
     if norm_matrix === nothing
         norm_matrix = float(I(size(vec1)[1]))
     end
-    return sum(sum(vec1' .* norm_matrix .* vec2)) 
+    return sum(sum(vec1' .* norm_matrix .* vec2))
 end
 
 
@@ -170,7 +170,7 @@ end
 
 
 function convert_to_sparse(var, format = "csc")
-    #= It computes the sparse representation of the input variable 'var', either a matrix or a vector; 
+    #= It computes the sparse representation of the input variable 'var', either a matrix or a vector;
     the format of the sparse variable is given by 'format'.
     :param mat: matrix, vector
     :type mat: AbstractMatrix, AbstractVector
@@ -191,7 +191,7 @@ function convert_to_sparse(var, format = "csc")
         elseif format == "coo"
             idx_cartesian = findall(!iszero, var)
             idx = hcat(getindex.(idx_cartesian, 1), getindex.(idx_cartesian,2))
-            var_nnz = filter(el -> el != 0, var)  
+            var_nnz = filter(el -> el != 0, var)
             sparse_var = CompressedSparseOperator{:COO}(var_nnz, idx[:,1], idx[:,2], max(idx[:,1]...), max(idx[:,2]...))
         end
     return sparse_var
@@ -213,7 +213,7 @@ function sparse_matrix_matrix_mul(mat1, mat2, format = "csc")
     :rtype: numpy.ndarray
     =#
 
-    if format == "csc" 
+    if format == "csc"
         M = mat1 * mat2
     elseif format in ("csr", "coo")
         info_mat1 = findnz(mat1)
@@ -240,7 +240,7 @@ function sparse_matrix_vector_mul(mat, vec)
     :rtype: numpy.ndarray
     =#
 
-    if format == "csc" 
+    if format == "csc"
         V = mat * vec
     elseif format in ("csr", "coo")
         info_mat = findnz(mat)
@@ -267,7 +267,7 @@ function sparse_to_full_matrix(mat, format = "csc")
     :rtype: numpy.ndarray
     =#
 
-    if format == "csc" 
+    if format == "csc"
         full_mat = Matrix(mat)
     elseif format in ("csr", "coo")
         info_mat= findnz(mat)
@@ -281,21 +281,21 @@ function sparse_to_full_matrix(mat, format = "csc")
 
 end
 
-
+#=
 function get_no_index(vec::Core.Box, i::Int64)
     #=MODIFY
     =#
 
-    
+
 end
 
 
 function get_vec_index(vec::Array, i::Int64)
     #=MODIFY
     =#
-   
+
     vec[i]
-    
+
 end
 
 
@@ -310,15 +310,21 @@ function get_mat_index(mat::Matrix, i::Int64, dim::Int64)
     else
         @error "Exceeded dimension limit of a 2D matrix"
     end
-    
+
 end
 
 
 get_index(vec::Core.Box, i::Int64) = get_no_index(vec, i)
 get_index(vec::Array, i::Int64) = get_vec_index(vec, i)
-get_index(mat::Matrix, i::Int64, dim::Int64) = get_mat_index(mat, i, dim)
+get_index(mat::Matrix, i::Int64, dim::Int64) = get_mat_index(mat, i, dim) =#
 
 
+function generate_parameter(a::T, b::T) where T <: Array{Float64}
+
+  return [rand(Uniform(a[i], b[i])) for i = 1:length(a)]
+
+end
+#=
 function generate_empty_vector(n::Int64)
     #=MODIFY
     =#
@@ -326,6 +332,7 @@ function generate_empty_vector(n::Int64)
     Vector{Float64}(undef, n)
 
 end
+
 
 function generate_uniformly_distributed_values(a::Float64, b::Float64, n::Int64, path::String, val_name::String)
     #=MODIFY
@@ -338,8 +345,8 @@ function generate_uniformly_distributed_values(a::Float64, b::Float64, n::Int64,
 
 end
 
-generate_value(n::Int64) = generate_empty_vector(n)
-generate_value(a::Float64, b::Float64, n::Int64, path::String, val_name::String) = generate_uniformly_distributed_values(a, b, n, path, val_name)
+generate_values(n::Int64) = generate_empty_vector(n)
+generate_values(a::Float64, b::Float64, n::Int64, path::String, val_name::String) = generate_save_uniformly_distributed_values(a, b, n, path, val_name) =#
 
 
 
