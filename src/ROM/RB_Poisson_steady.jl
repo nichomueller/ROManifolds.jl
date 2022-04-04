@@ -1,7 +1,6 @@
-include("../UTILS/general.jl")
+include("../utils/general.jl")
 
-
-#= function RB_variables_function(Nᵤˢ) 
+#= function RB_variables_function(Nᵤˢ)
     #=MODIFY
     =#
 
@@ -40,9 +39,9 @@ function get_snapshot_matrix(ROM_info, RB_variables::RB_problem)
     catch e
         println("Error: $e. Impossible to load the snapshots matrix")
     end
-    
+
     @info "Dimension of snapshot matrix: $(size(Sᵘ))"
-    
+
     RB_variables.Sᵘ = Sᵘ
     RB_variables.Nᵤˢ = size(Sᵘ)[1]
 
@@ -55,14 +54,14 @@ function get_norm_matrix(ROM_info, RB_variables::RB_problem)
 
     @info "Importing the norm matrix"
 
-    if check_norm_matrix(RB_variables) 
-            
-        try 
-            Xᵘ = Matrix(CSV.read(ROM_info.FEM_snap_path * "Xᵘ.csv", DataFrame))  
+    if check_norm_matrix(RB_variables)
+
+        try
+            Xᵘ = Matrix(CSV.read(ROM_info.FEM_snap_path * "Xᵘ.csv", DataFrame))
         catch e
             println("Error: $e. Impossible to load the H1 norm matrix")
         end
-        
+
     end
 
     RB_variables.Xᵘ = Xᵘ
@@ -107,7 +106,7 @@ function PODs_space(ROM_info, RB_variables::RB_problem)
     nₛᵘ = size(Φₛᵘ)[2]
 
     return (Φₛᵘ, nₛᵘ)
-    
+
 end
 
 
@@ -124,7 +123,7 @@ function build_reduced_basis(ROM_info, RB_variables::RB_problem)
     (RB_variables.Φₛᵘ, RB_variables.nₛᵘ) = (Φₛᵘ, nₛᵘ)
     RB_variables.offline_time += RB_building_time
 
-    if ROM_info.save_offline_structures 
+    if ROM_info.save_offline_structures
         save_variable(Φₛᵘ, "Φₛᵘ", "csv", joinpath(ROM_info.paths.basis_path, "Φₛᵘ"))
     end
 
@@ -137,7 +136,7 @@ function import_reduced_basis(ROM_info, RB_variables::RB_problem)
 
     @info "Importing the reduced basis"
 
-    Φₛᵘ = load_variable("Φₛᵘ", "csv", joinpath(ROM_info.paths.basis_path, "Φₛᵘ"))   
+    Φₛᵘ = load_variable("Φₛᵘ", "csv", joinpath(ROM_info.paths.basis_path, "Φₛᵘ"))
     RB_variables.Φₛᵘ = Φₛᵘ
     (RB_variables.Nₛᵘ, RB_variables.nₛᵘ) = size(Φₛᵘ)
 
@@ -145,56 +144,62 @@ end
 
 
 function check_reduced_affine_components(ROM_info, RB_variables::RB_problem)
-    #=MODIFY
-    =#
+  #=MODIFY
+  =#
 
-    operators = []
+  operators = []
 
-    if ROM_info.problem_nonlinearities["A"] === false
+  if ROM_info.problem_nonlinearities["A"] === false
 
-        if isfile(joinpath(ROM_info.paths.ROM_structures_path, "Aₙ.csv"))
-            @info "Importing reduced affine LHS matrix"
-            RB_variables.Aₙ = load_variable("Aₙ", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Aₙ")) 
-        else
-            @info "Failed to import the reduced affine LHS matrix: must build it"
-            push!(operators, "A")
-        end
-
+    if isfile(joinpath(ROM_info.paths.ROM_structures_path, "Aₙ.csv"))
+      @info "Importing reduced affine stiffness matrix"
+      RB_variables.Aₙ = load_variable("Aₙ", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Aₙ"))
+      RB_variables.nₛᵘ = size(RB_variables.Aₙ)[1]
     else
-
-        if isfile(joinpath(ROM_info.paths.ROM_structures_path, "Aₙ_affine.csv")) && isfile(joinpath(ROM_info.paths.ROM_structures_path, "Aₙ_idx.csv"))
-            @info "Importing MDEIM offline structures for the LHS matrix"
-            RB_variables.Aₙ_affine = load_variable("Aₙ_affine", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Aₙ_affine")) 
-            RB_variables.Aₙ_idx = load_variable("Aₙ_idx", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Aₙ_idx")) 
-        else
-            @info "Failed to import MDEIM offline structures for the LHS matrix: must build them"
-            push!(operators, "A")
-        end
-
-    if (ROM_info.problem_nonlinearities["f"] === true || ROM_info.problem_nonlinearities["h"] === true)
-
-        if isfile(joinpath(ROM_info.paths.ROM_structures_path, "Fₙ.csv"))
-            @info "Importing reduced affine RHS vector"
-            RB_variables.Fₙ = load_variable("Fₙ", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Fₙ")) 
-        else
-            @info "Failed to import the reduced affine RHS vector: must build it"
-            push!(operators, "F")
-        end
-
-    else
-
-        if isfile(joinpath(ROM_info.paths.ROM_structures_path, "Fₙ_affine.csv")) && isfile(joinpath(ROM_info.paths.ROM_structures_path, "Fₙ_idx.csv"))
-            @info "Importing DEIM offline structures for the RHS vector"
-            RB_variables.Aₙ_affine = load_variable("Fₙ_affine", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Fₙ_affine")) 
-            RB_variables.Aₙ_idx = load_variable("Fₙ_idx", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Fₙ_idx")) 
-        else
-            @info "Failed to import DEIM offline structures for the RHS vector: must build them"
-            push!(operators, "F")
-        end
-
+      @info "Failed to import the reduced affine stiffness matrix: must build it"
+      push!(operators, "A")
     end
 
-    operators
+  else
+
+    if isfile(joinpath(ROM_info.paths.ROM_structures_path, "Aₙ_affine.csv")) && isfile(joinpath(ROM_info.paths.ROM_structures_path, "Aₙ_idx.csv"))
+      @info "Importing MDEIM offline structures for the stiffness matrix"
+      RB_variables.Aₙ_affine = load_variable("Aₙ_affine", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Aₙ_affine"))
+      RB_variables.Aₙ_idx = load_variable("Aₙ_idx", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Aₙ_idx"))
+      RB_variables.nₛᵘ = size(RB_variables.Aₙ_affine)[1]
+    else
+      @info "Failed to import MDEIM offline structures for the stiffness matrix: must build them"
+      push!(operators, "A")
+    end
+
+  end
+
+  if (ROM_info.problem_nonlinearities["f"] === true || ROM_info.problem_nonlinearities["h"] === true)
+
+    if isfile(joinpath(ROM_info.paths.ROM_structures_path, "Fₙ.csv"))
+      @info "Importing reduced affine RHS vector"
+      RB_variables.Fₙ = load_variable("Fₙ", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Fₙ"))
+      RB_variables.nₛᵘ = size(RB_variables.Fₙ)[1]
+    else
+      @info "Failed to import the reduced affine RHS vector: must build it"
+      push!(operators, "F")
+    end
+
+  else
+
+    if isfile(joinpath(ROM_info.paths.ROM_structures_path, "Fₙ_affine.csv")) && isfile(joinpath(ROM_info.paths.ROM_structures_path, "Fₙ_idx.csv"))
+      @info "Importing DEIM offline structures for the RHS vector"
+      RB_variables.Fₙ_affine = load_variable("Fₙ_affine", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Fₙ_affine"))
+      RB_variables.Fₙ_idx = load_variable("Fₙ_idx", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Fₙ_idx"))
+      RB_variables.nₛᵘ = size(RB_variables.Fₙ_affine)[1]
+    else
+      @info "Failed to import DEIM offline structures for the RHS vector: must build them"
+      push!(operators, "F")
+    end
+
+  end
+
+  operators
 
 end
 
@@ -206,19 +211,19 @@ end
     @info "Importing affine stiffness matrix"
 
     if ROM_info.problem_nonlinearities["A"] === false
-        RB_variables.Aₙ = load_variable("Aₙ", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Aₙ")) 
+        RB_variables.Aₙ = load_variable("Aₙ", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Aₙ"))
     else
-        RB_variables.Aₙ_affine = load_variable("Aₙ_mdeim", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Aₙ_mdeim")) 
-        RB_variables.Aₙ_idx = load_variable("Aₙ_mdeim_idx", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Aₙ_mdeim_idx")) 
+        RB_variables.Aₙ_affine = load_variable("Aₙ_mdeim", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Aₙ_mdeim"))
+        RB_variables.Aₙ_idx = load_variable("Aₙ_mdeim_idx", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Aₙ_mdeim_idx"))
     end
 
     @info "Importing affine forcing term"
 
     if ROM_info.problem_nonlinearities["F"] === false
-        RB_variables.Fₙ = load_variable("Fₙ", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Fₙ")) 
+        RB_variables.Fₙ = load_variable("Fₙ", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Fₙ"))
     else
-        RB_variables.Fₙ_affine = load_variable("Fₙ_deim", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Fₙ_deim")) 
-        RB_variables.Fₙ_idx = load_variable("Fₙ_deim_idx", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Fₙ_deim_idx")) 
+        RB_variables.Fₙ_affine = load_variable("Fₙ_deim", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Fₙ_deim"))
+        RB_variables.Fₙ_idx = load_variable("Fₙ_deim_idx", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Fₙ_deim_idx"))
     end
 
 
@@ -248,30 +253,24 @@ end =#
 
 
 function get_generalized_coordinates(ROM_info, RB_variables::RB_problem, snaps = nothing)
-    #=MODIFY
-    =#
+  #=MODIFY
+  =#
 
-    if !check_norm_matrix(RB_variables)
-        get_norm_matrix(ROM_info, RB_variables)
-    end
+  if !check_norm_matrix(RB_variables)
+    get_norm_matrix(ROM_info, RB_variables)
+  end
 
-    if snaps === nothing || maximum(snaps) > ROM_info.nₛ
-        snaps = 1:ROM_info.nₛ
-    end
+  if snaps === nothing || maximum(snaps) > ROM_info.nₛ
+    snaps = 1:ROM_info.nₛ
+  end
 
-    û = zeros(RB_variables.nₛᵘ, length(snaps))
-    Φₛᵘ_normed = RB_variables.Xᵘ * RB_variables.Φₛᵘ 
+  û = zeros(RB_variables.nₛᵘ, length(snaps))
+  Φₛᵘ_normed = RB_variables.Xᵘ * RB_variables.Φₛᵘ
+  RB_variables.û = RB_variables.Sᵘ * Φₛᵘ_normed
 
-    for i_nₛ = snaps  
-        @info "Assembling generalized coordinate relative to snapshot $(i_nₛ)"     
-        û[:, i_nₛ] = Φₛᵘ_normed * RB_variables.Sᵘ[:, i_nₛ]
-    end
-
-    RB_variables.û = û
-
-    if ROM_info.save_offline_structures
-        save_variable(û, "û", "csv", joinpath(ROM_info.paths.gen_coords_path, "û"))
-    end
+  if ROM_info.save_offline_structures
+    save_variable(RB_variables.û, "û", "csv", joinpath(ROM_info.paths.gen_coords_path, "û"))
+  end
 
 end
 
@@ -286,38 +285,38 @@ function initialize_RB_system(RB_variables::RB_problem)
 end
 
 
-function get_RB_system(ROM_info, RB_variables::RB_problem, param, FE_space = nothing, parametric_info = nothing, problem_info = nothing)
+function get_RB_system(ROM_info, RB_variables::RB_problem; μ = nothing, FE_space = nothing, param = nothing)
     #=MODIFY
     =#
 
     @info "Preparing the RB system: fetching online reduced structures"
 
     if ROM_info.problem_nonlinearities["Aₙ"] === false
-        RB_variables.LHSₙ[1] = param * RB_variables.Aₙ
+        RB_variables.LHSₙ[1] = μ * RB_variables.Aₙ
     else
-        A_param = assemble_stiffness(FE_space, parametric_info, problem_info)
-        (_, A_param_affine) = MDEIM_online(A_param, RB_variables.Aₙ_affine, RB_variables.Aₙ_idx)
-        RB_variables.LHSₙ[1] = A_param_affine
+        A_μ = assemble_stiffness(FE_space, ROM_info, param)
+        (_, A_μ_affine) = MDEIM_online(A_μ, RB_variables.Aₙ_affine, RB_variables.Aₙ_idx)
+        RB_variables.LHSₙ[1] = A_μ_affine
     end
 
     if ROM_info.problem_nonlinearities["f"] === false && ROM_info.problem_nonlinearities["h"] === false
         RB_variables.RHSₙ[1] = RB_variables.Fₙ
-    else   
-        F_param = assemble_forcing(FE_space, parametric_info, problem_info)
-        (_, F_param_affine) = DEIM_online(F_param, RB_variables.Fₙ_affine, RB_variables.Fₙ_idx)    
-        RB_variables.RHSₙ[1] = F_param_affine
+    else
+        F_μ = assemble_forcing(FE_space, param)
+        (_, F_μ_affine) = DEIM_online(F_μ, RB_variables.Fₙ_affine, RB_variables.Fₙ_idx)
+        RB_variables.RHSₙ[1] = F_μ_affine
     end
-    
+
 end
 
 
-function solve_RB_system(ROM_info, RB_variables::RB_problem; param = nothing, FE_space = nothing, parametric_info = nothing, problem_info = nothing)
+function solve_RB_system(ROM_info, RB_variables::RB_problem; μ = nothing, FE_space = nothing, param = nothing)
     #=MODIFY
     =#
 
-    if (ROM_info.problem_nonlinearities["A"] === true || ROM_info.problem_nonlinearities["f"] === true || ROM_info.problem_nonlinearities["h"] === true) 
+    if (ROM_info.problem_nonlinearities["A"] === true || ROM_info.problem_nonlinearities["f"] === true || ROM_info.problem_nonlinearities["h"] === true)
 
-        if FE_space === nothing || parametric_info === nothing || problem_info === nothing
+        if FE_space === nothing || param === nothing
             @error "When the problem is non-affine with respect to a parameter, must provide FOM info when fetching the RB linear system"
         end
 
@@ -327,7 +326,7 @@ function solve_RB_system(ROM_info, RB_variables::RB_problem; param = nothing, FE
         @error "When the stiffness is affine with respect to a parameter, must provide the parameter's when fetching the RB linear system"
     end
 
-    get_RB_system(ROM_info, RB_variables, param, FE_space, parametric_info, problem_info)
+    get_RB_system(ROM_info, RB_variables; μ, FE_space, param)
 
     @info "Solving RB problem via backslash"
     @info "Condition number of the system's matrix: $(cond(RB_variables.LHSₙ[1]))"
@@ -360,7 +359,7 @@ function testing_phase(ROM_info, RB_variables::RB_problem, param_nbs)
     uₙ_param = zeros(RB_variables.nᵤˢ)
 
     if ROM_info.problem_nonlinearities["A"] === false
-        params = load_variable("α", "jld", joinpath(ROM_info.paths.FEM_structures_path, "params")) 
+        params = load_variable("α", "jld", joinpath(ROM_info.paths.FEM_structures_path, "params"))
     end
 
     for param_nb in param_nbs
@@ -372,7 +371,7 @@ function testing_phase(ROM_info, RB_variables::RB_problem, param_nbs)
             if ROM_info.problem_nonlinearities["A"] === false
                 solve_RB_system(ROM_info, RB_variables; param = params[param_nb, :])
             else
-                solve_RB_system(ROM_info, RB_variables; FE_space = FE_space, parametric_info = parametric_info, problem_info = problem_info)
+                solve_RB_system(ROM_info, RB_variables; FE_space = FE_space, parametric_info = parametric_info)
             end
         end
 
@@ -421,4 +420,3 @@ function compute_errors(RB_variables::RB_problem, pointwise_u_err)
     mynorm(pointwise_u_err, RB_variables.Xᵘ)
 
 end
-

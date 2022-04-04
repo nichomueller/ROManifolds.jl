@@ -1,34 +1,67 @@
-function stretching(x::Point, dim::Int64)
+function FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, problem_nonlinearities)
+
+  @assert isdir(root) "$root is an invalid root directory"
+
+  nonlins = ""
+  for (key, value) in problem_nonlinearities
+      if value === true
+          nonlins *= "_" * key
+      end
+  end
+
+  root_tests = joinpath(root, "tests")
+  create_dir(root_tests)
+  mesh_path = joinpath(root_tests, joinpath("meshes", mesh_name))
+  @assert isfile(mesh_path) "$mesh_path is an invalid mesh path"
+  type_path = joinpath(root_tests, problem_type)
+  create_dir(type_path)
+  problem_path = joinpath(type_path, problem_name)
+  create_dir(problem_path)
+  problem_and_info_path = joinpath(problem_path, string(problem_dim) * "D" * nonlins)
+  create_dir(problem_and_info_path)
+  current_test = joinpath(problem_and_info_path, mesh_name)
+  create_dir(current_test)
+  FEM_path = joinpath(current_test, "FEM_data")
+  create_dir(FEM_path)
+  FEM_snap_path = joinpath(FEM_path, "snapshots")
+  create_dir(FEM_snap_path)
+  FEM_structures_path = joinpath(FEM_path, "FEM_structures")
+  create_dir(FEM_structures_path)
+
+  _ -> (mesh_path; cur_mesh_path; FEM_snap_path; FEM_structures_path)
+
+end
+(out) -> (mesh_path; cur_mesh_path; FEM_snap_path; FEM_structures_path)
+
+function stretching(x::Point, μ::Float64)
     #=MODIFY
     =#
 
     m = zeros(length(x))
-    m[1] = x[1]^2
-    for i in 2:dim
-        m[i] = x[i]
+    m[1] = μ * x[1]^2
+    for i in 2:length(x)
+        m[i] = μ * x[i]
     end
 
     Point(m)
 
 end
 
-struct reference_info <: Int64
-    L
-    dim
-    ndof_dir
+struct reference_info{T<:Int64}
+    L::T
+    dim::T
+    ndof_dir::T
 end
 
-function generate_cartesian_model(reference_info, deformation)
+function generate_cartesian_model(info::reference_info, deformation::Function, μ::Float64)
     #=MODIFY
     =#
+  pmin = Point(Fill(0, info.dim))
+  pmax = Point(Fill(info.L, info.dim))
+  partition = Tuple(Fill(info.ndof_dir, info.dim))
 
-    const pmin = Point(Fill(0, reference_info.dim))
-    const pmax = Point(Fill(reference_info.L, reference_info.dim))
-    const partition = Tuple(Fill(reference_info.ndof_dir, reference_info.dim))
+  model = CartesianDiscreteModel(pmin, pmax, partition, map = (x->deformation(x, μ)))
 
-    model = CartesianDiscreteModel(pmin, pmax, partition, map = (x->deformation(x, reference_info.dim)))
-
-    return model
+  return model
 
 end
-

@@ -67,6 +67,18 @@ function JLD_append(filename, var_name, var)
     end
 end
 
+function CSV_append(var::Array, file_name::String)
+
+  if !isfile(file_name)
+    CSV.write(file_name, DataFrame(var))
+  else
+    file = open(file_name)
+    CSV.write(file_name, DataFrame(var))
+    close(file)
+  end
+
+end
+
 
 function load_variable(var_name, extension = "csv", path = nothing, sparse = false, delimiter = nothing)
     #=Utility method, which allows to load arrays/matrices from .jld files. If the path to the text file does not exist,
@@ -281,88 +293,8 @@ function sparse_to_full_matrix(mat, format = "csc")
 
 end
 
-#=
-function get_no_index(vec::Core.Box, i::Int64)
-    #=MODIFY
-    =#
+function generate_parameter(a::T, b::T, n::Int64 = 1) where T <: Array{Float64}
 
+  return [[rand(Uniform(a[i], b[i])) for i = 1:length(a)] for j in 1:n]
 
 end
-
-
-function get_vec_index(vec::Array, i::Int64)
-    #=MODIFY
-    =#
-
-    vec[i]
-
-end
-
-
-function get_mat_index(mat::Matrix, i::Int64, dim::Int64)
-    #=MODIFY
-    =#
-
-    if dim === 1
-        mat[i, :]
-    elseif dim === 2
-        mat[:, i]
-    else
-        @error "Exceeded dimension limit of a 2D matrix"
-    end
-
-end
-
-
-get_index(vec::Core.Box, i::Int64) = get_no_index(vec, i)
-get_index(vec::Array, i::Int64) = get_vec_index(vec, i)
-get_index(mat::Matrix, i::Int64, dim::Int64) = get_mat_index(mat, i, dim) =#
-
-
-function generate_parameter(a::T, b::T) where T <: Array{Float64}
-
-  return [rand(Uniform(a[i], b[i])) for i = 1:length(a)]
-
-end
-#=
-function generate_empty_vector(n::Int64)
-    #=MODIFY
-    =#
-
-    Vector{Float64}(undef, n)
-
-end
-
-
-function generate_uniformly_distributed_values(a::Float64, b::Float64, n::Int64, path::String, val_name::String)
-    #=MODIFY
-    =#
-
-    val = rand(Uniform(a, b), n)
-    JLD_append(path, val_name, val)
-
-    val
-
-end
-
-generate_values(n::Int64) = generate_empty_vector(n)
-generate_values(a::Float64, b::Float64, n::Int64, path::String, val_name::String) = generate_save_uniformly_distributed_values(a, b, n, path, val_name) =#
-
-
-
-#=
-function main()
-    #B = sparse(rand(5,5))
-    #save_variable(B,"B","csv")
-    #Bloaded = load_variable("B", "csv", nothing, true)
-
-    mat1 = rand(10,10)
-    aa = rand(10,10)
-    mat2 = convert_to_sparse(aa, "coo")
-    sparse_to_full_matrix(mat2, "coo")
-    #sparse_matrix_matrix_mul(mat2, mat1, "coo")
-    #sparse_matrix_matrix_mul(mat2, mat1[:,1], "coo")
-end
-
-
-main() =#

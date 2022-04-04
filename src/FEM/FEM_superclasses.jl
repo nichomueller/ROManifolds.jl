@@ -31,33 +31,20 @@ struct FESpacePoisson <: FEMProblem
   dΓ
 end
 
-
-#=
-#struct steady_FSI_problem <: steady_problem
-
+struct problem_specifics
+  order::Int
+  dirichlet_tags::Array
+  neumann_tags::Array
+  solver::String
+  paths::Function
+  problem_nonlinearities::Dict
 end
 
-
-struct Navier_Stokes_problem <: FSI_problem
-
+struct parametric_specifics
+  μ::Array
+  model::UnstructuredDiscreteModel
+  α::Function
+  f::Function
+  g::Function
+  h::Function
 end
-
-
-struct Stokes_problem <: Navier_Stokes_problem
-
-end
-
-
-struct ADR_problem <: unsteady_problem
-
-end
-
-
-struct diffusion_problem <: ADR_problem
-
-end
-
-
-struct Poisson_problem <: ADR_problem
-
-end =#
