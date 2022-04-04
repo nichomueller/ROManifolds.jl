@@ -2,12 +2,44 @@ module InverseProblems
 
 using Gridap
 using Gridap.FESpaces
+# using Gridap.CellData
 using ChainRulesCore
 
 import ChainRulesCore.rrule
 
 export FEStateMap
 export LossFunction
+
+# A function that is defined in terms of a set of parameters,
+# e.g., an AbstractVector. We transform it into a FEFunction.
+struct ParamsToFEFunction{P}
+  fun::Function{P}
+  Q::FESpace
+end
+
+ParamsToFEFunction(f::Function{T},Q::FESpace) = ParamsToFEFunction{T}(f,Q)
+
+function ChainRulesCore.rrule(p_to_qh::ParamsToFEFunction{P},p)
+  p_to_qh(p) = interpolate(x->p_to_qh.fun(p,x),Q)
+  function p_to_qh_pullback(dqh)
+    dqdp(p,x) = ∇(k->p_to_qh.fun(k,x))(p)
+    cell_dqh = get_cell_dof_values(dqh)
+    Ω = get_triangulation(p_to_qh.Q)
+    cf = CellField(x->dqdp(p,x),Ω)
+    x = get_cell_points(get_cell_dof_basis(Q))
+    cell_dqhdp = cf(x)
+    cell_dq = lazy_map(cell_dqh,cell_dqhdp) do dqh, dqhdp
+      m = zero(P)
+      for i in 1:length(dqh)
+        m += dqhdp[i]*dqh[i]
+      end
+      m
+    end
+    dp = sum(cell_dq)
+    dp
+  end
+  p_to_qh(p), p_to_qh_pullback
+end
 
 # Struct that represents the FE solution of a parameterised PDE.
 # It is a map from the parameter space T to a FESpace
@@ -18,13 +50,14 @@ struct FEStateMap{P,U <: TrialFESpace, V <: FESpace}
   trial::V
   # assem::Assembler
 end
+
 # Add traits for Affine, Adjoint, etc. + other constructors
 # Provide solve() functionality (linear and nonlinear solver def'on)
 # Save Assembler in cache for efficiency (nonlinear problems, etc)
 # Define promotion of different types to CellData (if not already done in Gridap)
 
 function ChainRulesCore.rrule(uh::FEStateMap{T},qh::T) where T <: FEFunction
-# function qh_to_uh_rrule(qh)
+  # function qh_to_uh_rrule(qh)
   # Direct problem
   a = uh.form
   U = uh.test
@@ -51,6 +84,7 @@ struct LossFunction{P,U}
   state_sp::U
   # assem::Assembler
 end
+
 # Here, we can define different constructors, depending on T
 # E.g., P can be a FEFunction or a Real or an AbstractVector ...
 # E.g., U can be a FEFunction (unconstrained) or a FEStateMap{P} (for PDE-constrained)
