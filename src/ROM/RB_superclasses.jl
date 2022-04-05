@@ -1,8 +1,52 @@
 abstract type RB_problem end
-#= abstract type RB_problem_unsteady <: RB_problem end
-abstract type RB_problem_steady <: RB_problem_unsteady end =#
+abstract type RB_problem_unsteady <: RB_problem end
+abstract type RB_problem_steady <: RB_problem end
+abstract type STGRB <: RB_problem end
+abstract type STPGRB <: RB_problem end
 
-mutable struct Poisson_RB <: RB_problem
+Sᵘ = Array{Float64}(undef, 0, 0)
+Sᵖ = Array{Float64}(undef, 0, 0)
+Nᵤˢ = 0
+Nᵤᵖ = 0
+Φₛᵘ = Array{Float64}(undef, 0, 0)
+Φₛᵖ = Array{Float64}(undef, 0, 0)
+nₛᵘ = 0
+nₛᵖ = 0
+Φₜᵘ = Array{Float64}(undef, 0, 0)
+Φₜᵖ = Array{Float64}(undef, 0, 0)
+nₜᵘ = 0
+nₜᵖ = 0
+
+ũ = Float64[]
+uₙ = Float64[]
+û = Float64[]
+p̃ = Float64[]
+pₙ = Float64[]
+p̂ = Float64[]
+
+Mₙ = Array{Float64}(undef, 0, 0)
+Aₙ = Array{Float64}(undef, 0, 0)
+Aₙ_affine = Array{Float64}(undef, 0, 0)
+Aₙ_idx = Float64[]
+Bₙ = Array{Float64}(undef, 0, 0)
+Bₙ_affine = Array{Float64}(undef, 0, 0)
+Bₙ_idx = Float64[]
+Cₙ = Array{Float64}(undef, 0, 0)
+Cₙ_affine = Array{Float64}(undef, 0, 0)
+Cₙ_idx = Float64[]
+LHSₙ = Matrix{Float64}[]
+Fₙ = Float64[]
+Fₙ_affine = Float64[]
+Fₙ_idx = Float64[]
+RHSₙ = Matrix{Float64}[]
+Xᵘ = sparse([],[],[])
+Xᵖ = sparse([],[],[])
+Pᵘ_inv = sparse([],[],[])
+
+offline_time = 0.0
+
+
+mutable struct PoissonSTGRB <: STGRB
     Sᵘ
     Nᵤˢ
     Φₛᵘ
@@ -23,33 +67,26 @@ mutable struct Poisson_RB <: RB_problem
     offline_time
 end
 
-function setup_Poisson_RB(problem::Poisson_RB) :: Poisson_RB
+mutable struct PoissonSTPGRB <: STPGRB
+  poissonSTGRB::PoissonSTGRB
+  Pᵘ_inv
+end
+
+function setup_PoissonSTGRB(empty_struct::PoissonSTGRB) :: PoissonSTGRB
     #=MODIFY
     =#
 
-    Sᵘ = Array{Float64}(undef, 0, 0)
-    Nᵤˢ = 0
-    Φₛᵘ = Array{Float64}(undef, 0, 0)
-    nₛᵘ = 0
+    return PoissonSTGRB(Sᵘ, Nᵤˢ, Φₛᵘ, nₛᵘ, ũ, uₙ, û, Aₙ, Aₙ_affine, Aₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, Pᵘ_inv, offline_time)
 
-    ũ = Float64[]
-    uₙ = Float64[]
-    û = Float64[]
+end
 
-    Aₙ = Array{Float64}(undef, 0, 0)
-    Aₙ_affine = Array{Float64}(undef, 0, 0)
-    Aₙ_idx = Float64[]
-    LHSₙ = Matrix{Float64}[]
-    Fₙ = Float64[]
-    Fₙ_affine = Float64[]
-    Fₙ_idx = Float64[]
-    RHSₙ = Matrix{Float64}[]
-    Xᵘ = sparse([],[],[])
-    Pᵘ_inv = sparse([],[],[])
+function setup_PoissonSTPGRB(empty_struct::PoissonSTPGRB) :: PoissonSTPGRB
+  #=MODIFY
+  =#
 
-    offline_time = 0.0
+  @forward (PoissonSTPGRB, :poissonSTGRB) PoissonSTGRB
 
-    return Poisson_RB(Sᵘ, Nᵤˢ, Φₛᵘ, nₛᵘ, ũ, uₙ, û, Aₙ, Aₙ_affine, Aₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, Pᵘ_inv, offline_time)
+  return PoissonSTPGRB(PoissonSTGRB(Sᵘ, Nᵤˢ, Φₛᵘ, nₛᵘ, ũ, uₙ, û, Aₙ, Aₙ_affine, Aₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, Pᵘ_inv, offline_time), Pᵘ_inv)
 
 end
 
@@ -332,6 +369,7 @@ function setup_Stokes_RB(problem::steady_Stokes_RB) :: steady_Stokes_RB
     offline_time = 0.0
 
     return Stokes_RB(Sᵘ, Sᵖ, Nᵤˢ, Nᵤᵖ, Φₛᵘ, Φₛᵖ, nₛᵘ, nₛᵖ, Φₜᵘ, Φₜᵖ, nₜᵘ, nₜᵖ, ũ, uₙ, û, p̃, pₙ, p̂, Mₙ, Aₙ, Aₙ_affine, Aₙ_idx, Bₙ, Bₙ_affine, Bₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, Xᵖ, offline_time)
+end
 
 mutable struct steady_NS_RB <: RB_problem
     Sᵘ
@@ -406,9 +444,9 @@ mutable struct NS_RB <: RB_problem
     offline_time
 end
 
-
-setup_RB(problem::Poisson_RB) = setup_Poisson_RB(problem)
-setup_RB(problem::steady_ADR_RB) = setup_steady_ADR_RB(problem)
-setup_RB(problem::ADR_RB) = setup_ADR_RB(problem)
-setup_RB(problem::steady_Stokes_RB) = setup_steady_Stokes_RB(problem)
-setup_RB(problem::Stokes_RB) = setup_Stokes_RB(problem)
+setup(empty_struct::PoissonSTGRB) = setup_PoissonSTGRB(empty_struct)
+setup(empty_struct::PoissonSTPGRB) = setup_PoissonSTPGRB(empty_struct)
+setup(problem::steady_ADR_RB) = setup_steady_ADR_RB(problem)
+setup(problem::ADR_RB) = setup_ADR_RB(problem)
+setup(problem::steady_Stokes_RB) = setup_steady_Stokes_RB(problem)
+setup(problem::Stokes_RB) = setup_Stokes_RB(problem)

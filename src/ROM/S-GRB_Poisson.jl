@@ -1,4 +1,6 @@
-function assemble_reduced_affine_components(ROM_info, RB_variables::RB_problem, operators = nothing; probl = nothing, param = nothing)
+include("RB_Poisson_steady.jl")
+
+function assemble_reduced_affine_components(ROM_info, RB_variables::PoissonSTGRB, operators=nothing; μ=nothing)
   #=MODIFY
   =#
 
@@ -12,10 +14,10 @@ function assemble_reduced_affine_components(ROM_info, RB_variables::RB_problem, 
 
       @info "Assembling affine reduced stiffness"
       projection_time = @elapsed begin
-        A = load_variable("A", "csv", joinpath(ROM_info.paths.FEM_structures_path, "A"))
+        A = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "A.csv"); convert_to_sparse = true)
         RB_variables.Aₙ = (RB_variables.Φₛᵘ)' * A * RB_variables.Φₛᵘ
         if ROM_info.save_offline_structures
-            save_variable(RB_variables.Aₙ, "Aₙ", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Aₙ"))
+          save_variable(RB_variables.Aₙ, "Aₙ", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Aₙ"))
         end
       end
 
@@ -23,9 +25,10 @@ function assemble_reduced_affine_components(ROM_info, RB_variables::RB_problem, 
 
       @info "The stiffness is non-affine: running the MDEIM offline phase"
       projection_time = @elapsed begin
-        Aₙ_i = sparse([],[],[])
+        Aₙ_i = sparse([], [], [])
         for i_nₛ = 1:maximum(10, ROM_info.nₛ)
-          A_i = assemble_stiffness(FE_space, probl, param)
+          parametric_info = get_parametric_specifics(ROM_info, μ[i_nₛ])
+          A_i = assemble_stiffness(FE_space, ROM_info, parametric_info)
           Aₙ_i = hcat(Aₙ_i, (RB_variables.Φₛᵘ)' * A_i * RB_variables.Φₛᵘ)
         end
         Aₙ_i = reshape(Aₙ_i, :, 1)
@@ -46,10 +49,10 @@ function assemble_reduced_affine_components(ROM_info, RB_variables::RB_problem, 
 
       @info "Assembling affine reduced forcing term"
       projection_time += @elapsed begin
-        F = load_variable("F", "csv", joinpath(ROM_info.paths.FEM_structures_path, "F"))
+        F = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "F.csv"))
         RB_variables.Fₙ = (RB_variables.Φₛᵘ)' * F
         if ROM_info.save_offline_structures
-            save_variable(RB_variables.Fₙ, "Fₙ", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Fₙ"))
+          save_variable(RB_variables.Fₙ, "Fₙ", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Fₙ"))
         end
       end
 
@@ -59,7 +62,8 @@ function assemble_reduced_affine_components(ROM_info, RB_variables::RB_problem, 
       projection_time += @elapsed begin
         Fₙ_i = Float64[]
         for i_nₛ = 1:maximum(10, ROM_info.nₛ)
-          F_i = assemble_forcing(FE_space, param)
+          parametric_info = get_parametric_specifics(ROM_info, μ[i_nₛ])
+          F_i = assemble_forcing(FE_space, parametric_info)
           Fₙ_i = hcat(Fₙ_i, (RB_variables.Φₛᵘ)' * F_i)
         end
         if ROM_info.save_offline_structures
@@ -73,46 +77,5 @@ function assemble_reduced_affine_components(ROM_info, RB_variables::RB_problem, 
   end
 
   RB_variables.offline_time += projection_time
-
-end
-
-
-function build_RB_approximation(ROM_info, RB_variables::RB_problem)
-  #=MODIFY
-  =#
-
-  @info "Building $(ROM_info.RB_method) approximation with $(ROM_info.nₛ) snapshots and tolerances of $(ROM_info.ϵˢ) in space"
-
-  if ROM_info.import_snapshots
-    get_snapshot_matrix(ROM_info, RB_variables)
-    import_snapshots_success = true
-  else
-    import_snapshots_success = false
-  end
-
-  if ROM_info.import_offline_structures
-    import_reduced_basis(ROM_info, RB_variables)
-    import_basis_success = true
-  else
-    import_basis_success = false
-  end
-
-  if !import_snapshots_success && !import_basis_success
-    @error "Impossible to assemble the reduced problem if neither the snapshots nor the bases can be loaded"
-  end
-
-  if import_snapshots_success && !import_basis_success
-    @info "Failed to import the reduced basis, building it via POD"
-    build_reduced_basis(ROM_info, RB_variables)
-  end
-
-  if ROM_info.import_offline_structures
-    operators = check_reduced_affine_components(ROM_info, RB_variables)
-    if !isempty(operators)
-        assemble_reduced_affine_components(ROM_info, RB_variables, operators)
-    end
-  else
-    assemble_reduced_affine_components(ROM_info, RB_variables)
-  end
 
 end

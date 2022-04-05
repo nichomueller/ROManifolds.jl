@@ -28,10 +28,9 @@ function FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, pro
   FEM_structures_path = joinpath(FEM_path, "FEM_structures")
   create_dir(FEM_structures_path)
 
-  _ -> (mesh_path; cur_mesh_path; FEM_snap_path; FEM_structures_path)
+  _ -> (mesh_path; current_test; FEM_snap_path; FEM_structures_path)
 
 end
-(out) -> (mesh_path; cur_mesh_path; FEM_snap_path; FEM_structures_path)
 
 function stretching(x::Point, μ::Float64)
     #=MODIFY

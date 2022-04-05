@@ -1,7 +1,7 @@
 include("S-GRB_Poisson.jl")
 include("RB_Poisson_unsteady.jl")
 
-function get_RB_LHS_blocks(ROM_info, RB_variables::RB_problem; param = nothing)
+function get_RB_LHS_blocks(ROM_info, RB_variables::RB_problem, param; FE_space = nothing)
   #=MODIFY
   =#
 
@@ -12,7 +12,7 @@ function get_RB_LHS_blocks(ROM_info, RB_variables::RB_problem; param = nothing)
     (_, Aₙ_μ_affine) = MDEIM_online(Aₙ_μ, RB_variables.Aₙ_affine, RB_variables.Aₙ_idx)
     MAₙ = RB_variables.Mₙ + 2 / 3 * ROM_info.dt * Aₙ_μ_affine
   else
-    MAₙ = RB_variables.Mₙ + 2 / 3 * ROM_info.dt * RB_variables.Aₙ
+    MAₙ = RB_variables.Mₙ + 2 / 3 * ROM_info.dt * RB_variables.Aₙ * param.μ
   end
 
   Φₜᵘ_1 = RB_variables.Φₜᵘ[2:end, :]' * RB_variables.Φₜᵘ[1:end - 1, :]
@@ -43,7 +43,7 @@ function get_RB_LHS_blocks(ROM_info, RB_variables::RB_problem; param = nothing)
 
 end
 
-function get_RB_RHS_blocks(ROM_info, RB_variables::RB_problem; param = nothing)
+function get_RB_RHS_blocks(ROM_info, RB_variables::RB_problem, param; FE_space = nothing)
   #=MODIFY
   =#
 

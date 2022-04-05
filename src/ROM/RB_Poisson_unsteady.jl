@@ -201,9 +201,13 @@ function initialize_RB_system(RB_variables::RB_problem)
 
 end
 
-function check_affine_blocks(RB_variables::RB_problem)
+function check_affine_blocks(ROM_info, RB_variables::RB_problem)
   #=MODIFY
   =#
+
+  if ROM_info.import_offline_structures === false
+    return ["A", "F"]
+  end
 
   operators = []
 
@@ -233,5 +237,23 @@ function check_affine_blocks(RB_variables::RB_problem)
   end
 
   operators
+
+end
+
+function get_RB_system(ROM_info, RB_variables::RB_problem, FE_space = nothing, param = nothing)
+  #=MODIFY
+  =#
+
+  @info "Preparing the RB system: fetching online reduced structures"
+
+  operators = check_affine_blocks(ROM_info, RB_variables)
+
+  if "A" in operators
+    get_RB_LHS_blocks(ROM_info, RB_variables, param; FE_space)
+  end
+
+  if "F" in operators
+    get_RB_RHS_blocks(ROM_info, RB_variables, param; FE_space)
+  end
 
 end

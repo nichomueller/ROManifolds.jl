@@ -16,8 +16,9 @@ function run_FEM()
     α(x) = sum(μ)
 
     parametric_info = parametric_specifics(μ, model, α, f, g, h)
-    RHS = assemble_forcing(FE_space, problem_info, parametric_info)
+    RHS = assemble_forcing(FE_space, parametric_info)
     LHS = assemble_stiffness(FE_space, problem_info, parametric_info)
+    Xᵘ = assemble_H1_norm_matrix(FE_space)
 
     function parametric_solution()
 
@@ -25,7 +26,7 @@ function run_FEM()
 
     end
 
-    return RHS, LHS, parametric_solution
+    return RHS, LHS, Xᵘ, parametric_solution
 
   end
 
@@ -48,8 +49,9 @@ function run_FEM_A()
     α(x) = μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) / μ[3])
 
     parametric_info = parametric_specifics(μ, model, α, f, g, h)
-    RHS = assemble_forcing(FE_space, problem_info, parametric_info)
+    RHS = assemble_forcing(FE_space, parametric_info)
     LHS = assemble_stiffness(FE_space, problem_info, parametric_info)
+    Xᵘ = assemble_H1_norm_matrix(FE_space)
 
     function parametric_solution()
 
@@ -57,7 +59,7 @@ function run_FEM_A()
 
     end
 
-    return RHS, LHS, parametric_solution
+    return RHS, LHS, Xᵘ, parametric_solution
 
   end
 
@@ -80,8 +82,9 @@ function run_FEM_A_f_g()
     g(x) = sin(μ[5] * x[1]) + sin(μ[5] * x[2])
     parametric_info = parametric_specifics(μ, model, α, f, g, h)
 
-    RHS = assemble_forcing(FE_space, problem_info, parametric_info)
+    RHS = assemble_forcing(FE_space, parametric_info)
     LHS = assemble_stiffness(FE_space, problem_info, parametric_info)
+    Xᵘ = assemble_H1_norm_matrix(FE_space)
 
     function parametric_solution()
 
@@ -89,7 +92,7 @@ function run_FEM_A_f_g()
 
     end
 
-    return RHS, LHS, parametric_solution
+    return RHS, LHS, Xᵘ, parametric_solution
 
   end
 
@@ -114,8 +117,9 @@ function run_FEM_Omega()
     parametric_info = parametric_specifics(μ, model, α, f, g, h)
     FE_space = FE_space(problem_info, parametric_info)
 
-    RHS = assemble_forcing(FE_space, problem_info, parametric_info)
+    RHS = assemble_forcing(FE_space, parametric_info)
     LHS = assemble_stiffness(FE_space, problem_info, parametric_info)
+    Xᵘ = assemble_H1_norm_matrix(FE_space)
 
     function parametric_solution()
 
@@ -123,7 +127,7 @@ function run_FEM_Omega()
 
     end
 
-    return RHS, LHS, parametric_solution
+    return RHS, LHS, Xᵘ, parametric_solution
 
   end
 
@@ -146,6 +150,7 @@ end
 
 lazy_solution_info = lazy_map(FEM, μ)
 
+save_variable(lazy_solution_info[1][3], "Xᵘ", "csv", joinpath(paths.FEM_structures_path, "Xᵘ.csv"))
 if case === 0
   save_variable(lazy_solution_info[1][1], "F", "csv", joinpath(paths.FEM_structures_path, "F.csv"))
   save_variable(lazy_solution_info[1][2], "A", "csv", joinpath(paths.FEM_structures_path, "A.csv"))
@@ -153,11 +158,11 @@ elseif case === 1
   save_variable(lazy_solution_info[1][1], "F", "csv", joinpath(paths.FEM_structures_path, "F.csv"))
 end
 
-uₕ = lazy_solution_info[1][3]()
+uₕ = lazy_solution_info[1][4]()
 if nₛ > 1
   uₕ = hcat(uₕ, zeros(size(uₕ)[1], nₛ - 1))
 end
 for i in 1:nₛ
-  uₕ[:, i] = lazy_solution_info[i][3]()
+  uₕ[:, i] = lazy_solution_info[i][4]()
 end
 save_variable(uₕ, "uₕ", "csv", joinpath(problem_info.paths.FEM_snap_path, "uₕ.csv"))

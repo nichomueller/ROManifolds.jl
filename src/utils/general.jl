@@ -91,8 +91,6 @@ function load_variable(var_name, extension = "csv", path = nothing, sparse = fal
     :rtype: AbstractMatrix, AbstactVector
     =#
 
-    @assert !(sparse === false && (extension != "csv" || extension != "txt"))
-
     if path === nothing
         path = pwd() * "/" * var_name * "." * extension
     end
@@ -139,6 +137,17 @@ function load_variable(var_name, extension = "csv", path = nothing, sparse = fal
     end
 
 
+
+end
+
+function load_CSV(path; convert_to_sparse = false)
+
+  var = Matrix(CSV.read(path, DataFrame))
+  if convert_to_sparse === true
+      var = sparse(convert(Vector{Int64}, var[:,1]), convert(Vector{Int64}, var[:,2]), var[:,3])
+  end
+
+  var
 
 end
 

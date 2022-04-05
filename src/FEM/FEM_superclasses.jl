@@ -32,6 +32,7 @@ struct FESpacePoisson <: FEMProblem
 end
 
 struct problem_specifics
+  case::Int
   order::Int
   dirichlet_tags::Array
   neumann_tags::Array
