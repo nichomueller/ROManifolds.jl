@@ -4,7 +4,7 @@ include("../../../ROM/RB_superclasses.jl")
 include("../../../ROM/RB_utils.jl")
 
 RB_method = "S-GRB"
-ϵˢ = 1e-5
+ϵₛ = 1e-5
 training_percentage = 0.8
 considered_snaps = convert(Int64, nₛ * training_percentage)
 postprocess = false
@@ -43,7 +43,7 @@ struct ROM_specifics
   RB_method::String
   problem_nonlinearities::Dict
   nₛ::Int64
-  ϵˢ::Float64
+  ϵₛ::Float64
   postprocess::Bool
   import_snapshots::Bool
   import_offline_structures::Bool

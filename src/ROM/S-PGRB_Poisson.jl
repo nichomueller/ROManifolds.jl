@@ -56,9 +56,9 @@ function assemble_reduced_affine_components(ROM_info, RB_variables::PoissonSTPGR
         end
         Aₙ_i = reshape(Aₙ_i, :, 1)
         if ROM_info.save_offline_structures
-          (RB_variables.Aₙ_affine, RB_variables.Aₙ_idx) = DEIM_offline(Aₙ_i, ROM_info.ϵˢ, true, ROM_info.paths.ROM_structures_path, "Aₙ_mdeim")
+          (RB_variables.Aₙ_affine, RB_variables.Aₙ_idx) = DEIM_offline(Aₙ_i, ROM_info.ϵₛ, true, ROM_info.paths.ROM_structures_path, "Aₙ_mdeim")
         else
-          (RB_variables.Aₙ_affine, RB_variables.Aₙ_idx) = DEIM_offline(Aₙ_i, ROM_info.ϵˢ)
+          (RB_variables.Aₙ_affine, RB_variables.Aₙ_idx) = DEIM_offline(Aₙ_i, ROM_info.ϵₛ)
         end
       end
 
@@ -93,9 +93,9 @@ function assemble_reduced_affine_components(ROM_info, RB_variables::PoissonSTPGR
             Fₙ_i = hcat(Fₙ_i, (A_iΦₛᵘ)' * RB_variables.Pᵘ_inv * F)
           end
           if ROM_info.save_offline_structures
-            (RB_variables.Fₙ_affine, RB_variables.Fₙ_idx) = DEIM_offline(Fₙ_i, ROM_info.ϵˢ, true, ROM_info.paths.ROM_structures_path, "Fₙ_deim")
+            (RB_variables.Fₙ_affine, RB_variables.Fₙ_idx) = DEIM_offline(Fₙ_i, ROM_info.ϵₛ, true, ROM_info.paths.ROM_structures_path, "Fₙ_deim")
           else
-            (RB_variables.Fₙ_affine, RB_variables.Fₙ_idx) = DEIM_offline(Fₙ_i, ROM_info.ϵˢ)
+            (RB_variables.Fₙ_affine, RB_variables.Fₙ_idx) = DEIM_offline(Fₙ_i, ROM_info.ϵₛ)
           end
 
         end
@@ -131,9 +131,9 @@ function assemble_reduced_affine_components(ROM_info, RB_variables::PoissonSTPGR
         end
 
         if ROM_info.save_offline_structures
-          (RB_variables.Fₙ_affine, RB_variables.Fₙ_idx) = DEIM_offline(Fₙ_i, ROM_info.ϵˢ, true, ROM_info.paths.ROM_structures_path, "Fₙ_deim")
+          (RB_variables.Fₙ_affine, RB_variables.Fₙ_idx) = DEIM_offline(Fₙ_i, ROM_info.ϵₛ, true, ROM_info.paths.ROM_structures_path, "Fₙ_deim")
         else
-          (RB_variables.Fₙ_affine, RB_variables.Fₙ_idx) = DEIM_offline(Fₙ_i, ROM_info.ϵˢ)
+          (RB_variables.Fₙ_affine, RB_variables.Fₙ_idx) = DEIM_offline(Fₙ_i, ROM_info.ϵₛ)
         end
 
       end

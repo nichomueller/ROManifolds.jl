@@ -47,9 +47,9 @@ function stretching(x::Point, μ::Float64)
 end
 
 struct reference_info{T<:Int64}
-    L::T
-    dim::T
-    ndof_dir::T
+  L::T
+  dim::T
+  ndof_dir::T
 end
 
 function generate_cartesian_model(info::reference_info, deformation::Function, μ::Float64)

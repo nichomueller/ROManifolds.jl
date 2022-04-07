@@ -24,7 +24,7 @@ function PODs_time(ROM_info, RB_variables::RB_problem)
     #=MODIFY
     =#
 
-    @info "Performing the temporal POD for field u, using a tolerance of $ROM_info.ϵᵗ"
+    @info "Performing the temporal POD for field u, using a tolerance of $ROM_info.ϵₜ"
 
     if ROM_info.time_reduction_technique === "ST-HOSVD"
       Sᵘₜ = zeros(ROM_info.Nₜ, RB_variables.nᵤˢ * ROM_info.nₛ)
@@ -40,7 +40,7 @@ function PODs_time(ROM_info, RB_variables::RB_problem)
       end
     end
 
-    Φₜᵘ = POD(Sᵘ, ROM_info.ϵᵗ)
+    Φₜᵘ = POD(Sᵘ, ROM_info.ϵₜ)
     nₜᵘ = size(Φₜᵘ)[2]
 
     return (Φₜᵘ, nₜᵘ)
@@ -51,7 +51,7 @@ function build_reduced_basis(ROM_info, RB_variables::RB_problem)
   #=MODIFY
   =#
 
-  @info "Building the space-time reduced basis, using tolerances of $(ROM_info.ϵˢ, ROM_info.ϵᵗ)"
+  @info "Building the space-time reduced basis, using tolerances of $(ROM_info.ϵₛ, ROM_info.ϵₜ)"
 
   RB_building_time = @elapsed begin
     (Φₛᵘ, nₛᵘ) = PODs_space(ROM_info, RB_variables)

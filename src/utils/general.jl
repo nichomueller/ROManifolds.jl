@@ -1,6 +1,6 @@
 include("imports.jl")
 
-function create_dir(path)
+function create_dir(path::String)
     #=Create a directory at the given path
     :param name: path of the directory to be created, if not already existing
     :type name: str
@@ -12,18 +12,18 @@ function create_dir(path)
 
 end
 
-function get_full_subdirectories(rootdir)
+function get_full_subdirectories(rootdir::String)
     #=Get a full list of subdirectories at a given root directory
     :param rootdir: path of the root directory whose subdirectories are searched and listed
     :type rootdir: str
     =#
 
-    return filter(isdir, readdir(rootdir,join = true))
+    return filter(isdir, readdir(rootdir, join = true))
 
 end
 
 
-function save_variable(var, var_name, extension = "csv", path = nothing)
+#= function save_variable(var, var_name, extension = "csv", path = nothing)
     #=Utility method, which allows to save arrays/matrices in .jld files. If the path to the text file does not exist,
     it displays an error message.
     :param var: variable to be saved
@@ -54,10 +54,40 @@ function save_variable(var, var_name, extension = "csv", path = nothing)
         println("Error: $e. Impossible to save the desired variable")
     end
 
+end =#
+
+function save_CSV(var::AbstractArray, file_name::String)
+
+  if length(size(var)) === 1
+    var = reshape(var, :, 1)
+  end
+
+  if issparse(var)
+    i, j, v = findnz(var)
+    CSV.write(file_name, DataFrame([:i => i, :j => j, :v => v]))
+  else
+    try
+      CSV.write(file_name, DataFrame(var, :auto))
+    catch
+      CSV.write(file_name, Tables.table(var))
+    end
+  end
+
 end
 
+function append_CSV(var::AbstractArray, file_name::String)
 
-function JLD_append(filename, var_name, var)
+  if !isfile(file_name)
+    save_CSV(var, file_name)
+  else
+    file = open(file_name)
+    save_CSV(var, file)
+    close(file)
+  end
+
+end
+
+#= function append_JLD(filename, var_name, var)
     if !isfile(filename)
         save(filename, var_name, var)
     else
@@ -65,22 +95,11 @@ function JLD_append(filename, var_name, var)
         write(f, var_name, var)
         close(f)
     end
-end
-
-function CSV_append(var::Array, file_name::String)
-
-  if !isfile(file_name)
-    CSV.write(file_name, DataFrame(var))
-  else
-    file = open(file_name)
-    CSV.write(file_name, DataFrame(var))
-    close(file)
-  end
-
-end
+end =#
 
 
-function load_variable(var_name, extension = "csv", path = nothing, sparse = false, delimiter = nothing)
+
+#= function load_variable(var_name, extension = "csv", path = nothing, sparse = false, delimiter = nothing)
     #=Utility method, which allows to load arrays/matrices from .jld files. If the path to the text file does not exist,
     it displays an error message.
     :param variable_name: name of the loaded variable
@@ -136,11 +155,9 @@ function load_variable(var_name, extension = "csv", path = nothing, sparse = fal
         println("Error: $e. Impossible to load the desired variable")
     end
 
+end =#
 
-
-end
-
-function load_CSV(path; convert_to_sparse = false)
+function load_CSV(path::String; convert_to_sparse = false)
 
   var = Matrix(CSV.read(path, DataFrame))
   if convert_to_sparse === true
@@ -152,45 +169,55 @@ function load_CSV(path; convert_to_sparse = false)
 end
 
 
-function mydot(vec1, vec2, norm_matrix = nothing)
-    #=It computes the inner product between 'vec1' and 'vec2', defined by the (positive definite) matrix 'norm_matrix'.
-    If 'norm_matrix' is None (default), the standard inner product between 'vec1' and 'vec2' is returned.
-    :param vec1: first vector
-    :type vec1: np.ndarray
-    :param vec2: second vector
-    :type vec2: np.ndarray
-    :param norm_matrix: positive definite matrix, defining the inner product. If None, it defaults to the identity.
-    :type norm_matrix: scipy.sparse.csc_matrix or np.ndarray or NoneType
-    :return: inner product between 'vec1' and 'vec2', defined by 'norm_matrix'
-    :rtype: float
-    =#
+function mydot(vec1::Array, vec2::Array, norm_matrix = nothing)
+  #=It computes the inner product between 'vec1' and 'vec2', defined by the (positive definite) matrix 'norm_matrix'.
+  If 'norm_matrix' is None (default), the standard inner product between 'vec1' and 'vec2' is returned.
+  :param vec1: first vector
+  :type vec1: np.ndarray
+  :param vec2: second vector
+  :type vec2: np.ndarray
+  :param norm_matrix: positive definite matrix, defining the inner product. If None, it defaults to the identity.
+  :type norm_matrix: scipy.sparse.csc_matrix or np.ndarray or NoneType
+  :return: inner product between 'vec1' and 'vec2', defined by 'norm_matrix'
+  :rtype: float
+  =#
 
-    if norm_matrix === nothing
-        norm_matrix = float(I(size(vec1)[1]))
-    end
-    return sum(sum(vec1' .* norm_matrix .* vec2))
+  if norm_matrix === nothing
+      norm_matrix = float(I(size(vec1)[1]))
+  end
+
+  return sum(sum(vec1' * norm_matrix * vec2))
+
 end
 
 
-function mynorm(vec, norm_matrix = nothing)
-    #= It computes the norm of 'vec', defined by the (positive definite) matrix 'norm_matrix'.
-    If 'norm_matrix' is None (default), the Euclidean norm of 'vec' is returned.
-    :param vec: vector
-    :type vec: np.ndarray
-    :param norm_matrix: positive definite matrix, defining the norm. If None, it defaults to the identity.
-    :type norm_matrix: scipy.sparse.csc_matrix or np.ndarray or NoneType
-    :return: norm of 'vec', defined by 'norm_matrix'
-    :rtype: float
-    =#
+function mynorm(vec::Array, norm_matrix = nothing)
+  #= It computes the norm of 'vec', defined by the (positive definite) matrix 'norm_matrix'.
+  If 'norm_matrix' is None (default), the Euclidean norm of 'vec' is returned.
+  :param vec: vector
+  :type vec: np.ndarray
+  :param norm_matrix: positive definite matrix, defining the norm. If None, it defaults to the identity.
+  :type norm_matrix: scipy.sparse.csc_matrix or np.ndarray or NoneType
+  :return: norm of 'vec', defined by 'norm_matrix'
+  :rtype: float
+  =#
 
-    if norm_matrix === nothing
-        norm_matrix = float(I(size(vec1)[1]))
-    return sqrt(mydot(vec, vec, norm_matrix))
-    end
+  if norm_matrix === nothing
+    norm_matrix = float(I(size(vec1)[1]))
+  end
+
+  return sqrt(mydot(vec, vec, norm_matrix))
+
+end
+
+function generate_parameter(a::T, b::T, n::Int64 = 1) where T <: Array{Float64}
+
+  return [[rand(Uniform(a[i], b[i])) for i = 1:length(a)] for j in 1:n]
+
 end
 
 
-function convert_to_sparse(var, format = "csc")
+#= function convert_to_sparse(var, format = "csc")
     #= It computes the sparse representation of the input variable 'var', either a matrix or a vector;
     the format of the sparse variable is given by 'format'.
     :param mat: matrix, vector
@@ -300,10 +327,4 @@ function sparse_to_full_matrix(mat, format = "csc")
     end
     return full_mat
 
-end
-
-function generate_parameter(a::T, b::T, n::Int64 = 1) where T <: Array{Float64}
-
-  return [[rand(Uniform(a[i], b[i])) for i = 1:length(a)] for j in 1:n]
-
-end
+end =#

@@ -31,7 +31,7 @@ struct FESpacePoisson <: FEMProblem
   dΓ
 end
 
-struct problem_specifics
+struct problem_specifics <: FEMProblem
   case::Int
   order::Int
   dirichlet_tags::Array
@@ -41,11 +41,22 @@ struct problem_specifics
   problem_nonlinearities::Dict
 end
 
-struct parametric_specifics
-  μ::Array
-  model::UnstructuredDiscreteModel
-  α::Function
-  f::Function
-  g::Function
-  h::Function
+struct ProblemSpecificsUnsteady <: FEMProblem
+  case::Int
+  order::Int
+  dirichlet_tags::Array
+  neumann_tags::Array
+  solver::String
+
+  paths::Function
+  problem_nonlinearities::Dict
+end
+
+mutable struct parametric_specifics
+  μ
+  model
+  α
+  f
+  g
+  h
 end

@@ -8,7 +8,7 @@ function run_FEM()
   g(x) = 1
   h(x) = 1
 
-  FE_space = FE_space_0(problem_info, model)
+  FE_space = get_FE_space(problem_info, model, g)
 
   function run_parametric_FEM(μ::Array)
 
@@ -17,12 +17,12 @@ function run_FEM()
 
     parametric_info = parametric_specifics(μ, model, α, f, g, h)
     RHS = assemble_forcing(FE_space, parametric_info)
-    LHS = assemble_stiffness(FE_space, problem_info, parametric_info)
+    LHS = assemble_stiffness(FE_space, problem_info, parametric_info) # FE_space must take into account the Dirichlet BCs
     Xᵘ = assemble_H1_norm_matrix(FE_space)
 
     function parametric_solution()
 
-      return FE_solve_lifting(FE_space, problem_info, parametric_info)
+      return FE_solve(FE_space, problem_info, parametric_info)
 
     end
 
@@ -41,7 +41,7 @@ function run_FEM_A()
   g(x) = 1
   h(x) = 1
 
-  FE_space = FE_space_0(problem_info, model)
+  FE_space = get_FE_space(problem_info, model, g)
 
   function run_parametric_FEM(μ::Array)
 
@@ -55,7 +55,7 @@ function run_FEM_A()
 
     function parametric_solution()
 
-      return FE_solve_lifting(FE_space, problem_info, parametric_info)
+      return FE_solve(FE_space, problem_info, parametric_info)
 
     end
 
@@ -72,7 +72,7 @@ function run_FEM_A_f_g()
   model = DiscreteModelFromFile(paths.mesh_path)
   h(x) = 1
 
-  FE_space = FE_space_0(problem_info, model)
+  FE_space = get_FE_space(problem_info, model)
 
   function run_parametric_FEM(μ::Array)
 
@@ -88,7 +88,7 @@ function run_FEM_A_f_g()
 
     function parametric_solution()
 
-      return FE_solve_lifting(FE_space, problem_info, parametric_info)
+      return FE_solve(FE_space, problem_info, parametric_info)
 
     end
 
@@ -115,7 +115,7 @@ function run_FEM_Omega()
 
     model = generate_cartesian_model(ref_info, stretching, μ)
     parametric_info = parametric_specifics(μ, model, α, f, g, h)
-    FE_space = FE_space(problem_info, parametric_info)
+    FE_space = get_FE_space(problem_info, parametric_info, g)
 
     RHS = assemble_forcing(FE_space, parametric_info)
     LHS = assemble_stiffness(FE_space, problem_info, parametric_info)
@@ -136,7 +136,7 @@ function run_FEM_Omega()
 end
 
 const μ = generate_parameter(ranges[1, :], ranges[2, :], nₛ)
-save_variable(μ, "μ", "csv", joinpath(problem_info.paths.FEM_snap_path, "μ.csv"))
+save_CSV(μ, joinpath(problem_info.paths.FEM_snap_path, "μ.csv"))
 
 if case === 0
   FEM = run_FEM()
@@ -150,19 +150,24 @@ end
 
 lazy_solution_info = lazy_map(FEM, μ)
 
-save_variable(lazy_solution_info[1][3], "Xᵘ", "csv", joinpath(paths.FEM_structures_path, "Xᵘ.csv"))
+save_CSV(lazy_solution_info[1][3], joinpath(paths.FEM_structures_path, "Xᵘ.csv"))
 if case === 0
-  save_variable(lazy_solution_info[1][1], "F", "csv", joinpath(paths.FEM_structures_path, "F.csv"))
-  save_variable(lazy_solution_info[1][2], "A", "csv", joinpath(paths.FEM_structures_path, "A.csv"))
+  save_CSV(lazy_solution_info[1][1], joinpath(paths.FEM_structures_path, "F.csv"))
+  save_CSV(lazy_solution_info[1][2], joinpath(paths.FEM_structures_path, "A.csv"))
 elseif case === 1
-  save_variable(lazy_solution_info[1][1], "F", "csv", joinpath(paths.FEM_structures_path, "F.csv"))
+  save_CSV(lazy_solution_info[1][1], joinpath(paths.FEM_structures_path, "F.csv"))
 end
 
-uₕ = lazy_solution_info[1][4]()
+uₕ = lazy_solution_info[1][4]()[1]
+gₕ = lazy_solution_info[1][4]()[2]
+
 if nₛ > 1
   uₕ = hcat(uₕ, zeros(size(uₕ)[1], nₛ - 1))
+  gₕ = hcat(gₕ, zeros(size(gₕ)[1], nₛ - 1))
 end
-for i in 1:nₛ
-  uₕ[:, i] = lazy_solution_info[i][4]()
+for i in 2:nₛ
+  uₕ[:, i] = lazy_solution_info[i][4]()[1]
+  gₕ[:, i] = lazy_solution_info[i][4]()[2]
 end
-save_variable(uₕ, "uₕ", "csv", joinpath(problem_info.paths.FEM_snap_path, "uₕ.csv"))
+save_CSV(uₕ, joinpath(problem_info.paths.FEM_snap_path, "uₕ.csv"))
+save_CSV(gₕ, joinpath(problem_info.paths.FEM_snap_path, "gₕ.csv"))

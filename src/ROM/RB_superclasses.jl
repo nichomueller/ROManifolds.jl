@@ -6,8 +6,8 @@ abstract type STPGRB <: RB_problem end
 
 Sᵘ = Array{Float64}(undef, 0, 0)
 Sᵖ = Array{Float64}(undef, 0, 0)
-Nᵤˢ = 0
-Nᵤᵖ = 0
+Nₛᵘ = 0
+Nₛᵖ = 0
 Φₛᵘ = Array{Float64}(undef, 0, 0)
 Φₛᵖ = Array{Float64}(undef, 0, 0)
 nₛᵘ = 0
@@ -48,7 +48,7 @@ offline_time = 0.0
 
 mutable struct PoissonSTGRB <: STGRB
     Sᵘ
-    Nᵤˢ
+    Nₛᵘ
     Φₛᵘ
     nₛᵘ
     ũ
@@ -76,7 +76,7 @@ function setup_PoissonSTGRB(empty_struct::PoissonSTGRB) :: PoissonSTGRB
     #=MODIFY
     =#
 
-    return PoissonSTGRB(Sᵘ, Nᵤˢ, Φₛᵘ, nₛᵘ, ũ, uₙ, û, Aₙ, Aₙ_affine, Aₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, Pᵘ_inv, offline_time)
+    return PoissonSTGRB(Sᵘ, Nₛᵘ, Φₛᵘ, nₛᵘ, ũ, uₙ, û, Aₙ, Aₙ_affine, Aₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, Pᵘ_inv, offline_time)
 
 end
 
@@ -86,13 +86,13 @@ function setup_PoissonSTPGRB(empty_struct::PoissonSTPGRB) :: PoissonSTPGRB
 
   @forward (PoissonSTPGRB, :poissonSTGRB) PoissonSTGRB
 
-  return PoissonSTPGRB(PoissonSTGRB(Sᵘ, Nᵤˢ, Φₛᵘ, nₛᵘ, ũ, uₙ, û, Aₙ, Aₙ_affine, Aₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, Pᵘ_inv, offline_time), Pᵘ_inv)
+  return PoissonSTPGRB(PoissonSTGRB(Sᵘ, Nₛᵘ, Φₛᵘ, nₛᵘ, ũ, uₙ, û, Aₙ, Aₙ_affine, Aₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, Pᵘ_inv, offline_time), Pᵘ_inv)
 
 end
 
 mutable struct steady_ADR_RB <: RB_problem
     Sᵘ
-    Nᵤˢ
+    Nₛᵘ
     Φₛᵘ
     nₛᵘ
     ũ
@@ -121,7 +121,7 @@ function setup_steady_ADR_RB(problem::steady_ADR_RB) :: steady_ADR_RB
     =#
 
     Sᵘ = Array{Float64}(undef, 0, 0)
-    Nᵤˢ = 0
+    Nₛᵘ = 0
     Φₛᵘ = Array{Float64}(undef, 0, 0)
     nₛᵘ = 0
 
@@ -147,13 +147,13 @@ function setup_steady_ADR_RB(problem::steady_ADR_RB) :: steady_ADR_RB
 
     offline_time = 0.0
 
-    return steady_ADR_RB(Sᵘ, Nᵤˢ, Φₛᵘ, nₛᵘ, ũ, uₙ, û, Aₙ, Aₙ_affine, Aₙ_idx, Bₙ, Bₙ_affine, Bₙ_idx, Cₙ, Cₙ_affine, Cₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, offline_time)
+    return steady_ADR_RB(Sᵘ, Nₛᵘ, Φₛᵘ, nₛᵘ, ũ, uₙ, û, Aₙ, Aₙ_affine, Aₙ_idx, Bₙ, Bₙ_affine, Bₙ_idx, Cₙ, Cₙ_affine, Cₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, offline_time)
 
 end
 
 mutable struct ADR_RB <: RB_problem
     Sᵘ
-    Nᵤˢ
+    Nₛᵘ
     Φₛᵘ
     nₛᵘ
     Φₜᵘ
@@ -186,7 +186,7 @@ function setup_ADR_RB(problem::steady_ADR_RB) :: steady_ADR_RB
     =#
 
     Sᵘ = Array{Float64}(undef, 0, 0)
-    Nᵤˢ = 0
+    Nₛᵘ = 0
     Φₛᵘ = Array{Float64}(undef, 0, 0)
     nₛᵘ = 0
     Φₜᵘ = Array{Float64}(undef, 0, 0)
@@ -216,15 +216,15 @@ function setup_ADR_RB(problem::steady_ADR_RB) :: steady_ADR_RB
 
     offline_time = 0.0
 
-    return ADR_RB(Sᵘ, Nᵤˢ, Φₛᵘ, nₛᵘ, Φₜᵘ, nₜᵘ, nᵘ, ũ, uₙ, û, Mₙ, Aₙ, Aₙ_affine, Aₙ_idx, Bₙ, Bₙ_affine, Bₙ_idx, Cₙ, Cₙ_affine, Cₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, offline_time)
+    return ADR_RB(Sᵘ, Nₛᵘ, Φₛᵘ, nₛᵘ, Φₜᵘ, nₜᵘ, nᵘ, ũ, uₙ, û, Mₙ, Aₙ, Aₙ_affine, Aₙ_idx, Bₙ, Bₙ_affine, Bₙ_idx, Cₙ, Cₙ_affine, Cₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, offline_time)
 
 end
 
 mutable struct steady_Stokes_RB <: RB_problem
     Sᵘ
     Sᵖ
-    Nᵤˢ
-    Nᵤᵖ
+    Nₛᵘ
+    Nₛᵖ
     Φₛᵘ
     Φₛᵖ
     nₛᵘ
@@ -257,8 +257,8 @@ function setup_steady_Stokes_RB(problem::steady_Stokes_RB) :: steady_Stokes_RB
 
     Sᵘ = Array{Float64}(undef, 0, 0)
     Sᵖ = Array{Float64}(undef, 0, 0)
-    Nᵤˢ = 0
-    Nᵤᵖ = 0
+    Nₛᵘ = 0
+    Nₛᵖ = 0
     Φₛᵘ = Array{Float64}(undef, 0, 0)
     Φₛᵖ = Array{Float64}(undef, 0, 0)
     nₛᵘ = 0
@@ -287,15 +287,15 @@ function setup_steady_Stokes_RB(problem::steady_Stokes_RB) :: steady_Stokes_RB
 
     offline_time = 0.0
 
-    return steady_Stokes_RB(Sᵘ, Sᵖ, Nᵤˢ, Nᵤᵖ, Φₛᵘ, Φₛᵖ, nₛᵘ, nₛᵖ, ũ, uₙ, û, p̃, pₙ, p̂, Aₙ, Aₙ_affine, Aₙ_idx, Bₙ, Bₙ_affine, Bₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, Xᵖ, offline_time)
+    return steady_Stokes_RB(Sᵘ, Sᵖ, Nₛᵘ, Nₛᵖ, Φₛᵘ, Φₛᵖ, nₛᵘ, nₛᵖ, ũ, uₙ, û, p̃, pₙ, p̂, Aₙ, Aₙ_affine, Aₙ_idx, Bₙ, Bₙ_affine, Bₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, Xᵖ, offline_time)
 
 end
 
 mutable struct Stokes_RB <: RB_problem
     Sᵘ
     Sᵖ
-    Nᵤˢ
-    Nᵤᵖ
+    Nₛᵘ
+    Nₛᵖ
     Φₛᵘ
     Φₛᵖ
     nₛᵘ
@@ -333,8 +333,8 @@ function setup_Stokes_RB(problem::steady_Stokes_RB) :: steady_Stokes_RB
 
     Sᵘ = Array{Float64}(undef, 0, 0)
     Sᵖ = Array{Float64}(undef, 0, 0)
-    Nᵤˢ = 0
-    Nᵤᵖ = 0
+    Nₛᵘ = 0
+    Nₛᵖ = 0
     Φₛᵘ = Array{Float64}(undef, 0, 0)
     Φₛᵖ = Array{Float64}(undef, 0, 0)
     nₛᵘ = 0
@@ -368,14 +368,14 @@ function setup_Stokes_RB(problem::steady_Stokes_RB) :: steady_Stokes_RB
 
     offline_time = 0.0
 
-    return Stokes_RB(Sᵘ, Sᵖ, Nᵤˢ, Nᵤᵖ, Φₛᵘ, Φₛᵖ, nₛᵘ, nₛᵖ, Φₜᵘ, Φₜᵖ, nₜᵘ, nₜᵖ, ũ, uₙ, û, p̃, pₙ, p̂, Mₙ, Aₙ, Aₙ_affine, Aₙ_idx, Bₙ, Bₙ_affine, Bₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, Xᵖ, offline_time)
+    return Stokes_RB(Sᵘ, Sᵖ, Nₛᵘ, Nₛᵖ, Φₛᵘ, Φₛᵖ, nₛᵘ, nₛᵖ, Φₜᵘ, Φₜᵖ, nₜᵘ, nₜᵖ, ũ, uₙ, û, p̃, pₙ, p̂, Mₙ, Aₙ, Aₙ_affine, Aₙ_idx, Bₙ, Bₙ_affine, Bₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, Xᵖ, offline_time)
 end
 
 mutable struct steady_NS_RB <: RB_problem
     Sᵘ
     Sᵖ
-    Nᵤˢ
-    Nᵤᵖ
+    Nₛᵘ
+    Nₛᵖ
     Φₛᵘ
     Φₛᵖ
     nₛᵘ
@@ -408,8 +408,8 @@ end
 mutable struct NS_RB <: RB_problem
     Sᵘ
     Sᵖ
-    Nᵤˢ
-    Nᵤᵖ
+    Nₛᵘ
+    Nₛᵖ
     Φₛᵘ
     Φₛᵖ
     nₛᵘ

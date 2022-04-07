@@ -1,32 +1,6 @@
 include("../utils/general.jl")
 
-function FE_space(probl::problem_specifics, param::parametric_specifics)
-  #=MODIFY
-  =#
-
-  Tₕ = Triangulation(param.model)
-  degree = 2 .* probl.order
-  Qₕ = CellQuadrature(Tₕ, degree)
-
-  ref_FE = ReferenceFE(lagrangian, Float64, probl.order)
-  V₀ = TestFESpace(param.model, ref_FE; conformity=:H1, dirichlet_tags=probl.dirichlet_tags)
-  V = TrialFESpace(V₀, param.g)
-
-  ϕᵥ = get_fe_basis(V₀)
-  ϕᵤ = get_trial_fe_basis(V)
-  σₖ = get_cell_dof_ids(V₀)
-  Nₕ = length(get_free_dof_ids(V))
-
-  Ω = Triangulation(param.model)
-  dΩ = Measure(Ω, degree)
-  Γ = BoundaryTriangulation(param.model, tags=probl.neumann_tags)
-  dΓ = Measure(Γ, degree)
-
-  return FESpacePoisson(Qₕ, V₀, V, ϕᵥ, ϕᵤ, σₖ, Nₕ, dΩ, dΓ)
-
-end
-
-function FE_space_0(probl::problem_specifics, model::UnstructuredDiscreteModel)
+function get_FE_space(probl::problem_specifics, model::UnstructuredDiscreteModel, g = nothing)
   #=MODIFY
   =#
 
@@ -36,7 +10,11 @@ function FE_space_0(probl::problem_specifics, model::UnstructuredDiscreteModel)
 
   ref_FE = ReferenceFE(lagrangian, Float64, probl.order)
   V₀ = TestFESpace(model, ref_FE; conformity=:H1, dirichlet_tags=probl.dirichlet_tags)
-  V = TrialFESpace(V₀, (x -> 0))
+  if !isnothing(g)
+    V = TrialFESpace(V₀, g)
+  else
+    V = TrialFESpace(V₀, (x -> 0))
+  end
 
   ϕᵥ = get_fe_basis(V₀)
   ϕᵤ = get_trial_fe_basis(V)
@@ -80,7 +58,8 @@ function assemble_H1_norm_matrix(FE_space::FEMProblem)
   #=MODIFY
   =#
 
-  Xᵘ = assemble_matrix(∫(∇(FE_space.ϕᵥ) ⋅ ∇(FE_space.ϕᵤ)) * FE_space.dΩ, FE_space.V, FE_space.V₀) + assemble_matrix(∫(FE_space.ϕᵥ * FE_space.ϕᵤ) * FE_space.dΩ, FE_space.V, FE_space.V₀)
+  Xᵘ = assemble_matrix(∫(∇(FE_space.ϕᵥ) ⋅ ∇(FE_space.ϕᵤ)) * FE_space.dΩ, FE_space.V, FE_space.V₀) +
+  assemble_matrix(∫(FE_space.ϕᵥ * FE_space.ϕᵤ) * FE_space.dΩ, FE_space.V, FE_space.V₀)
 
   return Xᵘ
 
@@ -90,9 +69,11 @@ function FE_solve(FE_space::FESpacePoisson, probl::problem_specifics, param::par
   #=MODIFY
   =#
 
+  _, Gₕ = get_lifting_operator(FE_space, param)
+
   a(u, v) = ∫(∇(v) ⋅ (param.α * ∇(u))) * FE_space.dΩ
-  f(v) = ∫(v * param.f) * FE_space.dΩ + ∫(v * param.h) * FE_space.dΓ
-  operator = AffineFEOperator(a, f, FE_space.V, FE_space.V₀)
+  b(v) = ∫(v * param.f) * FE_space.dΩ + ∫(v * param.h) * FE_space.dΓ
+  operator = AffineFEOperator(a, b, FE_space.V, FE_space.V₀)
 
   if probl.solver === "lu"
     uₕ_field = solve(LinearFESolver(LUSolver()), operator)
@@ -100,28 +81,17 @@ function FE_solve(FE_space::FESpacePoisson, probl::problem_specifics, param::par
     uₕ_field = solve(LinearFESolver(), operator)
   end
 
-  uₕ = get_free_dof_values(uₕ_field)
-  return uₕ
+  uₕ = get_free_dof_values(uₕ_field) - Gₕ
+
+  return uₕ, Gₕ
 
 end
 
-function FE_solve_lifting(FE_space::FESpacePoisson, probl::problem_specifics, param::parametric_specifics)
-  #=MODIFY
-  =#
+function get_lifting_operator(FE_space::FESpacePoisson, param::parametric_specifics)
 
-  gₕ = interpolate_everywhere(param.g, FE_space.V₀)
+  gₕ = interpolate_everywhere(param.g, FE_space.V)
+  Gₕ = get_free_dof_values(gₕ)
 
-  a(u, v) = ∫(∇(v) ⋅ (param.α * ∇(u))) * FE_space.dΩ
-  f(v) = ∫(v * param.f) * FE_space.dΩ + ∫(v * param.h) * FE_space.dΓ - a(gₕ, v)
-  operator = AffineFEOperator(a, f, FE_space.V, FE_space.V₀)
-
-  if probl.solver === "lu"
-    uₕ_field = solve(LinearFESolver(LUSolver()), operator)
-  else
-    uₕ_field = solve(LinearFESolver(), operator)
-  end
-
-  uₕ = get_free_dof_values(uₕ_field) + get_free_dof_values(gₕ)
-  return uₕ
+  gₕ, Gₕ
 
 end
