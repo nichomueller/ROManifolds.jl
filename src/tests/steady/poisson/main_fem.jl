@@ -15,7 +15,7 @@ function run_FEM()
     @assert length(μ) === 3 "μ must be a 3x1 vector"
     α(x) = sum(μ)
 
-    parametric_info = parametric_specifics(μ, model, α, f, g, h)
+    parametric_info = ParametricSpecifics(μ, model, α, f, g, h)
     RHS = assemble_forcing(FE_space, parametric_info)
     LHS = assemble_stiffness(FE_space, problem_info, parametric_info) # FE_space must take into account the Dirichlet BCs
     Xᵘ = assemble_H1_norm_matrix(FE_space)
@@ -48,7 +48,7 @@ function run_FEM_A()
     @assert length(μ) === 3 "μ must be a 3x1 vector"
     α(x) = μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) / μ[3])
 
-    parametric_info = parametric_specifics(μ, model, α, f, g, h)
+    parametric_info = ParametricSpecifics(μ, model, α, f, g, h)
     RHS = assemble_forcing(FE_space, parametric_info)
     LHS = assemble_stiffness(FE_space, problem_info, parametric_info)
     Xᵘ = assemble_H1_norm_matrix(FE_space)
@@ -80,7 +80,7 @@ function run_FEM_A_f_g()
     α(x) = μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) / μ[3])
     f(x) = sin(μ[4] * x[1]) + sin(μ[4] * x[2])
     g(x) = sin(μ[5] * x[1]) + sin(μ[5] * x[2])
-    parametric_info = parametric_specifics(μ, model, α, f, g, h)
+    parametric_info = ParametricSpecifics(μ, model, α, f, g, h)
 
     RHS = assemble_forcing(FE_space, parametric_info)
     LHS = assemble_stiffness(FE_space, problem_info, parametric_info)
@@ -114,7 +114,7 @@ function run_FEM_Omega()
     @assert length(μ) === 1 "μ must be a 1x1 vector"
 
     model = generate_cartesian_model(ref_info, stretching, μ)
-    parametric_info = parametric_specifics(μ, model, α, f, g, h)
+    parametric_info = ParametricSpecifics(μ, model, α, f, g, h)
     FE_space = get_FE_space(problem_info, parametric_info, g)
 
     RHS = assemble_forcing(FE_space, parametric_info)

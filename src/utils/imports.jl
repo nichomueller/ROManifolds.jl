@@ -4,7 +4,7 @@ using Base: @kwdef
 using ReusePatterns
 using SuiteSparse, SparseArrays, Serialization, ThreadedSparseCSR, SparseMatricesCSR, LazyAlgebra, LazyAlgebra.SparseMethods, Arpack
 using MAT, CSV, JLD, DelimitedFiles, Arrow, CodecLz4
-using Test, InteractiveUtils, TimerOutputs, BenchmarkTools, Interact, Logging, Plots
+using Test, InteractiveUtils, TimerOutputs, BenchmarkTools, Interact, Logging, Plots, WriteVTK
 using Conda, PyCall
 using Flux, Flux.Data.MNIST
 using Gridap, Gridap.FESpaces, Gridap.ReferenceFEs, Gridap.Arrays, Gridap.Geometry, Gridap.Fields, Gridap.CellData

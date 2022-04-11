@@ -9,7 +9,7 @@ order = 1
 solver = "lu"
 nₛ = 100
 root = "/home/user1/git_repos/Mabla.jl"
-case = 0
+case = 2
 
 if case === 0
 
@@ -53,4 +53,4 @@ else
 
 end
 
-problem_info = problem_specifics(case, order, dirichlet_tags, neumann_tags, solver, paths, problem_nonlinearities)
+problem_info = ProblemSpecifics(case, order, dirichlet_tags, neumann_tags, solver, paths, problem_nonlinearities)

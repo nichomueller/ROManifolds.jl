@@ -1,8 +1,9 @@
-abstract type RB_problem end
-abstract type RB_problem_unsteady <: RB_problem end
-abstract type RB_problem_steady <: RB_problem end
-abstract type STGRB <: RB_problem end
-abstract type STPGRB <: RB_problem end
+include("../FEM/FEM_superclasses.jl")
+abstract type RBProblem <: Problem end
+abstract type RBProblemUnsteady <: RBProblem end
+abstract type RBProblem_steady <: RBProblem end
+abstract type STGRB <: RBProblem end
+abstract type STPGRB <: RBProblem end
 
 Sᵘ = Array{Float64}(undef, 0, 0)
 Sᵖ = Array{Float64}(undef, 0, 0)
@@ -90,7 +91,7 @@ function setup_PoissonSTPGRB(empty_struct::PoissonSTPGRB) :: PoissonSTPGRB
 
 end
 
-mutable struct steady_ADR_RB <: RB_problem
+mutable struct steady_ADR_RB <: RBProblem
     Sᵘ
     Nₛᵘ
     Φₛᵘ
@@ -151,7 +152,7 @@ function setup_steady_ADR_RB(problem::steady_ADR_RB) :: steady_ADR_RB
 
 end
 
-mutable struct ADR_RB <: RB_problem
+mutable struct ADR_RB <: RBProblem
     Sᵘ
     Nₛᵘ
     Φₛᵘ
@@ -220,7 +221,7 @@ function setup_ADR_RB(problem::steady_ADR_RB) :: steady_ADR_RB
 
 end
 
-mutable struct steady_Stokes_RB <: RB_problem
+mutable struct steady_Stokes_RB <: RBProblem
     Sᵘ
     Sᵖ
     Nₛᵘ
@@ -291,7 +292,7 @@ function setup_steady_Stokes_RB(problem::steady_Stokes_RB) :: steady_Stokes_RB
 
 end
 
-mutable struct Stokes_RB <: RB_problem
+mutable struct Stokes_RB <: RBProblem
     Sᵘ
     Sᵖ
     Nₛᵘ
@@ -371,7 +372,7 @@ function setup_Stokes_RB(problem::steady_Stokes_RB) :: steady_Stokes_RB
     return Stokes_RB(Sᵘ, Sᵖ, Nₛᵘ, Nₛᵖ, Φₛᵘ, Φₛᵖ, nₛᵘ, nₛᵖ, Φₜᵘ, Φₜᵖ, nₜᵘ, nₜᵖ, ũ, uₙ, û, p̃, pₙ, p̂, Mₙ, Aₙ, Aₙ_affine, Aₙ_idx, Bₙ, Bₙ_affine, Bₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, Xᵖ, offline_time)
 end
 
-mutable struct steady_NS_RB <: RB_problem
+mutable struct steady_NS_RB <: RBProblem
     Sᵘ
     Sᵖ
     Nₛᵘ
@@ -405,7 +406,7 @@ mutable struct steady_NS_RB <: RB_problem
     offline_time
 end
 
-mutable struct NS_RB <: RB_problem
+mutable struct NS_RB <: RBProblem
     Sᵘ
     Sᵖ
     Nₛᵘ

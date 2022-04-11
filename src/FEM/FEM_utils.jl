@@ -64,3 +64,10 @@ function generate_cartesian_model(info::reference_info, deformation::Function, Î
   return model
 
 end
+
+function generate_vtk_file(FE_space::FEMProblem, path::String, var_name::String, var::Array)
+
+  FE_var = FEFunction(FE_space.V, var)
+  writevtk(FE_space.Î©, path, cellfields = [var_name => FE_var])
+
+end

@@ -1,4 +1,6 @@
-abstract type FEMProblem end
+abstract type Problem end
+
+abstract type FEMProblem <: Problem end
 
 struct UnsteadyProblem <: FEMProblem  end
 
@@ -18,7 +20,6 @@ struct ConservationLawProblem <: FEMProblem end
 
 struct PoissonProblem <: FEMProblem end
 
-
 struct FESpacePoisson <: FEMProblem
   Qₕ
   V₀
@@ -27,11 +28,12 @@ struct FESpacePoisson <: FEMProblem
   ϕᵤ
   σₖ
   Nₕ
+  Ω
   dΩ
   dΓ
 end
 
-struct problem_specifics <: FEMProblem
+struct ProblemSpecifics <: FEMProblem
   case::Int
   order::Int
   dirichlet_tags::Array
@@ -52,7 +54,7 @@ struct ProblemSpecificsUnsteady <: FEMProblem
   problem_nonlinearities::Dict
 end
 
-mutable struct parametric_specifics
+mutable struct ParametricSpecifics
   μ
   model
   α

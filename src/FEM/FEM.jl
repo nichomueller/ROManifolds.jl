@@ -1,6 +1,6 @@
 include("../utils/general.jl")
 
-function get_FE_space(probl::problem_specifics, model::UnstructuredDiscreteModel, g = nothing)
+function get_FE_space(probl::ProblemSpecifics, model::UnstructuredDiscreteModel, g = nothing)
   #=MODIFY
   =#
 
@@ -26,11 +26,13 @@ function get_FE_space(probl::problem_specifics, model::UnstructuredDiscreteModel
   Γ = BoundaryTriangulation(model, tags=probl.neumann_tags)
   dΓ = Measure(Γ, degree)
 
-  return FESpacePoisson(Qₕ, V₀, V, ϕᵥ, ϕᵤ, σₖ, Nₕ, dΩ, dΓ)
+  FE_space = FESpacePoisson(Qₕ, V₀, V, ϕᵥ, ϕᵤ, σₖ, Nₕ, Ω, dΩ, dΓ)
+
+  return FE_space
 
 end
 
-function assemble_stiffness(FE_space::FEMProblem, probl::problem_specifics, param::parametric_specifics)
+function assemble_stiffness(FE_space::FEMProblem, probl::Problem, param::ParametricSpecifics)
   #=MODIFY
   =#
 
@@ -44,7 +46,7 @@ function assemble_stiffness(FE_space::FEMProblem, probl::problem_specifics, para
 
 end
 
-function assemble_forcing(FE_space::FEMProblem, param::parametric_specifics)
+function assemble_forcing(FE_space::FEMProblem, param::ParametricSpecifics)
   #=MODIFY
   =#
 
@@ -65,7 +67,7 @@ function assemble_H1_norm_matrix(FE_space::FEMProblem)
 
 end
 
-function FE_solve(FE_space::FESpacePoisson, probl::problem_specifics, param::parametric_specifics)
+function FE_solve(FE_space::FESpacePoisson, probl::ProblemSpecifics, param::ParametricSpecifics)
   #=MODIFY
   =#
 
@@ -87,7 +89,7 @@ function FE_solve(FE_space::FESpacePoisson, probl::problem_specifics, param::par
 
 end
 
-function get_lifting_operator(FE_space::FESpacePoisson, param::parametric_specifics)
+function get_lifting_operator(FE_space::FESpacePoisson, param::ParametricSpecifics)
 
   gₕ = interpolate_everywhere(param.g, FE_space.V)
   Gₕ = get_free_dof_values(gₕ)
