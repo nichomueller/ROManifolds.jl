@@ -1,7 +1,7 @@
 include("../utils/general.jl")
 include("../FEM/FEM_utils.jl")
 
-function POD(S, ϵ = 1e-5, X = nothing)
+function POD(S, ϵ = 1e-5, X = nothing; check_Σ = false)
   #=MODIFY
   =#
 
@@ -27,22 +27,30 @@ function POD(S, ϵ = 1e-5, X = nothing)
   cumulative_energy = 0.0
   N = 0
 
-  while cumulative_energy / total_energy < 1.0 - ϵ ^ 2 && N < size(S̃)[2]
-    N += 1
-    cumulative_energy += Σ[N] ^ 2
-    @info "POD loop number $N, cumulative energy = $cumulative_energy"
+  if !check_Σ
+    while cumulative_energy / total_energy < 1.0 - ϵ ^ 2 && N < size(S̃)[2]
+      N += 1
+      cumulative_energy += Σ[N] ^ 2
+      @info "POD loop number $N, cumulative energy = $cumulative_energy"
+    end
+  else
+    while N < size(S̃)[2] && (Σ[N + 1] > ϵ || cumulative_energy / total_energy < 1.0 - ϵ ^ 2)
+      N += 1
+      cumulative_energy += Σ[N] ^ 2
+      @info "POD loop number $N, cumulative energy = $cumulative_energy"
+    end
   end
 
-  @info "Basis number obtained via POD is $N, projection error ≤ $(abs((sqrt(1 - cumulative_energy / total_energy))))"
+  @info "Basis number obtained via POD is $N, projection error ≤ $((sqrt(abs(1 - cumulative_energy / total_energy))))"
 
   if issparse(U)
     U = Matrix(U)
   end
 
   if !isnothing(X)
-    return Matrix((L' \ U[:, 1:N])[invperm(H.p), :]) #Matrix((L' \ U[:, 1:N]))
+    return Matrix((L' \ U[:, 1:N])[invperm(H.p), :]), Σ #Matrix((L' \ U[:, 1:N]))
   else
-    return U[:, 1:N]
+    return U[:, 1:N], Σ
   end
 
 end
@@ -98,18 +106,20 @@ function DEIM_offline(S, ϵ = 1e-5)
   #=MODIFY
   =#
 
-  DEIM_mat = POD(S, ϵ)
+  DEIM_mat, Σ = POD(S, ϵ; check_Σ = true)
 
   (N, n) = size(DEIM_mat)
-  DEIM_idx = zeros(Int64, n)
+  DEIM_idx = Int64[]
 
-  DEIM_idx[1] = convert(Int64, argmax(abs.(DEIM_mat[:, 1]))[1])
+  append!(DEIM_idx, convert(Int64, argmax(abs.(DEIM_mat[:, 1]))[1]))
   for m in range(2, n)
     res = DEIM_mat[:, m] - DEIM_mat[:, 1:(m-1)] * (DEIM_mat[DEIM_idx[1:(m-1)], 1:(m-1)] \ DEIM_mat[DEIM_idx[1:(m-1)], m])
-    DEIM_idx[m] = convert(Int64, argmax(abs.(res))[1])
+    append!(DEIM_idx, convert(Int64, argmax(abs.(res))[1]))
   end
 
-  (DEIM_mat, DEIM_idx)
+  DEIM_err_bound = Σ[n+1] * norm(DEIM_mat[DEIM_idx, :] \ I(n))
+
+  (DEIM_mat, DEIM_idx, DEIM_err_bound, Σ)
 
 end
 
@@ -132,7 +142,7 @@ function MDEIM_online(mat_nonaffine, MDEIM_mat, MDEIM_idx, row_idx = nothing, co
   =#
 
   if !issparse(mat_nonaffine)
-    vec_nonaffine = reshape(mat_nonaffine, length(mat_nonaffine), 1)
+    vec_nonaffine = reshape(mat_nonaffine, :, 1)
   else
     vec_nonaffine = zeros(length(row_idx))
     full_idx = hcat(row_idx, col_idx)
@@ -145,7 +155,7 @@ function MDEIM_online(mat_nonaffine, MDEIM_mat, MDEIM_idx, row_idx = nothing, co
   vec_affine = MDEIM_mat * MDEIM_coeffs
 
   if !issparse(mat_nonaffine)
-    mat_affine = reshape(vec_affine, R, C)
+    mat_affine = reshape(vec_affine, size(mat_nonaffine)[1], size(mat_nonaffine)[2])
   else
     mat_affine = sparse(row_idx, col_idx, vec_affine)
   end
@@ -155,6 +165,8 @@ function MDEIM_online(mat_nonaffine, MDEIM_mat, MDEIM_idx, row_idx = nothing, co
 end
 
 function build_A_snapshots(problem_info, ROM_info, nₛ_MDEIM::Int, μ::Array)
+
+  @info "Building $nₛ_MDEIM snapshots of the matrix A"
 
   row_idx, col_idx, val, A = Int64[], Int64[], zeros(0), zeros(0)
   for i_nₛ = 1:nₛ_MDEIM
@@ -173,35 +185,44 @@ function build_A_snapshots(problem_info, ROM_info, nₛ_MDEIM::Int, μ::Array)
 
 end
 
-function MPOD(S_sparse::SparseMatrixCSC, ϵ = 1e-5)
+function find_FE_elements(idx::Array, σₖ::Table)
 
-  Nₕ = convert(Int64, sqrt(size(S_sparse)[1]))
-  z, _, _ = findnz(S_sparse)
-  z = unique(z)
-  S = Matrix(S_sparse[z, :])
-  U = POD(S, ϵ)
-  m = size(U)[2]
-  _, jU, vU = findnz(sparse(U))
+  el = Int64[]
+  for i = 1:length(idx)
+    for j = 1:size(σₖ)[1]
+      if idx[i] in abs.(σₖ[j])
+        append!(el, j)
+      end
+    end
+  end
 
-  return sparse(repeat(z, m, 1)[:], jU, vU, Nₕ ^ 2, m)
+  el
 
 end
 
-function MDEIM(U_sparse::SparseMatrixCSC)
+function MDEIM_offline(problem_info, ROM_info, nₛ_MDEIM::Int, μ::Array)
 
-  m = size(U_sparse)[2]
-  z, _, _ = findnz(U_sparse)
-  z = unique(z)
-  DEIM_mat = Matrix(U_sparse[z, :])
-  DEIM_idx = zeros(Int64, m)
+  A_snapshots, row_idx, col_idx = build_A_snapshots(problem_info, ROM_info, nₛ_MDEIM, μ)
+  MDEIM_mat, MDEIM_idx, MDEIM_err_bound, Σ = DEIM_offline(A_snapshots, ROM_info.ϵₛ)
+  idx = unique(union(row_idx[MDEIM_idx], col_idx[MDEIM_idx]))
 
-  DEIM_idx[1] = convert(Int64, argmax(abs.(DEIM_mat[:, 1]))[1])
-  for m in range(2, size(U_sparse)[2])
-    res = DEIM_mat[:, m] - DEIM_mat[:, 1:(m-1)] * (DEIM_mat[DEIM_idx[1:(m-1)], 1:(m-1)] \ DEIM_mat[DEIM_idx[1:(m-1)], m])
-    DEIM_idx[m] = convert(Int64, argmax(abs.(res))[1])
-  end
+  μ1 = parse.(Float64, split(chop(μ[1]; head=1, tail=1), ','))
+  parametric_info = get_parametric_specifics(ROM_info, μ1)
+  FE_space = get_FE_space(problem_info, parametric_info.model)
+  el = find_FE_elements(idx, FE_space.σₖ)
 
-  return z[DEIM_idx]
+  MDEIM_mat, MDEIM_idx, row_idx, col_idx, el, MDEIM_err_bound, Σ
+
+end
+
+function build_sparse_LHS(problem_info, ROM_info, μ_i::Array, el::Array)
+
+  parametric_info = get_parametric_specifics(ROM_info, μ_i)
+  FE_space = get_FE_space(problem_info, parametric_info.model)
+
+  Ω_sparse = view(FE_space.Ω, el)
+  dΩ_sparse = Measure(Ω_sparse, 2 * problem_info.order)
+  assemble_matrix(∫(∇(FE_space.ϕᵥ) ⋅ (parametric_info.α * ∇(FE_space.ϕᵤ))) * dΩ_sparse, FE_space.V, FE_space.V₀)
 
 end
 
@@ -227,13 +248,17 @@ function get_parametric_specifics(ROM_info, μ_nb)
   end
   α(x) = prepare_α(x, μ_nb, ROM_info.case)
 
-  if ROM_info.case === 2
-    f(x) = sin(μ_nb[4] * x[1]) + sin(μ_nb[4] * x[2])
-    h(x) = 1
-    return ParametricSpecifics(μ_nb, model, α, f, [], h)
-  else
-    return ParametricSpecifics(μ_nb, model, α, [], [], [])
+  function prepare_f(x, μ, case)
+    if case === 2
+      return sin(μ_nb[4] * x[1]) + sin(μ_nb[4] * x[2])
+    else
+      return 1
+    end
   end
+  f(x) = prepare_f(x, μ_nb, ROM_info.case)
+  h(x) = 1
+
+  ParametricSpecifics(μ_nb, model, α, f, [], h)
 
 end
 
@@ -270,3 +295,35 @@ function compute_MDEIM_error(problem_info, ROM_info, RB_variables, μ)
   Aₙ_μ = (RB_variables.Φₛᵘ)' * assemble_stiffness(FE_space, ROM_info, parametric_info) * RB_variables.Φₛᵘ
 
 end
+
+#= function MPOD(S_sparse::SparseMatrixCSC, ϵ = 1e-5)
+
+  Nₕ = convert(Int64, sqrt(size(S_sparse)[1]))
+  z, _, _ = findnz(S_sparse)
+  z = unique(z)
+  S = Matrix(S_sparse[z, :])
+  U = POD(S, ϵ)
+  m = size(U)[2]
+  _, jU, vU = findnz(sparse(U))
+
+  return sparse(repeat(z, m, 1)[:], jU, vU, Nₕ ^ 2, m)
+
+end
+
+function MDEIM(U_sparse::SparseMatrixCSC)
+
+  m = size(U_sparse)[2]
+  z, _, _ = findnz(U_sparse)
+  z = unique(z)
+  DEIM_mat = Matrix(U_sparse[z, :])
+  DEIM_idx = zeros(Int64, m)
+
+  DEIM_idx[1] = convert(Int64, argmax(abs.(DEIM_mat[:, 1]))[1])
+  for m in range(2, size(U_sparse)[2])
+    res = DEIM_mat[:, m] - DEIM_mat[:, 1:(m-1)] * (DEIM_mat[DEIM_idx[1:(m-1)], 1:(m-1)] \ DEIM_mat[DEIM_idx[1:(m-1)], m])
+    DEIM_idx[m] = convert(Int64, argmax(abs.(res))[1])
+  end
+
+  return z[DEIM_idx]
+
+end =#

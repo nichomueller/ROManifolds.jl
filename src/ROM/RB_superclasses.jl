@@ -27,8 +27,11 @@ p̂ = Float64[]
 
 Mₙ = Array{Float64}(undef, 0, 0)
 Aₙ = Array{Float64}(undef, 0, 0)
-Aₙ_affine = Array{Float64}(undef, 0, 0)
-Aₙ_idx = Float64[]
+MDEIM_mat = Array{Float64}(undef, 0, 0)
+MDEIM_idx = Float64[]
+row_idx = Float64[]
+col_idx = Float64[]
+sparse_el = Float64[]
 Bₙ = Array{Float64}(undef, 0, 0)
 Bₙ_affine = Array{Float64}(undef, 0, 0)
 Bₙ_idx = Float64[]
@@ -37,8 +40,8 @@ Cₙ_affine = Array{Float64}(undef, 0, 0)
 Cₙ_idx = Float64[]
 LHSₙ = Matrix{Float64}[]
 Fₙ = Float64[]
-Fₙ_affine = Float64[]
-Fₙ_idx = Float64[]
+DEIM_mat = Float64[]
+DEIM_idx = Float64[]
 RHSₙ = Matrix{Float64}[]
 Xᵘ = sparse([],[],[])
 Xᵖ = sparse([],[],[])
@@ -56,15 +59,17 @@ mutable struct PoissonSTGRB <: STGRB
     uₙ
     û
     Aₙ
-    Aₙ_affine
-    Aₙ_idx
+    MDEIM_mat
+    MDEIM_idx
+    row_idx
+    col_idx
+    sparse_el
     LHSₙ
     Fₙ
-    Fₙ_affine
-    Fₙ_idx
+    DEIM_mat
+    DEIM_idx
     RHSₙ
     Xᵘ
-    Pᵘ_inv
     offline_time
 end
 
@@ -77,7 +82,8 @@ function setup_PoissonSTGRB(empty_struct::PoissonSTGRB) :: PoissonSTGRB
     #=MODIFY
     =#
 
-    return PoissonSTGRB(Sᵘ, Nₛᵘ, Φₛᵘ, nₛᵘ, ũ, uₙ, û, Aₙ, Aₙ_affine, Aₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, Pᵘ_inv, offline_time)
+    return PoissonSTGRB(Sᵘ, Nₛᵘ, Φₛᵘ, nₛᵘ, ũ, uₙ, û, Aₙ, MDEIM_mat, MDEIM_idx, row_idx, col_idx,
+    sparse_el, LHSₙ, Fₙ, DEIM_mat, DEIM_idx, RHSₙ, Xᵘ, offline_time)
 
 end
 
@@ -87,7 +93,8 @@ function setup_PoissonSTPGRB(empty_struct::PoissonSTPGRB) :: PoissonSTPGRB
 
   @forward (PoissonSTPGRB, :poissonSTGRB) PoissonSTGRB
 
-  return PoissonSTPGRB(PoissonSTGRB(Sᵘ, Nₛᵘ, Φₛᵘ, nₛᵘ, ũ, uₙ, û, Aₙ, Aₙ_affine, Aₙ_idx, LHSₙ, Fₙ, Fₙ_affine, Fₙ_idx, RHSₙ, Xᵘ, Pᵘ_inv, offline_time), Pᵘ_inv)
+  return PoissonSTPGRB(PoissonSTGRB(ᵘ, Nₛᵘ, Φₛᵘ, nₛᵘ, ũ, uₙ, û, Aₙ, MDEIM_mat, MDEIM_idx, row_idx, col_idx,
+  sparse_el, LHSₙ, Fₙ, DEIM_mat, DEIM_idx, RHSₙ, Pᵘ_inv, offline_time), Pᵘ_inv)
 
 end
 

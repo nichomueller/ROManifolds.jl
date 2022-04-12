@@ -1,5 +1,5 @@
 using Pkg
-using DataFrames, Random, DataStructures, FillArrays, Tables, LinearAlgebra, Statistics, Distributions, Parameters, Classes, BlockArrays
+using DataFrames, Random, DataStructures, FillArrays, Tables, TypedTables, LinearAlgebra, Statistics, Distributions, Parameters, Classes, BlockArrays
 using Base: @kwdef
 using ReusePatterns
 using SuiteSparse, SparseArrays, Serialization, ThreadedSparseCSR, SparseMatricesCSR, LazyAlgebra, LazyAlgebra.SparseMethods, Arpack

@@ -9,12 +9,12 @@ considered_snaps = convert(Int64, nₛ * training_percentage)
 ϵₛ = 1e-5
 perform_RHS_DEIM = false
 postprocess = false
-import_snapshots = true
-import_offline_structures = false
+import_snapshots = false
+import_offline_structures = true
 save_offline_structures = true
 save_results = true
 
-case = 2
+case = 1
 
 if case === 0
 

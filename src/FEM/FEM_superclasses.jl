@@ -6,19 +6,9 @@ struct UnsteadyProblem <: FEMProblem  end
 
 struct SteadyProblem <: FEMProblem end
 
-struct FSIProblem <: FEMProblem end
-
-struct NavierStokesProblem <: FEMProblem end
-
-struct StokesProblem <: FEMProblem end
-
-struct ADRProblem <: FEMProblem end
-
-struct DiffusionProblem <: FEMProblem end
-
-struct ConservationLawProblem <: FEMProblem end
-
 struct PoissonProblem <: FEMProblem end
+
+struct PoissonProblemUnsteady <: FEMProblem end
 
 struct FESpacePoisson <: FEMProblem
   Qₕ

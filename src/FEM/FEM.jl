@@ -4,9 +4,12 @@ function get_FE_space(probl::ProblemSpecifics, model::UnstructuredDiscreteModel,
   #=MODIFY
   =#
 
-  Tₕ = Triangulation(model)
   degree = 2 .* probl.order
-  Qₕ = CellQuadrature(Tₕ, degree)
+  Ω = Triangulation(model)
+  dΩ = Measure(Ω, degree)
+  Γ = BoundaryTriangulation(model, tags=probl.neumann_tags)
+  dΓ = Measure(Γ, degree)
+  Qₕ = CellQuadrature(Ω, degree)
 
   ref_FE = ReferenceFE(lagrangian, Float64, probl.order)
   V₀ = TestFESpace(model, ref_FE; conformity=:H1, dirichlet_tags=probl.dirichlet_tags)
@@ -21,10 +24,35 @@ function get_FE_space(probl::ProblemSpecifics, model::UnstructuredDiscreteModel,
   σₖ = get_cell_dof_ids(V₀)
   Nₕ = length(get_free_dof_ids(V))
 
-  Ω = Triangulation(model)
+  FE_space = FESpacePoisson(Qₕ, V₀, V, ϕᵥ, ϕᵤ, σₖ, Nₕ, Ω, dΩ, dΓ)
+
+  return FE_space
+
+end
+
+function get_FE_space(probl::ProblemSpecificsUnsteady, model::UnstructuredDiscreteModel, g = nothing)
+  #=MODIFY
+  =#
+
+  Ω = Interior(model)
   dΩ = Measure(Ω, degree)
   Γ = BoundaryTriangulation(model, tags=probl.neumann_tags)
   dΓ = Measure(Γ, degree)
+  degree = 2 .* probl.order
+  Qₕ = CellQuadrature(Ω, degree)
+
+  ref_FE = ReferenceFE(lagrangian, Float64, probl.order)
+  V₀ = TestFESpace(model, ref_FE; conformity=:H1, dirichlet_tags=probl.dirichlet_tags)
+  if !isnothing(g)
+    V = TransientTrialFESpace(V₀, g)
+  else
+    V = TransientTrialFESpace(V₀, (x, t) -> 0)
+  end
+
+  ϕᵥ = get_fe_basis(V₀)
+  ϕᵤ = get_trial_fe_basis(V)
+  σₖ = get_cell_dof_ids(V₀)
+  Nₕ = length(get_free_dof_ids(V))
 
   FE_space = FESpacePoisson(Qₕ, V₀, V, ϕᵥ, ϕᵤ, σₖ, Nₕ, Ω, dΩ, dΓ)
 
