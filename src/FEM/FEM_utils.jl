@@ -1,13 +1,6 @@
-function FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, problem_nonlinearities)
+function FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, case)
 
   @assert isdir(root) "$root is an invalid root directory"
-
-  nonlins = ""
-  for (key, value) in problem_nonlinearities
-      if value === true
-          nonlins *= "_" * key
-      end
-  end
 
   root_tests = joinpath(root, "tests")
   create_dir(root_tests)
@@ -17,7 +10,7 @@ function FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, pro
   create_dir(type_path)
   problem_path = joinpath(type_path, problem_name)
   create_dir(problem_path)
-  problem_and_info_path = joinpath(problem_path, string(problem_dim) * "D" * nonlins)
+  problem_and_info_path = joinpath(problem_path, string(problem_dim) * "D" * "_" * string(case))
   create_dir(problem_and_info_path)
   current_test = joinpath(problem_and_info_path, mesh_name)
   create_dir(current_test)
@@ -69,5 +62,51 @@ function generate_vtk_file(FE_space::FEMProblem, path::String, var_name::String,
 
   FE_var = FEFunction(FE_space.V, var)
   writevtk(FE_space.Ω, path, cellfields = [var_name => FE_var])
+
+end
+
+function find_FE_elements(problem_info, ROM_info, idx::Array)
+
+  parametric_info = get_parametric_specifics(ROM_info, [])
+  FE_space = get_FE_space(problem_info, parametric_info.model)
+
+  el = Int64[]
+  for i = 1:length(idx)
+    for j = 1:size(FE_space.σₖ)[1]
+      if idx[i] in abs.(FE_space.σₖ[j])
+        append!(el, j)
+      end
+    end
+  end
+
+  unique(el)
+
+end
+
+function from_vec_to_mat_idx(idx::Array, Nᵤ::Int)
+
+  row_idx = Int.(idx .% Nᵤ)
+  row_idx[findall(x->x===0, row_idx)] .= Nᵤ
+  col_idx = Int.((idx-row_idx)/Nᵤ .+ 1)
+
+  row_idx, col_idx
+
+end
+
+function from_spacetime_to_space_time_idx_mat(idx::Array, Nᵤ::Int)
+
+  idx_time = 1 .+ floor.((idx.-1)/Nᵤ^2)
+  idx_space = idx - (idx_time.-1)*Nᵤ^2
+
+  idx_space, idx_time
+
+end
+
+function from_spacetime_to_space_time_idx_vec(idx::Array, Nᵤ::Int)
+
+  idx_time = 1 .+ floor.((idx.-1)/Nᵤ)
+  idx_space = idx - (idx_time.+1)*Nᵤ
+
+  idx_space, idx_time
 
 end

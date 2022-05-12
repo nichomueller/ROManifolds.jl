@@ -64,7 +64,6 @@ function load_CSV(path::String; convert_to_sparse = false)
 
 end
 
-
 function mydot(vec1::Array, vec2::Array, norm_matrix = nothing)
   #=It computes the inner product between 'vec1' and 'vec2', defined by the (positive definite) matrix 'norm_matrix'.
   If 'norm_matrix' is None (default), the standard inner product between 'vec1' and 'vec2' is returned.
@@ -86,7 +85,6 @@ function mydot(vec1::Array, vec2::Array, norm_matrix = nothing)
 
 end
 
-
 function mynorm(vec::Array, norm_matrix = nothing)
   #= It computes the norm of 'vec', defined by the (positive definite) matrix 'norm_matrix'.
   If 'norm_matrix' is None (default), the Euclidean norm of 'vec' is returned.
@@ -106,6 +104,18 @@ function mynorm(vec::Array, norm_matrix = nothing)
 
 end
 
+function tensor_product(AB, A, B; transpose_A=false)
+
+  @assert length(size(A)) === 3 && length(size(B)) === 2 "Only implemented tensor order 3 * tensor order 2"
+
+  if transpose_A
+    return @tensor AB[i,j,k] = A[l,i,k] * B[l,j]
+  else
+    return @tensor AB[i,j,k] = A[i,l,k] * B[l,j]
+  end
+
+end
+
 function generate_parameter(a::T, b::T, n::Int64 = 1) where T <: Array{Float64}
 
   return [[rand(Uniform(a[i], b[i])) for i = 1:length(a)] for j in 1:n]
@@ -118,6 +128,50 @@ function generate_vtk_file_transient(Ω::BodyFittedTriangulation, path::String, 
     for (uₕ,t) in uₕₜ
       pvd[t] = createvtk(Ω, path * "var_name_$t" * ".vtu", cellfields = [var_name => var])
     end
+  end
+
+end
+
+function plot_R2_R(f::Function, xrange::Array, yrange::Array, n::Int)
+  x = range(xrange[1], xrange[2], n)
+  y = range(yrange[1], yrange[2], n)
+  suface(x, y, f)
+end
+
+function plot_R_R2(f::Function, xrange::Array, n::Int)
+  xs_ys(vs) = Tuple(eltype(vs[1])[vs[i][j] for i in 1:length(vs)] for j in eachindex(first(vs)))
+  xs_ys(v, vs...) = xs_ys([v, vs...])
+  xs_ys(g::Function, a, b, n=100) = xs_ys(g.(range(a, b, n)))
+  plot(xs_ys(f, xrange[1], xrange[2], n)...)
+end
+
+function post_process(ROM_info, path_μ)
+  plotly()
+
+  if isfile(joinpath(ROM_info.paths.ROM_structures_path, "MDEIM_Σ.csv"))
+    MDEIM_Σ = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "MDEIM_Σ.csv"))
+    p = plot(collect(1:length(MDEIM_Σ)), MDEIM_Σ, yaxis=:log, lw = 3, title = "Decay singular values, MDEIM")
+    xlabel!("σ index")
+    ylabel!("σ value")
+    if ROM_info.save_results
+      save(p, joinpath(ROM_info.paths.results_path, "plot_MDEIM_Σ.eps"))
+    end
+  end
+  if isfile(joinpath(ROM_info.paths.ROM_structures_path, "DEIM_Σ.csv"))
+    DEIM_Σ = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "DEIM_Σ.csv"))
+    p = plot(collect(1:length(DEIM_Σ)), DEIM_Σ, yaxis=:log, lw = 3, title = "Decay singular values, DEIM")
+    xlabel!("σ index")
+    ylabel!("σ value")
+    if ROM_info.save_results
+      save(p, joinpath(ROM_info.paths.results_path, "plot_DEIM_Σ.eps"))
+    end
+  end
+
+  mean_point_err = load_CSV(joinpath(path_μ, "mean_point_err.csv"))[:]
+  if ROM_info.save_results
+    writevtk(FE_space.Ω, joinpath(path_μ, "mean_point_err"), cellfields = ["err"=> FEFunction(FE_space.V, mean_point_err)])
+  else
+    plot(collect(1:length(pointwise_err)), pointwise_err, yaxis=:log, lw = 3, title = "Average |uₕ - ũ|")
   end
 
 end

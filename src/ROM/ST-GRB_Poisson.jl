@@ -1,73 +1,349 @@
 include("S-GRB_Poisson.jl")
-include("RB_Poisson_unsteady.jl")
 
-function get_RB_LHS_blocks(ROM_info, RB_variables::RB_problem, param; FE_space = nothing)
-  #=MODIFY
-  =#
+function get_Aₙ(ROM_info::Problem, RB_variables::PoissonSTGRB) :: Vector
 
-  initialize_RB_system(RB_variables::RB_problem)
+  get_Aₙ(ROM_info, RB_variables.steady_info)
 
-  if ROM_info.problem_nonlinearities["A"]
-    Aₙ_μ = assemble_stiffness(FE_space, ROM_info, param)
-    (_, Aₙ_μ_affine) = MDEIM_online(Aₙ_μ, RB_variables.Aₙ_affine, RB_variables.Aₙ_idx)
-    MAₙ = RB_variables.Mₙ + 2 / 3 * ROM_info.dt * Aₙ_μ_affine
+end
+
+function get_Mₙ(ROM_info::Problem, RB_variables::PoissonSTGRB) :: Vector
+
+  if isfile(joinpath(ROM_info.paths.ROM_structures_path, "Mₙ.csv"))
+    @info "Importing reduced affine mass matrix"
+    Mₙ = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "Mₙ.csv"))
+    RB_variables.Mₙ = reshape(Mₙ,RB_variables.steady_info.nₛᵘ,RB_variables.steady_info.nₛᵘ,:)
+    RB_variables.Qᵐ = size(RB_variables.Mₙ)[3]
+    return []
   else
-    MAₙ = RB_variables.Mₙ + 2 / 3 * ROM_info.dt * RB_variables.Aₙ * param.μ
+    @info "Failed to import the reduced affine mass matrix: must build it"
+    return ["M"]
   end
 
-  Φₜᵘ_1 = RB_variables.Φₜᵘ[2:end, :]' * RB_variables.Φₜᵘ[1:end - 1, :]
-  Φₜᵘ_2 = RB_variables.Φₜᵘ[3:end, :]' * RB_variables.Φₜᵘ[1:end - 2, :]
+end
 
-  for i_s = 1:RB_variables.nₛᵘ
-    for i_t = 1:RB_variables.nₜᵘ
+function assemble_affine_matrices(ROM_info::Problem, RB_variables::PoissonSTGRB, var::String)
 
-      i_st = index_mapping(i_s, i_t)
+  if var === "M"
+    RB_variables.Qᵐ = 1
+    @info "Assembling affine reduced mass"
+    M = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "M.csv"); convert_to_sparse = true)
+    Mₙ = (RB_variables.steady_info.Φₛᵘ)' * M * RB_variables.steady_info.Φₛᵘ
+    RB_variables.Mₙ = zeros(RB_variables.steady_info.nₛᵘ, RB_variables.steady_info.nₛᵘ, 1)
+    RB_variables.Mₙ[:,:,1] = Mₙ
+  else
+    assemble_affine_matrices(ROM_info, RB_variables.steady_info, var)
+  end
 
-      for j_s = 1:RB_variables.nₛᵘ
-        for j_t = 1:RB_variables.nₜᵘ
+end
 
-          j_st = index_mapping(j_s, j_t)
-          RB_variables.LHSₙ[1][i_st, j_st] = MAₙ[i_s, j_s] * (i_t == j_t) \
-          - 4 / 3 * RB_variables.Mₙ[i_s, j_s] * Φₜᵘ_1[i_t, j_t] \
-          + 1 / 3 * RB_variables.Mₙ[i_s, j_s] * Φₜᵘ_2[i_t, j_t]
+function assemble_MDEIM_matrices(ROM_info::Problem, RB_variables::PoissonSTGRB, var::String)
 
-        end
+  @info "The matrix $var is non-affine: running the MDEIM offline phase on $nₛ_MDEIM snapshots"
+  MDEIM_mat, MDEIM_idx, sparse_el, _, _ = MDEIM_offline(problem_info, ROM_info, var)
+  Q = size(MDEIM_mat)[2]
+  Matₙ = zeros(RB_variables.steady_info.nₛᵘ, RB_variables.steady_info.nₛᵘ, Q)
+  for q = 1:Q
+    @info "ST-GRB: affine component number $q, matrix $var"
+    Matq = reshape(MDEIM_mat[:,q], (RB_variables.steady_info.Nₛᵘ, RB_variables.steady_info.Nₛᵘ))
+    Matₙ[:,:,q] = RB_variables.steady_info.Φₛᵘ' * Matrix(Matq) * RB_variables.steady_info.Φₛᵘ
+  end
+  MDEIMᵢ_mat = Matrix(MDEIM_mat[MDEIM_idx, :])
+
+  if var === "M"
+    RB_variables.Mₙ = Matₙ
+    RB_variables.MDEIMᵢ_M = MDEIMᵢ_mat
+    RB_variables.MDEIM_idx_M = MDEIM_idx
+    RB_variables.sparse_el_M = sparse_el
+    RB_variables.Qᵐ = Q
+  elseif var === "A"
+    RB_variables.steady_info.Aₙ = Matₙ
+    RB_variables.steady_info.MDEIMᵢ_A = MDEIMᵢ_mat
+    RB_variables.steady_info.MDEIM_idx_A = MDEIM_idx
+    RB_variables.steady_info.sparse_el_A = sparse_el
+    RB_variables.steady_info.Qᵃ = Q
+  else
+    @error "Unrecognized variable to assemble with MDEIM"
+  end
+
+end
+
+function assemble_affine_vectors(ROM_info::Problem, RB_variables::PoissonSTGRB, var::String)
+
+  assemble_affine_vectors(ROM_info, RB_variables.steady_info, var)
+
+end
+
+function assemble_DEIM_vectors(ROM_info::Problem, RB_variables::PoissonSTGRB, var::String)
+
+  @info "ST-GRB: running the DEIM offline phase on variable $var with $nₛ_DEIM snapshots"
+
+  DEIM_mat, DEIM_idx, _, _ = DEIM_offline(problem_info, ROM_info, var)
+  DEIMᵢ_mat = Matrix(DEIM_mat[DEIM_idx, :])
+  Q = size(DEIM_mat)[2]
+  varₙ = zeros(RB_variables.nₛᵘ,1,Q)
+  for q = 1:Q
+    varₙ[:,:,q] = RB_variables.Φₛᵘ' * Vector(DEIM_mat[:, q])
+  end
+  varₙ = reshape(varₙ,:,Q)
+
+  if var === "F"
+    RB_variables.DEIMᵢ_mat_F = DEIMᵢ_mat
+    RB_variables.DEIM_idx_F = DEIM_idx
+    RB_variables.Qᶠ = Q
+    RB_variables.Fₙ = varₙ
+  elseif var === "H"
+    RB_variables.DEIMᵢ_mat_H = DEIMᵢ_mat
+    RB_variables.DEIM_idx_H = DEIM_idx
+    RB_variables.Qʰ = Q
+    RB_variables.Hₙ = varₙ
+  else
+    @error "Unrecognized vector to assemble with DEIM"
+  end
+
+end
+
+function assemble_offline_structures(ROM_info::Problem, RB_variables::PoissonSTGRB, operators=nothing)
+
+  if isnothing(operators)
+    operators = set_operators(ROM_info, RB_variables)
+  end
+
+  assembly_time = 0
+  if "M" ∈ operators
+    if !ROM_info.probl_nl["M"]
+      assembly_time += @elapsed begin
+        assemble_affine_matrices(ROM_info, RB_variables, "M")
+      end
+    else
+      assembly_time += @elapsed begin
+        assemble_MDEIM_matrices(ROM_info, RB_variables, "M")
       end
     end
   end
 
-  if ROM_info.save_offline_structures && !ROM_info.problem_nonlinearities["A"]
-    save_variable(RB_variables.LHSₙ[1], "LHSₙ1", "csv", joinpath(ROM_info.paths.ROM_structures_path, "LHSₙ1"))
+  if "A" ∈ operators
+    if !ROM_info.probl_nl["A"]
+      assembly_time += @elapsed begin
+        assemble_affine_matrices(ROM_info, RB_variables, "A")
+      end
+    else
+      assembly_time += @elapsed begin
+        assemble_MDEIM_matrices(ROM_info, RB_variables, "A")
+      end
+    end
   end
 
+  if "F" ∈ operators
+    if !ROM_info.probl_nl["f"]
+      assembly_time += @elapsed begin
+        assemble_affine_vectors(ROM_info, RB_variables, "F")
+      end
+    else
+      assembly_time += @elapsed begin
+        assemble_DEIM_vectors(ROM_info, RB_variables, "F")
+      end
+    end
+  end
+
+  if "H" ∈ operators
+    if !ROM_info.probl_nl["h"]
+      assembly_time += @elapsed begin
+        assemble_affine_vectors(ROM_info, RB_variables, "H")
+      end
+    else
+      assembly_time += @elapsed begin
+        assemble_DEIM_vectors(ROM_info, RB_variables, "H")
+      end
+    end
+  end
+  RB_variables.steady_info.offline_time += assembly_time
+
+  save_affine_structures(ROM_info, RB_variables)
+  save_M_DEIM_structures(ROM_info, RB_variables)
 
 end
 
-function get_RB_RHS_blocks(ROM_info, RB_variables::RB_problem, param; FE_space = nothing)
-  #=MODIFY
-  =#
+function save_affine_structures(ROM_info::Problem, RB_variables::PoissonSTGRB)
 
-  initialize_RB_system(RB_variables::RB_problem)
-
-  if ROM_info.problem_nonlinearities["f"] || ROM_info.problem_nonlinearities["h"]
-    Fₙ_μ = assemble_forcing(FE_space, param)
-    (_, Fₙ_μ_affine) = DEIM_online(Fₙ_μ, RB_variables.Fₙ_affine, RB_variables.Fₙ_idx)
-    Fₙ = 2 / 3 * ROM_info.dt * Fₙ_μ_affine
-  else
-    Fₙ = 2 / 3 * ROM_info.dt * RB_variables.Fₙ
+  if ROM_info.save_offline_structures
+    Mₙ = reshape(RB_variables.Mₙ, :, RB_variables.Qᵐ)
+    save_CSV(Mₙ, joinpath(ROM_info.paths.ROM_structures_path, "Mₙ.csv"))
+    save_CSV([RB_variables.Qᵐ], joinpath(ROM_info.paths.ROM_structures_path, "Qᵐ.csv"))
+    save_affine_structures(ROM_info, RB_variables.steady_info)
   end
 
-  for i_s = 1:RB_variables.nₛᵘ
+end
+
+function get_affine_structures(ROM_info::Problem, RB_variables::PoissonSTGRB) :: Vector
+
+  operators = String[]
+
+  append!(operators, get_Mₙ(ROM_info, RB_variables))
+  append!(operators, get_affine_structures(ROM_info, RB_variables.steady_info))
+
+  return operators
+
+end
+
+function get_RB_LHS_blocks(ROM_info, RB_variables::PoissonSTGRB, θᵐ, θᵃ)
+
+  @info "Assembling LHS using Crank-Nicolson time scheme"
+
+  θ = ROM_info.θ
+  δtθ = ROM_info.δt*θ
+  nₜᵘ = RB_variables.nₜᵘ
+  Qᵐ = RB_variables.Qᵐ
+  Qᵃ = RB_variables.steady_info.Qᵃ
+
+  #Mat = δtθ*Aₙ + Mₙ
+  Φₜᵘ_M = zeros(RB_variables.nₜᵘ, RB_variables.nₜᵘ, Qᵐ)
+  Φₜᵘ₁_M = zeros(RB_variables.nₜᵘ, RB_variables.nₜᵘ, Qᵐ)
+  Φₜᵘ_A = zeros(RB_variables.nₜᵘ, RB_variables.nₜᵘ, Qᵃ)
+  Φₜᵘ₁_A = zeros(RB_variables.nₜᵘ, RB_variables.nₜᵘ, Qᵃ)
+
+  [Φₜᵘ_M[i_t,j_t,q] = sum(RB_variables.Φₜᵘ[:,i_t].*RB_variables.Φₜᵘ[:,j_t].*θᵐ[q,:]) for q = 1:Qᵐ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
+  [Φₜᵘ₁_M[i_t,j_t,q] = sum(RB_variables.Φₜᵘ[2:end,i_t].*RB_variables.Φₜᵘ[1:end-1,j_t].*θᵐ[q,2:end]) for q = 1:Qᵐ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
+  [Φₜᵘ_A[i_t,j_t,q] = sum(RB_variables.Φₜᵘ[:,i_t].*RB_variables.Φₜᵘ[:,j_t].*θᵃ[q,:]) for q = 1:Qᵃ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
+  [Φₜᵘ₁_A[i_t,j_t,q] = sum(RB_variables.Φₜᵘ[2:end,i_t].*RB_variables.Φₜᵘ[1:end-1,j_t].*θᵃ[q,2:end]) for q = 1:Qᵃ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
+
+  block₁ = zeros(RB_variables.nᵘ, RB_variables.nᵘ)
+
+  for i_s = 1:RB_variables.steady_info.nₛᵘ
     for i_t = 1:RB_variables.nₜᵘ
 
-      RB_variables.RHSₙ[1][index_mapping(i_s, i_t)] = Fₙ[i_s] * Φₜᵘ[:, i_t]
+      i_st = index_mapping(i_s, i_t, RB_variables)
+
+      for j_s = 1:RB_variables.steady_info.nₛᵘ
+        for j_t = 1:RB_variables.nₜᵘ
+
+          j_st = index_mapping(j_s, j_t, RB_variables)
+
+          Aₙ_μ_i_j = δtθ*RB_variables.steady_info.Aₙ[i_s,j_s,:]'*Φₜᵘ_A[i_t,j_t,:]
+          Mₙ_μ_i_j = RB_variables.Mₙ[i_s,j_s,:]'*Φₜᵘ_M[i_t,j_t,:]
+          Aₙ₁_μ_i_j = δtθ*RB_variables.steady_info.Aₙ[i_s,j_s,:]'*Φₜᵘ₁_A[i_t,j_t,:]
+          Mₙ₁_μ_i_j = RB_variables.Mₙ[i_s,j_s,:]'*Φₜᵘ₁_M[i_t,j_t,:]
+
+          block₁[i_st,j_st] = θ*(Aₙ_μ_i_j+Mₙ_μ_i_j) + (1-θ)*Aₙ₁_μ_i_j - θ*Mₙ₁_μ_i_j
+
+        end
+      end
 
     end
   end
 
-  if ROM_info.save_offline_structures && !ROM_info.problem_nonlinearities["f"] && !ROM_info.problem_nonlinearities["h"]
-    save_variable(RB_variables.RHSₙ[1], "RHSₙ1", "csv", joinpath(ROM_info.paths.ROM_structures_path, "RHSₙ1"))
+  push!(RB_variables.steady_info.LHSₙ, block₁)
+
+end
+
+function get_RB_RHS_blocks(ROM_info::Problem, RB_variables::PoissonSTGRB, θᶠ, θʰ)
+
+  @info "Assembling RHS"
+
+  Qᶠ = RB_variables.steady_info.Qᶠ
+  Qʰ = RB_variables.steady_info.Qʰ
+  δtθ = ROM_info.δt*ROM_info.θ
+  nₜᵘ = RB_variables.nₜᵘ
+
+  Φₜᵘ_F = zeros(RB_variables.nₜᵘ, Qᶠ)
+  Φₜᵘ_H = zeros(RB_variables.nₜᵘ, Qʰ)
+  [Φₜᵘ_F[i_t,q] = sum(RB_variables.Φₜᵘ[:,i_t].*θᶠ[q,:]) for q = 1:Qᶠ for i_t = 1:nₜᵘ]
+  [Φₜᵘ_H[i_t,q] = sum(RB_variables.Φₜᵘ[:,i_t].*θʰ[q,:]) for q = 1:Qʰ for i_t = 1:nₜᵘ]
+
+  block₁ = zeros(RB_variables.nᵘ,1)
+  for i_s = 1:RB_variables.steady_info.nₛᵘ
+    for i_t = 1:RB_variables.nₜᵘ
+
+      i_st = index_mapping(i_s, i_t, RB_variables)
+
+      Fₙ_μ_i_j = RB_variables.steady_info.Fₙ[i_s,:]'*Φₜᵘ_F[i_t,:]
+      Hₙ_μ_i_j = RB_variables.steady_info.Hₙ[i_s,:]'*Φₜᵘ_H[i_t,:]
+
+      block₁[i_st] = Fₙ_μ_i_j+Hₙ_μ_i_j
+
+    end
   end
 
+  block₁ *= δtθ
+  push!(RB_variables.steady_info.RHSₙ, reshape(block₁, :, 1))
+
+end
+
+function get_RB_system(ROM_info::Problem, RB_variables::PoissonSTGRB, param)
+
+  @info "Preparing the RB system: fetching reduced LHS"
+  initialize_RB_system(RB_variables.steady_info)
+  get_Q(ROM_info, RB_variables)
+  blocks = [1]
+  operators = get_system_blocks(ROM_info, RB_variables, blocks, blocks)
+
+  if ROM_info.space_time_M_DEIM
+    θᵐ, θᵃ, θᶠ, θʰ = get_θₛₜ(ROM_info, RB_variables, param)
+  else
+    θᵐ, θᵃ, θᶠ, θʰ = get_θ(ROM_info, RB_variables, param)
+  end
+
+  if "LHS" ∈ operators
+    get_RB_LHS_blocks(ROM_info, RB_variables, θᵐ, θᵃ)
+  end
+
+  if "RHS" ∈ operators
+    if !ROM_info.build_parametric_RHS
+      @info "Preparing the RB system: fetching reduced RHS"
+      get_RB_RHS_blocks(ROM_info, RB_variables, θᶠ, θʰ)
+    else
+      @info "Preparing the RB system: assembling reduced RHS exactly"
+      build_param_RHS(ROM_info, RB_variables, param)
+    end
+  end
+
+end
+
+function build_param_RHS(ROM_info::Problem, RB_variables::PoissonSTGRB, param)
+
+  δtθ = ROM_info.δt*ROM_info.θ
+
+  FE_space = get_FE_space(problem_info, param.model)
+  F_t, H_t = assemble_forcing(FE_space, RB_variables, param)
+  F, H = zeros(RB_variables.steady_info.Nₛᵘ, RB_variables.Nₜ), zeros(RB_variables.steady_info.Nₛᵘ, RB_variables.Nₜ)
+  times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+δtθ
+  for (i, tᵢ) in enumerate(times_θ)
+    F[:,i] = F_t(tᵢ)
+    H[:,i] = H_t(tᵢ)
+  end
+  F *= δtθ
+  H *= δtθ
+
+  Fₙ = RB_variables.steady_info.Φₛᵘ'*(F*RB_variables.Φₜᵘ)
+  Hₙ = RB_variables.steady_info.Φₛᵘ'*(H*RB_variables.Φₜᵘ)
+
+  push!(RB_variables.steady_info.RHSₙ, reshape(Fₙ+Hₙ,:,1))
+
+end
+
+function get_θ(ROM_info::Problem, RB_variables::PoissonSTGRB, param) :: Tuple
+
+  θᵐ = get_θᵐ(ROM_info, RB_variables, param)
+  θᵃ = get_θᵃ(ROM_info, RB_variables, param)
+  if !ROM_info.build_parametric_RHS
+    θᶠ, θʰ = get_θᶠʰ(ROM_info, RB_variables, param)
+  else
+    θᶠ, θʰ = Float64[], Float64[]
+  end
+
+  return θᵐ, θᵃ, θᶠ, θʰ
+
+end
+
+function get_θₛₜ(ROM_info::Problem, RB_variables::PoissonSTGRB, param) :: Tuple
+
+  θᵐ = get_θᵐₛₜ(ROM_info, RB_variables, param)
+  θᵃ = get_θᵃₛₜ(ROM_info, RB_variables, param)
+  if !ROM_info.build_parametric_RHS
+    θᶠ, θʰ = get_θᶠʰₛₜ(ROM_info, RB_variables, param)
+  else
+    θᶠ, θʰ = Float64[], Float64[]
+  end
+
+  return θᵐ, θᵃ, θᶠ, θʰ
 
 end

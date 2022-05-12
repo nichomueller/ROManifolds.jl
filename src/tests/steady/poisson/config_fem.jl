@@ -13,39 +13,43 @@ case = 2
 
 if case === 0
 
-  problem_nonlinearities = Dict("Ω" => false, "A" => false, "f" => false, "g" => false, "h" => false)
+  probl_nl = Dict("Ω" => false, "A" => false, "f" => false, "g" => false, "h" => false)
   ranges = [[0.4, 0.6] [0.4, 0.6] [0.05, 0.1]]
   mesh_name = "model.json"
-  paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, problem_nonlinearities)
   dirichlet_tags = ["sides"]
   neumann_tags = ["circle", "triangle", "square"]
+  dirichlet_labels = []
+  neumann_labels = []
 
 elseif case === 1
 
-  problem_nonlinearities = Dict("Ω" => false, "A" => true, "f" => false, "g" => false, "h" => false)
+  probl_nl = Dict("Ω" => false, "A" => true, "f" => false, "g" => false, "h" => false)
   ranges = [[0.4, 0.6] [0.4, 0.6] [0.05, 0.1]]
   mesh_name = "model.json"
-  paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, problem_nonlinearities)
   dirichlet_tags = ["sides"]
   neumann_tags = ["circle", "triangle", "square"]
+  dirichlet_labels = []
+  neumann_labels = []
 
 elseif case === 2
 
-  problem_nonlinearities = Dict("Ω" => false, "A" => true, "f" => true, "g" => true, "h" => false)
+  probl_nl = Dict("Ω" => false, "A" => true, "f" => true, "g" => true, "h" => false)
   ranges = [[0.4, 0.6] [0.4, 0.6] [0.05, 0.1] [0.0, 1.0] [0.0, 1.0]]
   mesh_name = "model.json"
-  paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, problem_nonlinearities)
   dirichlet_tags = ["sides"]
   neumann_tags = ["circle", "triangle", "square"]
+  dirichlet_labels = []
+  neumann_labels = []
 
 elseif case === 3
 
-  problem_nonlinearities = Dict("Ω" => true, "A" => false, "f" => false, "g" => false, "h" => false)
+  probl_nl = Dict("Ω" => true, "A" => false, "f" => false, "g" => false, "h" => false)
   ranges = [0.0, 1.0]
   mesh_name = "stretch_model"
-  paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, problem_nonlinearities)
-  dirichlet_tags = "boundary"
-  neumann_tags = []
+  dirichlet_tags = ["sides"]
+  neumann_tags = ["circle", "triangle", "square"]
+  dirichlet_labels = []
+  neumann_labels = []
 
 else
 
@@ -53,4 +57,5 @@ else
 
 end
 
-problem_info = ProblemSpecifics(case, order, dirichlet_tags, neumann_tags, solver, paths, problem_nonlinearities)
+paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, case)
+problem_info = ProblemSpecifics(case, probl_nl, order, dirichlet_tags, dirichlet_labels, neumann_tags, neumann_labels, solver, paths)

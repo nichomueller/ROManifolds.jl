@@ -3,12 +3,12 @@ include("../../../ROM/RB_Poisson_steady.jl")
 
 function setup_RB()
 
-  paths = ROM_paths(root, problem_type, problem_name, mesh_name, problem_dim, RB_method)
-  ROM_info = ROMSpecifics(case, paths, RB_method, problem_nonlinearities, considered_snaps, ϵₛ, postprocess, perform_RHS_DEIM, import_snapshots, import_offline_structures, save_offline_structures, save_results)
+  paths = ROM_paths(root, problem_type, problem_name, mesh_name, problem_dim, RB_method, case)
+  ROM_info = ROMSpecificsSteady(probl_nl, paths, RB_method, considered_snaps, ϵₛ, use_norm_X, build_parametric_RHS, nₛ_MDEIM, nₛ_DEIM, postprocess, import_snapshots, import_offline_structures, save_offline_structures, save_results)
   if RB_method === "S-GRB"
-    RB_variables = setup(PoissonSTGRB([], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], []))
+    RB_variables = setup((0))
   else
-    RB_variables = setup(PoissonSTPGRB([], []))
+    RB_variables = setup((0,0))
   end
 
   ROM_info, RB_variables
@@ -20,10 +20,10 @@ function run_RB()
   ROM_info, RB_variables = setup_RB()
 
   @info "Offline phase of the RB solver, steady Poisson problem"
-  μ = load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
-  build_RB_approximation(ROM_info, RB_variables; μ)
+  build_RB_approximation(ROM_info, RB_variables)
 
   @info "Online phase of the RB solver, steady Poisson problem"
+  μ = load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
   param_nbs = 95:100
   testing_phase(ROM_info, RB_variables, μ, param_nbs)
 
