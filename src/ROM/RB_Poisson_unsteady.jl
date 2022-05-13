@@ -25,7 +25,7 @@ function PODs_space(ROM_info::Problem, RB_variables::RBProblemUnsteady)
 
   if ROM_info.perform_nested_POD
 
-    for nₛ = 1:RB_variables.steady_info.nₛ
+    for nₛ = 1:ROM_info.nₛ
       Sᵘₙ = RB_variables.steady_info.Sᵘ[:, (nₛ-1)*RB_variables.Nₜ+1:nₛ*RB_variables.Nₜ]
       Φₙ, _ = POD(Sᵘₙ, ROM_info.ϵₛ)
       if nₛ ===1
@@ -34,8 +34,9 @@ function PODs_space(ROM_info::Problem, RB_variables::RBProblemUnsteady)
         global Φₙᵘ_temp = hcat(Φₙᵘ_temp, Φₙ)
       end
     end
-    RB_variables.steady_info.Φₛᵘ = Φₙᵘ_temp
-    RB_variables.steady_info.nₛᵘ = size(Φₙᵘ_temp)[2]
+    Φₛᵘ, _ = POD(Φₙᵘ_temp, ROM_info.ϵₛ)
+    RB_variables.steady_info.Φₛᵘ = Φₛᵘ
+    RB_variables.steady_info.nₛᵘ = size(Φₛᵘ)[2]
 
   else
 
@@ -77,7 +78,7 @@ function build_reduced_basis(ROM_info::Problem, RB_variables::RBProblemUnsteady)
   @info "Building the space-time reduced basis for field u, using a tolerance of ($(ROM_info.ϵₛ),$(ROM_info.ϵₜ))"
 
   RB_building_time = @elapsed begin
-    PODs_space(ROM_info, RB_variables.steady_info)
+    PODs_space(ROM_info, RB_variables)
     PODs_time(ROM_info, RB_variables)
   end
   RB_variables.nᵘ = RB_variables.steady_info.nₛᵘ * RB_variables.nₜᵘ
@@ -468,6 +469,7 @@ end
 
 function testing_phase(ROM_info::Problem, RB_variables::RBProblemUnsteady, μ, param_nbs)
 
+  H1_L2_err = zeros(length(param_nbs))
   mean_H1_err = zeros(RB_variables.Nₜ)
   mean_H1_L2_err = 0.0
   mean_pointwise_err = zeros(RB_variables.steady_info.Nₛᵘ, RB_variables.Nₜ)
@@ -498,6 +500,7 @@ function testing_phase(ROM_info::Problem, RB_variables::RBProblemUnsteady, μ, p
     mean_reconstruction_time = reconstruction_time / length(param_nbs)
 
     H1_err_nb, H1_L2_err_nb = compute_errors(uₕ_test, RB_variables, RB_variables.steady_info.Xᵘ₀)
+    H1_L2_err[i_nb] = H1_L2_err_nb
     mean_H1_err += H1_err_nb / length(param_nbs)
     mean_H1_L2_err += H1_L2_err_nb / length(param_nbs)
     mean_pointwise_err += abs.(uₕ_test - RB_variables.steady_info.ũ) / length(param_nbs)
@@ -534,9 +537,22 @@ function testing_phase(ROM_info::Problem, RB_variables::RBProblemUnsteady, μ, p
 
   end
 
+  pass_to_pp = Dict("path_μ"=>path_μ, "FE_space"=>FE_space, "H1_L2_err"=>H1_L2_err, "mean_H1_err"=>mean_H1_err, "mean_point_err"=>mean_pointwise_err)
+
   if ROM_info.postprocess
-    post_process(ROM_info, path_μ)
+    post_process(ROM_info, pass_to_pp)
   end
+
+  #= stability_constants = []
+  for Nₜ = 10:10:1000
+    append!(stability_constants, compute_stability_constant(ROM_info, M, A, ROM_info.θ, Nₜ))
+  end
+  pyplot()
+  p = plot(collect(10:10:1000), stability_constants, xaxis=:log, yaxis=:log, lw = 3, label="||(Aˢᵗ)⁻¹||₂", title = "Euclidean norm of (Aˢᵗ)⁻¹", legend=:topleft)
+  p = plot!(collect(10:10:1000), collect(10:10:1000), xaxis=:log, yaxis=:log, lw = 3, label="Nₜ")
+  xlabel!("Nₜ")
+  savefig(p, joinpath(ROM_info.paths.results_path, "stability_constant.eps"))
+  =#
 
 end
 
@@ -567,5 +583,20 @@ function check_dataset(ROM_info, RB_variables, i)
 
   u1≈my_u1
   u2≈my_u2
+
+end
+
+function compute_stability_constant(ROM_info, M, A, θ, Nₜ)
+
+  #= M = assemble_mass(FE_space, ROM_info, parametric_info)(0.0)
+  A = assemble_stiffness(FE_space, ROM_info, parametric_info)(0.0) =#
+  Nₕ = size(M)[1]
+  δt = ROM_info.T/Nₜ
+  B₁ = θ*(M + θ*δt*A)
+  B₂ = θ*(-M + (1-θ)*δt*A)
+  λ₁,_ = eigs(B₁)
+  λ₂,_ = eigs(B₂)
+
+  return 1/(minimum(abs.(λ₁)) + minimum(abs.(λ₂)))
 
 end

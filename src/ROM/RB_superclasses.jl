@@ -178,6 +178,7 @@ struct ROMSpecificsUnsteady <: UnsteadyProblem
   nₛ_MDEIM::Int64
   nₛ_DEIM::Int64
   space_time_M_DEIM::Bool
+  functional_M_DEIM::Bool
   postprocess::Bool
   import_snapshots::Bool
   import_offline_structures::Bool

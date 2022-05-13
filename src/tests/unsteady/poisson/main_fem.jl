@@ -115,43 +115,63 @@ function run_FEM_2()
 
 end
 
-const μ = generate_parameter(ranges[1, :], ranges[2, :], nₛ)
+FEM_time₀ = @elapsed begin
+
+  const μ = generate_parameter(ranges[1, :], ranges[2, :], nₛ)
+
+  if case === 0
+    FEM = run_FEM_0()
+  elseif case === 1
+    FEM = run_FEM_1()
+  else case === 2
+    FEM = run_FEM_2()
+  end
+
+  lazy_solution_info = lazy_map(FEM, μ)
+
+  Xᵘ₀ = lazy_solution_info[1][2]
+  H = lazy_solution_info[1][3][2]
+  M = lazy_solution_info[1][4]
+  if case === 0
+    A = lazy_solution_info[1][5]
+    F = lazy_solution_info[1][3][1]
+  elseif case === 1
+    F = lazy_solution_info[1][3][1]
+  end
+
+end
+
+FEM_time₁ = @elapsed begin
+  @info "Collecting solution number 1"
+  uₕ = lazy_solution_info[1][1]()[1]
+  #gₕ = lazy_solution_info[1][1]()[2]
+
+  Nₜ = convert(Int64, T / δt)
+  if nₛ > 1
+    uₕ = hcat(uₕ, zeros(size(uₕ)[1], (nₛ - 1)*Nₜ))
+    #gₕ = hcat(gₕ, zeros(size(gₕ)[1], (nₛ - 1)*Nₜ))
+  end
+  for i in 2:nₛ
+    @info "Collecting solution number $i"
+    uₕ[:, (i-1)*Nₜ+1:i*Nₜ] = lazy_solution_info[i][1]()[1]
+    #gₕ[:, (i-1)*Nₜ+1:i*Nₜ] = lazy_solution_info[i][1]()[2]
+  end
+end
+
+FEM_time = FEM_time₀+FEM_time₁/nₛ
+
 save_CSV(μ, joinpath(problem_info.paths.FEM_snap_path, "μ.csv"))
+save_CSV(Xᵘ₀, joinpath(paths.FEM_structures_path, "Xᵘ₀.csv"))
+save_CSV(H, joinpath(paths.FEM_structures_path, "H.csv"))
+save_CSV(M, joinpath(paths.FEM_structures_path, "M.csv"))
+save_CSV([FEM_time], joinpath(paths.FEM_structures_path, "FEM_time.csv"))
 
 if case === 0
-  FEM = run_FEM_0()
+  save_CSV(A, joinpath(paths.FEM_structures_path, "A.csv"))
+  save_CSV(F, joinpath(paths.FEM_structures_path, "F.csv"))
 elseif case === 1
-  FEM = run_FEM_1()
-else case === 2
-  FEM = run_FEM_2()
+  save_CSV(F, joinpath(paths.FEM_structures_path, "F.csv"))
 end
 
-lazy_solution_info = lazy_map(FEM, μ)
-
-save_CSV(lazy_solution_info[1][2], joinpath(paths.FEM_structures_path, "Xᵘ₀.csv"))
-save_CSV(lazy_solution_info[1][3][2], joinpath(paths.FEM_structures_path, "H.csv"))
-save_CSV(lazy_solution_info[1][4], joinpath(paths.FEM_structures_path, "M.csv"))
-
-if case === 0
-  save_CSV(lazy_solution_info[1][5], joinpath(paths.FEM_structures_path, "A.csv"))
-  save_CSV(lazy_solution_info[1][3][1], joinpath(paths.FEM_structures_path, "F.csv"))
-elseif case === 1
-  save_CSV(lazy_solution_info[1][3][1], joinpath(paths.FEM_structures_path, "F.csv"))
-end
-
-@info "Collecting solution number 1"
-uₕ = lazy_solution_info[1][1]()[1]
-#gₕ = lazy_solution_info[1][1]()[2]
-
-Nₜ = convert(Int64, T / δt)
-if nₛ > 1
-  uₕ = hcat(uₕ, zeros(size(uₕ)[1], (nₛ - 1)*Nₜ))
-  #gₕ = hcat(gₕ, zeros(size(gₕ)[1], (nₛ - 1)*Nₜ))
-end
-for i in 2:nₛ
-  @info "Collecting solution number $i"
-  uₕ[:, (i-1)*Nₜ+1:i*Nₜ] = lazy_solution_info[i][1]()[1]
-  #gₕ[:, (i-1)*Nₜ+1:i*Nₜ] = lazy_solution_info[i][1]()[2]
-end
 save_CSV(uₕ, joinpath(problem_info.paths.FEM_snap_path, "uₕ.csv"))
 #save_CSV(gₕ, joinpath(problem_info.paths.FEM_snap_path, "gₕ.csv"))

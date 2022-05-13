@@ -15,9 +15,11 @@ use_norm_X = false
 nₛ_MDEIM = min(30, considered_snaps)
 nₛ_DEIM = min(10, considered_snaps)
 space_time_M_DEIM = true
+functional_M_DEIM = false
+@assert !(space_time_M_DEIM && functional_M_DEIM) "Choose only one (M)DEIM technique"
 postprocess = true
-import_snapshots = true
-import_offline_structures = false
+import_snapshots = false
+import_offline_structures = true
 save_offline_structures = true
 save_results = true
 

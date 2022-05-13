@@ -28,4 +28,4 @@ Manifest.toml
 .vscode
 
 # Folder where the results are stored
-
+/tests

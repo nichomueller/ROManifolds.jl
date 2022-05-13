@@ -50,4 +50,5 @@ else
 
 end
 
-problem_info = ProblemSpecifics(case, order, dirichlet_tags, dirichlet_labels, neumann_tags, neumann_labels, solver, paths)
+paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, case)
+problem_info = ProblemSpecifics(case, probl_nl, order, dirichlet_tags, dirichlet_labels, neumann_tags, neumann_labels, solver, paths)

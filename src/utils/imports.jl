@@ -1,5 +1,5 @@
 using DrWatson
-@quickactivate "Mabla.jl"
+#@quickactivate "Mabla.jl"
 using Pkg
 using DataFrames, Random, DataStructures, FillArrays, Tables, TypedTables, LinearAlgebra, Statistics, Distributions, Parameters, Classes, BlockArrays
 using Base:@kwdef

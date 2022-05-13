@@ -252,48 +252,7 @@ function FE_solve(FE_space::FESpacePoissonUnsteady, probl::ProblemSpecificsUnste
 
 end
 
-#= function FE_solve_temp(FE_space::FESpacePoissonUnsteady, probl::ProblemSpecificsUnsteady, param::ParametricSpecificsUnsteady; subtract_Ddata = true)
-
-  _, Gₕₜ = get_lifting_operator(FE_space, probl, param)
-
-  F = assemble_forcing(FE_space, param)
-  A = assemble_stiffness(FE_space, probl, param)
-  M = assemble_mass(FE_space)
-  uₕₜ = zeros(FE_space.Nₕ, convert(Int64, probl.T / probl.δt + 1))
-  u₀_field = interpolate_everywhere(param.u₀, FE_space.V(probl.t₀))
-  uₕₜ[:, 1] = get_free_dof_values(u₀_field)
-  tᵢ_prev = probl.t₀
-
-  if probl.case === 0
-    AA = A(0.0)
-    for (i, tᵢ) in enumerate(probl.t₀+probl.δt:probl.δt:probl.T)
-      LHSⁿ = M + param.α(tᵢ)(Point(0.,0.))*AA*probl.δt/2
-      LHS_prev = M - param.α(tᵢ_prev)(Point(0.,0.))*AA*probl.δt/2
-      RHSⁿ = (F(tᵢ) + F(tᵢ_prev))*probl.δt/2
-      uₕₜ[:, i+1] = LHSⁿ \ (LHS_prev*uₕₜ[:, i] + RHSⁿ)
-      tᵢ_prev = tᵢ
-    end
-  else
-    for (i, tᵢ) in enumerate(probl.t₀+probl.δt:probl.δt:probl.T)
-      LHSⁿ = M + A(tᵢ)*probl.δt/2
-      LHS_prev = M - A(tᵢ_prev)*probl.δt/2
-      RHSⁿ = (F(tᵢ) + F(tᵢ_prev))*probl.δt/2
-      uₕₜ[:, i+1] = LHSⁿ \ (LHS_prev*uₕₜ[:, i] + RHSⁿ)
-      tᵢ_prev = tᵢ
-    end
-  end
-
-  if subtract_Ddata
-    uₕₜ = uₕₜ[:, 2:end] - Gₕₜ
-  else
-    uₕₜ = uₕₜ[:, 2:end]
-  end
-
-  return uₕₜ, Gₕₜ
-
-end =#
-
-#= function FE_solve(FE_space::FESpacePoisson, param::ParametricSpecificsUnsteady; subtract_Ddata = true)
+function FE_solve(FE_space::FESpacePoisson, param::ParametricSpecificsUnsteady; subtract_Ddata = true)
 
 _, Gₕ = get_lifting_operator(FE_space, param)
 
@@ -315,7 +274,7 @@ end
 
 return uₕ, Gₕ
 
-end =#
+end
 
 function get_lifting_operator(FE_space::FESpacePoisson, param::ParametricSpecifics)
 
