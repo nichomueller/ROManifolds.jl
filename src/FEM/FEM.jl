@@ -86,7 +86,7 @@ function assemble_mass(FE_space::UnsteadyProblem, probl::UnsteadyProblem, param:
 
   function unsteady_mass(t)
     if !probl.probl_nl["M"]
-      return assemble_matrix(∫(FE_space.ϕᵥ * FE_space.ϕᵤ(t)) * FE_space.dΩ, FE_space.V(t), FE_space.V₀)
+      return assemble_matrix(∫(FE_space.ϕᵥ * (param.mₛ * FE_space.ϕᵤ(t))) * FE_space.dΩ, FE_space.V(t), FE_space.V₀)
     else
       return assemble_matrix(∫(FE_space.ϕᵥ * (param.m(t) * FE_space.ϕᵤ(t))) * FE_space.dΩ, FE_space.V(t), FE_space.V₀)
     end
@@ -112,7 +112,7 @@ function assemble_stiffness(FE_space::UnsteadyProblem, probl::UnsteadyProblem, p
 
   function unsteady_stiffness(t)
     if !probl.probl_nl["A"]
-      return assemble_matrix(∫(∇(FE_space.ϕᵥ) ⋅ ∇(FE_space.ϕᵤ(t))) * FE_space.dΩ, FE_space.V(t), FE_space.V₀)
+      return assemble_matrix(∫(∇(FE_space.ϕᵥ) ⋅ (param.αₛ * ∇(FE_space.ϕᵤ(t)))) * FE_space.dΩ, FE_space.V(t), FE_space.V₀)
     else
       return assemble_matrix(∫(∇(FE_space.ϕᵥ) ⋅ (param.α(t) * ∇(FE_space.ϕᵤ(t)))) * FE_space.dΩ, FE_space.V(t), FE_space.V₀)
     end
@@ -140,11 +140,11 @@ function assemble_forcing(FE_space::UnsteadyProblem, probl::UnsteadyProblem, par
 
   function unsteady_forcing(t)
     if !probl.probl_nl["f"] && !probl.probl_nl["h"]
-      return assemble_vector(∫(FE_space.ϕᵥ) * FE_space.dΩ, FE_space.V₀), assemble_vector(∫(FE_space.ϕᵥ) * FE_space.dΓ, FE_space.V₀)
+      return assemble_vector(∫(FE_space.ϕᵥ * param.fₛ) * FE_space.dΩ, FE_space.V₀), assemble_vector(∫(FE_space.ϕᵥ * param.hₛ) * FE_space.dΓ, FE_space.V₀)
     elseif !probl.probl_nl["f"] && probl.probl_nl["h"]
-      return assemble_vector(∫(FE_space.ϕᵥ) * FE_space.dΩ, FE_space.V₀), assemble_vector(∫(FE_space.ϕᵥ * param.h(t)) * FE_space.dΓ, FE_space.V₀)
+      return assemble_vector(∫(FE_space.ϕᵥ * param.fₛ) * FE_space.dΩ, FE_space.V₀), assemble_vector(∫(FE_space.ϕᵥ * param.h(t)) * FE_space.dΓ, FE_space.V₀)
     elseif probl.probl_nl["f"] && !probl.probl_nl["h"]
-      return assemble_vector(∫(FE_space.ϕᵥ * param.f(t)) * FE_space.dΩ, FE_space.V₀), assemble_vector(∫(FE_space.ϕᵥ) * FE_space.dΓ, FE_space.V₀)
+      return assemble_vector(∫(FE_space.ϕᵥ * param.f(t)) * FE_space.dΩ, FE_space.V₀), assemble_vector(∫(FE_space.ϕᵥ * param.hₛ) * FE_space.dΓ, FE_space.V₀)
     elseif probl.probl_nl["f"] && probl.probl_nl["h"]
       return assemble_vector(∫(FE_space.ϕᵥ * param.f(t)) * FE_space.dΩ, FE_space.V₀), assemble_vector(∫(FE_space.ϕᵥ * param.h(t)) * FE_space.dΓ, FE_space.V₀)
     end

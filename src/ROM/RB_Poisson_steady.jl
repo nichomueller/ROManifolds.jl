@@ -4,9 +4,9 @@ include("RB_utils.jl")
 include("S-GRB_Poisson.jl")
 include("S-PGRB_Poisson.jl")
 
-function get_snapshot_matrix(ROM_info::Problem, RB_variables::RBProblemSteady)
+function get_snapshot_matrix(ROM_info::Problem, RB_variables::PoissonSteady)
 
-  @info "Importing the snapshot matrix, number of snapshots considered: $(ROM_info.nₛ)"
+  @info "Importing the snapshot matrix for field u, number of snapshots considered: $(ROM_info.nₛ)"
 
   name = "uₕ"
   Sᵘ = Matrix(CSV.read(joinpath(ROM_info.paths.FEM_snap_path, name * ".csv"), DataFrame))[:, 1:ROM_info.nₛ]
@@ -18,11 +18,11 @@ function get_snapshot_matrix(ROM_info::Problem, RB_variables::RBProblemSteady)
 
 end
 
-function get_norm_matrix(ROM_info::Problem, RB_variables::RBProblem)
+function get_norm_matrix(ROM_info::Problem, RB_variables::PoissonSteady)
 
   if check_norm_matrix(RB_variables)
 
-    @info "Importing the norm matrix"
+    @info "Importing the norm matrix Xᵘ₀"
 
     Xᵘ₀ = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "Xᵘ₀.csv"); convert_to_sparse = true)
     RB_variables.Nₛᵘ = size(Xᵘ₀)[1]
@@ -38,13 +38,13 @@ function get_norm_matrix(ROM_info::Problem, RB_variables::RBProblem)
 
 end
 
-function check_norm_matrix(RB_variables::RBProblem) :: Bool
+function check_norm_matrix(RB_variables::PoissonSteady) :: Bool
 
   isempty(RB_variables.Xᵘ₀) || maximum(abs.(RB_variables.Xᵘ₀)) === 0
 
 end
 
-function PODs_space(ROM_info::Problem, RB_variables::RBProblem)
+function PODs_space(ROM_info::Problem, RB_variables::PoissonSteady)
 
   @info "Performing the spatial POD for field u, using a tolerance of $(ROM_info.ϵₛ)"
 
@@ -56,9 +56,9 @@ function PODs_space(ROM_info::Problem, RB_variables::RBProblem)
 
 end
 
-function build_reduced_basis(ROM_info::Problem, RB_variables::RBProblemSteady)
+function build_reduced_basis(ROM_info::Problem, RB_variables::PoissonSteady)
 
-  @info "Building the spatial reduced basis for field u, using a tolerance of $(ROM_info.ϵₛ)"
+  @info "Building the reduced basis for field u, using a tolerance of $(ROM_info.ϵₛ)"
 
   RB_building_time = @elapsed begin
     PODs_space(ROM_info, RB_variables)
@@ -72,16 +72,16 @@ function build_reduced_basis(ROM_info::Problem, RB_variables::RBProblemSteady)
 
 end
 
-function import_reduced_basis(ROM_info::Problem, RB_variables::RBProblemSteady)
+function import_reduced_basis(ROM_info::Problem, RB_variables::PoissonSteady)
 
-  @info "Importing the spatial reduced basis"
+  @info "Importing the reduced basis for field u"
 
   RB_variables.Φₛᵘ = load_CSV(joinpath(ROM_info.paths.basis_path, "Φₛᵘ.csv"))
   (RB_variables.Nₛᵘ, RB_variables.nₛᵘ) = size(RB_variables.Φₛᵘ)
 
 end
 
-function get_generalized_coordinates(ROM_info::Problem, RB_variables::RBProblemSteady, snaps=nothing)
+function get_generalized_coordinates(ROM_info::Problem, RB_variables::PoissonSteady, snaps=nothing)
 
   get_norm_matrix(ROM_info, RB_variables)
 
@@ -98,7 +98,7 @@ function get_generalized_coordinates(ROM_info::Problem, RB_variables::RBProblemS
 
 end
 
-function set_operators(ROM_info::Problem, RB_variables::RBProblemSteady) :: Vector
+function set_operators(ROM_info::Problem, RB_variables::PoissonSteady) :: Vector
 
   operators = ["A"]
   if !ROM_info.build_parametric_RHS && !ROM_info.probl_nl["f"]
@@ -112,7 +112,7 @@ function set_operators(ROM_info::Problem, RB_variables::RBProblemSteady) :: Vect
 
 end
 
-function save_M_DEIM_structures(ROM_info::Problem, RB_variables::RBProblemSteady)
+function save_M_DEIM_structures(ROM_info::Problem, RB_variables::PoissonSteady)
 
   list_M_DEIM = (RB_variables.MDEIMᵢ_A, RB_variables.MDEIM_idx_A, RB_variables.sparse_el_A, RB_variables.DEIMᵢ_mat_F, RB_variables.DEIM_idx_F, RB_variables.DEIMᵢ_mat_H, RB_variables.DEIM_idx_H)
   list_names = ("MDEIMᵢ_A", "MDEIM_idx_A", "sparse_el_A", "DEIMᵢ_mat_F", "DEIM_idx_F", "DEIMᵢ_mat_H", "DEIM_idx_H")
@@ -128,7 +128,7 @@ function save_M_DEIM_structures(ROM_info::Problem, RB_variables::RBProblemSteady
 
 end
 
-function get_M_DEIM_structures(ROM_info::Problem, RB_variables::RBProblemSteady) :: Vector
+function get_M_DEIM_structures(ROM_info::Problem, RB_variables::PoissonSteady) :: Vector
 
   operators = String[]
 
@@ -215,7 +215,7 @@ function get_Hₙ(ROM_info::Problem, RB_variables::RBProblem) :: Vector
 
 end
 
-function get_affine_structures(ROM_info::Problem, RB_variables::RBProblemSteady) :: Vector
+function get_affine_structures(ROM_info::Problem, RB_variables::PoissonSteady) :: Vector
 
   operators = String[]
 
@@ -232,7 +232,7 @@ function get_affine_structures(ROM_info::Problem, RB_variables::RBProblemSteady)
 
 end
 
-function get_offline_structures(ROM_info::Problem, RB_variables::RBProblemSteady) :: Vector
+function get_offline_structures(ROM_info::Problem, RB_variables::PoissonSteady) :: Vector
 
   operators = String[]
 
@@ -244,7 +244,7 @@ function get_offline_structures(ROM_info::Problem, RB_variables::RBProblemSteady
 
 end
 
-function assemble_offline_structures(ROM_info::Problem, RB_variables::RBProblemSteady, operators=nothing)
+function assemble_offline_structures(ROM_info::Problem, RB_variables::PoissonSteady, operators=nothing)
 
   if isnothing(operators)
     operators = set_operators(ROM_info, RB_variables)
@@ -252,36 +252,30 @@ function assemble_offline_structures(ROM_info::Problem, RB_variables::RBProblemS
 
   assembly_time = 0
   if "A" ∈ operators || "F" ∈ operators || "H" ∈ operators
-    if !ROM_info.probl_nl["A"]
-      assembly_time += @elapsed begin
-        assemble_affine_matrices(ROM_info::Problem, RB_variables, "A")
-      end
-    else
-      assembly_time += @elapsed begin
+    assembly_time += @elapsed begin
+      if !ROM_info.probl_nl["A"]
+        assemble_affine_matrices(ROM_info, RB_variables, "A")
+      else
         assemble_MDEIM_matrices(ROM_info, RB_variables, "A")
       end
     end
   end
 
   if "F" ∈ operators
-    if !ROM_info.probl_nl["f"]
-      assembly_time += @elapsed begin
+    assembly_time += @elapsed begin
+      if !ROM_info.probl_nl["f"]
         assemble_affine_vectors(ROM_info, RB_variables, "F")
-      end
-    else
-      assembly_time += @elapsed begin
+      else
         assemble_DEIM_vectors(ROM_info, RB_variables, "F")
       end
     end
   end
 
   if "H" ∈ operators
-    if !ROM_info.probl_nl["h"]
-      assembly_time += @elapsed begin
+    assembly_time += @elapsed begin
+      if !ROM_info.probl_nl["h"]
         assemble_affine_vectors(ROM_info, RB_variables, "H")
-      end
-    else
-      assembly_time += @elapsed begin
+      else
         assemble_DEIM_vectors(ROM_info, RB_variables, "H")
       end
     end
@@ -351,7 +345,7 @@ function get_system_blocks(ROM_info::Problem, RB_variables::RBProblem, LHS_block
 
 end
 
-function get_θᵃ(ROM_info::Problem, RB_variables::RBProblemSteady, param) :: Array
+function get_θᵃ(ROM_info::Problem, RB_variables::PoissonSteady, param) :: Array
 
   if !ROM_info.probl_nl["A"]
     θᵃ = param.α(Point(0.,0.))
@@ -364,7 +358,7 @@ function get_θᵃ(ROM_info::Problem, RB_variables::RBProblemSteady, param) :: A
 
 end
 
-function get_θᶠʰ(ROM_info::Problem, RB_variables::RBProblemSteady, param) :: Tuple
+function get_θᶠʰ(ROM_info::Problem, RB_variables::PoissonSteady, param) :: Tuple
 
   if ROM_info.build_parametric_RHS
     @error "Cannot fetch θᶠ, θʰ if the RHS is built online"
@@ -395,7 +389,7 @@ function initialize_RB_system(RB_variables::RBProblem)
 
 end
 
-function get_Q(ROM_info::Problem, RB_variables::RBProblemSteady)
+function get_Q(ROM_info::Problem, RB_variables::PoissonSteady)
 
   if RB_variables.Qᵃ === 0
     RB_variables.Qᵃ = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "Qᵃ.csv"))[1]
@@ -412,7 +406,7 @@ function get_Q(ROM_info::Problem, RB_variables::RBProblemSteady)
 
 end
 
-function get_RB_system(ROM_info::Problem, RB_variables::RBProblemSteady, param)
+function get_RB_system(ROM_info::Problem, RB_variables::PoissonSteady, param)
 
   initialize_RB_system(RB_variables)
   get_Q(ROM_info, RB_variables)
@@ -442,7 +436,7 @@ function get_RB_system(ROM_info::Problem, RB_variables::RBProblemSteady, param)
 
 end
 
-function solve_RB_system(ROM_info::Problem, RB_variables::RBProblemSteady, param)
+function solve_RB_system(ROM_info::Problem, RB_variables::PoissonSteady, param)
 
   get_RB_system(ROM_info, RB_variables, param)
 
@@ -453,17 +447,16 @@ function solve_RB_system(ROM_info::Problem, RB_variables::RBProblemSteady, param
 
 end
 
-function reconstruct_FEM_solution(RB_variables::RBProblemSteady)
+function reconstruct_FEM_solution(RB_variables::PoissonSteady)
 
 
   @info "Reconstructing FEM solution from the newly computed RB one"
 
-  RB_variables.ũ = zeros(RB_variables.Nₛᵘ)
   RB_variables.ũ = RB_variables.Φₛᵘ * RB_variables.uₙ
 
 end
 
-function build_RB_approximation(ROM_info::Problem, RB_variables::RBProblemSteady)
+function build_RB_approximation(ROM_info::Problem, RB_variables::PoissonSteady)
 
 
   @info "Building $(ROM_info.RB_method) approximation with $(ROM_info.nₛ) snapshots and tolerances of $(ROM_info.ϵₛ) in space"
@@ -502,7 +495,7 @@ function build_RB_approximation(ROM_info::Problem, RB_variables::RBProblemSteady
 
 end
 
-function testing_phase(ROM_info::Problem, RB_variables::RBProblemSteady, μ, param_nbs)
+function testing_phase(ROM_info::Problem, RB_variables::PoissonSteady, μ, param_nbs)
 
   mean_H1_err = 0.0
   mean_pointwise_err = zeros(RB_variables.Nₛᵘ)

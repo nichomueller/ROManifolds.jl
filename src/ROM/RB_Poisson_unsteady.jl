@@ -2,31 +2,29 @@ include("RB_Poisson_steady.jl")
 include("ST-GRB_Poisson.jl")
 include("ST-PGRB_Poisson.jl")
 
-function get_snapshot_matrix(ROM_info::Problem, RB_variables::RBProblemUnsteady)
+function get_snapshot_matrix(ROM_info::Problem, RB_variables::PoissonUnsteady)
 
-  nₛ = ROM_info.nₛ
-  @info "Importing the snapshot matrix, number of snapshots considered: $nₛ"
+  @info "Importing the snapshot matrix for field u, number of snapshots considered: $(ROM_info.nₛ)"
 
-  name = "uₕ"
-  Sᵘ = Matrix(CSV.read(joinpath(ROM_info.paths.FEM_snap_path, name * ".csv"), DataFrame))[:, 1:(ROM_info.nₛ*RB_variables.Nₜ)]
+  Sᵘ = Matrix(CSV.read(joinpath(ROM_info.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, 1:(ROM_info.nₛ*RB_variables.Nₜ)]
 
-  RB_variables.steady_info.Sᵘ = Sᵘ
+  RB_variables.S.Sᵘ = Sᵘ
   Nₛᵘ = size(Sᵘ)[1]
-  RB_variables.steady_info.Nₛᵘ = Nₛᵘ
-  RB_variables.Nᵘ = RB_variables.steady_info.Nₛᵘ * RB_variables.Nₜ
+  RB_variables.S.Nₛᵘ = Nₛᵘ
+  RB_variables.Nᵘ = RB_variables.S.Nₛᵘ * RB_variables.Nₜ
 
-  @info "Dimension of snapshot matrix: $(size(Sᵘ))"
+  @info "Dimension of the snapshot matrix for field u: $(size(Sᵘ))"
 
 end
 
-function PODs_space(ROM_info::Problem, RB_variables::RBProblemUnsteady)
+function PODs_space(ROM_info::Problem, RB_variables::PoissonUnsteady)
 
   @info "Performing the nested spatial POD for field u, using a tolerance of $(ROM_info.ϵₛ)"
 
   if ROM_info.perform_nested_POD
 
     for nₛ = 1:ROM_info.nₛ
-      Sᵘₙ = RB_variables.steady_info.Sᵘ[:, (nₛ-1)*RB_variables.Nₜ+1:nₛ*RB_variables.Nₜ]
+      Sᵘₙ = RB_variables.S.Sᵘ[:, (nₛ-1)*RB_variables.Nₜ+1:nₛ*RB_variables.Nₜ]
       Φₙ, _ = POD(Sᵘₙ, ROM_info.ϵₛ)
       if nₛ ===1
         global Φₙᵘ_temp = Φₙ
@@ -35,34 +33,34 @@ function PODs_space(ROM_info::Problem, RB_variables::RBProblemUnsteady)
       end
     end
     Φₛᵘ, _ = POD(Φₙᵘ_temp, ROM_info.ϵₛ)
-    RB_variables.steady_info.Φₛᵘ = Φₛᵘ
-    RB_variables.steady_info.nₛᵘ = size(Φₛᵘ)[2]
+    RB_variables.S.Φₛᵘ = Φₛᵘ
+    RB_variables.S.nₛᵘ = size(Φₛᵘ)[2]
 
   else
 
-    PODs_space(ROM_info, RB_variables.steady_info)
+    PODs_space(ROM_info, RB_variables.S)
 
   end
 
 end
 
 
-function PODs_time(ROM_info::Problem, RB_variables::RBProblemUnsteady)
+function PODs_time(ROM_info::Problem, RB_variables::PoissonUnsteady)
 
   @info "Performing the temporal POD for field u, using a tolerance of $(ROM_info.ϵₜ)"
 
   if ROM_info.time_reduction_technique === "ST-HOSVD"
-    Sᵘₜ = zeros(RB_variables.Nₜ, RB_variables.steady_info.nₛᵘ * ROM_info.nₛ)
-    Sᵘ = RB_variables.steady_info.Φₛᵘ' * RB_variables.steady_info.Sᵘ
+    Sᵘₜ = zeros(RB_variables.Nₜ, RB_variables.S.nₛᵘ * ROM_info.nₛ)
+    Sᵘ = RB_variables.S.Φₛᵘ' * RB_variables.S.Sᵘ
     for i in 1:ROM_info.nₛ
-      Sᵘₜ[:, (i-1)*RB_variables.steady_info.nₛᵘ+1:i*RB_variables.steady_info.nₛᵘ] =
+      Sᵘₜ[:, (i-1)*RB_variables.S.nₛᵘ+1:i*RB_variables.S.nₛᵘ] =
       Sᵘ[:, (i-1)*RB_variables.Nₜ+1:i*RB_variables.Nₜ]'
     end
   else
-    Sᵘₜ = zeros(RB_variables.Nₜ, RB_variables.steady_info.Nₛᵘ * ROM_info.nₛ)
-    Sᵘ = RB_variables.steady_info.Sᵘ
+    Sᵘₜ = zeros(RB_variables.Nₜ, RB_variables.S.Nₛᵘ * ROM_info.nₛ)
+    Sᵘ = RB_variables.S.Sᵘ
     for i in 1:ROM_info.nₛ
-      Sᵘₜ[:, (i-1)*RB_variables.steady_info.Nₛᵘ+1:i*RB_variables.steady_info.Nₛᵘ] =
+      Sᵘₜ[:, (i-1)*RB_variables.S.Nₛᵘ+1:i*RB_variables.S.Nₛᵘ] =
       transpose(Sᵘ[:, (i-1)*RB_variables.Nₜ+1:i*RB_variables.Nₜ])
     end
   end
@@ -73,7 +71,7 @@ function PODs_time(ROM_info::Problem, RB_variables::RBProblemUnsteady)
 
 end
 
-function build_reduced_basis(ROM_info::Problem, RB_variables::RBProblemUnsteady)
+function build_reduced_basis(ROM_info::Problem, RB_variables::PoissonUnsteady)
 
   @info "Building the space-time reduced basis for field u, using a tolerance of ($(ROM_info.ϵₛ),$(ROM_info.ϵₜ))"
 
@@ -81,65 +79,41 @@ function build_reduced_basis(ROM_info::Problem, RB_variables::RBProblemUnsteady)
     PODs_space(ROM_info, RB_variables)
     PODs_time(ROM_info, RB_variables)
   end
-  RB_variables.nᵘ = RB_variables.steady_info.nₛᵘ * RB_variables.nₜᵘ
 
-  RB_variables.steady_info.Nₛᵘ = size(RB_variables.steady_info.Φₛᵘ)[1]
-  RB_variables.Nᵘ = RB_variables.steady_info.Nₛᵘ * RB_variables.Nₜ
+  RB_variables.nᵘ = RB_variables.S.nₛᵘ * RB_variables.nₜᵘ
+  RB_variables.Nᵘ = RB_variables.S.Nₛᵘ * RB_variables.Nₜ
 
-  RB_variables.steady_info.offline_time += RB_building_time
+  RB_variables.S.offline_time += RB_building_time
 
   if ROM_info.save_offline_structures
-    save_CSV(RB_variables.steady_info.Φₛᵘ, joinpath(ROM_info.paths.basis_path, "Φₛᵘ.csv"))
+    save_CSV(RB_variables.S.Φₛᵘ, joinpath(ROM_info.paths.basis_path, "Φₛᵘ.csv"))
     save_CSV(RB_variables.Φₜᵘ, joinpath(ROM_info.paths.basis_path, "Φₜᵘ.csv"))
   end
 
 end
 
-function nested_PODs(ROM_info::Problem, RB_variables::RBProblemUnsteady)
+function import_reduced_basis(ROM_info::Problem, RB_variables::PoissonUnsteady)
 
-  @info "Building the space-time reduced basis for field u, using a tolerance of ($(ROM_info.ϵₛ),$(ROM_info.ϵₜ))"
+  @info "Importing the reduced basis for field u"
 
-  RB_building_time = @elapsed begin
-    for nₛ = 1:RB_variables.steady_info.nₛ
-      Sᵘₙ = RB_variables.steady_info.Sᵘ[:, (nₛ-1)*RB_variables.Nₜ+1:nₛ*RB_variables.Nₜ]
-      Φₙ, _ = POD(Sᵘₙ, ROM_info.ϵₛ)
-      if nₛ ===1
-        global Φₙ_temp = Φₙ
-      else
-        Φₙ, _ = POD(Sᵘₙ, ROM_info.ϵₛ)
-        global Φₙᵘ_temp = hcat(Φₜᵘ_temp, Φₙ)
-      end
-    end
-    RB_variables.steady_info.Φₛᵘ = Φₙᵘ_temp
-    RB_variables.steady_info.nₛᵘ = size(Φₙᵘ_temp)[2]
-
-    PODs_time(ROM_info, RB_variables)
-  end
-
-end
-
-function import_reduced_basis(ROM_info::Problem, RB_variables::RBProblemUnsteady)
-
-  @info "Importing the temporal reduced basis"
-
-  import_reduced_basis(ROM_info, RB_variables.steady_info)
+  import_reduced_basis(ROM_info, RB_variables.S)
 
   RB_variables.Φₜᵘ = load_CSV(joinpath(ROM_info.paths.basis_path, "Φₜᵘ.csv"))
   RB_variables.nₜᵘ = size(RB_variables.Φₜᵘ)[2]
-  RB_variables.nᵘ = RB_variables.steady_info.nₛᵘ * RB_variables.nₜᵘ
+  RB_variables.nᵘ = RB_variables.S.nₛᵘ * RB_variables.nₜᵘ
 
 end
 
-function index_mapping(i::Int, j::Int, RB_variables::RBProblemUnsteady) :: Int64
+function index_mapping(i::Int, j::Int, RB_variables::PoissonUnsteady) :: Int64
 
   return convert(Int64, (i-1) * RB_variables.nₜᵘ + j)
 
 end
 
-function get_generalized_coordinates(ROM_info::Problem, RB_variables::RBProblemUnsteady, snaps=nothing)
+function get_generalized_coordinates(ROM_info::Problem, RB_variables::PoissonUnsteady, snaps=nothing)
 
-  if check_norm_matrix(RB_variables.steady_info)
-    get_norm_matrix(ROM_info, RB_variables.steady_info)
+  if check_norm_matrix(RB_variables.S)
+    get_norm_matrix(ROM_info, RB_variables.S)
   end
 
   if snaps === nothing || maximum(snaps) > ROM_info.nₛ
@@ -147,12 +121,12 @@ function get_generalized_coordinates(ROM_info::Problem, RB_variables::RBProblemU
   end
 
   û = zeros(RB_variables.nᵘ, length(snaps))
-  Φₛᵘ_normed = RB_variables.steady_info.Xᵘ₀ * RB_variables.steady_info.Φₛᵘ
+  Φₛᵘ_normed = RB_variables.S.Xᵘ₀ * RB_variables.S.Φₛᵘ
 
   for (i, i_nₛ) = enumerate(snaps)
-    @info "Assembling generalized coordinate relative to snapshot $(i_nₛ)"
-    S_i = RB_variables.steady_info.Sᵘ[:, (i_nₛ-1)*RB_variables.Nₜ+1:i_nₛ*RB_variables.Nₜ]
-    for i_s = 1:RB_variables.steady_info.nₛᵘ
+    @info "Assembling generalized coordinate relative to snapshot $(i_nₛ), field u"
+    S_i = RB_variables.S.Sᵘ[:, (i_nₛ-1)*RB_variables.Nₜ+1:i_nₛ*RB_variables.Nₜ]
+    for i_s = 1:RB_variables.S.nₛᵘ
       for i_t = 1:RB_variables.nₜᵘ
         Π_ij = reshape(Φₛᵘ_normed[:, i_s], :, 1) .* reshape(RB_variables.Φₜᵘ[:, i_t], :, 1)'
         û[index_mapping(i_s, i_t, RB_variables), i] = sum(Π_ij .* S_i)
@@ -160,7 +134,7 @@ function get_generalized_coordinates(ROM_info::Problem, RB_variables::RBProblemU
     end
   end
 
-  RB_variables.steady_info.û = û
+  RB_variables.S.û = û
 
   if ROM_info.save_offline_structures
     save_CSV(û, joinpath(ROM_info.paths.gen_coords_path, "û.csv"))
@@ -168,20 +142,20 @@ function get_generalized_coordinates(ROM_info::Problem, RB_variables::RBProblemU
 
 end
 
-function test_offline_phase(ROM_info::Problem, RB_variables::RBProblemUnsteady)
+function test_offline_phase(ROM_info::Problem, RB_variables::PoissonUnsteady)
 
   get_generalized_coordinates(ROM_info, RB_variables, 1)
 
-  uₙ = reshape(RB_variables.steady_info.û, (RB_variables.nₜᵘ, RB_variables.steady_info.nₛᵘ))
-  u_rec = RB_variables.steady_info.Φₛᵘ * (RB_variables.Φₜᵘ * uₙ)'
+  uₙ = reshape(RB_variables.S.û, (RB_variables.nₜᵘ, RB_variables.S.nₛᵘ))
+  u_rec = RB_variables.S.Φₛᵘ * (RB_variables.Φₜᵘ * uₙ)'
   err = zeros(RB_variables.Nₜ)
   for i = 1:RB_variables.Nₜ
-    err[i] = compute_errors(RB_variables.steady_info.Sᵘ[:, i], u_rec[:, i])
+    err[i] = compute_errors(RB_variables.S.Sᵘ[:, i], u_rec[:, i])
   end
 
 end
 
-function save_M_DEIM_structures(ROM_info::Problem, RB_variables::RBProblemUnsteady)
+function save_M_DEIM_structures(ROM_info::Problem, RB_variables::PoissonUnsteady)
 
   list_M_DEIM = (RB_variables.MDEIMᵢ_M, RB_variables.MDEIM_idx_M, RB_variables.sparse_el_M, )
   list_names = ("MDEIMᵢ_M", "MDEIM_idx_M", "sparse_el_M")
@@ -195,18 +169,18 @@ function save_M_DEIM_structures(ROM_info::Problem, RB_variables::RBProblemUnstea
     end
   end
 
-  save_M_DEIM_structures(ROM_info, RB_variables.steady_info)
+  save_M_DEIM_structures(ROM_info, RB_variables.S)
 
 end
 
-function set_operators(ROM_info, RB_variables::RBProblemUnsteady) :: Vector
+function set_operators(ROM_info, RB_variables::PoissonUnsteady) :: Vector
 
-  return vcat(["M"], set_operators(ROM_info, RB_variables.steady_info))
+  return vcat(["M"], set_operators(ROM_info, RB_variables.S))
 
 end
 
 
-function get_M_DEIM_structures(ROM_info::Problem, RB_variables::RBProblemUnsteady) :: Vector
+function get_M_DEIM_structures(ROM_info::Problem, RB_variables::PoissonUnsteady) :: Vector
 
   operators = String[]
 
@@ -225,11 +199,11 @@ function get_M_DEIM_structures(ROM_info::Problem, RB_variables::RBProblemUnstead
 
   end
 
-  append!(operators, get_M_DEIM_structures(ROM_info, RB_variables.steady_info))
+  append!(operators, get_M_DEIM_structures(ROM_info, RB_variables.S))
 
 end
 
-function get_offline_structures(ROM_info::Problem, RB_variables::RBProblemUnsteady) :: Vector
+function get_offline_structures(ROM_info::Problem, RB_variables::PoissonUnsteady) :: Vector
 
   operators = String[]
   append!(operators, get_affine_structures(ROM_info, RB_variables))
@@ -240,14 +214,14 @@ function get_offline_structures(ROM_info::Problem, RB_variables::RBProblemUnstea
 
 end
 
-function get_θᵐ(ROM_info::Problem, RB_variables::RBProblemUnsteady, param) :: Array
+function get_θᵐ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, param::ParametricSpecificsUnsteady) :: Array
 
   if !ROM_info.probl_nl["M"]
     times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+ROM_info.δt*ROM_info.θ
     θᵐ = [param.mₜ(t_θ) for t_θ = times_θ]
   else
     M_μ_sparse = build_sparse_mat(problem_info, ROM_info, param.μ, RB_variables.sparse_el_M; var="M")
-    Nₛᵘ = RB_variables.steady_info.Nₛᵘ
+    Nₛᵘ = RB_variables.S.Nₛᵘ
     θᵐ = zeros(RB_variables.Qᵐ, RB_variables.Nₜ)
     for iₜ = 1:RB_variables.Nₜ
       θᵐ[:,iₜ] = M_DEIM_online(M_μ_sparse[:,(iₜ-1)*Nₛᵘ+1:iₜ*Nₛᵘ], RB_variables.MDEIMᵢ_M, RB_variables.MDEIM_idx_M)
@@ -260,12 +234,12 @@ function get_θᵐ(ROM_info::Problem, RB_variables::RBProblemUnsteady, param) ::
 
 end
 
-function get_θᵐₛₜ(ROM_info::Problem, RB_variables::RBProblemUnsteady, param) :: Array
+function get_θᵐₛₜ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, param::ParametricSpecificsUnsteady) :: Array
 
   if !ROM_info.probl_nl["M"]
     θᵐ = get_θᵐ(ROM_info, RB_variables, param)
   else
-    Nₛᵘ = RB_variables.steady_info.Nₛᵘ
+    Nₛᵘ = RB_variables.S.Nₛᵘ
     _, MDEIM_idx_time = from_spacetime_to_space_time_idx_mat(RB_variables.MDEIM_idx_M, Nₛᵘ)
     unique!(MDEIM_idx_time)
     M_μ_sparse = build_sparse_mat(problem_info, ROM_info, param.μ, RB_variables.sparse_el_M, MDEIM_idx_time; var="M")
@@ -280,39 +254,39 @@ function get_θᵐₛₜ(ROM_info::Problem, RB_variables::RBProblemUnsteady, par
 
 end
 
-function get_θᵃ(ROM_info::Problem, RB_variables::RBProblemUnsteady, param) :: Array
+function get_θᵃ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, param::ParametricSpecificsUnsteady) :: Array
 
   if !ROM_info.probl_nl["A"]
     times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+ROM_info.δt*ROM_info.θ
     θᵃ = [param.αₜ(t_θ,param.μ) for t_θ = times_θ]
   else
-    A_μ_sparse = build_sparse_mat(problem_info, ROM_info, param.μ, RB_variables.steady_info.sparse_el_A; var="A")
-    Nₛᵘ = RB_variables.steady_info.Nₛᵘ
-    θᵃ = zeros(RB_variables.steady_info.Qᵃ, RB_variables.Nₜ)
+    A_μ_sparse = build_sparse_mat(problem_info, ROM_info, param.μ, RB_variables.S.sparse_el_A; var="A")
+    Nₛᵘ = RB_variables.S.Nₛᵘ
+    θᵃ = zeros(RB_variables.S.Qᵃ, RB_variables.Nₜ)
     for iₜ = 1:RB_variables.Nₜ
-      θᵃ[:,iₜ] = M_DEIM_online(A_μ_sparse[:,(iₜ-1)*Nₛᵘ+1:iₜ*Nₛᵘ], RB_variables.steady_info.MDEIMᵢ_A, RB_variables.steady_info.MDEIM_idx_A)
+      θᵃ[:,iₜ] = M_DEIM_online(A_μ_sparse[:,(iₜ-1)*Nₛᵘ+1:iₜ*Nₛᵘ], RB_variables.S.MDEIMᵢ_A, RB_variables.S.MDEIM_idx_A)
     end
   end
 
-  θᵃ = reshape(θᵃ, RB_variables.steady_info.Qᵃ, RB_variables.Nₜ)
+  θᵃ = reshape(θᵃ, RB_variables.S.Qᵃ, RB_variables.Nₜ)
 
   return θᵃ
 
 end
 
-function get_θᵃₛₜ(ROM_info::Problem, RB_variables::RBProblemUnsteady, param) :: Array
+function get_θᵃₛₜ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, param::ParametricSpecificsUnsteady) :: Array
 
   if !ROM_info.probl_nl["A"]
     θᵃ = get_θᵃ(ROM_info, RB_variables, param)
   else
-    Nₛᵘ = RB_variables.steady_info.Nₛᵘ
-    _, MDEIM_idx_time = from_spacetime_to_space_time_idx_mat(RB_variables.steady_info.MDEIM_idx_A, Nₛᵘ)
+    Nₛᵘ = RB_variables.S.Nₛᵘ
+    _, MDEIM_idx_time = from_spacetime_to_space_time_idx_mat(RB_variables.S.MDEIM_idx_A, Nₛᵘ)
     unique!(MDEIM_idx_time)
-    A_μ_sparse = build_sparse_mat(problem_info, ROM_info, param.μ, RB_variables.steady_info.sparse_el_A, MDEIM_idx_time; var="A")
+    A_μ_sparse = build_sparse_mat(problem_info, ROM_info, param.μ, RB_variables.S.sparse_el_A, MDEIM_idx_time; var="A")
 
     θᵃ = zeros(RB_variables.Qᵃ, length(MDEIM_idx_time))
     for iₜ = 1:length(MDEIM_idx_time)
-      θᵃ[:,iₜ] = M_DEIM_online(A_μ_sparse[:,(iₜ-1)*Nₛᵘ+1:iₜ*Nₛᵘ], RB_variables.steady_info.MDEIMᵢ_A, RB_variables.steady_info.MDEIM_idx_A)
+      θᵃ[:,iₜ] = M_DEIM_online(A_μ_sparse[:,(iₜ-1)*Nₛᵘ+1:iₜ*Nₛᵘ], RB_variables.S.MDEIMᵢ_A, RB_variables.S.MDEIM_idx_A)
     end
   end
 
@@ -320,7 +294,7 @@ function get_θᵃₛₜ(ROM_info::Problem, RB_variables::RBProblemUnsteady, par
 
 end
 
-function get_θᶠʰ(ROM_info::Problem, RB_variables::RBProblemUnsteady, param) :: Tuple
+function get_θᶠʰ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, param::ParametricSpecificsUnsteady) :: Tuple
 
   if ROM_info.build_parametric_RHS
     @error "Cannot fetch θᶠ, θʰ if the RHS is built online"
@@ -335,7 +309,7 @@ function get_θᶠʰ(ROM_info::Problem, RB_variables::RBProblemUnsteady, param) 
   else
     F_μ, _ = assemble_forcing(FE_space, ROM_info, param)
     for iₜ = 1:RB_variables.Nₜ
-      append!(θᶠ, M_DEIM_online(F_μ(times_θ[iₜ]), RB_variables.steady_info.DEIMᵢ_mat_F, RB_variables.steady_info.DEIM_idx_F))
+      append!(θᶠ, M_DEIM_online(F_μ(times_θ[iₜ]), RB_variables.S.DEIMᵢ_mat_F, RB_variables.S.DEIM_idx_F))
     end
   end
 
@@ -344,18 +318,18 @@ function get_θᶠʰ(ROM_info::Problem, RB_variables::RBProblemUnsteady, param) 
   else
     _, H_μ = assemble_forcing(FE_space, ROM_info, param)
     for iₜ = 1:RB_variables.Nₜ
-      append!(θʰ, M_DEIM_online(H_μ(times_θ[iₜ]), RB_variables.steady_info.DEIMᵢ_mat_H, RB_variables.steady_info.DEIM_idx_H))
+      append!(θʰ, M_DEIM_online(H_μ(times_θ[iₜ]), RB_variables.S.DEIMᵢ_mat_H, RB_variables.S.DEIM_idx_H))
     end
   end
 
-  θᶠ = reshape(θᶠ, RB_variables.steady_info.Qᶠ, RB_variables.Nₜ)
-  θʰ = reshape(θʰ, RB_variables.steady_info.Qʰ, RB_variables.Nₜ)
+  θᶠ = reshape(θᶠ, RB_variables.S.Qᶠ, RB_variables.Nₜ)
+  θʰ = reshape(θʰ, RB_variables.S.Qʰ, RB_variables.Nₜ)
 
   return θᶠ, θʰ
 
 end
 
-function get_θᶠʰₛₜ(ROM_info::Problem, RB_variables::RBProblemUnsteady, param) :: Tuple
+function get_θᶠʰₛₜ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, param::ParametricSpecificsUnsteady) :: Tuple
 
   if ROM_info.build_parametric_RHS
     @error "Cannot fetch θᶠ, θʰ if the RHS is built online"
@@ -369,11 +343,11 @@ function get_θᶠʰₛₜ(ROM_info::Problem, RB_variables::RBProblemUnsteady, p
     θᶠ = [param.fₜ(t_θ) for t_θ = times_θ]
   else
     F_μ, _ = assemble_forcing(FE_space, ROM_info, param)
-    _, DEIM_idx_time = from_spacetime_to_space_time_idx_vec(RB_variables.steady_info.DEIM_idx_F, Nₛᵘ)
+    _, DEIM_idx_time = from_spacetime_to_space_time_idx_vec(RB_variables.S.DEIM_idx_F, RB_variables.S.Nₛᵘ)
     unique!(DEIM_idx_time)
     times_DEIM = times_θ[DEIM_idx_time]
     for tᵢ = times_DEIM
-      append!(θᶠ, M_DEIM_online(F_μ(tᵢ), RB_variables.steady_info.DEIMᵢ_mat_F, RB_variables.steady_info.DEIM_idx_F))
+      append!(θᶠ, M_DEIM_online(F_μ(tᵢ), RB_variables.S.DEIMᵢ_mat_F, RB_variables.S.DEIM_idx_F))
     end
   end
 
@@ -381,53 +355,52 @@ function get_θᶠʰₛₜ(ROM_info::Problem, RB_variables::RBProblemUnsteady, p
     θʰ = [param.hₜ(t_θ) for t_θ = times_θ]
   else
     _, H_μ = assemble_forcing(FE_space, ROM_info, param)
-    _, DEIM_idx_time = from_spacetime_to_space_time_idx_vec(RB_variables.steady_info.DEIM_idx_H, Nₛᵘ)
+    _, DEIM_idx_time = from_spacetime_to_space_time_idx_vec(RB_variables.S.DEIM_idx_H, RB_variables.S.Nₛᵘ)
     unique!(DEIM_idx_time)
     times_DEIM = times_θ[DEIM_idx_time]
     for tᵢ = times_DEIM
-      append!(θʰ, M_DEIM_online(H_μ(tᵢ), RB_variables.steady_info.DEIMᵢ_mat_H, RB_variables.steady_info.DEIM_idx_H))
+      append!(θʰ, M_DEIM_online(H_μ(tᵢ), RB_variables.S.DEIMᵢ_mat_H, RB_variables.S.DEIM_idx_H))
     end
   end
 
-  θᶠ = reshape(θᶠ, RB_variables.steady_info.Qᶠ, RB_variables.Nₜ)
-  θʰ = reshape(θʰ, RB_variables.steady_info.Qʰ, RB_variables.Nₜ)
+  θᶠ = reshape(θᶠ, RB_variables.S.Qᶠ, RB_variables.Nₜ)
+  θʰ = reshape(θʰ, RB_variables.S.Qʰ, RB_variables.Nₜ)
 
   return θᶠ, θʰ
 
 end
 
-function get_Q(ROM_info::Problem, RB_variables::RBProblemUnsteady)
+function get_Q(ROM_info::Problem, RB_variables::PoissonUnsteady)
 
   if RB_variables.Qᵐ === 0
     RB_variables.Qᵐ = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "Qᵐ.csv"))[1]
   end
 
-  get_Q(ROM_info, RB_variables.steady_info)
+  get_Q(ROM_info, RB_variables.S)
 
 end
 
-function solve_RB_system(ROM_info::Problem, RB_variables::RBProblemUnsteady, param)
+function solve_RB_system(ROM_info::Problem, RB_variables::PoissonUnsteady, param::ParametricSpecificsUnsteady)
 
   get_RB_system(ROM_info, RB_variables, param)
 
   @info "Solving RB problem via backslash"
-  @info "Condition number of the system's matrix: $(cond(RB_variables.steady_info.LHSₙ[1]))"
-  RB_variables.steady_info.uₙ = zeros(RB_variables.nᵘ)
-  RB_variables.steady_info.uₙ = RB_variables.steady_info.LHSₙ[1] \ RB_variables.steady_info.RHSₙ[1]
+  @info "Condition number of the system's matrix: $(cond(RB_variables.S.LHSₙ[1]))"
+  RB_variables.S.uₙ = zeros(RB_variables.nᵘ)
+  RB_variables.S.uₙ = RB_variables.S.LHSₙ[1] \ RB_variables.S.RHSₙ[1]
 
 end
 
-function reconstruct_FEM_solution(RB_variables::RBProblemUnsteady)
+function reconstruct_FEM_solution(RB_variables::PoissonUnsteady)
 
   @info "Reconstructing FEM solution from the newly computed RB one"
 
-  RB_variables.steady_info.ũ = zeros(RB_variables.Nᵘ)
-  uₙ = reshape(RB_variables.steady_info.uₙ, (RB_variables.nₜᵘ, RB_variables.steady_info.nₛᵘ))
-  RB_variables.steady_info.ũ = RB_variables.steady_info.Φₛᵘ * (RB_variables.Φₜᵘ * uₙ)'
+  uₙ = reshape(RB_variables.S.uₙ, (RB_variables.nₜᵘ, RB_variables.S.nₛᵘ))
+  RB_variables.S.ũ = RB_variables.S.Φₛᵘ * (RB_variables.Φₜᵘ * uₙ)'
 
 end
 
-function build_RB_approximation(ROM_info::Problem, RB_variables::RBProblemUnsteady)
+function build_RB_approximation(ROM_info::Problem, RB_variables::PoissonUnsteady)
 
   RB_variables.Nₜ = convert(Int64, ROM_info.T / ROM_info.δt)
 
@@ -467,18 +440,18 @@ function build_RB_approximation(ROM_info::Problem, RB_variables::RBProblemUnstea
 
 end
 
-function testing_phase(ROM_info::Problem, RB_variables::RBProblemUnsteady, μ, param_nbs)
+function testing_phase(ROM_info::Problem, RB_variables::PoissonUnsteady, μ, param_nbs)
 
   H1_L2_err = zeros(length(param_nbs))
   mean_H1_err = zeros(RB_variables.Nₜ)
   mean_H1_L2_err = 0.0
-  mean_pointwise_err = zeros(RB_variables.steady_info.Nₛᵘ, RB_variables.Nₜ)
+  mean_pointwise_err = zeros(RB_variables.S.Nₛᵘ, RB_variables.Nₜ)
   mean_online_time = 0.0
   mean_reconstruction_time = 0.0
 
-  get_norm_matrix(ROM_info, RB_variables.steady_info)
+  get_norm_matrix(ROM_info, RB_variables.S)
 
-  ũ_μ = zeros(RB_variables.steady_info.Nₛᵘ, length(param_nbs)*RB_variables.Nₜ)
+  ũ_μ = zeros(RB_variables.S.Nₛᵘ, length(param_nbs)*RB_variables.Nₜ)
   uₙ_μ = zeros(RB_variables.nᵘ, length(param_nbs))
   FE_space = nothing
 
@@ -499,14 +472,14 @@ function testing_phase(ROM_info::Problem, RB_variables::RBProblemUnsteady, μ, p
     mean_online_time = online_time / length(param_nbs)
     mean_reconstruction_time = reconstruction_time / length(param_nbs)
 
-    H1_err_nb, H1_L2_err_nb = compute_errors(uₕ_test, RB_variables, RB_variables.steady_info.Xᵘ₀)
+    H1_err_nb, H1_L2_err_nb = compute_errors(uₕ_test, RB_variables, RB_variables.S.Xᵘ₀)
     H1_L2_err[i_nb] = H1_L2_err_nb
     mean_H1_err += H1_err_nb / length(param_nbs)
     mean_H1_L2_err += H1_L2_err_nb / length(param_nbs)
-    mean_pointwise_err += abs.(uₕ_test - RB_variables.steady_info.ũ) / length(param_nbs)
+    mean_pointwise_err += abs.(uₕ_test - RB_variables.S.ũ) / length(param_nbs)
 
-    ũ_μ[:, (i_nb-1)*RB_variables.Nₜ+1:i_nb*RB_variables.Nₜ] = RB_variables.steady_info.ũ
-    uₙ_μ[:, i_nb] = RB_variables.steady_info.uₙ
+    ũ_μ[:, (i_nb-1)*RB_variables.Nₜ+1:i_nb*RB_variables.Nₜ] = RB_variables.S.ũ
+    uₙ_μ[:, i_nb] = RB_variables.S.uₙ
 
     @info "Online wall time: $online_time s (snapshot number $nb)"
     @info "Relative reconstruction H1-L2 error: $H1_L2_err_nb (snapshot number $nb)"
@@ -529,7 +502,7 @@ function testing_phase(ROM_info::Problem, RB_variables::RBProblemUnsteady, μ, p
     save_CSV([mean_H1_L2_err], joinpath(path_μ, "H1_err.csv"))
 
     if !ROM_info.import_offline_structures
-      times = [RB_variables.steady_info.offline_time, mean_online_time, mean_reconstruction_time]
+      times = [RB_variables.S.offline_time, mean_online_time, mean_reconstruction_time]
     else
       times = [mean_online_time, mean_reconstruction_time]
     end
@@ -562,8 +535,8 @@ function check_dataset(ROM_info, RB_variables, i)
   μ_i = parse.(Float64, split(chop(μ[i]; head=1, tail=1), ','))
   param = get_parametric_specifics(ROM_info, μ_i)
 
-  u1 = RB_variables.steady_info.Sᵘ[:, (i-1)*RB_variables.Nₜ+1]
-  u2 = RB_variables.steady_info.Sᵘ[:, (i-1)*RB_variables.Nₜ+2]
+  u1 = RB_variables.S.Sᵘ[:, (i-1)*RB_variables.Nₜ+1]
+  u2 = RB_variables.S.Sᵘ[:, (i-1)*RB_variables.Nₜ+2]
   M = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "M.csv"); convert_to_sparse = true)
   A = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "A.csv"); convert_to_sparse = true)
   F = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "F.csv"))

@@ -1,28 +1,36 @@
 include("../FEM/FEM_superclasses.jl")
 abstract type RBProblem <: Problem end
-abstract type RBProblemSteady <: RBProblem end
-abstract type SGRB <: RBProblemSteady end
-abstract type SPGRB <: RBProblemSteady end
-abstract type RBProblemUnsteady <: RBProblem end
-abstract type STGRB <: RBProblemUnsteady end
-abstract type STPGRB <: RBProblemUnsteady end
+abstract type RBSteadyProblem <: Problem end
+abstract type RBUnsteadyProblem <: Problem end
+abstract type PoissonSteady <: RBSteadyProblem end
+abstract type PoissonUnsteady <: RBUnsteadyProblem end
+abstract type StokesUnsteady <: RBUnsteadyProblem end
 
-Sᵘ = Array{Float64}(undef, 0, 0)
-Sᵖ = Array{Float64}(undef, 0, 0)
+Sᵘ = Matrix{Float64}[]
+Sᵖ = Matrix{Float64}[]
+Sˡ = Matrix{Float64}[]
 Nₛᵘ = 0
 Nₛᵖ = 0
+Nₛˡ = 0
 Nₜ = 0
 Nᵘ = 0
-Φₛᵘ = Array{Float64}(undef, 0, 0)
-Φₛᵖ = Array{Float64}(undef, 0, 0)
+Nᵖ = 0
+Nˡ = 0
+Φₛᵘ = Matrix{Float64}[]
+Φₛᵖ = Matrix{Float64}[]
+Φₛˡ = Matrix{Float64}[]
 nₛᵘ = 0
 nₛᵖ = 0
-Φₜᵘ = Array{Float64}(undef, 0, 0)
-Φₜᵖ = Array{Float64}(undef, 0, 0)
+nₛˡ = 0
+Φₜᵘ = Matrix{Float64}[]
+Φₜᵖ = Matrix{Float64}[]
+Φₜˡ = Matrix{Float64}[]
 nₜᵘ = 0
 nₜᵖ = 0
+nₜˡ = 0
 nᵘ = 0
 nᵖ = 0
+nˡ = 0
 
 ũ = Float64[]
 uₙ = Float64[]
@@ -30,6 +38,9 @@ û = Float64[]
 p̃ = Float64[]
 pₙ = Float64[]
 p̂ = Float64[]
+λ̃ = Float64[]
+λₙ = Float64[]
+λ̂ = Float64[]
 
 Mₙ = Matrix{Float64}[]
 Aₙ = Matrix{Float64}[]
@@ -38,13 +49,13 @@ MΦᵀPᵤ⁻¹ = Matrix{Float64}[]
 MΦ = Matrix{Float64}[]
 MAₙ = Matrix{Float64}[]
 Bₙ = Matrix{Float64}[]
-Bₙ_affine = Matrix{Float64}[]
-Bₙ_idx = Float64[]
+Bᵀₙ = Matrix{Float64}[]
 Cₙ = Matrix{Float64}[]
-Cₙ_affine = Matrix{Float64}[]
-Cₙ_idx = Float64[]
+Lₙ = Matrix{Float64}[]
+Lᵀₙ = Matrix{Float64}[]
 Fₙ = Matrix{Float64}[]
 Hₙ = Matrix{Float64}[]
+Gₙ = Matrix{Float64}[]
 LHSₙ = Matrix{Float64}[]
 RHSₙ = Matrix{Float64}[]
 Xᵘ = sparse([], [], [])
@@ -55,18 +66,24 @@ Pᵤ⁻¹ = sparse([], [], [])
 
 Qᵃ = 0
 Qᵐ = 0
+Qᶜ = 0
 Qᶠ = 0
 Qʰ = 0
 θᵃ = Float64[]
 θᵐ = Float64[]
+θᶜ = Float64[]
 θᶠ = Float64[]
 θʰ = Float64[]
+
 MDEIMᵢ_A = Matrix{Float64}[]
 MDEIM_idx_A = Float64[]
 sparse_el_A = Float64[]
 MDEIMᵢ_M = Matrix{Float64}[]
 MDEIM_idx_M = Float64[]
 sparse_el_M = Float64[]
+MDEIMᵢ_C = Matrix{Float64}[]
+MDEIM_idx_C = Float64[]
+sparse_el_C = Float64[]
 DEIMᵢ_mat_F = Float64[]
 DEIM_idx_F = Float64[]
 DEIMᵢ_mat_H = Float64[]
@@ -74,7 +91,7 @@ DEIM_idx_H = Float64[]
 
 offline_time = 0.0
 
-mutable struct PoissonSGRB <: SGRB
+mutable struct PoissonSGRB <: PoissonSteady
   Sᵘ::Array; Φₛᵘ::Array; ũ::Array; uₙ::Array; û::Array; Aₙ::Array; Fₙ::Array;
   Hₙ::Array; Xᵘ₀::SparseMatrixCSC; LHSₙ::Array; RHSₙ::Array; MDEIMᵢ_A::Array;
   MDEIM_idx_A::Array; DEIMᵢ_mat_F::Array; DEIM_idx_F::Array; DEIMᵢ_mat_H::Array;
@@ -82,7 +99,7 @@ mutable struct PoissonSGRB <: SGRB
   Qᶠ::Int64; Qʰ::Int64; θᵃ::Array; θᶠ::Array; θʰ::Array; offline_time::Float64
 end
 
-mutable struct PoissonSPGRB <: SPGRB
+mutable struct PoissonSPGRB <: PoissonSteady
   Sᵘ::Array; Φₛᵘ::Array; ũ::Array; uₙ::Array; û::Array; Aₙ::Array; Fₙ::Array;
   Hₙ::Array; Xᵘ₀::SparseMatrixCSC; LHSₙ::Array; RHSₙ::Array; MDEIMᵢ_A::Array;
   MDEIM_idx_A::Array; DEIMᵢ_mat_F::Array; DEIM_idx_F::Array; DEIMᵢ_mat_H::Array;
@@ -107,14 +124,14 @@ function setup_PoissonSPGRB(::NTuple{2,Int})::PoissonSPGRB
 
 end
 
-mutable struct PoissonSTGRB <: STGRB
-  steady_info::PoissonSGRB; Φₜᵘ::Array; Mₙ::Array; MDEIMᵢ_M::Array;
+mutable struct PoissonSTGRB <: PoissonUnsteady
+  S::PoissonSGRB; Φₜᵘ::Array; Mₙ::Array; MDEIMᵢ_M::Array;
   MDEIM_idx_M::Array; sparse_el_M::Array; Nₜ::Int64; Nᵘ::Int64; nₜᵘ::Int64;
   nᵘ::Int64; Qᵐ::Int64; θᵐ::Array
 end
 
-mutable struct PoissonSTPGRB <: STPGRB
-  steady_info::PoissonSPGRB; Φₜᵘ::Array; Mₙ::Array; MDEIMᵢ_M::Array;
+mutable struct PoissonSTPGRB <: PoissonUnsteady
+  S::PoissonSPGRB; Φₜᵘ::Array; Mₙ::Array; MDEIMᵢ_M::Array;
   MDEIM_idx_M::Array; sparse_el_M::Array; MAₙ::Array; MΦ::Array; MΦᵀPᵤ⁻¹::Array;
   Nₜ::Int64; Nᵘ::Int64; nₜᵘ::Int64; nᵘ::Int64; Qᵐ::Int64; θᵐ::Array
 end
@@ -138,10 +155,49 @@ function setup_PoissonSTPGRB(::NTuple{4,Int})::PoissonSTPGRB
 
 end
 
+mutable struct StokesSTGRB <: StokesUnsteady
+  P::PoissonSTGRB; Sᵖ::Array; Sˡ::Array; Φₛᵖ::Array; Φₛˡ::Array; Φₜᵖ::Array;
+  Φₜˡ::Array; p̃::Array; pₙ::Array; p̂::Array; λ̃ ::Array; λₙ::Array; λ̂ ::Array;
+  Bₙ::Array; Bᵀₙ::Array; Lₙ::Array; Lᵀₙ::Array; Gₙ::Array; Xᵘ::SparseMatrixCSC;
+  Xᵖ::SparseMatrixCSC; Xᵖ₀::SparseMatrixCSC; Nₛᵖ::Int64; Nₛˡ::Int64; Nᵖ::Int64;
+  Nˡ::Int64; nₛᵖ::Int64; nₛˡ::Int64; nₜᵖ::Int64; nₜˡ::Int64; nᵖ::Int64; nˡ::Int64
+end
+
+#= mutable struct StokesSTPGRB <: StokesUnsteady
+  P::PoissonSTPGRB; Sᵖ::Array; Sˡ::Array; Φₛᵖ::Array; Φₛˡ::Array; Φₜᵖ::Array;
+  Φₜˡ::Array; p̃::Array; pₙ::Array; p̂::Array; λ̃ ::Array; λₙ::Array; λ̂ ::Array;
+  Bₙ::Array; Bᵀₙ::Array; Lₙ::Array; Lᵀₙ::Array; Xᵘ::SparseMatrixCSC;
+  Xᵖ::SparseMatrixCSC; Xᵖ₀::SparseMatrixCSC; Nₛᵖ::Int64; Nₛˡ::Int64; Nᵖ::Int64;
+  Nˡ::Int64; nₛᵖ::Int64; nₛˡ::Int64; nₜᵖ::Int64; nₜˡ::Int64; nᵖ::Int64; nˡ::Int64;
+end =#
+
+function setup_StokesSTGRB(::NTuple{5,Int})::StokesSTGRB
+
+  return StokesSTGRB(PoissonSTGRB(PoissonSGRB(Sᵘ, Φₛᵘ, ũ, uₙ, û, Aₙ, Fₙ, Hₙ, Xᵘ₀, LHSₙ, RHSₙ,
+  MDEIMᵢ_A, MDEIM_idx_A, DEIMᵢ_mat_F, DEIM_idx_F, DEIMᵢ_mat_H, DEIM_idx_H,
+  sparse_el_A, Nₛᵘ, nₛᵘ, Qᵃ, Qᶠ, Qʰ, θᵃ, θᶠ, θʰ, offline_time), Φₜᵘ, Mₙ,
+  MDEIMᵢ_M, MDEIM_idx_M, sparse_el_M, Nₜ, Nᵘ, nₜᵘ, nᵘ, Qᵐ, θᵐ), Sᵖ, Sˡ, Φₛᵖ, Φₛˡ,
+  Φₜᵖ, Φₜˡ, p̃, pₙ, p̂, λ̃ , λₙ, λ̂ , Bₙ, Bᵀₙ, Lₙ, Lᵀₙ, Gₙ, Xᵘ, Xᵖ, Xᵖ₀, Nₛᵖ, Nₛˡ, Nᵖ,
+  Nˡ, nₛᵖ, nₛˡ, nₜᵖ, nₜˡ, nᵖ, nˡ)
+
+end
+
+#= function setup_StokesSTPGRB(::NTuple{6,Int})::StokesSTPGRB
+
+  return StokesSTPGRB(PoissonSTPGRB(Sᵘ, Φₛᵘ, ũ, uₙ, û, Aₙ, Fₙ, Hₙ, Xᵘ₀, LHSₙ,
+  RHSₙ, MDEIMᵢ_A, MDEIM_idx_A, DEIMᵢ_mat_F, DEIM_idx_F, DEIMᵢ_mat_H, DEIM_idx_H,
+  sparse_el_A, Nₛᵘ, nₛᵘ, Qᵃ, Qᶠ, Qʰ, θᵃ, θᶠ, θʰ, offline_time, Pᵤ⁻¹, AΦᵀPᵤ⁻¹),
+  Φₜᵘ, Mₙ, MDEIMᵢ_M, MDEIM_idx_M, sparse_el_M, MAₙ, MΦ, MΦᵀPᵤ⁻¹, Nₜ, Nᵘ, nₜᵘ,
+  nᵘ)
+
+end =#
+
 setup(NT::NTuple{1,Int}) = setup_PoissonSGRB(NT)
 setup(NT::NTuple{2,Int}) = setup_PoissonSPGRB(NT)
 setup(NT::NTuple{3,Int}) = setup_PoissonSTGRB(NT)
 setup(NT::NTuple{4,Int}) = setup_PoissonSTPGRB(NT)
+setup(NT::NTuple{5,Int}) = setup_StokesSTGRB(NT)
+#setup(NT::NTuple{6,Int}) = setup_StokesSTPGRB(NT)
 
 struct ROMSpecificsSteady <: SteadyProblem
   probl_nl::Dict

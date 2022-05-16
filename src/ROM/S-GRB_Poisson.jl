@@ -79,11 +79,10 @@ function assemble_DEIM_vectors(ROM_info::Problem, RB_variables::PoissonSGRB, var
   DEIM_mat, DEIM_idx, _, _ = DEIM_offline(problem_info, ROM_info, var)
   DEIMᵢ_mat = Matrix(DEIM_mat[DEIM_idx, :])
   Q = size(DEIM_mat)[2]
-  varₙ = zeros(RB_variables.nₛᵘ,1,Q)
+  varₙ = zeros(RB_variables.nₛᵘ,Q)
   for q = 1:Q
-    varₙ[:,:,q] = RB_variables.Φₛᵘ' * Vector(DEIM_mat[:, q])
+    varₙ[:,q] = RB_variables.Φₛᵘ' * Vector(DEIM_mat[:, q])
   end
-  varₙ = reshape(varₙ,:,Q)
 
   if var === "F"
     RB_variables.DEIMᵢ_mat_F = DEIMᵢ_mat

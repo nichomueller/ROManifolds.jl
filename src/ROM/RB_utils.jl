@@ -264,13 +264,13 @@ function matrix_to_blocks(A::Array)
 
 end
 
-function compute_errors(uₕ::Array, RB_variables::RBProblemSteady, norm_matrix = nothing)
+function compute_errors(uₕ::Array, RB_variables::RBSteadyProblem, norm_matrix = nothing)
 
   mynorm(uₕ - RB_variables.ũ, norm_matrix) / mynorm(uₕ, norm_matrix)
 
 end
 
-function compute_errors(uₕ::Array, RB_variables::RBProblemUnsteady, norm_matrix = nothing)
+function compute_errors(uₕ::Array, RB_variables::RBUnsteadyProblem, norm_matrix = nothing)
 
   H1_err = zeros(RB_variables.Nₜ)
   H1_sol = zeros(RB_variables.Nₜ)

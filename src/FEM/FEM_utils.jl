@@ -83,7 +83,7 @@ function find_FE_elements(problem_info, ROM_info, idx::Array)
 
 end
 
-function from_vec_to_mat_idx(idx::Array, Nᵤ::Int)
+function from_vec_to_mat_idx(idx::Array, Nᵤ::Int64)
 
   row_idx = Int.(idx .% Nᵤ)
   row_idx[findall(x->x===0, row_idx)] .= Nᵤ
@@ -93,7 +93,7 @@ function from_vec_to_mat_idx(idx::Array, Nᵤ::Int)
 
 end
 
-function from_spacetime_to_space_time_idx_mat(idx::Array, Nᵤ::Int)
+function from_spacetime_to_space_time_idx_mat(idx::Array, Nᵤ::Int64)
 
   idx_time = 1 .+ floor.((idx.-1)/Nᵤ^2)
   idx_space = idx - (idx_time.-1)*Nᵤ^2
@@ -102,11 +102,46 @@ function from_spacetime_to_space_time_idx_mat(idx::Array, Nᵤ::Int)
 
 end
 
-function from_spacetime_to_space_time_idx_vec(idx::Array, Nᵤ::Int)
+function from_spacetime_to_space_time_idx_vec(idx::Array, Nᵤ::Int64)
 
   idx_time = 1 .+ floor.((idx.-1)/Nᵤ)
   idx_space = idx - (idx_time.+1)*Nᵤ
 
   idx_space, idx_time
+
+end
+
+function interface_to_unit_circle(map::Function, pts::Array)
+
+  return map.(pts)
+
+end
+
+function chebyshev_polynomial(x::Float64, n::Int64)
+
+  if n === 0
+    return 1
+  elseif n === 1
+    return 2*x
+  else
+    return 2*x*chebyshev_polynomial(x,n-1) - chebyshev_polynomial(x,n-2)
+  end
+
+end
+
+function chebyschev_multipliers(x::Array, order::Int64, dim=3)
+
+  Ξ = Matrix{Float64}[]
+  for d = 1:dim
+    for n = 1:order
+      for k = 1:n
+        ωₖ = k*pi/(order+1)
+        Pⁿₖ = chebyshev_polynomial(x[1]*cos(ωₖ*x[1]) + x[2]*sin(ωₖ*x[2]), n)/sqrt(pi)
+        append!(Ξ, Pⁿₖ*I(dim)[:,d])
+      end
+    end
+  end
+
+  return Ξ
 
 end
