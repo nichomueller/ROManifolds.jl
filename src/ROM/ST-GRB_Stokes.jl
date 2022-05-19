@@ -246,7 +246,7 @@ end
 function assemble_DEIM_vectors(ROM_info::Problem, RB_variables::StokesSTGRB, var::String)
 
   if var === "G"
-    DEIM_mat, RB_variables.DEIM_idx_G, _, _ = DEIM_offline(problem_info, ROM_info, var)
+    DEIM_mat, RB_variables.DEIM_idx_G, _, _ = DEIM_offline(FE_space, ROM_info, var)
     RB_variables.DEIMᵢ_mat_G = Matrix(DEIM_mat[RB_variables.DEIM_idx_G, :])
     RB_variables.Qᵍ = size(DEIM_mat)[2]
     RB_variables.Gₙ = zeros(RB_variables.nₛˡ,RB_variables.Qᵍ)
@@ -478,7 +478,6 @@ function build_param_RHS(ROM_info::Problem, RB_variables::StokesSTGRB, param)
   δtθ = ROM_info.δt*ROM_info.θ
   times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+δtθ
 
-  FE_space = get_FESpace(problem_info, param.model)
   G_t = assemble_dirichlet(FE_space, RB_variables, param)
   G = zeros(RB_variables.Nₛˡ, RB_variables.Nₜ)
   [G[i] = G_t(tᵢ) for (i, tᵢ) in enumerate(times_θ)]

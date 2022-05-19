@@ -73,12 +73,16 @@ function M_DEIM_online(mat_nonaffine, M_DEIMᵢ_mat, M_DEIM_idx)
 
 end
 
-function MDEIM_offline(problem_info::ProblemSpecifics, ROM_info, var::String)
+function MDEIM_offline(FE_space::SteadyProblem, ROM_info, var::String)
+
+  @info "Building $(ROM_info.nₛ_MDEIM) snapshots of $var"
+
+  μ = load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
 
   if var === "A"
-    snaps = build_A_snapshots(problem_info, ROM_info)
+    snaps = build_A_snapshots(FE_space, ROM_info, μ)
   elseif var === "M"
-    snaps = build_M_snapshots(problem_info, ROM_info)
+    snaps = build_M_snapshots(FE_space, ROM_info, μ)
   else
     @error "Run MDEIM on A or M only"
   end
@@ -89,25 +93,25 @@ function MDEIM_offline(problem_info::ProblemSpecifics, ROM_info, var::String)
   Nₕ = convert(Int64, sqrt(size(snaps)[1]))
   r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx, Nₕ)
 
-  el = find_FE_elements(problem_info, ROM_info, unique(union(r_idx, c_idx)))
+  el = find_FE_elements(FE_space.V₀, FE_space.Ω, unique(union(r_idx, c_idx)))
 
   MDEIM_mat, MDEIM_idx, el, MDEIM_err_bound, Σ
 
 end
 
-function MDEIM_offline(problem_info::ProblemSpecificsUnsteady, ROM_info, var::String)
+function MDEIM_offline(FE_space::UnsteadyProblem, ROM_info, var::String)
 
   if ROM_info.space_time_M_DEIM
-    return MDEIM_offline_spacetime(problem_info, ROM_info, var)
+    return MDEIM_offline_spacetime(FE_space, ROM_info, var)
   elseif ROM_info.functional_M_DEIM
-    return MDEIM_offline_functional(problem_info, ROM_info, var)
+    return MDEIM_offline_functional(FE_space, ROM_info, var)
   else
-    return MDEIM_offline_standard(problem_info, ROM_info, var)
+    return MDEIM_offline_standard(FE_space, ROM_info, var)
   end
 
 end
 
-function MDEIM_offline_standard(problem_info::ProblemSpecificsUnsteady, ROM_info, var::String)
+function MDEIM_offline_standard(FE_space::UnsteadyProblem, ROM_info, var::String)
 
   @info "Building $(ROM_info.nₛ_MDEIM) snapshots of $var, at each time step. This will take some time."
 
@@ -117,9 +121,9 @@ function MDEIM_offline_standard(problem_info::ProblemSpecificsUnsteady, ROM_info
     @info "Considering parameter number $k, need $(ROM_info.nₛ_MDEIM-k) more!"
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
     if var === "A"
-      snapsₖ = build_A_snapshots(problem_info, ROM_info, μₖ)
+      snapsₖ = build_A_snapshots(FE_space, ROM_info, μₖ)
     elseif var === "M"
-      snapsₖ = build_M_snapshots(problem_info, ROM_info, μₖ)
+      snapsₖ = build_M_snapshots(FE_space, ROM_info, μₖ)
     else
       @error "Run MDEIM on A or M only"
     end
@@ -137,13 +141,13 @@ function MDEIM_offline_standard(problem_info::ProblemSpecificsUnsteady, ROM_info
   Nₕ = convert(Int64, sqrt(size(MDEIM_mat)[1]))
   r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx, Nₕ)
 
-  el = find_FE_elements(problem_info, ROM_info, unique(union(r_idx, c_idx)))
+  el = find_FE_elements(FE_space.V₀, FE_space.Ω, unique(union(r_idx, c_idx)))
 
   MDEIM_mat, MDEIM_idx, el, MDEIM_err_bound, Σ
 
 end
 
-function MDEIM_offline_spacetime(problem_info::ProblemSpecificsUnsteady, ROM_info, var::String)
+function MDEIM_offline_spacetime(FE_space::UnsteadyProblem, ROM_info, var::String)
 
   @info "Building at each time step $(ROM_info.nₛ_MDEIM) snapshots of $var. This will take some time."
 
@@ -155,9 +159,9 @@ function MDEIM_offline_spacetime(problem_info::ProblemSpecificsUnsteady, ROM_inf
   for (nₜ,t) = enumerate(times_θ)
     @info "Considering time step $nₜ/$Nₜ"
     if var === "A"
-      snapsₜ = build_A_snapshots(problem_info, ROM_info, μ, t)
+      snapsₜ = build_A_snapshots(FE_space, ROM_info, μ, t)
     elseif var === "M"
-      snapsₜ = build_M_snapshots(problem_info, ROM_info, μ, t)
+      snapsₜ = build_M_snapshots(FE_space, ROM_info, μ, t)
     else
       @error "Run MDEIM on A or M only"
     end
@@ -189,7 +193,6 @@ function MDEIM_offline_spacetime(problem_info::ProblemSpecificsUnsteady, ROM_inf
 
   r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx_space, Nₕ)
   parametric_info = get_parametric_specifics(ROM_info, [])
-  FE_space = get_FESpace(problem_info, parametric_info.model)
 
   el = find_FE_elements(FE_space.V₀, FE_space.Ω, unique(union(r_idx, c_idx)))
 
@@ -197,88 +200,7 @@ function MDEIM_offline_spacetime(problem_info::ProblemSpecificsUnsteady, ROM_inf
 
 end
 
-#= function recast_matrix_full_dimensions(MDEIM_mat_tmp, row_idx, MDEIM_idx_time, Nₕ)
-
-  MDEIM_mat_tmp = MDEIM_mat_tmp[(MDEIM_idx_time.-1)*length(row_idx):MDEIM_idx_time*length(row_idx),:]
-  nₛ = size(MDEIM_mat_tmp)[2]
-  _, col_idx, val = findnz(MDEIM_mat_tmp)
-
-  sparse(repeat(row_idx, length(MDEIM_idx_time)), col_idx, val, Nₕ^2, length(MDEIM_idx_time)*nₛ)
-
-end =#
-
-#= function MDEIM_offline_spacetime1(problem_info::ProblemSpecificsUnsteady, ROM_info, var::String)
-
-  @info "Building at each time step $(ROM_info.nₛ_MDEIM) snapshots of $var. This will take some time."
-
-  μ = load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
-  Nₜ = convert(Int64, ROM_info.T / ROM_info.δt)
-  δtθ = ROM_info.δt*ROM_info.θ
-  times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+δtθ
-
-  for (nₜ,t) = enumerate(times_θ)
-    @info "Considering time step $nₜ/$Nₜ"
-    if var === "A"
-      snapsₜ = build_A_snapshots(problem_info, ROM_info, μ, t)
-    elseif var === "M"
-      snapsₜ = build_M_snapshots(problem_info, ROM_info, μ, t)
-    else
-      @error "Run MDEIM on A or M only"
-    end
-    collect_snaps = snapsₜ
-    if nₜ === 1
-      global collect_snaps = snapsₜ
-    else
-      global collect_snaps = hcat(collect_snaps, snapsₜ)
-    end
-
-    crit_idx = 5
-
-    if nₜ % crit_idx === 0
-
-      compressed_snaps_tmp, _ = M_DEIM_POD(collect_snaps, ROM_info.ϵₛ)
-      collect_snaps = Float64[]
-
-      if nₜ === crit_idx
-
-        compressed_snaps = compressed_snaps_tmp
-
-      else
-
-        if size(compressed_snaps_tmp)[2] != size(compressed_snaps)[2]
-          c = size(compressed_snaps)[2]
-          cₜ = size(compressed_snaps_tmp)[2]
-          if c > cₜ
-            basis_snaps, _, _ = svd(Matrix(compressed_snaps_tmp))
-            compressed_snaps_tmp = basis_snaps[:,1:c]
-          else
-            compressed_snaps_tmp = compressed_snaps_tmp[:,1:c]
-          end
-        end
-
-        global compressed_snaps = vcat(compressed_snaps, compressed_snaps_tmp)
-
-      end
-
-    end
-
-  end
-
-  Nₕ = convert(Int64, sqrt(size(compressed_snaps)[1]/Nₜ))
-
-  sparse_MDEIM_mat, Σ = M_DEIM_POD(compressed_snaps, ROM_info.ϵₛ)
-  MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(sparse_MDEIM_mat, Σ)
-  MDEIM_idx_space, MDEIM_idx_time = from_spacetime_to_space_time_idx_mat(MDEIM_idx, Nₕ)
-
-  r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx_space, Nₕ)
-
-  el = find_FE_elements(problem_info, ROM_info, unique(union(r_idx, c_idx)))
-
-  MDEIM_mat, MDEIM_idx, el, MDEIM_err_bound, Σ
-
-end =#
-
-function MDEIM_offline_functional(problem_info::ProblemSpecificsUnsteady, ROM_info, var::String)
+function MDEIM_offline_functional(FE_space::UnsteadyProblem, ROM_info, var::String)
 
   @info "Building $(ROM_info.nₛ_MDEIM) snapshots of $var, at each time step. This will take some time."
 
@@ -287,7 +209,6 @@ function MDEIM_offline_functional(problem_info::ProblemSpecificsUnsteady, ROM_in
   δtθ = ROM_info.δt*ROM_info.θ
   times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+δtθ
   param = get_parametric_specifics(ROM_info, parse.(Float64, split(chop(μ[1]; head=1, tail=1), ',')))
-  FE_space = get_FESpace(problem_info, param.model)
   qₕ = Qₕ_cell_data[rand(1:num_cells(FE_space.Ω))]
   xₕ = get_coordinates(qₕ)
   nquad = length(xₕ)
@@ -355,12 +276,16 @@ function MDEIM_offline_functional(problem_info::ProblemSpecificsUnsteady, ROM_in
 
 end
 
-function DEIM_offline(problem_info::ProblemSpecifics, ROM_info, var::String)
+function DEIM_offline(FE_space::SteadyProblem, ROM_info, var::String)
+
+  @info "Building $(ROM_info.nₛ_DEIM) snapshots of $var"
+
+  μ = load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
 
   if var === "F"
-    snaps = build_F_snapshots(problem_info, ROM_info)
+    snaps = build_F_snapshots(FE_space, ROM_info, μ)
   elseif var === "H"
-    snaps = build_H_snapshots(problem_info, ROM_info)
+    snaps = build_H_snapshots(FE_space, ROM_info, μ)
   else
     @error "Run DEIM on F or H only"
   end
@@ -373,17 +298,17 @@ function DEIM_offline(problem_info::ProblemSpecifics, ROM_info, var::String)
 
 end
 
-function DEIM_offline(problem_info::ProblemSpecificsUnsteady, ROM_info, var::String)
+function DEIM_offline(FE_space::UnsteadyProblem, ROM_info, var::String)
 
   if ROM_info.space_time_M_DEIM
-    DEIM_offline_spacetime(problem_info, ROM_info, var)
+    DEIM_offline_spacetime(FE_space, ROM_info, var)
   else
-    DEIM_offline_standard(problem_info, ROM_info, var)
+    DEIM_offline_standard(FE_space, ROM_info, var)
   end
 
 end
 
-function DEIM_offline_standard(problem_info::ProblemSpecificsUnsteady, ROM_info, var::String)
+function DEIM_offline_standard(FE_space::UnsteadyProblem, ROM_info, var::String)
 
   sparse_DEIM_mat = Matrix{Float64}[]
   @info "Building $(ROM_info.nₛ_DEIM) snapshots of $var at each time step."
@@ -393,9 +318,9 @@ function DEIM_offline_standard(problem_info::ProblemSpecificsUnsteady, ROM_info,
   for k = 1:ROM_info.nₛ_MDEIM
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
     if var === "F"
-      snapsₖ = build_F_snapshots(problem_info, ROM_info, μₖ)
+      snapsₖ = build_F_snapshots(FE_space, ROM_info, μₖ)
     elseif var === "H"
-      snapsₖ = build_H_snapshots(problem_info, ROM_info, μₖ)
+      snapsₖ = build_H_snapshots(FE_space, ROM_info, μₖ)
     else
       @error "Run DEIM on F or H only"
     end
@@ -417,7 +342,7 @@ function DEIM_offline_standard(problem_info::ProblemSpecificsUnsteady, ROM_info,
 
 end
 
-function DEIM_offline_spacetime(problem_info::ProblemSpecificsUnsteady, ROM_info, var::String)
+function DEIM_offline_spacetime(FE_space::UnsteadyProblem, ROM_info, var::String)
 
   @info "Building at each time step $(ROM_info.nₛ_MDEIM) snapshots of $var."
 
@@ -427,9 +352,9 @@ function DEIM_offline_spacetime(problem_info::ProblemSpecificsUnsteady, ROM_info
   for nₜ = 1:Nₜ
     @info "Considering time step $nₜ/$Nₜ"
     if var === "F"
-      snapsₜ = build_F_snapshots(problem_info, ROM_info, μ, nₜ)
+      snapsₜ = build_F_snapshots(FE_space, ROM_info, μ, nₜ)
     elseif var === "H"
-      snapsₜ = build_H_snapshots(problem_info, ROM_info, μ, nₜ)
+      snapsₜ = build_H_snapshots(FE_space, ROM_info, μ, nₜ)
     else
       @error "Run DEIM on F or H only"
     end

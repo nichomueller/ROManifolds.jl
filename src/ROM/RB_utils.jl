@@ -65,10 +65,9 @@ function POD(S, ϵ = 1e-5, X = nothing)
 
 end
 
-function build_sparse_mat(problem_info::ProblemSpecifics, ROM_info, μ_i::Array, el::Array; var="A")
+function build_sparse_mat(problem_info::ProblemSpecifics, FE_space::SteadyProblem, ROM_info, μ_i::Array, el::Array; var="A")
 
   param = get_parametric_specifics(ROM_info, μ_i)
-  FE_space = get_FESpace(problem_info, param.model)
 
   Ω_sparse = view(FE_space.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * problem_info.order)
@@ -82,10 +81,9 @@ function build_sparse_mat(problem_info::ProblemSpecifics, ROM_info, μ_i::Array,
 
 end
 
-function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, ROM_info, μ_i::Array, el::Array; var="A")
+function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, FE_space::UnsteadyProblem, ROM_info, μ_i::Array, el::Array; var="A")
 
   param = get_parametric_specifics(ROM_info, μ_i)
-  FE_space = get_FESpace(problem_info, param.model)
 
   Ω_sparse = view(FE_space.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * problem_info.order)
@@ -114,10 +112,9 @@ function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, ROM_info, μ_i
 
 end
 
-function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, ROM_info, μ_i::Array, el::Array, time_idx::Array; var="A")
+function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, FE_space::UnsteadyProblem, ROM_info, μ_i::Array, el::Array, time_idx::Array; var="A")
 
   param = get_parametric_specifics(ROM_info, μ_i)
-  FE_space = get_FESpace(problem_info, param.model)
 
   Ω_sparse = view(FE_space.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * problem_info.order)

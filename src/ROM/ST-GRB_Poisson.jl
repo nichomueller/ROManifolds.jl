@@ -39,7 +39,7 @@ end
 function assemble_MDEIM_matrices(ROM_info::Problem, RB_variables::PoissonSTGRB, var::String)
 
   @info "The matrix $var is non-affine: running the MDEIM offline phase on $nₛ_MDEIM snapshots"
-  MDEIM_mat, MDEIM_idx, sparse_el, _, _ = MDEIM_offline(problem_info, ROM_info, var)
+  MDEIM_mat, MDEIM_idx, sparse_el, _, _ = MDEIM_offline(FE_space, ROM_info, var)
   Q = size(MDEIM_mat)[2]
   Matₙ = zeros(RB_variables.S.nₛᵘ, RB_variables.S.nₛᵘ, Q)
   for q = 1:Q
@@ -77,7 +77,7 @@ function assemble_DEIM_vectors(ROM_info::Problem, RB_variables::PoissonSTGRB, va
 
   @info "ST-GRB: running the DEIM offline phase on variable $var with $nₛ_DEIM snapshots"
 
-  DEIM_mat, DEIM_idx, _, _ = DEIM_offline(problem_info, ROM_info, var)
+  DEIM_mat, DEIM_idx, _, _ = DEIM_offline(FE_space, ROM_info, var)
   DEIMᵢ_mat = Matrix(DEIM_mat[DEIM_idx, :])
   Q = size(DEIM_mat)[2]
   varₙ = zeros(RB_variables.nₛᵘ,1,Q)
@@ -293,7 +293,6 @@ function build_param_RHS(ROM_info::Problem, RB_variables::PoissonSTGRB, param)
 
   δtθ = ROM_info.δt*ROM_info.θ
 
-  FE_space = get_FESpace(problem_info, param.model)
   F_t = assemble_forcing(FE_space, ROM_info, param)
   H_t = assemble_neumann_datum(FE_space, ROM_info, param)
   F, H = zeros(RB_variables.S.Nₛᵘ, RB_variables.Nₜ), zeros(RB_variables.S.Nₛᵘ, RB_variables.Nₜ)

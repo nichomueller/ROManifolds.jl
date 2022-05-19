@@ -32,7 +32,7 @@ function assemble_MDEIM_matrices(ROM_info::Problem, RB_variables::PoissonSGRB, v
   if var === "A"
 
     @info "The stiffness is non-affine: running the MDEIM offline phase on $(ROM_info.nₛ_MDEIM) snapshots"
-    MDEIM_mat, RB_variables.MDEIM_idx_A, RB_variables.sparse_el_A, MDEIM_err_bound, MDEIM_Σ = MDEIM_offline(problem_info, ROM_info, "A")
+    MDEIM_mat, RB_variables.MDEIM_idx_A, RB_variables.sparse_el_A, MDEIM_err_bound, MDEIM_Σ = MDEIM_offline(FE_space, ROM_info, "A")
     RB_variables.Qᵃ = size(MDEIM_mat)[2]
     RB_variables.Aₙ = zeros(RB_variables.nₛᵘ, RB_variables.nₛᵘ, RB_variables.Qᵃ)
     for q = 1:RB_variables.Qᵃ
@@ -76,7 +76,7 @@ function assemble_DEIM_vectors(ROM_info::Problem, RB_variables::PoissonSGRB, var
 
   @info "S-GRB: running the DEIM offline phase on variable $var with $nₛ_DEIM snapshots"
 
-  DEIM_mat, DEIM_idx, _, _ = DEIM_offline(problem_info, ROM_info, var)
+  DEIM_mat, DEIM_idx, _, _ = DEIM_offline(FE_space, ROM_info, var)
   DEIMᵢ_mat = Matrix(DEIM_mat[DEIM_idx, :])
   Q = size(DEIM_mat)[2]
   varₙ = zeros(RB_variables.nₛᵘ,Q)
@@ -121,7 +121,6 @@ end
 
 function build_param_RHS(ROM_info::Problem, RB_variables::PoissonSGRB, param, ::Array) :: Tuple
 
-  FE_space = get_FESpace(problem_info, param.model)
   F = assemble_forcing(FE_space, ROM_info, param)
   H = assemble_neumann_datum(FE_space, ROM_info, param)
   Fₙ, Hₙ = (RB_variables.Φₛᵘ)' * F, (RB_variables.Φₛᵘ)' * H

@@ -349,7 +349,7 @@ function get_θᵃ(ROM_info::Problem, RB_variables::PoissonSteady, param) :: Arr
   if !ROM_info.probl_nl["A"]
     θᵃ = param.α(Point(0.,0.))
   else
-    A_μ_sparse = build_sparse_mat(problem_info, ROM_info, param.μ, RB_variables.sparse_el_A)
+    A_μ_sparse = build_sparse_mat(problem_info, FE_space, ROM_info, param.μ, RB_variables.sparse_el_A)
     θᵃ = M_DEIM_online(A_μ_sparse, RB_variables.MDEIMᵢ_A, RB_variables.MDEIM_idx_A)
   end
 
@@ -363,7 +363,6 @@ function get_θᶠʰ(ROM_info::Problem, RB_variables::PoissonSteady, param) :: T
     @error "Cannot fetch θᶠ, θʰ if the RHS is built online"
   end
 
-  FE_space = get_FESpacePoisson(problem_info, param.model)
   if !ROM_info.probl_nl["f"] && !ROM_info.probl_nl["h"]
     θᶠ, θʰ = param.f(Point(0.,0.)), param.h(Point(0.,0.))
   elseif !ROM_info.probl_nl["f"] && ROM_info.probl_nl["h"]
@@ -506,14 +505,12 @@ function testing_phase(ROM_info::Problem, RB_variables::PoissonSteady, μ, param
 
   ũ_μ = zeros(RB_variables.Nₛᵘ, length(param_nbs))
   uₙ_μ = zeros(RB_variables.nₛᵘ, length(param_nbs))
-  FE_space = nothing
 
   for nb in param_nbs
     @info "Considering parameter number: $nb"
 
     μ_nb = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
     parametric_info = get_parametric_specifics(ROM_info, μ_nb)
-    FE_space = get_FESpacePoisson(problem_info, parametric_info.model)
 
     uₕ_test = Matrix(CSV.read(joinpath(ROM_info.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, nb]
 

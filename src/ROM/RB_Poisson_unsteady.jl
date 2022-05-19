@@ -220,7 +220,7 @@ function get_θᵐ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, param::Pa
     times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+ROM_info.δt*ROM_info.θ
     θᵐ = [param.mₜ(t_θ) for t_θ = times_θ]
   else
-    M_μ_sparse = build_sparse_mat(problem_info, ROM_info, param.μ, RB_variables.sparse_el_M; var="M")
+    M_μ_sparse = build_sparse_mat(problem_info, FE_space, ROM_info, param.μ, RB_variables.sparse_el_M; var="M")
     Nₛᵘ = RB_variables.S.Nₛᵘ
     θᵐ = zeros(RB_variables.Qᵐ, RB_variables.Nₜ)
     for iₜ = 1:RB_variables.Nₜ
@@ -242,7 +242,7 @@ function get_θᵐₛₜ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, par
     Nₛᵘ = RB_variables.S.Nₛᵘ
     _, MDEIM_idx_time = from_spacetime_to_space_time_idx_mat(RB_variables.MDEIM_idx_M, Nₛᵘ)
     unique!(MDEIM_idx_time)
-    M_μ_sparse = build_sparse_mat(problem_info, ROM_info, param.μ, RB_variables.sparse_el_M, MDEIM_idx_time; var="M")
+    M_μ_sparse = build_sparse_mat(problem_info, FE_space, ROM_info, param.μ, RB_variables.sparse_el_M, MDEIM_idx_time; var="M")
 
     θᵐ = zeros(RB_variables.Qᵐ, length(MDEIM_idx_time))
     for iₜ = 1:length(MDEIM_idx_time)
@@ -260,7 +260,7 @@ function get_θᵃ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, param::Pa
     times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+ROM_info.δt*ROM_info.θ
     θᵃ = [param.αₜ(t_θ,param.μ) for t_θ = times_θ]
   else
-    A_μ_sparse = build_sparse_mat(problem_info, ROM_info, param.μ, RB_variables.S.sparse_el_A; var="A")
+    A_μ_sparse = build_sparse_mat(problem_info, FE_space, ROM_info, param.μ, RB_variables.S.sparse_el_A; var="A")
     Nₛᵘ = RB_variables.S.Nₛᵘ
     θᵃ = zeros(RB_variables.S.Qᵃ, RB_variables.Nₜ)
     for iₜ = 1:RB_variables.Nₜ
@@ -282,7 +282,7 @@ function get_θᵃₛₜ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, par
     Nₛᵘ = RB_variables.S.Nₛᵘ
     _, MDEIM_idx_time = from_spacetime_to_space_time_idx_mat(RB_variables.S.MDEIM_idx_A, Nₛᵘ)
     unique!(MDEIM_idx_time)
-    A_μ_sparse = build_sparse_mat(problem_info, ROM_info, param.μ, RB_variables.S.sparse_el_A, MDEIM_idx_time; var="A")
+    A_μ_sparse = build_sparse_mat(problem_info, FE_space, ROM_info, param.μ, RB_variables.S.sparse_el_A, MDEIM_idx_time; var="A")
 
     θᵃ = zeros(RB_variables.Qᵃ, length(MDEIM_idx_time))
     for iₜ = 1:length(MDEIM_idx_time)
@@ -300,7 +300,6 @@ function get_θᶠʰ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, param::
     @error "Cannot fetch θᶠ, θʰ if the RHS is built online"
   end
 
-  FE_space = get_FESpacePoisson(problem_info, param.model)
   times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+ROM_info.δt*ROM_info.θ
   θᶠ, θʰ = Float64[], Float64[]
 
@@ -337,7 +336,6 @@ function get_θᶠʰₛₜ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, p
 
   times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+ROM_info.δt*ROM_info.θ
   θᶠ, θʰ = Float64[], Float64[]
-  FE_space = get_FESpacePoisson(problem_info, param.model)
 
   if !ROM_info.probl_nl["f"]
     θᶠ = [param.fₜ(t_θ) for t_θ = times_θ]
@@ -453,14 +451,12 @@ function testing_phase(ROM_info::Problem, RB_variables::PoissonUnsteady, μ, par
 
   ũ_μ = zeros(RB_variables.S.Nₛᵘ, length(param_nbs)*RB_variables.Nₜ)
   uₙ_μ = zeros(RB_variables.nᵘ, length(param_nbs))
-  FE_space = nothing
 
   for (i_nb, nb) in enumerate(param_nbs)
     @info "Considering parameter number: $nb"
 
     μ_nb = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
     parametric_info = get_parametric_specifics(ROM_info, μ_nb)
-    FE_space = get_FESpacePoisson(problem_info, parametric_info.model)
     uₕ_test = Matrix(CSV.read(joinpath(ROM_info.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, (nb-1)*RB_variables.Nₜ+1:nb*RB_variables.Nₜ]
 
     online_time = @elapsed begin
