@@ -1,9 +1,8 @@
-include("../FEM/FEM.jl")
 include("RB_utils.jl")
 include("S-GRB_Poisson.jl")
 include("S-PGRB_Poisson.jl")
 
-function get_snapshot_matrix(ROM_info::Problem, RB_variables::PoissonSteady)
+function get_snapshot_matrix(ROM_info::Info, RB_variables::PoissonSteady)
 
   @info "Importing the snapshot matrix for field u, number of snapshots considered: $(ROM_info.nₛ)"
 
@@ -17,7 +16,7 @@ function get_snapshot_matrix(ROM_info::Problem, RB_variables::PoissonSteady)
 
 end
 
-function get_norm_matrix(ROM_info::Problem, RB_variables::PoissonSteady)
+function get_norm_matrix(ROM_info::Info, RB_variables::PoissonSteady)
 
   if check_norm_matrix(RB_variables)
 
@@ -43,7 +42,7 @@ function check_norm_matrix(RB_variables::PoissonSteady) :: Bool
 
 end
 
-function PODs_space(ROM_info::Problem, RB_variables::PoissonSteady)
+function PODs_space(ROM_info::Info, RB_variables::PoissonSteady)
 
   @info "Performing the spatial POD for field u, using a tolerance of $(ROM_info.ϵₛ)"
 
@@ -55,7 +54,7 @@ function PODs_space(ROM_info::Problem, RB_variables::PoissonSteady)
 
 end
 
-function build_reduced_basis(ROM_info::Problem, RB_variables::PoissonSteady)
+function build_reduced_basis(ROM_info::Info, RB_variables::PoissonSteady)
 
   @info "Building the reduced basis for field u, using a tolerance of $(ROM_info.ϵₛ)"
 
@@ -71,7 +70,7 @@ function build_reduced_basis(ROM_info::Problem, RB_variables::PoissonSteady)
 
 end
 
-function import_reduced_basis(ROM_info::Problem, RB_variables::PoissonSteady)
+function import_reduced_basis(ROM_info::Info, RB_variables::PoissonSteady)
 
   @info "Importing the reduced basis for field u"
 
@@ -80,7 +79,7 @@ function import_reduced_basis(ROM_info::Problem, RB_variables::PoissonSteady)
 
 end
 
-function get_generalized_coordinates(ROM_info::Problem, RB_variables::PoissonSteady, snaps=nothing)
+function get_generalized_coordinates(ROM_info::Info, RB_variables::PoissonSteady, snaps=nothing)
 
   get_norm_matrix(ROM_info, RB_variables)
 
@@ -97,7 +96,7 @@ function get_generalized_coordinates(ROM_info::Problem, RB_variables::PoissonSte
 
 end
 
-function set_operators(ROM_info::Problem, RB_variables::PoissonSteady) :: Vector
+function set_operators(ROM_info::Info, RB_variables::PoissonSteady) :: Vector
 
   operators = ["A"]
   if !ROM_info.build_parametric_RHS && !ROM_info.probl_nl["f"]
@@ -111,7 +110,7 @@ function set_operators(ROM_info::Problem, RB_variables::PoissonSteady) :: Vector
 
 end
 
-function save_M_DEIM_structures(ROM_info::Problem, RB_variables::PoissonSteady)
+function save_M_DEIM_structures(ROM_info::Info, RB_variables::PoissonSteady)
 
   list_M_DEIM = (RB_variables.MDEIMᵢ_A, RB_variables.MDEIM_idx_A, RB_variables.sparse_el_A, RB_variables.DEIMᵢ_mat_F, RB_variables.DEIM_idx_F, RB_variables.DEIMᵢ_mat_H, RB_variables.DEIM_idx_H)
   list_names = ("MDEIMᵢ_A", "MDEIM_idx_A", "sparse_el_A", "DEIMᵢ_mat_F", "DEIM_idx_F", "DEIMᵢ_mat_H", "DEIM_idx_H")
@@ -127,7 +126,7 @@ function save_M_DEIM_structures(ROM_info::Problem, RB_variables::PoissonSteady)
 
 end
 
-function get_M_DEIM_structures(ROM_info::Problem, RB_variables::PoissonSteady) :: Vector
+function get_M_DEIM_structures(ROM_info::Info, RB_variables::PoissonSteady) :: Vector
 
   operators = String[]
 
@@ -188,7 +187,7 @@ function get_M_DEIM_structures(ROM_info::Problem, RB_variables::PoissonSteady) :
 
 end
 
-function get_Fₙ(ROM_info::Problem, RB_variables::RBProblem) :: Vector
+function get_Fₙ(ROM_info::Info, RB_variables::RBProblem) :: Vector
 
   if isfile(joinpath(ROM_info.paths.ROM_structures_path, "Fₙ.csv"))
     @info "Importing reduced forcing vector"
@@ -201,7 +200,7 @@ function get_Fₙ(ROM_info::Problem, RB_variables::RBProblem) :: Vector
 
 end
 
-function get_Hₙ(ROM_info::Problem, RB_variables::RBProblem) :: Vector
+function get_Hₙ(ROM_info::Info, RB_variables::RBProblem) :: Vector
 
   if isfile(joinpath(ROM_info.paths.ROM_structures_path, "Hₙ.csv"))
     @info "Importing reduced affine Neumann data vector"
@@ -214,7 +213,7 @@ function get_Hₙ(ROM_info::Problem, RB_variables::RBProblem) :: Vector
 
 end
 
-function get_affine_structures(ROM_info::Problem, RB_variables::PoissonSteady) :: Vector
+function get_affine_structures(ROM_info::Info, RB_variables::PoissonSteady) :: Vector
 
   operators = String[]
 
@@ -231,7 +230,7 @@ function get_affine_structures(ROM_info::Problem, RB_variables::PoissonSteady) :
 
 end
 
-function get_offline_structures(ROM_info::Problem, RB_variables::PoissonSteady) :: Vector
+function get_offline_structures(ROM_info::Info, RB_variables::PoissonSteady) :: Vector
 
   operators = String[]
 
@@ -243,7 +242,7 @@ function get_offline_structures(ROM_info::Problem, RB_variables::PoissonSteady) 
 
 end
 
-function assemble_offline_structures(ROM_info::Problem, RB_variables::PoissonSteady, operators=nothing)
+function assemble_offline_structures(ROM_info::Info, RB_variables::PoissonSteady, operators=nothing)
 
   if isnothing(operators)
     operators = set_operators(ROM_info, RB_variables)
@@ -286,7 +285,7 @@ function assemble_offline_structures(ROM_info::Problem, RB_variables::PoissonSte
 
 end
 
-function get_system_blocks(ROM_info::Problem, RB_variables::RBProblem, LHS_blocks::Array, RHS_blocks::Array) :: Vector
+function get_system_blocks(ROM_info::Info, RB_variables::RBProblem, LHS_blocks::Array, RHS_blocks::Array) :: Vector
 
   if !ROM_info.import_offline_structures
     return ["LHS", "RHS"]
@@ -344,7 +343,7 @@ function get_system_blocks(ROM_info::Problem, RB_variables::RBProblem, LHS_block
 
 end
 
-function get_θᵃ(ROM_info::Problem, RB_variables::PoissonSteady, param) :: Array
+function get_θᵃ(ROM_info::Info, RB_variables::PoissonSteady, param) :: Array
 
   if !ROM_info.probl_nl["A"]
     θᵃ = param.α(Point(0.,0.))
@@ -357,7 +356,7 @@ function get_θᵃ(ROM_info::Problem, RB_variables::PoissonSteady, param) :: Arr
 
 end
 
-function get_θᶠʰ(ROM_info::Problem, RB_variables::PoissonSteady, param) :: Tuple
+function get_θᶠʰ(ROM_info::Info, RB_variables::PoissonSteady, param) :: Tuple
 
   if ROM_info.build_parametric_RHS
     @error "Cannot fetch θᶠ, θʰ if the RHS is built online"
@@ -388,7 +387,7 @@ function initialize_RB_system(RB_variables::RBProblem)
 
 end
 
-function get_Q(ROM_info::Problem, RB_variables::PoissonSteady)
+function get_Q(ROM_info::Info, RB_variables::PoissonSteady)
 
   if RB_variables.Qᵃ === 0
     RB_variables.Qᵃ = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "Qᵃ.csv"))[1]
@@ -405,7 +404,7 @@ function get_Q(ROM_info::Problem, RB_variables::PoissonSteady)
 
 end
 
-function get_RB_system(ROM_info::Problem, RB_variables::PoissonSteady, param)
+function get_RB_system(ROM_info::Info, RB_variables::PoissonSteady, param)
 
   initialize_RB_system(RB_variables)
   get_Q(ROM_info, RB_variables)
@@ -435,7 +434,7 @@ function get_RB_system(ROM_info::Problem, RB_variables::PoissonSteady, param)
 
 end
 
-function solve_RB_system(ROM_info::Problem, RB_variables::PoissonSteady, param)
+function solve_RB_system(ROM_info::Info, RB_variables::PoissonSteady, param)
 
   get_RB_system(ROM_info, RB_variables, param)
 
@@ -455,7 +454,7 @@ function reconstruct_FEM_solution(RB_variables::PoissonSteady)
 
 end
 
-function build_RB_approximation(ROM_info::Problem, RB_variables::PoissonSteady)
+function build_RB_approximation(ROM_info::Info, RB_variables::PoissonSteady)
 
 
   @info "Building $(ROM_info.RB_method) approximation with $(ROM_info.nₛ) snapshots and tolerances of $(ROM_info.ϵₛ) in space"
@@ -494,7 +493,7 @@ function build_RB_approximation(ROM_info::Problem, RB_variables::PoissonSteady)
 
 end
 
-function testing_phase(ROM_info::Problem, RB_variables::PoissonSteady, μ, param_nbs)
+function testing_phase(ROM_info::Info, RB_variables::PoissonSteady, μ, param_nbs)
 
   mean_H1_err = 0.0
   mean_pointwise_err = zeros(RB_variables.Nₛᵘ)
@@ -533,10 +532,6 @@ function testing_phase(ROM_info::Problem, RB_variables::PoissonSteady, μ, param
     @info "Online wall time: $online_time s (snapshot number $nb)"
     @info "Relative reconstruction H1-error: $H1_err_nb (snapshot number $nb)"
 
-    #=
-    err_bound = check_error_bound(A, A_μ_affine_sparse, F_μ_affine, RB_variables.ũ, RB_variables.Xᵘ₀)
-    H1_err_nb ≤ err_bound  =#
-
   end
 
   string_param_nbs = "params"
@@ -562,8 +557,10 @@ function testing_phase(ROM_info::Problem, RB_variables::PoissonSteady, μ, param
 
   end
 
+  pass_to_pp = Dict("path_μ"=>path_μ, "FE_space"=>FE_space, "mean_point_err_u"=>mean_pointwise_err)
+
   if ROM_info.postprocess
-    post_process(ROM_info, path_μ)
+    post_process(ROM_info, pass_to_pp)
   end
 
 end

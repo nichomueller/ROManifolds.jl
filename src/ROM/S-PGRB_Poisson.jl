@@ -1,5 +1,5 @@
 
-function get_inverse_P_matrix(ROM_info::Problem, RB_variables::PoissonSPGRB)
+function get_inverse_P_matrix(ROM_info::Info, RB_variables::PoissonSPGRB)
 
   if use_norm_X
 
@@ -27,7 +27,7 @@ function get_inverse_P_matrix(ROM_info::Problem, RB_variables::PoissonSPGRB)
 
 end
 
-function get_Aₙ(ROM_info::Problem, RB_variables::PoissonSPGRB) :: Vector
+function get_Aₙ(ROM_info::Info, RB_variables::PoissonSPGRB) :: Vector
 
   if isfile(joinpath(ROM_info.paths.ROM_structures_path, "Aₙ.csv")) && isfile(joinpath(ROM_info.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
     @info "Importing reduced affine stiffness matrix"
@@ -45,7 +45,7 @@ function get_Aₙ(ROM_info::Problem, RB_variables::PoissonSPGRB) :: Vector
 
 end
 
-function get_AΦᵀPᵤ⁻¹(ROM_info::Problem, RB_variables::PoissonSPGRB)
+function get_AΦᵀPᵤ⁻¹(ROM_info::Info, RB_variables::PoissonSPGRB)
 
   @info "S-PGRB: fetching the matrix AΦᵀPᵤ⁻¹"
   if isfile(joinpath(ROM_info.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
@@ -64,7 +64,7 @@ function get_AΦᵀPᵤ⁻¹(ROM_info::Problem, RB_variables::PoissonSPGRB)
 
 end
 
-function assemble_affine_matrices(ROM_info::Problem, RB_variables::PoissonSPGRB, var::String)
+function assemble_affine_matrices(ROM_info::Info, RB_variables::PoissonSPGRB, var::String)
 
   get_inverse_P_matrix(ROM_info, RB_variables)
 
@@ -83,7 +83,7 @@ function assemble_affine_matrices(ROM_info::Problem, RB_variables::PoissonSPGRB,
 
 end
 
-function assemble_MDEIM_matrices(ROM_info::Problem, RB_variables::PoissonSPGRB, var::String)
+function assemble_MDEIM_matrices(ROM_info::Info, RB_variables::PoissonSPGRB, var::String)
 
   get_inverse_P_matrix(ROM_info, RB_variables)
 
@@ -122,7 +122,7 @@ function assemble_MDEIM_matrices(ROM_info::Problem, RB_variables::PoissonSPGRB, 
 
 end
 
-function assemble_affine_vectors(ROM_info::Problem, RB_variables::PoissonSPGRB, var::String)
+function assemble_affine_vectors(ROM_info::Info, RB_variables::PoissonSPGRB, var::String)
 
   @info "S-PGRB: running the DEIM offline phase on variable $var with $nₛ_DEIM snapshots"
 
@@ -146,7 +146,7 @@ function assemble_affine_vectors(ROM_info::Problem, RB_variables::PoissonSPGRB, 
 
 end
 
-function assemble_DEIM_vectors(ROM_info::Problem, RB_variables::PoissonSPGRB, var::String)
+function assemble_DEIM_vectors(ROM_info::Info, RB_variables::PoissonSPGRB, var::String)
 
   @info "SPGRB: forcing term is non-affine: running the DEIM offline phase on $nₛ_DEIM snapshots; A is affine"
 
@@ -173,7 +173,7 @@ function assemble_DEIM_vectors(ROM_info::Problem, RB_variables::PoissonSPGRB, va
 
 end
 
-function save_affine_structures(ROM_info::Problem, RB_variables::PoissonSPGRB)
+function save_affine_structures(ROM_info::Info, RB_variables::PoissonSPGRB)
 
   if ROM_info.save_offline_structures
 
@@ -194,7 +194,7 @@ function save_affine_structures(ROM_info::Problem, RB_variables::PoissonSPGRB)
 
 end
 
-function build_param_RHS(ROM_info::Problem, RB_variables::PoissonSPGRB, param, θᵃ::Array) :: Tuple
+function build_param_RHS(ROM_info::Info, RB_variables::PoissonSPGRB, param, θᵃ::Array) :: Tuple
 
   θᵃ_temp = θᵃ[1:RB_variables.Qᵃ]/sqrt(θᵃ[1])
   F = assemble_forcing(FE_space, ROM_info, param)
@@ -206,7 +206,7 @@ function build_param_RHS(ROM_info::Problem, RB_variables::PoissonSPGRB, param, �
 
 end
 
-function get_θ(ROM_info::Problem, RB_variables::PoissonSPGRB, param) :: Tuple
+function get_θ(ROM_info::Info, RB_variables::PoissonSPGRB, param) :: Tuple
 
   θᵃ_temp = get_θᵃ(ROM_info, RB_variables, param)
   θᵃ = [θᵃ_temp[q₁]*θᵃ_temp[q₂] for q₁ = 1:RB_variables.Qᵃ for q₂ = 1:RB_variables.Qᵃ]

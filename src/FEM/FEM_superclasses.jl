@@ -1,15 +1,12 @@
 abstract type Problem end
-
-abstract type Params end
-
 abstract type FEMProblem <: Problem end
-
 abstract type SteadyProblem <: FEMProblem end
-
 abstract type UnsteadyProblem <: FEMProblem  end
+abstract type Info end
+abstract type SteadyInfo <: Info end
+abstract type UnsteadyInfo <: Info end
 
 struct PoissonProblem <: FEMProblem end
-
 struct PoissonProblemUnsteady <: FEMProblem end
 
 struct FESpacePoisson <: SteadyProblem
@@ -31,7 +28,6 @@ struct FESpacePoissonUnsteady <: UnsteadyProblem
   V::TransientTrialFESpace
   ϕᵥ::Gridap.FESpaces.SingleFieldFEBasis
   ϕᵤ::Function
-  σᵤ::Gridap.Arrays.Table
   Nₛᵘ::Int64
   Ω::Gridap.Geometry.BodyFittedTriangulation
   dΩ::Measure
@@ -49,11 +45,11 @@ struct FESpaceStokes <: SteadyProblem
   ϕᵤ::Gridap.FESpaces.SingleFieldFEBasis
   ψᵧ::Gridap.FESpaces.SingleFieldFEBasis
   ψₚ::Gridap.FESpaces.SingleFieldFEBasis
-  σᵤ::Gridap.Arrays.Table
   Nₛᵘ::Int64
   Nₛᵖ::Int64
   Ω::Gridap.Geometry.BodyFittedTriangulation
   dΩ::Measure
+  Γd
   dΓd::Measure
   dΓn::Measure
 end
@@ -68,16 +64,16 @@ struct FESpaceStokesUnsteady <: UnsteadyProblem
   ϕᵤ::Function
   ψᵧ::Gridap.FESpaces.SingleFieldFEBasis
   ψₚ::Gridap.FESpaces.SingleFieldFEBasis
-  σᵤ::Gridap.Arrays.Table
   Nₛᵘ::Int64
   Nₛᵖ::Int64
   Ω::Gridap.Geometry.BodyFittedTriangulation
   dΩ::Measure
+  Γd
   dΓd::Measure
   dΓn::Measure
 end
 
-struct ProblemSpecifics <: SteadyProblem
+struct ProblemSpecifics <: SteadyInfo
   case::Int
   probl_nl::Dict
   order::Int
@@ -89,7 +85,7 @@ struct ProblemSpecifics <: SteadyProblem
   paths::Function
 end
 
-struct ProblemSpecificsUnsteady <: UnsteadyProblem
+struct ProblemSpecificsUnsteady <: UnsteadyInfo
   case::Int
   probl_nl::Dict
   order::Int
@@ -107,7 +103,7 @@ struct ProblemSpecificsUnsteady <: UnsteadyProblem
   δt::Float64
 end
 
-mutable struct ParametricSpecifics <: Params
+mutable struct ParametricSpecifics
   μ::Array
   model::UnstructuredDiscreteModel
   α::Function
@@ -116,7 +112,7 @@ mutable struct ParametricSpecifics <: Params
   h::Function
 end
 
-mutable struct ParametricSpecificsUnsteady <: Params
+mutable struct ParametricSpecificsUnsteady
   μ::Array
   model::UnstructuredDiscreteModel
   αₛ::Function

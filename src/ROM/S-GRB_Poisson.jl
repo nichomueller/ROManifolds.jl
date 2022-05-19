@@ -1,4 +1,4 @@
-function get_Aₙ(ROM_info::Problem, RB_variables::PoissonSGRB) :: Vector
+function get_Aₙ(ROM_info::Info, RB_variables::PoissonSGRB) :: Vector
 
   if isfile(joinpath(ROM_info.paths.ROM_structures_path, "Aₙ.csv"))
     @info "Importing reduced affine stiffness matrix"
@@ -13,7 +13,7 @@ function get_Aₙ(ROM_info::Problem, RB_variables::PoissonSGRB) :: Vector
 
 end
 
-function assemble_affine_matrices(ROM_info::Problem, RB_variables::PoissonSGRB, var::String)
+function assemble_affine_matrices(ROM_info::Info, RB_variables::PoissonSGRB, var::String)
 
   if var === "A"
     RB_variables.Qᵃ = 1
@@ -27,7 +27,7 @@ function assemble_affine_matrices(ROM_info::Problem, RB_variables::PoissonSGRB, 
 
 end
 
-function assemble_MDEIM_matrices(ROM_info::Problem, RB_variables::PoissonSGRB, var::String)
+function assemble_MDEIM_matrices(ROM_info::Info, RB_variables::PoissonSGRB, var::String)
 
   if var === "A"
 
@@ -54,7 +54,7 @@ function assemble_MDEIM_matrices(ROM_info::Problem, RB_variables::PoissonSGRB, v
 
 end
 
-function assemble_affine_vectors(ROM_info::Problem, RB_variables::PoissonSGRB, var::String)
+function assemble_affine_vectors(ROM_info::Info, RB_variables::PoissonSGRB, var::String)
 
   if var === "F"
     RB_variables.Qᶠ = 1
@@ -72,7 +72,7 @@ function assemble_affine_vectors(ROM_info::Problem, RB_variables::PoissonSGRB, v
 
 end
 
-function assemble_DEIM_vectors(ROM_info::Problem, RB_variables::PoissonSGRB, var::String)
+function assemble_DEIM_vectors(ROM_info::Info, RB_variables::PoissonSGRB, var::String)
 
   @info "S-GRB: running the DEIM offline phase on variable $var with $nₛ_DEIM snapshots"
 
@@ -100,7 +100,7 @@ function assemble_DEIM_vectors(ROM_info::Problem, RB_variables::PoissonSGRB, var
 
 end
 
-function save_affine_structures(ROM_info::Problem, RB_variables::PoissonSGRB)
+function save_affine_structures(ROM_info::Info, RB_variables::PoissonSGRB)
 
   if ROM_info.save_offline_structures
 
@@ -119,7 +119,7 @@ function save_affine_structures(ROM_info::Problem, RB_variables::PoissonSGRB)
 
 end
 
-function build_param_RHS(ROM_info::Problem, RB_variables::PoissonSGRB, param, ::Array) :: Tuple
+function build_param_RHS(ROM_info::Info, RB_variables::PoissonSGRB, param, ::Array) :: Tuple
 
   F = assemble_forcing(FE_space, ROM_info, param)
   H = assemble_neumann_datum(FE_space, ROM_info, param)
@@ -129,7 +129,7 @@ function build_param_RHS(ROM_info::Problem, RB_variables::PoissonSGRB, param, ::
 
 end
 
-function get_θ(ROM_info::Problem, RB_variables::PoissonSGRB, param) :: Tuple
+function get_θ(ROM_info::Info, RB_variables::PoissonSGRB, param) :: Tuple
 
   θᵃ = get_θᵃ(ROM_info, RB_variables, param)
   if !ROM_info.build_parametric_RHS

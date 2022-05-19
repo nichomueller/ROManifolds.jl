@@ -65,7 +65,7 @@ function POD(S, ϵ = 1e-5, X = nothing)
 
 end
 
-function build_sparse_mat(problem_info::ProblemSpecifics, FE_space::SteadyProblem, ROM_info, μ_i::Array, el::Array; var="A")
+function build_sparse_mat(problem_info::ProblemSpecifics, FE_space::SteadyProblem, ROM_info::Info, μ_i::Array, el::Array; var="A")
 
   param = get_parametric_specifics(ROM_info, μ_i)
 
@@ -81,7 +81,7 @@ function build_sparse_mat(problem_info::ProblemSpecifics, FE_space::SteadyProble
 
 end
 
-function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, FE_space::UnsteadyProblem, ROM_info, μ_i::Array, el::Array; var="A")
+function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, FE_space::UnsteadyProblem, ROM_info::Info, μ_i::Array, el::Array; var="A")
 
   param = get_parametric_specifics(ROM_info, μ_i)
 
@@ -144,7 +144,7 @@ function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, FE_space::Unst
 
 end
 
-function get_parametric_specifics(ROM_info::ROMSpecificsSteady, μ::Array)
+function get_parametric_specifics(ROM_info::SteadyInfo, μ::Array)
 
   model = DiscreteModelFromFile(ROM_info.paths.mesh_path)
 
@@ -172,7 +172,7 @@ function get_parametric_specifics(ROM_info::ROMSpecificsSteady, μ::Array)
 
 end
 
-function get_parametric_specifics(ROM_info::ROMSpecificsUnsteady, μ::Array)
+function get_parametric_specifics(ROM_info::UnsteadyInfo, μ::Array)
 
   model = DiscreteModelFromFile(ROM_info.paths.mesh_path)
   αₛ(x) = 1
@@ -281,82 +281,75 @@ function compute_errors(uₕ::Array, RB_variables::RBUnsteadyProblem, norm_matri
 
 end
 
-function compute_MDEIM_error(problem_info, ROM_info, RB_variables, μ)
+function compute_MDEIM_error(FE_space::FEMProblem, ROM_info::Info, RB_variables::RBProblem)
 
-  parametric_info = get_parametric_specifics(ROM_info, μ)
-  FE_space = get_FESpace(problem_info, parametric_info.model)
   Aₙ_μ = (RB_variables.Φₛᵘ)' * assemble_stiffness(FE_space, ROM_info, parametric_info) * RB_variables.Φₛᵘ
 
 end
 
-function post_process(ROM_info::SteadyProblem, d::Dict)
+function post_process(ROM_info::SteadyInfo, d::Dict)
   plotly()
 
   if isfile(joinpath(ROM_info.paths.ROM_structures_path, "MDEIM_Σ.csv"))
     MDEIM_Σ = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "MDEIM_Σ.csv"))
-    p = plot(collect(1:length(MDEIM_Σ)), MDEIM_Σ, yaxis=:log, lw = 3, title = "Decay singular values, MDEIM")
-    xlabel!("σ index")
-    ylabel!("σ value")
-    if ROM_info.save_results
-      savefig(p, joinpath(ROM_info.paths.results_path, "plot_MDEIM_Σ.eps"))
-    end
+    make_plot(MDEIM_Σ, "Decay singular values, MDEIM", "σ index", "σ value", ROM_info.paths.results_path)
   end
   if isfile(joinpath(ROM_info.paths.ROM_structures_path, "DEIM_Σ.csv"))
     DEIM_Σ = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "DEIM_Σ.csv"))
-    p = plot(collect(1:length(DEIM_Σ)), DEIM_Σ, yaxis=:log, lw = 3, title = "Decay singular values, DEIM")
-    xlabel!("σ index")
-    ylabel!("σ value")
-    if ROM_info.save_results
-      savefig(p, joinpath(ROM_info.paths.results_path, "plot_DEIM_Σ.eps"))
-    end
+    make_plot(DEIM_Σ, "Decay singular values, DEIM", "σ index", "σ value", ROM_info.paths.results_path)
   end
 
   FE_space = d["FE_space"]
-  mean_point_err = load_CSV(joinpath(d["path_μ"], "mean_point_err.csv"))[:]
-  if ROM_info.save_results
-    writevtk(FE_space.Ω, joinpath(d["path_μ"], "mean_point_err"), cellfields = ["err"=> FEFunction(FE_space.V, mean_point_err)])
-  else
-    plot(collect(1:length(pointwise_err)), pointwise_err, yaxis=:log, lw = 3, title = "Average |uₕ - ũ|")
-  end
+  writevtk(FE_space.Ω, joinpath(d["path_μ"], "mean_point_err"), cellfields = ["err"=> FEFunction(FE_space.V, d["mean_point_err_u"])])
 
 end
 
-function post_process(ROM_info::UnsteadyProblem, d::Dict)
-  pyplot()
+function post_process(ROM_info::UnsteadyInfo, d::Dict)
 
   if isfile(joinpath(ROM_info.paths.ROM_structures_path, "MDEIM_Σ.csv"))
     MDEIM_Σ = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "MDEIM_Σ.csv"))
-    p = plot(collect(1:length(MDEIM_Σ)), MDEIM_Σ, yaxis=:log, lw = 3, title = "Decay singular values, MDEIM")
-    xlabel!("σ index")
-    ylabel!("σ value")
-    savefig(p, joinpath(ROM_info.paths.results_path, "plot_MDEIM_Σ.eps"))
+    make_plot(MDEIM_Σ, "Decay singular values, MDEIM", "σ index", "σ value", ROM_info.paths.results_path)
   end
   if isfile(joinpath(ROM_info.paths.ROM_structures_path, "DEIM_Σ.csv"))
     DEIM_Σ = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "DEIM_Σ.csv"))
-    p = plot(collect(1:length(DEIM_Σ)), DEIM_Σ, yaxis=:log, lw = 3, title = "Decay singular values, DEIM")
-    xlabel!("σ index")
-    ylabel!("σ value")
-    savefig(p, joinpath(ROM_info.paths.results_path, "plot_DEIM_Σ.eps"))
+    make_plot(DEIM_Σ, "Decay singular values, DEIM", "σ index", "σ value", ROM_info.paths.results_path)
   end
 
   times = collect(ROM_info.t₀+ROM_info.δt:ROM_info.δt:ROM_info.T)
   FE_space = d["FE_space"]
   vtk_dir = joinpath(d["path_μ"], "vtk_folder")
+
   create_dir(vtk_dir)
-  createpvd(joinpath(vtk_dir,"mean_point_err")) do pvd
+  createpvd(joinpath(vtk_dir,"mean_point_err_u")) do pvd
     for (i,t) in enumerate(times)
-      errₕt = FEFunction(FE_space.V(t), d["mean_point_err"][:,i])
+      errₕt = FEFunction(FE_space.V(t), d["mean_point_err_u"][:,i])
       pvd[i] = createvtk(FE_space.Ω, joinpath(vtk_dir, "mean_point_err_$i" * ".vtu"), cellfields = ["point_err" => errₕt])
     end
   end
 
-  p = plot(collect(1:length(d["mean_H1_err"])), d["mean_H1_err"], yaxis=:log, lw = 3, title = "Average ||uₕ(t) - ũ(t)||ₕ₁")
-  xlabel!("time [s]")
-  ylabel!("H¹ error")
-  savefig(p, joinpath(d["path_μ"], "mean_H1_err.eps"))
-  p = plot(collect(1:length(d["H1_L2_err"])), d["H1_L2_err"], yaxis=:log, lw = 3, title = "||uₕ - ũ||ₕ₁₋ₗ₂")
-  xlabel!("param μ number")
-  ylabel!("H¹-L² error")
-  savefig(p, joinpath(d["path_μ"], "H1_L2_err.eps"))
+  make_plot(d["mean_H1_err"], "Average ||uₕ(t) - ũ(t)||ₕ₁", "time [s]", "H¹ error", d["path_μ"])
+  make_plot(d["H1_L2_err"], "||uₕ - ũ||ₕ₁₋ₗ₂", "param μ number", "H¹-L² error", d["path_μ"])
 
+  if length(keys(d)) === 8
+
+    createpvd(joinpath(vtk_dir,"mean_point_err_p")) do pvd
+      for (i,t) in enumerate(times)
+        errₕt = FEFunction(FE_space.Q, d["mean_point_err_p"][:,i])
+        pvd[i] = createvtk(FE_space.Ω, joinpath(vtk_dir, "mean_point_err_$i" * ".vtu"), cellfields = ["point_err" => errₕt])
+      end
+    end
+
+    make_plot(d["mean_L2_err"], "Average ||pₕ(t) - p̃(t)||ₗ₂", "time [s]", "L² error", d["path_μ"])
+    make_plot(d["L2_L2_err"], "||pₕ - p̃||ₗ₂₋ₗ₂", "param μ number", "L²-L² error", d["path_μ"])
+
+  end
+
+end
+
+function make_plot(var::Vector, title::String, xlab::String, ylab::String, save_path::String)
+  pyplot()
+  p = plot(collect(1:length(var)), var, yaxis=:log, lw = 3, title = title)
+  xlabel!(xlab)
+  ylabel!(ylab)
+  savefig(p, joinpath(save_path, string(var)*".eps"))
 end

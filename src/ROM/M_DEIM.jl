@@ -73,7 +73,7 @@ function M_DEIM_online(mat_nonaffine, M_DEIMᵢ_mat, M_DEIM_idx)
 
 end
 
-function MDEIM_offline(FE_space::SteadyProblem, ROM_info, var::String)
+function MDEIM_offline(FE_space::SteadyProblem, ROM_info::Info, var::String)
 
   @info "Building $(ROM_info.nₛ_MDEIM) snapshots of $var"
 
@@ -99,7 +99,7 @@ function MDEIM_offline(FE_space::SteadyProblem, ROM_info, var::String)
 
 end
 
-function MDEIM_offline(FE_space::UnsteadyProblem, ROM_info, var::String)
+function MDEIM_offline(FE_space::UnsteadyProblem, ROM_info::Info, var::String)
 
   if ROM_info.space_time_M_DEIM
     return MDEIM_offline_spacetime(FE_space, ROM_info, var)
@@ -111,7 +111,7 @@ function MDEIM_offline(FE_space::UnsteadyProblem, ROM_info, var::String)
 
 end
 
-function MDEIM_offline_standard(FE_space::UnsteadyProblem, ROM_info, var::String)
+function MDEIM_offline_standard(FE_space::UnsteadyProblem, ROM_info::Info, var::String)
 
   @info "Building $(ROM_info.nₛ_MDEIM) snapshots of $var, at each time step. This will take some time."
 
@@ -147,7 +147,7 @@ function MDEIM_offline_standard(FE_space::UnsteadyProblem, ROM_info, var::String
 
 end
 
-function MDEIM_offline_spacetime(FE_space::UnsteadyProblem, ROM_info, var::String)
+function MDEIM_offline_spacetime(FE_space::UnsteadyProblem, ROM_info::Info, var::String)
 
   @info "Building at each time step $(ROM_info.nₛ_MDEIM) snapshots of $var. This will take some time."
 
@@ -200,7 +200,7 @@ function MDEIM_offline_spacetime(FE_space::UnsteadyProblem, ROM_info, var::Strin
 
 end
 
-function MDEIM_offline_functional(FE_space::UnsteadyProblem, ROM_info, var::String)
+function MDEIM_offline_functional(FE_space::UnsteadyProblem, ROM_info::Info, var::String)
 
   @info "Building $(ROM_info.nₛ_MDEIM) snapshots of $var, at each time step. This will take some time."
 
@@ -276,7 +276,7 @@ function MDEIM_offline_functional(FE_space::UnsteadyProblem, ROM_info, var::Stri
 
 end
 
-function DEIM_offline(FE_space::SteadyProblem, ROM_info, var::String)
+function DEIM_offline(FE_space::SteadyProblem, ROM_info::Info, var::String)
 
   @info "Building $(ROM_info.nₛ_DEIM) snapshots of $var"
 
@@ -298,7 +298,7 @@ function DEIM_offline(FE_space::SteadyProblem, ROM_info, var::String)
 
 end
 
-function DEIM_offline(FE_space::UnsteadyProblem, ROM_info, var::String)
+function DEIM_offline(FE_space::UnsteadyProblem, ROM_info::Info, var::String)
 
   if ROM_info.space_time_M_DEIM
     DEIM_offline_spacetime(FE_space, ROM_info, var)
@@ -308,7 +308,7 @@ function DEIM_offline(FE_space::UnsteadyProblem, ROM_info, var::String)
 
 end
 
-function DEIM_offline_standard(FE_space::UnsteadyProblem, ROM_info, var::String)
+function DEIM_offline_standard(FE_space::UnsteadyProblem, ROM_info::Info, var::String)
 
   sparse_DEIM_mat = Matrix{Float64}[]
   @info "Building $(ROM_info.nₛ_DEIM) snapshots of $var at each time step."
@@ -342,7 +342,7 @@ function DEIM_offline_standard(FE_space::UnsteadyProblem, ROM_info, var::String)
 
 end
 
-function DEIM_offline_spacetime(FE_space::UnsteadyProblem, ROM_info, var::String)
+function DEIM_offline_spacetime(FE_space::UnsteadyProblem, ROM_info::Info, var::String)
 
   @info "Building at each time step $(ROM_info.nₛ_MDEIM) snapshots of $var."
 

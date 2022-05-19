@@ -1,12 +1,12 @@
 include("S-PGRB_Poisson.jl")
 
-function get_Aₙ(ROM_info::Problem, RB_variables::PoissonSTPGRB) :: Vector
+function get_Aₙ(ROM_info::Info, RB_variables::PoissonSTPGRB) :: Vector
 
   get_Aₙ(ROM_info, RB_variables.S)
 
 end
 
-function get_Mₙ(ROM_info::Problem, RB_variables::PoissonSTPGRB) :: Vector
+function get_Mₙ(ROM_info::Info, RB_variables::PoissonSTPGRB) :: Vector
 
   if isfile(joinpath(ROM_info.paths.ROM_structures_path, "Mₙ.csv")) && isfile(joinpath(ROM_info.paths.ROM_structures_path, "MΦ.csv")) && isfile(joinpath(ROM_info.paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv"))
     @info "Importing reduced affine stiffness matrix"
@@ -25,7 +25,7 @@ function get_Mₙ(ROM_info::Problem, RB_variables::PoissonSTPGRB) :: Vector
 
 end
 
-function get_MAₙ(ROM_info::Problem, RB_variables::PoissonSTPGRB) :: Vector
+function get_MAₙ(ROM_info::Info, RB_variables::PoissonSTPGRB) :: Vector
 
   if isfile(joinpath(ROM_info.paths.ROM_structures_path, "Mₙ.csv"))
     @info "S-PGRB: importing MAₙ"
@@ -50,7 +50,7 @@ function assemble_MAₙ(RB_variables::PoissonSTPGRB)
 
 end
 
-function assemble_affine_matrices(ROM_info::Problem, RB_variables::PoissonSTPGRB, var::String)
+function assemble_affine_matrices(ROM_info::Info, RB_variables::PoissonSTPGRB, var::String)
 
   get_inverse_P_matrix(ROM_info, RB_variables)
 
@@ -68,7 +68,7 @@ function assemble_affine_matrices(ROM_info::Problem, RB_variables::PoissonSTPGRB
 
 end
 
-function assemble_MDEIM_matrices(ROM_info::Problem, RB_variables::PoissonSTPGRB, var::String)
+function assemble_MDEIM_matrices(ROM_info::Info, RB_variables::PoissonSTPGRB, var::String)
 
   @info "The matrix $var is non-affine: running the MDEIM offline phase on $nₛ_MDEIM snapshots"
   MDEIM_mat, MDEIM_idx, sparse_el, _, _ = MDEIM_offline(FE_space, ROM_info, var)
@@ -127,7 +127,7 @@ function assemble_MDEIM_matrices(ROM_info::Problem, RB_variables::PoissonSTPGRB,
 
 end
 
-function assemble_affine_vectors(ROM_info::Problem, RB_variables::PoissonSTPGRB, var::String)
+function assemble_affine_vectors(ROM_info::Info, RB_variables::PoissonSTPGRB, var::String)
 
   @info "SPGRB: assembling affine reduced RHS; A is affine"
 
@@ -155,7 +155,7 @@ function assemble_affine_vectors(ROM_info::Problem, RB_variables::PoissonSTPGRB,
 
 end
 
-function assemble_DEIM_vectors(ROM_info::Problem, RB_variables::PoissonSTPGRB, var::String)
+function assemble_DEIM_vectors(ROM_info::Info, RB_variables::PoissonSTPGRB, var::String)
 
   @info "ST-PGRB: running the DEIM offline phase on variable $var with $nₛ_DEIM snapshots"
 
@@ -185,7 +185,7 @@ function assemble_DEIM_vectors(ROM_info::Problem, RB_variables::PoissonSTPGRB, v
 
 end
 
-function assemble_offline_structures(ROM_info::Problem, RB_variables::PoissonSTPGRB, operators=nothing)
+function assemble_offline_structures(ROM_info::Info, RB_variables::PoissonSTPGRB, operators=nothing)
 
   if isnothing(operators)
     operatorsₜ = set_operators(ROM_info, RB_variables)
@@ -240,7 +240,7 @@ function assemble_offline_structures(ROM_info::Problem, RB_variables::PoissonSTP
 
 end
 
-function save_affine_structures(ROM_info::Problem, RB_variables::PoissonSTPGRB)
+function save_affine_structures(ROM_info::Info, RB_variables::PoissonSTPGRB)
 
   if ROM_info.save_offline_structures
     Mₙ = reshape(RB_variables.Mₙ, :, RB_variables.Qᵐ^2)
@@ -255,7 +255,7 @@ function save_affine_structures(ROM_info::Problem, RB_variables::PoissonSTPGRB)
 
 end
 
-function get_affine_structures(ROM_info::Problem, RB_variables::PoissonSTPGRB) :: Vector
+function get_affine_structures(ROM_info::Info, RB_variables::PoissonSTPGRB) :: Vector
 
   operators = String[]
 
@@ -346,7 +346,7 @@ function get_RB_LHS_blocks(ROM_info, RB_variables::PoissonSTPGRB, θᵐ, θᵃ, 
 
 end
 
-function get_RB_RHS_blocks(ROM_info::Problem, RB_variables::PoissonSTPGRB, θᶠ, θʰ)
+function get_RB_RHS_blocks(ROM_info::Info, RB_variables::PoissonSTPGRB, θᶠ, θʰ)
 
   @info "Assembling RHS"
 
@@ -390,7 +390,7 @@ function get_RB_RHS_blocks(ROM_info::Problem, RB_variables::PoissonSTPGRB, θᶠ
 
 end
 
-function get_RB_system(ROM_info::Problem, RB_variables::PoissonSTPGRB, param)
+function get_RB_system(ROM_info::Info, RB_variables::PoissonSTPGRB, param)
 
   @info "Preparing the RB system: fetching reduced LHS"
   initialize_RB_system(RB_variables.S)
@@ -416,7 +416,7 @@ function get_RB_system(ROM_info::Problem, RB_variables::PoissonSTPGRB, param)
 
 end
 
-function build_param_RHS(ROM_info::Problem, RB_variables::PoissonSTPGRB, param, θᵐ, θᵃ)
+function build_param_RHS(ROM_info::Info, RB_variables::PoissonSTPGRB, param, θᵐ, θᵃ)
 
   δt = ROM_info.δt
   θ = ROM_info.θ
@@ -445,7 +445,7 @@ function build_param_RHS(ROM_info::Problem, RB_variables::PoissonSTPGRB, param, 
 
 end
 
-function get_θ(ROM_info::Problem, RB_variables::PoissonSTPGRB, param) :: Tuple
+function get_θ(ROM_info::Info, RB_variables::PoissonSTPGRB, param) :: Tuple
 
   θᵐ_temp = get_θᵐ(ROM_info, RB_variables, param)
   θᵃ_temp = get_θᵃ(ROM_info, RB_variables, param)

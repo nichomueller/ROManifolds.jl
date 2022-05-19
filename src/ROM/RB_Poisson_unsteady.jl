@@ -2,7 +2,7 @@ include("RB_Poisson_steady.jl")
 include("ST-GRB_Poisson.jl")
 include("ST-PGRB_Poisson.jl")
 
-function get_snapshot_matrix(ROM_info::Problem, RB_variables::PoissonUnsteady)
+function get_snapshot_matrix(ROM_info::Info, RB_variables::PoissonUnsteady)
 
   @info "Importing the snapshot matrix for field u, number of snapshots considered: $(ROM_info.nₛ)"
 
@@ -17,7 +17,7 @@ function get_snapshot_matrix(ROM_info::Problem, RB_variables::PoissonUnsteady)
 
 end
 
-function PODs_space(ROM_info::Problem, RB_variables::PoissonUnsteady)
+function PODs_space(ROM_info::Info, RB_variables::PoissonUnsteady)
 
   @info "Performing the nested spatial POD for field u, using a tolerance of $(ROM_info.ϵₛ)"
 
@@ -45,7 +45,7 @@ function PODs_space(ROM_info::Problem, RB_variables::PoissonUnsteady)
 end
 
 
-function PODs_time(ROM_info::Problem, RB_variables::PoissonUnsteady)
+function PODs_time(ROM_info::Info, RB_variables::PoissonUnsteady)
 
   @info "Performing the temporal POD for field u, using a tolerance of $(ROM_info.ϵₜ)"
 
@@ -71,7 +71,7 @@ function PODs_time(ROM_info::Problem, RB_variables::PoissonUnsteady)
 
 end
 
-function build_reduced_basis(ROM_info::Problem, RB_variables::PoissonUnsteady)
+function build_reduced_basis(ROM_info::Info, RB_variables::PoissonUnsteady)
 
   @info "Building the space-time reduced basis for field u, using a tolerance of ($(ROM_info.ϵₛ),$(ROM_info.ϵₜ))"
 
@@ -92,7 +92,7 @@ function build_reduced_basis(ROM_info::Problem, RB_variables::PoissonUnsteady)
 
 end
 
-function import_reduced_basis(ROM_info::Problem, RB_variables::PoissonUnsteady)
+function import_reduced_basis(ROM_info::Info, RB_variables::PoissonUnsteady)
 
   @info "Importing the reduced basis for field u"
 
@@ -110,7 +110,7 @@ function index_mapping(i::Int, j::Int, RB_variables::PoissonUnsteady) :: Int64
 
 end
 
-function get_generalized_coordinates(ROM_info::Problem, RB_variables::PoissonUnsteady, snaps=nothing)
+function get_generalized_coordinates(ROM_info::Info, RB_variables::PoissonUnsteady, snaps=nothing)
 
   if check_norm_matrix(RB_variables.S)
     get_norm_matrix(ROM_info, RB_variables.S)
@@ -142,7 +142,7 @@ function get_generalized_coordinates(ROM_info::Problem, RB_variables::PoissonUns
 
 end
 
-function test_offline_phase(ROM_info::Problem, RB_variables::PoissonUnsteady)
+function test_offline_phase(ROM_info::Info, RB_variables::PoissonUnsteady)
 
   get_generalized_coordinates(ROM_info, RB_variables, 1)
 
@@ -155,7 +155,7 @@ function test_offline_phase(ROM_info::Problem, RB_variables::PoissonUnsteady)
 
 end
 
-function save_M_DEIM_structures(ROM_info::Problem, RB_variables::PoissonUnsteady)
+function save_M_DEIM_structures(ROM_info::Info, RB_variables::PoissonUnsteady)
 
   list_M_DEIM = (RB_variables.MDEIMᵢ_M, RB_variables.MDEIM_idx_M, RB_variables.sparse_el_M, )
   list_names = ("MDEIMᵢ_M", "MDEIM_idx_M", "sparse_el_M")
@@ -180,7 +180,7 @@ function set_operators(ROM_info, RB_variables::PoissonUnsteady) :: Vector
 end
 
 
-function get_M_DEIM_structures(ROM_info::Problem, RB_variables::PoissonUnsteady) :: Vector
+function get_M_DEIM_structures(ROM_info::Info, RB_variables::PoissonUnsteady) :: Vector
 
   operators = String[]
 
@@ -203,7 +203,7 @@ function get_M_DEIM_structures(ROM_info::Problem, RB_variables::PoissonUnsteady)
 
 end
 
-function get_offline_structures(ROM_info::Problem, RB_variables::PoissonUnsteady) :: Vector
+function get_offline_structures(ROM_info::Info, RB_variables::PoissonUnsteady) :: Vector
 
   operators = String[]
   append!(operators, get_affine_structures(ROM_info, RB_variables))
@@ -214,7 +214,7 @@ function get_offline_structures(ROM_info::Problem, RB_variables::PoissonUnsteady
 
 end
 
-function get_θᵐ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, param::ParametricSpecificsUnsteady) :: Array
+function get_θᵐ(ROM_info::Info, RB_variables::RBUnsteadyProblem, param::ParametricSpecificsUnsteady) :: Array
 
   if !ROM_info.probl_nl["M"]
     times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+ROM_info.δt*ROM_info.θ
@@ -234,7 +234,7 @@ function get_θᵐ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, param::Pa
 
 end
 
-function get_θᵐₛₜ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, param::ParametricSpecificsUnsteady) :: Array
+function get_θᵐₛₜ(ROM_info::Info, RB_variables::RBUnsteadyProblem, param::ParametricSpecificsUnsteady) :: Array
 
   if !ROM_info.probl_nl["M"]
     θᵐ = get_θᵐ(ROM_info, RB_variables, param)
@@ -254,7 +254,7 @@ function get_θᵐₛₜ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, par
 
 end
 
-function get_θᵃ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, param::ParametricSpecificsUnsteady) :: Array
+function get_θᵃ(ROM_info::Info, RB_variables::RBUnsteadyProblem, param::ParametricSpecificsUnsteady) :: Array
 
   if !ROM_info.probl_nl["A"]
     times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+ROM_info.δt*ROM_info.θ
@@ -274,7 +274,7 @@ function get_θᵃ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, param::Pa
 
 end
 
-function get_θᵃₛₜ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, param::ParametricSpecificsUnsteady) :: Array
+function get_θᵃₛₜ(ROM_info::Info, RB_variables::RBUnsteadyProblem, param::ParametricSpecificsUnsteady) :: Array
 
   if !ROM_info.probl_nl["A"]
     θᵃ = get_θᵃ(ROM_info, RB_variables, param)
@@ -294,7 +294,7 @@ function get_θᵃₛₜ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, par
 
 end
 
-function get_θᶠʰ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, param::ParametricSpecificsUnsteady) :: Tuple
+function get_θᶠʰ(ROM_info::Info, RB_variables::RBUnsteadyProblem, param::ParametricSpecificsUnsteady) :: Tuple
 
   if ROM_info.build_parametric_RHS
     @error "Cannot fetch θᶠ, θʰ if the RHS is built online"
@@ -328,7 +328,7 @@ function get_θᶠʰ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, param::
 
 end
 
-function get_θᶠʰₛₜ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, param::ParametricSpecificsUnsteady) :: Tuple
+function get_θᶠʰₛₜ(ROM_info::Info, RB_variables::RBUnsteadyProblem, param::ParametricSpecificsUnsteady) :: Tuple
 
   if ROM_info.build_parametric_RHS
     @error "Cannot fetch θᶠ, θʰ if the RHS is built online"
@@ -368,7 +368,7 @@ function get_θᶠʰₛₜ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, p
 
 end
 
-function get_Q(ROM_info::Problem, RB_variables::PoissonUnsteady)
+function get_Q(ROM_info::Info, RB_variables::PoissonUnsteady)
 
   if RB_variables.Qᵐ === 0
     RB_variables.Qᵐ = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "Qᵐ.csv"))[1]
@@ -378,7 +378,7 @@ function get_Q(ROM_info::Problem, RB_variables::PoissonUnsteady)
 
 end
 
-function solve_RB_system(ROM_info::Problem, RB_variables::PoissonUnsteady, param::ParametricSpecificsUnsteady)
+function solve_RB_system(ROM_info::Info, RB_variables::PoissonUnsteady, param::ParametricSpecificsUnsteady)
 
   get_RB_system(ROM_info, RB_variables, param)
 
@@ -398,7 +398,7 @@ function reconstruct_FEM_solution(RB_variables::PoissonUnsteady)
 
 end
 
-function build_RB_approximation(ROM_info::Problem, RB_variables::PoissonUnsteady)
+function build_RB_approximation(ROM_info::Info, RB_variables::PoissonUnsteady)
 
   RB_variables.Nₜ = convert(Int64, ROM_info.T / ROM_info.δt)
 
@@ -438,7 +438,7 @@ function build_RB_approximation(ROM_info::Problem, RB_variables::PoissonUnsteady
 
 end
 
-function testing_phase(ROM_info::Problem, RB_variables::PoissonUnsteady, μ, param_nbs)
+function testing_phase(ROM_info::Info, RB_variables::PoissonUnsteady, μ, param_nbs)
 
   H1_L2_err = zeros(length(param_nbs))
   mean_H1_err = zeros(RB_variables.Nₜ)
@@ -495,7 +495,7 @@ function testing_phase(ROM_info::Problem, RB_variables::PoissonUnsteady, μ, par
     save_CSV(uₙ_μ, joinpath(path_μ, "uₙ.csv"))
     save_CSV(mean_pointwise_err, joinpath(path_μ, "mean_point_err.csv"))
     save_CSV(mean_H1_err, joinpath(path_μ, "H1_err.csv"))
-    save_CSV([mean_H1_L2_err], joinpath(path_μ, "H1_err.csv"))
+    save_CSV([mean_H1_L2_err], joinpath(path_μ, "H1L2_err.csv"))
 
     if !ROM_info.import_offline_structures
       times = [RB_variables.S.offline_time, mean_online_time, mean_reconstruction_time]
@@ -506,7 +506,7 @@ function testing_phase(ROM_info::Problem, RB_variables::PoissonUnsteady, μ, par
 
   end
 
-  pass_to_pp = Dict("path_μ"=>path_μ, "FE_space"=>FE_space, "H1_L2_err"=>H1_L2_err, "mean_H1_err"=>mean_H1_err, "mean_point_err"=>mean_pointwise_err)
+  pass_to_pp = Dict("path_μ"=>path_μ, "FE_space"=>FE_space, "H1_L2_err"=>H1_L2_err, "mean_H1_err"=>mean_H1_err, "mean_point_err_u"=>mean_pointwise_err)
 
   if ROM_info.postprocess
     post_process(ROM_info, pass_to_pp)

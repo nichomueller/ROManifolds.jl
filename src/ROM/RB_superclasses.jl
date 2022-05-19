@@ -8,29 +8,21 @@ abstract type StokesUnsteady <: RBUnsteadyProblem end
 
 Sᵘ = Matrix{Float64}[]
 Sᵖ = Matrix{Float64}[]
-Sˡ = Matrix{Float64}[]
 Nₛᵘ = 0
 Nₛᵖ = 0
-Nₛˡ = 0
 Nₜ = 0
 Nᵘ = 0
 Nᵖ = 0
-Nˡ = 0
 Φₛᵘ = Matrix{Float64}[]
 Φₛᵖ = Matrix{Float64}[]
-Φₛˡ = Matrix{Float64}[]
 nₛᵘ = 0
 nₛᵖ = 0
-nₛˡ = 0
 Φₜᵘ = Matrix{Float64}[]
 Φₜᵖ = Matrix{Float64}[]
-Φₜˡ = Matrix{Float64}[]
 nₜᵘ = 0
 nₜᵖ = 0
-nₜˡ = 0
 nᵘ = 0
 nᵖ = 0
-nˡ = 0
 
 ũ = Float64[]
 uₙ = Float64[]
@@ -38,9 +30,6 @@ û = Float64[]
 p̃ = Float64[]
 pₙ = Float64[]
 p̂ = Float64[]
-λ̃ = Float64[]
-λₙ = Float64[]
-λ̂ = Float64[]
 
 Mₙ = Matrix{Float64}[]
 Aₙ = Matrix{Float64}[]
@@ -51,8 +40,6 @@ MAₙ = Matrix{Float64}[]
 Bₙ = Matrix{Float64}[]
 Bᵀₙ = Matrix{Float64}[]
 Cₙ = Matrix{Float64}[]
-Lₙ = Matrix{Float64}[]
-Lᵀₙ = Matrix{Float64}[]
 Fₙ = Matrix{Float64}[]
 Hₙ = Matrix{Float64}[]
 Gₙ = Matrix{Float64}[]
@@ -69,13 +56,11 @@ Qᵐ = 0
 Qᶜ = 0
 Qᶠ = 0
 Qʰ = 0
-Qᵍ = 0
 θᵃ = Float64[]
 θᵐ = Float64[]
 θᶜ = Float64[]
 θᶠ = Float64[]
 θʰ = Float64[]
-θᵍ = Float64[]
 
 MDEIMᵢ_A = Matrix{Float64}[]
 MDEIM_idx_A = Float64[]
@@ -90,8 +75,6 @@ DEIMᵢ_mat_F = Float64[]
 DEIM_idx_F = Float64[]
 DEIMᵢ_mat_H = Float64[]
 DEIM_idx_H = Float64[]
-DEIMᵢ_mat_G = Float64[]
-DEIM_idx_G = Float64[]
 
 offline_time = 0.0
 
@@ -160,12 +143,10 @@ function setup_PoissonSTPGRB(::NTuple{4,Int})::PoissonSTPGRB
 end
 
 mutable struct StokesSTGRB <: StokesUnsteady
-  P::PoissonSTGRB; Sᵖ::Array; Sˡ::Array; Φₛᵖ::Array; Φₛˡ::Array; Φₜᵖ::Array;
-  Φₜˡ::Array; p̃::Array; pₙ::Array; p̂::Array; λ̃ ::Array; λₙ::Array; λ̂ ::Array;
-  Bₙ::Array; Bᵀₙ::Array; Lₙ::Array; Lᵀₙ::Array; Gₙ::Array; Xᵘ::SparseMatrixCSC;
-  Xᵖ::SparseMatrixCSC; Xᵖ₀::SparseMatrixCSC; DEIMᵢ_mat_G::Array;
-  DEIM_idx_G::Array; Nₛᵖ::Int64; Nₛˡ::Int64; Nᵖ::Int64; Nˡ::Int64; nₛᵖ::Int64;
-  nₛˡ::Int64; nₜᵖ::Int64; nₜˡ::Int64; nᵖ::Int64; nˡ::Int64; Qᵍ::Int64; θᵍ::Array
+  P::PoissonSTGRB; Sᵖ::Array; Φₛᵖ::Array; Φₜᵖ::Array; p̃::Array; pₙ::Array;
+  p̂::Array; Bₙ::Array; Bᵀₙ::Array; Xᵘ::SparseMatrixCSC; Xᵖ::SparseMatrixCSC;
+  Xᵖ₀::SparseMatrixCSC; Nₛᵖ::Int64; Nₛˡ::Int64; Nᵖ::Int64; nₛᵖ::Int64;
+  nₜᵖ::Int64; nᵖ::Int64
 end
 
 #= mutable struct StokesSTPGRB <: StokesUnsteady
@@ -181,9 +162,8 @@ function setup_StokesSTGRB(::NTuple{5,Int})::StokesSTGRB
   return StokesSTGRB(PoissonSTGRB(PoissonSGRB(Sᵘ, Φₛᵘ, ũ, uₙ, û, Aₙ, Fₙ, Hₙ, Xᵘ₀, LHSₙ, RHSₙ,
   MDEIMᵢ_A, MDEIM_idx_A, DEIMᵢ_mat_F, DEIM_idx_F, DEIMᵢ_mat_H, DEIM_idx_H,
   sparse_el_A, Nₛᵘ, nₛᵘ, Qᵃ, Qᶠ, Qʰ, θᵃ, θᶠ, θʰ, offline_time), Φₜᵘ, Mₙ,
-  MDEIMᵢ_M, MDEIM_idx_M, sparse_el_M, Nₜ, Nᵘ, nₜᵘ, nᵘ, Qᵐ, θᵐ), Sᵖ, Sˡ, Φₛᵖ, Φₛˡ,
-  Φₜᵖ, Φₜˡ, p̃, pₙ, p̂, λ̃ , λₙ, λ̂ , Bₙ, Bᵀₙ, Lₙ, Lᵀₙ, Gₙ, Xᵘ, Xᵖ, Xᵖ₀, DEIMᵢ_mat_G,
-  DEIM_idx_G, Nₛᵖ, Nₛˡ, Nᵖ, Nˡ, nₛᵖ, nₛˡ, nₜᵖ, nₜˡ, nᵖ, nˡ, Qᵍ, θᵍ)
+  MDEIMᵢ_M, MDEIM_idx_M, sparse_el_M, Nₜ, Nᵘ, nₜᵘ, nᵘ, Qᵐ, θᵐ), Sᵖ, Φₛᵖ,
+  Φₜᵖ, p̃, pₙ, p̂, Bₙ, Bᵀₙ, Xᵘ, Xᵖ, Xᵖ₀, Nₛᵖ, Nᵖ, nₛᵖ, nₛˡ, nₜᵖ, nᵖ)
 
 end
 
@@ -204,7 +184,7 @@ setup(NT::NTuple{4,Int}) = setup_PoissonSTPGRB(NT)
 setup(NT::NTuple{5,Int}) = setup_StokesSTGRB(NT)
 #setup(NT::NTuple{6,Int}) = setup_StokesSTPGRB(NT)
 
-struct ROMSpecificsSteady <: SteadyProblem
+struct ROMSpecificsSteady <: SteadyInfo
   probl_nl::Dict
   paths::Function
   RB_method::String
@@ -221,7 +201,7 @@ struct ROMSpecificsSteady <: SteadyProblem
   save_results::Bool
 end
 
-struct ROMSpecificsUnsteady <: UnsteadyProblem
+struct ROMSpecificsUnsteady <: UnsteadyInfo
   probl_nl::Dict
   paths::Function
   RB_method::String

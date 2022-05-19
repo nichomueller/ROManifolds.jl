@@ -1,7 +1,7 @@
 include("config_fem.jl")
-include("../../../utils/general.jl")
 include("../../../ROM/RB_superclasses.jl")
 include("../../../ROM/RB_utils.jl")
+include("../../../ROM/RB_Poisson_steady.jl")
 
 RB_method = "S-GRB"
 training_percentage = 0.8

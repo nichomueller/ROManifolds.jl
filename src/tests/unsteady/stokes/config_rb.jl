@@ -1,7 +1,7 @@
 include("config_fem.jl")
-include("../../../utils/general.jl")
 include("../../../ROM/RB_superclasses.jl")
 include("../../../ROM/RB_utils.jl")
+include("../../../ROM/RB_Stokes_unsteady.jl")
 
 RB_method = "ST-GRB"
 time_reduction_technique = "ST-HOSVD"
@@ -12,30 +12,31 @@ training_percentage = 0.8
 considered_snaps = convert(Int64, nₛ * training_percentage)
 build_parametric_RHS = false
 use_norm_X = false
-nₛ_MDEIM = min(7, considered_snaps)
+nₛ_MDEIM = min(35, considered_snaps)
 nₛ_DEIM = min(10, considered_snaps)
 space_time_M_DEIM = false
 functional_M_DEIM = false
 @assert !(space_time_M_DEIM && functional_M_DEIM) "Choose only one (M)DEIM technique"
-postprocess = true
 import_snapshots = true
 import_offline_structures = false
 save_offline_structures = true
 save_results = true
+postprocess = true
+@assert !(postprocess && !save_results) "Cannot post-process if save_results is set to false"
 
 case = 0
 
 if case === 0
 
-  probl_nl = Dict("Ω" => false, "M" => false, "A" => false, "f" => false, "g" => false, "h" => false)
+  probl_nl = Dict("Ω" => false, "M" => false, "A" => false, "f" => false, "g" => true, "h" => false)
 
 elseif case === 1
 
-  probl_nl = Dict("Ω" => false, "M" => false, "A" => true, "f" => false, "g" => false, "h" => false)
+  probl_nl = Dict("Ω" => false, "M" => false, "A" => true, "f" => false, "g" => true, "h" => false)
 
 elseif case === 2
 
-  probl_nl = Dict("Ω" => false, "M" => false, "A" => true, "f" => true, "g" => false, "h" => false)
+  probl_nl = Dict("Ω" => false, "M" => false, "A" => true, "f" => false, "g" => true, "h" => false)
 
 else
 

@@ -1,5 +1,5 @@
 
-function primal_supremizers(ROM_info::Problem, RB_variables::StokesSTGRB)
+function primal_supremizers(ROM_info::Info, RB_variables::StokesSTGRB)
 
   @info "Computing primal supremizers"
 
@@ -37,7 +37,7 @@ function primal_supremizers(ROM_info::Problem, RB_variables::StokesSTGRB)
 
 end
 
-function dual_supremizers(ROM_info::Problem, RB_variables::StokesSTGRB)
+function dual_supremizers(ROM_info::Info, RB_variables::StokesSTGRB)
 
   @info "Computing dual supremizers"
 
@@ -118,7 +118,7 @@ function time_supremizers(RB_variables::StokesSTGRB, var="p")
 
 end
 
-function perform_supremizer_enrichment_space(ROM_info::Problem, RB_variables::StokesSTGRB)
+function perform_supremizer_enrichment_space(ROM_info::Info, RB_variables::StokesSTGRB)
 
   primal_supremizers(ROM_info, RB_variables)
   dual_supremizers(ROM_info, RB_variables)
@@ -132,7 +132,7 @@ function perform_supremizer_enrichment_time(RB_variables::StokesSTGRB)
 
 end
 
-function build_reduced_basis(ROM_info::Problem, RB_variables::StokesSTGRB)
+function build_reduced_basis(ROM_info::Info, RB_variables::StokesSTGRB)
 
   @info "Building the space-time reduced basis for fields (u,p,λ), using a tolerance of ($(ROM_info.ϵₛ),$(ROM_info.ϵₜ))"
 
@@ -162,19 +162,19 @@ function build_reduced_basis(ROM_info::Problem, RB_variables::StokesSTGRB)
 
 end
 
-function get_Aₙ(ROM_info::Problem, RB_variables::StokesSTGRB) :: Vector
+function get_Aₙ(ROM_info::Info, RB_variables::StokesSTGRB) :: Vector
 
   return get_Aₙ(ROM_info, RB_variables.P)
 
 end
 
-function get_Mₙ(ROM_info::Problem, RB_variables::StokesSTGRB) :: Vector
+function get_Mₙ(ROM_info::Info, RB_variables::StokesSTGRB) :: Vector
 
   return get_Mₙ(ROM_info, RB_variables.P)
 
 end
 
-function get_Bₙ(ROM_info::Problem, RB_variables::StokesSTGRB) :: Vector
+function get_Bₙ(ROM_info::Info, RB_variables::StokesSTGRB) :: Vector
 
   if isfile(joinpath(ROM_info.paths.ROM_structures_path, "Bₙ.csv")) && isfile(joinpath(ROM_info.paths.ROM_structures_path, "Bᵀₙ.csv"))
     @info "Importing reduced affine velocity-pressure and pressure-velocity matrices"
@@ -190,7 +190,7 @@ function get_Bₙ(ROM_info::Problem, RB_variables::StokesSTGRB) :: Vector
 
 end
 
-function get_Lₙ(ROM_info::Problem, RB_variables::StokesSTGRB) :: Vector
+function get_Lₙ(ROM_info::Info, RB_variables::StokesSTGRB) :: Vector
 
   if isfile(joinpath(ROM_info.paths.ROM_structures_path, "Lₙ.csv")) && isfile(joinpath(ROM_info.paths.ROM_structures_path, "Lᵀₙ.csv"))
     @info "Importing reduced affine coupling and transposed coupling matrices"
@@ -206,7 +206,7 @@ function get_Lₙ(ROM_info::Problem, RB_variables::StokesSTGRB) :: Vector
 
 end
 
-function assemble_affine_matrices(ROM_info::Problem, RB_variables::StokesSTGRB, var::String)
+function assemble_affine_matrices(ROM_info::Info, RB_variables::StokesSTGRB, var::String)
 
   if var === "B"
     @info "Assembling affine reduced velocity-pressure and pressure-velocity matrices"
@@ -224,13 +224,13 @@ function assemble_affine_matrices(ROM_info::Problem, RB_variables::StokesSTGRB, 
 
 end
 
-function assemble_MDEIM_matrices(ROM_info::Problem, RB_variables::StokesSTGRB, var::String)
+function assemble_MDEIM_matrices(ROM_info::Info, RB_variables::StokesSTGRB, var::String)
 
   assemble_MDEIM_matrices(ROM_info, RB_variables.P, var)
 
 end
 
-function assemble_affine_vectors(ROM_info::Problem, RB_variables::StokesSTGRB, var::String)
+function assemble_affine_vectors(ROM_info::Info, RB_variables::StokesSTGRB, var::String)
 
   if var === "G"
     RB_variables.Qᵍ = 1
@@ -243,7 +243,7 @@ function assemble_affine_vectors(ROM_info::Problem, RB_variables::StokesSTGRB, v
 
 end
 
-function assemble_DEIM_vectors(ROM_info::Problem, RB_variables::StokesSTGRB, var::String)
+function assemble_DEIM_vectors(ROM_info::Info, RB_variables::StokesSTGRB, var::String)
 
   if var === "G"
     DEIM_mat, RB_variables.DEIM_idx_G, _, _ = DEIM_offline(FE_space, ROM_info, var)
@@ -259,7 +259,7 @@ function assemble_DEIM_vectors(ROM_info::Problem, RB_variables::StokesSTGRB, var
 
 end
 
-function assemble_offline_structures(ROM_info::Problem, RB_variables::StokesSTGRB, operators=nothing)
+function assemble_offline_structures(ROM_info::Info, RB_variables::StokesSTGRB, operators=nothing)
 
   if isnothing(operators)
     operators = set_operators(ROM_info, RB_variables)
@@ -286,7 +286,7 @@ function assemble_offline_structures(ROM_info::Problem, RB_variables::StokesSTGR
 
 end
 
-function save_affine_structures(ROM_info::Problem, RB_variables::StokesSTGRB)
+function save_affine_structures(ROM_info::Info, RB_variables::StokesSTGRB)
 
   if ROM_info.save_offline_structures
     save_CSV(RB_variables.Bₙ, joinpath(ROM_info.paths.ROM_structures_path, "Bₙ.csv"))
@@ -298,7 +298,7 @@ function save_affine_structures(ROM_info::Problem, RB_variables::StokesSTGRB)
 
 end
 
-function get_affine_structures(ROM_info::Problem, RB_variables::StokesSTGRB) :: Vector
+function get_affine_structures(ROM_info::Info, RB_variables::StokesSTGRB) :: Vector
 
   operators = String[]
   append!(operators, get_Bₙ(ROM_info, RB_variables))
@@ -418,7 +418,7 @@ function get_RB_LHS_blocks(ROM_info, RB_variables::StokesSTGRB, θᵐ, θᵃ)
 
 end
 
-function get_RB_RHS_blocks(ROM_info::Problem, RB_variables::StokesSTGRB, θᶠ::Array, θʰ::Array, θᵍ::Array)
+function get_RB_RHS_blocks(ROM_info::Info, RB_variables::StokesSTGRB, θᶠ::Array, θʰ::Array, θᵍ::Array)
 
   @info "Assembling RHS"
 
@@ -441,7 +441,7 @@ function get_RB_RHS_blocks(ROM_info::Problem, RB_variables::StokesSTGRB, θᶠ::
 
 end
 
-function get_RB_system(ROM_info::Problem, RB_variables::StokesSTGRB, param)
+function get_RB_system(ROM_info::Info, RB_variables::StokesSTGRB, param)
 
   @info "Preparing the RB system: fetching reduced LHS"
   initialize_RB_system(RB_variables.S)
@@ -471,7 +471,7 @@ function get_RB_system(ROM_info::Problem, RB_variables::StokesSTGRB, param)
 
 end
 
-function build_param_RHS(ROM_info::Problem, RB_variables::StokesSTGRB, param)
+function build_param_RHS(ROM_info::Info, RB_variables::StokesSTGRB, param)
 
   build_param_RHS(ROM_info, RB_variables.P, param)
 
@@ -488,7 +488,7 @@ function build_param_RHS(ROM_info::Problem, RB_variables::StokesSTGRB, param)
 
 end
 
-function get_θ(ROM_info::Problem, RB_variables::StokesSTGRB, param) :: Tuple
+function get_θ(ROM_info::Info, RB_variables::StokesSTGRB, param) :: Tuple
 
   if !ROM_info.build_parametric_RHS
     θᵍ = get_θᵍ(ROM_info, RB_variables, param)
@@ -500,7 +500,7 @@ function get_θ(ROM_info::Problem, RB_variables::StokesSTGRB, param) :: Tuple
 
 end
 
-function get_θₛₜ(ROM_info::Problem, RB_variables::StokesSTGRB, param) :: Tuple
+function get_θₛₜ(ROM_info::Info, RB_variables::StokesSTGRB, param) :: Tuple
 
   if !ROM_info.build_parametric_RHS
     θᵍ = get_θᵍₛₜ(ROM_info, RB_variables, param)

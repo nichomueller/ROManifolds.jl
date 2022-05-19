@@ -1,4 +1,4 @@
-function build_M_snapshots(FE_space::SteadyProblem, ROM_info, μ::Array)
+function build_M_snapshots(FE_space::SteadyProblem, ROM_info::Info, μ::Array)
 
   for i_nₛ = 1:ROM_info.nₛ_MDEIM
     @info "Snapshot number $i_nₛ, mass"
@@ -17,7 +17,7 @@ function build_M_snapshots(FE_space::SteadyProblem, ROM_info, μ::Array)
 
 end
 
-function build_M_snapshots(FE_space::UnsteadyProblem, ROM_info, μ::Array)
+function build_M_snapshots(FE_space::UnsteadyProblem, ROM_info::Info, μ::Array)
 
   Nₜ = convert(Int64, ROM_info.T/ROM_info.δt)
   δtθ = ROM_info.δt*ROM_info.θ
@@ -41,7 +41,7 @@ function build_M_snapshots(FE_space::UnsteadyProblem, ROM_info, μ::Array)
 
 end
 
-function build_M_snapshots(FE_space::UnsteadyProblem, ROM_info, μ::Array, t::Float64)
+function build_M_snapshots(FE_space::UnsteadyProblem, ROM_info::Info, μ::Array, t::Float64)
 
   for i_nₛ= 1:ROM_info.nₛ_MDEIM
     @info "Snapshot $nₛ at time instant $t, mass"
@@ -60,7 +60,7 @@ function build_M_snapshots(FE_space::UnsteadyProblem, ROM_info, μ::Array, t::Fl
 
 end
 
-function build_A_snapshots(FE_space::SteadyProblem, ROM_info, μ::Array)
+function build_A_snapshots(FE_space::SteadyProblem, ROM_info::Info, μ::Array)
 
   for i_nₛ = 1:ROM_info.nₛ_MDEIM
     @info "Snapshot number $i_nₛ, stiffness"
@@ -79,7 +79,7 @@ function build_A_snapshots(FE_space::SteadyProblem, ROM_info, μ::Array)
 
 end
 
-function build_A_snapshots(FE_space::UnsteadyProblem, ROM_info, μ::Array)
+function build_A_snapshots(FE_space::UnsteadyProblem, ROM_info::Info, μ::Array)
 
   Nₜ = convert(Int64, ROM_info.T/ROM_info.δt)
   δtθ = ROM_info.δt*ROM_info.θ
@@ -103,7 +103,7 @@ function build_A_snapshots(FE_space::UnsteadyProblem, ROM_info, μ::Array)
 
 end
 
-function build_A_snapshots(FE_space::UnsteadyProblem, ROM_info, μ::Array, t::Float64)
+function build_A_snapshots(FE_space::UnsteadyProblem, ROM_info::Info, μ::Array, t::Float64)
 
   for i_nₛ= 1:ROM_info.nₛ_MDEIM
     @info "Snapshot $nₛ at time instant $t, stiffness"
@@ -122,7 +122,7 @@ function build_A_snapshots(FE_space::UnsteadyProblem, ROM_info, μ::Array, t::Fl
 
 end
 
-function build_F_snapshots(FE_space::SteadyProblem, ROM_info, μ::Array)
+function build_F_snapshots(FE_space::SteadyProblem, ROM_info::Info, μ::Array)
 
   F = zeros(FE_space.Nₛᵘ, ROM_info.nₛ_DEIM)
 
@@ -137,7 +137,7 @@ function build_F_snapshots(FE_space::SteadyProblem, ROM_info, μ::Array)
 
 end
 
-function build_F_snapshots(FE_space::UnsteadyProblem, ROM_info, μ::Array)
+function build_F_snapshots(FE_space::UnsteadyProblem, ROM_info::Info, μ::Array)
 
   Nₜ = convert(Int64, ROM_info.T/ROM_info.δt)
   δtθ = ROM_info.δt*ROM_info.θ
@@ -156,7 +156,7 @@ function build_F_snapshots(FE_space::UnsteadyProblem, ROM_info, μ::Array)
 
 end
 
-function build_F_snapshots(FE_space::UnsteadyProblem, ROM_info, μ::Array, t::Float64)
+function build_F_snapshots(FE_space::UnsteadyProblem, ROM_info::Info, μ::Array, t::Float64)
 
   F = zeros(FE_space.Nₛᵘ, ROM_info.nₛ_DEIM)
 
@@ -171,7 +171,7 @@ function build_F_snapshots(FE_space::UnsteadyProblem, ROM_info, μ::Array, t::Fl
 
 end
 
-function build_H_snapshots(FE_space::SteadyProblem, ROM_info, μ::Array)
+function build_H_snapshots(FE_space::SteadyProblem, ROM_info::Info, μ::Array)
 
   H = zeros(FE_space.Nₛᵘ, ROM_info.nₛ_DEIM)
 
@@ -186,7 +186,7 @@ function build_H_snapshots(FE_space::SteadyProblem, ROM_info, μ::Array)
 
 end
 
-function build_H_snapshots(FE_space::UnsteadyProblem, ROM_info, μ::Array)
+function build_H_snapshots(FE_space::UnsteadyProblem, ROM_info::Info, μ::Array)
 
   Nₜ = convert(Int64, ROM_info.T/ROM_info.δt)
   δtθ = ROM_info.δt*ROM_info.θ
@@ -205,7 +205,7 @@ function build_H_snapshots(FE_space::UnsteadyProblem, ROM_info, μ::Array)
 
 end
 
-function build_H_snapshots(FE_space::UnsteadyProblem, ROM_info, μ::Array, t::Float64)
+function build_H_snapshots(FE_space::UnsteadyProblem, ROM_info::Info, μ::Array, t::Float64)
 
   H = zeros(FE_space.Nₛᵘ, ROM_info.nₛ_DEIM)
 

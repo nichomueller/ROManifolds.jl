@@ -1,5 +1,4 @@
 include("config_fem.jl")
-include("../../../FEM/FEM.jl")
 
 αₛ(x) = 1
 αₜ(t, μ) = sum(μ) * (2 + sin(2π * t))
@@ -24,7 +23,7 @@ function run_FEM_0()
   model = DiscreteModelFromFile(paths.mesh_path)
   f(x, t::Real) = fₛ(x)*fₜ(t)
   f(t::Real) = x -> f(x, t)
-  FE_space = get_FESpace(problem_info, model; g)
+  FE_space = get_FESpace(problem_ntuple, problem_info, model; g)
 
   function run_parametric_FEM(μ::Array)
 
@@ -36,7 +35,7 @@ function run_FEM_0()
     M = assemble_mass(FE_space, problem_info, parametric_info)(0.0)
     F = assemble_forcing(FE_space, problem_info, parametric_info)(0.0)
     H = assemble_neumann_datum(FE_space, problem_info, parametric_info)(0.0)
-    Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space)
+    Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space₀)
 
     function parametric_solution()
 
@@ -57,7 +56,7 @@ function run_FEM_1()
   model = DiscreteModelFromFile(paths.mesh_path)
   f(x, t::Real) = fₛ(x)*fₜ(t)
   f(t::Real) = x -> f(x, t)
-  FE_space = get_FESpace(problem_info, model; g)
+  FE_space = get_FESpace(problem_ntuple, problem_info, model; g)
 
   function run_parametric_FEM(μ::Array)
 
@@ -68,7 +67,7 @@ function run_FEM_1()
     parametric_info = ParametricSpecificsUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, gₛ, gₜ, g, hₛ, hₜ, h, u₀)
     M = assemble_mass(FE_space, problem_info, parametric_info)(0.0)
     H = assemble_neumann_datum(FE_space, problem_info, parametric_info)(0.0)
-    Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space)
+    Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space₀)
 
     function parametric_solution()
 
@@ -87,7 +86,7 @@ end
 function run_FEM_2()
 
   model = DiscreteModelFromFile(paths.mesh_path)
-  FE_space = get_FESpace(problem_info, model)
+  FE_space = get_FESpace(problem_ntuple, problem_info, model)
 
   function run_parametric_FEM(μ::Array)
 
@@ -99,9 +98,8 @@ function run_FEM_2()
     f(t::Real) = x -> f(x, t)
     parametric_info = ParametricSpecificsUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, gₛ, gₜ, g, hₛ, hₜ, h, u₀)
     M = assemble_mass(FE_space, problem_info, parametric_info)(0.0)
-    F = assemble_forcing(FE_space, problem_info, parametric_info)(0.0)
     H = assemble_neumann_datum(FE_space, problem_info, parametric_info)(0.0)
-    Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space)
+    Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space₀)
 
     function parametric_solution()
 

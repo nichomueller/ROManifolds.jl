@@ -1,5 +1,4 @@
 include("config_fem.jl")
-include("../../../FEM/FEM.jl")
 
 function run_FEM_0()
 
@@ -8,8 +7,7 @@ function run_FEM_0()
   g(x) = 1
   h(x) = 1
 
-  FE_space = get_FESpace(problem_info, model; g)
-  FE_space0 = get_FESpace(problem_info, model)
+  FE_space = get_FESpace(problem_ntuple, problem_info, model; g)
 
   function run_parametric_FEM(μ::Array)
 
@@ -20,7 +18,7 @@ function run_FEM_0()
     F = assemble_forcing(FE_space, problem_info, parametric_info)
     H = assemble_neumann_datum(FE_space, problem_info, parametric_info)
     A = assemble_stiffness(FE_space, problem_info, parametric_info)
-    Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space0)
+    Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space₀)
 
     function parametric_solution()
 
@@ -43,8 +41,7 @@ function run_FEM_1()
   g(x) = 1
   h(x) = 1
 
-  FE_space = get_FESpace(problem_info, model; g)
-  FE_space0 = get_FESpace(problem_info, model)
+  FE_space = get_FESpace(problem_ntuple, problem_info, model; g)
 
   function run_parametric_FEM(μ::Array)
 
@@ -54,7 +51,7 @@ function run_FEM_1()
     parametric_info = ParametricSpecifics(μ, model, α, f, g, h)
     F = assemble_forcing(FE_space, problem_info, parametric_info)
     H = assemble_neumann_datum(FE_space, problem_info, parametric_info)
-    Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space0)
+    Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space₀)
 
     function parametric_solution()
 
@@ -75,7 +72,7 @@ function run_FEM_2()
   model = DiscreteModelFromFile(paths.mesh_path)
   h(x) = 1
 
-  FE_space = get_FESpace(problem_info, model)
+  FE_space = get_FESpace(problem_ntuple, problem_info, model)
 
   function run_parametric_FEM(μ::Array)
 
@@ -86,7 +83,7 @@ function run_FEM_2()
     parametric_info = ParametricSpecifics(μ, model, α, f, g, h)
 
     H = assemble_neumann_datum(FE_space, problem_info, parametric_info)
-    Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space)
+    Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space₀)
 
     function parametric_solution()
 

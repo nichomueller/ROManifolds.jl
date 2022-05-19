@@ -1,5 +1,4 @@
 include("config_fem.jl")
-include("../../../FEM/FEM.jl")
 
 α(x) = μ[1] * (1 + x.^2)
 dα(dx, x) = 2 * μ[1] * x * dx
