@@ -69,11 +69,13 @@ Qᵐ = 0
 Qᶜ = 0
 Qᶠ = 0
 Qʰ = 0
+Qᵍ = 0
 θᵃ = Float64[]
 θᵐ = Float64[]
 θᶜ = Float64[]
 θᶠ = Float64[]
 θʰ = Float64[]
+θᵍ = Float64[]
 
 MDEIMᵢ_A = Matrix{Float64}[]
 MDEIM_idx_A = Float64[]
@@ -88,6 +90,8 @@ DEIMᵢ_mat_F = Float64[]
 DEIM_idx_F = Float64[]
 DEIMᵢ_mat_H = Float64[]
 DEIM_idx_H = Float64[]
+DEIMᵢ_mat_G = Float64[]
+DEIM_idx_G = Float64[]
 
 offline_time = 0.0
 
@@ -159,8 +163,9 @@ mutable struct StokesSTGRB <: StokesUnsteady
   P::PoissonSTGRB; Sᵖ::Array; Sˡ::Array; Φₛᵖ::Array; Φₛˡ::Array; Φₜᵖ::Array;
   Φₜˡ::Array; p̃::Array; pₙ::Array; p̂::Array; λ̃ ::Array; λₙ::Array; λ̂ ::Array;
   Bₙ::Array; Bᵀₙ::Array; Lₙ::Array; Lᵀₙ::Array; Gₙ::Array; Xᵘ::SparseMatrixCSC;
-  Xᵖ::SparseMatrixCSC; Xᵖ₀::SparseMatrixCSC; Nₛᵖ::Int64; Nₛˡ::Int64; Nᵖ::Int64;
-  Nˡ::Int64; nₛᵖ::Int64; nₛˡ::Int64; nₜᵖ::Int64; nₜˡ::Int64; nᵖ::Int64; nˡ::Int64
+  Xᵖ::SparseMatrixCSC; Xᵖ₀::SparseMatrixCSC; DEIMᵢ_mat_G::Array;
+  DEIM_idx_G::Array; Nₛᵖ::Int64; Nₛˡ::Int64; Nᵖ::Int64; Nˡ::Int64; nₛᵖ::Int64;
+  nₛˡ::Int64; nₜᵖ::Int64; nₜˡ::Int64; nᵖ::Int64; nˡ::Int64; Qᵍ::Int64; θᵍ::Array
 end
 
 #= mutable struct StokesSTPGRB <: StokesUnsteady
@@ -177,8 +182,8 @@ function setup_StokesSTGRB(::NTuple{5,Int})::StokesSTGRB
   MDEIMᵢ_A, MDEIM_idx_A, DEIMᵢ_mat_F, DEIM_idx_F, DEIMᵢ_mat_H, DEIM_idx_H,
   sparse_el_A, Nₛᵘ, nₛᵘ, Qᵃ, Qᶠ, Qʰ, θᵃ, θᶠ, θʰ, offline_time), Φₜᵘ, Mₙ,
   MDEIMᵢ_M, MDEIM_idx_M, sparse_el_M, Nₜ, Nᵘ, nₜᵘ, nᵘ, Qᵐ, θᵐ), Sᵖ, Sˡ, Φₛᵖ, Φₛˡ,
-  Φₜᵖ, Φₜˡ, p̃, pₙ, p̂, λ̃ , λₙ, λ̂ , Bₙ, Bᵀₙ, Lₙ, Lᵀₙ, Gₙ, Xᵘ, Xᵖ, Xᵖ₀, Nₛᵖ, Nₛˡ, Nᵖ,
-  Nˡ, nₛᵖ, nₛˡ, nₜᵖ, nₜˡ, nᵖ, nˡ)
+  Φₜᵖ, Φₜˡ, p̃, pₙ, p̂, λ̃ , λₙ, λ̂ , Bₙ, Bᵀₙ, Lₙ, Lᵀₙ, Gₙ, Xᵘ, Xᵖ, Xᵖ₀, DEIMᵢ_mat_G,
+  DEIM_idx_G, Nₛᵖ, Nₛˡ, Nᵖ, Nˡ, nₛᵖ, nₛˡ, nₜᵖ, nₜˡ, nᵖ, nˡ, Qᵍ, θᵍ)
 
 end
 

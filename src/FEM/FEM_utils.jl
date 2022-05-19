@@ -25,39 +25,6 @@ function FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, cas
 
 end
 
-function stretching(x::Point, μ::Float64)
-    #=MODIFY
-    =#
-
-    m = zeros(length(x))
-    m[1] = μ * x[1]^2
-    for i in 2:length(x)
-        m[i] = μ * x[i]
-    end
-
-    Point(m)
-
-end
-
-struct reference_info{T<:Int64}
-  L::T
-  dim::T
-  ndof_dir::T
-end
-
-function generate_cartesian_model(info::reference_info, deformation::Function, μ::Float64)
-    #=MODIFY
-    =#
-  pmin = Point(Fill(0, info.dim))
-  pmax = Point(Fill(info.L, info.dim))
-  partition = Tuple(Fill(info.ndof_dir, info.dim))
-
-  model = CartesianDiscreteModel(pmin, pmax, partition, map = (x->deformation(x, μ)))
-
-  return model
-
-end
-
 function generate_vtk_file(FE_space::FEMProblem, path::String, var_name::String, var::Array)
 
   FE_var = FEFunction(FE_space.V, var)
@@ -65,15 +32,14 @@ function generate_vtk_file(FE_space::FEMProblem, path::String, var_name::String,
 
 end
 
-function find_FE_elements(problem_info, ROM_info, idx::Array)
+function find_FE_elements(V₀::Gridap.FESpaces.UnconstrainedFESpace, trian::Triangulation, idx::Array)
 
-  parametric_info = get_parametric_specifics(ROM_info, [])
-  FE_space = get_FE_space(problem_info, parametric_info.model)
+  connectivity = get_cell_dof_ids(V₀, trian)
 
   el = Int64[]
   for i = 1:length(idx)
-    for j = 1:size(FE_space.σₖ)[1]
-      if idx[i] in abs.(FE_space.σₖ[j])
+    for j = 1:size(connectivity)[1]
+      if idx[i] in abs.(connectivity[j])
         append!(el, j)
       end
     end
@@ -112,6 +78,11 @@ function from_spacetime_to_space_time_idx_vec(idx::Array, Nᵤ::Int64)
 end
 
 function interface_to_unit_circle(map::Function, pts::Array)
+
+  Θᵢₙ = get_cell_map(FE_space.dΓd)
+  Θᵢₙ⁻¹ = lazy_map(Operation(inv), Θᵢₙ)
+  JΘᵢₙ⁻¹ = lazy_map(Broadcasting(∇), Θᵢₙ⁻¹)
+  σᵢₙ = get_cell_dof_ids(FE_space.V₀, FE_space.Γd)
 
   return map.(pts)
 

@@ -424,8 +424,9 @@ function build_param_RHS(ROM_info::Problem, RB_variables::PoissonSTPGRB, param, 
   θᵐ_temp = θᵐ[1:RB_variables.Qᵐ]/sqrt(θᵐ[1])
   θᵃ_temp = θᵃ[1:RB_variables.S.Qᵃ]/sqrt(θᵃ[1])
 
-  FE_space = get_FE_space(problem_info, param.model)
-  F_t, H_t = assemble_forcing(FE_space, RB_variables, param)
+  FE_space = get_FESpace(problem_info, param.model)
+  F_t = assemble_forcing(FE_space, ROM_info, param)
+  H_t = assemble_neumann_datum(FE_space, ROM_info, param)
   F, H = zeros(RB_variables.S.Nₛᵘ, RB_variables.Nₜ), zeros(RB_variables.S.Nₛᵘ, RB_variables.Nₜ)
   times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+δtθ
   for (i, tᵢ) in enumerate(times_θ)

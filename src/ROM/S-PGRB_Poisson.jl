@@ -194,11 +194,12 @@ function save_affine_structures(ROM_info::Problem, RB_variables::PoissonSPGRB)
 
 end
 
-function build_param_RHS(ROM_info::Problem, RB_variables::PoissonSPGRB, param, θᵃ) :: Tuple
+function build_param_RHS(ROM_info::Problem, RB_variables::PoissonSPGRB, param, θᵃ::Array) :: Tuple
 
   θᵃ_temp = θᵃ[1:RB_variables.Qᵃ]/sqrt(θᵃ[1])
-  FE_space = get_FE_space(problem_info, param.model)
-  F, H = assemble_forcing(FE_space, ROM_info, param)
+  FE_space = get_FESpace(problem_info, param.model)
+  F = assemble_forcing(FE_space, ROM_info, param)
+  H = assemble_neumann_datum(FE_space, ROM_info, param)
   AΦᵀPᵤ⁻¹ = assemble_online_structure(θᵃ_temp, RB_variables.AΦᵀPᵤ⁻¹)
   Fₙ, Hₙ = AΦᵀPᵤ⁻¹ * F, AΦᵀPᵤ⁻¹ * H
 

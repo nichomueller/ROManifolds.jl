@@ -8,8 +8,8 @@ function run_FEM_0()
   g(x) = 1
   h(x) = 1
 
-  FE_space = get_FE_space(problem_info, model, g)
-  FE_space0 = get_FE_space(problem_info, model)
+  FE_space = get_FESpace(problem_info, model; g)
+  FE_space0 = get_FESpace(problem_info, model)
 
   function run_parametric_FEM(μ::Array)
 
@@ -18,6 +18,7 @@ function run_FEM_0()
 
     parametric_info = ParametricSpecifics(μ, model, α, f, g, h)
     F = assemble_forcing(FE_space, problem_info, parametric_info)
+    H = assemble_neumann_datum(FE_space, problem_info, parametric_info)
     A = assemble_stiffness(FE_space, problem_info, parametric_info)
     Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space0)
 
@@ -27,7 +28,7 @@ function run_FEM_0()
 
     end
 
-    parametric_solution, Xᵘ₀, F, A
+    parametric_solution, Xᵘ₀, H, F, A
 
   end
 
@@ -42,8 +43,8 @@ function run_FEM_1()
   g(x) = 1
   h(x) = 1
 
-  FE_space = get_FE_space(problem_info, model, g)
-  FE_space0 = get_FE_space(problem_info, model)
+  FE_space = get_FESpace(problem_info, model; g)
+  FE_space0 = get_FESpace(problem_info, model)
 
   function run_parametric_FEM(μ::Array)
 
@@ -52,7 +53,7 @@ function run_FEM_1()
 
     parametric_info = ParametricSpecifics(μ, model, α, f, g, h)
     F = assemble_forcing(FE_space, problem_info, parametric_info)
-    A = assemble_stiffness(FE_space, problem_info, parametric_info)
+    H = assemble_neumann_datum(FE_space, problem_info, parametric_info)
     Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space0)
 
     function parametric_solution()
@@ -61,7 +62,7 @@ function run_FEM_1()
 
     end
 
-    parametric_solution, Xᵘ₀, F, A
+    parametric_solution, Xᵘ₀, H, F
 
   end
 
@@ -74,7 +75,7 @@ function run_FEM_2()
   model = DiscreteModelFromFile(paths.mesh_path)
   h(x) = 1
 
-  FE_space = get_FE_space(problem_info, model)
+  FE_space = get_FESpace(problem_info, model)
 
   function run_parametric_FEM(μ::Array)
 
@@ -84,8 +85,7 @@ function run_FEM_2()
     g(x) = sin(μ[5] * x[1]) + sin(μ[5] * x[2])
     parametric_info = ParametricSpecifics(μ, model, α, f, g, h)
 
-    F = assemble_forcing(FE_space, problem_info, parametric_info)
-    A = assemble_stiffness(FE_space, problem_info, parametric_info)
+    H = assemble_neumann_datum(FE_space, problem_info, parametric_info)
     Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space)
 
     function parametric_solution()
@@ -94,42 +94,7 @@ function run_FEM_2()
 
     end
 
-    parametric_solution, Xᵘ₀, F, A
-
-  end
-
-  return run_parametric_FEM
-
-end
-
-function run_FEM_3()
-
-  α(x) = 1
-  f(x) = 1
-  g(x) = 1
-  h(x) = 1
-
-  ref_info = reference_info(1, 3, 100)
-
-  function run_parametric_FEM(μ::Array)
-
-    @assert length(μ) === 1 "μ must be a 1x1 vector"
-
-    model = generate_cartesian_model(ref_info, stretching, μ)
-    parametric_info = ParametricSpecifics(μ, model, α, f, g, h)
-    FE_space = get_FE_space(problem_info, parametric_info, g)
-
-    F = assemble_forcing(FE_space, problem_info, parametric_info)
-    A = assemble_stiffness(FE_space, problem_info, parametric_info)
-    Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space)
-
-    function parametric_solution()
-
-      return FE_solve(FE_space, problem_info, parametric_info)
-
-    end
-
-    parametric_solution, Xᵘ₀, F, A
+    parametric_solution, Xᵘ₀, H
 
   end
 
@@ -154,12 +119,12 @@ FEM_time₀ = @elapsed begin
   lazy_solution_info = lazy_map(FEM, μ)
 
   Xᵘ₀ = lazy_solution_info[1][2]
-  H = lazy_solution_info[1][3][2]
+  H = lazy_solution_info[1][3]
   if case === 0
-    A = lazy_solution_info[1][4]
-    F = lazy_solution_info[1][3][1]
+    A = lazy_solution_info[1][5]
+    F = lazy_solution_info[1][4]
   elseif case === 1
-    F = lazy_solution_info[1][3][1]
+    F = lazy_solution_info[1][4]
   end
 
 end

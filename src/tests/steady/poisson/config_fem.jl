@@ -9,7 +9,7 @@ order = 1
 solver = "lu"
 nₛ = 100
 root = "/home/user1/git_repos/Mabla.jl"
-case = 2
+case = 0
 
 if case === 0
 
@@ -59,3 +59,5 @@ end
 
 paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, case)
 problem_info = ProblemSpecifics(case, probl_nl, order, dirichlet_tags, dirichlet_labels, neumann_tags, neumann_labels, solver, paths)
+model = DiscreteModelFromFile(paths.mesh_path)
+FE_space = get_FESpace(problem_info, model)

@@ -13,29 +13,68 @@ struct PoissonProblem <: FEMProblem end
 struct PoissonProblemUnsteady <: FEMProblem end
 
 struct FESpacePoisson <: SteadyProblem
-  Qₕ
-  V₀
-  V
-  ϕᵥ
-  ϕᵤ
-  σₖ
-  Nₕ
-  Ω
-  dΩ
-  dΓ
+  Qₕ::CellQuadrature
+  V₀::Gridap.FESpaces.UnconstrainedFESpace
+  V::TrialFESpace
+  ϕᵥ::Gridap.FESpaces.SingleFieldFEBasis
+  ϕᵤ::Gridap.FESpaces.SingleFieldFEBasis
+  Nₛᵘ::Int64
+  Ω::Gridap.Geometry.BodyFittedTriangulation
+  dΩ::Measure
+  dΓd::Measure
+  dΓn::Measure
 end
 
 struct FESpacePoissonUnsteady <: UnsteadyProblem
-  Qₕ
-  V₀
-  V
-  ϕᵥ
-  ϕᵤ
-  σₖ
-  Nₕ
-  Ω
-  dΩ
-  dΓ
+  Qₕ::CellQuadrature
+  V₀::Gridap.FESpaces.UnconstrainedFESpace
+  V::TransientTrialFESpace
+  ϕᵥ::Gridap.FESpaces.SingleFieldFEBasis
+  ϕᵤ::Function
+  σᵤ::Gridap.Arrays.Table
+  Nₛᵘ::Int64
+  Ω::Gridap.Geometry.BodyFittedTriangulation
+  dΩ::Measure
+  dΓd::Measure
+  dΓn::Measure
+end
+
+struct FESpaceStokes <: SteadyProblem
+  Qₕ::CellQuadrature
+  V₀::Gridap.FESpaces.UnconstrainedFESpace
+  V::TrialFESpace
+  Q₀::Gridap.FESpaces.UnconstrainedFESpace
+  Q::TrialFESpace
+  ϕᵥ::Gridap.FESpaces.SingleFieldFEBasis
+  ϕᵤ::Gridap.FESpaces.SingleFieldFEBasis
+  ψᵧ::Gridap.FESpaces.SingleFieldFEBasis
+  ψₚ::Gridap.FESpaces.SingleFieldFEBasis
+  σᵤ::Gridap.Arrays.Table
+  Nₛᵘ::Int64
+  Nₛᵖ::Int64
+  Ω::Gridap.Geometry.BodyFittedTriangulation
+  dΩ::Measure
+  dΓd::Measure
+  dΓn::Measure
+end
+
+struct FESpaceStokesUnsteady <: UnsteadyProblem
+  Qₕ::CellQuadrature
+  V₀::Gridap.FESpaces.UnconstrainedFESpace
+  V::TransientTrialFESpace
+  Q₀::Gridap.FESpaces.UnconstrainedFESpace
+  Q::TrialFESpace
+  ϕᵥ::Gridap.FESpaces.SingleFieldFEBasis
+  ϕᵤ::Function
+  ψᵧ::Gridap.FESpaces.SingleFieldFEBasis
+  ψₚ::Gridap.FESpaces.SingleFieldFEBasis
+  σᵤ::Gridap.Arrays.Table
+  Nₛᵘ::Int64
+  Nₛᵖ::Int64
+  Ω::Gridap.Geometry.BodyFittedTriangulation
+  dΩ::Measure
+  dΓd::Measure
+  dΓn::Measure
 end
 
 struct ProblemSpecifics <: SteadyProblem

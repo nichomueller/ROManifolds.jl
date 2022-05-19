@@ -188,8 +188,10 @@ function MDEIM_offline_spacetime(problem_info::ProblemSpecificsUnsteady, ROM_inf
   MDEIM_mat = reshape(MDEIM_mat_tmp[(MDEIM_idx_time.-1)*length(row_idx):MDEIM_idx_time*length(row_idx),:], Nₕ^2, :)
 
   r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx_space, Nₕ)
+  parametric_info = get_parametric_specifics(ROM_info, [])
+  FE_space = get_FESpace(problem_info, parametric_info.model)
 
-  el = find_FE_elements(problem_info, ROM_info, unique(union(r_idx, c_idx)))
+  el = find_FE_elements(FE_space.V₀, FE_space.Ω, unique(union(r_idx, c_idx)))
 
   MDEIM_mat, MDEIM_idx, el, MDEIM_err_bound, Σ
 
@@ -285,8 +287,10 @@ function MDEIM_offline_functional(problem_info::ProblemSpecificsUnsteady, ROM_in
   δtθ = ROM_info.δt*ROM_info.θ
   times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+δtθ
   param = get_parametric_specifics(ROM_info, parse.(Float64, split(chop(μ[1]; head=1, tail=1), ',')))
-  FE_space = get_FE_space(problem_info, param.model)
-  xₕ = get_node_coordinates(FE_space.Ω)
+  FE_space = get_FESpace(problem_info, param.model)
+  qₕ = Qₕ_cell_data[rand(1:num_cells(FE_space.Ω))]
+  xₕ = get_coordinates(qₕ)
+  nquad = length(xₕ)
 
   for k = 1:ROM_info.nₛ_MDEIM
     @info "Considering parameter number $k, need $(ROM_info.nₛ_MDEIM-k) more!"
@@ -295,12 +299,13 @@ function MDEIM_offline_functional(problem_info::ProblemSpecificsUnsteady, ROM_in
     param = get_parametric_specifics(ROM_info, μₖ)
 
     if var === "A"
-      snapsₖ = [param.α(t_θ,param.μ)(xₕ) for t_θ = times_θ]
+      snapsₖ = [param.α(t_θ,param.μ)(xₕ[k]) for k = 1:nquad for t_θ = times_θ]
     elseif var === "M"
-      snapsₖ = [param.m(t_θ,param.μ)(xₕ) for t_θ = times_θ]
+      snapsₖ = [param.m(t_θ,param.μ)(xₕ[k]) for k = 1:nquad for t_θ = times_θ]
     else
       @error "Run MDEIM on A or M only"
     end
+    snapsₖ = reshape(snapsₖ,nquad,Nₜ)
     compressed_snapsₖ, _ = M_DEIM_POD(sparse(snapsₖ), ROM_info.ϵₛ)
     if k === 1
       global compressed_snaps = compressed_snapsₖ
@@ -310,10 +315,41 @@ function MDEIM_offline_functional(problem_info::ProblemSpecificsUnsteady, ROM_in
 
   end
 
-  sparse_MDEIM_mat, Σ = M_DEIM_POD(sparse(compressed_snaps), ROM_info.ϵₛ)
-  MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(sparse_MDEIM_mat, Σ)
+  sparse_param_mat, Σ = M_DEIM_POD(sparse(compressed_snaps), ROM_info.ϵₛ)
+  param_mat = Matrix(sparse_param_mat)
 
-  #what goes here?
+  refFE_quad = ReferenceFE(lagrangian_quad, Float64, probl.order)
+  V_quad =  TrialFESpace(TestFESpace(param.model, refFE_quad))
+
+  if var === "A"
+
+    for q = 1:size(MDEIM_mat)[2]
+      αₛ_q = FEFunction(V_quad,rMDEIM_mat[:,q])
+      Aq = assemble_matrix(∫(∇(FE_space.ϕᵥ) ⋅ (αₛ_q * ∇(FE_space.ϕᵤ(0.0)))) * FE_space.dΩ, FE_space.V(0.0), FE_space.V₀)
+      row_idx, val = findnz(Aq[:])
+      if q === 1
+        global affine_mat = sparse(row_idx, ones(length(row_idx)), val, size(Aq)[1]^2, size(param_mat)[2])
+      else
+        global affine_mat[:,q] = sparse(row_idx, ones(length(row_idx)), val)
+      end
+    end
+
+  else
+
+    for q = 1:size(MDEIM_mat)[2]
+      mₛ_q = FEFunction(V_quad,MDEIM_mat[:,q])
+      Mq = assemble_matrix(∫(FE_space.ϕᵥ ⋅ (mₛ_q * FE_space.ϕᵤ(0.0))) * FE_space.dΩ, FE_space.V(0.0), FE_space.V₀)
+      row_idx, val = findnz(Mq[:])
+      if q === 1
+        global affine_mat = sparse(row_idx, ones(length(row_idx)), val, size(Mq)[1]^2, size(param_mat)[2])
+      else
+        global affine_mat[:,q] = sparse(row_idx, ones(length(row_idx)), val)
+      end
+    end
+
+  end
+
+  MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(affine_mat, Σ)
 
   MDEIM_mat, MDEIM_idx, el, MDEIM_err_bound, Σ
 

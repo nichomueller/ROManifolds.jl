@@ -68,7 +68,7 @@ end
 function build_sparse_mat(problem_info::ProblemSpecifics, ROM_info, μ_i::Array, el::Array; var="A")
 
   param = get_parametric_specifics(ROM_info, μ_i)
-  FE_space = get_FE_space(problem_info, param.model)
+  FE_space = get_FESpace(problem_info, param.model)
 
   Ω_sparse = view(FE_space.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * problem_info.order)
@@ -85,7 +85,7 @@ end
 function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, ROM_info, μ_i::Array, el::Array; var="A")
 
   param = get_parametric_specifics(ROM_info, μ_i)
-  FE_space = get_FE_space(problem_info, param.model)
+  FE_space = get_FESpace(problem_info, param.model)
 
   Ω_sparse = view(FE_space.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * problem_info.order)
@@ -104,10 +104,10 @@ function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, ROM_info, μ_i
   Matₜ(t) = define_Matₜ(t, var)
 
   i,j,v = findnz(Matₜ(times_θ[1]))
-  Mat = sparse(i,j,v,FE_space.Nₕ,FE_space.Nₕ*Nₜ)
+  Mat = sparse(i,j,v,FE_space.Nₛᵘ,FE_space.Nₛᵘ*Nₜ)
   for (i_t,t) in enumerate(times_θ[2:end])
     i,j,v = findnz(Matₜ(t))
-    Mat[:,i_t*FE_space.Nₕ+1:(i_t+1)*FE_space.Nₕ] = sparse(i,j,v,FE_space.Nₕ,FE_space.Nₕ)
+    Mat[:,i_t*FE_space.Nₛᵘ+1:(i_t+1)*FE_space.Nₛᵘ] = sparse(i,j,v,FE_space.Nₛᵘ,FE_space.Nₛᵘ)
   end
 
   Mat
@@ -117,7 +117,7 @@ end
 function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, ROM_info, μ_i::Array, el::Array, time_idx::Array; var="A")
 
   param = get_parametric_specifics(ROM_info, μ_i)
-  FE_space = get_FE_space(problem_info, param.model)
+  FE_space = get_FESpace(problem_info, param.model)
 
   Ω_sparse = view(FE_space.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * problem_info.order)
@@ -137,10 +137,10 @@ function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, ROM_info, μ_i
   Matₜ(t) = define_Matₜ(t, var)
 
   i,j,v = findnz(Matₜ(times_MDEIM[1]))
-  Mat = sparse(i,j,v,FE_space.Nₕ,FE_space.Nₕ*Nₜ)
+  Mat = sparse(i,j,v,FE_space.Nₛᵘ,FE_space.Nₛᵘ*Nₜ)
   for (i_t,t) in enumerate(times_MDEIM[2:end])
     i,j,v = findnz(Matₜ(t))
-    Mat[:,i_t*FE_space.Nₕ+1:(i_t+1)*FE_space.Nₕ] = sparse(i,j,v,FE_space.Nₕ,FE_space.Nₕ)
+    Mat[:,i_t*FE_space.Nₛᵘ+1:(i_t+1)*FE_space.Nₛᵘ] = sparse(i,j,v,FE_space.Nₛᵘ,FE_space.Nₛᵘ)
   end
 
   Mat
@@ -287,7 +287,7 @@ end
 function compute_MDEIM_error(problem_info, ROM_info, RB_variables, μ)
 
   parametric_info = get_parametric_specifics(ROM_info, μ)
-  FE_space = get_FE_space(problem_info, parametric_info.model)
+  FE_space = get_FESpace(problem_info, parametric_info.model)
   Aₙ_μ = (RB_variables.Φₛᵘ)' * assemble_stiffness(FE_space, ROM_info, parametric_info) * RB_variables.Φₛᵘ
 
 end

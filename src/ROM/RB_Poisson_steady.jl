@@ -1,4 +1,3 @@
-#include("../utils/general.jl")
 include("../FEM/FEM.jl")
 include("RB_utils.jl")
 include("S-GRB_Poisson.jl")
@@ -364,17 +363,18 @@ function get_θᶠʰ(ROM_info::Problem, RB_variables::PoissonSteady, param) :: T
     @error "Cannot fetch θᶠ, θʰ if the RHS is built online"
   end
 
-  FE_space = get_FE_space(problem_info, param.model)
+  FE_space = get_FESpacePoisson(problem_info, param.model)
   if !ROM_info.probl_nl["f"] && !ROM_info.probl_nl["h"]
     θᶠ, θʰ = param.f(Point(0.,0.)), param.h(Point(0.,0.))
   elseif !ROM_info.probl_nl["f"] && ROM_info.probl_nl["h"]
-    _, H_μ = assemble_forcing(FE_space, ROM_info, param)
+    H_μ = assemble_neumann_datum(FE_space, ROM_info, param)
     θᶠ, θʰ = param.f(Point(0.,0.)), M_DEIM_online(H_μ, RB_variables.DEIMᵢ_mat_H, RB_variables.DEIM_idx_H)
   elseif ROM_info.probl_nl["f"] && !ROM_info.probl_nl["h"]
-    F_μ, _ = assemble_forcing(FE_space, ROM_info, param)
+    F_μ = assemble_forcing(FE_space, ROM_info, param)
     θᶠ, θʰ = M_DEIM_online(F_μ, RB_variables.DEIMᵢ_mat_F, RB_variables.DEIM_idx_F), param.h(Point(0.,0.))
   else ROM_info.probl_nl["f"] && ROM_info.probl_nl["h"]
-    F_μ, H_μ = assemble_forcing(FE_space, ROM_info, param)
+    F_μ = assemble_forcing(FE_space, ROM_info, param)
+    H_μ = assemble_neumann_datum(FE_space, ROM_info, param)
     θᶠ, θʰ = M_DEIM_online(F_μ, RB_variables.DEIMᵢ_mat_F, RB_variables.DEIM_idx_F), M_DEIM_online(H_μ, RB_variables.DEIMᵢ_mat_H, RB_variables.DEIM_idx_H)
   end
 
@@ -513,7 +513,7 @@ function testing_phase(ROM_info::Problem, RB_variables::PoissonSteady, μ, param
 
     μ_nb = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
     parametric_info = get_parametric_specifics(ROM_info, μ_nb)
-    FE_space = get_FE_space(problem_info, parametric_info.model)
+    FE_space = get_FESpacePoisson(problem_info, parametric_info.model)
 
     uₕ_test = Matrix(CSV.read(joinpath(ROM_info.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, nb]
 

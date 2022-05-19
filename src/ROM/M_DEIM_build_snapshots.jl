@@ -1,7 +1,7 @@
 function initialize_M(ROM_info, μ::Array)
   @info "Snapshot number 1, mass"
   parametric_info = get_parametric_specifics(ROM_info, μ)
-  FE_space = get_FE_space(problem_info, parametric_info.model)
+  FE_space = get_FESpace(problem_info, parametric_info.model)
   M_μ = assemble_mass(FE_space, ROM_info, parametric_info)
   Nₕ = size(M_μ)[1]
   row_idx, val = findnz(M_μ[:])
@@ -9,7 +9,7 @@ function initialize_M(ROM_info, μ::Array)
   M, FE_space
 end
 
-function build_M_snapshots(problem_info::ProblemSpecifics, ROM_info)
+function build_M_snapshots(::ProblemSpecifics, ROM_info)
 
   μ = load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
   @info "Building $(ROM_info.nₛ_MDEIM) snapshots of M"
@@ -47,7 +47,7 @@ function build_M_snapshots(problem_info::ProblemSpecificsUnsteady, ROM_info, μ:
   times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+δtθ
 
   parametric_info = get_parametric_specifics(ROM_info, μ)
-  FE_space = get_FE_space(problem_info, parametric_info.model)
+  FE_space = get_FESpace(problem_info, parametric_info.model)
 
   M = initialize_M(ROM_info, FE_space, parametric_info, Nₜ)
 
@@ -66,7 +66,7 @@ end
 function initialize_M(ROM_info, μ::Array, t::Float64)
   @info "Snapshot 1 at time instant $t, mass"
   parametric_info = get_parametric_specifics(ROM_info, μ)
-  FE_space = get_FE_space(problem_info, parametric_info.model)
+  FE_space = get_FESpace(problem_info, parametric_info.model)
   M_μ_t = assemble_mass(FE_space, ROM_info, parametric_info)(t)
   Nₕ = size(M_μ_t)[1]
   row_idx, val = findnz(M_μ_t[:])
@@ -74,7 +74,7 @@ function initialize_M(ROM_info, μ::Array, t::Float64)
   M, FE_space
 end
 
-function build_M_snapshots(problem_info::ProblemSpecificsUnsteady, ROM_info, μ::Array, t::Float64)
+function build_M_snapshots(::ProblemSpecificsUnsteady, ROM_info, μ::Array, t::Float64)
 
   μ₁ = parse.(Float64, split(chop(μ[1]; head=1, tail=1), ','))
   M, FE_space = initialize_M(ROM_info, μ₁, t)
@@ -95,7 +95,7 @@ end
 function initialize_A(ROM_info, μ::Array)
   @info "Snapshot number 1, stiffness"
   parametric_info = get_parametric_specifics(ROM_info, μ)
-  FE_space = get_FE_space(problem_info, parametric_info.model)
+  FE_space = get_FESpace(problem_info, parametric_info.model)
   A_μ = assemble_stiffness(FE_space, ROM_info, parametric_info)
   Nₕ = size(A_μ)[1]
   row_idx, val = findnz(A_μ[:])
@@ -103,7 +103,7 @@ function initialize_A(ROM_info, μ::Array)
   A, FE_space
 end
 
-function build_A_snapshots(problem_info::ProblemSpecifics, ROM_info)
+function build_A_snapshots(::ProblemSpecifics, ROM_info)
 
   μ = load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
   @info "Building $(ROM_info.nₛ_MDEIM) snapshots of A"
@@ -141,7 +141,7 @@ function build_A_snapshots(problem_info::ProblemSpecificsUnsteady, ROM_info, μ:
   times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+δtθ
 
   parametric_info = get_parametric_specifics(ROM_info, μ)
-  FE_space = get_FE_space(problem_info, parametric_info.model)
+  FE_space = get_FESpace(problem_info, parametric_info.model)
 
   A = initialize_A(ROM_info, FE_space, parametric_info, Nₜ)
 
@@ -160,7 +160,7 @@ end
 function initialize_A(ROM_info, μ::Array, t::Float64)
   @info "Snapshot 1 at time instant $t, stiffness"
   parametric_info = get_parametric_specifics(ROM_info, μ)
-  FE_space = get_FE_space(problem_info, parametric_info.model)
+  FE_space = get_FESpace(problem_info, parametric_info.model)
   A_μ_t = assemble_stiffness(FE_space, ROM_info, parametric_info)(t)
   Nₕ = size(A_μ_t)[1]
   row_idx, val = findnz(A_μ_t[:])
@@ -168,7 +168,7 @@ function initialize_A(ROM_info, μ::Array, t::Float64)
   A, FE_space
 end
 
-function build_A_snapshots(problem_info::ProblemSpecificsUnsteady, ROM_info, μ::Array, t::Float64)
+function build_A_snapshots(::ProblemSpecificsUnsteady, ROM_info, μ::Array, t::Float64)
 
   μ₁ = parse.(Float64, split(chop(μ[1]; head=1, tail=1), ','))
   A, FE_space = initialize_A(ROM_info, μ₁, t)
@@ -189,8 +189,8 @@ end
 function initialize_F(ROM_info, μ::Array)
   @info "Snapshot number 1"
   parametric_info = get_parametric_specifics(ROM_info, μ)
-  FE_space = get_FE_space(problem_info, parametric_info.model)
-  F_μ, _ = assemble_forcing(FE_space, ROM_info, parametric_info)
+  FE_space = get_FESpace(problem_info, parametric_info.model)
+  F_μ = assemble_forcing(FE_space, ROM_info, parametric_info)
   F = zeros(length(F_μ), ROM_info.nₛ_DEIM)
   F[:, 1] = F_μ
   F
@@ -208,8 +208,8 @@ function build_F_snapshots(problem_info, ROM_info)
     @info "Snapshot number $i_nₛ"
     μ_i = parse.(Float64, split(chop(μ[i_nₛ]; head=1, tail=1), ','))
     parametric_info = get_parametric_specifics(ROM_info, μ_i)
-    FE_space = get_FE_space(problem_info, parametric_info.model)
-    F_i, _ = assemble_forcing(FE_space, ROM_info, parametric_info)
+    FE_space = get_FESpace(problem_info, parametric_info.model)
+    F_i = assemble_forcing(FE_space, ROM_info, parametric_info)
     F[:, i_nₛ] = F_i[:]
   end
 
@@ -219,7 +219,7 @@ end
 
 function initialize_F(ROM_info, FE_space, parametric_info, Nₜ)
   @info "Snapshot at time step 1, forcing"
-  F_μ_t, _ = assemble_forcing(FE_space, ROM_info, parametric_info)
+  F_μ_t = assemble_forcing(FE_space, ROM_info, parametric_info)
   F_μ = F_μ_t(ROM_info.t₀+ROM_info.δt*ROM_info.θ)
   F = zeros(length(F_μ), Nₜ)
   F[:,1] = F_μ
@@ -233,13 +233,13 @@ function build_F_snapshots(problem_info::ProblemSpecificsUnsteady, ROM_info, μ:
   times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+δtθ
 
   parametric_info = get_parametric_specifics(ROM_info, μ)
-  FE_space = get_FE_space(problem_info, parametric_info.model)
+  FE_space = get_FESpace(problem_info, parametric_info.model)
 
   F = initialize_F(ROM_info, FE_space, parametric_info, Nₜ)
 
   for i_t = 2:Nₜ
     @info "Snapshot at time step $i_t, stiffness"
-    F_i_t, _ = assemble_forcing(FE_space, ROM_info, parametric_info)
+    F_i_t = assemble_forcing(FE_space, ROM_info, parametric_info)
     F_t = F_i_t(times_θ[i_t])
     i, v = findnz(F_t[:])
     F[:, i_t] = sparse(i, ones(length(i)), v)
@@ -252,14 +252,14 @@ end
 function initialize_F(ROM_info, μ::Array, t::Float64)
   @info "Snapshot 1 at time instant $t, forcing"
   parametric_info = get_parametric_specifics(ROM_info, μ)
-  FE_space = get_FE_space(problem_info, parametric_info.model)
-  F_μ_t, _ = assemble_forcing(FE_space, ROM_info, parametric_info)(t)
+  FE_space = get_FESpace(problem_info, parametric_info.model)
+  F_μ_t = assemble_forcing(FE_space, ROM_info, parametric_info)(t)
   F = zeros(length(F_μ), ROM_info.nₛ_DEIM)
   F[:,1] = F_μ_t
   F, FE_space
 end
 
-function build_F_snapshots(problem_info::ProblemSpecificsUnsteady, ROM_info, μ::Array, t::Float64)
+function build_F_snapshots(::ProblemSpecificsUnsteady, ROM_info, μ::Array, t::Float64)
 
   μ₁ = parse.(Float64, split(chop(μ[1]; head=1, tail=1), ','))
   F, FE_space = initialize_F(ROM_info, μ₁, t)
@@ -268,7 +268,7 @@ function build_F_snapshots(problem_info::ProblemSpecificsUnsteady, ROM_info, μ:
     @info "Snapshot $nₛ at time instant $t, forcing"
     μ_nₛ = parse.(Float64, split(chop(μ[nₛ]; head=1, tail=1), ','))
     parametric_info = get_parametric_specifics(ROM_info, μ_nₛ)
-    F_i_t, _ = assemble_forcing(FE_space, ROM_info, parametric_info)(t)
+    F_i_t = assemble_forcing(FE_space, ROM_info, parametric_info)(t)
     F[:, nₛ] = F_i_t
   end
 
@@ -279,8 +279,8 @@ end
 function initialize_H(ROM_info, μ::Array)
   @info "Snapshot number 1, Neumann term"
   parametric_info = get_parametric_specifics(ROM_info, μ)
-  FE_space = get_FE_space(problem_info, parametric_info.model)
-  _, H_μ = assemble_forcing(FE_space, ROM_info, parametric_info)
+  FE_space = get_FESpace(problem_info, parametric_info.model)
+  H_μ = assemble_neumann_datum(FE_space, ROM_info, parametric_info)
   H = zeros(length(H_μ), ROM_info.nₛ_DEIM)
   H[:, 1] = H_μ
   H
@@ -298,8 +298,8 @@ function build_H_snapshots(problem_info, ROM_info)
     @info "Snapshot number $i_nₛ"
     μ_i = parse.(Float64, split(chop(μ[i_nₛ]; head=1, tail=1), ','))
     parametric_info = get_parametric_specifics(ROM_info, μ_i)
-    FE_space = get_FE_space(problem_info, parametric_info.model)
-    _, H_i = assemble_forcing(FE_space, ROM_info, parametric_info)
+    FE_space = get_FESpace(problem_info, parametric_info.model)
+    H_i = assemble_neumann_datum(FE_space, ROM_info, parametric_info)
     H[:, i_nₛ] = H_i[:]
   end
 
@@ -309,7 +309,7 @@ end
 
 function initialize_H(ROM_info, FE_space, parametric_info, Nₜ)
   @info "Snapshot at time step 1, Neumann term"
-  _, H_μ_t= assemble_forcing(FE_space, ROM_info, parametric_info)
+  H_μ_t= assemble_neumann_datum(FE_space, ROM_info, parametric_info)
   H_μ = H_μ_t(ROM_info.t₀+ROM_info.δt*ROM_info.θ)
   H = zeros(length(H_μ), Nₜ)
   H[:,1] = H_μ
@@ -323,13 +323,13 @@ function build_H_snapshots(problem_info::ProblemSpecificsUnsteady, ROM_info, μ:
   times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+δtθ
 
   parametric_info = get_parametric_specifics(ROM_info, μ)
-  FE_space = get_FE_space(problem_info, parametric_info.model)
+  FE_space = get_FESpace(problem_info, parametric_info.model)
 
   H = initialize_H(ROM_info, FE_space, parametric_info, Nₜ)
 
   for i_t = 2:Nₜ
     @info "Snapshot at time step $i_t, stiffness"
-    H_i_t, _ = assemble_forcing(FE_space, ROM_info, parametric_info)
+    H_i_t = assemble_neumann_datum(FE_space, ROM_info, parametric_info)
     H_t = H_i_t(times_θ[i_t])
     i, v = findnz(H_t[:])
     H[:, i_t] = sparse(i, ones(length(i)), v)
@@ -342,14 +342,14 @@ end
 function initialize_H(ROM_info, μ::Array, t::Float64)
   @info "Snapshot 1 at time instant $t, Neumann term"
   parametric_info = get_parametric_specifics(ROM_info, μ)
-  FE_space = get_FE_space(problem_info, parametric_info.model)
-  _, H_μ_t = assemble_forcing(FE_space, ROM_info, parametric_info)(t)
+  FE_space = get_FESpace(problem_info, parametric_info.model)
+  H_μ_t = assemble_neumann_datum(FE_space, ROM_info, parametric_info)(t)
   H = zeros(length(H_μ), ROM_info.nₛ_DEIM)
   H[:,1] = H_μ_t
   H, FE_space
 end
 
-function build_H_snapshots(problem_info::ProblemSpecificsUnsteady, ROM_info, μ::Array, t::Float64)
+function build_H_snapshots(::ProblemSpecificsUnsteady, ROM_info, μ::Array, t::Float64)
 
   μ₁ = parse.(Float64, split(chop(μ[1]; head=1, tail=1), ','))
   H, FE_space = initialize_H(ROM_info, μ₁, t)
@@ -358,7 +358,7 @@ function build_H_snapshots(problem_info::ProblemSpecificsUnsteady, ROM_info, μ:
     @info "Snapshot $nₛ at time instant $t, Neumann term"
     μ_nₛ = parse.(Float64, split(chop(μ[nₛ]; head=1, tail=1), ','))
     parametric_info = get_parametric_specifics(ROM_info, μ_nₛ)
-    _, H_i_t = assemble_forcing(FE_space, ROM_info, parametric_info)(t)
+    H_i_t = assemble_neumann_datum(FE_space, ROM_info, parametric_info)(t)
     H[:, nₛ] = H_i_t
   end
 

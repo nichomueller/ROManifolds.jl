@@ -11,8 +11,8 @@ function run_FEM_0()
   g(x) = 1
   h(x) = 1
 
-  FE_space = get_FE_space(problem_info, model, g)
-  FE_space0 = get_FE_space(problem_info, model)
+  FE_space = get_FESpace(problem_info, model; g)
+  FE_space0 = get_FESpace(problem_info, model)
 
   function run_parametric_FEM(μ::Array)
 
@@ -45,8 +45,8 @@ function run_FEM_1()
   g(x) = 1
   h(x) = 1
 
-  FE_space = get_FE_space(problem_info, model, g)
-  FE_space0 = get_FE_space(problem_info, model)
+  FE_space = get_FESpace(problem_info, model; g)
+  FE_space0 = get_FESpace(problem_info, model)
 
   function run_parametric_FEM(μ::Array)
 
@@ -77,7 +77,7 @@ function run_FEM_2()
   model = DiscreteModelFromFile(paths.mesh_path)
   h(x) = 1
 
-  FE_space = get_FE_space(problem_info, model)
+  FE_space = get_FESpace(problem_info, model)
 
   function run_parametric_FEM(μ::Array)
 

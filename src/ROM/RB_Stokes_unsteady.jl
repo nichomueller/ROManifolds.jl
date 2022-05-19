@@ -267,7 +267,7 @@ function get_θᵍ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, param::Pa
     @error "Cannot fetch θᵍ if the RHS is built online"
   end
 
-  FE_space = get_FE_space(problem_info, param.model)
+  FE_space = get_FESpace(problem_info, param.model)
   times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+ROM_info.δt*ROM_info.θ
   θᵍ = Float64[]
 
@@ -292,7 +292,7 @@ function get_θᵍₛₜ(ROM_info::Problem, RB_variables::RBUnsteadyProblem, par
     @error "Cannot fetch θᵍ if the RHS is built online"
   end
 
-  FE_space = get_FE_space(problem_info, param.model)
+  FE_space = get_FESpace(problem_info, param.model)
   times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+ROM_info.δt*ROM_info.θ
   θᵍ = Float64[]
 
@@ -414,7 +414,7 @@ function testing_phase(ROM_info::Problem, RB_variables::StokesUnsteady, μ, para
 
     μ_nb = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
     parametric_info = get_parametric_specifics(ROM_info, μ_nb)
-    FE_space = get_FE_space(problem_info, parametric_info.model)
+    FE_space = get_FESpace(problem_info, parametric_info.model)
     uₕ_test = Matrix(CSV.read(joinpath(ROM_info.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, (nb-1)*RB_variables.P.Nₜ+1:nb*RB_variables.P.Nₜ]
 
     online_time = @elapsed begin

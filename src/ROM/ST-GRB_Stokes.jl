@@ -478,7 +478,7 @@ function build_param_RHS(ROM_info::Problem, RB_variables::StokesSTGRB, param)
   δtθ = ROM_info.δt*ROM_info.θ
   times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+δtθ
 
-  FE_space = get_FE_space(problem_info, param.model)
+  FE_space = get_FESpace(problem_info, param.model)
   G_t = assemble_dirichlet(FE_space, RB_variables, param)
   G = zeros(RB_variables.Nₛˡ, RB_variables.Nₜ)
   [G[i] = G_t(tᵢ) for (i, tᵢ) in enumerate(times_θ)]

@@ -119,10 +119,11 @@ function save_affine_structures(ROM_info::Problem, RB_variables::PoissonSGRB)
 
 end
 
-function build_param_RHS(ROM_info::Problem, RB_variables::PoissonSGRB, param, θᵃ) :: Tuple
+function build_param_RHS(ROM_info::Problem, RB_variables::PoissonSGRB, param, ::Array) :: Tuple
 
-  FE_space = get_FE_space(problem_info, param.model)
-  F, H = assemble_forcing(FE_space, ROM_info, param)
+  FE_space = get_FESpace(problem_info, param.model)
+  F = assemble_forcing(FE_space, ROM_info, param)
+  H = assemble_neumann_datum(FE_space, ROM_info, param)
   Fₙ, Hₙ = (RB_variables.Φₛᵘ)' * F, (RB_variables.Φₛᵘ)' * H
 
   reshape(Fₙ, :, 1), reshape(Hₙ, :, 1)

@@ -21,9 +21,9 @@ if case === 0
 
   probl_nl = Dict("Ω" => false, "M" => false, "A" => false, "f" => false, "g" => false, "h" => false)
   ranges = [[0.4, 0.6] [0.4, 0.6] [0.05, 0.1]]
-  mesh_name = "model.json"
-  dirichlet_tags = ["sides"]
-  neumann_tags = ["circle", "triangle", "square"]
+  mesh_name = "tube1x2_h0.15.msh"
+  dirichlet_tags = ["wall"]
+  neumann_tags = ["outlet"]
   dirichlet_labels = []
   neumann_labels = []
 
@@ -31,8 +31,9 @@ elseif case === 1
 
   probl_nl = Dict("Ω" => false, "M" => false, "A" => true, "f" => false, "g" => false, "h" => false)
   ranges = [[0.4, 0.6] [0.4, 0.6] [0.05, 0.1]]
-  mesh_name = "model.json"
-  neumann_tags = ["circle", "triangle", "square"]
+  mesh_name = "tube1x2_h0.15.msh"
+  dirichlet_tags = ["wall"]
+  neumann_tags = ["outlet"]
   dirichlet_labels = []
   neumann_labels = []
 
@@ -40,19 +41,9 @@ elseif case === 2
 
   probl_nl = Dict("Ω" => false, "M" => false, "A" => true, "f" => true, "g" => false, "h" => false)
   ranges = [[0.4, 0.6] [0.4, 0.6] [0.05, 0.1] [0.0, 1.0] [0.0, 1.0]]
-  mesh_name = "model.json"
-  dirichlet_tags = ["sides"]
-  neumann_tags = ["circle", "triangle", "square"]
-  dirichlet_labels = []
-  neumann_labels = []
-
-elseif case === 3
-
-  probl_nl = Dict("Ω" => true, "M" => false, "A" => false, "f" => false, "g" => false, "h" => false)
-  ranges = [0.0, 1.0]
-  mesh_name = "stretch_model"
-  dirichlet_tags = "boundary"
-  neumann_tags = []
+  mesh_name = "bypass.msh"
+  dirichlet_tags = ["wall"]
+  neumann_tags = ["outlet"]
   dirichlet_labels = []
   neumann_labels = []
 
@@ -64,5 +55,3 @@ end
 
 paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, case)
 problem_info = ProblemSpecificsUnsteady(case, probl_nl, order, dirichlet_tags, dirichlet_labels, neumann_tags, neumann_labels, solver, paths, time_method, θ, RK_type, t₀, T, δt)
-model = DiscreteModelFromFile(paths.mesh_path)
-FE_space = get_FESpace(problem_info, model)
