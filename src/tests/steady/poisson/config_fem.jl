@@ -22,8 +22,8 @@ if case === 0
   mesh_name = "model.json"
   dirichlet_tags = ["sides"]
   neumann_tags = ["circle", "triangle", "square"]
-  dirichlet_labels = []
-  neumann_labels = []
+  dirichlet_bnds = []
+  neumann_bnds = []
 
 elseif case === 1
 
@@ -32,8 +32,8 @@ elseif case === 1
   mesh_name = "model.json"
   dirichlet_tags = ["sides"]
   neumann_tags = ["circle", "triangle", "square"]
-  dirichlet_labels = []
-  neumann_labels = []
+  dirichlet_bnds = []
+  neumann_bnds = []
 
 elseif case === 2
 
@@ -42,8 +42,8 @@ elseif case === 2
   mesh_name = "model.json"
   dirichlet_tags = ["sides"]
   neumann_tags = ["circle", "triangle", "square"]
-  dirichlet_labels = []
-  neumann_labels = []
+  dirichlet_bnds = []
+  neumann_bnds = []
 
 elseif case === 3
 
@@ -52,8 +52,8 @@ elseif case === 3
   mesh_name = "stretch_model"
   dirichlet_tags = ["sides"]
   neumann_tags = ["circle", "triangle", "square"]
-  dirichlet_labels = []
-  neumann_labels = []
+  dirichlet_bnds = []
+  neumann_bnds = []
 
 else
 
@@ -62,7 +62,7 @@ else
 end
 
 paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, case)
-problem_info = ProblemSpecifics(case, probl_nl, order, dirichlet_tags, dirichlet_labels, neumann_tags, neumann_labels, solver, paths)
+problem_info = ProblemSpecifics(case, probl_nl, order, dirichlet_tags, dirichlet_bnds, neumann_tags, neumann_bnds, solver, paths)
 model = DiscreteModelFromFile(paths.mesh_path)
 FE_space = get_FESpace(problem_ntuple, problem_info, model)
 FE_space₀ = get_FESpace(problem_ntuple, problem_info, model)

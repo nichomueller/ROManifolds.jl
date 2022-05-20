@@ -28,8 +28,8 @@ if case === 0
   mesh_name = "model.json"
   dirichlet_tags = ["sides"]
   neumann_tags = ["circle", "triangle", "square"]
-  dirichlet_labels = []
-  neumann_labels = []
+  dirichlet_bnds = []
+  neumann_bnds = []
 
 elseif case === 1
 
@@ -37,8 +37,8 @@ elseif case === 1
   ranges = [[0.4, 0.6] [0.4, 0.6] [0.05, 0.1]]
   mesh_name = "model.json"
   neumann_tags = ["circle", "triangle", "square"]
-  dirichlet_labels = []
-  neumann_labels = []
+  dirichlet_bnds = []
+  neumann_bnds = []
 
 elseif case === 2
 
@@ -47,8 +47,8 @@ elseif case === 2
   mesh_name = "model.json"
   dirichlet_tags = ["sides"]
   neumann_tags = ["circle", "triangle", "square"]
-  dirichlet_labels = []
-  neumann_labels = []
+  dirichlet_bnds = []
+  neumann_bnds = []
 
 elseif case === 3
 
@@ -57,8 +57,8 @@ elseif case === 3
   mesh_name = "stretch_model"
   dirichlet_tags = "boundary"
   neumann_tags = []
-  dirichlet_labels = []
-  neumann_labels = []
+  dirichlet_bnds = []
+  neumann_bnds = []
 
 else
 
@@ -67,7 +67,7 @@ else
 end
 
 paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, case)
-problem_info = ProblemSpecificsUnsteady(case, probl_nl, order, dirichlet_tags, dirichlet_labels, neumann_tags, neumann_labels, solver, paths, time_method, θ, RK_type, t₀, T, δt)
+problem_info = ProblemSpecificsUnsteady(case, probl_nl, order, dirichlet_tags, dirichlet_bnds, neumann_tags, neumann_bnds, solver, paths, time_method, θ, RK_type, t₀, T, δt)
 model = DiscreteModelFromFile(paths.mesh_path)
 FE_space = get_FESpace(problem_ntuple, problem_info, model)
 FE_space₀ = get_FESpace(problem_ntuple, problem_info, model)

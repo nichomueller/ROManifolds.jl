@@ -1,43 +1,24 @@
 include("config_fem.jl")
 
-αₛ(x) = 1
-αₜ(t::Real, μ) = sum(μ) * (2 + sin(2π * t))
-mₛ(x) = 1
-mₜ(t::Real) = 1
-m(x, t::Real) = mₛ(x)*mₜ(t)
-m(t::Real) = x -> m(x, t)
-fₛ(x) = VectorValue(0,0,0)
-fₜ(t::Real) = 0
-f(x, t::Real) = fₛ(x)*fₜ(t)
-f(t::Real) = x -> f(x, t)
-gʷ(x, t::Real) = 0
-gʷ(t::Real) = x -> gʷ(x, t)
-const x₀ = Point(0,0,0)
-const R = 0.41784
-gₛ(x) = 2 * (1 .- VectorValue((x[1]-x₀[1])^2,(x[2]-x₀[2])^2,(x[3]-x₀[3])^2) / R^2) / (pi*R^2)
-gₜ(t::Real, μ) = 1-cos(2*pi*t/T)+μ[2]*sin(2*pi*μ[1]*t/T)
-hₛ(x) = VectorValue(0,0,0)
-hₜ(t::Real) = 0
-h(x, t::Real) = hₛ(x)*hₜ(t)
-h(t::Real) = x -> h(x, t)
-u₀(x) = VectorValue(0,0,0)
-p₀(x) = VectorValue(0,0,0)
-
 function run_FEM_0()
-
-  model = DiscreteModelFromFile(paths.mesh_path)
 
   function run_parametric_FEM(μ::Array)
 
     α(x, t::Real) = αₛ(x)*αₜ(t, μ)
     α(t::Real) = x -> α(x, t)
-    g(x, t::Real) = gₛ(x)*gₜ(t, μ)
+    gⁱⁿ(x, t::Real) = gₛ(x)*gₜ(t, μ)
+    gⁱⁿ(t::Real) = x -> gⁱⁿ(x, t)
+    function g(x,t::Real)
+      return gʷ(x,t) + gⁱⁿ(x,t)
+    end
     g(t::Real) = x -> g(x, t)
-    FE_space = get_FE_space(problem_info, model; [gʷ,g])
-    parametric_info = ParametricSpecificsUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, gₛ, gₜ, [gʷ,g], hₛ, hₜ, h, [u₀,p₀])
+    FE_space = get_FESpace(problem_ntuple, problem_info, model, [gʷ,gⁱⁿ])
+    parametric_info = ParametricSpecificsUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, gₛ, gₜ, g, hₛ, hₜ, h, x₀)
 
     A = assemble_stiffness(FE_space, problem_info, parametric_info)(0.0)
     M = assemble_mass(FE_space, problem_info, parametric_info)(0.0)
+    Bᵀ = assemble_primal_opᵀ(FE_space)
+    B = assemble_primal_op(FE_space)(0.0)
     F = assemble_forcing(FE_space, problem_info, parametric_info)(0.0)
     H = assemble_neumann_datum(FE_space, problem_info, parametric_info)(0.0)
     Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space₀)
@@ -48,7 +29,7 @@ function run_FEM_0()
 
     end
 
-    return parametric_solution, Xᵘ₀, F, H, M, A
+    return parametric_solution, Xᵘ₀, F, H, M, Bᵀ, B, A
 
   end
 
@@ -58,17 +39,23 @@ end
 
 function run_FEM_1()
 
-  model = DiscreteModelFromFile(paths.mesh_path)
-  FE_space = get_FE_space(problem_info, model, g)
-
   function run_parametric_FEM(μ::Array)
 
-    α(x, t::Real) = (1 + μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) * sin(t) / μ[3]))
+    α(x, t::Real) = αₛ(x)*αₜ(t, μ)
     α(t::Real) = x -> α(x, t)
-    g(x, t::Real) = gₛ(x)*gₜ(t, μ[4:end])
+    gⁱⁿ(x, t::Real) = gₛ(x)*gₜ(t, μ)
+    gⁱⁿ(t::Real) = x -> gⁱⁿ(x, t)
+    function g(x,t::Real)
+      return gʷ(x,t) + gⁱⁿ(x,t)
+    end
     g(t::Real) = x -> g(x, t)
-    parametric_info = ParametricSpecificsUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, gₛ, gₜ, [gʷ,g], hₛ, hₜ, h, u₀)
+    FE_space = get_FESpace(problem_ntuple, problem_info, model, [gʷ,gⁱⁿ])
+    parametric_info = ParametricSpecificsUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, gₛ, gₜ, g, hₛ, hₜ, h, x₀)
+
+    A = assemble_stiffness(FE_space, problem_info, parametric_info)(0.0)
     M = assemble_mass(FE_space, problem_info, parametric_info)(0.0)
+    Bᵀ = assemble_primal_opᵀ(FE_space)
+    B = assemble_primal_op(FE_space)(0.0)
     F = assemble_forcing(FE_space, problem_info, parametric_info)(0.0)
     H = assemble_neumann_datum(FE_space, problem_info, parametric_info)(0.0)
     Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space₀)
@@ -79,7 +66,7 @@ function run_FEM_1()
 
     end
 
-    return parametric_solution, Xᵘ₀, F, H, M
+    return parametric_solution, Xᵘ₀, F, H, M, Bᵀ, B, A
 
   end
 
@@ -89,21 +76,17 @@ end
 
 function run_FEM_2()
 
-  model = DiscreteModelFromFile(paths.mesh_path)
-  FE_space = get_FE_space(problem_info, model)
-
   function run_parametric_FEM(μ::Array)
 
-    α(x, t::Real) = αₛ(x)*αₜ(t, μ)
+    α(x, t::Real) = (1 + μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) * sin(t) / μ[3]))
     α(t::Real) = x -> α(x, t)
-    gₜ(t::Real, μ) = gₜ(t, μ[end-2:end-1])*μ[end]
-    g1(x, t::Real) = gₛ(x)*gₜ(t, μ)
-    g1(t::Real) = x -> g(x, t)
-    g2(x, t::Real) = gₛ(x)*(1-gₜ(t, μ))
-    g2(t::Real) = x -> g(x, t)
-    parametric_info = ParametricSpecificsUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, gₛ, gₜ, [gʷ,g1,g2], hₛ, hₜ, h, u₀)
-    A = assemble_stiffness(FE_space, problem_info, parametric_info)(0.0)
+    g(x, t::Real) = gₛ(x)*gₜ(t, μ[4:end])
+    g(t::Real) = x -> g(x, t)
+    FE_space = get_FESpace(problem_info, model, g)
+    parametric_info = ParametricSpecificsUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, gₛ, gₜ, [gʷ,g], hₛ, hₜ, h, u₀)
     M = assemble_mass(FE_space, problem_info, parametric_info)(0.0)
+    Bᵀ = assemble_primal_opᵀ(FE_space)
+    B = assemble_primal_op(FE_space)(0.0)
     F = assemble_forcing(FE_space, problem_info, parametric_info)(0.0)
     H = assemble_neumann_datum(FE_space, problem_info, parametric_info)(0.0)
     Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space₀)
@@ -114,7 +97,7 @@ function run_FEM_2()
 
     end
 
-    return parametric_solution, Xᵘ₀, F, H, M, A
+    return parametric_solution, Xᵘ₀, F, H, M, Bᵀ, B
 
   end
 
@@ -124,8 +107,40 @@ end
 
 function run_FEM_3()
 
-  model = DiscreteModelFromFile(paths.mesh_path)
-  FE_space = get_FE_space(problem_info, model)
+  function run_parametric_FEM(μ::Array)
+
+    α(x, t::Real) = αₛ(x)*αₜ(t, μ)
+    α(t::Real) = x -> α(x, t)
+    gₜ(t::Real, μ) = gₜ(t, μ[end-2:end-1])*μ[end]
+    g1(x, t::Real) = gₛ(x)*gₜ(t, μ)
+    g1(t::Real) = x -> g1(x, t)
+    g2(x, t::Real) = gₛ(x)*(1-gₜ(t, μ))
+    g2(t::Real) = x -> g2(x, t)
+    FE_space = get_FESpace(problem_info, model, g)
+    parametric_info = ParametricSpecificsUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, gₛ, gₜ, [gʷ,g1,g2], hₛ, hₜ, h, u₀)
+    A = assemble_stiffness(FE_space, problem_info, parametric_info)(0.0)
+    M = assemble_mass(FE_space, problem_info, parametric_info)(0.0)
+    Bᵀ = assemble_primal_opᵀ(FE_space)
+    B = assemble_primal_op(FE_space)(0.0)
+    F = assemble_forcing(FE_space, problem_info, parametric_info)(0.0)
+    H = assemble_neumann_datum(FE_space, problem_info, parametric_info)(0.0)
+    Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space₀)
+
+    function parametric_solution()
+
+      return FE_solve(FE_space, problem_info, parametric_info)
+
+    end
+
+    return parametric_solution, Xᵘ₀, F, H, M, Bᵀ, B, A
+
+  end
+
+  return run_parametric_FEM
+
+end
+
+function run_FEM_4()
 
   function run_parametric_FEM(μ::Array)
 
@@ -136,6 +151,7 @@ function run_FEM_3()
     g1(t::Real) = x -> g(x, t)
     g2(x, t::Real) = gₛ(x)*(1-gₜ(t, μ))
     g2(t::Real) = x -> g(x, t)
+    FE_space = get_FESpace(problem_info, model, g)
     parametric_info = ParametricSpecificsUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, gₛ, gₜ, [gʷ,g1,g2], hₛ, hₜ, h, u₀)
     M = assemble_mass(FE_space, problem_info, parametric_info)(0.0)
     F = assemble_forcing(FE_space, problem_info, parametric_info)(0.0)
@@ -164,15 +180,19 @@ FEM_time₀ = @elapsed begin
     FEM = run_FEM_0()
   elseif case === 1
     FEM = run_FEM_1()
-  else case === 2
+  elseif case === 2
     FEM = run_FEM_2()
+  elseif case === 3
+    FEM = run_FEM_3()
+  elseif case === 4
+    FEM = run_FEM_4()
   end
 
   lazy_solution_info = lazy_map(FEM, μ)
 
-  (Xᵘ₀, F, H, M) = lazy_solution_info[1][2:5]
+  (Xᵘ₀, F, H, M, B, Bᵀ) = lazy_solution_info[1][2:7]
   if case === 0 || case === 2
-    A = lazy_solution_info[1][6]
+    A = lazy_solution_info[1][8]
   end
 
 end

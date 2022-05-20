@@ -1,6 +1,30 @@
-function get_FESpace(::NTuple{1,Int}, probl::ProblemSpecifics, model::UnstructuredDiscreteModel, g = nothing)
+function set_labels(probl::Info, model::UnstructuredDiscreteModel)
+
+  labels = get_face_labeling(model)
+  if !isempty(probl.dirichlet_tags) && !isempty(probl.dirichlet_bnds)
+    for i = 1:length(probl.dirichlet_tags)
+      if probl.dirichlet_tags[i] ∉ labels.tag_to_name
+        add_tag_from_tags!(labels, probl.dirichlet_tags[i], probl.dirichlet_bnds[i])
+      end
+    end
+  end
+  if !isempty(probl.neumann_tags) && !isempty(probl.neumann_bnds)
+    for i = 1:length(probl.neumann_tags)
+      if probl.neumann_tags[i] ∉ labels.tag_to_name
+        add_tag_from_tags!(labels, probl.neumann_tags[i], probl.neumann_bnds[i])
+      end
+    end
+  end
+
+  labels
+
+end
+
+function get_FESpace(::NTuple{1,Int}, probl::SteadyInfo, model::UnstructuredDiscreteModel, g = nothing)
 
   degree = 2 .* probl.order
+  labels = set_labels(probl, model)
+
   Ω = Triangulation(model)
   dΩ = Measure(Ω, degree)
   Γn = BoundaryTriangulation(model, tags=probl.neumann_tags)
@@ -8,13 +32,6 @@ function get_FESpace(::NTuple{1,Int}, probl::ProblemSpecifics, model::Unstructur
   Γd = BoundaryTriangulation(model, tags=probl.neumann_tags)
   dΓd = Measure(Γd, degree)
   Qₕ = CellQuadrature(Ω, degree)
-
-  labels = get_face_labeling(model)
-  if !isempty(probl.dirichlet_tags) && !isempty(probl.dirichlet_labels)
-    for i = 1:length(probl.dirichlet_tags)
-      add_tag_from_tags!(labels, probl.dirichlet_tags[i], probl.dirichlet_labels[i])
-    end
-  end
 
   ref_FE = ReferenceFE(lagrangian, Float64, probl.order)
   V₀ = TestFESpace(model, ref_FE; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
@@ -34,23 +51,18 @@ function get_FESpace(::NTuple{1,Int}, probl::ProblemSpecifics, model::Unstructur
 
 end
 
-function get_FESpace(::NTuple{1,Int}, probl::ProblemSpecificsUnsteady, model::UnstructuredDiscreteModel, g = nothing)
+function get_FESpace(::NTuple{1,Int}, probl::UnsteadyInfo, model::UnstructuredDiscreteModel, g = nothing)
+
+  degree = 2 .* probl.order
+  labels = set_labels(probl, model)
 
   Ω = Interior(model)
-  degree = 2 .* probl.order
   dΩ = Measure(Ω, degree)
   Γn = BoundaryTriangulation(model, tags=probl.neumann_tags)
   dΓn = Measure(Γn, degree)
   Γd = BoundaryTriangulation(model, tags=probl.neumann_tags)
   dΓd = Measure(Γd, degree)
   Qₕ = CellQuadrature(Ω, degree)
-
-  labels = get_face_labeling(model)
-  if !isempty(probl.dirichlet_tags) && !isempty(probl.dirichlet_labels)
-    for i = 1:length(probl.dirichlet_tags)
-      add_tag_from_tags!(labels, probl.dirichlet_tags[i], probl.dirichlet_labels[i])
-    end
-  end
 
   ref_FE = ReferenceFE(lagrangian, Float64, probl.order)
   V₀ = TestFESpace(model, ref_FE; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
@@ -72,23 +84,18 @@ function get_FESpace(::NTuple{1,Int}, probl::ProblemSpecificsUnsteady, model::Un
 
 end
 
-function get_FESpace(::NTuple{2,Int}, probl::ProblemSpecifics, model::UnstructuredDiscreteModel, g = nothing)
+function get_FESpace(::NTuple{2,Int}, probl::SteadyInfo, model::UnstructuredDiscreteModel, g = nothing)
 
   degree = 2 .* probl.order
+  labels = set_labels(probl, model)
+
   Ω = Triangulation(model)
   dΩ = Measure(Ω, degree)
   Γn = BoundaryTriangulation(model, tags=probl.neumann_tags)
   dΓn = Measure(Γn, degree)
-  Γd = BoundaryTriangulation(model, tags=probl.weak_dirichlet_tags)
+  Γd = BoundaryTriangulation(model, tags=probl.dirichlet_tags)
   dΓd = Measure(Γd, degree)
   Qₕ = CellQuadrature(Ω, degree)
-
-  labels = get_face_labeling(model)
-  if !isempty(probl.dirichlet_tags) && !isempty(probl.dirichlet_labels)
-    for i = 1:length(probl.dirichlet_tags)
-      add_tag_from_tags!(labels, probl.dirichlet_tags[i], probl.dirichlet_labels[i])
-    end
-  end
 
   ref_FEᵤ = ReferenceFE(lagrangian, VectorValue{3,Float64}, probl.order)
   V₀ = TestFESpace(model, ref_FEᵤ; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
@@ -108,31 +115,26 @@ function get_FESpace(::NTuple{2,Int}, probl::ProblemSpecifics, model::Unstructur
   ψₚ = get_trial_fe_basis(Q)
   Nₛᵖ = length(get_free_dof_ids(Q))
 
-  FE_space = FESpaceStokes(Qₕ, V₀, V, Q₀, Q, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn)
+  FE_space = FESpaceStokes(Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn)
 
   return FE_space
 
 end
 
-function get_FESpace(::NTuple{2,Int}, probl::ProblemSpecificsUnsteady, model::UnstructuredDiscreteModel, g = nothing)
+function get_FESpace(::NTuple{2,Int}, probl::UnsteadyInfo, model::UnstructuredDiscreteModel, g = nothing)
+
+  degree = 2 .* probl.order
+  labels = set_labels(probl, model)
 
   Ω = Interior(model)
-  degree = 2 .* probl.order
   dΩ = Measure(Ω, degree)
   Γn = BoundaryTriangulation(model, tags=probl.neumann_tags)
   dΓn = Measure(Γn, degree)
-  Γd = BoundaryTriangulation(model, tags=probl.weak_dirichlet_tags)
+  Γd = BoundaryTriangulation(model, tags=probl.dirichlet_tags)
   dΓd = Measure(Γd, degree)
   Qₕ = CellQuadrature(Ω, degree)
 
-  labels = get_face_labeling(model)
-  if !isempty(probl.dirichlet_tags) && !isempty(probl.dirichlet_labels)
-    for i = 1:length(probl.dirichlet_tags)
-      add_tag_from_tags!(labels, probl.dirichlet_tags[i], probl.dirichlet_labels[i])
-    end
-  end
-
-  ref_FEᵤ = ReferenceFE(lagrangian, Float64, probl.order)
+  ref_FEᵤ = ReferenceFE(lagrangian, VectorValue{3,Float64}, probl.order)
   V₀ = TestFESpace(model, ref_FEᵤ; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
   if isnothing(g)
     g₀(x, t::Real) = VectorValue(0,0,0)
@@ -145,12 +147,12 @@ function get_FESpace(::NTuple{2,Int}, probl::ProblemSpecificsUnsteady, model::Un
   ϕᵤ(t) = get_trial_fe_basis(V(t))
   Nₛᵘ = length(get_free_dof_ids(V₀))
 
-  ref_FEₚ = ReferenceFE(lagrangian, Float64, order-1; space=:P)
-  Q₀ = TestFESpace(model, ref_FEₚ; conformity=:L2, constraint=:zeromean)
+  ref_FEₚ = ReferenceFE(lagrangian, Float64, probl.order-1; space=:P)
+  Q₀ = TestFESpace(model, ref_FEₚ, conformity=:L2, constraint=:zeromean)
   Q = TrialFESpace(Q₀)
-  ψᵧ = get_trial_fe_basis(Q₀)
+  ψᵧ = get_fe_basis(Q₀)
   ψₚ = get_trial_fe_basis(Q)
-  Nₛᵖ = length(get_free_dof_ids(Q))
+  Nₛᵖ = length(get_free_dof_ids(Q₀))
 
   X₀ = MultiFieldFESpace([V₀, Q₀])
   X = TransientMultiFieldFESpace([V, Q])

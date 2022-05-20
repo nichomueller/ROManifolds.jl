@@ -19,8 +19,8 @@ if case === 0
   paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, problem_nonlinearities)
   dirichlet_tags = ["diri0", "dirig"]
   neumann_tags = []
-  dirichlet_labels = [["sides", "sides_c"], ["circle","circle_c", "triangle", "triangle_c", "square", "square_c"]]
-  neumann_labels = []
+  dirichlet_bnds = [["sides", "sides_c"], ["circle","circle_c", "triangle", "triangle_c", "square", "square_c"]]
+  neumann_bnds = []
 
 elseif case === 1
 
@@ -30,8 +30,8 @@ elseif case === 1
   paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, problem_nonlinearities)
   dirichlet_tags = ["diri0", "dirig"]
   neumann_tags = []
-  dirichlet_labels = [["sides", "sides_c"], ["circle","circle_c", "triangle", "triangle_c", "square", "square_c"]]
-  neumann_labels = []
+  dirichlet_bnds = [["sides", "sides_c"], ["circle","circle_c", "triangle", "triangle_c", "square", "square_c"]]
+  neumann_bnds = []
 
 elseif case === 2
 
@@ -41,8 +41,8 @@ elseif case === 2
   paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, problem_nonlinearities)
   dirichlet_tags = ["diri0", "dirig"]
   neumann_tags = []
-  dirichlet_labels = [["sides", "sides_c"], ["circle","circle_c", "triangle", "triangle_c", "square", "square_c"]]
-  neumann_labels = []
+  dirichlet_bnds = [["sides", "sides_c"], ["circle","circle_c", "triangle", "triangle_c", "square", "square_c"]]
+  neumann_bnds = []
 
 else
 
@@ -51,4 +51,4 @@ else
 end
 
 paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, case)
-problem_info = ProblemSpecifics(case, probl_nl, order, dirichlet_tags, dirichlet_labels, neumann_tags, neumann_labels, solver, paths)
+problem_info = ProblemSpecifics(case, probl_nl, order, dirichlet_tags, dirichlet_bnds, neumann_tags, neumann_bnds, solver, paths)

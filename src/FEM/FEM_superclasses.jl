@@ -6,8 +6,8 @@ abstract type Info end
 abstract type SteadyInfo <: Info end
 abstract type UnsteadyInfo <: Info end
 
-struct PoissonProblem <: FEMProblem end
-struct PoissonProblemUnsteady <: FEMProblem end
+#= struct PoissonProblem <: FEMProblem end
+struct PoissonProblemUnsteady <: FEMProblem end =#
 
 struct FESpacePoisson <: SteadyProblem
   Qₕ::CellQuadrature
@@ -39,8 +39,10 @@ struct FESpaceStokes <: SteadyProblem
   Qₕ::CellQuadrature
   V₀::Gridap.FESpaces.UnconstrainedFESpace
   V::TrialFESpace
-  Q₀::Gridap.FESpaces.UnconstrainedFESpace
-  Q::TrialFESpace
+  Q₀::ZeroMeanFESpace
+  Q::ZeroMeanFESpace
+  X₀#::MultiFieldFESpace
+  X#::MultiFieldTrialFESpace
   ϕᵥ::Gridap.FESpaces.SingleFieldFEBasis
   ϕᵤ::Gridap.FESpaces.SingleFieldFEBasis
   ψᵧ::Gridap.FESpaces.SingleFieldFEBasis
@@ -58,8 +60,10 @@ struct FESpaceStokesUnsteady <: UnsteadyProblem
   Qₕ::CellQuadrature
   V₀::Gridap.FESpaces.UnconstrainedFESpace
   V::TransientTrialFESpace
-  Q₀::Gridap.FESpaces.UnconstrainedFESpace
-  Q::TrialFESpace
+  Q₀::ZeroMeanFESpace
+  Q::ZeroMeanFESpace
+  X₀::MultiFieldFESpace
+  X::TransientMultiFieldTrialFESpace
   ϕᵥ::Gridap.FESpaces.SingleFieldFEBasis
   ϕᵤ::Function
   ψᵧ::Gridap.FESpaces.SingleFieldFEBasis
@@ -78,9 +82,9 @@ struct ProblemSpecifics <: SteadyInfo
   probl_nl::Dict
   order::Int
   dirichlet_tags::Array
-  dirichlet_labels::Array
+  dirichlet_bnds::Array
   neumann_tags::Array
-  neumann_labels::Array
+  neumann_bnds::Array
   solver::String
   paths::Function
 end
@@ -90,9 +94,9 @@ struct ProblemSpecificsUnsteady <: UnsteadyInfo
   probl_nl::Dict
   order::Int
   dirichlet_tags::Array
-  dirichlet_labels::Array
+  dirichlet_bnds::Array
   neumann_tags::Array
-  neumann_labels::Array
+  neumann_bnds::Array
   solver::String
   paths::Function
   time_method::String
