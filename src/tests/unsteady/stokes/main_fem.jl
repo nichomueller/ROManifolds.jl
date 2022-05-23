@@ -221,6 +221,8 @@ save_CSV(Xᵘ₀, joinpath(paths.FEM_structures_path, "Xᵘ₀.csv"))
 save_CSV(F, joinpath(paths.FEM_structures_path, "F.csv"))
 save_CSV(H, joinpath(paths.FEM_structures_path, "H.csv"))
 save_CSV(M, joinpath(paths.FEM_structures_path, "M.csv"))
+save_CSV(B, joinpath(paths.FEM_structures_path, "B.csv"))
+save_CSV(Bᵀ, joinpath(paths.FEM_structures_path, "Bᵀ.csv"))
 save_CSV([FEM_time], joinpath(paths.FEM_structures_path, "FEM_time.csv"))
 
 if case === 0 || case === 2

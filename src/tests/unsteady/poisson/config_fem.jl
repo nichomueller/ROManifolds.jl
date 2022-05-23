@@ -36,6 +36,7 @@ elseif case === 1
   probl_nl = Dict("Ω" => false, "M" => false, "A" => true, "f" => false, "g" => false, "h" => false)
   ranges = [[0.4, 0.6] [0.4, 0.6] [0.05, 0.1]]
   mesh_name = "model.json"
+  dirichlet_tags = ["sides"]
   neumann_tags = ["circle", "triangle", "square"]
   dirichlet_bnds = []
   neumann_bnds = []

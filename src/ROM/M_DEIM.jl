@@ -38,6 +38,39 @@ function M_DEIM_POD(S, ϵ = 1e-5)
 
 end
 
+function M_DEIM_POD_functional(S, ϵ=1e-5)
+
+  S̃ = copy(S)
+
+  M_DEIM_mat, Σ, _ = svd(S̃)
+  (r,c) = size(M_DEIM_mat)
+
+  if r ≤ c
+
+    M_DEIM_mat = M_DEIM_mat[:, 1:r]
+
+  else
+
+    total_energy = sum(Σ .^ 2)
+    cumulative_energy = 0.0
+    N = 0
+
+    while N ≤ size(S̃)[2]-2 && cumulative_energy / total_energy < 1.0 - ϵ ^ 2
+
+      N += 1
+      cumulative_energy += Σ[N] ^ 2
+
+      @info "(M)DEIM-POD loop number $N, projection error = $((sqrt(abs(1 - cumulative_energy / total_energy))))"
+
+    end
+    M_DEIM_mat = M_DEIM_mat[:, 1:N]
+
+  end
+
+  return M_DEIM_mat,  Σ
+
+end
+
 function M_DEIM_offline(sparse_M_DEIM_mat, Σ)
 
   row_idx, _, _ = findnz(sparse_M_DEIM_mat)
@@ -202,6 +235,7 @@ end
 
 function MDEIM_offline_functional(FE_space::UnsteadyProblem, ROM_info::Info, var::String)
 
+  include("../FEM/LagrangianQuadRefFEs.jl")
   @info "Building $(ROM_info.nₛ_MDEIM) snapshots of $var, at each time step. This will take some time."
 
   μ = load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
@@ -209,6 +243,7 @@ function MDEIM_offline_functional(FE_space::UnsteadyProblem, ROM_info::Info, var
   δtθ = ROM_info.δt*ROM_info.θ
   times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+δtθ
   param = get_parametric_specifics(ROM_info, parse.(Float64, split(chop(μ[1]; head=1, tail=1), ',')))
+  Qₕ_cell_data = get_data(FE_space.Qₕ)
   qₕ = Qₕ_cell_data[rand(1:num_cells(FE_space.Ω))]
   xₕ = get_coordinates(qₕ)
   nquad = length(xₕ)
@@ -216,18 +251,18 @@ function MDEIM_offline_functional(FE_space::UnsteadyProblem, ROM_info::Info, var
   for k = 1:ROM_info.nₛ_MDEIM
     @info "Considering parameter number $k, need $(ROM_info.nₛ_MDEIM-k) more!"
 
-    μₖ = parse.(Float64, split(chop(μ[k+1]; head=1, tail=1), ','))
+    μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
     param = get_parametric_specifics(ROM_info, μₖ)
-
-    if var === "A"
-      snapsₖ = [param.α(t_θ,param.μ)(xₕ[k]) for k = 1:nquad for t_θ = times_θ]
+    snapsₖ = [param.α(xₕ[n],t_θ) for n = 1:nquad for t_θ = times_θ]
+    #= if var === "A"
+      snapsₖ = [param.α(xₕ[n],t_θ) for n = 1:nquad for t_θ = times_θ]
     elseif var === "M"
-      snapsₖ = [param.m(t_θ,param.μ)(xₕ[k]) for k = 1:nquad for t_θ = times_θ]
+      snapsₖ = [param.m(xₕ[n],t_θ) for n = 1:nquad for t_θ = times_θ]
     else
       @error "Run MDEIM on A or M only"
-    end
+    end =#
     snapsₖ = reshape(snapsₖ,nquad,Nₜ)
-    compressed_snapsₖ, _ = M_DEIM_POD(sparse(snapsₖ), ROM_info.ϵₛ)
+    compressed_snapsₖ, _ = M_DEIM_POD_functional(snapsₖ, ROM_info.ϵₛ)
     if k === 1
       global compressed_snaps = compressed_snapsₖ
     else
@@ -236,38 +271,20 @@ function MDEIM_offline_functional(FE_space::UnsteadyProblem, ROM_info::Info, var
 
   end
 
-  sparse_param_mat, Σ = M_DEIM_POD(sparse(compressed_snaps), ROM_info.ϵₛ)
-  param_mat = Matrix(sparse_param_mat)
+  param_mat, Σ = M_DEIM_POD_functional(compressed_snaps, ROM_info.ϵₛ)
 
-  refFE_quad = ReferenceFE(lagrangian_quad, Float64, probl.order)
-  V_quad =  TrialFESpace(TestFESpace(param.model, refFE_quad))
+  refFE_quad = ReferenceFE(lagrangian_quad, Float64, problem_info.order, FE_space.Ω)
+  V_quad =  TrialFESpace(TestFESpace(param.model, refFE_quad, conformity=:L2))
 
-  if var === "A"
-
-    for q = 1:size(MDEIM_mat)[2]
-      αₛ_q = FEFunction(V_quad,rMDEIM_mat[:,q])
-      Aq = assemble_matrix(∫(∇(FE_space.ϕᵥ) ⋅ (αₛ_q * ∇(FE_space.ϕᵤ(0.0)))) * FE_space.dΩ, FE_space.V(0.0), FE_space.V₀)
-      row_idx, val = findnz(Aq[:])
-      if q === 1
-        global affine_mat = sparse(row_idx, ones(length(row_idx)), val, size(Aq)[1]^2, size(param_mat)[2])
-      else
-        global affine_mat[:,q] = sparse(row_idx, ones(length(row_idx)), val)
-      end
+  for q = 1:size(param_mat)[2]
+    f_q = FEFunction(V_quad,param_mat[:,q])
+    Matq = assemble_matrix(∫(∇(FE_space.ϕᵥ) ⋅ (f_q * ∇(FE_space.ϕᵤ(0.0)))) * FE_space.dΩ, FE_space.V(0.0), FE_space.V₀)
+    row_idx, val = findnz(Matq[:])
+    if q === 1
+      global affine_mat = sparse(row_idx, ones(length(row_idx)), val, size(Matq)[1]^2, size(param_mat)[2])
+    else
+      global affine_mat[:,q] = sparse(row_idx, ones(length(row_idx)), val)
     end
-
-  else
-
-    for q = 1:size(MDEIM_mat)[2]
-      mₛ_q = FEFunction(V_quad,MDEIM_mat[:,q])
-      Mq = assemble_matrix(∫(FE_space.ϕᵥ ⋅ (mₛ_q * FE_space.ϕᵤ(0.0))) * FE_space.dΩ, FE_space.V(0.0), FE_space.V₀)
-      row_idx, val = findnz(Mq[:])
-      if q === 1
-        global affine_mat = sparse(row_idx, ones(length(row_idx)), val, size(Mq)[1]^2, size(param_mat)[2])
-      else
-        global affine_mat[:,q] = sparse(row_idx, ones(length(row_idx)), val)
-      end
-    end
-
   end
 
   MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(affine_mat, Σ)
