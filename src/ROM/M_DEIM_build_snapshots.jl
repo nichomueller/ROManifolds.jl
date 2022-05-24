@@ -43,13 +43,13 @@ end
 
 function build_M_snapshots(FE_space::UnsteadyProblem, ROM_info::Info, μ::Array, t::Float64)
 
-  for i_nₛ= 1:ROM_info.nₛ_MDEIM
+  for nₛ= 1:ROM_info.nₛ_MDEIM
     @info "Snapshot $nₛ at time instant $t, mass"
-    μ_i = parse.(Float64, split(chop(μ[nₛ]; head=1, tail=1), ','))
-    parametric_info = get_parametric_specifics(ROM_info, μ_i)
-    M_i = assemble_mass(FE_space, ROM_info, parametric_info)(t)
-    i, v = findnz(M_i[:])
-    if i_nₛ === 1
+    μ_nₛ = parse.(Float64, split(chop(μ[nₛ]; head=1, tail=1), ','))
+    parametric_info = get_parametric_specifics(ROM_info, μ_nₛ)
+    M_nₛ = assemble_mass(FE_space, ROM_info, parametric_info)(t)
+    i, v = findnz(M_nₛ[:])
+    if nₛ === 1
       global M = sparse(i, ones(length(i)), v, FE_space.Nₛᵘ^2, ROM_info.nₛ_MDEIM)
     else
       global M[:, nₛ] = sparse(i, ones(length(i)), v)
@@ -105,13 +105,13 @@ end
 
 function build_A_snapshots(FE_space::UnsteadyProblem, ROM_info::Info, μ::Array, t::Float64)
 
-  for i_nₛ= 1:ROM_info.nₛ_MDEIM
+  for nₛ = 1:ROM_info.nₛ_MDEIM
     @info "Snapshot $nₛ at time instant $t, stiffness"
-    μ_i = parse.(Float64, split(chop(μ[nₛ]; head=1, tail=1), ','))
-    parametric_info = get_parametric_specifics(ROM_info, μ_i)
-    A_i = assemble_stiffness(FE_space, ROM_info, parametric_info)(t)
-    i, v = findnz(A_i[:])
-    if i_nₛ === 1
+    μ_nₛ = parse.(Float64, split(chop(μ[nₛ]; head=1, tail=1), ','))
+    parametric_info = get_parametric_specifics(ROM_info, μ_nₛ)
+    A_nₛ = assemble_stiffness(FE_space, ROM_info, parametric_info)(t)
+    i, v = findnz(A_nₛ[:])
+    if nₛ === 1
       global A = sparse(i, ones(length(i)), v, FE_space.Nₛᵘ^2, ROM_info.nₛ_MDEIM)
     else
       global A[:, nₛ] = sparse(i, ones(length(i)), v)
@@ -209,7 +209,7 @@ function build_H_snapshots(FE_space::UnsteadyProblem, ROM_info::Info, μ::Array,
 
   H = zeros(FE_space.Nₛᵘ, ROM_info.nₛ_DEIM)
 
-  for nₛ= 1:ROM_info.nₛ_MDEIM
+  for nₛ = 1:ROM_info.nₛ_MDEIM
     @info "Snapshot $nₛ at time instant $t, neumann datum"
     μ_nₛ = parse.(Float64, split(chop(μ[nₛ]; head=1, tail=1), ','))
     parametric_info = get_parametric_specifics(ROM_info, μ_nₛ)

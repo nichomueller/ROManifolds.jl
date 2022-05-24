@@ -38,6 +38,43 @@ function M_DEIM_POD(S, ϵ = 1e-5)
 
 end
 
+function M_DEIM_POD_spacetime(S, ϵ = 1e-5)
+
+  S̃ = copy(S)
+  Nₕ = size(S̃)[1]
+  row_idx, _, _ = findnz(S̃)
+  unique!(row_idx)
+  S̃ = Matrix(S̃[row_idx, :])
+
+  C = S̃'*S̃
+  V, Σ, _ = svd(C)
+  Σ = sqrt.(Σ)
+
+  total_energy = sum(Σ .^ 2)
+  cumulative_energy = 0.0
+  N = 0
+
+  while N ≤ size(S̃)[2]-1 && cumulative_energy / total_energy < 1.0 - ϵ ^ 2
+    N += 1
+    cumulative_energy += Σ[N] ^ 2
+    @info "POD loop number $N, cumulative energy = $cumulative_energy"
+  end
+
+  V = V[:, 1:N]
+  M_DEIM_mat = S̃*V
+  for n = 1:N
+    M_DEIM_mat[:,n] /= Σ[n]
+  end
+
+  _, col_idx, val = findnz(sparse(M_DEIM_mat))
+  sparse_M_DEIM_mat = sparse(repeat(row_idx, N), col_idx, val, Nₕ, N)
+
+  @info "Basis number obtained via POD is $N, projection error ≤ $((sqrt(abs(1 - cumulative_energy / total_energy))))"
+
+  return sparse_M_DEIM_mat,  Σ
+
+end
+
 function M_DEIM_POD_functional(S, ϵ=1e-5)
 
   S̃ = copy(S)
@@ -144,6 +181,31 @@ function MDEIM_offline(FE_space::UnsteadyProblem, ROM_info::Info, var::String)
 
 end
 
+#= yea = zeros(6640,2)
+for j = 1:6640
+  my_idx = findall(x -> x == j, r_idx)
+  yea[j,1] = sum(Atest[my_idx] .* phi[c_idx[my_idx],1])
+  yea[j,2] = sum(Atest[my_idx] .* phi[c_idx[my_idx],2])
+end
+yeayea = phi'*yea =#
+
+time1 = @elapsed begin
+  yea1 = zeros(6640,2)
+  for j = 1:6640
+    my_idx = findall(x -> x == j, r_idx)
+    yea1[j,:] = (Atest[my_idx]' * phi[c_idx[my_idx],:])
+  end
+  yeayea = phi'*yea
+end
+
+time2 = @elapsed begin
+  my_idx=Matrix{Int64}[]
+  for j = 1:6640
+    push!(my_idx, reshape(findall(x -> x == j, r_idx),:,1))
+  end
+  yeayea1 = phi'*[Atest[my_idx[j][:]]' * phi[c_idx[my_idx[j][:]],:] for j = 1:6640]
+end
+
 function MDEIM_offline_standard(FE_space::UnsteadyProblem, ROM_info::Info, var::String)
 
   @info "Building $(ROM_info.nₛ_MDEIM) snapshots of $var, at each time step. This will take some time."
@@ -198,7 +260,7 @@ function MDEIM_offline_spacetime(FE_space::UnsteadyProblem, ROM_info::Info, var:
     else
       @error "Run MDEIM on A or M only"
     end
-    compressed_snapsₜ,_ = M_DEIM_POD(snapsₜ, ROM_info.ϵₛ*10^3)
+    compressed_snapsₜ,_ = M_DEIM_POD(snapsₜ, ROM_info.ϵₛ)
     if nₜ === 1
       global compressed_snaps = compressed_snapsₜ
     else
@@ -219,7 +281,7 @@ function MDEIM_offline_spacetime(FE_space::UnsteadyProblem, ROM_info::Info, var:
 
   Nₕ = convert(Int64, sqrt(size(compressed_snaps)[1]/Nₜ))
 
-  sparse_MDEIM_mat, Σ = M_DEIM_POD(compressed_snaps, ROM_info.ϵₛ)
+  sparse_MDEIM_mat, Σ = M_DEIM_POD_spacetime(compressed_snaps, ROM_info.ϵₛ)
   MDEIM_mat_tmp, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(sparse_MDEIM_mat, Σ)
   MDEIM_idx_space, MDEIM_idx_time = from_spacetime_to_space_time_idx_mat(MDEIM_idx, Nₕ)
   MDEIM_mat = reshape(MDEIM_mat_tmp[(MDEIM_idx_time.-1)*length(row_idx):MDEIM_idx_time*length(row_idx),:], Nₕ^2, :)
@@ -272,12 +334,13 @@ function MDEIM_offline_functional(FE_space::UnsteadyProblem, ROM_info::Info, var
   end
 
   param_mat, Σ = M_DEIM_POD_functional(compressed_snaps, ROM_info.ϵₛ)
+  param_mat_rep = repeat(param_mat, outer=[num_cells(FE_space.Ω),1])
 
   refFE_quad = ReferenceFE(lagrangian_quad, Float64, problem_info.order, FE_space.Ω)
   V_quad =  TrialFESpace(TestFESpace(param.model, refFE_quad, conformity=:L2))
 
   for q = 1:size(param_mat)[2]
-    f_q = FEFunction(V_quad,param_mat[:,q])
+    f_q = FEFunction(V_quad,param_mat_rep[:,q])
     Matq = assemble_matrix(∫(∇(FE_space.ϕᵥ) ⋅ (f_q * ∇(FE_space.ϕᵤ(0.0)))) * FE_space.dΩ, FE_space.V(0.0), FE_space.V₀)
     row_idx, val = findnz(Matq[:])
     if q === 1
