@@ -77,17 +77,6 @@ function from_spacetime_to_space_time_idx_vec(idx::Array, Nᵤ::Int64)
 
 end
 
-function interface_to_unit_circle(map::Function, pts::Array)
-
-  Θᵢₙ = get_cell_map(FE_space.dΓd)
-  Θᵢₙ⁻¹ = lazy_map(Operation(inv), Θᵢₙ)
-  JΘᵢₙ⁻¹ = lazy_map(Broadcasting(∇), Θᵢₙ⁻¹)
-  σᵢₙ = get_cell_dof_ids(FE_space.V₀, FE_space.Γd)
-
-  return map.(pts)
-
-end
-
 function chebyshev_polynomial(x::Float64, n::Int64)
 
   if n === 0

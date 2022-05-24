@@ -36,18 +36,38 @@ function assemble_affine_matrices(ROM_info::Info, RB_variables::PoissonSTGRB, va
 
 end
 
-function assemble_MDEIM_matrices(ROM_info::Info, RB_variables::PoissonSTGRB, var::String)
+function assemble_MDEIM_matrices(ROM_info::Info, RB_variables::PoissonSTGRB, var::String, do_ST_M_DEIM::Bool)
 
   @info "The matrix $var is non-affine: running the MDEIM offline phase on $nₛ_MDEIM snapshots"
-  MDEIM_mat, MDEIM_idx, sparse_el, _, _ = MDEIM_offline(FE_space, ROM_info, var)
+
+  if !do_ST_M_DEIM
+    MDEIM_mat, MDEIM_idx, sparse_el, _, _ = MDEIM_offline(FE_space, ROM_info, var)
+  else
+    MDEIM_mat, MDEIM_idx, sparse_el, _, _, row_idx = MDEIM_offline(FE_space, ROM_info, var)
+  end
+
   Q = size(MDEIM_mat)[2]
   Matₙ = zeros(RB_variables.S.nₛᵘ, RB_variables.S.nₛᵘ, Q)
-  for q = 1:Q
-    @info "ST-GRB: affine component number $q, matrix $var"
-    Matq = reshape(MDEIM_mat[:,q], (RB_variables.S.Nₛᵘ, RB_variables.S.Nₛᵘ))
-    Matₙ[:,:,q] = RB_variables.S.Φₛᵘ' * Matrix(Matq) * RB_variables.S.Φₛᵘ
-  end
-  MDEIMᵢ_mat = Matrix(MDEIM_mat[MDEIM_idx, :])
+
+  if !do_ST_M_DEIM
+    for q = 1:Q
+      @info "ST-GRB: affine component number $q, matrix $var"
+      Matq = reshape(MDEIM_mat[:,q], (RB_variables.S.Nₛᵘ, RB_variables.S.Nₛᵘ))
+      Matₙ[:,:,q] = RB_variables.S.Φₛᵘ' * Matrix(Matq) * RB_variables.S.Φₛᵘ
+    end
+    MDEIMᵢ_mat = Matrix(MDEIM_mat[MDEIM_idx, :])
+  else
+    for q = 1:Q
+      @info "ST-GRB: affine component number $q, matrix $var"
+      r_idx, c_idx = from_vec_to_mat_idx(row_idx, RB_variables.S.Nₛᵘ)
+      MatqΦ = zeros(RB_variables.S.Nₛᵘ,RB_variables.S.nₛᵘ)
+      for j = 1:RB_variables.S.Nₛᵘ
+        Mat_idx = findall(x -> x == j, r_idx)
+        MatqΦ[j,:] = (MDEIM_mat[Mat_idx]' * RB_variables.S.Φₛᵘ[c_idx[Mat_idx],:])
+      end
+      Matₙ[:,:,q] = RB_variables.S.Φₛᵘ' * MatqΦ
+    end
+    MDEIMᵢ_mat = Matrix(MDEIM_mat[MDEIM_idx, :])
 
   if var === "M"
     RB_variables.Mₙ = Matₙ
@@ -108,13 +128,15 @@ function assemble_offline_structures(ROM_info::Info, RB_variables::PoissonSTGRB,
     operators = set_operators(ROM_info, RB_variables)
   end
 
+  do_ST_M_DEIM = ROM_info.space_time_M_DEIM
+
   assembly_time = 0
   if "M" ∈ operators
     assembly_time += @elapsed begin
       if !ROM_info.probl_nl["M"]
         assemble_affine_matrices(ROM_info, RB_variables, "M")
       else
-        assemble_MDEIM_matrices(ROM_info, RB_variables, "M")
+        assemble_MDEIM_matrices(ROM_info, RB_variables, "M", do_ST_M_DEIM)
       end
     end
   end
@@ -124,7 +146,7 @@ function assemble_offline_structures(ROM_info::Info, RB_variables::PoissonSTGRB,
       if !ROM_info.probl_nl["A"]
         assemble_affine_matrices(ROM_info, RB_variables, "A")
       else
-        assemble_MDEIM_matrices(ROM_info, RB_variables, "A")
+        assemble_MDEIM_matrices(ROM_info, RB_variables, "A", do_ST_M_DEIM)
       end
     end
   end

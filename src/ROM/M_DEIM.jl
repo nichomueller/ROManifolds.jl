@@ -1,7 +1,7 @@
 include("../FEM/FEM_utils.jl")
 include("M_DEIM_build_snapshots.jl")
 
-function M_DEIM_POD(S, ϵ = 1e-5)
+function M_DEIM_POD(S::SparseMatrixCSC, ϵ = 1e-5)
 
   S̃ = copy(S)
   Nₕ = size(S̃)[1]
@@ -34,18 +34,13 @@ function M_DEIM_POD(S, ϵ = 1e-5)
 
   @info "Basis number obtained via POD is $N, projection error ≤ $M_DEIM_err_bound"
 
-  return sparse_M_DEIM_mat,  Σ
+  return sparse_M_DEIM_mat, Σ
 
 end
 
-function M_DEIM_POD_spacetime(S, ϵ = 1e-5)
+function M_DEIM_POD(S::Matrix, ϵ = 1e-5)
 
   S̃ = copy(S)
-  Nₕ = size(S̃)[1]
-  row_idx, _, _ = findnz(S̃)
-  unique!(row_idx)
-  S̃ = Matrix(S̃[row_idx, :])
-
   C = S̃'*S̃
   V, Σ, _ = svd(C)
   Σ = sqrt.(Σ)
@@ -66,19 +61,15 @@ function M_DEIM_POD_spacetime(S, ϵ = 1e-5)
     M_DEIM_mat[:,n] /= Σ[n]
   end
 
-  _, col_idx, val = findnz(sparse(M_DEIM_mat))
-  sparse_M_DEIM_mat = sparse(repeat(row_idx, N), col_idx, val, Nₕ, N)
-
   @info "Basis number obtained via POD is $N, projection error ≤ $((sqrt(abs(1 - cumulative_energy / total_energy))))"
 
-  return sparse_M_DEIM_mat,  Σ
+  return M_DEIM_mat, Σ
 
 end
 
-function M_DEIM_POD_functional(S, ϵ=1e-5)
+#= function M_DEIM_POD_functional(S::Array, ϵ=1e-5)
 
   S̃ = copy(S)
-
   M_DEIM_mat, Σ, _ = svd(S̃)
   (r,c) = size(M_DEIM_mat)
 
@@ -92,7 +83,7 @@ function M_DEIM_POD_functional(S, ϵ=1e-5)
     cumulative_energy = 0.0
     N = 0
 
-    while N ≤ size(S̃)[2]-2 && cumulative_energy / total_energy < 1.0 - ϵ ^ 2
+    while N ≤ size(S̃)[2]-1 && cumulative_energy / total_energy < 1.0 - ϵ ^ 2
 
       N += 1
       cumulative_energy += Σ[N] ^ 2
@@ -106,9 +97,9 @@ function M_DEIM_POD_functional(S, ϵ=1e-5)
 
   return M_DEIM_mat,  Σ
 
-end
+end =#
 
-function M_DEIM_offline(sparse_M_DEIM_mat, Σ)
+function M_DEIM_offline(sparse_M_DEIM_mat::SparseMatrixCSC, Σ::Vector)
 
   row_idx, _, _ = findnz(sparse_M_DEIM_mat)
   unique!(row_idx)
@@ -131,6 +122,27 @@ function M_DEIM_offline(sparse_M_DEIM_mat, Σ)
   M_DEIM_idx = row_idx[M_DEIM_idx]
 
   sparse_M_DEIM_mat[:,1:n_new], M_DEIM_idx, M_DEIM_err_bound
+
+end
+
+function M_DEIM_offline(M_DEIM_mat::Matrix, Σ::Vector)
+
+  (N, n) = size(M_DEIM_mat)
+  n_new = n
+  M_DEIM_idx = Int64[]
+  append!(M_DEIM_idx, convert(Int64, argmax(abs.(M_DEIM_mat[:, 1]))[1]))
+  for m in range(2, n)
+    res = M_DEIM_mat[:, m] - M_DEIM_mat[:, 1:(m-1)] * (M_DEIM_mat[M_DEIM_idx[1:(m-1)], 1:(m-1)] \ M_DEIM_mat[M_DEIM_idx[1:(m-1)], m])
+    append!(M_DEIM_idx, convert(Int64, argmax(abs.(res))[1]))
+    if abs(det(M_DEIM_mat[M_DEIM_idx[1:m], 1:m])) ≤ 1e-80
+      n_new = m
+      break
+    end
+  end
+  unique!(M_DEIM_idx)
+  M_DEIM_err_bound = Σ[min(n_new + 1,size(Σ)[1])] * norm(M_DEIM_mat[M_DEIM_idx,1:n_new] \ I(n_new))
+
+  M_DEIM_mat[:,1:n_new], M_DEIM_idx, M_DEIM_err_bound
 
 end
 
@@ -160,8 +172,7 @@ function MDEIM_offline(FE_space::SteadyProblem, ROM_info::Info, var::String)
   sparse_MDEIM_mat, Σ = M_DEIM_POD(snaps, ROM_info.ϵₛ)
   MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(sparse_MDEIM_mat, Σ)
 
-  Nₕ = convert(Int64, sqrt(size(snaps)[1]))
-  r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx, Nₕ)
+  r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx, FE_space.Nₛᵘ)
 
   el = find_FE_elements(FE_space.V₀, FE_space.Ω, unique(union(r_idx, c_idx)))
 
@@ -179,31 +190,6 @@ function MDEIM_offline(FE_space::UnsteadyProblem, ROM_info::Info, var::String)
     return MDEIM_offline_standard(FE_space, ROM_info, var)
   end
 
-end
-
-#= yea = zeros(6640,2)
-for j = 1:6640
-  my_idx = findall(x -> x == j, r_idx)
-  yea[j,1] = sum(Atest[my_idx] .* phi[c_idx[my_idx],1])
-  yea[j,2] = sum(Atest[my_idx] .* phi[c_idx[my_idx],2])
-end
-yeayea = phi'*yea =#
-
-time1 = @elapsed begin
-  yea1 = zeros(6640,2)
-  for j = 1:6640
-    my_idx = findall(x -> x == j, r_idx)
-    yea1[j,:] = (Atest[my_idx]' * phi[c_idx[my_idx],:])
-  end
-  yeayea = phi'*yea
-end
-
-time2 = @elapsed begin
-  my_idx=Matrix{Int64}[]
-  for j = 1:6640
-    push!(my_idx, reshape(findall(x -> x == j, r_idx),:,1))
-  end
-  yeayea1 = phi'*[Atest[my_idx[j][:]]' * phi[c_idx[my_idx[j][:]],:] for j = 1:6640]
 end
 
 function MDEIM_offline_standard(FE_space::UnsteadyProblem, ROM_info::Info, var::String)
@@ -233,8 +219,7 @@ function MDEIM_offline_standard(FE_space::UnsteadyProblem, ROM_info::Info, var::
   sparse_MDEIM_mat, Σ = M_DEIM_POD(compressed_snaps, ROM_info.ϵₛ)
   MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(sparse_MDEIM_mat, Σ)
 
-  Nₕ = convert(Int64, sqrt(size(MDEIM_mat)[1]))
-  r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx, Nₕ)
+  r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx, FE_space.Nₛᵘ)
 
   el = find_FE_elements(FE_space.V₀, FE_space.Ω, unique(union(r_idx, c_idx)))
 
@@ -254,11 +239,14 @@ function MDEIM_offline_spacetime(FE_space::UnsteadyProblem, ROM_info::Info, var:
   for (nₜ,t) = enumerate(times_θ)
     @info "Considering time step $nₜ/$Nₜ"
     if var === "A"
-      snapsₜ = build_A_snapshots(FE_space, ROM_info, μ, t)
+      snapsₜ, row_idx = build_A_snapshots(FE_space, ROM_info, μ, t)
     elseif var === "M"
-      snapsₜ = build_M_snapshots(FE_space, ROM_info, μ, t)
+      snapsₜ, row_idx = build_M_snapshots(FE_space, ROM_info, μ, t)
     else
       @error "Run MDEIM on A or M only"
+    end
+    if nₜ === 1
+      global row_idx = row_idx
     end
     compressed_snapsₜ,_ = M_DEIM_POD(snapsₜ, ROM_info.ϵₛ)
     if nₜ === 1
@@ -279,19 +267,27 @@ function MDEIM_offline_spacetime(FE_space::UnsteadyProblem, ROM_info::Info, var:
 
   end
 
-  Nₕ = convert(Int64, sqrt(size(compressed_snaps)[1]/Nₜ))
+  row_idx_st = zeros(length(row_idx)*Nₜ)
+  [row_idx_st[j+(i-1)*length(row_idx)] = row_idx[j] + (i-1)*FE_space.Nₛᵘ^2 for i=1:Nₜ for j=1:length(row_idx)]
 
-  sparse_MDEIM_mat, Σ = M_DEIM_POD_spacetime(compressed_snaps, ROM_info.ϵₛ)
-  MDEIM_mat_tmp, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(sparse_MDEIM_mat, Σ)
-  MDEIM_idx_space, MDEIM_idx_time = from_spacetime_to_space_time_idx_mat(MDEIM_idx, Nₕ)
-  MDEIM_mat = reshape(MDEIM_mat_tmp[(MDEIM_idx_time.-1)*length(row_idx):MDEIM_idx_time*length(row_idx),:], Nₕ^2, :)
+  MDEIM_mat_init, Σ = M_DEIM_POD(compressed_snaps, ROM_info.ϵₛ)
+  MDEIM_mat_tmp, MDEIM_idx_tmp, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat_init, Σ)
+  MDEIM_idx = row_idx_st[MDEIM_idx_tmp]
+  MDEIM_idx_space, MDEIM_idx_time = from_spacetime_to_space_time_idx_mat(MDEIM_idx, FE_space.Nₛᵘ)
+  unique!(MDEIM_idx_space)
+  unique!(MDEIM_idx_time)
 
-  r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx_space, Nₕ)
+  select_idx = zeros(length(MDEIM_idx_time)*length(row_idx))
+  [select_idx[(i-1)*length(row_idx)+1:i*length(row_idx)] = collect((MDEIM_idx_time[i]-1)*length(row_idx)+1:MDEIM_idx_time[i]*length(row_idx)) for i=1:length(MDEIM_idx_time)]
+  select_idx = select_idx[:]
+  MDEIM_mat = reshape(MDEIM_mat_tmp[(MDEIM_idx_time.-1)*length(row_idx):MDEIM_idx_time*length(row_idx),:], length(row_idx), length(MDEIM_idx_time))
+
+  r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx_space, FE_space.Nₛᵘ)
   parametric_info = get_parametric_specifics(ROM_info, [])
 
   el = find_FE_elements(FE_space.V₀, FE_space.Ω, unique(union(r_idx, c_idx)))
 
-  MDEIM_mat, MDEIM_idx, el, MDEIM_err_bound, Σ
+  MDEIM_mat, MDEIM_idx, el, MDEIM_err_bound, Σ, row_idx
 
 end
 
@@ -324,7 +320,7 @@ function MDEIM_offline_functional(FE_space::UnsteadyProblem, ROM_info::Info, var
       @error "Run MDEIM on A or M only"
     end =#
     snapsₖ = reshape(snapsₖ,nquad,Nₜ)
-    compressed_snapsₖ, _ = M_DEIM_POD_functional(snapsₖ, ROM_info.ϵₛ)
+    compressed_snapsₖ, _ = M_DEIM_POD(snapsₖ, ROM_info.ϵₛ)
     if k === 1
       global compressed_snaps = compressed_snapsₖ
     else
@@ -333,7 +329,7 @@ function MDEIM_offline_functional(FE_space::UnsteadyProblem, ROM_info::Info, var
 
   end
 
-  param_mat, Σ = M_DEIM_POD_functional(compressed_snaps, ROM_info.ϵₛ)
+  param_mat, Σ = M_DEIM_POD(compressed_snaps, ROM_info.ϵₛ)
   param_mat_rep = repeat(param_mat, outer=[num_cells(FE_space.Ω),1])
 
   refFE_quad = ReferenceFE(lagrangian_quad, Float64, problem_info.order, FE_space.Ω)
@@ -459,8 +455,7 @@ function DEIM_offline_spacetime(FE_space::UnsteadyProblem, ROM_info::Info, var::
   sparse_DEIM_mat, Σ = M_DEIM_POD(compressed_snaps, ROM_info.ϵₛ)
   DEIM_mat, DEIM_idx, DEIM_err_bound = M_DEIM_offline(sparse_DEIM_mat, Σ)
   unique!(DEIM_idx)
-  Nₕ = convert(Int64, size(DEIM_mat)[1]/Nₜ)
-  DEIM_mat = reshape(DEIM_mat, Nₕ, :)
+  DEIM_mat = reshape(DEIM_mat, FE_space.Nₛᵘ, :)
 
   DEIM_mat, DEIM_idx, DEIM_err_bound, Σ
 

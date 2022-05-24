@@ -110,15 +110,14 @@ function build_A_snapshots(FE_space::UnsteadyProblem, ROM_info::Info, μ::Array,
     μ_nₛ = parse.(Float64, split(chop(μ[nₛ]; head=1, tail=1), ','))
     parametric_info = get_parametric_specifics(ROM_info, μ_nₛ)
     A_nₛ = assemble_stiffness(FE_space, ROM_info, parametric_info)(t)
-    i, v = findnz(A_nₛ[:])
+    global i, v = findnz(A_nₛ[:])
     if nₛ === 1
-      global A = sparse(i, ones(length(i)), v, FE_space.Nₛᵘ^2, ROM_info.nₛ_MDEIM)
-    else
-      global A[:, nₛ] = sparse(i, ones(length(i)), v)
+      global A = zeros(length(i), ROM_info.nₛ_MDEIM)
     end
+    global A[:, nₛ] = v
   end
 
-  A
+  A, i
 
 end
 
