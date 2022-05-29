@@ -348,7 +348,7 @@ function get_θᵃ(ROM_info::Info, RB_variables::PoissonSteady, param) :: Array
   if !ROM_info.probl_nl["A"]
     θᵃ = param.α(Point(0.,0.))
   else
-    A_μ_sparse = build_sparse_mat(problem_info, FE_space, ROM_info, param.μ, RB_variables.sparse_el_A)
+    A_μ_sparse = build_sparse_mat(problem_info, FE_space, param, RB_variables.sparse_el_A)
     θᵃ = M_DEIM_online(A_μ_sparse, RB_variables.MDEIMᵢ_A, RB_variables.MDEIM_idx_A)
   end
 

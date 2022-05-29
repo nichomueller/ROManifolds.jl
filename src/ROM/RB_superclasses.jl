@@ -1,7 +1,7 @@
 include("../FEM/FEM_superclasses.jl")
 abstract type RBProblem <: Problem end
-abstract type RBSteadyProblem <: Problem end
-abstract type RBUnsteadyProblem <: Problem end
+abstract type RBSteadyProblem <: RBProblem end
+abstract type RBUnsteadyProblem <: RBProblem end
 abstract type PoissonSteady <: RBSteadyProblem end
 abstract type PoissonUnsteady <: RBUnsteadyProblem end
 abstract type StokesUnsteady <: RBUnsteadyProblem end
@@ -63,18 +63,20 @@ Qʰ = 0
 θʰ = Float64[]
 
 MDEIMᵢ_A = Matrix{Float64}[]
-MDEIM_idx_A = Float64[]
-sparse_el_A = Float64[]
+MDEIM_idx_A = Int64[]
+sparse_el_A = Int64[]
+row_idx_A = Int64[]
 MDEIMᵢ_M = Matrix{Float64}[]
-MDEIM_idx_M = Float64[]
-sparse_el_M = Float64[]
+MDEIM_idx_M = Int64[]
+sparse_el_M = Int64[]
+row_idx_M = Int64[]
 MDEIMᵢ_C = Matrix{Float64}[]
 MDEIM_idx_C = Float64[]
-sparse_el_C = Float64[]
+sparse_el_C = Int64[]
 DEIMᵢ_mat_F = Float64[]
 DEIM_idx_F = Float64[]
 DEIMᵢ_mat_H = Float64[]
-DEIM_idx_H = Float64[]
+DEIM_idx_H = Int64[]
 
 offline_time = 0.0
 
@@ -113,13 +115,14 @@ end
 
 mutable struct PoissonSTGRB <: PoissonUnsteady
   S::PoissonSGRB; Φₜᵘ::Array; Mₙ::Array; MDEIMᵢ_M::Array;
-  MDEIM_idx_M::Array; sparse_el_M::Array; Nₜ::Int64; Nᵘ::Int64; nₜᵘ::Int64;
-  nᵘ::Int64; Qᵐ::Int64; θᵐ::Array
+  MDEIM_idx_M::Array; sparse_el_M::Array; row_idx_A::Array; row_idx_M::Array;
+  Nₜ::Int64; Nᵘ::Int64; nₜᵘ::Int64; nᵘ::Int64; Qᵐ::Int64; θᵐ::Array
 end
 
 mutable struct PoissonSTPGRB <: PoissonUnsteady
   S::PoissonSPGRB; Φₜᵘ::Array; Mₙ::Array; MDEIMᵢ_M::Array;
-  MDEIM_idx_M::Array; sparse_el_M::Array; MAₙ::Array; MΦ::Array; MΦᵀPᵤ⁻¹::Array;
+  MDEIM_idx_M::Array; sparse_el_M::Array; row_idx_A::Array;
+  row_idx_M::Array; MAₙ::Array; MΦ::Array; MΦᵀPᵤ⁻¹::Array;
   Nₜ::Int64; Nᵘ::Int64; nₜᵘ::Int64; nᵘ::Int64; Qᵐ::Int64; θᵐ::Array
 end
 
@@ -128,7 +131,8 @@ function setup_PoissonSTGRB(::NTuple{3,Int})::PoissonSTGRB
   return PoissonSTGRB(PoissonSGRB(Sᵘ, Φₛᵘ, ũ, uₙ, û, Aₙ, Fₙ, Hₙ, Xᵘ₀, LHSₙ, RHSₙ,
   MDEIMᵢ_A, MDEIM_idx_A, DEIMᵢ_mat_F, DEIM_idx_F, DEIMᵢ_mat_H, DEIM_idx_H,
   sparse_el_A, Nₛᵘ, nₛᵘ, Qᵃ, Qᶠ, Qʰ, θᵃ, θᶠ, θʰ, offline_time), Φₜᵘ, Mₙ,
-  MDEIMᵢ_M, MDEIM_idx_M, sparse_el_M, Nₜ, Nᵘ, nₜᵘ, nᵘ, Qᵐ, θᵐ)
+  MDEIMᵢ_M, MDEIM_idx_M, sparse_el_M, row_idx_A, row_idx_M, Nₜ, Nᵘ, nₜᵘ, nᵘ,
+  Qᵐ, θᵐ)
 
 end
 
@@ -137,8 +141,8 @@ function setup_PoissonSTPGRB(::NTuple{4,Int})::PoissonSTPGRB
   return PoissonSTPGRB(PoissonSPGRB(Sᵘ, Φₛᵘ, ũ, uₙ, û, Aₙ, Fₙ, Hₙ, Xᵘ₀, LHSₙ,
   RHSₙ, MDEIMᵢ_A, MDEIM_idx_A, DEIMᵢ_mat_F, DEIM_idx_F, DEIMᵢ_mat_H, DEIM_idx_H,
   sparse_el_A, Nₛᵘ, nₛᵘ, Qᵃ, Qᶠ, Qʰ, θᵃ, θᶠ, θʰ, offline_time, Pᵤ⁻¹, AΦᵀPᵤ⁻¹),
-  Φₜᵘ, Mₙ, MDEIMᵢ_M, MDEIM_idx_M, sparse_el_M, MAₙ, MΦ, MΦᵀPᵤ⁻¹, Nₜ, Nᵘ, nₜᵘ,
-  nᵘ, Qᵐ, θᵐ)
+  Φₜᵘ, Mₙ, MDEIMᵢ_M, MDEIM_idx_M, sparse_el_M, sparse_el_M, row_idx_A, MAₙ, MΦ,
+  MΦᵀPᵤ⁻¹, Nₜ, Nᵘ, nₜᵘ, nᵘ, Qᵐ, θᵐ)
 
 end
 
@@ -162,8 +166,8 @@ function setup_StokesSTGRB(::NTuple{5,Int})::StokesSTGRB
   return StokesSTGRB(PoissonSTGRB(PoissonSGRB(Sᵘ, Φₛᵘ, ũ, uₙ, û, Aₙ, Fₙ, Hₙ, Xᵘ₀, LHSₙ, RHSₙ,
   MDEIMᵢ_A, MDEIM_idx_A, DEIMᵢ_mat_F, DEIM_idx_F, DEIMᵢ_mat_H, DEIM_idx_H,
   sparse_el_A, Nₛᵘ, nₛᵘ, Qᵃ, Qᶠ, Qʰ, θᵃ, θᶠ, θʰ, offline_time), Φₜᵘ, Mₙ,
-  MDEIMᵢ_M, MDEIM_idx_M, sparse_el_M, Nₜ, Nᵘ, nₜᵘ, nᵘ, Qᵐ, θᵐ), Sᵖ, Φₛᵖ,
-  Φₜᵖ, p̃, pₙ, p̂, Bₙ, Bᵀₙ, Xᵘ, Xᵖ, Xᵖ₀, Nₛᵖ, Nᵖ, nₛᵖ, nₛˡ, nₜᵖ, nᵖ)
+  MDEIMᵢ_M, MDEIM_idx_M, sparse_el_M, row_idx_A, row_idx_M, Nₜ, Nᵘ, nₜᵘ, nᵘ, Qᵐ,
+  θᵐ), Sᵖ, Φₛᵖ, Φₜᵖ, p̃, pₙ, p̂, Bₙ, Bᵀₙ, Xᵘ, Xᵖ, Xᵖ₀, Nₛᵖ, Nᵖ, nₛᵖ, nₛˡ, nₜᵖ, nᵖ)
 
 end
 

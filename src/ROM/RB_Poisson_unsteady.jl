@@ -157,15 +157,15 @@ end
 
 function save_M_DEIM_structures(ROM_info::Info, RB_variables::PoissonUnsteady)
 
-  list_M_DEIM = (RB_variables.MDEIMᵢ_M, RB_variables.MDEIM_idx_M, RB_variables.sparse_el_M, )
-  list_names = ("MDEIMᵢ_M", "MDEIM_idx_M", "sparse_el_M")
+  list_M_DEIM = (RB_variables.MDEIMᵢ_M, RB_variables.MDEIM_idx_M, RB_variables.sparse_el_M, RB_variables.row_idx_A, RB_variables.row_idx_M)
+  list_names = ("MDEIMᵢ_M", "MDEIM_idx_M", "sparse_el_M", "row_idx_A", "row_idx_M")
   l_info_vec = [[l_idx,l_val] for (l_idx,l_val) in enumerate(list_M_DEIM) if !all(isempty.(l_val))]
 
   if !isempty(l_info_vec)
     l_info_mat = reduce(vcat,transpose.(l_info_vec))
-    l_idx,l_val = l_info_mat[:,1], l_info_mat[:,2]
-    for i = l_idx
-      save_CSV(l_val[i], joinpath(ROM_info.paths.ROM_structures_path, list_names[i]*".csv"))
+    l_val = l_info_mat[:,2]
+    for (i,v) in enumerate(l_val)
+      save_CSV(v, joinpath(ROM_info.paths.ROM_structures_path, list_names[i]*".csv"))
     end
   end
 
@@ -179,6 +179,30 @@ function set_operators(ROM_info, RB_variables::PoissonUnsteady) :: Vector
 
 end
 
+function get_ST_M_DEIM_structures(ROM_info::Info, RB_variables::PoissonUnsteady) :: Vector
+
+  operators = String[]
+
+  if ROM_info.probl_nl["A"]
+    if isfile(joinpath(ROM_info.paths.ROM_structures_path, "row_idx_A.csv"))
+      RB_variables.row_idx_A = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "row_idx_A.csv"))[:]
+    else
+      @info "Failed to import MDEIM offline structures for the stiffness matrix, space-time technique: must build them"
+      append!(operators, ["A"])
+    end
+  end
+  if ROM_info.probl_nl["M"]
+    if isfile(joinpath(ROM_info.paths.ROM_structures_path, "row_idx_M.csv"))
+      RB_variables.row_idx_M = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "row_idx_M.csv"))[:]
+    else
+      @info "Failed to import MDEIM offline structures for the mass matrix, space-time technique: must build them"
+      append!(operators, ["M"])
+    end
+  end
+
+  operators
+
+end
 
 function get_M_DEIM_structures(ROM_info::Info, RB_variables::PoissonUnsteady) :: Vector
 
@@ -200,6 +224,9 @@ function get_M_DEIM_structures(ROM_info::Info, RB_variables::PoissonUnsteady) ::
   end
 
   append!(operators, get_M_DEIM_structures(ROM_info, RB_variables.S))
+  if ROM_info.space_time_M_DEIM
+    append!(operators, get_ST_M_DEIM_structures(ROM_info, RB_variables))
+  end
 
 end
 
@@ -220,7 +247,7 @@ function get_θᵐ(ROM_info::Info, RB_variables::RBUnsteadyProblem, param::Param
     times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+ROM_info.δt*ROM_info.θ
     θᵐ = [param.mₜ(t_θ) for t_θ = times_θ]
   else
-    M_μ_sparse = build_sparse_mat(problem_info, FE_space, ROM_info, param.μ, RB_variables.sparse_el_M; var="M")
+    M_μ_sparse = build_sparse_mat(problem_info, FE_space, ROM_info, param, RB_variables.sparse_el_M; var="M")
     Nₛᵘ = RB_variables.S.Nₛᵘ
     θᵐ = zeros(RB_variables.Qᵐ, RB_variables.Nₜ)
     for iₜ = 1:RB_variables.Nₜ
@@ -242,7 +269,7 @@ function get_θᵐₛₜ(ROM_info::Info, RB_variables::RBUnsteadyProblem, param:
     Nₛᵘ = RB_variables.S.Nₛᵘ
     _, MDEIM_idx_time = from_spacetime_to_space_time_idx_mat(RB_variables.MDEIM_idx_M, Nₛᵘ)
     unique!(MDEIM_idx_time)
-    M_μ_sparse = build_sparse_mat(problem_info, FE_space, ROM_info, param.μ, RB_variables.sparse_el_M, MDEIM_idx_time; var="M")
+    M_μ_sparse = build_sparse_mat(problem_info, FE_space, ROM_info, param, RB_variables.sparse_el_M, MDEIM_idx_time; var="M")
 
     θᵐ = zeros(RB_variables.Qᵐ, length(MDEIM_idx_time))
     for iₜ = 1:length(MDEIM_idx_time)
@@ -260,7 +287,7 @@ function get_θᵃ(ROM_info::Info, RB_variables::RBUnsteadyProblem, param::Param
     times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+ROM_info.δt*ROM_info.θ
     θᵃ = [param.αₜ(t_θ,param.μ) for t_θ = times_θ]
   else
-    A_μ_sparse = build_sparse_mat(problem_info, FE_space, ROM_info, param.μ, RB_variables.S.sparse_el_A; var="A")
+    A_μ_sparse = build_sparse_mat(problem_info, FE_space, ROM_info, param, RB_variables.S.sparse_el_A; var="A")
     Nₛᵘ = RB_variables.S.Nₛᵘ
     θᵃ = zeros(RB_variables.S.Qᵃ, RB_variables.Nₜ)
     for iₜ = 1:RB_variables.Nₜ
@@ -280,13 +307,15 @@ function get_θᵃₛₜ(ROM_info::Info, RB_variables::RBUnsteadyProblem, param:
     θᵃ = get_θᵃ(ROM_info, RB_variables, param)
   else
     Nₛᵘ = RB_variables.S.Nₛᵘ
-    _, MDEIM_idx_time = from_spacetime_to_space_time_idx_mat(RB_variables.S.MDEIM_idx_A, Nₛᵘ)
-    unique!(MDEIM_idx_time)
-    A_μ_sparse = build_sparse_mat(problem_info, FE_space, ROM_info, param.μ, RB_variables.S.sparse_el_A, MDEIM_idx_time; var="A")
+    _, MDEIM_idx_time = from_spacetime_to_space_time_idx_vec(RB_variables.S.MDEIM_idx_A, length(RB_variables.row_idx_A))
+    @assert RB_variables.S.Qᵃ === length(MDEIM_idx_time) "Something is wrong with ST-MDEIM"
+    A_μ_sparse = build_sparse_mat(problem_info, FE_space, ROM_info, param, RB_variables.S.sparse_el_A, MDEIM_idx_time; var="A")
 
-    θᵃ = zeros(RB_variables.Qᵃ, length(MDEIM_idx_time))
+    idx_sparse = from_full_idx_to_sparse_idx(RB_variables.row_idx_A,Nₛᵘ,RB_variables.Nₜ)
+    MDEIM_idx_space_sparse, _ = from_spacetime_to_space_time_idx_mat(idx_sparse[RB_variables.S.MDEIM_idx_A], Nₛᵘ)
+    θᵃ = zeros(RB_variables.S.Qᵃ, length(MDEIM_idx_time))
     for iₜ = 1:length(MDEIM_idx_time)
-      θᵃ[:,iₜ] = M_DEIM_online(A_μ_sparse[:,(iₜ-1)*Nₛᵘ+1:iₜ*Nₛᵘ], RB_variables.S.MDEIMᵢ_A, RB_variables.S.MDEIM_idx_A)
+      θᵃ[:,iₜ] = M_DEIM_online(A_μ_sparse[:,(iₜ-1)*Nₛᵘ+1:iₜ*Nₛᵘ], RB_variables.S.MDEIMᵢ_A, MDEIM_idx_space_sparse)
     end
   end
 

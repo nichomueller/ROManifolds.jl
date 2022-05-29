@@ -61,7 +61,7 @@ end
 
 function from_spacetime_to_space_time_idx_mat(idx::Array, Nᵤ::Int64)
 
-  idx_time = 1 .+ floor.((idx.-1)/Nᵤ^2)
+  idx_time = 1 .+ floor.(Int64,(idx.-1)/Nᵤ^2)
   idx_space = idx - (idx_time.-1)*Nᵤ^2
 
   idx_space, idx_time
@@ -70,11 +70,34 @@ end
 
 function from_spacetime_to_space_time_idx_vec(idx::Array, Nᵤ::Int64)
 
-  idx_time = 1 .+ floor.((idx.-1)/Nᵤ)
-  idx_space = idx - (idx_time.+1)*Nᵤ
+  idx_time = 1 .+ floor.(Int64,(idx.-1)/Nᵤ)
+  idx_space = idx - (idx_time.-1)*Nᵤ
 
   idx_space, idx_time
 
+end
+
+function from_full_idx_to_sparse_idx(sparse_to_full_idx::Vector,full_idx::Vector,Nₛ::Int64)
+
+  #sparse_idx = zeros(Int64,length(full_idx)*Nₜ)
+  #[sparse_idx[j+(i-1)*length(row_idx)] = row_idx[j] + (i-1)*Nₛ^2 for i=1:Nₜ for j=1:length(full_idx)]
+  #return sparse_idx
+  Nfull  = length(sparse_to_full_idx)
+  full_idx_space,full_idx_time = from_spacetime_to_space_time_idx_vec(full_idx, Nfull)
+  sparse_idx = (full_idx_time.-1)*Nₛ^2+row_idx[full_idx_space]
+  return sparse_idx
+
+end
+
+function remove_zero_entries(M_sparse::SparseMatrixCSC) :: Matrix
+  for col = 1:size(M_sparse)[2]
+    _,vals = findnz(M_sparse[:,col])
+    if col == 1
+      global M = zeros(length(vals),size(M_sparse)[2])
+    end
+    M[:,col] = vals
+  end
+  return M
 end
 
 function chebyshev_polynomial(x::Float64, n::Int64)

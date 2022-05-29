@@ -36,38 +36,21 @@ function assemble_affine_matrices(ROM_info::Info, RB_variables::PoissonSTGRB, va
 
 end
 
-function assemble_MDEIM_matrices(ROM_info::Info, RB_variables::PoissonSTGRB, var::String, do_ST_M_DEIM::Bool)
+function assemble_MDEIM_matrices(ROM_info::Info, RB_variables::PoissonSTGRB, var::String)
 
   @info "The matrix $var is non-affine: running the MDEIM offline phase on $nₛ_MDEIM snapshots"
 
-  if !do_ST_M_DEIM
-    MDEIM_mat, MDEIM_idx, sparse_el, _, _ = MDEIM_offline(FE_space, ROM_info, var)
-  else
-    MDEIM_mat, MDEIM_idx, sparse_el, _, _, row_idx = MDEIM_offline(FE_space, ROM_info, var)
-  end
+  MDEIM_mat, MDEIM_idx, sparse_el, _, _ = MDEIM_offline(FE_space, ROM_info, var)
 
   Q = size(MDEIM_mat)[2]
   Matₙ = zeros(RB_variables.S.nₛᵘ, RB_variables.S.nₛᵘ, Q)
 
-  if !do_ST_M_DEIM
-    for q = 1:Q
-      @info "ST-GRB: affine component number $q, matrix $var"
-      Matq = reshape(MDEIM_mat[:,q], (RB_variables.S.Nₛᵘ, RB_variables.S.Nₛᵘ))
-      Matₙ[:,:,q] = RB_variables.S.Φₛᵘ' * Matrix(Matq) * RB_variables.S.Φₛᵘ
-    end
-    MDEIMᵢ_mat = Matrix(MDEIM_mat[MDEIM_idx, :])
-  else
-    for q = 1:Q
-      @info "ST-GRB: affine component number $q, matrix $var"
-      r_idx, c_idx = from_vec_to_mat_idx(row_idx, RB_variables.S.Nₛᵘ)
-      MatqΦ = zeros(RB_variables.S.Nₛᵘ,RB_variables.S.nₛᵘ)
-      for j = 1:RB_variables.S.Nₛᵘ
-        Mat_idx = findall(x -> x == j, r_idx)
-        MatqΦ[j,:] = (MDEIM_mat[Mat_idx]' * RB_variables.S.Φₛᵘ[c_idx[Mat_idx],:])
-      end
-      Matₙ[:,:,q] = RB_variables.S.Φₛᵘ' * MatqΦ
-    end
-    MDEIMᵢ_mat = Matrix(MDEIM_mat[MDEIM_idx, :])
+  for q = 1:Q
+    @info "ST-GRB: affine component number $q, matrix $var"
+    Matq = reshape(MDEIM_mat[:,q], (RB_variables.S.Nₛᵘ, RB_variables.S.Nₛᵘ))
+    Matₙ[:,:,q] = RB_variables.S.Φₛᵘ' * Matrix(Matq) * RB_variables.S.Φₛᵘ
+  end
+  MDEIMᵢ_mat = Matrix(MDEIM_mat[MDEIM_idx, :])
 
   if var === "M"
     RB_variables.Mₙ = Matₙ
@@ -80,6 +63,55 @@ function assemble_MDEIM_matrices(ROM_info::Info, RB_variables::PoissonSTGRB, var
     RB_variables.S.MDEIMᵢ_A = MDEIMᵢ_mat
     RB_variables.S.MDEIM_idx_A = MDEIM_idx
     RB_variables.S.sparse_el_A = sparse_el
+    RB_variables.S.Qᵃ = Q
+  else
+    @error "Unrecognized variable to assemble with MDEIM"
+  end
+
+end
+
+function assemble_MDEIM_matrices_st(ROM_info::Info, RB_variables::PoissonSTGRB, var::String)
+
+  @info "The matrix $var is non-affine: running the MDEIM offline phase on $nₛ_MDEIM snapshots"
+
+  MDEIM_mat, MDEIM_idx, sparse_el, _, _, row_idx = MDEIM_offline(FE_space, ROM_info, var)
+
+  Q_temp = size(MDEIM_mat)[2]
+  Matₙ = zeros(RB_variables.S.nₛᵘ, RB_variables.S.nₛᵘ, Q_temp)
+
+  r_idx, c_idx = from_vec_to_mat_idx(row_idx, RB_variables.S.Nₛᵘ)
+  for q = 1:Q_temp
+    @info "ST-GRB: affine component number $q, matrix $var"
+    MatqΦ = zeros(RB_variables.S.Nₛᵘ,RB_variables.S.nₛᵘ)
+    for j = 1:RB_variables.S.Nₛᵘ
+      Mat_idx = findall(x -> x == j, r_idx)
+      MatqΦ[j,:] = (MDEIM_mat[Mat_idx]' * RB_variables.S.Φₛᵘ[c_idx[Mat_idx],:])
+    end
+    Matₙ[:,:,q] = RB_variables.S.Φₛᵘ' * MatqΦ
+  end
+
+  Q = length(MDEIM_idx)
+  MDEIM_idx_space, MDEIM_idx_time = from_spacetime_to_space_time_idx_vec(MDEIM_idx, length(row_idx))
+  idx = Int.(indexin(collect(eachrow(MDEIM_idx_time)), collect(eachrow(MDEIM_idx_time))))
+  idx_new = subtract_idx_in_blocks(idx)
+  MDEIMᵢ_mat = zeros(Q,Q)
+  for i = 1:Q
+    MDEIMᵢ_mat[:,i] = MDEIM_mat[MDEIM_idx_space[i],(idx_new[i]-1)*Q+1:idx_new[i]*Q]
+  end
+
+  if var === "M"
+    RB_variables.Mₙ = Matₙ
+    RB_variables.MDEIMᵢ_M = MDEIMᵢ_mat
+    RB_variables.MDEIM_idx_M = MDEIM_idx
+    RB_variables.sparse_el_M = sparse_el
+    RB_variables.row_idx_M = row_idx
+    RB_variables.Qᵐ = Q
+  elseif var === "A"
+    RB_variables.S.Aₙ = Matₙ
+    RB_variables.S.MDEIMᵢ_A = MDEIMᵢ_mat
+    RB_variables.S.MDEIM_idx_A = MDEIM_idx
+    RB_variables.S.sparse_el_A = sparse_el
+    RB_variables.row_idx_A = row_idx
     RB_variables.S.Qᵃ = Q
   else
     @error "Unrecognized variable to assemble with MDEIM"
@@ -120,6 +152,14 @@ function assemble_DEIM_vectors(ROM_info::Info, RB_variables::PoissonSTGRB, var::
     @error "Unrecognized vector to assemble with DEIM"
   end
 
+end
+
+function assemble_MDEIM_matrices(ROM_info::Info, RB_variables::PoissonSTGRB, var::String, do_ST_M_DEIM::Bool)
+  if do_ST_M_DEIM
+    assemble_MDEIM_matrices_st(ROM_info, RB_variables, var)
+  else
+    assemble_MDEIM_matrices(ROM_info, RB_variables, var)
+  end
 end
 
 function assemble_offline_structures(ROM_info::Info, RB_variables::PoissonSTGRB, operators=nothing)

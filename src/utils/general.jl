@@ -104,6 +104,56 @@ function mynorm(vec::Array, norm_matrix = nothing)
 
 end
 
+function my_unique(v::Vector)
+  u = unique(v)
+  idx = Int.(indexin(u,v))
+  return u,idx
+end
+
+function find_idx_duplicates(v::Vector)
+  u,idx = my_unique(v)
+  v_dupl = unique(v[setdiff(collect(1:length(v)),idx)])
+  idx_dupl = [findall(x->x.==vi,v) for vi=v_dupl]
+  return v_dupl,idx_dupl
+end
+
+#= function subtract_idx_in_blocks(idx::Vector)
+  _,idx_u = my_unique(idx)
+  idx_new = zeros(Int64,length(idx_u))
+  idx_new[1] = idx_u[1]
+  count = 0
+  for i=1:length(idx)
+    idx_new[i-count] = idx[i-count]-count
+    if idx[i] != idx[1]+i-1
+      count += 1
+    end
+  end
+  return idx_new
+end =#
+function subtract_idx_in_blocks(idx::Vector)
+
+  idx_new = copy(idx)
+
+  count_loc = zeros(Int,length(idx))
+  for i=1:length(idx)
+    if idx[i] != idx[1]+i-1
+      count_loc[i] = 1
+    end
+  end
+
+  count_glob = cumsum(count_loc)
+  for i=1:length(idx)
+    if count_loc[i] == 0
+      global val = count_glob[i]
+    end
+    count_glob[i] = val
+  end
+
+  idx_new -= count_glob
+  return idx_new
+
+end
+
 function tensor_product(AB, A, B; transpose_A=false)
 
   @assert length(size(A)) === 3 && length(size(B)) === 2 "Only implemented tensor order 3 * tensor order 2"

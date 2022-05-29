@@ -65,9 +65,7 @@ function POD(S, ϵ = 1e-5, X = nothing)
 
 end
 
-function build_sparse_mat(problem_info::ProblemSpecifics, FE_space::SteadyProblem, ROM_info::Info, μ_i::Array, el::Array; var="A")
-
-  param = get_parametric_specifics(ROM_info, μ_i)
+function build_sparse_mat(problem_info::ProblemSpecifics, FE_space::SteadyProblem, param::ParametricSpecifics, el::Array; var="A")
 
   Ω_sparse = view(FE_space.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * problem_info.order)
@@ -81,9 +79,7 @@ function build_sparse_mat(problem_info::ProblemSpecifics, FE_space::SteadyProble
 
 end
 
-function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, FE_space::UnsteadyProblem, ROM_info::Info, μ_i::Array, el::Array; var="A")
-
-  param = get_parametric_specifics(ROM_info, μ_i)
+function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, FE_space::UnsteadyProblem, ROM_info::Info, param::ParametricSpecificsUnsteady, el::Array; var="A")
 
   Ω_sparse = view(FE_space.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * problem_info.order)
@@ -112,9 +108,7 @@ function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, FE_space::Unst
 
 end
 
-function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, FE_space::UnsteadyProblem, ROM_info, μ_i::Array, el::Array, time_idx::Array; var="A")
-
-  param = get_parametric_specifics(ROM_info, μ_i)
+function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, FE_space::UnsteadyProblem, ROM_info, param::ParametricSpecificsUnsteady, el::Array, time_idx::Array; var="A")
 
   Ω_sparse = view(FE_space.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * problem_info.order)
@@ -133,11 +127,20 @@ function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, FE_space::Unst
   end
   Matₜ(t) = define_Matₜ(t, var)
 
-  i,j,v = findnz(Matₜ(times_MDEIM[1]))
-  Mat = sparse(i,j,v,FE_space.Nₛᵘ,FE_space.Nₛᵘ*Nₜ)
-  for (i_t,t) in enumerate(times_MDEIM[2:end])
+  #= for (i_t,t) in enumerate(times_MDEIM[1:end])
+    i,v = findnz(Matₜ(t)[:])
+    if i_t === 1
+      global Mat = zeros(length(i),length(times_MDEIM))
+    end
+    global Mat[:,i_t] = v
+  end =#
+
+  for (i_t,t) in enumerate(times_MDEIM)
     i,j,v = findnz(Matₜ(t))
-    Mat[:,i_t*FE_space.Nₛᵘ+1:(i_t+1)*FE_space.Nₛᵘ] = sparse(i,j,v,FE_space.Nₛᵘ,FE_space.Nₛᵘ)
+    if i_t === 1
+      global Mat = sparse(i,j,v,FE_space.Nₛᵘ,FE_space.Nₛᵘ*length(times_MDEIM))
+    end
+    global Mat[:,(i_t-1)*FE_space.Nₛᵘ+1:i_t*FE_space.Nₛᵘ] = sparse(i,j,v,FE_space.Nₛᵘ,FE_space.Nₛᵘ)
   end
 
   Mat

@@ -267,24 +267,20 @@ function MDEIM_offline_spacetime(FE_space::UnsteadyProblem, ROM_info::Info, var:
 
   end
 
-  row_idx_st = zeros(length(row_idx)*Nₜ)
-  [row_idx_st[j+(i-1)*length(row_idx)] = row_idx[j] + (i-1)*FE_space.Nₛᵘ^2 for i=1:Nₜ for j=1:length(row_idx)]
-
   MDEIM_mat_init, Σ = M_DEIM_POD(compressed_snaps, ROM_info.ϵₛ)
-  MDEIM_mat_tmp, MDEIM_idx_tmp, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat_init, Σ)
-  MDEIM_idx = row_idx_st[MDEIM_idx_tmp]
-  MDEIM_idx_space, MDEIM_idx_time = from_spacetime_to_space_time_idx_mat(MDEIM_idx, FE_space.Nₛᵘ)
-  unique!(MDEIM_idx_space)
+  MDEIM_mat_tmp, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat_init, Σ)
+  MDEIM_idx_space, MDEIM_idx_time = from_spacetime_to_space_time_idx_vec(MDEIM_idx, length(row_idx))
   unique!(MDEIM_idx_time)
 
-  select_idx = zeros(length(MDEIM_idx_time)*length(row_idx))
-  [select_idx[(i-1)*length(row_idx)+1:i*length(row_idx)] = collect((MDEIM_idx_time[i]-1)*length(row_idx)+1:MDEIM_idx_time[i]*length(row_idx)) for i=1:length(MDEIM_idx_time)]
-  select_idx = select_idx[:]
-  MDEIM_mat = reshape(MDEIM_mat_tmp[(MDEIM_idx_time.-1)*length(row_idx):MDEIM_idx_time*length(row_idx),:], length(row_idx), length(MDEIM_idx_time))
+  MDEIM_mat = zeros(length(row_idx), length(MDEIM_idx)*length(MDEIM_idx_time))
+  for i=1:length(MDEIM_idx_time)
+    MDEIM_mat[:,(i-1)*length(MDEIM_idx)+1:i*length(MDEIM_idx)] = MDEIM_mat_tmp[(MDEIM_idx_time[i]-1)*length(row_idx)+1:MDEIM_idx_time[i]*length(row_idx),:]
+  end
 
-  r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx_space, FE_space.Nₛᵘ)
-  parametric_info = get_parametric_specifics(ROM_info, [])
-
+  idx_sparse = from_full_idx_to_sparse_idx(row_idx,FE_space.Nₛᵘ,Nₜ)
+  MDEIM_idx_sparse = idx_sparse[MDEIM_idx]
+  MDEIM_idx_space_sparse, _ = from_spacetime_to_space_time_idx_mat(MDEIM_idx_sparse, FE_space.Nₛᵘ)
+  r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx_space_sparse, FE_space.Nₛᵘ)
   el = find_FE_elements(FE_space.V₀, FE_space.Ω, unique(union(r_idx, c_idx)))
 
   MDEIM_mat, MDEIM_idx, el, MDEIM_err_bound, Σ, row_idx
