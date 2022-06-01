@@ -56,7 +56,7 @@ end
 
 function build_reduced_basis(ROM_info::Info, RB_variables::PoissonSteady)
 
-  @info "Building the reduced basis for field u, using a tolerance of $(ROM_info.ϵₛ)"
+  @info "Building the spatial reduced basis for field u, using a tolerance of $(ROM_info.ϵₛ)"
 
   RB_building_time = @elapsed begin
     PODs_space(ROM_info, RB_variables)
@@ -72,8 +72,7 @@ end
 
 function import_reduced_basis(ROM_info::Info, RB_variables::PoissonSteady)
 
-  @info "Importing the reduced basis for field u"
-
+  @info "Importing the spatial reduced basis for field u"
   RB_variables.Φₛᵘ = load_CSV(joinpath(ROM_info.paths.basis_path, "Φₛᵘ.csv"))
   (RB_variables.Nₛᵘ, RB_variables.nₛᵘ) = size(RB_variables.Φₛᵘ)
 

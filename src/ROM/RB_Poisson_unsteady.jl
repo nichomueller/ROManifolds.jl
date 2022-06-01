@@ -94,10 +94,9 @@ end
 
 function import_reduced_basis(ROM_info::Info, RB_variables::PoissonUnsteady)
 
-  @info "Importing the reduced basis for field u"
-
   import_reduced_basis(ROM_info, RB_variables.S)
 
+  @info "Importing the temporal reduced basis for field u"
   RB_variables.Φₜᵘ = load_CSV(joinpath(ROM_info.paths.basis_path, "Φₜᵘ.csv"))
   RB_variables.nₜᵘ = size(RB_variables.Φₜᵘ)[2]
   RB_variables.nᵘ = RB_variables.S.nₛᵘ * RB_variables.nₜᵘ
@@ -165,7 +164,7 @@ function save_M_DEIM_structures(ROM_info::Info, RB_variables::PoissonUnsteady)
     l_info_mat = reduce(vcat,transpose.(l_info_vec))
     l_val = l_info_mat[:,2]
     for (i,v) in enumerate(l_val)
-      save_CSV(v, joinpath(ROM_info.paths.ROM_structures_path, list_names[i]*".csv"))
+      save_CSV(v,joinpath(ROM_info.paths.ROM_structures_path, list_names[i]*".csv"))
     end
   end
 
@@ -269,7 +268,7 @@ function get_θᵐₛₜ(ROM_info::Info, RB_variables::RBUnsteadyProblem, param:
     Nₛᵘ = RB_variables.S.Nₛᵘ
     _, MDEIM_idx_time = from_spacetime_to_space_time_idx_mat(RB_variables.MDEIM_idx_M, Nₛᵘ)
     unique!(MDEIM_idx_time)
-    M_μ_sparse = build_sparse_mat(problem_info, FE_space, ROM_info, param, RB_variables.sparse_el_M, MDEIM_idx_time; var="M")
+    M_μ_sparse = build_sparse_mat(problem_info, FE_space, ROM_info, param, RB_variables.sparse_el_M; var="M")
 
     θᵐ = zeros(RB_variables.Qᵐ, length(MDEIM_idx_time))
     for iₜ = 1:length(MDEIM_idx_time)
@@ -306,17 +305,9 @@ function get_θᵃₛₜ(ROM_info::Info, RB_variables::RBUnsteadyProblem, param:
   if !ROM_info.probl_nl["A"]
     θᵃ = get_θᵃ(ROM_info, RB_variables, param)
   else
-    Nₛᵘ = RB_variables.S.Nₛᵘ
-    _, MDEIM_idx_time = from_spacetime_to_space_time_idx_vec(RB_variables.S.MDEIM_idx_A, length(RB_variables.row_idx_A))
-    @assert RB_variables.S.Qᵃ === length(MDEIM_idx_time) "Something is wrong with ST-MDEIM"
-    A_μ_sparse = build_sparse_mat(problem_info, FE_space, ROM_info, param, RB_variables.S.sparse_el_A, MDEIM_idx_time; var="A")
-
-    idx_sparse = from_full_idx_to_sparse_idx(RB_variables.row_idx_A,Nₛᵘ,RB_variables.Nₜ)
-    MDEIM_idx_space_sparse, _ = from_spacetime_to_space_time_idx_mat(idx_sparse[RB_variables.S.MDEIM_idx_A], Nₛᵘ)
-    θᵃ = zeros(RB_variables.S.Qᵃ, length(MDEIM_idx_time))
-    for iₜ = 1:length(MDEIM_idx_time)
-      θᵃ[:,iₜ] = M_DEIM_online(A_μ_sparse[:,(iₜ-1)*Nₛᵘ+1:iₜ*Nₛᵘ], RB_variables.S.MDEIMᵢ_A, MDEIM_idx_space_sparse)
-    end
+    A_μ_sparse = build_sparse_mat(problem_info, FE_space, ROM_info, param, RB_variables.S.sparse_el_A, RB_variables.S.MDEIM_idx_A; var="A")
+    MDEIM_idx_new = modify_MDEIM_idx(RB_variables.S.MDEIM_idx_A,RB_variables.S.Nₛᵘ^2)
+    θᵃ = MDEIMᵢ_mat\Vector(A_μ_sparse[MDEIM_idx_new])
   end
 
   return θᵃ

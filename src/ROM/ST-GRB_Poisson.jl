@@ -36,7 +36,7 @@ function assemble_affine_matrices(ROM_info::Info, RB_variables::PoissonSTGRB, va
 
 end
 
-function assemble_MDEIM_matrices(ROM_info::Info, RB_variables::PoissonSTGRB, var::String)
+function assemble_MDEIM_matrices_standard(ROM_info::Info, RB_variables::PoissonSTGRB, var::String)
 
   @info "The matrix $var is non-affine: running the MDEIM offline phase on $nₛ_MDEIM snapshots"
 
@@ -70,33 +70,26 @@ function assemble_MDEIM_matrices(ROM_info::Info, RB_variables::PoissonSTGRB, var
 
 end
 
-function assemble_MDEIM_matrices_st(ROM_info::Info, RB_variables::PoissonSTGRB, var::String)
+function assemble_MDEIM_matrices_spacetime(ROM_info::Info, RB_variables::PoissonSTGRB, var::String)
 
   @info "The matrix $var is non-affine: running the MDEIM offline phase on $nₛ_MDEIM snapshots"
 
-  MDEIM_mat, MDEIM_idx, sparse_el, _, _, row_idx = MDEIM_offline(FE_space, ROM_info, var)
+  MDEIM_mat, MDEIM_idx, MDEIMᵢ_mat, row_idx, sparse_el = MDEIM_offline(FE_space, ROM_info, var)
+  Q = size(MDEIM_mat)[2]
+  MDEIM_mat_new = reshape(MDEIM_mat,length(row_idx),:)
+  Nₜ = Int(size(MDEIM_mat)[1]/Q)
 
-  Q_temp = size(MDEIM_mat)[2]
-  Matₙ = zeros(RB_variables.S.nₛᵘ, RB_variables.S.nₛᵘ, Q_temp)
+  Matₙ = zeros(RB_variables.S.nₛᵘ, RB_variables.S.nₛᵘ, Q*Nₜ)
 
   r_idx, c_idx = from_vec_to_mat_idx(row_idx, RB_variables.S.Nₛᵘ)
-  for q = 1:Q_temp
-    @info "ST-GRB: affine component number $q, matrix $var"
-    MatqΦ = zeros(RB_variables.S.Nₛᵘ,RB_variables.S.nₛᵘ)
+  for q = 1:Q
+    @info "ST-GRB: affine component number $q/$Q at time step $nₜ/$Nₜ, matrix $var"
+    MatqΦ = zeros(RB_variables.S.Nₛᵘ,RB_variables.S.nₛᵘ*Nₜ)
     for j = 1:RB_variables.S.Nₛᵘ
       Mat_idx = findall(x -> x == j, r_idx)
-      MatqΦ[j,:] = (MDEIM_mat[Mat_idx]' * RB_variables.S.Φₛᵘ[c_idx[Mat_idx],:])
+      MatqΦ[j,:] = reshape(MDEIM_mat_new[Mat_idx,(q-1)*Nₜ+1:q*Nₜ]' * RB_variables.S.Φₛᵘ[c_idx[Mat_idx],:],1,:)
     end
-    Matₙ[:,:,q] = RB_variables.S.Φₛᵘ' * MatqΦ
-  end
-
-  Q = length(MDEIM_idx)
-  MDEIM_idx_space, MDEIM_idx_time = from_spacetime_to_space_time_idx_vec(MDEIM_idx, length(row_idx))
-  idx = Int.(indexin(collect(eachrow(MDEIM_idx_time)), collect(eachrow(MDEIM_idx_time))))
-  idx_new = subtract_idx_in_blocks(idx)
-  MDEIMᵢ_mat = zeros(Q,Q)
-  for i = 1:Q
-    MDEIMᵢ_mat[:,i] = MDEIM_mat[MDEIM_idx_space[i],(idx_new[i]-1)*Q+1:idx_new[i]*Q]
+    Matₙ[:,:,(q-1)*Nₜ+1:q*Nₜ] = reshape(RB_variables.S.Φₛᵘ' * MatqΦ,RB_variables.S.Nₛᵘ,RB_variables.S.nₛᵘ,Nₜ)
   end
 
   if var === "M"
@@ -154,11 +147,11 @@ function assemble_DEIM_vectors(ROM_info::Info, RB_variables::PoissonSTGRB, var::
 
 end
 
-function assemble_MDEIM_matrices(ROM_info::Info, RB_variables::PoissonSTGRB, var::String, do_ST_M_DEIM::Bool)
-  if do_ST_M_DEIM
-    assemble_MDEIM_matrices_st(ROM_info, RB_variables, var)
+function assemble_MDEIM_matrices(ROM_info::Info, RB_variables::PoissonSTGRB, var::String)
+  if ROM_info.space_time_M_DEIM
+    assemble_MDEIM_matrices_spacetime(ROM_info, RB_variables, var)
   else
-    assemble_MDEIM_matrices(ROM_info, RB_variables, var)
+    assemble_MDEIM_matrices_standard(ROM_info, RB_variables, var)
   end
 end
 
@@ -168,15 +161,13 @@ function assemble_offline_structures(ROM_info::Info, RB_variables::PoissonSTGRB,
     operators = set_operators(ROM_info, RB_variables)
   end
 
-  do_ST_M_DEIM = ROM_info.space_time_M_DEIM
-
   assembly_time = 0
   if "M" ∈ operators
     assembly_time += @elapsed begin
       if !ROM_info.probl_nl["M"]
         assemble_affine_matrices(ROM_info, RB_variables, "M")
       else
-        assemble_MDEIM_matrices(ROM_info, RB_variables, "M", do_ST_M_DEIM)
+        assemble_MDEIM_matrices(ROM_info, RB_variables, "M")
       end
     end
   end
@@ -186,7 +177,7 @@ function assemble_offline_structures(ROM_info::Info, RB_variables::PoissonSTGRB,
       if !ROM_info.probl_nl["A"]
         assemble_affine_matrices(ROM_info, RB_variables, "A")
       else
-        assemble_MDEIM_matrices(ROM_info, RB_variables, "A", do_ST_M_DEIM)
+        assemble_MDEIM_matrices(ROM_info, RB_variables, "A")
       end
     end
   end
@@ -240,7 +231,7 @@ end
 
 function get_RB_LHS_blocks(ROM_info, RB_variables::PoissonSTGRB, θᵐ, θᵃ)
 
-  @info "Assembling LHS using Crank-Nicolson time scheme"
+  @info "Assembling LHS using θ-method time scheme, θ=$(ROM_info.θ)"
 
   θ = ROM_info.θ
   δtθ = ROM_info.δt*θ
@@ -248,7 +239,6 @@ function get_RB_LHS_blocks(ROM_info, RB_variables::PoissonSTGRB, θᵐ, θᵃ)
   Qᵐ = RB_variables.Qᵐ
   Qᵃ = RB_variables.S.Qᵃ
 
-  #Mat = δtθ*Aₙ + Mₙ
   Φₜᵘ_M = zeros(RB_variables.nₜᵘ, RB_variables.nₜᵘ, Qᵐ)
   Φₜᵘ₁_M = zeros(RB_variables.nₜᵘ, RB_variables.nₜᵘ, Qᵐ)
   Φₜᵘ_A = zeros(RB_variables.nₜᵘ, RB_variables.nₜᵘ, Qᵃ)
@@ -275,6 +265,61 @@ function get_RB_LHS_blocks(ROM_info, RB_variables::PoissonSTGRB, θᵐ, θᵃ)
           Mₙ_μ_i_j = RB_variables.Mₙ[i_s,j_s,:]'*Φₜᵘ_M[i_t,j_t,:]
           Aₙ₁_μ_i_j = δtθ*RB_variables.S.Aₙ[i_s,j_s,:]'*Φₜᵘ₁_A[i_t,j_t,:]
           Mₙ₁_μ_i_j = RB_variables.Mₙ[i_s,j_s,:]'*Φₜᵘ₁_M[i_t,j_t,:]
+
+          block₁[i_st,j_st] = θ*(Aₙ_μ_i_j+Mₙ_μ_i_j) + (1-θ)*Aₙ₁_μ_i_j - θ*Mₙ₁_μ_i_j
+
+        end
+      end
+
+    end
+  end
+
+  push!(RB_variables.S.LHSₙ, block₁)
+
+end
+
+function get_RB_LHS_blocks_spacetime(ROM_info, RB_variables::PoissonSTGRB, θᵐ, θᵃ)
+
+  @info "Assembling LHS using θ-method time scheme, θ=$(ROM_info.θ)"
+
+  θ = ROM_info.θ
+  δtθ = ROM_info.δt*θ
+  nₜᵘ = RB_variables.nₜᵘ
+  Qᵐ = RB_variables.Qᵐ
+  Qᵃ = RB_variables.S.Qᵃ
+  Nₜᵐ = Int(size(RB_variables.Mₙ)[3]/Qᵐ)
+  Nₜᵃ = Int(size(RB_variables.S.Aₙ)[3]/Qᵃ)
+
+  Φₜᵘ_M = zeros(RB_variables.nₜᵘ, RB_variables.nₜᵘ, Qᵐ)
+  Φₜᵘ₁_M = zeros(RB_variables.nₜᵘ, RB_variables.nₜᵘ, Qᵐ)
+  Φₜᵘ_A = zeros(RB_variables.nₜᵘ, RB_variables.nₜᵘ, Qᵃ)
+  Φₜᵘ₁_A = zeros(RB_variables.nₜᵘ, RB_variables.nₜᵘ, Qᵃ)
+
+  [Φₜᵘ_M[i_t,j_t,q] = θᵐ[q]*sum(RB_variables.Φₜᵘ[:,i_t].*RB_variables.Φₜᵘ[:,j_t]) for q = 1:Qᵐ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
+  [Φₜᵘ₁_M[i_t,j_t,q] = θᵐ[q]*sum(RB_variables.Φₜᵘ[2:end,i_t].*RB_variables.Φₜᵘ[1:end-1,j_t]) for q = 1:Qᵐ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
+  [Φₜᵘ_A[i_t,j_t,q] = θᵃ[q]*sum(RB_variables.Φₜᵘ[:,i_t].*RB_variables.Φₜᵘ[:,j_t]) for q = 1:Qᵃ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
+  [Φₜᵘ₁_A[i_t,j_t,q] = θᵃ[q]*sum(RB_variables.Φₜᵘ[2:end,i_t].*RB_variables.Φₜᵘ[1:end-1,j_t]) for q = 1:Qᵃ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
+
+  block₁ = zeros(RB_variables.nᵘ, RB_variables.nᵘ)
+
+  for i_s = 1:RB_variables.S.nₛᵘ
+    for i_t = 1:RB_variables.nₜᵘ
+
+      i_st = index_mapping(i_s, i_t, RB_variables)
+
+      for j_s = 1:RB_variables.S.nₛᵘ
+        for j_t = 1:RB_variables.nₜᵘ
+
+          j_st = index_mapping(j_s, j_t, RB_variables)
+
+          for qᵐ = 1:Qᵐ
+            Mₙ_μ_i_j += Φₜᵘ_M[i_t,j_t,qᵃ]*sum(RB_variables.Mₙ[i_s,j_s,(qᵐ-1)*Nₜᵐ+1:qᵐ*Nₜᵐ],dims=3)
+            Mₙ₁_μ_i_j += Φₜᵘ₁_M[i_t,j_t,qᵃ]*sum(RB_variables.Mₙ[i_s,j_s,(qᵐ-1)*Nₜᵐ+1:qᵐ*Nₜᵐ],dims=3)
+          end
+          for qᵃ = 1:Qᵃ
+            Aₙ_μ_i_j += δtθ*Φₜᵘ_A[i_t,j_t,qᵃ]*sum(RB_variables.S.Aₙ[i_s,j_s,(qᵃ-1)*Nₜᵃ+1:qᵃ*Nₜᵃ],dims=3)
+            Aₙ₁_μ_i_j += δtθ*Φₜᵘ₁_A[i_t,j_t,qᵃ]*sum(RB_variables.S.Aₙ[i_s,j_s,(qᵃ-1)*Nₜᵃ+1:qᵃ*Nₜᵃ],dims=3)
+          end
 
           block₁[i_st,j_st] = θ*(Aₙ_μ_i_j+Mₙ_μ_i_j) + (1-θ)*Aₙ₁_μ_i_j - θ*Mₙ₁_μ_i_j
 
@@ -336,7 +381,11 @@ function get_RB_system(ROM_info::Info, RB_variables::PoissonSTGRB, param)
   end
 
   if "LHS" ∈ operators
-    get_RB_LHS_blocks(ROM_info, RB_variables, θᵐ, θᵃ)
+    if ROM_info.space_time_M_DEIM
+      get_RB_LHS_blocks_spacetime(ROM_info, RB_variables, θᵐ, θᵃ)
+    else
+      get_RB_LHS_blocks(ROM_info, RB_variables, θᵐ, θᵃ)
+    end
   end
 
   if "RHS" ∈ operators

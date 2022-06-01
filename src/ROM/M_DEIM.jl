@@ -202,9 +202,9 @@ function MDEIM_offline_standard(FE_space::UnsteadyProblem, ROM_info::Info, var::
     @info "Considering parameter number $k, need $(ROM_info.nₛ_MDEIM-k) more!"
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
     if var === "A"
-      snapsₖ = build_A_snapshots(FE_space, ROM_info, μₖ)
+      snapsₖ = build_A_snapshots(FE_space, ROM_info, μₖ, ROM_info.space_time_M_DEIM)
     elseif var === "M"
-      snapsₖ = build_M_snapshots(FE_space, ROM_info, μₖ)
+      snapsₖ = build_M_snapshots(FE_space, ROM_info, μₖ, ROM_info.space_time_M_DEIM)
     else
       @error "Run MDEIM on A or M only"
     end
@@ -229,61 +229,36 @@ end
 
 function MDEIM_offline_spacetime(FE_space::UnsteadyProblem, ROM_info::Info, var::String)
 
-  @info "Building at each time step $(ROM_info.nₛ_MDEIM) snapshots of $var. This will take some time."
+  @info "Building $(ROM_info.nₛ_MDEIM) snapshots of $var, at each time step. This will take some time."
 
   μ = load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
-  Nₜ = convert(Int64, ROM_info.T / ROM_info.δt)
-  δtθ = ROM_info.δt*ROM_info.θ
-  times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+δtθ
 
-  for (nₜ,t) = enumerate(times_θ)
-    @info "Considering time step $nₜ/$Nₜ"
+  for k = 1:ROM_info.nₛ_MDEIM
+    @info "Considering parameter number $k, need $(ROM_info.nₛ_MDEIM-k) more!"
+    μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
     if var === "A"
-      snapsₜ, row_idx = build_A_snapshots(FE_space, ROM_info, μ, t)
+      snapsₖ,row_idx = build_A_snapshots(FE_space, ROM_info, μₖ, ROM_info.space_time_M_DEIM)
     elseif var === "M"
-      snapsₜ, row_idx = build_M_snapshots(FE_space, ROM_info, μ, t)
+      snapsₖ,row_idx = build_M_snapshots(FE_space, ROM_info, μₖ, ROM_info.space_time_M_DEIM)
     else
       @error "Run MDEIM on A or M only"
     end
-    if nₜ === 1
+    if k === 1
       global row_idx = row_idx
-    end
-    compressed_snapsₜ,_ = M_DEIM_POD(snapsₜ, ROM_info.ϵₛ)
-    if nₜ === 1
-      global compressed_snaps = compressed_snapsₜ
+      global snaps = snapsₖ
     else
-      if size(compressed_snaps)[2] != size(compressed_snapsₜ)[2]
-        c = size(compressed_snaps)[2]
-        cₜ = size(compressed_snapsₜ)[2]
-        if c > cₜ
-          basis_snapsₜ, _, _ = svd(compressed_snapsₜ)
-          compressed_snapsₜ = basis_snapsₜ[:,1:c]
-        else
-          compressed_snapsₜ = compressed_snapsₜ[:,1:c]
-        end
-      end
-      global compressed_snaps = vcat(compressed_snaps, compressed_snapsₜ)
+      global snaps = hcat(snaps, snapsₖ)
     end
-
   end
 
-  MDEIM_mat_init, Σ = M_DEIM_POD(compressed_snaps, ROM_info.ϵₛ)
-  MDEIM_mat_tmp, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat_init, Σ)
-  MDEIM_idx_space, MDEIM_idx_time = from_spacetime_to_space_time_idx_vec(MDEIM_idx, length(row_idx))
-  unique!(MDEIM_idx_time)
+  MDEIM_mat, Σ = POD(snaps, ROM_info.ϵₛ)
+  MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat, Σ)
+  MDEIMᵢ_mat = MDEIM_mat[MDEIM_idx,:]
+  MDEIM_idx_sparse = from_full_idx_to_sparse_idx(row_idx,MDEIM_idx,FE_space.Nₛᵘ)
+  MDEIM_idx_sparse_space, _ = from_spacetime_to_space_time_idx_vec(MDEIM_idx_sparse,FE_space.Nₛᵘ)
+  el = find_FE_elements(FE_space.V₀, FE_space.Ω, unique(MDEIM_idx_sparse_space))
 
-  MDEIM_mat = zeros(length(row_idx), length(MDEIM_idx)*length(MDEIM_idx_time))
-  for i=1:length(MDEIM_idx_time)
-    MDEIM_mat[:,(i-1)*length(MDEIM_idx)+1:i*length(MDEIM_idx)] = MDEIM_mat_tmp[(MDEIM_idx_time[i]-1)*length(row_idx)+1:MDEIM_idx_time[i]*length(row_idx),:]
-  end
-
-  idx_sparse = from_full_idx_to_sparse_idx(row_idx,FE_space.Nₛᵘ,Nₜ)
-  MDEIM_idx_sparse = idx_sparse[MDEIM_idx]
-  MDEIM_idx_space_sparse, _ = from_spacetime_to_space_time_idx_mat(MDEIM_idx_sparse, FE_space.Nₛᵘ)
-  r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx_space_sparse, FE_space.Nₛᵘ)
-  el = find_FE_elements(FE_space.V₀, FE_space.Ω, unique(union(r_idx, c_idx)))
-
-  MDEIM_mat, MDEIM_idx, el, MDEIM_err_bound, Σ, row_idx
+  MDEIM_mat, MDEIM_idx_sparse, MDEIMᵢ_mat, row_idx, el
 
 end
 
@@ -296,27 +271,30 @@ function MDEIM_offline_functional(FE_space::UnsteadyProblem, ROM_info::Info, var
   Nₜ = convert(Int64, ROM_info.T / ROM_info.δt)
   δtθ = ROM_info.δt*ROM_info.θ
   times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+δtθ
-  param = get_parametric_specifics(ROM_info, parse.(Float64, split(chop(μ[1]; head=1, tail=1), ',')))
-  Qₕ_cell_data = get_data(FE_space.Qₕ)
-  qₕ = Qₕ_cell_data[rand(1:num_cells(FE_space.Ω))]
-  xₕ = get_coordinates(qₕ)
-  nquad = length(xₕ)
+
+  ξₖ = get_cell_map(FE_space.Ω)
+  Qₕ_cell_point = get_cell_points(Qₕ)
+  qₖ = get_data(Qₕ_cell_point)
+  phys_quadp = lazy_map(evaluate,ξₖ,qₖ)
+  ncells = length(phys_quadp)
+  nquad_cell = length(phys_quadp[1])
+  nquad = nquad_cell*ncells
 
   for k = 1:ROM_info.nₛ_MDEIM
     @info "Considering parameter number $k, need $(ROM_info.nₛ_MDEIM-k) more!"
 
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
     param = get_parametric_specifics(ROM_info, μₖ)
-    snapsₖ = [param.α(xₕ[n],t_θ) for n = 1:nquad for t_θ = times_θ]
+    snapsₖ = [param.α(phys_quadp[n][q],t_θ) for n = 1:ncells for q = 1:nquad_cell for t_θ = times_θ]
     #= if var === "A"
-      snapsₖ = [param.α(xₕ[n],t_θ) for n = 1:nquad for t_θ = times_θ]
+      snapsₖ = [param.α(phys_quadp[n][q],t_θ) for n = 1:ncells for q = 1:nquad_cell for t_θ = times_θ]
     elseif var === "M"
-      snapsₖ = [param.m(xₕ[n],t_θ) for n = 1:nquad for t_θ = times_θ]
+      snapsₖ = [param.m(phys_quadp[n][q],t_θ) for n = 1:ncells for q = 1:nquad_cell for t_θ = times_θ]
     else
       @error "Run MDEIM on A or M only"
     end =#
     snapsₖ = reshape(snapsₖ,nquad,Nₜ)
-    compressed_snapsₖ, _ = M_DEIM_POD(snapsₖ, ROM_info.ϵₛ)
+    compressed_snapsₖ, _ = POD(snapsₖ, 1e-2)
     if k === 1
       global compressed_snaps = compressed_snapsₖ
     else
@@ -325,15 +303,18 @@ function MDEIM_offline_functional(FE_space::UnsteadyProblem, ROM_info::Info, var
 
   end
 
-  param_mat, Σ = M_DEIM_POD(compressed_snaps, ROM_info.ϵₛ)
-  param_mat_rep = repeat(param_mat, outer=[num_cells(FE_space.Ω),1])
+  param_mat, Σ = POD(compressed_snaps, 1e-2)
 
   refFE_quad = ReferenceFE(lagrangian_quad, Float64, problem_info.order, FE_space.Ω)
-  V_quad =  TrialFESpace(TestFESpace(param.model, refFE_quad, conformity=:L2))
+  V₀_quad = TestFESpace(param.model, refFE_quad, conformity=:L2)
 
   for q = 1:size(param_mat)[2]
-    f_q = FEFunction(V_quad,param_mat_rep[:,q])
-    Matq = assemble_matrix(∫(∇(FE_space.ϕᵥ) ⋅ (f_q * ∇(FE_space.ϕᵤ(0.0)))) * FE_space.dΩ, FE_space.V(0.0), FE_space.V₀)
+    param_q = FEFunction(V₀_quad,param_mat[:,q])
+    if var === "A"
+      Matq = assemble_matrix(∫(∇(FE_space.ϕᵥ) ⋅ (param_q * ∇(FE_space.ϕᵤ(0.0)))) * FE_space.dΩ, FE_space.V(0.0), FE_space.V₀)
+    elseif var === "M"
+      Matq = assemble_matrix(∫(FE_space.ϕᵥ * (param_q * FE_space.ϕᵤ(0.0))) * FE_space.dΩ, FE_space.V(0.0), FE_space.V₀)
+    end
     row_idx, val = findnz(Matq[:])
     if q === 1
       global affine_mat = sparse(row_idx, ones(length(row_idx)), val, size(Matq)[1]^2, size(param_mat)[2])

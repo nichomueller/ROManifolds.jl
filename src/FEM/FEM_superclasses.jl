@@ -109,7 +109,7 @@ end
 
 mutable struct ParametricSpecifics
   μ::Array
-  model::UnstructuredDiscreteModel
+  model::DiscreteModel
   α::Function
   f::Function
   g::Function
@@ -118,7 +118,7 @@ end
 
 mutable struct ParametricSpecificsUnsteady
   μ::Array
-  model::UnstructuredDiscreteModel
+  model::DiscreteModel
   αₛ::Function
   αₜ::Function
   α::Function

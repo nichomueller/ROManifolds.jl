@@ -79,14 +79,20 @@ end
 
 function from_full_idx_to_sparse_idx(sparse_to_full_idx::Vector,full_idx::Vector,Nₛ::Int64)
 
-  #sparse_idx = zeros(Int64,length(full_idx)*Nₜ)
-  #[sparse_idx[j+(i-1)*length(row_idx)] = row_idx[j] + (i-1)*Nₛ^2 for i=1:Nₜ for j=1:length(full_idx)]
-  #return sparse_idx
   Nfull  = length(sparse_to_full_idx)
   full_idx_space,full_idx_time = from_spacetime_to_space_time_idx_vec(full_idx, Nfull)
   sparse_idx = (full_idx_time.-1)*Nₛ^2+row_idx[full_idx_space]
   return sparse_idx
 
+end
+
+function invert_sparse_to_full_idx(sparse_to_full_idx::Vector,Nₛ::Int64)
+  r_idx, _ = from_vec_to_mat_idx(sparse_to_full_idx, Nₛ)
+  full_to_sparse_idx = Int64[]
+  for i = 1:Nₛ
+    append!(full_to_sparse_idx, findall(x -> x == i, r_idx))
+  end
+  return full_to_sparse_idx
 end
 
 function remove_zero_entries(M_sparse::SparseMatrixCSC) :: Matrix
@@ -98,6 +104,22 @@ function remove_zero_entries(M_sparse::SparseMatrixCSC) :: Matrix
     M[:,col] = vals
   end
   return M
+end
+
+function assign_label_to_sorted_elems(v::Vector) ::Vector
+  vnew = copy(v)
+  vnew = sort(vnew)
+  unique!(vnew)
+  labels = collect(1:length(vnew))
+  vret = Int.(indexin(v,vnew))
+  return vret
+end
+
+function modify_MDEIM_idx(MDEIM_idx::Vector, Nₕ²::Int64) ::Vector
+  idx_space, idx_time = from_spacetime_to_space_time_idx_vec(MDEIM_idx,Nₕ²)
+  idx_time_new = assign_label_to_sorted_elems(idx_time)
+  MDEIM_idx_new = (idx_time_new.-1)*Nₕ²+idx_space
+  return MDEIM_idx_new
 end
 
 function chebyshev_polynomial(x::Float64, n::Int64)

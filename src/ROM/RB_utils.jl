@@ -79,7 +79,37 @@ function build_sparse_mat(problem_info::ProblemSpecifics, FE_space::SteadyProble
 
 end
 
-function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, FE_space::UnsteadyProblem, ROM_info::Info, param::ParametricSpecificsUnsteady, el::Array; var="A")
+#= function build_sparse_mat(problem_info::ProblemSpecificsUnsteady,
+  FE_space::UnsteadyProblem,
+  ROM_info::Info,
+  param::ParametricSpecificsUnsteady,
+  el::Array;
+  var="A")
+
+  if !ROM_info.space_time_M_DEIM
+    return build_sparse_mat_standard(problem_info::ProblemSpecificsUnsteady,
+      FE_space::UnsteadyProblem,
+      ROM_info::Info,
+      param::ParametricSpecificsUnsteady,
+      el::Array;
+      var)
+  else
+    return build_sparse_mat_spacetime(problem_info::ProblemSpecificsUnsteady,
+      FE_space::UnsteadyProblem,
+      ROM_info::Info,
+      param::ParametricSpecificsUnsteady,
+      el::Array;
+      var)
+  end
+
+end =#
+
+function build_sparse_mat(problem_info::ProblemSpecificsUnsteady,
+  FE_space::UnsteadyProblem,
+  ROM_info::Info,
+  param::ParametricSpecificsUnsteady,
+  el::Vector;
+  var="A")
 
   Ω_sparse = view(FE_space.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * problem_info.order)
@@ -108,13 +138,20 @@ function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, FE_space::Unst
 
 end
 
-function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, FE_space::UnsteadyProblem, ROM_info, param::ParametricSpecificsUnsteady, el::Array, time_idx::Array; var="A")
+function build_sparse_mat(problem_info::ProblemSpecificsUnsteady,
+  FE_space::UnsteadyProblem,
+  ROM_info::Info,
+  param::ParametricSpecificsUnsteady,
+  el::Vector,
+  MDEIM_idx::Vector;
+  var="A")
 
   Ω_sparse = view(FE_space.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * problem_info.order)
   times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+ROM_info.δt*ROM_info.θ
-  times_MDEIM = times_θ[time_idx]
-  Nₜ = convert(Int64, ROM_info.T / ROM_info.δt)
+  _, idx_time = from_spacetime_to_space_time_idx_vec(MDEIM_idx, FE_space.Nₛᵘ^2)
+  idx_time = sort(idx_time)
+  unique!(idx_time)
 
   function define_Matₜ(t::Real, var::String)
     if var === "A"
@@ -127,18 +164,10 @@ function build_sparse_mat(problem_info::ProblemSpecificsUnsteady, FE_space::Unst
   end
   Matₜ(t) = define_Matₜ(t, var)
 
-  #= for (i_t,t) in enumerate(times_MDEIM[1:end])
-    i,v = findnz(Matₜ(t)[:])
-    if i_t === 1
-      global Mat = zeros(length(i),length(times_MDEIM))
-    end
-    global Mat[:,i_t] = v
-  end =#
-
-  for (i_t,t) in enumerate(times_MDEIM)
+  for (i_t,t) in enumerate(times_θ[idx_time])
     i,j,v = findnz(Matₜ(t))
     if i_t === 1
-      global Mat = sparse(i,j,v,FE_space.Nₛᵘ,FE_space.Nₛᵘ*length(times_MDEIM))
+      global Mat = sparse(i,j,v,FE_space.Nₛᵘ,FE_space.Nₛᵘ*length(idx_time))
     end
     global Mat[:,(i_t-1)*FE_space.Nₛᵘ+1:i_t*FE_space.Nₛᵘ] = sparse(i,j,v,FE_space.Nₛᵘ,FE_space.Nₛᵘ)
   end

@@ -1,4 +1,4 @@
-function set_labels(probl::Info, model::UnstructuredDiscreteModel)
+function set_labels(probl::Info, model::DiscreteModel)
 
   labels = get_face_labeling(model)
   if !isempty(probl.dirichlet_tags) && !isempty(probl.dirichlet_bnds)
@@ -20,7 +20,7 @@ function set_labels(probl::Info, model::UnstructuredDiscreteModel)
 
 end
 
-function get_FESpace(::NTuple{1,Int}, probl::SteadyInfo, model::UnstructuredDiscreteModel, g = nothing)
+function get_FESpace(::NTuple{1,Int}, probl::SteadyInfo, model::DiscreteModel, g = nothing)
 
   degree = 2 .* probl.order
   labels = set_labels(probl, model)
@@ -33,8 +33,8 @@ function get_FESpace(::NTuple{1,Int}, probl::SteadyInfo, model::UnstructuredDisc
   dΓd = Measure(Γd, degree)
   Qₕ = CellQuadrature(Ω, degree)
 
-  ref_FE = ReferenceFE(lagrangian, Float64, probl.order)
-  V₀ = TestFESpace(model, ref_FE; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
+  refFE = ReferenceFE(lagrangian, Float64, probl.order)
+  V₀ = TestFESpace(model, refFE; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
   if !isnothing(g)
     V = TrialFESpace(V₀, g)
   else
@@ -51,7 +51,7 @@ function get_FESpace(::NTuple{1,Int}, probl::SteadyInfo, model::UnstructuredDisc
 
 end
 
-function get_FESpace(::NTuple{1,Int}, probl::UnsteadyInfo, model::UnstructuredDiscreteModel, g = nothing)
+function get_FESpace(::NTuple{1,Int}, probl::UnsteadyInfo, model::DiscreteModel, g = nothing)
 
   degree = 2 .* probl.order
   labels = set_labels(probl, model)
@@ -64,8 +64,8 @@ function get_FESpace(::NTuple{1,Int}, probl::UnsteadyInfo, model::UnstructuredDi
   dΓd = Measure(Γd, degree)
   Qₕ = CellQuadrature(Ω, degree)
 
-  ref_FE = ReferenceFE(lagrangian, Float64, probl.order)
-  V₀ = TestFESpace(model, ref_FE; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
+  refFE = ReferenceFE(lagrangian, Float64, probl.order)
+  V₀ = TestFESpace(model, refFE; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
   if isnothing(g)
     g₀(x, t::Real) = 0
     g₀(t::Real) = x->g₀(x,t)
@@ -84,7 +84,7 @@ function get_FESpace(::NTuple{1,Int}, probl::UnsteadyInfo, model::UnstructuredDi
 
 end
 
-function get_FESpace(::NTuple{2,Int}, probl::SteadyInfo, model::UnstructuredDiscreteModel, g = nothing)
+function get_FESpace(::NTuple{2,Int}, probl::SteadyInfo, model::DiscreteModel, g = nothing)
 
   degree = 2 .* probl.order
   labels = set_labels(probl, model)
@@ -97,8 +97,8 @@ function get_FESpace(::NTuple{2,Int}, probl::SteadyInfo, model::UnstructuredDisc
   dΓd = Measure(Γd, degree)
   Qₕ = CellQuadrature(Ω, degree)
 
-  ref_FEᵤ = ReferenceFE(lagrangian, VectorValue{3,Float64}, probl.order)
-  V₀ = TestFESpace(model, ref_FEᵤ; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
+  refFEᵤ = ReferenceFE(lagrangian, VectorValue{3,Float64}, probl.order)
+  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
   if !isnothing(g)
     V = TrialFESpace(V₀, g)
   else
@@ -108,8 +108,8 @@ function get_FESpace(::NTuple{2,Int}, probl::SteadyInfo, model::UnstructuredDisc
   ϕᵤ = get_trial_fe_basis(V)
   Nₛᵘ = length(get_free_dof_ids(V))
 
-  ref_FEₚ = ReferenceFE(lagrangian, Float64, order-1; space=:P)
-  Q₀ = TestFESpace(model, ref_FEₚ; conformity=:L2, constraint=:zeromean)
+  refFEₚ = ReferenceFE(lagrangian, Float64, order-1; space=:P)
+  Q₀ = TestFESpace(model, refFEₚ; conformity=:L2, constraint=:zeromean)
   Q = TrialFESpace(Q₀)
   ψᵧ = get_trial_fe_basis(Q₀)
   ψₚ = get_trial_fe_basis(Q)
@@ -121,7 +121,7 @@ function get_FESpace(::NTuple{2,Int}, probl::SteadyInfo, model::UnstructuredDisc
 
 end
 
-function get_FESpace(::NTuple{2,Int}, probl::UnsteadyInfo, model::UnstructuredDiscreteModel, g = nothing)
+function get_FESpace(::NTuple{2,Int}, probl::UnsteadyInfo, model::DiscreteModel, g = nothing)
 
   degree = 2 .* probl.order
   labels = set_labels(probl, model)
@@ -134,8 +134,8 @@ function get_FESpace(::NTuple{2,Int}, probl::UnsteadyInfo, model::UnstructuredDi
   dΓd = Measure(Γd, degree)
   Qₕ = CellQuadrature(Ω, degree)
 
-  ref_FEᵤ = ReferenceFE(lagrangian, VectorValue{3,Float64}, probl.order)
-  V₀ = TestFESpace(model, ref_FEᵤ; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
+  refFEᵤ = ReferenceFE(lagrangian, VectorValue{3,Float64}, probl.order)
+  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
   if isnothing(g)
     g₀(x, t::Real) = VectorValue(0,0,0)
     g₀(t::Real) = x->g₀(x,t)
@@ -147,8 +147,8 @@ function get_FESpace(::NTuple{2,Int}, probl::UnsteadyInfo, model::UnstructuredDi
   ϕᵤ(t) = get_trial_fe_basis(V(t))
   Nₛᵘ = length(get_free_dof_ids(V₀))
 
-  ref_FEₚ = ReferenceFE(lagrangian, Float64, probl.order-1; space=:P)
-  Q₀ = TestFESpace(model, ref_FEₚ, conformity=:L2, constraint=:zeromean)
+  refFEₚ = ReferenceFE(lagrangian, Float64, probl.order-1; space=:P)
+  Q₀ = TestFESpace(model, refFEₚ, conformity=:L2, constraint=:zeromean)
   Q = TrialFESpace(Q₀)
   ψᵧ = get_fe_basis(Q₀)
   ψₚ = get_trial_fe_basis(Q)

@@ -59,18 +59,7 @@ function _lagrangian_quad_ref_fe(::Type{T},
   quad_pts = get_coordinates(quad)
 
   prebasis = compute_monomial_basis(T,p,orders)
-
-  if p == VERTEX
-    nodes = get_vertex_coordinates(p)
-  elseif p == SEGMENT
-    nodes = [Point(quad_pts[1][1]), Point((quad_pts[2][1]))]
-  elseif p == TRI
-    nodes = [Point(quad_pts[1][1],quad_pts[1][2]), Point((quad_pts[2][1],quad_pts[2][2])), Point((quad_pts[3][1],quad_pts[3][2]))]
-  else
-    nodes = quad_pts
-  end
-  _, face_own_nodes = compute_nodes(p,orders)
-
+  nodes, face_own_nodes = my_compute_nodes(p,orders,quad_pts)
   dofs = LagrangianDofBasis(T,nodes)
   reffaces = compute_lagrangian_quad_reffaces(T,p,orders,trian)
 
@@ -99,6 +88,102 @@ function _lagrangian_quad_ref_fe(::Type{T},
 
   GenericLagrangianRefFE(reffe,face_nodes)
 
+end
+
+function my_compute_nodes(p::ExtrusionPolytope{D},orders,quad_pts) where D
+  nodes, facenodes = _compute_nodes(p,orders,quad_pts)
+  if any(map(i->i==0,orders))
+    return (nodes, facenodes)
+  end
+  #terms = _coords_to_terms(_nodes,orders)
+  #nodes = _terms_to_coords(terms,orders)
+  (nodes, facenodes)
+end
+
+function _compute_nodes(p,orders,quad_pts)
+  if any( map(i->i==0,orders))
+    return _compute_constant_nodes(p,orders,quad_pts)
+  elseif all(map(i->i==1,orders))
+    return _compute_linear_nodes(p,quad_pts)
+  else
+    error("Not implemented higher order yet")
+  end
+end
+
+function _compute_constant_nodes(p,orders,quad_pts)
+  @assert all( orders .== 0) "If an order is 0 in some direction, it should be 0 also in the others"
+  x = compute_own_nodes(p,orders,quad_pts)
+  facenodes = [Int[] for i in 1:num_faces(p)]
+  push!(facenodes[end],1)
+  x, facenodes
+end
+
+function compute_own_nodes(p::ExtrusionPolytope{D},orders,quad_pts) where D
+  extrusion = Tuple(p.extrusion)
+  if all(map(i->i==0,orders))
+    _interior_nodes_order_0(p,quad_pts)
+  else
+    error("Not implemented higher order yet")
+  end
+end
+
+function _interior_nodes_order_0(p,quad_pts)
+  x = get_nodes(p,quad_pts)
+  x0 = sum(x) / length(x)
+  [x0,]
+end
+
+function _compute_linear_nodes(p,quad_pts)
+  x = get_nodes(p,quad_pts)
+  facenodes = [Int[] for i in 1:num_faces(p)]
+  for i in 1:num_vertices(p)
+    push!(facenodes[i],i)
+  end
+  x, facenodes
+end
+
+function _coords_to_terms(coords::Vector{<:Point{D}},orders) where D
+  indexbase = 1
+  terms = CartesianIndex{D}[]
+  P = Point{D,Int}
+  t = zero(Mutable(P))
+  for x in coords
+    for d in 1:D
+      t[d] = round(x[d]*orders[d]) + indexbase
+    end
+    term = CartesianIndex(Tuple(t))
+    push!(terms,term)
+  end
+  terms
+end
+
+function  _terms_to_coords(terms::Vector{CartesianIndex{D}},orders) where D
+  P = Point{D,Float64}
+  indexbase = 1
+  nodes = P[]
+  x = zero(Mutable(P))
+  for t in terms
+    for d in 1:D
+      x[d] = (t[d] - indexbase) / orders[d]
+    end
+    node = P(x)
+    push!(nodes,node)
+  end
+  nodes
+end
+
+function get_nodes(p::Polytope{D},quad_pts::Vector) where {D}
+  if D == 0
+    return get_vertex_coordinates(p)
+  elseif D == 1
+    return [Point(quad_pts[1][1]),Point(quad_pts[2][1])]
+  elseif p == TRI
+    return [Point(quad_pts[1][1],quad_pts[1][2]), Point((quad_pts[2][1],quad_pts[2][2])), Point((quad_pts[3][1],quad_pts[3][2]))]
+  elseif p == QUAD
+    return [Point(quad_pts[1][1],quad_pts[1][2]), Point((quad_pts[2][1],quad_pts[2][2])), Point((quad_pts[3][1],quad_pts[3][2])), Point((quad_pts[4][1],quad_pts[4][2]))]
+  else
+    return quad_pts
+  end
 end
 
 function _generate_face_quad_dofs(ndofs,face_to_own_dofs,polytope,reffaces)
@@ -231,17 +316,6 @@ function _compute_lagrangian_quad_reffaces(::Type{T},p::Polytope{D},orders,trian
   tuple(reffaces...)
 end
 
-function compute_quad_nodes(p,orders,quad_pts)
-  _compute_quad_nodes(p,orders,quad_pts)
-end
-
-function _compute_quad_nodes(p,orders,quad_pts)
-
-  @assert all(map(i->i==1,orders)) "Orders must be (1,1,1), other cases are not implemented yet"
-  _compute_linear_quad_nodes(p,quad_pts)
-
-end
-
 function tfill(v, ::Val{D}) where D
   t = tfill(v, Val{D-1}())
   (v,t...)
@@ -249,6 +323,7 @@ end
 
 tfill(v,::Val{0}) = ()
 tfill(v,::Val{1}) = (v,)
+
 tfill(v,::Val{2}) = (v,v)
 tfill(v,::Val{3}) = (v,v,v)
 

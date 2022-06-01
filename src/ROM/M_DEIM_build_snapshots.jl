@@ -82,9 +82,7 @@ end
 function build_A_snapshots(FE_space::UnsteadyProblem, ROM_info::Info, μ::Array)
 
   Nₜ = convert(Int64, ROM_info.T/ROM_info.δt)
-  δtθ = ROM_info.δt*ROM_info.θ
-  times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+δtθ
-
+  times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+ROM_info.δt*ROM_info.θ
   parametric_info = get_parametric_specifics(ROM_info, μ)
   A_t = assemble_stiffness(FE_space, ROM_info, parametric_info)
 
@@ -93,32 +91,23 @@ function build_A_snapshots(FE_space::UnsteadyProblem, ROM_info::Info, μ::Array)
     A_i = A_t(times_θ[i_t])
     i, v = findnz(A_i[:])
     if i_t === 1
-      global A = sparse(i, ones(length(i)), v, FE_space.Nₛᵘ^2, Nₜ)
-    else
-      global A[:, i_t] = sparse(i, ones(length(i)), v)
+      global row_idx = i
+      global A = zeros(length(row_idx),Nₜ)
     end
+    global A[:,i_t] = v
   end
 
-  A
+  A, row_idx
 
 end
 
-function build_A_snapshots(FE_space::UnsteadyProblem, ROM_info::Info, μ::Array, t::Float64)
-
-  for nₛ = 1:ROM_info.nₛ_MDEIM
-    @info "Snapshot $nₛ at time instant $t, stiffness"
-    μ_nₛ = parse.(Float64, split(chop(μ[nₛ]; head=1, tail=1), ','))
-    parametric_info = get_parametric_specifics(ROM_info, μ_nₛ)
-    A_nₛ = assemble_stiffness(FE_space, ROM_info, parametric_info)(t)
-    global i, v = findnz(A_nₛ[:])
-    if nₛ === 1
-      global A = zeros(length(i), ROM_info.nₛ_MDEIM)
-    end
-    global A[:, nₛ] = v
+function build_A_snapshots(FE_space::UnsteadyProblem, ROM_info::Info, μ::Array, space_time::Bool)
+  A, row_idx = build_A_snapshots(FE_space, ROM_info, μ)
+  if space_time
+    return A[:], row_idx
+  else
+    return A
   end
-
-  A, i
-
 end
 
 function build_F_snapshots(FE_space::SteadyProblem, ROM_info::Info, μ::Array)

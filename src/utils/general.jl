@@ -110,6 +110,12 @@ function my_unique(v::Vector)
   return u,idx
 end
 
+function my_sort(v::Vector)
+  s = sort(v)
+  idx = Int.(indexin(s,v))
+  return s,idx
+end
+
 function find_idx_duplicates(v::Vector)
   u,idx = my_unique(v)
   v_dupl = unique(v[setdiff(collect(1:length(v)),idx)])
@@ -117,19 +123,6 @@ function find_idx_duplicates(v::Vector)
   return v_dupl,idx_dupl
 end
 
-#= function subtract_idx_in_blocks(idx::Vector)
-  _,idx_u = my_unique(idx)
-  idx_new = zeros(Int64,length(idx_u))
-  idx_new[1] = idx_u[1]
-  count = 0
-  for i=1:length(idx)
-    idx_new[i-count] = idx[i-count]-count
-    if idx[i] != idx[1]+i-1
-      count += 1
-    end
-  end
-  return idx_new
-end =#
 function subtract_idx_in_blocks(idx::Vector)
 
   idx_new = copy(idx)
