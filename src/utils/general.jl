@@ -165,6 +165,22 @@ function generate_parameter(a::T, b::T, n::Int64 = 1) where T <: Array{Float64}
 
 end
 
+function generate_dcube_discrete_model(d::Int,npart::Int,path::String)
+  @assert d ≤ 3 "Select d-dimensional domain, where d ≤ 3"
+  if d == 1
+    domain = (0,1)
+    partition = (npart)
+  elseif d == 2
+    domain = (0,1,0,1)
+    partition = (npart,npart)
+  else
+    domain = (0,1,0,1,0,1)
+    partition = (npart,npart,npart)
+  end
+  model = CartesianDiscreteModel(domain,partition)
+  to_json_file(model,path)
+end
+
 function plot_R2_R(f::Function, xrange::Array, yrange::Array, n::Int)
   x = range(xrange[1], xrange[2], n)
   y = range(yrange[1], yrange[2], n)

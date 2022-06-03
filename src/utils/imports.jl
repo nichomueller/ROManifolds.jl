@@ -7,7 +7,7 @@ using SuiteSparse, SparseArrays, Serialization, ThreadedSparseCSR, SparseMatrice
 using MAT, CSV, JLD, DelimitedFiles, Arrow, CodecLz4
 using Test, InteractiveUtils, TimerOutputs, BenchmarkTools, Interact, Logging, Plots, WriteVTK
 using Conda, PyCall
-using Gridap, Gridap.FESpaces, Gridap.ReferenceFEs, Gridap.Arrays, Gridap.Geometry, Gridap.Fields, Gridap.CellData, GridapGmsh, Gridap.TensorValues
+using Gridap, Gridap.FESpaces, Gridap.ReferenceFEs, Gridap.Arrays, Gridap.Geometry, Gridap.Fields, Gridap.CellData, GridapGmsh, Gridap.Io, Gridap.TensorValues
 import Gridap:∇
 using Revise
 py"""

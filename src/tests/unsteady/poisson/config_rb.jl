@@ -3,7 +3,7 @@ include("../../../ROM/RB_superclasses.jl")
 include("../../../ROM/RB_utils.jl")
 include("../../../ROM/RB_Poisson_unsteady.jl")
 
-mesh_name = "my_cube.json"
+mesh_name = "2x2x2cube.json"
 case = 1
 RB_method = "ST-GRB"
 time_reduction_technique = "ST-HOSVD"
@@ -20,8 +20,8 @@ space_time_M_DEIM = false
 functional_M_DEIM = false
 @assert !(space_time_M_DEIM && functional_M_DEIM) "Choose only one (M)DEIM technique"
 postprocess = false
-import_snapshots = false
-import_offline_structures = true
+import_snapshots = true
+import_offline_structures = false
 save_offline_structures = true
 save_results = true
 

@@ -25,6 +25,14 @@ function FEM_paths(root, problem_type, problem_name, mesh_name, case)
 
 end
 
+function generate_dcube_discrete_model(I::Info,d::Int64,npart::Int,mesh_name::String)
+
+  mesh_dir = I.paths.mesh_path[1:findall(x->x=='/',I.paths.mesh_path)[end]]
+  mesh_path = joinpath(mesh_dir,mesh_name)
+  generate_dcube_discrete_model(d,npart,mesh_path)
+
+end
+
 function get_parametric_specifics(::NTuple{1,Int},Info::SteadyInfo,μ::Array)
 
   model = DiscreteModelFromFile(Info.paths.mesh_path)

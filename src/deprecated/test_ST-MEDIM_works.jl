@@ -454,7 +454,7 @@ end
 function get_θᵃ_old(RB_variables,MDEIM_mat_old, MDEIM_idx_old, MDEIMᵢ_mat_old, sparse_el_old)
 
   Qold = size(MDEIM_mat_old)[2]
-  A_μ_sparse_old = build_sparse_mat(problem_info, FE_space, ROM_info, param, sparse_el_old; var="A")
+  A_μ_sparse_old = build_sparse_mat_old(problem_info, FE_space, ROM_info, sparse_el_old)
   Nₛᵘ = RB_variables.S.Nₛᵘ
   θᵃ_old = zeros(RB_variables.S.Qᵃ, RB_variables.Nₜ)
   for iₜ = 1:RB_variables.Nₜ
@@ -467,8 +467,37 @@ function get_θᵃ_old(RB_variables,MDEIM_mat_old, MDEIM_idx_old, MDEIMᵢ_mat_o
 
 end
 
+function build_sparse_mat_old(problem_info::ProblemSpecificsUnsteady, FE_space::UnsteadyProblem, ROM_info::Info, el::Array)
+
+  μ=load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
+  μ_nb = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
+  param = get_parametric_specifics(problem_ntuple, ROM_info, μ_nb)
+
+  Ω_sparse = view(FE_space.Ω, el)
+  dΩ_sparse = Measure(Ω_sparse, 2 * problem_info.order)
+  times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+ROM_info.δt*ROM_info.θ
+  Nₜ = convert(Int64, ROM_info.T / ROM_info.δt)
+
+  function define_Matₜ(t::Real)
+    return assemble_matrix(∫(∇(FE_space.ϕᵥ) ⋅ (param.α(t) * ∇(FE_space.ϕᵤ(t)))) * dΩ_sparse, FE_space.V(t), FE_space.V₀)
+  end
+  Matₜ(t) = define_Matₜ(t)
+
+  i,j,v = findnz(Matₜ(times_θ[1]))
+  Mat = sparse(i,j,v,FE_space.Nₛᵘ,FE_space.Nₛᵘ*Nₜ)
+  for (i_t,t) in enumerate(times_θ[2:end])
+    i,j,v = findnz(Matₜ(t))
+    Mat[:,i_t*FE_space.Nₛᵘ+1:(i_t+1)*FE_space.Nₛᵘ] = sparse(i,j,v,FE_space.Nₛᵘ,FE_space.Nₛᵘ)
+  end
+
+  Mat
+
+end
+
+
 function test_old_MDEIM(ROM_info, RB_variables)
-  MDEIM_mat_old, MDEIM_idx_old, MDEIMᵢ_mat_old, sparse_el_old = MDEIM_offline_old(FE_space, ROM_info)
+  MDEIM_mat_old, MDEIM_idx_old, sparse_el_old,_,_ = MDEIM_offline_old(FE_space, ROM_info)
+  MDEIMᵢ_mat_old = MDEIM_mat_old[MDEIM_idx_old,:]
   μ=load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
   μ_nb = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
   #parametric_info = get_parametric_specifics(problem_ntuple, ROM_info, μ_nb)
