@@ -276,6 +276,17 @@ function get_θᵃ(ROM_info::Info, RB_variables::RBUnsteadyProblem, param::Param
 
 end
 
+function test_similarity(FE_space, ROM_info, RB_variables, nb=95)
+  MDEIM_mat, _ = MDEIM_offline(FE_space, ROM_info, "A")
+  μ_nb = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
+  param = get_parametric_specifics(problem_ntuple, ROM_info, μ_nb)
+  θᵃ = get_θᵃ(ROM_info, RB_variables, param)
+  Aapprox = MDEIM_mat*θᵃ
+  A,_ = build_A_snapshots(FE_space, ROM_info, μ_nb)
+  err = norm(A-Aapprox)
+  err
+end
+
 function get_θᵃₛₜ(ROM_info::Info, RB_variables::RBUnsteadyProblem, param::ParametricSpecificsUnsteady) :: Array
 
   if !ROM_info.probl_nl["A"]

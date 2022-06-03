@@ -86,7 +86,7 @@ function get_parametric_specifics(::NTuple{1,Int},Info::UnsteadyInfo,μ::Array)
     if !probl_nl["A"]
       return αₛ(x)*αₜ(t, μ)
     else
-      return (10 + μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) * sin(t) / μ[3]))
+      return (1 + μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) * sin(t) / μ[3]))
     end
   end
   α(x, t::Real) = prepare_α(x, t, μ, Info.probl_nl)
