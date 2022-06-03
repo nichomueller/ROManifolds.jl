@@ -3,7 +3,7 @@ include("../../../ROM/RB_superclasses.jl")
 include("../../../ROM/RB_utils.jl")
 include("../../../ROM/RB_Poisson_unsteady.jl")
 
-mesh_name = "2x2x2cube.json"
+mesh_name = "my_cube.json"
 case = 1
 RB_method = "ST-GRB"
 time_reduction_technique = "ST-HOSVD"
@@ -14,7 +14,7 @@ training_percentage = 0.8
 considered_snaps = floor(Int64, nₛ * training_percentage)
 build_parametric_RHS = false
 use_norm_X = false
-nₛ_MDEIM = min(5, considered_snaps)
+nₛ_MDEIM = min(35, considered_snaps)
 nₛ_DEIM = min(10, considered_snaps)
 space_time_M_DEIM = false
 functional_M_DEIM = false
