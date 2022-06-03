@@ -3,6 +3,8 @@ include("../../../ROM/RB_superclasses.jl")
 include("../../../ROM/RB_utils.jl")
 include("../../../ROM/RB_Poisson_unsteady.jl")
 
+mesh_name = "my_cube.json"
+case = 1
 RB_method = "ST-GRB"
 time_reduction_technique = "ST-HOSVD"
 perform_nested_POD = false
@@ -12,12 +14,12 @@ training_percentage = 0.8
 considered_snaps = convert(Int64, nₛ * training_percentage)
 build_parametric_RHS = false
 use_norm_X = false
-nₛ_MDEIM = min(6, considered_snaps)
+nₛ_MDEIM = min(5, considered_snaps)
 nₛ_DEIM = min(10, considered_snaps)
-space_time_M_DEIM = true
+space_time_M_DEIM = false
 functional_M_DEIM = false
 @assert !(space_time_M_DEIM && functional_M_DEIM) "Choose only one (M)DEIM technique"
-postprocess = true
+postprocess = false
 import_snapshots = false
 import_offline_structures = true
 save_offline_structures = true
@@ -25,15 +27,15 @@ save_results = true
 
 case = 1
 
-if case === 0
+if case == 0
 
   probl_nl = Dict("Ω" => false, "M" => false, "A" => false, "f" => false, "g" => false, "h" => false)
 
-elseif case === 1
+elseif case == 1
 
   probl_nl = Dict("Ω" => false, "M" => false, "A" => true, "f" => false, "g" => false, "h" => false)
 
-elseif case === 2
+elseif case == 2
 
   probl_nl = Dict("Ω" => false, "M" => false, "A" => true, "f" => true, "g" => false, "h" => false)
 

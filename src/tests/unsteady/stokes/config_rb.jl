@@ -21,20 +21,20 @@ import_snapshots = true
 import_offline_structures = false
 save_offline_structures = true
 save_results = true
-postprocess = true
+postprocess = false
 @assert !(postprocess && !save_results) "Cannot post-process if save_results is set to false"
 
 case = 0
 
-if case === 0
+if case == 0
 
   probl_nl = Dict("Ω" => false, "M" => false, "A" => false, "f" => false, "g" => true, "h" => false)
 
-elseif case === 1
+elseif case == 1
 
   probl_nl = Dict("Ω" => false, "M" => false, "A" => true, "f" => false, "g" => true, "h" => false)
 
-elseif case === 2
+elseif case == 2
 
   probl_nl = Dict("Ω" => false, "M" => false, "A" => true, "f" => false, "g" => true, "h" => false)
 

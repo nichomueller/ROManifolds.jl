@@ -24,7 +24,7 @@ end
 
 function save_CSV(var::AbstractArray, file_name::String)
 
-  if length(size(var)) === 1
+  if length(size(var)) == 1
     var = reshape(var, :, 1)
   end
 
@@ -56,7 +56,7 @@ end
 function load_CSV(path::String; convert_to_sparse = false)
 
   var = Matrix(CSV.read(path, DataFrame))
-  if convert_to_sparse === true
+  if convert_to_sparse == true
       var = sparse(convert(Vector{Int64}, var[:,1]), convert(Vector{Int64}, var[:,2]), var[:,3])
   end
 
@@ -77,7 +77,7 @@ function mydot(vec1::Array, vec2::Array, norm_matrix = nothing)
   :rtype: float
   =#
 
-  if norm_matrix === nothing
+  if isnothing(norm_matrix)
       norm_matrix = float(I(size(vec1)[1]))
   end
 
@@ -96,7 +96,7 @@ function mynorm(vec::Array, norm_matrix = nothing)
   :rtype: float
   =#
 
-  if norm_matrix === nothing
+  if isnothing(norm_matrix)
     norm_matrix = float(I(size(vec)[1]))
   end
 
@@ -149,7 +149,7 @@ end
 
 function tensor_product(AB, A, B; transpose_A=false)
 
-  @assert length(size(A)) === 3 && length(size(B)) === 2 "Only implemented tensor order 3 * tensor order 2"
+  @assert length(size(A)) == 3 && length(size(B)) == 2 "Only implemented tensor order 3 * tensor order 2"
 
   if transpose_A
     return @tensor AB[i,j,k] = A[l,i,k] * B[l,j]

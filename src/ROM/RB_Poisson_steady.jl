@@ -38,7 +38,7 @@ end
 
 function check_norm_matrix(RB_variables::PoissonSteady) :: Bool
 
-  isempty(RB_variables.Xᵘ₀) || maximum(abs.(RB_variables.Xᵘ₀)) === 0
+  isempty(RB_variables.Xᵘ₀) || maximum(abs.(RB_variables.Xᵘ₀)) == 0
 
 end
 
@@ -118,8 +118,8 @@ function save_M_DEIM_structures(ROM_info::Info, RB_variables::PoissonSteady)
   if !isempty(l_info_vec)
     l_info_mat = reduce(vcat,transpose.(l_info_vec))
     l_idx,l_val = l_info_mat[:,1], transpose.(l_info_mat[:,2])
-    for i = l_idx
-      save_CSV(l_val[i], joinpath(ROM_info.paths.ROM_structures_path, list_names[i]*".csv"))
+    for (i₁,i₂) in enumerate(l_idx)
+      save_CSV(l_val[i₁], joinpath(ROM_info.paths.ROM_structures_path, list_names[i₂]*".csv"))
     end
   end
 
@@ -388,16 +388,16 @@ end
 
 function get_Q(ROM_info::Info, RB_variables::PoissonSteady)
 
-  if RB_variables.Qᵃ === 0
-    RB_variables.Qᵃ = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "Qᵃ.csv"))[1]
+  if RB_variables.Qᵃ == 0
+    RB_variables.Qᵃ = size(RB_variables.Aₙ)[end]
   end
 
   if !ROM_info.build_parametric_RHS
-    if RB_variables.Qᶠ === 0
-      RB_variables.Qᶠ = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "Qᶠ.csv"))[1]
+    if RB_variables.Qᶠ == 0
+      RB_variables.Qᶠ = size(RB_variables.Fₙ)[end]
     end
-    if RB_variables.Qʰ === 0
-      RB_variables.Qʰ = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "Qʰ.csv"))[1]
+    if RB_variables.Qʰ == 0
+      RB_variables.Qʰ = size(RB_variables.Hₙ)[end]
     end
   end
 
@@ -508,7 +508,7 @@ function testing_phase(ROM_info::Info, RB_variables::PoissonSteady, μ, param_nb
     @info "Considering parameter number: $nb"
 
     μ_nb = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
-    parametric_info = get_parametric_specifics(ROM_info, μ_nb)
+    parametric_info = get_parametric_specifics(problem_ntuple, ROM_info, μ_nb)
 
     uₕ_test = Matrix(CSV.read(joinpath(ROM_info.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, nb]
 

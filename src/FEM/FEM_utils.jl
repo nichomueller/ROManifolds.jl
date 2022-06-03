@@ -1,4 +1,4 @@
-function FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, case)
+function FEM_paths(root, problem_type, problem_name, mesh_name, case)
 
   @assert isdir(root) "$root is an invalid root directory"
 
@@ -10,7 +10,7 @@ function FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, cas
   create_dir(type_path)
   problem_path = joinpath(type_path, problem_name)
   create_dir(problem_path)
-  problem_and_info_path = joinpath(problem_path, string(problem_dim) * "D" * "_" * string(case))
+  problem_and_info_path = joinpath(problem_path, "case" * string(case))
   create_dir(problem_and_info_path)
   current_test = joinpath(problem_and_info_path, mesh_name)
   create_dir(current_test)
@@ -21,7 +21,139 @@ function FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, cas
   FEM_structures_path = joinpath(FEM_path, "FEM_structures")
   create_dir(FEM_structures_path)
 
-  _ -> (mesh_path; current_test; FEM_snap_path; FEM_structures_path)
+  _ -> (mesh_path, current_test, FEM_snap_path, FEM_structures_path)
+
+end
+
+function get_parametric_specifics(::NTuple{1,Int},Info::SteadyInfo,μ::Array)
+
+  model = DiscreteModelFromFile(Info.paths.mesh_path)
+
+  function prepare_α(x, μ, probl_nl)
+    if !probl_nl["A"]
+      return sum(μ)
+    else
+      return 1 + μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) / μ[3])
+    end
+  end
+  α(x) = prepare_α(x, μ, Info.probl_nl)
+
+  function prepare_f(x, μ, probl_nl)
+    if probl_nl["f"]
+      return sin(μ[4] * x[1]) + sin(μ[4] * x[2])
+    else
+      return 1
+    end
+  end
+  f(x) = prepare_f(x, μ, Info.probl_nl)
+  g(x) = 0
+  h(x) = 1
+
+  ParametricSpecifics(μ, model, α, f, g, h)
+
+end
+
+function get_parametric_specifics(::NTuple{1,Int},Info::UnsteadyInfo,μ::Array)
+
+  model = DiscreteModelFromFile(Info.paths.mesh_path)
+  αₛ(x) = 1
+  αₜ(t, μ) = sum(μ) * (2 + sin(2π * t))
+  mₛ(x) = 1
+  mₜ(t::Real) = 1
+  m(x, t::Real) = mₛ(x)*mₜ(t)
+  m(t::Real) = x -> m(x, t)
+  fₛ(x) = 1
+  fₜ(t::Real) = sin(π * t)
+  gₛ(x) = 0
+  gₜ(t::Real) = 0
+  g(x, t::Real) = gₛ(x)*gₜ(t)
+  g(t::Real) = x -> g(x, t)
+  hₛ(x) = 0
+  hₜ(t::Real) = 0
+  h(x, t::Real) = hₛ(x)*hₜ(t)
+  h(t::Real) = x -> h(x, t)
+  u₀(x) = 0
+
+  function prepare_α(x, t, μ, probl_nl)
+    if !probl_nl["A"]
+      return αₛ(x)*αₜ(t, μ)
+    else
+      return (10 + μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) * sin(t) / μ[3]))
+    end
+  end
+  α(x, t::Real) = prepare_α(x, t, μ, Info.probl_nl)
+  α(t::Real) = x -> α(x, t)
+
+  function prepare_f(x, t, μ, probl_nl)
+    if !probl_nl["f"]
+      return fₛ(x)*fₜ(t)
+    else
+      return sin(π*t*x*(μ[4]+μ[5]))
+    end
+  end
+  f(x, t::Real) = prepare_f(x, t, μ, Info.probl_nl)
+  f(t::Real) = x -> f(x, t)
+
+  ParametricSpecificsUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, g, hₛ, hₜ, h, u₀)
+
+end
+
+function get_parametric_specifics(::NTuple{2,Int},Info::UnsteadyInfo,μ::Array)
+
+  model = DiscreteModelFromFile(Info.paths.mesh_path)
+  αₛ(x) = 1
+  αₜ(t::Real, μ) = sum(μ) * (2 + sin(2π * t))
+  mₛ(x) = 1
+  mₜ(t::Real) = 1
+  m(x, t::Real) = mₛ(x)*mₜ(t)
+  m(t::Real) = x -> m(x, t)
+  fₛ(x) = VectorValue(0.,0.,0.)
+  fₜ(t::Real) = 0
+  f(x, t::Real) = fₛ(x)*fₜ(t)
+  f(t::Real) = x -> f(x, t)
+  gʷ(x, t::Real) = VectorValue(0.,0.,0.)
+  gʷ(t::Real) = x -> gʷ(x, t)
+  x0 = Point(0.,0.,0.)
+  R = 1
+  gₛ(x) = 2 * (1 .- VectorValue((x[1]-x0[1])^2,(x[2]-x0[2])^2,(x[3]-x0[3])^2) / R^2) / (pi*R^2)
+  gₜ(t::Real, μ) = 1-cos(2*pi*t/T)+μ[2]*sin(2*pi*μ[1]*t/T)
+  gⁱⁿ(x, t::Real) = gₛ(x)*gₜ(t, μ)
+  gⁱⁿ(t::Real) = x -> gⁱⁿ(x, t)
+  hₛ(x) = VectorValue(0.,0.,0.)
+  hₜ(t::Real) = 0
+  h(x, t::Real) = hₛ(x)*hₜ(t)
+  h(t::Real) = x -> h(x, t)
+  u₀(x) = VectorValue(0.,0.,0.)
+  p₀(x) = 0.
+  function x₀(x)
+    return [u₀(x), p₀(x)]
+  end
+
+  function prepare_α(x, t, μ, probl_nl)
+    if !probl_nl["A"]
+      return αₛ(x)*αₜ(t, μ)
+    else
+      return (1 + μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) * sin(t) / μ[3]))
+    end
+  end
+  α(x, t::Real) = prepare_α(x, t, μ, Info.probl_nl)
+  α(t::Real) = x -> α(x, t)
+
+  function prepare_g(x, t, μ, case)
+    if case <= 1
+      gⁱⁿ(x, t::Real) = gₛ(x)*gₜ(t, μ)
+      gⁱⁿ(t::Real) = x -> gⁱⁿ(x, t)
+      return [gʷ,gⁱⁿ]
+    else
+      gⁱⁿ₁(x, t::Real) = gₛ(x)*gₜ(t, μ[end-2:end-1])*μ[end]
+      gⁱⁿ₁(t::Real) = x -> g(x, t)
+      gⁱⁿ₂(x, t::Real) = gₛ(x)*(1-gₜ(t, μ[end-2:end-1])*μ[end])
+      gⁱⁿ₂(t::Real) = x -> g(x, t)
+      return [gʷ,gⁱⁿ₁,gⁱⁿ₂]
+    end
+  end
+
+  ParametricSpecificsUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, prepare_g(x, t, μ, Info.case), hₛ, hₜ, h, u₀)
 
 end
 
@@ -52,7 +184,7 @@ end
 function from_vec_to_mat_idx(idx::Array, Nᵤ::Int64)
 
   row_idx = Int.(idx .% Nᵤ)
-  row_idx[findall(x->x===0, row_idx)] .= Nᵤ
+  row_idx[findall(x->x==0, row_idx)] .= Nᵤ
   col_idx = Int.((idx-row_idx)/Nᵤ .+ 1)
 
   row_idx, col_idx
@@ -124,9 +256,9 @@ end
 
 function chebyshev_polynomial(x::Float64, n::Int64)
 
-  if n === 0
+  if n == 0
     return 1
-  elseif n === 1
+  elseif n == 1
     return 2*x
   else
     return 2*x*chebyshev_polynomial(x,n-1) - chebyshev_polynomial(x,n-2)

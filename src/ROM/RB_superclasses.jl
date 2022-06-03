@@ -190,6 +190,7 @@ setup(NT::NTuple{5,Int}) = setup_StokesSTGRB(NT)
 
 struct ROMSpecificsSteady <: SteadyInfo
   probl_nl::Dict
+  case::Int
   paths::Function
   RB_method::String
   nₛ::Int64
@@ -207,6 +208,7 @@ end
 
 struct ROMSpecificsUnsteady <: UnsteadyInfo
   probl_nl::Dict
+  case::Int
   paths::Function
   RB_method::String
   time_reduction_technique::String

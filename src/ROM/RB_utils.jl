@@ -3,8 +3,8 @@ include("../FEM/FEM_utils.jl")
 include("RB_superclasses.jl")
 include("M_DEIM.jl")
 
-function ROM_paths(root, problem_type, problem_name, mesh_name, problem_dim, RB_method, case; test_case="")
-  paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, case)
+function ROM_paths(root, problem_type, problem_name, mesh_name, RB_method, case; test_case="")
+  paths = FEM_paths(root, problem_type, problem_name, mesh_name, case)
   mesh_path = paths.mesh_path
   FEM_snap_path = paths.FEM_snap_path
   FEM_structures_path = paths.FEM_structures_path
@@ -69,7 +69,7 @@ function build_sparse_mat(problem_info::ProblemSpecifics, FE_space::SteadyProble
 
   Ω_sparse = view(FE_space.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * problem_info.order)
-  if var === "A"
+  if var == "A"
     Mat = assemble_matrix(∫(∇(FE_space.ϕᵥ) ⋅ (param.α * ∇(FE_space.ϕᵤ))) * dΩ_sparse, FE_space.V, FE_space.V₀)
   else
     @error "Unrecognized sparse matrix"
@@ -117,9 +117,9 @@ function build_sparse_mat(problem_info::ProblemSpecificsUnsteady,
   Nₜ = convert(Int64, ROM_info.T / ROM_info.δt)
 
   function define_Matₜ(t::Real, var::String)
-    if var === "A"
+    if var == "A"
       return assemble_matrix(∫(∇(FE_space.ϕᵥ) ⋅ (param.α(t) * ∇(FE_space.ϕᵤ(t)))) * dΩ_sparse, FE_space.V(t), FE_space.V₀)
-    elseif mat === "M"
+    elseif mat == "M"
       return assemble_matrix(∫(FE_space.ϕᵥ ⋅ (param.m(t) * FE_space.ϕᵤ(t))) * dΩ_sparse, FE_space.V(t), FE_space.V₀)
     else
       @error "Unrecognized sparse matrix"
@@ -127,11 +127,13 @@ function build_sparse_mat(problem_info::ProblemSpecificsUnsteady,
   end
   Matₜ(t) = define_Matₜ(t, var)
 
-  i,j,v = findnz(Matₜ(times_θ[1]))
-  Mat = sparse(i,j,v,FE_space.Nₛᵘ,FE_space.Nₛᵘ*Nₜ)
-  for (i_t,t) in enumerate(times_θ[2:end])
+  for (i_t,t) in enumerate(times_θ)
     i,j,v = findnz(Matₜ(t))
-    Mat[:,i_t*FE_space.Nₛᵘ+1:(i_t+1)*FE_space.Nₛᵘ] = sparse(i,j,v,FE_space.Nₛᵘ,FE_space.Nₛᵘ)
+    if i_t == 1
+      global Mat = sparse(i,j,v,FE_space.Nₛᵘ,FE_space.Nₛᵘ*Nₜ)
+    else
+      Mat[:,(i_t-1)*FE_space.Nₛᵘ+1:i_t*FE_space.Nₛᵘ] = sparse(i,j,v,FE_space.Nₛᵘ,FE_space.Nₛᵘ)
+    end
   end
 
   Mat
@@ -154,9 +156,9 @@ function build_sparse_mat(problem_info::ProblemSpecificsUnsteady,
   unique!(idx_time)
 
   function define_Matₜ(t::Real, var::String)
-    if var === "A"
+    if var == "A"
       return assemble_matrix(∫(∇(FE_space.ϕᵥ) ⋅ (param.α(t) * ∇(FE_space.ϕᵤ(t)))) * dΩ_sparse, FE_space.V(t), FE_space.V₀)
-    elseif mat === "M"
+    elseif mat == "M"
       return assemble_matrix(∫(FE_space.ϕᵥ ⋅ (param.m(t) * FE_space.ϕᵤ(t))) * dΩ_sparse, FE_space.V(t), FE_space.V₀)
     else
       @error "Unrecognized sparse matrix"
@@ -166,99 +168,27 @@ function build_sparse_mat(problem_info::ProblemSpecificsUnsteady,
 
   for (i_t,t) in enumerate(times_θ[idx_time])
     i,j,v = findnz(Matₜ(t))
-    if i_t === 1
+    if i_t == 1
       global Mat = sparse(i,j,v,FE_space.Nₛᵘ,FE_space.Nₛᵘ*length(idx_time))
+    else
+      global Mat[:,(i_t-1)*FE_space.Nₛᵘ+1:i_t*FE_space.Nₛᵘ] = sparse(i,j,v,FE_space.Nₛᵘ,FE_space.Nₛᵘ)
     end
-    global Mat[:,(i_t-1)*FE_space.Nₛᵘ+1:i_t*FE_space.Nₛᵘ] = sparse(i,j,v,FE_space.Nₛᵘ,FE_space.Nₛᵘ)
   end
 
   Mat
 
 end
 
-function get_parametric_specifics(ROM_info::SteadyInfo, μ::Array)
-
-  model = DiscreteModelFromFile(ROM_info.paths.mesh_path)
-
-  function prepare_α(x, μ, probl_nl)
-    if !probl_nl["A"]
-      return sum(μ)
-    else
-      return 1 + μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) / μ[3])
-    end
-  end
-  α(x) = prepare_α(x, μ, ROM_info.probl_nl)
-
-  function prepare_f(x, μ, probl_nl)
-    if probl_nl["f"]
-      return sin(μ[4] * x[1]) + sin(μ[4] * x[2])
-    else
-      return 1
-    end
-  end
-  f(x) = prepare_f(x, μ, ROM_info.probl_nl)
-  g(x) = 0
-  h(x) = 1
-
-  ParametricSpecifics(μ, model, α, f, g, h)
-
-end
-
-function get_parametric_specifics(ROM_info::UnsteadyInfo, μ::Array)
-
-  model = DiscreteModelFromFile(ROM_info.paths.mesh_path)
-  αₛ(x) = 1
-  αₜ(t, μ) = sum(μ) * (2 + sin(2π * t))
-  mₛ(x) = 1
-  mₜ(t::Real) = 1
-  m(x, t::Real) = mₛ(x)*mₜ(t)
-  m(t::Real) = x -> m(x, t)
-  fₛ(x) = 1
-  fₜ(t::Real) = sin(π * t)
-  gₛ(x) = 0
-  gₜ(t::Real) = 0
-  g(x, t::Real) = gₛ(x)*gₜ(t)
-  g(t::Real) = x -> g(x, t)
-  hₛ(x) = 0
-  hₜ(t::Real) = 0
-  h(x, t::Real) = hₛ(x)*hₜ(t)
-  h(t::Real) = x -> h(x, t)
-  u₀(x) = 0
-
-  function prepare_α(x, t, μ, probl_nl)
-    if !probl_nl["A"]
-      return αₛ(x)*αₜ(t, μ)
-    else
-      return (1 + μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) * sin(t) / μ[3]))
-    end
-  end
-  α(x, t::Real) = prepare_α(x, t, μ, ROM_info.probl_nl)
-  α(t::Real) = x -> α(x, t)
-
-  function prepare_f(x, t, μ, probl_nl)
-    if !probl_nl["f"]
-      return fₛ(x)*fₜ(t)
-    else
-      return sin(π*t*x*(μ[4]+μ[5]))
-    end
-  end
-  f(x, t::Real) = prepare_f(x, t, μ, ROM_info.probl_nl)
-  f(t::Real) = x -> f(x, t)
-
-  ParametricSpecificsUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, gₛ, gₜ, g, hₛ, hₜ, h, u₀)
-
-end
-
-function assemble_online_structure(coeff, Mat::Array)
+function assemble_online_structure(coeff, Mat::Matrix)
 
   Mat_μ = zeros(size(Mat)[1:end-1])
   dim = length(size(Mat))
 
-  if dim === 2
+  if dim == 2
     for q = eachindex(coeff)
       Mat_μ += Mat[:,q] * coeff[q]
     end
-  elseif dim === 3
+  elseif dim == 3
     for q = eachindex(coeff)
       Mat_μ += Mat[:,:,q] * coeff[q]
     end
@@ -305,7 +235,7 @@ function compute_errors(uₕ::Array, RB_variables::RBUnsteadyProblem, norm_matri
   H1_sol = zeros(RB_variables.Nₜ)
 
   for i = 1:RB_variables.Nₜ
-    H1_err[i] = mynorm(uₕ[:, i] - RB_variables.steady_info.ũ[:, i], norm_matrix)
+    H1_err[i] = mynorm(uₕ[:, i] - RB_variables.S.ũ[:, i], norm_matrix)
     H1_sol[i] = mynorm(uₕ[:, i], norm_matrix)
   end
 
@@ -318,6 +248,8 @@ function compute_MDEIM_error(FE_space::FEMProblem, ROM_info::Info, RB_variables:
   Aₙ_μ = (RB_variables.Φₛᵘ)' * assemble_stiffness(FE_space, ROM_info, parametric_info) * RB_variables.Φₛᵘ
 
 end
+
+
 
 function post_process(ROM_info::SteadyInfo, d::Dict)
   plotly()
@@ -362,7 +294,7 @@ function post_process(ROM_info::UnsteadyInfo, d::Dict)
   make_plot(d["mean_H1_err"], "Average ||uₕ(t) - ũ(t)||ₕ₁", "time [s]", "H¹ error", d["path_μ"])
   make_plot(d["H1_L2_err"], "||uₕ - ũ||ₕ₁₋ₗ₂", "param μ number", "H¹-L² error", d["path_μ"])
 
-  if length(keys(d)) === 8
+  if length(keys(d)) == 8
 
     createpvd(joinpath(vtk_dir,"mean_point_err_p")) do pvd
       for (i,t) in enumerate(times)

@@ -26,7 +26,7 @@ function PODs_space(ROM_info::Info, RB_variables::PoissonUnsteady)
     for nₛ = 1:ROM_info.nₛ
       Sᵘₙ = RB_variables.S.Sᵘ[:, (nₛ-1)*RB_variables.Nₜ+1:nₛ*RB_variables.Nₜ]
       Φₙ, _ = POD(Sᵘₙ, ROM_info.ϵₛ)
-      if nₛ ===1
+      if nₛ ==1
         global Φₙᵘ_temp = Φₙ
       else
         global Φₙᵘ_temp = hcat(Φₙᵘ_temp, Φₙ)
@@ -49,7 +49,7 @@ function PODs_time(ROM_info::Info, RB_variables::PoissonUnsteady)
 
   @info "Performing the temporal POD for field u, using a tolerance of $(ROM_info.ϵₜ)"
 
-  if ROM_info.time_reduction_technique === "ST-HOSVD"
+  if ROM_info.time_reduction_technique == "ST-HOSVD"
     Sᵘₜ = zeros(RB_variables.Nₜ, RB_variables.S.nₛᵘ * ROM_info.nₛ)
     Sᵘ = RB_variables.S.Φₛᵘ' * RB_variables.S.Sᵘ
     for i in 1:ROM_info.nₛ
@@ -115,7 +115,7 @@ function get_generalized_coordinates(ROM_info::Info, RB_variables::PoissonUnstea
     get_norm_matrix(ROM_info, RB_variables.S)
   end
 
-  if snaps === nothing || maximum(snaps) > ROM_info.nₛ
+  if isnothing(snaps) || maximum(snaps) > ROM_info.nₛ
     snaps = 1:ROM_info.nₛ
   end
 
@@ -162,9 +162,9 @@ function save_M_DEIM_structures(ROM_info::Info, RB_variables::PoissonUnsteady)
 
   if !isempty(l_info_vec)
     l_info_mat = reduce(vcat,transpose.(l_info_vec))
-    l_val = l_info_mat[:,2]
-    for (i,v) in enumerate(l_val)
-      save_CSV(v,joinpath(ROM_info.paths.ROM_structures_path, list_names[i]*".csv"))
+    l_idx,l_val = l_info_mat[:,1], transpose.(l_info_mat[:,2])
+    for (i₁,i₂) in enumerate(l_idx)
+      save_CSV(l_val[i₁], joinpath(ROM_info.paths.ROM_structures_path, list_names[i₂]*".csv"))
     end
   end
 
@@ -175,31 +175,6 @@ end
 function set_operators(ROM_info, RB_variables::PoissonUnsteady) :: Vector
 
   return vcat(["M"], set_operators(ROM_info, RB_variables.S))
-
-end
-
-function get_ST_M_DEIM_structures(ROM_info::Info, RB_variables::PoissonUnsteady) :: Vector
-
-  operators = String[]
-
-  if ROM_info.probl_nl["A"]
-    if isfile(joinpath(ROM_info.paths.ROM_structures_path, "row_idx_A.csv"))
-      RB_variables.row_idx_A = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "row_idx_A.csv"))[:]
-    else
-      @info "Failed to import MDEIM offline structures for the stiffness matrix, space-time technique: must build them"
-      append!(operators, ["A"])
-    end
-  end
-  if ROM_info.probl_nl["M"]
-    if isfile(joinpath(ROM_info.paths.ROM_structures_path, "row_idx_M.csv"))
-      RB_variables.row_idx_M = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "row_idx_M.csv"))[:]
-    else
-      @info "Failed to import MDEIM offline structures for the mass matrix, space-time technique: must build them"
-      append!(operators, ["M"])
-    end
-  end
-
-  operators
 
 end
 
@@ -214,7 +189,8 @@ function get_M_DEIM_structures(ROM_info::Info, RB_variables::PoissonUnsteady) ::
       RB_variables.MDEIMᵢ_M = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "MDEIMᵢ_M.csv"))
       RB_variables.MDEIM_idx_M = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "MDEIM_idx_M.csv"))[:]
       RB_variables.sparse_el_M = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "sparse_el_M.csv"))[:]
-      return []
+      RB_variables.row_idx_M = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "row_idx_M.csv"))[:]
+      append!(operators, [])
     else
       @info "Failed to import MDEIM offline structures for the mass matrix: must build them"
       append!(operators, ["M"])
@@ -222,10 +198,16 @@ function get_M_DEIM_structures(ROM_info::Info, RB_variables::PoissonUnsteady) ::
 
   end
 
-  append!(operators, get_M_DEIM_structures(ROM_info, RB_variables.S))
-  if ROM_info.space_time_M_DEIM
-    append!(operators, get_ST_M_DEIM_structures(ROM_info, RB_variables))
+  if ROM_info.probl_nl["A"]
+    if isfile(joinpath(ROM_info.paths.ROM_structures_path, "row_idx_A.csv"))
+      RB_variables.row_idx_A = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "row_idx_A.csv"))[:]
+    else
+      @info "Failed to import MDEIM offline structures for the stiffness matrix: must build them"
+      append!(operators, ["A"])
+    end
   end
+
+  append!(operators, get_M_DEIM_structures(ROM_info, RB_variables.S))
 
 end
 
@@ -263,17 +245,11 @@ end
 function get_θᵐₛₜ(ROM_info::Info, RB_variables::RBUnsteadyProblem, param::ParametricSpecificsUnsteady) :: Array
 
   if !ROM_info.probl_nl["M"]
-    θᵐ = get_θᵐ(ROM_info, RB_variables, param)
+    θᵐ = [1]
   else
-    Nₛᵘ = RB_variables.S.Nₛᵘ
-    _, MDEIM_idx_time = from_spacetime_to_space_time_idx_mat(RB_variables.MDEIM_idx_M, Nₛᵘ)
-    unique!(MDEIM_idx_time)
-    M_μ_sparse = build_sparse_mat(problem_info, FE_space, ROM_info, param, RB_variables.sparse_el_M; var="M")
-
-    θᵐ = zeros(RB_variables.Qᵐ, length(MDEIM_idx_time))
-    for iₜ = 1:length(MDEIM_idx_time)
-      θᵐ[:,iₜ] = M_DEIM_online(M_μ_sparse[:,(iₜ-1)*Nₛᵘ+1:iₜ*Nₛᵘ], RB_variables.MDEIMᵢ_M, RB_variables.MDEIM_idx_M)
-    end
+    M_μ_sparse = build_sparse_mat(problem_info, FE_space, ROM_info, param, RB_variables.sparse_el_M, RB_variables.MDEIM_idx_M; var="M")
+    MDEIM_idx_new = modify_MDEIM_idx(RB_variables.MDEIM_idx_M,RB_variables.S.Nₛᵘ^2)
+    θᵐ = RB_variables.MDEIMᵢ_M\Vector(M_μ_sparse[MDEIM_idx_new])
   end
 
   return θᵐ
@@ -303,11 +279,11 @@ end
 function get_θᵃₛₜ(ROM_info::Info, RB_variables::RBUnsteadyProblem, param::ParametricSpecificsUnsteady) :: Array
 
   if !ROM_info.probl_nl["A"]
-    θᵃ = get_θᵃ(ROM_info, RB_variables, param)
+    θᵃ = [1]
   else
     A_μ_sparse = build_sparse_mat(problem_info, FE_space, ROM_info, param, RB_variables.S.sparse_el_A, RB_variables.S.MDEIM_idx_A; var="A")
     MDEIM_idx_new = modify_MDEIM_idx(RB_variables.S.MDEIM_idx_A,RB_variables.S.Nₛᵘ^2)
-    θᵃ = MDEIMᵢ_mat\Vector(A_μ_sparse[MDEIM_idx_new])
+    θᵃ = RB_variables.S.MDEIMᵢ_A\Vector(A_μ_sparse[MDEIM_idx_new])
   end
 
   return θᵃ
@@ -326,7 +302,7 @@ function get_θᶠʰ(ROM_info::Info, RB_variables::RBUnsteadyProblem, param::Par
   if !ROM_info.probl_nl["f"]
     θᶠ = [param.fₜ(t_θ) for t_θ = times_θ]
   else
-    F_μ, _ = assemble_forcing(FE_space, ROM_info, param)
+    F_μ = assemble_forcing(FE_space, ROM_info, param)
     for iₜ = 1:RB_variables.Nₜ
       append!(θᶠ, M_DEIM_online(F_μ(times_θ[iₜ]), RB_variables.S.DEIMᵢ_mat_F, RB_variables.S.DEIM_idx_F))
     end
@@ -335,7 +311,7 @@ function get_θᶠʰ(ROM_info::Info, RB_variables::RBUnsteadyProblem, param::Par
   if !ROM_info.probl_nl["h"]
     θʰ = [param.hₜ(t_θ) for t_θ = times_θ]
   else
-    _, H_μ = assemble_forcing(FE_space, ROM_info, param)
+    H_μ = assemble_neumann_datum(FE_space, ROM_info, param)
     for iₜ = 1:RB_variables.Nₜ
       append!(θʰ, M_DEIM_online(H_μ(times_θ[iₜ]), RB_variables.S.DEIMᵢ_mat_H, RB_variables.S.DEIM_idx_H))
     end
@@ -354,35 +330,21 @@ function get_θᶠʰₛₜ(ROM_info::Info, RB_variables::RBUnsteadyProblem, para
     @error "Cannot fetch θᶠ, θʰ if the RHS is built online"
   end
 
-  times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+ROM_info.δt*ROM_info.θ
-  θᶠ, θʰ = Float64[], Float64[]
-
   if !ROM_info.probl_nl["f"]
-    θᶠ = [param.fₜ(t_θ) for t_θ = times_θ]
+    θᶠ = [1]
   else
-    F_μ, _ = assemble_forcing(FE_space, ROM_info, param)
-    _, DEIM_idx_time = from_spacetime_to_space_time_idx_vec(RB_variables.S.DEIM_idx_F, RB_variables.S.Nₛᵘ)
-    unique!(DEIM_idx_time)
-    times_DEIM = times_θ[DEIM_idx_time]
-    for tᵢ = times_DEIM
-      append!(θᶠ, M_DEIM_online(F_μ(tᵢ), RB_variables.S.DEIMᵢ_mat_F, RB_variables.S.DEIM_idx_F))
-    end
+    F_μ = assemble_forcing(FE_space, ROM_info, param)
+    DEIM_idx_new = modify_MDEIM_idx(RB_variables.S.DEIM_idx_F,RB_variables.S.Nₛᵘ)
+    θᶠ = RB_variables.S.DEIMᵢ_F\Vector(F_μ[DEIM_idx_new])
   end
 
   if !ROM_info.probl_nl["h"]
-    θʰ = [param.hₜ(t_θ) for t_θ = times_θ]
+    θʰ = [1]
   else
-    _, H_μ = assemble_forcing(FE_space, ROM_info, param)
-    _, DEIM_idx_time = from_spacetime_to_space_time_idx_vec(RB_variables.S.DEIM_idx_H, RB_variables.S.Nₛᵘ)
-    unique!(DEIM_idx_time)
-    times_DEIM = times_θ[DEIM_idx_time]
-    for tᵢ = times_DEIM
-      append!(θʰ, M_DEIM_online(H_μ(tᵢ), RB_variables.S.DEIMᵢ_mat_H, RB_variables.S.DEIM_idx_H))
-    end
+    H_μ = assemble_neumann_datum(FE_space, ROM_info, param)
+    DEIM_idx_new = modify_MDEIM_idx(RB_variables.S.DEIM_idx_H,RB_variables.S.Nₛᵘ)
+    θʰ = RB_variables.S.DEIMᵢ_H\Vector(H_μ[DEIM_idx_new])
   end
-
-  θᶠ = reshape(θᶠ, RB_variables.S.Qᶠ, RB_variables.Nₜ)
-  θʰ = reshape(θʰ, RB_variables.S.Qʰ, RB_variables.Nₜ)
 
   return θᶠ, θʰ
 
@@ -390,8 +352,8 @@ end
 
 function get_Q(ROM_info::Info, RB_variables::PoissonUnsteady)
 
-  if RB_variables.Qᵐ === 0
-    RB_variables.Qᵐ = load_CSV(joinpath(ROM_info.paths.ROM_structures_path, "Qᵐ.csv"))[1]
+  if RB_variables.Qᵐ == 0
+    RB_variables.Qᵐ = size(RB_variables.Mₙ)[end]
   end
 
   get_Q(ROM_info, RB_variables.S)
@@ -473,10 +435,11 @@ function testing_phase(ROM_info::Info, RB_variables::PoissonUnsteady, μ, param_
   uₙ_μ = zeros(RB_variables.nᵘ, length(param_nbs))
 
   for (i_nb, nb) in enumerate(param_nbs)
+    println("\n")
     @info "Considering parameter number: $nb"
 
     μ_nb = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
-    parametric_info = get_parametric_specifics(ROM_info, μ_nb)
+    parametric_info = get_parametric_specifics(problem_ntuple, ROM_info, μ_nb)
     uₕ_test = Matrix(CSV.read(joinpath(ROM_info.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, (nb-1)*RB_variables.Nₜ+1:nb*RB_variables.Nₜ]
 
     online_time = @elapsed begin
@@ -545,44 +508,53 @@ function testing_phase(ROM_info::Info, RB_variables::PoissonUnsteady, μ, param_
 
 end
 
-function check_dataset(ROM_info, RB_variables, i)
+function check_dataset(
+  FE_space::FEMProblem,
+  ROM_info::Info,
+  RB_variables::PoissonUnsteady,
+  nb::Int64)
 
   μ = load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
-  μ_i = parse.(Float64, split(chop(μ[i]; head=1, tail=1), ','))
-  param = get_parametric_specifics(ROM_info, μ_i)
+  μ_i = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
+  param = get_parametric_specifics(problem_ntuple, ROM_info, μ_i)
 
-  u1 = RB_variables.S.Sᵘ[:, (i-1)*RB_variables.Nₜ+1]
-  u2 = RB_variables.S.Sᵘ[:, (i-1)*RB_variables.Nₜ+2]
-  M = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "M.csv"); convert_to_sparse = true)
-  A = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "A.csv"); convert_to_sparse = true)
-  F = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "F.csv"))
-  H = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "H.csv"))
+  u1 = RB_variables.S.Sᵘ[:,(nb-1)*RB_variables.Nₜ+1]
+  u2 = RB_variables.S.Sᵘ[:,(nb-1)*RB_variables.Nₜ+2]
+  M = assemble_mass(FE_space, ROM_info, param)(0.0)
+  # we suppose that case == 1 --> no need to multiply A by αₜ
+  A(t) = assemble_stiffness(FE_space, ROM_info, param)(t)
+  F = assemble_forcing(FE_space, ROM_info, param)(0.0)
+  H = assemble_neumann_datum(FE_space, ROM_info, param)(0.0)
 
   t¹_θ = ROM_info.t₀+ROM_info.δt*ROM_info.θ
   t²_θ = t¹_θ+ROM_info.δt
 
-  LHS1 = ROM_info.θ*(M+ROM_info.δt*ROM_info.θ*A*param.αₜ(t¹_θ,μ_i))
+  LHS1 = ROM_info.θ*(M+ROM_info.δt*ROM_info.θ*A(t¹_θ))
   RHS1 = ROM_info.δt*ROM_info.θ*(F*param.fₜ(t¹_θ)+H*param.hₜ(t¹_θ))
   my_u1 = LHS1\RHS1
 
-  LHS2 = ROM_info.θ*(M+ROM_info.δt*ROM_info.θ*A*param.αₜ(t²_θ,μ_i))
-  mat = (1-ROM_info.θ)*(M+ROM_info.δt*ROM_info.θ*A*param.αₜ(t²_θ,μ_i))-M
+  LHS2 = ROM_info.θ*(M+ROM_info.δt*ROM_info.θ*A(t²_θ))
+  mat = (1-ROM_info.θ)*(M+ROM_info.δt*ROM_info.θ*A(t²_θ))-M
   RHS2 = ROM_info.δt*ROM_info.θ*(F*param.fₜ(t²_θ)+H*param.hₜ(t²_θ))-mat*u1
   my_u2 = LHS2\RHS2
 
-  u1≈my_u1
-  u2≈my_u2
+  @test u1≈my_u1
+  @test u2≈my_u2
 
 end
 
-function compute_stability_constant(ROM_info, M, A, θ, Nₜ)
+function compute_stability_constant(
+  FE_space::FEMProblem,
+  ROM_info::Info,
+  param::ParametricSpecificsUnsteady,
+  Nₜ::Int64) ::Float64
 
-  #= M = assemble_mass(FE_space, ROM_info, parametric_info)(0.0)
-  A = assemble_stiffness(FE_space, ROM_info, parametric_info)(0.0) =#
-  Nₕ = size(M)[1]
   δt = ROM_info.T/Nₜ
-  B₁ = θ*(M + θ*δt*A)
-  B₂ = θ*(-M + (1-θ)*δt*A)
+  M = assemble_mass(FE_space, ROM_info, param)(0.0)
+  A = assemble_stiffness(FE_space, ROM_info, param)(0.0)
+
+  B₁ = ROM_info.θ*(M + ROM_info.θ*δt*A)
+  B₂ = ROM_info.θ*(-M + (1-ROM_info.θ)*δt*A)
   λ₁,_ = eigs(B₁)
   λ₂,_ = eigs(B₂)
 

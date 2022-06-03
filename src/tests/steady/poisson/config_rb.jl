@@ -19,19 +19,19 @@ save_results = true
 
 case = 2
 
-if case === 0
+if case == 0
 
   probl_nl = Dict("Ω" => false, "A" => false, "f" => false, "g" => false, "h" => false)
 
-elseif case === 1
+elseif case == 1
 
   probl_nl = Dict("Ω" => false, "A" => true, "f" => false, "g" => false, "h" => false)
 
-elseif case === 2
+elseif case == 2
 
   probl_nl = Dict("Ω" => false, "A" => true, "f" => true, "g" => true, "h" => false)
 
-elseif case === 3
+elseif case == 3
 
   probl_nl = Dict("Ω" => true, "A" => false, "f" => false, "g" => false, "h" => false)
 

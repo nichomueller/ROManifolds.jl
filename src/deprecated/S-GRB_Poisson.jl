@@ -27,7 +27,7 @@ function assemble_reduced_affine_components(ROM_info, RB_variables::PoissonSTGRB
       projection_time = @elapsed begin
         Aₙ_i = sparse([], [], [])
         for i_nₛ = 1:maximum(10, ROM_info.nₛ)
-          parametric_info = get_parametric_specifics(ROM_info, μ[i_nₛ])
+          parametric_info = get_parametric_specifics(problem_ntuple, ROM_info, μ[i_nₛ])
           A_i = assemble_stiffness(FE_space, ROM_info, parametric_info)
           Aₙ_i = hcat(Aₙ_i, (RB_variables.Φₛᵘ)' * A_i * RB_variables.Φₛᵘ)
         end
@@ -62,7 +62,7 @@ function assemble_reduced_affine_components(ROM_info, RB_variables::PoissonSTGRB
       projection_time += @elapsed begin
         Fₙ_i = Float64[]
         for i_nₛ = 1:maximum(10, ROM_info.nₛ)
-          parametric_info = get_parametric_specifics(ROM_info, μ[i_nₛ])
+          parametric_info = get_parametric_specifics(problem_ntuple, ROM_info, μ[i_nₛ])
           F_i = assemble_forcing(FE_space, parametric_info)
           Fₙ_i = hcat(Fₙ_i, (RB_variables.Φₛᵘ)' * F_i)
         end

@@ -1,4 +1,6 @@
-function FE_solve(FE_space::FESpacePoisson, probl::SteadyProblem, param::ParametricSpecifics; subtract_Ddata = true)
+function FE_solve(
+  FE_space::FESpacePoisson, probl::SteadyProblem,
+  param::ParametricSpecifics; subtract_Ddata = true)
 
   Gₕ = assemble_lifting(FE_space, param)
 
@@ -6,7 +8,7 @@ function FE_solve(FE_space::FESpacePoisson, probl::SteadyProblem, param::Paramet
   rhs(v) = ∫(v * param.f) * FE_space.dΩ + ∫(v * param.h) * FE_space.dΓn
   operator = AffineFEOperator(a, rhs, FE_space.V, FE_space.V₀)
 
-  if probl.solver === "lu"
+  if probl.solver == "lu"
     uₕ_field = solve(LinearFESolver(LUSolver()), operator)
   else
     uₕ_field = solve(LinearFESolver(), operator)
@@ -22,18 +24,20 @@ function FE_solve(FE_space::FESpacePoisson, probl::SteadyProblem, param::Paramet
 
 end
 
-function FE_solve(FE_space::FESpacePoissonUnsteady, probl::ProblemSpecificsUnsteady, param::ParametricSpecificsUnsteady; subtract_Ddata = true)
+function FE_solve(
+  FE_space::FESpacePoissonUnsteady, probl::ProblemSpecificsUnsteady,
+  param::ParametricSpecificsUnsteady; subtract_Ddata = true)
 
   Gₕₜ = assemble_lifting(FE_space, probl, param)
 
-  m(t, u, v) = ∫(param.m(t) * ( u * v ))dΩ
-  a(t, u, v) = ∫(∇(v) ⋅ (param.α(t) * ∇(u))) * FE_space.dΩ
-  rhs(t, v) = ∫(v * param.f(t)) * FE_space.dΩ + ∫(v * param.h(t)) * FE_space.dΓn
+  m(t, u, v) = ∫(param.m(t)*(u*v))dΩ
+  a(t, u, v) = ∫(∇(v)⋅(param.α(t)*∇(u)))*FE_space.dΩ
+  rhs(t, v) = rhs_form(t,v,FE_space,param)
   operator = TransientAffineFEOperator(m, a, rhs, FE_space.V, FE_space.V₀)
 
   linear_solver = LUSolver()
 
-  if probl.time_method === "θ-method"
+  if probl.time_method == "θ-method"
     ode_solver = ThetaMethod(linear_solver, probl.δt, probl.θ)
   else
     ode_solver = RungeKutta(linear_solver, probl.δt, probl.RK_type)
@@ -58,18 +62,20 @@ function FE_solve(FE_space::FESpacePoissonUnsteady, probl::ProblemSpecificsUnste
 
 end
 
-function FE_solve(FE_space::FESpaceStokesUnsteady, probl::ProblemSpecificsUnsteady, param::ParametricSpecificsUnsteady; subtract_Ddata = true)
+function FE_solve(
+  FE_space::FESpaceStokesUnsteady, probl::ProblemSpecificsUnsteady,
+  param::ParametricSpecificsUnsteady; subtract_Ddata=false)
 
-  Gₕₜ = assemble_lifting(FE_space, probl, param)
+  R₁,R₂ = assemble_lifting(FE_space, probl, param)
 
-  m(t, (u, p), (v, q)) = ∫(param.m(t) * ( u ⋅ v )) * FE_space.dΩ
-  ab(t, (u, p), (v, q)) = ∫(param.α(t)*(∇(v) ⊙ ∇(u))) * FE_space.dΩ - ∫((∇⋅v) * p) * FE_space.dΩ + ∫(q * (∇⋅u)) * FE_space.dΩ
-  rhs(t, (v, q)) = ∫(v ⋅ param.f(t)) * FE_space.dΩ + ∫(v ⋅ param.h(t)) * FE_space.dΓn
+  m(t,(u,p),(v,q)) = ∫(param.m(t)*(u⋅v))*FE_space.dΩ
+  ab(t,(u,p),(v,q)) = ∫(param.α(t)*(∇(v) ⊙ ∇(u)))*FE_space.dΩ - ∫((∇⋅v)*p)*FE_space.dΩ + ∫(q*(∇⋅u))*FE_space.dΩ
+  rhs(t,(v,q)) = ∫(v⋅param.f(t))*FE_space.dΩ + ∫(v⋅param.h(t))*FE_space.dΓn + ∫(v⋅param.f(t))*FE_space.dΩ + ∫(q*param.g(t))*FE_space.dΩ - (R₁-R₂)
   operator = TransientAffineFEOperator(m, ab, rhs, FE_space.X, FE_space.X₀)
 
   linear_solver = LUSolver()
 
-  if probl.time_method === "θ-method"
+  if probl.time_method == "θ-method"
     ode_solver = ThetaMethod(linear_solver, probl.δt, probl.θ)
   else
     ode_solver = RungeKutta(linear_solver, probl.δt, probl.RK_type)
@@ -149,21 +155,47 @@ end =#
 
 function assemble_lifting(FE_space::SteadyProblem, param::ParametricSpecifics)
 
-  gₕ = interpolate_everywhere(param.g, FE_space.V)
-  Gₕ = get_free_dof_values(gₕ)
+  Gₕ = zeros(FE_space.Nₛᵘ,1)
+  if !isnothing(FE_space.dΓd)
+    gₕ = interpolate_everywhere(param.g, FE_space.V)
+    Gₕ = get_free_dof_values(gₕ)
+  end
 
   Gₕ
 
 end
 
-function assemble_lifting(FE_space::UnsteadyProblem, probl::ProblemSpecificsUnsteady, param::ParametricSpecificsUnsteady)
+function assemble_lifting(
+  FE_space::FESpacePoissonUnsteady, probl::ProblemSpecificsUnsteady,
+  param::ParametricSpecificsUnsteady)
 
-  gₕ(t) = interpolate_everywhere(param.g(t), FE_space.V(t))
   Gₕ = zeros(FE_space.Nₛᵘ, convert(Int64, probl.T / probl.δt))
-  for (i, tᵢ) in enumerate(probl.t₀+probl.δt:probl.δt:probl.T)
-    Gₕ[:, i] = get_free_dof_values(gₕ(tᵢ))
+  if !isnothing(FE_space.dΓd)
+    gₕ(t) = interpolate_everywhere(param.g(t), FE_space.V(t))
+    for (i, tᵢ) in enumerate(probl.t₀+probl.δt:probl.δt:probl.T)
+      Gₕ[:, i] = get_free_dof_values(gₕ(tᵢ))
+    end
   end
 
   Gₕ
 
+end
+
+function assemble_lifting(FE_space::FESpaceStokesUnsteady, probl::ProblemSpecificsUnsteady, param::ParametricSpecificsUnsteady)
+
+  gₕ(t) = interpolate_dirichlet(param.g(t), FE_space.V(t))
+  R₁(t,v) = ∫(param.α(t)*(∇(v) ⊙ ∇(gₕ(t))))*FE_space.dΓd
+  R₂(t,q) = ∫(∇⋅(gₕ(t))*q)*FE_space.dΓd
+  return R₁,R₂
+
+end
+
+function rhs_form(
+  t::Real,v::FEBasis,FE_space::FESpacePoissonUnsteady,
+  param::ParametricSpecificsUnsteady)
+  if !isnothing(FE_space.dΓn)
+    return ∫(v*param.f(t))*FE_space.dΩ + ∫(v*param.h(t))*FE_space.dΓn
+  else
+    return ∫(v*param.f(t))*FE_space.dΩ
+  end
 end

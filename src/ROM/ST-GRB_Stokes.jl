@@ -138,7 +138,7 @@ end
 
 function assemble_affine_matrices(ROM_info::Info, RB_variables::StokesSTGRB, var::String)
 
-  if var === "B"
+  if var == "B"
     @info "Assembling affine reduced velocity-pressure and pressure-velocity matrices"
     B = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "B.csv"); convert_to_sparse = true)
     Bₙ = (RB_variables.Φₛᵖ)' * B * RB_variables.S.Φₛᵘ

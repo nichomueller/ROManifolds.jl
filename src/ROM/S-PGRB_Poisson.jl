@@ -3,7 +3,7 @@ function get_inverse_P_matrix(ROM_info::Info, RB_variables::PoissonSPGRB)
 
   if use_norm_X
 
-    if isempty(RB_variables.Pᵤ⁻¹) || maximum(abs.(RB_variables.Pᵤ⁻¹)) === 0
+    if isempty(RB_variables.Pᵤ⁻¹) || maximum(abs.(RB_variables.Pᵤ⁻¹)) == 0
       @info "S-PGRB: building the inverse of the diag preconditioner of the H1 norm matrix"
 
       if isfile(joinpath(ROM_info.paths.FEM_structures_path, "Pᵤ⁻¹.csv"))
@@ -68,7 +68,7 @@ function assemble_affine_matrices(ROM_info::Info, RB_variables::PoissonSPGRB, va
 
   get_inverse_P_matrix(ROM_info, RB_variables)
 
-  if var === "A"
+  if var == "A"
     RB_variables.Qᵃ = 1
     @info "Assembling affine reduced stiffness"
     @info "SPGRB: affine component number 1, matrix A"
@@ -87,7 +87,7 @@ function assemble_MDEIM_matrices(ROM_info::Info, RB_variables::PoissonSPGRB, var
 
   get_inverse_P_matrix(ROM_info, RB_variables)
 
-  if var === "A"
+  if var == "A"
 
     @info "The stiffness is non-affine: running the MDEIM offline phase on $(ROM_info.nₛ_MDEIM) snapshots. This might take some time"
     MDEIM_mat, RB_variables.MDEIM_idx_A, RB_variables.sparse_el_A, MDEIM_err_bound, MDEIM_Σ = MDEIM_offline(FE_space, ROM_info, "A")
@@ -126,14 +126,14 @@ function assemble_affine_vectors(ROM_info::Info, RB_variables::PoissonSPGRB, var
 
   @info "S-PGRB: running the DEIM offline phase on variable $var with $nₛ_DEIM snapshots"
 
-  if var === "F"
+  if var == "F"
     RB_variables.Qᶠ = 1
     @info "Assembling affine reduced forcing term"
     F = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "F.csv"))
     Fₙ = zeros(RB_variables.nₛᵘ, 1, RB_variables.Qᵃ*RB_variables.Qᶠ)
     tensor_product(Fₙ, RB_variables.AΦᵀPᵤ⁻¹, reshape(F,:,1))
     RB_variables.Fₙ = reshape(Fₙ,:,RB_variables.Qᵃ*RB_variables.Qᶠ)
-  elseif var === "H"
+  elseif var == "H"
     RB_variables.Qʰ = 1
     @info "Assembling affine reduced Neumann term"
     H = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "H.csv"))
@@ -157,12 +157,12 @@ function assemble_DEIM_vectors(ROM_info::Info, RB_variables::PoissonSPGRB, var::
   tensor_product(varₙ,RB_variables.AΦᵀPᵤ⁻¹,DEIM_mat)
   varₙ = reshape(varₙ,:,RB_variables.Qᵃ*Q)
 
-  if var === "F"
+  if var == "F"
     RB_variables.DEIMᵢ_mat_F = DEIMᵢ_mat
     RB_variables.DEIM_idx_F = DEIM_idx
     RB_variables.Qᶠ = Q
     RB_variables.Fₙ = varₙ
-  elseif var === "H"
+  elseif var == "H"
     RB_variables.DEIMᵢ_mat_H = DEIMᵢ_mat
     RB_variables.DEIM_idx_H = DEIM_idx
     RB_variables.Qʰ = Q
@@ -181,13 +181,10 @@ function save_affine_structures(ROM_info::Info, RB_variables::PoissonSPGRB)
     AΦᵀPᵤ⁻¹ = reshape(RB_variables.AΦᵀPᵤ⁻¹, :, RB_variables.Qᵃ)
     save_CSV(Aₙ, joinpath(ROM_info.paths.ROM_structures_path, "Aₙ.csv"))
     save_CSV(AΦᵀPᵤ⁻¹, joinpath(ROM_info.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
-    save_CSV([RB_variables.Qᵃ], joinpath(ROM_info.paths.ROM_structures_path, "Qᵃ.csv"))
 
     if !ROM_info.build_parametric_RHS
       save_CSV(RB_variables.Fₙ, joinpath(ROM_info.paths.ROM_structures_path, "Fₙ.csv"))
-      save_CSV([RB_variables.Qᶠ], joinpath(ROM_info.paths.ROM_structures_path, "Qᶠ.csv"))
       save_CSV(RB_variables.Hₙ, joinpath(ROM_info.paths.ROM_structures_path, "Hₙ.csv"))
-      save_CSV([RB_variables.Qʰ], joinpath(ROM_info.paths.ROM_structures_path, "Qʰ.csv"))
     end
 
   end

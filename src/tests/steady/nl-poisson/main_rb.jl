@@ -3,7 +3,7 @@ include("../../../ROM/RB_Poisson_steady.jl")
 
 function setup_RB()
 
-  paths = ROM_paths(root, problem_type, problem_name, mesh_name, problem_dim, RB_method)
+  paths = ROM_paths(root, problem_type, problem_name, mesh_name, RB_method)
   ROM_info = ROMSpecifics(case, paths, RB_method, problem_nonlinearities, considered_snaps, ϵₛ, perform_RHS_DEIM, postprocess, import_snapshots, import_offline_structures, save_offline_structures, save_results)
   if RB_method === "S-GRB"
     RB_variables = setup(PoissonSTGRB([], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], [], []))

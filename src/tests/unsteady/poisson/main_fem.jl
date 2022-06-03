@@ -1,35 +1,10 @@
 include("config_fem.jl")
 
-αₛ(x) = 1
-αₜ(t, μ) = sum(μ) * (2 + sin(2π * t))
-mₛ(x) = 1
-mₜ(t::Real) = 1
-m(x, t::Real) = mₛ(x)*mₜ(t)
-m(t::Real) = x -> m(x, t)
-fₛ(x) = 1
-fₜ(t::Real) = sin(π * t)
-gₛ(x) = 0
-gₜ(t::Real) = 0
-g(x, t::Real) = gₛ(x)*gₜ(t)
-g(t::Real) = x -> g(x, t)
-hₛ(x) = 0
-hₜ(t::Real) = 0
-h(x, t::Real) = hₛ(x)*hₜ(t)
-h(t::Real) = x -> h(x, t)
-u₀(x) = 0
-
 function run_FEM_0()
-
-  model = DiscreteModelFromFile(paths.mesh_path)
-  f(x, t::Real) = fₛ(x)*fₜ(t)
-  f(t::Real) = x -> f(x, t)
-  FE_space = get_FESpace(problem_ntuple, problem_info, model; g)
 
   function run_parametric_FEM(μ::Array)
 
-    α(x, t::Real) = αₛ(x)*αₜ(t, μ)
-    α(t::Real) = x -> α(x, t)
-    parametric_info = ParametricSpecificsUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, gₛ, gₜ, g, hₛ, hₜ, h, u₀)
+    parametric_info = get_parametric_specifics(problem_ntuple,problem_info,μ)
 
     A = assemble_stiffness(FE_space, problem_info, parametric_info)(0.0)
     M = assemble_mass(FE_space, problem_info, parametric_info)(0.0)
@@ -53,19 +28,11 @@ end
 
 function run_FEM_1()
 
-  model = DiscreteModelFromFile(paths.mesh_path)
-  f(x, t::Real) = fₛ(x)*fₜ(t)
-  f(t::Real) = x -> f(x, t)
-  FE_space = get_FESpace(problem_ntuple, problem_info, model; g)
-
   function run_parametric_FEM(μ::Array)
 
-    αₛ(x) = 0
-    αₜ(t::Real) = 0
-    α(x, t::Real) = (1 + μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) * sin(t) / μ[3]))
-    α(t::Real) = x -> α(x, t)
-    parametric_info = ParametricSpecificsUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, gₛ, gₜ, g, hₛ, hₜ, h, u₀)
+    parametric_info = get_parametric_specifics(problem_ntuple,problem_info,μ)
     M = assemble_mass(FE_space, problem_info, parametric_info)(0.0)
+    F = assemble_forcing(FE_space, problem_info, parametric_info)(0.0)
     H = assemble_neumann_datum(FE_space, problem_info, parametric_info)(0.0)
     Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space₀)
 
@@ -75,7 +42,7 @@ function run_FEM_1()
 
     end
 
-    return parametric_solution, Xᵘ₀, M, H
+    return parametric_solution, Xᵘ₀, M, H, F
 
   end
 
@@ -85,18 +52,9 @@ end
 
 function run_FEM_2()
 
-  model = DiscreteModelFromFile(paths.mesh_path)
-  FE_space = get_FESpace(problem_ntuple, problem_info, model)
-
   function run_parametric_FEM(μ::Array)
 
-    αₛ(x) = 0
-    αₜ(t::Real) = 0
-    α(x, t::Real) = (1 + μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) * sin(t) / μ[3]))
-    α(t::Real) = x -> α(x, t)
-    f(x, t::Real) = sin(π*t*x*(μ[4]+μ[5]))
-    f(t::Real) = x -> f(x, t)
-    parametric_info = ParametricSpecificsUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, gₛ, gₜ, g, hₛ, hₜ, h, u₀)
+    parametric_info = get_parametric_specifics(problem_ntuple,problem_info,μ)
     M = assemble_mass(FE_space, problem_info, parametric_info)(0.0)
     H = assemble_neumann_datum(FE_space, problem_info, parametric_info)(0.0)
     Xᵘ₀ = assemble_H1_norm_matrix_nobcs(FE_space₀)
@@ -119,11 +77,11 @@ FEM_time₀ = @elapsed begin
 
   const μ = generate_parameter(ranges[1, :], ranges[2, :], nₛ)
 
-  if case === 0
+  if case == 0
     FEM = run_FEM_0()
-  elseif case === 1
+  elseif case == 1
     FEM = run_FEM_1()
-  else case === 2
+  else case == 2
     FEM = run_FEM_2()
   end
 
@@ -132,28 +90,23 @@ FEM_time₀ = @elapsed begin
   Xᵘ₀ = lazy_solution_info[1][2]
   M = lazy_solution_info[1][3]
   H = lazy_solution_info[1][4]
-  if case === 0
+  if case == 0
     A = lazy_solution_info[1][6]
     F = lazy_solution_info[1][5]
-  elseif case === 1
+  elseif case == 1
     F = lazy_solution_info[1][5]
   end
 
 end
 
 FEM_time₁ = @elapsed begin
-  @info "Collecting solution number 1"
-  uₕ = lazy_solution_info[1][1]()[1]
   #gₕ = lazy_solution_info[1][1]()[2]
-
-  Nₜ = convert(Int64, T / δt)
-  if nₛ > 1
-    uₕ = hcat(uₕ, zeros(size(uₕ)[1], (nₛ - 1)*Nₜ))
-    #gₕ = hcat(gₕ, zeros(size(gₕ)[1], (nₛ - 1)*Nₜ))
-  end
-  for i in 2:nₛ
+  Nₕ = FE_space.Nₛᵘ
+  Nₜ = convert(Int64, T/δt)
+  uₕ = zeros(Nₕ,nₛ*Nₜ)
+  for i in 1:nₛ
     @info "Collecting solution number $i"
-    uₕ[:, (i-1)*Nₜ+1:i*Nₜ] = lazy_solution_info[i][1]()[1]
+    uₕ[:,(i-1)*Nₜ+1:i*Nₜ] = lazy_solution_info[i][1]()[1]
     #gₕ[:, (i-1)*Nₜ+1:i*Nₜ] = lazy_solution_info[i][1]()[2]
   end
 end
@@ -166,10 +119,10 @@ save_CSV(H, joinpath(paths.FEM_structures_path, "H.csv"))
 save_CSV(M, joinpath(paths.FEM_structures_path, "M.csv"))
 save_CSV([FEM_time], joinpath(paths.FEM_structures_path, "FEM_time.csv"))
 
-if case === 0
+if case == 0
   save_CSV(A, joinpath(paths.FEM_structures_path, "A.csv"))
   save_CSV(F, joinpath(paths.FEM_structures_path, "F.csv"))
-elseif case === 1
+elseif case == 1
   save_CSV(F, joinpath(paths.FEM_structures_path, "F.csv"))
 end
 

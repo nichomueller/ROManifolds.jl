@@ -58,7 +58,7 @@ function PODs_space(ROM_info::Info, RB_variables::StokesUnsteady)
     for nₛ = 1:ROM_info.nₛ
       Sᵖₙ = RB_variables.Sᵖ[:, (nₛ-1)*RB_variables.P.Nₜ+1:nₛ*RB_variables.P.Nₜ]
       Φₙᵖ, _ = POD(Sᵖₙ, ROM_info.ϵₛ)
-      if nₛ ===1
+      if nₛ ==1
         global Φₙᵖ_temp = Φₙᵖ
       else
         global Φₙᵖ_temp = hcat(Φₙᵖ_temp, Φₙᵖ)
@@ -84,7 +84,7 @@ function PODs_time(ROM_info::Info, RB_variables::StokesUnsteady)
 
   @info "Performing the temporal POD for fields (p,λ), using a tolerance of $(ROM_info.ϵₜ)"
 
-  if ROM_info.time_reduction_technique === "ST-HOSVD"
+  if ROM_info.time_reduction_technique == "ST-HOSVD"
     Sᵖₜ = zeros(RB_variables.P.Nₜ, RB_variables.nₛᵖ * ROM_info.nₛ)
     Sᵖ = RB_variables.Φₛᵖ' * RB_variables.Sᵖ
     for i in 1:ROM_info.nₛ
@@ -122,9 +122,9 @@ end
 
 function index_mapping(i::Int, j::Int, RB_variables::StokesUnsteady, var="u") :: Int64
 
-  if var === "u"
+  if var == "u"
     return index_mapping(i, j, RB_variables.P)
-  elseif var === "p"
+  elseif var == "p"
     return convert(Int64, (i-1) * RB_variables.nₜᵖ + j)
   else
     @error "Unrecognized variable"
@@ -140,7 +140,7 @@ function get_generalized_coordinates(ROM_info::Info, RB_variables::StokesUnstead
 
   get_generalized_coordinates(ROM_info, RB_variables.P)
 
-  if snaps === nothing || maximum(snaps) > ROM_info.nₛ
+  if isnothing(snaps) || maximum(snaps) > ROM_info.nₛ
     snaps = 1:ROM_info.nₛ
   end
 
@@ -306,7 +306,7 @@ function testing_phase(ROM_info::Info, RB_variables::StokesUnsteady, μ, param_n
     @info "Considering parameter number: $nb"
 
     μ_nb = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
-    parametric_info = get_parametric_specifics(ROM_info, μ_nb)
+    parametric_info = get_parametric_specifics(problem_ntuple, ROM_info, μ_nb)
     uₕ_test = Matrix(CSV.read(joinpath(ROM_info.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, (nb-1)*RB_variables.P.Nₜ+1:nb*RB_variables.P.Nₜ]
     pₕ_test = Matrix(CSV.read(joinpath(ROM_info.paths.FEM_snap_path, "pₕ.csv"), DataFrame))[:, (nb-1)*RB_variables.P.Nₜ+1:nb*RB_variables.P.Nₜ]
 
@@ -395,7 +395,7 @@ function check_dataset(ROM_info, RB_variables, i)
 
   μ = load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
   μ_i = parse.(Float64, split(chop(μ[i]; head=1, tail=1), ','))
-  param = get_parametric_specifics(ROM_info, μ_i)
+  param = get_parametric_specifics(problem_ntuple, ROM_info, μ_i)
 
   u1 = RB_variables.S.Sᵘ[:, (i-1)*RB_variables.P.Nₜ+1]
   u2 = RB_variables.S.Sᵘ[:, (i-1)*RB_variables.P.Nₜ+2]

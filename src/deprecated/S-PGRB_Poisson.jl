@@ -49,7 +49,7 @@ function assemble_reduced_affine_components(ROM_info, RB_variables::PoissonSTPGR
       projection_time = @elapsed begin
         Aₙ_i = sparse([], [], [])
         for i_nₛ = 1:maximum(10, ROM_info.nₛ)
-          parametric_info = get_parametric_specifics(ROM_info, μ[i_nₛ])
+          parametric_info = get_parametric_specifics(problem_ntuple, ROM_info, μ[i_nₛ])
           A_i = assemble_stiffness(FE_space, ROM_info, parametric_info)
           A_iΦₛᵘ = A_i * RB_variables.Φₛᵘ
           Aₙ_i = hcat(Aₙ_i, (A_iΦₛᵘ)' * RB_variables.Pᵘ_inv * A_iΦₛᵘ)

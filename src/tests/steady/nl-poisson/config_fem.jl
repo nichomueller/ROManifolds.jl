@@ -4,7 +4,6 @@ include("../../../FEM/FEM_utils.jl")
 
 problem_name = "poisson"
 problem_type = "steady"
-problem_dim = 3
 order = 1
 solver = "lu"
 nₛ = 100
@@ -16,7 +15,7 @@ if case === 0
   problem_nonlinearities = Dict("Ω" => false, "A" => false, "f" => false, "g" => false, "h" => false)
   ranges = [0., 1.]
   mesh_name = "model.json"
-  paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, problem_nonlinearities)
+  paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_nonlinearities)
   dirichlet_tags = ["diri0", "dirig"]
   neumann_tags = []
   dirichlet_bnds = [["sides", "sides_c"], ["circle","circle_c", "triangle", "triangle_c", "square", "square_c"]]
@@ -27,7 +26,7 @@ elseif case === 1
   problem_nonlinearities = Dict("Ω" => false, "A" => true, "f" => false, "g" => false, "h" => false)
   ranges = [0., 1.]
   mesh_name = "model.json"
-  paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, problem_nonlinearities)
+  paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_nonlinearities)
   dirichlet_tags = ["diri0", "dirig"]
   neumann_tags = []
   dirichlet_bnds = [["sides", "sides_c"], ["circle","circle_c", "triangle", "triangle_c", "square", "square_c"]]
@@ -38,7 +37,7 @@ elseif case === 2
   problem_nonlinearities = Dict("Ω" => false, "A" => true, "f" => true, "g" => true, "h" => false)
   ranges = [0., 1.]
   mesh_name = "model.json"
-  paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, problem_nonlinearities)
+  paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_nonlinearities)
   dirichlet_tags = ["diri0", "dirig"]
   neumann_tags = []
   dirichlet_bnds = [["sides", "sides_c"], ["circle","circle_c", "triangle", "triangle_c", "square", "square_c"]]
@@ -50,5 +49,4 @@ else
 
 end
 
-paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, case)
 problem_info = ProblemSpecifics(case, probl_nl, order, dirichlet_tags, dirichlet_bnds, neumann_tags, neumann_bnds, solver, paths)

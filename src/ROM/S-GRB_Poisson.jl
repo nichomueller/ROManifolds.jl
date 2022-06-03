@@ -15,7 +15,7 @@ end
 
 function assemble_affine_matrices(ROM_info::Info, RB_variables::PoissonSGRB, var::String)
 
-  if var === "A"
+  if var == "A"
     RB_variables.Qᵃ = 1
     @info "Assembling affine reduced stiffness"
     A = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "A.csv"); convert_to_sparse = true)
@@ -29,7 +29,7 @@ end
 
 function assemble_MDEIM_matrices(ROM_info::Info, RB_variables::PoissonSGRB, var::String)
 
-  if var === "A"
+  if var == "A"
 
     @info "The stiffness is non-affine: running the MDEIM offline phase on $(ROM_info.nₛ_MDEIM) snapshots"
     MDEIM_mat, RB_variables.MDEIM_idx_A, RB_variables.sparse_el_A, MDEIM_err_bound, MDEIM_Σ = MDEIM_offline(FE_space, ROM_info, "A")
@@ -56,12 +56,12 @@ end
 
 function assemble_affine_vectors(ROM_info::Info, RB_variables::PoissonSGRB, var::String)
 
-  if var === "F"
+  if var == "F"
     RB_variables.Qᶠ = 1
     @info "Assembling affine reduced forcing term"
     F = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "F.csv"))
     RB_variables.Fₙ = (RB_variables.Φₛᵘ)' * F
-  elseif var === "H"
+  elseif var == "H"
     RB_variables.Qʰ = 1
     @info "Assembling affine reduced Neumann term"
     H = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "H.csv"))
@@ -84,12 +84,12 @@ function assemble_DEIM_vectors(ROM_info::Info, RB_variables::PoissonSGRB, var::S
     varₙ[:,q] = RB_variables.Φₛᵘ' * Vector(DEIM_mat[:, q])
   end
 
-  if var === "F"
+  if var == "F"
     RB_variables.DEIMᵢ_mat_F = DEIMᵢ_mat
     RB_variables.DEIM_idx_F = DEIM_idx
     RB_variables.Qᶠ = Q
     RB_variables.Fₙ = varₙ
-  elseif var === "H"
+  elseif var == "H"
     RB_variables.DEIMᵢ_mat_H = DEIMᵢ_mat
     RB_variables.DEIM_idx_H = DEIM_idx
     RB_variables.Qʰ = Q
@@ -106,13 +106,10 @@ function save_affine_structures(ROM_info::Info, RB_variables::PoissonSGRB)
 
     Aₙ = reshape(RB_variables.Aₙ, :, RB_variables.Qᵃ)
     save_CSV(Aₙ, joinpath(ROM_info.paths.ROM_structures_path, "Aₙ.csv"))
-    save_CSV([RB_variables.Qᵃ], joinpath(ROM_info.paths.ROM_structures_path, "Qᵃ.csv"))
 
     if !ROM_info.build_parametric_RHS
       save_CSV(RB_variables.Fₙ, joinpath(ROM_info.paths.ROM_structures_path, "Fₙ.csv"))
-      save_CSV([RB_variables.Qᶠ], joinpath(ROM_info.paths.ROM_structures_path, "Qᶠ.csv"))
       save_CSV(RB_variables.Hₙ, joinpath(ROM_info.paths.ROM_structures_path, "Hₙ.csv"))
-      save_CSV([RB_variables.Qʰ], joinpath(ROM_info.paths.ROM_structures_path, "Qʰ.csv"))
     end
 
   end

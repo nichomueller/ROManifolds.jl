@@ -1,10 +1,10 @@
 include("../FEM/FEM_utils.jl")
+include("../FEM/LagrangianQuadRefFEs.jl")
 include("M_DEIM_build_snapshots.jl")
 
 function M_DEIM_POD(S::SparseMatrixCSC, ϵ = 1e-5)
 
   S̃ = copy(S)
-  Nₕ = size(S̃)[1]
   row_idx, _, _ = findnz(S̃)
   unique!(row_idx)
   S̃ = Matrix(S̃[row_idx, :])
@@ -20,17 +20,14 @@ function M_DEIM_POD(S::SparseMatrixCSC, ϵ = 1e-5)
   mult_factor = sqrt(nₛ) * crit_val
 
   while N ≤ size(S̃)[2]-2 && (M_DEIM_err_bound > ϵ || cumulative_energy / total_energy < 1.0 - ϵ ^ 2)
-
     N += 1
     cumulative_energy += Σ[N] ^ 2
     M_DEIM_err_bound = Σ[N + 1] * mult_factor
-
     @info "(M)DEIM-POD loop number $N, projection error = $M_DEIM_err_bound"
-
   end
   M_DEIM_mat = M_DEIM_mat[:, 1:N]
   _, col_idx, val = findnz(sparse(M_DEIM_mat))
-  sparse_M_DEIM_mat = sparse(repeat(row_idx, N), col_idx, val, Nₕ, N)
+  sparse_M_DEIM_mat = sparse(repeat(row_idx, N), col_idx, val, size(S̃)[1], N)
 
   @info "Basis number obtained via POD is $N, projection error ≤ $M_DEIM_err_bound"
 
@@ -41,63 +38,29 @@ end
 function M_DEIM_POD(S::Matrix, ϵ = 1e-5)
 
   S̃ = copy(S)
-  C = S̃'*S̃
-  V, Σ, _ = svd(C)
-  Σ = sqrt.(Σ)
+  M_DEIM_mat, Σ, _ = svd(S̃)
 
   total_energy = sum(Σ .^ 2)
   cumulative_energy = 0.0
   N = 0
+  M_DEIM_err_bound = 1e5
+  nₛ = size(S̃)[2]
+  crit_val = norm(inv(M_DEIM_mat'M_DEIM_mat))
+  mult_factor = sqrt(nₛ) * crit_val
 
-  while N ≤ size(S̃)[2]-1 && cumulative_energy / total_energy < 1.0 - ϵ ^ 2
+  while N ≤ size(S̃)[2]-2 && (M_DEIM_err_bound > ϵ || cumulative_energy / total_energy < 1.0 - ϵ ^ 2)
     N += 1
     cumulative_energy += Σ[N] ^ 2
-    @info "POD loop number $N, cumulative energy = $cumulative_energy"
+    M_DEIM_err_bound = Σ[N + 1] * mult_factor
+    @info "(M)DEIM-POD loop number $N, projection error = $M_DEIM_err_bound"
   end
+  M_DEIM_mat = M_DEIM_mat[:, 1:N]
 
-  V = V[:, 1:N]
-  M_DEIM_mat = S̃*V
-  for n = 1:N
-    M_DEIM_mat[:,n] /= Σ[n]
-  end
-
-  @info "Basis number obtained via POD is $N, projection error ≤ $((sqrt(abs(1 - cumulative_energy / total_energy))))"
+  @info "Basis number obtained via POD is $N, projection error ≤ $M_DEIM_err_bound"
 
   return M_DEIM_mat, Σ
 
 end
-
-#= function M_DEIM_POD_functional(S::Array, ϵ=1e-5)
-
-  S̃ = copy(S)
-  M_DEIM_mat, Σ, _ = svd(S̃)
-  (r,c) = size(M_DEIM_mat)
-
-  if r ≤ c
-
-    M_DEIM_mat = M_DEIM_mat[:, 1:r]
-
-  else
-
-    total_energy = sum(Σ .^ 2)
-    cumulative_energy = 0.0
-    N = 0
-
-    while N ≤ size(S̃)[2]-1 && cumulative_energy / total_energy < 1.0 - ϵ ^ 2
-
-      N += 1
-      cumulative_energy += Σ[N] ^ 2
-
-      @info "(M)DEIM-POD loop number $N, projection error = $((sqrt(abs(1 - cumulative_energy / total_energy))))"
-
-    end
-    M_DEIM_mat = M_DEIM_mat[:, 1:N]
-
-  end
-
-  return M_DEIM_mat,  Σ
-
-end =#
 
 function M_DEIM_offline(sparse_M_DEIM_mat::SparseMatrixCSC, Σ::Vector)
 
@@ -161,9 +124,9 @@ function MDEIM_offline(FE_space::SteadyProblem, ROM_info::Info, var::String)
 
   μ = load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
 
-  if var === "A"
+  if var == "A"
     snaps = build_A_snapshots(FE_space, ROM_info, μ)
-  elseif var === "M"
+  elseif var == "M"
     snaps = build_M_snapshots(FE_space, ROM_info, μ)
   else
     @error "Run MDEIM on A or M only"
@@ -199,31 +162,32 @@ function MDEIM_offline_standard(FE_space::UnsteadyProblem, ROM_info::Info, var::
   μ = load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
 
   for k = 1:ROM_info.nₛ_MDEIM
-    @info "Considering parameter number $k, need $(ROM_info.nₛ_MDEIM-k) more!"
+    @info "Considering parameter number $k/$(ROM_info.nₛ_MDEIM)"
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
-    if var === "A"
-      snapsₖ = build_A_snapshots(FE_space, ROM_info, μₖ, ROM_info.space_time_M_DEIM)
-    elseif var === "M"
-      snapsₖ = build_M_snapshots(FE_space, ROM_info, μₖ, ROM_info.space_time_M_DEIM)
+    if var == "A"
+      snapsₖ,row_idx = build_A_snapshots(FE_space, ROM_info, μₖ)
+    elseif var == "M"
+      snapsₖ,row_idx = build_M_snapshots(FE_space, ROM_info, μₖ)
     else
       @error "Run MDEIM on A or M only"
     end
     compressed_snapsₖ, _ = M_DEIM_POD(snapsₖ, ROM_info.ϵₛ)
-    if k === 1
+    if k == 1
+      global row_idx = row_idx
       global compressed_snaps = compressed_snapsₖ
     else
       global compressed_snaps = hcat(compressed_snaps, compressed_snapsₖ)
     end
   end
 
-  sparse_MDEIM_mat, Σ = M_DEIM_POD(compressed_snaps, ROM_info.ϵₛ)
-  MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(sparse_MDEIM_mat, Σ)
+  MDEIM_mat, Σ = M_DEIM_POD(compressed_snaps, ROM_info.ϵₛ)
+  MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat, Σ)
+  MDEIMᵢ_mat = MDEIM_mat[MDEIM_idx,:]
+  MDEIM_idx_sparse = from_full_idx_to_sparse_idx(row_idx,MDEIM_idx,FE_space.Nₛᵘ)
+  MDEIM_idx_sparse_space, _ = from_spacetime_to_space_time_idx_vec(MDEIM_idx_sparse,FE_space.Nₛᵘ)
+  el = find_FE_elements(FE_space.V₀, FE_space.Ω, unique(MDEIM_idx_sparse_space))
 
-  r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx, FE_space.Nₛᵘ)
-
-  el = find_FE_elements(FE_space.V₀, FE_space.Ω, unique(union(r_idx, c_idx)))
-
-  MDEIM_mat, MDEIM_idx, el, MDEIM_err_bound, Σ
+  MDEIM_mat, MDEIM_idx_sparse, MDEIMᵢ_mat, row_idx, el
 
 end
 
@@ -234,20 +198,20 @@ function MDEIM_offline_spacetime(FE_space::UnsteadyProblem, ROM_info::Info, var:
   μ = load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
 
   for k = 1:ROM_info.nₛ_MDEIM
-    @info "Considering parameter number $k, need $(ROM_info.nₛ_MDEIM-k) more!"
+    @info "Considering parameter number $k/$(ROM_info.nₛ_MDEIM)"
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
-    if var === "A"
-      snapsₖ,row_idx = build_A_snapshots(FE_space, ROM_info, μₖ, ROM_info.space_time_M_DEIM)
-    elseif var === "M"
-      snapsₖ,row_idx = build_M_snapshots(FE_space, ROM_info, μₖ, ROM_info.space_time_M_DEIM)
+    if var == "A"
+      snapsₖ,row_idx = build_A_snapshots(FE_space, ROM_info, μₖ)
+    elseif var == "M"
+      snapsₖ,row_idx = build_M_snapshots(FE_space, ROM_info, μₖ)
     else
       @error "Run MDEIM on A or M only"
     end
-    if k === 1
+    if k == 1
       global row_idx = row_idx
-      global snaps = snapsₖ
+      global snaps = snapsₖ[:]
     else
-      global snaps = hcat(snaps, snapsₖ)
+      global snaps = hcat(snaps, snapsₖ[:])
     end
   end
 
@@ -264,7 +228,6 @@ end
 
 function MDEIM_offline_functional(FE_space::UnsteadyProblem, ROM_info::Info, var::String)
 
-  include("../FEM/LagrangianQuadRefFEs.jl")
   @info "Building $(ROM_info.nₛ_MDEIM) snapshots of $var, at each time step. This will take some time."
 
   μ = load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
@@ -273,29 +236,32 @@ function MDEIM_offline_functional(FE_space::UnsteadyProblem, ROM_info::Info, var
   times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+δtθ
 
   ξₖ = get_cell_map(FE_space.Ω)
-  Qₕ_cell_point = get_cell_points(Qₕ)
+  Qₕ_cell_point = get_cell_points(FE_space.Qₕ)
   qₖ = get_data(Qₕ_cell_point)
   phys_quadp = lazy_map(evaluate,ξₖ,qₖ)
   ncells = length(phys_quadp)
   nquad_cell = length(phys_quadp[1])
   nquad = nquad_cell*ncells
 
+  refFE_quad = ReferenceFE(lagrangian_quad, Float64, problem_info.order)
+  V₀_quad = TestFESpace(model, refFE_quad, conformity=:L2)
+
   for k = 1:ROM_info.nₛ_MDEIM
-    @info "Considering parameter number $k, need $(ROM_info.nₛ_MDEIM-k) more!"
+    @info "Considering parameter number $k/$(ROM_info.nₛ_MDEIM)"
 
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
-    param = get_parametric_specifics(ROM_info, μₖ)
-    snapsₖ = [param.α(phys_quadp[n][q],t_θ) for n = 1:ncells for q = 1:nquad_cell for t_θ = times_θ]
-    #= if var === "A"
+    param = get_parametric_specifics(problem_ntuple, ROM_info, μₖ)
+    #= if var == "A"
       snapsₖ = [param.α(phys_quadp[n][q],t_θ) for n = 1:ncells for q = 1:nquad_cell for t_θ = times_θ]
-    elseif var === "M"
+    elseif var == "M"
       snapsₖ = [param.m(phys_quadp[n][q],t_θ) for n = 1:ncells for q = 1:nquad_cell for t_θ = times_θ]
     else
       @error "Run MDEIM on A or M only"
     end =#
+    snapsₖ = [param.α(phys_quadp[n][q],t_θ) for n = 1:ncells for q = 1:nquad_cell for t_θ = times_θ]
     snapsₖ = reshape(snapsₖ,nquad,Nₜ)
-    compressed_snapsₖ, _ = POD(snapsₖ, 1e-2)
-    if k === 1
+    compressed_snapsₖ, _ = POD(snapsₖ, ROM_info.ϵₛ)
+    if k == 1
       global compressed_snaps = compressed_snapsₖ
     else
       global compressed_snaps = hcat(compressed_snaps, compressed_snapsₖ)
@@ -303,21 +269,19 @@ function MDEIM_offline_functional(FE_space::UnsteadyProblem, ROM_info::Info, var
 
   end
 
-  param_mat, Σ = POD(compressed_snaps, 1e-2)
+  param_mat, Σ = POD(compressed_snaps, ROM_info.ϵₛ)
+  Q = size(param_mat)[2]
 
-  refFE_quad = ReferenceFE(lagrangian_quad, Float64, problem_info.order, FE_space.Ω)
-  V₀_quad = TestFESpace(param.model, refFE_quad, conformity=:L2)
-
-  for q = 1:size(param_mat)[2]
+  for q = 1:Q
     param_q = FEFunction(V₀_quad,param_mat[:,q])
-    if var === "A"
+    if var == "A"
       Matq = assemble_matrix(∫(∇(FE_space.ϕᵥ) ⋅ (param_q * ∇(FE_space.ϕᵤ(0.0)))) * FE_space.dΩ, FE_space.V(0.0), FE_space.V₀)
-    elseif var === "M"
+    elseif var == "M"
       Matq = assemble_matrix(∫(FE_space.ϕᵥ * (param_q * FE_space.ϕᵤ(0.0))) * FE_space.dΩ, FE_space.V(0.0), FE_space.V₀)
     end
     row_idx, val = findnz(Matq[:])
-    if q === 1
-      global affine_mat = sparse(row_idx, ones(length(row_idx)), val, size(Matq)[1]^2, size(param_mat)[2])
+    if q == 1
+      global affine_mat = sparse(row_idx, ones(length(row_idx)), val, size(Matq)[1]^2, Q)
     else
       global affine_mat[:,q] = sparse(row_idx, ones(length(row_idx)), val)
     end
@@ -335,9 +299,9 @@ function DEIM_offline(FE_space::SteadyProblem, ROM_info::Info, var::String)
 
   μ = load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
 
-  if var === "F"
+  if var == "F"
     snaps = build_F_snapshots(FE_space, ROM_info, μ)
-  elseif var === "H"
+  elseif var == "H"
     snaps = build_H_snapshots(FE_space, ROM_info, μ)
   else
     @error "Run DEIM on F or H only"
@@ -370,16 +334,16 @@ function DEIM_offline_standard(FE_space::UnsteadyProblem, ROM_info::Info, var::S
 
   for k = 1:ROM_info.nₛ_MDEIM
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
-    if var === "F"
+    if var == "F"
       snapsₖ = build_F_snapshots(FE_space, ROM_info, μₖ)
-    elseif var === "H"
+    elseif var == "H"
       snapsₖ = build_H_snapshots(FE_space, ROM_info, μₖ)
     else
       @error "Run DEIM on F or H only"
     end
 
     compressed_snapsₖ, _ = M_DEIM_POD(snapsₖ, ROM_info.ϵₛ)
-    if k === 1
+    if k == 1
       global compressed_snaps = compressed_snapsₖ
     else
       global compressed_snaps = hcat(compressed_snaps,compressed_snapsₖ)
@@ -404,15 +368,15 @@ function DEIM_offline_spacetime(FE_space::UnsteadyProblem, ROM_info::Info, var::
 
   for nₜ = 1:Nₜ
     @info "Considering time step $nₜ/$Nₜ"
-    if var === "F"
+    if var == "F"
       snapsₜ = build_F_snapshots(FE_space, ROM_info, μ, nₜ)
-    elseif var === "H"
+    elseif var == "H"
       snapsₜ = build_H_snapshots(FE_space, ROM_info, μ, nₜ)
     else
       @error "Run DEIM on F or H only"
     end
     compressed_snapsₜ, _ = M_DEIM_POD(snapsₜ, ROM_info.ϵₛ)
-    if nₜ === 1
+    if nₜ == 1
       global compressed_snaps = compressed_snapsₜ
     else
       if size(compressed_snaps)[2] != size(compressed_snapsₜ)[2]

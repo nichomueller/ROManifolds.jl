@@ -7,11 +7,11 @@ function run_FEM_0()
   g(x) = 1
   h(x) = 1
 
-  FE_space = get_FESpace(problem_ntuple, problem_info, model; g)
+  FE_space = get_FESpace(problem_ntuple, problem_info, model, g)
 
   function run_parametric_FEM(μ::Array)
 
-    @assert length(μ) === 3 "μ must be a 3x1 vector"
+    @assert length(μ) == 3 "μ must be a 3x1 vector"
     α(x) = sum(μ)
 
     parametric_info = ParametricSpecifics(μ, model, α, f, g, h)
@@ -41,11 +41,11 @@ function run_FEM_1()
   g(x) = 1
   h(x) = 1
 
-  FE_space = get_FESpace(problem_ntuple, problem_info, model; g)
+  FE_space = get_FESpace(problem_ntuple, problem_info, model, g)
 
   function run_parametric_FEM(μ::Array)
 
-    @assert length(μ) === 3 "μ must be a 3x1 vector"
+    @assert length(μ) == 3 "μ must be a 3x1 vector"
     α(x) = 1 + μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) / μ[3])
 
     parametric_info = ParametricSpecifics(μ, model, α, f, g, h)
@@ -76,7 +76,7 @@ function run_FEM_2()
 
   function run_parametric_FEM(μ::Array)
 
-    @assert length(μ) === 5 "μ must be a 5x1 vector"
+    @assert length(μ) == 5 "μ must be a 5x1 vector"
     α(x) = 1 + μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) / μ[3])
     f(x) = sin(μ[4] * x[1]) + sin(μ[4] * x[2])
     g(x) = sin(μ[5] * x[1]) + sin(μ[5] * x[2])
@@ -103,11 +103,11 @@ FEM_time₀ = @elapsed begin
 
   const μ = generate_parameter(ranges[1, :], ranges[2, :], nₛ)
 
-  if case === 0
+  if case == 0
     FEM = run_FEM_0()
-  elseif case === 1
+  elseif case == 1
     FEM = run_FEM_1()
-  elseif case === 2
+  elseif case == 2
     FEM = run_FEM_2()
   else
     FEM = run_FEM_3()
@@ -117,10 +117,10 @@ FEM_time₀ = @elapsed begin
 
   Xᵘ₀ = lazy_solution_info[1][2]
   H = lazy_solution_info[1][3]
-  if case === 0
+  if case == 0
     A = lazy_solution_info[1][5]
     F = lazy_solution_info[1][4]
-  elseif case === 1
+  elseif case == 1
     F = lazy_solution_info[1][4]
   end
 
@@ -151,10 +151,10 @@ save_CSV(Xᵘ₀, joinpath(paths.FEM_structures_path, "Xᵘ₀.csv"))
 save_CSV(H, joinpath(paths.FEM_structures_path, "H.csv"))
 save_CSV([FEM_time], joinpath(paths.FEM_structures_path, "FEM_time.csv"))
 
-if case === 0
+if case == 0
   save_CSV(A, joinpath(paths.FEM_structures_path, "A.csv"))
   save_CSV(F, joinpath(paths.FEM_structures_path, "F.csv"))
-elseif case === 1
+elseif case == 1
   save_CSV(F, joinpath(paths.FEM_structures_path, "F.csv"))
 end
 

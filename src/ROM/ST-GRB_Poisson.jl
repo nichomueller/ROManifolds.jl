@@ -23,7 +23,7 @@ end
 
 function assemble_affine_matrices(ROM_info::Info, RB_variables::PoissonSTGRB, var::String)
 
-  if var === "M"
+  if var == "M"
     RB_variables.Qᵐ = 1
     @info "Assembling affine reduced mass"
     M = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "M.csv"); convert_to_sparse = true)
@@ -40,29 +40,31 @@ function assemble_MDEIM_matrices_standard(ROM_info::Info, RB_variables::PoissonS
 
   @info "The matrix $var is non-affine: running the MDEIM offline phase on $nₛ_MDEIM snapshots"
 
-  MDEIM_mat, MDEIM_idx, sparse_el, _, _ = MDEIM_offline(FE_space, ROM_info, var)
+  MDEIM_mat, MDEIM_idx, MDEIMᵢ_mat, row_idx, sparse_el = MDEIM_offline(FE_space, ROM_info, var)
 
   Q = size(MDEIM_mat)[2]
-  Matₙ = zeros(RB_variables.S.nₛᵘ, RB_variables.S.nₛᵘ, Q)
+  r_idx, c_idx = from_vec_to_mat_idx(row_idx, RB_variables.S.Nₛᵘ)
 
-  for q = 1:Q
-    @info "ST-GRB: affine component number $q, matrix $var"
-    Matq = reshape(MDEIM_mat[:,q], (RB_variables.S.Nₛᵘ, RB_variables.S.Nₛᵘ))
-    Matₙ[:,:,q] = RB_variables.S.Φₛᵘ' * Matrix(Matq) * RB_variables.S.Φₛᵘ
+  MatqΦ = zeros(RB_variables.S.Nₛᵘ,RB_variables.S.nₛᵘ,Q)
+  for j = 1:RB_variables.S.Nₛᵘ
+    Mat_idx = findall(x -> x == j, r_idx)
+    MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RB_variables.S.Φₛᵘ[c_idx[Mat_idx],:])'
   end
-  MDEIMᵢ_mat = Matrix(MDEIM_mat[MDEIM_idx, :])
+  Matₙ = reshape(RB_variables.S.Φₛᵘ' * reshape(MatqΦ,RB_variables.S.Nₛᵘ,:),RB_variables.S.nₛᵘ,:,Q)
 
-  if var === "M"
+  if var == "M"
     RB_variables.Mₙ = Matₙ
     RB_variables.MDEIMᵢ_M = MDEIMᵢ_mat
     RB_variables.MDEIM_idx_M = MDEIM_idx
     RB_variables.sparse_el_M = sparse_el
+    RB_variables.row_idx_M = row_idx
     RB_variables.Qᵐ = Q
-  elseif var === "A"
+  elseif var == "A"
     RB_variables.S.Aₙ = Matₙ
     RB_variables.S.MDEIMᵢ_A = MDEIMᵢ_mat
     RB_variables.S.MDEIM_idx_A = MDEIM_idx
     RB_variables.S.sparse_el_A = sparse_el
+    RB_variables.row_idx_A = row_idx
     RB_variables.S.Qᵃ = Q
   else
     @error "Unrecognized variable to assemble with MDEIM"
@@ -72,34 +74,34 @@ end
 
 function assemble_MDEIM_matrices_spacetime(ROM_info::Info, RB_variables::PoissonSTGRB, var::String)
 
-  @info "The matrix $var is non-affine: running the MDEIM offline phase on $nₛ_MDEIM snapshots"
+  @info "The matrix $var is non-affine: running the MDEIM offline phase on $(ROM_info.nₛ_MDEIM) snapshots"
 
   MDEIM_mat, MDEIM_idx, MDEIMᵢ_mat, row_idx, sparse_el = MDEIM_offline(FE_space, ROM_info, var)
   Q = size(MDEIM_mat)[2]
   MDEIM_mat_new = reshape(MDEIM_mat,length(row_idx),:)
-  Nₜ = Int(size(MDEIM_mat)[1]/Q)
+  Nₜ = Int(size(MDEIM_mat_new)[2]/Q)
 
   Matₙ = zeros(RB_variables.S.nₛᵘ, RB_variables.S.nₛᵘ, Q*Nₜ)
 
   r_idx, c_idx = from_vec_to_mat_idx(row_idx, RB_variables.S.Nₛᵘ)
   for q = 1:Q
-    @info "ST-GRB: affine component number $q/$Q at time step $nₜ/$Nₜ, matrix $var"
+    @info "ST-GRB: affine component number $q/$Q, matrix $var"
     MatqΦ = zeros(RB_variables.S.Nₛᵘ,RB_variables.S.nₛᵘ*Nₜ)
     for j = 1:RB_variables.S.Nₛᵘ
       Mat_idx = findall(x -> x == j, r_idx)
       MatqΦ[j,:] = reshape(MDEIM_mat_new[Mat_idx,(q-1)*Nₜ+1:q*Nₜ]' * RB_variables.S.Φₛᵘ[c_idx[Mat_idx],:],1,:)
     end
-    Matₙ[:,:,(q-1)*Nₜ+1:q*Nₜ] = reshape(RB_variables.S.Φₛᵘ' * MatqΦ,RB_variables.S.Nₛᵘ,RB_variables.S.nₛᵘ,Nₜ)
+    Matₙ[:,:,(q-1)*Nₜ+1:q*Nₜ] = reshape(RB_variables.S.Φₛᵘ' * MatqΦ,RB_variables.S.nₛᵘ,RB_variables.S.nₛᵘ,Nₜ)
   end
 
-  if var === "M"
+  if var == "M"
     RB_variables.Mₙ = Matₙ
     RB_variables.MDEIMᵢ_M = MDEIMᵢ_mat
     RB_variables.MDEIM_idx_M = MDEIM_idx
     RB_variables.sparse_el_M = sparse_el
     RB_variables.row_idx_M = row_idx
     RB_variables.Qᵐ = Q
-  elseif var === "A"
+  elseif var == "A"
     RB_variables.S.Aₙ = Matₙ
     RB_variables.S.MDEIMᵢ_A = MDEIMᵢ_mat
     RB_variables.S.MDEIM_idx_A = MDEIM_idx
@@ -131,12 +133,12 @@ function assemble_DEIM_vectors(ROM_info::Info, RB_variables::PoissonSTGRB, var::
   end
   varₙ = reshape(varₙ,:,Q)
 
-  if var === "F"
+  if var == "F"
     RB_variables.DEIMᵢ_mat_F = DEIMᵢ_mat
     RB_variables.DEIM_idx_F = DEIM_idx
     RB_variables.Qᶠ = Q
     RB_variables.Fₙ = varₙ
-  elseif var === "H"
+  elseif var == "H"
     RB_variables.DEIMᵢ_mat_H = DEIMᵢ_mat
     RB_variables.DEIM_idx_H = DEIM_idx
     RB_variables.Qʰ = Q
@@ -213,7 +215,6 @@ function save_affine_structures(ROM_info::Info, RB_variables::PoissonSTGRB)
   if ROM_info.save_offline_structures
     Mₙ = reshape(RB_variables.Mₙ, :, RB_variables.Qᵐ)
     save_CSV(Mₙ, joinpath(ROM_info.paths.ROM_structures_path, "Mₙ.csv"))
-    save_CSV([RB_variables.Qᵐ], joinpath(ROM_info.paths.ROM_structures_path, "Qᵐ.csv"))
     save_affine_structures(ROM_info, RB_variables.S)
   end
 
@@ -285,10 +286,10 @@ function get_RB_LHS_blocks_spacetime(ROM_info, RB_variables::PoissonSTGRB, θᵐ
   θ = ROM_info.θ
   δtθ = ROM_info.δt*θ
   nₜᵘ = RB_variables.nₜᵘ
-  Qᵐ = RB_variables.Qᵐ
-  Qᵃ = RB_variables.S.Qᵃ
-  Nₜᵐ = Int(size(RB_variables.Mₙ)[3]/Qᵐ)
-  Nₜᵃ = Int(size(RB_variables.S.Aₙ)[3]/Qᵃ)
+  Qᵐ = ceil(Int,RB_variables.Qᵐ/RB_variables.Nₜ)
+  Qᵃ = ceil(Int,RB_variables.S.Qᵃ/RB_variables.Nₜ)
+  Nₜᵐ = RB_variables.Nₜ
+  Nₜᵃ = RB_variables.Nₜ
 
   Φₜᵘ_M = zeros(RB_variables.nₜᵘ, RB_variables.nₜᵘ, Qᵐ)
   Φₜᵘ₁_M = zeros(RB_variables.nₜᵘ, RB_variables.nₜᵘ, Qᵐ)
@@ -312,13 +313,25 @@ function get_RB_LHS_blocks_spacetime(ROM_info, RB_variables::PoissonSTGRB, θᵐ
 
           j_st = index_mapping(j_s, j_t, RB_variables)
 
-          for qᵐ = 1:Qᵐ
-            Mₙ_μ_i_j += Φₜᵘ_M[i_t,j_t,qᵃ]*sum(RB_variables.Mₙ[i_s,j_s,(qᵐ-1)*Nₜᵐ+1:qᵐ*Nₜᵐ],dims=3)
-            Mₙ₁_μ_i_j += Φₜᵘ₁_M[i_t,j_t,qᵃ]*sum(RB_variables.Mₙ[i_s,j_s,(qᵐ-1)*Nₜᵐ+1:qᵐ*Nₜᵐ],dims=3)
+          if Qᵐ>1
+            (Mₙ_μ_i_j,Mₙ₁_μ_i_j) = (0.,0.)
+            for qᵐ = 1:Qᵐ
+              Mₙ_μ_i_j += Φₜᵘ_M[i_t,j_t,qᵐ]*sum(RB_variables.Mₙ[i_s,j_s,(qᵐ-1)*Nₜᵐ+1:qᵐ*Nₜᵐ])
+              Mₙ₁_μ_i_j += Φₜᵘ₁_M[i_t,j_t,qᵐ]*sum(RB_variables.Mₙ[i_s,j_s,(qᵐ-1)*Nₜᵐ+1:qᵐ*Nₜᵐ])
+            end
+          else
+            Mₙ_μ_i_j = Φₜᵘ_M[i_t,j_t,:]'*RB_variables.Mₙ[i_s,j_s,:]
+            Mₙ₁_μ_i_j = Φₜᵘ₁_M[i_t,j_t,:]'*RB_variables.Mₙ[i_s,j_s,:]
           end
-          for qᵃ = 1:Qᵃ
-            Aₙ_μ_i_j += δtθ*Φₜᵘ_A[i_t,j_t,qᵃ]*sum(RB_variables.S.Aₙ[i_s,j_s,(qᵃ-1)*Nₜᵃ+1:qᵃ*Nₜᵃ],dims=3)
-            Aₙ₁_μ_i_j += δtθ*Φₜᵘ₁_A[i_t,j_t,qᵃ]*sum(RB_variables.S.Aₙ[i_s,j_s,(qᵃ-1)*Nₜᵃ+1:qᵃ*Nₜᵃ],dims=3)
+          if Qᵃ>1
+            (Aₙ_μ_i_j,Aₙ₁_μ_i_j) = (0.,0.)
+            for qᵃ = 1:Qᵃ
+              Aₙ_μ_i_j += δtθ*Φₜᵘ_A[i_t,j_t,qᵃ]*sum(RB_variables.S.Aₙ[i_s,j_s,(qᵃ-1)*Nₜᵃ+1:qᵃ*Nₜᵃ])
+              Aₙ₁_μ_i_j += δtθ*Φₜᵘ₁_A[i_t,j_t,qᵃ]*sum(RB_variables.S.Aₙ[i_s,j_s,(qᵃ-1)*Nₜᵃ+1:qᵃ*Nₜᵃ])
+            end
+          else
+            Aₙ_μ_i_j = δtθ*Φₜᵘ_A[i_t,j_t,:]'*RB_variables.S.Aₙ[i_s,j_s,:]
+            Aₙ₁_μ_i_j = δtθ*Φₜᵘ₁_A[i_t,j_t,:]'*RB_variables.S.Aₙ[i_s,j_s,:]
           end
 
           block₁[i_st,j_st] = θ*(Aₙ_μ_i_j+Mₙ_μ_i_j) + (1-θ)*Aₙ₁_μ_i_j - θ*Mₙ₁_μ_i_j
@@ -335,7 +348,7 @@ end
 
 function get_RB_RHS_blocks(ROM_info::Info, RB_variables::PoissonSTGRB, θᶠ, θʰ)
 
-  @info "Assembling RHS"
+  @info "Assembling RHS using θ-method time scheme, θ=$(ROM_info.θ)"
 
   Qᶠ = RB_variables.S.Qᶠ
   Qʰ = RB_variables.S.Qʰ

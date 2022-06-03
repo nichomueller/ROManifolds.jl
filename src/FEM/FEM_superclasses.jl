@@ -11,70 +11,70 @@ struct PoissonProblemUnsteady <: FEMProblem end =#
 
 struct FESpacePoisson <: SteadyProblem
   Qₕ::CellQuadrature
-  V₀::Gridap.FESpaces.UnconstrainedFESpace
+  V₀::UnconstrainedFESpace
   V::TrialFESpace
-  ϕᵥ::Gridap.FESpaces.SingleFieldFEBasis
-  ϕᵤ::Gridap.FESpaces.SingleFieldFEBasis
+  ϕᵥ::FEBasis
+  ϕᵤ::FEBasis
   Nₛᵘ::Int64
-  Ω::Gridap.Geometry.BodyFittedTriangulation
+  Ω::BodyFittedTriangulation
   dΩ::Measure
-  dΓd::Measure
-  dΓn::Measure
+  dΓd::Union{Measure,Nothing}
+  dΓn::Union{Measure,Nothing}
 end
 
 struct FESpacePoissonUnsteady <: UnsteadyProblem
   Qₕ::CellQuadrature
-  V₀::Gridap.FESpaces.UnconstrainedFESpace
+  V₀::UnconstrainedFESpace
   V::TransientTrialFESpace
-  ϕᵥ::Gridap.FESpaces.SingleFieldFEBasis
+  ϕᵥ::FEBasis
   ϕᵤ::Function
   Nₛᵘ::Int64
-  Ω::Gridap.Geometry.BodyFittedTriangulation
+  Ω::BodyFittedTriangulation
   dΩ::Measure
-  dΓd::Measure
-  dΓn::Measure
+  dΓd::Union{Measure,Nothing}
+  dΓn::Union{Measure,Nothing}
 end
 
 struct FESpaceStokes <: SteadyProblem
   Qₕ::CellQuadrature
-  V₀::Gridap.FESpaces.UnconstrainedFESpace
+  V₀::UnconstrainedFESpace
   V::TrialFESpace
   Q₀::ZeroMeanFESpace
   Q::ZeroMeanFESpace
   X₀#::MultiFieldFESpace
   X#::MultiFieldTrialFESpace
-  ϕᵥ::Gridap.FESpaces.SingleFieldFEBasis
-  ϕᵤ::Gridap.FESpaces.SingleFieldFEBasis
-  ψᵧ::Gridap.FESpaces.SingleFieldFEBasis
-  ψₚ::Gridap.FESpaces.SingleFieldFEBasis
+  ϕᵥ::FEBasis
+  ϕᵤ::FEBasis
+  ψᵧ::FEBasis
+  ψₚ::FEBasis
   Nₛᵘ::Int64
   Nₛᵖ::Int64
-  Ω::Gridap.Geometry.BodyFittedTriangulation
+  Ω::BodyFittedTriangulation
   dΩ::Measure
-  Γd
-  dΓd::Measure
-  dΓn::Measure
+  Γd::BoundaryTriangulation
+  dΓd::Union{Measure,Nothing}
+  dΓn::Union{Measure,Nothing}
 end
 
 struct FESpaceStokesUnsteady <: UnsteadyProblem
   Qₕ::CellQuadrature
-  V₀::Gridap.FESpaces.UnconstrainedFESpace
+  V₀::UnconstrainedFESpace
   V::TransientTrialFESpace
   Q₀::ZeroMeanFESpace
   Q::ZeroMeanFESpace
   X₀::MultiFieldFESpace
   X::TransientMultiFieldTrialFESpace
-  ϕᵥ::Gridap.FESpaces.SingleFieldFEBasis
+  ϕᵥ::FEBasis
   ϕᵤ::Function
-  ψᵧ::Gridap.FESpaces.SingleFieldFEBasis
-  ψₚ::Gridap.FESpaces.SingleFieldFEBasis
+  ψᵧ::FEBasis
+  ψₚ::FEBasis
   Nₛᵘ::Int64
   Nₛᵖ::Int64
-  Ω::Gridap.Geometry.BodyFittedTriangulation
+  Ω::BodyFittedTriangulation
   dΩ::Measure
-  Γd
-  dΓd::Measure
-  dΓn::Measure
+  Γd::BoundaryTriangulation
+  dΓd::Union{Measure,Nothing}
+  dΓn::Union{Measure,Nothing}
 end
 
 struct ProblemSpecifics <: SteadyInfo
@@ -128,8 +128,6 @@ mutable struct ParametricSpecificsUnsteady
   fₛ::Function
   fₜ::Function
   f::Function
-  gₛ::Function
-  gₜ::Function
   g::Function
   hₛ::Function
   hₜ::Function

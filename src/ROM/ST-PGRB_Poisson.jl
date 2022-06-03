@@ -54,7 +54,7 @@ function assemble_affine_matrices(ROM_info::Info, RB_variables::PoissonSTPGRB, v
 
   get_inverse_P_matrix(ROM_info, RB_variables)
 
-  if var === "M"
+  if var == "M"
     RB_variables.Qᵐ = 1
     @info "Assembling affine reduced mass"
     M = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "M.csv"); convert_to_sparse = true)
@@ -75,7 +75,7 @@ function assemble_MDEIM_matrices(ROM_info::Info, RB_variables::PoissonSTPGRB, va
   Q = size(MDEIM_mat)[2]
   MDEIMᵢ_mat = Matrix(MDEIM_mat[MDEIM_idx, :])
 
-  if var === "M"
+  if var == "M"
 
     RB_variables.MΦᵀPᵤ⁻¹ = zeros(RB_variables.S.nₛᵘ, RB_variables.S.Nₛᵘ, RB_variables.Qᵐ)
     RB_variables.Mₙ = zeros(RB_variables.S.nₛᵘ, RB_variables.S.nₛᵘ, RB_variables.Qᵐ^2)
@@ -97,7 +97,7 @@ function assemble_MDEIM_matrices(ROM_info::Info, RB_variables::PoissonSTPGRB, va
     RB_variables.sparse_el_M = sparse_el
     RB_variables.Qᵐ = Q
 
-  elseif var === "A"
+  elseif var == "A"
 
     AΦ = zeros(RB_variables.Nₛᵘ, RB_variables.nₛᵘ, RB_variables.Qᵃ)
     RB_variables.Aₙ = zeros(RB_variables.nₛᵘ, RB_variables.nₛᵘ, RB_variables.Qᵃ^2)
@@ -131,7 +131,7 @@ function assemble_affine_vectors(ROM_info::Info, RB_variables::PoissonSTPGRB, va
 
   @info "SPGRB: assembling affine reduced RHS; A is affine"
 
-  if var === "F"
+  if var == "F"
     RB_variables.Qᶠ = 1
     @info "Assembling affine reduced forcing term"
     F = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "F.csv"))
@@ -140,7 +140,7 @@ function assemble_affine_vectors(ROM_info::Info, RB_variables::PoissonSTPGRB, va
     AFₙ = zeros(RB_variables.nₛᵘ, 1, RB_variables.Qᵃ*RB_variables.Qᶠ)
     tensor_product(AFₙ, RB_variables.AΦᵀPᵤ⁻¹, reshape(F,:,1))
     RB_variables.Fₙ = hcat(reshape(MFₙ,:,RB_variables.Qᵐ*RB_variables.Qᶠ), reshape(AFₙ,:,RB_variables.Qᵃ*RB_variables.Qᶠ))
-  elseif var === "H"
+  elseif var == "H"
     RB_variables.Qʰ = 1
     @info "Assembling affine reduced Neumann term"
     H = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "H.csv"))
@@ -169,12 +169,12 @@ function assemble_DEIM_vectors(ROM_info::Info, RB_variables::PoissonSTPGRB, var:
   tensor_product(Avarₙ,RB_variables.AΦᵀPᵤ⁻¹,DEIM_mat)
   Avarₙ = reshape(Avarₙ,:,RB_variables.Qᵃ*Q)
 
-  if var === "F"
+  if var == "F"
     RB_variables.DEIMᵢ_mat_F = DEIMᵢ_mat
     RB_variables.DEIM_idx_F = DEIM_idx
     RB_variables.Qᶠ = Q
     RB_variables.Fₙ = hcat(Mvarₙ,Avarₙ)
-  elseif var === "H"
+  elseif var == "H"
     RB_variables.DEIMᵢ_mat_H = DEIMᵢ_mat
     RB_variables.DEIM_idx_H = DEIM_idx
     RB_variables.Qʰ = Q
@@ -249,7 +249,6 @@ function save_affine_structures(ROM_info::Info, RB_variables::PoissonSTPGRB)
     save_CSV(Mₙ, joinpath(ROM_info.paths.ROM_structures_path, "Mₙ.csv"))
     save_CSV(MAₙ, joinpath(ROM_info.paths.ROM_structures_path, "MAₙ.csv"))
     save_CSV(MΦᵀPᵤ⁻¹, joinpath(ROM_info.paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv"))
-    save_CSV([RB_variables.Qᵐ], joinpath(ROM_info.paths.ROM_structures_path, "Qᵐ.csv"))
     save_affine_structures(ROM_info, RB_variables)
   end
 
@@ -269,7 +268,7 @@ end
 
 function get_RB_LHS_blocks(ROM_info, RB_variables::PoissonSTPGRB, θᵐ, θᵃ, θᵐᵃ, θᵃᵐ)
 
-  @info "Assembling LHS using Crank-Nicolson time scheme"
+  @info "Assembling LHS using θ-method time scheme, θ=$(ROM_info.θ)"
 
   θ = ROM_info.θ
   δt = ROM_info.δt
@@ -314,7 +313,7 @@ function get_RB_LHS_blocks(ROM_info, RB_variables::PoissonSTPGRB, θᵐ, θᵃ, 
   [Φₜᵘ₁₋₁_MA[i_t,j_t,q] = sum(RB_variables.Φₜᵘ[2:end,i_t].*RB_variables.Φₜᵘ[1:end-1,j_t].*θᵐᵃ[q,2:end]) for q = 1:Qᵐᵃ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
   [Φₜᵘ₁₋₁_AM[i_t,j_t,q] = sum(RB_variables.Φₜᵘ[2:end,i_t].*RB_variables.Φₜᵘ[1:end-1,j_t].*θᵃᵐ[q,2:end]) for q = 1:Qᵐᵃ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
 
-  #check: Φₜᵘ₋₁₁_M === (Φₜᵘ₁₋₁_M)ᵀ
+  #check: Φₜᵘ₋₁₁_M == (Φₜᵘ₁₋₁_M)ᵀ
 
   block₁ = zeros(RB_variables.nᵘ, RB_variables.nᵘ)
 
@@ -348,7 +347,7 @@ end
 
 function get_RB_RHS_blocks(ROM_info::Info, RB_variables::PoissonSTPGRB, θᶠ, θʰ)
 
-  @info "Assembling RHS"
+  @info "Assembling RHS using θ-method time scheme, θ=$(ROM_info.θ)"
 
   Qᵐᶠ = RB_variables.Qᵐ*RB_variables.S.Qᶠ
   Qᵐʰ = RB_variables.Qᵐ*RB_variables.S.Qʰ

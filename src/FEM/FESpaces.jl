@@ -22,19 +22,26 @@ end
 
 function get_FESpace(::NTuple{1,Int}, probl::SteadyInfo, model::DiscreteModel, g = nothing)
 
-  degree = 2 .* probl.order
+  degree = 2*probl.order
   labels = set_labels(probl, model)
-
-  Ω = Triangulation(model)
+  Ω = Interior(model)
   dΩ = Measure(Ω, degree)
-  Γn = BoundaryTriangulation(model, tags=probl.neumann_tags)
-  dΓn = Measure(Γn, degree)
-  Γd = BoundaryTriangulation(model, tags=probl.neumann_tags)
-  dΓd = Measure(Γd, degree)
   Qₕ = CellQuadrature(Ω, degree)
-
   refFE = ReferenceFE(lagrangian, Float64, probl.order)
-  V₀ = TestFESpace(model, refFE; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
+  if !isempty(probl.neumann_tags)
+    Γn = BoundaryTriangulation(model, tags=probl.neumann_tags)
+    dΓn = Measure(Γn, degree)
+  else
+    dΓn = nothing
+  end
+  if !isempty(probl.dirichlet_tags)
+    Γd = BoundaryTriangulation(model, tags=probl.dirichlet_tags)
+    dΓd = Measure(Γd, degree)
+    V₀ = TestFESpace(model, refFE; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
+  else
+    dΓd = nothing
+    V₀ = TestFESpace(model, refFE; conformity=:H1, constraint=:zeromean)
+  end
   if !isnothing(g)
     V = TrialFESpace(V₀, g)
   else
@@ -53,19 +60,26 @@ end
 
 function get_FESpace(::NTuple{1,Int}, probl::UnsteadyInfo, model::DiscreteModel, g = nothing)
 
-  degree = 2 .* probl.order
+  degree = 2*probl.order
   labels = set_labels(probl, model)
-
   Ω = Interior(model)
   dΩ = Measure(Ω, degree)
-  Γn = BoundaryTriangulation(model, tags=probl.neumann_tags)
-  dΓn = Measure(Γn, degree)
-  Γd = BoundaryTriangulation(model, tags=probl.neumann_tags)
-  dΓd = Measure(Γd, degree)
   Qₕ = CellQuadrature(Ω, degree)
-
   refFE = ReferenceFE(lagrangian, Float64, probl.order)
-  V₀ = TestFESpace(model, refFE; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
+  if !isempty(probl.neumann_tags)
+    Γn = BoundaryTriangulation(model, tags=probl.neumann_tags)
+    dΓn = Measure(Γn, degree)
+  else
+    dΓn = nothing
+  end
+  if !isempty(probl.dirichlet_tags)
+    Γd = BoundaryTriangulation(model, tags=probl.dirichlet_tags)
+    dΓd = Measure(Γd, degree)
+    V₀ = TestFESpace(model, refFE; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
+  else
+    dΓd = nothing
+    V₀ = TestFESpace(model, refFE; conformity=:H1, constraint=:zeromean)
+  end
   if isnothing(g)
     g₀(x, t::Real) = 0
     g₀(t::Real) = x->g₀(x,t)
@@ -73,7 +87,6 @@ function get_FESpace(::NTuple{1,Int}, probl::UnsteadyInfo, model::DiscreteModel,
   else
     V = TransientTrialFESpace(V₀, g)
   end
-
   ϕᵥ = get_fe_basis(V₀)
   ϕᵤ(t) = get_trial_fe_basis(V(t))
   Nₛᵘ = length(get_free_dof_ids(V₀))
@@ -86,7 +99,7 @@ end
 
 function get_FESpace(::NTuple{2,Int}, probl::SteadyInfo, model::DiscreteModel, g = nothing)
 
-  degree = 2 .* probl.order
+  degree = 2*probl.order
   labels = set_labels(probl, model)
 
   Ω = Triangulation(model)
@@ -123,7 +136,7 @@ end
 
 function get_FESpace(::NTuple{2,Int}, probl::UnsteadyInfo, model::DiscreteModel, g = nothing)
 
-  degree = 2 .* probl.order
+  degree = 2*probl.order
   labels = set_labels(probl, model)
 
   Ω = Interior(model)

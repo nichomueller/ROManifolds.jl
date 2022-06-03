@@ -112,7 +112,7 @@ function assemble_primal_op(FE_space::UnsteadyProblem)
 
 end
 
-function assemble_forcing(FE_space::FESpacePoisson, probl::SteadyInfo, param::ParametricSpecifics)
+function assemble_forcing(FE_space::SteadyProblem, probl::SteadyInfo, param::ParametricSpecifics)
 
   if !probl.probl_nl["f"] && !probl.probl_nl["h"]
     return assemble_vector(∫(FE_space.ϕᵥ) * FE_space.dΩ, FE_space.V₀)
@@ -122,7 +122,7 @@ function assemble_forcing(FE_space::FESpacePoisson, probl::SteadyInfo, param::Pa
 
 end
 
-function assemble_forcing(FE_space::FESpacePoissonUnsteady, probl::UnsteadyInfo, param::ParametricSpecificsUnsteady)
+function assemble_forcing(FE_space::UnsteadyProblem, probl::UnsteadyInfo, param::ParametricSpecificsUnsteady)
 
   function unsteady_forcing(t)
     if !probl.probl_nl["f"]
@@ -136,37 +136,31 @@ function assemble_forcing(FE_space::FESpacePoissonUnsteady, probl::UnsteadyInfo,
 
 end
 
-function assemble_forcing(FE_space::FESpaceStokesUnsteady, probl::UnsteadyInfo, param::ParametricSpecificsUnsteady)
+function assemble_neumann_datum(FE_space::SteadyProblem, probl::SteadyInfo, param::ParametricSpecifics)
 
-  function unsteady_forcing(t)
-    if !probl.probl_nl["f"]
-      return assemble_vector(∫(FE_space.ϕᵥ ⋅ param.fₛ) * FE_space.dΩ, FE_space.V₀)
-    else probl.probl_nl["f"]
-      return assemble_vector(∫(FE_space.ϕᵥ ⋅ param.f(t)) * FE_space.dΩ, FE_space.V₀)
+  if !isnothing(FE_space.dΓn)
+    if !probl.probl_nl["h"]
+      return assemble_vector(∫(FE_space.ϕᵥ) * FE_space.dΓn, FE_space.V₀)
+    else
+      return assemble_vector(∫(FE_space.ϕᵥ * param.h) * FE_space.dΓn, FE_space.V₀)
     end
-  end
-
-  return unsteady_forcing
-
-end
-
-function assemble_neumann_datum(FE_space::FESpacePoisson, probl::SteadyInfo, param::ParametricSpecifics)
-
-  if !probl.probl_nl["h"]
-    return assemble_vector(∫(FE_space.ϕᵥ) * FE_space.dΓn, FE_space.V₀)
   else
-    return assemble_vector(∫(FE_space.ϕᵥ * param.h) * FE_space.dΓn, FE_space.V₀)
+    return zeros(num_free_dofs(FE_space.V₀))
   end
 
 end
 
-function assemble_neumann_datum(FE_space::FESpacePoissonUnsteady, probl::UnsteadyInfo, param::ParametricSpecificsUnsteady)
+function assemble_neumann_datum(FE_space::UnsteadyProblem, probl::UnsteadyInfo, param::ParametricSpecificsUnsteady)
 
   function unsteady_neumann_datum(t)
-    if !probl.probl_nl["h"]
-      return assemble_vector(∫(FE_space.ϕᵥ * param.hₛ) * FE_space.dΓn, FE_space.V₀)
+    if !isnothing(FE_space.dΓn)
+      if !probl.probl_nl["h"]
+        return assemble_vector(∫(FE_space.ϕᵥ * param.hₛ) * FE_space.dΓn, FE_space.V₀)
+      else
+        return assemble_vector(∫(FE_space.ϕᵥ * param.h(t)) * FE_space.dΓn, FE_space.V₀)
+      end
     else
-      return assemble_vector(∫(FE_space.ϕᵥ * param.h(t)) * FE_space.dΓn, FE_space.V₀)
+      return zeros(num_free_dofs(FE_space.V₀))
     end
   end
 
@@ -174,51 +168,23 @@ function assemble_neumann_datum(FE_space::FESpacePoissonUnsteady, probl::Unstead
 
 end
 
-function assemble_neumann_datum(FE_space::FESpaceStokesUnsteady, probl::UnsteadyInfo, param::ParametricSpecificsUnsteady)
+function assemble_dirichlet_datum(FE_space::SteadyProblem, probl::SteadyInfo, param::ParametricSpecifics)
 
-  function unsteady_neumann_datum(t)
-    if !probl.probl_nl["h"]
-      return assemble_vector(∫(FE_space.ϕᵥ ⋅ param.hₛ) * FE_space.dΓn, FE_space.V₀)
-    else
-      return assemble_vector(∫(FE_space.ϕᵥ ⋅ param.h(t)) * FE_space.dΓn, FE_space.V₀)
-    end
-  end
-
-  return unsteady_neumann_datum
-
-end
-
-function assemble_dirichlet_datum(FE_space::FESpacePoisson, probl::SteadyInfo, param::ParametricSpecifics)
-
-  if !probl.probl_nl["h"]
-    return assemble_vector(∫(FE_space.ϕᵥ) * FE_space.dΓd, FE_space.V₀)
-  else
+  if !isnothing(FE_space.dΓd)
     return assemble_vector(∫(FE_space.ϕᵥ * param.g) * FE_space.dΓd, FE_space.V₀)
+  else
+    return zeros(num_free_dofs(FE_space.V₀))
   end
 
 end
 
-function assemble_dirichlet_datum(FE_space::FESpacePoissonUnsteady, probl::UnsteadyInfo, param::ParametricSpecificsUnsteady)
+function assemble_dirichlet_datum(FE_space::UnsteadyProblem, probl::UnsteadyInfo, param::ParametricSpecificsUnsteady)
 
   function unsteady_dirichlet_datum(t)
-    if !probl.probl_nl["h"]
-      return assemble_vector(∫(FE_space.ϕᵥ * param.gₛ) * FE_space.dΓd, FE_space.V₀)
-    else
+    if !isnothing(FE_space.dΓd)
       return assemble_vector(∫(FE_space.ϕᵥ * param.g(t)) * FE_space.dΓd, FE_space.V₀)
-    end
-  end
-
-  return unsteady_dirichlet_datum
-
-end
-
-function assemble_dirichlet_datum(FE_space::FESpaceStokesUnsteady, probl::UnsteadyInfo, param::ParametricSpecificsUnsteady)
-
-  function unsteady_dirichlet_datum(t)
-    if !probl.probl_nl["h"]
-      return assemble_vector(∫(FE_space.ϕᵥ ⋅ param.gₛ) * FE_space.dΓd, FE_space.V₀)
     else
-      return assemble_vector(∫(FE_space.ϕᵥ ⋅ param.g(t)) * FE_space.dΓd, FE_space.V₀)
+      return zeros(num_free_dofs(FE_space.V₀))
     end
   end
 
@@ -226,7 +192,7 @@ function assemble_dirichlet_datum(FE_space::FESpaceStokesUnsteady, probl::Unstea
 
 end
 
-function assemble_L2_norm_matrix(FE_space::FEMProblem)
+function assemble_L2_norm_matrix(FE_space::FESpaceStokesUnsteady)
 
   Xᵖ = assemble_matrix(∫(FE_space.ψᵧ * FE_space.ψₚ) * FE_space.dΩ, FE_space.Q, FE_space.Q₀)
 
@@ -234,7 +200,7 @@ function assemble_L2_norm_matrix(FE_space::FEMProblem)
 
 end
 
-function assemble_L2_norm_matrix_nobcs(FE_space₀::FEMProblem)
+function assemble_L2_norm_matrix_nobcs(FE_space₀::FESpaceStokesUnsteady)
 
   Xᵖ₀ = assemble_matrix(∫(FE_space₀.ψᵧ * FE_space₀.ψₚ) * FE_space₀.dΩ, FE_space₀.Q, FE_space₀.Q₀)
 

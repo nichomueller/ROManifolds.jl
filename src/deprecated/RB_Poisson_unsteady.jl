@@ -96,7 +96,7 @@ function check_reduced_affine_components(ROM_info, RB_variables::RBProblem)
     push!(operators, "M")
   end
 
-  push!(operators, check_reduced_affine_components(ROM_info, RB_variables.steady_info))
+  push!(operators, check_reduced_affine_components(ROM_info, RB_variables.S))
 
   operators
 
