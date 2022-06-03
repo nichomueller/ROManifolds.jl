@@ -379,74 +379,75 @@ function M_DEIM_offline_old(sparse_M_DEIM_mat::SparseMatrixCSC, Σ::Vector)
 
 end
 
-function initialize_A_old(ROM_info, FE_space, parametric_info, Nₜ)
-  @info "Snapshot at time step 1, stiffness"
-  A_μ_t = assemble_stiffness(FE_space, ROM_info, parametric_info)
-  A_μ = A_μ_t(ROM_info.t₀+ROM_info.δt*ROM_info.θ)
-  row_idx, val = findnz(A_μ[:])
-  A = sparse(row_idx, ones(length(row_idx)), val, FE_space.Nₛᵘ^2 , Nₜ)
-  A
-end
-
-function build_A_snapshots_old(FE_space, ROM_info, μ::Array)
+function build_A_snapshots_old(FE_space::UnsteadyProblem, ROM_info::Info, μ::Array)
 
   Nₜ = convert(Int64, ROM_info.T/ROM_info.δt)
   δtθ = ROM_info.δt*ROM_info.θ
   times_θ = collect(ROM_info.t₀:ROM_info.δt:ROM_info.T-ROM_info.δt).+δtθ
 
   parametric_info = get_parametric_specifics(problem_ntuple, ROM_info, μ)
+  A_t = assemble_stiffness(FE_space, ROM_info, parametric_info)
 
-  A = initialize_A_old(ROM_info, FE_space, parametric_info, Nₜ)
-
-  for i_t = 2:Nₜ
+  for i_t = 1:Nₜ
     @info "Snapshot at time step $i_t, stiffness"
-    A_μ_t = assemble_stiffness(FE_space, ROM_info, parametric_info)
-    A_μ_i = A_μ_t(times_θ[i_t])
-    i, v = findnz(A_μ_i[:])
-    A[:, i_t] = sparse(i, ones(length(i)), v)
+    A_i = A_t(times_θ[i_t])
+    i, v = findnz(A_i[:])
+    if i_t === 1
+      global A = sparse(i, ones(length(i)), v, FE_space.Nₛᵘ^2, Nₜ)
+    else
+      global A[:, i_t] = sparse(i, ones(length(i)), v)
+    end
   end
 
   A
 
 end
 
-function MDEIM_offline_old(FE_space, ROM_info, var::String)
+function MDEIM_offline_old(FE_space::UnsteadyProblem, ROM_info::Info)
 
   @info "Building $(ROM_info.nₛ_MDEIM) snapshots of $var, at each time step. This will take some time."
+
   μ = load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
+
   for k = 1:ROM_info.nₛ_MDEIM
-    @info "Considering parameter number $k/$(ROM_info.nₛ_MDEIM)"
+    @info "Considering parameter number $k, need $(ROM_info.nₛ_MDEIM-k) more!"
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
+
     snapsₖ = build_A_snapshots_old(FE_space, ROM_info, μₖ)
-    comp_snapsₖ, _ = M_DEIM_POD_old(snapsₖ, ROM_info.ϵₛ)
+
+    compressed_snapsₖ, _ = M_DEIM_POD_old(snapsₖ, ROM_info.ϵₛ)
     if k === 1
-      global comp_snaps = comp_snapsₖ
+      global compressed_snaps_old = compressed_snapsₖ
     else
-      global comp_snaps = hcat(comp_snaps, comp_snapsₖ)
+      global compressed_snaps_old = hcat(compressed_snaps_old, compressed_snapsₖ)
     end
   end
 
-  sparse_MDEIM_mat, Σ = M_DEIM_POD_old(comp_snaps, ROM_info.ϵₛ)
-  MDEIM_mat_old, MDEIM_idx_old, _ = M_DEIM_offline_old(sparse_MDEIM_mat, Σ)
-  MDEIMᵢ_mat_old = Matrix(MDEIM_mat_old[MDEIM_idx_old, :])
+  sparse_MDEIM_mat, Σ = M_DEIM_POD_old(compressed_snaps_old, ROM_info.ϵₛ)
+  MDEIM_mat_old, MDEIM_idx_old, MDEIM_err_bound = M_DEIM_offline_old(sparse_MDEIM_mat, Σ)
+
   Nₕ = convert(Int64, sqrt(size(MDEIM_mat_old)[1]))
   r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx_old, Nₕ)
+
   el_old = find_FE_elements(FE_space.V₀, FE_space.Ω, unique(union(r_idx, c_idx)))
 
-  MDEIM_mat_old, MDEIM_idx_old, MDEIMᵢ_mat_old, el_old
+  MDEIM_mat_old, MDEIM_idx_old, el_old, MDEIM_err_bound, Σ
+
 end
 
-function assemble_MDEIM_matrices(ROM_info::Problem, RB_variables::PoissonSTGRB, var::String)
+function assemble_MDEIM_matrices_old(ROM_info::Info, RB_variables::PoissonSTGRB)
 
-  @info "The matrix $var is non-affine: running the MDEIM offline phase on $nₛ_MDEIM snapshots"
-  MDEIM_mat_old, MDEIM_idx_old, MDEIMᵢ_mat_old, sparse_el_old = MDEIM_offline_old(FE_space, ROM_info, var)
-  Qold = size(MDEIM_mat_old)[2]
-  Matₙ_old = zeros(RB_variables.S.nₛᵘ, RB_variables.S.nₛᵘ, Q)
-  for q = 1:Qold
+  MDEIM_mat_old, MDEIM_idx_old, sparse_el_old, _, _ = MDEIM_offline_old(FE_space, ROM_info)
+  Q = size(MDEIM_mat_old)[2]
+  #= Matₙ = zeros(RB_variables.S.nₛᵘ, RB_variables.S.nₛᵘ, Q)
+  for q = 1:Q
     @info "ST-GRB: affine component number $q, matrix $var"
-    Matq_old = reshape(MDEIM_mat_old[:,q], (RB_variables.S.Nₛᵘ, RB_variables.S.Nₛᵘ))
-    Matₙ_old[:,:,q] = RB_variables.S.Φₛᵘ' * Matrix(Matq_old) * RB_variables.S.Φₛᵘ
-  end
+    Matq = reshape(MDEIM_mat[:,q], (RB_variables.S.Nₛᵘ, RB_variables.S.Nₛᵘ))
+    Matₙ[:,:,q] = RB_variables.S.Φₛᵘ' * Matrix(Matq) * RB_variables.S.Φₛᵘ
+  end =#
+  MDEIMᵢ_mat_old = Matrix(MDEIM_mat_old[MDEIM_idx_old, :])
+
+  return MDEIM_mat_old, MDEIMᵢ_mat_old, MDEIM_idx_old, sparse_el_old
 
 end
 
@@ -467,9 +468,9 @@ function get_θᵃ_old(RB_variables,MDEIM_mat_old, MDEIM_idx_old, MDEIMᵢ_mat_o
 end
 
 function test_old_MDEIM(ROM_info, RB_variables)
-  MDEIM_mat_old, MDEIM_idx_old, MDEIMᵢ_mat_old, sparse_el_old = MDEIM_offline_old(FE_space, ROM_info, "A")
+  MDEIM_mat_old, MDEIM_idx_old, MDEIMᵢ_mat_old, sparse_el_old = MDEIM_offline_old(FE_space, ROM_info)
   μ=load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
-  μ_nb = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
+  μ_nb = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
   #parametric_info = get_parametric_specifics(problem_ntuple, ROM_info, μ_nb)
   A = build_A_snapshots_old(FE_space, ROM_info, μ_nb)
   θᵃ_old = get_θᵃ_old(RB_variables,MDEIM_mat_old, MDEIM_idx_old, MDEIMᵢ_mat_old, sparse_el_old)
