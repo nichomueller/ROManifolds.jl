@@ -145,77 +145,21 @@ end
 
 function MDEIM_offline(FE_space::UnsteadyProblem, ROM_info::Info, var::String)
 
-  if ROM_info.space_time_M_DEIM
-    return MDEIM_offline_spacetime(FE_space, ROM_info, var)
-  elseif ROM_info.functional_M_DEIM
+  if ROM_info.functional_M_DEIM
     return MDEIM_offline_functional(FE_space, ROM_info, var)
-  else
-    return MDEIM_offline_standard(FE_space, ROM_info, var)
+  else ROM_info.functional_M_DEIM
+    return MDEIM_offline_algebraic(FE_space, ROM_info, var)
   end
 
 end
 
-function MDEIM_offline_standard(FE_space::UnsteadyProblem, ROM_info::Info, var::String)
+function MDEIM_offline_algebraic(FE_space::UnsteadyProblem, ROM_info::Info, var::String)
 
   @info "Building $(ROM_info.nₛ_MDEIM) snapshots of $var, at each time step. This will take some time."
 
   μ = load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
-
-  for k = 1:ROM_info.nₛ_MDEIM
-    @info "Considering parameter number $k/$(ROM_info.nₛ_MDEIM)"
-    μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
-    if var == "A"
-      snapsₖ,row_idx = build_A_snapshots(FE_space, ROM_info, μₖ)
-    elseif var == "M"
-      snapsₖ,row_idx = build_M_snapshots(FE_space, ROM_info, μₖ)
-    else
-      @error "Run MDEIM on A or M only"
-    end
-    compressed_snapsₖ, _ = M_DEIM_POD(snapsₖ, ROM_info.ϵₛ)
-    if k == 1
-      global row_idx = row_idx
-      global compressed_snaps = compressed_snapsₖ
-    else
-      global compressed_snaps = hcat(compressed_snaps, compressed_snapsₖ)
-    end
-  end
-
-  MDEIM_mat, Σ = M_DEIM_POD(compressed_snaps, ROM_info.ϵₛ)
-  MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat, Σ)
-  MDEIMᵢ_mat = MDEIM_mat[MDEIM_idx,:]
-  MDEIM_idx_sparse = from_full_idx_to_sparse_idx(row_idx,MDEIM_idx,FE_space.Nₛᵘ)
-  MDEIM_idx_sparse_space, _ = from_spacetime_to_space_time_idx_vec(MDEIM_idx_sparse,FE_space.Nₛᵘ)
-  el = find_FE_elements(FE_space.V₀, FE_space.Ω, unique(MDEIM_idx_sparse_space))
-
-  MDEIM_mat, MDEIM_idx_sparse, MDEIMᵢ_mat, row_idx, el
-
-end
-
-function MDEIM_offline_spacetime(FE_space::UnsteadyProblem, ROM_info::Info, var::String)
-
-  @info "Building $(ROM_info.nₛ_MDEIM) snapshots of $var, at each time step. This will take some time."
-
-  μ = load_CSV(joinpath(ROM_info.paths.FEM_snap_path, "μ.csv"))
-
-  for k = 1:ROM_info.nₛ_MDEIM
-    @info "Considering parameter number $k/$(ROM_info.nₛ_MDEIM)"
-    μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
-    if var == "A"
-      snapsₖ,row_idx = build_A_snapshots(FE_space, ROM_info, μₖ)
-    elseif var == "M"
-      snapsₖ,row_idx = build_M_snapshots(FE_space, ROM_info, μₖ)
-    else
-      @error "Run MDEIM on A or M only"
-    end
-    if k == 1
-      global row_idx = row_idx
-      global snaps = snapsₖ[:]
-    else
-      global snaps = hcat(snaps, snapsₖ[:])
-    end
-  end
-
-  MDEIM_mat, Σ = POD(snaps, ROM_info.ϵₛ)
+  snaps,row_idx = get_snaps_MDEIM(FE_space, ROM_info, μ, var)
+  MDEIM_mat, Σ = M_DEIM_POD(snaps, ROM_info.ϵₛ)
   MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat, Σ)
   MDEIMᵢ_mat = MDEIM_mat[MDEIM_idx,:]
   MDEIM_idx_sparse = from_full_idx_to_sparse_idx(row_idx,MDEIM_idx,FE_space.Nₛᵘ)

@@ -101,14 +101,47 @@ function build_A_snapshots(FE_space::UnsteadyProblem, ROM_info::Info, μ::Array)
 
 end
 
-#= function build_A_snapshots(FE_space::UnsteadyProblem, ROM_info::Info, μ::Array, space_time::Bool)
-  A, row_idx = build_A_snapshots(FE_space, ROM_info, μ)
-  if space_time
-    return A[:], row_idx
+function get_snaps_MDEIM(FE_space::UnsteadyProblem, ROM_info::Info, μ::Matrix, var="A")
+  if ROM_info.space_time_M_DEIM
+    for k = 1:ROM_info.nₛ_MDEIM
+      @info "Considering parameter number $k/$(ROM_info.nₛ_MDEIM)"
+      μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
+      if var == "A"
+        snapsₖ,row_idx = build_A_snapshots(FE_space, ROM_info, μₖ)
+      elseif var == "M"
+        snapsₖ,row_idx = build_M_snapshots(FE_space, ROM_info, μₖ)
+      else
+        @error "Run MDEIM on A or M only"
+      end
+      if k == 1
+        global row_idx = row_idx
+        global snaps = snapsₖ[:]
+      else
+        global snaps = hcat(snaps, snapsₖ[:])
+      end
+    end
   else
-    return A
+    for k = 1:ROM_info.nₛ_MDEIM
+      @info "Considering parameter number $k/$(ROM_info.nₛ_MDEIM)"
+      μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
+      if var == "A"
+        snapsₖ,row_idx = build_A_snapshots(FE_space, ROM_info, μₖ)
+      elseif var == "M"
+        snapsₖ,row_idx = build_M_snapshots(FE_space, ROM_info, μₖ)
+      else
+        @error "Run MDEIM on A or M only"
+      end
+      compressed_snapsₖ, _ = M_DEIM_POD(snapsₖ, ROM_info.ϵₛ)
+      if k == 1
+        global row_idx = row_idx
+        global snaps = compressed_snapsₖ
+      else
+        global snaps = hcat(snaps, compressed_snapsₖ)
+      end
+    end
   end
-end =#
+  return snaps,row_idx
+end
 
 function build_F_snapshots(FE_space::SteadyProblem, ROM_info::Info, μ::Array)
 

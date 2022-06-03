@@ -77,22 +77,24 @@ function assemble_MDEIM_matrices_spacetime(ROM_info::Info, RB_variables::Poisson
   @info "The matrix $var is non-affine: running the MDEIM offline phase on $(ROM_info.nₛ_MDEIM) snapshots"
 
   MDEIM_mat, MDEIM_idx, MDEIMᵢ_mat, row_idx, sparse_el = MDEIM_offline(FE_space, ROM_info, var)
-  Q = size(MDEIM_mat)[2]
-  MDEIM_mat_new = reshape(MDEIM_mat,length(row_idx),:)
-  Nₜ = Int(size(MDEIM_mat_new)[2]/Q)
+  Nₜ = RB_variables.Nₜ
+  MDEIM_mat_new = reshape(MDEIM_mat,length(row_idx),RB_variables.Nₜ,:)
+  Q = size(MDEIM_mat_new)[3]
 
-  Matₙ = zeros(RB_variables.S.nₛᵘ, RB_variables.S.nₛᵘ, Q*Nₜ)
+  #Matₙ = zeros(RB_variables.S.nₛᵘ, RB_variables.S.nₛᵘ, Q*Nₜ)
 
   r_idx, c_idx = from_vec_to_mat_idx(row_idx, RB_variables.S.Nₛᵘ)
+  MatqΦ = zeros(RB_variables.S.Nₛᵘ,RB_variables.S.nₛᵘ,Q*Nₜ)
   for q = 1:Q
     @info "ST-GRB: affine component number $q/$Q, matrix $var"
-    MatqΦ = zeros(RB_variables.S.Nₛᵘ,RB_variables.S.nₛᵘ*Nₜ)
     for j = 1:RB_variables.S.Nₛᵘ
       Mat_idx = findall(x -> x == j, r_idx)
-      MatqΦ[j,:] = reshape(MDEIM_mat_new[Mat_idx,(q-1)*Nₜ+1:q*Nₜ]' * RB_variables.S.Φₛᵘ[c_idx[Mat_idx],:],1,:)
+      MatqΦ[j,:,(q-1)*Nₜ+1:q*Nₜ] = (MDEIM_mat_new[Mat_idx,:,q]' * RB_variables.S.Φₛᵘ[c_idx[Mat_idx],:])'
+      #MatqΦ[j,:] = reshape(MDEIM_mat_new[Mat_idx,(q-1)*Nₜ+1:q*Nₜ]' * RB_variables.S.Φₛᵘ[c_idx[Mat_idx],:],1,:)
     end
-    Matₙ[:,:,(q-1)*Nₜ+1:q*Nₜ] = reshape(RB_variables.S.Φₛᵘ' * MatqΦ,RB_variables.S.nₛᵘ,RB_variables.S.nₛᵘ,Nₜ)
+    #Matₙ[:,:,(q-1)*Nₜ+1:q*Nₜ] = reshape(RB_variables.S.Φₛᵘ' * MatqΦ,RB_variables.S.nₛᵘ,RB_variables.S.nₛᵘ,Nₜ)
   end
+  Matₙ = reshape(RB_variables.S.Φₛᵘ' * reshape(MatqΦ,RB_variables.S.Nₛᵘ,:),RB_variables.S.nₛᵘ,:,Q*Nₜ)
 
   if var == "M"
     RB_variables.Mₙ = Matₙ
@@ -286,8 +288,8 @@ function get_RB_LHS_blocks_spacetime(ROM_info, RB_variables::PoissonSTGRB, θᵐ
   θ = ROM_info.θ
   δtθ = ROM_info.δt*θ
   nₜᵘ = RB_variables.nₜᵘ
-  Qᵐ = ceil(Int,RB_variables.Qᵐ/RB_variables.Nₜ)
-  Qᵃ = ceil(Int,RB_variables.S.Qᵃ/RB_variables.Nₜ)
+  Qᵐ = RB_variables.Qᵐ
+  Qᵃ = RB_variables.S.Qᵃ
   Nₜᵐ = RB_variables.Nₜ
   Nₜᵃ = RB_variables.Nₜ
 

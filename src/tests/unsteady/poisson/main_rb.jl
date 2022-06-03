@@ -6,7 +6,7 @@ function setup_RB() :: Tuple
   ROM_info = ROMSpecificsUnsteady(probl_nl,case,paths,RB_method,
   time_reduction_technique,perform_nested_POD,considered_snaps,t₀,T,δt,θ,ϵₛ,ϵₜ,
     use_norm_X,build_parametric_RHS,nₛ_MDEIM,nₛ_DEIM,space_time_M_DEIM,
-    space_time_M_DEIM,postprocess,import_snapshots,import_offline_structures,
+    functional_M_DEIM,postprocess,import_snapshots,import_offline_structures,
     save_offline_structures,save_results)
 
   if RB_method == "ST-GRB"

@@ -16,7 +16,7 @@ build_parametric_RHS = false
 use_norm_X = false
 nₛ_MDEIM = min(10, considered_snaps)
 nₛ_DEIM = min(10, considered_snaps)
-space_time_M_DEIM = false
+space_time_M_DEIM = true
 functional_M_DEIM = false
 @assert !(space_time_M_DEIM && functional_M_DEIM) "Choose only one (M)DEIM technique"
 postprocess = false
