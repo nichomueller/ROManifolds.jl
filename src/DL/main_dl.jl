@@ -1,5 +1,3 @@
-include("config_dl.jl")
-
 function train_network(layer_dims, X, Y; η=0.001, epochs=1000)
   # Initiate an empty container for cost, iterations, and accuracy at each iteration
   costs = []
@@ -7,7 +5,7 @@ function train_network(layer_dims, X, Y; η=0.001, epochs=1000)
   accuracy = []
 
   # Initialise random weights for the network
-  params = initialise_model_weights(layer_dims)
+  Params = initialise_model_weights(layer_dims)
 
   # Train the network
   for i = 1:n_epochs
@@ -15,11 +13,11 @@ function train_network(layer_dims, X, Y; η=0.001, epochs=1000)
     for nb = 1:n_batches
 
       X_nb = X[nb]
-      Ŷ = model(X_nb, params)
+      Ŷ = model(X_nb, Params)
       cost = cross_entropy_loss(Ŷ, Y)
       acc = assess_accuracy(Ŷ, Y)
       ∇ = back_propagate_model_weights(Ŷ, Y, caches)
-      params = update_model_weights(params, ∇, η)
+      Params = update_model_weights(Params, ∇, η)
 
       println("Iteration -> $i, Cost -> $cost, Accuracy -> $acc")
 
@@ -32,7 +30,7 @@ function train_network(layer_dims, X, Y; η=0.001, epochs=1000)
 
   end
 
-  return (cost=costs, iterations=iters, accuracy=accuracy, parameters=params)
+  return (cost=costs, iterations=iters, accuracy=accuracy, Parameters=Params)
 
 end
 
@@ -65,10 +63,10 @@ epochs = 10
 
 for epoch = 1:epochs
   for d in train
-    gs = gradient(params(Net)) do
+    gs = gradient(Params(Net)) do
       l = loss(d...)
     end
-    update!(opt, params(Net), gs)
+    update!(opt, Params(Net), gs)
   end
   @show accuracy(valX, valY)
 end
@@ -151,7 +149,7 @@ training_loss = Float64[]
 epochs = Int64[]
 
 for epoch in 1:1000
-	train!(Loss, params(model), zip(xs, ys), optimizer)
+	train!(Loss, Params(model), zip(xs, ys), optimizer)
 
 	if epoch % 10 == 0
 	  # we record our training loss

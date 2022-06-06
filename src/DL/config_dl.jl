@@ -1,5 +1,3 @@
-include("../utils/general.jl")
-
 η = 0.01
 n_epochs = 50
 n_batches = 10

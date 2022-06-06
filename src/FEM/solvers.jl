@@ -1,12 +1,12 @@
 function FE_solve(
-  FE_space::FESpacePoisson, probl::SteadyProblem,
-  param::ParametricSpecifics; subtract_Ddata = true)
+  FESpace::FESpacePoisson, probl::SteadyProblem,
+  Param::ParametricSpecifics; subtract_Ddata = true)
 
-  Gₕ = assemble_lifting(FE_space, param)
+  Gₕ = assemble_lifting(FESpace, Param)
 
-  a(u, v) = ∫(∇(v) ⋅ (param.α * ∇(u))) * FE_space.dΩ
-  rhs(v) = ∫(v * param.f) * FE_space.dΩ + ∫(v * param.h) * FE_space.dΓn
-  operator = AffineFEOperator(a, rhs, FE_space.V, FE_space.V₀)
+  a(u, v) = ∫(∇(v) ⋅ (Param.α * ∇(u))) * FESpace.dΩ
+  rhs(v) = ∫(v * Param.f) * FESpace.dΩ + ∫(v * Param.h) * FESpace.dΓn
+  operator = AffineFEOperator(a, rhs, FESpace.V, FESpace.V₀)
 
   if probl.solver == "lu"
     uₕ_field = solve(LinearFESolver(LUSolver()), operator)
@@ -25,15 +25,15 @@ function FE_solve(
 end
 
 function FE_solve(
-  FE_space::FESpacePoissonUnsteady, probl::ProblemSpecificsUnsteady,
-  param::ParametricSpecificsUnsteady; subtract_Ddata = true)
+  FESpace::FESpacePoissonUnsteady, probl::ProblemSpecificsUnsteady,
+  Param::ParametricSpecificsUnsteady; subtract_Ddata = true)
 
-  Gₕₜ = assemble_lifting(FE_space, probl, param)
+  Gₕₜ = assemble_lifting(FESpace, probl, Param)
 
-  m(t, u, v) = ∫(param.m(t)*(u*v))dΩ
-  a(t, u, v) = ∫(∇(v)⋅(param.α(t)*∇(u)))*FE_space.dΩ
-  rhs(t, v) = rhs_form(t,v,FE_space,param)
-  operator = TransientAffineFEOperator(m, a, rhs, FE_space.V, FE_space.V₀)
+  m(t, u, v) = ∫(Param.m(t)*(u*v))dΩ
+  a(t, u, v) = ∫(∇(v)⋅(Param.α(t)*∇(u)))*FESpace.dΩ
+  rhs(t, v) = rhs_form(t,v,FESpace,Param)
+  operator = TransientAffineFEOperator(m, a, rhs, FESpace.V, FESpace.V₀)
 
   linear_solver = LUSolver()
 
@@ -43,12 +43,12 @@ function FE_solve(
     ode_solver = RungeKutta(linear_solver, probl.δt, probl.RK_type)
   end
 
-  u₀_field = interpolate_everywhere(param.u₀, FE_space.V(probl.t₀))
+  u₀_field = interpolate_everywhere(Param.u₀, FESpace.V(probl.t₀))
 
   uₕₜ_field = solve(ode_solver, operator, u₀_field, probl.t₀, probl.T)
-  uₕₜ = zeros(FE_space.Nₛᵘ, convert(Int64, probl.T / probl.δt))
+  uₕₜ = zeros(FESpace.Nₛᵘ, convert(Int64, probl.T / probl.δt))
   global count = 0
-  dΩ = FE_space.dΩ
+  dΩ = FESpace.dΩ
   for (uₕ, _) in uₕₜ_field
     global count += 1
     uₕₜ[:, count] = get_free_dof_values(uₕ)
@@ -63,15 +63,15 @@ function FE_solve(
 end
 
 function FE_solve(
-  FE_space::FESpaceStokesUnsteady, probl::ProblemSpecificsUnsteady,
-  param::ParametricSpecificsUnsteady; subtract_Ddata=false)
+  FESpace::FESpaceStokesUnsteady, probl::ProblemSpecificsUnsteady,
+  Param::ParametricSpecificsUnsteady; subtract_Ddata=false)
 
-  R₁,R₂ = assemble_lifting(FE_space, probl, param)
+  R₁,R₂ = assemble_lifting(FESpace, probl, Param)
 
-  m(t,(u,p),(v,q)) = ∫(param.m(t)*(u⋅v))*FE_space.dΩ
-  ab(t,(u,p),(v,q)) = ∫(param.α(t)*(∇(v) ⊙ ∇(u)))*FE_space.dΩ - ∫((∇⋅v)*p)*FE_space.dΩ + ∫(q*(∇⋅u))*FE_space.dΩ
-  rhs(t,(v,q)) = ∫(v⋅param.f(t))*FE_space.dΩ + ∫(v⋅param.h(t))*FE_space.dΓn + ∫(v⋅param.f(t))*FE_space.dΩ + ∫(q*param.g(t))*FE_space.dΩ - (R₁-R₂)
-  operator = TransientAffineFEOperator(m, ab, rhs, FE_space.X, FE_space.X₀)
+  m(t,(u,p),(v,q)) = ∫(Param.m(t)*(u⋅v))*FESpace.dΩ
+  ab(t,(u,p),(v,q)) = ∫(Param.α(t)*(∇(v) ⊙ ∇(u)))*FESpace.dΩ - ∫((∇⋅v)*p)*FESpace.dΩ + ∫(q*(∇⋅u))*FESpace.dΩ
+  rhs(t,(v,q)) = ∫(v⋅Param.f(t))*FESpace.dΩ + ∫(v⋅Param.h(t))*FESpace.dΓn + ∫(v⋅Param.f(t))*FESpace.dΩ + ∫(q*Param.g(t))*FESpace.dΩ - (R₁-R₂)
+  operator = TransientAffineFEOperator(m, ab, rhs, FESpace.X, FESpace.X₀)
 
   linear_solver = LUSolver()
 
@@ -81,17 +81,17 @@ function FE_solve(
     ode_solver = RungeKutta(linear_solver, probl.δt, probl.RK_type)
   end
 
-  u0(x) = param.u₀(x)[1]
-  p0(x) = param.u₀(x)[2]
-  u₀_field = interpolate_everywhere(u0, FE_space.V(probl.t₀))
-  p₀_field = interpolate_everywhere(p0, FE_space.Q(probl.t₀))
-  x₀_field = interpolate_everywhere([u₀_field,p₀_field], FE_space.X(probl.t₀))
+  u0(x) = Param.u₀(x)[1]
+  p0(x) = Param.u₀(x)[2]
+  u₀_field = interpolate_everywhere(u0, FESpace.V(probl.t₀))
+  p₀_field = interpolate_everywhere(p0, FESpace.Q(probl.t₀))
+  x₀_field = interpolate_everywhere([u₀_field,p₀_field], FESpace.X(probl.t₀))
 
   xₕₜ_field = solve(ode_solver, operator, x₀_field, probl.t₀, probl.T)
-  uₕₜ = zeros(FE_space.Nₛᵘ, convert(Int64, probl.T / probl.δt))
-  pₕₜ = zeros(FE_space.Nₛᵖ, convert(Int64, probl.T / probl.δt))
+  uₕₜ = zeros(FESpace.Nₛᵘ, convert(Int64, probl.T / probl.δt))
+  pₕₜ = zeros(FESpace.Nₛᵖ, convert(Int64, probl.T / probl.δt))
   global count = 0
-  dΩ = FE_space.dΩ
+  dΩ = FESpace.dΩ
   for (xₕ, _) in xₕₜ_field
     global count += 1
     uₕₜ[:, count] = get_free_dof_values(xₕ[1])
@@ -107,40 +107,40 @@ function FE_solve(
 end
 
 function check_stokes_solver()
-  A = assemble_stiffness(FE_space, problem_info, parametric_info)(0.0)
-  M = assemble_mass(FE_space, problem_info, parametric_info)(0.0)
-  Bᵀ = assemble_primal_opᵀ(FE_space)(0.0)
-  B = assemble_primal_opᵀ(FE_space)(0.0)
-  F = assemble_forcing(FE_space, problem_info, parametric_info)(0.0)
-  H = assemble_neumann_datum(FE_space, problem_info, parametric_info)(0.0)
+  A = assemble_stiffness(FESpace, FEMInfo, Param)(0.0)
+  M = assemble_mass(FESpace, FEMInfo, Param)(0.0)
+  Bᵀ = assemble_primal_opᵀ(FESpace)(0.0)
+  B = assemble_primal_opᵀ(FESpace)(0.0)
+  F = assemble_forcing(FESpace, FEMInfo, Param)(0.0)
+  H = assemble_neumann_datum(FESpace, FEMInfo, Param)(0.0)
 
   δt = 0.005
   θ = 0.5
 
   u1 = uₕₜ[:,1]
   p1 = pₕₜ[:,1]
-  res1 = θ*(δt*θ*A*parametric_info.α + M)*u1 + δt*θ*Bᵀ*p1 - δt*θ*(F+H)
+  res1 = θ*(δt*θ*A*Param.α + M)*u1 + δt*θ*Bᵀ*p1 - δt*θ*(F+H)
   res2 = B*u1
 
   u2 = uₕₜ[:,1]
   p2 = pₕₜ[:,1]
-  res1 = θ*(δt*θ*A*parametric_info.α + M)*u2 + ((1-θ)*δt*θ*A*parametric_info.α - θ*M)*u1 + δt*θ*Bᵀ*p2 - δt*θ*(F+H)
+  res1 = θ*(δt*θ*A*Param.α + M)*u2 + ((1-θ)*δt*θ*A*Param.α - θ*M)*u1 + δt*θ*Bᵀ*p2 - δt*θ*(F+H)
   res2 = B*u2
 
 end
 
-#= function FE_solve(FE_space::FESpacePoisson, param::ParametricSpecificsUnsteady; subtract_Ddata = true)
+#= function FE_solve(FESpace::FESpacePoisson, Param::ParametricSpecificsUnsteady; subtract_Ddata = true)
 
-_, Gₕ = get_lifting_operator(FE_space, param)
+_, Gₕ = get_lifting_operator(FESpace, Param)
 
-res(u,v) = ∫( ∇(v) ⊙ (param.α∘u ⋅ ∇(u)) - v * f) * FE_space.dΩ - ∫(v * param.h) * FE_space.dΓn
-jac(u, du, v) = ∫( ∇(v) ⊙ (param.dα∘(du, ∇(u))) )*dΩ
-operator = FEOperator(res, jac, FE_space.V, FE_space.V₀)
+res(u,v) = ∫( ∇(v) ⊙ (Param.α∘u ⋅ ∇(u)) - v * f) * FESpace.dΩ - ∫(v * Param.h) * FESpace.dΓn
+jac(u, du, v) = ∫( ∇(v) ⊙ (Param.dα∘(du, ∇(u))) )*dΩ
+operator = FEOperator(res, jac, FESpace.V, FESpace.V₀)
 
 nls = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking())
 solver = FESolver(nls)
 
-initial_uₕ_guess = FEFunction(FE_space.V, rand(Float64, num_free_dofs(FE_space.V)))
+initial_uₕ_guess = FEFunction(FESpace.V, rand(Float64, num_free_dofs(FESpace.V)))
 uₕ_field, _ = solve!(initial_uₕ_guess, solver, operator)
 
 if subtract_Ddata
@@ -153,11 +153,11 @@ return uₕ, Gₕ
 
 end =#
 
-function assemble_lifting(FE_space::SteadyProblem, param::ParametricSpecifics)
+function assemble_lifting(FESpace::SteadyProblem, Param::ParametricSpecifics)
 
-  Gₕ = zeros(FE_space.Nₛᵘ,1)
-  if !isnothing(FE_space.dΓd)
-    gₕ = interpolate_everywhere(param.g, FE_space.V)
+  Gₕ = zeros(FESpace.Nₛᵘ,1)
+  if !isnothing(FESpace.dΓd)
+    gₕ = interpolate_everywhere(Param.g, FESpace.V)
     Gₕ = get_free_dof_values(gₕ)
   end
 
@@ -166,12 +166,12 @@ function assemble_lifting(FE_space::SteadyProblem, param::ParametricSpecifics)
 end
 
 function assemble_lifting(
-  FE_space::FESpacePoissonUnsteady, probl::ProblemSpecificsUnsteady,
-  param::ParametricSpecificsUnsteady)
+  FESpace::FESpacePoissonUnsteady, probl::ProblemSpecificsUnsteady,
+  Param::ParametricSpecificsUnsteady)
 
-  Gₕ = zeros(FE_space.Nₛᵘ, convert(Int64, probl.T / probl.δt))
-  if !isnothing(FE_space.dΓd)
-    gₕ(t) = interpolate_everywhere(param.g(t), FE_space.V(t))
+  Gₕ = zeros(FESpace.Nₛᵘ, convert(Int64, probl.T / probl.δt))
+  if !isnothing(FESpace.dΓd)
+    gₕ(t) = interpolate_everywhere(Param.g(t), FESpace.V(t))
     for (i, tᵢ) in enumerate(probl.t₀+probl.δt:probl.δt:probl.T)
       Gₕ[:, i] = get_free_dof_values(gₕ(tᵢ))
     end
@@ -181,21 +181,21 @@ function assemble_lifting(
 
 end
 
-function assemble_lifting(FE_space::FESpaceStokesUnsteady, probl::ProblemSpecificsUnsteady, param::ParametricSpecificsUnsteady)
+function assemble_lifting(FESpace::FESpaceStokesUnsteady, probl::ProblemSpecificsUnsteady, Param::ParametricSpecificsUnsteady)
 
-  gₕ(t) = interpolate_dirichlet(param.g(t), FE_space.V(t))
-  R₁(t,v) = ∫(param.α(t)*(∇(v) ⊙ ∇(gₕ(t))))*FE_space.dΓd
-  R₂(t,q) = ∫(∇⋅(gₕ(t))*q)*FE_space.dΓd
+  gₕ(t) = interpolate_dirichlet(Param.g(t), FESpace.V(t))
+  R₁(t,v) = ∫(Param.α(t)*(∇(v) ⊙ ∇(gₕ(t))))*FESpace.dΓd
+  R₂(t,q) = ∫(∇⋅(gₕ(t))*q)*FESpace.dΓd
   return R₁,R₂
 
 end
 
 function rhs_form(
-  t::Real,v::FEBasis,FE_space::FESpacePoissonUnsteady,
-  param::ParametricSpecificsUnsteady)
-  if !isnothing(FE_space.dΓn)
-    return ∫(v*param.f(t))*FE_space.dΩ + ∫(v*param.h(t))*FE_space.dΓn
+  t::Real,v::FEBasis,FESpace::FESpacePoissonUnsteady,
+  Param::ParametricSpecificsUnsteady)
+  if !isnothing(FESpace.dΓn)
+    return ∫(v*Param.f(t))*FESpace.dΩ + ∫(v*Param.h(t))*FESpace.dΓn
   else
-    return ∫(v*param.f(t))*FE_space.dΩ
+    return ∫(v*Param.f(t))*FESpace.dΩ
   end
 end

@@ -117,8 +117,7 @@ function import_DEIM_MDEIM_structures(DEIM_MDEIM_path)
 end
 
 function rPOD(S, ϵ=1e-5, X=nothing, q=1, m=nothing)
-  #=MODIFY
-  =#
+
 
   if isnothing(m)
     m = size(S)[2] ./ 2

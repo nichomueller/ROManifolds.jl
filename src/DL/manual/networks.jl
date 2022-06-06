@@ -34,22 +34,22 @@ function linear_forward_activation(xₙ, W, b, activation_function="relu")
 end
 
 """
-    Forward the design matrix through the network layers using the parameters.
+    Forward the design matrix through the network layers using the Parameters.
 """
-function forward_propagate_model_weights(X, parameters)
+function forward_propagate_model_weights(X, Parameters)
   master_cache = []
   yₙ = X
-  L = Int(length(parameters) / 2)
+  L = Int(length(Parameters) / 2)
 
   # Forward propagate until the last (output) layer
   for l = 1:(L-1)
     xₙ = yₙ
-    yₙ, cache = linear_forward_activation(xₙ, parameters[string("W_", (l))], parameters[string("b_", (l))], "relu")
+    yₙ, cache = linear_forward_activation(xₙ, Parameters[string("W_", (l))], Parameters[string("b_", (l))], "relu")
     push!(master_cache, cache)
   end
 
   # Make predictions in the output layer
-  Ŷ, cache = linear_forward_activation(yₙ, parameters[string("W_", (L))], parameters[string("b_", (L))], "sigmoid")
+  Ŷ, cache = linear_forward_activation(yₙ, Parameters[string("W_", (L))], Parameters[string("b_", (L))], "sigmoid")
   push!(master_cache, cache)
 
   return Ŷ, master_cache

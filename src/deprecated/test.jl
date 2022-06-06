@@ -22,19 +22,19 @@ using Gridap.CellData=#
 
 function create_dir(name)
     #=Create a directory at the given path
-    :param name: path of the directory to be created, if not already existing
+    :Param name: path of the directory to be created, if not already existing
     :type name: str
     =#
 
     if !isdir(name)
         mkdir(name)
     end
-    
+
 end
 
 function get_full_subdirectories(rootdir)
     #=Get a full list of subdirectories at a given root directory
-    :param rootdir: path of the root directory whose subdirectories are searched and listed
+    :Param rootdir: path of the root directory whose subdirectories are searched and listed
     :type rootdir: str
     =#
 
@@ -45,9 +45,9 @@ end
 function save_matrix(matrix, file_name)
     #=Utility method, which allows to save 2D numpy arrays in text files. If the path to the text file does not exist,
     it displays an error message, but it does not raise any error.
-    :param matrix: matrix to be saved
+    :Param matrix: matrix to be saved
     :type matrix: numpy.ndarray
-    :param file_name: path to the file where the matrix has to be saved, provided that the path is a valid path
+    :Param file_name: path to the file where the matrix has to be saved, provided that the path is a valid path
     :type file_name: str
     =#
 
@@ -76,28 +76,28 @@ end
 
 function save_variable(var, variable_name, file_name)
     #=Utility method, which allows to save arrays/matrices in .jld files. If the path to the text file does not exist,
-    it displays an error message. 
-    :param var: variable to be saved
+    it displays an error message.
+    :Param var: variable to be saved
     :type var: AbstractMatrix, AbstactVector
-    :param variable_name: name with which we save the variable
+    :Param variable_name: name with which we save the variable
     :type variable_name: str
-    :param file_name: path to the file where the variable has to be saved, provided that the path is a valid path; no extension should be provided
+    :Param file_name: path to the file where the variable has to be saved, provided that the path is a valid path; no extension should be provided
     :type file_name: str
     =#
-   
+
     if occursin(".", file_name) && !issparse(var)
         (file_name, extension) = (String(split(file_name, ".")[1]), String(split(file_name, ".")[2]))
     else
         extension = "csv"
     end
-    
+
     try
         if extension == "jld"
             jldopen(file_name * ".jld", "w") do file
                 write(file, variable_name, var)
             end
         else
-            open(file_name * ".csv", "w") do file               
+            open(file_name * ".csv", "w") do file
                 if issparse(var)
                     i, j, v = findnz(var)
                     df = DataFrame([:i => i, :j => j, :v => v])
@@ -116,15 +116,15 @@ end
 function load_variable(variable_name, file_name, path = nothing)
     #=Utility method, which allows to load arrays/matrices from .jld files. If the path to the text file does not exist,
     it displays an error message.
-    :param variable_name: name of the loaded variable
+    :Param variable_name: name of the loaded variable
     :type variable_name: str
-    :param file_name: path to the file where the variable has to be loaded from, provided that the path is a valid path; no extension should be provided
+    :Param file_name: path to the file where the variable has to be loaded from, provided that the path is a valid path; no extension should be provided
     :type file_name: str
     :return the variable read from the .jld file
     :rtype: AbstractMatrix, AbstactVector
     =#
 
-    if occursin(".", file_name) 
+    if occursin(".", file_name)
         (file_name, extension) = (String(split(file_name, ".")[1]), String(split(file_name, ".")[2]))
     else
         extension = "csv"
@@ -137,7 +137,7 @@ function load_variable(variable_name, file_name, path = nothing)
     try
         if extension == "jld"
             c = jldopen(file_name * ".jld", "r") do file
-                read(file, variable_name)  
+                read(file, variable_name)
             end
         else
             c = Matrix(CSV.read(path, DataFrame))
@@ -175,7 +175,7 @@ function compute_DEIM_snapshot(Ω_p, quantity, vec_nonaffine_map)
     #=MODIFY
     =#
 
-    Θ = parameter_generator(Ω_p, quantity)
+    Θ = Parameter_generator(Ω_p, quantity)
 
     return vec_nonaffine_map(Θ)
 end
@@ -185,7 +185,7 @@ function compute_MDEIM_snapshot(Ω_p, quantity, mat_nonaffine_map)
     #=MODIFY
     =#
 
-    Θ = parameter_generator(Ω_p, quantity)
+    Θ = Parameter_generator(Ω_p, quantity)
     (R, C) = size(mat_nonaffine_map(Θ[1]))
     snap = zeros(R * C, quantity)
     [snap[:, k] = reshape(mat_nonaffine_map(Θ[k])[:], R * C, quantity) for k = 1:quantity]
@@ -200,7 +200,7 @@ function DEIM(Ω_p, S, ϵ, norm_matrix = nothing)
 
     #S = compute_DEIM_snapshot(Ω_p, quantity, vec_nonaffine_map)
     basis = POD(S, ϵ, norm_matrix)
-    DEIM_idx, DEIM_mat = DEIM_offline(basis)    
+    DEIM_idx, DEIM_mat = DEIM_offline(basis)
     DEIM_coeffs = DEIM_mat[DEIM_idx, :] \ vec_nonaffine[DEIM_idx]
     mul!(vec_affine, DEIM_mat, DEIM_coeffs)
 
@@ -212,7 +212,7 @@ end
 function DEIM_offline(basis)
     #=MODIFY
     =#
-   
+
     n = shape(basis)[2]
     DEIM_idx = zeros(Int64, n)
 
@@ -252,37 +252,37 @@ function MDEIM(Ω_p, quantity, mat_nonaffine_map, mat_nonaffine, ϵ, norm_matrix
     else
         (i, j) = [repeat(1:R, 1, C)[:], repeat((1:C)', R, 1)[:]]
     end
-    function parametric_domain(x)
+    function Parametric_domain(x)
         #=MODIFY
         assumed to be a parallelepiped
         =#
-    
+
         @unpack (Ix, Iy, Iz) = x
         return Ix, Iy, Iz
-    
+
     end
-    
-    
-    function parameter_generator(Ω_p, quantity)
+
+
+    function Parameter_generator(Ω_p, quantity)
         #=MODIFY
         =#
-        
-        param = zeros(quantity, size(Ω_p)[1])
+
+        Param = zeros(quantity, size(Ω_p)[1])
         for i in range(1, quantity)
             for j in range(1, size(Ω_p)[1])
-                param[i, j] = Uniform(Ω_p[j,:][1], Ω_p[j,:][2])
+                Param[i, j] = Uniform(Ω_p[j,:][1], Ω_p[j,:][2])
             end
         end
-        return param
-    
+        return Param
+
     end
 
 struct RB_info{T<:String}
-    
+
     config_path::T
     #include(config_path)
 
-    function set_info(config_path) 
+    function set_info(config_path)
         #=MODIFY
         =#
 
@@ -290,7 +290,7 @@ struct RB_info{T<:String}
 
         Nᵤˢ = FOM_specifics["space_dimension_FOM"][1]
         n_snaps = ROM_specifics["n_snapshots"]
-        snaps_matrix = zeros(Nᵤˢ, n_snaps) 
+        snaps_matrix = zeros(Nᵤˢ, n_snaps)
         A = zeros(Nᵤˢ, Nᵤˢ)
         A_affine = Matrix{Float64}[]
         θᴬ = Array{Float64}[]
@@ -311,7 +311,7 @@ struct RB_info{T<:String}
 
 end
 
-function parametric_domain(x)
+function Parametric_domain(x)
     #=MODIFY
     assumed to be a parallelepiped
     =#
@@ -322,16 +322,16 @@ function parametric_domain(x)
 end
 
 
-function parameter_generator(Ω_p, quantity)
+function Parameter_generator(Ω_p, quantity)
     #=MODIFY
     =#
-    
-    param = zeros(quantity, size(Ω_p)[1])
+
+    Param = zeros(quantity, size(Ω_p)[1])
     for i in range(1, quantity)
         for j in range(1, size(Ω_p)[1])
-            param[i, j] = Uniform(Ω_p[j,:][1], Ω_p[j,:][2])
+            Param[i, j] = Uniform(Ω_p[j,:][1], Ω_p[j,:][2])
         end
     end
-    return param
+    return Param
 
 end

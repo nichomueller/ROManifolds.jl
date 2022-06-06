@@ -15,7 +15,7 @@ const dirichlet_tags = ["sides"]
 const neumann_tags = ["circle", "triangle", "square"]
 const solver = "lu"
 
-const problem_info = problem_specifics(order, dirichlet_tags, neumann_tags, solver, paths, problem_nonlinearities)
+const FEMInfo = problem_specifics(order, dirichlet_tags, neumann_tags, solver, paths, problem_nonlinearities)
 
 
 
@@ -39,17 +39,17 @@ end =#
 
 
 
-#= struct parametric_specifics
-    parameters::Function
+#= struct Parametric_specifics
+    Parameters::Function
     model::Function
     data::Function
 end =#
 
 
 #= function get_domain(b::Bool, μᵒ::Float64)
-    @assert !(b === true && μᵒ === -1.0) "Provide valid parameter value for the domain deformation, or set Ω to be non-parametric"
+    @assert !(b === true && μᵒ === -1.0) "Provide valid Parameter value for the domain deformation, or set Ω to be non-Parametric"
     if b === false
-        model = DiscreteModelFromFile(problem_info.paths.mesh_path)
+        model = DiscreteModelFromFile(FEMInfo.paths.mesh_path)
     else
         #model = generate_cartesian_model(reference_info, deformation, μᵒ) # incomplete: implement domain deformation
         model = generate_cartesian_model(μᵒ)
@@ -69,7 +69,7 @@ end
 
 
 function get_f(b::Bool, μᶠ::Float64)
-    @assert !(b === true && μᶠ === -1.0) "Provide valid parameter value for the forcing term, or set f to be non-parametric"
+    @assert !(b === true && μᶠ === -1.0) "Provide valid Parameter value for the forcing term, or set f to be non-Parametric"
     if b === false
         f = x -> 1.0
     else
@@ -80,7 +80,7 @@ end
 
 
 function get_g(b::Bool, μᵍ::Float64)
-    @assert !(b === true && μᵍ === -1.0) "Provide valid parameter value for the forcing term, or set g to be non-parametric"
+    @assert !(b === true && μᵍ === -1.0) "Provide valid Parameter value for the forcing term, or set g to be non-Parametric"
     if b === false
         g = x -> 1
     else
@@ -92,7 +92,7 @@ end
 
 
 function get_h(b::Bool, μʰ::Float64)
-    @assert !(b === true && μʰ === -1.0) "Provide valid parameter value for the forcing term, or set h to be non-parametric"
+    @assert !(b === true && μʰ === -1.0) "Provide valid Parameter value for the forcing term, or set h to be non-Parametric"
     if b === false
         h = x -> 1
     else
@@ -102,75 +102,75 @@ function get_h(b::Bool, μʰ::Float64)
 end =#
 
 
-#= function get_nonparametric_g(x::Point)
+#= function get_nonParametric_g(x::Point)
     1
 end
-function get_parametric_g(x::Point, μᵍ::Float64)
+function get_Parametric_g(x::Point, μᵍ::Float64)
     sin(μᵍ .* x)
 end
-get_g(x::Point) = get_nonparametric_g(x::Point)
-get_g(x::Point, μᵍ::Float64) = get_parametric_g(x, μᵍ) =#
+get_g(x::Point) = get_nonParametric_g(x::Point)
+get_g(x::Point, μᵍ::Float64) = get_Parametric_g(x, μᵍ) =#
 
-#= function get_nonparametric_h(x::Point)
+#= function get_nonParametric_h(x::Point)
     1
 end
-function get_parametric_h(x::Point, μʰ::Float64)
+function get_Parametric_h(x::Point, μʰ::Float64)
     sin(μʰ .* x)
 end
-get_h(x::Point) = get_nonparametric_h(x::Point)
-get_h(x::Point, μʰ::Float64) = get_parametric_h(x, μʰ)
+get_h(x::Point) = get_nonParametric_h(x::Point)
+get_h(x::Point, μʰ::Float64) = get_Parametric_h(x, μʰ)
  =#
 
-#= function get_parametric_data(problem_nonlinearities::Dict, params::Function, i_nₛ::Int)
+#= function get_Parametric_data(problem_nonlinearities::Dict, Params::Function, i_nₛ::Int)
 
-    α(x) = αμ(x, Point(params.σ[i_nₛ, :]), problem_nonlinearities["A"])
-    f(x) = fμ(x, params.μᶠ[i_nₛ], problem_nonlinearities["f"])
-    g(x) = gμ(x, params.μᵍ[i_nₛ], problem_nonlinearities["g"])
-    h(x) = hμ(x, params.μʰ[i_nₛ], problem_nonlinearities["h"])
+    α(x) = αμ(x, Point(Params.σ[i_nₛ, :]), problem_nonlinearities["A"])
+    f(x) = fμ(x, Params.μᶠ[i_nₛ], problem_nonlinearities["f"])
+    g(x) = gμ(x, Params.μᵍ[i_nₛ], problem_nonlinearities["g"])
+    h(x) = hμ(x, Params.μʰ[i_nₛ], problem_nonlinearities["h"])
 
     (out) -> (α; f; g; h)
 end
 (out) -> (α; f; g; h)
  =#
 
-#= function generate_parameters(problem_nonlinearities::Dict, nₛ::Int, r::Dict)
+#= function generate_Parameters(problem_nonlinearities::Dict, nₛ::Int, r::Dict)
 
     if problem_nonlinearities["Ω"] === true
-        μᵒ = generate_value(r["μᵒ"][1], r["μᵒ"][2], nₛ, joinpath(all_paths.FEM_snap_path, "params.jld"), "μᵒ")
-        if !isfile(joinpath(all_paths.FEM_snap_path, "params.jld"))
-            save(joinpath(all_paths.FEM_snap_path, "params.jld"), "μᵒ", μᵒ)
+        μᵒ = generate_value(r["μᵒ"][1], r["μᵒ"][2], nₛ, joinpath(all_paths.FEM_snap_path, "Params.jld"), "μᵒ")
+        if !isfile(joinpath(all_paths.FEM_snap_path, "Params.jld"))
+            save(joinpath(all_paths.FEM_snap_path, "Params.jld"), "μᵒ", μᵒ)
         end
     else
         μᵒ = generate_value(nₛ)
     end
 
     μᴬ = hcat(rand(Uniform(r["μᴬ"][1], r["μᴬ"][2]), nₛ), rand(Uniform(r["μᴬ"][3], r["μᴬ"][4]), nₛ), rand(Uniform(r["μᴬ"][5], r["μᴬ"][6]), nₛ))
-    if !isfile(joinpath(all_paths.FEM_snap_path, "params.jld"))
-        save(joinpath(all_paths.FEM_snap_path, "params.jld"), "μᴬ", μᴬ)
+    if !isfile(joinpath(all_paths.FEM_snap_path, "Params.jld"))
+        save(joinpath(all_paths.FEM_snap_path, "Params.jld"), "μᴬ", μᴬ)
     end
 
     if problem_nonlinearities["f"] === true
-        μᶠ = generate_value(r["μᶠ"][1], r["μᶠ"][2], nₛ, joinpath(all_paths.FEM_snap_path, "params.jld"), "μᶠ")
-        if !isfile(joinpath(all_paths.FEM_snap_path, "params.jld"))
-            save(joinpath(all_paths.FEM_snap_path, "params.jld"), "μᶠ", μᶠ)
+        μᶠ = generate_value(r["μᶠ"][1], r["μᶠ"][2], nₛ, joinpath(all_paths.FEM_snap_path, "Params.jld"), "μᶠ")
+        if !isfile(joinpath(all_paths.FEM_snap_path, "Params.jld"))
+            save(joinpath(all_paths.FEM_snap_path, "Params.jld"), "μᶠ", μᶠ)
         end
     else
         μᶠ = generate_value(nₛ)
     end
 
     if problem_nonlinearities["g"] === true
-        μᵍ = generate_value(r["μᵍ"][1], r["μᵍ"][2], nₛ, joinpath(all_paths.FEM_snap_path, "params.jld"), "μᵍ")
-        if !isfile(joinpath(all_paths.FEM_snap_path, "params.jld"))
-            save(joinpath(all_paths.FEM_snap_path, "params.jld"), "μᵍ", μᵍ)
+        μᵍ = generate_value(r["μᵍ"][1], r["μᵍ"][2], nₛ, joinpath(all_paths.FEM_snap_path, "Params.jld"), "μᵍ")
+        if !isfile(joinpath(all_paths.FEM_snap_path, "Params.jld"))
+            save(joinpath(all_paths.FEM_snap_path, "Params.jld"), "μᵍ", μᵍ)
         end
     else
         μᵍ = generate_value(nₛ)
     end
 
     if problem_nonlinearities["h"] === true
-        μʰ = generate_value(r["μʰ"][1], r["μʰ"][2], nₛ, joinpath(all_paths.FEM_snap_path, "params.jld"), "μʰ")
-        if !isfile(joinpath(all_paths.FEM_snap_path, "params.jld"))
-            save(joinpath(all_paths.FEM_snap_path, "params.jld"), "μʰ", μʰ)
+        μʰ = generate_value(r["μʰ"][1], r["μʰ"][2], nₛ, joinpath(all_paths.FEM_snap_path, "Params.jld"), "μʰ")
+        if !isfile(joinpath(all_paths.FEM_snap_path, "Params.jld"))
+            save(joinpath(all_paths.FEM_snap_path, "Params.jld"), "μʰ", μʰ)
         end
     else
         μʰ = generate_value(nₛ)
@@ -181,7 +181,7 @@ end
 end
 
 
-struct param_info
+struct Param_info
     μᵒ::Vector
     μᴬ::Matrix
     μᶠ::Vector
@@ -193,48 +193,48 @@ end =#
 
 
 
-#= function compute_parametric_info(problem_nonlinearities, params, i_nₛ)
-    #= this_a = get_α(problem_nonlinearities["A"], get_index(params.μᴬ, i_nₛ, 1)).α
-    this_f = get_f(problem_nonlinearities["f"], get_index(params.μᶠ, i_nₛ)).f
-    this_g = get_g(problem_nonlinearities["g"], get_index(params.μᵍ, i_nₛ)).g
-    this_h = get_h(problem_nonlinearities["h"], get_index(params.μʰ, i_nₛ)).h
-    parametric_specifics(params,
-                        get_domain(problem_nonlinearities["Ω"], get_index(params.μᵒ, i_nₛ)),
+#= function compute_Param(problem_nonlinearities, Params, i_nₛ)
+    #= this_a = get_α(problem_nonlinearities["A"], get_index(Params.μᴬ, i_nₛ, 1)).α
+    this_f = get_f(problem_nonlinearities["f"], get_index(Params.μᶠ, i_nₛ)).f
+    this_g = get_g(problem_nonlinearities["g"], get_index(Params.μᵍ, i_nₛ)).g
+    this_h = get_h(problem_nonlinearities["h"], get_index(Params.μʰ, i_nₛ)).h
+    Parametric_specifics(Params,
+                        get_domain(problem_nonlinearities["Ω"], get_index(Params.μᵒ, i_nₛ)),
                         this_a,
                         this_f,
                         this_g,
                         this_h
                         ) =#
-    parametric_specifics(params,
-                        get_domain(problem_nonlinearities["Ω"], get_index(params.μᵒ, i_nₛ)),
-                        get_α(problem_nonlinearities["A"], get_index(params.μᴬ, i_nₛ, 1)).α,
-                        get_f(problem_nonlinearities["f"], get_index(params.μᶠ, i_nₛ)).f,
-                        get_g(problem_nonlinearities["g"], get_index(params.μᵍ, i_nₛ)).g,
-                        get_h(problem_nonlinearities["h"], get_index(params.μʰ, i_nₛ)).h
+    Parametric_specifics(Params,
+                        get_domain(problem_nonlinearities["Ω"], get_index(Params.μᵒ, i_nₛ)),
+                        get_α(problem_nonlinearities["A"], get_index(Params.μᴬ, i_nₛ, 1)).α,
+                        get_f(problem_nonlinearities["f"], get_index(Params.μᶠ, i_nₛ)).f,
+                        get_g(problem_nonlinearities["g"], get_index(Params.μᵍ, i_nₛ)).g,
+                        get_h(problem_nonlinearities["h"], get_index(Params.μʰ, i_nₛ)).h
                         )
 end =#
 
 
-#= function compute_parametric_info(problem_nonlinearities, params, i_nₛ)
+#= function compute_Param(problem_nonlinearities, Params, i_nₛ)
 
-    model = get_domain(problem_nonlinearities["Ω"], get_index(params.μᵒ, i_nₛ))
-    α = get_α(problem_nonlinearities["A"], get_index(params.μᴬ, i_nₛ, 1))
-    f = get_f(problem_nonlinearities["f"], get_index(params.μᶠ, i_nₛ))
-    g = get_g(problem_nonlinearities["g"], get_index(params.μᵍ, i_nₛ))
-    h = get_h(problem_nonlinearities["h"], get_index(params.μʰ, i_nₛ))
+    model = get_domain(problem_nonlinearities["Ω"], get_index(Params.μᵒ, i_nₛ))
+    α = get_α(problem_nonlinearities["A"], get_index(Params.μᴬ, i_nₛ, 1))
+    f = get_f(problem_nonlinearities["f"], get_index(Params.μᶠ, i_nₛ))
+    g = get_g(problem_nonlinearities["g"], get_index(Params.μᵍ, i_nₛ))
+    h = get_h(problem_nonlinearities["h"], get_index(Params.μʰ, i_nₛ))
 
-    x -> (params; model; α(x); f(x); g(x); h(x))
+    x -> (Params; model; α(x); f(x); g(x); h(x))
 
 end =#
 
 
-#= function compute_parametric_specifics(μ)
+#= function compute_Parametric_specifics(μ)
 
-  model = DiscreteModelFromFile(problem_info.paths.mesh_path)
-  α = get_α(problem_nonlinearities["A"], get_index(params.μᴬ, i_nₛ, 1))
-  f = get_f(problem_nonlinearities["f"], get_index(params.μᶠ, i_nₛ))
-  g = get_g(problem_nonlinearities["g"], get_index(params.μᵍ, i_nₛ))
-  h = get_h(problem_nonlinearities["h"], get_index(params.μʰ, i_nₛ))
+  model = DiscreteModelFromFile(FEMInfo.paths.mesh_path)
+  α = get_α(problem_nonlinearities["A"], get_index(Params.μᴬ, i_nₛ, 1))
+  f = get_f(problem_nonlinearities["f"], get_index(Params.μᶠ, i_nₛ))
+  g = get_g(problem_nonlinearities["g"], get_index(Params.μᵍ, i_nₛ))
+  h = get_h(problem_nonlinearities["h"], get_index(Params.μʰ, i_nₛ))
 
   x -> (μ; model; α(x); f(x); g(x); h(x))
 

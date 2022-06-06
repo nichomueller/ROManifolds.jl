@@ -1,16 +1,16 @@
 """
-    Funtion to initialise the parameters or weights of the desired network.
+    Funtion to initialise the Parameters or weights of the desired network.
 """
 function initialise_model_weights(layer_dims)
-    params = Dict()
+    Params = Dict()
 
     # Build a dictionary of initialised weights and bias units
     for l=2:length(layer_dims)
-        params[string("W_", (l-1))] = rand(StableRNG(1), layer_dims[l], layer_dims[l-1]) * sqrt(2 / (layer_dims[l-1]+layer_dims[l]))
-        params[string("b_", (l-1))] = zeros(layer_dims[l], 1)
+        Params[string("W_", (l-1))] = rand(StableRNG(1), layer_dims[l], layer_dims[l-1]) * sqrt(2 / (layer_dims[l-1]+layer_dims[l]))
+        Params[string("b_", (l-1))] = zeros(layer_dims[l], 1)
     end
 
-    return params
+    return Params
 end
 
 """
@@ -59,7 +59,7 @@ function linear_activation_backward(∂yₙ, cache, activation_function="relu")
 end
 
 """
-    Compute the gradients (∇) of the parameters (master_cache) of the constructed model
+    Compute the gradients (∇) of the Parameters (master_cache) of the constructed model
     with respect to the cost of predictions (Ŷ) in comparison with actual output (Y).
 """
 function back_propagate_model_weights(Ŷ, Y, master_cache)
@@ -86,18 +86,18 @@ function back_propagate_model_weights(Ŷ, Y, master_cache)
 end
 
 """
-    Update the paramaters of the model using the gradients (∇)
+    Update the Paramaters of the model using the gradients (∇)
     and the learning rate (η).
 """
-function update_model_weights(parameters, ∇, η)
+function update_model_weights(Parameters, ∇, η)
 
-    L = Int(length(parameters) / 2)
+    L = Int(length(Parameters) / 2)
 
-    # Update the parameters (weights and biases) for all the layers
+    # Update the Parameters (weights and biases) for all the layers
     for l = 0: (L-1)
-        parameters[string("W_", (l + 1))] -= η .* ∇[string("∂W_", (l + 1))]
-        parameters[string("b_", (l + 1))] -= η .* ∇[string("∂b_", (l + 1))]
+        Parameters[string("W_", (l + 1))] -= η .* ∇[string("∂W_", (l + 1))]
+        Parameters[string("b_", (l + 1))] -= η .* ∇[string("∂b_", (l + 1))]
     end
 
-    return parameters
+    return Parameters
 end

@@ -1,6 +1,6 @@
 include("functions.jl")
 include("networks.jl")
-include("parameters.jl")
+include("Parameters.jl")
 
 using MLJBase
 using StableRNGs
@@ -17,16 +17,16 @@ function train_network(layer_dims, X, Y; η=0.001, epochs=1000)
   accuracy = []
 
   # Initialise random weights for the network
-  params = initialise_model_weights(layer_dims)
+  Params = initialise_model_weights(layer_dims)
 
   # Train the network
   for i = 1:epochs
 
-    Ŷ, caches = forward_propagate_model_weights(X, params)
+    Ŷ, caches = forward_propagate_model_weights(X, Params)
     cost = cross_entropy_loss(Ŷ, Y)
     acc = assess_accuracy(Ŷ, Y)
     ∇ = back_propagate_model_weights(Ŷ, Y, caches)
-    params = update_model_weights(params, ∇, η)
+    Params = update_model_weights(Params, ∇, η)
 
     println("Iteration -> $i, Cost -> $cost, Accuracy -> $acc")
 
@@ -35,7 +35,7 @@ function train_network(layer_dims, X, Y; η=0.001, epochs=1000)
     push!(costs, cost)
     push!(accuracy, acc)
   end
-  return (cost=costs, iterations=iters, accuracy=accuracy, parameters=params)
+  return (cost=costs, iterations=iters, accuracy=accuracy, Parameters=Params)
 end
 
 # Generate fake data

@@ -1,8 +1,7 @@
 include("RB_Poisson_steady.jl")
 
-function assemble_reduced_affine_components(ROM_info, RB_variables::PoissonSTGRB, operators=nothing; μ=nothing)
-  #=MODIFY
-  =#
+function assemble_reduced_affine_components(RBInfo, RBVars::PoissonSTGRB, operators=nothing; μ=nothing)
+
 
   if operators === nothing
     operators = ["A", "F"]
@@ -10,14 +9,14 @@ function assemble_reduced_affine_components(ROM_info, RB_variables::PoissonSTGRB
 
   if "A" in operators
 
-    if ROM_info.problem_nonlinearities["A"] === false
+    if RBInfo.problem_nonlinearities["A"] === false
 
       @info "Assembling affine reduced stiffness"
       projection_time = @elapsed begin
-        A = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "A.csv"); convert_to_sparse = true)
-        RB_variables.Aₙ = (RB_variables.Φₛᵘ)' * A * RB_variables.Φₛᵘ
-        if ROM_info.save_offline_structures
-          save_variable(RB_variables.Aₙ, "Aₙ", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Aₙ"))
+        A = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "A.csv"); convert_to_sparse = true)
+        RBVars.Aₙ = (RBVars.Φₛᵘ)' * A * RBVars.Φₛᵘ
+        if RBInfo.save_offline_structures
+          save_variable(RBVars.Aₙ, "Aₙ", "csv", joinpath(RBInfo.paths.ROM_structures_path, "Aₙ"))
         end
       end
 
@@ -26,16 +25,16 @@ function assemble_reduced_affine_components(ROM_info, RB_variables::PoissonSTGRB
       @info "The stiffness is non-affine: running the MDEIM offline phase"
       projection_time = @elapsed begin
         Aₙ_i = sparse([], [], [])
-        for i_nₛ = 1:maximum(10, ROM_info.nₛ)
-          parametric_info = get_parametric_specifics(problem_ntuple, ROM_info, μ[i_nₛ])
-          A_i = assemble_stiffness(FE_space, ROM_info, parametric_info)
-          Aₙ_i = hcat(Aₙ_i, (RB_variables.Φₛᵘ)' * A_i * RB_variables.Φₛᵘ)
+        for i_nₛ = 1:maximum(10, RBInfo.nₛ)
+          Param = get_Parametric_specifics(problem_ntuple, RBInfo, μ[i_nₛ])
+          A_i = assemble_stiffness(FESpace, RBInfo, Param)
+          Aₙ_i = hcat(Aₙ_i, (RBVars.Φₛᵘ)' * A_i * RBVars.Φₛᵘ)
         end
         Aₙ_i = reshape(Aₙ_i, :, 1)
-        if ROM_info.save_offline_structures
-          (RB_variables.Aₙ_affine, RB_variables.Aₙ_idx) = DEIM_offline(Aₙ_i, ROM_info.ϵₛ, true, ROM_info.paths.ROM_structures_path, "Aₙ_mdeim")
+        if RBInfo.save_offline_structures
+          (RBVars.Aₙ_affine, RBVars.Aₙ_idx) = DEIM_offline(Aₙ_i, RBInfo.ϵₛ, true, RBInfo.paths.ROM_structures_path, "Aₙ_mdeim")
         else
-          (RB_variables.Aₙ_affine, RB_variables.Aₙ_idx) = DEIM_offline(Aₙ_i, ROM_info.ϵₛ)
+          (RBVars.Aₙ_affine, RBVars.Aₙ_idx) = DEIM_offline(Aₙ_i, RBInfo.ϵₛ)
         end
       end
 
@@ -45,14 +44,14 @@ function assemble_reduced_affine_components(ROM_info, RB_variables::PoissonSTGRB
 
   if "F" in operators
 
-    if ROM_info.problem_nonlinearities["f"] === false || ROM_info.problem_nonlinearities["h"] === false
+    if RBInfo.problem_nonlinearities["f"] === false || RBInfo.problem_nonlinearities["h"] === false
 
       @info "Assembling affine reduced forcing term"
       projection_time += @elapsed begin
-        F = load_CSV(joinpath(ROM_info.paths.FEM_structures_path, "F.csv"))
-        RB_variables.Fₙ = (RB_variables.Φₛᵘ)' * F
-        if ROM_info.save_offline_structures
-          save_variable(RB_variables.Fₙ, "Fₙ", "csv", joinpath(ROM_info.paths.ROM_structures_path, "Fₙ"))
+        F = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "F.csv"))
+        RBVars.Fₙ = (RBVars.Φₛᵘ)' * F
+        if RBInfo.save_offline_structures
+          save_variable(RBVars.Fₙ, "Fₙ", "csv", joinpath(RBInfo.paths.ROM_structures_path, "Fₙ"))
         end
       end
 
@@ -61,21 +60,21 @@ function assemble_reduced_affine_components(ROM_info, RB_variables::PoissonSTGRB
       @info "The forcing term is non-affine: running the DEIM offline phase"
       projection_time += @elapsed begin
         Fₙ_i = Float64[]
-        for i_nₛ = 1:maximum(10, ROM_info.nₛ)
-          parametric_info = get_parametric_specifics(problem_ntuple, ROM_info, μ[i_nₛ])
-          F_i = assemble_forcing(FE_space, parametric_info)
-          Fₙ_i = hcat(Fₙ_i, (RB_variables.Φₛᵘ)' * F_i)
+        for i_nₛ = 1:maximum(10, RBInfo.nₛ)
+          Param = get_Parametric_specifics(problem_ntuple, RBInfo, μ[i_nₛ])
+          F_i = assemble_forcing(FESpace, Param)
+          Fₙ_i = hcat(Fₙ_i, (RBVars.Φₛᵘ)' * F_i)
         end
-        if ROM_info.save_offline_structures
-          (RB_variables.Fₙ_affine, RB_variables.Fₙ_idx) = DEIM_offline(Fₙ_i, ROM_info.ϵₛ, true, ROM_info.paths.ROM_structures_path, "Fₙ_deim")
+        if RBInfo.save_offline_structures
+          (RBVars.Fₙ_affine, RBVars.Fₙ_idx) = DEIM_offline(Fₙ_i, RBInfo.ϵₛ, true, RBInfo.paths.ROM_structures_path, "Fₙ_deim")
         else
-          (RB_variables.Fₙ_affine, RB_variables.Fₙ_idx) = DEIM_offline(Fₙ_i, ROM_info.ϵₛ)
+          (RBVars.Fₙ_affine, RBVars.Fₙ_idx) = DEIM_offline(Fₙ_i, RBInfo.ϵₛ)
         end
       end
     end
 
   end
 
-  RB_variables.offline_time += projection_time
+  RBVars.offline_time += projection_time
 
 end
