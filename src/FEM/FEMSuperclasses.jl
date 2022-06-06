@@ -77,7 +77,7 @@ struct FESpaceStokesUnsteady <: UnsteadyProblem
   dΓn::Union{Measure,Nothing}
 end
 
-struct ProblemSpecificsSteady <: SteadyInfo
+struct ProblemInfoSteady <: SteadyInfo
   case::Int
   probl_nl::Dict
   order::Int
@@ -89,7 +89,7 @@ struct ProblemSpecificsSteady <: SteadyInfo
   paths::Function
 end
 
-struct ProblemSpecificsUnsteady <: UnsteadyInfo
+struct ProblemInfoUnsteady <: UnsteadyInfo
   case::Int
   probl_nl::Dict
   order::Int
@@ -107,7 +107,7 @@ struct ProblemSpecificsUnsteady <: UnsteadyInfo
   δt::Float64
 end
 
-mutable struct ParametricSpecificsSteady
+mutable struct ParametricInfoSteady
   μ::Vector
   model::DiscreteModel
   α::Function
@@ -116,7 +116,7 @@ mutable struct ParametricSpecificsSteady
   h::Function
 end
 
-mutable struct ParametricSpecificsUnsteady
+mutable struct ParametricInfoUnsteady
   μ::Vector
   model::DiscreteModel
   αₛ::Function

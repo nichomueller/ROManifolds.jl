@@ -10,11 +10,11 @@ shuffle_input = true
 batch_normalization = false
 early_stopping = true
 
-mutable struct DLSpecifics{T<:String}
+mutable struct DLInfo{T<:String}
   activation::T
   architecture::T
   loss::T
   optimizer::T
 end
 
-DL_info = DLSpecifics(activation, architecture, loss, optimizer)
+DL_info = DLInfo(activation, architecture, loss, optimizer)

@@ -1,10 +1,7 @@
-"""
-The exported names are
-$(EXPORTS)
-"""
 module FEM
 
-using Mabla.Utils
+include("../Utils/Utils.jl")
+using .Utils
 using Gridap
 using Gridap.Algebra
 using Gridap.Arrays
@@ -22,12 +19,10 @@ using Logging
 using LineSearches:BackTracking
 
 export assemble_FEM_structure
-
 export get_FESpace
 export LagrangianQuad
 export lagrangianQuad
 export LagrangianQuadRefFE
-
 export Problem
 export FEMProblem
 export SteadyProblem
@@ -39,20 +34,19 @@ export FESpacePoissonSteady
 export FESpacePoissonUnsteady
 export FESpaceStokesSteady
 export FESpaceStokesUnsteady
-export ProblemSpecificsSteady
-export ProblemSpecificsUnteady
-export ParametricSpecificsSteady
-export ParametricSpecificsUnSteady
-
+export ProblemInfoSteady
+export ProblemInfoUnsteady
+export ParametricInfoSteady
+export ParametricInfoUnsteady
 export FEM_paths
 export generate_dcube_discrete_model
-export get_Parametric_specifics
+export get_ParamInfo
 export generate_vtk_file
 export find_FE_elements
 export generate_dcube_discrete_model
 
-include("assemblers.jl")
 include("FEMSuperclasses.jl")
+include("assemblers.jl")
 include("FEMUtils.jl")
 include("FEMSpaces.jl")
 include("solvers.jl")

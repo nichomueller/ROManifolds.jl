@@ -1,16 +1,9 @@
 function get_snapshot_matrix(RBInfo, RBVars::RBProblem)
 
-
   @info "Importing the snapshot matrix, number of snapshots considered: $n_snap"
 
   name = "uₕ"
   Sᵘ = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, name * ".csv"), DataFrame))[:, 1:(RBInfo.nₛ*RBInfo.Nₜ)]
-  #= try
-      Sᵘ = Matrix(CSV.read(RBInfo.FEM_snap_path * var * ".csv", DataFrame))[:, 1:(RBInfo.nₛ * RBInfo.Nₜ)]
-  catch e
-      println("Error: $e. Impossible to load the snapshots matrix")
-  end =#
-
   RBVars.Sᵘ = Sᵘ
   RBVars.Nᵤˢ = size(Sᵘ)[1]
 

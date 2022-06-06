@@ -187,7 +187,7 @@ setup(NT::NTuple{4,Int}) = setup_PoissonSTPGRB(NT)
 setup(NT::NTuple{5,Int}) = setup_StokesSTGRB(NT)
 #setup(NT::NTuple{6,Int}) = setup_StokesSTPGRB(NT)
 
-struct ROMSpecificsSteady <: SteadyInfo
+struct ROMInfoSteady <: SteadyInfo
   probl_nl::Dict
   case::Int
   paths::Function
@@ -205,7 +205,7 @@ struct ROMSpecificsSteady <: SteadyInfo
   save_results::Bool
 end
 
-struct ROMSpecificsUnsteady <: UnsteadyInfo
+struct ROMInfoUnsteady <: UnsteadyInfo
   probl_nl::Dict
   case::Int
   paths::Function

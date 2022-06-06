@@ -1,4 +1,4 @@
-struct FE_specifics
+struct FE_Info
     Qₕ
     V₀
     V
@@ -86,7 +86,7 @@ function FESpace_poisson(FEMInfo, Param)
     Γ = BoundaryTriangulation(Param.model, tags = FEMInfo.neumann_tags)
     dΓ = Measure(Γ, degree)
 
-    return FE_specifics(Qₕ, V₀, V, ϕᵥ, ϕᵤ, σₖ, Nₕ, dΩ, dΓ)
+    return FE_Info(Qₕ, V₀, V, ϕᵥ, ϕᵤ, σₖ, Nₕ, dΩ, dΓ)
 
 end
 

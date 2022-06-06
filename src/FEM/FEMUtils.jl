@@ -33,7 +33,7 @@ function generate_dcube_discrete_model(I::Info,d::Int64,npart::Int,mesh_name::St
 
 end
 
-function get_Parametric_specifics(::NTuple{1,Int},Info::SteadyInfo,μ::Vector)
+function get_ParamInfo(::NTuple{1,Int},Info::SteadyInfo,μ::Vector)
 
   model = DiscreteModelFromFile(Info.paths.mesh_path)
 
@@ -57,11 +57,11 @@ function get_Parametric_specifics(::NTuple{1,Int},Info::SteadyInfo,μ::Vector)
   g(x) = 0
   h(x) = 1
 
-  ParametricSpecifics(μ, model, α, f, g, h)
+  ParametricInfo(μ, model, α, f, g, h)
 
 end
 
-function get_Parametric_specifics(::NTuple{1,Int},Info::UnsteadyInfo,μ::Vector)
+function get_ParamInfo(::NTuple{1,Int},Info::UnsteadyInfo,μ::Vector)
 
   model = DiscreteModelFromFile(Info.paths.mesh_path)
   αₛ(x) = 1
@@ -102,11 +102,11 @@ function get_Parametric_specifics(::NTuple{1,Int},Info::UnsteadyInfo,μ::Vector)
   f(x, t::Real) = prepare_f(x, t, μ, Info.probl_nl)
   f(t::Real) = x -> f(x, t)
 
-  ParametricSpecificsUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, g, hₛ, hₜ, h, u₀)
+  ParametricInfoUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, g, hₛ, hₜ, h, u₀)
 
 end
 
-function get_Parametric_specifics(::NTuple{2,Int},Info::UnsteadyInfo,μ::Vector)
+function get_ParamInfo(::NTuple{2,Int},Info::UnsteadyInfo,μ::Vector)
 
   model = DiscreteModelFromFile(Info.paths.mesh_path)
   αₛ(x) = 1
@@ -161,7 +161,7 @@ function get_Parametric_specifics(::NTuple{2,Int},Info::UnsteadyInfo,μ::Vector)
     end
   end
 
-  ParametricSpecificsUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, prepare_g(x, t, μ, Info.case), hₛ, hₜ, h, u₀)
+  ParametricInfoUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, prepare_g(x, t, μ, Info.case), hₛ, hₜ, h, u₀)
 
 end
 

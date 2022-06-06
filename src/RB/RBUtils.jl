@@ -60,7 +60,7 @@ function POD(S, ϵ = 1e-5, X = nothing)
 
 end
 
-function build_sparse_mat(FEMInfo::ProblemSpecifics, FESpace::SteadyProblem, Param::ParametricSpecifics, el::Vector; var="A")
+function build_sparse_mat(FEMInfo::ProblemInfoSteady, FESpace::SteadyProblem, Param::ParametricInfoSteady, el::Vector; var="A")
 
   Ω_sparse = view(FESpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
@@ -74,9 +74,9 @@ function build_sparse_mat(FEMInfo::ProblemSpecifics, FESpace::SteadyProblem, Par
 
 end
 
-function build_sparse_mat(FEMInfo::ProblemSpecificsUnsteady,
+function build_sparse_mat(FEMInfo::ProblemInfoUnsteady,
   FESpace::UnsteadyProblem,
-  Param::ParametricSpecificsUnsteady,
+  Param::ParametricInfoUnsteady,
   el::Vector,
   times_θ::Vector;
   var="A")

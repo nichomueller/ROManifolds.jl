@@ -1,23 +1,39 @@
-"""
-The exported names are
-$(EXPORTS)
-"""
 module RB
-using Mabla.Utils
-using Mabla.FEM
+include("../Utils/Utils.jl")
+include("../FEM/FEM.jl")
+using .Utils
+using .FEM
 using Arpack
+using LinearAlgebra
+using Plots
+using SparseArrays
 
-#= export M_DEIM_POD
-export M_DEIM_offline
-export M_DEIM_online
-export MDEIM_offline
-export DEIM_offline
-export MDEIM_offline_algebraic
-export MDEIM_offline_functional
-export DEIM_offline_algebraic
-export DEIM_offline_functional
-export get_snaps_MDEIM
-export get_snaps_DEIM =#
+#= import assemble_FEM_structure
+import get_FESpace
+import LagrangianQuad
+import lagrangianQuad
+import LagrangianQuadRefFE
+import Problem
+import FEMProblem
+import SteadyProblem
+import UnsteadyProblem
+import Info
+import SteadyInfo
+import UnsteadyInfo
+import FESpacePoissonSteady
+import FESpacePoissonUnsteady
+import FESpaceStokesSteady
+import FESpaceStokesUnsteady
+import ProblemInfoSteady
+import ProblemInfoUnsteady
+import ParametricInfoSteady
+import ParametricInfoUnsteady
+import FEM_paths
+import generate_dcube_discrete_model
+import get_ParamInfo
+import generate_vtk_file
+import find_FE_elements
+import generate_dcube_discrete_model =#
 
 export RBProblem
 export RBSteadyProblem
@@ -30,20 +46,20 @@ export PoissonSTGRB
 export PoissonSTPGRB
 export StokesUnsteady
 export StokesSTGRB
-export ROMSpecificsSteady
-export ROMSpecificsUnsteady
+export ROMInfoSteady
+export ROMInfoUnsteady
 export setup
 export offline_phase
 export online_phase
 export ROM_paths
 
-include("M_DEIM.jl")
+include("RBSuperclasses.jl")
+include("RBUtils.jl")
 include("MV_snapshots.jl")
+include("M_DEIM.jl")
 include("RBPoisson_steady.jl")
 include("RBPoisson_unsteady.jl")
 include("RBStokes_unsteady.jl")
-include("RBSuperclasses.jl")
-include("RBUtils.jl")
 include("S-GRB_Poisson.jl")
 include("S-PGRB_Poisson.jl")
 include("ST-GRB_Poisson.jl")

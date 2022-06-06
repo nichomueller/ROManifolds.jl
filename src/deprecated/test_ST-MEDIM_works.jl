@@ -158,7 +158,7 @@ function define_offline_snaps(FESpace, RBInfo, nₛMDEIM::Int64)
   for k = 1:nₛMDEIM
     @info "Considering Parameter number $k, need $(nₛMDEIM-k) more!"
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
-    Param = get_Parametric_specifics(problem_ntuple, RBInfo, μₖ)
+    Param = get_ParamInfo(problem_ntuple, RBInfo, μₖ)
     A_t = assemble_stiffness(FESpace, RBInfo, Param)
 
     for i_t = 1:Nₜ
@@ -209,7 +209,7 @@ function define_online_ST_stiffness(FESpace, RBInfo, el)
   times_θ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
   μ = load_CSV(path)
   μₒₙ = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
-  Param = get_Parametric_specifics(problem_ntuple, RBInfo, μₒₙ)
+  Param = get_ParamInfo(problem_ntuple, RBInfo, μₒₙ)
   Ω_sparse = view(FESpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2)
   A(t) = assemble_matrix(∫(∇(FESpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FESpace.ϕᵤ(t)))) * dΩ_sparse, FESpace.V(t), FESpace.V₀)
@@ -233,7 +233,7 @@ function define_online_ST_stiffness_old(FESpace, RBInfo, el, row_idx)
   times_θ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
   μ = load_CSV(path)
   μₒₙ = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
-  Param = get_Parametric_specifics(problem_ntuple, RBInfo, μₒₙ)
+  Param = get_ParamInfo(problem_ntuple, RBInfo, μₒₙ)
   Acom(t) = assemble_matrix(∫(∇(FESpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FESpace.ϕᵤ(t)))) * FESpace.dΩ, FESpace.V(t), FESpace.V₀)
 
   for (nₜ,t) = enumerate(times_θ)
@@ -255,7 +255,7 @@ function define_online_ST_stiffness_fast(FESpace, RBInfo, el, MDEIM_idx_sparse)
   times_θ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
   μ = load_CSV(path)
   μₒₙ = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
-  Param = get_Parametric_specifics(problem_ntuple, RBInfo, μₒₙ)
+  Param = get_ParamInfo(problem_ntuple, RBInfo, μₒₙ)
   Ω_sparse = view(FESpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2)
   _, idx_time = from_spacetime_to_space_time_idx_vec(MDEIM_idx_sparse, FESpace.Nₛᵘ^2)
@@ -385,7 +385,7 @@ function build_A_snapshots_old(FESpace::UnsteadyProblem, RBInfo::Info, μ::Vecto
   δtθ = RBInfo.δt*RBInfo.θ
   times_θ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+δtθ
 
-  Param = get_Parametric_specifics(problem_ntuple, RBInfo, μ)
+  Param = get_ParamInfo(problem_ntuple, RBInfo, μ)
   A_t = assemble_stiffness(FESpace, RBInfo, Param)
 
   for i_t = 1:Nₜ
@@ -467,11 +467,11 @@ function get_θᵃ_old(RBVars,MDEIM_mat_old, MDEIM_idx_old, MDEIMᵢ_mat_old, sp
 
 end
 
-function build_sparse_mat_old(FEMInfo::ProblemSpecificsUnsteady, FESpace::UnsteadyProblem, RBInfo::Info, el::Vector)
+function build_sparse_mat_old(FEMInfo::ProblemInfoUnsteady, FESpace::UnsteadyProblem, RBInfo::Info, el::Vector)
 
   μ=load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
   μ_nb = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
-  Param = get_Parametric_specifics(problem_ntuple, RBInfo, μ_nb)
+  Param = get_ParamInfo(problem_ntuple, RBInfo, μ_nb)
 
   Ω_sparse = view(FESpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
@@ -500,7 +500,7 @@ function test_old_MDEIM(RBInfo, RBVars)
   MDEIMᵢ_mat_old = MDEIM_mat_old[MDEIM_idx_old,:]
   μ=load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
   μ_nb = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
-  #Param = get_Parametric_specifics(problem_ntuple, RBInfo, μ_nb)
+  #Param = get_ParamInfo(problem_ntuple, RBInfo, μ_nb)
   A = build_A_snapshots_old(FESpace, RBInfo, μ_nb)
   θᵃ_old = get_θᵃ_old(RBVars,MDEIM_mat_old, MDEIM_idx_old, MDEIMᵢ_mat_old, sparse_el_old)
   Aapprox = MDEIM_mat_old*θᵃ_old

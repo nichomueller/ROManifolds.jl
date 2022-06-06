@@ -288,8 +288,8 @@ struct RB_info{T<:String}
 
         include(config_path)
 
-        Nᵤˢ = FOM_specifics["space_dimension_FOM"][1]
-        n_snaps = ROM_specifics["n_snapshots"]
+        Nᵤˢ = FOM_Info["space_dimension_FOM"][1]
+        n_snaps = ROM_Info["n_snapshots"]
         snaps_matrix = zeros(Nᵤˢ, n_snaps)
         A = zeros(Nᵤˢ, Nᵤˢ)
         A_affine = Matrix{Float64}[]

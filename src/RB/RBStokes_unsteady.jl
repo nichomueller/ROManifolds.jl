@@ -302,7 +302,7 @@ function online_phase(RBInfo::Info, RBVars::StokesUnsteady, μ, Param_nbs)
     @info "Considering Parameter number: $nb"
 
     μ_nb = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
-    Param = get_Parametric_specifics(problem_ntuple, RBInfo, μ_nb)
+    Param = get_ParamInfo(problem_ntuple, RBInfo, μ_nb)
     uₕ_test = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, (nb-1)*RBVars.P.Nₜ+1:nb*RBVars.P.Nₜ]
     pₕ_test = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "pₕ.csv"), DataFrame))[:, (nb-1)*RBVars.P.Nₜ+1:nb*RBVars.P.Nₜ]
 
@@ -391,7 +391,7 @@ function check_dataset(RBInfo, RBVars, i)
 
   μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
   μ_i = parse.(Float64, split(chop(μ[i]; head=1, tail=1), ','))
-  Param = get_Parametric_specifics(problem_ntuple, RBInfo, μ_i)
+  Param = get_ParamInfo(problem_ntuple, RBInfo, μ_i)
 
   u1 = RBVars.S.Sᵘ[:, (i-1)*RBVars.P.Nₜ+1]
   u2 = RBVars.S.Sᵘ[:, (i-1)*RBVars.P.Nₜ+2]

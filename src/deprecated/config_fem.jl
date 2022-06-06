@@ -15,11 +15,11 @@ const dirichlet_tags = ["sides"]
 const neumann_tags = ["circle", "triangle", "square"]
 const solver = "lu"
 
-const FEMInfo = problem_specifics(order, dirichlet_tags, neumann_tags, solver, paths, problem_nonlinearities)
+const FEMInfo = problem_Info(order, dirichlet_tags, neumann_tags, solver, paths, problem_nonlinearities)
 
 
 
-#= struct problem_specifics
+#= struct problem_Info
     problem_name::String
     problem_type::String
     paths::Function
@@ -39,7 +39,7 @@ end =#
 
 
 
-#= struct Parametric_specifics
+#= struct Parametric_Info
     Parameters::Function
     model::Function
     data::Function
@@ -198,14 +198,14 @@ end =#
     this_f = get_f(problem_nonlinearities["f"], get_index(Params.μᶠ, i_nₛ)).f
     this_g = get_g(problem_nonlinearities["g"], get_index(Params.μᵍ, i_nₛ)).g
     this_h = get_h(problem_nonlinearities["h"], get_index(Params.μʰ, i_nₛ)).h
-    Parametric_specifics(Params,
+    Parametric_Info(Params,
                         get_domain(problem_nonlinearities["Ω"], get_index(Params.μᵒ, i_nₛ)),
                         this_a,
                         this_f,
                         this_g,
                         this_h
                         ) =#
-    Parametric_specifics(Params,
+    Parametric_Info(Params,
                         get_domain(problem_nonlinearities["Ω"], get_index(Params.μᵒ, i_nₛ)),
                         get_α(problem_nonlinearities["A"], get_index(Params.μᴬ, i_nₛ, 1)).α,
                         get_f(problem_nonlinearities["f"], get_index(Params.μᶠ, i_nₛ)).f,
@@ -228,7 +228,7 @@ end =#
 end =#
 
 
-#= function compute_Parametric_specifics(μ)
+#= function compute_Parametric_Info(μ)
 
   model = DiscreteModelFromFile(FEMInfo.paths.mesh_path)
   α = get_α(problem_nonlinearities["A"], get_index(Params.μᴬ, i_nₛ, 1))

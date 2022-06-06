@@ -187,7 +187,7 @@ function MDEIM_offline_functional(
     @info "Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)"
 
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
-    Param = get_Parametric_specifics(problem_ntuple, RBInfo, μₖ)
+    Param = get_ParamInfo(problem_ntuple, RBInfo, μₖ)
     #= if var == "A"
       snapsₖ = [Param.α(phys_quadp[n][q],t_θ)
       for n = 1:ncells for q = 1:nquad_cell for t_θ = times_θ]
@@ -281,7 +281,7 @@ end
 function DEIM_offline_functional(FESpace::UnsteadyProblem,
   RBInfo::Info,
   var::String)
-  @abstractmethod
+  error("Functional DEIM not implemented yet")
 end
 
 function M_DEIM_online(Mat_nonaffine, Matᵢ::Matrix, idx::Vector)

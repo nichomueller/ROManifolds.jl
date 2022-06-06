@@ -3,7 +3,7 @@ function build_M_snapshots(FESpace::SteadyProblem, RBInfo::Info, μ::Matrix)
   for i_nₛ = 1:RBInfo.nₛ_MDEIM
     @info "Snapshot number $i_nₛ, mass"
     μ_i = parse.(Float64, split(chop(μ[i_nₛ]; head=1, tail=1), ','))
-    Param = get_Parametric_specifics(problem_ntuple, RBInfo, μ_i)
+    Param = get_ParamInfo(problem_ntuple, RBInfo, μ_i)
     M_i = assemble_mass(FESpace, RBInfo, Param)
     i, v = findnz(M_i[:])
     if i_nₛ == 1
@@ -21,7 +21,7 @@ function build_M_snapshots(FESpace::UnsteadyProblem, RBInfo::Info, μ::Vector)
 
   Nₜ = convert(Int64, RBInfo.T/RBInfo.δt)
   times_θ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
-  Param = get_Parametric_specifics(problem_ntuple, RBInfo, μ)
+  Param = get_ParamInfo(problem_ntuple, RBInfo, μ)
   M_t = assemble_mass(FESpace, RBInfo, Param)
 
   for i_t = 1:Nₜ
@@ -44,7 +44,7 @@ function build_A_snapshots(FESpace::SteadyProblem, RBInfo::Info, μ::Matrix)
   for i_nₛ = 1:RBInfo.nₛ_MDEIM
     @info "Snapshot number $i_nₛ, stiffness"
     μ_i = parse.(Float64, split(chop(μ[i_nₛ]; head=1, tail=1), ','))
-    Param = get_Parametric_specifics(problem_ntuple, RBInfo, μ_i)
+    Param = get_ParamInfo(problem_ntuple, RBInfo, μ_i)
     A_i = assemble_stiffness(FESpace, RBInfo, Param)
     i, v = findnz(A_i[:])
     if i_nₛ == 1
@@ -62,7 +62,7 @@ function build_A_snapshots(FESpace::UnsteadyProblem, RBInfo::Info, μ::Vector)
 
   Nₜ = convert(Int64, RBInfo.T/RBInfo.δt)
   times_θ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
-  Param = get_Parametric_specifics(problem_ntuple, RBInfo, μ)
+  Param = get_ParamInfo(problem_ntuple, RBInfo, μ)
   A_t = assemble_stiffness(FESpace, RBInfo, Param)
 
   for i_t = 1:Nₜ
@@ -140,7 +140,7 @@ function build_F_snapshots(FESpace::SteadyProblem, RBInfo::Info, μ::Vector)
   for i_nₛ = 1:RBInfo.nₛ_DEIM
     @info "Snapshot number $i_nₛ, forcing"
     μ_i = parse.(Float64, split(chop(μ[i_nₛ]; head=1, tail=1), ','))
-    Param = get_Parametric_specifics(problem_ntuple, RBInfo, μ_i)
+    Param = get_ParamInfo(problem_ntuple, RBInfo, μ_i)
     F[:, i_nₛ] = assemble_forcing(FESpace, RBInfo, Param)[:]
   end
 
@@ -154,7 +154,7 @@ function build_F_snapshots(FESpace::UnsteadyProblem, RBInfo::Info, μ::Vector)
   δtθ = RBInfo.δt*RBInfo.θ
   times_θ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+δtθ
 
-  Param = get_Parametric_specifics(problem_ntuple, RBInfo, μ)
+  Param = get_ParamInfo(problem_ntuple, RBInfo, μ)
   F_t = assemble_forcing(FESpace, RBInfo, Param)
   F = zeros(FESpace.Nₛᵘ, Nₜ)
 
@@ -174,7 +174,7 @@ function build_H_snapshots(FESpace::SteadyProblem, RBInfo::Info, μ::Vector)
   for i_nₛ = 1:RBInfo.nₛ_DEIM
     @info "Snapshot number $i_nₛ, neumann datum"
     μ_i = parse.(Float64, split(chop(μ[i_nₛ]; head=1, tail=1), ','))
-    Param = get_Parametric_specifics(problem_ntuple, RBInfo, μ_i)
+    Param = get_ParamInfo(problem_ntuple, RBInfo, μ_i)
     H[:, i_nₛ] = assemble_neumann_datum(FESpace, RBInfo, Param)[:]
   end
 
@@ -188,7 +188,7 @@ function build_H_snapshots(FESpace::UnsteadyProblem, RBInfo::Info, μ::Vector)
   δtθ = RBInfo.δt*RBInfo.θ
   times_θ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+δtθ
 
-  Param = get_Parametric_specifics(problem_ntuple, RBInfo, μ)
+  Param = get_ParamInfo(problem_ntuple, RBInfo, μ)
   H_t = assemble_neumann_datum(FESpace, RBInfo, Param)
   H = zeros(FESpace.Nₛᵘ, Nₜ)
 

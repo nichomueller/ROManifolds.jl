@@ -35,7 +35,7 @@ function run_FEM_A()
     @assert length(μ) === 3 "μ must be a 3x1 vector"
     α(x) = μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) / μ[3])
 
-    Param = Parametric_specifics(μ, model, α, f, g, h)
+    Param = Parametric_Info(μ, model, α, f, g, h)
     RHS = assemble_forcing(FESpace, FEMInfo, Param)
     LHS = assemble_stiffness(FESpace, FEMInfo, Param)
 
@@ -85,7 +85,7 @@ function run_FEM_A_f_g()
     α(x) = μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) / μ[3])
     f(x) = sin(μ[4] * x[1]) + sin(μ[4] * x[2])
     g(x) = sin(μ[5] * x[1]) + sin(μ[5] * x[2])
-    Param = Parametric_specifics(μ, model, α, f, g, h)
+    Param = Parametric_Info(μ, model, α, f, g, h)
 
     RHS = assemble_forcing(FESpace, FEMInfo, Param)
     LHS = assemble_stiffness(FESpace, FEMInfo, Param)
@@ -123,7 +123,7 @@ function run_FEM_Omega()
     @assert length(μ) === 1 "μ must be a 1x1 vector"
 
     model = generate_cartesian_model(ref_info, stretching, μ)
-    Param = Parametric_specifics(μ, model, α, f, g, h)
+    Param = Parametric_Info(μ, model, α, f, g, h)
     FESpace = FESpace(FEMInfo, Param)
 
     RHS = assemble_forcing(FESpace, FEMInfo, Param)
@@ -143,7 +143,7 @@ function run_FEM_Omega()
 
 end
 #= paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, problem_nonlinearities)
-FEMInfo = problem_specifics(problem_name, problem_type, paths, approx_type, problem_dim, problem_nonlinearities, number_coupled_blocks, order, dirichlet_tags, neumann_tags, solver, nₛ)
+FEMInfo = problem_Info(problem_name, problem_type, paths, approx_type, problem_dim, problem_nonlinearities, number_coupled_blocks, order, dirichlet_tags, neumann_tags, solver, nₛ)
 
 ranges = Dict("μᵒ" => [0., 1.], "μᴬ" => [[0.4, 0.6] [0.4, 0.6] [0.05, 0.1]], "μᶠ" => [0., 1.1], "μᵍ" => [0., 1.], "μʰ" => [0., 1.])
 (μᵒ, μᴬ, μᶠ, μᵍ, μʰ) = generate_Parameters(problem_nonlinearities, nₛ, ranges)

@@ -1,6 +1,6 @@
 function FE_solve(
-  FESpace::FESpacePoisson, probl::SteadyProblem,
-  Param::ParametricSpecifics; subtract_Ddata = true)
+  FESpace::FESpacePoissonSteady, probl::SteadyProblem,
+  Param::ParametricInfoSteady; subtract_Ddata = true)
 
   Gₕ = assemble_lifting(FESpace, Param)
 
@@ -25,8 +25,8 @@ function FE_solve(
 end
 
 function FE_solve(
-  FESpace::FESpacePoissonUnsteady, probl::ProblemSpecificsUnsteady,
-  Param::ParametricSpecificsUnsteady; subtract_Ddata = true)
+  FESpace::FESpacePoissonUnsteady, probl::ProblemInfoUnsteady,
+  Param::ParametricInfoUnsteady; subtract_Ddata = true)
 
   Gₕₜ = assemble_lifting(FESpace, probl, Param)
 
@@ -63,8 +63,8 @@ function FE_solve(
 end
 
 function FE_solve(
-  FESpace::FESpaceStokesUnsteady, probl::ProblemSpecificsUnsteady,
-  Param::ParametricSpecificsUnsteady; subtract_Ddata=false)
+  FESpace::FESpaceStokesUnsteady, probl::ProblemInfoUnsteady,
+  Param::ParametricInfoUnsteady; subtract_Ddata=false)
 
   R₁,R₂ = assemble_lifting(FESpace, probl, Param)
 
@@ -129,7 +129,7 @@ function check_stokes_solver()
 
 end
 
-#= function FE_solve(FESpace::FESpacePoisson, Param::ParametricSpecificsUnsteady; subtract_Ddata = true)
+#= function FE_solve(FESpace::FESpacePoisson, Param::ParametricInfoUnsteady; subtract_Ddata = true)
 
 _, Gₕ = get_lifting_operator(FESpace, Param)
 
@@ -153,7 +153,7 @@ return uₕ, Gₕ
 
 end =#
 
-function assemble_lifting(FESpace::SteadyProblem, Param::ParametricSpecifics)
+function assemble_lifting(FESpace::SteadyProblem, Param::ParametricInfoSteady)
 
   Gₕ = zeros(FESpace.Nₛᵘ,1)
   if !isnothing(FESpace.dΓd)
@@ -166,8 +166,8 @@ function assemble_lifting(FESpace::SteadyProblem, Param::ParametricSpecifics)
 end
 
 function assemble_lifting(
-  FESpace::FESpacePoissonUnsteady, probl::ProblemSpecificsUnsteady,
-  Param::ParametricSpecificsUnsteady)
+  FESpace::FESpacePoissonUnsteady, probl::ProblemInfoUnsteady,
+  Param::ParametricInfoUnsteady)
 
   Gₕ = zeros(FESpace.Nₛᵘ, convert(Int64, probl.T / probl.δt))
   if !isnothing(FESpace.dΓd)
@@ -181,7 +181,7 @@ function assemble_lifting(
 
 end
 
-function assemble_lifting(FESpace::FESpaceStokesUnsteady, probl::ProblemSpecificsUnsteady, Param::ParametricSpecificsUnsteady)
+function assemble_lifting(FESpace::FESpaceStokesUnsteady, ::ProblemInfoUnsteady, Param::ParametricInfoUnsteady)
 
   gₕ(t) = interpolate_dirichlet(Param.g(t), FESpace.V(t))
   R₁(t,v) = ∫(Param.α(t)*(∇(v) ⊙ ∇(gₕ(t))))*FESpace.dΓd
@@ -192,7 +192,7 @@ end
 
 function rhs_form(
   t::Real,v::FEBasis,FESpace::FESpacePoissonUnsteady,
-  Param::ParametricSpecificsUnsteady)
+  Param::ParametricInfoUnsteady)
   if !isnothing(FESpace.dΓn)
     return ∫(v*Param.f(t))*FESpace.dΩ + ∫(v*Param.h(t))*FESpace.dΓn
   else

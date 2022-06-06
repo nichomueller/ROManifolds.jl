@@ -233,7 +233,7 @@ function modify_MDEIM_idx(MDEIM_idx::Vector, RBVars::PoissonUnsteady) ::Vector
   return (idx_time_new.-1)*RBVars.S.Nₛᵘ^2+idx_space
 end
 
-function get_θᵐ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricSpecificsUnsteady) ::Vector
+function get_θᵐ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInfoUnsteady) ::Vector
   times_θ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
   if !RBInfo.probl_nl["M"]
     θᵐ = [Param.mₜ(t_θ) for t_θ = times_θ]
@@ -252,7 +252,7 @@ function get_θᵐ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricSpe
 
 end
 
-function get_θᵐₛₜ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricSpecificsUnsteady) ::Vector
+function get_θᵐₛₜ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInfoUnsteady) ::Vector
 
   if !RBInfo.probl_nl["M"]
     θᵐ = [1]
@@ -267,7 +267,7 @@ function get_θᵐₛₜ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::Paramet
 
 end
 
-function get_θᵃ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricSpecificsUnsteady) ::Vector
+function get_θᵃ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInfoUnsteady) ::Vector
 
   if !RBInfo.probl_nl["A"]
     times_θ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
@@ -287,7 +287,7 @@ function get_θᵃ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricSpe
 
 end
 
-function get_θᵃₛₜ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricSpecificsUnsteady) ::Vector
+function get_θᵃₛₜ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInfoUnsteady) ::Vector
 
   if !RBInfo.probl_nl["A"]
     θᵃ = [1]
@@ -302,7 +302,7 @@ function get_θᵃₛₜ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::Paramet
 
 end
 
-function get_θᶠʰ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricSpecificsUnsteady) ::Tuple
+function get_θᶠʰ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInfoUnsteady) ::Tuple
 
   if RBInfo.build_Parametric_RHS
     @error "Cannot fetch θᶠ, θʰ if the RHS is built online"
@@ -336,7 +336,7 @@ function get_θᶠʰ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricS
 
 end
 
-function get_θᶠʰₛₜ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricSpecificsUnsteady) ::Tuple
+function get_θᶠʰₛₜ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInfoUnsteady) ::Tuple
 
   if RBInfo.build_Parametric_RHS
     @error "Cannot fetch θᶠ, θʰ if the RHS is built online"
@@ -372,7 +372,7 @@ function get_Q(RBInfo::Info, RBVars::PoissonUnsteady)
 
 end
 
-function solve_RB_system(RBInfo::Info, RBVars::PoissonUnsteady, Param::ParametricSpecificsUnsteady)
+function solve_RB_system(RBInfo::Info, RBVars::PoissonUnsteady, Param::ParametricInfoUnsteady)
 
   get_RB_system(RBInfo, RBVars, Param)
 
@@ -451,7 +451,7 @@ function online_phase(RBInfo::Info, RBVars::PoissonUnsteady, μ, Param_nbs)
     @info "Considering Parameter number: $nb"
 
     μ_nb = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
-    Param = get_Parametric_specifics(problem_ntuple, RBInfo, μ_nb)
+    Param = get_ParamInfo(problem_ntuple, RBInfo, μ_nb)
     uₕ_test = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, (nb-1)*RBVars.Nₜ+1:nb*RBVars.Nₜ]
 
     online_time = @elapsed begin
@@ -563,7 +563,7 @@ function check_dataset(
 
   μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
   μ_i = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
-  Param = get_Parametric_specifics(problem_ntuple, RBInfo, μ_i)
+  Param = get_ParamInfo(problem_ntuple, RBInfo, μ_i)
 
   u1 = RBVars.S.Sᵘ[:,(nb-1)*RBVars.Nₜ+1]
   u2 = RBVars.S.Sᵘ[:,(nb-1)*RBVars.Nₜ+2]
@@ -592,7 +592,7 @@ end
 function plot_stability_constants(
   FESpace::FEMProblem,
   RBInfo::Info,
-  Param::ParametricSpecificsUnsteady)
+  Param::ParametricInfoUnsteady)
 
   M = assemble_mass(FESpace, RBInfo, Param)(0.0)
   A = assemble_stiffness(FESpace, RBInfo, Param)(0.0)

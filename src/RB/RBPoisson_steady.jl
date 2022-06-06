@@ -509,7 +509,7 @@ function online_phase(RBInfo::Info, RBVars::PoissonSteady, μ, Param_nbs)
     @info "Considering Parameter number: $nb"
 
     μ_nb = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
-    Param = get_Parametric_specifics(problem_ntuple, RBInfo, μ_nb)
+    Param = get_ParamInfo(problem_ntuple, RBInfo, μ_nb)
 
     uₕ_test = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, nb]
 
