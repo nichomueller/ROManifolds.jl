@@ -44,7 +44,7 @@ end
 
 """Generate a uniform random vector of dimension n between the ranges set by
   the vector of ranges 'a' and 'b'"""
-function generate_Parameter(a::Vector, b::Vector, n::Int64 = 1)
+function generate_parameter(a::Vector, b::Vector, n::Int64 = 1)
 
   return [[rand(Uniform(a[i], b[i])) for i = 1:length(a)] for j in 1:n]
 

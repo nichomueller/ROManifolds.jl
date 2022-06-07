@@ -191,7 +191,6 @@ end
 
 function generate_dcube_discrete_model(d::Int,npart::Int,path::String)
   @assert d ≤ 3 "Select d-dimensional domain, where d ≤ 3"
-  @assert npart > 3 "Select npart > 3"
   if d == 1
     domain = (0,1)
     partition = (npart)

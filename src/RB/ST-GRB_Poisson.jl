@@ -24,31 +24,24 @@ function assemble_affine_matrices(RBInfo::Info, RBVars::PoissonSTGRB, var::Strin
   if var == "M"
     RBVars.Qᵐ = 1
     @info "Assembling affine reduced mass"
-    M = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "M.csv"); convert_to_sparse = true)
-    Mₙ = (RBVars.S.Φₛᵘ)' * M * RBVars.S.Φₛᵘ
+    M = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "M.csv");
+      convert_to_sparse = true)
     RBVars.Mₙ = zeros(RBVars.S.nₛᵘ, RBVars.S.nₛᵘ, 1)
-    RBVars.Mₙ[:,:,1] = Mₙ
+    RBVars.Mₙ[:,:,1] = (RBVars.S.Φₛᵘ)' * M * RBVars.S.Φₛᵘ
   else
     assemble_affine_matrices(RBInfo, RBVars.S, var)
   end
 
 end
 
-function assemble_MDEIM_matrices_standard(RBInfo::Info, RBVars::PoissonSTGRB, var::String)
+function assemble_MDEIM_matrices(RBInfo::Info, RBVars::PoissonSTGRB, var::String)
 
-  @info "The matrix $var is non-affine: running the MDEIM offline phase on $nₛ_MDEIM snapshots"
+  @info "The matrix $var is non-affine:
+    running the MDEIM offline phase on $nₛ_MDEIM snapshots"
 
-  MDEIM_mat, MDEIM_idx, MDEIMᵢ_mat, row_idx, sparse_el = MDEIM_offline(FEMSpace, RBInfo, var)
-
-  Q = size(MDEIM_mat)[2]
-  r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
-
-  MatqΦ = zeros(RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q)
-  for j = 1:RBVars.S.Nₛᵘ
-    Mat_idx = findall(x -> x == j, r_idx)
-    MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.S.Φₛᵘ[c_idx[Mat_idx],:])'
-  end
-  Matₙ = reshape(RBVars.S.Φₛᵘ' * reshape(MatqΦ,RBVars.S.Nₛᵘ,:),RBVars.S.nₛᵘ,:,Q)
+  MDEIM_mat, MDEIM_idx, MDEIMᵢ_mat, row_idx, sparse_el =
+    MDEIM_offline(FEMSpace, RBInfo, var)
+  Matₙ, Q = assemble_reduced_mat_MDEIM(MDEIM_mat,RBInfo,RBVars,var)
 
   if var == "M"
     RBVars.Mₙ = Matₙ
@@ -70,47 +63,41 @@ function assemble_MDEIM_matrices_standard(RBInfo::Info, RBVars::PoissonSTGRB, va
 
 end
 
-function assemble_MDEIM_matrices_spacetime(RBInfo::Info, RBVars::PoissonSTGRB, var::String)
+function assemble_reduced_mat_MDEIM(
+  MDEIM_mat::Matrix,
+  RBInfo::Info,
+  RBVars::PoissonSTGRB,
+  var::String) ::Tuple
 
-  @info "The matrix $var is non-affine: running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots"
-
-  MDEIM_mat, MDEIM_idx, MDEIMᵢ_mat, row_idx, sparse_el = MDEIM_offline(FEMSpace, RBInfo, var)
-  Nₜ = RBVars.Nₜ
-  MDEIM_mat_new = reshape(MDEIM_mat,length(row_idx),RBVars.Nₜ,:)
-  Q = size(MDEIM_mat_new)[3]
-
-  #Matₙ = zeros(RBVars.S.nₛᵘ, RBVars.S.nₛᵘ, Q*Nₜ)
-
-  r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
-  MatqΦ = zeros(RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q*Nₜ)
-  for q = 1:Q
-    @info "ST-GRB: affine component number $q/$Q, matrix $var"
+  if RBInfo.space_time_M_DEIM
+    Nₜ = RBVars.Nₜ
+    MDEIM_mat_new = reshape(MDEIM_mat,length(row_idx),RBVars.Nₜ,:)
+    Q = size(MDEIM_mat_new)[3]
+    r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
+    MatqΦ = zeros(RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q*Nₜ)
+    for q = 1:Q
+      @info "ST-GRB: affine component number $q/$Q, matrix $var"
+      for j = 1:RBVars.S.Nₛᵘ
+        Mat_idx = findall(x -> x == j, r_idx)
+        MatqΦ[j,:,(q-1)*Nₜ+1:q*Nₜ] =
+          (MDEIM_mat_new[Mat_idx,:,q]' * RBVars.S.Φₛᵘ[c_idx[Mat_idx],:])'
+      end
+    end
+    Matₙ = reshape(RBVars.S.Φₛᵘ' * reshape(MatqΦ,RBVars.S.Nₛᵘ,:),
+      RBVars.S.nₛᵘ,:,Q*Nₜ)
+  else
+    Q = size(MDEIM_mat)[2]
+    r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
+    MatqΦ = zeros(RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q)
     for j = 1:RBVars.S.Nₛᵘ
       Mat_idx = findall(x -> x == j, r_idx)
-      MatqΦ[j,:,(q-1)*Nₜ+1:q*Nₜ] = (MDEIM_mat_new[Mat_idx,:,q]' * RBVars.S.Φₛᵘ[c_idx[Mat_idx],:])'
-      #MatqΦ[j,:] = reshape(MDEIM_mat_new[Mat_idx,(q-1)*Nₜ+1:q*Nₜ]' * RBVars.S.Φₛᵘ[c_idx[Mat_idx],:],1,:)
+      MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.S.Φₛᵘ[c_idx[Mat_idx],:])'
     end
-    #Matₙ[:,:,(q-1)*Nₜ+1:q*Nₜ] = reshape(RBVars.S.Φₛᵘ' * MatqΦ,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,Nₜ)
+    Matₙ = reshape(RBVars.S.Φₛᵘ' *
+      reshape(MatqΦ,RBVars.S.Nₛᵘ,:),RBVars.S.nₛᵘ,:,Q)
   end
-  Matₙ = reshape(RBVars.S.Φₛᵘ' * reshape(MatqΦ,RBVars.S.Nₛᵘ,:),RBVars.S.nₛᵘ,:,Q*Nₜ)
 
-  if var == "M"
-    RBVars.Mₙ = Matₙ
-    RBVars.MDEIMᵢ_M = MDEIMᵢ_mat
-    RBVars.MDEIM_idx_M = MDEIM_idx
-    RBVars.sparse_el_M = sparse_el
-    RBVars.row_idx_M = row_idx
-    RBVars.Qᵐ = Q
-  elseif var == "A"
-    RBVars.S.Aₙ = Matₙ
-    RBVars.S.MDEIMᵢ_A = MDEIMᵢ_mat
-    RBVars.S.MDEIM_idx_A = MDEIM_idx
-    RBVars.S.sparse_el_A = sparse_el
-    RBVars.row_idx_A = row_idx
-    RBVars.S.Qᵃ = Q
-  else
-    @error "Unrecognized variable to assemble with MDEIM"
-  end
+  Matₙ, Q
 
 end
 
@@ -147,14 +134,6 @@ function assemble_DEIM_vectors(RBInfo::Info, RBVars::PoissonSTGRB, var::String)
     @error "Unrecognized vector to assemble with DEIM"
   end
 
-end
-
-function assemble_MDEIM_matrices(RBInfo::Info, RBVars::PoissonSTGRB, var::String)
-  if RBInfo.space_time_M_DEIM
-    assemble_MDEIM_matrices_spacetime(RBInfo, RBVars, var)
-  else
-    assemble_MDEIM_matrices_standard(RBInfo, RBVars, var)
-  end
 end
 
 function assemble_offline_structures(RBInfo::Info, RBVars::PoissonSTGRB, operators=nothing)

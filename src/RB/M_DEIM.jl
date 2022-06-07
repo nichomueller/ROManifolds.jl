@@ -129,16 +129,6 @@ function MDEIM_offline(FEMSpace::SteadyProblem, RBInfo::Info, var::String)
 
 end
 
-function MDEIM_offline(FEMSpace::UnsteadyProblem, RBInfo::Info, var::String)
-
-  if RBInfo.functional_M_DEIM
-    return MDEIM_offline_functional(FEMSpace, RBInfo, var)
-  else RBInfo.functional_M_DEIM
-    return MDEIM_offline_algebraic(FEMSpace, RBInfo, var)
-  end
-
-end
-
 function MDEIM_offline(
   FEMSpace::UnsteadyProblem,
   RBInfo::Info,
@@ -155,71 +145,6 @@ function MDEIM_offline(
   MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx,row_idx,FEMSpace.Nₛᵘ)
   MDEIM_idx_sparse_space, _ = from_vec_to_mat_idx(MDEIM_idx_sparse,FEMSpace.Nₛᵘ)
   el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(MDEIM_idx_sparse_space))
-
-  MDEIM_mat, MDEIM_idx_sparse, MDEIMᵢ_mat, row_idx, el
-
-end
-
-function MDEIM_offline_functional(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::Info,
-  var::String)
-
-  @info "Building $(RBInfo.nₛ_MDEIM) snapshots of $var, at each time step.
-  This will take some time."
-
-  μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-
-
-  for k = 1:RBInfo.nₛ_MDEIM
-    @info "Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)"
-
-    μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
-    Param = get_ParamInfo(problem_ntuple, RBInfo, μₖ)
-    #= if var == "A"
-      snapsₖ = [Param.α(phys_quadp[n][q],t_θ)
-      for n = 1:ncells for q = 1:nquad_cell for t_θ = timesθ]
-    elseif var == "M"
-      snapsₖ = [Param.m(phys_quadp[n][q],t_θ)
-      for n = 1:ncells for q = 1:nquad_cell for t_θ = timesθ]
-    else
-      @error "Run MDEIM on A or M only"
-    end =#
-    snapsₖ = [Param.α(phys_quadp[n][q],t_θ)
-    for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
-    compressed_snapsₖ, _ = POD(reshape(snapsₖ,nquad,Nₜ), RBInfo.ϵₛ)
-    if k == 1
-      global compressed_snaps = compressed_snapsₖ
-    else
-      global compressed_snaps = hcat(compressed_snaps, compressed_snapsₖ)
-    end
-
-  end
-
-  Θmat, Σ = POD(compressed_snaps, RBInfo.ϵₛ)
-  Q = size(Θmat)[2]
-
-  for q = 1:Q
-    Θq = FEFunction(V₀_quad,Θmat[:,q])
-    #= if var == "A"
-      Matq = (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Θq*∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
-       FEMSpace.V(0.0), FEMSpace.V₀))
-    elseif var == "M"
-      Matq = assemble_matrix(∫(FEMSpace.ϕᵥ*(Θq*FEMSpace.ϕᵤ(0.0)))*FEMSpace.dΩ,
-      FEMSpace.V(0.0), FEMSpace.V₀)
-    end =#
-    Matq = (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Θq*∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
-       FEMSpace.V(0.0), FEMSpace.V₀))
-    i,v = findnz(Matq[:])
-    if q == 1
-      global row_idx = i
-      global zeros(length(row_idx),Q)
-    else
-      global Mat_affine[:,q] = v
-    end
-  end
-
-  MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(Mat_affine, Σ)
 
   MDEIM_mat, MDEIM_idx_sparse, MDEIMᵢ_mat, row_idx, el
 

@@ -52,6 +52,7 @@ using Gridap.Arrays
 using Gridap.Geometry
 using Gridap.Fields
 using Gridap.CellData
+using Gridap.Io
 using GridapGmsh
 using Gridap.TensorValues
 using LineSearches:BackTracking

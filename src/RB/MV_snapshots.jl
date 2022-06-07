@@ -138,22 +138,22 @@ function get_snaps_MDEIM(FEMSpace::UnsteadyProblem, RBInfo::Info, μ::Matrix, va
       μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
       Param = get_ParamInfo(problem_ntuple, RBInfo, μₖ)
       if var == "A"
-        snapsₖ = [Param.α(phys_quadp[n][q],t_θ)
+        paramsₖ = [Param.α(phys_quadp[n][q],t_θ)
         for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
       elseif var == "M"
-        snapsₖ = [Param.m(phys_quadp[n][q],t_θ)
+        paramsₖ = [Param.m(phys_quadp[n][q],t_θ)
         for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
       else
         @error "Run MDEIM on A or M only"
       end
-      compressed_snapsₖ, _ = POD(reshape(snapsₖ,nquad,Nₜ), RBInfo.ϵₛ)
+      compressed_paramsₖ, _ = POD(reshape(paramsₖ,nquad,Nₜ), RBInfo.ϵₛ)
       if k == 1
-        global snaps = compressed_snapsₖ
+        global params = compressed_paramsₖ
       else
-        global snaps = hcat(snaps, compressed_snapsₖ)
+        global params = hcat(params, compressed_paramsₖ)
       end
     end
-    Θmat, Σ = POD(compressed_snaps, RBInfo.ϵₛ)
+    Θmat, Σ = POD(params, RBInfo.ϵₛ)
     Q = size(Θmat)[2]
     for q = 1:Q
       Θq = FEFunction(V₀_quad,Θmat[:,q])
@@ -167,9 +167,9 @@ function get_snaps_MDEIM(FEMSpace::UnsteadyProblem, RBInfo::Info, μ::Matrix, va
       i,v = findnz(Matq[:])
       if q == 1
         global row_idx = i
-        global Mat_affine = zeros(length(row_idx),Q)
+        global snaps = zeros(length(row_idx),Q)
       end
-      global Mat_affine[:,q] = v
+      global snaps[:,q] = v
     end
 
   else

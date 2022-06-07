@@ -10,7 +10,7 @@ function get_all_subdirectories(path::String)
   filter(isdir, readdir(path, join=true))
 end
 
-function load_CSV(path::String; convert_to_sparse = false)
+function load_CSV(path::String; convert_to_sparse = false) ::AbstractArray
   var = Matrix(CSV.read(path, DataFrame))
   if convert_to_sparse == true
     var = sparse(convert(Vector{Int64}, var[:,1]), convert(Vector{Int64}, var[:,2]), var[:,3])
@@ -18,7 +18,7 @@ function load_CSV(path::String; convert_to_sparse = false)
   var
 end
 
-function save_CSV(var::Array, file_name::String)
+function save_CSV(var::AbstractArray, file_name::String)
   if length(size(var)) == 1
     var = reshape(var, :, 1)
   end
