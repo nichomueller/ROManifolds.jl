@@ -37,15 +37,15 @@ function get_FEMSpace(::NTuple{1,Int}, probl::SteadyInfo, model::DiscreteModel, 
   if !isempty(probl.dirichlet_tags)
     Γd = BoundaryTriangulation(model, tags=probl.dirichlet_tags)
     dΓd = Measure(Γd, degree)
-    V₀ = TestFEMSpace(model, refFE; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
+    V₀ = TestFESpace(model, refFE; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
   else
     dΓd = nothing
-    V₀ = TestFEMSpace(model, refFE; conformity=:H1, constraint=:zeromean)
+    V₀ = TestFESpace(model, refFE; conformity=:H1, constraint=:zeromean)
   end
   if !isnothing(g)
-    V = TrialFEMSpace(V₀, g)
+    V = TrialFESpace(V₀, g)
   else
-    V = TrialFEMSpace(V₀, (x -> 0))
+    V = TrialFESpace(V₀, (x -> 0))
   end
 
   ϕᵥ = get_fe_basis(V₀)
@@ -148,7 +148,7 @@ function get_FEMSpace(::NTuple{2,Int}, probl::UnsteadyInfo, model::DiscreteModel
   Qₕ = CellQuadrature(Ω, degree)
 
   refFEᵤ = ReferenceFE(lagrangian, VectorValue{3,Float64}, probl.order)
-  V₀ = TestFEMSpace(model, refFEᵤ; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
+  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
   if isnothing(g)
     g₀(x, t::Real) = VectorValue(0,0,0)
     g₀(t::Real) = x->g₀(x,t)

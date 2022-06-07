@@ -222,28 +222,18 @@ function get_offline_structures(RBInfo::Info, RBVars::PoissonUnsteady) ::Vector
 
 end
 
-function modify_timesθ_and_MDEIM_idx(
-  MDEIM_idx::Vector,
-  RBInfo::RBUnsteadyProblem,
-  RBVars::PoissonUnsteady) ::Tuple
-  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
-  idx_space, idx_time = from_vec_to_mat_idx(MDEIM_idx,RBVars.S.Nₛᵘ^2)
-  idx_time_mod = label_sorted_elems(idx_time)
-  timesθ_mod = timesθ[unique(sort(idx_time))]
-  MDEIM_idx_mod = (idx_time_mod.-1)*RBVars.S.Nₛᵘ^2+idx_space
-  timesθ_mod,MDEIM_idx_mod
-end
-
-function get_θᵐ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInfoUnsteady) ::Vector
+function get_θᵐ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInfoUnsteady) ::Array
   timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
   if !RBInfo.probl_nl["M"]
     θᵐ = [Param.mₜ(t_θ) for t_θ = timesθ]
   else
-    M_μ_sparse = build_sparse_mat(FEMInfo, FEMSpace, Param, RBVars.sparse_el_M, timesθ; var="M")
+    M_μ_sparse = build_sparse_mat(
+      FEMInfo,FEMSpace,Param,RBVars.S.sparse_el_A,timesθ;var="M")
     Nₛᵘ = RBVars.S.Nₛᵘ
     θᵐ = zeros(RBVars.Qᵐ, RBVars.Nₜ)
     for iₜ = 1:RBVars.Nₜ
-      θᵐ[:,iₜ] = M_DEIM_online(M_μ_sparse[:,(iₜ-1)*Nₛᵘ+1:iₜ*Nₛᵘ], RBVars.MDEIMᵢ_M, RBVars.MDEIM_idx_M)
+      θᵐ[:,iₜ] = M_DEIM_online(M_μ_sparse[:,(iₜ-1)*Nₛᵘ+1:iₜ*Nₛᵘ],
+        RBVars.MDEIMᵢ_M, RBVars.MDEIM_idx_M)
     end
   end
 
@@ -253,14 +243,15 @@ function get_θᵐ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInf
 
 end
 
-function get_θᵐₛₜ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInfoUnsteady) ::Vector
+function get_θᵐₛₜ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInfoUnsteady) ::Array
 
   if !RBInfo.probl_nl["M"]
     θᵐ = [1]
   else
     timesθ_mod,MDEIM_idx_mod =
       modify_timesθ_and_MDEIM_idx(RBVars.MDEIM_idx_M,RBInfo,RBVars)
-    M_μ_sparse = build_sparse_mat(FEMInfo, FEMSpace, Param, RBVars.sparse_el_M, timesθ_mod; var="M")
+    M_μ_sparse = build_sparse_mat(FEMInfo, FEMSpace, Param,
+      RBVars.sparse_el_M, timesθ_mod; var="M")
     θᵐ = RBVars.MDEIMᵢ_M\Vector(M_μ_sparse[MDEIM_idx_mod])
   end
 
@@ -268,17 +259,19 @@ function get_θᵐₛₜ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::Paramet
 
 end
 
-function get_θᵃ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInfoUnsteady) ::Vector
+function get_θᵃ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInfoUnsteady) ::Array
 
+  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
   if !RBInfo.probl_nl["A"]
-    timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
     θᵃ = [Param.αₜ(t_θ,Param.μ) for t_θ = timesθ]
   else
-    A_μ_sparse = build_sparse_mat(FEMInfo, FEMSpace, RBInfo, Param, RBVars.S.sparse_el_A; var="A")
+    A_μ_sparse = build_sparse_mat(
+      FEMInfo,FEMSpace,Param,RBVars.S.sparse_el_A,timesθ;var="A")
     Nₛᵘ = RBVars.S.Nₛᵘ
     θᵃ = zeros(RBVars.S.Qᵃ, RBVars.Nₜ)
     for iₜ = 1:RBVars.Nₜ
-      θᵃ[:,iₜ] = M_DEIM_online(A_μ_sparse[:,(iₜ-1)*Nₛᵘ+1:iₜ*Nₛᵘ], RBVars.S.MDEIMᵢ_A, RBVars.S.MDEIM_idx_A)
+      θᵃ[:,iₜ] = M_DEIM_online(A_μ_sparse[:,(iₜ-1)*Nₛᵘ+1:iₜ*Nₛᵘ],
+        RBVars.S.MDEIMᵢ_A, RBVars.S.MDEIM_idx_A)
     end
   end
 
@@ -288,14 +281,15 @@ function get_θᵃ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInf
 
 end
 
-function get_θᵃₛₜ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInfoUnsteady) ::Vector
+function get_θᵃₛₜ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInfoUnsteady) ::Array
 
   if !RBInfo.probl_nl["A"]
     θᵃ = [1]
   else
     timesθ_mod,MDEIM_idx_mod =
       modify_timesθ_and_MDEIM_idx(RBVars.MDEIM_idx_A,RBInfo,RBVars)
-    A_μ_sparse = build_sparse_mat(FEMInfo, FEMSpace, Param, RBVars.sparse_el_A, timesθ_mod; var="A")
+    A_μ_sparse = build_sparse_mat(FEMInfo, FEMSpace, Param,
+      RBVars.sparse_el_A, timesθ_mod; var="A")
     θᵃ = RBVars.MDEIMᵢ_A\Vector(A_μ_sparse[MDEIM_idx_mod])
   end
 

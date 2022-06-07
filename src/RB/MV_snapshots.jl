@@ -123,7 +123,7 @@ function get_snaps_MDEIM(FEMSpace::UnsteadyProblem, RBInfo::Info, μ::Matrix, va
     end
 
   elseif RBInfo.functional_M_DEIM
-
+    include("/home/user1/git_repos/Mabla.jl/src/FEM/LagrangianQuad.jl")
     ξₖ = get_cell_map(FEMSpace.Ω)
     Qₕ_cell_point = get_cell_points(FEMSpace.Qₕ)
     qₖ = get_data(Qₕ_cell_point)
@@ -131,7 +131,7 @@ function get_snaps_MDEIM(FEMSpace::UnsteadyProblem, RBInfo::Info, μ::Matrix, va
     ncells = length(phys_quadp)
     nquad_cell = length(phys_quadp[1])
     nquad = nquad_cell*ncells
-    refFE_quad = ReferenceFE(lagrangianQuad, Float64, FEMInfo.order)
+    refFE_quad = Gridap.ReferenceFE(lagrangianQuad, Float64, FEMInfo.order)
     V₀_quad = TestFESpace(model, refFE_quad, conformity=:L2)
     for k = 1:RBInfo.nₛ_MDEIM
       @info "Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)"
@@ -139,14 +139,14 @@ function get_snaps_MDEIM(FEMSpace::UnsteadyProblem, RBInfo::Info, μ::Matrix, va
       Param = get_ParamInfo(problem_ntuple, RBInfo, μₖ)
       if var == "A"
         paramsₖ = [Param.α(phys_quadp[n][q],t_θ)
-        for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
+          for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
       elseif var == "M"
         paramsₖ = [Param.m(phys_quadp[n][q],t_θ)
-        for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
+          for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
       else
         @error "Run MDEIM on A or M only"
       end
-      compressed_paramsₖ, _ = POD(reshape(paramsₖ,nquad,Nₜ), RBInfo.ϵₛ)
+      compressed_paramsₖ, _ = POD(reshape(paramsₖ,nquad,:), RBInfo.ϵₛ)
       if k == 1
         global params = compressed_paramsₖ
       else
@@ -178,9 +178,9 @@ function get_snaps_MDEIM(FEMSpace::UnsteadyProblem, RBInfo::Info, μ::Matrix, va
       @info "Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)"
       μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
       if var == "A"
-        snapsₖ,row_idx = build_A_snapshots(FEMSpace, RBInfo, μₖ)
+        snapsₖ,row_idx = build_A_snapshots(FEMSpace,RBInfo,μₖ,timesθ)
       elseif var == "M"
-        snapsₖ,row_idx = build_M_snapshots(FEMSpace, RBInfo, μₖ)
+        snapsₖ,row_idx = build_M_snapshots(FEMSpace,RBInfo,μₖ,timesθ)
       else
         @error "Run MDEIM on A or M only"
       end

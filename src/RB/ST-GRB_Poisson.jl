@@ -266,8 +266,13 @@ function get_RB_LHS_blocks_spacetime(RBInfo, RBVars::PoissonSTGRB, θᵐ, θᵃ)
   δtθ = RBInfo.δt*θ
   Qᵐ = RBVars.Qᵐ
   Qᵃ = RBVars.S.Qᵃ
-  Nₜᵐ = 1#Int(size(RBVars.Mₙ)[3]/Qᵐ)
-  Nₜᵃ = 10#Int(size(RBVars.S.Aₙ)[3]/Qᵃ)
+  Nₜᵐ = Int(size(RBVars.Mₙ)[3]/Qᵐ) #1
+  Nₜᵃ = Int(size(RBVars.S.Aₙ)[3]/Qᵃ) #10
+
+  [Φₜᵘ_M[i_t,j_t,q] = sum(RBVars.Φₜᵘ[:,i_t].*RBVars.Φₜᵘ[:,j_t].*θᵐ[q,:]) for q = 1:Qᵐ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
+  [Φₜᵘ₁_M[i_t,j_t,q] = sum(RBVars.Φₜᵘ[2:end,i_t].*RBVars.Φₜᵘ[1:end-1,j_t].*θᵐ[q,2:end]) for q = 1:Qᵐ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
+  [Φₜᵘ_A[i_t,j_t,q] = sum(RBVars.Φₜᵘ[:,i_t].*RBVars.Φₜᵘ[:,j_t].*θᵃ[q,:]) for q = 1:Qᵃ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
+  [Φₜᵘ₁_A[i_t,j_t,q] = sum(RBVars.Φₜᵘ[2:end,i_t].*RBVars.Φₜᵘ[1:end-1,j_t].*θᵃ[q,2:end]) for q = 1:Qᵃ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
 
   if Nₜᵐ>1
     RBVars.Mₙ = reshape(RBVars.Mₙ,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,Nₜᵐ,Qᵐ)

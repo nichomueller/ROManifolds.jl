@@ -1,7 +1,5 @@
 abstract type LagrangianQuadRefFE{D} <: LagrangianRefFE{D} end
-
 struct LagrangianQuad <: ReferenceFEName end
-
 const lagrangianQuad = LagrangianQuad()
 
 function ReferenceFE(
@@ -34,7 +32,7 @@ function _lagrangian_quad_ref_fe(::Type{T},
   @assert isa(p,ExtrusionPolytope)
   @assert is_n_cube(p)
   degrees= broadcast(*,2,orders)
-  q=Quadrature(p,Gridap.ReferenceFEs.TensorProduct(),degrees)
+  q = Quadrature(p,Gridap.ReferenceFEs.TensorProduct(),degrees)
   nodes = get_coordinates(q)
 
   prebasis = compute_monomial_basis(T,p,orders)

@@ -150,6 +150,18 @@ function MDEIM_offline(
 
 end
 
+function modify_timesθ_and_MDEIM_idx(
+  MDEIM_idx::Vector,
+  RBInfo::RBUnsteadyProblem,
+  RBVars::PoissonUnsteady) ::Tuple
+  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
+  idx_space, idx_time = from_vec_to_mat_idx(MDEIM_idx,RBVars.S.Nₛᵘ^2)
+  idx_time_mod = label_sorted_elems(idx_time)
+  timesθ_mod = timesθ[unique(sort(idx_time))]
+  MDEIM_idx_mod = (idx_time_mod.-1)*RBVars.S.Nₛᵘ^2+idx_space
+  timesθ_mod,MDEIM_idx_mod
+end
+
 function DEIM_offline(FEMSpace::SteadyProblem, RBInfo::Info, var::String)
 
   @info "Building $(RBInfo.nₛ_DEIM) snapshots of $var"
