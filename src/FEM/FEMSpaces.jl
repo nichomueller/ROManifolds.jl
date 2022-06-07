@@ -20,7 +20,7 @@ function set_labels(probl::Info, model::DiscreteModel)
 
 end
 
-function get_FESpace(::NTuple{1,Int}, probl::SteadyInfo, model::DiscreteModel, g = nothing)
+function get_FEMSpace(::NTuple{1,Int}, probl::SteadyInfo, model::DiscreteModel, g = nothing)
 
   degree = 2*probl.order
   labels = set_labels(probl, model)
@@ -37,28 +37,28 @@ function get_FESpace(::NTuple{1,Int}, probl::SteadyInfo, model::DiscreteModel, g
   if !isempty(probl.dirichlet_tags)
     Γd = BoundaryTriangulation(model, tags=probl.dirichlet_tags)
     dΓd = Measure(Γd, degree)
-    V₀ = TestFESpace(model, refFE; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
+    V₀ = TestFEMSpace(model, refFE; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
   else
     dΓd = nothing
-    V₀ = TestFESpace(model, refFE; conformity=:H1, constraint=:zeromean)
+    V₀ = TestFEMSpace(model, refFE; conformity=:H1, constraint=:zeromean)
   end
   if !isnothing(g)
-    V = TrialFESpace(V₀, g)
+    V = TrialFEMSpace(V₀, g)
   else
-    V = TrialFESpace(V₀, (x -> 0))
+    V = TrialFEMSpace(V₀, (x -> 0))
   end
 
   ϕᵥ = get_fe_basis(V₀)
   ϕᵤ = get_trial_fe_basis(V)
   Nₛᵘ = length(get_free_dof_ids(V))
 
-  FESpace = FESpacePoissonSteady(Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, dΩ, dΓd, dΓn)
+  FEMSpace = FEMSpacePoissonSteady(Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, dΩ, dΓd, dΓn)
 
-  return FESpace
+  return FEMSpace
 
 end
 
-function get_FESpace(::NTuple{1,Int}, probl::UnsteadyInfo, model::DiscreteModel, g = nothing)
+function get_FEMSpace(::NTuple{1,Int}, probl::UnsteadyInfo, model::DiscreteModel, g = nothing)
 
   degree = 2*probl.order
   labels = set_labels(probl, model)
@@ -91,13 +91,13 @@ function get_FESpace(::NTuple{1,Int}, probl::UnsteadyInfo, model::DiscreteModel,
   ϕᵤ(t) = get_trial_fe_basis(V(t))
   Nₛᵘ = length(get_free_dof_ids(V₀))
 
-  FESpace = FESpacePoissonUnsteady(Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, dΩ, dΓd, dΓn)
+  FEMSpace = FEMSpacePoissonUnsteady(Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, dΩ, dΓd, dΓn)
 
-  return FESpace
+  return FEMSpace
 
 end
 
-function get_FESpace(::NTuple{2,Int}, probl::SteadyInfo, model::DiscreteModel, g = nothing)
+function get_FEMSpace(::NTuple{2,Int}, probl::SteadyInfo, model::DiscreteModel, g = nothing)
 
   degree = 2*probl.order
   labels = set_labels(probl, model)
@@ -128,13 +128,13 @@ function get_FESpace(::NTuple{2,Int}, probl::SteadyInfo, model::DiscreteModel, g
   ψₚ = get_trial_fe_basis(Q)
   Nₛᵖ = length(get_free_dof_ids(Q))
 
-  FESpace = FESpaceStokes(Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn)
+  FEMSpace = FEMSpaceStokes(Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn)
 
-  return FESpace
+  return FEMSpace
 
 end
 
-function get_FESpace(::NTuple{2,Int}, probl::UnsteadyInfo, model::DiscreteModel, g = nothing)
+function get_FEMSpace(::NTuple{2,Int}, probl::UnsteadyInfo, model::DiscreteModel, g = nothing)
 
   degree = 2*probl.order
   labels = set_labels(probl, model)
@@ -148,7 +148,7 @@ function get_FESpace(::NTuple{2,Int}, probl::UnsteadyInfo, model::DiscreteModel,
   Qₕ = CellQuadrature(Ω, degree)
 
   refFEᵤ = ReferenceFE(lagrangian, VectorValue{3,Float64}, probl.order)
-  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
+  V₀ = TestFEMSpace(model, refFEᵤ; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
   if isnothing(g)
     g₀(x, t::Real) = VectorValue(0,0,0)
     g₀(t::Real) = x->g₀(x,t)
@@ -167,88 +167,11 @@ function get_FESpace(::NTuple{2,Int}, probl::UnsteadyInfo, model::DiscreteModel,
   ψₚ = get_trial_fe_basis(Q)
   Nₛᵖ = length(get_free_dof_ids(Q₀))
 
-  X₀ = MultiFieldFESpace([V₀, Q₀])
-  X = TransientMultiFieldFESpace([V, Q])
+  X₀ = MultiFieldFEMSpace([V₀, Q₀])
+  X = TransientMultiFieldFEMSpace([V, Q])
 
-  FESpace = FESpaceStokesUnsteady(Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn)
+  FEMSpace = FEMSpaceStokesUnsteady(Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn)
 
-  return FESpace
+  return FEMSpace
 
 end
-
-abstract type LagrangianQuadRefFE{D} <: LagrangianRefFE{D} end
-
-struct LagrangianQuad <: ReferenceFEName end
-
-const lagrangianQuad = LagrangianQuad()
-
-function ReferenceFE(
-  polytope::Polytope,
-  ::LagrangianQuad,
-  ::Type{T},
-  orders::Union{Integer,Tuple{Vararg{Integer}}}) where T
-  LagrangianQuadRefFE(T,polytope,orders)
-end
-
-function LagrangianQuadRefFE(
-  ::Type{T},
-  p::Polytope{D},
-  order::Int) where {T,D}
-  orders = tfill(order,Val{D}())
-  LagrangianQuadRefFE(T,p,orders)
-end
-
-function LagrangianQuadRefFE(
-  ::Type{T},
-  p::Polytope{D},
-  orders) where {T,D}
-  _lagrangian_quad_ref_fe(T,p,orders)
-end
-
-function _lagrangian_quad_ref_fe(::Type{T},
-  p::Polytope{D},
-  orders) where {T,D}
-
-  @assert isa(p,ExtrusionPolytope)
-  @assert is_n_cube(p)
-  degrees= broadcast(*,2,orders)
-  q=Quadrature(p,Gridap.ReferenceFEs.TensorProduct(),degrees)
-  nodes = get_coordinates(q)
-
-  prebasis = compute_monomial_basis(T,p,orders)
-
-  # Compute face_own_nodes
-  face_nodes = [Int[] for i in 1:num_faces(p)]
-  push!(last(face_nodes),collect(1:length(nodes))...)
-
-  # Compute face_own_nodes
-  face_dofs = [Int[] for i in 1:num_faces(p)]
-  push!(last(face_dofs),collect(1:length(nodes)*num_components(T))...)
-
-  dofs = LagrangianDofBasis(T,nodes)
-
-  nnodes = length(dofs.nodes)
-  ndofs = length(dofs.dof_to_node)
-  metadata = nothing
-
-  conf = L2Conformity()
-  reffe = GenericRefFE{typeof(conf)}(
-    ndofs,
-    p,
-    prebasis,
-    dofs,
-    conf,
-    metadata,
-    face_dofs)
-  GenericLagrangianRefFE(reffe,face_nodes)
-end
-
-function tfill(v, ::Val{D}) where D
-  t = tfill(v, Val{D-1}())
-  (v,t...)
-end
-
-tfill(v,::Val{0}) = ()
-tfill(v,::Val{1}) = (v,)
-tfill(v,::Val{2}) = (v,v)
-tfill(v,::Val{3}) = (v,v,v)

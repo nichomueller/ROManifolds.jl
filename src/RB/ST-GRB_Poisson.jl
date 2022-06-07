@@ -38,7 +38,7 @@ function assemble_MDEIM_matrices_standard(RBInfo::Info, RBVars::PoissonSTGRB, va
 
   @info "The matrix $var is non-affine: running the MDEIM offline phase on $nₛ_MDEIM snapshots"
 
-  MDEIM_mat, MDEIM_idx, MDEIMᵢ_mat, row_idx, sparse_el = MDEIM_offline(FESpace, RBInfo, var)
+  MDEIM_mat, MDEIM_idx, MDEIMᵢ_mat, row_idx, sparse_el = MDEIM_offline(FEMSpace, RBInfo, var)
 
   Q = size(MDEIM_mat)[2]
   r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
@@ -74,7 +74,7 @@ function assemble_MDEIM_matrices_spacetime(RBInfo::Info, RBVars::PoissonSTGRB, v
 
   @info "The matrix $var is non-affine: running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots"
 
-  MDEIM_mat, MDEIM_idx, MDEIMᵢ_mat, row_idx, sparse_el = MDEIM_offline(FESpace, RBInfo, var)
+  MDEIM_mat, MDEIM_idx, MDEIMᵢ_mat, row_idx, sparse_el = MDEIM_offline(FEMSpace, RBInfo, var)
   Nₜ = RBVars.Nₜ
   MDEIM_mat_new = reshape(MDEIM_mat,length(row_idx),RBVars.Nₜ,:)
   Q = size(MDEIM_mat_new)[3]
@@ -124,7 +124,7 @@ function assemble_DEIM_vectors(RBInfo::Info, RBVars::PoissonSTGRB, var::String)
 
   @info "ST-GRB: running the DEIM offline phase on variable $var with $nₛ_DEIM snapshots"
 
-  DEIM_mat, DEIM_idx, _, _ = DEIM_offline(FESpace, RBInfo, var)
+  DEIM_mat, DEIM_idx, _, _ = DEIM_offline(FEMSpace, RBInfo, var)
   DEIMᵢ_mat = Matrix(DEIM_mat[DEIM_idx, :])
   Q = size(DEIM_mat)[2]
   varₙ = zeros(RBVars.nₛᵘ,1,Q)
@@ -415,11 +415,11 @@ function build_Param_RHS(RBInfo::Info, RBVars::PoissonSTGRB, Param)
 
   δtθ = RBInfo.δt*RBInfo.θ
 
-  F_t = assemble_forcing(FESpace, RBInfo, Param)
-  H_t = assemble_neumann_datum(FESpace, RBInfo, Param)
+  F_t = assemble_forcing(FEMSpace, RBInfo, Param)
+  H_t = assemble_neumann_datum(FEMSpace, RBInfo, Param)
   F, H = zeros(RBVars.S.Nₛᵘ, RBVars.Nₜ), zeros(RBVars.S.Nₛᵘ, RBVars.Nₜ)
-  times_θ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+δtθ
-  for (i, tᵢ) in enumerate(times_θ)
+  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+δtθ
+  for (i, tᵢ) in enumerate(timesθ)
     F[:,i] = F_t(tᵢ)
     H[:,i] = H_t(tᵢ)
   end

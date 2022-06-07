@@ -5,7 +5,7 @@ using Gridap
 using Gridap.Algebra
 using Gridap.Arrays
 using Gridap.CellData
-using Gridap.FESpaces
+using Gridap.FEMSpaces
 using Gridap.Fields
 using Gridap.Geometry
 using GridapGmsh

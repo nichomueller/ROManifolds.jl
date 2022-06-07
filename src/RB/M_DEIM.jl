@@ -1,3 +1,4 @@
+include("MV_snapshots.jl")
 #= function M_DEIM_POD(S::SparseMatrixCSC, ϵ = 1e-5)
 
   S̃ = copy(S)
@@ -113,33 +114,33 @@ function M_DEIM_offline(M_DEIM_mat::Matrix, Σ::Vector)
 
 end
 
-function MDEIM_offline(FESpace::SteadyProblem, RBInfo::Info, var::String)
+function MDEIM_offline(FEMSpace::SteadyProblem, RBInfo::Info, var::String)
 
   @info "Building $(RBInfo.nₛ_MDEIM) snapshots of $var"
 
   μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  snaps,row_idx = get_snaps_MDEIM(FESpace, RBInfo, μ, var)
+  snaps,row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, μ, var)
   sparse_MDEIM_mat, Σ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
   MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(sparse_MDEIM_mat, Σ)
-  r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx, FESpace.Nₛᵘ)
-  el = find_FE_elements(FESpace.V₀, FESpace.Ω, unique(union(r_idx, c_idx)))
+  r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx, FEMSpace.Nₛᵘ)
+  el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(union(r_idx, c_idx)))
 
   MDEIM_mat, MDEIM_idx, el, MDEIM_err_bound, Σ
 
 end
 
-function MDEIM_offline(FESpace::UnsteadyProblem, RBInfo::Info, var::String)
+function MDEIM_offline(FEMSpace::UnsteadyProblem, RBInfo::Info, var::String)
 
   if RBInfo.functional_M_DEIM
-    return MDEIM_offline_functional(FESpace, RBInfo, var)
+    return MDEIM_offline_functional(FEMSpace, RBInfo, var)
   else RBInfo.functional_M_DEIM
-    return MDEIM_offline_algebraic(FESpace, RBInfo, var)
+    return MDEIM_offline_algebraic(FEMSpace, RBInfo, var)
   end
 
 end
 
-function MDEIM_offline_algebraic(
-  FESpace::UnsteadyProblem,
+function MDEIM_offline(
+  FEMSpace::UnsteadyProblem,
   RBInfo::Info,
   var::String)
 
@@ -147,20 +148,20 @@ function MDEIM_offline_algebraic(
   at each time step. This will take some time."
 
   μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  snaps,row_idx = get_snaps_MDEIM(FESpace, RBInfo, μ, var)
+  snaps,row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, μ, var)
   MDEIM_mat, Σ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
   MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat, Σ)
   MDEIMᵢ_mat = MDEIM_mat[MDEIM_idx,:]
-  MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx,row_idx,FESpace.Nₛᵘ)
-  MDEIM_idx_sparse_space, _ = from_vec_to_mat_idx(MDEIM_idx_sparse,FESpace.Nₛᵘ)
-  el = find_FE_elements(FESpace.V₀, FESpace.Ω, unique(MDEIM_idx_sparse_space))
+  MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx,row_idx,FEMSpace.Nₛᵘ)
+  MDEIM_idx_sparse_space, _ = from_vec_to_mat_idx(MDEIM_idx_sparse,FEMSpace.Nₛᵘ)
+  el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(MDEIM_idx_sparse_space))
 
   MDEIM_mat, MDEIM_idx_sparse, MDEIMᵢ_mat, row_idx, el
 
 end
 
 function MDEIM_offline_functional(
-  FESpace::UnsteadyProblem,
+  FEMSpace::UnsteadyProblem,
   RBInfo::Info,
   var::String)
 
@@ -168,20 +169,7 @@ function MDEIM_offline_functional(
   This will take some time."
 
   μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  Nₜ = convert(Int64, RBInfo.T / RBInfo.δt)
-  δtθ = RBInfo.δt*RBInfo.θ
-  times_θ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+δtθ
 
-  ξₖ = get_cell_map(FESpace.Ω)
-  Qₕ_cell_point = get_cell_points(FESpace.Qₕ)
-  qₖ = get_data(Qₕ_cell_point)
-  phys_quadp = lazy_map(evaluate,ξₖ,qₖ)
-  ncells = length(phys_quadp)
-  nquad_cell = length(phys_quadp[1])
-  nquad = nquad_cell*ncells
-
-  refFE_quad = ReferenceFE(lagrangian_quad, Float64, FEMInfo.order)
-  V₀_quad = TestFESpace(model, refFE_quad, conformity=:L2)
 
   for k = 1:RBInfo.nₛ_MDEIM
     @info "Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)"
@@ -190,17 +178,16 @@ function MDEIM_offline_functional(
     Param = get_ParamInfo(problem_ntuple, RBInfo, μₖ)
     #= if var == "A"
       snapsₖ = [Param.α(phys_quadp[n][q],t_θ)
-      for n = 1:ncells for q = 1:nquad_cell for t_θ = times_θ]
+      for n = 1:ncells for q = 1:nquad_cell for t_θ = timesθ]
     elseif var == "M"
       snapsₖ = [Param.m(phys_quadp[n][q],t_θ)
-      for n = 1:ncells for q = 1:nquad_cell for t_θ = times_θ]
+      for n = 1:ncells for q = 1:nquad_cell for t_θ = timesθ]
     else
       @error "Run MDEIM on A or M only"
     end =#
     snapsₖ = [Param.α(phys_quadp[n][q],t_θ)
-    for n = 1:ncells for q = 1:nquad_cell for t_θ = times_θ]
-    snapsₖ = reshape(snapsₖ,nquad,Nₜ)
-    compressed_snapsₖ, _ = POD(snapsₖ, RBInfo.ϵₛ)
+    for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
+    compressed_snapsₖ, _ = POD(reshape(snapsₖ,nquad,Nₜ), RBInfo.ϵₛ)
     if k == 1
       global compressed_snaps = compressed_snapsₖ
     else
@@ -210,38 +197,40 @@ function MDEIM_offline_functional(
   end
 
   Θmat, Σ = POD(compressed_snaps, RBInfo.ϵₛ)
-  Q = size(Param_mat)[2]
+  Q = size(Θmat)[2]
 
   for q = 1:Q
     Θq = FEFunction(V₀_quad,Θmat[:,q])
-    if var == "A"
-      Matq = (assemble_matrix(∫(∇(FESpace.ϕᵥ)⋅(Θq*∇(FESpace.ϕᵤ(0.0))))*FESpace.dΩ,
-       FESpace.V(0.0), FESpace.V₀))
+    #= if var == "A"
+      Matq = (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Θq*∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
+       FEMSpace.V(0.0), FEMSpace.V₀))
     elseif var == "M"
-      Matq = assemble_matrix(∫(FESpace.ϕᵥ*(Θq*FESpace.ϕᵤ(0.0)))*FESpace.dΩ,
-      FESpace.V(0.0), FESpace.V₀)
-    end
-    row_idx, val = findnz(Matq[:])
+      Matq = assemble_matrix(∫(FEMSpace.ϕᵥ*(Θq*FEMSpace.ϕᵤ(0.0)))*FEMSpace.dΩ,
+      FEMSpace.V(0.0), FEMSpace.V₀)
+    end =#
+    Matq = (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Θq*∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
+       FEMSpace.V(0.0), FEMSpace.V₀))
+    i,v = findnz(Matq[:])
     if q == 1
-      global affine_mat = sparse(row_idx, ones(length(row_idx)),
-      val, size(Matq)[1]^2, Q)
+      global row_idx = i
+      global zeros(length(row_idx),Q)
     else
-      global affine_mat[:,q] = sparse(row_idx, ones(length(row_idx)), val)
+      global Mat_affine[:,q] = v
     end
   end
 
-  MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(affine_mat, Σ)
+  MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(Mat_affine, Σ)
 
-  MDEIM_mat, MDEIM_idx, el, MDEIM_err_bound, Σ
+  MDEIM_mat, MDEIM_idx_sparse, MDEIMᵢ_mat, row_idx, el
 
 end
 
-function DEIM_offline(FESpace::SteadyProblem, RBInfo::Info, var::String)
+function DEIM_offline(FEMSpace::SteadyProblem, RBInfo::Info, var::String)
 
   @info "Building $(RBInfo.nₛ_DEIM) snapshots of $var"
 
   μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  snaps = get_snaps_DEIM(FESpace, RBInfo, μ, var)
+  snaps = get_snaps_DEIM(FEMSpace, RBInfo, μ, var)
   sparse_DEIM_mat, Σ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
   DEIM_mat, DEIM_idx, DEIM_err_bound = M_DEIM_offline(sparse_DEIM_mat, Σ)
   unique!(DEIM_idx)
@@ -250,18 +239,18 @@ function DEIM_offline(FESpace::SteadyProblem, RBInfo::Info, var::String)
 
 end
 
-function DEIM_offline(FESpace::UnsteadyProblem, RBInfo::Info, var::String)
+function DEIM_offline(FEMSpace::UnsteadyProblem, RBInfo::Info, var::String)
 
   if RBInfo.functional_M_DEIM
-    DEIM_offline_functional(FESpace, RBInfo, var)
+    DEIM_offline_functional(FEMSpace, RBInfo, var)
   else
-    DEIM_offline_algebraic(FESpace, RBInfo, var)
+    DEIM_offline_algebraic(FEMSpace, RBInfo, var)
   end
 
 end
 
 function DEIM_offline_algebraic(
-  FESpace::UnsteadyProblem,
+  FEMSpace::UnsteadyProblem,
   RBInfo::Info,
   var::String)
 
@@ -269,7 +258,7 @@ function DEIM_offline_algebraic(
   @info "Building $(RBInfo.nₛ_DEIM) snapshots of $var at each time step."
 
   μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  snaps = get_snaps_DEIM(FESpace, RBInfo, μ, var)
+  snaps = get_snaps_DEIM(FEMSpace, RBInfo, μ, var)
   sparse_DEIM_mat, Σ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
   DEIM_mat, DEIM_idx, DEIM_err_bound = M_DEIM_offline(sparse_DEIM_mat, Σ)
   unique!(DEIM_idx)
@@ -278,7 +267,7 @@ function DEIM_offline_algebraic(
 
 end
 
-function DEIM_offline_functional(FESpace::UnsteadyProblem,
+function DEIM_offline_functional(FEMSpace::UnsteadyProblem,
   RBInfo::Info,
   var::String)
   error("Functional DEIM not implemented yet")

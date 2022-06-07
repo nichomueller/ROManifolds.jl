@@ -31,19 +31,19 @@ function simple_model()
   dΓd = Measure(Γd, degree)
   Qₕ = CellQuadrature(Ω, degree)
 
-  refFE = ReferenceFE(lagrangian, Float64, 1)
-  V₀ = TestFESpace(model, refFE; conformity=:H1)
+  refFE = Gridap.ReferenceFE(lagrangian, Float64, 1)
+  V₀ = TestFEMSpace(model, refFE; conformity=:H1)
   g₀(x, t::Real) = 0
   g₀(t::Real) = x->g₀(x,t)
-  V = TransientTrialFESpace(V₀, g₀)
+  V = TransientTrialFEMSpace(V₀, g₀)
 
   ϕᵥ = get_fe_basis(V₀)
   ϕᵤ(t) = get_trial_fe_basis(V(t))
   Nₛᵘ = length(get_free_dof_ids(V₀))
 
-  FESpace = FESpacePoissonUnsteady(Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, dΩ, dΓd, dΓn)
+  FEMSpace = FEMSpacePoissonUnsteady(Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, dΩ, dΓd, dΓn)
 
-  return FESpace
+  return FEMSpace
 
 end
 
@@ -52,9 +52,9 @@ function MDEIM_offline_spacetime(II::info,S::Matrix,row_idx) :: Tuple
   MDEIM_mat, Σ = POD(S, II.ϵ)
   MDEIM_mat, MDEIM_idx, _ = M_DEIM_offline(MDEIM_mat, Σ)
   MDEIMᵢ_mat = MDEIM_mat[MDEIM_idx,:]
-  MDEIM_idx_sparse = from_full_idx_to_sparse_idx(row_idx,MDEIM_idx,FESpace.Nₛᵘ)
-  MDEIM_idx_sparse_space, _ = from_spacetime_to_space_time_idx_vec(MDEIM_idx_sparse,FESpace.Nₛᵘ)
-  el = find_FE_elements(FESpace.V₀, FESpace.Ω, unique(MDEIM_idx_sparse_space))
+  MDEIM_idx_sparse = from_full_idx_to_sparse_idx(row_idx,MDEIM_idx,FEMSpace.Nₛᵘ)
+  MDEIM_idx_sparse_space, _ = from_spacetime_to_space_time_idx_vec(MDEIM_idx_sparse,FEMSpace.Nₛᵘ)
+  el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(MDEIM_idx_sparse_space))
 
   return MDEIM_mat, MDEIM_idx_sparse, MDEIMᵢ_mat, el
 
@@ -79,19 +79,19 @@ end
 
 function modify_MDEIM_idx(MDEIM_idx) ::Vector
 
-  idx_space, idx_time = from_spacetime_to_space_time_idx_vec(MDEIM_idx,FESpace.Nₛᵘ^2)
+  idx_space, idx_time = from_spacetime_to_space_time_idx_vec(MDEIM_idx,FEMSpace.Nₛᵘ^2)
   idx_time_new = assign_label_to_sorted_elems(idx_time)
-  MDEIM_idx_new = (idx_time_new.-1)*FESpace.Nₛᵘ^2+idx_space
+  MDEIM_idx_new = (idx_time_new.-1)*FEMSpace.Nₛᵘ^2+idx_space
 
   return MDEIM_idx_new
 
 end
 
-function test_st_MDEIM(FESpace,II::info,S::Matrix,row_idx)
+function test_st_MDEIM(FEMSpace,II::info,S::Matrix,row_idx)
 
   MDEIM_mat, MDEIM_idx_sparse, MDEIMᵢ_mat, el = MDEIM_offline_spacetime(II,S,row_idx)
-  #online_snap = define_online_ST_stiffness(FESpace, RBInfo, el)
-  online_snap_fast = define_online_ST_stiffness_fast(FESpace, RBInfo, el, MDEIM_idx_sparse)
+  #online_snap = define_online_ST_stiffness(FEMSpace, RBInfo, el)
+  online_snap_fast = define_online_ST_stiffness_fast(FEMSpace, RBInfo, el, MDEIM_idx_sparse)
   MDEIM_idx_new = modify_MDEIM_idx(MDEIM_idx_sparse)
   #θ = get_θₛₜ(MDEIM_idx_sparse,MDEIMᵢ_mat,online_snap)
   θ_fast = get_θₛₜ(MDEIM_idx_new,MDEIMᵢ_mat,online_snap_fast)
@@ -104,7 +104,7 @@ end
 
 #= function check_similarity_approx_matrices()
   approx_snap = MDEIM_mat*θfast
-  _, idx_time = from_spacetime_to_space_time_idx_vec(MDEIM_idx_sparse, FESpace.Nₛᵘ^2)
+  _, idx_time = from_spacetime_to_space_time_idx_vec(MDEIM_idx_sparse, FEMSpace.Nₛᵘ^2)
   idx_time = sort(idx_time)
   unique!(idx_time)
   idx_collect = Int64[]
@@ -128,19 +128,19 @@ function check_eigen(online_snap,approx_snap,Nₜ)
 end
 
 """Unsteady case"""
-function run_one_test_ST_MDEIM(FESpace, RBInfo, nₛMDEIM::Int64)
+function run_one_test_ST_MDEIM(FEMSpace, RBInfo, nₛMDEIM::Int64)
 
-  snaps, row_idx = define_offline_snaps(FESpace, RBInfo, nₛMDEIM)
+  snaps, row_idx = define_offline_snaps(FEMSpace, RBInfo, nₛMDEIM)
   #snaps_red = define_offline_snaps_red(snaps)
   II = info(length(row_idx), 50, nₛMDEIM, 1e-5)
 
   runtime = @elapsed begin
-    approx_snap, Q, el = test_st_MDEIM(FESpace,II,snaps,row_idx)
+    approx_snap, Q, el = test_st_MDEIM(FEMSpace,II,snaps,row_idx)
   end
   #= runtime_red = @elapsed begin
-    approx_snap_red, Q_red = test_st_MDEIM(FESpace,II,snaps_red,row_idx)
+    approx_snap_red, Q_red = test_st_MDEIM(FEMSpace,II,snaps_red,row_idx)
   end =#
-  online_snap = define_online_ST_stiffness_old(FESpace, RBInfo, el, row_idx)
+  online_snap = define_online_ST_stiffness_old(FEMSpace, RBInfo, el, row_idx)
   diff = online_snap - approx_snap
   #diff_red = online_snap - approx_snap_red
   #err = [norm(diff)/norm(online_snap),norm(diff_red)/norm(online_snap)]
@@ -148,10 +148,10 @@ function run_one_test_ST_MDEIM(FESpace, RBInfo, nₛMDEIM::Int64)
   err,runtime,Q
 end
 
-function define_offline_snaps(FESpace, RBInfo, nₛMDEIM::Int64)
+function define_offline_snaps(FEMSpace, RBInfo, nₛMDEIM::Int64)
 
-  times_θ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
-  Nₜ = length(times_θ)
+  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
+  Nₜ = length(timesθ)
   path = "/home/user1/git_repos/Mabla.jl/tests/unsteady/poisson/3D_1/model.json/FEM_data/snapshots/μ.csv"
   μ = load_CSV(path)
 
@@ -159,11 +159,11 @@ function define_offline_snaps(FESpace, RBInfo, nₛMDEIM::Int64)
     @info "Considering Parameter number $k, need $(nₛMDEIM-k) more!"
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
     Param = get_ParamInfo(problem_ntuple, RBInfo, μₖ)
-    A_t = assemble_stiffness(FESpace, RBInfo, Param)
+    A_t = assemble_stiffness(FEMSpace, RBInfo, Param)
 
     for i_t = 1:Nₜ
       @info "Snapshot at time step $i_t/Nₜ"
-      A_i = A_t(times_θ[i_t])
+      A_i = A_t(timesθ[i_t])
       i, v = findnz(A_i[:])
       if i_t === 1
         global row_idx = i
@@ -203,44 +203,44 @@ function define_offline_snaps_red(full_snap)
 
 end
 
-function define_online_ST_stiffness(FESpace, RBInfo, el)
+function define_online_ST_stiffness(FEMSpace, RBInfo, el)
 
   path = "/home/user1/git_repos/Mabla.jl/tests/unsteady/poisson/3D_1/model.json/FEM_data/snapshots/μ.csv"
-  times_θ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
+  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
   μ = load_CSV(path)
   μₒₙ = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
   Param = get_ParamInfo(problem_ntuple, RBInfo, μₒₙ)
-  Ω_sparse = view(FESpace.Ω, el)
+  Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2)
-  A(t) = assemble_matrix(∫(∇(FESpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FESpace.ϕᵤ(t)))) * dΩ_sparse, FESpace.V(t), FESpace.V₀)
+  A(t) = assemble_matrix(∫(∇(FEMSpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FEMSpace.ϕᵤ(t)))) * dΩ_sparse, FEMSpace.V(t), FEMSpace.V₀)
 
-  for (nₜ,t) in enumerate(times_θ)
+  for (nₜ,t) in enumerate(timesθ)
     @info "Online snap, considering time step $nₜ/50"
     i,j,v = findnz(A(t))
     if nₜ === 1
-      global Aₒₙ = sparse(i,j,v,FESpace.Nₛᵘ,FESpace.Nₛᵘ*length(times_θ))
+      global Aₒₙ = sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ*length(timesθ))
     end
-    global Aₒₙ[:,(nₜ-1)*FESpace.Nₛᵘ+1:nₜ*FESpace.Nₛᵘ] = sparse(i,j,v,FESpace.Nₛᵘ,FESpace.Nₛᵘ)
+    global Aₒₙ[:,(nₜ-1)*FEMSpace.Nₛᵘ+1:nₜ*FEMSpace.Nₛᵘ] = sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ)
   end
 
   return Aₒₙ
 
 end
 
-function define_online_ST_stiffness_old(FESpace, RBInfo, el, row_idx)
+function define_online_ST_stiffness_old(FEMSpace, RBInfo, el, row_idx)
 
   path = "/home/user1/git_repos/Mabla.jl/tests/unsteady/poisson/3D_1/model.json/FEM_data/snapshots/μ.csv"
-  times_θ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
+  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
   μ = load_CSV(path)
   μₒₙ = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
   Param = get_ParamInfo(problem_ntuple, RBInfo, μₒₙ)
-  Acom(t) = assemble_matrix(∫(∇(FESpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FESpace.ϕᵤ(t)))) * FESpace.dΩ, FESpace.V(t), FESpace.V₀)
+  Acom(t) = assemble_matrix(∫(∇(FEMSpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FEMSpace.ϕᵤ(t)))) * FEMSpace.dΩ, FEMSpace.V(t), FEMSpace.V₀)
 
-  for (nₜ,t) = enumerate(times_θ)
+  for (nₜ,t) = enumerate(timesθ)
     @info "Considering time step $nₜ/50"
     Aₒₙₜ_com = Matrix(reshape(Acom(t)[:][row_idx],:,1))
     if nₜ === 1
-      global Aₒₙ_com = zeros(length(Aₒₙₜ_com)*length(times_θ),1)
+      global Aₒₙ_com = zeros(length(Aₒₙₜ_com)*length(timesθ),1)
     end
     global Aₒₙ_com[(nₜ-1)*length(Aₒₙₜ_com)+1:nₜ*length(Aₒₙₜ_com)] = Aₒₙₜ_com
   end
@@ -249,50 +249,50 @@ function define_online_ST_stiffness_old(FESpace, RBInfo, el, row_idx)
 
 end
 
-function define_online_ST_stiffness_fast(FESpace, RBInfo, el, MDEIM_idx_sparse)
+function define_online_ST_stiffness_fast(FEMSpace, RBInfo, el, MDEIM_idx_sparse)
 
   path = "/home/user1/git_repos/Mabla.jl/tests/unsteady/poisson/3D_1/model.json/FEM_data/snapshots/μ.csv"
-  times_θ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
+  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
   μ = load_CSV(path)
   μₒₙ = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
   Param = get_ParamInfo(problem_ntuple, RBInfo, μₒₙ)
-  Ω_sparse = view(FESpace.Ω, el)
+  Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2)
-  _, idx_time = from_spacetime_to_space_time_idx_vec(MDEIM_idx_sparse, FESpace.Nₛᵘ^2)
+  _, idx_time = from_spacetime_to_space_time_idx_vec(MDEIM_idx_sparse, FEMSpace.Nₛᵘ^2)
   idx_time = sort(idx_time)
   unique!(idx_time)
-  A(t) = assemble_matrix(∫(∇(FESpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FESpace.ϕᵤ(t)))) * dΩ_sparse, FESpace.V(t), FESpace.V₀)
+  A(t) = assemble_matrix(∫(∇(FEMSpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FEMSpace.ϕᵤ(t)))) * dΩ_sparse, FEMSpace.V(t), FEMSpace.V₀)
 
-  for (nₜ,t) in enumerate(times_θ[idx_time])
+  for (nₜ,t) in enumerate(timesθ[idx_time])
     @info "Online snap, considering time step $nₜ/$(length(idx_time))"
     i,j,v = findnz(A(t))
     if nₜ === 1
-      global Aₒₙ = sparse(i,j,v,FESpace.Nₛᵘ,FESpace.Nₛᵘ*length(idx_time))
+      global Aₒₙ = sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ*length(idx_time))
     end
-    global Aₒₙ[:,(nₜ-1)*FESpace.Nₛᵘ+1:nₜ*FESpace.Nₛᵘ] = sparse(i,j,v,FESpace.Nₛᵘ,FESpace.Nₛᵘ)
+    global Aₒₙ[:,(nₜ-1)*FEMSpace.Nₛᵘ+1:nₜ*FEMSpace.Nₛᵘ] = sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ)
   end
 
   return Aₒₙ
 
 end
 
-function run_multiple_tests_ST_MDEIM(FESpace,RBInfo)
+function run_multiple_tests_ST_MDEIM(FEMSpace,RBInfo)
 
   err_vec = Float64[]
   time_vec = Float64[]
   Q_vec = Int64[]
 
-  #err1,time1,Q1 = run_one_test_ST_MDEIM(FESpace, RBInfo, 1)
-  err2,time2,Q2 = run_one_test_ST_MDEIM(FESpace, RBInfo, 3)
-  err3,time3,Q3 = run_one_test_ST_MDEIM(FESpace, RBInfo, 6)
-  err4,time4,Q4 = run_one_test_ST_MDEIM(FESpace, RBInfo, 9)
-  err5,time5,Q5 = run_one_test_ST_MDEIM(FESpace, RBInfo, 12)
-  err6,time6,Q6 = run_one_test_ST_MDEIM(FESpace, RBInfo, 15)
-  err7,time7,Q7 = run_one_test_ST_MDEIM(FESpace, RBInfo, 18)
-  err8,time8,Q8 = run_one_test_ST_MDEIM(FESpace, RBInfo, 21)
-  err9,time9,Q9 = run_one_test_ST_MDEIM(FESpace, RBInfo, 24)
-  err10,time10,Q10 = run_one_test_ST_MDEIM(FESpace, RBInfo, 27)
-  err11,time11,Q11 = run_one_test_ST_MDEIM(FESpace, RBInfo, 30)
+  #err1,time1,Q1 = run_one_test_ST_MDEIM(FEMSpace, RBInfo, 1)
+  err2,time2,Q2 = run_one_test_ST_MDEIM(FEMSpace, RBInfo, 3)
+  err3,time3,Q3 = run_one_test_ST_MDEIM(FEMSpace, RBInfo, 6)
+  err4,time4,Q4 = run_one_test_ST_MDEIM(FEMSpace, RBInfo, 9)
+  err5,time5,Q5 = run_one_test_ST_MDEIM(FEMSpace, RBInfo, 12)
+  err6,time6,Q6 = run_one_test_ST_MDEIM(FEMSpace, RBInfo, 15)
+  err7,time7,Q7 = run_one_test_ST_MDEIM(FEMSpace, RBInfo, 18)
+  err8,time8,Q8 = run_one_test_ST_MDEIM(FEMSpace, RBInfo, 21)
+  err9,time9,Q9 = run_one_test_ST_MDEIM(FEMSpace, RBInfo, 24)
+  err10,time10,Q10 = run_one_test_ST_MDEIM(FEMSpace, RBInfo, 27)
+  err11,time11,Q11 = run_one_test_ST_MDEIM(FEMSpace, RBInfo, 30)
 
   err_vec = [err2,err3,err4,err5,err6,err7,err8,err9,err10,err11]
   time_vec = [time2,time3,time4,time5,time6,time7,time8,time9,time10,time11]
@@ -306,8 +306,8 @@ function run_multiple_tests_ST_MDEIM(FESpace,RBInfo)
 
 end
 
-#FESpace = simple_model()
-err_vec,time_vec,Q_vec = run_multiple_tests_ST_MDEIM(FESpace,RBInfo)
+#FEMSpace = simple_model()
+err_vec,time_vec,Q_vec = run_multiple_tests_ST_MDEIM(FEMSpace,RBInfo)
 
 
 ################################################################################
@@ -379,21 +379,21 @@ function M_DEIM_offline_old(sparse_M_DEIM_mat::SparseMatrixCSC, Σ::Vector)
 
 end
 
-function build_A_snapshots_old(FESpace::UnsteadyProblem, RBInfo::Info, μ::Vector)
+function build_A_snapshots_old(FEMSpace::UnsteadyProblem, RBInfo::Info, μ::Vector)
 
   Nₜ = convert(Int64, RBInfo.T/RBInfo.δt)
   δtθ = RBInfo.δt*RBInfo.θ
-  times_θ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+δtθ
+  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+δtθ
 
   Param = get_ParamInfo(problem_ntuple, RBInfo, μ)
-  A_t = assemble_stiffness(FESpace, RBInfo, Param)
+  A_t = assemble_stiffness(FEMSpace, RBInfo, Param)
 
   for i_t = 1:Nₜ
     @info "Snapshot at time step $i_t, stiffness"
-    A_i = A_t(times_θ[i_t])
+    A_i = A_t(timesθ[i_t])
     i, v = findnz(A_i[:])
     if i_t === 1
-      global A = sparse(i, ones(length(i)), v, FESpace.Nₛᵘ^2, Nₜ)
+      global A = sparse(i, ones(length(i)), v, FEMSpace.Nₛᵘ^2, Nₜ)
     else
       global A[:, i_t] = sparse(i, ones(length(i)), v)
     end
@@ -403,7 +403,7 @@ function build_A_snapshots_old(FESpace::UnsteadyProblem, RBInfo::Info, μ::Vecto
 
 end
 
-function MDEIM_offline_old(FESpace::UnsteadyProblem, RBInfo::Info)
+function MDEIM_offline_old(FEMSpace::UnsteadyProblem, RBInfo::Info)
 
   @info "Building $(RBInfo.nₛ_MDEIM) snapshots of $var, at each time step. This will take some time."
 
@@ -413,7 +413,7 @@ function MDEIM_offline_old(FESpace::UnsteadyProblem, RBInfo::Info)
     @info "Considering Parameter number $k, need $(RBInfo.nₛ_MDEIM-k) more!"
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
 
-    snapsₖ = build_A_snapshots_old(FESpace, RBInfo, μₖ)
+    snapsₖ = build_A_snapshots_old(FEMSpace, RBInfo, μₖ)
 
     compressed_snapsₖ, _ = M_DEIM_POD_old(snapsₖ, RBInfo.ϵₛ)
     if k === 1
@@ -429,7 +429,7 @@ function MDEIM_offline_old(FESpace::UnsteadyProblem, RBInfo::Info)
   Nₕ = convert(Int64, sqrt(size(MDEIM_mat_old)[1]))
   r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx_old, Nₕ)
 
-  el_old = find_FE_elements(FESpace.V₀, FESpace.Ω, unique(union(r_idx, c_idx)))
+  el_old = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(union(r_idx, c_idx)))
 
   MDEIM_mat_old, MDEIM_idx_old, el_old, MDEIM_err_bound, Σ
 
@@ -437,7 +437,7 @@ end
 
 function assemble_MDEIM_matrices_old(RBInfo::Info, RBVars::PoissonSTGRB)
 
-  MDEIM_mat_old, MDEIM_idx_old, sparse_el_old, _, _ = MDEIM_offline_old(FESpace, RBInfo)
+  MDEIM_mat_old, MDEIM_idx_old, sparse_el_old, _, _ = MDEIM_offline_old(FEMSpace, RBInfo)
   Q = size(MDEIM_mat_old)[2]
   #= Matₙ = zeros(RBVars.S.nₛᵘ, RBVars.S.nₛᵘ, Q)
   for q = 1:Q
@@ -454,7 +454,7 @@ end
 function get_θᵃ_old(RBVars,MDEIM_mat_old, MDEIM_idx_old, MDEIMᵢ_mat_old, sparse_el_old)
 
   Qold = size(MDEIM_mat_old)[2]
-  A_μ_sparse_old = build_sparse_mat_old(FEMInfo, FESpace, RBInfo, sparse_el_old)
+  A_μ_sparse_old = build_sparse_mat_old(FEMInfo, FEMSpace, RBInfo, sparse_el_old)
   Nₛᵘ = RBVars.S.Nₛᵘ
   θᵃ_old = zeros(RBVars.S.Qᵃ, RBVars.Nₜ)
   for iₜ = 1:RBVars.Nₜ
@@ -467,27 +467,27 @@ function get_θᵃ_old(RBVars,MDEIM_mat_old, MDEIM_idx_old, MDEIMᵢ_mat_old, sp
 
 end
 
-function build_sparse_mat_old(FEMInfo::ProblemInfoUnsteady, FESpace::UnsteadyProblem, RBInfo::Info, el::Vector)
+function build_sparse_mat_old(FEMInfo::ProblemInfoUnsteady, FEMSpace::UnsteadyProblem, RBInfo::Info, el::Vector)
 
   μ=load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
   μ_nb = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
   Param = get_ParamInfo(problem_ntuple, RBInfo, μ_nb)
 
-  Ω_sparse = view(FESpace.Ω, el)
+  Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
-  times_θ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
+  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
   Nₜ = convert(Int64, RBInfo.T / RBInfo.δt)
 
   function define_Matₜ(t::Real)
-    return assemble_matrix(∫(∇(FESpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FESpace.ϕᵤ(t)))) * dΩ_sparse, FESpace.V(t), FESpace.V₀)
+    return assemble_matrix(∫(∇(FEMSpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FEMSpace.ϕᵤ(t)))) * dΩ_sparse, FEMSpace.V(t), FEMSpace.V₀)
   end
   Matₜ(t) = define_Matₜ(t)
 
-  i,j,v = findnz(Matₜ(times_θ[1]))
-  Mat = sparse(i,j,v,FESpace.Nₛᵘ,FESpace.Nₛᵘ*Nₜ)
-  for (i_t,t) in enumerate(times_θ[2:end])
+  i,j,v = findnz(Matₜ(timesθ[1]))
+  Mat = sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ*Nₜ)
+  for (i_t,t) in enumerate(timesθ[2:end])
     i,j,v = findnz(Matₜ(t))
-    Mat[:,i_t*FESpace.Nₛᵘ+1:(i_t+1)*FESpace.Nₛᵘ] = sparse(i,j,v,FESpace.Nₛᵘ,FESpace.Nₛᵘ)
+    Mat[:,i_t*FEMSpace.Nₛᵘ+1:(i_t+1)*FEMSpace.Nₛᵘ] = sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ)
   end
 
   Mat
@@ -496,12 +496,12 @@ end
 
 
 function test_old_MDEIM(RBInfo, RBVars)
-  MDEIM_mat_old, MDEIM_idx_old, sparse_el_old,_,_ = MDEIM_offline_old(FESpace, RBInfo)
+  MDEIM_mat_old, MDEIM_idx_old, sparse_el_old,_,_ = MDEIM_offline_old(FEMSpace, RBInfo)
   MDEIMᵢ_mat_old = MDEIM_mat_old[MDEIM_idx_old,:]
   μ=load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
   μ_nb = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
   #Param = get_ParamInfo(problem_ntuple, RBInfo, μ_nb)
-  A = build_A_snapshots_old(FESpace, RBInfo, μ_nb)
+  A = build_A_snapshots_old(FEMSpace, RBInfo, μ_nb)
   θᵃ_old = get_θᵃ_old(RBVars,MDEIM_mat_old, MDEIM_idx_old, MDEIMᵢ_mat_old, sparse_el_old)
   Aapprox = MDEIM_mat_old*θᵃ_old
   norm(A-Aapprox)

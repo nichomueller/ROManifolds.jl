@@ -15,11 +15,11 @@ const dirichlet_tags = ["sides"]
 const neumann_tags = ["circle", "triangle", "square"]
 const solver = "lu"
 
-const FEMInfo = problem_Info(order, dirichlet_tags, neumann_tags, solver, paths, problem_nonlinearities)
+const FEMInfo = FEMInfo(order, dirichlet_tags, neumann_tags, solver, paths, problem_nonlinearities)
 
 
 
-#= struct problem_Info
+#= struct FEMInfo
     problem_name::String
     problem_type::String
     paths::Function

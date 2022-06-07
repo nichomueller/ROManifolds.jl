@@ -90,7 +90,7 @@ function assemble_MDEIM_matrices(RBInfo::Info, RBVars::PoissonSPGRB, var::String
   if var == "A"
 
     @info "The stiffness is non-affine: running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots. This might take some time"
-    MDEIM_mat, RBVars.MDEIM_idx_A, RBVars.sparse_el_A, MDEIM_err_bound, MDEIM_Σ = MDEIM_offline(FESpace, RBInfo, "A")
+    MDEIM_mat, RBVars.MDEIM_idx_A, RBVars.sparse_el_A, MDEIM_err_bound, MDEIM_Σ = MDEIM_offline(FEMSpace, RBInfo, "A")
     RBVars.Qᵃ = size(MDEIM_mat)[2]
 
     AΦ = zeros(RBVars.Nₛᵘ, RBVars.nₛᵘ, RBVars.Qᵃ)
@@ -150,7 +150,7 @@ function assemble_DEIM_vectors(RBInfo::Info, RBVars::PoissonSPGRB, var::String)
 
   @info "SPGRB: forcing term is non-affine: running the DEIM offline phase on $nₛ_DEIM snapshots; A is affine"
 
-  DEIM_mat, DEIM_idx, _, _ = DEIM_offline(FESpace, RBInfo, var)
+  DEIM_mat, DEIM_idx, _, _ = DEIM_offline(FEMSpace, RBInfo, var)
   DEIMᵢ_mat = Matrix(DEIM_mat[DEIM_idx, :])
   Q = size(DEIM_mat)[2]
   varₙ = zeros(RBVars.nₛᵘ,1,RBVars.Qᵃ*Q)
@@ -194,8 +194,8 @@ end
 function build_Param_RHS(RBInfo::Info, RBVars::PoissonSPGRB, Param, θᵃ::Vector) :: Tuple
 
   θᵃ_temp = θᵃ[1:RBVars.Qᵃ]/sqrt(θᵃ[1])
-  F = assemble_forcing(FESpace, RBInfo, Param)
-  H = assemble_neumann_datum(FESpace, RBInfo, Param)
+  F = assemble_forcing(FEMSpace, RBInfo, Param)
+  H = assemble_neumann_datum(FEMSpace, RBInfo, Param)
   AΦᵀPᵤ⁻¹ = assemble_online_structure(θᵃ_temp, RBVars.AΦᵀPᵤ⁻¹)
   Fₙ, Hₙ = AΦᵀPᵤ⁻¹ * F, AΦᵀPᵤ⁻¹ * H
 

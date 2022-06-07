@@ -60,12 +60,12 @@ function POD(S, ϵ = 1e-5, X = nothing)
 
 end
 
-function build_sparse_mat(FEMInfo::ProblemInfoSteady, FESpace::SteadyProblem, Param::ParametricInfoSteady, el::Vector; var="A")
+function build_sparse_mat(FEMInfo::ProblemInfoSteady, FEMSpace::SteadyProblem, Param::ParametricInfoSteady, el::Vector; var="A")
 
-  Ω_sparse = view(FESpace.Ω, el)
+  Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
   if var == "A"
-    Mat = assemble_matrix(∫(∇(FESpace.ϕᵥ) ⋅ (Param.α * ∇(FESpace.ϕᵤ))) * dΩ_sparse, FESpace.V, FESpace.V₀)
+    Mat = assemble_matrix(∫(∇(FEMSpace.ϕᵥ) ⋅ (Param.α * ∇(FEMSpace.ϕᵤ))) * dΩ_sparse, FEMSpace.V, FEMSpace.V₀)
   else
     @error "Unrecognized sparse matrix"
   end
@@ -75,33 +75,33 @@ function build_sparse_mat(FEMInfo::ProblemInfoSteady, FESpace::SteadyProblem, Pa
 end
 
 function build_sparse_mat(FEMInfo::ProblemInfoUnsteady,
-  FESpace::UnsteadyProblem,
+  FEMSpace::UnsteadyProblem,
   Param::ParametricInfoUnsteady,
   el::Vector,
-  times_θ::Vector;
+  timesθ::Vector;
   var="A")
 
-  Ω_sparse = view(FESpace.Ω, el)
+  Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
-  Nₜ = length(times_θ)
+  Nₜ = length(timesθ)
 
   function define_Matₜ(t::Real, var::String)
     if var == "A"
-      return assemble_matrix(∫(∇(FESpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FESpace.ϕᵤ(t)))) * dΩ_sparse, FESpace.V(t), FESpace.V₀)
+      return assemble_matrix(∫(∇(FEMSpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FEMSpace.ϕᵤ(t)))) * dΩ_sparse, FEMSpace.V(t), FEMSpace.V₀)
     elseif mat == "M"
-      return assemble_matrix(∫(FESpace.ϕᵥ ⋅ (Param.m(t) * FESpace.ϕᵤ(t))) * dΩ_sparse, FESpace.V(t), FESpace.V₀)
+      return assemble_matrix(∫(FEMSpace.ϕᵥ ⋅ (Param.m(t) * FEMSpace.ϕᵤ(t))) * dΩ_sparse, FEMSpace.V(t), FEMSpace.V₀)
     else
       @error "Unrecognized sparse matrix"
     end
   end
   Matₜ(t) = define_Matₜ(t, var)
 
-  for (i_t,t) in enumerate(times_θ)
+  for (i_t,t) in enumerate(timesθ)
     i,j,v = findnz(Matₜ(t))
     if i_t == 1
-      global Mat = sparse(i,j,v,FESpace.Nₛᵘ,FESpace.Nₛᵘ*Nₜ)
+      global Mat = sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ*Nₜ)
     else
-      Mat[:,(i_t-1)*FESpace.Nₛᵘ+1:i_t*FESpace.Nₛᵘ] = sparse(i,j,v,FESpace.Nₛᵘ,FESpace.Nₛᵘ)
+      Mat[:,(i_t-1)*FEMSpace.Nₛᵘ+1:i_t*FEMSpace.Nₛᵘ] = sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ)
     end
   end
 
@@ -154,8 +154,8 @@ function compute_errors(uₕ::Vector, RBVars::RBUnsteadyProblem, norm_matrix = n
 
 end
 
-function compute_MDEIM_error(FESpace::FEMProblem, RBInfo::Info, RBVars::RBProblem)
+function compute_MDEIM_error(FEMSpace::FEMProblem, RBInfo::Info, RBVars::RBProblem)
 
-  Aₙ_μ = (RBVars.Φₛᵘ)' * assemble_stiffness(FESpace, RBInfo, Param) * RBVars.Φₛᵘ
+  Aₙ_μ = (RBVars.Φₛᵘ)' * assemble_stiffness(FEMSpace, RBInfo, Param) * RBVars.Φₛᵘ
 
 end

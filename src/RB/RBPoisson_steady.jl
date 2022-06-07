@@ -1,3 +1,7 @@
+include("RB.jl")
+include("S-GRB_Poisson.jl")
+include("S-PGRB_Poisson.jl")
+
 function get_snapshot_matrix(RBInfo::Info, RBVars::PoissonSteady)
 
   @info "Importing the snapshot matrix for field u, number of snapshots considered: $(RBInfo.nₛ)"
@@ -348,7 +352,7 @@ function get_θᵃ(RBInfo::Info, RBVars::PoissonSteady, Param) ::Array
   if !RBInfo.probl_nl["A"]
     θᵃ = Param.α(Point(0.,0.))
   else
-    A_μ_sparse = build_sparse_mat(FEMInfo, FESpace, Param, RBVars.sparse_el_A)
+    A_μ_sparse = build_sparse_mat(FEMInfo, FEMSpace, Param, RBVars.sparse_el_A)
     θᵃ = M_DEIM_online(A_μ_sparse, RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A)
   end
 
@@ -365,14 +369,14 @@ function get_θᶠʰ(RBInfo::Info, RBVars::PoissonSteady, Param) ::Tuple
   if !RBInfo.probl_nl["f"] && !RBInfo.probl_nl["h"]
     θᶠ, θʰ = Param.f(Point(0.,0.)), Param.h(Point(0.,0.))
   elseif !RBInfo.probl_nl["f"] && RBInfo.probl_nl["h"]
-    H_μ = assemble_neumann_datum(FESpace, RBInfo, Param)
+    H_μ = assemble_neumann_datum(FEMSpace, RBInfo, Param)
     θᶠ, θʰ = Param.f(Point(0.,0.)), M_DEIM_online(H_μ, RBVars.DEIMᵢ_mat_H, RBVars.DEIM_idx_H)
   elseif RBInfo.probl_nl["f"] && !RBInfo.probl_nl["h"]
-    F_μ = assemble_forcing(FESpace, RBInfo, Param)
+    F_μ = assemble_forcing(FEMSpace, RBInfo, Param)
     θᶠ, θʰ = M_DEIM_online(F_μ, RBVars.DEIMᵢ_mat_F, RBVars.DEIM_idx_F), Param.h(Point(0.,0.))
   else RBInfo.probl_nl["f"] && RBInfo.probl_nl["h"]
-    F_μ = assemble_forcing(FESpace, RBInfo, Param)
-    H_μ = assemble_neumann_datum(FESpace, RBInfo, Param)
+    F_μ = assemble_forcing(FEMSpace, RBInfo, Param)
+    H_μ = assemble_neumann_datum(FEMSpace, RBInfo, Param)
     θᶠ, θʰ = M_DEIM_online(F_μ, RBVars.DEIMᵢ_mat_F, RBVars.DEIM_idx_F), M_DEIM_online(H_μ, RBVars.DEIMᵢ_mat_H, RBVars.DEIM_idx_H)
   end
 
@@ -557,7 +561,7 @@ function online_phase(RBInfo::Info, RBVars::PoissonSteady, μ, Param_nbs)
 
   end
 
-  pass_to_pp = Dict("path_μ"=>path_μ, "FESpace"=>FESpace, "mean_point_err_u"=>mean_pointwise_err)
+  pass_to_pp = Dict("path_μ"=>path_μ, "FEMSpace"=>FEMSpace, "mean_point_err_u"=>mean_pointwise_err)
 
   if RBInfo.postprocess
     post_process(RBInfo, pass_to_pp)
@@ -577,7 +581,7 @@ function post_process(RBInfo::SteadyInfo, d::Dict)
     generate_and_save_plot(DEIM_Σ, "Decay singular values, DEIM", "σ index", "σ value", RBInfo.paths.results_path)
   end
 
-  FESpace = d["FESpace"]
-  writevtk(FESpace.Ω, joinpath(d["path_μ"], "mean_point_err"), cellfields = ["err"=> FEFunction(FESpace.V, d["mean_point_err_u"])])
+  FEMSpace = d["FEMSpace"]
+  writevtk(FEMSpace.Ω, joinpath(d["path_μ"], "mean_point_err"), cellfields = ["err"=> FEFunction(FEMSpace.V, d["mean_point_err_u"])])
 
 end

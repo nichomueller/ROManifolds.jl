@@ -48,7 +48,7 @@ function assemble_reduced_affine_components(RBInfo, RBVars::PoissonSTPGRB, opera
         Aₙ_i = sparse([], [], [])
         for i_nₛ = 1:maximum(10, RBInfo.nₛ)
           Param = get_ParamInfo(problem_ntuple, RBInfo, μ[i_nₛ])
-          A_i = assemble_stiffness(FESpace, RBInfo, Param)
+          A_i = assemble_stiffness(FEMSpace, RBInfo, Param)
           A_iΦₛᵘ = A_i * RBVars.Φₛᵘ
           Aₙ_i = hcat(Aₙ_i, (A_iΦₛᵘ)' * RBVars.Pᵘ_inv * A_iΦₛᵘ)
         end
@@ -86,7 +86,7 @@ function assemble_reduced_affine_components(RBInfo, RBVars::PoissonSTPGRB, opera
           Fₙ_i = Float64[]
           for i_nₛ = 1:maximum(10, RBInfo.nₛ)
             Param = get_ParamInfo(RBInfo, μ[i_nₛ])
-            A_i = assemble_stiffness(FESpace, RBInfo, Param)
+            A_i = assemble_stiffness(FEMSpace, RBInfo, Param)
             A_iΦₛᵘ = A_i * RBVars.Φₛᵘ
             Fₙ_i = hcat(Fₙ_i, (A_iΦₛᵘ)' * RBVars.Pᵘ_inv * F)
           end
@@ -112,7 +112,7 @@ function assemble_reduced_affine_components(RBInfo, RBVars::PoissonSTPGRB, opera
           AΦₛᵘPᵘ_inv = (A * Φₛᵘ)' * RBVars.Pᵘ_inv
           for i_nₛ = 1:maximum(10, RBInfo.nₛ)
             Param = compute_Param(problem_nonlinearities, Params, i_nₛ)
-            F_i = assemble_forcing(FESpace, Param)
+            F_i = assemble_forcing(FEMSpace, Param)
             Fₙ_i = hcat(Fₙ_i, AΦₛᵘPᵘ_inv * F_i)
           end
 
@@ -120,8 +120,8 @@ function assemble_reduced_affine_components(RBInfo, RBVars::PoissonSTPGRB, opera
 
           for i_nₛ = 1:maximum(10, RBInfo.nₛ)
             Param = compute_Param(problem_nonlinearities, Params, i_nₛ)
-            A_i = assemble_stiffness(FESpace, RBInfo, Param)
-            F_i = assemble_forcing(FESpace, Param)
+            A_i = assemble_stiffness(FEMSpace, RBInfo, Param)
+            F_i = assemble_forcing(FEMSpace, Param)
             A_iΦₛᵘ = A_i * RBVars.Φₛᵘ
             Fₙ_i = hcat(Fₙ_i, (A_iΦₛᵘ)' * RBVars.Pᵘ_inv * F_i)
           end

@@ -1,3 +1,6 @@
+include("RBPoisson_unsteady.jl")
+include("ST-GRB_Stokes.jl")
+
 function get_snapshot_matrix(RBInfo::Info, RBVars::StokesUnsteady)
 
   get_snapshot_matrix(RBInfo, RBVars.P)
@@ -368,7 +371,7 @@ function online_phase(RBInfo::Info, RBVars::StokesUnsteady, μ, Param_nbs)
 
   end
 
-  pass_to_pp = Dict("path_μ"=>path_μ, "FESpace"=>FESpace, "H1_L2_err"=>H1_L2_err, "mean_H1_err"=>mean_H1_err, "mean_point_err_u"=>mean_pointwise_err_u, "L2_L2_err"=>L2_L2_err, "mean_L2_err"=>mean_L2_err, "mean_point_err_p"=>mean_pointwise_err_p)
+  pass_to_pp = Dict("path_μ"=>path_μ, "FEMSpace"=>FEMSpace, "H1_L2_err"=>H1_L2_err, "mean_H1_err"=>mean_H1_err, "mean_point_err_u"=>mean_pointwise_err_u, "L2_L2_err"=>L2_L2_err, "mean_L2_err"=>mean_L2_err, "mean_point_err_p"=>mean_pointwise_err_p)
 
   if RBInfo.postprocess
     post_process(RBInfo, pass_to_pp)
@@ -419,8 +422,8 @@ end
 
 function compute_stability_constant(RBInfo, M, A, θ, Nₜ)
 
-  #= M = assemble_mass(FESpace, RBInfo, Param)(0.0)
-  A = assemble_stiffness(FESpace, RBInfo, Param)(0.0) =#
+  #= M = assemble_mass(FEMSpace, RBInfo, Param)(0.0)
+  A = assemble_stiffness(FEMSpace, RBInfo, Param)(0.0) =#
   Nₕ = size(M)[1]
   δt = RBInfo.T/Nₜ
   B₁ = θ*(M + θ*δt*A)

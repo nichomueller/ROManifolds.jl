@@ -200,7 +200,7 @@ end
 
   @info "Assembling RHS"
 
-  Ffun = assemble_forcing(FESpace, Param)
+  Ffun = assemble_forcing(FEMSpace, Param)
   F_mat = zeros(RBVars.steady_info.Nₛᵘ, RBVars.Nₜ + 1)
   for (i, tᵢ) in enumerate(RBInfo.t₀:RBInfo.δt:RBInfo.T)
     F_mat[:, i] = Ffun(tᵢ)
@@ -255,11 +255,11 @@ function build_Param_RHS(RBInfo::Problem, RBVars::PoissonSTPGRB, Param)
 
   δtθ = RBInfo.δt*RBInfo.θ
 
-  FESpace = get_FESpace(FEMInfo, Param.model)
-  F_t, H_t = assemble_forcing(FESpace, RBVars, Param)
+  FEMSpace = get_FEMSpace(FEMInfo, Param.model)
+  F_t, H_t = assemble_forcing(FEMSpace, RBVars, Param)
   F, H = zeros(RBVars.steady_info.Nₛᵘ, RBVars.Nₜ), zeros(RBVars.steady_info.Nₛᵘ, RBVars.Nₜ)
-  times_θ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+δtθ
-  for (i, tᵢ) in enumerate(times_θ)
+  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+δtθ
+  for (i, tᵢ) in enumerate(timesθ)
     F[:,i] = F_t(tᵢ)
     H[:,i] = H_t(tᵢ)
   end

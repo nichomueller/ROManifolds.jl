@@ -13,7 +13,7 @@ using SuiteSparse, SparseArrays
 
 #=using Flux, Flux.Data.MNIST
 using Gridap
-using Gridap.FESpaces
+using Gridap.FEMSpaces
 using Gridap.ReferenceFEs
 using Gridap.Arrays
 using Gridap.Geometry

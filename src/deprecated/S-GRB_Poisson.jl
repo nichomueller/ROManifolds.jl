@@ -27,7 +27,7 @@ function assemble_reduced_affine_components(RBInfo, RBVars::PoissonSTGRB, operat
         Aₙ_i = sparse([], [], [])
         for i_nₛ = 1:maximum(10, RBInfo.nₛ)
           Param = get_ParamInfo(problem_ntuple, RBInfo, μ[i_nₛ])
-          A_i = assemble_stiffness(FESpace, RBInfo, Param)
+          A_i = assemble_stiffness(FEMSpace, RBInfo, Param)
           Aₙ_i = hcat(Aₙ_i, (RBVars.Φₛᵘ)' * A_i * RBVars.Φₛᵘ)
         end
         Aₙ_i = reshape(Aₙ_i, :, 1)
@@ -62,7 +62,7 @@ function assemble_reduced_affine_components(RBInfo, RBVars::PoissonSTGRB, operat
         Fₙ_i = Float64[]
         for i_nₛ = 1:maximum(10, RBInfo.nₛ)
           Param = get_ParamInfo(problem_ntuple, RBInfo, μ[i_nₛ])
-          F_i = assemble_forcing(FESpace, Param)
+          F_i = assemble_forcing(FEMSpace, Param)
           Fₙ_i = hcat(Fₙ_i, (RBVars.Φₛᵘ)' * F_i)
         end
         if RBInfo.save_offline_structures

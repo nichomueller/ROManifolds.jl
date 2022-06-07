@@ -1,4 +1,4 @@
-module RB
+#= module RB
 include("../Utils/Utils.jl")
 include("../FEM/FEM.jl")
 using .Utils
@@ -9,7 +9,7 @@ using Plots
 using SparseArrays
 
 #= import assemble_FEM_structure
-import get_FESpace
+import get_FEMSpace
 import LagrangianQuad
 import lagrangianQuad
 import LagrangianQuadRefFE
@@ -20,10 +20,10 @@ import UnsteadyProblem
 import Info
 import SteadyInfo
 import UnsteadyInfo
-import FESpacePoissonSteady
-import FESpacePoissonUnsteady
-import FESpaceStokesSteady
-import FESpaceStokesUnsteady
+import FEMSpacePoissonSteady
+import FEMSpacePoissonUnsteady
+import FEMSpaceStokesSteady
+import FEMSpaceStokesUnsteady
 import ProblemInfoSteady
 import ProblemInfoUnsteady
 import ParametricInfoSteady
@@ -65,4 +65,8 @@ include("S-PGRB_Poisson.jl")
 include("ST-GRB_Poisson.jl")
 include("ST-PGRB_Poisson.jl")
 include("ST-GRB_Stokes.jl")
-end
+end =#
+
+include("RBSuperclasses.jl")
+include("RBUtils.jl")
+include("M_DEIM.jl")

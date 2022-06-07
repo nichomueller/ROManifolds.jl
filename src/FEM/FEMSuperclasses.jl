@@ -9,7 +9,7 @@ abstract type UnsteadyInfo <: Info end
 #= struct PoissonProblem <: FEMProblem end
 struct PoissonProblemUnsteady <: FEMProblem end =#
 
-struct FESpacePoissonSteady <: SteadyProblem
+struct FEMSpacePoissonSteady <: SteadyProblem
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TrialFESpace
@@ -22,7 +22,7 @@ struct FESpacePoissonSteady <: SteadyProblem
   dΓn::Union{Measure,Nothing}
 end
 
-struct FESpacePoissonUnsteady <: UnsteadyProblem
+struct FEMSpacePoissonUnsteady <: UnsteadyProblem
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TransientTrialFESpace
@@ -35,7 +35,7 @@ struct FESpacePoissonUnsteady <: UnsteadyProblem
   dΓn::Union{Measure,Nothing}
 end
 
-struct FESpaceStokesSteady <: SteadyProblem
+struct FEMSpaceStokesSteady <: SteadyProblem
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TrialFESpace
@@ -56,7 +56,7 @@ struct FESpaceStokesSteady <: SteadyProblem
   dΓn::Union{Measure,Nothing}
 end
 
-struct FESpaceStokesUnsteady <: UnsteadyProblem
+struct FEMSpaceStokesUnsteady <: UnsteadyProblem
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TransientTrialFESpace

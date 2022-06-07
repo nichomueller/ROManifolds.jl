@@ -11,15 +11,15 @@ struct FE_Info
 end
 
 
-function assemble_stiffness(FESpace, Param, FEMInfo)
+function assemble_stiffness(FEMSpace, Param, FEMInfo)
     #=MODIFY
     =#
 
     if FEMInfo.problem_nonlinearities["A"] === false
-        A = assemble_matrix(∫(∇(FESpace.ϕᵥ) ⋅ ∇(FESpace.ϕᵤ)) * FESpace.dΩ, FESpace.V, FESpace.V₀)
+        A = assemble_matrix(∫(∇(FEMSpace.ϕᵥ) ⋅ ∇(FEMSpace.ϕᵤ)) * FEMSpace.dΩ, FEMSpace.V, FEMSpace.V₀)
         save_variable(A, "A", "csv", joinpath(FEMInfo.paths.FEM_structures_path, "A.csv"))
     else
-        A = assemble_matrix(∫(∇(FESpace.ϕᵥ) ⋅ (Param.α * ∇(FESpace.ϕᵤ))) * FESpace.dΩ, FESpace.V, FESpace.V₀)
+        A = assemble_matrix(∫(∇(FEMSpace.ϕᵥ) ⋅ (Param.α * ∇(FEMSpace.ϕᵤ))) * FEMSpace.dΩ, FEMSpace.V, FEMSpace.V₀)
     end
 
     A
@@ -27,11 +27,11 @@ function assemble_stiffness(FESpace, Param, FEMInfo)
 end
 
 
-function assemble_forcing(FESpace, Param, FEMInfo)
+function assemble_forcing(FEMSpace, Param, FEMInfo)
     #=MODIFY
     =#
 
-    F = assemble_vector(∫( FESpace.ϕᵥ * Param.f ) * FESpace.dΩ + ∫( FESpace.ϕᵥ * Param.h ) * FESpace.dΓ, FESpace.V₀)
+    F = assemble_vector(∫( FEMSpace.ϕᵥ * Param.f ) * FEMSpace.dΩ + ∫( FEMSpace.ϕᵥ * Param.h ) * FEMSpace.dΓ, FEMSpace.V₀)
     if FEMInfo.problem_nonlinearities["f"] === false && FEMInfo.problem_nonlinearities["h"] === false
         save_variable(F, "F", "csv", joinpath(FEMInfo.paths.FEM_structures_path, "F.csv"))
     end
@@ -41,17 +41,17 @@ function assemble_forcing(FESpace, Param, FEMInfo)
 end
 
 
-function assemble_H1_norm_matrix(FESpace, Param, FEMInfo)
+function assemble_H1_norm_matrix(FEMSpace, Param, FEMInfo)
     #=MODIFY
     =#
 
     if FEMInfo.problem_nonlinearities["A"] === false
-        Xᵘ = assemble_matrix(∫(∇(FESpace.ϕᵥ) ⋅ (Param.α * ∇(FESpace.ϕᵤ))) * FESpace.dΩ, FESpace.V, FESpace.V₀) + \
-        assemble_matrix(∫(FESpace.ϕᵥ * (Param.α * FESpace.ϕᵤ)) * FESpace.dΩ, FESpace.V, FESpace.V₀)
+        Xᵘ = assemble_matrix(∫(∇(FEMSpace.ϕᵥ) ⋅ (Param.α * ∇(FEMSpace.ϕᵤ))) * FEMSpace.dΩ, FEMSpace.V, FEMSpace.V₀) + \
+        assemble_matrix(∫(FEMSpace.ϕᵥ * (Param.α * FEMSpace.ϕᵤ)) * FEMSpace.dΩ, FEMSpace.V, FEMSpace.V₀)
 
     else # in this case, we do not consider the variable viscosity in the definition of the H1 norm matrix
-        Xᵘ = assemble_matrix(∫(∇(FESpace.ϕᵥ) ⋅ ∇(FESpace.ϕᵤ)) * FESpace.dΩ, FESpace.V, FESpace.V₀) + \
-        assemble_matrix(∫(FESpace.ϕᵥ * FESpace.ϕᵤ) * FESpace.dΩ, FESpace.V, FESpace.V₀)
+        Xᵘ = assemble_matrix(∫(∇(FEMSpace.ϕᵥ) ⋅ ∇(FEMSpace.ϕᵤ)) * FEMSpace.dΩ, FEMSpace.V, FEMSpace.V₀) + \
+        assemble_matrix(∫(FEMSpace.ϕᵥ * FEMSpace.ϕᵤ) * FEMSpace.dΩ, FEMSpace.V, FEMSpace.V₀)
 
     end
 
@@ -61,7 +61,7 @@ function assemble_H1_norm_matrix(FESpace, Param, FEMInfo)
 end
 
 
-function FESpace_poisson(FEMInfo, Param)
+function FEMSpace_poisson(FEMInfo, Param)
     #=MODIFY
     =#
 
@@ -69,10 +69,10 @@ function FESpace_poisson(FEMInfo, Param)
     degree = 2 .* FEMInfo.order
     Qₕ = CellQuadrature(Tₕ, degree)
 
-    ref_FE = ReferenceFE(lagrangian, Float64, FEMInfo.order)
-    V₀ = TestFESpace(Param.model, ref_FE; conformity = :H1, dirichlet_tags = FEMInfo.dirichlet_tags)
+    ref_FE = Gridap.ReferenceFE(lagrangian, Float64, FEMInfo.order)
+    V₀ = TestFEMSpace(Param.model, ref_FE; conformity = :H1, dirichlet_tags = FEMInfo.dirichlet_tags)
     if FEMInfo.problem_nonlinearities["g"] === false
-        V = TrialFESpace(V₀, Param.g)
+        V = TrialFEMSpace(V₀, Param.g)
     else
         V = V₀
     end
@@ -91,16 +91,16 @@ function FESpace_poisson(FEMInfo, Param)
 end
 
 
-function solve_poisson(FEMInfo, Param, FESpace, LHS, RHS)
+function solve_poisson(FEMInfo, Param, FEMSpace, LHS, RHS)
     #=MODIFY
     =#
 
-    a(u, v) = ∫(∇(v) ⋅ (Param.α * ∇(u))) * FESpace.dΩ
-    f(v) = ∫( v * Param.f ) * FESpace.dΩ + ∫( v * Param.h ) * FESpace.dΓ
+    a(u, v) = ∫(∇(v) ⋅ (Param.α * ∇(u))) * FEMSpace.dΩ
+    f(v) = ∫( v * Param.f ) * FEMSpace.dΩ + ∫( v * Param.h ) * FEMSpace.dΓ
 
     if FEMInfo.problem_nonlinearities["g"] === false
 
-        operator = AffineFEOperator(a, f, FESpace.V, FESpace.V₀)
+        operator = AffineFEOperator(a, f, FEMSpace.V, FEMSpace.V₀)
 
         if FEMInfo.solver === "lu"
             uₕ_field = solve(LinearFESolver(LUSolver()), operator)
@@ -111,7 +111,7 @@ function solve_poisson(FEMInfo, Param, FESpace, LHS, RHS)
 
     else
 
-        uₕ = solve_poisson_lifting(FEMInfo, Param, FESpace, LHS, RHS)
+        uₕ = solve_poisson_lifting(FEMInfo, Param, FEMSpace, LHS, RHS)
 
     end
 
@@ -120,13 +120,13 @@ function solve_poisson(FEMInfo, Param, FESpace, LHS, RHS)
 end
 
 
-function solve_poisson_lifting(FEMInfo, Param, FESpace, LHS, RHS)
+function solve_poisson_lifting(FEMInfo, Param, FEMSpace, LHS, RHS)
     #=MODIFY
     =#
 
-    gₕ = interpolate_dirichlet(Param.g, FESpace.V₀)
-    rₕ = ([integrate(∇(FESpace.ϕᵥ) ⋅ ∇(gₕ), FESpace.Qₕ)], [FESpace.σₖ])
-    assembler = SparseMatrixAssembler(FESpace.V, FESpace.V₀)
+    gₕ = interpolate_dirichlet(Param.g, FEMSpace.V₀)
+    rₕ = ([integrate(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ), FEMSpace.Qₕ)], [FEMSpace.σₖ])
+    assembler = SparseMatrixAssembler(FEMSpace.V, FEMSpace.V₀)
     Rₕ = allocate_vector(assembler, rₕ)
     assemble_vector!(Rₕ, assembler, rₕ)
 
@@ -142,13 +142,13 @@ function solve_poisson_lifting(FEMInfo, Param, FESpace, LHS, RHS)
 end
 
 
-#= function get_dof_values(uₕ, FESpace)
+#= function get_dof_values(uₕ, FEMSpace)
     #=MODIFY
     =#
 
     uₕ_free_dof_values = get_free_dof_values(uₕ)
-    uₕ_dirichlet_dof_values = get_dirichlet_dof_values(FESpace.V)
+    uₕ_dirichlet_dof_values = get_dirichlet_dof_values(FEMSpace.V)
     m = Broadcasting(PosNegReindex(uₕ_free_dof_values, uₕ_dirichlet_dof_values))
-    lazy_map(m, FESpace.σₖ)[:]
+    lazy_map(m, FEMSpace.σₖ)[:]
 
 end =#

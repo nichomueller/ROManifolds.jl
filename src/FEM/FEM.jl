@@ -1,4 +1,4 @@
-module FEM
+#= module FEM
 
 include("../Utils/Utils.jl")
 using .Utils
@@ -6,7 +6,7 @@ using Gridap
 using Gridap.Algebra
 using Gridap.Arrays
 using Gridap.CellData
-using Gridap.FESpaces
+using Gridap.FEMSpaces
 using Gridap.Fields
 using Gridap.Geometry
 using GridapGmsh
@@ -19,7 +19,7 @@ using Logging
 using LineSearches:BackTracking
 
 export assemble_FEM_structure
-export get_FESpace
+export get_FEMSpace
 export LagrangianQuad
 export lagrangianQuad
 export LagrangianQuadRefFE
@@ -30,10 +30,10 @@ export UnsteadyProblem
 export Info
 export SteadyInfo
 export UnsteadyInfo
-export FESpacePoissonSteady
-export FESpacePoissonUnsteady
-export FESpaceStokesSteady
-export FESpaceStokesUnsteady
+export FEMSpacePoissonSteady
+export FEMSpacePoissonUnsteady
+export FEMSpaceStokesSteady
+export FEMSpaceStokesUnsteady
 export ProblemInfoSteady
 export ProblemInfoUnsteady
 export ParametricInfoSteady
@@ -51,4 +51,11 @@ include("FEMUtils.jl")
 include("FEMSpaces.jl")
 include("solvers.jl")
 
-end
+end =#
+
+include("../Utils/Utils.jl")
+include("FEMSuperclasses.jl")
+include("assemblers.jl")
+include("FEMUtils.jl")
+include("FEMSpaces.jl")
+include("solvers.jl")

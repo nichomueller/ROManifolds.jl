@@ -15,8 +15,8 @@ function run_FEM_A()
   degree = 2 .* order
   Qₕ = CellQuadrature(Tₕ, degree)
   ref_FE = ReferenceFE(lagrangian, Float64, order)
-  V₀ = TestFESpace(model, ref_FE; conformity = :H1, dirichlet_tags = dirichlet_tags)
-  V = TrialFESpace(V₀, g)
+  V₀ = TestFEMSpace(model, ref_FE; conformity = :H1, dirichlet_tags = dirichlet_tags)
+  V = TrialFEMSpace(V₀, g)
   ϕᵥ = get_fe_basis(V₀)
   ϕᵤ = get_trial_fe_basis(V)
   σₖ = get_cell_dof_ids(V₀)
@@ -26,9 +26,9 @@ function run_FEM_A()
   Γ = BoundaryTriangulation(model, tags = neumann_tags)
   dΓ = Measure(Γ, degree)
 
-  FESpace = FESpacePoisson(Qₕ, V₀, V, ϕᵥ, ϕᵤ, σₖ, Nₕ, dΩ, dΓ) =#
+  FEMSpace = FEMSpacePoisson(Qₕ, V₀, V, ϕᵥ, ϕᵤ, σₖ, Nₕ, dΩ, dΓ) =#
 
-  FESpace = FESpace_0(FEMInfo, model)
+  FEMSpace = FEMSpace_0(FEMInfo, model)
 
   function run_Parametric_FEM(μ::Array)
 
@@ -36,12 +36,12 @@ function run_FEM_A()
     α(x) = μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) / μ[3])
 
     Param = Parametric_Info(μ, model, α, f, g, h)
-    RHS = assemble_forcing(FESpace, FEMInfo, Param)
-    LHS = assemble_stiffness(FESpace, FEMInfo, Param)
+    RHS = assemble_forcing(FEMSpace, FEMInfo, Param)
+    LHS = assemble_stiffness(FEMSpace, FEMInfo, Param)
 
     function Parametric_solution()
 
-      return FE_solve_lifting(FESpace, FEMInfo, Param)
+      return FE_solve_lifting(FEMSpace, FEMInfo, Param)
 
     end
 
@@ -77,7 +77,7 @@ function run_FEM_A_f_g()
   model = DiscreteModelFromFile(paths.mesh_path)
   h(x) = 1
 
-  FESpace = FESpace_0(FEMInfo, model)
+  FEMSpace = FEMSpace_0(FEMInfo, model)
 
   function run_Parametric_FEM(μ::Array)
 
@@ -87,12 +87,12 @@ function run_FEM_A_f_g()
     g(x) = sin(μ[5] * x[1]) + sin(μ[5] * x[2])
     Param = Parametric_Info(μ, model, α, f, g, h)
 
-    RHS = assemble_forcing(FESpace, FEMInfo, Param)
-    LHS = assemble_stiffness(FESpace, FEMInfo, Param)
+    RHS = assemble_forcing(FEMSpace, FEMInfo, Param)
+    LHS = assemble_stiffness(FEMSpace, FEMInfo, Param)
 
     function Parametric_solution()
 
-      return FE_solve_lifting(FESpace, FEMInfo, Param)
+      return FE_solve_lifting(FEMSpace, FEMInfo, Param)
 
     end
 
@@ -124,14 +124,14 @@ function run_FEM_Omega()
 
     model = generate_cartesian_model(ref_info, stretching, μ)
     Param = Parametric_Info(μ, model, α, f, g, h)
-    FESpace = FESpace(FEMInfo, Param)
+    FEMSpace = FEMSpace(FEMInfo, Param)
 
-    RHS = assemble_forcing(FESpace, FEMInfo, Param)
-    LHS = assemble_stiffness(FESpace, FEMInfo, Param)
+    RHS = assemble_forcing(FEMSpace, FEMInfo, Param)
+    LHS = assemble_stiffness(FEMSpace, FEMInfo, Param)
 
     function Parametric_solution()
 
-      return FE_solve_lifting(FESpace, FEMInfo, Param)
+      return FE_solve_lifting(FEMSpace, FEMInfo, Param)
 
     end
 
@@ -143,17 +143,17 @@ function run_FEM_Omega()
 
 end
 #= paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, problem_nonlinearities)
-FEMInfo = problem_Info(problem_name, problem_type, paths, approx_type, problem_dim, problem_nonlinearities, number_coupled_blocks, order, dirichlet_tags, neumann_tags, solver, nₛ)
+FEMInfo = FEMInfo(problem_name, problem_type, paths, approx_type, problem_dim, problem_nonlinearities, number_coupled_blocks, order, dirichlet_tags, neumann_tags, solver, nₛ)
 
 ranges = Dict("μᵒ" => [0., 1.], "μᴬ" => [[0.4, 0.6] [0.4, 0.6] [0.05, 0.1]], "μᶠ" => [0., 1.1], "μᵍ" => [0., 1.], "μʰ" => [0., 1.])
 (μᵒ, μᴬ, μᶠ, μᵍ, μʰ) = generate_Parameters(problem_nonlinearities, nₛ, ranges)
 Params = Param_info(μᵒ, μᴬ, μᶠ, μᵍ, μʰ)
 Param = compute_Param(problem_nonlinearities, Params, 1)
 
-FESpace = FESpace_poisson(FEMInfo, Param)
-RHS = assemble_forcing(FESpace, Param, FEMInfo)
-LHS = assemble_stiffness(FESpace, Param, FEMInfo)
-#= uₕ = Vector{Float64}(undef, FESpace.Nₕ)  =#
+FEMSpace = FEMSpace_poisson(FEMInfo, Param)
+RHS = assemble_forcing(FEMSpace, Param, FEMInfo)
+LHS = assemble_stiffness(FEMSpace, Param, FEMInfo)
+#= uₕ = Vector{Float64}(undef, FEMSpace.Nₕ)  =#
 uₕ = Any[]
 
 if problem_nonlinearities["Ω"] === false
@@ -164,10 +164,10 @@ if problem_nonlinearities["Ω"] === false
         if i_nₛ > 1
             Param = compute_Param(problem_nonlinearities, Params, i_nₛ)
             if problem_nonlinearities["f"] === true || problem_nonlinearities["h"] === true
-                RHS = assemble_forcing(FESpace, Param, FEMInfo)
+                RHS = assemble_forcing(FEMSpace, Param, FEMInfo)
             end
             if problem_nonlinearities["A"] === true
-                LHS = assemble_stiffness(FESpace, Param, FEMInfo)
+                LHS = assemble_stiffness(FEMSpace, Param, FEMInfo)
             end
         end
 
@@ -175,7 +175,7 @@ if problem_nonlinearities["Ω"] === false
             LHS .*= Param.α(Point(0., 0.))
         end
 
-        push!(uₕ, solve_poisson(FEMInfo, Param, FESpace, LHS, RHS))
+        push!(uₕ, solve_poisson(FEMInfo, Param, FEMSpace, LHS, RHS))
 
     end
 
@@ -186,12 +186,12 @@ else
 
         if i_nₛ > 1
             Param = compute_Param(problem_nonlinearities, Params, i_nₛ)
-            FESpace = FESpace_poisson(FEMInfo, Param)
-            RHS = assemble_forcing(FESpace, Param, FEMInfo)
-            LHS = assemble_stiffness(FESpace, Param, FEMInfo)
+            FEMSpace = FEMSpace_poisson(FEMInfo, Param)
+            RHS = assemble_forcing(FEMSpace, Param, FEMInfo)
+            LHS = assemble_stiffness(FEMSpace, Param, FEMInfo)
         end
 
-        push!(uₕ, solve_poisson(FEMInfo, Param, FESpace, LHS, RHS))
+        push!(uₕ, solve_poisson(FEMInfo, Param, FEMSpace, LHS, RHS))
 
     end
 
@@ -202,12 +202,12 @@ save_variable(uₕ, "uₕ", "csv", joinpath(FEMInfo.paths.FEM_snap_path, "uₕ.c
 
 
 
-#= S = assemble_stiffness(FESpace, compute_Param(problem_nonlinearities, Params, 1), FEMInfo)[:]
+#= S = assemble_stiffness(FEMSpace, compute_Param(problem_nonlinearities, Params, 1), FEMInfo)[:]
 for i_nₛ = 2:nₛ-1
     Param = compute_Param(problem_nonlinearities, Params, i_nₛ)
-    S = hcat(S, assemble_stiffness(FESpace, Param, FEMInfo)[:])
+    S = hcat(S, assemble_stiffness(FEMSpace, Param, FEMInfo)[:])
 end
 (MDEIM_mat, MDEIM_idx) = DEIM_offline(S, 1e-3)
-LHS10 = assemble_stiffness(FESpace, compute_Param(problem_nonlinearities, Params, 10), FEMInfo)
+LHS10 = assemble_stiffness(FEMSpace, compute_Param(problem_nonlinearities, Params, 10), FEMInfo)
 (MDEIM_coeffs, mat_affine) = MDEIM_online(LHS10, MDEIM_mat, MDEIM_idx)
 err_MDEIM = norm(LHS10 - mat_affine)/norm(LHS10) =#

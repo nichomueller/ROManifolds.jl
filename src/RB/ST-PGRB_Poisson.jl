@@ -69,7 +69,7 @@ end
 function assemble_MDEIM_matrices(RBInfo::Info, RBVars::PoissonSTPGRB, var::String)
 
   @info "The matrix $var is non-affine: running the MDEIM offline phase on $nₛ_MDEIM snapshots"
-  MDEIM_mat, MDEIM_idx, sparse_el, _, _ = MDEIM_offline(FESpace, RBInfo, var)
+  MDEIM_mat, MDEIM_idx, sparse_el, _, _ = MDEIM_offline(FEMSpace, RBInfo, var)
   Q = size(MDEIM_mat)[2]
   MDEIMᵢ_mat = Matrix(MDEIM_mat[MDEIM_idx, :])
 
@@ -157,7 +157,7 @@ function assemble_DEIM_vectors(RBInfo::Info, RBVars::PoissonSTPGRB, var::String)
 
   @info "ST-PGRB: running the DEIM offline phase on variable $var with $nₛ_DEIM snapshots"
 
-  DEIM_mat, DEIM_idx, _, _ = DEIM_offline(FESpace, RBInfo, var)
+  DEIM_mat, DEIM_idx, _, _ = DEIM_offline(FEMSpace, RBInfo, var)
   DEIMᵢ_mat = Matrix(DEIM_mat[DEIM_idx, :])
   Q = size(DEIM_mat)[2]
   Mvarₙ = zeros(RBVars.nₛᵘ,1,RBVars.Qᵐ*Q)
@@ -421,11 +421,11 @@ function build_Param_RHS(RBInfo::Info, RBVars::PoissonSTPGRB, Param, θᵐ, θ�
   θᵐ_temp = θᵐ[1:RBVars.Qᵐ]/sqrt(θᵐ[1])
   θᵃ_temp = θᵃ[1:RBVars.S.Qᵃ]/sqrt(θᵃ[1])
 
-  F_t = assemble_forcing(FESpace, RBInfo, Param)
-  H_t = assemble_neumann_datum(FESpace, RBInfo, Param)
+  F_t = assemble_forcing(FEMSpace, RBInfo, Param)
+  H_t = assemble_neumann_datum(FEMSpace, RBInfo, Param)
   F, H = zeros(RBVars.S.Nₛᵘ, RBVars.Nₜ), zeros(RBVars.S.Nₛᵘ, RBVars.Nₜ)
-  times_θ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+δtθ
-  for (i, tᵢ) in enumerate(times_θ)
+  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+δtθ
+  for (i, tᵢ) in enumerate(timesθ)
     F[:,i] = F_t(tᵢ)
     H[:,i] = H_t(tᵢ)
   end

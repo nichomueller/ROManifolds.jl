@@ -23,12 +23,12 @@ nₜᵖ = 0
 nᵘ = 0
 nᵖ = 0
 
-ũ = Float64[]
-uₙ = Float64[]
-û = Float64[]
-p̃ = Float64[]
-pₙ = Float64[]
-p̂ = Float64[]
+ũ = Matrix{Float64}[]
+uₙ = Matrix{Float64}[]
+û = Matrix{Float64}[]
+p̃ = Matrix{Float64}[]
+pₙ = Matrix{Float64}[]
+p̂ = Matrix{Float64}[]
 
 Mₙ = Matrix{Float64}[]
 Aₙ = Matrix{Float64}[]
@@ -62,38 +62,38 @@ Qʰ = 0
 θʰ = Float64[]
 
 MDEIMᵢ_A = Matrix{Float64}[]
-MDEIM_idx_A = Int64[]
-sparse_el_A = Int64[]
-row_idx_A = Int64[]
+MDEIM_idx_A = Vector{Int64}[]
+sparse_el_A = Vector{Int64}[]
+row_idx_A = Vector{Int64}[]
 MDEIMᵢ_M = Matrix{Float64}[]
-MDEIM_idx_M = Int64[]
-sparse_el_M = Int64[]
-row_idx_M = Int64[]
+MDEIM_idx_M = Vector{Int64}[]
+sparse_el_M = Vector{Int64}[]
+row_idx_M = Vector{Int64}[]
 MDEIMᵢ_C = Matrix{Float64}[]
-MDEIM_idx_C = Float64[]
-sparse_el_C = Int64[]
-DEIMᵢ_mat_F = Float64[]
-DEIM_idx_F = Float64[]
-DEIMᵢ_mat_H = Float64[]
-DEIM_idx_H = Int64[]
+MDEIM_idx_C = Vector{Int64}[]
+sparse_el_C = Vector{Int64}[]
+DEIMᵢ_mat_F = Matrix{Float64}[]
+DEIM_idx_F = Vector{Int64}[]
+DEIMᵢ_mat_H = Matrix{Float64}[]
+DEIM_idx_H = Vector{Int64}[]
 
 offline_time = 0.0
 
 mutable struct PoissonSGRB <: PoissonSteady
-  Sᵘ::Matrix; Φₛᵘ::Matrix; ũ::Matrix; uₙ::Matrix; û::Matrix; Aₙ::Matrix; Fₙ::Matrix;
-  Hₙ::Matrix; Xᵘ₀::SparseMatrixCSC; LHSₙ::Matrix; RHSₙ::Matrix; MDEIMᵢ_A::Matrix;
-  MDEIM_idx_A::Vector; DEIMᵢ_mat_F::Matrix; DEIM_idx_F::Vector; DEIMᵢ_mat_H::Matrix;
-  DEIM_idx_H::Vector; sparse_el_A::Vector; Nₛᵘ::Int64; nₛᵘ::Int64; Qᵃ::Int64;
-  Qᶠ::Int64; Qʰ::Int64; θᵃ::Vector; θᶠ::Vector; θʰ::Vector; offline_time::Float64
+  Sᵘ::Array; Φₛᵘ::Array; ũ::Array; uₙ::Array; û::Array; Aₙ::Array; Fₙ::Array;
+  Hₙ::Array; Xᵘ₀::SparseMatrixCSC; LHSₙ::Array; RHSₙ::Array; MDEIMᵢ_A::Array;
+  MDEIM_idx_A::Array; DEIMᵢ_mat_F::Array; DEIM_idx_F::Array; DEIMᵢ_mat_H::Array;
+  DEIM_idx_H::Array; sparse_el_A::Array; Nₛᵘ::Int64; nₛᵘ::Int64; Qᵃ::Int64;
+  Qᶠ::Int64; Qʰ::Int64; θᵃ::Array; θᶠ::Array; θʰ::Array; offline_time::Float64
 end
 
 mutable struct PoissonSPGRB <: PoissonSteady
-  Sᵘ::Matrix; Φₛᵘ::Matrix; ũ::Matrix; uₙ::Matrix; û::Matrix; Aₙ::Matrix; Fₙ::Matrix;
-  Hₙ::Matrix; Xᵘ₀::SparseMatrixCSC; LHSₙ::Matrix; RHSₙ::Matrix; MDEIMᵢ_A::Matrix;
-  MDEIM_idx_A::Vector; DEIMᵢ_mat_F::Matrix; DEIM_idx_F::Vector; DEIMᵢ_mat_H::Matrix;
-  DEIM_idx_H::Vector; sparse_el_A::Vector; Nₛᵘ::Int64; nₛᵘ::Int64; Qᵃ::Int64;
-  Qᶠ::Int64; Qʰ::Int64; θᵃ::Vector; θᶠ::Vector; θʰ::Vector; offline_time::Float64
-  Pᵤ⁻¹::SparseMatrixCSC; AΦᵀPᵤ⁻¹::Matrix
+  Sᵘ::Array; Φₛᵘ::Array; ũ::Array; uₙ::Array; û::Array; Aₙ::Array; Fₙ::Array;
+  Hₙ::Array; Xᵘ₀::SparseMatrixCSC; LHSₙ::Array; RHSₙ::Array; MDEIMᵢ_A::Array;
+  MDEIM_idx_A::Array; DEIMᵢ_mat_F::Array; DEIM_idx_F::Array; DEIMᵢ_mat_H::Array;
+  DEIM_idx_H::Array; sparse_el_A::Array; Nₛᵘ::Int64; nₛᵘ::Int64; Qᵃ::Int64;
+  Qᶠ::Int64; Qʰ::Int64; θᵃ::Array; θᶠ::Array; θʰ::Array; offline_time::Float64
+  Pᵤ⁻¹::SparseMatrixCSC; AΦᵀPᵤ⁻¹::Array
 end
 
 function setup_PoissonSGRB(::NTuple{1,Int})::PoissonSGRB
@@ -113,16 +113,16 @@ function setup_PoissonSPGRB(::NTuple{2,Int})::PoissonSPGRB
 end
 
 mutable struct PoissonSTGRB <: PoissonUnsteady
-  S::PoissonSGRB; Φₜᵘ::Matrix; Mₙ::Matrix; MDEIMᵢ_M::Matrix;
-  MDEIM_idx_M::Vector; sparse_el_M::Vector; row_idx_A::Vector; row_idx_M::Vector;
-  Nₜ::Int64; Nᵘ::Int64; nₜᵘ::Int64; nᵘ::Int64; Qᵐ::Int64; θᵐ::Vector
+  S::PoissonSGRB; Φₜᵘ::Array; Mₙ::Array; MDEIMᵢ_M::Array;
+  MDEIM_idx_M::Array; sparse_el_M::Array; row_idx_A::Array; row_idx_M::Array;
+  Nₜ::Int64; Nᵘ::Int64; nₜᵘ::Int64; nᵘ::Int64; Qᵐ::Int64; θᵐ::Array
 end
 
 mutable struct PoissonSTPGRB <: PoissonUnsteady
-  S::PoissonSPGRB; Φₜᵘ::Matrix; Mₙ::Matrix; MDEIMᵢ_M::Matrix;
-  MDEIM_idx_M::Vector; sparse_el_M::Vector; row_idx_A::Vector;
-  row_idx_M::Vector; MAₙ::Matrix; MΦ::Matrix; MΦᵀPᵤ⁻¹::Matrix;
-  Nₜ::Int64; Nᵘ::Int64; nₜᵘ::Int64; nᵘ::Int64; Qᵐ::Int64; θᵐ::Vector
+  S::PoissonSPGRB; Φₜᵘ::Array; Mₙ::Array; MDEIMᵢ_M::Array;
+  MDEIM_idx_M::Array; sparse_el_M::Array; row_idx_A::Array;
+  row_idx_M::Array; MAₙ::Array; MΦ::Array; MΦᵀPᵤ⁻¹::Array;
+  Nₜ::Int64; Nᵘ::Int64; nₜᵘ::Int64; nᵘ::Int64; Qᵐ::Int64; θᵐ::Array
 end
 
 function setup_PoissonSTGRB(::NTuple{3,Int})::PoissonSTGRB
@@ -146,16 +146,16 @@ function setup_PoissonSTPGRB(::NTuple{4,Int})::PoissonSTPGRB
 end
 
 mutable struct StokesSTGRB <: StokesUnsteady
-  P::PoissonSTGRB; Sᵖ::Matrix; Φₛᵖ::Matrix; Φₜᵖ::Matrix; p̃::Matrix; pₙ::Matrix;
-  p̂::Matrix; Bₙ::Matrix; Bᵀₙ::Matrix; Xᵘ::SparseMatrixCSC; Xᵖ::SparseMatrixCSC;
+  P::PoissonSTGRB; Sᵖ::Array; Φₛᵖ::Array; Φₜᵖ::Array; p̃::Array; pₙ::Array;
+  p̂::Array; Bₙ::Array; Bᵀₙ::Array; Xᵘ::SparseMatrixCSC; Xᵖ::SparseMatrixCSC;
   Xᵖ₀::SparseMatrixCSC; Nₛᵖ::Int64; Nₛˡ::Int64; Nᵖ::Int64; nₛᵖ::Int64;
   nₜᵖ::Int64; nᵖ::Int64
 end
 
 #= mutable struct StokesSTPGRB <: StokesUnsteady
-  P::PoissonSTPGRB; Sᵖ::Matrix; Sˡ::Matrix; Φₛᵖ::Matrix; Φₛˡ::Matrix; Φₜᵖ::Matrix;
-  Φₜˡ::Matrix; p̃::Matrix; pₙ::Matrix; p̂::Matrix; λ̃ ::Matrix; λₙ::Matrix; λ̂ ::Matrix;
-  Bₙ::Matrix; Bᵀₙ::Matrix; Lₙ::Matrix; Lᵀₙ::Matrix; Xᵘ::SparseMatrixCSC;
+  P::PoissonSTPGRB; Sᵖ::Array; Sˡ::Array; Φₛᵖ::Array; Φₛˡ::Array; Φₜᵖ::Array;
+  Φₜˡ::Array; p̃::Array; pₙ::Array; p̂::Array; λ̃ ::Array; λₙ::Array; λ̂ ::Array;
+  Bₙ::Array; Bᵀₙ::Array; Lₙ::Array; Lᵀₙ::Array; Xᵘ::SparseMatrixCSC;
   Xᵖ::SparseMatrixCSC; Xᵖ₀::SparseMatrixCSC; Nₛᵖ::Int64; Nₛˡ::Int64; Nᵖ::Int64;
   Nˡ::Int64; nₛᵖ::Int64; nₛˡ::Int64; nₜᵖ::Int64; nₜˡ::Int64; nᵖ::Int64; nˡ::Int64;
 end =#

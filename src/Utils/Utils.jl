@@ -1,4 +1,4 @@
-module Utils
+#= module Utils
 
 using CSV
 using Distributions
@@ -31,4 +31,34 @@ include("indexes.jl")
 include("operations.jl")
 include("plots.jl")
 
-end
+end =#
+
+using DataFrames
+using FillArrays
+using LinearAlgebra
+using Distributions
+using SuiteSparse
+using SparseArrays
+using Arpack
+using CSV
+using JLD
+using Test
+using Logging
+using Plots
+using Gridap
+using Gridap.FESpaces
+using Gridap.ReferenceFEs
+using Gridap.Arrays
+using Gridap.Geometry
+using Gridap.Fields
+using Gridap.CellData
+using GridapGmsh
+using Gridap.TensorValues
+using LineSearches:BackTracking
+using TensorOperations
+import Gridap:∇
+
+include("files.jl")
+include("indexes.jl")
+include("operations.jl")
+include("plots.jl")

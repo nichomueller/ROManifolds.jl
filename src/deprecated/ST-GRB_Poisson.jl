@@ -1,7 +1,7 @@
 include("S-GRB_Poisson.jl")
 include("RB_Poisson_unsteady.jl")
 
-function get_RB_LHS_blocks(RBInfo, RBVars::RB_problem, Param; FESpace = nothing)
+function get_RB_LHS_blocks(RBInfo, RBVars::RB_problem, Param; FEMSpace = nothing)
   #=MODIFY
   to be used when BDF2 is employed
   =#
@@ -9,7 +9,7 @@ function get_RB_LHS_blocks(RBInfo, RBVars::RB_problem, Param; FESpace = nothing)
   initialize_RB_system(RBVars::RB_problem)
 
   if RBInfo.problem_nonlinearities["A"]
-    Aₙ_μ = assemble_stiffness(FESpace, RBInfo, Param)
+    Aₙ_μ = assemble_stiffness(FEMSpace, RBInfo, Param)
     (_, Aₙ_μ_affine) = MDEIM_online(Aₙ_μ, RBVars.Aₙ_affine, RBVars.Aₙ_idx)
     MAₙ = RBVars.Mₙ + 2 / 3 * RBInfo.dt * Aₙ_μ_affine
   else
@@ -44,13 +44,13 @@ function get_RB_LHS_blocks(RBInfo, RBVars::RB_problem, Param; FESpace = nothing)
 
 end
 
-function get_RB_RHS_blocks(RBInfo, RBVars::RB_problem, Param; FESpace = nothing)
+function get_RB_RHS_blocks(RBInfo, RBVars::RB_problem, Param; FEMSpace = nothing)
 
 
   initialize_RB_system(RBVars::RB_problem)
 
   if RBInfo.problem_nonlinearities["f"] || RBInfo.problem_nonlinearities["h"]
-    Fₙ_μ = assemble_forcing(FESpace, Param)
+    Fₙ_μ = assemble_forcing(FEMSpace, Param)
     (_, Fₙ_μ_affine) = DEIM_online(Fₙ_μ, RBVars.Fₙ_affine, RBVars.Fₙ_idx)
     Fₙ = 2 / 3 * RBInfo.dt * Fₙ_μ_affine
   else

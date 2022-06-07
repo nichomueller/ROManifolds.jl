@@ -165,10 +165,10 @@ function get_ParamInfo(::NTuple{2,Int},Info::UnsteadyInfo,μ::Vector)
 
 end
 
-function generate_vtk_file(FESpace::FEMProblem, path::String, var_name::String, var::Array)
+function generate_vtk_file(FEMSpace::FEMProblem, path::String, var_name::String, var::Array)
 
-  FE_var = FEFunction(FESpace.V, var)
-  writevtk(FESpace.Ω, path, cellfields = [var_name => FE_var])
+  FE_var = FEFunction(FEMSpace.V, var)
+  writevtk(FEMSpace.Ω, path, cellfields = [var_name => FE_var])
 
 end
 

@@ -6,7 +6,7 @@ using Base:@kwdef
 using SuiteSparse, SparseArrays, Serialization, ThreadedSparseCSR, SparseMatricesCSR, LazyAlgebra, LazyAlgebra.SparseMethods, Arpack
 using MAT, CSV, JLD, DelimitedFiles, Arrow, CodecLz4
 using Test, InteractiveUtils, TimerOutputs, BenchmarkTools, Interact, Logging, Plots, WriteVTK
-using Gridap, Gridap.FESpaces, Gridap.ReferenceFEs, Gridap.Arrays, Gridap.Geometry, Gridap.Fields, Gridap.CellData, GridapGmsh, Gridap.Io, Gridap.TensorValues
+using Gridap, Gridap.FEMSpaces, Gridap.ReferenceFEs, Gridap.Arrays, Gridap.Geometry, Gridap.Fields, Gridap.CellData, GridapGmsh, Gridap.Io, Gridap.TensorValues
 import Gridap:∇
 using Revise
 using LineSearches:BackTracking

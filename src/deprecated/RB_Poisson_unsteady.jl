@@ -167,14 +167,14 @@ function check_affine_blocks(RBInfo, RBVars::RBProblem)
 
 end
 
-function get_RB_LHS_blocks(RBInfo, RBVars::RBProblem, Param; FESpace = nothing)
+function get_RB_LHS_blocks(RBInfo, RBVars::RBProblem, Param; FEMSpace = nothing)
 
 
   if RBInfo.case === 0
     MAₙ_1 = RBVars.Mₙ + RBInfo.δt / 2 * RBVars.Aₙ * Param.μ
     MAₙ_2 = RBVars.Mₙ - RBInfo.δt / 2 * RBVars.Aₙ * Param.μ
   else
-    Aₙ_μ = assemble_stiffness(FESpace, RBInfo, Param)
+    Aₙ_μ = assemble_stiffness(FEMSpace, RBInfo, Param)
     (_, Aₙ_μ_affine) = MDEIM_online(Aₙ_μ, RBVars.Aₙ_affine, RBVars.Aₙ_idx)
     MAₙ = RBVars.Mₙ + 2 / 3 * RBInfo.δt * Aₙ_μ_affine
   end
@@ -208,10 +208,10 @@ function get_RB_LHS_blocks(RBInfo, RBVars::RBProblem, Param; FESpace = nothing)
 
 end
 
-function get_RB_RHS_blocks(RBInfo, RBVars::RBProblem, Param; FESpace = nothing)
+function get_RB_RHS_blocks(RBInfo, RBVars::RBProblem, Param; FEMSpace = nothing)
 
 
-  Ffun = assemble_forcing(FESpace, Param)
+  Ffun = assemble_forcing(FEMSpace, Param)
   F = [Ffun(tᵢ) for tᵢ = RBInfo.t₀+RBInfo.δt:RBInfo.δt:RBInfo.T]
   Fₙ = (RBVars.Φₛᵘ)' * F * RBVars.Φₜᵘ
   push!(RBVars.RHSₙ, reshape(Fₙ, :, 1))
@@ -222,7 +222,7 @@ function get_RB_RHS_blocks(RBInfo, RBVars::RBProblem, Param; FESpace = nothing)
 
 end
 
-function get_RB_system(RBInfo, RBVars::RBProblem, FESpace=nothing, Param=nothing)
+function get_RB_system(RBInfo, RBVars::RBProblem, FEMSpace=nothing, Param=nothing)
 
 
   @info "Preparing the RB system: fetching online reduced structures"
@@ -230,11 +230,11 @@ function get_RB_system(RBInfo, RBVars::RBProblem, FESpace=nothing, Param=nothing
   operators = check_affine_blocks(RBInfo, RBVars)
 
   if "A" in operators
-    get_RB_LHS_blocks(RBInfo, RBVars, Param; FESpace)
+    get_RB_LHS_blocks(RBInfo, RBVars, Param; FEMSpace)
   end
 
   if "F" in operators
-    get_RB_RHS_blocks(RBInfo, RBVars, Param; FESpace)
+    get_RB_RHS_blocks(RBInfo, RBVars, Param; FEMSpace)
   end
 
 end
