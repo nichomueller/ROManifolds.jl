@@ -130,6 +130,7 @@ function standard_MDEIM(
   timesθ::Vector,
   var="A") ::Tuple
 
+  row_idx,Σ = Float64[],Float64[]
   for k = 1:RBInfo.nₛ_MDEIM
     @info "Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)"
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
@@ -140,69 +141,16 @@ function standard_MDEIM(
     else
       error("Run MDEIM on A or M only")
     end
-    #compressed_snapsₖ, _ = POD(snapsₖ, RBInfo.ϵₛ)
-    compressed_snapsₖ, _ = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
+    compressed_snapsₖ,Σ = POD(snapsₖ, RBInfo.ϵₛ)
     if k == 1
-      global row_idx = row_idx
       global snaps = compressed_snapsₖ
     else
-      #snaps_POD,_ = POD(hcat(snaps, compressed_snapsₖ), RBInfo.ϵₛ)
-      #global snaps = snaps_POD
-      global snaps = hcat(snaps, compressed_snapsₖ)
+      snaps_POD,_ = POD(hcat(snaps, compressed_snapsₖ), RBInfo.ϵₛ)
+      global snaps = snaps_POD
     end
   end
-  return snaps,row_idx
+  return snaps,row_idx,Σ
 end
-
-#=
-μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
-for k = 1:RBInfo.nₛ_MDEIM
-  @info "Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)"
-  μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
-  snapsₖ,row_idx = build_A_snapshots(FEMSpace,RBInfo,μₖ,timesθ)
-
-  compressed_snapsₖ, _ = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
-  if k == 1
-    global row_idx = row_idx
-    global snaps₁ = compressed_snapsₖ
-    global snaps₂ = compressed_snapsₖ
-  else
-    global snaps₁ = hcat(snaps₁, compressed_snapsₖ)
-    snaps_POD,_ = POD(hcat(snaps₂, compressed_snapsₖ), RBInfo.ϵₛ)
-    global snaps₂ = snaps_POD
-  end
-end
-
-μ₉₅ = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
-Param = get_ParamInfo(problem_ntuple,RBInfo,μ₉₅)
-A_μ_sparse = build_sparse_mat(FEMInfo,FEMSpace,Param,RBVars.S.sparse_el_A,timesθ;var="A")
-A₉₅_₁₀ = A_μ_sparse[:,(10-1)*FEMSpace.Nₛᵘ+1:10*FEMSpace.Nₛᵘ][:]
-
-MDEIM_mat, Σ₁ = M_DEIM_POD(snaps₁, RBInfo.ϵₛ)
-MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat, Σ₁)
-MDEIMᵢ_mat = MDEIM_mat[MDEIM_idx,:]
-MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx,row_idx,FEMSpace.Nₛᵘ)
-θ₁ = zeros(size(MDEIM_mat)[2], RBVars.Nₜ)
-Nₛᵘ=FEMSpace.Nₛᵘ
-for (iₜ,_) in enumerate(timesθ)
-  θ₁[:,iₜ] = M_DEIM_online(A_μ_sparse[:,(iₜ-1)*Nₛᵘ+1:iₜ*Nₛᵘ],MDEIMᵢ_mat,MDEIM_idx)
-end
-A₉₅_approx₁_₁₀ = MDEIM_mat*θ₁[:,10]
-
-MDEIM_mat, Σ₂ = M_DEIM_POD(snaps₂, RBInfo.ϵₛ)
-MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat, Σ₂)
-MDEIMᵢ_mat = MDEIM_mat[MDEIM_idx,:]
-MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx,row_idx,FEMSpace.Nₛᵘ)
-θ₂ = zeros(size(MDEIM_mat)[2], RBVars.Nₜ)
-for (iₜ,_) in enumerate(timesθ)
-  θ₂[:,iₜ] = M_DEIM_online(A_μ_sparse[:,(iₜ-1)*Nₛᵘ+1:iₜ*Nₛᵘ],MDEIMᵢ_mat,MDEIM_idx)
-end
-A₉₅_approx₂_₁₀ = MDEIM_mat*θ₂[:,10]
-
-norm(A₉₅_approx₁_₁₀ - A₉₅_₁₀)/norm(A₉₅_₁₀)
-norm(A₉₅_approx₂_₁₀ - A₉₅_₁₀)/norm(A₉₅_₁₀)
-=#
 
 function standard_MDEIM_sampling(
   FEMSpace::UnsteadyProblem,
@@ -241,37 +189,33 @@ function functional_MDEIM(
   var="A") ::Tuple
 
   phys_quadp,ncells,nquad_cell,nquad,V₀_quad = get_LagrangianQuad_info(FEMSpace)
+
+  Σ = Float64[]
   for k = 1:RBInfo.nₛ_MDEIM
     @info "Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)"
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
     Param = get_ParamInfo(problem_ntuple, RBInfo, μₖ)
     if var == "A"
-      paramsₖ = [Param.α(phys_quadp[n][q],t_θ)
+      Θₖ = [Param.α(phys_quadp[n][q],t_θ)
         for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
     elseif var == "M"
-      paramsₖ = [Param.m(phys_quadp[n][q],t_θ)
+      Θₖ = [Param.m(phys_quadp[n][q],t_θ)
         for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
     else
       error("Run MDEIM on A or M only")
     end
-    compressed_paramsₖ,_ = POD(reshape(paramsₖ,nquad,:), RBInfo.ϵₛ^2)
+    compressed_Θₖ,Σ = POD(reshape(Θₖ,nquad,:), RBInfo.ϵₛ)
     if k == 1
-      global params = compressed_paramsₖ
+      global Θmat = compressed_Θₖ
     else
-      global params = hcat(params, compressed_paramsₖ)
+      Θ_POD,_ = POD(hcat(Θmat, compressed_Θₖ), RBInfo.ϵₛ)
+      global Θmat = Θ_POD
     end
   end
-  Θmat,_ = POD(params, RBInfo.ϵₛ^2)
   Q = size(Θmat)[2]
   for q = 1:Q
     Θq = FEFunction(V₀_quad,Θmat[:,q])
-    if var == "A"
-      Matq = (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Θq*∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
-        FEMSpace.V(0.0), FEMSpace.V₀))
-    elseif var == "M"
-      Matq = (assemble_matrix(∫(FEMSpace.ϕᵥ*(Θq*FEMSpace.ϕᵤ(0.0)))*FEMSpace.dΩ,
-      FEMSpace.V(0.0), FEMSpace.V₀))
-    end
+    Matq = assemble_parametric_FE_structure(FEMSpace,Θq,var)
     i,v = findnz(Matq[:])
     if q == 1
       global row_idx = i
@@ -279,7 +223,7 @@ function functional_MDEIM(
     end
     global snaps[:,q] = v
   end
-  return snaps,row_idx
+  return snaps,row_idx,Σ
 end
 
 function functional_MDEIM_sampling(
@@ -315,13 +259,7 @@ function functional_MDEIM_sampling(
   Q = size(Θmat)[2]
   for q = 1:Q
     Θq = FEFunction(V₀_quad,Θmat[:,q])
-    if var == "A"
-      Matq = (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Θq*∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
-        FEMSpace.V(0.0), FEMSpace.V₀))
-    elseif var == "M"
-      Matq = (assemble_matrix(∫(FEMSpace.ϕᵥ*(Θq*FEMSpace.ϕᵤ(0.0)))*FEMSpace.dΩ,
-        FEMSpace.V(0.0), FEMSpace.V₀))
-    end
+    Matq = assemble_parametric_FE_structure(FEMSpace,Θq,var)
     i,v = findnz(Matq[:])
     if q == 1
       global row_idx = i
@@ -341,6 +279,7 @@ function get_snaps_MDEIM(
 
   snaps = Matrix{Float64}[]
   row_idx = Float64[]
+  Σ = Float64[]
 
   if RBInfo.space_time_M_DEIM
     for k = 1:RBInfo.nₛ_MDEIM
@@ -364,17 +303,17 @@ function get_snaps_MDEIM(
       nₜ = floor(Int,length(timesθ)*RBInfo.sampling_percentage)
       snaps,row_idx = functional_MDEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
     else
-      snaps,row_idx = functional_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
+      snaps,row_idx,Σ = functional_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
     end
   else
     if RBInfo.sampling_MDEIM
       nₜ = floor(Int,length(timesθ)*RBInfo.sampling_percentage)
       snaps,row_idx = standard_MDEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
     else
-      snaps,row_idx = standard_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
+      snaps,row_idx,Σ = standard_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
     end
   end
-  snaps,row_idx
+  snaps,row_idx,Σ
 end
 
 function build_F_snapshots(
@@ -527,32 +466,30 @@ function functional_DEIM(
     @info "Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)"
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
     Param = get_ParamInfo(problem_ntuple, RBInfo, μₖ)
-    if var == "F"
-      paramsₖ = [Param.f(phys_quadp[n][q],t_θ)
+    Θₖ = [Param.f(phys_quadp[n][q],t_θ)
+        for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
+    #= if var == "F"
+      Θₖ = [Param.f(phys_quadp[n][q],t_θ)
         for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
     elseif var == "H"
-      paramsₖ = [Param.h(phys_quadp[n][q],t_θ)
+      θₖ = [Param.h(phys_quadp[n][q],t_θ)
         for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
     else
       error("Run DEIM on F or H only")
-    end
-    compressed_paramsₖ,_ = POD(reshape(paramsₖ,nquad,:), RBInfo.ϵₛ^2)
+    end =#
+    compressed_Θₖ,_ = POD(reshape(Θₖ,nquad,:), RBInfo.ϵₛ)
     if k == 1
-      global params = compressed_paramsₖ
+      global Θmat = compressed_Θₖ
     else
-      global params = hcat(params, compressed_paramsₖ)
+      Θ_POD,_ = POD(hcat(Θmat, compressed_Θₖ), RBInfo.ϵₛ)
+      global Θmat = Θ_POD
     end
   end
-  Θmat,_ = POD(params, RBInfo.ϵₛ^2)
   Q = size(Θmat)[2]
   snaps = zeros(FEMSpace.Nₛᵘ,Q)
   for q = 1:Q
     Θq = FEFunction(V₀_quad,Θmat[:,q])
-    if var == "F"
-      snaps[:,q] = assemble_vector(∫(FEMSpace.ϕᵥ*Θq)*FEMSpace.dΩ,FEMSpace.V₀)
-    elseif var == "H"
-      snaps[:,q] = assemble_vector(∫(FEMSpace.ϕᵥ*Θq)*FEMSpace.dΓn,FEMSpace.V₀)
-    end
+    snaps[:,q] = assemble_parametric_FE_structure(FEMSpace,Θq,var)
   end
   return snaps
 end
@@ -592,11 +529,7 @@ function functional_DEIM_sampling(
   snaps = zeros(FEMSpace.Nₛᵘ,Q)
   for q = 1:Q
     Θq = FEFunction(V₀_quad,Θmat[:,q])
-    if var == "F"
-      snaps[:,q] = assemble_vector(∫(FEMSpace.ϕᵥ*Θq)*FEMSpace.dΩ,FEMSpace.V₀)
-    elseif var == "H"
-      snaps[:,q] = assemble_vector(∫(FEMSpace.ϕᵥ*Θq)*FEMSpace.dΓn,FEMSpace.V₀)
-    end
+    snaps[:,q] = assemble_parametric_FE_structure(FEMSpace,Θq,var)
   end
   snaps
 end
@@ -644,38 +577,38 @@ function get_snaps_DEIM(
 end
 
 function assemble_parametric_FE_structure(
-  FEMSpace::PoissonUnsteady,
+  FEMSpace::FEMSpacePoissonUnsteady,
   Θq::FEFunction,
   var::String)
   if var == "A"
-    Matq = (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Θq*∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
+    return (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Θq*∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
       FEMSpace.V(0.0), FEMSpace.V₀))
   elseif var == "M"
-    Matq = (assemble_matrix(∫(FEMSpace.ϕᵥ*(Θq*FEMSpace.ϕᵤ(0.0)))*FEMSpace.dΩ,
+    return (assemble_matrix(∫(FEMSpace.ϕᵥ*(Θq*FEMSpace.ϕᵤ(0.0)))*FEMSpace.dΩ,
       FEMSpace.V(0.0), FEMSpace.V₀))
   elseif var == "F"
-    snaps[:,q] = assemble_vector(∫(FEMSpace.ϕᵥ*Θq)*FEMSpace.dΩ,FEMSpace.V₀)
+    return assemble_vector(∫(FEMSpace.ϕᵥ*Θq)*FEMSpace.dΩ,FEMSpace.V₀)
   elseif var == "H"
-    snaps[:,q] = assemble_vector(∫(FEMSpace.ϕᵥ*Θq)*FEMSpace.dΓn,FEMSpace.V₀)
+    return assemble_vector(∫(FEMSpace.ϕᵥ*Θq)*FEMSpace.dΓn,FEMSpace.V₀)
   else
     error("Need to assemble an unrecognized FE structure")
   end
 end
 
 function assemble_parametric_FE_structure(
-  FEMSpace::StokesUnsteady,
+  FEMSpace::FEMSpaceStokesUnsteady,
   Θq::FEFunction,
   var::String)
   if var == "A"
-    Matq = (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Θq*∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
+    return (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Θq*∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
       FEMSpace.V(0.0), FEMSpace.V₀))
   elseif var == "M"
-    Matq = (assemble_matrix(∫(FEMSpace.ϕᵥ⋅(Θq*FEMSpace.ϕᵤ(0.0)))*FEMSpace.dΩ,
+    return (assemble_matrix(∫(FEMSpace.ϕᵥ⋅(Θq*FEMSpace.ϕᵤ(0.0)))*FEMSpace.dΩ,
       FEMSpace.V(0.0), FEMSpace.V₀))
   elseif var == "F"
-    snaps[:,q] = assemble_vector(∫(FEMSpace.ϕᵥ⋅Θq)*FEMSpace.dΩ,FEMSpace.V₀)
+    return assemble_vector(∫(FEMSpace.ϕᵥ⋅Θq)*FEMSpace.dΩ,FEMSpace.V₀)
   elseif var == "H"
-    snaps[:,q] = assemble_vector(∫(FEMSpace.ϕᵥ⋅Θq)*FEMSpace.dΓn,FEMSpace.V₀)
+    return assemble_vector(∫(FEMSpace.ϕᵥ⋅Θq)*FEMSpace.dΓn,FEMSpace.V₀)
   else
     error("Need to assemble an unrecognized FE structure")
   end

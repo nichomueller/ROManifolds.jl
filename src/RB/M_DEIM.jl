@@ -78,10 +78,12 @@ function MDEIM_offline(
   μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
   timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
 
-  snaps,row_idx = get_snaps_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
-
-  _, Σ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
-  #MDEIM_mat = snaps
+  if RBInfo.sampling_MDEIM
+    snaps,row_idx,_ = get_snaps_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
+    MDEIM_mat,Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
+  else
+    MDEIM_mat,row_idx,Σ = get_snaps_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
+  end
   MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat, Σ)
   MDEIMᵢ_mat = MDEIM_mat[MDEIM_idx,:]
   MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx,row_idx,FEMSpace.Nₛᵘ)
