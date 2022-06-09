@@ -9,15 +9,16 @@ end
 """Plot the vector-valued function 'f':R->R² between range specificed by
   'xrange'. The plotting grid is composed of 'n' points"""
 function plot_R_R²(f::Function, xrange::Vector, n::Int)
-  pyplot()
-  xs_ys(vs) = Tuple(eltype(vs[1])[vs[i][j] for i in 1:length(vs)] for j in eachindex(first(vs)))
+  xs_ys(vs) = Tuple(eltype(vs[1])[vs[i][j] for i in eachindex(vs)]
+    for j in eachindex(first(vs)))
   xs_ys(v, vs...) = xs_ys([v, vs...])
   xs_ys(g::Function, a, b, n=100) = xs_ys(g.(range(a, b, n)))
-  plot(xs_ys(f, xrange[1], xrange[2], n)...)
+  Plot.plot(xs_ys(f, xrange[1], xrange[2], n)...)
 end
 
 function generate_and_save_plot(xval::Vector, yval::Vector, title::String,
-  xlab::String, ylab::String, save_path::String, semilogx::Bool, semilogy::Bool)
+  xlab::String, ylab::String, save_path::String,
+  semilogx=false, semilogy=true; var="u")
   pyplot()
   if !semilogx && !semilogy
     p = plot(xval, yval, lw = 3, title = title)
@@ -30,5 +31,6 @@ function generate_and_save_plot(xval::Vector, yval::Vector, title::String,
   end
   xlabel!(xlab)
   ylabel!(ylab)
+  display(p)
   savefig(p, joinpath(save_path, string(var)*".eps"))
 end

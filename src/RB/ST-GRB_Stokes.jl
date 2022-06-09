@@ -1,3 +1,4 @@
+include("RBPoisson_unsteady.jl")
 
 function primal_supremizers(RBInfo::Info, RBVars::StokesSTGRB)
 
@@ -5,8 +6,9 @@ function primal_supremizers(RBInfo::Info, RBVars::StokesSTGRB)
 
   dir_idx = abs.(diag(RBVars.Xᵘ) .- 1) .< 1e-16
 
-  constraint_mat = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "primalConstraint.csv"))
-  constraint_mat[dir_idx] = 0
+  constraint_mat = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "B.csv");
+  convert_to_sparse = true)'
+  constraint_mat[dir_idx[dir_idx≤RBVars.P.S.Nₛᵘ*RBVars.P.S.Nₛᵖ]] = 0
 
   supr_primal = Matrix(solve(PardisoSolver(), RBVars.Xᵘ, constraint_mat * RBVars.Φₛᵖ))
 
@@ -16,10 +18,12 @@ function primal_supremizers(RBInfo::Info, RBVars::StokesSTGRB)
     @info "Normalizing primal supremizer $i"
 
     for j in 1:RBVars.P.S.nₛᵘ
-      supr_primal[:, i] -= mydot(supr_primal[:, i], RBVars.P.S.Φₛᵘ[:,j], RBVars.P.S.Xᵘ₀) / mynorm(RBVars.P.S.Φₛᵘ[:,j], RBVars.P.S.Xᵘ₀) * RBVars.P.S.Φₛᵘ[:,j]
+      supr_primal[:, i] -= mydot(supr_primal[:, i], RBVars.P.S.Φₛᵘ[:,j], RBVars.P.S.Xᵘ₀) /
+      mynorm(RBVars.P.S.Φₛᵘ[:,j], RBVars.P.S.Xᵘ₀) * RBVars.P.S.Φₛᵘ[:,j]
     end
     for j in range(i)
-      supr_primal[:, i] -= mydot(supr_primal[:, i], supr_primal[:, j], RBVars.P.S.Xᵘ₀) / mynorm(supr_primal[:, j], RBVars.P.S.Xᵘ₀) * supr_primal[:, j]
+      supr_primal[:, i] -= mydot(supr_primal[:, i], supr_primal[:, j], RBVars.P.S.Xᵘ₀) /
+      mynorm(supr_primal[:, j], RBVars.P.S.Xᵘ₀) * supr_primal[:, j]
     end
 
     supr_norm = mynorm(supr_primal[:, i], RBVars.P.S.Xᵘ₀)

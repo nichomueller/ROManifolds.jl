@@ -126,7 +126,7 @@ function index_mapping(i::Int, j::Int, RBVars::StokesUnsteady, var="u") :: Int64
   elseif var == "p"
     return convert(Int64, (i-1) * RBVars.nₜᵖ + j)
   else
-    @error "Unrecognized variable"
+    error("Unrecognized variable")
   end
 
 end
@@ -262,7 +262,8 @@ function offline_phase(RBInfo::Info, RBVars::StokesUnsteady)
   end
 
   if !import_snapshots_success && !import_basis_success
-    @error "Impossible to assemble the reduced problem if neither the snapshots nor the bases can be loaded"
+    error("Impossible to assemble the reduced problem if neither
+      the snapshots nor the bases can be loaded")
   end
 
   if import_snapshots_success && !import_basis_success
@@ -363,30 +364,25 @@ function online_phase(RBInfo::Info, RBVars::StokesUnsteady, μ, Param_nbs)
     save_CSV([mean_L2_L2_err], joinpath(path_μ, "L2L2_err.csv"))
 
     if !RBInfo.import_offline_structures
-      times = [RBVars.S.offline_time, mean_online_time, mean_reconstruction_time]
+      times = Dict(RBVars.S.offline_time=>"off_time",
+        mean_online_time=>"on_time", mean_reconstruction_time=>"rec_time")
     else
-      times = [mean_online_time, mean_reconstruction_time]
+      times = Dict(mean_online_time=>"on_time",
+        mean_reconstruction_time=>"rec_time")
     end
-    save_CSV(times, joinpath(path_μ, "times.csv"))
+    CSV.write(joinpath(path_μ, "times.csv"),times)
 
   end
 
-  pass_to_pp = Dict("path_μ"=>path_μ, "FEMSpace"=>FEMSpace, "H1_L2_err"=>H1_L2_err, "mean_H1_err"=>mean_H1_err, "mean_point_err_u"=>mean_pointwise_err_u, "L2_L2_err"=>L2_L2_err, "mean_L2_err"=>mean_L2_err, "mean_point_err_p"=>mean_pointwise_err_p)
+  pass_to_pp = Dict("path_μ"=>path_μ, "FEMSpace"=>FEMSpace,
+    "H1_L2_err"=>H1_L2_err, "mean_H1_err"=>mean_H1_err,
+    "mean_point_err_u"=>mean_pointwise_err_u,
+    "L2_L2_err"=>L2_L2_err, "mean_L2_err"=>mean_L2_err,
+    "mean_point_err_p"=>mean_pointwise_err_p)
 
   if RBInfo.postprocess
     post_process(RBInfo, pass_to_pp)
   end
-
-  #= stability_constants = []
-  for Nₜ = 10:10:1000
-    append!(stability_constants, compute_stability_constant(RBInfo, M, A, RBInfo.θ, Nₜ))
-  end
-  pyplot()
-  p = plot(collect(10:10:1000), stability_constants, xaxis=:log, yaxis=:log, lw = 3, label="||(Aˢᵗ)⁻¹||₂", title = "Euclidean norm of (Aˢᵗ)⁻¹", legend=:topleft)
-  p = plot!(collect(10:10:1000), collect(10:10:1000), xaxis=:log, yaxis=:log, lw = 3, label="Nₜ")
-  xlabel!("Nₜ")
-  savefig(p, joinpath(RBInfo.paths.results_path, "stability_constant.eps"))
-  =#
 
 end
 

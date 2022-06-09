@@ -81,7 +81,7 @@ function assemble_MDEIM_matrices(RBInfo::Info, RBVars::PoissonSTPGRB, var::Strin
     for q = 1:RBVars.Qᵐ
       RBVars.MΦ[:,:,q] = reshape(Vector(MDEIM_mat[:, q]), RBVars.S.Nₛᵘ, RBVars.S.Nₛᵘ) * RBVars.S.Φₛᵘ
     end
-    matrix_product!!(RBVars.MΦᵀPᵤ⁻¹, MΦ, RBVars.Pᵤ⁻¹, transpose_A=true)
+    matrix_product!(RBVars.MΦᵀPᵤ⁻¹, MΦ, RBVars.Pᵤ⁻¹, transpose_A=true)
 
     for q₁ = 1:RBVars.Qᵐ
       for q₂ = 1:RBVars.Qᵐ
@@ -103,7 +103,7 @@ function assemble_MDEIM_matrices(RBInfo::Info, RBVars::PoissonSTPGRB, var::Strin
     for q = 1:RBVars.Qᵃ
       AΦ[:,:,q] = reshape(Vector(MDEIM_mat[:, q]), RBVars.Nₛᵘ, RBVars.Nₛᵘ) * RBVars.Φₛᵘ
     end
-    matrix_product!!(RBVars.AΦᵀPᵤ⁻¹, AΦ, RBVars.Pᵤ⁻¹, transpose_A=true)
+    matrix_product!(RBVars.AΦᵀPᵤ⁻¹, AΦ, RBVars.Pᵤ⁻¹, transpose_A=true)
 
     for q₁ = 1:RBVars.Qᵃ
       for q₂ = 1:RBVars.Qᵃ
@@ -119,7 +119,7 @@ function assemble_MDEIM_matrices(RBInfo::Info, RBVars::PoissonSTPGRB, var::Strin
 
   else
 
-    @error "Unrecognized variable to assemble with MDEIM"
+    error("Unrecognized variable to assemble with MDEIM")
 
   end
 
@@ -134,21 +134,21 @@ function assemble_affine_vectors(RBInfo::Info, RBVars::PoissonSTPGRB, var::Strin
     @info "Assembling affine reduced forcing term"
     F = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "F.csv"))
     MFₙ = zeros(RBVars.nₛᵘ, 1, RBVars.Qᵐ*RBVars.Qᶠ)
-    matrix_product!!(MFₙ, RBVars.MΦᵀPᵤ⁻¹, reshape(F,:,1))
+    matrix_product!(MFₙ, RBVars.MΦᵀPᵤ⁻¹, reshape(F,:,1))
     AFₙ = zeros(RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qᶠ)
-    matrix_product!!(AFₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(F,:,1))
+    matrix_product!(AFₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(F,:,1))
     RBVars.Fₙ = hcat(reshape(MFₙ,:,RBVars.Qᵐ*RBVars.Qᶠ), reshape(AFₙ,:,RBVars.Qᵃ*RBVars.Qᶠ))
   elseif var == "H"
     RBVars.Qʰ = 1
     @info "Assembling affine reduced Neumann term"
     H = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "H.csv"))
     MHₙ = zeros(RBVars.nₛᵘ, 1, RBVars.Qᵐ*RBVars.Qʰ)
-    matrix_product!!(MHₙ, RBVars.MΦᵀPᵤ⁻¹, reshape(H,:,1))
+    matrix_product!(MHₙ, RBVars.MΦᵀPᵤ⁻¹, reshape(H,:,1))
     AHₙ = zeros(RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qʰ)
-    matrix_product!!(AHₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(H,:,1))
+    matrix_product!(AHₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(H,:,1))
     RBVars.Hₙ = hcat(reshape(MHₙ,:,RBVars.Qᵐ*RBVars.Qʰ), reshape(AHₙ,:,RBVars.Qᵃ*RBVars.Qʰ))
   else
-    @error "Unrecognized variable to assemble"
+    error("Unrecognized variable to assemble")
   end
 
 end
@@ -161,10 +161,10 @@ function assemble_DEIM_vectors(RBInfo::Info, RBVars::PoissonSTPGRB, var::String)
   DEIMᵢ_mat = Matrix(DEIM_mat[DEIM_idx, :])
   Q = size(DEIM_mat)[2]
   Mvarₙ = zeros(RBVars.nₛᵘ,1,RBVars.Qᵐ*Q)
-  matrix_product!!(Mvarₙ,RBVars.MΦᵀPᵤ⁻¹,DEIM_mat)
+  matrix_product!(Mvarₙ,RBVars.MΦᵀPᵤ⁻¹,DEIM_mat)
   Mvarₙ = reshape(Mvarₙ,:,RBVars.Qᵐ*Q)
   Avarₙ = zeros(RBVars.nₛᵘ,1,RBVars.Qᵃ*Q)
-  matrix_product!!(Avarₙ,RBVars.AΦᵀPᵤ⁻¹,DEIM_mat)
+  matrix_product!(Avarₙ,RBVars.AΦᵀPᵤ⁻¹,DEIM_mat)
   Avarₙ = reshape(Avarₙ,:,RBVars.Qᵃ*Q)
 
   if var == "F"
@@ -178,7 +178,7 @@ function assemble_DEIM_vectors(RBInfo::Info, RBVars::PoissonSTPGRB, var::String)
     RBVars.Qʰ = Q
     RBVars.Hₙ = hcat(Mvarₙ,Avarₙ)
   else
-    @error "Unrecognized variable to assemble"
+    error("Unrecognized variable to assemble")
   end
 
 end

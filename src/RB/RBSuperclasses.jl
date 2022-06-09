@@ -225,6 +225,8 @@ struct ROMInfoUnsteady <: UnsteadyInfo
   nₛ_DEIM::Int64
   space_time_M_DEIM::Bool
   functional_M_DEIM::Bool
+  sampling_MDEIM::Bool
+  sampling_percentage::Float64
   postprocess::Bool
   import_snapshots::Bool
   import_offline_structures::Bool

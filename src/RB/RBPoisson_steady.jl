@@ -100,14 +100,11 @@ function get_generalized_coordinates(
 
 end
 
-function set_operators(RBInfo::Info, ::PoissonSteady) :: Vector
+function set_operators(RBInfo::Info, ::PoissonSteady) ::Vector
 
   operators = ["A"]
-  if !RBInfo.build_Parametric_RHS && !RBInfo.probl_nl["f"]
-    append!(operators, ["F"])
-  end
-  if !RBInfo.build_Parametric_RHS && !RBInfo.probl_nl["h"]
-    append!(operators, ["H"])
+  if !RBInfo.build_Parametric_RHS
+    append!(operators, ["F","H"])
   end
 
   operators
@@ -130,7 +127,7 @@ function save_M_DEIM_structures(RBInfo::Info, RBVars::PoissonSteady)
 
 end
 
-function get_M_DEIM_structures(RBInfo::Info, RBVars::PoissonSteady) :: Vector
+function get_M_DEIM_structures(RBInfo::Info, RBVars::PoissonSteady) ::Vector
 
   operators = String[]
 
@@ -363,7 +360,7 @@ end
 function get_θᶠʰ(RBInfo::Info, RBVars::PoissonSteady, Param) ::Tuple
 
   if RBInfo.build_Parametric_RHS
-    @error "Cannot fetch θᶠ, θʰ if the RHS is built online"
+    error("Cannot fetch θᶠ, θʰ if the RHS is built online")
   end
 
   if !RBInfo.probl_nl["f"] && !RBInfo.probl_nl["h"]
@@ -405,6 +402,14 @@ function get_Q(RBInfo::Info, RBVars::PoissonSteady)
       RBVars.Qʰ = size(RBVars.Hₙ)[end]
     end
   end
+
+end
+
+function assemble_online_structure(θ::Array, Mat::Array)
+
+  Mat_shape = size(Mat)
+  Mat = reshape(Mat,:,Mat_shape[end])
+  reshape(Mat*θ,Mat_shape[1:end-1])
 
 end
 
@@ -478,7 +483,8 @@ function offline_phase(RBInfo::Info, RBVars::PoissonSteady)
   end
 
   if !import_snapshots_success && !import_basis_success
-    @error "Impossible to assemble the reduced problem if neither the snapshots nor the bases can be loaded"
+    error("Impossible to assemble the reduced problem if
+      neither the snapshots nor the bases can be loaded")
   end
 
   if import_snapshots_success && !import_basis_success
@@ -553,11 +559,13 @@ function online_phase(RBInfo::Info, RBVars::PoissonSteady, μ, Param_nbs)
     save_CSV([mean_H1_err], joinpath(path_μ, "H1_err.csv"))
 
     if !RBInfo.import_offline_structures
-      times = [RBVars.offline_time, mean_online_time, mean_reconstruction_time]
+      times = Dict(RBVars.S.offline_time=>"off_time",
+        mean_online_time=>"on_time", mean_reconstruction_time=>"rec_time")
     else
-      times = [mean_online_time, mean_reconstruction_time]
+      times = Dict(mean_online_time=>"on_time",
+        mean_reconstruction_time=>"rec_time")
     end
-    save_CSV(times, joinpath(path_μ, "times.csv"))
+    CSV.write(joinpath(path_μ, "times.csv"),times)
 
   end
 
@@ -570,18 +578,21 @@ function online_phase(RBInfo::Info, RBVars::PoissonSteady, μ, Param_nbs)
 end
 
 function post_process(RBInfo::SteadyInfo, d::Dict)
-  plotly()
-
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
     MDEIM_Σ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
-    generate_and_save_plot(MDEIM_Σ, "Decay singular values, MDEIM", "σ index", "σ value", RBInfo.paths.results_path)
+    generate_and_save_plot(
+      eachindex(MDEIM_Σ), MDEIM_Σ, "Decay singular values, MDEIM", "σ index",
+      "σ value", RBInfo.paths.results_path; var="MDEIM_Σ")
   end
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "DEIM_Σ.csv"))
     DEIM_Σ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "DEIM_Σ.csv"))
-    generate_and_save_plot(DEIM_Σ, "Decay singular values, DEIM", "σ index", "σ value", RBInfo.paths.results_path)
+    generate_and_save_plot(
+      eachindex(DEIM_Σ), DEIM_Σ, "Decay singular values, DEIM", "σ index",
+       "σ value", RBInfo.paths.results_path; var="DEIM_Σ")
   end
 
   FEMSpace = d["FEMSpace"]
-  writevtk(FEMSpace.Ω, joinpath(d["path_μ"], "mean_point_err"), cellfields = ["err"=> FEFunction(FEMSpace.V, d["mean_point_err_u"])])
+  writevtk(FEMSpace.Ω, joinpath(d["path_μ"], "mean_point_err"),
+  cellfields = ["err"=> FEFunction(FEMSpace.V, d["mean_point_err_u"])])
 
 end

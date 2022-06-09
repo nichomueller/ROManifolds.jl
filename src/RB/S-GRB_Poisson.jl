@@ -22,7 +22,7 @@ function assemble_affine_matrices(RBInfo::Info, RBVars::PoissonSGRB, var::String
     RBVars.Aₙ = zeros(RBVars.nₛᵘ, RBVars.nₛᵘ, RBVars.Qᵃ)
     RBVars.Aₙ[:,:,1] = (RBVars.Φₛᵘ)' * A * RBVars.Φₛᵘ
   else
-    @error "Unrecognized variable to load"
+    error("Unrecognized variable to load")
   end
 
 end
@@ -48,7 +48,7 @@ function assemble_MDEIM_matrices(RBInfo::Info, RBVars::PoissonSGRB, var::String)
 
   else
 
-    @error "Unrecognized variable to load"
+    error("Unrecognized variable to load")
 
   end
 
@@ -67,7 +67,7 @@ function assemble_affine_vectors(RBInfo::Info, RBVars::PoissonSGRB, var::String)
     H = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "H.csv"))
     RBVars.Hₙ = (RBVars.Φₛᵘ)' * H
   else
-    @error "Unrecognized variable to load"
+    error("Unrecognized variable to load")
   end
 
 end
@@ -95,7 +95,7 @@ function assemble_DEIM_vectors(RBInfo::Info, RBVars::PoissonSGRB, var::String)
     RBVars.Qʰ = Q
     RBVars.Hₙ = varₙ
   else
-    @error "Unrecognized vector to assemble with DEIM"
+    error("Unrecognized vector to assemble with DEIM")
   end
 
 end

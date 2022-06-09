@@ -78,7 +78,7 @@ function assemble_affine_matrices(RBInfo::Info, RBVars::PoissonSPGRB, var::Strin
     RBVars.AΦᵀPᵤ⁻¹[:,:,1] = (A * RBVars.Φₛᵘ)' * RBVars.Pᵤ⁻¹
     RBVars.Aₙ[:,:,1] = RBVars.AΦᵀPᵤ⁻¹[:,:,1] * (A * RBVars.Φₛᵘ)
   else
-    @error "Unrecognized variable to load"
+    error("Unrecognized variable to load")
   end
 
 end
@@ -116,7 +116,7 @@ function assemble_MDEIM_matrices(RBInfo::Info, RBVars::PoissonSPGRB, var::String
 
   else
 
-    @error "Unrecognized variable to load"
+    error("Unrecognized variable to load")
 
   end
 
@@ -141,7 +141,7 @@ function assemble_affine_vectors(RBInfo::Info, RBVars::PoissonSPGRB, var::String
     matrix_product!!(Hₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(H,:,1))
     RBVars.Hₙ = reshape(Hₙ,:,RBVars.Qᵃ*RBVars.Qʰ)
   else
-    @error "Unrecognized variable to assemble"
+    error("Unrecognized variable to assemble")
   end
 
 end
@@ -168,7 +168,7 @@ function assemble_DEIM_vectors(RBInfo::Info, RBVars::PoissonSPGRB, var::String)
     RBVars.Qʰ = Q
     RBVars.Hₙ = varₙ
   else
-    @error "Unrecognized variable to assemble"
+    error("Unrecognized variable to assemble")
   end
 
 end

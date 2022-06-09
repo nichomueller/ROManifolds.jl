@@ -162,7 +162,7 @@ function assemble_forcing(
 end
 
 function assemble_forcing(
-  FEMSpace::UnsteadyProblem,
+  FEMSpace::FEMSpacePoissonUnsteady,
   probl::UnsteadyInfo,
   Param::ParametricInfoUnsteady)
 
@@ -171,6 +171,23 @@ function assemble_forcing(
       assemble_vector(∫(FEMSpace.ϕᵥ*Param.fₛ)*FEMSpace.dΩ, FEMSpace.V₀)
     else probl.probl_nl["f"]
       assemble_vector(∫(FEMSpace.ϕᵥ*Param.f(t))*FEMSpace.dΩ, FEMSpace.V₀)
+    end
+  end
+
+  unsteady_forcing
+
+end
+
+function assemble_forcing(
+  FEMSpace::FEMSpaceStokesUnsteady,
+  probl::UnsteadyInfo,
+  Param::ParametricInfoUnsteady)
+
+  function unsteady_forcing(t)
+    if !probl.probl_nl["f"]
+      assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.fₛ)*FEMSpace.dΩ, FEMSpace.V₀)
+    else probl.probl_nl["f"]
+      assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.f(t))*FEMSpace.dΩ, FEMSpace.V₀)
     end
   end
 
@@ -196,7 +213,7 @@ function assemble_neumann_datum(
 end
 
 function assemble_neumann_datum(
-  FEMSpace::UnsteadyProblem,
+  FEMSpace::FEMSpacePoissonUnsteady,
   probl::UnsteadyInfo,
   Param::ParametricInfoUnsteady)
 
@@ -206,6 +223,27 @@ function assemble_neumann_datum(
         assemble_vector(∫(FEMSpace.ϕᵥ*Param.hₛ)*FEMSpace.dΓn, FEMSpace.V₀)
       else
         assemble_vector(∫(FEMSpace.ϕᵥ*Param.h(t))*FEMSpace.dΓn, FEMSpace.V₀)
+      end
+    else
+      zeros(num_free_dofs(FEMSpace.V₀))
+    end
+  end
+
+  unsteady_neumann_datum
+
+end
+
+function assemble_neumann_datum(
+  FEMSpace::FEMSpaceStokesUnsteady,
+  probl::UnsteadyInfo,
+  Param::ParametricInfoUnsteady)
+
+  function unsteady_neumann_datum(t)
+    if !isnothing(FEMSpace.dΓn)
+      if !probl.probl_nl["h"]
+        assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.hₛ)*FEMSpace.dΓn, FEMSpace.V₀)
+      else
+        assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.h(t))*FEMSpace.dΓn, FEMSpace.V₀)
       end
     else
       zeros(num_free_dofs(FEMSpace.V₀))

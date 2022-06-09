@@ -1,4 +1,4 @@
-function FEM_paths(root, problem_type, problem_name, mesh_name, case)
+function FEM_paths(root, problem_type, problem_name, mesh_name, case; test_case="")
 
   @assert isdir(root) "$root is an invalid root directory"
 
@@ -16,7 +16,7 @@ function FEM_paths(root, problem_type, problem_name, mesh_name, case)
   create_dir(current_test)
   FEM_path = joinpath(current_test, "FEM_data")
   create_dir(FEM_path)
-  FEM_snap_path = joinpath(FEM_path, "snapshots")
+  FEM_snap_path = joinpath(FEM_path, "snapshots"*test_case)
   create_dir(FEM_snap_path)
   FEM_structures_path = joinpath(FEM_path, "FEM_structures")
   create_dir(FEM_structures_path)
@@ -88,7 +88,7 @@ function get_ParamInfo(::NTuple{1,Int},Info::UnsteadyInfo,μ::Vector)
     if !probl_nl["f"]
       return fₛ(x)*fₜ(t)
     else
-      return sin(π*t*x*(μ[4]+μ[5]))
+      return 10+5*sin(π*t*sum(x)*(μ[4]+μ[5]))
     end
   end
   f(x, t::Real) = prepare_f(x, t, μ, Info.probl_nl)

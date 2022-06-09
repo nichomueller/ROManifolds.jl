@@ -2,14 +2,14 @@ function set_labels(probl::Info, model::DiscreteModel)
 
   labels = get_face_labeling(model)
   if !isempty(probl.dirichlet_tags) && !isempty(probl.dirichlet_bnds)
-    for i = 1:length(probl.dirichlet_tags)
+    for i = eachindex(probl.dirichlet_tags)
       if probl.dirichlet_tags[i] ∉ labels.tag_to_name
         add_tag_from_tags!(labels, probl.dirichlet_tags[i], probl.dirichlet_bnds[i])
       end
     end
   end
   if !isempty(probl.neumann_tags) && !isempty(probl.neumann_bnds)
-    for i = 1:length(probl.neumann_tags)
+    for i = eachindex(probl.neumann_tags)
       if probl.neumann_tags[i] ∉ labels.tag_to_name
         add_tag_from_tags!(labels, probl.neumann_tags[i], probl.neumann_bnds[i])
       end

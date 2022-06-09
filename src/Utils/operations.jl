@@ -46,6 +46,47 @@ end
   the vector of ranges 'a' and 'b'"""
 function generate_parameter(a::Vector, b::Vector, n::Int64 = 1)
 
-  return [[rand(Uniform(a[i], b[i])) for i = 1:length(a)] for j in 1:n]
+  return [[rand(Uniform(a[i], b[i])) for i = eachindex(a)] for j in 1:n]
+
+end
+
+"""Makes use of a truncated SVD (tolerance level specified by 'ϵ') to compute a
+  reduced basis 'U' that spans a vector space minimizing the l² distance from
+  the vector space spanned by the columns of 'S', the so-called snapshots matrix.
+  If the SPD matrix 'X' is provided, the columns of 'U' are orthogonal w.r.t.
+  the norm induced by 'X'"""
+function POD(S, ϵ = 1e-5, X = nothing)
+  S̃ = copy(S)
+  if !isnothing(X)
+    if !issparse(X)
+      X = sparse(X)
+    end
+    H = cholesky(X)
+    L = sparse(H.L)
+    mul!(S̃, L', S̃[H.p, :])
+  end
+  if issparse(S̃)
+    U, Σ, _ = svds(S̃; nsv=size(S̃)[2] - 1)[1]
+  else
+    U, Σ, _ = svd(S̃)
+  end
+
+  total_energy = sum(Σ .^ 2)
+  cumulative_energy = 0.0
+  N = 0
+  while cumulative_energy / total_energy < 1.0 - ϵ ^ 2 && N < size(S̃)[2]
+    N += 1
+    cumulative_energy += Σ[N] ^ 2
+    @info "POD loop number $N, projection error ≤ $((sqrt(abs(1 - cumulative_energy / total_energy))))"
+  end
+  @info "Basis number obtained via POD is $N"
+  if issparse(U)
+    U = Matrix(U)
+  end
+  if !isnothing(X)
+    return Matrix((L' \ U[:, 1:N])[invperm(H.p), :]), Σ
+  else
+    return U[:, 1:N], Σ
+  end
 
 end

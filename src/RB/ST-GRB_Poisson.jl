@@ -41,7 +41,7 @@ function assemble_MDEIM_matrices(RBInfo::Info, RBVars::PoissonSTGRB, var::String
 
   MDEIM_mat, MDEIM_idx, MDEIMᵢ_mat, row_idx, sparse_el =
     MDEIM_offline(FEMSpace, RBInfo, var)
-  Matₙ, Q = assemble_reduced_mat_MDEIM(MDEIM_mat,RBInfo,RBVars,var)
+  Matₙ, Q = assemble_reduced_mat_MDEIM(MDEIM_mat,row_idx,RBInfo,RBVars,var)
 
   if var == "M"
     RBVars.Mₙ = Matₙ
@@ -58,13 +58,14 @@ function assemble_MDEIM_matrices(RBInfo::Info, RBVars::PoissonSTGRB, var::String
     RBVars.row_idx_A = row_idx
     RBVars.S.Qᵃ = Q
   else
-    @error "Unrecognized variable to assemble with MDEIM"
+    error("Unrecognized variable to assemble with MDEIM")
   end
 
 end
 
 function assemble_reduced_mat_MDEIM(
   MDEIM_mat::Matrix,
+  row_idx::Vector,
   RBInfo::Info,
   RBVars::PoissonSTGRB,
   var::String) ::Tuple
@@ -111,29 +112,55 @@ function assemble_DEIM_vectors(RBInfo::Info, RBVars::PoissonSTGRB, var::String)
 
   @info "ST-GRB: running the DEIM offline phase on variable $var with $nₛ_DEIM snapshots"
 
-  DEIM_mat, DEIM_idx, _, _ = DEIM_offline(FEMSpace, RBInfo, var)
-  DEIMᵢ_mat = Matrix(DEIM_mat[DEIM_idx, :])
-  Q = size(DEIM_mat)[2]
-  varₙ = zeros(RBVars.nₛᵘ,1,Q)
-  for q = 1:Q
-    varₙ[:,:,q] = RBVars.Φₛᵘ' * Vector(DEIM_mat[:, q])
-  end
-  varₙ = reshape(varₙ,:,Q)
+  DEIM_mat, DEIM_idx, DEIMᵢ_mat = DEIM_offline(FEMSpace, RBInfo, var)
+  Vecₙ,Q = assemble_reduced_mat_DEIM(DEIM_mat,RBInfo,RBVars)
 
   if var == "F"
-    RBVars.DEIMᵢ_mat_F = DEIMᵢ_mat
-    RBVars.DEIM_idx_F = DEIM_idx
-    RBVars.Qᶠ = Q
-    RBVars.Fₙ = varₙ
+    RBVars.S.DEIMᵢ_mat_F = DEIMᵢ_mat
+    RBVars.S.DEIM_idx_F = DEIM_idx
+    RBVars.S.Qᶠ = Q
+    RBVars.S.Fₙ = Vecₙ
   elseif var == "H"
-    RBVars.DEIMᵢ_mat_H = DEIMᵢ_mat
-    RBVars.DEIM_idx_H = DEIM_idx
-    RBVars.Qʰ = Q
-    RBVars.Hₙ = varₙ
+    RBVars.S.DEIMᵢ_mat_H = DEIMᵢ_mat
+    RBVars.S.DEIM_idx_H = DEIM_idx
+    RBVars.S.Qʰ = Q
+    RBVars.S.Hₙ = Vecₙ
   else
-    @error "Unrecognized vector to assemble with DEIM"
+    error("Unrecognized vector to assemble with DEIM")
   end
 
+end
+
+function assemble_reduced_mat_DEIM(
+  DEIM_mat::Matrix,
+  RBInfo::Info,
+  RBVars::PoissonSTGRB) ::Tuple
+
+  if RBInfo.space_time_M_DEIM
+    Nₜ = RBVars.Nₜ
+    DEIM_mat_new = reshape(DEIM_mat,RBVars.S.Nₛᵘ,:)
+    Q = Int(size(MDEIM_mat_new)[2]/Nₜ)
+    r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
+    MatqΦ = zeros(RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q*Nₜ)
+    for q = 1:Q
+      @info "ST-GRB: affine component number $q/$Q, matrix $var"
+      for j = 1:RBVars.S.Nₛᵘ
+        Mat_idx = findall(x -> x == j, r_idx)
+        MatqΦ[j,:,(q-1)*Nₜ+1:q*Nₜ] =
+          (MDEIM_mat_new[Mat_idx,:,q]' * RBVars.S.Φₛᵘ[c_idx[Mat_idx],:])'
+      end
+    end
+    Matₙ = reshape(RBVars.S.Φₛᵘ' * reshape(MatqΦ,RBVars.S.Nₛᵘ,:),
+      RBVars.S.nₛᵘ,:,Q*Nₜ)
+  else
+    Q = size(DEIM_mat)[2]
+    Vecₙ = zeros(RBVars.S.nₛᵘ,1,Q)
+    for q = 1:Q
+      Vecₙ[:,:,q] = RBVars.S.Φₛᵘ' * Vector(DEIM_mat[:, q])
+    end
+    Vecₙ = reshape(Vecₙ,:,Q)
+  end
+  Vecₙ,Q
 end
 
 function assemble_offline_structures(RBInfo::Info, RBVars::PoissonSTGRB, operators=nothing)
@@ -264,24 +291,27 @@ function get_RB_LHS_blocks_spacetime(RBInfo, RBVars::PoissonSTGRB, θᵐ, θᵃ)
 
   θ = RBInfo.θ
   δtθ = RBInfo.δt*θ
+  Nₜ = RBVars.Nₜ
   Qᵐ = RBVars.Qᵐ
   Qᵃ = RBVars.S.Qᵃ
-  Nₜᵐ = Int(size(RBVars.Mₙ)[3]/Qᵐ) #1
-  Nₜᵃ = Int(size(RBVars.S.Aₙ)[3]/Qᵃ) #10
-
-  [Φₜᵘ_M[i_t,j_t,q] = sum(RBVars.Φₜᵘ[:,i_t].*RBVars.Φₜᵘ[:,j_t].*θᵐ[q,:]) for q = 1:Qᵐ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
-  [Φₜᵘ₁_M[i_t,j_t,q] = sum(RBVars.Φₜᵘ[2:end,i_t].*RBVars.Φₜᵘ[1:end-1,j_t].*θᵐ[q,2:end]) for q = 1:Qᵐ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
-  [Φₜᵘ_A[i_t,j_t,q] = sum(RBVars.Φₜᵘ[:,i_t].*RBVars.Φₜᵘ[:,j_t].*θᵃ[q,:]) for q = 1:Qᵃ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
-  [Φₜᵘ₁_A[i_t,j_t,q] = sum(RBVars.Φₜᵘ[2:end,i_t].*RBVars.Φₜᵘ[1:end-1,j_t].*θᵃ[q,2:end]) for q = 1:Qᵃ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
-
-  if Nₜᵐ>1
-    RBVars.Mₙ = reshape(RBVars.Mₙ,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,Nₜᵐ,Qᵐ)
+  if Qᵐ == size(RBVars.Mₙ)[3]
+    Qᵐ = ceil(Int,Qᵐ/Nₜ)
   end
-  if Nₜᵃ>1
-    RBVars.S.Aₙ = reshape(RBVars.S.Aₙ,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,Nₜᵃ,Qᵃ)
+  if Qᵃ == size(RBVars.S.Aₙ)[3]
+    Qᵃ = ceil(Int,Qᵃ/Nₜ)
   end
+  Nₜᵐ = Int(size(RBVars.Mₙ)[3]/Qᵐ)
+  Nₜᵃ = Int(size(RBVars.S.Aₙ)[3]/Qᵃ)
 
+  Φₜᵘ = RBVars.Φₜᵘ'*RBVars.Φₜᵘ
   Φₜᵘ₁ = RBVars.Φₜᵘ[2:end,:]'*RBVars.Φₜᵘ[1:end-1,:]
+
+  Mₙ = reshape(RBVars.Mₙ,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,Nₜᵐ,Qᵐ)
+  Mₙ = reshape(sum(assemble_online_structure(θᵐ,Mₙ),dims=3),
+    RBVars.S.nₛᵘ,RBVars.S.nₛᵘ)
+  Aₙ = reshape(RBVars.S.Aₙ,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,Nₜᵃ,Qᵃ)
+  Aₙ = reshape(sum(assemble_online_structure(θᵃ,Aₙ),dims=3),
+    RBVars.S.nₛᵘ,RBVars.S.nₛᵘ)
 
   block₁ = zeros(RBVars.nᵘ, RBVars.nᵘ)
 
@@ -295,26 +325,10 @@ function get_RB_LHS_blocks_spacetime(RBInfo, RBVars::PoissonSTGRB, θᵐ, θᵃ)
 
           j_st = index_mapping(j_s, j_t, RBVars)
 
-          #case1
-          #= Mₙ_μ_i_j = (i_t==j_t)*sum(RBVars.Mₙ[i_s,j_s,:,:]*θᵐ)
-          Mₙ₁_μ_i_j = sum(RBVars.Mₙ[i_s,j_s,:,:]*θᵐ)*Φₜᵘ₁_M[i_t,j_t]
-          Aₙ_μ_i_j = δtθ*(i_t==j_t)*sum(RBVars.S.Aₙ[i_s,j_s,:,:]*θᵃ)
-          Aₙ₁_μ_i_j = δtθ*sum(RBVars.S.Aₙ[i_s,j_s,:,:]*θᵃ)*Φₜᵘ₁_A[i_t,j_t] =#
-          #case 2
-          if Nₜᵐ>1
-            Mₙ_μ_i_j = sum([RBVars.Φₜᵘ[nₜᵐ,i_t]*RBVars.Φₜᵘ[nₜᵐ,j_t]*RBVars.Mₙ[i_s,j_s,nₜᵐ,qᵐ]*θᵐ[qᵐ] for qᵐ=1:Qᵐ for nₜᵐ=1:Nₜᵐ])
-            Mₙ₁_μ_i_j = sum([RBVars.Φₜᵘ[nₜᵐ+1,i_t]*RBVars.Φₜᵘ[nₜᵐ,j_t]*RBVars.Mₙ[i_s,j_s,nₜᵐ,qᵐ]*θᵐ[qᵐ] for qᵐ=1:Qᵐ for nₜᵐ=1:Nₜᵐ-1])
-          else
-            Mₙ_μ_i_j = sum((i_t==j_t)*RBVars.Mₙ[i_s,j_s,:])
-            Mₙ₁_μ_i_j = sum(RBVars.Mₙ[i_s,j_s,:]*Φₜᵘ₁[i_t,j_t])
-          end
-          if Nₜᵃ>1
-            Aₙ_μ_i_j = δtθ*sum([RBVars.Φₜᵘ[nₜᵃ,i_t]*RBVars.Φₜᵘ[nₜᵃ,j_t]*RBVars.S.Aₙ[i_s,j_s,nₜᵃ,qᵃ]*θᵃ[qᵃ] for qᵃ=1:Qᵃ for nₜᵃ=1:Nₜᵃ])
-            Aₙ₁_μ_i_j = δtθ*sum([RBVars.Φₜᵘ[nₜᵃ+1,i_t]*RBVars.Φₜᵘ[nₜᵃ,j_t]*RBVars.S.Aₙ[i_s,j_s,nₜᵃ,qᵃ]*θᵃ[qᵃ] for qᵃ=1:Qᵃ for nₜᵃ=1:Nₜᵃ-1])
-          else
-            Aₙ_μ_i_j = sum((i_t==j_t)*δtθ*RBVars.S.Aₙ[i_s,j_s,:])
-            Aₙ₁_μ_i_j = δtθ*sum(RBVars.S.Aₙ[i_s,j_s,:]*Φₜᵘ₁[i_t,j_t])
-          end
+          Aₙ_μ_i_j = δtθ*Aₙ[i_s,j_s]*Φₜᵘ[i_t,j_t]
+          Mₙ_μ_i_j = Mₙ[i_s,j_s]*Φₜᵘ[i_t,j_t]
+          Aₙ₁_μ_i_j = δtθ*Aₙ[i_s,j_s]*Φₜᵘ₁[i_t,j_t]
+          Mₙ₁_μ_i_j = Mₙ[i_s,j_s]*Φₜᵘ₁[i_t,j_t]
 
           block₁[i_st,j_st] = θ*(Aₙ_μ_i_j+Mₙ_μ_i_j) + (1-θ)*Aₙ₁_μ_i_j - θ*Mₙ₁_μ_i_j
 
@@ -403,7 +417,7 @@ function build_Param_RHS(RBInfo::Info, RBVars::PoissonSTGRB, Param)
   H_t = assemble_neumann_datum(FEMSpace, RBInfo, Param)
   F, H = zeros(RBVars.S.Nₛᵘ, RBVars.Nₜ), zeros(RBVars.S.Nₛᵘ, RBVars.Nₜ)
   timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+δtθ
-  for (i, tᵢ) in enumerate(timesθ)
+  for (i,tᵢ) in enumerate(timesθ)
     F[:,i] = F_t(tᵢ)
     H[:,i] = H_t(tᵢ)
   end
@@ -413,7 +427,7 @@ function build_Param_RHS(RBInfo::Info, RBVars::PoissonSTGRB, Param)
   Fₙ = RBVars.S.Φₛᵘ'*(F*RBVars.Φₜᵘ)
   Hₙ = RBVars.S.Φₛᵘ'*(H*RBVars.Φₜᵘ)
 
-  push!(RBVars.S.RHSₙ, Fₙ+Hₙ)
+  push!(RBVars.S.RHSₙ, reshape(Fₙ'+Hₙ',:,1))
 
 end
 

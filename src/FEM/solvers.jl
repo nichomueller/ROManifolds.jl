@@ -102,7 +102,7 @@ function FE_solve(
     uₕₜ -= Gₕₜ
   end
 
-  return uₕₜ, Gₕₜ
+  return uₕₜ, pₕₜ
 
 end
 

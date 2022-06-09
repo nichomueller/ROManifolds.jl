@@ -4,9 +4,17 @@ include("ST-PGRB_Poisson.jl")
 
 function get_snapshot_matrix(RBInfo::Info, RBVars::PoissonUnsteady)
 
-  @info "Importing the snapshot matrix for field u, number of snapshots considered: $(RBInfo.nₛ)"
-
-  Sᵘ = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, 1:(RBInfo.nₛ*RBVars.Nₜ)]
+  if RBInfo.perform_nested_POD
+    @info "Importing the snapshot matrix for field u obtained
+      with the nested POD"
+    Sᵘ = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
+      DataFrame))
+  else
+    @info "Importing the snapshot matrix for field u,
+      number of snapshots considered: $(RBInfo.nₛ)"
+    Sᵘ = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
+      DataFrame))[:, 1:(RBInfo.nₛ*RBVars.Nₜ)]
+  end
 
   RBVars.S.Sᵘ = Sᵘ
   Nₛᵘ = size(Sᵘ)[1]
@@ -17,33 +25,7 @@ function get_snapshot_matrix(RBInfo::Info, RBVars::PoissonUnsteady)
 
 end
 
-function PODs_space(RBInfo::Info, RBVars::PoissonUnsteady)
-
-  @info "Performing the nested spatial POD for field u, using a tolerance of $(RBInfo.ϵₛ)"
-
-  if RBInfo.perform_nested_POD
-
-    for nₛ = 1:RBInfo.nₛ
-      Sᵘₙ = RBVars.S.Sᵘ[:, (nₛ-1)*RBVars.Nₜ+1:nₛ*RBVars.Nₜ]
-      Φₙ, _ = POD(Sᵘₙ, RBInfo.ϵₛ)
-      if nₛ ==1
-        global Φₙᵘ_temp = Φₙ
-      else
-        global Φₙᵘ_temp = hcat(Φₙᵘ_temp, Φₙ)
-      end
-    end
-    Φₛᵘ, _ = POD(Φₙᵘ_temp, RBInfo.ϵₛ)
-    RBVars.S.Φₛᵘ = Φₛᵘ
-    RBVars.S.nₛᵘ = size(Φₛᵘ)[2]
-
-  else
-
-    PODs_space(RBInfo, RBVars.S)
-
-  end
-
-end
-
+PODs_space(RBInfo::Info, RBVars::PoissonUnsteady) = PODs_space(RBInfo, RBVars.S)
 
 function PODs_time(RBInfo::Info, RBVars::PoissonUnsteady)
 
@@ -103,11 +85,8 @@ function import_reduced_basis(RBInfo::Info, RBVars::PoissonUnsteady)
 
 end
 
-function index_mapping(i::Int, j::Int, RBVars::PoissonUnsteady) :: Int64
-
-  return convert(Int64, (i-1) * RBVars.nₜᵘ + j)
-
-end
+index_mapping(i::Int, j::Int, RBVars::PoissonUnsteady) =
+  convert(Int64, (i-1) * RBVars.nₜᵘ + j)
 
 function get_generalized_coordinates(RBInfo::Info, RBVars::PoissonUnsteady, snaps=nothing)
 
@@ -202,7 +181,6 @@ function get_M_DEIM_structures(RBInfo::Info, RBVars::PoissonUnsteady) :: Vector
     if isfile(joinpath(RBInfo.paths.ROM_structures_path, "row_idx_A.csv"))
       RBVars.row_idx_A = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "row_idx_A.csv"))[:]
     else
-      @info "Failed to import MDEIM offline structures for the stiffness matrix: must build them"
       append!(operators, ["A"])
     end
   end
@@ -287,10 +265,10 @@ function get_θᵃₛₜ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::Paramet
     θᵃ = [1]
   else
     timesθ_mod,MDEIM_idx_mod =
-      modify_timesθ_and_MDEIM_idx(RBVars.MDEIM_idx_A,RBInfo,RBVars)
+      modify_timesθ_and_MDEIM_idx(RBVars.S.MDEIM_idx_A,RBInfo,RBVars)
     A_μ_sparse = build_sparse_mat(FEMInfo, FEMSpace, Param,
-      RBVars.sparse_el_A, timesθ_mod; var="A")
-    θᵃ = RBVars.MDEIMᵢ_A\Vector(A_μ_sparse[MDEIM_idx_mod])
+      RBVars.S.sparse_el_A, timesθ_mod; var="A")
+    θᵃ = RBVars.S.MDEIMᵢ_A\Vector(A_μ_sparse[MDEIM_idx_mod])
   end
 
   return θᵃ
@@ -300,7 +278,7 @@ end
 function get_θᶠʰ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInfoUnsteady) ::Tuple
 
   if RBInfo.build_Parametric_RHS
-    @error "Cannot fetch θᶠ, θʰ if the RHS is built online"
+    error("Cannot fetch θᶠ, θʰ if the RHS is built online")
   end
 
   timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
@@ -334,7 +312,7 @@ end
 function get_θᶠʰₛₜ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInfoUnsteady) ::Tuple
 
   if RBInfo.build_Parametric_RHS
-    @error "Cannot fetch θᶠ, θʰ if the RHS is built online"
+    error("Cannot fetch θᶠ, θʰ if the RHS is built online")
   end
 
   if !RBInfo.probl_nl["f"]
@@ -408,7 +386,8 @@ function offline_phase(RBInfo::Info, RBVars::PoissonUnsteady)
   end
 
   if !import_snapshots_success && !import_basis_success
-    @error "Impossible to assemble the reduced problem if neither the snapshots nor the bases can be loaded"
+    error("Impossible to assemble the reduced problem if neither
+      the snapshots nor the bases can be loaded")
   end
 
   if import_snapshots_success && !import_basis_success
@@ -427,9 +406,9 @@ function offline_phase(RBInfo::Info, RBVars::PoissonUnsteady)
 
 end
 
-function online_phase(RBInfo::Info, RBVars::PoissonUnsteady, μ, Param_nbs)
+function online_phase(RBInfo::Info, RBVars::PoissonUnsteady, μ, param_nbs)
 
-  H1_L2_err = zeros(length(Param_nbs))
+  H1_L2_err = zeros(length(param_nbs))
   mean_H1_err = zeros(RBVars.Nₜ)
   mean_H1_L2_err = 0.0
   mean_pointwise_err = zeros(RBVars.S.Nₛᵘ, RBVars.Nₜ)
@@ -438,16 +417,23 @@ function online_phase(RBInfo::Info, RBVars::PoissonUnsteady, μ, Param_nbs)
 
   get_norm_matrix(RBInfo, RBVars.S)
 
-  ũ_μ = zeros(RBVars.S.Nₛᵘ, length(Param_nbs)*RBVars.Nₜ)
-  uₙ_μ = zeros(RBVars.nᵘ, length(Param_nbs))
+  ũ_μ = zeros(RBVars.S.Nₛᵘ, length(param_nbs)*RBVars.Nₜ)
+  uₙ_μ = zeros(RBVars.nᵘ, length(param_nbs))
 
-  for (i_nb, nb) in enumerate(Param_nbs)
+  for (i_nb, nb) in enumerate(param_nbs)
     println("\n")
-    @info "Considering Parameter number: $nb"
+    @info "Considering Parameter number: $nb/$(param_nbs[end])"
 
     μ_nb = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
     Param = get_ParamInfo(problem_ntuple, RBInfo, μ_nb)
-    uₕ_test = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, (nb-1)*RBVars.Nₜ+1:nb*RBVars.Nₜ]
+    if RBInfo.perform_nested_POD
+      nb_test = nb-90
+      uₕ_test = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path,
+      "uₕ_test.csv"), DataFrame))[:,(nb_test-1)*RBVars.Nₜ+1:nb_test*RBVars.Nₜ]
+    else
+      uₕ_test = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
+      DataFrame))[:,(nb-1)*RBVars.Nₜ+1:nb*RBVars.Nₜ]
+    end
 
     online_time = @elapsed begin
       solve_RB_system(RBInfo, RBVars, Param)
@@ -455,14 +441,14 @@ function online_phase(RBInfo::Info, RBVars::PoissonUnsteady, μ, Param_nbs)
     reconstruction_time = @elapsed begin
       reconstruct_FEM_solution(RBVars)
     end
-    mean_online_time = online_time / length(Param_nbs)
-    mean_reconstruction_time = reconstruction_time / length(Param_nbs)
+    mean_online_time = online_time / length(param_nbs)
+    mean_reconstruction_time = reconstruction_time / length(param_nbs)
 
     H1_err_nb, H1_L2_err_nb = compute_errors(uₕ_test, RBVars, RBVars.S.Xᵘ₀)
     H1_L2_err[i_nb] = H1_L2_err_nb
-    mean_H1_err += H1_err_nb / length(Param_nbs)
-    mean_H1_L2_err += H1_L2_err_nb / length(Param_nbs)
-    mean_pointwise_err += abs.(uₕ_test - RBVars.S.ũ) / length(Param_nbs)
+    mean_H1_err += H1_err_nb / length(param_nbs)
+    mean_H1_L2_err += H1_L2_err_nb / length(param_nbs)
+    mean_pointwise_err += abs.(uₕ_test - RBVars.S.ũ) / length(param_nbs)
 
     ũ_μ[:, (i_nb-1)*RBVars.Nₜ+1:i_nb*RBVars.Nₜ] = RBVars.S.ũ
     uₙ_μ[:, i_nb] = RBVars.S.uₙ
@@ -472,14 +458,14 @@ function online_phase(RBInfo::Info, RBVars::PoissonUnsteady, μ, Param_nbs)
 
   end
 
-  string_Param_nbs = "Params"
-  for Param_nb in Param_nbs
-    string_Param_nbs *= "_" * string(Param_nb)
+  string_param_nbs = "Params"
+  for Param_nb in param_nbs
+    string_param_nbs *= "_" * string(Param_nb)
   end
-  path_μ = joinpath(RBInfo.paths.results_path, string_Param_nbs)
+  path_μ = joinpath(RBInfo.paths.results_path, string_param_nbs)
 
   if RBInfo.save_results
-
+    @info "Saving the results..."
     create_dir(path_μ)
     save_CSV(ũ_μ, joinpath(path_μ, "ũ.csv"))
     save_CSV(uₙ_μ, joinpath(path_μ, "uₙ.csv"))
@@ -488,17 +474,21 @@ function online_phase(RBInfo::Info, RBVars::PoissonUnsteady, μ, Param_nbs)
     save_CSV([mean_H1_L2_err], joinpath(path_μ, "H1L2_err.csv"))
 
     if !RBInfo.import_offline_structures
-      times = [RBVars.S.offline_time, mean_online_time, mean_reconstruction_time]
+      times = Dict(RBVars.S.offline_time=>"off_time",
+        mean_online_time=>"on_time", mean_reconstruction_time=>"rec_time")
     else
-      times = [mean_online_time, mean_reconstruction_time]
+      times = Dict(mean_online_time=>"on_time",
+        mean_reconstruction_time=>"rec_time")
     end
-    save_CSV(times, joinpath(path_μ, "times.csv"))
-
+    CSV.write(joinpath(path_μ, "times.csv"),times)
   end
 
-  pass_to_pp = Dict("path_μ"=>path_μ, "FEMSpace"=>FEMSpace, "H1_L2_err"=>H1_L2_err, "mean_H1_err"=>mean_H1_err, "mean_point_err_u"=>mean_pointwise_err)
+  pass_to_pp = Dict("path_μ"=>path_μ,
+    "FEMSpace"=>FEMSpace, "H1_L2_err"=>H1_L2_err,
+    "mean_H1_err"=>mean_H1_err, "mean_point_err_u"=>mean_pointwise_err)
 
   if RBInfo.postprocess
+    @info "Post-processing the results..."
     post_process(RBInfo, pass_to_pp)
   end
 
@@ -509,14 +499,17 @@ function online_phase(RBInfo::Info, RBVars::PoissonUnsteady, μ, Param_nbs)
 end
 
 function post_process(RBInfo::UnsteadyInfo, d::Dict)
-
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
     MDEIM_Σ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
-    generate_and_save_plot(MDEIM_Σ, "Decay singular values, MDEIM", "σ index", "σ value", RBInfo.paths.results_path)
+    generate_and_save_plot(
+      eachindex(MDEIM_Σ), MDEIM_Σ, "Decay singular values, MDEIM", "σ index",
+      "σ value", RBInfo.paths.results_path; var="MDEIM_Σ")
   end
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "DEIM_Σ.csv"))
     DEIM_Σ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "DEIM_Σ.csv"))
-    generate_and_save_plot(DEIM_Σ, "Decay singular values, DEIM", "σ index", "σ value", RBInfo.paths.results_path)
+    generate_and_save_plot(
+      eachindex(DEIM_Σ), DEIM_Σ, "Decay singular values, DEIM", "σ index",
+       "σ value", RBInfo.paths.results_path; var="DEIM_Σ")
   end
 
   times = collect(RBInfo.t₀+RBInfo.δt:RBInfo.δt:RBInfo.T)
@@ -527,24 +520,36 @@ function post_process(RBInfo::UnsteadyInfo, d::Dict)
   createpvd(joinpath(vtk_dir,"mean_point_err_u")) do pvd
     for (i,t) in enumerate(times)
       errₕt = FEFunction(FEMSpace.V(t), d["mean_point_err_u"][:,i])
-      pvd[i] = createvtk(FEMSpace.Ω, joinpath(vtk_dir, "mean_point_err_$i" * ".vtu"), cellfields = ["point_err" => errₕt])
+      pvd[i] = createvtk(FEMSpace.Ω, joinpath(vtk_dir,
+        "mean_point_err_$i" * ".vtu"), cellfields = ["point_err" => errₕt])
     end
   end
 
-  generate_and_save_plot(d["mean_H1_err"], "Average ||uₕ(t) - ũ(t)||ₕ₁", "time [s]", "H¹ error", d["path_μ"])
-  generate_and_save_plot(d["H1_L2_err"], "||uₕ - ũ||ₕ₁₋ₗ₂", "Param μ number", "H¹-L² error", d["path_μ"])
+  generate_and_save_plot(times,d["mean_H1_err"],
+    "Average ||uₕ(t) - ũ(t)||ₕ₁", "time [s]", "H¹ error", d["path_μ"];
+    var="H1_err")
+  xvec = collect(eachindex(d["H1_L2_err"]))
+  generate_and_save_plot(xvec,d["H1_L2_err"],
+    "||uₕ - ũ||ₕ₁₋ₗ₂", "Param μ number", "H¹-L² error", d["path_μ"];
+    var="H1_L2_err")
 
   if length(keys(d)) == 8
 
     createpvd(joinpath(vtk_dir,"mean_point_err_p")) do pvd
       for (i,t) in enumerate(times)
         errₕt = FEFunction(FEMSpace.Q, d["mean_point_err_p"][:,i])
-        pvd[i] = createvtk(FEMSpace.Ω, joinpath(vtk_dir, "mean_point_err_$i" * ".vtu"), cellfields = ["point_err" => errₕt])
+        pvd[i] = createvtk(FEMSpace.Ω, joinpath(vtk_dir,
+          "mean_point_err_$i" * ".vtu"), cellfields = ["point_err" => errₕt])
       end
     end
 
-    generate_and_save_plot(d["mean_L2_err"], "Average ||pₕ(t) - p̃(t)||ₗ₂", "time [s]", "L² error", d["path_μ"])
-    generate_and_save_plot(d["L2_L2_err"], "||pₕ - p̃||ₗ₂₋ₗ₂", "Param μ number", "L²-L² error", d["path_μ"])
+    generate_and_save_plot(times,d["mean_L2_err"],
+      "Average ||pₕ(t) - p̃(t)||ₗ₂", "time [s]", "L² error", d["path_μ"];
+      var="L2_err")
+    xvec = collect(eachindex(d["L2_L2_err"]))
+    generate_and_save_plot(xvec,d["L2_L2_err"],
+      "||pₕ - p̃||ₗ₂₋ₗ₂", "Param μ number", "L²-L² error", d["path_μ"];
+      var="L2_L2_err")
 
   end
 
@@ -596,9 +601,11 @@ function plot_stability_constants(
     const_Nₜ = compute_stability_constant(RBInfo,Nₜ,M,A)
     append!(stability_constants, const_Nₜ)
   end
-  pyplot()
-  p = plot(collect(10:10:1000), stability_constants, xaxis=:log, yaxis=:log, lw = 3, label="||(Aˢᵗ)⁻¹||₂", title = "Euclidean norm of (Aˢᵗ)⁻¹", legend=:topleft)
-  p = plot!(collect(10:10:1000), collect(10:10:1000), xaxis=:log, yaxis=:log, lw = 3, label="Nₜ")
+  p = Plot.plot(collect(10:10:1000),
+    stability_constants, xaxis=:log, yaxis=:log, lw = 3,
+    label="||(Aˢᵗ)⁻¹||₂", title = "Euclidean norm of (Aˢᵗ)⁻¹", legend=:topleft)
+  p = Plot.plot!(collect(10:10:1000), collect(10:10:1000),
+    xaxis=:log, yaxis=:log, lw = 3, label="Nₜ")
   xlabel!("Nₜ")
   savefig(p, joinpath(RBInfo.paths.results_path, "stability_constant.eps"))
 

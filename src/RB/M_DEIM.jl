@@ -1,37 +1,4 @@
 include("MV_snapshots.jl")
-#= function M_DEIM_POD(S::SparseMatrixCSC, ϵ = 1e-5)
-
-  S̃ = copy(S)
-  row_idx, _, _ = findnz(S̃)
-  unique!(row_idx)
-  S̃ = Matrix(S̃[row_idx, :])
-
-  M_DEIM_mat, Σ, _ = svd(S̃)
-
-  total_energy = sum(Σ .^ 2)
-  cumulative_energy = 0.0
-  N = 0
-  M_DEIM_err_bound = 1e5
-  nₛ = size(S̃)[2]
-  crit_val = norm(inv(M_DEIM_mat'M_DEIM_mat))
-  mult_factor = sqrt(nₛ) * crit_val
-
-  while N ≤ size(S̃)[2]-2 && (M_DEIM_err_bound > ϵ ||
-    cumulative_energy / total_energy < 1.0 - ϵ ^ 2)
-    N += 1
-    cumulative_energy += Σ[N] ^ 2
-    M_DEIM_err_bound = Σ[N + 1] * mult_factor
-    @info "(M)DEIM-POD loop number $N, projection error = $M_DEIM_err_bound"
-  end
-  M_DEIM_mat = M_DEIM_mat[:, 1:N]
-  _, col_idx, val = findnz(sparse(M_DEIM_mat))
-  sparse_M_DEIM_mat = sparse(repeat(row_idx, N), col_idx, val, size(S̃)[1], N)
-
-  @info "Basis number obtained via POD is $N, projection error ≤ $M_DEIM_err_bound"
-
-  return sparse_M_DEIM_mat, Σ
-
-end =#
 
 function M_DEIM_POD(S::Matrix, ϵ = 1e-5)
 
@@ -61,35 +28,6 @@ function M_DEIM_POD(S::Matrix, ϵ = 1e-5)
 
 end
 
-#= function M_DEIM_offline(sparse_M_DEIM_mat::SparseMatrixCSC, Σ::Vector)
-
-  row_idx, _, _ = findnz(sparse_M_DEIM_mat)
-  unique!(row_idx)
-  M_DEIM_mat = Matrix(sparse_M_DEIM_mat[row_idx, :])
-
-  (N, n) = size(M_DEIM_mat)
-  n_new = n
-  M_DEIM_idx = Int64[]
-  append!(M_DEIM_idx, convert(Int64, argmax(abs.(M_DEIM_mat[:, 1]))[1]))
-  for m in range(2, n)
-    res = (M_DEIM_mat[:, m] -
-    M_DEIM_mat[:, 1:(m-1)] * (M_DEIM_mat[M_DEIM_idx[1:(m-1)], 1:(m-1)] \
-    M_DEIM_mat[M_DEIM_idx[1:(m-1)], m]))
-    append!(M_DEIM_idx, convert(Int64, argmax(abs.(res))[1]))
-    if abs(det(M_DEIM_mat[M_DEIM_idx[1:m], 1:m])) ≤ 1e-80
-      n_new = m
-      break
-    end
-  end
-  unique!(M_DEIM_idx)
-  M_DEIM_err_bound = (Σ[min(n_new + 1,size(Σ)[1])] *
-  norm(M_DEIM_mat[M_DEIM_idx,1:n_new] \ I(n_new)))
-  M_DEIM_idx = row_idx[M_DEIM_idx]
-
-  sparse_M_DEIM_mat[:,1:n_new], M_DEIM_idx, M_DEIM_err_bound
-
-end =#
-
 function M_DEIM_offline(M_DEIM_mat::Matrix, Σ::Vector)
 
   (N, n) = size(M_DEIM_mat)
@@ -98,8 +36,8 @@ function M_DEIM_offline(M_DEIM_mat::Matrix, Σ::Vector)
   append!(M_DEIM_idx, convert(Int64, argmax(abs.(M_DEIM_mat[:, 1]))[1]))
   for m in range(2, n)
     res = (M_DEIM_mat[:, m] -
-    M_DEIM_mat[:, 1:(m-1)] * (M_DEIM_mat[M_DEIM_idx[1:(m-1)], 1:(m-1)] \
-    M_DEIM_mat[M_DEIM_idx[1:(m-1)], m]))
+    M_DEIM_mat[:, 1:m-1] * (M_DEIM_mat[M_DEIM_idx[1:m-1], 1:m-1] \
+    M_DEIM_mat[M_DEIM_idx[1:m-1], m]))
     append!(M_DEIM_idx, convert(Int64, argmax(abs.(res))[1]))
     if abs(det(M_DEIM_mat[M_DEIM_idx[1:m], 1:m])) ≤ 1e-80
       n_new = m
@@ -138,8 +76,12 @@ function MDEIM_offline(
   at each time step. This will take some time."
 
   μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  snaps,row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, μ, var)
-  MDEIM_mat, Σ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
+  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
+
+  snaps,row_idx = get_snaps_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
+
+  _, Σ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
+  #MDEIM_mat = snaps
   MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat, Σ)
   MDEIMᵢ_mat = MDEIM_mat[MDEIM_idx,:]
   MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx,row_idx,FEMSpace.Nₛᵘ)
@@ -152,7 +94,7 @@ end
 
 function modify_timesθ_and_MDEIM_idx(
   MDEIM_idx::Vector,
-  RBInfo::RBUnsteadyProblem,
+  RBInfo::Info,
   RBVars::PoissonUnsteady) ::Tuple
   timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
   idx_space, idx_time = from_vec_to_mat_idx(MDEIM_idx,RBVars.S.Nₛᵘ^2)
@@ -162,7 +104,10 @@ function modify_timesθ_and_MDEIM_idx(
   timesθ_mod,MDEIM_idx_mod
 end
 
-function DEIM_offline(FEMSpace::SteadyProblem, RBInfo::Info, var::String)
+function DEIM_offline(
+  FEMSpace::SteadyProblem,
+  RBInfo::Info,
+  var::String) ::Tuple
 
   @info "Building $(RBInfo.nₛ_DEIM) snapshots of $var"
 
@@ -176,38 +121,22 @@ function DEIM_offline(FEMSpace::SteadyProblem, RBInfo::Info, var::String)
 
 end
 
-function DEIM_offline(FEMSpace::UnsteadyProblem, RBInfo::Info, var::String)
-
-  if RBInfo.functional_M_DEIM
-    DEIM_offline_functional(FEMSpace, RBInfo, var)
-  else
-    DEIM_offline_algebraic(FEMSpace, RBInfo, var)
-  end
-
-end
-
-function DEIM_offline_algebraic(
+function DEIM_offline(
   FEMSpace::UnsteadyProblem,
   RBInfo::Info,
-  var::String)
+  var::String) ::Tuple
 
-  sparse_DEIM_mat = Matrix{Float64}[]
-  @info "Building $(RBInfo.nₛ_DEIM) snapshots of $var at each time step."
+  @info "Building $(RBInfo.nₛ_DEIM) snapshots of $var, at each time step."
 
   μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  snaps = get_snaps_DEIM(FEMSpace, RBInfo, μ, var)
-  sparse_DEIM_mat, Σ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
-  DEIM_mat, DEIM_idx, DEIM_err_bound = M_DEIM_offline(sparse_DEIM_mat, Σ)
-  unique!(DEIM_idx)
+  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
+  snaps = get_snaps_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
+  DEIM_mat, Σ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
+  DEIM_mat, DEIM_idx, DEIM_err_bound = M_DEIM_offline(DEIM_mat, Σ)
+  DEIMᵢ_mat = DEIM_mat[DEIM_idx,:]
 
-  DEIM_mat, DEIM_idx, DEIM_err_bound, Σ
+  DEIM_mat, DEIM_idx, DEIMᵢ_mat
 
-end
-
-function DEIM_offline_functional(FEMSpace::UnsteadyProblem,
-  RBInfo::Info,
-  var::String)
-  error("Functional DEIM not implemented yet")
 end
 
 function M_DEIM_online(Mat_nonaffine, Matᵢ::Matrix, idx::Vector)
