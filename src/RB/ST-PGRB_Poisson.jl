@@ -424,7 +424,7 @@ function build_Param_RHS(RBInfo::Info, RBVars::PoissonSTPGRB, Param, θᵐ, θ�
   F_t = assemble_forcing(FEMSpace, RBInfo, Param)
   H_t = assemble_neumann_datum(FEMSpace, RBInfo, Param)
   F, H = zeros(RBVars.S.Nₛᵘ, RBVars.Nₜ), zeros(RBVars.S.Nₛᵘ, RBVars.Nₜ)
-  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+δtθ
+  timesθ = get_timesθ(RBInfo)
   for (i, tᵢ) in enumerate(timesθ)
     F[:,i] = F_t(tᵢ)
     H[:,i] = H_t(tᵢ)

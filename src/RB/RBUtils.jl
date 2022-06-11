@@ -16,6 +16,10 @@ function ROM_paths(root, problem_type, problem_name, mesh_name, RB_method, case,
   _ -> (mesh_path, FEM_snap_path, FEM_structures_path, basis_path, ROM_structures_path, gen_coords_path, results_path)
 end
 
+function get_timesθ(RBInfo::Info) ::Vector
+  collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
+end
+
 function build_sparse_mat(FEMInfo::ProblemInfoSteady, FEMSpace::SteadyProblem,
     Param::ParametricInfoSteady, el::Vector; var="A")
 

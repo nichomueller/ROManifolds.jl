@@ -415,18 +415,3 @@ function check_dataset(RBInfo, RBVars, i)
   u2≈my_u2
 
 end
-
-function compute_stability_constant(RBInfo, M, A, θ, Nₜ)
-
-  #= M = assemble_mass(FEMSpace, RBInfo, Param)(0.0)
-  A = assemble_stiffness(FEMSpace, RBInfo, Param)(0.0) =#
-  Nₕ = size(M)[1]
-  δt = RBInfo.T/Nₜ
-  B₁ = θ*(M + θ*δt*A)
-  B₂ = θ*(-M + (1-θ)*δt*A)
-  λ₁,_ = eigs(B₁)
-  λ₂,_ = eigs(B₂)
-
-  return 1/(minimum(abs.(λ₁)) + minimum(abs.(λ₂)))
-
-end

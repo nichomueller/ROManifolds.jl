@@ -347,7 +347,7 @@ function assemble_H¹₀_norm_matrix(FEMSpace₀::FEMSpacePoissonUnsteady)
 
 end
 
-function assemble_H¹_norm_matrix_nobcs(FEMSpace₀::FEMSpaceStokesUnsteady)
+function assemble_H¹₀_norm_matrix(FEMSpace₀::FEMSpaceStokesUnsteady)
 
   Xᵘ₀(t) = (assemble_matrix(∫(∇(FEMSpace₀.ϕᵥ)⊙∇(FEMSpace₀.ϕᵤ(t)))*FEMSpace₀.dΩ,
   FEMSpace₀.V(t), FEMSpace₀.V₀) +
@@ -355,6 +355,17 @@ function assemble_H¹_norm_matrix_nobcs(FEMSpace₀::FEMSpaceStokesUnsteady)
   FEMSpace₀.V(t), FEMSpace₀.V₀))
 
   return Xᵘ₀(0.0)
+
+end
+
+function assemble_H¹_norm_matrix_nobcs(FEMSpace::FEMSpaceStokesUnsteady)
+
+  Xᵘ(t) = (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙∇(FEMSpace.ϕᵤ(t)))*FEMSpace.dΩ,
+  FEMSpace.V(t), FEMSpace.V₀) +
+  assemble_matrix(∫(FEMSpace.ϕᵥ⋅FEMSpace.ϕᵤ(t))*FEMSpace.dΩ,
+  FEMSpace.V(t), FEMSpace.V₀))
+
+  return Xᵘ(0.0)
 
 end
 

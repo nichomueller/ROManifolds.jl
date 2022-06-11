@@ -94,7 +94,8 @@ function get_ParamInfo(::NTuple{1,Int},Info::UnsteadyInfo,μ::Vector)
   f(x, t::Real) = prepare_f(x, t, μ, Info.probl_nl)
   f(t::Real) = x -> f(x, t)
 
-  ParametricInfoUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, g, hₛ, hₜ, h, u₀)
+  ParametricInfoUnsteady(
+    μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, g, hₛ, hₜ, h, u₀)
 
 end
 
@@ -143,17 +144,21 @@ function get_ParamInfo(::NTuple{2,Int},Info::UnsteadyInfo,μ::Vector)
     if case <= 1
       gⁱⁿ(x, t::Real) = gₛ(x)*gₜ(t, μ)
       gⁱⁿ(t::Real) = x -> gⁱⁿ(x, t)
-      return [gʷ,gⁱⁿ]
+      return gⁱⁿ#[gʷ,gⁱⁿ]
     else
       gⁱⁿ₁(x, t::Real) = gₛ(x)*gₜ(t, μ[end-2:end-1])*μ[end]
       gⁱⁿ₁(t::Real) = x -> g(x, t)
       gⁱⁿ₂(x, t::Real) = gₛ(x)*(1-gₜ(t, μ[end-2:end-1])*μ[end])
       gⁱⁿ₂(t::Real) = x -> g(x, t)
-      return [gʷ,gⁱⁿ₁,gⁱⁿ₂]
+      return gⁱⁿ₁#[gʷ,gⁱⁿ₁,gⁱⁿ₂]
     end
   end
+  #g(x, t::Real) = prepare_g(x, t, μ, Info.case)
+  g(x, t::Real) = gₛ(x)*gₜ(t, μ)
+  g(t::Real) = x -> g(x, t)
 
-  ParametricInfoUnsteady(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, prepare_g(x, t, μ, Info.case), hₛ, hₜ, h, u₀)
+  ParametricInfoUnsteady(
+    μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, g, hₛ, hₜ, h, x₀)
 
 end
 

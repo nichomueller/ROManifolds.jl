@@ -208,7 +208,7 @@ function get_offline_structures(RBInfo::Info, RBVars::PoissonUnsteady) ::Vector
 end
 
 function get_θᵐ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInfoUnsteady) ::Array
-  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
+  timesθ = get_timesθ(RBInfo)
   if !RBInfo.probl_nl["M"]
     θᵐ = [Param.mₜ(t_θ) for t_θ = timesθ]
   else
@@ -246,7 +246,7 @@ end
 
 function get_θᵃ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInfoUnsteady) ::Array
 
-  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
+  timesθ = get_timesθ(RBInfo)
   if !RBInfo.probl_nl["A"]
     θᵃ = [Param.αₜ(t_θ,Param.μ) for t_θ = timesθ]
   else
@@ -288,7 +288,7 @@ function get_θᶠʰ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricI
     error("Cannot fetch θᶠ, θʰ if the RHS is built online")
   end
 
-  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
+  timesθ = get_timesθ(RBInfo)
   θᶠ, θʰ = Float64[], Float64[]
 
   if !RBInfo.probl_nl["f"]
@@ -559,40 +559,6 @@ function post_process(RBInfo::UnsteadyInfo, d::Dict)
       var="L2_L2_err")
 
   end
-
-end
-
-function check_dataset(
-  FEMSpace::FEMProblem,
-  RBInfo::Info,
-  RBVars::PoissonUnsteady,
-  nb::Int64)
-
-  μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  μ_i = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
-  Param = get_ParamInfo(problem_ntuple, RBInfo, μ_i)
-
-  u1 = RBVars.S.Sᵘ[:,(nb-1)*RBVars.Nₜ+1]
-  u2 = RBVars.S.Sᵘ[:,(nb-1)*RBVars.Nₜ+2]
-  M = assemble_mass(FEMSpace, RBInfo, Param)(0.0)
-  # we suppose that case == 1 --> no need to multiply A by αₜ
-  A(t) = assemble_stiffness(FEMSpace, RBInfo, Param)(t)
-  F = assemble_forcing(FEMSpace, RBInfo, Param)(0.0)
-  H = assemble_neumann_datum(FEMSpace, RBInfo, Param)(0.0)
-
-  t¹_θ = RBInfo.t₀+RBInfo.δt*RBInfo.θ
-  t²_θ = t¹_θ+RBInfo.δt
-
-  LHS1 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A(t¹_θ))
-  RHS1 = RBInfo.δt*RBInfo.θ*(F*Param.fₜ(t¹_θ)+H*Param.hₜ(t¹_θ))
-  my_u1 = LHS1\RHS1
-
-  LHS2 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A(t²_θ))
-  mat = (1-RBInfo.θ)*(M+RBInfo.δt*RBInfo.θ*A(t²_θ))-M
-  RHS2 = RBInfo.δt*RBInfo.θ*(F*Param.fₜ(t²_θ)+H*Param.hₜ(t²_θ))-mat*u1
-  my_u2 = LHS2\RHS2
-
-  u1≈my_u1 && u2≈my_u2
 
 end
 

@@ -76,7 +76,7 @@ function MDEIM_offline(
   at each time step. This will take some time."
 
   μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
+  timesθ = get_timesθ(RBInfo)
   MDEIM_mat,row_idx,Σ = get_snaps_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
   MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat, Σ)
   MDEIMᵢ_mat = MDEIM_mat[MDEIM_idx,:]
@@ -92,7 +92,7 @@ function modify_timesθ_and_MDEIM_idx(
   MDEIM_idx::Vector,
   RBInfo::Info,
   RBVars::PoissonUnsteady) ::Tuple
-  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
+  timesθ = get_timesθ(RBInfo)
   idx_space, idx_time = from_vec_to_mat_idx(MDEIM_idx,RBVars.S.Nₛᵘ^2)
   idx_time_mod = label_sorted_elems(idx_time)
   timesθ_mod = timesθ[unique(sort(idx_time))]
@@ -125,7 +125,7 @@ function DEIM_offline(
   @info "Building $(RBInfo.nₛ_DEIM) snapshots of $var, at each time step."
 
   μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
+  timesθ = get_timesθ(RBInfo)
   DEIM_mat,Σ = get_snaps_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
   DEIM_mat, DEIM_idx, DEIM_err_bound = M_DEIM_offline(DEIM_mat, Σ)
   DEIMᵢ_mat = DEIM_mat[DEIM_idx,:]

@@ -1,17 +1,17 @@
-function set_labels(probl::Info, model::DiscreteModel)
+function set_labels(ProblInfo::Info, model::DiscreteModel)
 
   labels = get_face_labeling(model)
-  if !isempty(probl.dirichlet_tags) && !isempty(probl.dirichlet_bnds)
-    for i = eachindex(probl.dirichlet_tags)
-      if probl.dirichlet_tags[i] ∉ labels.tag_to_name
-        add_tag_from_tags!(labels, probl.dirichlet_tags[i], probl.dirichlet_bnds[i])
+  if !isempty(ProblInfo.dirichlet_tags) && !isempty(ProblInfo.dirichlet_bnds)
+    for i = eachindex(ProblInfo.dirichlet_tags)
+      if ProblInfo.dirichlet_tags[i] ∉ labels.tag_to_name
+        add_tag_from_tags!(labels, ProblInfo.dirichlet_tags[i], ProblInfo.dirichlet_bnds[i])
       end
     end
   end
-  if !isempty(probl.neumann_tags) && !isempty(probl.neumann_bnds)
-    for i = eachindex(probl.neumann_tags)
-      if probl.neumann_tags[i] ∉ labels.tag_to_name
-        add_tag_from_tags!(labels, probl.neumann_tags[i], probl.neumann_bnds[i])
+  if !isempty(ProblInfo.neumann_tags) && !isempty(ProblInfo.neumann_bnds)
+    for i = eachindex(ProblInfo.neumann_tags)
+      if ProblInfo.neumann_tags[i] ∉ labels.tag_to_name
+        add_tag_from_tags!(labels, ProblInfo.neumann_tags[i], ProblInfo.neumann_bnds[i])
       end
     end
   end
@@ -20,24 +20,26 @@ function set_labels(probl::Info, model::DiscreteModel)
 
 end
 
-function get_FEMSpace(::NTuple{1,Int}, probl::SteadyInfo, model::DiscreteModel, g = nothing)
+function get_FEMSpace(
+  ::NTuple{1,Int}, ProblInfo::SteadyInfo, model::DiscreteModel, g = nothing)
 
-  degree = 2*probl.order
-  labels = set_labels(probl, model)
+  degree = 2*ProblInfo.order
+  labels = set_labels(ProblInfo, model)
   Ω = Interior(model)
   dΩ = Measure(Ω, degree)
   Qₕ = CellQuadrature(Ω, degree)
-  refFE = ReferenceFE(lagrangian, Float64, probl.order)
-  if !isempty(probl.neumann_tags)
-    Γn = BoundaryTriangulation(model, tags=probl.neumann_tags)
+  refFE = ReferenceFE(lagrangian, Float64, ProblInfo.order)
+  if !isempty(ProblInfo.neumann_tags)
+    Γn = BoundaryTriangulation(model, tags=ProblInfo.neumann_tags)
     dΓn = Measure(Γn, degree)
   else
     dΓn = nothing
   end
-  if !isempty(probl.dirichlet_tags)
-    Γd = BoundaryTriangulation(model, tags=probl.dirichlet_tags)
+  if !isempty(ProblInfo.dirichlet_tags)
+    Γd = BoundaryTriangulation(model, tags=ProblInfo.dirichlet_tags)
     dΓd = Measure(Γd, degree)
-    V₀ = TestFESpace(model, refFE; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
+    V₀ = TestFESpace(model, refFE; conformity=:H1,
+      dirichlet_tags=ProblInfo.dirichlet_tags, labels=labels)
   else
     dΓd = nothing
     V₀ = TestFESpace(model, refFE; conformity=:H1, constraint=:zeromean)
@@ -58,24 +60,26 @@ function get_FEMSpace(::NTuple{1,Int}, probl::SteadyInfo, model::DiscreteModel, 
 
 end
 
-function get_FEMSpace(::NTuple{1,Int}, probl::UnsteadyInfo, model::DiscreteModel, g = nothing)
+function get_FEMSpace(
+  ::NTuple{1,Int}, ProblInfo::UnsteadyInfo, model::DiscreteModel, g = nothing)
 
-  degree = 2*probl.order
-  labels = set_labels(probl, model)
+  degree = 2*ProblInfo.order
+  labels = set_labels(ProblInfo, model)
   Ω = Interior(model)
   dΩ = Measure(Ω, degree)
   Qₕ = CellQuadrature(Ω, degree)
-  refFE = ReferenceFE(lagrangian, Float64, probl.order)
-  if !isempty(probl.neumann_tags)
-    Γn = BoundaryTriangulation(model, tags=probl.neumann_tags)
+  refFE = ReferenceFE(lagrangian, Float64, ProblInfo.order)
+  if !isempty(ProblInfo.neumann_tags)
+    Γn = BoundaryTriangulation(model, tags=ProblInfo.neumann_tags)
     dΓn = Measure(Γn, degree)
   else
     dΓn = nothing
   end
-  if !isempty(probl.dirichlet_tags)
-    Γd = BoundaryTriangulation(model, tags=probl.dirichlet_tags)
+  if !isempty(ProblInfo.dirichlet_tags)
+    Γd = BoundaryTriangulation(model, tags=ProblInfo.dirichlet_tags)
     dΓd = Measure(Γd, degree)
-    V₀ = TestFESpace(model, refFE; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
+    V₀ = TestFESpace(model, refFE; conformity=:H1,
+      dirichlet_tags=ProblInfo.dirichlet_tags, labels=labels)
   else
     dΓd = nothing
     V₀ = TestFESpace(model, refFE; conformity=:H1, constraint=:zeromean)
@@ -97,21 +101,23 @@ function get_FEMSpace(::NTuple{1,Int}, probl::UnsteadyInfo, model::DiscreteModel
 
 end
 
-function get_FEMSpace(::NTuple{2,Int}, probl::SteadyInfo, model::DiscreteModel, g = nothing)
+function get_FEMSpace(
+  ::NTuple{2,Int}, ProblInfo::SteadyInfo, model::DiscreteModel, g = nothing)
 
-  degree = 2*probl.order
-  labels = set_labels(probl, model)
+  degree = 2*ProblInfo.order
+  labels = set_labels(ProblInfo, model)
 
   Ω = Triangulation(model)
   dΩ = Measure(Ω, degree)
-  Γn = BoundaryTriangulation(model, tags=probl.neumann_tags)
+  Γn = BoundaryTriangulation(model, tags=ProblInfo.neumann_tags)
   dΓn = Measure(Γn, degree)
-  Γd = BoundaryTriangulation(model, tags=probl.dirichlet_tags)
+  Γd = BoundaryTriangulation(model, tags=ProblInfo.dirichlet_tags)
   dΓd = Measure(Γd, degree)
   Qₕ = CellQuadrature(Ω, degree)
 
-  refFEᵤ = ReferenceFE(lagrangian, VectorValue{3,Float64}, probl.order)
-  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
+  refFEᵤ = ReferenceFE(lagrangian, VectorValue{3,Float64}, ProblInfo.order)
+  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1,
+    dirichlet_tags=ProblInfo.dirichlet_tags, labels=labels)
   if !isnothing(g)
     V = TrialFESpace(V₀, g)
   else
@@ -128,27 +134,40 @@ function get_FEMSpace(::NTuple{2,Int}, probl::SteadyInfo, model::DiscreteModel, 
   ψₚ = get_trial_fe_basis(Q)
   Nₛᵖ = length(get_free_dof_ids(Q))
 
-  FEMSpace = FEMSpaceStokes(Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn)
+  X₀ = MultiFieldFESpace([V₀, Q₀])
+  X = TransientMultiFieldFESpace([V, Q])
+
+  FEMSpace = FEMSpaceStokesSteady(
+    Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn)
 
   return FEMSpace
 
 end
 
-function get_FEMSpace(::NTuple{2,Int}, probl::UnsteadyInfo, model::DiscreteModel, g = nothing)
+function get_FEMSpace(
+  ::NTuple{2,Int}, ProblInfo::UnsteadyInfo, model::DiscreteModel, g = nothing)
 
-  degree = 2*probl.order
-  labels = set_labels(probl, model)
-
+  degree = 2*ProblInfo.order
+  labels = set_labels(ProblInfo, model)
   Ω = Interior(model)
   dΩ = Measure(Ω, degree)
-  Γn = BoundaryTriangulation(model, tags=probl.neumann_tags)
-  dΓn = Measure(Γn, degree)
-  Γd = BoundaryTriangulation(model, tags=probl.dirichlet_tags)
-  dΓd = Measure(Γd, degree)
   Qₕ = CellQuadrature(Ω, degree)
-
-  refFEᵤ = ReferenceFE(lagrangian, VectorValue{3,Float64}, probl.order)
-  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1, dirichlet_tags=probl.dirichlet_tags, labels=labels)
+  refFEᵤ = ReferenceFE(lagrangian, VectorValue{3,Float64}, ProblInfo.order)
+  if !isempty(ProblInfo.neumann_tags)
+    Γn = BoundaryTriangulation(model, tags=ProblInfo.neumann_tags)
+    dΓn = Measure(Γn, degree)
+  else
+    dΓn = nothing
+  end
+  if !isempty(ProblInfo.dirichlet_tags)
+    Γd = BoundaryTriangulation(model, tags=ProblInfo.dirichlet_tags)
+    dΓd = Measure(Γd, degree)
+    V₀ = TestFESpace(model, refFEᵤ; conformity=:H1,
+      dirichlet_tags=ProblInfo.dirichlet_tags, labels=labels)
+  else
+    dΓd = nothing
+    V₀ = TestFESpace(model, refFEᵤ; conformity=:H1, constraint=:zeromean)
+  end
   if isnothing(g)
     g₀(x, t::Real) = VectorValue(0,0,0)
     g₀(t::Real) = x->g₀(x,t)
@@ -160,17 +179,18 @@ function get_FEMSpace(::NTuple{2,Int}, probl::UnsteadyInfo, model::DiscreteModel
   ϕᵤ(t) = get_trial_fe_basis(V(t))
   Nₛᵘ = length(get_free_dof_ids(V₀))
 
-  refFEₚ = ReferenceFE(lagrangian, Float64, probl.order-1; space=:P)
+  refFEₚ = ReferenceFE(lagrangian, Float64, ProblInfo.order-1; space=:P)
   Q₀ = TestFESpace(model, refFEₚ, conformity=:L2, constraint=:zeromean)
   Q = TrialFESpace(Q₀)
   ψᵧ = get_fe_basis(Q₀)
   ψₚ = get_trial_fe_basis(Q)
   Nₛᵖ = length(get_free_dof_ids(Q₀))
 
-  X₀ = MultiFieldFEMSpace([V₀, Q₀])
-  X = TransientMultiFieldFEMSpace([V, Q])
+  X₀ = MultiFieldFESpace([V₀, Q₀])
+  X = TransientMultiFieldFESpace([V, Q])
 
-  FEMSpace = FEMSpaceStokesUnsteady(Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn)
+  FEMSpace = FEMSpaceStokesUnsteady(
+    Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn)
 
   return FEMSpace
 
