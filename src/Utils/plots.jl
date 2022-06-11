@@ -17,20 +17,22 @@ function plot_R_R²(f::Function, xrange::Vector, n::Int)
 end
 
 function generate_and_save_plot(xval::Vector, yval::Vector, title::String,
-  xlab::String, ylab::String, save_path::String,
+  label::Vector, xlab::String, ylab::String, save_path::String,
   semilogx=false, semilogy=true; var="u")
-  pyplot()
+
   if !semilogx && !semilogy
-    p = plot(xval, yval, lw = 3, title = title)
+    layout = Layout(title=title,xaxis_title=xlab,yaxis_title=ylab)
   elseif semilogx && !semilogy
-    p = plot(xval, yval, xaxis=:log, lw = 3, title = title)
+    layout = Layout(title=title,xaxis_title=xlab,yaxis_title=ylab,
+      xaxis_type="log")
   elseif !semilogx && semilogy
-    p = plot(xval, yval, yaxis=:log, lw = 3, title = title)
+    layout = Layout(title=title,xaxis_title=xlab,yaxis_title=ylab,
+      yaxis_type="log")
   else
-    p = plot(xval, yval, xaxis=:log, yaxis=:log, lw = 3, title = title)
+    layout = Layout(title=title,xaxis_title=xlab,yaxis_title=ylab,
+      xaxis_type="log",yaxis_type="log")
   end
-  xlabel!(xlab)
-  ylabel!(ylab)
-  display(p)
+  trace = scatter(x=xval,y=yval,name=label,line=attr(width=4))
+  p = plot(trace,layout)
   savefig(p, joinpath(save_path, string(var)*".eps"))
 end

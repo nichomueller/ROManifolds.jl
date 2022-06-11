@@ -44,7 +44,7 @@ using CSV
 using JLD
 using Test
 using Logging
-using Plots
+using PlotlyJS
 using Gridap
 using Gridap.FESpaces
 using Gridap.ReferenceFEs
@@ -57,6 +57,7 @@ using GridapGmsh
 using Gridap.TensorValues
 using LineSearches:BackTracking
 using TensorOperations
+using Kronecker
 import Gridap:∇
 
 include("files.jl")

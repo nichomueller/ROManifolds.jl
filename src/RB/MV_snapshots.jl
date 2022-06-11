@@ -130,7 +130,7 @@ function standard_MDEIM(
   timesθ::Vector,
   var="A") ::Tuple
 
-  row_idx,Σ = Float64[],Float64[]
+  snaps,row_idx,Σ = Matrix{Float64},Float64[],Float64[]
   for k = 1:RBInfo.nₛ_MDEIM
     @info "Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)"
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
@@ -143,11 +143,12 @@ function standard_MDEIM(
     end
     compressed_snapsₖ,Σ = POD(snapsₖ, RBInfo.ϵₛ)
     if k == 1
-      global snaps = compressed_snapsₖ
+      snaps = compressed_snapsₖ
     else
-      snaps_POD,_ = POD(hcat(snaps, compressed_snapsₖ), RBInfo.ϵₛ)
-      global snaps = snaps_POD
+      snaps = hcat(snaps, compressed_snapsₖ)
     end
+    snaps_POD,_ = POD(snaps, RBInfo.ϵₛ)
+    snaps = snaps_POD
   end
   return snaps,row_idx,Σ
 end
@@ -160,25 +161,27 @@ function standard_MDEIM_sampling(
   nₜ::Int64,
   var="A") ::Tuple
 
+  snaps,row_idx = Matrix{Float64},Float64[]
   for k = 1:RBInfo.nₛ_MDEIM
     @info "Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)"
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
     timesθₖ = timesθ[rand(1:length(timesθ),nₜ)]
     if var == "A"
-      snapsₖ,row_idx = build_A_snapshots(FEMSpace,RBInfo,μₖ,timesθₖ)
+      snapsₖ,i = build_A_snapshots(FEMSpace,RBInfo,μₖ,timesθₖ)
     elseif var == "M"
-      snapsₖ,row_idx = build_M_snapshots(FEMSpace,RBInfo,μₖ,timesθₖ)
+      snapsₖ,i = build_M_snapshots(FEMSpace,RBInfo,μₖ,timesθₖ)
     else
       error("Run MDEIM on A or M only")
     end
     if k == 1
-      global row_idx = row_idx
-      global snaps = snapsₖ
+      row_idx = i
+      snaps = snapsₖ
     else
-      global snaps = hcat(snaps, snapsₖ)
+      snaps = hcat(snaps, snapsₖ)
     end
   end
-  return snaps,row_idx
+  snapsPOD,Σ = POD(snaps,RBInfo.ϵₛ)
+  return snapsPOD,row_idx,Σ
 end
 
 function functional_MDEIM(
@@ -190,40 +193,43 @@ function functional_MDEIM(
 
   phys_quadp,ncells,nquad_cell,nquad,V₀_quad = get_LagrangianQuad_info(FEMSpace)
 
-  Σ = Float64[]
+  Θmat = Matrix{Float64}
   for k = 1:RBInfo.nₛ_MDEIM
     @info "Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)"
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
     Param = get_ParamInfo(problem_ntuple, RBInfo, μₖ)
+    timesθₖ = timesθ[rand(1:length(timesθ),4)]
     if var == "A"
       Θₖ = [Param.α(phys_quadp[n][q],t_θ)
-        for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
+        for t_θ = timesθₖ for n = 1:ncells for q = 1:nquad_cell]
     elseif var == "M"
       Θₖ = [Param.m(phys_quadp[n][q],t_θ)
-        for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
+        for t_θ = timesθₖ for n = 1:ncells for q = 1:nquad_cell]
     else
       error("Run MDEIM on A or M only")
     end
-    compressed_Θₖ,Σ = POD(reshape(Θₖ,nquad,:), RBInfo.ϵₛ)
+    compressed_Θₖ,_ = POD(reshape(Θₖ,nquad,:), RBInfo.ϵₛ)
     if k == 1
-      global Θmat = compressed_Θₖ
+      Θmat = compressed_Θₖ
     else
-      Θ_POD,_ = POD(hcat(Θmat, compressed_Θₖ), RBInfo.ϵₛ)
-      global Θmat = Θ_POD
+      Θmat = hcat(Θmat, compressed_Θₖ)
     end
   end
+  Θmat,_ = POD(Θmat,RBInfo.ϵₛ)
   Q = size(Θmat)[2]
+  row_idx,snaps = Float64[],Matrix{Float64}
   for q = 1:Q
     Θq = FEFunction(V₀_quad,Θmat[:,q])
     Matq = assemble_parametric_FE_structure(FEMSpace,Θq,var)
     i,v = findnz(Matq[:])
     if q == 1
-      global row_idx = i
-      global snaps = zeros(length(row_idx),Q)
+      row_idx = i
+      snaps = zeros(length(row_idx),Q)
     end
-    global snaps[:,q] = v
+    snaps[:,q] = v
   end
-  return snaps,row_idx,Σ
+  snapsPOD,Σ = POD(snaps,RBInfo.ϵₛ)
+  return snapsPOD,row_idx,Σ
 end
 
 function functional_MDEIM_sampling(
@@ -233,41 +239,76 @@ function functional_MDEIM_sampling(
   timesθ::Vector,
   nₜ::Int64,
   var="A") ::Tuple
+
   phys_quadp,ncells,nquad_cell,nquad,V₀_quad = get_LagrangianQuad_info(FEMSpace)
+  Θmat = Matrix{Float64}
   for k = 1:RBInfo.nₛ_MDEIM
     @info "Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)"
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
     Param = get_ParamInfo(problem_ntuple, RBInfo, μₖ)
     timesθₖ = timesθ[rand(1:length(timesθ),nₜ)]
     if var == "A"
-      paramsₖ = [Param.α(phys_quadp[n][q],t_θ)
+      Θₖ = [Param.α(phys_quadp[n][q],t_θ)
         for t_θ = timesθₖ for n = 1:ncells for q = 1:nquad_cell]
     elseif var == "M"
-      paramsₖ = [Param.m(phys_quadp[n][q],t_θ)
+      Θₖ = [Param.m(phys_quadp[n][q],t_θ)
         for t_θ = timesθₖ for n = 1:ncells for q = 1:nquad_cell]
     else
       error("Run MDEIM on A or M only")
     end
-    paramsₖ = reshape(paramsₖ,nquad,:)
+    Θₖ = reshape(Θₖ,nquad,:)
     if k == 1
-      global params = paramsₖ
+      Θmat = Θₖ
     else
-      global params = hcat(params, paramsₖ)
+      Θmat = hcat(Θmat, Θₖ)
     end
   end
-  Θmat = params
   Q = size(Θmat)[2]
+  snaps,row_idx = Matrix{Float64},Float64[]
   for q = 1:Q
     Θq = FEFunction(V₀_quad,Θmat[:,q])
     Matq = assemble_parametric_FE_structure(FEMSpace,Θq,var)
     i,v = findnz(Matq[:])
     if q == 1
-      global row_idx = i
-      global snaps = zeros(length(row_idx),Q)
+      row_idx = i
+      snaps = zeros(length(row_idx),Q)
     end
-    global snaps[:,q] = v
+    snaps[:,q] = v
   end
-  return snaps,row_idx
+  snapsPOD,Σ = POD(snaps,RBInfo.ϵₛ)
+  return snapsPOD,row_idx,Σ
+end
+
+function spacetime_MDEIM(
+  FEMSpace::UnsteadyProblem,
+  RBInfo::Info,
+  μ::Matrix,
+  timesθ::Vector,
+  var="A") ::Tuple
+
+  row_idx = Float64[]
+  for k = 1:RBInfo.nₛ_MDEIM
+    @info "Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)"
+    μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
+    if var == "A"
+      snapsₖ,i = build_A_snapshots(FEMSpace,RBInfo,μₖ,timesθ)
+    elseif var == "M"
+      snapsₖ,i = build_M_snapshots(FEMSpace,RBInfo,μₖ,timesθ)
+    else
+      error("Run MDEIM on A or M only")
+    end
+    compressed_snapsₖ,_ = POD(snapsₖ, RBInfo.ϵₛ)
+    if k == 1
+      row_idx = i
+      snaps = compressed_snapsₖ
+    else
+      snaps = hcat(snaps, compressed_snapsₖ)
+    end
+    snaps_POD,_ = POD(snaps, RBInfo.ϵₛ)
+    snaps = snaps_POD
+  end
+  snapsPOD,Σ = POD(snaps,RBInfo.ϵₛ)
+  return snapsPOD,row_idx,Σ
 end
 
 function get_snaps_MDEIM(
@@ -277,43 +318,23 @@ function get_snaps_MDEIM(
   timesθ::Vector,
   var="A") ::Tuple
 
-  snaps = Matrix{Float64}[]
-  row_idx = Float64[]
-  Σ = Float64[]
-
   if RBInfo.space_time_M_DEIM
-    for k = 1:RBInfo.nₛ_MDEIM
-      @info "Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)"
-      μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
-      if var == "A"
-        snapsₖ,row_idx = build_A_snapshots(FEMSpace,RBInfo,μₖ,timesθ)
-      elseif var == "M"
-        snapsₖ,row_idx = build_M_snapshots(FEMSpace,RBInfo,μₖ,timesθ)
-      else
-        error("Run MDEIM on A or M only")
-      end
-      if k == 1
-        row_idx = row_idx
-        snaps = zeros(length(row_idx)*length(timesθ),RBInfo.nₛ_MDEIM)
-      end
-      snaps[:,k] = snapsₖ[:]
-    end
+    return spacetime_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
   elseif RBInfo.functional_M_DEIM
     if RBInfo.sampling_MDEIM
       nₜ = floor(Int,length(timesθ)*RBInfo.sampling_percentage)
-      snaps,row_idx = functional_MDEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
+      return functional_MDEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
     else
-      snaps,row_idx,Σ = functional_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
+      return functional_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
     end
   else
     if RBInfo.sampling_MDEIM
       nₜ = floor(Int,length(timesθ)*RBInfo.sampling_percentage)
-      snaps,row_idx = standard_MDEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
+      return standard_MDEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
     else
-      snaps,row_idx,Σ = standard_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
+      return standard_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
     end
   end
-  snaps,row_idx,Σ
 end
 
 function build_F_snapshots(
@@ -404,8 +425,9 @@ function standard_DEIM(
   RBInfo::Info,
   μ::Matrix,
   timesθ::Vector,
-  var="F") ::Matrix
+  var="F") ::Tuple
 
+  snaps,Σ = Float64[],Float64[]
   for k = 1:RBInfo.nₛ_DEIM
     @info "Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)"
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
@@ -416,14 +438,16 @@ function standard_DEIM(
     else
       error("Run DEIM on F or H only")
     end
-    compressed_snapsₖ, _ = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
+    compressed_snapsₖ,Σ = POD(snapsₖ, RBInfo.ϵₛ)
     if k == 1
-      global snaps = compressed_snapsₖ
+      snaps = compressed_snapsₖ
     else
-      global snaps = hcat(snaps, compressed_snapsₖ)
+      snaps = hcat(snaps, compressed_snapsₖ)
     end
+    snaps_POD,_ = POD(snaps, RBInfo.ϵₛ)
+    snaps = snaps_POD
   end
-  snaps
+  snaps,Σ
 end
 
 function standard_DEIM_sampling(
@@ -432,7 +456,7 @@ function standard_DEIM_sampling(
   μ::Matrix,
   timesθ::Vector,
   nₜ::Int64,
-  var="F") ::Matrix
+  var="F") ::Tuple
 
   for k = 1:RBInfo.nₛ_DEIM
     @info "Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)"
@@ -451,7 +475,8 @@ function standard_DEIM_sampling(
       global snaps = hcat(snaps, snapsₖ)
     end
   end
-  snaps
+  snapsPOD,Σ = POD(snaps,RBInfo.ϵₛ)
+  return snapsPOD,Σ
 end
 
 function functional_DEIM(
@@ -459,16 +484,15 @@ function functional_DEIM(
   RBInfo::Info,
   μ::Matrix,
   timesθ::Vector,
-  var="F") ::Matrix
+  var="F") ::Tuple
 
   phys_quadp,ncells,nquad_cell,nquad,V₀_quad = get_LagrangianQuad_info(FEMSpace)
+  Θmat = Float64[]
   for k = 1:RBInfo.nₛ_DEIM
     @info "Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)"
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
     Param = get_ParamInfo(problem_ntuple, RBInfo, μₖ)
-    Θₖ = [Param.f(phys_quadp[n][q],t_θ)
-        for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
-    #= if var == "F"
+    if var == "F"
       Θₖ = [Param.f(phys_quadp[n][q],t_θ)
         for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
     elseif var == "H"
@@ -476,22 +500,23 @@ function functional_DEIM(
         for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
     else
       error("Run DEIM on F or H only")
-    end =#
+    end
     compressed_Θₖ,_ = POD(reshape(Θₖ,nquad,:), RBInfo.ϵₛ)
     if k == 1
-      global Θmat = compressed_Θₖ
+      Θmat = compressed_Θₖ
     else
-      Θ_POD,_ = POD(hcat(Θmat, compressed_Θₖ), RBInfo.ϵₛ)
-      global Θmat = Θ_POD
+      Θmat = hcat(Θmat, compressed_Θₖ)
     end
   end
+  Θmat,_ = POD(Θmat,RBInfo.ϵₛ)
   Q = size(Θmat)[2]
   snaps = zeros(FEMSpace.Nₛᵘ,Q)
   for q = 1:Q
     Θq = FEFunction(V₀_quad,Θmat[:,q])
     snaps[:,q] = assemble_parametric_FE_structure(FEMSpace,Θq,var)
   end
-  return snaps
+  snapsPOD,Σ = POD(snaps,RBInfo.ϵₛ)
+  return snapsPOD,Σ
 end
 
 function functional_DEIM_sampling(
@@ -500,7 +525,7 @@ function functional_DEIM_sampling(
   μ::Matrix,
   timesθ::Vector,
   nₜ::Int64,
-  var="F") ::Matrix
+  var="F") ::Tuple
 
   phys_quadp,ncells,nquad_cell,nquad,V₀_quad = get_LagrangianQuad_info(FEMSpace)
   for k = 1:RBInfo.nₛ_DEIM
@@ -510,10 +535,10 @@ function functional_DEIM_sampling(
     timesθₖ = timesθ[rand(1:length(timesθ),nₜ)]
     if var == "F"
       paramsₖ = [Param.f(phys_quadp[n][q],t_θ)
-        for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
+        for t_θ = timesθₖ for n = 1:ncells for q = 1:nquad_cell]
     elseif var == "H"
       paramsₖ = [Param.h(phys_quadp[n][q],t_θ)
-        for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
+        for t_θ = timesθₖ for n = 1:ncells for q = 1:nquad_cell]
     else
       error("Run DEIM on F or H only")
     end
@@ -531,7 +556,38 @@ function functional_DEIM_sampling(
     Θq = FEFunction(V₀_quad,Θmat[:,q])
     snaps[:,q] = assemble_parametric_FE_structure(FEMSpace,Θq,var)
   end
-  snaps
+  snapsPOD,Σ = POD(snaps,RBInfo.ϵₛ)
+  return snapsPOD,Σ
+end
+
+function spacetime_DEIM(
+  FEMSpace::UnsteadyProblem,
+  RBInfo::Info,
+  μ::Matrix,
+  timesθ::Vector,
+  var="A") ::Tuple
+
+  for k = 1:RBInfo.nₛ_MDEIM
+    @info "Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)"
+    μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
+    if var == "F"
+      snapsₖ = build_F_snapshots(FEMSpace, RBInfo, μₖ, timesθ)
+    elseif var == "H"
+      snapsₖ = build_H_snapshots(FEMSpace, RBInfo, μₖ, timesθ)
+    else
+      error("Run DEIM on F or H only")
+    end
+    compressed_snapsₖ,_ = POD(snapsₖ, RBInfo.ϵₛ)
+    if k == 1
+      snaps = compressed_snapsₖ
+    else
+      snaps = hcat(snaps, compressed_snapsₖ)
+    end
+    snaps_POD,_ = POD(snaps, RBInfo.ϵₛ)
+    snaps = snaps_POD
+  end
+  snapsPOD,Σ = POD(snaps,RBInfo.ϵₛ)
+  return snapsPOD,Σ
 end
 
 function get_snaps_DEIM(
@@ -539,41 +595,25 @@ function get_snaps_DEIM(
   RBInfo::Info,
   μ::Matrix,
   timesθ::Vector,
-  var="F") ::Matrix
+  var="F") ::Tuple
 
   if RBInfo.space_time_M_DEIM
-    for k = 1:RBInfo.nₛ_MDEIM
-      @info "Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)"
-      μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
-      if var == "F"
-        snapsₖ = build_F_snapshots(FEMSpace, RBInfo, μₖ)
-      elseif var == "H"
-        snapsₖ = build_H_snapshots(FEMSpace, RBInfo, μₖ)
-      else
-        error("Run DEIM on F or H only")
-      end
-      if k == 1
-        global snaps = snapsₖ[:]
-      else
-        global snaps = hcat(snaps, snapsₖ[:])
-      end
-    end
+    return spacetime_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
   elseif RBInfo.functional_M_DEIM
     if RBInfo.sampling_MDEIM
       nₜ = floor(Int,length(timesθ)*RBInfo.sampling_percentage)
-      snaps = functional_DEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
+      return functional_DEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
     else
-      snaps = functional_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
+      return functional_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
     end
   else
     if RBInfo.sampling_MDEIM
       nₜ = floor(Int,length(timesθ)*RBInfo.sampling_percentage)
-      snaps = standard_DEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
+      return standard_DEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
     else
-      snaps = standard_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
+      return standard_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
     end
   end
-  snaps
 end
 
 function assemble_parametric_FE_structure(

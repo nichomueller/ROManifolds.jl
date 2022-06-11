@@ -94,6 +94,11 @@ function matrix_to_blocks(A::Array)
 
 end
 
+function remove_small_entries(A::Array,tol=1e-15) ::Array
+  A[A.<=tol].=0
+  A
+end
+
 function compute_errors(uₕ::Matrix, RBVars::RBSteadyProblem, norm_matrix = nothing)
 
   mynorm(uₕ - RBVars.ũ, norm_matrix) / mynorm(uₕ, norm_matrix)

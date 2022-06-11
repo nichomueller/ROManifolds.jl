@@ -16,8 +16,7 @@ function from_full_idx_to_sparse_idx(
   Nₕ::Int64) ::Vector
   Nfull = length(sparse_to_full_idx)
   full_idx_space,full_idx_time = from_vec_to_mat_idx(full_idx, Nfull)
-  sparse_idx = (full_idx_time.-1)*Nₕ^2+row_idx[full_idx_space]
-  sparse_idx
+  (full_idx_time.-1)*Nₕ^2+row_idx[full_idx_space]
 end
 
 """Removes zero-valued rows of a CSC matrix Msparse and returns its full

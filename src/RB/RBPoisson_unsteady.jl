@@ -85,8 +85,15 @@ function import_reduced_basis(RBInfo::Info, RBVars::PoissonUnsteady)
 
 end
 
-index_mapping(i::Int, j::Int, RBVars::PoissonUnsteady) =
-  convert(Int64, (i-1) * RBVars.nₜᵘ + j)
+function index_mapping(i::Int,j::Int,RBVars::PoissonUnsteady) ::Int
+  Int((i-1)*RBVars.nₜᵘ+j)
+end
+
+function index_mapping_inverse(i::Int,RBVars::PoissonUnsteady) ::Tuple
+  iₛ = 1+floor(Int64,(i-1)/RBVars.nₜᵘ)
+  iₜ = i-(iₛ-1)*RBVars.nₜᵘ
+  iₛ,iₜ
+end
 
 function get_generalized_coordinates(RBInfo::Info, RBVars::PoissonUnsteady, snaps=nothing)
 
@@ -106,7 +113,7 @@ function get_generalized_coordinates(RBInfo::Info, RBVars::PoissonUnsteady, snap
     S_i = RBVars.S.Sᵘ[:, (i_nₛ-1)*RBVars.Nₜ+1:i_nₛ*RBVars.Nₜ]
     for i_s = 1:RBVars.S.nₛᵘ
       for i_t = 1:RBVars.nₜᵘ
-        Π_ij = reshape(Φₛᵘ_normed[:, i_s], :, 1) .* reshape(RBVars.Φₜᵘ[:, i_t], :, 1)'
+        Π_ij = reshape(Φₛᵘ_normed[:,i_s],:,1).*reshape(RBVars.Φₜᵘ[:,i_t],:,1)'
         û[index_mapping(i_s, i_t, RBVars), i] = sum(Π_ij .* S_i)
       end
     end
@@ -502,14 +509,14 @@ function post_process(RBInfo::UnsteadyInfo, d::Dict)
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
     MDEIM_Σ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
     generate_and_save_plot(
-      eachindex(MDEIM_Σ), MDEIM_Σ, "Decay singular values, MDEIM", "σ index",
-      "σ value", RBInfo.paths.results_path; var="MDEIM_Σ")
+      eachindex(MDEIM_Σ), MDEIM_Σ, "Decay singular values, MDEIM",
+      ["σ"], "σ index", "σ value", RBInfo.paths.results_path; var="MDEIM_Σ")
   end
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "DEIM_Σ.csv"))
     DEIM_Σ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "DEIM_Σ.csv"))
     generate_and_save_plot(
-      eachindex(DEIM_Σ), DEIM_Σ, "Decay singular values, DEIM", "σ index",
-       "σ value", RBInfo.paths.results_path; var="DEIM_Σ")
+      eachindex(DEIM_Σ), DEIM_Σ, "Decay singular values, DEIM",
+      ["σ"], "σ index", "σ value", RBInfo.paths.results_path; var="DEIM_Σ")
   end
 
   times = collect(RBInfo.t₀+RBInfo.δt:RBInfo.δt:RBInfo.T)
@@ -526,11 +533,11 @@ function post_process(RBInfo::UnsteadyInfo, d::Dict)
   end
 
   generate_and_save_plot(times,d["mean_H1_err"],
-    "Average ||uₕ(t) - ũ(t)||ₕ₁", "time [s]", "H¹ error", d["path_μ"];
+    "Average ||uₕ(t) - ũ(t)||ₕ₁", ["H¹ err"], "time [s]", "H¹ error", d["path_μ"];
     var="H1_err")
   xvec = collect(eachindex(d["H1_L2_err"]))
   generate_and_save_plot(xvec,d["H1_L2_err"],
-    "||uₕ - ũ||ₕ₁₋ₗ₂", "Param μ number", "H¹-L² error", d["path_μ"];
+    "||uₕ - ũ||ₕ₁₋ₗ₂", ["H¹-l² err"], "Param μ number", "H¹-l² error", d["path_μ"];
     var="H1_L2_err")
 
   if length(keys(d)) == 8
@@ -544,11 +551,11 @@ function post_process(RBInfo::UnsteadyInfo, d::Dict)
     end
 
     generate_and_save_plot(times,d["mean_L2_err"],
-      "Average ||pₕ(t) - p̃(t)||ₗ₂", "time [s]", "L² error", d["path_μ"];
+      "Average ||pₕ(t) - p̃(t)||ₗ₂", ["l² err"], "time [s]", "L² error", d["path_μ"];
       var="L2_err")
     xvec = collect(eachindex(d["L2_L2_err"]))
     generate_and_save_plot(xvec,d["L2_L2_err"],
-      "||pₕ - p̃||ₗ₂₋ₗ₂", "Param μ number", "L²-L² error", d["path_μ"];
+      "||pₕ - p̃||ₗ₂₋ₗ₂", ["l²-l² err"], "Param μ number", "L²-L² error", d["path_μ"];
       var="L2_L2_err")
 
   end

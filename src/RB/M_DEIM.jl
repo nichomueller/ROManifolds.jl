@@ -46,7 +46,7 @@ function M_DEIM_offline(M_DEIM_mat::Matrix, Σ::Vector)
   end
   unique!(M_DEIM_idx)
   M_DEIM_err_bound = (Σ[min(n_new + 1,size(Σ)[1])] *
-  norm(M_DEIM_mat[M_DEIM_idx,1:n_new] \ I(n_new)))
+    norm(M_DEIM_mat[M_DEIM_idx,1:n_new] \ I(n_new)))
 
   M_DEIM_mat[:,1:n_new], M_DEIM_idx, M_DEIM_err_bound
 
@@ -77,13 +77,7 @@ function MDEIM_offline(
 
   μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
   timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
-
-  if RBInfo.sampling_MDEIM
-    snaps,row_idx,_ = get_snaps_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
-    MDEIM_mat,Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
-  else
-    MDEIM_mat,row_idx,Σ = get_snaps_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
-  end
+  MDEIM_mat,row_idx,Σ = get_snaps_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
   MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat, Σ)
   MDEIMᵢ_mat = MDEIM_mat[MDEIM_idx,:]
   MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx,row_idx,FEMSpace.Nₛᵘ)
@@ -132,8 +126,7 @@ function DEIM_offline(
 
   μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
   timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
-  snaps = get_snaps_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
-  DEIM_mat, Σ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
+  DEIM_mat,Σ = get_snaps_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
   DEIM_mat, DEIM_idx, DEIM_err_bound = M_DEIM_offline(DEIM_mat, Σ)
   DEIMᵢ_mat = DEIM_mat[DEIM_idx,:]
 

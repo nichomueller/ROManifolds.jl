@@ -246,41 +246,38 @@ function get_RB_LHS_blocks(RBInfo, RBVars::PoissonSTGRB, θᵐ, θᵃ)
   Qᵐ = RBVars.Qᵐ
   Qᵃ = RBVars.S.Qᵃ
 
-  Φₜᵘ_M = zeros(RBVars.nₜᵘ, RBVars.nₜᵘ, Qᵐ)
-  Φₜᵘ₁_M = zeros(RBVars.nₜᵘ, RBVars.nₜᵘ, Qᵐ)
-  Φₜᵘ_A = zeros(RBVars.nₜᵘ, RBVars.nₜᵘ, Qᵃ)
-  Φₜᵘ₁_A = zeros(RBVars.nₜᵘ, RBVars.nₜᵘ, Qᵃ)
+  Φₜᵘ_M = zeros(RBVars.nₜᵘ,RBVars.nₜᵘ,Qᵐ)
+  Φₜᵘ₁_M = zeros(RBVars.nₜᵘ,RBVars.nₜᵘ,Qᵐ)
+  Φₜᵘ_A = zeros(RBVars.nₜᵘ,RBVars.nₜᵘ,Qᵃ)
+  Φₜᵘ₁_A = zeros(RBVars.nₜᵘ,RBVars.nₜᵘ,Qᵃ)
 
-  [Φₜᵘ_M[i_t,j_t,q] = sum(RBVars.Φₜᵘ[:,i_t].*RBVars.Φₜᵘ[:,j_t].*θᵐ[q,:]) for q = 1:Qᵐ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
-  [Φₜᵘ₁_M[i_t,j_t,q] = sum(RBVars.Φₜᵘ[2:end,i_t].*RBVars.Φₜᵘ[1:end-1,j_t].*θᵐ[q,2:end]) for q = 1:Qᵐ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
-  [Φₜᵘ_A[i_t,j_t,q] = sum(RBVars.Φₜᵘ[:,i_t].*RBVars.Φₜᵘ[:,j_t].*θᵃ[q,:]) for q = 1:Qᵃ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
-  [Φₜᵘ₁_A[i_t,j_t,q] = sum(RBVars.Φₜᵘ[2:end,i_t].*RBVars.Φₜᵘ[1:end-1,j_t].*θᵃ[q,2:end]) for q = 1:Qᵃ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
+  [Φₜᵘ_M[i_t,j_t,q] = sum(RBVars.Φₜᵘ[:,i_t].*RBVars.Φₜᵘ[:,j_t].*θᵐ[q,:])
+    for q = 1:Qᵐ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
+  [Φₜᵘ₁_M[i_t,j_t,q] = sum(RBVars.Φₜᵘ[2:end,i_t].*RBVars.Φₜᵘ[1:end-1,j_t].*θᵐ[q,2:end])
+    for q = 1:Qᵐ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
+  [Φₜᵘ_A[i_t,j_t,q] = sum(RBVars.Φₜᵘ[:,i_t].*RBVars.Φₜᵘ[:,j_t].*θᵃ[q,:])
+    for q = 1:Qᵃ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
+  [Φₜᵘ₁_A[i_t,j_t,q] = sum(RBVars.Φₜᵘ[2:end,i_t].*RBVars.Φₜᵘ[1:end-1,j_t].*θᵃ[q,2:end])
+    for q = 1:Qᵃ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
 
-  block₁ = zeros(RBVars.nᵘ, RBVars.nᵘ)
-
-  for i_s = 1:RBVars.S.nₛᵘ
-    for i_t = 1:RBVars.nₜᵘ
-
-      i_st = index_mapping(i_s, i_t, RBVars)
-
-      for j_s = 1:RBVars.S.nₛᵘ
-        for j_t = 1:RBVars.nₜᵘ
-
-          j_st = index_mapping(j_s, j_t, RBVars)
-
-          Aₙ_μ_i_j = δtθ*RBVars.S.Aₙ[i_s,j_s,:]'*Φₜᵘ_A[i_t,j_t,:]
-          Mₙ_μ_i_j = RBVars.Mₙ[i_s,j_s,:]'*Φₜᵘ_M[i_t,j_t,:]
-          Aₙ₁_μ_i_j = δtθ*RBVars.S.Aₙ[i_s,j_s,:]'*Φₜᵘ₁_A[i_t,j_t,:]
-          Mₙ₁_μ_i_j = RBVars.Mₙ[i_s,j_s,:]'*Φₜᵘ₁_M[i_t,j_t,:]
-
-          block₁[i_st,j_st] = θ*(Aₙ_μ_i_j+Mₙ_μ_i_j) + (1-θ)*Aₙ₁_μ_i_j - θ*Mₙ₁_μ_i_j
-
-        end
-      end
-
-    end
+  Mₙ_tmp = zeros(RBVars.nᵘ,RBVars.nᵘ,Qᵐ)
+  Mₙ₁_tmp = zeros(RBVars.nᵘ,RBVars.nᵘ,Qᵐ)
+  Aₙ_tmp = zeros(RBVars.nᵘ,RBVars.nᵘ,Qᵃ)
+  Aₙ₁_tmp = zeros(RBVars.nᵘ,RBVars.nᵘ,Qᵃ)
+  for qᵐ = 1:Qᵐ
+    Mₙ_tmp[:,:,qᵐ] = kron(RBVars.Mₙ[:,:,qᵐ],Φₜᵘ_M[:,:,qᵐ])
+    Mₙ₁_tmp[:,:,qᵐ] = kron(RBVars.Mₙ[:,:,qᵐ],Φₜᵘ₁_M[:,:,qᵐ])
   end
+  for qᵃ = 1:Qᵃ
+    Aₙ_tmp[:,:,qᵃ] = kron(RBVars.S.Aₙ[:,:,qᵃ],Φₜᵘ_A[:,:,qᵃ])
+    Aₙ₁_tmp[:,:,qᵃ] = kron(RBVars.S.Aₙ[:,:,qᵃ],Φₜᵘ₁_A[:,:,qᵃ])
+  end
+  Mₙ = reshape(sum(Mₙ_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
+  Mₙ₁ = reshape(sum(Mₙ₁_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
+  Aₙ = δtθ*reshape(sum(Aₙ_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
+  Aₙ₁ = δtθ*reshape(sum(Aₙ₁_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
 
+  block₁ = θ*(Aₙ+Mₙ) + (1-θ)*Aₙ₁ - θ*Mₙ₁
   push!(RBVars.S.LHSₙ, block₁)
 
 end
