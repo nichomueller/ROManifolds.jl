@@ -188,6 +188,9 @@ end
 
 function generate_dcube_discrete_model(I::Info,d::Int64,npart::Int,mesh_name::String)
 
+  if !occursin(".json",mesh_name)
+    mesh_name *= ".json"
+  end
   mesh_dir = I.paths.mesh_path[1:findall(x->x=='/',I.paths.mesh_path)[end]]
   mesh_path = joinpath(mesh_dir,mesh_name)
   generate_dcube_discrete_model(d,npart,mesh_path)

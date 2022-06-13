@@ -50,7 +50,7 @@ function PODs_space(RBInfo::Info, RBVars::StokesUnsteady)
   get_norm_matrix(RBInfo, RBVars)
   PODs_space(RBInfo, RBVars.S)
 
-  @info "Performing the nested spatial POD for fields (p,λ), using a tolerance of $(RBInfo.ϵₛ)"
+  @info "Performing the nested spatial POD for field p, using a tolerance of $(RBInfo.ϵₛ)"
 
   if RBInfo.perform_nested_POD
 
@@ -81,7 +81,7 @@ function PODs_time(RBInfo::Info, RBVars::StokesUnsteady)
 
   PODs_time(RBInfo, RBVars.S)
 
-  @info "Performing the temporal POD for fields (p,λ), using a tolerance of $(RBInfo.ϵₜ)"
+  @info "Performing the temporal POD for field p, using a tolerance of $(RBInfo.ϵₜ)"
 
   if RBInfo.time_reduction_technique == "ST-HOSVD"
     Sᵖₜ = zeros(RBVars.P.Nₜ, RBVars.nₛᵖ * RBInfo.nₛ)
@@ -109,7 +109,7 @@ function import_reduced_basis(RBInfo::Info, RBVars::StokesUnsteady)
 
   import_reduced_basis(RBInfo, RBVars.P)
 
-  @info "Importing the reduced basis for fields (p,λ)"
+  @info "Importing the reduced basis for field p"
 
   RBVars.Φₛᵖ = load_CSV(joinpath(RBInfo.paths.basis_path, "Φₛᵖ.csv"))
   RBVars.nₛᵖ = size(RBVars.Φₛᵖ)[2]
@@ -244,8 +244,6 @@ end
 function offline_phase(RBInfo::Info, RBVars::StokesUnsteady)
 
   RBVars.P.Nₜ = convert(Int64, RBInfo.T / RBInfo.δt)
-
-  @info "Building $(RBInfo.RB_method) approximation with $(RBInfo.nₛ) snapshots and tolerances of $(RBInfo.ϵₛ) in space"
 
   if RBInfo.import_snapshots
     get_snapshot_matrix(RBInfo, RBVars)

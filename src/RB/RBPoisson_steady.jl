@@ -58,8 +58,6 @@ end
 
 function build_reduced_basis(RBInfo::Info, RBVars::PoissonSteady)
 
-  @info "Building the spatial reduced basis for field u, using a tolerance of $(RBInfo.ϵₛ)"
-
   RB_building_time = @elapsed begin
     PODs_space(RBInfo, RBVars)
   end
@@ -464,9 +462,6 @@ function reconstruct_FEM_solution(RBVars::PoissonSteady)
 end
 
 function offline_phase(RBInfo::Info, RBVars::PoissonSteady)
-
-
-  @info "Building $(RBInfo.RB_method) approximation with $(RBInfo.nₛ) snapshots and tolerances of $(RBInfo.ϵₛ) in space"
 
   if RBInfo.import_snapshots
     get_snapshot_matrix(RBInfo, RBVars)

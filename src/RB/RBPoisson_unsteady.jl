@@ -55,7 +55,7 @@ end
 
 function build_reduced_basis(RBInfo::Info, RBVars::PoissonUnsteady)
 
-  @info "Building the space-time reduced basis for field u, using a tolerance of ($(RBInfo.ϵₛ),$(RBInfo.ϵₜ))"
+  @info "Building the space-time reduced basis for field u"
 
   RB_building_time = @elapsed begin
     PODs_space(RBInfo, RBVars)
@@ -376,8 +376,6 @@ function offline_phase(RBInfo::Info, RBVars::PoissonUnsteady)
 
   RBVars.Nₜ = convert(Int64, RBInfo.T / RBInfo.δt)
 
-  @info "Building $(RBInfo.RB_method) approximation with $(RBInfo.nₛ) snapshots and tolerances of $(RBInfo.ϵₛ) in space"
-
   if RBInfo.import_snapshots
     get_snapshot_matrix(RBInfo, RBVars)
     import_snapshots_success = true
@@ -413,7 +411,11 @@ function offline_phase(RBInfo::Info, RBVars::PoissonUnsteady)
 
 end
 
-function online_phase(RBInfo::Info, RBVars::PoissonUnsteady, μ, param_nbs)
+function loop_on_params(
+  RBInfo::Info,
+  RBVars::PoissonUnsteady,
+  μ::Matrix,
+  param_nbs) ::Tuple
 
   H1_L2_err = zeros(length(param_nbs))
   mean_H1_err = zeros(RBVars.Nₜ)
@@ -421,8 +423,6 @@ function online_phase(RBInfo::Info, RBVars::PoissonUnsteady, μ, param_nbs)
   mean_pointwise_err = zeros(RBVars.S.Nₛᵘ, RBVars.Nₜ)
   mean_online_time = 0.0
   mean_reconstruction_time = 0.0
-
-  get_norm_matrix(RBInfo, RBVars.S)
 
   ũ_μ = zeros(RBVars.S.Nₛᵘ, length(param_nbs)*RBVars.Nₜ)
   uₙ_μ = zeros(RBVars.nᵘ, length(param_nbs))
@@ -448,8 +448,10 @@ function online_phase(RBInfo::Info, RBVars::PoissonUnsteady, μ, param_nbs)
     reconstruction_time = @elapsed begin
       reconstruct_FEM_solution(RBVars)
     end
-    mean_online_time = online_time / length(param_nbs)
-    mean_reconstruction_time = reconstruction_time / length(param_nbs)
+    if i_nb > 1
+      mean_online_time = online_time/(length(param_nbs)-1)
+      mean_reconstruction_time = reconstruction_time/(length(param_nbs)-1)
+    end
 
     H1_err_nb, H1_L2_err_nb = compute_errors(uₕ_test, RBVars, RBVars.S.Xᵘ₀)
     H1_L2_err[i_nb] = H1_L2_err_nb
@@ -462,7 +464,25 @@ function online_phase(RBInfo::Info, RBVars::PoissonUnsteady, μ, param_nbs)
 
     @info "Online wall time: $online_time s (snapshot number $nb)"
     @info "Relative reconstruction H1-L2 error: $H1_L2_err_nb (snapshot number $nb)"
+  end
+  return (ũ_μ,uₙ_μ,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,
+  mean_online_time,mean_reconstruction_time)
+end
 
+function online_phase(
+  RBInfo::Info,
+  RBVars::PoissonUnsteady,
+  μ::Matrix,
+  param_nbs)
+
+  get_norm_matrix(RBInfo, RBVars.S)
+  adaptive_loop = false
+  if adaptive_loop
+    adaptive_loop_on_params(RBInfo, RBVars, μ, param_nbs)
+  else
+    (ũ_μ,uₙ_μ,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,
+    mean_online_time,mean_reconstruction_time) =
+    loop_on_params(RBInfo, RBVars, μ, param_nbs)
   end
 
   string_param_nbs = "Params"

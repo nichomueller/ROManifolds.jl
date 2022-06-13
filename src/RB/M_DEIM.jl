@@ -33,7 +33,7 @@ function M_DEIM_offline(M_DEIM_mat::Matrix, Σ::Vector)
   (N, n) = size(M_DEIM_mat)
   n_new = n
   M_DEIM_idx = Int64[]
-  append!(M_DEIM_idx, convert(Int64, argmax(abs.(M_DEIM_mat[:, 1]))[1]))
+  append!(M_DEIM_idx, Int(argmax(abs.(M_DEIM_mat[:, 1]))[1]))
   for m in range(2, n)
     res = (M_DEIM_mat[:, m] -
     M_DEIM_mat[:, 1:m-1] * (M_DEIM_mat[M_DEIM_idx[1:m-1], 1:m-1] \

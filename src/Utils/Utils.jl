@@ -57,7 +57,6 @@ using GridapGmsh
 using Gridap.TensorValues
 using LineSearches:BackTracking
 using TensorOperations
-using Kronecker
 import Gridap:∇
 
 include("files.jl")

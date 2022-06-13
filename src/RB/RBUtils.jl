@@ -1,9 +1,9 @@
-function ROM_paths(root, problem_type, problem_name, mesh_name, RB_method, case, test_case)
+function ROM_paths(root, problem_type, problem_name, mesh_name, RB_method, case)
   paths = FEM_paths(root, problem_type, problem_name, mesh_name, case)
   mesh_path = paths.mesh_path
   FEM_snap_path = paths.FEM_snap_path
   FEM_structures_path = paths.FEM_structures_path
-  ROM_path = joinpath(paths.current_test, RB_method*test_case)
+  ROM_path = joinpath(paths.current_test, RB_method)
   create_dir(ROM_path)
   basis_path = joinpath(ROM_path, "basis")
   create_dir(basis_path)

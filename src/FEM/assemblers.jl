@@ -123,16 +123,9 @@ function assemble_stiffness(
 
 end
 
-function assemble_primal_opᵀ(FEMSpace::FEMProblem)
-
-  assemble_matrix(∫(∇⋅(FEMSpace.ϕᵥ)*FEMSpace.ψₚ)*FEMSpace.dΩ,
-  FEMSpace.Q, FEMSpace.V₀)
-
-end
-
 function assemble_primal_op(FEMSpace::SteadyProblem)
 
-  ssemble_matrix(∫(FEMSpace.ψᵧ*∇⋅(FEMSpace.ϕᵤ))*FEMSpace.dΩ,
+  assemble_matrix(∫(FEMSpace.ψᵧ*∇⋅(FEMSpace.ϕᵤ))*FEMSpace.dΩ,
   FEMSpace.V, FEMSpace.Q₀)
 
 end
