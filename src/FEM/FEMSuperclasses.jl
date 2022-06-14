@@ -41,8 +41,8 @@ struct FEMSpaceStokesSteady <: SteadyProblem
   V::TrialFESpace
   Q₀::ZeroMeanFESpace
   Q::ZeroMeanFESpace
-  X₀#::MultiFieldFESpace
-  X#::MultiFieldTrialFESpace
+  X₀::MultiFieldFESpace
+  X::MultiFieldFESpace
   ϕᵥ::FEBasis
   ϕᵤ::FEBasis
   ψᵧ::FEBasis
@@ -57,6 +57,27 @@ struct FEMSpaceStokesSteady <: SteadyProblem
 end
 
 struct FEMSpaceStokesUnsteady <: UnsteadyProblem
+  Qₕ::CellQuadrature
+  V₀::UnconstrainedFESpace
+  V::TransientTrialFESpace
+  Q₀::ZeroMeanFESpace
+  Q::ZeroMeanFESpace
+  X₀::MultiFieldFESpace
+  X::TransientMultiFieldTrialFESpace
+  ϕᵥ::FEBasis
+  ϕᵤ::Function
+  ψᵧ::FEBasis
+  ψₚ::FEBasis
+  Nₛᵘ::Int64
+  Nₛᵖ::Int64
+  Ω::BodyFittedTriangulation
+  dΩ::Measure
+  Γd::BoundaryTriangulation
+  dΓd::Union{Measure,Nothing}
+  dΓn::Union{Measure,Nothing}
+end
+
+struct FEMSpaceNavierStokesUnsteady <: UnsteadyProblem
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TransientTrialFESpace

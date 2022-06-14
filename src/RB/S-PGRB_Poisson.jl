@@ -1,35 +1,29 @@
 
 function get_inverse_P_matrix(RBInfo::Info, RBVars::PoissonSPGRB)
 
-  if use_norm_X
-
-    if isempty(RBVars.Pᵤ⁻¹) || maximum(abs.(RBVars.Pᵤ⁻¹)) == 0
+  if RBInfo.use_norm_X
+    if isempty(RBVars.Pᵤ⁻¹)
       @info "S-PGRB: building the inverse of the diag preconditioner of the H1 norm matrix"
-
       if isfile(joinpath(RBInfo.paths.FEM_structures_path, "Pᵤ⁻¹.csv"))
-        RBVars.Pᵤ⁻¹ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Pᵤ⁻¹.csv"); convert_to_sparse = true)
+        RBVars.Pᵤ⁻¹ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Pᵤ⁻¹.csv");
+          convert_to_sparse = true)
       else
         get_norm_matrix(RBInfo, RBVars)
         diag_Xᵘ₀ = Vector(diag(RBVars.Xᵘ₀))
         RBVars.Pᵤ⁻¹ = spdiagm(1 ./ diag_Xᵘ₀)
         save_CSV(RBVars.Pᵤ⁻¹, joinpath(RBInfo.paths.FEM_structures_path, "Pᵤ⁻¹.csv"))
       end
-
     end
-
     RBVars.Pᵤ⁻¹ = Matrix(RBVars.Pᵤ⁻¹)
-
   else
-
     RBVars.Pᵤ⁻¹ = I(RBVars.Nₛᵘ)
-
   end
-
 end
 
 function get_Aₙ(RBInfo::Info, RBVars::PoissonSPGRB) :: Vector
 
-  if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Aₙ.csv")) && isfile(joinpath(RBInfo.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
+  if (isfile(joinpath(RBInfo.paths.ROM_structures_path, "Aₙ.csv")) &&
+      isfile(joinpath(RBInfo.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv")))
     @info "Importing reduced affine stiffness matrix"
     Aₙ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "Aₙ.csv"))
     RBVars.Aₙ = reshape(Aₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)
@@ -72,7 +66,8 @@ function assemble_affine_matrices(RBInfo::Info, RBVars::PoissonSPGRB, var::Strin
     RBVars.Qᵃ = 1
     @info "Assembling affine reduced stiffness"
     @info "SPGRB: affine component number 1, matrix A"
-    A = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "A.csv"); convert_to_sparse = true)
+    A = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "A.csv");
+      convert_to_sparse = true)
     RBVars.AΦᵀPᵤ⁻¹ = zeros(RBVars.nₛᵘ, RBVars.Nₛᵘ, RBVars.Qᵃ)
     RBVars.Aₙ = zeros(RBVars.nₛᵘ, RBVars.nₛᵘ, RBVars.Qᵃ^2)
     RBVars.AΦᵀPᵤ⁻¹[:,:,1] = (A * RBVars.Φₛᵘ)' * RBVars.Pᵤ⁻¹
@@ -87,37 +82,36 @@ function assemble_MDEIM_matrices(RBInfo::Info, RBVars::PoissonSPGRB, var::String
 
   get_inverse_P_matrix(RBInfo, RBVars)
 
-  if var == "A"
+  @info "The stiffness is non-affine: running the MDEIM offline phase
+    on $(RBInfo.nₛ_MDEIM) snapshots. This might take some time"
+  if isnothing(RBVars.S.MDEIM_mat_A) || maximum(RBVars.S.MDEIM_mat_A) == 0
+    RBVars.MDEIM_mat_A, RBVars.MDEIM_idx_A, RBVars.sparse_el_A,
+      MDEIM_err_bound, MDEIM_Σ = MDEIM_offline(FEMSpace, RBInfo, "A")
+  end
+  RBVars.Qᵃ = size(RBVars.MDEIM_mat_A)[2]
 
-    @info "The stiffness is non-affine: running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots. This might take some time"
-    MDEIM_mat, RBVars.MDEIM_idx_A, RBVars.sparse_el_A, MDEIM_err_bound, MDEIM_Σ = MDEIM_offline(FEMSpace, RBInfo, "A")
-    RBVars.Qᵃ = size(MDEIM_mat)[2]
+  AΦ = zeros(RBVars.Nₛᵘ, RBVars.nₛᵘ, RBVars.Qᵃ)
+  RBVars.Aₙ = zeros(RBVars.nₛᵘ, RBVars.nₛᵘ, RBVars.Qᵃ^2)
+  RBVars.AΦᵀPᵤ⁻¹ = zeros(RBVars.nₛᵘ, RBVars.Nₛᵘ, RBVars.Qᵃ)
+  for q = 1:RBVars.Qᵃ
+    AΦ[:,:,q] = reshape(Vector(RBVars.MDEIM_mat_A[:, q]),
+      RBVars.Nₛᵘ, RBVars.Nₛᵘ) * RBVars.Φₛᵘ
+  end
+  matrix_product!(RBVars.AΦᵀPᵤ⁻¹, AΦ, Matrix(RBVars.Pᵤ⁻¹), transpose_A=true)
 
-    AΦ = zeros(RBVars.Nₛᵘ, RBVars.nₛᵘ, RBVars.Qᵃ)
-    RBVars.Aₙ = zeros(RBVars.nₛᵘ, RBVars.nₛᵘ, RBVars.Qᵃ^2)
-    RBVars.AΦᵀPᵤ⁻¹ = zeros(RBVars.nₛᵘ, RBVars.Nₛᵘ, RBVars.Qᵃ)
-    for q = 1:RBVars.Qᵃ
-      AΦ[:,:,q] = reshape(Vector(MDEIM_mat[:, q]), RBVars.Nₛᵘ, RBVars.Nₛᵘ) * RBVars.Φₛᵘ
+  for q₁ = 1:RBVars.Qᵃ
+    for q₂ = 1:RBVars.Qᵃ
+      @info "SPGRB: affine component number $((q₁-1)*RBVars.Qᵃ+q₂), matrix A"
+      RBVars.Aₙ[:, :, (q₁-1)*RBVars.Qᵃ+q₂] =
+        (RBVars.AΦᵀPᵤ⁻¹[:,:,q₁]*AΦ[:,:,q₂])
     end
-    matrix_product!!(RBVars.AΦᵀPᵤ⁻¹, AΦ, RBVars.Pᵤ⁻¹, transpose_A=true)
+  end
+  RBVars.MDEIMᵢ_A = Matrix(RBVars.MDEIM_mat_A[RBVars.MDEIM_idx_A, :])
 
-    for q₁ = 1:RBVars.Qᵃ
-      for q₂ = 1:RBVars.Qᵃ
-        @info "SPGRB: affine component number $((q₁-1)*RBVars.Qᵃ+q₂), matrix A"
-        RBVars.Aₙ[:, :, (q₁-1)*RBVars.Qᵃ+q₂] = RBVars.AΦᵀPᵤ⁻¹[:, :, q₁] * AΦ[:, :, q₂]
-      end
-    end
-    RBVars.MDEIMᵢ_A = Matrix(MDEIM_mat[RBVars.MDEIM_idx_A, :])
-
-    if RBInfo.save_offline_structures
-      save_CSV([MDEIM_err_bound], joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_err_bound.csv"))
-      save_CSV(MDEIM_Σ, joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
-    end
-
-  else
-
-    error("Unrecognized variable to load")
-
+  if RBInfo.save_offline_structures
+    save_CSV([MDEIM_err_bound],
+      joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_err_bound.csv"))
+    save_CSV(MDEIM_Σ, joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
   end
 
 end
@@ -131,14 +125,14 @@ function assemble_affine_vectors(RBInfo::Info, RBVars::PoissonSPGRB, var::String
     @info "Assembling affine reduced forcing term"
     F = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "F.csv"))
     Fₙ = zeros(RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qᶠ)
-    matrix_product!!(Fₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(F,:,1))
+    matrix_product!(Fₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(F,:,1))
     RBVars.Fₙ = reshape(Fₙ,:,RBVars.Qᵃ*RBVars.Qᶠ)
   elseif var == "H"
     RBVars.Qʰ = 1
     @info "Assembling affine reduced Neumann term"
     H = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "H.csv"))
     Hₙ = zeros(RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qʰ)
-    matrix_product!!(Hₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(H,:,1))
+    matrix_product!(Hₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(H,:,1))
     RBVars.Hₙ = reshape(Hₙ,:,RBVars.Qᵃ*RBVars.Qʰ)
   else
     error("Unrecognized variable to assemble")
@@ -154,16 +148,16 @@ function assemble_DEIM_vectors(RBInfo::Info, RBVars::PoissonSPGRB, var::String)
   DEIMᵢ_mat = Matrix(DEIM_mat[DEIM_idx, :])
   Q = size(DEIM_mat)[2]
   varₙ = zeros(RBVars.nₛᵘ,1,RBVars.Qᵃ*Q)
-  matrix_product!!(varₙ,RBVars.AΦᵀPᵤ⁻¹,DEIM_mat)
+  matrix_product!(varₙ,RBVars.AΦᵀPᵤ⁻¹,DEIM_mat)
   varₙ = reshape(varₙ,:,RBVars.Qᵃ*Q)
 
   if var == "F"
-    RBVars.DEIMᵢ_mat_F = DEIMᵢ_mat
+    RBVars.DEIMᵢ_F = DEIMᵢ_mat
     RBVars.DEIM_idx_F = DEIM_idx
     RBVars.Qᶠ = Q
     RBVars.Fₙ = varₙ
   elseif var == "H"
-    RBVars.DEIMᵢ_mat_H = DEIMᵢ_mat
+    RBVars.DEIMᵢ_H = DEIMᵢ_mat
     RBVars.DEIM_idx_H = DEIM_idx
     RBVars.Qʰ = Q
     RBVars.Hₙ = varₙ

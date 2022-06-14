@@ -34,41 +34,12 @@ function assemble_affine_matrices(RBInfo::Info, RBVars::PoissonSTGRB, var::Strin
 
 end
 
-function assemble_MDEIM_matrices(RBInfo::Info, RBVars::PoissonSTGRB, var::String)
-
-  @info "The matrix $var is non-affine:
-    running the MDEIM offline phase on $nₛ_MDEIM snapshots"
-
-  MDEIM_mat, MDEIM_idx, MDEIMᵢ_mat, row_idx, sparse_el =
-    MDEIM_offline(FEMSpace, RBInfo, var)
-  Matₙ, Q = assemble_reduced_mat_MDEIM(MDEIM_mat,row_idx,RBInfo,RBVars,var)
-
-  if var == "M"
-    RBVars.Mₙ = Matₙ
-    RBVars.MDEIMᵢ_M = MDEIMᵢ_mat
-    RBVars.MDEIM_idx_M = MDEIM_idx
-    RBVars.sparse_el_M = sparse_el
-    RBVars.row_idx_M = row_idx
-    RBVars.Qᵐ = Q
-  elseif var == "A"
-    RBVars.S.Aₙ = Matₙ
-    RBVars.S.MDEIMᵢ_A = MDEIMᵢ_mat
-    RBVars.S.MDEIM_idx_A = MDEIM_idx
-    RBVars.S.sparse_el_A = sparse_el
-    RBVars.row_idx_A = row_idx
-    RBVars.S.Qᵃ = Q
-  else
-    error("Unrecognized variable to assemble with MDEIM")
-  end
-
-end
-
 function assemble_reduced_mat_MDEIM(
-  MDEIM_mat::Matrix,
-  row_idx::Vector,
   RBInfo::Info,
   RBVars::PoissonSTGRB,
-  var::String) ::Tuple
+  MDEIM_mat::Matrix,
+  row_idx::Vector,
+  var::String)
 
   if RBInfo.space_time_M_DEIM
     Nₜ = RBVars.Nₜ
@@ -98,7 +69,13 @@ function assemble_reduced_mat_MDEIM(
       reshape(MatqΦ,RBVars.S.Nₛᵘ,:),RBVars.S.nₛᵘ,:,Q)
   end
 
-  Matₙ, Q
+  if var == "M"
+    RBVars.Mₙ = Matₙ
+    RBVars.Qᵐ = Q
+  else
+    RBVars.S.Aₙ = Matₙ
+    RBVars.S.Qᵃ = Q
+  end
 
 end
 
@@ -108,49 +85,21 @@ function assemble_affine_vectors(RBInfo::Info, RBVars::PoissonSTGRB, var::String
 
 end
 
-function assemble_DEIM_vectors(RBInfo::Info, RBVars::PoissonSTGRB, var::String)
-
-  @info "ST-GRB: running the DEIM offline phase on variable $var with $nₛ_DEIM snapshots"
-
-  DEIM_mat, DEIM_idx, DEIMᵢ_mat = DEIM_offline(FEMSpace, RBInfo, var)
-  Vecₙ,Q = assemble_reduced_mat_DEIM(DEIM_mat,RBInfo,RBVars)
-
-  if var == "F"
-    RBVars.S.DEIMᵢ_mat_F = DEIMᵢ_mat
-    RBVars.S.DEIM_idx_F = DEIM_idx
-    RBVars.S.Qᶠ = Q
-    RBVars.S.Fₙ = Vecₙ
-  elseif var == "H"
-    RBVars.S.DEIMᵢ_mat_H = DEIMᵢ_mat
-    RBVars.S.DEIM_idx_H = DEIM_idx
-    RBVars.S.Qʰ = Q
-    RBVars.S.Hₙ = Vecₙ
-  else
-    error("Unrecognized vector to assemble with DEIM")
-  end
-
-end
-
 function assemble_reduced_mat_DEIM(
-  DEIM_mat::Matrix,
   RBInfo::Info,
-  RBVars::PoissonSTGRB) ::Tuple
+  RBVars::PoissonSTGRB,
+  DEIM_mat::Matrix,
+  var::String)
 
   if RBInfo.space_time_M_DEIM
     Nₜ = RBVars.Nₜ
     DEIM_mat_new = reshape(DEIM_mat,RBVars.S.Nₛᵘ,:)
-    Q = Int(size(MDEIM_mat_new)[2]/Nₜ)
-    r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
-    MatqΦ = zeros(RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q*Nₜ)
-    for q = 1:Q
-      @info "ST-GRB: affine component number $q/$Q, matrix $var"
-      for j = 1:RBVars.S.Nₛᵘ
-        Mat_idx = findall(x -> x == j, r_idx)
-        MatqΦ[j,:,(q-1)*Nₜ+1:q*Nₜ] =
-          (MDEIM_mat_new[Mat_idx,:,q]' * RBVars.S.Φₛᵘ[c_idx[Mat_idx],:])'
-      end
+    Q = Int(size(DEIM_mat_new)[2]/Nₜ)
+    Vecₙ = zeros(RBVars.S.nₛᵘ,1,Q*Nₜ)
+    for q = 1:Q*Nₜ
+      Vecₙ[:,:,q] = RBVars.S.Φₛᵘ' * Vector(DEIM_mat_new[:, q])
     end
-    Matₙ = reshape(RBVars.S.Φₛᵘ' * reshape(MatqΦ,RBVars.S.Nₛᵘ,:),
+    Vecₙ = reshape(RBVars.S.Φₛᵘ' * reshape(MatqΦ,RBVars.S.Nₛᵘ,:),
       RBVars.S.nₛᵘ,:,Q*Nₜ)
   else
     Q = size(DEIM_mat)[2]
@@ -160,7 +109,17 @@ function assemble_reduced_mat_DEIM(
     end
     Vecₙ = reshape(Vecₙ,:,Q)
   end
-  Vecₙ,Q
+
+  if var == "F"
+    RBVars.S.Fₙ = Vecₙ
+    RBVars.S.Qᶠ = Q
+  elseif var == "H"
+    RBVars.S.Hₙ = Vecₙ
+    RBVars.S.Qʰ = Q
+  else
+    error("Unrecognized vector to assemble with DEIM")
+  end
+
 end
 
 function assemble_offline_structures(RBInfo::Info, RBVars::PoissonSTGRB, operators=nothing)
@@ -219,21 +178,18 @@ end
 function save_affine_structures(RBInfo::Info, RBVars::PoissonSTGRB)
 
   if RBInfo.save_offline_structures
-    Mₙ = reshape(RBVars.Mₙ, :, RBVars.Qᵐ)
-    save_CSV(Mₙ, joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
+    save_CSV(reshape(RBVars.Mₙ, :, RBVars.Qᵐ),
+      joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
     save_affine_structures(RBInfo, RBVars.S)
   end
 
 end
 
 function get_affine_structures(RBInfo::Info, RBVars::PoissonSTGRB) :: Vector
-
   operators = String[]
   append!(operators, get_Mₙ(RBInfo, RBVars))
   append!(operators, get_affine_structures(RBInfo, RBVars.S))
-
   return operators
-
 end
 
 function get_RB_LHS_blocks(RBInfo, RBVars::PoissonSTGRB, θᵐ, θᵃ)
@@ -477,11 +433,7 @@ function adaptive_cycle_offline(
   assemble_offline_structures(RBInfo, RBVars)
   RBVars.Φₛᵘ = hcat(Φₛᵘ_old,RBVars.Φₛᵘ)
   RBVars.Φₜᵘ = hcat(Φₜᵘ_old,RBVars.Φₜᵘ)
-  θᵐ, θᵃ, θᶠ, θʰ = get_θ(RBInfo, RBVars, Param)
-  get_RB_LHS_blocks(RBInfo, RBVars, θᵐ, θᵃ)
-  if !RBInfo.build_Parametric_RHS
-    get_RB_RHS_blocks(RBInfo, RBVars, θᶠ, θʰ)
-  else
-    build_Param_RHS(RBInfo, RBVars, Param)
-  end
+
+  loop_on_params(RBInfo,RBVars,μ,param_nbs)
+
 end

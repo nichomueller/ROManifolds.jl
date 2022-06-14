@@ -140,17 +140,70 @@ function test_offline_phase(RBInfo::Info, RBVars::PoissonUnsteady)
 
 end
 
+function assemble_MDEIM_matrices(
+  RBInfo::Info,
+  RBVars::PoissonUnsteady,
+  var::String)
+
+  @info "The matrix $var is non-affine:
+    running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots"
+  if var == "M"
+    if isempty(RBVars.MDEIM_mat_M)
+      (RBVars.MDEIM_mat_M, RBVars.MDEIM_idx_M, RBVars.MDEIMᵢ_M, RBVars.row_idx_M,
+        RBVars.sparse_el_M) = MDEIM_offline(FEMSpace, RBInfo, "M")
+    end
+    assemble_reduced_mat_MDEIM(
+      RBInfo,RBVars,RBVars.MDEIM_mat_M,RBVars.row_idx_M,"M")
+  else
+    if isempty(RBVars.S.MDEIM_mat_A)
+      (RBVars.S.MDEIM_mat_A, RBVars.S.MDEIM_idx_A, RBVars.S.MDEIMᵢ_A,
+      RBVars.row_idx_A,RBVars.S.sparse_el_A) = MDEIM_offline(FEMSpace, RBInfo, "A")
+    end
+    assemble_reduced_mat_MDEIM(
+      RBInfo,RBVars,RBVars.S.MDEIM_mat_A,RBVars.row_idx_A,"A")
+  end
+
+end
+
+function assemble_DEIM_vectors(
+  RBInfo::Info,
+  RBVars::PoissonUnsteady,
+  var::String)
+
+  @info "The vector $var is non-affine:
+    running the DEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots"
+
+  if var == "F"
+    if isempty(RBVars.S.DEIM_mat_F)
+      RBVars.S.DEIM_mat_F, RBVars.S.DEIM_idx_F, RBVars.S.DEIMᵢ_F =
+        DEIM_offline(FEMSpace, RBInfo,"F")
+    end
+    assemble_reduced_mat_DEIM(RBInfo,RBVars,RBVars.S.DEIM_mat_F,"F")
+  else
+    if isempty(RBVars.S.DEIM_mat_H)
+      RBVars.S.DEIM_mat_H, RBVars.S.DEIM_idx_H, RBVars.S.DEIMᵢ_H =
+        DEIM_offline(FEMSpace,RBInfo,"H")
+    end
+    assemble_reduced_mat_DEIM(RBInfo,RBVars,RBVars.S.DEIM_mat_H,"H")
+  end
+
+end
+
 function save_M_DEIM_structures(RBInfo::Info, RBVars::PoissonUnsteady)
 
-  list_M_DEIM = (RBVars.MDEIMᵢ_M, RBVars.MDEIM_idx_M, RBVars.sparse_el_M, RBVars.row_idx_A, RBVars.row_idx_M)
-  list_names = ("MDEIMᵢ_M", "MDEIM_idx_M", "sparse_el_M", "row_idx_A", "row_idx_M")
-  l_info_vec = [[l_idx,l_val] for (l_idx,l_val) in enumerate(list_M_DEIM) if !all(isempty.(l_val))]
+  list_M_DEIM = (RBVars.MDEIM_mat_M, RBVars.MDEIMᵢ_M, RBVars.MDEIM_idx_M,
+    RBVars.sparse_el_M, RBVars.row_idx_A, RBVars.row_idx_M)
+  list_names = ("MDEIM_mat_M", "MDEIMᵢ_M", "MDEIM_idx_M", "sparse_el_M",
+    "row_idx_A", "row_idx_M")
+  l_info_vec = [[l_idx,l_val] for (l_idx,l_val) in
+    enumerate(list_M_DEIM) if !all(isempty.(l_val))]
 
   if !isempty(l_info_vec)
     l_info_mat = reduce(vcat,transpose.(l_info_vec))
     l_idx,l_val = l_info_mat[:,1], transpose.(l_info_mat[:,2])
     for (i₁,i₂) in enumerate(l_idx)
-      save_CSV(l_val[i₁], joinpath(RBInfo.paths.ROM_structures_path, list_names[i₂]*".csv"))
+      save_CSV(l_val[i₁], joinpath(RBInfo.paths.ROM_structures_path,
+        list_names[i₂]*".csv"))
     end
   end
 
@@ -172,10 +225,14 @@ function get_M_DEIM_structures(RBInfo::Info, RBVars::PoissonUnsteady) :: Vector
 
     if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MDEIMᵢ_M.csv"))
       @info "Importing MDEIM offline structures for the mass matrix"
-      RBVars.MDEIMᵢ_M = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "MDEIMᵢ_M.csv"))
-      RBVars.MDEIM_idx_M = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_idx_M.csv"))[:]
-      RBVars.sparse_el_M = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "sparse_el_M.csv"))[:]
-      RBVars.row_idx_M = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "row_idx_M.csv"))[:]
+      RBVars.MDEIMᵢ_M = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
+        "MDEIMᵢ_M.csv"))
+      RBVars.MDEIM_idx_M = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
+        "MDEIM_idx_M.csv"))[:]
+      RBVars.sparse_el_M = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
+        "sparse_el_M.csv"))[:]
+      RBVars.row_idx_M = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
+        "row_idx_M.csv"))[:]
       append!(operators, [])
     else
       @info "Failed to import MDEIM offline structures for the mass matrix: must build them"
@@ -186,7 +243,8 @@ function get_M_DEIM_structures(RBInfo::Info, RBVars::PoissonUnsteady) :: Vector
 
   if RBInfo.probl_nl["A"]
     if isfile(joinpath(RBInfo.paths.ROM_structures_path, "row_idx_A.csv"))
-      RBVars.row_idx_A = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "row_idx_A.csv"))[:]
+      RBVars.row_idx_A = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
+        "row_idx_A.csv"))[:]
     else
       append!(operators, ["A"])
     end
@@ -296,7 +354,7 @@ function get_θᶠʰ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricI
   else
     F_μ = assemble_forcing(FEMSpace, RBInfo, Param)
     for iₜ = 1:RBVars.Nₜ
-      append!(θᶠ, M_DEIM_online(F_μ(timesθ[iₜ]), RBVars.S.DEIMᵢ_mat_F, RBVars.S.DEIM_idx_F))
+      append!(θᶠ, M_DEIM_online(F_μ(timesθ[iₜ]), RBVars.S.DEIMᵢ_F, RBVars.S.DEIM_idx_F))
     end
   end
 
@@ -305,7 +363,7 @@ function get_θᶠʰ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricI
   else
     H_μ = assemble_neumann_datum(FEMSpace, RBInfo, Param)
     for iₜ = 1:RBVars.Nₜ
-      append!(θʰ, M_DEIM_online(H_μ(timesθ[iₜ]), RBVars.S.DEIMᵢ_mat_H, RBVars.S.DEIM_idx_H))
+      append!(θʰ, M_DEIM_online(H_μ(timesθ[iₜ]), RBVars.S.DEIMᵢ_H, RBVars.S.DEIM_idx_H))
     end
   end
 
@@ -402,7 +460,7 @@ function offline_phase(RBInfo::Info, RBVars::PoissonUnsteady)
 
   if RBInfo.import_offline_structures
     operators = get_offline_structures(RBInfo, RBVars)
-    if "A" ∈ operators || "M" ∈ operators || "MA" ∈ operators || "F" ∈ operators
+    if "A" ∈ operators || "M" ∈ operators || "F" ∈ operators || "H" ∈ operators
       assemble_offline_structures(RBInfo, RBVars, operators)
     end
   else
@@ -476,13 +534,15 @@ function online_phase(
   param_nbs)
 
   get_norm_matrix(RBInfo, RBVars.S)
-  adaptive_loop = false
-  if adaptive_loop
-    adaptive_loop_on_params(RBInfo, RBVars, μ, param_nbs)
-  else
-    (ũ_μ,uₙ_μ,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,
+  (ũ_μ,uₙ_μ,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,
     mean_online_time,mean_reconstruction_time) =
     loop_on_params(RBInfo, RBVars, μ, param_nbs)
+
+  adaptive_loop = false
+  if adaptive_loop
+    (ũ_μ,uₙ_μ,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,
+      mean_online_time,mean_reconstruction_time) =
+      adaptive_loop_on_params(RBInfo,RBVars,mean_pointwise_err)
   end
 
   string_param_nbs = "Params"

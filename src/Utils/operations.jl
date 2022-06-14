@@ -29,17 +29,16 @@ end
 """Computation of the standard matrix product between A, tensor of order 3,
   and B, tensor of order 2. If transpose_A is true, then the first two dimensions
   of A are permuted"""
-function matrix_product!(AB::Array, A::Array, B::Array; transpose_A=false)
-
-  @assert length(size(A)) == 3 && length(size(B)) == 2
-  "Only implemented tensor order 3 * tensor order 2"
-
+function matrix_product!(
+    AB::Array, A::Array, B::Array; transpose_A=false)
+  @assert length(size(A)) == 3 && length(size(B)) == 2 "Only implemented tensor order 3 * tensor order 2"
   if transpose_A
-    return @tensor AB[i,j,k] = A[l,i,k] * B[l,j]
-  else
-    return @tensor AB[i,j,k] = A[i,l,k] * B[l,j]
+    A = permutedims(A,[2,1,3])
   end
-
+  for q = 1:size(A)[3]
+    AB[:,:,q] = A[:,:,q]'*B
+  end
+  AB
 end
 
 """Generate a uniform random vector of dimension n between the ranges set by
