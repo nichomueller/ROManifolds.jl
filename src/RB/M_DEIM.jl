@@ -52,23 +52,8 @@ function M_DEIM_offline(M_DEIM_mat::Matrix, Σ::Vector)
 
 end
 
-function MDEIM_offline(FEMSpace::SteadyProblem, RBInfo::Info, var::String)
-
-  @info "Building $(RBInfo.nₛ_MDEIM) snapshots of $var"
-
-  μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  snaps,row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, μ, var)
-  sparse_MDEIM_mat, Σ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
-  MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(sparse_MDEIM_mat, Σ)
-  r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx, FEMSpace.Nₛᵘ)
-  el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(union(r_idx, c_idx)))
-
-  MDEIM_mat, MDEIM_idx, el, MDEIM_err_bound, Σ
-
-end
-
 function MDEIM_offline(
-  FEMSpace::UnsteadyProblem,
+  FEMSpace::FEMProblem,
   RBInfo::Info,
   var::String)
 
@@ -76,8 +61,7 @@ function MDEIM_offline(
   at each time step. This will take some time."
 
   μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  timesθ = get_timesθ(RBInfo)
-  MDEIM_mat,row_idx,Σ = get_snaps_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
+  MDEIM_mat,row_idx,Σ = get_snaps_MDEIM(FEMSpace,RBInfo,μ,var)
   MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat, Σ)
   MDEIMᵢ_mat = MDEIM_mat[MDEIM_idx,:]
   MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx,row_idx,FEMSpace.Nₛᵘ)
@@ -101,32 +85,14 @@ function modify_timesθ_and_MDEIM_idx(
 end
 
 function DEIM_offline(
-  FEMSpace::SteadyProblem,
-  RBInfo::Info,
-  var::String) ::Tuple
-
-  @info "Building $(RBInfo.nₛ_DEIM) snapshots of $var"
-
-  μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  snaps = get_snaps_DEIM(FEMSpace, RBInfo, μ, var)
-  sparse_DEIM_mat, Σ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
-  DEIM_mat, DEIM_idx, DEIM_err_bound = M_DEIM_offline(sparse_DEIM_mat, Σ)
-  unique!(DEIM_idx)
-
-  DEIM_mat, DEIM_idx, DEIM_err_bound, Σ
-
-end
-
-function DEIM_offline(
-  FEMSpace::UnsteadyProblem,
+  FEMSpace::FEMProblem,
   RBInfo::Info,
   var::String) ::Tuple
 
   @info "Building $(RBInfo.nₛ_DEIM) snapshots of $var, at each time step."
 
   μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  timesθ = get_timesθ(RBInfo)
-  DEIM_mat,Σ = get_snaps_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
+  DEIM_mat,Σ = get_snaps_DEIM(FEMSpace,RBInfo,μ,var)
   DEIM_mat, DEIM_idx, DEIM_err_bound = M_DEIM_offline(DEIM_mat, Σ)
   DEIMᵢ_mat = DEIM_mat[DEIM_idx,:]
 
@@ -138,7 +104,7 @@ function M_DEIM_online(Mat_nonaffine, Matᵢ::Matrix, idx::Vector)
   Matᵢ\Matrix(reshape(Mat_nonaffine,:,1)[idx,:])
 end
 
-#= function check_MDEIM_error_bound(A, Aₘ, Fₘ, ũ, X = nothing)
+function check_MDEIM_error_bound(A, Aₘ, Fₘ, ũ, X = nothing)
 
   if isnothing(X)
     X_inv_sqrt = I(size(X)[1])
@@ -173,4 +139,4 @@ end
 
   return err_bound
 
-end =#
+end

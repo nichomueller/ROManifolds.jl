@@ -7,7 +7,7 @@ end
 
 """Get a full list of subdirectories at a given root directory"""
 function get_all_subdirectories(path::String)
-  filter(isdir, readdir(path, join=true))
+  filter(isdir,readdir(path,join=true))
 end
 
 function load_CSV(path::String; convert_to_sparse = false) ::AbstractArray

@@ -145,22 +145,24 @@ function assemble_MDEIM_matrices(
   RBVars::PoissonUnsteady,
   var::String)
 
-  @info "The matrix $var is non-affine:
-    running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots"
   if var == "M"
+    @info "The matrix $var is non-affine:
+      running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots"
     if isempty(RBVars.MDEIM_mat_M)
       (RBVars.MDEIM_mat_M, RBVars.MDEIM_idx_M, RBVars.MDEIMᵢ_M, RBVars.row_idx_M,
         RBVars.sparse_el_M) = MDEIM_offline(FEMSpace, RBInfo, "M")
     end
     assemble_reduced_mat_MDEIM(
       RBInfo,RBVars,RBVars.MDEIM_mat_M,RBVars.row_idx_M,"M")
-  else
+  elseif var == "A"
     if isempty(RBVars.S.MDEIM_mat_A)
       (RBVars.S.MDEIM_mat_A, RBVars.S.MDEIM_idx_A, RBVars.S.MDEIMᵢ_A,
-      RBVars.row_idx_A,RBVars.S.sparse_el_A) = MDEIM_offline(FEMSpace, RBInfo, "A")
+      RBVars.S.row_idx_A,RBVars.S.sparse_el_A) = MDEIM_offline(FEMSpace, RBInfo, "A")
     end
     assemble_reduced_mat_MDEIM(
-      RBInfo,RBVars,RBVars.S.MDEIM_mat_A,RBVars.row_idx_A,"A")
+      RBInfo,RBVars,RBVars.S.MDEIM_mat_A,RBVars.S.row_idx_A,"A")
+  else
+    error("Unrecognized variable on which to perform MDEIM")
   end
 
 end
@@ -175,16 +177,18 @@ function assemble_DEIM_vectors(
 
   if var == "F"
     if isempty(RBVars.S.DEIM_mat_F)
-      RBVars.S.DEIM_mat_F, RBVars.S.DEIM_idx_F, RBVars.S.DEIMᵢ_F =
-        DEIM_offline(FEMSpace, RBInfo,"F")
+       RBVars.S.DEIM_mat_F, RBVars.S.DEIM_idx_F, RBVars.S.DEIMᵢ_F =
+        DEIM_offline(FEMSpace,RBInfo,"F")
     end
     assemble_reduced_mat_DEIM(RBInfo,RBVars,RBVars.S.DEIM_mat_F,"F")
-  else
+  elseif var == "H"
     if isempty(RBVars.S.DEIM_mat_H)
-      RBVars.S.DEIM_mat_H, RBVars.S.DEIM_idx_H, RBVars.S.DEIMᵢ_H =
+       RBVars.S.DEIM_mat_H, RBVars.S.DEIM_idx_H, RBVars.S.DEIMᵢ_H =
         DEIM_offline(FEMSpace,RBInfo,"H")
     end
-    assemble_reduced_mat_DEIM(RBInfo,RBVars,RBVars.S.DEIM_mat_H,"H")
+    assemble_reduced_mat_DEIM(RBInfo,RBVars, RBVars.S.DEIM_mat_H,"H")
+  else
+    error("Unrecognized variable on which to perform DEIM")
   end
 
 end
@@ -192,9 +196,9 @@ end
 function save_M_DEIM_structures(RBInfo::Info, RBVars::PoissonUnsteady)
 
   list_M_DEIM = (RBVars.MDEIM_mat_M, RBVars.MDEIMᵢ_M, RBVars.MDEIM_idx_M,
-    RBVars.sparse_el_M, RBVars.row_idx_A, RBVars.row_idx_M)
+    RBVars.sparse_el_M, RBVars.row_idx_M)
   list_names = ("MDEIM_mat_M", "MDEIMᵢ_M", "MDEIM_idx_M", "sparse_el_M",
-    "row_idx_A", "row_idx_M")
+   "row_idx_M")
   l_info_vec = [[l_idx,l_val] for (l_idx,l_val) in
     enumerate(list_M_DEIM) if !all(isempty.(l_val))]
 
@@ -239,15 +243,6 @@ function get_M_DEIM_structures(RBInfo::Info, RBVars::PoissonUnsteady) :: Vector
       append!(operators, ["M"])
     end
 
-  end
-
-  if RBInfo.probl_nl["A"]
-    if isfile(joinpath(RBInfo.paths.ROM_structures_path, "row_idx_A.csv"))
-      RBVars.row_idx_A = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
-        "row_idx_A.csv"))[:]
-    else
-      append!(operators, ["A"])
-    end
   end
 
   append!(operators, get_M_DEIM_structures(RBInfo, RBVars.S))
@@ -354,7 +349,8 @@ function get_θᶠʰ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricI
   else
     F_μ = assemble_forcing(FEMSpace, RBInfo, Param)
     for iₜ = 1:RBVars.Nₜ
-      append!(θᶠ, M_DEIM_online(F_μ(timesθ[iₜ]), RBVars.S.DEIMᵢ_F, RBVars.S.DEIM_idx_F))
+      append!(θᶠ,
+        M_DEIM_online(F_μ(timesθ[iₜ]), RBVars.S.DEIMᵢ_F, RBVars.S.DEIM_idx_F))
     end
   end
 
@@ -363,7 +359,8 @@ function get_θᶠʰ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricI
   else
     H_μ = assemble_neumann_datum(FEMSpace, RBInfo, Param)
     for iₜ = 1:RBVars.Nₜ
-      append!(θʰ, M_DEIM_online(H_μ(timesθ[iₜ]), RBVars.S.DEIMᵢ_H, RBVars.S.DEIM_idx_H))
+      append!(θʰ,
+        M_DEIM_online(H_μ(timesθ[iₜ]), RBVars.S.DEIMᵢ_H, RBVars.S.DEIM_idx_H))
     end
   end
 
@@ -400,34 +397,20 @@ function get_θᶠʰₛₜ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::Param
 
 end
 
-function get_Q(RBInfo::Info, RBVars::PoissonUnsteady)
-
-  if RBVars.Qᵐ == 0
-    RBVars.Qᵐ = size(RBVars.Mₙ)[end]
-  end
-
-  get_Q(RBInfo, RBVars.S)
-
-end
-
 function solve_RB_system(RBInfo::Info, RBVars::PoissonUnsteady, Param::ParametricInfoUnsteady)
-
   get_RB_system(RBInfo, RBVars, Param)
-
   @info "Solving RB problem via backslash"
   @info "Condition number of the system's matrix: $(cond(RBVars.S.LHSₙ[1]))"
-  RBVars.S.uₙ = zeros(RBVars.nᵘ)
-  RBVars.S.uₙ = RBVars.S.LHSₙ[1] \ RBVars.S.RHSₙ[1]
-
+  RBVars.S.online_time += @elapsed begin
+    RBVars.S.uₙ = zeros(RBVars.nᵘ)
+    RBVars.S.uₙ = RBVars.S.LHSₙ[1] \ RBVars.S.RHSₙ[1]
+  end
 end
 
 function reconstruct_FEM_solution(RBVars::PoissonUnsteady)
-
   @info "Reconstructing FEM solution from the newly computed RB one"
-
   uₙ = reshape(RBVars.S.uₙ, (RBVars.nₜᵘ, RBVars.S.nₛᵘ))
   RBVars.S.ũ = RBVars.S.Φₛᵘ * (RBVars.Φₜᵘ * uₙ)'
-
 end
 
 function offline_phase(RBInfo::Info, RBVars::PoissonUnsteady)
@@ -460,7 +443,7 @@ function offline_phase(RBInfo::Info, RBVars::PoissonUnsteady)
 
   if RBInfo.import_offline_structures
     operators = get_offline_structures(RBInfo, RBVars)
-    if "A" ∈ operators || "M" ∈ operators || "F" ∈ operators || "H" ∈ operators
+    if !isempty(operators)
       assemble_offline_structures(RBInfo, RBVars, operators)
     end
   else
@@ -500,9 +483,7 @@ function loop_on_params(
       DataFrame))[:,(nb-1)*RBVars.Nₜ+1:nb*RBVars.Nₜ]
     end
 
-    online_time = @elapsed begin
-      solve_RB_system(RBInfo, RBVars, Param)
-    end
+    solve_RB_system(RBInfo, RBVars, Param)
     reconstruction_time = @elapsed begin
       reconstruct_FEM_solution(RBVars)
     end

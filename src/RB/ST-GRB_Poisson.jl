@@ -10,7 +10,7 @@ function get_Mₙ(RBInfo::Info, RBVars::PoissonSTGRB) :: Vector
     @info "Importing reduced affine mass matrix"
     Mₙ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
     RBVars.Mₙ = reshape(Mₙ,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,:)
-    RBVars.Qᵐ = size(RBVars.Mₙ)[3]
+    RBVars.Qᵐ = size(RBVars.Mₙ)[end]
     return []
   else
     @info "Failed to import the reduced affine mass matrix: must build it"
@@ -128,39 +128,32 @@ function assemble_offline_structures(RBInfo::Info, RBVars::PoissonSTGRB, operato
     operators = set_operators(RBInfo, RBVars)
   end
 
-  assembly_time = 0
-  if "M" ∈ operators
-    assembly_time += @elapsed begin
+  RBVars.S.offline_time += @elapsed begin
+    if "M" ∈ operators
       if !RBInfo.probl_nl["M"]
         assemble_affine_matrices(RBInfo, RBVars, "M")
       else
         assemble_MDEIM_matrices(RBInfo, RBVars, "M")
       end
     end
-  end
 
-  if "A" ∈ operators
-    assembly_time += @elapsed begin
+    if "A" ∈ operators
       if !RBInfo.probl_nl["A"]
         assemble_affine_matrices(RBInfo, RBVars, "A")
       else
         assemble_MDEIM_matrices(RBInfo, RBVars, "A")
       end
     end
-  end
 
-  if "F" ∈ operators
-    assembly_time += @elapsed begin
+    if "F" ∈ operators
       if !RBInfo.probl_nl["f"]
         assemble_affine_vectors(RBInfo, RBVars, "F")
       else
         assemble_DEIM_vectors(RBInfo, RBVars, "F")
       end
     end
-  end
 
-  if "H" ∈ operators
-    assembly_time += @elapsed begin
+    if "H" ∈ operators
       if !RBInfo.probl_nl["h"]
         assemble_affine_vectors(RBInfo, RBVars, "H")
       else
@@ -168,7 +161,6 @@ function assemble_offline_structures(RBInfo::Info, RBVars::PoissonSTGRB, operato
       end
     end
   end
-  RBVars.S.offline_time += assembly_time
 
   save_affine_structures(RBInfo, RBVars)
   save_M_DEIM_structures(RBInfo, RBVars)
@@ -190,6 +182,13 @@ function get_affine_structures(RBInfo::Info, RBVars::PoissonSTGRB) :: Vector
   append!(operators, get_Mₙ(RBInfo, RBVars))
   append!(operators, get_affine_structures(RBInfo, RBVars.S))
   return operators
+end
+
+function get_Q(RBInfo::Info, RBVars::PoissonSTGRB)
+  if RBVars.Qᵐ == 0
+    RBVars.Qᵐ = size(RBVars.Mₙ)[end]
+  end
+  get_Q(RBInfo, RBVars.S)
 end
 
 function get_RB_LHS_blocks(RBInfo, RBVars::PoissonSTGRB, θᵐ, θᵃ)
@@ -330,42 +329,44 @@ end
 
 function get_RB_system(RBInfo::Info, RBVars::PoissonSTGRB, Param)
 
-  @info "Preparing the RB system: fetching reduced LHS"
   initialize_RB_system(RBVars.S)
-  get_Q(RBInfo, RBVars)
-  blocks = [1]
-  operators = get_system_blocks(RBInfo, RBVars, blocks, blocks)
+  initialize_online_time(RBVars.S)
 
-  if RBInfo.space_time_M_DEIM
-    θᵐ, θᵃ, θᶠ, θʰ = get_θₛₜ(RBInfo, RBVars, Param)
-  else
-    θᵐ, θᵃ, θᶠ, θʰ = get_θ(RBInfo, RBVars, Param)
-  end
+  RBVars.S.online_time = @elapsed begin
+    get_Q(RBInfo, RBVars)
+    blocks = [1]
+    operators = get_system_blocks(RBInfo,RBVars,blocks,blocks)
 
-  if "LHS" ∈ operators
     if RBInfo.space_time_M_DEIM
-      get_RB_LHS_blocks_spacetime(RBInfo, RBVars, θᵐ, θᵃ)
+      θᵐ, θᵃ, θᶠ, θʰ = get_θₛₜ(RBInfo, RBVars, Param)
     else
-      get_RB_LHS_blocks(RBInfo, RBVars, θᵐ, θᵃ)
+      θᵐ, θᵃ, θᶠ, θʰ = get_θ(RBInfo, RBVars, Param)
+    end
+
+    if "LHS" ∈ operators
+      if RBInfo.space_time_M_DEIM
+        get_RB_LHS_blocks_spacetime(RBInfo, RBVars, θᵐ, θᵃ)
+      else
+        get_RB_LHS_blocks(RBInfo, RBVars, θᵐ, θᵃ)
+      end
+    end
+
+    if "RHS" ∈ operators
+      if !RBInfo.build_Parametric_RHS
+        get_RB_RHS_blocks(RBInfo, RBVars, θᶠ, θʰ)
+      else
+        build_Param_RHS(RBInfo, RBVars, Param)
+      end
     end
   end
 
-  if "RHS" ∈ operators
-    if !RBInfo.build_Parametric_RHS
-      @info "Preparing the RB system: fetching reduced RHS"
-      get_RB_RHS_blocks(RBInfo, RBVars, θᶠ, θʰ)
-    else
-      @info "Preparing the RB system: assembling reduced RHS exactly"
-      build_Param_RHS(RBInfo, RBVars, Param)
-    end
-  end
+  save_system_blocks(RBInfo,RBVars,blocks,blocks,operators)
 
 end
 
 function build_Param_RHS(RBInfo::Info, RBVars::PoissonSTGRB, Param)
-
+  @info "Assembling RHS exactly using θ-method time scheme, θ=$(RBInfo.θ)"
   δtθ = RBInfo.δt*RBInfo.θ
-
   F_t = assemble_forcing(FEMSpace, RBInfo, Param)
   H_t = assemble_neumann_datum(FEMSpace, RBInfo, Param)
   F, H = zeros(RBVars.S.Nₛᵘ, RBVars.Nₜ), zeros(RBVars.S.Nₛᵘ, RBVars.Nₜ)
@@ -376,12 +377,9 @@ function build_Param_RHS(RBInfo::Info, RBVars::PoissonSTGRB, Param)
   end
   F *= δtθ
   H *= δtθ
-
   Fₙ = RBVars.S.Φₛᵘ'*(F*RBVars.Φₜᵘ)
   Hₙ = RBVars.S.Φₛᵘ'*(H*RBVars.Φₜᵘ)
-
   push!(RBVars.S.RHSₙ, reshape(Fₙ'+Hₙ',:,1))
-
 end
 
 function get_θ(RBInfo::Info, RBVars::PoissonSTGRB, Param) ::Tuple

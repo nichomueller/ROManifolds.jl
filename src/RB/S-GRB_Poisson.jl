@@ -7,7 +7,7 @@ function get_Aₙ(RBInfo::Info, RBVars::PoissonSGRB) :: Vector
     RBVars.Qᵃ = size(RBVars.Aₙ)[3]
     return []
   else
-    @info "Failed to import the reduced affine stiffness matrix: must build it"
+    @info "Failed to import Aₙ: must build it"
     return ["A"]
   end
 
@@ -20,35 +20,49 @@ function assemble_affine_matrices(RBInfo::Info, RBVars::PoissonSGRB, var::String
     @info "Assembling affine reduced stiffness"
     A = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "A.csv");
       convert_to_sparse = true)
-    RBVars.Aₙ = zeros(RBVars.nₛᵘ, RBVars.nₛᵘ, RBVars.Qᵃ)
-    RBVars.Aₙ[:,:,1] = (RBVars.Φₛᵘ)' * A * RBVars.Φₛᵘ
+    RBVars.Aₙ = reshape((RBVars.Φₛᵘ)'*A*RBVars.Φₛᵘ,RBVars.nₛᵘ,RBVars.nₛᵘ,1)
   else
     error("Unrecognized variable to load")
   end
 
 end
 
-function assemble_MDEIM_matrices(RBInfo::Info, RBVars::PoissonSGRB, var::String)
+function assemble_reduced_mat_MDEIM(
+  RBVars::PoissonSGRB,
+  MDEIM_mat::Matrix,
+  row_idx::Vector)
 
-  @info "The stiffness is non-affine: running the MDEIM offline phase
-    on $(RBInfo.nₛ_MDEIM) snapshots"
-  if isnothing(RBVars.S.MDEIM_mat_A) || maximum(RBVars.S.MDEIM_mat_A) == 0
-    (RBVars.MDEIM_mat_A, RBVars.MDEIM_idx_A, RBVars.sparse_el_A,
-      MDEIM_err_bound, MDEIM_Σ) = MDEIM_offline(FEMSpace, RBInfo, "A")
+  Q = size(MDEIM_mat)[2]
+  r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
+  MatqΦ = zeros(RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q)
+  for j = 1:RBVars.S.Nₛᵘ
+    Mat_idx = findall(x -> x == j, r_idx)
+    MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.S.Φₛᵘ[c_idx[Mat_idx],:])'
   end
-  RBVars.Qᵃ = size(RBVars.MDEIM_mat_A)[2]
-  RBVars.Aₙ = zeros(RBVars.nₛᵘ, RBVars.nₛᵘ, RBVars.Qᵃ)
-  for q = 1:RBVars.Qᵃ
-    @info "S-GRB: affine component number $q, matrix $var"
-    Aq = reshape(RBVars.MDEIM_mat_A[:, q], (RBVars.Nₛᵘ, RBVars.Nₛᵘ))
-    RBVars.Aₙ[:,:,q] = RBVars.Φₛᵘ' * Matrix(Aq) * RBVars.Φₛᵘ
+  RBVars.S.Aₙ = reshape(RBVars.S.Φₛᵘ' *
+    reshape(MatqΦ,RBVars.S.Nₛᵘ,:),RBVars.S.nₛᵘ,:,Q)
+  RBVars.S.Qᵃ = Q
+
+end
+
+function assemble_reduced_mat_DEIM(
+  RBVars::PoissonSTGRB,
+  DEIM_mat::Matrix,
+  var::String)
+
+  Q = size(DEIM_mat)[2]
+  Vecₙ = zeros(RBVars.S.nₛᵘ,1,Q)
+  for q = 1:Q
+    Vecₙ[:,:,q] = RBVars.S.Φₛᵘ' * Vector(DEIM_mat[:, q])
   end
-  RBVars.MDEIMᵢ_A = Matrix(RBVars.MDEIM_mat_A[RBVars.MDEIM_idx_A, :])
-  if RBInfo.save_offline_structures
-    save_CSV([MDEIM_err_bound],
-      joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_err_bound.csv"))
-    save_CSV(MDEIM_Σ,
-      joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
+  Vecₙ = reshape(Vecₙ,:,Q)
+
+  if var == "F"
+    RBVars.S.Fₙ = Vecₙ
+    RBVars.S.Qᶠ = Q
+  else var == "H"
+    RBVars.S.Hₙ = Vecₙ
+    RBVars.S.Qʰ = Q
   end
 
 end
@@ -71,36 +85,6 @@ function assemble_affine_vectors(RBInfo::Info, RBVars::PoissonSGRB, var::String)
 
 end
 
-function assemble_DEIM_vectors(RBInfo::Info, RBVars::PoissonSGRB, var::String)
-
-  @info "S-GRB: running the DEIM offline phase on variable $var with $nₛ_DEIM snapshots"
-
-  DEIM_mat, DEIM_idx, _, _ = DEIM_offline(FEMSpace, RBInfo, var)
-  DEIMᵢ_mat = Matrix(DEIM_mat[DEIM_idx, :])
-  Q = size(DEIM_mat)[2]
-  varₙ = zeros(RBVars.nₛᵘ,Q)
-  for q = 1:Q
-    varₙ[:,q] = RBVars.Φₛᵘ' * Vector(DEIM_mat[:, q])
-  end
-
-  if var == "F"
-    RBVars.Fₙ = varₙ
-    RBVars.DEIM_mat_F = DEIM_mat
-    RBVars.DEIMᵢ_F = DEIMᵢ_mat
-    RBVars.DEIM_idx_F = DEIM_idx
-    RBVars.Qᶠ = Q
-  elseif var == "H"
-    RBVars.Hₙ = varₙ
-    RBVars.DEIM_mat_H = DEIM_mat
-    RBVars.DEIMᵢ_H = DEIMᵢ_mat
-    RBVars.DEIM_idx_H = DEIM_idx
-    RBVars.Qʰ = Q
-  else
-    error("Unrecognized vector to assemble with DEIM")
-  end
-
-end
-
 function save_affine_structures(RBInfo::Info, RBVars::PoissonSGRB)
   if RBInfo.save_offline_structures
     Aₙ = reshape(RBVars.Aₙ, :, RBVars.Qᵃ)
@@ -112,14 +96,24 @@ function save_affine_structures(RBInfo::Info, RBVars::PoissonSGRB)
   end
 end
 
-function build_Param_RHS(RBInfo::Info, RBVars::PoissonSGRB, Param, ::Array) ::Tuple
+function get_Q(RBInfo::Info, RBVars::PoissonSteady)
+  if RBVars.Qᵃ == 0
+    RBVars.Qᵃ = size(RBVars.Aₙ)[end]
+  end
+  if !RBInfo.build_Parametric_RHS
+    if RBVars.Qᶠ == 0
+      RBVars.Qᶠ = size(RBVars.Fₙ)[end]
+    end
+    if RBVars.Qʰ == 0
+      RBVars.Qʰ = size(RBVars.Hₙ)[end]
+    end
+  end
+end
 
+function build_Param_RHS(RBInfo::Info, RBVars::PoissonSGRB, Param, ::Array) ::Tuple
   F = assemble_forcing(FEMSpace, RBInfo, Param)
   H = assemble_neumann_datum(FEMSpace, RBInfo, Param)
-  Fₙ, Hₙ = (RBVars.Φₛᵘ)' * F, (RBVars.Φₛᵘ)' * H
-
-  reshape(Fₙ, :, 1), reshape(Hₙ, :, 1)
-
+  reshape((RBVars.Φₛᵘ)'*F,:,1), reshape((RBVars.Φₛᵘ)'*H,:,1)
 end
 
 function get_θ(RBInfo::Info, RBVars::PoissonSGRB, Param) ::Tuple

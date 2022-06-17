@@ -16,9 +16,14 @@ function plot_R_R²(f::Function, xrange::Vector, n::Int)
   Plot.plot(xs_ys(f, xrange[1], xrange[2], n)...)
 end
 
-function generate_and_save_plot(xval::Vector, yval::Vector, title::String,
+function generate_and_save_plot(xval::Array, yval::Array, title::String,
   label::Vector, xlab::String, ylab::String, save_path::String,
-  semilogx=false, semilogy=true; var="u")
+  semilogx=false, semilogy=true; var="u",modes=["lines"])
+
+  @assert size(xval) == size(yval) "Invalid plot: provide an input with the same
+    x-values as its y-values"
+  @assert length(size(xval)) == 2 "Invalid plot: provide an input which is at
+    most a matrix"
 
   if !semilogx && !semilogy
     layout = Layout(title=title,xaxis_title=xlab,yaxis_title=ylab)
@@ -32,7 +37,11 @@ function generate_and_save_plot(xval::Vector, yval::Vector, title::String,
     layout = Layout(title=title,xaxis_title=xlab,yaxis_title=ylab,
       xaxis_type="log",yaxis_type="log")
   end
-  trace = scatter(x=xval,y=yval,name=label,line=attr(width=4))
+
+  n_traces = size(xval)[1]
+  traces = [scatter(x=xval[i,:],y=yval[i,:],mode=modes[i],name=label[i],
+    line=attr(width=4)) for i=1:n_traces]
   p = plot(trace,layout)
   savefig(p, joinpath(save_path, string(var)*".eps"))
+
 end

@@ -20,13 +20,18 @@ function get_timesθ(RBInfo::Info) ::Vector
   collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
 end
 
-function build_sparse_mat(FEMInfo::ProblemInfoSteady, FEMSpace::SteadyProblem,
-    Param::ParametricInfoSteady, el::Vector; var="A")
+function build_sparse_mat(
+  FEMInfo::ProblemInfoSteady,
+  FEMSpace::SteadyProblem,
+  Param::ParametricInfoSteady,
+  el::Vector;
+  var="A")
 
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
   if var == "A"
-    Mat = assemble_matrix(∫(∇(FEMSpace.ϕᵥ) ⋅ (Param.α * ∇(FEMSpace.ϕᵤ))) * dΩ_sparse, FEMSpace.V, FEMSpace.V₀)
+    Mat = assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Param.α*∇(FEMSpace.ϕᵤ)))*dΩ_sparse,
+      FEMSpace.V, FEMSpace.V₀)
   else
     error("Unrecognized sparse matrix")
   end
@@ -35,7 +40,8 @@ function build_sparse_mat(FEMInfo::ProblemInfoSteady, FEMSpace::SteadyProblem,
 
 end
 
-function build_sparse_mat(FEMInfo::ProblemInfoUnsteady,
+function build_sparse_mat(
+  FEMInfo::ProblemInfoUnsteady,
   FEMSpace::UnsteadyProblem,
   Param::ParametricInfoUnsteady,
   el::Vector,
@@ -126,5 +132,117 @@ end
 function compute_MDEIM_error(FEMSpace::FEMProblem, RBInfo::Info, RBVars::RBProblem)
 
   Aₙ_μ = (RBVars.Φₛᵘ)' * assemble_stiffness(FEMSpace, RBInfo, Param) * RBVars.Φₛᵘ
+
+end
+
+function post_process()
+  paths = FEM_paths(root, problem_type, problem_name, mesh_name, case)
+  root = paths.current_test
+  root_subs = get_all_subdirectories(root)
+  filter!(el->!occursin("FEM_data",el),root_subs)
+
+  (ϵ,ϵ_fun,ϵ_sampl,ϵ_fun_sampl,ϵ_nest,ϵ_fun_nest,ϵ_sampl_nest,ϵ_fun_sampl_nest) =
+    (String[],String[],String[],String[],String[],String[],String[],String[])
+  t,errH1L2 = Float64[],Float64[]
+  t_sampl,errH1L2_sampl = Float64[],Float64[]
+  t_fun,errH1L2_fun = Float64[],Float64[]
+  t_fun_sampl,errH1L2_fun_sampl = Float64[],Float64[]
+  t_nest,errH1L2_nest = Float64[],Float64[]
+  t_sampl_nest,errH1L2_sampl_nest = Float64[],Float64[]
+  t_fun_nest,errH1L2_fun_nest = Float64[],Float64[]
+  t_fun_sampl_nest,errH1L2_fun_sampl_nest = Float64[],Float64[]
+
+  for dir in root_subs
+    if !occursin("nest",dir)
+      if !occursin("sampl",dir)
+        ϵ,ϵ_fun,errH1L2,errH1L2_fun,t,t_fun =
+          check_if_fun(dir,ϵ,ϵ_fun,errH1L2,errH1L2_fun,t,t_fun)
+      else
+        ϵ_sampl,ϵ_fun_sampl,errH1L2_sampl,errH1L2_fun_sampl,t_sampl,t_fun_sampl =
+          check_if_fun(dir,ϵ_sampl,ϵ_fun_sampl,errH1L2_sampl,errH1L2_fun_sampl,
+          t_sampl,t_fun_sampl)
+      end
+    else
+      if !occursin("sampl",dir)
+        ϵ_nest,ϵ_fun_nest,errH1L2_nest,errH1L2_fun_nest,t_nest,t_fun_nest =
+          check_if_fun(dir,ϵ_nest,ϵ_fun_nest,errH1L2_nest,errH1L2_fun_nest,
+          t_nest,t_fun_nest)
+      else
+        ϵ_sampl_nest,ϵ_fun_sampl_nest,errH1L2_sampl_nest,errH1L2_fun_sampl_nest,
+          t_sampl_nest,t_fun_sampl_nest = check_if_fun(dir,ϵ_sampl_nest,
+          ϵ_fun_sampl_nest,errH1L2_sampl_nest,errH1L2_fun_sampl_nest,
+          t_sampl_nest,t_fun_sampl_nest)
+      end
+    end
+  end
+
+  errors = Dict("Standard"=>errH1L2,"Functional"=>errH1L2_fun,
+  "Standard-sampling"=>errH1L2_sampl,"Functional-sampling"=>errH1L2_fun_sampl,
+  "Standard-nested"=>errH1L2_nest,"Functional-nested"=>errH1L2_fun_nest,
+  "Standard-sampling-nested"=>errH1L2_sampl_nest,
+  "Functional-sampling-nested"=>errH1L2_fun_sampl_nest)
+  times = Dict("Standard"=>t,"Functional"=>t_fun,
+  "Standard-sampling"=>t_sampl,"Functional-sampling"=>t_fun_sampl,
+  "Standard-nested"=>t_nest,"Functional-nested"=>t_fun_nest,
+  "Standard-sampling-nested"=>t_sampl_nest,
+  "Functional-sampling-nested"=>t_fun_sampl_nest)
+  tols = Dict("Standard"=>ϵ,"Functional"=>ϵ_fun,
+  "Standard-sampling"=>ϵ_sampl,"Functional-sampling"=>ϵ_fun_sampl,
+  "Standard-nested"=>ϵ_nest,"Functional-nested"=>ϵ_fun_nest,
+  "Standard-sampling-nested"=>ϵ_sampl_nest,
+  "Functional-sampling-nested"=>ϵ_fun_sampl_nest)
+
+  plots_dir = joinpath(root,"plots")
+  create_dir(plots_dir)
+
+  for (key, val) in errors
+    ϵ = parse.(Float64,tols[key])
+    xvals = hcat(ϵ,ϵ)'
+    yvals = hcat(val,ϵ)'
+    labels = hcat(["H¹-l² err"],["ϵ"])'
+    generate_and_save_plot(xvals,yvals,"Average H¹-l² err, method: "*key,
+    ["H¹-l² err","ϵ"],"ϵ","",plots_dir,true,true;var="err_"*key,
+    modes=vcat(["lines"],["lines"]))
+  end
+  for (key, val) in times
+    generate_and_save_plot(val,"Average online time, method: "*key,tols[key],
+    "","",plots_dir,false,true;var="time_"*key,modes=["scatter"])
+  end
+
+  function get_paths(dir::String)::Tuple
+    path_to_err = joinpath(dir,
+      "results/Params_95_96_97_98_99_100/H1L2_err.csv")
+    path_to_t = joinpath(dir,
+      "results/Params_95_96_97_98_99_100/times.csv")
+    path_to_err,path_to_t
+  end
+
+  function get_tolerances(dir::String)::Vector
+    if occursin("-3",dir)
+      return ["1e-3"]
+    elseif occursin("-4",dir)
+      return ["1e-4"]
+    elseif occursin("-5",dir)
+      return ["1e-5"]
+    else
+      error("Unrecognized tolerance")
+    end
+  end
+
+  function check_if_fun(dir::String,tol,tol_fun,err,err_fun,time,time_fun)
+    path_to_err,path_to_t = get_paths(dir)
+    if ispath(path_to_err) && ispath(path_to_t)
+      if occursin("fun",dir)
+        append!(tol_fun,get_tolerances(dir))
+        append!(err_fun,load_CSV(path_to_err)[1])
+        append!(time_fun,load_CSV(path_to_t)[1,1])
+      else
+        append!(tol,get_tolerances(dir))
+        append!(err,load_CSV(path_to_err)[1])
+        append!(time,load_CSV(path_to_t)[1,1])
+      end
+    end
+    return tol,tol_fun,err,err_fun,time,time_fun
+  end
 
 end

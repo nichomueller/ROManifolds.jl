@@ -27,10 +27,12 @@ function get_Aₙ(RBInfo::Info, RBVars::PoissonSPGRB) :: Vector
     @info "Importing reduced affine stiffness matrix"
     Aₙ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "Aₙ.csv"))
     RBVars.Aₙ = reshape(Aₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)
+    Qᵃ = sqrt(size(RBVars.Aₙ)[3])
+    @assert floor(Qᵃ) == Qᵃ "Qᵃ should be the square root of an Int64"
+    RBVars.Qᵃ = Int(Qᵃ)
     @info "S-PGRB: fetching the matrix AΦᵀPᵤ⁻¹"
     AΦᵀPᵤ⁻¹ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
     RBVars.AΦᵀPᵤ⁻¹ = reshape(AΦᵀPᵤ⁻¹,RBVars.nₛᵘ,RBVars.Nₛᵘ,:)
-    RBVars.Qᵃ = size(RBVars.Aₙ)[3]
     return []
   else
     @info "Failed to import the reduced affine stiffness matrix: must build it"
@@ -68,10 +70,8 @@ function assemble_affine_matrices(RBInfo::Info, RBVars::PoissonSPGRB, var::Strin
     @info "SPGRB: affine component number 1, matrix A"
     A = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "A.csv");
       convert_to_sparse = true)
-    RBVars.AΦᵀPᵤ⁻¹ = zeros(RBVars.nₛᵘ, RBVars.Nₛᵘ, RBVars.Qᵃ)
-    RBVars.Aₙ = zeros(RBVars.nₛᵘ, RBVars.nₛᵘ, RBVars.Qᵃ^2)
-    RBVars.AΦᵀPᵤ⁻¹[:,:,1] = (A * RBVars.Φₛᵘ)' * RBVars.Pᵤ⁻¹
-    RBVars.Aₙ[:,:,1] = RBVars.AΦᵀPᵤ⁻¹[:,:,1] * (A * RBVars.Φₛᵘ)
+    RBVars.AΦᵀPᵤ⁻¹ = reshape((A*RBVars.Φₛᵘ)'*RBVars.Pᵤ⁻¹,RBVars.nₛᵘ,RBVars.Nₛᵘ,1)
+    RBVars.Aₙ = reshape(RBVars.AΦᵀPᵤ⁻¹*(A*RBVars.Φₛᵘ),RBVars.nₛᵘ,RBVars.nₛᵘ,1)
   else
     error("Unrecognized variable to load")
   end
@@ -116,6 +116,58 @@ function assemble_MDEIM_matrices(RBInfo::Info, RBVars::PoissonSPGRB, var::String
 
 end
 
+function assemble_reduced_mat_MDEIM(
+  RBVars::PoissonSPGRB,
+  MDEIM_mat::Matrix,
+  row_idx::Vector)
+
+  Q = size(MDEIM_mat)[2]
+  r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
+  MatqΦ = zeros(RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q)
+  for j = 1:RBVars.S.Nₛᵘ
+    Mat_idx = findall(x -> x == j, r_idx)
+    MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.S.Φₛᵘ[c_idx[Mat_idx],:])'
+  end
+  MatqΦᵀPᵤ⁻¹ = zeros(RBVars.S.nₛᵘ,RBVars.S.Nₛᵘ,Q)
+  matrix_product!(MatqΦᵀPᵤ⁻¹,MatqΦ,Matrix(RBVars.S.Pᵤ⁻¹),transpose_A=true)
+  Matₙ = zeros(RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,Q^2)
+  for q₁ = 1:Q
+    for q₂ = 1:Q
+      @info "ST-PGRB: affine component number $((q₁-1)*RBVars.Qᵐ+q₂), matrix $var"
+      Matₙ[:,:,(q₁-1)*Q+q₂] = MatqΦᵀPᵤ⁻¹[:,:,q₁]*MatqΦ[:,:,q₂]
+    end
+  end
+
+  RBVars.S.Aₙ = Matₙ
+  RBVars.S.AΦᵀPᵤ⁻¹ = MatqΦᵀPᵤ⁻¹
+  RBVars.S.Qᵃ = Q
+
+end
+
+function assemble_reduced_mat_DEIM(
+  RBVars::PoissonSTPGRB,
+  DEIM_mat::Matrix,
+  var::String)
+
+  Q = size(DEIM_mat)[2]
+  MVecₙ = zeros(RBVars.S.nₛᵘ,1,RBVars.Qᵐ*Q)
+  matrix_product_vec!(MVecₙ,RBVars.MΦᵀPᵤ⁻¹,DEIM_mat)
+  MVecₙ = reshape(MVecₙ,:,RBVars.Qᵐ*Q)
+  AVecₙ = zeros(RBVars.S.nₛᵘ,1,RBVars.Qᵐ*Q)
+  matrix_product_vec!(AVecₙ,RBVars.S.AΦᵀPᵤ⁻¹,DEIM_mat)
+  AVecₙ = reshape(AVecₙ,:,RBVars.Qᵃ*Q)
+  Vecₙ = hcat(MVecₙ,AVecₙ)
+
+  if var == "F"
+    RBVars.S.Fₙ = Vecₙ
+    RBVars.S.Qᶠ = Q
+  else var == "H"
+    RBVars.S.Hₙ = Vecₙ
+    RBVars.S.Qʰ = Q
+  end
+
+end
+
 function assemble_affine_vectors(RBInfo::Info, RBVars::PoissonSPGRB, var::String)
 
   @info "S-PGRB: running the DEIM offline phase on variable $var with $nₛ_DEIM snapshots"
@@ -125,42 +177,15 @@ function assemble_affine_vectors(RBInfo::Info, RBVars::PoissonSPGRB, var::String
     @info "Assembling affine reduced forcing term"
     F = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "F.csv"))
     Fₙ = zeros(RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qᶠ)
-    matrix_product!(Fₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(F,:,1))
+    matrix_product_vec!(Fₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(F,:,1))
     RBVars.Fₙ = reshape(Fₙ,:,RBVars.Qᵃ*RBVars.Qᶠ)
   elseif var == "H"
     RBVars.Qʰ = 1
     @info "Assembling affine reduced Neumann term"
     H = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "H.csv"))
     Hₙ = zeros(RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qʰ)
-    matrix_product!(Hₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(H,:,1))
+    matrix_product_vec!(Hₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(H,:,1))
     RBVars.Hₙ = reshape(Hₙ,:,RBVars.Qᵃ*RBVars.Qʰ)
-  else
-    error("Unrecognized variable to assemble")
-  end
-
-end
-
-function assemble_DEIM_vectors(RBInfo::Info, RBVars::PoissonSPGRB, var::String)
-
-  @info "SPGRB: forcing term is non-affine: running the DEIM offline phase on $nₛ_DEIM snapshots; A is affine"
-
-  DEIM_mat, DEIM_idx, _, _ = DEIM_offline(FEMSpace, RBInfo, var)
-  DEIMᵢ_mat = Matrix(DEIM_mat[DEIM_idx, :])
-  Q = size(DEIM_mat)[2]
-  varₙ = zeros(RBVars.nₛᵘ,1,RBVars.Qᵃ*Q)
-  matrix_product!(varₙ,RBVars.AΦᵀPᵤ⁻¹,DEIM_mat)
-  varₙ = reshape(varₙ,:,RBVars.Qᵃ*Q)
-
-  if var == "F"
-    RBVars.DEIMᵢ_F = DEIMᵢ_mat
-    RBVars.DEIM_idx_F = DEIM_idx
-    RBVars.Qᶠ = Q
-    RBVars.Fₙ = varₙ
-  elseif var == "H"
-    RBVars.DEIMᵢ_H = DEIMᵢ_mat
-    RBVars.DEIM_idx_H = DEIM_idx
-    RBVars.Qʰ = Q
-    RBVars.Hₙ = varₙ
   else
     error("Unrecognized variable to assemble")
   end
@@ -183,6 +208,22 @@ function save_affine_structures(RBInfo::Info, RBVars::PoissonSPGRB)
 
   end
 
+end
+
+function get_Q(RBInfo::Info, RBVars::PoissonSPGRB)
+  if RBVars.Qᵃ == 0
+    Qᵃ = sqrt(size(RBVars.Aₙ)[end])
+    @assert floor(Qᵃ) == Qᵃ "Qᵃ should be the square root of an Int64"
+    RBVars.Qᵃ = Int(Qᵃ)
+  end
+  if !RBInfo.build_Parametric_RHS
+    if RBVars.Qᶠ == 0
+      RBVars.Qᶠ = Int(size(RBVars.Fₙ)[end]/RBVars.Qᵃ)
+    end
+    if RBVars.Qʰ == 0
+      RBVars.Qʰ = Int(size(RBVars.Hₙ)[end]/RBVars.Qᵃ)
+    end
+  end
 end
 
 function build_Param_RHS(RBInfo::Info, RBVars::PoissonSPGRB, Param, θᵃ::Vector) :: Tuple

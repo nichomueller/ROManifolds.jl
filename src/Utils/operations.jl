@@ -36,7 +36,33 @@ function matrix_product!(
     A = permutedims(A,[2,1,3])
   end
   for q = 1:size(A)[3]
-    AB[:,:,q] = A[:,:,q]'*B
+    AB[:,:,q] = A[:,:,q]*B
+  end
+  AB
+end
+
+"""Computation of the standard matrix product between A, tensor of order 3,
+  and B, tensor of order 2. If transpose_A is true, then the first two dimensions
+  of A are permuted"""
+function matrix_product_vec!(
+    AB::Array, A::Array, B::Array; transpose_A=false)
+  @assert length(size(A)) == 3 && length(size(B)) == 2 || length(size(B)) == 3
+   "Only implemented tensor order 3 * tensor order 2 or 3"
+  if transpose_A
+    A = permutedims(A,[2,1,3])
+  end
+  if length(size(B)) == 2
+    for q₁ = 1:size(A)[end]
+      for q₂ = 1:size(B)[end]
+        AB[:,:,q₂+(q₁-1)*size(B)[end]] = A[:,:,q₁]*B[:,q₂]
+      end
+    end
+  else
+    for q₁ = 1:size(A)[end]
+      for q₂ = 1:size(B)[end]
+        AB[:,:,q₂+(q₁-1)*size(B)[end]] = A[:,:,q₁]*B[:,:,q₂]
+      end
+    end
   end
   AB
 end

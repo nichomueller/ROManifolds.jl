@@ -80,13 +80,58 @@ function set_operators(RBInfo::Info, ::PoissonSteady) ::Vector
   operators
 end
 
+function assemble_MDEIM_matrices(
+  RBInfo::Info,
+  RBVars::PoissonSteady,
+  var::String)
+
+  @info "The matrix $var is non-affine:
+    running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots"
+  if var == "A"
+    if isempty(RBVars.S.MDEIM_mat_A)
+      (RBVars.S.MDEIM_mat_A, RBVars.S.MDEIM_idx_A, RBVars.S.MDEIMᵢ_A,
+      RBVars.row_idx_A,RBVars.S.sparse_el_A) = MDEIM_offline(FEMSpace, RBInfo, "A")
+    end
+    assemble_reduced_mat_MDEIM(RBVars,RBVars.S.MDEIM_mat_A,RBVars.row_idx_A)
+  else
+    error("Unrecognized variable on which to perform MDEIM")
+  end
+
+end
+
+function assemble_DEIM_vectors(
+  RBInfo::Info,
+  RBVars::PoissonSteady,
+  var::String)
+
+  @info "The vector $var is non-affine:
+    running the DEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots"
+
+  if var == "F"
+    if isempty(RBVars.DEIM_mat_F)
+      RBVars.DEIM_mat_F, RBVars.DEIM_idx_F, RBVars.DEIMᵢ_F =
+        DEIM_offline(FEMSpace, RBInfo,"F")
+    end
+    assemble_reduced_mat_DEIM(RBVars,RBVars.DEIM_mat_F,"F")
+  elseif var == "H"
+    if isempty(RBVars.DEIM_mat_H)
+      RBVars.DEIM_mat_H, RBVars.DEIM_idx_H, RBVars.DEIMᵢ_H =
+        DEIM_offline(FEMSpace,RBInfo,"H")
+    end
+    assemble_reduced_mat_DEIM(RBVars,RBVars.DEIM_mat_H,"H")
+  else
+    error("Unrecognized variable on which to perform DEIM")
+  end
+
+end
+
 function save_M_DEIM_structures(RBInfo::Info, RBVars::PoissonSteady)
 
   list_M_DEIM = (RBVars.MDEIM_mat_A, RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A,
-    RBVars.sparse_el_A, RBVars.DEIM_mat_F, RBVars.DEIMᵢ_F, RBVars.DEIM_idx_F,
-    RBVars.DEIM_mat_H, RBVars.DEIMᵢ_H, RBVars.DEIM_idx_H)
-  list_names = ("MDEIM_mat_A", "MDEIMᵢ_A", "MDEIM_idx_A", "sparse_el_A",
-    "DEIM_mat_F", "DEIMᵢ_F", "DEIM_idx_F", "DEIM_mat_H", "DEIMᵢ_H", "DEIM_idx_H")
+    RBVars.row_idx_A, RBVars.sparse_el_A, RBVars.DEIM_mat_F, RBVars.DEIMᵢ_F,
+    RBVars.DEIM_idx_F, RBVars.DEIM_mat_H, RBVars.DEIMᵢ_H, RBVars.DEIM_idx_H)
+  list_names = ("MDEIM_mat_A","MDEIMᵢ_A","MDEIM_idx_A","row_idx_A","sparse_el_A",
+    "DEIM_mat_F","DEIMᵢ_F","DEIM_idx_F","DEIM_mat_H","DEIMᵢ_H","DEIM_idx_H")
   l_info_vec = [[l_idx,l_val] for (l_idx,l_val) in
     enumerate(list_M_DEIM) if !all(isempty.(l_val))]
 
@@ -108,39 +153,40 @@ function get_M_DEIM_structures(RBInfo::Info, RBVars::PoissonSteady) ::Vector
   if RBInfo.probl_nl["A"]
 
     if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MDEIMᵢ_A.csv"))
-      @info "Importing MDEIM offline structures, stiffness matrix"
+      @info "Importing MDEIM offline structures, A"
       RBVars.MDEIMᵢ_A = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
         "MDEIMᵢ_A.csv"))
       RBVars.MDEIM_idx_A = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
         "MDEIM_idx_A.csv"))[:]
+      RBVars.row_idx_A = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
+        "row_idx_A.csv"))[:]
       RBVars.sparse_el_A = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
         "sparse_el_A.csv"))[:]
       append!(operators, [])
     else
-      @info "Failed to import MDEIM offline structures, stiffness matrix: must build them"
+      @info "Failed to import MDEIM offline structures,
+        A: must build them"
       append!(operators, ["A"])
     end
 
   end
 
   if RBInfo.build_Parametric_RHS
-
     @info "Will assemble nonaffine reduced RHS exactly"
     return operators
-
   else
 
     if RBInfo.probl_nl["f"]
 
       if isfile(joinpath(RBInfo.paths.ROM_structures_path, "DEIMᵢ_F.csv"))
-        @info "Importing DEIM offline structures, forcing vector"
+        @info "Importing DEIM offline structures, F"
         RBVars.DEIMᵢ_F = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
           "DEIMᵢ_F.csv"))
         RBVars.DEIM_idx_F = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
           "DEIM_idx_F.csv"))[:]
         append!(operators, [])
       else
-        @info "Failed to import DEIM offline structures, forcing vector: must build them"
+        @info "Failed to import DEIM offline structures, F: must build them"
         append!(operators, ["F"])
       end
 
@@ -149,7 +195,7 @@ function get_M_DEIM_structures(RBInfo::Info, RBVars::PoissonSteady) ::Vector
     if RBInfo.probl_nl["h"]
 
       if isfile(joinpath(RBInfo.paths.ROM_structures_path, "DEIMᵢ_H.csv"))
-        @info "Importing DEIM offline structures, Neumann vector"
+        @info "Importing DEIM offline structures, H"
         RBVars.DEIMᵢ_H = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
           "DEIMᵢ_H.csv"))
         RBVars.DEIM_idx_H = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
@@ -157,7 +203,7 @@ function get_M_DEIM_structures(RBInfo::Info, RBVars::PoissonSteady) ::Vector
         append!(operators, [])
         return
       else
-        @info "Failed to import DEIM offline structures, Neumann vector: must build them"
+        @info "Failed to import DEIM offline structures, H: must build them"
         append!(operators, ["H"])
       end
 
@@ -172,11 +218,11 @@ end
 function get_Fₙ(RBInfo::Info, RBVars::RBProblem) :: Vector
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Fₙ.csv"))
-    @info "Importing reduced forcing vector"
+    @info "Importing Fₙ"
     RBVars.Fₙ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "Fₙ.csv"))
     return []
   else
-    @info "Failed to import the reduced forcing vector: must build it"
+    @info "Failed to import Fₙ: must build it"
     return ["F"]
   end
 
@@ -185,11 +231,11 @@ end
 function get_Hₙ(RBInfo::Info, RBVars::RBProblem) :: Vector
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Hₙ.csv"))
-    @info "Importing reduced affine Neumann data vector"
+    @info "Importing Hₙ"
     RBVars.Hₙ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "Hₙ.csv"))
     return []
   else
-    @info "Failed to import the reduced affine Neumann data vector: must build it"
+    @info "Failed to import Hₙ: must build it"
     return ["H"]
   end
 
@@ -233,29 +279,24 @@ function assemble_offline_structures(
     operators = set_operators(RBInfo, RBVars)
   end
 
-  assembly_time = 0
-  if "A" ∈ operators || "F" ∈ operators || "H" ∈ operators
-    assembly_time += @elapsed begin
+  RBVars.offline_time += @elapsed begin
+    if "A" ∈ operators || "F" ∈ operators || "H" ∈ operators
       if !RBInfo.probl_nl["A"]
         assemble_affine_matrices(RBInfo, RBVars, "A")
       else
         assemble_MDEIM_matrices(RBInfo, RBVars, "A")
       end
     end
-  end
 
-  if "F" ∈ operators
-    assembly_time += @elapsed begin
+    if "F" ∈ operators
       if !RBInfo.probl_nl["f"]
         assemble_affine_vectors(RBInfo, RBVars, "F")
       else
         assemble_DEIM_vectors(RBInfo, RBVars, "F")
       end
     end
-  end
 
-  if "H" ∈ operators
-    assembly_time += @elapsed begin
+    if "H" ∈ operators
       if !RBInfo.probl_nl["h"]
         assemble_affine_vectors(RBInfo, RBVars, "H")
       else
@@ -263,7 +304,6 @@ function assemble_offline_structures(
       end
     end
   end
-  RBVars.offline_time += assembly_time
 
   save_affine_structures(RBInfo, RBVars)
   save_M_DEIM_structures(RBInfo, RBVars)
@@ -274,7 +314,7 @@ function get_system_blocks(
   RBInfo::Info,
   RBVars::RBProblem,
   LHS_blocks::Array,
-  RHS_blocks::Array) :: Vector
+  RHS_blocks::Array) ::Vector
 
   if !RBInfo.import_offline_structures
     return ["LHS", "RHS"]
@@ -289,7 +329,6 @@ function get_system_blocks(
       break
     end
   end
-
   for i = RHS_blocks
     RHSₙi = "RHSₙ" * string(i) * ".csv"
     if !isfile(joinpath(RBInfo.paths.ROM_structures_path, RHSₙi * ".csv"))
@@ -297,7 +336,6 @@ function get_system_blocks(
       break
     end
   end
-
   if "LHS" ∉ operators
     for i = LHS_blocks
       LHSₙi = "LHSₙ" * string(i) * ".csv"
@@ -307,7 +345,6 @@ function get_system_blocks(
       RBVars.nᵘ = size(RBVars.LHSₙ[i])[1]
     end
   end
-
   if "RHS" ∉ operators
     for i = RHS_blocks
       RHSₙi = "RHSₙ" * string(i) * ".csv"
@@ -320,6 +357,27 @@ function get_system_blocks(
 
   operators
 
+end
+
+function save_system_blocks(
+  RBInfo::Info,
+  RBVars::RBProblem,
+  LHS_blocks::Array,
+  RHS_blocks::Array,
+  operators::Vector)
+
+  if !RBInfo.probl_nl["A"] && "LHS" ∈ operators
+    for i = LHS_blocks
+      LHSₙi = "LHSₙ" * string(i) * ".csv"
+      save_CSV(RBVars.LHSₙ[i],joinpath(RBInfo.paths.ROM_structures_path, LHSₙi))
+    end
+  end
+  if !RBInfo.probl_nl["f"] && !RBInfo.probl_nl["h"] && "RHS" ∈ operators
+    for i = RHS_blocks
+      RHSₙi = "RHSₙ" * string(i) * ".csv"
+      save_CSV(RBVars.RHSₙ[i],joinpath(RBInfo.paths.ROM_structures_path, RHSₙi))
+    end
+  end
 end
 
 function get_θᵃ(RBInfo::Info, RBVars::PoissonSteady, Param) ::Array
@@ -360,73 +418,67 @@ function initialize_RB_system(RBVars::RBProblem)
   RBVars.RHSₙ = Matrix{Float64}[]
 end
 
-function get_Q(RBInfo::Info, RBVars::PoissonSteady)
-  if RBVars.Qᵃ == 0
-    RBVars.Qᵃ = size(RBVars.Aₙ)[end]
-  end
-  if !RBInfo.build_Parametric_RHS
-    if RBVars.Qᶠ == 0
-      RBVars.Qᶠ = size(RBVars.Fₙ)[end]
-    end
-    if RBVars.Qʰ == 0
-      RBVars.Qʰ = size(RBVars.Hₙ)[end]
-    end
-  end
+function initialize_online_time(RBVars::RBProblem)
+  RBVars.online_time = 0.0
 end
 
 function assemble_online_structure(θ::Array, Mat::Array) ::Array
   Mat_shape = size(Mat)
   Mat = reshape(Mat,:,Mat_shape[end])
-  reshape(Mat*θ,Mat_shape[1:end-1])
+  if length(size(θ)) == 2 && size(θ)[2] > 1
+    return reshape(Mat*θ,(Mat_shape[1:end-1]...,size(θ)[2]))
+  else
+    return reshape(Mat*θ,Mat_shape[1:end-1])
+  end
 end
 
 function get_RB_system(RBInfo::Info, RBVars::PoissonSteady, Param)
 
   initialize_RB_system(RBVars)
-  get_Q(RBInfo, RBVars)
-  blocks = [1]
-  operators = get_system_blocks(RBInfo, RBVars, blocks, blocks)
+  initialize_online_time(RBVars)
 
-  @info "Preparing the RB system: fetching reduced LHS"
-  θᵃ, θᶠ, θʰ = get_θ(RBInfo, RBVars, Param)
+  RBVars.online_time = @elapsed begin
+    get_Q(RBInfo, RBVars)
+    blocks = [1]
+    operators = get_system_blocks(RBInfo, RBVars, blocks, blocks)
 
-  if "LHS" ∈ operators
-    push!(RBVars.LHSₙ,assemble_online_structure(θᵃ, RBVars.Aₙ))
-  end
+    θᵃ, θᶠ, θʰ = get_θ(RBInfo, RBVars, Param)
 
-  if "RHS" ∈ operators
-    if !RBInfo.build_Parametric_RHS
-      @info "Preparing the RB system: fetching reduced RHS"
-      Fₙ_μ = assemble_online_structure(θᶠ, RBVars.Fₙ)
-      Hₙ_μ = assemble_online_structure(θʰ, RBVars.Hₙ)
-      push!(RBVars.RHSₙ, reshape(Fₙ_μ+Hₙ_μ,:,1))
-    else
-      @info "Preparing the RB system: assembling reduced RHS exactly"
-      Fₙ_μ, Hₙ_μ = build_Param_RHS(RBInfo, RBVars, Param, θᵃ)
-      push!(RBVars.RHSₙ, reshape(Fₙ_μ+Hₙ_μ,:,1))
+    if "LHS" ∈ operators
+      @info "Assembling reduced LHS"
+      push!(RBVars.LHSₙ,assemble_online_structure(θᵃ, RBVars.Aₙ))
+    end
+
+    if "RHS" ∈ operators
+      if !RBInfo.build_Parametric_RHS
+        @info "Assembling reduced RHS"
+        Fₙ_μ = assemble_online_structure(θᶠ, RBVars.Fₙ)
+        Hₙ_μ = assemble_online_structure(θʰ, RBVars.Hₙ)
+        push!(RBVars.RHSₙ, reshape(Fₙ_μ+Hₙ_μ,:,1))
+      else
+        @info "Assembling reduced RHS exactly"
+        Fₙ_μ, Hₙ_μ = build_Param_RHS(RBInfo, RBVars, Param, θᵃ)
+        push!(RBVars.RHSₙ, reshape(Fₙ_μ+Hₙ_μ,:,1))
+      end
     end
   end
+
+  save_system_blocks(RBInfo,RBVars,blocks,blocks,operators)
 
 end
 
 function solve_RB_system(RBInfo::Info, RBVars::PoissonSteady, Param)
-
   get_RB_system(RBInfo, RBVars, Param)
-
   @info "Solving RB problem via backslash"
   @info "Condition number of the system's matrix: $(cond(RBVars.LHSₙ[1]))"
-  RBVars.uₙ = zeros(RBVars.nₛᵘ)
-  RBVars.uₙ = RBVars.LHSₙ[1] \ RBVars.RHSₙ[1]
-
+  RBVars.online_time += @elapsed begin
+    RBVars.uₙ = RBVars.LHSₙ[1] \ RBVars.RHSₙ[1]
+  end
 end
 
 function reconstruct_FEM_solution(RBVars::PoissonSteady)
-
-
   @info "Reconstructing FEM solution from the newly computed RB one"
-
   RBVars.ũ = RBVars.Φₛᵘ * RBVars.uₙ
-
 end
 
 function offline_phase(RBInfo::Info, RBVars::PoissonSteady)
@@ -457,7 +509,7 @@ function offline_phase(RBInfo::Info, RBVars::PoissonSteady)
 
   if RBInfo.import_offline_structures
     operators = get_offline_structures(RBInfo, RBVars)
-    if "A" ∈ operators || "F" ∈ operators || "H" ∈ operators
+    if !isempty(operators)
       assemble_offline_structures(RBInfo, RBVars, operators)
     end
   else
@@ -486,9 +538,7 @@ function online_phase(RBInfo::Info, RBVars::PoissonSteady, μ, Param_nbs)
 
     uₕ_test = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, nb]
 
-    online_time = @elapsed begin
-      solve_RB_system(RBInfo, RBVars, Param)
-    end
+    solve_RB_system(RBInfo, RBVars, Param)
     reconstruction_time = @elapsed begin
       reconstruct_FEM_solution(RBVars)
     end
