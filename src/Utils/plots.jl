@@ -18,12 +18,16 @@ end
 
 function generate_and_save_plot(xval::Array, yval::Array, title::String,
   label::Vector, xlab::String, ylab::String, save_path::String,
-  semilogx=false, semilogy=true; var="u",modes=["lines"])
+  semilogx=false, semilogy=true; var="u",selected_style=["lines"])
 
   @assert size(xval) == size(yval) "Invalid plot: provide an input with the same
     x-values as its y-values"
-  @assert length(size(xval)) == 2 "Invalid plot: provide an input which is at
+  @assert length(size(xval)) <= 2 "Invalid plot: provide an input which is at
     most a matrix"
+  if length(size(xval)) == 1
+    xval = reshape(xval,1,:)
+    yval = reshape(yval,1,:)
+  end
 
   if !semilogx && !semilogy
     layout = Layout(title=title,xaxis_title=xlab,yaxis_title=ylab)
@@ -39,9 +43,9 @@ function generate_and_save_plot(xval::Array, yval::Array, title::String,
   end
 
   n_traces = size(xval)[1]
-  traces = [scatter(x=xval[i,:],y=yval[i,:],mode=modes[i],name=label[i],
+  traces = [scatter(x=xval[i,:],y=yval[i,:],mode=selected_style[i],name=label[i],
     line=attr(width=4)) for i=1:n_traces]
-  p = plot(trace,layout)
+  p = plot(traces,layout)
   savefig(p, joinpath(save_path, string(var)*".eps"))
 
 end

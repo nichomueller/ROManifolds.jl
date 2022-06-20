@@ -38,3 +38,11 @@ function label_sorted_elems(vec::Vector) ::Vector
   vecnew = unique(sort(copy(vec)))
   Int.(indexin(vec,vecnew))
 end
+
+function Base.argmax(v::Vector,n_val=nothing)
+  if isnothing(n_val)
+    n_val = length(v)
+  end
+  s = sort(v)
+  idx = Int.(indexin(s,v))[1:n_val]
+end

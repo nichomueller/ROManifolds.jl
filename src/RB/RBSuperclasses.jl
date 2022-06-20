@@ -83,6 +83,7 @@ DEIM_idx_H = Vector{Int64}[]
 
 offline_time = 0.0
 online_time = 0.0
+in_adaptive_loop = false
 
 mutable struct PoissonSGRB <: PoissonSteady
   Sᵘ::Array; Φₛᵘ::Array; ũ::Array; uₙ::Array; û::Array; Aₙ::Array; Fₙ::Array;
@@ -125,14 +126,14 @@ end
 mutable struct PoissonSTGRB <: PoissonUnsteady
   S::PoissonSGRB; Φₜᵘ::Array; Mₙ::Array; MDEIM_mat_M::Array; MDEIMᵢ_M::Array;
   MDEIM_idx_M::Array; row_idx_M::Array; sparse_el_M::Array;
-  Nₜ::Int64; Nᵘ::Int64; nₜᵘ::Int64; nᵘ::Int64; Qᵐ::Int64; θᵐ::Array
+  Nₜ::Int64; Nᵘ::Int64; nₜᵘ::Int64; nᵘ::Int64; Qᵐ::Int64; θᵐ::Array; in_adaptive_loop::Bool
 end
 
 mutable struct PoissonSTPGRB <: PoissonUnsteady
   S::PoissonSPGRB; Φₜᵘ::Array; Mₙ::Array; MDEIM_mat_M::Array; MDEIMᵢ_M::Array;
   MDEIM_idx_M::Array; row_idx_M::Array; sparse_el_M::Array;
   MAₙ::Array; MΦ::Array; MΦᵀPᵤ⁻¹::Array; Nₜ::Int64; Nᵘ::Int64; nₜᵘ::Int64;
-  nᵘ::Int64; Qᵐ::Int64; θᵐ::Array
+  nᵘ::Int64; Qᵐ::Int64; θᵐ::Array; in_adaptive_loop::Bool
 end
 
 function setup_PoissonSTGRB(::NTuple{3,Int})::PoissonSTGRB
@@ -141,7 +142,7 @@ function setup_PoissonSTGRB(::NTuple{3,Int})::PoissonSTGRB
   MDEIM_mat_A, MDEIMᵢ_A, MDEIM_idx_A, row_idx_A, sparse_el_A, DEIM_mat_F, DEIMᵢ_F,
   DEIM_idx_F, DEIM_mat_H, DEIMᵢ_H, DEIM_idx_H, Nₛᵘ, nₛᵘ, Qᵃ, Qᶠ, Qʰ, θᵃ, θᶠ, θʰ,
   offline_time, online_time), Φₜᵘ, Mₙ, MDEIM_mat_M, MDEIMᵢ_M, MDEIM_idx_M,
-  row_idx_M, sparse_el_M, Nₜ, Nᵘ, nₜᵘ, nᵘ, Qᵐ, θᵐ)
+  row_idx_M, sparse_el_M, Nₜ, Nᵘ, nₜᵘ, nᵘ, Qᵐ, θᵐ, in_adaptive_loop)
 
 end
 
@@ -152,7 +153,7 @@ function setup_PoissonSTPGRB(::NTuple{4,Int})::PoissonSTPGRB
   DEIMᵢ_F, DEIM_idx_F, DEIM_mat_H, DEIMᵢ_H, DEIM_idx_H, Nₛᵘ, nₛᵘ, Qᵃ, Qᶠ, Qʰ, θᵃ,
   θᶠ, θʰ, offline_time, online_time, Pᵤ⁻¹, AΦᵀPᵤ⁻¹), Φₜᵘ, Mₙ, MDEIM_mat_M,
   MDEIMᵢ_M, MDEIM_idx_M, row_idx_M, sparse_el_M, MAₙ, MΦ, MΦᵀPᵤ⁻¹, Nₜ, Nᵘ,
-  nₜᵘ, nᵘ, Qᵐ, θᵐ)
+  nₜᵘ, nᵘ, Qᵐ, θᵐ, in_adaptive_loop)
 
 end
 
@@ -177,7 +178,7 @@ function setup_StokesSTGRB(::NTuple{5,Int})::StokesSTGRB
   LHSₙ, RHSₙ, MDEIM_mat_A, MDEIMᵢ_A, MDEIM_idx_A, row_idx_A, sparse_el_A,
   DEIM_mat_F, DEIMᵢ_F, DEIM_idx_F, DEIM_mat_H, DEIMᵢ_H, DEIM_idx_H, Nₛᵘ, nₛᵘ, Qᵃ,
   Qᶠ, Qʰ, θᵃ, θᶠ, θʰ, offline_time, online_time), Φₜᵘ, Mₙ, MDEIM_mat_M, MDEIMᵢ_M,
-  MDEIM_idx_M, row_idx_M, sparse_el_M, Nₜ, Nᵘ, nₜᵘ, nᵘ, Qᵐ, θᵐ), Sᵖ, Φₛᵖ, Φₜᵖ, p̃,
+  MDEIM_idx_M, row_idx_M, sparse_el_M, Nₜ, Nᵘ, nₜᵘ, nᵘ, Qᵐ, θᵐ, in_adaptive_loop), Sᵖ, Φₛᵖ, Φₜᵖ, p̃,
   pₙ, p̂, Bₙ, Xᵘ, Xᵖ, Xᵖ₀, Nₛᵖ, Nᵖ, nₛᵖ, nₛˡ, nₜᵖ, nᵖ)
 
 end
@@ -217,7 +218,7 @@ struct ROMInfoSteady <: SteadyInfo
   save_results::Bool
 end
 
-struct ROMInfoUnsteady <: UnsteadyInfo
+mutable struct ROMInfoUnsteady <: UnsteadyInfo
   probl_nl::Dict
   case::Int
   paths::Function

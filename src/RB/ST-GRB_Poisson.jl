@@ -409,29 +409,3 @@ function get_θₛₜ(RBInfo::Info, RBVars::PoissonSTGRB, Param) ::Tuple
   return θᵐ, θᵃ, θᶠ, θʰ
 
 end
-
-function adaptive_cycle_offline(
-  RBInfo::Info,
-  RBVars::PoissonUnsteady,
-  mean_pointwise_err::Matrix,
-  n_adaptive=[5,5])
-
-  sᵢ = argmax(abs.(mean_pointwise_err),dims=1)
-  tᵢ = argmax(abs.(mean_pointwise_err),dims=2)
-  ind_s = [sᵢ[i][1] for i=1:n_adaptive[1]]
-  ind_t = [tᵢ[i][2] for i=1:n_adaptive[2]]
-  Sᵘ = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
-      DataFrame))[:, 1:RBVars.Nₜ]
-  Φₛᵘ_new = Sᵘ[:,ind_s]
-  Φₜᵘ_new = Sᵘ[ind_t,:]
-  Φₛᵘ_old = RBVars.Φₛᵘ
-  Φₜᵘ_old = RBVars.Φₜᵘ
-  RBVars.Φₛᵘ = Φₛᵘ_new
-  RBVars.Φₜᵘ = Φₜᵘ_new
-  assemble_offline_structures(RBInfo, RBVars)
-  RBVars.Φₛᵘ = hcat(Φₛᵘ_old,RBVars.Φₛᵘ)
-  RBVars.Φₜᵘ = hcat(Φₜᵘ_old,RBVars.Φₜᵘ)
-
-  loop_on_params(RBInfo,RBVars,μ,param_nbs)
-
-end

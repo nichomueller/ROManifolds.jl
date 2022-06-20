@@ -117,13 +117,9 @@ end
 
 function compute_errors(uₕ::Matrix, RBVars::RBUnsteadyProblem, norm_matrix = nothing)
 
-  H1_err = zeros(RBVars.Nₜ)
-  H1_sol = zeros(RBVars.Nₜ)
-
-  for i = 1:RBVars.Nₜ
-    H1_err[i] = mynorm(uₕ[:, i] - RBVars.S.ũ[:, i], norm_matrix)
-    H1_sol[i] = mynorm(uₕ[:, i], norm_matrix)
-  end
+  err = abs.(RBVars.S.ũ-uₕ)
+  H1_err = diag(err'*Matrix(norm_matrix)*err)
+  H1_sol = diag(uₕ'*Matrix(norm_matrix)*uₕ)
 
   return H1_err ./ H1_sol, norm(H1_err) / norm(H1_sol)
 

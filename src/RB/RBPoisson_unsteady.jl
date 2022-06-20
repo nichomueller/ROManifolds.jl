@@ -13,7 +13,7 @@ function get_snapshot_matrix(RBInfo::Info, RBVars::PoissonUnsteady)
     @info "Importing the snapshot matrix for field u,
       number of snapshots considered: $(RBInfo.nₛ)"
     Sᵘ = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
-      DataFrame))[:, 1:(RBInfo.nₛ*RBVars.Nₜ)]
+      DataFrame))[:, 1:RBInfo.nₛ*RBVars.Nₜ]
   end
 
   RBVars.S.Sᵘ = Sᵘ
@@ -505,7 +505,7 @@ function loop_on_params(
     @info "Relative reconstruction H1-L2 error: $H1_L2_err_nb (snapshot number $nb)"
   end
   return (ũ_μ,uₙ_μ,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,
-  mean_online_time,mean_reconstruction_time)
+    mean_online_time,mean_reconstruction_time)
 end
 
 function online_phase(
@@ -518,12 +518,12 @@ function online_phase(
   (ũ_μ,uₙ_μ,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,
     mean_online_time,mean_reconstruction_time) =
     loop_on_params(RBInfo, RBVars, μ, param_nbs)
-
-  adaptive_loop = false
+  adaptive_loop = true
   if adaptive_loop
+    #while maximum(abs.(mean_pointwise_err)) > RBInfo.ϵₜ
     (ũ_μ,uₙ_μ,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,
       mean_online_time,mean_reconstruction_time) =
-      adaptive_loop_on_params(RBInfo,RBVars,mean_pointwise_err)
+      adaptive_loop_on_params(RBInfo,RBVars,mean_pointwise_err,μ)
   end
 
   string_param_nbs = "Params"
@@ -620,6 +620,49 @@ function post_process(RBInfo::UnsteadyInfo, d::Dict)
       var="L2_L2_err")
 
   end
+
+end
+
+function adaptive_loop_on_params(
+  RBInfo::Info,
+  RBVars::PoissonUnsteady,
+  mean_pointwise_err::Matrix,
+  μ::Matrix,
+  n_adaptive=nothing)
+
+  if isnothing(n_adaptive)
+    nₛᵘ_add = floor(Int64,RBVars.S.nₛᵘ*0.1)
+    nₜᵘ_add = floor(Int64,RBVars.nₜᵘ*0.1)
+    n_adaptive = maximum(hcat([1,1],[nₛᵘ_add,nₜᵘ_add]),dims=2)
+  end
+
+  @info "Running adaptive cycle: adding $n_adaptive temporal and spatial bases,
+    respectively"
+
+  space_err = diag(mean_pointwise_err*I(RBVars.Nₜ)*mean_pointwise_err')
+  time_err = diag(mean_pointwise_err'*Matrix(RBVars.S.Xᵘ₀)*mean_pointwise_err)
+  ind_s = argmax(abs.(space_err),n_adaptive[1])
+  ind_t = argmax(abs.(time_err),n_adaptive[2])
+
+  if isempty(RBVars.S.Sᵘ)
+    Sᵘ = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
+      DataFrame))[:,1:RBInfo.nₛ*RBVars.Nₜ]
+  else
+    Sᵘ = RBVars.S.Sᵘ
+  end
+  Sᵘ = reshape(sum(reshape(Sᵘ,RBVars.S.Nₛᵘ,RBVars.Nₜ,:),dims=3),RBVars.S.Nₛᵘ,:)
+
+  Φₛᵘ_new = Matrix(qr(Sᵘ[:,ind_t]).Q)[:,1:n_adaptive[2]]
+  Φₜᵘ_new = Matrix(qr(Sᵘ[ind_s,:]').Q)[:,1:n_adaptive[1]]
+  RBVars.S.nₛᵘ += n_adaptive[2]
+  RBVars.nₜᵘ += n_adaptive[1]
+
+  RBVars.S.Φₛᵘ = Matrix(qr(hcat(RBVars.S.Φₛᵘ,Φₛᵘ_new)).Q)[:,1:RBVars.S.nₛᵘ]
+  RBVars.Φₜᵘ = Matrix(qr(hcat(RBVars.Φₜᵘ,Φₜᵘ_new)).Q)[:,1:RBVars.nₜᵘ]
+  RBInfo.save_offline_structures = false
+  assemble_offline_structures(RBInfo, RBVars)
+
+  loop_on_params(RBInfo,RBVars,μ,param_nbs)
 
 end
 
