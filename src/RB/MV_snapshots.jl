@@ -138,11 +138,11 @@ function standard_MDEIM(
     else
       error("Run MDEIM on A or M only")
     end
-    compressed_snapsₖ,Σ = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
+    compressed_snapsₖ,Σ = POD(snapsₖ, RBInfo.ϵₛ)
     if k == 1
       snaps = compressed_snapsₖ
     else
-      snaps_POD,Σ = M_DEIM_POD(hcat(snaps, compressed_snapsₖ), RBInfo.ϵₛ)
+      snaps_POD,Σ = POD(hcat(snaps, compressed_snapsₖ), RBInfo.ϵₛ)
       snaps = snaps_POD
     end
   end
@@ -440,12 +440,11 @@ function standard_DEIM(
     if k == 1
       snaps = compressed_snapsₖ
     else
-      snaps = hcat(snaps, compressed_snapsₖ)
+      snaps_POD,Σ = M_DEIM_POD(hcat(snaps, compressed_snapsₖ), RBInfo.ϵₛ)
+      snaps = snaps_POD
     end
-    snaps_POD,_ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
-    snaps = snaps_POD
   end
-  snaps,Σ
+  return snaps,Σ
 end
 
 function standard_DEIM_sampling(
@@ -506,7 +505,7 @@ function functional_DEIM(
       Θmat = hcat(Θmat, compressed_Θₖ)
     end
   end
-  Θmat,_ = M_DEIM_POD(Θmat,RBInfo.ϵₛ)
+  Θmat,_ = POD(Θmat,RBInfo.ϵₛ)
   Q = size(Θmat)[2]
   snaps = zeros(FEMSpace.Nₛᵘ,Q)
   for q = 1:Q
@@ -547,7 +546,7 @@ function functional_DEIM_sampling(
       global params = hcat(params, paramsₖ)
     end
   end
-  Θmat,_ = M_DEIM_POD(params, RBInfo.ϵₛ^2)
+  Θmat,_ = M_DEIM_POD(params, RBInfo.ϵₛ)
   Q = size(Θmat)[2]
   snaps = zeros(FEMSpace.Nₛᵘ,Q)
   for q = 1:Q
