@@ -111,7 +111,7 @@ function POD(S, ϵ = 1e-5, X = nothing)
   if !isnothing(X)
     return Matrix((L' \ U[:, 1:N])[invperm(H.p), :]), Σ
   else
-    return U[:, 1:N], Σ
+    return U[:,1:N], Σ
   end
 
 end

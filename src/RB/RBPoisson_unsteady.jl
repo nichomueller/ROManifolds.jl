@@ -518,7 +518,7 @@ function online_phase(
   (ũ_μ,uₙ_μ,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,
     mean_online_time,mean_reconstruction_time) =
     loop_on_params(RBInfo, RBVars, μ, param_nbs)
-  adaptive_loop = true
+  adaptive_loop = false
   if adaptive_loop
     #while maximum(abs.(mean_pointwise_err)) > RBInfo.ϵₜ
     (ũ_μ,uₙ_μ,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,

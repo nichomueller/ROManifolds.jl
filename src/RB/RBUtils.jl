@@ -127,22 +127,66 @@ function compute_MDEIM_error(FEMSpace::FEMProblem, RBInfo::Info, RBVars::RBProbl
 
 end
 
-function post_process()
-  paths = FEM_paths(root, problem_type, problem_name, mesh_name, case)
-  root = paths.current_test
+function post_process(root::String)
+
+  @info "Exporting plots and tables"
+
+  function get_paths(dir::String)::Tuple
+    path_to_err = joinpath(dir,
+      "results/Params_95_96_97_98_99_100/H1L2_err.csv")
+    path_to_t = joinpath(dir,
+      "results/Params_95_96_97_98_99_100/times.csv")
+    path_to_err,path_to_t
+  end
+
+  function get_tolerances(dir::String)::Vector
+    if occursin("-3",dir)
+      return ["1e-3"]
+    elseif occursin("-4",dir)
+      return ["1e-4"]
+    elseif occursin("-5",dir)
+      return ["1e-5"]
+    else
+      return []
+    end
+  end
+
+  function check_if_fun(dir::String,tol,tol_fun,err,err_fun,time,time_fun)
+    path_to_err,path_to_t = get_paths(dir)
+    if ispath(path_to_err) && ispath(path_to_t)
+      ϵ = get_tolerances(dir)
+      if !isempty(ϵ)
+        if occursin("fun",dir)
+          append!(tol_fun,ϵ)
+          append!(err_fun,load_CSV(path_to_err)[1])
+          cur_time = load_CSV(path_to_t)
+          append!(time_fun["on"],cur_time[findall(x->x.=="on_time",cur_time[:,2]),1])
+          append!(time_fun["off"],cur_time[findall(x->x.=="off_time",cur_time[:,2]),1])
+        else
+          append!(tol,ϵ)
+          append!(err,load_CSV(path_to_err)[1])
+          cur_time = load_CSV(path_to_t)
+          append!(time["on"],cur_time[findall(x->x.=="on_time",cur_time[:,2]),1])
+          append!(time["off"],cur_time[findall(x->x.=="off_time",cur_time[:,2]),1])
+        end
+      end
+    end
+    return tol,tol_fun,err,err_fun,time,time_fun
+  end
+
   root_subs = get_all_subdirectories(root)
   filter!(el->!occursin("FEM_data",el),root_subs)
 
   (ϵ,ϵ_fun,ϵ_sampl,ϵ_fun_sampl,ϵ_nest,ϵ_fun_nest,ϵ_sampl_nest,ϵ_fun_sampl_nest) =
     (String[],String[],String[],String[],String[],String[],String[],String[])
-  t,errH1L2 = Float64[],Float64[]
-  t_sampl,errH1L2_sampl = Float64[],Float64[]
-  t_fun,errH1L2_fun = Float64[],Float64[]
-  t_fun_sampl,errH1L2_fun_sampl = Float64[],Float64[]
-  t_nest,errH1L2_nest = Float64[],Float64[]
-  t_sampl_nest,errH1L2_sampl_nest = Float64[],Float64[]
-  t_fun_nest,errH1L2_fun_nest = Float64[],Float64[]
-  t_fun_sampl_nest,errH1L2_fun_sampl_nest = Float64[],Float64[]
+  (errH1L2,errH1L2_fun,errH1L2_sampl,errH1L2_fun_sampl,errH1L2_nest,
+    errH1L2_fun_nest,errH1L2_sampl_nest,errH1L2_fun_sampl_nest) =
+    (Float64[],Float64[],Float64[],Float64[],Float64[],Float64[],Float64[],Float64[])
+  (t,t_fun,t_sampl,t_fun_sampl,t_nest,t_fun_nest,t_sampl_nest,t_fun_sampl_nest) =
+    (Dict("on"=>Float64[],"off"=>Float64[]),Dict("on"=>Float64[],"off"=>Float64[]),
+    Dict("on"=>Float64[],"off"=>Float64[]),Dict("on"=>Float64[],"off"=>Float64[]),
+    Dict("on"=>Float64[],"off"=>Float64[]),Dict("on"=>Float64[],"off"=>Float64[]),
+    Dict("on"=>Float64[],"off"=>Float64[]),Dict("on"=>Float64[],"off"=>Float64[]))
 
   for dir in root_subs
     if !occursin("nest",dir)
@@ -188,53 +232,20 @@ function post_process()
   create_dir(plots_dir)
 
   for (key, val) in errors
-    ϵ = parse.(Float64,tols[key])
-    xvals = hcat(ϵ,ϵ)'
-    yvals = hcat(val,ϵ)'
-    labels = hcat(["H¹-l² err"],["ϵ"])'
-    generate_and_save_plot(xvals,yvals,"Average H¹-l² err, method: "*key,
-    ["H¹-l² err","ϵ"],"ϵ","",plots_dir,true,true;var="err_"*key,
-    modes=vcat(["lines"],["lines"]))
+    if !isempty(val)
+      ϵ = parse.(Float64,tols[key])
+      xvals = hcat(ϵ,ϵ)
+      yvals = hcat(val,ϵ)
+      generate_and_save_plot(xvals,yvals,"Average H¹-l² err, method: "*key,
+      ["H¹-l² err","ϵ"],"ϵ","",plots_dir,true,true;var="err_"*key,
+      selected_style=vcat(["lines"],["lines"]))
+    end
   end
-  for (key, val) in times
+  CSV.write(joinpath(plots_dir, "errors.csv"),errors)
+  CSV.write(joinpath(plots_dir, "times.csv"),times)
+  #= for (key, val) in times
     generate_and_save_plot(val,"Average online time, method: "*key,tols[key],
-    "","",plots_dir,false,true;var="time_"*key,modes=["scatter"])
-  end
-
-  function get_paths(dir::String)::Tuple
-    path_to_err = joinpath(dir,
-      "results/Params_95_96_97_98_99_100/H1L2_err.csv")
-    path_to_t = joinpath(dir,
-      "results/Params_95_96_97_98_99_100/times.csv")
-    path_to_err,path_to_t
-  end
-
-  function get_tolerances(dir::String)::Vector
-    if occursin("-3",dir)
-      return ["1e-3"]
-    elseif occursin("-4",dir)
-      return ["1e-4"]
-    elseif occursin("-5",dir)
-      return ["1e-5"]
-    else
-      error("Unrecognized tolerance")
-    end
-  end
-
-  function check_if_fun(dir::String,tol,tol_fun,err,err_fun,time,time_fun)
-    path_to_err,path_to_t = get_paths(dir)
-    if ispath(path_to_err) && ispath(path_to_t)
-      if occursin("fun",dir)
-        append!(tol_fun,get_tolerances(dir))
-        append!(err_fun,load_CSV(path_to_err)[1])
-        append!(time_fun,load_CSV(path_to_t)[1,1])
-      else
-        append!(tol,get_tolerances(dir))
-        append!(err,load_CSV(path_to_err)[1])
-        append!(time,load_CSV(path_to_t)[1,1])
-      end
-    end
-    return tol,tol_fun,err,err_fun,time,time_fun
-  end
+    "","",plots_dir,false,true;var="time_"*key,selected_style=["scatter"])
+  end =#
 
 end

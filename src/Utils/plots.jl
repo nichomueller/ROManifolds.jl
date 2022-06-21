@@ -17,7 +17,7 @@ function plot_R_R²(f::Function, xrange::Vector, n::Int)
 end
 
 function generate_and_save_plot(xval::Array, yval::Array, title::String,
-  label::Vector, xlab::String, ylab::String, save_path::String,
+  label::Array, xlab::String, ylab::String, save_path::String,
   semilogx=false, semilogy=true; var="u",selected_style=["lines"])
 
   @assert size(xval) == size(yval) "Invalid plot: provide an input with the same
@@ -42,8 +42,8 @@ function generate_and_save_plot(xval::Array, yval::Array, title::String,
       xaxis_type="log",yaxis_type="log")
   end
 
-  n_traces = size(xval)[1]
-  traces = [scatter(x=xval[i,:],y=yval[i,:],mode=selected_style[i],name=label[i],
+  n_traces = size(xval)[2]
+  traces = [scatter(x=xval[:,i],y=yval[:,i],mode=selected_style[i],name=label[i],
     line=attr(width=4)) for i=1:n_traces]
   p = plot(traces,layout)
   savefig(p, joinpath(save_path, string(var)*".eps"))
