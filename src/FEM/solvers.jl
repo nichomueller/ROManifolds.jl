@@ -66,6 +66,47 @@ function FE_solve(
   FEMSpace::FEMSpaceStokesUnsteady, probl::ProblemInfoUnsteady,
   Param::ParametricInfoUnsteady; subtract_Ddata=false)
 
+  timesθ = get_timesθ(probl)
+  θ = probl.θ
+  δt = probl.δt
+  δtθ = θ*δt
+
+  A(t) = assemble_stiffness(FEMSpace, FEMInfo, Param)(t)
+  M(t) = assemble_mass(FEMSpace, FEMInfo, Param)(t)
+  B(t) = assemble_primal_op(FEMSpace)(t)
+  F(t) = assemble_forcing(FEMSpace, FEMInfo, Param)(t)
+  H(t) = assemble_neumann_datum(FEMSpace, FEMInfo, Param)(t)
+  R₁(t) = assemble_lifting(FEMSpace, probl, Param).R₁(t)
+  R₂(t) = assemble_lifting(FEMSpace, probl, Param).R₂(t)
+  Block1(t) = θ*(M(t)+δtθ*A(t))
+  LHS(t) = vcat(θ*hcat(M(t)+δtθ*A(t),-δtθ*B(t)'),hcat(B(t),zeros(FEMSpace.Nₛᵖ,FEMSpace.Nₛᵖ)))
+  RHS(t) = vcat(δtθ*(F(t)+H(t)-R₁(t)),-R₂(t))
+  RHS_add(u,p,t) = θ*vcat((M(t)-δt*(1-θ)*A(t))*u+δt*(1-θ)*B(t)'*p,zeros(FEMSpace.Nₛᵖ))
+
+  u0(x) = Param.u₀(x)[1]
+  p0(x) = Param.u₀(x)[2]
+  u₀ = get_free_dof_values(interpolate_everywhere(u0, FEMSpace.V(probl.t₀)))
+  p₀ = get_free_dof_values(interpolate_everywhere(p0, FEMSpace.Q(probl.t₀)))
+
+  uₕₜ = hcat(u₀,zeros(FEMSpace.Nₛᵘ, convert(Int64, probl.T / probl.δt)))
+  pₕₜ = hcat(p₀,zeros(FEMSpace.Nₛᵖ, convert(Int64, probl.T / probl.δt)))
+
+  count = 1
+  for (iₜ,t) in enumerate(timesθ)
+    count += 1
+    xₕₜ = LHS(t)\(RHS(t)+RHS_add(uₕₜ[:,count-1],pₕₜ[:,count-1],t-δt))
+    uₕₜ[:,count] = xₕₜ[1:FEMSpace.Nₛᵘ]
+    pₕₜ[:,count] = xₕₜ[FEMSpace.Nₛᵘ+1:end]
+  end
+
+  return uₕₜ[:,2:end], pₕₜ[:,2:end]
+
+end
+
+#= function FE_solve(
+  FEMSpace::FEMSpaceStokesUnsteady, probl::ProblemInfoUnsteady,
+  Param::ParametricInfoUnsteady; subtract_Ddata=false)
+
   m(t,(u,p),(v,q)) = ∫(Param.m(t)*(u⋅v))*FEMSpace.dΩ
   ab(t,(u,p),(v,q)) = (∫(Param.α(t)*(∇(v) ⊙ ∇(u)))*FEMSpace.dΩ -
     ∫((∇⋅v)*p)*FEMSpace.dΩ + ∫(q*(∇⋅u))*FEMSpace.dΩ)
@@ -105,7 +146,7 @@ function FE_solve(
 
   return uₕₜ, pₕₜ
 
-end
+end =#
 
 #= function FE_solve(FEMSpace::FEMSpacePoisson, Param::ParametricInfoUnsteady; subtract_Ddata = true)
 
@@ -161,23 +202,26 @@ end
 
 function assemble_lifting(
   FEMSpace::FEMSpaceStokesUnsteady,
-  probl::ProblemInfoUnsteady,
+  ::ProblemInfoUnsteady,
   Param::ParametricInfoUnsteady)
 
   gₕ(t) = interpolate_dirichlet(Param.g(t), FEMSpace.V(t))
-  Nₜ = convert(Int64, probl.T / probl.δt)
-  R₁ = zeros(FEMSpace.Nₛᵘ, Nₜ)
-  R₂ = zeros(FEMSpace.Nₛᵖ, Nₜ)
-  if !isnothing(FEMSpace.dΓd)
-    r₁(t,v) = ∫(Param.α(t)*(∇(v) ⊙ ∇(gₕ(t))))*FEMSpace.dΓd
-    r₂(t,q) = ∫(∇⋅(gₕ(t))*q)*FEMSpace.dΓd
-    for (i,tᵢ) in enumerate(probl.t₀+probl.δt:probl.δt:probl.T)
-      @info "Constructing lifting operator at timestep $i/$Nₜ"
-      R₁[:,i] = assemble_vector(r₁(tᵢ,FEMSpace.ϕᵥ),FEMSpace.V₀)
-      R₂[:,i] = assemble_vector(r₂(tᵢ,FEMSpace.ψᵧ),FEMSpace.Q₀)
+  function R₁(t)
+    if !isnothing(FEMSpace.dΓd)
+      return assemble_vector(
+        ∫(Param.α(t)*(∇(FEMSpace.ϕᵥ) ⊙ ∇(gₕ(t))))*FEMSpace.dΩ,FEMSpace.V₀)
+    else
+      return zeros(FEMSpace.Nₛᵘ)
     end
   end
-  R₁,R₂
+  function R₂(t)
+    if !isnothing(FEMSpace.dΓd)
+      return assemble_vector(∫(FEMSpace.ψᵧ*(∇⋅(gₕ(t))))*FEMSpace.dΩ,FEMSpace.Q₀)
+    else
+      return zeros(FEMSpace.Nₛᵖ)
+    end
+  end
+  _->(R₁,R₂)
 end
 
 function rhs_form(

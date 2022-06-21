@@ -44,7 +44,6 @@ using CSV
 using JLD
 using Test
 using Logging
-using Revise
 using PlotlyJS
 using Gridap
 using Gridap.FESpaces

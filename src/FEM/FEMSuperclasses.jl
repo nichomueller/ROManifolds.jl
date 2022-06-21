@@ -11,7 +11,7 @@ struct PoissonProblemUnsteady <: FEMProblem end =#
 
 struct FEMSpacePoissonSteady <: SteadyProblem
   Qₕ::CellQuadrature
-  V₀::UnconstrainedFESpace
+  V₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
   V::TrialFESpace
   ϕᵥ::FEBasis
   ϕᵤ::FEBasis
@@ -24,7 +24,7 @@ end
 
 struct FEMSpacePoissonUnsteady <: UnsteadyProblem
   Qₕ::CellQuadrature
-  V₀::UnconstrainedFESpace
+  V₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
   V::TransientTrialFESpace
   ϕᵥ::FEBasis
   ϕᵤ::Function
@@ -37,9 +37,9 @@ end
 
 struct FEMSpaceStokesSteady <: SteadyProblem
   Qₕ::CellQuadrature
-  V₀::UnconstrainedFESpace
+  V₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
   V::TrialFESpace
-  Q₀::ZeroMeanFESpace
+  Q₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
   Q::ZeroMeanFESpace
   X₀::MultiFieldFESpace
   X::MultiFieldFESpace
@@ -58,9 +58,9 @@ end
 
 struct FEMSpaceStokesUnsteady <: UnsteadyProblem
   Qₕ::CellQuadrature
-  V₀::UnconstrainedFESpace
+  V₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
   V::TransientTrialFESpace
-  Q₀::ZeroMeanFESpace
+  Q₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
   Q::ZeroMeanFESpace
   X₀::MultiFieldFESpace
   X::TransientMultiFieldTrialFESpace
@@ -81,7 +81,7 @@ struct FEMSpaceNavierStokesUnsteady <: UnsteadyProblem
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TransientTrialFESpace
-  Q₀::ZeroMeanFESpace
+  Q₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
   Q::ZeroMeanFESpace
   X₀::MultiFieldFESpace
   X::TransientMultiFieldTrialFESpace
