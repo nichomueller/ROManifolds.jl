@@ -162,6 +162,10 @@ function get_ParamInfo(::NTuple{2,Int},Info::UnsteadyInfo,μ::Vector)
 
 end
 
+function get_timesθ(I::Info) ::Vector
+  collect(I.t₀:I.δt:I.T-I.δt).+I.δt*I.θ
+end
+
 function generate_vtk_file(FEMSpace::FEMProblem, path::String, var_name::String, var::Array)
 
   FE_var = FEFunction(FEMSpace.V, var)
