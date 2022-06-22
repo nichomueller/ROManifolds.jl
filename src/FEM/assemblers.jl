@@ -362,6 +362,58 @@ function assemble_H¹_norm_matrix_nobcs(FEMSpace::FEMSpaceStokesUnsteady)
 
 end
 
+function assemble_lifting(FEMSpace::SteadyProblem, Param::ParametricInfoSteady)
+
+  Gₕ = zeros(FEMSpace.Nₛᵘ,1)
+  if !isnothing(FEMSpace.dΓd)
+    gₕ = interpolate_everywhere(Param.g, FEMSpace.V)
+    Gₕ = get_free_dof_values(gₕ)
+  end
+
+  Gₕ
+
+end
+
+function assemble_lifting(
+  FEMSpace::FEMSpacePoissonUnsteady, probl::ProblemInfoUnsteady,
+  Param::ParametricInfoUnsteady)
+
+  Gₕ = zeros(FEMSpace.Nₛᵘ, convert(Int64, probl.T / probl.δt))
+  if !isnothing(FEMSpace.dΓd)
+    gₕ(t) = interpolate_everywhere(Param.g(t), FEMSpace.V(t))
+    for (i, tᵢ) in enumerate(probl.t₀+probl.δt:probl.δt:probl.T)
+      Gₕ[:, i] = get_free_dof_values(gₕ(tᵢ))
+    end
+  end
+
+  Gₕ
+
+end
+
+function assemble_lifting(
+  FEMSpace::FEMSpaceStokesUnsteady,
+  ::ProblemInfoUnsteady,
+  Param::ParametricInfoUnsteady)
+
+  gₕ(t) = interpolate_dirichlet(Param.g(t), FEMSpace.V(t))
+  function R₁(t)
+    if !isnothing(FEMSpace.dΓd)
+      return assemble_vector(
+        ∫(Param.α(t)*(∇(FEMSpace.ϕᵥ) ⊙ ∇(gₕ(t))))*FEMSpace.dΩ,FEMSpace.V₀)
+    else
+      return zeros(FEMSpace.Nₛᵘ)
+    end
+  end
+  function R₂(t)
+    if !isnothing(FEMSpace.dΓd)
+      return assemble_vector(∫(FEMSpace.ψᵧ*(∇⋅(gₕ(t))))*FEMSpace.dΩ,FEMSpace.Q₀)
+    else
+      return zeros(FEMSpace.Nₛᵖ)
+    end
+  end
+  _->(R₁,R₂)
+end
+
 function assemble_FEM_structure(
   FEMSpace::SteadyProblem,
   probl::SteadyInfo,
