@@ -35,22 +35,22 @@ function M_DEIM_offline(M_DEIM_mat::Matrix, Σ::Vector)
   (N, n) = size(M_DEIM_mat)
   n_new = n
   M_DEIM_idx = Int64[]
-  append!(M_DEIM_idx, Int(argmax(abs.(M_DEIM_mat[:, 1]))[1]))
+  append!(M_DEIM_idx, Int(argmax(abs.(M_DEIM_mat[:, 1]))))
   for m = 2:n
     res = (M_DEIM_mat[:, m] -
     M_DEIM_mat[:, 1:m-1] * (M_DEIM_mat[M_DEIM_idx[1:m-1], 1:m-1] \
     M_DEIM_mat[M_DEIM_idx[1:m-1], m]))
     append!(M_DEIM_idx, convert(Int64, argmax(abs.(res))[1]))
     if abs(det(M_DEIM_mat[M_DEIM_idx[1:m], 1:m])) ≤ 1e-80
-      #= error("Something went wrong with the construction of (M)DEIM basis:
-        obtaining singular nested matrices during (M)DEIM offline phase") =#
+      @error "Something went wrong with the construction of (M)DEIM basis:
+        obtaining singular nested matrices during (M)DEIM offline phase"
       n_new = m
       break
     end
   end
   unique!(M_DEIM_idx)
   M_DEIM_err_bound = (Σ[min(n_new + 1,length(Σ))] *
-    norm(M_DEIM_mat[M_DEIM_idx,1:n_new] \ I(n_new)))
+    norm(M_DEIM_mat[M_DEIM_idx,1:n_new]' \ I(n_new)))
 
   M_DEIM_mat[:,1:n_new], M_DEIM_idx, M_DEIM_err_bound
 

@@ -25,8 +25,8 @@ function generate_and_save_plot(xval::Array, yval::Array, title::String,
   @assert length(size(xval)) <= 2 "Invalid plot: provide an input which is at
     most a matrix"
   if length(size(xval)) == 1
-    xval = reshape(xval,1,:)
-    yval = reshape(yval,1,:)
+    xval = reshape(xval,:,1)
+    yval = reshape(yval,:,1)
   end
 
   if !semilogx && !semilogy

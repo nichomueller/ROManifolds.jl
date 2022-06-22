@@ -39,10 +39,7 @@ function label_sorted_elems(vec::Vector) ::Vector
   Int.(indexin(vec,vecnew))
 end
 
-function Base.argmax(v::Vector,n_val=nothing)
-  if isnothing(n_val)
-    n_val = length(v)
-  end
+function Base.argmax(v::Vector,n_val::Int64)
   s = sort(v)
   idx = Int.(indexin(s,v))[1:n_val]
 end

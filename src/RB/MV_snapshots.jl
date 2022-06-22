@@ -138,11 +138,11 @@ function standard_MDEIM(
     else
       error("Run MDEIM on A or M only")
     end
-    compressed_snapsₖ,Σ = POD(snapsₖ, RBInfo.ϵₛ)
+    compressed_snapsₖ,Σ = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
     if k == 1
       snaps = compressed_snapsₖ
     else
-      snaps_POD,Σ = POD(hcat(snaps, compressed_snapsₖ), RBInfo.ϵₛ)
+      snaps_POD,Σ = M_DEIM_POD(hcat(snaps, compressed_snapsₖ), RBInfo.ϵₛ)
       snaps = snaps_POD
     end
   end
@@ -211,7 +211,7 @@ function functional_MDEIM(
       Θmat = hcat(Θmat, compressed_Θₖ)
     end
   end
-  Θmat,_ = POD(Θmat,RBInfo.ϵₛ)
+  Θmat,_ = M_DEIM_POD(Θmat,RBInfo.ϵₛ)
   Q = size(Θmat)[2]
   row_idx,snaps = Float64[],Matrix{Float64}
   for q = 1:Q
@@ -259,7 +259,7 @@ function functional_MDEIM_sampling(
       Θmat = hcat(Θmat, Θₖ)
     end
   end
-  Θmat,_ = POD(Θmat,RBInfo.ϵₛ)
+  Θmat,_ = M_DEIM_POD(Θmat,RBInfo.ϵₛ)
   Q = size(Θmat)[2]
   snaps,row_idx = Matrix{Float64},Float64[]
   for q = 1:Q
@@ -319,14 +319,14 @@ function get_snaps_MDEIM(
   if RBInfo.space_time_M_DEIM
     return spacetime_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
   elseif RBInfo.functional_M_DEIM
-    if RBInfo.sampling_MDEIM
+    if RBInfo.sampling_M_DEIM
       nₜ = floor(Int,length(timesθ)*RBInfo.sampling_percentage)
       return functional_MDEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
     else
       return functional_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
     end
   else
-    if RBInfo.sampling_MDEIM
+    if RBInfo.sampling_M_DEIM
       nₜ = floor(Int,length(timesθ)*RBInfo.sampling_percentage)
       return standard_MDEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
     else
@@ -597,14 +597,14 @@ function get_snaps_DEIM(
   if RBInfo.space_time_M_DEIM
     return spacetime_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
   elseif RBInfo.functional_M_DEIM
-    if RBInfo.sampling_MDEIM
+    if RBInfo.sampling_M_DEIM
       nₜ = floor(Int,length(timesθ)*RBInfo.sampling_percentage)
       return functional_DEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
     else
       return functional_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
     end
   else
-    if RBInfo.sampling_MDEIM
+    if RBInfo.sampling_M_DEIM
       nₜ = floor(Int,length(timesθ)*RBInfo.sampling_percentage)
       return standard_DEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
     else
