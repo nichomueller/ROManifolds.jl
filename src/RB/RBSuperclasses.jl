@@ -240,6 +240,7 @@ mutable struct ROMInfoUnsteady <: UnsteadyInfo
   functional_M_DEIM::Bool
   sampling_M_DEIM::Bool
   sampling_percentage::Float64
+  adaptivity::Bool
   postprocess::Bool
   import_snapshots::Bool
   import_offline_structures::Bool

@@ -467,6 +467,7 @@ function loop_on_params(
 
   ũ_μ = zeros(RBVars.S.Nₛᵘ, length(param_nbs)*RBVars.Nₜ)
   uₙ_μ = zeros(RBVars.nᵘ, length(param_nbs))
+  mean_uₕ_test = zeros(RBVars.S.Nₛᵘ, RBVars.Nₜ)
 
   for (i_nb, nb) in enumerate(param_nbs)
     println("\n")
@@ -482,6 +483,7 @@ function loop_on_params(
       uₕ_test = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
       DataFrame))[:,(nb-1)*RBVars.Nₜ+1:nb*RBVars.Nₜ]
     end
+    mean_uₕ_test += uₕ_test
 
     solve_RB_system(RBInfo, RBVars, Param)
     reconstruction_time = @elapsed begin
@@ -496,16 +498,16 @@ function loop_on_params(
     H1_L2_err[i_nb] = H1_L2_err_nb
     mean_H1_err += H1_err_nb / length(param_nbs)
     mean_H1_L2_err += H1_L2_err_nb / length(param_nbs)
-    mean_pointwise_err += abs.(uₕ_test - RBVars.S.ũ) / length(param_nbs)
+    mean_pointwise_err += abs.(uₕ_test-RBVars.S.ũ)/length(param_nbs)
 
     ũ_μ[:, (i_nb-1)*RBVars.Nₜ+1:i_nb*RBVars.Nₜ] = RBVars.S.ũ
     uₙ_μ[:, i_nb] = RBVars.S.uₙ
 
-    @info "Online wall time: $(RBVars.online_time) s (snapshot number $nb)"
+    @info "Online wall time: $(RBVars.S.online_time) s (snapshot number $nb)"
     @info "Relative reconstruction H1-L2 error: $H1_L2_err_nb (snapshot number $nb)"
   end
-  return (ũ_μ,uₙ_μ,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,
-    mean_online_time,mean_reconstruction_time)
+  return (ũ_μ,uₙ_μ,mean_uₕ_test,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,
+    H1_L2_err,mean_online_time,mean_reconstruction_time)
 end
 
 function online_phase(
@@ -515,15 +517,18 @@ function online_phase(
   param_nbs)
 
   get_norm_matrix(RBInfo, RBVars.S)
-  (ũ_μ,uₙ_μ,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,
+  (ũ_μ,uₙ_μ,mean_uₕ_test,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,
     mean_online_time,mean_reconstruction_time) =
     loop_on_params(RBInfo, RBVars, μ, param_nbs)
-  adaptive_loop = true
-  if adaptive_loop
-    #while maximum(abs.(mean_pointwise_err)) > RBInfo.ϵₜ
-    (ũ_μ,uₙ_μ,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,
-      mean_online_time,mean_reconstruction_time) =
-      adaptive_loop_on_params(RBInfo,RBVars,mean_pointwise_err,μ)
+
+  adapt_time = 0.
+  if RBInfo.adaptivity
+    adapt_time = @elapsed begin
+      (ũ_μ,uₙ_μ,_,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,
+      H1_L2_err,mean_online_time,mean_reconstruction_time) =
+      adaptive_loop_on_params(RBInfo,RBVars,mean_uₕ_test,mean_pointwise_err,
+        μ,param_nbs)
+    end
   end
 
   string_param_nbs = "Params"
@@ -541,13 +546,8 @@ function online_phase(
     save_CSV(mean_H1_err, joinpath(path_μ, "H1_err.csv"))
     save_CSV([mean_H1_L2_err], joinpath(path_μ, "H1L2_err.csv"))
 
-    if !RBInfo.import_offline_structures
-      times = Dict(RBVars.S.offline_time=>"off_time",
-        mean_online_time=>"on_time", mean_reconstruction_time=>"rec_time")
-    else
-      times = Dict(mean_online_time=>"on_time",
-        mean_reconstruction_time=>"rec_time")
-    end
+    times = Dict("off_time"=>RBVars.S.offline_time,
+      "on_time"=>mean_online_time+adapt_time,"rec_time"=>mean_reconstruction_time)
     CSV.write(joinpath(path_μ, "times.csv"),times)
   end
 
@@ -626,8 +626,10 @@ end
 function adaptive_loop_on_params(
   RBInfo::Info,
   RBVars::PoissonUnsteady,
+  mean_uₕ_test::Matrix,
   mean_pointwise_err::Matrix,
   μ::Matrix,
+  param_nbs,
   n_adaptive=nothing)
 
   if isnothing(n_adaptive)
@@ -639,10 +641,17 @@ function adaptive_loop_on_params(
   @info "Running adaptive cycle: adding $n_adaptive temporal and spatial bases,
     respectively"
 
-  space_err = diag(mean_pointwise_err*I(RBVars.Nₜ)*mean_pointwise_err')
-  time_err = diag(mean_pointwise_err'*Matrix(RBVars.S.Xᵘ₀)*mean_pointwise_err)
-  ind_s = argmax(abs.(space_err),n_adaptive[1])
-  ind_t = argmax(abs.(time_err),n_adaptive[2])
+  time_err = zeros(RBVars.Nₜ)
+  space_err = zeros(RBVars.S.Nₛᵘ)
+  for iₜ = 1:RBVars.Nₜ
+    time_err[iₜ] = (mynorm(mean_pointwise_err[:,iₜ],RBVars.S.Xᵘ₀) /
+      mynorm(mean_uₕ_test[:,iₜ],RBVars.S.Xᵘ₀))
+  end
+  for iₛ = 1:RBVars.S.Nₛᵘ
+    space_err[iₛ] = mynorm(mean_pointwise_err[iₛ,:])/mynorm(mean_uₕ_test[iₛ,:])
+  end
+  ind_s = argmax(space_err,n_adaptive[1])
+  ind_t = argmax(time_err,n_adaptive[2])
 
   if isempty(RBVars.S.Sᵘ)
     Sᵘ = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
@@ -656,6 +665,7 @@ function adaptive_loop_on_params(
   Φₜᵘ_new = Matrix(qr(Sᵘ[ind_s,:]').Q)[:,1:n_adaptive[1]]
   RBVars.S.nₛᵘ += n_adaptive[2]
   RBVars.nₜᵘ += n_adaptive[1]
+  RBVars.nᵘ = RBVars.S.nₛᵘ*RBVars.nₜᵘ
 
   RBVars.S.Φₛᵘ = Matrix(qr(hcat(RBVars.S.Φₛᵘ,Φₛᵘ_new)).Q)[:,1:RBVars.S.nₛᵘ]
   RBVars.Φₜᵘ = Matrix(qr(hcat(RBVars.Φₜᵘ,Φₜᵘ_new)).Q)[:,1:RBVars.nₜᵘ]

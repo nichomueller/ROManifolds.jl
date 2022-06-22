@@ -40,6 +40,6 @@ function label_sorted_elems(vec::Vector) ::Vector
 end
 
 function Base.argmax(v::Vector,n_val::Int64)
-  s = sort(v)
+  s = sort(v,rev=true)
   idx = Int.(indexin(s,v))[1:n_val]
 end
