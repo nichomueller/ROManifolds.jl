@@ -542,7 +542,7 @@ function online_phase(RBInfo::Info, RBVars::PoissonSteady, μ, Param_nbs)
     reconstruction_time = @elapsed begin
       reconstruct_FEM_solution(RBVars)
     end
-    mean_online_time = online_time / length(Param_nbs)
+    mean_online_time = RBVars.online_time / length(Param_nbs)
     mean_reconstruction_time = reconstruction_time / length(Param_nbs)
 
     H1_err_nb = compute_errors(uₕ_test, RBVars, RBVars.Xᵘ₀)
@@ -552,7 +552,7 @@ function online_phase(RBInfo::Info, RBVars::PoissonSteady, μ, Param_nbs)
     ũ_μ[:, nb - Param_nbs[1] + 1] = RBVars.ũ
     uₙ_μ[:, nb - Param_nbs[1] + 1] = RBVars.uₙ
 
-    @info "Online wall time: $online_time s (snapshot number $nb)"
+    @info "Online wall time: $(RBVars.online_time) s (snapshot number $nb)"
     @info "Relative reconstruction H1-error: $H1_err_nb (snapshot number $nb)"
 
   end
