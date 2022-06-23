@@ -39,7 +39,7 @@ struct FEMSpaceStokesSteady <: SteadyProblem
   Qₕ::CellQuadrature
   V₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
   V::TrialFESpace
-  Q₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
+  Q₀::ZeroMeanFESpace
   Q::ZeroMeanFESpace
   X₀::MultiFieldFESpace
   X::MultiFieldFESpace
@@ -60,7 +60,7 @@ struct FEMSpaceStokesUnsteady <: UnsteadyProblem
   Qₕ::CellQuadrature
   V₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
   V::TransientTrialFESpace
-  Q₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
+  Q₀::ZeroMeanFESpace
   Q::ZeroMeanFESpace
   X₀::MultiFieldFESpace
   X::TransientMultiFieldTrialFESpace
@@ -129,7 +129,7 @@ struct ProblemInfoUnsteady <: UnsteadyInfo
 end
 
 mutable struct ParametricInfoSteady
-  μ::Vector
+  μ::Vector{Float64}
   model::DiscreteModel
   α::Function
   f::Function
@@ -138,7 +138,7 @@ mutable struct ParametricInfoSteady
 end
 
 mutable struct ParametricInfoUnsteady
-  μ::Vector
+  μ::Vector{Float64}
   model::DiscreteModel
   αₛ::Function
   αₜ::Function

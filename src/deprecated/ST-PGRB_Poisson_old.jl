@@ -1,17 +1,17 @@
 
 function get_MΦ(RBInfo::Problem, RBVars::PoissonSTPGRB)
 
-  @info "S-PGRB: fetching the matrix AΦᵀPᵤ⁻¹"
+  println("S-PGRB: fetching the matrix AΦᵀPᵤ⁻¹")
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MΦ.csv"))
     MΦ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "MΦ.csv"))
     RBVars.MΦ = reshape(MΦ,RBVars.steady_info.Nₛᵘ,RBVars.steady_info.nₛᵘ,:)
     return
   else
     if !RBInfo.probl_nl["M"]
-      @info "S-PGRB: failed to build MΦ; have to assemble affine stiffness"
+      println("S-PGRB: failed to build MΦ; have to assemble affine stiffness")
       assemble_affine_matrices(RBInfo, RBVars, "M")
     else
-      @info "S-PGRB: failed to build MΦ; have to assemble non-affine stiffness "
+      println("S-PGRB: failed to build MΦ; have to assemble non-affine stiffness ")
       assemble_MDEIM_matrices(RBInfo, RBVars, "M")
     end
   end
@@ -20,14 +20,14 @@ end
 
 function get_MAₙ(RBInfo::Problem, RBVars::PoissonSTPGRB)
 
-  @info "S-PGRB: fetching the matrix MAₙ"
+  println("S-PGRB: fetching the matrix MAₙ")
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MAₙ.csv"))
-    @info "Importing reduced affine matrix MAₙ"
+    println("Importing reduced affine matrix MAₙ")
     RBVars.MAₙ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "MAₙ.csv"))
     return
   else
     if !RBInfo.probl_nl["M"]
-      @info "S-PGRB: failed to import MAₙ; have to assemble MΦ and AΦᵀPᵤ⁻¹"
+      println("S-PGRB: failed to import MAₙ; have to assemble MΦ and AΦᵀPᵤ⁻¹")
       get_MΦ(RBInfo, RBVars)
       get_AΦᵀPᵤ⁻¹(RBInfo, RBVars.steady_info)
       nₛᵘ = RBVars.steady_info.nₛᵘ
@@ -45,7 +45,7 @@ function assemble_affine_matrices(RBInfo::Problem, RBVars::PoissonSTPGRB, var::S
 
   if var === "M"
     RBVars.Qᵐ = 1
-    @info "Assembling affine reduced mass"
+    println("Assembling affine reduced mass")
     M = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "M.csv"); convert_to_sparse = true)
     RBVars.Mₙ = zeros(RBVars.steady_info.nₛᵘ, RBVars.steady_info.nₛᵘ, RBVars.Qᵐ)
     RBVars.Mₙ[:,:,1] = (M*RBVars.steady_info.Φₛᵘ)' * RBVars.Pᵤ⁻¹ * (M*RBVars.steady_info.Φₛᵘ)
@@ -63,7 +63,7 @@ function assemble_MDEIM_matrices(RBInfo::Problem, RBVars::PoissonSTPGRB, var::St
 
   if var === "M"
 
-    @info "The mass is non-affine: running the MDEIM offline phase on $nₛ_MDEIM snapshots. This might take some time"
+    println("The mass is non-affine: running the MDEIM offline phase on $nₛ_MDEIM snapshots. This might take some time")
     MDEIM_mat, RBVars.MDEIM_idx_M, RBVars.sparse_el_M, _, _ = MDEIM_offline(FEMInfo, RBInfo, "M")
     RBVars.Qᵐ = size(MDEIM_mat)[2]
 
@@ -77,7 +77,7 @@ function assemble_MDEIM_matrices(RBInfo::Problem, RBVars::PoissonSTPGRB, var::St
 
     for q₁ = 1:RBVars.Qᵐ
       for q₂ = 1:RBVars.Qᵐ
-        @info "SPGRB: affine component number $((q₁-1)*RBVars.Qᵐ+q₂), matrix M"
+        println("SPGRB: affine component number $((q₁-1)*RBVars.Qᵐ+q₂), matrix M")
         RBVars.Mₙ[:, :, (q₁-1)*RBVars.Qᵐ+q₂] = MΦP_inv[:, :, q₁] * RBVars.MΦ[:, :, q₂]
       end
     end
@@ -164,7 +164,7 @@ end
 
 function get_RB_LHS_blocks(RBInfo::Problem, RBVars::PoissonSTPGRB, Mₙ, Aₙ, MAₙ)
 
-  @info "Assembling LHS using Crank-Nicolson time scheme"
+  println("Assembling LHS using Crank-Nicolson time scheme")
 
   θ = RBInfo.θ
   δtθ = RBInfo.δt*θ
@@ -198,7 +198,7 @@ end
 
 #= function get_RB_RHS_blocks(RBInfo, RBVars::PoissonSTPGRB, Param)
 
-  @info "Assembling RHS"
+  println("Assembling RHS"
 
   Ffun = assemble_forcing(FEMSpace, Param)
   F_mat = zeros(RBVars.steady_info.Nₛᵘ, RBVars.Nₜ + 1)
@@ -213,7 +213,7 @@ end =#
 
 function get_RB_RHS_blocks(RBInfo::Problem, RBVars::PoissonSTPGRB, Fₙ, Hₙ)
 
-  @info "Assembling RHS"
+  println("Assembling RHS")
 
   δtθ = RBInfo.δt*RBInfo.θ
   FHₙ = δtθ*(Fₙ+Hₙ)
@@ -223,7 +223,7 @@ end
 
 function get_RB_system(RBInfo::Problem, RBVars::PoissonSTPGRB, Param)
 
-  @info "Preparing the RB system: fetching reduced LHS"
+  println("Preparing the RB system: fetching reduced LHS")
   initialize_RB_system(RBVars)
   θᵐ, θᵐᵃ, θᵃ, θᶠ = get_θ(RBInfo, RBVars, Param)
   blocks = [1]
@@ -238,12 +238,12 @@ function get_RB_system(RBInfo::Problem, RBVars::PoissonSTPGRB, Param)
 
   if "RHS" ∈ operators
     if !RBInfo.build_Parametric_RHS
-      @info "Preparing the RB system: fetching reduced RHS"
+      println("Preparing the RB system: fetching reduced RHS")
       Fₙ_μ = assemble_online_structure(θᶠ, RBVars.steady_info.Fₙ)
       Hₙ_μ = assemble_online_structure(θʰ, RBVars.steady_info.Hₙ)
       push!(RBVars.steady_info.RHSₙ, reshape(Fₙ_μ+Hₙ_μ,:,1))
     else
-      @info "Preparing the RB system: assembling reduced RHS exactly"
+      println("Preparing the RB system: assembling reduced RHS exactly")
       Fₙ_μ, Hₙ_μ = build_Param_RHS(RBInfo, RBVars, Param)
       push!(RBVars.steady_info.RHSₙ, reshape(Fₙ_μ+Hₙ_μ,:,1))
     end

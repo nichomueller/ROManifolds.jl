@@ -25,7 +25,7 @@ function FEM_paths(root, problem_type, problem_name, mesh_name, case; test_case=
 
 end
 
-function get_ParamInfo(::NTuple{1,Int},Info::SteadyInfo,μ::Vector)
+function get_ParamInfo(::NTuple{1,Int},Info::SteadyInfo,μ::Vector{Float64})
 
   model = DiscreteModelFromFile(Info.paths.mesh_path)
 
@@ -53,7 +53,7 @@ function get_ParamInfo(::NTuple{1,Int},Info::SteadyInfo,μ::Vector)
 
 end
 
-function get_ParamInfo(::NTuple{1,Int},Info::UnsteadyInfo,μ::Vector)
+function get_ParamInfo(::NTuple{1,Int},Info::UnsteadyInfo,μ::Vector{Float64})
 
   model = DiscreteModelFromFile(Info.paths.mesh_path)
   αₛ(x) = 1
@@ -99,7 +99,7 @@ function get_ParamInfo(::NTuple{1,Int},Info::UnsteadyInfo,μ::Vector)
 
 end
 
-function get_ParamInfo(::NTuple{2,Int},Info::UnsteadyInfo,μ::Vector)
+function get_ParamInfo(::NTuple{2,Int},Info::UnsteadyInfo,μ::Vector{Float64})
 
   model = DiscreteModelFromFile(Info.paths.mesh_path)
   αₛ(x) = 1
@@ -162,7 +162,7 @@ function get_ParamInfo(::NTuple{2,Int},Info::UnsteadyInfo,μ::Vector)
 
 end
 
-function get_timesθ(I::Info) ::Vector
+function get_timesθ(I::Info) ::Vector{Float64}
   collect(I.t₀:I.δt:I.T-I.δt).+I.δt*I.θ
 end
 
@@ -173,7 +173,7 @@ function generate_vtk_file(FEMSpace::FEMProblem, path::String, var_name::String,
 
 end
 
-function find_FE_elements(V₀::UnconstrainedFESpace, trian::Triangulation, idx::Vector)
+function find_FE_elements(V₀::UnconstrainedFESpace, trian::Triangulation, idx::Vector{Float64})
 
   connectivity = get_cell_dof_ids(V₀, trian)
 

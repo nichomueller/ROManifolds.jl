@@ -5,15 +5,15 @@ include("ST-PGRB_Poisson.jl")
 function get_snapshot_matrix(RBInfo::Info, RBVars::PoissonUnsteady)
 
   if RBInfo.perform_nested_POD
-    @info "Importing the snapshot matrix for field u obtained
-      with the nested POD"
-    Sᵘ = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
+    println("Importing the snapshot matrix for field u obtained
+      with the nested POD")
+    Sᵘ = Matrix{Float64}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path,"uₕ.csv"),
       DataFrame))
   else
-    @info "Importing the snapshot matrix for field u,
-      number of snapshots considered: $(RBInfo.nₛ)"
-    Sᵘ = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
-      DataFrame))[:, 1:RBInfo.nₛ*RBVars.Nₜ]
+    println("Importing the snapshot matrix for field u,
+      number of snapshots considered: $(RBInfo.nₛ)")
+    Sᵘ = Matrix{Float64}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path,"uₕ.csv"),
+      DataFrame))[:,1:RBInfo.nₛ*RBVars.Nₜ]
   end
 
   RBVars.S.Sᵘ = Sᵘ
@@ -21,7 +21,7 @@ function get_snapshot_matrix(RBInfo::Info, RBVars::PoissonUnsteady)
   RBVars.S.Nₛᵘ = Nₛᵘ
   RBVars.Nᵘ = RBVars.S.Nₛᵘ * RBVars.Nₜ
 
-  @info "Dimension of the snapshot matrix for field u: $(size(Sᵘ))"
+  println("Dimension of the snapshot matrix for field u: $(size(Sᵘ))")
 
 end
 
@@ -29,7 +29,7 @@ PODs_space(RBInfo::Info, RBVars::PoissonUnsteady) = PODs_space(RBInfo, RBVars.S)
 
 function PODs_time(RBInfo::Info, RBVars::PoissonUnsteady)
 
-  @info "Performing the temporal POD for field u, using a tolerance of $(RBInfo.ϵₜ)"
+  println("Performing the temporal POD for field u, using a tolerance of $(RBInfo.ϵₜ)")
 
   if RBInfo.time_reduction_technique == "ST-HOSVD"
     Sᵘₜ = zeros(RBVars.Nₜ, RBVars.S.nₛᵘ * RBInfo.nₛ)
@@ -55,17 +55,15 @@ end
 
 function build_reduced_basis(RBInfo::Info, RBVars::PoissonUnsteady)
 
-  @info "Building the space-time reduced basis for field u"
+  println("Building the space-time reduced basis for field u")
 
-  RB_building_time = @elapsed begin
+  RBVars.S.offline_time += @elapsed begin
     PODs_space(RBInfo, RBVars)
     PODs_time(RBInfo, RBVars)
   end
 
   RBVars.nᵘ = RBVars.S.nₛᵘ * RBVars.nₜᵘ
   RBVars.Nᵘ = RBVars.S.Nₛᵘ * RBVars.Nₜ
-
-  RBVars.S.offline_time += RB_building_time
 
   if RBInfo.save_offline_structures
     save_CSV(RBVars.S.Φₛᵘ, joinpath(RBInfo.paths.basis_path, "Φₛᵘ.csv"))
@@ -78,7 +76,7 @@ function import_reduced_basis(RBInfo::Info, RBVars::PoissonUnsteady)
 
   import_reduced_basis(RBInfo, RBVars.S)
 
-  @info "Importing the temporal reduced basis for field u"
+  println("Importing the temporal reduced basis for field u")
   RBVars.Φₜᵘ = load_CSV(joinpath(RBInfo.paths.basis_path, "Φₜᵘ.csv"))
   RBVars.nₜᵘ = size(RBVars.Φₜᵘ)[2]
   RBVars.nᵘ = RBVars.S.nₛᵘ * RBVars.nₜᵘ
@@ -109,7 +107,7 @@ function get_generalized_coordinates(RBInfo::Info, RBVars::PoissonUnsteady, snap
   Φₛᵘ_normed = RBVars.S.Xᵘ₀ * RBVars.S.Φₛᵘ
 
   for (i, i_nₛ) = enumerate(snaps)
-    @info "Assembling generalized coordinate relative to snapshot $(i_nₛ), field u"
+    println("Assembling generalized coordinate relative to snapshot $(i_nₛ), field u")
     S_i = RBVars.S.Sᵘ[:, (i_nₛ-1)*RBVars.Nₜ+1:i_nₛ*RBVars.Nₜ]
     for i_s = 1:RBVars.S.nₛᵘ
       for i_t = 1:RBVars.nₜᵘ
@@ -146,8 +144,8 @@ function assemble_MDEIM_matrices(
   var::String)
 
   if var == "M"
-    @info "The matrix $var is non-affine:
-      running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots"
+    println("The matrix $var is non-affine:
+      running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
     if isempty(RBVars.MDEIM_mat_M)
       (RBVars.MDEIM_mat_M, RBVars.MDEIM_idx_M, RBVars.MDEIMᵢ_M, RBVars.row_idx_M,
         RBVars.sparse_el_M) = MDEIM_offline(FEMSpace, RBInfo, "M")
@@ -172,8 +170,8 @@ function assemble_DEIM_vectors(
   RBVars::PoissonUnsteady,
   var::String)
 
-  @info "The vector $var is non-affine:
-    running the DEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots"
+  println("The vector $var is non-affine:
+    running the DEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
 
   if var == "F"
     if isempty(RBVars.S.DEIM_mat_F)
@@ -228,7 +226,7 @@ function get_M_DEIM_structures(RBInfo::Info, RBVars::PoissonUnsteady) :: Vector
   if RBInfo.probl_nl["M"]
 
     if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MDEIMᵢ_M.csv"))
-      @info "Importing MDEIM offline structures for the mass matrix"
+      println("Importing MDEIM offline structures for the mass matrix")
       RBVars.MDEIMᵢ_M = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
         "MDEIMᵢ_M.csv"))
       RBVars.MDEIM_idx_M = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
@@ -239,7 +237,7 @@ function get_M_DEIM_structures(RBInfo::Info, RBVars::PoissonUnsteady) :: Vector
         "row_idx_M.csv"))[:]
       append!(operators, [])
     else
-      @info "Failed to import MDEIM offline structures for the mass matrix: must build them"
+      println("Failed to import MDEIM offline structures for the mass matrix: must build them")
       append!(operators, ["M"])
     end
 
@@ -249,7 +247,7 @@ function get_M_DEIM_structures(RBInfo::Info, RBVars::PoissonUnsteady) :: Vector
 
 end
 
-function get_offline_structures(RBInfo::Info, RBVars::PoissonUnsteady) ::Vector
+function get_offline_structures(RBInfo::Info, RBVars::PoissonUnsteady) ::Vector{Float64}
 
   operators = String[]
   append!(operators, get_affine_structures(RBInfo, RBVars))
@@ -399,8 +397,8 @@ end
 
 function solve_RB_system(RBInfo::Info, RBVars::PoissonUnsteady, Param::ParametricInfoUnsteady)
   get_RB_system(RBInfo, RBVars, Param)
-  @info "Solving RB problem via backslash"
-  @info "Condition number of the system's matrix: $(cond(RBVars.S.LHSₙ[1]))"
+  println("Solving RB problem via backslash")
+  println("Condition number of the system's matrix: $(cond(RBVars.S.LHSₙ[1]))")
   RBVars.S.online_time += @elapsed begin
     RBVars.S.uₙ = zeros(RBVars.nᵘ)
     @fastmath RBVars.S.uₙ = RBVars.S.LHSₙ[1] \ RBVars.S.RHSₙ[1]
@@ -408,7 +406,7 @@ function solve_RB_system(RBInfo::Info, RBVars::PoissonUnsteady, Param::Parametri
 end
 
 function reconstruct_FEM_solution(RBVars::PoissonUnsteady)
-  @info "Reconstructing FEM solution from the newly computed RB one"
+  println("Reconstructing FEM solution from the newly computed RB one")
   uₙ = reshape(RBVars.S.uₙ, (RBVars.nₜᵘ, RBVars.S.nₛᵘ))
   @fastmath RBVars.S.ũ = RBVars.S.Φₛᵘ * (RBVars.Φₜᵘ * uₙ)'
 end
@@ -437,7 +435,7 @@ function offline_phase(RBInfo::Info, RBVars::PoissonUnsteady)
   end
 
   if import_snapshots_success && !import_basis_success
-    @info "Failed to import the reduced basis, building it via POD"
+    println("Failed to import the reduced basis, building it via POD")
     build_reduced_basis(RBInfo, RBVars)
   end
 
@@ -455,7 +453,7 @@ end
 function loop_on_params(
   RBInfo::Info,
   RBVars::PoissonUnsteady,
-  μ::Matrix,
+  μ::Matrix{Float64},
   param_nbs) ::Tuple
 
   H1_L2_err = zeros(length(param_nbs))
@@ -471,16 +469,16 @@ function loop_on_params(
 
   for (i_nb, nb) in enumerate(param_nbs)
     println("\n")
-    @info "Considering Parameter number: $nb/$(param_nbs[end])"
+    println("Considering Parameter number: $nb/$(param_nbs[end])")
 
     μ_nb = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
     Param = get_ParamInfo(problem_ntuple, RBInfo, μ_nb)
     if RBInfo.perform_nested_POD
       nb_test = nb-90
-      uₕ_test = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path,
+      uₕ_test = Matrix{Float64}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path,
       "uₕ_test.csv"), DataFrame))[:,(nb_test-1)*RBVars.Nₜ+1:nb_test*RBVars.Nₜ]
     else
-      uₕ_test = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
+      uₕ_test = Matrix{Float64}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
       DataFrame))[:,(nb-1)*RBVars.Nₜ+1:nb*RBVars.Nₜ]
     end
     mean_uₕ_test += uₕ_test
@@ -503,8 +501,8 @@ function loop_on_params(
     ũ_μ[:, (i_nb-1)*RBVars.Nₜ+1:i_nb*RBVars.Nₜ] = RBVars.S.ũ
     uₙ_μ[:, i_nb] = RBVars.S.uₙ
 
-    @info "Online wall time: $(RBVars.S.online_time) s (snapshot number $nb)"
-    @info "Relative reconstruction H1-L2 error: $H1_L2_err_nb (snapshot number $nb)"
+    println("Online wall time: $(RBVars.S.online_time) s (snapshot number $nb)")
+    println("Relative reconstruction H1-L2 error: $H1_L2_err_nb (snapshot number $nb)")
   end
   return (ũ_μ,uₙ_μ,mean_uₕ_test,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,
     H1_L2_err,mean_online_time,mean_reconstruction_time)
@@ -513,7 +511,7 @@ end
 function online_phase(
   RBInfo::Info,
   RBVars::PoissonUnsteady,
-  μ::Matrix,
+  μ::Matrix{Float64},
   param_nbs)
 
   get_norm_matrix(RBInfo, RBVars.S)
@@ -538,7 +536,7 @@ function online_phase(
   path_μ = joinpath(RBInfo.paths.results_path, string_param_nbs)
 
   if RBInfo.save_results
-    @info "Saving the results..."
+    println("Saving the results...")
     create_dir(path_μ)
     save_CSV(ũ_μ, joinpath(path_μ, "ũ.csv"))
     save_CSV(uₙ_μ, joinpath(path_μ, "uₙ.csv"))
@@ -556,7 +554,7 @@ function online_phase(
     "mean_H1_err"=>mean_H1_err, "mean_point_err_u"=>mean_pointwise_err)
 
   if RBInfo.postprocess
-    @info "Post-processing the results..."
+    println("Post-processing the results...")
     post_process(RBInfo, pass_to_pp)
   end
 
@@ -626,9 +624,9 @@ end
 function adaptive_loop_on_params(
   RBInfo::Info,
   RBVars::PoissonUnsteady,
-  mean_uₕ_test::Matrix,
-  mean_pointwise_err::Matrix,
-  μ::Matrix,
+  mean_uₕ_test::Matrix{Float64},
+  mean_pointwise_err::Matrix{Float64},
+  μ::Matrix{Float64},
   param_nbs,
   n_adaptive=nothing)
 
@@ -638,8 +636,8 @@ function adaptive_loop_on_params(
     n_adaptive = maximum(hcat([1,1],[nₛᵘ_add,nₜᵘ_add]),dims=2)
   end
 
-  @info "Running adaptive cycle: adding $n_adaptive temporal and spatial bases,
-    respectively"
+  println("Running adaptive cycle: adding $n_adaptive temporal and spatial bases,
+    respectively")
 
   time_err = zeros(RBVars.Nₜ)
   space_err = zeros(RBVars.S.Nₛᵘ)
@@ -654,21 +652,21 @@ function adaptive_loop_on_params(
   ind_t = argmax(time_err,n_adaptive[2])
 
   if isempty(RBVars.S.Sᵘ)
-    Sᵘ = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
+    Sᵘ = Matrix{Float64}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
       DataFrame))[:,1:RBInfo.nₛ*RBVars.Nₜ]
   else
     Sᵘ = RBVars.S.Sᵘ
   end
   Sᵘ = reshape(sum(reshape(Sᵘ,RBVars.S.Nₛᵘ,RBVars.Nₜ,:),dims=3),RBVars.S.Nₛᵘ,:)
 
-  Φₛᵘ_new = Matrix(qr(Sᵘ[:,ind_t]).Q)[:,1:n_adaptive[2]]
-  Φₜᵘ_new = Matrix(qr(Sᵘ[ind_s,:]').Q)[:,1:n_adaptive[1]]
+  Φₛᵘ_new = Matrix{Float64}(qr(Sᵘ[:,ind_t]).Q)[:,1:n_adaptive[2]]
+  Φₜᵘ_new = Matrix{Float64}(qr(Sᵘ[ind_s,:]').Q)[:,1:n_adaptive[1]]
   RBVars.S.nₛᵘ += n_adaptive[2]
   RBVars.nₜᵘ += n_adaptive[1]
   RBVars.nᵘ = RBVars.S.nₛᵘ*RBVars.nₜᵘ
 
-  RBVars.S.Φₛᵘ = Matrix(qr(hcat(RBVars.S.Φₛᵘ,Φₛᵘ_new)).Q)[:,1:RBVars.S.nₛᵘ]
-  RBVars.Φₜᵘ = Matrix(qr(hcat(RBVars.Φₜᵘ,Φₜᵘ_new)).Q)[:,1:RBVars.nₜᵘ]
+  RBVars.S.Φₛᵘ = Matrix{Float64}(qr(hcat(RBVars.S.Φₛᵘ,Φₛᵘ_new)).Q)[:,1:RBVars.S.nₛᵘ]
+  RBVars.Φₜᵘ = Matrix{Float64}(qr(hcat(RBVars.Φₜᵘ,Φₜᵘ_new)).Q)[:,1:RBVars.nₜᵘ]
   RBInfo.save_offline_structures = false
   assemble_offline_structures(RBInfo, RBVars)
 

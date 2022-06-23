@@ -9,7 +9,7 @@ function get_Mₙ(RBInfo::Info, RBVars::PoissonSTPGRB) :: Vector
   if (isfile(joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv")) &&
       isfile(joinpath(RBInfo.paths.ROM_structures_path, "MΦ.csv")) &&
       isfile(joinpath(RBInfo.paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv")))
-    @info "Importing reduced affine stiffness matrix"
+    println("Importing reduced affine stiffness matrix")
     Mₙ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
     RBVars.Mₙ = reshape(Mₙ,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,:)
     Qᵐ = sqrt(size(RBVars.Mₙ)[end])
@@ -21,7 +21,7 @@ function get_Mₙ(RBInfo::Info, RBVars::PoissonSTPGRB) :: Vector
     RBVars.MΦᵀPᵤ⁻¹ = reshape(MΦᵀPᵤ⁻¹,RBVars.S.nₛᵘ,RBVars.S.Nₛᵘ,:)
     return []
   else
-    @info "Failed to import the reduced affine mass matrix: must build it"
+    println("Failed to import the reduced affine mass matrix: must build it")
     return ["M"]
   end
 
@@ -30,12 +30,12 @@ end
 function get_MAₙ(RBInfo::Info, RBVars::PoissonSTPGRB) :: Vector
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
-    @info "S-PGRB: importing MAₙ"
+    println("S-PGRB: importing MAₙ")
     MAₙ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "MAₙ.csv"))
     RBVars.MAₙ = reshape(MAₙ,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,:)
     return []
   else
-    @info "ST-PGRB: failed to import MAₙ: must build it"
+    println("ST-PGRB: failed to import MAₙ: must build it")
     return ["M","A"]
   end
 
@@ -43,7 +43,7 @@ end
 
 function assemble_MAₙ(RBVars::PoissonSTPGRB)
 
-  @info "S-PGRB: Assembling MAₙ"
+  println("S-PGRB: Assembling MAₙ")
 
   nₛᵘ = RBVars.S.nₛᵘ
   MAₙ = zeros(RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,RBVars.Qᵐ*RBVars.S.Qᵃ)
@@ -61,7 +61,7 @@ function assemble_affine_matrices(RBInfo::Info, RBVars::PoissonSTPGRB, var::Stri
 
   if var == "M"
     RBVars.Qᵐ = 1
-    @info "Assembling affine reduced mass"
+    println("Assembling affine reduced mass")
     M = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "M.csv");
       convert_to_sparse = true)
     RBVars.Mₙ = reshape((M*RBVars.S.Φₛᵘ)'*RBVars.S.Pᵤ⁻¹*(M*RBVars.S.Φₛᵘ),
@@ -79,8 +79,8 @@ end
 function assemble_reduced_mat_MDEIM(
   RBInfo::Info,
   RBVars::PoissonSTPGRB,
-  MDEIM_mat::Matrix,
-  row_idx::Vector,
+  MDEIM_mat::Matrix{Float64},
+  row_idx::Vector{Float64},
   var::String)
 
   if RBInfo.space_time_M_DEIM
@@ -90,7 +90,7 @@ function assemble_reduced_mat_MDEIM(
     r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
     MatqΦ = zeros(RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q*Nₜ)
     for q = 1:Q
-      @info "ST-GRB: affine component number $q/$Q, matrix $var"
+      println("ST-GRB: affine component number $q/$Q, matrix $var")
       for j = 1:RBVars.S.Nₛᵘ
         Mat_idx = findall(x -> x == j, r_idx)
         MatqΦ[j,:,(q-1)*Nₜ+1:q*Nₜ] =
@@ -101,7 +101,7 @@ function assemble_reduced_mat_MDEIM(
     matrix_product!(MatqΦᵀPᵤ⁻¹,MatqΦ,Matrix(RBVars.S.Pᵤ⁻¹),transpose_A=true)
     for q₁ = 1:Q*Nₜ
       for q₂ = 1:Q*Nₜ
-        @info "ST-PGRB: affine component number $((q₁-1)*RBVars.Qᵐ+q₂), matrix $var"
+        println("ST-PGRB: affine component number $((q₁-1)*RBVars.Qᵐ+q₂), matrix $var")
         RBVars.Mₙ[:,:,(q₁-1)*Q+q₂] = MatqΦᵀPᵤ⁻¹[:,:,q₁]*MatqΦ[:,:,q₂]
       end
     end
@@ -118,7 +118,7 @@ function assemble_reduced_mat_MDEIM(
     Matₙ = zeros(RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,Q^2)
     for q₁ = 1:Q
       for q₂ = 1:Q
-        @info "ST-PGRB: affine component number $((q₁-1)*RBVars.Qᵐ+q₂), matrix $var"
+        println("ST-PGRB: affine component number $((q₁-1)*RBVars.Qᵐ+q₂), matrix $var")
         Matₙ[:,:,(q₁-1)*Q+q₂] = MatqΦᵀPᵤ⁻¹[:,:,q₁]*MatqΦ[:,:,q₂]
       end
     end
@@ -138,11 +138,11 @@ end
 
 function assemble_affine_vectors(RBInfo::Info, RBVars::PoissonSTPGRB, var::String)
 
-  @info "SPGRB: assembling affine reduced RHS; A is affine"
+  println("SPGRB: assembling affine reduced RHS; A is affine")
 
   if var == "F"
     RBVars.S.Qᶠ = 1
-    @info "Assembling affine reduced forcing term"
+    println("Assembling affine reduced forcing term")
     F = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "F.csv"))
     MFₙ = zeros(RBVars.S.nₛᵘ, 1, RBVars.Qᵐ*RBVars.S.Qᶠ)
     matrix_product_vec!(MFₙ, RBVars.MΦᵀPᵤ⁻¹, reshape(F,:,1))
@@ -152,7 +152,7 @@ function assemble_affine_vectors(RBInfo::Info, RBVars::PoissonSTPGRB, var::Strin
       reshape(AFₙ,:,RBVars.S.Qᵃ*RBVars.S.Qᶠ))
   elseif var == "H"
     RBVars.S.Qʰ = 1
-    @info "Assembling affine reduced Neumann term"
+    println("Assembling affine reduced Neumann term")
     H = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "H.csv"))
     MHₙ = zeros(RBVars.S.nₛᵘ, 1, RBVars.Qᵐ*RBVars.S.Qʰ)
     matrix_product_vec!(MHₙ, RBVars.MΦᵀPᵤ⁻¹, reshape(H,:,1))
@@ -169,7 +169,7 @@ end
 function assemble_reduced_mat_DEIM(
   RBInfo::Info,
   RBVars::PoissonSTPGRB,
-  DEIM_mat::Matrix,
+  DEIM_mat::Matrix{Float64},
   var::String)
 
   if RBInfo.space_time_M_DEIM
@@ -286,7 +286,7 @@ end
 
 function get_RB_LHS_blocks(RBInfo, RBVars::PoissonSTPGRB, θᵐ, θᵃ, θᵐᵃ, θᵃᵐ)
 
-  @info "Assembling LHS using θ-method time scheme, θ=$(RBInfo.θ)"
+  println("Assembling LHS using θ-method time scheme, θ=$(RBInfo.θ)")
 
   θ = RBInfo.θ
   δt = RBInfo.δt
@@ -388,7 +388,7 @@ end
 
 function get_RB_RHS_blocks(RBInfo::Info, RBVars::PoissonSTPGRB, θᶠ, θʰ)
 
-  @info "Assembling RHS using θ-method time scheme, θ=$(RBInfo.θ)"
+  println("Assembling RHS using θ-method time scheme, θ=$(RBInfo.θ)")
 
   Qᵐᶠ = RBVars.Qᵐ*RBVars.S.Qᶠ
   Qᵐʰ = RBVars.Qᵐ*RBVars.S.Qʰ
@@ -469,7 +469,7 @@ end
 
 function build_Param_RHS(RBInfo::Info, RBVars::PoissonSTPGRB, Param)
 
-  @info "Assembling RHS exactly using θ-method time scheme, θ=$(RBInfo.θ)"
+  println("Assembling RHS exactly using θ-method time scheme, θ=$(RBInfo.θ)")
 
   δt = RBInfo.δt
   θ = RBInfo.θ

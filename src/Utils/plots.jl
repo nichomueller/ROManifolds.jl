@@ -1,6 +1,6 @@
 """Plot the surface of the function 'f':R²->R between ranges specificed by
   'xrange' and 'yrange'. The plotting grid is composed of 'n' points/direction"""
-function plot_R²_R(f::Function, xrange::Vector, yrange::Vector, n::Int)
+function plot_R²_R(f::Function, xrange::Vector{Float64}, yrange::Vector{Float64}, n::Int)
   x = range(xrange[1], xrange[2], n)
   y = range(yrange[1], yrange[2], n)
   suface(x, y, f)
@@ -8,7 +8,7 @@ end
 
 """Plot the vector-valued function 'f':R->R² between range specificed by
   'xrange'. The plotting grid is composed of 'n' points"""
-function plot_R_R²(f::Function, xrange::Vector, n::Int)
+function plot_R_R²(f::Function, xrange::Vector{Float64}, n::Int)
   xs_ys(vs) = Tuple(eltype(vs[1])[vs[i][j] for i in eachindex(vs)]
     for j in eachindex(first(vs)))
   xs_ys(v, vs...) = xs_ys([v, vs...])

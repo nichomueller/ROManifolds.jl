@@ -4,22 +4,22 @@ include("S-PGRB_Poisson.jl")
 
 function get_snapshot_matrix(RBInfo::Info, RBVars::PoissonSteady)
 
-  @info "Importing the snapshot matrix for field u,
-    number of snapshots considered: $(RBInfo.nₛ)"
-  Sᵘ = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
+  println("Importing the snapshot matrix for field u,
+    number of snapshots considered: $(RBInfo.nₛ)")
+  Sᵘ = Matrix{Float64}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
     DataFrame))[:, 1:RBInfo.nₛ]
-  @info "Dimension of snapshot matrix: $(size(Sᵘ))"
+  println("Dimension of snapshot matrix: $(size(Sᵘ))")
   RBVars.Sᵘ = Sᵘ
   RBVars.Nₛᵘ = size(Sᵘ)[1]
 end
 
 function get_norm_matrix(RBInfo::Info, RBVars::PoissonSteady)
   if check_norm_matrix(RBVars)
-    @info "Importing the norm matrix Xᵘ₀"
+    println("Importing the norm matrix Xᵘ₀")
     Xᵘ₀ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Xᵘ₀.csv");
      convert_to_sparse = true)
     RBVars.Nₛᵘ = size(Xᵘ₀)[1]
-    @info "Dimension of norm matrix: $(size(Xᵘ₀))"
+    println("Dimension of norm matrix: $(size(Xᵘ₀))")
     if RBInfo.use_norm_X
       RBVars.Xᵘ₀ = Xᵘ₀
     else
@@ -33,7 +33,7 @@ function check_norm_matrix(RBVars::PoissonSteady) :: Bool
 end
 
 function PODs_space(RBInfo::Info, RBVars::PoissonSteady)
-  @info "Performing the spatial POD for field u, using a tolerance of $(RBInfo.ϵₛ)"
+  println("Performing the spatial POD for field u, using a tolerance of $(RBInfo.ϵₛ)")
   get_norm_matrix(RBInfo, RBVars)
   RBVars.Φₛᵘ, _ = POD(RBVars.Sᵘ, RBInfo.ϵₛ, RBVars.Xᵘ₀)
   (RBVars.Nₛᵘ, RBVars.nₛᵘ) = size(RBVars.Φₛᵘ)
@@ -50,7 +50,7 @@ function build_reduced_basis(RBInfo::Info, RBVars::PoissonSteady)
 end
 
 function import_reduced_basis(RBInfo::Info, RBVars::PoissonSteady)
-  @info "Importing the spatial reduced basis for field u"
+  println("Importing the spatial reduced basis for field u")
   RBVars.Φₛᵘ = load_CSV(joinpath(RBInfo.paths.basis_path, "Φₛᵘ.csv"))
   (RBVars.Nₛᵘ, RBVars.nₛᵘ) = size(RBVars.Φₛᵘ)
 end
@@ -72,7 +72,7 @@ function get_generalized_coordinates(
 
 end
 
-function set_operators(RBInfo::Info, ::PoissonSteady) ::Vector
+function set_operators(RBInfo::Info, ::PoissonSteady) ::Vector{Float64}
   operators = ["A"]
   if !RBInfo.build_Parametric_RHS
     append!(operators, ["F","H"])
@@ -85,14 +85,14 @@ function assemble_MDEIM_matrices(
   RBVars::PoissonSteady,
   var::String)
 
-  @info "The matrix $var is non-affine:
-    running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots"
+  println("The matrix $var is non-affine:
+    running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
   if var == "A"
-    if isempty(RBVars.S.MDEIM_mat_A)
-      (RBVars.S.MDEIM_mat_A, RBVars.S.MDEIM_idx_A, RBVars.S.MDEIMᵢ_A,
-      RBVars.row_idx_A,RBVars.S.sparse_el_A) = MDEIM_offline(FEMSpace, RBInfo, "A")
+    if isempty(RBVars.MDEIM_mat_A)
+      (RBVars.MDEIM_mat_A, RBVars.MDEIM_idx_A, RBVars.MDEIMᵢ_A,
+      RBVars.row_idx_A,RBVars.sparse_el_A) = MDEIM_offline(FEMSpace, RBInfo, "A")
     end
-    assemble_reduced_mat_MDEIM(RBVars,RBVars.S.MDEIM_mat_A,RBVars.row_idx_A)
+    assemble_reduced_mat_MDEIM(RBVars,RBVars.MDEIM_mat_A,RBVars.row_idx_A)
   else
     error("Unrecognized variable on which to perform MDEIM")
   end
@@ -104,8 +104,8 @@ function assemble_DEIM_vectors(
   RBVars::PoissonSteady,
   var::String)
 
-  @info "The vector $var is non-affine:
-    running the DEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots"
+  println("The vector $var is non-affine:
+    running the DEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
 
   if var == "F"
     if isempty(RBVars.DEIM_mat_F)
@@ -146,14 +146,14 @@ function save_M_DEIM_structures(RBInfo::Info, RBVars::PoissonSteady)
 
 end
 
-function get_M_DEIM_structures(RBInfo::Info, RBVars::PoissonSteady) ::Vector
+function get_M_DEIM_structures(RBInfo::Info, RBVars::PoissonSteady) ::Vector{Float64}
 
   operators = String[]
 
   if RBInfo.probl_nl["A"]
 
     if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MDEIMᵢ_A.csv"))
-      @info "Importing MDEIM offline structures, A"
+      println("Importing MDEIM offline structures, A")
       RBVars.MDEIMᵢ_A = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
         "MDEIMᵢ_A.csv"))
       RBVars.MDEIM_idx_A = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
@@ -164,29 +164,29 @@ function get_M_DEIM_structures(RBInfo::Info, RBVars::PoissonSteady) ::Vector
         "sparse_el_A.csv"))[:]
       append!(operators, [])
     else
-      @info "Failed to import MDEIM offline structures,
-        A: must build them"
+      println("Failed to import MDEIM offline structures,
+        A: must build them")
       append!(operators, ["A"])
     end
 
   end
 
   if RBInfo.build_Parametric_RHS
-    @info "Will assemble nonaffine reduced RHS exactly"
+    println("Will assemble nonaffine reduced RHS exactly")
     return operators
   else
 
     if RBInfo.probl_nl["f"]
 
       if isfile(joinpath(RBInfo.paths.ROM_structures_path, "DEIMᵢ_F.csv"))
-        @info "Importing DEIM offline structures, F"
+        println("Importing DEIM offline structures, F")
         RBVars.DEIMᵢ_F = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
           "DEIMᵢ_F.csv"))
         RBVars.DEIM_idx_F = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
           "DEIM_idx_F.csv"))[:]
         append!(operators, [])
       else
-        @info "Failed to import DEIM offline structures, F: must build them"
+        println("Failed to import DEIM offline structures, F: must build them")
         append!(operators, ["F"])
       end
 
@@ -195,7 +195,7 @@ function get_M_DEIM_structures(RBInfo::Info, RBVars::PoissonSteady) ::Vector
     if RBInfo.probl_nl["h"]
 
       if isfile(joinpath(RBInfo.paths.ROM_structures_path, "DEIMᵢ_H.csv"))
-        @info "Importing DEIM offline structures, H"
+        println("Importing DEIM offline structures, H")
         RBVars.DEIMᵢ_H = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
           "DEIMᵢ_H.csv"))
         RBVars.DEIM_idx_H = load_CSV(joinpath(RBInfo.paths.ROM_structures_path,
@@ -203,7 +203,7 @@ function get_M_DEIM_structures(RBInfo::Info, RBVars::PoissonSteady) ::Vector
         append!(operators, [])
         return
       else
-        @info "Failed to import DEIM offline structures, H: must build them"
+        println("Failed to import DEIM offline structures, H: must build them")
         append!(operators, ["H"])
       end
 
@@ -218,11 +218,11 @@ end
 function get_Fₙ(RBInfo::Info, RBVars::RBProblem) :: Vector
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Fₙ.csv"))
-    @info "Importing Fₙ"
+    println("Importing Fₙ")
     RBVars.Fₙ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "Fₙ.csv"))
     return []
   else
-    @info "Failed to import Fₙ: must build it"
+    println("Failed to import Fₙ: must build it")
     return ["F"]
   end
 
@@ -231,11 +231,11 @@ end
 function get_Hₙ(RBInfo::Info, RBVars::RBProblem) :: Vector
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Hₙ.csv"))
-    @info "Importing Hₙ"
+    println("Importing Hₙ")
     RBVars.Hₙ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "Hₙ.csv"))
     return []
   else
-    @info "Failed to import Hₙ: must build it"
+    println("Failed to import Hₙ: must build it")
     return ["H"]
   end
 
@@ -314,7 +314,7 @@ function get_system_blocks(
   RBInfo::Info,
   RBVars::RBProblem,
   LHS_blocks::Array,
-  RHS_blocks::Array) ::Vector
+  RHS_blocks::Array) ::Vector{Float64}
 
   if !RBInfo.import_offline_structures
     return ["LHS", "RHS"]
@@ -339,7 +339,7 @@ function get_system_blocks(
   if "LHS" ∉ operators
     for i = LHS_blocks
       LHSₙi = "LHSₙ" * string(i) * ".csv"
-      @info "Importing block number $i of the reduced affine LHS"
+      println("Importing block number $i of the reduced affine LHS")
       push!(RBVars.LHSₙ,
         load_CSV(joinpath(RBInfo.paths.ROM_structures_path, LHSₙi)))
       RBVars.nᵘ = size(RBVars.LHSₙ[i])[1]
@@ -348,7 +348,7 @@ function get_system_blocks(
   if "RHS" ∉ operators
     for i = RHS_blocks
       RHSₙi = "RHSₙ" * string(i) * ".csv"
-      @info "Importing block number $i of the reduced affine LHS"
+      println("Importing block number $i of the reduced affine LHS")
       push!(RBVars.RHSₙ,
         load_CSV(joinpath(RBInfo.paths.ROM_structures_path, RHSₙi)))
       RBVars.nᵘ = size(RBVars.RHSₙ[i])[1]
@@ -364,7 +364,7 @@ function save_system_blocks(
   RBVars::RBProblem,
   LHS_blocks::Array,
   RHS_blocks::Array,
-  operators::Vector)
+  operators::Vector{Float64})
 
   if !RBInfo.probl_nl["A"] && "LHS" ∈ operators
     for i = LHS_blocks
@@ -445,18 +445,18 @@ function get_RB_system(RBInfo::Info, RBVars::PoissonSteady, Param)
     θᵃ, θᶠ, θʰ = get_θ(RBInfo, RBVars, Param)
 
     if "LHS" ∈ operators
-      @info "Assembling reduced LHS"
+      println("Assembling reduced LHS")
       push!(RBVars.LHSₙ,assemble_online_structure(θᵃ, RBVars.Aₙ))
     end
 
     if "RHS" ∈ operators
       if !RBInfo.build_Parametric_RHS
-        @info "Assembling reduced RHS"
+        println("Assembling reduced RHS")
         Fₙ_μ = assemble_online_structure(θᶠ, RBVars.Fₙ)
         Hₙ_μ = assemble_online_structure(θʰ, RBVars.Hₙ)
         push!(RBVars.RHSₙ, reshape(Fₙ_μ+Hₙ_μ,:,1))
       else
-        @info "Assembling reduced RHS exactly"
+        println("Assembling reduced RHS exactly")
         Fₙ_μ, Hₙ_μ = build_Param_RHS(RBInfo, RBVars, Param, θᵃ)
         push!(RBVars.RHSₙ, reshape(Fₙ_μ+Hₙ_μ,:,1))
       end
@@ -469,15 +469,15 @@ end
 
 function solve_RB_system(RBInfo::Info, RBVars::PoissonSteady, Param)
   get_RB_system(RBInfo, RBVars, Param)
-  @info "Solving RB problem via backslash"
-  @info "Condition number of the system's matrix: $(cond(RBVars.LHSₙ[1]))"
+  println("Solving RB problem via backslash")
+  println("Condition number of the system's matrix: $(cond(RBVars.LHSₙ[1]))")
   RBVars.online_time += @elapsed begin
     RBVars.uₙ = RBVars.LHSₙ[1] \ RBVars.RHSₙ[1]
   end
 end
 
 function reconstruct_FEM_solution(RBVars::PoissonSteady)
-  @info "Reconstructing FEM solution from the newly computed RB one"
+  println("Reconstructing FEM solution from the newly computed RB one")
   RBVars.ũ = RBVars.Φₛᵘ * RBVars.uₙ
 end
 
@@ -503,7 +503,7 @@ function offline_phase(RBInfo::Info, RBVars::PoissonSteady)
   end
 
   if import_snapshots_success && !import_basis_success
-    @info "Failed to import the reduced basis, building it via POD"
+    println("Failed to import the reduced basis, building it via POD")
     build_reduced_basis(RBInfo, RBVars)
   end
 
@@ -531,12 +531,12 @@ function online_phase(RBInfo::Info, RBVars::PoissonSteady, μ, Param_nbs)
   uₙ_μ = zeros(RBVars.nₛᵘ, length(Param_nbs))
 
   for nb in Param_nbs
-    @info "Considering Parameter number: $nb"
+    println("Considering Parameter number: $nb")
 
     μ_nb = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
     Param = get_ParamInfo(problem_ntuple, RBInfo, μ_nb)
 
-    uₕ_test = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, nb]
+    uₕ_test = Matrix{Float64}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, nb]
 
     solve_RB_system(RBInfo, RBVars, Param)
     reconstruction_time = @elapsed begin
@@ -552,8 +552,8 @@ function online_phase(RBInfo::Info, RBVars::PoissonSteady, μ, Param_nbs)
     ũ_μ[:, nb - Param_nbs[1] + 1] = RBVars.ũ
     uₙ_μ[:, nb - Param_nbs[1] + 1] = RBVars.uₙ
 
-    @info "Online wall time: $(RBVars.online_time) s (snapshot number $nb)"
-    @info "Relative reconstruction H1-error: $H1_err_nb (snapshot number $nb)"
+    println("Online wall time: $(RBVars.online_time) s (snapshot number $nb)")
+    println("Relative reconstruction H1-error: $H1_err_nb (snapshot number $nb)")
 
   end
 
@@ -572,7 +572,7 @@ function online_phase(RBInfo::Info, RBVars::PoissonSteady, μ, Param_nbs)
     save_CSV([mean_H1_err], joinpath(path_μ, "H1_err.csv"))
 
     if !RBInfo.import_offline_structures
-      times = Dict(RBVars.S.offline_time=>"off_time",
+      times = Dict(RBVars.offline_time=>"off_time",
         mean_online_time=>"on_time", mean_reconstruction_time=>"rec_time")
     else
       times = Dict(mean_online_time=>"on_time",

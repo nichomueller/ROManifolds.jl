@@ -1,20 +1,20 @@
 function get_snapshot_matrix(RBInfo, RBVars::RBProblem)
 
-  @info "Importing the snapshot matrix, number of snapshots considered: $n_snap"
+  println("Importing the snapshot matrix, number of snapshots considered: $n_snap")
 
   name = "uₕ"
   Sᵘ = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, name * ".csv"), DataFrame))[:, 1:(RBInfo.nₛ*RBInfo.Nₜ)]
   RBVars.Sᵘ = Sᵘ
   RBVars.Nᵤˢ = size(Sᵘ)[1]
 
-  @info "Dimension of snapshot matrix: $(size(Sᵘ)); (Nᵤˢ, Nₜ, nₛ) = ($RBVars.Nᵤˢ, $RBInfo.Nₜ, $RBInfo.nₛ)"
+  println("Dimension of snapshot matrix: $(size(Sᵘ)); (Nᵤˢ, Nₜ, nₛ) = ($RBVars.Nᵤˢ, $RBInfo.Nₜ, $RBInfo.nₛ)")
 
 end
 
 function PODs_time(RBInfo, RBVars::RBProblem)
 
 
-  @info "Performing the temporal POD for field u, using a tolerance of $RBInfo.ϵₜ"
+  println("Performing the temporal POD for field u, using a tolerance of $RBInfo.ϵₜ")
 
   if RBInfo.time_reduction_technique === "ST-HOSVD"
     Sᵘₜ = zeros(RBInfo.Nₜ, RBVars.nᵤˢ * RBInfo.nₛ)
@@ -39,7 +39,7 @@ end
 function build_reduced_basis(RBInfo, RBVars::RBProblem)
 
 
-  @info "Building the space-time reduced basis, using tolerances of $(RBInfo.ϵₛ, RBInfo.ϵₜ)"
+  println("Building the space-time reduced basis, using tolerances of $(RBInfo.ϵₛ, RBInfo.ϵₜ)")
 
   RB_building_time = @elapsed begin
     PODs_space(RBInfo, RBVars)
@@ -59,7 +59,7 @@ end
 function import_reduced_basis(RBInfo, RBVars::RBProblem)
 
 
-  @info "Importing the reduced basis"
+  println("Importing the reduced basis")
 
   RBVars.Φₛᵘ = load_CSV(joinpath(RBInfo.paths.basis_path, "Φₛᵘ.csv"))
   RBVars.Φₜᵘ = load_CSV(joinpath(RBInfo.paths.basis_path, "Φₜᵘ.csv"))
@@ -75,10 +75,10 @@ function check_reduced_affine_components(RBInfo, RBVars::RBProblem)
   operators = []
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
-    @info "Importing reduced mass matrix"
+    println("Importing reduced mass matrix")
     RBVars.Mₙ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
   else
-    @info "Failed to import the reduced mass matrix: must build it"
+    println("Failed to import the reduced mass matrix: must build it")
     push!(operators, "M")
   end
 
@@ -110,7 +110,7 @@ function get_generalized_coordinates(RBInfo, RBVars::RBProblem, snaps=nothing)
   Φₛᵘ_normed = RBVars.Xᵘ * RBVars.Φₛᵘ
 
   for i_nₛ = snaps
-    @info "Assembling generalized coordinate relative to snapshot $(i_nₛ)"
+    println("Assembling generalized coordinate relative to snapshot $(i_nₛ)")
     for i_s = 1:RBVars.nₛᵘ
       for i_t = 1:RBVars.nₛᵗ
         Π_ij = kron(Φₛᵘ_normed[:, i_s], RBVars.Φₜᵘ[:, i_t])
@@ -144,20 +144,20 @@ function check_affine_blocks(RBInfo, RBVars::RBProblem)
     RHSₙi = "RHSₙ" * string(i) * ".csv"
 
     if isfile(joinpath(RBInfo.paths.ROM_structures_path, LHSₙi * ".csv"))
-      @info "Importing block number $i of the reduced affine LHS"
+      println("Importing block number $i of the reduced affine LHS")
       push!(RBVars.LHSₙ, load_CSV(joinpath(RBInfo.paths.ROM_structures_path, LHSₙi)))
       RBVars.nₛᵘ = size(RBVars.LHSₙ[i])[1]
     else
-      @info "Failed to import the block number $i of the reduced affine LHS: must build it"
+      println("Failed to import the block number $i of the reduced affine LHS: must build it")
       push!(operators, "A")
     end
 
     if isfile(joinpath(RBInfo.paths.ROM_structures_path, RHSₙi * ".csv"))
-      @info "Importing block number $i of the reduced affine RHS"
+      println("Importing block number $i of the reduced affine RHS")
       push!(RBVars.RHSₙ, load_CSV(joinpath(RBInfo.paths.ROM_structures_path, RHSₙi)))
       RBVars.nₛᵘ = size(RBVars.RHSₙ[i])[1]
     else
-      @info "Failed to import the block number $i of the reduced affine RHS: must build it"
+      println("Failed to import the block number $i of the reduced affine RHS: must build it")
       push!(operators, "F")
     end
 
@@ -225,7 +225,7 @@ end
 function get_RB_system(RBInfo, RBVars::RBProblem, FEMSpace=nothing, Param=nothing)
 
 
-  @info "Preparing the RB system: fetching online reduced structures"
+  println("Preparing the RB system: fetching online reduced structures")
 
   operators = check_affine_blocks(RBInfo, RBVars)
 

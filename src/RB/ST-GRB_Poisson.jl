@@ -7,13 +7,13 @@ end
 function get_Mₙ(RBInfo::Info, RBVars::PoissonSTGRB) :: Vector
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
-    @info "Importing reduced affine mass matrix"
+    println("Importing reduced affine mass matrix")
     Mₙ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
     RBVars.Mₙ = reshape(Mₙ,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,:)
     RBVars.Qᵐ = size(RBVars.Mₙ)[end]
     return []
   else
-    @info "Failed to import the reduced affine mass matrix: must build it"
+    println("Failed to import the reduced affine mass matrix: must build it")
     return ["M"]
   end
 
@@ -23,7 +23,7 @@ function assemble_affine_matrices(RBInfo::Info, RBVars::PoissonSTGRB, var::Strin
 
   if var == "M"
     RBVars.Qᵐ = 1
-    @info "Assembling affine reduced mass"
+    println("Assembling affine reduced mass")
     M = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "M.csv");
       convert_to_sparse = true)
     RBVars.Mₙ = zeros(RBVars.S.nₛᵘ, RBVars.S.nₛᵘ, 1)
@@ -37,8 +37,8 @@ end
 function assemble_reduced_mat_MDEIM(
   RBInfo::Info,
   RBVars::PoissonSTGRB,
-  MDEIM_mat::Matrix,
-  row_idx::Vector,
+  MDEIM_mat::Matrix{Float64},
+  row_idx::Vector{Float64},
   var::String)
 
   if RBInfo.space_time_M_DEIM
@@ -48,7 +48,7 @@ function assemble_reduced_mat_MDEIM(
     r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
     MatqΦ = zeros(RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q*Nₜ)
     @simd for q = 1:Q
-      @info "ST-GRB: affine component number $q/$Q, matrix $var"
+      println("ST-GRB: affine component number $q/$Q, matrix $var")
       for j = 1:RBVars.S.Nₛᵘ
         Mat_idx = findall(x -> x == j, r_idx)
         MatqΦ[j,:,(q-1)*Nₜ+1:q*Nₜ] =
@@ -88,7 +88,7 @@ end
 function assemble_reduced_mat_DEIM(
   RBInfo::Info,
   RBVars::PoissonSTGRB,
-  DEIM_mat::Matrix,
+  DEIM_mat::Matrix{Float64},
   var::String)
 
   if RBInfo.space_time_M_DEIM
@@ -97,7 +97,7 @@ function assemble_reduced_mat_DEIM(
     Q = Int(size(DEIM_mat_new)[2]/Nₜ)
     Vecₙ = zeros(RBVars.S.nₛᵘ,1,Q*Nₜ)
     @simd for q = 1:Q*Nₜ
-      Vecₙ[:,:,q] = RBVars.S.Φₛᵘ' * Vector(DEIM_mat_new[:, q])
+      Vecₙ[:,:,q] = RBVars.S.Φₛᵘ' * Vector{Float64}(DEIM_mat_new[:, q])
     end
     Vecₙ = reshape(RBVars.S.Φₛᵘ' * reshape(MatqΦ,RBVars.S.Nₛᵘ,:),
       RBVars.S.nₛᵘ,:,Q*Nₜ)
@@ -105,7 +105,7 @@ function assemble_reduced_mat_DEIM(
     Q = size(DEIM_mat)[2]
     Vecₙ = zeros(RBVars.S.nₛᵘ,1,Q)
     @simd for q = 1:Q
-      Vecₙ[:,:,q] = RBVars.S.Φₛᵘ' * Vector(DEIM_mat[:, q])
+      Vecₙ[:,:,q] = RBVars.S.Φₛᵘ' * Vector{Float64}(DEIM_mat[:, q])
     end
     Vecₙ = reshape(Vecₙ,:,Q)
   end
@@ -193,7 +193,7 @@ end
 
 function get_RB_LHS_blocks(RBInfo, RBVars::PoissonSTGRB, θᵐ, θᵃ)
 
-  @info "Assembling LHS using θ-method time scheme, θ=$(RBInfo.θ)"
+  println("Assembling LHS using θ-method time scheme, θ=$(RBInfo.θ)")
 
   θ = RBInfo.θ
   δtθ = RBInfo.δt*θ
@@ -244,7 +244,7 @@ end
 
 function get_RB_LHS_blocks_spacetime(RBInfo, RBVars::PoissonSTGRB, θᵐ, θᵃ)
 
-  @info "Assembling LHS using θ-method time scheme, θ=$(RBInfo.θ)"
+  println("Assembling LHS using θ-method time scheme, θ=$(RBInfo.θ)")
 
   θ = RBInfo.θ
   δtθ = RBInfo.δt*θ
@@ -301,7 +301,7 @@ end
 
 function get_RB_RHS_blocks(RBInfo::Info, RBVars::PoissonSTGRB, θᶠ, θʰ)
 
-  @info "Assembling RHS using θ-method time scheme, θ=$(RBInfo.θ)"
+  println("Assembling RHS using θ-method time scheme, θ=$(RBInfo.θ)")
 
   Qᶠ = RBVars.S.Qᶠ
   Qʰ = RBVars.S.Qʰ
@@ -372,7 +372,7 @@ function get_RB_system(RBInfo::Info, RBVars::PoissonSTGRB, Param)
 end
 
 function build_Param_RHS(RBInfo::Info, RBVars::PoissonSTGRB, Param)
-  @info "Assembling RHS exactly using θ-method time scheme, θ=$(RBInfo.θ)"
+  println("Assembling RHS exactly using θ-method time scheme, θ=$(RBInfo.θ)")
   δtθ = RBInfo.δt*RBInfo.θ
   F_t = assemble_forcing(FEMSpace, RBInfo, Param)
   H_t = assemble_neumann_datum(FEMSpace, RBInfo, Param)

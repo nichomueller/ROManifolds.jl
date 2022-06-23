@@ -3,7 +3,7 @@ include("RB_Poisson_unsteady.jl")
 
 function get_RB_LHS_blocks(RBInfo, RBVars::PoissonSTGRB, θᵐ, θᵃ)
 
-  @info "Assembling LHS using θ-method time scheme, θ=$(RBInfo.θ)"
+  println("Assembling LHS using θ-method time scheme, θ=$(RBInfo.θ)")
 
   θ = RBInfo.θ
   δtθ = RBInfo.δt*θ
@@ -67,7 +67,7 @@ end
 
 function get_RB_RHS_blocks(RBInfo::Info, RBVars::PoissonSTGRB, θᶠ, θʰ)
 
-  @info "Assembling RHS using θ-method time scheme, θ=$(RBInfo.θ)"
+  println("Assembling RHS using θ-method time scheme, θ=$(RBInfo.θ)")
 
   Qᶠ = RBVars.S.Qᶠ
   Qʰ = RBVars.S.Qʰ

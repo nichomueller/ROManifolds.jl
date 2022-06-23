@@ -21,9 +21,9 @@ function set_labels(ProblInfo::Info, model::DiscreteModel)
 end
 
 function get_FEMSpace(
-  ::NTuple{1,Int}, ProblInfo::SteadyInfo, model::DiscreteModel, g = nothing)
+  ::NTuple{1,Int}, ProblInfo::SteadyInfo, model::DiscreteModel, g=nothing)
 
-  degree = 2*ProblInfo.order
+  degree = 2 * ProblInfo.order
   labels = set_labels(ProblInfo, model)
   Ω = Interior(model)
   dΩ = Measure(Ω, degree)
@@ -61,9 +61,9 @@ function get_FEMSpace(
 end
 
 function get_FEMSpace(
-  ::NTuple{1,Int}, ProblInfo::UnsteadyInfo, model::DiscreteModel, g = nothing)
+  ::NTuple{1,Int}, ProblInfo::UnsteadyInfo, model::DiscreteModel, g=nothing)
 
-  degree = 2*ProblInfo.order
+  degree = 2 * ProblInfo.order
   labels = set_labels(ProblInfo, model)
   Ω = Interior(model)
   dΩ = Measure(Ω, degree)
@@ -86,7 +86,7 @@ function get_FEMSpace(
   end
   if isnothing(g)
     g₀(x, t::Real) = 0
-    g₀(t::Real) = x->g₀(x,t)
+    g₀(t::Real) = x -> g₀(x, t)
     V = TransientTrialFESpace(V₀, g₀)
   else
     V = TransientTrialFESpace(V₀, g)
@@ -102,9 +102,12 @@ function get_FEMSpace(
 end
 
 function get_FEMSpace(
-  ::NTuple{2,Int}, ProblInfo::SteadyInfo, model::DiscreteModel, g = nothing)
+  ::NTuple{2,Int},
+  ProblInfo::SteadyInfo,
+  model::DiscreteModel,
+  g=nothing)
 
-  degree = 2*ProblInfo.order
+  degree = 2 * ProblInfo.order
   labels = set_labels(ProblInfo, model)
 
   Ω = Triangulation(model)
@@ -127,7 +130,7 @@ function get_FEMSpace(
   ϕᵤ = get_trial_fe_basis(V)
   Nₛᵘ = length(get_free_dof_ids(V))
 
-  refFEₚ = ReferenceFE(lagrangian, Float64, order-1; space=:P)
+  refFEₚ = ReferenceFE(lagrangian, Float64, order - 1; space=:P)
   Q₀ = TestFESpace(model, refFEₚ; conformity=:L2, constraint=:zeromean)
   Q = TrialFESpace(Q₀)
   ψᵧ = get_trial_fe_basis(Q₀)
@@ -145,9 +148,9 @@ function get_FEMSpace(
 end
 
 function get_FEMSpace(
-  ::NTuple{2,Int}, ProblInfo::UnsteadyInfo, model::DiscreteModel, g = nothing)
+  ::NTuple{2,Int}, ProblInfo::UnsteadyInfo, model::DiscreteModel, g=nothing)
 
-  degree = 2*ProblInfo.order
+  degree = 2 * ProblInfo.order
   labels = set_labels(ProblInfo, model)
   Ω = Interior(model)
   dΩ = Measure(Ω, degree)
@@ -169,8 +172,8 @@ function get_FEMSpace(
     V₀ = TestFESpace(model, refFEᵤ; conformity=:H1, constraint=:zeromean)
   end
   if isnothing(g)
-    g₀(x, t::Real) = VectorValue(0,0,0)
-    g₀(t::Real) = x->g₀(x,t)
+    g₀(x, t::Real) = VectorValue(0, 0, 0)
+    g₀(t::Real) = x -> g₀(x, t)
     V = TransientTrialFESpace(V₀, g₀)
   else
     V = TransientTrialFESpace(V₀, g)
@@ -179,7 +182,7 @@ function get_FEMSpace(
   ϕᵤ(t) = get_trial_fe_basis(V(t))
   Nₛᵘ = length(get_free_dof_ids(V₀))
 
-  refFEₚ = ReferenceFE(lagrangian, Float64, ProblInfo.order-1; space=:P)
+  refFEₚ = ReferenceFE(lagrangian, Float64, ProblInfo.order - 1; space=:P)
   Q₀ = TestFESpace(model, refFEₚ, conformity=:L2, constraint=:zeromean)
   Q = TrialFESpace(Q₀)
   ψᵧ = get_fe_basis(Q₀)

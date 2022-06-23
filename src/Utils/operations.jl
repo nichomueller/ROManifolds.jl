@@ -3,7 +3,7 @@
   (positive definite) matrix 'norm_matrix'.
   If typeof(norm_matrix) == nothing (default), the standard inner product between
   'vec1' and 'vec2' is returned."""
-function mydot(vec1::Vector, vec2::Vector, norm_matrix = nothing)
+function mydot(vec1::Vector{Float64}, vec2::Vector{Float64}, norm_matrix = nothing)
 
   if isnothing(norm_matrix)
       norm_matrix = float(I(size(vec1)[1]))
@@ -15,7 +15,7 @@ end
 """Computation of the norm of 'vec', defined by the (positive definite) matrix
 'norm_matrix'. If typeof(norm_matrix) == nothing (default), the Euclidean norm
 of 'vec' is returned."""
-function mynorm(vec::Vector, norm_matrix = nothing)
+function mynorm(vec::Vector{Float64}, norm_matrix = nothing)
 
   if isnothing(norm_matrix)
     norm_matrix = float(I(size(vec)[1]))
@@ -67,7 +67,7 @@ end
 
 """Generate a uniform random vector of dimension n between the ranges set by
   the vector of ranges 'a' and 'b'"""
-function generate_parameter(a::Vector, b::Vector, n::Int64 = 1)
+function generate_parameter(a::Vector{Float64}, b::Vector{Float64}, n::Int64 = 1)
 
   return [[rand(Uniform(a[i], b[i])) for i = eachindex(a)] for j in 1:n]
 
@@ -100,13 +100,13 @@ function POD(S::GeneralizedMatrix, ϵ::Float64=1e-5, X=nothing)
 
   energies = cumsum(Σ.^2)
   N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  @info "Basis number obtained via POD is $N,
-    projection error ≤ $(sqrt(1-energies[N]/energies[end]))"
+  println("Basis number obtained via POD is $N,
+    projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
   if issparse(U)
-    U = Matrix(U)
+    U = Matrix{Float64}(U)
   end
   if !isnothing(X)
-    return Matrix((L' \ U[:, 1:N])[invperm(H.p), :]), Σ
+    return Matrix{Float64}((L' \ U[:, 1:N])[invperm(H.p), :]), Σ
   else
     return U[:,1:N], Σ
   end

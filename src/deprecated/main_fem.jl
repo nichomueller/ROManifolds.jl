@@ -159,7 +159,7 @@ uₕ = Any[]
 if problem_nonlinearities["Ω"] === false
 
     for i_nₛ = 1:nₛ
-        @info "Computing snapshot $i_nₛ"
+        println("Computing snapshot $i_nₛ"
 
         if i_nₛ > 1
             Param = compute_Param(problem_nonlinearities, Params, i_nₛ)
@@ -182,7 +182,7 @@ if problem_nonlinearities["Ω"] === false
 else
 
     for i_nₛ = 1:nₛ
-        @info "Computing snapshot $i_nₛ"
+        println("Computing snapshot $i_nₛ"
 
         if i_nₛ > 1
             Param = compute_Param(problem_nonlinearities, Params, i_nₛ)

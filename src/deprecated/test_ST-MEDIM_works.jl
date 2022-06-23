@@ -156,13 +156,13 @@ function define_offline_snaps(FEMSpace, RBInfo, nₛMDEIM::Int64)
   μ = load_CSV(path)
 
   for k = 1:nₛMDEIM
-    @info "Considering Parameter number $k, need $(nₛMDEIM-k) more!"
+    println("Considering Parameter number $k, need $(nₛMDEIM-k) more!")
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
     Param = get_ParamInfo(problem_ntuple, RBInfo, μₖ)
     A_t = assemble_stiffness(FEMSpace, RBInfo, Param)
 
     for i_t = 1:Nₜ
-      @info "Snapshot at time step $i_t/Nₜ"
+      println("Snapshot at time step $i_t/Nₜ")
       A_i = A_t(timesθ[i_t])
       i, v = findnz(A_i[:])
       if i_t === 1
@@ -215,7 +215,7 @@ function define_online_ST_stiffness(FEMSpace, RBInfo, el)
   A(t) = assemble_matrix(∫(∇(FEMSpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FEMSpace.ϕᵤ(t)))) * dΩ_sparse, FEMSpace.V(t), FEMSpace.V₀)
 
   for (nₜ,t) in enumerate(timesθ)
-    @info "Online snap, considering time step $nₜ/50"
+    println("Online snap, considering time step $nₜ/50")
     i,j,v = findnz(A(t))
     if nₜ === 1
       global Aₒₙ = sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ*length(timesθ))
@@ -237,7 +237,7 @@ function define_online_ST_stiffness_old(FEMSpace, RBInfo, el, row_idx)
   Acom(t) = assemble_matrix(∫(∇(FEMSpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FEMSpace.ϕᵤ(t)))) * FEMSpace.dΩ, FEMSpace.V(t), FEMSpace.V₀)
 
   for (nₜ,t) = enumerate(timesθ)
-    @info "Considering time step $nₜ/50"
+    println("Considering time step $nₜ/50")
     Aₒₙₜ_com = Matrix(reshape(Acom(t)[:][row_idx],:,1))
     if nₜ === 1
       global Aₒₙ_com = zeros(length(Aₒₙₜ_com)*length(timesθ),1)
@@ -264,7 +264,7 @@ function define_online_ST_stiffness_fast(FEMSpace, RBInfo, el, MDEIM_idx_sparse)
   A(t) = assemble_matrix(∫(∇(FEMSpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FEMSpace.ϕᵤ(t)))) * dΩ_sparse, FEMSpace.V(t), FEMSpace.V₀)
 
   for (nₜ,t) in enumerate(timesθ[idx_time])
-    @info "Online snap, considering time step $nₜ/$(length(idx_time))"
+    println("Online snap, considering time step $nₜ/$(length(idx_time))")
     i,j,v = findnz(A(t))
     if nₜ === 1
       global Aₒₙ = sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ*length(idx_time))
@@ -340,15 +340,14 @@ function M_DEIM_POD_old(S::SparseMatrixCSC, ϵ = 1e-5)
     cumulative_energy += Σ[N] ^ 2
     M_DEIM_err_bound = Σ[N + 1] * mult_factor
 
-    @info "(M)DEIM-POD loop number $N, projection error = $M_DEIM_err_bound"
+    println("(M)DEIM-POD loop number $N, projection error = $M_DEIM_err_bound")
 
   end
   M_DEIM_mat = M_DEIM_mat[:, 1:N]
   _, col_idx, val = findnz(sparse(M_DEIM_mat))
   sparse_M_DEIM_mat = sparse(repeat(row_idx, N), col_idx, val, Nₕ, N)
 
-  @info "Basis number obtained via POD is $N, projection error ≤ $M_DEIM_err_bound"
-
+  println("Basis number obtained via POD is $N, projection error ≤ $M_DEIM_err_bound")
   return sparse_M_DEIM_mat, Σ
 
 end
@@ -389,7 +388,7 @@ function build_A_snapshots_old(FEMSpace::UnsteadyProblem, RBInfo::Info, μ::Vect
   A_t = assemble_stiffness(FEMSpace, RBInfo, Param)
 
   for i_t = 1:Nₜ
-    @info "Snapshot at time step $i_t, stiffness"
+    println("Snapshot at time step $i_t, stiffness")
     A_i = A_t(timesθ[i_t])
     i, v = findnz(A_i[:])
     if i_t === 1
@@ -405,12 +404,12 @@ end
 
 function MDEIM_offline_old(FEMSpace::UnsteadyProblem, RBInfo::Info)
 
-  @info "Building $(RBInfo.nₛ_MDEIM) snapshots of $var, at each time step. This will take some time."
+  println("Building $(RBInfo.nₛ_MDEIM) snapshots of $var, at each time step. This will take some time.")
 
   μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
 
   for k = 1:RBInfo.nₛ_MDEIM
-    @info "Considering Parameter number $k, need $(RBInfo.nₛ_MDEIM-k) more!"
+    println("Considering Parameter number $k, need $(RBInfo.nₛ_MDEIM-k) more!")
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
 
     snapsₖ = build_A_snapshots_old(FEMSpace, RBInfo, μₖ)
@@ -441,7 +440,7 @@ function assemble_MDEIM_matrices_old(RBInfo::Info, RBVars::PoissonSTGRB)
   Q = size(MDEIM_mat_old)[2]
   #= Matₙ = zeros(RBVars.S.nₛᵘ, RBVars.S.nₛᵘ, Q)
   for q = 1:Q
-    @info "ST-GRB: affine component number $q, matrix $var"
+    println("ST-GRB: affine component number $q, matrix $var"
     Matq = reshape(MDEIM_mat[:,q], (RBVars.S.Nₛᵘ, RBVars.S.Nₛᵘ))
     Matₙ[:,:,q] = RBVars.S.Φₛᵘ' * Matrix(Matq) * RBVars.S.Φₛᵘ
   end =#

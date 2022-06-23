@@ -20,7 +20,7 @@ function build_sparse_mat(
   FEMInfo::ProblemInfoSteady,
   FEMSpace::SteadyProblem,
   Param::ParametricInfoSteady,
-  el::Vector;
+  el::Vector{Float64};
   var="A")
 
   Ω_sparse = view(FEMSpace.Ω, el)
@@ -40,8 +40,8 @@ function build_sparse_mat(
   FEMInfo::ProblemInfoUnsteady,
   FEMSpace::UnsteadyProblem,
   Param::ParametricInfoUnsteady,
-  el::Vector,
-  timesθ::Vector;
+  el::Vector{Float64},
+  timesθ::Vector{Float64};
   var="A")
 
   Ω_sparse = view(FEMSpace.Ω, el)
@@ -105,13 +105,13 @@ function remove_small_entries(A::Array,tol=1e-15) ::Array
   A
 end
 
-function compute_errors(uₕ::Matrix, RBVars::RBSteadyProblem, norm_matrix = nothing)
+function compute_errors(uₕ::Matrix{Float64}, RBVars::RBSteadyProblem, norm_matrix = nothing)
 
   mynorm(uₕ - RBVars.ũ, norm_matrix) / mynorm(uₕ, norm_matrix)
 
 end
 
-function compute_errors(uₕ::Matrix, RBVars::RBUnsteadyProblem, norm_matrix = nothing)
+function compute_errors(uₕ::Matrix{Float64}, RBVars::RBUnsteadyProblem, norm_matrix = nothing)
 
   H1_err = zeros(RBVars.Nₜ)
   H1_sol = zeros(RBVars.Nₜ)
@@ -133,7 +133,7 @@ end
 
 function post_process(root::String)
 
-  @info "Exporting plots and tables"
+  println("Exporting plots and tables")
 
   function get_paths(dir::String)::Tuple
     path_to_err = joinpath(dir,
@@ -143,7 +143,7 @@ function post_process(root::String)
     path_to_err,path_to_t
   end
 
-  function get_tolerances(dir::String)::Vector
+  function get_tolerances(dir::String)::Vector{Float64}
     if occursin("-3",dir)
       return ["1e-3"]
     elseif occursin("-4",dir)

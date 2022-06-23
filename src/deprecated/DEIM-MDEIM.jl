@@ -29,7 +29,7 @@ function DEIM_offline(S, ϵ = 1e-5, save_path = nothing, save_to_file = false)
     DEIM_mat = basis#[DEIM_idx[:], :]
 
     if save_to_file
-        @info "Offline phase of DEIM and MDEIM are the same: be careful with the path to which the (M)DEIM matrix and indices are saved"
+        println("Offline phase of DEIM and MDEIM are the same: be careful with the path to which the (M)DEIM matrix and indices are saved")
         CSV.write(save_path, DEIM_mat)
         CSV.write(save_path, DEIM_idx)
     end
@@ -49,7 +49,7 @@ function DEIM_online(vec_nonaffine, DEIM_mat, DEIM_idx, save_path = nothing, sav
         DEIM_mat = load_variable("DEIM_mat", "csv", DEIM_MDEIM_path)
         DEIM_idx = load_variable("DEIM_idx", "csv", DEIM_MDEIM_path)
     else
-        @error "Error: cannot read the DEIM vector, must run the DEIM offline phase!"
+        error("Error: cannot read the DEIM vector, must run the DEIM offline phase!"
     end =#
 
     DEIM_coeffs = DEIM_mat[DEIM_idx[:], :] \ vec_nonaffine[DEIM_idx[:]]
@@ -77,7 +77,7 @@ function MDEIM_online(mat_nonaffine, MDEIM_mat, MDEIM_idx, save_path = nothing, 
         MDEIM_mat = load_variable("MDEIM_mat", "csv", DEIM_MDEIM_path)
         MDEIM_idx = load_variable("MDEIM_idx", "csv", DEIM_MDEIM_path)
     else
-        @error "Error: cannot read the MDEIM matrix, must run the DEIM offline phase!"
+        error("Error: cannot read the MDEIM matrix, must run the DEIM offline phase!"
     end =#
 
     MDEIM_coeffs = MDEIM_mat[MDEIM_idx[:], :] \ reshape(mat_nonaffine, R * C, 1)[MDEIM_idx[:]]
@@ -111,7 +111,7 @@ function import_DEIM_MDEIM_structures(DEIM_MDEIM_path)
         DEIM_idx = Matrix(CSV.read(path, DataFrame))
         return (DEIM_mat, DEIM_idx)
     else
-        @error "Error: cannot read the (M)DEIM structures, must run the (M)DEIM offline phase!"
+        error("Error: cannot read the (M)DEIM structures, must run the (M)DEIM offline phase!")
     end
 
 end
@@ -148,10 +148,10 @@ function rPOD(S, ϵ=1e-5, X=nothing, q=1, m=nothing)
   while cumulative_energy / total_energy < 1.0 - ϵ ^ 2 && N < size(B)[2]
     N += 1
     cumulative_energy += Σ[N] ^ 2
-    @info "POD loop number $N, cumulative energy = $cumulative_energy"
+    println("POD loop number $N, cumulative energy = $cumulative_energy")
   end
 
-  @info "Basis number obtained via POD is $N, projection error <= $(abs((sqrt(1 - cumulative_energy / total_energy))))"
+  println("Basis number obtained via POD is $N, projection error <= $(abs((sqrt(1 - cumulative_energy / total_energy))))")
   V = Q * U[:, N]
 
   if !isnothing(X)
@@ -192,12 +192,12 @@ end
     DEIM_idx = last(DEIM_idx, N)
     DEIM_err_bound = Σ[N+1] * norm(DEIM_mat[DEIM_idx, 1:N] \ I(N))
 
-    @info "POD loop number $N, cumulative energy = $cumulative_energy"
+    println("POD loop number $N, cumulative energy = $cumulative_energy"
 
   end
 
-  @info "Basis number obtained via POD is $N, projection error ≤ $((sqrt(abs(1 - cumulative_energy / total_energy))))"
-  @info "DEIM/MDEIM error bound = $DEIM_err_bound"
+  println("Basis number obtained via POD is $N, projection error ≤ $((sqrt(abs(1 - cumulative_energy / total_energy))))"
+  println("DEIM/MDEIM error bound = $DEIM_err_bound"
 
   return DEIM_mat[:, 1:N], DEIM_idx, DEIM_err_bound, Σ
 
