@@ -47,7 +47,7 @@ function assemble_reduced_mat_MDEIM(
     Q = size(MDEIM_mat_new)[3]
     r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
     MatqΦ = zeros(RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q*Nₜ)
-    for q = 1:Q
+    @simd for q = 1:Q
       @info "ST-GRB: affine component number $q/$Q, matrix $var"
       for j = 1:RBVars.S.Nₛᵘ
         Mat_idx = findall(x -> x == j, r_idx)
@@ -61,7 +61,7 @@ function assemble_reduced_mat_MDEIM(
     Q = size(MDEIM_mat)[2]
     r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
     MatqΦ = zeros(RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q)
-    for j = 1:RBVars.S.Nₛᵘ
+    @simd for j = 1:RBVars.S.Nₛᵘ
       Mat_idx = findall(x -> x == j, r_idx)
       MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.S.Φₛᵘ[c_idx[Mat_idx],:])'
     end
@@ -96,7 +96,7 @@ function assemble_reduced_mat_DEIM(
     DEIM_mat_new = reshape(DEIM_mat,RBVars.S.Nₛᵘ,:)
     Q = Int(size(DEIM_mat_new)[2]/Nₜ)
     Vecₙ = zeros(RBVars.S.nₛᵘ,1,Q*Nₜ)
-    for q = 1:Q*Nₜ
+    @simd for q = 1:Q*Nₜ
       Vecₙ[:,:,q] = RBVars.S.Φₛᵘ' * Vector(DEIM_mat_new[:, q])
     end
     Vecₙ = reshape(RBVars.S.Φₛᵘ' * reshape(MatqΦ,RBVars.S.Nₛᵘ,:),
@@ -104,7 +104,7 @@ function assemble_reduced_mat_DEIM(
   else
     Q = size(DEIM_mat)[2]
     Vecₙ = zeros(RBVars.S.nₛᵘ,1,Q)
-    for q = 1:Q
+    @simd for q = 1:Q
       Vecₙ[:,:,q] = RBVars.S.Φₛᵘ' * Vector(DEIM_mat[:, q])
     end
     Vecₙ = reshape(Vecₙ,:,Q)
@@ -206,24 +206,29 @@ function get_RB_LHS_blocks(RBInfo, RBVars::PoissonSTGRB, θᵐ, θᵃ)
   Φₜᵘ_A = zeros(RBVars.nₜᵘ,RBVars.nₜᵘ,Qᵃ)
   Φₜᵘ₁_A = zeros(RBVars.nₜᵘ,RBVars.nₜᵘ,Qᵃ)
 
-  [Φₜᵘ_M[i_t,j_t,q] = sum(RBVars.Φₜᵘ[:,i_t].*RBVars.Φₜᵘ[:,j_t].*θᵐ[q,:])
-    for q = 1:Qᵐ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
-  [Φₜᵘ₁_M[i_t,j_t,q] = sum(RBVars.Φₜᵘ[2:end,i_t].*RBVars.Φₜᵘ[1:end-1,j_t].*θᵐ[q,2:end])
-    for q = 1:Qᵐ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
-  [Φₜᵘ_A[i_t,j_t,q] = sum(RBVars.Φₜᵘ[:,i_t].*RBVars.Φₜᵘ[:,j_t].*θᵃ[q,:])
-    for q = 1:Qᵃ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
-  [Φₜᵘ₁_A[i_t,j_t,q] = sum(RBVars.Φₜᵘ[2:end,i_t].*RBVars.Φₜᵘ[1:end-1,j_t].*θᵃ[q,2:end])
-    for q = 1:Qᵃ for i_t = 1:nₜᵘ for j_t = 1:nₜᵘ]
+  @simd for i_t = 1:nₜᵘ
+    for j_t = 1:nₜᵘ
+      for q = 1:Qᵐ
+        Φₜᵘ_M[i_t,j_t,q] = sum(RBVars.Φₜᵘ[:,i_t].*RBVars.Φₜᵘ[:,j_t].*θᵐ[q,:])
+        Φₜᵘ₁_M[i_t,j_t,q] = sum(RBVars.Φₜᵘ[2:end,i_t].*RBVars.Φₜᵘ[1:end-1,j_t].*θᵐ[q,2:end])
+      end
+      for q = 1:Qᵃ
+        Φₜᵘ_A[i_t,j_t,q] = sum(RBVars.Φₜᵘ[:,i_t].*RBVars.Φₜᵘ[:,j_t].*θᵃ[q,:])
+        Φₜᵘ₁_A[i_t,j_t,q] = sum(RBVars.Φₜᵘ[2:end,i_t].*RBVars.Φₜᵘ[1:end-1,j_t].*θᵃ[q,2:end])
+      end
+    end
+  end
 
   Mₙ_tmp = zeros(RBVars.nᵘ,RBVars.nᵘ,Qᵐ)
   Mₙ₁_tmp = zeros(RBVars.nᵘ,RBVars.nᵘ,Qᵐ)
   Aₙ_tmp = zeros(RBVars.nᵘ,RBVars.nᵘ,Qᵃ)
   Aₙ₁_tmp = zeros(RBVars.nᵘ,RBVars.nᵘ,Qᵃ)
-  for qᵐ = 1:Qᵐ
+
+  @simd for qᵐ = 1:Qᵐ
     Mₙ_tmp[:,:,qᵐ] = kron(RBVars.Mₙ[:,:,qᵐ],Φₜᵘ_M[:,:,qᵐ])
     Mₙ₁_tmp[:,:,qᵐ] = kron(RBVars.Mₙ[:,:,qᵐ],Φₜᵘ₁_M[:,:,qᵐ])
   end
-  for qᵃ = 1:Qᵃ
+  @simd for qᵃ = 1:Qᵃ
     Aₙ_tmp[:,:,qᵃ] = kron(RBVars.S.Aₙ[:,:,qᵃ],Φₜᵘ_A[:,:,qᵃ])
     Aₙ₁_tmp[:,:,qᵃ] = kron(RBVars.S.Aₙ[:,:,qᵃ],Φₜᵘ₁_A[:,:,qᵃ])
   end
@@ -305,20 +310,22 @@ function get_RB_RHS_blocks(RBInfo::Info, RBVars::PoissonSTGRB, θᶠ, θʰ)
 
   Φₜᵘ_F = zeros(RBVars.nₜᵘ, Qᶠ)
   Φₜᵘ_H = zeros(RBVars.nₜᵘ, Qʰ)
-  [Φₜᵘ_F[i_t,q] = sum(RBVars.Φₜᵘ[:,i_t].*θᶠ[q,:]) for q = 1:Qᶠ for i_t = 1:nₜᵘ]
-  [Φₜᵘ_H[i_t,q] = sum(RBVars.Φₜᵘ[:,i_t].*θʰ[q,:]) for q = 1:Qʰ for i_t = 1:nₜᵘ]
+  @simd for i_t = 1:nₜᵘ
+    for q = 1:Qᶠ
+      Φₜᵘ_F[i_t,q] = sum(RBVars.Φₜᵘ[:,i_t].*θᶠ[q,:])
+    end
+    for q = 1:Qʰ
+      Φₜᵘ_H[i_t,q] = sum(RBVars.Φₜᵘ[:,i_t].*θʰ[q,:])
+    end
+  end
 
   block₁ = zeros(RBVars.nᵘ,1)
-  for i_s = 1:RBVars.S.nₛᵘ
+  @simd for i_s = 1:RBVars.S.nₛᵘ
     for i_t = 1:RBVars.nₜᵘ
-
       i_st = index_mapping(i_s, i_t, RBVars)
-
       Fₙ_μ_i_j = RBVars.S.Fₙ[i_s,:]'*Φₜᵘ_F[i_t,:]
       Hₙ_μ_i_j = RBVars.S.Hₙ[i_s,:]'*Φₜᵘ_H[i_t,:]
-
       block₁[i_st,1] = Fₙ_μ_i_j+Hₙ_μ_i_j
-
     end
   end
 

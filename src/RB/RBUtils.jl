@@ -116,7 +116,7 @@ function compute_errors(uₕ::Matrix, RBVars::RBUnsteadyProblem, norm_matrix = n
   H1_err = zeros(RBVars.Nₜ)
   H1_sol = zeros(RBVars.Nₜ)
 
-  for i = 1:RBVars.Nₜ
+  @simd for i = 1:RBVars.Nₜ
     H1_err[i] = mynorm(uₕ[:, i] - RBVars.S.ũ[:, i], norm_matrix)
     H1_sol[i] = mynorm(uₕ[:, i], norm_matrix)
   end
@@ -192,7 +192,7 @@ function post_process(root::String)
     Dict("on"=>Float64[],"off"=>Float64[]),Dict("on"=>Float64[],"off"=>Float64[]),
     Dict("on"=>Float64[],"off"=>Float64[]),Dict("on"=>Float64[],"off"=>Float64[]))
 
-  for dir in root_subs
+  @simd for dir in root_subs
     if !occursin("nest",dir)
       if !occursin("sampl",dir)
         ϵ,ϵ_fun,errH1L2,errH1L2_fun,t,t_fun =

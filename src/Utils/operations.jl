@@ -8,8 +8,7 @@ function mydot(vec1::Vector, vec2::Vector, norm_matrix = nothing)
   if isnothing(norm_matrix)
       norm_matrix = float(I(size(vec1)[1]))
   end
-
-  return sum(sum(vec1' * norm_matrix * vec2))
+  sum(sum(vec1' * norm_matrix * vec2))
 
 end
 
@@ -21,8 +20,7 @@ function mynorm(vec::Vector, norm_matrix = nothing)
   if isnothing(norm_matrix)
     norm_matrix = float(I(size(vec)[1]))
   end
-
-  return sqrt(mydot(vec, vec, norm_matrix))
+  sqrt(mydot(vec, vec, norm_matrix))
 
 end
 
@@ -75,12 +73,16 @@ function generate_parameter(a::Vector, b::Vector, n::Int64 = 1)
 
 end
 
+const GeneralizedMatrix = Union{Matrix,SparseMatrixCSC}
+const GeneralizedVector = Union{Vector,SparseVector}
+const GeneralizedMatVec = Union{GeneralizedMatrix,GeneralizedVector}
+
 """Makes use of a truncated SVD (tolerance level specified by 'ϵ') to compute a
   reduced basis 'U' that spans a vector space minimizing the l² distance from
   the vector space spanned by the columns of 'S', the so-called snapshots matrix.
   If the SPD matrix 'X' is provided, the columns of 'U' are orthogonal w.r.t.
   the norm induced by 'X'"""
-function POD(S, ϵ = 1e-5, X = nothing)
+function POD(S::GeneralizedMatrix, ϵ::Float64=1e-5, X=nothing)
   S̃ = copy(S)
   if !isnothing(X)
     if !issparse(X)
@@ -96,15 +98,10 @@ function POD(S, ϵ = 1e-5, X = nothing)
     U, Σ, _ = svd(S̃)
   end
 
-  total_energy = sum(Σ .^ 2)
-  cumulative_energy = 0.0
-  N = 0
-  while cumulative_energy / total_energy < 1.0 - ϵ ^ 2 && N < size(S̃)[2]
-    N += 1
-    cumulative_energy += Σ[N] ^ 2
-    @info "POD loop number $N, projection error ≤ $((sqrt(abs(1 - cumulative_energy / total_energy))))"
-  end
-  @info "Basis number obtained via POD is $N"
+  energies = cumsum(Σ.^2)
+  N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
+  @info "Basis number obtained via POD is $N,
+    projection error ≤ $(sqrt(1-energies[N]/energies[end]))"
   if issparse(U)
     U = Matrix(U)
   end

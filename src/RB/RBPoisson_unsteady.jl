@@ -34,14 +34,14 @@ function PODs_time(RBInfo::Info, RBVars::PoissonUnsteady)
   if RBInfo.time_reduction_technique == "ST-HOSVD"
     Sᵘₜ = zeros(RBVars.Nₜ, RBVars.S.nₛᵘ * RBInfo.nₛ)
     Sᵘ = RBVars.S.Φₛᵘ' * RBVars.S.Sᵘ
-    for i in 1:RBInfo.nₛ
-      Sᵘₜ[:, (i-1)*RBVars.S.nₛᵘ+1:i*RBVars.S.nₛᵘ] =
-      Sᵘ[:, (i-1)*RBVars.Nₜ+1:i*RBVars.Nₜ]'
+    @simd for i in 1:RBInfo.nₛ
+      Sᵘₜ[:,(i-1)*RBVars.S.nₛᵘ+1:i*RBVars.S.nₛᵘ] =
+      Sᵘ[:,(i-1)*RBVars.Nₜ+1:i*RBVars.Nₜ]'
     end
   else
     Sᵘₜ = zeros(RBVars.Nₜ, RBVars.S.Nₛᵘ * RBInfo.nₛ)
     Sᵘ = RBVars.S.Sᵘ
-    for i in 1:RBInfo.nₛ
+    @simd for i in 1:RBInfo.nₛ
       Sᵘₜ[:, (i-1)*RBVars.S.Nₛᵘ+1:i*RBVars.S.Nₛᵘ] =
       transpose(Sᵘ[:, (i-1)*RBVars.Nₜ+1:i*RBVars.Nₜ])
     end
@@ -269,7 +269,7 @@ function get_θᵐ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInf
       FEMInfo,FEMSpace,Param,RBVars.S.sparse_el_A,timesθ;var="M")
     Nₛᵘ = RBVars.S.Nₛᵘ
     θᵐ = zeros(RBVars.Qᵐ, RBVars.Nₜ)
-    for iₜ = 1:RBVars.Nₜ
+    @simd for iₜ = 1:RBVars.Nₜ
       θᵐ[:,iₜ] = M_DEIM_online(M_μ_sparse[:,(iₜ-1)*Nₛᵘ+1:iₜ*Nₛᵘ],
         RBVars.MDEIMᵢ_M, RBVars.MDEIM_idx_M)
     end
@@ -307,7 +307,7 @@ function get_θᵃ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricInf
       FEMInfo,FEMSpace,Param,RBVars.S.sparse_el_A,timesθ;var="A")
     Nₛᵘ = RBVars.S.Nₛᵘ
     θᵃ = zeros(RBVars.S.Qᵃ, RBVars.Nₜ)
-    for iₜ = 1:RBVars.Nₜ
+    @simd for iₜ = 1:RBVars.Nₜ
       θᵃ[:,iₜ] = M_DEIM_online(A_μ_sparse[:,(iₜ-1)*Nₛᵘ+1:iₜ*Nₛᵘ],
         RBVars.S.MDEIMᵢ_A, RBVars.S.MDEIM_idx_A)
     end
@@ -348,7 +348,7 @@ function get_θᶠʰ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricI
     θᶠ = [Param.fₜ(t_θ) for t_θ = timesθ]
   else
     F_μ = assemble_forcing(FEMSpace, RBInfo, Param)
-    for iₜ = 1:RBVars.Nₜ
+    @simd for iₜ = 1:RBVars.Nₜ
       append!(θᶠ,
         M_DEIM_online(F_μ(timesθ[iₜ]), RBVars.S.DEIMᵢ_F, RBVars.S.DEIM_idx_F))
     end
@@ -358,7 +358,7 @@ function get_θᶠʰ(RBInfo::Info, RBVars::RBUnsteadyProblem, Param::ParametricI
     θʰ = [Param.hₜ(t_θ) for t_θ = timesθ]
   else
     H_μ = assemble_neumann_datum(FEMSpace, RBInfo, Param)
-    for iₜ = 1:RBVars.Nₜ
+    @simd for iₜ = 1:RBVars.Nₜ
       append!(θʰ,
         M_DEIM_online(H_μ(timesθ[iₜ]), RBVars.S.DEIMᵢ_H, RBVars.S.DEIM_idx_H))
     end
@@ -403,14 +403,14 @@ function solve_RB_system(RBInfo::Info, RBVars::PoissonUnsteady, Param::Parametri
   @info "Condition number of the system's matrix: $(cond(RBVars.S.LHSₙ[1]))"
   RBVars.S.online_time += @elapsed begin
     RBVars.S.uₙ = zeros(RBVars.nᵘ)
-    RBVars.S.uₙ = RBVars.S.LHSₙ[1] \ RBVars.S.RHSₙ[1]
+    @fastmath RBVars.S.uₙ = RBVars.S.LHSₙ[1] \ RBVars.S.RHSₙ[1]
   end
 end
 
 function reconstruct_FEM_solution(RBVars::PoissonUnsteady)
   @info "Reconstructing FEM solution from the newly computed RB one"
   uₙ = reshape(RBVars.S.uₙ, (RBVars.nₜᵘ, RBVars.S.nₛᵘ))
-  RBVars.S.ũ = RBVars.S.Φₛᵘ * (RBVars.Φₜᵘ * uₙ)'
+  @fastmath RBVars.S.ũ = RBVars.S.Φₛᵘ * (RBVars.Φₜᵘ * uₙ)'
 end
 
 function offline_phase(RBInfo::Info, RBVars::PoissonUnsteady)

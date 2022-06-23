@@ -93,13 +93,13 @@ function assemble_MDEIM_matrices(RBInfo::Info, RBVars::PoissonSPGRB, var::String
   AΦ = zeros(RBVars.Nₛᵘ, RBVars.nₛᵘ, RBVars.Qᵃ)
   RBVars.Aₙ = zeros(RBVars.nₛᵘ, RBVars.nₛᵘ, RBVars.Qᵃ^2)
   RBVars.AΦᵀPᵤ⁻¹ = zeros(RBVars.nₛᵘ, RBVars.Nₛᵘ, RBVars.Qᵃ)
-  for q = 1:RBVars.Qᵃ
+  @simd for q = 1:RBVars.Qᵃ
     AΦ[:,:,q] = reshape(Vector(RBVars.MDEIM_mat_A[:, q]),
       RBVars.Nₛᵘ, RBVars.Nₛᵘ) * RBVars.Φₛᵘ
   end
   matrix_product!(RBVars.AΦᵀPᵤ⁻¹, AΦ, Matrix(RBVars.Pᵤ⁻¹), transpose_A=true)
 
-  for q₁ = 1:RBVars.Qᵃ
+  @simd for q₁ = 1:RBVars.Qᵃ
     for q₂ = 1:RBVars.Qᵃ
       @info "SPGRB: affine component number $((q₁-1)*RBVars.Qᵃ+q₂), matrix A"
       RBVars.Aₙ[:, :, (q₁-1)*RBVars.Qᵃ+q₂] =
@@ -124,14 +124,14 @@ function assemble_reduced_mat_MDEIM(
   Q = size(MDEIM_mat)[2]
   r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
   MatqΦ = zeros(RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q)
-  for j = 1:RBVars.S.Nₛᵘ
+  @simd for j = 1:RBVars.S.Nₛᵘ
     Mat_idx = findall(x -> x == j, r_idx)
     MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.S.Φₛᵘ[c_idx[Mat_idx],:])'
   end
   MatqΦᵀPᵤ⁻¹ = zeros(RBVars.S.nₛᵘ,RBVars.S.Nₛᵘ,Q)
   matrix_product!(MatqΦᵀPᵤ⁻¹,MatqΦ,Matrix(RBVars.S.Pᵤ⁻¹),transpose_A=true)
   Matₙ = zeros(RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,Q^2)
-  for q₁ = 1:Q
+  @simd for q₁ = 1:Q
     for q₂ = 1:Q
       @info "ST-PGRB: affine component number $((q₁-1)*RBVars.Qᵐ+q₂), matrix $var"
       Matₙ[:,:,(q₁-1)*Q+q₂] = MatqΦᵀPᵤ⁻¹[:,:,q₁]*MatqΦ[:,:,q₂]

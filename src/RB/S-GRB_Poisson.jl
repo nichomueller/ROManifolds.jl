@@ -35,7 +35,7 @@ function assemble_reduced_mat_MDEIM(
   Q = size(MDEIM_mat)[2]
   r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
   MatqΦ = zeros(RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q)
-  for j = 1:RBVars.S.Nₛᵘ
+  @simd for j = 1:RBVars.S.Nₛᵘ
     Mat_idx = findall(x -> x == j, r_idx)
     MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.S.Φₛᵘ[c_idx[Mat_idx],:])'
   end
@@ -52,7 +52,7 @@ function assemble_reduced_mat_DEIM(
 
   Q = size(DEIM_mat)[2]
   Vecₙ = zeros(RBVars.S.nₛᵘ,1,Q)
-  for q = 1:Q
+  @simd for q = 1:Q
     Vecₙ[:,:,q] = RBVars.S.Φₛᵘ' * Vector(DEIM_mat[:, q])
   end
   Vecₙ = reshape(Vecₙ,:,Q)

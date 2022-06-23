@@ -1,58 +1,45 @@
 include("MV_snapshots.jl")
 
-function M_DEIM_POD(S::Matrix, ϵ = 1e-5)
+function M_DEIM_POD(S::Matrix, ϵ::Float64=1e-5)
 
   S̃ = copy(S)
   M_DEIM_mat, Σ, _ = svd(S̃)
 
-  total_energy = sum(Σ .^ 2)
-  cumulative_energy = 0.0
-  N = 0
-  M_DEIM_err_bound = 1e5
-  crit_val = norm(inv(M_DEIM_mat'M_DEIM_mat))
-  mult_factor = sqrt(size(S̃)[2]) * crit_val
+  energies = cumsum(Σ.^2)
+  mult_factor = sqrt(size(S̃)[2])*norm(inv(M_DEIM_mat'M_DEIM_mat))
+  M_DEIM_err_bound = vcat(mult_factor*Σ[2:end],0.)
 
-  while N < size(S̃)[2] && (M_DEIM_err_bound > ϵ ||
-    cumulative_energy / total_energy < 1.0 - ϵ ^ 2)
-    N += 1
-    cumulative_energy += Σ[N] ^ 2
-    if N==size(S̃)[2]
-      M_DEIM_err_bound = 0.
-    else
-      M_DEIM_err_bound = Σ[N+1]*mult_factor
-    end
-    @info "(M)DEIM-POD loop number $N, projection error = $M_DEIM_err_bound"
-  end
+  energies = cumsum(Σ.^2)
+  N₁ = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
+  N₂ = findall(x->x ≤ ϵ,M_DEIM_err_bound)[1]
+  N = max(N₁,N₂)
+  @info "Basis number obtained via POD is $N,
+  projection error ≤ $(max(sqrt(1-energies[N]/energies[end]),M_DEIM_err_bound[N]))"
 
-  @info "Basis number obtained via POD is $N, projection error ≤ $M_DEIM_err_bound"
-
-  return M_DEIM_mat[:,1:N], Σ
+  M_DEIM_mat[:,1:N], Σ
 
 end
 
 function M_DEIM_offline(M_DEIM_mat::Matrix, Σ::Vector)
 
   (N, n) = size(M_DEIM_mat)
-  n_new = n
   M_DEIM_idx = Int64[]
   append!(M_DEIM_idx, Int(argmax(abs.(M_DEIM_mat[:, 1]))))
-  for m = 2:n
+  @simd for m = 2:n
     res = (M_DEIM_mat[:, m] -
     M_DEIM_mat[:, 1:m-1] * (M_DEIM_mat[M_DEIM_idx[1:m-1], 1:m-1] \
     M_DEIM_mat[M_DEIM_idx[1:m-1], m]))
     append!(M_DEIM_idx, convert(Int64, argmax(abs.(res))[1]))
     if abs(det(M_DEIM_mat[M_DEIM_idx[1:m], 1:m])) ≤ 1e-80
-      @error "Something went wrong with the construction of (M)DEIM basis:
-        obtaining singular nested matrices during (M)DEIM offline phase"
-      n_new = m
-      break
+      error("Something went wrong with the construction of (M)DEIM basis:
+        obtaining singular nested matrices during (M)DEIM offline phase")
     end
   end
   unique!(M_DEIM_idx)
-  M_DEIM_err_bound = (Σ[min(n_new + 1,length(Σ))] *
-    norm(M_DEIM_mat[M_DEIM_idx,1:n_new]' \ I(n_new)))
+  M_DEIM_err_bound = (Σ[min(n+1,length(Σ))] *
+    norm(M_DEIM_mat[M_DEIM_idx,1:n]' \ I(n)))
 
-  M_DEIM_mat[:,1:n_new], M_DEIM_idx, M_DEIM_err_bound
+  M_DEIM_mat[:,1:n], M_DEIM_idx, M_DEIM_err_bound
 
 end
 
@@ -80,7 +67,6 @@ function MDEIM_offline(
   at each time step. This will take some time."
 
   μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  timesθ = get_timesθ(RBInfo)
   MDEIM_mat,row_idx,Σ = get_snaps_MDEIM(FEMSpace,RBInfo,μ,var)
   MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat, Σ)
   MDEIMᵢ_mat = MDEIM_mat[MDEIM_idx,:]
@@ -129,7 +115,6 @@ function DEIM_offline(
   @info "Building $(RBInfo.nₛ_DEIM) snapshots of $var, at each time step."
 
   μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  timesθ = get_timesθ(RBInfo)
   DEIM_mat,Σ = get_snaps_DEIM(FEMSpace,RBInfo,μ,var)
   DEIM_mat, DEIM_idx, DEIM_err_bound = M_DEIM_offline(DEIM_mat, Σ)
   DEIMᵢ_mat = DEIM_mat[DEIM_idx,:]
@@ -139,5 +124,5 @@ function DEIM_offline(
 end
 
 function M_DEIM_online(Mat_nonaffine, Matᵢ::Matrix, idx::Vector)
-  Matᵢ\Matrix(reshape(Mat_nonaffine,:,1)[idx,:])
+  @fastmath Matᵢ\Matrix(reshape(Mat_nonaffine,:,1)[idx,:])
 end
