@@ -32,7 +32,6 @@ function build_M_snapshots(
   M_t = assemble_mass(FEMSpace, RBInfo, Param)
 
   for i_t = 1:Nₜ
-    @info "Snapshot at time step $i_t, mass"
     M_i = M_t(timesθ[i_t])
     i, v = findnz(M_i[:])
     if i_t == 1
@@ -76,7 +75,6 @@ function build_A_snapshots(
   A_t = assemble_stiffness(FEMSpace, RBInfo, Param)
 
   for i_t = 1:Nₜ
-    @info "Snapshot at time step $i_t, stiffness"
     A_i = A_t(timesθ[i_t])
     i, v = findnz(A_i[:])
     if i_t == 1
@@ -323,7 +321,6 @@ function build_F_snapshots(
   F = zeros(FEMSpace.Nₛᵘ, Nₜ)
 
   for i_t = 1:Nₜ
-    @info "Snapshot at time step $i_t, forcing"
     F[:,i_t] = F_t(timesθ[i_t])[:]
   end
   F
@@ -357,8 +354,7 @@ function build_H_snapshots(
   H = zeros(FEMSpace.Nₛᵘ, Nₜ)
 
   for i_t = 1:Nₜ
-    @info "Snapshot at time step $i_t, neumann datum"
-    H[:, i_t] = H_t(timesθ[i_t])[:]
+    H[:,i_t] = H_t(timesθ[i_t])[:]
   end
   H
 end
@@ -552,9 +548,9 @@ function build_snapshots(
     return build_A_snapshots(FEMSpace,RBInfo,μₖ)
   elseif var == "M"
     return build_M_snapshots(FEMSpace,RBInfo,μₖ)
-  elseif var == "M"
+  elseif var == "F"
     return build_F_snapshots(FEMSpace,RBInfo,μₖ)
-  else var == "M"
+  else var == "H"
     return build_H_snapshots(FEMSpace,RBInfo,μₖ)
   end
 
@@ -571,9 +567,9 @@ function build_snapshots(
     return build_A_snapshots(FEMSpace,RBInfo,μₖ,timesθ)
   elseif var == "M"
     return build_M_snapshots(FEMSpace,RBInfo,μₖ,timesθ)
-  elseif var == "M"
+  elseif var == "F"
     return build_F_snapshots(FEMSpace,RBInfo,μₖ,timesθ)
-  else var == "M"
+  else var == "H"
     return build_H_snapshots(FEMSpace,RBInfo,μₖ,timesθ)
   end
 
