@@ -5,8 +5,8 @@ function get_inverse_P_matrix(RBInfo::Info, RBVars::PoissonSPGRB)
     if isempty(RBVars.Pᵤ⁻¹)
       println("S-PGRB: building the inverse of the diag preconditioner of the H1 norm matrix")
       if isfile(joinpath(RBInfo.paths.FEM_structures_path, "Pᵤ⁻¹.csv"))
-        RBVars.Pᵤ⁻¹ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Pᵤ⁻¹.csv");
-          convert_to_sparse = true)
+        RBVars.Pᵤ⁻¹ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Pᵤ⁻¹.csv"),
+          true)
       else
         get_norm_matrix(RBInfo, RBVars)
         diag_Xᵘ₀ = Vector{Float64}(diag(RBVars.Xᵘ₀))
@@ -68,8 +68,7 @@ function assemble_affine_matrices(RBInfo::Info, RBVars::PoissonSPGRB, var::Strin
     RBVars.Qᵃ = 1
     println("Assembling affine reduced stiffness")
     println("SPGRB: affine component number 1, matrix A")
-    A = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "A.csv");
-      convert_to_sparse = true)
+    A = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "A.csv"), true)
     RBVars.AΦᵀPᵤ⁻¹ = reshape((A*RBVars.Φₛᵘ)'*RBVars.Pᵤ⁻¹,RBVars.nₛᵘ,RBVars.Nₛᵘ,1)
     RBVars.Aₙ = reshape(RBVars.AΦᵀPᵤ⁻¹*(A*RBVars.Φₛᵘ),RBVars.nₛᵘ,RBVars.nₛᵘ,1)
   else

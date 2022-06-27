@@ -16,8 +16,7 @@ end
 function get_norm_matrix(RBInfo::Info, RBVars::PoissonSteady)
   if check_norm_matrix(RBVars)
     println("Importing the norm matrix Xᵘ₀")
-    Xᵘ₀ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Xᵘ₀.csv");
-     convert_to_sparse = true)
+    Xᵘ₀ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Xᵘ₀.csv"), true)
     RBVars.Nₛᵘ = size(Xᵘ₀)[1]
     println("Dimension of norm matrix: $(size(Xᵘ₀))")
     if RBInfo.use_norm_X
@@ -534,7 +533,7 @@ function online_phase(RBInfo::Info, RBVars::PoissonSteady, μ, Param_nbs)
     println("Considering Parameter number: $nb")
 
     μ_nb = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
-    Param = get_ParamInfo(problem_ntuple, RBInfo, μ_nb)
+    Param = get_ParamInfo(RBInfo, problem_id, μ_nb)
 
     uₕ_test = Matrix{Float64}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, nb]
 

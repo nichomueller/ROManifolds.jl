@@ -6,7 +6,7 @@ function check_dataset(
 
   μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
   μ_i = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
-  Param = get_ParamInfo(problem_ntuple, RBInfo, μ_i)
+  Param = get_ParamInfo(RBInfo, problem_id, μ_i)
 
   u1 = RBVars.S.Sᵘ[:,(nb-1)*RBVars.Nₜ+1]
   u2 = RBVars.S.Sᵘ[:,(nb-1)*RBVars.Nₜ+2]

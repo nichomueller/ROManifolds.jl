@@ -14,7 +14,7 @@ function load_CSV(path::String) where T
   Matrix{Float64}(CSV.read(path, DataFrame))
 end
 
-function load_CSV(path::String;::SparseMatrixCSC{T}) where T
+function load_CSV(path::String,::Bool)
   var = Matrix{Float64}(CSV.read(path, DataFrame))
   sparse(convert(Vector{Int64}, var[:,1]), convert(Vector{Int64}, var[:,2]), var[:,3])
 end

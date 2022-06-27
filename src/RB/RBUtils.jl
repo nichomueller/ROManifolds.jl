@@ -1,5 +1,5 @@
-function ROM_paths(root, problem_type, problem_name, mesh_name, RB_method, case)
-  paths = FEM_paths(root, problem_type, problem_name, mesh_name, case)
+function ROM_paths(root, problem_steadiness, problem_name, mesh_name, RB_method, case)
+  paths = FEM_paths(root, problem_steadiness, problem_name, mesh_name, case)
   mesh_path = paths.mesh_path
   FEM_snap_path = paths.FEM_snap_path
   FEM_structures_path = paths.FEM_structures_path
@@ -16,18 +16,41 @@ function ROM_paths(root, problem_type, problem_name, mesh_name, RB_method, case)
   _ -> (mesh_path, FEM_snap_path, FEM_structures_path, basis_path, ROM_structures_path, gen_coords_path, results_path)
 end
 
+function select_RB_method(
+  RB_method::String,
+  tol::String,
+  add_info::Dict) ::String
+
+  if add_info["nested_POD"]
+    RB_method *= "_nest"
+  end
+  if add_info["st_M_DEIM"]
+    RB_method *= "_st"
+  end
+  if add_info["fun_M_DEIM"]
+    RB_method *= "_fun"
+  end
+  if add_info["sampl_M_DEIM"]
+    RB_method *= "_sampl"
+  end
+
+  RB_method *= tol
+
+end
+
 function build_sparse_mat(
+  FEMSpace₀::SteadyProblem,
   FEMInfo::ProblemInfoSteady,
-  FEMSpace::SteadyProblem,
   Param::ParametricInfoSteady,
   el::Vector{Float64};
   var="A")
 
-  Ω_sparse = view(FEMSpace.Ω, el)
+  Ω_sparse = view(FEMSpace₀.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
+
   if var == "A"
-    Mat = assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Param.α*∇(FEMSpace.ϕᵤ)))*dΩ_sparse,
-      FEMSpace.V, FEMSpace.V₀)
+    Mat = assemble_matrix(∫(∇(FEMSpace₀.ϕᵥ)⋅(Param.α*∇(FEMSpace₀.ϕᵤ)))*dΩ_sparse,
+      FEMSpace₀.V, FEMSpace₀.V₀)
   else
     error("Unrecognized sparse matrix")
   end
@@ -37,24 +60,24 @@ function build_sparse_mat(
 end
 
 function build_sparse_mat(
+  FEMSpace₀::UnsteadyProblem,
   FEMInfo::ProblemInfoUnsteady,
-  FEMSpace::UnsteadyProblem,
   Param::ParametricInfoUnsteady,
   el::Vector{Float64},
   timesθ::Vector{Float64};
   var="A")
 
-  Ω_sparse = view(FEMSpace.Ω, el)
+  Ω_sparse = view(FEMSpace₀.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
   Nₜ = length(timesθ)
 
   function define_Matₜ(t::Real, var::String)
     if var == "A"
-      return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Param.α(t)*∇(FEMSpace.ϕᵤ(t))))*dΩ_sparse,
-        FEMSpace.V(t), FEMSpace.V₀)
+      return assemble_matrix(∫(∇(FEMSpace₀.ϕᵥ)⋅(Param.α(t)*∇(FEMSpace₀.ϕᵤ(t))))*dΩ_sparse,
+        FEMSpace₀.V(t), FEMSpace₀.V₀)
     elseif mat == "M"
-      return assemble_matrix(∫(FEMSpace.ϕᵥ*(Param.m(t)*FEMSpace.ϕᵤ(t)))*dΩ_sparse,
-        FEMSpace.V(t), FEMSpace.V₀)
+      return assemble_matrix(∫(FEMSpace₀.ϕᵥ*(Param.m(t)*FEMSpace₀.ϕᵤ(t)))*dΩ_sparse,
+        FEMSpace₀.V(t), FEMSpace₀.V₀)
     else
       error("Unrecognized sparse matrix")
     end
@@ -64,10 +87,10 @@ function build_sparse_mat(
   for (i_t,t) in enumerate(timesθ)
     i,j,v = findnz(Matₜ(t))
     if i_t == 1
-      global Mat = sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ*Nₜ)
+      global Mat = sparse(i,j,v,FEMSpace₀.Nₛᵘ,FEMSpace₀.Nₛᵘ*Nₜ)
     else
-      Mat[:,(i_t-1)*FEMSpace.Nₛᵘ+1:i_t*FEMSpace.Nₛᵘ] =
-        sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ)
+      Mat[:,(i_t-1)*FEMSpace₀.Nₛᵘ+1:i_t*FEMSpace₀.Nₛᵘ] =
+        sparse(i,j,v,FEMSpace₀.Nₛᵘ,FEMSpace₀.Nₛᵘ)
     end
   end
 

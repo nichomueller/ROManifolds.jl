@@ -6,8 +6,7 @@ function primal_supremizers(RBInfo::Info, RBVars::StokesSTGRB)
 
   dir_idx = abs.(diag(RBVars.Xᵘ) .- 1) .< 1e-16
 
-  constraint_mat = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "B.csv");
-  convert_to_sparse = true)'
+  constraint_mat = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "B.csv"); true)'
   constraint_mat[dir_idx[dir_idx≤RBVars.P.S.Nₛᵘ*RBVars.P.S.Nₛᵖ]] = 0
 
   supr_primal = Matrix{Float64}(solve(PardisoSolver(), RBVars.Xᵘ, constraint_mat * RBVars.Φₛᵖ))
@@ -144,11 +143,11 @@ function assemble_affine_matrices(RBInfo::Info, RBVars::StokesSTGRB, var::String
 
   if var == "B"
     println("Assembling affine reduced velocity-pressure and pressure-velocity matrices")
-    B = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "B.csv"); convert_to_sparse = true)
+    B = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "B.csv");  true)
     Bₙ = (RBVars.Φₛᵖ)' * B * RBVars.S.Φₛᵘ
     RBVars.Bₙ = zeros(RBVars.nₛᵖ, RBVars.S.nₛᵘ, 1)
     RBVars.Bₙ[:,:,1] = Bₙ
-    Bᵀ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Bᵀ.csv"); convert_to_sparse = true)
+    Bᵀ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Bᵀ.csv"); true)
     Bᵀₙ = (RBVars.S.Φₛᵘ)' * Bᵀ * RBVars.Φₛᵖ
     RBVars.Bᵀₙ = zeros(RBVars.S.nₛᵘ, RBVars.nₛᵖ, 1)
     RBVars.Bᵀₙ[:,:,1] = Bᵀₙ

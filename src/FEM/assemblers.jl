@@ -378,10 +378,10 @@ function assemble_lifting(
   FEMSpace::FEMSpacePoissonUnsteady, probl::ProblemInfoUnsteady,
   Param::ParametricInfoUnsteady)
 
-  Gₕ = zeros(FEMSpace.Nₛᵘ, convert(Int64, probl.T / probl.δt))
+  Gₕ = zeros(FEMSpace.Nₛᵘ, convert(Int64, probl.tₗ / probl.δt))
   if !isnothing(FEMSpace.dΓd)
     gₕ(t) = interpolate_everywhere(Param.g(t), FEMSpace.V(t))
-    for (i, tᵢ) in enumerate(probl.t₀+probl.δt:probl.δt:probl.T)
+    for (i, tᵢ) in enumerate(probl.t₀+probl.δt:probl.δt:probl.tₗ)
       Gₕ[:, i] = get_free_dof_values(gₕ(tᵢ))
     end
   end

@@ -1,4 +1,4 @@
-function FEM_paths(root, problem_type, problem_name, mesh_name, case; test_case="")
+function FEM_paths(root, problem_steadiness, problem_name, mesh_name, case; test_case="")
 
   @assert isdir(root) "$root is an invalid root directory"
 
@@ -6,7 +6,7 @@ function FEM_paths(root, problem_type, problem_name, mesh_name, case; test_case=
   create_dir(root_tests)
   mesh_path = joinpath(root_tests, joinpath("meshes", mesh_name))
   @assert isfile(mesh_path) "$mesh_path is an invalid mesh path"
-  type_path = joinpath(root_tests, problem_type)
+  type_path = joinpath(root_tests, problem_steadiness)
   create_dir(type_path)
   problem_path = joinpath(type_path, problem_name)
   create_dir(problem_path)
@@ -25,155 +25,249 @@ function FEM_paths(root, problem_type, problem_name, mesh_name, case; test_case=
 
 end
 
-function get_ParamInfo(::NTuple{1,Int},Info::SteadyInfo,μ::Vector{Float64})
-
-  model = DiscreteModelFromFile(Info.paths.mesh_path)
-
-  function prepare_α(x, μ, probl_nl)
-    if !probl_nl["A"]
-      return sum(μ)
-    else
-      return 1 + μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) / μ[3])
-    end
+function get_problem_id(problem_name::String)
+  if problem_name == "poisson"
+    return (Int8(0),)
+  elseif problem_name == "stokes"
+    return (Int8(0),Int8(0))
+  elseif problem_name == "navier-stokes"
+    return (Int8(0),Int8(0),Int8(0))
+  else
+    error("unimplemented")
   end
-  α(x) = prepare_α(x, μ, Info.probl_nl)
+end
 
-  function prepare_f(x, μ, probl_nl)
-    if probl_nl["f"]
-      return sin(μ[4] * x[1]) + sin(μ[4] * x[2])
-    else
-      return 1
-    end
-  end
-  f(x) = prepare_f(x, μ, Info.probl_nl)
-  g(x) = 0
-  h(x) = 1
+function get_ParamInfo(
+  ProblInfo::SteadyInfo{N,T},
+  problem_id::NTuple{1,Int},
+  μ::Vector{T}) where {N,T}
+
+  model = DiscreteModelFromFile(ProblInfo.paths.mesh_path)
+
+  α(x) = get_α(ProblInfo, problem_id, μ).α(x)
+  f(x) = get_f(ProblInfo, problem_id, μ).f(x)
+  g(x) = get_g(ProblInfo, problem_id, μ).g(x)
+  h(x) = get_h(ProblInfo, problem_id, μ).h(x)
 
   ParametricInfo(μ, model, α, f, g, h)
 
 end
 
-function get_ParamInfo(::NTuple{1,Int},Info::UnsteadyInfo,μ::Vector{Float64})
+function get_ParamInfo(
+  ProblInfo::UnsteadyInfo{N,T},
+  problem_id::NTuple,
+  μ::Vector{T}) where {N,T}
 
-  model = DiscreteModelFromFile(Info.paths.mesh_path)
-  αₛ(x) = 1
-  αₜ(t, μ) = sum(μ) * (2 + sin(2π * t))
-  mₛ(x) = 1
-  mₜ(t::Real) = 1
-  m(x, t::Real) = mₛ(x)*mₜ(t)
-  m(t::Real) = x -> m(x, t)
-  fₛ(x) = 1
-  fₜ(t::Real) = sin(π * t)
-  gₛ(x) = 0
-  gₜ(t::Real) = 0
-  g(x, t::Real) = gₛ(x)*gₜ(t)
-  g(t::Real) = x -> g(x, t)
-  hₛ(x) = 0
-  hₜ(t::Real) = 0
-  h(x, t::Real) = hₛ(x)*hₜ(t)
-  h(t::Real) = x -> h(x, t)
-  u₀(x) = 0
+  model = DiscreteModelFromFile(ProblInfo.paths.mesh_path)
 
-  function prepare_α(x, t, μ, probl_nl)
-    if !probl_nl["A"]
-      return αₛ(x)*αₜ(t, μ)
-    else
-      return (10 + μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) * sin(t) / μ[3]))
-    end
-  end
-  α(x, t::Real) = prepare_α(x, t, μ, Info.probl_nl)
+  αₛ(x) = get_α(ProblInfo, problem_id, μ).αₛ(x)
+  αₜ(t) = get_α(ProblInfo, problem_id, μ).αₜ(t)
+  α(x, t::Real) = get_α(ProblInfo, problem_id, μ).α(x, t)
   α(t::Real) = x -> α(x, t)
 
-  function prepare_f(x, t, μ, probl_nl)
-    if !probl_nl["f"]
-      return fₛ(x)*fₜ(t)
-    else
-      return 10+5*sin(π*t*sum(x)*(μ[4]+μ[5]))
-    end
-  end
-  f(x, t::Real) = prepare_f(x, t, μ, Info.probl_nl)
+  fₛ(x) = get_f(ProblInfo, problem_id, μ).fₛ(x)
+  fₜ(t) = get_f(ProblInfo, problem_id, μ).fₜ(t)
+  f(x, t::Real) = get_f(ProblInfo, problem_id, μ).f(x, t)
   f(t::Real) = x -> f(x, t)
+
+  gₛ(x) = get_g(ProblInfo, problem_id, μ).gₛ(x)
+  gₜ(t) = get_g(ProblInfo, problem_id, μ).gₜ(t)
+  g(x, t::Real) = get_g(ProblInfo, problem_id, μ).g(x, t)
+  g(t::Real) = x -> g(x, t)
+
+  hₛ(x) = get_h(ProblInfo, problem_id, μ).hₛ(x)
+  hₜ(t) = get_h(ProblInfo, problem_id, μ).hₜ(t)
+  h(x, t::Real) = get_h(ProblInfo, problem_id, μ).h(x, t)
+  h(t::Real) = x -> h(x, t)
+
+  mₛ(x) = get_m(ProblInfo, μ).mₛ(x)
+  mₜ(t) = get_m(ProblInfo, μ).mₜ(t)
+  m(x, t::Real) = get_m(ProblInfo, μ).m(x, t)
+  m(t::Real) = x -> m(x, t)
+
+  u₀(x) = get_IC(ProblInfo, problem_id)(x)
 
   ParametricInfoUnsteady(
     μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, g, hₛ, hₜ, h, u₀)
 
 end
 
-function get_ParamInfo(::NTuple{2,Int},Info::UnsteadyInfo,μ::Vector{Float64})
-
-  model = DiscreteModelFromFile(Info.paths.mesh_path)
-  αₛ(x) = 1
-  αₜ(t::Real, μ) = sum(μ) * (2 + sin(2π * t))
-  mₛ(x) = 1
-  mₜ(t::Real) = 1
-  m(x, t::Real) = mₛ(x)*mₜ(t)
-  m(t::Real) = x -> m(x, t)
-  fₛ(x) = VectorValue(0.,0.,0.)
-  fₜ(t::Real) = 0
-  f(x, t::Real) = fₛ(x)*fₜ(t)
-  f(t::Real) = x -> f(x, t)
-  gʷ(x, t::Real) = VectorValue(0.,0.,0.)
-  gʷ(t::Real) = x -> gʷ(x, t)
-  x0 = Point(0.,0.,0.)
-  R = 1
-  gₛ(x) = 2 * (1 .- VectorValue((x[1]-x0[1])^2,(x[2]-x0[2])^2,(x[3]-x0[3])^2) / R^2) / (pi*R^2)
-  gₜ(t::Real, μ) = 1-cos(2*pi*t/T)+μ[2]*sin(2*pi*μ[1]*t/T)
-  gⁱⁿ(x, t::Real) = gₛ(x)*gₜ(t, μ)
-  gⁱⁿ(t::Real) = x -> gⁱⁿ(x, t)
-  hₛ(x) = VectorValue(0.,0.,0.)
-  hₜ(t::Real) = 0
-  h(x, t::Real) = hₛ(x)*hₜ(t)
-  h(t::Real) = x -> h(x, t)
-  u₀(x) = VectorValue(0.,0.,0.)
-  p₀(x) = 0.
-  function x₀(x)
-    return [u₀(x), p₀(x)]
+function get_α(ProblInfo::SteadyInfo{N,T}, ::NTuple{1,Int8}, μ) where {N,T}
+  if !ProblInfo.probl_nl["A"]
+    return T(sum(μ))
+  else
+    return T(1. + μ[3] + 1. / μ[3] * exp(-norm(x-Point(μ[1:N]))^2 / μ[3]))
   end
+end
 
-  function prepare_α(x, t, μ, probl_nl)
-    if !probl_nl["A"]
-      return αₛ(x)*αₜ(t, μ)
+function get_α(ProblInfo::UnsteadyInfo{N,T}, ::NTuple{1,Int8}, μ) where {N,T}
+  αₛ(x) = one(T)
+  αₜ(t, μ) = T(5. * sum(μ) * (2 + sin(t)))
+  function α(x, t)
+    if !ProblInfo.probl_nl["A"]
+      return T(αₛ(x)*αₜ(t, μ))
     else
-      return (1 + μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) * sin(t) / μ[3]))
+      return T(10. * (1. + 1. / μ[3] * exp(-norm(x-Point(μ[1:N]))^2 * sin(t) / μ[3])))
     end
   end
-  α(x, t::Real) = prepare_α(x, t, μ, Info.probl_nl)
-  α(t::Real) = x -> α(x, t)
+  _-> (αₛ,αₜ,α)
+end
 
-  function prepare_g(x, t, μ, case)
-    if case <= 1
-      gⁱⁿ(x, t::Real) = gₛ(x)*gₜ(t, μ)
-      gⁱⁿ(t::Real) = x -> gⁱⁿ(x, t)
-      return gⁱⁿ#[gʷ,gⁱⁿ]
+function get_α(ProblInfo::UnsteadyInfo{N,T}, ::NTuple{2,Int8}, μ) where {N,T}
+  αₛ(x) = one(T)
+  αₜ(t::Real, μ) = T(5. * sum(μ) * (2 + sin(t)))
+  function α(x, t)
+    if !ProblInfo.probl_nl["A"]
+      return T(αₛ(x)*αₜ(t, μ))
     else
-      gⁱⁿ₁(x, t::Real) = gₛ(x)*gₜ(t, μ[end-2:end-1])*μ[end]
-      gⁱⁿ₁(t::Real) = x -> g(x, t)
-      gⁱⁿ₂(x, t::Real) = gₛ(x)*(1-gₜ(t, μ[end-2:end-1])*μ[end])
-      gⁱⁿ₂(t::Real) = x -> g(x, t)
-      return gⁱⁿ₁#[gʷ,gⁱⁿ₁,gⁱⁿ₂]
+      return T(10. * (1. + 1. / μ[3] * exp(-norm(x-Point(μ[1:N]))^2 * sin(t) / μ[3])))
     end
   end
-  #g(x, t::Real) = prepare_g(x, t, μ, Info.case)
-  g(x, t::Real) = gₛ(x)*gₜ(t, μ)
-  g(t::Real) = x -> g(x, t)
+  _-> (αₛ,αₜ,α)
+end
 
-  ParametricInfoUnsteady(
-    μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, g, hₛ, hₜ, h, x₀)
+function get_f(ProblInfo::SteadyInfo{N,T}, ::NTuple{1,Int8}, μ) where {N,T}
+  if !ProblInfo.probl_nl["f"]
+    return one(T)
+  else
+    return T(1 + sin(norm(Point(μ[4:3+N]) .* x)*t))
+  end
+end
+
+function get_f(ProblInfo::UnsteadyInfo{N,T}, ::NTuple{1,Int8}, μ) where {N,T}
+
+  fₛ(x) = one(T)
+  fₜ(t::Real) = T(sin(t))
+  function f(x, t)
+    if !ProblInfo.probl_nl["f"]
+      return T(fₛ(x)*fₜ(t))
+    else
+      return T(1 + sin(norm(Point(μ[4:3+N]) .* x)*t))
+    end
+  end
+  _-> (fₛ,fₜ,f)
 
 end
 
-function get_timesθ(I::Info) ::Vector{Float64}
-  collect(I.t₀:I.δt:I.T-I.δt).+I.δt*I.θ
+function get_f(ProblInfo::UnsteadyInfo{N,T}, ::NTuple{2,Int8}, μ) where {N,T}
+
+  fₛ(x) = zero(VectorValue(N,T))
+  fₜ(t::Real) = zero(T)
+  function f(x, t)
+    if !ProblInfo.probl_nl["f"]
+      return T(fₛ(x)*fₜ(t))
+    else
+      return zero(VectorValue(N,T))
+    end
+  end
+  _-> (fₛ,fₜ,f)
+
 end
 
-function generate_vtk_file(FEMSpace::FEMProblem, path::String, var_name::String, var::Array)
+function get_g(ProblInfo::SteadyInfo{N,T}, ::NTuple{1,Int8}, μ) where {N,T}
+  if !ProblInfo.probl_nl["g"]
+    return zero(T)
+  else
+    return zero(T)
+  end
+end
+
+function get_g(ProblInfo::UnsteadyInfo{N,T}, ::NTuple{1,Int8}, μ) where {N,T}
+  gₛ(x) = zero(T)
+  gₜ(t::Real) = zero(T)
+  function g(x, t)
+    if !ProblInfo.probl_nl["g"]
+      return T(gₛ(x)*gₜ(t))
+    else
+      return zero(T)
+    end
+  end
+  _-> (gₛ,gₜ,g)
+end
+
+function get_g(ProblInfo::UnsteadyInfo{N,T}, ::NTuple{2,Int8}, μ) where {N,T}
+  x0 = zero(VectorValue(N,T))
+  diff = x - x0
+  gₛ(x) = T(1 .- diff .* diff)
+  gₜ(t::Real, μ) = T(1-cos(t)+μ[end]*sin(μ[end-1]))
+  function g(x, t)
+    if ProblInfo.probl_nl["g"]
+      return T(gₛ(x)*gₜ(t, μ))
+    else
+      return T(gₛ(x)*gₜ(t, μ))
+    end
+  end
+  _-> (gₛ,gₜ,g)
+end
+
+function get_h(ProblInfo::SteadyInfo{N,T}, ::NTuple{1,Int8}, μ) where {N,T}
+  if ProblInfo.probl_nl["h"]
+    return 1 + sin(Point(μ[end-N+1:end]) .* x)
+  else
+    return one(T)
+  end
+end
+
+function get_h(ProblInfo::UnsteadyInfo{N,T}, ::NTuple{1,Int8}, μ) where {N,T}
+  hₛ(x) = one(T)
+  hₜ(t::Real) = T(sin(t))
+  function h(x, t)
+    if !ProblInfo.probl_nl["h"]
+      return T(hₛ(x)*hₜ(t))
+    else
+      return T(1 + sin(norm(Point(μ[end-N+1:end]) .* x)*t))
+    end
+  end
+  _-> (hₛ,hₜ,h)
+end
+
+function get_h(::UnsteadyInfo{N,T}, ::NTuple{2,Int8}, μ) where {N,T}
+  hₛ(x) = zero(VectorValue(N,T))
+  hₜ(t::Real) = zero(T)
+  h(x, t::Real) = zero(VectorValue(N,T))
+  _-> (hₛ,hₜ,h)
+end
+
+function get_m(ProblInfo::UnsteadyInfo{N,T}, μ) where {N,T}
+  mₛ(x) = one(T)
+  mₜ(t::Real) = one(T)
+  function m(x, t)
+    if !ProblInfo.probl_nl["M"]
+      return T(mₛ(x)*mₜ(t))
+    else
+      return one(T)
+    end
+  end
+  _-> (mₛ,mₜ,m)
+end
+
+function get_IC(::UnsteadyInfo{N,T}, ::NTuple{1,Int8}) where {N,T}
+  u₀(x) = zero(T)
+end
+
+function get_IC(::UnsteadyInfo{N,T}, ::NTuple{2,Int8}) where {N,T}
+  u₀(x) = [zero(T),zero(VectorValue(N,T))]
+end
+
+function get_timesθ(I::Info)
+  collect(I.t₀:I.δt:I.tₗ-I.δt).+I.δt*I.θ
+end
+
+function generate_vtk_file(
+  FEMSpace::FEMProblem,
+  path::String,
+  var_name::String,
+  var::Array)
 
   FE_var = FEFunction(FEMSpace.V, var)
   writevtk(FEMSpace.Ω, path, cellfields = [var_name => FE_var])
 
 end
 
-function find_FE_elements(V₀::UnconstrainedFESpace, trian::Triangulation, idx::Vector{Float64})
+function find_FE_elements(
+  V₀::UnconstrainedFESpace,
+  trian::Triangulation,
+  idx::Vector{T}) where T
 
   connectivity = get_cell_dof_ids(V₀, trian)
 
@@ -181,7 +275,7 @@ function find_FE_elements(V₀::UnconstrainedFESpace, trian::Triangulation, idx:
   for i = 1:length(idx)
     for j = 1:size(connectivity)[1]
       if idx[i] in abs.(connectivity[j])
-        append!(el, j)
+        append!(el, convert(T,j))
       end
     end
   end
@@ -190,12 +284,12 @@ function find_FE_elements(V₀::UnconstrainedFESpace, trian::Triangulation, idx:
 
 end
 
-function generate_dcube_discrete_model(I::Info,d::Int64,npart::Int,mesh_name::String)
+function generate_dcube_discrete_model(ProblInfo::Info,d::Int,npart::Int,mesh_name::String)
 
   if !occursin(".json",mesh_name)
     mesh_name *= ".json"
   end
-  mesh_dir = I.paths.mesh_path[1:findall(x->x=='/',I.paths.mesh_path)[end]]
+  mesh_dir = ProblInfo.paths.mesh_path[1:findall(x->x=='/',ProblInfo.paths.mesh_path)[end]]
   mesh_path = joinpath(mesh_dir,mesh_name)
   generate_dcube_discrete_model(d,npart,mesh_path)
 

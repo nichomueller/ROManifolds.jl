@@ -45,8 +45,8 @@ function FE_solve(
 
   u₀_field = interpolate_everywhere(Param.u₀, FEMSpace.V(probl.t₀))
 
-  uₕₜ_field = solve(ode_solver, operator, u₀_field, probl.t₀, probl.T)
-  uₕₜ = zeros(FEMSpace.Nₛᵘ, convert(Int64, probl.T / probl.δt))
+  uₕₜ_field = solve(ode_solver, operator, u₀_field, probl.t₀, probl.tₗ)
+  uₕₜ = zeros(FEMSpace.Nₛᵘ, convert(Int64, probl.tₗ / probl.δt))
   global count = 0
   dΩ = FEMSpace.dΩ
   for (uₕ, _) in uₕₜ_field
@@ -88,8 +88,8 @@ function FE_solve(
   u₀ = get_free_dof_values(interpolate_everywhere(u0, FEMSpace.V(probl.t₀)))
   p₀ = get_free_dof_values(interpolate_everywhere(p0, FEMSpace.Q(probl.t₀)))
 
-  uₕₜ = hcat(u₀,zeros(FEMSpace.Nₛᵘ, convert(Int64, probl.T / probl.δt)))
-  pₕₜ = hcat(p₀,zeros(FEMSpace.Nₛᵖ, convert(Int64, probl.T / probl.δt)))
+  uₕₜ = hcat(u₀,zeros(FEMSpace.Nₛᵘ, convert(Int64, probl.tₗ / probl.δt)))
+  pₕₜ = hcat(p₀,zeros(FEMSpace.Nₛᵖ, convert(Int64, probl.tₗ / probl.δt)))
 
   count = 1
   for (iₜ,t) in enumerate(timesθ)

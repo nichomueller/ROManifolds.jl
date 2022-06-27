@@ -212,7 +212,7 @@ function get_RB_RHS_blocks(RBInfo, RBVars::RBProblem, Param; FEMSpace = nothing)
 
 
   Ffun = assemble_forcing(FEMSpace, Param)
-  F = [Ffun(tᵢ) for tᵢ = RBInfo.t₀+RBInfo.δt:RBInfo.δt:RBInfo.T]
+  F = [Ffun(tᵢ) for tᵢ = RBInfo.t₀+RBInfo.δt:RBInfo.δt:RBInfo.tₗ]
   Fₙ = (RBVars.Φₛᵘ)' * F * RBVars.Φₜᵘ
   push!(RBVars.RHSₙ, reshape(Fₙ, :, 1))
 

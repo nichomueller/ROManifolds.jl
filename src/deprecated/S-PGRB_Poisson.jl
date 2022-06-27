@@ -47,7 +47,7 @@ function assemble_reduced_affine_components(RBInfo, RBVars::PoissonSTPGRB, opera
       projection_time = @elapsed begin
         Aₙ_i = sparse([], [], [])
         for i_nₛ = 1:maximum(10, RBInfo.nₛ)
-          Param = get_ParamInfo(problem_ntuple, RBInfo, μ[i_nₛ])
+          Param = get_ParamInfo(problem_id, RBInfo, μ[i_nₛ])
           A_i = assemble_stiffness(FEMSpace, RBInfo, Param)
           A_iΦₛᵘ = A_i * RBVars.Φₛᵘ
           Aₙ_i = hcat(Aₙ_i, (A_iΦₛᵘ)' * RBVars.Pᵘ_inv * A_iΦₛᵘ)

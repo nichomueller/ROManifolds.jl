@@ -202,7 +202,7 @@ end
 
   Ffun = assemble_forcing(FEMSpace, Param)
   F_mat = zeros(RBVars.steady_info.Nₛᵘ, RBVars.Nₜ + 1)
-  for (i, tᵢ) in enumerate(RBInfo.t₀:RBInfo.δt:RBInfo.T)
+  for (i, tᵢ) in enumerate(RBInfo.tₗ₀:RBInfo.δt:RBInfo.tₗ)
     F_mat[:, i] = Ffun(tᵢ)
   end
   F = (F_mat[:, 2:end] + F_mat[:, 1:end-1])*RBInfo.δt/2
@@ -258,7 +258,7 @@ function build_Param_RHS(RBInfo::Problem, RBVars::PoissonSTPGRB, Param)
   FEMSpace = get_FEMSpace(FEMInfo, Param.model)
   F_t, H_t = assemble_forcing(FEMSpace, RBVars, Param)
   F, H = zeros(RBVars.steady_info.Nₛᵘ, RBVars.Nₜ), zeros(RBVars.steady_info.Nₛᵘ, RBVars.Nₜ)
-  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+δtθ
+  timesθ = collect(RBInfo.tₗ₀:RBInfo.δt:RBInfo.tₗ-RBInfo.δt).+δtθ
   for (i, tᵢ) in enumerate(timesθ)
     F[:,i] = F_t(tᵢ)
     H[:,i] = H_t(tᵢ)

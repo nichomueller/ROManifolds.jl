@@ -62,8 +62,7 @@ function assemble_affine_matrices(RBInfo::Info, RBVars::PoissonSTPGRB, var::Stri
   if var == "M"
     RBVars.Qᵐ = 1
     println("Assembling affine reduced mass")
-    M = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "M.csv");
-      convert_to_sparse = true)
+    M = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "M.csv"), true)
     RBVars.Mₙ = reshape((M*RBVars.S.Φₛᵘ)'*RBVars.S.Pᵤ⁻¹*(M*RBVars.S.Φₛᵘ),
       RBVars.S.Nₛᵘ, RBVars.S.nₛᵘ, RBVars.Qᵐ)
     RBVars.MΦ = reshape(M*RBVars.S.Φₛᵘ,

@@ -20,10 +20,10 @@ function get_norm_matrix(RBInfo::Info, RBVars::PoissonSteady)
 
     println("Importing the norm matrices Xᵘ₀, Xᵘ, Xᵖ₀, Xᵖ")
 
-    Xᵘ₀ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Xᵘ₀.csv"); convert_to_sparse = true)
-    Xᵘ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Xᵘ.csv"); convert_to_sparse = true)
-    Xᵖ₀ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Xᵖ₀.csv"); convert_to_sparse = true)
-    Xᵖ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Xᵖ.csv"); convert_to_sparse = true)
+    Xᵘ₀ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Xᵘ₀.csv"), true)
+    Xᵘ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Xᵘ.csv"), true)
+    Xᵖ₀ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Xᵖ₀.csv"), true)
+    Xᵖ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Xᵖ.csv"), true)
     RBVars.Nₛᵘ = size(Xᵘ₀)[1]
     RBVars.Nᵖ = size(Xᵖ₀)[1]
     println("Dimension of H¹ norm matrix, field u: $(size(Xᵘ₀))")
@@ -243,7 +243,7 @@ end
 
 function offline_phase(RBInfo::Info, RBVars::StokesUnsteady)
 
-  RBVars.P.Nₜ = convert(Int64, RBInfo.T / RBInfo.δt)
+  RBVars.P.Nₜ = convert(Int64, RBInfo.tₗ / RBInfo.δt)
 
   if RBInfo.import_snapshots
     get_snapshot_matrix(RBInfo, RBVars)
@@ -304,7 +304,7 @@ function online_phase(RBInfo::Info, RBVars::StokesUnsteady, μ, Param_nbs)
     println("Considering Parameter number: $nb")
 
     μ_nb = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
-    Param = get_ParamInfo(problem_ntuple, RBInfo, μ_nb)
+    Param = get_ParamInfo(RBInfo, problem_id, μ_nb)
     uₕ_test = Matrix{Float64}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, (nb-1)*RBVars.P.Nₜ+1:nb*RBVars.P.Nₜ]
     pₕ_test = Matrix{Float64}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "pₕ.csv"), DataFrame))[:, (nb-1)*RBVars.P.Nₜ+1:nb*RBVars.P.Nₜ]
 
@@ -388,12 +388,12 @@ function check_dataset(RBInfo, RBVars, i)
 
   μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
   μ_i = parse.(Float64, split(chop(μ[i]; head=1, tail=1), ','))
-  Param = get_ParamInfo(problem_ntuple, RBInfo, μ_i)
+  Param = get_ParamInfo(RBInfo, problem_id, μ_i)
 
   u1 = RBVars.S.Sᵘ[:, (i-1)*RBVars.P.Nₜ+1]
   u2 = RBVars.S.Sᵘ[:, (i-1)*RBVars.P.Nₜ+2]
-  M = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "M.csv"); convert_to_sparse = true)
-  A = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "A.csv"); convert_to_sparse = true)
+  M = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "M.csv"), true)
+  A = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "A.csv"), true)
   F = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "F.csv"))
   H = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "H.csv"))
 

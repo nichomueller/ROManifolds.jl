@@ -24,8 +24,7 @@ function assemble_affine_matrices(RBInfo::Info, RBVars::PoissonSTGRB, var::Strin
   if var == "M"
     RBVars.Qᵐ = 1
     println("Assembling affine reduced mass")
-    M = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "M.csv");
-      convert_to_sparse = true)
+    M = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "M.csv"), true)
     RBVars.Mₙ = zeros(RBVars.S.nₛᵘ, RBVars.S.nₛᵘ, 1)
     RBVars.Mₙ[:,:,1] = (RBVars.S.Φₛᵘ)' * M * RBVars.S.Φₛᵘ
   else
@@ -334,7 +333,7 @@ function get_RB_RHS_blocks(RBInfo::Info, RBVars::PoissonSTGRB, θᶠ, θʰ)
 
 end
 
-function get_RB_system(RBInfo::Info, RBVars::PoissonSTGRB, Param)
+function get_RB_system(FEMSpace₀::UnsteadyProblem, RBInfo::Info, RBVars::PoissonSTGRB, Param)
 
   initialize_RB_system(RBVars.S)
   initialize_online_time(RBVars.S)
@@ -345,9 +344,9 @@ function get_RB_system(RBInfo::Info, RBVars::PoissonSTGRB, Param)
     operators = get_system_blocks(RBInfo,RBVars,blocks,blocks)
 
     if RBInfo.space_time_M_DEIM
-      θᵐ, θᵃ, θᶠ, θʰ = get_θₛₜ(RBInfo, RBVars, Param)
+      θᵐ, θᵃ, θᶠ, θʰ = get_θₛₜ(FEMSpace₀, RBInfo, RBVars, Param)
     else
-      θᵐ, θᵃ, θᶠ, θʰ = get_θ(RBInfo, RBVars, Param)
+      θᵐ, θᵃ, θᶠ, θʰ = get_θ(FEMSpace₀, RBInfo, RBVars, Param)
     end
 
     if "LHS" ∈ operators
@@ -362,7 +361,7 @@ function get_RB_system(RBInfo::Info, RBVars::PoissonSTGRB, Param)
       if !RBInfo.build_Parametric_RHS
         get_RB_RHS_blocks(RBInfo, RBVars, θᶠ, θʰ)
       else
-        build_Param_RHS(RBInfo, RBVars, Param)
+        build_Param_RHS(FEMSpace₀, RBInfo, RBVars, Param)
       end
     end
   end
@@ -371,11 +370,11 @@ function get_RB_system(RBInfo::Info, RBVars::PoissonSTGRB, Param)
 
 end
 
-function build_Param_RHS(RBInfo::Info, RBVars::PoissonSTGRB, Param)
+function build_Param_RHS(FEMSpace₀::UnsteadyProblem, RBInfo::Info, RBVars::PoissonSTGRB, Param)
   println("Assembling RHS exactly using θ-method time scheme, θ=$(RBInfo.θ)")
   δtθ = RBInfo.δt*RBInfo.θ
-  F_t = assemble_forcing(FEMSpace, RBInfo, Param)
-  H_t = assemble_neumann_datum(FEMSpace, RBInfo, Param)
+  F_t = assemble_forcing(FEMSpace₀, RBInfo, Param)
+  H_t = assemble_neumann_datum(FEMSpace₀, RBInfo, Param)
   F, H = zeros(RBVars.S.Nₛᵘ, RBVars.Nₜ), zeros(RBVars.S.Nₛᵘ, RBVars.Nₜ)
   timesθ = get_timesθ(RBInfo)
   for (i,tᵢ) in enumerate(timesθ)
@@ -389,12 +388,12 @@ function build_Param_RHS(RBInfo::Info, RBVars::PoissonSTGRB, Param)
   push!(RBVars.S.RHSₙ, reshape(Fₙ'+Hₙ',:,1))
 end
 
-function get_θ(RBInfo::Info, RBVars::PoissonSTGRB, Param) ::Tuple
+function get_θ(FEMSpace₀::UnsteadyProblem, RBInfo::Info, RBVars::PoissonSTGRB, Param)
 
-  θᵐ = get_θᵐ(RBInfo, RBVars, Param)
-  θᵃ = get_θᵃ(RBInfo, RBVars, Param)
+  θᵐ = get_θᵐ(FEMSpace₀, RBInfo, RBVars, Param)
+  θᵃ = get_θᵃ(FEMSpace₀, RBInfo, RBVars, Param)
   if !RBInfo.build_Parametric_RHS
-    θᶠ, θʰ = get_θᶠʰ(RBInfo, RBVars, Param)
+    θᶠ, θʰ = get_θᶠʰ(FEMSpace₀, RBInfo, RBVars, Param)
   else
     θᶠ, θʰ = Float64[], Float64[]
   end
@@ -403,12 +402,12 @@ function get_θ(RBInfo::Info, RBVars::PoissonSTGRB, Param) ::Tuple
 
 end
 
-function get_θₛₜ(RBInfo::Info, RBVars::PoissonSTGRB, Param) ::Tuple
+function get_θₛₜ(FEMSpace₀::UnsteadyProblem, RBInfo::Info, RBVars::PoissonSTGRB, Param)
 
-  θᵐ = get_θᵐₛₜ(RBInfo, RBVars, Param)
-  θᵃ = get_θᵃₛₜ(RBInfo, RBVars, Param)
+  θᵐ = get_θᵐₛₜ(FEMSpace₀, RBInfo, RBVars, Param)
+  θᵃ = get_θᵃₛₜ(FEMSpace₀, RBInfo, RBVars, Param)
   if !RBInfo.build_Parametric_RHS
-    θᶠ, θʰ = get_θᶠʰₛₜ(RBInfo, RBVars, Param)
+    θᶠ, θʰ = get_θᶠʰₛₜ(FEMSpace₀, RBInfo, RBVars, Param)
   else
     θᶠ, θʰ = Float64[], Float64[]
   end

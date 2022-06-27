@@ -8,7 +8,7 @@ function build_M_snapshots(
   for i_nₛ = 1:RBInfo.nₛ_MDEIM
     println("Snapshot number $i_nₛ, mass")
     μ_i = parse.(Float64, split(chop(μ[i_nₛ]; head=1, tail=1), ','))
-    Param = get_ParamInfo(problem_ntuple, RBInfo, μ_i)
+    Param = get_ParamInfo(RBInfo, problem_id, μ_i)
     M_i = assemble_mass(FEMSpace, RBInfo, Param)
     i, v = findnz(M_i[:])
     if i_nₛ == 1
@@ -28,7 +28,7 @@ function build_M_snapshots(
   timesθ::Vector{Float64}) ::Tuple
 
   Nₜ = length(timesθ)
-  Param = get_ParamInfo(problem_ntuple, RBInfo, μ)
+  Param = get_ParamInfo(RBInfo, problem_id, μ)
   M_t = assemble_mass(FEMSpace, RBInfo, Param)
 
   for i_t = 1:Nₜ
@@ -51,7 +51,7 @@ function build_A_snapshots(
   for i_nₛ = 1:RBInfo.nₛ_MDEIM
     println("Snapshot number $i_nₛ, stiffness")
     μ_i = parse.(Float64, split(chop(μ[i_nₛ]; head=1, tail=1), ','))
-    Param = get_ParamInfo(problem_ntuple, RBInfo, μ_i)
+    Param = get_ParamInfo(RBInfo, problem_id, μ_i)
     A_i = assemble_stiffness(FEMSpace, RBInfo, Param)
     i, v = findnz(A_i[:])
     if i_nₛ == 1
@@ -71,7 +71,7 @@ function build_A_snapshots(
   timesθ::Vector{Float64}) ::Tuple
 
   Nₜ = length(timesθ)
-  Param = get_ParamInfo(problem_ntuple, RBInfo, μ)
+  Param = get_ParamInfo(RBInfo, problem_id, μ)
   A_t = assemble_stiffness(FEMSpace, RBInfo, Param)
 
   for i_t = 1:Nₜ
@@ -167,7 +167,7 @@ function functional_MDEIM(
   @simd for k = 1:RBInfo.nₛ_MDEIM
     println("Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)")
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
-    Param = get_ParamInfo(problem_ntuple, RBInfo, μₖ)
+    Param = get_ParamInfo(RBInfo, problem_id, μₖ)
     Θₖ = build_parameter_on_phys_quadp(Param,phys_quadp,ncells,nquad_cell,
       timesθ,var)
     Θₖ,_ = M_DEIM_POD(reshape(Θₖ,nquad,:), RBInfo.ϵₛ)
@@ -206,7 +206,7 @@ function functional_MDEIM_sampling(
   @simd for k = 1:RBInfo.nₛ_MDEIM
     println("Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)")
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
-    Param = get_ParamInfo(problem_ntuple, RBInfo, μₖ)
+    Param = get_ParamInfo(RBInfo, problem_id, μₖ)
     timesθₖ = timesθ[rand(1:length(timesθ),nₜ)]
     Θₖ = build_parameter_on_phys_quadp(Param,phys_quadp,ncells,nquad_cell,
       timesθₖ,var)
@@ -293,7 +293,7 @@ function build_F_snapshots(
   for i_nₛ = 1:RBInfo.nₛ_DEIM
     println("Snapshot number $i_nₛ, forcing")
     μ_i = parse.(Float64, split(chop(μ[i_nₛ]; head=1, tail=1), ','))
-    Param = get_ParamInfo(problem_ntuple, RBInfo, μ_i)
+    Param = get_ParamInfo(RBInfo, problem_id, μ_i)
     F[:,i_nₛ] = assemble_forcing(FEMSpace, RBInfo, Param)[:]
   end
   F
@@ -306,7 +306,7 @@ function build_F_snapshots(
   timesθ::Vector{Float64}) ::Matrix{Float64}
 
   Nₜ = length(timesθ)
-  Param = get_ParamInfo(problem_ntuple, RBInfo, μ)
+  Param = get_ParamInfo(RBInfo, problem_id, μ)
   F_t = assemble_forcing(FEMSpace, RBInfo, Param)
   F = zeros(FEMSpace.Nₛᵘ, Nₜ)
 
@@ -326,7 +326,7 @@ function build_H_snapshots(
   for i_nₛ = 1:RBInfo.nₛ_DEIM
     println("Snapshot number $i_nₛ, neumann datum")
     μ_i = parse.(Float64, split(chop(μ[i_nₛ]; head=1, tail=1), ','))
-    Param = get_ParamInfo(problem_ntuple, RBInfo, μ_i)
+    Param = get_ParamInfo(RBInfo, problem_id, μ_i)
     H[:,i_nₛ] = assemble_neumann_datum(FEMSpace, RBInfo, Param)[:]
   end
   H
@@ -339,7 +339,7 @@ function build_H_snapshots(
   timesθ::Vector{Float64}) ::Matrix{Float64}
 
   Nₜ = length(timesθ)
-  Param = get_ParamInfo(problem_ntuple, RBInfo, μ)
+  Param = get_ParamInfo(RBInfo, problem_id, μ)
   H_t = assemble_neumann_datum(FEMSpace, RBInfo, Param)
   H = zeros(FEMSpace.Nₛᵘ, Nₜ)
 
@@ -415,7 +415,7 @@ function functional_DEIM(
   for k = 1:RBInfo.nₛ_DEIM
     println("Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)")
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
-    Param = get_ParamInfo(problem_ntuple, RBInfo, μₖ)
+    Param = get_ParamInfo(RBInfo, problem_id, μₖ)
     Θₖ = build_parameter_on_phys_quadp(Param,phys_quadp,ncells,nquad_cell,
       timesθ,var)
     Θₖ,_ = M_DEIM_POD(reshape(Θₖ,nquad,:), RBInfo.ϵₛ)
@@ -447,7 +447,7 @@ function functional_DEIM_sampling(
   for k = 1:RBInfo.nₛ_DEIM
     println("Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)")
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
-    Param = get_ParamInfo(problem_ntuple, RBInfo, μₖ)
+    Param = get_ParamInfo(RBInfo, problem_id, μₖ)
     timesθₖ = timesθ[rand(1:length(timesθ),nₜ)]
     Θₖ = build_parameter_on_phys_quadp(Param,phys_quadp,ncells,nquad_cell,
       timesθₖ,var)

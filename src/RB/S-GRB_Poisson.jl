@@ -18,8 +18,7 @@ function assemble_affine_matrices(RBInfo::Info, RBVars::PoissonSGRB, var::String
   if var == "A"
     RBVars.Qᵃ = 1
     println("Assembling affine reduced stiffness")
-    A = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "A.csv");
-      convert_to_sparse = true)
+    A = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "A.csv"), true)
     RBVars.Aₙ = reshape((RBVars.Φₛᵘ)'*A*RBVars.Φₛᵘ,RBVars.nₛᵘ,RBVars.nₛᵘ,1)
   else
     error("Unrecognized variable to load")

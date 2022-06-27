@@ -1,43 +1,44 @@
 abstract type Problem end
-abstract type FEMProblem <: Problem end
-abstract type SteadyProblem <: FEMProblem end
-abstract type UnsteadyProblem <: FEMProblem  end
+abstract type FEMProblem{N,T} <: Problem end
+abstract type SteadyProblem{N,T} <: FEMProblem{N,T} end
+abstract type UnsteadyProblem{N,T} <: FEMProblem{N,T} end
+
 abstract type Info end
-abstract type SteadyInfo <: Info end
-abstract type UnsteadyInfo <: Info end
+abstract type SteadyInfo{N,T} <: Info end
+abstract type UnsteadyInfo{N,T} <: Info end
 
 #= struct PoissonProblem <: FEMProblem end
 struct PoissonProblemUnsteady <: FEMProblem end =#
 
-struct FEMSpacePoissonSteady <: SteadyProblem
+struct FEMSpacePoissonSteady{N,T} <: SteadyProblem{N,T}
   Qₕ::CellQuadrature
-  V₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
+  V₀::UnconstrainedFESpace
   V::TrialFESpace
   ϕᵥ::FEBasis
   ϕᵤ::FEBasis
   Nₛᵘ::Int64
   Ω::BodyFittedTriangulation
   dΩ::Measure
-  dΓd::Union{Measure,Nothing}
-  dΓn::Union{Measure,Nothing}
+  dΓd::Measure
+  dΓn::Measure
 end
 
-struct FEMSpacePoissonUnsteady <: UnsteadyProblem
+struct FEMSpacePoissonUnsteady{N,T} <: UnsteadyProblem{N,T}
   Qₕ::CellQuadrature
-  V₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
+  V₀::UnconstrainedFESpace
   V::TransientTrialFESpace
   ϕᵥ::FEBasis
   ϕᵤ::Function
   Nₛᵘ::Int64
   Ω::BodyFittedTriangulation
   dΩ::Measure
-  dΓd::Union{Measure,Nothing}
-  dΓn::Union{Measure,Nothing}
+  dΓd::Measure
+  dΓn::Measure
 end
 
-struct FEMSpaceStokesSteady <: SteadyProblem
+struct FEMSpaceStokesSteady{N,T} <: SteadyProblem{N,T}
   Qₕ::CellQuadrature
-  V₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
+  V₀::UnconstrainedFESpace
   V::TrialFESpace
   Q₀::ZeroMeanFESpace
   Q::ZeroMeanFESpace
@@ -52,13 +53,13 @@ struct FEMSpaceStokesSteady <: SteadyProblem
   Ω::BodyFittedTriangulation
   dΩ::Measure
   Γd::BoundaryTriangulation
-  dΓd::Union{Measure,Nothing}
-  dΓn::Union{Measure,Nothing}
+  dΓd::Measure
+  dΓn::Measure
 end
 
-struct FEMSpaceStokesUnsteady <: UnsteadyProblem
+struct FEMSpaceStokesUnsteady{N,T} <: UnsteadyProblem{N,T}
   Qₕ::CellQuadrature
-  V₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
+  V₀::UnconstrainedFESpace
   V::TransientTrialFESpace
   Q₀::ZeroMeanFESpace
   Q::ZeroMeanFESpace
@@ -73,15 +74,15 @@ struct FEMSpaceStokesUnsteady <: UnsteadyProblem
   Ω::BodyFittedTriangulation
   dΩ::Measure
   Γd::BoundaryTriangulation
-  dΓd::Union{Measure,Nothing}
-  dΓn::Union{Measure,Nothing}
+  dΓd::Measure
+  dΓn::Measure
 end
 
-struct FEMSpaceNavierStokesUnsteady <: UnsteadyProblem
+struct FEMSpaceNavierStokesUnsteady{N,T} <: UnsteadyProblem{N,T}
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TransientTrialFESpace
-  Q₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
+  Q₀::ZeroMeanFESpace
   Q::ZeroMeanFESpace
   X₀::MultiFieldFESpace
   X::TransientMultiFieldTrialFESpace
@@ -94,11 +95,12 @@ struct FEMSpaceNavierStokesUnsteady <: UnsteadyProblem
   Ω::BodyFittedTriangulation
   dΩ::Measure
   Γd::BoundaryTriangulation
-  dΓd::Union{Measure,Nothing}
-  dΓn::Union{Measure,Nothing}
+  dΓd::Measure
+  dΓn::Measure
 end
 
-struct ProblemInfoSteady <: SteadyInfo
+struct ProblemInfoSteady{N,T} <: SteadyInfo{N,T}
+  problem_id::NTuple
   case::Int
   probl_nl::Dict
   order::Int
@@ -110,7 +112,8 @@ struct ProblemInfoSteady <: SteadyInfo
   paths::Function
 end
 
-struct ProblemInfoUnsteady <: UnsteadyInfo
+struct ProblemInfoUnsteady{N,T} <: UnsteadyInfo{N,T}
+  problem_id::NTuple
   case::Int
   probl_nl::Dict
   order::Int
@@ -124,12 +127,12 @@ struct ProblemInfoUnsteady <: UnsteadyInfo
   θ::Float64
   RK_type::Symbol
   t₀::Float64
-  T::Float64
+  tₗ::Float64
   δt::Float64
 end
 
-mutable struct ParametricInfoSteady
-  μ::Vector{Float64}
+mutable struct ParametricInfoSteady{T}
+  μ::Vector{T}
   model::DiscreteModel
   α::Function
   f::Function
@@ -137,8 +140,8 @@ mutable struct ParametricInfoSteady
   h::Function
 end
 
-mutable struct ParametricInfoUnsteady
-  μ::Vector{Float64}
+mutable struct ParametricInfoUnsteady{T}
+  μ::Vector{T}
   model::DiscreteModel
   αₛ::Function
   αₜ::Function
