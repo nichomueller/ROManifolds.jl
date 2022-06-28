@@ -5,8 +5,7 @@ function get_inverse_P_matrix(RBInfo::Info, RBVars::PoissonSPGRB)
     if isempty(RBVars.Pᵤ⁻¹)
       println("S-PGRB: building the inverse of the diag preconditioner of the H1 norm matrix")
       if isfile(joinpath(RBInfo.paths.FEM_structures_path, "Pᵤ⁻¹.csv"))
-        RBVars.Pᵤ⁻¹ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Pᵤ⁻¹.csv"),
-          true)
+        RBVars.Pᵤ⁻¹ = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "Pᵤ⁻¹.csv"))
       else
         get_norm_matrix(RBInfo, RBVars)
         diag_Xᵘ₀ = Vector{Float64}(diag(RBVars.Xᵘ₀))
@@ -25,13 +24,13 @@ function get_Aₙ(RBInfo::Info, RBVars::PoissonSPGRB) :: Vector
   if (isfile(joinpath(RBInfo.paths.ROM_structures_path, "Aₙ.csv")) &&
       isfile(joinpath(RBInfo.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv")))
     println("Importing reduced affine stiffness matrix")
-    Aₙ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "Aₙ.csv"))
+    Aₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "Aₙ.csv"))
     RBVars.Aₙ = reshape(Aₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)
     Qᵃ = sqrt(size(RBVars.Aₙ)[3])
     @assert floor(Qᵃ) == Qᵃ "Qᵃ should be the square root of an Int64"
     RBVars.Qᵃ = Int(Qᵃ)
     println("S-PGRB: fetching the matrix AΦᵀPᵤ⁻¹")
-    AΦᵀPᵤ⁻¹ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
+    AΦᵀPᵤ⁻¹ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
     RBVars.AΦᵀPᵤ⁻¹ = reshape(AΦᵀPᵤ⁻¹,RBVars.nₛᵘ,RBVars.Nₛᵘ,:)
     return []
   else
@@ -45,7 +44,7 @@ function get_AΦᵀPᵤ⁻¹(RBInfo::Info, RBVars::PoissonSPGRB)
 
   println("S-PGRB: fetching the matrix AΦᵀPᵤ⁻¹")
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
-    AΦᵀPᵤ⁻¹ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
+    AΦᵀPᵤ⁻¹ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
     RBVars.AΦᵀPᵤ⁻¹ = reshape(AΦᵀPᵤ⁻¹,RBVars.nₛᵘ,RBVars.Nₛᵘ,:)
     return
   else
@@ -68,7 +67,7 @@ function assemble_affine_matrices(RBInfo::Info, RBVars::PoissonSPGRB, var::Strin
     RBVars.Qᵃ = 1
     println("Assembling affine reduced stiffness")
     println("SPGRB: affine component number 1, matrix A")
-    A = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "A.csv"), true)
+    A = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "A.csv"))
     RBVars.AΦᵀPᵤ⁻¹ = reshape((A*RBVars.Φₛᵘ)'*RBVars.Pᵤ⁻¹,RBVars.nₛᵘ,RBVars.Nₛᵘ,1)
     RBVars.Aₙ = reshape(RBVars.AΦᵀPᵤ⁻¹*(A*RBVars.Φₛᵘ),RBVars.nₛᵘ,RBVars.nₛᵘ,1)
   else
@@ -79,8 +78,8 @@ end
 
 function assemble_reduced_mat_MDEIM(
   RBVars::PoissonSPGRB,
-  MDEIM_mat::Matrix{Float64},
-  row_idx::Vector{Float64})
+  MDEIM_mat::Matrix{T},
+  row_idx::Vector{Int64})
 
   Q = size(MDEIM_mat)[2]
   r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.Nₛᵘ)
@@ -136,14 +135,14 @@ function assemble_affine_vectors(RBInfo::Info, RBVars::PoissonSPGRB, var::String
   if var == "F"
     RBVars.Qᶠ = 1
     println("Assembling affine reduced forcing term")
-    F = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "F.csv"))
+    F = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_structures_path, "F.csv"))
     Fₙ = zeros(RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qᶠ)
     matrix_product_vec!(Fₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(F,:,1))
     RBVars.Fₙ = reshape(Fₙ,:,RBVars.Qᵃ*RBVars.Qᶠ)
   elseif var == "H"
     RBVars.Qʰ = 1
     println("Assembling affine reduced Neumann term")
-    H = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "H.csv"))
+    H = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_structures_path, "H.csv"))
     Hₙ = zeros(RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qʰ)
     matrix_product_vec!(Hₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(H,:,1))
     RBVars.Hₙ = reshape(Hₙ,:,RBVars.Qᵃ*RBVars.Qʰ)

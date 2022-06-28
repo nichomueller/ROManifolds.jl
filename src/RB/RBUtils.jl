@@ -40,10 +40,10 @@ end
 
 function build_sparse_mat(
   FEMSpace₀::SteadyProblem,
-  FEMInfo::ProblemInfoSteady,
-  Param::ParametricInfoSteady,
-  el::Vector{Float64};
-  var="A")
+  FEMInfo::ProblemInfoSteady{N,T},
+  Param::ParametricInfoSteady{T},
+  el::Vector{Int64};
+  var="A") where {N,T}
 
   Ω_sparse = view(FEMSpace₀.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
@@ -61,11 +61,11 @@ end
 
 function build_sparse_mat(
   FEMSpace₀::UnsteadyProblem,
-  FEMInfo::ProblemInfoUnsteady,
-  Param::ParametricInfoUnsteady,
-  el::Vector{Float64},
-  timesθ::Vector{Float64};
-  var="A")
+  FEMInfo::ProblemInfoUnsteady{N,T},
+  Param::ParametricInfoUnsteady{T},
+  el::Vector{Int64},
+  timesθ::Vector{T};
+  var="A") where {N,T}
 
   Ω_sparse = view(FEMSpace₀.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
@@ -123,21 +123,27 @@ function matrix_to_blocks(A::Array)
 
 end
 
-function remove_small_entries(A::Array,tol=1e-15) ::Array
+function remove_small_entries(A::Array,tol=1e-15)
   A[A.<=tol].=0
   A
 end
 
-function compute_errors(uₕ::Matrix{Float64}, RBVars::RBSteadyProblem, norm_matrix = nothing)
+function compute_errors(
+  uₕ::Vector{T},
+  RBVars::RBSteadyProblem{T},
+  norm_matrix = nothing) where T
 
   mynorm(uₕ - RBVars.ũ, norm_matrix) / mynorm(uₕ, norm_matrix)
 
 end
 
-function compute_errors(uₕ::Matrix{Float64}, RBVars::RBUnsteadyProblem, norm_matrix = nothing)
+function compute_errors(
+  uₕ::Matrix{T},
+  RBVars::RBUnsteadyProblem{T},
+  norm_matrix = nothing) where T
 
-  H1_err = zeros(RBVars.Nₜ)
-  H1_sol = zeros(RBVars.Nₜ)
+  H1_err = zeros(T, RBVars.Nₜ)
+  H1_sol = zeros(T, RBVars.Nₜ)
 
   @simd for i = 1:RBVars.Nₜ
     H1_err[i] = mynorm(uₕ[:, i] - RBVars.S.ũ[:, i], norm_matrix)
@@ -158,7 +164,7 @@ function post_process(root::String)
 
   println("Exporting plots and tables")
 
-  function get_paths(dir::String)::Tuple
+  function get_paths(dir::String)
     path_to_err = joinpath(dir,
       "results/Params_95_96_97_98_99_100/H1L2_err.csv")
     path_to_t = joinpath(dir,
@@ -166,7 +172,7 @@ function post_process(root::String)
     path_to_err,path_to_t
   end
 
-  function get_tolerances(dir::String)::Vector{Float64}
+  function get_tolerances(dir::String)
     if occursin("-3",dir)
       return ["1e-3"]
     elseif occursin("-4",dir)
@@ -185,14 +191,14 @@ function post_process(root::String)
       if !isempty(ϵ)
         if occursin("fun",dir)
           append!(tol_fun,ϵ)
-          append!(err_fun,load_CSV(path_to_err)[1])
-          cur_time = load_CSV(path_to_t)
+          append!(err_fun,load_CSV(Matrix{T}(undef,0,0), path_to_err)[1])
+          cur_time = load_CSV(Matrix{T}(undef,0,0), path_to_t)
           append!(time_fun["on"],cur_time[findall(x->x.=="on_time",cur_time[:,2]),1])
           append!(time_fun["off"],cur_time[findall(x->x.=="off_time",cur_time[:,2]),1])
         else
           append!(tol,ϵ)
-          append!(err,load_CSV(path_to_err)[1])
-          cur_time = load_CSV(path_to_t)
+          append!(err,load_CSV(Matrix{T}(undef,0,0), path_to_err)[1])
+          cur_time = load_CSV(Matrix{T}(undef,0,0), path_to_t)
           append!(time["on"],cur_time[findall(x->x.=="on_time",cur_time[:,2]),1])
           append!(time["off"],cur_time[findall(x->x.=="off_time",cur_time[:,2]),1])
         end

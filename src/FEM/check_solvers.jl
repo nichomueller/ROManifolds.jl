@@ -4,7 +4,7 @@ function check_dataset(
   RBVars::PoissonUnsteady,
   nb::Int64)
 
-  μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
+  μ = load_CSV(Matrix{String}(undef,0,0),joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
   μ_i = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
   Param = get_ParamInfo(RBInfo, problem_id, μ_i)
 

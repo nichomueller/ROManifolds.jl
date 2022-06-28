@@ -20,10 +20,10 @@ function get_norm_matrix(RBInfo::Info, RBVars::PoissonSteady)
 
     println("Importing the norm matrices Xᵘ₀, Xᵘ, Xᵖ₀, Xᵖ")
 
-    Xᵘ₀ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Xᵘ₀.csv"), true)
-    Xᵘ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Xᵘ.csv"), true)
-    Xᵖ₀ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Xᵖ₀.csv"), true)
-    Xᵖ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Xᵖ.csv"), true)
+    Xᵘ₀ = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "Xᵘ₀.csv"))
+    Xᵘ = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "Xᵘ.csv"))
+    Xᵖ₀ = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "Xᵖ₀.csv"))
+    Xᵖ = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "Xᵖ.csv"))
     RBVars.Nₛᵘ = size(Xᵘ₀)[1]
     RBVars.Nᵖ = size(Xᵖ₀)[1]
     println("Dimension of H¹ norm matrix, field u: $(size(Xᵘ₀))")
@@ -111,9 +111,9 @@ function import_reduced_basis(RBInfo::Info, RBVars::StokesUnsteady)
 
   println("Importing the reduced basis for field p")
 
-  RBVars.Φₛᵖ = load_CSV(joinpath(RBInfo.paths.basis_path, "Φₛᵖ.csv"))
+  RBVars.Φₛᵖ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.basis_path, "Φₛᵖ.csv"))
   RBVars.nₛᵖ = size(RBVars.Φₛᵖ)[2]
-  RBVars.Φₜᵖ = load_CSV(joinpath(RBInfo.paths.basis_path, "Φₜᵖ.csv"))
+  RBVars.Φₜᵖ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.basis_path, "Φₜᵖ.csv"))
   RBVars.nₜᵖ = size(RBVars.Φₜᵖ)[2]
   RBVars.nᵖ = RBVars.nₛᵖ * RBVars.nₜᵖ
 
@@ -386,16 +386,16 @@ end
 
 function check_dataset(RBInfo, RBVars, i)
 
-  μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
+  μ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_snap_path, "μ.csv"))
   μ_i = parse.(Float64, split(chop(μ[i]; head=1, tail=1), ','))
   Param = get_ParamInfo(RBInfo, problem_id, μ_i)
 
   u1 = RBVars.S.Sᵘ[:, (i-1)*RBVars.P.Nₜ+1]
   u2 = RBVars.S.Sᵘ[:, (i-1)*RBVars.P.Nₜ+2]
-  M = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "M.csv"), true)
-  A = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "A.csv"), true)
-  F = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "F.csv"))
-  H = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "H.csv"))
+  M = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "M.csv"))
+  A = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "A.csv"))
+  F = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_structures_path, "F.csv"))
+  H = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_structures_path, "H.csv"))
 
   t¹_θ = RBInfo.t₀+RBInfo.δt*RBInfo.θ
   t²_θ = t¹_θ+RBInfo.δt

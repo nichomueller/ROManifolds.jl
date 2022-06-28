@@ -61,10 +61,11 @@ function init_PoissonSTGRB_variables(::Type{T}) where T
   sparse_el_M = Vector{Int64}(undef,0)
   θᵐ = Matrix{T}(undef,0,0)
   Nₜ = 0
+  Nᵘ = 0
   nₜᵘ = 0
   nᵘ = 0
   Qᵐ = 0
-  Φₜᵘ,Mₙ,MDEIM_mat_M,MDEIMᵢ_M,MDEIM_idx_M,sparse_el_M,row_idx_M,θᵐ,Nₜ,nₜᵘ,nᵘ,Qᵐ
+  Φₜᵘ,Mₙ,MDEIM_mat_M,MDEIMᵢ_M,MDEIM_idx_M,row_idx_M,sparse_el_M,θᵐ,Nₜ,Nᵘ,nₜᵘ,nᵘ,Qᵐ
 end
 
 function init_PoissonSTPGRB_variables(::Type{T}) where T
@@ -115,14 +116,14 @@ end
 
 function setup(::NTuple{1,Int}, ::Type{T}) where T
 
-  PoissonSGRB{T}(init_PoissonSGRB_variables(T))
+  PoissonSGRB{T}(init_PoissonSGRB_variables(T)...)
 
 end
 
 function setup(::NTuple{2,Int}, ::Type{T}) where T
 
-  PoissonSPGRB{T}(init_PoissonSGRB_variables(T),
-    init_PoissonSPGRB_variables(T))
+  PoissonSPGRB{T}(init_PoissonSGRB_variables(T)...,
+    init_PoissonSPGRB_variables(T)...)
 
 end
 
@@ -140,15 +141,15 @@ end
 
 function setup(::NTuple{3,Int}, ::Type{T}) where T
 
-  PoissonSTGRB{T}(PoissonSGRB{T}(init_PoissonSGRB_variables(T)),
-    init_PoissonSTGRB_variables(T))
+  PoissonSTGRB{T}(PoissonSGRB{T}(init_PoissonSGRB_variables(T)...),
+    init_PoissonSTGRB_variables(T)...)
 
 end
 
 function setup(::NTuple{4,Int}, ::Type{T}) where T
 
-  PoissonSTPGRB{T}(PoissonSPGRB{T}(init_PoissonSGRB_variables(T),
-    init_PoissonSPGRB_variables(T)), init_PoissonSTPGRB_variables(T))
+  PoissonSTPGRB{T}(PoissonSPGRB{T}(init_PoissonSGRB_variables(T)...,
+    init_PoissonSPGRB_variables(T)...), init_PoissonSTPGRB_variables(T)...)
 
 end
 
@@ -169,8 +170,8 @@ end =#
 
 function setup(::NTuple{5,Int}, ::Type{T}) where T
 
-  StokesSTGRB{T}(PoissonSTGRB{T}(PoissonSGRB{T}(init_PoissonSGRB_variables(T)),
-    init_PoissonSTGRB_variables(T)), init_StokesSTGRB_variables(T))
+  StokesSTGRB{T}(PoissonSTGRB{T}(PoissonSGRB{T}(init_PoissonSGRB_variables(T)...),
+    init_PoissonSTGRB_variables(T)...), init_StokesSTGRB_variables(T)...)
 
 end
 
@@ -185,7 +186,7 @@ end
 end =#
 
 
-struct ROMInfoSteady{N,T} <: SteadyInfo{N,T}
+struct ROMInfoSteady{T} <: SteadyInfo
   probl_nl::Dict
   case::Int
   paths::Function
@@ -203,7 +204,7 @@ struct ROMInfoSteady{N,T} <: SteadyInfo{N,T}
   save_results::Bool
 end
 
-mutable struct ROMInfoUnsteady{N,T} <: UnsteadyInfo{N,T}
+mutable struct ROMInfoUnsteady{T} <: UnsteadyInfo
   probl_nl::Dict
   case::Int
   paths::Function

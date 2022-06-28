@@ -82,11 +82,40 @@ end
   the vector space spanned by the columns of 'S', the so-called snapshots matrix.
   If the SPD matrix 'X' is provided, the columns of 'U' are orthogonal w.r.t.
   the norm induced by 'X'"""
-function POD(S::Matrix{T}, ϵ::T, X::SparseMatrixCSC) where T
+function POD(S::Matrix{T}, ϵ::Float64, X::SparseMatrixCSC{T}) where T
+
+  H = cholesky(X)
+  #L = sparse(H.L)
+  #mul!(S, L', S[H.p, :])
+  U, Σ, _ = svd(H.L'*S[H.p, :])
+
+  energies = cumsum(Σ.^2)
+  N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
+  println("Basis number obtained via POD is $N,
+    projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
+
+  Matrix{T}((H.L' \ U[:, 1:N])[invperm(H.p), :]), T.(Σ)
+
+end
+
+function POD(S::SparseMatrixCSC{T}, ϵ::Float64, X::SparseMatrixCSC{T}) where T
 
   H = cholesky(X)
   L = sparse(H.L)
-  mul!(S, L', S[H.p, :])
+  #mul!(S, L', S[H.p, :])
+  U, Σ, _ = svds(L'*S[H.p, :]; nsv=size(S)[2] - 1)[1]
+
+  energies = cumsum(Σ.^2)
+  N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
+  println("Basis number obtained via POD is $N,
+    projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
+
+  Matrix{T}((L' \ U[:, 1:N])[invperm(H.p), :]), T.(Σ)
+
+end
+
+function POD(S::Matrix{T}, ϵ::Float64) where T
+
   U, Σ, _ = svd(S)
 
   energies = cumsum(Σ.^2)
@@ -94,43 +123,11 @@ function POD(S::Matrix{T}, ϵ::T, X::SparseMatrixCSC) where T
   println("Basis number obtained via POD is $N,
     projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
 
-  Matrix{T}((L' \ U[:, 1:N])[invperm(H.p), :]), Σ
+  T.(U[:, 1:N]), T.(Σ)
 
 end
 
-function POD(S::SparseMatrixCSC, ϵ::T, X::SparseMatrixCSC) where T
-
-  H = cholesky(X)
-  L = sparse(H.L)
-  mul!(S, L', S[H.p, :])
-  U, Σ, _ = svds(S; nsv=size(S)[2] - 1)[1]
-
-  energies = cumsum(Σ.^2)
-  N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  println("Basis number obtained via POD is $N,
-    projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
-
-  Matrix{T}((L' \ U[:, 1:N])[invperm(H.p), :]), Σ
-
-end
-
-function POD(S::Matrix{T}, ϵ::T) where T
-
-  U, Σ, _ = svd(S)
-
-  energies = cumsum(Σ.^2)
-  N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  println("Basis number obtained via POD is $N,
-    projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
-  if issparse(U)
-    U = Matrix{T}(U)
-  end
-
-  U[:, 1:N], Σ
-
-end
-
-function POD(S::SparseMatrixCSC, ϵ::T) where T
+function POD(S::SparseMatrixCSC, ϵ::Float64) where T
 
   U, Σ, _ = svds(S; nsv=size(S)[2] - 1)[1]
 
@@ -139,6 +136,6 @@ function POD(S::SparseMatrixCSC, ϵ::T) where T
   println("Basis number obtained via POD is $N,
     projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
 
-  U[:, 1:N], Σ
+  T.(U[:, 1:N]), T.(Σ)
 
 end

@@ -1,12 +1,11 @@
 include("MV_snapshots.jl")
 
-function M_DEIM_POD(S::Matrix{Float64}, ϵ::Float64=1e-5)
+function M_DEIM_POD(S::Matrix{T}, ϵ=1e-5) where T
 
-  S̃ = copy(S)
-  M_DEIM_mat, Σ, _ = svd(S̃)
+  M_DEIM_mat, Σ, _ = svd(S)
 
   energies = cumsum(Σ .^ 2)
-  mult_factor = sqrt(size(S̃)[2]) * norm(inv(M_DEIM_mat'M_DEIM_mat))
+  mult_factor = sqrt(size(S)[2]) * norm(inv(M_DEIM_mat'M_DEIM_mat))
   M_DEIM_err_bound = vcat(mult_factor * Σ[2:end], 0.0)
 
   energies = cumsum(Σ .^ 2)
@@ -16,11 +15,11 @@ function M_DEIM_POD(S::Matrix{Float64}, ϵ::Float64=1e-5)
   println("Basis number obtained via POD is $N,
   projection error ≤ $(max(sqrt(1-energies[N]/energies[end]),M_DEIM_err_bound[N]))")
 
-  M_DEIM_mat[:, 1:N], Σ
+  T.(M_DEIM_mat[:, 1:N]), T.(Σ)
 
 end
 
-function M_DEIM_offline(M_DEIM_mat::Matrix{Float64}, Σ::Vector{Float64})
+function M_DEIM_offline(M_DEIM_mat::Matrix{T}, Σ::Vector{T}) where T
 
   (N, n) = size(M_DEIM_mat)
   M_DEIM_idx = Int64[]
@@ -47,7 +46,7 @@ function MDEIM_offline(RBInfo::Info, var::String)
 
   println("Building $(RBInfo.nₛ_MDEIM) snapshots of $var")
 
-  μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
+  μ = load_CSV(Matrix{String}(undef,0,0),joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
   model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
   FEMSpace₀ = get_FEMSpace₀(FEMInfo.problem_id, FEMInfo, model)
 
@@ -63,9 +62,10 @@ function MDEIM_offline(RBInfo::Info, var::String)
 end
 
 function modify_timesθ_and_MDEIM_idx(
-  MDEIM_idx::Vector{Float64},
-  RBInfo::Info,
-  RBVars::PoissonUnsteady)
+  MDEIM_idx::Vector{Int64},
+  RBInfo::ROMInfoUnsteady{T},
+  RBVars::PoissonUnsteady) where T
+
   timesθ = get_timesθ(RBInfo)
   idx_space, idx_time = from_vec_to_mat_idx(MDEIM_idx, RBVars.S.Nₛᵘ^2)
   idx_time_mod = label_sorted_elems(idx_time)
@@ -78,7 +78,7 @@ function DEIM_offline(RBInfo::Info, var::String)
 
   println("Building $(RBInfo.nₛ_DEIM) snapshots of $var")
 
-  μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
+  μ = load_CSV(Matrix{String}(undef,0,0), joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
   model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
   FEMSpace₀ = get_FEMSpace₀(FEMInfo.problem_id, FEMInfo, model)
 
@@ -90,6 +90,6 @@ function DEIM_offline(RBInfo::Info, var::String)
 
 end
 
-function M_DEIM_online(Mat_nonaffine, Matᵢ::Matrix{Float64}, idx::Vector{Float64})
-  @fastmath Matᵢ \ Matrix{Float64}(reshape(Mat_nonaffine, :, 1)[idx, :])
+function M_DEIM_online(Mat_nonaffine, Matᵢ::Matrix{T}, idx::Vector{Int64}) where T
+  @fastmath Matᵢ \ Matrix{T}(reshape(Mat_nonaffine, :, 1)[idx, :])
 end

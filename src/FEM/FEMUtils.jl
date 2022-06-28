@@ -249,8 +249,8 @@ function get_IC(::UnsteadyInfo{N,T}, ::NTuple{2,Int8}) where {N,T}
   u₀(x) = [zero(T),zero(VectorValue(N,T))]
 end
 
-function get_timesθ(I::Info)
-  collect(I.t₀:I.δt:I.tₗ-I.δt).+I.δt*I.θ
+function get_timesθ(I::UnsteadyInfo{N,T}) where {N,T}
+  T.(collect(I.t₀:I.δt:I.tₗ-I.δt).+I.δt*I.θ)
 end
 
 function generate_vtk_file(

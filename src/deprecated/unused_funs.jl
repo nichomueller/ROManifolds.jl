@@ -87,3 +87,10 @@ function chebyschev_multipliers(x::Vector, order::Int64, dim=3)
   return Ξ
 
 end
+
+
+function index_mapping_inverse(i::Int,RBVars::PoissonUnsteady) ::Tuple
+  iₛ = 1+floor(Int64,(i-1)/RBVars.nₜᵘ)
+  iₜ = i-(iₛ-1)*RBVars.nₜᵘ
+  iₛ,iₜ
+end

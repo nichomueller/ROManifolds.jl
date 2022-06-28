@@ -6,7 +6,7 @@ function primal_supremizers(RBInfo::Info, RBVars::StokesSTGRB)
 
   dir_idx = abs.(diag(RBVars.Xᵘ) .- 1) .< 1e-16
 
-  constraint_mat = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "B.csv"); true)'
+  constraint_mat = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_structures_path, "B.csv"); true)'
   constraint_mat[dir_idx[dir_idx≤RBVars.P.S.Nₛᵘ*RBVars.P.S.Nₛᵖ]] = 0
 
   supr_primal = Matrix{Float64}(solve(PardisoSolver(), RBVars.Xᵘ, constraint_mat * RBVars.Φₛᵖ))
@@ -127,10 +127,8 @@ function get_Bₙ(RBInfo::Info, RBVars::StokesSTGRB) :: Vector
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Bₙ.csv")) && isfile(joinpath(RBInfo.paths.ROM_structures_path, "Bᵀₙ.csv"))
     println("Importing reduced affine velocity-pressure and pressure-velocity matrices")
-    Bₙ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "Bₙ.csv"))
+    Bₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "Bₙ.csv"))
     RBVars.Bₙ = reshape(Bₙ,RBVars.S.nₛᵘ,RBVars.nₛᵖ,1)
-    Bᵀₙ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "Bᵀₙ.csv"))
-    RBVars.Bᵀₙ = reshape(Bᵀₙ,RBVars.nₛᵖ,RBVars.S.nₛᵘ,1)
     return []
   else
     println("Failed to import the reduced affine velocity-pressure and pressure-velocity matrices: must build them")
@@ -143,14 +141,10 @@ function assemble_affine_matrices(RBInfo::Info, RBVars::StokesSTGRB, var::String
 
   if var == "B"
     println("Assembling affine reduced velocity-pressure and pressure-velocity matrices")
-    B = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "B.csv");  true)
+    B = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "B.csv"))
     Bₙ = (RBVars.Φₛᵖ)' * B * RBVars.S.Φₛᵘ
     RBVars.Bₙ = zeros(RBVars.nₛᵖ, RBVars.S.nₛᵘ, 1)
     RBVars.Bₙ[:,:,1] = Bₙ
-    Bᵀ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Bᵀ.csv"); true)
-    Bᵀₙ = (RBVars.S.Φₛᵘ)' * Bᵀ * RBVars.Φₛᵖ
-    RBVars.Bᵀₙ = zeros(RBVars.S.nₛᵘ, RBVars.nₛᵖ, 1)
-    RBVars.Bᵀₙ[:,:,1] = Bᵀₙ
   else
     assemble_affine_matrices(RBInfo, RBVars.P, var)
   end
