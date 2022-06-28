@@ -1,23 +1,27 @@
-function get_Aₙ(RBInfo::Info, RBVars::PoissonSTPGRB) :: Vector
+function get_Aₙ(
+  RBInfo::ROMInfoUnsteady{T},
+  RBVars::PoissonSTPGRB{T}) where T
 
-  get_Aₙ(RBInfo, RBVars.S)
+  get_Aₙ(RBInfo.S, RBVars.S)
 
 end
 
-function get_Mₙ(RBInfo::Info, RBVars::PoissonSTPGRB) :: Vector
+function get_Mₙ(
+  RBInfo::ROMInfoUnsteady{T},
+  RBVars::PoissonSTPGRB{T}) where T
 
-  if (isfile(joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv")) &&
-      isfile(joinpath(RBInfo.paths.ROM_structures_path, "MΦ.csv")) &&
-      isfile(joinpath(RBInfo.paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv")))
+  if (isfile(joinpath(RBInfo.S.paths.ROM_structures_path, "Mₙ.csv")) &&
+      isfile(joinpath(RBInfo.S.paths.ROM_structures_path, "MΦ.csv")) &&
+      isfile(joinpath(RBInfo.S.paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv")))
     println("Importing reduced affine stiffness matrix")
-    Mₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
+    Mₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.S.paths.ROM_structures_path, "Mₙ.csv"))
     RBVars.Mₙ = reshape(Mₙ,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,:)
     Qᵐ = sqrt(size(RBVars.Mₙ)[end])
     @assert floor(Qᵐ) == Qᵐ "Qᵐ should be the square root of an Int64"
     RBVars.Qᵐ = Int(Qᵐ)
-    MΦ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "MΦ.csv"))
+    MΦ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.S.paths.ROM_structures_path, "MΦ.csv"))
     RBVars.MΦ = reshape(MΦ,RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,:)
-    MΦᵀPᵤ⁻¹ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv"))
+    MΦᵀPᵤ⁻¹ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.S.paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv"))
     RBVars.MΦᵀPᵤ⁻¹ = reshape(MΦᵀPᵤ⁻¹,RBVars.S.nₛᵘ,RBVars.S.Nₛᵘ,:)
     return []
   else
@@ -27,11 +31,13 @@ function get_Mₙ(RBInfo::Info, RBVars::PoissonSTPGRB) :: Vector
 
 end
 
-function get_MAₙ(RBInfo::Info, RBVars::PoissonSTPGRB) :: Vector
+function get_MAₙ(
+  RBInfo::ROMInfoUnsteady{T},
+  RBVars::PoissonSTPGRB{T}) where T
 
-  if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
+  if isfile(joinpath(RBInfo.S.paths.ROM_structures_path, "Mₙ.csv"))
     println("S-PGRB: importing MAₙ")
-    MAₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "MAₙ.csv"))
+    MAₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.S.paths.ROM_structures_path, "MAₙ.csv"))
     RBVars.MAₙ = reshape(MAₙ,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,:)
     return []
   else
@@ -41,7 +47,7 @@ function get_MAₙ(RBInfo::Info, RBVars::PoissonSTPGRB) :: Vector
 
 end
 
-function assemble_MAₙ(RBVars::PoissonSTPGRB)
+function assemble_MAₙ(RBVars::PoissonSTPGRB{T}) where T
 
   println("S-PGRB: Assembling MAₙ")
 
@@ -55,14 +61,17 @@ function assemble_MAₙ(RBVars::PoissonSTPGRB)
 
 end
 
-function assemble_affine_matrices(RBInfo::Info, RBVars::PoissonSTPGRB, var::String)
+function assemble_affine_matrices(
+  RBInfo::ROMInfoUnsteady{T},
+  RBVars::PoissonSTPGRB{T},
+  var::String) where T
 
-  get_inverse_P_matrix(RBInfo, RBVars.S)
+  get_inverse_P_matrix(RBInfo.S, RBVars.S)
 
   if var == "M"
     RBVars.Qᵐ = 1
     println("Assembling affine reduced mass")
-    M = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "M.csv"))
+    M = load_CSV(sparse([],[],T[]), joinpath(RBInfo.S.paths.FEM_structures_path, "M.csv"))
     RBVars.Mₙ = reshape((M*RBVars.S.Φₛᵘ)'*RBVars.S.Pᵤ⁻¹*(M*RBVars.S.Φₛᵘ),
       RBVars.S.Nₛᵘ, RBVars.S.nₛᵘ, RBVars.Qᵐ)
     RBVars.MΦ = reshape(M*RBVars.S.Φₛᵘ,
@@ -70,17 +79,17 @@ function assemble_affine_matrices(RBInfo::Info, RBVars::PoissonSTPGRB, var::Stri
     RBVars.MΦᵀPᵤ⁻¹ = reshape((M*RBVars.S.Φₛᵘ)'*Matrix(RBVars.S.Pᵤ⁻¹),
       RBVars.S.Nₛᵘ, RBVars.S.nₛᵘ, RBVars.Qᵐ)
   else
-    assemble_affine_matrices(RBInfo, RBVars.S, var)
+    assemble_affine_matrices(RBInfo.S, RBVars.S, var)
   end
 
 end
 
 function assemble_reduced_mat_MDEIM(
-  RBInfo::Info,
-  RBVars::PoissonSTPGRB,
+  RBInfo::ROMInfoUnsteady{T},
+  RBVars::PoissonSTPGRB{T},
   MDEIM_mat::Matrix{Float64},
-  row_idx::Vector{Float64},
-  var::String)
+  row_idx::Vector{Int64},
+  var::String) where T
 
   if RBInfo.space_time_M_DEIM
     Nₜ = RBVars.Nₜ
@@ -135,14 +144,17 @@ function assemble_reduced_mat_MDEIM(
 
 end
 
-function assemble_affine_vectors(RBInfo::Info, RBVars::PoissonSTPGRB, var::String)
+function assemble_affine_vectors(
+  RBInfo::ROMInfoUnsteady{T},
+  RBVars::PoissonSTPGRB{T},
+  var::String) where T
 
   println("SPGRB: assembling affine reduced RHS; A is affine")
 
   if var == "F"
     RBVars.S.Qᶠ = 1
     println("Assembling affine reduced forcing term")
-    F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.FEM_structures_path, "F.csv"))
+    F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.S.paths.FEM_structures_path, "F.csv"))
     MFₙ = zeros(RBVars.S.nₛᵘ, 1, RBVars.Qᵐ*RBVars.S.Qᶠ)
     matrix_product_vec!(MFₙ, RBVars.MΦᵀPᵤ⁻¹, reshape(F,:,1))
     AFₙ = zeros(RBVars.S.nₛᵘ, 1, RBVars.S.Qᵃ*RBVars.S.Qᶠ)
@@ -152,7 +164,7 @@ function assemble_affine_vectors(RBInfo::Info, RBVars::PoissonSTPGRB, var::Strin
   elseif var == "H"
     RBVars.S.Qʰ = 1
     println("Assembling affine reduced Neumann term")
-    H = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.FEM_structures_path, "H.csv"))
+    H = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.S.paths.FEM_structures_path, "H.csv"))
     MHₙ = zeros(RBVars.S.nₛᵘ, 1, RBVars.Qᵐ*RBVars.S.Qʰ)
     matrix_product_vec!(MHₙ, RBVars.MΦᵀPᵤ⁻¹, reshape(H,:,1))
     AHₙ = zeros(RBVars.S.nₛᵘ, 1, RBVars.S.Qᵃ*RBVars.S.Qʰ)
@@ -166,10 +178,10 @@ function assemble_affine_vectors(RBInfo::Info, RBVars::PoissonSTPGRB, var::Strin
 end
 
 function assemble_reduced_mat_DEIM(
-  RBInfo::Info,
-  RBVars::PoissonSTPGRB,
+  RBInfo::ROMInfoUnsteady{T},
+  RBVars::PoissonSTPGRB{T},
   DEIM_mat::Matrix{Float64},
-  var::String)
+  var::String) where T
 
   if RBInfo.space_time_M_DEIM
     Nₜ = RBVars.Nₜ
@@ -205,7 +217,10 @@ function assemble_reduced_mat_DEIM(
 
 end
 
-function assemble_offline_structures(RBInfo::Info, RBVars::PoissonSTPGRB, operators=nothing)
+function assemble_offline_structures(
+  RBInfo::ROMInfoUnsteady{T},
+  RBVars::PoissonSTPGRB{T},
+  operators=nothing) where T
 
   if isnothing(operators)
     operators = set_operators(RBInfo, RBVars)
@@ -213,7 +228,7 @@ function assemble_offline_structures(RBInfo::Info, RBVars::PoissonSTPGRB, operat
 
   RBVars.S.offline_time += @elapsed begin
     if "M" ∈ operators || "F" ∈ operators || "H" ∈ operators
-      if !RBInfo.probl_nl["M"]
+      if !RBInfo.S.probl_nl["M"]
         assemble_affine_matrices(RBInfo, RBVars, "M")
       else
         assemble_MDEIM_matrices(RBInfo, RBVars, "M")
@@ -221,7 +236,7 @@ function assemble_offline_structures(RBInfo::Info, RBVars::PoissonSTPGRB, operat
     end
 
     if "A" ∈ operators || "F" ∈ operators || "H" ∈ operators
-      if !RBInfo.probl_nl["A"]
+      if !RBInfo.S.probl_nl["A"]
         assemble_affine_matrices(RBInfo, RBVars, "A")
       else
         assemble_MDEIM_matrices(RBInfo, RBVars, "A")
@@ -229,7 +244,7 @@ function assemble_offline_structures(RBInfo::Info, RBVars::PoissonSTPGRB, operat
     end
 
     if "F" ∈ operators
-      if !RBInfo.probl_nl["f"]
+      if !RBInfo.S.probl_nl["f"]
         assemble_affine_vectors(RBInfo, RBVars, "F")
       else
         assemble_DEIM_vectors(RBInfo, RBVars, "F")
@@ -237,7 +252,7 @@ function assemble_offline_structures(RBInfo::Info, RBVars::PoissonSTPGRB, operat
     end
 
     if "H" ∈ operators
-      if !RBInfo.probl_nl["h"]
+      if !RBInfo.S.probl_nl["h"]
         assemble_affine_vectors(RBInfo, RBVars, "H")
       else
         assemble_DEIM_vectors(RBInfo, RBVars, "H")
@@ -254,36 +269,51 @@ function assemble_offline_structures(RBInfo::Info, RBVars::PoissonSTPGRB, operat
 
 end
 
-function save_affine_structures(RBInfo::Info, RBVars::PoissonSTPGRB)
-  if RBInfo.save_offline_structures
+function save_affine_structures(
+  RBInfo::ROMInfoUnsteady{T},
+  RBVars::PoissonSTPGRB{T}) where T
+
+  if RBInfo.S.save_offline_structures
     save_CSV(reshape(RBVars.Mₙ,:,RBVars.Qᵐ^2),
-      joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
+      joinpath(RBInfo.S.paths.ROM_structures_path, "Mₙ.csv"))
     save_CSV(reshape(RBVars.MAₙ,:,RBVars.Qᵐ*RBVars.S.Qᵃ),
-      joinpath(RBInfo.paths.ROM_structures_path, "MAₙ.csv"))
+      joinpath(RBInfo.S.paths.ROM_structures_path, "MAₙ.csv"))
     save_CSV(reshape(RBVars.MΦᵀPᵤ⁻¹,:,RBVars.Qᵐ),
-      joinpath(RBInfo.paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv"))
-    save_affine_structures(RBInfo, RBVars.S)
+      joinpath(RBInfo.S.paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv"))
+    save_affine_structures(RBInfo.S, RBVars.S)
   end
 end
 
-function get_affine_structures(RBInfo::Info, RBVars::PoissonSTPGRB) :: Vector
+function get_affine_structures(
+  RBInfo::ROMInfoUnsteady{T},
+  RBVars::PoissonSTPGRB{T}) where T
+
   operators = String[]
-  append!(operators, get_affine_structures(RBInfo, RBVars.S))
+  append!(operators, get_affine_structures(RBInfo.S, RBVars.S))
   append!(operators, get_Mₙ(RBInfo, RBVars))
   append!(operators, get_MAₙ(RBInfo, RBVars))
   return operators
 end
 
-function get_Q(RBInfo::Info, RBVars::PoissonSTPGRB)
+function get_Q(
+  RBInfo::ROMInfoUnsteady{T},
+  RBVars::PoissonSTPGRB{T}) where T
+
   if RBVars.Qᵐ == 0
     Qᵐ = sqrt(size(RBVars.Mₙ)[end])
     @assert floor(Qᵐ) == Qᵐ "Qᵐ should be the square root of an Int64"
     RBVars.Qᵐ = Int(Qᵐ)
   end
-  get_Q(RBInfo, RBVars.S)
+  get_Q(RBInfo.S, RBVars.S)
 end
 
-function get_RB_LHS_blocks(RBInfo, RBVars::PoissonSTPGRB, θᵐ, θᵃ, θᵐᵃ, θᵃᵐ)
+function get_RB_LHS_blocks(
+  RBInfo::ROMInfoUnsteady{T},
+  RBVars::PoissonSTPGRB{T},
+  θᵐ::Array{T},
+  θᵃ::Array{T},
+  θᵐᵃ::Array{T},
+  θᵃᵐ::Array{T}) where T
 
   println("Assembling LHS using θ-method time scheme, θ=$(RBInfo.θ)")
 
@@ -385,7 +415,11 @@ function get_RB_LHS_blocks(RBInfo, RBVars::PoissonSTPGRB, θᵐ, θᵃ, θᵐᵃ
 
 end
 
-function get_RB_RHS_blocks(RBInfo::Info, RBVars::PoissonSTPGRB, θᶠ, θʰ)
+function get_RB_RHS_blocks(
+  RBInfo::ROMInfoUnsteady{T},
+  RBVars::PoissonSTPGRB{T},
+  θᶠ::Array{T},
+  θʰ::Array{T}) where T
 
   println("Assembling RHS using θ-method time scheme, θ=$(RBInfo.θ)")
 
@@ -437,7 +471,10 @@ function get_RB_RHS_blocks(RBInfo::Info, RBVars::PoissonSTPGRB, θᶠ, θʰ)
 
 end
 
-function get_RB_system(RBInfo::Info, RBVars::PoissonSTPGRB, Param)
+function get_RB_system(
+  RBInfo::ROMInfoUnsteady{T},
+  RBVars::PoissonSTPGRB{T},
+  Param::ParametricInfoUnsteady{D,T}) where {D,T}
 
   initialize_RB_system(RBVars.S)
   initialize_online_time(RBVars.S)
@@ -454,7 +491,7 @@ function get_RB_system(RBInfo::Info, RBVars::PoissonSTPGRB, Param)
     end
 
     if "RHS" ∈ operators
-      if !RBInfo.build_Parametric_RHS
+      if !RBInfo.S.build_Parametric_RHS
         get_RB_RHS_blocks(RBInfo, RBVars, θᶠ, θʰ)
       else
         build_Param_RHS(RBInfo, RBVars, Param)
@@ -466,7 +503,10 @@ function get_RB_system(RBInfo::Info, RBVars::PoissonSTPGRB, Param)
 
 end
 
-function build_Param_RHS(RBInfo::Info, RBVars::PoissonSTPGRB, Param)
+function build_Param_RHS(
+  RBInfo::ROMInfoUnsteady{T},
+  RBVars::PoissonSTPGRB{T},
+  Param::ParametricInfoUnsteady{D,T}) where {D,T}
 
   println("Assembling RHS exactly using θ-method time scheme, θ=$(RBInfo.θ)")
 
@@ -521,7 +561,10 @@ function build_Param_RHS(RBInfo::Info, RBVars::PoissonSTPGRB, Param)
 
 end
 
-function get_θ(RBInfo::Info, RBVars::PoissonSTPGRB, Param) ::Tuple
+function get_θ(
+  RBInfo::ROMInfoUnsteady{T},
+  RBVars::PoissonSTPGRB{T},
+  Param::ParametricInfoUnsteady{D,T}) where {D,T}
 
   θᵐ_temp = get_θᵐ(RBInfo, RBVars, Param)
   θᵃ_temp = get_θᵃ(RBInfo, RBVars, Param)
@@ -549,7 +592,7 @@ function get_θ(RBInfo::Info, RBVars::PoissonSTPGRB, Param) ::Tuple
     end
   end
 
-  if !RBInfo.build_Parametric_RHS
+  if !RBInfo.S.build_Parametric_RHS
 
     θᶠ_temp, θʰ_temp = get_θᶠʰ(RBInfo, RBVars, Param)
     Qᶠ, Qʰ = size(θᶠ_temp)[1], size(θʰ_temp)[1]

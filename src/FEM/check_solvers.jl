@@ -36,7 +36,6 @@ function check_stokes_solver()
   A = assemble_stiffness(FEMSpace, FEMInfo, Param)(0.0)
   M = assemble_mass(FEMSpace, FEMInfo, Param)(0.0)
   B = assemble_primal_op(FEMSpace)(0.0)
-  #Bᵀ = assemble_primal_opᵀ(FEMSpace)(0.0)
   F = assemble_forcing(FEMSpace, FEMInfo, Param)(0.0)
   H = assemble_neumann_datum(FEMSpace, FEMInfo, Param)(0.0)
 

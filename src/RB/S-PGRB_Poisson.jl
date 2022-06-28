@@ -1,5 +1,7 @@
 
-function get_inverse_P_matrix(RBInfo::Info, RBVars::PoissonSPGRB)
+function get_inverse_P_matrix(
+  RBInfo::ROMInfoSteady{T},
+  RBVars::PoissonSPGRB{T}) where T
 
   if RBInfo.use_norm_X
     if isempty(RBVars.Pᵤ⁻¹)
@@ -8,18 +10,20 @@ function get_inverse_P_matrix(RBInfo::Info, RBVars::PoissonSPGRB)
         RBVars.Pᵤ⁻¹ = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "Pᵤ⁻¹.csv"))
       else
         get_norm_matrix(RBInfo, RBVars)
-        diag_Xᵘ₀ = Vector{Float64}(diag(RBVars.Xᵘ₀))
+        diag_Xᵘ₀ = Vector{T}(diag(RBVars.Xᵘ₀))
         RBVars.Pᵤ⁻¹ = spdiagm(1 ./ diag_Xᵘ₀)
         save_CSV(RBVars.Pᵤ⁻¹, joinpath(RBInfo.paths.FEM_structures_path, "Pᵤ⁻¹.csv"))
       end
     end
-    RBVars.Pᵤ⁻¹ = Matrix{Float64}(RBVars.Pᵤ⁻¹)
+    RBVars.Pᵤ⁻¹ = Matrix{T}(RBVars.Pᵤ⁻¹)
   else
     RBVars.Pᵤ⁻¹ = I(RBVars.Nₛᵘ)
   end
 end
 
-function get_Aₙ(RBInfo::Info, RBVars::PoissonSPGRB) :: Vector
+function get_Aₙ(
+  RBInfo::ROMInfoSteady{T},
+  RBVars::PoissonSPGRB{T}) where T
 
   if (isfile(joinpath(RBInfo.paths.ROM_structures_path, "Aₙ.csv")) &&
       isfile(joinpath(RBInfo.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv")))
@@ -40,7 +44,9 @@ function get_Aₙ(RBInfo::Info, RBVars::PoissonSPGRB) :: Vector
 
 end
 
-function get_AΦᵀPᵤ⁻¹(RBInfo::Info, RBVars::PoissonSPGRB)
+function get_AΦᵀPᵤ⁻¹(
+  RBInfo::ROMInfoSteady{T},
+  RBVars::PoissonSPGRB{T}) where T
 
   println("S-PGRB: fetching the matrix AΦᵀPᵤ⁻¹")
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
@@ -59,7 +65,10 @@ function get_AΦᵀPᵤ⁻¹(RBInfo::Info, RBVars::PoissonSPGRB)
 
 end
 
-function assemble_affine_matrices(RBInfo::Info, RBVars::PoissonSPGRB, var::String)
+function assemble_affine_matrices(
+  RBInfo::ROMInfoSteady{T},
+  RBVars::PoissonSPGRB{T},
+  var::String) where T
 
   get_inverse_P_matrix(RBInfo, RBVars)
 
@@ -77,9 +86,9 @@ function assemble_affine_matrices(RBInfo::Info, RBVars::PoissonSPGRB, var::Strin
 end
 
 function assemble_reduced_mat_MDEIM(
-  RBVars::PoissonSPGRB,
+  RBVars::PoissonSPGRB{T},
   MDEIM_mat::Matrix{T},
-  row_idx::Vector{Int64})
+  row_idx::Vector{Int64}) where T
 
   Q = size(MDEIM_mat)[2]
   r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.Nₛᵘ)
@@ -105,9 +114,9 @@ function assemble_reduced_mat_MDEIM(
 end
 
 function assemble_reduced_mat_DEIM(
-  RBVars::PoissonSTPGRB,
-  DEIM_mat::Matrix{Float64},
-  var::String)
+  RBVars::PoissonSPGRB{T},
+  DEIM_mat::Matrix{T},
+  var::String) where T
 
   Q = size(DEIM_mat)[2]
   MVecₙ = zeros(RBVars.nₛᵘ,1,RBVars.Qᵐ*Q)
@@ -128,7 +137,10 @@ function assemble_reduced_mat_DEIM(
 
 end
 
-function assemble_affine_vectors(RBInfo::Info, RBVars::PoissonSPGRB, var::String)
+function assemble_affine_vectors(
+  RBInfo::ROMInfoSteady{T},
+  RBVars::PoissonSPGRB{T},
+  var::String) where T
 
   println("S-PGRB: running the DEIM offline phase on variable $var with $nₛ_DEIM snapshots")
 
@@ -152,7 +164,9 @@ function assemble_affine_vectors(RBInfo::Info, RBVars::PoissonSPGRB, var::String
 
 end
 
-function save_affine_structures(RBInfo::Info, RBVars::PoissonSPGRB)
+function save_affine_structures(
+  RBInfo::ROMInfoSteady{T},
+  RBVars::PoissonSPGRB{T}) where T
 
   if RBInfo.save_offline_structures
 
@@ -170,7 +184,10 @@ function save_affine_structures(RBInfo::Info, RBVars::PoissonSPGRB)
 
 end
 
-function get_Q(RBInfo::Info, RBVars::PoissonSPGRB)
+function get_Q(
+  RBInfo::ROMInfoSteady{T},
+  RBVars::PoissonSPGRB{T}) where T
+
   if RBVars.Qᵃ == 0
     Qᵃ = sqrt(size(RBVars.Aₙ)[end])
     @assert floor(Qᵃ) == Qᵃ "Qᵃ should be the square root of an Int64"
@@ -186,7 +203,11 @@ function get_Q(RBInfo::Info, RBVars::PoissonSPGRB)
   end
 end
 
-function build_Param_RHS(RBInfo::Info, RBVars::PoissonSPGRB, Param, θᵃ::Vector{Float64}) :: Tuple
+function build_Param_RHS(
+  RBInfo::ROMInfoSteady{T},
+  RBVars::PoissonSPGRB{T},
+  Param::ParametricInfoSteady{T},
+  θᵃ::Vector{T}) where T
 
   θᵃ_temp = θᵃ[1:RBVars.Qᵃ]/sqrt(θᵃ[1])
   F = assemble_forcing(FEMSpace, RBInfo, Param)
@@ -198,7 +219,10 @@ function build_Param_RHS(RBInfo::Info, RBVars::PoissonSPGRB, Param, θᵃ::Vecto
 
 end
 
-function get_θ(RBInfo::Info, RBVars::PoissonSPGRB, Param) :: Tuple
+function get_θ(
+  RBInfo::ROMInfoSteady{T},
+  RBVars::PoissonSPGRB{T},
+  Param::ParametricInfoSteady{T}) where T
 
   θᵃ_temp = get_θᵃ(RBInfo, RBVars, Param)
   θᵃ = [θᵃ_temp[q₁]*θᵃ_temp[q₂] for q₁ = 1:RBVars.Qᵃ for q₂ = 1:RBVars.Qᵃ]
@@ -211,7 +235,7 @@ function get_θ(RBInfo::Info, RBVars::PoissonSPGRB, Param) :: Tuple
 
   else
 
-    θᶠ, θʰ = Float64[], Float64[]
+    θᶠ, θʰ = T[], T[]
 
   end
 

@@ -85,16 +85,16 @@ end
 function POD(S::Matrix{T}, ϵ::Float64, X::SparseMatrixCSC{T}) where T
 
   H = cholesky(X)
-  #L = sparse(H.L)
+  L = sparse(H.L)
   #mul!(S, L', S[H.p, :])
-  U, Σ, _ = svd(H.L'*S[H.p, :])
+  U, Σ, _ = svd(L'*S[H.p, :])
 
   energies = cumsum(Σ.^2)
   N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
   println("Basis number obtained via POD is $N,
     projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
 
-  Matrix{T}((H.L' \ U[:, 1:N])[invperm(H.p), :]), T.(Σ)
+  Matrix{T}((L' \ U[:, 1:N])[invperm(H.p), :]), T.(Σ)
 
 end
 

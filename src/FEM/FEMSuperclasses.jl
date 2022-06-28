@@ -1,16 +1,13 @@
 abstract type Problem end
-abstract type FEMProblem{N,T} <: Problem end
-abstract type SteadyProblem{N,T} <: FEMProblem{N,T} end
-abstract type UnsteadyProblem{N,T} <: FEMProblem{N,T} end
+abstract type FEMProblem{D,T} <: Problem end
+abstract type SteadyProblem{D,T} <: FEMProblem{D,T} end
+abstract type UnsteadyProblem{D,T} <: FEMProblem{D,T} end
 
 abstract type Info end
-abstract type SteadyInfo{N,T} <: Info end
-abstract type UnsteadyInfo{N,T} <: Info end
+abstract type SteadyInfo{T} <: Info end
+abstract type UnsteadyInfo{T} <: Info end
 
-#= struct PoissonProblem <: FEMProblem end
-struct PoissonProblemUnsteady <: FEMProblem end =#
-
-struct FEMSpacePoissonSteady{N,T} <: SteadyProblem{N,T}
+struct FEMSpacePoissonSteady{D,T} <: SteadyProblem{D,T}
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TrialFESpace
@@ -23,7 +20,7 @@ struct FEMSpacePoissonSteady{N,T} <: SteadyProblem{N,T}
   dΓn::Measure
 end
 
-struct FEMSpacePoissonUnsteady{N,T} <: UnsteadyProblem{N,T}
+struct FEMSpacePoissonUnsteady{D,T} <: UnsteadyProblem{D,T}
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TransientTrialFESpace
@@ -36,7 +33,7 @@ struct FEMSpacePoissonUnsteady{N,T} <: UnsteadyProblem{N,T}
   dΓn::Measure
 end
 
-struct FEMSpaceStokesSteady{N,T} <: SteadyProblem{N,T}
+struct FEMSpaceStokesSteady{D,T} <: SteadyProblem{D,T}
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TrialFESpace
@@ -57,7 +54,7 @@ struct FEMSpaceStokesSteady{N,T} <: SteadyProblem{N,T}
   dΓn::Measure
 end
 
-struct FEMSpaceStokesUnsteady{N,T} <: UnsteadyProblem{N,T}
+struct FEMSpaceStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TransientTrialFESpace
@@ -78,7 +75,7 @@ struct FEMSpaceStokesUnsteady{N,T} <: UnsteadyProblem{N,T}
   dΓn::Measure
 end
 
-struct FEMSpaceNavierStokesUnsteady{N,T} <: UnsteadyProblem{N,T}
+struct FEMSpaceNavierStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TransientTrialFESpace
@@ -99,30 +96,22 @@ struct FEMSpaceNavierStokesUnsteady{N,T} <: UnsteadyProblem{N,T}
   dΓn::Measure
 end
 
-struct ProblemInfoSteady{N,T} <: SteadyInfo{N,T}
+struct ProblemInfoSteady{T} <: SteadyInfo{T}
   problem_id::NTuple
+  D::Int64
   case::Int
   probl_nl::Dict
   order::Int
-  dirichlet_tags::Array
-  dirichlet_bnds::Array
-  neumann_tags::Array
-  neumann_bnds::Array
+  dirichlet_tags::Vector{String}
+  dirichlet_bnds::Vector{Int64}
+  neumann_tags::Vector{String}
+  neumann_bnds::Vector{Int64}
   solver::String
   paths::Function
 end
 
-struct ProblemInfoUnsteady{N,T} <: UnsteadyInfo{N,T}
-  problem_id::NTuple
-  case::Int
-  probl_nl::Dict
-  order::Int
-  dirichlet_tags::Array
-  dirichlet_bnds::Array
-  neumann_tags::Array
-  neumann_bnds::Array
-  solver::String
-  paths::Function
+struct ProblemInfoUnsteady{T} <: UnsteadyInfo{T}
+  S::ProblemInfoSteady{T}
   time_method::String
   θ::Float64
   RK_type::Symbol
@@ -131,18 +120,18 @@ struct ProblemInfoUnsteady{N,T} <: UnsteadyInfo{N,T}
   δt::Float64
 end
 
-mutable struct ParametricInfoSteady{T}
+mutable struct ParametricInfoSteady{D,T}
   μ::Vector{T}
-  model::DiscreteModel
+  model::DiscreteModel{D,D}
   α::Function
   f::Function
   g::Function
   h::Function
 end
 
-mutable struct ParametricInfoUnsteady{T}
+mutable struct ParametricInfoUnsteady{D,T}
   μ::Vector{T}
-  model::DiscreteModel
+  model::DiscreteModel{D,D}
   αₛ::Function
   αₜ::Function
   α::Function

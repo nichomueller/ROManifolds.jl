@@ -1,6 +1,6 @@
 """Given a vector 'idx' referred to the entries of a vector 'vec' of length Nₕ^2,
  this function computes the row-column indexes of the NₕxNₕ matrix associated to 'vec'"""
-function from_vec_to_mat_idx(idx::Vector{T}, Nₕ::Int64)
+function from_vec_to_mat_idx(idx::Vector{T}, Nₕ::Int64) where T
   col_idx = 1 .+ floor.(Int64,(idx.-1)/Nₕ)
   row_idx = idx - (col_idx.-1)*Nₕ
   row_idx,col_idx
@@ -41,7 +41,7 @@ function label_sorted_elems(vec::Vector{T}) where T
   Int.(indexin(vec,vecnew))
 end
 
-function Base.argmax(v::Vector{T},n_val::Int64)
+function Base.argmax(v::Vector{T},n_val::Int64) where T
   s = sort(v,rev=true)
   idx = Int.(indexin(s,v))[1:n_val]
 end

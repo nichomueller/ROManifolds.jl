@@ -38,12 +38,30 @@ function select_RB_method(
 
 end
 
+function get_method_id(problem_name::String, RB_method::String)
+  if problem_name == "poisson" && RB_method == "S-GRB"
+    return (0,)
+  elseif problem_name == "poisson" && RB_method == "S-PGRB"
+    return (0,0)
+  elseif problem_name == "poisson" && RB_method == "ST-GRB"
+    return (0,0,0)
+  elseif problem_name == "poisson" && RB_method == "ST-PGRB"
+    return (0,0,0,0)
+  elseif problem_name == "stokes" && RB_method == "ST-GRB"
+    return (0,0,0,0,0)
+  elseif problem_name == "stokes" && RB_method == "ST-PGRB"
+    return (0,0,0,0,0,0)
+  else
+    error("unimplemented")
+  end
+end
+
 function build_sparse_mat(
   FEMSpace₀::SteadyProblem,
-  FEMInfo::ProblemInfoSteady{N,T},
+  FEMInfo::ProblemInfoSteady{T},
   Param::ParametricInfoSteady{T},
   el::Vector{Int64};
-  var="A") where {N,T}
+  var="A") where T
 
   Ω_sparse = view(FEMSpace₀.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
@@ -61,14 +79,14 @@ end
 
 function build_sparse_mat(
   FEMSpace₀::UnsteadyProblem,
-  FEMInfo::ProblemInfoUnsteady{N,T},
-  Param::ParametricInfoUnsteady{T},
+  FEMInfo::ProblemInfoUnsteady{T},
+  Param::ParametricInfoUnsteady{D,T},
   el::Vector{Int64},
   timesθ::Vector{T};
-  var="A") where {N,T}
+  var="A") where {D,T}
 
   Ω_sparse = view(FEMSpace₀.Ω, el)
-  dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
+  dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.S.order)
   Nₜ = length(timesθ)
 
   function define_Matₜ(t::Real, var::String)

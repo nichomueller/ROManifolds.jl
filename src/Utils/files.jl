@@ -10,8 +10,8 @@ function get_all_subdirectories(path::String)
   filter(isdir,readdir(path,join=true))
 end
 
-function load_CSV(::Array{N,T}, path::String) where {N,T}
-  return Array{N,T}(CSV.read(path, DataFrame))
+function load_CSV(::Array{D,T}, path::String) where {D,T}
+  return Array{D,T}(CSV.read(path, DataFrame))
 end
 
 function load_CSV(::SparseMatrixCSC{T}, path::String) where T
@@ -24,9 +24,9 @@ function load_CSV(::SparseVector{T}, path::String) where T
   sparse(Int.(var[:,1]), var[:,2])
 end
 
-function save_CSV(var::Array{N,T}, path::String) where {N,T}
+function save_CSV(var::Array{D,T}, path::String) where {D,T}
 
-  if N == 1
+  if D == 1
     var = reshape(var, :, 1)
   end
 

@@ -1,6 +1,8 @@
 function FE_solve(
-  FEMSpace::FEMSpacePoissonSteady, probl::SteadyProblem,
-  Param::ParametricInfoSteady; subtract_Ddata = true)
+  FEMSpace::FEMSpacePoissonSteady,
+  probl::ProblemInfoSteady{T},
+  Param::ParametricInfoSteady{D,T};
+  subtract_Ddata = true) where {D,T}
 
   Gₕ = assemble_lifting(FEMSpace, Param)
 
@@ -25,8 +27,10 @@ function FE_solve(
 end
 
 function FE_solve(
-  FEMSpace::FEMSpacePoissonUnsteady, probl::ProblemInfoUnsteady,
-  Param::ParametricInfoUnsteady; subtract_Ddata = true)
+  FEMSpace::FEMSpacePoissonUnsteady,
+  probl::ProblemInfoUnsteady{T},
+  Param::ParametricInfoUnsteady{D,T};
+  subtract_Ddata = true) where {D,T}
 
   Gₕₜ = assemble_lifting(FEMSpace, probl, Param)
 
@@ -63,8 +67,10 @@ function FE_solve(
 end
 
 function FE_solve(
-  FEMSpace::FEMSpaceStokesUnsteady, probl::ProblemInfoUnsteady,
-  Param::ParametricInfoUnsteady; subtract_Ddata=false)
+  FEMSpace::FEMSpaceStokesUnsteady,
+  probl::ProblemInfoUnsteady{T},
+  Param::ParametricInfoUnsteady{D,T};
+  subtract_Ddata=false) where {D,T}
 
   timesθ = get_timesθ(probl)
   θ = probl.θ
@@ -104,8 +110,8 @@ function FE_solve(
 end
 
 #= function FE_solve(
-  FEMSpace::FEMSpaceStokesUnsteady, probl::ProblemInfoUnsteady,
-  Param::ParametricInfoUnsteady; subtract_Ddata=false)
+  FEMSpace::FEMSpaceStokesUnsteady, probl::ProblemInfoUnsteady{T},
+  Param::ParametricInfoUnsteady{D,T}; subtract_Ddata=false)
 
   m(t,(u,p),(v,q)) = ∫(Param.m(t)*(u⋅v))*FEMSpace.dΩ
   ab(t,(u,p),(v,q)) = (∫(Param.α(t)*(∇(v) ⊙ ∇(u)))*FEMSpace.dΩ -
@@ -148,7 +154,7 @@ end
 
 end =#
 
-#= function FE_solve(FEMSpace::FEMSpacePoisson, Param::ParametricInfoUnsteady; subtract_Ddata = true)
+#= function FE_solve(FEMSpace::FEMSpacePoisson, Param::ParametricInfoUnsteady{D,T}; subtract_Ddata = true)
 
 _, Gₕ = get_lifting_operator(FEMSpace, Param)
 
@@ -173,8 +179,11 @@ return uₕ, Gₕ
 end =#
 
 function rhs_form(
-  t::Real,v::FEBasis,FEMSpace::FEMSpacePoissonUnsteady,
-  Param::ParametricInfoUnsteady)
+  t::Real,
+  v::FEBasis,
+  FEMSpace::FEMSpacePoissonUnsteady,
+  Param::ParametricInfoUnsteady{D,T}) where {D,T}
+
   if !isnothing(FEMSpace.dΓn)
     return ∫(v*Param.f(t))*FEMSpace.dΩ + ∫(v*Param.h(t))*FEMSpace.dΓn
   else
@@ -183,8 +192,11 @@ function rhs_form(
 end
 
 function rhs_form(
-  t::Real,v::FEBasis,FEMSpace::FEMSpaceStokesUnsteady,
-  Param::ParametricInfoUnsteady)
+  t::Real,
+  v::FEBasis,
+  FEMSpace::FEMSpaceStokesUnsteady,
+  Param::ParametricInfoUnsteady{D,T}) where {D,T}
+
   if !isnothing(FEMSpace.dΓn)
     return ∫(v⋅Param.f(t))*FEMSpace.dΩ + ∫(v⋅Param.h(t))*FEMSpace.dΓn
   else

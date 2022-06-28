@@ -1,7 +1,7 @@
 function assemble_mass(
   FEMSpace::FEMSpacePoissonSteady,
-  probl::SteadyInfo,
-  Param::ParametricInfoSteady)
+  probl::SteadyInfo{T},
+  Param::ParametricInfoSteady{D,T}) where {D,T}
 
   if !probl.probl_nl["M"]
     assemble_matrix(∫(FEMSpace.ϕᵥ*FEMSpace.ϕᵤ)*FEMSpace.dΩ,
@@ -15,11 +15,11 @@ end
 
 function assemble_mass(
   FEMSpace::FEMSpacePoissonUnsteady,
-  probl::UnsteadyInfo,
-  Param::ParametricInfoUnsteady)
+  probl::UnsteadyInfo{T},
+  Param::ParametricInfoUnsteady{D,T}) where {D,T}
 
   function unsteady_mass(t)
-    if !probl.probl_nl["M"]
+    if !probl.S.probl_nl["M"]
       assemble_matrix(∫(FEMSpace.ϕᵥ*(Param.mₛ*FEMSpace.ϕᵤ(t)))*FEMSpace.dΩ,
       FEMSpace.V(t), FEMSpace.V₀)
     else
@@ -34,11 +34,11 @@ end
 
 function assemble_mass(
   FEMSpace::FEMSpaceStokesUnsteady,
-  probl::UnsteadyInfo,
-  Param::ParametricInfoUnsteady)
+  probl::UnsteadyInfo{T},
+  Param::ParametricInfoUnsteady{D,T}) where {D,T}
 
   function unsteady_mass(t)
-    if !probl.probl_nl["M"]
+    if !probl.S.probl_nl["M"]
       assemble_matrix(∫(FEMSpace.ϕᵥ⋅(Param.mₛ*FEMSpace.ϕᵤ(t)))*FEMSpace.dΩ,
       FEMSpace.V(t), FEMSpace.V₀)
     else
@@ -53,10 +53,10 @@ end
 
 function assemble_stiffness(
   FEMSpace::FEMSpacePoissonSteady,
-  probl::SteadyInfo,
-  Param::ParametricInfoSteady)
+  probl::SteadyInfo{T},
+  Param::ParametricInfoSteady{D,T}) where {D,T}
 
-  if !probl.probl_nl["A"]
+  if !probl.S.probl_nl["A"]
     assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅∇(FEMSpace.ϕᵤ))*FEMSpace.dΩ,
     FEMSpace.V, FEMSpace.V₀)
   else
@@ -68,11 +68,11 @@ end
 
 function assemble_stiffness(
   FEMSpace::FEMSpacePoissonUnsteady,
-  probl::UnsteadyInfo,
-  Param::ParametricInfoUnsteady)
+  probl::UnsteadyInfo{T},
+  Param::ParametricInfoUnsteady{D,T}) where {D,T}
 
   function unsteady_stiffness(t)
-    if !probl.probl_nl["A"]
+    if !probl.S.probl_nl["A"]
       assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Param.αₛ*∇(FEMSpace.ϕᵤ(t))))*FEMSpace.dΩ,
       FEMSpace.V(t), FEMSpace.V₀)
     else
@@ -87,11 +87,11 @@ end
 
 function assemble_stiffness(
   FEMSpace::FEMSpacePoissonUnsteady,
-  probl::UnsteadyInfo,
-  Param::ParametricInfoUnsteady)
+  probl::UnsteadyInfo{T},
+  Param::ParametricInfoUnsteady{D,T}) where {D,T}
 
   function unsteady_stiffness(t)
-    if !probl.probl_nl["A"]
+    if !probl.S.probl_nl["A"]
       assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Param.αₛ*∇(FEMSpace.ϕᵤ(t))))*FEMSpace.dΩ,
       FEMSpace.V(t), FEMSpace.V₀)
     else
@@ -106,11 +106,11 @@ end
 
 function assemble_stiffness(
   FEMSpace::FEMSpaceStokesUnsteady,
-  probl::UnsteadyInfo,
-  Param::ParametricInfoUnsteady)
+  probl::UnsteadyInfo{T},
+  Param::ParametricInfoUnsteady{D,T}) where {D,T}
 
   function unsteady_stiffness(t)
-    if !probl.probl_nl["A"]
+    if !probl.S.probl_nl["A"]
       assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Param.αₛ*∇(FEMSpace.ϕᵤ(t))))*FEMSpace.dΩ,
       FEMSpace.V(t), FEMSpace.V₀)
     else
@@ -143,8 +143,8 @@ end
 
 function assemble_forcing(
   FEMSpace::SteadyProblem,
-  probl::SteadyInfo,
-  Param::ParametricInfoSteady)
+  probl::SteadyInfo{T},
+  Param::ParametricInfoSteady{D,T}) where {D,T}
 
   if !probl.probl_nl["f"] && !probl.probl_nl["h"]
     assemble_vector(∫(FEMSpace.ϕᵥ)*FEMSpace.dΩ, FEMSpace.V₀)
@@ -156,13 +156,13 @@ end
 
 function assemble_forcing(
   FEMSpace::FEMSpacePoissonUnsteady,
-  probl::UnsteadyInfo,
-  Param::ParametricInfoUnsteady)
+  probl::UnsteadyInfo{T},
+  Param::ParametricInfoUnsteady{D,T}) where {D,T}
 
   function unsteady_forcing(t)
-    if !probl.probl_nl["f"]
+    if !probl.S.probl_nl["f"]
       assemble_vector(∫(FEMSpace.ϕᵥ*Param.fₛ)*FEMSpace.dΩ, FEMSpace.V₀)
-    else probl.probl_nl["f"]
+    else
       assemble_vector(∫(FEMSpace.ϕᵥ*Param.f(t))*FEMSpace.dΩ, FEMSpace.V₀)
     end
   end
@@ -173,13 +173,13 @@ end
 
 function assemble_forcing(
   FEMSpace::FEMSpaceStokesUnsteady,
-  probl::UnsteadyInfo,
-  Param::ParametricInfoUnsteady)
+  probl::UnsteadyInfo{T},
+  Param::ParametricInfoUnsteady{D,T}) where {D,T}
 
   function unsteady_forcing(t)
-    if !probl.probl_nl["f"]
+    if !probl.S.probl_nl["f"]
       assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.fₛ)*FEMSpace.dΩ, FEMSpace.V₀)
-    else probl.probl_nl["f"]
+    else
       assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.f(t))*FEMSpace.dΩ, FEMSpace.V₀)
     end
   end
@@ -190,8 +190,8 @@ end
 
 function assemble_neumann_datum(
   FEMSpace::SteadyProblem,
-  probl::SteadyInfo,
-  Param::ParametricInfoSteady)
+  probl::SteadyInfo{T},
+  Param::ParametricInfoSteady{D,T}) where {D,T}
 
   if !isnothing(FEMSpace.dΓn)
     if !probl.probl_nl["h"]
@@ -207,12 +207,12 @@ end
 
 function assemble_neumann_datum(
   FEMSpace::FEMSpacePoissonUnsteady,
-  probl::UnsteadyInfo,
-  Param::ParametricInfoUnsteady)
+  probl::UnsteadyInfo{T},
+  Param::ParametricInfoUnsteady{D,T}) where {D,T}
 
   function unsteady_neumann_datum(t)
     if !isnothing(FEMSpace.dΓn)
-      if !probl.probl_nl["h"]
+      if !probl.S.probl_nl["h"]
         assemble_vector(∫(FEMSpace.ϕᵥ*Param.hₛ)*FEMSpace.dΓn, FEMSpace.V₀)
       else
         assemble_vector(∫(FEMSpace.ϕᵥ*Param.h(t))*FEMSpace.dΓn, FEMSpace.V₀)
@@ -228,12 +228,12 @@ end
 
 function assemble_neumann_datum(
   FEMSpace::FEMSpaceStokesUnsteady,
-  probl::UnsteadyInfo,
-  Param::ParametricInfoUnsteady)
+  probl::UnsteadyInfo{T},
+  Param::ParametricInfoUnsteady{D,T}) where {D,T}
 
   function unsteady_neumann_datum(t)
     if !isnothing(FEMSpace.dΓn)
-      if !probl.probl_nl["h"]
+      if !probl.S.probl_nl["h"]
         assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.hₛ)*FEMSpace.dΓn, FEMSpace.V₀)
       else
         assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.h(t))*FEMSpace.dΓn, FEMSpace.V₀)
@@ -249,7 +249,7 @@ end
 
 function assemble_dirichlet_datum(
   FEMSpace::SteadyProblem,
-  Param::ParametricInfoSteady)
+  Param::ParametricInfoSteady{D,T}) where {D,T}
 
   if !isnothing(FEMSpace.dΓd)
     assemble_vector(∫(FEMSpace.ϕᵥ*Param.g)*FEMSpace.dΓd, FEMSpace.V₀)
@@ -261,7 +261,7 @@ end
 
 function assemble_dirichlet_datum(
   FEMSpace::UnsteadyProblem,
-  Param::ParametricInfoUnsteady)
+  Param::ParametricInfoUnsteady{D,T}) where {D,T}
 
   function unsteady_dirichlet_datum(t)
     if !isnothing(FEMSpace.dΓd)
@@ -362,7 +362,9 @@ function assemble_H¹_norm_matrix_nobcs(FEMSpace::FEMSpaceStokesUnsteady)
 
 end
 
-function assemble_lifting(FEMSpace::SteadyProblem, Param::ParametricInfoSteady)
+function assemble_lifting(
+  FEMSpace::SteadyProblem,
+  Param::ParametricInfoSteady{D,T}) where {D,T}
 
   Gₕ = zeros(FEMSpace.Nₛᵘ,1)
   if !isnothing(FEMSpace.dΓd)
@@ -375,8 +377,9 @@ function assemble_lifting(FEMSpace::SteadyProblem, Param::ParametricInfoSteady)
 end
 
 function assemble_lifting(
-  FEMSpace::FEMSpacePoissonUnsteady, probl::ProblemInfoUnsteady,
-  Param::ParametricInfoUnsteady)
+  FEMSpace::FEMSpacePoissonUnsteady,
+  probl::ProblemInfoUnsteady{T},
+  Param::ParametricInfoUnsteady{D,T}) where {D,T}
 
   Gₕ = zeros(FEMSpace.Nₛᵘ, convert(Int64, probl.tₗ / probl.δt))
   if !isnothing(FEMSpace.dΓd)
@@ -392,8 +395,8 @@ end
 
 function assemble_lifting(
   FEMSpace::FEMSpaceStokesUnsteady,
-  ::ProblemInfoUnsteady,
-  Param::ParametricInfoUnsteady)
+  ::ProblemInfoUnsteady{T},
+  Param::ParametricInfoUnsteady{D,T}) where {D,T}
 
   gₕ(t) = interpolate_dirichlet(Param.g(t), FEMSpace.V(t))
   function R₁(t)
@@ -416,9 +419,10 @@ end
 
 function assemble_FEM_structure(
   FEMSpace::SteadyProblem,
-  probl::SteadyInfo,
-  Param::ParametricInfoSteady,
-  var::String)
+  probl::SteadyInfo{T},
+  Param::ParametricInfoSteady{D,T},
+  var::String) where {D,T}
+
   if var == "A"
     assemble_stiffness(FEMSpace,probl,Param)
   elseif var == "B"
@@ -442,4 +446,5 @@ function assemble_FEM_structure(
   elseif var == "Xᵖ₀"
     assemble_L²₀_norm_matrix(FEMSpace)
   end
+
 end

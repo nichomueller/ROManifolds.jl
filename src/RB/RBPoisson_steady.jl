@@ -91,7 +91,7 @@ end
 
 function set_operators(
   RBInfo::ROMInfoSteady{T},
-  ::PoissonSteady{T})
+  ::PoissonSteady{T}) where T
 
   operators = ["A"]
   if !RBInfo.build_Parametric_RHS
@@ -416,7 +416,7 @@ end
 function get_θᵃ(
   RBInfo::ROMInfoSteady{T},
   RBVars::PoissonSteady{T},
-  Param::ParametricInfoSteady{T}) where T
+  Param::ParametricInfoSteady{D,T}) where {D,T}
 
   if !RBInfo.probl_nl["A"]
     θᵃ = Param.α(Point(0.,0.))
@@ -430,7 +430,7 @@ end
 function get_θᶠʰ(
   RBInfo::ROMInfoSteady{T},
   RBVars::PoissonSteady{T},
-  Param::ParametricInfoSteady{T}) where T
+  Param::ParametricInfoSteady{D,T}) where {D,T}
 
   if RBInfo.build_Parametric_RHS
     error("Cannot fetch θᶠ, θʰ if the RHS is built online")
@@ -474,7 +474,7 @@ end
 function get_RB_system(
   RBInfo::ROMInfoSteady{T},
   RBVars::PoissonSteady{T},
-  Param::ParametricInfoSteady{T}) where T
+  Param::ParametricInfoSteady{D,T}) where {D,T}
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
@@ -512,7 +512,7 @@ end
 function solve_RB_system(
   RBInfo::ROMInfoSteady{T},
   RBVars::PoissonSteady{T},
-  Param::ParametricInfoSteady{T}) where T
+  Param::ParametricInfoSteady{D,T}) where {D,T}
 
   get_RB_system(RBInfo, RBVars, Param)
   println("Solving RB problem via backslash")

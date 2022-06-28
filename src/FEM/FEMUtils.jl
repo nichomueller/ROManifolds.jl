@@ -27,20 +27,20 @@ end
 
 function get_problem_id(problem_name::String)
   if problem_name == "poisson"
-    return (Int8(0),)
+    return (0,)
   elseif problem_name == "stokes"
-    return (Int8(0),Int8(0))
+    return (0,0)
   elseif problem_name == "navier-stokes"
-    return (Int8(0),Int8(0),Int8(0))
+    return (0,0,0)
   else
     error("unimplemented")
   end
 end
 
 function get_ParamInfo(
-  ProblInfo::SteadyInfo{N,T},
+  ProblInfo::SteadyInfo{T},
   problem_id::NTuple{1,Int},
-  μ::Vector{T}) where {N,T}
+  μ::Vector{T}) where T
 
   model = DiscreteModelFromFile(ProblInfo.paths.mesh_path)
 
@@ -49,14 +49,14 @@ function get_ParamInfo(
   g(x) = get_g(ProblInfo, problem_id, μ).g(x)
   h(x) = get_h(ProblInfo, problem_id, μ).h(x)
 
-  ParametricInfo(μ, model, α, f, g, h)
+  ParametricInfoSteady{ProblInfo.D,T}(μ, model, α, f, g, h)
 
 end
 
 function get_ParamInfo(
-  ProblInfo::UnsteadyInfo{N,T},
+  ProblInfo::UnsteadyInfo{T},
   problem_id::NTuple,
-  μ::Vector{T}) where {N,T}
+  μ::Vector{T}) where T
 
   model = DiscreteModelFromFile(ProblInfo.paths.mesh_path)
 
@@ -87,84 +87,84 @@ function get_ParamInfo(
 
   u₀(x) = get_IC(ProblInfo, problem_id)(x)
 
-  ParametricInfoUnsteady(
+  ParametricInfoUnsteady{ProblInfo.D,T}(
     μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, g, hₛ, hₜ, h, u₀)
 
 end
 
-function get_α(ProblInfo::SteadyInfo{N,T}, ::NTuple{1,Int8}, μ) where {N,T}
+function get_α(ProblInfo::SteadyInfo{T}, ::NTuple{1,Int64}, μ) where T
   if !ProblInfo.probl_nl["A"]
     return T(sum(μ))
   else
-    return T(1. + μ[3] + 1. / μ[3] * exp(-norm(x-Point(μ[1:N]))^2 / μ[3]))
+    return T(1. + μ[3] + 1. / μ[3] * exp(-norm(x-Point(μ[1:ProblInfo.D]))^2 / μ[3]))
   end
 end
 
-function get_α(ProblInfo::UnsteadyInfo{N,T}, ::NTuple{1,Int8}, μ) where {N,T}
+function get_α(ProblInfo::UnsteadyInfo{T}, ::NTuple{1,Int64}, μ) where T
   αₛ(x) = one(T)
   αₜ(t, μ) = T(5. * sum(μ) * (2 + sin(t)))
   function α(x, t)
-    if !ProblInfo.probl_nl["A"]
+    if !ProblInfo.S.probl_nl["A"]
       return T(αₛ(x)*αₜ(t, μ))
     else
-      return T(10. * (1. + 1. / μ[3] * exp(-norm(x-Point(μ[1:N]))^2 * sin(t) / μ[3])))
+      return T(10. * (1. + 1. / μ[3] * exp(-norm(x-Point(μ[1:ProblInfo.S.D]))^2 * sin(t) / μ[3])))
     end
   end
   _-> (αₛ,αₜ,α)
 end
 
-function get_α(ProblInfo::UnsteadyInfo{N,T}, ::NTuple{2,Int8}, μ) where {N,T}
+function get_α(ProblInfo::UnsteadyInfo{T}, ::NTuple{2,Int64}, μ) where T
   αₛ(x) = one(T)
   αₜ(t::Real, μ) = T(5. * sum(μ) * (2 + sin(t)))
   function α(x, t)
-    if !ProblInfo.probl_nl["A"]
+    if !ProblInfo.S.probl_nl["A"]
       return T(αₛ(x)*αₜ(t, μ))
     else
-      return T(10. * (1. + 1. / μ[3] * exp(-norm(x-Point(μ[1:N]))^2 * sin(t) / μ[3])))
+      return T(10. * (1. + 1. / μ[3] * exp(-norm(x-Point(μ[1:ProblInfo.S.D]))^2 * sin(t) / μ[3])))
     end
   end
   _-> (αₛ,αₜ,α)
 end
 
-function get_f(ProblInfo::SteadyInfo{N,T}, ::NTuple{1,Int8}, μ) where {N,T}
+function get_f(ProblInfo::SteadyInfo{T}, ::NTuple{1,Int64}, μ) where T
   if !ProblInfo.probl_nl["f"]
     return one(T)
   else
-    return T(1 + sin(norm(Point(μ[4:3+N]) .* x)*t))
+    return T(1 + sin(norm(Point(μ[4:3+ProblInfo.D]) .* x)*t))
   end
 end
 
-function get_f(ProblInfo::UnsteadyInfo{N,T}, ::NTuple{1,Int8}, μ) where {N,T}
+function get_f(ProblInfo::UnsteadyInfo{T}, ::NTuple{1,Int64}, μ) where T
 
   fₛ(x) = one(T)
   fₜ(t::Real) = T(sin(t))
   function f(x, t)
-    if !ProblInfo.probl_nl["f"]
+    if !ProblInfo.S.probl_nl["f"]
       return T(fₛ(x)*fₜ(t))
     else
-      return T(1 + sin(norm(Point(μ[4:3+N]) .* x)*t))
+      return T(1 + sin(norm(Point(μ[4:3+ProblInfo.S.D]) .* x)*t))
     end
   end
   _-> (fₛ,fₜ,f)
 
 end
 
-function get_f(ProblInfo::UnsteadyInfo{N,T}, ::NTuple{2,Int8}, μ) where {N,T}
+function get_f(ProblInfo::UnsteadyInfo{T}, ::NTuple{2,Int64}, μ) where T
 
   fₛ(x) = zero(VectorValue(N,T))
   fₜ(t::Real) = zero(T)
   function f(x, t)
-    if !ProblInfo.probl_nl["f"]
+    if !ProblInfo.S.probl_nl["f"]
       return T(fₛ(x)*fₜ(t))
     else
-      return zero(VectorValue(N,T))
+      return zero(VectorValue(ProblInfo.S.D,T))
     end
   end
   _-> (fₛ,fₜ,f)
 
 end
 
-function get_g(ProblInfo::SteadyInfo{N,T}, ::NTuple{1,Int8}, μ) where {N,T}
+function get_g(ProblInfo::SteadyInfo{T}, ::NTuple{1,Int64}, μ) where T
   if !ProblInfo.probl_nl["g"]
     return zero(T)
   else
@@ -172,11 +172,11 @@ function get_g(ProblInfo::SteadyInfo{N,T}, ::NTuple{1,Int8}, μ) where {N,T}
   end
 end
 
-function get_g(ProblInfo::UnsteadyInfo{N,T}, ::NTuple{1,Int8}, μ) where {N,T}
+function get_g(ProblInfo::UnsteadyInfo{T}, ::NTuple{1,Int64}, μ) where T
   gₛ(x) = zero(T)
   gₜ(t::Real) = zero(T)
   function g(x, t)
-    if !ProblInfo.probl_nl["g"]
+    if !ProblInfo.S.probl_nl["g"]
       return T(gₛ(x)*gₜ(t))
     else
       return zero(T)
@@ -185,13 +185,13 @@ function get_g(ProblInfo::UnsteadyInfo{N,T}, ::NTuple{1,Int8}, μ) where {N,T}
   _-> (gₛ,gₜ,g)
 end
 
-function get_g(ProblInfo::UnsteadyInfo{N,T}, ::NTuple{2,Int8}, μ) where {N,T}
+function get_g(ProblInfo::UnsteadyInfo{T}, ::NTuple{2,Int64}, μ) where T
   x0 = zero(VectorValue(N,T))
   diff = x - x0
   gₛ(x) = T(1 .- diff .* diff)
   gₜ(t::Real, μ) = T(1-cos(t)+μ[end]*sin(μ[end-1]))
   function g(x, t)
-    if ProblInfo.probl_nl["g"]
+    if ProblInfo.S.probl_nl["g"]
       return T(gₛ(x)*gₜ(t, μ))
     else
       return T(gₛ(x)*gₜ(t, μ))
@@ -200,39 +200,39 @@ function get_g(ProblInfo::UnsteadyInfo{N,T}, ::NTuple{2,Int8}, μ) where {N,T}
   _-> (gₛ,gₜ,g)
 end
 
-function get_h(ProblInfo::SteadyInfo{N,T}, ::NTuple{1,Int8}, μ) where {N,T}
+function get_h(ProblInfo::SteadyInfo{T}, ::NTuple{1,Int64}, μ) where T
   if ProblInfo.probl_nl["h"]
-    return 1 + sin(Point(μ[end-N+1:end]) .* x)
+    return 1 + sin(Point(μ[end-ProblInfo.D+1:end]) .* x)
   else
     return one(T)
   end
 end
 
-function get_h(ProblInfo::UnsteadyInfo{N,T}, ::NTuple{1,Int8}, μ) where {N,T}
+function get_h(ProblInfo::UnsteadyInfo{T}, ::NTuple{1,Int64}, μ) where T
   hₛ(x) = one(T)
   hₜ(t::Real) = T(sin(t))
   function h(x, t)
-    if !ProblInfo.probl_nl["h"]
+    if !ProblInfo.S.probl_nl["h"]
       return T(hₛ(x)*hₜ(t))
     else
-      return T(1 + sin(norm(Point(μ[end-N+1:end]) .* x)*t))
+      return T(1 + sin(norm(Point(μ[end-ProblInfo.S.D+1:end]) .* x)*t))
     end
   end
   _-> (hₛ,hₜ,h)
 end
 
-function get_h(::UnsteadyInfo{N,T}, ::NTuple{2,Int8}, μ) where {N,T}
-  hₛ(x) = zero(VectorValue(N,T))
+function get_h(ProblInfo::UnsteadyInfo{T}, ::NTuple{2,Int64}, μ) where T
+  hₛ(x) = zero(VectorValue(ProblInfo.S.D,T))
   hₜ(t::Real) = zero(T)
-  h(x, t::Real) = zero(VectorValue(N,T))
+  h(x, t::Real) = zero(VectorValue(ProblInfo.S.D,T))
   _-> (hₛ,hₜ,h)
 end
 
-function get_m(ProblInfo::UnsteadyInfo{N,T}, μ) where {N,T}
+function get_m(ProblInfo::UnsteadyInfo{T}, μ) where T
   mₛ(x) = one(T)
   mₜ(t::Real) = one(T)
   function m(x, t)
-    if !ProblInfo.probl_nl["M"]
+    if !ProblInfo.S.probl_nl["M"]
       return T(mₛ(x)*mₜ(t))
     else
       return one(T)
@@ -241,15 +241,15 @@ function get_m(ProblInfo::UnsteadyInfo{N,T}, μ) where {N,T}
   _-> (mₛ,mₜ,m)
 end
 
-function get_IC(::UnsteadyInfo{N,T}, ::NTuple{1,Int8}) where {N,T}
+function get_IC(::UnsteadyInfo{T}, ::NTuple{1,Int64}) where T
   u₀(x) = zero(T)
 end
 
-function get_IC(::UnsteadyInfo{N,T}, ::NTuple{2,Int8}) where {N,T}
-  u₀(x) = [zero(T),zero(VectorValue(N,T))]
+function get_IC(ProblInfo::UnsteadyInfo{T}, ::NTuple{2,Int64}) where T
+  u₀(x) = [zero(T),zero(VectorValue(ProblInfo.S.D,T))]
 end
 
-function get_timesθ(I::UnsteadyInfo{N,T}) where {N,T}
+function get_timesθ(I::UnsteadyInfo{T}) where T
   T.(collect(I.t₀:I.δt:I.tₗ-I.δt).+I.δt*I.θ)
 end
 
