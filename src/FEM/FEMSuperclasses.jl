@@ -127,6 +127,10 @@ mutable struct ParametricInfoSteady{D,T}
   f::Function
   g::Function
   h::Function
+  function ParametricInfoSteady(::Type{T}) where T
+    D = num_cell_dims(model)
+    new{D,T}(μ, model, α, m, f, g, h)
+  end
 end
 
 mutable struct ParametricInfoUnsteady{D,T}
@@ -146,4 +150,8 @@ mutable struct ParametricInfoUnsteady{D,T}
   hₜ::Function
   h::Function
   u₀::Function
+  function ParametricInfoUnsteady(::Type{T}) where T
+    D = num_cell_dims(model)
+    new{D,T}(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, g, hₛ, hₜ, h, u₀)
+  end
 end

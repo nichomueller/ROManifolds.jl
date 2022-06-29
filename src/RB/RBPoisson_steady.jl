@@ -3,12 +3,12 @@ include("S-GRB_Poisson.jl")
 include("S-PGRB_Poisson.jl")
 
 function get_snapshot_matrix(
-  RBInfo::ROMInfoSteady{T},
+  RBInfo::ROMInfoSteady,
   RBVars::PoissonSteady{T}) where T
 
   println("Importing the snapshot matrix for field u,
     number of snapshots considered: $(RBInfo.nₛ)")
-  Sᵘ = Matrix{Float64}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
+  Sᵘ = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
     DataFrame))[:, 1:RBInfo.nₛ]
   println("Dimension of snapshot matrix: $(size(Sᵘ))")
   RBVars.Sᵘ = Sᵘ
@@ -16,7 +16,7 @@ function get_snapshot_matrix(
 end
 
 function get_norm_matrix(
-  RBInfo::ROMInfoSteady{T},
+  RBInfo::Info,
   RBVars::PoissonSteady{T}) where T
 
   if check_norm_matrix(RBVars)
@@ -38,7 +38,7 @@ function check_norm_matrix(RBVars::PoissonSteady{T}) where T
 end
 
 function PODs_space(
-  RBInfo::ROMInfoSteady{T},
+  RBInfo::Info,
   RBVars::PoissonSteady{T}) where T
 
   println("Performing the spatial POD for field u, using a tolerance of $(RBInfo.ϵₛ)")
@@ -49,7 +49,7 @@ function PODs_space(
 end
 
 function build_reduced_basis(
-  RBInfo::ROMInfoSteady{T},
+  RBInfo::ROMInfoSteady,
   RBVars::PoissonSteady{T}) where T
 
   RB_building_time = @elapsed begin
@@ -63,7 +63,7 @@ function build_reduced_basis(
 end
 
 function import_reduced_basis(
-  RBInfo::ROMInfoSteady{T},
+  RBInfo::Info,
   RBVars::PoissonSteady{T}) where T
 
   println("Importing the spatial reduced basis for field u")
@@ -73,7 +73,7 @@ function import_reduced_basis(
 end
 
 function get_generalized_coordinates(
-  RBInfo::ROMInfoSteady{T},
+  RBInfo::ROMInfoSteady,
   RBVars::PoissonSteady{T},
   snaps=nothing) where T
 
@@ -90,8 +90,8 @@ function get_generalized_coordinates(
 end
 
 function set_operators(
-  RBInfo::ROMInfoSteady{T},
-  ::PoissonSteady{T}) where T
+  RBInfo::Info,
+  ::PoissonSteady)
 
   operators = ["A"]
   if !RBInfo.build_Parametric_RHS
@@ -102,9 +102,9 @@ function set_operators(
 end
 
 function assemble_MDEIM_matrices(
-  RBInfo::ROMInfoSteady{T},
-  RBVars::PoissonSteady{T},
-  var::String) where T
+  RBInfo::ROMInfoSteady,
+  RBVars::PoissonSteady,
+  var::String)
 
   println("The matrix $var is non-affine:
     running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
@@ -121,9 +121,9 @@ function assemble_MDEIM_matrices(
 end
 
 function assemble_DEIM_vectors(
-  RBInfo::ROMInfoSteady{T},
-  RBVars::PoissonSteady{T},
-  var::String) where T
+  RBInfo::ROMInfoSteady,
+  RBVars::PoissonSteady,
+  var::String)
 
   println("The vector $var is non-affine:
     running the DEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
@@ -147,8 +147,8 @@ function assemble_DEIM_vectors(
 end
 
 function save_M_DEIM_structures(
-  RBInfo::ROMInfoSteady{T},
-  RBVars::PoissonSteady{T}) where T
+  RBInfo::Info,
+  RBVars::PoissonSteady)
 
   list_M_DEIM = (RBVars.MDEIM_mat_A, RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A,
     RBVars.row_idx_A, RBVars.sparse_el_A, RBVars.DEIM_mat_F, RBVars.DEIMᵢ_F,
@@ -170,7 +170,7 @@ function save_M_DEIM_structures(
 end
 
 function get_M_DEIM_structures(
-  RBInfo::ROMInfoSteady{T},
+  RBInfo::Info,
   RBVars::PoissonSteady{T}) where T
 
   operators = String[]
@@ -241,7 +241,7 @@ function get_M_DEIM_structures(
 end
 
 function get_Fₙ(
-  RBInfo::ROMInfoSteady{T},
+  RBInfo::ROMInfoSteady,
   RBVars::PoissonSteady{T}) where T
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Fₙ.csv"))
@@ -256,7 +256,7 @@ function get_Fₙ(
 end
 
 function get_Hₙ(
-  RBInfo::ROMInfoSteady{T},
+  RBInfo::ROMInfoSteady,
   RBVars::PoissonSteady{T}) where T
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Hₙ.csv"))
@@ -271,8 +271,8 @@ function get_Hₙ(
 end
 
 function get_affine_structures(
-  RBInfo::ROMInfoSteady{T},
-  RBVars::PoissonSteady{T}) where T
+  RBInfo::Info,
+  RBVars::PoissonSteady)
 
   operators = String[]
 
@@ -290,8 +290,8 @@ function get_affine_structures(
 end
 
 function get_offline_structures(
-  RBInfo::ROMInfoSteady{T},
-  RBVars::PoissonSteady{T}) where T
+  RBInfo::ROMInfoSteady,
+  RBVars::PoissonSteady)
 
   operators = String[]
 
@@ -304,9 +304,9 @@ function get_offline_structures(
 end
 
 function assemble_offline_structures(
-  RBInfo::ROMInfoSteady{T},
-  RBVars::PoissonSteady{T},
-  operators=nothing) where T
+  RBInfo::ROMInfoSteady,
+  RBVars::PoissonSteady,
+  operators=nothing)
 
   if isnothing(operators)
     operators = set_operators(RBInfo, RBVars)
@@ -344,7 +344,7 @@ function assemble_offline_structures(
 end
 
 function get_system_blocks(
-  RBInfo::ROMInfoSteady{T},
+  RBInfo::ROMInfoSteady,
   RBVars::PoissonSteady{T},
   LHS_blocks::Vector{Matrix{T}},
   RHS_blocks::Vector{Matrix{T}}) where T
@@ -393,7 +393,7 @@ function get_system_blocks(
 end
 
 function save_system_blocks(
-  RBInfo::ROMInfoSteady{T},
+  RBInfo::ROMInfoSteady,
   RBVars::PoissonSteady{T},
   LHS_blocks::Vector{Matrix{T}},
   RHS_blocks::Vector{Matrix{T}},
@@ -414,9 +414,9 @@ function save_system_blocks(
 end
 
 function get_θᵃ(
-  RBInfo::ROMInfoSteady{T},
-  RBVars::PoissonSteady{T},
-  Param::ParametricInfoSteady{D,T}) where {D,T}
+  RBInfo::ROMInfoSteady,
+  RBVars::PoissonSteady,
+  Param::ParametricInfoSteady)
 
   if !RBInfo.probl_nl["A"]
     θᵃ = Param.α(Point(0.,0.))
@@ -428,9 +428,9 @@ function get_θᵃ(
 end
 
 function get_θᶠʰ(
-  RBInfo::ROMInfoSteady{T},
-  RBVars::PoissonSteady{T},
-  Param::ParametricInfoSteady{D,T}) where {D,T}
+  RBInfo::ROMInfoSteady,
+  RBVars::PoissonSteady,
+  Param::ParametricInfoSteady)
 
   if RBInfo.build_Parametric_RHS
     error("Cannot fetch θᶠ, θʰ if the RHS is built online")
@@ -457,7 +457,7 @@ function initialize_RB_system(RBVars::PoissonSteady{T}) where T
   RBVars.RHSₙ = Matrix{T}[]
 end
 
-function initialize_online_time(RBVars::PoissonSteady{T}) where T
+function initialize_online_time(RBVars::PoissonSteady)
   RBVars.online_time = 0.0
 end
 
@@ -472,9 +472,9 @@ function assemble_online_structure(θ, Mat)
 end
 
 function get_RB_system(
-  RBInfo::ROMInfoSteady{T},
-  RBVars::PoissonSteady{T},
-  Param::ParametricInfoSteady{D,T}) where {D,T}
+  RBInfo::ROMInfoSteady,
+  RBVars::PoissonSteady,
+  Param::ParametricInfoSteady)
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
@@ -510,9 +510,9 @@ function get_RB_system(
 end
 
 function solve_RB_system(
-  RBInfo::ROMInfoSteady{T},
-  RBVars::PoissonSteady{T},
-  Param::ParametricInfoSteady{D,T}) where {D,T}
+  RBInfo::ROMInfoSteady,
+  RBVars::PoissonSteady,
+  Param::ParametricInfoSteady)
 
   get_RB_system(RBInfo, RBVars, Param)
   println("Solving RB problem via backslash")
@@ -523,14 +523,14 @@ function solve_RB_system(
 
 end
 
-function reconstruct_FEM_solution(RBVars::PoissonSteady{T}) where T
+function reconstruct_FEM_solution(RBVars::PoissonSteady)
   println("Reconstructing FEM solution from the newly computed RB one")
   RBVars.ũ = RBVars.Φₛᵘ * RBVars.uₙ
 end
 
 function offline_phase(
-  RBInfo::ROMInfoSteady{T},
-  RBVars::PoissonSteady{T}) where T
+  RBInfo::ROMInfoSteady,
+  RBVars::PoissonSteady)
 
   if RBInfo.import_snapshots
     get_snapshot_matrix(RBInfo, RBVars)
@@ -568,7 +568,7 @@ function offline_phase(
 end
 
 function online_phase(
-  RBInfo::ROMInfoSteady{T},
+  RBInfo::ROMInfoSteady,
   RBVars::PoissonSteady{T},
   μ::Matrix{T},
   Param_nbs) where T
@@ -643,7 +643,7 @@ function online_phase(
 
 end
 
-function post_process(RBInfo::ROMInfoSteady{T}, d::Dict) where T
+function post_process(RBInfo::ROMInfoSteady, d::Dict) where T
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
     MDEIM_Σ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
     generate_and_save_plot(

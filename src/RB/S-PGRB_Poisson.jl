@@ -1,6 +1,6 @@
 
 function get_inverse_P_matrix(
-  RBInfo::ROMInfoSteady{T},
+  RBInfo::Info,
   RBVars::PoissonSPGRB{T}) where T
 
   if RBInfo.use_norm_X
@@ -22,7 +22,7 @@ function get_inverse_P_matrix(
 end
 
 function get_Aₙ(
-  RBInfo::ROMInfoSteady{T},
+  RBInfo::Info,
   RBVars::PoissonSPGRB{T}) where T
 
   if (isfile(joinpath(RBInfo.paths.ROM_structures_path, "Aₙ.csv")) &&
@@ -45,7 +45,7 @@ function get_Aₙ(
 end
 
 function get_AΦᵀPᵤ⁻¹(
-  RBInfo::ROMInfoSteady{T},
+  RBInfo::ROMInfoSteady,
   RBVars::PoissonSPGRB{T}) where T
 
   println("S-PGRB: fetching the matrix AΦᵀPᵤ⁻¹")
@@ -66,7 +66,7 @@ function get_AΦᵀPᵤ⁻¹(
 end
 
 function assemble_affine_matrices(
-  RBInfo::ROMInfoSteady{T},
+  RBInfo::Info,
   RBVars::PoissonSPGRB{T},
   var::String) where T
 
@@ -87,19 +87,19 @@ end
 
 function assemble_reduced_mat_MDEIM(
   RBVars::PoissonSPGRB{T},
-  MDEIM_mat::Matrix{T},
+  MDEIM_mat::Matrix,
   row_idx::Vector{Int64}) where T
 
   Q = size(MDEIM_mat)[2]
   r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.Nₛᵘ)
-  MatqΦ = zeros(RBVars.Nₛᵘ,RBVars.nₛᵘ,Q)
+  MatqΦ = zeros(T,RBVars.Nₛᵘ,RBVars.nₛᵘ,Q)
   @simd for j = 1:RBVars.Nₛᵘ
     Mat_idx = findall(x -> x == j, r_idx)
     MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.Φₛᵘ[c_idx[Mat_idx],:])'
   end
-  MatqΦᵀPᵤ⁻¹ = zeros(RBVars.nₛᵘ,RBVars.Nₛᵘ,Q)
+  MatqΦᵀPᵤ⁻¹ = zeros(T,RBVars.nₛᵘ,RBVars.Nₛᵘ,Q)
   matrix_product!(MatqΦᵀPᵤ⁻¹,MatqΦ,Matrix(RBVars.Pᵤ⁻¹),transpose_A=true)
-  Matₙ = zeros(RBVars.nₛᵘ,RBVars.nₛᵘ,Q^2)
+  Matₙ = zeros(T,RBVars.nₛᵘ,RBVars.nₛᵘ,Q^2)
   @simd for q₁ = 1:Q
     for q₂ = 1:Q
       println("ST-PGRB: affine component number $((q₁-1)*RBVars.Qᵐ+q₂), matrix $var")
@@ -115,14 +115,14 @@ end
 
 function assemble_reduced_mat_DEIM(
   RBVars::PoissonSPGRB{T},
-  DEIM_mat::Matrix{T},
+  DEIM_mat::Matrix,
   var::String) where T
 
   Q = size(DEIM_mat)[2]
-  MVecₙ = zeros(RBVars.nₛᵘ,1,RBVars.Qᵐ*Q)
+  MVecₙ = zeros(T,RBVars.nₛᵘ,1,RBVars.Qᵐ*Q)
   matrix_product_vec!(MVecₙ,RBVars.MΦᵀPᵤ⁻¹,DEIM_mat)
   MVecₙ = reshape(MVecₙ,:,RBVars.Qᵐ*Q)
-  AVecₙ = zeros(RBVars.nₛᵘ,1,RBVars.Qᵐ*Q)
+  AVecₙ = zeros(T,RBVars.nₛᵘ,1,RBVars.Qᵐ*Q)
   matrix_product_vec!(AVecₙ,RBVars.AΦᵀPᵤ⁻¹,DEIM_mat)
   AVecₙ = reshape(AVecₙ,:,RBVars.Qᵃ*Q)
   Vecₙ = hcat(MVecₙ,AVecₙ)
@@ -138,7 +138,7 @@ function assemble_reduced_mat_DEIM(
 end
 
 function assemble_affine_vectors(
-  RBInfo::ROMInfoSteady{T},
+  RBInfo::ROMInfoSteady,
   RBVars::PoissonSPGRB{T},
   var::String) where T
 
@@ -148,14 +148,14 @@ function assemble_affine_vectors(
     RBVars.Qᶠ = 1
     println("Assembling affine reduced forcing term")
     F = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_structures_path, "F.csv"))
-    Fₙ = zeros(RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qᶠ)
+    Fₙ = zeros(T,RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qᶠ)
     matrix_product_vec!(Fₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(F,:,1))
     RBVars.Fₙ = reshape(Fₙ,:,RBVars.Qᵃ*RBVars.Qᶠ)
   elseif var == "H"
     RBVars.Qʰ = 1
     println("Assembling affine reduced Neumann term")
     H = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_structures_path, "H.csv"))
-    Hₙ = zeros(RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qʰ)
+    Hₙ = zeros(T,RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qʰ)
     matrix_product_vec!(Hₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(H,:,1))
     RBVars.Hₙ = reshape(Hₙ,:,RBVars.Qᵃ*RBVars.Qʰ)
   else
@@ -165,8 +165,8 @@ function assemble_affine_vectors(
 end
 
 function save_affine_structures(
-  RBInfo::ROMInfoSteady{T},
-  RBVars::PoissonSPGRB{T}) where T
+  RBInfo::Info,
+  RBVars::PoissonSPGRB)
 
   if RBInfo.save_offline_structures
 
@@ -185,8 +185,8 @@ function save_affine_structures(
 end
 
 function get_Q(
-  RBInfo::ROMInfoSteady{T},
-  RBVars::PoissonSPGRB{T}) where T
+  RBInfo::Info,
+  RBVars::PoissonSPGRB)
 
   if RBVars.Qᵃ == 0
     Qᵃ = sqrt(size(RBVars.Aₙ)[end])
@@ -204,10 +204,10 @@ function get_Q(
 end
 
 function build_Param_RHS(
-  RBInfo::ROMInfoSteady{T},
-  RBVars::PoissonSPGRB{T},
-  Param::ParametricInfoSteady{T},
-  θᵃ::Vector{T}) where T
+  RBInfo::ROMInfoSteady,
+  RBVars::PoissonSPGRB,
+  Param::ParametricInfoSteady,
+  θᵃ::Vector)
 
   θᵃ_temp = θᵃ[1:RBVars.Qᵃ]/sqrt(θᵃ[1])
   F = assemble_forcing(FEMSpace, RBInfo, Param)
@@ -220,9 +220,9 @@ function build_Param_RHS(
 end
 
 function get_θ(
-  RBInfo::ROMInfoSteady{T},
-  RBVars::PoissonSPGRB{T},
-  Param::ParametricInfoSteady{T}) where T
+  RBInfo::ROMInfoSteady,
+  RBVars::PoissonSPGRB,
+  Param::ParametricInfoSteady)
 
   θᵃ_temp = get_θᵃ(RBInfo, RBVars, Param)
   θᵃ = [θᵃ_temp[q₁]*θᵃ_temp[q₂] for q₁ = 1:RBVars.Qᵃ for q₂ = 1:RBVars.Qᵃ]
@@ -235,7 +235,7 @@ function get_θ(
 
   else
 
-    θᶠ, θʰ = T[], T[]
+    θᶠ, θʰ = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
 
   end
 

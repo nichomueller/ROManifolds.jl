@@ -1,5 +1,5 @@
 function get_Aₙ(
-  RBInfo::ROMInfoSteady{T},
+  RBInfo::Info,
   RBVars::PoissonSGRB{T}) where T
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Aₙ.csv"))
@@ -16,7 +16,7 @@ function get_Aₙ(
 end
 
 function assemble_affine_matrices(
-  RBInfo::ROMInfoSteady{T},
+  RBInfo::Info,
   RBVars::PoissonSGRB{T},
   var::String) where T
 
@@ -33,12 +33,12 @@ end
 
 function assemble_reduced_mat_MDEIM(
   RBVars::PoissonSGRB{T},
-  MDEIM_mat::Matrix{T},
-  row_idx::Vector{T}) where T
+  MDEIM_mat::Matrix,
+  row_idx::Vector)
 
   Q = size(MDEIM_mat)[2]
   r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.Nₛᵘ)
-  MatqΦ = zeros(RBVars.Nₛᵘ,RBVars.nₛᵘ,Q)
+  MatqΦ = zeros(T,RBVars.Nₛᵘ,RBVars.nₛᵘ,Q)
   @simd for j = 1:RBVars.Nₛᵘ
     Mat_idx = findall(x -> x == j, r_idx)
     MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.Φₛᵘ[c_idx[Mat_idx],:])'
@@ -50,12 +50,12 @@ function assemble_reduced_mat_MDEIM(
 end
 
 function assemble_reduced_mat_DEIM(
-  RBVars::PoissonSTGRB,
-  DEIM_mat::Matrix{T},
+  RBVars::PoissonSGRB{T},
+  DEIM_mat::Matrix,
   var::String) where T
 
   Q = size(DEIM_mat)[2]
-  Vecₙ = zeros(RBVars.nₛᵘ,1,Q)
+  Vecₙ = zeros(T,RBVars.nₛᵘ,1,Q)
   @simd for q = 1:Q
     Vecₙ[:,:,q] = RBVars.Φₛᵘ' * Vector{T}(DEIM_mat[:, q])
   end
@@ -72,7 +72,7 @@ function assemble_reduced_mat_DEIM(
 end
 
 function assemble_affine_vectors(
-  RBInfo::ROMInfoSteady{T},
+  RBInfo::Info,
   RBVars::PoissonSGRB{T},
   var::String) where T
 
@@ -93,8 +93,8 @@ function assemble_affine_vectors(
 end
 
 function save_affine_structures(
-  RBInfo::ROMInfoSteady{T},
-  RBVars::PoissonSGRB{T}) where T
+  RBInfo::Info,
+  RBVars::PoissonSGRB)
 
   if RBInfo.save_offline_structures
     Aₙ = reshape(RBVars.Aₙ, :, RBVars.Qᵃ)
@@ -108,8 +108,8 @@ function save_affine_structures(
 end
 
 function get_Q(
-  RBInfo::ROMInfoSteady{T},
-  RBVars::PoissonSGRB{T}) where T
+  RBInfo::Info,
+  RBVars::PoissonSGRB)
 
   if RBVars.Qᵃ == 0
     RBVars.Qᵃ = size(RBVars.Aₙ)[end]
@@ -126,10 +126,10 @@ function get_Q(
 end
 
 function build_Param_RHS(
-  RBInfo::ROMInfoSteady{T},
-  RBVars::PoissonSGRB{T},
-  Param,
-  ::Array) where T
+  RBInfo::ROMInfoSteady,
+  RBVars::PoissonSGRB,
+  Param::ParametricInfoSteady,
+  ::Array)
 
   F = assemble_forcing(FEMSpace, RBInfo, Param)
   H = assemble_neumann_datum(FEMSpace, RBInfo, Param)
@@ -138,15 +138,15 @@ function build_Param_RHS(
 end
 
 function get_θ(
-  RBInfo::ROMInfoSteady{T},
+  RBInfo::ROMInfoSteady,
   RBVars::PoissonSGRB{T},
-  Param) where T
+  Param::ParametricInfoSteady) where T
 
   θᵃ = get_θᵃ(RBInfo, RBVars, Param)
   if !RBInfo.build_Parametric_RHS
     θᶠ, θʰ = get_θᶠʰ(RBInfo, RBVars, Param)
   else
-    θᶠ, θʰ = T[], T[]
+    θᶠ, θʰ = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
   end
 
   return θᵃ, θᶠ, θʰ

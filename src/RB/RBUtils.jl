@@ -58,10 +58,10 @@ end
 
 function build_sparse_mat(
   FEMSpace₀::SteadyProblem,
-  FEMInfo::ProblemInfoSteady{T},
-  Param::ParametricInfoSteady{T},
+  FEMInfo::ProblemInfoSteady,
+  Param::ParametricInfoSteady,
   el::Vector{Int64};
-  var="A") where T
+  var="A")
 
   Ω_sparse = view(FEMSpace₀.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
@@ -79,11 +79,11 @@ end
 
 function build_sparse_mat(
   FEMSpace₀::UnsteadyProblem,
-  FEMInfo::ProblemInfoUnsteady{T},
-  Param::ParametricInfoUnsteady{D,T},
+  FEMInfo::ProblemInfoUnsteady,
+  Param::ParametricInfoUnsteady,
   el::Vector{Int64},
-  timesθ::Vector{T};
-  var="A") where {D,T}
+  timesθ::Vector;
+  var="A")
 
   Ω_sparse = view(FEMSpace₀.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.S.order)
@@ -116,9 +116,9 @@ function build_sparse_mat(
 
 end
 
-function blocks_to_matrix(A_block::Array, N_blocks::Int)
+function blocks_to_matrix(A_block::Array{T}, N_blocks::Int64) where T
 
-  A = zeros(prod(size(A_block[1])), N_blocks)
+  A = zeros(T,prod(size(A_block[1])), N_blocks)
   for n = 1:N_blocks
     A[:, n] = A_block[n][:]
   end
@@ -127,9 +127,9 @@ function blocks_to_matrix(A_block::Array, N_blocks::Int)
 
 end
 
-function matrix_to_blocks(A::Array)
+function matrix_to_blocks(A::Array{T}) where T
 
-  A_block = Matrix{Float64}[]
+  A_block = Matrix{T}[]
   N_blocks = size(A)[end]
   dims = Tuple(size(A)[1:end-1])
   order = prod(size(A)[1:end-1])
@@ -156,7 +156,7 @@ function compute_errors(
 end
 
 function compute_errors(
-  uₕ::Matrix{T},
+  uₕ::Matrix,
   RBVars::RBUnsteadyProblem{T},
   norm_matrix = nothing) where T
 
@@ -203,6 +203,8 @@ function post_process(root::String)
   end
 
   function check_if_fun(dir::String,tol,tol_fun,err,err_fun,time,time_fun)
+    S = String
+    T = Float64
     path_to_err,path_to_t = get_paths(dir)
     if ispath(path_to_err) && ispath(path_to_t)
       ϵ = get_tolerances(dir)
@@ -229,15 +231,15 @@ function post_process(root::String)
   filter!(el->!occursin("FEM_data",el),root_subs)
 
   (ϵ,ϵ_fun,ϵ_sampl,ϵ_fun_sampl,ϵ_nest,ϵ_fun_nest,ϵ_sampl_nest,ϵ_fun_sampl_nest) =
-    (String[],String[],String[],String[],String[],String[],String[],String[])
+    (S[],S[],S[],S[],S[],S[],S[],S[])
   (errH1L2,errH1L2_fun,errH1L2_sampl,errH1L2_fun_sampl,errH1L2_nest,
     errH1L2_fun_nest,errH1L2_sampl_nest,errH1L2_fun_sampl_nest) =
-    (Float64[],Float64[],Float64[],Float64[],Float64[],Float64[],Float64[],Float64[])
+    (T[],T[],T[],T[],T[],T[],T[],T[])
   (t,t_fun,t_sampl,t_fun_sampl,t_nest,t_fun_nest,t_sampl_nest,t_fun_sampl_nest) =
-    (Dict("on"=>Float64[],"off"=>Float64[]),Dict("on"=>Float64[],"off"=>Float64[]),
-    Dict("on"=>Float64[],"off"=>Float64[]),Dict("on"=>Float64[],"off"=>Float64[]),
-    Dict("on"=>Float64[],"off"=>Float64[]),Dict("on"=>Float64[],"off"=>Float64[]),
-    Dict("on"=>Float64[],"off"=>Float64[]),Dict("on"=>Float64[],"off"=>Float64[]))
+    (Dict("on"=>T[],"off"=>T[]),Dict("on"=>T[],"off"=>T[]),
+    Dict("on"=>T[],"off"=>T[]),Dict("on"=>T[],"off"=>T[]),
+    Dict("on"=>T[],"off"=>T[]),Dict("on"=>T[],"off"=>T[]),
+    Dict("on"=>T[],"off"=>T[]),Dict("on"=>T[],"off"=>T[]))
 
   @simd for dir in root_subs
     if !occursin("nest",dir)
@@ -284,7 +286,7 @@ function post_process(root::String)
 
   for (key, val) in errors
     if !isempty(val)
-      ϵ = parse.(Float64,tols[key])
+      ϵ = parse.(T,tols[key])
       xvals = hcat(ϵ,ϵ)
       yvals = hcat(val,ϵ)
       generate_and_save_plot(xvals,yvals,"Average H¹-l² err, method: "*key,

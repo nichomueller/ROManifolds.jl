@@ -23,8 +23,8 @@ end
 function get_FEMSpace(
   ::NTuple{1,Int64},
   ProblInfo::SteadyInfo{T},
-  model::DiscreteModel,
-  g::Function) where T
+  model::DiscreteModel{D,D},
+  g::Function) where {D,T}
 
   degree = 2 * ProblInfo.order
   labels = set_labels(ProblInfo, model)
@@ -44,7 +44,7 @@ function get_FEMSpace(
   ϕᵤ = get_trial_fe_basis(V)
   Nₛᵘ = length(get_free_dof_ids(V))
 
-  FEMSpace = FEMSpacePoissonSteady{ProblInfo.D,T}(Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, dΩ, dΓd, dΓn)
+  FEMSpace = FEMSpacePoissonSteady{D,T}(Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, dΩ, dΓd, dΓn)
 
   return FEMSpace
 
@@ -53,8 +53,8 @@ end
 function get_FEMSpace(
   ::NTuple{1,Int64},
   ProblInfo::UnsteadyInfo{T},
-  model::DiscreteModel,
-  g::Function) where T
+  model::DiscreteModel{D,D},
+  g::Function) where {D,T}
 
   degree = 2 * ProblInfo.S.order
   labels = set_labels(ProblInfo.S, model)
@@ -74,7 +74,7 @@ function get_FEMSpace(
   ϕᵤ(t) = get_trial_fe_basis(V(t))
   Nₛᵘ = length(get_free_dof_ids(V₀))
 
-  FEMSpace = FEMSpacePoissonUnsteady{ProblInfo.S.D,T}(Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, dΩ, dΓd, dΓn)
+  FEMSpace = FEMSpacePoissonUnsteady{D,T}(Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, dΩ, dΓd, dΓn)
 
   return FEMSpace
 
@@ -83,8 +83,8 @@ end
 function get_FEMSpace(
   ::NTuple{2,Int64},
   ProblInfo::SteadyInfo{T},
-  model::DiscreteModel,
-  g::Function) where T
+  model::DiscreteModel{D,D},
+  g::Function) where {D,T}
 
   degree = 2 * ProblInfo.order
   labels = set_labels(ProblInfo, model)
@@ -116,7 +116,7 @@ function get_FEMSpace(
   X₀ = MultiFieldFESpace([V₀, Q₀])
   X = TransientMultiFieldFESpace([V, Q])
 
-  FEMSpace = FEMSpaceStokesSteady{ProblInfo.D,T}(
+  FEMSpace = FEMSpaceStokesSteady{D,T}(
     Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn)
 
   return FEMSpace
@@ -126,15 +126,15 @@ end
 function get_FEMSpace(
   ::NTuple{2,Int64},
   ProblInfo::UnsteadyInfo{T},
-  model::DiscreteModel,
-  g::Function) where T
+  model::DiscreteModel{D,D},
+  g::Function) where {D,T}
 
   degree = 2 * ProblInfo.order
   labels = set_labels(ProblInfo.S, model)
   Ω = Interior(model)
   dΩ = Measure(Ω, degree)
   Qₕ = CellQuadrature(Ω, degree)
-  refFEᵤ = ReferenceFE(lagrangian, VectorValue{ProblInfo.D,T}, ProblInfo.S.order)
+  refFEᵤ = ReferenceFE(lagrangian, VectorValue{D,T}, ProblInfo.S.order)
   Γn = BoundaryTriangulation(model, tags=ProblInfo.S.neumann_tags)
   dΓn = Measure(Γn, degree)
   Γd = BoundaryTriangulation(model, tags=ProblInfo.S.dirichlet_tags)
@@ -157,7 +157,7 @@ function get_FEMSpace(
   X₀ = MultiFieldFESpace([V₀, Q₀])
   X = TransientMultiFieldFESpace([V, Q])
 
-  FEMSpace = FEMSpaceStokesUnsteady{ProblInfo.S.D,T}(
+  FEMSpace = FEMSpaceStokesUnsteady{D,T}(
     Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn)
 
   return FEMSpace
@@ -166,8 +166,8 @@ end
 
 function get_FEMSpace₀(
   problem_id::NTuple{1,Int64},
-  ProblInfo::SteadyInfo{T},
-  model::DiscreteModel) where T
+  ProblInfo::SteadyInfo,
+  model::DiscreteModel)
 
   get_FEMSpace(problem_id,ProblInfo,model,x->0)
 
@@ -186,8 +186,8 @@ end
 
 function get_FEMSpace₀(
   problem_id::NTuple{2,Int64},
-  ProblInfo::SteadyInfo{T},
-  model::DiscreteModel) where T
+  ProblInfo::SteadyInfo,
+  model::DiscreteModel)
 
   get_FEMSpace(problem_id,ProblInfo,model,x->0)
 
