@@ -587,7 +587,7 @@ function online_phase(
     println("Considering Parameter number: $nb")
 
     μ_nb = parse.(T, split(chop(μ[nb]; head=1, tail=1), ','))
-    Param = get_ParamInfo(RBInfo, problem_id, μ_nb)
+    Param = get_ParamInfo(RBInfo.FEMInfo, RBInfo.FEMInfo.problem_id, μ_nb)
 
     uₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, nb]
 

@@ -1,6 +1,6 @@
 function FE_solve(
   FEMSpace::FEMSpacePoissonSteady,
-  probl::ProblemInfoSteady,
+  probl::SteadyInfo,
   Param::ParametricInfoSteady;
   subtract_Ddata = true)
 
@@ -28,8 +28,8 @@ end
 
 function FE_solve(
   FEMSpace::FEMSpacePoissonUnsteady,
-  probl::ProblemInfoUnsteady{T},
-  Param::ParametricInfoUnsteady;
+  probl::UnsteadyInfo,
+  Param::ParametricInfoUnsteady{T};
   subtract_Ddata = true) where T
 
   Gₕₜ = assemble_lifting(FEMSpace, probl, Param)
@@ -68,9 +68,9 @@ end
 
 function FE_solve(
   FEMSpace::FEMSpaceStokesUnsteady,
-  probl::ProblemInfoUnsteady{T},
+  probl::UnsteadyInfo,
   Param::ParametricInfoUnsteady;
-  subtract_Ddata=false) where T
+  subtract_Ddata=false)
 
   timesθ = get_timesθ(probl)
   θ = probl.θ

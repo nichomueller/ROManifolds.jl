@@ -4,8 +4,6 @@ abstract type SteadyProblem{D,T} <: FEMProblem{D,T} end
 abstract type UnsteadyProblem{D,T} <: FEMProblem{D,T} end
 
 abstract type Info end
-abstract type SteadyInfo{T} <: Info end
-abstract type UnsteadyInfo{T} <: Info end
 
 struct FEMSpacePoissonSteady{D,T} <: SteadyProblem{D,T}
   Qₕ::CellQuadrature
@@ -18,6 +16,8 @@ struct FEMSpacePoissonSteady{D,T} <: SteadyProblem{D,T}
   dΩ::Measure
   dΓd::Measure
   dΓn::Measure
+  phys_quadp
+  V₀_quad
 end
 
 struct FEMSpacePoissonUnsteady{D,T} <: UnsteadyProblem{D,T}
@@ -31,6 +31,8 @@ struct FEMSpacePoissonUnsteady{D,T} <: UnsteadyProblem{D,T}
   dΩ::Measure
   dΓd::Measure
   dΓn::Measure
+  phys_quadp
+  V₀_quad
 end
 
 struct FEMSpaceStokesSteady{D,T} <: SteadyProblem{D,T}
@@ -52,6 +54,8 @@ struct FEMSpaceStokesSteady{D,T} <: SteadyProblem{D,T}
   Γd::BoundaryTriangulation
   dΓd::Measure
   dΓn::Measure
+  phys_quadp
+  V₀_quad
 end
 
 struct FEMSpaceStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
@@ -73,6 +77,8 @@ struct FEMSpaceStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
   Γd::BoundaryTriangulation
   dΓd::Measure
   dΓn::Measure
+  phys_quadp
+  V₀_quad
 end
 
 struct FEMSpaceNavierStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
@@ -94,9 +100,11 @@ struct FEMSpaceNavierStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
   Γd::BoundaryTriangulation
   dΓd::Measure
   dΓn::Measure
+  phys_quadp
+  V₀_quad
 end
 
-struct ProblemInfoSteady{T} <: SteadyInfo{T}
+struct SteadyInfo{T} <: Info
   problem_id::NTuple
   D::Int64
   case::Int
@@ -110,8 +118,18 @@ struct ProblemInfoSteady{T} <: SteadyInfo{T}
   paths::Function
 end
 
-struct ProblemInfoUnsteady{T} <: UnsteadyInfo{T}
-  S::ProblemInfoSteady{T}
+struct UnsteadyInfo{T} <: Info
+  problem_id::NTuple
+  D::Int64
+  case::Int
+  probl_nl::Dict
+  order::Int
+  dirichlet_tags::Vector{String}
+  dirichlet_bnds::Vector{Int64}
+  neumann_tags::Vector{String}
+  neumann_bnds::Vector{Int64}
+  solver::String
+  paths::Function
   time_method::String
   θ::Float64
   RK_type::Symbol

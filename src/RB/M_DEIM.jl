@@ -48,7 +48,7 @@ function MDEIM_offline(RBInfo::Info, var::String)
 
   μ = load_CSV(Matrix{String}(undef,0,0),joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
   model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
-  FEMSpace₀ = get_FEMSpace₀(FEMInfo.problem_id, FEMInfo, model)
+  FEMSpace₀ = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
 
   MDEIM_mat, Σ, row_idx = get_snaps_MDEIM(FEMSpace₀, RBInfo, μ, var)
   MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat, Σ)
@@ -66,7 +66,7 @@ function modify_timesθ_and_MDEIM_idx(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady)
 
-  timesθ = get_timesθ(RBInfo)
+  timesθ = get_timesθ(RBInfo.FEMInfo)
   idx_space, idx_time = from_vec_to_mat_idx(MDEIM_idx, RBVars.S.Nₛᵘ^2)
   idx_time_mod = label_sorted_elems(idx_time)
   timesθ_mod = timesθ[unique(sort(idx_time))]
@@ -80,7 +80,7 @@ function DEIM_offline(RBInfo::Info, var::String)
 
   μ = load_CSV(Matrix{String}(undef,0,0), joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
   model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
-  FEMSpace₀ = get_FEMSpace₀(FEMInfo.problem_id, FEMInfo, model)
+  FEMSpace₀ = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
 
   DEIM_mat, Σ = get_snaps_DEIM(FEMSpace₀, RBInfo, μ, var)
   DEIM_mat, DEIM_idx, DEIM_err_bound = M_DEIM_offline(DEIM_mat, Σ)

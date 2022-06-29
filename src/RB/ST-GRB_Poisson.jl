@@ -420,7 +420,7 @@ function build_Param_RHS(
   F_t = assemble_forcing(FEMSpace₀, RBInfo, Param)
   H_t = assemble_neumann_datum(FEMSpace₀, RBInfo, Param)
   F, H = zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ), zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ)
-  timesθ = get_timesθ(RBInfo)
+  timesθ = get_timesθ(RBInfo.FEMInfo)
   for (i,tᵢ) in enumerate(timesθ)
     F[:,i] = F_t(tᵢ)
     H[:,i] = H_t(tᵢ)

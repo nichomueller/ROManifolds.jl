@@ -34,7 +34,7 @@ end
 function assemble_reduced_mat_MDEIM(
   RBVars::PoissonSGRB{T},
   MDEIM_mat::Matrix,
-  row_idx::Vector)
+  row_idx::Vector) where T
 
   Q = size(MDEIM_mat)[2]
   r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.Nₛᵘ)

@@ -58,7 +58,7 @@ end
 
 function build_sparse_mat(
   FEMSpace₀::SteadyProblem,
-  FEMInfo::ProblemInfoSteady,
+  FEMInfo::SteadyInfo,
   Param::ParametricInfoSteady,
   el::Vector{Int64};
   var="A")
@@ -79,7 +79,7 @@ end
 
 function build_sparse_mat(
   FEMSpace₀::UnsteadyProblem,
-  FEMInfo::ProblemInfoUnsteady,
+  FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady,
   el::Vector{Int64},
   timesθ::Vector;

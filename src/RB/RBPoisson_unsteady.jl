@@ -287,7 +287,7 @@ function get_θᵐ(
   RBVars::PoissonUnsteady{T},
   Param::ParametricInfoUnsteady) where T
 
-  timesθ = get_timesθ(RBInfo)
+  timesθ = get_timesθ(RBInfo.FEMInfo)
   if !RBInfo.probl_nl["M"]
     θᵐ = [Param.mₜ(t_θ) for t_θ = timesθ]
   else
@@ -334,7 +334,7 @@ function get_θᵃ(
   RBVars::PoissonUnsteady{T},
   Param::ParametricInfoUnsteady) where T
 
-  timesθ = get_timesθ(RBInfo)
+  timesθ = get_timesθ(RBInfo.FEMInfo)
   if !RBInfo.probl_nl["A"]
     θᵃ = [Param.αₜ(t_θ,Param.μ) for t_θ = timesθ]
   else
@@ -384,7 +384,7 @@ function get_θᶠʰ(
     error("Cannot fetch θᶠ, θʰ if the RHS is built online")
   end
 
-  timesθ = get_timesθ(RBInfo)
+  timesθ = get_timesθ(RBInfo.FEMInfo)
   #θᶠ, θʰ = Float64[], Float64[]
 
   if !RBInfo.probl_nl["f"]
@@ -541,7 +541,7 @@ function loop_on_params(
     println("Considering Parameter number: $nb/$(param_nbs[end])")
 
     μ_nb = parse.(T, split(chop(μ[nb]; head=1, tail=1), ','))
-    Param = get_ParamInfo(RBInfo, FEMInfo.problem_id, μ_nb)
+    Param = get_ParamInfo(RBInfo.FEMInfo, RBInfo.FEMInfo.problem_id, μ_nb)
     if RBInfo.perform_nested_POD
       nb_test = nb-90
       uₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path,
@@ -584,7 +584,7 @@ function online_phase(
   param_nbs)
 
   model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
-  FEMSpace₀ = get_FEMSpace₀(FEMInfo.problem_id, FEMInfo, model)
+  FEMSpace₀ = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
 
   get_norm_matrix(RBInfo, RBVars.S)
   (ũ_μ,uₙ_μ,mean_uₕ_test,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,

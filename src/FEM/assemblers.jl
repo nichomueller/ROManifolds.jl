@@ -378,7 +378,7 @@ end
 
 function assemble_lifting(
   FEMSpace::FEMSpacePoissonUnsteady,
-  probl::ProblemInfoUnsteady,
+  probl::UnsteadyInfo,
   Param::ParametricInfoUnsteady)
 
   Gₕ = zeros(FEMSpace.Nₛᵘ, convert(Int64, probl.tₗ / probl.δt))
@@ -395,7 +395,7 @@ end
 
 function assemble_lifting(
   FEMSpace::FEMSpaceStokesUnsteady,
-  ::ProblemInfoUnsteady,
+  ::UnsteadyInfo,
   Param::ParametricInfoUnsteady)
 
   gₕ(t) = interpolate_dirichlet(Param.g(t), FEMSpace.V(t))

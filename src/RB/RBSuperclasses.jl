@@ -186,7 +186,8 @@ end
 end =#
 
 
-struct ROMInfoSteady <: SteadyInfo
+struct ROMInfoSteady{T} <: Info
+  FEMInfo::SteadyInfo{T}
   probl_nl::Dict
   case::Int
   paths::Function
@@ -204,7 +205,8 @@ struct ROMInfoSteady <: SteadyInfo
   save_results::Bool
 end
 
-mutable struct ROMInfoUnsteady <: UnsteadyInfo
+mutable struct ROMInfoUnsteady{T} <: Info
+  FEMInfo::UnsteadyInfo{T}
   probl_nl::Dict
   case::Int
   paths::Function
