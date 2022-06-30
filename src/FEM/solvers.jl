@@ -1,6 +1,6 @@
 function FE_solve(
   FEMSpace::FEMSpacePoissonSteady,
-  probl::SteadyInfo,
+  FEMInfo::SteadyInfo,
   Param::ParametricInfoSteady;
   subtract_Ddata = true)
 
@@ -10,7 +10,7 @@ function FE_solve(
   rhs(v) = ∫(v * Param.f) * FEMSpace.dΩ + ∫(v * Param.h) * FEMSpace.dΓn
   operator = AffineFEOperator(a, rhs, FEMSpace.V, FEMSpace.V₀)
 
-  if probl.solver == "lu"
+  if FEMInfo.solver == "lu"
     uₕ_field = solve(LinearFESolver(LUSolver()), operator)
   else
     uₕ_field = solve(LinearFESolver(), operator)
@@ -27,12 +27,12 @@ function FE_solve(
 end
 
 function FE_solve(
-  FEMSpace::FEMSpacePoissonUnsteady,
-  probl::UnsteadyInfo,
-  Param::ParametricInfoUnsteady{D,T};
+  FEMSpace::FEMSpacePoissonUnsteady{D,T},
+  FEMInfo::UnsteadyInfo,
+  Param::ParametricInfoUnsteady{T};
   subtract_Ddata = true) where {D,T}
 
-  Gₕₜ = assemble_lifting(FEMSpace, probl, Param)
+  Gₕₜ = assemble_lifting(FEMSpace, FEMInfo, Param)
 
   m(t, u, v) = ∫(Param.m(t)*(u*v))dΩ
   a(t, u, v) = ∫(∇(v)⋅(Param.α(t)*∇(u)))*FEMSpace.dΩ
@@ -41,16 +41,16 @@ function FE_solve(
 
   linear_solver = LUSolver()
 
-  if probl.time_method == "θ-method"
-    ode_solver = ThetaMethod(linear_solver, probl.δt, probl.θ)
+  if FEMInfo.time_method == "θ-method"
+    ode_solver = ThetaMethod(linear_solver, FEMInfo.δt, FEMInfo.θ)
   else
-    ode_solver = RungeKutta(linear_solver, probl.δt, probl.RK_type)
+    ode_solver = RungeKutta(linear_solver, FEMInfo.δt, FEMInfo.RK_type)
   end
 
-  u₀_field = interpolate_everywhere(Param.u₀, FEMSpace.V(probl.t₀))
+  u₀_field = interpolate_everywhere(Param.u₀, FEMSpace.V(FEMInfo.t₀))
 
-  uₕₜ_field = solve(ode_solver, operator, u₀_field, probl.t₀, probl.tₗ)
-  uₕₜ = zeros(T, FEMSpace.Nₛᵘ, Int(probl.tₗ / probl.δt))
+  uₕₜ_field = solve(ode_solver, operator, u₀_field, FEMInfo.t₀, FEMInfo.tₗ)
+  uₕₜ = zeros(T, FEMSpace.Nₛᵘ, Int(FEMInfo.tₗ / FEMInfo.δt))
   global count = 0
   dΩ = FEMSpace.dΩ
   for (uₕ, _) in uₕₜ_field
@@ -68,13 +68,13 @@ end
 
 function FE_solve(
   FEMSpace::FEMSpaceStokesUnsteady,
-  probl::UnsteadyInfo,
+  FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady;
   subtract_Ddata=false)
 
-  timesθ = get_timesθ(probl)
-  θ = probl.θ
-  δt = probl.δt
+  timesθ = get_timesθ(FEMInfo)
+  θ = FEMInfo.θ
+  δt = FEMInfo.δt
   δtθ = θ*δt
 
   A(t) = assemble_stiffness(FEMSpace, FEMInfo, Param)(t)
@@ -82,8 +82,8 @@ function FE_solve(
   B(t) = assemble_primal_op(FEMSpace)(t)
   F(t) = assemble_forcing(FEMSpace, FEMInfo, Param)(t)
   H(t) = assemble_neumann_datum(FEMSpace, FEMInfo, Param)(t)
-  R₁(t) = assemble_lifting(FEMSpace, probl, Param).R₁(t)
-  R₂(t) = assemble_lifting(FEMSpace, probl, Param).R₂(t)
+  R₁(t) = assemble_lifting(FEMSpace, FEMInfo, Param).R₁(t)
+  R₂(t) = assemble_lifting(FEMSpace, FEMInfo, Param).R₂(t)
   Block1(t) = θ*(M(t)+δtθ*A(t))
   LHS(t) = vcat(θ*hcat(M(t)+δtθ*A(t),-δtθ*B(t)'),hcat(B(t),zeros(FEMSpace.Nₛᵖ,FEMSpace.Nₛᵖ)))
   RHS(t) = vcat(δtθ*(F(t)+H(t)-R₁(t)),-R₂(t))
@@ -91,11 +91,11 @@ function FE_solve(
 
   u0(x) = Param.u₀(x)[1]
   p0(x) = Param.u₀(x)[2]
-  u₀ = get_free_dof_values(interpolate_everywhere(u0, FEMSpace.V(probl.t₀)))
-  p₀ = get_free_dof_values(interpolate_everywhere(p0, FEMSpace.Q(probl.t₀)))
+  u₀ = get_free_dof_values(interpolate_everywhere(u0, FEMSpace.V(FEMInfo.t₀)))
+  p₀ = get_free_dof_values(interpolate_everywhere(p0, FEMSpace.Q(FEMInfo.t₀)))
 
-  uₕₜ = hcat(u₀,zeros(T, FEMSpace.Nₛᵘ, Int(probl.tₗ / probl.δt)))
-  pₕₜ = hcat(p₀,zeros(T, FEMSpace.Nₛᵖ, Int(probl.tₗ / probl.δt)))
+  uₕₜ = hcat(u₀,zeros(T, FEMSpace.Nₛᵘ, Int(FEMInfo.tₗ / FEMInfo.δt)))
+  pₕₜ = hcat(p₀,zeros(T, FEMSpace.Nₛᵖ, Int(FEMInfo.tₗ / FEMInfo.δt)))
 
   count = 1
   for (iₜ,t) in enumerate(timesθ)

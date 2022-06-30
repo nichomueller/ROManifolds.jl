@@ -237,21 +237,21 @@ function get_RB_system(RBInfo::Problem, RBVars::PoissonSTPGRB, Param)
   end
 
   if "RHS" ∈ operators
-    if !RBInfo.build_Parametric_RHS
+    if !RBInfo.build_parametric_RHS
       println("Preparing the RB system: fetching reduced RHS")
       Fₙ_μ = assemble_online_structure(θᶠ, RBVars.steady_info.Fₙ)
       Hₙ_μ = assemble_online_structure(θʰ, RBVars.steady_info.Hₙ)
       push!(RBVars.steady_info.RHSₙ, reshape(Fₙ_μ+Hₙ_μ,:,1))
     else
       println("Preparing the RB system: assembling reduced RHS exactly")
-      Fₙ_μ, Hₙ_μ = build_Param_RHS(RBInfo, RBVars, Param)
+      Fₙ_μ, Hₙ_μ = build_param_RHS(RBInfo, RBVars, Param)
       push!(RBVars.steady_info.RHSₙ, reshape(Fₙ_μ+Hₙ_μ,:,1))
     end
   end
 
 end
 
-function build_Param_RHS(RBInfo::Problem, RBVars::PoissonSTPGRB, Param)
+function build_param_RHS(RBInfo::Problem, RBVars::PoissonSTPGRB, Param)
 
   δtθ = RBInfo.δt*RBInfo.θ
 
@@ -289,7 +289,7 @@ function get_θ(RBInfo::Problem, RBVars::PoissonSTPGRB, Param)
   θᵃ_temp = get_θᵃ(RBInfo, RBVars, Param)
   θᵃ = [θᵃ_temp[q₁]*θᵃ_temp[q₂] for q₁ = 1:Qᵃ for q₂ = 1:Qᵃ]
 
-  if !RBInfo.build_Parametric_RHS
+  if !RBInfo.build_parametric_RHS
 
     θᶠ_temp, θʰ_temp = get_θᶠʰ(RBInfo, RBVars, Param)
     Qᶠ, Qʰ = length(θᶠ_temp), length(θʰ_temp)

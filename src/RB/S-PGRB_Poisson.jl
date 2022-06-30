@@ -175,7 +175,7 @@ function save_affine_structures(
     save_CSV(Aₙ, joinpath(RBInfo.paths.ROM_structures_path, "Aₙ.csv"))
     save_CSV(AΦᵀPᵤ⁻¹, joinpath(RBInfo.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
 
-    if !RBInfo.build_Parametric_RHS
+    if !RBInfo.build_parametric_RHS
       save_CSV(RBVars.Fₙ, joinpath(RBInfo.paths.ROM_structures_path, "Fₙ.csv"))
       save_CSV(RBVars.Hₙ, joinpath(RBInfo.paths.ROM_structures_path, "Hₙ.csv"))
     end
@@ -193,7 +193,7 @@ function get_Q(
     @assert floor(Qᵃ) == Qᵃ "Qᵃ should be the square root of an Int64"
     RBVars.Qᵃ = Int(Qᵃ)
   end
-  if !RBInfo.build_Parametric_RHS
+  if !RBInfo.build_parametric_RHS
     if RBVars.Qᶠ == 0
       RBVars.Qᶠ = Int(size(RBVars.Fₙ)[end]/RBVars.Qᵃ)
     end
@@ -203,7 +203,7 @@ function get_Q(
   end
 end
 
-function build_Param_RHS(
+function build_param_RHS(
   RBInfo::ROMInfoSteady,
   RBVars::PoissonSPGRB,
   Param::ParametricInfoSteady,
@@ -227,7 +227,7 @@ function get_θ(
   θᵃ_temp = get_θᵃ(RBInfo, RBVars, Param)
   θᵃ = [θᵃ_temp[q₁]*θᵃ_temp[q₂] for q₁ = 1:RBVars.Qᵃ for q₂ = 1:RBVars.Qᵃ]
 
-  if !RBInfo.build_Parametric_RHS
+  if !RBInfo.build_parametric_RHS
 
     θᶠ_temp, θʰ_temp = get_θᶠʰ(RBInfo, RBVars, Param)
     θᶠ = [θᵃ_temp[q₁]*θᶠ_temp[q₂] for q₁ = 1:RBVars.Qᵃ for q₂ = 1:RBVars.Qᶠ]

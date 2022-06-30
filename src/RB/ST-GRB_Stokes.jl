@@ -318,20 +318,20 @@ function get_RB_system(RBInfo::Info, RBVars::StokesSTGRB, Param)
   end
 
   if "RHS" ∈ operators
-    if !RBInfo.build_Parametric_RHS
+    if !RBInfo.build_parametric_RHS
       println("Preparing the RB system: fetching reduced RHS")
       get_RB_RHS_blocks(RBInfo, RBVars, θᶠ, θʰ)
     else
       println("Preparing the RB system: assembling reduced RHS exactly")
-      build_Param_RHS(RBInfo, RBVars, Param)
+      build_param_RHS(RBInfo, RBVars, Param)
     end
   end
 
 end
 
-function build_Param_RHS(RBInfo::Info, RBVars::StokesSTGRB, Param)
+function build_param_RHS(RBInfo::Info, RBVars::StokesSTGRB, Param)
 
-  build_Param_RHS(RBInfo, RBVars.P, Param)
+  build_param_RHS(RBInfo, RBVars.P, Param)
   push!(RBVars.S.RHSₙ, zeros(RBVars.nᵖ,1))
 
 end

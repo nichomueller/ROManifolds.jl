@@ -380,7 +380,7 @@ function get_θᶠʰ(
   RBVars::PoissonUnsteady{T},
   Param::ParametricInfoUnsteady) where T
 
-  if RBInfo.build_Parametric_RHS
+  if RBInfo.build_parametric_RHS
     error("Cannot fetch θᶠ, θʰ if the RHS is built online")
   end
 
@@ -427,7 +427,7 @@ function get_θᶠʰₛₜ(
   RBVars::PoissonUnsteady{T},
   Param::ParametricInfoUnsteady) where T
 
-  if RBInfo.build_Parametric_RHS
+  if RBInfo.build_parametric_RHS
     error("Cannot fetch θᶠ, θʰ if the RHS is built online")
   end
 
@@ -489,6 +489,8 @@ function offline_phase(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady)
 
+  println("Offline phase of the RB solver, unsteady Poisson problem")
+
   RBVars.Nₜ = Int(RBInfo.tₗ / RBInfo.δt)
 
   if RBInfo.import_snapshots
@@ -523,6 +525,69 @@ function offline_phase(
   else
     assemble_offline_structures(RBInfo, RBVars)
   end
+
+end
+
+function online_phase(
+  RBInfo::ROMInfoUnsteady{T},
+  RBVars::PoissonUnsteady,
+  param_nbs) where T
+
+  println("Online phase of the RB solver, unsteady Poisson problem")
+
+  μ = load_CSV(Array{T}[],
+    joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))::Vector{Vector{T}}
+  model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
+  FEMSpace₀ = get_FEMSpace₀(RBInfo.FEMInfo.problem_id,
+    RBInfo.FEMInfo, model)
+
+  get_norm_matrix(RBInfo, RBVars.S)
+  (ũ_μ,uₙ_μ,mean_uₕ_test,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,
+    mean_online_time,mean_reconstruction_time) =
+    loop_on_params(FEMSpace₀, RBInfo, RBVars, μ, param_nbs)
+
+  adapt_time = 0.
+  if RBInfo.adaptivity
+    adapt_time = @elapsed begin
+      (ũ_μ,uₙ_μ,_,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,
+      H1_L2_err,mean_online_time,mean_reconstruction_time) =
+      adaptive_loop_on_params(FEMSpace₀, RBInfo, RBVars, mean_uₕ_test,
+      mean_pointwise_err, μ, param_nbs)
+    end
+  end
+
+  string_param_nbs = "params"
+  for Param_nb in param_nbs
+    string_param_nbs *= "_" * string(Param_nb)
+  end
+  path_μ = joinpath(RBInfo.paths.results_path, string_param_nbs)
+
+  if RBInfo.save_results
+    println("Saving the results...")
+    create_dir(path_μ)
+    save_CSV(ũ_μ, joinpath(path_μ, "ũ.csv"))
+    save_CSV(uₙ_μ, joinpath(path_μ, "uₙ.csv"))
+    save_CSV(mean_pointwise_err, joinpath(path_μ, "mean_point_err.csv"))
+    save_CSV(mean_H1_err, joinpath(path_μ, "H1_err.csv"))
+    save_CSV([mean_H1_L2_err], joinpath(path_μ, "H1L2_err.csv"))
+
+    times = Dict("off_time"=>RBVars.S.offline_time,
+      "on_time"=>mean_online_time+adapt_time,"rec_time"=>mean_reconstruction_time)
+    CSV.write(joinpath(path_μ, "times.csv"),times)
+  end
+
+  pass_to_pp = Dict("path_μ"=>path_μ,
+    "FEMSpace"=>FEMSpace₀, "H1_L2_err"=>H1_L2_err,
+    "mean_H1_err"=>mean_H1_err, "mean_point_err_u"=>mean_pointwise_err)
+
+  if RBInfo.postprocess
+    println("Post-processing the results...")
+    post_process(RBInfo, pass_to_pp)
+  end
+
+  #=
+  plot_stability_constant(FEMSpace,RBInfo,Param,Nₜ)
+  =#
 
 end
 
@@ -584,122 +649,6 @@ function loop_on_params(
     H1_L2_err,mean_online_time,mean_reconstruction_time)
 end
 
-function online_phase(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady,
-  μ::Vector{Vector{T}},
-  param_nbs) where T
-
-  model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
-  FEMSpace₀ = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
-
-  get_norm_matrix(RBInfo, RBVars.S)
-  (ũ_μ,uₙ_μ,mean_uₕ_test,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,
-    mean_online_time,mean_reconstruction_time) =
-    loop_on_params(FEMSpace₀, RBInfo, RBVars, μ, param_nbs)
-
-  adapt_time = 0.
-  if RBInfo.adaptivity
-    adapt_time = @elapsed begin
-      (ũ_μ,uₙ_μ,_,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,
-      H1_L2_err,mean_online_time,mean_reconstruction_time) =
-      adaptive_loop_on_params(FEMSpace₀, RBInfo, RBVars, mean_uₕ_test,
-      mean_pointwise_err, μ, param_nbs)
-    end
-  end
-
-  string_param_nbs = "Params"
-  for Param_nb in param_nbs
-    string_param_nbs *= "_" * string(Param_nb)
-  end
-  path_μ = joinpath(RBInfo.paths.results_path, string_param_nbs)
-
-  if RBInfo.save_results
-    println("Saving the results...")
-    create_dir(path_μ)
-    save_CSV(ũ_μ, joinpath(path_μ, "ũ.csv"))
-    save_CSV(uₙ_μ, joinpath(path_μ, "uₙ.csv"))
-    save_CSV(mean_pointwise_err, joinpath(path_μ, "mean_point_err.csv"))
-    save_CSV(mean_H1_err, joinpath(path_μ, "H1_err.csv"))
-    save_CSV([mean_H1_L2_err], joinpath(path_μ, "H1L2_err.csv"))
-
-    times = Dict("off_time"=>RBVars.S.offline_time,
-      "on_time"=>mean_online_time+adapt_time,"rec_time"=>mean_reconstruction_time)
-    CSV.write(joinpath(path_μ, "times.csv"),times)
-  end
-
-  pass_to_pp = Dict("path_μ"=>path_μ,
-    "FEMSpace"=>FEMSpace₀, "H1_L2_err"=>H1_L2_err,
-    "mean_H1_err"=>mean_H1_err, "mean_point_err_u"=>mean_pointwise_err)
-
-  if RBInfo.postprocess
-    println("Post-processing the results...")
-    post_process(RBInfo, pass_to_pp)
-  end
-
-  #=
-  plot_stability_constant(FEMSpace,RBInfo,Param,Nₜ)
-  =#
-
-end
-
-function post_process(RBInfo::UnsteadyInfo, d::Dict)
-  if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
-    MDEIM_Σ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
-    generate_and_save_plot(
-      eachindex(MDEIM_Σ), MDEIM_Σ, "Decay singular values, MDEIM",
-      ["σ"], "σ index", "σ value", RBInfo.paths.results_path; var="MDEIM_Σ")
-  end
-  if isfile(joinpath(RBInfo.paths.ROM_structures_path, "DEIM_Σ.csv"))
-    DEIM_Σ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path, "DEIM_Σ.csv"))
-    generate_and_save_plot(
-      eachindex(DEIM_Σ), DEIM_Σ, "Decay singular values, DEIM",
-      ["σ"], "σ index", "σ value", RBInfo.paths.results_path; var="DEIM_Σ")
-  end
-
-  times = collect(RBInfo.t₀+RBInfo.δt:RBInfo.δt:RBInfo.tₗ)
-  FEMSpace = d["FEMSpace"]
-  vtk_dir = joinpath(d["path_μ"], "vtk_folder")
-
-  create_dir(vtk_dir)
-  createpvd(joinpath(vtk_dir,"mean_point_err_u")) do pvd
-    for (i,t) in enumerate(times)
-      errₕt = FEFunction(FEMSpace.V(t), d["mean_point_err_u"][:,i])
-      pvd[i] = createvtk(FEMSpace.Ω, joinpath(vtk_dir,
-        "mean_point_err_$i" * ".vtu"), cellfields = ["point_err" => errₕt])
-    end
-  end
-
-  generate_and_save_plot(times,d["mean_H1_err"],
-    "Average ||uₕ(t) - ũ(t)||ₕ₁", ["H¹ err"], "time [s]", "H¹ error", d["path_μ"];
-    var="H1_err")
-  xvec = collect(eachindex(d["H1_L2_err"]))
-  generate_and_save_plot(xvec,d["H1_L2_err"],
-    "||uₕ - ũ||ₕ₁₋ₗ₂", ["H¹-l² err"], "Param μ number", "H¹-l² error", d["path_μ"];
-    var="H1_L2_err")
-
-  if length(keys(d)) == 8
-
-    createpvd(joinpath(vtk_dir,"mean_point_err_p")) do pvd
-      for (i,t) in enumerate(times)
-        errₕt = FEFunction(FEMSpace.Q, d["mean_point_err_p"][:,i])
-        pvd[i] = createvtk(FEMSpace.Ω, joinpath(vtk_dir,
-          "mean_point_err_$i" * ".vtu"), cellfields = ["point_err" => errₕt])
-      end
-    end
-
-    generate_and_save_plot(times,d["mean_L2_err"],
-      "Average ||pₕ(t) - p̃(t)||ₗ₂", ["l² err"], "time [s]", "L² error", d["path_μ"];
-      var="L2_err")
-    xvec = collect(eachindex(d["L2_L2_err"]))
-    generate_and_save_plot(xvec,d["L2_L2_err"],
-      "||pₕ - p̃||ₗ₂₋ₗ₂", ["l²-l² err"], "Param μ number", "L²-L² error", d["path_μ"];
-      var="L2_L2_err")
-
-  end
-
-end
-
 function adaptive_loop_on_params(
   FEMSpace₀::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
@@ -751,36 +700,5 @@ function adaptive_loop_on_params(
   assemble_offline_structures(RBInfo, RBVars)
 
   loop_on_params(FEMSpace₀,RBInfo,RBVars,μ,param_nbs)
-
-end
-
-function plot_stability_constants(
-  FEMSpace::FEMProblem,
-  RBInfo::ROMInfoUnsteady,
-  Param::ParametricInfoUnsteady)
-
-  M = assemble_FEM_structure(FEMSpace, RBInfo, Param, "M")(0.0)
-  A = assemble_FEM_structure(FEMSpace, RBInfo, Param, "A")(0.0)
-  stability_constants = []
-  for Nₜ = 10:10:1000
-    const_Nₜ = compute_stability_constant(RBInfo,Nₜ,M,A)
-    append!(stability_constants, const_Nₜ)
-  end
-  p = Plot.plot(collect(10:10:1000),
-    stability_constants, xaxis=:log, yaxis=:log, lw = 3,
-    label="||(Aˢᵗ)⁻¹||₂", title = "Euclidean norm of (Aˢᵗ)⁻¹", legend=:topleft)
-  p = Plot.plot!(collect(10:10:1000), collect(10:10:1000),
-    xaxis=:log, yaxis=:log, lw = 3, label="Nₜ")
-  xlabel!("Nₜ")
-  savefig(p, joinpath(RBInfo.paths.results_path, "stability_constant.eps"))
-
-  function compute_stability_constant(RBInfo,Nₜ,M,A)
-    δt = RBInfo.tₗ/Nₜ
-    B₁ = RBInfo.θ*(M + RBInfo.θ*δt*A)
-    B₂ = RBInfo.θ*(-M + (1-RBInfo.θ)*δt*A)
-    λ₁,_ = eigs(B₁)
-    λ₂,_ = eigs(B₂)
-    return 1/(minimum(abs.(λ₁)) + minimum(abs.(λ₂)))
-  end
 
 end

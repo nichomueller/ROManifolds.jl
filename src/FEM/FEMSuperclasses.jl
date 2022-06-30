@@ -5,7 +5,7 @@ abstract type UnsteadyProblem{D,T} <: FEMProblem{D,T} end
 
 abstract type Info{T} end
 
-abstract type ParametricInfo end
+abstract type ParametricInfo{T} <: Info{T} end
 
 const F = Function
 
@@ -142,23 +142,18 @@ struct UnsteadyInfo{T} <: Info{T}
   δt::Float64
 end
 
-struct ParametricInfoSteady{D,T} <: ParametricInfo
+struct ParametricInfoSteady{T} <: ParametricInfo{T}
   μ::Vector{T}
-  model::DiscreteModel{D,D}
+  model::DiscreteModel
   α::F
   f::F
   g::F
   h::F
-  function ParametricInfoSteady(
-    μ::Vector{T}, model::DiscreteModel, α::F, f::F, g::F, h::F) where T
-    D = num_cell_dims(model)
-    new{D,T}(μ, model, α, m, f, g, h)
-  end
 end
 
-struct ParametricInfoUnsteady{D,T} <: ParametricInfo
+struct ParametricInfoUnsteady{T} <: ParametricInfo{T}
   μ::Vector{T}
-  model::DiscreteModel{D,D}
+  model::DiscreteModel
   αₛ::F
   αₜ::F
   α::F
@@ -173,10 +168,4 @@ struct ParametricInfoUnsteady{D,T} <: ParametricInfo
   hₜ::F
   h::F
   u₀::F
-  function ParametricInfoUnsteady{T}(
-    μ::Vector{T}, model::DiscreteModel, αₛ::F, αₜ::F, α::F, mₛ::F, mₜ::F, m::F,
-    fₛ::F, fₜ::F, f::F, g::F, hₛ::F, hₜ::F, h::F, u₀::F) where T
-    D = num_cell_dims(model)
-    new{D,T}(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, g, hₛ, hₜ, h, u₀)
-  end
 end

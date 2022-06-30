@@ -69,4 +69,5 @@ end =#
 
 include("RBSuperclasses.jl")
 include("RBUtils.jl")
+include("post_process.jl")
 include("M_DEIM.jl")

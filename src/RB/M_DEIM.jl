@@ -11,7 +11,7 @@ function M_DEIM_POD(S::Matrix{T}, ϵ=1e-5) where T
   energies = cumsum(Σ .^ 2)
   N₁ = findall(x -> x ≥ (1 - ϵ^2) * energies[end], energies)[1]
   N₂ = findall(x -> x ≤ ϵ, M_DEIM_err_bound)[1]
-  N = max(N₁, N₂)
+  N = max(N₁, N₂)::Int
   println("Basis number obtained via POD is $N,
   projection error ≤ $(max(sqrt(1-energies[N]/energies[end]),M_DEIM_err_bound[N]))")
 

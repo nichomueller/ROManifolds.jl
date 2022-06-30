@@ -397,10 +397,10 @@ function get_RB_system(
     end
 
     if "RHS" ∈ operators
-      if !RBInfo.build_Parametric_RHS
+      if !RBInfo.build_parametric_RHS
         get_RB_RHS_blocks(RBInfo, RBVars, θᶠ, θʰ)
       else
-        build_Param_RHS(FEMSpace₀, RBInfo, RBVars, Param)
+        build_param_RHS(FEMSpace₀, RBInfo, RBVars, Param)
       end
     end
   end
@@ -409,7 +409,7 @@ function get_RB_system(
 
 end
 
-function build_Param_RHS(
+function build_param_RHS(
   FEMSpace₀::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTGRB{T},
@@ -441,7 +441,7 @@ function get_θ(
 
   θᵐ = get_θᵐ(FEMSpace₀, RBInfo, RBVars, Param)
   θᵃ = get_θᵃ(FEMSpace₀, RBInfo, RBVars, Param)
-  if !RBInfo.build_Parametric_RHS
+  if !RBInfo.build_parametric_RHS
     θᶠ, θʰ = get_θᶠʰ(FEMSpace₀, RBInfo, RBVars, Param)
   else
     θᶠ, θʰ = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
@@ -459,7 +459,7 @@ function get_θₛₜ(
 
   θᵐ = get_θᵐₛₜ(FEMSpace₀, RBInfo, RBVars, Param)
   θᵃ = get_θᵃₛₜ(FEMSpace₀, RBInfo, RBVars, Param)
-  if !RBInfo.build_Parametric_RHS
+  if !RBInfo.build_parametric_RHS
     θᶠ, θʰ = get_θᶠʰₛₜ(FEMSpace₀, RBInfo, RBVars, Param)
   else
     θᶠ, θʰ = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)

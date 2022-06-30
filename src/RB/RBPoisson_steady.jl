@@ -94,7 +94,7 @@ function set_operators(
   ::PoissonSteady)
 
   operators = ["A"]
-  if !RBInfo.build_Parametric_RHS
+  if !RBInfo.build_parametric_RHS
     append!(operators, ["F","H"])
   end
   operators
@@ -196,7 +196,7 @@ function get_M_DEIM_structures(
 
   end
 
-  if RBInfo.build_Parametric_RHS
+  if RBInfo.build_parametric_RHS
     println("Will assemble nonaffine reduced RHS exactly")
     return operators
   else
@@ -278,7 +278,7 @@ function get_affine_structures(
 
   append!(operators, get_Aₙ(RBInfo, RBVars))
 
-  if RBInfo.build_Parametric_RHS
+  if RBInfo.build_parametric_RHS
     return operators
   else
     append!(operators, get_Fₙ(RBInfo, RBVars))
@@ -432,7 +432,7 @@ function get_θᶠʰ(
   RBVars::PoissonSteady,
   Param::ParametricInfoSteady)
 
-  if RBInfo.build_Parametric_RHS
+  if RBInfo.build_parametric_RHS
     error("Cannot fetch θᶠ, θʰ if the RHS is built online")
   end
 
@@ -492,14 +492,14 @@ function get_RB_system(
     end
 
     if "RHS" ∈ operators
-      if !RBInfo.build_Parametric_RHS
+      if !RBInfo.build_parametric_RHS
         println("Assembling reduced RHS")
         Fₙ_μ = assemble_online_structure(θᶠ, RBVars.Fₙ)
         Hₙ_μ = assemble_online_structure(θʰ, RBVars.Hₙ)
         push!(RBVars.RHSₙ, reshape(Fₙ_μ+Hₙ_μ,:,1))
       else
         println("Assembling reduced RHS exactly")
-        Fₙ_μ, Hₙ_μ = build_Param_RHS(RBInfo, RBVars, Param, θᵃ)
+        Fₙ_μ, Hₙ_μ = build_param_RHS(RBInfo, RBVars, Param, θᵃ)
         push!(RBVars.RHSₙ, reshape(Fₙ_μ+Hₙ_μ,:,1))
       end
     end
@@ -609,7 +609,7 @@ function online_phase(
 
   end
 
-  string_Param_nbs = "Params"
+  string_Param_nbs = "params"
   for Param_nb in Param_nbs
     string_Param_nbs *= "_" * string(Param_nb)
   end
@@ -639,25 +639,5 @@ function online_phase(
   if RBInfo.postprocess
     post_process(RBInfo, pass_to_pp)
   end
-
-end
-
-function post_process(RBInfo::ROMInfoSteady, d::Dict) where T
-  if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
-    MDEIM_Σ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
-    generate_and_save_plot(
-      eachindex(MDEIM_Σ), MDEIM_Σ, "Decay singular values, MDEIM",
-      ["σ"], "σ index", "σ value", RBInfo.paths.results_path; var="MDEIM_Σ")
-  end
-  if isfile(joinpath(RBInfo.paths.ROM_structures_path, "DEIM_Σ.csv"))
-    DEIM_Σ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path, "DEIM_Σ.csv"))
-    generate_and_save_plot(
-      eachindex(DEIM_Σ), DEIM_Σ, "Decay singular values, DEIM",
-      ["σ"], "σ index", "σ value", RBInfo.paths.results_path; var="DEIM_Σ")
-  end
-
-  FEMSpace = d["FEMSpace"]
-  writevtk(FEMSpace.Ω, joinpath(d["path_μ"], "mean_point_err"),
-  cellfields = ["err"=> FEFunction(FEMSpace.V, d["mean_point_err_u"])])
 
 end

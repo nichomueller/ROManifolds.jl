@@ -491,10 +491,10 @@ function get_RB_system(
     end
 
     if "RHS" ∈ operators
-      if !RBInfo.build_Parametric_RHS
+      if !RBInfo.build_parametric_RHS
         get_RB_RHS_blocks(RBInfo, RBVars, θᶠ, θʰ)
       else
-        build_Param_RHS(RBInfo, RBVars, Param)
+        build_param_RHS(RBInfo, RBVars, Param)
       end
     end
   end
@@ -503,7 +503,7 @@ function get_RB_system(
 
 end
 
-function build_Param_RHS(
+function build_param_RHS(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTPGRB{T},
   Param::ParametricInfoUnsteady) where T
@@ -592,7 +592,7 @@ function get_θ(
     end
   end
 
-  if !RBInfo.build_Parametric_RHS
+  if !RBInfo.build_parametric_RHS
 
     θᶠ_temp, θʰ_temp = get_θᶠʰ(RBInfo, RBVars, Param)
     Qᶠ, Qʰ = size(θᶠ_temp)[1], size(θʰ_temp)[1]

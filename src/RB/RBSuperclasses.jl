@@ -116,7 +116,7 @@ end
 
 function setup(::NTuple{1,Int}, ::Type{T}) where T
 
-  PoissonSGRB{T}(init_PoissonSGRB_variables(T)...)
+  PoissonSGRB{T}(init_PoissonSGRB_variables(T)...)::PoissonSGRB
 
 end
 
@@ -195,7 +195,7 @@ struct ROMInfoSteady{T} <: Info{T}
   nₛ::Int64
   ϵₛ::Float64
   use_norm_X::Bool
-  build_Parametric_RHS::Bool
+  build_parametric_RHS::Bool
   nₛ_MDEIM::Int64
   nₛ_DEIM::Int64
   postprocess::Bool
@@ -214,7 +214,7 @@ mutable struct ROMInfoUnsteady{T} <: Info{T}
   nₛ::Int64
   ϵₛ::Float64
   use_norm_X::Bool
-  build_Parametric_RHS::Bool
+  build_parametric_RHS::Bool
   nₛ_MDEIM::Int64
   nₛ_DEIM::Int64
   postprocess::Bool

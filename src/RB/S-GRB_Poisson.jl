@@ -99,7 +99,7 @@ function save_affine_structures(
   if RBInfo.save_offline_structures
     Aₙ = reshape(RBVars.Aₙ, :, RBVars.Qᵃ)
     save_CSV(Aₙ, joinpath(RBInfo.paths.ROM_structures_path, "Aₙ.csv"))
-    if !RBInfo.build_Parametric_RHS
+    if !RBInfo.build_parametric_RHS
       save_CSV(RBVars.Fₙ, joinpath(RBInfo.paths.ROM_structures_path, "Fₙ.csv"))
       save_CSV(RBVars.Hₙ, joinpath(RBInfo.paths.ROM_structures_path, "Hₙ.csv"))
     end
@@ -114,7 +114,7 @@ function get_Q(
   if RBVars.Qᵃ == 0
     RBVars.Qᵃ = size(RBVars.Aₙ)[end]
   end
-  if !RBInfo.build_Parametric_RHS
+  if !RBInfo.build_parametric_RHS
     if RBVars.Qᶠ == 0
       RBVars.Qᶠ = size(RBVars.Fₙ)[end]
     end
@@ -125,7 +125,7 @@ function get_Q(
 
 end
 
-function build_Param_RHS(
+function build_param_RHS(
   RBInfo::ROMInfoSteady,
   RBVars::PoissonSGRB,
   Param::ParametricInfoSteady,
@@ -143,7 +143,7 @@ function get_θ(
   Param::ParametricInfoSteady) where T
 
   θᵃ = get_θᵃ(RBInfo, RBVars, Param)
-  if !RBInfo.build_Parametric_RHS
+  if !RBInfo.build_parametric_RHS
     θᶠ, θʰ = get_θᶠʰ(RBInfo, RBVars, Param)
   else
     θᶠ, θʰ = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)

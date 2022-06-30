@@ -339,7 +339,7 @@ function online_phase(RBInfo::Info, RBVars::StokesUnsteady, μ, Param_nbs)
 
   end
 
-  string_Param_nbs = "Params"
+  string_Param_nbs = "params"
   for Param_nb in Param_nbs
     string_Param_nbs *= "_" * string(Param_nb)
   end
