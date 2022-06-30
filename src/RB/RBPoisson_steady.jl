@@ -344,10 +344,10 @@ function assemble_offline_structures(
 end
 
 function get_system_blocks(
-  RBInfo::ROMInfoSteady,
+  RBInfo::Info,
   RBVars::PoissonSteady{T},
-  LHS_blocks::Vector{Matrix{T}},
-  RHS_blocks::Vector{Matrix{T}}) where T
+  LHS_blocks::Vector{Int64},
+  RHS_blocks::Vector{Int64}) where T
 
   if !RBInfo.import_offline_structures
     return ["LHS", "RHS"]
@@ -393,10 +393,10 @@ function get_system_blocks(
 end
 
 function save_system_blocks(
-  RBInfo::ROMInfoSteady,
+  RBInfo::Info,
   RBVars::PoissonSteady{T},
-  LHS_blocks::Vector{Matrix{T}},
-  RHS_blocks::Vector{Matrix{T}},
+  LHS_blocks::Vector{Int64},
+  RHS_blocks::Vector{Int64},
   operators::Vector{String}) where T
 
   if !RBInfo.probl_nl["A"] && "LHS" ∈ operators
@@ -439,13 +439,13 @@ function get_θᶠʰ(
   if !RBInfo.probl_nl["f"]
     θᶠ = Param.f(Point(0.,0.))
   else
-    F_μ = assemble_forcing(FEMSpace, RBInfo, Param)
+    F_μ = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
     θᶠ = M_DEIM_online(F_μ, RBVars.DEIMᵢ_F, RBVars.DEIM_idx_F)
   end
   if !RBInfo.probl_nl["h"]
     θʰ = Param.h(Point(0.,0.))
   else
-    H_μ = assemble_neumann_datum(FEMSpace, RBInfo, Param)
+    H_μ = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
     θʰ = M_DEIM_online(H_μ, RBVars.DEIMᵢ_H, RBVars.DEIM_idx_H)
   end
   θᶠ, θʰ
@@ -570,7 +570,7 @@ end
 function online_phase(
   RBInfo::ROMInfoSteady,
   RBVars::PoissonSteady{T},
-  μ::Matrix{T},
+  μ::Vector{Vector{T}},
   Param_nbs) where T
 
   mean_H1_err = 0.0
@@ -586,8 +586,7 @@ function online_phase(
   for nb in Param_nbs
     println("Considering Parameter number: $nb")
 
-    μ_nb = parse.(T, split(chop(μ[nb]; head=1, tail=1), ','))
-    Param = get_ParamInfo(RBInfo.FEMInfo, RBInfo.FEMInfo.problem_id, μ_nb)
+    Param = get_ParamInfo(RBInfo, μ[nb])
 
     uₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, nb]
 

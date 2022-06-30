@@ -1,8 +1,8 @@
-abstract type LagrangianQuadRefFE{D} <: LagrangianRefFE{D} end
-struct LagrangianQuad <: ReferenceFEName end
+abstract type LagrangianQuadRefFE{D} <: Gridap.ReferenceFEs.LagrangianRefFE{D} end
+struct LagrangianQuad <: Gridap.ReferenceFEs.ReferenceFEName end
 const lagrangianQuad = LagrangianQuad()
 
-function ReferenceFE(
+function Gridap.ReferenceFEs.ReferenceFE(
   polytope::Polytope,
   ::LagrangianQuad,
   ::Type{T},

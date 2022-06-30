@@ -210,8 +210,8 @@ function build_Param_RHS(
   θᵃ::Vector)
 
   θᵃ_temp = θᵃ[1:RBVars.Qᵃ]/sqrt(θᵃ[1])
-  F = assemble_forcing(FEMSpace, RBInfo, Param)
-  H = assemble_neumann_datum(FEMSpace, RBInfo, Param)
+  F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
+  H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
   AΦᵀPᵤ⁻¹ = assemble_online_structure(θᵃ_temp, RBVars.AΦᵀPᵤ⁻¹)
   Fₙ, Hₙ = AΦᵀPᵤ⁻¹ * F, AΦᵀPᵤ⁻¹ * H
 

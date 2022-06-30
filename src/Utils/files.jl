@@ -10,6 +10,11 @@ function get_all_subdirectories(path::String)
   filter(isdir,readdir(path,join=true))
 end
 
+function load_CSV(::Array{Array{T}}, path::String) where T
+  var = Array(CSV.read(path, DataFrame))
+  return [parse.(T, split(chop(var[k]; head=1, tail=1), ',')) for k in 1:size(var)[1]]
+end
+
 function load_CSV(::Array{D,T}, path::String) where {D,T}
   return Array{D,T}(CSV.read(path, DataFrame))
 end

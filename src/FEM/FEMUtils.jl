@@ -49,7 +49,7 @@ function get_ParamInfo(
   g(x) = get_g(ProblInfo, problem_id, μ).g(x)
   h(x) = get_h(ProblInfo, problem_id, μ).h(x)
 
-  ParametricInfoSteady{T}(μ, model, α, f, g, h)
+  ParametricInfoSteady(μ, model, α, f, g, h)
 
 end
 

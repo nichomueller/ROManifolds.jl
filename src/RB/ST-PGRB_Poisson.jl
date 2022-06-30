@@ -513,13 +513,13 @@ function build_Param_RHS(
   δt = RBInfo.δt
   θ = RBInfo.θ
   δtθ = δt*θ
-  θᵐ_temp = get_θᵐ(RBInfo, RBVars, Param)
-  θᵃ_temp = get_θᵃ(RBInfo, RBVars, Param)
+  θᵐ_temp = get_θᵐ(FEMSpace, RBInfo, RBVars, Param)
+  θᵃ_temp = get_θᵃ(FEMSpace, RBInfo, RBVars, Param)
 
-  F_t = assemble_forcing(FEMSpace, RBInfo, Param)
-  H_t = assemble_neumann_datum(FEMSpace, RBInfo, Param)
+  F_t = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
+  H_t = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
   F, H = zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ), zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ)
-  timesθ = get_timesθ(RBInfo.FEMInfo)
+  timesθ = get_timesθ(RBInfo)
   for (i, tᵢ) in enumerate(timesθ)
     F[:,i] = F_t(tᵢ)
     H[:,i] = H_t(tᵢ)

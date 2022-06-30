@@ -287,7 +287,7 @@ function get_θᵐ(
   RBVars::PoissonUnsteady{T},
   Param::ParametricInfoUnsteady) where T
 
-  timesθ = get_timesθ(RBInfo.FEMInfo)
+  timesθ = get_timesθ(RBInfo)
   if !RBInfo.probl_nl["M"]
     θᵐ = [Param.mₜ(t_θ) for t_θ = timesθ]
   else
@@ -334,7 +334,7 @@ function get_θᵃ(
   RBVars::PoissonUnsteady{T},
   Param::ParametricInfoUnsteady) where T
 
-  timesθ = get_timesθ(RBInfo.FEMInfo)
+  timesθ = get_timesθ(RBInfo)
   if !RBInfo.probl_nl["A"]
     θᵃ = [Param.αₜ(t_θ,Param.μ) for t_θ = timesθ]
   else
@@ -384,18 +384,18 @@ function get_θᶠʰ(
     error("Cannot fetch θᶠ, θʰ if the RHS is built online")
   end
 
-  timesθ = get_timesθ(RBInfo.FEMInfo)
+  timesθ = get_timesθ(RBInfo)
   #θᶠ, θʰ = Float64[], Float64[]
 
   if !RBInfo.probl_nl["f"]
     θᶠ = [Param.fₜ(t_θ) for t_θ = timesθ]
   else
-    F_μ = assemble_forcing(FEMSpace₀, RBInfo, Param)
+    F_μ = assemble_FEM_structure(FEMSpace₀, RBInfo, Param, "F")
     F = zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ)
     for (i,tᵢ) in enumerate(timesθ)
       F[:,i] = F_μ(tᵢ)
     end
-    θᶠ = (RBVars.S.DEIMᵢ_F \ Matrix{T}(F_μ[RBVars.S.DEIM_idx_F, :]))
+    θᶠ = (RBVars.S.DEIMᵢ_F \ Matrix{T}(F[RBVars.S.DEIM_idx_F, :]))
     #= @simd for iₜ = 1:RBVars.Nₜ
       append!(θᶠ,
         M_DEIM_online(F_μ(timesθ[iₜ]), RBVars.S.DEIMᵢ_F, RBVars.S.DEIM_idx_F))
@@ -405,12 +405,12 @@ function get_θᶠʰ(
   if !RBInfo.probl_nl["h"]
     θʰ = [Param.hₜ(t_θ) for t_θ = timesθ]
   else
-    H_μ = assemble_neumann_datum(FEMSpace₀, RBInfo, Param)
+    H_μ = assemble_FEM_structure(FEMSpace₀, RBInfo, Param, "H")
     H = zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ)
     for (i,tᵢ) in enumerate(timesθ)
       H[:,i] = H_μ(tᵢ)
     end
-    θʰ = (RBVars.S.DEIMᵢ_H \ Matrix{T}(H_μ[RBVars.S.DEIM_idx_H, :]))
+    θʰ = (RBVars.S.DEIMᵢ_H \ Matrix{T}(H[RBVars.S.DEIM_idx_H, :]))
     #= @simd for iₜ = 1:RBVars.Nₜ
       append!(θʰ,
         M_DEIM_online(H_μ(timesθ[iₜ]), RBVars.S.DEIMᵢ_H, RBVars.S.DEIM_idx_H))
@@ -434,17 +434,25 @@ function get_θᶠʰₛₜ(
   if !RBInfo.probl_nl["f"]
     θᶠ = [one(T)]
   else
-    F_μ = assemble_forcing(FEMSpace₀, RBInfo, Param)
+    F_μ = assemble_FEM_structure(FEMSpace₀, RBInfo, Param, "F")
+    F = zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ)
+    for (i,tᵢ) in enumerate(timesθ)
+      F[:,i] = F_μ(tᵢ)
+    end
     _,DEIM_idx_mod = modify_timesθ_and_MDEIM_idx(RBVars.S.DEIM_idx_F,RBInfo,RBVars)
-    θᶠ = T.(RBVars.S.DEIMᵢ_F\Vector(F_μ[DEIM_idx_mod]))
+    θᶠ = T.(RBVars.S.DEIMᵢ_F\Vector(F[DEIM_idx_mod]))
   end
 
   if !RBInfo.probl_nl["h"]
     θʰ = [one(T)]
   else
-    H_μ = assemble_neumann_datum(FEMSpace₀, RBInfo, Param)
+    H_μ = assemble_FEM_structure(FEMSpace₀, RBInfo, Param, "H")
+    H = zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ)
+    for (i,tᵢ) in enumerate(timesθ)
+      H[:,i] = H_μ(tᵢ)
+    end
     _,DEIM_idx_mod = modify_timesθ_and_MDEIM_idx(RBVars.S.DEIM_idx_H,RBInfo,RBVars)
-    θʰ = T.(RBVars.S.DEIMᵢ_H\Vector(H_μ[DEIM_idx_mod]))
+    θʰ = T.(RBVars.S.DEIMᵢ_H\Vector(H[DEIM_idx_mod]))
   end
 
   reshape(θᶠ, :, 1), reshape(θʰ, :, 1)
@@ -463,7 +471,7 @@ function solve_RB_system(
   println("Condition number of the system's matrix: $(cond(RBVars.S.LHSₙ[1]))")
 
   RBVars.S.online_time += @elapsed begin
-    RBVars.S.uₙ = zeros(T, RBVars.nᵘ)
+    RBVars.S.uₙ = zeros(T, RBVars.nᵘ, 1)
     @fastmath RBVars.S.uₙ = RBVars.S.LHSₙ[1] \ RBVars.S.RHSₙ[1]
   end
 
@@ -522,7 +530,7 @@ function loop_on_params(
   FEMSpace₀::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady{T},
-  μ::Matrix,
+  μ::Vector{Vector{T}},
   param_nbs) where T
 
   H1_L2_err = zeros(T, length(param_nbs))
@@ -540,8 +548,7 @@ function loop_on_params(
     println("\n")
     println("Considering Parameter number: $nb/$(param_nbs[end])")
 
-    μ_nb = parse.(T, split(chop(μ[nb]; head=1, tail=1), ','))
-    Param = get_ParamInfo(RBInfo.FEMInfo, RBInfo.FEMInfo.problem_id, μ_nb)
+    Param = get_ParamInfo(RBInfo, μ[nb])
     if RBInfo.perform_nested_POD
       nb_test = nb-90
       uₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path,
@@ -580,8 +587,8 @@ end
 function online_phase(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady,
-  μ::Matrix,
-  param_nbs)
+  μ::Vector{Vector{T}},
+  param_nbs) where T
 
   model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
   FEMSpace₀ = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
@@ -622,7 +629,7 @@ function online_phase(
   end
 
   pass_to_pp = Dict("path_μ"=>path_μ,
-    "FEMSpace"=>FEMSpace, "H1_L2_err"=>H1_L2_err,
+    "FEMSpace"=>FEMSpace₀, "H1_L2_err"=>H1_L2_err,
     "mean_H1_err"=>mean_H1_err, "mean_point_err_u"=>mean_pointwise_err)
 
   if RBInfo.postprocess
@@ -699,7 +706,7 @@ function adaptive_loop_on_params(
   RBVars::PoissonUnsteady{T},
   mean_uₕ_test::Matrix,
   mean_pointwise_err::Matrix,
-  μ::Matrix{T},
+  μ::Vector{Vector{T}},
   param_nbs,
   n_adaptive=nothing) where T
 
@@ -752,8 +759,8 @@ function plot_stability_constants(
   RBInfo::ROMInfoUnsteady,
   Param::ParametricInfoUnsteady)
 
-  M = assemble_mass(FEMSpace, RBInfo, Param)(0.0)
-  A = assemble_stiffness(FEMSpace, RBInfo, Param)(0.0)
+  M = assemble_FEM_structure(FEMSpace, RBInfo, Param, "M")(0.0)
+  A = assemble_FEM_structure(FEMSpace, RBInfo, Param, "A")(0.0)
   stability_constants = []
   for Nₜ = 10:10:1000
     const_Nₜ = compute_stability_constant(RBInfo,Nₜ,M,A)

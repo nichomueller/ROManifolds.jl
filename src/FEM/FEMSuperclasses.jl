@@ -3,7 +3,11 @@ abstract type FEMProblem{D,T} <: Problem end
 abstract type SteadyProblem{D,T} <: FEMProblem{D,T} end
 abstract type UnsteadyProblem{D,T} <: FEMProblem{D,T} end
 
-abstract type Info end
+abstract type Info{T} end
+
+abstract type ParametricInfo end
+
+const F = Function
 
 struct FEMSpacePoissonSteady{D,T} <: SteadyProblem{D,T}
   Qₕ::CellQuadrature
@@ -16,8 +20,8 @@ struct FEMSpacePoissonSteady{D,T} <: SteadyProblem{D,T}
   dΩ::Measure
   dΓd::Measure
   dΓn::Measure
-  phys_quadp
-  V₀_quad
+  phys_quadp::LazyArray
+  V₀_quad::UnconstrainedFESpace
 end
 
 struct FEMSpacePoissonUnsteady{D,T} <: UnsteadyProblem{D,T}
@@ -25,14 +29,14 @@ struct FEMSpacePoissonUnsteady{D,T} <: UnsteadyProblem{D,T}
   V₀::UnconstrainedFESpace
   V::TransientTrialFESpace
   ϕᵥ::FEBasis
-  ϕᵤ::Function
+  ϕᵤ::F
   Nₛᵘ::Int64
   Ω::BodyFittedTriangulation
   dΩ::Measure
   dΓd::Measure
   dΓn::Measure
-  phys_quadp
-  V₀_quad
+  phys_quadp::LazyArray
+  V₀_quad::UnconstrainedFESpace
 end
 
 struct FEMSpaceStokesSteady{D,T} <: SteadyProblem{D,T}
@@ -54,8 +58,8 @@ struct FEMSpaceStokesSteady{D,T} <: SteadyProblem{D,T}
   Γd::BoundaryTriangulation
   dΓd::Measure
   dΓn::Measure
-  phys_quadp
-  V₀_quad
+  phys_quadp::LazyArray
+  V₀_quad::UnconstrainedFESpace
 end
 
 struct FEMSpaceStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
@@ -67,7 +71,7 @@ struct FEMSpaceStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
   X₀::MultiFieldFESpace
   X::TransientMultiFieldTrialFESpace
   ϕᵥ::FEBasis
-  ϕᵤ::Function
+  ϕᵤ::F
   ψᵧ::FEBasis
   ψₚ::FEBasis
   Nₛᵘ::Int64
@@ -77,8 +81,8 @@ struct FEMSpaceStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
   Γd::BoundaryTriangulation
   dΓd::Measure
   dΓn::Measure
-  phys_quadp
-  V₀_quad
+  phys_quadp::LazyArray
+  V₀_quad::UnconstrainedFESpace
 end
 
 struct FEMSpaceNavierStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
@@ -90,7 +94,7 @@ struct FEMSpaceNavierStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
   X₀::MultiFieldFESpace
   X::TransientMultiFieldTrialFESpace
   ϕᵥ::FEBasis
-  ϕᵤ::Function
+  ϕᵤ::F
   ψᵧ::FEBasis
   ψₚ::FEBasis
   Nₛᵘ::Int64
@@ -100,11 +104,11 @@ struct FEMSpaceNavierStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
   Γd::BoundaryTriangulation
   dΓd::Measure
   dΓn::Measure
-  phys_quadp
-  V₀_quad
+  phys_quadp::LazyArray
+  V₀_quad::UnconstrainedFESpace
 end
 
-struct SteadyInfo{T} <: Info
+struct SteadyInfo{T} <: Info{T}
   problem_id::NTuple
   D::Int64
   case::Int
@@ -115,10 +119,10 @@ struct SteadyInfo{T} <: Info
   neumann_tags::Vector{String}
   neumann_bnds::Vector{Int64}
   solver::String
-  paths::Function
+  paths::F
 end
 
-struct UnsteadyInfo{T} <: Info
+struct UnsteadyInfo{T} <: Info{T}
   problem_id::NTuple
   D::Int64
   case::Int
@@ -129,7 +133,7 @@ struct UnsteadyInfo{T} <: Info
   neumann_tags::Vector{String}
   neumann_bnds::Vector{Int64}
   solver::String
-  paths::Function
+  paths::F
   time_method::String
   θ::Float64
   RK_type::Symbol
@@ -138,37 +142,40 @@ struct UnsteadyInfo{T} <: Info
   δt::Float64
 end
 
-mutable struct ParametricInfoSteady{D,T}
+struct ParametricInfoSteady{D,T} <: ParametricInfo
   μ::Vector{T}
   model::DiscreteModel{D,D}
-  α::Function
-  f::Function
-  g::Function
-  h::Function
-  function ParametricInfoSteady(::Type{T}) where T
+  α::F
+  f::F
+  g::F
+  h::F
+  function ParametricInfoSteady(
+    μ::Vector{T}, model::DiscreteModel, α::F, f::F, g::F, h::F) where T
     D = num_cell_dims(model)
     new{D,T}(μ, model, α, m, f, g, h)
   end
 end
 
-mutable struct ParametricInfoUnsteady{D,T}
+struct ParametricInfoUnsteady{D,T} <: ParametricInfo
   μ::Vector{T}
   model::DiscreteModel{D,D}
-  αₛ::Function
-  αₜ::Function
-  α::Function
-  mₛ::Function
-  mₜ::Function
-  m::Function
-  fₛ::Function
-  fₜ::Function
-  f::Function
-  g::Function
-  hₛ::Function
-  hₜ::Function
-  h::Function
-  u₀::Function
-  function ParametricInfoUnsteady(::Type{T}) where T
+  αₛ::F
+  αₜ::F
+  α::F
+  mₛ::F
+  mₜ::F
+  m::F
+  fₛ::F
+  fₜ::F
+  f::F
+  g::F
+  hₛ::F
+  hₜ::F
+  h::F
+  u₀::F
+  function ParametricInfoUnsteady{T}(
+    μ::Vector{T}, model::DiscreteModel, αₛ::F, αₜ::F, α::F, mₛ::F, mₜ::F, m::F,
+    fₛ::F, fₜ::F, f::F, g::F, hₛ::F, hₜ::F, h::F, u₀::F) where T
     D = num_cell_dims(model)
     new{D,T}(μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, g, hₛ, hₜ, h, u₀)
   end

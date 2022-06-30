@@ -4,17 +4,16 @@ function check_dataset(
   RBVars::PoissonUnsteady,
   nb::Int64)
 
-  μ = load_CSV(Matrix{String}(undef,0,0),joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  μ_i = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
-  Param = get_ParamInfo(RBInfo, problem_id, μ_i)
+  μ = load_CSV(Array{Float64}[],joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
+  Param = get_ParamInfo(RBInfo, problem_id, μ[nb])
 
   u1 = RBVars.S.Sᵘ[:,(nb-1)*RBVars.Nₜ+1]
   u2 = RBVars.S.Sᵘ[:,(nb-1)*RBVars.Nₜ+2]
-  M = assemble_mass(FEMSpace, RBInfo, Param)(0.0)
+  M = assemble_FEM_structure(FEMSpace, RBInfo, Param, "M")(0.0)
   # we suppose that case == 1 --> no need to multiply A by αₜ
-  A(t) = assemble_stiffness(FEMSpace, RBInfo, Param)(t)
-  F = assemble_forcing(FEMSpace, RBInfo, Param)(0.0)
-  H = assemble_neumann_datum(FEMSpace, RBInfo, Param)(0.0)
+  A(t) = assemble_FEM_structure(FEMSpace, RBInfo, Param, "A")(t)
+  F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")(0.0)
+  H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")(0.0)
 
   t¹_θ = RBInfo.t₀+RBInfo.δt*RBInfo.θ
   t²_θ = t¹_θ+RBInfo.δt

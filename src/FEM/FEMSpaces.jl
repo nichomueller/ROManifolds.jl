@@ -21,7 +21,7 @@ function set_labels(ProblInfo::Info, model::DiscreteModel)
 end
 
 function get_measures_quadrature(
-  ProblInfo::SteadyInfo,
+  ProblInfo::Info,
   model::DiscreteModel)
 
   degree = 2 * ProblInfo.order
@@ -39,6 +39,7 @@ end
 
 function get_lagrangianQuad_info(
   ::SteadyInfo{T},
+  model::DiscreteModel,
   Ω::BodyFittedTriangulation,
   Qₕ::CellQuadrature) where T
 
@@ -55,6 +56,7 @@ end
 
 function get_lagrangianQuad_info(
   ::UnsteadyInfo{T},
+  model::DiscreteModel,
   Ω::BodyFittedTriangulation,
   Qₕ::CellQuadrature) where T
 
@@ -73,7 +75,7 @@ function get_FEMSpace(
   ::NTuple{1,Int64},
   ProblInfo::SteadyInfo{T},
   model::DiscreteModel{D,D},
-  g::Function) where {D,T}
+  g::F) where {D,T}
 
   Ω, Qₕ, dΩ, dΓn, dΓd = get_measures_quadrature(ProblInfo, model)
 
@@ -88,7 +90,7 @@ function get_FEMSpace(
   ϕᵤ = get_trial_fe_basis(V)
   Nₛᵘ = length(get_free_dof_ids(V))
 
-  phys_quadp, V₀_quad = get_lagrangianQuad_info(ProblInfo, Ω, Qₕ)
+  phys_quadp, V₀_quad = get_lagrangianQuad_info(ProblInfo, model, Ω, Qₕ)
 
   FEMSpace = FEMSpacePoissonSteady{D,T}(
     Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, dΩ, dΓd, dΓn, phys_quadp, V₀_quad)
@@ -101,7 +103,7 @@ function get_FEMSpace(
   ::NTuple{1,Int64},
   ProblInfo::UnsteadyInfo{T},
   model::DiscreteModel{D,D},
-  g::Function) where {D,T}
+  g::F) where {D,T}
 
   Ω, Qₕ, dΩ, dΓn, dΓd = get_measures_quadrature(ProblInfo, model)
 
@@ -115,7 +117,7 @@ function get_FEMSpace(
   ϕᵤ(t) = get_trial_fe_basis(V(t))
   Nₛᵘ = length(get_free_dof_ids(V₀))
 
-  phys_quadp, V₀_quad = get_lagrangianQuad_info(ProblInfo, Ω, Qₕ)
+  phys_quadp, V₀_quad = get_lagrangianQuad_info(ProblInfo, model, Ω, Qₕ)
 
   FEMSpace = FEMSpacePoissonUnsteady{D,T}(
     Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, dΩ, dΓd, dΓn, phys_quadp, V₀_quad)
@@ -128,7 +130,7 @@ function get_FEMSpace(
   ::NTuple{2,Int64},
   ProblInfo::SteadyInfo{T},
   model::DiscreteModel{D,D},
-  g::Function) where {D,T}
+  g::F) where {D,T}
 
   Ω, Qₕ, dΩ, dΓn, dΓd = get_measures_quadrature(ProblInfo, model)
 
@@ -152,7 +154,7 @@ function get_FEMSpace(
   X₀ = MultiFieldFESpace([V₀, Q₀])
   X = TransientMultiFieldFESpace([V, Q])
 
-  phys_quadp, V₀_quad = get_lagrangianQuad_info(ProblInfo, Ω, Qₕ)
+  phys_quadp, V₀_quad = get_lagrangianQuad_info(ProblInfo, model, Ω, Qₕ)
 
   FEMSpace = FEMSpaceStokesSteady{D,T}(
     Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn,
@@ -166,7 +168,7 @@ function get_FEMSpace(
   ::NTuple{2,Int64},
   ProblInfo::UnsteadyInfo{T},
   model::DiscreteModel{D,D},
-  g::Function) where {D,T}
+  g::F) where {D,T}
 
   Ω, Qₕ, dΩ, dΓn, dΓd = get_measures_quadrature(ProblInfo, model)
 
@@ -190,7 +192,7 @@ function get_FEMSpace(
   X₀ = MultiFieldFESpace([V₀, Q₀])
   X = TransientMultiFieldFESpace([V, Q])
 
-  phys_quadp, V₀_quad = get_lagrangianQuad_info(ProblInfo, Ω, Qₕ)
+  phys_quadp, V₀_quad = get_lagrangianQuad_info(ProblInfo, model, Ω, Qₕ)
 
   FEMSpace = FEMSpaceStokesUnsteady{D,T}(
     Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn,

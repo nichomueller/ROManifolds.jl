@@ -386,9 +386,8 @@ end
 
 function check_dataset(RBInfo, RBVars, i)
 
-  μ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_snap_path, "μ.csv"))
-  μ_i = parse.(Float64, split(chop(μ[i]; head=1, tail=1), ','))
-  Param = get_ParamInfo(RBInfo, problem_id, μ_i)
+  μ = load_CSV(Array{Float64}[], joinpath( RBInfo.paths.FEM_snap_path, "μ.csv"))
+  Param = get_ParamInfo(RBInfo, problem_id, μ[i])
 
   u1 = RBVars.S.Sᵘ[:, (i-1)*RBVars.P.Nₜ+1]
   u2 = RBVars.S.Sᵘ[:, (i-1)*RBVars.P.Nₜ+2]
@@ -400,12 +399,12 @@ function check_dataset(RBInfo, RBVars, i)
   t¹_θ = RBInfo.t₀+RBInfo.δt*RBInfo.θ
   t²_θ = t¹_θ+RBInfo.δt
 
-  LHS1 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A*Param.αₜ(t¹_θ,μ_i))
+  LHS1 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A*Param.αₜ(t¹_θ,μ[i]))
   RHS1 = RBInfo.δt*RBInfo.θ*(F*Param.fₜ(t¹_θ)+H*Param.hₜ(t¹_θ))
   my_u1 = LHS1\RHS1
 
-  LHS2 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A*Param.αₜ(t²_θ,μ_i))
-  mat = (1-RBInfo.θ)*(M+RBInfo.δt*RBInfo.θ*A*Param.αₜ(t²_θ,μ_i))-M
+  LHS2 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A*Param.αₜ(t²_θ,μ[i]))
+  mat = (1-RBInfo.θ)*(M+RBInfo.δt*RBInfo.θ*A*Param.αₜ(t²_θ,μ[i]))-M
   RHS2 = RBInfo.δt*RBInfo.θ*(F*Param.fₜ(t²_θ)+H*Param.hₜ(t²_θ))-mat*u1
   my_u2 = LHS2\RHS2
 

@@ -186,11 +186,11 @@ end
 end =#
 
 
-struct ROMInfoSteady{T} <: Info
+struct ROMInfoSteady{T} <: Info{T}
   FEMInfo::SteadyInfo{T}
   probl_nl::Dict
   case::Int
-  paths::Function
+  paths::F
   RB_method::String
   nₛ::Int64
   ϵₛ::Float64
@@ -205,11 +205,11 @@ struct ROMInfoSteady{T} <: Info
   save_results::Bool
 end
 
-mutable struct ROMInfoUnsteady{T} <: Info
+mutable struct ROMInfoUnsteady{T} <: Info{T}
   FEMInfo::UnsteadyInfo{T}
   probl_nl::Dict
   case::Int
-  paths::Function
+  paths::F
   RB_method::String
   nₛ::Int64
   ϵₛ::Float64

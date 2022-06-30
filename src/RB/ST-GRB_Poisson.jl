@@ -380,7 +380,7 @@ function get_RB_system(
   RBVars.S.online_time = @elapsed begin
     get_Q(RBInfo, RBVars)
     blocks = [1]
-    operators = get_system_blocks(RBInfo,RBVars,blocks,blocks)
+    operators = get_system_blocks(RBInfo,RBVars.S,blocks,blocks)
 
     if RBInfo.space_time_M_DEIM
       θᵐ, θᵃ, θᶠ, θʰ = get_θₛₜ(FEMSpace₀, RBInfo, RBVars, Param)
@@ -405,7 +405,7 @@ function get_RB_system(
     end
   end
 
-  save_system_blocks(RBInfo,RBVars,blocks,blocks,operators)
+  save_system_blocks(RBInfo,RBVars.S,blocks,blocks,operators)
 
 end
 
@@ -417,10 +417,10 @@ function build_Param_RHS(
 
   println("Assembling RHS exactly using θ-method time scheme, θ=$(RBInfo.θ)")
   δtθ = RBInfo.δt*RBInfo.θ
-  F_t = assemble_forcing(FEMSpace₀, RBInfo, Param)
-  H_t = assemble_neumann_datum(FEMSpace₀, RBInfo, Param)
+  F_t = assemble_FEM_structure(FEMSpace₀, RBInfo, Param, "F")
+  H_t = assemble_FEM_structure(FEMSpace₀, RBInfo, Param, "H")
   F, H = zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ), zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ)
-  timesθ = get_timesθ(RBInfo.FEMInfo)
+  timesθ = get_timesθ(RBInfo)
   for (i,tᵢ) in enumerate(timesθ)
     F[:,i] = F_t(tᵢ)
     H[:,i] = H_t(tᵢ)

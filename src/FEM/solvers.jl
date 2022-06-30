@@ -29,8 +29,8 @@ end
 function FE_solve(
   FEMSpace::FEMSpacePoissonUnsteady,
   probl::UnsteadyInfo,
-  Param::ParametricInfoUnsteady{T};
-  subtract_Ddata = true) where T
+  Param::ParametricInfoUnsteady{D,T};
+  subtract_Ddata = true) where {D,T}
 
   Gₕₜ = assemble_lifting(FEMSpace, probl, Param)
 

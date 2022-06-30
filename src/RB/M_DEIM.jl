@@ -42,11 +42,11 @@ function M_DEIM_offline(M_DEIM_mat::Matrix, Σ::Vector)
 
 end
 
-function MDEIM_offline(RBInfo::Info, var::String)
+function MDEIM_offline(RBInfo::Info{T}, var::String) where T
 
   println("Building $(RBInfo.nₛ_MDEIM) snapshots of $var")
 
-  μ = load_CSV(Matrix{String}(undef,0,0),joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
+  μ = load_CSV(Array{T}[],joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
   model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
   FEMSpace₀ = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
 
@@ -66,7 +66,7 @@ function modify_timesθ_and_MDEIM_idx(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady)
 
-  timesθ = get_timesθ(RBInfo.FEMInfo)
+  timesθ = get_timesθ(RBInfo)
   idx_space, idx_time = from_vec_to_mat_idx(MDEIM_idx, RBVars.S.Nₛᵘ^2)
   idx_time_mod = label_sorted_elems(idx_time)
   timesθ_mod = timesθ[unique(sort(idx_time))]
@@ -74,11 +74,11 @@ function modify_timesθ_and_MDEIM_idx(
   timesθ_mod, MDEIM_idx_mod
 end
 
-function DEIM_offline(RBInfo::Info, var::String)
+function DEIM_offline(RBInfo::Info{T}, var::String) where T
 
   println("Building $(RBInfo.nₛ_DEIM) snapshots of $var")
 
-  μ = load_CSV(Matrix{String}(undef,0,0), joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
+  μ = load_CSV(Array{T}[], joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
   model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
   FEMSpace₀ = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
 

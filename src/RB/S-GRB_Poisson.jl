@@ -131,8 +131,8 @@ function build_Param_RHS(
   Param::ParametricInfoSteady,
   ::Array)
 
-  F = assemble_forcing(FEMSpace, RBInfo, Param)
-  H = assemble_neumann_datum(FEMSpace, RBInfo, Param)
+  F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
+  H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
   reshape((RBVars.Φₛᵘ)'*F,:,1), reshape((RBVars.Φₛᵘ)'*H,:,1)
 
 end

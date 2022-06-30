@@ -56,6 +56,38 @@ function get_method_id(problem_name::String, RB_method::String)
   end
 end
 
+function assemble_FEM_structure(
+  FEMSpace::FEMProblem,
+  RBInfo::ROMInfoSteady,
+  Param::ParametricInfo,
+  var::String)
+
+  assemble_FEM_structure(FEMSpace,RBInfo.FEMInfo,Param,var)
+
+end
+
+function assemble_FEM_structure(
+  FEMSpace::FEMProblem,
+  RBInfo::ROMInfoUnsteady,
+  Param::ParametricInfo,
+  var::String)
+
+  assemble_FEM_structure(FEMSpace,RBInfo.FEMInfo,Param,var)
+
+end
+
+function get_ParamInfo(RBInfo::Info, μ::Vector)
+
+  get_ParamInfo(RBInfo.FEMInfo, RBInfo.FEMInfo.problem_id, μ)
+
+end
+
+function get_timesθ(RBInfo::ROMInfoUnsteady)
+
+  get_timesθ(RBInfo.FEMInfo)
+
+end
+
 function build_sparse_mat(
   FEMSpace₀::SteadyProblem,
   FEMInfo::SteadyInfo,
@@ -86,7 +118,7 @@ function build_sparse_mat(
   var="A")
 
   Ω_sparse = view(FEMSpace₀.Ω, el)
-  dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.S.order)
+  dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
   Nₜ = length(timesθ)
 
   function define_Matₜ(t::Real, var::String)
@@ -172,15 +204,12 @@ function compute_errors(
 
 end
 
-function compute_MDEIM_error(FEMSpace::FEMProblem, RBInfo::Info, RBVars::RBProblem)
-
-  Aₙ_μ = (RBVars.Φₛᵘ)' * assemble_stiffness(FEMSpace, RBInfo, Param) * RBVars.Φₛᵘ
-
-end
-
 function post_process(root::String)
 
   println("Exporting plots and tables")
+
+  S = String
+  T = Float64
 
   function get_paths(dir::String)
     path_to_err = joinpath(dir,
@@ -203,9 +232,9 @@ function post_process(root::String)
   end
 
   function check_if_fun(dir::String,tol,tol_fun,err,err_fun,time,time_fun)
-    S = String
-    T = Float64
+
     path_to_err,path_to_t = get_paths(dir)
+
     if ispath(path_to_err) && ispath(path_to_t)
       ϵ = get_tolerances(dir)
       if !isempty(ϵ)
@@ -224,7 +253,9 @@ function post_process(root::String)
         end
       end
     end
-    return tol,tol_fun,err,err_fun,time,time_fun
+
+    tol,tol_fun,err,err_fun,time,time_fun
+
   end
 
   root_subs = get_all_subdirectories(root)
