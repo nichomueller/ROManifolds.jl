@@ -10,6 +10,7 @@ abstract type ParametricInfo{T} <: Info{T} end
 const F = Function
 
 struct FEMSpacePoissonSteady{D,T} <: SteadyProblem{D,T}
+  model::DiscreteModel
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TrialFESpace
@@ -25,6 +26,7 @@ struct FEMSpacePoissonSteady{D,T} <: SteadyProblem{D,T}
 end
 
 struct FEMSpacePoissonUnsteady{D,T} <: UnsteadyProblem{D,T}
+  model::DiscreteModel
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TransientTrialFESpace
@@ -40,6 +42,7 @@ struct FEMSpacePoissonUnsteady{D,T} <: UnsteadyProblem{D,T}
 end
 
 struct FEMSpaceStokesSteady{D,T} <: SteadyProblem{D,T}
+  model::DiscreteModel
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TrialFESpace
@@ -63,6 +66,7 @@ struct FEMSpaceStokesSteady{D,T} <: SteadyProblem{D,T}
 end
 
 struct FEMSpaceStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
+  model::DiscreteModel
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TransientTrialFESpace
@@ -86,6 +90,7 @@ struct FEMSpaceStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
 end
 
 struct FEMSpaceNavierStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
+  model::DiscreteModel
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TransientTrialFESpace
@@ -144,7 +149,6 @@ end
 
 struct ParametricInfoSteady{T} <: ParametricInfo{T}
   μ::Vector{T}
-  model::DiscreteModel
   α::F
   f::F
   g::F
@@ -153,7 +157,6 @@ end
 
 struct ParametricInfoUnsteady{T} <: ParametricInfo{T}
   μ::Vector{T}
-  model::DiscreteModel
   αₛ::F
   αₜ::F
   α::F

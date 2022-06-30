@@ -42,14 +42,12 @@ function get_ParamInfo(
   problem_id::NTuple{1,Int},
   μ::Vector) where T
 
-  model = DiscreteModelFromFile(FEMInfo.paths.mesh_path)
-
   α(x) = get_α(FEMInfo, problem_id, μ).α(x)
   f(x) = get_f(FEMInfo, problem_id, μ).f(x)
   g(x) = get_g(FEMInfo, problem_id, μ).g(x)
   h(x) = get_h(FEMInfo, problem_id, μ).h(x)
 
-  ParametricInfoSteady(μ, model, α, f, g, h)
+  ParametricInfoSteady(μ, α, f, g, h)
 
 end
 
@@ -89,8 +87,6 @@ function get_ParamInfo(
   FEMInfo::UnsteadyInfo{T},
   ::NTuple{1,Int},
   μ::Vector) where T
-
-  model = DiscreteModelFromFile(FEMInfo.paths.mesh_path)
 
   αₛ(x) = one(T)
   αₜ(t, μ) = T(5. * sum(μ) * (2 + sin(t)))
@@ -150,15 +146,7 @@ function get_ParamInfo(
   u₀(x) = zero(T)
 
   ParametricInfoUnsteady{T}(
-    μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, g, hₛ, hₜ, h, u₀)
-
-end
-
-function get_ParamInfoNeww(
-  D::Int64,
-  μ::Vector) where T
-
-  ParametricInfoUnsteadyNewww{D,T}(μ)
+    μ, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, g, hₛ, hₜ, h, u₀)
 
 end
 

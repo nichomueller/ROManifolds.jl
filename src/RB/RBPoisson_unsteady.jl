@@ -538,8 +538,7 @@ function online_phase(
   μ = load_CSV(Array{T}[],
     joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))::Vector{Vector{T}}
   model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
-  FEMSpace₀ = get_FEMSpace₀(RBInfo.FEMInfo.problem_id,
-    RBInfo.FEMInfo, model)
+  FEMSpace₀ = get_FEMSpace₀(RBInfo.FEMInfo.problem_id,RBInfo.FEMInfo,model)
 
   get_norm_matrix(RBInfo, RBVars.S)
   (ũ_μ,uₙ_μ,mean_uₕ_test,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,

@@ -53,7 +53,8 @@ function get_snaps_MDEIM(
   var="A") where T
 
   snaps,row_idx = build_matrix_snapshots(FEMSpace, RBInfo, μ, var)
-  M_DEIM_POD(snaps, RBInfo.ϵₛ)...,row_idx
+  snaps, Σ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
+  snaps, Σ, row_idx
 
 end
 
@@ -73,7 +74,7 @@ function standard_MDEIM(
   timesθ::Vector,
   var="A") where T
 
-  snaps,row_idx,Σ = Matrix{T}(undef,0,0),Int64[],Int64[]
+  snaps,row_idx,Σ = Matrix{T}(undef,0,0),Int64[],Vector{T}(undef,0)
   @simd for k = 1:RBInfo.nₛ_MDEIM
     println("Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)")
     snapsₖ,row_idx = build_matrix_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
@@ -95,7 +96,7 @@ function standard_MDEIM_sampling(
   nₜ::Int64,
   var="A") where T
 
-  snaps,row_idx = Matrix{T}(undef,0,0),Int64[]
+  snaps,row_idx,Σ = Matrix{T}(undef,0,0),Int64[],Vector{T}(undef,0)
   @simd for k = 1:RBInfo.nₛ_MDEIM
     println("Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)")
     timesθₖ = timesθ[rand(1:length(timesθ),nₜ)]
@@ -106,7 +107,8 @@ function standard_MDEIM_sampling(
       snaps = hcat(snaps,snapsₖ)
     end
   end
-  return M_DEIM_POD(snaps,RBInfo.ϵₛ)...,row_idx
+  snaps, Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
+  return snaps, Σ, row_idx
 end
 
 function functional_MDEIM(
@@ -144,7 +146,8 @@ function functional_MDEIM(
     end
     snaps[:,q] = v
   end
-  return M_DEIM_POD(snaps,RBInfo.ϵₛ)...,row_idx
+  snaps, Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
+  return snaps, Σ, row_idx
 end
 
 function functional_MDEIM_sampling(
@@ -183,7 +186,8 @@ function functional_MDEIM_sampling(
     end
     snaps[:,q] = v
   end
-  return M_DEIM_POD(snaps,RBInfo.ϵₛ)...,row_idx
+  snaps, Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
+  return snaps, Σ, row_idx
 end
 
 function spacetime_MDEIM(
@@ -193,7 +197,7 @@ function spacetime_MDEIM(
   timesθ::Vector,
   var="A") where T
 
-  snaps, row_idx = Matrix{T}(undef,0,0), Int64[]
+  snaps, row_idx, Σ = Matrix{T}(undef,0,0), Int64[], Vector{T}(undef,0)
   @simd for k = 1:RBInfo.nₛ_MDEIM
     println("Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)")
     snapsₖ,row_idx = build_matrix_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
@@ -205,7 +209,8 @@ function spacetime_MDEIM(
     end
     snaps,_ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
   end
-  return M_DEIM_POD(snaps,RBInfo.ϵₛ)...,row_idx
+  snaps, Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
+  return snaps, Σ, row_idx
 end
 
 function get_snaps_MDEIM(
@@ -217,22 +222,25 @@ function get_snaps_MDEIM(
   timesθ = get_timesθ(RBInfo)
 
   if RBInfo.space_time_M_DEIM
-    return spacetime_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
+    snaps, Σ, row_idx = spacetime_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T},Vector{T},Vector{Int}}
   elseif RBInfo.functional_M_DEIM
     if RBInfo.sampling_M_DEIM
       nₜ = floor(Int,length(timesθ)*RBInfo.sampling_percentage)
-      return functional_MDEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
+      snaps, Σ, row_idx = functional_MDEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)::Tuple{Matrix{T},Vector{T},Vector{Int}}
     else
-      return functional_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
+      snaps, Σ, row_idx = functional_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T},Vector{T},Vector{Int}}
     end
   else
     if RBInfo.sampling_M_DEIM
       nₜ = floor(Int,length(timesθ)*RBInfo.sampling_percentage)
-      return standard_MDEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
+      snaps, Σ, row_idx = standard_MDEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)::Tuple{Matrix{T},Vector{T},Vector{Int}}
     else
-      return standard_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
+      snaps, Σ, row_idx = standard_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T},Vector{T},Vector{Int}}
     end
   end
+
+  return snaps, Σ, row_idx
+
 end
 
 function build_vector_snapshots(
@@ -280,7 +288,8 @@ function get_snaps_DEIM(
   var="F") where T
 
   snaps = build_vector_snapshots(FEMSpace,RBInfo,μ,var)
-  return M_DEIM_POD(snaps, RBInfo.ϵₛ)
+  snaps, Σ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
+  return snaps, Σ
 
 end
 
@@ -304,6 +313,7 @@ function standard_DEIM(
   end
 
   return snaps, Σ
+
 end
 
 function standard_DEIM_sampling(
@@ -324,7 +334,10 @@ function standard_DEIM_sampling(
       global snaps = hcat(snaps, snapsₖ)
     end
   end
-  return M_DEIM_POD(snaps,RBInfo.ϵₛ)
+
+  snaps, Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
+  return snaps, Σ
+
 end
 
 function functional_DEIM(
@@ -355,7 +368,8 @@ function functional_DEIM(
     Θq = FEFunction(FEMSpace.V₀_quad,Θmat[:,q])
     snaps[:,q] = assemble_parametric_FE_vector(FEMSpace,Θq,var)
   end
-  return M_DEIM_POD(snaps,RBInfo.ϵₛ)
+  snaps, Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
+  return snaps, Σ
 end
 
 function functional_DEIM_sampling(
@@ -388,7 +402,8 @@ function functional_DEIM_sampling(
     Θq = FEFunction(FEMSpace.V₀_quad,Θmat[:,q])
     snaps[:,q] = assemble_parametric_FE_vector(FEMSpace,Θq,var)
   end
-  return M_DEIM_POD(snaps,RBInfo.ϵₛ)
+  snaps, Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
+  return snaps, Σ
 end
 
 function spacetime_DEIM(
@@ -409,7 +424,8 @@ function spacetime_DEIM(
     end
     snaps,_ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
   end
-  return M_DEIM_POD(snaps,RBInfo.ϵₛ)
+  snaps, Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
+  return snaps, Σ
 end
 
 function get_snaps_DEIM(
@@ -419,23 +435,27 @@ function get_snaps_DEIM(
   var="F") where T
 
   timesθ = get_timesθ(RBInfo)
+
   if RBInfo.space_time_M_DEIM
-    return spacetime_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
+    snaps, Σ = spacetime_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
   elseif RBInfo.functional_M_DEIM
     if RBInfo.sampling_M_DEIM
       nₜ = floor(Int,length(timesθ)*RBInfo.sampling_percentage)
-      return functional_DEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
+      snaps, Σ = functional_DEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
     else
-      return functional_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
+      snaps, Σ = functional_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
     end
   else
     if RBInfo.sampling_M_DEIM
       nₜ = floor(Int,length(timesθ)*RBInfo.sampling_percentage)
-      return standard_DEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
+      snaps, Σ = standard_DEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
     else
-      return standard_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
+      snaps, Σ = standard_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
     end
   end
+
+  return snaps, Σ
+
 end
 
 function build_parameter_on_phys_quadp(

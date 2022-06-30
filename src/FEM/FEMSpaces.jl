@@ -20,9 +20,7 @@ function set_labels(FEMInfo::Info, model::DiscreteModel)
 
 end
 
-function get_measures_quadrature(
-  FEMInfo::Info,
-  model::DiscreteModel)
+function get_mod_meas_quad(FEMInfo::Info, model::DiscreteModel)
 
   degree = 2 * FEMInfo.order
   Ω = Triangulation(model)
@@ -77,7 +75,7 @@ function get_FEMSpace(
   model::DiscreteModel{D,D},
   g::F) where {D,T}
 
-  Ω, Qₕ, dΩ, dΓn, dΓd = get_measures_quadrature(FEMInfo, model)
+  Ω, Qₕ, dΩ, dΓn, dΓd = get_mod_meas_quad(FEMInfo, model)
 
   labels = set_labels(FEMInfo, model)
   refFE = Gridap.ReferenceFE(lagrangian, T, FEMInfo.order)
@@ -93,7 +91,7 @@ function get_FEMSpace(
   phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
 
   FEMSpace = FEMSpacePoissonSteady{D,T}(
-    Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, dΩ, dΓd, dΓn, phys_quadp, V₀_quad)
+    model, Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, dΩ, dΓd, dΓn, phys_quadp, V₀_quad)
 
   return FEMSpace
 
@@ -105,7 +103,7 @@ function get_FEMSpace(
   model::DiscreteModel{D,D},
   g::F) where {D,T}
 
-  Ω, Qₕ, dΩ, dΓn, dΓd = get_measures_quadrature(FEMInfo, model)
+  Ω, Qₕ, dΩ, dΓn, dΓd = get_mod_meas_quad(FEMInfo, model)
 
   refFE = Gridap.ReferenceFE(lagrangian, T, FEMInfo.order)
   labels = set_labels(FEMInfo, model)
@@ -120,7 +118,7 @@ function get_FEMSpace(
   phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
 
   FEMSpace = FEMSpacePoissonUnsteady{D,T}(
-    Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, dΩ, dΓd, dΓn, phys_quadp, V₀_quad)
+    model, Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, dΩ, dΓd, dΓn, phys_quadp, V₀_quad)
 
   return FEMSpace
 
@@ -132,7 +130,7 @@ function get_FEMSpace(
   model::DiscreteModel{D,D},
   g::F) where {D,T}
 
-  Ω, Qₕ, dΩ, dΓn, dΓd = get_measures_quadrature(FEMInfo, model)
+  Ω, Qₕ, dΩ, dΓn, dΓd = get_mod_meas_quad(FEMInfo, model)
 
   refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,T}, FEMInfo.order)
   labels = set_labels(FEMInfo, model)
@@ -157,7 +155,7 @@ function get_FEMSpace(
   phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
 
   FEMSpace = FEMSpaceStokesSteady{D,T}(
-    Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn,
+    model, Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn,
     phys_quadp, V₀_quad)
 
   return FEMSpace
@@ -170,7 +168,7 @@ function get_FEMSpace(
   model::DiscreteModel{D,D},
   g::F) where {D,T}
 
-  Ω, Qₕ, dΩ, dΓn, dΓd = get_measures_quadrature(FEMInfo, model)
+  Ω, Qₕ, dΩ, dΓn, dΓd = get_mod_meas_quad(FEMInfo, model)
 
   refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,T}, FEMInfo.order)
   labels = set_labels(FEMInfo, model)
@@ -195,7 +193,7 @@ function get_FEMSpace(
   phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
 
   FEMSpace = FEMSpaceStokesUnsteady{D,T}(
-    Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn,
+    model, Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn,
     phys_quadp, V₀_quad)
 
   return FEMSpace
@@ -234,7 +232,7 @@ end
 function get_FEMSpace₀(
   problem_id::NTuple{2,Int64},
   FEMInfo::UnsteadyInfo{T},
-  model::DiscreteModel) where T
+  model::DiscreteModel,) where T
 
   g₀(x, t::Real) = zero(T)
   g₀(t::Real) = x -> g₀(x, t)
