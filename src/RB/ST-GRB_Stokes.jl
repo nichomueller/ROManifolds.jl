@@ -129,7 +129,7 @@ function get_Bₙ(RBInfo::Info, RBVars::StokesSTGRB) :: Vector
     println("Importing reduced affine velocity-pressure and pressure-velocity matrices")
     Bₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "Bₙ.csv"))
     RBVars.Bₙ = reshape(Bₙ,RBVars.S.nₛᵘ,RBVars.nₛᵖ,1)
-    return []
+    return [""]
   else
     println("Failed to import the reduced affine velocity-pressure and pressure-velocity matrices: must build them")
     return ["B"]

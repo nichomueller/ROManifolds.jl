@@ -74,7 +74,7 @@ end
 """Generate a uniform random vector of dimension n between the ranges set by
   the vector of ranges 'a' and 'b'"""
 function generate_parameter(a::Vector{T}, b::Vector{T}, n = 1) where T
-  [[T.(rand(Uniform(a[i], b[i]))) for i = eachindex(a)] for j in 1:n]
+  [[T.(rand(Uniform(a[i], b[i]))) for i = eachindex(a)] for j in 1:n]::Vector{Vector{T}}
 end
 
 """Makes use of a truncated SVD (tolerance level specified by 'ϵ') to compute a
@@ -138,4 +138,20 @@ function POD(S::SparseMatrixCSC, ϵ::Float64) where T
 
   T.(U[:, 1:N]), T.(Σ)
 
+end
+
+function get_NTuple(N::Int64, T::DataType)
+
+  ntupl = ()
+  for _ = 1:N
+    ntupl = (ntupl...,zero(T))
+  end
+
+  ntupl
+
+end
+
+function Base.one(vv::VectorValue{D,T}) where {D,T}
+  vv_one = zero(vv) .+ one(T)
+  return vv_one::VectorValue{D,T}
 end

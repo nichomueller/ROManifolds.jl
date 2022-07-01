@@ -378,7 +378,7 @@ function online_phase(RBInfo::Info, RBVars::StokesUnsteady, μ, Param_nbs)
     "L2_L2_err"=>L2_L2_err, "mean_L2_err"=>mean_L2_err,
     "mean_point_err_p"=>mean_pointwise_err_p)
 
-  if RBInfo.postprocess
+  if RBInfo.post_process
     post_process(RBInfo, pass_to_pp)
   end
 

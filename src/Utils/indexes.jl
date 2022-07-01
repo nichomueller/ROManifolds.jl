@@ -25,7 +25,7 @@ end
   representation Mfull"""
 function remove_zero_entries(Msparse::SparseMatrixCSC{T}) where T
   for col = 1:size(Msparse)[2]
-    _,vals = findnz(Msparse[:,col])
+    _,vals = findnz(Msparse[:,col])::Tuple{Vector{Int},Vector{T}}
     if col == 1
       global Mfull = zeros(length(vals),size(Msparse)[2])
     end

@@ -36,7 +36,7 @@ function get_Aₙ(
     println("S-PGRB: fetching the matrix AΦᵀPᵤ⁻¹")
     AΦᵀPᵤ⁻¹ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
     RBVars.AΦᵀPᵤ⁻¹ = reshape(AΦᵀPᵤ⁻¹,RBVars.nₛᵘ,RBVars.Nₛᵘ,:)
-    return []
+    return [""]
   else
     println("Failed to import the reduced affine stiffness matrix: must build it")
     return ["A"]
@@ -204,6 +204,7 @@ function get_Q(
 end
 
 function build_param_RHS(
+  FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::PoissonSPGRB,
   Param::ParametricInfoSteady,
@@ -220,16 +221,17 @@ function build_param_RHS(
 end
 
 function get_θ(
+  FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::PoissonSPGRB,
   Param::ParametricInfoSteady)
 
-  θᵃ_temp = get_θᵃ(RBInfo, RBVars, Param)
+  θᵃ_temp = get_θᵃ(FEMSpace, RBInfo, RBVars, Param)
   θᵃ = [θᵃ_temp[q₁]*θᵃ_temp[q₂] for q₁ = 1:RBVars.Qᵃ for q₂ = 1:RBVars.Qᵃ]
 
   if !RBInfo.build_parametric_RHS
 
-    θᶠ_temp, θʰ_temp = get_θᶠʰ(RBInfo, RBVars, Param)
+    θᶠ_temp, θʰ_temp = get_θᶠʰ(FEMSpace, RBInfo, RBVars, Param)
     θᶠ = [θᵃ_temp[q₁]*θᶠ_temp[q₂] for q₁ = 1:RBVars.Qᵃ for q₂ = 1:RBVars.Qᶠ]
     θʰ = [θᵃ_temp[q₁]*θʰ_temp[q₂] for q₁ = 1:RBVars.Qᵃ for q₂ = 1:RBVars.Qʰ]
 

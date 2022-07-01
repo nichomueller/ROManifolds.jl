@@ -26,10 +26,10 @@ function get_mod_meas_quad(FEMInfo::Info, model::DiscreteModel)
   Ω = Triangulation(model)
   dΩ = Measure(Ω, degree)
   Γn = BoundaryTriangulation(model, tags=FEMInfo.neumann_tags)
-  dΓn = Measure(Γn, degree)
+  dΓn = Measure(Γn, degree)::Measure
   Γd = BoundaryTriangulation(model, tags=FEMInfo.dirichlet_tags)
-  dΓd = Measure(Γd, degree)
-  Qₕ = CellQuadrature(Ω, degree)
+  dΓd = Measure(Γd, degree)::Measure
+  Qₕ = CellQuadrature(Ω, degree)::CellQuadrature
 
   Ω, Qₕ, dΩ, dΓn, dΓd
 
@@ -44,7 +44,7 @@ function get_lagrangianQuad_info(
   ξₖ = get_cell_map(Ω)
   Qₕ_cell_point = get_cell_points(Qₕ)
   qₖ = get_data(Qₕ_cell_point)
-  phys_quadp = lazy_map(evaluate,ξₖ,qₖ)
+  phys_quadp = lazy_map(evaluate,ξₖ,qₖ)::LazyArray
   refFE_quad = Gridap.ReferenceFE(lagrangianQuad,T,FEMInfo.order)
   V₀_quad = TestFESpace(model,refFE_quad,conformity=:L2)
 
@@ -61,7 +61,7 @@ function get_lagrangianQuad_info(
   ξₖ = get_cell_map(Ω)
   Qₕ_cell_point = get_cell_points(Qₕ)
   qₖ = get_data(Qₕ_cell_point)
-  phys_quadp = lazy_map(evaluate,ξₖ,qₖ)
+  phys_quadp = lazy_map(evaluate,ξₖ,qₖ)::LazyArray
   refFE_quad = Gridap.ReferenceFE(lagrangianQuad,T,FEMInfo.order)
   V₀_quad = TestFESpace(model,refFE_quad,conformity=:L2)
 

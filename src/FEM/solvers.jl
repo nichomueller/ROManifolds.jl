@@ -1,8 +1,8 @@
 function FE_solve(
   FEMSpace::FEMSpacePoissonSteady,
-  FEMInfo::SteadyInfo,
+  FEMInfo::SteadyInfo{T},
   Param::ParametricInfoSteady;
-  subtract_Ddata = true)
+  subtract_Ddata = true) where T
 
   Gₕ = assemble_lifting(FEMSpace, Param)
 
@@ -17,9 +17,9 @@ function FE_solve(
   end
 
   if subtract_Ddata
-    uₕ = get_free_dof_values(uₕ_field) - Gₕ
+    uₕ = get_free_dof_values(uₕ_field)::Vector{T} - Gₕ
   else
-    uₕ = get_free_dof_values(uₕ_field)
+    uₕ = get_free_dof_values(uₕ_field)::Vector{T}
   end
 
   return uₕ, Gₕ
@@ -55,7 +55,7 @@ function FE_solve(
   dΩ = FEMSpace.dΩ
   for (uₕ, _) in uₕₜ_field
     global count += 1
-    uₕₜ[:, count] = get_free_dof_values(uₕ)
+    uₕₜ[:, count] = get_free_dof_values(uₕ)::Vector{T}
   end
 
   if subtract_Ddata
@@ -68,9 +68,9 @@ end
 
 function FE_solve(
   FEMSpace::FEMSpaceStokesUnsteady,
-  FEMInfo::UnsteadyInfo,
+  FEMInfo::UnsteadyInfo{T},
   Param::ParametricInfoUnsteady;
-  subtract_Ddata=false)
+  subtract_Ddata=false) where T
 
   timesθ = get_timesθ(FEMInfo)
   θ = FEMInfo.θ
@@ -85,14 +85,14 @@ function FE_solve(
   R₁(t) = assemble_lifting(FEMSpace, FEMInfo, Param).R₁(t)
   R₂(t) = assemble_lifting(FEMSpace, FEMInfo, Param).R₂(t)
   Block1(t) = θ*(M(t)+δtθ*A(t))
-  LHS(t) = vcat(θ*hcat(M(t)+δtθ*A(t),-δtθ*B(t)'),hcat(B(t),zeros(FEMSpace.Nₛᵖ,FEMSpace.Nₛᵖ)))
+  LHS(t) = vcat(θ*hcat(M(t)+δtθ*A(t),-δtθ*B(t)'),hcat(B(t),zeros(T,FEMSpace.Nₛᵖ,FEMSpace.Nₛᵖ)))
   RHS(t) = vcat(δtθ*(F(t)+H(t)-R₁(t)),-R₂(t))
-  RHS_add(u,p,t) = θ*vcat((M(t)-δt*(1-θ)*A(t))*u+δt*(1-θ)*B(t)'*p,zeros(FEMSpace.Nₛᵖ))
+  RHS_add(u,p,t) = θ*vcat((M(t)-δt*(1-θ)*A(t))*u+δt*(1-θ)*B(t)'*p,zeros(T,FEMSpace.Nₛᵖ))
 
   u0(x) = Param.u₀(x)[1]
   p0(x) = Param.u₀(x)[2]
-  u₀ = get_free_dof_values(interpolate_everywhere(u0, FEMSpace.V(FEMInfo.t₀)))
-  p₀ = get_free_dof_values(interpolate_everywhere(p0, FEMSpace.Q(FEMInfo.t₀)))
+  u₀ = get_free_dof_values(interpolate_everywhere(u0, FEMSpace.V(FEMInfo.t₀)))::Vector{T}
+  p₀ = get_free_dof_values(interpolate_everywhere(p0, FEMSpace.Q(FEMInfo.t₀)))::Vector{T}
 
   uₕₜ = hcat(u₀,zeros(T, FEMSpace.Nₛᵘ, Int(FEMInfo.tₗ / FEMInfo.δt)))
   pₕₜ = hcat(p₀,zeros(T, FEMSpace.Nₛᵖ, Int(FEMInfo.tₗ / FEMInfo.δt)))

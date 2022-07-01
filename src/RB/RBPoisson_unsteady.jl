@@ -282,34 +282,28 @@ function get_offline_structures(
 end
 
 function get_θᵐ(
-  FEMSpace₀::UnsteadyProblem,
+  FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady{T},
   Param::ParametricInfoUnsteady) where T
 
   timesθ = get_timesθ(RBInfo)
+
   if !RBInfo.probl_nl["M"]
     θᵐ = [Param.mₜ(t_θ) for t_θ = timesθ]
   else
     M_μ_sparse = build_sparse_mat(
-      FEMSpace₀,FEMInfo,Param,RBVars.sparse_el_M,timesθ;var="M")
+      FEMSpace,FEMInfo,Param,RBVars.sparse_el_M,timesθ;var="M")
     θᵐ = (RBVars.MDEIMᵢ_M \
       Matrix{T}(reshape(M_μ_sparse, :, RBVars.Nₜ)[RBVars.MDEIM_idx_M, :]))
-    #=
-    Nₛᵘ = RBVars.S.Nₛᵘ
-    θᵐ = zeros(RBVars.Qᵐ, RBVars.Nₜ)
-    @simd for iₜ = 1:RBVars.Nₜ
-      θᵐ[:,iₜ] = M_DEIM_online(M_μ_sparse[:,(iₜ-1)*Nₛᵘ+1:iₜ*Nₛᵘ],
-        RBVars.MDEIMᵢ_M, RBVars.MDEIM_idx_M)
-    end =#
   end
 
-  reshape(θᵐ, RBVars.Qᵐ, RBVars.Nₜ)
+  reshape(θᵐ, RBVars.Qᵐ, RBVars.Nₜ)::Matrix{T}
 
 end
 
 function get_θᵐₛₜ(
-  FEMSpace₀::UnsteadyProblem,
+  FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady{T},
   Param::ParametricInfoUnsteady) where T
@@ -319,63 +313,58 @@ function get_θᵐₛₜ(
   else
     timesθ_mod,MDEIM_idx_mod =
       modify_timesθ_and_MDEIM_idx(RBVars.MDEIM_idx_M,RBInfo,RBVars)
-      M_μ_sparse = build_sparse_mat(FEMSpace₀, FEMInfo, Param, RBVars.sparse_el_M,
+      M_μ_sparse = build_sparse_mat(FEMSpace, FEMInfo, Param, RBVars.sparse_el_M,
       timesθ_mod; var="M")
     θᵐ = RBVars.MDEIMᵢ_M\Vector(M_μ_sparse[MDEIM_idx_mod])
   end
 
-  reshape(θᵐ,:,1)
+  reshape(θᵐ,:,1)::Matrix{T}
 
 end
 
 function get_θᵃ(
-  FEMSpace₀::UnsteadyProblem,
+  FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady{T},
   Param::ParametricInfoUnsteady) where T
 
   timesθ = get_timesθ(RBInfo)
+
   if !RBInfo.probl_nl["A"]
     θᵃ = [Param.αₜ(t_θ,Param.μ) for t_θ = timesθ]
   else
     A_μ_sparse = build_sparse_mat(
-      FEMSpace₀,FEMInfo,Param,RBVars.S.sparse_el_A,timesθ;var="A")
+      FEMSpace,FEMInfo,Param,RBVars.S.sparse_el_A,timesθ;var="A")
     θᵃ = (RBVars.S.MDEIMᵢ_A \
       Matrix{T}(reshape(A_μ_sparse, :, RBVars.Nₜ)[RBVars.S.MDEIM_idx_A, :]))
-    #= Nₛᵘ = RBVars.S.Nₛᵘ
-    θᵃ = zeros(RBVars.S.Qᵃ, RBVars.Nₜ)
-    @simd for iₜ = 1:RBVars.Nₜ
-      θᵃ[:,iₜ] = M_DEIM_online(A_μ_sparse[:,(iₜ-1)*Nₛᵘ+1:iₜ*Nₛᵘ],
-        RBVars.S.MDEIMᵢ_A, RBVars.S.MDEIM_idx_A)
-    end =#
   end
 
-  reshape(θᵃ, RBVars.S.Qᵃ, RBVars.Nₜ)
+  reshape(θᵃ, RBVars.S.Qᵃ, RBVars.Nₜ)::Matrix{T}
 
 end
 
 function get_θᵃₛₜ(
-  FEMSpace₀::UnsteadyProblem,
+  FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady{T},
   Param::ParametricInfoUnsteady) where T
 
   if !RBInfo.probl_nl["A"]
-    RBInfo.θᵃ = [one(T)]
+    θᵃ = [one(T)]
   else
     timesθ_mod,MDEIM_idx_mod =
       modify_timesθ_and_MDEIM_idx(RBVars.S.MDEIM_idx_A,RBInfo,RBVars)
-    A_μ_sparse = build_sparse_mat(FEMSpace₀,FEMInfo, Param, RBVars.S.sparse_el_A,
+    A_μ_sparse = build_sparse_mat(FEMSpace,FEMInfo, Param, RBVars.S.sparse_el_A,
       timesθ_mod; var="A")
-    RBInfo.θᵃ = RBVars.S.MDEIMᵢ_A\Vector(A_μ_sparse[MDEIM_idx_mod])
+    θᵃ = RBVars.S.MDEIMᵢ_A\Vector(A_μ_sparse[MDEIM_idx_mod])
   end
 
-  reshape(θᵃ, :, 1)
+  reshape(θᵃ, :, 1)::Matrix{T}
 
 end
 
 function get_θᶠʰ(
-  FEMSpace₀::UnsteadyProblem,
+  FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady{T},
   Param::ParametricInfoUnsteady) where T
@@ -385,44 +374,36 @@ function get_θᶠʰ(
   end
 
   timesθ = get_timesθ(RBInfo)
-  #θᶠ, θʰ = Float64[], Float64[]
 
   if !RBInfo.probl_nl["f"]
     θᶠ = [Param.fₜ(t_θ) for t_θ = timesθ]
   else
-    F_μ = assemble_FEM_structure(FEMSpace₀, RBInfo, Param, "F")
+    F_μ = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
     F = zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ)
     for (i,tᵢ) in enumerate(timesθ)
       F[:,i] = F_μ(tᵢ)
     end
     θᶠ = (RBVars.S.DEIMᵢ_F \ Matrix{T}(F[RBVars.S.DEIM_idx_F, :]))
-    #= @simd for iₜ = 1:RBVars.Nₜ
-      append!(θᶠ,
-        M_DEIM_online(F_μ(timesθ[iₜ]), RBVars.S.DEIMᵢ_F, RBVars.S.DEIM_idx_F))
-    end =#
   end
 
   if !RBInfo.probl_nl["h"]
     θʰ = [Param.hₜ(t_θ) for t_θ = timesθ]
   else
-    H_μ = assemble_FEM_structure(FEMSpace₀, RBInfo, Param, "H")
+    H_μ = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
     H = zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ)
     for (i,tᵢ) in enumerate(timesθ)
       H[:,i] = H_μ(tᵢ)
     end
     θʰ = (RBVars.S.DEIMᵢ_H \ Matrix{T}(H[RBVars.S.DEIM_idx_H, :]))
-    #= @simd for iₜ = 1:RBVars.Nₜ
-      append!(θʰ,
-        M_DEIM_online(H_μ(timesθ[iₜ]), RBVars.S.DEIMᵢ_H, RBVars.S.DEIM_idx_H))
-    end =#
   end
 
-  reshape(θᶠ, RBVars.S.Qᶠ, RBVars.Nₜ), reshape(θʰ, RBVars.S.Qʰ, RBVars.Nₜ)
+  (reshape(θᶠ, RBVars.S.Qᶠ, RBVars.Nₜ)::Matrix{T},
+  reshape(θʰ, RBVars.S.Qʰ, RBVars.Nₜ)::Matrix{T})
 
 end
 
 function get_θᶠʰₛₜ(
-  FEMSpace₀::UnsteadyProblem,
+  FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady{T},
   Param::ParametricInfoUnsteady) where T
@@ -434,7 +415,7 @@ function get_θᶠʰₛₜ(
   if !RBInfo.probl_nl["f"]
     θᶠ = [one(T)]
   else
-    F_μ = assemble_FEM_structure(FEMSpace₀, RBInfo, Param, "F")
+    F_μ = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
     F = zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ)
     for (i,tᵢ) in enumerate(timesθ)
       F[:,i] = F_μ(tᵢ)
@@ -446,7 +427,7 @@ function get_θᶠʰₛₜ(
   if !RBInfo.probl_nl["h"]
     θʰ = [one(T)]
   else
-    H_μ = assemble_FEM_structure(FEMSpace₀, RBInfo, Param, "H")
+    H_μ = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
     H = zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ)
     for (i,tᵢ) in enumerate(timesθ)
       H[:,i] = H_μ(tᵢ)
@@ -455,17 +436,17 @@ function get_θᶠʰₛₜ(
     θʰ = T.(RBVars.S.DEIMᵢ_H\Vector(H[DEIM_idx_mod]))
   end
 
-  reshape(θᶠ, :, 1), reshape(θʰ, :, 1)
+  reshape(θᶠ, :, 1)::Matrix{T}, reshape(θʰ, :, 1)::Matrix{T}
 
 end
 
 function solve_RB_system(
-  FEMSpace₀::UnsteadyProblem,
+  FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady{T},
   Param::ParametricInfoUnsteady) where T
 
-  get_RB_system(FEMSpace₀, RBInfo, RBVars, Param)
+  get_RB_system(FEMSpace, RBInfo, RBVars, Param)
 
   println("Solving RB problem via backslash")
   println("Condition number of the system's matrix: $(cond(RBVars.S.LHSₙ[1]))")
@@ -538,19 +519,19 @@ function online_phase(
   μ = load_CSV(Array{T}[],
     joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))::Vector{Vector{T}}
   model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
-  FEMSpace₀ = get_FEMSpace₀(RBInfo.FEMInfo.problem_id,RBInfo.FEMInfo,model)
+  FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id,RBInfo.FEMInfo,model)
 
   get_norm_matrix(RBInfo, RBVars.S)
   (ũ_μ,uₙ_μ,mean_uₕ_test,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,
     mean_online_time,mean_reconstruction_time) =
-    loop_on_params(FEMSpace₀, RBInfo, RBVars, μ, param_nbs)
+    loop_on_params(FEMSpace, RBInfo, RBVars, μ, param_nbs)
 
   adapt_time = 0.
   if RBInfo.adaptivity
     adapt_time = @elapsed begin
       (ũ_μ,uₙ_μ,_,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,
       H1_L2_err,mean_online_time,mean_reconstruction_time) =
-      adaptive_loop_on_params(FEMSpace₀, RBInfo, RBVars, mean_uₕ_test,
+      adaptive_loop_on_params(FEMSpace, RBInfo, RBVars, mean_uₕ_test,
       mean_pointwise_err, μ, param_nbs)
     end
   end
@@ -576,10 +557,10 @@ function online_phase(
   end
 
   pass_to_pp = Dict("path_μ"=>path_μ,
-    "FEMSpace"=>FEMSpace₀, "H1_L2_err"=>H1_L2_err,
+    "FEMSpace"=>FEMSpace, "H1_L2_err"=>H1_L2_err,
     "mean_H1_err"=>mean_H1_err, "mean_point_err_u"=>mean_pointwise_err)
 
-  if RBInfo.postprocess
+  if RBInfo.post_process
     println("Post-processing the results...")
     post_process(RBInfo, pass_to_pp)
   end
@@ -591,7 +572,7 @@ function online_phase(
 end
 
 function loop_on_params(
-  FEMSpace₀::UnsteadyProblem,
+  FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady{T},
   μ::Vector{Vector{T}},
@@ -623,7 +604,7 @@ function loop_on_params(
     end
     mean_uₕ_test += uₕ_test
 
-    solve_RB_system(FEMSpace₀, RBInfo, RBVars, Param)
+    solve_RB_system(FEMSpace, RBInfo, RBVars, Param)
     reconstruction_time = @elapsed begin
       reconstruct_FEM_solution(RBVars)
     end
@@ -649,7 +630,7 @@ function loop_on_params(
 end
 
 function adaptive_loop_on_params(
-  FEMSpace₀::UnsteadyProblem,
+  FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady{T},
   mean_uₕ_test::Matrix,
@@ -698,6 +679,6 @@ function adaptive_loop_on_params(
   RBInfo.save_offline_structures = false
   assemble_offline_structures(RBInfo, RBVars)
 
-  loop_on_params(FEMSpace₀,RBInfo,RBVars,μ,param_nbs)
+  loop_on_params(FEMSpace,RBInfo,RBVars,μ,param_nbs)
 
 end

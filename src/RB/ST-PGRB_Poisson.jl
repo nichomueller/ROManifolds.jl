@@ -23,7 +23,7 @@ function get_Mₙ(
     RBVars.MΦ = reshape(MΦ,RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,:)
     MΦᵀPᵤ⁻¹ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv"))
     RBVars.MΦᵀPᵤ⁻¹ = reshape(MΦᵀPᵤ⁻¹,RBVars.S.nₛᵘ,RBVars.S.Nₛᵘ,:)
-    return []
+    return [""]
   else
     println("Failed to import the reduced affine mass matrix: must build it")
     return ["M"]
@@ -39,7 +39,7 @@ function get_MAₙ(
     println("S-PGRB: importing MAₙ")
     MAₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "MAₙ.csv"))
     RBVars.MAₙ = reshape(MAₙ,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,:)
-    return []
+    return [""]
   else
     println("ST-PGRB: failed to import MAₙ: must build it")
     return ["M","A"]

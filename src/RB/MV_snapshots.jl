@@ -4,16 +4,17 @@ function build_matrix_snapshots(
   μ::Vector{Vector{T}},
   var::String) where T
 
+  Mat,row_idx = Matrix{T}(undef,0,0),Int64[]
   for k = 1:RBInfo.nₛ_MDEIM
     println("Snapshot number $k, $var")
     Param = get_ParamInfo(RBInfo, μ[i_nₛ])
     Mat_k = assemble_FEM_structure(FEMSpace, RBInfo, Param, var)
-    i, v = findnz(Mat_k[:])
+    i, v = findnz(Mat_k[:])::Tuple{Vector{Int},Vector{T}}
     if i_nₛ == 1
-      global row_idx = i
-      global Mat = zeros(T,length(row_idx),RBInfo.nₛ_MDEIM)
+      row_idx = i
+      Mat = zeros(T,length(row_idx),RBInfo.nₛ_MDEIM)
     else
-      global Mat[:,i_nₛ] = v
+      Mat[:,i_nₛ] = v
     end
   end
 
@@ -32,14 +33,15 @@ function build_matrix_snapshots(
   Param = get_ParamInfo(RBInfo, μ)
   Mat_t = assemble_FEM_structure(FEMSpace, RBInfo, Param, var)
 
+  Mat,row_idx = Matrix{T}(undef,0,0),Int64[]
   for i_t = 1:Nₜ
     Mat_i = Mat_t(timesθ[i_t])
-    i, v = findnz(Mat_i[:])
+    i, v = findnz(Mat_i[:])::Tuple{Vector{Int},Vector{T}}
     if i_t == 1
-      global row_idx = i
-      global Mat = zeros(T,length(row_idx),Nₜ)
+      row_idx = i
+      Mat = zeros(T,length(row_idx),Nₜ)
     end
-    global Mat[:,i_t] = v
+    Mat[:,i_t] = v
   end
 
   Mat,row_idx
@@ -139,7 +141,7 @@ function functional_MDEIM(
   @simd for q = 1:Q
     Θq = FEFunction(FEMSpace.V₀_quad,Θmat[:,q])
     Matq = assemble_parametric_FE_matrix(FEMSpace,Θq,var)
-    i,v = findnz(Matq[:])
+    i,v = findnz(Matq[:])::Tuple{Vector{Int},Vector{T}}
     if q == 1
       row_idx = i
       snaps = zeros(T,length(row_idx),Q)
@@ -179,7 +181,7 @@ function functional_MDEIM_sampling(
   @simd for q = 1:Q
     Θq = FEFunction(FEMSpace.V₀_quad,Θmat[:,q])
     Matq = assemble_parametric_FE_matrix(FEMSpace,Θq,var)
-    i,v = findnz(Matq[:])
+    i,v = findnz(Matq[:])::Tuple{Vector{Int},Vector{T}}
     if q == 1
       row_idx = i
       snaps = zeros(T,length(row_idx),Q)
@@ -222,20 +224,20 @@ function get_snaps_MDEIM(
   timesθ = get_timesθ(RBInfo)
 
   if RBInfo.space_time_M_DEIM
-    snaps, Σ, row_idx = spacetime_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T},Vector{T},Vector{Int}}
+    snaps, Σ, row_idx = spacetime_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
   elseif RBInfo.functional_M_DEIM
     if RBInfo.sampling_M_DEIM
       nₜ = floor(Int,length(timesθ)*RBInfo.sampling_percentage)
-      snaps, Σ, row_idx = functional_MDEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)::Tuple{Matrix{T},Vector{T},Vector{Int}}
+      snaps, Σ, row_idx = functional_MDEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
     else
-      snaps, Σ, row_idx = functional_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T},Vector{T},Vector{Int}}
+      snaps, Σ, row_idx = functional_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
     end
   else
     if RBInfo.sampling_M_DEIM
       nₜ = floor(Int,length(timesθ)*RBInfo.sampling_percentage)
-      snaps, Σ, row_idx = standard_MDEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)::Tuple{Matrix{T},Vector{T},Vector{Int}}
+      snaps, Σ, row_idx = standard_MDEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
     else
-      snaps, Σ, row_idx = standard_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T},Vector{T},Vector{Int}}
+      snaps, Σ, row_idx = standard_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
     end
   end
 
@@ -491,10 +493,10 @@ function assemble_parametric_FE_matrix(
 
   if var == "A"
     return (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Θq*∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
-      FEMSpace.V(0.0), FEMSpace.V₀))::Matrix{T}
+      FEMSpace.V(0.0), FEMSpace.V₀))::SparseMatrixCSC{T, Int64}
   elseif var == "M"
     return (assemble_matrix(∫(FEMSpace.ϕᵥ*(Θq*FEMSpace.ϕᵤ(0.0)))*FEMSpace.dΩ,
-      FEMSpace.V(0.0), FEMSpace.V₀))::Matrix{T}
+      FEMSpace.V(0.0), FEMSpace.V₀))::SparseMatrixCSC{T, Int64}
   else
     error("Need to assemble an unrecognized FE structure")
   end
@@ -523,10 +525,10 @@ function assemble_parametric_FE_matrix(
 
   if var == "A"
     return (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Θq*∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
-      FEMSpace.V(0.0), FEMSpace.V₀))::Matrix{T}
+      FEMSpace.V(0.0), FEMSpace.V₀))::SparseMatrixCSC{T, Int64}
   elseif var == "M"
     return (assemble_matrix(∫(FEMSpace.ϕᵥ⋅(Θq*FEMSpace.ϕᵤ(0.0)))*FEMSpace.dΩ,
-      FEMSpace.V(0.0), FEMSpace.V₀))::Matrix{T}
+      FEMSpace.V(0.0), FEMSpace.V₀))::SparseMatrixCSC{T, Int64}
   else
     error("Need to assemble an unrecognized FE structure")
   end

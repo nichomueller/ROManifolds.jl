@@ -37,6 +37,20 @@ function get_problem_id(problem_name::String)
   end
 end
 
+function init_FEM_variables(
+  ::Info{T}) where T
+
+  M = sparse([], [], T[])
+  A = sparse([], [], T[])
+  B = sparse([], [], T[])
+  Xᵘ₀ = sparse([], [], T[])
+  F = Vector{T}(undef,0)
+  H = Vector{T}(undef,0)
+
+  M, A, B, Xᵘ₀, F, H
+
+end
+
 function get_ParamInfo(
   FEMInfo::SteadyInfo{T},
   problem_id::NTuple{1,Int},
@@ -150,6 +164,18 @@ function get_ParamInfo(
 
 end
 
+function nonlinearity_lifting_op(FEMInfo::Info)
+  if !FEMInfo.probl_nl["A"] && !FEMInfo.probl_nl["g"]
+    return 0
+  elseif FEMInfo.probl_nl["A"] && !FEMInfo.probl_nl["g"]
+    return 1
+  elseif !FEMInfo.probl_nl["A"] && FEMInfo.probl_nl["g"]
+    return 2
+  else
+    return 3
+  end
+end
+
 #= function get_f(FEMInfo::UnsteadyInfo{T}, ::NTuple{2,Int64}, μ) where T
 
   fₛ(x) = zero(VectorValue(N,T))
@@ -211,7 +237,7 @@ function find_FE_elements(
   trian::Triangulation,
   idx::Vector{T}) where T
 
-  connectivity = get_cell_dof_ids(V₀, trian)
+  connectivity = get_cell_dof_ids(V₀, trian)::Table{Int32, Vector{Int32}, Vector{Int32}}
 
   el = Int64[]
   for i = 1:length(idx)

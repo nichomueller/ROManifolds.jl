@@ -27,7 +27,7 @@ function get_norm_matrix(
     if RBInfo.use_norm_X
       RBVars.Xᵘ₀ = Xᵘ₀
     else
-      RBVars.Xᵘ₀ = sparse(I(RBVars.Nₛᵘ))
+      RBVars.Xᵘ₀ = 1.0sparse(I,RBVars.Nₛᵘ,RBVars.Nₛᵘ)
     end
   end
 
@@ -241,13 +241,13 @@ function get_M_DEIM_structures(
 end
 
 function get_Fₙ(
-  RBInfo::ROMInfoSteady,
+  RBInfo::Info,
   RBVars::PoissonSteady{T}) where T
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Fₙ.csv"))
     println("Importing Fₙ")
     RBVars.Fₙ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path, "Fₙ.csv"))
-    return []
+    return [""]
   else
     println("Failed to import Fₙ: must build it")
     return ["F"]
@@ -256,13 +256,13 @@ function get_Fₙ(
 end
 
 function get_Hₙ(
-  RBInfo::ROMInfoSteady,
+  RBInfo::Info,
   RBVars::PoissonSteady{T}) where T
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Hₙ.csv"))
     println("Importing Hₙ")
     RBVars.Hₙ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path, "Hₙ.csv"))
-    return []
+    return [""]
   else
     println("Failed to import Hₙ: must build it")
     return ["H"]
@@ -414,36 +414,38 @@ function save_system_blocks(
 end
 
 function get_θᵃ(
-  RBInfo::ROMInfoSteady,
+  FEMSpace::SteadyProblem,
+  RBInfo::ROMInfoSteady{T},
   RBVars::PoissonSteady,
-  Param::ParametricInfoSteady)
+  Param::ParametricInfoSteady) where T
 
   if !RBInfo.probl_nl["A"]
-    θᵃ = Param.α(Point(0.,0.))
+    θᵃ = reshape([Param.α(Point(0.,0.))],1,1)
   else
-    A_μ_sparse = build_sparse_mat(FEMInfo, FEMSpace, Param, RBVars.sparse_el_A)
+    A_μ_sparse = build_sparse_mat(FEMSpace, FEMInfo, Param, RBVars.sparse_el_A)
     θᵃ = M_DEIM_online(A_μ_sparse, RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A)
   end
-  θᵃ
+  θᵃ::Matrix{T}
 end
 
 function get_θᶠʰ(
-  RBInfo::ROMInfoSteady,
+  FEMSpace::SteadyProblem,
+  RBInfo::ROMInfoSteady{T},
   RBVars::PoissonSteady,
-  Param::ParametricInfoSteady)
+  Param::ParametricInfoSteady) where T
 
   if RBInfo.build_parametric_RHS
     error("Cannot fetch θᶠ, θʰ if the RHS is built online")
   end
 
   if !RBInfo.probl_nl["f"]
-    θᶠ = Param.f(Point(0.,0.))
+    θᶠ = reshape([Param.f(Point(0.,0.))],1,1)
   else
     F_μ = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
     θᶠ = M_DEIM_online(F_μ, RBVars.DEIMᵢ_F, RBVars.DEIM_idx_F)
   end
   if !RBInfo.probl_nl["h"]
-    θʰ = Param.h(Point(0.,0.))
+    θʰ = reshape([Param.h(Point(0.,0.))],1,1)
   else
     H_μ = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
     θʰ = M_DEIM_online(H_μ, RBVars.DEIMᵢ_H, RBVars.DEIM_idx_H)
@@ -461,17 +463,20 @@ function initialize_online_time(RBVars::PoissonSteady)
   RBVars.online_time = 0.0
 end
 
-function assemble_online_structure(θ, Mat)
+function assemble_online_structure(θ::Matrix{T}, Mat::Array{T}) where T
   Mat_shape = size(Mat)
   Mat = reshape(Mat,:,Mat_shape[end])
-  if length(size(θ)) == 2 && size(θ)[2] > 1
-    return reshape(Mat*θ,(Mat_shape[1:end-1]...,size(θ)[2]))
+  Matμ = zeros(T, Mat_shape[1:end-1])
+  if size(θ)[2] > 1
+    Matμ = reshape(Mat*θ,(Mat_shape[1:end-1]...,size(θ)[2]))
   else
-    return reshape(Mat*θ,Mat_shape[1:end-1])
+    Matμ = reshape(Mat*θ,Mat_shape[1:end-1])
   end
+  Matμ::Array{T}
 end
 
 function get_RB_system(
+  FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::PoissonSteady,
   Param::ParametricInfoSteady)
@@ -484,7 +489,7 @@ function get_RB_system(
     blocks = [1]
     operators = get_system_blocks(RBInfo, RBVars, blocks, blocks)
 
-    θᵃ, θᶠ, θʰ = get_θ(RBInfo, RBVars, Param)
+    θᵃ, θᶠ, θʰ = get_θ(FEMSpace, RBInfo, RBVars, Param)
 
     if "LHS" ∈ operators
       println("Assembling reduced LHS")
@@ -499,7 +504,7 @@ function get_RB_system(
         push!(RBVars.RHSₙ, reshape(Fₙ_μ+Hₙ_μ,:,1))
       else
         println("Assembling reduced RHS exactly")
-        Fₙ_μ, Hₙ_μ = build_param_RHS(RBInfo, RBVars, Param, θᵃ)
+        Fₙ_μ, Hₙ_μ = build_param_RHS(FEMSpace, RBInfo, RBVars, Param, θᵃ)
         push!(RBVars.RHSₙ, reshape(Fₙ_μ+Hₙ_μ,:,1))
       end
     end
@@ -510,11 +515,12 @@ function get_RB_system(
 end
 
 function solve_RB_system(
+  FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::PoissonSteady,
   Param::ParametricInfoSteady)
 
-  get_RB_system(RBInfo, RBVars, Param)
+  get_RB_system(FEMSpace, RBInfo, RBVars, Param)
   println("Solving RB problem via backslash")
   println("Condition number of the system's matrix: $(cond(RBVars.LHSₙ[1]))")
   RBVars.online_time += @elapsed begin
@@ -570,8 +576,12 @@ end
 function online_phase(
   RBInfo::ROMInfoSteady,
   RBVars::PoissonSteady{T},
-  μ::Vector{Vector{T}},
   Param_nbs) where T
+
+  μ = load_CSV(Array{T}[],
+    joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))::Vector{Vector{T}}
+  model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
+  FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id,RBInfo.FEMInfo,model)
 
   mean_H1_err = 0.0
   mean_pointwise_err = zeros(T, RBVars.Nₛᵘ)
@@ -590,7 +600,7 @@ function online_phase(
 
     uₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, nb]
 
-    solve_RB_system(RBInfo, RBVars, Param)
+    solve_RB_system(FEMSpace, RBInfo, RBVars, Param)
     reconstruction_time = @elapsed begin
       reconstruct_FEM_solution(RBVars)
     end
@@ -636,7 +646,7 @@ function online_phase(
 
   pass_to_pp = Dict("path_μ"=>path_μ, "FEMSpace"=>FEMSpace, "mean_point_err_u"=>mean_pointwise_err)
 
-  if RBInfo.postprocess
+  if RBInfo.post_process
     post_process(RBInfo, pass_to_pp)
   end
 

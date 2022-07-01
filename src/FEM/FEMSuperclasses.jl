@@ -125,6 +125,7 @@ struct SteadyInfo{T} <: Info{T}
   neumann_bnds::Vector{Int64}
   solver::String
   paths::F
+  nₛ::Int64
 end
 
 struct UnsteadyInfo{T} <: Info{T}
@@ -139,6 +140,7 @@ struct UnsteadyInfo{T} <: Info{T}
   neumann_bnds::Vector{Int64}
   solver::String
   paths::F
+  nₛ::Int64
   time_method::String
   θ::Float64
   RK_type::Symbol

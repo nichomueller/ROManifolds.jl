@@ -89,45 +89,45 @@ function get_timesθ(RBInfo::ROMInfoUnsteady)
 end
 
 function build_sparse_mat(
-  FEMSpace₀::SteadyProblem,
+  FEMSpace::SteadyProblem,
   FEMInfo::SteadyInfo,
   Param::ParametricInfoSteady,
   el::Vector{Int64};
   var="A")
 
-  Ω_sparse = view(FEMSpace₀.Ω, el)
+  Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
 
   if var == "A"
-    Mat = assemble_matrix(∫(∇(FEMSpace₀.ϕᵥ)⋅(Param.α*∇(FEMSpace₀.ϕᵤ)))*dΩ_sparse,
-      FEMSpace₀.V, FEMSpace₀.V₀)
+    Mat = assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Param.α*∇(FEMSpace.ϕᵤ)))*dΩ_sparse,
+      FEMSpace.V, FEMSpace.V₀)
   else
     error("Unrecognized sparse matrix")
   end
 
-  Mat
+  Mat::SparseMatrixCSC{T, Int64}
 
 end
 
 function build_sparse_mat(
-  FEMSpace₀::UnsteadyProblem,
-  FEMInfo::UnsteadyInfo,
+  FEMSpace::UnsteadyProblem,
+  FEMInfo::UnsteadyInfo{T},
   Param::ParametricInfoUnsteady,
   el::Vector{Int64},
   timesθ::Vector;
-  var="A")
+  var="A") where T
 
-  Ω_sparse = view(FEMSpace₀.Ω, el)
+  Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
   Nₜ = length(timesθ)
 
   function define_Matₜ(t::Real, var::String)
     if var == "A"
-      return assemble_matrix(∫(∇(FEMSpace₀.ϕᵥ)⋅(Param.α(t)*∇(FEMSpace₀.ϕᵤ(t))))*dΩ_sparse,
-        FEMSpace₀.V(t), FEMSpace₀.V₀)
-    elseif mat == "M"
-      return assemble_matrix(∫(FEMSpace₀.ϕᵥ*(Param.m(t)*FEMSpace₀.ϕᵤ(t)))*dΩ_sparse,
-        FEMSpace₀.V(t), FEMSpace₀.V₀)
+      return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Param.α(t)*∇(FEMSpace.ϕᵤ(t))))*dΩ_sparse,
+        FEMSpace.V(t), FEMSpace.V₀)
+    elseif var == "M"
+      return assemble_matrix(∫(FEMSpace.ϕᵥ*(Param.m(t)*FEMSpace.ϕᵤ(t)))*dΩ_sparse,
+        FEMSpace.V(t), FEMSpace.V₀)
     else
       error("Unrecognized sparse matrix")
     end
@@ -135,16 +135,16 @@ function build_sparse_mat(
   Matₜ(t) = define_Matₜ(t, var)
 
   for (i_t,t) in enumerate(timesθ)
-    i,j,v = findnz(Matₜ(t))
+    i,j,v = findnz(Matₜ(t))::Tuple{Vector{Int},Vector{Int},Vector{T}}
     if i_t == 1
-      global Mat = sparse(i,j,v,FEMSpace₀.Nₛᵘ,FEMSpace₀.Nₛᵘ*Nₜ)
+      global Mat = sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ*Nₜ)
     else
-      Mat[:,(i_t-1)*FEMSpace₀.Nₛᵘ+1:i_t*FEMSpace₀.Nₛᵘ] =
-        sparse(i,j,v,FEMSpace₀.Nₛᵘ,FEMSpace₀.Nₛᵘ)
+      Mat[:,(i_t-1)*FEMSpace.Nₛᵘ+1:i_t*FEMSpace.Nₛᵘ] =
+        sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ)
     end
   end
 
-  Mat
+  Mat::SparseMatrixCSC{T, Int64}
 
 end
 

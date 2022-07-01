@@ -7,7 +7,7 @@ function get_Aₙ(
     Aₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "Aₙ.csv"))
     RBVars.Aₙ = reshape(Aₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)
     RBVars.Qᵃ = size(RBVars.Aₙ)[3]
-    return []
+    return [""]
   else
     println("Failed to import Aₙ: must build it")
     return ["A"]
@@ -126,6 +126,7 @@ function get_Q(
 end
 
 function build_param_RHS(
+  FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::PoissonSGRB,
   Param::ParametricInfoSteady,
@@ -133,18 +134,20 @@ function build_param_RHS(
 
   F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
   H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
-  reshape((RBVars.Φₛᵘ)'*F,:,1), reshape((RBVars.Φₛᵘ)'*H,:,1)
+  (reshape((RBVars.Φₛᵘ)'*F,:,1)::Matrix{T},
+    reshape((RBVars.Φₛᵘ)'*H,:,1)::Matrix{T})
 
 end
 
 function get_θ(
+  FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::PoissonSGRB{T},
   Param::ParametricInfoSteady) where T
 
-  θᵃ = get_θᵃ(RBInfo, RBVars, Param)
+  θᵃ = get_θᵃ(FEMSpace, RBInfo, RBVars, Param)
   if !RBInfo.build_parametric_RHS
-    θᶠ, θʰ = get_θᶠʰ(RBInfo, RBVars, Param)
+    θᶠ, θʰ = get_θᶠʰ(FEMSpace, RBInfo, RBVars, Param)
   else
     θᶠ, θʰ = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
   end

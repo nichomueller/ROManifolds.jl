@@ -15,7 +15,7 @@ function get_Mₙ(
     Mₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
     RBVars.Mₙ = reshape(Mₙ,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,:)
     RBVars.Qᵐ = size(RBVars.Mₙ)[end]
-    return []
+    return [""]
   else
     println("Failed to import the reduced affine mass matrix: must build it")
     return ["M"]
@@ -251,12 +251,12 @@ function get_RB_LHS_blocks(
   Aₙ₁_tmp = zeros(T,RBVars.nᵘ,RBVars.nᵘ,Qᵃ)
 
   @simd for qᵐ = 1:Qᵐ
-    Mₙ_tmp[:,:,qᵐ] = kron(RBVars.Mₙ[:,:,qᵐ],Φₜᵘ_M[:,:,qᵐ])
-    Mₙ₁_tmp[:,:,qᵐ] = kron(RBVars.Mₙ[:,:,qᵐ],Φₜᵘ₁_M[:,:,qᵐ])
+    Mₙ_tmp[:,:,qᵐ] = kron(RBVars.Mₙ[:,:,qᵐ],Φₜᵘ_M[:,:,qᵐ])::Matrix{T}
+    Mₙ₁_tmp[:,:,qᵐ] = kron(RBVars.Mₙ[:,:,qᵐ],Φₜᵘ₁_M[:,:,qᵐ])::Matrix{T}
   end
   @simd for qᵃ = 1:Qᵃ
-    Aₙ_tmp[:,:,qᵃ] = kron(RBVars.S.Aₙ[:,:,qᵃ],Φₜᵘ_A[:,:,qᵃ])
-    Aₙ₁_tmp[:,:,qᵃ] = kron(RBVars.S.Aₙ[:,:,qᵃ],Φₜᵘ₁_A[:,:,qᵃ])
+    Aₙ_tmp[:,:,qᵃ] = kron(RBVars.S.Aₙ[:,:,qᵃ],Φₜᵘ_A[:,:,qᵃ])::Matrix{T}
+    Aₙ₁_tmp[:,:,qᵃ] = kron(RBVars.S.Aₙ[:,:,qᵃ],Φₜᵘ₁_A[:,:,qᵃ])::Matrix{T}
   end
   Mₙ = reshape(sum(Mₙ_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
   Mₙ₁ = reshape(sum(Mₙ₁_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
@@ -369,7 +369,7 @@ function get_RB_RHS_blocks(
 end
 
 function get_RB_system(
-  FEMSpace₀::UnsteadyProblem,
+  FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTGRB{T},
   Param::ParametricInfoUnsteady) where T
@@ -383,9 +383,9 @@ function get_RB_system(
     operators = get_system_blocks(RBInfo,RBVars.S,blocks,blocks)
 
     if RBInfo.space_time_M_DEIM
-      θᵐ, θᵃ, θᶠ, θʰ = get_θₛₜ(FEMSpace₀, RBInfo, RBVars, Param)
+      θᵐ, θᵃ, θᶠ, θʰ = get_θₛₜ(FEMSpace, RBInfo, RBVars, Param)
     else
-      θᵐ, θᵃ, θᶠ, θʰ = get_θ(FEMSpace₀, RBInfo, RBVars, Param)
+      θᵐ, θᵃ, θᶠ, θʰ = get_θ(FEMSpace, RBInfo, RBVars, Param)
     end
 
     if "LHS" ∈ operators
@@ -400,7 +400,7 @@ function get_RB_system(
       if !RBInfo.build_parametric_RHS
         get_RB_RHS_blocks(RBInfo, RBVars, θᶠ, θʰ)
       else
-        build_param_RHS(FEMSpace₀, RBInfo, RBVars, Param)
+        build_param_RHS(FEMSpace, RBInfo, RBVars, Param)
       end
     end
   end
@@ -410,15 +410,15 @@ function get_RB_system(
 end
 
 function build_param_RHS(
-  FEMSpace₀::UnsteadyProblem,
+  FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTGRB{T},
   Param::ParametricInfoUnsteady) where T
 
   println("Assembling RHS exactly using θ-method time scheme, θ=$(RBInfo.θ)")
   δtθ = RBInfo.δt*RBInfo.θ
-  F_t = assemble_FEM_structure(FEMSpace₀, RBInfo, Param, "F")
-  H_t = assemble_FEM_structure(FEMSpace₀, RBInfo, Param, "H")
+  F_t = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
+  H_t = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
   F, H = zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ), zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ)
   timesθ = get_timesθ(RBInfo)
   for (i,tᵢ) in enumerate(timesθ)
@@ -434,15 +434,15 @@ function build_param_RHS(
 end
 
 function get_θ(
-  FEMSpace₀::UnsteadyProblem,
+  FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTGRB{T},
   Param::ParametricInfoUnsteady) where T
 
-  θᵐ = get_θᵐ(FEMSpace₀, RBInfo, RBVars, Param)
-  θᵃ = get_θᵃ(FEMSpace₀, RBInfo, RBVars, Param)
+  θᵐ = get_θᵐ(FEMSpace, RBInfo, RBVars, Param)
+  θᵃ = get_θᵃ(FEMSpace, RBInfo, RBVars, Param)
   if !RBInfo.build_parametric_RHS
-    θᶠ, θʰ = get_θᶠʰ(FEMSpace₀, RBInfo, RBVars, Param)
+    θᶠ, θʰ = get_θᶠʰ(FEMSpace, RBInfo, RBVars, Param)
   else
     θᶠ, θʰ = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
   end
@@ -452,15 +452,15 @@ function get_θ(
 end
 
 function get_θₛₜ(
-  FEMSpace₀::UnsteadyProblem,
+  FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTGRB{T},
   Param::ParametricInfoUnsteady) where T
 
-  θᵐ = get_θᵐₛₜ(FEMSpace₀, RBInfo, RBVars, Param)
-  θᵃ = get_θᵃₛₜ(FEMSpace₀, RBInfo, RBVars, Param)
+  θᵐ = get_θᵐₛₜ(FEMSpace, RBInfo, RBVars, Param)
+  θᵃ = get_θᵃₛₜ(FEMSpace, RBInfo, RBVars, Param)
   if !RBInfo.build_parametric_RHS
-    θᶠ, θʰ = get_θᶠʰₛₜ(FEMSpace₀, RBInfo, RBVars, Param)
+    θᶠ, θʰ = get_θᶠʰₛₜ(FEMSpace, RBInfo, RBVars, Param)
   else
     θᶠ, θʰ = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
   end
