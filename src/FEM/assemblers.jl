@@ -331,6 +331,8 @@ function assemble_second_lifting(
   FEMSpace::FEMSpaceStokesUnsteady{D,T},
   Param::ParametricInfoUnsteady) where {D,T}
 
+  nonlin_lift = nonlinearity_lifting_op(FEMInfo)
+
   g₁(x,t::Real) = one(VectorValue(get_NTuple(D, T)))
   g₁(t::Real) = x->g₁(x,t)
 

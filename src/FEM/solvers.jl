@@ -4,7 +4,7 @@ function FE_solve(
   Param::ParametricInfoSteady;
   subtract_Ddata = true) where T
 
-  Gₕ = assemble_lifting(FEMSpace, Param)
+  R₁ = assemble_lifting(FEMSpace, Param)
 
   a(u, v) = ∫(∇(v) ⋅ (Param.α * ∇(u))) * FEMSpace.dΩ
   rhs(v) = ∫(v * Param.f) * FEMSpace.dΩ + ∫(v * Param.h) * FEMSpace.dΓn
@@ -17,7 +17,7 @@ function FE_solve(
   end
 
   if subtract_Ddata
-    uₕ = get_free_dof_values(uₕ_field)::Vector{T} - Gₕ
+    uₕ = get_free_dof_values(uₕ_field)::Vector{T} - R₁
   else
     uₕ = get_free_dof_values(uₕ_field)::Vector{T}
   end
@@ -32,7 +32,7 @@ function FE_solve(
   Param::ParametricInfoUnsteady{T};
   subtract_Ddata = true) where {D,T}
 
-  Gₕₜ = assemble_lifting(FEMSpace, FEMInfo, Param)
+  R₁(t) = assemble_lifting(FEMSpace, Param)(t)
 
   m(t, u, v) = ∫(Param.m(t)*(u*v))dΩ
   a(t, u, v) = ∫(∇(v)⋅(Param.α(t)*∇(u)))*FEMSpace.dΩ
@@ -82,8 +82,8 @@ function FE_solve(
   B(t) = assemble_primal_op(FEMSpace)(t)
   F(t) = assemble_forcing(FEMSpace, FEMInfo, Param)(t)
   H(t) = assemble_neumann_datum(FEMSpace, FEMInfo, Param)(t)
-  R₁(t) = assemble_lifting(FEMSpace, FEMInfo, Param).R₁(t)
-  R₂(t) = assemble_lifting(FEMSpace, FEMInfo, Param).R₂(t)
+  R₁(t) = assemble_lifting(FEMSpace, Param)(t)
+  R₂(t) = assemble_second_lifting(FEMSpace, Param)(t)
   Block1(t) = θ*(M(t)+δtθ*A(t))
   LHS(t) = vcat(θ*hcat(M(t)+δtθ*A(t),-δtθ*B(t)'),hcat(B(t),zeros(T,FEMSpace.Nₛᵖ,FEMSpace.Nₛᵖ)))
   RHS(t) = vcat(δtθ*(F(t)+H(t)-R₁(t)),-R₂(t))
