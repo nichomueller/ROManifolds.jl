@@ -150,19 +150,19 @@ end
 
 function define_offline_snaps(FEMSpace, RBInfo, nₛMDEIM::Int64)
 
-  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
+  timesθ = collect(RBInfo.tₗ₀:RBInfo.δt:RBInfo.tₗ-RBInfo.δt).+RBInfo.δt*RBInfo.θ
   Nₜ = length(timesθ)
   path = "/home/user1/git_repos/Mabla.jl/tests/unsteady/poisson/3D_1/model.json/FEM_data/snapshots/μ.csv"
   μ = load_CSV(path)
 
   for k = 1:nₛMDEIM
-    @info "Considering Parameter number $k, need $(nₛMDEIM-k) more!"
+    println("Considering Parameter number $k, need $(nₛMDEIM-k) more!")
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
-    Param = get_ParamInfo(problem_ntuple, RBInfo, μₖ)
+    Param = get_ParamInfo(problem_id, RBInfo, μₖ)
     A_t = assemble_stiffness(FEMSpace, RBInfo, Param)
 
     for i_t = 1:Nₜ
-      @info "Snapshot at time step $i_t/Nₜ"
+      println("Snapshot at time step $i_t/Nₜ")
       A_i = A_t(timesθ[i_t])
       i, v = findnz(A_i[:])
       if i_t === 1
@@ -206,16 +206,16 @@ end
 function define_online_ST_stiffness(FEMSpace, RBInfo, el)
 
   path = "/home/user1/git_repos/Mabla.jl/tests/unsteady/poisson/3D_1/model.json/FEM_data/snapshots/μ.csv"
-  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
+  timesθ = collect(RBInfo.tₗ₀:RBInfo.δt:RBInfo.tₗ-RBInfo.δt).+RBInfo.δt*RBInfo.θ
   μ = load_CSV(path)
   μₒₙ = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
-  Param = get_ParamInfo(problem_ntuple, RBInfo, μₒₙ)
+  Param = get_ParamInfo(problem_id, RBInfo, μₒₙ)
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2)
   A(t) = assemble_matrix(∫(∇(FEMSpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FEMSpace.ϕᵤ(t)))) * dΩ_sparse, FEMSpace.V(t), FEMSpace.V₀)
 
   for (nₜ,t) in enumerate(timesθ)
-    @info "Online snap, considering time step $nₜ/50"
+    println("Online snap, considering time step $nₜ/50")
     i,j,v = findnz(A(t))
     if nₜ === 1
       global Aₒₙ = sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ*length(timesθ))
@@ -230,14 +230,14 @@ end
 function define_online_ST_stiffness_old(FEMSpace, RBInfo, el, row_idx)
 
   path = "/home/user1/git_repos/Mabla.jl/tests/unsteady/poisson/3D_1/model.json/FEM_data/snapshots/μ.csv"
-  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
+  timesθ = collect(RBInfo.tₗ₀:RBInfo.δt:RBInfo.tₗ-RBInfo.δt).+RBInfo.δt*RBInfo.θ
   μ = load_CSV(path)
   μₒₙ = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
-  Param = get_ParamInfo(problem_ntuple, RBInfo, μₒₙ)
+  Param = get_ParamInfo(problem_id, RBInfo, μₒₙ)
   Acom(t) = assemble_matrix(∫(∇(FEMSpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FEMSpace.ϕᵤ(t)))) * FEMSpace.dΩ, FEMSpace.V(t), FEMSpace.V₀)
 
   for (nₜ,t) = enumerate(timesθ)
-    @info "Considering time step $nₜ/50"
+    println("Considering time step $nₜ/50")
     Aₒₙₜ_com = Matrix(reshape(Acom(t)[:][row_idx],:,1))
     if nₜ === 1
       global Aₒₙ_com = zeros(length(Aₒₙₜ_com)*length(timesθ),1)
@@ -252,10 +252,10 @@ end
 function define_online_ST_stiffness_fast(FEMSpace, RBInfo, el, MDEIM_idx_sparse)
 
   path = "/home/user1/git_repos/Mabla.jl/tests/unsteady/poisson/3D_1/model.json/FEM_data/snapshots/μ.csv"
-  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
+  timesθ = collect(RBInfo.tₗ₀:RBInfo.δt:RBInfo.tₗ-RBInfo.δt).+RBInfo.δt*RBInfo.θ
   μ = load_CSV(path)
   μₒₙ = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
-  Param = get_ParamInfo(problem_ntuple, RBInfo, μₒₙ)
+  Param = get_ParamInfo(problem_id, RBInfo, μₒₙ)
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2)
   _, idx_time = from_spacetime_to_space_time_idx_vec(MDEIM_idx_sparse, FEMSpace.Nₛᵘ^2)
@@ -264,7 +264,7 @@ function define_online_ST_stiffness_fast(FEMSpace, RBInfo, el, MDEIM_idx_sparse)
   A(t) = assemble_matrix(∫(∇(FEMSpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FEMSpace.ϕᵤ(t)))) * dΩ_sparse, FEMSpace.V(t), FEMSpace.V₀)
 
   for (nₜ,t) in enumerate(timesθ[idx_time])
-    @info "Online snap, considering time step $nₜ/$(length(idx_time))"
+    println("Online snap, considering time step $nₜ/$(length(idx_time))")
     i,j,v = findnz(A(t))
     if nₜ === 1
       global Aₒₙ = sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ*length(idx_time))
@@ -340,15 +340,14 @@ function M_DEIM_POD_old(S::SparseMatrixCSC, ϵ = 1e-5)
     cumulative_energy += Σ[N] ^ 2
     M_DEIM_err_bound = Σ[N + 1] * mult_factor
 
-    @info "(M)DEIM-POD loop number $N, projection error = $M_DEIM_err_bound"
+    println("(M)DEIM-POD loop number $N, projection error = $M_DEIM_err_bound")
 
   end
   M_DEIM_mat = M_DEIM_mat[:, 1:N]
   _, col_idx, val = findnz(sparse(M_DEIM_mat))
   sparse_M_DEIM_mat = sparse(repeat(row_idx, N), col_idx, val, Nₕ, N)
 
-  @info "Basis number obtained via POD is $N, projection error ≤ $M_DEIM_err_bound"
-
+  println("Basis number obtained via POD is $N, projection error ≤ $M_DEIM_err_bound")
   return sparse_M_DEIM_mat, Σ
 
 end
@@ -381,15 +380,15 @@ end
 
 function build_A_snapshots_old(FEMSpace::UnsteadyProblem, RBInfo::Info, μ::Vector)
 
-  Nₜ = convert(Int64, RBInfo.T/RBInfo.δt)
+  Nₜ = convert(Int64, RBInfo.tₗ/RBInfo.δt)
   δtθ = RBInfo.δt*RBInfo.θ
-  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+δtθ
+  timesθ = collect(RBInfo.tₗ₀:RBInfo.δt:RBInfo.tₗ-RBInfo.δt).+δtθ
 
-  Param = get_ParamInfo(problem_ntuple, RBInfo, μ)
+  Param = get_ParamInfo(problem_id, RBInfo, μ)
   A_t = assemble_stiffness(FEMSpace, RBInfo, Param)
 
   for i_t = 1:Nₜ
-    @info "Snapshot at time step $i_t, stiffness"
+    println("Snapshot at time step $i_t, stiffness")
     A_i = A_t(timesθ[i_t])
     i, v = findnz(A_i[:])
     if i_t === 1
@@ -405,12 +404,12 @@ end
 
 function MDEIM_offline_old(FEMSpace::UnsteadyProblem, RBInfo::Info)
 
-  @info "Building $(RBInfo.nₛ_MDEIM) snapshots of $var, at each time step. This will take some time."
+  println("Building $(RBInfo.nₛ_MDEIM) snapshots of $var, at each time step. This will take some time.")
 
-  μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
+  μ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_snap_path, "μ.csv"))
 
   for k = 1:RBInfo.nₛ_MDEIM
-    @info "Considering Parameter number $k, need $(RBInfo.nₛ_MDEIM-k) more!"
+    println("Considering Parameter number $k, need $(RBInfo.nₛ_MDEIM-k) more!")
     μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
 
     snapsₖ = build_A_snapshots_old(FEMSpace, RBInfo, μₖ)
@@ -441,7 +440,7 @@ function assemble_MDEIM_matrices_old(RBInfo::Info, RBVars::PoissonSTGRB)
   Q = size(MDEIM_mat_old)[2]
   #= Matₙ = zeros(RBVars.S.nₛᵘ, RBVars.S.nₛᵘ, Q)
   for q = 1:Q
-    @info "ST-GRB: affine component number $q, matrix $var"
+    println("ST-GRB: affine component number $q, matrix $var"
     Matq = reshape(MDEIM_mat[:,q], (RBVars.S.Nₛᵘ, RBVars.S.Nₛᵘ))
     Matₙ[:,:,q] = RBVars.S.Φₛᵘ' * Matrix(Matq) * RBVars.S.Φₛᵘ
   end =#
@@ -469,14 +468,14 @@ end
 
 function build_sparse_mat_old(FEMInfo::ProblemInfoUnsteady, FEMSpace::UnsteadyProblem, RBInfo::Info, el::Vector)
 
-  μ=load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
+  μ=load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_snap_path, "μ.csv"))
   μ_nb = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
-  Param = get_ParamInfo(problem_ntuple, RBInfo, μ_nb)
+  Param = get_ParamInfo(problem_id, RBInfo, μ_nb)
 
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
-  timesθ = collect(RBInfo.t₀:RBInfo.δt:RBInfo.T-RBInfo.δt).+RBInfo.δt*RBInfo.θ
-  Nₜ = convert(Int64, RBInfo.T / RBInfo.δt)
+  timesθ = collect(RBInfo.tₗ₀:RBInfo.δt:RBInfo.tₗ-RBInfo.δt).+RBInfo.δt*RBInfo.θ
+  Nₜ = convert(Int64, RBInfo.tₗ / RBInfo.δt)
 
   function define_Matₜ(t::Real)
     return assemble_matrix(∫(∇(FEMSpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FEMSpace.ϕᵤ(t)))) * dΩ_sparse, FEMSpace.V(t), FEMSpace.V₀)
@@ -498,9 +497,9 @@ end
 function test_old_MDEIM(RBInfo, RBVars)
   MDEIM_mat_old, MDEIM_idx_old, sparse_el_old,_,_ = MDEIM_offline_old(FEMSpace, RBInfo)
   MDEIMᵢ_mat_old = MDEIM_mat_old[MDEIM_idx_old,:]
-  μ=load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
+  μ=load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_snap_path, "μ.csv"))
   μ_nb = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
-  #Param = get_ParamInfo(problem_ntuple, RBInfo, μ_nb)
+  #Param = get_ParamInfo(problem_id, RBInfo, μ_nb)
   A = build_A_snapshots_old(FEMSpace, RBInfo, μ_nb)
   θᵃ_old = get_θᵃ_old(RBVars,MDEIM_mat_old, MDEIM_idx_old, MDEIMᵢ_mat_old, sparse_el_old)
   Aapprox = MDEIM_mat_old*θᵃ_old

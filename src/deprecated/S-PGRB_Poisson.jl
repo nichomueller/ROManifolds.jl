@@ -20,7 +20,7 @@ function assemble_reduced_affine_components(RBInfo, RBVars::PoissonSTPGRB, opera
 
 
   if isempty(RBVars.Φₛᵘ) || maximum(abs.(RBVars.Φₛᵘ)) === 0
-    @error "Error: must generate or import spatial RBs before computing the reduced affine components"
+    error("Error: must generate or import spatial RBs before computing the reduced affine components")
   end
 
   if isnothing(operators)
@@ -31,9 +31,9 @@ function assemble_reduced_affine_components(RBInfo, RBVars::PoissonSTPGRB, opera
 
     if !RBInfo.problem_nonlinearities["A"]
 
-      @info "Assembling affine reduced stiffness"
+      println("Assembling affine reduced stiffness")
       projection_time = @elapsed begin
-        A = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "A.csv"))
+        A = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_structures_path, "A.csv"))
         AΦₛᵘ = A * RBVars.Φₛᵘ
         RBVars.Aₙ = (AΦₛᵘ)' * RBVars.Pᵘ_inv * AΦₛᵘ
         if RBInfo.save_offline_structures
@@ -43,11 +43,11 @@ function assemble_reduced_affine_components(RBInfo, RBVars::PoissonSTPGRB, opera
 
     else
 
-      @info "The stiffness is non-affine: running the MDEIM offline phase"
+      println("The stiffness is non-affine: running the MDEIM offline phase")
       projection_time = @elapsed begin
         Aₙ_i = sparse([], [], [])
         for i_nₛ = 1:maximum(10, RBInfo.nₛ)
-          Param = get_ParamInfo(problem_ntuple, RBInfo, μ[i_nₛ])
+          Param = get_ParamInfo(RBInfo, μ[i_nₛ])
           A_i = assemble_stiffness(FEMSpace, RBInfo, Param)
           A_iΦₛᵘ = A_i * RBVars.Φₛᵘ
           Aₙ_i = hcat(Aₙ_i, (A_iΦₛᵘ)' * RBVars.Pᵘ_inv * A_iΦₛᵘ)
@@ -68,13 +68,13 @@ function assemble_reduced_affine_components(RBInfo, RBVars::PoissonSTPGRB, opera
 
     if !RBInfo.problem_nonlinearities["f"] && !RBInfo.problem_nonlinearities["h"]
 
-      @info "Assembling affine reduced forcing term"
+      println("Assembling affine reduced forcing term")
       projection_time += @elapsed begin
-        F = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "F.csv"))
+        F = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_structures_path, "F.csv"))
 
         if !RBInfo.problem_nonlinearities["A"]
 
-          A = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "A.csv"); convert_to_sparse = true)
+          A = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_structures_path, "A.csv"); convert_to_sparse = true)
           AΦₛᵘ = A * RBVars.Φₛᵘ
           RBVars.Fₙ = (AΦₛᵘ)' * RBVars.Pᵘ_inv * F
           if RBInfo.save_offline_structures
@@ -102,13 +102,13 @@ function assemble_reduced_affine_components(RBInfo, RBVars::PoissonSTPGRB, opera
 
     else
 
-      @info "The forcing term is non-affine: running the DEIM offline phase"
+      println("The forcing term is non-affine: running the DEIM offline phase")
       projection_time += @elapsed begin
         Fₙ_i = Float64[]
 
         if !RBInfo.problem_nonlinearities["A"]
 
-          A = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "A.csv"); convert_to_sparse = true)
+          A = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_structures_path, "A.csv"); convert_to_sparse = true)
           AΦₛᵘPᵘ_inv = (A * Φₛᵘ)' * RBVars.Pᵘ_inv
           for i_nₛ = 1:maximum(10, RBInfo.nₛ)
             Param = compute_Param(problem_nonlinearities, Params, i_nₛ)

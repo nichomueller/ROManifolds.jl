@@ -1,17 +1,17 @@
-function set_labels(ProblInfo::Info, model::DiscreteModel)
+function set_labels(FEMInfo::Info, model::DiscreteModel)
 
   labels = get_face_labeling(model)
-  if !isempty(ProblInfo.dirichlet_tags) && !isempty(ProblInfo.dirichlet_bnds)
-    for i = eachindex(ProblInfo.dirichlet_tags)
-      if ProblInfo.dirichlet_tags[i] ∉ labels.tag_to_name
-        add_tag_from_tags!(labels, ProblInfo.dirichlet_tags[i], ProblInfo.dirichlet_bnds[i])
+  if !isempty(FEMInfo.dirichlet_tags) && !isempty(FEMInfo.dirichlet_bnds)
+    for i = eachindex(FEMInfo.dirichlet_tags)
+      if FEMInfo.dirichlet_tags[i] ∉ labels.tag_to_name
+        add_tag_from_tags!(labels, FEMInfo.dirichlet_tags[i], FEMInfo.dirichlet_bnds[i])
       end
     end
   end
-  if !isempty(ProblInfo.neumann_tags) && !isempty(ProblInfo.neumann_bnds)
-    for i = eachindex(ProblInfo.neumann_tags)
-      if ProblInfo.neumann_tags[i] ∉ labels.tag_to_name
-        add_tag_from_tags!(labels, ProblInfo.neumann_tags[i], ProblInfo.neumann_bnds[i])
+  if !isempty(FEMInfo.neumann_tags) && !isempty(FEMInfo.neumann_bnds)
+    for i = eachindex(FEMInfo.neumann_tags)
+      if FEMInfo.neumann_tags[i] ∉ labels.tag_to_name
+        add_tag_from_tags!(labels, FEMInfo.neumann_tags[i], FEMInfo.neumann_bnds[i])
       end
     end
   end
@@ -20,114 +20,129 @@ function set_labels(ProblInfo::Info, model::DiscreteModel)
 
 end
 
-function get_FEMSpace(
-  ::NTuple{1,Int}, ProblInfo::SteadyInfo, model::DiscreteModel, g = nothing)
+function get_mod_meas_quad(FEMInfo::Info, model::DiscreteModel)
 
-  degree = 2*ProblInfo.order
-  labels = set_labels(ProblInfo, model)
-  Ω = Interior(model)
+  degree = 2 * FEMInfo.order
+  Ω = Triangulation(model)
   dΩ = Measure(Ω, degree)
-  Qₕ = CellQuadrature(Ω, degree)
-  refFE = ReferenceFE(lagrangian, Float64, ProblInfo.order)
-  if !isempty(ProblInfo.neumann_tags)
-    Γn = BoundaryTriangulation(model, tags=ProblInfo.neumann_tags)
-    dΓn = Measure(Γn, degree)
-  else
-    dΓn = nothing
-  end
-  if !isempty(ProblInfo.dirichlet_tags)
-    Γd = BoundaryTriangulation(model, tags=ProblInfo.dirichlet_tags)
-    dΓd = Measure(Γd, degree)
-    V₀ = TestFESpace(model, refFE; conformity=:H1,
-      dirichlet_tags=ProblInfo.dirichlet_tags, labels=labels)
-  else
-    dΓd = nothing
-    V₀ = TestFESpace(model, refFE; conformity=:H1, constraint=:zeromean)
-  end
-  if !isnothing(g)
-    V = TrialFESpace(V₀, g)
-  else
-    V = TrialFESpace(V₀, (x -> 0))
-  end
+  Γn = BoundaryTriangulation(model, tags=FEMInfo.neumann_tags)
+  dΓn = Measure(Γn, degree)::Measure
+  Γd = BoundaryTriangulation(model, tags=FEMInfo.dirichlet_tags)
+  dΓd = Measure(Γd, degree)::Measure
+  Qₕ = CellQuadrature(Ω, degree)::CellQuadrature
+
+  Ω, Qₕ, dΩ, dΓn, dΓd
+
+end
+
+function get_lagrangianQuad_info(
+  ::SteadyInfo{T},
+  model::DiscreteModel,
+  Ω::BodyFittedTriangulation,
+  Qₕ::CellQuadrature) where T
+
+  ξₖ = get_cell_map(Ω)
+  Qₕ_cell_point = get_cell_points(Qₕ)
+  qₖ = get_data(Qₕ_cell_point)
+  phys_quadp = lazy_map(evaluate,ξₖ,qₖ)::LazyArray
+  refFE_quad = Gridap.ReferenceFE(lagrangianQuad,T,FEMInfo.order)
+  V₀_quad = TestFESpace(model,refFE_quad,conformity=:L2)
+
+  phys_quadp, V₀_quad
+
+end
+
+function get_lagrangianQuad_info(
+  ::UnsteadyInfo{T},
+  model::DiscreteModel,
+  Ω::BodyFittedTriangulation,
+  Qₕ::CellQuadrature) where T
+
+  ξₖ = get_cell_map(Ω)
+  Qₕ_cell_point = get_cell_points(Qₕ)
+  qₖ = get_data(Qₕ_cell_point)
+  phys_quadp = lazy_map(evaluate,ξₖ,qₖ)::LazyArray
+  refFE_quad = Gridap.ReferenceFE(lagrangianQuad,T,FEMInfo.order)
+  V₀_quad = TestFESpace(model,refFE_quad,conformity=:L2)
+
+  phys_quadp, V₀_quad
+
+end
+
+function get_FEMSpace(
+  ::NTuple{1,Int64},
+  FEMInfo::SteadyInfo{T},
+  model::DiscreteModel{D,D},
+  g::F) where {D,T}
+
+  Ω, Qₕ, dΩ, dΓn, dΓd = get_mod_meas_quad(FEMInfo, model)
+
+  labels = set_labels(FEMInfo, model)
+  refFE = Gridap.ReferenceFE(lagrangian, T, FEMInfo.order)
+
+  V₀ = TestFESpace(model, refFE; conformity=:H1,
+    dirichlet_tags=FEMInfo.dirichlet_tags, labels=labels)
+  V = TransientTrialFESpace(V₀, g)
 
   ϕᵥ = get_fe_basis(V₀)
   ϕᵤ = get_trial_fe_basis(V)
   Nₛᵘ = length(get_free_dof_ids(V))
 
-  FEMSpace = FEMSpacePoissonSteady(Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, dΩ, dΓd, dΓn)
+  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
+
+  FEMSpace = FEMSpacePoissonSteady{D,T}(
+    model, Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, dΩ, dΓd, dΓn, phys_quadp, V₀_quad)
 
   return FEMSpace
 
 end
 
 function get_FEMSpace(
-  ::NTuple{1,Int}, ProblInfo::UnsteadyInfo, model::DiscreteModel, g = nothing)
+  ::NTuple{1,Int64},
+  FEMInfo::UnsteadyInfo{T},
+  model::DiscreteModel{D,D},
+  g::F) where {D,T}
 
-  degree = 2*ProblInfo.order
-  labels = set_labels(ProblInfo, model)
-  Ω = Interior(model)
-  dΩ = Measure(Ω, degree)
-  Qₕ = CellQuadrature(Ω, degree)
-  refFE = ReferenceFE(lagrangian, Float64, ProblInfo.order)
-  if !isempty(ProblInfo.neumann_tags)
-    Γn = BoundaryTriangulation(model, tags=ProblInfo.neumann_tags)
-    dΓn = Measure(Γn, degree)
-  else
-    dΓn = nothing
-  end
-  if !isempty(ProblInfo.dirichlet_tags)
-    Γd = BoundaryTriangulation(model, tags=ProblInfo.dirichlet_tags)
-    dΓd = Measure(Γd, degree)
-    V₀ = TestFESpace(model, refFE; conformity=:H1,
-      dirichlet_tags=ProblInfo.dirichlet_tags, labels=labels)
-  else
-    dΓd = nothing
-    V₀ = TestFESpace(model, refFE; conformity=:H1, constraint=:zeromean)
-  end
-  if isnothing(g)
-    g₀(x, t::Real) = 0
-    g₀(t::Real) = x->g₀(x,t)
-    V = TransientTrialFESpace(V₀, g₀)
-  else
-    V = TransientTrialFESpace(V₀, g)
-  end
+  Ω, Qₕ, dΩ, dΓn, dΓd = get_mod_meas_quad(FEMInfo, model)
+
+  refFE = Gridap.ReferenceFE(lagrangian, T, FEMInfo.order)
+  labels = set_labels(FEMInfo, model)
+  V₀ = TestFESpace(model, refFE; conformity=:H1,
+    dirichlet_tags=FEMInfo.dirichlet_tags, labels=labels)
+  V = TransientTrialFESpace(V₀, g)
+
   ϕᵥ = get_fe_basis(V₀)
   ϕᵤ(t) = get_trial_fe_basis(V(t))
   Nₛᵘ = length(get_free_dof_ids(V₀))
 
-  FEMSpace = FEMSpacePoissonUnsteady(Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, dΩ, dΓd, dΓn)
+  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
+
+  FEMSpace = FEMSpacePoissonUnsteady{D,T}(
+    model, Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, dΩ, dΓd, dΓn, phys_quadp, V₀_quad)
 
   return FEMSpace
 
 end
 
 function get_FEMSpace(
-  ::NTuple{2,Int}, ProblInfo::SteadyInfo, model::DiscreteModel, g = nothing)
+  ::NTuple{2,Int64},
+  FEMInfo::SteadyInfo{T},
+  model::DiscreteModel{D,D},
+  g::F) where {D,T}
 
-  degree = 2*ProblInfo.order
-  labels = set_labels(ProblInfo, model)
+  Ω, Qₕ, dΩ, dΓn, dΓd = get_mod_meas_quad(FEMInfo, model)
 
-  Ω = Triangulation(model)
-  dΩ = Measure(Ω, degree)
-  Γn = BoundaryTriangulation(model, tags=ProblInfo.neumann_tags)
-  dΓn = Measure(Γn, degree)
-  Γd = BoundaryTriangulation(model, tags=ProblInfo.dirichlet_tags)
-  dΓd = Measure(Γd, degree)
-  Qₕ = CellQuadrature(Ω, degree)
-
-  refFEᵤ = ReferenceFE(lagrangian, VectorValue{3,Float64}, ProblInfo.order)
+  refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,T}, FEMInfo.order)
+  labels = set_labels(FEMInfo, model)
   V₀ = TestFESpace(model, refFEᵤ; conformity=:H1,
-    dirichlet_tags=ProblInfo.dirichlet_tags, labels=labels)
-  if !isnothing(g)
-    V = TrialFESpace(V₀, g)
-  else
-    V = TrialFESpace(V₀, (x -> 0))
-  end
+    dirichlet_tags=FEMInfo.dirichlet_tags, labels=labels)
+  V = TransientTrialFESpace(V₀, g)
+
   ϕᵥ = get_fe_basis(V₀)
   ϕᵤ = get_trial_fe_basis(V)
   Nₛᵘ = length(get_free_dof_ids(V))
 
-  refFEₚ = ReferenceFE(lagrangian, Float64, order-1; space=:P)
+  refFEₚ = Gridap.ReferenceFE(lagrangian, T, order - 1; space=:P)
   Q₀ = TestFESpace(model, refFEₚ; conformity=:L2, constraint=:zeromean)
   Q = TrialFESpace(Q₀)
   ψᵧ = get_trial_fe_basis(Q₀)
@@ -137,49 +152,35 @@ function get_FEMSpace(
   X₀ = MultiFieldFESpace([V₀, Q₀])
   X = TransientMultiFieldFESpace([V, Q])
 
-  FEMSpace = FEMSpaceStokesSteady(
-    Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn)
+  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
+
+  FEMSpace = FEMSpaceStokesSteady{D,T}(
+    model, Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn,
+    phys_quadp, V₀_quad)
 
   return FEMSpace
 
 end
 
 function get_FEMSpace(
-  ::NTuple{2,Int}, ProblInfo::UnsteadyInfo, model::DiscreteModel, g = nothing)
+  ::NTuple{2,Int64},
+  FEMInfo::UnsteadyInfo{T},
+  model::DiscreteModel{D,D},
+  g::F) where {D,T}
 
-  degree = 2*ProblInfo.order
-  labels = set_labels(ProblInfo, model)
-  Ω = Interior(model)
-  dΩ = Measure(Ω, degree)
-  Qₕ = CellQuadrature(Ω, degree)
-  refFEᵤ = ReferenceFE(lagrangian, VectorValue{3,Float64}, ProblInfo.order)
-  if !isempty(ProblInfo.neumann_tags)
-    Γn = BoundaryTriangulation(model, tags=ProblInfo.neumann_tags)
-    dΓn = Measure(Γn, degree)
-  else
-    dΓn = nothing
-  end
-  if !isempty(ProblInfo.dirichlet_tags)
-    Γd = BoundaryTriangulation(model, tags=ProblInfo.dirichlet_tags)
-    dΓd = Measure(Γd, degree)
-    V₀ = TestFESpace(model, refFEᵤ; conformity=:H1,
-      dirichlet_tags=ProblInfo.dirichlet_tags, labels=labels)
-  else
-    dΓd = nothing
-    V₀ = TestFESpace(model, refFEᵤ; conformity=:H1, constraint=:zeromean)
-  end
-  if isnothing(g)
-    g₀(x, t::Real) = VectorValue(0,0,0)
-    g₀(t::Real) = x->g₀(x,t)
-    V = TransientTrialFESpace(V₀, g₀)
-  else
-    V = TransientTrialFESpace(V₀, g)
-  end
+  Ω, Qₕ, dΩ, dΓn, dΓd = get_mod_meas_quad(FEMInfo, model)
+
+  refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,T}, FEMInfo.order)
+  labels = set_labels(FEMInfo, model)
+  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1,
+    dirichlet_tags=FEMInfo.dirichlet_tags, labels=labels)
+  V = TransientTrialFESpace(V₀, g)
+
   ϕᵥ = get_fe_basis(V₀)
   ϕᵤ(t) = get_trial_fe_basis(V(t))
   Nₛᵘ = length(get_free_dof_ids(V₀))
 
-  refFEₚ = ReferenceFE(lagrangian, Float64, ProblInfo.order-1; space=:P)
+  refFEₚ = Gridap.ReferenceFE(lagrangian, T, FEMInfo.order - 1; space=:P)
   Q₀ = TestFESpace(model, refFEₚ, conformity=:L2, constraint=:zeromean)
   Q = TrialFESpace(Q₀)
   ψᵧ = get_fe_basis(Q₀)
@@ -189,9 +190,52 @@ function get_FEMSpace(
   X₀ = MultiFieldFESpace([V₀, Q₀])
   X = TransientMultiFieldFESpace([V, Q])
 
-  FEMSpace = FEMSpaceStokesUnsteady(
-    Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn)
+  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
+
+  FEMSpace = FEMSpaceStokesUnsteady{D,T}(
+    model, Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn,
+    phys_quadp, V₀_quad)
 
   return FEMSpace
+
+end
+
+function get_FEMSpace₀(
+  problem_id::NTuple{1,Int64},
+  FEMInfo::SteadyInfo,
+  model::DiscreteModel)
+
+  get_FEMSpace(problem_id,FEMInfo,model,x->0)
+
+end
+
+function get_FEMSpace₀(
+  problem_id::NTuple{1,Int64},
+  FEMInfo::UnsteadyInfo{T},
+  model::DiscreteModel) where T
+
+  g₀(x, t::Real) = zero(T)
+  g₀(t::Real) = x -> g₀(x, t)
+  get_FEMSpace(problem_id,FEMInfo,model,g₀)
+
+end
+
+function get_FEMSpace₀(
+  problem_id::NTuple{2,Int64},
+  FEMInfo::SteadyInfo,
+  model::DiscreteModel)
+
+  get_FEMSpace(problem_id,FEMInfo,model,x->0)
+
+end
+
+function get_FEMSpace₀(
+  problem_id::NTuple{2,Int64},
+  FEMInfo::UnsteadyInfo{T},
+  model::DiscreteModel,) where T
+
+  g₀(x, t::Real) = zero(T)
+  g₀(t::Real) = x -> g₀(x, t)
+  get_FEMSpace(problem_id,FEMInfo,model,g₀)
 
 end

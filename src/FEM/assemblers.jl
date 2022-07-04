@@ -1,9 +1,9 @@
 function assemble_mass(
   FEMSpace::FEMSpacePoissonSteady,
-  probl::SteadyInfo,
+  FEMInfo::SteadyInfo,
   Param::ParametricInfoSteady)
 
-  if !probl.probl_nl["M"]
+  if !FEMInfo.probl_nl["M"]
     assemble_matrix(∫(FEMSpace.ϕᵥ*FEMSpace.ϕᵤ)*FEMSpace.dΩ,
     FEMSpace.V, FEMSpace.V₀)
   else
@@ -15,11 +15,11 @@ end
 
 function assemble_mass(
   FEMSpace::FEMSpacePoissonUnsteady,
-  probl::UnsteadyInfo,
+  FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady)
 
   function unsteady_mass(t)
-    if !probl.probl_nl["M"]
+    if !FEMInfo.probl_nl["M"]
       assemble_matrix(∫(FEMSpace.ϕᵥ*(Param.mₛ*FEMSpace.ϕᵤ(t)))*FEMSpace.dΩ,
       FEMSpace.V(t), FEMSpace.V₀)
     else
@@ -34,11 +34,11 @@ end
 
 function assemble_mass(
   FEMSpace::FEMSpaceStokesUnsteady,
-  probl::UnsteadyInfo,
+  FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady)
 
   function unsteady_mass(t)
-    if !probl.probl_nl["M"]
+    if !FEMInfo.probl_nl["M"]
       assemble_matrix(∫(FEMSpace.ϕᵥ⋅(Param.mₛ*FEMSpace.ϕᵤ(t)))*FEMSpace.dΩ,
       FEMSpace.V(t), FEMSpace.V₀)
     else
@@ -53,10 +53,10 @@ end
 
 function assemble_stiffness(
   FEMSpace::FEMSpacePoissonSteady,
-  probl::SteadyInfo,
+  FEMInfo::SteadyInfo,
   Param::ParametricInfoSteady)
 
-  if !probl.probl_nl["A"]
+  if !FEMInfo.probl_nl["A"]
     assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅∇(FEMSpace.ϕᵤ))*FEMSpace.dΩ,
     FEMSpace.V, FEMSpace.V₀)
   else
@@ -68,11 +68,11 @@ end
 
 function assemble_stiffness(
   FEMSpace::FEMSpacePoissonUnsteady,
-  probl::UnsteadyInfo,
+  FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady)
 
   function unsteady_stiffness(t)
-    if !probl.probl_nl["A"]
+    if !FEMInfo.probl_nl["A"]
       assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Param.αₛ*∇(FEMSpace.ϕᵤ(t))))*FEMSpace.dΩ,
       FEMSpace.V(t), FEMSpace.V₀)
     else
@@ -87,11 +87,11 @@ end
 
 function assemble_stiffness(
   FEMSpace::FEMSpacePoissonUnsteady,
-  probl::UnsteadyInfo,
+  FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady)
 
   function unsteady_stiffness(t)
-    if !probl.probl_nl["A"]
+    if !FEMInfo.probl_nl["A"]
       assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Param.αₛ*∇(FEMSpace.ϕᵤ(t))))*FEMSpace.dΩ,
       FEMSpace.V(t), FEMSpace.V₀)
     else
@@ -106,11 +106,11 @@ end
 
 function assemble_stiffness(
   FEMSpace::FEMSpaceStokesUnsteady,
-  probl::UnsteadyInfo,
+  FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady)
 
   function unsteady_stiffness(t)
-    if !probl.probl_nl["A"]
+    if !FEMInfo.probl_nl["A"]
       assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Param.αₛ*∇(FEMSpace.ϕᵤ(t))))*FEMSpace.dΩ,
       FEMSpace.V(t), FEMSpace.V₀)
     else
@@ -143,10 +143,10 @@ end
 
 function assemble_forcing(
   FEMSpace::SteadyProblem,
-  probl::SteadyInfo,
+  FEMInfo::SteadyInfo,
   Param::ParametricInfoSteady)
 
-  if !probl.probl_nl["f"] && !probl.probl_nl["h"]
+  if !FEMInfo.probl_nl["f"] && !FEMInfo.probl_nl["h"]
     assemble_vector(∫(FEMSpace.ϕᵥ)*FEMSpace.dΩ, FEMSpace.V₀)
   else
     assemble_vector(∫(FEMSpace.ϕᵥ*Param.f)*FEMSpace.dΩ, FEMSpace.V₀)
@@ -156,13 +156,13 @@ end
 
 function assemble_forcing(
   FEMSpace::FEMSpacePoissonUnsteady,
-  probl::UnsteadyInfo,
+  FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady)
 
   function unsteady_forcing(t)
-    if !probl.probl_nl["f"]
+    if !FEMInfo.probl_nl["f"]
       assemble_vector(∫(FEMSpace.ϕᵥ*Param.fₛ)*FEMSpace.dΩ, FEMSpace.V₀)
-    else probl.probl_nl["f"]
+    else
       assemble_vector(∫(FEMSpace.ϕᵥ*Param.f(t))*FEMSpace.dΩ, FEMSpace.V₀)
     end
   end
@@ -173,13 +173,13 @@ end
 
 function assemble_forcing(
   FEMSpace::FEMSpaceStokesUnsteady,
-  probl::UnsteadyInfo,
+  FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady)
 
   function unsteady_forcing(t)
-    if !probl.probl_nl["f"]
+    if !FEMInfo.probl_nl["f"]
       assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.fₛ)*FEMSpace.dΩ, FEMSpace.V₀)
-    else probl.probl_nl["f"]
+    else
       assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.f(t))*FEMSpace.dΩ, FEMSpace.V₀)
     end
   end
@@ -190,36 +190,30 @@ end
 
 function assemble_neumann_datum(
   FEMSpace::SteadyProblem,
-  probl::SteadyInfo,
-  Param::ParametricInfoSteady)
+  FEMInfo::SteadyInfo{T},
+  Param::ParametricInfoSteady) where T
 
-  if !isnothing(FEMSpace.dΓn)
-    if !probl.probl_nl["h"]
-      assemble_vector(∫(FEMSpace.ϕᵥ)*FEMSpace.dΓn, FEMSpace.V₀)
-    else
-      assemble_vector(∫(FEMSpace.ϕᵥ*Param.h)*FEMSpace.dΓn, FEMSpace.V₀)
-    end
+  if !FEMInfo.probl_nl["h"]
+    assemble_vector(∫(FEMSpace.ϕᵥ)*FEMSpace.dΓn, FEMSpace.V₀)::Vector{T}
   else
-    zeros(num_free_dofs(FEMSpace.V₀))
+    assemble_vector(∫(FEMSpace.ϕᵥ*Param.h)*FEMSpace.dΓn, FEMSpace.V₀)::Vector{T}
   end
 
 end
 
 function assemble_neumann_datum(
   FEMSpace::FEMSpacePoissonUnsteady,
-  probl::UnsteadyInfo,
-  Param::ParametricInfoUnsteady)
+  FEMInfo::UnsteadyInfo{T},
+  Param::ParametricInfoUnsteady) where T
 
   function unsteady_neumann_datum(t)
-    if !isnothing(FEMSpace.dΓn)
-      if !probl.probl_nl["h"]
-        assemble_vector(∫(FEMSpace.ϕᵥ*Param.hₛ)*FEMSpace.dΓn, FEMSpace.V₀)
-      else
-        assemble_vector(∫(FEMSpace.ϕᵥ*Param.h(t))*FEMSpace.dΓn, FEMSpace.V₀)
-      end
+
+    if !FEMInfo.probl_nl["h"]
+      assemble_vector(∫(FEMSpace.ϕᵥ*Param.hₛ)*FEMSpace.dΓn, FEMSpace.V₀)::Vector{T}
     else
-      zeros(num_free_dofs(FEMSpace.V₀))
+      assemble_vector(∫(FEMSpace.ϕᵥ*Param.h(t))*FEMSpace.dΓn, FEMSpace.V₀)::Vector{T}
     end
+
   end
 
   unsteady_neumann_datum
@@ -228,18 +222,14 @@ end
 
 function assemble_neumann_datum(
   FEMSpace::FEMSpaceStokesUnsteady,
-  probl::UnsteadyInfo,
-  Param::ParametricInfoUnsteady)
+  FEMInfo::UnsteadyInfo{T},
+  Param::ParametricInfoUnsteady) where T
 
   function unsteady_neumann_datum(t)
-    if !isnothing(FEMSpace.dΓn)
-      if !probl.probl_nl["h"]
-        assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.hₛ)*FEMSpace.dΓn, FEMSpace.V₀)
-      else
-        assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.h(t))*FEMSpace.dΓn, FEMSpace.V₀)
-      end
+    if !FEMInfo.probl_nl["h"]
+      assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.hₛ)*FEMSpace.dΓn, FEMSpace.V₀)::Vector{T}
     else
-      zeros(num_free_dofs(FEMSpace.V₀))
+      assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.h(t))*FEMSpace.dΓn, FEMSpace.V₀)::Vector{T}
     end
   end
 
@@ -247,31 +237,112 @@ function assemble_neumann_datum(
 
 end
 
-function assemble_dirichlet_datum(
-  FEMSpace::SteadyProblem,
-  Param::ParametricInfoSteady)
+function assemble_lifting(
+  FEMSpace::FEMSpacePoissonSteady,
+  Param::ParametricInfoSteady{T}) where T
 
-  if !isnothing(FEMSpace.dΓd)
-    assemble_vector(∫(FEMSpace.ϕᵥ*Param.g)*FEMSpace.dΓd, FEMSpace.V₀)
+  nonlin_lift = nonlinearity_lifting_op(FEMInfo)
+
+  if nonlin_lift == 0
+    gₕ = interpolate_dirichlet(x->one(T), FEMSpace.V)
+    R = assemble_vector(
+      ∫(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ))*FEMSpace.dΩ,FEMSpace.V₀)
+  elseif nonlin_lift == 1
+    gₕ = interpolate_dirichlet(x->one(T), FEMSpace.V)
+    R = assemble_vector(
+      ∫(Param.α*(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ)))*FEMSpace.dΩ,FEMSpace.V₀)
+  elseif nonlin_lift == 2
+    gₕ = interpolate_dirichlet(Param.g, FEMSpace.V)
+    R = assemble_vector(
+      ∫(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ))*FEMSpace.dΩ,FEMSpace.V₀)
   else
-    zeros(num_free_dofs(FEMSpace.V₀))
+    gₕ = interpolate_dirichlet(Param.g, FEMSpace.V)
+    R = assemble_vector(
+      ∫(Param.α*(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ)))*FEMSpace.dΩ,FEMSpace.V₀)
   end
+
+  R::Vector{T}
 
 end
 
-function assemble_dirichlet_datum(
-  FEMSpace::UnsteadyProblem,
-  Param::ParametricInfoUnsteady)
+function assemble_lifting(
+  FEMSpace::FEMSpacePoissonUnsteady,
+  Param::ParametricInfoUnsteady{T}) where T
 
-  function unsteady_dirichlet_datum(t)
-    if !isnothing(FEMSpace.dΓd)
-      assemble_vector(∫(FEMSpace.ϕᵥ*Param.g(t))*FEMSpace.dΓd, FEMSpace.V₀)
-    else
-      zeros(num_free_dofs(FEMSpace.V₀))
-    end
+  nonlin_lift = nonlinearity_lifting_op(FEMInfo)
+
+  g₁(x,t::Real) = one(T)
+  g₁(t::Real) = x->g₁(x,t)
+
+  if nonlin_lift == 0
+    gₕ(t) = interpolate_dirichlet(g₁(t), FEMSpace.V(t))
+    R(t) = assemble_vector(
+      ∫(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ(t)))*FEMSpace.dΩ,FEMSpace.V₀)
+  elseif nonlin_lift == 1
+    gₕ(t) = interpolate_dirichlet(g₁(t), FEMSpace.V(t))
+    R(t) = assemble_vector(
+      ∫(Param.α(t)*(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ(t))))*FEMSpace.dΩ,FEMSpace.V₀)
+  elseif nonlin_lift == 2
+    gₕ(t) = interpolate_dirichlet(Param.g(t), FEMSpace.V(t))
+    R(t) = assemble_vector(
+      ∫(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ(t)))*FEMSpace.dΩ,FEMSpace.V₀)
+  else
+    gₕ(t) = interpolate_dirichlet(Param.g(t), FEMSpace.V(t))
+    R(t) = assemble_vector(
+      ∫(Param.α(t)*(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ(t))))*FEMSpace.dΩ,FEMSpace.V₀)
   end
 
-  return unsteady_dirichlet_datum
+  R
+
+end
+
+function assemble_lifting(
+  FEMSpace::FEMSpaceStokesUnsteady{D,T},
+  Param::ParametricInfoUnsteady) where {D,T}
+
+  nonlin_lift = nonlinearity_lifting_op(FEMInfo)
+
+  g₁(x,t::Real) = one(VectorValue(get_NTuple(D, T)))
+  g₁(t::Real) = x->g₁(x,t)
+
+  if nonlin_lift == 0
+    gₕ(t) = interpolate_dirichlet(g₁(t), FEMSpace.V(t))
+    R(t) = assemble_vector(
+      ∫(∇(FEMSpace.ϕᵥ) ⊙ ∇(gₕ(t)))*FEMSpace.dΩ,FEMSpace.V₀)
+  elseif nonlin_lift == 1
+    gₕ(t) = interpolate_dirichlet(g₁(t), FEMSpace.V(t))
+    R(t) = assemble_vector(
+      ∫(Param.α(t)*(∇(FEMSpace.ϕᵥ) ⊙ ∇(gₕ(t))))*FEMSpace.dΩ,FEMSpace.V₀)
+  elseif nonlin_lift == 2
+    gₕ(t) = interpolate_dirichlet(Param.g(t), FEMSpace.V(t))
+    R(t) = assemble_vector(
+      ∫(∇(FEMSpace.ϕᵥ) ⊙ ∇(gₕ(t)))*FEMSpace.dΩ,FEMSpace.V₀)
+  else
+    gₕ(t) = interpolate_dirichlet(Param.g(t), FEMSpace.V(t))
+    R(t) = assemble_vector(
+      ∫(Param.α(t)*(∇(FEMSpace.ϕᵥ) ⊙ ∇(gₕ(t))))*FEMSpace.dΩ,FEMSpace.V₀)
+  end
+
+  R
+
+end
+
+function assemble_second_lifting(
+  FEMSpace::FEMSpaceStokesUnsteady{D,T},
+  Param::ParametricInfoUnsteady) where {D,T}
+
+  nonlin_lift = nonlinearity_lifting_op(FEMInfo)
+
+  g₁(x,t::Real) = one(VectorValue(get_NTuple(D, T)))
+  g₁(t::Real) = x->g₁(x,t)
+
+  if nonlin_lift ≤ 1
+    gₕ(t) = interpolate_dirichlet(g₁(t), FEMSpace.V(t))
+  else
+    gₕ(t) = interpolate_dirichlet(Param.g(t), FEMSpace.V(t))
+  end
+
+  assemble_vector(∫(FEMSpace.ψᵧ*(∇⋅(gₕ(t))))*FEMSpace.dΩ,FEMSpace.Q₀)::Vector{T}
 
 end
 
@@ -320,119 +391,72 @@ function assemble_H¹_norm_matrix(FEMSpace::FEMSpaceStokesUnsteady)
 
 end
 
-function assemble_H¹₀_norm_matrix(FEMSpace₀::FEMSpacePoissonSteady)
+function assemble_H¹₀_norm_matrix(
+  FEMSpace₀::FEMSpacePoissonSteady{D,T}) where {D,T}
 
   (assemble_matrix(∫(∇(FEMSpace₀.ϕᵥ)⋅∇(FEMSpace₀.ϕᵤ))*FEMSpace₀.dΩ,
   FEMSpace₀.V, FEMSpace₀.V₀) +
   assemble_matrix(∫(FEMSpace₀.ϕᵥ*FEMSpace₀.ϕᵤ)*FEMSpace₀.dΩ,
-  FEMSpace₀.V, FEMSpace₀.V₀))
+  FEMSpace₀.V, FEMSpace₀.V₀))::SparseMatrixCSC{T, Int64}
 
 end
 
-function assemble_H¹₀_norm_matrix(FEMSpace₀::FEMSpacePoissonUnsteady)
+function assemble_H¹₀_norm_matrix(
+  FEMSpace₀::FEMSpacePoissonUnsteady{D,T}) where {D,T}
 
   Xᵘ₀(t) = (assemble_matrix(∫(∇(FEMSpace₀.ϕᵥ)⋅∇(FEMSpace₀.ϕᵤ(t)))*FEMSpace₀.dΩ,
   FEMSpace₀.V(t), FEMSpace₀.V₀) +
   assemble_matrix(∫(FEMSpace₀.ϕᵥ * FEMSpace₀.ϕᵤ(t))*FEMSpace₀.dΩ,
   FEMSpace₀.V(t), FEMSpace₀.V₀))
 
-  return Xᵘ₀(0.0)
+  return Xᵘ₀(0.0)::SparseMatrixCSC{T, Int64}
 
 end
 
-function assemble_H¹₀_norm_matrix(FEMSpace₀::FEMSpaceStokesUnsteady)
+function assemble_H¹₀_norm_matrix(
+  FEMSpace₀::FEMSpaceStokesUnsteady{D,T}) where {D,T}
 
   Xᵘ₀(t) = (assemble_matrix(∫(∇(FEMSpace₀.ϕᵥ)⊙∇(FEMSpace₀.ϕᵤ(t)))*FEMSpace₀.dΩ,
   FEMSpace₀.V(t), FEMSpace₀.V₀) +
   assemble_matrix(∫(FEMSpace₀.ϕᵥ⋅FEMSpace₀.ϕᵤ(t))*FEMSpace₀.dΩ,
   FEMSpace₀.V(t), FEMSpace₀.V₀))
 
-  return Xᵘ₀(0.0)
+  return Xᵘ₀(0.0)::SparseMatrixCSC{T, Int64}
 
 end
 
-function assemble_H¹_norm_matrix_nobcs(FEMSpace::FEMSpaceStokesUnsteady)
+function assemble_H¹_norm_matrix_nobcs(
+  FEMSpace::FEMSpaceStokesUnsteady{D,T}) where {D,T}
 
   Xᵘ(t) = (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙∇(FEMSpace.ϕᵤ(t)))*FEMSpace.dΩ,
   FEMSpace.V(t), FEMSpace.V₀) +
   assemble_matrix(∫(FEMSpace.ϕᵥ⋅FEMSpace.ϕᵤ(t))*FEMSpace.dΩ,
   FEMSpace.V(t), FEMSpace.V₀))
 
-  return Xᵘ(0.0)
+  return Xᵘ(0.0)::SparseMatrixCSC{T, Int64}
 
-end
-
-function assemble_lifting(FEMSpace::SteadyProblem, Param::ParametricInfoSteady)
-
-  Gₕ = zeros(FEMSpace.Nₛᵘ,1)
-  if !isnothing(FEMSpace.dΓd)
-    gₕ = interpolate_everywhere(Param.g, FEMSpace.V)
-    Gₕ = get_free_dof_values(gₕ)
-  end
-
-  Gₕ
-
-end
-
-function assemble_lifting(
-  FEMSpace::FEMSpacePoissonUnsteady, probl::ProblemInfoUnsteady,
-  Param::ParametricInfoUnsteady)
-
-  Gₕ = zeros(FEMSpace.Nₛᵘ, convert(Int64, probl.T / probl.δt))
-  if !isnothing(FEMSpace.dΓd)
-    gₕ(t) = interpolate_everywhere(Param.g(t), FEMSpace.V(t))
-    for (i, tᵢ) in enumerate(probl.t₀+probl.δt:probl.δt:probl.T)
-      Gₕ[:, i] = get_free_dof_values(gₕ(tᵢ))
-    end
-  end
-
-  Gₕ
-
-end
-
-function assemble_lifting(
-  FEMSpace::FEMSpaceStokesUnsteady,
-  ::ProblemInfoUnsteady,
-  Param::ParametricInfoUnsteady)
-
-  gₕ(t) = interpolate_dirichlet(Param.g(t), FEMSpace.V(t))
-  function R₁(t)
-    if !isnothing(FEMSpace.dΓd)
-      return assemble_vector(
-        ∫(Param.α(t)*(∇(FEMSpace.ϕᵥ) ⊙ ∇(gₕ(t))))*FEMSpace.dΩ,FEMSpace.V₀)
-    else
-      return zeros(FEMSpace.Nₛᵘ)
-    end
-  end
-  function R₂(t)
-    if !isnothing(FEMSpace.dΓd)
-      return assemble_vector(∫(FEMSpace.ψᵧ*(∇⋅(gₕ(t))))*FEMSpace.dΩ,FEMSpace.Q₀)
-    else
-      return zeros(FEMSpace.Nₛᵖ)
-    end
-  end
-  _->(R₁,R₂)
 end
 
 function assemble_FEM_structure(
-  FEMSpace::SteadyProblem,
-  probl::SteadyInfo,
-  Param::ParametricInfoSteady,
+  FEMSpace::FEMProblem,
+  FEMInfo::Info,
+  Param::ParametricInfo,
   var::String)
+
   if var == "A"
-    assemble_stiffness(FEMSpace,probl,Param)
+    assemble_stiffness(FEMSpace,FEMInfo,Param)
   elseif var == "B"
     assemble_primal_op(FEMSpace)
   elseif var == "C"
     assemble_convective_op(FEMSpace)
   elseif var == "F"
-    assemble_forcing(FEMSpace,probl,Param)
+    assemble_forcing(FEMSpace,FEMInfo,Param)
   elseif var == "G"
     assemble_dirichlet_datum(FEMSpace,Param)
   elseif var == "H"
-    assemble_neumann_datum(FEMSpace,probl,Param)
+    assemble_neumann_datum(FEMSpace,FEMInfo,Param)
   elseif var == "M"
-    assemble_mass(FEMSpace,probl,Param)
+    assemble_mass(FEMSpace,FEMInfo,Param)
   elseif var == "Xᵘ"
     assemble_H¹_norm_matrix(FEMSpace)
   elseif var == "Xᵖ"
@@ -442,4 +466,5 @@ function assemble_FEM_structure(
   elseif var == "Xᵖ₀"
     assemble_L²₀_norm_matrix(FEMSpace)
   end
+
 end

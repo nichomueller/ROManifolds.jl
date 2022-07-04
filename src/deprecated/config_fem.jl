@@ -3,12 +3,12 @@ include("../../../FEM/FEM_superclasses.jl")
 include("../../../FEM/FEM_utils.jl")
 
 const problem_name = "poisson"
-const problem_type = "steady"
+const problem_steadiness = "steady"
 const problem_dim = 3
 const problem_nonlinearities = Dict("Ω" => false, "A" => true, "f" => false, "g" => false, "h" => false)
 const mesh_name = "model.json" # stretch_model
 const root = "/home/user1/git_repos/Mabla.jl"
-const paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, problem_nonlinearities)
+const paths = FEM_paths(root, problem_steadiness, problem_name, mesh_name, problem_dim, problem_nonlinearities)
 
 const order = 1
 const dirichlet_tags = ["sides"]
@@ -21,7 +21,7 @@ const FEMInfo = FEMInfo(order, dirichlet_tags, neumann_tags, solver, paths, prob
 
 #= struct FEMInfo
     problem_name::String
-    problem_type::String
+    problem_steadiness::String
     paths::Function
     approx_type::String
     problem_dim::Int

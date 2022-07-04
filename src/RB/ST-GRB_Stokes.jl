@@ -2,20 +2,19 @@ include("RBPoisson_unsteady.jl")
 
 function primal_supremizers(RBInfo::Info, RBVars::StokesSTGRB)
 
-  @info "Computing primal supremizers"
+  println("Computing primal supremizers")
 
   dir_idx = abs.(diag(RBVars.Xᵘ) .- 1) .< 1e-16
 
-  constraint_mat = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "B.csv");
-  convert_to_sparse = true)'
+  constraint_mat = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_structures_path, "B.csv"); true)'
   constraint_mat[dir_idx[dir_idx≤RBVars.P.S.Nₛᵘ*RBVars.P.S.Nₛᵖ]] = 0
 
-  supr_primal = Matrix(solve(PardisoSolver(), RBVars.Xᵘ, constraint_mat * RBVars.Φₛᵖ))
+  supr_primal = Matrix{Float64}(solve(PardisoSolver(), RBVars.Xᵘ, constraint_mat * RBVars.Φₛᵖ))
 
   min_norm = 1e16
   for i = 1:size(supr_primal)[2]
 
-    @info "Normalizing primal supremizer $i"
+    println("Normalizing primal supremizer $i")
 
     for j in 1:RBVars.P.S.nₛᵘ
       supr_primal[:, i] -= mydot(supr_primal[:, i], RBVars.P.S.Φₛᵘ[:,j], RBVars.P.S.Xᵘ₀) /
@@ -28,12 +27,12 @@ function primal_supremizers(RBInfo::Info, RBVars::StokesSTGRB)
 
     supr_norm = mynorm(supr_primal[:, i], RBVars.P.S.Xᵘ₀)
     min_norm = min(supr_norm, min_norm)
-    @info "Norm supremizers: $supr_norm"
+    println("Norm supremizers: $supr_norm")
     supr_primal[:, i] /= supr_norm
 
   end
 
-  @info "Primal supremizers enrichment ended with norm: $min_norm"
+  println("Primal supremizers enrichment ended with norm: $min_norm")
 
   supr_primal[abs.(supr_primal) < 1e-15] = 0
   RBVars.P.S.Φₛᵘ = hcat(RBVars.P.S.Φₛᵘ, supr_primal)
@@ -43,7 +42,7 @@ end
 
 function time_supremizers(RBVars::StokesSTGRB)
 
-  @info "Checking if primal supremizers in time need to be added"
+  println("Checking if primal supremizers in time need to be added")
 
   ΦₜᵘΦₜ = RBVars.P.Φₛᵘ' * RBVars.Φₜᵖ
   nₜ = size(Φₜ)[2]
@@ -60,7 +59,7 @@ function time_supremizers(RBVars::StokesSTGRB)
     normᵢ = norm(ΦₜᵘΦₜ[:, i])
     ΦₜᵘΦₜ[:, i] /= normᵢ
     if normᵢ ≤ 1e-2
-      @info "Time basis vector number $i of field p needs to be added to the velocity's time basis; the corresponding norm is: $(crit_norm[i])"
+      println("Time basis vector number $i of field p needs to be added to the velocity's time basis; the corresponding norm is: $(crit_norm[i])")
       Φₜ_crit = RBVars.Φₜᵖ[:,crit_idx]
       for j in 1:RBVars.P.nₜᵘ
         Φₜ_crit -= (Φₜ_crit' * RBVars.P.Φₜᵘ[:,j]) / norm(RBVars.P.Φₛᵘ[:,j]) * RBVars.P.Φₜᵘ[:,j]
@@ -88,7 +87,7 @@ end
 
 function build_reduced_basis(RBInfo::Info, RBVars::StokesSTGRB)
 
-  @info "Building the space-time reduced basis for fields (u,p,λ), using a tolerance of ($(RBInfo.ϵₛ),$(RBInfo.ϵₜ))"
+  println("Building the space-time reduced basis for fields (u,p,λ), using a tolerance of ($(RBInfo.ϵₛ),$(RBInfo.ϵₜ))")
 
   RB_building_time = @elapsed begin
     PODs_space(RBInfo, RBVars)
@@ -127,14 +126,12 @@ end
 function get_Bₙ(RBInfo::Info, RBVars::StokesSTGRB) :: Vector
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Bₙ.csv")) && isfile(joinpath(RBInfo.paths.ROM_structures_path, "Bᵀₙ.csv"))
-    @info "Importing reduced affine velocity-pressure and pressure-velocity matrices"
-    Bₙ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "Bₙ.csv"))
+    println("Importing reduced affine velocity-pressure and pressure-velocity matrices")
+    Bₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "Bₙ.csv"))
     RBVars.Bₙ = reshape(Bₙ,RBVars.S.nₛᵘ,RBVars.nₛᵖ,1)
-    Bᵀₙ = load_CSV(joinpath(RBInfo.paths.ROM_structures_path, "Bᵀₙ.csv"))
-    RBVars.Bᵀₙ = reshape(Bᵀₙ,RBVars.nₛᵖ,RBVars.S.nₛᵘ,1)
-    return []
+    return [""]
   else
-    @info "Failed to import the reduced affine velocity-pressure and pressure-velocity matrices: must build them"
+    println("Failed to import the reduced affine velocity-pressure and pressure-velocity matrices: must build them")
     return ["B"]
   end
 
@@ -143,15 +140,11 @@ end
 function assemble_affine_matrices(RBInfo::Info, RBVars::StokesSTGRB, var::String)
 
   if var == "B"
-    @info "Assembling affine reduced velocity-pressure and pressure-velocity matrices"
-    B = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "B.csv"); convert_to_sparse = true)
+    println("Assembling affine reduced velocity-pressure and pressure-velocity matrices")
+    B = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "B.csv"))
     Bₙ = (RBVars.Φₛᵖ)' * B * RBVars.S.Φₛᵘ
     RBVars.Bₙ = zeros(RBVars.nₛᵖ, RBVars.S.nₛᵘ, 1)
     RBVars.Bₙ[:,:,1] = Bₙ
-    Bᵀ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Bᵀ.csv"); convert_to_sparse = true)
-    Bᵀₙ = (RBVars.S.Φₛᵘ)' * Bᵀ * RBVars.Φₛᵖ
-    RBVars.Bᵀₙ = zeros(RBVars.S.nₛᵘ, RBVars.nₛᵖ, 1)
-    RBVars.Bᵀₙ[:,:,1] = Bᵀₙ
   else
     assemble_affine_matrices(RBInfo, RBVars.P, var)
   end
@@ -219,7 +212,7 @@ end
 
 function get_RB_LHS_blocks(RBInfo, RBVars::StokesSTGRB, θᵐ, θᵃ)
 
-  @info "Assembling LHS using Crank-Nicolson time scheme"
+  println("Assembling LHS using Crank-Nicolson time scheme")
 
   θ = RBInfo.θ
   δtθ = RBInfo.δt*θ
@@ -295,9 +288,9 @@ function get_RB_LHS_blocks(RBInfo, RBVars::StokesSTGRB, θᵐ, θᵃ)
 
 end
 
-function get_RB_RHS_blocks(RBInfo::Info, RBVars::StokesSTGRB, θᶠ::Vector, θʰ::Vector)
+function get_RB_RHS_blocks(RBInfo::Info, RBVars::StokesSTGRB, θᶠ::Vector{Float64}, θʰ::Vector{Float64})
 
-  @info "Assembling RHS"
+  println("Assembling RHS")
 
   get_RB_RHS_blocks(RBInfo, RBVars.P, θᶠ, θʰ)
 
@@ -308,7 +301,7 @@ end
 
 function get_RB_system(RBInfo::Info, RBVars::StokesSTGRB, Param)
 
-  @info "Preparing the RB system: fetching reduced LHS"
+  println("Preparing the RB system: fetching reduced LHS")
   initialize_RB_system(RBVars.S)
   get_Q(RBInfo, RBVars)
   blocks = [1]
@@ -325,20 +318,20 @@ function get_RB_system(RBInfo::Info, RBVars::StokesSTGRB, Param)
   end
 
   if "RHS" ∈ operators
-    if !RBInfo.build_Parametric_RHS
-      @info "Preparing the RB system: fetching reduced RHS"
+    if !RBInfo.build_parametric_RHS
+      println("Preparing the RB system: fetching reduced RHS")
       get_RB_RHS_blocks(RBInfo, RBVars, θᶠ, θʰ)
     else
-      @info "Preparing the RB system: assembling reduced RHS exactly"
-      build_Param_RHS(RBInfo, RBVars, Param)
+      println("Preparing the RB system: assembling reduced RHS exactly")
+      build_param_RHS(RBInfo, RBVars, Param)
     end
   end
 
 end
 
-function build_Param_RHS(RBInfo::Info, RBVars::StokesSTGRB, Param)
+function build_param_RHS(RBInfo::Info, RBVars::StokesSTGRB, Param)
 
-  build_Param_RHS(RBInfo, RBVars.P, Param)
+  build_param_RHS(RBInfo, RBVars.P, Param)
   push!(RBVars.S.RHSₙ, zeros(RBVars.nᵖ,1))
 
 end

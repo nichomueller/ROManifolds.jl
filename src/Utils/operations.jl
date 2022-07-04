@@ -3,26 +3,30 @@
   (positive definite) matrix 'norm_matrix'.
   If typeof(norm_matrix) == nothing (default), the standard inner product between
   'vec1' and 'vec2' is returned."""
-function mydot(vec1::Vector, vec2::Vector, norm_matrix = nothing)
+function mydot(vec1::Vector{T}, vec2::Vector{T}, norm_matrix::SparseMatrixCSC) where T
 
-  if isnothing(norm_matrix)
-      norm_matrix = float(I(size(vec1)[1]))
-  end
+  sum(sum(vec1' * norm_matrix * vec2))
 
-  return sum(sum(vec1' * norm_matrix * vec2))
+end
+
+function mydot(vec1::Vector{T}, vec2::Vector{T}) where T
+
+  sum(sum(vec1' * vec2))
 
 end
 
 """Computation of the norm of 'vec', defined by the (positive definite) matrix
 'norm_matrix'. If typeof(norm_matrix) == nothing (default), the Euclidean norm
 of 'vec' is returned."""
-function mynorm(vec::Vector, norm_matrix = nothing)
+function mynorm(vec::Vector{T}, norm_matrix::SparseMatrixCSC) where T
 
-  if isnothing(norm_matrix)
-    norm_matrix = float(I(size(vec)[1]))
-  end
+  sqrt(mydot(vec, vec, norm_matrix))
 
-  return sqrt(mydot(vec, vec, norm_matrix))
+end
+
+function mynorm(vec::Vector{T}) where T
+
+  sqrt(mydot(vec, vec))
 
 end
 
@@ -69,10 +73,8 @@ end
 
 """Generate a uniform random vector of dimension n between the ranges set by
   the vector of ranges 'a' and 'b'"""
-function generate_parameter(a::Vector, b::Vector, n::Int64 = 1)
-
-  return [[rand(Uniform(a[i], b[i])) for i = eachindex(a)] for j in 1:n]
-
+function generate_parameter(a::Vector{T}, b::Vector{T}, n = 1) where T
+  [[T.(rand(Uniform(a[i], b[i]))) for i = eachindex(a)] for j in 1:n]::Vector{Vector{T}}
 end
 
 """Makes use of a truncated SVD (tolerance level specified by 'ϵ') to compute a
@@ -80,38 +82,76 @@ end
   the vector space spanned by the columns of 'S', the so-called snapshots matrix.
   If the SPD matrix 'X' is provided, the columns of 'U' are orthogonal w.r.t.
   the norm induced by 'X'"""
-function POD(S, ϵ = 1e-5, X = nothing)
-  S̃ = copy(S)
-  if !isnothing(X)
-    if !issparse(X)
-      X = sparse(X)
-    end
-    H = cholesky(X)
-    L = sparse(H.L)
-    mul!(S̃, L', S̃[H.p, :])
-  end
-  if issparse(S̃)
-    U, Σ, _ = svds(S̃; nsv=size(S̃)[2] - 1)[1]
-  else
-    U, Σ, _ = svd(S̃)
+function POD(S::Matrix{T}, ϵ::Float64, X::SparseMatrixCSC{T}) where T
+
+  H = cholesky(X)
+  L = sparse(H.L)
+  #mul!(S, L', S[H.p, :])
+  U, Σ, _ = svd(L'*S[H.p, :])
+
+  energies = cumsum(Σ.^2)
+  N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
+  println("Basis number obtained via POD is $N,
+    projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
+
+  Matrix{T}((L' \ U[:, 1:N])[invperm(H.p), :]), T.(Σ)
+
+end
+
+function POD(S::SparseMatrixCSC{T}, ϵ::Float64, X::SparseMatrixCSC{T}) where T
+
+  H = cholesky(X)
+  L = sparse(H.L)
+  #mul!(S, L', S[H.p, :])
+  U, Σ, _ = svds(L'*S[H.p, :]; nsv=size(S)[2] - 1)[1]
+
+  energies = cumsum(Σ.^2)
+  N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
+  println("Basis number obtained via POD is $N,
+    projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
+
+  Matrix{T}((L' \ U[:, 1:N])[invperm(H.p), :]), T.(Σ)
+
+end
+
+function POD(S::Matrix{T}, ϵ::Float64) where T
+
+  U, Σ, _ = svd(S)
+
+  energies = cumsum(Σ.^2)
+  N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
+  println("Basis number obtained via POD is $N,
+    projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
+
+  T.(U[:, 1:N]), T.(Σ)
+
+end
+
+function POD(S::SparseMatrixCSC, ϵ::Float64) where T
+
+  U, Σ, _ = svds(S; nsv=size(S)[2] - 1)[1]
+
+  energies = cumsum(Σ.^2)
+  N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
+  println("Basis number obtained via POD is $N,
+    projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
+
+  T.(U[:, 1:N]), T.(Σ)
+
+end
+
+function get_NTuple(N::Int64, T::DataType)
+
+  ntupl = ()
+  for _ = 1:N
+    ntupl = (ntupl...,zero(T))
   end
 
-  total_energy = sum(Σ .^ 2)
-  cumulative_energy = 0.0
-  N = 0
-  while cumulative_energy / total_energy < 1.0 - ϵ ^ 2 && N < size(S̃)[2]
-    N += 1
-    cumulative_energy += Σ[N] ^ 2
-    @info "POD loop number $N, projection error ≤ $((sqrt(abs(1 - cumulative_energy / total_energy))))"
-  end
-  @info "Basis number obtained via POD is $N"
-  if issparse(U)
-    U = Matrix(U)
-  end
-  if !isnothing(X)
-    return Matrix((L' \ U[:, 1:N])[invperm(H.p), :]), Σ
-  else
-    return U[:,1:N], Σ
-  end
+  ntupl
 
+end
+
+function Base.one(vv::VectorValue{D,T}) where {D,T}
+  vv_one = zero(vv) .+ one(T)
+  return vv_one::VectorValue{D,T}
 end

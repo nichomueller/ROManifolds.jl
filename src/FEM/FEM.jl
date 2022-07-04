@@ -55,6 +55,7 @@ end =#
 
 include("../Utils/Utils.jl")
 include("FEMSuperclasses.jl")
+include("LagrangianQuad.jl")
 include("assemblers.jl")
 include("FEMUtils.jl")
 include("FEMSpaces.jl")

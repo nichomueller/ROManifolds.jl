@@ -1,45 +1,52 @@
 abstract type Problem end
-abstract type FEMProblem <: Problem end
-abstract type SteadyProblem <: FEMProblem end
-abstract type UnsteadyProblem <: FEMProblem  end
-abstract type Info end
-abstract type SteadyInfo <: Info end
-abstract type UnsteadyInfo <: Info end
+abstract type FEMProblem{D,T} <: Problem end
+abstract type SteadyProblem{D,T} <: FEMProblem{D,T} end
+abstract type UnsteadyProblem{D,T} <: FEMProblem{D,T} end
 
-#= struct PoissonProblem <: FEMProblem end
-struct PoissonProblemUnsteady <: FEMProblem end =#
+abstract type Info{T} end
 
-struct FEMSpacePoissonSteady <: SteadyProblem
+abstract type ParametricInfo{T} <: Info{T} end
+
+const F = Function
+
+struct FEMSpacePoissonSteady{D,T} <: SteadyProblem{D,T}
+  model::DiscreteModel
   Qₕ::CellQuadrature
-  V₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
+  V₀::UnconstrainedFESpace
   V::TrialFESpace
   ϕᵥ::FEBasis
   ϕᵤ::FEBasis
   Nₛᵘ::Int64
   Ω::BodyFittedTriangulation
   dΩ::Measure
-  dΓd::Union{Measure,Nothing}
-  dΓn::Union{Measure,Nothing}
+  dΓd::Measure
+  dΓn::Measure
+  phys_quadp::LazyArray
+  V₀_quad::UnconstrainedFESpace
 end
 
-struct FEMSpacePoissonUnsteady <: UnsteadyProblem
+struct FEMSpacePoissonUnsteady{D,T} <: UnsteadyProblem{D,T}
+  model::DiscreteModel
   Qₕ::CellQuadrature
-  V₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
+  V₀::UnconstrainedFESpace
   V::TransientTrialFESpace
   ϕᵥ::FEBasis
-  ϕᵤ::Function
+  ϕᵤ::F
   Nₛᵘ::Int64
   Ω::BodyFittedTriangulation
   dΩ::Measure
-  dΓd::Union{Measure,Nothing}
-  dΓn::Union{Measure,Nothing}
+  dΓd::Measure
+  dΓn::Measure
+  phys_quadp::LazyArray
+  V₀_quad::UnconstrainedFESpace
 end
 
-struct FEMSpaceStokesSteady <: SteadyProblem
+struct FEMSpaceStokesSteady{D,T} <: SteadyProblem{D,T}
+  model::DiscreteModel
   Qₕ::CellQuadrature
-  V₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
+  V₀::UnconstrainedFESpace
   V::TrialFESpace
-  Q₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
+  Q₀::ZeroMeanFESpace
   Q::ZeroMeanFESpace
   X₀::MultiFieldFESpace
   X::MultiFieldFESpace
@@ -52,41 +59,23 @@ struct FEMSpaceStokesSteady <: SteadyProblem
   Ω::BodyFittedTriangulation
   dΩ::Measure
   Γd::BoundaryTriangulation
-  dΓd::Union{Measure,Nothing}
-  dΓn::Union{Measure,Nothing}
+  dΓd::Measure
+  dΓn::Measure
+  phys_quadp::LazyArray
+  V₀_quad::UnconstrainedFESpace
 end
 
-struct FEMSpaceStokesUnsteady <: UnsteadyProblem
-  Qₕ::CellQuadrature
-  V₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
-  V::TransientTrialFESpace
-  Q₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
-  Q::ZeroMeanFESpace
-  X₀::MultiFieldFESpace
-  X::TransientMultiFieldTrialFESpace
-  ϕᵥ::FEBasis
-  ϕᵤ::Function
-  ψᵧ::FEBasis
-  ψₚ::FEBasis
-  Nₛᵘ::Int64
-  Nₛᵖ::Int64
-  Ω::BodyFittedTriangulation
-  dΩ::Measure
-  Γd::BoundaryTriangulation
-  dΓd::Union{Measure,Nothing}
-  dΓn::Union{Measure,Nothing}
-end
-
-struct FEMSpaceNavierStokesUnsteady <: UnsteadyProblem
+struct FEMSpaceStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
+  model::DiscreteModel
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TransientTrialFESpace
-  Q₀::Union{UnconstrainedFESpace,ZeroMeanFESpace}
+  Q₀::ZeroMeanFESpace
   Q::ZeroMeanFESpace
   X₀::MultiFieldFESpace
   X::TransientMultiFieldTrialFESpace
   ϕᵥ::FEBasis
-  ϕᵤ::Function
+  ϕᵤ::F
   ψᵧ::FEBasis
   ψₚ::FEBasis
   Nₛᵘ::Int64
@@ -94,64 +83,94 @@ struct FEMSpaceNavierStokesUnsteady <: UnsteadyProblem
   Ω::BodyFittedTriangulation
   dΩ::Measure
   Γd::BoundaryTriangulation
-  dΓd::Union{Measure,Nothing}
-  dΓn::Union{Measure,Nothing}
+  dΓd::Measure
+  dΓn::Measure
+  phys_quadp::LazyArray
+  V₀_quad::UnconstrainedFESpace
 end
 
-struct ProblemInfoSteady <: SteadyInfo
+struct FEMSpaceNavierStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
+  model::DiscreteModel
+  Qₕ::CellQuadrature
+  V₀::UnconstrainedFESpace
+  V::TransientTrialFESpace
+  Q₀::ZeroMeanFESpace
+  Q::ZeroMeanFESpace
+  X₀::MultiFieldFESpace
+  X::TransientMultiFieldTrialFESpace
+  ϕᵥ::FEBasis
+  ϕᵤ::F
+  ψᵧ::FEBasis
+  ψₚ::FEBasis
+  Nₛᵘ::Int64
+  Nₛᵖ::Int64
+  Ω::BodyFittedTriangulation
+  dΩ::Measure
+  Γd::BoundaryTriangulation
+  dΓd::Measure
+  dΓn::Measure
+  phys_quadp::LazyArray
+  V₀_quad::UnconstrainedFESpace
+end
+
+struct SteadyInfo{T} <: Info{T}
+  problem_id::NTuple
+  D::Int64
   case::Int
   probl_nl::Dict
   order::Int
-  dirichlet_tags::Array
-  dirichlet_bnds::Array
-  neumann_tags::Array
-  neumann_bnds::Array
+  dirichlet_tags::Vector{String}
+  dirichlet_bnds::Vector{Int64}
+  neumann_tags::Vector{String}
+  neumann_bnds::Vector{Int64}
   solver::String
-  paths::Function
+  paths::F
+  nₛ::Int64
 end
 
-struct ProblemInfoUnsteady <: UnsteadyInfo
+struct UnsteadyInfo{T} <: Info{T}
+  problem_id::NTuple
+  D::Int64
   case::Int
   probl_nl::Dict
   order::Int
-  dirichlet_tags::Array
-  dirichlet_bnds::Array
-  neumann_tags::Array
-  neumann_bnds::Array
+  dirichlet_tags::Vector{String}
+  dirichlet_bnds::Vector{Int64}
+  neumann_tags::Vector{String}
+  neumann_bnds::Vector{Int64}
   solver::String
-  paths::Function
+  paths::F
+  nₛ::Int64
   time_method::String
   θ::Float64
   RK_type::Symbol
   t₀::Float64
-  T::Float64
+  tₗ::Float64
   δt::Float64
 end
 
-mutable struct ParametricInfoSteady
-  μ::Vector
-  model::DiscreteModel
-  α::Function
-  f::Function
-  g::Function
-  h::Function
+struct ParametricInfoSteady{T} <: ParametricInfo{T}
+  μ::Vector{T}
+  α::F
+  f::F
+  g::F
+  h::F
 end
 
-mutable struct ParametricInfoUnsteady
-  μ::Vector
-  model::DiscreteModel
-  αₛ::Function
-  αₜ::Function
-  α::Function
-  mₛ::Function
-  mₜ::Function
-  m::Function
-  fₛ::Function
-  fₜ::Function
-  f::Function
-  g::Function
-  hₛ::Function
-  hₜ::Function
-  h::Function
-  u₀::Function
+struct ParametricInfoUnsteady{T} <: ParametricInfo{T}
+  μ::Vector{T}
+  αₛ::F
+  αₜ::F
+  α::F
+  mₛ::F
+  mₜ::F
+  m::F
+  fₛ::F
+  fₜ::F
+  f::F
+  g::F
+  hₛ::F
+  hₜ::F
+  h::F
+  u₀::F
 end

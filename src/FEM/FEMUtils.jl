@@ -1,4 +1,4 @@
-function FEM_paths(root, problem_type, problem_name, mesh_name, case; test_case="")
+function FEM_paths(root, problem_steadiness, problem_name, mesh_name, case; test_case="")
 
   @assert isdir(root) "$root is an invalid root directory"
 
@@ -6,7 +6,7 @@ function FEM_paths(root, problem_type, problem_name, mesh_name, case; test_case=
   create_dir(root_tests)
   mesh_path = joinpath(root_tests, joinpath("meshes", mesh_name))
   @assert isfile(mesh_path) "$mesh_path is an invalid mesh path"
-  type_path = joinpath(root_tests, problem_type)
+  type_path = joinpath(root_tests, problem_steadiness)
   create_dir(type_path)
   problem_path = joinpath(type_path, problem_name)
   create_dir(problem_path)
@@ -25,163 +25,225 @@ function FEM_paths(root, problem_type, problem_name, mesh_name, case; test_case=
 
 end
 
-function get_ParamInfo(::NTuple{1,Int},Info::SteadyInfo,μ::Vector)
-
-  model = DiscreteModelFromFile(Info.paths.mesh_path)
-
-  function prepare_α(x, μ, probl_nl)
-    if !probl_nl["A"]
-      return sum(μ)
-    else
-      return 1 + μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) / μ[3])
-    end
+function get_problem_id(problem_name::String)
+  if problem_name == "poisson"
+    return (0,)
+  elseif problem_name == "stokes"
+    return (0,0)
+  elseif problem_name == "navier-stokes"
+    return (0,0,0)
+  else
+    error("unimplemented")
   end
-  α(x) = prepare_α(x, μ, Info.probl_nl)
+end
 
-  function prepare_f(x, μ, probl_nl)
-    if probl_nl["f"]
-      return sin(μ[4] * x[1]) + sin(μ[4] * x[2])
-    else
-      return 1
-    end
-  end
-  f(x) = prepare_f(x, μ, Info.probl_nl)
-  g(x) = 0
-  h(x) = 1
+function init_FEM_variables(
+  ::Info{T}) where T
 
-  ParametricInfo(μ, model, α, f, g, h)
+  M = sparse([], [], T[])
+  A = sparse([], [], T[])
+  B = sparse([], [], T[])
+  Xᵘ₀ = sparse([], [], T[])
+  F = Vector{T}(undef,0)
+  H = Vector{T}(undef,0)
+
+  M, A, B, Xᵘ₀, F, H
 
 end
 
-function get_ParamInfo(::NTuple{1,Int},Info::UnsteadyInfo,μ::Vector)
+function get_ParamInfo(
+  FEMInfo::SteadyInfo{T},
+  problem_id::NTuple{1,Int},
+  μ::Vector) where T
 
-  model = DiscreteModelFromFile(Info.paths.mesh_path)
-  αₛ(x) = 1
-  αₜ(t, μ) = sum(μ) * (2 + sin(2π * t))
-  mₛ(x) = 1
-  mₜ(t::Real) = 1
-  m(x, t::Real) = mₛ(x)*mₜ(t)
-  m(t::Real) = x -> m(x, t)
-  fₛ(x) = 1
-  fₜ(t::Real) = sin(π * t)
-  gₛ(x) = 0
-  gₜ(t::Real) = 0
-  g(x, t::Real) = gₛ(x)*gₜ(t)
-  g(t::Real) = x -> g(x, t)
-  hₛ(x) = 0
-  hₜ(t::Real) = 0
-  h(x, t::Real) = hₛ(x)*hₜ(t)
-  h(t::Real) = x -> h(x, t)
-  u₀(x) = 0
+  α(x) = get_α(FEMInfo, problem_id, μ).α(x)
+  f(x) = get_f(FEMInfo, problem_id, μ).f(x)
+  g(x) = get_g(FEMInfo, problem_id, μ).g(x)
+  h(x) = get_h(FEMInfo, problem_id, μ).h(x)
 
-  function prepare_α(x, t, μ, probl_nl)
-    if !probl_nl["A"]
-      return αₛ(x)*αₜ(t, μ)
+  ParametricInfoSteady(μ, α, f, g, h)
+
+end
+
+function get_α(FEMInfo::SteadyInfo{T}, ::NTuple{1,Int64}, μ) where T
+  if !FEMInfo.probl_nl["A"]
+    return T(sum(μ))
+  else
+    return T(1. + μ[3] + 1. / μ[3] * exp(-norm(x-Point(μ[1:FEMInfo.D]))^2 / μ[3]))
+  end
+end
+
+function get_f(FEMInfo::SteadyInfo{T}, ::NTuple{1,Int64}, μ) where T
+  if !FEMInfo.probl_nl["f"]
+    return one(T)
+  else
+    return T(1 + sin(norm(Point(μ[4:3+FEMInfo.D]) .* x)*t))
+  end
+end
+
+function get_g(FEMInfo::SteadyInfo{T}, ::NTuple{1,Int64}, μ) where T
+  if !FEMInfo.probl_nl["g"]
+    return zero(T)
+  else
+    return zero(T)
+  end
+end
+
+function get_h(FEMInfo::SteadyInfo{T}, ::NTuple{1,Int64}, μ) where T
+  if FEMInfo.probl_nl["h"]
+    return 1 + sin(Point(μ[end-FEMInfo.D+1:end]) .* x)
+  else
+    return one(T)
+  end
+end
+
+function get_ParamInfo(
+  FEMInfo::UnsteadyInfo{T},
+  ::NTuple{1,Int},
+  μ::Vector) where T
+
+  αₛ(x) = one(T)
+  αₜ(t, μ) = T(5. * sum(μ) * (2 + sin(t)))
+  function α(x, t::Real)
+    if !FEMInfo.probl_nl["A"]
+      return T(αₛ(x)*αₜ(t, μ))
     else
-      return (10 + μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) * sin(t) / μ[3]))
+      return T(10. * (1. + 1. / μ[3] * exp(-norm(x-Point(μ[1:FEMInfo.D]))^2 * sin(t) / μ[3])))
     end
   end
-  α(x, t::Real) = prepare_α(x, t, μ, Info.probl_nl)
   α(t::Real) = x -> α(x, t)
 
-  function prepare_f(x, t, μ, probl_nl)
-    if !probl_nl["f"]
-      return fₛ(x)*fₜ(t)
+  fₛ(x) = one(T)
+  fₜ(t::Real) = T(sin(t))
+  function f(x, t::Real)
+    if !FEMInfo.probl_nl["f"]
+      return T(fₛ(x)*fₜ(t))
     else
-      return 10+5*sin(π*t*sum(x)*(μ[4]+μ[5]))
+      return T(1 + sin(norm(Point(μ[4:3+FEMInfo.D]) .* x)*t))
     end
   end
-  f(x, t::Real) = prepare_f(x, t, μ, Info.probl_nl)
   f(t::Real) = x -> f(x, t)
 
-  ParametricInfoUnsteady(
-    μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, g, hₛ, hₜ, h, u₀)
-
-end
-
-function get_ParamInfo(::NTuple{2,Int},Info::UnsteadyInfo,μ::Vector)
-
-  model = DiscreteModelFromFile(Info.paths.mesh_path)
-  αₛ(x) = 1
-  αₜ(t::Real, μ) = sum(μ) * (2 + sin(2π * t))
-  mₛ(x) = 1
-  mₜ(t::Real) = 1
-  m(x, t::Real) = mₛ(x)*mₜ(t)
-  m(t::Real) = x -> m(x, t)
-  fₛ(x) = VectorValue(0.,0.,0.)
-  fₜ(t::Real) = 0
-  f(x, t::Real) = fₛ(x)*fₜ(t)
-  f(t::Real) = x -> f(x, t)
-  gʷ(x, t::Real) = VectorValue(0.,0.,0.)
-  gʷ(t::Real) = x -> gʷ(x, t)
-  x0 = Point(0.,0.,0.)
-  R = 1
-  gₛ(x) = 2 * (1 .- VectorValue((x[1]-x0[1])^2,(x[2]-x0[2])^2,(x[3]-x0[3])^2) / R^2) / (pi*R^2)
-  gₜ(t::Real, μ) = 1-cos(2*pi*t/T)+μ[2]*sin(2*pi*μ[1]*t/T)
-  gⁱⁿ(x, t::Real) = gₛ(x)*gₜ(t, μ)
-  gⁱⁿ(t::Real) = x -> gⁱⁿ(x, t)
-  hₛ(x) = VectorValue(0.,0.,0.)
-  hₜ(t::Real) = 0
-  h(x, t::Real) = hₛ(x)*hₜ(t)
-  h(t::Real) = x -> h(x, t)
-  u₀(x) = VectorValue(0.,0.,0.)
-  p₀(x) = 0.
-  function x₀(x)
-    return [u₀(x), p₀(x)]
-  end
-
-  function prepare_α(x, t, μ, probl_nl)
-    if !probl_nl["A"]
-      return αₛ(x)*αₜ(t, μ)
+  gₛ(x) = zero(T)
+  gₜ(t::Real) = zero(T)
+  function g(x, t::Real)
+    if !FEMInfo.probl_nl["g"]
+      return T(gₛ(x)*gₜ(t))
     else
-      return (1 + μ[3] + 1 / μ[3] * exp(-((x[1] - μ[1])^2 + (x[2] - μ[2])^2) * sin(t) / μ[3]))
+      return zero(T)
     end
   end
-  α(x, t::Real) = prepare_α(x, t, μ, Info.probl_nl)
-  α(t::Real) = x -> α(x, t)
-
-  function prepare_g(x, t, μ, case)
-    if case <= 1
-      gⁱⁿ(x, t::Real) = gₛ(x)*gₜ(t, μ)
-      gⁱⁿ(t::Real) = x -> gⁱⁿ(x, t)
-      return gⁱⁿ#[gʷ,gⁱⁿ]
-    else
-      gⁱⁿ₁(x, t::Real) = gₛ(x)*gₜ(t, μ[end-2:end-1])*μ[end]
-      gⁱⁿ₁(t::Real) = x -> g(x, t)
-      gⁱⁿ₂(x, t::Real) = gₛ(x)*(1-gₜ(t, μ[end-2:end-1])*μ[end])
-      gⁱⁿ₂(t::Real) = x -> g(x, t)
-      return gⁱⁿ₁#[gʷ,gⁱⁿ₁,gⁱⁿ₂]
-    end
-  end
-  #g(x, t::Real) = prepare_g(x, t, μ, Info.case)
-  g(x, t::Real) = gₛ(x)*gₜ(t, μ)
   g(t::Real) = x -> g(x, t)
 
-  ParametricInfoUnsteady(
-    μ, model, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, g, hₛ, hₜ, h, x₀)
+  hₛ(x) = one(T)
+  hₜ(t::Real) = T(sin(t))
+  function h(x, t::Real)
+    if !FEMInfo.probl_nl["h"]
+      return T(hₛ(x)*hₜ(t))
+    else
+      return T(1 + sin(norm(Point(μ[end-FEMInfo.D+1:end]) .* x)*t))
+    end
+  end
+  h(t::Real) = x -> h(x, t)
+
+  mₛ(x) = one(T)
+  mₜ(t::Real) = one(T)
+  function m(x, t)
+    if !FEMInfo.probl_nl["M"]
+      return T(mₛ(x)*mₜ(t))
+    else
+      return one(T)
+    end
+  end
+  m(t::Real) = x -> m(x, t)
+
+  u₀(x) = zero(T)
+
+  ParametricInfoUnsteady{T}(
+    μ, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, g, hₛ, hₜ, h, u₀)
 
 end
 
-function get_timesθ(I::Info) ::Vector
-  collect(I.t₀:I.δt:I.T-I.δt).+I.δt*I.θ
+function nonlinearity_lifting_op(FEMInfo::Info)
+  if !FEMInfo.probl_nl["A"] && !FEMInfo.probl_nl["g"]
+    return 0
+  elseif FEMInfo.probl_nl["A"] && !FEMInfo.probl_nl["g"]
+    return 1
+  elseif !FEMInfo.probl_nl["A"] && FEMInfo.probl_nl["g"]
+    return 2
+  else
+    return 3
+  end
 end
 
-function generate_vtk_file(FEMSpace::FEMProblem, path::String, var_name::String, var::Array)
+#= function get_f(FEMInfo::UnsteadyInfo{T}, ::NTuple{2,Int64}, μ) where T
+
+  fₛ(x) = zero(VectorValue(N,T))
+  fₜ(t::Real) = zero(T)
+  function f(x, t)
+    if !FEMInfo.probl_nl["f"]
+      return T(fₛ(x)*fₜ(t))
+    else
+      return zero(VectorValue(FEMInfo.D,T))
+    end
+  end
+  _-> (fₛ,fₜ,f)
+
+end
+
+function get_g(FEMInfo::UnsteadyInfo{T}, ::NTuple{2,Int64}, μ) where T
+  x0 = zero(VectorValue(N,T))
+  diff = x - x0
+  gₛ(x) = T(1 .- diff .* diff)
+  gₜ(t::Real, μ) = T(1-cos(t)+μ[end]*sin(μ[end-1]))
+  function g(x, t)
+    if FEMInfo.probl_nl["g"]
+      return T(gₛ(x)*gₜ(t, μ))
+    else
+      return T(gₛ(x)*gₜ(t, μ))
+    end
+  end
+  _-> (gₛ,gₜ,g)
+end
+
+function get_h(FEMInfo::UnsteadyInfo{T}, ::NTuple{2,Int64}, μ) where T
+  hₛ(x) = zero(VectorValue(FEMInfo.D,T))
+  hₜ(t::Real) = zero(T)
+  h(x, t::Real) = zero(VectorValue(FEMInfo.D,T))
+  _-> (hₛ,hₜ,h)
+end
+
+function get_IC(FEMInfo::UnsteadyInfo{T}, ::NTuple{2,Int64}) where T
+  u₀(x) = [zero(T),zero(VectorValue(FEMInfo.D,T))]
+end =#
+
+function get_timesθ(FEMInfo::UnsteadyInfo{T}) where T
+  T.(collect(FEMInfo.t₀:FEMInfo.δt:FEMInfo.tₗ-FEMInfo.δt).+FEMInfo.δt*FEMInfo.θ)
+end
+
+function generate_vtk_file(
+  FEMSpace::FEMProblem,
+  path::String,
+  var_name::String,
+  var::Array)
 
   FE_var = FEFunction(FEMSpace.V, var)
   writevtk(FEMSpace.Ω, path, cellfields = [var_name => FE_var])
 
 end
 
-function find_FE_elements(V₀::UnconstrainedFESpace, trian::Triangulation, idx::Vector)
+function find_FE_elements(
+  V₀::UnconstrainedFESpace,
+  trian::Triangulation,
+  idx::Vector{T}) where T
 
-  connectivity = get_cell_dof_ids(V₀, trian)
+  connectivity = get_cell_dof_ids(V₀, trian)::Table{Int32, Vector{Int32}, Vector{Int32}}
 
   el = Int64[]
   for i = 1:length(idx)
     for j = 1:size(connectivity)[1]
       if idx[i] in abs.(connectivity[j])
-        append!(el, j)
+        append!(el, convert(T,j))
       end
     end
   end
@@ -190,12 +252,12 @@ function find_FE_elements(V₀::UnconstrainedFESpace, trian::Triangulation, idx:
 
 end
 
-function generate_dcube_discrete_model(I::Info,d::Int64,npart::Int,mesh_name::String)
+function generate_dcube_discrete_model(FEMInfo::Info,d::Int,npart::Int,mesh_name::String)
 
   if !occursin(".json",mesh_name)
     mesh_name *= ".json"
   end
-  mesh_dir = I.paths.mesh_path[1:findall(x->x=='/',I.paths.mesh_path)[end]]
+  mesh_dir = FEMInfo.paths.mesh_path[1:findall(x->x=='/',FEMInfo.paths.mesh_path)[end]]
   mesh_path = joinpath(mesh_dir,mesh_name)
   generate_dcube_discrete_model(d,npart,mesh_path)
 

@@ -142,8 +142,8 @@ function run_FEM_Omega()
   return run_Parametric_FEM
 
 end
-#= paths = FEM_paths(root, problem_type, problem_name, mesh_name, problem_dim, problem_nonlinearities)
-FEMInfo = FEMInfo(problem_name, problem_type, paths, approx_type, problem_dim, problem_nonlinearities, number_coupled_blocks, order, dirichlet_tags, neumann_tags, solver, nₛ)
+#= paths = FEM_paths(root, problem_steadiness, problem_name, mesh_name, problem_dim, problem_nonlinearities)
+FEMInfo = FEMInfo(problem_name, problem_steadiness, paths, approx_type, problem_dim, problem_nonlinearities, number_coupled_blocks, order, dirichlet_tags, neumann_tags, solver, nₛ)
 
 ranges = Dict("μᵒ" => [0., 1.], "μᴬ" => [[0.4, 0.6] [0.4, 0.6] [0.05, 0.1]], "μᶠ" => [0., 1.1], "μᵍ" => [0., 1.], "μʰ" => [0., 1.])
 (μᵒ, μᴬ, μᶠ, μᵍ, μʰ) = generate_Parameters(problem_nonlinearities, nₛ, ranges)
@@ -159,7 +159,7 @@ uₕ = Any[]
 if problem_nonlinearities["Ω"] === false
 
     for i_nₛ = 1:nₛ
-        @info "Computing snapshot $i_nₛ"
+        println("Computing snapshot $i_nₛ"
 
         if i_nₛ > 1
             Param = compute_Param(problem_nonlinearities, Params, i_nₛ)
@@ -182,7 +182,7 @@ if problem_nonlinearities["Ω"] === false
 else
 
     for i_nₛ = 1:nₛ
-        @info "Computing snapshot $i_nₛ"
+        println("Computing snapshot $i_nₛ"
 
         if i_nₛ > 1
             Param = compute_Param(problem_nonlinearities, Params, i_nₛ)

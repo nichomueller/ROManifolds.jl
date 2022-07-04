@@ -5,12 +5,12 @@ function get_snapshot_matrix(RBInfo::Info, RBVars::StokesUnsteady)
 
   get_snapshot_matrix(RBInfo, RBVars.P)
 
-  @info "Importing the snapshot matrix for field p, number of snapshots considered: $(RBInfo.nₛ)"
-  Sᵖ = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "pₕ.csv"), DataFrame))[:, 1:(RBInfo.nₛ*RBVars.Nₜ)]
+  println("Importing the snapshot matrix for field p, number of snapshots considered: $(RBInfo.nₛ)")
+  Sᵖ = Matrix{Float64}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "pₕ.csv"), DataFrame))[:, 1:(RBInfo.nₛ*RBVars.Nₜ)]
   RBVars.Sᵖ = Sᵖ
   RBVars.Nₛᵖ = size(Sᵖ)[1]
   RBVars.Nᵖ = RBVars.Nₛᵖ * RBVars.Nₜ
-  @info "Dimension of snapshot matrix for field p: $(size(Sᵖ))"
+  println("Dimension of snapshot matrix for field p: $(size(Sᵖ))")
 
 end
 
@@ -18,16 +18,16 @@ function get_norm_matrix(RBInfo::Info, RBVars::PoissonSteady)
 
   if check_norm_matrix(RBVars)
 
-    @info "Importing the norm matrices Xᵘ₀, Xᵘ, Xᵖ₀, Xᵖ"
+    println("Importing the norm matrices Xᵘ₀, Xᵘ, Xᵖ₀, Xᵖ")
 
-    Xᵘ₀ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Xᵘ₀.csv"); convert_to_sparse = true)
-    Xᵘ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Xᵘ.csv"); convert_to_sparse = true)
-    Xᵖ₀ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Xᵖ₀.csv"); convert_to_sparse = true)
-    Xᵖ = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "Xᵖ.csv"); convert_to_sparse = true)
+    Xᵘ₀ = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "Xᵘ₀.csv"))
+    Xᵘ = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "Xᵘ.csv"))
+    Xᵖ₀ = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "Xᵖ₀.csv"))
+    Xᵖ = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "Xᵖ.csv"))
     RBVars.Nₛᵘ = size(Xᵘ₀)[1]
     RBVars.Nᵖ = size(Xᵖ₀)[1]
-    @info "Dimension of H¹ norm matrix, field u: $(size(Xᵘ₀))"
-    @info "Dimension of L² norm matrix, field p: $(size(Xᵖ₀))"
+    println("Dimension of H¹ norm matrix, field u: $(size(Xᵘ₀))")
+    println("Dimension of L² norm matrix, field p: $(size(Xᵖ₀))")
 
     if RBInfo.use_norm_X
       RBVars.Xᵘ₀ = Xᵘ₀
@@ -50,7 +50,7 @@ function PODs_space(RBInfo::Info, RBVars::StokesUnsteady)
   get_norm_matrix(RBInfo, RBVars)
   PODs_space(RBInfo, RBVars.S)
 
-  @info "Performing the nested spatial POD for field p, using a tolerance of $(RBInfo.ϵₛ)"
+  println("Performing the nested spatial POD for field p, using a tolerance of $(RBInfo.ϵₛ)")
 
   if RBInfo.perform_nested_POD
 
@@ -81,7 +81,7 @@ function PODs_time(RBInfo::Info, RBVars::StokesUnsteady)
 
   PODs_time(RBInfo, RBVars.S)
 
-  @info "Performing the temporal POD for field p, using a tolerance of $(RBInfo.ϵₜ)"
+  println("Performing the temporal POD for field p, using a tolerance of $(RBInfo.ϵₜ)")
 
   if RBInfo.time_reduction_technique == "ST-HOSVD"
     Sᵖₜ = zeros(RBVars.P.Nₜ, RBVars.nₛᵖ * RBInfo.nₛ)
@@ -109,11 +109,11 @@ function import_reduced_basis(RBInfo::Info, RBVars::StokesUnsteady)
 
   import_reduced_basis(RBInfo, RBVars.P)
 
-  @info "Importing the reduced basis for field p"
+  println("Importing the reduced basis for field p")
 
-  RBVars.Φₛᵖ = load_CSV(joinpath(RBInfo.paths.basis_path, "Φₛᵖ.csv"))
+  RBVars.Φₛᵖ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.basis_path, "Φₛᵖ.csv"))
   RBVars.nₛᵖ = size(RBVars.Φₛᵖ)[2]
-  RBVars.Φₜᵖ = load_CSV(joinpath(RBInfo.paths.basis_path, "Φₜᵖ.csv"))
+  RBVars.Φₜᵖ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.basis_path, "Φₜᵖ.csv"))
   RBVars.nₜᵖ = size(RBVars.Φₜᵖ)[2]
   RBVars.nᵖ = RBVars.nₛᵖ * RBVars.nₜᵖ
 
@@ -148,7 +148,7 @@ function get_generalized_coordinates(RBInfo::Info, RBVars::StokesUnsteady, snaps
 
   for (i, i_nₛ) = enumerate(snaps)
 
-    @info "Assembling generalized coordinate relative to snapshot $(i_nₛ), field p"
+    println("Assembling generalized coordinate relative to snapshot $(i_nₛ), field p")
     Sᵖ_i = RBVars.Sᵖ[:, (i_nₛ-1)*RBVars.P.Nₜ+1:i_nₛ*RBVars.P.Nₜ]
     for i_s = 1:RBVars.nₛᵖ
       for i_t = 1:RBVars.nₜᵖ
@@ -224,8 +224,8 @@ function solve_RB_system(RBInfo::Info, RBVars::StokesUnsteady, Param)
   LHSₙ = [LHS_tmp[1] LHS_tmp[2]; LHS_tmp[3] LHS_tmp[4]]
   RHSₙ = [RHS_tmp[1]; RHS_tmp[2]]
 
-  @info "Solving RB problem via backslash"
-  @info "Condition number of the system's matrix: $(cond(LHSₙ))"
+  println("Solving RB problem via backslash")
+  println("Condition number of the system's matrix: $(cond(LHSₙ))")
   xₙ = LHSₙ \ RHSₙ
   RBVars.P.S.uₙ = xₙ[1:RBVars.P.nᵘ,:]
   RBVars.pₙ = xₙ[RBVars.P.nᵘ+1:end,:]
@@ -243,7 +243,7 @@ end
 
 function offline_phase(RBInfo::Info, RBVars::StokesUnsteady)
 
-  RBVars.P.Nₜ = convert(Int64, RBInfo.T / RBInfo.δt)
+  RBVars.P.Nₜ = convert(Int64, RBInfo.tₗ / RBInfo.δt)
 
   if RBInfo.import_snapshots
     get_snapshot_matrix(RBInfo, RBVars)
@@ -265,7 +265,7 @@ function offline_phase(RBInfo::Info, RBVars::StokesUnsteady)
   end
 
   if import_snapshots_success && !import_basis_success
-    @info "Failed to import the reduced basis, building it via POD"
+    println("Failed to import the reduced basis, building it via POD")
     build_reduced_basis(RBInfo, RBVars)
   end
 
@@ -301,12 +301,12 @@ function online_phase(RBInfo::Info, RBVars::StokesUnsteady, μ, Param_nbs)
   pₙ_μ = zeros(RBVars.nᵘ, length(Param_nbs))
 
   for (i_nb, nb) in enumerate(Param_nbs)
-    @info "Considering Parameter number: $nb"
+    println("Considering Parameter number: $nb")
 
     μ_nb = parse.(Float64, split(chop(μ[nb]; head=1, tail=1), ','))
-    Param = get_ParamInfo(problem_ntuple, RBInfo, μ_nb)
-    uₕ_test = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, (nb-1)*RBVars.P.Nₜ+1:nb*RBVars.P.Nₜ]
-    pₕ_test = Matrix(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "pₕ.csv"), DataFrame))[:, (nb-1)*RBVars.P.Nₜ+1:nb*RBVars.P.Nₜ]
+    Param = get_ParamInfo(RBInfo, problem_id, μ_nb)
+    uₕ_test = Matrix{Float64}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, (nb-1)*RBVars.P.Nₜ+1:nb*RBVars.P.Nₜ]
+    pₕ_test = Matrix{Float64}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "pₕ.csv"), DataFrame))[:, (nb-1)*RBVars.P.Nₜ+1:nb*RBVars.P.Nₜ]
 
     online_time = @elapsed begin
       solve_RB_system(RBInfo, RBVars, Param)
@@ -333,13 +333,13 @@ function online_phase(RBInfo::Info, RBVars::StokesUnsteady, μ, Param_nbs)
     p̃_μ[:, (i_nb-1)*RBVars.P.Nₜ+1:i_nb*RBVars.P.Nₜ] = RBVars.S.p̃
     pₙ_μ[:, i_nb] = RBVars.S.pₙ
 
-    @info "Online wall time: $online_time s (snapshot number $nb)"
-    @info "Relative reconstruction H1-L2 error: $H1_L2_err_nb (snapshot number $nb)"
-    @info "Relative reconstruction L2-L2 error: $L2_L2_err_nb (snapshot number $nb)"
+    println("Online wall time: $online_time s (snapshot number $nb)")
+    println("Relative reconstruction H1-L2 error: $H1_L2_err_nb (snapshot number $nb)")
+    println("Relative reconstruction L2-L2 error: $L2_L2_err_nb (snapshot number $nb)")
 
   end
 
-  string_Param_nbs = "Params"
+  string_Param_nbs = "params"
   for Param_nb in Param_nbs
     string_Param_nbs *= "_" * string(Param_nb)
   end
@@ -378,7 +378,7 @@ function online_phase(RBInfo::Info, RBVars::StokesUnsteady, μ, Param_nbs)
     "L2_L2_err"=>L2_L2_err, "mean_L2_err"=>mean_L2_err,
     "mean_point_err_p"=>mean_pointwise_err_p)
 
-  if RBInfo.postprocess
+  if RBInfo.post_process
     post_process(RBInfo, pass_to_pp)
   end
 
@@ -386,26 +386,25 @@ end
 
 function check_dataset(RBInfo, RBVars, i)
 
-  μ = load_CSV(joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  μ_i = parse.(Float64, split(chop(μ[i]; head=1, tail=1), ','))
-  Param = get_ParamInfo(problem_ntuple, RBInfo, μ_i)
+  μ = load_CSV(Array{Float64}[], joinpath( RBInfo.paths.FEM_snap_path, "μ.csv"))
+  Param = get_ParamInfo(RBInfo, problem_id, μ[i])
 
   u1 = RBVars.S.Sᵘ[:, (i-1)*RBVars.P.Nₜ+1]
   u2 = RBVars.S.Sᵘ[:, (i-1)*RBVars.P.Nₜ+2]
-  M = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "M.csv"); convert_to_sparse = true)
-  A = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "A.csv"); convert_to_sparse = true)
-  F = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "F.csv"))
-  H = load_CSV(joinpath(RBInfo.paths.FEM_structures_path, "H.csv"))
+  M = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "M.csv"))
+  A = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "A.csv"))
+  F = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_structures_path, "F.csv"))
+  H = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_structures_path, "H.csv"))
 
   t¹_θ = RBInfo.t₀+RBInfo.δt*RBInfo.θ
   t²_θ = t¹_θ+RBInfo.δt
 
-  LHS1 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A*Param.αₜ(t¹_θ,μ_i))
+  LHS1 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A*Param.αₜ(t¹_θ,μ[i]))
   RHS1 = RBInfo.δt*RBInfo.θ*(F*Param.fₜ(t¹_θ)+H*Param.hₜ(t¹_θ))
   my_u1 = LHS1\RHS1
 
-  LHS2 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A*Param.αₜ(t²_θ,μ_i))
-  mat = (1-RBInfo.θ)*(M+RBInfo.δt*RBInfo.θ*A*Param.αₜ(t²_θ,μ_i))-M
+  LHS2 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A*Param.αₜ(t²_θ,μ[i]))
+  mat = (1-RBInfo.θ)*(M+RBInfo.δt*RBInfo.θ*A*Param.αₜ(t²_θ,μ[i]))-M
   RHS2 = RBInfo.δt*RBInfo.θ*(F*Param.fₜ(t²_θ)+H*Param.hₜ(t²_θ))-mat*u1
   my_u2 = LHS2\RHS2
 
