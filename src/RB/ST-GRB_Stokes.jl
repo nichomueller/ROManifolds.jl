@@ -57,8 +57,8 @@ end
 
 function assemble_reduced_mat_MDEIM(
   RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonSTGRB{T},
-  MDEIM_mat::Matrix{T},
+  RBVars::PoissonSTGRB,
+  MDEIM_mat::Matrix,
   row_idx::Vector{Int64},
   var::String)
 
@@ -77,8 +77,8 @@ end
 
 function assemble_reduced_mat_DEIM(
   RBInfo::ROMInfoUnsteady,
-  RBVars::StokesSTGRB{T},
-  DEIM_mat::Matrix{T},
+  RBVars::StokesSTGRB,
+  DEIM_mat::Matrix,
   var::String)
 
   assemble_reduced_mat_DEIM(RBInfo, RBVars.P, DEIM_mat, var)
@@ -142,7 +142,7 @@ function get_Q(
 
 end
 
-function function get_RB_LHS_blocks(
+function get_RB_LHS_blocks(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTGRB{T},
   θᵐ::Matrix,
@@ -154,9 +154,9 @@ function function get_RB_LHS_blocks(
   Φₜᵘᵖ = RBVars.Φₜᵘ' * RBVars.Φₜᵖ
   Φₜᵘᵖ₁ = RBVars.Φₜᵘ[:, 2:end]' * RBVars.Φₜᵖ[:, 1:end-1]
 
-  Bₙ = kron(RBVars.Bₙ[:,:,1], Φₜᵘᵖ')::Matrix{T}
-  Bₙᵀ = kron(transpose(RBVars.Bₙ[:,:,1]), Φₜᵘᵖ)::Matrix{T}
-  Bₙ₁ᵀ = kron(transpose(RBVars.Bₙ[:,:,1]), Φₜᵘᵖ₁)::Matrix{T}
+  Bₙ = kron(RBVars.Bₙ[:,:,1]*θᵇ, Φₜᵘᵖ')::Matrix{T}
+  Bₙᵀ = kron(transpose(RBVars.Bₙ[:,:,1]*θᵇ), Φₜᵘᵖ)::Matrix{T}
+  Bₙ₁ᵀ = kron(transpose(RBVars.Bₙ[:,:,1]*θᵇ), Φₜᵘᵖ₁)::Matrix{T}
 
   block₂ = RBInfo.δt*RBInfo.θ * (RBInfo.θ*Bₙᵀ + (1 - RBInfo.θ)*Bₙ₁ᵀ)
   block₃ = Bₙ

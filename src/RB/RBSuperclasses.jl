@@ -40,12 +40,15 @@ function init_PoissonSGRB_variables(::Type{T}) where T
   MDEIMᵢ_A, MDEIM_idx_A, row_idx_A, sparse_el_A, DEIM_mat_F, DEIMᵢ_F, DEIM_idx_F,
   DEIM_mat_H, DEIMᵢ_H, DEIM_idx_H, Nₛᵘ, nₛᵘ, Qᵃ, Qᶠ, Qʰ,
   offline_time, online_time)
+
 end
 
 function init_PoissonSPGRB_variables(::Type{T}) where T
   Pᵤ⁻¹ = sparse([], [], T[])
   AΦᵀPᵤ⁻¹ = Array{T}(undef,0,0,0)
-  Pᵤ⁻¹, AΦᵀPᵤ⁻¹
+
+  (init_PoissonSGRB_variables(T)..., Pᵤ⁻¹, AΦᵀPᵤ⁻¹)
+
 end
 
 function init_PoissonSTGRB_variables(::Type{T}) where T
@@ -61,33 +64,47 @@ function init_PoissonSTGRB_variables(::Type{T}) where T
   nₜᵘ = 0
   nᵘ = 0
   Qᵐ = 0
-  Φₜᵘ,Mₙ,MDEIM_mat_M,MDEIMᵢ_M,MDEIM_idx_M,row_idx_M,sparse_el_M,Nₜ,Nᵘ,nₜᵘ,nᵘ,Qᵐ
+
+  (init_PoissonSGRB_variables(T)...,Φₜᵘ,Mₙ,MDEIM_mat_M,MDEIMᵢ_M,MDEIM_idx_M,
+    row_idx_M,sparse_el_M,Nₜ,Nᵘ,nₜᵘ,nᵘ,Qᵐ)
+
 end
 
 function init_PoissonSTPGRB_variables(::Type{T}) where T
   MAₙ = Array{T}(undef,0,0,0)
   MΦ = Array{T}(undef,0,0,0)
   MΦᵀPᵤ⁻¹ = Array{T}(undef,0,0,0)
-  MAₙ,MΦ,MΦᵀPᵤ⁻¹
+
+  (init_PoissonSPGRB_variables(T)..., init_PoissonSTGRB_variables(T)...,
+    MAₙ,MΦ,MΦᵀPᵤ⁻¹)
+
 end
 
-function init_StokesSTGRB_variables(::Type{T}) where T
+function init_StokesSGRB_variables(::Type{T}) where T
   Sᵖ = Matrix{T}(undef,0,0)
   Φₛᵘ = Matrix{T}(undef,0,0)
-  Φₜᵖ = Matrix{T}(undef,0,0)
   p̃ = Matrix{T}(undef,0,0)
   pₙ = Matrix{T}(undef,0,0)
   p̂ = Matrix{T}(undef,0,0)
   Bₙ = Array{T}(undef,0,0,0)
   Xᵘ = sparse([], [], T[])
-  Xᵖ = sparse([], [], T[])
   Xᵖ₀ = sparse([], [], T[])
   Nₛᵖ = 0
-  Nᵖ = 0
   nₛᵖ = 0
+
+  (init_PoissonSGRB_variables(T)..., Sᵖ,Φₛᵘ,p̃,pₙ,p̂,Bₙ,Xᵘ,Xᵖ₀,Nₛᵖ,nₛᵖ)
+
+end
+
+function init_StokesSTGRB_variables(::Type{T}) where T
+  Φₜᵖ = Matrix{T}(undef,0,0)
+  Nᵖ = 0
   nₜᵖ = 0
   nᵖ = 0
-  Sᵖ,Φₛᵘ,Φₜᵖ,p̃,pₙ,p̂,Bₙ,Xᵘ,Xᵖ,Xᵖ₀,Nₛᵖ,Nᵖ,nₛᵖ,nₜᵖ,nᵖ
+
+  (init_PoissonSTGRB_variables(T)..., init_StokesSGRB_variables(T)...,
+    Φₜᵖ,Nᵖ,nₜᵖ,nᵖ)
+
 end
 
 mutable struct PoissonSGRB{T} <: PoissonSteady{T}
@@ -111,13 +128,25 @@ mutable struct PoissonSPGRB{T} <: PoissonSteady{T}
 end
 
 mutable struct PoissonSTGRB{T} <: PoissonUnsteady{T}
-  S::PoissonSGRB{T}; Φₜᵘ::Matrix{T}; Mₙ::Array{T}; MDEIM_mat_M::Matrix{T}; MDEIMᵢ_M::Matrix{T};
+  S::PoissonSGRB{T}; Sᵘ::Matrix{T}; Φₛᵘ::Matrix{T}; ũ::Matrix{T}; uₙ::Matrix{T}; û::Matrix{T}; Aₙ::Array{T}; Fₙ::Matrix{T};
+  Hₙ::Matrix{T}; Xᵘ₀::SparseMatrixCSC{T}; LHSₙ::Vector{Matrix{T}}; RHSₙ::Vector{Matrix{T}}; MDEIM_mat_A::Matrix{T};
+  MDEIMᵢ_A::Matrix{T}; MDEIM_idx_A::Vector{Int64}; row_idx_A::Vector{Int64}; sparse_el_A::Vector{Int64};
+  DEIM_mat_F::Matrix{T}; DEIMᵢ_F::Matrix{T}; DEIM_idx_F::Vector{Int64}; DEIM_mat_H::Matrix{T};
+  DEIMᵢ_H::Matrix{T}; DEIM_idx_H::Vector{Int64};
+  Nₛᵘ::Int64; nₛᵘ::Int64; Qᵃ::Int64; Qᶠ::Int64; Qʰ::Int64; offline_time::Float64;
+  online_time::Float64; Φₜᵘ::Matrix{T}; Mₙ::Array{T}; MDEIM_mat_M::Matrix{T}; MDEIMᵢ_M::Matrix{T};
   MDEIM_idx_M::Vector{Int64}; row_idx_M::Vector{Int64}; sparse_el_M::Vector{Int64};
   Nₜ::Int64; Nᵘ::Int64; nₜᵘ::Int64; nᵘ::Int64; Qᵐ::Int64;
 end
 
 mutable struct PoissonSTPGRB{T} <: PoissonUnsteady{T}
-  S::PoissonSGRB{T}; Φₜᵘ::Matrix{T}; Mₙ::Array{T}; MDEIM_mat_M::Matrix{T}; MDEIMᵢ_M::Matrix{T};
+  S::PoissonSPGRB{T}; Sᵘ::Matrix{T}; Φₛᵘ::Matrix{T}; ũ::Matrix{T}; uₙ::Matrix{T}; û::Matrix{T}; Aₙ::Array{T}; Fₙ::Matrix{T};
+  Hₙ::Matrix{T}; Xᵘ₀::SparseMatrixCSC{T}; LHSₙ::Vector{Matrix{T}}; RHSₙ::Vector{Matrix{T}}; MDEIM_mat_A::Matrix{T};
+  MDEIMᵢ_A::Matrix{T}; MDEIM_idx_A::Vector{Int64}; row_idx_A::Vector{Int64}; sparse_el_A::Vector{Int64};
+  DEIM_mat_F::Matrix{T}; DEIMᵢ_F::Matrix{T}; DEIM_idx_F::Vector{Int64}; DEIM_mat_H::Matrix{T};
+  DEIMᵢ_H::Matrix{T}; DEIM_idx_H::Vector{Int64};
+  Nₛᵘ::Int64; nₛᵘ::Int64; Qᵃ::Int64; Qᶠ::Int64; Qʰ::Int64; offline_time::Float64;
+  online_time::Float64;Pᵤ⁻¹::SparseMatrixCSC{T}; AΦᵀPᵤ⁻¹::Array{T}; Φₜᵘ::Matrix{T}; Mₙ::Array{T}; MDEIM_mat_M::Matrix{T}; MDEIMᵢ_M::Matrix{T};
   MDEIM_idx_M::Vector{Int64}; row_idx_M::Vector{Int64}; sparse_el_M::Vector{Int64};
   Nₜ::Int64; Nᵘ::Int64; nₜᵘ::Int64; nᵘ::Int64; Qᵐ::Int64;MAₙ::Array{T};MΦ::Array{T};MΦᵀPᵤ⁻¹::Array{T}
 end
@@ -130,8 +159,8 @@ mutable struct StokesSGRB{T} <: StokesUnsteady{T}
   DEIMᵢ_H::Matrix{T}; DEIM_idx_H::Vector{Int64};
   Nₛᵘ::Int64; nₛᵘ::Int64; Qᵃ::Int64; Qᶠ::Int64; Qʰ::Int64; offline_time::Float64;
   online_time::Float64; Sᵖ::Matrix{T}; Φₛᵖ::Matrix{T}; p̃::Matrix{T}; pₙ::Matrix{T};
-  p̂::Matrix{T}; Bₙ::Array{T}; Xᵘ::SparseMatrixCSC{T}; Xᵖ::SparseMatrixCSC{T};
-  Xᵖ₀::SparseMatrixCSC{T}; Nₛᵖ::Int64; Nᵖ::Int64; nₛᵖ::Int64
+  p̂::Matrix{T}; Bₙ::Array{T}; Xᵘ::SparseMatrixCSC{T};
+  Xᵖ₀::SparseMatrixCSC{T}; Nₛᵖ::Int64; nₛᵖ::Int64
 end
 
 mutable struct StokesSTGRB{T} <: StokesUnsteady{T}
@@ -144,8 +173,8 @@ mutable struct StokesSTGRB{T} <: StokesUnsteady{T}
   online_time::Float64; Φₜᵘ::Matrix{T}; Mₙ::Array{T}; MDEIM_mat_M::Matrix{T}; MDEIMᵢ_M::Matrix{T};
   MDEIM_idx_M::Vector{Int64}; row_idx_M::Vector{Int64}; sparse_el_M::Vector{Int64};
   Nₜ::Int64; Nᵘ::Int64; nₜᵘ::Int64; nᵘ::Int64; Qᵐ::Int64; Sᵖ::Matrix{T}; Φₛᵖ::Matrix{T}; Φₜᵖ::Matrix{T}; p̃::Matrix{T}; pₙ::Matrix{T};
-  p̂::Matrix{T}; Bₙ::Array{T}; Xᵘ::SparseMatrixCSC{T}; Xᵖ::SparseMatrixCSC{T};
-  Xᵖ₀::SparseMatrixCSC{T}; Nₛᵖ::Int64; Nᵖ::Int64; nₛᵖ::Int64;
+  p̂::Matrix{T}; Bₙ::Array{T}; Xᵘ::SparseMatrixCSC{T};
+  Xᵖ₀::SparseMatrixCSC{T}; Nₛᵖ::Int64; nₛᵖ::Int64;
   nₜᵖ::Int64; nᵖ::Int64
 end
 
@@ -157,8 +186,7 @@ end
 
 function setup(::NTuple{2,Int}, ::Type{T}) where T
 
-  PoissonSPGRB{T}(init_PoissonSGRB_variables(T)...,
-    init_PoissonSPGRB_variables(T)...)
+  PoissonSPGRB{T}(init_PoissonSPGRB_variables(T)...)
 
 end
 
@@ -185,9 +213,9 @@ end
 
 function setup(::NTuple{6,Int}, ::Type{T}) where T
 
-  NT1 = get_NTuple(1, Int64)
+  NT3 = get_NTuple(3, Int64)
   NT5 = get_NTuple(5, Int64)
-  StokesSGRB{T}(setup(NT1, T), setup(NT5, T), init_StokesSGRB_variables(T)...)
+  StokesSTGRB{T}(setup(NT3, T), setup(NT5, T), init_StokesSTGRB_variables(T)...)
 
 end
 
