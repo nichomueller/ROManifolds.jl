@@ -88,6 +88,23 @@ function get_timesθ(RBInfo::ROMInfoUnsteady)
 
 end
 
+function assemble_parametric_structure(
+  θ::Matrix{T},
+  Mat::Array{T,D}) where {T,D}
+
+  Mat_shape = size(Mat)
+  Mat = reshape(Mat,:,Mat_shape[end])
+
+  if size(θ)[2] > 1
+    Matμ = reshape(Mat*θ,(Mat_shape[1:end-1]...,size(θ)[2]))
+  else
+    Matμ = reshape(Mat*θ,Mat_shape[1:end-1])
+  end
+
+  Matμ::Array{T,D-1}
+
+end
+
 function build_sparse_mat(
   FEMSpace::SteadyProblem,
   FEMInfo::SteadyInfo,

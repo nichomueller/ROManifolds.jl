@@ -155,7 +155,7 @@ function get_FEMSpace(
   phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
 
   FEMSpace = FEMSpaceStokesSteady{D,T}(
-    model, Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn,
+    model, Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, dΓd, dΓn,
     phys_quadp, V₀_quad)
 
   return FEMSpace
@@ -193,7 +193,7 @@ function get_FEMSpace(
   phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
 
   FEMSpace = FEMSpaceStokesUnsteady{D,T}(
-    model, Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn,
+    model, Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, dΓd, dΓn,
     phys_quadp, V₀_quad)
 
   return FEMSpace
@@ -225,16 +225,16 @@ function get_FEMSpace₀(
   FEMInfo::SteadyInfo,
   model::DiscreteModel)
 
-  get_FEMSpace(problem_id,FEMInfo,model,x->0)
+  get_FEMSpace(problem_id,FEMInfo,model, x->zero(VectorValue(FEMInfo.D, T)))
 
 end
 
 function get_FEMSpace₀(
   problem_id::NTuple{2,Int64},
   FEMInfo::UnsteadyInfo{T},
-  model::DiscreteModel,) where T
+  model::DiscreteModel) where T
 
-  g₀(x, t::Real) = zero(T)
+  g₀(x, t::Real) = zero(VectorValue(FEMInfo.D, T))
   g₀(t::Real) = x -> g₀(x, t)
   get_FEMSpace(problem_id,FEMInfo,model,g₀)
 

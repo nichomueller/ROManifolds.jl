@@ -213,7 +213,7 @@ function build_param_RHS(
   θᵃ_temp = θᵃ[1:RBVars.Qᵃ]/sqrt(θᵃ[1])
   F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
   H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
-  AΦᵀPᵤ⁻¹ = assemble_online_structure(θᵃ_temp, RBVars.AΦᵀPᵤ⁻¹)
+  AΦᵀPᵤ⁻¹ = assemble_parametric_structure(θᵃ_temp, RBVars.AΦᵀPᵤ⁻¹)
   Fₙ, Hₙ = AΦᵀPᵤ⁻¹ * F, AΦᵀPᵤ⁻¹ * H
 
   reshape(Fₙ, :, 1), reshape(Hₙ, :, 1)

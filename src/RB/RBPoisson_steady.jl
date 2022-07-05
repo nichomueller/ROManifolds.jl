@@ -33,13 +33,13 @@ function get_norm_matrix(
 
 end
 
-function check_norm_matrix(RBVars::PoissonSteady{T}) where T
+function check_norm_matrix(RBVars::PoissonSteady)
   isempty(RBVars.Xᵘ₀)
 end
 
 function PODs_space(
   RBInfo::Info,
-  RBVars::PoissonSteady{T}) where T
+  RBVars::PoissonSteady)
 
   println("Performing the spatial POD for field u, using a tolerance of $(RBInfo.ϵₛ)")
   get_norm_matrix(RBInfo, RBVars)
@@ -50,12 +50,12 @@ end
 
 function build_reduced_basis(
   RBInfo::ROMInfoSteady,
-  RBVars::PoissonSteady{T}) where T
+  RBVars::PoissonSteady)
 
-  RB_building_time = @elapsed begin
+  RBVars.offline_time += @elapsed begin
     PODs_space(RBInfo, RBVars)
   end
-  RBVars.offline_time += RB_building_time
+
   if RBInfo.save_offline_structures
     save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.paths.basis_path,"Φₛᵘ.csv"))
   end
@@ -67,15 +67,16 @@ function import_reduced_basis(
   RBVars::PoissonSteady{T}) where T
 
   println("Importing the spatial reduced basis for field u")
-  RBVars.Φₛᵘ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.basis_path, "Φₛᵘ.csv"))
+  RBVars.Φₛᵘ = load_CSV(Matrix{T}(undef,0,0),
+    joinpath( RBInfo.paths.basis_path, "Φₛᵘ.csv"))
   (RBVars.Nₛᵘ, RBVars.nₛᵘ) = size(RBVars.Φₛᵘ)
 
 end
 
 function get_generalized_coordinates(
   RBInfo::ROMInfoSteady,
-  RBVars::PoissonSteady{T},
-  snaps=nothing) where T
+  RBVars::PoissonSteady,
+  snaps=nothing)
 
   get_norm_matrix(RBInfo, RBVars)
   if isnothing(snaps) || maximum(snaps) > RBInfo.nₛ
@@ -374,17 +375,15 @@ function get_system_blocks(
       LHSₙi = "LHSₙ" * string(i) * ".csv"
       println("Importing block number $i of the reduced affine LHS")
       push!(RBVars.LHSₙ,
-        load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path, LHSₙi)))
-      RBVars.nᵘ = size(RBVars.LHSₙ[i])[1]
+        load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, LHSₙi)))
     end
   end
   if "RHS" ∉ operators
     for i = RHS_blocks
       RHSₙi = "RHSₙ" * string(i) * ".csv"
-      println("Importing block number $i of the reduced affine LHS")
+      println("Importing block number $i of the reduced affine RHS")
       push!(RBVars.RHSₙ,
-        load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path, RHSₙi)))
-      RBVars.nᵘ = size(RBVars.RHSₙ[i])[1]
+        load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, RHSₙi)))
     end
   end
 
@@ -463,18 +462,6 @@ function initialize_online_time(RBVars::PoissonSteady)
   RBVars.online_time = 0.0
 end
 
-function assemble_online_structure(θ::Matrix{T}, Mat::Array{T}) where T
-  Mat_shape = size(Mat)
-  Mat = reshape(Mat,:,Mat_shape[end])
-  Matμ = zeros(T, Mat_shape[1:end-1])
-  if size(θ)[2] > 1
-    Matμ = reshape(Mat*θ,(Mat_shape[1:end-1]...,size(θ)[2]))
-  else
-    Matμ = reshape(Mat*θ,Mat_shape[1:end-1])
-  end
-  Matμ::Array{T}
-end
-
 function get_RB_system(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
@@ -493,14 +480,14 @@ function get_RB_system(
 
     if "LHS" ∈ operators
       println("Assembling reduced LHS")
-      push!(RBVars.LHSₙ,assemble_online_structure(θᵃ, RBVars.Aₙ))
+      push!(RBVars.LHSₙ,assemble_parametric_structure(θᵃ, RBVars.Aₙ))
     end
 
     if "RHS" ∈ operators
       if !RBInfo.build_parametric_RHS
         println("Assembling reduced RHS")
-        Fₙ_μ = assemble_online_structure(θᶠ, RBVars.Fₙ)
-        Hₙ_μ = assemble_online_structure(θʰ, RBVars.Hₙ)
+        Fₙ_μ = assemble_parametric_structure(θᶠ, RBVars.Fₙ)
+        Hₙ_μ = assemble_parametric_structure(θʰ, RBVars.Hₙ)
         push!(RBVars.RHSₙ, reshape(Fₙ_μ+Hₙ_μ,:,1))
       else
         println("Assembling reduced RHS exactly")

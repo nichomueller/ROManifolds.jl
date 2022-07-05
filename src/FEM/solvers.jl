@@ -32,7 +32,7 @@ function FE_solve(
   Param::ParametricInfoUnsteady{T};
   subtract_Ddata = true) where {D,T}
 
-  R₁(t) = assemble_lifting(FEMSpace, Param)(t)
+  R₁(t) = assemble_lifting(FEMSpace, FEMInfo, Param)(t)
 
   m(t, u, v) = ∫(Param.m(t)*(u*v))dΩ
   a(t, u, v) = ∫(∇(v)⋅(Param.α(t)*∇(u)))*FEMSpace.dΩ
@@ -58,11 +58,11 @@ function FE_solve(
     uₕₜ[:, count] = get_free_dof_values(uₕ)::Vector{T}
   end
 
-  if subtract_Ddata
+  #= if subtract_Ddata
     uₕₜ -= Gₕₜ
-  end
+  end =#
 
-  return uₕₜ, Gₕₜ
+  return uₕₜ#, Gₕₜ
 
 end
 
@@ -82,27 +82,25 @@ function FE_solve(
   B(t) = assemble_primal_op(FEMSpace)(t)
   F(t) = assemble_forcing(FEMSpace, FEMInfo, Param)(t)
   H(t) = assemble_neumann_datum(FEMSpace, FEMInfo, Param)(t)
-  R₁(t) = assemble_lifting(FEMSpace, Param)(t)
-  R₂(t) = assemble_second_lifting(FEMSpace, Param)(t)
-  Block1(t) = θ*(M(t)+δtθ*A(t))
-  LHS(t) = vcat(θ*hcat(M(t)+δtθ*A(t),-δtθ*B(t)'),hcat(B(t),zeros(T,FEMSpace.Nₛᵖ,FEMSpace.Nₛᵖ)))
-  RHS(t) = vcat(δtθ*(F(t)+H(t)-R₁(t)),-R₂(t))
-  RHS_add(u,p,t) = θ*vcat((M(t)-δt*(1-θ)*A(t))*u+δt*(1-θ)*B(t)'*p,zeros(T,FEMSpace.Nₛᵖ))
+  R₁(t) = assemble_lifting(FEMSpace, FEMInfo, Param)(t)
+  R₂(t) = assemble_second_lifting(FEMSpace, FEMInfo, Param)(t)
+  LHS(t) = vcat(hcat(M(t)/δtθ+A(t),-B(t)'),hcat(B(t),zeros(T,FEMSpace.Nₛᵖ,FEMSpace.Nₛᵖ)))
+  RHS(t) = vcat(F(t)+H(t)-R₁(t),-R₂(t))
 
   u0(x) = Param.u₀(x)[1]
   p0(x) = Param.u₀(x)[2]
   u₀ = get_free_dof_values(interpolate_everywhere(u0, FEMSpace.V(FEMInfo.t₀)))::Vector{T}
-  p₀ = get_free_dof_values(interpolate_everywhere(p0, FEMSpace.Q(FEMInfo.t₀)))::Vector{T}
+  p₀ = collect(get_free_dof_values(interpolate_everywhere(p0, FEMSpace.Q(FEMInfo.t₀))))::Vector{T}
 
-  uₕₜ = hcat(u₀,zeros(T, FEMSpace.Nₛᵘ, Int(FEMInfo.tₗ / FEMInfo.δt)))
-  pₕₜ = hcat(p₀,zeros(T, FEMSpace.Nₛᵖ, Int(FEMInfo.tₗ / FEMInfo.δt)))
+  uₕₜ = hcat(u₀, zeros(T, FEMSpace.Nₛᵘ, Int(FEMInfo.tₗ / FEMInfo.δt)))
+  pₕₜ = hcat(p₀, zeros(T, FEMSpace.Nₛᵖ, Int(FEMInfo.tₗ / FEMInfo.δt)))
 
   count = 1
   for (iₜ,t) in enumerate(timesθ)
     count += 1
-    xₕₜ = LHS(t)\(RHS(t)+RHS_add(uₕₜ[:,count-1],pₕₜ[:,count-1],t-δt))
-    uₕₜ[:,count] = xₕₜ[1:FEMSpace.Nₛᵘ]
-    pₕₜ[:,count] = xₕₜ[FEMSpace.Nₛᵘ+1:end]
+    xₕₜ = LHS(t)\(RHS(t)+vcat(M(t)/δtθ*uₕₜ[:,count-1], zeros(FEMSpace.Nₛᵖ)))
+    uₕₜ[:,count] = 1/θ * xₕₜ[1:FEMSpace.Nₛᵘ] + (1-1/θ) * uₕₜ[:,count-1]
+    pₕₜ[:,count] = 1/θ * xₕₜ[FEMSpace.Nₛᵘ+1:end] + (1-1/θ) * pₕₜ[:,count-1]
   end
 
   return uₕₜ[:,2:end], pₕₜ[:,2:end]

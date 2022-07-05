@@ -58,7 +58,6 @@ struct FEMSpaceStokesSteady{D,T} <: SteadyProblem{D,T}
   Nₛᵖ::Int64
   Ω::BodyFittedTriangulation
   dΩ::Measure
-  Γd::BoundaryTriangulation
   dΓd::Measure
   dΓn::Measure
   phys_quadp::LazyArray
@@ -82,7 +81,6 @@ struct FEMSpaceStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
   Nₛᵖ::Int64
   Ω::BodyFittedTriangulation
   dΩ::Measure
-  Γd::BoundaryTriangulation
   dΓd::Measure
   dΓn::Measure
   phys_quadp::LazyArray
@@ -168,6 +166,8 @@ struct ParametricInfoUnsteady{T} <: ParametricInfo{T}
   fₛ::F
   fₜ::F
   f::F
+  gₛ::F
+  gₜ::F
   g::F
   hₛ::F
   hₜ::F

@@ -13,8 +13,14 @@ function post_process(RBInfo::ROMInfoSteady, d::Dict) where T
   end
 
   FEMSpace = d["FEMSpace"]
-  writevtk(FEMSpace.Ω, joinpath(d["path_μ"], "mean_point_err"),
+  writevtk(FEMSpace.Ω, joinpath(d["path_μ"], "mean_point_err_u"),
   cellfields = ["err"=> FEFunction(FEMSpace.V, d["mean_point_err_u"])])
+
+  if "mean_point_err_p" ∈ keys(d)
+    FEMSpace = d["FEMSpace"]
+    writevtk(FEMSpace.Ω, joinpath(d["path_μ"], "mean_point_err_p"),
+    cellfields = ["err"=> FEFunction(FEMSpace.V, d["mean_point_err_p"])])
+  end
 
 end
 
@@ -41,7 +47,16 @@ function post_process(RBInfo::UnsteadyInfo, d::Dict)
     for (i,t) in enumerate(times)
       errₕt = FEFunction(FEMSpace.V(t), d["mean_point_err_u"][:,i])
       pvd[i] = createvtk(FEMSpace.Ω, joinpath(vtk_dir,
-        "mean_point_err_$i" * ".vtu"), cellfields = ["point_err" => errₕt])
+        "mean_point_err_u_$i" * ".vtu"), cellfields = ["point_err" => errₕt])
+    end
+  end
+  if "mean_point_err_p" ∈ keys(d)
+    createpvd(joinpath(vtk_dir,"mean_point_err_p")) do pvd
+      for (i,t) in enumerate(times)
+        errₕt = FEFunction(FEMSpace.V(t), d["mean_point_err_p"][:,i])
+        pvd[i] = createvtk(FEMSpace.Ω, joinpath(vtk_dir,
+          "mean_point_err_p_$i" * ".vtu"), cellfields = ["point_err" => errₕt])
+      end
     end
   end
 
@@ -53,15 +68,7 @@ function post_process(RBInfo::UnsteadyInfo, d::Dict)
     "||uₕ - ũ||ₕ₁₋ₗ₂", ["H¹-l² err"], "Param μ number", "H¹-l² error", d["path_μ"];
     var="H1_L2_err")
 
-  if length(keys(d)) == 8
-
-    createpvd(joinpath(vtk_dir,"mean_point_err_p")) do pvd
-      for (i,t) in enumerate(times)
-        errₕt = FEFunction(FEMSpace.Q, d["mean_point_err_p"][:,i])
-        pvd[i] = createvtk(FEMSpace.Ω, joinpath(vtk_dir,
-          "mean_point_err_$i" * ".vtu"), cellfields = ["point_err" => errₕt])
-      end
-    end
+  if mean_L2_err ∈ keys(d)
 
     generate_and_save_plot(times,d["mean_L2_err"],
       "Average ||pₕ(t) - p̃(t)||ₗ₂", ["l² err"], "time [s]", "L² error", d["path_μ"];

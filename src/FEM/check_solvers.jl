@@ -53,3 +53,32 @@ function check_stokes_solver()
   res2 = B*u2
 
 end
+
+function check_dataset(RBInfo, RBVars, i)
+
+  μ = load_CSV(Array{Float64}[], joinpath( RBInfo.paths.FEM_snap_path, "μ.csv"))
+  Param = get_ParamInfo(RBInfo, problem_id, μ[i])
+
+  u1 = RBVars.S.Sᵘ[:, (i-1)*RBVars.P.Nₜ+1]
+  u2 = RBVars.S.Sᵘ[:, (i-1)*RBVars.P.Nₜ+2]
+  M = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "M.csv"))
+  A = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "A.csv"))
+  F = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_structures_path, "F.csv"))
+  H = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_structures_path, "H.csv"))
+
+  t¹_θ = RBInfo.t₀+RBInfo.δt*RBInfo.θ
+  t²_θ = t¹_θ+RBInfo.δt
+
+  LHS1 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A*Param.αₜ(t¹_θ,μ[i]))
+  RHS1 = RBInfo.δt*RBInfo.θ*(F*Param.fₜ(t¹_θ)+H*Param.hₜ(t¹_θ))
+  my_u1 = LHS1\RHS1
+
+  LHS2 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A*Param.αₜ(t²_θ,μ[i]))
+  mat = (1-RBInfo.θ)*(M+RBInfo.δt*RBInfo.θ*A*Param.αₜ(t²_θ,μ[i]))-M
+  RHS2 = RBInfo.δt*RBInfo.θ*(F*Param.fₜ(t²_θ)+H*Param.hₜ(t²_θ))-mat*u1
+  my_u2 = LHS2\RHS2
+
+  u1≈my_u1
+  u2≈my_u2
+
+end

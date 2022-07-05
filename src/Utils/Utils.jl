@@ -45,7 +45,6 @@ using JLD
 using Test
 using Logging
 using PlotlyJS
-using BlockArrays
 using Gridap
 using Gridap.FESpaces
 using Gridap.ReferenceFEs
