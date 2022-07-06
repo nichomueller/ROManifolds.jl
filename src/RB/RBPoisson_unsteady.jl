@@ -19,8 +19,7 @@ function get_snapshot_matrix(
   end
 
   RBVars.S.Sᵘ = Sᵘ
-  Nₛᵘ = size(Sᵘ)[1]
-  RBVars.S.Nₛᵘ = Nₛᵘ
+  RBVars.S.Nₛᵘ = size(Sᵘ)[1]
   RBVars.Nᵘ = RBVars.S.Nₛᵘ * RBVars.Nₜ
 
   println("Dimension of the snapshot matrix for field u: $(size(Sᵘ))")
@@ -114,20 +113,12 @@ function get_generalized_coordinates(
 
   û = zeros(T, RBVars.nᵘ, length(snaps))
   Φₛᵘ_normed = RBVars.S.Xᵘ₀ * RBVars.S.Φₛᵘ
-  Π = kron(Φₛᵘ_normed, RBVars.Φₜᵘ)
+  Π = kron(Φₛᵘ_normed, RBVars.Φₜᵘ)::Matrix{T}
 
   for (i, i_nₛ) = enumerate(snaps)
     println("Assembling generalized coordinate relative to snapshot $(i_nₛ), field u")
     S_i = RBVars.S.Sᵘ[:, (i_nₛ-1)*RBVars.Nₜ+1:i_nₛ*RBVars.Nₜ]
-    û[:, i] = sum(Π_ij, dims=2) .* S_i
-
-    #= for i_s = 1:RBVars.S.nₛᵘ
-      for i_t = 1:RBVars.nₜᵘ
-        Π_ij = reshape(Φₛᵘ_normed[:,i_s],:,1).*reshape(RBVars.Φₜᵘ[:,i_t],:,1)'
-        û[index_mapping(i_s, i_t, RBVars), i] = sum(Π_ij .* S_i)
-      end
-    end
-    sum(Π_ij .* S_i) =#
+    û[:, i] = sum(Π, dims=2) .* S_i
   end
 
   RBVars.S.û = û
@@ -443,8 +434,8 @@ end
 function solve_RB_system(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T},
-  Param::ParametricInfoUnsteady) where T
+  RBVars::PoissonUnsteady,
+  Param::ParametricInfoUnsteady)
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
 
@@ -452,13 +443,12 @@ function solve_RB_system(
   println("Condition number of the system's matrix: $(cond(RBVars.S.LHSₙ[1]))")
 
   RBVars.S.online_time += @elapsed begin
-    RBVars.S.uₙ = zeros(T, RBVars.nᵘ, 1)
     @fastmath RBVars.S.uₙ = RBVars.S.LHSₙ[1] \ RBVars.S.RHSₙ[1]
   end
 
 end
 
-function reconstruct_FEM_solution(RBVars::PoissonUnsteady{T}) where T
+function reconstruct_FEM_solution(RBVars::PoissonUnsteady)
 
   println("Reconstructing FEM solution from the newly computed RB one")
   uₙ = reshape(RBVars.S.uₙ, (RBVars.nₜᵘ, RBVars.S.nₛᵘ))
@@ -530,7 +520,7 @@ function online_phase(
   if RBInfo.adaptivity
     adapt_time = @elapsed begin
       (ũ_μ,uₙ_μ,_,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,
-      H1_L2_err,mean_online_time,mean_reconstruction_time) =
+      H1_L2_err,_,_) =
       adaptive_loop_on_params(FEMSpace, RBInfo, RBVars, mean_uₕ_test,
       mean_pointwise_err, μ, param_nbs)
     end
@@ -613,7 +603,8 @@ function loop_on_params(
       mean_reconstruction_time = reconstruction_time/(length(param_nbs)-1)
     end
 
-    H1_err_nb, H1_L2_err_nb = compute_errors(uₕ_test, RBVars, RBVars.S.Xᵘ₀)
+    H1_err_nb, H1_L2_err_nb = compute_errors(
+        RBVars, uₕ_test, RBVars.S.ũ, RBVars.S.Xᵘ₀)
     H1_L2_err[i_nb] = H1_L2_err_nb
     mean_H1_err += H1_err_nb / length(param_nbs)
     mean_H1_L2_err += H1_L2_err_nb / length(param_nbs)
@@ -642,7 +633,7 @@ function adaptive_loop_on_params(
   if isnothing(n_adaptive)
     nₛᵘ_add = floor(Int64,RBVars.S.nₛᵘ*0.1)
     nₜᵘ_add = floor(Int64,RBVars.nₜᵘ*0.1)
-    n_adaptive = maximum(hcat([1,1],[nₛᵘ_add,nₜᵘ_add]),dims=2)
+    n_adaptive = maximum(hcat([1,1],[nₛᵘ_add,nₜᵘ_add]),dims=2)::Vector{Int}
   end
 
   println("Running adaptive cycle: adding $n_adaptive temporal and spatial bases,

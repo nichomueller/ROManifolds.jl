@@ -3,6 +3,7 @@ abstract type RBSteadyProblem{T} <: RBProblem end
 abstract type RBUnsteadyProblem{T} <: RBProblem end
 abstract type PoissonSteady{T} <: RBSteadyProblem{T} end
 abstract type PoissonUnsteady{T} <: RBUnsteadyProblem{T} end
+abstract type StokesSteady{T} <: RBSteadyProblem{T} end
 abstract type StokesUnsteady{T} <: RBUnsteadyProblem{T} end
 
 function init_PoissonSGRB_variables(::Type{T}) where T
@@ -40,12 +41,15 @@ function init_PoissonSGRB_variables(::Type{T}) where T
   MDEIMᵢ_A, MDEIM_idx_A, row_idx_A, sparse_el_A, DEIM_mat_F, DEIMᵢ_F, DEIM_idx_F,
   DEIM_mat_H, DEIMᵢ_H, DEIM_idx_H, Nₛᵘ, nₛᵘ, Qᵃ, Qᶠ, Qʰ,
   offline_time, online_time)
+
 end
 
 function init_PoissonSPGRB_variables(::Type{T}) where T
   Pᵤ⁻¹ = sparse([], [], T[])
   AΦᵀPᵤ⁻¹ = Array{T}(undef,0,0,0)
-  Pᵤ⁻¹, AΦᵀPᵤ⁻¹
+
+  (init_PoissonSGRB_variables(T)..., Pᵤ⁻¹, AΦᵀPᵤ⁻¹)
+
 end
 
 function init_PoissonSTGRB_variables(::Type{T}) where T
@@ -61,33 +65,44 @@ function init_PoissonSTGRB_variables(::Type{T}) where T
   nₜᵘ = 0
   nᵘ = 0
   Qᵐ = 0
+
   Φₜᵘ,Mₙ,MDEIM_mat_M,MDEIMᵢ_M,MDEIM_idx_M,row_idx_M,sparse_el_M,Nₜ,Nᵘ,nₜᵘ,nᵘ,Qᵐ
+
 end
 
 function init_PoissonSTPGRB_variables(::Type{T}) where T
   MAₙ = Array{T}(undef,0,0,0)
   MΦ = Array{T}(undef,0,0,0)
   MΦᵀPᵤ⁻¹ = Array{T}(undef,0,0,0)
-  MAₙ,MΦ,MΦᵀPᵤ⁻¹
+
+  (init_PoissonSTGRB_variables(T)...,MAₙ,MΦ,MΦᵀPᵤ⁻¹)
+
 end
 
-function init_StokesSTGRB_variables(::Type{T}) where T
+function init_StokesSGRB_variables(::Type{T}) where T
   Sᵖ = Matrix{T}(undef,0,0)
   Φₛᵘ = Matrix{T}(undef,0,0)
-  Φₜᵖ = Matrix{T}(undef,0,0)
   p̃ = Matrix{T}(undef,0,0)
   pₙ = Matrix{T}(undef,0,0)
   p̂ = Matrix{T}(undef,0,0)
   Bₙ = Array{T}(undef,0,0,0)
   Xᵘ = sparse([], [], T[])
-  Xᵖ = sparse([], [], T[])
   Xᵖ₀ = sparse([], [], T[])
   Nₛᵖ = 0
-  Nᵖ = 0
   nₛᵖ = 0
+
+  Sᵖ,Φₛᵘ,p̃,pₙ,p̂,Bₙ,Xᵘ,Xᵖ₀,Nₛᵖ,nₛᵖ
+
+end
+
+function init_StokesSTGRB_variables(::Type{T}) where T
+  Φₜᵖ = Matrix{T}(undef,0,0)
+  Nᵖ = 0
   nₜᵖ = 0
   nᵖ = 0
-  Sᵖ,Φₛᵘ,Φₜᵖ,p̃,pₙ,p̂,Bₙ,Xᵘ,Xᵖ,Xᵖ₀,Nₛᵖ,Nᵖ,nₛᵖ,nₜᵖ,nᵖ
+
+  Φₜᵖ,Nᵖ,nₜᵖ,nᵖ
+
 end
 
 mutable struct PoissonSGRB{T} <: PoissonSteady{T}
@@ -117,70 +132,62 @@ mutable struct PoissonSTGRB{T} <: PoissonUnsteady{T}
 end
 
 mutable struct PoissonSTPGRB{T} <: PoissonUnsteady{T}
-  S::PoissonSGRB{T}; Φₜᵘ::Matrix{T}; Mₙ::Array{T}; MDEIM_mat_M::Matrix{T}; MDEIMᵢ_M::Matrix{T};
+  S::PoissonSPGRB{T}; Φₜᵘ::Matrix{T}; Mₙ::Array{T}; MDEIM_mat_M::Matrix{T}; MDEIMᵢ_M::Matrix{T};
   MDEIM_idx_M::Vector{Int64}; row_idx_M::Vector{Int64}; sparse_el_M::Vector{Int64};
   Nₜ::Int64; Nᵘ::Int64; nₜᵘ::Int64; nᵘ::Int64; Qᵐ::Int64;MAₙ::Array{T};MΦ::Array{T};MΦᵀPᵤ⁻¹::Array{T}
 end
 
+mutable struct StokesSGRB{T} <: StokesSteady{T}
+  P::PoissonSGRB{T}; Sᵖ::Matrix{T}; Φₛᵖ::Matrix{T}; p̃::Matrix{T}; pₙ::Matrix{T};
+  p̂::Matrix{T}; Bₙ::Array{T}; Xᵘ::SparseMatrixCSC{T};
+  Xᵖ₀::SparseMatrixCSC{T}; Nₛᵖ::Int64; nₛᵖ::Int64
+end
+
 mutable struct StokesSTGRB{T} <: StokesUnsteady{T}
-  P::PoissonSTGRB{T}; Sᵖ::Matrix{T}; Φₛᵖ::Matrix{T}; Φₜᵖ::Matrix{T}; p̃::Matrix{T}; pₙ::Matrix{T};
-  p̂::Matrix{T}; Bₙ::Array{T}; Xᵘ::SparseMatrixCSC{T}; Xᵖ::SparseMatrixCSC{T};
-  Xᵖ₀::SparseMatrixCSC{T}; Nₛᵖ::Int64; Nᵖ::Int64; nₛᵖ::Int64;
+  P::PoissonSTGRB{T}; S::StokesSGRB{T}; Φₜᵖ::Matrix{T}; Nᵖ::Int64;
   nₜᵖ::Int64; nᵖ::Int64
 end
 
 function setup(::NTuple{1,Int}, ::Type{T}) where T
 
-  PoissonSGRB{T}(init_PoissonSGRB_variables(T)...)::PoissonSGRB
+  PoissonSGRB{T}(init_PoissonSGRB_variables(T)...)
 
 end
 
 function setup(::NTuple{2,Int}, ::Type{T}) where T
 
-  PoissonSPGRB{T}(init_PoissonSGRB_variables(T)...,
-    init_PoissonSPGRB_variables(T)...)
+  PoissonSPGRB{T}(init_PoissonSPGRB_variables(T)...)
 
 end
 
 function setup(::NTuple{3,Int}, ::Type{T}) where T
 
-  PoissonSTGRB{T}(PoissonSGRB{T}(init_PoissonSGRB_variables(T)...),
-    init_PoissonSTGRB_variables(T)...)
+  NT1 = get_NTuple(1, Int64)
+  PoissonSTGRB{T}(setup(NT1, T), init_PoissonSTGRB_variables(T)...)
 
 end
 
 function setup(::NTuple{4,Int}, ::Type{T}) where T
 
-  PoissonSTPGRB{T}(PoissonSPGRB{T}(init_PoissonSGRB_variables(T)...,
-    init_PoissonSPGRB_variables(T)...), init_PoissonSTPGRB_variables(T)...)
+  NT2 = get_NTuple(2, Int64)
+  PoissonSTPGRB{T}(setup(NT2, T), init_PoissonSTPGRB_variables(T)...)
 
 end
-
-#= mutable struct StokesSTPGRB <: StokesUnsteady
-  P::PoissonSTPGRB; Sᵖ::Array; Sˡ::Array; Φₛᵖ::Array; Φₛˡ::Array; Φₜᵖ::Array;
-  Φₜˡ::Array; p̃::Array; pₙ::Array; p̂::Array; λ̃ ::Array; λₙ::Array; λ̂ ::Array;
-  Bₙ::Array; Bᵀₙ::Array; Lₙ::Array; Lᵀₙ::Array; Xᵘ::SparseMatrixCSC;
-  Xᵖ::SparseMatrixCSC; Xᵖ₀::SparseMatrixCSC; Nₛᵖ::Int64; Nₛˡ::Int64; Nᵖ::Int64;
-  Nˡ::Int64; nₛᵖ::Int64; nₛˡ::Int64; nₜᵖ::Int64; nₜˡ::Int64; nᵖ::Int64; nˡ::Int64;
-end =#
 
 function setup(::NTuple{5,Int}, ::Type{T}) where T
 
-  StokesSTGRB{T}(PoissonSTGRB{T}(PoissonSGRB{T}(init_PoissonSGRB_variables(T)...),
-    init_PoissonSTGRB_variables(T)...), init_StokesSTGRB_variables(T)...)
+  NT1 = get_NTuple(1, Int64)
+  StokesSGRB{T}(setup(NT1, T), init_StokesSGRB_variables(T)...)
 
 end
 
-#= function setup_StokesSTPGRB(::NTuple{6,Int})::StokesSTPGRB
+function setup(::NTuple{6,Int}, ::Type{T}) where T
 
-  return StokesSTPGRB(PoissonSTPGRB(Sᵘ, Φₛᵘ, ũ, uₙ, û, Aₙ, Fₙ, Hₙ, Xᵘ₀, LHSₙ,
-  RHSₙ, MDEIMᵢ_A, MDEIM_idx_A, DEIMᵢ_F, DEIM_idx_F, DEIMᵢ_H, DEIM_idx_H,
-  sparse_el_A, Nₛᵘ, nₛᵘ, Qᵃ, Qᶠ, Qʰ, θᵃ, θᶠ, θʰ, offline_time, Pᵤ⁻¹, AΦᵀPᵤ⁻¹),
-  Φₜᵘ, Mₙ, MDEIMᵢ_M, MDEIM_idx_M, sparse_el_M, MAₙ, MΦ, MΦᵀPᵤ⁻¹, Nₜ, Nᵘ, nₜᵘ,
-  nᵘ)
+  NT3 = get_NTuple(3, Int64)
+  NT5 = get_NTuple(5, Int64)
+  StokesSTGRB{T}(setup(NT3, T), setup(NT5, T), init_StokesSTGRB_variables(T)...)
 
-end =#
-
+end
 
 struct ROMInfoSteady{T} <: Info{T}
   FEMInfo::SteadyInfo{T}

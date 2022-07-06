@@ -37,14 +37,14 @@ end
 
 function get_lagrangianQuad_info(
   ::SteadyInfo{T},
-  model::DiscreteModel,
+  model::DiscreteModel{Dc,Dp},
   Ω::BodyFittedTriangulation,
-  Qₕ::CellQuadrature) where T
+  Qₕ::CellQuadrature) where {Dc,Dp,T}
 
   ξₖ = get_cell_map(Ω)
   Qₕ_cell_point = get_cell_points(Qₕ)
   qₖ = get_data(Qₕ_cell_point)
-  phys_quadp = lazy_map(evaluate,ξₖ,qₖ)::LazyArray
+  phys_quadp = collect(lazy_map(evaluate,ξₖ,qₖ))::Vector{Vector{VectorValue{Dp,T}}}
   refFE_quad = Gridap.ReferenceFE(lagrangianQuad,T,FEMInfo.order)
   V₀_quad = TestFESpace(model,refFE_quad,conformity=:L2)
 
@@ -54,14 +54,14 @@ end
 
 function get_lagrangianQuad_info(
   ::UnsteadyInfo{T},
-  model::DiscreteModel,
+  model::DiscreteModel{Dc,Dp},
   Ω::BodyFittedTriangulation,
-  Qₕ::CellQuadrature) where T
+  Qₕ::CellQuadrature) where {Dc,Dp,T}
 
   ξₖ = get_cell_map(Ω)
   Qₕ_cell_point = get_cell_points(Qₕ)
   qₖ = get_data(Qₕ_cell_point)
-  phys_quadp = lazy_map(evaluate,ξₖ,qₖ)::LazyArray
+  phys_quadp = collect(lazy_map(evaluate,ξₖ,qₖ))::Vector{Vector{VectorValue{Dp,T}}}
   refFE_quad = Gridap.ReferenceFE(lagrangianQuad,T,FEMInfo.order)
   V₀_quad = TestFESpace(model,refFE_quad,conformity=:L2)
 
@@ -155,7 +155,7 @@ function get_FEMSpace(
   phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
 
   FEMSpace = FEMSpaceStokesSteady{D,T}(
-    model, Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn,
+    model, Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, dΓd, dΓn,
     phys_quadp, V₀_quad)
 
   return FEMSpace
@@ -193,7 +193,7 @@ function get_FEMSpace(
   phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
 
   FEMSpace = FEMSpaceStokesUnsteady{D,T}(
-    model, Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, Γd, dΓd, dΓn,
+    model, Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, dΩ, dΓd, dΓn,
     phys_quadp, V₀_quad)
 
   return FEMSpace
@@ -225,16 +225,16 @@ function get_FEMSpace₀(
   FEMInfo::SteadyInfo,
   model::DiscreteModel)
 
-  get_FEMSpace(problem_id,FEMInfo,model,x->0)
+  get_FEMSpace(problem_id,FEMInfo,model, x->zero(VectorValue(FEMInfo.D, T)))
 
 end
 
 function get_FEMSpace₀(
   problem_id::NTuple{2,Int64},
   FEMInfo::UnsteadyInfo{T},
-  model::DiscreteModel,) where T
+  model::DiscreteModel) where T
 
-  g₀(x, t::Real) = zero(T)
+  g₀(x, t::Real) = zero(VectorValue(FEMInfo.D, T))
   g₀(t::Real) = x -> g₀(x, t)
   get_FEMSpace(problem_id,FEMInfo,model,g₀)
 

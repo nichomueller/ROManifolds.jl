@@ -44,10 +44,12 @@ function init_FEM_variables(
   A = sparse([], [], T[])
   B = sparse([], [], T[])
   Xᵘ₀ = sparse([], [], T[])
+  Xᵘ = sparse([], [], T[])
+  Xᵖ₀ = sparse([], [], T[])
   F = Vector{T}(undef,0)
   H = Vector{T}(undef,0)
 
-  M, A, B, Xᵘ₀, F, H
+  M, A, B, Xᵘ₀, Xᵘ, Xᵖ₀, F, H
 
 end
 
@@ -160,7 +162,73 @@ function get_ParamInfo(
   u₀(x) = zero(T)
 
   ParametricInfoUnsteady{T}(
-    μ, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, g, hₛ, hₜ, h, u₀)
+    μ, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, gₛ, gₜ, g, hₛ, hₜ, h, u₀)
+
+end
+
+function get_ParamInfo(
+  FEMInfo::UnsteadyInfo{T},
+  ::NTuple{2,Int},
+  μ::Vector) where T
+
+  αₛ(x) = one(T)
+  αₜ(t, μ) = T(5. * sum(μ) * (2 + sin(t)))
+  function α(x, t::Real)
+    if !FEMInfo.probl_nl["A"]
+      return T(αₛ(x)*αₜ(t, μ))
+    else
+      return T(10. * (1. + 1. / μ[3] * exp(-norm(x-Point(μ[1:FEMInfo.D]))^2 * sin(t) / μ[3])))
+    end
+  end
+  α(t::Real) = x -> α(x, t)
+
+  fₛ(x) = one(VectorValue(FEMInfo.D, T))
+  fₜ(t::Real) = one(T)
+  function f(x, t)
+    if !FEMInfo.probl_nl["f"]
+      return T(fₛ(x)*fₜ(t))
+    else
+      return T(1 + Point(μ[4:3+FEMInfo.D]) .* x*t)
+    end
+  end
+
+  gₛ(x) = zero(VectorValue(FEMInfo.D, T))
+  gₜ(t::Real) = zero(T)
+  function g(x, t::Real)
+    if !FEMInfo.probl_nl["g"]
+      return T(gₛ(x)*gₜ(t))
+    else
+      return zero(VectorValue(FEMInfo.D, T))
+    end
+  end
+  g(t::Real) = x -> g(x, t)
+
+  hₛ(x) = one(VectorValue(FEMInfo.D, T))
+  hₜ(t::Real) = T(sin(t))
+  function h(x, t::Real)
+    if !FEMInfo.probl_nl["h"]
+      return T(hₛ(x)*hₜ(t))
+    else
+      return T(1 + Point(μ[end-FEMInfo.D+1:end]) .* x*t)
+    end
+  end
+  h(t::Real) = x -> h(x, t)
+
+  mₛ(x) = one(T)
+  mₜ(t::Real) = one(T)
+  function m(x, t)
+    if !FEMInfo.probl_nl["M"]
+      return T(mₛ(x)*mₜ(t))
+    else
+      return one(T)
+    end
+  end
+  m(t::Real) = x -> m(x, t)
+
+  u₀(x) = [zero(VectorValue(FEMInfo.D, T)), zero(T)]
+
+  ParametricInfoUnsteady{T}(
+    μ, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, gₛ, gₜ, g, hₛ, hₜ, h, u₀)
 
 end
 

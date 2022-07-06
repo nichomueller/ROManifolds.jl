@@ -216,8 +216,8 @@ end
 function get_RB_LHS_blocks(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTGRB{T},
-  θᵐ::Array{T},
-  θᵃ::Array{T}) where T
+  θᵐ::Matrix{T},
+  θᵃ::Matrix{T}) where T
 
   println("Assembling LHS using θ-method time scheme, θ=$(RBInfo.θ)")
 
@@ -294,10 +294,10 @@ function get_RB_LHS_blocks_spacetime(
   Φₜᵘ₁ = RBVars.Φₜᵘ[2:end,:]'*RBVars.Φₜᵘ[1:end-1,:]
 
   Mₙ = reshape(RBVars.Mₙ,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,Nₜᵐ,Qᵐ)
-  Mₙ = reshape(sum(assemble_online_structure(θᵐ,Mₙ),dims=3),
+  Mₙ = reshape(sum(assemble_parametric_structure(θᵐ,Mₙ),dims=3),
     RBVars.S.nₛᵘ,RBVars.S.nₛᵘ)
   Aₙ = reshape(RBVars.S.Aₙ,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,Nₜᵃ,Qᵃ)
-  Aₙ = reshape(sum(assemble_online_structure(θᵃ,Aₙ),dims=3),
+  Aₙ = reshape(sum(assemble_parametric_structure(θᵃ,Aₙ),dims=3),
     RBVars.S.nₛᵘ,RBVars.S.nₛᵘ)
 
   block₁ = zeros(T, RBVars.nᵘ, RBVars.nᵘ)
@@ -371,8 +371,8 @@ end
 function get_RB_system(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonSTGRB{T},
-  Param::ParametricInfoUnsteady) where T
+  RBVars::PoissonSTGRB,
+  Param::ParametricInfoUnsteady)
 
   initialize_RB_system(RBVars.S)
   initialize_online_time(RBVars.S)

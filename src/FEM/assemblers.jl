@@ -188,6 +188,40 @@ function assemble_forcing(
 
 end
 
+function assemble_dirichlet_datum(
+  FEMSpace::SteadyProblem,
+  FEMInfo::SteadyInfo{T},
+  Param::ParametricInfoSteady) where T
+
+  nonlin_lift = nonlinearity_lifting_op(FEMInfo)
+
+  if nonlin_lift ≤ 1
+    return interpolate_dirichlet(x->one(T), FEMSpace.V)
+  else
+    return interpolate_dirichlet(Param.g(t), FEMSpace.V)
+  end
+
+end
+
+function assemble_dirichlet_datum(
+  FEMSpace::UnsteadyProblem,
+  FEMInfo::UnsteadyInfo{T},
+  Param::ParametricInfoUnsteady) where T
+
+  nonlin_lift = nonlinearity_lifting_op(FEMInfo)
+
+  function dirichlet_datum(t)
+    if nonlin_lift ≤ 1
+      return interpolate_dirichlet(Param.gₛ(t), FEMSpace.V(t))
+    else
+      return interpolate_dirichlet(Param.g(t), FEMSpace.V(t))
+    end
+  end
+
+  dirichlet_datum
+
+end
+
 function assemble_neumann_datum(
   FEMSpace::SteadyProblem,
   FEMInfo::SteadyInfo{T},
@@ -239,155 +273,125 @@ end
 
 function assemble_lifting(
   FEMSpace::FEMSpacePoissonSteady,
-  Param::ParametricInfoSteady{T}) where T
+  FEMInfo::SteadyInfo{T},
+  Param::ParametricInfoSteady) where T
 
   nonlin_lift = nonlinearity_lifting_op(FEMInfo)
+  gₕ = assemble_dirichlet_datum(FEMSpace,FEMInfo,Param)
 
-  if nonlin_lift == 0
-    gₕ = interpolate_dirichlet(x->one(T), FEMSpace.V)
-    R = assemble_vector(
-      ∫(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ))*FEMSpace.dΩ,FEMSpace.V₀)
-  elseif nonlin_lift == 1
-    gₕ = interpolate_dirichlet(x->one(T), FEMSpace.V)
-    R = assemble_vector(
-      ∫(Param.α*(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ)))*FEMSpace.dΩ,FEMSpace.V₀)
-  elseif nonlin_lift == 2
-    gₕ = interpolate_dirichlet(Param.g, FEMSpace.V)
-    R = assemble_vector(
-      ∫(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ))*FEMSpace.dΩ,FEMSpace.V₀)
+  if isodd(nonlin_lift)
+    return assemble_vector(
+      ∫(Param.α*(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ)))*FEMSpace.dΩ,FEMSpace.V₀)::Vector{T}
   else
-    gₕ = interpolate_dirichlet(Param.g, FEMSpace.V)
-    R = assemble_vector(
-      ∫(Param.α*(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ)))*FEMSpace.dΩ,FEMSpace.V₀)
+    return assemble_vector(
+      ∫(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ))*FEMSpace.dΩ,FEMSpace.V₀)::Vector{T}
   end
-
-  R::Vector{T}
 
 end
 
 function assemble_lifting(
   FEMSpace::FEMSpacePoissonUnsteady,
-  Param::ParametricInfoUnsteady{T}) where T
+  FEMInfo::UnsteadyInfo{T},
+  Param::ParametricInfoUnsteady) where T
 
   nonlin_lift = nonlinearity_lifting_op(FEMInfo)
+  gₕ(t) = assemble_dirichlet_datum(FEMSpace,FEMInfo,Param)(t)
 
-  g₁(x,t::Real) = one(T)
-  g₁(t::Real) = x->g₁(x,t)
-
-  if nonlin_lift == 0
-    gₕ(t) = interpolate_dirichlet(g₁(t), FEMSpace.V(t))
-    R(t) = assemble_vector(
-      ∫(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ(t)))*FEMSpace.dΩ,FEMSpace.V₀)
-  elseif nonlin_lift == 1
-    gₕ(t) = interpolate_dirichlet(g₁(t), FEMSpace.V(t))
-    R(t) = assemble_vector(
-      ∫(Param.α(t)*(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ(t))))*FEMSpace.dΩ,FEMSpace.V₀)
-  elseif nonlin_lift == 2
-    gₕ(t) = interpolate_dirichlet(Param.g(t), FEMSpace.V(t))
-    R(t) = assemble_vector(
-      ∫(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ(t)))*FEMSpace.dΩ,FEMSpace.V₀)
-  else
-    gₕ(t) = interpolate_dirichlet(Param.g(t), FEMSpace.V(t))
-    R(t) = assemble_vector(
-      ∫(Param.α(t)*(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ(t))))*FEMSpace.dΩ,FEMSpace.V₀)
+  function lifting_op(t)
+    if isodd(nonlin_lift)
+      return assemble_vector(
+        ∫(Param.α(t)*(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ(t))))*FEMSpace.dΩ,FEMSpace.V₀)
+    else
+      return assemble_vector(
+        ∫(Param.αₛ(t)*∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ(t)))*FEMSpace.dΩ,FEMSpace.V₀)
+    end
   end
 
-  R
+  lifting_op
 
 end
 
 function assemble_lifting(
   FEMSpace::FEMSpaceStokesUnsteady{D,T},
+  FEMInfo::UnsteadyInfo{T},
   Param::ParametricInfoUnsteady) where {D,T}
 
   nonlin_lift = nonlinearity_lifting_op(FEMInfo)
+  gₕ(t) = assemble_dirichlet_datum(FEMSpace,FEMInfo,Param)(t)
 
-  g₁(x,t::Real) = one(VectorValue(get_NTuple(D, T)))
-  g₁(t::Real) = x->g₁(x,t)
-
-  if nonlin_lift == 0
-    gₕ(t) = interpolate_dirichlet(g₁(t), FEMSpace.V(t))
-    R(t) = assemble_vector(
-      ∫(∇(FEMSpace.ϕᵥ) ⊙ ∇(gₕ(t)))*FEMSpace.dΩ,FEMSpace.V₀)
-  elseif nonlin_lift == 1
-    gₕ(t) = interpolate_dirichlet(g₁(t), FEMSpace.V(t))
-    R(t) = assemble_vector(
-      ∫(Param.α(t)*(∇(FEMSpace.ϕᵥ) ⊙ ∇(gₕ(t))))*FEMSpace.dΩ,FEMSpace.V₀)
-  elseif nonlin_lift == 2
-    gₕ(t) = interpolate_dirichlet(Param.g(t), FEMSpace.V(t))
-    R(t) = assemble_vector(
-      ∫(∇(FEMSpace.ϕᵥ) ⊙ ∇(gₕ(t)))*FEMSpace.dΩ,FEMSpace.V₀)
-  else
-    gₕ(t) = interpolate_dirichlet(Param.g(t), FEMSpace.V(t))
-    R(t) = assemble_vector(
-      ∫(Param.α(t)*(∇(FEMSpace.ϕᵥ) ⊙ ∇(gₕ(t))))*FEMSpace.dΩ,FEMSpace.V₀)
+  function lifting_op(t)
+    if isodd(nonlin_lift)
+      return assemble_vector(
+        ∫(Param.α(t)*(∇(FEMSpace.ϕᵥ) ⊙ ∇(gₕ(t))))*FEMSpace.dΩ,FEMSpace.V₀)
+    else
+      return assemble_vector(
+        ∫(Param.αₛ(t)*∇(FEMSpace.ϕᵥ) ⊙ ∇(gₕ(t)))*FEMSpace.dΩ,FEMSpace.V₀)
+    end
   end
 
-  R
+  lifting_op
 
 end
 
 function assemble_second_lifting(
-  FEMSpace::FEMSpaceStokesUnsteady{D,T},
-  Param::ParametricInfoUnsteady) where {D,T}
+  FEMSpace::FEMSpaceStokesUnsteady,
+  FEMInfo::UnsteadyInfo{T},
+  Param::ParametricInfoUnsteady) where T
 
-  nonlin_lift = nonlinearity_lifting_op(FEMInfo)
+  gₕ(t) = assemble_dirichlet_datum(FEMSpace,FEMInfo,Param)(t)
 
-  g₁(x,t::Real) = one(VectorValue(get_NTuple(D, T)))
-  g₁(t::Real) = x->g₁(x,t)
-
-  if nonlin_lift ≤ 1
-    gₕ(t) = interpolate_dirichlet(g₁(t), FEMSpace.V(t))
-  else
-    gₕ(t) = interpolate_dirichlet(Param.g(t), FEMSpace.V(t))
-  end
-
-  assemble_vector(∫(FEMSpace.ψᵧ*(∇⋅(gₕ(t))))*FEMSpace.dΩ,FEMSpace.Q₀)::Vector{T}
+  lifting_op(t) =
+    assemble_vector(∫(FEMSpace.ψᵧ*(∇⋅(gₕ(t))))*FEMSpace.dΩ,FEMSpace.Q₀)
 
 end
 
-function assemble_L²_norm_matrix(FEMSpace::FEMSpaceStokesUnsteady)
+function assemble_L²_norm_matrix(
+  FEMSpace::FEMSpaceStokesUnsteady{D,T}) where {D,T}
 
   assemble_matrix(∫(FEMSpace.ψᵧ*FEMSpace.ψₚ)*FEMSpace.dΩ,
-  FEMSpace.Q, FEMSpace.Q₀)
+  FEMSpace.Q, FEMSpace.Q₀)::SparseMatrixCSC{T, Int64}
 
 end
 
-function assemble_L²₀_norm_matrix(FEMSpace₀::FEMSpaceStokesUnsteady)
+function assemble_L²₀_norm_matrix(
+  FEMSpace₀::FEMSpaceStokesUnsteady{D,T}) where {D,T}
 
   assemble_matrix(∫(FEMSpace₀.ψᵧ*FEMSpace₀.ψₚ)*FEMSpace₀.dΩ,
-  FEMSpace₀.Q, FEMSpace₀.Q₀)
+  FEMSpace₀.Q, FEMSpace₀.Q₀)::SparseMatrixCSC{T, Int64}
 
 end
 
-function assemble_H¹_norm_matrix(FEMSpace::FEMSpacePoissonSteady)
+function assemble_H¹_norm_matrix(
+  FEMSpace::FEMSpacePoissonSteady{D,T}) where {D,T}
 
   (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅∇(FEMSpace.ϕᵤ))*FEMSpace.dΩ,
   FEMSpace.V, FEMSpace.V₀) +
   assemble_matrix(∫(FEMSpace.ϕᵥ*FEMSpace.ϕᵤ)*FEMSpace.dΩ,
-  FEMSpace.V, FEMSpace.V₀))
+  FEMSpace.V, FEMSpace.V₀))::SparseMatrixCSC{T, Int64}
 
 end
 
-function assemble_H¹_norm_matrix(FEMSpace::FEMSpacePoissonUnsteady)
+function assemble_H¹_norm_matrix(
+  FEMSpace::FEMSpacePoissonUnsteady{D,T}) where {D,T}
 
   Xᵘ(t) = (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅∇(FEMSpace.ϕᵤ(t)))*FEMSpace.dΩ,
   FEMSpace.V(t), FEMSpace.V₀) +
   assemble_matrix(∫(FEMSpace.ϕᵥ*FEMSpace.ϕᵤ(t))*FEMSpace.dΩ,
   FEMSpace.V(t), FEMSpace.V₀))
 
-  Xᵘ(0.0)
+  Xᵘ(0.0)::SparseMatrixCSC{T, Int64}
 
 end
 
-function assemble_H¹_norm_matrix(FEMSpace::FEMSpaceStokesUnsteady)
+function assemble_H¹_norm_matrix(
+  FEMSpace::FEMSpaceStokesUnsteady{D,T}) where {D,T}
 
   Xᵘ(t) = (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙∇(FEMSpace.ϕᵤ(t)))*FEMSpace.dΩ,
   FEMSpace.V(t), FEMSpace.V₀) +
   assemble_matrix(∫(FEMSpace.ϕᵥ⋅FEMSpace.ϕᵤ(t))*FEMSpace.dΩ,
   FEMSpace.V(t), FEMSpace.V₀))
 
-  return Xᵘ(0.0)
+  Xᵘ(0.0)::SparseMatrixCSC{T, Int64}
 
 end
 
@@ -425,7 +429,7 @@ function assemble_H¹₀_norm_matrix(
 
 end
 
-function assemble_H¹_norm_matrix_nobcs(
+function assemble_H¹_norm_matrix(
   FEMSpace::FEMSpaceStokesUnsteady{D,T}) where {D,T}
 
   Xᵘ(t) = (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙∇(FEMSpace.ϕᵤ(t)))*FEMSpace.dΩ,
@@ -452,7 +456,7 @@ function assemble_FEM_structure(
   elseif var == "F"
     assemble_forcing(FEMSpace,FEMInfo,Param)
   elseif var == "G"
-    assemble_dirichlet_datum(FEMSpace,Param)
+    assemble_dirichlet_datum(FEMSpace,FEMInfo,Param)
   elseif var == "H"
     assemble_neumann_datum(FEMSpace,FEMInfo,Param)
   elseif var == "M"

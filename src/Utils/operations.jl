@@ -147,11 +147,29 @@ function get_NTuple(N::Int64, T::DataType)
     ntupl = (ntupl...,zero(T))
   end
 
-  ntupl
+  ntupl::NTuple{N,T}
 
 end
 
+Gridap.VectorValue(D::Int, T::DataType) = VectorValue(get_NTuple(D, T))
+
 function Base.one(vv::VectorValue{D,T}) where {D,T}
   vv_one = zero(vv) .+ one(T)
-  return vv_one::VectorValue{D,T}
+  vv_one::VectorValue{D,T}
+end
+
+function Base.Float64(vv::VectorValue{D,Float64}) where D
+  VectorValue(Float64.([vv...]))
+end
+
+function Base.Float32(vv::VectorValue{D,Float32}) where D
+  VectorValue(Float32.([vv...]))
+end
+
+function Base.Int64(vv::VectorValue{D,Int64}) where D
+  VectorValue(Int64.([vv...]))
+end
+
+function Base.Int32(vv::VectorValue{D,Int32}) where D
+  VectorValue(Int32.([vv...]))
 end

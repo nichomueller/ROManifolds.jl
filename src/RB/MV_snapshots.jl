@@ -128,19 +128,20 @@ function functional_MDEIM(
     Param = get_ParamInfo(RBInfo, μ[k])
     Θₖ = build_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
       timesθ,var)
-    Θₖ,_ = M_DEIM_POD(reshape(Θₖ,ncells*nquad_cell,:), RBInfo.ϵₛ)
+    Θₖ,_ = POD(reshape(Θₖ,ncells*nquad_cell,:), RBInfo.ϵₛ)
     if k == 1
       Θmat = Θₖ
     else
       Θmat = hcat(Θmat,Θₖ)
     end
   end
-  Θmat,_ = M_DEIM_POD(Θmat,RBInfo.ϵₛ)
+  Θmat,_ = POD(Θmat,RBInfo.ϵₛ)
   Q = size(Θmat)[2]
   snaps,row_idx = Matrix{T}(undef,0,0),Int64[]
+  Mat_Θ = assemble_parametric_FE_matrix(FEMSpace,var)
   @simd for q = 1:Q
     Θq = FEFunction(FEMSpace.V₀_quad,Θmat[:,q])
-    Matq = assemble_parametric_FE_matrix(FEMSpace,Θq,var)
+    Matq = Mat_Θ(Θq)::SparseMatrixCSC{T,Int64}
     i,v = findnz(Matq[:])::Tuple{Vector{Int},Vector{T}}
     if q == 1
       row_idx = i
@@ -175,7 +176,7 @@ function functional_MDEIM_sampling(
       Θmat = hcat(Θmat, Θₖ)
     end
   end
-  Θmat,_ = M_DEIM_POD(Θmat,RBInfo.ϵₛ)
+  Θmat,_ = POD(Θmat,RBInfo.ϵₛ)
   Q = size(Θmat)[2]
   snaps,row_idx = Matrix{T}(undef,0,0),Int64[]
   @simd for q = 1:Q
@@ -356,7 +357,7 @@ function functional_DEIM(
     Param = get_ParamInfo(RBInfo, μ[k])
     Θₖ = build_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
       timesθ,var)
-    Θₖ,_ = M_DEIM_POD(reshape(Θₖ,ncells*nquad_cell,:), RBInfo.ϵₛ)
+    Θₖ,_ = POD(reshape(Θₖ,ncells*nquad_cell,:), RBInfo.ϵₛ)
     if k == 1
       Θmat = Θₖ
     else
@@ -397,7 +398,7 @@ function functional_DEIM_sampling(
       global Θmat = hcat(Θmat, Θₖ)
     end
   end
-  Θmat,_ = M_DEIM_POD(Θmat, RBInfo.ϵₛ)
+  Θmat,_ = POD(Θmat, RBInfo.ϵₛ)
   Q = size(Θmat)[2]
   snaps = zeros(T,FEMSpace.Nₛᵘ,Q)
   for q = 1:Q
@@ -462,11 +463,11 @@ end
 
 function build_parameter_on_phys_quadp(
   Param::ParametricInfoUnsteady{T},
-  phys_quadp::LazyArray,
+  phys_quadp::Vector{Vector{VectorValue{D,T}}},
   ncells::Int64,
   nquad_cell::Int64,
   timesθ::Vector,
-  var::String) where T
+  var::String) where {D,T}
 
   if var == "A"
     return [Param.α(phys_quadp[n][q],t_θ)
@@ -487,18 +488,19 @@ function build_parameter_on_phys_quadp(
 end
 
 function assemble_parametric_FE_matrix(
-  FEMSpace::FEMSpacePoissonUnsteady{D,T},
-  Θq::FEFunction,
-  var::String) where {D,T}
+  FEMSpace::FEMSpacePoissonUnsteady,
+  var::String)
 
-  if var == "A"
-    return (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Θq*∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
-      FEMSpace.V(0.0), FEMSpace.V₀))::SparseMatrixCSC{T, Int64}
-  elseif var == "M"
-    return (assemble_matrix(∫(FEMSpace.ϕᵥ*(Θq*FEMSpace.ϕᵤ(0.0)))*FEMSpace.dΩ,
-      FEMSpace.V(0.0), FEMSpace.V₀))::SparseMatrixCSC{T, Int64}
-  else
-    error("Need to assemble an unrecognized FE structure")
+  function Mat_θ(Θ)
+    if var == "A"
+      (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Θ*∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
+        FEMSpace.V(0.0), FEMSpace.V₀))
+    elseif var == "M"
+      (assemble_matrix(∫(FEMSpace.ϕᵥ*(Θ*FEMSpace.ϕᵤ(0.0)))*FEMSpace.dΩ,
+        FEMSpace.V(0.0), FEMSpace.V₀))
+    else
+      error("Need to assemble an unrecognized FE structure")
+    end
   end
 
 end

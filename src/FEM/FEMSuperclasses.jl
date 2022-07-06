@@ -21,7 +21,7 @@ struct FEMSpacePoissonSteady{D,T} <: SteadyProblem{D,T}
   dΩ::Measure
   dΓd::Measure
   dΓn::Measure
-  phys_quadp::LazyArray
+  phys_quadp::Vector{Vector{VectorValue{D,T}}}
   V₀_quad::UnconstrainedFESpace
 end
 
@@ -37,7 +37,7 @@ struct FEMSpacePoissonUnsteady{D,T} <: UnsteadyProblem{D,T}
   dΩ::Measure
   dΓd::Measure
   dΓn::Measure
-  phys_quadp::LazyArray
+  phys_quadp::Vector{Vector{VectorValue{D,T}}}
   V₀_quad::UnconstrainedFESpace
 end
 
@@ -58,10 +58,9 @@ struct FEMSpaceStokesSteady{D,T} <: SteadyProblem{D,T}
   Nₛᵖ::Int64
   Ω::BodyFittedTriangulation
   dΩ::Measure
-  Γd::BoundaryTriangulation
   dΓd::Measure
   dΓn::Measure
-  phys_quadp::LazyArray
+  phys_quadp::Vector{Vector{VectorValue{D,T}}}
   V₀_quad::UnconstrainedFESpace
 end
 
@@ -82,10 +81,9 @@ struct FEMSpaceStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
   Nₛᵖ::Int64
   Ω::BodyFittedTriangulation
   dΩ::Measure
-  Γd::BoundaryTriangulation
   dΓd::Measure
   dΓn::Measure
-  phys_quadp::LazyArray
+  phys_quadp::Vector{Vector{VectorValue{D,T}}}
   V₀_quad::UnconstrainedFESpace
 end
 
@@ -109,7 +107,7 @@ struct FEMSpaceNavierStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
   Γd::BoundaryTriangulation
   dΓd::Measure
   dΓn::Measure
-  phys_quadp::LazyArray
+  phys_quadp::Vector{Vector{VectorValue{D,T}}}
   V₀_quad::UnconstrainedFESpace
 end
 
@@ -168,6 +166,8 @@ struct ParametricInfoUnsteady{T} <: ParametricInfo{T}
   fₛ::F
   fₜ::F
   f::F
+  gₛ::F
+  gₜ::F
   g::F
   hₛ::F
   hₜ::F
