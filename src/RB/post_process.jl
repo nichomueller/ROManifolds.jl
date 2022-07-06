@@ -18,7 +18,7 @@ function post_process(RBInfo::ROMInfoSteady, d::Dict) where T
 
 end
 
-function post_process(RBInfo::UnsteadyInfo, d::Dict)
+function post_process(RBInfo::ROMInfoUnsteady, d::Dict)
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
     MDEIM_Σ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
     generate_and_save_plot(
@@ -129,7 +129,7 @@ function post_process(root::String)
     elseif occursin("-5",dir)
       return ["1e-5"]
     else
-      return [""]
+      return String[]
     end
   end
 
@@ -143,13 +143,13 @@ function post_process(root::String)
         if occursin("fun",dir)
           append!(tol_fun,ϵ)
           append!(err_fun,load_CSV(Matrix{T}(undef,0,0), path_to_err)[1])
-          cur_time = load_CSV(Matrix{T}(undef,0,0), path_to_t)
+          cur_time = Matrix(CSV.read(path_to_t, DataFrame))
           append!(time_fun["on"],cur_time[findall(x->x.=="on_time",cur_time[:,2]),1])
           append!(time_fun["off"],cur_time[findall(x->x.=="off_time",cur_time[:,2]),1])
         else
           append!(tol,ϵ)
           append!(err,load_CSV(Matrix{T}(undef,0,0), path_to_err)[1])
-          cur_time = load_CSV(Matrix{T}(undef,0,0), path_to_t)
+          cur_time = Matrix(CSV.read(path_to_t, DataFrame))
           append!(time["on"],cur_time[findall(x->x.=="on_time",cur_time[:,2]),1])
           append!(time["off"],cur_time[findall(x->x.=="off_time",cur_time[:,2]),1])
         end

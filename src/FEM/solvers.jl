@@ -58,11 +58,11 @@ function FE_solve(
     uₕₜ[:, count] = get_free_dof_values(uₕ)::Vector{T}
   end
 
-  if subtract_Ddata
+  #= if subtract_Ddata
     uₕₜ -= Gₕₜ
-  end
+  end =#
 
-  return uₕₜ, Gₕₜ
+  return uₕₜ#, Gₕₜ
 
 end
 

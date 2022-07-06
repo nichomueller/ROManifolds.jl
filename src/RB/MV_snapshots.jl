@@ -487,9 +487,9 @@ function build_parameter_on_phys_quadp(
 end
 
 function assemble_parametric_FE_matrix(
-  FEMSpace::FEMSpacePoissonUnsteady{T},
+  FEMSpace::FEMSpacePoissonUnsteady{D,T},
   Θq::FEFunction,
-  var::String) where T
+  var::String) where {D,T}
 
   if var == "A"
     return (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Θq*∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
@@ -504,9 +504,9 @@ function assemble_parametric_FE_matrix(
 end
 
 function assemble_parametric_FE_vector(
-  FEMSpace::FEMSpacePoissonUnsteady{T},
+  FEMSpace::FEMSpacePoissonUnsteady{D,T},
   Θq::FEFunction,
-  var::String) where T
+  var::String) where {D,T}
 
   if var == "F"
     return assemble_vector(∫(FEMSpace.ϕᵥ*Θq)*FEMSpace.dΩ,FEMSpace.V₀)::Vector{T}
@@ -519,9 +519,9 @@ function assemble_parametric_FE_vector(
 end
 
 function assemble_parametric_FE_matrix(
-  FEMSpace::FEMSpaceStokesUnsteady{T},
+  FEMSpace::FEMSpaceStokesUnsteady{D,T},
   Θq::FEFunction,
-  var::String) where T
+  var::String) where {D,T}
 
   if var == "A"
     return (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Θq*∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
@@ -536,9 +536,9 @@ function assemble_parametric_FE_matrix(
 end
 
 function assemble_parametric_FE_vector(
-  FEMSpace::FEMSpaceStokesUnsteady{T},
+  FEMSpace::FEMSpaceStokesUnsteady{D,T},
   Θq::FEFunction,
-  var::String) where T
+  var::String) where {D,T}
 
   if var == "F"
     return assemble_vector(∫(FEMSpace.ϕᵥ⋅Θq)*FEMSpace.dΩ,FEMSpace.V₀)::Vector{T}
