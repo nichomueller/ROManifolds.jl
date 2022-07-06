@@ -85,8 +85,13 @@ function DEIM_offline(RBInfo::Info{T}, var::String) where T
   DEIM_mat, Σ = get_snaps_DEIM(FEMSpace, RBInfo, μ, var)
   DEIM_mat, DEIM_idx, DEIM_err_bound = M_DEIM_offline(DEIM_mat, Σ)
   DEIMᵢ_mat = DEIM_mat[DEIM_idx, :]
+  if var == "H"
+    el = find_FE_elements(FEMSpace.V₀, FEMSpace.Γn, unique(DEIM_idx))
+  else
+    el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(DEIM_idx))
+  end
 
-  DEIM_mat, DEIM_idx, DEIMᵢ_mat
+  DEIM_mat, DEIM_idx, DEIMᵢ_mat, el
 
 end
 

@@ -463,32 +463,6 @@ end
 
 function build_parameter_on_phys_quadp(
   Param::ParametricInfoUnsteady{T},
-  phys_quadp::LazyArray,
-  ncells::Int64,
-  nquad_cell::Int64,
-  timesθ::Vector,
-  var::String) where T
-
-  if var == "A"
-    return [Param.α(phys_quadp[n][q],t_θ)
-      for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]::Vector{T}
-  elseif var == "M"
-    return [Param.m(phys_quadp[n][q],t_θ)
-      for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]::Vector{T}
-  elseif var == "F"
-    return [Param.f(phys_quadp[n][q],t_θ)
-      for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]::Vector{T}
-  elseif var == "H"
-    return [Param.h(phys_quadp[n][q],t_θ)
-      for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]::Vector{T}
-  else
-    error("not implemented")
-  end
-
-end
-
-function build_parameter_on_phys_quadp(
-  Param::ParametricInfoUnsteady{T},
   phys_quadp::Vector{Vector{VectorValue{D,T}}},
   ncells::Int64,
   nquad_cell::Int64,

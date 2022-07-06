@@ -302,10 +302,30 @@ end
 
 function find_FE_elements(
   V₀::UnconstrainedFESpace,
-  trian::Triangulation,
+  trian::BodyFittedTriangulation,
   idx::Vector{T}) where T
 
   connectivity = get_cell_dof_ids(V₀, trian)::Table{Int32, Vector{Int32}, Vector{Int32}}
+
+  el = Int64[]
+  for i = 1:length(idx)
+    for j = 1:size(connectivity)[1]
+      if idx[i] in abs.(connectivity[j])
+        append!(el, convert(T,j))
+      end
+    end
+  end
+
+  unique(el)
+
+end
+
+function find_FE_elements(
+  V₀::UnconstrainedFESpace,
+  trian::BoundaryTriangulation,
+  idx::Vector{T}) where T
+
+  connectivity = collect(get_cell_dof_ids(V₀, trian))::Vector{Vector{Int32}}
 
   el = Int64[]
   for i = 1:length(idx)

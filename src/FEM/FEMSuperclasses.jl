@@ -18,6 +18,7 @@ struct FEMSpacePoissonSteady{D,T} <: SteadyProblem{D,T}
   ϕᵤ::FEBasis
   Nₛᵘ::Int64
   Ω::BodyFittedTriangulation
+  Γn::BoundaryTriangulation
   dΩ::Measure
   dΓd::Measure
   dΓn::Measure
@@ -34,6 +35,7 @@ struct FEMSpacePoissonUnsteady{D,T} <: UnsteadyProblem{D,T}
   ϕᵤ::F
   Nₛᵘ::Int64
   Ω::BodyFittedTriangulation
+  Γn::BoundaryTriangulation
   dΩ::Measure
   dΓd::Measure
   dΓn::Measure
@@ -57,6 +59,7 @@ struct FEMSpaceStokesSteady{D,T} <: SteadyProblem{D,T}
   Nₛᵘ::Int64
   Nₛᵖ::Int64
   Ω::BodyFittedTriangulation
+  Γn::BoundaryTriangulation
   dΩ::Measure
   dΓd::Measure
   dΓn::Measure
@@ -80,6 +83,7 @@ struct FEMSpaceStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
   Nₛᵘ::Int64
   Nₛᵖ::Int64
   Ω::BodyFittedTriangulation
+  Γn::BoundaryTriangulation
   dΩ::Measure
   dΓd::Measure
   dΓn::Measure
@@ -103,6 +107,7 @@ struct FEMSpaceNavierStokesUnsteady{D,T} <: UnsteadyProblem{D,T}
   Nₛᵘ::Int64
   Nₛᵖ::Int64
   Ω::BodyFittedTriangulation
+  Γn::BoundaryTriangulation
   dΩ::Measure
   Γd::BoundaryTriangulation
   dΓd::Measure
