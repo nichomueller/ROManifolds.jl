@@ -458,8 +458,12 @@ function online_phase(
     save_CSV(mean_pointwise_err_p, joinpath(path_μ, "mean_point_err_p.csv"))
     save_CSV([mean_L2_err], joinpath(path_μ, "L2_err.csv"))
 
+    if RBInfo.import_offline_structures
+      RBVars.P.S.offline_time = NaN
+    end
+
     if !RBInfo.import_offline_structures
-      times = Dict(RBVars.P.offline_time=>"off_time",
+      times = Dict(RBVars.P.S.offline_time=>"off_time",
         mean_online_time=>"on_time", mean_reconstruction_time=>"rec_time")
     else
       times = Dict(mean_online_time=>"on_time",

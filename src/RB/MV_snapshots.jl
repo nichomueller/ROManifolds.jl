@@ -90,29 +90,6 @@ function standard_MDEIM(
   return snaps,Σ,row_idx
 end
 
-function standard_MDEIM_sampling(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady{T},
-  μ::Vector{Vector{T}},
-  timesθ::Vector,
-  nₜ::Int64,
-  var="A") where T
-
-  snaps,row_idx,Σ = Matrix{T}(undef,0,0),Int64[],Vector{T}(undef,0)
-  @simd for k = 1:RBInfo.nₛ_MDEIM
-    println("Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)")
-    timesθₖ = timesθ[rand(1:length(timesθ),nₜ)]
-    snapsₖ,row_idx = build_matrix_snapshots(FEMSpace,RBInfo,μ[k],timesθₖ,var)
-    if k == 1
-      snaps = snapsₖ
-    else
-      snaps = hcat(snaps,snapsₖ)
-    end
-  end
-  snaps, Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
-  return snaps, Σ, row_idx
-end
-
 function functional_MDEIM(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady{T},
@@ -142,46 +119,6 @@ function functional_MDEIM(
   @simd for q = 1:Q
     Θq = FEFunction(FEMSpace.V₀_quad,Θmat[:,q])
     Matq = Mat_Θ(Θq)::SparseMatrixCSC{T,Int64}
-    i,v = findnz(Matq[:])::Tuple{Vector{Int},Vector{T}}
-    if q == 1
-      row_idx = i
-      snaps = zeros(T,length(row_idx),Q)
-    end
-    snaps[:,q] = v
-  end
-  snaps, Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
-  return snaps, Σ, row_idx
-end
-
-function functional_MDEIM_sampling(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady{T},
-  μ::Vector{Vector{T}},
-  timesθ::Vector,
-  nₜ::Int64,
-  var="A") where T
-
-  ncells,nquad_cell = get_LagrangianQuad_info(FEMSpace)
-  Θmat = Matrix{T}(undef,0,0)
-  @simd for k = 1:RBInfo.nₛ_MDEIM
-    println("Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)")
-    Param = get_ParamInfo(RBInfo, μ[k])
-    timesθₖ = timesθ[rand(1:length(timesθ),nₜ)]
-    Θₖ = build_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
-      timesθₖ,var)
-    Θₖ = reshape(Θₖ,ncells*nquad_cell,:)
-    if k == 1
-      Θmat = Θₖ
-    else
-      Θmat = hcat(Θmat, Θₖ)
-    end
-  end
-  Θmat,_ = POD(Θmat,RBInfo.ϵₛ)
-  Q = size(Θmat)[2]
-  snaps,row_idx = Matrix{T}(undef,0,0),Int64[]
-  @simd for q = 1:Q
-    Θq = FEFunction(FEMSpace.V₀_quad,Θmat[:,q])
-    Matq = assemble_parametric_FE_matrix(FEMSpace,Θq,var)
     i,v = findnz(Matq[:])::Tuple{Vector{Int},Vector{T}}
     if q == 1
       row_idx = i
@@ -224,23 +161,16 @@ function get_snaps_MDEIM(
 
   timesθ = get_timesθ(RBInfo)
 
-  if RBInfo.space_time_M_DEIM
-    snaps, Σ, row_idx = spacetime_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
-  elseif RBInfo.functional_M_DEIM
-    if RBInfo.sampling_M_DEIM
-      nₜ = floor(Int,length(timesθ)*RBInfo.sampling_percentage)
-      snaps, Σ, row_idx = functional_MDEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
-    else
+  t = @elapsed begin
+    if RBInfo.space_time_M_DEIM
+      snaps, Σ, row_idx = spacetime_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
+    elseif RBInfo.functional_M_DEIM
       snaps, Σ, row_idx = functional_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
-    end
-  else
-    if RBInfo.sampling_M_DEIM
-      nₜ = floor(Int,length(timesθ)*RBInfo.sampling_percentage)
-      snaps, Σ, row_idx = standard_MDEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
     else
       snaps, Σ, row_idx = standard_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
     end
   end
+  println("MDEIM elapsed time: $t")
 
   return snaps, Σ, row_idx
 
@@ -319,30 +249,6 @@ function standard_DEIM(
 
 end
 
-function standard_DEIM_sampling(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady{T},
-  μ::Vector{Vector{T}},
-  timesθ::Vector,
-  nₜ::Int64,
-  var="F") where T
-
-  for k = 1:RBInfo.nₛ_DEIM
-    println("Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)")
-    timesθₖ = timesθ[rand(1:length(timesθ),nₜ)]
-    snapsₖ = build_vector_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
-    if k == 1
-      global snaps = snapsₖ
-    else
-      global snaps = hcat(snaps, snapsₖ)
-    end
-  end
-
-  snaps, Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
-  return snaps, Σ
-
-end
-
 function functional_DEIM(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady{T},
@@ -366,44 +272,11 @@ function functional_DEIM(
   end
   Θmat,_ = POD(Θmat,RBInfo.ϵₛ)
   Q = size(Θmat)[2]
+  Vec_Θ = assemble_parametric_FE_vector(FEMSpace,var)
   snaps = zeros(T,FEMSpace.Nₛᵘ,Q)
   for q = 1:Q
     Θq = FEFunction(FEMSpace.V₀_quad,Θmat[:,q])
-    snaps[:,q] = assemble_parametric_FE_vector(FEMSpace,Θq,var)
-  end
-  snaps, Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
-  return snaps, Σ
-end
-
-function functional_DEIM_sampling(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady{T},
-  μ::Vector{Vector{T}},
-  timesθ::Vector,
-  nₜ::Int64,
-  var="F") where T
-
-  ncells,nquad_cell = get_LagrangianQuad_info(FEMSpace)
-  Θmat = Matrix{T}(undef,0,0)
-  for k = 1:RBInfo.nₛ_DEIM
-    println("Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)")
-    Param = get_ParamInfo(RBInfo, μ[k])
-    timesθₖ = timesθ[rand(1:length(timesθ),nₜ)]
-    Θₖ = build_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
-      timesθₖ,var)
-    Θₖ = reshape(Θₖ,ncells*nquad_cell,:)
-    if k == 1
-      global Θmat = Θₖ
-    else
-      global Θmat = hcat(Θmat, Θₖ)
-    end
-  end
-  Θmat,_ = POD(Θmat, RBInfo.ϵₛ)
-  Q = size(Θmat)[2]
-  snaps = zeros(T,FEMSpace.Nₛᵘ,Q)
-  for q = 1:Q
-    Θq = FEFunction(FEMSpace.V₀_quad,Θmat[:,q])
-    snaps[:,q] = assemble_parametric_FE_vector(FEMSpace,Θq,var)
+    snaps[:,q] = Vec_Θ(Θq)
   end
   snaps, Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
   return snaps, Σ
@@ -439,23 +312,16 @@ function get_snaps_DEIM(
 
   timesθ = get_timesθ(RBInfo)
 
-  if RBInfo.space_time_M_DEIM
-    snaps, Σ = spacetime_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
-  elseif RBInfo.functional_M_DEIM
-    if RBInfo.sampling_M_DEIM
-      nₜ = floor(Int,length(timesθ)*RBInfo.sampling_percentage)
-      snaps, Σ = functional_DEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
-    else
+  t = @elapsed begin
+    if RBInfo.space_time_M_DEIM
+      snaps, Σ = spacetime_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
+    elseif RBInfo.functional_M_DEIM
       snaps, Σ = functional_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
-    end
-  else
-    if RBInfo.sampling_M_DEIM
-      nₜ = floor(Int,length(timesθ)*RBInfo.sampling_percentage)
-      snaps, Σ = standard_DEIM_sampling(FEMSpace,RBInfo,μ,timesθ,nₜ,var)
     else
       snaps, Σ = standard_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
     end
   end
+  println("DEIM elapsed time: $t")
 
   return snaps, Σ
 
@@ -503,51 +369,62 @@ function assemble_parametric_FE_matrix(
     end
   end
 
+  Mat_θ
+
 end
 
 function assemble_parametric_FE_vector(
-  FEMSpace::FEMSpacePoissonUnsteady{D,T},
-  Θq::FEFunction,
-  var::String) where {D,T}
+  FEMSpace::FEMSpacePoissonUnsteady,
+  var::String)
 
-  if var == "F"
-    return assemble_vector(∫(FEMSpace.ϕᵥ*Θq)*FEMSpace.dΩ,FEMSpace.V₀)::Vector{T}
-  elseif var == "H"
-    return assemble_vector(∫(FEMSpace.ϕᵥ*Θq)*FEMSpace.dΓn,FEMSpace.V₀)::Vector{T}
-  else
-    error("Need to assemble an unrecognized FE structure")
+  function Vec_θ(Θ)
+    if var == "F"
+      assemble_vector(∫(FEMSpace.ϕᵥ*Θ)*FEMSpace.dΩ,FEMSpace.V₀)
+    elseif var == "H"
+      assemble_vector(∫(FEMSpace.ϕᵥ*Θ)*FEMSpace.dΓn,FEMSpace.V₀)
+    else
+      error("Need to assemble an unrecognized FE structure")
+    end
   end
+
+  Vec_θ
 
 end
 
 function assemble_parametric_FE_matrix(
-  FEMSpace::FEMSpaceStokesUnsteady{D,T},
-  Θq::FEFunction,
-  var::String) where {D,T}
+  FEMSpace::FEMSpaceStokesUnsteady,
+  var::String)
 
-  if var == "A"
-    return (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Θq*∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
-      FEMSpace.V(0.0), FEMSpace.V₀))::SparseMatrixCSC{T, Int64}
-  elseif var == "M"
-    return (assemble_matrix(∫(FEMSpace.ϕᵥ⋅(Θq*FEMSpace.ϕᵤ(0.0)))*FEMSpace.dΩ,
-      FEMSpace.V(0.0), FEMSpace.V₀))::SparseMatrixCSC{T, Int64}
-  else
-    error("Need to assemble an unrecognized FE structure")
+  function Mat_θ(Θ)
+    if var == "A"
+      (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Θ*∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
+        FEMSpace.V(0.0), FEMSpace.V₀))
+    elseif var == "M"
+      (assemble_matrix(∫(FEMSpace.ϕᵥ⋅(Θ*FEMSpace.ϕᵤ(0.0)))*FEMSpace.dΩ,
+        FEMSpace.V(0.0), FEMSpace.V₀))
+    else
+      error("Need to assemble an unrecognized FE structure")
+    end
   end
+
+  Mat_θ
 
 end
 
 function assemble_parametric_FE_vector(
-  FEMSpace::FEMSpaceStokesUnsteady{D,T},
-  Θq::FEFunction,
-  var::String) where {D,T}
+  FEMSpace::FEMSpaceStokesUnsteady,
+  var::String)
 
-  if var == "F"
-    return assemble_vector(∫(FEMSpace.ϕᵥ⋅Θq)*FEMSpace.dΩ,FEMSpace.V₀)::Vector{T}
-  elseif var == "H"
-    return assemble_vector(∫(FEMSpace.ϕᵥ⋅Θq)*FEMSpace.dΓn,FEMSpace.V₀)::Vector{T}
-  else
-    error("Need to assemble an unrecognized FE structure")
+  function Vec_θ(Θ)
+    if var == "F"
+      assemble_vector(∫(FEMSpace.ϕᵥ⋅Θ)*FEMSpace.dΩ,FEMSpace.V₀)
+    elseif var == "H"
+      assemble_vector(∫(FEMSpace.ϕᵥ⋅Θ)*FEMSpace.dΓn,FEMSpace.V₀)
+    else
+      error("Need to assemble an unrecognized FE structure")
+    end
   end
+
+  Vec_θ
 
 end

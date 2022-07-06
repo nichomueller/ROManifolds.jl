@@ -533,6 +533,10 @@ function online_phase(
     save_CSV(mean_H1_err, joinpath(path_μ, "H1_err.csv"))
     save_CSV([mean_H1_L2_err], joinpath(path_μ, "H1L2_err.csv"))
 
+    if RBInfo.import_offline_structures
+      RBVars.S.offline_time = NaN
+    end
+
     times = Dict("off_time"=>RBVars.S.offline_time,
       "on_time"=>mean_online_time+adapt_time,"rec_time"=>mean_reconstruction_time)
     CSV.write(joinpath(path_μ, "times.csv"),times)
