@@ -26,9 +26,11 @@ function init_PoissonSGRB_variables(::Type{T}) where T
   DEIM_mat_F = Matrix{T}(undef,0,0)
   DEIMᵢ_F = Matrix{T}(undef,0,0)
   DEIM_idx_F = Vector{Int64}(undef,0)
+  sparse_el_F = Vector{Int64}(undef,0)
   DEIM_mat_H = Matrix{T}(undef,0,0)
   DEIMᵢ_H = Matrix{T}(undef,0,0)
   DEIM_idx_H = Vector{Int64}(undef,0)
+  sparse_el_H = Vector{Int64}(undef,0)
   Nₛᵘ = 0
   nₛᵘ = 0
   Qᵃ = 0
@@ -39,7 +41,7 @@ function init_PoissonSGRB_variables(::Type{T}) where T
 
   (Sᵘ, Φₛᵘ, ũ, uₙ, û, Aₙ, Fₙ, Hₙ, Xᵘ₀, LHSₙ, RHSₙ, MDEIM_mat_A,
   MDEIMᵢ_A, MDEIM_idx_A, row_idx_A, sparse_el_A, DEIM_mat_F, DEIMᵢ_F, DEIM_idx_F,
-  DEIM_mat_H, DEIMᵢ_H, DEIM_idx_H, Nₛᵘ, nₛᵘ, Qᵃ, Qᶠ, Qʰ,
+  sparse_el_F, DEIM_mat_H, DEIMᵢ_H, DEIM_idx_H, sparse_el_H, Nₛᵘ, nₛᵘ, Qᵃ, Qᶠ, Qʰ,
   offline_time, online_time)
 
 end
@@ -109,8 +111,8 @@ mutable struct PoissonSGRB{T} <: PoissonSteady{T}
   Sᵘ::Matrix{T}; Φₛᵘ::Matrix{T}; ũ::Matrix{T}; uₙ::Matrix{T}; û::Matrix{T}; Aₙ::Array{T}; Fₙ::Matrix{T};
   Hₙ::Matrix{T}; Xᵘ₀::SparseMatrixCSC{T}; LHSₙ::Vector{Matrix{T}}; RHSₙ::Vector{Matrix{T}}; MDEIM_mat_A::Matrix{T};
   MDEIMᵢ_A::Matrix{T}; MDEIM_idx_A::Vector{Int64}; row_idx_A::Vector{Int64}; sparse_el_A::Vector{Int64};
-  DEIM_mat_F::Matrix{T}; DEIMᵢ_F::Matrix{T}; DEIM_idx_F::Vector{Int64}; DEIM_mat_H::Matrix{T};
-  DEIMᵢ_H::Matrix{T}; DEIM_idx_H::Vector{Int64};
+  DEIM_mat_F::Matrix{T}; DEIMᵢ_F::Matrix{T}; DEIM_idx_F::Vector{Int64}; sparse_el_F::Vector{Int64};
+  DEIM_mat_H::Matrix{T}; DEIMᵢ_H::Matrix{T}; DEIM_idx_H::Vector{Int64}; sparse_el_H::Vector{Int64};
   Nₛᵘ::Int64; nₛᵘ::Int64; Qᵃ::Int64; Qᶠ::Int64; Qʰ::Int64; offline_time::Float64;
   online_time::Float64
 end
@@ -119,8 +121,8 @@ mutable struct PoissonSPGRB{T} <: PoissonSteady{T}
   Sᵘ::Matrix{T}; Φₛᵘ::Matrix{T}; ũ::Matrix{T}; uₙ::Matrix{T}; û::Matrix{T}; Aₙ::Array{T}; Fₙ::Matrix{T};
   Hₙ::Matrix{T}; Xᵘ₀::SparseMatrixCSC{T}; LHSₙ::Vector{Matrix{T}}; RHSₙ::Vector{Matrix{T}}; MDEIM_mat_A::Matrix{T};
   MDEIMᵢ_A::Matrix{T}; MDEIM_idx_A::Vector{Int64}; row_idx_A::Vector{Int64}; sparse_el_A::Vector{Int64};
-  DEIM_mat_F::Matrix{T}; DEIMᵢ_F::Matrix{T}; DEIM_idx_F::Vector{Int64}; DEIM_mat_H::Matrix{T};
-  DEIMᵢ_H::Matrix{T}; DEIM_idx_H::Vector{Int64};
+  DEIM_mat_F::Matrix{T}; DEIMᵢ_F::Matrix{T}; DEIM_idx_F::Vector{Int64}; sparse_el_F::Vector{Int64};
+  DEIM_mat_H::Matrix{T}; DEIMᵢ_H::Matrix{T}; DEIM_idx_H::Vector{Int64}; sparse_el_H::Vector{Int64};
   Nₛᵘ::Int64; nₛᵘ::Int64; Qᵃ::Int64; Qᶠ::Int64; Qʰ::Int64; offline_time::Float64;
   online_time::Float64;Pᵤ⁻¹::SparseMatrixCSC{T}; AΦᵀPᵤ⁻¹::Array{T}
 end

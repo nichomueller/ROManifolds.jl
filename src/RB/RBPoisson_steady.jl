@@ -131,13 +131,13 @@ function assemble_DEIM_vectors(
 
   if var == "F"
     if isempty(RBVars.DEIM_mat_F)
-      RBVars.DEIM_mat_F, RBVars.DEIM_idx_F, RBVars.DEIMᵢ_F =
+      RBVars.DEIM_mat_F, RBVars.DEIM_idx_F, RBVars.DEIMᵢ_F, RBVars.sparse_el_F =
         DEIM_offline(RBInfo,"F")
     end
     assemble_reduced_mat_DEIM(RBVars,RBVars.DEIM_mat_F,"F")
   elseif var == "H"
     if isempty(RBVars.DEIM_mat_H)
-      RBVars.DEIM_mat_H, RBVars.DEIM_idx_H, RBVars.DEIMᵢ_H =
+      RBVars.DEIM_mat_H, RBVars.DEIM_idx_H, RBVars.DEIMᵢ_H, RBVars.sparse_el_H =
         DEIM_offline(RBInfo,"H")
     end
     assemble_reduced_mat_DEIM(RBVars,RBVars.DEIM_mat_H,"H")
@@ -153,9 +153,11 @@ function save_M_DEIM_structures(
 
   list_M_DEIM = (RBVars.MDEIM_mat_A, RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A,
     RBVars.row_idx_A, RBVars.sparse_el_A, RBVars.DEIM_mat_F, RBVars.DEIMᵢ_F,
-    RBVars.DEIM_idx_F, RBVars.DEIM_mat_H, RBVars.DEIMᵢ_H, RBVars.DEIM_idx_H)
+    RBVars.DEIM_idx_F, RBVars.sparse_el_F, RBVars.DEIM_mat_H, RBVars.DEIMᵢ_H,
+    RBVars.DEIM_idx_H, RBVars.sparse_el_H)
   list_names = ("MDEIM_mat_A","MDEIMᵢ_A","MDEIM_idx_A","row_idx_A","sparse_el_A",
-    "DEIM_mat_F","DEIMᵢ_F","DEIM_idx_F","DEIM_mat_H","DEIMᵢ_H","DEIM_idx_H")
+    "DEIM_mat_F","DEIMᵢ_F","DEIM_idx_F","sparse_el_F",
+    "DEIM_mat_H","DEIMᵢ_H","DEIM_idx_H","sparse_el_H")
   l_info_vec = [[l_idx,l_val] for (l_idx,l_val) in
     enumerate(list_M_DEIM) if !all(isempty.(l_val))]
 
@@ -206,10 +208,12 @@ function get_M_DEIM_structures(
 
       if isfile(joinpath(RBInfo.paths.ROM_structures_path, "DEIMᵢ_F.csv"))
         println("Importing DEIM offline structures, F")
-        RBVars.DEIMᵢ_F = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path,
+        RBVars.DEIMᵢ_F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path,
           "DEIMᵢ_F.csv"))
-        RBVars.DEIM_idx_F = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path,
+        RBVars.DEIM_idx_F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path,
           "DEIM_idx_F.csv"))[:]
+        RBVars.sparse_el_F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path,
+          "sparse_el_F.csv"))[:]
         append!(operators, [])
       else
         println("Failed to import DEIM offline structures, F: must build them")
@@ -226,6 +230,8 @@ function get_M_DEIM_structures(
           "DEIMᵢ_H.csv"))
         RBVars.DEIM_idx_H = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path,
           "DEIM_idx_H.csv"))[:]
+        RBVars.sparse_el_H = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path,
+          "sparse_el_H.csv"))[:]
         append!(operators, [])
         return
       else
@@ -440,7 +446,7 @@ function get_θᶠʰ(
   if !RBInfo.probl_nl["f"]
     θᶠ = reshape([Param.f(Point(0.,0.))],1,1)
   else
-    F_μ = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
+    F_μ = build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_F)
     θᶠ = M_DEIM_online(F_μ, RBVars.DEIMᵢ_F, RBVars.DEIM_idx_F)
   end
   if !RBInfo.probl_nl["h"]

@@ -186,6 +186,75 @@ function build_sparse_mat(
 
 end
 
+function build_sparse_vec(
+  FEMSpace::SteadyProblem,
+  FEMInfo::SteadyInfo{T},
+  Param::ParametricInfoSteady,
+  el::Vector{Int64},
+  var="F") where T
+
+  Ω_sparse = view(FEMSpace.Ω, el)
+  dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
+
+  function define_Vec(::FEMSpacePoissonSteady, var::String)
+    if var == "F"
+      return assemble_vector(∫(FEMSpace.ϕᵥ*Param.f)*dΩ_sparse, FEMSpace.V₀)
+    elseif var == "H"
+      return assemble_vector(∫(FEMSpace.ϕᵥ*Param.h)*dΩ_sparse, FEMSpace.V₀)
+    end
+  end
+  function define_Vec(::FEMSpaceStokesSteady, var::String)
+    if var == "F"
+      return assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.f)*dΩ_sparse, FEMSpace.V₀)
+    elseif var == "H"
+      return assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.h)*dΩ_sparse, FEMSpace.V₀)
+    end
+  end
+
+  define_Vec(FEMSpace, var)::Vector{T}
+
+end
+
+function build_sparse_vec(
+  FEMSpace::UnsteadyProblem,
+  FEMInfo::UnsteadyInfo{T},
+  Param::ParametricInfoUnsteady,
+  el::Vector{Int64},
+  timesθ::Vector;
+  var="F") where T
+
+  Ω_sparse = view(FEMSpace.Ω, el)
+  dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
+
+  function define_Vecₜ(::FEMSpacePoissonUnsteady, t::Real, var::String)
+    if var == "F"
+      return assemble_vector(∫(FEMSpace.ϕᵥ*Param.f(t))*dΩ_sparse, FEMSpace.V₀)
+    elseif var == "H"
+      return assemble_vector(∫(FEMSpace.ϕᵥ*Param.h(t))*dΩ_sparse, FEMSpace.V₀)
+    else
+      error("Unrecognized variable")
+    end
+  end
+  function define_Vecₜ(::FEMSpaceStokesUnsteady, t::Real, var::String)
+    if var == "F"
+      return assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.f(t))*dΩ_sparse, FEMSpace.V₀)
+    elseif var == "H"
+      return assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.h(t))*dΩ_sparse, FEMSpace.V₀)
+    else
+      error("Unrecognized variable")
+    end
+  end
+  Vecₜ(t) = define_Vecₜ(FEMSpace, t, var)
+
+  Vec = zeros(T, FEMSpace.Nₛᵘ, length(timesθ))
+  for (i_t,t) in enumerate(timesθ)
+    Vec[:, i_t] = Vecₜ(t)
+  end
+
+  Vec
+
+end
+
 function blocks_to_matrix(A_block::Array{T}, N_blocks::Int64) where T
 
   A = zeros(T,prod(size(A_block[1])), N_blocks)

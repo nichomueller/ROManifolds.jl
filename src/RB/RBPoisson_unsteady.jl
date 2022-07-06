@@ -181,13 +181,13 @@ function assemble_DEIM_vectors(
 
   if var == "F"
     if isempty(RBVars.S.DEIM_mat_F)
-       RBVars.S.DEIM_mat_F, RBVars.S.DEIM_idx_F, RBVars.S.DEIMᵢ_F =
+       RBVars.S.DEIM_mat_F, RBVars.S.DEIM_idx_F, RBVars.S.DEIMᵢ_F, RBVars.S.sparse_el_F =
         DEIM_offline(RBInfo,"F")
     end
     assemble_reduced_mat_DEIM(RBInfo,RBVars,RBVars.S.DEIM_mat_F,"F")
   elseif var == "H"
     if isempty(RBVars.S.DEIM_mat_H)
-       RBVars.S.DEIM_mat_H, RBVars.S.DEIM_idx_H, RBVars.S.DEIMᵢ_H =
+       RBVars.S.DEIM_mat_H, RBVars.S.DEIM_idx_H, RBVars.S.DEIMᵢ_H, RBVars.S.sparse_el_H =
         DEIM_offline(RBInfo,"H")
     end
     assemble_reduced_mat_DEIM(RBInfo,RBVars, RBVars.S.DEIM_mat_H,"H")
@@ -369,23 +369,15 @@ function get_θᶠʰ(
   if !RBInfo.probl_nl["f"]
     θᶠ = [Param.fₜ(t_θ) for t_θ = timesθ]
   else
-    F_μ = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
-    F = zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ)
-    for (i,tᵢ) in enumerate(timesθ)
-      F[:,i] = F_μ(tᵢ)
-    end
-    θᶠ = (RBVars.S.DEIMᵢ_F \ Matrix{T}(F[RBVars.S.DEIM_idx_F, :]))
+    F_μ = build_sparse_vec(FEMSpace,FEMInfo, Param, RBVars.S.sparse_el_F, timesθ; var="F")
+    θᶠ = (RBVars.S.DEIMᵢ_F \ Matrix{T}(F_μ[RBVars.S.DEIM_idx_F, :]))
   end
 
   if !RBInfo.probl_nl["h"]
     θʰ = [Param.hₜ(t_θ) for t_θ = timesθ]
   else
-    H_μ = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
-    H = zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ)
-    for (i,tᵢ) in enumerate(timesθ)
-      H[:,i] = H_μ(tᵢ)
-    end
-    θʰ = (RBVars.S.DEIMᵢ_H \ Matrix{T}(H[RBVars.S.DEIM_idx_H, :]))
+    H_μ = build_sparse_vec(FEMSpace,FEMInfo, Param, RBVars.S.sparse_el_H, timesθ; var="H")
+    θʰ = (RBVars.S.DEIMᵢ_H \ Matrix{T}(H_μ[RBVars.S.DEIM_idx_H, :]))
   end
 
   (reshape(θᶠ, RBVars.S.Qᶠ, RBVars.Nₜ)::Matrix{T},
