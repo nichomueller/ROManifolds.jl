@@ -236,7 +236,5 @@ mutable struct ROMInfoUnsteady{T} <: Info{T}
   ϵₜ::Float64
   space_time_M_DEIM::Bool
   functional_M_DEIM::Bool
-  sampling_M_DEIM::Bool
-  sampling_percentage::Float64
   adaptivity::Bool
 end

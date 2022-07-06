@@ -170,12 +170,11 @@ function post_process(root::String)
   root_subs = get_all_subdirectories(root)
   filter!(el->!occursin("FEM_data",el),root_subs)
 
-  (ϵ,ϵ_fun,ϵ_sampl,ϵ_fun_sampl,ϵ_nest,ϵ_fun_nest,ϵ_sampl_nest,ϵ_fun_sampl_nest) =
+  (ϵ,ϵ_fun,ϵ_nest,ϵ_fun_nest) =
     (S[],S[],S[],S[],S[],S[],S[],S[])
-  (errH1L2,errH1L2_fun,errH1L2_sampl,errH1L2_fun_sampl,errH1L2_nest,
-    errH1L2_fun_nest,errH1L2_sampl_nest,errH1L2_fun_sampl_nest) =
+  (errH1L2,errH1L2_fun,errH1L2_nest,errH1L2_fun_nest) =
     (T[],T[],T[],T[],T[],T[],T[],T[])
-  (t,t_fun,t_sampl,t_fun_sampl,t_nest,t_fun_nest,t_sampl_nest,t_fun_sampl_nest) =
+  (t,t_fun,t_nest,t_fun_nest) =
     (Dict("on"=>T[],"off"=>T[]),Dict("on"=>T[],"off"=>T[]),
     Dict("on"=>T[],"off"=>T[]),Dict("on"=>T[],"off"=>T[]),
     Dict("on"=>T[],"off"=>T[]),Dict("on"=>T[],"off"=>T[]),
@@ -183,43 +182,21 @@ function post_process(root::String)
 
   @simd for dir in root_subs
     if !occursin("nest",dir)
-      if !occursin("sampl",dir)
-        ϵ,ϵ_fun,errH1L2,errH1L2_fun,t,t_fun =
-          check_if_fun(dir,ϵ,ϵ_fun,errH1L2,errH1L2_fun,t,t_fun)
-      else
-        ϵ_sampl,ϵ_fun_sampl,errH1L2_sampl,errH1L2_fun_sampl,t_sampl,t_fun_sampl =
-          check_if_fun(dir,ϵ_sampl,ϵ_fun_sampl,errH1L2_sampl,errH1L2_fun_sampl,
-          t_sampl,t_fun_sampl)
-      end
+      ϵ,ϵ_fun,errH1L2,errH1L2_fun,t,t_fun =
+        check_if_fun(dir,ϵ,ϵ_fun,errH1L2,errH1L2_fun,t,t_fun)
     else
-      if !occursin("sampl",dir)
-        ϵ_nest,ϵ_fun_nest,errH1L2_nest,errH1L2_fun_nest,t_nest,t_fun_nest =
-          check_if_fun(dir,ϵ_nest,ϵ_fun_nest,errH1L2_nest,errH1L2_fun_nest,
-          t_nest,t_fun_nest)
-      else
-        ϵ_sampl_nest,ϵ_fun_sampl_nest,errH1L2_sampl_nest,errH1L2_fun_sampl_nest,
-          t_sampl_nest,t_fun_sampl_nest = check_if_fun(dir,ϵ_sampl_nest,
-          ϵ_fun_sampl_nest,errH1L2_sampl_nest,errH1L2_fun_sampl_nest,
-          t_sampl_nest,t_fun_sampl_nest)
-      end
+      ϵ_nest,ϵ_fun_nest,errH1L2_nest,errH1L2_fun_nest,t_nest,t_fun_nest =
+        check_if_fun(dir,ϵ_nest,ϵ_fun_nest,errH1L2_nest,errH1L2_fun_nest,
+        t_nest,t_fun_nest)
     end
   end
 
   errors = Dict("Standard"=>errH1L2,"Functional"=>errH1L2_fun,
-  "Standard-sampling"=>errH1L2_sampl,"Functional-sampling"=>errH1L2_fun_sampl,
-  "Standard-nested"=>errH1L2_nest,"Functional-nested"=>errH1L2_fun_nest,
-  "Standard-sampling-nested"=>errH1L2_sampl_nest,
-  "Functional-sampling-nested"=>errH1L2_fun_sampl_nest)
+  "Standard-nested"=>errH1L2_nest,"Functional-nested"=>errH1L2_fun_nest)
   times = Dict("Standard"=>t,"Functional"=>t_fun,
-  "Standard-sampling"=>t_sampl,"Functional-sampling"=>t_fun_sampl,
-  "Standard-nested"=>t_nest,"Functional-nested"=>t_fun_nest,
-  "Standard-sampling-nested"=>t_sampl_nest,
-  "Functional-sampling-nested"=>t_fun_sampl_nest)
+  "Standard-nested"=>t_nest,"Functional-nested"=>t_fun_nest)
   tols = Dict("Standard"=>ϵ,"Functional"=>ϵ_fun,
-  "Standard-sampling"=>ϵ_sampl,"Functional-sampling"=>ϵ_fun_sampl,
-  "Standard-nested"=>ϵ_nest,"Functional-nested"=>ϵ_fun_nest,
-  "Standard-sampling-nested"=>ϵ_sampl_nest,
-  "Functional-sampling-nested"=>ϵ_fun_sampl_nest)
+  "Standard-nested"=>ϵ_nest,"Functional-nested"=>ϵ_fun_nest)
 
   plots_dir = joinpath(root,"plots")
   create_dir(plots_dir)

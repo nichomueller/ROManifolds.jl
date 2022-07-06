@@ -30,9 +30,6 @@ function select_RB_method(
   if add_info["fun_M_DEIM"]
     RB_method *= "_fun"
   end
-  if add_info["sampl_M_DEIM"]
-    RB_method *= "_sampl"
-  end
 
   RB_method *= tol
 
