@@ -18,32 +18,28 @@ function get_snapshot_matrix(
 end
 
 function get_norm_matrix(
-  RBInfo::ROMInfoSteady,
+  RBInfo::Info,
   RBVars::StokesSteady{T}) where T
+
+  get_norm_matrix(RBInfo, RBVars.P)
 
   if check_norm_matrix(RBVars)
 
-    println("Importing the norm matrices Xᵘ₀, Xᵘ, Xᵖ₀")
+    println("Importing the norm matrices Xᵘ, Xᵖ₀")
 
-    Xᵘ₀ = load_CSV(sparse([],[],T[]),
-      joinpath(RBInfo.paths.FEM_structures_path, "Xᵘ₀.csv"))
     Xᵘ = load_CSV(sparse([],[],T[]),
       joinpath(RBInfo.paths.FEM_structures_path, "Xᵘ.csv"))
     Xᵖ₀ = load_CSV(sparse([],[],T[]),
       joinpath(RBInfo.paths.FEM_structures_path, "Xᵖ₀.csv"))
-    RBVars.Nₛᵘ = size(Xᵘ₀)[1]
     RBVars.Nₛᵖ = size(Xᵖ₀)[1]
-    println("Dimension of H¹ norm matrix, field u: $(size(Xᵘ₀))")
     println("Dimension of L² norm matrix, field p: $(size(Xᵖ₀))")
 
     if RBInfo.use_norm_X
-      RBVars.Xᵘ₀ = Xᵘ₀
       RBVars.Xᵘ = Xᵘ
       RBVars.Xᵖ₀ = Xᵖ₀
     else
-      RBVars.Xᵘ₀ = 1.0sparse(I(RBVars.Nₛᵘ),RBVars.Nₛᵘ,RBVars.Nₛᵘ)
-      RBVars.Xᵘ = 1.0sparse(I(RBVars.Nₛᵘ),RBVars.Nₛᵘ,RBVars.Nₛᵘ)
-      RBVars.Xᵖ₀ = 1.0sparse(I(RBVars.Nₛᵖ),RBVars.Nₛᵖ,RBVars.Nₛᵖ)
+      RBVars.Xᵘ = one(T)*sparse(I,RBVars.P.Nₛᵘ,RBVars.P.Nₛᵘ)
+      RBVars.Xᵖ₀ = one(T)*sparse(I,RBVars.Nₛᵖ,RBVars.Nₛᵖ)
     end
 
   end
@@ -51,11 +47,11 @@ function get_norm_matrix(
 end
 
 function check_norm_matrix(RBVars::StokesSteady)
-  isempty(RBVars.Xᵘ₀) || isempty(RBVars.Xᵘ) || isempty(RBVars.Xᵖ₀)
+  isempty(RBVars.Xᵘ) || isempty(RBVars.Xᵖ₀)
 end
 
 function PODs_space(
-  RBInfo::ROMInfoSteady,
+  RBInfo::Info,
   RBVars::StokesSteady)
 
   PODs_space(RBInfo,RBVars.P)
@@ -68,35 +64,34 @@ function PODs_space(
 end
 
 function primal_supremizers(
-  RBInfo::ROMInfoSteady,
+  RBInfo::Info,
   RBVars::StokesSteady{T}) where T
 
   println("Computing primal supremizers")
 
-  dir_idx = abs.(diag(RBVars.Xᵘ) .- 1) .< 1e-16
+  #dir_idx = abs.(diag(RBVars.Xᵘ) .- 1) .< 1e-16
 
-  constraint_mat = load_CSV(Matrix{T}(undef,0,0),
-    joinpath( RBInfo.paths.FEM_structures_path, "B.csv"); true)'
-  constraint_mat[dir_idx[dir_idx≤RBVars.Nₛᵘ*RBVars.Nₛᵖ]] = 0
+  constraint_mat = load_CSV(sparse([],[],T[]),
+    joinpath(RBInfo.paths.FEM_structures_path, "B.csv"))'
+  #constraint_mat[dir_idx[dir_idx≤RBVars.P.Nₛᵘ*RBVars.Nₛᵖ]] = 0
 
-  supr_primal = Matrix{T}(solve(PardisoSolver(),
-    RBVars.Xᵘ, constraint_mat * RBVars.Φₛᵖ))
+  supr_primal = Matrix{T}(RBVars.Xᵘ) \ (Matrix{T}(constraint_mat) * RBVars.Φₛᵖ)
 
   min_norm = 1e16
   for i = 1:size(supr_primal)[2]
 
     println("Normalizing primal supremizer $i")
 
-    for j in 1:RBVars.nₛᵘ
-      supr_primal[:, i] -= mydot(supr_primal[:, i], RBVars.Φₛᵘ[:,j], RBVars.Xᵘ₀) /
-      mynorm(RBVars.Φₛᵘ[:,j], RBVars.Xᵘ₀) * RBVars.Φₛᵘ[:,j]
+    for j in 1:RBVars.P.nₛᵘ
+      supr_primal[:, i] -= mydot(supr_primal[:, i], RBVars.P.Φₛᵘ[:,j], RBVars.P.Xᵘ₀) /
+      mynorm(RBVars.P.Φₛᵘ[:,j], RBVars.P.Xᵘ₀) * RBVars.P.Φₛᵘ[:,j]
     end
-    for j in range(i)
-      supr_primal[:, i] -= mydot(supr_primal[:, i], supr_primal[:, j], RBVars.Xᵘ₀) /
-      mynorm(supr_primal[:, j], RBVars.Xᵘ₀) * supr_primal[:, j]
+    for j in 1:i
+      supr_primal[:, i] -= mydot(supr_primal[:, i], supr_primal[:, j], RBVars.P.Xᵘ₀) /
+      mynorm(supr_primal[:, j], RBVars.P.Xᵘ₀) * supr_primal[:, j]
     end
 
-    supr_norm = mynorm(supr_primal[:, i], RBVars.Xᵘ₀)
+    supr_norm = mynorm(supr_primal[:, i], RBVars.P.Xᵘ₀)
     min_norm = min(supr_norm, min_norm)
     println("Norm supremizers: $supr_norm")
     supr_primal[:, i] /= supr_norm
@@ -114,8 +109,8 @@ function supr_enrichment_space(
   RBVars::StokesSteady)
 
   supr_primal = primal_supremizers(RBInfo, RBVars)
-  RBVars.Φₛᵘ = hcat(RBVars.Φₛᵘ, supr_primal)
-  RBVars.nₛᵘ = size(RBVars.Φₛᵘ)[2]
+  RBVars.P.Φₛᵘ = hcat(RBVars.P.Φₛᵘ, supr_primal)
+  RBVars.P.nₛᵘ = size(RBVars.P.Φₛᵘ)[2]
 
 end
 
@@ -123,13 +118,13 @@ function build_reduced_basis(
   RBInfo::ROMInfoSteady,
   RBVars::StokesSteady)
 
-  RBVars.offline_time += @elapsed begin
+  RBVars.P.offline_time += @elapsed begin
     PODs_space(RBInfo, RBVars)
     supr_enrichment_space(RBInfo, RBVars)
   end
 
   if RBInfo.save_offline_structures
-    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.paths.basis_path,"Φₛᵘ.csv"))
+    save_CSV(RBVars.P.Φₛᵘ, joinpath(RBInfo.paths.basis_path,"Φₛᵘ.csv"))
     save_CSV(RBVars.Φₛᵖ, joinpath(RBInfo.paths.basis_path,"Φₛᵖ.csv"))
   end
 
@@ -169,7 +164,7 @@ function get_generalized_coordinates(
 end
 
 function set_operators(
-  RBInfo::ROMInfoSteady,
+  RBInfo::Info,
   RBVars::StokesSteady)
 
   append!(["B"], set_operators(RBInfo, RBVars.P))
@@ -225,7 +220,7 @@ function get_offline_structures(
 end
 
 function get_system_blocks(
-  RBInfo::ROMInfoSteady,
+  RBInfo::Info,
   RBVars::StokesSteady,
   LHS_blocks::Vector{Int64},
   RHS_blocks::Vector{Int64})
@@ -235,7 +230,7 @@ function get_system_blocks(
 end
 
 function save_system_blocks(
-  RBInfo::ROMInfoSteady,
+  RBInfo::Info,
   RBVars::StokesSteady,
   LHS_blocks::Vector{Int64},
   RHS_blocks::Vector{Int64},
@@ -292,7 +287,7 @@ function get_RB_system(
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
 
-  RBVars.online_time = @elapsed begin
+  RBVars.P.online_time = @elapsed begin
     get_Q(RBInfo, RBVars)
     LHS_blocks = [1, 2, 3]
     RHS_blocks = [1]
@@ -302,13 +297,13 @@ function get_RB_system(
 
     if "LHS" ∈ operators
       println("Assembling reduced LHS")
-      push!(RBVars.LHSₙ, get_RB_LHS_blocks(RBInfo, RBVars, θᵃ, θᵇ))
+      push!(RBVars.P.LHSₙ, get_RB_LHS_blocks(RBInfo, RBVars, θᵃ, θᵇ))
     end
 
     if "RHS" ∈ operators
       if !RBInfo.build_parametric_RHS
         println("Assembling reduced RHS")
-        push!(RBVars.RHSₙ, get_RB_RHS_blocks(RBInfo, RBVars, θᶠ, θʰ))
+        push!(RBVars.P.RHSₙ, get_RB_RHS_blocks(RBInfo, RBVars, θᶠ, θʰ))
       else
         println("Assembling reduced RHS exactly")
         build_param_RHS(FEMSpace, RBInfo, RBVars, Param)
@@ -328,15 +323,15 @@ function solve_RB_system(
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
   println("Solving RB problem via backslash")
-  println("Condition number of the system's matrix: $(cond(RBVars.LHSₙ[1]))")
-  RBVars.online_time += @elapsed begin
-    xₙ = (vcat(hcat(RBVars.LHSₙ[1], RBVars.LHSₙ[2]),
-      hcat(RBVars.LHSₙ[3], zeros(T, RBVars.nₛᵖ, RBVars.nₛᵖ))) \
-      vcat(RBVars.RHSₙ[1], zeros(T, RBVars.nₛᵖ, 1)))
+  println("Condition number of the system's matrix: $(cond(RBVars.P.LHSₙ[1]))")
+  RBVars.P.online_time += @elapsed begin
+    xₙ = (vcat(hcat(RBVars.P.LHSₙ[1], RBVars.P.LHSₙ[2]),
+      hcat(RBVars.P.LHSₙ[3], zeros(T, RBVars.nₛᵖ, RBVars.nₛᵖ))) \
+      vcat(RBVars.P.RHSₙ[1], zeros(T, RBVars.nₛᵖ, 1)))
   end
 
-  RBVars.uₙ = xₙ[1:RBVars.nₛᵘ,:]
-  RBVars.pₙ = xₙ[RBVars.nₛᵘ+1:end,:]
+  RBVars.P.uₙ = xₙ[1:RBVars.P.nₛᵘ,:]
+  RBVars.pₙ = xₙ[RBVars.P.nₛᵘ+1:end,:]
 
 end
 
@@ -397,17 +392,17 @@ function online_phase(
 
   mean_H1_err = 0.0
   mean_L2_err = 0.0
-  mean_pointwise_err_u = zeros(T, RBVars.Nₛᵘ)
+  mean_pointwise_err_u = zeros(T, RBVars.P.Nₛᵘ)
   mean_pointwise_err_p = zeros(T, RBVars.Nₛᵖ)
   mean_online_time = 0.0
   mean_reconstruction_time = 0.0
 
   get_norm_matrix(RBInfo, RBVars)
 
-  ũ_μ = zeros(T, RBVars.Nₛᵘ, length(param_nbs))
-  uₙ_μ = zeros(T, RBVars.nₛᵘ, length(param_nbs))
-  p̃_μ = zeros(T, RBVars.Nₛᵘ, length(param_nbs))
-  pₙ_μ = zeros(T, RBVars.nₛᵘ, length(param_nbs))
+  ũ_μ = zeros(T, RBVars.P.Nₛᵘ, length(param_nbs))
+  uₙ_μ = zeros(T, RBVars.P.nₛᵘ, length(param_nbs))
+  p̃_μ = zeros(T, RBVars.P.Nₛᵘ, length(param_nbs))
+  pₙ_μ = zeros(T, RBVars.P.nₛᵘ, length(param_nbs))
 
   for nb in param_nbs
     println("Considering Parameter number: $nb")
@@ -423,23 +418,23 @@ function online_phase(
     reconstruction_time = @elapsed begin
       reconstruct_FEM_solution(RBVars)
     end
-    mean_online_time = RBVars.online_time / length(param_nbs)
+    mean_online_time = RBVars.P.online_time / length(param_nbs)
     mean_reconstruction_time = reconstruction_time / length(param_nbs)
 
-    H1_err_nb = compute_errors(uₕ_test, RBVars, RBVars.Xᵘ₀)
+    H1_err_nb = compute_errors(uₕ_test, RBVars, RBVars.P.Xᵘ₀)
     mean_H1_err += H1_err_nb / length(param_nbs)
-    mean_pointwise_err_u += abs.(uₕ_test - RBVars.ũ) / length(param_nbs)
+    mean_pointwise_err_u += abs.(uₕ_test - RBVars.P.ũ) / length(param_nbs)
 
     L2_err_nb = compute_errors(pₕ_test, RBVars, RBVars.Xᵖ₀)
     mean_L2_err += L2_err_nb / length(param_nbs)
     mean_pointwise_err_p += abs.(pₕ_test - RBVars.p̃) / length(param_nbs)
 
-    ũ_μ[:, nb - param_nbs[1] + 1] = RBVars.ũ
-    uₙ_μ[:, nb - param_nbs[1] + 1] = RBVars.uₙ
+    ũ_μ[:, nb - param_nbs[1] + 1] = RBVars.P.ũ
+    uₙ_μ[:, nb - param_nbs[1] + 1] = RBVars.P.uₙ
     p̃_μ[:, nb - param_nbs[1] + 1] = RBVars.p̃
     pₙ_μ[:, nb - param_nbs[1] + 1] = RBVars.pₙ
 
-    println("Online wall time: $(RBVars.online_time) s (snapshot number $nb)")
+    println("Online wall time: $(RBVars.P.online_time) s (snapshot number $nb)")
     println("Relative reconstruction H1-error: $H1_err_nb (snapshot number $nb)")
     println("Relative reconstruction L2-error: $L2_err_nb (snapshot number $nb)")
 
@@ -464,7 +459,7 @@ function online_phase(
     save_CSV([mean_L2_err], joinpath(path_μ, "L2_err.csv"))
 
     if !RBInfo.import_offline_structures
-      times = Dict(RBVars.offline_time=>"off_time",
+      times = Dict(RBVars.P.offline_time=>"off_time",
         mean_online_time=>"on_time", mean_reconstruction_time=>"rec_time")
     else
       times = Dict(mean_online_time=>"on_time",

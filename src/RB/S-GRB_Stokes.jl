@@ -7,14 +7,14 @@ function get_Aₙ(
 end
 
 function get_Bₙ(
-  RBInfo::Info,
-  RBVars::StokesSGRB)
+  RBInfo::Info{T},
+  RBVars::StokesSGRB) where T
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Bₙ.csv"))
-    println("Importing reduced affine stiffness matrix")
+    println("Importing reduced affine divergence matrix")
     Bₙ = load_CSV(Matrix{T}(undef,0,0),
       joinpath(RBInfo.paths.ROM_structures_path, "Bₙ.csv"))
-    RBVars.Bₙ = reshape(Bₙ,RBVars.nₛᵖ,RBVars.nₛᵘ,:)
+    RBVars.Bₙ = reshape(Bₙ,RBVars.nₛᵖ,RBVars.P.nₛᵘ,:)
     return [""]
   else
     println("Failed to import Bₙ: must build it")
@@ -95,17 +95,12 @@ function assemble_offline_structures(
 
   RBVars.offline_time += @elapsed begin
     if "B" ∈ operators
-      if !RBInfo.probl_nl["B"]
-        assemble_affine_matrices(RBInfo, RBVars, "B")
-      else
-        assemble_MDEIM_matrices(RBInfo, RBVars, "B")
-      end
+      assemble_affine_matrices(RBInfo, RBVars, "B")
     end
 
   end
 
   save_affine_structures(RBInfo, RBVars)
-  #save_M_DEIM_structures(RBInfo, RBVars)
 
 end
 
@@ -145,13 +140,13 @@ function get_RB_LHS_blocks(
   θᵃ::Matrix,
   θᵇ::Matrix) where T
 
-  Aₙ_μ =  assemble_parametric_structure(θᵃ, RBVars.Aₙ)
+  Aₙ_μ =  assemble_parametric_structure(θᵃ, RBVars.P.Aₙ)
   Bₙ_μ =  assemble_parametric_structure(θᵇ, RBVars.Bₙ)
 
-  push!(RBVars.S.LHSₙ, Aₙ_μ)
-  push!(RBVars.S.LHSₙ, -Bₙ_μ')
-  push!(RBVars.S.LHSₙ, Bₙ_μ)
-  push!(RBVars.S.LHSₙ, Matrix{T}[])
+  push!(RBVars.P.LHSₙ, Aₙ_μ)
+  push!(RBVars.P.LHSₙ, -Bₙ_μ')
+  push!(RBVars.P.LHSₙ, Bₙ_μ)
+  push!(RBVars.P.LHSₙ, Matrix{T}(undef,0,0))
 
 end
 
@@ -161,11 +156,11 @@ function get_RB_RHS_blocks(
   θᶠ::Matrix,
   θʰ::Matrix) where T
 
-  Fₙ_μ = assemble_parametric_structure(θᶠ, RBVars.Fₙ)
-  Hₙ_μ = assemble_parametric_structure(θʰ, RBVars.Hₙ)
+  Fₙ_μ = assemble_parametric_structure(θᶠ, RBVars.P.Fₙ)
+  Hₙ_μ = assemble_parametric_structure(θʰ, RBVars.P.Hₙ)
 
-  push!(RBVars.S.RHSₙ, Fₙ_μ + Hₙ_μ)
-  push!(RBVars.S.RHSₙ, Matrix{T}[])
+  push!(RBVars.P.RHSₙ, Fₙ_μ + Hₙ_μ)
+  push!(RBVars.P.RHSₙ, Matrix{T}(undef,0,0))
 
 end
 
@@ -178,11 +173,11 @@ function build_param_RHS(
 
   F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
   H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
-  Fₙ_μ = reshape((RBVars.Φₛᵘ)'*F,:,1)::Matrix{T}
-  Hₙ_μ = reshape((RBVars.Φₛᵘ)'*H,:,1)::Matrix{T}
+  Fₙ_μ = reshape((RBVars.P.Φₛᵘ)'*F,:,1)::Matrix{T}
+  Hₙ_μ = reshape((RBVars.P.Φₛᵘ)'*H,:,1)::Matrix{T}
 
-  push!(RBVars.S.RHSₙ, Fₙ_μ + Hₙ_μ)
-  push!(RBVars.S.RHSₙ, Matrix{T}[])
+  push!(RBVars.P.RHSₙ, Fₙ_μ + Hₙ_μ)
+  push!(RBVars.P.RHSₙ, zeros(RBVars.nₛᵖ,1))
 
 end
 
@@ -201,6 +196,6 @@ function get_θ(
     θᶠ, θʰ = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
   end =#
 
-  return get_θ(FEMSpace, RBInfo, RBVars.P, Param), θᵇ
+  return get_θ(FEMSpace, RBInfo, RBVars.P, Param)..., θᵇ
 
 end

@@ -115,14 +115,24 @@ function build_sparse_mat(
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
 
-  if var == "A"
-    Mat = assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Param.α*∇(FEMSpace.ϕᵤ)))*dΩ_sparse,
-      FEMSpace.V, FEMSpace.V₀)
-  else
-    error("Unrecognized sparse matrix")
+  function define_Mat(::FEMSpacePoissonSteady, var::String)
+    if var == "A"
+      return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Param.α*∇(FEMSpace.ϕᵤ)))*dΩ_sparse,
+        FEMSpace.V, FEMSpace.V₀)
+    else
+      error("Unrecognized sparse matrix")
+    end
+  end
+  function define_Mat(::FEMSpaceStokesSteady, var::String)
+    if var == "A"
+      return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Param.α*∇(FEMSpace.ϕᵤ)))*dΩ_sparse,
+        FEMSpace.V, FEMSpace.V₀)
+    else
+      error("Unrecognized sparse matrix")
+    end
   end
 
-  Mat::SparseMatrixCSC{T, Int64}
+  define_Mat(FEMSpace, var)::SparseMatrixCSC{T, Int64}
 
 end
 
@@ -138,7 +148,7 @@ function build_sparse_mat(
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
   Nₜ = length(timesθ)
 
-  function define_Matₜ(t::Real, var::String)
+  function define_Matₜ(::FEMSpacePoissonUnsteady, t::Real, var::String)
     if var == "A"
       return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Param.α(t)*∇(FEMSpace.ϕᵤ(t))))*dΩ_sparse,
         FEMSpace.V(t), FEMSpace.V₀)
@@ -149,7 +159,18 @@ function build_sparse_mat(
       error("Unrecognized sparse matrix")
     end
   end
-  Matₜ(t) = define_Matₜ(t, var)
+  function define_Matₜ(::FEMSpaceStokesUnsteady, t::Real, var::String)
+    if var == "A"
+      return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Param.α(t)*∇(FEMSpace.ϕᵤ(t))))*dΩ_sparse,
+        FEMSpace.V(t), FEMSpace.V₀)
+    elseif var == "M"
+      return assemble_matrix(∫(FEMSpace.ϕᵥ⋅(Param.m(t)*FEMSpace.ϕᵤ(t)))*dΩ_sparse,
+        FEMSpace.V(t), FEMSpace.V₀)
+    else
+      error("Unrecognized sparse matrix")
+    end
+  end
+  Matₜ(t) = define_Matₜ(FEMSpace, t, var)
 
   for (i_t,t) in enumerate(timesθ)
     i,j,v = findnz(Matₜ(t))::Tuple{Vector{Int},Vector{Int},Vector{T}}
@@ -205,18 +226,19 @@ function compute_errors(
 end
 
 function compute_errors(
-  uₕ::Matrix,
   RBVars::RBUnsteadyProblem{T},
+  uₕ::Matrix,
+  ũ::Matrix,
   norm_matrix = nothing) where T
 
-  H1_err = zeros(T, RBVars.Nₜ)
-  H1_sol = zeros(T, RBVars.Nₜ)
+  norm_err = zeros(T, RBVars.Nₜ)
+  norm_sol = zeros(T, RBVars.Nₜ)
 
   @simd for i = 1:RBVars.Nₜ
-    H1_err[i] = mynorm(uₕ[:, i] - RBVars.S.ũ[:, i], norm_matrix)
-    H1_sol[i] = mynorm(uₕ[:, i], norm_matrix)
+    norm_err[i] = mynorm(uₕ[:, i] - ũ[:, i], norm_matrix)
+    norm_sol[i] = mynorm(uₕ[:, i], norm_matrix)
   end
 
-  return H1_err ./ H1_sol, norm(H1_err) / norm(H1_sol)
+  return norm_err ./ norm_sol, norm(norm_err) / norm(norm_sol)
 
 end

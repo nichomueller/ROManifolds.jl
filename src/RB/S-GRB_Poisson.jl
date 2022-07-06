@@ -79,12 +79,12 @@ function assemble_affine_vectors(
   if var == "F"
     RBVars.Qᶠ = 1
     println("Assembling affine reduced forcing term")
-    F = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_structures_path, "F.csv"))
+    F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.FEM_structures_path, "F.csv"))
     RBVars.Fₙ = (RBVars.Φₛᵘ)' * F
   elseif var == "H"
     RBVars.Qʰ = 1
     println("Assembling affine reduced Neumann term")
-    H = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_structures_path, "H.csv"))
+    H = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.FEM_structures_path, "H.csv"))
     RBVars.Hₙ = (RBVars.Φₛᵘ)' * H
   else
     error("Unrecognized variable to load")

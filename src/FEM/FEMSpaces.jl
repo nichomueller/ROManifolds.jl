@@ -37,14 +37,14 @@ end
 
 function get_lagrangianQuad_info(
   ::SteadyInfo{T},
-  model::DiscreteModel,
+  model::DiscreteModel{Dc,Dp},
   Ω::BodyFittedTriangulation,
-  Qₕ::CellQuadrature) where T
+  Qₕ::CellQuadrature) where {Dc,Dp,T}
 
   ξₖ = get_cell_map(Ω)
   Qₕ_cell_point = get_cell_points(Qₕ)
   qₖ = get_data(Qₕ_cell_point)
-  phys_quadp = lazy_map(evaluate,ξₖ,qₖ)::LazyArray
+  phys_quadp = collect(lazy_map(evaluate,ξₖ,qₖ))::Vector{Vector{VectorValue{Dp,T}}}
   refFE_quad = Gridap.ReferenceFE(lagrangianQuad,T,FEMInfo.order)
   V₀_quad = TestFESpace(model,refFE_quad,conformity=:L2)
 
@@ -54,14 +54,14 @@ end
 
 function get_lagrangianQuad_info(
   ::UnsteadyInfo{T},
-  model::DiscreteModel,
+  model::DiscreteModel{Dc,Dp},
   Ω::BodyFittedTriangulation,
-  Qₕ::CellQuadrature) where T
+  Qₕ::CellQuadrature) where {Dc,Dp,T}
 
   ξₖ = get_cell_map(Ω)
   Qₕ_cell_point = get_cell_points(Qₕ)
   qₖ = get_data(Qₕ_cell_point)
-  phys_quadp = lazy_map(evaluate,ξₖ,qₖ)::LazyArray
+  phys_quadp = collect(lazy_map(evaluate,ξₖ,qₖ))::Vector{Vector{VectorValue{Dp,T}}}
   refFE_quad = Gridap.ReferenceFE(lagrangianQuad,T,FEMInfo.order)
   V₀_quad = TestFESpace(model,refFE_quad,conformity=:L2)
 

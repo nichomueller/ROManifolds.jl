@@ -1,30 +1,52 @@
 function check_dataset(
-  FEMSpace::FEMProblem,
-  RBInfo::Info,
+  RBInfo::Info{T},
   RBVars::PoissonUnsteady,
-  nb::Int64)
+  nb::Int64) where T
 
-  μ = load_CSV(Array{Float64}[],joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  Param = get_ParamInfo(RBInfo, problem_id, μ[nb])
+  RBVars.Nₜ = Int(RBInfo.tₗ / RBInfo.δt)
+  get_snapshot_matrix(RBInfo, RBVars)
 
-  u1 = RBVars.S.Sᵘ[:,(nb-1)*RBVars.Nₜ+1]
-  u2 = RBVars.S.Sᵘ[:,(nb-1)*RBVars.Nₜ+2]
-  M = assemble_FEM_structure(FEMSpace, RBInfo, Param, "M")(0.0)
-  # we suppose that case == 1 --> no need to multiply A by αₜ
-  A(t) = assemble_FEM_structure(FEMSpace, RBInfo, Param, "A")(t)
-  F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")(0.0)
-  H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")(0.0)
+  μ = load_CSV(Array{T}[],
+    joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))::Vector{Vector{T}}
+  model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
+  FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id,RBInfo.FEMInfo,model)
+  Param = get_ParamInfo(RBInfo, μ[nb])
 
   t¹_θ = RBInfo.t₀+RBInfo.δt*RBInfo.θ
   t²_θ = t¹_θ+RBInfo.δt
 
-  LHS1 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A(t¹_θ))
-  RHS1 = RBInfo.δt*RBInfo.θ*(F*Param.fₜ(t¹_θ)+H*Param.hₜ(t¹_θ))
-  my_u1 = LHS1\RHS1
+  u1 = RBVars.S.Sᵘ[:,(nb-1)*RBVars.Nₜ+1]
+  u2 = RBVars.S.Sᵘ[:,(nb-1)*RBVars.Nₜ+2]
+  M = assemble_FEM_structure(FEMSpace, RBInfo, Param, "M")(0.0)
+  H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")(0.0)
 
-  LHS2 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A(t²_θ))
-  mat = (1-RBInfo.θ)*(M+RBInfo.δt*RBInfo.θ*A(t²_θ))-M
-  RHS2 = RBInfo.δt*RBInfo.θ*(F*Param.fₜ(t²_θ)+H*Param.hₜ(t²_θ))-mat*u1
+  if RBInfo.case == 0
+    A = assemble_FEM_structure(FEMSpace, RBInfo, Param, "A")(0.0)
+    F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")(0.0)
+    LHS1 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A*Param.αₜ(t¹_θ))
+    RHS1 = RBInfo.δt*RBInfo.θ*(F*Param.fₜ(t¹_θ)+H*Param.hₜ(t¹_θ))
+    LHS2 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A*Param.αₜ(t²_θ))
+    mat = (1-RBInfo.θ)*(M+RBInfo.δt*RBInfo.θ*A*Param.αₜ(t²_θ))-M
+    RHS2 = RBInfo.δt*RBInfo.θ*(F*Param.fₜ(t²_θ)+H*Param.hₜ(t²_θ))-mat*u1
+  elseif RBInfo.case == 1
+    A = assemble_FEM_structure(FEMSpace, RBInfo, Param, "A")
+    F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")(0.0)
+    LHS1 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A(t¹_θ))
+    RHS1 = RBInfo.δt*RBInfo.θ*(F*Param.fₜ(t¹_θ)+H*Param.hₜ(t¹_θ))
+    LHS2 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A(t²_θ))
+    mat = (1-RBInfo.θ)*(M+RBInfo.δt*RBInfo.θ*A(t²_θ))-M
+    RHS2 = RBInfo.δt*RBInfo.θ*(F*Param.fₜ(t²_θ)+H*Param.hₜ(t²_θ))-mat*u1
+  else
+    A = assemble_FEM_structure(FEMSpace, RBInfo, Param, "A")
+    F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
+    LHS1 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A(t¹_θ))
+    RHS1 = RBInfo.δt*RBInfo.θ*(F(t¹_θ)+H*Param.hₜ(t¹_θ))
+    LHS2 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A(t²_θ))
+    mat = (1-RBInfo.θ)*(M+RBInfo.δt*RBInfo.θ*A(t²_θ))-M
+    RHS2 = RBInfo.δt*RBInfo.θ*(F(t²_θ)+H*Param.hₜ(t²_θ))-mat*u1
+  end
+
+  my_u1 = LHS1\RHS1
   my_u2 = LHS2\RHS2
 
   u1≈my_u1 && u2≈my_u2

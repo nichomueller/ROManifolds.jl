@@ -371,8 +371,8 @@ end
 function get_RB_system(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonSTGRB{T},
-  Param::ParametricInfoUnsteady) where T
+  RBVars::PoissonSTGRB,
+  Param::ParametricInfoUnsteady)
 
   initialize_RB_system(RBVars.S)
   initialize_online_time(RBVars.S)

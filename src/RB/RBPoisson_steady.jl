@@ -23,11 +23,11 @@ function get_norm_matrix(
     println("Importing the norm matrix Xᵘ₀")
     Xᵘ₀ = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "Xᵘ₀.csv"))
     RBVars.Nₛᵘ = size(Xᵘ₀)[1]
-    println("Dimension of norm matrix: $(size(Xᵘ₀))")
+    println("Dimension of norm matrix, field u: $(size(Xᵘ₀))")
     if RBInfo.use_norm_X
       RBVars.Xᵘ₀ = Xᵘ₀
     else
-      RBVars.Xᵘ₀ = 1.0sparse(I,RBVars.Nₛᵘ,RBVars.Nₛᵘ)
+      RBVars.Xᵘ₀ = one(T)*sparse(I,RBVars.Nₛᵘ,RBVars.Nₛᵘ)
     end
   end
 
