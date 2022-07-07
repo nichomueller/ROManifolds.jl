@@ -151,10 +151,10 @@ function import_reduced_basis(
   println("Importing the reduced basis for field p")
 
   RBVars.S.Φₛᵖ = load_CSV(Matrix{T}(undef,0,0),
-    joinpath( RBInfo.paths.basis_path, "Φₛᵖ.csv"))
+    joinpath(RBInfo.paths.basis_path, "Φₛᵖ.csv"))
   RBVars.S.nₛᵖ = size(RBVars.S.Φₛᵖ)[2]
   RBVars.Φₜᵖ = load_CSV(Matrix{T}(undef,0,0),
-    joinpath( RBInfo.paths.basis_path, "Φₜᵖ.csv"))
+    joinpath(RBInfo.paths.basis_path, "Φₜᵖ.csv"))
   RBVars.nₜᵖ = size(RBVars.Φₜᵖ)[2]
   RBVars.nᵖ = RBVars.S.nₛᵖ * RBVars.nₜᵖ
 

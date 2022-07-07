@@ -3,7 +3,7 @@ function get_MΦ(RBInfo::Problem, RBVars::PoissonSTPGRB)
 
   println("S-PGRB: fetching the matrix AΦᵀPᵤ⁻¹")
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MΦ.csv"))
-    MΦ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path, "MΦ.csv"))
+    MΦ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "MΦ.csv"))
     RBVars.MΦ = reshape(MΦ,RBVars.steady_info.Nₛᵘ,RBVars.steady_info.nₛᵘ,:)
     return
   else
@@ -23,7 +23,7 @@ function get_MAₙ(RBInfo::Problem, RBVars::PoissonSTPGRB)
   println("S-PGRB: fetching the matrix MAₙ")
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MAₙ.csv"))
     println("Importing reduced affine matrix MAₙ")
-    RBVars.MAₙ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path, "MAₙ.csv"))
+    RBVars.MAₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "MAₙ.csv"))
     return
   else
     if !RBInfo.probl_nl["M"]
@@ -46,7 +46,7 @@ function assemble_affine_matrices(RBInfo::Problem, RBVars::PoissonSTPGRB, var::S
   if var === "M"
     RBVars.Qᵐ = 1
     println("Assembling affine reduced mass")
-    M = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_structures_path, "M.csv"); convert_to_sparse = true)
+    M = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.FEM_structures_path, "M.csv"); convert_to_sparse = true)
     RBVars.Mₙ = zeros(RBVars.steady_info.nₛᵘ, RBVars.steady_info.nₛᵘ, RBVars.Qᵐ)
     RBVars.Mₙ[:,:,1] = (M*RBVars.steady_info.Φₛᵘ)' * RBVars.Pᵤ⁻¹ * (M*RBVars.steady_info.Φₛᵘ)
     RBVars.MΦ = zeros(RBVars.steady_info.Nₛᵘ, RBVars.steady_info.nₛᵘ, RBVars.Qᵐ)

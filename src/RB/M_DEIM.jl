@@ -42,7 +42,7 @@ function M_DEIM_offline(M_DEIM_mat::Matrix, Σ::Vector)
 
 end
 
-function MDEIM_offline(RBInfo::Info{T}, var::String) where T
+function MDEIM_offline(RBInfo::ROMInfoSteady{T}, var::String) where T
 
   println("Building $(RBInfo.nₛ_MDEIM) snapshots of $var")
 
@@ -61,6 +61,26 @@ function MDEIM_offline(RBInfo::Info{T}, var::String) where T
 
 end
 
+function MDEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
+
+  println("Building $(RBInfo.nₛ_MDEIM) snapshots of $var")
+
+  μ = load_CSV(Array{T}[],joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
+  model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
+  FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
+
+  MDEIM_mat, MDEIM_mat_time, Σ, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, μ, var)
+  MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat, Σ)
+  _, MDEIM_idx_time, _ = M_DEIM_offline(MDEIM_mat_time, Σ)
+  MDEIMᵢ_mat = MDEIM_mat[MDEIM_idx, :]
+  MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx, row_idx, FEMSpace.Nₛᵘ)
+  MDEIM_idx_sparse_space, _ = from_vec_to_mat_idx(MDEIM_idx_sparse, FEMSpace.Nₛᵘ)
+  el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(MDEIM_idx_sparse_space))
+
+  MDEIM_mat, MDEIM_idx_sparse, MDEIMᵢ_mat, row_idx, el, MDEIM_idx_time
+
+end
+
 function modify_timesθ_and_MDEIM_idx(
   MDEIM_idx::Vector{Int64},
   RBInfo::ROMInfoUnsteady,
@@ -74,7 +94,7 @@ function modify_timesθ_and_MDEIM_idx(
   timesθ_mod, MDEIM_idx_mod
 end
 
-function DEIM_offline(RBInfo::Info{T}, var::String) where T
+function DEIM_offline(RBInfo::ROMInfoSteady{T}, var::String) where T
 
   println("Building $(RBInfo.nₛ_DEIM) snapshots of $var")
 
@@ -92,6 +112,28 @@ function DEIM_offline(RBInfo::Info{T}, var::String) where T
   end
 
   DEIM_mat, DEIM_idx, DEIMᵢ_mat, el
+
+end
+
+function DEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
+
+  println("Building $(RBInfo.nₛ_DEIM) snapshots of $var")
+
+  μ = load_CSV(Array{T}[], joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
+  model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
+  FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
+
+  DEIM_mat, DEIM_mat_time, Σ = get_snaps_DEIM(FEMSpace, RBInfo, μ, var)
+  DEIM_mat, DEIM_idx, DEIM_err_bound = M_DEIM_offline(DEIM_mat, Σ)
+  _, DEIM_idx_time, _ = M_DEIM_offline(DEIM_mat_time, Σ)
+  DEIMᵢ_mat = DEIM_mat[DEIM_idx, :]
+  if var == "H"
+    el = find_FE_elements(FEMSpace.V₀, FEMSpace.Γn, unique(DEIM_idx))
+  else
+    el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(DEIM_idx))
+  end
+
+  DEIM_mat, DEIM_idx, DEIMᵢ_mat, el, DEIM_idx_time
 
 end
 

@@ -76,18 +76,21 @@ function standard_MDEIM(
   timesθ::Vector,
   var="A") where T
 
-  snaps,row_idx,Σ = Matrix{T}(undef,0,0),Int64[],Vector{T}(undef,0)
+  snaps,snaps_time,row_idx,Σ = Matrix{T}(undef,0,0),Matrix{T}(undef,0,0),Int64[],Int64[]
   @simd for k = 1:RBInfo.nₛ_MDEIM
     println("Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)")
     snapsₖ,row_idx = build_matrix_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
     snapsₖ,Σ = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
+    snapsₖ_time,_ = M_DEIM_POD(Matrix{T}(snaps')::Matrix{T}, RBInfo.ϵₛ)
     if k == 1
       snaps = snapsₖ
+      snaps_time = snapsₖ_time
     else
       snaps,Σ = M_DEIM_POD(hcat(snaps, snapsₖ), RBInfo.ϵₛ)
+      snaps_time,_ = M_DEIM_POD(hcat(snaps_time, snapsₖ_time), RBInfo.ϵₜ)
     end
   end
-  return snaps,Σ,row_idx
+  return snaps,snaps_time,Σ,row_idx
 end
 
 function functional_MDEIM(
@@ -127,7 +130,8 @@ function functional_MDEIM(
     snaps[:,q] = v
   end
   snaps, Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
-  return snaps, Σ, row_idx
+  snaps_time, _ = M_DEIM_POD(Matrix{T}(snaps')::Matrix{T},RBInfo.ϵₜ)
+  return snaps, snaps_time, Σ, row_idx
 end
 
 function spacetime_MDEIM(
@@ -161,15 +165,11 @@ function get_snaps_MDEIM(
 
   timesθ = get_timesθ(RBInfo)
 
-  if RBInfo.space_time_M_DEIM
-    snaps, Σ, row_idx = spacetime_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
-  elseif RBInfo.functional_M_DEIM
-    snaps, Σ, row_idx = functional_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
+  if RBInfo.functional_M_DEIM
+    return functional_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}, Vector{T}, Vector{Int}}
   else
-    snaps, Σ, row_idx = standard_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
+    return standard_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}, Vector{T}, Vector{Int}}
   end
-
-  return snaps, Σ, row_idx
 
 end
 
@@ -276,7 +276,8 @@ function functional_DEIM(
     snaps[:,q] = Vec_Θ(Θq)
   end
   snaps, Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
-  return snaps, Σ
+  snaps_time, _ = M_DEIM_POD(Matrix{T}(snaps')::Matrix{T},RBInfo.ϵₜ)
+  return snaps, snaps_time, Σ
 end
 
 function spacetime_DEIM(
@@ -309,15 +310,11 @@ function get_snaps_DEIM(
 
   timesθ = get_timesθ(RBInfo)
 
-  if RBInfo.space_time_M_DEIM
-    snaps, Σ = spacetime_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
-  elseif RBInfo.functional_M_DEIM
-    snaps, Σ = functional_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
+  if RBInfo.functional_M_DEIM
+    return functional_DEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}, Vector{T}}
   else
-    snaps, Σ = standard_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
+    return standard_DEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}, Vector{T}}
   end
-
-  return snaps, Σ
 
 end
 

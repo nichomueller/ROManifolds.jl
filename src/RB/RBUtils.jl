@@ -24,9 +24,6 @@ function select_RB_method(
   if add_info["nested_POD"]
     RB_method *= "_nest"
   end
-  if add_info["st_M_DEIM"]
-    RB_method *= "_st"
-  end
   if add_info["fun_M_DEIM"]
     RB_method *= "_fun"
   end

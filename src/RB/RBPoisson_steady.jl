@@ -68,7 +68,7 @@ function import_reduced_basis(
 
   println("Importing the spatial reduced basis for field u")
   RBVars.Φₛᵘ = load_CSV(Matrix{T}(undef,0,0),
-    joinpath( RBInfo.paths.basis_path, "Φₛᵘ.csv"))
+    joinpath(RBInfo.paths.basis_path, "Φₛᵘ.csv"))
   (RBVars.Nₛᵘ, RBVars.nₛᵘ) = size(RBVars.Φₛᵘ)
 
 end
@@ -182,14 +182,14 @@ function get_M_DEIM_structures(
 
     if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MDEIMᵢ_A.csv"))
       println("Importing MDEIM offline structures, A")
-      RBVars.MDEIMᵢ_A = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path,
+      RBVars.MDEIMᵢ_A = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path,
         "MDEIMᵢ_A.csv"))
-      RBVars.MDEIM_idx_A = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path,
-        "MDEIM_idx_A.csv"))[:]
-      RBVars.row_idx_A = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path,
-        "row_idx_A.csv"))[:]
-      RBVars.sparse_el_A = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path,
-        "sparse_el_A.csv"))[:]
+      RBVars.MDEIM_idx_A = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.paths.ROM_structures_path,
+        "MDEIM_idx_A.csv"))
+      RBVars.row_idx_A = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.paths.ROM_structures_path,
+        "row_idx_A.csv"))
+      RBVars.sparse_el_A = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.paths.ROM_structures_path,
+        "sparse_el_A.csv"))
       append!(operators, [])
     else
       println("Failed to import MDEIM offline structures,
@@ -210,10 +210,10 @@ function get_M_DEIM_structures(
         println("Importing DEIM offline structures, F")
         RBVars.DEIMᵢ_F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path,
           "DEIMᵢ_F.csv"))
-        RBVars.DEIM_idx_F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path,
-          "DEIM_idx_F.csv"))[:]
-        RBVars.sparse_el_F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path,
-          "sparse_el_F.csv"))[:]
+        RBVars.DEIM_idx_F = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.paths.ROM_structures_path,
+          "DEIM_idx_F.csv"))
+        RBVars.sparse_el_F = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.paths.ROM_structures_path,
+          "sparse_el_F.csv"))
         append!(operators, [])
       else
         println("Failed to import DEIM offline structures, F: must build them")
@@ -226,12 +226,12 @@ function get_M_DEIM_structures(
 
       if isfile(joinpath(RBInfo.paths.ROM_structures_path, "DEIMᵢ_H.csv"))
         println("Importing DEIM offline structures, H")
-        RBVars.DEIMᵢ_H = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path,
+        RBVars.DEIMᵢ_H = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path,
           "DEIMᵢ_H.csv"))
-        RBVars.DEIM_idx_H = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path,
-          "DEIM_idx_H.csv"))[:]
-        RBVars.sparse_el_H = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path,
-          "sparse_el_H.csv"))[:]
+        RBVars.DEIM_idx_H = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.paths.ROM_structures_path,
+          "DEIM_idx_H.csv"))
+        RBVars.sparse_el_H = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.paths.ROM_structures_path,
+          "sparse_el_H.csv"))
         append!(operators, [])
         return
       else
@@ -253,7 +253,7 @@ function get_Fₙ(
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Fₙ.csv"))
     println("Importing Fₙ")
-    RBVars.Fₙ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path, "Fₙ.csv"))
+    RBVars.Fₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "Fₙ.csv"))
     return [""]
   else
     println("Failed to import Fₙ: must build it")
@@ -268,7 +268,7 @@ function get_Hₙ(
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Hₙ.csv"))
     println("Importing Hₙ")
-    RBVars.Hₙ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path, "Hₙ.csv"))
+    RBVars.Hₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "Hₙ.csv"))
     return [""]
   else
     println("Failed to import Hₙ: must build it")

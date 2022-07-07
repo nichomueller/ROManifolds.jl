@@ -61,8 +61,8 @@ function import_reduced_basis(RBInfo, RBVars::RBProblem)
 
   println("Importing the reduced basis")
 
-  RBVars.Φₛᵘ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.basis_path, "Φₛᵘ.csv"))
-  RBVars.Φₜᵘ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.basis_path, "Φₜᵘ.csv"))
+  RBVars.Φₛᵘ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.basis_path, "Φₛᵘ.csv"))
+  RBVars.Φₜᵘ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.basis_path, "Φₜᵘ.csv"))
   (RBVars.Nₛᵘ, RBVars.nₛᵘ) = size(RBVars.Φₛᵘ)
   RBVars.nₜᵘ = size(RBVars.Φₜᵘ)[2]
   RBVars.nᵘ = RBVars.nₛᵘ * RBVars.nₜᵘ
@@ -76,7 +76,7 @@ function check_reduced_affine_components(RBInfo, RBVars::RBProblem)
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
     println("Importing reduced mass matrix")
-    RBVars.Mₙ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
+    RBVars.Mₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
   else
     println("Failed to import the reduced mass matrix: must build it")
     push!(operators, "M")
@@ -145,7 +145,7 @@ function check_affine_blocks(RBInfo, RBVars::RBProblem)
 
     if isfile(joinpath(RBInfo.paths.ROM_structures_path, LHSₙi * ".csv"))
       println("Importing block number $i of the reduced affine LHS")
-      push!(RBVars.LHSₙ, load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path, LHSₙi)))
+      push!(RBVars.LHSₙ, load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, LHSₙi)))
       RBVars.nₛᵘ = size(RBVars.LHSₙ[i])[1]
     else
       println("Failed to import the block number $i of the reduced affine LHS: must build it")
@@ -154,7 +154,7 @@ function check_affine_blocks(RBInfo, RBVars::RBProblem)
 
     if isfile(joinpath(RBInfo.paths.ROM_structures_path, RHSₙi * ".csv"))
       println("Importing block number $i of the reduced affine RHS")
-      push!(RBVars.RHSₙ, load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path, RHSₙi)))
+      push!(RBVars.RHSₙ, load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, RHSₙi)))
       RBVars.nₛᵘ = size(RBVars.RHSₙ[i])[1]
     else
       println("Failed to import the block number $i of the reduced affine RHS: must build it")
