@@ -630,13 +630,9 @@ function online_phase(
       RBVars.S.offline_time = NaN
     end
 
-    if !RBInfo.import_offline_structures
-      times = Dict(RBVars.offline_time=>"off_time",
-        mean_online_time=>"on_time", mean_reconstruction_time=>"rec_time")
-    else
-      times = Dict(mean_online_time=>"on_time",
-        mean_reconstruction_time=>"rec_time")
-    end
+    times = Dict("off_time"=>RBVars.S.offline_time,
+      "on_time"=>mean_online_time+adapt_time,"rec_time"=>mean_reconstruction_time)
+
     CSV.write(joinpath(path_μ, "times.csv"),times)
 
   end

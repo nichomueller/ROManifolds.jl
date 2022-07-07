@@ -24,7 +24,7 @@ function post_process(RBInfo::ROMInfoSteady, d::Dict) where T
 
 end
 
-function post_process(RBInfo::UnsteadyInfo, d::Dict)
+function post_process(RBInfo::ROMInfoUnsteady{T}, d::Dict) where T
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
     MDEIM_Σ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
     generate_and_save_plot(
@@ -68,7 +68,7 @@ function post_process(RBInfo::UnsteadyInfo, d::Dict)
     "||uₕ - ũ||ₕ₁₋ₗ₂", ["H¹-l² err"], "Param μ number", "H¹-l² error", d["path_μ"];
     var="H1_L2_err")
 
-  if mean_L2_err ∈ keys(d)
+  if "mean_L2_err" ∈ keys(d)
 
     generate_and_save_plot(times,d["mean_L2_err"],
       "Average ||pₕ(t) - p̃(t)||ₗ₂", ["l² err"], "time [s]", "L² error", d["path_μ"];
@@ -120,11 +120,10 @@ function post_process(root::String)
   S = String
   T = Float64
 
-  function get_paths(dir::String)
-    path_to_err = joinpath(dir,
-      "results/params_95_96_97_98_99_100/H1L2_err.csv")
-    path_to_t = joinpath(dir,
-      "results/params_95_96_97_98_99_100/times.csv")
+  function get_err_t_paths(res_path::String)
+    param_path = get_all_subdirectories(res_path)[end]
+    path_to_err = joinpath(param_path, "H1L2_err.csv")
+    path_to_t = joinpath(param_path, "times.csv")
     path_to_err,path_to_t
   end
 
@@ -142,25 +141,29 @@ function post_process(root::String)
 
   function check_if_fun(dir::String,tol,tol_fun,err,err_fun,time,time_fun)
 
-    path_to_err,path_to_t = get_paths(dir)
+    if ispath(joinpath(dir, "results"))
 
-    if ispath(path_to_err) && ispath(path_to_t)
-      ϵ = get_tolerances(dir)
-      if !isempty(ϵ)
-        if occursin("fun",dir)
-          append!(tol_fun,ϵ)
-          append!(err_fun,load_CSV(Matrix{T}(undef,0,0), path_to_err)[1])
-          cur_time = load_CSV(Matrix{T}(undef,0,0), path_to_t)
-          append!(time_fun["on"],cur_time[findall(x->x.=="on_time",cur_time[:,2]),1])
-          append!(time_fun["off"],cur_time[findall(x->x.=="off_time",cur_time[:,2]),1])
-        else
-          append!(tol,ϵ)
-          append!(err,load_CSV(Matrix{T}(undef,0,0), path_to_err)[1])
-          cur_time = load_CSV(Matrix{T}(undef,0,0), path_to_t)
-          append!(time["on"],cur_time[findall(x->x.=="on_time",cur_time[:,2]),1])
-          append!(time["off"],cur_time[findall(x->x.=="off_time",cur_time[:,2]),1])
+      path_to_err,path_to_t = get_err_t_paths(joinpath(dir, "results"))
+
+      if ispath(path_to_err) && ispath(path_to_t)
+        ϵ = get_tolerances(dir)
+        if !isempty(ϵ)
+          if occursin("fun",dir)
+            append!(tol_fun,ϵ)
+            append!(err_fun,load_CSV(Matrix{T}(undef,0,0), path_to_err)[1])
+            cur_time = load_CSV(Matrix(undef,0,0), path_to_t)
+            append!(time_fun["on"],cur_time[findall(x->x.=="on_time",cur_time[:,1]),2])
+            append!(time_fun["off"],cur_time[findall(x->x.=="off_time",cur_time[:,1]),2])
+          else
+            append!(tol,ϵ)
+            append!(err,load_CSV(Matrix{T}(undef,0,0), path_to_err)[1])
+            cur_time = load_CSV(Matrix(undef,0,0), path_to_t)
+            append!(time["on"],cur_time[findall(x->x.=="on_time",cur_time[:,1]),2])
+            append!(time["off"],cur_time[findall(x->x.=="off_time",cur_time[:,1]),2])
+          end
         end
       end
+
     end
 
     tol,tol_fun,err,err_fun,time,time_fun
@@ -169,6 +172,7 @@ function post_process(root::String)
 
   root_subs = get_all_subdirectories(root)
   filter!(el->!occursin("FEM_data",el),root_subs)
+  filter!(el->!occursin("plots",el),root_subs)
 
   (ϵ,ϵ_fun,ϵ_nest,ϵ_fun_nest) =
     (S[],S[],S[],S[],S[],S[],S[],S[])
@@ -180,7 +184,7 @@ function post_process(root::String)
     Dict("on"=>T[],"off"=>T[]),Dict("on"=>T[],"off"=>T[]),
     Dict("on"=>T[],"off"=>T[]),Dict("on"=>T[],"off"=>T[]))
 
-  @simd for dir in root_subs
+  for dir in root_subs
     if !occursin("nest",dir)
       ϵ,ϵ_fun,errH1L2,errH1L2_fun,t,t_fun =
         check_if_fun(dir,ϵ,ϵ_fun,errH1L2,errH1L2_fun,t,t_fun)
