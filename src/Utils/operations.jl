@@ -91,8 +91,7 @@ function POD(S::Matrix{T}, ϵ::Float64, X::SparseMatrixCSC{T}) where T
 
   energies = cumsum(Σ.^2)
   N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  println("Basis number obtained via POD is $N,
-    projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
+  println("Basis number obtained via POD is $N, projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
 
   Matrix{T}((L' \ U[:, 1:N])[invperm(H.p), :]), T.(Σ)
 
@@ -107,8 +106,7 @@ function POD(S::SparseMatrixCSC{T}, ϵ::Float64, X::SparseMatrixCSC{T}) where T
 
   energies = cumsum(Σ.^2)
   N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  println("Basis number obtained via POD is $N,
-    projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
+  println("Basis number obtained via POD is $N, projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
 
   Matrix{T}((L' \ U[:, 1:N])[invperm(H.p), :]), T.(Σ)
 
@@ -120,8 +118,7 @@ function POD(S::Matrix{T}, ϵ::Float64) where T
 
   energies = cumsum(Σ.^2)
   N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  println("Basis number obtained via POD is $N,
-    projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
+  println("Basis number obtained via POD is $N, projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
 
   T.(U[:, 1:N]), T.(Σ)
 
@@ -133,8 +130,7 @@ function POD(S::SparseMatrixCSC, ϵ::Float64) where T
 
   energies = cumsum(Σ.^2)
   N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  println("Basis number obtained via POD is $N,
-    projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
+  println("Basis number obtained via POD is $N, projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
 
   T.(U[:, 1:N]), T.(Σ)
 

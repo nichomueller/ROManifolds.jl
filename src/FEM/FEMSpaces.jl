@@ -44,7 +44,7 @@ function get_lagrangianQuad_info(
   ξₖ = get_cell_map(Ω)
   Qₕ_cell_point = get_cell_points(Qₕ)
   qₖ = get_data(Qₕ_cell_point)
-  phys_quadp = collect(lazy_map(evaluate,ξₖ,qₖ))::Vector{Vector{VectorValue{Dp,T}}}
+  phys_quadp = collect(lazy_map(Gridap.evaluate,ξₖ,qₖ))::Vector{Vector{VectorValue{Dp,T}}}
   refFE_quad = Gridap.ReferenceFE(lagrangianQuad,T,FEMInfo.order)
   V₀_quad = TestFESpace(model,refFE_quad,conformity=:L2)
 
@@ -61,7 +61,7 @@ function get_lagrangianQuad_info(
   ξₖ = get_cell_map(Ω)
   Qₕ_cell_point = get_cell_points(Qₕ)
   qₖ = get_data(Qₕ_cell_point)
-  phys_quadp = collect(lazy_map(evaluate,ξₖ,qₖ))::Vector{Vector{VectorValue{Dp,T}}}
+  phys_quadp = collect(lazy_map(Gridap.evaluate,ξₖ,qₖ))::Vector{Vector{VectorValue{Dp,T}}}
   refFE_quad = Gridap.ReferenceFE(lagrangianQuad,T,FEMInfo.order)
   V₀_quad = TestFESpace(model,refFE_quad,conformity=:L2)
 

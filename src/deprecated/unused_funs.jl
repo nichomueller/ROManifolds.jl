@@ -1,3 +1,31 @@
+function plot_θ_comparison(timesθ, θ, θ_approx)
+
+  θ1_plt = hcat(θ[1,:], θ_approx[1,:])
+  traces1 = [scatter(x=timesθ,y=θ1_plt[:,i]) for i=1:2]
+  p1 = plot(traces1)
+  display(p1)
+
+
+  θ2_plt = hcat(θ[2,:], θ_approx[2,:])
+  traces2 = [scatter(x=timesθ,y=θ2_plt[:,i]) for i=1:2]
+  p2 = plot(traces2)
+  display(p2)
+
+end
+
+function modify_timesθ_and_MDEIM_idx(
+  MDEIM_idx::Vector{Int64},
+  RBInfo::ROMInfoUnsteady,
+  RBVars::PoissonUnsteady)
+
+  timesθ = get_timesθ(RBInfo)
+  idx_space, idx_time = from_vec_to_mat_idx(MDEIM_idx, RBVars.S.Nₛᵘ^2)
+  idx_time_mod = label_sorted_elems(idx_time)
+  timesθ_mod = timesθ[unique(sort(idx_time))]
+  MDEIM_idx_mod = (idx_time_mod .- 1) * RBVars.S.Nₛᵘ^2 + idx_space
+  timesθ_mod, MDEIM_idx_mod
+end
+
 function my_unique(v::Vector)
   u = unique(v)
   idx = Int.(indexin(u,v))

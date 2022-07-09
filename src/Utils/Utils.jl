@@ -44,6 +44,7 @@ using CSV
 using JLD
 using Test
 using Interpolations
+using ScatteredInterpolation
 using PlotlyJS
 using Gridap
 using Gridap.FESpaces
