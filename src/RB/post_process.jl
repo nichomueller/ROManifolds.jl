@@ -66,7 +66,7 @@ function post_process(RBInfo::ROMInfoUnsteady{T}, d::Dict) where T
   xvec = collect(eachindex(d["H1_L2_err"]))
   generate_and_save_plot(xvec,d["H1_L2_err"],
     "||uₕ - ũ||ₕ₁₋ₗ₂", ["H¹-l² err"], "Param μ number", "H¹-l² error", d["path_μ"];
-    var="H1_L2_err")
+    var="H1_L2_err", selected_style=["markers"])
 
   if "mean_L2_err" ∈ keys(d)
 
@@ -76,7 +76,7 @@ function post_process(RBInfo::ROMInfoUnsteady{T}, d::Dict) where T
     xvec = collect(eachindex(d["L2_L2_err"]))
     generate_and_save_plot(xvec,d["L2_L2_err"],
       "||pₕ - p̃||ₗ₂₋ₗ₂", ["l²-l² err"], "Param μ number", "L²-L² error", d["path_μ"];
-      var="L2_L2_err")
+      var="L2_L2_err", selected_style=["markers"])
 
   end
 
