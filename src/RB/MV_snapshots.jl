@@ -131,31 +131,47 @@ function functional_MDEIM(
 
   Mat_Θ = assemble_parametric_FE_matrix(FEMSpace,var)
 
-  #space
   Q = size(Θmat)[2]
+  Q_time = size(Θmat_time)[2]
   snaps,row_idx = Matrix{T}(undef,0,0),Int64[]
-  @simd for q = 1:Q
+  snaps_time = Matrix{T}(undef,0,0)
+
+  for q = 1:min(Q, Q_time)::Int
+    #space
     Θq = FEFunction(FEMSpace.V₀_quad,Θmat[:,q])
     Matq = T.(Mat_Θ(Θq))::SparseMatrixCSC{T,Int64}
     i,v = findnz(Matq[:])::Tuple{Vector{Int},Vector{T}}
     if q == 1
       row_idx = i
       snaps = zeros(T,length(row_idx),Q)
+      snaps_time = zeros(T,length(row_idx),Q_time)
     end
     snaps[:,q] = v
-  end
-  snaps_space, Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
-
-  #time
-  Q_time = size(Θmat_time)[2]
-  snaps_time = zeros(T,length(row_idx),Q_time)
-  @simd for q = 1:Q_time
+    #time
     Θq = FEFunction(FEMSpace.V₀_quad,Θmat_time[:,q])
     Matq = T.(Mat_Θ(Θq))::SparseMatrixCSC{T,Int64}
     _,v = findnz(Matq[:])::Tuple{Vector{Int},Vector{T}}
     snaps_time[:,q] = v
   end
-  snaps_time,_ = POD(Matrix{T}(snaps_time')::Matrix{T},RBInfo.ϵₜ)
+  if Q > Q_time
+    for q = Q_time+1:Q
+      #space
+      Θq = FEFunction(FEMSpace.V₀_quad,Θmat[:,q])
+      Matq = T.(Mat_Θ(Θq))::SparseMatrixCSC{T,Int64}
+      _,v = findnz(Matq[:])::Tuple{Vector{Int},Vector{T}}
+      snaps[:,q] = v
+    end
+  else
+    for q = Q+1:Q_time
+      #time
+      Θq = FEFunction(FEMSpace.V₀_quad,Θmat_time[:,q])
+      Matq = T.(Mat_Θ(Θq))::SparseMatrixCSC{T,Int64}
+      _,v = findnz(Matq[:])::Tuple{Vector{Int},Vector{T}}
+      snaps_time[:,q] = v
+    end
+  end
+  snaps_space, Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
+  snaps_time, _ = M_DEIM_POD(Matrix{T}(snaps_time')::Matrix{T},RBInfo.ϵₜ)
 
   return snaps_space, snaps_time, Σ, row_idx
 
@@ -284,23 +300,31 @@ function functional_DEIM(
 
   Vec_Θ = assemble_parametric_FE_vector(FEMSpace,var)
 
-  #space
   Q = size(Θmat)[2]
+  Q_time = size(Θmat_time)[2]
   snaps = zeros(T,FEMSpace.Nₛᵘ,Q)
-  for q = 1:Q
+  snaps_time = zeros(T,FEMSpace.Nₛᵘ,Q_time)
+  for q = 1:min(Q, Q_time)::Int
+    #space
     Θq = FEFunction(FEMSpace.V₀_quad,Θmat[:,q])
     snaps[:,q] = T.(Vec_Θ(Θq))
-  end
-  snaps_space, Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
-
-  #time
-  Q_time = size(Θmat_time)[2]
-  snaps_time = zeros(T,FEMSpace.Nₛᵘ,Q_time)
-  for q = 1:Q_time
+    #time
     Θq = FEFunction(FEMSpace.V₀_quad,Θmat_time[:,q])
     snaps_time[:,q] = T.(Vec_Θ(Θq))
   end
-  snaps_time, Σ = M_DEIM_POD(Matrix{T}(snaps_time')::Matrix{T},RBInfo.ϵₜ)
+  if Q > Q_time
+    for q = Q_time+1:Q
+      Θq = FEFunction(FEMSpace.V₀_quad,Θmat[:,q])
+      snaps[:,q] = T.(Vec_Θ(Θq))
+    end
+  else
+    for q = Q+1:Q_time
+      Θq = FEFunction(FEMSpace.V₀_quad,Θmat_time[:,q])
+      snaps_time[:,q] = T.(Vec_Θ(Θq))
+    end
+  end
+  snaps_space, Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
+  snaps_time, _ = M_DEIM_POD(Matrix{T}(snaps_time')::Matrix{T},RBInfo.ϵₜ)
 
   return snaps_space, snaps_time, Σ
 
