@@ -69,6 +69,10 @@ function get_LagrangianQuad_info(FEMSpace::Problem)
 
 end
 
+function num_time_modes_M_DEIM(n::Int, nₛ_M_DEIM::Int, timesθ::Vector)
+  min(n, ceil(Int, length(timesθ) / nₛ_M_DEIM))::Int
+end
+
 function standard_MDEIM(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady{T},
@@ -76,20 +80,24 @@ function standard_MDEIM(
   timesθ::Vector,
   var="A") where T
 
-  snaps_space,snaps_time,row_idx,Σ = Matrix{T}(undef,0,0),Matrix{T}(undef,0,0),Int64[],T[]
+  (snaps_space,snaps_time,row_idx,Σ) =
+    (Matrix{T}(undef,0,0),Matrix{T}(undef,0,0),Int64[],T[])
   @simd for k = 1:RBInfo.nₛ_MDEIM
     println("Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)")
-    snapsₖ,row_idx = build_matrix_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
+    snapsₖ, row_idx = build_matrix_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
     snapsₖ_space, Σ = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
-    snapsₖ_time, _ = M_DEIM_POD(Matrix{T}(snapsₖ')::Matrix{T}, RBInfo.ϵₜ)
+    nₜₖ = num_time_modes_M_DEIM(size(snapsₖ_space)[2], RBInfo.nₛ_MDEIM, timesθ)
     if k == 1
       snaps_space = snapsₖ_space
-      snaps_time = snapsₖ_time
+      snaps_time = snapsₖ_space[:, 1:nₜₖ]
     else
       snaps_space,Σ = M_DEIM_POD(hcat(snaps_space, snapsₖ_space), RBInfo.ϵₛ)
-      snaps_time,_ = M_DEIM_POD(hcat(snaps_time, snapsₖ_time), RBInfo.ϵₜ)
+      snaps_time = hcat(snaps_time, snapsₖ_space[:, 1:nₜₖ])
     end
   end
+
+  snaps_time,_ = POD(Matrix{T}(snaps_time')::Matrix{T}, RBInfo.ϵₜ)
+
   return snaps_space,snaps_time,Σ,row_idx
 end
 
@@ -100,9 +108,6 @@ function functional_MDEIM(
   timesθ::Vector,
   var="A") where T
 
-  num_time_modes_MDEIM(n::Int) =
-    min(n, ceil(Int, length(timesθ) / RBInfo.nₛ_MDEIM))::Int
-
   ncells,nquad_cell = get_LagrangianQuad_info(FEMSpace)
 
   Θmat, Θmat_time = Matrix{Float64}(undef,0,0), Matrix{Float64}(undef,0,0)
@@ -112,13 +117,13 @@ function functional_MDEIM(
     Θₖ = build_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
       timesθ,var)
     Θₖ,_ = POD(Θₖ, RBInfo.ϵₛ)
-    Θₖ_add = Θₖ[:, 1:num_time_modes_MDEIM(size(Θₖ)[2])]
+    nₜₖ = num_time_modes_M_DEIM(size(Θₖ)[2], RBInfo.nₛ_MDEIM, timesθ)
     if k == 1
       Θmat = Θₖ
-      Θmat_time = Θₖ_add
+      Θmat_time = Θₖ[:, 1:nₜₖ]
     else
       Θmat = hcat(Θmat, Θₖ)
-      Θmat_time = hcat(Θmat_time, Θₖ_add)
+      Θmat_time = hcat(Θmat_time, Θₖ[:, 1:nₜₖ])
     end
   end
 
@@ -234,15 +239,17 @@ function standard_DEIM(
     println("Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)")
     snapsₖ = build_vector_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
     snapsₖ_space,_ = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
-    snapsₖ_time,_ = M_DEIM_POD(Matrix{T}(snapsₖ')::Matrix{T}, RBInfo.ϵₜ)
+    nₜₖ = num_time_modes_M_DEIM(size(snapsₖ_space)[2], RBInfo.nₛ_DEIM, timesθ)
     if k == 1
       snaps_space = snapsₖ_space
-      snaps_time = snapsₖ_time
+      snaps_time = snapsₖ_space[:, 1:nₜₖ]
     else
       snaps_space, Σ = M_DEIM_POD(hcat(snaps_space,snapsₖ_space), RBInfo.ϵₛ)
-      snaps_time, _ = M_DEIM_POD(hcat(snaps_time,snapsₖ_time), RBInfo.ϵₜ)
+      snaps_time = hcat(snaps_time, snapsₖ_space[:, 1:nₜₖ])
     end
   end
+
+  snaps_time,_ = POD(Matrix{T}(snaps_time')::Matrix{T}, RBInfo.ϵₜ)
 
   return snaps_space, snaps_time, Σ
 
@@ -255,9 +262,6 @@ function functional_DEIM(
   timesθ::Vector,
   var="F") where T
 
-  num_time_modes_DEIM(n::Int) =
-    min(n, ceil(Int, length(timesθ) / RBInfo.nₛ_DEIM))::Int
-
   ncells,nquad_cell = get_LagrangianQuad_info(FEMSpace)
   Θmat, Θmat_time = Matrix{Float64}(undef,0,0), Matrix{Float64}(undef,0,0)
   for k = 1:RBInfo.nₛ_DEIM
@@ -266,13 +270,13 @@ function functional_DEIM(
     Θₖ = build_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
       timesθ,var)
     Θₖ,_ = POD(Θₖ, RBInfo.ϵₛ)
-    Θₖ_add = Θₖ[:, 1:num_time_modes_DEIM(size(Θₖ)[2])]
+    nₜₖ = num_time_modes_M_DEIM(size(Θₖ)[2], RBInfo.nₛ_DEIM, timesθ)
     if k == 1
       Θmat = Θₖ
-      Θmat_time = Θₖ_add
+      Θmat_time = Θₖ[:, 1:nₜₖ]
     else
       Θmat = hcat(Θmat, Θₖ)
-      Θmat_time = hcat(Θmat_time, Θₖ_add)
+      Θmat_time = hcat(Θmat_time, Θₖ[:, 1:nₜₖ])
     end
   end
 
@@ -280,6 +284,7 @@ function functional_DEIM(
 
   Vec_Θ = assemble_parametric_FE_vector(FEMSpace,var)
 
+  #space
   Q = size(Θmat)[2]
   snaps = zeros(T,FEMSpace.Nₛᵘ,Q)
   for q = 1:Q
@@ -288,6 +293,7 @@ function functional_DEIM(
   end
   snaps_space, Σ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
 
+  #time
   Q_time = size(Θmat_time)[2]
   snaps_time = zeros(T,FEMSpace.Nₛᵘ,Q_time)
   for q = 1:Q_time
