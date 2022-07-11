@@ -161,16 +161,13 @@ function get_snaps_MDEIM(
 
   timesθ = get_timesθ(RBInfo)
 
-  t = @elapsed begin
-    if RBInfo.space_time_M_DEIM
-      snaps, Σ, row_idx = spacetime_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
-    elseif RBInfo.functional_M_DEIM
-      snaps, Σ, row_idx = functional_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
-    else
-      snaps, Σ, row_idx = standard_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
-    end
+  if RBInfo.space_time_M_DEIM
+    snaps, Σ, row_idx = spacetime_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
+  elseif RBInfo.functional_M_DEIM
+    snaps, Σ, row_idx = functional_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
+  else
+    snaps, Σ, row_idx = standard_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)
   end
-  println("MDEIM elapsed time: $t")
 
   return snaps, Σ, row_idx
 
@@ -312,16 +309,13 @@ function get_snaps_DEIM(
 
   timesθ = get_timesθ(RBInfo)
 
-  t = @elapsed begin
-    if RBInfo.space_time_M_DEIM
-      snaps, Σ = spacetime_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
-    elseif RBInfo.functional_M_DEIM
-      snaps, Σ = functional_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
-    else
-      snaps, Σ = standard_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
-    end
+  if RBInfo.space_time_M_DEIM
+    snaps, Σ = spacetime_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
+  elseif RBInfo.functional_M_DEIM
+    snaps, Σ = functional_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
+  else
+    snaps, Σ = standard_DEIM(FEMSpace,RBInfo,μ,timesθ,var)
   end
-  println("DEIM elapsed time: $t")
 
   return snaps, Σ
 
