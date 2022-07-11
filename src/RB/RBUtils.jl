@@ -24,9 +24,6 @@ function select_RB_method(
   if add_info["nested_POD"]
     RB_method *= "_nest"
   end
-  if add_info["st_M_DEIM"]
-    RB_method *= "_st"
-  end
   if add_info["fun_M_DEIM"]
     RB_method *= "_fun"
   end
@@ -79,9 +76,9 @@ function get_ParamInfo(RBInfo::Info, μ::Vector)
 
 end
 
-function get_timesθ(RBInfo::ROMInfoUnsteady)
+function get_timesθ(RBInfo::ROMInfoUnsteady{T}) where T
 
-  get_timesθ(RBInfo.FEMInfo)
+  T.(get_timesθ(RBInfo.FEMInfo))
 
 end
 
@@ -129,17 +126,17 @@ function build_sparse_mat(
     end
   end
 
-  define_Mat(FEMSpace, var)::SparseMatrixCSC{T, Int64}
+  define_Mat(FEMSpace, var)::SparseMatrixCSC{Float64, Int64}
 
 end
 
 function build_sparse_mat(
   FEMSpace::UnsteadyProblem,
-  FEMInfo::UnsteadyInfo{T},
+  FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady,
   el::Vector{Int64},
   timesθ::Vector;
-  var="A") where T
+  var="A")
 
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
@@ -169,26 +166,27 @@ function build_sparse_mat(
   end
   Matₜ(t) = define_Matₜ(FEMSpace, t, var)
 
+  Mat = sparse([], [], Float64[])
   for (i_t,t) in enumerate(timesθ)
-    i,j,v = findnz(Matₜ(t))::Tuple{Vector{Int},Vector{Int},Vector{T}}
+    i,j,v = findnz(Matₜ(t))::Tuple{Vector{Int},Vector{Int},Vector{Float64}}
     if i_t == 1
-      global Mat = sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ*Nₜ)
+      Mat = sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ*Nₜ)
     else
       Mat[:,(i_t-1)*FEMSpace.Nₛᵘ+1:i_t*FEMSpace.Nₛᵘ] =
         sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ)
     end
   end
 
-  Mat::SparseMatrixCSC{T, Int64}
+  Mat::SparseMatrixCSC{Float64, Int64}
 
 end
 
 function build_sparse_vec(
   FEMSpace::SteadyProblem,
-  FEMInfo::SteadyInfo{T},
+  FEMInfo::SteadyInfo,
   Param::ParametricInfoSteady,
-  el::Vector{Int64},
-  var="F") where T
+  el::Vector{Int64};
+  var="F")
 
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
@@ -208,17 +206,17 @@ function build_sparse_vec(
     end
   end
 
-  define_Vec(FEMSpace, var)::Vector{T}
+  define_Vec(FEMSpace, var)::Vector{Float64}
 
 end
 
 function build_sparse_vec(
   FEMSpace::UnsteadyProblem,
-  FEMInfo::UnsteadyInfo{T},
+  FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady,
   el::Vector{Int64},
   timesθ::Vector;
-  var="F") where T
+  var="F")
 
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
@@ -243,12 +241,12 @@ function build_sparse_vec(
   end
   Vecₜ(t) = define_Vecₜ(FEMSpace, t, var)
 
-  Vec = zeros(T, FEMSpace.Nₛᵘ, length(timesθ))
+  Vec = zeros(FEMSpace.Nₛᵘ, length(timesθ))
   for (i_t,t) in enumerate(timesθ)
     Vec[:, i_t] = Vecₜ(t)
   end
 
-  Vec
+  Vec::Matrix{Float64}
 
 end
 

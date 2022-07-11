@@ -43,7 +43,8 @@ using Arpack
 using CSV
 using JLD
 using Test
-using Logging
+using Interpolations
+using ScatteredInterpolation
 using PlotlyJS
 using Gridap
 using Gridap.FESpaces

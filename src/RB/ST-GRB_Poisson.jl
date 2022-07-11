@@ -41,39 +41,20 @@ function assemble_affine_matrices(
 end
 
 function assemble_reduced_mat_MDEIM(
-  RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTGRB{T},
   MDEIM_mat::Matrix{T},
   row_idx::Vector{Int64},
   var::String) where T
 
-  if RBInfo.space_time_M_DEIM
-    Nₜ = RBVars.Nₜ
-    MDEIM_mat_new = reshape(MDEIM_mat,length(row_idx),RBVars.Nₜ,:)
-    Q = size(MDEIM_mat_new)[3]
-    r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
-    MatqΦ = zeros(T, RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q*Nₜ)
-    @simd for q = 1:Q
-      println("ST-GRB: affine component number $q/$Q, matrix $var")
-      for j = 1:RBVars.S.Nₛᵘ
-        Mat_idx = findall(x -> x == j, r_idx)
-        MatqΦ[j,:,(q-1)*Nₜ+1:q*Nₜ] =
-          (MDEIM_mat_new[Mat_idx,:,q]' * RBVars.S.Φₛᵘ[c_idx[Mat_idx],:])'
-      end
-    end
-    Matₙ = reshape(RBVars.S.Φₛᵘ' * reshape(MatqΦ,RBVars.S.Nₛᵘ,:),
-      RBVars.S.nₛᵘ,:,Q*Nₜ)
-  else
-    Q = size(MDEIM_mat)[2]
-    r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
-    MatqΦ = zeros(T, RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q)
-    @simd for j = 1:RBVars.S.Nₛᵘ
-      Mat_idx = findall(x -> x == j, r_idx)
-      MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.S.Φₛᵘ[c_idx[Mat_idx],:])'
-    end
-    Matₙ = reshape(RBVars.S.Φₛᵘ' *
-      reshape(MatqΦ,RBVars.S.Nₛᵘ,:),RBVars.S.nₛᵘ,:,Q)
+  Q = size(MDEIM_mat)[2]
+  r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
+  MatqΦ = zeros(T, RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q)
+  @simd for j = 1:RBVars.S.Nₛᵘ
+    Mat_idx = findall(x -> x == j, r_idx)
+    MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.S.Φₛᵘ[c_idx[Mat_idx],:])'
   end
+  Matₙ = reshape(RBVars.S.Φₛᵘ' *
+    reshape(MatqΦ,RBVars.S.Nₛᵘ,:),RBVars.S.nₛᵘ,:,Q)
 
   if var == "M"
     RBVars.Mₙ = Matₙ
@@ -95,29 +76,16 @@ function assemble_affine_vectors(
 end
 
 function assemble_reduced_mat_DEIM(
-  RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTGRB{T},
   DEIM_mat::Matrix{T},
   var::String) where T
 
-  if RBInfo.space_time_M_DEIM
-    Nₜ = RBVars.Nₜ
-    DEIM_mat_new = reshape(DEIM_mat,RBVars.S.Nₛᵘ,:)
-    Q = Int(size(DEIM_mat_new)[2]/Nₜ)
-    Vecₙ = zeros(T, RBVars.S.nₛᵘ,1,Q*Nₜ)
-    @simd for q = 1:Q*Nₜ
-      Vecₙ[:,:,q] = RBVars.S.Φₛᵘ' * Vector{T}(DEIM_mat_new[:, q])
-    end
-    Vecₙ = reshape(RBVars.S.Φₛᵘ' * reshape(MatqΦ,RBVars.S.Nₛᵘ,:),
-      RBVars.S.nₛᵘ,:,Q*Nₜ)
-  else
-    Q = size(DEIM_mat)[2]
-    Vecₙ = zeros(T, RBVars.S.nₛᵘ,1,Q)
-    @simd for q = 1:Q
-      Vecₙ[:,:,q] = RBVars.S.Φₛᵘ' * Vector{T}(DEIM_mat[:, q])
-    end
-    Vecₙ = reshape(Vecₙ,:,Q)
+  Q = size(DEIM_mat)[2]
+  Vecₙ = zeros(T, RBVars.S.nₛᵘ,1,Q)
+  @simd for q = 1:Q
+    Vecₙ[:,:,q] = RBVars.S.Φₛᵘ' * Vector{T}(DEIM_mat[:, q])
   end
+  Vecₙ = reshape(Vecₙ,:,Q)
 
   if var == "F"
     RBVars.S.Fₙ = Vecₙ
@@ -268,67 +236,6 @@ function get_RB_LHS_blocks(
 
 end
 
-function get_RB_LHS_blocks_spacetime(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonSTGRB{T},
-  θᵐ::Array{T},
-  θᵃ::Array{T}) where T
-
-  println("Assembling LHS using θ-method time scheme, θ=$(RBInfo.θ)")
-
-  θ = RBInfo.θ
-  δtθ = RBInfo.δt*θ
-  Nₜ = RBVars.Nₜ
-  Qᵐ = RBVars.Qᵐ
-  Qᵃ = RBVars.S.Qᵃ
-  if Qᵐ == size(RBVars.Mₙ)[3]
-    Qᵐ = ceil(Int,Qᵐ/Nₜ)
-  end
-  if Qᵃ == size(RBVars.S.Aₙ)[3]
-    Qᵃ = ceil(Int,Qᵃ/Nₜ)
-  end
-  Nₜᵐ = Int(size(RBVars.Mₙ)[3]/Qᵐ)
-  Nₜᵃ = Int(size(RBVars.S.Aₙ)[3]/Qᵃ)
-
-  Φₜᵘ = RBVars.Φₜᵘ'*RBVars.Φₜᵘ
-  Φₜᵘ₁ = RBVars.Φₜᵘ[2:end,:]'*RBVars.Φₜᵘ[1:end-1,:]
-
-  Mₙ = reshape(RBVars.Mₙ,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,Nₜᵐ,Qᵐ)
-  Mₙ = reshape(sum(assemble_parametric_structure(θᵐ,Mₙ),dims=3),
-    RBVars.S.nₛᵘ,RBVars.S.nₛᵘ)
-  Aₙ = reshape(RBVars.S.Aₙ,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,Nₜᵃ,Qᵃ)
-  Aₙ = reshape(sum(assemble_parametric_structure(θᵃ,Aₙ),dims=3),
-    RBVars.S.nₛᵘ,RBVars.S.nₛᵘ)
-
-  block₁ = zeros(T, RBVars.nᵘ, RBVars.nᵘ)
-
-  for i_s = 1:RBVars.S.nₛᵘ
-    for i_t = 1:RBVars.nₜᵘ
-
-      i_st = index_mapping(i_s, i_t, RBVars)
-
-      for j_s = 1:RBVars.S.nₛᵘ
-        for j_t = 1:RBVars.nₜᵘ
-
-          j_st = index_mapping(j_s, j_t, RBVars)
-
-          Aₙ_μ_i_j = δtθ*Aₙ[i_s,j_s]*Φₜᵘ[i_t,j_t]
-          Mₙ_μ_i_j = Mₙ[i_s,j_s]*Φₜᵘ[i_t,j_t]
-          Aₙ₁_μ_i_j = δtθ*Aₙ[i_s,j_s]*Φₜᵘ₁[i_t,j_t]
-          Mₙ₁_μ_i_j = Mₙ[i_s,j_s]*Φₜᵘ₁[i_t,j_t]
-
-          block₁[i_st,j_st] = θ*(Aₙ_μ_i_j+Mₙ_μ_i_j) + (1-θ)*Aₙ₁_μ_i_j - θ*Mₙ₁_μ_i_j
-
-        end
-      end
-
-    end
-  end
-
-  push!(RBVars.S.LHSₙ, block₁)
-
-end
-
 function get_RB_RHS_blocks(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTGRB{T},
@@ -382,18 +289,10 @@ function get_RB_system(
     blocks = [1]
     operators = get_system_blocks(RBInfo,RBVars.S,blocks,blocks)
 
-    if RBInfo.space_time_M_DEIM
-      θᵐ, θᵃ, θᶠ, θʰ = get_θₛₜ(FEMSpace, RBInfo, RBVars, Param)
-    else
-      θᵐ, θᵃ, θᶠ, θʰ = get_θ(FEMSpace, RBInfo, RBVars, Param)
-    end
+    θᵐ, θᵃ, θᶠ, θʰ = get_θ(FEMSpace, RBInfo, RBVars, Param)
 
     if "LHS" ∈ operators
-      if RBInfo.space_time_M_DEIM
-        get_RB_LHS_blocks_spacetime(RBInfo, RBVars, θᵐ, θᵃ)
-      else
-        get_RB_LHS_blocks(RBInfo, RBVars, θᵐ, θᵃ)
-      end
+      get_RB_LHS_blocks(RBInfo, RBVars, θᵐ, θᵃ)
     end
 
     if "RHS" ∈ operators
@@ -443,24 +342,6 @@ function get_θ(
   θᵃ = get_θᵃ(FEMSpace, RBInfo, RBVars, Param)
   if !RBInfo.build_parametric_RHS
     θᶠ, θʰ = get_θᶠʰ(FEMSpace, RBInfo, RBVars, Param)
-  else
-    θᶠ, θʰ = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
-  end
-
-  return θᵐ, θᵃ, θᶠ, θʰ
-
-end
-
-function get_θₛₜ(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonSTGRB{T},
-  Param::ParametricInfoUnsteady) where T
-
-  θᵐ = get_θᵐₛₜ(FEMSpace, RBInfo, RBVars, Param)
-  θᵃ = get_θᵃₛₜ(FEMSpace, RBInfo, RBVars, Param)
-  if !RBInfo.build_parametric_RHS
-    θᶠ, θʰ = get_θᶠʰₛₜ(FEMSpace, RBInfo, RBVars, Param)
   else
     θᶠ, θʰ = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
   end

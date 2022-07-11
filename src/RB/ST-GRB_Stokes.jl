@@ -15,8 +15,8 @@ function get_Mₙ(
 end
 
 function get_Bₙ(
-  RBInfo::Info{T},
-  RBVars::StokesSTGRB) where T
+  RBInfo::Info,
+  RBVars::StokesSTGRB{T}) where T
   #MODIFY#
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Bₙ.csv"))

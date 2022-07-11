@@ -68,7 +68,7 @@ function import_reduced_basis(
 
   println("Importing the spatial reduced basis for field u")
   RBVars.Φₛᵘ = load_CSV(Matrix{T}(undef,0,0),
-    joinpath( RBInfo.paths.basis_path, "Φₛᵘ.csv"))
+    joinpath(RBInfo.paths.basis_path, "Φₛᵘ.csv"))
   (RBVars.Nₛᵘ, RBVars.nₛᵘ) = size(RBVars.Φₛᵘ)
 
 end
@@ -182,14 +182,14 @@ function get_M_DEIM_structures(
 
     if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MDEIMᵢ_A.csv"))
       println("Importing MDEIM offline structures, A")
-      RBVars.MDEIMᵢ_A = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path,
+      RBVars.MDEIMᵢ_A = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path,
         "MDEIMᵢ_A.csv"))
-      RBVars.MDEIM_idx_A = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path,
-        "MDEIM_idx_A.csv"))[:]
-      RBVars.row_idx_A = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path,
-        "row_idx_A.csv"))[:]
-      RBVars.sparse_el_A = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path,
-        "sparse_el_A.csv"))[:]
+      RBVars.MDEIM_idx_A = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.paths.ROM_structures_path,
+        "MDEIM_idx_A.csv"))
+      RBVars.row_idx_A = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.paths.ROM_structures_path,
+        "row_idx_A.csv"))
+      RBVars.sparse_el_A = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.paths.ROM_structures_path,
+        "sparse_el_A.csv"))
       append!(operators, [])
     else
       println("Failed to import MDEIM offline structures,
@@ -210,10 +210,10 @@ function get_M_DEIM_structures(
         println("Importing DEIM offline structures, F")
         RBVars.DEIMᵢ_F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path,
           "DEIMᵢ_F.csv"))
-        RBVars.DEIM_idx_F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path,
-          "DEIM_idx_F.csv"))[:]
-        RBVars.sparse_el_F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path,
-          "sparse_el_F.csv"))[:]
+        RBVars.DEIM_idx_F = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.paths.ROM_structures_path,
+          "DEIM_idx_F.csv"))
+        RBVars.sparse_el_F = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.paths.ROM_structures_path,
+          "sparse_el_F.csv"))
         append!(operators, [])
       else
         println("Failed to import DEIM offline structures, F: must build them")
@@ -226,12 +226,12 @@ function get_M_DEIM_structures(
 
       if isfile(joinpath(RBInfo.paths.ROM_structures_path, "DEIMᵢ_H.csv"))
         println("Importing DEIM offline structures, H")
-        RBVars.DEIMᵢ_H = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path,
+        RBVars.DEIMᵢ_H = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path,
           "DEIMᵢ_H.csv"))
-        RBVars.DEIM_idx_H = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path,
-          "DEIM_idx_H.csv"))[:]
-        RBVars.sparse_el_H = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path,
-          "sparse_el_H.csv"))[:]
+        RBVars.DEIM_idx_H = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.paths.ROM_structures_path,
+          "DEIM_idx_H.csv"))
+        RBVars.sparse_el_H = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.paths.ROM_structures_path,
+          "sparse_el_H.csv"))
         append!(operators, [])
         return
       else
@@ -253,7 +253,7 @@ function get_Fₙ(
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Fₙ.csv"))
     println("Importing Fₙ")
-    RBVars.Fₙ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path, "Fₙ.csv"))
+    RBVars.Fₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "Fₙ.csv"))
     return [""]
   else
     println("Failed to import Fₙ: must build it")
@@ -268,7 +268,7 @@ function get_Hₙ(
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Hₙ.csv"))
     println("Importing Hₙ")
-    RBVars.Hₙ = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.ROM_structures_path, "Hₙ.csv"))
+    RBVars.Hₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "Hₙ.csv"))
     return [""]
   else
     println("Failed to import Hₙ: must build it")
@@ -425,9 +425,9 @@ function get_θᵃ(
   Param::ParametricInfoSteady) where T
 
   if !RBInfo.probl_nl["A"]
-    θᵃ = reshape([Param.α(Point(0.,0.))],1,1)
+    θᵃ = reshape([T.(Param.α(Point(0.,0.)))],1,1)
   else
-    A_μ_sparse = build_sparse_mat(FEMSpace, FEMInfo, Param, RBVars.sparse_el_A)
+    A_μ_sparse = T.(build_sparse_mat(FEMSpace, FEMInfo, Param, RBVars.sparse_el_A))
     θᵃ = M_DEIM_online(A_μ_sparse, RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A)
   end
   θᵃ::Matrix{T}
@@ -444,15 +444,15 @@ function get_θᶠʰ(
   end
 
   if !RBInfo.probl_nl["f"]
-    θᶠ = reshape([Param.f(Point(0.,0.))],1,1)
+    θᶠ = reshape([T.(Param.f(Point(0.,0.)))],1,1)
   else
-    F_μ = build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_F)
+    F_μ = T.(build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_F; var="F"))
     θᶠ = M_DEIM_online(F_μ, RBVars.DEIMᵢ_F, RBVars.DEIM_idx_F)
   end
   if !RBInfo.probl_nl["h"]
-    θʰ = reshape([Param.h(Point(0.,0.))],1,1)
+    θʰ = reshape([T.(Param.h(Point(0.,0.)))],1,1)
   else
-    H_μ = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
+    H_μ = T.(build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_H; var="H"))
     θʰ = M_DEIM_online(H_μ, RBVars.DEIMᵢ_H, RBVars.DEIM_idx_H)
   end
   θᶠ, θʰ
@@ -630,18 +630,15 @@ function online_phase(
       RBVars.S.offline_time = NaN
     end
 
-    if !RBInfo.import_offline_structures
-      times = Dict(RBVars.offline_time=>"off_time",
-        mean_online_time=>"on_time", mean_reconstruction_time=>"rec_time")
-    else
-      times = Dict(mean_online_time=>"on_time",
-        mean_reconstruction_time=>"rec_time")
-    end
+    times = Dict("off_time"=>RBVars.S.offline_time,
+      "on_time"=>mean_online_time+adapt_time,"rec_time"=>mean_reconstruction_time)
+
     CSV.write(joinpath(path_μ, "times.csv"),times)
 
   end
 
-  pass_to_pp = Dict("path_μ"=>path_μ, "FEMSpace"=>FEMSpace, "mean_point_err_u"=>mean_pointwise_err)
+  pass_to_pp = Dict("path_μ"=>path_μ, "FEMSpace"=>FEMSpace,
+    "mean_point_err_u"=>Float64.(mean_pointwise_err))
 
   if RBInfo.post_process
     post_process(RBInfo, pass_to_pp)

@@ -462,20 +462,16 @@ function online_phase(
       RBVars.P.S.offline_time = NaN
     end
 
-    if !RBInfo.import_offline_structures
-      times = Dict(RBVars.P.S.offline_time=>"off_time",
-        mean_online_time=>"on_time", mean_reconstruction_time=>"rec_time")
-    else
-      times = Dict(mean_online_time=>"on_time",
-        mean_reconstruction_time=>"rec_time")
-    end
+    times = Dict("off_time"=>RBVars.S.offline_time,
+      "on_time"=>mean_online_time,"rec_time"=>mean_reconstruction_time)
+
     CSV.write(joinpath(path_μ, "times.csv"),times)
 
   end
 
   pass_to_pp = Dict("path_μ"=>path_μ, "FEMSpace"=>FEMSpace,
-    "mean_point_err_u"=>mean_pointwise_err_u,
-    "mean_point_err_p"=>mean_pointwise_err_p)
+    "mean_point_err_u"=>Float64.(mean_pointwise_err_u),
+    "mean_point_err_p"=>Float64.(mean_pointwise_err_p))
 
   if RBInfo.post_process
     post_process(RBInfo, pass_to_pp)

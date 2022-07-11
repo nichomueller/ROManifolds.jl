@@ -72,12 +72,12 @@ function assemble_affine_matrices(
     RBVars.Qᵐ = 1
     println("Assembling affine reduced mass")
     M = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "M.csv"))
-    RBVars.Mₙ = reshape((M*RBVars.S.Φₛᵘ)'*RBVars.S.Pᵤ⁻¹*(M*RBVars.S.Φₛᵘ),
-      RBVars.S.Nₛᵘ, RBVars.S.nₛᵘ, RBVars.Qᵐ)
-    RBVars.MΦ = reshape(M*RBVars.S.Φₛᵘ,
-      RBVars.S.Nₛᵘ, RBVars.S.nₛᵘ, RBVars.Qᵐ)
-    RBVars.MΦᵀPᵤ⁻¹ = reshape((M*RBVars.S.Φₛᵘ)'*Matrix(RBVars.S.Pᵤ⁻¹),
-      RBVars.S.Nₛᵘ, RBVars.S.nₛᵘ, RBVars.Qᵐ)
+    RBVars.Mₙ = zeros(T, RBVars.S.nₛᵘ, RBVars.S.nₛᵘ, 1)
+    RBVars.Mₙ[:,:,1] = (M*RBVars.S.Φₛᵘ)'*RBVars.S.Pᵤ⁻¹*(M*RBVars.S.Φₛᵘ)
+    RBVars.MΦ = zeros(T, RBVars.S.Nₛᵘ, RBVars.S.nₛᵘ, 1)
+    RBVars.MΦ[:,:,1] = M * RBVars.S.Φₛᵘ
+    RBVars.MΦᵀPᵤ⁻¹ = zeros(T, RBVars.S.nₛᵘ, RBVars.S.Nₛᵘ, 1)
+    RBVars.MΦᵀPᵤ⁻¹[:,:,1] = (M*RBVars.S.Φₛᵘ)' * RBVars.S.Pᵤ⁻¹
   else
     assemble_affine_matrices(RBInfo, RBVars.S, var)
   end
@@ -85,50 +85,25 @@ function assemble_affine_matrices(
 end
 
 function assemble_reduced_mat_MDEIM(
-  RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTPGRB{T},
   MDEIM_mat::Matrix,
   row_idx::Vector{Int64},
   var::String) where T
 
-  if RBInfo.space_time_M_DEIM
-    Nₜ = RBVars.Nₜ
-    MDEIM_mat_new = reshape(MDEIM_mat,length(row_idx),RBVars.Nₜ,:)
-    Q = size(MDEIM_mat_new)[3]
-    r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
-    MatqΦ = zeros(T,RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q*Nₜ)
-    for q = 1:Q
-      println("ST-GRB: affine component number $q/$Q, matrix $var")
-      for j = 1:RBVars.S.Nₛᵘ
-        Mat_idx = findall(x -> x == j, r_idx)
-        MatqΦ[j,:,(q-1)*Nₜ+1:q*Nₜ] =
-          (MDEIM_mat_new[Mat_idx,:,q]' * RBVars.S.Φₛᵘ[c_idx[Mat_idx],:])'
-      end
-    end
-    MatqΦᵀPᵤ⁻¹ = zeros(T,RBVars.S.nₛᵘ,RBVars.S.Nₛᵘ,Q*Nₜ)
-    matrix_product!(MatqΦᵀPᵤ⁻¹,MatqΦ,Matrix(RBVars.S.Pᵤ⁻¹),transpose_A=true)
-    for q₁ = 1:Q*Nₜ
-      for q₂ = 1:Q*Nₜ
-        println("ST-PGRB: affine component number $((q₁-1)*RBVars.Qᵐ+q₂), matrix $var")
-        RBVars.Mₙ[:,:,(q₁-1)*Q+q₂] = MatqΦᵀPᵤ⁻¹[:,:,q₁]*MatqΦ[:,:,q₂]
-      end
-    end
-  else
-    Q = size(MDEIM_mat)[2]
-    r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
-    MatqΦ = zeros(T,RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q)
-    for j = 1:RBVars.S.Nₛᵘ
-      Mat_idx = findall(x -> x == j, r_idx)
-      MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.S.Φₛᵘ[c_idx[Mat_idx],:])'
-    end
-    MatqΦᵀPᵤ⁻¹ = zeros(T,RBVars.S.nₛᵘ,RBVars.S.Nₛᵘ,Q)
-    matrix_product!(MatqΦᵀPᵤ⁻¹,MatqΦ,Matrix(RBVars.S.Pᵤ⁻¹),transpose_A=true)
-    Matₙ = zeros(T,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,Q^2)
-    for q₁ = 1:Q
-      for q₂ = 1:Q
-        println("ST-PGRB: affine component number $((q₁-1)*RBVars.Qᵐ+q₂), matrix $var")
-        Matₙ[:,:,(q₁-1)*Q+q₂] = MatqΦᵀPᵤ⁻¹[:,:,q₁]*MatqΦ[:,:,q₂]
-      end
+  Q = size(MDEIM_mat)[2]
+  r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
+  MatqΦ = zeros(T,RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q)
+  for j = 1:RBVars.S.Nₛᵘ
+    Mat_idx = findall(x -> x == j, r_idx)
+    MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.S.Φₛᵘ[c_idx[Mat_idx],:])'
+  end
+  MatqΦᵀPᵤ⁻¹ = zeros(T,RBVars.S.nₛᵘ,RBVars.S.Nₛᵘ,Q)
+  matrix_product!(MatqΦᵀPᵤ⁻¹,MatqΦ,Matrix(RBVars.S.Pᵤ⁻¹),transpose_A=true)
+  Matₙ = zeros(T,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,Q^2)
+  for q₁ = 1:Q
+    for q₂ = 1:Q
+      println("ST-PGRB: affine component number $((q₁-1)*RBVars.Qᵐ+q₂), matrix $var")
+      Matₙ[:,:,(q₁-1)*Q+q₂] = MatqΦᵀPᵤ⁻¹[:,:,q₁]*MatqΦ[:,:,q₂]
     end
   end
 
@@ -178,32 +153,18 @@ function assemble_affine_vectors(
 end
 
 function assemble_reduced_mat_DEIM(
-  RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTPGRB{T},
   DEIM_mat::Matrix,
   var::String) where T
 
-  if RBInfo.space_time_M_DEIM
-    Nₜ = RBVars.Nₜ
-    DEIM_mat_new = reshape(DEIM_mat,RBVars.S.Nₛᵘ,:)
-    Q = Int(size(DEIM_mat_new)[2]/Nₜ)
-    MVecₙ = zeros(T,RBVars.S.nₛᵘ,1,RBVars.Qᵐ*Q*Nₜ)
-    matrix_product_vec!(MVecₙ,RBVars.MΦᵀPᵤ⁻¹,DEIM_mat_new)
-    MVecₙ = reshape(MVecₙ,:,RBVars.Qᵐ*Q*Nₜ)
-    AVecₙ = zeros(T,RBVars.S.nₛᵘ,1,RBVars.S.Qᵃ*Q*Nₜ)
-    matrix_product_vec!(AVecₙ,RBVars.S.AΦᵀPᵤ⁻¹,DEIM_mat_new)
-    AVecₙ = reshape(AVecₙ,:,RBVars.S.Qᵃ*Q*Nₜ)
-    Vecₙ = hcat(MVecₙ,AVecₙ)
-  else
-    Q = size(DEIM_mat)[2]
-    MVecₙ = zeros(T,RBVars.S.nₛᵘ,1,RBVars.Qᵐ*Q)
-    matrix_product_vec!(MVecₙ,RBVars.MΦᵀPᵤ⁻¹,DEIM_mat)
-    MVecₙ = reshape(MVecₙ,:,RBVars.Qᵐ*Q)
-    AVecₙ = zeros(T,RBVars.S.nₛᵘ,1,RBVars.S.Qᵃ*Q)
-    matrix_product_vec!(AVecₙ,RBVars.S.AΦᵀPᵤ⁻¹,DEIM_mat)
-    AVecₙ = reshape(AVecₙ,:,RBVars.S.Qᵃ*Q)
-    Vecₙ = hcat(MVecₙ,AVecₙ)
-  end
+  Q = size(DEIM_mat)[2]
+  MVecₙ = zeros(T,RBVars.S.nₛᵘ,1,RBVars.Qᵐ*Q)
+  matrix_product_vec!(MVecₙ,RBVars.MΦᵀPᵤ⁻¹,DEIM_mat)
+  MVecₙ = reshape(MVecₙ,:,RBVars.Qᵐ*Q)
+  AVecₙ = zeros(T,RBVars.S.nₛᵘ,1,RBVars.S.Qᵃ*Q)
+  matrix_product_vec!(AVecₙ,RBVars.S.AΦᵀPᵤ⁻¹,DEIM_mat)
+  AVecₙ = reshape(AVecₙ,:,RBVars.S.Qᵃ*Q)
+  Vecₙ = hcat(MVecₙ,AVecₙ)
 
   if var == "F"
     RBVars.S.Fₙ = Vecₙ

@@ -151,10 +151,10 @@ function import_reduced_basis(
   println("Importing the reduced basis for field p")
 
   RBVars.S.Φₛᵖ = load_CSV(Matrix{T}(undef,0,0),
-    joinpath( RBInfo.paths.basis_path, "Φₛᵖ.csv"))
+    joinpath(RBInfo.paths.basis_path, "Φₛᵖ.csv"))
   RBVars.S.nₛᵖ = size(RBVars.S.Φₛᵖ)[2]
   RBVars.Φₜᵖ = load_CSV(Matrix{T}(undef,0,0),
-    joinpath( RBInfo.paths.basis_path, "Φₜᵖ.csv"))
+    joinpath(RBInfo.paths.basis_path, "Φₜᵖ.csv"))
   RBVars.nₜᵖ = size(RBVars.Φₜᵖ)[2]
   RBVars.nᵖ = RBVars.S.nₛᵖ * RBVars.nₜᵖ
 
@@ -445,9 +445,9 @@ function online_phase(
 
   pass_to_pp = Dict("path_μ"=>path_μ,
     "FEMSpace"=>FEMSpace, "H1_L2_err"=>H1_L2_err,
-    "mean_H1_err"=>mean_H1_err, "mean_point_err_u"=>mean_pointwise_err_u,
+    "mean_H1_err"=>mean_H1_err, "mean_point_err_u"=>Float64.(mean_pointwise_err_u),
     "L2_L2_err"=>L2_L2_err, "mean_L2_err"=>mean_L2_err,
-    "mean_point_err_p"=>mean_pointwise_err_p)
+    "mean_point_err_p"=>Float64.(mean_pointwise_err_p))
 
   if RBInfo.post_process
     println("Post-processing the results...")

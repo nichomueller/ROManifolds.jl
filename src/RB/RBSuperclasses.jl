@@ -62,13 +62,18 @@ function init_PoissonSTGRB_variables(::Type{T}) where T
   MDEIM_idx_M = Vector{Int64}(undef,0)
   row_idx_M = Vector{Int64}(undef,0)
   sparse_el_M = Vector{Int64}(undef,0)
+  MDEIM_idx_time_A = Vector{Int64}(undef,0)
+  MDEIM_idx_time_M = Vector{Int64}(undef,0)
+  DEIM_idx_time_F = Vector{Int64}(undef,0)
+  DEIM_idx_time_H = Vector{Int64}(undef,0)
   Nₜ = 0
   Nᵘ = 0
   nₜᵘ = 0
   nᵘ = 0
   Qᵐ = 0
 
-  Φₜᵘ,Mₙ,MDEIM_mat_M,MDEIMᵢ_M,MDEIM_idx_M,row_idx_M,sparse_el_M,Nₜ,Nᵘ,nₜᵘ,nᵘ,Qᵐ
+  (Φₜᵘ,Mₙ,MDEIM_mat_M,MDEIMᵢ_M,MDEIM_idx_M,row_idx_M,sparse_el_M,
+  MDEIM_idx_time_A, MDEIM_idx_time_M, DEIM_idx_time_F, DEIM_idx_time_H, Nₜ,Nᵘ,nₜᵘ,nᵘ,Qᵐ)
 
 end
 
@@ -130,12 +135,16 @@ end
 mutable struct PoissonSTGRB{T} <: PoissonUnsteady{T}
   S::PoissonSGRB{T}; Φₜᵘ::Matrix{T}; Mₙ::Array{T}; MDEIM_mat_M::Matrix{T}; MDEIMᵢ_M::Matrix{T};
   MDEIM_idx_M::Vector{Int64}; row_idx_M::Vector{Int64}; sparse_el_M::Vector{Int64};
+  MDEIM_idx_time_A::Vector{Int64}; MDEIM_idx_time_M::Vector{Int64};
+  DEIM_idx_time_F::Vector{Int64}; DEIM_idx_time_H::Vector{Int64};
   Nₜ::Int64; Nᵘ::Int64; nₜᵘ::Int64; nᵘ::Int64; Qᵐ::Int64;
 end
 
 mutable struct PoissonSTPGRB{T} <: PoissonUnsteady{T}
   S::PoissonSPGRB{T}; Φₜᵘ::Matrix{T}; Mₙ::Array{T}; MDEIM_mat_M::Matrix{T}; MDEIMᵢ_M::Matrix{T};
   MDEIM_idx_M::Vector{Int64}; row_idx_M::Vector{Int64}; sparse_el_M::Vector{Int64};
+  MDEIM_idx_time_A::Vector{Int64}; MDEIM_idx_time_M::Vector{Int64};
+  DEIM_idx_time_F::Vector{Int64}; DEIM_idx_time_H::Vector{Int64};
   Nₜ::Int64; Nᵘ::Int64; nₜᵘ::Int64; nᵘ::Int64; Qᵐ::Int64;MAₙ::Array{T};MΦ::Array{T};MΦᵀPᵤ⁻¹::Array{T}
 end
 
@@ -191,8 +200,8 @@ function setup(::NTuple{6,Int}, ::Type{T}) where T
 
 end
 
-struct ROMInfoSteady{T} <: Info{T}
-  FEMInfo::SteadyInfo{T}
+struct ROMInfoSteady{T} <: Info
+  FEMInfo::SteadyInfo
   probl_nl::Dict
   case::Int
   paths::F
@@ -210,8 +219,8 @@ struct ROMInfoSteady{T} <: Info{T}
   save_results::Bool
 end
 
-mutable struct ROMInfoUnsteady{T} <: Info{T}
-  FEMInfo::UnsteadyInfo{T}
+mutable struct ROMInfoUnsteady{T} <: Info
+  FEMInfo::UnsteadyInfo
   probl_nl::Dict
   case::Int
   paths::F
@@ -234,7 +243,6 @@ mutable struct ROMInfoUnsteady{T} <: Info{T}
   δt::Float64
   θ::Float64
   ϵₜ::Float64
-  space_time_M_DEIM::Bool
   functional_M_DEIM::Bool
   adaptivity::Bool
 end

@@ -7,8 +7,8 @@ function get_Aₙ(
 end
 
 function get_Bₙ(
-  RBInfo::Info{T},
-  RBVars::StokesSGRB) where T
+  RBInfo::Info,
+  RBVars::StokesSGRB{T}) where T
 
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Bₙ.csv"))
     println("Importing reduced affine divergence matrix")

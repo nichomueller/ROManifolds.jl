@@ -13,7 +13,7 @@ function assemble_reduced_affine_components(RBInfo, RBVars::PoissonSTGRB, operat
 
       println("Assembling affine reduced stiffness")
       projection_time = @elapsed begin
-        A = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_structures_path, "A.csv"); convert_to_sparse = true)
+        A = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.FEM_structures_path, "A.csv"); convert_to_sparse = true)
         RBVars.Aₙ = (RBVars.Φₛᵘ)' * A * RBVars.Φₛᵘ
         if RBInfo.save_offline_structures
           save_variable(RBVars.Aₙ, "Aₙ", "csv", joinpath(RBInfo.paths.ROM_structures_path, "Aₙ"))
@@ -48,7 +48,7 @@ function assemble_reduced_affine_components(RBInfo, RBVars::PoissonSTGRB, operat
 
       println("Assembling affine reduced forcing term")
       projection_time += @elapsed begin
-        F = load_CSV(Matrix{T}(undef,0,0), joinpath( RBInfo.paths.FEM_structures_path, "F.csv"))
+        F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.FEM_structures_path, "F.csv"))
         RBVars.Fₙ = (RBVars.Φₛᵘ)' * F
         if RBInfo.save_offline_structures
           save_variable(RBVars.Fₙ, "Fₙ", "csv", joinpath(RBInfo.paths.ROM_structures_path, "Fₙ"))

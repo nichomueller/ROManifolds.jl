@@ -12,16 +12,20 @@ end
 
 function load_CSV(::Array{Array{T}}, path::String) where T
   try
+    var = CSV.read(path, DataFrame)
+    return [T.(var[:,i]) for i in 1:size(var,2)]
+  catch
     var = Array(CSV.read(path, DataFrame))
     return [parse.(T, split(chop(var[k]; head=1, tail=1), ',')) for k in 1:size(var)[1]]
-  catch
-    var = CSV.read(path, DataFrame)
-    return [var[:,i] for i in 1:size(var,2)]
   end
 end
 
-function load_CSV(::Array{D,T}, path::String) where {D,T}
-  return Array{D,T}(CSV.read(path, DataFrame))
+function load_CSV(::Array{T,D}, path::String) where {T,D}
+  if D == 1
+    return Matrix{T}(CSV.read(path, DataFrame))[:]
+  else
+    return Array{T,D}(CSV.read(path, DataFrame))
+  end
 end
 
 function load_CSV(::SparseMatrixCSC{T}, path::String) where T
@@ -34,7 +38,7 @@ function load_CSV(::SparseVector{T}, path::String) where T
   sparse(Int.(var[:,1]), var[:,2])
 end
 
-function save_CSV(var::Array{D,T}, path::String) where {D,T}
+function save_CSV(var::Array{T,D}, path::String) where {T,D}
 
   if D == 1
     var = reshape(var, :, 1)

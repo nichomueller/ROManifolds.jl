@@ -12,12 +12,12 @@ function M_DEIM_POD(S::Matrix{T}, ϵ=1e-5) where T
   N₁ = findall(x -> x ≥ (1 - ϵ^2) * energies[end], energies)[1]
   N₂ = findall(x -> x ≤ ϵ, M_DEIM_err_bound)[1]
   N = max(N₁, N₂)::Int
-  println("Basis number obtained via POD is $N,
-  projection error ≤ $(max(sqrt(1-energies[N]/energies[end]),M_DEIM_err_bound[N]))")
+  println("Basis number obtained via POD is $N, projection error ≤ $(max(sqrt(1-energies[N]/energies[end]),M_DEIM_err_bound[N]))")
 
   T.(M_DEIM_mat[:, 1:N]), T.(Σ)
 
 end
+
 
 function M_DEIM_offline(M_DEIM_mat::Matrix, Σ::Vector)
 
@@ -42,7 +42,7 @@ function M_DEIM_offline(M_DEIM_mat::Matrix, Σ::Vector)
 
 end
 
-function MDEIM_offline(RBInfo::Info{T}, var::String) where T
+function MDEIM_offline(RBInfo::ROMInfoSteady{T}, var::String) where T
 
   println("Building $(RBInfo.nₛ_MDEIM) snapshots of $var")
 
@@ -61,20 +61,31 @@ function MDEIM_offline(RBInfo::Info{T}, var::String) where T
 
 end
 
-function modify_timesθ_and_MDEIM_idx(
-  MDEIM_idx::Vector{Int64},
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady)
+function MDEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
 
-  timesθ = get_timesθ(RBInfo)
-  idx_space, idx_time = from_vec_to_mat_idx(MDEIM_idx, RBVars.S.Nₛᵘ^2)
-  idx_time_mod = label_sorted_elems(idx_time)
-  timesθ_mod = timesθ[unique(sort(idx_time))]
-  MDEIM_idx_mod = (idx_time_mod .- 1) * RBVars.S.Nₛᵘ^2 + idx_space
-  timesθ_mod, MDEIM_idx_mod
+  println("Building $(RBInfo.nₛ_MDEIM) snapshots of $var")
+
+  μ = load_CSV(Array{T}[],joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))::Vector{Vector{T}}
+  model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
+  FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
+
+  MDEIM_mat, MDEIM_mat_time, Σ, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, μ, var)
+
+  MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat, Σ)
+  MDEIMᵢ_mat = MDEIM_mat[MDEIM_idx, :]
+  MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx, row_idx, FEMSpace.Nₛᵘ)
+  MDEIM_idx_sparse_space, _ = from_vec_to_mat_idx(MDEIM_idx_sparse, FEMSpace.Nₛᵘ)
+  el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(MDEIM_idx_sparse_space))
+
+  _, MDEIM_idx_time, _ = M_DEIM_offline(MDEIM_mat_time, Σ)
+  #MDEIM_idx_time = vcat(MDEIM_idx_time, Int(RBInfo.tₗ / RBInfo.δt))
+  unique!(sort!(MDEIM_idx_time))
+
+  MDEIM_mat, MDEIM_idx_sparse, MDEIMᵢ_mat, row_idx, el, MDEIM_idx_time
+
 end
 
-function DEIM_offline(RBInfo::Info{T}, var::String) where T
+function DEIM_offline(RBInfo::ROMInfoSteady{T}, var::String) where T
 
   println("Building $(RBInfo.nₛ_DEIM) snapshots of $var")
 
@@ -92,6 +103,32 @@ function DEIM_offline(RBInfo::Info{T}, var::String) where T
   end
 
   DEIM_mat, DEIM_idx, DEIMᵢ_mat, el
+
+end
+
+function DEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
+
+  println("Building $(RBInfo.nₛ_DEIM) snapshots of $var")
+
+  μ = load_CSV(Array{T}[], joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
+  model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
+  FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
+
+  DEIM_mat, DEIM_mat_time, Σ = get_snaps_DEIM(FEMSpace, RBInfo, μ, var)
+
+  DEIM_mat, DEIM_idx, DEIM_err_bound = M_DEIM_offline(DEIM_mat, Σ)
+  DEIMᵢ_mat = DEIM_mat[DEIM_idx, :]
+  if var == "H"
+    el = find_FE_elements(FEMSpace.V₀, FEMSpace.Γn, unique(DEIM_idx))
+  else
+    el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(DEIM_idx))
+  end
+
+  _, DEIM_idx_time, _ = M_DEIM_offline(DEIM_mat_time, Σ)
+  #DEIM_idx_time = vcat(DEIM_idx_time, Int(RBInfo.tₗ / RBInfo.δt))
+  unique!(sort!(DEIM_idx_time))
+
+  DEIM_mat, DEIM_idx, DEIMᵢ_mat, el, DEIM_idx_time
 
 end
 
