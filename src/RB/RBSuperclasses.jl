@@ -237,12 +237,12 @@ mutable struct ROMInfoUnsteady{T} <: Info
   save_offline_structures::Bool
   save_results::Bool
   time_reduction_technique::String
-  perform_nested_POD::Bool
   t₀::Float64
   tₗ::Float64
   δt::Float64
   θ::Float64
   ϵₜ::Float64
   functional_M_DEIM::Bool
+  st_M_DEIM::Bool
   adaptivity::Bool
 end

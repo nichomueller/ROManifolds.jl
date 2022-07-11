@@ -6,17 +6,10 @@ function get_snapshot_matrix(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady{T}) where T
 
-  if RBInfo.perform_nested_POD
-    println("Importing the snapshot matrix for field u obtained
-      with the nested POD")
-    Sᵘ = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path,"uₕ.csv"),
-      DataFrame))
-  else
-    println("Importing the snapshot matrix for field u,
-      number of snapshots considered: $(RBInfo.nₛ)")
-    Sᵘ = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path,"uₕ.csv"),
-      DataFrame))[:,1:RBInfo.nₛ*RBVars.Nₜ]
-  end
+  println("Importing the snapshot matrix for field u,
+    number of snapshots considered: $(RBInfo.nₛ)")
+  Sᵘ = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path,"uₕ.csv"),
+    DataFrame))[:,1:RBInfo.nₛ*RBVars.Nₜ]
 
   RBVars.S.Sᵘ = Sᵘ
   RBVars.S.Nₛᵘ = size(Sᵘ)[1]
@@ -370,11 +363,18 @@ function get_θᵐ(
       θᵐ[i_t] = Param.mₜ(t_θ)
     end
   else
-    red_timesθ = timesθ[RBVars.MDEIM_idx_time_M]
-    M_μ_sparse = T.(build_sparse_mat(
-      FEMSpace,FEMInfo,Param,RBVars.sparse_el_M,red_timesθ;var="M"))
-    θᵐ = interpolated_θ(RBVars, M_μ_sparse, timesθ, RBVars.MDEIMᵢ_M,
-      RBVars.MDEIM_idx_M, RBVars.MDEIM_idx_time_M, RBVars.Qᵐ)
+    if RBInfo.st_M_DEIM
+      red_timesθ = timesθ[RBVars.MDEIM_idx_time_M]
+      M_μ_sparse = T.(build_sparse_mat(
+        FEMSpace,FEMInfo,Param,RBVars.sparse_el_M,red_timesθ;var="M"))
+      θᵐ = interpolated_θ(RBVars, M_μ_sparse, timesθ, RBVars.MDEIMᵢ_M,
+        RBVars.MDEIM_idx_M, RBVars.MDEIM_idx_time_M, RBVars.Qᵐ)
+    else
+      M_μ_sparse = T.(build_sparse_mat(
+        FEMSpace,FEMInfo,Param,RBVars.sparse_el_M,timesθ;var="M"))
+      θᵐ = (RBVars.MDEIMᵢ_M \
+        Matrix{T}(reshape(M_μ_sparse, :, RBVars.Nₜ)[RBVars.MDEIM_idx_M, :]))
+    end
   end
 
   θᵐ
@@ -395,11 +395,18 @@ function get_θᵃ(
       θᵃ[i_t] = T.(Param.αₜ(t_θ,Param.μ))
     end
   else
-    red_timesθ = timesθ[RBVars.MDEIM_idx_time_A]
-    A_μ_sparse = T.(build_sparse_mat(
-      FEMSpace,FEMInfo,Param,RBVars.S.sparse_el_A,red_timesθ;var="A"))
-    θᵃ = interpolated_θ(RBVars, A_μ_sparse, timesθ, RBVars.S.MDEIMᵢ_A,
-      RBVars.S.MDEIM_idx_A, RBVars.MDEIM_idx_time_A, RBVars.S.Qᵃ)
+    if RBInfo.st_M_DEIM
+      red_timesθ = timesθ[RBVars.MDEIM_idx_time_A]
+      A_μ_sparse = T.(build_sparse_mat(
+        FEMSpace,FEMInfo,Param,RBVars.S.sparse_el_A,red_timesθ;var="A"))
+      θᵃ = interpolated_θ(RBVars, A_μ_sparse, timesθ, RBVars.S.MDEIMᵢ_A,
+        RBVars.S.MDEIM_idx_A, RBVars.MDEIM_idx_time_A, RBVars.S.Qᵃ)
+    else
+      A_μ_sparse = build_sparse_mat(
+        FEMSpace,FEMInfo,Param,RBVars.S.sparse_el_A,timesθ;var="A")
+      θᵃ = (RBVars.S.MDEIMᵢ_A \
+        Matrix{T}(reshape(A_μ_sparse, :, RBVars.Nₜ)[RBVars.S.MDEIM_idx_A, :]))
+    end
   end
 
   θᵃ
@@ -424,11 +431,17 @@ function get_θᶠʰ(
       θᶠ[i_t] = T.(Param.fₜ(t_θ))
     end
   else
-    red_timesθ = timesθ[RBVars.DEIM_idx_time_F]
-    F_μ_sparse = T.(build_sparse_vec(
-      FEMSpace,FEMInfo, Param, RBVars.S.sparse_el_F, red_timesθ; var="F"))
-    θᶠ = interpolated_θ(RBVars, F_μ_sparse, timesθ, RBVars.S.DEIMᵢ_F,
-      RBVars.S.DEIM_idx_F, RBVars.DEIM_idx_time_F, RBVars.S.Qᶠ)
+    if RBInfo.st_M_DEIM
+      red_timesθ = timesθ[RBVars.DEIM_idx_time_F]
+      F_μ_sparse = T.(build_sparse_vec(
+        FEMSpace,FEMInfo, Param, RBVars.S.sparse_el_F, red_timesθ; var="F"))
+      θᶠ = interpolated_θ(RBVars, F_μ_sparse, timesθ, RBVars.S.DEIMᵢ_F,
+        RBVars.S.DEIM_idx_F, RBVars.DEIM_idx_time_F, RBVars.S.Qᶠ)
+    else
+      F_μ = build_sparse_vec(FEMSpace,FEMInfo, Param, RBVars.S.sparse_el_F,
+        timesθ; var="F")
+      θᶠ = (RBVars.S.DEIMᵢ_F \ Matrix{T}(F_μ[RBVars.S.DEIM_idx_F, :]))
+    end
   end
 
   if !RBInfo.probl_nl["h"]
@@ -437,11 +450,17 @@ function get_θᶠʰ(
       θʰ[i_t] = T.(Param.hₜ(t_θ))
     end
   else
-    red_timesθ = timesθ[RBVars.DEIM_idx_time_H]
-    H_μ_sparse = T.(build_sparse_vec(
-      FEMSpace,FEMInfo, Param, RBVars.S.sparse_el_H, red_timesθ; var="H"))
-    θʰ =  interpolated_θ(RBVars, H_μ_sparse, timesθ, RBVars.S.DEIMᵢ_H,
-      RBVars.S.DEIM_idx_H, RBVars.DEIM_idx_time_H, RBVars.S.Qʰ)
+    if RBInfo.st_M_DEIM
+      red_timesθ = timesθ[RBVars.DEIM_idx_time_H]
+      H_μ_sparse = T.(build_sparse_vec(
+        FEMSpace,FEMInfo, Param, RBVars.S.sparse_el_H, red_timesθ; var="H"))
+      θʰ =  interpolated_θ(RBVars, H_μ_sparse, timesθ, RBVars.S.DEIMᵢ_H,
+        RBVars.S.DEIM_idx_H, RBVars.DEIM_idx_time_H, RBVars.S.Qʰ)
+    else
+      H_μ = build_sparse_vec(FEMSpace,FEMInfo, Param, RBVars.S.sparse_el_H,
+        timesθ; var="H")
+      θʰ = (RBVars.S.DEIMᵢ_H \ Matrix{T}(H_μ[RBVars.S.DEIM_idx_H, :]))
+    end
   end
 
   θᶠ, θʰ
@@ -605,14 +624,10 @@ function loop_on_params(
     println("Considering Parameter number: $nb/$(param_nbs[end])")
 
     Param = get_ParamInfo(RBInfo, μ[nb])
-    if RBInfo.perform_nested_POD
-      nb_test = nb-90
-      uₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path,
-      "uₕ_test.csv"), DataFrame))[:,(nb_test-1)*RBVars.Nₜ+1:nb_test*RBVars.Nₜ]
-    else
-      uₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
-      DataFrame))[:,(nb-1)*RBVars.Nₜ+1:nb*RBVars.Nₜ]
-    end
+
+    uₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
+    DataFrame))[:,(nb-1)*RBVars.Nₜ+1:nb*RBVars.Nₜ]
+
     mean_uₕ_test += uₕ_test
 
     solve_RB_system(FEMSpace, RBInfo, RBVars, Param)

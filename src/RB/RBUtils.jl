@@ -21,8 +21,8 @@ function select_RB_method(
   tol::String,
   add_info::Dict) ::String
 
-  if add_info["nested_POD"]
-    RB_method *= "_nest"
+  if add_info["st_M_DEIM"]
+    RB_method *= "_st"
   end
   if add_info["fun_M_DEIM"]
     RB_method *= "_fun"
