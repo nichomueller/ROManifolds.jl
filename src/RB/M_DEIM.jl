@@ -65,7 +65,7 @@ function MDEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
 
   println("Building $(RBInfo.nₛ_MDEIM) snapshots of $var")
 
-  μ = load_CSV(Array{T}[],joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
+  μ = load_CSV(Array{T}[],joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))::Vector{Vector{T}}
   model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
 

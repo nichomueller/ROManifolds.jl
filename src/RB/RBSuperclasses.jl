@@ -200,8 +200,8 @@ function setup(::NTuple{6,Int}, ::Type{T}) where T
 
 end
 
-struct ROMInfoSteady{T} <: Info{T}
-  FEMInfo::SteadyInfo{T}
+struct ROMInfoSteady{T} <: Info
+  FEMInfo::SteadyInfo
   probl_nl::Dict
   case::Int
   paths::F
@@ -219,8 +219,8 @@ struct ROMInfoSteady{T} <: Info{T}
   save_results::Bool
 end
 
-mutable struct ROMInfoUnsteady{T} <: Info{T}
-  FEMInfo::UnsteadyInfo{T}
+mutable struct ROMInfoUnsteady{T} <: Info
+  FEMInfo::UnsteadyInfo
   probl_nl::Dict
   case::Int
   paths::F

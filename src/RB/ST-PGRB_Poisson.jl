@@ -72,12 +72,12 @@ function assemble_affine_matrices(
     RBVars.Qᵐ = 1
     println("Assembling affine reduced mass")
     M = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "M.csv"))
-    RBVars.Mₙ = reshape((M*RBVars.S.Φₛᵘ)'*RBVars.S.Pᵤ⁻¹*(M*RBVars.S.Φₛᵘ),
-      RBVars.S.Nₛᵘ, RBVars.S.nₛᵘ, RBVars.Qᵐ)
-    RBVars.MΦ = reshape(M*RBVars.S.Φₛᵘ,
-      RBVars.S.Nₛᵘ, RBVars.S.nₛᵘ, RBVars.Qᵐ)
-    RBVars.MΦᵀPᵤ⁻¹ = reshape((M*RBVars.S.Φₛᵘ)'*Matrix(RBVars.S.Pᵤ⁻¹),
-      RBVars.S.Nₛᵘ, RBVars.S.nₛᵘ, RBVars.Qᵐ)
+    RBVars.Mₙ = zeros(T, RBVars.S.nₛᵘ, RBVars.S.nₛᵘ, 1)
+    RBVars.Mₙ[:,:,1] = (M*RBVars.S.Φₛᵘ)'*RBVars.S.Pᵤ⁻¹*(M*RBVars.S.Φₛᵘ)
+    RBVars.MΦ = zeros(T, RBVars.S.Nₛᵘ, RBVars.S.nₛᵘ, 1)
+    RBVars.MΦ[:,:,1] = M * RBVars.S.Φₛᵘ
+    RBVars.MΦᵀPᵤ⁻¹ = zeros(T, RBVars.S.nₛᵘ, RBVars.S.Nₛᵘ, 1)
+    RBVars.MΦᵀPᵤ⁻¹[:,:,1] = (M*RBVars.S.Φₛᵘ)' * RBVars.S.Pᵤ⁻¹
   else
     assemble_affine_matrices(RBInfo, RBVars.S, var)
   end

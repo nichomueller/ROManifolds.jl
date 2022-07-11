@@ -1,6 +1,6 @@
 function check_dataset(
-  RBInfo::Info{T},
-  RBVars::PoissonUnsteady,
+  RBInfo::Info,
+  RBVars::PoissonUnsteady{T},
   nb::Int64) where T
 
   RBVars.Nₜ = Int(RBInfo.tₗ / RBInfo.δt)

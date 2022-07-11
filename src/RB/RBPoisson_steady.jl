@@ -425,9 +425,9 @@ function get_θᵃ(
   Param::ParametricInfoSteady) where T
 
   if !RBInfo.probl_nl["A"]
-    θᵃ = reshape([Param.α(Point(0.,0.))],1,1)
+    θᵃ = reshape([T.(Param.α(Point(0.,0.)))],1,1)
   else
-    A_μ_sparse = build_sparse_mat(FEMSpace, FEMInfo, Param, RBVars.sparse_el_A)
+    A_μ_sparse = T.(build_sparse_mat(FEMSpace, FEMInfo, Param, RBVars.sparse_el_A))
     θᵃ = M_DEIM_online(A_μ_sparse, RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A)
   end
   θᵃ::Matrix{T}
@@ -444,15 +444,15 @@ function get_θᶠʰ(
   end
 
   if !RBInfo.probl_nl["f"]
-    θᶠ = reshape([Param.f(Point(0.,0.))],1,1)
+    θᶠ = reshape([T.(Param.f(Point(0.,0.)))],1,1)
   else
-    F_μ = build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_F)
+    F_μ = T.(build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_F; var="F"))
     θᶠ = M_DEIM_online(F_μ, RBVars.DEIMᵢ_F, RBVars.DEIM_idx_F)
   end
   if !RBInfo.probl_nl["h"]
-    θʰ = reshape([Param.h(Point(0.,0.))],1,1)
+    θʰ = reshape([T.(Param.h(Point(0.,0.)))],1,1)
   else
-    H_μ = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
+    H_μ = T.(build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_H; var="H"))
     θʰ = M_DEIM_online(H_μ, RBVars.DEIMᵢ_H, RBVars.DEIM_idx_H)
   end
   θᶠ, θʰ
@@ -637,7 +637,8 @@ function online_phase(
 
   end
 
-  pass_to_pp = Dict("path_μ"=>path_μ, "FEMSpace"=>FEMSpace, "mean_point_err_u"=>mean_pointwise_err)
+  pass_to_pp = Dict("path_μ"=>path_μ, "FEMSpace"=>FEMSpace,
+    "mean_point_err_u"=>Float64.(mean_pointwise_err))
 
   if RBInfo.post_process
     post_process(RBInfo, pass_to_pp)

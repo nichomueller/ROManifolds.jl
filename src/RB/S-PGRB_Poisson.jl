@@ -77,8 +77,10 @@ function assemble_affine_matrices(
     println("Assembling affine reduced stiffness")
     println("SPGRB: affine component number 1, matrix A")
     A = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "A.csv"))
-    RBVars.AΦᵀPᵤ⁻¹ = reshape((A*RBVars.Φₛᵘ)'*RBVars.Pᵤ⁻¹,RBVars.nₛᵘ,RBVars.Nₛᵘ,1)
-    RBVars.Aₙ = reshape(RBVars.AΦᵀPᵤ⁻¹*(A*RBVars.Φₛᵘ),RBVars.nₛᵘ,RBVars.nₛᵘ,1)
+    RBVars.Aₙ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ, 1)
+    RBVars.Aₙ[:,:,1] = (RBVars.Φₛᵘ)' * A * RBVars.Φₛᵘ
+    RBVars.AΦᵀPᵤ⁻¹ = zeros(T, RBVars.nₛᵘ, RBVars.Nₛᵘ, 1)
+    RBVars.AΦᵀPᵤ⁻¹[:,:,1] = (A*RBVars.Φₛᵘ)' * RBVars.Pᵤ⁻¹
   else
     error("Unrecognized variable to load")
   end

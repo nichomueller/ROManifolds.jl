@@ -12,11 +12,11 @@ end
 
 function load_CSV(::Array{Array{T}}, path::String) where T
   try
+    var = CSV.read(path, DataFrame)
+    return [T.(var[:,i]) for i in 1:size(var,2)]
+  catch
     var = Array(CSV.read(path, DataFrame))
     return [parse.(T, split(chop(var[k]; head=1, tail=1), ',')) for k in 1:size(var)[1]]
-  catch
-    var = CSV.read(path, DataFrame)
-    return [var[:,i] for i in 1:size(var,2)]
   end
 end
 

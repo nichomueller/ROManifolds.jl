@@ -365,14 +365,14 @@ function get_θᵐ(
   timesθ = get_timesθ(RBInfo)
 
   if !RBInfo.probl_nl["M"]
-    θᵐ = zeros(T, 1, RBVars.Nₜ)
+    θᵐ = T.(zeros(T, 1, RBVars.Nₜ))
     for (i_t, t_θ) = enumerate(timesθ)
       θᵐ[i_t] = Param.mₜ(t_θ)
     end
   else
     red_timesθ = timesθ[RBVars.MDEIM_idx_time_M]
-    M_μ_sparse = build_sparse_mat(
-      FEMSpace,FEMInfo,Param,RBVars.sparse_el_M,red_timesθ;var="M")
+    M_μ_sparse = T.(build_sparse_mat(
+      FEMSpace,FEMInfo,Param,RBVars.sparse_el_M,red_timesθ;var="M"))
     θᵐ = interpolated_θ(RBVars, M_μ_sparse, timesθ, RBVars.MDEIMᵢ_M,
       RBVars.MDEIM_idx_M, RBVars.MDEIM_idx_time_M, RBVars.Qᵐ)
   end
@@ -392,12 +392,12 @@ function get_θᵃ(
   if !RBInfo.probl_nl["A"]
     θᵃ = zeros(T, 1, RBVars.Nₜ)
     for (i_t, t_θ) = enumerate(timesθ)
-      θᵃ[i_t] = Param.αₜ(t_θ,Param.μ)
+      θᵃ[i_t] = T.(Param.αₜ(t_θ,Param.μ))
     end
   else
     red_timesθ = timesθ[RBVars.MDEIM_idx_time_A]
-    A_μ_sparse = build_sparse_mat(
-      FEMSpace,FEMInfo,Param,RBVars.S.sparse_el_A,red_timesθ;var="A")
+    A_μ_sparse = T.(build_sparse_mat(
+      FEMSpace,FEMInfo,Param,RBVars.S.sparse_el_A,red_timesθ;var="A"))
     θᵃ = interpolated_θ(RBVars, A_μ_sparse, timesθ, RBVars.S.MDEIMᵢ_A,
       RBVars.S.MDEIM_idx_A, RBVars.MDEIM_idx_time_A, RBVars.S.Qᵃ)
   end
@@ -421,30 +421,25 @@ function get_θᶠʰ(
   if !RBInfo.probl_nl["f"]
     θᶠ = zeros(T, 1, RBVars.Nₜ)
     for (i_t, t_θ) = enumerate(timesθ)
-      θᶠ[i_t] = Param.fₜ(t_θ)
+      θᶠ[i_t] = T.(Param.fₜ(t_θ))
     end
   else
-    F_μ_sparse = build_sparse_vec(
-      FEMSpace,FEMInfo, Param, RBVars.S.sparse_el_F, timesθ; var="F")
-    θᶠ = (RBVars.S.DEIMᵢ_F \
-      Matrix{T}(reshape(F_μ_sparse, :, length(timesθ))[RBVars.S.DEIM_idx_F, :]))
-    #=
     red_timesθ = timesθ[RBVars.DEIM_idx_time_F]
-    F_μ_sparse = build_sparse_vec(
-      FEMSpace,FEMInfo, Param, RBVars.S.sparse_el_F, red_timesθ; var="F")
+    F_μ_sparse = T.(build_sparse_vec(
+      FEMSpace,FEMInfo, Param, RBVars.S.sparse_el_F, red_timesθ; var="F"))
     θᶠ = interpolated_θ(RBVars, F_μ_sparse, timesθ, RBVars.S.DEIMᵢ_F,
-      RBVars.S.DEIM_idx_F, RBVars.DEIM_idx_time_F, RBVars.S.Qᶠ) =#
+      RBVars.S.DEIM_idx_F, RBVars.DEIM_idx_time_F, RBVars.S.Qᶠ)
   end
 
   if !RBInfo.probl_nl["h"]
     θʰ = zeros(T, 1, RBVars.Nₜ)
     for (i_t, t_θ) = enumerate(timesθ)
-      θʰ[i_t] = Param.hₜ(t_θ)
+      θʰ[i_t] = T.(Param.hₜ(t_θ))
     end
   else
     red_timesθ = timesθ[RBVars.DEIM_idx_time_H]
-    H_μ_sparse = build_sparse_vec(
-      FEMSpace,FEMInfo, Param, RBVars.S.sparse_el_H, red_timesθ; var="H")
+    H_μ_sparse = T.(build_sparse_vec(
+      FEMSpace,FEMInfo, Param, RBVars.S.sparse_el_H, red_timesθ; var="H"))
     θʰ =  interpolated_θ(RBVars, H_μ_sparse, timesθ, RBVars.S.DEIMᵢ_H,
       RBVars.S.DEIM_idx_H, RBVars.DEIM_idx_time_H, RBVars.S.Qʰ)
   end
@@ -574,7 +569,7 @@ function online_phase(
 
   pass_to_pp = Dict("path_μ"=>path_μ,
     "FEMSpace"=>FEMSpace, "H1_L2_err"=>H1_L2_err,
-    "mean_H1_err"=>mean_H1_err, "mean_point_err_u"=>mean_pointwise_err)
+    "mean_H1_err"=>mean_H1_err, "mean_point_err_u"=>Float64.(mean_pointwise_err))
 
   if RBInfo.post_process
     println("Post-processing the results...")

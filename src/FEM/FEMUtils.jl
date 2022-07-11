@@ -37,26 +37,25 @@ function get_problem_id(problem_name::String)
   end
 end
 
-function init_FEM_variables(
-  ::Info{T}) where T
+function init_FEM_variables()
 
-  M = sparse([], [], T[])
-  A = sparse([], [], T[])
-  B = sparse([], [], T[])
-  Xᵘ₀ = sparse([], [], T[])
-  Xᵘ = sparse([], [], T[])
-  Xᵖ₀ = sparse([], [], T[])
-  F = Vector{T}(undef,0)
-  H = Vector{T}(undef,0)
+  M = sparse([], [], Float64[])
+  A = sparse([], [], Float64[])
+  B = sparse([], [], Float64[])
+  Xᵘ₀ = sparse([], [], Float64[])
+  Xᵘ = sparse([], [], Float64[])
+  Xᵖ₀ = sparse([], [], Float64[])
+  F = Vector{Float64}(undef,0)
+  H = Vector{Float64}(undef,0)
 
   M, A, B, Xᵘ₀, Xᵘ, Xᵖ₀, F, H
 
 end
 
 function get_ParamInfo(
-  FEMInfo::SteadyInfo{T},
+  FEMInfo::SteadyInfo,
   problem_id::NTuple{1,Int},
-  μ::Vector) where T
+  μ::Vector)
 
   α(x) = get_α(FEMInfo, problem_id, μ).α(x)
   f(x) = get_f(FEMInfo, problem_id, μ).f(x)
@@ -67,167 +66,167 @@ function get_ParamInfo(
 
 end
 
-function get_α(FEMInfo::SteadyInfo{T}, ::NTuple{1,Int64}, μ) where T
+function get_α(FEMInfo::SteadyInfo, ::NTuple{1,Int64}, μ)
   if !FEMInfo.probl_nl["A"]
-    return T(sum(μ))
+    return sum(μ)
   else
-    return T(1. + μ[3] + 1. / μ[3] * exp(-norm(x-Point(μ[1:FEMInfo.D]))^2 / μ[3]))
+    return 1. + μ[3] + 1. / μ[3] * exp(-norm(x-Point(μ[1:FEMInfo.D]))^2 / μ[3])
   end
 end
 
-function get_f(FEMInfo::SteadyInfo{T}, ::NTuple{1,Int64}, μ) where T
+function get_f(FEMInfo::SteadyInfo, ::NTuple{1,Int64}, μ)
   if !FEMInfo.probl_nl["f"]
-    return one(T)
+    return 1.
   else
-    return T(1 + sin(norm(Point(μ[4:3+FEMInfo.D]) .* x)*t))
+    return 1. + sin(norm(Point(μ[4:3+FEMInfo.D]) .* x)*t)
   end
 end
 
-function get_g(FEMInfo::SteadyInfo{T}, ::NTuple{1,Int64}, μ) where T
+function get_g(FEMInfo::SteadyInfo, ::NTuple{1,Int64}, μ)
   if !FEMInfo.probl_nl["g"]
-    return zero(T)
+    return 0.
   else
-    return zero(T)
+    return 0.
   end
 end
 
-function get_h(FEMInfo::SteadyInfo{T}, ::NTuple{1,Int64}, μ) where T
+function get_h(FEMInfo::SteadyInfo, ::NTuple{1,Int64}, μ)
   if FEMInfo.probl_nl["h"]
-    return 1 + sin(Point(μ[end-FEMInfo.D+1:end]) .* x)
+    return 1. + sin(Point(μ[end-FEMInfo.D+1:end]) .* x)
   else
-    return one(T)
+    return 1.
   end
 end
 
 function get_ParamInfo(
-  FEMInfo::UnsteadyInfo{T},
+  FEMInfo::UnsteadyInfo,
   ::NTuple{1,Int},
-  μ::Vector) where T
+  μ::Vector)
 
-  αₛ(x) = one(T)
-  αₜ(t, μ) = T(5. * sum(μ) * (2 + sin(t)))
+  αₛ(x) = 1.
+  αₜ(t, μ) = 5. * sum(μ) * (2 + sin(t))
   function α(x, t::Real)
     if !FEMInfo.probl_nl["A"]
-      return T(αₛ(x)*αₜ(t, μ))
+      return αₛ(x)*αₜ(t, μ)
     else
-      return T(10. * (1. + 1. / μ[3] * exp(-norm(x-Point(μ[1:FEMInfo.D]))^2 * sin(t) / μ[3])))
+      return 10. * (1. + 1. / μ[3] * exp(-norm(x-Point(μ[1:FEMInfo.D]))^2 * sin(t) / μ[3]))
     end
   end
   α(t::Real) = x -> α(x, t)
 
-  fₛ(x) = one(T)
-  fₜ(t::Real) = T(sin(t))
+  fₛ(x) = 1.
+  fₜ(t::Real) = sin(t)
   function f(x, t::Real)
     if !FEMInfo.probl_nl["f"]
-      return T(fₛ(x)*fₜ(t))
+      return fₛ(x)*fₜ(t)
     else
-      return T(1 + sin(norm(Point(μ[4:3+FEMInfo.D]) .* x)*t))
+      return 1. + sin(norm(Point(μ[4:3+FEMInfo.D]) .* x)*t)
     end
   end
   f(t::Real) = x -> f(x, t)
 
-  gₛ(x) = zero(T)
-  gₜ(t::Real) = zero(T)
+  gₛ(x) = 0.
+  gₜ(t::Real) = 0.
   function g(x, t::Real)
     if !FEMInfo.probl_nl["g"]
-      return T(gₛ(x)*gₜ(t))
+      return gₛ(x)*gₜ(t)
     else
-      return zero(T)
+      return 0.
     end
   end
   g(t::Real) = x -> g(x, t)
 
-  hₛ(x) = one(T)
-  hₜ(t::Real) = T(sin(t))
+  hₛ(x) = 1.
+  hₜ(t::Real) = sin(t)
   function h(x, t::Real)
     if !FEMInfo.probl_nl["h"]
-      return T(hₛ(x)*hₜ(t))
+      return hₛ(x)*hₜ(t)
     else
-      return T(1 + sin(norm(Point(μ[end-FEMInfo.D+1:end]) .* x)*t))
+      return 1. + sin(norm(Point(μ[end-FEMInfo.D+1:end]) .* x)*t)
     end
   end
   h(t::Real) = x -> h(x, t)
 
-  mₛ(x) = one(T)
-  mₜ(t::Real) = one(T)
+  mₛ(x) = 1.
+  mₜ(t::Real) = 1.
   function m(x, t)
     if !FEMInfo.probl_nl["M"]
-      return T(mₛ(x)*mₜ(t))
+      return mₛ(x)*mₜ(t)
     else
-      return one(T)
+      return 1.
     end
   end
   m(t::Real) = x -> m(x, t)
 
-  u₀(x) = zero(T)
+  u₀(x) = 0.
 
-  ParametricInfoUnsteady{T}(
+  ParametricInfoUnsteady(
     μ, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, gₛ, gₜ, g, hₛ, hₜ, h, u₀)
 
 end
 
 function get_ParamInfo(
-  FEMInfo::UnsteadyInfo{T},
+  FEMInfo::UnsteadyInfo,
   ::NTuple{2,Int},
-  μ::Vector) where T
+  μ::Vector)
 
-  αₛ(x) = one(T)
-  αₜ(t, μ) = T(5. * sum(μ) * (2 + sin(t)))
+  αₛ(x) = 1.
+  αₜ(t, μ) = 5. * sum(μ) * (2 + sin(t))
   function α(x, t::Real)
     if !FEMInfo.probl_nl["A"]
-      return T(αₛ(x)*αₜ(t, μ))
+      return αₛ(x)*αₜ(t, μ)
     else
-      return T(10. * (1. + 1. / μ[3] * exp(-norm(x-Point(μ[1:FEMInfo.D]))^2 * sin(t) / μ[3])))
+      return 10. * (1. + 1. / μ[3] * exp(-norm(x-Point(μ[1:FEMInfo.D]))^2 * sin(t) / μ[3]))
     end
   end
   α(t::Real) = x -> α(x, t)
 
-  fₛ(x) = one(VectorValue(FEMInfo.D, T))
+  fₛ(x) = one(VectorValue(FEMInfo.D, Float64))
   fₜ(t::Real) = one(T)
   function f(x, t)
     if !FEMInfo.probl_nl["f"]
-      return T(fₛ(x)*fₜ(t))
+      return fₛ(x)*fₜ(t)
     else
-      return T(1 + Point(μ[4:3+FEMInfo.D]) .* x*t)
+      return 1. .+ Point(μ[4:3+FEMInfo.D]) .* x*t
     end
   end
 
-  gₛ(x) = zero(VectorValue(FEMInfo.D, T))
-  gₜ(t::Real) = zero(T)
+  gₛ(x) = zero(VectorValue(FEMInfo.D, Float64))
+  gₜ(t::Real) = 0.
   function g(x, t::Real)
     if !FEMInfo.probl_nl["g"]
-      return T(gₛ(x)*gₜ(t))
+      return gₛ(x)*gₜ(t)
     else
-      return zero(VectorValue(FEMInfo.D, T))
+      return zero(VectorValue(FEMInfo.D, Float64))
     end
   end
   g(t::Real) = x -> g(x, t)
 
-  hₛ(x) = one(VectorValue(FEMInfo.D, T))
-  hₜ(t::Real) = T(sin(t))
+  hₛ(x) = one(VectorValue(FEMInfo.D, Float64))
+  hₜ(t::Real) = sin(t)
   function h(x, t::Real)
     if !FEMInfo.probl_nl["h"]
-      return T(hₛ(x)*hₜ(t))
+      return hₛ(x)*hₜ(t)
     else
-      return T(1 + Point(μ[end-FEMInfo.D+1:end]) .* x*t)
+      return 1. .+ Point(μ[end-FEMInfo.D+1:end]) .* x*t
     end
   end
   h(t::Real) = x -> h(x, t)
 
-  mₛ(x) = one(T)
-  mₜ(t::Real) = one(T)
+  mₛ(x) = 1.
+  mₜ(t::Real) = 1.
   function m(x, t)
     if !FEMInfo.probl_nl["M"]
-      return T(mₛ(x)*mₜ(t))
+      return mₛ(x)*mₜ(t)
     else
-      return one(T)
+      return 1.
     end
   end
   m(t::Real) = x -> m(x, t)
 
-  u₀(x) = [zero(VectorValue(FEMInfo.D, T)), zero(T)]
+  u₀(x) = [zero(VectorValue(FEMInfo.D, Float64)), 0.]
 
-  ParametricInfoUnsteady{T}(
+  ParametricInfoUnsteady(
     μ, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, gₛ, gₜ, g, hₛ, hₜ, h, u₀)
 
 end
@@ -285,8 +284,8 @@ function get_IC(FEMInfo::UnsteadyInfo{T}, ::NTuple{2,Int64}) where T
   u₀(x) = [zero(T),zero(VectorValue(FEMInfo.D,T))]
 end =#
 
-function get_timesθ(FEMInfo::UnsteadyInfo{T}) where T
-  T.(collect(FEMInfo.t₀:FEMInfo.δt:FEMInfo.tₗ-FEMInfo.δt).+FEMInfo.δt*FEMInfo.θ)
+function get_timesθ(FEMInfo::UnsteadyInfo)
+  collect(FEMInfo.t₀:FEMInfo.δt:FEMInfo.tₗ-FEMInfo.δt).+FEMInfo.δt*FEMInfo.θ
 end
 
 function generate_vtk_file(
@@ -303,7 +302,7 @@ end
 function find_FE_elements(
   V₀::UnconstrainedFESpace,
   trian::BodyFittedTriangulation,
-  idx::Vector{T}) where T
+  idx::Vector)
 
   connectivity = get_cell_dof_ids(V₀, trian)::Table{Int32, Vector{Int32}, Vector{Int32}}
 
@@ -311,7 +310,7 @@ function find_FE_elements(
   for i = 1:length(idx)
     for j = 1:size(connectivity)[1]
       if idx[i] in abs.(connectivity[j])
-        append!(el, convert(T,j))
+        append!(el, Int(j))
       end
     end
   end
@@ -323,7 +322,7 @@ end
 function find_FE_elements(
   V₀::UnconstrainedFESpace,
   trian::BoundaryTriangulation,
-  idx::Vector{T}) where T
+  idx::Vector)
 
   connectivity = collect(get_cell_dof_ids(V₀, trian))::Vector{Vector{Int32}}
 
@@ -331,7 +330,7 @@ function find_FE_elements(
   for i = 1:length(idx)
     for j = 1:size(connectivity)[1]
       if idx[i] in abs.(connectivity[j])
-        append!(el, convert(T,j))
+        append!(el, Int(j))
       end
     end
   end
@@ -340,18 +339,26 @@ function find_FE_elements(
 
 end
 
-function generate_dcube_discrete_model(FEMInfo::Info,d::Int,npart::Int,mesh_name::String)
+function generate_dcube_discrete_model(
+  FEMInfo::Info,
+  d::Int,
+  npart::Int,
+  mesh_name::String)
 
   if !occursin(".json",mesh_name)
     mesh_name *= ".json"
   end
   mesh_dir = FEMInfo.paths.mesh_path[1:findall(x->x=='/',FEMInfo.paths.mesh_path)[end]]
   mesh_path = joinpath(mesh_dir,mesh_name)
-  generate_dcube_discrete_model(d,npart,mesh_path)
+  generate_dcube_discrete_model(d, npart, mesh_path)
 
 end
 
-function generate_dcube_discrete_model(d::Int,npart::Int,path::String)
+function generate_dcube_discrete_model(
+  d::Int,
+  npart::Int,
+  path::String)
+
   @assert d ≤ 3 "Select d-dimensional domain, where d ≤ 3"
   if d == 1
     domain = (0,1)

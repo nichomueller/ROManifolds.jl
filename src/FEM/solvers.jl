@@ -1,8 +1,8 @@
 function FE_solve(
   FEMSpace::FEMSpacePoissonSteady,
-  FEMInfo::SteadyInfo{T},
+  FEMInfo::SteadyInfo,
   Param::ParametricInfoSteady;
-  subtract_Ddata = true) where T
+  subtract_Ddata = true)
 
   R₁ = assemble_lifting(FEMSpace, Param)
 
@@ -17,9 +17,9 @@ function FE_solve(
   end
 
   if subtract_Ddata
-    uₕ = get_free_dof_values(uₕ_field)::Vector{T} - R₁
+    uₕ = get_free_dof_values(uₕ_field)::Vector{Float64} - R₁
   else
-    uₕ = get_free_dof_values(uₕ_field)::Vector{T}
+    uₕ = get_free_dof_values(uₕ_field)::Vector{Float64}
   end
 
   return uₕ, Gₕ
@@ -27,10 +27,10 @@ function FE_solve(
 end
 
 function FE_solve(
-  FEMSpace::FEMSpacePoissonUnsteady{D,T},
+  FEMSpace::FEMSpacePoissonUnsteady,
   FEMInfo::UnsteadyInfo,
-  Param::ParametricInfoUnsteady{T};
-  subtract_Ddata = true) where {D,T}
+  Param::ParametricInfoUnsteady;
+  subtract_Ddata = true)
 
   R₁(t) = assemble_lifting(FEMSpace, FEMInfo, Param)(t)
 
@@ -50,12 +50,12 @@ function FE_solve(
   u₀_field = interpolate_everywhere(Param.u₀, FEMSpace.V(FEMInfo.t₀))
 
   uₕₜ_field = solve(ode_solver, operator, u₀_field, FEMInfo.t₀, FEMInfo.tₗ)
-  uₕₜ = zeros(T, FEMSpace.Nₛᵘ, Int(FEMInfo.tₗ / FEMInfo.δt))
+  uₕₜ = zeros(FEMSpace.Nₛᵘ, Int(FEMInfo.tₗ / FEMInfo.δt))
   global count = 0
   dΩ = FEMSpace.dΩ
   for (uₕ, _) in uₕₜ_field
     global count += 1
-    uₕₜ[:, count] = get_free_dof_values(uₕ)::Vector{T}
+    uₕₜ[:, count] = get_free_dof_values(uₕ)::Vector{Float64}
   end
 
   #= if subtract_Ddata
@@ -68,7 +68,7 @@ end
 
 function FE_solve(
   FEMSpace::FEMSpaceStokesUnsteady,
-  FEMInfo::UnsteadyInfo{T},
+  FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady;
   subtract_Ddata=false) where T
 
@@ -89,11 +89,11 @@ function FE_solve(
 
   u0(x) = Param.u₀(x)[1]
   p0(x) = Param.u₀(x)[2]
-  u₀ = get_free_dof_values(interpolate_everywhere(u0, FEMSpace.V(FEMInfo.t₀)))::Vector{T}
-  p₀ = collect(get_free_dof_values(interpolate_everywhere(p0, FEMSpace.Q(FEMInfo.t₀))))::Vector{T}
+  u₀ = get_free_dof_values(interpolate_everywhere(u0, FEMSpace.V(FEMInfo.t₀)))::Vector{Float64}
+  p₀ = collect(get_free_dof_values(interpolate_everywhere(p0, FEMSpace.Q(FEMInfo.t₀))))::Vector{Float64}
 
-  uₕₜ = hcat(u₀, zeros(T, FEMSpace.Nₛᵘ, Int(FEMInfo.tₗ / FEMInfo.δt)))
-  pₕₜ = hcat(p₀, zeros(T, FEMSpace.Nₛᵖ, Int(FEMInfo.tₗ / FEMInfo.δt)))
+  uₕₜ = hcat(u₀, zeros(FEMSpace.Nₛᵘ, Int(FEMInfo.tₗ / FEMInfo.δt)))
+  pₕₜ = hcat(p₀, zeros(FEMSpace.Nₛᵖ, Int(FEMInfo.tₗ / FEMInfo.δt)))
 
   count = 1
   for (iₜ,t) in enumerate(timesθ)
