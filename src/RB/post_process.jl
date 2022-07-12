@@ -131,7 +131,7 @@ function post_process(root::String)
     ["1e"*dir[end-1:end]]
   end
 
-  function check_if_fun(dir::String,tol,tol_fun,err,err_fun,time,time_fun)
+  function check_if_fun(dir::String,tol,err,time)
 
     if ispath(joinpath(dir, "results"))
 
@@ -141,19 +141,11 @@ function post_process(root::String)
         ϵ = get_tolerances(dir)
         if !isempty(ϵ)
 
-          if occursin("fun",dir)
-            append!(tol_fun,ϵ)
-            append!(err_fun,load_CSV(Matrix{T}(undef,0,0), path_to_err)[1])
-            cur_time = load_CSV(Matrix(undef,0,0), path_to_t)
-            append!(time_fun["on"],cur_time[findall(x->x.=="on_time",cur_time[:,1]),2])
-            append!(time_fun["off"],cur_time[findall(x->x.=="off_time",cur_time[:,1]),2])
-          else
-            append!(tol,ϵ)
-            append!(err,load_CSV(Matrix{T}(undef,0,0), path_to_err)[1])
-            cur_time = load_CSV(Matrix(undef,0,0), path_to_t)
-            append!(time["on"],cur_time[findall(x->x.=="on_time",cur_time[:,1]),2])
-            append!(time["off"],cur_time[findall(x->x.=="off_time",cur_time[:,1]),2])
-          end
+          append!(tol,ϵ)
+          append!(err,load_CSV(Matrix{T}(undef,0,0), path_to_err)[1])
+          cur_time = load_CSV(Matrix(undef,0,0), path_to_t)
+          append!(time["on"],cur_time[findall(x->x.=="on_time",cur_time[:,1]),2])
+          append!(time["off"],cur_time[findall(x->x.=="off_time",cur_time[:,1]),2])
 
         end
       end
@@ -180,12 +172,18 @@ function post_process(root::String)
 
   for dir in root_subs
     if !occursin("st",dir)
-      ϵ,ϵ_fun,errH1L2,errH1L2_fun,t,t_fun =
-        check_if_fun(dir,ϵ,ϵ_fun,errH1L2,errH1L2_fun,t,t_fun)
+      if occursin("fun",dir)
+        ϵ_fun,errH1L2_fun,t_fun = check_if_fun(dir,ϵ_fun,errH1L2_fun,t_fun)
+      else
+        ϵ,errH1L2,t = check_if_fun(dir,ϵ,errH1L2,t)
+      end
     else
-      ϵ_st,ϵ_st_fun,errH1L2_st,errH1L2_st_fun,t_st,t_st_fun =
-        check_if_fun(dir,ϵ_st,ϵ_st_fun,errH1L2_st,errH1L2_st_fun,
-        t_st,t_st_fun)
+      if occursin("fun",dir)
+        ϵ_st_fun,errH1L2_st_fun,t_st_fun =
+          check_if_fun(dir,ϵ_st_fun,errH1L2_st_fun,t_st_fun)
+      else
+        ϵ_st,errH1L2_st,t_st = check_if_fun(dir,ϵ_st,errH1L2_st,t_st)
+      end
     end
   end
 
