@@ -128,7 +128,7 @@ function post_process(root::String)
   end
 
   function get_tolerances(dir::String)
-    dir[end-2:end]
+    ["1e"*dir[end-1:end]]
   end
 
   function check_if_fun(dir::String,tol,tol_fun,err,err_fun,time,time_fun)
@@ -140,43 +140,27 @@ function post_process(root::String)
       if ispath(path_to_err) && ispath(path_to_t)
         ϵ = get_tolerances(dir)
         if !isempty(ϵ)
-          if occursin("st",dir)
-            if occursin("fun",dir)
-              append!(tol_fun_st,ϵ)
-              append!(err_fun_st,load_CSV(Matrix{T}(undef,0,0), path_to_err)[1])
-              cur_time = load_CSV(Matrix(undef,0,0), path_to_t)
-              append!(time_fun_st["on"],cur_time[findall(x->x.=="on_time",cur_time[:,1]),2])
-              append!(time_fun_st["off"],cur_time[findall(x->x.=="off_time",cur_time[:,1]),2])
-            else
-              append!(tol_st,ϵ)
-              append!(err_st,load_CSV(Matrix{T}(undef,0,0), path_to_err)[1])
-              cur_time = load_CSV(Matrix(undef,0,0), path_to_t)
-              append!(time_st["on"],cur_time[findall(x->x.=="on_time",cur_time[:,1]),2])
-              append!(time_st["off"],cur_time[findall(x->x.=="off_time",cur_time[:,1]),2])
-            end
+
+          if occursin("fun",dir)
+            append!(tol_fun,ϵ)
+            append!(err_fun,load_CSV(Matrix{T}(undef,0,0), path_to_err)[1])
+            cur_time = load_CSV(Matrix(undef,0,0), path_to_t)
+            append!(time_fun["on"],cur_time[findall(x->x.=="on_time",cur_time[:,1]),2])
+            append!(time_fun["off"],cur_time[findall(x->x.=="off_time",cur_time[:,1]),2])
           else
-            if occursin("fun",dir)
-              append!(tol_fun,ϵ)
-              append!(err_fun,load_CSV(Matrix{T}(undef,0,0), path_to_err)[1])
-              cur_time = load_CSV(Matrix(undef,0,0), path_to_t)
-              append!(time_fun["on"],cur_time[findall(x->x.=="on_time",cur_time[:,1]),2])
-              append!(time_fun["off"],cur_time[findall(x->x.=="off_time",cur_time[:,1]),2])
-            else
-              append!(tol,ϵ)
-              append!(err,load_CSV(Matrix{T}(undef,0,0), path_to_err)[1])
-              cur_time = load_CSV(Matrix(undef,0,0), path_to_t)
-              append!(time["on"],cur_time[findall(x->x.=="on_time",cur_time[:,1]),2])
-              append!(time["off"],cur_time[findall(x->x.=="off_time",cur_time[:,1]),2])
-            end
+            append!(tol,ϵ)
+            append!(err,load_CSV(Matrix{T}(undef,0,0), path_to_err)[1])
+            cur_time = load_CSV(Matrix(undef,0,0), path_to_t)
+            append!(time["on"],cur_time[findall(x->x.=="on_time",cur_time[:,1]),2])
+            append!(time["off"],cur_time[findall(x->x.=="off_time",cur_time[:,1]),2])
           end
+
         end
       end
 
     end
 
-    (tol,tol_fun,tol_st,tol_fun_st,
-    err,err_fun,err_st,err_fun_st,
-    time,time_fun,time_st,time_fun_st)
+    tol,tol_fun,err,err_fun,time,time_fun
 
   end
 
@@ -184,11 +168,11 @@ function post_process(root::String)
   filter!(el->!occursin("FEM_data",el),root_subs)
   filter!(el->!occursin("plots",el),root_subs)
 
-  (ϵ,ϵ_fun,ϵ_st,ϵ_fun_st) =
+  (ϵ,ϵ_fun,ϵ_st,ϵ_st_fun) =
     (S[],S[],S[],S[],S[],S[],S[],S[])
-  (errH1L2,errH1L2_fun,errH1L2_st,errH1L2_fun_st) =
+  (errH1L2,errH1L2_fun,errH1L2_st,errH1L2_st_fun) =
     (T[],T[],T[],T[],T[],T[],T[],T[])
-  (t,t_fun,t_st,t_fun_st) =
+  (t,t_fun,t_st,t_st_fun) =
     (Dict("on"=>T[],"off"=>T[]),Dict("on"=>T[],"off"=>T[]),
     Dict("on"=>T[],"off"=>T[]),Dict("on"=>T[],"off"=>T[]),
     Dict("on"=>T[],"off"=>T[]),Dict("on"=>T[],"off"=>T[]),
@@ -199,18 +183,18 @@ function post_process(root::String)
       ϵ,ϵ_fun,errH1L2,errH1L2_fun,t,t_fun =
         check_if_fun(dir,ϵ,ϵ_fun,errH1L2,errH1L2_fun,t,t_fun)
     else
-      ϵ_st,ϵ_fun_st,errH1L2_st,errH1L2_fun_st,t_st,t_fun_st =
-        check_if_fun(dir,ϵ_st,ϵ_fun_st,errH1L2_st,errH1L2_fun_st,
-        t_st,t_fun_st)
+      ϵ_st,ϵ_st_fun,errH1L2_st,errH1L2_st_fun,t_st,t_st_fun =
+        check_if_fun(dir,ϵ_st,ϵ_st_fun,errH1L2_st,errH1L2_st_fun,
+        t_st,t_st_fun)
     end
   end
 
   errors = Dict("Standard"=>errH1L2,"Functional"=>errH1L2_fun,
-  "Standard-st"=>errH1L2_st,"Functional-st"=>errH1L2_fun_st)
+  "Standard-st"=>errH1L2_st,"Functional-st"=>errH1L2_st_fun)
   times = Dict("Standard"=>t,"Functional"=>t_fun,
-  "Standard-st"=>t_st,"Functional-st"=>t_fun_st)
+  "Standard-st"=>t_st,"Functional-st"=>t_st_fun)
   tols = Dict("Standard"=>ϵ,"Functional"=>ϵ_fun,
-  "Standard-st"=>ϵ_st,"Functional-st"=>ϵ_fun_st)
+  "Standard-st"=>ϵ_st,"Functional-st"=>ϵ_st_fun)
 
   plots_dir = joinpath(root,"plots")
   create_dir(plots_dir)

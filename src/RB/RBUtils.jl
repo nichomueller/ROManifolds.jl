@@ -72,7 +72,7 @@ end
 
 function get_ParamInfo(RBInfo::Info, μ::Vector)
 
-  get_ParamInfo(RBInfo.FEMInfo, RBInfo.FEMInfo.problem_id, μ)
+  get_ParamInfo(RBInfo.FEMInfo, μ)
 
 end
 

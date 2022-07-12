@@ -242,7 +242,7 @@ mutable struct ROMInfoUnsteady{T} <: Info
   δt::Float64
   θ::Float64
   ϵₜ::Float64
-  functional_M_DEIM::Bool
   st_M_DEIM::Bool
+  functional_M_DEIM::Bool
   adaptivity::Bool
 end

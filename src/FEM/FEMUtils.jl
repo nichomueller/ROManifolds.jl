@@ -1,4 +1,4 @@
-function FEM_paths(root, problem_steadiness, problem_name, mesh_name, case; test_case="")
+function FEM_paths(root, problem_steadiness, problem_name, mesh_name, case)
 
   @assert isdir(root) "$root is an invalid root directory"
 
@@ -16,7 +16,7 @@ function FEM_paths(root, problem_steadiness, problem_name, mesh_name, case; test
   create_dir(current_test)
   FEM_path = joinpath(current_test, "FEM_data")
   create_dir(FEM_path)
-  FEM_snap_path = joinpath(FEM_path, "snapshots"*test_case)
+  FEM_snap_path = joinpath(FEM_path, "snapshots")
   create_dir(FEM_snap_path)
   FEM_structures_path = joinpath(FEM_path, "FEM_structures")
   create_dir(FEM_structures_path)
@@ -52,185 +52,6 @@ function init_FEM_variables()
 
 end
 
-function get_ParamInfo(
-  FEMInfo::SteadyInfo,
-  problem_id::NTuple{1,Int},
-  μ::Vector)
-
-  α(x) = get_α(FEMInfo, problem_id, μ).α(x)
-  f(x) = get_f(FEMInfo, problem_id, μ).f(x)
-  g(x) = get_g(FEMInfo, problem_id, μ).g(x)
-  h(x) = get_h(FEMInfo, problem_id, μ).h(x)
-
-  ParametricInfoSteady(μ, α, f, g, h)
-
-end
-
-function get_α(FEMInfo::SteadyInfo, ::NTuple{1,Int64}, μ)
-  if !FEMInfo.probl_nl["A"]
-    return sum(μ)
-  else
-    return 1. + μ[3] + 1. / μ[3] * exp(-norm(x-Point(μ[1:FEMInfo.D]))^2 / μ[3])
-  end
-end
-
-function get_f(FEMInfo::SteadyInfo, ::NTuple{1,Int64}, μ)
-  if !FEMInfo.probl_nl["f"]
-    return 1.
-  else
-    return 1. + sin(norm(Point(μ[4:3+FEMInfo.D]) .* x)*t)
-  end
-end
-
-function get_g(FEMInfo::SteadyInfo, ::NTuple{1,Int64}, μ)
-  if !FEMInfo.probl_nl["g"]
-    return 0.
-  else
-    return 0.
-  end
-end
-
-function get_h(FEMInfo::SteadyInfo, ::NTuple{1,Int64}, μ)
-  if FEMInfo.probl_nl["h"]
-    return 1. + sin(Point(μ[end-FEMInfo.D+1:end]) .* x)
-  else
-    return 1.
-  end
-end
-
-function get_ParamInfo(
-  FEMInfo::UnsteadyInfo,
-  ::NTuple{1,Int},
-  μ::Vector)
-
-  αₛ(x) = 1.
-  αₜ(t, μ) = 5. * sum(μ) * (2 + sin(t))
-  function α(x, t::Real)
-    if !FEMInfo.probl_nl["A"]
-      return αₛ(x)*αₜ(t, μ)
-    else
-      return 10. * (1. + 1. / μ[3] * exp(-norm(x-Point(μ[1:FEMInfo.D]))^2 * sin(t) / μ[3]))
-    end
-  end
-  α(t::Real) = x -> α(x, t)
-
-  fₛ(x) = 1.
-  fₜ(t::Real) = sin(t)
-  function f(x, t::Real)
-    if !FEMInfo.probl_nl["f"]
-      return fₛ(x)*fₜ(t)
-    else
-      return 1. + sin(norm(Point(μ[4:3+FEMInfo.D]) .* x)*t)
-    end
-  end
-  f(t::Real) = x -> f(x, t)
-
-  gₛ(x) = 0.
-  gₜ(t::Real) = 0.
-  function g(x, t::Real)
-    if !FEMInfo.probl_nl["g"]
-      return gₛ(x)*gₜ(t)
-    else
-      return 0.
-    end
-  end
-  g(t::Real) = x -> g(x, t)
-
-  hₛ(x) = 1.
-  hₜ(t::Real) = sin(t)
-  function h(x, t::Real)
-    if !FEMInfo.probl_nl["h"]
-      return hₛ(x)*hₜ(t)
-    else
-      return 1. + sin(norm(Point(μ[end-FEMInfo.D+1:end]) .* x)*t)
-    end
-  end
-  h(t::Real) = x -> h(x, t)
-
-  mₛ(x) = 1.
-  mₜ(t::Real) = 1.
-  function m(x, t)
-    if !FEMInfo.probl_nl["M"]
-      return mₛ(x)*mₜ(t)
-    else
-      return 1.
-    end
-  end
-  m(t::Real) = x -> m(x, t)
-
-  u₀(x) = 0.
-
-  ParametricInfoUnsteady(
-    μ, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, gₛ, gₜ, g, hₛ, hₜ, h, u₀)
-
-end
-
-function get_ParamInfo(
-  FEMInfo::UnsteadyInfo,
-  ::NTuple{2,Int},
-  μ::Vector)
-
-  αₛ(x) = 1.
-  αₜ(t, μ) = 5. * sum(μ) * (2 + sin(t))
-  function α(x, t::Real)
-    if !FEMInfo.probl_nl["A"]
-      return αₛ(x)*αₜ(t, μ)
-    else
-      return 10. * (1. + 1. / μ[3] * exp(-norm(x-Point(μ[1:FEMInfo.D]))^2 * sin(t) / μ[3]))
-    end
-  end
-  α(t::Real) = x -> α(x, t)
-
-  fₛ(x) = one(VectorValue(FEMInfo.D, Float64))
-  fₜ(t::Real) = one(T)
-  function f(x, t)
-    if !FEMInfo.probl_nl["f"]
-      return fₛ(x)*fₜ(t)
-    else
-      return 1. .+ Point(μ[4:3+FEMInfo.D]) .* x*t
-    end
-  end
-
-  gₛ(x) = zero(VectorValue(FEMInfo.D, Float64))
-  gₜ(t::Real) = 0.
-  function g(x, t::Real)
-    if !FEMInfo.probl_nl["g"]
-      return gₛ(x)*gₜ(t)
-    else
-      return zero(VectorValue(FEMInfo.D, Float64))
-    end
-  end
-  g(t::Real) = x -> g(x, t)
-
-  hₛ(x) = one(VectorValue(FEMInfo.D, Float64))
-  hₜ(t::Real) = sin(t)
-  function h(x, t::Real)
-    if !FEMInfo.probl_nl["h"]
-      return hₛ(x)*hₜ(t)
-    else
-      return 1. .+ Point(μ[end-FEMInfo.D+1:end]) .* x*t
-    end
-  end
-  h(t::Real) = x -> h(x, t)
-
-  mₛ(x) = 1.
-  mₜ(t::Real) = 1.
-  function m(x, t)
-    if !FEMInfo.probl_nl["M"]
-      return mₛ(x)*mₜ(t)
-    else
-      return 1.
-    end
-  end
-  m(t::Real) = x -> m(x, t)
-
-  u₀(x) = [zero(VectorValue(FEMInfo.D, Float64)), 0.]
-
-  ParametricInfoUnsteady(
-    μ, αₛ, αₜ, α, mₛ, mₜ, m, fₛ, fₜ, f, gₛ, gₜ, g, hₛ, hₜ, h, u₀)
-
-end
-
 function nonlinearity_lifting_op(FEMInfo::Info)
   if !FEMInfo.probl_nl["A"] && !FEMInfo.probl_nl["g"]
     return 0
@@ -242,47 +63,6 @@ function nonlinearity_lifting_op(FEMInfo::Info)
     return 3
   end
 end
-
-#= function get_f(FEMInfo::UnsteadyInfo{T}, ::NTuple{2,Int64}, μ) where T
-
-  fₛ(x) = zero(VectorValue(N,T))
-  fₜ(t::Real) = zero(T)
-  function f(x, t)
-    if !FEMInfo.probl_nl["f"]
-      return T(fₛ(x)*fₜ(t))
-    else
-      return zero(VectorValue(FEMInfo.D,T))
-    end
-  end
-  _-> (fₛ,fₜ,f)
-
-end
-
-function get_g(FEMInfo::UnsteadyInfo{T}, ::NTuple{2,Int64}, μ) where T
-  x0 = zero(VectorValue(N,T))
-  diff = x - x0
-  gₛ(x) = T(1 .- diff .* diff)
-  gₜ(t::Real, μ) = T(1-cos(t)+μ[end]*sin(μ[end-1]))
-  function g(x, t)
-    if FEMInfo.probl_nl["g"]
-      return T(gₛ(x)*gₜ(t, μ))
-    else
-      return T(gₛ(x)*gₜ(t, μ))
-    end
-  end
-  _-> (gₛ,gₜ,g)
-end
-
-function get_h(FEMInfo::UnsteadyInfo{T}, ::NTuple{2,Int64}, μ) where T
-  hₛ(x) = zero(VectorValue(FEMInfo.D,T))
-  hₜ(t::Real) = zero(T)
-  h(x, t::Real) = zero(VectorValue(FEMInfo.D,T))
-  _-> (hₛ,hₜ,h)
-end
-
-function get_IC(FEMInfo::UnsteadyInfo{T}, ::NTuple{2,Int64}) where T
-  u₀(x) = [zero(T),zero(VectorValue(FEMInfo.D,T))]
-end =#
 
 function get_timesθ(FEMInfo::UnsteadyInfo)
   collect(FEMInfo.t₀:FEMInfo.δt:FEMInfo.tₗ-FEMInfo.δt).+FEMInfo.δt*FEMInfo.θ
