@@ -85,31 +85,92 @@ end
 function plot_stability_constants(
   FEMSpace::FEMProblem,
   RBInfo::ROMInfoUnsteady,
+  RBVars::PoissonUnsteady,
   Param::ParametricInfoUnsteady)
 
-  M = assemble_FEM_structure(FEMSpace, RBInfo, Param, "M")(0.0)
-  A = assemble_FEM_structure(FEMSpace, RBInfo, Param, "A")(0.0)
-  stability_constants = []
-  for Nₜ = 10:10:1000
-    const_Nₜ = compute_stability_constant(RBInfo,Nₜ,M,A)
-    append!(stability_constants, const_Nₜ)
-  end
-  p = Plot.plot(collect(10:10:1000),
-    stability_constants, xaxis=:log, yaxis=:log, lw = 3,
-    label="||(Aˢᵗ)⁻¹||₂", title = "Euclidean norm of (Aˢᵗ)⁻¹", legend=:topleft)
-  p = Plot.plot!(collect(10:10:1000), collect(10:10:1000),
-    xaxis=:log, yaxis=:log, lw = 3, label="Nₜ")
-  xlabel!("Nₜ")
-  savefig(p, joinpath(RBInfo.paths.results_path, "stability_constant.eps"))
-
-  function compute_stability_constant(RBInfo,Nₜ,M,A)
+  function compute_stability_constant_Nₜ(RBInfo,Nₜ,M,A)
+    println("Considering Nₜ = $Nₜ")
     δt = RBInfo.tₗ/Nₜ
     B₁ = RBInfo.θ*(M + RBInfo.θ*δt*A)
-    B₂ = RBInfo.θ*(-M + (1-RBInfo.θ)*δt*A)
     λ₁,_ = eigs(B₁)
-    λ₂,_ = eigs(B₂)
-    return 1/(minimum(abs.(λ₁)) + minimum(abs.(λ₂)))
+    return 1/minimum(abs.(λ₁))
   end
+
+  function compute_stability_constant_μ(RBInfo,timesθ,M,A)
+    λvec = zeros(length(timesθ))
+    for (iₜ, t) = enumerate(timesθ)
+      println("Considering time instant $iₜ/$(length(timesθ))")
+      B₁ = RBInfo.θ*(M + RBInfo.θ*RBInfo.δt*A(t))
+      λ,_ = eigs(Matrix(B₁))
+      λvec[iₜ] = minimum(abs.(λ))
+    end
+
+    1/minimum(abs.(λvec))
+
+  end
+
+  function compute_MDEIM_structure(
+    basis::Matrix{T},
+    θ,
+    row_idx,
+    iₜ) where T
+
+    Mat = basis * θ[:, iₜ]
+    sparse_Mat_t = zeros(size(basis)[1]^2)
+    sparse_Mat_t[row_idx] = sparse(Mat)
+    sparse(reshape(sparse_Mat_t, size(basis)[1], size(basis)[1]))::SparseMatrixCSC{T,Int64}
+  end
+
+  function compute_DEIM_structure(basis, θ, iₜ)
+    basis * θ[:, iₜ]
+  end
+
+  M = assemble_FEM_structure(FEMSpace, RBInfo, Param, "M")(0.0)
+  A(t) = assemble_FEM_structure(FEMSpace, RBInfo, Param, "A")(t)
+  F(t) = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")(t)
+
+  vec_Nₜ = collect(100:100:1000)
+  stability_constants = []
+  for Nₜ = vec_Nₜ
+    const_Nₜ = compute_stability_constant_Nₜ(RBInfo,Nₜ,M,A(0.0))
+    append!(stability_constants, const_Nₜ)
+  end
+
+  xval = hcat(vec_Nₜ,vec_Nₜ)
+  yval = hcat(vec_Nₜ,stability_constants)
+  label = ["Nₜ", "||(Aˢᵗ)⁻¹||₂"]
+  paths = FEM_paths(root,problem_steadiness,problem_name,mesh_name,case)
+  save_path = paths.current_test
+  generate_and_save_plot(xval, yval, "Euclidean norm of (Aˢᵗ)⁻¹",
+    label, "Nₜ", "||(Aˢᵗ)⁻¹||₂", save_path, true, true;
+    var="stability_constant_Nₜ", selected_color=["black","blue"],
+    selected_style=["lines","lines"], selected_dash = ["",""])
+
+  timesθ = get_timesθ(RBInfo)
+  compute_stability_constant_μ(RBInfo,timesθ,M,A)
+
+  _, θᵃ, θᶠ, θʰ = get_θ(FEMSpace, RBInfo, RBVars, Param)
+
+  stab_norm = zeros(RBVars.Nₜ)
+  A_μ_MDEIM_t = zeros(RBVars.S.Nₛᵘ, RBVars.S.Nₛᵘ, 2)
+  for (iₜ, _) in enumerate(timesθ)
+    A_μ_MDEIM_t[:,:,2] =
+      RBInfo.θ*RBInfo.δt*compute_MDEIM_structure(RBVars.S.MDEIM_mat_A, θᵃ,
+      RBVars.S.row_idx_A, iₜ)
+    if iₜ == 1
+      LHS_μ_DEIM_t =  RBInfo.θ*(A_μ_MDEIM_t[:,:,2]+M)*RBVars.S.ũ[:,iₜ]
+    else
+      LHS_μ_DEIM_t =  (RBInfo.θ*(A_μ_MDEIM_t[:,:,2]+M)*RBVars.S.ũ[:,iₜ] +
+        ((1-RBInfo.θ)*A_μ_MDEIM_t[:,:,1] - RBInfo.θ*M)*RBVars.S.ũ[:,iₜ-1])
+    end
+    F_μ_DEIM_t = compute_DEIM_structure(RBVars.S.DEIM_mat_F, θᶠ, iₜ)
+    H_μ_DEIM_t = compute_DEIM_structure(RBVars.S.DEIM_mat_F, θʰ, iₜ)
+    RHS_μ_DEIM_t = RBInfo.θ*RBInfo.δt*(F_μ_DEIM_t + Hμ_DEIM_t)
+    stab_norms[iₜ] = norm(LHS_μ_DEIM_t - RHS_μ_DEIM_t)
+    A_μ_MDEIM_t[:,:,1] = A_μ_MDEIM_t[:,:,2]
+  end
+
+  save_CSV(stab_norm, joinpath(RBInfo.paths.results_path, "stab_norm.csv"))
 
 end
 
@@ -152,7 +213,26 @@ function post_process(root::String)
 
     end
 
-    tol,tol_fun,err,err_fun,time,time_fun
+    tol,err,time
+
+  end
+
+  function get_style_info(key::String, selected_color, selected_style, selected_dash)
+
+    if occursin("functional", key)
+      cur_color = "red"
+    else
+      cur_color = "blue"
+    end
+
+    if occursin("-ST", key)
+      cur_dash = "dash"
+    else
+      cur_dash = ""
+    end
+
+    (vcat(selected_color, cur_color), vcat(selected_style, "lines"),
+      vcat(selected_dash, cur_dash))
 
   end
 
@@ -187,31 +267,40 @@ function post_process(root::String)
     end
   end
 
-  errors = Dict("Standard"=>errH1L2,"Functional"=>errH1L2_fun,
-  "Standard-st"=>errH1L2_st,"Functional-st"=>errH1L2_st_fun)
-  times = Dict("Standard"=>t,"Functional"=>t_fun,
-  "Standard-st"=>t_st,"Functional-st"=>t_st_fun)
-  tols = Dict("Standard"=>ϵ,"Functional"=>ϵ_fun,
-  "Standard-st"=>ϵ_st,"Functional-st"=>ϵ_st_fun)
+  errors = Dict("err standard-S"=>errH1L2,"err functional-S"=>errH1L2_fun,
+  "err standard-ST"=>errH1L2_st,"err functional-ST"=>errH1L2_st_fun)
+  times = Dict("t standard-S"=>t,"t functional-S"=>t_fun,
+  "t standard-ST"=>t_st,"t functional-ST"=>t_st_fun)
+  tols = Dict("ϵ standard-S"=>ϵ,"ϵ functional-S"=>ϵ_fun,
+  "ϵ standard-ST"=>ϵ_st,"ϵ functional-ST"=>ϵ_st_fun)
 
   plots_dir = joinpath(root,"plots")
   create_dir(plots_dir)
 
-  for (key, val) in errors
-    if !isempty(val)
-      ϵ = parse.(T,tols[key])
-      xvals = hcat(ϵ,ϵ)
-      yvals = hcat(val,ϵ)
-      generate_and_save_plot(xvals,yvals,"Average H¹-l² err, method: "*key,
-      ["H¹-l² err","ϵ"],"ϵ","",plots_dir,true,true;var="err_"*key,
-      selected_style=vcat(["lines"],["lines"]))
-    end
-  end
   CSV.write(joinpath(plots_dir, "errors.csv"),errors)
   CSV.write(joinpath(plots_dir, "times.csv"),times)
-  #= for (key, val) in times
-    generate_and_save_plot(val,"Average online time, method: "*key,tols[key],
-    "","",plots_dir,false,true;var="time_"*key,selected_style=["scatter"])
-  end =#
+
+  if ϵ == ϵ_fun == ϵ_st == ϵ_st_fun
+
+    tol = parse.(T,ϵ)
+    xlab, ylab = "ϵ", "H¹-l² err"
+
+    xvals, yvals = tol, tol
+    label, selected_style, selected_color, selected_dash = "ϵ", "lines", "black", ""
+    for (key, val) in errors
+      if !isempty(val)
+        xvals = hcat(xvals, tol)
+        yvals = hcat(yvals, val)
+        label = vcat(label, key)
+        selected_color, selected_style, selected_dash =
+          get_style_info(key, selected_color, selected_style, selected_dash)
+      end
+    end
+
+    generate_and_save_plot(xvals,yvals,"Average H¹-l² error",label,xlab,ylab,
+      plots_dir,true,true;var="err",selected_color=selected_color,
+      selected_style=selected_style,selected_dash=selected_dash)
+
+  end
 
 end

@@ -595,10 +595,6 @@ function online_phase(
     post_process(RBInfo, pass_to_pp)
   end
 
-  #=
-  plot_stability_constant(FEMSpace,RBInfo,Param,Nₜ)
-  =#
-
 end
 
 function loop_on_params(
@@ -626,7 +622,7 @@ function loop_on_params(
     Param = get_ParamInfo(RBInfo, μ[nb])
 
     uₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
-    DataFrame))[:,(nb-1)*RBVars.Nₜ+1:nb*RBVars.Nₜ]
+      DataFrame))[:,(nb-1)*RBVars.Nₜ+1:nb*RBVars.Nₜ]
 
     mean_uₕ_test += uₕ_test
 

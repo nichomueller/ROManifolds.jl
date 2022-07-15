@@ -18,7 +18,8 @@ end
 
 function generate_and_save_plot(xval::Array, yval::Array, title::String,
   label::Array, xlab::String, ylab::String, save_path::String,
-  semilogx=false, semilogy=true; var="u",selected_style=["lines"])
+  semilogx=false, semilogy=true; var="u",selected_color=["blue"],
+  selected_style=["lines"],selected_dash=[""])
 
   @assert size(xval) == size(yval) "Invalid plot: provide an input with the same
     x-values as its y-values"
@@ -44,7 +45,7 @@ function generate_and_save_plot(xval::Array, yval::Array, title::String,
 
   n_traces = size(xval)[2]
   traces = [scatter(x=xval[:,i],y=yval[:,i],mode=selected_style[i],name=label[i],
-    line=attr(width=4)) for i=1:n_traces]
+    line=attr(width=4,color=selected_color[i],dash=selected_dash[i])) for i=1:n_traces]
   p = plot(traces,layout)
   savefig(p, joinpath(save_path, string(var)*".eps"))
 
