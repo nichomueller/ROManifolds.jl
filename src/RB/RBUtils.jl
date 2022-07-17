@@ -70,7 +70,7 @@ function assemble_FEM_structure(
 
 end
 
-function get_ParamInfo(RBInfo::Info, μ::Vector)
+function get_ParamInfo(RBInfo::Info, μ::Vector{T}) where T
 
   get_ParamInfo(RBInfo.FEMInfo, μ)
 

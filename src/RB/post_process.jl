@@ -109,22 +109,6 @@ function plot_stability_constants(
 
   end
 
-  function compute_MDEIM_structure(
-    basis::Matrix{T},
-    θ,
-    row_idx,
-    iₜ) where T
-
-    Mat = basis * θ[:, iₜ]
-    sparse_Mat_t = zeros(size(basis)[1]^2)
-    sparse_Mat_t[row_idx] = sparse(Mat)
-    sparse(reshape(sparse_Mat_t, size(basis)[1], size(basis)[1]))::SparseMatrixCSC{T,Int64}
-  end
-
-  function compute_DEIM_structure(basis, θ, iₜ)
-    basis * θ[:, iₜ]
-  end
-
   M = assemble_FEM_structure(FEMSpace, RBInfo, Param, "M")(0.0)
   A(t) = assemble_FEM_structure(FEMSpace, RBInfo, Param, "A")(t)
   F(t) = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")(t)
@@ -148,29 +132,6 @@ function plot_stability_constants(
 
   timesθ = get_timesθ(RBInfo)
   compute_stability_constant_μ(RBInfo,timesθ,M,A)
-
-  _, θᵃ, θᶠ, θʰ = get_θ(FEMSpace, RBInfo, RBVars, Param)
-
-  stab_norm = zeros(RBVars.Nₜ)
-  A_μ_MDEIM_t = zeros(RBVars.S.Nₛᵘ, RBVars.S.Nₛᵘ, 2)
-  for (iₜ, _) in enumerate(timesθ)
-    A_μ_MDEIM_t[:,:,2] =
-      RBInfo.θ*RBInfo.δt*compute_MDEIM_structure(RBVars.S.MDEIM_mat_A, θᵃ,
-      RBVars.S.row_idx_A, iₜ)
-    if iₜ == 1
-      LHS_μ_DEIM_t =  RBInfo.θ*(A_μ_MDEIM_t[:,:,2]+M)*RBVars.S.ũ[:,iₜ]
-    else
-      LHS_μ_DEIM_t =  (RBInfo.θ*(A_μ_MDEIM_t[:,:,2]+M)*RBVars.S.ũ[:,iₜ] +
-        ((1-RBInfo.θ)*A_μ_MDEIM_t[:,:,1] - RBInfo.θ*M)*RBVars.S.ũ[:,iₜ-1])
-    end
-    F_μ_DEIM_t = compute_DEIM_structure(RBVars.S.DEIM_mat_F, θᶠ, iₜ)
-    H_μ_DEIM_t = compute_DEIM_structure(RBVars.S.DEIM_mat_F, θʰ, iₜ)
-    RHS_μ_DEIM_t = RBInfo.θ*RBInfo.δt*(F_μ_DEIM_t + Hμ_DEIM_t)
-    stab_norms[iₜ] = norm(LHS_μ_DEIM_t - RHS_μ_DEIM_t)
-    A_μ_MDEIM_t[:,:,1] = A_μ_MDEIM_t[:,:,2]
-  end
-
-  save_CSV(stab_norm, joinpath(RBInfo.paths.results_path, "stab_norm.csv"))
 
 end
 

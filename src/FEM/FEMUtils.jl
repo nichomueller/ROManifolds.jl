@@ -119,6 +119,28 @@ function find_FE_elements(
 
 end
 
+function set_labels(FEMInfo::Info, model::DiscreteModel)
+
+  labels = get_face_labeling(model)
+  if !isempty(FEMInfo.dirichlet_tags) && !isempty(FEMInfo.dirichlet_bnds)
+    for i = eachindex(FEMInfo.dirichlet_tags)
+      if FEMInfo.dirichlet_tags[i] ∉ labels.tag_to_name
+        add_tag_from_tags!(labels, FEMInfo.dirichlet_tags[i], FEMInfo.dirichlet_bnds[i])
+      end
+    end
+  end
+  if !isempty(FEMInfo.neumann_tags) && !isempty(FEMInfo.neumann_bnds)
+    for i = eachindex(FEMInfo.neumann_tags)
+      if FEMInfo.neumann_tags[i] ∉ labels.tag_to_name
+        add_tag_from_tags!(labels, FEMInfo.neumann_tags[i], FEMInfo.neumann_bnds[i])
+      end
+    end
+  end
+
+  labels
+
+end
+
 function generate_dcube_discrete_model(
   FEMInfo::Info,
   d::Int,

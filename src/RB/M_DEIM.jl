@@ -78,7 +78,6 @@ function MDEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
   el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(MDEIM_idx_sparse_space))
 
   _, MDEIM_idx_time, _ = M_DEIM_offline(MDEIM_mat_time, Σ)
-  #MDEIM_idx_time = vcat(MDEIM_idx_time, Int(RBInfo.tₗ / RBInfo.δt))
   unique!(sort!(MDEIM_idx_time))
 
   MDEIM_mat, MDEIM_idx_sparse, MDEIMᵢ_mat, row_idx, el, MDEIM_idx_time
@@ -125,7 +124,6 @@ function DEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
   end
 
   _, DEIM_idx_time, _ = M_DEIM_offline(DEIM_mat_time, Σ)
-  #DEIM_idx_time = vcat(DEIM_idx_time, Int(RBInfo.tₗ / RBInfo.δt))
   unique!(sort!(DEIM_idx_time))
 
   DEIM_mat, DEIM_idx, DEIMᵢ_mat, el, DEIM_idx_time
