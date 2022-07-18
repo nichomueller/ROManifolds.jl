@@ -168,14 +168,14 @@ end
 
 function save_affine_structures(
   RBInfo::Info,
-  RBVars::PoissonSPGRB)
+  RBVars::PoissonSPGRB{T}) where T
 
   if RBInfo.save_offline_structures
 
-    Aₙ = reshape(RBVars.Aₙ, :, RBVars.Qᵃ)
-    AΦᵀPᵤ⁻¹ = reshape(RBVars.AΦᵀPᵤ⁻¹, :, RBVars.Qᵃ)
-    save_CSV(Aₙ, joinpath(RBInfo.Paths.ROM_structures_path, "Aₙ.csv"))
-    save_CSV(AΦᵀPᵤ⁻¹, joinpath(RBInfo.Paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
+    save_CSV(reshape(RBVars.Aₙ, :, RBVars.Qᵃ)::Matrix{T},
+      joinpath(RBInfo.Paths.ROM_structures_path, "Aₙ.csv"))
+    save_CSV(reshape(RBVars.AΦᵀPᵤ⁻¹, :, RBVars.Qᵃ)::Matrix{T},
+      joinpath(RBInfo.Paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
 
     if !RBInfo.build_parametric_RHS
       save_CSV(RBVars.Fₙ, joinpath(RBInfo.Paths.ROM_structures_path, "Fₙ.csv"))
@@ -208,6 +208,39 @@ function get_Q(
 
 end
 
+function get_RB_system(
+  FEMSpace::SteadyProblem,
+  RBInfo::ROMInfoSteady,
+  RBVars::PoissonSPGRB,
+  Param::ParametricInfoSteady)
+
+  initialize_RB_system(RBVars)
+  initialize_online_time(RBVars)
+
+  RBVars.online_time = @elapsed begin
+    get_Q(RBInfo, RBVars)
+    blocks = [1]
+    operators = get_system_blocks(RBInfo, RBVars, blocks, blocks)
+
+    θᵃ, θᶠ, θʰ = get_θ(FEMSpace, RBInfo, RBVars, Param)
+
+    if "LHS" ∈ operators
+      get_RB_LHS_blocks(RBVars, θᵃ)
+    end
+
+    if "RHS" ∈ operators
+      if !RBInfo.build_parametric_RHS
+        get_RB_RHS_blocks(RBVars, θᶠ, θʰ)
+      else
+        build_param_RHS(FEMSpace, RBInfo, RBVars, Param, θᵃ)
+      end
+    end
+  end
+
+  save_system_blocks(RBInfo,RBVars,blocks,blocks,operators)
+
+end
+
 function build_param_RHS(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
@@ -221,7 +254,7 @@ function build_param_RHS(
   AΦᵀPᵤ⁻¹ = assemble_parametric_structure(θᵃ_temp, RBVars.AΦᵀPᵤ⁻¹)
   Fₙ, Hₙ = AΦᵀPᵤ⁻¹ * F, AΦᵀPᵤ⁻¹ * H
 
-  reshape(Fₙ, :, 1), reshape(Hₙ, :, 1)
+  push!(RBVars.RHSₙ, reshape(Fₙ'+Hₙ',:,1))::Vector{Matrix{T}}
 
 end
 
@@ -232,13 +265,26 @@ function get_θ(
   Param::ParametricInfoSteady)
 
   θᵃ_temp = get_θᵃ(FEMSpace, RBInfo, RBVars, Param)
-  θᵃ = [θᵃ_temp[q₁]*θᵃ_temp[q₂] for q₁ = 1:RBVars.Qᵃ for q₂ = 1:RBVars.Qᵃ]
+  θᵃ = zeros(T, RBVars.Qᵃ^2, 1)
+  for q₁ = 1:RBVars.Qᵃ
+    for q₂ = 1:RBVars.Qᵃ
+      θᵃ[(q₁-1)*RBVars.Qᵃ+q₂] = θᵃ_temp[q₁]*θᵃ_temp[q₂]
+    end
+  end
 
   if !RBInfo.build_parametric_RHS
 
     θᶠ_temp, θʰ_temp = get_θᶠʰ(FEMSpace, RBInfo, RBVars, Param)
-    θᶠ = [θᵃ_temp[q₁]*θᶠ_temp[q₂] for q₁ = 1:RBVars.Qᵃ for q₂ = 1:RBVars.Qᶠ]
-    θʰ = [θᵃ_temp[q₁]*θʰ_temp[q₂] for q₁ = 1:RBVars.Qᵃ for q₂ = 1:RBVars.Qʰ]
+    θᶠ = zeros(T, RBVars.Qᵃ*RBVars.Qᶠ, 1)
+    θʰ = zeros(T, RBVars.Qᵃ*RBVars.Qʰ, 1)
+    for q₁ = 1:RBVars.Qᵃ
+      for q₂ = 1:RBVars.Qᶠ
+        θᶠ[(q₁-1)*RBVars.Qᵃ+q₂] = θᵃ_temp[q₁]*θᶠ_temp[q₂]
+      end
+      for q₂ = 1:RBVars.Qʰ
+        θʰ[(q₁-1)*RBVars.Qᵃ+q₂] = θᵃ_temp[q₁]*θʰ_temp[q₂]
+      end
+    end
 
   else
 

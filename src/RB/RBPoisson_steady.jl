@@ -160,17 +160,9 @@ function save_M_DEIM_structures(
   list_names = ("MDEIM_mat_A","MDEIMᵢ_A","MDEIM_idx_A","row_idx_A","sparse_el_A",
     "DEIM_mat_F","DEIMᵢ_F","DEIM_idx_F","sparse_el_F",
     "DEIM_mat_H","DEIMᵢ_H","DEIM_idx_H","sparse_el_H")
-  l_info_vec = [[l_idx,l_val] for (l_idx,l_val) in
-    enumerate(list_M_DEIM) if !all(isempty.(l_val))]
 
-  if !isempty(l_info_vec)
-    l_info_mat = reduce(vcat,transpose.(l_info_vec))
-    l_idx,l_val = l_info_mat[:,1], transpose.(l_info_mat[:,2])
-    for (i₁,i₂) in enumerate(l_idx)
-      save_CSV(l_val[i₁], joinpath(RBInfo.Paths.ROM_structures_path,
-        list_names[i₂]*".csv"))
-    end
-  end
+  save_structures_in_list(list_M_DEIM, list_names,
+    RBInfo.Paths.ROM_structures_path)
 
 end
 
@@ -461,6 +453,34 @@ function get_θᶠʰ(
 
 end
 
+function get_RB_LHS_blocks(
+  RBVars::PoissonSteady{T},
+  θᵃ::Matrix) where T
+
+  println("Assembling reduced LHS")
+
+  block₁ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ)
+  for q = 1:RBVars.Qᵃ
+    block₁ += RBVars.Aₙ[:,:,q] * θᵃ[q]
+  end
+
+  push!(RBVars.LHSₙ, block₁)::Vector{Matrix{T}}
+
+end
+
+function get_RB_RHS_blocks(
+  RBVars::PoissonSteady{T},
+  θᶠ::Array,
+  θʰ::Array) where T
+
+  println("Assembling reduced RHS")
+
+  block₁ = RBVars.Fₙ * θᶠ + RBVars.Hₙ * θʰ
+
+  push!(RBVars.RHSₙ, block₁)::Vector{Matrix{T}}
+
+end
+
 function initialize_RB_system(RBVars::PoissonSteady{T}) where T
   RBVars.LHSₙ = Matrix{T}[]
   RBVars.RHSₙ = Matrix{T}[]
@@ -468,45 +488,6 @@ end
 
 function initialize_online_time(RBVars::PoissonSteady)
   RBVars.online_time = 0.0
-end
-
-function get_RB_system(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
-  RBVars::PoissonSteady,
-  Param::ParametricInfoSteady)
-
-  initialize_RB_system(RBVars)
-  initialize_online_time(RBVars)
-
-  RBVars.online_time = @elapsed begin
-    get_Q(RBInfo, RBVars)
-    blocks = [1]
-    operators = get_system_blocks(RBInfo, RBVars, blocks, blocks)
-
-    θᵃ, θᶠ, θʰ = get_θ(FEMSpace, RBInfo, RBVars, Param)
-
-    if "LHS" ∈ operators
-      println("Assembling reduced LHS")
-      push!(RBVars.LHSₙ,assemble_parametric_structure(θᵃ, RBVars.Aₙ))
-    end
-
-    if "RHS" ∈ operators
-      if !RBInfo.build_parametric_RHS
-        println("Assembling reduced RHS")
-        Fₙ_μ = assemble_parametric_structure(θᶠ, RBVars.Fₙ)
-        Hₙ_μ = assemble_parametric_structure(θʰ, RBVars.Hₙ)
-        push!(RBVars.RHSₙ, reshape(Fₙ_μ+Hₙ_μ,:,1))
-      else
-        println("Assembling reduced RHS exactly")
-        Fₙ_μ, Hₙ_μ = build_param_RHS(FEMSpace, RBInfo, RBVars, Param, θᵃ)
-        push!(RBVars.RHSₙ, reshape(Fₙ_μ+Hₙ_μ,:,1))
-      end
-    end
-  end
-
-  save_system_blocks(RBInfo,RBVars,blocks,blocks,operators)
-
 end
 
 function solve_RB_system(

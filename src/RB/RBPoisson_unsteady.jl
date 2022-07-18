@@ -229,17 +229,9 @@ function save_M_DEIM_structures(
     RBVars.MDEIM_idx_time_M, RBVars.DEIM_idx_time_F, RBVars.DEIM_idx_time_H)
   list_names = ("MDEIM_mat_M", "MDEIMᵢ_M", "MDEIM_idx_M", "sparse_el_M",
    "row_idx_M", "MDEIM_idx_time_A", "MDEIM_idx_time_M", "DEIM_idx_time_F", "DEIM_idx_time_H")
-  l_info_vec = [[l_idx,l_val] for (l_idx,l_val) in
-    enumerate(list_M_DEIM) if !all(isempty.(l_val))]
 
-  if !isempty(l_info_vec)
-    l_info_mat = reduce(vcat,transpose.(l_info_vec))
-    l_idx,l_val = l_info_mat[:,1], transpose.(l_info_mat[:,2])
-    for (i₁,i₂) in enumerate(l_idx)
-      save_CSV(l_val[i₁], joinpath(RBInfo.Paths.ROM_structures_path,
-        list_names[i₂]*".csv"))
-    end
-  end
+  save_structures_in_list(list_M_DEIM, list_names,
+    RBInfo.Paths.ROM_structures_path)
 
   save_M_DEIM_structures(RBInfo, RBVars.S)
 
