@@ -214,13 +214,13 @@ function DEIM_offline(basis)
     =#
 
     n = shape(basis)[2]
-    DEIM_idx = zeros(Int64, n)
+    DEIM_idx = zeros(Int, n)
 
-    DEIM_idx[1] = convert(Int64, argmax(abs(basis[:, 1])))
+    DEIM_idx[1] = convert(Int, argmax(abs(basis[:, 1])))
 
     if n > 1
         res = self.M_basis[:, 2] - dot(basis[:, 1], basis[DEIM_idx[1], 2] / basis[DEIM_idx[1], 1])
-        DEIM_idx[2] = convert(Int64, argmax(abs(res)))
+        DEIM_idx[2] = convert(Int, argmax(abs(res)))
     end
 
     proj = zeros(n)
@@ -228,7 +228,7 @@ function DEIM_offline(basis)
     for m in range(3, n)
         mul!(proj, basis[:, 1:m], mul!(tmp, basis[DEIM_idx[1:m], 1:m], basis[DEIM_idx[1:m], m]))
         res = basis[:, m] - proj
-        DEIM_idx[m] = convert(Int64, argmax(abs(res)))
+        DEIM_idx[m] = convert(Int, argmax(abs(res)))
     end
 
     DEIM_mat = basis[:, DEIM_idx]
@@ -292,19 +292,19 @@ struct RB_info{T<:String}
         n_snaps = ROM_Info["n_snapshots"]
         snaps_matrix = zeros(Nᵤˢ, n_snaps)
         A = zeros(Nᵤˢ, Nᵤˢ)
-        A_affine = Matrix{Float64}[]
-        θᴬ = Array{Float64}[]
+        A_affine = Matrix{Float}[]
+        θᴬ = Array{Float}[]
         Xᵤ = zeros(Nᵤˢ, Nᵤˢ)
         F = zeros(Nᵤˢ)
-        F_affine = Array{Float64}[]
-        θᶠ = Array{Float64}[]
+        F_affine = Array{Float}[]
+        θᶠ = Array{Float}[]
         W̃ = zeros(Nᵤˢ)
 
-        basis_space = Array{Float64}(undef, 0, 2)
-        Aₙ = Array{Float64}(undef, 0, 2)
-        Aₙ_affine = Matrix{Float64}[]
+        basis_space = Array{Float}(undef, 0, 2)
+        Aₙ = Array{Float}(undef, 0, 2)
+        Aₙ_affine = Matrix{Float}[]
         fₙ = []
-        fₙ_affine = Array{Float64}[]
+        fₙ_affine = Array{Float}[]
         Wₙ = []
 
     end

@@ -59,7 +59,7 @@ function assemble_reduced_affine_components(RBInfo, RBVars::PoissonSTGRB, operat
 
       println("The forcing term is non-affine: running the DEIM offline phase")
       projection_time += @elapsed begin
-        Fₙ_i = Float64[]
+        Fₙ_i = Float[]
         for i_nₛ = 1:maximum(10, RBInfo.nₛ)
           Param = get_ParamInfo(RBInfo, μ[i_nₛ])
           F_i = assemble_forcing(FEMSpace, Param)

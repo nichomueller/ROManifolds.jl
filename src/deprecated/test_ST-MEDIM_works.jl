@@ -1,5 +1,5 @@
 mutable struct info
-  Nₕ²::Int64; Nₜ::Int64; nₛ::Int64; ϵ::Float64;
+  Nₕ²::Int; Nₜ::Int; nₛ::Int; ϵ::Float;
 end
 
 function simple_model()
@@ -31,7 +31,7 @@ function simple_model()
   dΓd = Measure(Γd, degree)
   Qₕ = CellQuadrature(Ω, degree)
 
-  refFE = Gridap.ReferenceFE(lagrangian, Float64, 1)
+  refFE = Gridap.ReferenceFE(lagrangian, Float, 1)
   V₀ = TestFEMSpace(model, refFE; conformity=:H1)
   g₀(x, t::Real) = 0
   g₀(t::Real) = x->g₀(x,t)
@@ -107,7 +107,7 @@ end
   _, idx_time = from_spacetime_to_space_time_idx_vec(MDEIM_idx_sparse, FEMSpace.Nₛᵘ^2)
   idx_time = sort(idx_time)
   unique!(idx_time)
-  idx_collect = Int64[]
+  idx_collect = Int[]
   for i = 1:length(idx_time)
     append!(idx_collect,collect(II.Nₕ²*(idx_time[i]-1)+1:II.Nₕ²*idx_time[i]))
   end
@@ -128,7 +128,7 @@ function check_eigen(online_snap,approx_snap,Nₜ)
 end
 
 """Unsteady case"""
-function run_one_test_ST_MDEIM(FEMSpace, RBInfo, nₛMDEIM::Int64)
+function run_one_test_ST_MDEIM(FEMSpace, RBInfo, nₛMDEIM::Int)
 
   snaps, row_idx = define_offline_snaps(FEMSpace, RBInfo, nₛMDEIM)
   #snaps_red = define_offline_snaps_red(snaps)
@@ -148,7 +148,7 @@ function run_one_test_ST_MDEIM(FEMSpace, RBInfo, nₛMDEIM::Int64)
   err,runtime,Q
 end
 
-function define_offline_snaps(FEMSpace, RBInfo, nₛMDEIM::Int64)
+function define_offline_snaps(FEMSpace, RBInfo, nₛMDEIM::Int)
 
   timesθ = collect(RBInfo.tₗ₀:RBInfo.δt:RBInfo.tₗ-RBInfo.δt).+RBInfo.δt*RBInfo.θ
   Nₜ = length(timesθ)
@@ -157,7 +157,7 @@ function define_offline_snaps(FEMSpace, RBInfo, nₛMDEIM::Int64)
 
   for k = 1:nₛMDEIM
     println("Considering Parameter number $k, need $(nₛMDEIM-k) more!")
-    μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
+    μₖ = parse.(Float, split(chop(μ[k]; head=1, tail=1), ','))
     Param = get_ParamInfo(problem_id, RBInfo, μₖ)
     A_t = assemble_stiffness(FEMSpace, RBInfo, Param)
 
@@ -208,7 +208,7 @@ function define_online_ST_stiffness(FEMSpace, RBInfo, el)
   path = "/home/user1/git_repos/Mabla.jl/tests/unsteady/poisson/3D_1/model.json/FEM_data/snapshots/μ.csv"
   timesθ = collect(RBInfo.tₗ₀:RBInfo.δt:RBInfo.tₗ-RBInfo.δt).+RBInfo.δt*RBInfo.θ
   μ = load_CSV(path)
-  μₒₙ = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
+  μₒₙ = parse.(Float, split(chop(μ[95]; head=1, tail=1), ','))
   Param = get_ParamInfo(problem_id, RBInfo, μₒₙ)
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2)
@@ -232,7 +232,7 @@ function define_online_ST_stiffness_old(FEMSpace, RBInfo, el, row_idx)
   path = "/home/user1/git_repos/Mabla.jl/tests/unsteady/poisson/3D_1/model.json/FEM_data/snapshots/μ.csv"
   timesθ = collect(RBInfo.tₗ₀:RBInfo.δt:RBInfo.tₗ-RBInfo.δt).+RBInfo.δt*RBInfo.θ
   μ = load_CSV(path)
-  μₒₙ = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
+  μₒₙ = parse.(Float, split(chop(μ[95]; head=1, tail=1), ','))
   Param = get_ParamInfo(problem_id, RBInfo, μₒₙ)
   Acom(t) = assemble_matrix(∫(∇(FEMSpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FEMSpace.ϕᵤ(t)))) * FEMSpace.dΩ, FEMSpace.V(t), FEMSpace.V₀)
 
@@ -254,7 +254,7 @@ function define_online_ST_stiffness_fast(FEMSpace, RBInfo, el, MDEIM_idx_sparse)
   path = "/home/user1/git_repos/Mabla.jl/tests/unsteady/poisson/3D_1/model.json/FEM_data/snapshots/μ.csv"
   timesθ = collect(RBInfo.tₗ₀:RBInfo.δt:RBInfo.tₗ-RBInfo.δt).+RBInfo.δt*RBInfo.θ
   μ = load_CSV(path)
-  μₒₙ = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
+  μₒₙ = parse.(Float, split(chop(μ[95]; head=1, tail=1), ','))
   Param = get_ParamInfo(problem_id, RBInfo, μₒₙ)
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2)
@@ -278,9 +278,9 @@ end
 
 function run_multiple_tests_ST_MDEIM(FEMSpace,RBInfo)
 
-  err_vec = Float64[]
-  time_vec = Float64[]
-  Q_vec = Int64[]
+  err_vec = Float[]
+  time_vec = Float[]
+  Q_vec = Int[]
 
   #err1,time1,Q1 = run_one_test_ST_MDEIM(FEMSpace, RBInfo, 1)
   err2,time2,Q2 = run_one_test_ST_MDEIM(FEMSpace, RBInfo, 3)
@@ -360,11 +360,11 @@ function M_DEIM_offline_old(sparse_M_DEIM_mat::SparseMatrixCSC, Σ::Vector)
 
   (N, n) = size(M_DEIM_mat)
   n_new = n
-  M_DEIM_idx = Int64[]
-  append!(M_DEIM_idx, convert(Int64, argmax(abs.(M_DEIM_mat[:, 1]))[1]))
+  M_DEIM_idx = Int[]
+  append!(M_DEIM_idx, convert(Int, argmax(abs.(M_DEIM_mat[:, 1]))[1]))
   for m in range(2, n)
     res = M_DEIM_mat[:, m] - M_DEIM_mat[:, 1:(m-1)] * (M_DEIM_mat[M_DEIM_idx[1:(m-1)], 1:(m-1)] \ M_DEIM_mat[M_DEIM_idx[1:(m-1)], m])
-    append!(M_DEIM_idx, convert(Int64, argmax(abs.(res))[1]))
+    append!(M_DEIM_idx, convert(Int, argmax(abs.(res))[1]))
     if abs(det(M_DEIM_mat[M_DEIM_idx[1:m], 1:m])) ≤ 1e-80
       n_new = m
       break
@@ -380,7 +380,7 @@ end
 
 function build_A_snapshots_old(FEMSpace::UnsteadyProblem, RBInfo::Info, μ::Vector)
 
-  Nₜ = convert(Int64, RBInfo.tₗ/RBInfo.δt)
+  Nₜ = convert(Int, RBInfo.tₗ/RBInfo.δt)
   δtθ = RBInfo.δt*RBInfo.θ
   timesθ = collect(RBInfo.tₗ₀:RBInfo.δt:RBInfo.tₗ-RBInfo.δt).+δtθ
 
@@ -410,7 +410,7 @@ function MDEIM_offline_old(FEMSpace::UnsteadyProblem, RBInfo::Info)
 
   for k = 1:RBInfo.nₛ_MDEIM
     println("Considering Parameter number $k, need $(RBInfo.nₛ_MDEIM-k) more!")
-    μₖ = parse.(Float64, split(chop(μ[k]; head=1, tail=1), ','))
+    μₖ = parse.(Float, split(chop(μ[k]; head=1, tail=1), ','))
 
     snapsₖ = build_A_snapshots_old(FEMSpace, RBInfo, μₖ)
 
@@ -425,7 +425,7 @@ function MDEIM_offline_old(FEMSpace::UnsteadyProblem, RBInfo::Info)
   sparse_MDEIM_mat, Σ = M_DEIM_POD_old(compressed_snaps_old, RBInfo.ϵₛ)
   MDEIM_mat_old, MDEIM_idx_old, MDEIM_err_bound = M_DEIM_offline_old(sparse_MDEIM_mat, Σ)
 
-  Nₕ = convert(Int64, sqrt(size(MDEIM_mat_old)[1]))
+  Nₕ = convert(Int, sqrt(size(MDEIM_mat_old)[1]))
   r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx_old, Nₕ)
 
   el_old = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(union(r_idx, c_idx)))
@@ -438,11 +438,11 @@ function assemble_MDEIM_matrices_old(RBInfo::Info, RBVars::PoissonSTGRB)
 
   MDEIM_mat_old, MDEIM_idx_old, sparse_el_old, _, _ = MDEIM_offline_old(FEMSpace, RBInfo)
   Q = size(MDEIM_mat_old)[2]
-  #= Matₙ = zeros(RBVars.S.nₛᵘ, RBVars.S.nₛᵘ, Q)
+  #= Matₙ = zeros(RBVars.nₛᵘ, RBVars.nₛᵘ, Q)
   for q = 1:Q
     println("ST-GRB: affine component number $q, matrix $var"
-    Matq = reshape(MDEIM_mat[:,q], (RBVars.S.Nₛᵘ, RBVars.S.Nₛᵘ))
-    Matₙ[:,:,q] = RBVars.S.Φₛᵘ' * Matrix(Matq) * RBVars.S.Φₛᵘ
+    Matq = reshape(MDEIM_mat[:,q], (RBVars.Nₛᵘ, RBVars.Nₛᵘ))
+    Matₙ[:,:,q] = RBVars.Φₛᵘ' * Matrix(Matq) * RBVars.Φₛᵘ
   end =#
   MDEIMᵢ_mat_old = Matrix(MDEIM_mat_old[MDEIM_idx_old, :])
 
@@ -454,8 +454,8 @@ function get_θᵃ_old(RBVars,MDEIM_mat_old, MDEIM_idx_old, MDEIMᵢ_mat_old, sp
 
   Qold = size(MDEIM_mat_old)[2]
   A_μ_sparse_old = build_sparse_mat_old(FEMInfo, FEMSpace, RBInfo, sparse_el_old)
-  Nₛᵘ = RBVars.S.Nₛᵘ
-  θᵃ_old = zeros(RBVars.S.Qᵃ, RBVars.Nₜ)
+  Nₛᵘ = RBVars.Nₛᵘ
+  θᵃ_old = zeros(RBVars.Qᵃ, RBVars.Nₜ)
   for iₜ = 1:RBVars.Nₜ
     θᵃ_old[:,iₜ] = M_DEIM_online(A_μ_sparse_old[:,(iₜ-1)*Nₛᵘ+1:iₜ*Nₛᵘ], MDEIMᵢ_mat_old, MDEIM_idx_old)
   end
@@ -469,13 +469,13 @@ end
 function build_sparse_mat_old(FEMInfo::ProblemInfoUnsteady, FEMSpace::UnsteadyProblem, RBInfo::Info, el::Vector)
 
   μ=load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  μ_nb = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
+  μ_nb = parse.(Float, split(chop(μ[95]; head=1, tail=1), ','))
   Param = get_ParamInfo(problem_id, RBInfo, μ_nb)
 
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
   timesθ = collect(RBInfo.tₗ₀:RBInfo.δt:RBInfo.tₗ-RBInfo.δt).+RBInfo.δt*RBInfo.θ
-  Nₜ = convert(Int64, RBInfo.tₗ / RBInfo.δt)
+  Nₜ = convert(Int, RBInfo.tₗ / RBInfo.δt)
 
   function define_Matₜ(t::Real)
     return assemble_matrix(∫(∇(FEMSpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FEMSpace.ϕᵤ(t)))) * dΩ_sparse, FEMSpace.V(t), FEMSpace.V₀)
@@ -498,7 +498,7 @@ function test_old_MDEIM(RBInfo, RBVars)
   MDEIM_mat_old, MDEIM_idx_old, sparse_el_old,_,_ = MDEIM_offline_old(FEMSpace, RBInfo)
   MDEIMᵢ_mat_old = MDEIM_mat_old[MDEIM_idx_old,:]
   μ=load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  μ_nb = parse.(Float64, split(chop(μ[95]; head=1, tail=1), ','))
+  μ_nb = parse.(Float, split(chop(μ[95]; head=1, tail=1), ','))
   #Param = get_ParamInfo(problem_id, RBInfo, μ_nb)
   A = build_A_snapshots_old(FEMSpace, RBInfo, μ_nb)
   θᵃ_old = get_θᵃ_old(RBVars,MDEIM_mat_old, MDEIM_idx_old, MDEIMᵢ_mat_old, sparse_el_old)

@@ -1,6 +1,6 @@
 """Plot the surface of the function 'f':R²->R between ranges specificed by
   'xrange' and 'yrange'. The plotting grid is composed of 'n' points/direction"""
-function plot_R²_R(f::Function, xrange::Vector, yrange::Vector, n::Int)
+function plot_R²_R(f::F, xrange::Vector, yrange::Vector, n::Int)
   x = range(xrange[1], xrange[2], n)
   y = range(yrange[1], yrange[2], n)
   suface(x, y, f)
@@ -8,17 +8,18 @@ end
 
 """Plot the vector-valued function 'f':R->R² between range specificed by
   'xrange'. The plotting grid is composed of 'n' points"""
-function plot_R_R²(f::Function, xrange::Vector, n::Int)
+function plot_R_R²(f::F, xrange::Vector, n::Int)
   xs_ys(vs) = Tuple(eltype(vs[1])[vs[i][j] for i in eachindex(vs)]
     for j in eachindex(first(vs)))
   xs_ys(v, vs...) = xs_ys([v, vs...])
-  xs_ys(g::Function, a, b, n=100) = xs_ys(g.(range(a, b, n)))
+  xs_ys(g::F, a, b, n=100) = xs_ys(g.(range(a, b, n)))
   Plot.plot(xs_ys(f, xrange[1], xrange[2], n)...)
 end
 
 function generate_and_save_plot(xval::Array, yval::Array, title::String,
   label::Array, xlab::String, ylab::String, save_path::String,
-  semilogx=false, semilogy=true; var="u",selected_style=["lines"])
+  semilogx=false, semilogy=true; var="u",selected_color=["blue"],
+  selected_style=["lines"],selected_dash=[""])
 
   @assert size(xval) == size(yval) "Invalid plot: provide an input with the same
     x-values as its y-values"
@@ -44,7 +45,7 @@ function generate_and_save_plot(xval::Array, yval::Array, title::String,
 
   n_traces = size(xval)[2]
   traces = [scatter(x=xval[:,i],y=yval[:,i],mode=selected_style[i],name=label[i],
-    line=attr(width=4)) for i=1:n_traces]
+    line=attr(width=4,color=selected_color[i],dash=selected_dash[i])) for i=1:n_traces]
   p = plot(traces,layout)
   savefig(p, joinpath(save_path, string(var)*".eps"))
 

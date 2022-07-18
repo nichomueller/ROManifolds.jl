@@ -4,7 +4,7 @@ function build_matrix_snapshots(
   μ::Vector{Vector{T}},
   var::String) where T
 
-  Mat,row_idx = Matrix{T}(undef,0,0),Int64[]
+  Mat,row_idx = Matrix{T}(undef,0,0),Int[]
   for k = 1:RBInfo.nₛ_MDEIM
     println("Snapshot number $k, $var")
     Param = get_ParamInfo(RBInfo, μ[i_nₛ])
@@ -33,7 +33,7 @@ function build_matrix_snapshots(
   Param = get_ParamInfo(RBInfo, μ)
   Mat_t = assemble_FEM_structure(FEMSpace, RBInfo, Param, var)
 
-  Mat,row_idx = Matrix{T}(undef,0,0),Int64[]
+  Mat,row_idx = Matrix{T}(undef,0,0),Int[]
   for i_t = 1:Nₜ
     Mat_i = Mat_t(timesθ[i_t])
     i, v = findnz(Mat_i[:])::Tuple{Vector{Int},Vector{T}}
@@ -81,7 +81,7 @@ function standard_MDEIM(
   var="A") where T
 
   (snaps_space,snaps_time,row_idx,Σ) =
-    (Matrix{T}(undef,0,0),Matrix{T}(undef,0,0),Int64[],T[])
+    (Matrix{T}(undef,0,0),Matrix{T}(undef,0,0),Int[],T[])
   @simd for k = 1:RBInfo.nₛ_MDEIM
     println("Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)")
     snapsₖ, row_idx = build_matrix_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
@@ -110,7 +110,7 @@ function functional_MDEIM(
 
   ncells,nquad_cell = get_LagrangianQuad_info(FEMSpace)
 
-  Θmat, Θmat_time = Matrix{Float64}(undef,0,0), Matrix{Float64}(undef,0,0)
+  Θmat, Θmat_time = Matrix{Float}(undef,0,0), Matrix{Float}(undef,0,0)
   @simd for k = 1:RBInfo.nₛ_MDEIM
     println("Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)")
     Param = get_ParamInfo(RBInfo, μ[k])
@@ -133,13 +133,13 @@ function functional_MDEIM(
 
   Q = size(Θmat)[2]
   Q_time = size(Θmat_time)[2]
-  snaps,row_idx = Matrix{T}(undef,0,0),Int64[]
+  snaps,row_idx = Matrix{T}(undef,0,0),Int[]
   snaps_time = Matrix{T}(undef,0,0)
 
   for q = 1:min(Q, Q_time)::Int
     #space
     Θq = FEFunction(FEMSpace.V₀_quad,Θmat[:,q])
-    Matq = T.(Mat_Θ(Θq))::SparseMatrixCSC{T,Int64}
+    Matq = T.(Mat_Θ(Θq))::SparseMatrixCSC{T,Int}
     i,v = findnz(Matq[:])::Tuple{Vector{Int},Vector{T}}
     if q == 1
       row_idx = i
@@ -149,7 +149,7 @@ function functional_MDEIM(
     snaps[:,q] = v
     #time
     Θq = FEFunction(FEMSpace.V₀_quad,Θmat_time[:,q])
-    Matq = T.(Mat_Θ(Θq))::SparseMatrixCSC{T,Int64}
+    Matq = T.(Mat_Θ(Θq))::SparseMatrixCSC{T,Int}
     _,v = findnz(Matq[:])::Tuple{Vector{Int},Vector{T}}
     snaps_time[:,q] = v
   end
@@ -157,7 +157,7 @@ function functional_MDEIM(
     for q = Q_time+1:Q
       #space
       Θq = FEFunction(FEMSpace.V₀_quad,Θmat[:,q])
-      Matq = T.(Mat_Θ(Θq))::SparseMatrixCSC{T,Int64}
+      Matq = T.(Mat_Θ(Θq))::SparseMatrixCSC{T,Int}
       _,v = findnz(Matq[:])::Tuple{Vector{Int},Vector{T}}
       snaps[:,q] = v
     end
@@ -165,7 +165,7 @@ function functional_MDEIM(
     for q = Q+1:Q_time
       #time
       Θq = FEFunction(FEMSpace.V₀_quad,Θmat_time[:,q])
-      Matq = T.(Mat_Θ(Θq))::SparseMatrixCSC{T,Int64}
+      Matq = T.(Mat_Θ(Θq))::SparseMatrixCSC{T,Int}
       _,v = findnz(Matq[:])::Tuple{Vector{Int},Vector{T}}
       snaps_time[:,q] = v
     end
@@ -279,7 +279,7 @@ function functional_DEIM(
   var="F") where T
 
   ncells,nquad_cell = get_LagrangianQuad_info(FEMSpace)
-  Θmat, Θmat_time = Matrix{Float64}(undef,0,0), Matrix{Float64}(undef,0,0)
+  Θmat, Θmat_time = Matrix{Float}(undef,0,0), Matrix{Float}(undef,0,0)
   for k = 1:RBInfo.nₛ_DEIM
     println("Considering Parameter number $k/$(RBInfo.nₛ_DEIM)")
     Param = get_ParamInfo(RBInfo, μ[k])
@@ -338,20 +338,15 @@ function get_snaps_DEIM(
 
   timesθ = get_timesθ(RBInfo)
 
-  #= if RBInfo.functional_M_DEIM
-    return functional_DEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}, Vector{T}}
-  else
-    return standard_DEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}, Vector{T}}
-  end =#
   standard_DEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}, Vector{T}}
 
 end
 
 function build_parameter_on_phys_quadp(
   Param::ParametricInfoUnsteady,
-  phys_quadp::Vector{Vector{VectorValue{D,Float64}}},
-  ncells::Int64,
-  nquad_cell::Int64,
+  phys_quadp::Vector{Vector{VectorValue{D,Float}}},
+  ncells::Int,
+  nquad_cell::Int,
   timesθ::Vector{T},
   var::String) where {D,T}
 
@@ -371,7 +366,7 @@ function build_parameter_on_phys_quadp(
     error("not implemented")
   end
 
-  reshape(Θ,ncells*nquad_cell,:)::Matrix{Float64}
+  reshape(Θ,ncells*nquad_cell,:)::Matrix{Float}
 
 end
 

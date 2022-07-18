@@ -22,13 +22,13 @@ end
 function M_DEIM_offline(M_DEIM_mat::Matrix, Σ::Vector)
 
   (N, n) = size(M_DEIM_mat)
-  M_DEIM_idx = Int64[]
+  M_DEIM_idx = Int[]
   append!(M_DEIM_idx, Int(argmax(abs.(M_DEIM_mat[:, 1]))))
   @simd for m = 2:n
     res = (M_DEIM_mat[:, m] -
            M_DEIM_mat[:, 1:m-1] * (M_DEIM_mat[M_DEIM_idx[1:m-1], 1:m-1] \
                                    M_DEIM_mat[M_DEIM_idx[1:m-1], m]))
-    append!(M_DEIM_idx, convert(Int64, argmax(abs.(res))[1]))
+    append!(M_DEIM_idx, convert(Int, argmax(abs.(res))[1]))
     if abs(det(M_DEIM_mat[M_DEIM_idx[1:m], 1:m])) ≤ 1e-80
       error("Something went wrong with the construction of (M)DEIM basis:
         obtaining singular nested matrices during (M)DEIM offline phase")
@@ -46,8 +46,8 @@ function MDEIM_offline(RBInfo::ROMInfoSteady{T}, var::String) where T
 
   println("Building $(RBInfo.nₛ_MDEIM) snapshots of $var")
 
-  μ = load_CSV(Array{T}[],joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
+  μ = load_CSV(Array{T}[],joinpath(RBInfo.Paths.FEM_snap_path, "μ.csv"))
+  model = DiscreteModelFromFile(RBInfo.Paths.mesh_path)
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
 
   MDEIM_mat, Σ, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, μ, var)
@@ -65,8 +65,8 @@ function MDEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
 
   println("Building $(RBInfo.nₛ_MDEIM) snapshots of $var")
 
-  μ = load_CSV(Array{T}[],joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))::Vector{Vector{T}}
-  model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
+  μ = load_CSV(Array{T}[],joinpath(RBInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{T}}
+  model = DiscreteModelFromFile(RBInfo.Paths.mesh_path)
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
 
   MDEIM_mat, MDEIM_mat_time, Σ, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, μ, var)
@@ -78,7 +78,6 @@ function MDEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
   el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(MDEIM_idx_sparse_space))
 
   _, MDEIM_idx_time, _ = M_DEIM_offline(MDEIM_mat_time, Σ)
-  #MDEIM_idx_time = vcat(MDEIM_idx_time, Int(RBInfo.tₗ / RBInfo.δt))
   unique!(sort!(MDEIM_idx_time))
 
   MDEIM_mat, MDEIM_idx_sparse, MDEIMᵢ_mat, row_idx, el, MDEIM_idx_time
@@ -89,8 +88,8 @@ function DEIM_offline(RBInfo::ROMInfoSteady{T}, var::String) where T
 
   println("Building $(RBInfo.nₛ_DEIM) snapshots of $var")
 
-  μ = load_CSV(Array{T}[], joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
+  μ = load_CSV(Array{T}[], joinpath(RBInfo.Paths.FEM_snap_path, "μ.csv"))
+  model = DiscreteModelFromFile(RBInfo.Paths.mesh_path)
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
 
   DEIM_mat, Σ = get_snaps_DEIM(FEMSpace, RBInfo, μ, var)
@@ -110,8 +109,8 @@ function DEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
 
   println("Building $(RBInfo.nₛ_DEIM) snapshots of $var")
 
-  μ = load_CSV(Array{T}[], joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
-  model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
+  μ = load_CSV(Array{T}[], joinpath(RBInfo.Paths.FEM_snap_path, "μ.csv"))
+  model = DiscreteModelFromFile(RBInfo.Paths.mesh_path)
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
 
   DEIM_mat, DEIM_mat_time, Σ = get_snaps_DEIM(FEMSpace, RBInfo, μ, var)
@@ -125,13 +124,12 @@ function DEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
   end
 
   _, DEIM_idx_time, _ = M_DEIM_offline(DEIM_mat_time, Σ)
-  #DEIM_idx_time = vcat(DEIM_idx_time, Int(RBInfo.tₗ / RBInfo.δt))
   unique!(sort!(DEIM_idx_time))
 
   DEIM_mat, DEIM_idx, DEIMᵢ_mat, el, DEIM_idx_time
 
 end
 
-function M_DEIM_online(Mat_nonaffine, Matᵢ::Matrix{T}, idx::Vector{Int64}) where T
+function M_DEIM_online(Mat_nonaffine, Matᵢ::Matrix{T}, idx::Vector{Int}) where T
   @fastmath Matᵢ \ Matrix{T}(reshape(Mat_nonaffine, :, 1)[idx, :])
 end

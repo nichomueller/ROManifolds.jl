@@ -88,7 +88,7 @@ function check_reduced_affine_components(RBInfo, RBVars::RBProblem)
 
 end
 
-function index_mapping(i::T, j::T) where {T<:Int64}
+function index_mapping(i::T, j::T) where {T<:Int}
 
 
   return int(i * nₜᵘ + j)

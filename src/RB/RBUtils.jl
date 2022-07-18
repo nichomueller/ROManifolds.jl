@@ -1,4 +1,5 @@
 function ROM_paths(root, problem_steadiness, problem_name, mesh_name, RB_method, case)
+
   paths = FEM_paths(root, problem_steadiness, problem_name, mesh_name, case)
   mesh_path = paths.mesh_path
   FEM_snap_path = paths.FEM_snap_path
@@ -13,7 +14,10 @@ function ROM_paths(root, problem_steadiness, problem_name, mesh_name, RB_method,
   create_dir(gen_coords_path)
   results_path = joinpath(ROM_path, "results")
   create_dir(results_path)
-  _ -> (mesh_path, FEM_snap_path, FEM_structures_path, basis_path, ROM_structures_path, gen_coords_path, results_path)
+
+  RBPathInfo(mesh_path, FEM_snap_path, FEM_structures_path, basis_path,
+    ROM_structures_path, gen_coords_path, results_path)
+
 end
 
 function select_RB_method(
@@ -53,7 +57,7 @@ end
 function assemble_FEM_structure(
   FEMSpace::FEMProblem,
   RBInfo::ROMInfoSteady,
-  Param::ParametricInfo,
+  Param::ParametricInfoSteady,
   var::String)
 
   assemble_FEM_structure(FEMSpace,RBInfo.FEMInfo,Param,var)
@@ -63,14 +67,14 @@ end
 function assemble_FEM_structure(
   FEMSpace::FEMProblem,
   RBInfo::ROMInfoUnsteady,
-  Param::ParametricInfo,
+  Param::ParametricInfoUnsteady,
   var::String)
 
   assemble_FEM_structure(FEMSpace,RBInfo.FEMInfo,Param,var)
 
 end
 
-function get_ParamInfo(RBInfo::Info, μ::Vector)
+function get_ParamInfo(RBInfo::Info, μ::Vector{T}) where T
 
   get_ParamInfo(RBInfo.FEMInfo, μ)
 
@@ -103,7 +107,7 @@ function build_sparse_mat(
   FEMSpace::SteadyProblem,
   FEMInfo::SteadyInfo,
   Param::ParametricInfoSteady,
-  el::Vector{Int64};
+  el::Vector{Int};
   var="A")
 
   Ω_sparse = view(FEMSpace.Ω, el)
@@ -126,7 +130,7 @@ function build_sparse_mat(
     end
   end
 
-  define_Mat(FEMSpace, var)::SparseMatrixCSC{Float64, Int64}
+  define_Mat(FEMSpace, var)::SparseMatrixCSC{Float, Int}
 
 end
 
@@ -134,7 +138,7 @@ function build_sparse_mat(
   FEMSpace::UnsteadyProblem,
   FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady,
-  el::Vector{Int64},
+  el::Vector{Int},
   timesθ::Vector;
   var="A")
 
@@ -166,9 +170,9 @@ function build_sparse_mat(
   end
   Matₜ(t) = define_Matₜ(FEMSpace, t, var)
 
-  Mat = sparse([], [], Float64[])
+  Mat = sparse([], [], Float[])
   for (i_t,t) in enumerate(timesθ)
-    i,j,v = findnz(Matₜ(t))::Tuple{Vector{Int},Vector{Int},Vector{Float64}}
+    i,j,v = findnz(Matₜ(t))::Tuple{Vector{Int},Vector{Int},Vector{Float}}
     if i_t == 1
       Mat = sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ*Nₜ)
     else
@@ -177,7 +181,7 @@ function build_sparse_mat(
     end
   end
 
-  Mat::SparseMatrixCSC{Float64, Int64}
+  Mat::SparseMatrixCSC{Float, Int}
 
 end
 
@@ -185,7 +189,7 @@ function build_sparse_vec(
   FEMSpace::SteadyProblem,
   FEMInfo::SteadyInfo,
   Param::ParametricInfoSteady,
-  el::Vector{Int64};
+  el::Vector{Int};
   var="F")
 
   Ω_sparse = view(FEMSpace.Ω, el)
@@ -206,7 +210,7 @@ function build_sparse_vec(
     end
   end
 
-  define_Vec(FEMSpace, var)::Vector{Float64}
+  define_Vec(FEMSpace, var)::Vector{Float}
 
 end
 
@@ -214,29 +218,32 @@ function build_sparse_vec(
   FEMSpace::UnsteadyProblem,
   FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady,
-  el::Vector{Int64},
+  el::Vector{Int},
   timesθ::Vector;
   var="F")
 
-  Ω_sparse = view(FEMSpace.Ω, el)
-  dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
+  if var == "F"
+    Ω_sparse = view(FEMSpace.Ω, el)
+    dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
+  elseif var == "H"
+    Ω_sparse = view(FEMSpace.Γn, el)
+    dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
+  else
+    error("Unrecognized variable")
+  end
 
   function define_Vecₜ(::FEMSpacePoissonUnsteady, t::Real, var::String)
     if var == "F"
       return assemble_vector(∫(FEMSpace.ϕᵥ*Param.f(t))*dΩ_sparse, FEMSpace.V₀)
-    elseif var == "H"
+    else var == "H"
       return assemble_vector(∫(FEMSpace.ϕᵥ*Param.h(t))*dΩ_sparse, FEMSpace.V₀)
-    else
-      error("Unrecognized variable")
     end
   end
   function define_Vecₜ(::FEMSpaceStokesUnsteady, t::Real, var::String)
     if var == "F"
       return assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.f(t))*dΩ_sparse, FEMSpace.V₀)
-    elseif var == "H"
+    else var == "H"
       return assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.h(t))*dΩ_sparse, FEMSpace.V₀)
-    else
-      error("Unrecognized variable")
     end
   end
   Vecₜ(t) = define_Vecₜ(FEMSpace, t, var)
@@ -246,11 +253,11 @@ function build_sparse_vec(
     Vec[:, i_t] = Vecₜ(t)
   end
 
-  Vec::Matrix{Float64}
+  Vec::Matrix{Float}
 
 end
 
-function blocks_to_matrix(A_block::Array{T}, N_blocks::Int64) where T
+function blocks_to_matrix(A_block::Array{T}, N_blocks::Int) where T
 
   A = zeros(T,prod(size(A_block[1])), N_blocks)
   for n = 1:N_blocks

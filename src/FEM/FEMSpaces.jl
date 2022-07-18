@@ -1,25 +1,3 @@
-function set_labels(FEMInfo::Info, model::DiscreteModel)
-
-  labels = get_face_labeling(model)
-  if !isempty(FEMInfo.dirichlet_tags) && !isempty(FEMInfo.dirichlet_bnds)
-    for i = eachindex(FEMInfo.dirichlet_tags)
-      if FEMInfo.dirichlet_tags[i] ∉ labels.tag_to_name
-        add_tag_from_tags!(labels, FEMInfo.dirichlet_tags[i], FEMInfo.dirichlet_bnds[i])
-      end
-    end
-  end
-  if !isempty(FEMInfo.neumann_tags) && !isempty(FEMInfo.neumann_bnds)
-    for i = eachindex(FEMInfo.neumann_tags)
-      if FEMInfo.neumann_tags[i] ∉ labels.tag_to_name
-        add_tag_from_tags!(labels, FEMInfo.neumann_tags[i], FEMInfo.neumann_bnds[i])
-      end
-    end
-  end
-
-  labels
-
-end
-
 function get_mod_meas_quad(FEMInfo::Info, model::DiscreteModel)
 
   degree = 2 * FEMInfo.order
@@ -44,8 +22,8 @@ function get_lagrangianQuad_info(
   ξₖ = get_cell_map(Ω)
   Qₕ_cell_point = get_cell_points(Qₕ)
   qₖ = get_data(Qₕ_cell_point)
-  phys_quadp = collect(lazy_map(Gridap.evaluate,ξₖ,qₖ))::Vector{Vector{VectorValue{Dp,Float64}}}
-  refFE_quad = Gridap.ReferenceFE(lagrangianQuad,Float64,FEMInfo.order)
+  phys_quadp = collect(lazy_map(Gridap.evaluate,ξₖ,qₖ))::Vector{Vector{VectorValue{Dp,Float}}}
+  refFE_quad = Gridap.ReferenceFE(lagrangianQuad,Float,FEMInfo.order)
   V₀_quad = TestFESpace(model,refFE_quad,conformity=:L2)
 
   phys_quadp, V₀_quad
@@ -61,8 +39,8 @@ function get_lagrangianQuad_info(
   ξₖ = get_cell_map(Ω)
   Qₕ_cell_point = get_cell_points(Qₕ)
   qₖ = get_data(Qₕ_cell_point)
-  phys_quadp = collect(lazy_map(Gridap.evaluate,ξₖ,qₖ))::Vector{Vector{VectorValue{Dp,Float64}}}
-  refFE_quad = Gridap.ReferenceFE(lagrangianQuad,Float64,FEMInfo.order)
+  phys_quadp = collect(lazy_map(Gridap.evaluate,ξₖ,qₖ))::Vector{Vector{VectorValue{Dp,Float}}}
+  refFE_quad = Gridap.ReferenceFE(lagrangianQuad,Float,FEMInfo.order)
   V₀_quad = TestFESpace(model,refFE_quad,conformity=:L2)
 
   phys_quadp, V₀_quad
@@ -70,7 +48,7 @@ function get_lagrangianQuad_info(
 end
 
 function get_FEMSpace(
-  ::NTuple{1,Int64},
+  ::NTuple{1,Int},
   FEMInfo::SteadyInfo,
   model::DiscreteModel{D,D},
   g::F) where D
@@ -78,7 +56,7 @@ function get_FEMSpace(
   Ω, Γn, Qₕ, dΩ, dΓn, dΓd = get_mod_meas_quad(FEMInfo, model)
 
   labels = set_labels(FEMInfo, model)
-  refFE = Gridap.ReferenceFE(lagrangian, Float64, FEMInfo.order)
+  refFE = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order)
 
   V₀ = TestFESpace(model, refFE; conformity=:H1,
     dirichlet_tags=FEMInfo.dirichlet_tags, labels=labels)
@@ -98,14 +76,14 @@ function get_FEMSpace(
 end
 
 function get_FEMSpace(
-  ::NTuple{1,Int64},
+  ::NTuple{1,Int},
   FEMInfo::UnsteadyInfo,
   model::DiscreteModel{D,D},
   g::F) where D
 
   Ω, Γn, Qₕ, dΩ, dΓn, dΓd = get_mod_meas_quad(FEMInfo, model)
 
-  refFE = Gridap.ReferenceFE(lagrangian, Float64, FEMInfo.order)
+  refFE = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order)
   labels = set_labels(FEMInfo, model)
   V₀ = TestFESpace(model, refFE; conformity=:H1,
     dirichlet_tags=FEMInfo.dirichlet_tags, labels=labels)
@@ -125,14 +103,14 @@ function get_FEMSpace(
 end
 
 function get_FEMSpace(
-  ::NTuple{2,Int64},
+  ::NTuple{2,Int},
   FEMInfo::SteadyInfo,
   model::DiscreteModel{D,D},
   g::F) where D
 
   Ω, Γn, Qₕ, dΩ, dΓn, dΓd = get_mod_meas_quad(FEMInfo, model)
 
-  refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,Float64}, FEMInfo.order)
+  refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,Float}, FEMInfo.order)
   labels = set_labels(FEMInfo, model)
   V₀ = TestFESpace(model, refFEᵤ; conformity=:H1,
     dirichlet_tags=FEMInfo.dirichlet_tags, labels=labels)
@@ -142,7 +120,7 @@ function get_FEMSpace(
   ϕᵤ = get_trial_fe_basis(V)
   Nₛᵘ = length(get_free_dof_ids(V))
 
-  refFEₚ = Gridap.ReferenceFE(lagrangian, Float64, order - 1; space=:P)
+  refFEₚ = Gridap.ReferenceFE(lagrangian, Float, order - 1; space=:P)
   Q₀ = TestFESpace(model, refFEₚ; conformity=:L2, constraint=:zeromean)
   Q = TrialFESpace(Q₀)
   ψᵧ = get_trial_fe_basis(Q₀)
@@ -163,14 +141,14 @@ function get_FEMSpace(
 end
 
 function get_FEMSpace(
-  ::NTuple{2,Int64},
+  ::NTuple{2,Int},
   FEMInfo::UnsteadyInfo,
   model::DiscreteModel{D,D},
   g::F) where D
 
   Ω, Γn, Qₕ, dΩ, dΓn, dΓd = get_mod_meas_quad(FEMInfo, model)
 
-  refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,Float64}, FEMInfo.order)
+  refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,Float}, FEMInfo.order)
   labels = set_labels(FEMInfo, model)
   V₀ = TestFESpace(model, refFEᵤ; conformity=:H1,
     dirichlet_tags=FEMInfo.dirichlet_tags, labels=labels)
@@ -180,7 +158,7 @@ function get_FEMSpace(
   ϕᵤ(t) = get_trial_fe_basis(V(t))
   Nₛᵘ = length(get_free_dof_ids(V₀))
 
-  refFEₚ = Gridap.ReferenceFE(lagrangian, Float64, FEMInfo.order - 1; space=:P)
+  refFEₚ = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order - 1; space=:P)
   Q₀ = TestFESpace(model, refFEₚ, conformity=:L2, constraint=:zeromean)
   Q = TrialFESpace(Q₀)
   ψᵧ = get_fe_basis(Q₀)
@@ -201,7 +179,7 @@ function get_FEMSpace(
 end
 
 function get_FEMSpace₀(
-  problem_id::NTuple{1,Int64},
+  problem_id::NTuple{1,Int},
   FEMInfo::SteadyInfo,
   model::DiscreteModel)
 
@@ -210,7 +188,7 @@ function get_FEMSpace₀(
 end
 
 function get_FEMSpace₀(
-  problem_id::NTuple{1,Int64},
+  problem_id::NTuple{1,Int},
   FEMInfo::UnsteadyInfo,
   model::DiscreteModel)
 
@@ -221,20 +199,20 @@ function get_FEMSpace₀(
 end
 
 function get_FEMSpace₀(
-  problem_id::NTuple{2,Int64},
+  problem_id::NTuple{2,Int},
   FEMInfo::SteadyInfo,
   model::DiscreteModel)
 
-  get_FEMSpace(problem_id,FEMInfo,model, x->zero(VectorValue(FEMInfo.D, Float64)))
+  get_FEMSpace(problem_id,FEMInfo,model, x->zero(VectorValue(FEMInfo.D, Float)))
 
 end
 
 function get_FEMSpace₀(
-  problem_id::NTuple{2,Int64},
+  problem_id::NTuple{2,Int},
   FEMInfo::UnsteadyInfo,
   model::DiscreteModel)
 
-  g₀(x, t::Real) = zero(VectorValue(FEMInfo.D, Float64))
+  g₀(x, t::Real) = zero(VectorValue(FEMInfo.D, Float))
   g₀(t::Real) = x -> g₀(x, t)
   get_FEMSpace(problem_id,FEMInfo,model,g₀)
 

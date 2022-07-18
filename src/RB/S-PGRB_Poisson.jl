@@ -6,13 +6,13 @@ function get_inverse_P_matrix(
   if RBInfo.use_norm_X
     if isempty(RBVars.Pᵤ⁻¹)
       println("S-PGRB: building the inverse of the diag preconditioner of the H1 norm matrix")
-      if isfile(joinpath(RBInfo.paths.FEM_structures_path, "Pᵤ⁻¹.csv"))
-        RBVars.Pᵤ⁻¹ = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "Pᵤ⁻¹.csv"))
+      if isfile(joinpath(RBInfo.Paths.FEM_structures_path, "Pᵤ⁻¹.csv"))
+        RBVars.Pᵤ⁻¹ = load_CSV(sparse([],[],T[]), joinpath(RBInfo.Paths.FEM_structures_path, "Pᵤ⁻¹.csv"))
       else
         get_norm_matrix(RBInfo, RBVars)
         diag_Xᵘ₀ = Vector{T}(diag(RBVars.Xᵘ₀))
         RBVars.Pᵤ⁻¹ = spdiagm(1 ./ diag_Xᵘ₀)
-        save_CSV(RBVars.Pᵤ⁻¹, joinpath(RBInfo.paths.FEM_structures_path, "Pᵤ⁻¹.csv"))
+        save_CSV(RBVars.Pᵤ⁻¹, joinpath(RBInfo.Paths.FEM_structures_path, "Pᵤ⁻¹.csv"))
       end
     end
     RBVars.Pᵤ⁻¹ = Matrix{T}(RBVars.Pᵤ⁻¹)
@@ -25,17 +25,17 @@ function get_Aₙ(
   RBInfo::Info,
   RBVars::PoissonSPGRB{T}) where T
 
-  if (isfile(joinpath(RBInfo.paths.ROM_structures_path, "Aₙ.csv")) &&
-      isfile(joinpath(RBInfo.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv")))
+  if (isfile(joinpath(RBInfo.Paths.ROM_structures_path, "Aₙ.csv")) &&
+      isfile(joinpath(RBInfo.Paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv")))
     println("Importing reduced affine stiffness matrix")
-    Aₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "Aₙ.csv"))
-    RBVars.Aₙ = reshape(Aₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)
+    Aₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "Aₙ.csv"))
+    RBVars.Aₙ = reshape(Aₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)::Array{T,3}
     Qᵃ = sqrt(size(RBVars.Aₙ)[3])
-    @assert floor(Qᵃ) == Qᵃ "Qᵃ should be the square root of an Int64"
+    @assert floor(Qᵃ) == Qᵃ "Qᵃ should be the square root of an Int"
     RBVars.Qᵃ = Int(Qᵃ)
     println("S-PGRB: fetching the matrix AΦᵀPᵤ⁻¹")
-    AΦᵀPᵤ⁻¹ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
-    RBVars.AΦᵀPᵤ⁻¹ = reshape(AΦᵀPᵤ⁻¹,RBVars.nₛᵘ,RBVars.Nₛᵘ,:)
+    AΦᵀPᵤ⁻¹ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
+    RBVars.AΦᵀPᵤ⁻¹ = reshape(AΦᵀPᵤ⁻¹,RBVars.nₛᵘ,RBVars.Nₛᵘ,:)::Array{T,3}
     return [""]
   else
     println("Failed to import the reduced affine stiffness matrix: must build it")
@@ -49,8 +49,8 @@ function get_AΦᵀPᵤ⁻¹(
   RBVars::PoissonSPGRB{T}) where T
 
   println("S-PGRB: fetching the matrix AΦᵀPᵤ⁻¹")
-  if isfile(joinpath(RBInfo.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
-    AΦᵀPᵤ⁻¹ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
+  if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
+    AΦᵀPᵤ⁻¹ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
     RBVars.AΦᵀPᵤ⁻¹ = reshape(AΦᵀPᵤ⁻¹,RBVars.nₛᵘ,RBVars.Nₛᵘ,:)
     return
   else
@@ -76,7 +76,7 @@ function assemble_affine_matrices(
     RBVars.Qᵃ = 1
     println("Assembling affine reduced stiffness")
     println("SPGRB: affine component number 1, matrix A")
-    A = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "A.csv"))
+    A = load_CSV(sparse([],[],T[]), joinpath(RBInfo.Paths.FEM_structures_path, "A.csv"))
     RBVars.Aₙ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ, 1)
     RBVars.Aₙ[:,:,1] = (RBVars.Φₛᵘ)' * A * RBVars.Φₛᵘ
     RBVars.AΦᵀPᵤ⁻¹ = zeros(T, RBVars.nₛᵘ, RBVars.Nₛᵘ, 1)
@@ -90,7 +90,7 @@ end
 function assemble_reduced_mat_MDEIM(
   RBVars::PoissonSPGRB{T},
   MDEIM_mat::Matrix,
-  row_idx::Vector{Int64}) where T
+  row_idx::Vector{Int}) where T
 
   Q = size(MDEIM_mat)[2]
   r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.Nₛᵘ)
@@ -109,8 +109,8 @@ function assemble_reduced_mat_MDEIM(
     end
   end
 
-  RBVars.Aₙ = Matₙ
-  RBVars.AΦᵀPᵤ⁻¹ = MatqΦᵀPᵤ⁻¹
+  RBVars.Aₙ = Matₙ::Array{T,3}
+  RBVars.AΦᵀPᵤ⁻¹ = MatqΦᵀPᵤ⁻¹::Array{T,3}
   RBVars.Qᵃ = Q
 
 end
@@ -149,14 +149,14 @@ function assemble_affine_vectors(
   if var == "F"
     RBVars.Qᶠ = 1
     println("Assembling affine reduced forcing term")
-    F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.FEM_structures_path, "F.csv"))
+    F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.FEM_structures_path, "F.csv"))
     Fₙ = zeros(T,RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qᶠ)
     matrix_product_vec!(Fₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(F,:,1))
     RBVars.Fₙ = reshape(Fₙ,:,RBVars.Qᵃ*RBVars.Qᶠ)
   elseif var == "H"
     RBVars.Qʰ = 1
     println("Assembling affine reduced Neumann term")
-    H = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.FEM_structures_path, "H.csv"))
+    H = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.FEM_structures_path, "H.csv"))
     Hₙ = zeros(T,RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qʰ)
     matrix_product_vec!(Hₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(H,:,1))
     RBVars.Hₙ = reshape(Hₙ,:,RBVars.Qᵃ*RBVars.Qʰ)
@@ -174,12 +174,12 @@ function save_affine_structures(
 
     Aₙ = reshape(RBVars.Aₙ, :, RBVars.Qᵃ)
     AΦᵀPᵤ⁻¹ = reshape(RBVars.AΦᵀPᵤ⁻¹, :, RBVars.Qᵃ)
-    save_CSV(Aₙ, joinpath(RBInfo.paths.ROM_structures_path, "Aₙ.csv"))
-    save_CSV(AΦᵀPᵤ⁻¹, joinpath(RBInfo.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
+    save_CSV(Aₙ, joinpath(RBInfo.Paths.ROM_structures_path, "Aₙ.csv"))
+    save_CSV(AΦᵀPᵤ⁻¹, joinpath(RBInfo.Paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
 
     if !RBInfo.build_parametric_RHS
-      save_CSV(RBVars.Fₙ, joinpath(RBInfo.paths.ROM_structures_path, "Fₙ.csv"))
-      save_CSV(RBVars.Hₙ, joinpath(RBInfo.paths.ROM_structures_path, "Hₙ.csv"))
+      save_CSV(RBVars.Fₙ, joinpath(RBInfo.Paths.ROM_structures_path, "Fₙ.csv"))
+      save_CSV(RBVars.Hₙ, joinpath(RBInfo.Paths.ROM_structures_path, "Hₙ.csv"))
     end
 
   end
@@ -192,7 +192,7 @@ function get_Q(
 
   if RBVars.Qᵃ == 0
     Qᵃ = sqrt(size(RBVars.Aₙ)[end])
-    @assert floor(Qᵃ) == Qᵃ "Qᵃ should be the square root of an Int64"
+    @assert floor(Qᵃ) == Qᵃ "Qᵃ should be the square root of an Int"
     RBVars.Qᵃ = Int(Qᵃ)
   end
   if !RBInfo.build_parametric_RHS
@@ -203,6 +203,9 @@ function get_Q(
       RBVars.Qʰ = Int(size(RBVars.Hₙ)[end]/RBVars.Qᵃ)
     end
   end
+
+  return
+
 end
 
 function build_param_RHS(

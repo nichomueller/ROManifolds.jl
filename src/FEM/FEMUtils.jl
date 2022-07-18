@@ -21,7 +21,7 @@ function FEM_paths(root, problem_steadiness, problem_name, mesh_name, case)
   FEM_structures_path = joinpath(FEM_path, "FEM_structures")
   create_dir(FEM_structures_path)
 
-  _ -> (mesh_path, current_test, FEM_snap_path, FEM_structures_path)
+  FEMPathInfo(mesh_path, current_test,FEM_snap_path, FEM_structures_path)
 
 end
 
@@ -39,14 +39,14 @@ end
 
 function init_FEM_variables()
 
-  M = sparse([], [], Float64[])
-  A = sparse([], [], Float64[])
-  B = sparse([], [], Float64[])
-  Xᵘ₀ = sparse([], [], Float64[])
-  Xᵘ = sparse([], [], Float64[])
-  Xᵖ₀ = sparse([], [], Float64[])
-  F = Vector{Float64}(undef,0)
-  H = Vector{Float64}(undef,0)
+  M = sparse([], [], Float[])
+  A = sparse([], [], Float[])
+  B = sparse([], [], Float[])
+  Xᵘ₀ = sparse([], [], Float[])
+  Xᵘ = sparse([], [], Float[])
+  Xᵖ₀ = sparse([], [], Float[])
+  F = Vector{Float}(undef,0)
+  H = Vector{Float}(undef,0)
 
   M, A, B, Xᵘ₀, Xᵘ, Xᵖ₀, F, H
 
@@ -86,7 +86,7 @@ function find_FE_elements(
 
   connectivity = get_cell_dof_ids(V₀, trian)::Table{Int32, Vector{Int32}, Vector{Int32}}
 
-  el = Int64[]
+  el = Int[]
   for i = 1:length(idx)
     for j = 1:size(connectivity)[1]
       if idx[i] in abs.(connectivity[j])
@@ -106,7 +106,7 @@ function find_FE_elements(
 
   connectivity = collect(get_cell_dof_ids(V₀, trian))::Vector{Vector{Int32}}
 
-  el = Int64[]
+  el = Int[]
   for i = 1:length(idx)
     for j = 1:size(connectivity)[1]
       if idx[i] in abs.(connectivity[j])
@@ -119,6 +119,28 @@ function find_FE_elements(
 
 end
 
+function set_labels(FEMInfo::Info, model::DiscreteModel)
+
+  labels = get_face_labeling(model)
+  if !isempty(FEMInfo.dirichlet_tags) && !isempty(FEMInfo.dirichlet_bnds)
+    for i = eachindex(FEMInfo.dirichlet_tags)
+      if FEMInfo.dirichlet_tags[i] ∉ labels.tag_to_name
+        add_tag_from_tags!(labels, FEMInfo.dirichlet_tags[i], FEMInfo.dirichlet_bnds[i])
+      end
+    end
+  end
+  if !isempty(FEMInfo.neumann_tags) && !isempty(FEMInfo.neumann_bnds)
+    for i = eachindex(FEMInfo.neumann_tags)
+      if FEMInfo.neumann_tags[i] ∉ labels.tag_to_name
+        add_tag_from_tags!(labels, FEMInfo.neumann_tags[i], FEMInfo.neumann_bnds[i])
+      end
+    end
+  end
+
+  labels
+
+end
+
 function generate_dcube_discrete_model(
   FEMInfo::Info,
   d::Int,
@@ -128,7 +150,7 @@ function generate_dcube_discrete_model(
   if !occursin(".json",mesh_name)
     mesh_name *= ".json"
   end
-  mesh_dir = FEMInfo.paths.mesh_path[1:findall(x->x=='/',FEMInfo.paths.mesh_path)[end]]
+  mesh_dir = FEMInfo.Paths.mesh_path[1:findall(x->x=='/',FEMInfo.Paths.mesh_path)[end]]
   mesh_path = joinpath(mesh_dir,mesh_name)
   generate_dcube_discrete_model(d, npart, mesh_path)
 

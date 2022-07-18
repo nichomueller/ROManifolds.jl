@@ -83,7 +83,7 @@ function assemble_reduced_affine_components(RBInfo, RBVars::PoissonSTPGRB, opera
 
         else
 
-          Fₙ_i = Float64[]
+          Fₙ_i = Float[]
           for i_nₛ = 1:maximum(10, RBInfo.nₛ)
             Param = get_ParamInfo(RBInfo, μ[i_nₛ])
             A_i = assemble_stiffness(FEMSpace, RBInfo, Param)
@@ -104,7 +104,7 @@ function assemble_reduced_affine_components(RBInfo, RBVars::PoissonSTPGRB, opera
 
       println("The forcing term is non-affine: running the DEIM offline phase")
       projection_time += @elapsed begin
-        Fₙ_i = Float64[]
+        Fₙ_i = Float[]
 
         if !RBInfo.problem_nonlinearities["A"]
 

@@ -10,19 +10,19 @@ function get_Mₙ(
   RBInfo::Info,
   RBVars::PoissonSTPGRB{T}) where T
 
-  if (isfile(joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv")) &&
-      isfile(joinpath(RBInfo.paths.ROM_structures_path, "MΦ.csv")) &&
-      isfile(joinpath(RBInfo.paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv")))
+  if (isfile(joinpath(RBInfo.Paths.ROM_structures_path, "Mₙ.csv")) &&
+      isfile(joinpath(RBInfo.Paths.ROM_structures_path, "MΦ.csv")) &&
+      isfile(joinpath(RBInfo.Paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv")))
     println("Importing reduced affine stiffness matrix")
-    Mₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
-    RBVars.Mₙ = reshape(Mₙ,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,:)
+    Mₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "Mₙ.csv"))
+    RBVars.Mₙ = reshape(Mₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)::Array{T,3}
     Qᵐ = sqrt(size(RBVars.Mₙ)[end])
-    @assert floor(Qᵐ) == Qᵐ "Qᵐ should be the square root of an Int64"
+    @assert floor(Qᵐ) == Qᵐ "Qᵐ should be the square root of an Int"
     RBVars.Qᵐ = Int(Qᵐ)
-    MΦ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "MΦ.csv"))
-    RBVars.MΦ = reshape(MΦ,RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,:)
-    MΦᵀPᵤ⁻¹ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv"))
-    RBVars.MΦᵀPᵤ⁻¹ = reshape(MΦᵀPᵤ⁻¹,RBVars.S.nₛᵘ,RBVars.S.Nₛᵘ,:)
+    MΦ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "MΦ.csv"))
+    RBVars.MΦ = reshape(MΦ,RBVars.Nₛᵘ,RBVars.nₛᵘ,:)
+    MΦᵀPᵤ⁻¹ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv"))
+    RBVars.MΦᵀPᵤ⁻¹ = reshape(MΦᵀPᵤ⁻¹,RBVars.nₛᵘ,RBVars.Nₛᵘ,:)
     return [""]
   else
     println("Failed to import the reduced affine mass matrix: must build it")
@@ -35,10 +35,10 @@ function get_MAₙ(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTPGRB{T}) where T
 
-  if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
+  if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "Mₙ.csv"))
     println("S-PGRB: importing MAₙ")
-    MAₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "MAₙ.csv"))
-    RBVars.MAₙ = reshape(MAₙ,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,:)
+    MAₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "MAₙ.csv"))
+    RBVars.MAₙ = reshape(MAₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)
     return [""]
   else
     println("ST-PGRB: failed to import MAₙ: must build it")
@@ -51,12 +51,12 @@ function assemble_MAₙ(RBVars::PoissonSTPGRB{T}) where T
 
   println("S-PGRB: Assembling MAₙ")
 
-  nₛᵘ = RBVars.S.nₛᵘ
-  MAₙ = zeros(T,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,RBVars.Qᵐ*RBVars.S.Qᵃ)
+  nₛᵘ = RBVars.nₛᵘ
+  MAₙ = zeros(T,RBVars.nₛᵘ,RBVars.nₛᵘ,RBVars.Qᵐ*RBVars.Qᵃ)
   MΦᵀ = permutedims(RBVars.MΦ,[2,1,3])
-  AΦᵀPᵤ⁻¹ᵀ = permutedims(RBVars.S.AΦᵀPᵤ⁻¹,[2,1,3])
+  AΦᵀPᵤ⁻¹ᵀ = permutedims(RBVars.AΦᵀPᵤ⁻¹,[2,1,3])
   [MAₙ[:,:,(qᵃ-1)*RBVars.Qᵐ+qᵐ] = MΦᵀ[:,:,qᵐ]*AΦᵀPᵤ⁻¹ᵀ[:,:,qᵃ]
-    for qᵐ=1:RBVars.Qᵐ for qᵃ=1:RBVars.S.Qᵃ]
+    for qᵐ=1:RBVars.Qᵐ for qᵃ=1:RBVars.Qᵃ]
   RBVars.MAₙ = MAₙ
 
 end
@@ -71,13 +71,13 @@ function assemble_affine_matrices(
   if var == "M"
     RBVars.Qᵐ = 1
     println("Assembling affine reduced mass")
-    M = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "M.csv"))
-    RBVars.Mₙ = zeros(T, RBVars.S.nₛᵘ, RBVars.S.nₛᵘ, 1)
-    RBVars.Mₙ[:,:,1] = (M*RBVars.S.Φₛᵘ)'*RBVars.S.Pᵤ⁻¹*(M*RBVars.S.Φₛᵘ)
-    RBVars.MΦ = zeros(T, RBVars.S.Nₛᵘ, RBVars.S.nₛᵘ, 1)
-    RBVars.MΦ[:,:,1] = M * RBVars.S.Φₛᵘ
-    RBVars.MΦᵀPᵤ⁻¹ = zeros(T, RBVars.S.nₛᵘ, RBVars.S.Nₛᵘ, 1)
-    RBVars.MΦᵀPᵤ⁻¹[:,:,1] = (M*RBVars.S.Φₛᵘ)' * RBVars.S.Pᵤ⁻¹
+    M = load_CSV(sparse([],[],T[]), joinpath(RBInfo.Paths.FEM_structures_path, "M.csv"))
+    RBVars.Mₙ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ, 1)
+    RBVars.Mₙ[:,:,1] = (M*RBVars.Φₛᵘ)'*RBVars.Pᵤ⁻¹*(M*RBVars.Φₛᵘ)
+    RBVars.MΦ = zeros(T, RBVars.Nₛᵘ, RBVars.nₛᵘ, 1)
+    RBVars.MΦ[:,:,1] = M * RBVars.Φₛᵘ
+    RBVars.MΦᵀPᵤ⁻¹ = zeros(T, RBVars.nₛᵘ, RBVars.Nₛᵘ, 1)
+    RBVars.MΦᵀPᵤ⁻¹[:,:,1] = (M*RBVars.Φₛᵘ)' * RBVars.Pᵤ⁻¹
   else
     assemble_affine_matrices(RBInfo, RBVars.S, var)
   end
@@ -87,19 +87,19 @@ end
 function assemble_reduced_mat_MDEIM(
   RBVars::PoissonSTPGRB{T},
   MDEIM_mat::Matrix,
-  row_idx::Vector{Int64},
+  row_idx::Vector{Int},
   var::String) where T
 
   Q = size(MDEIM_mat)[2]
-  r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
-  MatqΦ = zeros(T,RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q)
-  for j = 1:RBVars.S.Nₛᵘ
+  r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.Nₛᵘ)
+  MatqΦ = zeros(T,RBVars.Nₛᵘ,RBVars.nₛᵘ,Q)
+  for j = 1:RBVars.Nₛᵘ
     Mat_idx = findall(x -> x == j, r_idx)
-    MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.S.Φₛᵘ[c_idx[Mat_idx],:])'
+    MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.Φₛᵘ[c_idx[Mat_idx],:])'
   end
-  MatqΦᵀPᵤ⁻¹ = zeros(T,RBVars.S.nₛᵘ,RBVars.S.Nₛᵘ,Q)
-  matrix_product!(MatqΦᵀPᵤ⁻¹,MatqΦ,Matrix(RBVars.S.Pᵤ⁻¹),transpose_A=true)
-  Matₙ = zeros(T,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,Q^2)
+  MatqΦᵀPᵤ⁻¹ = zeros(T,RBVars.nₛᵘ,RBVars.Nₛᵘ,Q)
+  matrix_product!(MatqΦᵀPᵤ⁻¹,MatqΦ,Matrix(RBVars.Pᵤ⁻¹),transpose_A=true)
+  Matₙ = zeros(T,RBVars.nₛᵘ,RBVars.nₛᵘ,Q^2)
   for q₁ = 1:Q
     for q₂ = 1:Q
       println("ST-PGRB: affine component number $((q₁-1)*RBVars.Qᵐ+q₂), matrix $var")
@@ -108,13 +108,13 @@ function assemble_reduced_mat_MDEIM(
   end
 
   if var == "M"
-    RBVars.Mₙ = Matₙ
-    RBVars.MΦᵀPᵤ⁻¹ = MatqΦᵀPᵤ⁻¹
+    RBVars.Mₙ = Matₙ::Array{T,3}
+    RBVars.MΦᵀPᵤ⁻¹ = MatqΦᵀPᵤ⁻¹::Array{T,3}
     RBVars.Qᵐ = Q
   else
-    RBVars.S.Aₙ = Matₙ
-    RBVars.S.AΦᵀPᵤ⁻¹ = MatqΦᵀPᵤ⁻¹
-    RBVars.S.Qᵃ = Q
+    RBVars.Aₙ = Matₙ::Array{T,3}
+    RBVars.AΦᵀPᵤ⁻¹ = MatqΦᵀPᵤ⁻¹::Array{T,3}
+    RBVars.Qᵃ = Q
   end
 
 end
@@ -127,25 +127,25 @@ function assemble_affine_vectors(
   println("SPGRB: assembling affine reduced RHS; A is affine")
 
   if var == "F"
-    RBVars.S.Qᶠ = 1
+    RBVars.Qᶠ = 1
     println("Assembling affine reduced forcing term")
-    F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.FEM_structures_path, "F.csv"))
-    MFₙ = zeros(T, RBVars.S.nₛᵘ, 1, RBVars.Qᵐ*RBVars.S.Qᶠ)
+    F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.FEM_structures_path, "F.csv"))
+    MFₙ = zeros(T, RBVars.nₛᵘ, 1, RBVars.Qᵐ*RBVars.Qᶠ)
     matrix_product_vec!(MFₙ, RBVars.MΦᵀPᵤ⁻¹, reshape(F,:,1))
-    AFₙ = zeros(T, RBVars.S.nₛᵘ, 1, RBVars.S.Qᵃ*RBVars.S.Qᶠ)
-    matrix_product_vec!(AFₙ, RBVars.S.AΦᵀPᵤ⁻¹, reshape(F,:,1))
-    RBVars.S.Fₙ = hcat(reshape(MFₙ,:,RBVars.Qᵐ*RBVars.S.Qᶠ),
-      reshape(AFₙ,:,RBVars.S.Qᵃ*RBVars.S.Qᶠ))
+    AFₙ = zeros(T, RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qᶠ)
+    matrix_product_vec!(AFₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(F,:,1))
+    RBVars.Fₙ = hcat(reshape(MFₙ,:,RBVars.Qᵐ*RBVars.Qᶠ),
+      reshape(AFₙ,:,RBVars.Qᵃ*RBVars.Qᶠ))
   elseif var == "H"
-    RBVars.S.Qʰ = 1
+    RBVars.Qʰ = 1
     println("Assembling affine reduced Neumann term")
-    H = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.FEM_structures_path, "H.csv"))
-    MHₙ = zeros(T, RBVars.S.nₛᵘ, 1, RBVars.Qᵐ*RBVars.S.Qʰ)
+    H = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.FEM_structures_path, "H.csv"))
+    MHₙ = zeros(T, RBVars.nₛᵘ, 1, RBVars.Qᵐ*RBVars.Qʰ)
     matrix_product_vec!(MHₙ, RBVars.MΦᵀPᵤ⁻¹, reshape(H,:,1))
-    AHₙ = zeros(T, RBVars.S.nₛᵘ, 1, RBVars.S.Qᵃ*RBVars.S.Qʰ)
-    matrix_product_vec!(AHₙ, RBVars.S.AΦᵀPᵤ⁻¹, reshape(H,:,1))
-    RBVars.S.Hₙ = hcat(reshape(MHₙ,:,RBVars.Qᵐ*RBVars.S.Qʰ),
-      reshape(AHₙ,:,RBVars.S.Qᵃ*RBVars.S.Qʰ))
+    AHₙ = zeros(T, RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qʰ)
+    matrix_product_vec!(AHₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(H,:,1))
+    RBVars.Hₙ = hcat(reshape(MHₙ,:,RBVars.Qᵐ*RBVars.Qʰ),
+      reshape(AHₙ,:,RBVars.Qᵃ*RBVars.Qʰ))
   else
     error("Unrecognized variable to assemble")
   end
@@ -158,20 +158,20 @@ function assemble_reduced_mat_DEIM(
   var::String) where T
 
   Q = size(DEIM_mat)[2]
-  MVecₙ = zeros(T,RBVars.S.nₛᵘ,1,RBVars.Qᵐ*Q)
+  MVecₙ = zeros(T,RBVars.nₛᵘ,1,RBVars.Qᵐ*Q)
   matrix_product_vec!(MVecₙ,RBVars.MΦᵀPᵤ⁻¹,DEIM_mat)
   MVecₙ = reshape(MVecₙ,:,RBVars.Qᵐ*Q)
-  AVecₙ = zeros(T,RBVars.S.nₛᵘ,1,RBVars.S.Qᵃ*Q)
-  matrix_product_vec!(AVecₙ,RBVars.S.AΦᵀPᵤ⁻¹,DEIM_mat)
-  AVecₙ = reshape(AVecₙ,:,RBVars.S.Qᵃ*Q)
+  AVecₙ = zeros(T,RBVars.nₛᵘ,1,RBVars.Qᵃ*Q)
+  matrix_product_vec!(AVecₙ,RBVars.AΦᵀPᵤ⁻¹,DEIM_mat)
+  AVecₙ = reshape(AVecₙ,:,RBVars.Qᵃ*Q)
   Vecₙ = hcat(MVecₙ,AVecₙ)
 
   if var == "F"
-    RBVars.S.Fₙ = Vecₙ
-    RBVars.S.Qᶠ = Q
+    RBVars.Fₙ = Vecₙ
+    RBVars.Qᶠ = Q
   elseif var == "H"
-    RBVars.S.Hₙ = Vecₙ
-    RBVars.S.Qʰ = Q
+    RBVars.Hₙ = Vecₙ
+    RBVars.Qʰ = Q
   else
     error("Unrecognized vector to assemble with DEIM")
   end
@@ -187,7 +187,7 @@ function assemble_offline_structures(
     operators = set_operators(RBInfo, RBVars)
   end
 
-  RBVars.S.offline_time += @elapsed begin
+  RBVars.offline_time += @elapsed begin
     if "M" ∈ operators || "F" ∈ operators || "H" ∈ operators
       if !RBInfo.probl_nl["M"]
         assemble_affine_matrices(RBInfo, RBVars, "M")
@@ -236,11 +236,11 @@ function save_affine_structures(
 
   if RBInfo.save_offline_structures
     save_CSV(reshape(RBVars.Mₙ,:,RBVars.Qᵐ^2),
-      joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
-    save_CSV(reshape(RBVars.MAₙ,:,RBVars.Qᵐ*RBVars.S.Qᵃ),
-      joinpath(RBInfo.paths.ROM_structures_path, "MAₙ.csv"))
+      joinpath(RBInfo.Paths.ROM_structures_path, "Mₙ.csv"))
+    save_CSV(reshape(RBVars.MAₙ,:,RBVars.Qᵐ*RBVars.Qᵃ),
+      joinpath(RBInfo.Paths.ROM_structures_path, "MAₙ.csv"))
     save_CSV(reshape(RBVars.MΦᵀPᵤ⁻¹,:,RBVars.Qᵐ),
-      joinpath(RBInfo.paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv"))
+      joinpath(RBInfo.Paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv"))
     save_affine_structures(RBInfo, RBVars.S)
   end
 end
@@ -262,7 +262,7 @@ function get_Q(
 
   if RBVars.Qᵐ == 0
     Qᵐ = sqrt(size(RBVars.Mₙ)[end])
-    @assert floor(Qᵐ) == Qᵐ "Qᵐ should be the square root of an Int64"
+    @assert floor(Qᵐ) == Qᵐ "Qᵐ should be the square root of an Int"
     RBVars.Qᵐ = Int(Qᵐ)
   end
   get_Q(RBInfo, RBVars.S)
@@ -281,9 +281,9 @@ function get_RB_LHS_blocks(
   θ = RBInfo.θ
   δt = RBInfo.δt
   nₜᵘ = RBVars.nₜᵘ
-  Qᵐᵃ = RBVars.Qᵐ*RBVars.S.Qᵃ
+  Qᵐᵃ = RBVars.Qᵐ*RBVars.Qᵃ
   Qᵐ = RBVars.Qᵐ^2
-  Qᵃ = RBVars.S.Qᵃ^2
+  Qᵃ = RBVars.Qᵃ^2
 
   Φₜᵘ_M = zeros(T, RBVars.nₜᵘ, RBVars.nₜᵘ, Qᵐ)
   Φₜᵘ₋₁₋₁_M = zeros(T, RBVars.nₜᵘ, RBVars.nₜᵘ, Qᵐ)
@@ -340,18 +340,18 @@ function get_RB_LHS_blocks(
 
   block₁ = zeros(T, RBVars.nᵘ, RBVars.nᵘ)
 
-  for i_s = 1:RBVars.S.nₛᵘ
+  for i_s = 1:RBVars.nₛᵘ
 
     for i_t = 1:RBVars.nₜᵘ
 
       i_st = index_mapping(i_s, i_t, RBVars)
 
-      for j_s = 1:RBVars.S.nₛᵘ
+      for j_s = 1:RBVars.nₛᵘ
         for j_t = 1:RBVars.nₜᵘ
 
           j_st = index_mapping(j_s, j_t, RBVars)
 
-          term1 = RBVars.S.Aₙ[i_s,j_s,:]'*( θ^2*Φₜᵘ_A[i_t,j_t,:] +
+          term1 = RBVars.Aₙ[i_s,j_s,:]'*( θ^2*Φₜᵘ_A[i_t,j_t,:] +
             (1-θ)^2*θ^2*Φₜᵘ₋₁₋₁_A[i_t,j_t,:] + θ*(1-θ)*Φₜᵘ₋₁₁_A[i_t,j_t,:] +
             θ*(1-θ)*Φₜᵘ₋₁₁_A[j_t,i_t,:] )
           term2 = RBVars.MAₙ[i_s,j_s,:]'*( θ*Φₜᵘ_MA[i_t,j_t,:] -
@@ -372,7 +372,7 @@ function get_RB_LHS_blocks(
     end
   end
 
-  push!(RBVars.S.LHSₙ, block₁)
+  push!(RBVars.LHSₙ, block₁)
 
 end
 
@@ -384,10 +384,10 @@ function get_RB_RHS_blocks(
 
   println("Assembling RHS using θ-method time scheme, θ=$(RBInfo.θ)")
 
-  Qᵐᶠ = RBVars.Qᵐ*RBVars.S.Qᶠ
-  Qᵐʰ = RBVars.Qᵐ*RBVars.S.Qʰ
-  Qᶠ_tot = RBVars.S.Qᶠ*(RBVars.Qᵐ+RBVars.S.Qᵃ)
-  Qʰ_tot = RBVars.S.Qʰ*(RBVars.Qᵐ+RBVars.S.Qᵃ)
+  Qᵐᶠ = RBVars.Qᵐ*RBVars.Qᶠ
+  Qᵐʰ = RBVars.Qᵐ*RBVars.Qʰ
+  Qᶠ_tot = RBVars.Qᶠ*(RBVars.Qᵐ+RBVars.Qᵃ)
+  Qʰ_tot = RBVars.Qʰ*(RBVars.Qᵐ+RBVars.Qᵃ)
   δt = RBInfo.δt
   θ = RBInfo.θ
   δtθ = δt*θ
@@ -408,19 +408,19 @@ function get_RB_RHS_blocks(
     for q = 1:Qʰ_tot for i_t = 1:nₜᵘ]
 
   block₁ = zeros(T,RBVars.nᵘ,1)
-  for i_s = 1:RBVars.S.nₛᵘ
+  for i_s = 1:RBVars.nₛᵘ
     for i_t = 1:RBVars.nₜᵘ
 
       i_st = index_mapping(i_s, i_t, RBVars)
 
-      term1 = (RBVars.S.Fₙ[i_s,1:Qᵐᶠ]'*Φₜᵘ_F[i_t,1:Qᵐᶠ] +
-        RBVars.S.Hₙ[i_s,1:Qᵐʰ]'*Φₜᵘ_H[i_t,1:Qᵐʰ])
-      term2 = δtθ*(RBVars.S.Fₙ[i_s,Qᵐᶠ+1:end]'*Φₜᵘ_F[i_t,Qᵐᶠ+1:end] +
-        RBVars.S.Hₙ[i_s,Qᵐʰ+1:end]'*Φₜᵘ_H[i_t,Qᵐʰ+1:end])
-      term3 = -θ*( RBVars.S.Fₙ[i_s,1:Qᵐᶠ]'*Φₜᵘ₋₁₁_F[i_t,1:Qᵐᶠ] +
-        RBVars.S.Hₙ[i_s,1:Qᵐʰ]'*Φₜᵘ₋₁₁_H[i_t,1:Qᵐʰ] )
-      term4 = δtθ*(1-θ)*(RBVars.S.Fₙ[i_s,Qᵐᶠ+1:end]'*Φₜᵘ₋₁₁_F[i_t,Qᵐᶠ+1:end] +
-        RBVars.S.Hₙ[i_s,Qᵐʰ+1:end]'*Φₜᵘ₋₁₁_H[i_t,Qᵐʰ+1:end])
+      term1 = (RBVars.Fₙ[i_s,1:Qᵐᶠ]'*Φₜᵘ_F[i_t,1:Qᵐᶠ] +
+        RBVars.Hₙ[i_s,1:Qᵐʰ]'*Φₜᵘ_H[i_t,1:Qᵐʰ])
+      term2 = δtθ*(RBVars.Fₙ[i_s,Qᵐᶠ+1:end]'*Φₜᵘ_F[i_t,Qᵐᶠ+1:end] +
+        RBVars.Hₙ[i_s,Qᵐʰ+1:end]'*Φₜᵘ_H[i_t,Qᵐʰ+1:end])
+      term3 = -θ*( RBVars.Fₙ[i_s,1:Qᵐᶠ]'*Φₜᵘ₋₁₁_F[i_t,1:Qᵐᶠ] +
+        RBVars.Hₙ[i_s,1:Qᵐʰ]'*Φₜᵘ₋₁₁_H[i_t,1:Qᵐʰ] )
+      term4 = δtθ*(1-θ)*(RBVars.Fₙ[i_s,Qᵐᶠ+1:end]'*Φₜᵘ₋₁₁_F[i_t,Qᵐᶠ+1:end] +
+        RBVars.Hₙ[i_s,Qᵐʰ+1:end]'*Φₜᵘ₋₁₁_H[i_t,Qᵐʰ+1:end])
 
       block₁[i_st,1] = term1 + term2 + term3 + term4
 
@@ -428,7 +428,7 @@ function get_RB_RHS_blocks(
   end
 
   block₁ *= δtθ
-  push!(RBVars.S.RHSₙ, block₁)
+  push!(RBVars.RHSₙ, block₁)
 
 end
 
@@ -440,7 +440,7 @@ function get_RB_system(
   initialize_RB_system(RBVars.S)
   initialize_online_time(RBVars.S)
 
-  RBVars.S.online_time = @elapsed begin
+  RBVars.online_time = @elapsed begin
     get_Q(RBInfo, RBVars)
     blocks = [1]
     operators = get_system_blocks(RBInfo, RBVars, blocks, blocks)
@@ -479,7 +479,7 @@ function build_param_RHS(
 
   F_t = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
   H_t = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
-  F, H = zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ), zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ)
+  F, H = zeros(T, RBVars.Nₛᵘ, RBVars.Nₜ), zeros(T, RBVars.Nₛᵘ, RBVars.Nₜ)
   timesθ = get_timesθ(RBInfo)
   for (i, tᵢ) in enumerate(timesθ)
     F[:,i] = F_t(tᵢ)
@@ -487,38 +487,38 @@ function build_param_RHS(
   end
   RHS = (F+H)*δtθ
 
-  MRHSΦₜ = zeros(T, RBVars.S.Nₛᵘ,RBVars.nₜᵘ,RBVars.Qᵐ)
-  MRHSΦₜ₁ = zeros(T, RBVars.S.Nₛᵘ,RBVars.nₜᵘ,RBVars.Qᵐ)
-  ARHSΦₜ = zeros(T, RBVars.S.Nₛᵘ,RBVars.nₜᵘ,RBVars.S.Qᵃ)
-  ARHSΦₜ₁ = zeros(T, RBVars.S.Nₛᵘ,RBVars.nₜᵘ,RBVars.S.Qᵃ)
-  for iₛ=1:RBVars.S.Nₛᵘ
+  MRHSΦₜ = zeros(T, RBVars.Nₛᵘ,RBVars.nₜᵘ,RBVars.Qᵐ)
+  MRHSΦₜ₁ = zeros(T, RBVars.Nₛᵘ,RBVars.nₜᵘ,RBVars.Qᵐ)
+  ARHSΦₜ = zeros(T, RBVars.Nₛᵘ,RBVars.nₜᵘ,RBVars.Qᵃ)
+  ARHSΦₜ₁ = zeros(T, RBVars.Nₛᵘ,RBVars.nₜᵘ,RBVars.Qᵃ)
+  for iₛ=1:RBVars.Nₛᵘ
     for jₜ=1:RBVars.nₜᵘ
       for qᵐ=1:RBVars.Qᵐ
         MRHSΦₜ[iₛ,jₜ,qᵐ] = sum(RHS[iₛ,:].*RBVars.Φₜᵘ[:,jₜ].*θᵐ_temp[qᵐ,:])
         MRHSΦₜ₁[iₛ,jₜ,qᵐ] = sum(RHS[iₛ,2:end].*RBVars.Φₜᵘ[1:end-1,jₜ].*θᵐ_temp[qᵐ,2:end])
       end
-      for qᵃ=1:RBVars.S.Qᵃ
+      for qᵃ=1:RBVars.Qᵃ
         ARHSΦₜ[iₛ,jₜ,qᵃ] = sum(RHS[iₛ,:].*RBVars.Φₜᵘ[:,jₜ].*θᵃ_temp[qᵃ,:])
         ARHSΦₜ₁[iₛ,jₜ,qᵃ] = sum(RHS[iₛ,2:end].*RBVars.Φₜᵘ[1:end-1,jₜ].*θᵃ_temp[qᵃ,2:end])
       end
     end
   end
 
-  MRHSₙ = zeros(T,RBVars.S.nₛᵘ,RBVars.nₜᵘ)
-  ARHSₙ = zeros(T,RBVars.S.nₛᵘ,RBVars.nₜᵘ)
-  MRHS₁ₙ = zeros(T,RBVars.S.nₛᵘ,RBVars.nₜᵘ)
-  ARHS₁ₙ = zeros(T,RBVars.S.nₛᵘ,RBVars.nₜᵘ)
+  MRHSₙ = zeros(T,RBVars.nₛᵘ,RBVars.nₜᵘ)
+  ARHSₙ = zeros(T,RBVars.nₛᵘ,RBVars.nₜᵘ)
+  MRHS₁ₙ = zeros(T,RBVars.nₛᵘ,RBVars.nₜᵘ)
+  ARHS₁ₙ = zeros(T,RBVars.nₛᵘ,RBVars.nₜᵘ)
   for qᵐ=1:RBVars.Qᵐ
     MRHSₙ += RBVars.MΦᵀPᵤ⁻¹[:,:,qᵐ]*MRHSΦₜ[:,:,qᵐ]
     MRHS₁ₙ += RBVars.MΦᵀPᵤ⁻¹[:,:,qᵐ]*MRHSΦₜ₁[:,:,qᵐ]
   end
-  for qᵃ=1:RBVars.S.Qᵃ
-    ARHSₙ += RBVars.S.AΦᵀPᵤ⁻¹[:,:,qᵃ]*ARHSΦₜ[:,:,qᵃ]
-    ARHS₁ₙ += RBVars.S.AΦᵀPᵤ⁻¹[:,:,qᵃ]*ARHSΦₜ₁[:,:,qᵃ]
+  for qᵃ=1:RBVars.Qᵃ
+    ARHSₙ += RBVars.AΦᵀPᵤ⁻¹[:,:,qᵃ]*ARHSΦₜ[:,:,qᵃ]
+    ARHS₁ₙ += RBVars.AΦᵀPᵤ⁻¹[:,:,qᵃ]*ARHSΦₜ₁[:,:,qᵃ]
   end
 
   RHSₙ = MRHSₙ+δtθ*ARHSₙ + θ*(δt*(1-θ)*ARHS₁ₙ-MRHS₁ₙ)
-  push!(RBVars.S.RHSₙ, reshape(RHSₙ',:,1))
+  push!(RBVars.RHSₙ, reshape(RHSₙ',:,1))
 
 end
 

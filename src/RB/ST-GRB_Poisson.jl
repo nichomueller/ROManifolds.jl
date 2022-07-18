@@ -10,10 +10,10 @@ function get_Mₙ(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTGRB{T}) where T
 
-  if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
+  if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "Mₙ.csv"))
     println("Importing reduced affine mass matrix")
-    Mₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
-    RBVars.Mₙ = reshape(Mₙ,RBVars.S.nₛᵘ,RBVars.S.nₛᵘ,:)
+    Mₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "Mₙ.csv"))
+    RBVars.Mₙ = reshape(Mₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)::Array{T,3}
     RBVars.Qᵐ = size(RBVars.Mₙ)[end]
     return [""]
   else
@@ -31,9 +31,9 @@ function assemble_affine_matrices(
   if var == "M"
     RBVars.Qᵐ = 1
     println("Assembling affine reduced mass")
-    M = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "M.csv"))
-    RBVars.Mₙ = zeros(T, RBVars.S.nₛᵘ, RBVars.S.nₛᵘ, 1)
-    RBVars.Mₙ[:,:,1] = (RBVars.S.Φₛᵘ)' * M * RBVars.S.Φₛᵘ
+    M = load_CSV(sparse([],[],T[]), joinpath(RBInfo.Paths.FEM_structures_path, "M.csv"))
+    RBVars.Mₙ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ, 1)
+    RBVars.Mₙ[:,:,1] = (RBVars.Φₛᵘ)' * M * RBVars.Φₛᵘ
   else
     assemble_affine_matrices(RBInfo, RBVars.S, var)
   end
@@ -43,25 +43,25 @@ end
 function assemble_reduced_mat_MDEIM(
   RBVars::PoissonSTGRB{T},
   MDEIM_mat::Matrix{T},
-  row_idx::Vector{Int64},
+  row_idx::Vector{Int},
   var::String) where T
 
   Q = size(MDEIM_mat)[2]
-  r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.S.Nₛᵘ)
-  MatqΦ = zeros(T, RBVars.S.Nₛᵘ,RBVars.S.nₛᵘ,Q)
-  @simd for j = 1:RBVars.S.Nₛᵘ
+  r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.Nₛᵘ)
+  MatqΦ = zeros(T, RBVars.Nₛᵘ,RBVars.nₛᵘ,Q)
+  @simd for j = 1:RBVars.Nₛᵘ
     Mat_idx = findall(x -> x == j, r_idx)
-    MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.S.Φₛᵘ[c_idx[Mat_idx],:])'
+    MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.Φₛᵘ[c_idx[Mat_idx],:])'
   end
-  Matₙ = reshape(RBVars.S.Φₛᵘ' *
-    reshape(MatqΦ,RBVars.S.Nₛᵘ,:),RBVars.S.nₛᵘ,:,Q)
+  Matₙ = reshape(RBVars.Φₛᵘ' *
+    reshape(MatqΦ,RBVars.Nₛᵘ,:),RBVars.nₛᵘ,:,Q)::Array{T,3}
 
   if var == "M"
     RBVars.Mₙ = Matₙ
     RBVars.Qᵐ = Q
   else
-    RBVars.S.Aₙ = Matₙ
-    RBVars.S.Qᵃ = Q
+    RBVars.Aₙ = Matₙ
+    RBVars.Qᵃ = Q
   end
 
 end
@@ -81,18 +81,18 @@ function assemble_reduced_mat_DEIM(
   var::String) where T
 
   Q = size(DEIM_mat)[2]
-  Vecₙ = zeros(T, RBVars.S.nₛᵘ,1,Q)
+  Vecₙ = zeros(T, RBVars.nₛᵘ,1,Q)
   @simd for q = 1:Q
-    Vecₙ[:,:,q] = RBVars.S.Φₛᵘ' * Vector{T}(DEIM_mat[:, q])
+    Vecₙ[:,:,q] = RBVars.Φₛᵘ' * Vector{T}(DEIM_mat[:, q])
   end
-  Vecₙ = reshape(Vecₙ,:,Q)
+  Vecₙ = reshape(Vecₙ,:,Q)::Matrix{T}
 
   if var == "F"
-    RBVars.S.Fₙ = Vecₙ
-    RBVars.S.Qᶠ = Q
+    RBVars.Fₙ = Vecₙ
+    RBVars.Qᶠ = Q
   elseif var == "H"
-    RBVars.S.Hₙ = Vecₙ
-    RBVars.S.Qʰ = Q
+    RBVars.Hₙ = Vecₙ
+    RBVars.Qʰ = Q
   else
     error("Unrecognized vector to assemble with DEIM")
   end
@@ -108,7 +108,7 @@ function assemble_offline_structures(
     operators = set_operators(RBInfo, RBVars)
   end
 
-  RBVars.S.offline_time += @elapsed begin
+  RBVars.offline_time += @elapsed begin
     if "M" ∈ operators
       if !RBInfo.probl_nl["M"]
         assemble_affine_matrices(RBInfo, RBVars, "M")
@@ -153,7 +153,7 @@ function save_affine_structures(
 
   if RBInfo.save_offline_structures
     save_CSV(reshape(RBVars.Mₙ, :, RBVars.Qᵐ),
-      joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
+      joinpath(RBInfo.Paths.ROM_structures_path, "Mₙ.csv"))
     save_affine_structures(RBInfo, RBVars.S)
   end
 
@@ -177,6 +177,7 @@ function get_Q(
   if RBVars.Qᵐ == 0
     RBVars.Qᵐ = size(RBVars.Mₙ)[end]
   end
+
   get_Q(RBInfo, RBVars.S)
 
 end
@@ -193,7 +194,7 @@ function get_RB_LHS_blocks(
   δtθ = RBInfo.δt*θ
   nₜᵘ = RBVars.nₜᵘ
   Qᵐ = RBVars.Qᵐ
-  Qᵃ = RBVars.S.Qᵃ
+  Qᵃ = RBVars.Qᵃ
 
   Φₜᵘ_M = zeros(T,RBVars.nₜᵘ,RBVars.nₜᵘ,Qᵐ)
   Φₜᵘ₁_M = zeros(T,RBVars.nₜᵘ,RBVars.nₜᵘ,Qᵐ)
@@ -223,8 +224,8 @@ function get_RB_LHS_blocks(
     Mₙ₁_tmp[:,:,qᵐ] = kron(RBVars.Mₙ[:,:,qᵐ],Φₜᵘ₁_M[:,:,qᵐ])::Matrix{T}
   end
   @simd for qᵃ = 1:Qᵃ
-    Aₙ_tmp[:,:,qᵃ] = kron(RBVars.S.Aₙ[:,:,qᵃ],Φₜᵘ_A[:,:,qᵃ])::Matrix{T}
-    Aₙ₁_tmp[:,:,qᵃ] = kron(RBVars.S.Aₙ[:,:,qᵃ],Φₜᵘ₁_A[:,:,qᵃ])::Matrix{T}
+    Aₙ_tmp[:,:,qᵃ] = kron(RBVars.Aₙ[:,:,qᵃ],Φₜᵘ_A[:,:,qᵃ])::Matrix{T}
+    Aₙ₁_tmp[:,:,qᵃ] = kron(RBVars.Aₙ[:,:,qᵃ],Φₜᵘ₁_A[:,:,qᵃ])::Matrix{T}
   end
   Mₙ = reshape(sum(Mₙ_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
   Mₙ₁ = reshape(sum(Mₙ₁_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
@@ -232,7 +233,7 @@ function get_RB_LHS_blocks(
   Aₙ₁ = δtθ*reshape(sum(Aₙ₁_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
 
   block₁ = θ*(Aₙ+Mₙ) + (1-θ)*Aₙ₁ - θ*Mₙ₁
-  push!(RBVars.S.LHSₙ, block₁)
+  push!(RBVars.LHSₙ, block₁)::Vector{Matrix{T}}
 
 end
 
@@ -244,8 +245,8 @@ function get_RB_RHS_blocks(
 
   println("Assembling RHS using θ-method time scheme, θ=$(RBInfo.θ)")
 
-  Qᶠ = RBVars.S.Qᶠ
-  Qʰ = RBVars.S.Qʰ
+  Qᶠ = RBVars.Qᶠ
+  Qʰ = RBVars.Qʰ
   δtθ = RBInfo.δt*RBInfo.θ
   nₜᵘ = RBVars.nₜᵘ
 
@@ -261,17 +262,17 @@ function get_RB_RHS_blocks(
   end
 
   block₁ = zeros(T, RBVars.nᵘ,1)
-  @simd for i_s = 1:RBVars.S.nₛᵘ
+  @simd for i_s = 1:RBVars.nₛᵘ
     for i_t = 1:RBVars.nₜᵘ
       i_st = index_mapping(i_s, i_t, RBVars)
-      Fₙ_μ_i_j = RBVars.S.Fₙ[i_s,:]'*Φₜᵘ_F[i_t,:]
-      Hₙ_μ_i_j = RBVars.S.Hₙ[i_s,:]'*Φₜᵘ_H[i_t,:]
+      Fₙ_μ_i_j = RBVars.Fₙ[i_s,:]'*Φₜᵘ_F[i_t,:]
+      Hₙ_μ_i_j = RBVars.Hₙ[i_s,:]'*Φₜᵘ_H[i_t,:]
       block₁[i_st,1] = Fₙ_μ_i_j+Hₙ_μ_i_j
     end
   end
 
   block₁ *= δtθ
-  push!(RBVars.S.RHSₙ, block₁)
+  push!(RBVars.RHSₙ, block₁)::Vector{Matrix{T}}
 
 end
 
@@ -284,7 +285,7 @@ function get_RB_system(
   initialize_RB_system(RBVars.S)
   initialize_online_time(RBVars.S)
 
-  RBVars.S.online_time = @elapsed begin
+  RBVars.online_time = @elapsed begin
     get_Q(RBInfo, RBVars)
     blocks = [1]
     operators = get_system_blocks(RBInfo,RBVars.S,blocks,blocks)
@@ -318,7 +319,7 @@ function build_param_RHS(
   δtθ = RBInfo.δt*RBInfo.θ
   F_t = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
   H_t = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
-  F, H = zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ), zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ)
+  F, H = zeros(T, RBVars.Nₛᵘ, RBVars.Nₜ), zeros(T, RBVars.Nₛᵘ, RBVars.Nₜ)
   timesθ = get_timesθ(RBInfo)
   for (i,tᵢ) in enumerate(timesθ)
     F[:,i] = F_t(tᵢ)
@@ -326,9 +327,9 @@ function build_param_RHS(
   end
   F *= δtθ
   H *= δtθ
-  Fₙ = RBVars.S.Φₛᵘ'*(F*RBVars.Φₜᵘ)
-  Hₙ = RBVars.S.Φₛᵘ'*(H*RBVars.Φₜᵘ)
-  push!(RBVars.S.RHSₙ, reshape(Fₙ'+Hₙ',:,1))
+  Fₙ = RBVars.Φₛᵘ'*(F*RBVars.Φₜᵘ)
+  Hₙ = RBVars.Φₛᵘ'*(H*RBVars.Φₜᵘ)
+  push!(RBVars.RHSₙ, reshape(Fₙ'+Hₙ',:,1))::Vector{Matrix{T}}
 
 end
 
