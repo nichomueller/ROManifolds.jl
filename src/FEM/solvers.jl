@@ -132,8 +132,8 @@ end
   x₀_field = interpolate_everywhere([u₀_field,p₀_field], FEMSpace.X(probl.t₀))
 
   xₕₜ_field = solve(ode_solver, operator, x₀_field, probl.t₀, probl.T)
-  uₕₜ = zeros(FEMSpace.Nₛᵘ, convert(Int64, probl.T / probl.δt))
-  pₕₜ = zeros(FEMSpace.Nₛᵖ, convert(Int64, probl.T / probl.δt))
+  uₕₜ = zeros(FEMSpace.Nₛᵘ, convert(Int, probl.T / probl.δt))
+  pₕₜ = zeros(FEMSpace.Nₛᵖ, convert(Int, probl.T / probl.δt))
   global count = 0
   dΩ = FEMSpace.dΩ
   for (xₕ, _) in xₕₜ_field

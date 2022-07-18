@@ -146,7 +146,7 @@ optimizer = ADAM()
 optimizer1 = LBFGS()
 
 training_loss = Float64[]
-epochs = Int64[]
+epochs = Int[]
 
 for epoch in 1:1000
 	train!(Loss, Params(model), zip(xs, ys), optimizer)

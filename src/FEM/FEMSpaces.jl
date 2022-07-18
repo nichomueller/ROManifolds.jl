@@ -48,7 +48,7 @@ function get_lagrangianQuad_info(
 end
 
 function get_FEMSpace(
-  ::NTuple{1,Int64},
+  ::NTuple{1,Int},
   FEMInfo::SteadyInfo,
   model::DiscreteModel{D,D},
   g::F) where D
@@ -76,7 +76,7 @@ function get_FEMSpace(
 end
 
 function get_FEMSpace(
-  ::NTuple{1,Int64},
+  ::NTuple{1,Int},
   FEMInfo::UnsteadyInfo,
   model::DiscreteModel{D,D},
   g::F) where D
@@ -103,7 +103,7 @@ function get_FEMSpace(
 end
 
 function get_FEMSpace(
-  ::NTuple{2,Int64},
+  ::NTuple{2,Int},
   FEMInfo::SteadyInfo,
   model::DiscreteModel{D,D},
   g::F) where D
@@ -141,7 +141,7 @@ function get_FEMSpace(
 end
 
 function get_FEMSpace(
-  ::NTuple{2,Int64},
+  ::NTuple{2,Int},
   FEMInfo::UnsteadyInfo,
   model::DiscreteModel{D,D},
   g::F) where D
@@ -179,7 +179,7 @@ function get_FEMSpace(
 end
 
 function get_FEMSpace₀(
-  problem_id::NTuple{1,Int64},
+  problem_id::NTuple{1,Int},
   FEMInfo::SteadyInfo,
   model::DiscreteModel)
 
@@ -188,7 +188,7 @@ function get_FEMSpace₀(
 end
 
 function get_FEMSpace₀(
-  problem_id::NTuple{1,Int64},
+  problem_id::NTuple{1,Int},
   FEMInfo::UnsteadyInfo,
   model::DiscreteModel)
 
@@ -199,7 +199,7 @@ function get_FEMSpace₀(
 end
 
 function get_FEMSpace₀(
-  problem_id::NTuple{2,Int64},
+  problem_id::NTuple{2,Int},
   FEMInfo::SteadyInfo,
   model::DiscreteModel)
 
@@ -208,7 +208,7 @@ function get_FEMSpace₀(
 end
 
 function get_FEMSpace₀(
-  problem_id::NTuple{2,Int64},
+  problem_id::NTuple{2,Int},
   FEMInfo::UnsteadyInfo,
   model::DiscreteModel)
 

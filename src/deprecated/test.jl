@@ -214,13 +214,13 @@ function DEIM_offline(basis)
     =#
 
     n = shape(basis)[2]
-    DEIM_idx = zeros(Int64, n)
+    DEIM_idx = zeros(Int, n)
 
-    DEIM_idx[1] = convert(Int64, argmax(abs(basis[:, 1])))
+    DEIM_idx[1] = convert(Int, argmax(abs(basis[:, 1])))
 
     if n > 1
         res = self.M_basis[:, 2] - dot(basis[:, 1], basis[DEIM_idx[1], 2] / basis[DEIM_idx[1], 1])
-        DEIM_idx[2] = convert(Int64, argmax(abs(res)))
+        DEIM_idx[2] = convert(Int, argmax(abs(res)))
     end
 
     proj = zeros(n)
@@ -228,7 +228,7 @@ function DEIM_offline(basis)
     for m in range(3, n)
         mul!(proj, basis[:, 1:m], mul!(tmp, basis[DEIM_idx[1:m], 1:m], basis[DEIM_idx[1:m], m]))
         res = basis[:, m] - proj
-        DEIM_idx[m] = convert(Int64, argmax(abs(res)))
+        DEIM_idx[m] = convert(Int, argmax(abs(res)))
     end
 
     DEIM_mat = basis[:, DEIM_idx]

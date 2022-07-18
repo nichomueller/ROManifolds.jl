@@ -10,18 +10,18 @@ function get_Mₙ(
   RBInfo::Info,
   RBVars::PoissonSTPGRB{T}) where T
 
-  if (isfile(joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv")) &&
-      isfile(joinpath(RBInfo.paths.ROM_structures_path, "MΦ.csv")) &&
-      isfile(joinpath(RBInfo.paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv")))
+  if (isfile(joinpath(RBInfo.Paths.ROM_structures_path, "Mₙ.csv")) &&
+      isfile(joinpath(RBInfo.Paths.ROM_structures_path, "MΦ.csv")) &&
+      isfile(joinpath(RBInfo.Paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv")))
     println("Importing reduced affine stiffness matrix")
-    Mₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
+    Mₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "Mₙ.csv"))
     RBVars.Mₙ = reshape(Mₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)::Array{T,3}
     Qᵐ = sqrt(size(RBVars.Mₙ)[end])
-    @assert floor(Qᵐ) == Qᵐ "Qᵐ should be the square root of an Int64"
+    @assert floor(Qᵐ) == Qᵐ "Qᵐ should be the square root of an Int"
     RBVars.Qᵐ = Int(Qᵐ)
-    MΦ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "MΦ.csv"))
+    MΦ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "MΦ.csv"))
     RBVars.MΦ = reshape(MΦ,RBVars.Nₛᵘ,RBVars.nₛᵘ,:)
-    MΦᵀPᵤ⁻¹ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv"))
+    MΦᵀPᵤ⁻¹ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv"))
     RBVars.MΦᵀPᵤ⁻¹ = reshape(MΦᵀPᵤ⁻¹,RBVars.nₛᵘ,RBVars.Nₛᵘ,:)
     return [""]
   else
@@ -35,9 +35,9 @@ function get_MAₙ(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTPGRB{T}) where T
 
-  if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
+  if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "Mₙ.csv"))
     println("S-PGRB: importing MAₙ")
-    MAₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "MAₙ.csv"))
+    MAₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "MAₙ.csv"))
     RBVars.MAₙ = reshape(MAₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)
     return [""]
   else
@@ -71,7 +71,7 @@ function assemble_affine_matrices(
   if var == "M"
     RBVars.Qᵐ = 1
     println("Assembling affine reduced mass")
-    M = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "M.csv"))
+    M = load_CSV(sparse([],[],T[]), joinpath(RBInfo.Paths.FEM_structures_path, "M.csv"))
     RBVars.Mₙ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ, 1)
     RBVars.Mₙ[:,:,1] = (M*RBVars.Φₛᵘ)'*RBVars.Pᵤ⁻¹*(M*RBVars.Φₛᵘ)
     RBVars.MΦ = zeros(T, RBVars.Nₛᵘ, RBVars.nₛᵘ, 1)
@@ -87,7 +87,7 @@ end
 function assemble_reduced_mat_MDEIM(
   RBVars::PoissonSTPGRB{T},
   MDEIM_mat::Matrix,
-  row_idx::Vector{Int64},
+  row_idx::Vector{Int},
   var::String) where T
 
   Q = size(MDEIM_mat)[2]
@@ -129,7 +129,7 @@ function assemble_affine_vectors(
   if var == "F"
     RBVars.Qᶠ = 1
     println("Assembling affine reduced forcing term")
-    F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.FEM_structures_path, "F.csv"))
+    F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.FEM_structures_path, "F.csv"))
     MFₙ = zeros(T, RBVars.nₛᵘ, 1, RBVars.Qᵐ*RBVars.Qᶠ)
     matrix_product_vec!(MFₙ, RBVars.MΦᵀPᵤ⁻¹, reshape(F,:,1))
     AFₙ = zeros(T, RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qᶠ)
@@ -139,7 +139,7 @@ function assemble_affine_vectors(
   elseif var == "H"
     RBVars.Qʰ = 1
     println("Assembling affine reduced Neumann term")
-    H = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.FEM_structures_path, "H.csv"))
+    H = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.FEM_structures_path, "H.csv"))
     MHₙ = zeros(T, RBVars.nₛᵘ, 1, RBVars.Qᵐ*RBVars.Qʰ)
     matrix_product_vec!(MHₙ, RBVars.MΦᵀPᵤ⁻¹, reshape(H,:,1))
     AHₙ = zeros(T, RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qʰ)
@@ -236,11 +236,11 @@ function save_affine_structures(
 
   if RBInfo.save_offline_structures
     save_CSV(reshape(RBVars.Mₙ,:,RBVars.Qᵐ^2),
-      joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
+      joinpath(RBInfo.Paths.ROM_structures_path, "Mₙ.csv"))
     save_CSV(reshape(RBVars.MAₙ,:,RBVars.Qᵐ*RBVars.Qᵃ),
-      joinpath(RBInfo.paths.ROM_structures_path, "MAₙ.csv"))
+      joinpath(RBInfo.Paths.ROM_structures_path, "MAₙ.csv"))
     save_CSV(reshape(RBVars.MΦᵀPᵤ⁻¹,:,RBVars.Qᵐ),
-      joinpath(RBInfo.paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv"))
+      joinpath(RBInfo.Paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv"))
     save_affine_structures(RBInfo, RBVars.S)
   end
 end
@@ -262,7 +262,7 @@ function get_Q(
 
   if RBVars.Qᵐ == 0
     Qᵐ = sqrt(size(RBVars.Mₙ)[end])
-    @assert floor(Qᵐ) == Qᵐ "Qᵐ should be the square root of an Int64"
+    @assert floor(Qᵐ) == Qᵐ "Qᵐ should be the square root of an Int"
     RBVars.Qᵐ = Int(Qᵐ)
   end
   get_Q(RBInfo, RBVars.S)

@@ -20,17 +20,17 @@ function init_PoissonSGRB_variables(::Type{T}) where T
   RHSₙ = Matrix{T}[]
   MDEIM_mat_A = Matrix{T}(undef,0,0)
   MDEIMᵢ_A = Matrix{T}(undef,0,0)
-  MDEIM_idx_A = Vector{Int64}(undef,0)
-  row_idx_A = Vector{Int64}(undef,0)
-  sparse_el_A = Vector{Int64}(undef,0)
+  MDEIM_idx_A = Vector{Int}(undef,0)
+  row_idx_A = Vector{Int}(undef,0)
+  sparse_el_A = Vector{Int}(undef,0)
   DEIM_mat_F = Matrix{T}(undef,0,0)
   DEIMᵢ_F = Matrix{T}(undef,0,0)
-  DEIM_idx_F = Vector{Int64}(undef,0)
-  sparse_el_F = Vector{Int64}(undef,0)
+  DEIM_idx_F = Vector{Int}(undef,0)
+  sparse_el_F = Vector{Int}(undef,0)
   DEIM_mat_H = Matrix{T}(undef,0,0)
   DEIMᵢ_H = Matrix{T}(undef,0,0)
-  DEIM_idx_H = Vector{Int64}(undef,0)
-  sparse_el_H = Vector{Int64}(undef,0)
+  DEIM_idx_H = Vector{Int}(undef,0)
+  sparse_el_H = Vector{Int}(undef,0)
   Nₛᵘ = 0
   nₛᵘ = 0
   Qᵃ = 0
@@ -59,13 +59,13 @@ function init_PoissonSTGRB_variables(::Type{T}) where T
   Mₙ = Array{T}(undef,0,0,0)
   MDEIM_mat_M = Matrix{T}(undef,0,0)
   MDEIMᵢ_M = Matrix{T}(undef,0,0)
-  MDEIM_idx_M = Vector{Int64}(undef,0)
-  row_idx_M = Vector{Int64}(undef,0)
-  sparse_el_M = Vector{Int64}(undef,0)
-  MDEIM_idx_time_A = Vector{Int64}(undef,0)
-  MDEIM_idx_time_M = Vector{Int64}(undef,0)
-  DEIM_idx_time_F = Vector{Int64}(undef,0)
-  DEIM_idx_time_H = Vector{Int64}(undef,0)
+  MDEIM_idx_M = Vector{Int}(undef,0)
+  row_idx_M = Vector{Int}(undef,0)
+  sparse_el_M = Vector{Int}(undef,0)
+  MDEIM_idx_time_A = Vector{Int}(undef,0)
+  MDEIM_idx_time_M = Vector{Int}(undef,0)
+  DEIM_idx_time_F = Vector{Int}(undef,0)
+  DEIM_idx_time_H = Vector{Int}(undef,0)
   Nₜ = 0
   Nᵘ = 0
   nₜᵘ = 0
@@ -115,48 +115,48 @@ end
 mutable struct PoissonSGRB{T} <: PoissonSteady{T}
   Sᵘ::Matrix{T}; Φₛᵘ::Matrix{T}; ũ::Matrix{T}; uₙ::Matrix{T}; û::Matrix{T}; Aₙ::Array{T}; Fₙ::Matrix{T};
   Hₙ::Matrix{T}; Xᵘ₀::SparseMatrixCSC{T}; LHSₙ::Vector{Matrix{T}}; RHSₙ::Vector{Matrix{T}}; MDEIM_mat_A::Matrix{T};
-  MDEIMᵢ_A::Matrix{T}; MDEIM_idx_A::Vector{Int64}; row_idx_A::Vector{Int64}; sparse_el_A::Vector{Int64};
-  DEIM_mat_F::Matrix{T}; DEIMᵢ_F::Matrix{T}; DEIM_idx_F::Vector{Int64}; sparse_el_F::Vector{Int64};
-  DEIM_mat_H::Matrix{T}; DEIMᵢ_H::Matrix{T}; DEIM_idx_H::Vector{Int64}; sparse_el_H::Vector{Int64};
-  Nₛᵘ::Int64; nₛᵘ::Int64; Qᵃ::Int64; Qᶠ::Int64; Qʰ::Int64; offline_time::Float64;
+  MDEIMᵢ_A::Matrix{T}; MDEIM_idx_A::Vector{Int}; row_idx_A::Vector{Int}; sparse_el_A::Vector{Int};
+  DEIM_mat_F::Matrix{T}; DEIMᵢ_F::Matrix{T}; DEIM_idx_F::Vector{Int}; sparse_el_F::Vector{Int};
+  DEIM_mat_H::Matrix{T}; DEIMᵢ_H::Matrix{T}; DEIM_idx_H::Vector{Int}; sparse_el_H::Vector{Int};
+  Nₛᵘ::Int; nₛᵘ::Int; Qᵃ::Int; Qᶠ::Int; Qʰ::Int; offline_time::Float64;
   online_time::Float64
 end
 
 mutable struct PoissonSPGRB{T} <: PoissonSteady{T}
   Sᵘ::Matrix{T}; Φₛᵘ::Matrix{T}; ũ::Matrix{T}; uₙ::Matrix{T}; û::Matrix{T}; Aₙ::Array{T}; Fₙ::Matrix{T};
   Hₙ::Matrix{T}; Xᵘ₀::SparseMatrixCSC{T}; LHSₙ::Vector{Matrix{T}}; RHSₙ::Vector{Matrix{T}}; MDEIM_mat_A::Matrix{T};
-  MDEIMᵢ_A::Matrix{T}; MDEIM_idx_A::Vector{Int64}; row_idx_A::Vector{Int64}; sparse_el_A::Vector{Int64};
-  DEIM_mat_F::Matrix{T}; DEIMᵢ_F::Matrix{T}; DEIM_idx_F::Vector{Int64}; sparse_el_F::Vector{Int64};
-  DEIM_mat_H::Matrix{T}; DEIMᵢ_H::Matrix{T}; DEIM_idx_H::Vector{Int64}; sparse_el_H::Vector{Int64};
-  Nₛᵘ::Int64; nₛᵘ::Int64; Qᵃ::Int64; Qᶠ::Int64; Qʰ::Int64; offline_time::Float64;
+  MDEIMᵢ_A::Matrix{T}; MDEIM_idx_A::Vector{Int}; row_idx_A::Vector{Int}; sparse_el_A::Vector{Int};
+  DEIM_mat_F::Matrix{T}; DEIMᵢ_F::Matrix{T}; DEIM_idx_F::Vector{Int}; sparse_el_F::Vector{Int};
+  DEIM_mat_H::Matrix{T}; DEIMᵢ_H::Matrix{T}; DEIM_idx_H::Vector{Int}; sparse_el_H::Vector{Int};
+  Nₛᵘ::Int; nₛᵘ::Int; Qᵃ::Int; Qᶠ::Int; Qʰ::Int; offline_time::Float64;
   online_time::Float64;Pᵤ⁻¹::SparseMatrixCSC{T}; AΦᵀPᵤ⁻¹::Array{T}
 end
 
 mutable struct PoissonSTGRB{T} <: PoissonUnsteady{T}
   S::PoissonSGRB{T}; Φₜᵘ::Matrix{T}; Mₙ::Array{T}; MDEIM_mat_M::Matrix{T}; MDEIMᵢ_M::Matrix{T};
-  MDEIM_idx_M::Vector{Int64}; row_idx_M::Vector{Int64}; sparse_el_M::Vector{Int64};
-  MDEIM_idx_time_A::Vector{Int64}; MDEIM_idx_time_M::Vector{Int64};
-  DEIM_idx_time_F::Vector{Int64}; DEIM_idx_time_H::Vector{Int64};
-  Nₜ::Int64; Nᵘ::Int64; nₜᵘ::Int64; nᵘ::Int64; Qᵐ::Int64;
+  MDEIM_idx_M::Vector{Int}; row_idx_M::Vector{Int}; sparse_el_M::Vector{Int};
+  MDEIM_idx_time_A::Vector{Int}; MDEIM_idx_time_M::Vector{Int};
+  DEIM_idx_time_F::Vector{Int}; DEIM_idx_time_H::Vector{Int};
+  Nₜ::Int; Nᵘ::Int; nₜᵘ::Int; nᵘ::Int; Qᵐ::Int;
 end
 
 mutable struct PoissonSTPGRB{T} <: PoissonUnsteady{T}
   S::PoissonSPGRB{T}; Φₜᵘ::Matrix{T}; Mₙ::Array{T}; MDEIM_mat_M::Matrix{T}; MDEIMᵢ_M::Matrix{T};
-  MDEIM_idx_M::Vector{Int64}; row_idx_M::Vector{Int64}; sparse_el_M::Vector{Int64};
-  MDEIM_idx_time_A::Vector{Int64}; MDEIM_idx_time_M::Vector{Int64};
-  DEIM_idx_time_F::Vector{Int64}; DEIM_idx_time_H::Vector{Int64};
-  Nₜ::Int64; Nᵘ::Int64; nₜᵘ::Int64; nᵘ::Int64; Qᵐ::Int64;MAₙ::Array{T};MΦ::Array{T};MΦᵀPᵤ⁻¹::Array{T}
+  MDEIM_idx_M::Vector{Int}; row_idx_M::Vector{Int}; sparse_el_M::Vector{Int};
+  MDEIM_idx_time_A::Vector{Int}; MDEIM_idx_time_M::Vector{Int};
+  DEIM_idx_time_F::Vector{Int}; DEIM_idx_time_H::Vector{Int};
+  Nₜ::Int; Nᵘ::Int; nₜᵘ::Int; nᵘ::Int; Qᵐ::Int;MAₙ::Array{T};MΦ::Array{T};MΦᵀPᵤ⁻¹::Array{T}
 end
 
 mutable struct StokesSGRB{T} <: StokesSteady{T}
   P::PoissonSGRB{T}; Sᵖ::Matrix{T}; Φₛᵖ::Matrix{T}; p̃::Matrix{T}; pₙ::Matrix{T};
   p̂::Matrix{T}; Bₙ::Array{T}; Xᵘ::SparseMatrixCSC{T};
-  Xᵖ₀::SparseMatrixCSC{T}; Nₛᵖ::Int64; nₛᵖ::Int64
+  Xᵖ₀::SparseMatrixCSC{T}; Nₛᵖ::Int; nₛᵖ::Int
 end
 
 mutable struct StokesSTGRB{T} <: StokesUnsteady{T}
-  P::PoissonSTGRB{T}; S::StokesSGRB{T}; Φₜᵖ::Matrix{T}; Nᵖ::Int64;
-  nₜᵖ::Int64; nᵖ::Int64
+  P::PoissonSTGRB{T}; S::StokesSGRB{T}; Φₜᵖ::Matrix{T}; Nᵖ::Int;
+  nₜᵖ::Int; nᵖ::Int
 end
 
 function setup(::NTuple{1,Int}, ::Type{T}) where T
@@ -173,29 +173,29 @@ end
 
 function setup(::NTuple{3,Int}, ::Type{T}) where T
 
-  NT1 = get_NTuple(1, Int64)
+  NT1 = get_NTuple(1, Int)
   PoissonSTGRB{T}(setup(NT1, T), init_PoissonSTGRB_variables(T)...)
 
 end
 
 function setup(::NTuple{4,Int}, ::Type{T}) where T
 
-  NT2 = get_NTuple(2, Int64)
+  NT2 = get_NTuple(2, Int)
   PoissonSTPGRB{T}(setup(NT2, T), init_PoissonSTPGRB_variables(T)...)
 
 end
 
 function setup(::NTuple{5,Int}, ::Type{T}) where T
 
-  NT1 = get_NTuple(1, Int64)
+  NT1 = get_NTuple(1, Int)
   StokesSGRB{T}(setup(NT1, T), init_StokesSGRB_variables(T)...)
 
 end
 
 function setup(::NTuple{6,Int}, ::Type{T}) where T
 
-  NT3 = get_NTuple(3, Int64)
-  NT5 = get_NTuple(5, Int64)
+  NT3 = get_NTuple(3, Int)
+  NT5 = get_NTuple(5, Int)
   StokesSTGRB{T}(setup(NT3, T), setup(NT5, T), init_StokesSTGRB_variables(T)...)
 
 end
@@ -260,7 +260,7 @@ function Base.getproperty(RBVars::StokesSTGRB, sym::Symbol)
   end
 end
 
-function Base.setproperty(RBVars::StokesSTGRB, sym::Symbol, x::T) where T
+function Base.setproperty!(RBVars::StokesSTGRB, sym::Symbol, x::T) where T
   if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
     :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A, :DEIM_mat_F,
     :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H, :DEIM_idx_H,
@@ -276,18 +276,28 @@ function Base.setproperty(RBVars::StokesSTGRB, sym::Symbol, x::T) where T
   end
 end
 
+struct RBPathInfo <: Info
+  mesh_path::String
+  FEM_snap_path::String
+  FEM_structures_path::String
+  basis_path::String
+  ROM_structures_path::String
+  gen_coords_path::String
+  results_path::String
+end
+
 struct ROMInfoSteady{T} <: Info
   FEMInfo::SteadyInfo
   probl_nl::Dict
   case::Int
-  paths::F
+  Paths::RBPathInfo
   RB_method::String
-  nₛ::Int64
+  nₛ::Int
   ϵₛ::Float64
   use_norm_X::Bool
   build_parametric_RHS::Bool
-  nₛ_MDEIM::Int64
-  nₛ_DEIM::Int64
+  nₛ_MDEIM::Int
+  nₛ_DEIM::Int
   post_process::Bool
   import_snapshots::Bool
   import_offline_structures::Bool
@@ -299,14 +309,14 @@ mutable struct ROMInfoUnsteady{T} <: Info
   FEMInfo::UnsteadyInfo
   probl_nl::Dict
   case::Int
-  paths::F
+  Paths::RBPathInfo
   RB_method::String
-  nₛ::Int64
+  nₛ::Int
   ϵₛ::Float64
   use_norm_X::Bool
   build_parametric_RHS::Bool
-  nₛ_MDEIM::Int64
-  nₛ_DEIM::Int64
+  nₛ_MDEIM::Int
+  nₛ_DEIM::Int
   post_process::Bool
   import_snapshots::Bool
   import_offline_structures::Bool

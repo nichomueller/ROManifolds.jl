@@ -1,5 +1,5 @@
 mutable struct info
-  Nₕ²::Int64; Nₜ::Int64; nₛ::Int64; ϵ::Float64;
+  Nₕ²::Int; Nₜ::Int; nₛ::Int; ϵ::Float64;
 end
 
 function simple_model()
@@ -107,7 +107,7 @@ end
   _, idx_time = from_spacetime_to_space_time_idx_vec(MDEIM_idx_sparse, FEMSpace.Nₛᵘ^2)
   idx_time = sort(idx_time)
   unique!(idx_time)
-  idx_collect = Int64[]
+  idx_collect = Int[]
   for i = 1:length(idx_time)
     append!(idx_collect,collect(II.Nₕ²*(idx_time[i]-1)+1:II.Nₕ²*idx_time[i]))
   end
@@ -128,7 +128,7 @@ function check_eigen(online_snap,approx_snap,Nₜ)
 end
 
 """Unsteady case"""
-function run_one_test_ST_MDEIM(FEMSpace, RBInfo, nₛMDEIM::Int64)
+function run_one_test_ST_MDEIM(FEMSpace, RBInfo, nₛMDEIM::Int)
 
   snaps, row_idx = define_offline_snaps(FEMSpace, RBInfo, nₛMDEIM)
   #snaps_red = define_offline_snaps_red(snaps)
@@ -148,7 +148,7 @@ function run_one_test_ST_MDEIM(FEMSpace, RBInfo, nₛMDEIM::Int64)
   err,runtime,Q
 end
 
-function define_offline_snaps(FEMSpace, RBInfo, nₛMDEIM::Int64)
+function define_offline_snaps(FEMSpace, RBInfo, nₛMDEIM::Int)
 
   timesθ = collect(RBInfo.tₗ₀:RBInfo.δt:RBInfo.tₗ-RBInfo.δt).+RBInfo.δt*RBInfo.θ
   Nₜ = length(timesθ)
@@ -280,7 +280,7 @@ function run_multiple_tests_ST_MDEIM(FEMSpace,RBInfo)
 
   err_vec = Float64[]
   time_vec = Float64[]
-  Q_vec = Int64[]
+  Q_vec = Int[]
 
   #err1,time1,Q1 = run_one_test_ST_MDEIM(FEMSpace, RBInfo, 1)
   err2,time2,Q2 = run_one_test_ST_MDEIM(FEMSpace, RBInfo, 3)
@@ -360,11 +360,11 @@ function M_DEIM_offline_old(sparse_M_DEIM_mat::SparseMatrixCSC, Σ::Vector)
 
   (N, n) = size(M_DEIM_mat)
   n_new = n
-  M_DEIM_idx = Int64[]
-  append!(M_DEIM_idx, convert(Int64, argmax(abs.(M_DEIM_mat[:, 1]))[1]))
+  M_DEIM_idx = Int[]
+  append!(M_DEIM_idx, convert(Int, argmax(abs.(M_DEIM_mat[:, 1]))[1]))
   for m in range(2, n)
     res = M_DEIM_mat[:, m] - M_DEIM_mat[:, 1:(m-1)] * (M_DEIM_mat[M_DEIM_idx[1:(m-1)], 1:(m-1)] \ M_DEIM_mat[M_DEIM_idx[1:(m-1)], m])
-    append!(M_DEIM_idx, convert(Int64, argmax(abs.(res))[1]))
+    append!(M_DEIM_idx, convert(Int, argmax(abs.(res))[1]))
     if abs(det(M_DEIM_mat[M_DEIM_idx[1:m], 1:m])) ≤ 1e-80
       n_new = m
       break
@@ -380,7 +380,7 @@ end
 
 function build_A_snapshots_old(FEMSpace::UnsteadyProblem, RBInfo::Info, μ::Vector)
 
-  Nₜ = convert(Int64, RBInfo.tₗ/RBInfo.δt)
+  Nₜ = convert(Int, RBInfo.tₗ/RBInfo.δt)
   δtθ = RBInfo.δt*RBInfo.θ
   timesθ = collect(RBInfo.tₗ₀:RBInfo.δt:RBInfo.tₗ-RBInfo.δt).+δtθ
 
@@ -425,7 +425,7 @@ function MDEIM_offline_old(FEMSpace::UnsteadyProblem, RBInfo::Info)
   sparse_MDEIM_mat, Σ = M_DEIM_POD_old(compressed_snaps_old, RBInfo.ϵₛ)
   MDEIM_mat_old, MDEIM_idx_old, MDEIM_err_bound = M_DEIM_offline_old(sparse_MDEIM_mat, Σ)
 
-  Nₕ = convert(Int64, sqrt(size(MDEIM_mat_old)[1]))
+  Nₕ = convert(Int, sqrt(size(MDEIM_mat_old)[1]))
   r_idx, c_idx = from_vec_to_mat_idx(MDEIM_idx_old, Nₕ)
 
   el_old = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(union(r_idx, c_idx)))
@@ -475,7 +475,7 @@ function build_sparse_mat_old(FEMInfo::ProblemInfoUnsteady, FEMSpace::UnsteadyPr
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
   timesθ = collect(RBInfo.tₗ₀:RBInfo.δt:RBInfo.tₗ-RBInfo.δt).+RBInfo.δt*RBInfo.θ
-  Nₜ = convert(Int64, RBInfo.tₗ / RBInfo.δt)
+  Nₜ = convert(Int, RBInfo.tₗ / RBInfo.δt)
 
   function define_Matₜ(t::Real)
     return assemble_matrix(∫(∇(FEMSpace.ϕᵥ) ⋅ (Param.α(t) * ∇(FEMSpace.ϕᵤ(t)))) * dΩ_sparse, FEMSpace.V(t), FEMSpace.V₀)

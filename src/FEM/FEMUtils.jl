@@ -21,7 +21,7 @@ function FEM_paths(root, problem_steadiness, problem_name, mesh_name, case)
   FEM_structures_path = joinpath(FEM_path, "FEM_structures")
   create_dir(FEM_structures_path)
 
-  _ -> (mesh_path, current_test, FEM_snap_path, FEM_structures_path)
+  FEMPathInfo(mesh_path, current_test,FEM_snap_path, FEM_structures_path)
 
 end
 
@@ -86,7 +86,7 @@ function find_FE_elements(
 
   connectivity = get_cell_dof_ids(V₀, trian)::Table{Int32, Vector{Int32}, Vector{Int32}}
 
-  el = Int64[]
+  el = Int[]
   for i = 1:length(idx)
     for j = 1:size(connectivity)[1]
       if idx[i] in abs.(connectivity[j])
@@ -106,7 +106,7 @@ function find_FE_elements(
 
   connectivity = collect(get_cell_dof_ids(V₀, trian))::Vector{Vector{Int32}}
 
-  el = Int64[]
+  el = Int[]
   for i = 1:length(idx)
     for j = 1:size(connectivity)[1]
       if idx[i] in abs.(connectivity[j])
@@ -150,7 +150,7 @@ function generate_dcube_discrete_model(
   if !occursin(".json",mesh_name)
     mesh_name *= ".json"
   end
-  mesh_dir = FEMInfo.paths.mesh_path[1:findall(x->x=='/',FEMInfo.paths.mesh_path)[end]]
+  mesh_dir = FEMInfo.Paths.mesh_path[1:findall(x->x=='/',FEMInfo.Paths.mesh_path)[end]]
   mesh_path = joinpath(mesh_dir,mesh_name)
   generate_dcube_discrete_model(d, npart, mesh_path)
 

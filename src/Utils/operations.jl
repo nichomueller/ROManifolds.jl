@@ -136,7 +136,7 @@ function POD(S::SparseMatrixCSC, ϵ::Float64) where T
 
 end
 
-function get_NTuple(N::Int64, T::DataType)
+function get_NTuple(N::Int, T::DataType)
 
   ntupl = ()
   for _ = 1:N
@@ -162,8 +162,8 @@ function Base.Float32(vv::VectorValue{D,Float32}) where D
   VectorValue(Float32.([vv...]))
 end
 
-function Base.Int64(vv::VectorValue{D,Int64}) where D
-  VectorValue(Int64.([vv...]))
+function Base.Int(vv::VectorValue{D,Int}) where D
+  VectorValue(Int.([vv...]))
 end
 
 function Base.Int32(vv::VectorValue{D,Int32}) where D

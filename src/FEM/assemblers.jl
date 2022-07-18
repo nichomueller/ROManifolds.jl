@@ -349,7 +349,7 @@ function assemble_L²_norm_matrix(
   FEMSpace::FEMSpaceStokesUnsteady)
 
   assemble_matrix(∫(FEMSpace.ψᵧ*FEMSpace.ψₚ)*FEMSpace.dΩ,
-  FEMSpace.Q, FEMSpace.Q₀)::SparseMatrixCSC{Float64, Int64}
+  FEMSpace.Q, FEMSpace.Q₀)::SparseMatrixCSC{Float64, Int}
 
 end
 
@@ -357,7 +357,7 @@ function assemble_L²₀_norm_matrix(
   FEMSpace₀::FEMSpaceStokesUnsteady)
 
   assemble_matrix(∫(FEMSpace₀.ψᵧ*FEMSpace₀.ψₚ)*FEMSpace₀.dΩ,
-  FEMSpace₀.Q, FEMSpace₀.Q₀)::SparseMatrixCSC{Float64, Int64}
+  FEMSpace₀.Q, FEMSpace₀.Q₀)::SparseMatrixCSC{Float64, Int}
 
 end
 
@@ -367,7 +367,7 @@ function assemble_H¹_norm_matrix(
   (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅∇(FEMSpace.ϕᵤ))*FEMSpace.dΩ,
   FEMSpace.V, FEMSpace.V₀) +
   assemble_matrix(∫(FEMSpace.ϕᵥ*FEMSpace.ϕᵤ)*FEMSpace.dΩ,
-  FEMSpace.V, FEMSpace.V₀))::SparseMatrixCSC{Float64, Int64}
+  FEMSpace.V, FEMSpace.V₀))::SparseMatrixCSC{Float64, Int}
 
 end
 
@@ -379,7 +379,7 @@ function assemble_H¹_norm_matrix(
   assemble_matrix(∫(FEMSpace.ϕᵥ*FEMSpace.ϕᵤ(t))*FEMSpace.dΩ,
   FEMSpace.V(t), FEMSpace.V₀))
 
-  Xᵘ(0.0)::SparseMatrixCSC{Float64, Int64}
+  Xᵘ(0.0)::SparseMatrixCSC{Float64, Int}
 
 end
 
@@ -391,7 +391,7 @@ function assemble_H¹_norm_matrix(
   assemble_matrix(∫(FEMSpace.ϕᵥ⋅FEMSpace.ϕᵤ(t))*FEMSpace.dΩ,
   FEMSpace.V(t), FEMSpace.V₀))
 
-  Xᵘ(0.0)::SparseMatrixCSC{Float64, Int64}
+  Xᵘ(0.0)::SparseMatrixCSC{Float64, Int}
 
 end
 
@@ -401,7 +401,7 @@ function assemble_H¹₀_norm_matrix(
   (assemble_matrix(∫(∇(FEMSpace₀.ϕᵥ)⋅∇(FEMSpace₀.ϕᵤ))*FEMSpace₀.dΩ,
   FEMSpace₀.V, FEMSpace₀.V₀) +
   assemble_matrix(∫(FEMSpace₀.ϕᵥ*FEMSpace₀.ϕᵤ)*FEMSpace₀.dΩ,
-  FEMSpace₀.V, FEMSpace₀.V₀))::SparseMatrixCSC{Float64, Int64}
+  FEMSpace₀.V, FEMSpace₀.V₀))::SparseMatrixCSC{Float64, Int}
 
 end
 
@@ -413,7 +413,7 @@ function assemble_H¹₀_norm_matrix(
   assemble_matrix(∫(FEMSpace₀.ϕᵥ * FEMSpace₀.ϕᵤ(t))*FEMSpace₀.dΩ,
   FEMSpace₀.V(t), FEMSpace₀.V₀))
 
-  return Xᵘ₀(0.0)::SparseMatrixCSC{Float64, Int64}
+  return Xᵘ₀(0.0)::SparseMatrixCSC{Float64, Int}
 
 end
 
@@ -425,7 +425,7 @@ function assemble_H¹₀_norm_matrix(
   assemble_matrix(∫(FEMSpace₀.ϕᵥ⋅FEMSpace₀.ϕᵤ(t))*FEMSpace₀.dΩ,
   FEMSpace₀.V(t), FEMSpace₀.V₀))
 
-  return Xᵘ₀(0.0)::SparseMatrixCSC{Float64, Int64}
+  return Xᵘ₀(0.0)::SparseMatrixCSC{Float64, Int}
 
 end
 
@@ -437,14 +437,14 @@ function assemble_H¹_norm_matrix(
   assemble_matrix(∫(FEMSpace.ϕᵥ⋅FEMSpace.ϕᵤ(t))*FEMSpace.dΩ,
   FEMSpace.V(t), FEMSpace.V₀))
 
-  return Xᵘ(0.0)::SparseMatrixCSC{Float64, Int64}
+  return Xᵘ(0.0)::SparseMatrixCSC{Float64, Int}
 
 end
 
 function assemble_FEM_structure(
   FEMSpace::FEMProblem,
   FEMInfo::Info,
-  Param::ParametricInfo,
+  Param::Info,
   var::String)
 
   if var == "A"

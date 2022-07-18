@@ -10,10 +10,10 @@ function get_Bₙ(
   RBInfo::Info,
   RBVars::StokesSGRB{T}) where T
 
-  if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Bₙ.csv"))
+  if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "Bₙ.csv"))
     println("Importing reduced affine divergence matrix")
     Bₙ = load_CSV(Matrix{T}(undef,0,0),
-      joinpath(RBInfo.paths.ROM_structures_path, "Bₙ.csv"))
+      joinpath(RBInfo.Paths.ROM_structures_path, "Bₙ.csv"))
     RBVars.Bₙ = reshape(Bₙ,RBVars.nₛᵖ,RBVars.nₛᵘ,:)
     return [""]
   else
@@ -47,7 +47,7 @@ function assemble_affine_matrices(
   if var == "B"
     println("Assembling affine reduced B")
     B = load_CSV(sparse([],[],T[]),
-      joinpath(RBInfo.paths.FEM_structures_path, "B.csv"))
+      joinpath(RBInfo.Paths.FEM_structures_path, "B.csv"))
     RBVars.Bₙ = reshape((RBVars.Φₛᵖ)'*B*RBVars.Φₛᵘ,RBVars.nₛᵖ,RBVars.nₛᵘ,1)
   else
     assemble_affine_matrices(RBInfo, RBVars, var)
@@ -110,7 +110,7 @@ function save_affine_structures(
 
   if RBInfo.save_offline_structures
     Bₙ = reshape(RBVars.Bₙ, :, 1)
-    save_CSV(Bₙ, joinpath(RBInfo.paths.ROM_structures_path, "Bₙ.csv"))
+    save_CSV(Bₙ, joinpath(RBInfo.Paths.ROM_structures_path, "Bₙ.csv"))
   end
 
 end

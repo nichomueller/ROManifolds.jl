@@ -9,7 +9,7 @@ function get_snapshot_matrix(
 
   println("Importing the snapshot matrix for field u,
     number of snapshots considered: $(RBInfo.nₛ)")
-  Sᵖ = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "pₕ.csv"),
+  Sᵖ = Matrix{T}(CSV.read(joinpath(RBInfo.Paths.FEM_snap_path, "pₕ.csv"),
     DataFrame))[:, 1:RBInfo.nₛ]
   println("Dimension of pressure snapshot matrix: $(size(Sᵖ))")
   RBVars.Sᵖ = Sᵖ
@@ -28,9 +28,9 @@ function get_norm_matrix(
     println("Importing the norm matrices Xᵘ, Xᵖ₀")
 
     Xᵘ = load_CSV(sparse([],[],T[]),
-      joinpath(RBInfo.paths.FEM_structures_path, "Xᵘ.csv"))
+      joinpath(RBInfo.Paths.FEM_structures_path, "Xᵘ.csv"))
     Xᵖ₀ = load_CSV(sparse([],[],T[]),
-      joinpath(RBInfo.paths.FEM_structures_path, "Xᵖ₀.csv"))
+      joinpath(RBInfo.Paths.FEM_structures_path, "Xᵖ₀.csv"))
     RBVars.Nₛᵖ = size(Xᵖ₀)[1]
     println("Dimension of L² norm matrix, field p: $(size(Xᵖ₀))")
 
@@ -72,7 +72,7 @@ function primal_supremizers(
   #dir_idx = abs.(diag(RBVars.Xᵘ) .- 1) .< 1e-16
 
   constraint_mat = load_CSV(sparse([],[],T[]),
-    joinpath(RBInfo.paths.FEM_structures_path, "B.csv"))'
+    joinpath(RBInfo.Paths.FEM_structures_path, "B.csv"))'
   #constraint_mat[dir_idx[dir_idx≤RBVars.Nₛᵘ*RBVars.Nₛᵖ]] = 0
 
   supr_primal = Matrix{T}(RBVars.Xᵘ) \ (Matrix{T}(constraint_mat) * RBVars.Φₛᵖ)
@@ -124,9 +124,11 @@ function build_reduced_basis(
   end
 
   if RBInfo.save_offline_structures
-    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.paths.basis_path,"Φₛᵘ.csv"))
-    save_CSV(RBVars.Φₛᵖ, joinpath(RBInfo.paths.basis_path,"Φₛᵖ.csv"))
+    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.Paths.basis_path,"Φₛᵘ.csv"))
+    save_CSV(RBVars.Φₛᵖ, joinpath(RBInfo.Paths.basis_path,"Φₛᵖ.csv"))
   end
+
+  return
 
 end
 
@@ -138,7 +140,7 @@ function import_reduced_basis(
 
   println("Importing the spatial reduced basis for field p")
   RBVars.Φₛᵖ = load_CSV(Matrix{T}(undef,0,0),
-    joinpath(RBInfo.paths.basis_path, "Φₛᵖ.csv"))
+    joinpath(RBInfo.Paths.basis_path, "Φₛᵖ.csv"))
   (RBVars.Nₛᵖ, RBVars.nₛᵖ) = size(RBVars.Φₛᵖ)
 
 end
@@ -158,7 +160,7 @@ function get_generalized_coordinates(
   Φₛᵖ_normed = RBVars.Xᵖ₀*RBVars.Φₛᵖ
   RBVars.p̂ = RBVars.Sᵖ[:,snaps]*Φₛᵖ_normed
   if RBInfo.save_offline_structures
-    save_CSV(RBVars.p̂, joinpath(RBInfo.paths.gen_coords_path, "p̂.csv"))
+    save_CSV(RBVars.p̂, joinpath(RBInfo.Paths.gen_coords_path, "p̂.csv"))
   end
 
 end
@@ -222,8 +224,8 @@ end
 function get_system_blocks(
   RBInfo::Info,
   RBVars::StokesSteady,
-  LHS_blocks::Vector{Int64},
-  RHS_blocks::Vector{Int64})
+  LHS_blocks::Vector{Int},
+  RHS_blocks::Vector{Int})
 
   get_system_blocks(RBInfo, RBVars.P, LHS_blocks, RHS_blocks)
 
@@ -232,8 +234,8 @@ end
 function save_system_blocks(
   RBInfo::Info,
   RBVars::StokesSteady,
-  LHS_blocks::Vector{Int64},
-  RHS_blocks::Vector{Int64},
+  LHS_blocks::Vector{Int},
+  RHS_blocks::Vector{Int},
   operators::Vector{String})
 
   save_system_blocks(RBInfo, RBVars.P, LHS_blocks, RHS_blocks, operators)
@@ -386,8 +388,8 @@ function online_phase(
   param_nbs) where T
 
   μ = load_CSV(Array{T}[],
-    joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))::Vector{Vector{T}}
-  model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
+    joinpath(RBInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{T}}
+  model = DiscreteModelFromFile(RBInfo.Paths.mesh_path)
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id,RBInfo.FEMInfo,model)
 
   mean_H1_err = 0.0
@@ -409,9 +411,9 @@ function online_phase(
 
     Param = get_ParamInfo(RBInfo, μ[nb])
 
-    uₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
+    uₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.Paths.FEM_snap_path, "uₕ.csv"),
       DataFrame))[:, nb]
-    pₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "pₕ.csv"),
+    pₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.Paths.FEM_snap_path, "pₕ.csv"),
       DataFrame))[:, nb]
 
     solve_RB_system(FEMSpace, RBInfo, RBVars, Param)
@@ -444,7 +446,7 @@ function online_phase(
   for Param_nb in param_nbs
     string_param_nbs *= "_" * string(Param_nb)
   end
-  path_μ = joinpath(RBInfo.paths.results_path, string_param_nbs)
+  path_μ = joinpath(RBInfo.Paths.results_path, string_param_nbs)
 
   if RBInfo.save_results
 

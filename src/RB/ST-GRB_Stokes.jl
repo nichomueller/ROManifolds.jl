@@ -19,10 +19,10 @@ function get_Bₙ(
   RBVars::StokesSTGRB{T}) where T
   #MODIFY#
 
-  if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Bₙ.csv"))
+  if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "Bₙ.csv"))
     println("Importing reduced affine divergence matrix")
     Bₙ = load_CSV(Matrix{T}(undef,0,0),
-      joinpath(RBInfo.paths.ROM_structures_path, "Bₙ.csv"))
+      joinpath(RBInfo.Paths.ROM_structures_path, "Bₙ.csv"))
     RBVars.Bₙ = reshape(Bₙ,RBVars.nₛᵖ,RBVars.nₛᵘ,:)
     return [""]
   else
@@ -56,7 +56,7 @@ function assemble_affine_matrices(
   if var == "B"
     println("Assembling affine primal operator B")
     B = load_CSV(sparse([],[],T[]),
-      joinpath(RBInfo.paths.FEM_structures_path, "B.csv"))
+      joinpath(RBInfo.Paths.FEM_structures_path, "B.csv"))
     RBVars.Bₙ = zeros(T, RBVars.nₛᵖ, RBVars.nₛᵘ, 1)
     RBVars.Bₙ[:,:,1] = (RBVars.Φₛᵖ)' * B * RBVars.Φₛᵘ
   else
@@ -69,7 +69,7 @@ function assemble_reduced_mat_MDEIM(
   RBInfo::ROMInfoUnsteady,
   RBVars::StokesSTGRB,
   MDEIM_mat::Matrix,
-  row_idx::Vector{Int64},
+  row_idx::Vector{Int},
   var::String)
 
   assemble_reduced_mat_MDEIM(RBInfo, RBVars.P, MDEIM_mat, row_idx, var)
@@ -123,7 +123,7 @@ function save_affine_structures(
 
   if RBInfo.save_offline_structures
     Bₙ = reshape(RBVars.Bₙ, :, 1)
-    save_CSV(Bₙ, joinpath(RBInfo.paths.ROM_structures_path, "Bₙ.csv"))
+    save_CSV(Bₙ, joinpath(RBInfo.Paths.ROM_structures_path, "Bₙ.csv"))
   end
 
 end

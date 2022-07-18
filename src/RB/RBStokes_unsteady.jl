@@ -10,7 +10,7 @@ function get_snapshot_matrix(
 
   println("Importing the snapshot matrix for field u,
     number of snapshots considered: $(RBInfo.nₛ)")
-  Sᵖ = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "pₕ.csv"),
+  Sᵖ = Matrix{T}(CSV.read(joinpath(RBInfo.Paths.FEM_snap_path, "pₕ.csv"),
     DataFrame))[:, 1:RBInfo.nₛ*RBVars.Nₜ]
   println("Dimension of pressure snapshot matrix: $(size(Sᵖ))")
 
@@ -134,11 +134,13 @@ function build_reduced_basis(
   RBVars.Nᵖ = RBVars.Nₛᵖ * RBVars.Nₜ
 
   if RBInfo.save_offline_structures
-    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.paths.basis_path, "Φₛᵘ.csv"))
-    save_CSV(RBVars.Φₜᵘ, joinpath(RBInfo.paths.basis_path, "Φₜᵘ.csv"))
-    save_CSV(RBVars.Φₛᵖ, joinpath(RBInfo.paths.basis_path, "Φₛᵖ.csv"))
-    save_CSV(RBVars.Φₜᵖ, joinpath(RBInfo.paths.basis_path, "Φₜᵖ.csv"))
+    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.Paths.basis_path, "Φₛᵘ.csv"))
+    save_CSV(RBVars.Φₜᵘ, joinpath(RBInfo.Paths.basis_path, "Φₜᵘ.csv"))
+    save_CSV(RBVars.Φₛᵖ, joinpath(RBInfo.Paths.basis_path, "Φₛᵖ.csv"))
+    save_CSV(RBVars.Φₜᵖ, joinpath(RBInfo.Paths.basis_path, "Φₜᵖ.csv"))
   end
+
+  return
 
 end
 
@@ -151,10 +153,10 @@ function import_reduced_basis(
   println("Importing the reduced basis for field p")
 
   RBVars.Φₛᵖ = load_CSV(Matrix{T}(undef,0,0),
-    joinpath(RBInfo.paths.basis_path, "Φₛᵖ.csv"))
+    joinpath(RBInfo.Paths.basis_path, "Φₛᵖ.csv"))
   RBVars.nₛᵖ = size(RBVars.Φₛᵖ)[2]
   RBVars.Φₜᵖ = load_CSV(Matrix{T}(undef,0,0),
-    joinpath(RBInfo.paths.basis_path, "Φₜᵖ.csv"))
+    joinpath(RBInfo.Paths.basis_path, "Φₜᵖ.csv"))
   RBVars.nₜᵖ = size(RBVars.Φₜᵖ)[2]
   RBVars.nᵖ = RBVars.nₛᵖ * RBVars.nₜᵖ
 
@@ -175,7 +177,7 @@ end
 function get_generalized_coordinates(
   RBInfo::ROMInfoUnsteady,
   RBVars::StokesUnsteady{T},
-  snaps::Vector{Int64}) where T
+  snaps::Vector{Int}) where T
 
   if check_norm_matrix(RBVars.S)
     get_norm_matrix(RBInfo, RBVars)
@@ -196,7 +198,7 @@ function get_generalized_coordinates(
   RBVars.p̂ = p̂
 
   if RBInfo.save_offline_structures
-    save_CSV(p̂, joinpath(RBInfo.paths.gen_coords_path, "p̂.csv"))
+    save_CSV(p̂, joinpath(RBInfo.Paths.gen_coords_path, "p̂.csv"))
   end
 
 end
@@ -391,8 +393,8 @@ function online_phase(
   println("Online phase of the RB solver, unsteady Stokes problem")
 
   μ = load_CSV(Array{T}[],
-    joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))::Vector{Vector{T}}
-  model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
+    joinpath(RBInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{T}}
+  model = DiscreteModelFromFile(RBInfo.Paths.mesh_path)
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id,RBInfo.FEMInfo,model)
 
   get_norm_matrix(RBInfo, RBVars.S)
@@ -416,7 +418,7 @@ function online_phase(
   for Param_nb in param_nbs
     string_param_nbs *= "_" * string(Param_nb)
   end
-  path_μ = joinpath(RBInfo.paths.results_path, string_param_nbs)
+  path_μ = joinpath(RBInfo.Paths.results_path, string_param_nbs)
 
   if RBInfo.save_results
     println("Saving the results...")
@@ -488,9 +490,9 @@ function loop_on_params(
 
     Param = get_ParamInfo(RBInfo, μ[nb])
 
-    uₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
+    uₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.Paths.FEM_snap_path, "uₕ.csv"),
       DataFrame))[:,(nb-1)*RBVars.Nₜ+1:nb*RBVars.Nₜ]
-    pₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "pₕ.csv"),
+    pₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.Paths.FEM_snap_path, "pₕ.csv"),
       DataFrame))[:,(nb-1)*RBVars.Nₜ+1:nb*RBVars.Nₜ]
 
     mean_uₕ_test += uₕ_test
@@ -547,11 +549,11 @@ function adaptive_loop_on_params(
   n_adaptive=nothing) where T
 
   if isnothing(n_adaptive)
-    nₛᵘ_add = floor(Int64,RBVars.nₛᵘ*0.1)
-    nₜᵘ_add = floor(Int64,RBVars.nₜᵘ*0.1)
+    nₛᵘ_add = floor(Int,RBVars.nₛᵘ*0.1)
+    nₜᵘ_add = floor(Int,RBVars.nₜᵘ*0.1)
     n_adaptive_u = maximum(hcat([1,1],[nₛᵘ_add,nₜᵘ_add]),dims=2)::Vector{Int}
-    nₛᵖ_add = floor(Int64,RBVars.nₛᵖ*0.1)
-    nₜᵖ_add = floor(Int64,RBVars.nₜᵖ*0.1)
+    nₛᵖ_add = floor(Int,RBVars.nₛᵖ*0.1)
+    nₜᵖ_add = floor(Int,RBVars.nₜᵖ*0.1)
     n_adaptive_p = maximum(hcat([1,1],[nₛᵖ_add,nₜᵖ_add]),dims=2)::Vector{Int}
   end
 
@@ -581,9 +583,9 @@ function adaptive_loop_on_params(
   ind_t_p = argmax(time_err_p,n_adaptive_p[2])
 
   if isempty(RBVars.Pᵘ)
-    Sᵘ = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
+    Sᵘ = Matrix{T}(CSV.read(joinpath(RBInfo.Paths.FEM_snap_path, "uₕ.csv"),
       DataFrame))[:,1:RBInfo.nₛ*RBVars.Nₜ]
-    Sᵖ = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "pₕ.csv"),
+    Sᵖ = Matrix{T}(CSV.read(joinpath(RBInfo.Paths.FEM_snap_path, "pₕ.csv"),
       DataFrame))[:,1:RBInfo.nₛ*RBVars.Nₜ]
   else
     Sᵘ = RBVars.Pᵘ

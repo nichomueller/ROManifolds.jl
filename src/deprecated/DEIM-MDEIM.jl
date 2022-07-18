@@ -9,13 +9,13 @@ function DEIM_offline(S, ϵ = 1e-5, save_path = nothing, save_to_file = false)
     basis = POD(S, ϵ)
 
     (N, n) = size(basis)
-    DEIM_idx = zeros(Int64, n)
+    DEIM_idx = zeros(Int, n)
 
-    DEIM_idx[1] = convert(Int64, argmax(abs.(basis[:, 1]))[1])
+    DEIM_idx[1] = convert(Int, argmax(abs.(basis[:, 1]))[1])
 
     #= if n > 2
         res = basis[:, 2] - basis[:, 1] * basis[DEIM_idx[1], 2] / basis[DEIM_idx[1], 1]
-        DEIM_idx[2] = convert(Int64, argmax(abs.(res))[1])
+        DEIM_idx[2] = convert(Int, argmax(abs.(res))[1])
     end =#
 
     #proj = zeros(N)
@@ -23,7 +23,7 @@ function DEIM_offline(S, ϵ = 1e-5, save_path = nothing, save_to_file = false)
         #mul!(proj, basis[:, 1:m], mul!(tmp, basis[DEIM_idx[1:m], 1:m], basis[DEIM_idx[1:m], m]))
         res = basis[:, m] - basis[:, 1:(m - 1)] * (basis[DEIM_idx[1:(m - 1)], 1:(m - 1)] \ basis[DEIM_idx[1:(m - 1)], m])
         #res = basis[:, m] - proj
-        DEIM_idx[m] = convert(Int64, argmax(abs.(res))[1])
+        DEIM_idx[m] = convert(Int, argmax(abs.(res))[1])
     end
 
     DEIM_mat = basis#[DEIM_idx[:], :]
@@ -175,7 +175,7 @@ end
   total_energy = sum(Σ .^ 2)
   cumulative_energy = 0.0
   N = 0
-  DEIM_idx = Int64[]
+  DEIM_idx = Int[]
   DEIM_err_bound = 0
 
   while N < size(S̃)[2] && (DEIM_err_bound > ϵ || cumulative_energy / total_energy < 1.0 - ϵ ^ 2)
@@ -183,10 +183,10 @@ end
     N += 1
     cumulative_energy += Σ[N] ^ 2
 
-    append!(DEIM_idx, convert(Int64, argmax(abs.(DEIM_mat[:, 1]))[1]))
+    append!(DEIM_idx, convert(Int, argmax(abs.(DEIM_mat[:, 1]))[1]))
     for m in range(2, N)
       res = DEIM_mat[:, m] - DEIM_mat[:, 1:(m-1)] * (DEIM_mat[DEIM_idx[1:(m-1)], 1:(m-1)] \ DEIM_mat[DEIM_idx[1:(m-1)], m])
-      append!(DEIM_idx, convert(Int64, argmax(abs.(res))[1]))
+      append!(DEIM_idx, convert(Int, argmax(abs.(res))[1]))
     end
 
     DEIM_idx = last(DEIM_idx, N)

@@ -1,15 +1,15 @@
 function post_process(RBInfo::ROMInfoSteady, d::Dict) where T
-  if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
-    MDEIM_Σ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
+  if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "MDEIM_Σ.csv"))
+    MDEIM_Σ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "MDEIM_Σ.csv"))
     generate_and_save_plot(
       eachindex(MDEIM_Σ), MDEIM_Σ, "Decay singular values, MDEIM",
-      ["σ"], "σ index", "σ value", RBInfo.paths.results_path; var="MDEIM_Σ")
+      ["σ"], "σ index", "σ value", RBInfo.Paths.results_path; var="MDEIM_Σ")
   end
-  if isfile(joinpath(RBInfo.paths.ROM_structures_path, "DEIM_Σ.csv"))
-    DEIM_Σ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "DEIM_Σ.csv"))
+  if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "DEIM_Σ.csv"))
+    DEIM_Σ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "DEIM_Σ.csv"))
     generate_and_save_plot(
       eachindex(DEIM_Σ), DEIM_Σ, "Decay singular values, DEIM",
-      ["σ"], "σ index", "σ value", RBInfo.paths.results_path; var="DEIM_Σ")
+      ["σ"], "σ index", "σ value", RBInfo.Paths.results_path; var="DEIM_Σ")
   end
 
   FEMSpace = d["FEMSpace"]
@@ -25,17 +25,17 @@ function post_process(RBInfo::ROMInfoSteady, d::Dict) where T
 end
 
 function post_process(RBInfo::ROMInfoUnsteady{T}, d::Dict) where T
-  if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
-    MDEIM_Σ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_Σ.csv"))
+  if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "MDEIM_Σ.csv"))
+    MDEIM_Σ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "MDEIM_Σ.csv"))
     generate_and_save_plot(
       eachindex(MDEIM_Σ), MDEIM_Σ, "Decay singular values, MDEIM",
-      ["σ"], "σ index", "σ value", RBInfo.paths.results_path; var="MDEIM_Σ")
+      ["σ"], "σ index", "σ value", RBInfo.Paths.results_path; var="MDEIM_Σ")
   end
-  if isfile(joinpath(RBInfo.paths.ROM_structures_path, "DEIM_Σ.csv"))
-    DEIM_Σ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "DEIM_Σ.csv"))
+  if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "DEIM_Σ.csv"))
+    DEIM_Σ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "DEIM_Σ.csv"))
     generate_and_save_plot(
       eachindex(DEIM_Σ), DEIM_Σ, "Decay singular values, DEIM",
-      ["σ"], "σ index", "σ value", RBInfo.paths.results_path; var="DEIM_Σ")
+      ["σ"], "σ index", "σ value", RBInfo.Paths.results_path; var="DEIM_Σ")
   end
 
   times = collect(RBInfo.t₀+RBInfo.δt:RBInfo.δt:RBInfo.tₗ)

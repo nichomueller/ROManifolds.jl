@@ -14,7 +14,7 @@ function plot_θ_comparison(timesθ, θ, θ_approx)
 end
 
 function modify_timesθ_and_MDEIM_idx(
-  MDEIM_idx::Vector{Int64},
+  MDEIM_idx::Vector{Int},
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady)
 
@@ -69,25 +69,25 @@ function subtract_idx_in_blocks(idx::Vector)
 
 end
 
-function from_spacetime_to_space_time_idx_mat(idx::Vector, Nᵤ::Int64)
+function from_spacetime_to_space_time_idx_mat(idx::Vector, Nᵤ::Int)
 
-  idx_time = 1 .+ floor.(Int64,(idx.-1)/Nᵤ^2)
+  idx_time = 1 .+ floor.(Int,(idx.-1)/Nᵤ^2)
   idx_space = idx - (idx_time.-1)*Nᵤ^2
 
   idx_space, idx_time
 
 end
 
-function invert_sparse_to_full_idx(sparse_to_full_idx::Vector,Nₛ::Int64)
+function invert_sparse_to_full_idx(sparse_to_full_idx::Vector,Nₛ::Int)
   r_idx, _ = from_vec_to_mat_idx(sparse_to_full_idx, Nₛ)
-  full_to_sparse_idx = Int64[]
+  full_to_sparse_idx = Int[]
   for i = 1:Nₛ
     append!(full_to_sparse_idx, findall(x -> x == i, r_idx))
   end
   return full_to_sparse_idx
 end
 
-function chebyshev_polynomial(x::Float64, n::Int64)
+function chebyshev_polynomial(x::Float64, n::Int)
 
   if n == 0
     return 1
@@ -99,7 +99,7 @@ function chebyshev_polynomial(x::Float64, n::Int64)
 
 end
 
-function chebyschev_multipliers(x::Vector, order::Int64, dim=3)
+function chebyschev_multipliers(x::Vector, order::Int, dim=3)
 
   Ξ = Matrix{Float64}[]
   for d = 1:dim
@@ -118,7 +118,7 @@ end
 
 
 function index_mapping_inverse(i::Int,RBVars::PoissonUnsteady) ::Tuple
-  iₛ = 1+floor(Int64,(i-1)/RBVars.nₜᵘ)
+  iₛ = 1+floor(Int,(i-1)/RBVars.nₜᵘ)
   iₜ = i-(iₛ-1)*RBVars.nₜᵘ
   iₛ,iₜ
 end

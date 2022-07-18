@@ -10,9 +10,9 @@ function get_Mₙ(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTGRB{T}) where T
 
-  if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
+  if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "Mₙ.csv"))
     println("Importing reduced affine mass matrix")
-    Mₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
+    Mₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "Mₙ.csv"))
     RBVars.Mₙ = reshape(Mₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)::Array{T,3}
     RBVars.Qᵐ = size(RBVars.Mₙ)[end]
     return [""]
@@ -31,7 +31,7 @@ function assemble_affine_matrices(
   if var == "M"
     RBVars.Qᵐ = 1
     println("Assembling affine reduced mass")
-    M = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "M.csv"))
+    M = load_CSV(sparse([],[],T[]), joinpath(RBInfo.Paths.FEM_structures_path, "M.csv"))
     RBVars.Mₙ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ, 1)
     RBVars.Mₙ[:,:,1] = (RBVars.Φₛᵘ)' * M * RBVars.Φₛᵘ
   else
@@ -43,7 +43,7 @@ end
 function assemble_reduced_mat_MDEIM(
   RBVars::PoissonSTGRB{T},
   MDEIM_mat::Matrix{T},
-  row_idx::Vector{Int64},
+  row_idx::Vector{Int},
   var::String) where T
 
   Q = size(MDEIM_mat)[2]
@@ -153,7 +153,7 @@ function save_affine_structures(
 
   if RBInfo.save_offline_structures
     save_CSV(reshape(RBVars.Mₙ, :, RBVars.Qᵐ),
-      joinpath(RBInfo.paths.ROM_structures_path, "Mₙ.csv"))
+      joinpath(RBInfo.Paths.ROM_structures_path, "Mₙ.csv"))
     save_affine_structures(RBInfo, RBVars.S)
   end
 
@@ -177,6 +177,7 @@ function get_Q(
   if RBVars.Qᵐ == 0
     RBVars.Qᵐ = size(RBVars.Mₙ)[end]
   end
+
   get_Q(RBInfo, RBVars.S)
 
 end

@@ -8,7 +8,7 @@ function get_snapshot_matrix(
 
   println("Importing the snapshot matrix for field u,
     number of snapshots considered: $(RBInfo.nₛ)")
-  Sᵘ = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path,"uₕ.csv"),
+  Sᵘ = Matrix{T}(CSV.read(joinpath(RBInfo.Paths.FEM_snap_path,"uₕ.csv"),
     DataFrame))[:,1:RBInfo.nₛ*RBVars.Nₜ]
 
   RBVars.Sᵘ = Sᵘ
@@ -93,9 +93,11 @@ function build_reduced_basis(
   RBVars.Nᵘ = RBVars.Nₛᵘ * RBVars.Nₜ
 
   if RBInfo.save_offline_structures
-    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.paths.basis_path, "Φₛᵘ.csv"))
-    save_CSV(RBVars.Φₜᵘ, joinpath(RBInfo.paths.basis_path, "Φₜᵘ.csv"))
+    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.Paths.basis_path, "Φₛᵘ.csv"))
+    save_CSV(RBVars.Φₜᵘ, joinpath(RBInfo.Paths.basis_path, "Φₜᵘ.csv"))
   end
+
+  return
 
 end
 
@@ -106,15 +108,15 @@ function import_reduced_basis(
   import_reduced_basis(RBInfo, RBVars.S)
 
   println("Importing the temporal reduced basis for field u")
-  RBVars.Φₜᵘ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.basis_path, "Φₜᵘ.csv"))
+  RBVars.Φₜᵘ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.basis_path, "Φₜᵘ.csv"))
   RBVars.nₜᵘ = size(RBVars.Φₜᵘ)[2]
   RBVars.nᵘ = RBVars.nₛᵘ * RBVars.nₜᵘ
 
 end
 
 function index_mapping(
-  i::Int64,
-  j::Int64,
+  i::Int,
+  j::Int,
   RBVars::PoissonUnsteady)
 
   Int((i-1)*RBVars.nₜᵘ+j)
@@ -124,7 +126,7 @@ end
 function get_generalized_coordinates(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady{T},
-  snaps::Vector{Int64}) where T
+  snaps::Vector{Int}) where T
 
   if check_norm_matrix(RBVars.S)
     get_norm_matrix(RBInfo, RBVars.S)
@@ -145,7 +147,7 @@ function get_generalized_coordinates(
   RBVars.û = û
 
   if RBInfo.save_offline_structures
-    save_CSV(û, joinpath(RBInfo.paths.gen_coords_path, "û.csv"))
+    save_CSV(û, joinpath(RBInfo.Paths.gen_coords_path, "û.csv"))
   end
 
 end
@@ -234,7 +236,7 @@ function save_M_DEIM_structures(
     l_info_mat = reduce(vcat,transpose.(l_info_vec))
     l_idx,l_val = l_info_mat[:,1], transpose.(l_info_mat[:,2])
     for (i₁,i₂) in enumerate(l_idx)
-      save_CSV(l_val[i₁], joinpath(RBInfo.paths.ROM_structures_path,
+      save_CSV(l_val[i₁], joinpath(RBInfo.Paths.ROM_structures_path,
         list_names[i₂]*".csv"))
     end
   end
@@ -258,9 +260,9 @@ function get_M_DEIM_structures(
   operators = String[]
 
   if RBInfo.probl_nl["A"]
-    if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_idx_time_A.csv"))
+    if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "MDEIM_idx_time_A.csv"))
       RBVars.MDEIM_idx_time_A = load_CSV(Vector{Int}(undef,0),
-        joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_idx_time_A.csv"))
+        joinpath(RBInfo.Paths.ROM_structures_path, "MDEIM_idx_time_A.csv"))
     else
       append!(operators, ["A"])
     end
@@ -268,18 +270,18 @@ function get_M_DEIM_structures(
 
   if RBInfo.probl_nl["M"]
 
-    if isfile(joinpath(RBInfo.paths.ROM_structures_path, "MDEIMᵢ_M.csv"))
+    if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "MDEIMᵢ_M.csv"))
       println("Importing MDEIM offline structures for the mass matrix")
-      RBVars.MDEIMᵢ_M = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path,
+      RBVars.MDEIMᵢ_M = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path,
         "MDEIMᵢ_M.csv"))
-      RBVars.MDEIM_idx_M = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.paths.ROM_structures_path,
+      RBVars.MDEIM_idx_M = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.Paths.ROM_structures_path,
         "MDEIM_idx_M.csv"))
-      RBVars.sparse_el_M = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.paths.ROM_structures_path,
+      RBVars.sparse_el_M = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.Paths.ROM_structures_path,
         "sparse_el_M.csv"))
-      RBVars.row_idx_M = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.paths.ROM_structures_path,
+      RBVars.row_idx_M = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.Paths.ROM_structures_path,
         "row_idx_M.csv"))
       RBVars.MDEIM_idx_time_M = load_CSV(Vector{Int}(undef,0),
-        joinpath(RBInfo.paths.ROM_structures_path, "MDEIM_idx_time_M.csv"))
+        joinpath(RBInfo.Paths.ROM_structures_path, "MDEIM_idx_time_M.csv"))
       append!(operators, [])
     else
       println("Failed to import MDEIM offline structures for the mass matrix: must build them")
@@ -289,18 +291,18 @@ function get_M_DEIM_structures(
   end
 
   if RBInfo.probl_nl["f"]
-    if isfile(joinpath(RBInfo.paths.ROM_structures_path, "DEIM_idx_time_F.csv"))
+    if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "DEIM_idx_time_F.csv"))
     RBVars.DEIM_idx_time_F = load_CSV(Vector{Int}(undef,0),
-      joinpath(RBInfo.paths.ROM_structures_path, "DEIM_idx_time_F.csv"))
+      joinpath(RBInfo.Paths.ROM_structures_path, "DEIM_idx_time_F.csv"))
     else
       append!(operators, ["F"])
     end
   end
 
   if RBInfo.probl_nl["h"]
-    if isfile(joinpath(RBInfo.paths.ROM_structures_path, "DEIM_idx_time_H.csv"))
+    if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "DEIM_idx_time_H.csv"))
     RBVars.DEIM_idx_time_H = load_CSV(Vector{Int}(undef,0),
-      joinpath(RBInfo.paths.ROM_structures_path, "DEIM_idx_time_H.csv"))
+      joinpath(RBInfo.Paths.ROM_structures_path, "DEIM_idx_time_H.csv"))
     else
       append!(operators, ["H"])
     end
@@ -325,7 +327,7 @@ end
 
 function interpolated_θ(
   RBVars::PoissonUnsteady{T},
-  Mat_μ_sparse::SparseMatrixCSC{T, Int64},
+  Mat_μ_sparse::SparseMatrixCSC{T, Int},
   timesθ::Vector{T},
   MDEIMᵢ::Matrix{T},
   MDEIM_idx::Vector{Int},
@@ -571,8 +573,8 @@ function online_phase(
   println("Online phase of the RB solver, unsteady Poisson problem")
 
   μ = load_CSV(Array{T}[],
-    joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))::Vector{Vector{T}}
-  model = DiscreteModelFromFile(RBInfo.paths.mesh_path)
+    joinpath(RBInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{T}}
+  model = DiscreteModelFromFile(RBInfo.Paths.mesh_path)
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id,RBInfo.FEMInfo,model)
 
   get_norm_matrix(RBInfo, RBVars.S)
@@ -594,7 +596,7 @@ function online_phase(
   for Param_nb in param_nbs
     string_param_nbs *= "_" * string(Param_nb)
   end
-  path_μ = joinpath(RBInfo.paths.results_path, string_param_nbs)
+  path_μ = joinpath(RBInfo.Paths.results_path, string_param_nbs)
 
   if RBInfo.save_results
     println("Saving the results...")
@@ -649,7 +651,7 @@ function loop_on_params(
 
     Param = get_ParamInfo(RBInfo, μ[nb])
 
-    uₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
+    uₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.Paths.FEM_snap_path, "uₕ.csv"),
       DataFrame))[:,(nb-1)*RBVars.Nₜ+1:nb*RBVars.Nₜ]
 
     mean_uₕ_test += uₕ_test
@@ -691,8 +693,8 @@ function adaptive_loop_on_params(
   n_adaptive=nothing) where T
 
   if isnothing(n_adaptive)
-    nₛᵘ_add = floor(Int64,RBVars.nₛᵘ*0.1)
-    nₜᵘ_add = floor(Int64,RBVars.nₜᵘ*0.1)
+    nₛᵘ_add = floor(Int,RBVars.nₛᵘ*0.1)
+    nₜᵘ_add = floor(Int,RBVars.nₜᵘ*0.1)
     n_adaptive = maximum(hcat([1,1],[nₛᵘ_add,nₜᵘ_add]),dims=2)::Vector{Int}
   end
 
@@ -712,7 +714,7 @@ function adaptive_loop_on_params(
   ind_t = argmax(time_err,n_adaptive[2])
 
   if isempty(RBVars.Sᵘ)
-    Sᵘ = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
+    Sᵘ = Matrix{T}(CSV.read(joinpath(RBInfo.Paths.FEM_snap_path, "uₕ.csv"),
       DataFrame))[:,1:RBInfo.nₛ*RBVars.Nₜ]
   else
     Sᵘ = RBVars.Sᵘ
