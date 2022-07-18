@@ -140,7 +140,7 @@ function post_process(root::String)
   println("Exporting plots and tables")
 
   S = String
-  T = Float
+  T = Float64
 
   function get_err_t_paths(res_path::String)
     param_path = get_all_subdirectories(res_path)[end]
@@ -212,7 +212,7 @@ function post_process(root::String)
     Dict("on"=>T[],"off"=>T[]),Dict("on"=>T[],"off"=>T[]))
 
   for dir in root_subs
-    if !occursin("st",dir)
+    if !occursin("_st_",dir)
       if occursin("fun",dir)
         ϵ_fun,errH1L2_fun,t_fun = check_if_fun(dir,ϵ_fun,errH1L2_fun,t_fun)
       else
