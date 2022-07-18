@@ -140,7 +140,7 @@ function post_process(root::String)
   println("Exporting plots and tables")
 
   S = String
-  T = Float64
+  T = Float
 
   function get_err_t_paths(res_path::String)
     param_path = get_all_subdirectories(res_path)[end]

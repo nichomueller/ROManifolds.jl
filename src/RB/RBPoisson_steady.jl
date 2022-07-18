@@ -640,7 +640,7 @@ function online_phase(
   end
 
   pass_to_pp = Dict("path_μ"=>path_μ, "FEMSpace"=>FEMSpace,
-    "mean_point_err_u"=>Float64.(mean_pointwise_err))
+    "mean_point_err_u"=>Float.(mean_pointwise_err))
 
   if RBInfo.post_process
     post_process(RBInfo, pass_to_pp)

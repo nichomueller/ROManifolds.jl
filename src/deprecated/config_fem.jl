@@ -46,7 +46,7 @@ end =#
 end =#
 
 
-#= function get_domain(b::Bool, μᵒ::Float64)
+#= function get_domain(b::Bool, μᵒ::Float)
     @assert !(b === true && μᵒ === -1.0) "Provide valid Parameter value for the domain deformation, or set Ω to be non-Parametric"
     if b === false
         model = DiscreteModelFromFile(FEMInfo.paths.mesh_path)
@@ -68,7 +68,7 @@ function get_α(b::Bool, μᴬ::Vector)
 end
 
 
-function get_f(b::Bool, μᶠ::Float64)
+function get_f(b::Bool, μᶠ::Float)
     @assert !(b === true && μᶠ === -1.0) "Provide valid Parameter value for the forcing term, or set f to be non-Parametric"
     if b === false
         f = x -> 1.0
@@ -79,7 +79,7 @@ function get_f(b::Bool, μᶠ::Float64)
 end
 
 
-function get_g(b::Bool, μᵍ::Float64)
+function get_g(b::Bool, μᵍ::Float)
     @assert !(b === true && μᵍ === -1.0) "Provide valid Parameter value for the forcing term, or set g to be non-Parametric"
     if b === false
         g = x -> 1
@@ -91,7 +91,7 @@ end
 
 
 
-function get_h(b::Bool, μʰ::Float64)
+function get_h(b::Bool, μʰ::Float)
     @assert !(b === true && μʰ === -1.0) "Provide valid Parameter value for the forcing term, or set h to be non-Parametric"
     if b === false
         h = x -> 1
@@ -105,20 +105,20 @@ end =#
 #= function get_nonParametric_g(x::Point)
     1
 end
-function get_Parametric_g(x::Point, μᵍ::Float64)
+function get_Parametric_g(x::Point, μᵍ::Float)
     sin(μᵍ .* x)
 end
 get_g(x::Point) = get_nonParametric_g(x::Point)
-get_g(x::Point, μᵍ::Float64) = get_Parametric_g(x, μᵍ) =#
+get_g(x::Point, μᵍ::Float) = get_Parametric_g(x, μᵍ) =#
 
 #= function get_nonParametric_h(x::Point)
     1
 end
-function get_Parametric_h(x::Point, μʰ::Float64)
+function get_Parametric_h(x::Point, μʰ::Float)
     sin(μʰ .* x)
 end
 get_h(x::Point) = get_nonParametric_h(x::Point)
-get_h(x::Point, μʰ::Float64) = get_Parametric_h(x, μʰ)
+get_h(x::Point, μʰ::Float) = get_Parametric_h(x, μʰ)
  =#
 
 #= function get_Parametric_data(problem_nonlinearities::Dict, Params::Function, i_nₛ::Int)

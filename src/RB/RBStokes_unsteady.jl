@@ -447,9 +447,9 @@ function online_phase(
 
   pass_to_pp = Dict("path_μ"=>path_μ,
     "FEMSpace"=>FEMSpace, "H1_L2_err"=>H1_L2_err,
-    "mean_H1_err"=>mean_H1_err, "mean_point_err_u"=>Float64.(mean_pointwise_err_u),
+    "mean_H1_err"=>mean_H1_err, "mean_point_err_u"=>Float.(mean_pointwise_err_u),
     "L2_L2_err"=>L2_L2_err, "mean_L2_err"=>mean_L2_err,
-    "mean_point_err_p"=>Float64.(mean_pointwise_err_p))
+    "mean_point_err_p"=>Float.(mean_pointwise_err_p))
 
   if RBInfo.post_process
     println("Post-processing the results...")

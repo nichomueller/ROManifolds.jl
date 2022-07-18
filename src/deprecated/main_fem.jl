@@ -14,7 +14,7 @@ function run_FEM_A()
   #= Tₕ = Triangulation(model)
   degree = 2 .* order
   Qₕ = CellQuadrature(Tₕ, degree)
-  ref_FE = ReferenceFE(lagrangian, Float64, order)
+  ref_FE = ReferenceFE(lagrangian, Float, order)
   V₀ = TestFEMSpace(model, ref_FE; conformity = :H1, dirichlet_tags = dirichlet_tags)
   V = TrialFEMSpace(V₀, g)
   ϕᵥ = get_fe_basis(V₀)
@@ -153,7 +153,7 @@ Param = compute_Param(problem_nonlinearities, Params, 1)
 FEMSpace = FEMSpace_poisson(FEMInfo, Param)
 RHS = assemble_forcing(FEMSpace, Param, FEMInfo)
 LHS = assemble_stiffness(FEMSpace, Param, FEMInfo)
-#= uₕ = Vector{Float64}(undef, FEMSpace.Nₕ)  =#
+#= uₕ = Vector{Float}(undef, FEMSpace.Nₕ)  =#
 uₕ = Any[]
 
 if problem_nonlinearities["Ω"] === false

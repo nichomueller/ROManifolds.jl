@@ -39,14 +39,14 @@ end
 
 function init_FEM_variables()
 
-  M = sparse([], [], Float64[])
-  A = sparse([], [], Float64[])
-  B = sparse([], [], Float64[])
-  Xᵘ₀ = sparse([], [], Float64[])
-  Xᵘ = sparse([], [], Float64[])
-  Xᵖ₀ = sparse([], [], Float64[])
-  F = Vector{Float64}(undef,0)
-  H = Vector{Float64}(undef,0)
+  M = sparse([], [], Float[])
+  A = sparse([], [], Float[])
+  B = sparse([], [], Float[])
+  Xᵘ₀ = sparse([], [], Float[])
+  Xᵘ = sparse([], [], Float[])
+  Xᵖ₀ = sparse([], [], Float[])
+  F = Vector{Float}(undef,0)
+  H = Vector{Float}(undef,0)
 
   M, A, B, Xᵘ₀, Xᵘ, Xᵖ₀, F, H
 

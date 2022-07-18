@@ -120,7 +120,7 @@ end
 function datetime2input(x)
 firstyear = year(unix2datetime(first_train_epoch))
 lastyear = year(unix2datetime(last_test_epoch))
-  Float64.([
+  Float.([
     (year(x) - firstyear) / (lastyear - firstyear),
     month(x) / 12,
     day(x) / 31,
@@ -145,7 +145,7 @@ Loss(x, y) = Flux.mse(model(x), y)
 optimizer = ADAM()
 optimizer1 = LBFGS()
 
-training_loss = Float64[]
+training_loss = Float[]
 epochs = Int[]
 
 for epoch in 1:1000

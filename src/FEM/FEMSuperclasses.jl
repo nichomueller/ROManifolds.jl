@@ -5,9 +5,6 @@ abstract type UnsteadyProblem{D} <: FEMProblem{D} end
 
 abstract type Info end
 
-const F = Function
-const Float = Float64
-
 struct FEMSpacePoissonSteady{D} <: SteadyProblem{D}
   model::DiscreteModel
   Qₕ::CellQuadrature
@@ -21,7 +18,7 @@ struct FEMSpacePoissonSteady{D} <: SteadyProblem{D}
   dΩ::Measure
   dΓd::Measure
   dΓn::Measure
-  phys_quadp::Vector{Vector{VectorValue{D,Float64}}}
+  phys_quadp::Vector{Vector{VectorValue{D,Float}}}
   V₀_quad::UnconstrainedFESpace
 end
 
@@ -38,7 +35,7 @@ struct FEMSpacePoissonUnsteady{D} <: UnsteadyProblem{D}
   dΩ::Measure
   dΓd::Measure
   dΓn::Measure
-  phys_quadp::Vector{Vector{VectorValue{D,Float64}}}
+  phys_quadp::Vector{Vector{VectorValue{D,Float}}}
   V₀_quad::UnconstrainedFESpace
 end
 
@@ -62,7 +59,7 @@ struct FEMSpaceStokesSteady{D} <: SteadyProblem{D}
   dΩ::Measure
   dΓd::Measure
   dΓn::Measure
-  phys_quadp::Vector{Vector{VectorValue{D,Float64}}}
+  phys_quadp::Vector{Vector{VectorValue{D,Float}}}
   V₀_quad::UnconstrainedFESpace
 end
 
@@ -86,7 +83,7 @@ struct FEMSpaceStokesUnsteady{D} <: UnsteadyProblem{D}
   dΩ::Measure
   dΓd::Measure
   dΓn::Measure
-  phys_quadp::Vector{Vector{VectorValue{D,Float64}}}
+  phys_quadp::Vector{Vector{VectorValue{D,Float}}}
   V₀_quad::UnconstrainedFESpace
 end
 
@@ -111,7 +108,7 @@ struct FEMSpaceNavierStokesUnsteady{D} <: UnsteadyProblem{D}
   Γd::BoundaryTriangulation
   dΓd::Measure
   dΓn::Measure
-  phys_quadp::Vector{Vector{VectorValue{D,Float64}}}
+  phys_quadp::Vector{Vector{VectorValue{D,Float}}}
   V₀_quad::UnconstrainedFESpace
 end
 
@@ -151,11 +148,11 @@ struct UnsteadyInfo <: Info
   Paths::FEMPathInfo
   nₛ::Int
   time_method::String
-  θ::Float64
+  θ::Float
   RK_type::Symbol
-  t₀::Float64
-  tₗ::Float64
-  δt::Float64
+  t₀::Float
+  tₗ::Float
+  δt::Float
 end
 
 struct ParametricInfoSteady <: Info

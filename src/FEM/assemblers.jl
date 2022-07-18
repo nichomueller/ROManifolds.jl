@@ -228,9 +228,9 @@ function assemble_neumann_datum(
   Param::ParametricInfoSteady)
 
   if !FEMInfo.probl_nl["h"]
-    assemble_vector(∫(FEMSpace.ϕᵥ)*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float64}
+    assemble_vector(∫(FEMSpace.ϕᵥ)*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float}
   else
-    assemble_vector(∫(FEMSpace.ϕᵥ*Param.h)*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float64}
+    assemble_vector(∫(FEMSpace.ϕᵥ*Param.h)*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float}
   end
 
 end
@@ -243,9 +243,9 @@ function assemble_neumann_datum(
   function unsteady_neumann_datum(t)
 
     if !FEMInfo.probl_nl["h"]
-      assemble_vector(∫(FEMSpace.ϕᵥ*Param.hₛ)*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float64}
+      assemble_vector(∫(FEMSpace.ϕᵥ*Param.hₛ)*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float}
     else
-      assemble_vector(∫(FEMSpace.ϕᵥ*Param.h(t))*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float64}
+      assemble_vector(∫(FEMSpace.ϕᵥ*Param.h(t))*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float}
     end
 
   end
@@ -261,9 +261,9 @@ function assemble_neumann_datum(
 
   function unsteady_neumann_datum(t)
     if !FEMInfo.probl_nl["h"]
-      assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.hₛ)*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float64}
+      assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.hₛ)*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float}
     else
-      assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.h(t))*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float64}
+      assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.h(t))*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float}
     end
   end
 
@@ -281,10 +281,10 @@ function assemble_lifting(
 
   if isodd(nonlin_lift)
     return assemble_vector(
-      ∫(Param.α*(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ)))*FEMSpace.dΩ,FEMSpace.V₀)::Vector{Float64}
+      ∫(Param.α*(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ)))*FEMSpace.dΩ,FEMSpace.V₀)::Vector{Float}
   else
     return assemble_vector(
-      ∫(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ))*FEMSpace.dΩ,FEMSpace.V₀)::Vector{Float64}
+      ∫(∇(FEMSpace.ϕᵥ) ⋅ ∇(gₕ))*FEMSpace.dΩ,FEMSpace.V₀)::Vector{Float}
   end
 
 end
@@ -349,7 +349,7 @@ function assemble_L²_norm_matrix(
   FEMSpace::FEMSpaceStokesUnsteady)
 
   assemble_matrix(∫(FEMSpace.ψᵧ*FEMSpace.ψₚ)*FEMSpace.dΩ,
-  FEMSpace.Q, FEMSpace.Q₀)::SparseMatrixCSC{Float64, Int}
+  FEMSpace.Q, FEMSpace.Q₀)::SparseMatrixCSC{Float, Int}
 
 end
 
@@ -357,7 +357,7 @@ function assemble_L²₀_norm_matrix(
   FEMSpace₀::FEMSpaceStokesUnsteady)
 
   assemble_matrix(∫(FEMSpace₀.ψᵧ*FEMSpace₀.ψₚ)*FEMSpace₀.dΩ,
-  FEMSpace₀.Q, FEMSpace₀.Q₀)::SparseMatrixCSC{Float64, Int}
+  FEMSpace₀.Q, FEMSpace₀.Q₀)::SparseMatrixCSC{Float, Int}
 
 end
 
@@ -367,7 +367,7 @@ function assemble_H¹_norm_matrix(
   (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅∇(FEMSpace.ϕᵤ))*FEMSpace.dΩ,
   FEMSpace.V, FEMSpace.V₀) +
   assemble_matrix(∫(FEMSpace.ϕᵥ*FEMSpace.ϕᵤ)*FEMSpace.dΩ,
-  FEMSpace.V, FEMSpace.V₀))::SparseMatrixCSC{Float64, Int}
+  FEMSpace.V, FEMSpace.V₀))::SparseMatrixCSC{Float, Int}
 
 end
 
@@ -379,7 +379,7 @@ function assemble_H¹_norm_matrix(
   assemble_matrix(∫(FEMSpace.ϕᵥ*FEMSpace.ϕᵤ(t))*FEMSpace.dΩ,
   FEMSpace.V(t), FEMSpace.V₀))
 
-  Xᵘ(0.0)::SparseMatrixCSC{Float64, Int}
+  Xᵘ(0.0)::SparseMatrixCSC{Float, Int}
 
 end
 
@@ -391,7 +391,7 @@ function assemble_H¹_norm_matrix(
   assemble_matrix(∫(FEMSpace.ϕᵥ⋅FEMSpace.ϕᵤ(t))*FEMSpace.dΩ,
   FEMSpace.V(t), FEMSpace.V₀))
 
-  Xᵘ(0.0)::SparseMatrixCSC{Float64, Int}
+  Xᵘ(0.0)::SparseMatrixCSC{Float, Int}
 
 end
 
@@ -401,7 +401,7 @@ function assemble_H¹₀_norm_matrix(
   (assemble_matrix(∫(∇(FEMSpace₀.ϕᵥ)⋅∇(FEMSpace₀.ϕᵤ))*FEMSpace₀.dΩ,
   FEMSpace₀.V, FEMSpace₀.V₀) +
   assemble_matrix(∫(FEMSpace₀.ϕᵥ*FEMSpace₀.ϕᵤ)*FEMSpace₀.dΩ,
-  FEMSpace₀.V, FEMSpace₀.V₀))::SparseMatrixCSC{Float64, Int}
+  FEMSpace₀.V, FEMSpace₀.V₀))::SparseMatrixCSC{Float, Int}
 
 end
 
@@ -413,7 +413,7 @@ function assemble_H¹₀_norm_matrix(
   assemble_matrix(∫(FEMSpace₀.ϕᵥ * FEMSpace₀.ϕᵤ(t))*FEMSpace₀.dΩ,
   FEMSpace₀.V(t), FEMSpace₀.V₀))
 
-  return Xᵘ₀(0.0)::SparseMatrixCSC{Float64, Int}
+  return Xᵘ₀(0.0)::SparseMatrixCSC{Float, Int}
 
 end
 
@@ -425,7 +425,7 @@ function assemble_H¹₀_norm_matrix(
   assemble_matrix(∫(FEMSpace₀.ϕᵥ⋅FEMSpace₀.ϕᵤ(t))*FEMSpace₀.dΩ,
   FEMSpace₀.V(t), FEMSpace₀.V₀))
 
-  return Xᵘ₀(0.0)::SparseMatrixCSC{Float64, Int}
+  return Xᵘ₀(0.0)::SparseMatrixCSC{Float, Int}
 
 end
 
@@ -437,7 +437,7 @@ function assemble_H¹_norm_matrix(
   assemble_matrix(∫(FEMSpace.ϕᵥ⋅FEMSpace.ϕᵤ(t))*FEMSpace.dΩ,
   FEMSpace.V(t), FEMSpace.V₀))
 
-  return Xᵘ(0.0)::SparseMatrixCSC{Float64, Int}
+  return Xᵘ(0.0)::SparseMatrixCSC{Float, Int}
 
 end
 

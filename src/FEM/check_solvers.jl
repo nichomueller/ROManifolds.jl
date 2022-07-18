@@ -78,7 +78,7 @@ end
 
 function check_dataset(RBInfo, RBVars, i)
 
-  μ = load_CSV(Array{Float64}[], joinpath(RBInfo.Paths.FEM_snap_path, "μ.csv"))
+  μ = load_CSV(Array{Float}[], joinpath(RBInfo.Paths.FEM_snap_path, "μ.csv"))
   Param = get_ParamInfo(RBInfo, μ[i])
 
   u1 = RBVars.Sᵘ[:, (i-1)*RBVars.Nₜ+1]

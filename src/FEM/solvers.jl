@@ -17,9 +17,9 @@ function FE_solve(
   end
 
   if subtract_Ddata
-    uₕ = get_free_dof_values(uₕ_field)::Vector{Float64} - R₁
+    uₕ = get_free_dof_values(uₕ_field)::Vector{Float} - R₁
   else
-    uₕ = get_free_dof_values(uₕ_field)::Vector{Float64}
+    uₕ = get_free_dof_values(uₕ_field)::Vector{Float}
   end
 
   return uₕ, Gₕ
@@ -55,7 +55,7 @@ function FE_solve(
   dΩ = FEMSpace.dΩ
   for (uₕ, _) in uₕₜ_field
     global count += 1
-    uₕₜ[:, count] = get_free_dof_values(uₕ)::Vector{Float64}
+    uₕₜ[:, count] = get_free_dof_values(uₕ)::Vector{Float}
   end
 
   #= if subtract_Ddata
@@ -89,8 +89,8 @@ function FE_solve(
 
   u0(x) = Param.u₀(x)[1]
   p0(x) = Param.u₀(x)[2]
-  u₀ = get_free_dof_values(interpolate_everywhere(u0, FEMSpace.V(FEMInfo.t₀)))::Vector{Float64}
-  p₀ = collect(get_free_dof_values(interpolate_everywhere(p0, FEMSpace.Q(FEMInfo.t₀))))::Vector{Float64}
+  u₀ = get_free_dof_values(interpolate_everywhere(u0, FEMSpace.V(FEMInfo.t₀)))::Vector{Float}
+  p₀ = collect(get_free_dof_values(interpolate_everywhere(p0, FEMSpace.Q(FEMInfo.t₀))))::Vector{Float}
 
   uₕₜ = hcat(u₀, zeros(FEMSpace.Nₛᵘ, Int(FEMInfo.tₗ / FEMInfo.δt)))
   pₕₜ = hcat(p₀, zeros(FEMSpace.Nₛᵖ, Int(FEMInfo.tₗ / FEMInfo.δt)))
@@ -163,7 +163,7 @@ operator = FEOperator(res, jac, FEMSpace.V, FEMSpace.V₀)
 nls = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking())
 solver = FESolver(nls)
 
-initial_uₕ_guess = FEFunction(FEMSpace.V, rand(Float64, num_free_dofs(FEMSpace.V)))
+initial_uₕ_guess = FEFunction(FEMSpace.V, rand(Float, num_free_dofs(FEMSpace.V)))
 uₕ_field, _ = solve!(initial_uₕ_guess, solver, operator)
 
 if subtract_Ddata

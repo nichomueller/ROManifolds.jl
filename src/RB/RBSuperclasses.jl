@@ -118,8 +118,8 @@ mutable struct PoissonSGRB{T} <: PoissonSteady{T}
   MDEIMᵢ_A::Matrix{T}; MDEIM_idx_A::Vector{Int}; row_idx_A::Vector{Int}; sparse_el_A::Vector{Int};
   DEIM_mat_F::Matrix{T}; DEIMᵢ_F::Matrix{T}; DEIM_idx_F::Vector{Int}; sparse_el_F::Vector{Int};
   DEIM_mat_H::Matrix{T}; DEIMᵢ_H::Matrix{T}; DEIM_idx_H::Vector{Int}; sparse_el_H::Vector{Int};
-  Nₛᵘ::Int; nₛᵘ::Int; Qᵃ::Int; Qᶠ::Int; Qʰ::Int; offline_time::Float64;
-  online_time::Float64
+  Nₛᵘ::Int; nₛᵘ::Int; Qᵃ::Int; Qᶠ::Int; Qʰ::Int; offline_time::Float;
+  online_time::Float
 end
 
 mutable struct PoissonSPGRB{T} <: PoissonSteady{T}
@@ -128,8 +128,8 @@ mutable struct PoissonSPGRB{T} <: PoissonSteady{T}
   MDEIMᵢ_A::Matrix{T}; MDEIM_idx_A::Vector{Int}; row_idx_A::Vector{Int}; sparse_el_A::Vector{Int};
   DEIM_mat_F::Matrix{T}; DEIMᵢ_F::Matrix{T}; DEIM_idx_F::Vector{Int}; sparse_el_F::Vector{Int};
   DEIM_mat_H::Matrix{T}; DEIMᵢ_H::Matrix{T}; DEIM_idx_H::Vector{Int}; sparse_el_H::Vector{Int};
-  Nₛᵘ::Int; nₛᵘ::Int; Qᵃ::Int; Qᶠ::Int; Qʰ::Int; offline_time::Float64;
-  online_time::Float64;Pᵤ⁻¹::SparseMatrixCSC{T}; AΦᵀPᵤ⁻¹::Array{T}
+  Nₛᵘ::Int; nₛᵘ::Int; Qᵃ::Int; Qᶠ::Int; Qʰ::Int; offline_time::Float;
+  online_time::Float;Pᵤ⁻¹::SparseMatrixCSC{T}; AΦᵀPᵤ⁻¹::Array{T}
 end
 
 mutable struct PoissonSTGRB{T} <: PoissonUnsteady{T}
@@ -293,7 +293,7 @@ struct ROMInfoSteady{T} <: Info
   Paths::RBPathInfo
   RB_method::String
   nₛ::Int
-  ϵₛ::Float64
+  ϵₛ::Float
   use_norm_X::Bool
   build_parametric_RHS::Bool
   nₛ_MDEIM::Int
@@ -312,7 +312,7 @@ mutable struct ROMInfoUnsteady{T} <: Info
   Paths::RBPathInfo
   RB_method::String
   nₛ::Int
-  ϵₛ::Float64
+  ϵₛ::Float
   use_norm_X::Bool
   build_parametric_RHS::Bool
   nₛ_MDEIM::Int
@@ -323,11 +323,11 @@ mutable struct ROMInfoUnsteady{T} <: Info
   save_offline_structures::Bool
   save_results::Bool
   time_reduction_technique::String
-  t₀::Float64
-  tₗ::Float64
-  δt::Float64
-  θ::Float64
-  ϵₜ::Float64
+  t₀::Float
+  tₗ::Float
+  δt::Float
+  θ::Float
+  ϵₜ::Float
   st_M_DEIM::Bool
   functional_M_DEIM::Bool
   adaptivity::Bool

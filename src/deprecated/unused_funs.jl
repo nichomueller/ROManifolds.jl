@@ -87,7 +87,7 @@ function invert_sparse_to_full_idx(sparse_to_full_idx::Vector,Nₛ::Int)
   return full_to_sparse_idx
 end
 
-function chebyshev_polynomial(x::Float64, n::Int)
+function chebyshev_polynomial(x::Float, n::Int)
 
   if n == 0
     return 1
@@ -101,7 +101,7 @@ end
 
 function chebyschev_multipliers(x::Vector, order::Int, dim=3)
 
-  Ξ = Matrix{Float64}[]
+  Ξ = Matrix{Float}[]
   for d = 1:dim
     for n = 1:order
       for k = 1:n

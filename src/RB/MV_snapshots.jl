@@ -110,7 +110,7 @@ function functional_MDEIM(
 
   ncells,nquad_cell = get_LagrangianQuad_info(FEMSpace)
 
-  Θmat, Θmat_time = Matrix{Float64}(undef,0,0), Matrix{Float64}(undef,0,0)
+  Θmat, Θmat_time = Matrix{Float}(undef,0,0), Matrix{Float}(undef,0,0)
   @simd for k = 1:RBInfo.nₛ_MDEIM
     println("Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)")
     Param = get_ParamInfo(RBInfo, μ[k])
@@ -279,7 +279,7 @@ function functional_DEIM(
   var="F") where T
 
   ncells,nquad_cell = get_LagrangianQuad_info(FEMSpace)
-  Θmat, Θmat_time = Matrix{Float64}(undef,0,0), Matrix{Float64}(undef,0,0)
+  Θmat, Θmat_time = Matrix{Float}(undef,0,0), Matrix{Float}(undef,0,0)
   for k = 1:RBInfo.nₛ_DEIM
     println("Considering Parameter number $k/$(RBInfo.nₛ_DEIM)")
     Param = get_ParamInfo(RBInfo, μ[k])
@@ -344,7 +344,7 @@ end
 
 function build_parameter_on_phys_quadp(
   Param::ParametricInfoUnsteady,
-  phys_quadp::Vector{Vector{VectorValue{D,Float64}}},
+  phys_quadp::Vector{Vector{VectorValue{D,Float}}},
   ncells::Int,
   nquad_cell::Int,
   timesθ::Vector{T},
@@ -366,7 +366,7 @@ function build_parameter_on_phys_quadp(
     error("not implemented")
   end
 
-  reshape(Θ,ncells*nquad_cell,:)::Matrix{Float64}
+  reshape(Θ,ncells*nquad_cell,:)::Matrix{Float}
 
 end
 

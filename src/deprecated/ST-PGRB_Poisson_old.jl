@@ -298,7 +298,7 @@ function get_θ(RBInfo::Problem, RBVars::PoissonSTPGRB, Param)
 
   else
 
-    θᶠ, θʰ = Float64[], Float64[]
+    θᶠ, θʰ = Float[], Float[]
 
   end
 

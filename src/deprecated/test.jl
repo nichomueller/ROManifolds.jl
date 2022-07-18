@@ -292,19 +292,19 @@ struct RB_info{T<:String}
         n_snaps = ROM_Info["n_snapshots"]
         snaps_matrix = zeros(Nᵤˢ, n_snaps)
         A = zeros(Nᵤˢ, Nᵤˢ)
-        A_affine = Matrix{Float64}[]
-        θᴬ = Array{Float64}[]
+        A_affine = Matrix{Float}[]
+        θᴬ = Array{Float}[]
         Xᵤ = zeros(Nᵤˢ, Nᵤˢ)
         F = zeros(Nᵤˢ)
-        F_affine = Array{Float64}[]
-        θᶠ = Array{Float64}[]
+        F_affine = Array{Float}[]
+        θᶠ = Array{Float}[]
         W̃ = zeros(Nᵤˢ)
 
-        basis_space = Array{Float64}(undef, 0, 2)
-        Aₙ = Array{Float64}(undef, 0, 2)
-        Aₙ_affine = Matrix{Float64}[]
+        basis_space = Array{Float}(undef, 0, 2)
+        Aₙ = Array{Float}(undef, 0, 2)
+        Aₙ_affine = Matrix{Float}[]
         fₙ = []
-        fₙ_affine = Array{Float64}[]
+        fₙ_affine = Array{Float}[]
         Wₙ = []
 
     end

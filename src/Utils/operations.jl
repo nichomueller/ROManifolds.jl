@@ -1,3 +1,5 @@
+const F = Function
+const Float = Float64
 
 """Computation of the inner product between 'vec1' and 'vec2', defined by the
   (positive definite) matrix 'norm_matrix'.
@@ -82,7 +84,7 @@ end
   the vector space spanned by the columns of 'S', the so-called snapshots matrix.
   If the SPD matrix 'X' is provided, the columns of 'U' are orthogonal w.r.t.
   the norm induced by 'X'"""
-function POD(S::Matrix{T}, ϵ::Float64, X::SparseMatrixCSC{T}) where T
+function POD(S::Matrix{T}, ϵ::Float, X::SparseMatrixCSC{T}) where T
 
   H = cholesky(X)
   L = sparse(H.L)
@@ -97,7 +99,7 @@ function POD(S::Matrix{T}, ϵ::Float64, X::SparseMatrixCSC{T}) where T
 
 end
 
-function POD(S::SparseMatrixCSC{T}, ϵ::Float64, X::SparseMatrixCSC{T}) where T
+function POD(S::SparseMatrixCSC{T}, ϵ::Float, X::SparseMatrixCSC{T}) where T
 
   H = cholesky(X)
   L = sparse(H.L)
@@ -112,7 +114,7 @@ function POD(S::SparseMatrixCSC{T}, ϵ::Float64, X::SparseMatrixCSC{T}) where T
 
 end
 
-function POD(S::Matrix{T}, ϵ::Float64) where T
+function POD(S::Matrix{T}, ϵ::Float) where T
 
   U, Σ, _ = svd(S)
 
@@ -124,7 +126,7 @@ function POD(S::Matrix{T}, ϵ::Float64) where T
 
 end
 
-function POD(S::SparseMatrixCSC, ϵ::Float64) where T
+function POD(S::SparseMatrixCSC, ϵ::Float) where T
 
   U, Σ, _ = svds(S; nsv=size(S)[2] - 1)[1]
 
@@ -154,7 +156,7 @@ function Base.one(vv::VectorValue{D,T}) where {D,T}
   vv_one::VectorValue{D,T}
 end
 
-function Base.Float64(vv::VectorValue{D,Float64}) where D
+function Base.Float64(vv::VectorValue{D,Float}) where D
   VectorValue(Float64.([vv...]))
 end
 
@@ -162,8 +164,8 @@ function Base.Float32(vv::VectorValue{D,Float32}) where D
   VectorValue(Float32.([vv...]))
 end
 
-function Base.Int(vv::VectorValue{D,Int}) where D
-  VectorValue(Int.([vv...]))
+function Base.Int64(vv::VectorValue{D,Int}) where D
+  VectorValue(Int64.([vv...]))
 end
 
 function Base.Int32(vv::VectorValue{D,Int32}) where D

@@ -69,7 +69,7 @@ function FEMSpace_poisson(FEMInfo, Param)
     degree = 2 .* FEMInfo.order
     Qₕ = CellQuadrature(Tₕ, degree)
 
-    ref_FE = Gridap.ReferenceFE(lagrangian, Float64, FEMInfo.order)
+    ref_FE = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order)
     V₀ = TestFEMSpace(Param.model, ref_FE; conformity = :H1, dirichlet_tags = FEMInfo.dirichlet_tags)
     if FEMInfo.problem_nonlinearities["g"] === false
         V = TrialFEMSpace(V₀, Param.g)
