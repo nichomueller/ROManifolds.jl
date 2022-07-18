@@ -152,7 +152,7 @@ function post_process(root::String)
 
     end
 
-    tol,tol_fun,err,err_fun,time,time_fun
+    tol,err,time
 
   end
 
