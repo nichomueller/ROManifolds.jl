@@ -29,13 +29,13 @@ function get_Aₙ(
       isfile(joinpath(RBInfo.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv")))
     println("Importing reduced affine stiffness matrix")
     Aₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "Aₙ.csv"))
-    RBVars.Aₙ = reshape(Aₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)
+    RBVars.Aₙ = reshape(Aₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)::Array{T,3}
     Qᵃ = sqrt(size(RBVars.Aₙ)[3])
     @assert floor(Qᵃ) == Qᵃ "Qᵃ should be the square root of an Int64"
     RBVars.Qᵃ = Int(Qᵃ)
     println("S-PGRB: fetching the matrix AΦᵀPᵤ⁻¹")
     AΦᵀPᵤ⁻¹ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
-    RBVars.AΦᵀPᵤ⁻¹ = reshape(AΦᵀPᵤ⁻¹,RBVars.nₛᵘ,RBVars.Nₛᵘ,:)
+    RBVars.AΦᵀPᵤ⁻¹ = reshape(AΦᵀPᵤ⁻¹,RBVars.nₛᵘ,RBVars.Nₛᵘ,:)::Array{T,3}
     return [""]
   else
     println("Failed to import the reduced affine stiffness matrix: must build it")
@@ -109,8 +109,8 @@ function assemble_reduced_mat_MDEIM(
     end
   end
 
-  RBVars.Aₙ = Matₙ
-  RBVars.AΦᵀPᵤ⁻¹ = MatqΦᵀPᵤ⁻¹
+  RBVars.Aₙ = Matₙ::Array{T,3}
+  RBVars.AΦᵀPᵤ⁻¹ = MatqΦᵀPᵤ⁻¹::Array{T,3}
   RBVars.Qᵃ = Q
 
 end

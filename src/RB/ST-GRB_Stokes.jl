@@ -23,7 +23,7 @@ function get_Bₙ(
     println("Importing reduced affine divergence matrix")
     Bₙ = load_CSV(Matrix{T}(undef,0,0),
       joinpath(RBInfo.paths.ROM_structures_path, "Bₙ.csv"))
-    RBVars.S.Bₙ = reshape(Bₙ,RBVars.S.nₛᵖ,RBVars.P.S.nₛᵘ,:)
+    RBVars.Bₙ = reshape(Bₙ,RBVars.nₛᵖ,RBVars.nₛᵘ,:)
     return [""]
   else
     println("Failed to import Bₙ: must build it")
@@ -57,8 +57,8 @@ function assemble_affine_matrices(
     println("Assembling affine primal operator B")
     B = load_CSV(sparse([],[],T[]),
       joinpath(RBInfo.paths.FEM_structures_path, "B.csv"))
-    RBVars.S.Bₙ = zeros(T, RBVars.S.nₛᵖ, RBVars.P.S.nₛᵘ, 1)
-    RBVars.S.Bₙ[:,:,1] = (RBVars.S.Φₛᵖ)' * B * RBVars.P.S.Φₛᵘ
+    RBVars.Bₙ = zeros(T, RBVars.nₛᵖ, RBVars.nₛᵘ, 1)
+    RBVars.Bₙ[:,:,1] = (RBVars.Φₛᵖ)' * B * RBVars.Φₛᵘ
   else
     assemble_affine_matrices(RBInfo, RBVars.P, var)
   end
@@ -106,7 +106,7 @@ function assemble_offline_structures(
 
   assemble_offline_structures(RBInfo, RBVars.P, operators)
 
-  RBVars.P.S.offline_time += @elapsed begin
+  RBVars.offline_time += @elapsed begin
     if "B" ∈ operators
       assemble_affine_matrices(RBInfo, RBVars, "B")
     end
@@ -122,7 +122,7 @@ function save_affine_structures(
   RBVars::StokesSTGRB)
 
   if RBInfo.save_offline_structures
-    Bₙ = reshape(RBVars.S.Bₙ, :, 1)
+    Bₙ = reshape(RBVars.Bₙ, :, 1)
     save_CSV(Bₙ, joinpath(RBInfo.paths.ROM_structures_path, "Bₙ.csv"))
   end
 
@@ -156,19 +156,19 @@ function get_RB_LHS_blocks(
 
   get_RB_LHS_blocks(RBInfo, RBVars.P, θᵐ, θᵃ)
 
-  Φₜᵘᵖ = RBVars.P.Φₜᵘ' * RBVars.Φₜᵖ
-  Φₜᵘᵖ₁ = RBVars.P.Φₜᵘ[2:end,:]' * RBVars.Φₜᵖ[1:end-1,:]
+  Φₜᵘᵖ = RBVars.Φₜᵘ' * RBVars.Φₜᵖ
+  Φₜᵘᵖ₁ = RBVars.Φₜᵘ[2:end,:]' * RBVars.Φₜᵖ[1:end-1,:]
 
-  Bₙ = kron(RBVars.S.Bₙ[:,:,1].*θᵇ, Φₜᵘᵖ')::Matrix{T}
+  Bₙ = kron(RBVars.Bₙ[:,:,1].*θᵇ, Φₜᵘᵖ')::Matrix{T}
   Bₙᵀ = Bₙ'
-  Bₙ₁ᵀ = kron(transpose(RBVars.S.Bₙ[:,:,1].*θᵇ), Φₜᵘᵖ₁)::Matrix{T}
+  Bₙ₁ᵀ = kron(transpose(RBVars.Bₙ[:,:,1].*θᵇ), Φₜᵘᵖ₁)::Matrix{T}
 
   block₂ = RBInfo.δt*RBInfo.θ * (RBInfo.θ*Bₙᵀ + (1 - RBInfo.θ)*Bₙ₁ᵀ)
   block₃ = Bₙ
 
-  push!(RBVars.P.S.LHSₙ, - block₂)
-  push!(RBVars.P.S.LHSₙ, block₃)
-  push!(RBVars.P.S.LHSₙ, Matrix{T}(undef,0,0))
+  push!(RBVars.LHSₙ, - block₂)
+  push!(RBVars.LHSₙ, block₃)
+  push!(RBVars.LHSₙ, Matrix{T}(undef,0,0))
 
 end
 
@@ -182,7 +182,7 @@ function get_RB_RHS_blocks(
 
   get_RB_RHS_blocks(RBInfo, RBVars.P, θᶠ, θʰ)
 
-  push!(RBVars.P.S.RHSₙ, Matrix{T}(undef,0,0))
+  push!(RBVars.RHSₙ, Matrix{T}(undef,0,0))
 
 end
 
@@ -198,7 +198,7 @@ function get_RB_system(
   LHS_blocks = [1, 2, 3]
   RHS_blocks = [1]
 
-  RBVars.P.S.online_time = @elapsed begin
+  RBVars.online_time = @elapsed begin
     get_Q(RBInfo, RBVars)
 
     operators = get_system_blocks(RBInfo,RBVars.S,LHS_blocks,RHS_blocks)
@@ -218,7 +218,7 @@ function get_RB_system(
     end
   end
 
-  save_system_blocks(RBInfo,RBVars.P.S,LHS_blocks,RHS_blocks,operators)
+  save_system_blocks(RBInfo,RBVars.S,LHS_blocks,RHS_blocks,operators)
 
 end
 
@@ -229,7 +229,7 @@ function build_param_RHS(
   Param::ParametricInfoUnsteady)
 
   build_param_RHS(FEMSpace, RBInfo, RBVars.P, Param)
-  push!(RBVars.P.S.RHSₙ, zeros(RBVars.nᵖ,1))
+  push!(RBVars.RHSₙ, zeros(RBVars.nᵖ,1))
 
 end
 

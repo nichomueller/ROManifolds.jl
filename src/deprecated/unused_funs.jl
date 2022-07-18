@@ -19,10 +19,10 @@ function modify_timesθ_and_MDEIM_idx(
   RBVars::PoissonUnsteady)
 
   timesθ = get_timesθ(RBInfo)
-  idx_space, idx_time = from_vec_to_mat_idx(MDEIM_idx, RBVars.S.Nₛᵘ^2)
+  idx_space, idx_time = from_vec_to_mat_idx(MDEIM_idx, RBVars.Nₛᵘ^2)
   idx_time_mod = label_sorted_elems(idx_time)
   timesθ_mod = timesθ[unique(sort(idx_time))]
-  MDEIM_idx_mod = (idx_time_mod .- 1) * RBVars.S.Nₛᵘ^2 + idx_space
+  MDEIM_idx_mod = (idx_time_mod .- 1) * RBVars.Nₛᵘ^2 + idx_space
   timesθ_mod, MDEIM_idx_mod
 end
 

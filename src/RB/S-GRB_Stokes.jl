@@ -14,7 +14,7 @@ function get_Bₙ(
     println("Importing reduced affine divergence matrix")
     Bₙ = load_CSV(Matrix{T}(undef,0,0),
       joinpath(RBInfo.paths.ROM_structures_path, "Bₙ.csv"))
-    RBVars.Bₙ = reshape(Bₙ,RBVars.nₛᵖ,RBVars.P.nₛᵘ,:)
+    RBVars.Bₙ = reshape(Bₙ,RBVars.nₛᵖ,RBVars.nₛᵘ,:)
     return [""]
   else
     println("Failed to import Bₙ: must build it")
@@ -140,13 +140,13 @@ function get_RB_LHS_blocks(
   θᵃ::Matrix,
   θᵇ::Matrix) where T
 
-  Aₙ_μ =  assemble_parametric_structure(θᵃ, RBVars.P.Aₙ)
+  Aₙ_μ =  assemble_parametric_structure(θᵃ, RBVars.Aₙ)
   Bₙ_μ =  assemble_parametric_structure(θᵇ, RBVars.Bₙ)
 
-  push!(RBVars.P.LHSₙ, Aₙ_μ)
-  push!(RBVars.P.LHSₙ, -Bₙ_μ')
-  push!(RBVars.P.LHSₙ, Bₙ_μ)
-  push!(RBVars.P.LHSₙ, Matrix{T}(undef,0,0))
+  push!(RBVars.LHSₙ, Aₙ_μ)
+  push!(RBVars.LHSₙ, -Bₙ_μ')
+  push!(RBVars.LHSₙ, Bₙ_μ)
+  push!(RBVars.LHSₙ, Matrix{T}(undef,0,0))
 
 end
 
@@ -156,11 +156,11 @@ function get_RB_RHS_blocks(
   θᶠ::Matrix,
   θʰ::Matrix) where T
 
-  Fₙ_μ = assemble_parametric_structure(θᶠ, RBVars.P.Fₙ)
-  Hₙ_μ = assemble_parametric_structure(θʰ, RBVars.P.Hₙ)
+  Fₙ_μ = assemble_parametric_structure(θᶠ, RBVars.Fₙ)
+  Hₙ_μ = assemble_parametric_structure(θʰ, RBVars.Hₙ)
 
-  push!(RBVars.P.RHSₙ, Fₙ_μ + Hₙ_μ)
-  push!(RBVars.P.RHSₙ, Matrix{T}(undef,0,0))
+  push!(RBVars.RHSₙ, Fₙ_μ + Hₙ_μ)
+  push!(RBVars.RHSₙ, Matrix{T}(undef,0,0))
 
 end
 
@@ -173,11 +173,11 @@ function build_param_RHS(
 
   F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
   H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
-  Fₙ_μ = reshape((RBVars.P.Φₛᵘ)'*F,:,1)::Matrix{T}
-  Hₙ_μ = reshape((RBVars.P.Φₛᵘ)'*H,:,1)::Matrix{T}
+  Fₙ_μ = reshape((RBVars.Φₛᵘ)'*F,:,1)::Matrix{T}
+  Hₙ_μ = reshape((RBVars.Φₛᵘ)'*H,:,1)::Matrix{T}
 
-  push!(RBVars.P.RHSₙ, Fₙ_μ + Hₙ_μ)
-  push!(RBVars.P.RHSₙ, zeros(RBVars.nₛᵖ,1))
+  push!(RBVars.RHSₙ, Fₙ_μ + Hₙ_μ)
+  push!(RBVars.RHSₙ, zeros(RBVars.nₛᵖ,1))
 
 end
 

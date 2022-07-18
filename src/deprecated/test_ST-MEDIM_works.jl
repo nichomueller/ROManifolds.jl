@@ -438,11 +438,11 @@ function assemble_MDEIM_matrices_old(RBInfo::Info, RBVars::PoissonSTGRB)
 
   MDEIM_mat_old, MDEIM_idx_old, sparse_el_old, _, _ = MDEIM_offline_old(FEMSpace, RBInfo)
   Q = size(MDEIM_mat_old)[2]
-  #= Matₙ = zeros(RBVars.S.nₛᵘ, RBVars.S.nₛᵘ, Q)
+  #= Matₙ = zeros(RBVars.nₛᵘ, RBVars.nₛᵘ, Q)
   for q = 1:Q
     println("ST-GRB: affine component number $q, matrix $var"
-    Matq = reshape(MDEIM_mat[:,q], (RBVars.S.Nₛᵘ, RBVars.S.Nₛᵘ))
-    Matₙ[:,:,q] = RBVars.S.Φₛᵘ' * Matrix(Matq) * RBVars.S.Φₛᵘ
+    Matq = reshape(MDEIM_mat[:,q], (RBVars.Nₛᵘ, RBVars.Nₛᵘ))
+    Matₙ[:,:,q] = RBVars.Φₛᵘ' * Matrix(Matq) * RBVars.Φₛᵘ
   end =#
   MDEIMᵢ_mat_old = Matrix(MDEIM_mat_old[MDEIM_idx_old, :])
 
@@ -454,8 +454,8 @@ function get_θᵃ_old(RBVars,MDEIM_mat_old, MDEIM_idx_old, MDEIMᵢ_mat_old, sp
 
   Qold = size(MDEIM_mat_old)[2]
   A_μ_sparse_old = build_sparse_mat_old(FEMInfo, FEMSpace, RBInfo, sparse_el_old)
-  Nₛᵘ = RBVars.S.Nₛᵘ
-  θᵃ_old = zeros(RBVars.S.Qᵃ, RBVars.Nₜ)
+  Nₛᵘ = RBVars.Nₛᵘ
+  θᵃ_old = zeros(RBVars.Qᵃ, RBVars.Nₜ)
   for iₜ = 1:RBVars.Nₜ
     θᵃ_old[:,iₜ] = M_DEIM_online(A_μ_sparse_old[:,(iₜ-1)*Nₛᵘ+1:iₜ*Nₛᵘ], MDEIMᵢ_mat_old, MDEIM_idx_old)
   end

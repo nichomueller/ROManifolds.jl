@@ -15,8 +15,8 @@ function check_dataset(
   t¹_θ = RBInfo.t₀+RBInfo.δt*RBInfo.θ
   t²_θ = t¹_θ+RBInfo.δt
 
-  u1 = RBVars.S.Sᵘ[:,(nb-1)*RBVars.Nₜ+1]
-  u2 = RBVars.S.Sᵘ[:,(nb-1)*RBVars.Nₜ+2]
+  u1 = RBVars.Sᵘ[:,(nb-1)*RBVars.Nₜ+1]
+  u2 = RBVars.Sᵘ[:,(nb-1)*RBVars.Nₜ+2]
   M = assemble_FEM_structure(FEMSpace, RBInfo, Param, "M")(0.0)
   H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")(0.0)
 
@@ -81,8 +81,8 @@ function check_dataset(RBInfo, RBVars, i)
   μ = load_CSV(Array{Float64}[], joinpath(RBInfo.paths.FEM_snap_path, "μ.csv"))
   Param = get_ParamInfo(RBInfo, μ[i])
 
-  u1 = RBVars.S.Sᵘ[:, (i-1)*RBVars.P.Nₜ+1]
-  u2 = RBVars.S.Sᵘ[:, (i-1)*RBVars.P.Nₜ+2]
+  u1 = RBVars.Sᵘ[:, (i-1)*RBVars.Nₜ+1]
+  u2 = RBVars.Sᵘ[:, (i-1)*RBVars.Nₜ+2]
   M = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "M.csv"))
   A = load_CSV(sparse([],[],T[]), joinpath(RBInfo.paths.FEM_structures_path, "A.csv"))
   F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.FEM_structures_path, "F.csv"))

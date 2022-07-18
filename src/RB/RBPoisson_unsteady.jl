@@ -11,9 +11,9 @@ function get_snapshot_matrix(
   Sᵘ = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path,"uₕ.csv"),
     DataFrame))[:,1:RBInfo.nₛ*RBVars.Nₜ]
 
-  RBVars.S.Sᵘ = Sᵘ
-  RBVars.S.Nₛᵘ = size(Sᵘ)[1]
-  RBVars.Nᵘ = RBVars.S.Nₛᵘ * RBVars.Nₜ
+  RBVars.Sᵘ = Sᵘ
+  RBVars.Nₛᵘ = size(Sᵘ)[1]
+  RBVars.Nᵘ = RBVars.Nₛᵘ * RBVars.Nₜ
 
   println("Dimension of the snapshot matrix for field u: $(size(Sᵘ))")
 
@@ -29,17 +29,17 @@ function PODs_time(
   println("Performing the temporal POD for field u, using a tolerance of $(RBInfo.ϵₜ)")
 
   if RBInfo.time_reduction_technique == "ST-HOSVD"
-    Sᵘₜ = zeros(T, RBVars.Nₜ, RBVars.S.nₛᵘ * RBInfo.nₛ)
-    Sᵘ = RBVars.S.Φₛᵘ' * RBVars.S.Sᵘ
+    Sᵘₜ = zeros(T, RBVars.Nₜ, RBVars.nₛᵘ * RBInfo.nₛ)
+    Sᵘ = RBVars.Φₛᵘ' * RBVars.Sᵘ
     @simd for i in 1:RBInfo.nₛ
-      Sᵘₜ[:,(i-1)*RBVars.S.nₛᵘ+1:i*RBVars.S.nₛᵘ] =
+      Sᵘₜ[:,(i-1)*RBVars.nₛᵘ+1:i*RBVars.nₛᵘ] =
       Sᵘ[:,(i-1)*RBVars.Nₜ+1:i*RBVars.Nₜ]'
     end
   else
-    Sᵘₜ = zeros(T, RBVars.Nₜ, RBVars.S.Nₛᵘ * RBInfo.nₛ)
-    Sᵘ = RBVars.S.Sᵘ
+    Sᵘₜ = zeros(T, RBVars.Nₜ, RBVars.Nₛᵘ * RBInfo.nₛ)
+    Sᵘ = RBVars.Sᵘ
     @simd for i in 1:RBInfo.nₛ
-      Sᵘₜ[:, (i-1)*RBVars.S.Nₛᵘ+1:i*RBVars.S.Nₛᵘ] =
+      Sᵘₜ[:, (i-1)*RBVars.Nₛᵘ+1:i*RBVars.Nₛᵘ] =
       transpose(Sᵘ[:, (i-1)*RBVars.Nₜ+1:i*RBVars.Nₜ])
     end
   end
@@ -50,22 +50,50 @@ function PODs_time(
 
 end
 
+#= function PODs_time_old(
+  RBInfo::ROMInfoUnsteady,
+  RBVars::PoissonUnsteady{T}) where T
+
+  println("Performing the temporal POD for field u, using a tolerance of $(RBInfo.ϵₜ)")
+
+  if RBInfo.time_reduction_technique == "ST-HOSVD"
+    Sᵘₜ = zeros(T, RBVars.Nₜ, RBVars.S.nₛᵘ * RBInfo.S.nₛ)
+    Sᵘ = RBVars.S.Φₛᵘ' * RBVars.S.Sᵘ
+    @simd for i in 1:RBInfo.S.nₛ
+      Sᵘₜ[:,(i-1)*RBVars.S.nₛᵘ+1:i*RBVars.S.nₛᵘ] =
+      Sᵘ[:,(i-1)*RBVars.Nₜ+1:i*RBVars.Nₜ]'
+    end
+  else
+    Sᵘₜ = zeros(T, RBVars.Nₜ, RBVars.S.Nₛᵘ * RBInfo.S.nₛ)
+    Sᵘ = RBVars.S.Sᵘ
+    @simd for i in 1:RBInfo.S.nₛ
+      Sᵘₜ[:, (i-1)*RBVars.Nₛᵘ+1:i*RBVars.S.Nₛᵘ] =
+      transpose(Sᵘ[:, (i-1)*RBVars.Nₜ+1:i*RBVars.Nₜ])
+    end
+  end
+
+  Φₜᵘ, _ = POD(Sᵘₜ, RBInfo.ϵₜ)
+  RBVars.Φₜᵘ = Φₜᵘ
+  RBVars.nₜᵘ = size(Φₜᵘ)[2]
+
+end =#
+
 function build_reduced_basis(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady)
 
   println("Building the space-time reduced basis for field u")
 
-  RBVars.S.offline_time += @elapsed begin
+  RBVars.offline_time += @elapsed begin
     PODs_space(RBInfo, RBVars)
     PODs_time(RBInfo, RBVars)
   end
 
-  RBVars.nᵘ = RBVars.S.nₛᵘ * RBVars.nₜᵘ
-  RBVars.Nᵘ = RBVars.S.Nₛᵘ * RBVars.Nₜ
+  RBVars.nᵘ = RBVars.nₛᵘ * RBVars.nₜᵘ
+  RBVars.Nᵘ = RBVars.Nₛᵘ * RBVars.Nₜ
 
   if RBInfo.save_offline_structures
-    save_CSV(RBVars.S.Φₛᵘ, joinpath(RBInfo.paths.basis_path, "Φₛᵘ.csv"))
+    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.paths.basis_path, "Φₛᵘ.csv"))
     save_CSV(RBVars.Φₜᵘ, joinpath(RBInfo.paths.basis_path, "Φₜᵘ.csv"))
   end
 
@@ -80,7 +108,7 @@ function import_reduced_basis(
   println("Importing the temporal reduced basis for field u")
   RBVars.Φₜᵘ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.basis_path, "Φₜᵘ.csv"))
   RBVars.nₜᵘ = size(RBVars.Φₜᵘ)[2]
-  RBVars.nᵘ = RBVars.S.nₛᵘ * RBVars.nₜᵘ
+  RBVars.nᵘ = RBVars.nₛᵘ * RBVars.nₜᵘ
 
 end
 
@@ -105,16 +133,16 @@ function get_generalized_coordinates(
   @assert maximum(snaps) ≤ RBInfo.nₛ
 
   û = zeros(T, RBVars.nᵘ, length(snaps))
-  Φₛᵘ_normed = RBVars.S.Xᵘ₀ * RBVars.S.Φₛᵘ
+  Φₛᵘ_normed = RBVars.Xᵘ₀ * RBVars.Φₛᵘ
   Π = kron(Φₛᵘ_normed, RBVars.Φₜᵘ)::Matrix{T}
 
   for (i, i_nₛ) = enumerate(snaps)
     println("Assembling generalized coordinate relative to snapshot $(i_nₛ), field u")
-    S_i = RBVars.S.Sᵘ[:, (i_nₛ-1)*RBVars.Nₜ+1:i_nₛ*RBVars.Nₜ]
+    S_i = RBVars.Sᵘ[:, (i_nₛ-1)*RBVars.Nₜ+1:i_nₛ*RBVars.Nₜ]
     û[:, i] = sum(Π, dims=2) .* S_i
   end
 
-  RBVars.S.û = û
+  RBVars.û = û
 
   if RBInfo.save_offline_structures
     save_CSV(û, joinpath(RBInfo.paths.gen_coords_path, "û.csv"))
@@ -128,11 +156,11 @@ function test_offline_phase(
 
   get_generalized_coordinates(RBInfo, RBVars, 1)
 
-  uₙ = reshape(RBVars.S.û, (RBVars.nₜᵘ, RBVars.S.nₛᵘ))
-  u_rec = RBVars.S.Φₛᵘ * (RBVars.Φₜᵘ * uₙ)'
+  uₙ = reshape(RBVars.û, (RBVars.nₜᵘ, RBVars.nₛᵘ))
+  u_rec = RBVars.Φₛᵘ * (RBVars.Φₜᵘ * uₙ)'
   err = zeros(T, RBVars.Nₜ)
   for i = 1:RBVars.Nₜ
-    err[i] = compute_errors(RBVars.S.Sᵘ[:, i], u_rec[:, i])
+    err[i] = compute_errors(RBVars.Sᵘ[:, i], u_rec[:, i])
   end
 
 end
@@ -152,12 +180,12 @@ function assemble_MDEIM_matrices(
     assemble_reduced_mat_MDEIM(
       RBVars,RBVars.MDEIM_mat_M,RBVars.row_idx_M,"M")
   elseif var == "A"
-    if isempty(RBVars.S.MDEIM_mat_A)
-      (RBVars.S.MDEIM_mat_A, RBVars.S.MDEIM_idx_A, RBVars.S.MDEIMᵢ_A,
-      RBVars.S.row_idx_A,RBVars.S.sparse_el_A, RBVars.MDEIM_idx_time_A) = MDEIM_offline(RBInfo, "A")
+    if isempty(RBVars.MDEIM_mat_A)
+      (RBVars.MDEIM_mat_A, RBVars.MDEIM_idx_A, RBVars.MDEIMᵢ_A,
+      RBVars.row_idx_A,RBVars.sparse_el_A, RBVars.MDEIM_idx_time_A) = MDEIM_offline(RBInfo, "A")
     end
     assemble_reduced_mat_MDEIM(
-      RBVars,RBVars.S.MDEIM_mat_A,RBVars.S.row_idx_A,"A")
+      RBVars,RBVars.MDEIM_mat_A,RBVars.row_idx_A,"A")
   else
     error("Unrecognized variable on which to perform MDEIM")
   end
@@ -173,17 +201,17 @@ function assemble_DEIM_vectors(
     running the DEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
 
   if var == "F"
-    if isempty(RBVars.S.DEIM_mat_F)
-       (RBVars.S.DEIM_mat_F, RBVars.S.DEIM_idx_F, RBVars.S.DEIMᵢ_F,
-          RBVars.S.sparse_el_F, RBVars.DEIM_idx_time_F) = DEIM_offline(RBInfo,"F")
+    if isempty(RBVars.DEIM_mat_F)
+       (RBVars.DEIM_mat_F, RBVars.DEIM_idx_F, RBVars.DEIMᵢ_F,
+          RBVars.sparse_el_F, RBVars.DEIM_idx_time_F) = DEIM_offline(RBInfo,"F")
     end
-    assemble_reduced_mat_DEIM(RBVars,RBVars.S.DEIM_mat_F,"F")
+    assemble_reduced_mat_DEIM(RBVars,RBVars.DEIM_mat_F,"F")
   elseif var == "H"
-    if isempty(RBVars.S.DEIM_mat_H)
-       (RBVars.S.DEIM_mat_H, RBVars.S.DEIM_idx_H, RBVars.S.DEIMᵢ_H,
-          RBVars.S.sparse_el_H, RBVars.DEIM_idx_time_H) = DEIM_offline(RBInfo,"H")
+    if isempty(RBVars.DEIM_mat_H)
+       (RBVars.DEIM_mat_H, RBVars.DEIM_idx_H, RBVars.DEIMᵢ_H,
+          RBVars.sparse_el_H, RBVars.DEIM_idx_time_H) = DEIM_offline(RBInfo,"H")
     end
-    assemble_reduced_mat_DEIM(RBVars, RBVars.S.DEIM_mat_H,"H")
+    assemble_reduced_mat_DEIM(RBVars, RBVars.DEIM_mat_H,"H")
   else
     error("Unrecognized variable on which to perform DEIM")
   end
@@ -377,7 +405,7 @@ function get_θᵐ(
     end
   end
 
-  θᵐ
+  θᵐ::Matrix{T}
 
 end
 
@@ -398,18 +426,18 @@ function get_θᵃ(
     if RBInfo.st_M_DEIM
       red_timesθ = timesθ[RBVars.MDEIM_idx_time_A]
       A_μ_sparse = T.(build_sparse_mat(
-        FEMSpace,FEMInfo,Param,RBVars.S.sparse_el_A,red_timesθ;var="A"))
-      θᵃ = interpolated_θ(RBVars, A_μ_sparse, timesθ, RBVars.S.MDEIMᵢ_A,
-        RBVars.S.MDEIM_idx_A, RBVars.MDEIM_idx_time_A, RBVars.S.Qᵃ)
+        FEMSpace,FEMInfo,Param,RBVars.sparse_el_A,red_timesθ;var="A"))
+      θᵃ = interpolated_θ(RBVars, A_μ_sparse, timesθ, RBVars.MDEIMᵢ_A,
+        RBVars.MDEIM_idx_A, RBVars.MDEIM_idx_time_A, RBVars.Qᵃ)
     else
       A_μ_sparse = build_sparse_mat(
-        FEMSpace,FEMInfo,Param,RBVars.S.sparse_el_A,timesθ;var="A")
-      θᵃ = (RBVars.S.MDEIMᵢ_A \
-        Matrix{T}(reshape(A_μ_sparse, :, RBVars.Nₜ)[RBVars.S.MDEIM_idx_A, :]))
+        FEMSpace,FEMInfo,Param,RBVars.sparse_el_A,timesθ;var="A")
+      θᵃ = (RBVars.MDEIMᵢ_A \
+        Matrix{T}(reshape(A_μ_sparse, :, RBVars.Nₜ)[RBVars.MDEIM_idx_A, :]))
     end
   end
 
-  θᵃ
+  θᵃ::Matrix{T}
 
 end
 
@@ -434,13 +462,13 @@ function get_θᶠʰ(
     if RBInfo.st_M_DEIM
       red_timesθ = timesθ[RBVars.DEIM_idx_time_F]
       F_μ_sparse = T.(build_sparse_vec(
-        FEMSpace,FEMInfo, Param, RBVars.S.sparse_el_F, red_timesθ; var="F"))
-      θᶠ = interpolated_θ(RBVars, F_μ_sparse, timesθ, RBVars.S.DEIMᵢ_F,
-        RBVars.S.DEIM_idx_F, RBVars.DEIM_idx_time_F, RBVars.S.Qᶠ)
+        FEMSpace,FEMInfo, Param, RBVars.sparse_el_F, red_timesθ; var="F"))
+      θᶠ = interpolated_θ(RBVars, F_μ_sparse, timesθ, RBVars.DEIMᵢ_F,
+        RBVars.DEIM_idx_F, RBVars.DEIM_idx_time_F, RBVars.Qᶠ)
     else
-      F_μ = build_sparse_vec(FEMSpace,FEMInfo, Param, RBVars.S.sparse_el_F,
+      F_μ = build_sparse_vec(FEMSpace,FEMInfo, Param, RBVars.sparse_el_F,
         timesθ; var="F")
-      θᶠ = (RBVars.S.DEIMᵢ_F \ Matrix{T}(F_μ[RBVars.S.DEIM_idx_F, :]))
+      θᶠ = (RBVars.DEIMᵢ_F \ Matrix{T}(F_μ[RBVars.DEIM_idx_F, :]))
     end
   end
 
@@ -453,17 +481,17 @@ function get_θᶠʰ(
     if RBInfo.st_M_DEIM
       red_timesθ = timesθ[RBVars.DEIM_idx_time_H]
       H_μ_sparse = T.(build_sparse_vec(
-        FEMSpace,FEMInfo, Param, RBVars.S.sparse_el_H, red_timesθ; var="H"))
-      θʰ =  interpolated_θ(RBVars, H_μ_sparse, timesθ, RBVars.S.DEIMᵢ_H,
-        RBVars.S.DEIM_idx_H, RBVars.DEIM_idx_time_H, RBVars.S.Qʰ)
+        FEMSpace,FEMInfo, Param, RBVars.sparse_el_H, red_timesθ; var="H"))
+      θʰ =  interpolated_θ(RBVars, H_μ_sparse, timesθ, RBVars.DEIMᵢ_H,
+        RBVars.DEIM_idx_H, RBVars.DEIM_idx_time_H, RBVars.Qʰ)
     else
-      H_μ = build_sparse_vec(FEMSpace,FEMInfo, Param, RBVars.S.sparse_el_H,
+      H_μ = build_sparse_vec(FEMSpace,FEMInfo, Param, RBVars.sparse_el_H,
         timesθ; var="H")
-      θʰ = (RBVars.S.DEIMᵢ_H \ Matrix{T}(H_μ[RBVars.S.DEIM_idx_H, :]))
+      θʰ = (RBVars.DEIMᵢ_H \ Matrix{T}(H_μ[RBVars.DEIM_idx_H, :]))
     end
   end
 
-  θᶠ, θʰ
+  (θᶠ, θʰ)::Tuple{Matrix{T},Matrix{T}}
 
 end
 
@@ -476,10 +504,10 @@ function solve_RB_system(
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
 
   println("Solving RB problem via backslash")
-  println("Condition number of the system's matrix: $(cond(RBVars.S.LHSₙ[1]))")
+  println("Condition number of the system's matrix: $(cond(RBVars.LHSₙ[1]))")
 
-  RBVars.S.online_time += @elapsed begin
-    @fastmath RBVars.S.uₙ = RBVars.S.LHSₙ[1] \ RBVars.S.RHSₙ[1]
+  RBVars.online_time += @elapsed begin
+    @fastmath RBVars.uₙ = RBVars.LHSₙ[1] \ RBVars.RHSₙ[1]
   end
 
 end
@@ -487,8 +515,8 @@ end
 function reconstruct_FEM_solution(RBVars::PoissonUnsteady)
 
   println("Reconstructing FEM solution from the newly computed RB one")
-  uₙ = reshape(RBVars.S.uₙ, (RBVars.nₜᵘ, RBVars.S.nₛᵘ))
-  @fastmath RBVars.S.ũ = RBVars.S.Φₛᵘ * (RBVars.Φₜᵘ * uₙ)'
+  uₙ = reshape(RBVars.uₙ, (RBVars.nₜᵘ, RBVars.nₛᵘ))
+  @fastmath RBVars.ũ = RBVars.Φₛᵘ * (RBVars.Φₜᵘ * uₙ)'
 
 end
 
@@ -578,10 +606,10 @@ function online_phase(
     save_CSV(H1_L2_err, joinpath(path_μ, "H1L2_err.csv"))
 
     if RBInfo.import_offline_structures
-      RBVars.S.offline_time = NaN
+      RBVars.offline_time = NaN
     end
 
-    times = Dict("off_time"=>RBVars.S.offline_time,
+    times = Dict("off_time"=>RBVars.offline_time,
       "on_time"=>mean_online_time+adapt_time,"rec_time"=>mean_reconstruction_time)
     CSV.write(joinpath(path_μ, "times.csv"),times)
   end
@@ -607,13 +635,13 @@ function loop_on_params(
   H1_L2_err = zeros(T, length(param_nbs))
   mean_H1_err = zeros(T, RBVars.Nₜ)
   mean_H1_L2_err = 0.0
-  mean_pointwise_err = zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ)
+  mean_pointwise_err = zeros(T, RBVars.Nₛᵘ, RBVars.Nₜ)
   mean_online_time = 0.0
   mean_reconstruction_time = 0.0
 
-  ũ_μ = zeros(T, RBVars.S.Nₛᵘ, length(param_nbs)*RBVars.Nₜ)
+  ũ_μ = zeros(T, RBVars.Nₛᵘ, length(param_nbs)*RBVars.Nₜ)
   uₙ_μ = zeros(T, RBVars.nᵘ, length(param_nbs))
-  mean_uₕ_test = zeros(T, RBVars.S.Nₛᵘ, RBVars.Nₜ)
+  mean_uₕ_test = zeros(T, RBVars.Nₛᵘ, RBVars.Nₜ)
 
   for (i_nb, nb) in enumerate(param_nbs)
     println("\n")
@@ -631,21 +659,21 @@ function loop_on_params(
       reconstruct_FEM_solution(RBVars)
     end
     if i_nb > 1
-      mean_online_time = RBVars.S.online_time/(length(param_nbs)-1)
+      mean_online_time = RBVars.online_time/(length(param_nbs)-1)
       mean_reconstruction_time = reconstruction_time/(length(param_nbs)-1)
     end
 
     H1_err_nb, H1_L2_err_nb = compute_errors(
-        RBVars, uₕ_test, RBVars.S.ũ, RBVars.S.Xᵘ₀)
+        RBVars, uₕ_test, RBVars.ũ, RBVars.Xᵘ₀)
     H1_L2_err[i_nb] = H1_L2_err_nb
     mean_H1_err += H1_err_nb / length(param_nbs)
     mean_H1_L2_err += H1_L2_err_nb / length(param_nbs)
-    mean_pointwise_err += abs.(uₕ_test-RBVars.S.ũ)/length(param_nbs)
+    mean_pointwise_err += abs.(uₕ_test-RBVars.ũ)/length(param_nbs)
 
-    ũ_μ[:, (i_nb-1)*RBVars.Nₜ+1:i_nb*RBVars.Nₜ] = RBVars.S.ũ
-    uₙ_μ[:, i_nb] = RBVars.S.uₙ
+    ũ_μ[:, (i_nb-1)*RBVars.Nₜ+1:i_nb*RBVars.Nₜ] = RBVars.ũ
+    uₙ_μ[:, i_nb] = RBVars.uₙ
 
-    println("Online wall time: $(RBVars.S.online_time) s (snapshot number $nb)")
+    println("Online wall time: $(RBVars.online_time) s (snapshot number $nb)")
     println("Relative reconstruction H1-L2 error: $H1_L2_err_nb (snapshot number $nb)")
   end
   return (ũ_μ,uₙ_μ,mean_uₕ_test,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,
@@ -663,7 +691,7 @@ function adaptive_loop_on_params(
   n_adaptive=nothing) where T
 
   if isnothing(n_adaptive)
-    nₛᵘ_add = floor(Int64,RBVars.S.nₛᵘ*0.1)
+    nₛᵘ_add = floor(Int64,RBVars.nₛᵘ*0.1)
     nₜᵘ_add = floor(Int64,RBVars.nₜᵘ*0.1)
     n_adaptive = maximum(hcat([1,1],[nₛᵘ_add,nₜᵘ_add]),dims=2)::Vector{Int}
   end
@@ -672,32 +700,32 @@ function adaptive_loop_on_params(
     respectively")
 
   time_err = zeros(T, RBVars.Nₜ)
-  space_err = zeros(T, RBVars.S.Nₛᵘ)
+  space_err = zeros(T, RBVars.Nₛᵘ)
   for iₜ = 1:RBVars.Nₜ
-    time_err[iₜ] = (mynorm(mean_pointwise_err[:,iₜ],RBVars.S.Xᵘ₀) /
-      mynorm(mean_uₕ_test[:,iₜ],RBVars.S.Xᵘ₀))
+    time_err[iₜ] = (mynorm(mean_pointwise_err[:,iₜ],RBVars.Xᵘ₀) /
+      mynorm(mean_uₕ_test[:,iₜ],RBVars.Xᵘ₀))
   end
-  for iₛ = 1:RBVars.S.Nₛᵘ
+  for iₛ = 1:RBVars.Nₛᵘ
     space_err[iₛ] = mynorm(mean_pointwise_err[iₛ,:])/mynorm(mean_uₕ_test[iₛ,:])
   end
   ind_s = argmax(space_err,n_adaptive[1])
   ind_t = argmax(time_err,n_adaptive[2])
 
-  if isempty(RBVars.S.Sᵘ)
+  if isempty(RBVars.Sᵘ)
     Sᵘ = Matrix{T}(CSV.read(joinpath(RBInfo.paths.FEM_snap_path, "uₕ.csv"),
       DataFrame))[:,1:RBInfo.nₛ*RBVars.Nₜ]
   else
-    Sᵘ = RBVars.S.Sᵘ
+    Sᵘ = RBVars.Sᵘ
   end
-  Sᵘ = reshape(sum(reshape(Sᵘ,RBVars.S.Nₛᵘ,RBVars.Nₜ,:),dims=3),RBVars.S.Nₛᵘ,:)
+  Sᵘ = reshape(sum(reshape(Sᵘ,RBVars.Nₛᵘ,RBVars.Nₜ,:),dims=3),RBVars.Nₛᵘ,:)
 
   Φₛᵘ_new = Matrix{T}(qr(Sᵘ[:,ind_t]).Q)[:,1:n_adaptive[2]]
   Φₜᵘ_new = Matrix{T}(qr(Sᵘ[ind_s,:]').Q)[:,1:n_adaptive[1]]
-  RBVars.S.nₛᵘ += n_adaptive[2]
+  RBVars.nₛᵘ += n_adaptive[2]
   RBVars.nₜᵘ += n_adaptive[1]
-  RBVars.nᵘ = RBVars.S.nₛᵘ*RBVars.nₜᵘ
+  RBVars.nᵘ = RBVars.nₛᵘ*RBVars.nₜᵘ
 
-  RBVars.S.Φₛᵘ = Matrix{T}(qr(hcat(RBVars.S.Φₛᵘ,Φₛᵘ_new)).Q)[:,1:RBVars.S.nₛᵘ]
+  RBVars.Φₛᵘ = Matrix{T}(qr(hcat(RBVars.Φₛᵘ,Φₛᵘ_new)).Q)[:,1:RBVars.nₛᵘ]
   RBVars.Φₜᵘ = Matrix{T}(qr(hcat(RBVars.Φₜᵘ,Φₜᵘ_new)).Q)[:,1:RBVars.nₜᵘ]
   RBInfo.save_offline_structures = false
   assemble_offline_structures(RBInfo, RBVars)

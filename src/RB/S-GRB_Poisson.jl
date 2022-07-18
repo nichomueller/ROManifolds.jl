@@ -5,7 +5,7 @@ function get_Aₙ(
   if isfile(joinpath(RBInfo.paths.ROM_structures_path, "Aₙ.csv"))
     println("Importing reduced affine stiffness matrix")
     Aₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "Aₙ.csv"))
-    RBVars.Aₙ = reshape(Aₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)
+    RBVars.Aₙ = reshape(Aₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)::Array{T,3}
     RBVars.Qᵃ = size(RBVars.Aₙ)[3]
     return [""]
   else
@@ -45,7 +45,7 @@ function assemble_reduced_mat_MDEIM(
     MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.Φₛᵘ[c_idx[Mat_idx],:])'
   end
   RBVars.Aₙ = reshape(RBVars.Φₛᵘ' *
-    reshape(MatqΦ,RBVars.Nₛᵘ,:),RBVars.nₛᵘ,:,Q)
+    reshape(MatqΦ,RBVars.Nₛᵘ,:),RBVars.nₛᵘ,:,Q)::Array{T,3}
   RBVars.Qᵃ = Q
 
 end
