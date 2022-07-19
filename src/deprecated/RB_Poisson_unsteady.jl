@@ -50,8 +50,8 @@ function build_reduced_basis(RBInfo, RBVars::RBProblem)
   RBVars.offline_time += RB_building_time
 
   if RBInfo.save_offline_structures
-    save_CSV(Φₛᵘ, joinpath(RBInfo.paths.basis_path, "Φₛᵘ.csv"))
-    save_CSV(Φₜᵘ, joinpath(RBInfo.paths.basis_path, "Φₜᵘ.csv"))
+    save_CSV(Φₛᵘ, joinpath(RBInfo.paths.ROM_structures_path, "Φₛᵘ.csv"))
+    save_CSV(Φₜᵘ, joinpath(RBInfo.paths.ROM_structures_path, "Φₜᵘ.csv"))
   end
 
 end
@@ -61,8 +61,8 @@ function import_reduced_basis(RBInfo, RBVars::RBProblem)
 
   println("Importing the reduced basis")
 
-  RBVars.Φₛᵘ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.basis_path, "Φₛᵘ.csv"))
-  RBVars.Φₜᵘ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.basis_path, "Φₜᵘ.csv"))
+  RBVars.Φₛᵘ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "Φₛᵘ.csv"))
+  RBVars.Φₜᵘ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.paths.ROM_structures_path, "Φₜᵘ.csv"))
   (RBVars.Nₛᵘ, RBVars.nₛᵘ) = size(RBVars.Φₛᵘ)
   RBVars.nₜᵘ = size(RBVars.Φₜᵘ)[2]
   RBVars.nᵘ = RBVars.nₛᵘ * RBVars.nₜᵘ
@@ -123,7 +123,7 @@ function get_generalized_coordinates(RBInfo, RBVars::RBProblem, snaps=nothing)
   RBVars.û = û
 
   if RBInfo.save_offline_structures
-    save_CSV(û, joinpath(RBInfo.paths.gen_coords_path, "û.csv"))
+    save_CSV(û, joinpath(RBInfo.paths.ROM_structures_path, "û.csv"))
   end
 
 end

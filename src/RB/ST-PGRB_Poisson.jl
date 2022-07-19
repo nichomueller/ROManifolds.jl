@@ -71,7 +71,7 @@ function assemble_affine_matrices(
   if var == "M"
     RBVars.Qᵐ = 1
     println("Assembling affine reduced mass")
-    M = load_CSV(sparse([],[],T[]), joinpath(RBInfo.Paths.FEM_structures_path, "M.csv"))
+    M = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "M.csv"))
     RBVars.Mₙ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ, 1)
     RBVars.Mₙ[:,:,1] = (M*RBVars.Φₛᵘ)'*RBVars.Pᵤ⁻¹*(M*RBVars.Φₛᵘ)
     RBVars.MΦ = zeros(T, RBVars.Nₛᵘ, RBVars.nₛᵘ, 1)
@@ -129,7 +129,7 @@ function assemble_affine_vectors(
   if var == "F"
     RBVars.Qᶠ = 1
     println("Assembling affine reduced forcing term")
-    F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.FEM_structures_path, "F.csv"))
+    F = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "F.csv"))
     MFₙ = zeros(T, RBVars.nₛᵘ, 1, RBVars.Qᵐ*RBVars.Qᶠ)
     matrix_product_vec!(MFₙ, RBVars.MΦᵀPᵤ⁻¹, reshape(F,:,1))
     AFₙ = zeros(T, RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qᶠ)
@@ -139,7 +139,7 @@ function assemble_affine_vectors(
   elseif var == "H"
     RBVars.Qʰ = 1
     println("Assembling affine reduced Neumann term")
-    H = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.FEM_structures_path, "H.csv"))
+    H = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "H.csv"))
     MHₙ = zeros(T, RBVars.nₛᵘ, 1, RBVars.Qᵐ*RBVars.Qʰ)
     matrix_product_vec!(MHₙ, RBVars.MΦᵀPᵤ⁻¹, reshape(H,:,1))
     AHₙ = zeros(T, RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qʰ)

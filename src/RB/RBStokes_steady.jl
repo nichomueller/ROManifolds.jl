@@ -9,7 +9,7 @@ function get_snapshot_matrix(
 
   println("Importing the snapshot matrix for field u,
     number of snapshots considered: $(RBInfo.nₛ)")
-  Sᵖ = Matrix{T}(CSV.read(joinpath(RBInfo.Paths.FEM_snap_path, "pₕ.csv"),
+  Sᵖ = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"),
     DataFrame))[:, 1:RBInfo.nₛ]
   println("Dimension of pressure snapshot matrix: $(size(Sᵖ))")
   RBVars.Sᵖ = Sᵖ
@@ -28,9 +28,9 @@ function get_norm_matrix(
     println("Importing the norm matrices Xᵘ, Xᵖ₀")
 
     Xᵘ = load_CSV(sparse([],[],T[]),
-      joinpath(RBInfo.Paths.FEM_structures_path, "Xᵘ.csv"))
+      joinpath(get_FEM_structures_path(RBInfo), "Xᵘ.csv"))
     Xᵖ₀ = load_CSV(sparse([],[],T[]),
-      joinpath(RBInfo.Paths.FEM_structures_path, "Xᵖ₀.csv"))
+      joinpath(get_FEM_structures_path(RBInfo), "Xᵖ₀.csv"))
     RBVars.Nₛᵖ = size(Xᵖ₀)[1]
     println("Dimension of L² norm matrix, field p: $(size(Xᵖ₀))")
 
@@ -72,7 +72,7 @@ function primal_supremizers(
   #dir_idx = abs.(diag(RBVars.Xᵘ) .- 1) .< 1e-16
 
   constraint_mat = load_CSV(sparse([],[],T[]),
-    joinpath(RBInfo.Paths.FEM_structures_path, "B.csv"))'
+    joinpath(get_FEM_structures_path(RBInfo), "B.csv"))'
   #constraint_mat[dir_idx[dir_idx≤RBVars.Nₛᵘ*RBVars.Nₛᵖ]] = 0
 
   supr_primal = Matrix{T}(RBVars.Xᵘ) \ (Matrix{T}(constraint_mat) * RBVars.Φₛᵖ)
@@ -124,8 +124,8 @@ function build_reduced_basis(
   end
 
   if RBInfo.save_offline_structures
-    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.Paths.basis_path,"Φₛᵘ.csv"))
-    save_CSV(RBVars.Φₛᵖ, joinpath(RBInfo.Paths.basis_path,"Φₛᵖ.csv"))
+    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.Paths.ROM_structures_path,"Φₛᵘ.csv"))
+    save_CSV(RBVars.Φₛᵖ, joinpath(RBInfo.Paths.ROM_structures_path,"Φₛᵖ.csv"))
   end
 
   return
@@ -140,7 +140,7 @@ function import_reduced_basis(
 
   println("Importing the spatial reduced basis for field p")
   RBVars.Φₛᵖ = load_CSV(Matrix{T}(undef,0,0),
-    joinpath(RBInfo.Paths.basis_path, "Φₛᵖ.csv"))
+    joinpath(RBInfo.Paths.ROM_structures_path, "Φₛᵖ.csv"))
   (RBVars.Nₛᵖ, RBVars.nₛᵖ) = size(RBVars.Φₛᵖ)
 
 end
@@ -160,7 +160,7 @@ function get_generalized_coordinates(
   Φₛᵖ_normed = RBVars.Xᵖ₀*RBVars.Φₛᵖ
   RBVars.p̂ = RBVars.Sᵖ[:,snaps]*Φₛᵖ_normed
   if RBInfo.save_offline_structures
-    save_CSV(RBVars.p̂, joinpath(RBInfo.Paths.gen_coords_path, "p̂.csv"))
+    save_CSV(RBVars.p̂, joinpath(RBInfo.Paths.ROM_structures_path, "p̂.csv"))
   end
 
 end
@@ -388,8 +388,8 @@ function online_phase(
   param_nbs) where T
 
   μ = load_CSV(Array{T}[],
-    joinpath(RBInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{T}}
-  model = DiscreteModelFromFile(RBInfo.Paths.mesh_path)
+    joinpath(get_FEM_snap_path(RBInfo), "μ.csv"))::Vector{Vector{T}}
+  model = DiscreteModelFromFile(get_mesh_path(RBInfo))
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id,RBInfo.FEMInfo,model)
 
   mean_H1_err = 0.0
@@ -411,9 +411,9 @@ function online_phase(
 
     Param = get_ParamInfo(RBInfo, μ[nb])
 
-    uₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.Paths.FEM_snap_path, "uₕ.csv"),
+    uₕ_test = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
       DataFrame))[:, nb]
-    pₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.Paths.FEM_snap_path, "pₕ.csv"),
+    pₕ_test = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"),
       DataFrame))[:, nb]
 
     solve_RB_system(FEMSpace, RBInfo, RBVars, Param)

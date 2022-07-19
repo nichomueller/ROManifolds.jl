@@ -135,7 +135,7 @@ function plot_stability_constants(
 
 end
 
-function post_process(root::String)
+function post_process(test_dir::String)
 
   println("Exporting plots and tables")
 
@@ -153,7 +153,7 @@ function post_process(root::String)
     ["1e"*dir[end-1:end]]
   end
 
-  function check_if_fun(dir::String,tol,err,time)
+  function check_results(dir::String,tol,err,time)
 
     if ispath(joinpath(dir, "results"))
 
@@ -178,6 +178,43 @@ function post_process(root::String)
 
   end
 
+  function check_bases(dir::String, nₛᵘ, nₜᵘ, Qᵃ, Qᵃₜ, Qᶠ, Qᶠₜ, Qʰ, Qʰₜ)
+
+    function check_basis_existence(path_to_bases::String, name::String)
+      Q = NaN
+      if isfile(joinpath(path_to_bases, name * ".csv"))
+        M_DEIM_idx = load_CSV(Vector{Int}(undef,0),
+          joinpath(path_to_bases, name * ".csv"))
+        Q = length(M_DEIM_idx)
+      end
+      Q
+    end
+
+    path_to_bases = joinpath(dir, "ROM_structures")
+
+    if ispath(path_to_bases)
+
+      Φₛᵘ = load_CSV(Matrix{T}(undef,0,0),
+        joinpath(path_to_bases, "Φₛᵘ.csv"))
+      append!(nₛᵘ, size(Φₛᵘ)[2])
+
+      Φₜᵘ = load_CSV(Matrix{T}(undef,0,0),
+        joinpath(path_to_bases, "Φₜᵘ.csv"))
+      append!(nₜᵘ, size(Φₜᵘ)[2])
+
+      append!(Qᵃ, check_basis_existence(path_to_bases, "MDEIM_idx_A"))
+      append!(Qᵃₜ, check_basis_existence(path_to_bases, "MDEIM_idx_time_A"))
+      append!(Qᶠ, check_basis_existence(path_to_bases, "DEIM_idx_F"))
+      append!(Qᶠₜ, check_basis_existence(path_to_bases, "DEIM_idx_time_F"))
+      append!(Qʰ, check_basis_existence(path_to_bases, "DEIM_idx_H"))
+      append!(Qʰₜ, check_basis_existence(path_to_bases, "DEIM_idx_time_H"))
+
+    end
+
+    nₛᵘ, nₜᵘ, Qᵃ, Qᵃₜ, Qᶠ, Qᶠₜ, Qʰ, Qʰₜ
+
+  end
+
   function get_style_info(key::String, selected_color, selected_style, selected_dash)
 
     if occursin("functional", key)
@@ -197,33 +234,46 @@ function post_process(root::String)
 
   end
 
-  root_subs = get_all_subdirectories(root)
-  filter!(el->!occursin("FEM_data",el),root_subs)
-  filter!(el->!occursin("plots",el),root_subs)
+  test_subdir = get_all_subdirectories(test_dir)
+  filter!(el->!occursin("FEM_data",el),test_subdir)
+  filter!(el->!occursin("plots",el),test_subdir)
 
-  (ϵ,ϵ_fun,ϵ_st,ϵ_st_fun) =
-    (S[],S[],S[],S[],S[],S[],S[],S[])
-  (errH1L2,errH1L2_fun,errH1L2_st,errH1L2_st_fun) =
-    (T[],T[],T[],T[],T[],T[],T[],T[])
+  (ϵ,ϵ_fun,ϵ_st,ϵ_st_fun) = (S[],S[],S[],S[])
+  (errH1L2,errH1L2_fun,errH1L2_st,errH1L2_st_fun) = (T[],T[],T[],T[])
   (t,t_fun,t_st,t_st_fun) =
     (Dict("on"=>T[],"off"=>T[]),Dict("on"=>T[],"off"=>T[]),
-    Dict("on"=>T[],"off"=>T[]),Dict("on"=>T[],"off"=>T[]),
-    Dict("on"=>T[],"off"=>T[]),Dict("on"=>T[],"off"=>T[]),
     Dict("on"=>T[],"off"=>T[]),Dict("on"=>T[],"off"=>T[]))
 
-  for dir in root_subs
+  nₛᵘ, nₜᵘ, Qᵃ, Qᵃₜ, Qᶠ, Qᶠₜ, Qʰ, Qʰₜ =
+    Int[],Int[],Int[],Int[],Int[],Int[],Int[],Int[]
+  nₛᵘ_fun, nₜᵘ_fun, Qᵃ_fun, Qᵃₜ_fun, Qᶠ_fun, Qᶠₜ_fun, Qʰ_fun, Qʰₜ_fun =
+    Int[],Int[],Int[],Int[],Int[],Int[],Int[],Int[]
+  nₛᵘ_st, nₜᵘ_st, Qᵃ_st, Qᵃₜ_st, Qᶠ_st, Qᶠₜ_st, Qʰ_st, Qʰₜ_st =
+    Int[],Int[],Int[],Int[],Int[],Int[],Int[],Int[]
+  (nₛᵘ_st_fun, nₜᵘ_st_fun, Qᵃ_st_fun, Qᵃₜ_st_fun, Qᶠ_st_fun, Qᶠₜ_st_fun,
+    Qʰ_st_fun, Qʰₜ_st_fun) = Int[],Int[],Int[],Int[],Int[],Int[],Int[],Int[]
+
+  for dir in test_subdir
     if !occursin("_st_",dir)
       if occursin("fun",dir)
-        ϵ_fun,errH1L2_fun,t_fun = check_if_fun(dir,ϵ_fun,errH1L2_fun,t_fun)
+        ϵ_fun,errH1L2_fun,t_fun = check_results(dir,ϵ_fun,errH1L2_fun,t_fun)
+        nₛᵘ_fun, nₜᵘ_fun, Qᵃ_fun, Qᵃₜ_fun, Qᶠ_fun, Qᶠₜ_fun, Qʰ_fun, Qʰₜ_fun =
+          check_bases(dir, nₛᵘ_fun, nₜᵘ_fun, Qᵃ_fun, Qᵃₜ_fun, Qᶠ_fun, Qᶠₜ_fun, Qʰ_fun, Qʰₜ_fun)
       else
-        ϵ,errH1L2,t = check_if_fun(dir,ϵ,errH1L2,t)
+        ϵ,errH1L2,t = check_results(dir,ϵ,errH1L2,t)
+        nₛᵘ, nₜᵘ, Qᵃ, Qᵃₜ, Qᶠ, Qᶠₜ, Qʰ, Qʰₜ =
+          check_bases(dir, nₛᵘ, nₜᵘ, Qᵃ, Qᵃₜ, Qᶠ, Qᶠₜ, Qʰ, Qʰₜ)
       end
     else
       if occursin("fun",dir)
         ϵ_st_fun,errH1L2_st_fun,t_st_fun =
-          check_if_fun(dir,ϵ_st_fun,errH1L2_st_fun,t_st_fun)
+          check_results(dir,ϵ_st_fun,errH1L2_st_fun,t_st_fun)
+        nₛᵘ_st_fun, nₜᵘ_st_fun, Qᵃ_st_fun, Qᵃₜ_st_fun, Qᶠ_st_fun, Qᶠₜ_st_fun, Qʰ_st_fun, Qʰₜ_st_fun =
+          check_bases(dir, nₛᵘ_st_fun, nₜᵘ_st_fun, Qᵃ_st_fun, Qᵃₜ_st_fun, Qᶠ_st_fun, Qᶠₜ_st_fun, Qʰ_st_fun, Qʰₜ_st_fun)
       else
-        ϵ_st,errH1L2_st,t_st = check_if_fun(dir,ϵ_st,errH1L2_st,t_st)
+        ϵ_st,errH1L2_st,t_st = check_results(dir,ϵ_st,errH1L2_st,t_st)
+        nₛᵘ_st, nₜᵘ_st, Qᵃ_st, Qᵃₜ_st, Qᶠ_st, Qᶠₜ_st, Qʰ_st, Qʰₜ_st =
+          check_bases(dir, nₛᵘ_st, nₜᵘ_st, Qᵃ_st, Qᵃₜ_st, Qᶠ_st, Qᶠₜ_st, Qʰ_st, Qʰₜ_st)
       end
     end
   end
@@ -235,11 +285,20 @@ function post_process(root::String)
   tols = Dict("ϵ standard-S"=>ϵ,"ϵ functional-S"=>ϵ_fun,
   "ϵ standard-ST"=>ϵ_st,"ϵ functional-ST"=>ϵ_st_fun)
 
-  plots_dir = joinpath(root,"plots")
+  n = Dict("nₛᵘ"=>nₛᵘ,"nₜᵘ"=>nₜᵘ,"Qᵃ"=>Qᵃ,"Qᶠ"=>Qᶠ,"Qʰ"=>Qʰ)
+  n_st = ("nₛᵘ"=>nₛᵘ_st,"nₜᵘ"=>nₜᵘ_st,"Qᵃ"=>Qᵃ_st,"Qᵃₜ"=>Qᵃₜ_st,"Qᶠ"=>Qᶠ_st,"Qᶠₜ"=>Qᶠₜ_st,"Qʰ"=>Qʰ_st,"Qʰₜ"=>Qʰₜ_st)
+  n_fun = ("nₛᵘ"=>nₛᵘ_fun,"nₜᵘ"=>nₜᵘ_fun,"Qᵃ"=>Qᵃ_fun,"Qᶠ"=>Qᶠ_fun,"Qʰ"=>Qʰ_fun)
+  n_st_fun = ("nₛᵘ"=>nₛᵘ_st_fun,"nₜᵘ"=>nₜᵘ_st_fun,"Qᵃ"=>Qᵃ_st_fun,"Qᵃₜ"=>Qᵃₜ_st_fun,"Qᶠ"=>Qᶠ_st_fun,"Qᶠₜ"=>Qᶠₜ_st_fun,
+    "Qʰ"=>Qʰ_st_fun,"Qʰₜ"=>Qʰₜ_st_fun)
+
+  nbases = Dict("n"=>n,"n_st"=>n_st,"n_fun"=>n_fun,"n_st_fun"=>n_st_fun)
+
+  plots_dir = joinpath(test_dir,"plots")
   create_dir(plots_dir)
 
   CSV.write(joinpath(plots_dir, "errors.csv"),errors)
   CSV.write(joinpath(plots_dir, "times.csv"),times)
+  CSV.write(joinpath(plots_dir, "nbases.csv"),nbases)
 
   if ϵ == ϵ_fun == ϵ_st == ϵ_st_fun
 

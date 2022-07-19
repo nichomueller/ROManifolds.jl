@@ -12,7 +12,8 @@ function M_DEIM_POD(S::Matrix{T}, ϵ=1e-5) where T
   N₁ = findall(x -> x ≥ (1 - ϵ^2) * energies[end], energies)[1]
   N₂ = findall(x -> x ≤ ϵ, M_DEIM_err_bound)[1]
   N = max(N₁, N₂)::Int
-  println("Basis number obtained via POD is $N, projection error ≤ $(max(sqrt(1-energies[N]/energies[end]),M_DEIM_err_bound[N]))")
+  err = max(sqrt(1-energies[N]/energies[end]),M_DEIM_err_bound[N])::Float
+  println("Basis number obtained via POD is $N, projection error ≤ $err")
 
   T.(M_DEIM_mat[:, 1:N]), T.(Σ)
 
@@ -46,8 +47,8 @@ function MDEIM_offline(RBInfo::ROMInfoSteady{T}, var::String) where T
 
   println("Building $(RBInfo.nₛ_MDEIM) snapshots of $var")
 
-  μ = load_CSV(Array{T}[],joinpath(RBInfo.Paths.FEM_snap_path, "μ.csv"))
-  model = DiscreteModelFromFile(RBInfo.Paths.mesh_path)
+  μ = load_CSV(Array{T}[],joinpath(get_FEM_snap_path(RBInfo), "μ.csv"))
+  model = DiscreteModelFromFile(get_mesh_path(RBInfo))
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
 
   MDEIM_mat, Σ, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, μ, var)
@@ -65,8 +66,8 @@ function MDEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
 
   println("Building $(RBInfo.nₛ_MDEIM) snapshots of $var")
 
-  μ = load_CSV(Array{T}[],joinpath(RBInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{T}}
-  model = DiscreteModelFromFile(RBInfo.Paths.mesh_path)
+  μ = load_CSV(Array{T}[],joinpath(get_FEM_snap_path(RBInfo), "μ.csv"))::Vector{Vector{T}}
+  model = DiscreteModelFromFile(get_mesh_path(RBInfo))
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
 
   MDEIM_mat, MDEIM_mat_time, Σ, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, μ, var)
@@ -88,8 +89,8 @@ function DEIM_offline(RBInfo::ROMInfoSteady{T}, var::String) where T
 
   println("Building $(RBInfo.nₛ_DEIM) snapshots of $var")
 
-  μ = load_CSV(Array{T}[], joinpath(RBInfo.Paths.FEM_snap_path, "μ.csv"))
-  model = DiscreteModelFromFile(RBInfo.Paths.mesh_path)
+  μ = load_CSV(Array{T}[], joinpath(get_FEM_snap_path(RBInfo), "μ.csv"))
+  model = DiscreteModelFromFile(get_mesh_path(RBInfo))
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
 
   DEIM_mat, Σ = get_snaps_DEIM(FEMSpace, RBInfo, μ, var)
@@ -109,8 +110,8 @@ function DEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
 
   println("Building $(RBInfo.nₛ_DEIM) snapshots of $var")
 
-  μ = load_CSV(Array{T}[], joinpath(RBInfo.Paths.FEM_snap_path, "μ.csv"))
-  model = DiscreteModelFromFile(RBInfo.Paths.mesh_path)
+  μ = load_CSV(Array{T}[], joinpath(get_FEM_snap_path(RBInfo), "μ.csv"))
+  model = DiscreteModelFromFile(get_mesh_path(RBInfo))
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
 
   DEIM_mat, DEIM_mat_time, Σ = get_snaps_DEIM(FEMSpace, RBInfo, μ, var)

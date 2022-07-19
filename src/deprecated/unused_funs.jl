@@ -6,6 +6,7 @@ function plot_θ_comparison(timesθ, θ, θ_approx)
   display(p1)
 
 
+  #layout = Layout(title=title,xaxis_title=xlab,yaxis_title=ylab)
   θ2_plt = hcat(θ[2,:], θ_approx[2,:])
   traces2 = [scatter(x=timesθ,y=θ2_plt[:,i]) for i=1:2]
   p2 = plot(traces2)

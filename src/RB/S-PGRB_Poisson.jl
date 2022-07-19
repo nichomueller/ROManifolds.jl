@@ -6,13 +6,13 @@ function get_inverse_P_matrix(
   if RBInfo.use_norm_X
     if isempty(RBVars.Pᵤ⁻¹)
       println("S-PGRB: building the inverse of the diag preconditioner of the H1 norm matrix")
-      if isfile(joinpath(RBInfo.Paths.FEM_structures_path, "Pᵤ⁻¹.csv"))
-        RBVars.Pᵤ⁻¹ = load_CSV(sparse([],[],T[]), joinpath(RBInfo.Paths.FEM_structures_path, "Pᵤ⁻¹.csv"))
+      if isfile(joinpath(get_FEM_structures_path(RBInfo), "Pᵤ⁻¹.csv"))
+        RBVars.Pᵤ⁻¹ = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "Pᵤ⁻¹.csv"))
       else
         get_norm_matrix(RBInfo, RBVars)
         diag_Xᵘ₀ = Vector{T}(diag(RBVars.Xᵘ₀))
         RBVars.Pᵤ⁻¹ = spdiagm(1 ./ diag_Xᵘ₀)
-        save_CSV(RBVars.Pᵤ⁻¹, joinpath(RBInfo.Paths.FEM_structures_path, "Pᵤ⁻¹.csv"))
+        save_CSV(RBVars.Pᵤ⁻¹, joinpath(get_FEM_structures_path(RBInfo), "Pᵤ⁻¹.csv"))
       end
     end
     RBVars.Pᵤ⁻¹ = Matrix{T}(RBVars.Pᵤ⁻¹)
@@ -52,7 +52,6 @@ function get_AΦᵀPᵤ⁻¹(
   if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
     AΦᵀPᵤ⁻¹ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "AΦᵀPᵤ⁻¹.csv"))
     RBVars.AΦᵀPᵤ⁻¹ = reshape(AΦᵀPᵤ⁻¹,RBVars.nₛᵘ,RBVars.Nₛᵘ,:)
-    return
   else
     if !RBInfo.probl_nl["A"]
       println("S-PGRB: failed to build AΦᵀPᵤ⁻¹; have to assemble affine stiffness")
@@ -76,7 +75,7 @@ function assemble_affine_matrices(
     RBVars.Qᵃ = 1
     println("Assembling affine reduced stiffness")
     println("SPGRB: affine component number 1, matrix A")
-    A = load_CSV(sparse([],[],T[]), joinpath(RBInfo.Paths.FEM_structures_path, "A.csv"))
+    A = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "A.csv"))
     RBVars.Aₙ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ, 1)
     RBVars.Aₙ[:,:,1] = (RBVars.Φₛᵘ)' * A * RBVars.Φₛᵘ
     RBVars.AΦᵀPᵤ⁻¹ = zeros(T, RBVars.nₛᵘ, RBVars.Nₛᵘ, 1)
@@ -149,14 +148,14 @@ function assemble_affine_vectors(
   if var == "F"
     RBVars.Qᶠ = 1
     println("Assembling affine reduced forcing term")
-    F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.FEM_structures_path, "F.csv"))
+    F = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "F.csv"))
     Fₙ = zeros(T,RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qᶠ)
     matrix_product_vec!(Fₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(F,:,1))
     RBVars.Fₙ = reshape(Fₙ,:,RBVars.Qᵃ*RBVars.Qᶠ)
   elseif var == "H"
     RBVars.Qʰ = 1
     println("Assembling affine reduced Neumann term")
-    H = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.FEM_structures_path, "H.csv"))
+    H = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "H.csv"))
     Hₙ = zeros(T,RBVars.nₛᵘ, 1, RBVars.Qᵃ*RBVars.Qʰ)
     matrix_product_vec!(Hₙ, RBVars.AΦᵀPᵤ⁻¹, reshape(H,:,1))
     RBVars.Hₙ = reshape(Hₙ,:,RBVars.Qᵃ*RBVars.Qʰ)

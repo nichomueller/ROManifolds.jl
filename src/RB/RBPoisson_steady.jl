@@ -8,7 +8,7 @@ function get_snapshot_matrix(
 
   println("Importing the snapshot matrix for field u,
     number of snapshots considered: $(RBInfo.nₛ)")
-  Sᵘ = Matrix{T}(CSV.read(joinpath(RBInfo.Paths.FEM_snap_path, "uₕ.csv"),
+  Sᵘ = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
     DataFrame))[:, 1:RBInfo.nₛ]
   println("Dimension of snapshot matrix: $(size(Sᵘ))")
   RBVars.Sᵘ = Sᵘ
@@ -21,7 +21,7 @@ function get_norm_matrix(
 
   if check_norm_matrix(RBVars)
     println("Importing the norm matrix Xᵘ₀")
-    Xᵘ₀ = load_CSV(sparse([],[],T[]), joinpath(RBInfo.Paths.FEM_structures_path, "Xᵘ₀.csv"))
+    Xᵘ₀ = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "Xᵘ₀.csv"))
     RBVars.Nₛᵘ = size(Xᵘ₀)[1]
     println("Dimension of norm matrix, field u: $(size(Xᵘ₀))")
     if RBInfo.use_norm_X
@@ -57,7 +57,7 @@ function build_reduced_basis(
   end
 
   if RBInfo.save_offline_structures
-    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.Paths.basis_path,"Φₛᵘ.csv"))
+    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.Paths.ROM_structures_path,"Φₛᵘ.csv"))
   end
 
   return
@@ -70,7 +70,7 @@ function import_reduced_basis(
 
   println("Importing the spatial reduced basis for field u")
   RBVars.Φₛᵘ = load_CSV(Matrix{T}(undef,0,0),
-    joinpath(RBInfo.Paths.basis_path, "Φₛᵘ.csv"))
+    joinpath(RBInfo.Paths.ROM_structures_path, "Φₛᵘ.csv"))
   (RBVars.Nₛᵘ, RBVars.nₛᵘ) = size(RBVars.Φₛᵘ)
 
 end
@@ -87,7 +87,7 @@ function get_generalized_coordinates(
   Φₛᵘ_normed = RBVars.Xᵘ₀*RBVars.Φₛᵘ
   RBVars.û = RBVars.Sᵘ[:,snaps]*Φₛᵘ_normed
   if RBInfo.save_offline_structures
-    save_CSV(RBVars.û, joinpath(RBInfo.Paths.gen_coords_path, "û.csv"))
+    save_CSV(RBVars.û, joinpath(RBInfo.Paths.ROM_structures_path, "û.csv"))
   end
 
 end
@@ -184,7 +184,6 @@ function get_M_DEIM_structures(
         "row_idx_A.csv"))
       RBVars.sparse_el_A = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.Paths.ROM_structures_path,
         "sparse_el_A.csv"))
-      append!(operators, [])
     else
       println("Failed to import MDEIM offline structures,
         A: must build them")
@@ -194,8 +193,9 @@ function get_M_DEIM_structures(
   end
 
   if RBInfo.build_parametric_RHS
+
     println("Will assemble nonaffine reduced RHS exactly")
-    return operators
+
   else
 
     if RBInfo.probl_nl["f"]
@@ -208,7 +208,6 @@ function get_M_DEIM_structures(
           "DEIM_idx_F.csv"))
         RBVars.sparse_el_F = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.Paths.ROM_structures_path,
           "sparse_el_F.csv"))
-        append!(operators, [])
       else
         println("Failed to import DEIM offline structures, F: must build them")
         append!(operators, ["F"])
@@ -226,8 +225,6 @@ function get_M_DEIM_structures(
           "DEIM_idx_H.csv"))
         RBVars.sparse_el_H = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.Paths.ROM_structures_path,
           "sparse_el_H.csv"))
-        append!(operators, [])
-        return
       else
         println("Failed to import DEIM offline structures, H: must build them")
         append!(operators, ["H"])
@@ -555,8 +552,8 @@ function online_phase(
   Param_nbs) where T
 
   μ = load_CSV(Array{T}[],
-    joinpath(RBInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{T}}
-  model = DiscreteModelFromFile(RBInfo.Paths.mesh_path)
+    joinpath(get_FEM_snap_path(RBInfo), "μ.csv"))::Vector{Vector{T}}
+  model = DiscreteModelFromFile(get_mesh_path(RBInfo))
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id,RBInfo.FEMInfo,model)
 
   mean_H1_err = 0.0
@@ -574,7 +571,7 @@ function online_phase(
 
     Param = get_ParamInfo(RBInfo, μ[nb])
 
-    uₕ_test = Matrix{T}(CSV.read(joinpath(RBInfo.Paths.FEM_snap_path, "uₕ.csv"), DataFrame))[:, nb]
+    uₕ_test = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"), DataFrame))[:, nb]
 
     solve_RB_system(FEMSpace, RBInfo, RBVars, Param)
     reconstruction_time = @elapsed begin
