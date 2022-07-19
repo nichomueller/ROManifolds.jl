@@ -439,6 +439,7 @@ function get_θᵃ(
     end
   end
 
+  save_CSV(θᵃ, joinpath(RBInfo.Paths.ROM_structures_path, "θᵃ.csv"))
   θᵃ::Matrix{T}
 
 end

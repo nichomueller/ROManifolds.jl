@@ -202,8 +202,9 @@ function get_M_DEIM_structures(
   end
 
   if RBInfo.build_parametric_RHS
+
     println("Will assemble nonaffine reduced RHS exactly")
-    return operators
+
   else
 
     if RBInfo.probl_nl["f"]
