@@ -47,7 +47,7 @@ function assemble_affine_matrices(
   if var == "B"
     println("Assembling affine reduced B")
     B = load_CSV(sparse([],[],T[]),
-      joinpath(RBInfo.Paths.FEM_structures_path, "B.csv"))
+      joinpath(get_FEM_structures_path(RBInfo), "B.csv"))
     RBVars.Bₙ = reshape((RBVars.Φₛᵖ)'*B*RBVars.Φₛᵘ,RBVars.nₛᵖ,RBVars.nₛᵘ,1)
   else
     assemble_affine_matrices(RBInfo, RBVars, var)

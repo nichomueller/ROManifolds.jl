@@ -277,12 +277,8 @@ function Base.setproperty!(RBVars::StokesSTGRB, sym::Symbol, x::T) where T
 end
 
 struct RBPathInfo <: Info
-  mesh_path::String
-  FEM_snap_path::String
-  FEM_structures_path::String
-  basis_path::String
+  FEMPaths::FEMPathInfo
   ROM_structures_path::String
-  gen_coords_path::String
   results_path::String
 end
 

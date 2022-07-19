@@ -31,7 +31,7 @@ function assemble_affine_matrices(
   if var == "M"
     RBVars.Qᵐ = 1
     println("Assembling affine reduced mass")
-    M = load_CSV(sparse([],[],T[]), joinpath(RBInfo.Paths.FEM_structures_path, "M.csv"))
+    M = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "M.csv"))
     RBVars.Mₙ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ, 1)
     RBVars.Mₙ[:,:,1] = (RBVars.Φₛᵘ)' * M * RBVars.Φₛᵘ
   else
@@ -101,8 +101,8 @@ end
 
 function assemble_offline_structures(
   RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonSTGRB{T},
-  operators=nothing) where T
+  RBVars::PoissonSTGRB,
+  operators=nothing)
 
   if isnothing(operators)
     operators = set_operators(RBInfo, RBVars)
@@ -152,7 +152,7 @@ function save_affine_structures(
   RBVars::PoissonSTGRB{T}) where T
 
   if RBInfo.save_offline_structures
-    save_CSV(reshape(RBVars.Mₙ, :, RBVars.Qᵐ),
+    save_CSV(reshape(RBVars.Mₙ, :, RBVars.Qᵐ)::Matrix{T},
       joinpath(RBInfo.Paths.ROM_structures_path, "Mₙ.csv"))
     save_affine_structures(RBInfo, RBVars.S)
   end

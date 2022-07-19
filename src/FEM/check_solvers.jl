@@ -7,8 +7,8 @@ function check_dataset(
   get_snapshot_matrix(RBInfo, RBVars)
 
   μ = load_CSV(Array{T}[],
-    joinpath(RBInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{T}}
-  model = DiscreteModelFromFile(RBInfo.Paths.mesh_path)
+    joinpath(get_FEM_snap_path(RBInfo), "μ.csv"))::Vector{Vector{T}}
+  model = DiscreteModelFromFile(get_mesh_path(RBInfo))
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id,RBInfo.FEMInfo,model)
   Param = get_ParamInfo(RBInfo, μ[nb])
 
@@ -78,15 +78,15 @@ end
 
 function check_dataset(RBInfo, RBVars, i)
 
-  μ = load_CSV(Array{Float}[], joinpath(RBInfo.Paths.FEM_snap_path, "μ.csv"))
+  μ = load_CSV(Array{Float}[], joinpath(get_FEM_snap_path(RBInfo), "μ.csv"))
   Param = get_ParamInfo(RBInfo, μ[i])
 
   u1 = RBVars.Sᵘ[:, (i-1)*RBVars.Nₜ+1]
   u2 = RBVars.Sᵘ[:, (i-1)*RBVars.Nₜ+2]
-  M = load_CSV(sparse([],[],T[]), joinpath(RBInfo.Paths.FEM_structures_path, "M.csv"))
-  A = load_CSV(sparse([],[],T[]), joinpath(RBInfo.Paths.FEM_structures_path, "A.csv"))
-  F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.FEM_structures_path, "F.csv"))
-  H = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.FEM_structures_path, "H.csv"))
+  M = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "M.csv"))
+  A = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "A.csv"))
+  F = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "F.csv"))
+  H = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "H.csv"))
 
   t¹_θ = RBInfo.t₀+RBInfo.δt*RBInfo.θ
   t²_θ = t¹_θ+RBInfo.δt

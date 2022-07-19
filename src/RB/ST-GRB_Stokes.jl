@@ -56,7 +56,7 @@ function assemble_affine_matrices(
   if var == "B"
     println("Assembling affine primal operator B")
     B = load_CSV(sparse([],[],T[]),
-      joinpath(RBInfo.Paths.FEM_structures_path, "B.csv"))
+      joinpath(get_FEM_structures_path(RBInfo), "B.csv"))
     RBVars.Bₙ = zeros(T, RBVars.nₛᵖ, RBVars.nₛᵘ, 1)
     RBVars.Bₙ[:,:,1] = (RBVars.Φₛᵖ)' * B * RBVars.Φₛᵘ
   else

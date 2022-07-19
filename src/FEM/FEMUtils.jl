@@ -21,7 +21,7 @@ function FEM_paths(root, problem_steadiness, problem_name, mesh_name, case)
   FEM_structures_path = joinpath(FEM_path, "FEM_structures")
   create_dir(FEM_structures_path)
 
-  FEMPathInfo(mesh_path, current_test,FEM_snap_path, FEM_structures_path)
+  FEMPathInfo(mesh_path, current_test, FEM_snap_path, FEM_structures_path)
 
 end
 

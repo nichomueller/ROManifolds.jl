@@ -23,7 +23,7 @@ function assemble_affine_matrices(
   if var == "A"
     RBVars.Qᵃ = 1
     println("Assembling affine reduced stiffness")
-    A = load_CSV(sparse([],[],T[]), joinpath(RBInfo.Paths.FEM_structures_path, "A.csv"))
+    A = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "A.csv"))
     RBVars.Aₙ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ, 1)
     RBVars.Aₙ[:,:,1] = (RBVars.Φₛᵘ)' * A * RBVars.Φₛᵘ
   else
@@ -80,12 +80,12 @@ function assemble_affine_vectors(
   if var == "F"
     RBVars.Qᶠ = 1
     println("Assembling affine reduced forcing term")
-    F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.FEM_structures_path, "F.csv"))
+    F = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "F.csv"))
     RBVars.Fₙ = (RBVars.Φₛᵘ)' * F
   elseif var == "H"
     RBVars.Qʰ = 1
     println("Assembling affine reduced Neumann term")
-    H = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.FEM_structures_path, "H.csv"))
+    H = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "H.csv"))
     RBVars.Hₙ = (RBVars.Φₛᵘ)' * H
   else
     error("Unrecognized variable to load")
@@ -95,11 +95,11 @@ end
 
 function save_affine_structures(
   RBInfo::Info,
-  RBVars::PoissonSGRB)
+  RBVars::PoissonSGRB{T}) where T
 
   if RBInfo.save_offline_structures
-    Aₙ = reshape(RBVars.Aₙ, :, RBVars.Qᵃ)
-    save_CSV(Aₙ, joinpath(RBInfo.Paths.ROM_structures_path, "Aₙ.csv"))
+    save_CSV(reshape(RBVars.Aₙ, :, RBVars.Qᵃ)::Matrix{T},
+      joinpath(RBInfo.Paths.ROM_structures_path, "Aₙ.csv"))
     if !RBInfo.build_parametric_RHS
       save_CSV(RBVars.Fₙ, joinpath(RBInfo.Paths.ROM_structures_path, "Fₙ.csv"))
       save_CSV(RBVars.Hₙ, joinpath(RBInfo.Paths.ROM_structures_path, "Hₙ.csv"))
@@ -128,17 +128,53 @@ function get_Q(
 
 end
 
+function get_RB_system(
+  FEMSpace::SteadyProblem,
+  RBInfo::ROMInfoSteady,
+  RBVars::PoissonSGRB,
+  Param::ParametricInfoSteady)
+
+  initialize_RB_system(RBVars)
+  initialize_online_time(RBVars)
+
+  RBVars.online_time = @elapsed begin
+    get_Q(RBInfo, RBVars)
+    blocks = [1]
+    operators = get_system_blocks(RBInfo, RBVars, blocks, blocks)
+
+    θᵃ, θᶠ, θʰ = get_θ(FEMSpace, RBInfo, RBVars, Param)
+
+    if "LHS" ∈ operators
+      get_RB_LHS_blocks(RBVars, θᵃ)
+    end
+
+    if "RHS" ∈ operators
+      if !RBInfo.build_parametric_RHS
+        get_RB_RHS_blocks(RBVars, θᶠ, θʰ)
+      else
+        build_param_RHS(FEMSpace, RBInfo, RBVars, Param)
+      end
+    end
+  end
+
+  save_system_blocks(RBInfo,RBVars,blocks,blocks,operators)
+
+end
+
 function build_param_RHS(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::PoissonSGRB,
-  Param::ParametricInfoSteady,
-  ::Array)
+  Param::ParametricInfoSteady)
+
+  println("Assembling reduced RHS exactly")
 
   F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
   H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
-  (reshape((RBVars.Φₛᵘ)'*F,:,1)::Matrix{T},
-    reshape((RBVars.Φₛᵘ)'*H,:,1)::Matrix{T})
+  Fₙ = RBVars.Φₛᵘ'*(F*RBVars.Φₜᵘ)
+  Hₙ = RBVars.Φₛᵘ'*(H*RBVars.Φₜᵘ)
+
+  push!(RBVars.RHSₙ, reshape(Fₙ'+Hₙ',:,1))::Vector{Matrix{T}}
 
 end
 

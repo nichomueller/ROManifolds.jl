@@ -1,23 +1,26 @@
-function ROM_paths(root, problem_steadiness, problem_name, mesh_name, RB_method, case)
+function ROM_paths(FEMPaths, RB_method)
 
-  paths = FEM_paths(root, problem_steadiness, problem_name, mesh_name, case)
-  mesh_path = paths.mesh_path
-  FEM_snap_path = paths.FEM_snap_path
-  FEM_structures_path = paths.FEM_structures_path
-  ROM_path = joinpath(paths.current_test, RB_method)
+  ROM_path = joinpath(FEMPaths.current_test, RB_method)
   create_dir(ROM_path)
-  basis_path = joinpath(ROM_path, "basis")
-  create_dir(basis_path)
   ROM_structures_path = joinpath(ROM_path, "ROM_structures")
   create_dir(ROM_structures_path)
-  gen_coords_path = joinpath(ROM_path, "gen_coords")
-  create_dir(gen_coords_path)
   results_path = joinpath(ROM_path, "results")
   create_dir(results_path)
 
-  RBPathInfo(mesh_path, FEM_snap_path, FEM_structures_path, basis_path,
-    ROM_structures_path, gen_coords_path, results_path)
+  RBPathInfo(FEMPaths, ROM_structures_path, results_path)
 
+end
+
+function get_mesh_path(RBInfo::Info)
+  RBInfo.Paths.FEMPaths.mesh_path
+end
+
+function get_FEM_snap_path(RBInfo::Info)
+  RBInfo.Paths.FEMPaths.FEM_snap_path
+end
+
+function get_FEM_structures_path(RBInfo::Info)
+  RBInfo.Paths.FEMPaths.FEM_structures_path
 end
 
 function select_RB_method(
