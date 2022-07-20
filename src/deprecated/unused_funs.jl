@@ -1,16 +1,16 @@
 function plot_θ_comparison(timesθ, θ, θ_approx)
 
-  θ1_plt = hcat(θ[1,:], θ_approx[1,:])
-  traces1 = [scatter(x=timesθ,y=θ1_plt[:,i]) for i=1:2]
-  p1 = plot(traces1)
-  display(p1)
+  layout = Layout(title=attr(text="ε = 10⁻⁵",x=0.035,y=0.975,font_size=30),
+    xaxis_title="time [s]", legend=attr(x=0.375,y=1.05,yanchor="top",orientation="h"))
 
-
-  #layout = Layout(title=title,xaxis_title=xlab,yaxis_title=ylab)
-  θ2_plt = hcat(θ[2,:], θ_approx[2,:])
-  traces2 = [scatter(x=timesθ,y=θ2_plt[:,i]) for i=1:2]
-  p2 = plot(traces2)
-  display(p2)
+  θ_plt = hcat(θ, θ_approx)
+  sel_colors = ["black","blue"]
+  sel_dashes = ["","dash"]
+  names = ["θᵃ", "θᵃ approx"]
+  traces = [scatter(x=timesθ,y=θ_plt[:,i],name=names[i],
+    line=attr(width=4,color=sel_colors[i],dash=sel_dashes[i])) for i=1:size(θ_plt)[2]]
+  p = plot(traces,layout)
+  savefig(p, joinpath("/home/user1/git_repos/NicholasPhD/Mabla_results/cube20x20x20.json/plots/θᵃ5.eps"))
 
 end
 
