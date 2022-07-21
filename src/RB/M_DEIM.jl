@@ -15,14 +15,14 @@ function M_DEIM_POD(S::Matrix{T}, ϵ=1e-5) where T
   err = max(sqrt(1-energies[N]/energies[end]),M_DEIM_err_bound[N])::Float
   println("Basis number obtained via POD is $N, projection error ≤ $err")
 
-  T.(M_DEIM_mat[:, 1:N]), T.(Σ)
+  T.(M_DEIM_mat[:, 1:N])
 
 end
 
 
-function M_DEIM_offline(M_DEIM_mat::Matrix, Σ::Vector)
+function M_DEIM_offline(M_DEIM_mat::Matrix)
 
-  (N, n) = size(M_DEIM_mat)
+  n = size(M_DEIM_mat)[2]
   M_DEIM_idx = Int[]
   append!(M_DEIM_idx, Int(argmax(abs.(M_DEIM_mat[:, 1]))))
   @simd for m = 2:n
@@ -36,10 +36,8 @@ function M_DEIM_offline(M_DEIM_mat::Matrix, Σ::Vector)
     end
   end
   unique!(M_DEIM_idx)
-  M_DEIM_err_bound = (Σ[min(n + 1, length(Σ))] *
-                      norm(M_DEIM_mat[M_DEIM_idx, 1:n]' \ I(n)))
 
-  M_DEIM_mat[:, 1:n], M_DEIM_idx, M_DEIM_err_bound
+  M_DEIM_mat[:, 1:n], M_DEIM_idx
 
 end
 
@@ -51,8 +49,8 @@ function MDEIM_offline(RBInfo::ROMInfoSteady{T}, var::String) where T
   model = DiscreteModelFromFile(get_mesh_path(RBInfo))
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
 
-  MDEIM_mat, Σ, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, μ, var)
-  MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat, Σ)
+  MDEIM_mat, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, μ, var)
+  MDEIM_mat, MDEIM_idx = M_DEIM_offline(MDEIM_mat)
   MDEIMᵢ_mat = MDEIM_mat[MDEIM_idx, :]
   MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx, row_idx, FEMSpace.Nₛᵘ)
   MDEIM_idx_sparse_space, _ = from_vec_to_mat_idx(MDEIM_idx_sparse, FEMSpace.Nₛᵘ)
@@ -70,15 +68,15 @@ function MDEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
   model = DiscreteModelFromFile(get_mesh_path(RBInfo))
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
 
-  MDEIM_mat, MDEIM_mat_time, Σ, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, μ, var)
+  MDEIM_mat, MDEIM_mat_time, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, μ, var)
 
-  MDEIM_mat, MDEIM_idx, MDEIM_err_bound = M_DEIM_offline(MDEIM_mat, Σ)
+  MDEIM_mat, MDEIM_idx = M_DEIM_offline(MDEIM_mat)
   MDEIMᵢ_mat = MDEIM_mat[MDEIM_idx, :]
   MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx, row_idx, FEMSpace.Nₛᵘ)
   MDEIM_idx_sparse_space, _ = from_vec_to_mat_idx(MDEIM_idx_sparse, FEMSpace.Nₛᵘ)
   el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(MDEIM_idx_sparse_space))
 
-  _, MDEIM_idx_time, _ = M_DEIM_offline(MDEIM_mat_time, Σ)
+  _, MDEIM_idx_time, _ = M_DEIM_offline(MDEIM_mat_time)
   unique!(sort!(MDEIM_idx_time))
 
   MDEIM_mat, MDEIM_idx_sparse, MDEIMᵢ_mat, row_idx, el, MDEIM_idx_time
@@ -93,8 +91,8 @@ function DEIM_offline(RBInfo::ROMInfoSteady{T}, var::String) where T
   model = DiscreteModelFromFile(get_mesh_path(RBInfo))
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
 
-  DEIM_mat, Σ = get_snaps_DEIM(FEMSpace, RBInfo, μ, var)
-  DEIM_mat, DEIM_idx, DEIM_err_bound = M_DEIM_offline(DEIM_mat, Σ)
+  DEIM_mat = get_snaps_DEIM(FEMSpace, RBInfo, μ, var)
+  DEIM_mat, DEIM_idx = M_DEIM_offline(DEIM_mat)
   DEIMᵢ_mat = DEIM_mat[DEIM_idx, :]
   if var == "H"
     el = find_FE_elements(FEMSpace.V₀, FEMSpace.Γn, unique(DEIM_idx))
@@ -114,9 +112,9 @@ function DEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
   model = DiscreteModelFromFile(get_mesh_path(RBInfo))
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
 
-  DEIM_mat, DEIM_mat_time, Σ = get_snaps_DEIM(FEMSpace, RBInfo, μ, var)
+  DEIM_mat, DEIM_mat_time = get_snaps_DEIM(FEMSpace, RBInfo, μ, var)
 
-  DEIM_mat, DEIM_idx, DEIM_err_bound = M_DEIM_offline(DEIM_mat, Σ)
+  DEIM_mat, DEIM_idx = M_DEIM_offline(DEIM_mat)
   DEIMᵢ_mat = DEIM_mat[DEIM_idx, :]
   if var == "H"
     el = find_FE_elements(FEMSpace.V₀, FEMSpace.Γn, unique(DEIM_idx))
@@ -124,7 +122,7 @@ function DEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
     el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(DEIM_idx))
   end
 
-  _, DEIM_idx_time, _ = M_DEIM_offline(DEIM_mat_time, Σ)
+  _, DEIM_idx_time, _ = M_DEIM_offline(DEIM_mat_time)
   unique!(sort!(DEIM_idx_time))
 
   DEIM_mat, DEIM_idx, DEIMᵢ_mat, el, DEIM_idx_time

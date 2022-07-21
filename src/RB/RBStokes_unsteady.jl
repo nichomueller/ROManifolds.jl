@@ -28,7 +28,7 @@ function PODs_space(
 
   println("Performing the spatial POD for field p, using a tolerance of $(RBInfo.ϵₛ)")
   get_norm_matrix(RBInfo, RBVars.S)
-  RBVars.Φₛᵖ, _ = POD(RBVars.Sᵖ, RBInfo.ϵₛ, RBVars.Xᵖ₀)
+  RBVars.Φₛᵖ = POD(RBVars.Sᵖ, RBInfo.ϵₛ, RBVars.Xᵖ₀)
   (RBVars.Nₛᵖ, RBVars.nₛᵖ) = size(RBVars.Φₛᵖ)
 
 end
@@ -68,7 +68,7 @@ function PODs_time(
     end
   end
 
-  Φₜᵖ, _ = POD(Sᵖₜ, RBInfo.ϵₜ)
+  Φₜᵖ = POD(Sᵖₜ, RBInfo.ϵₜ)
   RBVars.Φₜᵖ = Φₜᵖ
   RBVars.nₜᵖ = size(Φₜᵖ)[2]
 

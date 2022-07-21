@@ -44,7 +44,7 @@ function PODs_time(
     end
   end
 
-  Φₜᵘ, _ = POD(Sᵘₜ, RBInfo.ϵₜ)
+  Φₜᵘ = POD(Sᵘₜ, RBInfo.ϵₜ)
   RBVars.Φₜᵘ = Φₜᵘ
   RBVars.nₜᵘ = size(Φₜᵘ)[2]
 
