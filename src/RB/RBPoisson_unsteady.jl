@@ -29,20 +29,11 @@ function PODs_time(
   println("Performing the temporal POD for field u, using a tolerance of $(RBInfo.ϵₜ)")
 
   if RBInfo.time_reduction_technique == "ST-HOSVD"
-    Sᵘₜ = zeros(T, RBVars.Nₜ, RBVars.nₛᵘ * RBInfo.nₛ)
     Sᵘ = RBVars.Φₛᵘ' * RBVars.Sᵘ
-    @simd for i in 1:RBInfo.nₛ
-      Sᵘₜ[:,(i-1)*RBVars.nₛᵘ+1:i*RBVars.nₛᵘ] =
-      Sᵘ[:,(i-1)*RBVars.Nₜ+1:i*RBVars.Nₜ]'
-    end
   else
-    Sᵘₜ = zeros(T, RBVars.Nₜ, RBVars.Nₛᵘ * RBInfo.nₛ)
     Sᵘ = RBVars.Sᵘ
-    @simd for i in 1:RBInfo.nₛ
-      Sᵘₜ[:, (i-1)*RBVars.Nₛᵘ+1:i*RBVars.Nₛᵘ] =
-      transpose(Sᵘ[:, (i-1)*RBVars.Nₜ+1:i*RBVars.Nₜ])
-    end
   end
+  Sᵘₜ = mode₂_unfolding(Sᵘ, RBVars.nₛ)
 
   Φₜᵘ = POD(Sᵘₜ, RBInfo.ϵₜ)
   RBVars.Φₜᵘ = Φₜᵘ

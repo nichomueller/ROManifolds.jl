@@ -53,20 +53,11 @@ function PODs_time(
   println("Performing the temporal POD for field p, using a tolerance of $(RBInfo.ϵₜ)")
 
   if RBInfo.time_reduction_technique == "ST-HOSVD"
-    Sᵖₜ = zeros(T, RBVars.Nₜ, RBVars.nₛᵖ * RBInfo.nₛ)
     Sᵖ = RBVars.Φₛᵖ' * RBVars.Sᵖ
-    @simd for i in 1:RBInfo.nₛ
-      Sᵖₜ[:, (i-1)*RBVars.nₛᵖ+1:i*RBVars.nₛᵖ] =
-      Sᵖ[:, (i-1)*RBVars.Nₜ+1:i*RBVars.Nₜ]'
-    end
   else
-    Sᵖₜ = zeros(T, RBVars.Nₜ, RBVars.Nₛᵖ * RBInfo.nₛ)
     Sᵖ = RBVars.Sᵖ
-    @simd for i in 1:RBInfo.nₛ
-      Sᵖₜ[:, (i-1)*RBVars.Nₛᵖ+1:i*RBVars.Nₛᵖ] =
-      transpose(Sᵖ[:, (i-1)*RBVars.Nₜ+1:i*RBVars.Nₜ])
-    end
   end
+  Sᵖₜ = mode₂_unfolding(Sᵖ, RBVars.nₛ)
 
   Φₜᵖ = POD(Sᵖₜ, RBInfo.ϵₜ)
   RBVars.Φₜᵖ = Φₜᵖ

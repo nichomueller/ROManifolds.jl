@@ -138,6 +138,16 @@ function POD(S::SparseMatrixCSC, ϵ::Float) where T
 
 end
 
+function mode₂_unfolding(Mat₁::Matrix{T}, nₛ::Int) where T
+  Nₛ, Nₜnₛ = size(Mat₁)
+  Nₜ = Int(Nₜnₛ/nₛ)
+  Mat₂ = zeros(T, Nₜ, Nₛ*nₛ)
+  @simd for i in 1:nₛ
+    Mat₂[:, (i-1)*Nₛ+1:i*Nₛ] = Mat₁[:, (i-1)*Nₜ+1:i*Nₜ]'
+  end
+  Mat₂
+end
+
 function get_NTuple(N::Int, T::DataType)
 
   ntupl = ()

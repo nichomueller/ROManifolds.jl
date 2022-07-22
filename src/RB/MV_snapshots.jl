@@ -80,20 +80,21 @@ function standard_MDEIM(
   timesθ::Vector,
   var="A") where T
 
-  (snaps_space, snaps_time, row_idx) =
-    (Matrix{T}(undef,0,0), Matrix{T}(undef,0,0), Int[])
+  Nₜ = length(timesθ)
+
+  snaps_space = zeros(T, FEMSpace.Nₛᵘ^2, Nₜ*RBInfo.nₛ_MDEIM)
+  snaps_time = zeros(T, FEMSpace.Nₛᵘ^2*RBInfo.nₛ_MDEIM, Nₜ)
+  row_idx = Int[]
+
   @simd for k = 1:RBInfo.nₛ_MDEIM
     println("Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)")
     snapsₖ, row_idx = build_matrix_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
-    snapsₖ_space, snapsₖ_time = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
-    if k == 1
-      snaps_space = snapsₖ_space
-      snaps_time = snapsₖ_time
-    else
-      snaps_space, _ = M_DEIM_POD(hcat(snaps_space, snapsₖ_space), RBInfo.ϵₛ)
-      snaps_time, _ = M_DEIM_POD(hcat(snaps_time, snapsₖ_time), RBInfo.ϵₜ)
-    end
+    snaps_space[:,(k-1)*Nₜ+1:k*Nₜ] = snapsₖ
+    snaps_time[(k-1)*FEMSpace.Nₛᵘ^2+1:k*FEMSpace.Nₛᵘ^2,:] = snapsₖ'
   end
+
+  snaps_space, _ = M_DEIM_POD(snaps_time, RBInfo.ϵₛ)
+  _, snaps_time = M_DEIM_POD(snaps_time, RBInfo.ϵₜ)
 
   return snaps_space, snaps_time, row_idx
 
@@ -107,42 +108,40 @@ function functional_MDEIM(
   var="A") where T
 
   ncells,nquad_cell = get_LagrangianQuad_info(FEMSpace)
+  Nq, Nₜ = ncells*nquad_cell, length(timesθ)
+  Θmat = zeros(T, Nq, Nₜ*RBInfo.nₛ_MDEIM)
+  Θmat_time = zeros(T, Nq*RBInfo.nₛ_MDEIM, Nₜ)
 
-  Θmat, Θmat_time = Matrix{Float}(undef,0,0), Matrix{Float}(undef,0,0)
   @simd for k = 1:RBInfo.nₛ_MDEIM
     println("Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)")
     Param = get_ParamInfo(RBInfo, μ[k])
     Θₖ = build_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
       timesθ,var)
-    Θₖ, Θₖ_time = M_DEIM_POD(Θₖ, RBInfo.ϵₛ)
-    if k == 1
-      Θmat = Θₖ
-      Θmat_time = Θₖ_time
-    else
-      Θmat = hcat(Θmat, Θₖ)
-      Θmat_time = hcat(Θmat_time, Θₖ_time)
-    end
+    Θmat[:,(k-1)*Nₜ+1:k*Nₜ] = Θₖ
+    Θmat_time[(k-1)*Nq+1:k*Nq,:] = Θₖ'
   end
 
+  # space
   Θmat, _ = M_DEIM_POD(Θmat,RBInfo.ϵₛ)
-
   Mat_Θ = assemble_parametric_FE_matrix(FEMSpace,var)
   Q = size(Θmat)[2]
   snaps,row_idx = Matrix{T}(undef,0,0),Int[]
 
-  for q = 1:min(Q, Q_time)::Int
+  for q = 1:Q
     Θq = FEFunction(FEMSpace.V₀_quad,Θmat[:,q])
     Matq = T.(Mat_Θ(Θq))::SparseMatrixCSC{T,Int}
     i,v = findnz(Matq[:])::Tuple{Vector{Int},Vector{T}}
     if q == 1
       row_idx = i
       snaps = zeros(T,length(row_idx),Q)
-      snaps_time = zeros(T,length(row_idx),Q_time)
     end
     snaps[:,q] = v
   end
+
   snaps_space, _ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
-  snaps_time, _ = M_DEIM_POD(Θmat_time,RBInfo.ϵₜ)
+
+  #time
+  _, snaps_time = M_DEIM_POD(Θmat_time,RBInfo.ϵₜ)
 
   return snaps_space, snaps_time, row_idx
 
@@ -157,9 +156,9 @@ function get_snaps_MDEIM(
   timesθ = get_timesθ(RBInfo)
 
   if RBInfo.functional_M_DEIM
-    return functional_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}, Vector{T}, Vector{Int}}
+    return functional_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}, Vector{Int}}
   else
-    return standard_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}, Vector{T}, Vector{Int}}
+    return standard_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}, Vector{Int}}
   end
 
 end
@@ -221,63 +220,63 @@ function standard_DEIM(
   timesθ::Vector,
   var="F") where T
 
-  snaps_space, snaps_time = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
-  for k = 1:RBInfo.nₛ_DEIM
+  Nₜ = length(timesθ)
+
+  snaps_space = zeros(T, FEMSpace.Nₛᵘ, Nₜ*RBInfo.nₛ_MDEIM)
+  snaps_time = zeros(T, FEMSpace.Nₛᵘ*RBInfo.nₛ_MDEIM, Nₜ)
+
+  @simd for k = 1:RBInfo.nₛ_MDEIM
     println("Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)")
     snapsₖ = build_vector_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
-    snapsₖ_space, snapsₖ_time = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
-    if k == 1
-      snaps_space = snapsₖ_space
-      snaps_time = snapsₖ_time
-    else
-      snaps_space, _ = M_DEIM_POD(hcat(snaps_space,snapsₖ_space), RBInfo.ϵₛ)
-      snaps_time, _ = M_DEIM_POD(hcat(snaps_time,snapsₖ_time), RBInfo.ϵₜ)
-    end
+    snaps_space[:,(k-1)*Nₜ+1:k*Nₜ] = snapsₖ
+    snaps_time[(k-1)*FEMSpace.Nₛᵘ+1:k*FEMSpace.Nₛᵘ,:] = snapsₖ'
   end
+
+  snaps_space, _ = M_DEIM_POD(snaps_time, RBInfo.ϵₛ)
+  _, snaps_time = M_DEIM_POD(snaps_time, RBInfo.ϵₜ)
 
   return snaps_space, snaps_time
 
 end
 
-function functional_DEIM(
+function functional_MDEIM(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady{T},
   μ::Vector{Vector{T}},
   timesθ::Vector,
-  var="F") where T
+  var="A") where T
 
   ncells,nquad_cell = get_LagrangianQuad_info(FEMSpace)
+  Nq, Nₜ = ncells*nquad_cell, length(timesθ)
+  Θmat = zeros(T, Nq, Nₜ*RBInfo.nₛ_MDEIM)
+  Θmat_time = zeros(T, Nq*RBInfo.nₛ_MDEIM, Nₜ)
 
-  Θmat, Θmat_time = Matrix{Float}(undef,0,0), Matrix{Float}(undef,0,0)
   @simd for k = 1:RBInfo.nₛ_MDEIM
     println("Considering Parameter number $k/$(RBInfo.nₛ_MDEIM)")
     Param = get_ParamInfo(RBInfo, μ[k])
     Θₖ = build_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
       timesθ,var)
-    Θₖ, Θₖ_time = M_DEIM_POD(Θₖ, RBInfo.ϵₛ)
-    if k == 1
-      Θmat = Θₖ
-      Θmat_time = Θₖ_time
-    else
-      Θmat = hcat(Θmat, Θₖ)
-      Θmat_time = hcat(Θmat_time, Θₖ_time)
-    end
+    Θmat[:,(k-1)*Nₜ+1:k*Nₜ] = Θₖ
+    Θmat_time[(k-1)*Nq+1:k*Nq,:] = Θₖ'
   end
 
+  # space
   Θmat, _ = M_DEIM_POD(Θmat,RBInfo.ϵₛ)
-
   Vec_Θ = assemble_parametric_FE_vector(FEMSpace,var)
   Q = size(Θmat)[2]
   snaps = Matrix{T}(undef,0,0)
 
   for q = 1:Q
-    Θq = FEFunction(FEMSpace.V₀_quad,Θmat[:,q])
+    Θq = FEFunction(FEMSpace.V₀_quad, Θmat[:,q])
     snaps[:,q] = T.(Vec_Θ(Θq))
   end
-  snaps_space, _ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
-  snaps_time, _ = M_DEIM_POD(Θmat_time, RBInfo.ϵₜ)
 
-  return snaps_space, snaps_time
+  snaps_space, _ = M_DEIM_POD(snaps,RBInfo.ϵₛ)
+
+  #time
+  _, snaps_time = M_DEIM_POD(Θmat_time,RBInfo.ϵₜ)
+
+  return snaps_space, snaps_time, row_idx
 
 end
 
@@ -289,7 +288,7 @@ function get_snaps_DEIM(
 
   timesθ = get_timesθ(RBInfo)
 
-  standard_DEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}, Vector{T}}
+  standard_DEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}}
 
 end
 

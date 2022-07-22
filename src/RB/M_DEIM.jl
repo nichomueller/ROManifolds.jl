@@ -3,6 +3,7 @@ include("MV_snapshots.jl")
 function M_DEIM_POD(S::Matrix{T}, ϵ=1e-5) where T
 
   U, Σ, Vᵀ = svd(S)
+  V = Vᵀ'::Matrix{T}
 
   energies = cumsum(Σ .^ 2)
   mult_factor = sqrt(size(S)[2]) * norm(inv(U'U))
@@ -15,7 +16,7 @@ function M_DEIM_POD(S::Matrix{T}, ϵ=1e-5) where T
   err = max(sqrt(1-energies[N]/energies[end]),M_DEIM_err_bound[N])::Float
   println("Basis number obtained via POD is $N, projection error ≤ $err")
 
-  U[:, 1:N], T.(Vᵀ')::Matrix{T}
+  U[:,1:N], V[:,1:N]
 
 end
 
@@ -76,7 +77,7 @@ function MDEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
   MDEIM_idx_sparse_space, _ = from_vec_to_mat_idx(MDEIM_idx_sparse, FEMSpace.Nₛᵘ)
   el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(MDEIM_idx_sparse_space))
 
-  _, MDEIM_idx_time, _ = M_DEIM_offline(MDEIM_mat_time)
+  _, MDEIM_idx_time = M_DEIM_offline(MDEIM_mat_time)
   unique!(sort!(MDEIM_idx_time))
 
   MDEIM_mat, MDEIM_idx_sparse, MDEIMᵢ_mat, row_idx, el, MDEIM_idx_time
@@ -122,7 +123,7 @@ function DEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
     el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(DEIM_idx))
   end
 
-  _, DEIM_idx_time, _ = M_DEIM_offline(DEIM_mat_time)
+  _, DEIM_idx_time = M_DEIM_offline(DEIM_mat_time)
   unique!(sort!(DEIM_idx_time))
 
   DEIM_mat, DEIM_idx, DEIMᵢ_mat, el, DEIM_idx_time
