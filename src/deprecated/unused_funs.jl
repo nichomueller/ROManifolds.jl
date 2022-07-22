@@ -1,16 +1,19 @@
 function plot_θ_comparison(timesθ, θ, θ_approx)
 
-  θ1_plt = hcat(θ[1,:], θ_approx[1,:])
-  traces1 = [scatter(x=timesθ,y=θ1_plt[:,i]) for i=1:2]
-  p1 = plot(traces1)
-  display(p1)
-
-
-  #layout = Layout(title=title,xaxis_title=xlab,yaxis_title=ylab)
-  θ2_plt = hcat(θ[2,:], θ_approx[2,:])
-  traces2 = [scatter(x=timesθ,y=θ2_plt[:,i]) for i=1:2]
-  p2 = plot(traces2)
-  display(p2)
+  layout = Layout(title="θᵃ vs approximated θᵃ, ε = 10⁻⁵ ",xaxis_title="time [s]",yaxis_title="θᵃ(t)")
+  #= selected_color=["black"]
+  for _ = 1:size(θ_approx)[2]
+    append!(selected_color, ["blue"])
+  end =#
+  θ_plt = hcat(θ, θ_approx)
+  #traces = [scatter(x=timesθ,y=θ_plt[:,i],line=attr(width=4,color=selected_color[i])) for i=1:size(θ_plt)[2]]
+  sel_colors = ["black","blue"]
+  sel_dashes = ["","dash"]
+  names = ["θᵃ", "θᵃ approx"]
+  traces = [scatter(x=timesθ,y=θ_plt[:,i],name=names[i],
+    line=attr(width=4,color=sel_colors[i],dash=sel_dashes[i])) for i=1:size(θ_plt)[2]]
+  p = plot(traces,layout)
+  savefig(p, joinpath("/home/nmueller/scratch/tests/unsteady/poisson/case3/cube20x20x20.json/ST-GRB_st_fun_-5/θᵃ.eps"))
 
 end
 
