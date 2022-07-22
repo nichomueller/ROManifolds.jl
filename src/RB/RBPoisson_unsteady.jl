@@ -44,39 +44,11 @@ function PODs_time(
     end
   end
 
-  Φₜᵘ, _ = POD(Sᵘₜ, RBInfo.ϵₜ)
+  Φₜᵘ = POD(Sᵘₜ, RBInfo.ϵₜ)
   RBVars.Φₜᵘ = Φₜᵘ
   RBVars.nₜᵘ = size(Φₜᵘ)[2]
 
 end
-
-#= function PODs_time_old(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T}) where T
-
-  println("Performing the temporal POD for field u, using a tolerance of $(RBInfo.ϵₜ)")
-
-  if RBInfo.time_reduction_technique == "ST-HOSVD"
-    Sᵘₜ = zeros(T, RBVars.Nₜ, RBVars.S.nₛᵘ * RBInfo.S.nₛ)
-    Sᵘ = RBVars.S.Φₛᵘ' * RBVars.S.Sᵘ
-    @simd for i in 1:RBInfo.S.nₛ
-      Sᵘₜ[:,(i-1)*RBVars.S.nₛᵘ+1:i*RBVars.S.nₛᵘ] =
-      Sᵘ[:,(i-1)*RBVars.Nₜ+1:i*RBVars.Nₜ]'
-    end
-  else
-    Sᵘₜ = zeros(T, RBVars.Nₜ, RBVars.S.Nₛᵘ * RBInfo.S.nₛ)
-    Sᵘ = RBVars.S.Sᵘ
-    @simd for i in 1:RBInfo.S.nₛ
-      Sᵘₜ[:, (i-1)*RBVars.Nₛᵘ+1:i*RBVars.S.Nₛᵘ] =
-      transpose(Sᵘ[:, (i-1)*RBVars.Nₜ+1:i*RBVars.Nₜ])
-    end
-  end
-
-  Φₜᵘ, _ = POD(Sᵘₜ, RBInfo.ϵₜ)
-  RBVars.Φₜᵘ = Φₜᵘ
-  RBVars.nₜᵘ = size(Φₜᵘ)[2]
-
-end =#
 
 function build_reduced_basis(
   RBInfo::ROMInfoUnsteady,
@@ -432,7 +404,6 @@ function get_θᵃ(
     end
   end
 
-  save_CSV(θᵃ, joinpath(RBInfo.Paths.ROM_structures_path, "θᵃ.csv"))
   θᵃ::Matrix{T}
 
 end

@@ -43,7 +43,7 @@ function PODs_space(
 
   println("Performing the spatial POD for field u, using a tolerance of $(RBInfo.ϵₛ)")
   get_norm_matrix(RBInfo, RBVars)
-  RBVars.Φₛᵘ, _ = POD(RBVars.Sᵘ, RBInfo.ϵₛ, RBVars.Xᵘ₀)
+  RBVars.Φₛᵘ = POD(RBVars.Sᵘ, RBInfo.ϵₛ, RBVars.Xᵘ₀)
   (RBVars.Nₛᵘ, RBVars.nₛᵘ) = size(RBVars.Φₛᵘ)
 
 end

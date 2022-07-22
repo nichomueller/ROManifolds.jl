@@ -1,19 +1,16 @@
 function plot_θ_comparison(timesθ, θ, θ_approx)
 
-  layout = Layout(title="θᵃ vs approximated θᵃ, ε = 10⁻⁵ ",xaxis_title="time [s]",yaxis_title="θᵃ(t)")
-  #= selected_color=["black"]
-  for _ = 1:size(θ_approx)[2]
-    append!(selected_color, ["blue"])
-  end =#
+  layout = Layout(title=attr(text="ε = 10⁻⁵",x=0.035,y=0.975,font_size=30),
+    xaxis_title="time [s]", legend=attr(x=0.375,y=1.05,yanchor="top",orientation="h"))
+
   θ_plt = hcat(θ, θ_approx)
-  #traces = [scatter(x=timesθ,y=θ_plt[:,i],line=attr(width=4,color=selected_color[i])) for i=1:size(θ_plt)[2]]
   sel_colors = ["black","blue"]
   sel_dashes = ["","dash"]
   names = ["θᵃ", "θᵃ approx"]
   traces = [scatter(x=timesθ,y=θ_plt[:,i],name=names[i],
     line=attr(width=4,color=sel_colors[i],dash=sel_dashes[i])) for i=1:size(θ_plt)[2]]
   p = plot(traces,layout)
-  savefig(p, joinpath("/home/nmueller/scratch/tests/unsteady/poisson/case3/cube20x20x20.json/ST-GRB_st_fun_-5/θᵃ.eps"))
+  savefig(p, joinpath("/home/user1/git_repos/NicholasPhD/Mabla_results/cube20x20x20.json/plots/θᵃ5.eps"))
 
 end
 
