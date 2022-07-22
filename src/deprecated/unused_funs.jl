@@ -10,7 +10,8 @@ function plot_θ_comparison(timesθ, θ, θ_approx)
   traces = [scatter(x=timesθ,y=θ_plt[:,i],name=names[i],
     line=attr(width=4,color=sel_colors[i],dash=sel_dashes[i])) for i=1:size(θ_plt)[2]]
   p = plot(traces,layout)
-  savefig(p, joinpath("/home/user1/git_repos/NicholasPhD/Mabla_results/cube20x20x20.json/plots/θᵃ5.eps"))
+  display(p)
+  #savefig(p, joinpath("/home/user1/git_repos/NicholasPhD/Mabla_results/cube20x20x20.json/plots/θᵃ5.eps"))
 
 end
 
