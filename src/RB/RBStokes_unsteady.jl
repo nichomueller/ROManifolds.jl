@@ -57,7 +57,7 @@ function PODs_time(
   else
     Sᵖ = RBVars.Sᵖ
   end
-  Sᵖₜ = mode₂_unfolding(Sᵖ, RBVars.nₛ)
+  Sᵖₜ = mode₂_unfolding(Sᵖ, RBInfo.nₛ)
 
   Φₜᵖ = POD(Sᵖₜ, RBInfo.ϵₜ)
   RBVars.Φₜᵖ = Φₜᵖ
@@ -477,7 +477,7 @@ function loop_on_params(
 
   for (i_nb, nb) in enumerate(param_nbs)
     println("\n")
-    println("Considering Parameter number: $nb/$(param_nbs[end])")
+    println("Considering parameter number: $nb/$(param_nbs[end])")
 
     Param = get_ParamInfo(RBInfo, μ[nb])
 

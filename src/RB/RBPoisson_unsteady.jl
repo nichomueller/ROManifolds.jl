@@ -33,7 +33,7 @@ function PODs_time(
   else
     Sᵘ = RBVars.Sᵘ
   end
-  Sᵘₜ = mode₂_unfolding(Sᵘ, RBVars.nₛ)
+  Sᵘₜ = mode₂_unfolding(Sᵘ, RBInfo.nₛ)
 
   Φₜᵘ = POD(Sᵘₜ, RBInfo.ϵₜ)
   RBVars.Φₜᵘ = Φₜᵘ
@@ -395,6 +395,7 @@ function get_θᵃ(
     end
   end
 
+  save_CSV(θᵃ, joinpath(RBInfo.Paths.ROM_structures_path, "θᵃ.csv"))
   θᵃ::Matrix{T}
 
 end
@@ -603,7 +604,7 @@ function loop_on_params(
 
   for (i_nb, nb) in enumerate(param_nbs)
     println("\n")
-    println("Considering Parameter number: $nb/$(param_nbs[end])")
+    println("Considering parameter number: $nb/$(param_nbs[end])")
 
     Param = get_ParamInfo(RBInfo, μ[nb])
 

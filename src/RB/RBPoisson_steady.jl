@@ -567,7 +567,7 @@ function online_phase(
   uₙ_μ = zeros(T, RBVars.nₛᵘ, length(Param_nbs))
 
   for nb in Param_nbs
-    println("Considering Parameter number: $nb")
+    println("Considering parameter number: $nb")
 
     Param = get_ParamInfo(RBInfo, μ[nb])
 

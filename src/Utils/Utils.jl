@@ -21,7 +21,7 @@ export label_sorted_elems
 export mydot
 export mynorm
 export matrix_product
-export generate_Parameter
+export generate_parameter
 export plot_R²_R
 export plot_R_R²
 export generate_and_save_plot
