@@ -2,10 +2,10 @@ include("MV_snapshots.jl")
 
 function M_DEIM_POD(S::Matrix{T}, ϵ=1e-5) where T
 
-  M_DEIM_mat, Σ, _ = svd(S)
+  U, Σ, Vᵀ = svd(S)
 
   energies = cumsum(Σ .^ 2)
-  mult_factor = sqrt(size(S)[2]) * norm(inv(M_DEIM_mat'M_DEIM_mat))
+  mult_factor = sqrt(size(S)[2]) * norm(inv(U'U))
   M_DEIM_err_bound = vcat(mult_factor * Σ[2:end], 0.0)
 
   energies = cumsum(Σ .^ 2)
@@ -15,7 +15,7 @@ function M_DEIM_POD(S::Matrix{T}, ϵ=1e-5) where T
   err = max(sqrt(1-energies[N]/energies[end]),M_DEIM_err_bound[N])::Float
   println("Basis number obtained via POD is $N, projection error ≤ $err")
 
-  T.(M_DEIM_mat[:, 1:N])
+  U[:, 1:N], T.(Vᵀ')::Matrix{T}
 
 end
 
