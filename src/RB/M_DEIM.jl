@@ -20,7 +20,6 @@ function M_DEIM_POD(S::Matrix{T}, ϵ=1e-5) where T
 
 end
 
-
 function M_DEIM_offline(M_DEIM_mat::Matrix)
 
   n = size(M_DEIM_mat)[2]

@@ -36,6 +36,7 @@ end =#
 using DataFrames
 using FillArrays
 using LinearAlgebra
+using Random
 using Distributions
 using SuiteSparse
 using SparseArrays

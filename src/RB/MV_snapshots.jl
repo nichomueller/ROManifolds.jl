@@ -90,14 +90,16 @@ function standard_MDEIM(
     snapsₖ, row_idx = build_matrix_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
     if k == 1
       snaps_space = zeros(T, length(row_idx), Nₜ*RBInfo.nₛ_MDEIM)
-      snaps_time = zeros(T, length(row_idx)*RBInfo.nₛ_MDEIM, Nₜ)
+      snaps_time = zeros(T, Nₜ, length(row_idx)*RBInfo.nₛ_MDEIM)
     end
     snaps_space[:,(k-1)*Nₜ+1:k*Nₜ] = snapsₖ
-    snaps_time[(k-1)*length(row_idx)+1:k*length(row_idx),:] = snapsₖ
+    snaps_time[:,(k-1)*length(row_idx)+1:k*length(row_idx)] = snapsₖ'
   end
 
   snaps_space, _ = M_DEIM_POD(snaps_space, RBInfo.ϵₛ)
-  _, snaps_time = M_DEIM_POD(snaps_time, RBInfo.ϵₜ)
+  snaps_time, _ = M_DEIM_POD(snaps_time, RBInfo.ϵₜ)
+
+  snaps_time = snaps_time[:,vcat([1],shuffle(collect(2:size(snaps_time)[2])))]
 
   return snaps_space, snaps_time, row_idx
 
@@ -226,17 +228,19 @@ function standard_DEIM(
   Nₜ = length(timesθ)
 
   snaps_space = zeros(T, FEMSpace.Nₛᵘ, Nₜ*RBInfo.nₛ_MDEIM)
-  snaps_time = zeros(T, FEMSpace.Nₛᵘ*RBInfo.nₛ_MDEIM, Nₜ)
+  snaps_time = zeros(T, Nₜ, FEMSpace.Nₛᵘ*RBInfo.nₛ_MDEIM)
 
   @simd for k = 1:RBInfo.nₛ_MDEIM
     println("Considering parameter number $k/$(RBInfo.nₛ_MDEIM)")
     snapsₖ = build_vector_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
     snaps_space[:,(k-1)*Nₜ+1:k*Nₜ] = snapsₖ
-    snaps_time[(k-1)*FEMSpace.Nₛᵘ+1:k*FEMSpace.Nₛᵘ,:] = snapsₖ
+    snaps_time[:,(k-1)*FEMSpace.Nₛᵘ+1:k*FEMSpace.Nₛᵘ] = snapsₖ'
   end
 
   snaps_space, _ = M_DEIM_POD(snaps_space, RBInfo.ϵₛ)
-  _, snaps_time = M_DEIM_POD(snaps_time, RBInfo.ϵₜ)
+  snaps_time, _ = M_DEIM_POD(snaps_time, RBInfo.ϵₜ)
+
+  snaps_time = snaps_time[:,vcat([1],shuffle(collect(2:size(snaps_time)[2])))]
 
   return snaps_space, snaps_time
 
