@@ -411,13 +411,7 @@ function get_snaps_DEIM(
   var="F") where T
 
   timesθ = get_timesθ(RBInfo)
-
-  if RBInfo.functional_M_DEIM
-    return functional_DEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}}
-  else
-    return standard_DEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}}
-  end
-
+  return standard_DEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}}
 
 end
 
