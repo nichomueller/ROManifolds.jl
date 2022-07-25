@@ -15,6 +15,46 @@ function plot_θ_comparison(timesθ, θ, θ_approx)
 
 end
 
+function make_θ_plot()
+  timesθ = get_timesθ(FEMInfo)
+  pp = "/home/user1/git_repos/Mabla.jl/tests/unsteady/poisson/case3/cube20x20x20.json/ST-GRB_st_-5/ROM_structures/θᵃ.csv"
+  θᵃapp = load_CSV(Vector{Float}(undef,0),pp)
+  θᵃapp = reshape(θᵃapp,:,50)
+  pp = "/home/user1/git_repos/Mabla.jl/tests/unsteady/poisson/case3/cube20x20x20.json/ST-GRB_-5/ROM_structures/θᵃ.csv"
+  θᵃ = load_CSV(Vector{Float}(undef,0),pp)
+  θᵃ = reshape(θᵃ,:,50)
+  plot_θ_comparison(timesθ, θᵃ[1,:], θᵃapp[1,:])
+end
+
+function interpolated_θ_BSpline(
+  RBVars::PoissonUnsteady{T},
+  Mat_μ_sparse::SparseMatrixCSC{T, Int},
+  timesθ::Vector{T},
+  MDEIMᵢ::Matrix{T},
+  MDEIM_idx::Vector{Int},
+  MDEIM_idx_time::Vector{Int},
+  Q::Int) where T
+
+  red_timesθ = timesθ[MDEIM_idx_time]
+  discarded_idx_time = setdiff(collect(1:RBVars.Nₜ), MDEIM_idx_time)
+  θ = zeros(T, Q, RBVars.Nₜ)
+
+  red_θ = (MDEIMᵢ \
+    Matrix{T}(reshape(Mat_μ_sparse, :, length(red_timesθ))[MDEIM_idx, :]))
+  θ[:, MDEIM_idx_time] = red_θ
+
+  for q = 1:Q
+    etp = BSplineInterpolation(red_θ[q,:], red_timesθ, 2, :Uniform, :Uniform)
+
+    for iₜ = discarded_idx_time
+      θ[q, iₜ] = etp(timesθ[iₜ])
+    end
+  end
+
+  θ::Matrix{T}
+
+end
+
 function modify_timesθ_and_MDEIM_idx(
   MDEIM_idx::Vector{Int},
   RBInfo::ROMInfoUnsteady,

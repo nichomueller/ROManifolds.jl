@@ -26,9 +26,8 @@ function M_DEIM_offline(M_DEIM_mat::Matrix)
   M_DEIM_idx = Int[]
   append!(M_DEIM_idx, Int(argmax(abs.(M_DEIM_mat[:, 1]))))
   @simd for m = 2:n
-    res = (M_DEIM_mat[:, m] -
-           M_DEIM_mat[:, 1:m-1] * (M_DEIM_mat[M_DEIM_idx[1:m-1], 1:m-1] \
-                                   M_DEIM_mat[M_DEIM_idx[1:m-1], m]))
+    res = (M_DEIM_mat[:, m] - M_DEIM_mat[:, 1:m-1] *
+      (M_DEIM_mat[M_DEIM_idx[1:m-1], 1:m-1] \ M_DEIM_mat[M_DEIM_idx[1:m-1], m]))
     append!(M_DEIM_idx, convert(Int, argmax(abs.(res))[1]))
     if abs(det(M_DEIM_mat[M_DEIM_idx[1:m], 1:m])) ≤ 1e-80
       error("Something went wrong with the construction of (M)DEIM basis:

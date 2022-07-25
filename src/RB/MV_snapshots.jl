@@ -80,26 +80,49 @@ function standard_MDEIM(
   timesθ::Vector,
   var="A") where T
 
-  Nₜ = length(timesθ)
-
+  (nₛ_min, nₛ_max) = sort([RBInfo.nₛ_MDEIM, RBInfo.nₛ_MDEIM_time])
   snaps_space, snaps_time = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
   row_idx = Int[]
 
-  @simd for k = 1:RBInfo.nₛ_MDEIM
-    println("Considering parameter number $k/$(RBInfo.nₛ_MDEIM)")
+  @simd for k = 1:nₛ_min
+    println("Considering parameter number $k/$nₛ_max")
     snapsₖ, row_idx = build_matrix_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
+    snapsₖ_space, snapsₖ_time = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
     if k == 1
-      snaps_space = zeros(T, length(row_idx), Nₜ*RBInfo.nₛ_MDEIM)
-      snaps_time = zeros(T, Nₜ, length(row_idx)*RBInfo.nₛ_MDEIM)
+      snaps_space = snapsₖ_space
+      snaps_time = snapsₖ_time
+    else
+      snaps_space = hcat(snaps_space, snapsₖ_space)
+      snaps_time = hcat(snaps_time, snapsₖ_time)
     end
-    snaps_space[:,(k-1)*Nₜ+1:k*Nₜ] = snapsₖ
-    snaps_time[:,(k-1)*length(row_idx)+1:k*length(row_idx)] = snapsₖ'
+  end
+
+  if nₛ_min == RBInfo.nₛ_MDEIM
+    @simd for k = nₛ_min+1:nₛ_max
+      println("Considering parameter number $k/$nₛ_max")
+      snapsₖ, row_idx = build_matrix_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
+      _, snapsₖ_time = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
+      if k == 1
+        snaps_time = snapsₖ_time
+      else
+        snaps_time = hcat(snaps_time, snapsₖ_time)
+      end
+    end
+  else
+    @simd for k = nₛ_min+1:nₛ_max
+      println("Considering parameter number $k/$nₛ_max")
+      snapsₖ, row_idx = build_matrix_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
+      snapsₖ_space, _ = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
+      if k == 1
+        snaps_space = snapsₖ_space
+      else
+        snaps_space = hcat(snaps_space, snapsₖ_space)
+      end
+    end
   end
 
   snaps_space, _ = M_DEIM_POD(snaps_space, RBInfo.ϵₛ)
   snaps_time, _ = M_DEIM_POD(snaps_time, RBInfo.ϵₜ)
-
-  snaps_time = snaps_time[:,vcat([1],shuffle(collect(2:size(snaps_time)[2])))]
 
   return snaps_space, snaps_time, row_idx
 
@@ -112,18 +135,52 @@ function functional_MDEIM(
   timesθ::Vector,
   var="A") where T
 
+  (nₛ_min, nₛ_max) = sort([RBInfo.nₛ_MDEIM, RBInfo.nₛ_MDEIM_time])
   ncells,nquad_cell = get_LagrangianQuad_info(FEMSpace)
   Nq, Nₜ = ncells*nquad_cell, length(timesθ)
-  Θmat_space = zeros(T, Nq, Nₜ*RBInfo.nₛ_MDEIM)
-  Θmat_time = zeros(T, Nq*RBInfo.nₛ_MDEIM, Nₜ)
+  Θmat_space, Θmat_time = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
 
-  @simd for k = 1:RBInfo.nₛ_MDEIM
-    println("Considering parameter number $k/$(RBInfo.nₛ_MDEIM)")
+  @simd for k = 1:nₛ_min
+    println("Considering parameter number $k/$nₛ_max")
     Param = get_ParamInfo(RBInfo, μ[k])
     Θₖ = build_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
       timesθ,var)
-    Θmat_space[:,(k-1)*Nₜ+1:k*Nₜ] = Θₖ
-    Θmat_time[(k-1)*Nq+1:k*Nq,:] = Θₖ
+    Θₖ_space, Θₖ_time = M_DEIM_POD(Θₖ, RBInfo.ϵₛ)
+    if k == 1
+      Θmat_space = Θₖ_space
+      Θmat_time = Θₖ_time
+    else
+      Θmat_space = hcat(Θmat_space, Θₖ_space)
+      Θmat_time = hcat(Θmat_time, Θₖ_time)
+    end
+  end
+
+  if nₛ_min == RBInfo.nₛ_MDEIM
+    @simd for k = nₛ_min+1:nₛ_max
+      println("Considering parameter number $k/$nₛ_max")
+      Param = get_ParamInfo(RBInfo, μ[k])
+      Θₖ = build_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
+        timesθ,var)
+      _, Θₖ_time = M_DEIM_POD(Θₖ, RBInfo.ϵₛ)
+      if k == 1
+        Θmat_time = Θₖ_time
+      else
+        Θmat_time = hcat(Θmat_time, Θₖ_time)
+      end
+    end
+  else
+    @simd for k = nₛ_min+1:nₛ_max
+      println("Considering parameter number $k/$nₛ_max")
+      Param = get_ParamInfo(RBInfo, μ[k])
+      Θₖ = build_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
+        timesθ,var)
+      Θₖ_space, _ = M_DEIM_POD(Θₖ, RBInfo.ϵₛ)
+      if k == 1
+        Θmat_space = Θₖ_space
+      else
+        Θmat_space = hcat(Θmat_space, Θₖ_space)
+      end
+    end
   end
 
   # space
@@ -146,7 +203,7 @@ function functional_MDEIM(
   snaps_space, _ = M_DEIM_POD(snaps_space,RBInfo.ϵₛ)
 
   #time
-  _, snaps_time = M_DEIM_POD(Θmat_time,RBInfo.ϵₜ)
+  snaps_time, _ = M_DEIM_POD(Θmat_time,RBInfo.ϵₜ)
 
   return snaps_space, snaps_time, row_idx
 
@@ -225,22 +282,48 @@ function standard_DEIM(
   timesθ::Vector,
   var="F") where T
 
-  Nₜ = length(timesθ)
+  (nₛ_min, nₛ_max) = sort([RBInfo.nₛ_DEIM, RBInfo.nₛ_DEIM_time])
+  snaps_space, snaps_time = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
 
-  snaps_space = zeros(T, FEMSpace.Nₛᵘ, Nₜ*RBInfo.nₛ_MDEIM)
-  snaps_time = zeros(T, Nₜ, FEMSpace.Nₛᵘ*RBInfo.nₛ_MDEIM)
-
-  @simd for k = 1:RBInfo.nₛ_MDEIM
+  @simd for k = 1:nₛ_min
     println("Considering parameter number $k/$(RBInfo.nₛ_MDEIM)")
     snapsₖ = build_vector_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
-    snaps_space[:,(k-1)*Nₜ+1:k*Nₜ] = snapsₖ
-    snaps_time[:,(k-1)*FEMSpace.Nₛᵘ+1:k*FEMSpace.Nₛᵘ] = snapsₖ'
+    snapsₖ_space, snapsₖ_time = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
+    if k == 1
+      snaps_space = snapsₖ_space
+      snaps_time = snapsₖ_time
+    else
+      snaps_space = hcat(snaps_space, snapsₖ_space)
+      snaps_time = hcat(snaps_time, snapsₖ_time)
+    end
+  end
+
+  if nₛ_min == RBInfo.nₛ_DEIM
+    @simd for k = nₛ_min+1:nₛ_max
+      println("Considering parameter number $k/$nₛ_max")
+      snapsₖ = build_vector_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
+      _, snapsₖ_time = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
+      if k == 1
+        snaps_time = snapsₖ_time
+      else
+        snaps_time = hcat(snaps_time, snapsₖ_time)
+      end
+    end
+  else
+    @simd for k = nₛ_min+1:nₛ_max
+      println("Considering parameter number $k/$nₛ_max")
+      snapsₖ = build_vector_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
+      snapsₖ_space, _ = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
+      if k == 1
+        snaps_space = snapsₖ_space
+      else
+        snaps_space = hcat(snaps_space, snapsₖ_space)
+      end
+    end
   end
 
   snaps_space, _ = M_DEIM_POD(snaps_space, RBInfo.ϵₛ)
   snaps_time, _ = M_DEIM_POD(snaps_time, RBInfo.ϵₜ)
-
-  snaps_time = snaps_time[:,vcat([1],shuffle(collect(2:size(snaps_time)[2])))]
 
   return snaps_space, snaps_time
 
@@ -251,27 +334,61 @@ function functional_DEIM(
   RBInfo::ROMInfoUnsteady{T},
   μ::Vector{Vector{T}},
   timesθ::Vector,
-  var="A") where T
+  var="F") where T
 
+  (nₛ_min, nₛ_max) = sort([RBInfo.nₛ_DEIM, RBInfo.nₛ_DEIM_time])
   ncells,nquad_cell = get_LagrangianQuad_info(FEMSpace)
   Nq, Nₜ = ncells*nquad_cell, length(timesθ)
-  Θmat_space = zeros(T, Nq, Nₜ*RBInfo.nₛ_MDEIM)
-  Θmat_time = zeros(T, Nq*RBInfo.nₛ_MDEIM, Nₜ)
+  Θmat_space, Θmat_time = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
 
-  @simd for k = 1:RBInfo.nₛ_MDEIM
-    println("Considering parameter number $k/$(RBInfo.nₛ_MDEIM)")
+  @simd for k = 1:nₛ_min
+    println("Considering parameter number $k/$nₛ_max")
     Param = get_ParamInfo(RBInfo, μ[k])
     Θₖ = build_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
       timesθ,var)
-    Θmat_space[:,(k-1)*Nₜ+1:k*Nₜ] = Θₖ
-    Θmat_time[(k-1)*Nq+1:k*Nq,:] = Θₖ
+    Θₖ_space, Θₖ_time = M_DEIM_POD(Θₖ, RBInfo.ϵₛ)
+    if k == 1
+      Θmat_space = Θₖ_space
+      Θmat_time = Θₖ_time
+    else
+      Θmat_space = hcat(Θmat_space, Θₖ_space)
+      Θmat_time = hcat(Θmat_time, Θₖ_time)
+    end
+  end
+
+  if nₛ_min == RBInfo.nₛ_DEIM
+    @simd for k = nₛ_min+1:nₛ_max
+      println("Considering parameter number $k/$nₛ_max")
+      Param = get_ParamInfo(RBInfo, μ[k])
+      Θₖ = build_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
+        timesθ,var)
+      _, Θₖ_time = M_DEIM_POD(Θₖ, RBInfo.ϵₛ)
+      if k == 1
+        Θmat_time = Θₖ_time
+      else
+        Θmat_time = hcat(Θmat_time, Θₖ_time)
+      end
+    end
+  else
+    @simd for k = nₛ_min+1:nₛ_max
+      println("Considering parameter number $k/$nₛ_max")
+      Param = get_ParamInfo(RBInfo, μ[k])
+      Θₖ = build_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
+        timesθ,var)
+      Θₖ_space, _ = M_DEIM_POD(Θₖ, RBInfo.ϵₛ)
+      if k == 1
+        Θmat_space = Θₖ_space
+      else
+        Θmat_space = hcat(Θmat_space, Θₖ_space)
+      end
+    end
   end
 
   # space
   Θmat_space, _ = M_DEIM_POD(Θmat_space,RBInfo.ϵₛ)
   Vec_Θ = assemble_parametric_FE_vector(FEMSpace,var)
   Q = size(Θmat_space)[2]
-  snaps_space = Matrix{T}(undef,0,0)
+  snaps_space = zeros(FEMSpace.Nₛᵘ, Q)
 
   for q = 1:Q
     Θq = FEFunction(FEMSpace.V₀_quad, Θmat_space[:,q])
@@ -281,9 +398,9 @@ function functional_DEIM(
   snaps_space, _ = M_DEIM_POD(snaps_space,RBInfo.ϵₛ)
 
   #time
-  _, snaps_time = M_DEIM_POD(Θmat_time,RBInfo.ϵₜ)
+  snaps_time, _ = M_DEIM_POD(Θmat_time,RBInfo.ϵₜ)
 
-  return snaps_space, snaps_time, row_idx
+  return snaps_space, snaps_time
 
 end
 
@@ -295,7 +412,12 @@ function get_snaps_DEIM(
 
   timesθ = get_timesθ(RBInfo)
 
-  standard_DEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}}
+  if RBInfo.functional_M_DEIM
+    return functional_DEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}}
+  else
+    return standard_DEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}}
+  end
+
 
 end
 

@@ -313,6 +313,8 @@ mutable struct ROMInfoUnsteady{T} <: Info
   build_parametric_RHS::Bool
   nₛ_MDEIM::Int
   nₛ_DEIM::Int
+  nₛ_MDEIM_time::Int
+  nₛ_DEIM_time::Int
   post_process::Bool
   import_snapshots::Bool
   import_offline_structures::Bool
