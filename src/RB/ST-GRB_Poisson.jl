@@ -2,7 +2,7 @@ function get_Aₙ(
   RBInfo::Info,
   RBVars::PoissonSTGRB)
 
-  get_Aₙ(RBInfo, RBVars.S)
+  get_Aₙ(RBInfo, RBVars.Steady)
 
 end
 
@@ -35,7 +35,7 @@ function assemble_affine_matrices(
     RBVars.Mₙ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ, 1)
     RBVars.Mₙ[:,:,1] = (RBVars.Φₛᵘ)' * M * RBVars.Φₛᵘ
   else
-    assemble_affine_matrices(RBInfo, RBVars.S, var)
+    assemble_affine_matrices(RBInfo, RBVars.Steady, var)
   end
 
 end
@@ -71,7 +71,7 @@ function assemble_affine_vectors(
   RBVars::PoissonSTGRB{T},
   var::String) where T
 
-  assemble_affine_vectors(RBInfo, RBVars.S, var)
+  assemble_affine_vectors(RBInfo, RBVars.Steady, var)
 
 end
 
@@ -154,7 +154,7 @@ function save_affine_structures(
   if RBInfo.save_offline_structures
     save_CSV(reshape(RBVars.Mₙ, :, RBVars.Qᵐ)::Matrix{T},
       joinpath(RBInfo.Paths.ROM_structures_path, "Mₙ.csv"))
-    save_affine_structures(RBInfo, RBVars.S)
+    save_affine_structures(RBInfo, RBVars.Steady)
   end
 
 end
@@ -165,7 +165,7 @@ function get_affine_structures(
 
   operators = String[]
   append!(operators, get_Mₙ(RBInfo, RBVars))
-  append!(operators, get_affine_structures(RBInfo, RBVars.S))
+  append!(operators, get_affine_structures(RBInfo, RBVars.Steady))
   return operators
 
 end
@@ -178,7 +178,7 @@ function get_Q(
     RBVars.Qᵐ = size(RBVars.Mₙ)[end]
   end
 
-  get_Q(RBInfo, RBVars.S)
+  get_Q(RBInfo, RBVars.Steady)
 
 end
 
@@ -282,13 +282,13 @@ function get_RB_system(
   RBVars::PoissonSTGRB,
   Param::ParametricInfoUnsteady)
 
-  initialize_RB_system(RBVars.S)
-  initialize_online_time(RBVars.S)
+  initialize_RB_system(RBVars.Steady)
+  initialize_online_time(RBVars.Steady)
 
   RBVars.online_time = @elapsed begin
     get_Q(RBInfo, RBVars)
     blocks = [1]
-    operators = get_system_blocks(RBInfo,RBVars.S,blocks,blocks)
+    operators = get_system_blocks(RBInfo,RBVars.Steady,blocks,blocks)
 
     θᵐ, θᵃ, θᶠ, θʰ = get_θ(FEMSpace, RBInfo, RBVars, Param)
 
@@ -305,7 +305,7 @@ function get_RB_system(
     end
   end
 
-  save_system_blocks(RBInfo,RBVars.S,blocks,blocks,operators)
+  save_system_blocks(RBInfo,RBVars.Steady,blocks,blocks,operators)
 
 end
 

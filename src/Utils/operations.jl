@@ -148,6 +148,24 @@ function mode₂_unfolding(Mat₁::Matrix{T}, nₛ::Int) where T
   Mat₂
 end
 
+function newton(
+  res::F,
+  Jₙ::Matrix{T},
+  u₀::Vector{T},
+  ε::Float,
+  max_k::Int) where T
+
+  k = 0
+  uᵏ = u₀
+  while k ≤ max_k && norm(res(uᵏ)) ≥ ε
+    uᵏ -= Jₙ \ res(uᵏ)::Vector{T}
+    k += 1
+  end
+
+  uᵏ::Vector{T}
+
+end
+
 function get_NTuple(N::Int, T::DataType)
 
   ntupl = ()

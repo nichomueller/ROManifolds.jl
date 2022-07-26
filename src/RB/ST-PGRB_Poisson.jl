@@ -2,7 +2,7 @@ function get_Aₙ(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTPGRB)
 
-  get_Aₙ(RBInfo, RBVars.S)
+  get_Aₙ(RBInfo, RBVars.Steady)
 
 end
 
@@ -66,7 +66,7 @@ function assemble_affine_matrices(
   RBVars::PoissonSTPGRB{T},
   var::String) where T
 
-  get_inverse_P_matrix(RBInfo, RBVars.S)
+  get_inverse_P_matrix(RBInfo, RBVars.Steady)
 
   if var == "M"
     RBVars.Qᵐ = 1
@@ -79,7 +79,7 @@ function assemble_affine_matrices(
     RBVars.MΦᵀPᵤ⁻¹ = zeros(T, RBVars.nₛᵘ, RBVars.Nₛᵘ, 1)
     RBVars.MΦᵀPᵤ⁻¹[:,:,1] = (M*RBVars.Φₛᵘ)' * RBVars.Pᵤ⁻¹
   else
-    assemble_affine_matrices(RBInfo, RBVars.S, var)
+    assemble_affine_matrices(RBInfo, RBVars.Steady, var)
   end
 
 end
@@ -241,7 +241,7 @@ function save_affine_structures(
       joinpath(RBInfo.Paths.ROM_structures_path, "MAₙ.csv"))
     save_CSV(reshape(RBVars.MΦᵀPᵤ⁻¹,:,RBVars.Qᵐ),
       joinpath(RBInfo.Paths.ROM_structures_path, "MΦᵀPᵤ⁻¹.csv"))
-    save_affine_structures(RBInfo, RBVars.S)
+    save_affine_structures(RBInfo, RBVars.Steady)
   end
 end
 
@@ -250,7 +250,7 @@ function get_affine_structures(
   RBVars::PoissonSTPGRB)
 
   operators = String[]
-  append!(operators, get_affine_structures(RBInfo, RBVars.S))
+  append!(operators, get_affine_structures(RBInfo, RBVars.Steady))
   append!(operators, get_Mₙ(RBInfo, RBVars))
   append!(operators, get_MAₙ(RBInfo, RBVars))
   return operators
@@ -265,7 +265,7 @@ function get_Q(
     @assert floor(Qᵐ) == Qᵐ "Qᵐ should be the square root of an Int"
     RBVars.Qᵐ = Int(Qᵐ)
   end
-  get_Q(RBInfo, RBVars.S)
+  get_Q(RBInfo, RBVars.Steady)
 end
 
 function get_RB_LHS_blocks(
@@ -437,8 +437,8 @@ function get_RB_system(
   RBVars::PoissonSTPGRB,
   Param::ParametricInfoUnsteady)
 
-  initialize_RB_system(RBVars.S)
-  initialize_online_time(RBVars.S)
+  initialize_RB_system(RBVars.Steady)
+  initialize_online_time(RBVars.Steady)
 
   RBVars.online_time = @elapsed begin
     get_Q(RBInfo, RBVars)

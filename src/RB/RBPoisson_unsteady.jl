@@ -20,7 +20,7 @@ function get_snapshot_matrix(
 end
 
 PODs_space(RBInfo::Info, RBVars::PoissonUnsteady) =
-  PODs_space(RBInfo, RBVars.S)
+  PODs_space(RBInfo, RBVars.Steady)
 
 function PODs_time(
   RBInfo::ROMInfoUnsteady,
@@ -68,7 +68,7 @@ function import_reduced_basis(
   RBInfo::Info,
   RBVars::PoissonUnsteady{T}) where T
 
-  import_reduced_basis(RBInfo, RBVars.S)
+  import_reduced_basis(RBInfo, RBVars.Steady)
 
   println("Importing the temporal reduced basis for field u")
   RBVars.Φₜᵘ = load_CSV(Matrix{T}(undef,0,0),
@@ -92,8 +92,8 @@ function get_generalized_coordinates(
   RBVars::PoissonUnsteady{T},
   snaps::Vector{Int}) where T
 
-  if check_norm_matrix(RBVars.S)
-    get_norm_matrix(RBInfo, RBVars.S)
+  if check_norm_matrix(RBVars.Steady)
+    get_norm_matrix(RBInfo, RBVars.Steady)
   end
 
   @assert maximum(snaps) ≤ RBInfo.nₛ
@@ -197,7 +197,7 @@ function save_M_DEIM_structures(
   save_structures_in_list(list_M_DEIM, list_names,
     RBInfo.Paths.ROM_structures_path)
 
-  save_M_DEIM_structures(RBInfo, RBVars.S)
+  save_M_DEIM_structures(RBInfo, RBVars.Steady)
 
 end
 
@@ -205,7 +205,7 @@ function set_operators(
   RBInfo::Info,
   RBVars::PoissonUnsteady)
 
-  vcat(["M"], set_operators(RBInfo, RBVars.S))
+  vcat(["M"], set_operators(RBInfo, RBVars.Steady))
 
 end
 
@@ -264,7 +264,7 @@ function get_M_DEIM_structures(
     end
   end
 
-  append!(operators, get_M_DEIM_structures(RBInfo, RBVars.S))
+  append!(operators, get_M_DEIM_structures(RBInfo, RBVars.Steady))
 
 end
 
@@ -534,7 +534,7 @@ function online_phase(
   model = DiscreteModelFromFile(get_mesh_path(RBInfo))
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id,RBInfo.FEMInfo,model)
 
-  get_norm_matrix(RBInfo, RBVars.S)
+  get_norm_matrix(RBInfo, RBVars.Steady)
   (ũ_μ,uₙ_μ,mean_uₕ_test,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,
     mean_online_time,mean_reconstruction_time) =
     loop_on_params(FEMSpace, RBInfo, RBVars, μ, param_nbs)

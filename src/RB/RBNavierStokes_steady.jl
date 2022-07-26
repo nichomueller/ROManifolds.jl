@@ -1,196 +1,67 @@
-include("RBPoisson_steady.jl")
-include("S-GRB_Stokes.jl")
+include("RBStokes_steady.jl")
+include("S-GRB_NavierStokes.jl")
 
 function get_snapshot_matrix(
   RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady{T}) where T
+  RBVars::NavierStokesSteady{T}) where T
 
-  get_snapshot_matrix(RBInfo, RBVars.Poisson)
-
-  println("Importing the snapshot matrix for field u,
-    number of snapshots considered: $(RBInfo.nₛ)")
-  Sᵖ = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"),
-    DataFrame))[:, 1:RBInfo.nₛ]
-  println("Dimension of pressure snapshot matrix: $(size(Sᵖ))")
-  RBVars.Sᵖ = Sᵖ
-  RBVars.Nₛᵖ = size(Sᵖ)[1]
+  get_snapshot_matrix(RBInfo, RBVars.Stokes)
 
 end
 
 function get_norm_matrix(
   RBInfo::Info,
-  RBVars::StokesSteady{T}) where T
+  RBVars::NavierStokesSteady{T}) where T
 
-  get_norm_matrix(RBInfo, RBVars.Poisson)
-
-  if check_norm_matrix(RBVars)
-
-    println("Importing the norm matrices Xᵘ, Xᵖ₀")
-
-    Xᵘ = load_CSV(sparse([],[],T[]),
-      joinpath(get_FEM_structures_path(RBInfo), "Xᵘ.csv"))
-    Xᵖ₀ = load_CSV(sparse([],[],T[]),
-      joinpath(get_FEM_structures_path(RBInfo), "Xᵖ₀.csv"))
-    RBVars.Nₛᵖ = size(Xᵖ₀)[1]
-    println("Dimension of L² norm matrix, field p: $(size(Xᵖ₀))")
-
-    if RBInfo.use_norm_X
-      RBVars.Xᵘ = Xᵘ
-      RBVars.Xᵖ₀ = Xᵖ₀
-    else
-      RBVars.Xᵘ = one(T)*sparse(I,RBVars.Nₛᵘ,RBVars.Nₛᵘ)
-      RBVars.Xᵖ₀ = one(T)*sparse(I,RBVars.Nₛᵖ,RBVars.Nₛᵖ)
-    end
-
-  end
-
-end
-
-function check_norm_matrix(RBVars::StokesSteady)
-  isempty(RBVars.Xᵘ) || isempty(RBVars.Xᵖ₀)
-end
-
-function PODs_space(
-  RBInfo::Info,
-  RBVars::StokesSteady)
-
-  PODs_space(RBInfo,RBVars.Poisson)
-
-  println("Performing the spatial POD for field p, using a tolerance of $(RBInfo.ϵₛ)")
-  get_norm_matrix(RBInfo, RBVars)
-  RBVars.Φₛᵖ = POD(RBVars.Sᵖ, RBInfo.ϵₛ, RBVars.Xᵖ₀)
-  (RBVars.Nₛᵖ, RBVars.nₛᵖ) = size(RBVars.Φₛᵖ)
-
-end
-
-function primal_supremizers(
-  RBInfo::Info,
-  RBVars::StokesSteady{T}) where T
-
-  println("Computing primal supremizers")
-
-  constraint_mat = load_CSV(sparse([],[],T[]),
-    joinpath(get_FEM_structures_path(RBInfo), "B.csv"))'
-
-  supr_primal = Matrix{T}(RBVars.Xᵘ) \ (Matrix{T}(constraint_mat) * RBVars.Φₛᵖ)
-
-  min_norm = 1e16
-  for i = 1:size(supr_primal)[2]
-
-    println("Normalizing primal supremizer $i")
-
-    for j in 1:RBVars.nₛᵘ
-      supr_primal[:, i] -= mydot(supr_primal[:, i], RBVars.Φₛᵘ[:,j], RBVars.Xᵘ₀) /
-      mynorm(RBVars.Φₛᵘ[:,j], RBVars.Xᵘ₀) * RBVars.Φₛᵘ[:,j]
-    end
-    for j in 1:i
-      supr_primal[:, i] -= mydot(supr_primal[:, i], supr_primal[:, j], RBVars.Xᵘ₀) /
-      mynorm(supr_primal[:, j], RBVars.Xᵘ₀) * supr_primal[:, j]
-    end
-
-    supr_norm = mynorm(supr_primal[:, i], RBVars.Xᵘ₀)
-    min_norm = min(supr_norm, min_norm)
-    println("Norm supremizers: $supr_norm")
-    supr_primal[:, i] /= supr_norm
-
-  end
-
-  println("Primal supremizers enrichment ended with norm: $min_norm")
-
-  supr_primal
-
-end
-
-function supr_enrichment_space(
-  RBInfo::Info,
-  RBVars::StokesSteady)
-
-  supr_primal = primal_supremizers(RBInfo, RBVars)
-  RBVars.Φₛᵘ = hcat(RBVars.Φₛᵘ, supr_primal)
-  RBVars.nₛᵘ = size(RBVars.Φₛᵘ)[2]
+  get_norm_matrix(RBInfo, RBVars.Stokes)
 
 end
 
 function build_reduced_basis(
   RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady)
+  RBVars::NavierStokesSteady)
 
-  RBVars.offline_time += @elapsed begin
-    PODs_space(RBInfo, RBVars)
-    supr_enrichment_space(RBInfo, RBVars)
-  end
-
-  if RBInfo.save_offline_structures
-    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.Paths.ROM_structures_path,"Φₛᵘ.csv"))
-    save_CSV(RBVars.Φₛᵖ, joinpath(RBInfo.Paths.ROM_structures_path,"Φₛᵖ.csv"))
-  end
-
-  return
+  build_reduced_basis(RBInfo, RBVars.Stokes)
 
 end
 
 function import_reduced_basis(
   RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady{T}) where T
+  RBVars::NavierStokesSteady{T}) where T
 
-  import_reduced_basis(RBInfo, RBVars.Poisson)
-
-  println("Importing the spatial reduced basis for field p")
-  RBVars.Φₛᵖ = load_CSV(Matrix{T}(undef,0,0),
-    joinpath(RBInfo.Paths.ROM_structures_path, "Φₛᵖ.csv"))
-  (RBVars.Nₛᵖ, RBVars.nₛᵖ) = size(RBVars.Φₛᵖ)
-
-end
-
-function get_generalized_coordinates(
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady,
-  snaps=nothing)
-
-  get_norm_matrix(RBInfo, RBVars)
-  if isnothing(snaps) || maximum(snaps) > RBInfo.nₛ
-    snaps = 1:RBInfo.nₛ
-  end
-
-  get_generalized_coordinates(RBInfo, RBVars.Poisson, snaps)
-
-  Φₛᵖ_normed = RBVars.Xᵖ₀*RBVars.Φₛᵖ
-  RBVars.p̂ = RBVars.Sᵖ[:,snaps]*Φₛᵖ_normed
-  if RBInfo.save_offline_structures
-    save_CSV(RBVars.p̂, joinpath(RBInfo.Paths.ROM_structures_path, "p̂.csv"))
-  end
+  import_reduced_basis(RBInfo, RBVars.Stokes)
 
 end
 
 function set_operators(
   RBInfo::Info,
-  RBVars::StokesSteady)
+  RBVars::NavierStokesSteady)
 
-  append!(["B"], set_operators(RBInfo, RBVars.Poisson))
+  set_operators(RBInfo, RBVars.Stokes)
 
 end
 
 function assemble_MDEIM_matrices(
   RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady,
+  RBVars::NavierStokesSteady,
   var::String)
 
-  assemble_MDEIM_matrices(RBInfo, RBVars.Poisson, var)
+  assemble_MDEIM_matrices(RBInfo, RBVars.Stokes, var)
 
 end
 
 function assemble_DEIM_vectors(
   RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady,
+  RBVars::NavierStokesSteady,
   var::String)
 
-  assemble_DEIM_vectors(RBInfo, RBVars.Poisson, var)
+  assemble_DEIM_vectors(RBInfo, RBVars.Stokes, var)
 
 end
 
 function save_M_DEIM_structures(
   ::ROMInfoSteady,
-  ::StokesSteady)
+  ::NavierStokesSteady)
 
   error("not implemented")
 
@@ -198,15 +69,15 @@ end
 
 function get_M_DEIM_structures(
   RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady)
+  RBVars::NavierStokesSteady)
 
-  get_M_DEIM_structures(RBInfo, RBVars.Poisson)
+  get_M_DEIM_structures(RBInfo, RBVars.Stokes)
 
 end
 
 function get_offline_structures(
   RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady)
+  RBVars::NavierStokesSteady)
 
   operators = String[]
 
@@ -220,39 +91,39 @@ end
 
 function get_system_blocks(
   RBInfo::Info,
-  RBVars::StokesSteady,
+  RBVars::NavierStokesSteady,
   LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int})
 
-  get_system_blocks(RBInfo, RBVars.Poisson, LHS_blocks, RHS_blocks)
+  get_system_blocks(RBInfo, RBVars.Stokes, LHS_blocks, RHS_blocks)
 
 end
 
 function save_system_blocks(
   RBInfo::Info,
-  RBVars::StokesSteady,
+  RBVars::NavierStokesSteady,
   LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int},
   operators::Vector{String})
 
-  save_system_blocks(RBInfo, RBVars.Poisson, LHS_blocks, RHS_blocks, operators)
+  save_system_blocks(RBInfo, RBVars.Stokes, LHS_blocks, RHS_blocks, operators)
 
 end
 
 function get_θᵃ(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady,
+  RBVars::NavierStokesSteady,
   Param::ParametricInfoSteady)
 
-  get_θᵃ(FEMSpace, RBInfo, RBVars.Poisson, Param)
+  get_θᵃ(FEMSpace, RBInfo, RBVars.Stokes, Param)
 
 end
 
 function get_θᵇ(
   ::SteadyProblem,
   ::ROMInfoSteady{T},
-  ::StokesSteady,
+  ::NavierStokesSteady,
   ::ParametricInfoSteady) where T
 
   reshape([one(T)],1,1)::Matrix{T}
@@ -262,25 +133,25 @@ end
 function get_θᶠʰ(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady,
+  RBVars::NavierStokesSteady,
   Param::ParametricInfoSteady)
 
-  get_θᶠʰ(FEMSpace, RBInfo, RBVars.Poisson, Param)
+  get_θᶠʰ(FEMSpace, RBInfo, RBVars.Stokes, Param)
 
 end
 
-function initialize_RB_system(RBVars::StokesSteady)
-  initialize_RB_system(RBVars.Poisson)
+function initialize_RB_system(RBVars::NavierStokesSteady)
+  initialize_RB_system(RBVars.Stokes)
 end
 
-function initialize_online_time(RBVars::StokesSteady)
-  initialize_RB_system(RBVars.Poisson)
+function initialize_online_time(RBVars::NavierStokesSteady)
+  initialize_RB_system(RBVars.Stokes)
 end
 
 function get_RB_system(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady,
+  RBVars::NavierStokesSteady,
   Param::ParametricInfoSteady)
 
   initialize_RB_system(RBVars)
@@ -317,7 +188,7 @@ end
 function solve_RB_system(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady{T},
-  RBVars::StokesSteady,
+  RBVars::NavierStokesSteady,
   Param::ParametricInfoSteady) where T
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
@@ -334,15 +205,15 @@ function solve_RB_system(
 
 end
 
-function reconstruct_FEM_solution(RBVars::StokesSteady)
+function reconstruct_FEM_solution(RBVars::NavierStokesSteady)
   println("Reconstructing FEM solution from the newly computed RB one")
-  reconstruct_FEM_solution(RBVars.Poisson)
+  reconstruct_FEM_solution(RBVars.Stokes)
   RBVars.p̃ = RBVars.Φₛᵖ * RBVars.pₙ
 end
 
 function offline_phase(
   RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady)
+  RBVars::NavierStokesSteady)
 
   if RBInfo.import_snapshots
     get_snapshot_matrix(RBInfo, RBVars)
@@ -381,7 +252,7 @@ end
 
 function online_phase(
   RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady{T},
+  RBVars::NavierStokesSteady{T},
   param_nbs) where T
 
   μ = load_CSV(Array{T}[],

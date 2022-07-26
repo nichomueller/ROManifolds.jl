@@ -2,7 +2,7 @@ function get_Aₙ(
   RBInfo::Info,
   RBVars::StokesSTGRB)
 
-  get_Aₙ(RBInfo, RBVars.P)
+  get_Aₙ(RBInfo, RBVars.Poisson)
 
 end
 
@@ -10,25 +10,15 @@ function get_Mₙ(
   RBInfo::ROMInfoUnsteady,
   RBVars::StokesSTGRB)
 
-  get_Mₙ(RBInfo, RBVars.P)
+  get_Mₙ(RBInfo, RBVars.Poisson)
 
 end
 
 function get_Bₙ(
   RBInfo::Info,
-  RBVars::StokesSTGRB{T}) where T
-  #MODIFY#
+  RBVars::StokesSTGRB)
 
-  if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "Bₙ.csv"))
-    println("Importing reduced affine divergence matrix")
-    Bₙ = load_CSV(Matrix{T}(undef,0,0),
-      joinpath(RBInfo.Paths.ROM_structures_path, "Bₙ.csv"))
-    RBVars.Bₙ = reshape(Bₙ,RBVars.nₛᵖ,RBVars.nₛᵘ,:)
-    return [""]
-  else
-    println("Failed to import Bₙ: must build it")
-    return ["B"]
-  end
+  get_Bₙ(RBInfo, RBVars.Steady)
 
 end
 
@@ -36,7 +26,7 @@ function get_Fₙ(
   RBInfo::Info,
   RBVars::StokesSTGRB)
 
-  get_Fₙ(RBInfo, RBVars.P)
+  get_Fₙ(RBInfo, RBVars.Poisson)
 
 end
 
@@ -44,7 +34,7 @@ function get_Hₙ(
   RBInfo::Info,
   RBVars::StokesSTGRB)
 
-  get_Hₙ(RBInfo, RBVars.P)
+  get_Hₙ(RBInfo, RBVars.Poisson)
 
 end
 
@@ -60,7 +50,7 @@ function assemble_affine_matrices(
     RBVars.Bₙ = zeros(T, RBVars.nₛᵖ, RBVars.nₛᵘ, 1)
     RBVars.Bₙ[:,:,1] = (RBVars.Φₛᵖ)' * B * RBVars.Φₛᵘ
   else
-    assemble_affine_matrices(RBInfo, RBVars.P, var)
+    assemble_affine_matrices(RBInfo, RBVars.Poisson, var)
   end
 
 end
@@ -72,7 +62,7 @@ function assemble_reduced_mat_MDEIM(
   row_idx::Vector{Int},
   var::String)
 
-  assemble_reduced_mat_MDEIM(RBInfo, RBVars.P, MDEIM_mat, row_idx, var)
+  assemble_reduced_mat_MDEIM(RBInfo, RBVars.Poisson, MDEIM_mat, row_idx, var)
 
 end
 
@@ -81,7 +71,7 @@ function assemble_affine_vectors(
   RBVars::StokesSTGRB,
   var::String)
 
-  assemble_affine_vectors(RBInfo, RBVars.P, var)
+  assemble_affine_vectors(RBInfo, RBVars.Poisson, var)
 
 end
 
@@ -91,7 +81,7 @@ function assemble_reduced_mat_DEIM(
   DEIM_mat::Matrix,
   var::String)
 
-  assemble_reduced_mat_DEIM(RBInfo, RBVars.P, DEIM_mat, var)
+  assemble_reduced_mat_DEIM(RBInfo, RBVars.Poisson, DEIM_mat, var)
 
 end
 
@@ -104,7 +94,7 @@ function assemble_offline_structures(
     operators = set_operators(RBInfo, RBVars)
   end
 
-  assemble_offline_structures(RBInfo, RBVars.P, operators)
+  assemble_offline_structures(RBInfo, RBVars.Poisson, operators)
 
   RBVars.offline_time += @elapsed begin
     if "B" ∈ operators
@@ -132,7 +122,7 @@ function get_affine_structures(
   RBInfo::Info,
   RBVars::StokesSTGRB)
 
-  operators = get_affine_structures(RBInfo, RBVars.P)
+  operators = get_affine_structures(RBInfo, RBVars.Poisson)
   append!(operators, get_Bₙ(RBInfo, RBVars))
 
   return operators
@@ -143,7 +133,7 @@ function get_Q(
   RBInfo::Info,
   RBVars::StokesSTGRB)
 
-  get_Q(RBInfo, RBVars.P)
+  get_Q(RBInfo, RBVars.Poisson)
 
 end
 
@@ -154,7 +144,7 @@ function get_RB_LHS_blocks(
   θᵃ::Matrix,
   θᵇ::Matrix) where T
 
-  get_RB_LHS_blocks(RBInfo, RBVars.P, θᵐ, θᵃ)
+  get_RB_LHS_blocks(RBInfo, RBVars.Poisson, θᵐ, θᵃ)
 
   Φₜᵘᵖ = RBVars.Φₜᵘ' * RBVars.Φₜᵖ
   Φₜᵘᵖ₁ = RBVars.Φₜᵘ[2:end,:]' * RBVars.Φₜᵖ[1:end-1,:]
@@ -180,7 +170,7 @@ function get_RB_RHS_blocks(
 
   println("Assembling RHS")
 
-  get_RB_RHS_blocks(RBInfo, RBVars.P, θᶠ, θʰ)
+  get_RB_RHS_blocks(RBInfo, RBVars.Poisson, θᶠ, θʰ)
 
   push!(RBVars.RHSₙ, Matrix{T}(undef,0,0))
 
@@ -192,8 +182,8 @@ function get_RB_system(
   RBVars::StokesSTGRB,
   Param::ParametricInfoUnsteady)
 
-  initialize_RB_system(RBVars.S)
-  initialize_online_time(RBVars.S)
+  initialize_RB_system(RBVars.Steady)
+  initialize_online_time(RBVars.Steady)
 
   LHS_blocks = [1, 2, 3]
   RHS_blocks = [1]
@@ -201,7 +191,7 @@ function get_RB_system(
   RBVars.online_time = @elapsed begin
     get_Q(RBInfo, RBVars)
 
-    operators = get_system_blocks(RBInfo,RBVars.S,LHS_blocks,RHS_blocks)
+    operators = get_system_blocks(RBInfo,RBVars.Steady,LHS_blocks,RHS_blocks)
 
     θᵐ, θᵃ, θᶠ, θʰ, θᵇ  = get_θ(FEMSpace, RBInfo, RBVars, Param)
 
@@ -218,7 +208,7 @@ function get_RB_system(
     end
   end
 
-  save_system_blocks(RBInfo,RBVars.S,LHS_blocks,RHS_blocks,operators)
+  save_system_blocks(RBInfo,RBVars.Steady,LHS_blocks,RHS_blocks,operators)
 
 end
 
@@ -228,7 +218,7 @@ function build_param_RHS(
   RBVars::StokesSTGRB,
   Param::ParametricInfoUnsteady)
 
-  build_param_RHS(FEMSpace, RBInfo, RBVars.P, Param)
+  build_param_RHS(FEMSpace, RBInfo, RBVars.Poisson, Param)
   push!(RBVars.RHSₙ, zeros(RBVars.nᵖ,1))
 
 end
@@ -240,14 +230,7 @@ function get_θ(
   Param::ParametricInfoUnsteady)
 
   θᵇ = get_θᵇ(FEMSpace, RBInfo, RBVars, Param)
-  #=
-  θᵃ = get_θᵃ(FEMSpace, RBInfo, RBVars, Param)
-  if !RBInfo.build_parametric_RHS
-    θᶠ, θʰ = get_θᶠʰ(FEMSpace, RBInfo, RBVars, Param)
-  else
-    θᶠ, θʰ = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
-  end =#
 
-  return get_θ(FEMSpace, RBInfo, RBVars.P, Param)..., θᵇ
+  return get_θ(FEMSpace, RBInfo, RBVars.Poisson, Param)..., θᵇ
 
 end

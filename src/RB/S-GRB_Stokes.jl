@@ -2,7 +2,7 @@ function get_Aₙ(
   RBInfo::Info,
   RBVars::StokesSGRB)
 
-  get_Aₙ(RBInfo, RBVars.P)
+  get_Aₙ(RBInfo, RBVars.Poisson)
 
 end
 
@@ -27,7 +27,7 @@ function get_Fₙ(
   RBInfo::Info,
   RBVars::StokesSGRB)
 
-  get_Fₙ(RBInfo, RBVars.P)
+  get_Fₙ(RBInfo, RBVars.Poisson)
 
 end
 
@@ -35,7 +35,7 @@ function get_Hₙ(
   RBInfo::Info,
   RBVars::StokesSGRB)
 
-  get_Hₙ(RBInfo, RBVars.P)
+  get_Hₙ(RBInfo, RBVars.Poisson)
 
 end
 
@@ -60,7 +60,7 @@ function assemble_reduced_mat_MDEIM(
   MDEIM_mat::Matrix,
   row_idx::Vector)
 
-  assemble_reduced_mat_MDEIM(RBVars.P, MDEIM_mat, row_idx)
+  assemble_reduced_mat_MDEIM(RBVars.Poisson, MDEIM_mat, row_idx)
 
 end
 
@@ -69,7 +69,7 @@ function assemble_affine_vectors(
   RBVars::StokesSGRB,
   var::String)
 
-  assemble_affine_vectors(RBInfo, RBVars.P, var)
+  assemble_affine_vectors(RBInfo, RBVars.Poisson, var)
 
 end
 
@@ -78,7 +78,7 @@ function assemble_reduced_mat_DEIM(
   DEIM_mat::Matrix,
   var::String)
 
-  assemble_reduced_mat_DEIM(RBVars.P, DEIM_mat, var)
+  assemble_reduced_mat_DEIM(RBVars.Poisson, DEIM_mat, var)
 
 end
 
@@ -91,7 +91,7 @@ function assemble_offline_structures(
     operators = set_operators(RBInfo, RBVars)
   end
 
-  assemble_offline_structures(RBInfo, RBVars.P, operators)
+  assemble_offline_structures(RBInfo, RBVars.Poisson, operators)
 
   RBVars.offline_time += @elapsed begin
     if "B" ∈ operators
@@ -119,7 +119,7 @@ function get_affine_structures(
   RBInfo::ROMInfoSteady,
   RBVars::StokesSteady)
 
-  operators = get_affine_structures(RBInfo, RBVars.P)
+  operators = get_affine_structures(RBInfo, RBVars.Poisson)
   append!(operators, get_Bₙ(RBInfo, RBVars))
 
   operators
@@ -130,7 +130,7 @@ function get_Q(
   RBInfo::Info,
   RBVars::StokesSGRB)
 
-  get_Q(RBInfo, RBVars.P)
+  get_Q(RBInfo, RBVars.Poisson)
 
 end
 
@@ -196,6 +196,6 @@ function get_θ(
     θᶠ, θʰ = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
   end =#
 
-  return get_θ(FEMSpace, RBInfo, RBVars.P, Param)..., θᵇ
+  return get_θ(FEMSpace, RBInfo, RBVars.Poisson, Param)..., θᵇ
 
 end

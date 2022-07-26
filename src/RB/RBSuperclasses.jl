@@ -5,6 +5,8 @@ abstract type PoissonSteady{T} <: RBSteadyProblem{T} end
 abstract type PoissonUnsteady{T} <: RBUnsteadyProblem{T} end
 abstract type StokesSteady{T} <: RBSteadyProblem{T} end
 abstract type StokesUnsteady{T} <: RBUnsteadyProblem{T} end
+abstract type NavierStokesSteady{T} <: RBSteadyProblem{T} end
+abstract type NavierStokesUnsteady{T} <: RBUnsteadyProblem{T} end
 
 function init_PoissonSGRB_variables(::Type{T}) where T
   Sᵘ = Matrix{T}(undef,0,0)
@@ -112,6 +114,13 @@ function init_StokesSTGRB_variables(::Type{T}) where T
 
 end
 
+function init_NavierStokesSGRB_variables(::Type{T}) where T
+  Cₙ = Array{T}(undef,0,0,0)
+
+  Cₙ
+
+end
+
 mutable struct PoissonSGRB{T} <: PoissonSteady{T}
   Sᵘ::Matrix{T}; Φₛᵘ::Matrix{T}; ũ::Matrix{T}; uₙ::Matrix{T}; û::Matrix{T}; Aₙ::Array{T}; Fₙ::Matrix{T};
   Hₙ::Matrix{T}; Xᵘ₀::SparseMatrixCSC{T}; LHSₙ::Vector{Matrix{T}}; RHSₙ::Vector{Matrix{T}}; MDEIM_mat_A::Matrix{T};
@@ -133,7 +142,7 @@ mutable struct PoissonSPGRB{T} <: PoissonSteady{T}
 end
 
 mutable struct PoissonSTGRB{T} <: PoissonUnsteady{T}
-  S::PoissonSGRB{T}; Φₜᵘ::Matrix{T}; Mₙ::Array{T}; MDEIM_mat_M::Matrix{T}; MDEIMᵢ_M::Matrix{T};
+  Steady::PoissonSGRB{T}; Φₜᵘ::Matrix{T}; Mₙ::Array{T}; MDEIM_mat_M::Matrix{T}; MDEIMᵢ_M::Matrix{T};
   MDEIM_idx_M::Vector{Int}; row_idx_M::Vector{Int}; sparse_el_M::Vector{Int};
   MDEIM_idx_time_A::Vector{Int}; MDEIM_idx_time_M::Vector{Int};
   DEIM_idx_time_F::Vector{Int}; DEIM_idx_time_H::Vector{Int};
@@ -141,7 +150,7 @@ mutable struct PoissonSTGRB{T} <: PoissonUnsteady{T}
 end
 
 mutable struct PoissonSTPGRB{T} <: PoissonUnsteady{T}
-  S::PoissonSPGRB{T}; Φₜᵘ::Matrix{T}; Mₙ::Array{T}; MDEIM_mat_M::Matrix{T}; MDEIMᵢ_M::Matrix{T};
+  Steady::PoissonSPGRB{T}; Φₜᵘ::Matrix{T}; Mₙ::Array{T}; MDEIM_mat_M::Matrix{T}; MDEIMᵢ_M::Matrix{T};
   MDEIM_idx_M::Vector{Int}; row_idx_M::Vector{Int}; sparse_el_M::Vector{Int};
   MDEIM_idx_time_A::Vector{Int}; MDEIM_idx_time_M::Vector{Int};
   DEIM_idx_time_F::Vector{Int}; DEIM_idx_time_H::Vector{Int};
@@ -149,14 +158,22 @@ mutable struct PoissonSTPGRB{T} <: PoissonUnsteady{T}
 end
 
 mutable struct StokesSGRB{T} <: StokesSteady{T}
-  P::PoissonSGRB{T}; Sᵖ::Matrix{T}; Φₛᵖ::Matrix{T}; p̃::Matrix{T}; pₙ::Matrix{T};
+  Poisson::PoissonSGRB{T}; Sᵖ::Matrix{T}; Φₛᵖ::Matrix{T}; p̃::Matrix{T}; pₙ::Matrix{T};
   p̂::Matrix{T}; Bₙ::Array{T}; Xᵘ::SparseMatrixCSC{T};
   Xᵖ₀::SparseMatrixCSC{T}; Nₛᵖ::Int; nₛᵖ::Int
 end
 
 mutable struct StokesSTGRB{T} <: StokesUnsteady{T}
-  P::PoissonSTGRB{T}; S::StokesSGRB{T}; Φₜᵖ::Matrix{T}; Nᵖ::Int;
+  Poisson::PoissonSTGRB{T}; Steady::StokesSGRB{T}; Φₜᵖ::Matrix{T}; Nᵖ::Int;
   nₜᵖ::Int; nᵖ::Int
+end
+
+mutable struct NavierStokesSGRB{T} <: NavierStokesSteady{T}
+  Stokes::StokesSGRB{T}; Cₙ::Array{T};
+end
+
+mutable struct NavierStokesSTGRB{T} <: NavierStokesUnsteady{T}
+  Stokes::StokesSTGRB{T}; Steady::NavierStokesSGRB{T}
 end
 
 function setup(::NTuple{1,Int}, ::Type{T}) where T
@@ -200,12 +217,27 @@ function setup(::NTuple{6,Int}, ::Type{T}) where T
 
 end
 
+function setup(::NTuple{7,Int}, ::Type{T}) where T
+
+  NT5 = get_NTuple(5, Int)
+  StokesSGRB{T}(setup(NT5, T), init_NavierStokesSGRB_variables(T)...)
+
+end
+
+function setup(::NTuple{8,Int}, ::Type{T}) where T
+
+  NT6 = get_NTuple(6, Int)
+  NT7 = get_NTuple(7, Int)
+  StokesSTGRB{T}(setup(NT6, T), setup(NT7, T))
+
+end
+
 function Base.getproperty(RBVars::PoissonUnsteady, sym::Symbol)
   if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
     :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A, :DEIM_mat_F,
     :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H, :DEIM_idx_H,
     :sparse_el_H, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :offline_time, :online_time)
-    getfield(RBVars.S, sym)
+    getfield(RBVars.Steady, sym)
   else
     getfield(RBVars, sym)
   end
@@ -216,7 +248,7 @@ function Base.setproperty!(RBVars::PoissonUnsteady, sym::Symbol, x::T) where T
     :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A, :DEIM_mat_F,
     :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H, :DEIM_idx_H,
     :sparse_el_H, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :offline_time, :online_time)
-    setfield!(RBVars.S, sym, x)::T
+    setfield!(RBVars.Steady, sym, x)::T
   else
     setfield!(RBVars, sym, x)::T
   end
@@ -227,7 +259,7 @@ function Base.getproperty(RBVars::StokesSGRB, sym::Symbol)
     :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A, :DEIM_mat_F,
     :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H, :DEIM_idx_H,
     :sparse_el_H, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :offline_time, :online_time)
-    getfield(RBVars.P, sym)
+    getfield(RBVars.Poisson, sym)
   else
     getfield(RBVars, sym)
   end
@@ -238,7 +270,7 @@ function Base.setproperty!(RBVars::StokesSGRB, sym::Symbol, x::T) where T
     :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A, :DEIM_mat_F,
     :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H, :DEIM_idx_H,
     :sparse_el_H, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :offline_time, :online_time)
-    setfield!(RBVars.P, sym, x)::T
+    setfield!(RBVars.Poisson, sym, x)::T
   else
     setfield!(RBVars, sym, x)::T
   end
@@ -252,9 +284,9 @@ function Base.getproperty(RBVars::StokesSTGRB, sym::Symbol)
     :Φₜᵘ, :Mₙ, :MDEIM_mat_M, :MDEIMᵢ_M, :MDEIM_idx_M, :row_idx_M, :sparse_el_M,
     :MDEIM_idx_time_A, :MDEIM_idx_time_M, :DEIM_idx_time_F, :DEIM_idx_time_H,
     :Nₜ, :Nᵘ, :nₜᵘ, :nᵘ, :Qᵐ)
-    getfield(RBVars.S, sym)
+    getfield(RBVars.Steady, sym)
   elseif sym in (:Sᵖ, :Φₛᵘ, :p̃, :pₙ, :p̂, :Bₙ, :Xᵘ, :Xᵖ₀, :Nₛᵖ, :nₛᵖ)
-    getfield(RBVars.P, sym)
+    getfield(RBVars.Poisson, sym)
   else
     getfield(RBVars, sym)
   end
@@ -268,9 +300,61 @@ function Base.setproperty!(RBVars::StokesSTGRB, sym::Symbol, x::T) where T
     :Φₜᵘ, :Mₙ, :MDEIM_mat_M, :MDEIMᵢ_M, :MDEIM_idx_M, :row_idx_M, :sparse_el_M,
     :MDEIM_idx_time_A, :MDEIM_idx_time_M, :DEIM_idx_time_F, :DEIM_idx_time_H,
     :Nₜ, :Nᵘ, :nₜᵘ, :nᵘ, :Qᵐ)
-    setfield!(RBVars.S, sym, x)::T
+    setfield!(RBVars.Steady, sym, x)::T
   elseif sym in (:Sᵖ, :Φₛᵘ, :p̃, :pₙ, :p̂, :Bₙ, :Xᵘ, :Xᵖ₀, :Nₛᵖ, :nₛᵖ)
-    setfield!(RBVars.P, sym, x)::T
+    setfield!(RBVars.Poisson, sym, x)::T
+  else
+    setfield!(RBVars, sym, x)::T
+  end
+end
+
+function Base.getproperty(RBVars::NavierStokesSGRB, sym::Symbol)
+  if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
+    :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A, :DEIM_mat_F,
+    :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H, :DEIM_idx_H,
+    :sparse_el_H, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :offline_time, :online_time,
+    :Sᵖ, :Φₛᵘ, :p̃, :pₙ, :p̂, :Bₙ, :Xᵘ, :Xᵖ₀, :Nₛᵖ, :nₛᵖ)
+    getfield(RBVars.Stokes, sym)
+  else
+    getfield(RBVars, sym)
+  end
+end
+
+function Base.setproperty!(RBVars::NavierStokesSGRB, sym::Symbol, x::T) where T
+  if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
+    :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A, :DEIM_mat_F,
+    :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H, :DEIM_idx_H,
+    :sparse_el_H, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :offline_time, :online_time,
+    :Sᵖ, :Φₛᵘ, :p̃, :pₙ, :p̂, :Bₙ, :Xᵘ, :Xᵖ₀, :Nₛᵖ, :nₛᵖ)
+    setfield!(RBVars.Stokes, sym, x)::T
+  else
+    setfield!(RBVars, sym, x)::T
+  end
+end
+
+function Base.getproperty(RBVars::NavierStokesSTGRB, sym::Symbol)
+  if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
+    :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A, :DEIM_mat_F,
+    :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H, :DEIM_idx_H,
+    :sparse_el_H, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :offline_time, :online_time,
+    :Sᵖ, :Φₛᵘ, :p̃, :pₙ, :p̂, :Bₙ, :Xᵘ, :Xᵖ₀, :Nₛᵖ, :nₛᵖ)
+    getfield(RBVars.Steady, sym)
+  elseif sym in (:Φₜᵖ, :Nᵖ, :nₜᵖ, :nᵖ)
+    getfield(RBVars.Stokes, sym)
+  else
+    getfield(RBVars, sym)
+  end
+end
+
+function Base.setproperty!(RBVars::NavierStokesSTGRB, sym::Symbol, x::T) where T
+  if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
+    :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A, :DEIM_mat_F,
+    :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H, :DEIM_idx_H,
+    :sparse_el_H, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :offline_time, :online_time,
+    :Sᵖ, :Φₛᵘ, :p̃, :pₙ, :p̂, :Bₙ, :Xᵘ, :Xᵖ₀, :Nₛᵖ, :nₛᵖ)
+    setfield!(RBVars.Steady, sym, x)::T
+  elseif sym in (:Φₜᵖ, :Nᵖ, :nₜᵖ, :nᵖ)
+    setfield!(RBVars.Stokes, sym, x)::T
   else
     setfield!(RBVars, sym, x)::T
   end

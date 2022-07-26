@@ -4,25 +4,25 @@ function plot_θ_comparison(timesθ, θ, θ_approx, n)
     xaxis_title="time [s]", legend=attr(x=0.375,y=1.05,yanchor="top",orientation="h"))
 
   θ_plt = hcat(θ, θ_approx)
-  sel_colors = ["black","blue"]
+  sel_colors = ["black","red"]
   sel_dashes = ["","dash"]
   names = ["θᵃ", "θᵃ approx"]
   traces = [scatter(x=timesθ,y=θ_plt[:,i],name=names[i],
     line=attr(width=4,color=sel_colors[i],dash=sel_dashes[i])) for i=1:size(θ_plt)[2]]
   p = plot(traces,layout)
   display(p)
-  #savefig(p, joinpath("/home/user1/git_repos/NicholasPhD/Mabla_results/cube20x20x20.json/plots/θᵃ$n.eps"))
+  savefig(p, joinpath("/home/user1/git_repos/NicholasPhD/Mabla_results/cube20x20x20.json/plots/θᵃ$n.eps"))
 
 end
 
 function make_θ_plot(n::Int)
   timesθ = get_timesθ(FEMInfo)
-  pp = "/home/user1/git_repos/Mabla.jl/tests/unsteady/poisson/case3/cube20x20x20.json/ST-GRB_st_-$n/ROM_structures/θᵃ.csv"
+  pp = "/home/user1/git_repos/NicholasPhD/Mabla_results/cube20x20x20.json/ST-GRB_st_-$n/ROM_structures/θᵃ.csv"
   θᵃapp = load_CSV(Vector{Float}(undef,0),pp)
-  θᵃapp = reshape(θᵃapp,:,50)
-  pp = "/home/user1/git_repos/Mabla.jl/tests/unsteady/poisson/case3/cube20x20x20.json/ST-GRB_-$n/ROM_structures/θᵃ.csv"
+  θᵃapp = reshape(abs.(θᵃapp),:,50)
+  pp = "/home/user1/git_repos/NicholasPhD/Mabla_results/cube20x20x20.json/ST-GRB_-$n/ROM_structures/θᵃ.csv"
   θᵃ = load_CSV(Vector{Float}(undef,0),pp)
-  θᵃ = reshape(θᵃ,:,50)
+  θᵃ = reshape(abs.(θᵃ),:,50)
   plot_θ_comparison(timesθ, θᵃ[1,:], θᵃapp[1,:], n)
 end
 

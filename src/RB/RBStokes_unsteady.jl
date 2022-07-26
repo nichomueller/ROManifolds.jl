@@ -6,7 +6,7 @@ function get_snapshot_matrix(
   RBInfo::ROMInfoUnsteady,
   RBVars::StokesUnsteady{T}) where T
 
-  get_snapshot_matrix(RBInfo, RBVars.P)
+  get_snapshot_matrix(RBInfo, RBVars.Poisson)
 
   println("Importing the snapshot matrix for field u,
     number of snapshots considered: $(RBInfo.nₛ)")
@@ -24,23 +24,12 @@ function PODs_space(
   RBInfo::Info,
   RBVars::StokesUnsteady)
 
-  PODs_space(RBInfo, RBVars.P)
+  PODs_space(RBInfo, RBVars.Poisson)
 
   println("Performing the spatial POD for field p, using a tolerance of $(RBInfo.ϵₛ)")
-  get_norm_matrix(RBInfo, RBVars.S)
+  get_norm_matrix(RBInfo, RBVars.Steady)
   RBVars.Φₛᵖ = POD(RBVars.Sᵖ, RBInfo.ϵₛ, RBVars.Xᵖ₀)
   (RBVars.Nₛᵖ, RBVars.nₛᵖ) = size(RBVars.Φₛᵖ)
-
-end
-
-function supr_enrichment_space(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady)
-  #MODIFY#
-
-  supr_primal = primal_supremizers(RBInfo, RBVars.S)
-  RBVars.Φₛᵘ = hcat(RBVars.Φₛᵘ, supr_primal)
-  RBVars.nₛᵘ = size(RBVars.Φₛᵘ)[2]
 
 end
 
@@ -48,7 +37,7 @@ function PODs_time(
   RBInfo::ROMInfoUnsteady,
   RBVars::StokesUnsteady{T}) where T
 
-  PODs_time(RBInfo, RBVars.P)
+  PODs_time(RBInfo, RBVars.Poisson)
 
   println("Performing the temporal POD for field p, using a tolerance of $(RBInfo.ϵₜ)")
 
@@ -114,7 +103,7 @@ function build_reduced_basis(
 
   RBVars.offline_time += @elapsed begin
     PODs_space(RBInfo, RBVars)
-    supr_enrichment_space(RBInfo, RBVars)
+    supr_enrichment_space(RBInfo, RBVars.Steady)
     PODs_time(RBInfo, RBVars)
     time_supremizers(RBVars)
   end
@@ -139,7 +128,7 @@ function import_reduced_basis(
   RBInfo::ROMInfoUnsteady{T},
   RBVars::StokesUnsteady) where T
 
-  import_reduced_basis(RBInfo, RBVars.P)
+  import_reduced_basis(RBInfo, RBVars.Poisson)
 
   println("Importing the reduced basis for field p")
 
@@ -156,7 +145,7 @@ end
 function index_mapping(i::Int, j::Int, RBVars::StokesUnsteady, var="u")
 
   if var == "u"
-    return index_mapping(i, j, RBVars.P)
+    return index_mapping(i, j, RBVars.Poisson)
   elseif var == "p"
     return Int((i-1) * RBVars.nₜᵖ + j)
   else
@@ -170,11 +159,11 @@ function get_generalized_coordinates(
   RBVars::StokesUnsteady{T},
   snaps::Vector{Int}) where T
 
-  if check_norm_matrix(RBVars.S)
+  if check_norm_matrix(RBVars.Steady)
     get_norm_matrix(RBInfo, RBVars)
   end
 
-  get_generalized_coordinates(RBInfo, RBVars.P)
+  get_generalized_coordinates(RBInfo, RBVars.Poisson)
 
   p̂ = zeros(T, RBVars.nᵖ, length(snaps))
   Φₛᵖ_normed = RBVars.Xᵖ₀ * RBVars.Φₛᵖ
@@ -211,7 +200,7 @@ function set_operators(
   RBInfo::Info,
   RBVars::StokesUnsteady)
 
-  append!(["B"], set_operators(RBInfo, RBVars.P))
+  append!(["B"], set_operators(RBInfo, RBVars.Poisson))
 
 end
 
@@ -220,7 +209,7 @@ function assemble_MDEIM_matrices(
   RBVars::StokesUnsteady,
   var::String)
 
-  assemble_MDEIM_matrices(RBInfo, RBVars.P, var)
+  assemble_MDEIM_matrices(RBInfo, RBVars.Poisson, var)
 
 end
 
@@ -229,7 +218,7 @@ function assemble_DEIM_vectors(
   RBVars::StokesUnsteady,
   var::String)
 
-  assemble_DEIM_vectors(RBInfo, RBVars.P, var)
+  assemble_DEIM_vectors(RBInfo, RBVars.Poisson, var)
 
 end
 
@@ -245,7 +234,7 @@ function get_M_DEIM_structures(
   RBInfo::ROMInfoUnsteady,
   RBVars::StokesUnsteady)
 
-  get_M_DEIM_structures(RBInfo, RBVars.P)
+  get_M_DEIM_structures(RBInfo, RBVars.Poisson)
 
 end
 
@@ -268,7 +257,7 @@ function get_θᵐ(
   RBVars::StokesUnsteady,
   Param::ParametricInfoUnsteady)
 
-  get_θᵐ(FEMSpace, RBInfo, RBVars.P, Param)
+  get_θᵐ(FEMSpace, RBInfo, RBVars.Poisson, Param)
 
 end
 
@@ -278,7 +267,7 @@ function get_θᵃ(
   RBVars::StokesUnsteady,
   Param::ParametricInfoUnsteady)
 
-  get_θᵃ(FEMSpace, RBInfo, RBVars.P, Param)
+  get_θᵃ(FEMSpace, RBInfo, RBVars.Poisson, Param)
 
 end
 
@@ -298,7 +287,7 @@ function get_θᶠʰ(
   RBVars::StokesUnsteady,
   Param::ParametricInfoUnsteady)
 
-  get_θᶠʰ(FEMSpace, RBInfo, RBVars.P, Param)
+  get_θᶠʰ(FEMSpace, RBInfo, RBVars.Poisson, Param)
 
 end
 
@@ -326,7 +315,7 @@ end
 
 function reconstruct_FEM_solution(RBVars::StokesUnsteady)
 
-  reconstruct_FEM_solution(RBVars.P)
+  reconstruct_FEM_solution(RBVars.Poisson)
 
   pₙ = reshape(RBVars.pₙ, (RBVars.nₜᵖ, RBVars.nₛᵖ))
   @fastmath RBVars.p̃ = RBVars.Φₛᵖ * (RBVars.Φₜᵖ * pₙ)'
@@ -388,7 +377,7 @@ function online_phase(
   model = DiscreteModelFromFile(get_mesh_path(RBInfo))
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id,RBInfo.FEMInfo,model)
 
-  get_norm_matrix(RBInfo, RBVars.S)
+  get_norm_matrix(RBInfo, RBVars.Steady)
   (ũ_μ,uₙ_μ,mean_uₕ_test,mean_pointwise_err_u,mean_H1_err,mean_H1_L2_err,
     H1_L2_err,p̃_μ,pₙ_μ,mean_pₕ_test,mean_pointwise_err_p,mean_L2_err,mean_L2_L2_err,
     L2_L2_err,mean_online_time,mean_reconstruction_time) =
@@ -499,13 +488,13 @@ function loop_on_params(
     end
 
     H1_err_nb, H1_L2_err_nb = compute_errors(
-      RBVars.P, uₕ_test, RBVars.ũ, RBVars.Xᵘ₀)
+      RBVars.Poisson, uₕ_test, RBVars.ũ, RBVars.Xᵘ₀)
     H1_L2_err[i_nb] = H1_L2_err_nb
     mean_H1_err += H1_err_nb / length(param_nbs)
     mean_H1_L2_err += H1_L2_err_nb / length(param_nbs)
     mean_pointwise_err_u += abs.(uₕ_test-RBVars.ũ)/length(param_nbs)
     L2_err_nb, L2_L2_err_nb = compute_errors(
-      RBVars.P, pₕ_test, RBVars.p̃, RBVars.Xᵖ₀)
+      RBVars.Poisson, pₕ_test, RBVars.p̃, RBVars.Xᵖ₀)
     L2_L2_err[i_nb] = L2_L2_err_nb
     mean_L2_err += L2_err_nb / length(param_nbs)
     mean_L2_L2_err += L2_L2_err_nb / length(param_nbs)
