@@ -28,10 +28,12 @@ end
 function get_problem_id(problem_name::String)
   if problem_name == "poisson"
     return (0,)
-  elseif problem_name == "stokes"
+  elseif problem_name == "ADR"
     return (0,0)
-  elseif problem_name == "navier-stokes"
+  elseif problem_name == "stokes"
     return (0,0,0)
+  elseif problem_name == "navier-stokes"
+    return (0,0,0,0)
   else
     error("unimplemented")
   end
@@ -62,6 +64,13 @@ function nonlinearity_lifting_op(FEMInfo::Info)
   else
     return 3
   end
+end
+
+function get_h(FEMSpace::Problem)
+  Λ = SkeletonTriangulation(FEMSpace.Ω)
+  dΛ = Measure(Λ, 2)
+  h = get_array(∫(1)dΛ)[1]
+  h
 end
 
 function get_timesθ(FEMInfo::UnsteadyInfo)

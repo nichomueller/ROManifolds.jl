@@ -152,12 +152,12 @@ function newton(
   res::F,
   Jₙ::Matrix{T},
   u₀::Vector{T},
-  ε::Float,
+  ϵ::Float,
   max_k::Int) where T
 
   k = 0
   uᵏ = u₀
-  while k ≤ max_k && norm(res(uᵏ)) ≥ ε
+  while k ≤ max_k && norm(res(uᵏ)) ≥ ϵ
     uᵏ -= Jₙ \ res(uᵏ)::Vector{T}
     k += 1
   end

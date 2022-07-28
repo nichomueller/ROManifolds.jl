@@ -141,6 +141,55 @@ function assemble_primal_op(FEMSpace::UnsteadyProblem)
 
 end
 
+function assemble_advection(
+  FEMSpace::FEMSpaceADRSteady,
+  ::SteadyInfo,
+  Param::ParametricInfoSteady)
+
+
+  assemble_matrix(∫(FEMSpace.ϕᵥ * (Param.b⋅∇(FEMSpace.ϕᵤ)))*FEMSpace.dΩ,
+    FEMSpace.V, FEMSpace.V₀)
+
+
+end
+
+function assemble_advection(
+  FEMSpace::FEMSpaceADRUnsteady,
+  FEMInfo::UnsteadyInfo,
+  Param::ParametricInfoUnsteady)
+
+  function advection(t)
+    if !FEMInfo.probl_nl["b"]
+      assemble_matrix(∫(FEMSpace.ϕᵥ * (Param.bₛ⋅∇(FEMSpace.ϕᵤ(t))))*FEMSpace.dΩ,
+        FEMSpace.V(t), FEMSpace.V₀)
+    else
+      assemble_matrix(∫(FEMSpace.ϕᵥ * (Param.b(t)⋅∇(FEMSpace.ϕᵤ(t))))*FEMSpace.dΩ,
+        FEMSpace.V(t), FEMSpace.V₀)
+    end
+  end
+
+end
+
+function assemble_convection(
+  FEMSpace::FEMSpaceNavierStokesSteady,
+  Param::ParametricInfoSteady)
+
+  C(u) = Param.Re * assemble_matrix(∫( FEMSpace.ϕᵥ ⊙ ((∇u')⋅u) )*FEMSpace.dΩ,
+    FEMSpace.V, FEMSpace.V₀)
+  C
+
+end
+
+function assemble_convection(
+  FEMSpace::FEMSpaceNavierStokesUnsteady,
+  Param::ParametricInfoUnsteady)
+
+  C(u,t) = Param.Re * assemble_matrix(∫( FEMSpace.ϕᵥ ⊙ ((∇u')⋅u) )*FEMSpace.dΩ,
+    FEMSpace.V(t), FEMSpace.V₀)
+  C
+
+end
+
 function assemble_forcing(
   FEMSpace::SteadyProblem,
   FEMInfo::SteadyInfo,
@@ -333,7 +382,7 @@ function assemble_lifting(
 
 end
 
-function assemble_second_lifting(
+function assemble_continuity_lifting(
   FEMSpace::FEMSpaceStokesUnsteady,
   FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady)
@@ -450,15 +499,21 @@ function assemble_FEM_structure(
   if var == "A"
     assemble_stiffness(FEMSpace,FEMInfo,Param)
   elseif var == "B"
+    assemble_advection(FEMSpace,FEMInfo,Param)
+  elseif var == "Bₚ"
     assemble_primal_op(FEMSpace)
   elseif var == "C"
-    assemble_convective_op(FEMSpace)
+    assemble_convection(FEMSpace,Param)
   elseif var == "F"
     assemble_forcing(FEMSpace,FEMInfo,Param)
   elseif var == "G"
     assemble_dirichlet_datum(FEMSpace,FEMInfo,Param)
   elseif var == "H"
     assemble_neumann_datum(FEMSpace,FEMInfo,Param)
+  elseif var == "L"
+    assemble_lifting(FEMSpace,FEMInfo,Param)
+  elseif var == "L_cont"
+    assemble_continuity_lifting(FEMSpace,FEMInfo,Param)
   elseif var == "M"
     assemble_mass(FEMSpace,FEMInfo,Param)
   elseif var == "Xᵘ"
