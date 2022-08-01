@@ -1,209 +1,106 @@
-include("RBPoisson_steady.jl")
-include("ST-GRB_Poisson.jl")
-include("ST-PGRB_Poisson.jl")
+include("RBADR_steady.jl")
+include("ST-GRB_ADR.jl")
 
 function get_snapshot_matrix(
   RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T}) where T
+  RBVars::ADRUnsteady{T}) where T
 
-  println("Importing the snapshot matrix for field u,
-    number of snapshots considered: $(RBInfo.nₛ)")
-  Sᵘ = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo),"uₕ.csv"),
-    DataFrame))[:,1:RBInfo.nₛ*RBVars.Nₜ]
-
-  RBVars.Sᵘ = Sᵘ
-  RBVars.Nₛᵘ = size(Sᵘ)[1]
-  RBVars.Nᵘ = RBVars.Nₛᵘ * RBVars.Nₜ
-
-  println("Dimension of the snapshot matrix for field u: $(size(Sᵘ))")
+  get_snapshot_matrix(RBInfo, RBVars.Poisson)
 
 end
 
-PODs_space(RBInfo::Info, RBVars::PoissonUnsteady) =
+PODs_space(RBInfo::Info, RBVars::ADRUnsteady) =
   PODs_space(RBInfo, RBVars.Steady)
 
 function PODs_time(
   RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T}) where T
+  RBVars::ADRUnsteady{T}) where T
 
-  println("Performing the temporal POD for field u, using a tolerance of $(RBInfo.ϵₜ)")
-
-  if RBInfo.time_reduction_technique == "ST-HOSVD"
-    Sᵘ = RBVars.Φₛᵘ' * RBVars.Sᵘ
-  else
-    Sᵘ = RBVars.Sᵘ
-  end
-  Sᵘₜ = mode₂_unfolding(Sᵘ, RBInfo.nₛ)
-
-  Φₜᵘ = POD(Sᵘₜ, RBInfo.ϵₜ)
-  RBVars.Φₜᵘ = Φₜᵘ
-  RBVars.nₜᵘ = size(Φₜᵘ)[2]
+  PODs_time(RBInfo, RBVars.Poisson)
 
 end
 
 function build_reduced_basis(
   RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady)
+  RBVars::ADRUnsteady)
 
-  println("Building the space-time reduced basis for field u")
-
-  RBVars.offline_time += @elapsed begin
-    PODs_space(RBInfo, RBVars)
-    PODs_time(RBInfo, RBVars)
-  end
-
-  RBVars.nᵘ = RBVars.nₛᵘ * RBVars.nₜᵘ
-  RBVars.Nᵘ = RBVars.Nₛᵘ * RBVars.Nₜ
-
-  if RBInfo.save_offline_structures
-    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.Paths.ROM_structures_path, "Φₛᵘ.csv"))
-    save_CSV(RBVars.Φₜᵘ, joinpath(RBInfo.Paths.ROM_structures_path, "Φₜᵘ.csv"))
-  end
-
-  return
+  build_reduced_basis(RBInfo, RBVars.Poisson)
 
 end
 
 function import_reduced_basis(
   RBInfo::Info,
-  RBVars::PoissonUnsteady{T}) where T
+  RBVars::ADRUnsteady{T}) where T
 
-  import_reduced_basis(RBInfo, RBVars.Steady)
-
-  println("Importing the temporal reduced basis for field u")
-  RBVars.Φₜᵘ = load_CSV(Matrix{T}(undef,0,0),
-    joinpath(RBInfo.Paths.ROM_structures_path, "Φₜᵘ.csv"))
-  RBVars.nₜᵘ = size(RBVars.Φₜᵘ)[2]
-  RBVars.nᵘ = RBVars.nₛᵘ * RBVars.nₜᵘ
+  import_reduced_basis(RBInfo, RBVars.Poisson)
 
 end
 
 function index_mapping(
   i::Int,
   j::Int,
-  RBVars::PoissonUnsteady)
+  RBVars::ADRUnsteady)
 
-  Int((i-1)*RBVars.nₜᵘ+j)
-
-end
-
-function get_generalized_coordinates(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T},
-  snaps::Vector{Int}) where T
-
-  if check_norm_matrix(RBVars.Steady)
-    get_norm_matrix(RBInfo, RBVars.Steady)
-  end
-
-  @assert maximum(snaps) ≤ RBInfo.nₛ
-
-  û = zeros(T, RBVars.nᵘ, length(snaps))
-  Φₛᵘ_normed = RBVars.Xᵘ₀ * RBVars.Φₛᵘ
-  Π = kron(Φₛᵘ_normed, RBVars.Φₜᵘ)::Matrix{T}
-
-  for (i, i_nₛ) = enumerate(snaps)
-    println("Assembling generalized coordinate relative to snapshot $(i_nₛ), field u")
-    S_i = RBVars.Sᵘ[:, (i_nₛ-1)*RBVars.Nₜ+1:i_nₛ*RBVars.Nₜ]
-    û[:, i] = sum(Π, dims=2) .* S_i
-  end
-
-  RBVars.û = û
-
-  if RBInfo.save_offline_structures
-    save_CSV(û, joinpath(RBInfo.Paths.ROM_structures_path, "û.csv"))
-  end
-
-end
-
-function test_offline_phase(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T}) where T
-
-  get_generalized_coordinates(RBInfo, RBVars, 1)
-
-  uₙ = reshape(RBVars.û, (RBVars.nₜᵘ, RBVars.nₛᵘ))
-  u_rec = RBVars.Φₛᵘ * (RBVars.Φₜᵘ * uₙ)'
-  err = zeros(T, RBVars.Nₜ)
-  for i = 1:RBVars.Nₜ
-    err[i] = compute_errors(RBVars.Sᵘ[:, i], u_rec[:, i])
-  end
+  index_mapping(i, j, RBVars.Poisson)
 
 end
 
 function assemble_MDEIM_matrices(
   RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady,
+  RBVars::ADRUnsteady,
   var::String)
 
-  if var == "M"
+  if var == "B"
     println("The matrix $var is non-affine:
       running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
-    if isempty(RBVars.MDEIM_mat_M)
-      (RBVars.MDEIM_mat_M, RBVars.MDEIM_idx_M, RBVars.MDEIMᵢ_M, RBVars.row_idx_M,
-        RBVars.sparse_el_M, RBVars.MDEIM_idx_time_M) = MDEIM_offline(RBInfo, "M")
+    if isempty(RBVars.MDEIM_mat_B)
+      (RBVars.MDEIM_mat_B, RBVars.MDEIM_idx_B, RBVars.MDEIMᵢ_B, RBVars.row_idx_B,
+        RBVars.sparse_el_B, RBVars.MDEIM_idx_time_B) = MDEIM_offline(RBInfo, "B")
     end
     assemble_reduced_mat_MDEIM(
-      RBVars,RBVars.MDEIM_mat_M,RBVars.row_idx_M,"M")
-  elseif var == "A"
-    if isempty(RBVars.MDEIM_mat_A)
-      (RBVars.MDEIM_mat_A, RBVars.MDEIM_idx_A, RBVars.MDEIMᵢ_A,
-      RBVars.row_idx_A,RBVars.sparse_el_A, RBVars.MDEIM_idx_time_A) = MDEIM_offline(RBInfo, "A")
+      RBVars,RBVars.MDEIM_mat_B,RBVars.row_idx_B,"B")
+  elseif var == "D"
+    if isempty(RBVars.MDEIM_mat_D)
+      (RBVars.MDEIM_mat_D, RBVars.MDEIM_idx_D, RBVars.MDEIMᵢ_D,
+      RBVars.row_idx_D,RBVars.sparse_el_D, RBVars.MDEIM_idx_time_D) = MDEIM_offline(RBInfo, "D")
     end
     assemble_reduced_mat_MDEIM(
-      RBVars,RBVars.MDEIM_mat_A,RBVars.row_idx_A,"A")
+      RBVars,RBVars.MDEIM_mat_D,RBVars.row_idx_D,"D")
   else
-    error("Unrecognized variable on which to perform MDEIM")
+    assemble_MDEIM_matrices(RBInfo, RBVars.Poisson, var)
   end
 
 end
 
 function assemble_DEIM_vectors(
   RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady,
+  RBVars::ADRUnsteady,
   var::String)
 
-  println("The vector $var is non-affine:
-    running the DEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
-
-  if var == "F"
-    if isempty(RBVars.DEIM_mat_F)
-       (RBVars.DEIM_mat_F, RBVars.DEIM_idx_F, RBVars.DEIMᵢ_F,
-          RBVars.sparse_el_F, RBVars.DEIM_idx_time_F) = DEIM_offline(RBInfo,"F")
-    end
-    assemble_reduced_mat_DEIM(RBVars,RBVars.DEIM_mat_F,"F")
-  elseif var == "H"
-    if isempty(RBVars.DEIM_mat_H)
-       (RBVars.DEIM_mat_H, RBVars.DEIM_idx_H, RBVars.DEIMᵢ_H,
-          RBVars.sparse_el_H, RBVars.DEIM_idx_time_H) = DEIM_offline(RBInfo,"H")
-    end
-    assemble_reduced_mat_DEIM(RBVars, RBVars.DEIM_mat_H,"H")
-  else
-    error("Unrecognized variable on which to perform DEIM")
-  end
+  assemble_DEIM_vectors(RBInfo, RBVars.Poisson, var)
 
 end
 
 function save_M_DEIM_structures(
   RBInfo::Info,
-  RBVars::PoissonUnsteady)
+  RBVars::ADRUnsteady)
 
-  list_M_DEIM = (RBVars.MDEIM_mat_M, RBVars.MDEIMᵢ_M, RBVars.MDEIM_idx_M,
-    RBVars.sparse_el_M, RBVars.row_idx_M, RBVars.MDEIM_idx_time_A,
-    RBVars.MDEIM_idx_time_M, RBVars.DEIM_idx_time_F, RBVars.DEIM_idx_time_H)
-  list_names = ("MDEIM_mat_M", "MDEIMᵢ_M", "MDEIM_idx_M", "sparse_el_M",
-   "row_idx_M", "MDEIM_idx_time_A", "MDEIM_idx_time_M", "DEIM_idx_time_F", "DEIM_idx_time_H")
+  list_M_DEIM = (RBVars.MDEIM_mat_B, RBVars.MDEIMᵢ_B, RBVars.MDEIM_idx_B,
+    RBVars.sparse_el_B, RBVars.row_idx_B, RBVars.MDEIM_idx_time_B,
+    RBVars.MDEIM_mat_D, RBVars.MDEIMᵢ_D, RBVars.MDEIM_idx_D,
+    RBVars.sparse_el_D, RBVars.row_idx_D, RBVars.MDEIM_idx_time_D)
+  list_names = ("MDEIM_mat_B", "MDEIMᵢ_B", "MDEIM_idx_B", "sparse_el_B",
+   "row_idx_B", "MDEIM_idx_time_B", "MDEIM_mat_D", "MDEIMᵢ_D", "MDEIM_idx_D",
+   "sparse_el_D", "row_idx_D", "MDEIM_idx_time_D")
 
   save_structures_in_list(list_M_DEIM, list_names,
     RBInfo.Paths.ROM_structures_path)
-
-  save_M_DEIM_structures(RBInfo, RBVars.Steady)
 
 end
 
 function set_operators(
   RBInfo::Info,
-  RBVars::PoissonUnsteady)
+  RBVars::ADRUnsteady)
 
   vcat(["M"], set_operators(RBInfo, RBVars.Steady))
 
@@ -211,7 +108,7 @@ end
 
 function get_M_DEIM_structures(
   RBInfo::Info,
-  RBVars::PoissonUnsteady{T}) where T
+  RBVars::ADRUnsteady{T}) where T
 
   operators = String[]
 
@@ -221,6 +118,24 @@ function get_M_DEIM_structures(
         joinpath(RBInfo.Paths.ROM_structures_path, "MDEIM_idx_time_A.csv"))
     else
       append!(operators, ["A"])
+    end
+  end
+
+  if RBInfo.probl_nl["B"]
+    if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "MDEIM_idx_time_B.csv"))
+      RBVars.MDEIM_idx_time_B = load_CSV(Vector{Int}(undef,0),
+        joinpath(RBInfo.Paths.ROM_structures_path, "MDEIM_idx_time_B.csv"))
+    else
+      append!(operators, ["B"])
+    end
+  end
+
+  if RBInfo.probl_nl["D"]
+    if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "MDEIM_idx_time_D.csv"))
+      RBVars.MDEIM_idx_time_D = load_CSV(Vector{Int}(undef,0),
+        joinpath(RBInfo.Paths.ROM_structures_path, "MDEIM_idx_time_D.csv"))
+    else
+      append!(operators, ["D"])
     end
   end
 
@@ -270,7 +185,7 @@ end
 
 function get_offline_structures(
   RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady)
+  RBVars::ADRUnsteady)
 
   operators = String[]
   append!(operators, get_affine_structures(RBInfo, RBVars))
@@ -284,126 +199,101 @@ end
 function get_θᵐ(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T},
+  RBVars::ADRUnsteady{T},
   Param::ParametricInfoUnsteady) where T
 
-  timesθ = get_timesθ(RBInfo)
-
-  if !RBInfo.probl_nl["M"]
-    θᵐ = T.(zeros(T, 1, RBVars.Nₜ))
-    for (i_t, t_θ) = enumerate(timesθ)
-      θᵐ[i_t] = Param.mₜ(t_θ)
-    end
-  else
-    if RBInfo.st_M_DEIM
-      red_timesθ = timesθ[RBVars.MDEIM_idx_time_M]
-      M_μ_sparse = T.(build_sparse_mat(
-        FEMSpace,FEMInfo,Param,RBVars.sparse_el_M,red_timesθ;var="M"))
-      θᵐ = interpolated_θ(RBVars, M_μ_sparse, timesθ, RBVars.MDEIMᵢ_M,
-        RBVars.MDEIM_idx_M, RBVars.MDEIM_idx_time_M, RBVars.Qᵐ)
-    else
-      M_μ_sparse = T.(build_sparse_mat(
-        FEMSpace,FEMInfo,Param,RBVars.sparse_el_M,timesθ;var="M"))
-      θᵐ = (RBVars.MDEIMᵢ_M \
-        Matrix{T}(reshape(M_μ_sparse, :, RBVars.Nₜ)[RBVars.MDEIM_idx_M, :]))
-    end
-  end
-
-  θᵐ::Matrix{T}
+  get_θᵐ(FEMSpace, RBInfo, RBVars, Param)
 
 end
 
 function get_θᵃ(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T},
+  RBVars::ADRUnsteady{T},
+  Param::ParametricInfoUnsteady) where T
+
+  get_θᵃ(FEMSpace, RBInfo, RBVars, Param)
+
+end
+
+function get_θᵇ(
+  FEMSpace::UnsteadyProblem,
+  RBInfo::ROMInfoUnsteady,
+  RBVars::ADRUnsteady{T},
   Param::ParametricInfoUnsteady) where T
 
   timesθ = get_timesθ(RBInfo)
 
-  if !RBInfo.probl_nl["A"]
-    θᵃ = zeros(T, 1, RBVars.Nₜ)
+  if !RBInfo.probl_nl["B"]
+    θᵇ = T.(zeros(T, 1, RBVars.Nₜ))
     for (i_t, t_θ) = enumerate(timesθ)
-      θᵃ[i_t] = T.(Param.αₜ(t_θ,Param.μ))
+      θᵇ[i_t] = Param.bₜ(t_θ)
     end
   else
     if RBInfo.st_M_DEIM
-      red_timesθ = timesθ[RBVars.MDEIM_idx_time_A]
-      A_μ_sparse = T.(build_sparse_mat(
-        FEMSpace,FEMInfo,Param,RBVars.sparse_el_A,red_timesθ;var="A"))
-      θᵃ = interpolated_θ(RBVars, A_μ_sparse, timesθ, RBVars.MDEIMᵢ_A,
-        RBVars.MDEIM_idx_A, RBVars.MDEIM_idx_time_A, RBVars.Qᵃ)
+      red_timesθ = timesθ[RBVars.MDEIM_idx_time_B]
+      B_μ_sparse = T.(build_sparse_mat(
+        FEMSpace,FEMInfo,Param,RBVars.sparse_el_B,red_timesθ;var="B"))
+      θᵇ = interpolated_θ(RBVars, B_μ_sparse, timesθ, RBVars.MDEIMᵢ_B,
+        RBVars.MDEIM_idx_B, RBVars.MDEIM_idx_time_B, RBVars.Qᵐ)
     else
-      A_μ_sparse = build_sparse_mat(
-        FEMSpace,FEMInfo,Param,RBVars.sparse_el_A,timesθ;var="A")
-      θᵃ = (RBVars.MDEIMᵢ_A \
-        Matrix{T}(reshape(A_μ_sparse, :, RBVars.Nₜ)[RBVars.MDEIM_idx_A, :]))
+      B_μ_sparse = T.(build_sparse_mat(
+        FEMSpace,FEMInfo,Param,RBVars.sparse_el_B,timesθ;var="B"))
+      θᵇ = (RBVars.MDEIMᵢ_B \
+        Matrix{T}(reshape(B_μ_sparse, :, RBVars.Nₜ)[RBVars.MDEIM_idx_B, :]))
     end
   end
 
-  save_CSV(θᵃ, joinpath(RBInfo.Paths.ROM_structures_path, "θᵃ.csv"))
-  θᵃ::Matrix{T}
+  θᵇ::Matrix{T}
+
+end
+
+function get_θᵈ(
+  FEMSpace::UnsteadyProblem,
+  RBInfo::ROMInfoUnsteady,
+  RBVars::ADRUnsteady{T},
+  Param::ParametricInfoUnsteady) where T
+
+  timesθ = get_timesθ(RBInfo)
+
+  if !RBInfo.probl_nl["D"]
+    θᵈ = T.(zeros(T, 1, RBVars.Nₜ))
+    for (i_t, t_θ) = enumerate(timesθ)
+      θᵈ[i_t] = Param.σₜ(t_θ)
+    end
+  else
+    if RBInfo.st_M_DEIM
+      red_timesθ = timesθ[RBVars.MDEIM_idx_time_D]
+      D_μ_sparse = T.(build_sparse_mat(
+        FEMSpace,FEMInfo,Param,RBVars.sparse_el_D,red_timesθ;var="D"))
+      θᵈ = interpolated_θ(RBVars, D_μ_sparse, timesθ, RBVars.MDEIMᵢ_D,
+        RBVars.MDEIM_idx_D, RBVars.MDEIM_idx_time_D, RBVars.Qᵈ)
+    else
+      D_μ_sparse = T.(build_sparse_mat(
+        FEMSpace,FEMInfo,Param,RBVars.sparse_el_D,timesθ;var="D"))
+      θᵈ = (RBVars.MDEIMᵢ_D \
+        Matrix{T}(reshape(D_μ_sparse, :, RBVars.Nₜ)[RBVars.MDEIM_idx_D, :]))
+    end
+  end
+
+  θᵈ::Matrix{T}
 
 end
 
 function get_θᶠʰ(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T},
+  RBVars::ADRUnsteady{T},
   Param::ParametricInfoUnsteady) where T
 
-  if RBInfo.build_parametric_RHS
-    error("Cannot fetch θᶠ, θʰ if the RHS is built online")
-  end
-
-  timesθ = get_timesθ(RBInfo)
-
-  if !RBInfo.probl_nl["f"]
-    θᶠ = zeros(T, 1, RBVars.Nₜ)
-    for (i_t, t_θ) = enumerate(timesθ)
-      θᶠ[i_t] = T.(Param.fₜ(t_θ))
-    end
-  else
-    if RBInfo.st_M_DEIM
-      red_timesθ = timesθ[RBVars.DEIM_idx_time_F]
-      F_μ_sparse = T.(build_sparse_vec(
-        FEMSpace,FEMInfo, Param, RBVars.sparse_el_F, red_timesθ; var="F"))
-      θᶠ = interpolated_θ(RBVars, F_μ_sparse, timesθ, RBVars.DEIMᵢ_F,
-        RBVars.DEIM_idx_F, RBVars.DEIM_idx_time_F, RBVars.Qᶠ)
-    else
-      F_μ = build_sparse_vec(FEMSpace,FEMInfo, Param, RBVars.sparse_el_F,
-        timesθ; var="F")
-      θᶠ = (RBVars.DEIMᵢ_F \ Matrix{T}(F_μ[RBVars.DEIM_idx_F, :]))
-    end
-  end
-
-  if !RBInfo.probl_nl["h"]
-    θʰ = zeros(T, 1, RBVars.Nₜ)
-    for (i_t, t_θ) = enumerate(timesθ)
-      θʰ[i_t] = T.(Param.hₜ(t_θ))
-    end
-  else
-    if RBInfo.st_M_DEIM
-      red_timesθ = timesθ[RBVars.DEIM_idx_time_H]
-      H_μ_sparse = T.(build_sparse_vec(
-        FEMSpace,FEMInfo, Param, RBVars.sparse_el_H, red_timesθ; var="H"))
-      θʰ =  interpolated_θ(RBVars, H_μ_sparse, timesθ, RBVars.DEIMᵢ_H,
-        RBVars.DEIM_idx_H, RBVars.DEIM_idx_time_H, RBVars.Qʰ)
-    else
-      H_μ = build_sparse_vec(FEMSpace,FEMInfo, Param, RBVars.sparse_el_H,
-        timesθ; var="H")
-      θʰ = (RBVars.DEIMᵢ_H \ Matrix{T}(H_μ[RBVars.DEIM_idx_H, :]))
-    end
-  end
-
-  (θᶠ, θʰ)::Tuple{Matrix{T},Matrix{T}}
+  get_θᶠʰ(FEMSpace, RBInfo, RBVars, Param)
 
 end
 
 function solve_RB_system(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady,
+  RBVars::ADRUnsteady,
   Param::ParametricInfoUnsteady)
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
@@ -417,19 +307,17 @@ function solve_RB_system(
 
 end
 
-function reconstruct_FEM_solution(RBVars::PoissonUnsteady)
+function reconstruct_FEM_solution(RBVars::ADRUnsteady)
 
-  println("Reconstructing FEM solution from the newly computed RB one")
-  uₙ = reshape(RBVars.uₙ, (RBVars.nₜᵘ, RBVars.nₛᵘ))
-  @fastmath RBVars.ũ = RBVars.Φₛᵘ * (RBVars.Φₜᵘ * uₙ)'
+  reconstruct_FEM_solution(RBVars.Poisson)
 
 end
 
 function offline_phase(
   RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady)
+  RBVars::ADRUnsteady)
 
-  println("Offline phase of the RB solver, unsteady Poisson problem")
+  println("Offline phase of the RB solver, unsteady ADR problem")
 
   RBVars.Nₜ = Int(RBInfo.tₗ / RBInfo.δt)
 
@@ -470,10 +358,10 @@ end
 
 function online_phase(
   RBInfo::ROMInfoUnsteady{T},
-  RBVars::PoissonUnsteady,
+  RBVars::ADRUnsteady,
   param_nbs) where T
 
-  println("Online phase of the RB solver, unsteady Poisson problem")
+  println("Online phase of the RB solver, unsteady ADR problem")
 
   μ = load_CSV(Array{T}[],
     joinpath(get_FEM_snap_path(RBInfo), "μ.csv"))::Vector{Vector{T}}
@@ -533,7 +421,7 @@ end
 function loop_on_params(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T},
+  RBVars::ADRUnsteady{T},
   μ::Vector{Vector{T}},
   param_nbs) where T
 
@@ -552,7 +440,7 @@ function loop_on_params(
     println("\n")
     println("Considering parameter number: $nb/$(param_nbs[end])")
 
-    Param = get_ParamInfo(RBInfo, μ[nb])
+    Param = get_ParamInfo(RBInfo, FEMSpace, μ[nb])
 
     uₕ_test = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
       DataFrame))[:,(nb-1)*RBVars.Nₜ+1:nb*RBVars.Nₜ]
@@ -588,7 +476,7 @@ end
 function adaptive_loop_on_params(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T},
+  RBVars::ADRUnsteady{T},
   mean_uₕ_test::Matrix,
   mean_pointwise_err::Matrix,
   μ::Vector{Vector{T}},

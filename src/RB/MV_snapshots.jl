@@ -69,10 +69,6 @@ function get_LagrangianQuad_info(FEMSpace::Problem)
 
 end
 
-function num_time_modes_M_DEIM(n::Int, nₛ_M_DEIM::Int, timesθ::Vector)
-  min(n, ceil(Int, length(timesθ) / nₛ_M_DEIM))::Int
-end
-
 function standard_MDEIM(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady{T},
@@ -429,6 +425,12 @@ function build_parameter_on_phys_quadp(
   elseif var == "M"
     Θ = [Param.m(phys_quadp[n][q],t_θ)
       for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
+  elseif var == "B"
+    Θ = [Param.b(phys_quadp[n][q],t_θ)
+      for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
+  elseif var == "D"
+    Θ = [Param.σ(phys_quadp[n][q],t_θ)
+      for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
   elseif var == "F"
     Θ = [Param.f(phys_quadp[n][q],t_θ)
       for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
@@ -465,6 +467,47 @@ end
 
 function assemble_parametric_FE_vector(
   FEMSpace::FEMSpacePoissonUnsteady,
+  var::String)
+
+  function Vec_θ(Θ)
+    if var == "F"
+      assemble_vector(∫(FEMSpace.ϕᵥ*Θ)*FEMSpace.dΩ,FEMSpace.V₀)
+    elseif var == "H"
+      assemble_vector(∫(FEMSpace.ϕᵥ*Θ)*FEMSpace.dΓn,FEMSpace.V₀)
+    else
+      error("Need to assemble an unrecognized FE structure")
+    end
+  end
+
+  Vec_θ
+
+end
+
+function assemble_parametric_FE_matrix(
+  FEMSpace::FEMSpaceADRUnsteady,
+  var::String)
+
+  function Mat_θ(Θ)
+    if var == "A"
+      (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Θ*∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
+        FEMSpace.V(0.0), FEMSpace.V₀))
+    elseif var == "M" || var == "D"
+      (assemble_matrix(∫(FEMSpace.ϕᵥ*(Θ*FEMSpace.ϕᵤ(0.0)))*FEMSpace.dΩ,
+        FEMSpace.V(0.0), FEMSpace.V₀))
+    elseif var == "B"
+      (assemble_matrix(∫(FEMSpace.ϕᵥ * (Θ⋅∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
+        FEMSpace.V(0.0), FEMSpace.V₀))
+    else
+      error("Need to assemble an unrecognized FE structure")
+    end
+  end
+
+  Mat_θ
+
+end
+
+function assemble_parametric_FE_vector(
+  FEMSpace::FEMSpaceADRUnsteady,
   var::String)
 
   function Vec_θ(Θ)

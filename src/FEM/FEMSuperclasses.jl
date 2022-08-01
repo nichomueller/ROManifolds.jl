@@ -309,6 +309,7 @@ end
 
 struct ParamNavierStokesSteady <: ParametricInfoSteady
   μ::Vector
+  Re::Float
   α::F
   f::F
   g::F
@@ -317,6 +318,7 @@ end
 
 struct ParamNavierStokesUnsteady <: ParametricInfoUnsteady
   μ::Vector
+  Re::Float
   αₛ::F
   αₜ::F
   α::F

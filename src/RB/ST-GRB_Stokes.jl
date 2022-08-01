@@ -147,18 +147,16 @@ function get_RB_LHS_blocks(
   get_RB_LHS_blocks(RBInfo, RBVars.Poisson, θᵐ, θᵃ)
 
   Φₜᵘᵖ = RBVars.Φₜᵘ' * RBVars.Φₜᵖ
-  Φₜᵘᵖ₁ = RBVars.Φₜᵘ[2:end,:]' * RBVars.Φₜᵖ[1:end-1,:]
+  Bₙᵀ = permutedims(RBVars.Bₙ,[2,1,3])::Array{T,3}
+  Bₙᵀ = kron(Bₙᵀ[:,:,1].*θᵇ, Φₜᵘᵖ)::Matrix{T}
+  Bₙ = (Bₙᵀ)'::Matrix{T}
 
-  Bₙ = kron(RBVars.Bₙ[:,:,1].*θᵇ, Φₜᵘᵖ')::Matrix{T}
-  Bₙᵀ = Bₙ'
-  Bₙ₁ᵀ = kron(transpose(RBVars.Bₙ[:,:,1].*θᵇ), Φₜᵘᵖ₁)::Matrix{T}
-
-  block₂ = RBInfo.δt*RBInfo.θ * (RBInfo.θ*Bₙᵀ + (1 - RBInfo.θ)*Bₙ₁ᵀ)
+  block₂ = -RBInfo.δt*RBInfo.θ * Bₙᵀ
   block₃ = Bₙ
 
-  push!(RBVars.LHSₙ, - block₂)
+  push!(RBVars.LHSₙ, block₂)
   push!(RBVars.LHSₙ, block₃)
-  push!(RBVars.LHSₙ, Matrix{T}(undef,0,0))
+  push!(RBVars.LHSₙ, zeros(T, RBVars.nᵖ, RBVars.nᵖ))
 
 end
 
@@ -229,8 +227,9 @@ function get_θ(
   RBVars::StokesSTGRB,
   Param::ParametricInfoUnsteady)
 
+  θᵐ, θᵃ, θᶠ, θʰ  = get_θ(FEMSpace, RBInfo, RBVars.Poisson, Param)
   θᵇ = get_θᵇ(FEMSpace, RBInfo, RBVars, Param)
 
-  return get_θ(FEMSpace, RBInfo, RBVars.Poisson, Param)..., θᵇ
+  return θᵐ, θᵃ, θᵇ, θᶠ, θʰ
 
 end

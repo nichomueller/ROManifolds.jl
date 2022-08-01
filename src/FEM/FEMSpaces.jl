@@ -103,7 +103,7 @@ function get_FEMSpace(
 end
 
 function get_FEMSpace(
-  ::NTuple{1,Int},
+  ::NTuple{2,Int},
   FEMInfo::SteadyInfo,
   model::DiscreteModel{D,D},
   g::F) where D
@@ -131,7 +131,7 @@ function get_FEMSpace(
 end
 
 function get_FEMSpace(
-  ::NTuple{1,Int},
+  ::NTuple{2,Int},
   FEMInfo::UnsteadyInfo,
   model::DiscreteModel{D,D},
   g::F) where D

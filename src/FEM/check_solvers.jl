@@ -104,3 +104,107 @@ function check_dataset(RBInfo, RBVars, i)
   u2≈my_u2
 
 end
+
+function ADR()
+  #MODEL
+  domain = (0,1,0,1)
+  partition = (10,10)
+  model = CartesianDiscreteModel(domain, partition)
+
+  #DATA
+  f(x,t::Real) = 1.
+  f(t::Real) = x->f(x,t)
+  g(x,t) = 0.
+  g(t::Real) = x->g(x,t)
+  b(x,t) = VectorValue(x[1],x[2])*t
+  b(t::Real) = x->b(x,t)
+  σ(x,t) = 1.
+  σ(t::Real) = x->σ(x,t)
+  b₂(x,t) = 0.5*b(x,t)
+  b₂(t::Real) = x->b₂(x,t)
+  div_b₂(t) = ∇⋅(b₂(t))
+  div_b₂_σ(x,t::Real) = div_b₂(t)(x) + σ(x,t)
+  div_b₂_σ(t::Real) = x->div_b₂_σ(x,t)
+
+  #GRIDAP SOLVER
+  order = 2
+  reffe = ReferenceFE(lagrangian,Float64,order)
+  V = TestFESpace(model,reffe,dirichlet_tags="boundary",conformity=:H1)
+  U = TransientTrialFESpace(V,g)
+  degree = 2*order
+  Ωₕ = Triangulation(model)
+  Qₕ = CellQuadrature(Ωₕ,4)
+  dΩ = Measure(Ωₕ,degree)
+  m(t,u,v) = ∫( v*u )dΩ
+  a(t,u,v) = ∫( ∇(v)⋅∇(u) + v*(b(t) ⋅ ∇(u)) + σ(t)*v*u )dΩ
+  rhs(t,v) = ∫(v*f(t))dΩ
+
+  #SUPG STABILIZATION, SET ρ = 1 IF GLS STABILIZATION
+  ρ = 0
+  factor₁(t,u) = -Δ(u) + ∇⋅(b(t)*u) + σ(t)*u - f(t)
+  Λ = SkeletonTriangulation(model)
+  dΛ = Measure(Λ,4)
+  h = get_array(∫(1)dΛ)[1]
+  pechlet(x,t::Real) = norm(b(x,t))*h / 2
+  ξ(x) = coth(x) - 1/x
+  τ(x,t::Real) = h*ξ(pechlet(x,t)) / (2*norm(b(x,t)))
+  τ(t::Real) = x -> τ(x,t)
+  lₛ(t,v) = - Δ(v) + div_bb₂_σ(t)*v
+  lₛₛ(t,v) = bb(t) ⋅ ∇(v) + div_bb₂(t)*v
+  factor₂(t,v) = τ(t) * (lₛ(t,v) + ρ*lₛₛ(t,v))
+  l_stab(t,u,v) = ∫(factor₁(t,u)*factor₂(t,v)) * dΩ
+  lhs(t,u,v) = a(t,u,v) + l_stab(t,u,v)
+
+  ode_solver = ThetaMethod(LUSolver(), 0.01, 1)
+  u0_field = interpolate_everywhere(0., U(0.))
+
+  op_SUPG = TransientAffineFEOperator(m,lhs,rhs,U,V)
+  uht_SUPG_form = solve(ode_solver, op_SUPG, u0_field, 0., 0.02)
+
+  uht_SUPG = zeros(361, 2)
+  global count = 0
+  for (uh, _) in uht_SUPG_form
+      global count += 1
+      uht_SUPG[:, count] = get_free_dof_values(uh)
+  end
+
+  # MATRICES
+  ϕᵥ = get_fe_basis(V)
+  ϕᵤϕᵤ(t) = get_trial_fe_basis(U(t))
+
+  M(t) = assemble_matrix(m(t,ϕᵤϕᵤ(t),ϕᵥ),U(t),V) / 0.01
+  A(t) = assemble_matrix(a(t,ϕᵤϕᵤ(t),ϕᵥ),U(t),V)
+  L(t) = assemble_matrix(l_stab(t,ϕᵤϕᵤ(t),ϕᵥ),U(t),V)
+  F(t) = assemble_vector(rhs(t,ϕᵥ),V)
+  LHS(t) = M(t)+A(t)+L(t)
+
+  # THIS IS WRONG: RHS IS INCORRECT
+  my_uht = zeros(361, 2)
+  my_uht[:,1] = (M(0.01)+A(0.01)+L(0.01)) \ F(0.01)
+  my_uht[:,2] = (M(0.02)+A(0.02)+L(0.02)) \ (F(0.02) + M(0.02)*my_uht[:,1])
+
+end
+
+using ForwardDiff
+using LinearAlgebra
+using Test
+using Gridap.ODEs.ODETools
+using Gridap.ODEs.TransientFETools
+using Gridap.FESpaces: get_algebraic_operator
+using Gridap.ODEs.ODETools: ThetaMethodNonlinearOperator
+
+function get_A_b(op,u0_field,Δtθ,ode_solver)
+  odeop = get_algebraic_operator(op)
+  ode_cache = allocate_cache(odeop)
+  u0 = get_free_dof_values(u0_field)
+  uf = copy(u0)
+  vθ = similar(u0)
+  nl_cache = nothing
+  tθ = Δtθ
+  ode_cache = update_cache!(ode_cache,odeop,tθ)
+  nlop = ThetaMethodNonlinearOperator(odeop,tθ,Δtθ,u0,ode_cache,vθ)
+  nl_cache = solve!(uf,ode_solver.nls,nlop,nl_cache)
+  nl_cache.A, nl_cache.b
+end
+
+LHS_1 , RHS_1 = get_A_b(op_SUPG,u0_field,Δtθ,ode_solver)

@@ -142,14 +142,12 @@ function assemble_primal_op(FEMSpace::UnsteadyProblem)
 end
 
 function assemble_advection(
-  FEMSpace::FEMSpaceADRSteady,
+  FEMSpace::FEMSpaceADRSteady{D},
   ::SteadyInfo,
-  Param::ParametricInfoSteady)
-
+  Param::ParametricInfoSteady) where D
 
   assemble_matrix(∫(FEMSpace.ϕᵥ * (Param.b⋅∇(FEMSpace.ϕᵤ)))*FEMSpace.dΩ,
-    FEMSpace.V, FEMSpace.V₀)
-
+      FEMSpace.V, FEMSpace.V₀)
 
 end
 
@@ -174,8 +172,9 @@ function assemble_convection(
   FEMSpace::FEMSpaceNavierStokesSteady,
   Param::ParametricInfoSteady)
 
-  C(u) = Param.Re * assemble_matrix(∫( FEMSpace.ϕᵥ ⊙ ((∇u')⋅u) )*FEMSpace.dΩ,
-    FEMSpace.V, FEMSpace.V₀)
+  C(u) = Param.Re * assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
+    ((∇FEMSpace.ϕᵤ')⋅u) )*FEMSpace.dΩ, FEMSpace.V, FEMSpace.V₀)
+
   C
 
 end
@@ -184,9 +183,97 @@ function assemble_convection(
   FEMSpace::FEMSpaceNavierStokesUnsteady,
   Param::ParametricInfoUnsteady)
 
-  C(u,t) = Param.Re * assemble_matrix(∫( FEMSpace.ϕᵥ ⊙ ((∇u')⋅u) )*FEMSpace.dΩ,
-    FEMSpace.V(t), FEMSpace.V₀)
+  C(u,t) = Param.Re * assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
+    ((∇FEMSpace.ϕᵤ')⋅u) )*FEMSpace.dΩ, FEMSpace.V(t), FEMSpace.V₀)
+
   C
+
+end
+
+function assemble_reaction(
+  FEMSpace::FEMSpaceADRSteady,
+  ::SteadyInfo,
+  Param::ParametricInfoSteady)
+
+  assemble_matrix(∫(FEMSpace.ϕᵥ * FEMSpace.ϕᵤ)*FEMSpace.dΩ,
+    FEMSpace.V, FEMSpace.V₀)
+
+end
+
+function assemble_reaction(
+  FEMSpace::FEMSpaceADRUnsteady,
+  FEMInfo::UnsteadyInfo,
+  Param::ParametricInfoUnsteady)
+
+  function advection(t)
+    if !FEMInfo.probl_nl["R"]
+      assemble_matrix(∫(Param.σₛ * FEMSpace.ϕᵥ * FEMSpace.ϕᵤ(t))*FEMSpace.dΩ,
+        FEMSpace.V(t), FEMSpace.V₀)
+    else
+      assemble_matrix(∫(Param.σ(t) * FEMSpace.ϕᵥ * FEMSpace.ϕᵤ(t))*FEMSpace.dΩ,
+        FEMSpace.V(t), FEMSpace.V₀)
+    end
+  end
+
+end
+
+function assemble_SUPG_term(
+  FEMSpace::FEMSpaceADRSteady,
+  Param::ParametricInfoSteady)
+
+  #SUPG STABILIZATION, SET ρ = 1 IF GLS STABILIZATION
+  ρ = 0
+  b₂(x) = 0.5*Param.b(x)
+  div_b₂ = ∇⋅(b₂)
+  div_b₂_σ(x) = div_b₂(x) + Param.σ(x)
+
+  factor₁(u) = - Param.α*(Δ(u)) + ∇⋅(Param.b*u) + Param.σ*u - Param.f
+
+  lₛ(v) = - Param.α*(Δ(v)) + div_b₂_σ*v
+  lₛₛ(v) = Param.b⋅∇(v) + div_b₂*v
+  h = get_h(FEMSpace)
+  Pechlet(x) = norm(Param.b(x))*h / (2*Param.α(x))
+  ξ(x) = coth(x) - 1/x
+  τ(x) = h*ξ(pechlet(x)) / (2*norm(Param.b(x)))
+
+  factor₂(v) = τ * (lₛ(v) + ρ*lₛₛ(v))
+
+  l_stab(u,v) = ∫(factor₁(u)*factor₂(v)) * FEMSpace.dΩ
+  L = assemble_matrix(l_stab(FEMSpace.ϕᵤ,FEMSpace.ϕᵥ),
+    FEMSpace.V, FEMSpace.V₀)
+
+  l_stab, L
+
+end
+
+function assemble_SUPG_term(
+  FEMSpace::FEMSpaceADRUnsteady,
+  Param::ParametricInfoUnsteady)
+
+  #SUPG STABILIZATION, SET ρ = 1 IF GLS STABILIZATION
+  ρ = 0
+  b₂(x,t::Real) = 0.5*Param.b(x,t)
+  b₂(t::Real) = x -> b₂(x,t)
+  div_b₂(t::Real) = ∇⋅(b₂(t))
+  div_b₂_σ(x,t::Real) = div_b₂(t)(x) + Param.σ(x,t)
+  div_b₂_σ(t::Real) = x -> div_b₂_σ(x,t)
+
+  factor₁(t,u) = - Param.α(t)*(Δ(u)) + ∇⋅(Param.b(t)*u) + Param.σ(t)*u - Param.f(t)
+
+  lₛ(t,v) = - Param.α(t)*(Δ(v)) + div_b₂_σ(t)*v
+  lₛₛ(t,v) = Param.b(t)⋅∇(v) + div_b₂(t)*v
+  h = get_h(FEMSpace)
+  Pechlet(x,t::Real) = norm(Param.b(x,t))*h / (2*Param.α(x,t))
+  ξ(x) = coth(x) - 1/x
+  τ(x,t::Real) = h*ξ(pechlet(x,t)) / (2*norm(Param.b(x,t)))
+  τ(t::Real) = x -> τ(x,t)
+  factor₂(t,v) = τ(t) * (lₛ(t,v) + ρ*lₛₛ(t,v))
+
+  l_stab(t,u,v) = ∫(factor₁(t,u)*factor₂(t,v)) * FEMSpace.dΩ
+  L(t) = assemble_matrix(l_stab(t,FEMSpace.ϕᵤ(t),FEMSpace.ϕᵥ),
+    FEMSpace.V(t), FEMSpace.V₀)
+
+  l_stab, L
 
 end
 
@@ -504,6 +591,8 @@ function assemble_FEM_structure(
     assemble_primal_op(FEMSpace)
   elseif var == "C"
     assemble_convection(FEMSpace,Param)
+  elseif var == "D"
+    assemble_reaction(FEMSpace,FEMInfo,Param)
   elseif var == "F"
     assemble_forcing(FEMSpace,FEMInfo,Param)
   elseif var == "G"

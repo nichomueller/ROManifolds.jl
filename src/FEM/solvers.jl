@@ -59,38 +59,11 @@ function FE_solve(
   FEMInfo::SteadyInfo,
   Param::ParametricInfoSteady)
 
-
   a(u,v) = ∫(∇(v)⋅(Param.α*∇(u)) +
     v * Param.b ⋅ ∇(u) + Param.σ * v * u) * FEMSpace.dΩ
+  lhs(u,v) = a(u,v)
+
   rhs(v) = ∫(v * Param.f) * FEMSpace.dΩ + ∫(v * Param.h) * FEMSpace.dΓn
-
-  #SUPG STABILIZATION, SET ρ = 1 IF GLS STABILIZATION
-  ρ = 0
-  b₂(x) = 0.5*Param.b(x)
-  div_b₂ = ∇⋅(b₂)
-  div_b₂_σ(x) = div_b₂(x) + Param.σ(x)
-  factor₁(u) = - Param.α*(Δ(u)) + ∇⋅(Param.b*u) + Param.σ*u - Param.f
-  lₛ(v) = - Param.α*(Δ(v)) + div_b₂_σ*v
-  lₛₛ(v) = Param.b⋅∇(v) + div_b₂*v
-  h = get_h(FEMSpace)
-  Pechlet(x) = norm(Param.b(x))*h / (2*Param.α(x))
-  ξ(x) = coth(x) - 1/x
-  τ(x) = h*ξ(pechlet(x)) / (2*norm(Param.b(x)))
-  factor₂(v) = τ * (lₛ(v) + ρ*lₛₛ(v))
-  l_stab(u,v) = ∫(factor₁(u)*factor₂(v)) * FEMSpace.dΩ
-  lhs(u,v) = a(u,v) + l_stab(u,v)
-
-  #=
-  #USING PECHLET STABILIZATION OF α
-  Λ = SkeletonTriangulation(FEMSpace.Ω)
-  dΛ = Measure(Λ,4)
-  h = get_array(∫(1)dΛ)[1]
-  Pechlet(x) = norm(Param.b(x))*h / (2*Param.α(x))
-  ξ(x) = x - 1 + x/(exp(x)-1)
-  α_stab(x) = Param.α*(1 + ξ(Pechlet(x)))
-  a(u,v) = ∫(∇(v)⋅(α_stab*∇(u)) +
-    v * Param.b ⋅ ∇(u) + Param.σ * v * u) * FEMSpace.dΩ
-  =#
 
   operator = AffineFEOperator(lhs, rhs, FEMSpace.V, FEMSpace.V₀)
 
@@ -112,26 +85,8 @@ function FE_solve(
   m(t, u, v) = ∫(Param.m(t)*(u*v))dΩ
   a(t, u, v) = ∫(∇(v)⋅(Param.α(t)*∇(u)) +
     v * Param.b(t) ⋅ ∇(u) + Param.σ(t) * v * u) * FEMSpace.dΩ
+  lhs(t,u,v) = a(t,u,v)
   rhs(t, v) = rhs_form(t,v,FEMSpace,Param)
-
-  #SUPG STABILIZATION, SET ρ = 1 IF GLS STABILIZATION
-  ρ = 0
-  b₂(x,t::Real) = 0.5*Param.b(x,t)
-  b₂(t::Real) = x -> b₂(x,t)
-  div_b₂(t::Real) = ∇⋅(b₂(t))
-  div_b₂_σ(x,t::Real) = div_b₂(t)(x) + Param.σ(x,t)
-  div_b₂_σ(t::Real) = x -> div_b₂_σ(x,t)
-  factor₁(t,u) = - Param.α(t)*(Δ(u)) + ∇⋅(Param.b(t)*u) + Param.σ(t)*u - Param.f(t)
-  lₛ(t,v) = - Param.α(t)*(Δ(v)) + div_b₂_σ(t)*v
-  lₛₛ(t,v) = Param.b(t)⋅∇(v) + div_b₂(t)*v
-  h = get_h(FEMSpace)
-  Pechlet(x,t::Real) = norm(Param.b(x,t))*h / (2*Param.α(x,t))
-  ξ(x) = coth(x) - 1/x
-  τ(x,t::Real) = h*ξ(pechlet(x,t)) / (2*norm(Param.b(x,t)))
-  τ(t::Real) = x -> τ(x,t)
-  factor₂(t,v) = τ(t) * (lₛ(t,v) + ρ*lₛₛ(t,v))
-  l_stab(t,u,v) = ∫(factor₁(t,u)*factor₂(t,v)) * FEMSpace.dΩ
-  lhs(u,v) = a(t,u,v) + l_stab(t,u,v)
 
   operator = TransientAffineFEOperator(m, a, rhs, FEMSpace.V, FEMSpace.V₀)
 

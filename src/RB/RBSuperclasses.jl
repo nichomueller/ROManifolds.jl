@@ -337,7 +337,7 @@ function Base.getproperty(RBVars::ADRSTGRB, sym::Symbol)
   end
 end
 
-function Base.setproperty!(RBVars::ASDRSTGRB, sym::Symbol, x::T) where T
+function Base.setproperty!(RBVars::ADRSTGRB, sym::Symbol, x::T) where T
   if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
     :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A, :DEIM_mat_F,
     :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H, :DEIM_idx_H,

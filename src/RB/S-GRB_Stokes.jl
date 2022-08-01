@@ -14,7 +14,8 @@ function get_Bₙ(
     println("Importing reduced affine divergence matrix")
     Bₙ = load_CSV(Matrix{T}(undef,0,0),
       joinpath(RBInfo.Paths.ROM_structures_path, "Bₙ.csv"))
-    RBVars.Bₙ = reshape(Bₙ,RBVars.nₛᵖ,RBVars.nₛᵘ,:)
+    RBVars.Bₙ = reshape(Bₙ,RBVars.nₛᵖ,RBVars.nₛᵘ,:)::Array{T,3}
+    RBVars.Qᵇ = size(RBVars.Bₙ)[3]
     return [""]
   else
     println("Failed to import Bₙ: must build it")
@@ -50,7 +51,7 @@ function assemble_affine_matrices(
       joinpath(get_FEM_structures_path(RBInfo), "B.csv"))
     RBVars.Bₙ = reshape((RBVars.Φₛᵖ)'*B*RBVars.Φₛᵘ,RBVars.nₛᵖ,RBVars.nₛᵘ,1)
   else
-    assemble_affine_matrices(RBInfo, RBVars, var)
+    assemble_affine_matrices(RBInfo, RBVars.Poisson, var)
   end
 
 end
@@ -135,32 +136,32 @@ function get_Q(
 end
 
 function get_RB_LHS_blocks(
-  ::ROMInfoSteady,
   RBVars::StokesSGRB{T},
   θᵃ::Matrix,
   θᵇ::Matrix) where T
 
-  Aₙ_μ =  assemble_parametric_structure(θᵃ, RBVars.Aₙ)
-  Bₙ_μ =  assemble_parametric_structure(θᵇ, RBVars.Bₙ)
+  println("Assembling reduced LHS")
 
-  push!(RBVars.LHSₙ, Aₙ_μ)
-  push!(RBVars.LHSₙ, -Bₙ_μ')
-  push!(RBVars.LHSₙ, Bₙ_μ)
-  push!(RBVars.LHSₙ, Matrix{T}(undef,0,0))
+  get_RB_LHS_blocks(RBVars.Poisson, θᵃ)
+
+  block₂ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵖ)
+  for q = 1:RBVars.Qᵇ
+    block₂ += RBVars.Bₙ[:,:,q] * θᵇ[q]
+  end
+
+  push!(RBVars.LHSₙ, -block₂')::Vector{Matrix{T}}
+  push!(RBVars.LHSₙ, block₂)::Vector{Matrix{T}}
+  push!(RBVars.LHSₙ, zeros(T, RBVars.nₛᵖ, RBVars.nₛᵖ))::Vector{Matrix{T}}
 
 end
 
 function get_RB_RHS_blocks(
-  ::ROMInfoSteady,
-  RBVars::StokesSGRB{T},
-  θᶠ::Matrix,
-  θʰ::Matrix) where T
+  RBVars::PoissonSteady{T},
+  θᶠ::Array,
+  θʰ::Array) where T
 
-  Fₙ_μ = assemble_parametric_structure(θᶠ, RBVars.Fₙ)
-  Hₙ_μ = assemble_parametric_structure(θʰ, RBVars.Hₙ)
-
-  push!(RBVars.RHSₙ, Fₙ_μ + Hₙ_μ)
-  push!(RBVars.RHSₙ, Matrix{T}(undef,0,0))
+  get_RB_RHS_blocks(RBVars.Poisson, θᶠ, θʰ)
+  push!(RBVars.RHSₙ, zeros(T, RBVars.nₛᵖ, 1))::Vector{Matrix{T}}
 
 end
 
@@ -168,16 +169,10 @@ function build_param_RHS(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::StokesSGRB{T},
-  Param::ParametricInfoSteady,
-  ::Array) where T
+  Param::ParametricInfoSteady) where T
 
-  F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
-  H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
-  Fₙ_μ = reshape((RBVars.Φₛᵘ)'*F,:,1)::Matrix{T}
-  Hₙ_μ = reshape((RBVars.Φₛᵘ)'*H,:,1)::Matrix{T}
-
-  push!(RBVars.RHSₙ, Fₙ_μ + Hₙ_μ)
-  push!(RBVars.RHSₙ, zeros(RBVars.nₛᵖ,1))
+  build_param_RHS(FEMSpace, RBInfo, RBVars.Poisson, Param)
+  push!(RBVars.RHSₙ, zeros(T, RBVars.nₛᵖ, 1))
 
 end
 
@@ -187,15 +182,9 @@ function get_θ(
   RBVars::StokesSGRB{T},
   Param::ParametricInfoSteady) where T
 
+  θᵃ, θᶠ, θʰ = get_θ(FEMSpace, RBInfo, RBVars.Poisson, Param)
   θᵇ = get_θᵇ(FEMSpace, RBInfo, RBVars, Param)
-  #=
-  θᵃ = get_θᵃ(FEMSpace, RBInfo, RBVars, Param)
-  if !RBInfo.build_parametric_RHS
-    θᶠ, θʰ = get_θᶠʰ(FEMSpace, RBInfo, RBVars, Param)
-  else
-    θᶠ, θʰ = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
-  end =#
 
-  return get_θ(FEMSpace, RBInfo, RBVars.Poisson, Param)..., θᵇ
+  return θᵃ, θᵇ, θᶠ, θʰ
 
 end
