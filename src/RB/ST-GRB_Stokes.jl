@@ -56,13 +56,12 @@ function assemble_affine_matrices(
 end
 
 function assemble_reduced_mat_MDEIM(
-  RBInfo::ROMInfoUnsteady,
   RBVars::StokesSTGRB,
   MDEIM_mat::Matrix,
   row_idx::Vector{Int},
   var::String)
 
-  assemble_reduced_mat_MDEIM(RBInfo, RBVars.Poisson, MDEIM_mat, row_idx, var)
+  assemble_reduced_mat_MDEIM(RBVars.Poisson, MDEIM_mat, row_idx, var)
 
 end
 
@@ -122,7 +121,8 @@ function get_affine_structures(
   RBInfo::Info,
   RBVars::StokesSTGRB)
 
-  operators = get_affine_structures(RBInfo, RBVars.Poisson)
+  operators = String[]
+  append!(operators, get_affine_structures(RBInfo, RBVars.Poisson))
   append!(operators, get_Bₙ(RBInfo, RBVars))
 
   return operators
@@ -154,9 +154,9 @@ function get_RB_LHS_blocks(
   block₂ = -RBInfo.δt*RBInfo.θ * Bₙᵀ
   block₃ = Bₙ
 
-  push!(RBVars.LHSₙ, block₂)
-  push!(RBVars.LHSₙ, block₃)
-  push!(RBVars.LHSₙ, zeros(T, RBVars.nᵖ, RBVars.nᵖ))
+  push!(RBVars.LHSₙ, block₂)::Vector{Matrix{T}}
+  push!(RBVars.LHSₙ, block₃)::Vector{Matrix{T}}
+  push!(RBVars.LHSₙ, zeros(T, RBVars.nᵖ, RBVars.nᵖ))::Vector{Matrix{T}}
 
 end
 

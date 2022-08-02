@@ -73,6 +73,33 @@ function get_h(FEMSpace::Problem)
   h
 end
 
+function get_α_stab(
+  FEMSpace::SteadyProblem,
+  Param::ParametricInfoSteady)
+
+  h_mesh = get_h(FEMSpace)
+  Pechlet(x) = norm(Param.b(x))*h_mesh / (2*Param.α(x))
+  ξ(x) = x - 1 + 2*x/(exp(2*x)-1)
+  α_stab(x) = Param.α(x)*(1 + ξ(Pechlet(x)))
+
+  α_stab
+
+end
+
+function get_α_stab(
+  FEMSpace::UnsteadyProblem,
+  Param::ParametricInfoUnsteady)
+
+  h_mesh = get_h(FEMSpace)
+  Pechlet(x, t) = norm(Param.b(x, t))*h_mesh / (2*Param.α(x, t))
+  ξ(x) = x - 1 + 2*x/(exp(2*x)-1)
+  α_stab(x, t::Real) = Param.α(x, t)*(1 + ξ(Pechlet(x, t)))
+  α_stab(t::Real) = x -> α_stab(x, t)
+
+  α_stab
+
+end
+
 function get_timesθ(FEMInfo::UnsteadyInfo)
   collect(FEMInfo.t₀:FEMInfo.δt:FEMInfo.tₗ-FEMInfo.δt).+FEMInfo.δt*FEMInfo.θ
 end

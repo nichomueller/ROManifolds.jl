@@ -114,7 +114,7 @@ function assemble_MDEIM_matrices(
   if var == "A"
     if isempty(RBVars.MDEIM_mat_A)
       (RBVars.MDEIM_mat_A, RBVars.MDEIM_idx_A, RBVars.MDEIMᵢ_A,
-      RBVars.row_idx_A,RBVars.sparse_el_A) = MDEIM_offline(RBInfo, "A")
+      RBVars.row_idx_A,RBVars.sparse_el_A) = MDEIM_offline(RBInfo, RBVars, "A")
     end
     assemble_reduced_mat_MDEIM(RBVars,RBVars.MDEIM_mat_A,RBVars.row_idx_A)
   else

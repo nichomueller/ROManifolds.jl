@@ -141,14 +141,14 @@ function assemble_MDEIM_matrices(
       running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
     if isempty(RBVars.MDEIM_mat_M)
       (RBVars.MDEIM_mat_M, RBVars.MDEIM_idx_M, RBVars.MDEIMᵢ_M, RBVars.row_idx_M,
-        RBVars.sparse_el_M, RBVars.MDEIM_idx_time_M) = MDEIM_offline(RBInfo, "M")
+        RBVars.sparse_el_M, RBVars.MDEIM_idx_time_M) = MDEIM_offline(RBInfo, RBVars, "M")
     end
     assemble_reduced_mat_MDEIM(
       RBVars,RBVars.MDEIM_mat_M,RBVars.row_idx_M,"M")
   elseif var == "A"
     if isempty(RBVars.MDEIM_mat_A)
       (RBVars.MDEIM_mat_A, RBVars.MDEIM_idx_A, RBVars.MDEIMᵢ_A,
-      RBVars.row_idx_A,RBVars.sparse_el_A, RBVars.MDEIM_idx_time_A) = MDEIM_offline(RBInfo, "A")
+      RBVars.row_idx_A,RBVars.sparse_el_A, RBVars.MDEIM_idx_time_A) = MDEIM_offline(RBInfo, RBVars, "A")
     end
     assemble_reduced_mat_MDEIM(
       RBVars,RBVars.MDEIM_mat_A,RBVars.row_idx_A,"A")

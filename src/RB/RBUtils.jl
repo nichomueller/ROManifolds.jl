@@ -266,6 +266,63 @@ function build_sparse_vec(
 
 end
 
+#= function assemble_RBapprox_convection(
+  FEMSpace::FEMSpaceNavierStokesSteady,
+  Param::ParametricInfoSteady,
+  RBVars::NavierStokesSteady{T}) where T
+
+  C = assemble_convection(FEMSpace, Param)
+
+  Cᵩ = Array{T}(undef,0,0,0)
+  for k = 1:RBVars.nₛᵘ_quad
+    Φₛᵘ_fun = FEFunction(FEMSpace.V₀_quad, RBVars.Φₛᵘ_quad[:, k])
+    i, v = findnz(C(Φₛᵘ_fun)[:])::Tuple{Vector{Int},Vector{T}}
+    if k == 1
+      RBVars.row_idx_C = i
+      Cᵩ = zeros(T, length(RBVars.row_idx_C), 1, RBVars.nₛᵘ)
+    end
+    Cᵩ[:, :, k] = v
+  end
+
+  Cᵩ
+
+end
+
+function assemble_RBapprox_convection(
+  FEMSpace::FEMSpaceNavierStokesUnsteady,
+  Param::ParametricInfoUnsteady,
+  RBInfo::ParamNavierStokesUnsteady,
+  RBVars::NavierStokesUnsteady{T}) where T
+
+  function index_mapping_inverse_quad(i::Int)
+    iₛ = 1+Int(floor((i-1)/RBVars.nₜᵘ_quad))
+    iₜ = i-(iₛ-1)*RBVars.nₜᵘ_quad
+    iₛ, iₜ
+  end
+
+  C = assemble_convection(FEMSpace, Param)
+  timesθ = get_timesθ(RBInfo)
+
+  Cᵩ = Array{T}(undef,0,0,0)
+  for nₜ = 1:RBVars.Nₜ
+    for k = 1:RBVars.nᵘ
+      kₛ, kₜ = index_mapping_inverse(k)
+      Φₛᵘ_fun = FEFunction(FEMSpace.V₀_quad,
+        RBVars.Φₛᵘ_quad[:, kₛ] * RBVars.Φₜᵘ_quad[nₜ, kₜ])
+      # this is wrong: Φₛᵘ_fun is not at time timesθ[nₜ]
+      i, v = findnz(C(Φₛᵘ_fun, timesθ[nₜ])[:])::Tuple{Vector{Int},Vector{T}}
+      if k*nₜ == 1
+        RBVars.row_idx_C = i
+        Cᵩ = zeros(T, length(RBVars.row_idx_C), RBVars.Nₜ, RBVars.nᵘ)
+      end
+      Cᵩ[:, nₜ, k] = v
+    end
+  end
+
+  Cᵩ
+
+end =#
+
 function interpolated_θ(
   RBVars::RBUnsteadyProblem{T},
   Mat_μ_sparse::SparseMatrixCSC{T, Int},

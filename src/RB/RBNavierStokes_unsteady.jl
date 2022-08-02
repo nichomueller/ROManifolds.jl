@@ -4,32 +4,31 @@ include("ST-GRB_NavierStokes.jl")
 
 function get_snapshot_matrix(
   RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady{T}) where T
+  RBVars::NavierStokesUnsteady{T}) where T
 
-  get_snapshot_matrix(RBInfo, RBVars.Poisson)
+  get_snapshot_matrix(RBInfo, RBVars.Stokes)
 
-  println("Importing the snapshot matrix for field u,
+  println("Importing the snapshot matrix for field u on quadrature points,
     number of snapshots considered: $(RBInfo.nₛ)")
-  Sᵖ = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"),
+  Sᵘ_quad = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ_quadp.csv"),
     DataFrame))[:, 1:RBInfo.nₛ*RBVars.Nₜ]
-  println("Dimension of pressure snapshot matrix: $(size(Sᵖ))")
-
-  RBVars.Sᵖ = Sᵖ
-  RBVars.Nₛᵖ = size(Sᵖ)[1]
-  RBVars.Nᵖ = RBVars.Nₛᵖ * RBVars.Nₜ
+  println("Dimension of velocity snapshot matrix on quadrature points: $(size(Sᵘ_quad))")
 
 end
 
 function PODs_space(
   RBInfo::Info,
-  RBVars::StokesUnsteady)
+  RBVars::NavierStokesUnsteady)
 
-  PODs_space(RBInfo, RBVars.Poisson)
+  PODs_space(RBInfo, RBVars.Steady)
 
-  println("Performing the spatial POD for field p, using a tolerance of $(RBInfo.ϵₛ)")
-  get_norm_matrix(RBInfo, RBVars.Steady)
-  RBVars.Φₛᵖ = POD(RBVars.Sᵖ, RBInfo.ϵₛ, RBVars.Xᵖ₀)
-  (RBVars.Nₛᵖ, RBVars.nₛᵖ) = size(RBVars.Φₛᵖ)
+end
+
+function supr_enrichment_space(
+  RBInfo::Info,
+  RBVars::NavierStokesUnsteady)
+
+  supr_enrichment_space(RBInfo, RBVars.Steady)
 
 end
 
@@ -37,87 +36,57 @@ function PODs_time(
   RBInfo::ROMInfoUnsteady,
   RBVars::StokesUnsteady{T}) where T
 
-  PODs_time(RBInfo, RBVars.Poisson)
+  PODs_time(RBInfo, RBVars.Stokes)
 
-  println("Performing the temporal POD for field p, using a tolerance of $(RBInfo.ϵₜ)")
+  println("Performing the temporal POD for field u on quadrature points")
 
   if RBInfo.time_reduction_technique == "ST-HOSVD"
-    Sᵖ = RBVars.Φₛᵖ' * RBVars.Sᵖ
+    Sᵘ_quad = RBVars.Φₛᵘ_quad' * RBVars.Sᵘ_quad
   else
-    Sᵖ = RBVars.Sᵖ
+    Sᵘ_quad = RBVars.Sᵘ_quad
   end
-  Sᵖₜ = mode₂_unfolding(Sᵖ, RBInfo.nₛ)
+  Sᵘₜ_quad = mode₂_unfolding(Sᵘ_quad, RBInfo.nₛ)
 
-  Φₜᵖ = POD(Sᵖₜ, RBInfo.ϵₜ)
-  RBVars.Φₜᵖ = Φₜᵖ
-  RBVars.nₜᵖ = size(Φₜᵖ)[2]
+  RBVars.Φₜᵘ_quad = POD(Sᵘₜ_quad, RBInfo.ϵₜ)
+  RBVars.nₜᵘ_quad = size(RBVars.Φₜᵘ_quad)[2]
 
 end
 
-function time_supremizers(RBVars::StokesUnsteady{T}) where T
+function supr_enrichment_time(
+  RBVars::NavierStokesUnsteady)
 
-  function compute_projection_on_span(
-    ξ_new::Vector{T},
-    ξ::Matrix{T}) where T
-
-    proj = zeros(T, size(ξ_new))
-    for j = 1:size(ξ)[2]
-      proj += ξ[:,j] * (ξ_new' * ξ[:,j]) / (ξ[:,j]' * ξ[:,j])
-    end
-
-    proj
-
-  end
-
-  println("Checking if primal supremizers in time need to be added")
-
-  ΦₜᵘΦₜᵖ = RBVars.Φₜᵘ' * RBVars.Φₜᵖ
-  ξ = zeros(T, size(ΦₜᵘΦₜᵖ))
-
-  for l = 1:size(ΦₜᵘΦₜᵖ)[2]
-
-    if l == 1
-      ξ[:,l] = ΦₜᵘΦₜᵖ[:,1]
-      enrich = (norm(ξ[:,l]) ≤ 1e-2)
-    else
-      ξ[:,l] = compute_projection_on_span(ΦₜᵘΦₜᵖ[:, l], ΦₜᵘΦₜᵖ[:, 1:l-1])
-      enrich = (norm(ξ[:,l] - ΦₜᵘΦₜᵖ[:,l]) ≤ 1e-2)
-    end
-
-    if enrich
-      Φₜᵖ_l_on_Φₜᵘ = compute_projection_on_span(RBVars.Φₜᵖ[:, l], RBVars.Φₜᵘ)
-      Φₜᵘ_to_add = ((RBVars.Φₜᵖ[:, l] - Φₜᵖ_l_on_Φₜᵘ) /
-        norm(RBVars.Φₜᵖ[:, l] - Φₜᵖ_l_on_Φₜᵘ))
-      RBVars.Φₜᵘ = hcat(RBVars.Φₜᵘ, Φₜᵘ_to_add)
-      ΦₜᵘΦₜᵖ = hcat(ΦₜᵘΦₜᵖ, Φₜᵘ_to_add' * RBVars.Φₜᵖ)
-      RBVars.nₜᵘ += 1
-    end
-
-  end
+  supr_enrichment_time(RBVars.Stokes)
+  RBVars.Φₜᵘ_quad = time_supremizers(RBVars.Φₜᵘ_quad, RBVars.Φₜᵖ)
+  RBVars.nₜᵘ_quad = size(RBVars.Φₜᵘ_quad)[2]
 
 end
 
 function build_reduced_basis(
   RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady)
+  RBVars::NavierStokesUnsteady)
 
   RBVars.offline_time += @elapsed begin
     PODs_space(RBInfo, RBVars)
     supr_enrichment_space(RBInfo, RBVars.Steady)
     PODs_time(RBInfo, RBVars)
-    time_supremizers(RBVars)
+    supr_enrichment_time(RBVars)
   end
 
   RBVars.nᵘ = RBVars.nₛᵘ * RBVars.nₜᵘ
   RBVars.Nᵘ = RBVars.Nₛᵘ * RBVars.Nₜ
   RBVars.nᵖ = RBVars.nₛᵖ * RBVars.nₜᵖ
   RBVars.Nᵖ = RBVars.Nₛᵖ * RBVars.Nₜ
+  RBVars.nᵘ_quad = RBVars.nₛᵘ_quad * RBVars.nₜᵘ_quad
 
   if RBInfo.save_offline_structures
     save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.Paths.ROM_structures_path, "Φₛᵘ.csv"))
     save_CSV(RBVars.Φₜᵘ, joinpath(RBInfo.Paths.ROM_structures_path, "Φₜᵘ.csv"))
     save_CSV(RBVars.Φₛᵖ, joinpath(RBInfo.Paths.ROM_structures_path, "Φₛᵖ.csv"))
     save_CSV(RBVars.Φₜᵖ, joinpath(RBInfo.Paths.ROM_structures_path, "Φₜᵖ.csv"))
+    save_CSV(RBVars.Φₛᵘ_quad,
+      joinpath(RBInfo.Paths.ROM_structures_path, "Φₛᵘ_quad.csv"))
+    save_CSV(RBVars.Φₜᵘ_quad,
+      joinpath(RBInfo.Paths.ROM_structures_path, "Φₜᵘ_quad.csv"))
   end
 
   return
@@ -126,121 +95,88 @@ end
 
 function import_reduced_basis(
   RBInfo::ROMInfoUnsteady{T},
-  RBVars::StokesUnsteady) where T
+  RBVars::NavierStokesUnsteady) where T
 
-  import_reduced_basis(RBInfo, RBVars.Poisson)
+  import_reduced_basis(RBInfo, RBVars.Stokes)
+  println("Importing the space and time reduced basis for field u, quadrature points")
+  RBVars.Φₛᵘ_quad = load_CSV(Matrix{T}(undef,0,0),
+    joinpath(RBInfo.Paths.ROM_structures_path, "Φₛᵘ_quad.csv"))
+  RBVars.Φₜᵘ_quad = load_CSV(Matrix{T}(undef,0,0),
+    joinpath(RBInfo.Paths.ROM_structures_path, "Φₜᵘ_quad.csv"))
 
-  println("Importing the reduced basis for field p")
-
-  RBVars.Φₛᵖ = load_CSV(Matrix{T}(undef,0,0),
-    joinpath(RBInfo.Paths.ROM_structures_path, "Φₛᵖ.csv"))
-  RBVars.nₛᵖ = size(RBVars.Φₛᵖ)[2]
-  RBVars.Φₜᵖ = load_CSV(Matrix{T}(undef,0,0),
-    joinpath(RBInfo.Paths.ROM_structures_path, "Φₜᵖ.csv"))
-  RBVars.nₜᵖ = size(RBVars.Φₜᵖ)[2]
-  RBVars.nᵖ = RBVars.nₛᵖ * RBVars.nₜᵖ
-
-end
-
-function index_mapping(i::Int, j::Int, RBVars::StokesUnsteady, var="u")
-
-  if var == "u"
-    return index_mapping(i, j, RBVars.Poisson)
-  elseif var == "p"
-    return Int((i-1) * RBVars.nₜᵖ + j)
-  else
-    error("Unrecognized variable")
-  end
+  RBVars.nₛᵘ_quad = size(RBVars.Φₛᵘ_quad)[2]
+  RBVars.nₜᵘ_quad = size(RBVars.Φₜᵘ_quad)[2]
+  RBVars.nᵘ_quad = RBVars.nₛᵘ_quad * RBVars.nₜᵘ_quad
 
 end
 
-function get_generalized_coordinates(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady{T},
-  snaps::Vector{Int}) where T
+function index_mapping(i::Int, j::Int, RBVars::NavierStokesUnsteady, var="u")
 
-  if check_norm_matrix(RBVars.Steady)
-    get_norm_matrix(RBInfo, RBVars)
-  end
-
-  get_generalized_coordinates(RBInfo, RBVars.Poisson)
-
-  p̂ = zeros(T, RBVars.nᵖ, length(snaps))
-  Φₛᵖ_normed = RBVars.Xᵖ₀ * RBVars.Φₛᵖ
-  Π = kron(Φₛᵖ_normed, RBVars.Φₜᵘ)::Matrix{T}
-
-  for (i, i_nₛ) = enumerate(snaps)
-    println("Assembling generalized coordinate relative to snapshot $(i_nₛ), field p")
-    S_i = RBVars.Sᵖ[:, (i_nₛ-1)*RBVars.Nₜ+1:i_nₛ*RBVars.Nₜ]
-    p̂[:, i] = sum(Π, dims=2) .* S_i
-  end
-
-  RBVars.p̂ = p̂
-
-  if RBInfo.save_offline_structures
-    save_CSV(p̂, joinpath(RBInfo.Paths.ROM_structures_path, "p̂.csv"))
-  end
-
-end
-
-function test_offline_phase(RBInfo::ROMInfoUnsteady, RBVars::StokesUnsteady)
-
-  get_generalized_coordinates(RBInfo, RBVars, 1)
-
-  uₙ = reshape(RBVars.û, (RBVars.nₜᵘ, RBVars.nₛᵘ))
-  u_rec = RBVars.Φₛᵘ * (RBVars.Φₜᵘ * uₙ)'
-  err = zeros(RBVars.Nₜ)
-  for i = 1:RBVars.Nₜ
-    err[i] = compute_errors(RBVars.Pᵘ[:, i], u_rec[:, i])
-  end
+  index_mapping(i, j, RBVars.Stokes, var)
 
 end
 
 function set_operators(
   RBInfo::Info,
-  RBVars::StokesUnsteady)
+  RBVars::NavierStokesUnsteady)
 
-  append!(["B"], set_operators(RBInfo, RBVars.Poisson))
+  append!(["M"], set_operators(RBInfo, RBVars.Steady))
 
 end
 
 function assemble_MDEIM_matrices(
   RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady,
+  RBVars::NavierStokesUnsteady,
   var::String)
 
-  assemble_MDEIM_matrices(RBInfo, RBVars.Poisson, var)
+  if var == "C"
+    println("The matrix C is non-affine:
+      running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
+    if isempty(RBVars.MDEIM_mat_C)
+      (RBVars.MDEIM_mat_C, RBVars.MDEIM_idx_C, RBVars.MDEIMᵢ_C, RBVars.row_idx_C,
+      RBVars.sparse_el_C, RBVars.MDEIM_idx_time_C) = MDEIM_offline(RBInfo, RBVars, "C")
+    end
+    assemble_reduced_mat_MDEIM(RBVars,RBVars.MDEIM_mat_C,RBVars.row_idx_C)
+  else
+    assemble_MDEIM_matrices(RBInfo, RBVars.Stokes, var)
+  end
 
 end
 
 function assemble_DEIM_vectors(
   RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady,
+  RBVars::NavierStokesUnsteady,
   var::String)
 
-  assemble_DEIM_vectors(RBInfo, RBVars.Poisson, var)
+  assemble_DEIM_vectors(RBInfo, RBVars.Stokes, var)
 
 end
 
 function save_M_DEIM_structures(
-  ::ROMInfoUnsteady,
-  ::StokesUnsteady)
+  RBInfo::ROMInfoUnsteady,
+  RBVars::NavierStokesUnsteady)
 
-  error("not implemented")
+  list_M_DEIM = (RBVars.MDEIM_mat_C, RBVars.MDEIMᵢ_C, RBVars.MDEIM_idx_C,
+    RBVars.row_idx_C, RBVars.sparse_el_C, RBVars.MDEIM_idx_time_C)
+  list_names = ("MDEIM_mat_C","MDEIMᵢ_C","MDEIM_idx_C","row_idx_C",
+    "sparse_el_C", "MDEIM_idx_time_C")
+
+  save_structures_in_list(list_M_DEIM, list_names,
+    RBInfo.Paths.ROM_structures_path)
 
 end
 
 function get_M_DEIM_structures(
   RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady)
+  RBVars::NavierStokesUnsteady)
 
-  get_M_DEIM_structures(RBInfo, RBVars.Poisson)
+  get_M_DEIM_structures(RBInfo, RBVars.Stokes)
 
 end
 
 function get_offline_structures(
   RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady)
+  RBVars::NavierStokesUnsteady)
 
   operators = String[]
   append!(operators, get_affine_structures(RBInfo, RBVars))
@@ -254,47 +190,72 @@ end
 function get_θᵐ(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady,
+  RBVars::NavierStokesUnsteady,
   Param::ParametricInfoUnsteady)
 
-  get_θᵐ(FEMSpace, RBInfo, RBVars.Poisson, Param)
+  get_θᵐ(FEMSpace, RBInfo, RBVars.Stokes, Param)
 
 end
 
 function get_θᵃ(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady,
+  RBVars::NavierStokesUnsteady,
   Param::ParametricInfoUnsteady)
 
-  get_θᵃ(FEMSpace, RBInfo, RBVars.Poisson, Param)
+  get_θᵃ(FEMSpace, RBInfo, RBVars.Stokes, Param)
 
 end
 
 function get_θᵇ(
-  ::UnsteadyProblem,
-  ::ROMInfoUnsteady,
-  ::StokesUnsteady{T},
-  ::ParametricInfoUnsteady) where T
+  FEMSpace::UnsteadyProblem,
+  RBInfo::ROMInfoUnsteady,
+  RBVars::NavierStokesUnsteady,
+  Param::ParametricInfoUnsteady)
 
-  reshape([one(T)],1,1)::Matrix{T}
+  get_θᵇ(FEMSpace, RBInfo, RBVars.Stokes, Param)
+
+end
+
+function get_θᶜ(
+  FEMSpace::UnsteadyProblem,
+  RBInfo::ROMInfoUnsteady,
+  RBVars::NavierStokesUnsteady,
+  Param::ParametricInfoUnsteady)
+
+  timesθ = get_timesθ(RBInfo)
+
+  if RBInfo.st_M_DEIM
+    red_timesθ = timesθ[RBVars.MDEIM_idx_time_C]
+    C_μ_sparse = T.(build_sparse_mat(
+      FEMSpace,FEMInfo,Param,RBVars.sparse_el_C,red_timesθ;var="C"))
+    θᶜ = interpolated_θ(RBVars, C_μ_sparse, timesθ, RBVars.MDEIMᵢ_C,
+      RBVars.MDEIM_idx_C, RBVars.MDEIM_idx_time_C, RBVars.Qᵐ)
+  else
+    C_μ_sparse = T.(build_sparse_mat(
+      FEMSpace,FEMInfo,Param,RBVars.sparse_el_C,timesθ;var="C"))
+    θᶜ = (RBVars.MDEIMᵢ_C \
+      Matrix{T}(reshape(C_μ_sparse, :, RBVars.Nₜ)[RBVars.MDEIM_idx_C, :]))
+  end
+
+  θᶜ::Matrix{T}
 
 end
 
 function get_θᶠʰ(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady,
+  RBVars::NavierStokesUnsteady,
   Param::ParametricInfoUnsteady)
 
-  get_θᶠʰ(FEMSpace, RBInfo, RBVars.Poisson, Param)
+  get_θᶠʰ(FEMSpace, RBInfo, RBVars.Stokes, Param)
 
 end
 
 function solve_RB_system(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady,
+  RBVars::NavierStokesUnsteady,
   Param::ParametricInfoUnsteady)
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
@@ -313,18 +274,15 @@ function solve_RB_system(
 
 end
 
-function reconstruct_FEM_solution(RBVars::StokesUnsteady)
+function reconstruct_FEM_solution(RBVars::NavierStokesUnsteady)
 
-  reconstruct_FEM_solution(RBVars.Poisson)
-
-  pₙ = reshape(RBVars.pₙ, (RBVars.nₜᵖ, RBVars.nₛᵖ))
-  @fastmath RBVars.p̃ = RBVars.Φₛᵖ * (RBVars.Φₜᵖ * pₙ)'
+  reconstruct_FEM_solution(RBVars.Stokes)
 
 end
 
 function offline_phase(
   RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady)
+  RBVars::NavierStokesUnsteady)
 
   println("Offline phase of the RB solver, unsteady Stokes problem")
 
@@ -367,7 +325,7 @@ end
 
 function online_phase(
   RBInfo::ROMInfoUnsteady{T},
-  RBVars::StokesUnsteady,
+  RBVars::NavierStokesUnsteady,
   param_nbs) where T
 
   println("Online phase of the RB solver, unsteady Stokes problem")
@@ -441,7 +399,7 @@ end
 function loop_on_params(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady{T},
+  RBVars::NavierStokesUnsteady{T},
   μ::Vector{Vector{T}},
   param_nbs) where T
 
@@ -488,13 +446,13 @@ function loop_on_params(
     end
 
     H1_err_nb, H1_L2_err_nb = compute_errors(
-      RBVars.Poisson, uₕ_test, RBVars.ũ, RBVars.Xᵘ₀)
+      RBVars.Stokes, uₕ_test, RBVars.ũ, RBVars.Xᵘ₀)
     H1_L2_err[i_nb] = H1_L2_err_nb
     mean_H1_err += H1_err_nb / length(param_nbs)
     mean_H1_L2_err += H1_L2_err_nb / length(param_nbs)
     mean_pointwise_err_u += abs.(uₕ_test-RBVars.ũ)/length(param_nbs)
     L2_err_nb, L2_L2_err_nb = compute_errors(
-      RBVars.Poisson, pₕ_test, RBVars.p̃, RBVars.Xᵖ₀)
+      RBVars.Stokes, pₕ_test, RBVars.p̃, RBVars.Xᵖ₀)
     L2_L2_err[i_nb] = L2_L2_err_nb
     mean_L2_err += L2_err_nb / length(param_nbs)
     mean_L2_L2_err += L2_L2_err_nb / length(param_nbs)
@@ -519,7 +477,7 @@ end
 function adaptive_loop_on_params(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady{T},
+  RBVars::NavierStokesUnsteady{T},
   mean_uₕ_test::Matrix,
   mean_pointwise_err_u::Matrix,
   mean_pₕ_test::Matrix,

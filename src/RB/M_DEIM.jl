@@ -31,7 +31,7 @@ function M_DEIM_offline(M_DEIM_mat::Matrix)
     append!(M_DEIM_idx, convert(Int, argmax(abs.(res))[1]))
     if abs(det(M_DEIM_mat[M_DEIM_idx[1:m], 1:m])) ≤ 1e-80
       error("Something went wrong with the construction of (M)DEIM basis:
-        obtaining singular nested matrices during (M)DEIM offline phase")
+        obtaining singular nested matrices")
     end
   end
   unique!(M_DEIM_idx)
@@ -40,7 +40,10 @@ function M_DEIM_offline(M_DEIM_mat::Matrix)
 
 end
 
-function MDEIM_offline(RBInfo::ROMInfoSteady{T}, var::String) where T
+function MDEIM_offline(
+  RBInfo::ROMInfoSteady{T},
+  RBVars::RBSteadyProblem,
+  var::String) where T
 
   println("Building $(RBInfo.nₛ_MDEIM) snapshots of $var")
 
@@ -48,7 +51,7 @@ function MDEIM_offline(RBInfo::ROMInfoSteady{T}, var::String) where T
   model = DiscreteModelFromFile(get_mesh_path(RBInfo))
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
 
-  MDEIM_mat, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, μ, var)
+  MDEIM_mat, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
   MDEIM_mat, MDEIM_idx = M_DEIM_offline(MDEIM_mat)
   MDEIMᵢ_mat = MDEIM_mat[MDEIM_idx, :]
   MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx, row_idx, FEMSpace.Nₛᵘ)
@@ -59,7 +62,10 @@ function MDEIM_offline(RBInfo::ROMInfoSteady{T}, var::String) where T
 
 end
 
-function MDEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
+function MDEIM_offline(
+  RBInfo::ROMInfoUnsteady{T},
+  RBVars::RBUnsteadyProblem,
+  var::String) where T
 
   println("Building $(RBInfo.nₛ_MDEIM) snapshots of $var")
 
@@ -67,7 +73,7 @@ function MDEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
   model = DiscreteModelFromFile(get_mesh_path(RBInfo))
   FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id, RBInfo.FEMInfo, model)
 
-  MDEIM_mat, MDEIM_mat_time, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, μ, var)
+  MDEIM_mat, MDEIM_mat_time, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
 
   MDEIM_mat, MDEIM_idx = M_DEIM_offline(MDEIM_mat)
   MDEIMᵢ_mat = MDEIM_mat[MDEIM_idx, :]

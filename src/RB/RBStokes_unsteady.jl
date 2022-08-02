@@ -54,7 +54,7 @@ function PODs_time(
 
 end
 
-function time_supremizers(RBVars::StokesUnsteady{T}) where T
+function time_supremizers(Φₜᵘ::Matrix{T}, Φₜᵖ::Matrix{T}) where T
 
   function compute_projection_on_span(
     ξ_new::Vector{T},
@@ -71,7 +71,7 @@ function time_supremizers(RBVars::StokesUnsteady{T}) where T
 
   println("Checking if primal supremizers in time need to be added")
 
-  ΦₜᵘΦₜᵖ = RBVars.Φₜᵘ' * RBVars.Φₜᵖ
+  ΦₜᵘΦₜᵖ = Φₜᵘ' * Φₜᵖ
   ξ = zeros(T, size(ΦₜᵘΦₜᵖ))
 
   for l = 1:size(ΦₜᵘΦₜᵖ)[2]
@@ -85,15 +85,23 @@ function time_supremizers(RBVars::StokesUnsteady{T}) where T
     end
 
     if enrich
-      Φₜᵖ_l_on_Φₜᵘ = compute_projection_on_span(RBVars.Φₜᵖ[:, l], RBVars.Φₜᵘ)
-      Φₜᵘ_to_add = ((RBVars.Φₜᵖ[:, l] - Φₜᵖ_l_on_Φₜᵘ) /
-        norm(RBVars.Φₜᵖ[:, l] - Φₜᵖ_l_on_Φₜᵘ))
-      RBVars.Φₜᵘ = hcat(RBVars.Φₜᵘ, Φₜᵘ_to_add)
-      ΦₜᵘΦₜᵖ = hcat(ΦₜᵘΦₜᵖ, Φₜᵘ_to_add' * RBVars.Φₜᵖ)
-      RBVars.nₜᵘ += 1
+      Φₜᵖ_l_on_Φₜᵘ = compute_projection_on_span(Φₜᵖ[:, l], Φₜᵘ)
+      Φₜᵘ_to_add = ((Φₜᵖ[:, l] - Φₜᵖ_l_on_Φₜᵘ) / norm(Φₜᵖ[:, l] - Φₜᵖ_l_on_Φₜᵘ))
+      Φₜᵘ = hcat(Φₜᵘ, Φₜᵘ_to_add)
+      ΦₜᵘΦₜᵖ = hcat(ΦₜᵘΦₜᵖ, Φₜᵘ_to_add' * Φₜᵖ)
     end
 
   end
+
+  Φₜᵘ
+
+end
+
+function supr_enrichment_time(
+  RBVars::StokesUnsteady)
+
+  RBVars.Φₜᵘ = time_supremizers(RBVars.Φₜᵘ, RBVars.Φₜᵖ)
+  RBVars.nₜᵘ = size(RBVars.Φₜᵘ)[2]
 
 end
 
@@ -105,7 +113,7 @@ function build_reduced_basis(
     PODs_space(RBInfo, RBVars)
     supr_enrichment_space(RBInfo, RBVars.Steady)
     PODs_time(RBInfo, RBVars)
-    time_supremizers(RBVars)
+    supr_enrichment_time(RBVars)
   end
 
   RBVars.nᵘ = RBVars.nₛᵘ * RBVars.nₜᵘ
@@ -200,7 +208,7 @@ function set_operators(
   RBInfo::Info,
   RBVars::StokesUnsteady)
 
-  append!(["B"], set_operators(RBInfo, RBVars.Poisson))
+  append!(["M"], set_operators(RBInfo, RBVars.Steady))
 
 end
 

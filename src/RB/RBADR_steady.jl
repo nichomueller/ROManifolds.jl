@@ -51,7 +51,7 @@ function assemble_MDEIM_matrices(
       running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
     if isempty(RBVars.MDEIM_mat_B)
       (RBVars.MDEIM_mat_B, RBVars.MDEIM_idx_B, RBVars.MDEIMᵢ_B,
-      RBVars.row_idx_B,RBVars.sparse_el_B) = MDEIM_offline(RBInfo, "B")
+      RBVars.row_idx_B,RBVars.sparse_el_B) = MDEIM_offline(RBInfo, RBVars, "B")
     end
     assemble_reduced_mat_MDEIM(RBVars,RBVars.MDEIM_mat_B,RBVars.row_idx_B)
   elseif var == "D"
@@ -59,7 +59,7 @@ function assemble_MDEIM_matrices(
       running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
     if isempty(RBVars.MDEIM_mat_D)
       (RBVars.MDEIM_mat_D, RBVars.MDEIM_idx_D, RBVars.MDEIMᵢ_D,
-      RBVars.row_idx_D,RBVars.sparse_el_D) = MDEIM_offline(RBInfo, "D")
+      RBVars.row_idx_D,RBVars.sparse_el_D) = MDEIM_offline(RBInfo, RBVars, "D")
     end
     assemble_reduced_mat_MDEIM(RBVars,RBVars.MDEIM_mat_D,RBVars.row_idx_D)
   else
@@ -96,7 +96,8 @@ function get_M_DEIM_structures(
   RBInfo::Info,
   RBVars::ADRSteady{T}) where T
 
-  operators = get_M_DEIM_structures(RBInfo, RBVars.Poisson)
+  operators = String[]
+  append!(operators, get_M_DEIM_structures(RBInfo, RBVars.Poisson))
 
   if RBInfo.probl_nl["B"]
 

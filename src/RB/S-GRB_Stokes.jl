@@ -120,7 +120,8 @@ function get_affine_structures(
   RBInfo::ROMInfoSteady,
   RBVars::StokesSteady)
 
-  operators = get_affine_structures(RBInfo, RBVars.Poisson)
+  operators = String[]
+  append!(operators, get_affine_structures(RBInfo, RBVars.Poisson))
   append!(operators, get_Bₙ(RBInfo, RBVars))
 
   operators
@@ -144,7 +145,7 @@ function get_RB_LHS_blocks(
 
   get_RB_LHS_blocks(RBVars.Poisson, θᵃ)
 
-  block₂ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵖ)
+  block₂ = zeros(T, RBVars.nₛᵖ, RBVars.nₛᵘ)
   for q = 1:RBVars.Qᵇ
     block₂ += RBVars.Bₙ[:,:,q] * θᵇ[q]
   end

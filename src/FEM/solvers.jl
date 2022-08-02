@@ -123,13 +123,13 @@ function FE_solve(
   δt = FEMInfo.δt
   δtθ = θ*δt
 
-  A(t) = assemble_stiffness(FEMSpace, FEMInfo, Param)(t)
-  M(t) = assemble_mass(FEMSpace, FEMInfo, Param)(t)
-  B(t) = assemble_primal_op(FEMSpace)(t)
-  F(t) = assemble_forcing(FEMSpace, FEMInfo, Param)(t)
-  H(t) = assemble_neumann_datum(FEMSpace, FEMInfo, Param)(t)
-  R₁(t) = assemble_lifting(FEMSpace, FEMInfo, Param)(t)
-  R₂(t) = assemble_continuity_lifting(FEMSpace, FEMInfo, Param)(t)
+  A(t) = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "A")(t)
+  M(t) = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "M")(t)
+  B(t) = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "Bₚ")(t)
+  F(t) = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "F")(t)
+  H(t) = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "H")(t)
+  R₁(t) = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "L")(t)
+  R₂(t) = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "L_cont")(t)
   LHS(t) = vcat(hcat(M(t)/δtθ+A(t),-B(t)'),hcat(B(t),zeros(T,FEMSpace.Nₛᵖ,FEMSpace.Nₛᵖ)))
   RHS(t) = vcat(F(t)+H(t)-R₁(t),-R₂(t))
 

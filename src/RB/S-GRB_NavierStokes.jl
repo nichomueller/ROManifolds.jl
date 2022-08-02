@@ -126,6 +126,7 @@ function assemble_offline_structures(
   end
 
   save_affine_structures(RBInfo, RBVars)
+  save_M_DEIM_structures(RBInfo, RBVars)
 
 end
 
@@ -144,8 +145,9 @@ function get_affine_structures(
   RBInfo::ROMInfoSteady,
   RBVars::NavierStokesSteady)
 
-  operators = get_affine_structures(RBInfo, RBVars.Stokes)
+  operators = String[]
   append!(operators, get_Cₙ(RBInfo, RBVars))
+  append!(operators, get_affine_structures(RBInfo, RBVars.Stokes))
 
   operators
 
@@ -163,19 +165,29 @@ function get_Q(
 end
 
 function get_RB_LHS_blocks(
-  ::ROMInfoSteady,
   RBVars::NavierStokesSGRB{T},
   θᵃ::Matrix,
   θᵇ::Matrix) where T
 
-  Aₙ_μ =  assemble_parametric_structure(θᵃ, RBVars.Aₙ)
-  Bₙ_μ =  assemble_parametric_structure(θᵇ, RBVars.Bₙ)
-  Cₙ_μ =  assemble_parametric_structure(θᶜ, RBVars.Cₙ)
+  println("Assembling reduced LHS")
 
-  push!(RBVars.LHSₙ, Aₙ_μ + Cₙ_μ)
-  push!(RBVars.LHSₙ, -Bₙ_μ')
-  push!(RBVars.LHSₙ, Bₙ_μ)
-  push!(RBVars.LHSₙ, Matrix{T}(undef,0,0))
+  block₁ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ)
+  for q = 1:RBVars.Qᵃ
+    block₁ += RBVars.Aₙ[:,:,q] * θᵃ[q]
+  end
+  for q = 1:RBVars.Qᶜ
+    block₁ += RBVars.Cₙ[:,:,q] * θᶜ[q]
+  end
+
+  block₂ = zeros(T, RBVars.nₛᵖ, RBVars.nₛᵘ)
+  for q = 1:RBVars.Qᵇ
+    block₂ += RBVars.Bₙ[:,:,q] * θᵇ[q]
+  end
+
+  push!(RBVars.LHSₙ, block₁)::Vector{Matrix{T}}
+  push!(RBVars.LHSₙ, -block₂')::Vector{Matrix{T}}
+  push!(RBVars.LHSₙ, block₂)::Vector{Matrix{T}}
+  push!(RBVars.LHSₙ, zeros(T, RBVars.nₛᵖ, RBVars.nₛᵖ))
 
 end
 

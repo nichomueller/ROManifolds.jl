@@ -7,6 +7,13 @@ function get_snapshot_matrix(
 
   get_snapshot_matrix(RBInfo, RBVars.Stokes)
 
+  println("Importing the snapshot matrix for field u on quadrature points,
+    number of snapshots considered: $(RBInfo.nₛ)")
+  Sᵘ_quad = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ_quadp.csv"),
+    DataFrame))[:, 1:RBInfo.nₛ]
+  println("Dimension of velocity snapshot matrix on quadrature points: $(size(Sᵘ_quad))")
+  RBVars.Nₛᵘ_quad = size(Sᵘ_quad)[1]
+
 end
 
 function get_norm_matrix(
@@ -17,11 +24,111 @@ function get_norm_matrix(
 
 end
 
+function PODs_space(
+  RBInfo::Info,
+  RBVars::NavierStokesSteady)
+
+  PODs_space(RBInfo,RBVars.Stokes)
+
+  println("Performing the spatial POD for field u on quadrature points")
+  RBVars.Φₛᵘ_quad = POD(RBVars.Sᵘ_quad, RBInfo.ϵₛ, RBVars.Xᵘ₀)
+  (RBVars.Nₛᵘ_quad, RBVars.nₛᵘ_quad) = size(RBVars.Φₛᵘ_quad)
+
+end
+
+function primal_supremizers(
+  RBInfo::Info,
+  RBVars::NavierStokesSteady{T}) where T
+
+  println("Computing primal supremizers")
+
+  constraint_mat = load_CSV(sparse([],[],T[]),
+    joinpath(get_FEM_structures_path(RBInfo), "B.csv"))'
+
+  supr_primal = Matrix{T}(RBVars.Xᵘ) \ (Matrix{T}(constraint_mat) * RBVars.Φₛᵖ)
+  supr_primal_quad = supr_primal
+
+  min_norm = 1e16
+  for i = 1:size(supr_primal)[2]
+
+    println("Normalizing primal supremizer $i")
+
+    for j in 1:RBVars.nₛᵘ
+      supr_primal[:, i] -= mydot(supr_primal[:, i], RBVars.Φₛᵘ[:,j], RBVars.Xᵘ₀) /
+      mynorm(RBVars.Φₛᵘ[:,j], RBVars.Xᵘ₀) * RBVars.Φₛᵘ[:,j]
+    end
+    for j in 1:i
+      supr_primal[:, i] -= mydot(supr_primal[:, i], supr_primal[:, j], RBVars.Xᵘ₀) /
+      mynorm(supr_primal[:, j], RBVars.Xᵘ₀) * supr_primal[:, j]
+    end
+
+    supr_norm = mynorm(supr_primal[:, i], RBVars.Xᵘ₀)
+    min_norm = min(supr_norm, min_norm)
+    println("Norm supremizers: $supr_norm")
+    supr_primal[:, i] /= supr_norm
+
+  end
+
+  println("Primal supremizers enrichment ended with norm: $min_norm")
+
+  min_norm = 1e16
+  for i = 1:size(supr_primal_quad)[2]
+
+    println("Normalizing primal supremizer $i, quadrature points")
+
+    for j in 1:RBVars.nₛᵘ_quad
+      supr_primal_quad[:, i] -= mydot(supr_primal_quad[:, i], RBVars.Φₛᵘ_quad[:,j], RBVars.Xᵘ₀) /
+      mynorm(RBVars.Φₛᵘ_quad[:,j], RBVars.Xᵘ₀) * RBVars.Φₛᵘ_quad[:,j]
+    end
+    for j in 1:i
+      supr_primal_quad[:, i] -= mydot(supr_primal_quad[:, i], supr_primal_quad[:, j], RBVars.Xᵘ₀) /
+      mynorm(supr_primal_quad[:, j], RBVars.Xᵘ₀) * supr_primal_quad[:, j]
+    end
+
+    supr_norm = mynorm(supr_primal_quad[:, i], RBVars.Xᵘ₀)
+    min_norm = min(supr_norm, min_norm)
+    println("Norm supremizers: $supr_norm")
+    supr_primal_quad[:, i] /= supr_norm
+
+  end
+
+  println("Primal supremizers on quadrature points enrichment ended with norm: $min_norm")
+
+  supr_primal, supr_primal_quad
+
+end
+
+function supr_enrichment_space(
+  RBInfo::Info,
+  RBVars::NavierStokesSteady)
+
+  supr_primal, supr_primal_quad = primal_supremizers(RBInfo, RBVars)
+
+  RBVars.Φₛᵘ = hcat(RBVars.Φₛᵘ, supr_primal)
+  RBVars.nₛᵘ = size(RBVars.Φₛᵘ)[2]
+
+  RBVars.Φₛᵘ_quad = hcat(RBVars.Φₛᵘ_quad, supr_primal_quad)
+  RBVars.nₛᵘ_quad = size(RBVars.Φₛᵘ_quad)[2]
+
+end
+
 function build_reduced_basis(
   RBInfo::ROMInfoSteady,
   RBVars::NavierStokesSteady)
 
-  build_reduced_basis(RBInfo, RBVars.Stokes)
+  RBVars.offline_time += @elapsed begin
+    PODs_space(RBInfo, RBVars)
+    supr_enrichment_space(RBInfo, RBVars)
+  end
+
+  if RBInfo.save_offline_structures
+    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.Paths.ROM_structures_path,"Φₛᵘ.csv"))
+    save_CSV(RBVars.Φₛᵖ, joinpath(RBInfo.Paths.ROM_structures_path,"Φₛᵖ.csv"))
+    save_CSV(RBVars.Φₛᵘ_quad,
+      joinpath(RBInfo.Paths.ROM_structures_path,"Φₛᵘ_quad.csv"))
+  end
+
+  return
 
 end
 
@@ -30,6 +137,10 @@ function import_reduced_basis(
   RBVars::NavierStokesSteady{T}) where T
 
   import_reduced_basis(RBInfo, RBVars.Stokes)
+  println("Importing the spatial reduced basis for field u, quadrature points")
+  RBVars.Φₛᵘ_quad = load_CSV(Matrix{T}(undef,0,0),
+    joinpath(RBInfo.Paths.ROM_structures_path, "Φₛᵘ_quad.csv"))
+  (RBVars.Nₛᵘ_quad, RBVars.nₛᵘ_quad) = size(RBVars.Φₛᵘ_quad)
 
 end
 
@@ -51,7 +162,7 @@ function assemble_MDEIM_matrices(
       running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
     if isempty(RBVars.MDEIM_mat_C)
       (RBVars.MDEIM_mat_C, RBVars.MDEIM_idx_C, RBVars.MDEIMᵢ_C,
-      RBVars.row_idx_C,RBVars.sparse_el_C) = MDEIM_offline(RBInfo, "C")
+      RBVars.row_idx_C,RBVars.sparse_el_C) = MDEIM_offline(RBInfo, RBVars, "C")
     end
     assemble_reduced_mat_MDEIM(RBVars,RBVars.MDEIM_mat_C,RBVars.row_idx_C)
   else
@@ -86,7 +197,8 @@ function get_M_DEIM_structures(
   RBInfo::ROMInfoSteady,
   RBVars::NavierStokesSteady)
 
-  operators = get_M_DEIM_structures(RBInfo, RBVars.Stokes)
+  operators = String[]
+  append!(operators, get_M_DEIM_structures(RBInfo, RBVars.Stokes))
 
   if RBInfo.probl_nl["C"]
 
