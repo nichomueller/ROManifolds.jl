@@ -43,7 +43,7 @@ function get_FEMSpace_quantities(
 
   V₀ = TestFESpace(model, refFE; conformity=:H1,
     dirichlet_tags=FEMInfo.dirichlet_tags, labels=labels)
-  V = TransientTrialFESpace(V₀, g)
+  V = TrialFESpace(V₀, g)
 
   ϕᵥ = get_fe_basis(V₀)
   ϕᵤ = get_trial_fe_basis(V)
@@ -111,7 +111,7 @@ function get_FEMSpace_quantities(
   labels = set_labels(FEMInfo, model)
   V₀ = TestFESpace(model, refFEᵤ; conformity=:H1,
     dirichlet_tags=FEMInfo.dirichlet_tags, labels=labels)
-  V = TransientTrialFESpace(V₀, g)
+  V = TrialFESpace(V₀, g)
 
   ϕᵥ = get_fe_basis(V₀)
   ϕᵤ = get_trial_fe_basis(V)
@@ -125,7 +125,7 @@ function get_FEMSpace_quantities(
   Nₛᵖ = length(get_free_dof_ids(Q))
 
   X₀ = MultiFieldFESpace([V₀, Q₀])
-  X = TransientMultiFieldFESpace([V, Q])
+  X = MultiFieldFESpace([V, Q])
 
   phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
 

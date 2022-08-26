@@ -18,11 +18,11 @@ function check_dataset(
   u1 = RBVars.Sᵘ[:,(nb-1)*RBVars.Nₜ+1]
   u2 = RBVars.Sᵘ[:,(nb-1)*RBVars.Nₜ+2]
   M = assemble_FEM_structure(FEMSpace, RBInfo, Param, "M")(0.0)
-  H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")(0.0)
 
   if RBInfo.case == 0
     A = assemble_FEM_structure(FEMSpace, RBInfo, Param, "A")(0.0)
     F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")(0.0)
+    H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")(0.0)
     LHS1 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A*Param.αₜ(t¹_θ))
     RHS1 = RBInfo.δt*RBInfo.θ*(F*Param.fₜ(t¹_θ)+H*Param.hₜ(t¹_θ))
     LHS2 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A*Param.αₜ(t²_θ))
@@ -31,19 +31,30 @@ function check_dataset(
   elseif RBInfo.case == 1
     A = assemble_FEM_structure(FEMSpace, RBInfo, Param, "A")
     F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")(0.0)
+    H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")(0.0)
     LHS1 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A(t¹_θ))
     RHS1 = RBInfo.δt*RBInfo.θ*(F*Param.fₜ(t¹_θ)+H*Param.hₜ(t¹_θ))
     LHS2 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A(t²_θ))
     mat = (1-RBInfo.θ)*(M+RBInfo.δt*RBInfo.θ*A(t²_θ))-M
     RHS2 = RBInfo.δt*RBInfo.θ*(F*Param.fₜ(t²_θ)+H*Param.hₜ(t²_θ))-mat*u1
-  else
+  elseif RBInfo.case == 2
     A = assemble_FEM_structure(FEMSpace, RBInfo, Param, "A")
     F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
+    H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")(0.0)
     LHS1 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A(t¹_θ))
     RHS1 = RBInfo.δt*RBInfo.θ*(F(t¹_θ)+H*Param.hₜ(t¹_θ))
     LHS2 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A(t²_θ))
     mat = (1-RBInfo.θ)*(M+RBInfo.δt*RBInfo.θ*A(t²_θ))-M
     RHS2 = RBInfo.δt*RBInfo.θ*(F(t²_θ)+H*Param.hₜ(t²_θ))-mat*u1
+  else
+    A = assemble_FEM_structure(FEMSpace, RBInfo, Param, "A")
+    F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
+    H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
+    LHS1 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A(t¹_θ))
+    RHS1 = RBInfo.δt*RBInfo.θ*(F(t¹_θ)+H(t¹_θ))
+    LHS2 = RBInfo.θ*(M+RBInfo.δt*RBInfo.θ*A(t²_θ))
+    mat = (1-RBInfo.θ)*(M+RBInfo.δt*RBInfo.θ*A(t²_θ))-M
+    RHS2 = RBInfo.δt*RBInfo.θ*(F(t²_θ)+H(t²_θ))-mat*u1
   end
 
   my_u1 = LHS1\RHS1

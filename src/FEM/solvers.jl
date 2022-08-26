@@ -3,7 +3,7 @@ function FE_solve(
   FEMInfo::SteadyInfo,
   Param::ParametricInfoSteady)
 
-  R₁ = assemble_lifting(FEMSpace, FEMInfo, Param)
+  #R₁ = assemble_lifting(FEMSpace, FEMInfo, Param)
 
   a(u, v) = ∫(∇(v) ⋅ (Param.α * ∇(u))) * FEMSpace.dΩ
   rhs(v) = ∫(v * Param.f) * FEMSpace.dΩ + ∫(v * Param.h) * FEMSpace.dΓn
@@ -24,7 +24,7 @@ function FE_solve(
   FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady)
 
-  R₁(t) = assemble_lifting(FEMSpace, FEMInfo, Param)(t)
+  #R₁(t) = assemble_lifting(FEMSpace, FEMInfo, Param)(t)
 
   m(t, u, v) = ∫(Param.m(t)*(u*v))dΩ
   a(t, u, v) = ∫(∇(v)⋅(Param.α(t)*∇(u)))*FEMSpace.dΩ

@@ -96,7 +96,7 @@ end
 
 function assemble_stiffness(
   ::NTuple{2,Int},
-  FEMSpace::FEMSpaceADRSteady,
+  FEMSpace::SteadyProblem,
   ::SteadyInfo,
   Param::ParametricInfoSteady)
 
@@ -111,7 +111,7 @@ end
 
 function assemble_stiffness(
   ::NTuple{2,Int},
-  FEMSpace::FEMSpaceADRUnsteady,
+  FEMSpace::UnsteadyProblem,
   ::UnsteadyInfo,
   Param::ParametricInfoUnsteady)
 
@@ -130,7 +130,7 @@ end
 
 function assemble_stiffness(
   ::NTuple{3,Int},
-  FEMSpace::FEMSpaceStokesSteady,
+  FEMSpace::SteadyProblem,
   FEMInfo::SteadyInfo,
   Param::ParametricInfoSteady)
 
@@ -146,7 +146,7 @@ end
 
 function assemble_stiffness(
   ::NTuple{3,Int},
-  FEMSpace::FEMSpaceStokesUnsteady,
+  FEMSpace::UnsteadyProblem,
   FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady)
 
@@ -206,7 +206,7 @@ end
 
 function assemble_advection(
   ::NTuple{2,Int},
-  FEMSpace::FEMSpaceADRSteady,
+  FEMSpace::SteadyProblem,
   ::SteadyInfo,
   Param::ParametricInfoSteady)
 
@@ -217,7 +217,7 @@ end
 
 function assemble_advection(
   ::NTuple{2,Int},
-  FEMSpace::FEMSpaceADRUnsteady,
+  FEMSpace::SteadyProblem,
   FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady)
 
@@ -235,7 +235,7 @@ end
 
 function assemble_convection(
   ::NTuple{4,Int},
-  FEMSpace::FEMSpaceNavierStokesSteady,
+  FEMSpace::SteadyProblem,
   Param::ParametricInfoSteady)
 
   C(u) = Param.Re * assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
@@ -247,7 +247,7 @@ end
 
 function assemble_convection(
   ::NTuple{4,Int},
-  FEMSpace::FEMSpaceNavierStokesUnsteady,
+  FEMSpace::UnsteadyProblem,
   Param::ParametricInfoUnsteady)
 
   C(u,t) = Param.Re * assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
@@ -259,7 +259,7 @@ end
 
 function assemble_reaction(
   ::NTuple{2,Int},
-  FEMSpace::FEMSpaceADRSteady,
+  FEMSpace::SteadyProblem,
   ::SteadyInfo,
   Param::ParametricInfoSteady)
 
@@ -270,7 +270,7 @@ end
 
 function assemble_reaction(
   ::NTuple{2,Int},
-  FEMSpace::FEMSpaceADRUnsteady,
+  FEMSpace::UnsteadyProblem,
   FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady)
 
@@ -364,7 +364,7 @@ end
 
 function assemble_forcing(
   ::NTuple{1,Int},
-  FEMSpace::FEMSpacePoissonUnsteady,
+  FEMSpace::UnsteadyProblem,
   FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady)
 
@@ -392,9 +392,9 @@ end
 
 function assemble_forcing(
   ::NTuple{3,Int},
-  FEMSpace::FEMSpaceStokessteady{D},
-  FEMInfo::steadyInfo,
-  Param::ParametricInfosteady) where D
+  FEMSpace::SteadyProblem{D},
+  FEMInfo::SteadyInfo,
+  Param::ParametricInfoSteady) where D
 
   if !FEMInfo.probl_nl["f"]
     fₛ(x) = x -> one(VectorValue(FEMInfo.D, Float))
@@ -407,7 +407,7 @@ end
 
 function assemble_forcing(
   ::NTuple{3,Int},
-  FEMSpace::FEMSpaceStokesUnsteady,
+  FEMSpace::UnsteadyProblem,
   FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady)
 
@@ -542,7 +542,7 @@ end
 
 function assemble_neumann_datum(
   ::NTuple{1,Int},
-  FEMSpace::FEMSpacePoissonUnsteady,
+  FEMSpace::UnsteadyProblem,
   FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady)
 
@@ -572,7 +572,7 @@ end
 
 function assemble_neumann_datum(
   ::NTuple{3,Int},
-  FEMSpace::FEMSpaceStokesSteady,
+  FEMSpace::SteadyProblem,
   FEMInfo::SteadyInfo,
   Param::ParametricInfoSteady)
 
@@ -587,7 +587,7 @@ end
 
 function assemble_neumann_datum(
   ::NTuple{3,Int},
-  FEMSpace::FEMSpaceStokesUnsteady,
+  FEMSpace::UnsteadyProblem,
   FEMInfo::UnsteadyInfo,
   Param::ParametricInfoUnsteady)
 
@@ -689,7 +689,7 @@ end =#
 
 function assemble_L²_norm_matrix(
   ::NTuple{3,Int},
-  FEMSpace::FEMSpaceStokesUnsteady)
+  FEMSpace::FEMProblem)
 
   assemble_matrix(∫(FEMSpace.ψᵧ*FEMSpace.ψₚ)*FEMSpace.dΩ,
     FEMSpace.Q, FEMSpace.Q₀)::SparseMatrixCSC{Float, Int}
@@ -698,7 +698,7 @@ end
 
 function assemble_L²_norm_matrix(
   ::NTuple{4,Int},
-  FEMSpace::FEMSpaceStokesUnsteady)
+  FEMSpace::FEMProblem)
 
   assemble_L²_norm_matrix(get_NTuple(3, Int), FEMSpace)
 
@@ -706,7 +706,7 @@ end
 
 function assemble_H¹_norm_matrix(
   ::NTuple{1,Int},
-  FEMSpace::FEMSpacePoissonSteady)
+  FEMSpace::SteadyProblem)
 
   (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅∇(FEMSpace.ϕᵤ))*FEMSpace.dΩ,
     FEMSpace.V, FEMSpace.V₀) +
@@ -717,7 +717,7 @@ end
 
 function assemble_H¹_norm_matrix(
   ::NTuple{1,Int},
-  FEMSpace::FEMSpacePoissonUnsteady)
+  FEMSpace::UnsteadyProblem)
 
   (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅∇(FEMSpace.ϕᵤ(0.0)))*FEMSpace.dΩ,
     FEMSpace.V(0.0), FEMSpace.V₀) +
@@ -728,7 +728,7 @@ end
 
 function assemble_H¹_norm_matrix(
   ::NTuple{2,Int},
-  FEMSpace::FEMSpaceStokesUnsteady)
+  FEMSpace::FEMProblem)
 
   assemble_H¹_norm_matrix(get_NTuple(1, Int), FEMSpace)
 
@@ -736,7 +736,7 @@ end
 
 function assemble_H¹_norm_matrix(
   ::NTuple{3,Int},
-  FEMSpace::FEMSpaceStokesSteady)
+  FEMSpace::SteadyProblem)
 
   (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙∇(FEMSpace.ϕᵤ))*FEMSpace.dΩ,
   FEMSpace.V, FEMSpace.V₀) +
@@ -747,7 +747,7 @@ end
 
 function assemble_H¹_norm_matrix(
   ::NTuple{3,Int},
-  FEMSpace::FEMSpaceStokesUnsteady)
+  FEMSpace::UnsteadyProblem)
 
   (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙∇(FEMSpace.ϕᵤ(0.0)))*FEMSpace.dΩ,
     FEMSpace.V(0.0), FEMSpace.V₀) +
@@ -758,7 +758,7 @@ end
 
 function assemble_H¹_norm_matrix(
   ::NTuple{4,Int},
-  FEMSpace::FEMSpaceStokesUnsteady)
+  FEMSpace::FEMProblem)
 
   assemble_H¹_norm_matrix(get_NTuple(3, Int), FEMSpace)
 
