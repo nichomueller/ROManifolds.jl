@@ -205,7 +205,7 @@ function build_param_RHS(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::NavierStokesSGRB{T},
-  Param::ParametricInfoSteady) where T
+  Param::SteadyParametricInfo) where T
 
   build_param_RHS(FEMSpace, RBInfo, RBVars.Stokes, Param)
 
@@ -215,7 +215,7 @@ function get_θ(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::StokesSGRB{T},
-  Param::ParametricInfoSteady) where T
+  Param::SteadyParametricInfo) where T
 
   θᵃ, θᵇ, θᶠ, θʰ = get_θ(FEMSpace, RBInfo, RBVars.Stokes, Param)
   θᶜ = get_θᶜ(FEMSpace, RBVars, Param)

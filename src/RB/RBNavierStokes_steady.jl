@@ -261,7 +261,7 @@ function get_θᵃ(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::NavierStokesSteady,
-  Param::ParametricInfoSteady)
+  Param::SteadyParametricInfo)
 
   get_θᵃ(FEMSpace, RBInfo, RBVars.Stokes, Param)
 
@@ -271,7 +271,7 @@ function get_θᵇ(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::NavierStokesSteady,
-  Param::ParametricInfoSteady)
+  Param::SteadyParametricInfo)
 
   get_θᵇ(FEMSpace, RBInfo, RBVars.Stokes, Param)
 
@@ -280,7 +280,7 @@ end
 function get_θᶜ(
   FEMSpace::SteadyProblem,
   RBVars::NavierStokesSteady,
-  Param::ParametricInfoSteady)
+  Param::SteadyParametricInfo)
 
   C_μ_sparse = T.(build_sparse_mat(FEMSpace, FEMInfo, Param, RBVars.sparse_el_C))
   θᶜ = M_DEIM_online(C_μ_sparse, RBVars.MDEIMᵢ_C, RBVars.MDEIM_idx_C)
@@ -292,7 +292,7 @@ function get_θᶠʰ(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::NavierStokesSteady,
-  Param::ParametricInfoSteady)
+  Param::SteadyParametricInfo)
 
   get_θᶠʰ(FEMSpace, RBInfo, RBVars.Stokes, Param)
 
@@ -333,7 +333,7 @@ function get_RB_system(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::NavierStokesSteady,
-  Param::ParametricInfoSteady)
+  Param::SteadyParametricInfo)
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
@@ -370,7 +370,7 @@ function solve_RB_system(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady{T},
   RBVars::NavierStokesSteady,
-  Param::ParametricInfoSteady) where T
+  Param::SteadyParametricInfo) where T
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
   println("Solving RB problem via backslash")

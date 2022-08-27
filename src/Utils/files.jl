@@ -74,10 +74,10 @@ end
 
 function save_structures_in_list(
   list_structures::Tuple,
-  list_names::Tuple,
-  path::String)
+  list_names::NTuple{D},
+  path::String) where D
 
-  @assert length(list_structures) == length(list_names) "Wrong dimension"
+  @assert length(list_structures) == D "Wrong length"
 
   l_info_vec = [[l_idx,l_val] for (l_idx,l_val) in
     enumerate(list_structures) if !all(isempty.(l_val))]
@@ -89,5 +89,23 @@ function save_structures_in_list(
       save_CSV(l_val[i₁], joinpath(path, list_names[i₂]*".csv"))
     end
   end
+
+end
+
+function load_structures_in_list(
+  list_names::Tuple{Vararg{String, D}},
+  list_types::Tuple,
+  path::String) where D
+
+  @assert length(list_types) == D "Wrong length"
+
+  ret_tuple = ()
+
+  for (idx, name) in enumerate(list_names)
+    ret_tuple = (ret_tuple...,
+      load_CSV(list_types[idx], joinpath(path, name*".csv")))
+  end
+
+  ret_tuple
 
 end

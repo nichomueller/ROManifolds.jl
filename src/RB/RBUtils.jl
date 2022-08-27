@@ -60,7 +60,7 @@ end
 function assemble_FEM_structure(
   FEMSpace::FEMProblem,
   RBInfo::ROMInfoSteady,
-  Param::ParametricInfoSteady,
+  Param::SteadyParametricInfo,
   var::String)
 
   assemble_FEM_structure(FEMSpace,RBInfo.FEMInfo,Param,var)
@@ -70,7 +70,7 @@ end
 function assemble_FEM_structure(
   FEMSpace::FEMProblem,
   RBInfo::ROMInfoUnsteady,
-  Param::ParametricInfoUnsteady,
+  Param::UnsteadyParametricInfo,
   var::String)
 
   assemble_FEM_structure(FEMSpace,RBInfo.FEMInfo,Param,var)
@@ -115,7 +115,7 @@ end
 function build_sparse_mat(
   FEMSpace::SteadyProblem,
   FEMInfo::SteadyInfo,
-  Param::ParametricInfoSteady,
+  Param::SteadyParametricInfo,
   el::Vector{Int};
   var="A")
 
@@ -146,7 +146,7 @@ end
 function build_sparse_mat(
   FEMSpace::UnsteadyProblem,
   FEMInfo::UnsteadyInfo,
-  Param::ParametricInfoUnsteady,
+  Param::UnsteadyParametricInfo,
   el::Vector{Int},
   timesθ::Vector;
   var="A")
@@ -197,7 +197,7 @@ end
 function build_sparse_vec(
   FEMSpace::SteadyProblem,
   FEMInfo::SteadyInfo,
-  Param::ParametricInfoSteady,
+  Param::SteadyParametricInfo,
   el::Vector{Int};
   var="F")
 
@@ -226,7 +226,7 @@ end
 function build_sparse_vec(
   FEMSpace::UnsteadyProblem,
   FEMInfo::UnsteadyInfo,
-  Param::ParametricInfoUnsteady,
+  Param::UnsteadyParametricInfo,
   el::Vector{Int},
   timesθ::Vector;
   var="F")
@@ -268,7 +268,7 @@ end
 
 #= function assemble_RBapprox_convection(
   FEMSpace::FEMSpaceNavierStokesSteady,
-  Param::ParametricInfoSteady,
+  Param::SteadyParametricInfo,
   RBVars::NavierStokesSteady{T}) where T
 
   C = assemble_convection(FEMSpace, Param)
@@ -290,7 +290,7 @@ end
 
 function assemble_RBapprox_convection(
   FEMSpace::FEMSpaceNavierStokesUnsteady,
-  Param::ParametricInfoUnsteady,
+  Param::UnsteadyParametricInfo,
   RBInfo::ParamNavierStokesUnsteady,
   RBVars::NavierStokesUnsteady{T}) where T
 
@@ -377,42 +377,12 @@ function interpolated_θ(
 
 end
 
-function blocks_to_matrix(A_block::Array{T}, N_blocks::Int) where T
-
-  A = zeros(T,prod(size(A_block[1])), N_blocks)
-  for n = 1:N_blocks
-    A[:, n] = A_block[n][:]
-  end
-
-  A
-
-end
-
-function matrix_to_blocks(A::Array{T}) where T
-
-  A_block = Matrix{T}[]
-  N_blocks = size(A)[end]
-  dims = Tuple(size(A)[1:end-1])
-  order = prod(size(A)[1:end-1])
-  for n = 1:N_blocks
-    push!(A_block, reshape(A[:][(n-1)*order+1:n*order], dims))
-  end
-
-  A_block
-
-end
-
-function remove_small_entries(A::Array,tol=1e-15)
-  A[A.<=tol].=0
-  A
-end
-
 function compute_errors(
-  uₕ::Vector{T},
+  uₕ::Vector,
   RBVars::RBSteadyProblem{T},
   norm_matrix = nothing) where T
 
-  mynorm(uₕ - RBVars.ũ, norm_matrix) / mynorm(uₕ, norm_matrix)
+  mynorm(uₕ - RBVars.ũ[:, 1], norm_matrix) / mynorm(uₕ, norm_matrix)
 
 end
 

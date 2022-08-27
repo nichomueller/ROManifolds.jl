@@ -280,7 +280,7 @@ function get_RB_system(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTGRB,
-  Param::ParametricInfoUnsteady)
+  Param::UnsteadyParametricInfo)
 
   initialize_RB_system(RBVars.Steady)
   initialize_online_time(RBVars.Steady)
@@ -313,7 +313,7 @@ function build_param_RHS(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTGRB{T},
-  Param::ParametricInfoUnsteady) where T
+  Param::UnsteadyParametricInfo) where T
 
   println("Assembling RHS exactly using θ-method time scheme, θ=$(RBInfo.θ)")
   δtθ = RBInfo.δt*RBInfo.θ
@@ -337,7 +337,7 @@ function get_θ(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTGRB{T},
-  Param::ParametricInfoUnsteady) where T
+  Param::UnsteadyParametricInfo) where T
 
   θᵐ = get_θᵐ(FEMSpace, RBInfo, RBVars, Param)
   θᵃ = get_θᵃ(FEMSpace, RBInfo, RBVars, Param)

@@ -178,7 +178,7 @@ function get_RB_system(
   FEMSpace::UnsteadyProblem,
   RBInfo::Info,
   RBVars::StokesSTGRB,
-  Param::ParametricInfoUnsteady)
+  Param::UnsteadyParametricInfo)
 
   initialize_RB_system(RBVars.Steady)
   initialize_online_time(RBVars.Steady)
@@ -214,7 +214,7 @@ function build_param_RHS(
   FEMSpace::UnsteadyProblem,
   RBInfo::Info,
   RBVars::StokesSTGRB,
-  Param::ParametricInfoUnsteady)
+  Param::UnsteadyParametricInfo)
 
   build_param_RHS(FEMSpace, RBInfo, RBVars.Poisson, Param)
   push!(RBVars.RHSₙ, zeros(RBVars.nᵖ,1))
@@ -225,7 +225,7 @@ function get_θ(
   FEMSpace::UnsteadyProblem,
   RBInfo::Info,
   RBVars::StokesSTGRB,
-  Param::ParametricInfoUnsteady)
+  Param::UnsteadyParametricInfo)
 
   θᵐ, θᵃ, θᶠ, θʰ  = get_θ(FEMSpace, RBInfo, RBVars.Poisson, Param)
   θᵇ = get_θᵇ(FEMSpace, RBInfo, RBVars, Param)

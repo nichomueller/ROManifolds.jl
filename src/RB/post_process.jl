@@ -2,12 +2,12 @@ function post_process(::ROMInfoSteady, d::Dict) where T
 
   FEMSpace = d["FEMSpace"]
   writevtk(FEMSpace.Ω, joinpath(d["path_μ"], "mean_point_err_u"),
-  cellfields = ["err"=> FEFunction(FEMSpace.V, d["mean_point_err_u"])])
+  cellfields = ["err"=> FEFunction(FEMSpace.V, d["mean_point_err_u"][:, 1])])
 
   if "mean_point_err_p" ∈ keys(d)
     FEMSpace = d["FEMSpace"]
     writevtk(FEMSpace.Ω, joinpath(d["path_μ"], "mean_point_err_p"),
-    cellfields = ["err"=> FEFunction(FEMSpace.V, d["mean_point_err_p"])])
+    cellfields = ["err"=> FEFunction(FEMSpace.V, d["mean_point_err_p"][:, 1])])
   end
 
 end
@@ -62,7 +62,7 @@ function plot_stability_constants(
   FEMSpace::FEMProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady,
-  Param::ParametricInfoUnsteady)
+  Param::UnsteadyParametricInfo)
 
   function compute_stability_constant_Nₜ(RBInfo,Nₜ,M,A)
     println("Considering Nₜ = $Nₜ")

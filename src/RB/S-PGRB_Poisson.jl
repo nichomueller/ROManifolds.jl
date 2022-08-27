@@ -211,7 +211,7 @@ function get_RB_system(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::PoissonSPGRB,
-  Param::ParametricInfoSteady)
+  Param::SteadyParametricInfo)
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
@@ -244,7 +244,7 @@ function build_param_RHS(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::PoissonSPGRB,
-  Param::ParametricInfoSteady,
+  Param::SteadyParametricInfo,
   θᵃ::Vector)
 
   θᵃ_temp = θᵃ[1:RBVars.Qᵃ]/sqrt(θᵃ[1])
@@ -261,7 +261,7 @@ function get_θ(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::PoissonSPGRB,
-  Param::ParametricInfoSteady)
+  Param::SteadyParametricInfo)
 
   θᵃ_temp = get_θᵃ(FEMSpace, RBInfo, RBVars, Param)
   θᵃ = zeros(T, RBVars.Qᵃ^2, 1)

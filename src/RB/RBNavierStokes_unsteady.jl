@@ -191,7 +191,7 @@ function get_θᵐ(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::NavierStokesUnsteady,
-  Param::ParametricInfoUnsteady)
+  Param::UnsteadyParametricInfo)
 
   get_θᵐ(FEMSpace, RBInfo, RBVars.Stokes, Param)
 
@@ -201,7 +201,7 @@ function get_θᵃ(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::NavierStokesUnsteady,
-  Param::ParametricInfoUnsteady)
+  Param::UnsteadyParametricInfo)
 
   get_θᵃ(FEMSpace, RBInfo, RBVars.Stokes, Param)
 
@@ -211,7 +211,7 @@ function get_θᵇ(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::NavierStokesUnsteady,
-  Param::ParametricInfoUnsteady)
+  Param::UnsteadyParametricInfo)
 
   get_θᵇ(FEMSpace, RBInfo, RBVars.Stokes, Param)
 
@@ -221,7 +221,7 @@ function get_θᶜ(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::NavierStokesUnsteady,
-  Param::ParametricInfoUnsteady)
+  Param::UnsteadyParametricInfo)
 
   timesθ = get_timesθ(RBInfo)
 
@@ -246,7 +246,7 @@ function get_θᶠʰ(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::NavierStokesUnsteady,
-  Param::ParametricInfoUnsteady)
+  Param::UnsteadyParametricInfo)
 
   get_θᶠʰ(FEMSpace, RBInfo, RBVars.Stokes, Param)
 
@@ -256,7 +256,7 @@ function solve_RB_system(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::NavierStokesUnsteady,
-  Param::ParametricInfoUnsteady)
+  Param::UnsteadyParametricInfo)
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
 

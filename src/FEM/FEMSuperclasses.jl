@@ -4,8 +4,8 @@ abstract type SteadyProblem{D} <: FEMProblem{D} end
 abstract type UnsteadyProblem{D} <: FEMProblem{D} end
 
 abstract type Info end
-abstract type ParametricInfoSteady <: Info end
-abstract type ParametricInfoUnsteady <: Info end
+abstract type SteadyParametricInfo <: Info end
+abstract type UnsteadyParametricInfo <: Info end
 
 struct FEMSpacePoissonSteady{D} <: SteadyProblem{D}
   model::DiscreteModel
@@ -215,7 +215,7 @@ struct UnsteadyInfo <: Info
   δt::Float
 end
 
-struct ParamPoissonSteady <: ParametricInfoSteady
+struct ParamPoissonSteady <: SteadyParametricInfo
   μ::Vector
   α::F
   f::F
@@ -223,7 +223,7 @@ struct ParamPoissonSteady <: ParametricInfoSteady
   h::F
 end
 
-struct ParamPoissonUnsteady <: ParametricInfoUnsteady
+struct ParamPoissonUnsteady <: UnsteadyParametricInfo
   μ::Vector
   αₛ::F
   αₜ::F
@@ -243,7 +243,7 @@ struct ParamPoissonUnsteady <: ParametricInfoUnsteady
   u₀::F
 end
 
-struct ParamADRSteady <: ParametricInfoSteady
+struct ParamADRSteady <: SteadyParametricInfo
   μ::Vector
   α::F
   b::F
@@ -253,7 +253,7 @@ struct ParamADRSteady <: ParametricInfoSteady
   h::F
 end
 
-struct ParamADRUnsteady <: ParametricInfoUnsteady
+struct ParamADRUnsteady <: UnsteadyParametricInfo
   μ::Vector
   αₛ::F
   αₜ::F
@@ -279,7 +279,7 @@ struct ParamADRUnsteady <: ParametricInfoUnsteady
   u₀::F
 end
 
-struct ParamStokesSteady <: ParametricInfoSteady
+struct ParamStokesSteady <: SteadyParametricInfo
   μ::Vector
   α::F
   f::F
@@ -287,7 +287,7 @@ struct ParamStokesSteady <: ParametricInfoSteady
   h::F
 end
 
-struct ParamStokesUnsteady <: ParametricInfoUnsteady
+struct ParamStokesUnsteady <: UnsteadyParametricInfo
   μ::Vector
   αₛ::F
   αₜ::F
@@ -307,7 +307,7 @@ struct ParamStokesUnsteady <: ParametricInfoUnsteady
   x₀::F
 end
 
-struct ParamNavierStokesSteady <: ParametricInfoSteady
+struct ParamNavierStokesSteady <: SteadyParametricInfo
   μ::Vector
   Re::Float
   α::F
@@ -316,7 +316,7 @@ struct ParamNavierStokesSteady <: ParametricInfoSteady
   h::F
 end
 
-struct ParamNavierStokesUnsteady <: ParametricInfoUnsteady
+struct ParamNavierStokesUnsteady <: UnsteadyParametricInfo
   μ::Vector
   Re::Float
   αₛ::F

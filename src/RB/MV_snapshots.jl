@@ -10,7 +10,7 @@ function build_matrix_snapshots(
     Param = get_ParamInfo(RBInfo, μ[k])
     Mat_k = assemble_FEM_structure(FEMSpace, RBInfo, Param, var)
     i, v = findnz(Mat_k[:])::Tuple{Vector{Int},Vector{T}}
-    if kₛ == 1
+    if k == 1
       row_idx = i
       Mat = zeros(T,length(row_idx),RBInfo.nₛ_MDEIM)
     else
@@ -557,7 +557,7 @@ function call_θmat_snapshots(
 end
 
 function build_parameter_on_phys_quadp(
-  Param::ParametricInfoUnsteady,
+  Param::UnsteadyParametricInfo,
   phys_quadp::Vector{Vector{VectorValue{D,Float}}},
   ncells::Int,
   nquad_cell::Int,

@@ -243,7 +243,7 @@ function get_θᵃ(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::StokesSteady,
-  Param::ParametricInfoSteady)
+  Param::SteadyParametricInfo)
 
   get_θᵃ(FEMSpace, RBInfo, RBVars.Poisson, Param)
 
@@ -253,7 +253,7 @@ function get_θᵇ(
   ::SteadyProblem,
   ::ROMInfoSteady{T},
   ::StokesSteady,
-  ::ParametricInfoSteady) where T
+  ::SteadyParametricInfo) where T
 
   reshape([one(T)],1,1)::Matrix{T}
 
@@ -263,7 +263,7 @@ function get_θᶠʰ(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::StokesSteady,
-  Param::ParametricInfoSteady)
+  Param::SteadyParametricInfo)
 
   get_θᶠʰ(FEMSpace, RBInfo, RBVars.Poisson, Param)
 
@@ -281,7 +281,7 @@ function get_RB_system(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::StokesSteady,
-  Param::ParametricInfoSteady)
+  Param::SteadyParametricInfo)
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
@@ -315,7 +315,7 @@ function solve_RB_system(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady{T},
   RBVars::StokesSteady,
-  Param::ParametricInfoSteady) where T
+  Param::SteadyParametricInfo) where T
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
   println("Solving RB problem via backslash")

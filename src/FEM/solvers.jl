@@ -1,9 +1,7 @@
 function FE_solve(
   FEMSpace::FEMSpacePoissonSteady,
   FEMInfo::SteadyInfo,
-  Param::ParametricInfoSteady)
-
-  #R₁ = assemble_lifting(FEMSpace, FEMInfo, Param)
+  Param::SteadyParametricInfo)
 
   a(u, v) = ∫(∇(v) ⋅ (Param.α * ∇(u))) * FEMSpace.dΩ
   rhs(v) = ∫(v * Param.f) * FEMSpace.dΩ + ∫(v * Param.h) * FEMSpace.dΓn
@@ -22,9 +20,7 @@ end
 function FE_solve(
   FEMSpace::FEMSpacePoissonUnsteady,
   FEMInfo::UnsteadyInfo,
-  Param::ParametricInfoUnsteady)
-
-  #R₁(t) = assemble_lifting(FEMSpace, FEMInfo, Param)(t)
+  Param::UnsteadyParametricInfo)
 
   m(t, u, v) = ∫(Param.m(t)*(u*v))dΩ
   a(t, u, v) = ∫(∇(v)⋅(Param.α(t)*∇(u)))*FEMSpace.dΩ
@@ -57,7 +53,7 @@ end
 function FE_solve(
   FEMSpace::FEMSpaceADRSteady,
   FEMInfo::SteadyInfo,
-  Param::ParametricInfoSteady)
+  Param::SteadyParametricInfo)
 
   a(u,v) = ∫(∇(v)⋅(Param.α*∇(u)) +
     v * Param.b ⋅ ∇(u) + Param.σ * v * u) * FEMSpace.dΩ
@@ -80,7 +76,7 @@ end
 function FE_solve(
   FEMSpace::FEMSpaceADRUnsteady,
   FEMInfo::UnsteadyInfo,
-  Param::ParametricInfoUnsteady)
+  Param::UnsteadyParametricInfo)
 
   m(t, u, v) = ∫(Param.m(t)*(u*v))dΩ
   a(t, u, v) = ∫(∇(v)⋅(Param.α(t)*∇(u)) +
@@ -114,9 +110,28 @@ function FE_solve(
 end
 
 function FE_solve(
+  FEMSpace::FEMSpaceStokesSteady,
+  FEMInfo::SteadyInfo,
+  Param::SteadyParametricInfo) where T
+
+  a((u,p),(v,q)) = ∫( ∇(v)⊙(Param.α*∇(u)) - (∇⋅v)*p + q*(∇⋅u) )FEMSpace.dΩ
+  rhs(v) = ∫(v ⋅ Param.f) * FEMSpace.dΩ + ∫(v ⋅ Param.h) * FEMSpace.dΓn
+  operator = AffineFEOperator(a, rhs, FEMSpace.X, FEMSpace.X₀)
+
+  if FEMInfo.solver == "lu"
+    uₕ_field, pₕ_field = solve(LinearFESolver(LUSolver()), operator)
+  else
+    uₕ_field, pₕ_field = solve(LinearFESolver(), operator)
+  end
+
+  get_free_dof_values(uₕ_field), get_free_dof_values(pₕ_field)
+
+end
+
+function FE_solve(
   FEMSpace::FEMSpaceStokesUnsteady,
   FEMInfo::UnsteadyInfo,
-  Param::ParametricInfoUnsteady) where T
+  Param::UnsteadyParametricInfo) where T
 
   timesθ = get_timesθ(FEMInfo)
   θ = FEMInfo.θ
@@ -155,7 +170,7 @@ end
 
 #= function FE_solve(
   FEMSpace::FEMSpaceStokesUnsteady, probl::ProblemInfoUnsteady{T},
-  Param::ParametricInfoUnsteady{D,T}; subtract_Ddata=false)
+  Param::UnsteadyParametricInfo{D,T}; subtract_Ddata=false)
 
   m(t,(u,p),(v,q)) = ∫(Param.m(t)*(u⋅v))*FEMSpace.dΩ
   ab(t,(u,p),(v,q)) = (∫(Param.α(t)*(∇(v) ⊙ ∇(u)))*FEMSpace.dΩ -
@@ -198,7 +213,7 @@ end
 
 end =#
 
-#= function FE_solve(FEMSpace::FEMSpacePoisson, Param::ParametricInfoUnsteady{D,T}; subtract_Ddata = true)
+#= function FE_solve(FEMSpace::FEMSpacePoisson, Param::UnsteadyParametricInfo{D,T}; subtract_Ddata = true)
 
 _, Gₕ = get_lifting_operator(FEMSpace, Param)
 
@@ -226,7 +241,7 @@ function rhs_form(
   t::Real,
   v::FEBasis,
   FEMSpace::FEMSpacePoissonUnsteady,
-  Param::ParametricInfoUnsteady)
+  Param::UnsteadyParametricInfo)
 
   if !isnothing(FEMSpace.dΓn)
     return ∫(v*Param.f(t))*FEMSpace.dΩ + ∫(v*Param.h(t))*FEMSpace.dΓn
@@ -239,7 +254,7 @@ function rhs_form(
   t::Real,
   v::FEBasis,
   FEMSpace::FEMSpaceStokesUnsteady,
-  Param::ParametricInfoUnsteady)
+  Param::UnsteadyParametricInfo)
 
   if !isnothing(FEMSpace.dΓn)
     return ∫(v⋅Param.f(t))*FEMSpace.dΩ + ∫(v⋅Param.h(t))*FEMSpace.dΓn

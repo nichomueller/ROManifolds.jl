@@ -435,7 +435,7 @@ end
 function get_RB_system(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTPGRB,
-  Param::ParametricInfoUnsteady)
+  Param::UnsteadyParametricInfo)
 
   initialize_RB_system(RBVars.Steady)
   initialize_online_time(RBVars.Steady)
@@ -467,7 +467,7 @@ end
 function build_param_RHS(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTPGRB{T},
-  Param::ParametricInfoUnsteady) where T
+  Param::UnsteadyParametricInfo) where T
 
   println("Assembling RHS exactly using θ-method time scheme, θ=$(RBInfo.θ)")
 
@@ -525,7 +525,7 @@ end
 function get_θ(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTPGRB{T},
-  Param::ParametricInfoUnsteady) where T
+  Param::UnsteadyParametricInfo) where T
 
   θᵐ_temp = get_θᵐ(RBInfo, RBVars, Param)
   θᵃ_temp = get_θᵃ(RBInfo, RBVars, Param)

@@ -148,6 +148,36 @@ function mode₂_unfolding(Mat₁::Matrix{T}, nₛ::Int) where T
   Mat₂
 end
 
+function blocks_to_matrix(A_block::Array{T}, N_blocks::Int) where T
+
+  A = zeros(T,prod(size(A_block[1])), N_blocks)
+  for n = 1:N_blocks
+    A[:, n] = A_block[n][:]
+  end
+
+  A
+
+end
+
+function matrix_to_blocks(A::Array{T}) where T
+
+  A_block = Matrix{T}[]
+  N_blocks = size(A)[end]
+  dims = Tuple(size(A)[1:end-1])
+  order = prod(size(A)[1:end-1])
+  for n = 1:N_blocks
+    push!(A_block, reshape(A[:][(n-1)*order+1:n*order], dims))
+  end
+
+  A_block
+
+end
+
+function remove_small_entries(A::Array,tol=1e-15)
+  A[A.<=tol].=0
+  A
+end
+
 function newton(
   res::F,
   Jₙ::Matrix{T},

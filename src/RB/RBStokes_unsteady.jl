@@ -263,7 +263,7 @@ function get_θᵐ(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::StokesUnsteady,
-  Param::ParametricInfoUnsteady)
+  Param::UnsteadyParametricInfo)
 
   get_θᵐ(FEMSpace, RBInfo, RBVars.Poisson, Param)
 
@@ -273,7 +273,7 @@ function get_θᵃ(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::StokesUnsteady,
-  Param::ParametricInfoUnsteady)
+  Param::UnsteadyParametricInfo)
 
   get_θᵃ(FEMSpace, RBInfo, RBVars.Poisson, Param)
 
@@ -283,7 +283,7 @@ function get_θᵇ(
   ::UnsteadyProblem,
   ::ROMInfoUnsteady,
   ::StokesUnsteady{T},
-  ::ParametricInfoUnsteady) where T
+  ::UnsteadyParametricInfo) where T
 
   reshape([one(T)],1,1)::Matrix{T}
 
@@ -293,7 +293,7 @@ function get_θᶠʰ(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::StokesUnsteady,
-  Param::ParametricInfoUnsteady)
+  Param::UnsteadyParametricInfo)
 
   get_θᶠʰ(FEMSpace, RBInfo, RBVars.Poisson, Param)
 
@@ -303,7 +303,7 @@ function solve_RB_system(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::StokesUnsteady,
-  Param::ParametricInfoUnsteady)
+  Param::UnsteadyParametricInfo)
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
 

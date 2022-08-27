@@ -191,7 +191,7 @@ function get_RB_system(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::ADRSGRB,
-  Param::ParametricInfoSteady)
+  Param::SteadyParametricInfo)
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
@@ -224,7 +224,7 @@ function build_param_RHS(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::ADRSGRB,
-  Param::ParametricInfoSteady)
+  Param::SteadyParametricInfo)
 
   build_param_RHS(FEMSpace, RBInfo, RBVars.Poisson, Param)
 
@@ -234,7 +234,7 @@ function get_θ(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::ADRSGRB{T},
-  Param::ParametricInfoSteady) where T
+  Param::SteadyParametricInfo) where T
 
   θᵃ, θᶠ, θʰ = get_θ(FEMSpace, RBInfo, RBVars.Poisson, Param)
   θᵇ = get_θᵇ(FEMSpace, RBInfo, RBVars, Param)

@@ -170,7 +170,7 @@ function build_param_RHS(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::StokesSGRB{T},
-  Param::ParametricInfoSteady) where T
+  Param::SteadyParametricInfo) where T
 
   build_param_RHS(FEMSpace, RBInfo, RBVars.Poisson, Param)
   push!(RBVars.RHSₙ, zeros(T, RBVars.nₛᵖ, 1))
@@ -181,7 +181,7 @@ function get_θ(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::StokesSGRB{T},
-  Param::ParametricInfoSteady) where T
+  Param::SteadyParametricInfo) where T
 
   θᵃ, θᶠ, θʰ = get_θ(FEMSpace, RBInfo, RBVars.Poisson, Param)
   θᵇ = get_θᵇ(FEMSpace, RBInfo, RBVars, Param)

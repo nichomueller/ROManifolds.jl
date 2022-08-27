@@ -176,14 +176,12 @@ function get_M_DEIM_structures(
 
     if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "MDEIMᵢ_A.csv"))
       println("Importing MDEIM offline structures, A")
-      RBVars.MDEIMᵢ_A = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path,
-        "MDEIMᵢ_A.csv"))
-      RBVars.MDEIM_idx_A = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.Paths.ROM_structures_path,
-        "MDEIM_idx_A.csv"))
-      RBVars.row_idx_A = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.Paths.ROM_structures_path,
-        "row_idx_A.csv"))
-      RBVars.sparse_el_A = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.Paths.ROM_structures_path,
-        "sparse_el_A.csv"))
+
+      (RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A, RBVars.row_idx_A, RBVars.sparse_el_A) =
+        load_structures_in_list(("MDEIMᵢ_A", "MDEIM_idx_A", "row_idx_A", "sparse_el_A"),
+        (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
+        RBInfo.Paths.ROM_structures_path)
+
     else
       println("Failed to import MDEIM offline structures,
         A: must build them")
@@ -202,12 +200,10 @@ function get_M_DEIM_structures(
 
       if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "DEIMᵢ_F.csv"))
         println("Importing DEIM offline structures, F")
-        RBVars.DEIMᵢ_F = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path,
-          "DEIMᵢ_F.csv"))
-        RBVars.DEIM_idx_F = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.Paths.ROM_structures_path,
-          "DEIM_idx_F.csv"))
-        RBVars.sparse_el_F = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.Paths.ROM_structures_path,
-          "sparse_el_F.csv"))
+        (RBVars.DEIMᵢ_F, RBVars.DEIM_idx_F, RBVars.sparse_el_F) =
+          load_structures_in_list(("DEIMᵢ_F", "DEIM_idx_F", "sparse_el_F"),
+          (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
+          RBInfo.Paths.ROM_structures_path)
       else
         println("Failed to import DEIM offline structures, F: must build them")
         append!(operators, ["F"])
@@ -219,12 +215,10 @@ function get_M_DEIM_structures(
 
       if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "DEIMᵢ_H.csv"))
         println("Importing DEIM offline structures, H")
-        RBVars.DEIMᵢ_H = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path,
-          "DEIMᵢ_H.csv"))
-        RBVars.DEIM_idx_H = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.Paths.ROM_structures_path,
-          "DEIM_idx_H.csv"))
-        RBVars.sparse_el_H = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.Paths.ROM_structures_path,
-          "sparse_el_H.csv"))
+        (RBVars.DEIMᵢ_H, RBVars.DEIM_idx_H, RBVars.sparse_el_H) =
+          load_structures_in_list(("DEIMᵢ_H", "DEIM_idx_H", "sparse_el_H"),
+          (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
+          RBInfo.Paths.ROM_structures_path)
       else
         println("Failed to import DEIM offline structures, H: must build them")
         append!(operators, ["H"])
@@ -413,7 +407,7 @@ function get_θᵃ(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady{T},
   RBVars::PoissonSteady,
-  Param::ParametricInfoSteady) where T
+  Param::SteadyParametricInfo) where T
 
   if !RBInfo.probl_nl["A"]
     θᵃ = reshape([T.(Param.α(Point(0.,0.)))],1,1)
@@ -428,7 +422,7 @@ function get_θᶠʰ(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady{T},
   RBVars::PoissonSteady,
-  Param::ParametricInfoSteady) where T
+  Param::SteadyParametricInfo) where T
 
   if RBInfo.build_parametric_RHS
     error("Cannot fetch θᶠ, θʰ if the RHS is built online")
@@ -491,7 +485,7 @@ function solve_RB_system(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::PoissonSteady,
-  Param::ParametricInfoSteady)
+  Param::SteadyParametricInfo)
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
   println("Solving RB problem via backslash")
@@ -611,7 +605,7 @@ function online_phase(
     end
 
     times = Dict("off_time"=>RBVars.offline_time,
-      "on_time"=>mean_online_time+adapt_time,"rec_time"=>mean_reconstruction_time)
+      "on_time"=>mean_online_time,"rec_time"=>mean_reconstruction_time)
 
     CSV.write(joinpath(path_μ, "times.csv"),times)
 

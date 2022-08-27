@@ -285,7 +285,7 @@ function get_θᵐ(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady{T},
-  Param::ParametricInfoUnsteady) where T
+  Param::UnsteadyParametricInfo) where T
 
   timesθ = get_timesθ(RBInfo)
 
@@ -317,7 +317,7 @@ function get_θᵃ(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady{T},
-  Param::ParametricInfoUnsteady) where T
+  Param::UnsteadyParametricInfo) where T
 
   timesθ = get_timesθ(RBInfo)
 
@@ -350,7 +350,7 @@ function get_θᶠʰ(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady{T},
-  Param::ParametricInfoUnsteady) where T
+  Param::UnsteadyParametricInfo) where T
 
   if RBInfo.build_parametric_RHS
     error("Cannot fetch θᶠ, θʰ if the RHS is built online")
@@ -404,7 +404,7 @@ function solve_RB_system(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady,
-  Param::ParametricInfoUnsteady)
+  Param::UnsteadyParametricInfo)
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
 

@@ -132,7 +132,7 @@ function get_RB_system(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::PoissonSGRB,
-  Param::ParametricInfoSteady)
+  Param::SteadyParametricInfo)
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
@@ -165,7 +165,7 @@ function build_param_RHS(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::PoissonSGRB,
-  Param::ParametricInfoSteady)
+  Param::SteadyParametricInfo)
 
   println("Assembling reduced RHS exactly")
 
@@ -182,7 +182,7 @@ function get_θ(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::PoissonSGRB{T},
-  Param::ParametricInfoSteady) where T
+  Param::SteadyParametricInfo) where T
 
   θᵃ = get_θᵃ(FEMSpace, RBInfo, RBVars, Param)
   if !RBInfo.build_parametric_RHS
