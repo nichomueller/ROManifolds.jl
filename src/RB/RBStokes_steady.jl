@@ -7,7 +7,7 @@ function get_snapshot_matrix(
 
   get_snapshot_matrix(RBInfo, RBVars.Poisson)
 
-  println("Importing the snapshot matrix for field u,
+  println("Importing the snapshot matrix for field p,
     number of snapshots considered: $(RBInfo.nₛ)")
   Sᵖ = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"),
     DataFrame))[:, 1:RBInfo.nₛ]
@@ -25,20 +25,16 @@ function get_norm_matrix(
 
   if check_norm_matrix(RBVars)
 
-    println("Importing the norm matrices Xᵘ, Xᵖ₀")
+    println("Importing the norm matrix Xᵖ₀")
 
-    Xᵘ = load_CSV(sparse([],[],T[]),
-      joinpath(get_FEM_structures_path(RBInfo), "Xᵘ.csv"))
     Xᵖ₀ = load_CSV(sparse([],[],T[]),
       joinpath(get_FEM_structures_path(RBInfo), "Xᵖ₀.csv"))
     RBVars.Nₛᵖ = size(Xᵖ₀)[1]
     println("Dimension of L² norm matrix, field p: $(size(Xᵖ₀))")
 
     if RBInfo.use_norm_X
-      RBVars.Xᵘ = Xᵘ
       RBVars.Xᵖ₀ = Xᵖ₀
     else
-      RBVars.Xᵘ = one(T)*sparse(I,RBVars.Nₛᵘ,RBVars.Nₛᵘ)
       RBVars.Xᵖ₀ = one(T)*sparse(I,RBVars.Nₛᵖ,RBVars.Nₛᵖ)
     end
 
@@ -47,7 +43,7 @@ function get_norm_matrix(
 end
 
 function check_norm_matrix(RBVars::StokesSteady)
-  isempty(RBVars.Xᵘ) || isempty(RBVars.Xᵖ₀)
+  isempty(RBVars.Xᵘ₀) || isempty(RBVars.Xᵖ₀)
 end
 
 function PODs_space(
@@ -72,7 +68,7 @@ function primal_supremizers(
   constraint_mat = load_CSV(sparse([],[],T[]),
     joinpath(get_FEM_structures_path(RBInfo), "B.csv"))'
 
-  supr_primal = Matrix{T}(RBVars.Xᵘ) \ (Matrix{T}(constraint_mat) * RBVars.Φₛᵖ)
+  supr_primal = Matrix{T}(RBVars.Xᵘ₀) \ (Matrix{T}(constraint_mat) * RBVars.Φₛᵖ)
 
   min_norm = 1e16
   for i = 1:size(supr_primal)[2]
@@ -175,7 +171,17 @@ function assemble_MDEIM_matrices(
   RBVars::StokesSteady,
   var::String)
 
-  assemble_MDEIM_matrices(RBInfo, RBVars.Poisson, var)
+  println("The matrix $var is non-affine:
+    running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
+  if var == "A"
+    if isempty(RBVars.MDEIM_mat_A)
+      (RBVars.MDEIM_mat_A, RBVars.MDEIM_idx_A, RBVars.MDEIMᵢ_A,
+      RBVars.row_idx_A,RBVars.sparse_el_A) = MDEIM_offline(RBInfo, RBVars, "A")
+    end
+    assemble_reduced_mat_MDEIM(RBVars,RBVars.MDEIM_mat_A,RBVars.row_idx_A)
+  else
+    error("Unrecognized variable on which to perform MDEIM")
+  end
 
 end
 
@@ -184,7 +190,24 @@ function assemble_DEIM_vectors(
   RBVars::StokesSteady,
   var::String)
 
-  assemble_DEIM_vectors(RBInfo, RBVars.Poisson, var)
+  println("The vector $var is non-affine:
+    running the DEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
+
+  if var == "F"
+    if isempty(RBVars.DEIM_mat_F)
+      RBVars.DEIM_mat_F, RBVars.DEIM_idx_F, RBVars.DEIMᵢ_F, RBVars.sparse_el_F =
+        DEIM_offline(RBInfo,"F")
+    end
+    assemble_reduced_mat_DEIM(RBVars,RBVars.DEIM_mat_F,"F")
+  elseif var == "H"
+    if isempty(RBVars.DEIM_mat_H)
+      RBVars.DEIM_mat_H, RBVars.DEIM_idx_H, RBVars.DEIMᵢ_H, RBVars.sparse_el_H =
+        DEIM_offline(RBInfo,"H")
+    end
+    assemble_reduced_mat_DEIM(RBVars,RBVars.DEIM_mat_H,"H")
+  else
+    error("Unrecognized variable on which to perform DEIM")
+  end
 
 end
 
@@ -274,7 +297,7 @@ function initialize_RB_system(RBVars::StokesSteady)
 end
 
 function initialize_online_time(RBVars::StokesSteady)
-  initialize_RB_system(RBVars.Poisson)
+  initialize_online_time(RBVars.Poisson)
 end
 
 function get_RB_system(
@@ -295,12 +318,12 @@ function get_RB_system(
     θᵃ, θᶠ, θʰ, θᵇ = get_θ(FEMSpace, RBInfo, RBVars, Param)
 
     if "LHS" ∈ operators
-      get_RB_LHS_blocks(RBInfo, RBVars, θᵃ, θᵇ)
+      get_RB_LHS_blocks(RBVars, θᵃ, θᵇ)
     end
 
     if "RHS" ∈ operators
       if !RBInfo.build_parametric_RHS
-        get_RB_RHS_blocks(RBInfo, RBVars, θᶠ, θʰ)
+        get_RB_RHS_blocks(RBVars, θᶠ, θʰ)
       else
         build_param_RHS(FEMSpace, RBInfo, RBVars, Param)
       end

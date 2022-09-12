@@ -415,7 +415,9 @@ function get_θᵃ(
     A_μ_sparse = T.(build_sparse_mat(FEMSpace, FEMInfo, Param, RBVars.sparse_el_A))
     θᵃ = M_DEIM_online(A_μ_sparse, RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A)
   end
+
   θᵃ::Matrix{T}
+
 end
 
 function get_θᶠʰ(

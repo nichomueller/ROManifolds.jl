@@ -115,7 +115,7 @@ function FE_solve(
   Param::SteadyParametricInfo) where T
 
   a((u,p),(v,q)) = ∫( ∇(v)⊙(Param.α*∇(u)) - (∇⋅v)*p + q*(∇⋅u) )FEMSpace.dΩ
-  rhs(v) = ∫(v ⋅ Param.f) * FEMSpace.dΩ + ∫(v ⋅ Param.h) * FEMSpace.dΓn
+  rhs((v,q)) = ∫(v ⋅ Param.f) * FEMSpace.dΩ + ∫(v ⋅ Param.h) * FEMSpace.dΓn
   operator = AffineFEOperator(a, rhs, FEMSpace.X, FEMSpace.X₀)
 
   if FEMInfo.solver == "lu"
@@ -124,7 +124,7 @@ function FE_solve(
     uₕ_field, pₕ_field = solve(LinearFESolver(), operator)
   end
 
-  get_free_dof_values(uₕ_field), get_free_dof_values(pₕ_field)
+  Vector(get_free_dof_values(uₕ_field)), Vector(get_free_dof_values(pₕ_field))
 
 end
 

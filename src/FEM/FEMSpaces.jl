@@ -120,7 +120,7 @@ function get_FEMSpace_quantities(
   refFEₚ = Gridap.ReferenceFE(lagrangian, Float, order - 1; space=:P)
   Q₀ = TestFESpace(model, refFEₚ; conformity=:L2, constraint=:zeromean)
   Q = TrialFESpace(Q₀)
-  ψᵧ = get_trial_fe_basis(Q₀)
+  ψᵧ = get_fe_basis(Q₀)
   ψₚ = get_trial_fe_basis(Q)
   Nₛᵖ = length(get_free_dof_ids(Q))
 

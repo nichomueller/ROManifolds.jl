@@ -92,13 +92,34 @@ function assemble_offline_structures(
     operators = set_operators(RBInfo, RBVars)
   end
 
-  assemble_offline_structures(RBInfo, RBVars.Poisson, operators)
-
   RBVars.offline_time += @elapsed begin
+    if "A" ∈ operators
+      if !RBInfo.probl_nl["A"]
+        assemble_affine_matrices(RBInfo, RBVars, "A")
+      else
+        assemble_MDEIM_matrices(RBInfo, RBVars, "A")
+      end
+    end
+
     if "B" ∈ operators
       assemble_affine_matrices(RBInfo, RBVars, "B")
     end
 
+    if "F" ∈ operators
+      if !RBInfo.probl_nl["f"]
+        assemble_affine_vectors(RBInfo, RBVars, "F")
+      else
+        assemble_DEIM_vectors(RBInfo, RBVars, "F")
+      end
+    end
+
+    if "H" ∈ operators
+      if !RBInfo.probl_nl["h"]
+        assemble_affine_vectors(RBInfo, RBVars, "H")
+      else
+        assemble_DEIM_vectors(RBInfo, RBVars, "H")
+      end
+    end
   end
 
   save_affine_structures(RBInfo, RBVars)

@@ -178,7 +178,7 @@ function assemble_primal_op(
   ::NTuple{3,Int},
   FEMSpace::SteadyProblem)
 
-  assemble_matrix(∫(FEMSpace.ψᵧ*∇⋅(FEMSpace.ϕᵤ))*FEMSpace.dΩ,
+  assemble_matrix(∫(FEMSpace.ψᵧ*(∇⋅(FEMSpace.ϕᵤ)))*FEMSpace.dΩ,
     FEMSpace.V, FEMSpace.Q₀)
 
 end
@@ -397,7 +397,7 @@ function assemble_forcing(
   Param::SteadyParametricInfo) where D
 
   if !FEMInfo.probl_nl["f"]
-    fₛ(x) = x -> one(VectorValue(FEMInfo.D, Float))
+    fₛ = x -> one(VectorValue(FEMInfo.D, Float))
     assemble_vector(∫(FEMSpace.ϕᵥ⋅fₛ)*FEMSpace.dΩ, FEMSpace.V₀)
   else
     assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.f)*FEMSpace.dΩ, FEMSpace.V₀)
@@ -484,7 +484,7 @@ function assemble_neumann_datum(
   Param::SteadyParametricInfo)
 
   if !FEMInfo.probl_nl["h"]
-    hₛ(x) = x -> one(VectorValue(FEMInfo.D, Float))
+    hₛ = x -> one(VectorValue(FEMInfo.D, Float))
     assemble_vector(∫(FEMSpace.ϕᵥ⋅hₛ)*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float}
   else
     assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.h)*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float}
