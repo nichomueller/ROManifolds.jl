@@ -29,7 +29,7 @@ struct FEMSpacePoissonUnsteady{D} <: UnsteadyProblem{D}
   V₀::UnconstrainedFESpace
   V::TransientTrialFESpace
   ϕᵥ::FEBasis
-  ϕᵤ::F
+  ϕᵤ::Function
   Nₛᵘ::Int
   Ω::BodyFittedTriangulation
   Γn::BoundaryTriangulation
@@ -61,7 +61,7 @@ struct FEMSpaceADRUnsteady{D} <: UnsteadyProblem{D}
   V₀::UnconstrainedFESpace
   V::TransientTrialFESpace
   ϕᵥ::FEBasis
-  ϕᵤ::F
+  ϕᵤ::Function
   Nₛᵘ::Int
   Ω::BodyFittedTriangulation
   Γn::BoundaryTriangulation
@@ -76,8 +76,8 @@ struct FEMSpaceStokesSteady{D} <: SteadyProblem{D}
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TrialFESpace
-  Q₀::ZeroMeanFESpace
-  Q::ZeroMeanFESpace
+  Q₀::UnconstrainedFESpace
+  Q::UnconstrainedFESpace
   X₀::MultiFieldFESpace
   X::MultiFieldFESpace
   ϕᵥ::FEBasis
@@ -99,12 +99,12 @@ struct FEMSpaceStokesUnsteady{D} <: UnsteadyProblem{D}
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TransientTrialFESpace
-  Q₀::ZeroMeanFESpace
-  Q::ZeroMeanFESpace
+  Q₀::UnconstrainedFESpace
+  Q::UnconstrainedFESpace
   X₀::MultiFieldFESpace
   X::TransientMultiFieldTrialFESpace
   ϕᵥ::FEBasis
-  ϕᵤ::F
+  ϕᵤ::Function
   ψᵧ::FEBasis
   ψₚ::FEBasis
   Nₛᵘ::Int
@@ -122,8 +122,8 @@ struct FEMSpaceNavierStokesSteady{D} <: SteadyProblem{D}
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TrialFESpace
-  Q₀::ZeroMeanFESpace
-  Q::ZeroMeanFESpace
+  Q₀::UnconstrainedFESpace
+  Q::UnconstrainedFESpace
   X₀::MultiFieldFESpace
   X::MultiFieldFESpace
   ϕᵥ::FEBasis
@@ -145,12 +145,12 @@ struct FEMSpaceNavierStokesUnsteady{D} <: UnsteadyProblem{D}
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
   V::TransientTrialFESpace
-  Q₀::ZeroMeanFESpace
-  Q::ZeroMeanFESpace
+  Q₀::UnconstrainedFESpace
+  Q::UnconstrainedFESpace
   X₀::MultiFieldFESpace
   X::TransientMultiFieldTrialFESpace
   ϕᵥ::FEBasis
-  ϕᵤ::F
+  ϕᵤ::Function
   ψᵧ::FEBasis
   ψₚ::FEBasis
   Nₛᵘ::Int
@@ -202,122 +202,122 @@ end
 
 struct ParamPoissonSteady <: SteadyParametricInfo
   μ::Vector
-  α::F
-  f::F
-  g::F
-  h::F
+  α::Function
+  f::Function
+  g::Function
+  h::Function
 end
 
 struct ParamPoissonUnsteady <: UnsteadyParametricInfo
   μ::Vector
-  αₛ::F
-  αₜ::F
-  α::F
-  mₛ::F
-  mₜ::F
-  m::F
-  fₛ::F
-  fₜ::F
-  f::F
-  gₛ::F
-  gₜ::F
-  g::F
-  hₛ::F
-  hₜ::F
-  h::F
-  u₀::F
+  αₛ::Function
+  αₜ::Function
+  α::Function
+  mₛ::Function
+  mₜ::Function
+  m::Function
+  fₛ::Function
+  fₜ::Function
+  f::Function
+  gₛ::Function
+  gₜ::Function
+  g::Function
+  hₛ::Function
+  hₜ::Function
+  h::Function
+  u₀::Function
 end
 
 struct ParamADRSteady <: SteadyParametricInfo
   μ::Vector
-  α::F
-  b::F
-  σ::F
-  f::F
-  g::F
-  h::F
+  α::Function
+  b::Function
+  σ::Function
+  f::Function
+  g::Function
+  h::Function
 end
 
 struct ParamADRUnsteady <: UnsteadyParametricInfo
   μ::Vector
-  αₛ::F
-  αₜ::F
-  α::F
-  mₛ::F
-  mₜ::F
-  m::F
-  bₛ::F
-  bₜ::F
-  b::F
-  σₛ::F
-  σₜ::F
-  σ::F
-  fₛ::F
-  fₜ::F
-  f::F
-  gₛ::F
-  gₜ::F
-  g::F
-  hₛ::F
-  hₜ::F
-  h::F
-  u₀::F
+  αₛ::Function
+  αₜ::Function
+  α::Function
+  mₛ::Function
+  mₜ::Function
+  m::Function
+  bₛ::Function
+  bₜ::Function
+  b::Function
+  σₛ::Function
+  σₜ::Function
+  σ::Function
+  fₛ::Function
+  fₜ::Function
+  f::Function
+  gₛ::Function
+  gₜ::Function
+  g::Function
+  hₛ::Function
+  hₜ::Function
+  h::Function
+  u₀::Function
 end
 
 struct ParamStokesSteady <: SteadyParametricInfo
   μ::Vector
-  α::F
-  f::F
-  g::F
-  h::F
+  α::Function
+  f::Function
+  g::Function
+  h::Function
 end
 
 struct ParamStokesUnsteady <: UnsteadyParametricInfo
   μ::Vector
-  αₛ::F
-  αₜ::F
-  α::F
-  mₛ::F
-  mₜ::F
-  m::F
-  fₛ::F
-  fₜ::F
-  f::F
-  gₛ::F
-  gₜ::F
-  g::F
-  hₛ::F
-  hₜ::F
-  h::F
-  x₀::F
+  αₛ::Function
+  αₜ::Function
+  α::Function
+  mₛ::Function
+  mₜ::Function
+  m::Function
+  fₛ::Function
+  fₜ::Function
+  f::Function
+  gₛ::Function
+  gₜ::Function
+  g::Function
+  hₛ::Function
+  hₜ::Function
+  h::Function
+  x₀::Function
 end
 
 struct ParamNavierStokesSteady <: SteadyParametricInfo
   μ::Vector
   Re::Float
-  α::F
-  f::F
-  g::F
-  h::F
+  α::Function
+  f::Function
+  g::Function
+  h::Function
 end
 
 struct ParamNavierStokesUnsteady <: UnsteadyParametricInfo
   μ::Vector
   Re::Float
-  αₛ::F
-  αₜ::F
-  α::F
-  mₛ::F
-  mₜ::F
-  m::F
-  fₛ::F
-  fₜ::F
-  f::F
-  gₛ::F
-  gₜ::F
-  g::F
-  hₛ::F
-  hₜ::F
-  h::F
-  x₀::F
+  αₛ::Function
+  αₜ::Function
+  α::Function
+  mₛ::Function
+  mₜ::Function
+  m::Function
+  fₛ::Function
+  fₜ::Function
+  f::Function
+  gₛ::Function
+  gₜ::Function
+  g::Function
+  hₛ::Function
+  hₜ::Function
+  h::Function
+  x₀::Function
 end

@@ -178,7 +178,7 @@ function remove_small_entries(A::Array,tol=1e-15)
 end
 
 function newton(
-  res::F,
+  res::Function,
   Jₙ::Matrix{T},
   u₀::Vector{T},
   ϵ::Float,
