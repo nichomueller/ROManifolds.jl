@@ -50,14 +50,6 @@ function init_PoissonSGRB_variables(::Type{T}) where T
 
 end
 
-function init_PoissonSPGRB_variables(::Type{T}) where T
-  Pᵤ⁻¹ = sparse([], [], T[])
-  AΦᵀPᵤ⁻¹ = Array{T}(undef,0,0,0)
-
-  (init_PoissonSGRB_variables(T)..., Pᵤ⁻¹, AΦᵀPᵤ⁻¹)
-
-end
-
 function init_PoissonSTGRB_variables(::Type{T}) where T
   Φₜᵘ = Matrix{T}(undef,0,0)
   Mₙ = Array{T}(undef,0,0,0)
@@ -78,15 +70,6 @@ function init_PoissonSTGRB_variables(::Type{T}) where T
 
   (Φₜᵘ,Mₙ,MDEIM_mat_M,MDEIMᵢ_M,MDEIM_idx_M,row_idx_M,sparse_el_M,
   MDEIM_idx_time_A, MDEIM_idx_time_M, DEIM_idx_time_F, DEIM_idx_time_H, Nₜ,Nᵘ,nₜᵘ,nᵘ,Qᵐ)
-
-end
-
-function init_PoissonSTPGRB_variables(::Type{T}) where T
-  MAₙ = Array{T}(undef,0,0,0)
-  MΦ = Array{T}(undef,0,0,0)
-  MΦᵀPᵤ⁻¹ = Array{T}(undef,0,0,0)
-
-  (init_PoissonSTGRB_variables(T)...,MAₙ,MΦ,MΦᵀPᵤ⁻¹)
 
 end
 
@@ -168,30 +151,12 @@ mutable struct PoissonSGRB{T} <: PoissonSteady{T}
   online_time::Float
 end
 
-mutable struct PoissonSPGRB{T} <: PoissonSteady{T}
-  Sᵘ::Matrix{T}; Φₛᵘ::Matrix{T}; ũ::Matrix{T}; uₙ::Matrix{T}; û::Matrix{T}; Aₙ::Array{T}; Fₙ::Matrix{T};
-  Hₙ::Matrix{T}; Xᵘ₀::SparseMatrixCSC{T}; LHSₙ::Vector{Matrix{T}}; RHSₙ::Vector{Matrix{T}}; MDEIM_mat_A::Matrix{T};
-  MDEIMᵢ_A::Matrix{T}; MDEIM_idx_A::Vector{Int}; row_idx_A::Vector{Int}; sparse_el_A::Vector{Int};
-  DEIM_mat_F::Matrix{T}; DEIMᵢ_F::Matrix{T}; DEIM_idx_F::Vector{Int}; sparse_el_F::Vector{Int};
-  DEIM_mat_H::Matrix{T}; DEIMᵢ_H::Matrix{T}; DEIM_idx_H::Vector{Int}; sparse_el_H::Vector{Int};
-  Nₛᵘ::Int; nₛᵘ::Int; Qᵃ::Int; Qᶠ::Int; Qʰ::Int; offline_time::Float;
-  online_time::Float;Pᵤ⁻¹::SparseMatrixCSC{T}; AΦᵀPᵤ⁻¹::Array{T}
-end
-
 mutable struct PoissonSTGRB{T} <: PoissonUnsteady{T}
   Steady::PoissonSGRB{T}; Φₜᵘ::Matrix{T}; Mₙ::Array{T}; MDEIM_mat_M::Matrix{T}; MDEIMᵢ_M::Matrix{T};
   MDEIM_idx_M::Vector{Int}; row_idx_M::Vector{Int}; sparse_el_M::Vector{Int};
   MDEIM_idx_time_A::Vector{Int}; MDEIM_idx_time_M::Vector{Int};
   DEIM_idx_time_F::Vector{Int}; DEIM_idx_time_H::Vector{Int};
   Nₜ::Int; Nᵘ::Int; nₜᵘ::Int; nᵘ::Int; Qᵐ::Int;
-end
-
-mutable struct PoissonSTPGRB{T} <: PoissonUnsteady{T}
-  Steady::PoissonSPGRB{T}; Φₜᵘ::Matrix{T}; Mₙ::Array{T}; MDEIM_mat_M::Matrix{T}; MDEIMᵢ_M::Matrix{T};
-  MDEIM_idx_M::Vector{Int}; row_idx_M::Vector{Int}; sparse_el_M::Vector{Int};
-  MDEIM_idx_time_A::Vector{Int}; MDEIM_idx_time_M::Vector{Int};
-  DEIM_idx_time_F::Vector{Int}; DEIM_idx_time_H::Vector{Int};
-  Nₜ::Int; Nᵘ::Int; nₜᵘ::Int; nᵘ::Int; Qᵐ::Int;MAₙ::Array{T};MΦ::Array{T};MΦᵀPᵤ⁻¹::Array{T}
 end
 
 mutable struct ADRSGRB{T} <: ADRSteady{T}
@@ -234,66 +199,52 @@ end
 
 function setup(::NTuple{2,Int}, ::Type{T}) where T
 
-  PoissonSPGRB{T}(init_PoissonSPGRB_variables(T)...)
+  PoissonSTGRB{T}(
+    setup(get_NTuple(1, Int), T), init_PoissonSTGRB_variables(T)...)
 
 end
 
 function setup(::NTuple{3,Int}, ::Type{T}) where T
 
-  NT1 = get_NTuple(1, Int)
-  PoissonSTGRB{T}(setup(NT1, T), init_PoissonSTGRB_variables(T)...)
+  ADRSGRB{T}(
+    setup(get_NTuple(1, Int), T), init_ADRSGRB_variables(T)...)
 
 end
 
 function setup(::NTuple{4,Int}, ::Type{T}) where T
 
-  NT2 = get_NTuple(2, Int)
-  PoissonSTPGRB{T}(setup(NT2, T), init_PoissonSTPGRB_variables(T)...)
+  ADRSTGRB{T}(
+    setup(get_NTuple(2, Int), T), setup(get_NTuple(3, Int), T),
+    init_ADRSTGRB_variables(T)...)
 
 end
 
 function setup(::NTuple{5,Int}, ::Type{T}) where T
 
-  NT1 = get_NTuple(1, Int)
-  ADRSGRB{T}(setup(NT1, T), init_ADRSGRB_variables(T)...)
+  StokesSGRB{T}(
+    setup(get_NTuple(1, Int), T), init_StokesSGRB_variables(T)...)
 
 end
 
 function setup(::NTuple{6,Int}, ::Type{T}) where T
 
-  NT3 = get_NTuple(3, Int)
-  NT5 = get_NTuple(5, Int)
-  ADRSTGRB{T}(setup(NT3, T), setup(NT5, T), init_ADRSTGRB_variables(T)...)
+  StokesSTGRB{T}(
+    setup(get_NTuple(2, Int), T), setup(get_NTuple(5, Int), T),
+    init_StokesSTGRB_variables(T)...)
 
 end
 
 function setup(::NTuple{7,Int}, ::Type{T}) where T
 
-  NT1 = get_NTuple(1, Int)
-  StokesSGRB{T}(setup(NT1, T), init_StokesSGRB_variables(T)...)
+  NavierStokesSGRB{T}(
+    setup(get_NTuple(5, Int), T), init_NavierStokesSGRB_variables(T)...)
 
 end
 
 function setup(::NTuple{8,Int}, ::Type{T}) where T
 
-  NT3 = get_NTuple(3, Int)
-  NT7 = get_NTuple(7, Int)
-  StokesSTGRB{T}(setup(NT3, T), setup(NT7, T), init_StokesSTGRB_variables(T)...)
-
-end
-
-function setup(::NTuple{9,Int}, ::Type{T}) where T
-
-  NT7 = get_NTuple(7, Int)
-  StokesSGRB{T}(setup(NT7, T), init_NavierStokesSGRB_variables(T)...)
-
-end
-
-function setup(::NTuple{10,Int}, ::Type{T}) where T
-
-  NT8 = get_NTuple(8, Int)
-  NT9 = get_NTuple(9, Int)
-  StokesSTGRB{T}(setup(NT8, T), setup(NT9, T),
+  NavierStokesSTGRB{T}(
+    setup(get_NTuple(6, Int), T), setup(get_NTuple(7, Int), T),
     init_NavierStokesSTGRB_variables(T)...)
 
 end
