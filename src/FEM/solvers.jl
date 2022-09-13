@@ -143,10 +143,9 @@ function FE_solve(
   B(t) = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "Bₚ")(t)
   F(t) = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "F")(t)
   H(t) = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "H")(t)
-  R₁(t) = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "L")(t)
-  R₂(t) = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "L_cont")(t)
+  R(t) = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "L")(t)
   LHS(t) = vcat(hcat(M(t)/δtθ+A(t),-B(t)'),hcat(B(t),zeros(T,FEMSpace.Nₛᵖ,FEMSpace.Nₛᵖ)))
-  RHS(t) = vcat(F(t)+H(t)-R₁(t),-R₂(t))
+  RHS(t) = vcat(F(t)+H(t), zeros(T,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ)) - R(t)
 
   u0(x) = Param.x₀(x)[1]
   p0(x) = Param.x₀(x)[2]

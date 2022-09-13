@@ -87,7 +87,6 @@ function plot_stability_constants(
 
   M = assemble_FEM_structure(FEMSpace, RBInfo, Param, "M")(0.0)
   A(t) = assemble_FEM_structure(FEMSpace, RBInfo, Param, "A")(t)
-  F(t) = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")(t)
 
   vec_Nₜ = collect(100:100:1000)
   stability_constants = []

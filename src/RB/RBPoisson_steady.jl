@@ -490,6 +490,7 @@ function solve_RB_system(
   Param::SteadyParametricInfo)
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
+
   println("Solving RB problem via backslash")
   println("Condition number of the system's matrix: $(cond(RBVars.LHSₙ[1]))")
   RBVars.online_time += @elapsed begin

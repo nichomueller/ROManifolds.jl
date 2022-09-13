@@ -109,7 +109,7 @@ function DEIM_offline(RBInfo::ROMInfoSteady{T}, var::String) where T
 
 end
 
-function DEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
+function DEIM_offline(RBInfo::ROMInfoUnsteady{T}) where T
 
   println("Building $(RBInfo.nₛ_DEIM) snapshots of $var")
 
@@ -121,11 +121,7 @@ function DEIM_offline(RBInfo::ROMInfoUnsteady{T}, var::String) where T
 
   DEIM_mat, DEIM_idx = M_DEIM_offline(DEIM_mat)
   DEIMᵢ_mat = DEIM_mat[DEIM_idx, :]
-  if var == "H"
-    el = find_FE_elements(FEMSpace.V₀, FEMSpace.Γn, unique(DEIM_idx))
-  else
-    el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(DEIM_idx))
-  end
+  el = find_FE_elements(FEMSpace.V₀, FEMSpace.Γn, unique(DEIM_idx))
 
   _, DEIM_idx_time = M_DEIM_offline(DEIM_mat_time)
   unique!(sort!(DEIM_idx_time))

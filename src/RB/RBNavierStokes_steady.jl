@@ -347,17 +347,17 @@ function get_RB_system(
     θᵃ, θᵇ, θᶜ, θᶠ, θʰ = get_θ(FEMSpace, RBInfo, RBVars, Param)
 
     if "LHS" ∈ operators
-      println("Assembling reduced LHS")
       push!(RBVars.LHSₙ, get_RB_LHS_blocks(RBInfo, RBVars, θᵃ, θᵇ, θᶜ))
     end
 
     if "RHS" ∈ operators
       if !RBInfo.build_parametric_RHS
-        println("Assembling reduced RHS")
         push!(RBVars.RHSₙ, get_RB_RHS_blocks(RBInfo, RBVars, θᶠ, θʰ))
       else
-        println("Assembling reduced RHS exactly")
         build_param_RHS(FEMSpace, RBInfo, RBVars, Param)
+      end
+      if RBInfo.probl_nl["g"]
+        build_RB_lifting(FEMSpace, RBInfo, RBVars, Param)
       end
     end
   end

@@ -155,6 +155,26 @@ function find_FE_elements(
 
 end
 
+function define_g_FEM(
+  FEMSpace::SteadyProblem,
+  Param::SteadyParametricInfo)
+
+  interpolate_dirichlet(Param.g, FEMSpace.V)
+
+end
+
+function define_dg_FEM(
+  FEMSpace::UnsteadyProblem,
+  Param::UnsteadyParametricInfo)
+
+  function dg(t)
+    dg(x,t::Real) = ∂t(Param.g)(x,t)
+    dg(t::Real) = x -> dg(x,t)
+    interpolate_dirichlet(dg(t), FEMSpace.V(t))
+  end
+
+end
+
 function set_labels(FEMInfo::Info, model::DiscreteModel)
 
   labels = get_face_labeling(model)

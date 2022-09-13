@@ -187,6 +187,21 @@ function get_RB_RHS_blocks(
 
 end
 
+function build_RB_lifting(
+  FEMSpace::SteadyProblem,
+  RBInfo::ROMInfoSteady,
+  RBVars::StokesSGRB{T},
+  Param::SteadyParametricInfo) where T
+
+  println("Assembling reduced lifting exactly")
+
+  L = assemble_FEM_structure(FEMSpace, RBInfo, Param, "L")
+  Lₙ = Matrix{T}[]
+  push!(Lₙ, vcat(RBVars.Φₛᵘ, RBVars.Φₛᵖ)'*L)
+  RBVars.RHSₙ -= Lₙ
+
+end
+
 function build_param_RHS(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,

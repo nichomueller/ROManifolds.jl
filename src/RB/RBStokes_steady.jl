@@ -327,6 +327,9 @@ function get_RB_system(
       else
         build_param_RHS(FEMSpace, RBInfo, RBVars, Param)
       end
+      if RBInfo.probl_nl["g"]
+        build_RB_lifting(FEMSpace, RBInfo, RBVars, Param)
+      end
     end
   end
 

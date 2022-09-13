@@ -291,10 +291,33 @@ function get_RB_system(
       else
         build_param_RHS(FEMSpace, RBInfo, RBVars, Param)
       end
+      if RBInfo.probl_nl["g"]
+        build_RB_lifting(FEMSpace, RBInfo, RBVars, Param)
+      end
     end
   end
 
   save_system_blocks(RBInfo,RBVars.Steady,LHS_blocks,RHS_blocks,operators)
+
+end
+
+function build_RB_lifting(
+  FEMSpace::UnsteadyProblem,
+  RBInfo::ROMInfoUnsteady,
+  RBVars::NavierStokesSTGRB{T},
+  Param::UnsteadyParametricInfo) where T
+
+  println("Assembling reduced lifting exactly")
+
+  L_t = assemble_FEM_structure(FEMSpace, RBInfo, Param, "L")
+  L = zeros(T, RBVars.Nₛᵘ+RBVars.Nₛᵖ, RBVars.Nₜ)
+  timesθ = get_timesθ(RBInfo)
+  for (i,tᵢ) in enumerate(timesθ)
+    L[:,i] = L_t(tᵢ)
+  end
+  Lₙ = Matrix{T}[]
+  push!(Lₙ, reshape((vcat(RBVars.Φₛᵘ,RBVars.Φₛᵖ)'*(L*RBVars.Φₜᵘ))',:,1))::Vector{Matrix{T}}
+  RBVars.RHSₙ -= Lₙ
 
 end
 

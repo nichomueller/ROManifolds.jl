@@ -224,7 +224,7 @@ function functional_MDEIM_linear(
 
   # space
   Θmat_space, _ = M_DEIM_POD(Θmat_space,RBInfo.ϵₛ)
-  Mat_Θ = assemble_parametric_FE_matrix(FEMSpace,var)
+  Mat_Θ = assemble_parametric_FE_matrix(RBInfo.problem_id,FEMSpace,var)
   Q = size(Θmat_space)[2]
   snaps_space,row_idx = Matrix{T}(undef,0,0),Int[]
 
@@ -441,7 +441,7 @@ function functional_DEIM(
 
   # space
   Θmat_space, _ = M_DEIM_POD(Θmat_space,RBInfo.ϵₛ)
-  Vec_Θ = assemble_parametric_FE_vector(FEMSpace,var)
+  Vec_Θ = assemble_parametric_FE_vector(RBInfo.problem_id,FEMSpace,var)
   Q = size(Θmat_space)[2]
   snaps_space = zeros(FEMSpace.Nₛᵘ, Q)
 
@@ -565,33 +565,31 @@ function build_parameter_on_phys_quadp(
   var::String) where {D,T}
 
   if var == "A"
-    Θ = [Param.α(phys_quadp[n][q],t_θ)
-      for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
+    Θfun = Param.α
   elseif var == "M"
-    Θ = [Param.m(phys_quadp[n][q],t_θ)
-      for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
+    Θfun = Param.m
   elseif var == "B"
-    Θ = [Param.b(phys_quadp[n][q],t_θ)
-      for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
+    Θfun = Param.b
   elseif var == "D"
-    Θ = [Param.σ(phys_quadp[n][q],t_θ)
-      for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
+    Θfun = Param.σ
   elseif var == "F"
-    Θ = [Param.f(phys_quadp[n][q],t_θ)
-      for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
+    Θfun = Param.f
   elseif var == "H"
-    Θ = [Param.h(phys_quadp[n][q],t_θ)
-      for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
+    Θfun = Param.h
   else
     error("not implemented")
   end
+
+  Θ = [Θfun(phys_quadp[n][q],t_θ)
+      for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
 
   reshape(Θ, ncells*nquad_cell, :)::Matrix{Float}
 
 end
 
 function assemble_parametric_FE_matrix(
-  FEMSpace::FEMSpacePoissonUnsteady,
+  ::NTuple{1,Int},
+  FEMSpace::UnsteadyProblem,
   var::String)
 
   function Mat_θ(Θ)
@@ -611,7 +609,8 @@ function assemble_parametric_FE_matrix(
 end
 
 function assemble_parametric_FE_vector(
-  FEMSpace::FEMSpacePoissonUnsteady,
+  ::NTuple{1,Int},
+  FEMSpace::UnsteadyProblem,
   var::String)
 
   function Vec_θ(Θ)
@@ -629,7 +628,8 @@ function assemble_parametric_FE_vector(
 end
 
 function assemble_parametric_FE_matrix(
-  FEMSpace::FEMSpaceADRUnsteady,
+  ::NTuple{2,Int},
+  FEMSpace::UnsteadyProblem,
   var::String)
 
   function Mat_θ(Θ)
@@ -652,7 +652,8 @@ function assemble_parametric_FE_matrix(
 end
 
 function assemble_parametric_FE_vector(
-  FEMSpace::FEMSpaceADRUnsteady,
+  ::NTuple{2,Int},
+  FEMSpace::UnsteadyProblem,
   var::String)
 
   function Vec_θ(Θ)
@@ -670,7 +671,8 @@ function assemble_parametric_FE_vector(
 end
 
 function assemble_parametric_FE_matrix(
-  FEMSpace::FEMSpaceStokesUnsteady,
+  ::NTuple{3,Int},
+  FEMSpace::UnsteadyProblem,
   var::String)
 
   function Mat_θ(Θ)
@@ -690,7 +692,8 @@ function assemble_parametric_FE_matrix(
 end
 
 function assemble_parametric_FE_vector(
-  FEMSpace::FEMSpaceStokesUnsteady,
+  ::NTuple{3,Int},
+  FEMSpace::UnsteadyProblem,
   var::String)
 
   function Vec_θ(Θ)
@@ -708,7 +711,8 @@ function assemble_parametric_FE_vector(
 end
 
 function assemble_parametric_FE_matrix(
-  FEMSpace::FEMSpaceNavierStokesUnsteady,
+  ::NTuple{4,Int},
+  FEMSpace::UnsteadyProblem,
   var::String)
 
   function Mat_θ(Θ)
@@ -731,7 +735,8 @@ function assemble_parametric_FE_matrix(
 end
 
 function assemble_parametric_FE_vector(
-  FEMSpace::FEMSpaceNavierStokesUnsteady,
+  ::NTuple{4,Int},
+  FEMSpace::UnsteadyProblem,
   var::String)
 
   function Vec_θ(Θ)

@@ -154,6 +154,9 @@ function get_RB_system(
       else
         build_param_RHS(FEMSpace, RBInfo, RBVars, Param)
       end
+      if RBInfo.probl_nl["g"]
+        build_RB_lifting(FEMSpace, RBInfo, RBVars, Param)
+      end
     end
   end
 
@@ -171,10 +174,25 @@ function build_param_RHS(
 
   F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
   H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
-  Fₙ = RBVars.Φₛᵘ'*(F*RBVars.Φₜᵘ)
-  Hₙ = RBVars.Φₛᵘ'*(H*RBVars.Φₜᵘ)
+  Fₙ = RBVars.Φₛᵘ'*F
+  Hₙ = RBVars.Φₛᵘ'*H
 
-  push!(RBVars.RHSₙ, reshape(Fₙ'+Hₙ',:,1))::Vector{Matrix{T}}
+  push!(RBVars.RHSₙ, reshape(Fₙ+Hₙ,:,1))::Vector{Matrix{T}}
+
+end
+
+function build_RB_lifting(
+  FEMSpace::SteadyProblem,
+  RBInfo::ROMInfoSteady,
+  RBVars::PoissonSGRB{T},
+  Param::SteadyParametricInfo) where T
+
+  println("Assembling reduced lifting exactly")
+
+  L = assemble_FEM_structure(FEMSpace, RBInfo, Param, "L")
+  Lₙ = Matrix{T}[]
+  push!(Lₙ, RBVars.Φₛᵘ'*L)
+  RBVars.RHSₙ -= Lₙ
 
 end
 
