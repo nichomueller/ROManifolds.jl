@@ -1,6 +1,5 @@
 include("RB.jl")
 include("S-GRB_Poisson.jl")
-include("S-PGRB_Poisson.jl")
 
 function get_snapshot_matrix(
   RBInfo::ROMInfoSteady,

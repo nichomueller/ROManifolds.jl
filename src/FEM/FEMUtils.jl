@@ -175,25 +175,20 @@ function define_dg_FEM(
 
 end
 
-function set_labels(FEMInfo::Info, model::DiscreteModel)
+function set_labels(
+  model::DiscreteModel,
+  bnd_info::Dict)
+
+  tags = collect(keys(bnd_info))
+  bnds = collect(values(bnd_info))
+  @assert length(tags) == length(bnds)
 
   labels = get_face_labeling(model)
-  if !isempty(FEMInfo.dirichlet_tags) && !isempty(FEMInfo.dirichlet_bnds)
-    for i = eachindex(FEMInfo.dirichlet_tags)
-      if FEMInfo.dirichlet_tags[i] ∉ labels.tag_to_name
-        add_tag_from_tags!(labels, FEMInfo.dirichlet_tags[i], FEMInfo.dirichlet_bnds[i])
-      end
+  for i = eachindex(tags)
+    if tags[i] ∉ labels.tag_to_name
+      add_tag_from_tags!(labels, tags[i], bnds[i])
     end
   end
-  if !isempty(FEMInfo.neumann_tags) && !isempty(FEMInfo.neumann_bnds)
-    for i = eachindex(FEMInfo.neumann_tags)
-      if FEMInfo.neumann_tags[i] ∉ labels.tag_to_name
-        add_tag_from_tags!(labels, FEMInfo.neumann_tags[i], FEMInfo.neumann_bnds[i])
-      end
-    end
-  end
-
-  labels
 
 end
 

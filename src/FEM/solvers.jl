@@ -114,7 +114,7 @@ function FE_solve(
   FEMInfo::SteadyInfo,
   Param::SteadyParametricInfo) where T
 
-  a((u,p),(v,q)) = ∫( ∇(v)⊙(Param.α*∇(u)) - (∇⋅v)*p + q*(∇⋅u) )FEMSpace.dΩ
+  a((u,p),(v,q)) = ∫( ∇(v)⊙(Param.α*∇(u)) - (∇⋅v)*p + q*(∇⋅u) ) * FEMSpace.dΩ
   rhs((v,q)) = ∫(v ⋅ Param.f) * FEMSpace.dΩ + ∫(v ⋅ Param.h) * FEMSpace.dΓn
   operator = AffineFEOperator(a, rhs, FEMSpace.X, FEMSpace.X₀)
 

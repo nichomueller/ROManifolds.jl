@@ -1,4 +1,3 @@
-const F = Function
 const Float = Float64
 
 """Computation of the inner product between 'vec1' and 'vec2', defined by the

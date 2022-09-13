@@ -526,7 +526,7 @@ function assemble_lifting(
   FEMInfo::SteadyInfo,
   Param::SteadyParametricInfo)
 
-  g = define_g_FEM(FEMSpace, FEMInfo)
+  g = define_g_FEM(FEMSpace, Param)
 
   assemble_vector(
     ∫(Param.α * ∇(FEMSpace.ϕᵥ) ⋅ ∇(g))*FEMSpace.dΩ,FEMSpace.V₀)::Vector{Float}
@@ -540,8 +540,8 @@ function assemble_lifting(
   Param::UnsteadyParametricInfo)
 
   δtθ = FEMInfo.δt*FEMInfo.θ
-  g = define_g_FEM(FEMSpace, FEMInfo)
-  dg = define_dg_FEM(FEMSpace, FEMInfo)
+  g = define_g_FEM(FEMSpace, Param)
+  dg = define_dg_FEM(FEMSpace, Param)
 
   L(t) = (assemble_vector(∫(Param.m(t) * FEMSpace.ϕᵥ * dg(t))*FEMSpace.dΩ,FEMSpace.V₀) +
     δtθ * assemble_vector(∫(Param.α(t) * ∇(FEMSpace.ϕᵥ) ⋅ ∇(g(t)))*FEMSpace.dΩ,FEMSpace.V₀))
@@ -556,7 +556,7 @@ function assemble_lifting(
   FEMInfo::SteadyInfo,
   Param::SteadyParametricInfo)
 
-  g = define_g_FEM(FEMSpace, FEMInfo)
+  g = define_g_FEM(FEMSpace, Param)
 
   (assemble_vector(∫(Param.α * ∇(FEMSpace.ϕᵥ) ⋅ ∇(g))*FEMSpace.dΩ,FEMSpace.V₀) +
     assemble_vector(∫(FEMSpace.ϕᵥ * (Param.b ⋅ ∇(g)))*FEMSpace.dΩ,FEMSpace.V₀) +
@@ -571,8 +571,8 @@ function assemble_lifting(
   Param::UnsteadyParametricInfo)
 
   δtθ = FEMInfo.δt*FEMInfo.θ
-  g = define_g_FEM(FEMSpace, FEMInfo)
-  dg = define_dg_FEM(FEMSpace, FEMInfo)
+  g = define_g_FEM(FEMSpace, Param)
+  dg = define_dg_FEM(FEMSpace, Param)
 
   L(t) = δtθ * (assemble_vector(∫(Param.m(t) * FEMSpace.ϕᵥ * dg(t))*FEMSpace.dΩ,FEMSpace.V₀) / δtθ +
     assemble_vector(∫(Param.α(t) * ∇(FEMSpace.ϕᵥ) ⋅ ∇(g(t)))*FEMSpace.dΩ,FEMSpace.V₀) +
@@ -589,10 +589,10 @@ function assemble_lifting(
   FEMInfo::SteadyInfo,
   Param::SteadyParametricInfo)
 
-  g = define_g_FEM(FEMSpace, FEMInfo)
+  g = define_g_FEM(FEMSpace, Param)
 
   vcat(assemble_vector(∫(Param.α * ∇(FEMSpace.ϕᵥ) ⊙ ∇(g))*FEMSpace.dΩ,FEMSpace.V₀),
-    assemble_vector(∫(FEMSpace.ψᵧ * ∇⋅g)*FEMSpace.dΩ,FEMSpace.Q₀))::Vector{Float}
+    assemble_vector(∫(FEMSpace.ψᵧ * (∇⋅g))*FEMSpace.dΩ,FEMSpace.Q₀))::Vector{Float}
 
 end
 
@@ -603,8 +603,8 @@ function assemble_lifting(
   Param::UnsteadyParametricInfo)
 
   δtθ = FEMInfo.δt*FEMInfo.θ
-  g = define_g_FEM(FEMSpace, FEMInfo)
-  dg = define_dg_FEM(FEMSpace, FEMInfo)
+  g = define_g_FEM(FEMSpace, Param)
+  dg = define_dg_FEM(FEMSpace, Param)
 
   L(t) = vcat(assemble_vector(∫(Param.m(t) * FEMSpace.ϕᵥ ⋅ dg(t))*FEMSpace.dΩ,FEMSpace.V₀) +
     δtθ * assemble_vector(∫(Param.α(t) * ∇(FEMSpace.ϕᵥ) ⊙ ∇(g(t)))*FEMSpace.dΩ,FEMSpace.V₀),
@@ -622,7 +622,7 @@ function assemble_lifting(
 
   C(u) = Param.Re * assemble_vector(∫( FEMSpace.ϕᵥ ⊙
     ((FEMSpace.ϕᵥ')⋅u) )*FEMSpace.dΩ, FEMSpace.V₀)
-  g = define_g_FEM(FEMSpace, FEMInfo)
+  g = define_g_FEM(FEMSpace, Param)
 
   (assemble_lifting(get_NTuple(3, Int), FEMSpace, FEMInfo, Param) +
     vcat(C(g), zeros(FEMSpace.Nₛᵖ)))::Vector{Float}
@@ -638,7 +638,7 @@ function assemble_lifting(
   δtθ = FEMInfo.δt*FEMInfo.θ
   C(u,t) = Param.Re * assemble_vector(∫( FEMSpace.ϕᵥ ⊙
     ((FEMSpace.ϕᵥ')⋅u(t)) )*FEMSpace.dΩ, FEMSpace.V₀)
-  g = define_g_FEM(FEMSpace, FEMInfo)
+  g = define_g_FEM(FEMSpace, Param)
 
   L(t) = (assemble_lifting(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)(t) +
     vcat(δtθ * C(g(t),t), zeros(FEMSpace.Nₛᵖ)))

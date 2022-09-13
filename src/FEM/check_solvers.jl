@@ -65,6 +65,33 @@ function check_dataset(
 end
 
 function check_stokes_solver()
+
+  μ = load_CSV(Array{T}[],
+    joinpath(get_FEM_snap_path(RBInfo), "μ.csv"))::Vector{Vector{T}}
+  model = DiscreteModelFromFile(get_mesh_path(RBInfo))
+  Param = get_ParamInfo(RBInfo, μ[1])
+  FEMSpace = get_FEMSpace(FEMInfo.problem_id, FEMInfo, model, Param.g)
+
+  u = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
+    DataFrame))[:, 1]
+  p = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"),
+    DataFrame))[:, 1]
+  x = vcat(u,p)
+
+  A = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "A")
+  B = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "Bₚ")
+  F = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "F")
+  H = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "H")
+  L = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "L")
+
+  LHS = vcat(hcat(A, -B'), hcat(B, zeros(T, FEMSpace.Nₛᵖ, FEMSpace.Nₛᵖ)))
+  RHS = vcat(F + H, zeros(T, FEMSpace.Nₛᵖ, 1)) - L
+
+  LHS * x - RHS
+
+end
+
+#= function check_stokes_solver()
   A = assemble_stiffness(FEMSpace, FEMInfo, Param)(0.0)
   M = assemble_mass(FEMSpace, FEMInfo, Param)(0.0)
   B = assemble_primal_op(FEMSpace)(0.0)
@@ -85,7 +112,7 @@ function check_stokes_solver()
   res1 = θ*(δt*θ*A*α + M)*u2 + ((1-θ)*δt*θ*A*α - θ*M)*u1 + δt*θ*Bᵀ*p2 - δt*θ*(F+H)
   res2 = B*u2
 
-end
+end =#
 
 function check_dataset(RBInfo, RBVars, i)
 

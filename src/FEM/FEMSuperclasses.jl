@@ -18,7 +18,6 @@ struct FEMSpacePoissonSteady{D} <: SteadyProblem{D}
   Ω::BodyFittedTriangulation
   Γn::BoundaryTriangulation
   dΩ::Measure
-  dΓd::Measure
   dΓn::Measure
   phys_quadp::Vector{Vector{VectorValue{D,Float}}}
   V₀_quad::UnconstrainedFESpace
@@ -35,7 +34,6 @@ struct FEMSpacePoissonUnsteady{D} <: UnsteadyProblem{D}
   Ω::BodyFittedTriangulation
   Γn::BoundaryTriangulation
   dΩ::Measure
-  dΓd::Measure
   dΓn::Measure
   phys_quadp::Vector{Vector{VectorValue{D,Float}}}
   V₀_quad::UnconstrainedFESpace
@@ -52,7 +50,6 @@ struct FEMSpaceADRSteady{D} <: SteadyProblem{D}
   Ω::BodyFittedTriangulation
   Γn::BoundaryTriangulation
   dΩ::Measure
-  dΓd::Measure
   dΓn::Measure
   phys_quadp::Vector{Vector{VectorValue{D,Float}}}
   V₀_quad::UnconstrainedFESpace
@@ -69,7 +66,6 @@ struct FEMSpaceADRUnsteady{D} <: UnsteadyProblem{D}
   Ω::BodyFittedTriangulation
   Γn::BoundaryTriangulation
   dΩ::Measure
-  dΓd::Measure
   dΓn::Measure
   phys_quadp::Vector{Vector{VectorValue{D,Float}}}
   V₀_quad::UnconstrainedFESpace
@@ -93,7 +89,6 @@ struct FEMSpaceStokesSteady{D} <: SteadyProblem{D}
   Ω::BodyFittedTriangulation
   Γn::BoundaryTriangulation
   dΩ::Measure
-  dΓd::Measure
   dΓn::Measure
   phys_quadp::Vector{Vector{VectorValue{D,Float}}}
   V₀_quad::UnconstrainedFESpace
@@ -117,7 +112,6 @@ struct FEMSpaceStokesUnsteady{D} <: UnsteadyProblem{D}
   Ω::BodyFittedTriangulation
   Γn::BoundaryTriangulation
   dΩ::Measure
-  dΓd::Measure
   dΓn::Measure
   phys_quadp::Vector{Vector{VectorValue{D,Float}}}
   V₀_quad::UnconstrainedFESpace
@@ -141,7 +135,6 @@ struct FEMSpaceNavierStokesSteady{D} <: SteadyProblem{D}
   Ω::BodyFittedTriangulation
   Γn::BoundaryTriangulation
   dΩ::Measure
-  dΓd::Measure
   dΓn::Measure
   phys_quadp::Vector{Vector{VectorValue{D,Float}}}
   V₀_quad::UnconstrainedFESpace
@@ -165,8 +158,6 @@ struct FEMSpaceNavierStokesUnsteady{D} <: UnsteadyProblem{D}
   Ω::BodyFittedTriangulation
   Γn::BoundaryTriangulation
   dΩ::Measure
-  Γd::BoundaryTriangulation
-  dΓd::Measure
   dΓn::Measure
   phys_quadp::Vector{Vector{VectorValue{D,Float}}}
   V₀_quad::UnconstrainedFESpace
@@ -184,11 +175,8 @@ struct SteadyInfo <: Info
   D::Int
   case::Int
   probl_nl::Dict
+  bnd_info::Dict
   order::Int
-  dirichlet_tags::Vector{String}
-  dirichlet_bnds::Vector{Int}
-  neumann_tags::Vector{String}
-  neumann_bnds::Vector{Int}
   solver::String
   Paths::FEMPathInfo
   nₛ::Int
@@ -199,11 +187,8 @@ struct UnsteadyInfo <: Info
   D::Int
   case::Int
   probl_nl::Dict
+  bnd_info::Dict
   order::Int
-  dirichlet_tags::Vector{String}
-  dirichlet_bnds::Vector{Int}
-  neumann_tags::Vector{String}
-  neumann_bnds::Vector{Int}
   solver::String
   Paths::FEMPathInfo
   nₛ::Int

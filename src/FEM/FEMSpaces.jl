@@ -1,15 +1,15 @@
 function get_mod_meas_quad(FEMInfo::Info, model::DiscreteModel)
 
+  set_labels(model, FEMInfo.bnd_info)
+
   degree = 2 * FEMInfo.order
   Ω = Triangulation(model)
   dΩ = Measure(Ω, degree)
-  Γn = BoundaryTriangulation(model, tags=FEMInfo.neumann_tags)
+  Γn = BoundaryTriangulation(model, tags=["neumann"])
   dΓn = Measure(Γn, degree)::Measure
-  Γd = BoundaryTriangulation(model, tags=FEMInfo.dirichlet_tags)
-  dΓd = Measure(Γd, degree)::Measure
   Qₕ = CellQuadrature(Ω, degree)::CellQuadrature
 
-  Ω, Γn, Qₕ, dΩ, dΓn, dΓd
+  Ω, Γn, Qₕ, dΩ, dΓn
 
 end
 
@@ -36,13 +36,12 @@ function get_FEMSpace_quantities(
   model::DiscreteModel{D,D},
   g::F) where D
 
-  Ω, Γn, Qₕ, dΩ, dΓn, dΓd = get_mod_meas_quad(FEMInfo, model)
+  Ω, Γn, Qₕ, dΩ, dΓn = get_mod_meas_quad(FEMInfo, model)
 
-  labels = set_labels(FEMInfo, model)
   refFE = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order)
 
   V₀ = TestFESpace(model, refFE; conformity=:H1,
-    dirichlet_tags=FEMInfo.dirichlet_tags, labels=labels)
+    dirichlet_tags=["dirichlet"])
   V = TrialFESpace(V₀, g)
 
   ϕᵥ = get_fe_basis(V₀)
@@ -51,7 +50,7 @@ function get_FEMSpace_quantities(
 
   phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
 
-  Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, Γn, dΩ, dΓd, dΓn, phys_quadp, V₀_quad
+  Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad
 
 end
 
@@ -61,12 +60,11 @@ function get_FEMSpace_quantities(
   model::DiscreteModel{D,D},
   g::F) where D
 
-  Ω, Γn, Qₕ, dΩ, dΓn, dΓd = get_mod_meas_quad(FEMInfo, model)
+  Ω, Γn, Qₕ, dΩ, dΓn = get_mod_meas_quad(FEMInfo, model)
 
   refFE = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order)
-  labels = set_labels(FEMInfo, model)
   V₀ = TestFESpace(model, refFE; conformity=:H1,
-    dirichlet_tags=FEMInfo.dirichlet_tags, labels=labels)
+    dirichlet_tags=["dirichlet"])
   V = TransientTrialFESpace(V₀, g)
 
   ϕᵥ = get_fe_basis(V₀)
@@ -75,7 +73,7 @@ function get_FEMSpace_quantities(
 
   phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
 
-  Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, Γn, dΩ, dΓd, dΓn, phys_quadp, V₀_quad
+  Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad
 
 end
 
@@ -105,12 +103,10 @@ function get_FEMSpace_quantities(
   model::DiscreteModel{D,D},
   g::F) where D
 
-  Ω, Γn, Qₕ, dΩ, dΓn, dΓd = get_mod_meas_quad(FEMInfo, model)
+  Ω, Γn, Qₕ, dΩ, dΓn = get_mod_meas_quad(FEMInfo, model)
 
   refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,Float}, FEMInfo.order)
-  labels = set_labels(FEMInfo, model)
-  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1,
-    dirichlet_tags=FEMInfo.dirichlet_tags, labels=labels)
+  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1, dirichlet_tags=["dirichlet"])
   V = TrialFESpace(V₀, g)
 
   ϕᵥ = get_fe_basis(V₀)
@@ -118,7 +114,7 @@ function get_FEMSpace_quantities(
   Nₛᵘ = length(get_free_dof_ids(V))
 
   refFEₚ = Gridap.ReferenceFE(lagrangian, Float, order - 1; space=:P)
-  Q₀ = TestFESpace(model, refFEₚ; conformity=:L2, constraint=:zeromean)
+  Q₀ = TestFESpace(model, refFEₚ; conformity=:L2)
   Q = TrialFESpace(Q₀)
   ψᵧ = get_fe_basis(Q₀)
   ψₚ = get_trial_fe_basis(Q)
@@ -129,7 +125,7 @@ function get_FEMSpace_quantities(
 
   phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
 
-  Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, Γn, dΩ, dΓd, dΓn,
+  Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, Γn, dΩ, dΓn,
     phys_quadp, V₀_quad
 
 end
@@ -140,12 +136,11 @@ function get_FEMSpace_quantities(
   model::DiscreteModel{D,D},
   g::F) where D
 
-  Ω, Γn, Qₕ, dΩ, dΓn, dΓd = get_mod_meas_quad(FEMInfo, model)
+  Ω, Γn, Qₕ, dΩ, dΓn = get_mod_meas_quad(FEMInfo, model)
 
   refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,Float}, FEMInfo.order)
-  labels = set_labels(FEMInfo, model)
   V₀ = TestFESpace(model, refFEᵤ; conformity=:H1,
-    dirichlet_tags=FEMInfo.dirichlet_tags, labels=labels)
+    dirichlet_tags=["dirichlet"])
   V = TransientTrialFESpace(V₀, g)
 
   ϕᵥ = get_fe_basis(V₀)
@@ -164,7 +159,7 @@ function get_FEMSpace_quantities(
 
   phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
 
-  Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, Γn, dΩ, dΓd, dΓn,
+  Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, Γn, dΩ, dΓn,
     phys_quadp, V₀_quad
 
 end

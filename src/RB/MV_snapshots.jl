@@ -136,7 +136,7 @@ function get_snaps_MDEIM(
   RBInfo::ROMInfoSteady,
   RBVars::RBSteadyProblem,
   μ::Vector{Vector{T}},
-  var="A") where T
+  var::String) where T
 
   snaps, row_idx = call_matrix_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
 
@@ -160,7 +160,7 @@ function standard_MDEIM(
   RBVars::RBUnsteadyProblem,
   μ::Vector{Vector{T}},
   timesθ::Vector,
-  var="A") where T
+  var::String) where T
 
   (nₛ_min, nₛ_max) = sort([RBInfo.nₛ_MDEIM, RBInfo.nₛ_MDEIM_time])
   snaps_space, snaps_time = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
@@ -218,7 +218,7 @@ function functional_MDEIM_linear(
   RBInfo::ROMInfoUnsteady{T},
   μ::Vector{Vector{T}},
   timesθ::Vector,
-  var="A") where T
+  var::String) where T
 
   Θmat_space, Θmat_time = build_θmat_snapshots(FEMSpace, RBInfo, μ, timesθ, var)
 
@@ -254,7 +254,7 @@ function functional_MDEIM_nonlinear(
   RBVars::RBUnsteadyProblem,
   μ::Vector{Vector{T}},
   timesθ::Vector,
-  var="C") where T
+  var::String) where T
 
   function index_mapping_inverse_quad(i::Int)
     iₛ = 1+Int(floor((i-1)/RBVars.nₜᵘ_quad))
@@ -314,7 +314,7 @@ function get_snaps_MDEIM(
   RBInfo::ROMInfoUnsteady,
   RBVars::RBUnsteadyProblem,
   μ::Vector{Vector{T}},
-  var="A") where T
+  var::String) where T
 
   timesθ = get_timesθ(RBInfo)
 
@@ -368,7 +368,7 @@ function get_snaps_DEIM(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   μ::Vector{Vector{T}},
-  var="F") where T
+  var::String) where T
 
   snaps = build_vector_snapshots(FEMSpace,RBInfo,μ,var)
   snaps, _ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
@@ -381,7 +381,7 @@ function standard_DEIM(
   RBInfo::ROMInfoUnsteady{T},
   μ::Vector{Vector{T}},
   timesθ::Vector,
-  var="F") where T
+  var::String) where T
 
   (nₛ_min, nₛ_max) = sort([RBInfo.nₛ_DEIM, RBInfo.nₛ_DEIM_time])
   snaps_space, snaps_time = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
@@ -435,7 +435,7 @@ function functional_DEIM(
   RBInfo::ROMInfoUnsteady{T},
   μ::Vector{Vector{T}},
   timesθ::Vector,
-  var="F") where T
+  var::String) where T
 
   Θmat_space, Θmat_time = build_θmat_snapshots(FEMSpace, RBInfo, μ, timesθ, var)
 
@@ -463,7 +463,7 @@ function get_snaps_DEIM(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,
   μ::Vector{Vector{T}},
-  var="F") where T
+  var::String) where T
 
   timesθ = get_timesθ(RBInfo)
   return standard_DEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}}
