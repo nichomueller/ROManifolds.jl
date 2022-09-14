@@ -2,9 +2,9 @@ function get_Aₙ(
   RBInfo::Info,
   RBVars::PoissonSGRB{T}) where T
 
-  if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "Aₙ.csv"))
+  if isfile(joinpath(RBInfo.ROM_structures_path, "Aₙ.csv"))
     println("Importing reduced affine stiffness matrix")
-    Aₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "Aₙ.csv"))
+    Aₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, "Aₙ.csv"))
     RBVars.Aₙ = reshape(Aₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)::Array{T,3}
     RBVars.Qᵃ = size(RBVars.Aₙ)[3]
     return [""]
@@ -113,11 +113,11 @@ function save_affine_structures(
 
   if RBInfo.save_offline_structures
     save_CSV(reshape(RBVars.Aₙ, :, RBVars.Qᵃ)::Matrix{T},
-      joinpath(RBInfo.Paths.ROM_structures_path, "Aₙ.csv"))
+      joinpath(RBInfo.ROM_structures_path, "Aₙ.csv"))
     if !RBInfo.build_parametric_RHS
-      save_CSV(RBVars.Fₙ, joinpath(RBInfo.Paths.ROM_structures_path, "Fₙ.csv"))
-      save_CSV(RBVars.Hₙ, joinpath(RBInfo.Paths.ROM_structures_path, "Hₙ.csv"))
-      save_CSV(RBVars.Lₙ, joinpath(RBInfo.Paths.ROM_structures_path, "Lₙ.csv"))
+      save_CSV(RBVars.Fₙ, joinpath(RBInfo.ROM_structures_path, "Fₙ.csv"))
+      save_CSV(RBVars.Hₙ, joinpath(RBInfo.ROM_structures_path, "Hₙ.csv"))
+      save_CSV(RBVars.Lₙ, joinpath(RBInfo.ROM_structures_path, "Lₙ.csv"))
     end
   end
 

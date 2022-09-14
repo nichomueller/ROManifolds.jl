@@ -479,7 +479,6 @@ end
 struct ROMInfoSteady{T} <: Info
   FEMInfo::SteadyInfo
   probl_nl::Dict
-  case::Int
   Paths::RBPathInfo
   RB_method::String
   nₛ::Int
@@ -498,7 +497,6 @@ end
 mutable struct ROMInfoUnsteady{T} <: Info
   FEMInfo::UnsteadyInfo
   probl_nl::Dict
-  case::Int
   Paths::RBPathInfo
   RB_method::String
   nₛ::Int
@@ -523,4 +521,14 @@ mutable struct ROMInfoUnsteady{T} <: Info
   st_M_DEIM::Bool
   functional_M_DEIM::Bool
   adaptivity::Bool
+end
+
+function Base.getproperty(RBInfo::ROMInfoSteady, sym::Symbol)
+  if sym in (:probl_nl,)
+    getfield(RBInfo.FEMInfo, sym)
+  elseif sym in (:FEMPaths, :ROM_structures_path, :results_path)
+    getfield(RBInfo.Paths, sym)
+  else
+    getfield(RBInfo, sym)
+  end
 end

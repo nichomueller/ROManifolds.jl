@@ -122,10 +122,10 @@ function build_reduced_basis(
   RBVars.Nᵖ = RBVars.Nₛᵖ * RBVars.Nₜ
 
   if RBInfo.save_offline_structures
-    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.Paths.ROM_structures_path, "Φₛᵘ.csv"))
-    save_CSV(RBVars.Φₜᵘ, joinpath(RBInfo.Paths.ROM_structures_path, "Φₜᵘ.csv"))
-    save_CSV(RBVars.Φₛᵖ, joinpath(RBInfo.Paths.ROM_structures_path, "Φₛᵖ.csv"))
-    save_CSV(RBVars.Φₜᵖ, joinpath(RBInfo.Paths.ROM_structures_path, "Φₜᵖ.csv"))
+    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.ROM_structures_path, "Φₛᵘ.csv"))
+    save_CSV(RBVars.Φₜᵘ, joinpath(RBInfo.ROM_structures_path, "Φₜᵘ.csv"))
+    save_CSV(RBVars.Φₛᵖ, joinpath(RBInfo.ROM_structures_path, "Φₛᵖ.csv"))
+    save_CSV(RBVars.Φₜᵖ, joinpath(RBInfo.ROM_structures_path, "Φₜᵖ.csv"))
   end
 
   return
@@ -141,10 +141,10 @@ function import_reduced_basis(
   println("Importing the reduced basis for field p")
 
   RBVars.Φₛᵖ = load_CSV(Matrix{T}(undef,0,0),
-    joinpath(RBInfo.Paths.ROM_structures_path, "Φₛᵖ.csv"))
+    joinpath(RBInfo.ROM_structures_path, "Φₛᵖ.csv"))
   RBVars.nₛᵖ = size(RBVars.Φₛᵖ)[2]
   RBVars.Φₜᵖ = load_CSV(Matrix{T}(undef,0,0),
-    joinpath(RBInfo.Paths.ROM_structures_path, "Φₜᵖ.csv"))
+    joinpath(RBInfo.ROM_structures_path, "Φₜᵖ.csv"))
   RBVars.nₜᵖ = size(RBVars.Φₜᵖ)[2]
   RBVars.nᵖ = RBVars.nₛᵖ * RBVars.nₜᵖ
 
@@ -186,7 +186,7 @@ function get_generalized_coordinates(
   RBVars.p̂ = p̂
 
   if RBInfo.save_offline_structures
-    save_CSV(p̂, joinpath(RBInfo.Paths.ROM_structures_path, "p̂.csv"))
+    save_CSV(p̂, joinpath(RBInfo.ROM_structures_path, "p̂.csv"))
   end
 
 end
@@ -406,7 +406,7 @@ function online_phase(
   for Param_nb in param_nbs
     string_param_nbs *= "_" * string(Param_nb)
   end
-  path_μ = joinpath(RBInfo.Paths.results_path, string_param_nbs)
+  path_μ = joinpath(RBInfo.results_path, string_param_nbs)
 
   if RBInfo.save_results
     println("Saving the results...")

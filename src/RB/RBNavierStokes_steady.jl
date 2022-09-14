@@ -122,10 +122,10 @@ function build_reduced_basis(
   end
 
   if RBInfo.save_offline_structures
-    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.Paths.ROM_structures_path,"Φₛᵘ.csv"))
-    save_CSV(RBVars.Φₛᵖ, joinpath(RBInfo.Paths.ROM_structures_path,"Φₛᵖ.csv"))
+    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.ROM_structures_path,"Φₛᵘ.csv"))
+    save_CSV(RBVars.Φₛᵖ, joinpath(RBInfo.ROM_structures_path,"Φₛᵖ.csv"))
     save_CSV(RBVars.Φₛᵘ_quad,
-      joinpath(RBInfo.Paths.ROM_structures_path,"Φₛᵘ_quad.csv"))
+      joinpath(RBInfo.ROM_structures_path,"Φₛᵘ_quad.csv"))
   end
 
   return
@@ -139,7 +139,7 @@ function import_reduced_basis(
   import_reduced_basis(RBInfo, RBVars.Stokes)
   println("Importing the spatial reduced basis for field u, quadrature points")
   RBVars.Φₛᵘ_quad = load_CSV(Matrix{T}(undef,0,0),
-    joinpath(RBInfo.Paths.ROM_structures_path, "Φₛᵘ_quad.csv"))
+    joinpath(RBInfo.ROM_structures_path, "Φₛᵘ_quad.csv"))
   (RBVars.Nₛᵘ_quad, RBVars.nₛᵘ_quad) = size(RBVars.Φₛᵘ_quad)
 
 end
@@ -189,7 +189,7 @@ function save_M_DEIM_structures(
   list_names = ("MDEIM_mat_C","MDEIMᵢ_C","MDEIM_idx_C","row_idx_C","sparse_el_C")
 
   save_structures_in_list(list_M_DEIM, list_names,
-    RBInfo.Paths.ROM_structures_path)
+    RBInfo.ROM_structures_path)
 
 end
 
@@ -202,15 +202,15 @@ function get_M_DEIM_structures(
 
   if RBInfo.probl_nl["C"]
 
-    if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "MDEIMᵢ_B.csv"))
+    if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIMᵢ_B.csv"))
       println("Importing MDEIM offline structures, B")
-      RBVars.MDEIMᵢ_C = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path,
+      RBVars.MDEIMᵢ_C = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path,
         "MDEIMᵢ_C.csv"))
-      RBVars.MDEIM_idx_C = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.Paths.ROM_structures_path,
+      RBVars.MDEIM_idx_C = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.ROM_structures_path,
         "MDEIM_idx_C.csv"))
-      RBVars.row_idx_C = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.Paths.ROM_structures_path,
+      RBVars.row_idx_C = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.ROM_structures_path,
         "row_idx_C.csv"))
-      RBVars.sparse_el_C = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.Paths.ROM_structures_path,
+      RBVars.sparse_el_C = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.ROM_structures_path,
         "sparse_el_C.csv"))
     else
       println("Failed to import MDEIM offline structures,
@@ -493,7 +493,7 @@ function online_phase(
   for Param_nb in param_nbs
     string_param_nbs *= "_" * string(Param_nb)
   end
-  path_μ = joinpath(RBInfo.Paths.results_path, string_param_nbs)
+  path_μ = joinpath(RBInfo.results_path, string_param_nbs)
 
   if RBInfo.save_results
 

@@ -79,14 +79,14 @@ function build_reduced_basis(
   RBVars.nᵘ_quad = RBVars.nₛᵘ_quad * RBVars.nₜᵘ_quad
 
   if RBInfo.save_offline_structures
-    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.Paths.ROM_structures_path, "Φₛᵘ.csv"))
-    save_CSV(RBVars.Φₜᵘ, joinpath(RBInfo.Paths.ROM_structures_path, "Φₜᵘ.csv"))
-    save_CSV(RBVars.Φₛᵖ, joinpath(RBInfo.Paths.ROM_structures_path, "Φₛᵖ.csv"))
-    save_CSV(RBVars.Φₜᵖ, joinpath(RBInfo.Paths.ROM_structures_path, "Φₜᵖ.csv"))
+    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.ROM_structures_path, "Φₛᵘ.csv"))
+    save_CSV(RBVars.Φₜᵘ, joinpath(RBInfo.ROM_structures_path, "Φₜᵘ.csv"))
+    save_CSV(RBVars.Φₛᵖ, joinpath(RBInfo.ROM_structures_path, "Φₛᵖ.csv"))
+    save_CSV(RBVars.Φₜᵖ, joinpath(RBInfo.ROM_structures_path, "Φₜᵖ.csv"))
     save_CSV(RBVars.Φₛᵘ_quad,
-      joinpath(RBInfo.Paths.ROM_structures_path, "Φₛᵘ_quad.csv"))
+      joinpath(RBInfo.ROM_structures_path, "Φₛᵘ_quad.csv"))
     save_CSV(RBVars.Φₜᵘ_quad,
-      joinpath(RBInfo.Paths.ROM_structures_path, "Φₜᵘ_quad.csv"))
+      joinpath(RBInfo.ROM_structures_path, "Φₜᵘ_quad.csv"))
   end
 
   return
@@ -100,9 +100,9 @@ function import_reduced_basis(
   import_reduced_basis(RBInfo, RBVars.Stokes)
   println("Importing the space and time reduced basis for field u, quadrature points")
   RBVars.Φₛᵘ_quad = load_CSV(Matrix{T}(undef,0,0),
-    joinpath(RBInfo.Paths.ROM_structures_path, "Φₛᵘ_quad.csv"))
+    joinpath(RBInfo.ROM_structures_path, "Φₛᵘ_quad.csv"))
   RBVars.Φₜᵘ_quad = load_CSV(Matrix{T}(undef,0,0),
-    joinpath(RBInfo.Paths.ROM_structures_path, "Φₜᵘ_quad.csv"))
+    joinpath(RBInfo.ROM_structures_path, "Φₜᵘ_quad.csv"))
 
   RBVars.nₛᵘ_quad = size(RBVars.Φₛᵘ_quad)[2]
   RBVars.nₜᵘ_quad = size(RBVars.Φₜᵘ_quad)[2]
@@ -162,7 +162,7 @@ function save_M_DEIM_structures(
     "sparse_el_C", "MDEIM_idx_time_C")
 
   save_structures_in_list(list_M_DEIM, list_names,
-    RBInfo.Paths.ROM_structures_path)
+    RBInfo.ROM_structures_path)
 
 end
 
@@ -356,7 +356,7 @@ function online_phase(
   for Param_nb in param_nbs
     string_param_nbs *= "_" * string(Param_nb)
   end
-  path_μ = joinpath(RBInfo.Paths.results_path, string_param_nbs)
+  path_μ = joinpath(RBInfo.results_path, string_param_nbs)
 
   if RBInfo.save_results
     println("Saving the results...")

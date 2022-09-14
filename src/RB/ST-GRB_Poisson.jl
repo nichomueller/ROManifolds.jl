@@ -10,9 +10,9 @@ function get_Mₙ(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTGRB{T}) where T
 
-  if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "Mₙ.csv"))
+  if isfile(joinpath(RBInfo.ROM_structures_path, "Mₙ.csv"))
     println("Importing reduced affine mass matrix")
-    Mₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "Mₙ.csv"))
+    Mₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, "Mₙ.csv"))
     RBVars.Mₙ = reshape(Mₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)::Array{T,3}
     RBVars.Qᵐ = size(RBVars.Mₙ)[end]
     return [""]
@@ -153,7 +153,7 @@ function save_affine_structures(
 
   if RBInfo.save_offline_structures
     save_CSV(reshape(RBVars.Mₙ, :, RBVars.Qᵐ)::Matrix{T},
-      joinpath(RBInfo.Paths.ROM_structures_path, "Mₙ.csv"))
+      joinpath(RBInfo.ROM_structures_path, "Mₙ.csv"))
     save_affine_structures(RBInfo, RBVars.Steady)
   end
 

@@ -10,9 +10,9 @@ function get_Bₙ(
   RBInfo::Info,
   RBVars::ADRSGRB{T}) where T
 
-  if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "Bₙ.csv"))
+  if isfile(joinpath(RBInfo.ROM_structures_path, "Bₙ.csv"))
     println("Importing reduced affine B matrix")
-    Bₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "Bₙ.csv"))
+    Bₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, "Bₙ.csv"))
     RBVars.Bₙ = reshape(Bₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)::Array{T,3}
     RBVars.Qᵇ = size(RBVars.Bₙ)[3]
     return [""]
@@ -27,9 +27,9 @@ function get_Dₙ(
   RBInfo::Info,
   RBVars::ADRSGRB{T}) where T
 
-  if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "Dₙ.csv"))
+  if isfile(joinpath(RBInfo.ROM_structures_path, "Dₙ.csv"))
     println("Importing reduced affine D matrix")
-    Dₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, "Dₙ.csv"))
+    Dₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, "Dₙ.csv"))
     RBVars.Dₙ = reshape(Dₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)::Array{T,3}
     RBVars.Qᵈ = size(RBVars.Dₙ)[3]
     return [""]
@@ -153,9 +153,9 @@ function save_affine_structures(
 
   if RBInfo.save_offline_structures
     save_CSV(reshape(RBVars.Bₙ, :, RBVars.Qᵇ)::Matrix{T},
-      joinpath(RBInfo.Paths.ROM_structures_path, "Bₙ.csv"))
+      joinpath(RBInfo.ROM_structures_path, "Bₙ.csv"))
     save_CSV(reshape(RBVars.Dₙ, :, RBVars.Qᵈ)::Matrix{T},
-      joinpath(RBInfo.Paths.ROM_structures_path, "Dₙ.csv"))
+      joinpath(RBInfo.ROM_structures_path, "Dₙ.csv"))
   end
 
 end

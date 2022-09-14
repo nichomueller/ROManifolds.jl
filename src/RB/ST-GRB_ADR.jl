@@ -140,7 +140,7 @@ function save_affine_structures(
 
   if RBInfo.save_offline_structures
     save_CSV(reshape(RBVars.Mₙ, :, RBVars.Qᵐ)::Matrix{T},
-      joinpath(RBInfo.Paths.ROM_structures_path, "Mₙ.csv"))
+      joinpath(RBInfo.ROM_structures_path, "Mₙ.csv"))
     save_affine_structures(RBInfo, RBVars.Steady)
   end
 

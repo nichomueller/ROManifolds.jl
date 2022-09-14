@@ -112,7 +112,7 @@ function save_affine_structures(
 
   if RBInfo.save_offline_structures
     Bₙ = reshape(RBVars.Bₙ, :, 1)
-    save_CSV(Bₙ, joinpath(RBInfo.Paths.ROM_structures_path, "Bₙ.csv"))
+    save_CSV(Bₙ, joinpath(RBInfo.ROM_structures_path, "Bₙ.csv"))
   end
 
 end

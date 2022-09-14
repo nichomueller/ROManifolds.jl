@@ -18,10 +18,10 @@ function get_Cₙ(
   RBInfo::Info,
   RBVars::NavierStokesSGRB{T}) where T
 
-  if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "Cₙ.csv"))
+  if isfile(joinpath(RBInfo.ROM_structures_path, "Cₙ.csv"))
     println("Importing reduced affine convection matrix")
     Cₙ = load_CSV(Matrix{T}(undef,0,0),
-      joinpath(RBInfo.Paths.ROM_structures_path, "Cₙ.csv"))
+      joinpath(RBInfo.ROM_structures_path, "Cₙ.csv"))
     RBVars.Cₙ = reshape(Cₙ,RBVars.nₛᵖ,RBVars.nₛᵘ,:)::Array{T,3}
     return [""]
   else
@@ -136,7 +136,7 @@ function save_affine_structures(
 
   if RBInfo.save_offline_structures
     Cₙ = reshape(RBVars.Cₙ, :, RBVars.Qᶜ)::Matrix{T}
-    save_CSV(Cₙ, joinpath(RBInfo.Paths.ROM_structures_path, "Cₙ.csv"))
+    save_CSV(Cₙ, joinpath(RBInfo.ROM_structures_path, "Cₙ.csv"))
   end
 
 end

@@ -56,7 +56,7 @@ function build_reduced_basis(
   end
 
   if RBInfo.save_offline_structures
-    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.Paths.ROM_structures_path,"Φₛᵘ.csv"))
+    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.ROM_structures_path,"Φₛᵘ.csv"))
   end
 
   return
@@ -69,7 +69,7 @@ function import_reduced_basis(
 
   println("Importing the spatial reduced basis for field u")
   RBVars.Φₛᵘ = load_CSV(Matrix{T}(undef,0,0),
-    joinpath(RBInfo.Paths.ROM_structures_path, "Φₛᵘ.csv"))
+    joinpath(RBInfo.ROM_structures_path, "Φₛᵘ.csv"))
   (RBVars.Nₛᵘ, RBVars.nₛᵘ) = size(RBVars.Φₛᵘ)
 
 end
@@ -86,7 +86,7 @@ function get_generalized_coordinates(
   Φₛᵘ_normed = RBVars.Xᵘ₀*RBVars.Φₛᵘ
   RBVars.û = RBVars.Sᵘ[:,snaps]*Φₛᵘ_normed
   if RBInfo.save_offline_structures
-    save_CSV(RBVars.û, joinpath(RBInfo.Paths.ROM_structures_path, "û.csv"))
+    save_CSV(RBVars.û, joinpath(RBInfo.ROM_structures_path, "û.csv"))
   end
 
 end
@@ -169,7 +169,7 @@ function save_M_DEIM_structures(
     "DEIM_mat_L","DEIMᵢ_L","DEIM_idx_L","sparse_el_L")
 
   save_structures_in_list(list_M_DEIM, list_names,
-    RBInfo.Paths.ROM_structures_path)
+    RBInfo.ROM_structures_path)
 
 end
 
@@ -181,13 +181,13 @@ function get_M_DEIM_structures(
 
   if RBInfo.probl_nl["A"]
 
-    if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "MDEIMᵢ_A.csv"))
+    if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIMᵢ_A.csv"))
       println("Importing MDEIM offline structures, A")
 
       (RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A, RBVars.row_idx_A, RBVars.sparse_el_A) =
         load_structures_in_list(("MDEIMᵢ_A", "MDEIM_idx_A", "row_idx_A", "sparse_el_A"),
         (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
-        RBInfo.Paths.ROM_structures_path)
+        RBInfo.ROM_structures_path)
 
     else
       println("Failed to import MDEIM offline structures for
@@ -205,12 +205,12 @@ function get_M_DEIM_structures(
 
     if RBInfo.probl_nl["f"]
 
-      if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "DEIMᵢ_F.csv"))
+      if isfile(joinpath(RBInfo.ROM_structures_path, "DEIMᵢ_F.csv"))
         println("Importing DEIM offline structures, F")
         (RBVars.DEIMᵢ_F, RBVars.DEIM_idx_F, RBVars.sparse_el_F) =
           load_structures_in_list(("DEIMᵢ_F", "DEIM_idx_F", "sparse_el_F"),
           (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
-          RBInfo.Paths.ROM_structures_path)
+          RBInfo.ROM_structures_path)
       else
         println("Failed to import DEIM offline structures for F: must build them")
         append!(operators, ["F"])
@@ -220,12 +220,12 @@ function get_M_DEIM_structures(
 
     if RBInfo.probl_nl["h"]
 
-      if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "DEIMᵢ_H.csv"))
+      if isfile(joinpath(RBInfo.ROM_structures_path, "DEIMᵢ_H.csv"))
         println("Importing DEIM offline structures, H")
         (RBVars.DEIMᵢ_H, RBVars.DEIM_idx_H, RBVars.sparse_el_H) =
           load_structures_in_list(("DEIMᵢ_H", "DEIM_idx_H", "sparse_el_H"),
           (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
-          RBInfo.Paths.ROM_structures_path)
+          RBInfo.ROM_structures_path)
       else
         println("Failed to import DEIM offline structures for H: must build them")
         append!(operators, ["H"])
@@ -235,12 +235,12 @@ function get_M_DEIM_structures(
 
     if RBInfo.probl_nl["g"]
 
-      if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "DEIMᵢ_L.csv"))
+      if isfile(joinpath(RBInfo.ROM_structures_path, "DEIMᵢ_L.csv"))
         println("Importing DEIM offline structures, L")
         (RBVars.DEIMᵢ_L, RBVars.DEIM_idx_L, RBVars.sparse_el_L) =
           load_structures_in_list(("DEIMᵢ_L", "DEIM_idx_L", "sparse_el_L"),
           (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
-          RBInfo.Paths.ROM_structures_path)
+          RBInfo.ROM_structures_path)
       else
         println("Failed to import DEIM offline structures for L: must build them")
         append!(operators, ["L"])
@@ -258,10 +258,10 @@ function get_Fₙ(
   RBInfo::Info,
   RBVars::PoissonSteady{T}) where T
 
-  if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "Fₙ.csv"))
+  if isfile(joinpath(RBInfo.ROM_structures_path, "Fₙ.csv"))
     println("Importing Fₙ")
     RBVars.Fₙ = load_CSV(Matrix{T}(undef,0,0),
-      joinpath(RBInfo.Paths.ROM_structures_path, "Fₙ.csv"))
+      joinpath(RBInfo.ROM_structures_path, "Fₙ.csv"))
     return [""]
   else
     println("Failed to import Fₙ: must build it")
@@ -274,10 +274,10 @@ function get_Hₙ(
   RBInfo::Info,
   RBVars::PoissonSteady{T}) where T
 
-  if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "Hₙ.csv"))
+  if isfile(joinpath(RBInfo.ROM_structures_path, "Hₙ.csv"))
     println("Importing Hₙ")
     RBVars.Hₙ = load_CSV(Matrix{T}(undef,0,0),
-      joinpath(RBInfo.Paths.ROM_structures_path, "Hₙ.csv"))
+      joinpath(RBInfo.ROM_structures_path, "Hₙ.csv"))
     return [""]
   else
     println("Failed to import Hₙ: must build it")
@@ -290,10 +290,10 @@ function get_Lₙ(
   RBInfo::Info,
   RBVars::PoissonSteady{T}) where T
 
-  if isfile(joinpath(RBInfo.Paths.ROM_structures_path, "Lₙ.csv"))
+  if isfile(joinpath(RBInfo.ROM_structures_path, "Lₙ.csv"))
     println("Importing Lₙ")
     RBVars.Lₙ = load_CSV(Matrix{T}(undef,0,0),
-      joinpath(RBInfo.Paths.ROM_structures_path, "Lₙ.csv"))
+      joinpath(RBInfo.ROM_structures_path, "Lₙ.csv"))
     return [""]
   else
     println("Failed to import Lₙ: must build it")
@@ -398,14 +398,14 @@ function get_system_blocks(
 
   for i = LHS_blocks
     LHSₙi = "LHSₙ" * string(i) * ".csv"
-    if !isfile(joinpath(RBInfo.Paths.ROM_structures_path, LHSₙi * ".csv"))
+    if !isfile(joinpath(RBInfo.ROM_structures_path, LHSₙi * ".csv"))
       append!(operators, ["LHS"])
       break
     end
   end
   for i = RHS_blocks
     RHSₙi = "RHSₙ" * string(i) * ".csv"
-    if !isfile(joinpath(RBInfo.Paths.ROM_structures_path, RHSₙi * ".csv"))
+    if !isfile(joinpath(RBInfo.ROM_structures_path, RHSₙi * ".csv"))
       append!(operators, ["RHS"])
       break
     end
@@ -415,7 +415,7 @@ function get_system_blocks(
       LHSₙi = "LHSₙ" * string(i) * ".csv"
       println("Importing block number $i of the reduced affine LHS")
       push!(RBVars.LHSₙ,
-        load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, LHSₙi)))
+        load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, LHSₙi)))
     end
   end
   if "RHS" ∉ operators
@@ -423,7 +423,7 @@ function get_system_blocks(
       RHSₙi = "RHSₙ" * string(i) * ".csv"
       println("Importing block number $i of the reduced affine RHS")
       push!(RBVars.RHSₙ,
-        load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.Paths.ROM_structures_path, RHSₙi)))
+        load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, RHSₙi)))
     end
   end
 
@@ -441,13 +441,13 @@ function save_system_blocks(
   if !RBInfo.probl_nl["A"] && "LHS" ∈ operators
     for i = LHS_blocks
       LHSₙi = "LHSₙ" * string(i) * ".csv"
-      save_CSV(RBVars.LHSₙ[i],joinpath(RBInfo.Paths.ROM_structures_path, LHSₙi))
+      save_CSV(RBVars.LHSₙ[i],joinpath(RBInfo.ROM_structures_path, LHSₙi))
     end
   end
   if !RBInfo.probl_nl["f"] && !RBInfo.probl_nl["h"] && "RHS" ∈ operators
     for i = RHS_blocks
       RHSₙi = "RHSₙ" * string(i) * ".csv"
-      save_CSV(RBVars.RHSₙ[i],joinpath(RBInfo.Paths.ROM_structures_path, RHSₙi))
+      save_CSV(RBVars.RHSₙ[i],joinpath(RBInfo.ROM_structures_path, RHSₙi))
     end
   end
 end
@@ -652,7 +652,7 @@ function online_phase(
   for Param_nb in Param_nbs
     string_Param_nbs *= "_" * string(Param_nb)
   end
-  path_μ = joinpath(RBInfo.Paths.results_path, string_Param_nbs)
+  path_μ = joinpath(RBInfo.results_path, string_Param_nbs)
 
   if RBInfo.save_results
 
