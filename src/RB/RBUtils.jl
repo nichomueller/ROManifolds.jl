@@ -12,15 +12,15 @@ function ROM_paths(FEMPaths, RB_method)
 end
 
 function get_mesh_path(RBInfo::Info)
-  RBInfo.FEMPaths.mesh_path
+  RBInfo.Paths.FEMPaths.mesh_path
 end
 
 function get_FEM_snap_path(RBInfo::Info)
-  RBInfo.FEMPaths.FEM_snap_path
+  RBInfo.Paths.FEMPaths.FEM_snap_path
 end
 
 function get_FEM_structures_path(RBInfo::Info)
-  RBInfo.FEMPaths.FEM_structures_path
+  RBInfo.Paths.FEMPaths.FEM_structures_path
 end
 
 function select_RB_method(
@@ -57,12 +57,20 @@ function get_method_id(problem_name::String, RB_method::String)
   end
 end
 
-function get_nonlinear_operators(probl_nl::Dict)
+function get_nonlinear_operators(RBInfo::Info)
 
-  operators = collect(keys(probl_nl))
-  is_nonlinear = Int.(collect(values(probl_nl)))
+  operators = collect(keys(RBInfo.probl_nl))
+  is_nonlinear = Int.(collect(values(RBInfo.probl_nl)))
 
   operators[findall(is_nonlinear .== 1)]
+
+end
+
+function get_linear_operators(RBInfo::Info)
+
+  operators = collect(keys(RBInfo.probl_nl))
+
+  setdiff(operators, get_nonlinear_operators(RBInfo))
 
 end
 

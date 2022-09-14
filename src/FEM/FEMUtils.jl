@@ -55,11 +55,11 @@ function init_FEM_variables()
 end
 
 function nonlinearity_lifting_op(FEMInfo::Info)
-  if !FEMInfo.probl_nl["A"] && !FEMInfo.probl_nl["g"]
+  if "A" ∉ FEMInfo.probl_nl && "L" ∉ FEMInfo.probl_nl
     return 0
-  elseif FEMInfo.probl_nl["A"] && !FEMInfo.probl_nl["g"]
+  elseif "A" ∈ FEMInfo.probl_nl && "L" ∉ FEMInfo.probl_nl
     return 1
-  elseif !FEMInfo.probl_nl["A"] && FEMInfo.probl_nl["g"]
+  elseif "A" ∉ FEMInfo.probl_nl && "L" ∈ FEMInfo.probl_nl
     return 2
   else
     return 3

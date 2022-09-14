@@ -174,7 +174,7 @@ struct SteadyInfo <: Info
   problem_id::NTuple
   D::Int
   case::Int
-  probl_nl::Dict
+  probl_nl::Vector{String}
   bnd_info::Dict
   order::Int
   solver::String
@@ -186,7 +186,7 @@ struct UnsteadyInfo <: Info
   problem_id::NTuple
   D::Int
   case::Int
-  probl_nl::Dict
+  probl_nl::Vector{String}
   bnd_info::Dict
   order::Int
   solver::String

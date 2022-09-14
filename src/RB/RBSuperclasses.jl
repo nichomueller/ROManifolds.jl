@@ -478,7 +478,6 @@ end
 
 struct ROMInfoSteady{T} <: Info
   FEMInfo::SteadyInfo
-  probl_nl::Dict
   Paths::RBPathInfo
   RB_method::String
   nₛ::Int
@@ -496,7 +495,6 @@ end
 
 mutable struct ROMInfoUnsteady{T} <: Info
   FEMInfo::UnsteadyInfo
-  probl_nl::Dict
   Paths::RBPathInfo
   RB_method::String
   nₛ::Int
@@ -526,7 +524,7 @@ end
 function Base.getproperty(RBInfo::ROMInfoSteady, sym::Symbol)
   if sym in (:probl_nl,)
     getfield(RBInfo.FEMInfo, sym)
-  elseif sym in (:FEMPaths, :ROM_structures_path, :results_path)
+  elseif sym in (:ROM_structures_path, :results_path)
     getfield(RBInfo.Paths, sym)
   else
     getfield(RBInfo, sym)

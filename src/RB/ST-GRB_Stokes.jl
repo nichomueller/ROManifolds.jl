@@ -87,9 +87,9 @@ end
 function assemble_offline_structures(
   RBInfo::ROMInfoUnsteady,
   RBVars::StokesSTGRB,
-  operators=nothing)
+  operators=String[])
 
-  if isnothing(operators)
+  if isempty(operators)
     operators = set_operators(RBInfo, RBVars)
   end
 
