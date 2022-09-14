@@ -117,7 +117,7 @@ function build_sparse_mat(
   FEMInfo::SteadyInfo,
   Param::SteadyParametricInfo,
   el::Vector{Int};
-  var="A")
+  var::String)
 
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
@@ -149,7 +149,7 @@ function build_sparse_mat(
   Param::UnsteadyParametricInfo,
   el::Vector{Int},
   timesθ::Vector;
-  var="A")
+  var::String)
 
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
@@ -198,8 +198,8 @@ function build_sparse_vec(
   FEMSpace::SteadyProblem,
   FEMInfo::SteadyInfo,
   Param::SteadyParametricInfo,
-  el::Vector{Int};
-  var="F")
+  el::Vector{Int},
+  var::String)
 
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
@@ -228,8 +228,8 @@ function build_sparse_vec(
   FEMInfo::UnsteadyInfo,
   Param::UnsteadyParametricInfo,
   el::Vector{Int},
-  timesθ::Vector;
-  var="F")
+  timesθ::Vector,
+  var::String)
 
   if var == "F"
     Ω_sparse = view(FEMSpace.Ω, el)

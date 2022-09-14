@@ -321,7 +321,7 @@ function get_snaps_MDEIM(
   if RBInfo.functional_M_DEIM
     return call_functional_MDEIM(FEMSpace,RBInfo,RBVars,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}, Vector{Int}}
   else
-    return standard_MDEIM(FEMSpace,RBInfo,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}, Vector{Int}}
+    return standard_MDEIM(FEMSpace,RBInfo,RBVars,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}, Vector{Int}}
   end
 
 end
@@ -430,34 +430,7 @@ function standard_DEIM(
 
 end
 
-function functional_DEIM(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady{T},
-  μ::Vector{Vector{T}},
-  timesθ::Vector,
-  var::String) where T
 
-  Θmat_space, Θmat_time = build_θmat_snapshots(FEMSpace, RBInfo, μ, timesθ, var)
-
-  # space
-  Θmat_space, _ = M_DEIM_POD(Θmat_space,RBInfo.ϵₛ)
-  Vec_Θ = assemble_parametric_FE_vector(RBInfo.problem_id,FEMSpace,var)
-  Q = size(Θmat_space)[2]
-  snaps_space = zeros(FEMSpace.Nₛᵘ, Q)
-
-  for q = 1:Q
-    Θq = FEFunction(FEMSpace.V₀_quad, Θmat_space[:,q])
-    snaps_space[:,q] = T.(Vec_Θ(Θq))
-  end
-
-  snaps_space, _ = M_DEIM_POD(snaps_space,RBInfo.ϵₛ)
-
-  #time
-  snaps_time, _ = M_DEIM_POD(Θmat_time,RBInfo.ϵₜ)
-
-  return snaps_space, snaps_time
-
-end
 
 function get_snaps_DEIM(
   FEMSpace::UnsteadyProblem,
@@ -477,11 +450,7 @@ function build_θmat_snapshots(
   timesθ::Vector,
   var::String) where T
 
-  if var ∈ ["f", "h"]
-    nₛ, nₛ_time = RBInfo.nₛ_DEIM, RBInfo.nₛ_DEIM_time
-  else
-    nₛ, nₛ_time = RBInfo.nₛ_MDEIM, RBInfo.nₛ_MDEIM_time
-  end
+  nₛ, nₛ_time = RBInfo.nₛ_MDEIM, RBInfo.nₛ_MDEIM_time
 
   (nₛ_min, nₛ_max) = sort([nₛ, nₛ_time])
   ncells,nquad_cell = get_LagrangianQuad_info(FEMSpace)
@@ -572,10 +541,6 @@ function build_parameter_on_phys_quadp(
     Θfun = Param.b
   elseif var == "D"
     Θfun = Param.σ
-  elseif var == "F"
-    Θfun = Param.f
-  elseif var == "H"
-    Θfun = Param.h
   else
     error("not implemented")
   end
@@ -608,25 +573,6 @@ function assemble_parametric_FE_matrix(
 
 end
 
-function assemble_parametric_FE_vector(
-  ::NTuple{1,Int},
-  FEMSpace::UnsteadyProblem,
-  var::String)
-
-  function Vec_θ(Θ)
-    if var == "F"
-      assemble_vector(∫(FEMSpace.ϕᵥ*Θ)*FEMSpace.dΩ,FEMSpace.V₀)
-    elseif var == "H"
-      assemble_vector(∫(FEMSpace.ϕᵥ*Θ)*FEMSpace.dΓn,FEMSpace.V₀)
-    else
-      error("Need to assemble an unrecognized FE structure")
-    end
-  end
-
-  Vec_θ
-
-end
-
 function assemble_parametric_FE_matrix(
   ::NTuple{2,Int},
   FEMSpace::UnsteadyProblem,
@@ -651,25 +597,6 @@ function assemble_parametric_FE_matrix(
 
 end
 
-function assemble_parametric_FE_vector(
-  ::NTuple{2,Int},
-  FEMSpace::UnsteadyProblem,
-  var::String)
-
-  function Vec_θ(Θ)
-    if var == "F"
-      assemble_vector(∫(FEMSpace.ϕᵥ*Θ)*FEMSpace.dΩ,FEMSpace.V₀)
-    elseif var == "H"
-      assemble_vector(∫(FEMSpace.ϕᵥ*Θ)*FEMSpace.dΓn,FEMSpace.V₀)
-    else
-      error("Need to assemble an unrecognized FE structure")
-    end
-  end
-
-  Vec_θ
-
-end
-
 function assemble_parametric_FE_matrix(
   ::NTuple{3,Int},
   FEMSpace::UnsteadyProblem,
@@ -688,25 +615,6 @@ function assemble_parametric_FE_matrix(
   end
 
   Mat_θ
-
-end
-
-function assemble_parametric_FE_vector(
-  ::NTuple{3,Int},
-  FEMSpace::UnsteadyProblem,
-  var::String)
-
-  function Vec_θ(Θ)
-    if var == "F"
-      assemble_vector(∫(FEMSpace.ϕᵥ⋅Θ)*FEMSpace.dΩ,FEMSpace.V₀)
-    elseif var == "H"
-      assemble_vector(∫(FEMSpace.ϕᵥ⋅Θ)*FEMSpace.dΓn,FEMSpace.V₀)
-    else
-      error("Need to assemble an unrecognized FE structure")
-    end
-  end
-
-  Vec_θ
 
 end
 
@@ -731,24 +639,5 @@ function assemble_parametric_FE_matrix(
   end
 
   Mat_θ
-
-end
-
-function assemble_parametric_FE_vector(
-  ::NTuple{4,Int},
-  FEMSpace::UnsteadyProblem,
-  var::String)
-
-  function Vec_θ(Θ)
-    if var == "F"
-      assemble_vector(∫(FEMSpace.ϕᵥ⋅Θ)*FEMSpace.dΩ,FEMSpace.V₀)
-    elseif var == "H"
-      assemble_vector(∫(FEMSpace.ϕᵥ⋅Θ)*FEMSpace.dΓn,FEMSpace.V₀)
-    else
-      error("Need to assemble an unrecognized FE structure")
-    end
-  end
-
-  Vec_θ
 
 end

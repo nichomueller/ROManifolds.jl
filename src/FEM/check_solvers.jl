@@ -76,12 +76,12 @@ function check_stokes_solver()
     DataFrame))[:, 1]
   p = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"),
     DataFrame))[:, 1]
-  x = vcat(u,p)
+  x = vcat(u, p)
 
   A = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "A")
   B = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "Bₚ")
   F = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "F")
-  H = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "H")
+  H = 0. * assemble_FEM_structure(FEMSpace, FEMInfo, Param, "H")
   L = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "L")
 
   LHS = vcat(hcat(A, -B'), hcat(B, zeros(T, FEMSpace.Nₛᵖ, FEMSpace.Nₛᵖ)))
