@@ -1,25 +1,101 @@
-function get_Aₙ(
+function get_A(
   RBInfo::Info,
   RBVars::PoissonSTGRB)
 
-  get_Aₙ(RBInfo, RBVars.Steady)
+  if "A" ∈ RBInfo.probl_nl
+    if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIM_idx_time_A.csv"))
+      RBVars.MDEIM_idx_time_A = load_CSV(Vector{Int}(undef,0),
+        joinpath(RBInfo.ROM_structures_path, "MDEIM_idx_time_A.csv"))
+    end
+  end
+
+  get_A(RBInfo, RBVars.Steady)
 
 end
 
-function get_Mₙ(
+function get_M(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTGRB{T}) where T
 
-  if isfile(joinpath(RBInfo.ROM_structures_path, "Mₙ.csv"))
-    println("Importing reduced affine mass matrix")
-    Mₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, "Mₙ.csv"))
-    RBVars.Mₙ = reshape(Mₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)::Array{T,3}
-    RBVars.Qᵐ = size(RBVars.Mₙ)[end]
-    return [""]
+  if "M" ∈ RBInfo.probl_nl
+
+    if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIMᵢ_M.csv"))
+      println("Importing MDEIM offline structures for the mass matrix")
+      RBVars.MDEIMᵢ_M = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path,
+        "MDEIMᵢ_M.csv"))
+      RBVars.MDEIM_idx_M = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.ROM_structures_path,
+        "MDEIM_idx_M.csv"))
+      RBVars.sparse_el_M = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.ROM_structures_path,
+        "sparse_el_M.csv"))
+      RBVars.row_idx_M = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.ROM_structures_path,
+        "row_idx_M.csv"))
+      RBVars.MDEIM_idx_time_M = load_CSV(Vector{Int}(undef,0),
+        joinpath(RBInfo.ROM_structures_path, "MDEIM_idx_time_M.csv"))
+      return [""]
+    else
+      println("Failed to import MDEIM offline structures for M: must build them")
+      return ["M"]
+    end
+
   else
-    println("Failed to import the reduced affine mass matrix: must build it")
-    return ["M"]
+
+    if isfile(joinpath(RBInfo.ROM_structures_path, "Mₙ.csv"))
+      println("Importing reduced affine mass matrix")
+      Mₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, "Mₙ.csv"))
+      RBVars.Mₙ = reshape(Mₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)::Array{T,3}
+      RBVars.Qᵐ = size(RBVars.Mₙ)[end]
+      return [""]
+    else
+      println("Failed to import the reduced affine M: must build it")
+      return ["M"]
+    end
+
   end
+
+end
+
+function get_F(
+  RBInfo::Info,
+  RBVars::PoissonSTGRB)
+
+  if "F" ∈ RBInfo.probl_nl
+    if isfile(joinpath(RBInfo.ROM_structures_path, "DEIM_idx_time_F.csv"))
+      RBVars.DEIM_idx_time_F = load_CSV(Vector{Int}(undef,0),
+        joinpath(RBInfo.ROM_structures_path, "DEIM_idx_time_F.csv"))
+    end
+  end
+
+  get_F(RBInfo, RBVars.Steady)
+
+end
+
+function get_H(
+  RBInfo::Info,
+  RBVars::PoissonSTGRB)
+
+  if "H" ∈ RBInfo.probl_nl
+    if isfile(joinpath(RBInfo.ROM_structures_path, "DEIM_idx_time_H.csv"))
+      RBVars.DEIM_idx_time_H = load_CSV(Vector{Int}(undef,0),
+        joinpath(RBInfo.ROM_structures_path, "DEIM_idx_time_H.csv"))
+    end
+  end
+
+  get_H(RBInfo, RBVars.Steady)
+
+end
+
+function get_L(
+  RBInfo::Info,
+  RBVars::PoissonSTGRB)
+
+  if "L" ∈ RBInfo.probl_nl
+    if isfile(joinpath(RBInfo.ROM_structures_path, "DEIM_idx_time_L.csv"))
+      RBVars.DEIM_idx_time_L = load_CSV(Vector{Int}(undef,0),
+        joinpath(RBInfo.ROM_structures_path, "DEIM_idx_time_L.csv"))
+    end
+  end
+
+  get_L(RBInfo, RBVars.Steady)
 
 end
 
@@ -96,62 +172,6 @@ function assemble_reduced_mat_DEIM(
   else
     error("Unrecognized vector to assemble with DEIM")
   end
-
-end
-
-function assemble_offline_structures(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonSTGRB,
-  operators=String[])
-
-  if isempty(operators)
-    operators = set_operators(RBInfo, RBVars)
-  end
-
-  RBVars.offline_time += @elapsed begin
-    for var ∈ intersect(operators, RBInfo.probl_nl)
-      if var ∈ ("A", "M")
-        assemble_MDEIM_matrices(RBInfo, RBVars, var)
-      else
-        assemble_DEIM_vectors(RBInfo, RBVars, var)
-      end
-    end
-
-    for var ∈ setdiff(operators, RBInfo.probl_nl)
-      if var ∈ ("A", "M")
-        assemble_affine_matrices(RBInfo, RBVars, var)
-      else
-        assemble_affine_vectors(RBInfo, RBVars, var)
-      end
-    end
-  end
-
-  save_affine_structures(RBInfo, RBVars)
-  save_M_DEIM_structures(RBInfo, RBVars)
-
-end
-
-function save_affine_structures(
-  RBInfo::Info,
-  RBVars::PoissonSTGRB{T}) where T
-
-  if RBInfo.save_offline_structures
-    save_CSV(reshape(RBVars.Mₙ, :, RBVars.Qᵐ)::Matrix{T},
-      joinpath(RBInfo.ROM_structures_path, "Mₙ.csv"))
-    save_affine_structures(RBInfo, RBVars.Steady)
-  end
-
-end
-
-function get_affine_structures(
-  RBInfo::Info,
-  RBVars::PoissonSTGRB)
-
-  operators = get_affine_structures(RBInfo, RBVars.Steady)
-
-  append!(operators, get_Mₙ(RBInfo, RBVars))
-
-  operators
 
 end
 

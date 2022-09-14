@@ -154,129 +154,26 @@ function assemble_DEIM_vectors(
 
 end
 
-function save_M_DEIM_structures(
+function save_assembled_structures(
   RBInfo::Info,
   RBVars::PoissonSteady)
 
-  list_M_DEIM = (RBVars.MDEIM_mat_A, RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A,
+  affine_vars = (reshape(RBVars.Aₙ, :, RBVars.Qᵃ)::Matrix{T},
+                RBVars.Fₙ, RBVars.Hₙ, RBVars.Lₙ)
+  affine_names = ("Aₙ", "Fₙ", "Hₙ", "Lₙ")
+  save_structures_in_list(affine_vars, affine_names, RBInfo.ROM_structures_path)
+
+  M_DEIM_vars = (RBVars.MDEIM_mat_A, RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A,
     RBVars.row_idx_A, RBVars.sparse_el_A, RBVars.DEIM_mat_F, RBVars.DEIMᵢ_F,
     RBVars.DEIM_idx_F, RBVars.sparse_el_F, RBVars.DEIM_mat_H, RBVars.DEIMᵢ_H,
     RBVars.DEIM_idx_H, RBVars.sparse_el_H, RBVars.DEIM_mat_L, RBVars.DEIMᵢ_L,
     RBVars.DEIM_idx_L, RBVars.sparse_el_L)
-  list_names = ("MDEIM_mat_A","MDEIMᵢ_A","MDEIM_idx_A","row_idx_A","sparse_el_A",
+  M_DEIM_names = (
+    "MDEIM_mat_A","MDEIMᵢ_A","MDEIM_idx_A","row_idx_A","sparse_el_A",
     "DEIM_mat_F","DEIMᵢ_F","DEIM_idx_F","sparse_el_F",
     "DEIM_mat_H","DEIMᵢ_H","DEIM_idx_H","sparse_el_H",
     "DEIM_mat_L","DEIMᵢ_L","DEIM_idx_L","sparse_el_L")
-
-  save_structures_in_list(list_M_DEIM, list_names,
-    RBInfo.ROM_structures_path)
-
-end
-
-function get_M_DEIM_structures(
-  RBInfo::Info,
-  RBVars::PoissonSteady{T}) where T
-
-  operators = String[]
-
-  if "A" ∈ RBInfo.probl_nl
-
-    if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIMᵢ_A.csv"))
-      println("Importing MDEIM offline structures, A")
-
-      (RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A, RBVars.row_idx_A, RBVars.sparse_el_A) =
-        load_structures_in_list(("MDEIMᵢ_A", "MDEIM_idx_A", "row_idx_A", "sparse_el_A"),
-        (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
-        RBInfo.ROM_structures_path)
-
-    else
-      println("Failed to import MDEIM offline structures for
-        A: must build them")
-      append!(operators, ["A"])
-    end
-
-  end
-
-  if RBInfo.build_parametric_RHS
-
-    println("Will assemble nonaffine reduced RHS exactly")
-
-  else
-
-    if "F" ∈ RBInfo.probl_nl
-
-      if isfile(joinpath(RBInfo.ROM_structures_path, "DEIMᵢ_F.csv"))
-        println("Importing DEIM offline structures, F")
-        (RBVars.DEIMᵢ_F, RBVars.DEIM_idx_F, RBVars.sparse_el_F) =
-          load_structures_in_list(("DEIMᵢ_F", "DEIM_idx_F", "sparse_el_F"),
-          (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
-          RBInfo.ROM_structures_path)
-      else
-        println("Failed to import DEIM offline structures for F: must build them")
-        append!(operators, ["F"])
-      end
-
-    end
-
-    if "H" ∈ RBInfo.probl_nl
-
-      if isfile(joinpath(RBInfo.ROM_structures_path, "DEIMᵢ_H.csv"))
-        println("Importing DEIM offline structures, H")
-        (RBVars.DEIMᵢ_H, RBVars.DEIM_idx_H, RBVars.sparse_el_H) =
-          load_structures_in_list(("DEIMᵢ_H", "DEIM_idx_H", "sparse_el_H"),
-          (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
-          RBInfo.ROM_structures_path)
-      else
-        println("Failed to import DEIM offline structures for H: must build them")
-        append!(operators, ["H"])
-      end
-
-    end
-
-    if "L" ∈ RBInfo.probl_nl
-
-      if isfile(joinpath(RBInfo.ROM_structures_path, "DEIMᵢ_L.csv"))
-        println("Importing DEIM offline structures, L")
-        (RBVars.DEIMᵢ_L, RBVars.DEIM_idx_L, RBVars.sparse_el_L) =
-          load_structures_in_list(("DEIMᵢ_L", "DEIM_idx_L", "sparse_el_L"),
-          (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
-          RBInfo.ROM_structures_path)
-      else
-        println("Failed to import DEIM offline structures for L: must build them")
-        append!(operators, ["L"])
-      end
-
-    end
-
-  end
-
-  operators
-
-end
-
-function get_affine_structures(
-  RBInfo::Info,
-  RBVars::PoissonSteady)
-
-  operators = String[]
-
-  if "A" ∉ RBInfo.probl_nl
-    append!(operators, get_Aₙ(RBInfo, RBVars))
-  end
-
-  if RBInfo.build_parametric_RHS
-    if "F" ∉ RBInfo.probl_nl
-      append!(operators, get_Fₙ(RBInfo, RBVars))
-    end
-    if "H" ∉ RBInfo.probl_nl
-      append!(operators, get_Hₙ(RBInfo, RBVars))
-    end
-    if "L" ∉ RBInfo.probl_nl
-      append!(operators, get_Lₙ(RBInfo, RBVars))
-    end
-  end
-
-  operators
+  save_structures_in_list(M_DEIM_vars, M_DEIM_names, RBInfo.ROM_structures_path)
 
 end
 
@@ -286,9 +183,13 @@ function get_offline_structures(
 
   operators = String[]
 
-  append!(operators, get_affine_structures(RBInfo, RBVars))
-  append!(operators, get_M_DEIM_structures(RBInfo, RBVars))
-  unique!(operators)
+  append!(operators, get_A(RBInfo, RBVars))
+
+  if RBInfo.build_parametric_RHS
+    append!(operators, get_F(RBInfo, RBVars))
+    append!(operators, get_H(RBInfo, RBVars))
+    append!(operators, get_L(RBInfo, RBVars))
+  end
 
   operators
 
@@ -321,8 +222,7 @@ function assemble_offline_structures(
     end
   end
 
-  save_affine_structures(RBInfo, RBVars)
-  save_M_DEIM_structures(RBInfo, RBVars)
+  save_assembled_structures(RBInfo, RBVars)
 
 end
 

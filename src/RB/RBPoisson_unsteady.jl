@@ -184,20 +184,22 @@ function assemble_DEIM_vectors(
 
 end
 
-function save_M_DEIM_structures(
+function save_assembled_structures(
   RBInfo::Info,
   RBVars::PoissonUnsteady)
 
-  list_M_DEIM = (RBVars.MDEIM_mat_M, RBVars.MDEIMᵢ_M, RBVars.MDEIM_idx_M,
+  affine_vars = (reshape(RBVars.Mₙ, :, RBVars.Qᵐ)::Matrix{T},)
+  affine_names = ("Mₙ",)
+  save_structures_in_list(affine_vars, affine_names, RBInfo.ROM_structures_path)
+
+  M_DEIM_vars = (RBVars.MDEIM_mat_M, RBVars.MDEIMᵢ_M, RBVars.MDEIM_idx_M,
     RBVars.sparse_el_M, RBVars.row_idx_M, RBVars.MDEIM_idx_time_A,
     RBVars.MDEIM_idx_time_M, RBVars.DEIM_idx_time_F, RBVars.DEIM_idx_time_H)
-  list_names = ("MDEIM_mat_M", "MDEIMᵢ_M", "MDEIM_idx_M", "sparse_el_M",
+  M_DEIM_names = ("MDEIM_mat_M", "MDEIMᵢ_M", "MDEIM_idx_M", "sparse_el_M",
    "row_idx_M", "MDEIM_idx_time_A", "MDEIM_idx_time_M", "DEIM_idx_time_F", "DEIM_idx_time_H")
+  save_structures_in_list(list_M_DEIM, list_names, RBInfo.ROM_structures_path)
 
-  save_structures_in_list(list_M_DEIM, list_names,
-    RBInfo.ROM_structures_path)
-
-  save_M_DEIM_structures(RBInfo, RBVars.Steady)
+  save_assembled_structures(RBInfo, RBVars.Steady)
 
 end
 
@@ -209,75 +211,53 @@ function set_operators(
 
 end
 
-function get_M_DEIM_structures(
-  RBInfo::Info,
-  RBVars::PoissonUnsteady{T}) where T
-
-  operators = String[]
-
-  if "A" ∈ RBInfo.probl_nl
-    if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIM_idx_time_A.csv"))
-      RBVars.MDEIM_idx_time_A = load_CSV(Vector{Int}(undef,0),
-        joinpath(RBInfo.ROM_structures_path, "MDEIM_idx_time_A.csv"))
-    else
-      append!(operators, ["A"])
-    end
-  end
-
-  if "M" ∈ RBInfo.probl_nl
-
-    if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIMᵢ_M.csv"))
-      println("Importing MDEIM offline structures for the mass matrix")
-      RBVars.MDEIMᵢ_M = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path,
-        "MDEIMᵢ_M.csv"))
-      RBVars.MDEIM_idx_M = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.ROM_structures_path,
-        "MDEIM_idx_M.csv"))
-      RBVars.sparse_el_M = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.ROM_structures_path,
-        "sparse_el_M.csv"))
-      RBVars.row_idx_M = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.ROM_structures_path,
-        "row_idx_M.csv"))
-      RBVars.MDEIM_idx_time_M = load_CSV(Vector{Int}(undef,0),
-        joinpath(RBInfo.ROM_structures_path, "MDEIM_idx_time_M.csv"))
-      append!(operators, [])
-    else
-      println("Failed to import MDEIM offline structures for the mass matrix: must build them")
-      append!(operators, ["M"])
-    end
-
-  end
-
-  if "F" ∈ RBInfo.probl_nl
-    if isfile(joinpath(RBInfo.ROM_structures_path, "DEIM_idx_time_F.csv"))
-    RBVars.DEIM_idx_time_F = load_CSV(Vector{Int}(undef,0),
-      joinpath(RBInfo.ROM_structures_path, "DEIM_idx_time_F.csv"))
-    else
-      append!(operators, ["F"])
-    end
-  end
-
-  if "H" ∈ RBInfo.probl_nl
-    if isfile(joinpath(RBInfo.ROM_structures_path, "DEIM_idx_time_H.csv"))
-    RBVars.DEIM_idx_time_H = load_CSV(Vector{Int}(undef,0),
-      joinpath(RBInfo.ROM_structures_path, "DEIM_idx_time_H.csv"))
-    else
-      append!(operators, ["H"])
-    end
-  end
-
-  append!(operators, get_M_DEIM_structures(RBInfo, RBVars.Steady))
-
-end
-
 function get_offline_structures(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonUnsteady)
 
   operators = String[]
-  append!(operators, get_affine_structures(RBInfo, RBVars))
-  append!(operators, get_M_DEIM_structures(RBInfo, RBVars))
-  unique!(operators)
+
+  append!(operators, get_A(RBInfo, RBVars))
+  append!(operators, get_M(RBInfo, RBVars))
+
+  if RBInfo.build_parametric_RHS
+    append!(operators, get_F(RBInfo, RBVars))
+    append!(operators, get_H(RBInfo, RBVars))
+    append!(operators, get_L(RBInfo, RBVars))
+  end
 
   operators
+
+end
+
+function assemble_offline_structures(
+  RBInfo::ROMInfoUnsteady,
+  RBVars::PoissonSTGRB,
+  operators=String[])
+
+  if isempty(operators)
+    operators = set_operators(RBInfo, RBVars)
+  end
+
+  RBVars.offline_time += @elapsed begin
+    for var ∈ intersect(operators, RBInfo.probl_nl)
+      if var ∈ ("A", "M")
+        assemble_MDEIM_matrices(RBInfo, RBVars, var)
+      else
+        assemble_DEIM_vectors(RBInfo, RBVars, var)
+      end
+    end
+
+    for var ∈ setdiff(operators, RBInfo.probl_nl)
+      if var ∈ ("A", "M")
+        assemble_affine_matrices(RBInfo, RBVars, var)
+      else
+        assemble_affine_vectors(RBInfo, RBVars, var)
+      end
+    end
+  end
+
+  save_assembled_structures(RBInfo, RBVars)
 
 end
 
