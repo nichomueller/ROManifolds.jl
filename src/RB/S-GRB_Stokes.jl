@@ -104,8 +104,14 @@ function assemble_affine_vectors(
 
   if var ∈ ("F", "H")
     assemble_affine_vectors(RBInfo, RBVars.Poisson, var)
+  elseif var == "L"
+    RBVars.Qˡ = 1
+    println("Assembling affine reduced lifting term")
+    L = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "L.csv"))
+    RBVars.Lₙ = vcat(RBVars.Φₛᵘ, RBVars.Φₛᵖ)' * L
   else
-
+    error("Unrecognized variable to assemble")
+  end
 
 end
 
@@ -128,31 +134,19 @@ function assemble_offline_structures(
   end
 
   RBVars.offline_time += @elapsed begin
-    if "A" ∈ operators
-      if !RBInfo.probl_nl["A"]
-        assemble_affine_matrices(RBInfo, RBVars, "A")
+    for var ∈ intersect(operators, RBInfo.probl_nl)
+      if var ∈ ("A", "B")
+        assemble_MDEIM_matrices(RBInfo, RBVars, var)
       else
-        assemble_MDEIM_matrices(RBInfo, RBVars, "A")
+        assemble_DEIM_vectors(RBInfo, RBVars, var)
       end
     end
 
-    if "B" ∈ operators
-      assemble_affine_matrices(RBInfo, RBVars, "B")
-    end
-
-    if "F" ∈ operators
-      if !RBInfo.probl_nl["f"]
-        assemble_affine_vectors(RBInfo, RBVars, "F")
+    for var ∈ setdiff(operators, RBInfo.probl_nl)
+      if var ∈ ("A", "B")
+        assemble_affine_matrices(RBInfo, RBVars, var)
       else
-        assemble_DEIM_vectors(RBInfo, RBVars, "F")
-      end
-    end
-
-    if "H" ∈ operators
-      if !RBInfo.probl_nl["h"]
-        assemble_affine_vectors(RBInfo, RBVars, "H")
-      else
-        assemble_DEIM_vectors(RBInfo, RBVars, "H")
+        assemble_affine_vectors(RBInfo, RBVars, var)
       end
     end
   end
@@ -176,8 +170,8 @@ function get_affine_structures(
   RBInfo::ROMInfoSteady,
   RBVars::StokesSteady)
 
-  operators = String[]
-  append!(operators, get_affine_structures(RBInfo, RBVars.Poisson))
+  operators = get_affine_structures(RBInfo, RBVars.Poisson)
+
   append!(operators, get_Bₙ(RBInfo, RBVars))
 
   operators
@@ -222,7 +216,7 @@ function get_RB_RHS_blocks(
 
 end
 
-function build_RB_lifting(
+#= function build_RB_lifting(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::StokesSGRB{T},
@@ -235,7 +229,7 @@ function build_RB_lifting(
   push!(Lₙ, vcat(RBVars.Φₛᵘ, RBVars.Φₛᵖ)'*L)
   RBVars.RHSₙ -= Lₙ
 
-end
+end =#
 
 function build_param_RHS(
   FEMSpace::SteadyProblem,

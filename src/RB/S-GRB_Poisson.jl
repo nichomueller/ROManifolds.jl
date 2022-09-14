@@ -1,16 +1,29 @@
-function get_Aₙ(
+function get_affine_matrices(
   RBInfo::Info,
-  RBVars::PoissonSGRB{T}) where T
+  RBVars::PoissonSGRB{T},
+  var::String) where T
 
-  if isfile(joinpath(RBInfo.ROM_structures_path, "Aₙ.csv"))
-    println("Importing reduced affine stiffness matrix")
-    Aₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, "Aₙ.csv"))
-    RBVars.Aₙ = reshape(Aₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)::Array{T,3}
-    RBVars.Qᵃ = size(RBVars.Aₙ)[3]
-    return [""]
+  if !isfile(joinpath(RBInfo.ROM_structures_path, var * "ₙ.csv"))
+
+    println("Failed to import reduced affine $var: must build it")
+    return [var]
+
   else
-    println("Failed to import Aₙ: must build it")
-    return ["A"]
+
+    println("Importing reduced affine $var")
+    Matₙ = load_CSV(Matrix{T}(undef,0,0),
+      joinpath(RBInfo.ROM_structures_path, var * "ₙ.csv"))
+    Matₙ = reshape(Matₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)::Array{T,3}
+
+    if var == "A"
+      RBVars.Aₙ = Matₙ
+      RBVars.Qᵃ = size(Matₙ)[3]
+    else
+      error("Unrecognized variable to load")
+    end
+
+    return [""]
+
   end
 
 end
@@ -22,12 +35,12 @@ function assemble_affine_matrices(
 
   if var == "A"
     RBVars.Qᵃ = 1
-    println("Assembling affine reduced stiffness")
+    println("Assembling affine reduced $var")
     A = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "A.csv"))
     RBVars.Aₙ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ, 1)
     RBVars.Aₙ[:,:,1] = (RBVars.Φₛᵘ)' * A * RBVars.Φₛᵘ
   else
-    error("Unrecognized variable to load")
+    error("Unrecognized variable to assemble")
   end
 
 end
@@ -81,6 +94,41 @@ function assemble_reduced_mat_DEIM(
 
 end
 
+function get_affine_vectors(
+  RBInfo::Info,
+  RBVars::PoissonSGRB{T},
+  var::String) where T
+
+  if !isfile(joinpath(RBInfo.ROM_structures_path, var * "ₙ.csv"))
+
+    println("Failed to import reduced affine $var: must build it")
+    return [var]
+
+  else
+
+    println("Importing reduced affine $var")
+    Vecₙ = load_CSV(Matrix{T}(undef,0,0),
+      joinpath(RBInfo.ROM_structures_path, var * "ₙ.csv"))
+
+    if var == "F"
+      RBVars.Fₙ = Vecₙ
+      RBVars.Qᶠ = size(Vecₙ)[2]
+    elseif var == "H"
+      RBVars.Hₙ = Vecₙ
+      RBVars.Qʰ = size(Vecₙ)[2]
+    elseif var == "L"
+      RBVars.Lₙ = Vecₙ
+      RBVars.Qˡ = size(Vecₙ)[2]
+    else
+      error("Unrecognized variable to load")
+    end
+
+    return [""]
+
+  end
+
+end
+
 function assemble_affine_vectors(
   RBInfo::Info,
   RBVars::PoissonSGRB{T},
@@ -102,7 +150,7 @@ function assemble_affine_vectors(
     L = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "L.csv"))
     RBVars.Lₙ = (RBVars.Φₛᵘ)' * L
   else
-    error("Unrecognized variable to load")
+    error("Unrecognized variable to assemble")
   end
 
 end

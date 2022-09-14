@@ -215,7 +215,7 @@ function get_M_DEIM_structures(
 
   operators = String[]
 
-  if RBInfo.probl_nl["A"]
+  if "A" ∈ RBInfo.probl_nl
     if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIM_idx_time_A.csv"))
       RBVars.MDEIM_idx_time_A = load_CSV(Vector{Int}(undef,0),
         joinpath(RBInfo.ROM_structures_path, "MDEIM_idx_time_A.csv"))
@@ -224,7 +224,7 @@ function get_M_DEIM_structures(
     end
   end
 
-  if RBInfo.probl_nl["M"]
+  if "M" ∈ RBInfo.probl_nl
 
     if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIMᵢ_M.csv"))
       println("Importing MDEIM offline structures for the mass matrix")
@@ -246,7 +246,7 @@ function get_M_DEIM_structures(
 
   end
 
-  if RBInfo.probl_nl["f"]
+  if "F" ∈ RBInfo.probl_nl
     if isfile(joinpath(RBInfo.ROM_structures_path, "DEIM_idx_time_F.csv"))
     RBVars.DEIM_idx_time_F = load_CSV(Vector{Int}(undef,0),
       joinpath(RBInfo.ROM_structures_path, "DEIM_idx_time_F.csv"))
@@ -255,7 +255,7 @@ function get_M_DEIM_structures(
     end
   end
 
-  if RBInfo.probl_nl["h"]
+  if "H" ∈ RBInfo.probl_nl
     if isfile(joinpath(RBInfo.ROM_structures_path, "DEIM_idx_time_H.csv"))
     RBVars.DEIM_idx_time_H = load_CSV(Vector{Int}(undef,0),
       joinpath(RBInfo.ROM_structures_path, "DEIM_idx_time_H.csv"))
@@ -289,7 +289,7 @@ function get_θᵐ(
 
   timesθ = get_timesθ(RBInfo)
 
-  if !RBInfo.probl_nl["M"]
+  if "M" ∉ RBInfo.probl_nl
     θᵐ = T.(zeros(T, 1, RBVars.Nₜ))
     for (i_t, t_θ) = enumerate(timesθ)
       θᵐ[i_t] = Param.mₜ(t_θ)
@@ -321,7 +321,7 @@ function get_θᵃ(
 
   timesθ = get_timesθ(RBInfo)
 
-  if !RBInfo.probl_nl["A"]
+  if "A" ∉ RBInfo.probl_nl
     θᵃ = zeros(T, 1, RBVars.Nₜ)
     for (i_t, t_θ) = enumerate(timesθ)
       θᵃ[i_t] = T.(Param.αₜ(t_θ,Param.μ))
@@ -358,7 +358,7 @@ function get_θᶠʰ(
 
   timesθ = get_timesθ(RBInfo)
 
-  if !RBInfo.probl_nl["f"]
+  if "F" ∉ RBInfo.probl_nl
     θᶠ = zeros(T, 1, RBVars.Nₜ)
     for (i_t, t_θ) = enumerate(timesθ)
       θᶠ[i_t] = T.(Param.fₜ(t_θ))
@@ -377,7 +377,7 @@ function get_θᶠʰ(
     end
   end
 
-  if !RBInfo.probl_nl["h"]
+  if "H" ∉ RBInfo.probl_nl
     θʰ = zeros(T, 1, RBVars.Nₜ)
     for (i_t, t_θ) = enumerate(timesθ)
       θʰ[i_t] = T.(Param.hₜ(t_θ))

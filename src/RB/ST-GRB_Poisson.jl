@@ -109,35 +109,19 @@ function assemble_offline_structures(
   end
 
   RBVars.offline_time += @elapsed begin
-    if "M" ∈ operators
-      if !RBInfo.probl_nl["M"]
-        assemble_affine_matrices(RBInfo, RBVars, "M")
+    for var ∈ intersect(operators, RBInfo.probl_nl)
+      if var ∈ ("A", "M")
+        assemble_MDEIM_matrices(RBInfo, RBVars, var)
       else
-        assemble_MDEIM_matrices(RBInfo, RBVars, "M")
+        assemble_DEIM_vectors(RBInfo, RBVars, var)
       end
     end
 
-    if "A" ∈ operators
-      if !RBInfo.probl_nl["A"]
-        assemble_affine_matrices(RBInfo, RBVars, "A")
+    for var ∈ setdiff(operators, RBInfo.probl_nl)
+      if var ∈ ("A", "M")
+        assemble_affine_matrices(RBInfo, RBVars, var)
       else
-        assemble_MDEIM_matrices(RBInfo, RBVars, "A")
-      end
-    end
-
-    if "F" ∈ operators
-      if !RBInfo.probl_nl["f"]
-        assemble_affine_vectors(RBInfo, RBVars, "F")
-      else
-        assemble_DEIM_vectors(RBInfo, RBVars, "F")
-      end
-    end
-
-    if "H" ∈ operators
-      if !RBInfo.probl_nl["h"]
-        assemble_affine_vectors(RBInfo, RBVars, "H")
-      else
-        assemble_DEIM_vectors(RBInfo, RBVars, "H")
+        assemble_affine_vectors(RBInfo, RBVars, var)
       end
     end
   end
@@ -163,10 +147,11 @@ function get_affine_structures(
   RBInfo::Info,
   RBVars::PoissonSTGRB)
 
-  operators = String[]
+  operators = get_affine_structures(RBInfo, RBVars.Steady)
+
   append!(operators, get_Mₙ(RBInfo, RBVars))
-  append!(operators, get_affine_structures(RBInfo, RBVars.Steady))
-  return operators
+
+  operators
 
 end
 
@@ -302,7 +287,7 @@ function get_RB_system(
       else
         build_param_RHS(FEMSpace, RBInfo, RBVars, Param)
       end
-      if RBInfo.probl_nl["g"]
+      if "L" ∈ RBInfo.probl_nl
         build_RB_lifting(FEMSpace, RBInfo, RBVars, Param)
       end
     end

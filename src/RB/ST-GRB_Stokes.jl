@@ -93,13 +93,22 @@ function assemble_offline_structures(
     operators = set_operators(RBInfo, RBVars)
   end
 
-  assemble_offline_structures(RBInfo, RBVars.Poisson, operators)
-
   RBVars.offline_time += @elapsed begin
-    if "B" ∈ operators
-      assemble_affine_matrices(RBInfo, RBVars, "B")
+    for var ∈ intersect(operators, RBInfo.probl_nl)
+      if var ∈ ("A", "B")
+        assemble_MDEIM_matrices(RBInfo, RBVars, var)
+      else
+        assemble_DEIM_vectors(RBInfo, RBVars, var)
+      end
     end
 
+    for var ∈ setdiff(operators, RBInfo.probl_nl)
+      if var ∈ ("A", "B")
+        assemble_affine_matrices(RBInfo, RBVars, var)
+      else
+        assemble_affine_vectors(RBInfo, RBVars, var)
+      end
+    end
   end
 
   save_affine_structures(RBInfo, RBVars)
@@ -121,11 +130,11 @@ function get_affine_structures(
   RBInfo::Info,
   RBVars::StokesSTGRB)
 
-  operators = String[]
-  append!(operators, get_affine_structures(RBInfo, RBVars.Poisson))
+  operators = get_affine_structures(RBInfo, RBVars.Poisson)
+
   append!(operators, get_Bₙ(RBInfo, RBVars))
 
-  return operators
+  operators
 
 end
 
@@ -203,7 +212,7 @@ function get_RB_system(
       else
         build_param_RHS(FEMSpace, RBInfo, RBVars, Param)
       end
-      if RBInfo.probl_nl["g"]
+      if "L" ∈ RBInfo.probl_nl
         build_RB_lifting(FEMSpace, RBInfo, RBVars, Param)
       end
     end

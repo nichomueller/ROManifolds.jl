@@ -145,11 +145,7 @@ function get_affine_structures(
   RBInfo::ROMInfoSteady,
   RBVars::NavierStokesSteady)
 
-  operators = String[]
-  append!(operators, get_Cₙ(RBInfo, RBVars))
-  append!(operators, get_affine_structures(RBInfo, RBVars.Stokes))
-
-  operators
+  get_affine_structures(RBInfo, RBVars.Stokes)
 
 end
 

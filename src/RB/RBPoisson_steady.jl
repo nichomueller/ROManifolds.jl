@@ -179,7 +179,7 @@ function get_M_DEIM_structures(
 
   operators = String[]
 
-  if RBInfo.probl_nl["A"]
+  if "A" ∈ RBInfo.probl_nl
 
     if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIMᵢ_A.csv"))
       println("Importing MDEIM offline structures, A")
@@ -203,7 +203,7 @@ function get_M_DEIM_structures(
 
   else
 
-    if RBInfo.probl_nl["f"]
+    if "F" ∈ RBInfo.probl_nl
 
       if isfile(joinpath(RBInfo.ROM_structures_path, "DEIMᵢ_F.csv"))
         println("Importing DEIM offline structures, F")
@@ -218,7 +218,7 @@ function get_M_DEIM_structures(
 
     end
 
-    if RBInfo.probl_nl["h"]
+    if "H" ∈ RBInfo.probl_nl
 
       if isfile(joinpath(RBInfo.ROM_structures_path, "DEIMᵢ_H.csv"))
         println("Importing DEIM offline structures, H")
@@ -233,7 +233,7 @@ function get_M_DEIM_structures(
 
     end
 
-    if RBInfo.probl_nl["g"]
+    if "L" ∈ RBInfo.probl_nl
 
       if isfile(joinpath(RBInfo.ROM_structures_path, "DEIMᵢ_L.csv"))
         println("Importing DEIM offline structures, L")
@@ -254,68 +254,26 @@ function get_M_DEIM_structures(
 
 end
 
-function get_Fₙ(
-  RBInfo::Info,
-  RBVars::PoissonSteady{T}) where T
-
-  if isfile(joinpath(RBInfo.ROM_structures_path, "Fₙ.csv"))
-    println("Importing Fₙ")
-    RBVars.Fₙ = load_CSV(Matrix{T}(undef,0,0),
-      joinpath(RBInfo.ROM_structures_path, "Fₙ.csv"))
-    return [""]
-  else
-    println("Failed to import Fₙ: must build it")
-    return ["F"]
-  end
-
-end
-
-function get_Hₙ(
-  RBInfo::Info,
-  RBVars::PoissonSteady{T}) where T
-
-  if isfile(joinpath(RBInfo.ROM_structures_path, "Hₙ.csv"))
-    println("Importing Hₙ")
-    RBVars.Hₙ = load_CSV(Matrix{T}(undef,0,0),
-      joinpath(RBInfo.ROM_structures_path, "Hₙ.csv"))
-    return [""]
-  else
-    println("Failed to import Hₙ: must build it")
-    return ["H"]
-  end
-
-end
-
-function get_Lₙ(
-  RBInfo::Info,
-  RBVars::PoissonSteady{T}) where T
-
-  if isfile(joinpath(RBInfo.ROM_structures_path, "Lₙ.csv"))
-    println("Importing Lₙ")
-    RBVars.Lₙ = load_CSV(Matrix{T}(undef,0,0),
-      joinpath(RBInfo.ROM_structures_path, "Lₙ.csv"))
-    return [""]
-  else
-    println("Failed to import Lₙ: must build it")
-    return ["L"]
-  end
-
-end
-
 function get_affine_structures(
   RBInfo::Info,
   RBVars::PoissonSteady)
 
   operators = String[]
 
-  append!(operators, get_Aₙ(RBInfo, RBVars))
+  if "A" ∉ RBInfo.probl_nl
+    append!(operators, get_Aₙ(RBInfo, RBVars))
+  end
 
   if RBInfo.build_parametric_RHS
-    return operators
-  else
-    append!(operators, get_Fₙ(RBInfo, RBVars))
-    append!(operators, get_Hₙ(RBInfo, RBVars))
-    append!(operators, get_Lₙ(RBInfo, RBVars))
+    if "F" ∉ RBInfo.probl_nl
+      append!(operators, get_Fₙ(RBInfo, RBVars))
+    end
+    if "H" ∉ RBInfo.probl_nl
+      append!(operators, get_Hₙ(RBInfo, RBVars))
+    end
+    if "L" ∉ RBInfo.probl_nl
+      append!(operators, get_Lₙ(RBInfo, RBVars))
+    end
   end
 
   operators
@@ -346,35 +304,19 @@ function assemble_offline_structures(
   end
 
   RBVars.offline_time += @elapsed begin
-    if "A" ∈ operators
-      if !RBInfo.probl_nl["A"]
-        assemble_affine_matrices(RBInfo, RBVars, "A")
+    for var ∈ intersect(operators, RBInfo.probl_nl)
+      if var == "A"
+        assemble_MDEIM_matrices(RBInfo, RBVars, var)
       else
-        assemble_MDEIM_matrices(RBInfo, RBVars, "A")
+        assemble_DEIM_vectors(RBInfo, RBVars, var)
       end
     end
 
-    if "F" ∈ operators
-      if !RBInfo.probl_nl["f"]
-        assemble_affine_vectors(RBInfo, RBVars, "F")
+    for var ∈ setdiff(operators, RBInfo.probl_nl)
+      if var == "A"
+        assemble_affine_matrices(RBInfo, RBVars, var)
       else
-        assemble_DEIM_vectors(RBInfo, RBVars, "F")
-      end
-    end
-
-    if "H" ∈ operators
-      if !RBInfo.probl_nl["h"]
-        assemble_affine_vectors(RBInfo, RBVars, "H")
-      else
-        assemble_DEIM_vectors(RBInfo, RBVars, "H")
-      end
-    end
-
-    if "L" ∈ operators
-      if !RBInfo.probl_nl["g"]
-        assemble_affine_vectors(RBInfo, RBVars, "L")
-      else
-        assemble_DEIM_vectors(RBInfo, RBVars, "L")
+        assemble_affine_vectors(RBInfo, RBVars, var)
       end
     end
   end
@@ -438,13 +380,13 @@ function save_system_blocks(
   RHS_blocks::Vector{Int},
   operators::Vector{String}) where T
 
-  if !RBInfo.probl_nl["A"] && "LHS" ∈ operators
+  if "A" ∉ RBInfo.probl_nl && "LHS" ∈ operators
     for i = LHS_blocks
       LHSₙi = "LHSₙ" * string(i) * ".csv"
       save_CSV(RBVars.LHSₙ[i],joinpath(RBInfo.ROM_structures_path, LHSₙi))
     end
   end
-  if !RBInfo.probl_nl["f"] && !RBInfo.probl_nl["h"] && "RHS" ∈ operators
+  if "F" ∉ RBInfo.probl_nl && "H" ∉ RBInfo.probl_nl && "RHS" ∈ operators
     for i = RHS_blocks
       RHSₙi = "RHSₙ" * string(i) * ".csv"
       save_CSV(RBVars.RHSₙ[i],joinpath(RBInfo.ROM_structures_path, RHSₙi))
@@ -458,7 +400,7 @@ function get_θᵃ(
   RBVars::PoissonSteady,
   Param::SteadyParametricInfo) where T
 
-  if !RBInfo.probl_nl["A"]
+  if "A" ∉ RBInfo.probl_nl
     θᵃ = reshape([T.(Param.α(Point(0.,0.)))],1,1)
   else
     A_μ_sparse = T.(build_sparse_mat(FEMSpace, FEMInfo, Param, RBVars.sparse_el_A))
@@ -479,21 +421,21 @@ function get_θᶠʰˡ(
     error("Cannot fetch θᶠ, θʰ, θˡ if the RHS is built online")
   end
 
-  if !RBInfo.probl_nl["f"]
+  if "F" ∉ RBInfo.probl_nl
     θᶠ = reshape([T.(Param.f(Point(0.,0.)))],1,1)
   else
     F_μ = T.(build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_F, "F"))
     θᶠ = M_DEIM_online(F_μ, RBVars.DEIMᵢ_F, RBVars.DEIM_idx_F)
   end
 
-  if !RBInfo.probl_nl["h"]
+  if "H" ∉ RBInfo.probl_nl
     θʰ = reshape([T.(Param.h(Point(0.,0.)))],1,1)
   else
     H_μ = T.(build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_H, "H"))
     θʰ = M_DEIM_online(H_μ, RBVars.DEIMᵢ_H, RBVars.DEIM_idx_H)
   end
 
-  if !RBInfo.probl_nl["g"]
+  if "L" ∉ RBInfo.probl_nl
     θˡ = reshape([T.(Param.g(Point(0.,0.)))],1,1)
   else
     L_μ = T.(build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_H, "L"))

@@ -146,11 +146,7 @@ function get_affine_structures(
   RBInfo::Info,
   RBVars::NavierStokesSTGRB)
 
-  operators = String[]
-  append!(operators, get_Cₙ(RBInfo, RBVars))
-  append!(operators, get_affine_structures(RBInfo, RBVars.Stokes))
-
-  operators
+  get_affine_structures(RBInfo, RBVars.Stokes)
 
 end
 
@@ -291,7 +287,7 @@ function get_RB_system(
       else
         build_param_RHS(FEMSpace, RBInfo, RBVars, Param)
       end
-      if RBInfo.probl_nl["g"]
+      if "L" ∈ RBInfo.probl_nl
         build_RB_lifting(FEMSpace, RBInfo, RBVars, Param)
       end
     end

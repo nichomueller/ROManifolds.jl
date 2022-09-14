@@ -57,23 +57,6 @@ function get_method_id(problem_name::String, RB_method::String)
   end
 end
 
-function get_nonlinear_operators(RBInfo::Info)
-
-  operators = collect(keys(RBInfo.probl_nl))
-  is_nonlinear = Int.(collect(values(RBInfo.probl_nl)))
-
-  operators[findall(is_nonlinear .== 1)]
-
-end
-
-function get_linear_operators(RBInfo::Info)
-
-  operators = collect(keys(RBInfo.probl_nl))
-
-  setdiff(operators, get_nonlinear_operators(RBInfo))
-
-end
-
 function assemble_FEM_structure(
   FEMSpace::FEMProblem,
   RBInfo::ROMInfoSteady,

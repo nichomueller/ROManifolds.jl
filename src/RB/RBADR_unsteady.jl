@@ -112,7 +112,7 @@ function get_M_DEIM_structures(
 
   operators = String[]
 
-  if RBInfo.probl_nl["A"]
+  if "A" ∈ RBInfo.probl_nl
     if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIM_idx_time_A.csv"))
       RBVars.MDEIM_idx_time_A = load_CSV(Vector{Int}(undef,0),
         joinpath(RBInfo.ROM_structures_path, "MDEIM_idx_time_A.csv"))
@@ -121,7 +121,7 @@ function get_M_DEIM_structures(
     end
   end
 
-  if RBInfo.probl_nl["B"]
+  if "B" ∈ RBInfo.probl_nl
     if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIM_idx_time_B.csv"))
       RBVars.MDEIM_idx_time_B = load_CSV(Vector{Int}(undef,0),
         joinpath(RBInfo.ROM_structures_path, "MDEIM_idx_time_B.csv"))
@@ -130,7 +130,7 @@ function get_M_DEIM_structures(
     end
   end
 
-  if RBInfo.probl_nl["D"]
+  if "D" ∈ RBInfo.probl_nl
     if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIM_idx_time_D.csv"))
       RBVars.MDEIM_idx_time_D = load_CSV(Vector{Int}(undef,0),
         joinpath(RBInfo.ROM_structures_path, "MDEIM_idx_time_D.csv"))
@@ -139,7 +139,7 @@ function get_M_DEIM_structures(
     end
   end
 
-  if RBInfo.probl_nl["M"]
+  if "M" ∈ RBInfo.probl_nl
 
     if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIMᵢ_M.csv"))
       println("Importing MDEIM offline structures for the mass matrix")
@@ -161,7 +161,7 @@ function get_M_DEIM_structures(
 
   end
 
-  if RBInfo.probl_nl["f"]
+  if "F" ∈ RBInfo.probl_nl
     if isfile(joinpath(RBInfo.ROM_structures_path, "DEIM_idx_time_F.csv"))
     RBVars.DEIM_idx_time_F = load_CSV(Vector{Int}(undef,0),
       joinpath(RBInfo.ROM_structures_path, "DEIM_idx_time_F.csv"))
@@ -170,7 +170,7 @@ function get_M_DEIM_structures(
     end
   end
 
-  if RBInfo.probl_nl["h"]
+  if "H" ∈ RBInfo.probl_nl
     if isfile(joinpath(RBInfo.ROM_structures_path, "DEIM_idx_time_H.csv"))
     RBVars.DEIM_idx_time_H = load_CSV(Vector{Int}(undef,0),
       joinpath(RBInfo.ROM_structures_path, "DEIM_idx_time_H.csv"))
@@ -224,7 +224,7 @@ function get_θᵇ(
 
   timesθ = get_timesθ(RBInfo)
 
-  if !RBInfo.probl_nl["B"]
+  if "B" ∉ RBInfo.probl_nl
     θᵇ = T.(zeros(T, 1, RBVars.Nₜ))
     for (i_t, t_θ) = enumerate(timesθ)
       θᵇ[i_t] = Param.bₜ(t_θ)
@@ -256,7 +256,7 @@ function get_θᵈ(
 
   timesθ = get_timesθ(RBInfo)
 
-  if !RBInfo.probl_nl["D"]
+  if !"D" ∈ RBInfo.probl_nl
     θᵈ = T.(zeros(T, 1, RBVars.Nₜ))
     for (i_t, t_θ) = enumerate(timesθ)
       θᵈ[i_t] = Param.σₜ(t_θ)

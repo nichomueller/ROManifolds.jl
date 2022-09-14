@@ -200,7 +200,7 @@ function get_M_DEIM_structures(
   operators = String[]
   append!(operators, get_M_DEIM_structures(RBInfo, RBVars.Stokes))
 
-  if RBInfo.probl_nl["C"]
+  if "C" ∈ RBInfo.probl_nl
 
     if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIMᵢ_B.csv"))
       println("Importing MDEIM offline structures, B")
@@ -356,7 +356,7 @@ function get_RB_system(
       else
         build_param_RHS(FEMSpace, RBInfo, RBVars, Param)
       end
-      if RBInfo.probl_nl["g"]
+      if "L" ∈ RBInfo.probl_nl
         build_RB_lifting(FEMSpace, RBInfo, RBVars, Param)
       end
     end

@@ -274,7 +274,7 @@ function get_θᵃ(
   RBVars::StokesSteady,
   Param::SteadyParametricInfo)
 
-  if !RBInfo.probl_nl["A"]
+  if "A" ∉ RBInfo.probl_nl
     θᵃ = reshape([T.(Param.α(Point(0.,0.)))],1,1)
   else
     A_μ_sparse = T.(build_sparse_mat(FEMSpace, FEMInfo, Param, RBVars.sparse_el_A))
@@ -305,21 +305,21 @@ function get_θᶠʰˡ(
     error("Cannot fetch θᶠ, θʰ, θˡ if the RHS is built online")
   end
 
-  if !RBInfo.probl_nl["f"]
+  if "F" ∉ RBInfo.probl_nl
     θᶠ = reshape([T.(Param.f(Point(0.,0.)))],1,1)
   else
     F_μ = T.(build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_F, "F"))
     θᶠ = M_DEIM_online(F_μ, RBVars.DEIMᵢ_F, RBVars.DEIM_idx_F)
   end
 
-  if !RBInfo.probl_nl["h"]
+  if "H" ∉ RBInfo.probl_nl
     θʰ = reshape([T.(Param.h(Point(0.,0.)))],1,1)
   else
     H_μ = T.(build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_H, "H"))
     θʰ = M_DEIM_online(H_μ, RBVars.DEIMᵢ_H, RBVars.DEIM_idx_H)
   end
 
-  if !RBInfo.probl_nl["g"]
+  if "L" ∉ RBInfo.probl_nl
     θˡ = reshape([T.(Param.g(Point(0.,0.)))],1,1)
   else
     L_μ = T.(build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_H, "L"))

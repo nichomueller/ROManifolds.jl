@@ -99,7 +99,7 @@ function get_M_DEIM_structures(
   operators = String[]
   append!(operators, get_M_DEIM_structures(RBInfo, RBVars.Poisson))
 
-  if RBInfo.probl_nl["B"]
+  if "B" ∈ RBInfo.probl_nl
 
     if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIMᵢ_B.csv"))
       println("Importing MDEIM offline structures, B")
@@ -119,7 +119,7 @@ function get_M_DEIM_structures(
 
   end
 
-  if RBInfo.probl_nl["D"]
+  if "D" ∈ RBInfo.probl_nl
 
     if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIMᵢ_D.csv"))
       println("Importing MDEIM offline structures, D")
@@ -190,14 +190,14 @@ function save_system_blocks(
   RHS_blocks::Vector{Int},
   operators::Vector{String}) where T
 
-  if (!RBInfo.probl_nl["A"] && !RBInfo.probl_nl["B"]
-      && !RBInfo.probl_nl["D"] && "LHS" ∈ operators)
+  if ("A" ∉ RBInfo.probl_nl && "B" ∉ RBInfo.probl_nl
+      && !"D" ∈ RBInfo.probl_nl && "LHS" ∈ operators)
     for i = LHS_blocks
       LHSₙi = "LHSₙ" * string(i) * ".csv"
       save_CSV(RBVars.LHSₙ[i],joinpath(RBInfo.ROM_structures_path, LHSₙi))
     end
   end
-  if !RBInfo.probl_nl["f"] && !RBInfo.probl_nl["h"] && "RHS" ∈ operators
+  if "F" ∉ RBInfo.probl_nl && "H" ∉ RBInfo.probl_nl && "RHS" ∈ operators
     for i = RHS_blocks
       RHSₙi = "RHSₙ" * string(i) * ".csv"
       save_CSV(RBVars.RHSₙ[i],joinpath(RBInfo.ROM_structures_path, RHSₙi))
@@ -222,7 +222,7 @@ function get_θᵇ(
   RBVars::ADRSteady,
   Param::SteadyParametricInfo) where T
 
-  if !RBInfo.probl_nl["B"]
+  if "B" ∉ RBInfo.probl_nl
     θᵇ = reshape([T.(Param.b(Point(0.,0.)))],1,1)
   else
     B_μ_sparse = T.(build_sparse_mat(FEMSpace, FEMInfo, Param, RBVars.sparse_el_B))
@@ -239,7 +239,7 @@ function get_θᵈ(
   RBVars::ADRSteady,
   Param::SteadyParametricInfo) where T
 
-  if !RBInfo.probl_nl["D"]
+  if !"D" ∈ RBInfo.probl_nl
     θᵈ = reshape([T.(Param.σ(Point(0.,0.)))],1,1)
   else
     D_μ_sparse = T.(build_sparse_mat(FEMSpace, FEMInfo, Param, RBVars.sparse_el_D))
