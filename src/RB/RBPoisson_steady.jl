@@ -115,7 +115,7 @@ function assemble_MDEIM_matrices(
       (RBVars.MDEIM_mat_A, RBVars.MDEIM_idx_A, RBVars.MDEIMᵢ_A,
       RBVars.row_idx_A,RBVars.sparse_el_A) = MDEIM_offline(RBInfo, RBVars, "A")
     end
-    assemble_reduced_mat_MDEIM(RBVars,RBVars.MDEIM_mat_A,RBVars.row_idx_A)
+    assemble_reduced_mat_MDEIM(RBVars, RBVars.MDEIM_mat_A, RBVars.row_idx_A, var)
   else
     error("Unrecognized variable on which to perform MDEIM")
   end

@@ -35,7 +35,8 @@ end
 function assemble_reduced_mat_MDEIM(
   RBVars::PoissonSGRB{T},
   MDEIM_mat::Matrix,
-  row_idx::Vector) where T
+  row_idx::Vector,
+  var::String) where T
 
   Q = size(MDEIM_mat)[2]
   r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.Nₛᵘ)
@@ -44,9 +45,14 @@ function assemble_reduced_mat_MDEIM(
     Mat_idx = findall(x -> x == j, r_idx)
     MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.Φₛᵘ[c_idx[Mat_idx],:])'
   end
-  RBVars.Aₙ = reshape(RBVars.Φₛᵘ' *
+
+  Matₙ = reshape(RBVars.Φₛᵘ' *
     reshape(MatqΦ,RBVars.Nₛᵘ,:),RBVars.nₛᵘ,:,Q)::Array{T,3}
-  RBVars.Qᵃ = Q
+
+  if var == "A"
+    RBVars.Aₙ = Matₙ
+    RBVars.Qᵃ = Q
+  end
 
 end
 

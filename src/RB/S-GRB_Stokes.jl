@@ -40,16 +40,32 @@ function get_Hₙ(
 
 end
 
+function get_Lₙ(
+  RBInfo::Info,
+  RBVars::StokesSGRB)
+
+  get_Lₙ(RBInfo, RBVars.Poisson)
+
+end
+
 function assemble_affine_matrices(
   RBInfo::Info,
   RBVars::StokesSGRB{T},
   var::String) where T
 
-  if var == "B"
+  if var == "A"
+    println("Assembling affine reduced stiffness")
+    RBVars.Qᵃ = 1
+    A = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "A.csv"))
+    RBVars.Aₙ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ, 1)
+    RBVars.Aₙ[:,:,1] = (RBVars.Φₛᵘ)' * A * RBVars.Φₛᵘ
+  elseif var == "B"
     println("Assembling affine reduced B")
+    RBVars.Qᵇ = 1
     B = load_CSV(sparse([],[],T[]),
       joinpath(get_FEM_structures_path(RBInfo), "B.csv"))
-    RBVars.Bₙ = reshape((RBVars.Φₛᵖ)'*B*RBVars.Φₛᵘ,RBVars.nₛᵖ,RBVars.nₛᵘ,1)
+    RBVars.Bₙ = zeros(T, RBVars.nₛᵖ, RBVars.nₛᵘ, 1)
+    RBVars.Bₙ[:,:,1] = (RBVars.Φₛᵖ)' * B * RBVars.Φₛᵘ
   else
     assemble_affine_matrices(RBInfo, RBVars.Poisson, var)
   end
@@ -59,9 +75,25 @@ end
 function assemble_reduced_mat_MDEIM(
   RBVars::StokesSGRB,
   MDEIM_mat::Matrix,
-  row_idx::Vector)
+  row_idx::Vector,
+  var::String)
 
-  assemble_reduced_mat_MDEIM(RBVars.Poisson, MDEIM_mat, row_idx)
+  if var == "A"
+    assemble_reduced_mat_MDEIM(RBVars.Poisson, MDEIM_mat, row_idx, var)
+  else var == "B"
+    Q = size(MDEIM_mat)[2]
+    r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.Nₛᵖ)
+    MatqΦ = zeros(T,RBVars.Nₛᵖ,RBVars.nₛᵘ,Q)
+    @simd for j = 1:RBVars.Nₛᵖ
+      Mat_idx = findall(x -> x == j, r_idx)
+      MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.Φₛᵘ[c_idx[Mat_idx],:])'
+    end
+
+    Matₙ = reshape(RBVars.Φₛᵖ' *
+      reshape(MatqΦ,RBVars.Nₛᵖ,:),RBVars.nₛᵘ,:,Q)::Array{T,3}
+    RBVars.Bₙ = Matₙ
+    RBVars.Qᵇ = Q
+  end
 
 end
 

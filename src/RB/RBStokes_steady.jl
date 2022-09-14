@@ -205,6 +205,12 @@ function assemble_DEIM_vectors(
         DEIM_offline(RBInfo,"H")
     end
     assemble_reduced_mat_DEIM(RBVars,RBVars.DEIM_mat_H,"H")
+  elseif var == "L"
+    if isempty(RBVars.DEIM_mat_L)
+      RBVars.DEIM_mat_L, RBVars.DEIM_idx_L, RBVars.DEIMᵢ_L, RBVars.sparse_el_L =
+        DEIM_offline(RBInfo,"L")
+    end
+    assemble_reduced_mat_DEIM(RBVars,RBVars.DEIM_mat_L,"L")
   else
     error("Unrecognized variable on which to perform DEIM")
   end
@@ -212,10 +218,10 @@ function assemble_DEIM_vectors(
 end
 
 function save_M_DEIM_structures(
-  ::ROMInfoSteady,
-  ::StokesSteady)
+  RBInfo::ROMInfoSteady,
+  RBVars::StokesSteady)
 
-  error("not implemented")
+  save_M_DEIM_structures(RBInfo, RBVars.Poisson)
 
 end
 
@@ -268,7 +274,14 @@ function get_θᵃ(
   RBVars::StokesSteady,
   Param::SteadyParametricInfo)
 
-  get_θᵃ(FEMSpace, RBInfo, RBVars.Poisson, Param)
+  if !RBInfo.probl_nl["A"]
+    θᵃ = reshape([T.(Param.α(Point(0.,0.)))],1,1)
+  else
+    A_μ_sparse = T.(build_sparse_mat(FEMSpace, FEMInfo, Param, RBVars.sparse_el_A))
+    θᵃ = M_DEIM_online(A_μ_sparse, RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A)
+  end
+
+  θᵃ::Matrix{T}
 
 end
 
@@ -282,13 +295,38 @@ function get_θᵇ(
 
 end
 
-function get_θᶠʰ(
+function get_θᶠʰˡ(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::StokesSteady,
   Param::SteadyParametricInfo)
 
-  get_θᶠʰ(FEMSpace, RBInfo, RBVars.Poisson, Param)
+  if RBInfo.build_parametric_RHS
+    error("Cannot fetch θᶠ, θʰ, θˡ if the RHS is built online")
+  end
+
+  if !RBInfo.probl_nl["f"]
+    θᶠ = reshape([T.(Param.f(Point(0.,0.)))],1,1)
+  else
+    F_μ = T.(build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_F, "F"))
+    θᶠ = M_DEIM_online(F_μ, RBVars.DEIMᵢ_F, RBVars.DEIM_idx_F)
+  end
+
+  if !RBInfo.probl_nl["h"]
+    θʰ = reshape([T.(Param.h(Point(0.,0.)))],1,1)
+  else
+    H_μ = T.(build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_H, "H"))
+    θʰ = M_DEIM_online(H_μ, RBVars.DEIMᵢ_H, RBVars.DEIM_idx_H)
+  end
+
+  if !RBInfo.probl_nl["g"]
+    θˡ = reshape([T.(Param.g(Point(0.,0.)))],1,1)
+  else
+    L_μ = T.(build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_H, "L"))
+    θˡ = M_DEIM_online(L_μ, RBVars.DEIMᵢ_L, RBVars.DEIM_idx_L)
+  end
+
+  θᶠ, θʰ, θˡ
 
 end
 
@@ -315,7 +353,7 @@ function get_RB_system(
     RHS_blocks = [1]
     operators = get_system_blocks(RBInfo, RBVars, LHS_blocks, RHS_blocks)
 
-    θᵃ, θᶠ, θʰ, θᵇ = get_θ(FEMSpace, RBInfo, RBVars, Param)
+    θᵃ, θᶠ, θʰ, θˡ, θᵇ = get_θ(FEMSpace, RBInfo, RBVars, Param)
 
     if "LHS" ∈ operators
       get_RB_LHS_blocks(RBVars, θᵃ, θᵇ)
@@ -323,12 +361,9 @@ function get_RB_system(
 
     if "RHS" ∈ operators
       if !RBInfo.build_parametric_RHS
-        get_RB_RHS_blocks(RBVars, θᶠ, θʰ)
+        get_RB_RHS_blocks(RBVars, θᶠ, θʰ, θˡ)
       else
         build_param_RHS(FEMSpace, RBInfo, RBVars, Param)
-      end
-      if RBInfo.probl_nl["g"]
-        build_RB_lifting(FEMSpace, RBInfo, RBVars, Param)
       end
     end
   end
