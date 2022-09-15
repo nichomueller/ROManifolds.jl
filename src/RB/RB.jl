@@ -67,7 +67,7 @@ include("ST-PGRB_Poisson.jl")
 include("ST-GRB_Stokes.jl")
 end =#
 
-include("RBSuperclasses.jl")
-include("RBUtils.jl")
-include("post_process.jl")
+include("RB_Types.jl")
+include("RB_Utils.jl")
+include("Post_Process.jl")
 include("M_DEIM.jl")

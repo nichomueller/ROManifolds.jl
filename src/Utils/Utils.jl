@@ -58,7 +58,7 @@ using Gridap.TensorValues
 using LineSearches:BackTracking
 import Gridap:∇
 
-include("files.jl")
-include("indexes.jl")
-include("operations.jl")
-include("plots.jl")
+include("Files.jl")
+include("Indexes.jl")
+include("Operations.jl")
+include("Plots.jl")

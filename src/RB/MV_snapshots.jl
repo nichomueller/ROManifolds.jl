@@ -1,4 +1,4 @@
-function build_matrix_snapshots(
+function assemble_matrix_snapshots(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady{T},
   μ::Vector{Vector{T}},
@@ -22,7 +22,7 @@ function build_matrix_snapshots(
 
 end
 
-function build_matrix_snapshots(
+function assemble_matrix_snapshots(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady{T},
   μ::Vector,
@@ -48,7 +48,7 @@ function build_matrix_snapshots(
 
 end
 
-function build_matrix_snapshots(
+function assemble_matrix_snapshots(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady{T},
   RBVars::RBSteadyProblem,
@@ -71,7 +71,7 @@ function build_matrix_snapshots(
 
 end
 
-function build_matrix_snapshots(
+function assemble_matrix_snapshots(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady{T},
   RBVars::RBUnsteadyProblem,
@@ -107,9 +107,9 @@ function call_matrix_snapshots(
   var::String) where T
 
   if var ∈ ["C"]
-    build_matrix_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
+    assemble_matrix_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
   else
-    build_matrix_snapshots(FEMSpace, RBInfo, μ, var)
+    assemble_matrix_snapshots(FEMSpace, RBInfo, μ, var)
   end
 
 end
@@ -124,9 +124,9 @@ function call_matrix_snapshots(
   var::String) where T
 
   if var ∈ ["C"]
-    build_matrix_snapshots(FEMSpace, RBInfo, RBVars, μ[k], k, timesθ, var)
+    assemble_matrix_snapshots(FEMSpace, RBInfo, RBVars, μ[k], k, timesθ, var)
   else
-    build_matrix_snapshots(FEMSpace, RBInfo, μ[k], timesθ, var)
+    assemble_matrix_snapshots(FEMSpace, RBInfo, μ[k], timesθ, var)
   end
 
 end
@@ -220,7 +220,7 @@ function functional_MDEIM_linear(
   timesθ::Vector,
   var::String) where T
 
-  Θmat_space, Θmat_time = build_θmat_snapshots(FEMSpace, RBInfo, μ, timesθ, var)
+  Θmat_space, Θmat_time = assemble_θmat_snapshots(FEMSpace, RBInfo, μ, timesθ, var)
 
   # space
   Θmat_space, _ = M_DEIM_POD(Θmat_space,RBInfo.ϵₛ)
@@ -326,7 +326,7 @@ function get_snaps_MDEIM(
 
 end
 
-function build_vector_snapshots(
+function assemble_vector_snapshots(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady{T},
   μ::Vector{Vector{T}},
@@ -344,7 +344,7 @@ function build_vector_snapshots(
 
 end
 
-function build_vector_snapshots(
+function assemble_vector_snapshots(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady{T},
   μ::Vector,
@@ -370,7 +370,7 @@ function get_snaps_DEIM(
   μ::Vector{Vector{T}},
   var::String) where T
 
-  snaps = build_vector_snapshots(FEMSpace,RBInfo,μ,var)
+  snaps = assemble_vector_snapshots(FEMSpace,RBInfo,μ,var)
   snaps, _ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
   return snaps
 
@@ -388,7 +388,7 @@ function standard_DEIM(
 
   @simd for k = 1:nₛ_min
     println("Considering parameter number $k/$(RBInfo.nₛ_MDEIM)")
-    snapsₖ = build_vector_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
+    snapsₖ = assemble_vector_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
     snapsₖ_space, snapsₖ_time = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
     if k == 1
       snaps_space = snapsₖ_space
@@ -402,7 +402,7 @@ function standard_DEIM(
   if nₛ_min == RBInfo.nₛ_DEIM
     @simd for k = nₛ_min+1:nₛ_max
       println("Considering parameter number $k/$nₛ_max")
-      snapsₖ = build_vector_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
+      snapsₖ = assemble_vector_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
       _, snapsₖ_time = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
       if k == 1
         snaps_time = snapsₖ_time
@@ -413,7 +413,7 @@ function standard_DEIM(
   else
     @simd for k = nₛ_min+1:nₛ_max
       println("Considering parameter number $k/$nₛ_max")
-      snapsₖ = build_vector_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
+      snapsₖ = assemble_vector_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
       snapsₖ_space, _ = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
       if k == 1
         snaps_space = snapsₖ_space
@@ -441,7 +441,7 @@ function get_snaps_DEIM(
 
 end
 
-function build_θmat_snapshots(
+function assemble_θmat_snapshots(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady{T},
   μ::Vector{Vector{T}},
@@ -457,7 +457,7 @@ function build_θmat_snapshots(
   @simd for k = 1:nₛ_min
     println("Considering parameter number $k/$nₛ_max")
     Param = get_ParamInfo(RBInfo, μ[k])
-    Θₖ = build_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
+    Θₖ = assemble_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
       timesθ,var)
     Θₖ_space, Θₖ_time = M_DEIM_POD(Θₖ, RBInfo.ϵₛ)
     if k == 1
@@ -473,7 +473,7 @@ function build_θmat_snapshots(
     @simd for k = nₛ_min+1:nₛ_max
       println("Considering parameter number $k/$nₛ_max")
       Param = get_ParamInfo(RBInfo, μ[k])
-      Θₖ = build_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
+      Θₖ = assemble_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
         timesθ,var)
       _, Θₖ_time = M_DEIM_POD(Θₖ, RBInfo.ϵₛ)
       if k == 1
@@ -486,7 +486,7 @@ function build_θmat_snapshots(
     @simd for k = nₛ_min+1:nₛ_max
       println("Considering parameter number $k/$nₛ_max")
       Param = get_ParamInfo(RBInfo, μ[k])
-      Θₖ = build_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
+      Θₖ = assemble_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
         timesθ,var)
       Θₖ_space, _ = M_DEIM_POD(Θₖ, RBInfo.ϵₛ)
       if k == 1
@@ -501,7 +501,7 @@ function build_θmat_snapshots(
 
 end
 
-function build_θmat_snapshots(RBVars::RBUnsteadyProblem)
+function assemble_θmat_snapshots(RBVars::RBUnsteadyProblem)
 
   RBVars.Φₛᵘ_quad, RBVars.Φₜᵘ_quad
 
@@ -516,14 +516,14 @@ function call_θmat_snapshots(
   var::String) where T
 
   if var ∈ ["C"]
-    build_θmat_snapshots(RBVars)
+    assemble_θmat_snapshots(RBVars)
   else
-    build_θmat_snapshots(FEMSpace, RBInfo, μ, timesθ, var)
+    assemble_θmat_snapshots(FEMSpace, RBInfo, μ, timesθ, var)
   end
 
 end
 
-function build_parameter_on_phys_quadp(
+function assemble_parameter_on_phys_quadp(
   Param::UnsteadyParametricInfo,
   phys_quadp::Vector{Vector{VectorValue{D,Float}}},
   ncells::Int,
