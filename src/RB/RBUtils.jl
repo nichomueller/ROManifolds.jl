@@ -116,7 +116,7 @@ function build_sparse_mat(
   FEMSpace::SteadyProblem,
   FEMInfo::SteadyInfo,
   Param::SteadyParametricInfo,
-  el::Vector{Int};
+  el::Vector{Int},
   var::String)
 
   Ω_sparse = view(FEMSpace.Ω, el)
@@ -148,7 +148,7 @@ function build_sparse_mat(
   FEMInfo::UnsteadyInfo,
   Param::UnsteadyParametricInfo,
   el::Vector{Int},
-  timesθ::Vector;
+  timesθ::Vector,
   var::String)
 
   Ω_sparse = view(FEMSpace.Ω, el)
@@ -329,12 +329,11 @@ function interpolated_θ(
   timesθ::Vector{T},
   MDEIMᵢ::Matrix{T},
   MDEIM_idx::Vector{Int},
-  MDEIM_idx_time::Vector{Int},
-  Q::Int) where T
+  MDEIM_idx_time::Vector{Int}) where T
 
   red_timesθ = timesθ[MDEIM_idx_time]
   discarded_idx_time = setdiff(collect(1:RBVars.Nₜ), MDEIM_idx_time)
-  θ = zeros(T, Q, RBVars.Nₜ)
+  θ = zeros(T, length(MDEIM_idx), RBVars.Nₜ)
 
   red_θ = (MDEIMᵢ \
     Matrix{T}(reshape(Mat_μ_sparse, :, length(red_timesθ))[MDEIM_idx, :]))
@@ -356,12 +355,11 @@ function interpolated_θ(
   timesθ::Vector{T},
   DEIMᵢ::Matrix{T},
   DEIM_idx::Vector{Int},
-  DEIM_idx_time::Vector{Int},
-  Q::Int) where T
+  DEIM_idx_time::Vector{Int}) where T
 
   red_timesθ = timesθ[DEIM_idx_time]
   discarded_idx_time = setdiff(collect(1:RBVars.Nₜ), DEIM_idx_time)
-  θ = zeros(T, Q, RBVars.Nₜ)
+  θ = zeros(T, length(MDEIM_idx), RBVars.Nₜ)
 
   red_θ = (DEIMᵢ \
     Matrix{T}(reshape(Vec_μ_sparse, :, length(red_timesθ))[DEIM_idx, :]))
@@ -371,6 +369,121 @@ function interpolated_θ(
   θ[:, DEIM_idx_time] = red_θ
   for iₜ = discarded_idx_time
     θ[:, iₜ] = ScatteredInterpolation.evaluate(etp,[timesθ[iₜ]])
+  end
+
+  θ::Matrix{T}
+
+end
+
+function θ_matrix(
+  FEMSpace::SteadyProblem,
+  RBInfo::ROMInfoSteady{T},
+  ::RBSteadyProblem,
+  fun::Function,
+  MDEIMᵢ::Matrix,
+  MDEIM_idx::Vector{Int},
+  sparse_el::Vector{Int},
+  var::String) where T
+
+  if var ∉ RBInfo.probl_nl
+    θ = reshape([T.(fun(Point(0., 0.)))], 1, 1)
+  else
+    Mat_μ_sparse =
+      T.(build_sparse_mat(FEMSpace, FEMInfo, Param, sparse_el, var))
+    θ = M_DEIM_online(Mat_μ_sparse, MDEIMᵢ, MDEIM_idx)
+  end
+
+  θ::Matrix{T}
+
+end
+
+function θ_matrix(
+  FEMSpace::UnsteadyProblem,
+  RBInfo::ROMInfoUnsteady{T},
+  RBVars::RBUnsteadyProblem,
+  fun::Function,
+  MDEIMᵢ::Matrix,
+  MDEIM_idx::Vector{Int},
+  sparse_el::Vector{Int},
+  MDEIM_idx_time::Vector{Int},
+  var::String) where T
+
+  timesθ = get_timesθ(RBInfo)
+
+  if var ∉ RBInfo.probl_nl
+    θ = zeros(T, 1, RBVars.Nₜ)
+    for (i_t, t_θ) = enumerate(timesθ)
+      θ[i_t] = T.(fun(t_θ, Param.μ))
+    end
+  else
+    if RBInfo.st_M_DEIM
+      red_timesθ = timesθ[MDEIM_idx_time]
+      Mat_μ_sparse = T.(build_sparse_mat(
+        FEMSpace, FEMInfo, Param, sparse_el, red_timesθ, var))
+      θ = interpolated_θ(RBVars, Mat_μ_sparse, timesθ, MDEIMᵢ,
+        MDEIM_idx, MDEIM_idx_time)
+    else
+      Mat_μ_sparse = build_sparse_mat(
+        FEMSpace, FEMInfo, Param, sparse_el,timesθ, var)
+      θ = (MDEIMᵢ \ Matrix{T}(reshape(Mat_μ_sparse, :, RBVars.Nₜ)[MDEIM_idx, :]))
+    end
+  end
+
+  θ::Matrix{T}
+
+end
+
+function θ_vector(
+  FEMSpace::SteadyProblem,
+  RBInfo::ROMInfoSteady{T},
+  ::RBSteadyProblem,
+  fun::Function,
+  DEIMᵢ::Matrix{T},
+  DEIM_idx::Vector{Int},
+  sparse_el::Vector{Int},
+  var::String)
+
+  if var ∉ RBInfo.probl_nl
+    θ = reshape([T.(fun(Point(0., 0.)))], 1, 1)
+  else
+    Vec_μ_sparse =
+      T.(build_sparse_vec(FEMSpace, FEMInfo, Param, sparse_el, var))
+    θ = M_DEIM_online(Vec_μ_sparse, DEIMᵢ, DEIM_idx)
+  end
+
+  θ::Matrix{T}
+
+end
+
+function θ_vector(
+  FEMSpace::UnsteadyProblem,
+  RBInfo::ROMInfoUnsteady{T},
+  RBVars::RBUnsteadyProblem,
+  fun::Function,
+  DEIMᵢ::Matrix{T},
+  DEIM_idx::Vector{Int},
+  sparse_el::Vector{Int},
+  DEIM_idx_time::Vector{Int},
+  var::String)
+
+  timesθ = get_timesθ(RBInfo)
+
+  if var ∉ RBInfo.probl_nl
+    θ = zeros(T, 1, RBVars.Nₜ)
+    for (i_t, t_θ) = enumerate(timesθ)
+      θ[i_t] = T.(fun(t_θ))
+    end
+  else
+    if RBInfo.st_M_DEIM
+      red_timesθ = timesθ[DEIM_idx_time]
+      Vec_μ_sparse = T.(build_sparse_vec(
+        FEMSpace,FEMInfo, Param, sparse_el, red_timesθ, var))
+      θ = interpolated_θ(RBVars, Vec_μ_sparse, timesθ, DEIMᵢ,
+        DEIM_idx, DEIM_idx_time)
+    else
+      Vec_μ_sparse = build_sparse_vec(FEMSpace, FEMInfo, Param, sparse_el, timesθ, var)
+      θ = (DEIMᵢ \ Matrix{T}(Vec_μ_sparse[DEIM_idx, :]))
+    end
   end
 
   θ::Matrix{T}

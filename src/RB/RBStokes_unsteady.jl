@@ -217,7 +217,29 @@ function assemble_MDEIM_matrices(
   RBVars::StokesUnsteady,
   var::String)
 
-  assemble_MDEIM_matrices(RBInfo, RBVars.Poisson, var)
+  println("The matrix $var is non-affine:
+    running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
+  if var == "A"
+    if isempty(RBVars.MDEIM_mat_A)
+      (RBVars.MDEIM_mat_A, RBVars.MDEIM_idx_A, RBVars.MDEIMᵢ_A,
+      RBVars.row_idx_A,RBVars.sparse_el_A) = MDEIM_offline(RBInfo, RBVars, "A")
+    end
+    assemble_reduced_mat_MDEIM(RBVars, RBVars.MDEIM_mat_A, RBVars.row_idx_A, var)
+  elseif var == "B"
+    if isempty(RBVars.MDEIM_mat_B)
+      (RBVars.MDEIM_mat_B, RBVars.MDEIM_idx_B, RBVars.MDEIMᵢ_B,
+      RBVars.row_idx_B,RBVars.sparse_el_B) = MDEIM_offline(RBInfo, RBVars, "B")
+    end
+    assemble_reduced_mat_MDEIM(RBVars, RBVars.MDEIM_mat_B, RBVars.row_idx_B, var)
+  elseif var == "M"
+    if isempty(RBVars.MDEIM_mat_M)
+      (RBVars.MDEIM_mat_M, RBVars.MDEIM_idx_M, RBVars.MDEIMᵢ_M,
+      RBVars.row_idx_M,RBVars.sparse_el_M) = MDEIM_offline(RBInfo, RBVars, "M")
+    end
+    assemble_reduced_mat_MDEIM(RBVars, RBVars.MDEIM_mat_M, RBVars.row_idx_M, var)
+  else
+    error("Unrecognized variable on which to perform MDEIM")
+  end
 
 end
 
@@ -230,19 +252,24 @@ function assemble_DEIM_vectors(
 
 end
 
-function save_M_DEIM_structures(
-  ::ROMInfoUnsteady,
-  ::StokesUnsteady)
+function save_assembled_structures(
+  RBInfo::Info,
+  RBVars::PoissonSteady)
 
-  error("not implemented")
+  affine_vars = (reshape(RBVars.Bₙ, :, RBVars.Qᵇ)::Matrix{T}, RBVars.Lcₙ)
+  affine_names = ("Bₙ", "Lcₙ")
+  save_structures_in_list(affine_vars, affine_names, RBInfo.ROM_structures_path)
 
-end
+  M_DEIM_vars = (
+    RBVars.MDEIM_mat_B, RBVars.MDEIMᵢ_B, RBVars.MDEIM_idx_B, RBVars.row_idx_B,
+    RBVars.sparse_el_B, RBVars.DEIM_mat_Lc, RBVars.DEIMᵢ_Lc, RBVars.DEIM_idx_Lc,)
+    RBVars.sparse_el_Lc
+  M_DEIM_names = (
+    "MDEIM_mat_B","MDEIMᵢ_B","MDEIM_idx_B","row_idx_B","sparse_el_B",
+    "DEIM_mat_Lc","DEIMᵢ_Lc","DEIM_idx_Lc","sparse_el_Lc")
+  save_structures_in_list(M_DEIM_vars, M_DEIM_names, RBInfo.ROM_structures_path)
 
-function get_M_DEIM_structures(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady)
-
-  get_M_DEIM_structures(RBInfo, RBVars.Poisson)
+  save_assembled_structures(RBInfo, RBVars.Poisson)
 
 end
 
@@ -250,52 +277,83 @@ function get_offline_structures(
   RBInfo::ROMInfoUnsteady,
   RBVars::StokesUnsteady)
 
-  operators = String[]
-  append!(operators, get_affine_structures(RBInfo, RBVars))
-  append!(operators, get_M_DEIM_structures(RBInfo, RBVars))
-  unique!(operators)
+  operators = get_offline_structures(RBInfo, RBVars.Poisson)
+
+  append!(operators, get_B(RBInfo, RBVars))
+
+  if RBInfo.build_parametric_RHS
+    append!(operators, get_Lc(RBInfo, RBVars))
+  end
 
   operators
 
 end
 
-function get_θᵐ(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
+function get_system_blocks(
+  RBInfo::Info,
   RBVars::StokesUnsteady,
-  Param::UnsteadyParametricInfo)
+  LHS_blocks::Vector{Int},
+  RHS_blocks::Vector{Int})
 
-  get_θᵐ(FEMSpace, RBInfo, RBVars.Poisson, Param)
+  get_system_blocks(RBInfo, RBVars.Poisson, LHS_blocks, RHS_blocks)
 
 end
 
-function get_θᵃ(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
+function save_system_blocks(
+  RBInfo::Info,
   RBVars::StokesUnsteady,
-  Param::UnsteadyParametricInfo)
+  LHS_blocks::Vector{Int},
+  RHS_blocks::Vector{Int},
+  operators::Vector{String})
 
-  get_θᵃ(FEMSpace, RBInfo, RBVars.Poisson, Param)
+  save_system_blocks(RBInfo, RBVars.Poisson, LHS_blocks, RHS_blocks, operators)
 
 end
 
-function get_θᵇ(
-  ::UnsteadyProblem,
-  ::ROMInfoUnsteady,
-  ::StokesUnsteady{T},
-  ::UnsteadyParametricInfo) where T
+function get_θ_matrix(
+  FEMSpace::SteadyProblem,
+  RBInfo::ROMInfoSteady,
+  RBVars::StokesSteady,
+  Param::SteadyParametricInfo,
+  var::String)
 
-  reshape([one(T)],1,1)::Matrix{T}
+  if var == "A"
+    return θ_matrix(FEMSpace, RBInfo, RBVars, Param.α, RBVars.MDEIMᵢ_A,
+      RBVars.MDEIM_idx_A, RBVars.sparse_el_A, RBVars.MDEIM_idx_time_A, "A")::Matrix{T}
+  elseif var == "B"
+    return θ_matrix(FEMSpace, RBInfo, RBVars, Param.b, RBVars.MDEIMᵢ_B,
+      RBVars.MDEIM_idx_B, RBVars.sparse_el_B, RBVars.MDEIM_idx_time_B, "B")::Matrix{T}
+  elseif var == "M"
+    return θ_matrix(FEMSpace, RBInfo, RBVars, Param.m, RBVars.MDEIMᵢ_M,
+      RBVars.MDEIM_idx_M, RBVars.sparse_el_M, RBVars.MDEIM_idx_time_M, "M")::Matrix{T}
+  else
+    error("Unrecognized variable")
+  end
 
 end
 
-function get_θᶠʰ(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady,
-  Param::UnsteadyParametricInfo)
+function get_θ_vector(
+  FEMSpace::SteadyProblem,
+  RBInfo::ROMInfoSteady,
+  RBVars::StokesSteady,
+  Param::SteadyParametricInfo,
+  var::String)
 
-  get_θᶠʰ(FEMSpace, RBInfo, RBVars.Poisson, Param)
+  if var == "F"
+    return θ_vector(FEMSpace, RBInfo, RBVars, Param.f, RBVars.DEIMᵢ_F,
+      RBVars.DEIM_idx_F, RBVars.sparse_el_F, RBVars.DEIM_idx_time_F, "F")::Matrix{T}
+  elseif var == "H"
+    return θ_vector(FEMSpace, RBInfo, RBVars, Param.h, RBVars.DEIMᵢ_H,
+      RBVars.DEIM_idx_H, RBVars.sparse_el_H, RBVars.DEIM_idx_time_H, "H")::Matrix{T}
+  elseif var == "L"
+    return θ_vector(FEMSpace, RBInfo, RBVars, Param.g, RBVars.DEIMᵢ_L,
+      RBVars.DEIM_idx_L, RBVars.sparse_el_L, RBVars.DEIM_idx_time_L, "L")::Matrix{T}
+  elseif var == "Lc"
+    return θ_vector(FEMSpace, RBInfo, RBVars, Param.g, RBVars.DEIMᵢ_Lc,
+      RBVars.DEIM_idx_Lc, RBVars.sparse_el_Lc, RBVars.DEIM_idx_time_Lc, "Lc")::Matrix{T}
+  else
+    error("Unrecognized variable")
+  end
 
 end
 

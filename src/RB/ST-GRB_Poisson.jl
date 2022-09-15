@@ -169,6 +169,9 @@ function assemble_reduced_mat_DEIM(
   elseif var == "H"
     RBVars.Hₙ = Vecₙ
     RBVars.Qʰ = Q
+  elseif var == "L"
+    RBVars.Lₙ = Vecₙ
+    RBVars.Qˡ = Q
   else
     error("Unrecognized vector to assemble with DEIM")
   end
@@ -246,37 +249,39 @@ function get_RB_RHS_blocks(
   RBInfo::ROMInfoUnsteady,
   RBVars::PoissonSTGRB{T},
   θᶠ::Array{T},
-  θʰ::Array{T}) where T
+  θʰ::Array{T},
+  θˡ::Array{T}) where T
 
   println("Assembling RHS using θ-method time scheme, θ=$(RBInfo.θ)")
 
-  Qᶠ = RBVars.Qᶠ
-  Qʰ = RBVars.Qʰ
-  δtθ = RBInfo.δt*RBInfo.θ
-  nₜᵘ = RBVars.nₜᵘ
+  Φₜᵘ_F = zeros(T, RBVars.nₜᵘ, RBVars.Qᶠ)
+  Φₜᵘ_H = zeros(T, RBVars.nₜᵘ, RBVars.Qʰ)
+  Φₜᵘ_L = zeros(T, RBVars.nₜᵘ, RBVars.Qˡ)
 
-  Φₜᵘ_F = zeros(T, RBVars.nₜᵘ, Qᶠ)
-  Φₜᵘ_H = zeros(T, RBVars.nₜᵘ, Qʰ)
-  @simd for i_t = 1:nₜᵘ
-    for q = 1:Qᶠ
+  @simd for i_t = 1:RBVars.nₜᵘ
+    for q = 1:RBVars.Qᶠ
       Φₜᵘ_F[i_t,q] = sum(RBVars.Φₜᵘ[:,i_t].*θᶠ[q,:])
     end
-    for q = 1:Qʰ
+    for q = 1:RBVars.Qʰ
       Φₜᵘ_H[i_t,q] = sum(RBVars.Φₜᵘ[:,i_t].*θʰ[q,:])
+    end
+    for q = 1:RBVars.Qˡ
+      Φₜᵘ_L[i_t,q] = sum(RBVars.Φₜᵘ[:,i_t].*θˡ[q,:])
     end
   end
 
-  block₁ = zeros(T, RBVars.nᵘ,1)
+  block₁ = zeros(T, RBVars.nᵘ, 1)
   @simd for i_s = 1:RBVars.nₛᵘ
     for i_t = 1:RBVars.nₜᵘ
       i_st = index_mapping(i_s, i_t, RBVars)
       Fₙ_μ_i_j = RBVars.Fₙ[i_s,:]'*Φₜᵘ_F[i_t,:]
       Hₙ_μ_i_j = RBVars.Hₙ[i_s,:]'*Φₜᵘ_H[i_t,:]
-      block₁[i_st,1] = Fₙ_μ_i_j+Hₙ_μ_i_j
+      Lₙ_μ_i_j = RBVars.Lₙ[i_s,:]'*Φₜᵘ_L[i_t,:]
+      block₁[i_st, :] = Fₙ_μ_i_j + Hₙ_μ_i_j - Lₙ_μ_i_j
     end
   end
 
-  block₁ *= δtθ
+  block₁ *= RBInfo.δt*RBInfo.θ
   push!(RBVars.RHSₙ, block₁)::Vector{Matrix{T}}
 
 end
@@ -295,7 +300,7 @@ function get_RB_system(
     blocks = [1]
     operators = get_system_blocks(RBInfo,RBVars.Steady,blocks,blocks)
 
-    θᵐ, θᵃ, θᶠ, θʰ = get_θ(FEMSpace, RBInfo, RBVars, Param)
+    θᵃ, θᵐ, θᶠ, θʰ, θˡ = get_θ(FEMSpace, RBInfo, RBVars, Param)
 
     if "LHS" ∈ operators
       get_RB_LHS_blocks(RBInfo, RBVars, θᵐ, θᵃ)
@@ -303,37 +308,14 @@ function get_RB_system(
 
     if "RHS" ∈ operators
       if !RBInfo.build_parametric_RHS
-        get_RB_RHS_blocks(RBInfo, RBVars, θᶠ, θʰ)
+        get_RB_RHS_blocks(RBInfo, RBVars, θᶠ, θʰ, θˡ)
       else
         build_param_RHS(FEMSpace, RBInfo, RBVars, Param)
-      end
-      if "L" ∈ RBInfo.probl_nl
-        build_RB_lifting(FEMSpace, RBInfo, RBVars, Param)
       end
     end
   end
 
   save_system_blocks(RBInfo,RBVars.Steady,blocks,blocks,operators)
-
-end
-
-function build_RB_lifting(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonSTGRB{T},
-  Param::UnsteadyParametricInfo) where T
-
-  println("Assembling reduced lifting exactly")
-
-  L_t = assemble_FEM_structure(FEMSpace, RBInfo, Param, "L")
-  L = zeros(T, RBVars.Nₛᵘ, RBVars.Nₜ)
-  timesθ = get_timesθ(RBInfo)
-  for (i,tᵢ) in enumerate(timesθ)
-    L[:,i] = L_t(tᵢ)
-  end
-  Lₙ = Matrix{T}[]
-  push!(Lₙ, reshape((RBVars.Φₛᵘ'*(L*RBVars.Φₜᵘ))',:,1))::Vector{Matrix{T}}
-  RBVars.RHSₙ -= Lₙ
 
 end
 
@@ -344,37 +326,19 @@ function build_param_RHS(
   Param::UnsteadyParametricInfo) where T
 
   println("Assembling RHS exactly using θ-method time scheme, θ=$(RBInfo.θ)")
-  δtθ = RBInfo.δt*RBInfo.θ
+
   F_t = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
   H_t = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
-  F, H = zeros(T, RBVars.Nₛᵘ, RBVars.Nₜ), zeros(T, RBVars.Nₛᵘ, RBVars.Nₜ)
+  L_t = assemble_FEM_structure(FEMSpace, RBInfo, Param, "L")
+
+  RHS = zeros(T, RBVars.Nₛᵘ, RBVars.Nₜ)
   timesθ = get_timesθ(RBInfo)
+
   for (i,tᵢ) in enumerate(timesθ)
-    F[:,i] = F_t(tᵢ)
-    H[:,i] = H_t(tᵢ)
-  end
-  F *= δtθ
-  H *= δtθ
-  Fₙ = RBVars.Φₛᵘ'*(F*RBVars.Φₜᵘ)
-  Hₙ = RBVars.Φₛᵘ'*(H*RBVars.Φₜᵘ)
-  push!(RBVars.RHSₙ, reshape(Fₙ'+Hₙ',:,1))::Vector{Matrix{T}}
-
-end
-
-function get_θ(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonSTGRB{T},
-  Param::UnsteadyParametricInfo) where T
-
-  θᵐ = get_θᵐ(FEMSpace, RBInfo, RBVars, Param)
-  θᵃ = get_θᵃ(FEMSpace, RBInfo, RBVars, Param)
-  if !RBInfo.build_parametric_RHS
-    θᶠ, θʰ = get_θᶠʰ(FEMSpace, RBInfo, RBVars, Param)
-  else
-    θᶠ, θʰ = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
+    RHS[:,i] = F_t(tᵢ) + H_t(tᵢ) - L_t(tᵢ)
   end
 
-  return θᵐ, θᵃ, θᶠ, θʰ
+  RHSₙ = RBInfo.δt*RBInfo.θ * RBVars.Φₛᵘ'*(RHS*RBVars.Φₜᵘ)
+  push!(RBVars.RHSₙ, reshape(RHSₙ',:,1))::Vector{Matrix{T}}
 
 end

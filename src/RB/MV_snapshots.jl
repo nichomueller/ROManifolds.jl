@@ -430,8 +430,6 @@ function standard_DEIM(
 
 end
 
-
-
 function get_snaps_DEIM(
   FEMSpace::UnsteadyProblem,
   RBInfo::ROMInfoUnsteady,

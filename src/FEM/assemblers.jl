@@ -174,18 +174,22 @@ function assemble_stiffness(
 
 end
 
-function assemble_primal_op(
+function assemble_B(
   ::NTuple{3,Int},
-  FEMSpace::SteadyProblem)
+  FEMSpace::SteadyProblem,
+  ::Info,
+  ::Info)
 
   assemble_matrix(∫(FEMSpace.ψᵧ*(∇⋅(FEMSpace.ϕᵤ)))*FEMSpace.dΩ,
     FEMSpace.V, FEMSpace.Q₀)
 
 end
 
-function assemble_primal_op(
-  ::NTuple{4,Int},
-  FEMSpace::UnsteadyProblem)
+function assemble_B(
+  ::NTuple{3,Int},
+  FEMSpace::UnsteadyProblem,
+  ::Info,
+  ::Info)
 
   function unsteady_primal_form(t)
     assemble_matrix(∫(FEMSpace.ψᵧ*(∇⋅(FEMSpace.ϕᵤ(t))))*FEMSpace.dΩ,
@@ -196,15 +200,17 @@ function assemble_primal_op(
 
 end
 
-function assemble_primal_op(
+function assemble_B(
   ::NTuple{4,Int},
-  FEMSpace::FEMProblem)
+  FEMSpace::FEMProblem,
+  FEMInfo::Info,
+  Param::Info)
 
-  assemble_primal_op(get_NTuple(3, Int), FEMSpace)
+  assemble_B(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)
 
 end
 
-function assemble_advection(
+function assemble_B(
   ::NTuple{2,Int},
   FEMSpace::SteadyProblem,
   ::SteadyInfo,
@@ -215,7 +221,7 @@ function assemble_advection(
 
 end
 
-function assemble_advection(
+function assemble_B(
   ::NTuple{2,Int},
   FEMSpace::SteadyProblem,
   FEMInfo::UnsteadyInfo,
@@ -543,8 +549,8 @@ function assemble_lifting(
   g = define_g_FEM(FEMSpace, Param)
   dg = define_dg_FEM(FEMSpace, Param)
 
-  L(t) = (assemble_vector(∫(Param.m(t) * FEMSpace.ϕᵥ * dg(t))*FEMSpace.dΩ,FEMSpace.V₀) +
-    δtθ * assemble_vector(∫(Param.α(t) * ∇(FEMSpace.ϕᵥ) ⋅ ∇(g(t)))*FEMSpace.dΩ,FEMSpace.V₀))
+  L(t) = (assemble_vector(∫(Param.m(t) * FEMSpace.ϕᵥ * dg(t))*FEMSpace.dΩ,FEMSpace.V₀) / δtθ +
+    assemble_vector(∫(Param.α(t) * ∇(FEMSpace.ϕᵥ) ⋅ ∇(g(t)))*FEMSpace.dΩ,FEMSpace.V₀))
 
   L
 
@@ -591,8 +597,8 @@ function assemble_lifting(
 
   g = define_g_FEM(FEMSpace, Param)
 
-  vcat(assemble_vector(∫(Param.α * ∇(FEMSpace.ϕᵥ) ⊙ ∇(g))*FEMSpace.dΩ,FEMSpace.V₀),
-    assemble_vector(∫(FEMSpace.ψᵧ * (∇⋅g))*FEMSpace.dΩ,FEMSpace.Q₀))::Vector{Float}
+  assemble_vector(∫(Param.α * ∇(FEMSpace.ϕᵥ) ⊙ ∇(g))*FEMSpace.dΩ,
+    FEMSpace.V₀)::Vector{Float}
 
 end
 
@@ -606,11 +612,10 @@ function assemble_lifting(
   g = define_g_FEM(FEMSpace, Param)
   dg = define_dg_FEM(FEMSpace, Param)
 
-  L(t) = vcat(assemble_vector(∫(Param.m(t) * FEMSpace.ϕᵥ ⋅ dg(t))*FEMSpace.dΩ,FEMSpace.V₀) +
-    δtθ * assemble_vector(∫(Param.α(t) * ∇(FEMSpace.ϕᵥ) ⊙ ∇(g(t)))*FEMSpace.dΩ,FEMSpace.V₀),
-    assemble_vector(∫(FEMSpace.ψᵧ*(∇⋅(g(t))))*FEMSpace.dΩ,FEMSpace.Q₀))
+  L₁(t) = assemble_vector(∫(Param.m(t) * FEMSpace.ϕᵥ ⋅ dg(t))*FEMSpace.dΩ,FEMSpace.V₀) / δtθ +
+    assemble_vector(∫(Param.α(t) * ∇(FEMSpace.ϕᵥ) ⊙ ∇(g(t)))*FEMSpace.dΩ,FEMSpace.V₀)
 
-  L
+  L₁
 
 end
 
@@ -624,8 +629,9 @@ function assemble_lifting(
     ((FEMSpace.ϕᵥ')⋅u) )*FEMSpace.dΩ, FEMSpace.V₀)
   g = define_g_FEM(FEMSpace, Param)
 
-  (assemble_lifting(get_NTuple(3, Int), FEMSpace, FEMInfo, Param) +
-    vcat(C(g), zeros(FEMSpace.Nₛᵖ)))::Vector{Float}
+  L₁ = assemble_lifting(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)
+
+  (L₁ + C(g))::Vector{Float}
 
 end
 
@@ -635,15 +641,50 @@ function assemble_lifting(
   FEMInfo::UnsteadyInfo,
   Param::UnsteadyParametricInfo)
 
-  δtθ = FEMInfo.δt*FEMInfo.θ
-  C(u,t) = Param.Re * assemble_vector(∫( FEMSpace.ϕᵥ ⊙
+  C(u, t) = Param.Re * assemble_vector(∫( FEMSpace.ϕᵥ ⊙
     ((FEMSpace.ϕᵥ')⋅u(t)) )*FEMSpace.dΩ, FEMSpace.V₀)
   g = define_g_FEM(FEMSpace, Param)
 
-  L(t) = (assemble_lifting(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)(t) +
-    vcat(δtθ * C(g(t),t), zeros(FEMSpace.Nₛᵖ)))
+  L₁ = assemble_lifting(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)
+  L₁_new(t) = L₁(t) + C(g(t), t)
 
-  L
+  L₁_new
+
+end
+
+function assemble_lifting_continuity(
+  ::NTuple{3,Int},
+  FEMSpace::SteadyProblem,
+  FEMInfo::SteadyInfo,
+  Param::SteadyParametricInfo)
+
+  g = define_g_FEM(FEMSpace, Param)
+
+  assemble_vector(∫(FEMSpace.ψᵧ * (∇⋅g))*FEMSpace.dΩ,FEMSpace.Q₀)::Vector{Float}
+
+end
+
+function assemble_lifting_continuity(
+  ::NTuple{3,Int},
+  FEMSpace::UnsteadyProblem,
+  FEMInfo::UnsteadyInfo,
+  Param::UnsteadyParametricInfo)
+
+  g = define_g_FEM(FEMSpace, Param)
+
+  L₂(t) = assemble_vector(∫(FEMSpace.ψᵧ*(∇⋅(g(t))))*FEMSpace.dΩ,FEMSpace.Q₀)
+
+  L₂
+
+end
+
+function assemble_lifting_continuity(
+  ::NTuple{4,Int},
+  FEMSpace::FEMProblem,
+  FEMInfo::Info,
+  Param::Info)
+
+  assemble_lifting_continuity(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)
 
 end
 
@@ -736,9 +777,7 @@ function assemble_FEM_structure(
   if var == "A"
     assemble_stiffness(NT,FEMSpace,FEMInfo,Param)
   elseif var == "B"
-    assemble_advection(NT,FEMSpace,FEMInfo,Param)
-  elseif var == "Bₚ"
-    assemble_primal_op(NT,FEMSpace)
+    assemble_B(NT,FEMSpace,FEMInfo,Param)
   elseif var == "C"
     assemble_convection(NT,FEMSpace,Param)
   elseif var == "D"
@@ -749,6 +788,8 @@ function assemble_FEM_structure(
     assemble_neumann_datum(NT,FEMSpace,FEMInfo,Param)
   elseif var == "L"
     assemble_lifting(NT,FEMSpace,FEMInfo,Param)
+  elseif var == "Lc"
+    assemble_lifting_continuity(NT,FEMSpace,FEMInfo,Param)
   elseif var == "M"
     assemble_mass(NT,FEMSpace,FEMInfo,Param)
   elseif var == "Xᵘ"

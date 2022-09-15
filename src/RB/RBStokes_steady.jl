@@ -162,7 +162,7 @@ function set_operators(
   RBInfo::Info,
   RBVars::StokesSteady)
 
-  append!(["B"], set_operators(RBInfo, RBVars.Poisson))
+  append!(["B", "Lc"], set_operators(RBInfo, RBVars.Poisson))
 
 end
 
@@ -178,7 +178,13 @@ function assemble_MDEIM_matrices(
       (RBVars.MDEIM_mat_A, RBVars.MDEIM_idx_A, RBVars.MDEIMᵢ_A,
       RBVars.row_idx_A,RBVars.sparse_el_A) = MDEIM_offline(RBInfo, RBVars, "A")
     end
-    assemble_reduced_mat_MDEIM(RBVars,RBVars.MDEIM_mat_A,RBVars.row_idx_A)
+    assemble_reduced_mat_MDEIM(RBVars, RBVars.MDEIM_mat_A, RBVars.row_idx_A, var)
+  elseif var == "B"
+    if isempty(RBVars.MDEIM_mat_B)
+      (RBVars.MDEIM_mat_B, RBVars.MDEIM_idx_B, RBVars.MDEIMᵢ_B,
+      RBVars.row_idx_B,RBVars.sparse_el_B) = MDEIM_offline(RBInfo, RBVars, "B")
+    end
+    assemble_reduced_mat_MDEIM(RBVars, RBVars.MDEIM_mat_B, RBVars.row_idx_B, var)
   else
     error("Unrecognized variable on which to perform MDEIM")
   end
@@ -211,25 +217,36 @@ function assemble_DEIM_vectors(
         DEIM_offline(RBInfo,"L")
     end
     assemble_reduced_mat_DEIM(RBVars,RBVars.DEIM_mat_L,"L")
+  elseif var == "Lc"
+    if isempty(RBVars.DEIM_mat_Lc)
+      RBVars.DEIM_mat_Lc, RBVars.DEIM_idx_Lc, RBVars.DEIMᵢ_Lc, RBVars.sparse_el_Lc =
+        DEIM_offline(RBInfo,"Lc")
+    end
+    assemble_reduced_mat_DEIM(RBVars,RBVars.DEIM_mat_Lc,"Lc")
   else
     error("Unrecognized variable on which to perform DEIM")
   end
 
 end
 
-function save_M_DEIM_structures(
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady)
+function save_assembled_structures(
+  RBInfo::Info,
+  RBVars::PoissonSteady)
 
-  save_M_DEIM_structures(RBInfo, RBVars.Poisson)
+  affine_vars = (reshape(RBVars.Bₙ, :, RBVars.Qᵇ)::Matrix{T}, RBVars.Lcₙ)
+  affine_names = ("Bₙ", "Lcₙ")
+  save_structures_in_list(affine_vars, affine_names, RBInfo.ROM_structures_path)
 
-end
+  M_DEIM_vars = (
+    RBVars.MDEIM_mat_B, RBVars.MDEIMᵢ_B, RBVars.MDEIM_idx_B, RBVars.row_idx_B,
+    RBVars.sparse_el_B, RBVars.DEIM_mat_Lc, RBVars.DEIMᵢ_Lc, RBVars.DEIM_idx_Lc,)
+    RBVars.sparse_el_Lc
+  M_DEIM_names = (
+    "MDEIM_mat_B","MDEIMᵢ_B","MDEIM_idx_B","row_idx_B","sparse_el_B",
+    "DEIM_mat_Lc","DEIMᵢ_Lc","DEIM_idx_Lc","sparse_el_Lc")
+  save_structures_in_list(M_DEIM_vars, M_DEIM_names, RBInfo.ROM_structures_path)
 
-function get_M_DEIM_structures(
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady)
-
-  get_M_DEIM_structures(RBInfo, RBVars.Poisson)
+  save_assembled_structures(RBInfo, RBVars.Poisson)
 
 end
 
@@ -239,9 +256,15 @@ function get_offline_structures(
 
   operators = String[]
 
-  append!(operators, get_affine_structures(RBInfo, RBVars))
-  append!(operators, get_M_DEIM_structures(RBInfo, RBVars))
-  unique!(operators)
+  append!(operators, get_A(RBInfo, RBVars))
+  append!(operators, get_B(RBInfo, RBVars))
+
+  if RBInfo.build_parametric_RHS
+    append!(operators, get_F(RBInfo, RBVars))
+    append!(operators, get_H(RBInfo, RBVars))
+    append!(operators, get_L(RBInfo, RBVars))
+    append!(operators, get_Lc(RBInfo, RBVars))
+  end
 
   operators
 
@@ -268,65 +291,70 @@ function save_system_blocks(
 
 end
 
-function get_θᵃ(
+function get_θ_matrix(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::StokesSteady,
-  Param::SteadyParametricInfo)
+  Param::SteadyParametricInfo,
+  var::String)
 
-  if "A" ∉ RBInfo.probl_nl
-    θᵃ = reshape([T.(Param.α(Point(0.,0.)))],1,1)
+  if var == "A"
+    return θ_matrix(FEMSpace, RBInfo, RBVars, Param.α, RBVars.MDEIMᵢ_A,
+      RBVars.MDEIM_idx_A, RBVars.sparse_el_A, "A")::Matrix{T}
+  elseif var == "B"
+    return θ_matrix(FEMSpace, RBInfo, RBVars, Param.b, RBVars.MDEIMᵢ_B,
+      RBVars.MDEIM_idx_B, RBVars.sparse_el_B, "B")::Matrix{T}
   else
-    A_μ_sparse = T.(build_sparse_mat(FEMSpace, FEMInfo, Param, RBVars.sparse_el_A))
-    θᵃ = M_DEIM_online(A_μ_sparse, RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A)
+    error("Unrecognized variable")
   end
 
-  θᵃ::Matrix{T}
-
 end
 
-function get_θᵇ(
-  ::SteadyProblem,
-  ::ROMInfoSteady{T},
-  ::StokesSteady,
-  ::SteadyParametricInfo) where T
-
-  reshape([one(T)],1,1)::Matrix{T}
-
-end
-
-function get_θᶠʰˡ(
+function get_θ_vector(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady,
   RBVars::StokesSteady,
-  Param::SteadyParametricInfo)
+  Param::SteadyParametricInfo,
+  var::String)
 
-  if RBInfo.build_parametric_RHS
-    error("Cannot fetch θᶠ, θʰ, θˡ if the RHS is built online")
-  end
-
-  if "F" ∉ RBInfo.probl_nl
-    θᶠ = reshape([T.(Param.f(Point(0.,0.)))],1,1)
+  if var == "F"
+    return θ_vector(FEMSpace, RBInfo, RBVars, Param.f, RBVars.DEIMᵢ_F,
+      RBVars.DEIM_idx_F, RBVars.sparse_el_F, "F")::Matrix{T}
+  elseif var == "H"
+    return θ_vector(FEMSpace, RBInfo, RBVars, Param.h, RBVars.DEIMᵢ_H,
+      RBVars.DEIM_idx_H, RBVars.sparse_el_H, "H")::Matrix{T}
+  elseif var == "L"
+    return θ_vector(FEMSpace, RBInfo, RBVars, Param.g, RBVars.DEIMᵢ_L,
+      RBVars.DEIM_idx_L, RBVars.sparse_el_L, "L")::Matrix{T}
+  elseif var == "Lc"
+    return θ_vector(FEMSpace, RBInfo, RBVars, Param.g, RBVars.DEIMᵢ_Lc,
+      RBVars.DEIM_idx_Lc, RBVars.sparse_el_Lc, "Lc")::Matrix{T}
   else
-    F_μ = T.(build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_F, "F"))
-    θᶠ = M_DEIM_online(F_μ, RBVars.DEIMᵢ_F, RBVars.DEIM_idx_F)
+    error("Unrecognized variable")
   end
 
-  if "H" ∉ RBInfo.probl_nl
-    θʰ = reshape([T.(Param.h(Point(0.,0.)))],1,1)
+end
+
+function get_θ(
+  FEMSpace::SteadyProblem,
+  RBInfo::ROMInfoSteady,
+  RBVars::StokesSGRB{T},
+  Param::SteadyParametricInfo) where T
+
+  θᵃ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "A")
+  θᵇ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "B")
+
+  if !RBInfo.build_parametric_RHS
+    θᶠ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "F")
+    θʰ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "H")
+    θˡ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "L")
+    θˡᶜ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "Lc")
   else
-    H_μ = T.(build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_H, "H"))
-    θʰ = M_DEIM_online(H_μ, RBVars.DEIMᵢ_H, RBVars.DEIM_idx_H)
+    θᶠ, θʰ, θˡ, θˡᶜ = (Matrix{T}(undef,0,0), Matrix{T}(undef,0,0),
+      Matrix{T}(undef,0,0), Matrix{T}(undef,0,0))
   end
 
-  if "L" ∉ RBInfo.probl_nl
-    θˡ = reshape([T.(Param.g(Point(0.,0.)))],1,1)
-  else
-    L_μ = T.(build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_H, "L"))
-    θˡ = M_DEIM_online(L_μ, RBVars.DEIMᵢ_L, RBVars.DEIM_idx_L)
-  end
-
-  θᶠ, θʰ, θˡ
+  return θᵃ, θᵇ, θᶠ, θʰ, θˡ, θˡᶜ
 
 end
 
@@ -350,10 +378,10 @@ function get_RB_system(
   RBVars.online_time = @elapsed begin
     get_Q(RBInfo, RBVars)
     LHS_blocks = [1, 2, 3]
-    RHS_blocks = [1]
+    RHS_blocks = [1, 2]
     operators = get_system_blocks(RBInfo, RBVars, LHS_blocks, RHS_blocks)
 
-    θᵃ, θᶠ, θʰ, θˡ, θᵇ = get_θ(FEMSpace, RBInfo, RBVars, Param)
+    θᵃ, θᵇ, θᶠ, θʰ, θˡ, θˡᶜ = get_θ(FEMSpace, RBInfo, RBVars, Param)
 
     if "LHS" ∈ operators
       get_RB_LHS_blocks(RBVars, θᵃ, θᵇ)
@@ -361,7 +389,7 @@ function get_RB_system(
 
     if "RHS" ∈ operators
       if !RBInfo.build_parametric_RHS
-        get_RB_RHS_blocks(RBVars, θᶠ, θʰ, θˡ)
+        get_RB_RHS_blocks(RBVars, θᶠ, θʰ, θˡ, θˡᶜ)
       else
         build_param_RHS(FEMSpace, RBInfo, RBVars, Param)
       end
@@ -384,7 +412,7 @@ function solve_RB_system(
   RBVars.online_time += @elapsed begin
     xₙ = (vcat(hcat(RBVars.LHSₙ[1], RBVars.LHSₙ[2]),
       hcat(RBVars.LHSₙ[3], zeros(T, RBVars.nₛᵖ, RBVars.nₛᵖ))) \
-      vcat(RBVars.RHSₙ[1], zeros(T, RBVars.nₛᵖ, 1)))
+      vcat(RBVars.RHSₙ[1], RBVars.RHSₙ[2]))
   end
 
   RBVars.uₙ = xₙ[1:RBVars.nₛᵘ,:]

@@ -294,55 +294,61 @@ function save_system_blocks(
   end
 end
 
-function get_θᵃ(
+function get_θ_matrix(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady{T},
   RBVars::PoissonSteady,
-  Param::SteadyParametricInfo) where T
+  Param::SteadyParametricInfo,
+  var::String) where T
 
-  if "A" ∉ RBInfo.probl_nl
-    θᵃ = reshape([T.(Param.α(Point(0.,0.)))],1,1)
+  if var == "A"
+    return θ_matrix(FEMSpace, RBInfo, RBVars, Param.α, RBVars.MDEIMᵢ_A,
+      RBVars.MDEIM_idx_A, RBVars.sparse_el_A, "A")::Matrix{T}
   else
-    A_μ_sparse = T.(build_sparse_mat(FEMSpace, FEMInfo, Param, RBVars.sparse_el_A))
-    θᵃ = M_DEIM_online(A_μ_sparse, RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A)
+    error("Unrecognized variable")
   end
-
-  θᵃ::Matrix{T}
 
 end
 
-function get_θᶠʰˡ(
+function get_θ_vector(
   FEMSpace::SteadyProblem,
   RBInfo::ROMInfoSteady{T},
   RBVars::PoissonSteady,
+  Param::SteadyParametricInfo,
+  var::String) where T
+
+  if var == "F"
+    return θ_vector(FEMSpace, RBInfo, RBVars, Param.f, RBVars.DEIMᵢ_F,
+      RBVars.DEIM_idx_F, RBVars.sparse_el_F, "F")::Matrix{T}
+  elseif var == "H"
+    return θ_vector(FEMSpace, RBInfo, RBVars, Param.h, RBVars.DEIMᵢ_H,
+      RBVars.DEIM_idx_H, RBVars.sparse_el_H, "H")::Matrix{T}
+  elseif var == "L"
+    return θ_vector(FEMSpace, RBInfo, RBVars, Param.g, RBVars.DEIMᵢ_L,
+      RBVars.DEIM_idx_L, RBVars.sparse_el_L, "L")::Matrix{T}
+  else
+    error("Unrecognized variable")
+  end
+
+end
+
+function get_θ(
+  FEMSpace::SteadyProblem,
+  RBInfo::ROMInfoSteady,
+  RBVars::PoissonSGRB{T},
   Param::SteadyParametricInfo) where T
 
-  if RBInfo.build_parametric_RHS
-    error("Cannot fetch θᶠ, θʰ, θˡ if the RHS is built online")
-  end
+  θᵃ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "A")
 
-  if "F" ∉ RBInfo.probl_nl
-    θᶠ = reshape([T.(Param.f(Point(0.,0.)))],1,1)
+  if !RBInfo.build_parametric_RHS
+    θᶠ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "F")
+    θʰ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "H")
+    θˡ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "L")
   else
-    F_μ = T.(build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_F, "F"))
-    θᶠ = M_DEIM_online(F_μ, RBVars.DEIMᵢ_F, RBVars.DEIM_idx_F)
+    θᶠ, θʰ, θˡ = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
   end
 
-  if "H" ∉ RBInfo.probl_nl
-    θʰ = reshape([T.(Param.h(Point(0.,0.)))],1,1)
-  else
-    H_μ = T.(build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_H, "H"))
-    θʰ = M_DEIM_online(H_μ, RBVars.DEIMᵢ_H, RBVars.DEIM_idx_H)
-  end
-
-  if "L" ∉ RBInfo.probl_nl
-    θˡ = reshape([T.(Param.g(Point(0.,0.)))],1,1)
-  else
-    L_μ = T.(build_sparse_vec(FEMSpace, FEMInfo, Param, RBVars.sparse_el_H, "L"))
-    θˡ = M_DEIM_online(L_μ, RBVars.DEIMᵢ_L, RBVars.DEIM_idx_L)
-  end
-
-  θᶠ, θʰ, θˡ
+  return θᵃ, θᶠ, θʰ, θˡ
 
 end
 
@@ -369,7 +375,7 @@ function get_RB_RHS_blocks(
 
   println("Assembling reduced RHS")
 
-  block₁ = RBVars.Fₙ * θᶠ + RBVars.Hₙ * θʰ + RBVars.Lₙ * θˡ
+  block₁ = RBVars.Fₙ * θᶠ + RBVars.Hₙ * θʰ - RBVars.Lₙ * θˡ
 
   push!(RBVars.RHSₙ, block₁)::Vector{Matrix{T}}
 

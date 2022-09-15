@@ -1,50 +1,103 @@
-function get_Aₙ(
+function get_A(
   RBInfo::Info,
   RBVars::StokesSGRB)
 
-  get_Aₙ(RBInfo, RBVars.Poisson)
+  get_A(RBInfo, RBVars.Poisson)
 
 end
 
-function get_Bₙ(
+function get_B(
   RBInfo::Info,
   RBVars::StokesSGRB{T}) where T
 
-  if isfile(joinpath(RBInfo.ROM_structures_path, "Bₙ.csv"))
-    println("Importing reduced affine divergence matrix")
-    Bₙ = load_CSV(Matrix{T}(undef,0,0),
-      joinpath(RBInfo.ROM_structures_path, "Bₙ.csv"))
-    RBVars.Bₙ = reshape(Bₙ,RBVars.nₛᵖ,RBVars.nₛᵘ,:)::Array{T,3}
-    RBVars.Qᵇ = size(RBVars.Bₙ)[3]
-    return [""]
+  if "B" ∈ RBInfo.probl_nl
+
+    if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIMᵢ_B.csv"))
+      println("Importing MDEIM offline structures, B")
+      (RBVars.MDEIMᵢ_B, RBVars.MDEIM_idx_B, RBVars.row_idx_B, RBVars.sparse_el_B) =
+        load_structures_in_list(("MDEIMᵢ_B", "MDEIM_idx_B", "row_idx_B", "sparse_el_B"),
+        (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
+        RBInfo.ROM_structures_path)
+      return [""]
+    else
+      println("Failed to import MDEIM offline structures for
+        B: must build them")
+      return ["B"]
+    end
+
   else
-    println("Failed to import Bₙ: must build it")
-    return ["B"]
+
+    if isfile(joinpath(RBInfo.ROM_structures_path, "Bₙ.csv"))
+      println("Importing reduced affine divergence matrix")
+      Bₙ = load_CSV(Matrix{T}(undef,0,0),
+        joinpath(RBInfo.ROM_structures_path, "Bₙ.csv"))
+      RBVars.Bₙ = reshape(Bₙ,RBVars.nₛᵖ,RBVars.nₛᵘ,:)::Array{T,3}
+      RBVars.Qᵇ = size(RBVars.Bₙ)[3]
+      return [""]
+    else
+      println("Failed to import Bₙ: must build it")
+      return ["B"]
+    end
+
   end
 
 end
 
-function get_Fₙ(
+function get_F(
   RBInfo::Info,
   RBVars::StokesSGRB)
 
-  get_Fₙ(RBInfo, RBVars.Poisson)
+  get_F(RBInfo, RBVars.Poisson)
 
 end
 
-function get_Hₙ(
+function get_H(
   RBInfo::Info,
   RBVars::StokesSGRB)
 
-  get_Hₙ(RBInfo, RBVars.Poisson)
+  get_H(RBInfo, RBVars.Poisson)
 
 end
 
-function get_Lₙ(
+function get_L(
   RBInfo::Info,
   RBVars::StokesSGRB)
 
-  get_Lₙ(RBInfo, RBVars.Poisson)
+  get_L(RBInfo, RBVars.Poisson)
+
+end
+
+function get_Lc(
+  RBInfo::Info,
+  RBVars::StokesSGRB)
+
+  if "Lc" ∈ RBInfo.probl_nl
+
+    if isfile(joinpath(RBInfo.ROM_structures_path, "DEIMᵢ_Lc.csv"))
+      println("Importing DEIM offline structures, L")
+      (RBVars.DEIMᵢ_Lc, RBVars.DEIM_idx_Lc, RBVars.sparse_el_Lc) =
+        load_structures_in_list(("DEIMᵢ_Lc", "DEIM_idx_Lc", "sparse_el_Lc"),
+        (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
+        RBInfo.ROM_structures_path)
+      return [""]
+    else
+      println("Failed to import DEIM offline structures for Lc: must build them")
+      return ["Lc"]
+    end
+
+  else
+
+    if isfile(joinpath(RBInfo.ROM_structures_path, "Lcₙ.csv"))
+      println("Importing Lcₙ")
+      RBVars.Lcₙ = load_CSV(Matrix{T}(undef,0,0),
+        joinpath(RBInfo.ROM_structures_path, "Lcₙ.csv"))
+      return [""]
+    else
+      println("Failed to import Lcₙ: must build it")
+      return ["Lc"]
+    end
+
+  end
 
 end
 
@@ -53,13 +106,7 @@ function assemble_affine_matrices(
   RBVars::StokesSGRB{T},
   var::String) where T
 
-  if var == "A"
-    println("Assembling affine reduced stiffness")
-    RBVars.Qᵃ = 1
-    A = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "A.csv"))
-    RBVars.Aₙ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ, 1)
-    RBVars.Aₙ[:,:,1] = (RBVars.Φₛᵘ)' * A * RBVars.Φₛᵘ
-  elseif var == "B"
+  if var == "B"
     println("Assembling affine reduced B")
     RBVars.Qᵇ = 1
     B = load_CSV(sparse([],[],T[]),
@@ -78,9 +125,7 @@ function assemble_reduced_mat_MDEIM(
   row_idx::Vector,
   var::String)
 
-  if var == "A"
-    assemble_reduced_mat_MDEIM(RBVars.Poisson, MDEIM_mat, row_idx, var)
-  else var == "B"
+  if var == "B"
     Q = size(MDEIM_mat)[2]
     r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.Nₛᵖ)
     MatqΦ = zeros(T,RBVars.Nₛᵖ,RBVars.nₛᵘ,Q)
@@ -93,6 +138,9 @@ function assemble_reduced_mat_MDEIM(
       reshape(MatqΦ,RBVars.Nₛᵖ,:),RBVars.nₛᵘ,:,Q)::Array{T,3}
     RBVars.Bₙ = Matₙ
     RBVars.Qᵇ = Q
+
+  else
+    assemble_reduced_mat_MDEIM(RBVars.Poisson, MDEIM_mat, row_idx, var)
   end
 
 end
@@ -102,15 +150,14 @@ function assemble_affine_vectors(
   RBVars::StokesSGRB,
   var::String)
 
-  if var ∈ ("F", "H")
-    assemble_affine_vectors(RBInfo, RBVars.Poisson, var)
-  elseif var == "L"
-    RBVars.Qˡ = 1
-    println("Assembling affine reduced lifting term")
-    L = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "L.csv"))
-    RBVars.Lₙ = vcat(RBVars.Φₛᵘ, RBVars.Φₛᵖ)' * L
+  if var == "Lc"
+    RBVars.Qˡᶜ = 1
+    println("Assembling affine reduced lifting term, continuity")
+    Lc = load_CSV(Matrix{T}(undef,0,0),
+      joinpath(get_FEM_structures_path(RBInfo), "Lc.csv"))
+    RBVars.Lcₙ = RBVars.Φₛᵖ' * Lc
   else
-    error("Unrecognized variable to assemble")
+    assemble_affine_vectors(RBInfo, RBVars.Poisson, var)
   end
 
 end
@@ -120,7 +167,17 @@ function assemble_reduced_mat_DEIM(
   DEIM_mat::Matrix,
   var::String)
 
-  assemble_reduced_mat_DEIM(RBVars.Poisson, DEIM_mat, var)
+  if var == "Lc"
+    Q = size(DEIM_mat)[2]
+    Vecₙ = zeros(T, RBVars.nₛᵖ, 1, Q)
+    @simd for q = 1:Q
+      Vecₙ[:,:,q] = RBVars.Φₛᵖ' * Vector{T}(DEIM_mat[:, q])
+    end
+    RBVars.Lcₙ = reshape(Vecₙ, :, Q)
+    RBVars.Qˡᶜ = Q
+  else
+    assemble_reduced_mat_DEIM(RBVars.Poisson, DEIM_mat, var)
+  end
 
 end
 
@@ -151,36 +208,22 @@ function assemble_offline_structures(
     end
   end
 
-  save_affine_structures(RBInfo, RBVars)
-
-end
-
-function save_affine_structures(
-  RBInfo::Info,
-  RBVars::StokesSGRB)
-
-  if RBInfo.save_offline_structures
-    Bₙ = reshape(RBVars.Bₙ, :, 1)
-    save_CSV(Bₙ, joinpath(RBInfo.ROM_structures_path, "Bₙ.csv"))
-  end
-
-end
-
-function get_affine_structures(
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady)
-
-  operators = get_affine_structures(RBInfo, RBVars.Poisson)
-
-  append!(operators, get_Bₙ(RBInfo, RBVars))
-
-  operators
+  save_assembled_structures(RBInfo, RBVars)
 
 end
 
 function get_Q(
   RBInfo::Info,
   RBVars::StokesSGRB)
+
+  if RBVars.Qᵇ == 0
+    RBVars.Qᵇ = size(RBVars.Bₙ)[end]
+  end
+  if !RBInfo.build_parametric_RHS
+    if RBVars.Qˡᶜ == 0
+      RBVars.Qˡᶜ = size(RBVars.Lcₙ)[end]
+    end
+  end
 
   get_Q(RBInfo, RBVars.Poisson)
 
@@ -202,34 +245,20 @@ function get_RB_LHS_blocks(
 
   push!(RBVars.LHSₙ, -block₂')::Vector{Matrix{T}}
   push!(RBVars.LHSₙ, block₂)::Vector{Matrix{T}}
-  push!(RBVars.LHSₙ, zeros(T, RBVars.nₛᵖ, RBVars.nₛᵖ))::Vector{Matrix{T}}
 
 end
 
 function get_RB_RHS_blocks(
   RBVars::PoissonSteady{T},
-  θᶠ::Array,
-  θʰ::Array) where T
+  θᶠ::Matrix,
+  θʰ::Matrix,
+  θˡ::Matrix,
+  θˡᶜ::Matrix) where T
 
-  get_RB_RHS_blocks(RBVars.Poisson, θᶠ, θʰ)
-  push!(RBVars.RHSₙ, zeros(T, RBVars.nₛᵖ, 1))::Vector{Matrix{T}}
+  get_RB_RHS_blocks(RBVars.Poisson, θᶠ, θʰ, θˡ)
+  push!(RBVars.RHSₙ, -RBVars.Lcₙ * θˡᶜ)::Vector{Matrix{T}}
 
 end
-
-#= function build_RB_lifting(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSGRB{T},
-  Param::SteadyParametricInfo) where T
-
-  println("Assembling reduced lifting exactly")
-
-  L = assemble_FEM_structure(FEMSpace, RBInfo, Param, "L")
-  Lₙ = Matrix{T}[]
-  push!(Lₙ, vcat(RBVars.Φₛᵘ, RBVars.Φₛᵖ)'*L)
-  RBVars.RHSₙ -= Lₙ
-
-end =#
 
 function build_param_RHS(
   FEMSpace::SteadyProblem,
@@ -238,19 +267,8 @@ function build_param_RHS(
   Param::SteadyParametricInfo) where T
 
   build_param_RHS(FEMSpace, RBInfo, RBVars.Poisson, Param)
-  push!(RBVars.RHSₙ, zeros(T, RBVars.nₛᵖ, 1))
 
-end
-
-function get_θ(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSGRB{T},
-  Param::SteadyParametricInfo) where T
-
-  θᵃ, θᶠ, θʰ = get_θ(FEMSpace, RBInfo, RBVars.Poisson, Param)
-  θᵇ = get_θᵇ(FEMSpace, RBInfo, RBVars, Param)
-
-  return θᵃ, θᵇ, θᶠ, θʰ
+  Lc = assemble_FEM_structure(FEMSpace, RBInfo, Param, "Lc")
+  push!(RBVars.RHSₙ, reshape(-RBVars.Φₛᵖ' * L, :, 1)::Matrix{T})
 
 end
