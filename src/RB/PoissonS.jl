@@ -4,8 +4,8 @@ include("PoissonS_support.jl")
 ################################# OFFLINE ######################################
 
 function get_snapshot_matrix(
-  RBInfo::ROMInfoSteady,
-  RBVars::PoissonSteady{T}) where T
+  RBInfo::ROMInfoS,
+  RBVars::PoissonS{T}) where T
 
   println("Importing the snapshot matrix for field u,
     number of snapshots considered: $(RBInfo.nₛ)")
@@ -22,7 +22,7 @@ end
 
 function get_norm_matrix(
   RBInfo::Info,
-  RBVars::PoissonSteady{T}) where T
+  RBVars::PoissonS{T}) where T
 
   if check_norm_matrix(RBVars)
     println("Importing the norm matrix Xᵘ₀")
@@ -39,8 +39,8 @@ function get_norm_matrix(
 end
 
 function assemble_reduced_basis(
-  RBInfo::ROMInfoSteady,
-  RBVars::PoissonSteady)
+  RBInfo::ROMInfoS,
+  RBVars::PoissonS)
 
   RBVars.offline_time += @elapsed begin
     PODs_space(RBInfo, RBVars)
@@ -56,7 +56,7 @@ end
 
 function get_reduced_basis(
   RBInfo::Info,
-  RBVars::PoissonSteady{T}) where T
+  RBVars::PoissonS{T}) where T
 
   println("Importing the spatial reduced basis for field u")
 
@@ -67,14 +67,14 @@ function get_reduced_basis(
 end
 
 function get_offline_structures(
-  RBInfo::ROMInfoSteady,
-  RBVars::PoissonSteady)
+  RBInfo::ROMInfoS,
+  RBVars::PoissonS)
 
   operators = String[]
 
   append!(operators, get_A(RBInfo, RBVars))
 
-  if RBInfo.assemble_parametric_RHS
+  if RBInfo.online_RHS
     append!(operators, get_F(RBInfo, RBVars))
     append!(operators, get_H(RBInfo, RBVars))
     append!(operators, get_L(RBInfo, RBVars))
@@ -85,8 +85,8 @@ function get_offline_structures(
 end
 
 function assemble_offline_structures(
-  RBInfo::ROMInfoSteady,
-  RBVars::PoissonSteady,
+  RBInfo::ROMInfoS,
+  RBVars::PoissonS,
   operators=String[])
 
   if isempty(operators)
@@ -116,8 +116,8 @@ function assemble_offline_structures(
 end
 
 function offline_phase(
-  RBInfo::ROMInfoSteady,
-  RBVars::PoissonSteady)
+  RBInfo::ROMInfoS,
+  RBVars::PoissonS)
 
   if RBInfo.get_snapshots
     get_snapshot_matrix(RBInfo, RBVars)
@@ -157,14 +157,14 @@ end
 ################################## ONLINE ######################################
 
 function get_θ(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
-  RBVars::PoissonSteady{T},
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::PoissonS{T},
   Param::SteadyParametricInfo) where T
 
   θᵃ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "A")
 
-  if !RBInfo.assemble_parametric_RHS
+  if !RBInfo.online_RHS
     θᶠ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "F")
     θʰ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "H")
     θˡ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "L")
@@ -177,7 +177,7 @@ function get_θ(
 end
 
 function get_RB_LHS_blocks(
-  RBVars::PoissonSteady{T},
+  RBVars::PoissonS{T},
   θᵃ::Matrix) where T
 
   println("Assembling reduced LHS")
@@ -192,7 +192,7 @@ function get_RB_LHS_blocks(
 end
 
 function get_RB_RHS_blocks(
-  RBVars::PoissonSteady{T},
+  RBVars::PoissonS{T},
   θᶠ::Matrix,
   θʰ::Matrix,
   θˡ::Matrix) where T
@@ -206,9 +206,9 @@ function get_RB_RHS_blocks(
 end
 
 function get_RB_system(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
-  RBVars::PoissonSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::PoissonS,
   Param::SteadyParametricInfo)
 
   initialize_RB_system(RBVars)
@@ -226,7 +226,7 @@ function get_RB_system(
     end
 
     if "RHS" ∈ operators
-      if !RBInfo.assemble_parametric_RHS
+      if !RBInfo.online_RHS
         get_RB_RHS_blocks(RBVars, θᶠ, θʰ, θˡ)
       else
         assemble_param_RHS(FEMSpace, RBInfo, RBVars, Param)
@@ -239,9 +239,9 @@ function get_RB_system(
 end
 
 function solve_RB_system(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
-  RBVars::PoissonSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::PoissonS,
   Param::SteadyParametricInfo)
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
@@ -254,14 +254,14 @@ function solve_RB_system(
 
 end
 
-function reconstruct_FEM_solution(RBVars::PoissonSteady)
+function reconstruct_FEM_solution(RBVars::PoissonS)
   println("Reconstructing FEM solution from the newly computed RB one")
   RBVars.ũ = RBVars.Φₛᵘ * RBVars.uₙ
 end
 
 function online_phase(
-  RBInfo::ROMInfoSteady,
-  RBVars::PoissonSteady{T},
+  RBInfo::ROMInfoS,
+  RBVars::PoissonS{T},
   Param_nbs) where T
 
   μ = load_CSV(Array{T}[],

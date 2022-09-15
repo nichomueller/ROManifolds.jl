@@ -1,6 +1,6 @@
 function assemble_matrix_snapshots(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady{T},
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS{T},
   μ::Vector{Vector{T}},
   var::String) where T
 
@@ -23,8 +23,8 @@ function assemble_matrix_snapshots(
 end
 
 function assemble_matrix_snapshots(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST{T},
   μ::Vector,
   timesθ::Vector,
   var::String) where T
@@ -49,9 +49,9 @@ function assemble_matrix_snapshots(
 end
 
 function assemble_matrix_snapshots(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady{T},
-  RBVars::RBSteadyProblem,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS{T},
+  RBVars::RBProblemS,
   μ::Vector{Vector{T}},
   var::String) where T
 
@@ -72,9 +72,9 @@ function assemble_matrix_snapshots(
 end
 
 function assemble_matrix_snapshots(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady{T},
-  RBVars::RBUnsteadyProblem,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST{T},
+  RBVars::RBProblemST,
   μ::Vector,
   k::Int,
   timesθ::Vector,
@@ -100,9 +100,9 @@ function assemble_matrix_snapshots(
 end
 
 function call_matrix_snapshots(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
-  RBVars::RBSteadyProblem,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::RBProblemS,
   μ::Vector{Vector{T}},
   var::String) where T
 
@@ -115,9 +115,9 @@ function call_matrix_snapshots(
 end
 
 function call_matrix_snapshots(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady{T},
-  RBVars::RBUnsteadyProblem,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST{T},
+  RBVars::RBProblemST,
   μ::Vector{Vector{T}},
   k::Int,
   timesθ::Vector,
@@ -132,9 +132,9 @@ function call_matrix_snapshots(
 end
 
 function get_snaps_MDEIM(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
-  RBVars::RBSteadyProblem,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::RBProblemS,
   μ::Vector{Vector{T}},
   var::String) where T
 
@@ -155,9 +155,9 @@ function get_LagrangianQuad_info(FEMSpace::Problem)
 end
 
 function standard_MDEIM(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady{T},
-  RBVars::RBUnsteadyProblem,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST{T},
+  RBVars::RBProblemST,
   μ::Vector{Vector{T}},
   timesθ::Vector,
   var::String) where T
@@ -214,8 +214,8 @@ function standard_MDEIM(
 end
 
 function functional_MDEIM_linear(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST{T},
   μ::Vector{Vector{T}},
   timesθ::Vector,
   var::String) where T
@@ -249,9 +249,9 @@ function functional_MDEIM_linear(
 end
 
 function functional_MDEIM_nonlinear(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady{T},
-  RBVars::RBUnsteadyProblem,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST{T},
+  RBVars::RBProblemST,
   μ::Vector{Vector{T}},
   timesθ::Vector,
   var::String) where T
@@ -294,9 +294,9 @@ function functional_MDEIM_nonlinear(
 end
 
 function call_functional_MDEIM(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady{T},
-  RBVars::RBUnsteadyProblem,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST{T},
+  RBVars::RBProblemST,
   μ::Vector{Vector{T}},
   timesθ::Vector,
   var) where T
@@ -310,9 +310,9 @@ function call_functional_MDEIM(
 end
 
 function get_snaps_MDEIM(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::RBUnsteadyProblem,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::RBProblemST,
   μ::Vector{Vector{T}},
   var::String) where T
 
@@ -327,8 +327,8 @@ function get_snaps_MDEIM(
 end
 
 function assemble_vector_snapshots(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady{T},
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS{T},
   μ::Vector{Vector{T}},
   var::String) where T
 
@@ -345,8 +345,8 @@ function assemble_vector_snapshots(
 end
 
 function assemble_vector_snapshots(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST{T},
   μ::Vector,
   timesθ::Vector,
   var::String) where T
@@ -365,8 +365,8 @@ function assemble_vector_snapshots(
 end
 
 function get_snaps_DEIM(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
   μ::Vector{Vector{T}},
   var::String) where T
 
@@ -377,8 +377,8 @@ function get_snaps_DEIM(
 end
 
 function standard_DEIM(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST{T},
   μ::Vector{Vector{T}},
   timesθ::Vector,
   var::String) where T
@@ -431,8 +431,8 @@ function standard_DEIM(
 end
 
 function get_snaps_DEIM(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
   μ::Vector{Vector{T}},
   var::String) where T
 
@@ -442,8 +442,8 @@ function get_snaps_DEIM(
 end
 
 function assemble_θmat_snapshots(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST{T},
   μ::Vector{Vector{T}},
   timesθ::Vector,
   var::String) where T
@@ -501,16 +501,16 @@ function assemble_θmat_snapshots(
 
 end
 
-function assemble_θmat_snapshots(RBVars::RBUnsteadyProblem)
+function assemble_θmat_snapshots(RBVars::RBProblemST)
 
   RBVars.Φₛᵘ_quad, RBVars.Φₜᵘ_quad
 
 end
 
 function call_θmat_snapshots(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady{T},
-  RBVars::RBUnsteadyProblem,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST{T},
+  RBVars::RBProblemST,
   μ::Vector,
   timesθ::Vector,
   var::String) where T
@@ -552,7 +552,7 @@ end
 
 function assemble_parametric_FE_matrix(
   ::NTuple{1,Int},
-  FEMSpace::UnsteadyProblem,
+  FEMSpace::FEMProblemST,
   var::String)
 
   function Mat_θ(Θ)
@@ -573,7 +573,7 @@ end
 
 function assemble_parametric_FE_matrix(
   ::NTuple{2,Int},
-  FEMSpace::UnsteadyProblem,
+  FEMSpace::FEMProblemST,
   var::String)
 
   function Mat_θ(Θ)
@@ -597,7 +597,7 @@ end
 
 function assemble_parametric_FE_matrix(
   ::NTuple{3,Int},
-  FEMSpace::UnsteadyProblem,
+  FEMSpace::FEMProblemST,
   var::String)
 
   function Mat_θ(Θ)
@@ -618,7 +618,7 @@ end
 
 function assemble_parametric_FE_matrix(
   ::NTuple{4,Int},
-  FEMSpace::UnsteadyProblem,
+  FEMSpace::FEMProblemST,
   var::String)
 
   function Mat_θ(Θ)

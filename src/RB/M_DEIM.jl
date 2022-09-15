@@ -41,8 +41,8 @@ function M_DEIM_offline(M_DEIM_mat::Matrix)
 end
 
 function MDEIM_offline(
-  RBInfo::ROMInfoSteady{T},
-  RBVars::RBSteadyProblem,
+  RBInfo::ROMInfoS{T},
+  RBVars::RBProblemS,
   var::String) where T
 
   println("Building $(RBInfo.nₛ_MDEIM) snapshots of $var")
@@ -63,8 +63,8 @@ function MDEIM_offline(
 end
 
 function MDEIM_offline(
-  RBInfo::ROMInfoUnsteady{T},
-  RBVars::RBUnsteadyProblem,
+  RBInfo::ROMInfoST{T},
+  RBVars::RBProblemST,
   var::String) where T
 
   println("Building $(RBInfo.nₛ_MDEIM) snapshots of $var")
@@ -88,7 +88,7 @@ function MDEIM_offline(
 
 end
 
-function DEIM_offline(RBInfo::ROMInfoSteady{T}, var::String) where T
+function DEIM_offline(RBInfo::ROMInfoS{T}, var::String) where T
 
   println("Building $(RBInfo.nₛ_DEIM) snapshots of $var")
 
@@ -109,7 +109,7 @@ function DEIM_offline(RBInfo::ROMInfoSteady{T}, var::String) where T
 
 end
 
-function DEIM_offline(RBInfo::ROMInfoUnsteady{T}) where T
+function DEIM_offline(RBInfo::ROMInfoST{T}) where T
 
   println("Building $(RBInfo.nₛ_DEIM) snapshots of $var")
 

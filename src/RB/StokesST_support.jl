@@ -1,12 +1,12 @@
 ################################# OFFLINE ######################################
 
-function check_norm_matrix(RBVars::StokesUnsteady)
+function check_norm_matrix(RBVars::StokesST)
   check_norm_matrix(RBVars.Steady)
 end
 
 function PODs_space(
   RBInfo::Info,
-  RBVars::StokesUnsteady)
+  RBVars::StokesST)
 
   PODs_space(RBInfo, RBVars.Poisson)
 
@@ -18,8 +18,8 @@ function PODs_space(
 end
 
 function PODs_time(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady{T}) where T
+  RBInfo::ROMInfoST,
+  RBVars::StokesST{T}) where T
 
   PODs_time(RBInfo, RBVars.Poisson)
 
@@ -82,14 +82,14 @@ function time_supremizers(Φₜᵘ::Matrix{T}, Φₜᵖ::Matrix{T}) where T
 end
 
 function supr_enrichment_time(
-  RBVars::StokesUnsteady)
+  RBVars::StokesST)
 
   RBVars.Φₜᵘ = time_supremizers(RBVars.Φₜᵘ, RBVars.Φₜᵖ)
   RBVars.nₜᵘ = size(RBVars.Φₜᵘ)[2]
 
 end
 
-function index_mapping(i::Int, j::Int, RBVars::StokesUnsteady, var="u")
+function index_mapping(i::Int, j::Int, RBVars::StokesST, var="u")
 
   if var == "u"
     return index_mapping(i, j, RBVars.Poisson)
@@ -102,8 +102,8 @@ function index_mapping(i::Int, j::Int, RBVars::StokesUnsteady, var="u")
 end
 
 function get_generalized_coordinates(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady{T},
+  RBInfo::ROMInfoST,
+  RBVars::StokesST{T},
   snaps::Vector{Int}) where T
 
   if check_norm_matrix(RBVars)
@@ -132,7 +132,7 @@ end
 
 function set_operators(
   RBInfo::Info,
-  RBVars::StokesUnsteady)
+  RBVars::StokesST)
 
   append!(["M"], set_operators(RBInfo, RBVars.Steady))
 
@@ -140,15 +140,15 @@ end
 
 function get_A(
   RBInfo::Info,
-  RBVars::StokesUnsteady)
+  RBVars::StokesST)
 
   get_A(RBInfo, RBVars.Poisson)
 
 end
 
 function get_M(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady)
+  RBInfo::ROMInfoST,
+  RBVars::StokesST)
 
   get_M(RBInfo, RBVars.Poisson)
 
@@ -156,7 +156,7 @@ end
 
 function get_B(
   RBInfo::Info,
-  RBVars::StokesUnsteady)
+  RBVars::StokesST)
 
   get_B(RBInfo, RBVars.Steady)
 
@@ -164,7 +164,7 @@ end
 
 function get_F(
   RBInfo::Info,
-  RBVars::StokesUnsteady)
+  RBVars::StokesST)
 
   get_F(RBInfo, RBVars.Poisson)
 
@@ -172,7 +172,7 @@ end
 
 function get_H(
   RBInfo::Info,
-  RBVars::StokesUnsteady)
+  RBVars::StokesST)
 
   get_H(RBInfo, RBVars.Poisson)
 
@@ -180,7 +180,7 @@ end
 
 function get_L(
   RBInfo::Info,
-  RBVars::StokesUnsteady)
+  RBVars::StokesST)
 
   get_L(RBInfo, RBVars.Poisson)
 
@@ -188,7 +188,7 @@ end
 
 function get_Lc(
   RBInfo::Info,
-  RBVars::StokesUnsteady)
+  RBVars::StokesST)
 
   get_Lc(RBInfo, RBVars.Steady)
 
@@ -196,7 +196,7 @@ end
 
 function assemble_affine_matrices(
   RBInfo::Info,
-  RBVars::StokesUnsteady{T},
+  RBVars::StokesST{T},
   var::String) where T
 
   if var == "B"
@@ -212,8 +212,8 @@ function assemble_affine_matrices(
 end
 
 function assemble_MDEIM_matrices(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady,
+  RBInfo::ROMInfoST,
+  RBVars::StokesST,
   var::String)
 
   println("The matrix $var is non-affine:
@@ -243,7 +243,7 @@ function assemble_MDEIM_matrices(
 end
 
 function assemble_reduced_mat_MDEIM(
-  RBVars::StokesUnsteady,
+  RBVars::StokesST,
   MDEIM_mat::Matrix,
   row_idx::Vector{Int},
   var::String)
@@ -270,7 +270,7 @@ end
 
 function assemble_affine_vectors(
   RBInfo::Info,
-  RBVars::StokesUnsteady,
+  RBVars::StokesST,
   var::String)
 
   assemble_affine_vectors(RBInfo, RBVars.Steady, var)
@@ -278,8 +278,8 @@ function assemble_affine_vectors(
 end
 
 function assemble_DEIM_vectors(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady,
+  RBInfo::ROMInfoST,
+  RBVars::StokesST,
   var::String)
 
   assemble_DEIM_vectors(RBInfo, RBVars.Poisson, var)
@@ -287,8 +287,8 @@ function assemble_DEIM_vectors(
 end
 
 function assemble_reduced_mat_DEIM(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady,
+  RBInfo::ROMInfoST,
+  RBVars::StokesST,
   DEIM_mat::Matrix,
   var::String)
 
@@ -298,7 +298,7 @@ end
 
 function save_assembled_structures(
   RBInfo::Info,
-  RBVars::PoissonSteady)
+  RBVars::PoissonS)
 
   affine_vars = (reshape(RBVars.Bₙ, :, RBVars.Qᵇ)::Matrix{T}, RBVars.Lcₙ)
   affine_names = ("Bₙ", "Lcₙ")
@@ -321,7 +321,7 @@ end
 
 function get_system_blocks(
   RBInfo::Info,
-  RBVars::StokesUnsteady,
+  RBVars::StokesST,
   LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int})
 
@@ -331,7 +331,7 @@ end
 
 function save_system_blocks(
   RBInfo::Info,
-  RBVars::StokesUnsteady,
+  RBVars::StokesST,
   LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int},
   operators::Vector{String})
@@ -341,9 +341,9 @@ function save_system_blocks(
 end
 
 function get_θ_matrix(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::StokesS,
   Param::SteadyParametricInfo,
   var::String)
 
@@ -363,9 +363,9 @@ function get_θ_matrix(
 end
 
 function get_θ_vector(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::StokesS,
   Param::SteadyParametricInfo,
   var::String)
 
@@ -389,12 +389,12 @@ end
 
 function get_Q(
   RBInfo::Info,
-  RBVars::StokesUnsteady)
+  RBVars::StokesST)
 
   if RBVars.Qᵇ == 0
     RBVars.Qᵇ = size(RBVars.Bₙ)[end]
   end
-  if !RBInfo.assemble_parametric_RHS
+  if !RBInfo.online_RHS
     if RBVars.Qˡᶜ == 0
       RBVars.Qˡᶜ = size(RBVars.Lcₙ)[end]
     end
@@ -405,9 +405,9 @@ function get_Q(
 end
 
 function assemble_param_RHS(
-  FEMSpace::UnsteadyProblem,
+  FEMSpace::FEMProblemST,
   RBInfo::Info,
-  RBVars::StokesUnsteady,
+  RBVars::StokesST,
   Param::UnsteadyParametricInfo)
 
   assemble_param_RHS(FEMSpace, RBInfo, RBVars.Poisson, Param)
@@ -427,9 +427,9 @@ function assemble_param_RHS(
 end
 
 function adaptive_loop_on_params(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::StokesST{T},
   mean_uₕ_test::Matrix,
   mean_pointwise_err_u::Matrix,
   mean_pₕ_test::Matrix,

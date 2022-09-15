@@ -5,8 +5,8 @@ include("StokesST_support.jl")
 ################################# OFFLINE ######################################
 
 function get_snapshot_matrix(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady{T}) where T
+  RBInfo::ROMInfoST,
+  RBVars::StokesST{T}) where T
 
   get_snapshot_matrix(RBInfo, RBVars.Poisson)
 
@@ -22,13 +22,13 @@ function get_snapshot_matrix(
 
 end
 
-function get_norm_matrix(RBVars::StokesUnsteady)
+function get_norm_matrix(RBVars::StokesST)
   get_norm_matrix(RBVars.Steady)
 end
 
 function assemble_reduced_basis(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady)
+  RBInfo::ROMInfoST,
+  RBVars::StokesST)
 
   RBVars.offline_time += @elapsed begin
     PODs_space(RBInfo, RBVars)
@@ -54,8 +54,8 @@ function assemble_reduced_basis(
 end
 
 function get_reduced_basis(
-  RBInfo::ROMInfoUnsteady{T},
-  RBVars::StokesUnsteady) where T
+  RBInfo::ROMInfoST{T},
+  RBVars::StokesST) where T
 
   get_reduced_basis(RBInfo, RBVars.Poisson)
 
@@ -72,14 +72,14 @@ function get_reduced_basis(
 end
 
 function get_offline_structures(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady)
+  RBInfo::ROMInfoST,
+  RBVars::StokesST)
 
   operators = get_offline_structures(RBInfo, RBVars.Poisson)
 
   append!(operators, get_B(RBInfo, RBVars))
 
-  if RBInfo.assemble_parametric_RHS
+  if RBInfo.online_RHS
     append!(operators, get_Lc(RBInfo, RBVars))
   end
 
@@ -88,8 +88,8 @@ function get_offline_structures(
 end
 
 function assemble_offline_structures(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady,
+  RBInfo::ROMInfoST,
+  RBVars::StokesST,
   operators=String[])
 
   if isempty(operators)
@@ -119,8 +119,8 @@ function assemble_offline_structures(
 end
 
 function offline_phase(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady)
+  RBInfo::ROMInfoST,
+  RBVars::StokesST)
 
   println("Offline phase of the RB solver, unsteady Stokes problem")
 
@@ -164,16 +164,16 @@ end
 ################################## ONLINE ######################################
 
 function get_θ(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::StokesST{T},
   Param::UnsteadyParametricInfo) where T
 
   θᵃ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "A")
   θᵇ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "B")
   θᵐ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "M")
 
-  if !RBInfo.assemble_parametric_RHS
+  if !RBInfo.online_RHS
     θᶠ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "F")
     θʰ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "H")
     θˡ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "L")
@@ -188,8 +188,8 @@ function get_θ(
 end
 
 function get_RB_LHS_blocks(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady{T},
+  RBInfo::ROMInfoST,
+  RBVars::StokesST{T},
   θᵐ::Matrix,
   θᵃ::Matrix,
   θᵇ::Matrix) where T
@@ -225,7 +225,7 @@ end
 
 function get_RB_RHS_blocks(
   RBInfo::Info,
-  RBVars::StokesUnsteady{T},
+  RBVars::StokesST{T},
   θᶠ::Matrix,
   θʰ::Matrix,
   θˡ::Matrix,
@@ -254,9 +254,9 @@ function get_RB_RHS_blocks(
 end
 
 function get_RB_system(
-  FEMSpace::UnsteadyProblem,
+  FEMSpace::FEMProblemST,
   RBInfo::Info,
-  RBVars::StokesUnsteady,
+  RBVars::StokesST,
   Param::UnsteadyParametricInfo)
 
   initialize_RB_system(RBVars)
@@ -277,7 +277,7 @@ function get_RB_system(
     end
 
     if "RHS" ∈ operators
-      if !RBInfo.assemble_parametric_RHS
+      if !RBInfo.online_RHS
         get_RB_RHS_blocks(RBInfo, RBVars, θᶠ, θʰ, θˡ, θˡᶜ)
       else
         assemble_param_RHS(FEMSpace, RBInfo, RBVars, Param)
@@ -290,9 +290,9 @@ function get_RB_system(
 end
 
 function solve_RB_system(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::StokesST,
   Param::UnsteadyParametricInfo)
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
@@ -311,7 +311,7 @@ function solve_RB_system(
 
 end
 
-function reconstruct_FEM_solution(RBVars::StokesUnsteady)
+function reconstruct_FEM_solution(RBVars::StokesST)
 
   reconstruct_FEM_solution(RBVars.Poisson)
 
@@ -321,9 +321,9 @@ function reconstruct_FEM_solution(RBVars::StokesUnsteady)
 end
 
 function loop_on_params(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::StokesST{T},
   μ::Vector{Vector{T}},
   param_nbs) where T
 
@@ -399,8 +399,8 @@ function loop_on_params(
 end
 
 function online_phase(
-  RBInfo::ROMInfoUnsteady{T},
-  RBVars::StokesUnsteady,
+  RBInfo::ROMInfoST{T},
+  RBVars::StokesST,
   param_nbs) where T
 
   println("Online phase of the RB solver, unsteady Stokes problem")

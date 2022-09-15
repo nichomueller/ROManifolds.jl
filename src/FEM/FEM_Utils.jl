@@ -74,7 +74,7 @@ function get_h(FEMSpace::Problem)
 end
 
 function get_α_stab(
-  FEMSpace::SteadyProblem,
+  FEMSpace::FEMProblemS,
   Param::SteadyParametricInfo)
 
   h_mesh = get_h(FEMSpace)
@@ -87,7 +87,7 @@ function get_α_stab(
 end
 
 function get_α_stab(
-  FEMSpace::UnsteadyProblem,
+  FEMSpace::FEMProblemST,
   Param::UnsteadyParametricInfo)
 
   h_mesh = get_h(FEMSpace)
@@ -100,7 +100,7 @@ function get_α_stab(
 
 end
 
-function get_timesθ(FEMInfo::UnsteadyInfo)
+function get_timesθ(FEMInfo::InfoST)
   collect(FEMInfo.t₀:FEMInfo.δt:FEMInfo.tₗ-FEMInfo.δt).+FEMInfo.δt*FEMInfo.θ
 end
 
@@ -156,7 +156,7 @@ function find_FE_elements(
 end
 
 function define_g_FEM(
-  FEMSpace::SteadyProblem,
+  FEMSpace::FEMProblemS,
   Param::SteadyParametricInfo)
 
   interpolate_dirichlet(Param.g, FEMSpace.V)
@@ -164,7 +164,7 @@ function define_g_FEM(
 end
 
 function define_dg_FEM(
-  FEMSpace::UnsteadyProblem,
+  FEMSpace::FEMProblemST,
   Param::UnsteadyParametricInfo)
 
   function dg(t)

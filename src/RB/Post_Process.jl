@@ -1,4 +1,4 @@
-function post_process(::ROMInfoSteady, d::Dict) where T
+function post_process(::ROMInfoS, d::Dict) where T
 
   FEMSpace = d["FEMSpace"]
   writevtk(FEMSpace.Ω, joinpath(d["path_μ"], "mean_point_err_u"),
@@ -12,7 +12,7 @@ function post_process(::ROMInfoSteady, d::Dict) where T
 
 end
 
-function post_process(RBInfo::ROMInfoUnsteady{T}, d::Dict) where T
+function post_process(RBInfo::ROMInfoST{T}, d::Dict) where T
 
   times = collect(RBInfo.t₀+RBInfo.δt:RBInfo.δt:RBInfo.tₗ)
   FEMSpace = d["FEMSpace"]
@@ -60,8 +60,8 @@ end
 
 function plot_stability_constants(
   FEMSpace::FEMProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady,
+  RBInfo::ROMInfoST,
+  RBVars::PoissonST,
   Param::UnsteadyParametricInfo)
 
   function compute_stability_constant_Nₜ(RBInfo,Nₜ,M,A)

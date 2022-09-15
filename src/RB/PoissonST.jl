@@ -2,8 +2,8 @@ include("PoissonS.jl")
 include("PoissonST_support.jl")
 
 function get_snapshot_matrix(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T}) where T
+  RBInfo::ROMInfoST,
+  RBVars::PoissonST{T}) where T
 
   println("Importing the snapshot matrix for field u,
     number of snapshots considered: $(RBInfo.nₛ)")
@@ -19,8 +19,8 @@ function get_snapshot_matrix(
 end
 
 function assemble_reduced_basis(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady)
+  RBInfo::ROMInfoST,
+  RBVars::PoissonST)
 
   println("Building the space-time reduced basis for field u")
 
@@ -43,7 +43,7 @@ end
 
 function get_reduced_basis(
   RBInfo::Info,
-  RBVars::PoissonUnsteady{T}) where T
+  RBVars::PoissonST{T}) where T
 
   get_reduced_basis(RBInfo, RBVars.Steady)
 
@@ -56,15 +56,15 @@ function get_reduced_basis(
 end
 
 function get_offline_structures(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady)
+  RBInfo::ROMInfoST,
+  RBVars::PoissonST)
 
   operators = String[]
 
   append!(operators, get_A(RBInfo, RBVars))
   append!(operators, get_M(RBInfo, RBVars))
 
-  if RBInfo.assemble_parametric_RHS
+  if RBInfo.online_RHS
     append!(operators, get_F(RBInfo, RBVars))
     append!(operators, get_H(RBInfo, RBVars))
     append!(operators, get_L(RBInfo, RBVars))
@@ -75,8 +75,8 @@ function get_offline_structures(
 end
 
 function assemble_offline_structures(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady,
+  RBInfo::ROMInfoST,
+  RBVars::PoissonST,
   operators=String[])
 
   if isempty(operators)
@@ -106,8 +106,8 @@ function assemble_offline_structures(
 end
 
 function offline_phase(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady)
+  RBInfo::ROMInfoST,
+  RBVars::PoissonST)
 
   println("Offline phase of the RB solver, unsteady Poisson problem")
 
@@ -151,15 +151,15 @@ end
 ################################## ONLINE ######################################
 
 function get_θ(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::PoissonST{T},
   Param::UnsteadyParametricInfo) where T
 
   θᵃ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "A")
   θᵐ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "M")
 
-  if !RBInfo.assemble_parametric_RHS
+  if !RBInfo.online_RHS
     θᶠ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "F")
     θʰ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "H")
     θˡ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "L")
@@ -172,8 +172,8 @@ function get_θ(
 end
 
 function get_RB_LHS_blocks(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T},
+  RBInfo::ROMInfoST,
+  RBVars::PoissonST{T},
   θᵐ::Matrix{T},
   θᵃ::Matrix{T}) where T
 
@@ -227,8 +227,8 @@ function get_RB_LHS_blocks(
 end
 
 function get_RB_RHS_blocks(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T},
+  RBInfo::ROMInfoST,
+  RBVars::PoissonST{T},
   θᶠ::Array{T},
   θʰ::Array{T},
   θˡ::Array{T}) where T
@@ -268,9 +268,9 @@ function get_RB_RHS_blocks(
 end
 
 function get_RB_system(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::PoissonST,
   Param::UnsteadyParametricInfo)
 
   initialize_RB_system(RBVars)
@@ -288,7 +288,7 @@ function get_RB_system(
     end
 
     if "RHS" ∈ operators
-      if !RBInfo.assemble_parametric_RHS
+      if !RBInfo.online_RHS
         get_RB_RHS_blocks(RBInfo, RBVars, θᶠ, θʰ, θˡ)
       else
         assemble_param_RHS(FEMSpace, RBInfo, RBVars, Param)
@@ -301,9 +301,9 @@ function get_RB_system(
 end
 
 function solve_RB_system(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::PoissonST,
   Param::UnsteadyParametricInfo)
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
@@ -317,7 +317,7 @@ function solve_RB_system(
 
 end
 
-function reconstruct_FEM_solution(RBVars::PoissonUnsteady)
+function reconstruct_FEM_solution(RBVars::PoissonST)
 
   println("Reconstructing FEM solution from the newly computed RB one")
   uₙ = reshape(RBVars.uₙ, (RBVars.nₜᵘ, RBVars.nₛᵘ))
@@ -326,9 +326,9 @@ function reconstruct_FEM_solution(RBVars::PoissonUnsteady)
 end
 
 function loop_on_params(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::PoissonST{T},
   μ::Vector{Vector{T}},
   param_nbs) where T
 
@@ -381,8 +381,8 @@ function loop_on_params(
 end
 
 function online_phase(
-  RBInfo::ROMInfoUnsteady{T},
-  RBVars::PoissonUnsteady,
+  RBInfo::ROMInfoST{T},
+  RBVars::PoissonST,
   param_nbs) where T
 
   println("Online phase of the RB solver, unsteady Poisson problem")

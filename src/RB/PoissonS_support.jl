@@ -1,12 +1,12 @@
 ################################# OFFLINE ######################################
 
-function check_norm_matrix(RBVars::PoissonSteady)
+function check_norm_matrix(RBVars::PoissonS)
   isempty(RBVars.Xᵘ₀)
 end
 
 function PODs_space(
   RBInfo::Info,
-  RBVars::PoissonSteady)
+  RBVars::PoissonS)
 
   println("Performing the spatial POD for field u, using a tolerance of $(RBInfo.ϵₛ)")
   get_norm_matrix(RBInfo, RBVars)
@@ -16,8 +16,8 @@ function PODs_space(
 end
 
 function get_generalized_coordinates(
-  RBInfo::ROMInfoSteady,
-  RBVars::PoissonSteady,
+  RBInfo::ROMInfoS,
+  RBVars::PoissonS,
   snaps=nothing)
 
   get_norm_matrix(RBInfo, RBVars)
@@ -37,10 +37,10 @@ end
 
 function set_operators(
   RBInfo::Info,
-  ::PoissonSteady)
+  ::PoissonS)
 
   operators = ["A"]
-  if !RBInfo.assemble_parametric_RHS
+  if !RBInfo.online_RHS
     append!(operators, ["F","H","L"])
   end
   operators
@@ -49,7 +49,7 @@ end
 
 function get_A(
   RBInfo::Info,
-  RBVars::PoissonSteady{T}) where T
+  RBVars::PoissonS{T}) where T
 
   if "A" ∈ RBInfo.probl_nl
 
@@ -86,7 +86,7 @@ end
 
 function get_F(
   RBInfo::Info,
-  RBVars::PoissonSteady{T}) where T
+  RBVars::PoissonS{T}) where T
 
   if "F" ∈ RBInfo.probl_nl
 
@@ -120,7 +120,7 @@ end
 
 function get_H(
   RBInfo::Info,
-  RBVars::PoissonSteady{T}) where T
+  RBVars::PoissonS{T}) where T
 
   if "H" ∈ RBInfo.probl_nl
 
@@ -154,7 +154,7 @@ end
 
 function get_L(
   RBInfo::Info,
-  RBVars::PoissonSteady{T}) where T
+  RBVars::PoissonS{T}) where T
 
   if "L" ∈ RBInfo.probl_nl
 
@@ -188,7 +188,7 @@ end
 
 function assemble_affine_matrices(
   RBInfo::Info,
-  RBVars::PoissonSteady{T},
+  RBVars::PoissonS{T},
   var::String) where T
 
   if var == "A"
@@ -204,8 +204,8 @@ function assemble_affine_matrices(
 end
 
 function assemble_MDEIM_matrices(
-  RBInfo::ROMInfoSteady,
-  RBVars::PoissonSteady,
+  RBInfo::ROMInfoS,
+  RBVars::PoissonS,
   var::String)
 
   println("The matrix $var is non-affine:
@@ -223,7 +223,7 @@ function assemble_MDEIM_matrices(
 end
 
 function assemble_reduced_mat_MDEIM(
-  RBVars::PoissonSteady{T},
+  RBVars::PoissonS{T},
   MDEIM_mat::Matrix,
   row_idx::Vector,
   var::String) where T
@@ -248,7 +248,7 @@ end
 
 function assemble_affine_vectors(
   RBInfo::Info,
-  RBVars::PoissonSteady{T},
+  RBVars::PoissonS{T},
   var::String) where T
 
   if var == "F"
@@ -273,8 +273,8 @@ function assemble_affine_vectors(
 end
 
 function assemble_DEIM_vectors(
-  RBInfo::ROMInfoSteady,
-  RBVars::PoissonSteady,
+  RBInfo::ROMInfoS,
+  RBVars::PoissonS,
   var::String)
 
   println("The vector $var is non-affine:
@@ -305,7 +305,7 @@ function assemble_DEIM_vectors(
 end
 
 function assemble_reduced_mat_DEIM(
-  RBVars::PoissonSteady{T},
+  RBVars::PoissonS{T},
   DEIM_mat::Matrix,
   var::String) where T
 
@@ -331,7 +331,7 @@ end
 
 function save_assembled_structures(
   RBInfo::Info,
-  RBVars::PoissonSteady)
+  RBVars::PoissonS)
 
   affine_vars = (reshape(RBVars.Aₙ, :, RBVars.Qᵃ)::Matrix{T},
                 RBVars.Fₙ, RBVars.Hₙ, RBVars.Lₙ)
@@ -356,7 +356,7 @@ end
 
 function get_system_blocks(
   RBInfo::Info,
-  RBVars::PoissonSteady{T},
+  RBVars::PoissonS{T},
   LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int}) where T
 
@@ -403,7 +403,7 @@ end
 
 function save_system_blocks(
   RBInfo::Info,
-  RBVars::PoissonSteady{T},
+  RBVars::PoissonS{T},
   LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int},
   operators::Vector{String}) where T
@@ -423,9 +423,9 @@ function save_system_blocks(
 end
 
 function get_θ_matrix(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady{T},
-  RBVars::PoissonSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS{T},
+  RBVars::PoissonS,
   Param::SteadyParametricInfo,
   var::String) where T
 
@@ -439,9 +439,9 @@ function get_θ_matrix(
 end
 
 function get_θ_vector(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady{T},
-  RBVars::PoissonSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS{T},
+  RBVars::PoissonS,
   Param::SteadyParametricInfo,
   var::String) where T
 
@@ -462,12 +462,12 @@ end
 
 function get_Q(
   RBInfo::Info,
-  RBVars::PoissonSteady)
+  RBVars::PoissonS)
 
   if RBVars.Qᵃ == 0
     RBVars.Qᵃ = size(RBVars.Aₙ)[end]
   end
-  if !RBInfo.assemble_parametric_RHS
+  if !RBInfo.online_RHS
     if RBVars.Qᶠ == 0
       RBVars.Qᶠ = size(RBVars.Fₙ)[end]
     end
@@ -484,9 +484,9 @@ function get_Q(
 end
 
 function assemble_param_RHS(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
-  RBVars::PoissonSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::PoissonS,
   Param::SteadyParametricInfo)
 
   println("Assembling reduced RHS exactly")

@@ -1,13 +1,13 @@
 abstract type Problem end
 abstract type FEMProblem{D} <: Problem end
-abstract type SteadyProblem{D} <: FEMProblem{D} end
-abstract type UnsteadyProblem{D} <: FEMProblem{D} end
+abstract type FEMProblemS{D} <: FEMProblem{D} end
+abstract type FEMProblemST{D} <: FEMProblem{D} end
 
 abstract type Info end
 abstract type SteadyParametricInfo <: Info end
 abstract type UnsteadyParametricInfo <: Info end
 
-struct FEMSpacePoissonSteady{D} <: SteadyProblem{D}
+struct FEMSpacePoissonS{D} <: FEMProblemS{D}
   model::DiscreteModel
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
@@ -23,7 +23,7 @@ struct FEMSpacePoissonSteady{D} <: SteadyProblem{D}
   V₀_quad::UnconstrainedFESpace
 end
 
-struct FEMSpacePoissonUnsteady{D} <: UnsteadyProblem{D}
+struct FEMSpacePoissonST{D} <: FEMProblemST{D}
   model::DiscreteModel
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
@@ -39,7 +39,7 @@ struct FEMSpacePoissonUnsteady{D} <: UnsteadyProblem{D}
   V₀_quad::UnconstrainedFESpace
 end
 
-struct FEMSpaceADRSteady{D} <: SteadyProblem{D}
+struct FEMSpaceADRS{D} <: FEMProblemS{D}
   model::DiscreteModel
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
@@ -55,7 +55,7 @@ struct FEMSpaceADRSteady{D} <: SteadyProblem{D}
   V₀_quad::UnconstrainedFESpace
 end
 
-struct FEMSpaceADRUnsteady{D} <: UnsteadyProblem{D}
+struct FEMSpaceADRST{D} <: FEMProblemST{D}
   model::DiscreteModel
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
@@ -71,7 +71,7 @@ struct FEMSpaceADRUnsteady{D} <: UnsteadyProblem{D}
   V₀_quad::UnconstrainedFESpace
 end
 
-struct FEMSpaceStokesSteady{D} <: SteadyProblem{D}
+struct FEMSpaceStokesS{D} <: FEMProblemS{D}
   model::DiscreteModel
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
@@ -94,7 +94,7 @@ struct FEMSpaceStokesSteady{D} <: SteadyProblem{D}
   V₀_quad::UnconstrainedFESpace
 end
 
-struct FEMSpaceStokesUnsteady{D} <: UnsteadyProblem{D}
+struct FEMSpaceStokesST{D} <: FEMProblemST{D}
   model::DiscreteModel
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
@@ -117,7 +117,7 @@ struct FEMSpaceStokesUnsteady{D} <: UnsteadyProblem{D}
   V₀_quad::UnconstrainedFESpace
 end
 
-struct FEMSpaceNavierStokesSteady{D} <: SteadyProblem{D}
+struct FEMSpaceNavierStokesS{D} <: FEMProblemS{D}
   model::DiscreteModel
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
@@ -140,7 +140,7 @@ struct FEMSpaceNavierStokesSteady{D} <: SteadyProblem{D}
   V₀_quad::UnconstrainedFESpace
 end
 
-struct FEMSpaceNavierStokesUnsteady{D} <: UnsteadyProblem{D}
+struct FEMSpaceNavierStokesST{D} <: FEMProblemST{D}
   model::DiscreteModel
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
@@ -170,7 +170,7 @@ struct FEMPathInfo <: Info
   FEM_structures_path::String
 end
 
-struct SteadyInfo <: Info
+struct InfoS <: Info
   problem_id::NTuple
   D::Int
   case::Int
@@ -182,7 +182,7 @@ struct SteadyInfo <: Info
   nₛ::Int
 end
 
-struct UnsteadyInfo <: Info
+struct InfoST <: Info
   problem_id::NTuple
   D::Int
   case::Int
@@ -200,7 +200,7 @@ struct UnsteadyInfo <: Info
   δt::Float
 end
 
-struct ParamPoissonSteady <: SteadyParametricInfo
+struct ParamPoissonS <: SteadyParametricInfo
   μ::Vector
   α::Function
   f::Function
@@ -208,7 +208,7 @@ struct ParamPoissonSteady <: SteadyParametricInfo
   h::Function
 end
 
-struct ParamPoissonUnsteady <: UnsteadyParametricInfo
+struct ParamPoissonST <: UnsteadyParametricInfo
   μ::Vector
   αₛ::Function
   αₜ::Function
@@ -228,7 +228,7 @@ struct ParamPoissonUnsteady <: UnsteadyParametricInfo
   u₀::Function
 end
 
-struct ParamADRSteady <: SteadyParametricInfo
+struct ParamADRS <: SteadyParametricInfo
   μ::Vector
   α::Function
   b::Function
@@ -238,7 +238,7 @@ struct ParamADRSteady <: SteadyParametricInfo
   h::Function
 end
 
-struct ParamADRUnsteady <: UnsteadyParametricInfo
+struct ParamADRST <: UnsteadyParametricInfo
   μ::Vector
   αₛ::Function
   αₜ::Function
@@ -264,7 +264,7 @@ struct ParamADRUnsteady <: UnsteadyParametricInfo
   u₀::Function
 end
 
-struct ParamStokesSteady <: SteadyParametricInfo
+struct ParamStokesS <: SteadyParametricInfo
   μ::Vector
   α::Function
   f::Function
@@ -272,7 +272,7 @@ struct ParamStokesSteady <: SteadyParametricInfo
   h::Function
 end
 
-struct ParamStokesUnsteady <: UnsteadyParametricInfo
+struct ParamStokesST <: UnsteadyParametricInfo
   μ::Vector
   αₛ::Function
   αₜ::Function
@@ -292,7 +292,7 @@ struct ParamStokesUnsteady <: UnsteadyParametricInfo
   x₀::Function
 end
 
-struct ParamNavierStokesSteady <: SteadyParametricInfo
+struct ParamNavierStokesS <: SteadyParametricInfo
   μ::Vector
   Re::Float
   α::Function
@@ -301,7 +301,7 @@ struct ParamNavierStokesSteady <: SteadyParametricInfo
   h::Function
 end
 
-struct ParamNavierStokesUnsteady <: UnsteadyParametricInfo
+struct ParamNavierStokesST <: UnsteadyParametricInfo
   μ::Vector
   Re::Float
   αₛ::Function

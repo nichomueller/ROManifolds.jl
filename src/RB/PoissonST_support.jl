@@ -1,11 +1,11 @@
 ################################# OFFLINE ######################################
 
-PODs_space(RBInfo::Info, RBVars::PoissonUnsteady) =
+PODs_space(RBInfo::Info, RBVars::PoissonST) =
   PODs_space(RBInfo, RBVars.Steady)
 
 function PODs_time(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T}) where T
+  RBInfo::ROMInfoST,
+  RBVars::PoissonST{T}) where T
 
   println("Performing the temporal POD for field u, using a tolerance of $(RBInfo.ϵₜ)")
 
@@ -25,15 +25,15 @@ end
 function index_mapping(
   i::Int,
   j::Int,
-  RBVars::PoissonUnsteady)
+  RBVars::PoissonST)
 
   Int((i-1)*RBVars.nₜᵘ+j)
 
 end
 
 function get_generalized_coordinates(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T},
+  RBInfo::ROMInfoST,
+  RBVars::PoissonST{T},
   snaps::Vector{Int}) where T
 
   if check_norm_matrix(RBVars.Steady)
@@ -62,7 +62,7 @@ end
 
 function set_operators(
   RBInfo::Info,
-  RBVars::PoissonUnsteady)
+  RBVars::PoissonST)
 
   vcat(["M"], set_operators(RBInfo, RBVars.Steady))
 
@@ -70,7 +70,7 @@ end
 
 function get_A(
   RBInfo::Info,
-  RBVars::PoissonUnsteady)
+  RBVars::PoissonST)
 
   if "A" ∈ RBInfo.probl_nl
     if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIM_idx_time_A.csv"))
@@ -84,8 +84,8 @@ function get_A(
 end
 
 function get_M(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T}) where T
+  RBInfo::ROMInfoST,
+  RBVars::PoissonST{T}) where T
 
   if "M" ∈ RBInfo.probl_nl
 
@@ -126,7 +126,7 @@ end
 
 function get_F(
   RBInfo::Info,
-  RBVars::PoissonUnsteady)
+  RBVars::PoissonST)
 
   if "F" ∈ RBInfo.probl_nl
     if isfile(joinpath(RBInfo.ROM_structures_path, "DEIM_idx_time_F.csv"))
@@ -141,7 +141,7 @@ end
 
 function get_H(
   RBInfo::Info,
-  RBVars::PoissonUnsteady)
+  RBVars::PoissonST)
 
   if "H" ∈ RBInfo.probl_nl
     if isfile(joinpath(RBInfo.ROM_structures_path, "DEIM_idx_time_H.csv"))
@@ -156,7 +156,7 @@ end
 
 function get_L(
   RBInfo::Info,
-  RBVars::PoissonUnsteady)
+  RBVars::PoissonST)
 
   if "L" ∈ RBInfo.probl_nl
     if isfile(joinpath(RBInfo.ROM_structures_path, "DEIM_idx_time_L.csv"))
@@ -171,7 +171,7 @@ end
 
 function assemble_affine_matrices(
   RBInfo::Info,
-  RBVars::PoissonUnsteady{T},
+  RBVars::PoissonST{T},
   var::String) where T
 
   if var == "M"
@@ -187,8 +187,8 @@ function assemble_affine_matrices(
 end
 
 function assemble_MDEIM_matrices(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady,
+  RBInfo::ROMInfoST,
+  RBVars::PoissonST,
   var::String)
 
   if var == "M"
@@ -214,7 +214,7 @@ function assemble_MDEIM_matrices(
 end
 
 function assemble_reduced_mat_MDEIM(
-  RBVars::PoissonUnsteady{T},
+  RBVars::PoissonST{T},
   MDEIM_mat::Matrix{T},
   row_idx::Vector{Int},
   var::String) where T
@@ -241,7 +241,7 @@ end
 
 function assemble_affine_vectors(
   RBInfo::Info,
-  RBVars::PoissonUnsteady{T},
+  RBVars::PoissonST{T},
   var::String) where T
 
   assemble_affine_vectors(RBInfo, RBVars.Steady, var)
@@ -249,8 +249,8 @@ function assemble_affine_vectors(
 end
 
 function assemble_DEIM_vectors(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady,
+  RBInfo::ROMInfoST,
+  RBVars::PoissonST,
   var::String)
 
   println("The vector $var is non-affine:
@@ -281,7 +281,7 @@ function assemble_DEIM_vectors(
 end
 
 function assemble_reduced_mat_DEIM(
-  RBVars::PoissonUnsteady{T},
+  RBVars::PoissonST{T},
   DEIM_mat::Matrix{T},
   var::String) where T
 
@@ -309,7 +309,7 @@ end
 
 function save_assembled_structures(
   RBInfo::Info,
-  RBVars::PoissonUnsteady)
+  RBVars::PoissonST)
 
   affine_vars = (reshape(RBVars.Mₙ, :, RBVars.Qᵐ)::Matrix{T},)
   affine_names = ("Mₙ",)
@@ -330,7 +330,7 @@ end
 
 function get_system_blocks(
   RBInfo::Info,
-  RBVars::PoissonUnsteady,
+  RBVars::PoissonST,
   LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int})
 
@@ -340,7 +340,7 @@ end
 
 function save_system_blocks(
   RBInfo::Info,
-  RBVars::PoissonUnsteady,
+  RBVars::PoissonST,
   LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int},
   operators::Vector{String})
@@ -350,9 +350,9 @@ function save_system_blocks(
 end
 
 function get_θ_matrix(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::PoissonST{T},
   Param::UnsteadyParametricInfo,
   var::String) where T
 
@@ -371,9 +371,9 @@ function get_θ_matrix(
 end
 
 function get_θ_vector(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::PoissonST{T},
   Param::UnsteadyParametricInfo,
   var::String) where T
 
@@ -394,7 +394,7 @@ end
 
 function get_Q(
   RBInfo::Info,
-  RBVars::PoissonUnsteady)
+  RBVars::PoissonST)
 
   if RBVars.Qᵐ == 0
     RBVars.Qᵐ = size(RBVars.Mₙ)[end]
@@ -405,9 +405,9 @@ function get_Q(
 end
 
 function assemble_param_RHS(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::PoissonST{T},
   Param::UnsteadyParametricInfo) where T
 
   println("Assembling RHS exactly using θ-method time scheme, θ=$(RBInfo.θ)")
@@ -429,9 +429,9 @@ function assemble_param_RHS(
 end
 
 function adaptive_loop_on_params(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::PoissonUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::PoissonST{T},
   mean_uₕ_test::Matrix,
   mean_pointwise_err::Matrix,
   μ::Vector{Vector{T}},

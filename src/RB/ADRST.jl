@@ -2,27 +2,27 @@ include("ADRS.jl")
 include("ADRST_support.jl")
 
 function get_snapshot_matrix(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::ADRUnsteady{T}) where T
+  RBInfo::ROMInfoST,
+  RBVars::ADRST{T}) where T
 
   get_snapshot_matrix(RBInfo, RBVars.Poisson)
 
 end
 
-PODs_space(RBInfo::Info, RBVars::ADRUnsteady) =
+PODs_space(RBInfo::Info, RBVars::ADRST) =
   PODs_space(RBInfo, RBVars.Steady)
 
 function PODs_time(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::ADRUnsteady{T}) where T
+  RBInfo::ROMInfoST,
+  RBVars::ADRST{T}) where T
 
   PODs_time(RBInfo, RBVars.Poisson)
 
 end
 
 function assemble_reduced_basis(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::ADRUnsteady)
+  RBInfo::ROMInfoST,
+  RBVars::ADRST)
 
   assemble_reduced_basis(RBInfo, RBVars.Poisson)
 
@@ -30,7 +30,7 @@ end
 
 function get_reduced_basis(
   RBInfo::Info,
-  RBVars::ADRUnsteady{T}) where T
+  RBVars::ADRST{T}) where T
 
   get_reduced_basis(RBInfo, RBVars.Poisson)
 
@@ -39,15 +39,15 @@ end
 function index_mapping(
   i::Int,
   j::Int,
-  RBVars::ADRUnsteady)
+  RBVars::ADRST)
 
   index_mapping(i, j, RBVars.Poisson)
 
 end
 
 function assemble_MDEIM_matrices(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::ADRUnsteady,
+  RBInfo::ROMInfoST,
+  RBVars::ADRST,
   var::String)
 
   if var == "B"
@@ -73,8 +73,8 @@ function assemble_MDEIM_matrices(
 end
 
 function assemble_DEIM_vectors(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::ADRUnsteady,
+  RBInfo::ROMInfoST,
+  RBVars::ADRST,
   var::String)
 
   assemble_DEIM_vectors(RBInfo, RBVars.Poisson, var)
@@ -83,7 +83,7 @@ end
 
 function save_M_DEIM_structures(
   RBInfo::Info,
-  RBVars::ADRUnsteady)
+  RBVars::ADRST)
 
   list_M_DEIM = (RBVars.MDEIM_mat_B, RBVars.MDEIMᵢ_B, RBVars.MDEIM_idx_B,
     RBVars.sparse_el_B, RBVars.row_idx_B, RBVars.MDEIM_idx_time_B,
@@ -100,7 +100,7 @@ end
 
 function set_operators(
   RBInfo::Info,
-  RBVars::ADRUnsteady)
+  RBVars::ADRST)
 
   vcat(["M"], set_operators(RBInfo, RBVars.Steady))
 
@@ -108,7 +108,7 @@ end
 
 function get_M_DEIM_structures(
   RBInfo::Info,
-  RBVars::ADRUnsteady{T}) where T
+  RBVars::ADRST{T}) where T
 
   operators = String[]
 
@@ -184,8 +184,8 @@ function get_M_DEIM_structures(
 end
 
 function get_offline_structures(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::ADRUnsteady)
+  RBInfo::ROMInfoST,
+  RBVars::ADRST)
 
   operators = String[]
   append!(operators, get_affine_structures(RBInfo, RBVars))
@@ -197,9 +197,9 @@ function get_offline_structures(
 end
 
 function get_θᵐ(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::ADRUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::ADRST{T},
   Param::UnsteadyParametricInfo) where T
 
   get_θᵐ(FEMSpace, RBInfo, RBVars, Param)
@@ -207,9 +207,9 @@ function get_θᵐ(
 end
 
 function get_θᵃ(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::ADRUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::ADRST{T},
   Param::UnsteadyParametricInfo) where T
 
   get_θᵃ(FEMSpace, RBInfo, RBVars, Param)
@@ -217,9 +217,9 @@ function get_θᵃ(
 end
 
 function get_θᵇ(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::ADRUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::ADRST{T},
   Param::UnsteadyParametricInfo) where T
 
   timesθ = get_timesθ(RBInfo)
@@ -249,9 +249,9 @@ function get_θᵇ(
 end
 
 function get_θᵈ(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::ADRUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::ADRST{T},
   Param::UnsteadyParametricInfo) where T
 
   timesθ = get_timesθ(RBInfo)
@@ -281,9 +281,9 @@ function get_θᵈ(
 end
 
 function get_θᶠʰ(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::ADRUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::ADRST{T},
   Param::UnsteadyParametricInfo) where T
 
   get_θᶠʰ(FEMSpace, RBInfo, RBVars, Param)
@@ -291,9 +291,9 @@ function get_θᶠʰ(
 end
 
 function solve_RB_system(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::ADRUnsteady,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::ADRST,
   Param::UnsteadyParametricInfo)
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
@@ -307,15 +307,15 @@ function solve_RB_system(
 
 end
 
-function reconstruct_FEM_solution(RBVars::ADRUnsteady)
+function reconstruct_FEM_solution(RBVars::ADRST)
 
   reconstruct_FEM_solution(RBVars.Poisson)
 
 end
 
 function offline_phase(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::ADRUnsteady)
+  RBInfo::ROMInfoST,
+  RBVars::ADRST)
 
   println("Offline phase of the RB solver, unsteady ADR problem")
 
@@ -357,8 +357,8 @@ function offline_phase(
 end
 
 function online_phase(
-  RBInfo::ROMInfoUnsteady{T},
-  RBVars::ADRUnsteady,
+  RBInfo::ROMInfoST{T},
+  RBVars::ADRST,
   param_nbs) where T
 
   println("Online phase of the RB solver, unsteady ADR problem")
@@ -419,9 +419,9 @@ function online_phase(
 end
 
 function loop_on_params(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::ADRUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::ADRST{T},
   μ::Vector{Vector{T}},
   param_nbs) where T
 
@@ -474,9 +474,9 @@ function loop_on_params(
 end
 
 function adaptive_loop_on_params(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::ADRUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::ADRST{T},
   mean_uₕ_test::Matrix,
   mean_pointwise_err::Matrix,
   μ::Vector{Vector{T}},

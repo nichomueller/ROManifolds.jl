@@ -1,12 +1,12 @@
 ################################# OFFLINE ######################################
 
-function check_norm_matrix(RBVars::StokesSteady)
+function check_norm_matrix(RBVars::StokesS)
   isempty(RBVars.Xᵘ₀) || isempty(RBVars.Xᵖ₀)
 end
 
 function PODs_space(
   RBInfo::Info,
-  RBVars::StokesSteady)
+  RBVars::StokesS)
 
   PODs_space(RBInfo,RBVars.Poisson)
 
@@ -19,7 +19,7 @@ end
 
 function primal_supremizers(
   RBInfo::Info,
-  RBVars::StokesSteady{T}) where T
+  RBVars::StokesS{T}) where T
 
   println("Computing primal supremizers")
 
@@ -57,7 +57,7 @@ end
 
 function supr_enrichment_space(
   RBInfo::Info,
-  RBVars::StokesSteady)
+  RBVars::StokesS)
 
   supr_primal = primal_supremizers(RBInfo, RBVars)
   RBVars.Φₛᵘ = hcat(RBVars.Φₛᵘ, supr_primal)
@@ -66,8 +66,8 @@ function supr_enrichment_space(
 end
 
 function get_generalized_coordinates(
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady,
+  RBInfo::ROMInfoS,
+  RBVars::StokesS,
   snaps=nothing)
 
   get_norm_matrix(RBInfo, RBVars)
@@ -87,7 +87,7 @@ end
 
 function set_operators(
   RBInfo::Info,
-  RBVars::StokesSteady)
+  RBVars::StokesS)
 
   append!(["B", "Lc"], set_operators(RBInfo, RBVars.Poisson))
 
@@ -95,7 +95,7 @@ end
 
 function get_A(
   RBInfo::Info,
-  RBVars::StokesSteady)
+  RBVars::StokesS)
 
   get_A(RBInfo, RBVars.Poisson)
 
@@ -103,7 +103,7 @@ end
 
 function get_B(
   RBInfo::Info,
-  RBVars::StokesSteady{T}) where T
+  RBVars::StokesS{T}) where T
 
   if "B" ∈ RBInfo.probl_nl
 
@@ -140,7 +140,7 @@ end
 
 function get_F(
   RBInfo::Info,
-  RBVars::StokesSteady)
+  RBVars::StokesS)
 
   get_F(RBInfo, RBVars.Poisson)
 
@@ -148,7 +148,7 @@ end
 
 function get_H(
   RBInfo::Info,
-  RBVars::StokesSteady)
+  RBVars::StokesS)
 
   get_H(RBInfo, RBVars.Poisson)
 
@@ -156,7 +156,7 @@ end
 
 function get_L(
   RBInfo::Info,
-  RBVars::StokesSteady)
+  RBVars::StokesS)
 
   get_L(RBInfo, RBVars.Poisson)
 
@@ -164,7 +164,7 @@ end
 
 function get_Lc(
   RBInfo::Info,
-  RBVars::StokesSteady)
+  RBVars::StokesS)
 
   if "Lc" ∈ RBInfo.probl_nl
 
@@ -198,7 +198,7 @@ end
 
 function assemble_affine_matrices(
   RBInfo::Info,
-  RBVars::StokesSteady{T},
+  RBVars::StokesS{T},
   var::String) where T
 
   if var == "B"
@@ -215,8 +215,8 @@ function assemble_affine_matrices(
 end
 
 function assemble_MDEIM_matrices(
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady,
+  RBInfo::ROMInfoS,
+  RBVars::StokesS,
   var::String)
 
   println("The matrix $var is non-affine:
@@ -240,7 +240,7 @@ function assemble_MDEIM_matrices(
 end
 
 function assemble_reduced_mat_MDEIM(
-  RBVars::StokesSteady,
+  RBVars::StokesS,
   MDEIM_mat::Matrix,
   row_idx::Vector,
   var::String)
@@ -267,7 +267,7 @@ end
 
 function assemble_affine_vectors(
   RBInfo::Info,
-  RBVars::StokesSteady,
+  RBVars::StokesS,
   var::String)
 
   if var == "Lc"
@@ -283,8 +283,8 @@ function assemble_affine_vectors(
 end
 
 function assemble_DEIM_vectors(
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady,
+  RBInfo::ROMInfoS,
+  RBVars::StokesS,
   var::String)
 
   println("The vector $var is non-affine:
@@ -321,7 +321,7 @@ function assemble_DEIM_vectors(
 end
 
 function assemble_reduced_mat_DEIM(
-  RBVars::StokesSteady,
+  RBVars::StokesS,
   DEIM_mat::Matrix,
   var::String)
 
@@ -341,7 +341,7 @@ end
 
 function save_assembled_structures(
   RBInfo::Info,
-  RBVars::PoissonSteady)
+  RBVars::PoissonS)
 
   affine_vars = (reshape(RBVars.Bₙ, :, RBVars.Qᵇ)::Matrix{T}, RBVars.Lcₙ)
   affine_names = ("Bₙ", "Lcₙ")
@@ -364,7 +364,7 @@ end
 
 function get_system_blocks(
   RBInfo::Info,
-  RBVars::StokesSteady,
+  RBVars::StokesS,
   LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int})
 
@@ -374,7 +374,7 @@ end
 
 function save_system_blocks(
   RBInfo::Info,
-  RBVars::StokesSteady,
+  RBVars::StokesS,
   LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int},
   operators::Vector{String})
@@ -384,9 +384,9 @@ function save_system_blocks(
 end
 
 function get_θ_matrix(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::StokesS,
   Param::SteadyParametricInfo,
   var::String)
 
@@ -403,9 +403,9 @@ function get_θ_matrix(
 end
 
 function get_θ_vector(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::StokesS,
   Param::SteadyParametricInfo,
   var::String)
 
@@ -429,12 +429,12 @@ end
 
 function get_Q(
   RBInfo::Info,
-  RBVars::StokesSteady)
+  RBVars::StokesS)
 
   if RBVars.Qᵇ == 0
     RBVars.Qᵇ = size(RBVars.Bₙ)[end]
   end
-  if !RBInfo.assemble_parametric_RHS
+  if !RBInfo.online_RHS
     if RBVars.Qˡᶜ == 0
       RBVars.Qˡᶜ = size(RBVars.Lcₙ)[end]
     end
@@ -445,9 +445,9 @@ function get_Q(
 end
 
 function assemble_param_RHS(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady{T},
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::StokesS{T},
   Param::SteadyParametricInfo) where T
 
   assemble_param_RHS(FEMSpace, RBInfo, RBVars.Poisson, Param)

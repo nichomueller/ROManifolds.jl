@@ -2,8 +2,8 @@ include("RB.jl")
 include("ADRS_support.jl")
 
 function get_snapshot_matrix(
-  RBInfo::ROMInfoSteady,
-  RBVars::ADRSteady)
+  RBInfo::ROMInfoS,
+  RBVars::ADRS)
 
   get_snapshot_matrix(RBInfo, RBVars.Poisson)
 
@@ -11,15 +11,15 @@ end
 
 function get_norm_matrix(
   RBInfo::Info,
-  RBVars::ADRSteady)
+  RBVars::ADRS)
 
   get_norm_matrix(RBInfo, RBVars.Poisson)
 
 end
 
 function assemble_reduced_basis(
-  RBInfo::ROMInfoSteady,
-  RBVars::ADRSteady)
+  RBInfo::ROMInfoS,
+  RBVars::ADRS)
 
   assemble_reduced_basis(RBInfo, RBVars.Poisson)
 
@@ -27,7 +27,7 @@ end
 
 function get_reduced_basis(
   RBInfo::Info,
-  RBVars::ADRSteady)
+  RBVars::ADRS)
 
   get_reduced_basis(RBInfo, RBVars.Poisson)
 
@@ -35,15 +35,15 @@ end
 
 function set_operators(
   RBInfo::Info,
-  RBVars::ADRSteady)
+  RBVars::ADRS)
 
   vcat(["B","R"], set_operators(RBInfo, RBVars.Poisson))
 
 end
 
 function assemble_MDEIM_matrices(
-  RBInfo::ROMInfoSteady,
-  RBVars::ADRSteady,
+  RBInfo::ROMInfoS,
+  RBVars::ADRS,
   var::String)
 
   if var == "B"
@@ -69,8 +69,8 @@ function assemble_MDEIM_matrices(
 end
 
 function assemble_DEIM_vectors(
-  RBInfo::ROMInfoSteady,
-  RBVars::ADRSteady,
+  RBInfo::ROMInfoS,
+  RBVars::ADRS,
   var::String)
 
   assemble_DEIM_vectors(RBInfo, RBVars.Poisson, var)
@@ -79,7 +79,7 @@ end
 
 function save_M_DEIM_structures(
   RBInfo::Info,
-  RBVars::ADRSteady)
+  RBVars::ADRS)
 
   list_M_DEIM = (RBVars.MDEIM_mat_B, RBVars.MDEIMᵢ_B, RBVars.MDEIM_idx_B,
     RBVars.row_idx_B, RBVars.sparse_el_B, RBVars.MDEIM_mat_D, RBVars.MDEIMᵢ_D,
@@ -94,7 +94,7 @@ end
 
 function get_M_DEIM_structures(
   RBInfo::Info,
-  RBVars::ADRSteady{T}) where T
+  RBVars::ADRS{T}) where T
 
   operators = String[]
   append!(operators, get_M_DEIM_structures(RBInfo, RBVars.Poisson))
@@ -145,7 +145,7 @@ end
 
 function get_Fₙ(
   RBInfo::Info,
-  RBVars::ADRSteady{T}) where T
+  RBVars::ADRS{T}) where T
 
   get_Fₙ(RBInfo, RBVars.Poisson)
 
@@ -153,15 +153,15 @@ end
 
 function get_Hₙ(
   RBInfo::Info,
-  RBVars::ADRSteady{T}) where T
+  RBVars::ADRS{T}) where T
 
   get_Hₙ(RBInfo, RBVars.Poisson)
 
 end
 
 function get_offline_structures(
-  RBInfo::ROMInfoSteady,
-  RBVars::ADRSteady)
+  RBInfo::ROMInfoS,
+  RBVars::ADRS)
 
   operators = String[]
 
@@ -175,7 +175,7 @@ end
 
 function get_system_blocks(
   RBInfo::Info,
-  RBVars::ADRSteady{T},
+  RBVars::ADRS{T},
   LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int}) where T
 
@@ -185,7 +185,7 @@ end
 
 function save_system_blocks(
   RBInfo::Info,
-  RBVars::ADRSteady{T},
+  RBVars::ADRS{T},
   LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int},
   operators::Vector{String}) where T
@@ -207,9 +207,9 @@ function save_system_blocks(
 end
 
 function get_θᵃ(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady{T},
-  RBVars::ADRSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS{T},
+  RBVars::ADRS,
   Param::SteadyParametricInfo) where T
 
   get_θᵃ(FEMSpace, RBInfo, RBVars.Poisson, Param)
@@ -217,9 +217,9 @@ function get_θᵃ(
 end
 
 function get_θᵇ(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady{T},
-  RBVars::ADRSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS{T},
+  RBVars::ADRS,
   Param::SteadyParametricInfo) where T
 
   if "B" ∉ RBInfo.probl_nl
@@ -234,9 +234,9 @@ function get_θᵇ(
 end
 
 function get_θᵈ(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady{T},
-  RBVars::ADRSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS{T},
+  RBVars::ADRS,
   Param::SteadyParametricInfo) where T
 
   if !"D" ∈ RBInfo.probl_nl
@@ -251,9 +251,9 @@ function get_θᵈ(
 end
 
 function get_θᶠʰ(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady{T},
-  RBVars::ADRSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS{T},
+  RBVars::ADRS,
   Param::SteadyParametricInfo) where T
 
   get_θᶠʰ(FEMSpace, RBInfo, RBVars.Poisson, Param)
@@ -261,7 +261,7 @@ function get_θᶠʰ(
 end
 
 function get_RB_LHS_blocks(
-  RBVars::ADRSteady{T},
+  RBVars::ADRS{T},
   θᵃ::Matrix,
   θᵇ::Matrix,
   θᵈ::Matrix) where T
@@ -284,7 +284,7 @@ function get_RB_LHS_blocks(
 end
 
 function get_RB_RHS_blocks(
-  RBVars::ADRSteady{T},
+  RBVars::ADRS{T},
   θᶠ::Array,
   θʰ::Array) where T
 
@@ -293,9 +293,9 @@ function get_RB_RHS_blocks(
 end
 
 function solve_RB_system(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
-  RBVars::ADRSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::ADRS,
   Param::SteadyParametricInfo)
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
@@ -307,13 +307,13 @@ function solve_RB_system(
 
 end
 
-function reconstruct_FEM_solution(RBVars::ADRSteady)
+function reconstruct_FEM_solution(RBVars::ADRS)
   reconstruct_FEM_solution(RBVars.Poisson)
 end
 
 function offline_phase(
-  RBInfo::ROMInfoSteady,
-  RBVars::ADRSteady)
+  RBInfo::ROMInfoS,
+  RBVars::ADRS)
 
   if RBInfo.get_snapshots
     get_snapshot_matrix(RBInfo, RBVars)
@@ -351,8 +351,8 @@ function offline_phase(
 end
 
 function online_phase(
-  RBInfo::ROMInfoSteady,
-  RBVars::ADRSteady{T},
+  RBInfo::ROMInfoS,
+  RBVars::ADRS{T},
   Param_nbs) where T
 
   μ = load_CSV(Array{T}[],

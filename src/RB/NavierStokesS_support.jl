@@ -108,7 +108,7 @@ function assemble_reduced_mat_DEIM(
 end
 
 function assemble_offline_structures(
-  RBInfo::ROMInfoSteady,
+  RBInfo::ROMInfoS,
   RBVars::NavierStokesSGRB,
   operators=String[])
 
@@ -142,8 +142,8 @@ function save_affine_structures(
 end
 
 function get_affine_structures(
-  RBInfo::ROMInfoSteady,
-  RBVars::NavierStokesSteady)
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS)
 
   get_affine_structures(RBInfo, RBVars.Stokes)
 
@@ -188,7 +188,7 @@ function get_RB_LHS_blocks(
 end
 
 function get_RB_RHS_blocks(
-  RBInfo::ROMInfoSteady,
+  RBInfo::ROMInfoS,
   RBVars::NavierStokesSGRB{T},
   θᶠ::Matrix,
   θʰ::Matrix) where T
@@ -198,8 +198,8 @@ function get_RB_RHS_blocks(
 end
 
 function assemble_RB_lifting(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
   RBVars::NavierStokesSGRB{T},
   Param::SteadyParametricInfo) where T
 
@@ -213,8 +213,8 @@ function assemble_RB_lifting(
 end
 
 function assemble_param_RHS(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
   RBVars::NavierStokesSGRB{T},
   Param::SteadyParametricInfo) where T
 
@@ -223,8 +223,8 @@ function assemble_param_RHS(
 end
 
 function get_θ(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
   RBVars::StokesSGRB{T},
   Param::SteadyParametricInfo) where T
 

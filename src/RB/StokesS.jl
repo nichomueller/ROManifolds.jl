@@ -4,8 +4,8 @@ include("StokesS_support.jl")
 ################################# OFFLINE ######################################
 
 function get_snapshot_matrix(
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady{T}) where T
+  RBInfo::ROMInfoS,
+  RBVars::StokesS{T}) where T
 
   get_snapshot_matrix(RBInfo, RBVars.Poisson)
 
@@ -21,7 +21,7 @@ end
 
 function get_norm_matrix(
   RBInfo::Info,
-  RBVars::StokesSteady{T}) where T
+  RBVars::StokesS{T}) where T
 
   get_norm_matrix(RBInfo, RBVars.Poisson)
 
@@ -45,8 +45,8 @@ function get_norm_matrix(
 end
 
 function assemble_reduced_basis(
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady)
+  RBInfo::ROMInfoS,
+  RBVars::StokesS)
 
   RBVars.offline_time += @elapsed begin
     PODs_space(RBInfo, RBVars)
@@ -63,8 +63,8 @@ function assemble_reduced_basis(
 end
 
 function get_reduced_basis(
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady{T}) where T
+  RBInfo::ROMInfoS,
+  RBVars::StokesS{T}) where T
 
   get_reduced_basis(RBInfo, RBVars.Poisson)
 
@@ -76,15 +76,15 @@ function get_reduced_basis(
 end
 
 function get_offline_structures(
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady)
+  RBInfo::ROMInfoS,
+  RBVars::StokesS)
 
   operators = String[]
 
   append!(operators, get_A(RBInfo, RBVars))
   append!(operators, get_B(RBInfo, RBVars))
 
-  if RBInfo.assemble_parametric_RHS
+  if RBInfo.online_RHS
     append!(operators, get_F(RBInfo, RBVars))
     append!(operators, get_H(RBInfo, RBVars))
     append!(operators, get_L(RBInfo, RBVars))
@@ -96,8 +96,8 @@ function get_offline_structures(
 end
 
 function assemble_offline_structures(
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady,
+  RBInfo::ROMInfoS,
+  RBVars::StokesS,
   operators=String[])
 
   if isempty(operators)
@@ -127,8 +127,8 @@ function assemble_offline_structures(
 end
 
 function offline_phase(
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady)
+  RBInfo::ROMInfoS,
+  RBVars::StokesS)
 
   if RBInfo.get_snapshots
     get_snapshot_matrix(RBInfo, RBVars)
@@ -168,15 +168,15 @@ end
 ################################## ONLINE ######################################
 
 function get_θ(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady{T},
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::StokesS{T},
   Param::SteadyParametricInfo) where T
 
   θᵃ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "A")
   θᵇ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "B")
 
-  if !RBInfo.assemble_parametric_RHS
+  if !RBInfo.online_RHS
     θᶠ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "F")
     θʰ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "H")
     θˡ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "L")
@@ -191,7 +191,7 @@ function get_θ(
 end
 
 function get_RB_LHS_blocks(
-  RBVars::StokesSteady{T},
+  RBVars::StokesS{T},
   θᵃ::Matrix,
   θᵇ::Matrix) where T
 
@@ -210,7 +210,7 @@ function get_RB_LHS_blocks(
 end
 
 function get_RB_RHS_blocks(
-  RBVars::StokesSteady{T},
+  RBVars::StokesS{T},
   θᶠ::Matrix,
   θʰ::Matrix,
   θˡ::Matrix,
@@ -222,9 +222,9 @@ function get_RB_RHS_blocks(
 end
 
 function get_RB_system(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::StokesS,
   Param::SteadyParametricInfo)
 
   initialize_RB_system(RBVars)
@@ -243,7 +243,7 @@ function get_RB_system(
     end
 
     if "RHS" ∈ operators
-      if !RBInfo.assemble_parametric_RHS
+      if !RBInfo.online_RHS
         get_RB_RHS_blocks(RBVars, θᶠ, θʰ, θˡ, θˡᶜ)
       else
         assemble_param_RHS(FEMSpace, RBInfo, RBVars, Param)
@@ -256,9 +256,9 @@ function get_RB_system(
 end
 
 function solve_RB_system(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady{T},
-  RBVars::StokesSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS{T},
+  RBVars::StokesS,
   Param::SteadyParametricInfo) where T
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
@@ -275,15 +275,15 @@ function solve_RB_system(
 
 end
 
-function reconstruct_FEM_solution(RBVars::StokesSteady)
+function reconstruct_FEM_solution(RBVars::StokesS)
   println("Reconstructing FEM solution from the newly computed RB one")
   reconstruct_FEM_solution(RBVars.Poisson)
   RBVars.p̃ = RBVars.Φₛᵖ * RBVars.pₙ
 end
 
 function online_phase(
-  RBInfo::ROMInfoSteady,
-  RBVars::StokesSteady{T},
+  RBInfo::ROMInfoS,
+  RBVars::StokesS{T},
   param_nbs) where T
 
   μ = load_CSV(Array{T}[],

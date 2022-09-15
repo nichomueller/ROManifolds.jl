@@ -23,7 +23,7 @@ function get_Dₙ(
 end
 
 function get_Mₙ(
-  RBInfo::ROMInfoUnsteady,
+  RBInfo::ROMInfoST,
   RBVars::ADRSTGRB)
 
   get_Mₙ(RBInfo, RBVars.Poisson)
@@ -100,7 +100,7 @@ function assemble_reduced_mat_DEIM(
 end
 
 function assemble_offline_structures(
-  RBInfo::ROMInfoUnsteady,
+  RBInfo::ROMInfoST,
   RBVars::ADRSTGRB,
   operators=String[])
 
@@ -162,7 +162,7 @@ function get_Q(
 end
 
 function get_RB_LHS_blocks(
-  RBInfo::ROMInfoUnsteady,
+  RBInfo::ROMInfoST,
   RBVars::ADRSTGRB{T},
   θᵐ::Matrix{T},
   θᵃ::Matrix{T},
@@ -252,7 +252,7 @@ function get_RB_LHS_blocks(
 end
 
 function get_RB_RHS_blocks(
-  RBInfo::ROMInfoUnsteady,
+  RBInfo::ROMInfoST,
   RBVars::ADRSTGRB{T},
   θᶠ::Array{T},
   θʰ::Array{T}) where T
@@ -262,8 +262,8 @@ function get_RB_RHS_blocks(
 end
 
 function get_RB_system(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
   RBVars::ADRSTGRB,
   Param::UnsteadyParametricInfo)
 
@@ -282,7 +282,7 @@ function get_RB_system(
     end
 
     if "RHS" ∈ operators
-      if !RBInfo.assemble_parametric_RHS
+      if !RBInfo.online_RHS
         get_RB_RHS_blocks(RBInfo, RBVars, θᶠ, θʰ)
       else
         assemble_param_RHS(FEMSpace, RBInfo, RBVars, Param)
@@ -295,8 +295,8 @@ function get_RB_system(
 end
 
 function assemble_param_RHS(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
   RBVars::ADRSTGRB{T},
   Param::UnsteadyParametricInfo) where T
 
@@ -305,8 +305,8 @@ function assemble_param_RHS(
 end
 
 function get_θ(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
   RBVars::ADRSTGRB{T},
   Param::UnsteadyParametricInfo) where T
 

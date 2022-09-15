@@ -32,7 +32,7 @@ end
 
 function get_FEMSpace_quantities(
   ::NTuple{1,Int},
-  FEMInfo::SteadyInfo,
+  FEMInfo::InfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
 
@@ -56,7 +56,7 @@ end
 
 function get_FEMSpace_quantities(
   ::NTuple{1,Int},
-  FEMInfo::UnsteadyInfo,
+  FEMInfo::InfoST,
   model::DiscreteModel{D,D},
   g::Function) where D
 
@@ -79,7 +79,7 @@ end
 
 function get_FEMSpace_quantities(
   ::NTuple{2,Int},
-  FEMInfo::SteadyInfo,
+  FEMInfo::InfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
 
@@ -89,7 +89,7 @@ end
 
 function get_FEMSpace_quantities(
   ::NTuple{2,Int},
-  FEMInfo::SteadyInfo,
+  FEMInfo::InfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
 
@@ -99,7 +99,7 @@ end
 
 function get_FEMSpace_quantities(
   ::NTuple{3,Int},
-  FEMInfo::SteadyInfo,
+  FEMInfo::InfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
 
@@ -132,7 +132,7 @@ end
 
 function get_FEMSpace_quantities(
   ::NTuple{3,Int},
-  FEMInfo::UnsteadyInfo,
+  FEMInfo::InfoST,
   model::DiscreteModel{D,D},
   g::Function) where D
 
@@ -166,7 +166,7 @@ end
 
 function get_FEMSpace_quantities(
   ::NTuple{4,Int},
-  FEMInfo::SteadyInfo,
+  FEMInfo::InfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
 
@@ -176,7 +176,7 @@ end
 
 function get_FEMSpace_quantities(
   ::NTuple{4,Int},
-  FEMInfo::SteadyInfo,
+  FEMInfo::InfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
 
@@ -186,95 +186,95 @@ end
 
 function get_FEMSpace(
   NT::NTuple{1,Int},
-  FEMInfo::SteadyInfo,
+  FEMInfo::InfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  return FEMSpacePoissonSteady{D}(
+  return FEMSpacePoissonS{D}(
     model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
 
 function get_FEMSpace(
   NT::NTuple{1,Int},
-  FEMInfo::UnsteadyInfo,
+  FEMInfo::InfoST,
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  return FEMSpacePoissonUnsteady{D}(
+  return FEMSpacePoissonST{D}(
     model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
 
 function get_FEMSpace(
   NT::NTuple{2,Int},
-  FEMInfo::SteadyInfo,
+  FEMInfo::InfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  return FEMSpaceADRSteady{D}(
+  return FEMSpaceADRS{D}(
     model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
 
 function get_FEMSpace(
   NT::NTuple{2,Int},
-  FEMInfo::UnsteadyInfo,
+  FEMInfo::InfoST,
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  return FEMSpaceADRUnsteady{D}(
+  return FEMSpaceADRST{D}(
     model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
 
 function get_FEMSpace(
   NT::NTuple{3,Int},
-  FEMInfo::SteadyInfo,
+  FEMInfo::InfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  return FEMSpaceStokesSteady{D}(
+  return FEMSpaceStokesS{D}(
     model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
 
 function get_FEMSpace(
   NT::NTuple{3,Int},
-  FEMInfo::UnsteadyInfo,
+  FEMInfo::InfoST,
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  return FEMSpaceStokesUnsteady{D}(
+  return FEMSpaceStokesST{D}(
     model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
 
 function get_FEMSpace(
   NT::NTuple{4,Int},
-  FEMInfo::SteadyInfo,
+  FEMInfo::InfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  return FEMSpaceNavierStokesSteady{D}(
+  return FEMSpaceNavierStokesS{D}(
     model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
 
 function get_FEMSpace(
   NT::NTuple{4,Int},
-  FEMInfo::UnsteadyInfo,
+  FEMInfo::InfoST,
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  return FEMSpaceNavierStokesUnsteady{D}(
+  return FEMSpaceNavierStokesST{D}(
     model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
 
 function get_FEMSpace₀(
   problem_id::NTuple{1,Int},
-  FEMInfo::SteadyInfo,
+  FEMInfo::InfoS,
   model::DiscreteModel)
 
   get_FEMSpace(problem_id,FEMInfo,model,x->0)
@@ -283,7 +283,7 @@ end
 
 function get_FEMSpace₀(
   problem_id::NTuple{1,Int},
-  FEMInfo::UnsteadyInfo,
+  FEMInfo::InfoST,
   model::DiscreteModel)
 
   g₀(x, t::Real) = 0.
@@ -294,7 +294,7 @@ end
 
 function get_FEMSpace₀(
   problem_id::NTuple{2,Int},
-  FEMInfo::SteadyInfo,
+  FEMInfo::InfoS,
   model::DiscreteModel)
 
   get_FEMSpace(problem_id,FEMInfo,model,x->0)
@@ -303,7 +303,7 @@ end
 
 function get_FEMSpace₀(
   problem_id::NTuple{2,Int},
-  FEMInfo::UnsteadyInfo,
+  FEMInfo::InfoST,
   model::DiscreteModel)
 
   g₀(x, t::Real) = 0.
@@ -314,7 +314,7 @@ end
 
 function get_FEMSpace₀(
   problem_id::NTuple{3,Int},
-  FEMInfo::SteadyInfo,
+  FEMInfo::InfoS,
   model::DiscreteModel)
 
   get_FEMSpace(problem_id,FEMInfo,model, x->zero(VectorValue(FEMInfo.D, Float)))
@@ -323,7 +323,7 @@ end
 
 function get_FEMSpace₀(
   problem_id::NTuple{3,Int},
-  FEMInfo::UnsteadyInfo,
+  FEMInfo::InfoST,
   model::DiscreteModel)
 
   g₀(x, t::Real) = zero(VectorValue(FEMInfo.D, Float))
@@ -334,7 +334,7 @@ end
 
 function get_FEMSpace₀(
   problem_id::NTuple{4,Int},
-  FEMInfo::SteadyInfo,
+  FEMInfo::InfoS,
   model::DiscreteModel)
 
   get_FEMSpace(problem_id,FEMInfo,model, x->zero(VectorValue(FEMInfo.D, Float)))
@@ -343,7 +343,7 @@ end
 
 function get_FEMSpace₀(
   problem_id::NTuple{4,Int},
-  FEMInfo::UnsteadyInfo,
+  FEMInfo::InfoST,
   model::DiscreteModel)
 
   g₀(x, t::Real) = zero(VectorValue(FEMInfo.D, Float))

@@ -3,8 +3,8 @@ include("NavierStokesS.jl")
 include("NavierStokesST_support.jl")
 
 function get_snapshot_matrix(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::NavierStokesUnsteady{T}) where T
+  RBInfo::ROMInfoST,
+  RBVars::NavierStokesST{T}) where T
 
   get_snapshot_matrix(RBInfo, RBVars.Stokes)
 
@@ -18,7 +18,7 @@ end
 
 function PODs_space(
   RBInfo::Info,
-  RBVars::NavierStokesUnsteady)
+  RBVars::NavierStokesST)
 
   PODs_space(RBInfo, RBVars.Steady)
 
@@ -26,15 +26,15 @@ end
 
 function supr_enrichment_space(
   RBInfo::Info,
-  RBVars::NavierStokesUnsteady)
+  RBVars::NavierStokesST)
 
   supr_enrichment_space(RBInfo, RBVars.Steady)
 
 end
 
 function PODs_time(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::StokesUnsteady{T}) where T
+  RBInfo::ROMInfoST,
+  RBVars::StokesST{T}) where T
 
   PODs_time(RBInfo, RBVars.Stokes)
 
@@ -53,7 +53,7 @@ function PODs_time(
 end
 
 function supr_enrichment_time(
-  RBVars::NavierStokesUnsteady)
+  RBVars::NavierStokesST)
 
   supr_enrichment_time(RBVars.Stokes)
   RBVars.Φₜᵘ_quad = time_supremizers(RBVars.Φₜᵘ_quad, RBVars.Φₜᵖ)
@@ -62,8 +62,8 @@ function supr_enrichment_time(
 end
 
 function assemble_reduced_basis(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::NavierStokesUnsteady)
+  RBInfo::ROMInfoST,
+  RBVars::NavierStokesST)
 
   RBVars.offline_time += @elapsed begin
     PODs_space(RBInfo, RBVars)
@@ -94,8 +94,8 @@ function assemble_reduced_basis(
 end
 
 function get_reduced_basis(
-  RBInfo::ROMInfoUnsteady{T},
-  RBVars::NavierStokesUnsteady) where T
+  RBInfo::ROMInfoST{T},
+  RBVars::NavierStokesST) where T
 
   get_reduced_basis(RBInfo, RBVars.Stokes)
   println("Importing the space and time reduced basis for field u, quadrature points")
@@ -110,7 +110,7 @@ function get_reduced_basis(
 
 end
 
-function index_mapping(i::Int, j::Int, RBVars::NavierStokesUnsteady, var="u")
+function index_mapping(i::Int, j::Int, RBVars::NavierStokesST, var="u")
 
   index_mapping(i, j, RBVars.Stokes, var)
 
@@ -118,15 +118,15 @@ end
 
 function set_operators(
   RBInfo::Info,
-  RBVars::NavierStokesUnsteady)
+  RBVars::NavierStokesST)
 
   append!(["M"], set_operators(RBInfo, RBVars.Steady))
 
 end
 
 function assemble_MDEIM_matrices(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::NavierStokesUnsteady,
+  RBInfo::ROMInfoST,
+  RBVars::NavierStokesST,
   var::String)
 
   if var == "C"
@@ -144,8 +144,8 @@ function assemble_MDEIM_matrices(
 end
 
 function assemble_DEIM_vectors(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::NavierStokesUnsteady,
+  RBInfo::ROMInfoST,
+  RBVars::NavierStokesST,
   var::String)
 
   assemble_DEIM_vectors(RBInfo, RBVars.Stokes, var)
@@ -153,8 +153,8 @@ function assemble_DEIM_vectors(
 end
 
 function save_M_DEIM_structures(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::NavierStokesUnsteady)
+  RBInfo::ROMInfoST,
+  RBVars::NavierStokesST)
 
   list_M_DEIM = (RBVars.MDEIM_mat_C, RBVars.MDEIMᵢ_C, RBVars.MDEIM_idx_C,
     RBVars.row_idx_C, RBVars.sparse_el_C, RBVars.MDEIM_idx_time_C)
@@ -167,16 +167,16 @@ function save_M_DEIM_structures(
 end
 
 function get_M_DEIM_structures(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::NavierStokesUnsteady)
+  RBInfo::ROMInfoST,
+  RBVars::NavierStokesST)
 
   get_M_DEIM_structures(RBInfo, RBVars.Stokes)
 
 end
 
 function get_offline_structures(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::NavierStokesUnsteady)
+  RBInfo::ROMInfoST,
+  RBVars::NavierStokesST)
 
   operators = String[]
   append!(operators, get_affine_structures(RBInfo, RBVars))
@@ -188,9 +188,9 @@ function get_offline_structures(
 end
 
 function get_θᵐ(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::NavierStokesUnsteady,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::NavierStokesST,
   Param::UnsteadyParametricInfo)
 
   get_θᵐ(FEMSpace, RBInfo, RBVars.Stokes, Param)
@@ -198,9 +198,9 @@ function get_θᵐ(
 end
 
 function get_θᵃ(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::NavierStokesUnsteady,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::NavierStokesST,
   Param::UnsteadyParametricInfo)
 
   get_θᵃ(FEMSpace, RBInfo, RBVars.Stokes, Param)
@@ -208,9 +208,9 @@ function get_θᵃ(
 end
 
 function get_θᵇ(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::NavierStokesUnsteady,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::NavierStokesST,
   Param::UnsteadyParametricInfo)
 
   get_θᵇ(FEMSpace, RBInfo, RBVars.Stokes, Param)
@@ -218,9 +218,9 @@ function get_θᵇ(
 end
 
 function get_θᶜ(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::NavierStokesUnsteady,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::NavierStokesST,
   Param::UnsteadyParametricInfo)
 
   timesθ = get_timesθ(RBInfo)
@@ -243,9 +243,9 @@ function get_θᶜ(
 end
 
 function get_θᶠʰ(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::NavierStokesUnsteady,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::NavierStokesST,
   Param::UnsteadyParametricInfo)
 
   get_θᶠʰ(FEMSpace, RBInfo, RBVars.Stokes, Param)
@@ -253,9 +253,9 @@ function get_θᶠʰ(
 end
 
 function solve_RB_system(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::NavierStokesUnsteady,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::NavierStokesST,
   Param::UnsteadyParametricInfo)
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
@@ -274,15 +274,15 @@ function solve_RB_system(
 
 end
 
-function reconstruct_FEM_solution(RBVars::NavierStokesUnsteady)
+function reconstruct_FEM_solution(RBVars::NavierStokesST)
 
   reconstruct_FEM_solution(RBVars.Stokes)
 
 end
 
 function offline_phase(
-  RBInfo::ROMInfoUnsteady,
-  RBVars::NavierStokesUnsteady)
+  RBInfo::ROMInfoST,
+  RBVars::NavierStokesST)
 
   println("Offline phase of the RB solver, unsteady Stokes problem")
 
@@ -324,8 +324,8 @@ function offline_phase(
 end
 
 function online_phase(
-  RBInfo::ROMInfoUnsteady{T},
-  RBVars::NavierStokesUnsteady,
+  RBInfo::ROMInfoST{T},
+  RBVars::NavierStokesST,
   param_nbs) where T
 
   println("Online phase of the RB solver, unsteady Stokes problem")
@@ -397,9 +397,9 @@ function online_phase(
 end
 
 function loop_on_params(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::NavierStokesUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::NavierStokesST{T},
   μ::Vector{Vector{T}},
   param_nbs) where T
 
@@ -475,9 +475,9 @@ function loop_on_params(
 end
 
 function adaptive_loop_on_params(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady,
-  RBVars::NavierStokesUnsteady{T},
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::NavierStokesST{T},
   mean_uₕ_test::Matrix,
   mean_pointwise_err_u::Matrix,
   mean_pₕ_test::Matrix,

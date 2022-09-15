@@ -7,7 +7,7 @@ function ROM_paths(FEMPaths, RB_method)
   results_path = joinpath(ROM_path, "results")
   create_dir(results_path)
 
-  RBPathInfo(FEMPaths, ROM_structures_path, results_path)
+  ROMPath(FEMPaths, ROM_structures_path, results_path)
 
 end
 
@@ -59,7 +59,7 @@ end
 
 function assemble_FEM_structure(
   FEMSpace::FEMProblem,
-  RBInfo::ROMInfoSteady,
+  RBInfo::ROMInfoS,
   Param::SteadyParametricInfo,
   var::String)
 
@@ -69,7 +69,7 @@ end
 
 function assemble_FEM_structure(
   FEMSpace::FEMProblem,
-  RBInfo::ROMInfoUnsteady,
+  RBInfo::ROMInfoST,
   Param::UnsteadyParametricInfo,
   var::String)
 
@@ -89,18 +89,18 @@ function get_ParamInfo(RBInfo::Info, FEMSpace::FEMProblem, μ::Vector{T}) where 
 
 end
 
-function get_timesθ(RBInfo::ROMInfoUnsteady{T}) where T
+function get_timesθ(RBInfo::ROMInfoST{T}) where T
 
   T.(get_timesθ(RBInfo.FEMInfo))
 
 end
 
-function initialize_RB_system(RBVars::RBSteadyProblem{T}) where T
+function initialize_RB_system(RBVars::RBProblemS{T}) where T
   RBVars.LHSₙ = Matrix{T}[]
   RBVars.RHSₙ = Matrix{T}[]
 end
 
-function initialize_RB_system(RBVars::RBUnsteadyProblem{T}) where T
+function initialize_RB_system(RBVars::RBProblemST{T}) where T
   RBVars.LHSₙ = Matrix{T}[]
   RBVars.RHSₙ = Matrix{T}[]
 end
@@ -127,8 +127,8 @@ function assemble_parametric_structure(
 end
 
 function assemble_sparse_mat(
-  FEMSpace::SteadyProblem,
-  FEMInfo::SteadyInfo,
+  FEMSpace::FEMProblemS,
+  FEMInfo::InfoS,
   Param::SteadyParametricInfo,
   el::Vector{Int},
   var::String)
@@ -136,7 +136,7 @@ function assemble_sparse_mat(
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
 
-  function define_Mat(::FEMSpacePoissonSteady, var::String)
+  function define_Mat(::FEMSpacePoissonS, var::String)
     if var == "A"
       return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Param.α*∇(FEMSpace.ϕᵤ)))*dΩ_sparse,
         FEMSpace.V, FEMSpace.V₀)
@@ -144,7 +144,7 @@ function assemble_sparse_mat(
       error("Unrecognized sparse matrix")
     end
   end
-  function define_Mat(::FEMSpaceStokesSteady, var::String)
+  function define_Mat(::FEMSpaceStokesS, var::String)
     if var == "A"
       return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Param.α*∇(FEMSpace.ϕᵤ)))*dΩ_sparse,
         FEMSpace.V, FEMSpace.V₀)
@@ -158,8 +158,8 @@ function assemble_sparse_mat(
 end
 
 function assemble_sparse_mat(
-  FEMSpace::UnsteadyProblem,
-  FEMInfo::UnsteadyInfo,
+  FEMSpace::FEMProblemST,
+  FEMInfo::InfoST,
   Param::UnsteadyParametricInfo,
   el::Vector{Int},
   timesθ::Vector,
@@ -169,7 +169,7 @@ function assemble_sparse_mat(
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
   Nₜ = length(timesθ)
 
-  function define_Matₜ(::FEMSpacePoissonUnsteady, t::Real, var::String)
+  function define_Matₜ(::FEMSpacePoissonST, t::Real, var::String)
     if var == "A"
       return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Param.α(t)*∇(FEMSpace.ϕᵤ(t))))*dΩ_sparse,
         FEMSpace.V(t), FEMSpace.V₀)
@@ -180,7 +180,7 @@ function assemble_sparse_mat(
       error("Unrecognized sparse matrix")
     end
   end
-  function define_Matₜ(::FEMSpaceStokesUnsteady, t::Real, var::String)
+  function define_Matₜ(::FEMSpaceStokesST, t::Real, var::String)
     if var == "A"
       return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Param.α(t)*∇(FEMSpace.ϕᵤ(t))))*dΩ_sparse,
         FEMSpace.V(t), FEMSpace.V₀)
@@ -209,8 +209,8 @@ function assemble_sparse_mat(
 end
 
 function assemble_sparse_vec(
-  FEMSpace::SteadyProblem,
-  FEMInfo::SteadyInfo,
+  FEMSpace::FEMProblemS,
+  FEMInfo::InfoS,
   Param::SteadyParametricInfo,
   el::Vector{Int},
   var::String)
@@ -218,14 +218,14 @@ function assemble_sparse_vec(
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
 
-  function define_Vec(::FEMSpacePoissonSteady, var::String)
+  function define_Vec(::FEMSpacePoissonS, var::String)
     if var == "F"
       return assemble_vector(∫(FEMSpace.ϕᵥ*Param.f)*dΩ_sparse, FEMSpace.V₀)
     elseif var == "H"
       return assemble_vector(∫(FEMSpace.ϕᵥ*Param.h)*dΩ_sparse, FEMSpace.V₀)
     end
   end
-  function define_Vec(::FEMSpaceStokesSteady, var::String)
+  function define_Vec(::FEMSpaceStokesS, var::String)
     if var == "F"
       return assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.f)*dΩ_sparse, FEMSpace.V₀)
     elseif var == "H"
@@ -238,8 +238,8 @@ function assemble_sparse_vec(
 end
 
 function assemble_sparse_vec(
-  FEMSpace::UnsteadyProblem,
-  FEMInfo::UnsteadyInfo,
+  FEMSpace::FEMProblemST,
+  FEMInfo::InfoST,
   Param::UnsteadyParametricInfo,
   el::Vector{Int},
   timesθ::Vector,
@@ -255,14 +255,14 @@ function assemble_sparse_vec(
     error("Unrecognized variable")
   end
 
-  function define_Vecₜ(::FEMSpacePoissonUnsteady, t::Real, var::String)
+  function define_Vecₜ(::FEMSpacePoissonST, t::Real, var::String)
     if var == "F"
       return assemble_vector(∫(FEMSpace.ϕᵥ*Param.f(t))*dΩ_sparse, FEMSpace.V₀)
     else var == "H"
       return assemble_vector(∫(FEMSpace.ϕᵥ*Param.h(t))*dΩ_sparse, FEMSpace.V₀)
     end
   end
-  function define_Vecₜ(::FEMSpaceStokesUnsteady, t::Real, var::String)
+  function define_Vecₜ(::FEMSpaceStokesST, t::Real, var::String)
     if var == "F"
       return assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.f(t))*dΩ_sparse, FEMSpace.V₀)
     else var == "H"
@@ -281,9 +281,9 @@ function assemble_sparse_vec(
 end
 
 #= function assemble_RBapprox_convection(
-  FEMSpace::FEMSpaceNavierStokesSteady,
+  FEMSpace::FEMSpaceNavierStokesS,
   Param::SteadyParametricInfo,
-  RBVars::NavierStokesSteady{T}) where T
+  RBVars::NavierStokesS{T}) where T
 
   C = assemble_convection(FEMSpace, Param)
 
@@ -303,10 +303,10 @@ end
 end
 
 function assemble_RBapprox_convection(
-  FEMSpace::FEMSpaceNavierStokesUnsteady,
+  FEMSpace::FEMSpaceNavierStokesST,
   Param::UnsteadyParametricInfo,
-  RBInfo::ParamNavierStokesUnsteady,
-  RBVars::NavierStokesUnsteady{T}) where T
+  RBInfo::ParamNavierStokesST,
+  RBVars::NavierStokesST{T}) where T
 
   function index_mapping_inverse_quad(i::Int)
     iₛ = 1+Int(floor((i-1)/RBVars.nₜᵘ_quad))
@@ -338,7 +338,7 @@ function assemble_RBapprox_convection(
 end =#
 
 function interpolated_θ(
-  RBVars::RBUnsteadyProblem{T},
+  RBVars::RBProblemST{T},
   Mat_μ_sparse::SparseMatrixCSC{T, Int},
   timesθ::Vector{T},
   MDEIMᵢ::Matrix{T},
@@ -364,7 +364,7 @@ function interpolated_θ(
 end
 
 function interpolated_θ(
-  RBVars::RBUnsteadyProblem{T},
+  RBVars::RBProblemST{T},
   Vec_μ_sparse::Matrix{T},
   timesθ::Vector{T},
   DEIMᵢ::Matrix{T},
@@ -390,9 +390,9 @@ function interpolated_θ(
 end
 
 function θ_matrix(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady{T},
-  ::RBSteadyProblem,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS{T},
+  ::RBProblemS,
   fun::Function,
   MDEIMᵢ::Matrix,
   MDEIM_idx::Vector{Int},
@@ -412,9 +412,9 @@ function θ_matrix(
 end
 
 function θ_matrix(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady{T},
-  RBVars::RBUnsteadyProblem,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST{T},
+  RBVars::RBProblemST,
   fun::Function,
   MDEIMᵢ::Matrix,
   MDEIM_idx::Vector{Int},
@@ -448,14 +448,14 @@ function θ_matrix(
 end
 
 function θ_vector(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady{T},
-  ::RBSteadyProblem,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS{T},
+  ::RBProblemS,
   fun::Function,
-  DEIMᵢ::Matrix{T},
+  DEIMᵢ::Matrix,
   DEIM_idx::Vector{Int},
   sparse_el::Vector{Int},
-  var::String)
+  var::String) where T
 
   if var ∉ RBInfo.probl_nl
     θ = reshape([T.(fun(Point(0., 0.)))], 1, 1)
@@ -470,15 +470,15 @@ function θ_vector(
 end
 
 function θ_vector(
-  FEMSpace::UnsteadyProblem,
-  RBInfo::ROMInfoUnsteady{T},
-  RBVars::RBUnsteadyProblem,
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST{T},
+  RBVars::RBProblemST,
   fun::Function,
-  DEIMᵢ::Matrix{T},
+  DEIMᵢ::Matrix,
   DEIM_idx::Vector{Int},
   sparse_el::Vector{Int},
   DEIM_idx_time::Vector{Int},
-  var::String)
+  var::String) where T
 
   timesθ = get_timesθ(RBInfo)
 
@@ -506,7 +506,7 @@ end
 
 function compute_errors(
   uₕ::Vector,
-  RBVars::RBSteadyProblem{T},
+  RBVars::RBProblemS{T},
   norm_matrix = nothing) where T
 
   mynorm(uₕ - RBVars.ũ[:, 1], norm_matrix) / mynorm(uₕ, norm_matrix)
@@ -514,7 +514,7 @@ function compute_errors(
 end
 
 function compute_errors(
-  RBVars::RBUnsteadyProblem{T},
+  RBVars::RBProblemST{T},
   uₕ::Matrix,
   ũ::Matrix,
   norm_matrix = nothing) where T

@@ -2,8 +2,8 @@ include("StokesS.jl")
 include("NavierStokesS_support.jl")
 
 function get_snapshot_matrix(
-  RBInfo::ROMInfoSteady,
-  RBVars::NavierStokesSteady{T}) where T
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS{T}) where T
 
   get_snapshot_matrix(RBInfo, RBVars.Stokes)
 
@@ -18,7 +18,7 @@ end
 
 function get_norm_matrix(
   RBInfo::Info,
-  RBVars::NavierStokesSteady{T}) where T
+  RBVars::NavierStokesS{T}) where T
 
   get_norm_matrix(RBInfo, RBVars.Stokes)
 
@@ -26,7 +26,7 @@ end
 
 function PODs_space(
   RBInfo::Info,
-  RBVars::NavierStokesSteady)
+  RBVars::NavierStokesS)
 
   PODs_space(RBInfo,RBVars.Stokes)
 
@@ -38,7 +38,7 @@ end
 
 function primal_supremizers(
   RBInfo::Info,
-  RBVars::NavierStokesSteady{T}) where T
+  RBVars::NavierStokesS{T}) where T
 
   println("Computing primal supremizers")
 
@@ -100,7 +100,7 @@ end
 
 function supr_enrichment_space(
   RBInfo::Info,
-  RBVars::NavierStokesSteady)
+  RBVars::NavierStokesS)
 
   supr_primal, supr_primal_quad = primal_supremizers(RBInfo, RBVars)
 
@@ -113,8 +113,8 @@ function supr_enrichment_space(
 end
 
 function assemble_reduced_basis(
-  RBInfo::ROMInfoSteady,
-  RBVars::NavierStokesSteady)
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS)
 
   RBVars.offline_time += @elapsed begin
     PODs_space(RBInfo, RBVars)
@@ -133,8 +133,8 @@ function assemble_reduced_basis(
 end
 
 function get_reduced_basis(
-  RBInfo::ROMInfoSteady,
-  RBVars::NavierStokesSteady{T}) where T
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS{T}) where T
 
   get_reduced_basis(RBInfo, RBVars.Stokes)
   println("Importing the spatial reduced basis for field u, quadrature points")
@@ -146,15 +146,15 @@ end
 
 function set_operators(
   RBInfo::Info,
-  RBVars::NavierStokesSteady)
+  RBVars::NavierStokesS)
 
   append!(["C"], set_operators(RBInfo, RBVars.Stokes))
 
 end
 
 function assemble_MDEIM_matrices(
-  RBInfo::ROMInfoSteady,
-  RBVars::NavierStokesSteady,
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS,
   var::String)
 
   if var == "C"
@@ -172,8 +172,8 @@ function assemble_MDEIM_matrices(
 end
 
 function assemble_DEIM_vectors(
-  RBInfo::ROMInfoSteady,
-  RBVars::NavierStokesSteady,
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS,
   var::String)
 
   assemble_DEIM_vectors(RBInfo, RBVars.Stokes, var)
@@ -181,8 +181,8 @@ function assemble_DEIM_vectors(
 end
 
 function save_M_DEIM_structures(
-  RBInfo::ROMInfoSteady,
-  RBVars::NavierStokesSteady)
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS)
 
   list_M_DEIM = (RBVars.MDEIM_mat_C, RBVars.MDEIMᵢ_C, RBVars.MDEIM_idx_C,
     RBVars.row_idx_C, RBVars.sparse_el_C)
@@ -194,8 +194,8 @@ function save_M_DEIM_structures(
 end
 
 function get_M_DEIM_structures(
-  RBInfo::ROMInfoSteady,
-  RBVars::NavierStokesSteady)
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS)
 
   operators = String[]
   append!(operators, get_M_DEIM_structures(RBInfo, RBVars.Stokes))
@@ -223,8 +223,8 @@ function get_M_DEIM_structures(
 end
 
 function get_offline_structures(
-  RBInfo::ROMInfoSteady,
-  RBVars::NavierStokesSteady)
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS)
 
   operators = String[]
 
@@ -238,7 +238,7 @@ end
 
 function get_system_blocks(
   RBInfo::Info,
-  RBVars::NavierStokesSteady,
+  RBVars::NavierStokesS,
   LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int})
 
@@ -248,7 +248,7 @@ end
 
 function save_system_blocks(
   RBInfo::Info,
-  RBVars::NavierStokesSteady,
+  RBVars::NavierStokesS,
   LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int},
   operators::Vector{String})
@@ -258,9 +258,9 @@ function save_system_blocks(
 end
 
 function get_θᵃ(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
-  RBVars::NavierStokesSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS,
   Param::SteadyParametricInfo)
 
   get_θᵃ(FEMSpace, RBInfo, RBVars.Stokes, Param)
@@ -268,9 +268,9 @@ function get_θᵃ(
 end
 
 function get_θᵇ(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
-  RBVars::NavierStokesSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS,
   Param::SteadyParametricInfo)
 
   get_θᵇ(FEMSpace, RBInfo, RBVars.Stokes, Param)
@@ -278,8 +278,8 @@ function get_θᵇ(
 end
 
 function get_θᶜ(
-  FEMSpace::SteadyProblem,
-  RBVars::NavierStokesSteady,
+  FEMSpace::FEMProblemS,
+  RBVars::NavierStokesS,
   Param::SteadyParametricInfo)
 
   C_μ_sparse = T.(assemble_sparse_mat(FEMSpace, FEMInfo, Param, RBVars.sparse_el_C))
@@ -289,9 +289,9 @@ function get_θᶜ(
 end
 
 function get_θᶠʰ(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
-  RBVars::NavierStokesSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS,
   Param::SteadyParametricInfo)
 
   get_θᶠʰ(FEMSpace, RBInfo, RBVars.Stokes, Param)
@@ -299,7 +299,7 @@ function get_θᶠʰ(
 end
 
 function get_RB_LHS_blocks(
-  RBVars::ADRSteady{T},
+  RBVars::ADRS{T},
   θᵃ::Matrix,
   θᵇ::Matrix) where T
 
@@ -322,9 +322,9 @@ function get_RB_LHS_blocks(
 end
 
 function get_RB_system(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
-  RBVars::NavierStokesSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS,
   Param::SteadyParametricInfo)
 
   initialize_RB_system(RBVars)
@@ -343,7 +343,7 @@ function get_RB_system(
     end
 
     if "RHS" ∈ operators
-      if !RBInfo.assemble_parametric_RHS
+      if !RBInfo.online_RHS
         push!(RBVars.RHSₙ, get_RB_RHS_blocks(RBInfo, RBVars, θᶠ, θʰ))
       else
         assemble_param_RHS(FEMSpace, RBInfo, RBVars, Param)
@@ -359,9 +359,9 @@ function get_RB_system(
 end
 
 function solve_RB_system(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady{T},
-  RBVars::NavierStokesSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS{T},
+  RBVars::NavierStokesS,
   Param::SteadyParametricInfo) where T
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
@@ -378,13 +378,13 @@ function solve_RB_system(
 
 end
 
-function reconstruct_FEM_solution(RBVars::NavierStokesSteady)
+function reconstruct_FEM_solution(RBVars::NavierStokesS)
   reconstruct_FEM_solution(RBVars.Stokes)
 end
 
 function offline_phase(
-  RBInfo::ROMInfoSteady,
-  RBVars::NavierStokesSteady)
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS)
 
   if RBInfo.get_snapshots
     get_snapshot_matrix(RBInfo, RBVars)
@@ -422,8 +422,8 @@ function offline_phase(
 end
 
 function online_phase(
-  RBInfo::ROMInfoSteady,
-  RBVars::NavierStokesSteady{T},
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS{T},
   param_nbs) where T
 
   μ = load_CSV(Array{T}[],

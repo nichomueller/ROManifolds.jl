@@ -103,8 +103,8 @@ function assemble_reduced_mat_DEIM(
 end
 
 function assemble_offline_structures(
-  RBInfo::ROMInfoSteady,
-  RBVars::ADRSteady,
+  RBInfo::ROMInfoS,
+  RBVars::ADRS,
   operators=String[])
 
   if isempty(operators)
@@ -183,8 +183,8 @@ function get_Q(
 end
 
 function get_RB_system(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
   RBVars::ADRSGRB,
   Param::SteadyParametricInfo)
 
@@ -203,7 +203,7 @@ function get_RB_system(
     end
 
     if "RHS" ∈ operators
-      if !RBInfo.assemble_parametric_RHS
+      if !RBInfo.online_RHS
         get_RB_RHS_blocks(RBVars, θᶠ, θʰ)
       else
         assemble_param_RHS(FEMSpace, RBInfo, RBVars, Param)
@@ -219,8 +219,8 @@ function get_RB_system(
 end
 
 function assemble_RB_lifting(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
   RBVars::ADRSGRB{T},
   Param::SteadyParametricInfo) where T
 
@@ -234,8 +234,8 @@ function assemble_RB_lifting(
 end
 
 function assemble_param_RHS(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
   RBVars::ADRSGRB,
   Param::SteadyParametricInfo)
 
@@ -244,8 +244,8 @@ function assemble_param_RHS(
 end
 
 function get_θ(
-  FEMSpace::SteadyProblem,
-  RBInfo::ROMInfoSteady,
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
   RBVars::ADRSGRB{T},
   Param::SteadyParametricInfo) where T
 

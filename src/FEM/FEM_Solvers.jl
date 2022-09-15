@@ -1,6 +1,6 @@
 function FE_solve(
-  FEMSpace::FEMSpacePoissonSteady,
-  FEMInfo::SteadyInfo,
+  FEMSpace::FEMSpacePoissonS,
+  FEMInfo::InfoS,
   Param::SteadyParametricInfo)
 
   a(u, v) = ∫(∇(v) ⋅ (Param.α * ∇(u))) * FEMSpace.dΩ
@@ -18,8 +18,8 @@ function FE_solve(
 end
 
 function FE_solve(
-  FEMSpace::FEMSpacePoissonUnsteady,
-  FEMInfo::UnsteadyInfo,
+  FEMSpace::FEMSpacePoissonST,
+  FEMInfo::InfoST,
   Param::UnsteadyParametricInfo)
 
   m(t, u, v) = ∫(Param.m(t)*(u*v))dΩ
@@ -51,8 +51,8 @@ function FE_solve(
 end
 
 function FE_solve(
-  FEMSpace::FEMSpaceADRSteady,
-  FEMInfo::SteadyInfo,
+  FEMSpace::FEMSpaceADRS,
+  FEMInfo::InfoS,
   Param::SteadyParametricInfo)
 
   a(u,v) = ∫(∇(v)⋅(Param.α*∇(u)) +
@@ -74,8 +74,8 @@ function FE_solve(
 end
 
 function FE_solve(
-  FEMSpace::FEMSpaceADRUnsteady,
-  FEMInfo::UnsteadyInfo,
+  FEMSpace::FEMSpaceADRST,
+  FEMInfo::InfoST,
   Param::UnsteadyParametricInfo)
 
   m(t, u, v) = ∫(Param.m(t)*(u*v))dΩ
@@ -110,8 +110,8 @@ function FE_solve(
 end
 
 function FE_solve(
-  FEMSpace::FEMSpaceStokesSteady,
-  FEMInfo::SteadyInfo,
+  FEMSpace::FEMSpaceStokesS,
+  FEMInfo::InfoS,
   Param::SteadyParametricInfo) where T
 
   a((u,p),(v,q)) = ∫( ∇(v)⊙(Param.α*∇(u)) - (∇⋅v)*p + q*(∇⋅u) ) * FEMSpace.dΩ
@@ -129,8 +129,8 @@ function FE_solve(
 end
 
 function FE_solve(
-  FEMSpace::FEMSpaceStokesUnsteady,
-  FEMInfo::UnsteadyInfo,
+  FEMSpace::FEMSpaceStokesST,
+  FEMInfo::InfoST,
   Param::UnsteadyParametricInfo) where T
 
   timesθ = get_timesθ(FEMInfo)
@@ -168,7 +168,7 @@ function FE_solve(
 end
 
 #= function FE_solve(
-  FEMSpace::FEMSpaceStokesUnsteady, probl::ProblemInfoUnsteady{T},
+  FEMSpace::FEMSpaceStokesST, probl::ProblemInfoUnsteady{T},
   Param::UnsteadyParametricInfo{D,T}; subtract_Ddata=false)
 
   m(t,(u,p),(v,q)) = ∫(Param.m(t)*(u⋅v))*FEMSpace.dΩ
@@ -239,7 +239,7 @@ end =#
 function rhs_form(
   t::Real,
   v::FEBasis,
-  FEMSpace::FEMSpacePoissonUnsteady,
+  FEMSpace::FEMSpacePoissonST,
   Param::UnsteadyParametricInfo)
 
   if !isnothing(FEMSpace.dΓn)
@@ -252,7 +252,7 @@ end
 function rhs_form(
   t::Real,
   v::FEBasis,
-  FEMSpace::FEMSpaceStokesUnsteady,
+  FEMSpace::FEMSpaceStokesST,
   Param::UnsteadyParametricInfo)
 
   if !isnothing(FEMSpace.dΓn)
