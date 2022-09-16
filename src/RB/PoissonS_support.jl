@@ -333,8 +333,8 @@ function save_affine_structures(
   RBInfo::Info,
   RBVars::PoissonS{T}) where T
 
-  affine_vars = (reshape(RBVars.Aₙ, :, RBVars.Qᵃ)::Matrix{T},
-                RBVars.Fₙ, RBVars.Hₙ, RBVars.Lₙ)
+  Aₙ = reshape_3Darrays_in_list((RBVars.Aₙ,), [RBVars.Qᵃ])
+  affine_vars = (Aₙ, RBVars.Fₙ, RBVars.Hₙ, RBVars.Lₙ)
   affine_names = ("Aₙ", "Fₙ", "Hₙ", "Lₙ")
 
   save_structures_in_list(affine_vars, affine_names, RBInfo.ROM_structures_path)
@@ -472,22 +472,29 @@ function get_Q(
   RBInfo::Info,
   RBVars::PoissonS)
 
-  if RBVars.Qᵃ == 0
+  if "A" ∉ RBInfo.probl_nl
     RBVars.Qᵃ = size(RBVars.Aₙ)[end]
-  end
-  if !RBInfo.online_RHS
-    if RBVars.Qᶠ == 0
-      RBVars.Qᶠ = size(RBVars.Fₙ)[end]
-    end
-    if RBVars.Qʰ == 0
-      RBVars.Qʰ = size(RBVars.Hₙ)[end]
-    end
-    if RBVars.Qˡ == 0
-      RBVars.Qˡ = size(RBVars.Lₙ)[end]
-    end
+    else
+    RBVars.Qᵃ = size(RBVars.MDEIMᵢ_A)[end]
   end
 
-  return
+  if "F" ∉ RBInfo.probl_nl
+    RBVars.Qᶠ = size(RBVars.Fₙ)[end]
+    else
+    RBVars.Qᶠ = size(RBVars.DEIMᵢ_F)[end]
+  end
+
+  if "H" ∉ RBInfo.probl_nl
+    RBVars.Qʰ = size(RBVars.Hₙ)[end]
+    else
+    RBVars.Qʰ = size(RBVars.DEIMᵢ_H)[end]
+  end
+
+  if "L" ∉ RBInfo.probl_nl
+    RBVars.Qˡ = size(RBVars.Lₙ)[end]
+    else
+    RBVars.Qˡ = size(RBVars.DEIMᵢ_L)[end]
+  end
 
 end
 

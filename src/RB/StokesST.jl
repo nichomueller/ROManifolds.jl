@@ -79,7 +79,7 @@ function get_offline_structures(
 
   append!(operators, get_B(RBInfo, RBVars))
 
-  if RBInfo.online_RHS
+  if !RBInfo.online_RHS
     append!(operators, get_Lc(RBInfo, RBVars))
   end
 

@@ -41,6 +41,27 @@ function label_sorted_elems(vec::Vector{T}) where T
   Int.(indexin(vec,vecnew))
 end
 
+function reshape_3Darrays_in_list(
+  list_3Darrays::NTuple{D, Array{T, 3}},
+  list_dims::Vector{Int}) where {D, T}
+
+  @assert length(list_dims) == D "Wrong length"
+
+  reshaped_2Darrays = ()
+
+  for i = 1:D
+    if !isempty(list_3Darrays[i])
+      reshaped_2Darrays = (reshaped_2Darrays...,
+        reshape(list_3Darrays[i], :, list_dims[i])::Matrix{T})
+    else
+      reshaped_2Darrays = (reshaped_2Darrays..., list_3Darrays[i])
+    end
+  end
+
+  reshaped_2Darrays
+
+end
+
 function Base.argmax(v::Vector{T},n_val::Int) where T
   s = sort(v,rev=true)
   idx = Int.(indexin(s,v))[1:n_val]

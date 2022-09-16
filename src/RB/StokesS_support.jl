@@ -343,8 +343,8 @@ function save_affine_structures(
   RBInfo::Info,
   RBVars::PoissonS)
 
-  affine_vars = (reshape(RBVars.Bₙ, :, RBVars.Qᵇ)::Matrix{T}, RBVars.Lcₙ)
-  affine_names = ("Bₙ", "Lcₙ")
+  Bₙ = reshape_3Darrays_in_list((RBVars.Bₙ,), [RBVars.Qᵇ])
+  affine_vars, affine_names = (Bₙ, RBVars.Lcₙ), ("Bₙ", "Lcₙ")
   save_structures_in_list(affine_vars, affine_names, RBInfo.ROM_structures_path)
 
   save_affine_structures(RBInfo, RBVars.Poisson)
@@ -439,13 +439,16 @@ function get_Q(
   RBInfo::Info,
   RBVars::StokesS)
 
-  if RBVars.Qᵇ == 0
+  if "B" ∉ RBInfo.probl_nl
     RBVars.Qᵇ = size(RBVars.Bₙ)[end]
+    else
+    RBVars.Qᵇ = size(RBVars.MDEIMᵢ_B)[end]
   end
-  if !RBInfo.online_RHS
-    if RBVars.Qˡᶜ == 0
-      RBVars.Qˡᶜ = size(RBVars.Lcₙ)[end]
-    end
+
+  if "Lc" ∉ RBInfo.probl_nl
+    RBVars.Qˡᶜ = size(RBVars.Lcₙ)[end]
+    else
+    RBVars.Qˡᶜ = size(RBVars.DEIMᵢ_Lc)[end]
   end
 
   get_Q(RBInfo, RBVars.Poisson)

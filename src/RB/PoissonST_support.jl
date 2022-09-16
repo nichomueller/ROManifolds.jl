@@ -311,8 +311,8 @@ function save_affine_structures(
   RBInfo::Info,
   RBVars::PoissonST)
 
-  affine_vars = (reshape(RBVars.Mₙ, :, RBVars.Qᵐ)::Matrix{T},)
-  affine_names = ("Mₙ",)
+  Mₙ = reshape_3Darrays_in_list((RBVars.Mₙ,), [RBVars.Qᵐ])
+  affine_vars, affine_names = (Mₙ,), ("Mₙ",)
   save_structures_in_list(affine_vars, affine_names, RBInfo.ROM_structures_path)
 
   save_affine_structures(RBInfo, RBVars.Steady)
@@ -404,8 +404,10 @@ function get_Q(
   RBInfo::Info,
   RBVars::PoissonST)
 
-  if RBVars.Qᵐ == 0
+  if "M" ∉ RBInfo.probl_nl
     RBVars.Qᵐ = size(RBVars.Mₙ)[end]
+    else
+    RBVars.Qᵐ = size(RBVars.MDEIMᵢ_M)[end]
   end
 
   get_Q(RBInfo, RBVars.Steady)
