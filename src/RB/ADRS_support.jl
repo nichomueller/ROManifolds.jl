@@ -186,7 +186,7 @@ function get_RB_system(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS,
   RBVars::ADRSGRB,
-  Param::SteadyParametricInfo)
+  Param::ParamInfoS)
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
@@ -222,7 +222,7 @@ function assemble_RB_lifting(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS,
   RBVars::ADRSGRB{T},
-  Param::SteadyParametricInfo) where T
+  Param::ParamInfoS) where T
 
   println("Assembling reduced lifting exactly")
 
@@ -237,7 +237,7 @@ function assemble_param_RHS(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS,
   RBVars::ADRSGRB,
-  Param::SteadyParametricInfo)
+  Param::ParamInfoS)
 
   assemble_param_RHS(FEMSpace, RBInfo, RBVars.Poisson, Param)
 
@@ -247,7 +247,7 @@ function get_θ(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS,
   RBVars::ADRSGRB{T},
-  Param::SteadyParametricInfo) where T
+  Param::ParamInfoS) where T
 
   θᵃ, θᶠ, θʰ = get_θ(FEMSpace, RBInfo, RBVars.Poisson, Param)
   θᵇ = get_θᵇ(FEMSpace, RBInfo, RBVars, Param)

@@ -1,7 +1,7 @@
 function FE_solve(
   FEMSpace::FEMSpacePoissonS,
   FEMInfo::InfoS,
-  Param::SteadyParametricInfo)
+  Param::ParamInfoS)
 
   a(u, v) = ∫(∇(v) ⋅ (Param.α * ∇(u))) * FEMSpace.dΩ
   rhs(v) = ∫(v * Param.f) * FEMSpace.dΩ + ∫(v * Param.h) * FEMSpace.dΓn
@@ -20,7 +20,7 @@ end
 function FE_solve(
   FEMSpace::FEMSpacePoissonST,
   FEMInfo::InfoST,
-  Param::UnsteadyParametricInfo)
+  Param::ParamInfoST)
 
   m(t, u, v) = ∫(Param.m(t)*(u*v))dΩ
   a(t, u, v) = ∫(∇(v)⋅(Param.α(t)*∇(u)))*FEMSpace.dΩ
@@ -53,7 +53,7 @@ end
 function FE_solve(
   FEMSpace::FEMSpaceADRS,
   FEMInfo::InfoS,
-  Param::SteadyParametricInfo)
+  Param::ParamInfoS)
 
   a(u,v) = ∫(∇(v)⋅(Param.α*∇(u)) +
     v * Param.b ⋅ ∇(u) + Param.σ * v * u) * FEMSpace.dΩ
@@ -76,7 +76,7 @@ end
 function FE_solve(
   FEMSpace::FEMSpaceADRST,
   FEMInfo::InfoST,
-  Param::UnsteadyParametricInfo)
+  Param::ParamInfoST)
 
   m(t, u, v) = ∫(Param.m(t)*(u*v))dΩ
   a(t, u, v) = ∫(∇(v)⋅(Param.α(t)*∇(u)) +
@@ -112,7 +112,7 @@ end
 function FE_solve(
   FEMSpace::FEMSpaceStokesS,
   FEMInfo::InfoS,
-  Param::SteadyParametricInfo) where T
+  Param::ParamInfoS) where T
 
   a((u,p),(v,q)) = ∫( ∇(v)⊙(Param.α*∇(u)) - (∇⋅v)*p + q*(∇⋅u) ) * FEMSpace.dΩ
   rhs((v,q)) = ∫(v ⋅ Param.f) * FEMSpace.dΩ + ∫(v ⋅ Param.h) * FEMSpace.dΓn
@@ -131,7 +131,7 @@ end
 function FE_solve(
   FEMSpace::FEMSpaceStokesST,
   FEMInfo::InfoST,
-  Param::UnsteadyParametricInfo) where T
+  Param::ParamInfoST) where T
 
   timesθ = get_timesθ(FEMInfo)
   θ = FEMInfo.θ
@@ -169,7 +169,7 @@ end
 
 #= function FE_solve(
   FEMSpace::FEMSpaceStokesST, probl::ProblemInfoUnsteady{T},
-  Param::UnsteadyParametricInfo{D,T}; subtract_Ddata=false)
+  Param::ParamInfoST{D,T}; subtract_Ddata=false)
 
   m(t,(u,p),(v,q)) = ∫(Param.m(t)*(u⋅v))*FEMSpace.dΩ
   ab(t,(u,p),(v,q)) = (∫(Param.α(t)*(∇(v) ⊙ ∇(u)))*FEMSpace.dΩ -
@@ -212,7 +212,7 @@ end
 
 end =#
 
-#= function FE_solve(FEMSpace::FEMSpacePoisson, Param::UnsteadyParametricInfo{D,T}; subtract_Ddata = true)
+#= function FE_solve(FEMSpace::FEMSpacePoisson, Param::ParamInfoST{D,T}; subtract_Ddata = true)
 
 _, Gₕ = get_lifting_operator(FEMSpace, Param)
 
@@ -240,7 +240,7 @@ function rhs_form(
   t::Real,
   v::FEBasis,
   FEMSpace::FEMSpacePoissonST,
-  Param::UnsteadyParametricInfo)
+  Param::ParamInfoST)
 
   if !isnothing(FEMSpace.dΓn)
     return ∫(v*Param.f(t))*FEMSpace.dΩ + ∫(v*Param.h(t))*FEMSpace.dΓn
@@ -253,7 +253,7 @@ function rhs_form(
   t::Real,
   v::FEBasis,
   FEMSpace::FEMSpaceStokesST,
-  Param::UnsteadyParametricInfo)
+  Param::ParamInfoST)
 
   if !isnothing(FEMSpace.dΓn)
     return ∫(v⋅Param.f(t))*FEMSpace.dΩ + ∫(v⋅Param.h(t))*FEMSpace.dΓn

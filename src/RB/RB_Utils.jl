@@ -60,7 +60,7 @@ end
 function assemble_FEM_structure(
   FEMSpace::FEMProblem,
   RBInfo::ROMInfoS,
-  Param::SteadyParametricInfo,
+  Param::ParamInfoS,
   var::String)
 
   assemble_FEM_structure(FEMSpace,RBInfo.FEMInfo,Param,var)
@@ -70,7 +70,7 @@ end
 function assemble_FEM_structure(
   FEMSpace::FEMProblem,
   RBInfo::ROMInfoST,
-  Param::UnsteadyParametricInfo,
+  Param::ParamInfoST,
   var::String)
 
   assemble_FEM_structure(FEMSpace,RBInfo.FEMInfo,Param,var)
@@ -129,7 +129,7 @@ end
 function assemble_sparse_mat(
   FEMSpace::FEMProblemS,
   FEMInfo::InfoS,
-  Param::SteadyParametricInfo,
+  Param::ParamInfoS,
   el::Vector{Int},
   var::String)
 
@@ -160,7 +160,7 @@ end
 function assemble_sparse_mat(
   FEMSpace::FEMProblemST,
   FEMInfo::InfoST,
-  Param::UnsteadyParametricInfo,
+  Param::ParamInfoST,
   el::Vector{Int},
   timesθ::Vector,
   var::String)
@@ -211,25 +211,41 @@ end
 function assemble_sparse_vec(
   FEMSpace::FEMProblemS,
   FEMInfo::InfoS,
-  Param::SteadyParametricInfo,
+  Param::ParamInfoS,
   el::Vector{Int},
   var::String)
 
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
 
-  function define_Vec(::FEMSpacePoissonS, var::String)
+  function define_Vec(FEMSpace::FEMSpacePoissonS, var::String)
     if var == "F"
       return assemble_vector(∫(FEMSpace.ϕᵥ*Param.f)*dΩ_sparse, FEMSpace.V₀)
     elseif var == "H"
       return assemble_vector(∫(FEMSpace.ϕᵥ*Param.h)*dΩ_sparse, FEMSpace.V₀)
+    elseif var == "L"
+      g = define_g_FEM(FEMSpace, Param)
+      return assemble_vector(
+        ∫(Param.α * ∇(FEMSpace.ϕᵥ) ⋅ ∇(g))*dΩ_sparse,FEMSpace.V₀)
+    else
+      error("Unrecognized variable")
     end
   end
-  function define_Vec(::FEMSpaceStokesS, var::String)
+  function define_Vec(FEMSpace::FEMSpaceStokesS, var::String)
     if var == "F"
       return assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.f)*dΩ_sparse, FEMSpace.V₀)
     elseif var == "H"
       return assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.h)*dΩ_sparse, FEMSpace.V₀)
+    elseif var == "L"
+      g = define_g_FEM(FEMSpace, Param)
+      return assemble_vector(
+        ∫(Param.α * ∇(FEMSpace.ϕᵥ) ⊙ ∇(g))*dΩ_sparse,FEMSpace.V₀)
+    elseif var == "Lc"
+      g = define_g_FEM(FEMSpace, Param)
+      return assemble_vector(
+        ∫(FEMSpace.ψᵧ * (∇⋅g))*dΩ_sparse,FEMSpace.Q₀)
+    else
+      error("Unrecognized variable")
     end
   end
 
@@ -240,7 +256,7 @@ end
 function assemble_sparse_vec(
   FEMSpace::FEMProblemST,
   FEMInfo::InfoST,
-  Param::UnsteadyParametricInfo,
+  Param::ParamInfoST,
   el::Vector{Int},
   timesθ::Vector,
   var::String)
@@ -255,20 +271,38 @@ function assemble_sparse_vec(
     error("Unrecognized variable")
   end
 
-  function define_Vecₜ(::FEMSpacePoissonST, t::Real, var::String)
+  function define_Vecₜ(FEMSpace::FEMSpacePoissonST, t::Real, var::String)
     if var == "F"
       return assemble_vector(∫(FEMSpace.ϕᵥ*Param.f(t))*dΩ_sparse, FEMSpace.V₀)
-    else var == "H"
+    elseif var == "H"
       return assemble_vector(∫(FEMSpace.ϕᵥ*Param.h(t))*dΩ_sparse, FEMSpace.V₀)
+    elseif var == "L"
+      g = define_g_FEM(FEMSpace, Param)
+      return assemble_vector(
+        ∫(Param.α(t) * ∇(FEMSpace.ϕᵥ) ⋅ ∇(g(t)))*dΩ_sparse,FEMSpace.V₀)
+    else
+      error("Unrecognized variable")
     end
   end
-  function define_Vecₜ(::FEMSpaceStokesST, t::Real, var::String)
+
+  function define_Vecₜ(FEMSpace::FEMSpaceStokesST, t::Real, var::String)
     if var == "F"
       return assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.f(t))*dΩ_sparse, FEMSpace.V₀)
-    else var == "H"
+    elseif var == "H"
       return assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.h(t))*dΩ_sparse, FEMSpace.V₀)
+    elseif var == "L"
+      g = define_g_FEM(FEMSpace, Param)
+      return assemble_vector(
+        ∫(Param.α(t) * ∇(FEMSpace.ϕᵥ) ⊙ ∇(g(t)))*dΩ_sparse,FEMSpace.V₀)
+    elseif var == "Lc"
+      g = define_g_FEM(FEMSpace, Param)
+      return assemble_vector(
+        ∫(FEMSpace.ψᵧ * (∇⋅g(t)))*dΩ_sparse,FEMSpace.Q₀)
+    else
+      error("Unrecognized variable")
     end
   end
+
   Vecₜ(t) = define_Vecₜ(FEMSpace, t, var)
 
   Vec = zeros(FEMSpace.Nₛᵘ, length(timesθ))
@@ -282,7 +316,7 @@ end
 
 #= function assemble_RBapprox_convection(
   FEMSpace::FEMSpaceNavierStokesS,
-  Param::SteadyParametricInfo,
+  Param::ParamInfoS,
   RBVars::NavierStokesS{T}) where T
 
   C = assemble_convection(FEMSpace, Param)
@@ -304,7 +338,7 @@ end
 
 function assemble_RBapprox_convection(
   FEMSpace::FEMSpaceNavierStokesST,
-  Param::UnsteadyParametricInfo,
+  Param::ParamInfoST,
   RBInfo::ParamNavierStokesST,
   RBVars::NavierStokesST{T}) where T
 
@@ -393,6 +427,7 @@ function θ_matrix(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS{T},
   ::RBProblemS,
+  Param::ParamInfoS,
   fun::Function,
   MDEIMᵢ::Matrix,
   MDEIM_idx::Vector{Int},
@@ -415,6 +450,7 @@ function θ_matrix(
   FEMSpace::FEMProblemST,
   RBInfo::ROMInfoST{T},
   RBVars::RBProblemST,
+  Param::ParamInfoST,
   fun::Function,
   MDEIMᵢ::Matrix,
   MDEIM_idx::Vector{Int},
@@ -451,6 +487,7 @@ function θ_vector(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS{T},
   ::RBProblemS,
+  Param::ParamInfoS,
   fun::Function,
   DEIMᵢ::Matrix,
   DEIM_idx::Vector{Int},
@@ -473,6 +510,7 @@ function θ_vector(
   FEMSpace::FEMProblemST,
   RBInfo::ROMInfoST{T},
   RBVars::RBProblemST,
+  Param::ParamInfoST,
   fun::Function,
   DEIMᵢ::Matrix,
   DEIM_idx::Vector{Int},

@@ -210,7 +210,7 @@ function get_θᵃ(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS{T},
   RBVars::ADRS,
-  Param::SteadyParametricInfo) where T
+  Param::ParamInfoS) where T
 
   get_θᵃ(FEMSpace, RBInfo, RBVars.Poisson, Param)
 
@@ -220,7 +220,7 @@ function get_θᵇ(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS{T},
   RBVars::ADRS,
-  Param::SteadyParametricInfo) where T
+  Param::ParamInfoS) where T
 
   if "B" ∉ RBInfo.probl_nl
     θᵇ = reshape([T.(Param.b(Point(0.,0.)))],1,1)
@@ -237,7 +237,7 @@ function get_θᵈ(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS{T},
   RBVars::ADRS,
-  Param::SteadyParametricInfo) where T
+  Param::ParamInfoS) where T
 
   if !"D" ∈ RBInfo.probl_nl
     θᵈ = reshape([T.(Param.σ(Point(0.,0.)))],1,1)
@@ -254,7 +254,7 @@ function get_θᶠʰ(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS{T},
   RBVars::ADRS,
-  Param::SteadyParametricInfo) where T
+  Param::ParamInfoS) where T
 
   get_θᶠʰ(FEMSpace, RBInfo, RBVars.Poisson, Param)
 
@@ -296,7 +296,7 @@ function solve_RB_system(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS,
   RBVars::ADRS,
-  Param::SteadyParametricInfo)
+  Param::ParamInfoS)
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
   println("Solving RB problem via backslash")

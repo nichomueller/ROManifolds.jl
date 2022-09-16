@@ -26,8 +26,8 @@ import FEMSpaceStokesS
 import FEMSpaceStokesST
 import ProblemInfoSteady
 import ProblemInfoUnsteady
-import SteadyParametricInfo
-import UnsteadyParametricInfo
+import ParamInfoS
+import ParamInfoST
 import FEM_paths
 import generate_dcube_discrete_model
 import get_ParamInfo

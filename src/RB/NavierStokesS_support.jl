@@ -201,7 +201,7 @@ function assemble_RB_lifting(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS,
   RBVars::NavierStokesSGRB{T},
-  Param::SteadyParametricInfo) where T
+  Param::ParamInfoS) where T
 
   println("Assembling reduced lifting exactly")
 
@@ -216,7 +216,7 @@ function assemble_param_RHS(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS,
   RBVars::NavierStokesSGRB{T},
-  Param::SteadyParametricInfo) where T
+  Param::ParamInfoS) where T
 
   assemble_param_RHS(FEMSpace, RBInfo, RBVars.Stokes, Param)
 
@@ -226,7 +226,7 @@ function get_θ(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS,
   RBVars::StokesSGRB{T},
-  Param::SteadyParametricInfo) where T
+  Param::ParamInfoS) where T
 
   θᵃ, θᵇ, θᶠ, θʰ = get_θ(FEMSpace, RBInfo, RBVars.Stokes, Param)
   θᶜ = get_θᶜ(FEMSpace, RBVars, Param)

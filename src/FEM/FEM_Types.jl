@@ -4,8 +4,8 @@ abstract type FEMProblemS{D} <: FEMProblem{D} end
 abstract type FEMProblemST{D} <: FEMProblem{D} end
 
 abstract type Info end
-abstract type SteadyParametricInfo <: Info end
-abstract type UnsteadyParametricInfo <: Info end
+abstract type ParamInfoS <: Info end
+abstract type ParamInfoST <: Info end
 
 struct FEMSpacePoissonS{D} <: FEMProblemS{D}
   model::DiscreteModel
@@ -200,7 +200,7 @@ struct InfoST <: Info
   δt::Float
 end
 
-struct ParamPoissonS <: SteadyParametricInfo
+struct ParamPoissonS <: ParamInfoS
   μ::Vector
   α::Function
   f::Function
@@ -208,7 +208,7 @@ struct ParamPoissonS <: SteadyParametricInfo
   h::Function
 end
 
-struct ParamPoissonST <: UnsteadyParametricInfo
+struct ParamPoissonST <: ParamInfoST
   μ::Vector
   αₛ::Function
   αₜ::Function
@@ -228,7 +228,7 @@ struct ParamPoissonST <: UnsteadyParametricInfo
   u₀::Function
 end
 
-struct ParamADRS <: SteadyParametricInfo
+struct ParamADRS <: ParamInfoS
   μ::Vector
   α::Function
   b::Function
@@ -238,7 +238,7 @@ struct ParamADRS <: SteadyParametricInfo
   h::Function
 end
 
-struct ParamADRST <: UnsteadyParametricInfo
+struct ParamADRST <: ParamInfoST
   μ::Vector
   αₛ::Function
   αₜ::Function
@@ -264,7 +264,7 @@ struct ParamADRST <: UnsteadyParametricInfo
   u₀::Function
 end
 
-struct ParamStokesS <: SteadyParametricInfo
+struct ParamStokesS <: ParamInfoS
   μ::Vector
   α::Function
   f::Function
@@ -272,7 +272,7 @@ struct ParamStokesS <: SteadyParametricInfo
   h::Function
 end
 
-struct ParamStokesST <: UnsteadyParametricInfo
+struct ParamStokesST <: ParamInfoST
   μ::Vector
   αₛ::Function
   αₜ::Function
@@ -292,7 +292,7 @@ struct ParamStokesST <: UnsteadyParametricInfo
   x₀::Function
 end
 
-struct ParamNavierStokesS <: SteadyParametricInfo
+struct ParamNavierStokesS <: ParamInfoS
   μ::Vector
   Re::Float
   α::Function
@@ -301,7 +301,7 @@ struct ParamNavierStokesS <: SteadyParametricInfo
   h::Function
 end
 
-struct ParamNavierStokesST <: UnsteadyParametricInfo
+struct ParamNavierStokesST <: ParamInfoST
   μ::Vector
   Re::Float
   αₛ::Function

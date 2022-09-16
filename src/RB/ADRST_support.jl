@@ -265,7 +265,7 @@ function get_RB_system(
   FEMSpace::FEMProblemST,
   RBInfo::ROMInfoST,
   RBVars::ADRSTGRB,
-  Param::UnsteadyParametricInfo)
+  Param::ParamInfoST)
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
@@ -298,7 +298,7 @@ function assemble_param_RHS(
   FEMSpace::FEMProblemST,
   RBInfo::ROMInfoST,
   RBVars::ADRSTGRB{T},
-  Param::UnsteadyParametricInfo) where T
+  Param::ParamInfoST) where T
 
   assemble_param_RHS(FEMSpace, RBInfo, RBVars.Poisson, Param)
 
@@ -308,7 +308,7 @@ function get_θ(
   FEMSpace::FEMProblemST,
   RBInfo::ROMInfoST,
   RBVars::ADRSTGRB{T},
-  Param::UnsteadyParametricInfo) where T
+  Param::ParamInfoST) where T
 
   θᵐ, θᵃ, θᶠ, θʰ = get_θ(FEMSpace, RBInfo, RBVars.Poisson, Param)
   θᵇ = get_θᵇ(FEMSpace, RBInfo, RBVars, Param)

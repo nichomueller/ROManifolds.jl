@@ -36,8 +36,8 @@ export FEMSpaceStokesS
 export FEMSpaceStokesST
 export ProblemInfoSteady
 export ProblemInfoUnsteady
-export SteadyParametricInfo
-export UnsteadyParametricInfo
+export ParamInfoS
+export ParamInfoST
 export FEM_paths
 export generate_dcube_discrete_model
 export get_ParamInfo

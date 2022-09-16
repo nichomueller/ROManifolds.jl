@@ -296,13 +296,21 @@ function assemble_reduced_mat_DEIM(
 
 end
 
-function save_assembled_structures(
+function save_affine_structures(
   RBInfo::Info,
   RBVars::PoissonS)
 
   affine_vars = (reshape(RBVars.Bₙ, :, RBVars.Qᵇ)::Matrix{T}, RBVars.Lcₙ)
   affine_names = ("Bₙ", "Lcₙ")
   save_structures_in_list(affine_vars, affine_names, RBInfo.ROM_structures_path)
+
+  save_affine_structures(RBInfo, RBVars.Poisson)
+
+end
+
+function save_M_DEIM_structures(
+  RBInfo::Info,
+  RBVars::PoissonS)
 
   M_DEIM_vars = (
     RBVars.MDEIM_mat_B, RBVars.MDEIMᵢ_B, RBVars.MDEIM_idx_B, RBVars.row_idx_B,
@@ -313,7 +321,7 @@ function save_assembled_structures(
     "DEIM_mat_Lc","DEIMᵢ_Lc","DEIM_idx_Lc","sparse_el_Lc")
   save_structures_in_list(M_DEIM_vars, M_DEIM_names, RBInfo.ROM_structures_path)
 
-  save_assembled_structures(RBInfo, RBVars.Poisson)
+  save_M_DEIM_structures(RBInfo, RBVars.Poisson)
 
 end
 
@@ -344,17 +352,17 @@ function get_θ_matrix(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS,
   RBVars::StokesS,
-  Param::SteadyParametricInfo,
+  Param::ParamInfoS,
   var::String)
 
   if var == "A"
-    return θ_matrix(FEMSpace, RBInfo, RBVars, Param.α, RBVars.MDEIMᵢ_A,
+    return θ_matrix(FEMSpace, RBInfo, RBVars, Param, Param.α, RBVars.MDEIMᵢ_A,
       RBVars.MDEIM_idx_A, RBVars.sparse_el_A, RBVars.MDEIM_idx_time_A, "A")::Matrix{T}
   elseif var == "B"
-    return θ_matrix(FEMSpace, RBInfo, RBVars, Param.b, RBVars.MDEIMᵢ_B,
+    return θ_matrix(FEMSpace, RBInfo, RBVars, Param, Param.b, RBVars.MDEIMᵢ_B,
       RBVars.MDEIM_idx_B, RBVars.sparse_el_B, RBVars.MDEIM_idx_time_B, "B")::Matrix{T}
   elseif var == "M"
-    return θ_matrix(FEMSpace, RBInfo, RBVars, Param.m, RBVars.MDEIMᵢ_M,
+    return θ_matrix(FEMSpace, RBInfo, RBVars, Param, Param.m, RBVars.MDEIMᵢ_M,
       RBVars.MDEIM_idx_M, RBVars.sparse_el_M, RBVars.MDEIM_idx_time_M, "M")::Matrix{T}
   else
     error("Unrecognized variable")
@@ -366,20 +374,20 @@ function get_θ_vector(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS,
   RBVars::StokesS,
-  Param::SteadyParametricInfo,
+  Param::ParamInfoS,
   var::String)
 
   if var == "F"
-    return θ_vector(FEMSpace, RBInfo, RBVars, Param.f, RBVars.DEIMᵢ_F,
+    return θ_vector(FEMSpace, RBInfo, RBVars, Param, Param.f, RBVars.DEIMᵢ_F,
       RBVars.DEIM_idx_F, RBVars.sparse_el_F, RBVars.DEIM_idx_time_F, "F")::Matrix{T}
   elseif var == "H"
-    return θ_vector(FEMSpace, RBInfo, RBVars, Param.h, RBVars.DEIMᵢ_H,
+    return θ_vector(FEMSpace, RBInfo, RBVars, Param, Param.h, RBVars.DEIMᵢ_H,
       RBVars.DEIM_idx_H, RBVars.sparse_el_H, RBVars.DEIM_idx_time_H, "H")::Matrix{T}
   elseif var == "L"
-    return θ_vector(FEMSpace, RBInfo, RBVars, Param.g, RBVars.DEIMᵢ_L,
+    return θ_vector(FEMSpace, RBInfo, RBVars, Param, Param.g, RBVars.DEIMᵢ_L,
       RBVars.DEIM_idx_L, RBVars.sparse_el_L, RBVars.DEIM_idx_time_L, "L")::Matrix{T}
   elseif var == "Lc"
-    return θ_vector(FEMSpace, RBInfo, RBVars, Param.g, RBVars.DEIMᵢ_Lc,
+    return θ_vector(FEMSpace, RBInfo, RBVars, Param, Param.g, RBVars.DEIMᵢ_Lc,
       RBVars.DEIM_idx_Lc, RBVars.sparse_el_Lc, RBVars.DEIM_idx_time_Lc, "Lc")::Matrix{T}
   else
     error("Unrecognized variable")
@@ -408,7 +416,7 @@ function assemble_param_RHS(
   FEMSpace::FEMProblemST,
   RBInfo::Info,
   RBVars::StokesST,
-  Param::UnsteadyParametricInfo)
+  Param::ParamInfoST)
 
   assemble_param_RHS(FEMSpace, RBInfo, RBVars.Poisson, Param)
 

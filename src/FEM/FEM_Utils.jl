@@ -75,7 +75,7 @@ end
 
 function get_α_stab(
   FEMSpace::FEMProblemS,
-  Param::SteadyParametricInfo)
+  Param::ParamInfoS)
 
   h_mesh = get_h(FEMSpace)
   Pechlet(x) = norm(Param.b(x))*h_mesh / (2*Param.α(x))
@@ -88,7 +88,7 @@ end
 
 function get_α_stab(
   FEMSpace::FEMProblemST,
-  Param::UnsteadyParametricInfo)
+  Param::ParamInfoST)
 
   h_mesh = get_h(FEMSpace)
   Pechlet(x, t) = norm(Param.b(x, t))*h_mesh / (2*Param.α(x, t))
@@ -157,7 +157,7 @@ end
 
 function define_g_FEM(
   FEMSpace::FEMProblemS,
-  Param::SteadyParametricInfo)
+  Param::ParamInfoS)
 
   interpolate_dirichlet(Param.g, FEMSpace.V)
 
@@ -165,7 +165,7 @@ end
 
 function define_dg_FEM(
   FEMSpace::FEMProblemST,
-  Param::UnsteadyParametricInfo)
+  Param::ParamInfoST)
 
   function dg(t)
     dg(x,t::Real) = ∂t(Param.g)(x,t)

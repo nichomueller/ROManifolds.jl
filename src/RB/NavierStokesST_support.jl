@@ -262,7 +262,7 @@ function get_RB_system(
   FEMSpace::FEMProblemST,
   RBInfo::Info,
   RBVars::NavierStokesSTGRB,
-  Param::UnsteadyParametricInfo)
+  Param::ParamInfoST)
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
@@ -301,7 +301,7 @@ function assemble_RB_lifting(
   FEMSpace::FEMProblemST,
   RBInfo::ROMInfoST,
   RBVars::NavierStokesSTGRB{T},
-  Param::UnsteadyParametricInfo) where T
+  Param::ParamInfoST) where T
 
   println("Assembling reduced lifting exactly")
 
@@ -321,7 +321,7 @@ function assemble_param_RHS(
   FEMSpace::FEMProblemST,
   RBInfo::Info,
   RBVars::NavierStokesSTGRB,
-  Param::UnsteadyParametricInfo)
+  Param::ParamInfoST)
 
   assemble_param_RHS(FEMSpace, RBInfo, RBVars.Stokes, Param)
 
@@ -331,7 +331,7 @@ function get_θ(
   FEMSpace::FEMProblemST,
   RBInfo::Info,
   RBVars::NavierStokesSTGRB,
-  Param::UnsteadyParametricInfo)
+  Param::ParamInfoST)
 
   θᵐ, θᵃ, θᵇ, θᶠ, θʰ  = get_θ(FEMSpace, RBInfo, RBVars.Stokes, Param)
   θᶜ = get_θᶜ(FEMSpace, RBInfo, RBVars, Param)

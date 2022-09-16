@@ -97,14 +97,6 @@ function assemble_offline_structures(
   end
 
   RBVars.offline_time += @elapsed begin
-    for var ∈ intersect(operators, RBInfo.probl_nl)
-      if var ∈ ("A", "B", "M")
-        assemble_MDEIM_matrices(RBInfo, RBVars, var)
-      else
-        assemble_DEIM_vectors(RBInfo, RBVars, var)
-      end
-    end
-
     for var ∈ setdiff(operators, RBInfo.probl_nl)
       if var ∈ ("A", "B", "M")
         assemble_affine_matrices(RBInfo, RBVars, var)
@@ -114,7 +106,19 @@ function assemble_offline_structures(
     end
   end
 
-  save_assembled_structures(RBInfo, RBVars)
+  save_affine_structures(RBInfo, RBVars)
+
+  RBVars.offline_time += @elapsed begin
+    for var ∈ intersect(operators, RBInfo.probl_nl)
+      if var ∈ ("A", "B", "M")
+        assemble_MDEIM_matrices(RBInfo, RBVars, var)
+      else
+        assemble_DEIM_vectors(RBInfo, RBVars, var)
+      end
+    end
+  end
+
+  save_M_DEIM_structures(RBInfo, RBVars)
 
 end
 
@@ -167,7 +171,7 @@ function get_θ(
   FEMSpace::FEMProblemST,
   RBInfo::ROMInfoST,
   RBVars::StokesST{T},
-  Param::UnsteadyParametricInfo) where T
+  Param::ParamInfoST) where T
 
   θᵃ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "A")
   θᵇ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "B")
@@ -257,7 +261,7 @@ function get_RB_system(
   FEMSpace::FEMProblemST,
   RBInfo::Info,
   RBVars::StokesST,
-  Param::UnsteadyParametricInfo)
+  Param::ParamInfoST)
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
@@ -293,7 +297,7 @@ function solve_RB_system(
   FEMSpace::FEMProblemST,
   RBInfo::ROMInfoST,
   RBVars::StokesST,
-  Param::UnsteadyParametricInfo)
+  Param::ParamInfoST)
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
 

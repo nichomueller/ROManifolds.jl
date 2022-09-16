@@ -62,7 +62,7 @@ function plot_stability_constants(
   FEMSpace::FEMProblem,
   RBInfo::ROMInfoST,
   RBVars::PoissonST,
-  Param::UnsteadyParametricInfo)
+  Param::ParamInfoST)
 
   function compute_stability_constant_Nₜ(RBInfo,Nₜ,M,A)
     println("Considering Nₜ = $Nₜ")

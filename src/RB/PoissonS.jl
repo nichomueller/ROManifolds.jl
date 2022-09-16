@@ -94,14 +94,6 @@ function assemble_offline_structures(
   end
 
   RBVars.offline_time += @elapsed begin
-    for var ∈ intersect(operators, RBInfo.probl_nl)
-      if var == "A"
-        assemble_MDEIM_matrices(RBInfo, RBVars, var)
-      else
-        assemble_DEIM_vectors(RBInfo, RBVars, var)
-      end
-    end
-
     for var ∈ setdiff(operators, RBInfo.probl_nl)
       if var == "A"
         assemble_affine_matrices(RBInfo, RBVars, var)
@@ -111,7 +103,19 @@ function assemble_offline_structures(
     end
   end
 
-  save_assembled_structures(RBInfo, RBVars)
+  save_affine_structures(RBInfo, RBVars)
+
+  RBVars.offline_time += @elapsed begin
+    for var ∈ intersect(operators, RBInfo.probl_nl)
+      if var == "A"
+        assemble_MDEIM_matrices(RBInfo, RBVars, var)
+      else
+        assemble_DEIM_vectors(RBInfo, RBVars, var)
+      end
+    end
+  end
+
+  save_M_DEIM_structures(RBInfo, RBVars)
 
 end
 
@@ -160,7 +164,7 @@ function get_θ(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS,
   RBVars::PoissonS{T},
-  Param::SteadyParametricInfo) where T
+  Param::ParamInfoS) where T
 
   θᵃ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "A")
 
@@ -209,7 +213,7 @@ function get_RB_system(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS,
   RBVars::PoissonS,
-  Param::SteadyParametricInfo)
+  Param::ParamInfoS)
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
@@ -242,7 +246,7 @@ function solve_RB_system(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS,
   RBVars::PoissonS,
-  Param::SteadyParametricInfo)
+  Param::ParamInfoS)
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
 

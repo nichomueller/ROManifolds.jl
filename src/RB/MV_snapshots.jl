@@ -524,7 +524,7 @@ function call_θmat_snapshots(
 end
 
 function assemble_parameter_on_phys_quadp(
-  Param::UnsteadyParametricInfo,
+  Param::ParamInfoST,
   phys_quadp::Vector{Vector{VectorValue{D,Float}}},
   ncells::Int,
   nquad_cell::Int,

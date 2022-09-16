@@ -1,5 +1,27 @@
 function check_dataset(
   RBInfo::Info,
+  nb::Int) where T
+
+  μ = load_CSV(Array{T}[],
+    joinpath(get_FEM_snap_path(RBInfo), "μ.csv"))::Vector{Vector{T}}
+  model = DiscreteModelFromFile(get_mesh_path(RBInfo))
+  FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id,RBInfo.FEMInfo,model)
+  Param = get_ParamInfo(RBInfo, μ[nb])
+
+  A = assemble_FEM_structure(FEMSpace, RBInfo, Param, "A")
+  F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
+  H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
+  L = assemble_FEM_structure(FEMSpace, RBInfo, Param, "L")
+
+  u = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
+    DataFrame))[:, nb]
+
+  A \ (F + H - L) ≈ u
+
+end
+
+function check_dataset(
+  RBInfo::Info,
   RBVars::PoissonST{T},
   nb::Int) where T
 
