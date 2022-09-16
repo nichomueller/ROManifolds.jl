@@ -13,9 +13,8 @@ function assemble_matrix_snapshots(
     if k == 1
       row_idx = i
       Mat = zeros(T,length(row_idx),RBInfo.nₛ_MDEIM)
-    else
-      Mat[:,k] = v
     end
+    Mat[:,k] = v
   end
 
   Mat,row_idx

@@ -51,70 +51,60 @@ function get_A(
   RBInfo::Info,
   RBVars::PoissonS{T}) where T
 
-  if "A" ∈ RBInfo.probl_nl
+  op = String[]
 
-    if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIMᵢ_A.csv"))
-      println("Importing MDEIM offline structures, A")
+  if isfile(joinpath(RBInfo.ROM_structures_path, "Aₙ.csv"))
+
+    Aₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, "Aₙ.csv"))
+    RBVars.Aₙ = reshape(Aₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)::Array{T,3}
+
+    if "A" ∈ RBInfo.probl_nl
+
       (RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A, RBVars.row_idx_A, RBVars.sparse_el_A) =
         load_structures_in_list(("MDEIMᵢ_A", "MDEIM_idx_A", "row_idx_A", "sparse_el_A"),
         (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
         RBInfo.ROM_structures_path)
-        return [""]
-    else
-      println("Failed to import MDEIM offline structures for
-        A: must build them")
-      return ["A"]
+
     end
 
   else
 
-    if isfile(joinpath(RBInfo.ROM_structures_path, "Aₙ.csv"))
-      println("Importing reduced affine A")
-      Aₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, "Aₙ.csv"))
-      RBVars.Aₙ = reshape(Aₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)::Array{T,3}
-      RBVars.Qᵃ = size(RBVars.Aₙ)[3]
-      return [""]
-    else
-      println("Failed to import Aₙ: must build it")
-      return ["A"]
-    end
+    println("Failed to import offline structures for A: must build them")
+    op = ["A"]
 
   end
 
-end
+  op
 
+end
 
 function get_F(
   RBInfo::Info,
   RBVars::PoissonS{T}) where T
 
-  if "F" ∈ RBInfo.probl_nl
+  op = String[]
 
-    if isfile(joinpath(RBInfo.ROM_structures_path, "DEIMᵢ_F.csv"))
-      println("Importing DEIM offline structures, F")
+  if isfile(joinpath(RBInfo.ROM_structures_path, "Fₙ.csv"))
+
+    RBVars.Fₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, "Fₙ.csv"))
+
+    if "F" ∈ RBInfo.probl_nl
+
       (RBVars.DEIMᵢ_F, RBVars.DEIM_idx_F, RBVars.sparse_el_F) =
         load_structures_in_list(("DEIMᵢ_F", "DEIM_idx_F", "sparse_el_F"),
         (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
         RBInfo.ROM_structures_path)
-      return [""]
-    else
-      println("Failed to import DEIM offline structures for F: must build them")
-      return ["F"]
+
     end
 
   else
 
-    if isfile(joinpath(RBInfo.ROM_structures_path, "Fₙ.csv"))
-      println("Importing Fₙ")
-      RBVars.Fₙ = load_CSV(Matrix{T}(undef,0,0),
-        joinpath(RBInfo.ROM_structures_path, "Fₙ.csv"))
-      return [""]
-    else
-      println("Failed to import Fₙ: must build it")
-      return ["F"]
-    end
+    println("Failed to import offline structures for F: must build them")
+    op = ["F"]
 
   end
+
+  op
 
 end
 
@@ -122,33 +112,29 @@ function get_H(
   RBInfo::Info,
   RBVars::PoissonS{T}) where T
 
-  if "H" ∈ RBInfo.probl_nl
+  op = String[]
 
-    if isfile(joinpath(RBInfo.ROM_structures_path, "DEIMᵢ_H.csv"))
-      println("Importing DEIM offline structures, H")
+  if isfile(joinpath(RBInfo.ROM_structures_path, "Hₙ.csv"))
+
+    RBVars.Hₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, "Hₙ.csv"))
+
+    if "H" ∈ RBInfo.probl_nl
+
       (RBVars.DEIMᵢ_H, RBVars.DEIM_idx_H, RBVars.sparse_el_H) =
         load_structures_in_list(("DEIMᵢ_H", "DEIM_idx_H", "sparse_el_H"),
         (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
         RBInfo.ROM_structures_path)
-      return [""]
-    else
-      println("Failed to import DEIM offline structures for H: must build them")
-      return ["H"]
+
     end
 
   else
 
-    if isfile(joinpath(RBInfo.ROM_structures_path, "Hₙ.csv"))
-      println("Importing Hₙ")
-      RBVars.Hₙ = load_CSV(Matrix{T}(undef,0,0),
-        joinpath(RBInfo.ROM_structures_path, "Hₙ.csv"))
-      return [""]
-    else
-      println("Failed to import Hₙ: must build it")
-      return ["H"]
-    end
+    println("Failed to import offline structures for H: must build them")
+    op = ["H"]
 
   end
+
+  op
 
 end
 
@@ -156,33 +142,29 @@ function get_L(
   RBInfo::Info,
   RBVars::PoissonS{T}) where T
 
-  if "L" ∈ RBInfo.probl_nl
+  op = String[]
 
-    if isfile(joinpath(RBInfo.ROM_structures_path, "DEIMᵢ_L.csv"))
-      println("Importing DEIM offline structures, L")
+  if isfile(joinpath(RBInfo.ROM_structures_path, "Lₙ.csv"))
+
+    RBVars.Lₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, "Lₙ.csv"))
+
+    if "L" ∈ RBInfo.probl_nl
+
       (RBVars.DEIMᵢ_L, RBVars.DEIM_idx_L, RBVars.sparse_el_L) =
         load_structures_in_list(("DEIMᵢ_L", "DEIM_idx_L", "sparse_el_L"),
         (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
         RBInfo.ROM_structures_path)
-      return [""]
-    else
-      println("Failed to import DEIM offline structures for L: must build them")
-      return ["L"]
+
     end
 
   else
 
-    if isfile(joinpath(RBInfo.ROM_structures_path, "Lₙ.csv"))
-      println("Importing Lₙ")
-      RBVars.Lₙ = load_CSV(Matrix{T}(undef,0,0),
-        joinpath(RBInfo.ROM_structures_path, "Lₙ.csv"))
-      return [""]
-    else
-      println("Failed to import Lₙ: must build it")
-      return ["L"]
-    end
+    println("Failed to import offline structures for L: must build them")
+    op = ["L"]
 
   end
+
+  op
 
 end
 
@@ -192,11 +174,11 @@ function assemble_affine_matrices(
   var::String) where T
 
   if var == "A"
-    RBVars.Qᵃ = 1
     println("Assembling affine reduced A")
     A = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "A.csv"))
     RBVars.Aₙ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ, 1)
     RBVars.Aₙ[:,:,1] = (RBVars.Φₛᵘ)' * A * RBVars.Φₛᵘ
+    RBVars.Qᵃ = 1
   else
     error("Unrecognized variable to assemble")
   end
@@ -252,20 +234,20 @@ function assemble_affine_vectors(
   var::String) where T
 
   if var == "F"
-    RBVars.Qᶠ = 1
     println("Assembling affine reduced forcing term")
     F = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "F.csv"))
     RBVars.Fₙ = (RBVars.Φₛᵘ)' * F
+    RBVars.Qᶠ = 1
   elseif var == "H"
-    RBVars.Qʰ = 1
     println("Assembling affine reduced Neumann term")
     H = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "H.csv"))
     RBVars.Hₙ = (RBVars.Φₛᵘ)' * H
+    RBVars.Qʰ = 1
   elseif var == "L"
-    RBVars.Qˡ = 1
     println("Assembling affine reduced lifting term")
     L = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "L.csv"))
     RBVars.Lₙ = (RBVars.Φₛᵘ)' * L
+    RBVars.Qˡ = 1
   else
     error("Unrecognized variable to assemble")
   end
@@ -329,33 +311,25 @@ function assemble_reduced_mat_DEIM(
 
 end
 
-function save_affine_structures(
+function save_assembled_structures(
   RBInfo::Info,
   RBVars::PoissonS{T}) where T
 
-  Aₙ = reshape_3Darrays_in_list((RBVars.Aₙ,), [RBVars.Qᵃ])
+  Aₙ = reshape(RBVars.Aₙ, :, RBVars.Qᵃ)::Matrix{T}
   affine_vars = (Aₙ, RBVars.Fₙ, RBVars.Hₙ, RBVars.Lₙ)
   affine_names = ("Aₙ", "Fₙ", "Hₙ", "Lₙ")
-
   save_structures_in_list(affine_vars, affine_names, RBInfo.ROM_structures_path)
 
-end
-
-function save_M_DEIM_structures(
-  RBInfo::Info,
-  RBVars::PoissonS{T}) where T
-
-  M_DEIM_vars = (RBVars.MDEIM_mat_A, RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A,
-    RBVars.row_idx_A, RBVars.sparse_el_A, RBVars.DEIM_mat_F, RBVars.DEIMᵢ_F,
-    RBVars.DEIM_idx_F, RBVars.sparse_el_F, RBVars.DEIM_mat_H, RBVars.DEIMᵢ_H,
-    RBVars.DEIM_idx_H, RBVars.sparse_el_H, RBVars.DEIM_mat_L, RBVars.DEIMᵢ_L,
+  M_DEIM_vars = (RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A,
+    RBVars.row_idx_A, RBVars.sparse_el_A, RBVars.DEIMᵢ_F,
+    RBVars.DEIM_idx_F, RBVars.sparse_el_F, RBVars.DEIMᵢ_H,
+    RBVars.DEIM_idx_H, RBVars.sparse_el_H, RBVars.DEIMᵢ_L,
     RBVars.DEIM_idx_L, RBVars.sparse_el_L)
   M_DEIM_names = (
-    "MDEIM_mat_A","MDEIMᵢ_A","MDEIM_idx_A","row_idx_A","sparse_el_A",
-    "DEIM_mat_F","DEIMᵢ_F","DEIM_idx_F","sparse_el_F",
-    "DEIM_mat_H","DEIMᵢ_H","DEIM_idx_H","sparse_el_H",
-    "DEIM_mat_L","DEIMᵢ_L","DEIM_idx_L","sparse_el_L")
-
+    "MDEIMᵢ_A","MDEIM_idx_A","row_idx_A","sparse_el_A",
+    "DEIMᵢ_F","DEIM_idx_F","sparse_el_F",
+    "DEIMᵢ_H","DEIM_idx_H","sparse_el_H",
+    "DEIMᵢ_L","DEIM_idx_L","sparse_el_L")
   save_structures_in_list(M_DEIM_vars, M_DEIM_names, RBInfo.ROM_structures_path)
 
 end
@@ -422,7 +396,7 @@ function save_system_blocks(
       save_CSV(RBVars.LHSₙ[i],joinpath(RBInfo.ROM_structures_path, LHSₙi))
     end
   end
-  if "F" ∉ RBInfo.probl_nl && "H" ∉ RBInfo.probl_nl && "RHS" ∈ operators
+  if "F" ∉ RBInfo.probl_nl && "H" ∉ RBInfo.probl_nl && "L" ∉ RBInfo.probl_nl && "RHS" ∈ operators
     for i = RHS_blocks
       RHSₙi = "RHSₙ" * string(i) * ".csv"
       save_CSV(RBVars.RHSₙ[i],joinpath(RBInfo.ROM_structures_path, RHSₙi))
@@ -468,33 +442,12 @@ function get_θ_vector(
 
 end
 
-function get_Q(
-  RBInfo::Info,
-  RBVars::PoissonS)
+function get_Q(RBVars::PoissonS)
 
-  if "A" ∉ RBInfo.probl_nl
-    RBVars.Qᵃ = size(RBVars.Aₙ)[end]
-    else
-    RBVars.Qᵃ = size(RBVars.MDEIMᵢ_A)[end]
-  end
-
-  if "F" ∉ RBInfo.probl_nl
-    RBVars.Qᶠ = size(RBVars.Fₙ)[end]
-    else
-    RBVars.Qᶠ = size(RBVars.DEIMᵢ_F)[end]
-  end
-
-  if "H" ∉ RBInfo.probl_nl
-    RBVars.Qʰ = size(RBVars.Hₙ)[end]
-    else
-    RBVars.Qʰ = size(RBVars.DEIMᵢ_H)[end]
-  end
-
-  if "L" ∉ RBInfo.probl_nl
-    RBVars.Qˡ = size(RBVars.Lₙ)[end]
-    else
-    RBVars.Qˡ = size(RBVars.DEIMᵢ_L)[end]
-  end
+  RBVars.Qᵃ = size(RBVars.Aₙ)[end]
+  RBVars.Qᶠ = size(RBVars.Fₙ)[end]
+  RBVars.Qʰ = size(RBVars.Hₙ)[end]
+  RBVars.Qˡ = size(RBVars.Lₙ)[end]
 
 end
 

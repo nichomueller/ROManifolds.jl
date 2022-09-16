@@ -2,10 +2,7 @@ function check_dataset(
   RBInfo::Info,
   nb::Int) where T
 
-  μ = load_CSV(Array{T}[],
-    joinpath(get_FEM_snap_path(RBInfo), "μ.csv"))::Vector{Vector{T}}
-  model = DiscreteModelFromFile(get_mesh_path(RBInfo))
-  FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id,RBInfo.FEMInfo,model)
+  FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
   Param = get_ParamInfo(RBInfo, μ[nb])
 
   A = assemble_FEM_structure(FEMSpace, RBInfo, Param, "A")

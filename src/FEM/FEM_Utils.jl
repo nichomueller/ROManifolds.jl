@@ -66,6 +66,16 @@ function nonlinearity_lifting_op(FEMInfo::Info)
   end
 end
 
+function get_FEMProblem_info(FEMInfo::Info)
+  μ = load_CSV(Array{Float}[],
+    joinpath(FEMInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{Float}}
+  model = DiscreteModelFromFile(FEMInfo.Paths.mesh_path)
+  FEMSpace = get_FEMSpace₀(FEMInfo.problem_id, FEMInfo,model)
+
+  FEMSpace, μ
+
+end
+
 function get_h(FEMSpace::Problem)
   Λ = SkeletonTriangulation(FEMSpace.Ω)
   dΛ = Measure(Λ, 2)
@@ -100,7 +110,7 @@ function get_α_stab(
 
 end
 
-function get_timesθ(FEMInfo::InfoST)
+function get_timesθ(FEMInfo::FEMInfoST)
   collect(FEMInfo.t₀:FEMInfo.δt:FEMInfo.tₗ-FEMInfo.δt).+FEMInfo.δt*FEMInfo.θ
 end
 

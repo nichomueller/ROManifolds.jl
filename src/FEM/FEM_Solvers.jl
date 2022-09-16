@@ -1,6 +1,6 @@
 function FE_solve(
   FEMSpace::FEMSpacePoissonS,
-  FEMInfo::InfoS,
+  FEMInfo::FEMInfoS,
   Param::ParamInfoS)
 
   a(u, v) = ∫(∇(v) ⋅ (Param.α * ∇(u))) * FEMSpace.dΩ
@@ -19,7 +19,7 @@ end
 
 function FE_solve(
   FEMSpace::FEMSpacePoissonST,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
   m(t, u, v) = ∫(Param.m(t)*(u*v))dΩ
@@ -52,7 +52,7 @@ end
 
 function FE_solve(
   FEMSpace::FEMSpaceADRS,
-  FEMInfo::InfoS,
+  FEMInfo::FEMInfoS,
   Param::ParamInfoS)
 
   a(u,v) = ∫(∇(v)⋅(Param.α*∇(u)) +
@@ -75,7 +75,7 @@ end
 
 function FE_solve(
   FEMSpace::FEMSpaceADRST,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
   m(t, u, v) = ∫(Param.m(t)*(u*v))dΩ
@@ -111,7 +111,7 @@ end
 
 function FE_solve(
   FEMSpace::FEMSpaceStokesS,
-  FEMInfo::InfoS,
+  FEMInfo::FEMInfoS,
   Param::ParamInfoS) where T
 
   a((u,p),(v,q)) = ∫( ∇(v)⊙(Param.α*∇(u)) - (∇⋅v)*p + q*(∇⋅u) ) * FEMSpace.dΩ
@@ -130,7 +130,7 @@ end
 
 function FE_solve(
   FEMSpace::FEMSpaceStokesST,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST) where T
 
   timesθ = get_timesθ(FEMInfo)

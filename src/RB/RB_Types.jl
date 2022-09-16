@@ -126,10 +126,11 @@ function init_StokesS_variables(::Type{T}) where T
   Nₛᵖ = 0
   nₛᵖ = 0
   Qᵇ = 0
+  Qˡᶜ = 0
 
   (Sᵖ, Φₛᵘ, p̃, pₙ, p̂, Bₙ, Lcₙ, MDEIM_mat_B, MDEIMᵢ_B, MDEIM_idx_B, row_idx_B,
     sparse_el_B, DEIM_mat_Lc, DEIMᵢ_Lc, DEIM_idx_Lc, sparse_el_Lc,
-    Xᵘ, Xᵖ₀, Nₛᵖ, nₛᵖ, Qᵇ)
+    Xᵘ, Xᵖ₀, Nₛᵖ, nₛᵖ, Qᵇ, Qˡᶜ)
 
 end
 
@@ -207,7 +208,7 @@ mutable struct StokesS{T} <: RBProblemS{T}
   MDEIM_idx_B::Vector{Int}; row_idx_B::Vector{Int}; sparse_el_B::Vector{Int};
   DEIM_mat_Lc::Matrix{T}; DEIMᵢ_Lc::Matrix{T}; DEIM_idx_Lc::Vector{Int};
   sparse_el_Lc::Vector{Int}; Xᵘ::SparseMatrixCSC{T}; Xᵖ₀::SparseMatrixCSC{T};
-  Nₛᵖ::Int; nₛᵖ::Int; Qᵇ::Int
+  Nₛᵖ::Int; nₛᵖ::Int; Qᵇ::Int; Qˡᶜ::Int
 end
 
 mutable struct StokesST{T} <: RBProblemST{T}
@@ -370,8 +371,8 @@ function Base.getproperty(RBVars::StokesS, sym::Symbol)
   if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
     :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A, :DEIM_mat_F,
     :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H, :DEIM_idx_H,
-    :sparse_el_H, :DEIM_mat_L, :DEIMᵢ_L, :DEIM_idx_L,
-    :sparse_el_L, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :Qˡ, :offline_time, :online_time)
+    :sparse_el_H, :DEIM_mat_L, :DEIMᵢ_L, :DEIM_idx_L, :sparse_el_L,
+    :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :Qˡ, :offline_time, :online_time)
     getfield(RBVars.Poisson, sym)
   else
     getfield(RBVars, sym)
@@ -382,8 +383,8 @@ function Base.setproperty!(RBVars::StokesS, sym::Symbol, x::T) where T
   if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
     :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A, :DEIM_mat_F,
     :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H, :DEIM_idx_H,
-    :sparse_el_H, :DEIM_mat_L, :DEIMᵢ_L, :DEIM_idx_L,
-    :sparse_el_L, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :Qˡ, :offline_time, :online_time)
+    :sparse_el_H, :DEIM_mat_L, :DEIMᵢ_L, :DEIM_idx_L, :sparse_el_L,
+    :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :Qˡ, :offline_time, :online_time)
     setfield!(RBVars.Poisson, sym, x)::T
   else
     setfield!(RBVars, sym, x)::T
@@ -494,8 +495,8 @@ struct ROMPath <: Info
   results_path::String
 end
 
-struct ROMInfoS{T} <: Info
-  FEMInfo::InfoS
+struct ROMInfoS{T} <: InfoS
+  FEMInfo::FEMInfoS
   Paths::ROMPath
   RB_method::String
   nₛ::Int
@@ -511,8 +512,8 @@ struct ROMInfoS{T} <: Info
   save_results::Bool
 end
 
-mutable struct ROMInfoST{T} <: Info
-  FEMInfo::InfoST
+mutable struct ROMInfoST{T} <: InfoST
+  FEMInfo::FEMInfoST
   Paths::ROMPath
   RB_method::String
   nₛ::Int

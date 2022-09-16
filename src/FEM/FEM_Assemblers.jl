@@ -1,7 +1,7 @@
 function assemble_mass(
   ::NTuple{1,Int},
   FEMSpace::FEMProblemST,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
   function unsteady_mass(t)
@@ -21,7 +21,7 @@ end
 function assemble_mass(
   ::NTuple{2,Int},
   FEMSpace::FEMProblemST,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
   assemble_mass(get_NTuple(1, Int), FEMSpace, FEMInfo, Param)
@@ -31,7 +31,7 @@ end
 function assemble_mass(
   ::NTuple{3,Int},
   FEMSpace::FEMProblemST,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
   function unsteady_mass(t)
@@ -51,7 +51,7 @@ end
 function assemble_mass(
   ::NTuple{4,Int},
   FEMSpace::FEMProblemST,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
   assemble_mass(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)
@@ -61,7 +61,7 @@ end
 function assemble_stiffness(
   ::NTuple{1,Int},
   FEMSpace::FEMProblemS,
-  FEMInfo::InfoS,
+  FEMInfo::FEMInfoS,
   Param::ParamInfoS)
 
   if "A" ∉ FEMInfo.probl_nl
@@ -77,7 +77,7 @@ end
 function assemble_stiffness(
   ::NTuple{1,Int},
   FEMSpace::FEMProblemST,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
   function unsteady_stiffness(t)
@@ -97,7 +97,7 @@ end
 function assemble_stiffness(
   ::NTuple{2,Int},
   FEMSpace::FEMProblemS,
-  ::InfoS,
+  ::FEMInfoS,
   Param::ParamInfoS)
 
   ####### USING PECHLET STABILIZATION OF α #######
@@ -112,7 +112,7 @@ end
 function assemble_stiffness(
   ::NTuple{2,Int},
   FEMSpace::FEMProblemST,
-  ::InfoST,
+  ::FEMInfoST,
   Param::ParamInfoST)
 
   ####### USING PECHLET STABILIZATION OF α #######
@@ -131,7 +131,7 @@ end
 function assemble_stiffness(
   ::NTuple{3,Int},
   FEMSpace::FEMProblemS,
-  FEMInfo::InfoS,
+  FEMInfo::FEMInfoS,
   Param::ParamInfoS)
 
   if "A" ∉ FEMInfo.probl_nl
@@ -147,7 +147,7 @@ end
 function assemble_stiffness(
   ::NTuple{3,Int},
   FEMSpace::FEMProblemST,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
   function unsteady_stiffness(t)
@@ -213,7 +213,7 @@ end
 function assemble_B(
   ::NTuple{2,Int},
   FEMSpace::FEMProblemS,
-  ::InfoS,
+  ::FEMInfoS,
   Param::ParamInfoS)
 
   assemble_matrix(∫(FEMSpace.ϕᵥ * (Param.b⋅∇(FEMSpace.ϕᵤ)))*FEMSpace.dΩ,
@@ -224,7 +224,7 @@ end
 function assemble_B(
   ::NTuple{2,Int},
   FEMSpace::FEMProblemS,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
   function advection(t)
@@ -266,7 +266,7 @@ end
 function assemble_reaction(
   ::NTuple{2,Int},
   FEMSpace::FEMProblemS,
-  ::InfoS,
+  ::FEMInfoS,
   Param::ParamInfoS)
 
   assemble_matrix(∫(FEMSpace.ϕᵥ * FEMSpace.ϕᵤ)*FEMSpace.dΩ,
@@ -277,7 +277,7 @@ end
 function assemble_reaction(
   ::NTuple{2,Int},
   FEMSpace::FEMProblemST,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
   function advection(t)
@@ -357,10 +357,10 @@ end =#
 function assemble_forcing(
   ::NTuple{1,Int},
   FEMSpace::FEMProblemS,
-  FEMInfo::InfoS,
+  FEMInfo::FEMInfoS,
   Param::ParamInfoS)
 
-  if "F" ∉ FEMInfo.probl_nl && "H" ∉ FEMInfo.probl_nl
+  if "F" ∉ FEMInfo.probl_nl
     assemble_vector(∫(FEMSpace.ϕᵥ)*FEMSpace.dΩ, FEMSpace.V₀)
   else
     assemble_vector(∫(FEMSpace.ϕᵥ*Param.f)*FEMSpace.dΩ, FEMSpace.V₀)
@@ -371,7 +371,7 @@ end
 function assemble_forcing(
   ::NTuple{1,Int},
   FEMSpace::FEMProblemST,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
   function unsteady_forcing(t)
@@ -399,7 +399,7 @@ end
 function assemble_forcing(
   ::NTuple{3,Int},
   FEMSpace::FEMProblemS{D},
-  FEMInfo::InfoS,
+  FEMInfo::FEMInfoS,
   Param::ParamInfoS) where D
 
   if "F" ∉ FEMInfo.probl_nl
@@ -414,7 +414,7 @@ end
 function assemble_forcing(
   ::NTuple{3,Int},
   FEMSpace::FEMProblemST,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
   function unsteady_forcing(t)
@@ -442,7 +442,7 @@ end
 function assemble_neumann_datum(
   ::NTuple{1,Int},
   FEMSpace::FEMProblemS,
-  FEMInfo::InfoS,
+  FEMInfo::FEMInfoS,
   Param::ParamInfoS)
 
   if "H" ∉ FEMInfo.probl_nl
@@ -456,7 +456,7 @@ end
 function assemble_neumann_datum(
   ::NTuple{1,Int},
   FEMSpace::FEMProblemST,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
   function unsteady_neumann_datum(t)
@@ -486,7 +486,7 @@ end
 function assemble_neumann_datum(
   ::NTuple{3,Int},
   FEMSpace::FEMProblemS,
-  FEMInfo::InfoS,
+  FEMInfo::FEMInfoS,
   Param::ParamInfoS)
 
   if "H" ∉ FEMInfo.probl_nl
@@ -501,7 +501,7 @@ end
 function assemble_neumann_datum(
   ::NTuple{3,Int},
   FEMSpace::FEMProblemST,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
   function unsteady_neumann_datum(t)
@@ -529,7 +529,7 @@ end
 function assemble_lifting(
   ::NTuple{1,Int},
   FEMSpace::FEMProblemS,
-  FEMInfo::InfoS,
+  FEMInfo::FEMInfoS,
   Param::ParamInfoS)
 
   g = define_g_FEM(FEMSpace, Param)
@@ -542,7 +542,7 @@ end
 function assemble_lifting(
   ::NTuple{1,Int},
   FEMSpace::FEMProblemST,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
   δtθ = FEMInfo.δt*FEMInfo.θ
@@ -559,7 +559,7 @@ end
 function assemble_lifting(
   ::NTuple{2,Int},
   FEMSpace::FEMProblemS,
-  FEMInfo::InfoS,
+  FEMInfo::FEMInfoS,
   Param::ParamInfoS)
 
   g = define_g_FEM(FEMSpace, Param)
@@ -573,7 +573,7 @@ end
 function assemble_lifting(
   ::NTuple{2,Int},
   FEMSpace::FEMProblemST,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
   δtθ = FEMInfo.δt*FEMInfo.θ
@@ -592,7 +592,7 @@ end
 function assemble_lifting(
   ::NTuple{3,Int},
   FEMSpace::FEMProblemS,
-  FEMInfo::InfoS,
+  FEMInfo::FEMInfoS,
   Param::ParamInfoS)
 
   g = define_g_FEM(FEMSpace, Param)
@@ -605,7 +605,7 @@ end
 function assemble_lifting(
   ::NTuple{3,Int},
   FEMSpace::FEMProblemST,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
   δtθ = FEMInfo.δt*FEMInfo.θ
@@ -622,7 +622,7 @@ end
 function assemble_lifting(
   ::NTuple{4,Int},
   FEMSpace::FEMProblemS,
-  FEMInfo::InfoS,
+  FEMInfo::FEMInfoS,
   Param::ParamInfoS)
 
   C(u) = Param.Re * assemble_vector(∫( FEMSpace.ϕᵥ ⊙
@@ -638,7 +638,7 @@ end
 function assemble_lifting(
   ::NTuple{4,Int},
   FEMSpace::FEMProblemST,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
   C(u, t) = Param.Re * assemble_vector(∫( FEMSpace.ϕᵥ ⊙
@@ -655,7 +655,7 @@ end
 function assemble_lifting_continuity(
   ::NTuple{3,Int},
   FEMSpace::FEMProblemS,
-  FEMInfo::InfoS,
+  FEMInfo::FEMInfoS,
   Param::ParamInfoS)
 
   g = define_g_FEM(FEMSpace, Param)
@@ -667,7 +667,7 @@ end
 function assemble_lifting_continuity(
   ::NTuple{3,Int},
   FEMSpace::FEMProblemST,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
   g = define_g_FEM(FEMSpace, Param)

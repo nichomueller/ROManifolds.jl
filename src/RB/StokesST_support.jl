@@ -313,12 +313,11 @@ function save_M_DEIM_structures(
   RBVars::PoissonS)
 
   M_DEIM_vars = (
-    RBVars.MDEIM_mat_B, RBVars.MDEIMᵢ_B, RBVars.MDEIM_idx_B, RBVars.row_idx_B,
-    RBVars.sparse_el_B, RBVars.DEIM_mat_Lc, RBVars.DEIMᵢ_Lc, RBVars.DEIM_idx_Lc,)
-    RBVars.sparse_el_Lc
+    RBVars.MDEIMᵢ_B, RBVars.MDEIM_idx_B, RBVars.row_idx_B, RBVars.sparse_el_B,
+    RBVars.DEIMᵢ_Lc, RBVars.DEIM_idx_Lc, RBVars.sparse_el_Lc)
   M_DEIM_names = (
-    "MDEIM_mat_B","MDEIMᵢ_B","MDEIM_idx_B","row_idx_B","sparse_el_B",
-    "DEIM_mat_Lc","DEIMᵢ_Lc","DEIM_idx_Lc","sparse_el_Lc")
+    "MDEIMᵢ_B","MDEIM_idx_B","row_idx_B","sparse_el_B",
+    "DEIMᵢ_Lc","DEIM_idx_Lc","sparse_el_Lc")
   save_structures_in_list(M_DEIM_vars, M_DEIM_names, RBInfo.ROM_structures_path)
 
   save_M_DEIM_structures(RBInfo, RBVars.Poisson)

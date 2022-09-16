@@ -101,11 +101,7 @@ function assemble_offline_structures(
         assemble_affine_vectors(RBInfo, RBVars, var)
       end
     end
-  end
 
-  save_affine_structures(RBInfo, RBVars)
-
-  RBVars.offline_time += @elapsed begin
     for var ∈ intersect(operators, RBInfo.probl_nl)
       if var == "A"
         assemble_MDEIM_matrices(RBInfo, RBVars, var)
@@ -115,7 +111,7 @@ function assemble_offline_structures(
     end
   end
 
-  save_M_DEIM_structures(RBInfo, RBVars)
+  save_assembled_structures(RBInfo, RBVars)
 
 end
 
@@ -217,10 +213,10 @@ function get_RB_system(
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
+  get_Q(RBVars)
+  blocks = [1]
 
   RBVars.online_time = @elapsed begin
-    get_Q(RBInfo, RBVars)
-    blocks = [1]
     operators = get_system_blocks(RBInfo, RBVars, blocks, blocks)
 
     θᵃ, θᶠ, θʰ, θˡ = get_θ(FEMSpace, RBInfo, RBVars, Param)
@@ -268,10 +264,7 @@ function online_phase(
   RBVars::PoissonS{T},
   Param_nbs) where T
 
-  μ = load_CSV(Array{T}[],
-    joinpath(get_FEM_snap_path(RBInfo), "μ.csv"))::Vector{Vector{T}}
-  model = DiscreteModelFromFile(get_mesh_path(RBInfo))
-  FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id,RBInfo.FEMInfo,model)
+  FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
 
   mean_H1_err = 0.0
   mean_pointwise_err = zeros(T, RBVars.Nₛᵘ)

@@ -164,3 +164,24 @@ function index_mapping_inverse(i::Int,RBVars::PoissonUnsteady) ::Tuple
   iₜ = i-(iₛ-1)*RBVars.nₜᵘ
   iₛ,iₜ
 end
+
+function reshape_3Darrays_in_list(
+  list_3Darrays::NTuple{D, Array{T, 3}},
+  list_dims::Vector{Int}) where {D, T}
+
+  @assert length(list_dims) == D "Wrong length"
+
+  reshaped_2Darrays = ()
+
+  for i = 1:D
+    if !isempty(list_3Darrays[i])
+      reshaped_2Darrays = (reshaped_2Darrays...,
+        reshape(list_3Darrays[i], :, list_dims[i])::Matrix{T})
+    else
+      reshaped_2Darrays = (reshaped_2Darrays..., list_3Darrays[i])
+    end
+  end
+
+  reshaped_2Darrays
+
+end

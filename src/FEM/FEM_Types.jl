@@ -4,6 +4,8 @@ abstract type FEMProblemS{D} <: FEMProblem{D} end
 abstract type FEMProblemST{D} <: FEMProblem{D} end
 
 abstract type Info end
+abstract type InfoS <: Info end
+abstract type InfoST <: Info end
 abstract type ParamInfoS <: Info end
 abstract type ParamInfoST <: Info end
 
@@ -170,7 +172,7 @@ struct FEMPathInfo <: Info
   FEM_structures_path::String
 end
 
-struct InfoS <: Info
+struct FEMInfoS <: InfoS
   problem_id::NTuple
   D::Int
   case::Int
@@ -182,7 +184,7 @@ struct InfoS <: Info
   nₛ::Int
 end
 
-struct InfoST <: Info
+struct FEMInfoST <: InfoST
   problem_id::NTuple
   D::Int
   case::Int
@@ -267,6 +269,7 @@ end
 struct ParamStokesS <: ParamInfoS
   μ::Vector
   α::Function
+  b::Function
   f::Function
   g::Function
   h::Function

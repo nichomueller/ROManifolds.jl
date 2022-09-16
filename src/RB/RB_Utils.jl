@@ -128,7 +128,7 @@ end
 
 function assemble_sparse_mat(
   FEMSpace::FEMProblemS,
-  FEMInfo::InfoS,
+  FEMInfo::FEMInfoS,
   Param::ParamInfoS,
   el::Vector{Int},
   var::String)
@@ -159,7 +159,7 @@ end
 
 function assemble_sparse_mat(
   FEMSpace::FEMProblemST,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST,
   el::Vector{Int},
   timesθ::Vector,
@@ -210,12 +210,16 @@ end
 
 function assemble_sparse_vec(
   FEMSpace::FEMProblemS,
-  FEMInfo::InfoS,
+  FEMInfo::FEMInfoS,
   Param::ParamInfoS,
   el::Vector{Int},
   var::String)
 
-  Ω_sparse = view(FEMSpace.Ω, el)
+  if var == "H"
+    Ω_sparse = view(FEMSpace.Γn, el)
+  else
+    Ω_sparse = view(FEMSpace.Ω, el)
+  end
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
 
   function define_Vec(FEMSpace::FEMSpacePoissonS, var::String)
@@ -255,21 +259,18 @@ end
 
 function assemble_sparse_vec(
   FEMSpace::FEMProblemST,
-  FEMInfo::InfoST,
+  FEMInfo::FEMInfoST,
   Param::ParamInfoST,
   el::Vector{Int},
   timesθ::Vector,
   var::String)
 
-  if var == "F"
-    Ω_sparse = view(FEMSpace.Ω, el)
-    dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
-  elseif var == "H"
+  if var == "H"
     Ω_sparse = view(FEMSpace.Γn, el)
-    dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
   else
-    error("Unrecognized variable")
+    Ω_sparse = view(FEMSpace.Ω, el)
   end
+  dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
 
   function define_Vecₜ(FEMSpace::FEMSpacePoissonST, t::Real, var::String)
     if var == "F"
