@@ -125,7 +125,7 @@ function POD(S::Matrix{T}, ϵ::Float) where T
 
 end
 
-function POD(S::SparseMatrixCSC, ϵ::Float) where T
+function POD(S::SparseMatrixCSC{T}, ϵ::Float) where T
 
   U, Σ, _ = svds(S; nsv=size(S)[2] - 1)[1]
 
@@ -134,6 +134,42 @@ function POD(S::SparseMatrixCSC, ϵ::Float) where T
   println("Basis number obtained via POD is $N, projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
 
   T.(U[:, 1:N])
+
+end
+
+function solve_cholesky(A::SparseMatrixCSC{T}, b::Vector{T}) where T
+
+  H = cholesky(A)
+  L = sparse(H.L)
+
+  y = L[invperm(H.p), :] \ b
+  x = L[invperm(H.p), :]' \ y
+
+  x::Vector{T}
+
+end
+
+function solve_cholesky(A::SparseMatrixCSC{T}, B::Matrix{T}) where T
+
+  H = cholesky(A)
+  L = sparse(H.L)
+
+  y = L[invperm(H.p), :] * B
+  x = L[invperm(H.p), :]' \ y
+
+  x::Matrix{T}
+
+end
+
+function solve_cholesky(A::SparseMatrixCSC{T}, B::SparseMatrixCSC{T}) where T
+
+  H = cholesky(A)
+  L = sparse(H.L)
+
+  y = L[invperm(H.p), :] * B
+  x = L[invperm(H.p), :]' \ y
+
+  x::Matrix{T}
 
 end
 

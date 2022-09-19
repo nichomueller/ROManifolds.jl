@@ -114,7 +114,7 @@ function assemble_offline_structures(
     end
 
     for var ∈ intersect(operators, RBInfo.probl_nl)
-      if var ∈ var ∈ ("A", "B")
+      if var ∈ ("A", "B")
         assemble_MDEIM_matrices(RBInfo, RBVars, var)
       else
         assemble_DEIM_vectors(RBInfo, RBVars, var)

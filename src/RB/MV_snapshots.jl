@@ -331,12 +331,16 @@ function assemble_vector_snapshots(
   μ::Vector{Vector{T}},
   var::String) where T
 
-  Vec = zeros(T, FEMSpace.Nₛᵘ, RBInfo.nₛ_DEIM)
+  Vec = Matrix{T}(undef,0,0)
 
   for i_nₛ = 1:RBInfo.nₛ_DEIM
     println("Snapshot number $i_nₛ, $var")
     Param = get_ParamInfo(RBInfo, μ[i_nₛ])
-    Vec[:,i_nₛ] = assemble_FEM_structure(FEMSpace, RBInfo, Param, var)[:]
+    v = assemble_FEM_structure(FEMSpace, RBInfo, Param, var)[:]
+    if i_nₛ == 1
+      Vec = zeros(T, length(v), RBInfo.nₛ_DEIM)
+    end
+    Vec[:, i_nₛ] = v
   end
 
   Vec
@@ -353,10 +357,14 @@ function assemble_vector_snapshots(
   Nₜ = length(timesθ)
   Param = get_ParamInfo(RBInfo, μ)
   Vec_t = assemble_FEM_structure(FEMSpace, RBInfo, Param, var)
-  Vec = zeros(T, FEMSpace.Nₛᵘ, Nₜ)
+  Vec = Matrix{T}(undef,0,0)
 
   for i_t = 1:Nₜ
-    Vec[:,i_t] = Vec_t(timesθ[i_t])[:]
+    v = Vec_t(timesθ[i_t])[:]
+    if i_nₛ == 1
+      Vec = zeros(T, length(v), Nₜ)
+    end
+    Vec[:, i_t] = v
   end
 
   Vec

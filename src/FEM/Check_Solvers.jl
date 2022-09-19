@@ -85,11 +85,8 @@ end
 
 function check_stokes_solver()
 
-  μ = load_CSV(Array{T}[],
-    joinpath(get_FEM_snap_path(RBInfo), "μ.csv"))::Vector{Vector{T}}
-  model = DiscreteModelFromFile(get_mesh_path(RBInfo))
-  Param = get_ParamInfo(RBInfo, μ[1])
-  FEMSpace = get_FEMSpace(FEMInfo.problem_id, FEMInfo, model, Param.g)
+  FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
+  Param = get_ParamInfo(RBInfo, μ[nb])
 
   u = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
     DataFrame))[:, 1]
@@ -98,13 +95,14 @@ function check_stokes_solver()
   x = vcat(u, p)
 
   A = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "A")
-  B = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "Bₚ")
+  B = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "B")
   F = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "F")
   H = 0. * assemble_FEM_structure(FEMSpace, FEMInfo, Param, "H")
   L = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "L")
+  Lc = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "Lc")
 
   LHS = vcat(hcat(A, -B'), hcat(B, zeros(T, FEMSpace.Nₛᵖ, FEMSpace.Nₛᵖ)))
-  RHS = vcat(F + H, zeros(T, FEMSpace.Nₛᵖ, 1)) - L
+  RHS = vcat(F + H - L, - Lc)
 
   LHS * x - RHS
 

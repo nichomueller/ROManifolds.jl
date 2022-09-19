@@ -26,7 +26,8 @@ function primal_supremizers(
   constraint_mat = load_CSV(sparse([],[],T[]),
     joinpath(get_FEM_structures_path(RBInfo), "B.csv"))'
 
-  supr_primal = Matrix{T}(RBVars.Xᵘ₀) \ (Matrix{T}(constraint_mat) * RBVars.Φₛᵖ)
+  #supr_primal = RBVars.Xᵘ₀ \ (constraint_mat * RBVars.Φₛᵖ)
+  supr_primal = solve_cholesky(RBVars.Xᵘ₀, constraint_mat * RBVars.Φₛᵖ)
 
   min_norm = 1e16
   for i = 1:size(supr_primal)[2]
@@ -311,9 +312,9 @@ function assemble_DEIM_vectors(
 end
 
 function assemble_reduced_mat_DEIM(
-  RBVars::StokesS,
+  RBVars::StokesS{T},
   DEIM_mat::Matrix,
-  var::String)
+  var::String) where T
 
   if var == "Lc"
     Q = size(DEIM_mat)[2]
