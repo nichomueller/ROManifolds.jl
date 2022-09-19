@@ -7,7 +7,7 @@ function post_process(::ROMInfoS, d::Dict) where T
   if "mean_point_err_p" ∈ keys(d)
     FEMSpace = d["FEMSpace"]
     writevtk(FEMSpace.Ω, joinpath(d["path_μ"], "mean_point_err_p"),
-    cellfields = ["err"=> FEFunction(FEMSpace.V, d["mean_point_err_p"][:, 1])])
+    cellfields = ["err"=> FEFunction(FEMSpace.Q, d["mean_point_err_p"][:, 1])])
   end
 
 end

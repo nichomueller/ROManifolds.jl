@@ -313,12 +313,15 @@ end
 
 function save_assembled_structures(
   RBInfo::Info,
-  RBVars::PoissonS{T}) where T
+  RBVars::PoissonS{T},
+  operators::Vector{String}) where T
 
-  Aₙ = reshape(RBVars.Aₙ, :, RBVars.Qᵃ)::Matrix{T}
-  affine_vars = (Aₙ, RBVars.Fₙ, RBVars.Hₙ, RBVars.Lₙ)
+  affine_vars = (reshape(RBVars.Aₙ, RBVars.nₛᵘ ^ 2, :)::Matrix{T},
+    RBVars.Fₙ, RBVars.Hₙ, RBVars.Lₙ)
   affine_names = ("Aₙ", "Fₙ", "Hₙ", "Lₙ")
-  save_structures_in_list(affine_vars, affine_names, RBInfo.ROM_structures_path)
+  affine_entry = get_affine_entries(operators, affine_names)
+  save_structures_in_list(affine_vars, affine_names,
+    RBInfo.ROM_structures_path, affine_entry)
 
   M_DEIM_vars = (RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A,
     RBVars.row_idx_A, RBVars.sparse_el_A, RBVars.DEIMᵢ_F,

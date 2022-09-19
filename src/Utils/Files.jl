@@ -92,6 +92,22 @@ function save_structures_in_list(
 
 end
 
+function save_structures_in_list(
+  list_structures::Tuple,
+  list_names::NTuple{D},
+  path::String,
+  vec_idx::Vector{Int}) where D
+
+  @assert length(list_structures) == D "Wrong length"
+
+  if !isempty(vec_idx)
+    for idx in vec_idx
+      save_CSV(list_structures[idx], joinpath(path, list_names[idx]*".csv"))
+    end
+  end
+
+end
+
 function load_structures_in_list(
   list_names::Tuple{Vararg{String, D}},
   list_types::Tuple,

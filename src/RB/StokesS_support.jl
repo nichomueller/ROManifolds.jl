@@ -159,7 +159,7 @@ end
 
 function get_Lc(
   RBInfo::Info,
-  RBVars::StokesS)
+  RBVars::StokesS{T}) where T
 
   op = String[]
 
@@ -332,12 +332,14 @@ end
 
 function save_assembled_structures(
   RBInfo::Info,
-  RBVars::PoissonS)
+  RBVars::StokesS{T},
+  operators::Vector{String}) where T
 
-  Bₙ = reshape_3Darrays_in_list((RBVars.Bₙ,), [RBVars.Qᵇ])
+  Bₙ = reshape(RBVars.Bₙ, RBVars.nₛᵘ * RBVars.nₛᵖ, :)::Matrix{T}
   affine_vars, affine_names = (Bₙ, RBVars.Lcₙ), ("Bₙ", "Lcₙ")
-  save_structures_in_list(affine_vars, affine_names, RBInfo.ROM_structures_path)
-  save_affine_structures(RBInfo, RBVars.Poisson)
+  affine_entry = get_affine_entries(operators, affine_names)
+  save_structures_in_list(affine_vars, affine_names,
+    RBInfo.ROM_structures_path, affine_entry)
 
   M_DEIM_vars = (
     RBVars.MDEIMᵢ_B, RBVars.MDEIM_idx_B, RBVars.row_idx_B, RBVars.sparse_el_B,
@@ -347,7 +349,8 @@ function save_assembled_structures(
     "DEIMᵢ_Lc","DEIM_idx_Lc","sparse_el_Lc")
   save_structures_in_list(M_DEIM_vars, M_DEIM_names, RBInfo.ROM_structures_path)
 
-  save_M_DEIM_structures(RBInfo, RBVars.Poisson)
+  operators_to_pass = setdiff(operators, ("B", "Lc"))
+  save_assembled_structures(RBInfo, RBVars.Poisson, operators_to_pass)
 
 end
 
@@ -376,10 +379,10 @@ end
 
 function get_θ_matrix(
   FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS,
+  RBInfo::ROMInfoS{T},
   RBVars::StokesS,
   Param::ParamInfoS,
-  var::String)
+  var::String) where T
 
   if var == "A"
     return θ_matrix(FEMSpace, RBInfo, RBVars, Param, Param.α, RBVars.MDEIMᵢ_A,
@@ -395,10 +398,10 @@ end
 
 function get_θ_vector(
   FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS,
+  RBInfo::ROMInfoS{T},
   RBVars::StokesS,
   Param::ParamInfoS,
-  var::String)
+  var::String) where T
 
   if var == "F"
     return θ_vector(FEMSpace, RBInfo, RBVars, Param, Param.f, RBVars.DEIMᵢ_F,

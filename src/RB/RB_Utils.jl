@@ -57,6 +57,21 @@ function get_method_id(problem_name::String, RB_method::String)
   end
 end
 
+function get_affine_entries(
+  operators::Vector{String},
+  affine_names::NTuple{D}) where D
+
+  affine_entries = Int[]
+  for idx = eachindex(operators)
+    if (operators[idx] * "ₙ") ∈ affine_names
+      append!(affine_entries, idx)
+    end
+  end
+
+  affine_entries
+
+end
+
 function assemble_FEM_structure(
   FEMSpace::FEMProblem,
   RBInfo::ROMInfoS,
@@ -424,6 +439,49 @@ function interpolated_θ(
 
 end
 
+function modify_fun(
+  fun::Function,
+  D::Int,
+  T::Type)
+
+  val = fun(zero(VectorValue(D, T)))
+  if typeof(val) != T
+    val = val[1][1]
+  end
+
+  T.(val)
+
+end
+
+function modify_fun(
+  fun::Function,
+  t_θ::Vector,
+  T::Type)
+
+  val = fun(t_θ)
+  if typeof(val) != T
+    val = val[1][1]
+  end
+
+  T.(val)
+
+end
+
+function modify_fun(
+  fun::Function,
+  μ::Vector,
+  t_θ::Vector,
+  T::Type)
+
+  val = fun(t_θ, μ)
+  if typeof(val) != T
+    val = val[1][1]
+  end
+
+  T.(val)
+
+end
+
 function θ_matrix(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS{T},
@@ -436,7 +494,7 @@ function θ_matrix(
   var::String) where T
 
   if var ∉ RBInfo.probl_nl
-    θ = reshape([T.(fun(Point(0., 0.)))], 1, 1)
+    θ = reshape([modify_fun(fun, FEMInfo.D, T)], 1, 1)
   else
     Mat_μ_sparse =
       T.(assemble_sparse_mat(FEMSpace, FEMInfo, Param, sparse_el, var))
@@ -464,7 +522,7 @@ function θ_matrix(
   if var ∉ RBInfo.probl_nl
     θ = zeros(T, 1, RBVars.Nₜ)
     for (i_t, t_θ) = enumerate(timesθ)
-      θ[i_t] = T.(fun(t_θ, Param.μ))
+      θ[i_t] = modify_fun(fun, Param.μ, t_θ, T)
     end
   else
     if RBInfo.st_M_DEIM
@@ -496,7 +554,7 @@ function θ_vector(
   var::String) where T
 
   if var ∉ RBInfo.probl_nl
-    θ = reshape([T.(fun(Point(0., 0.)))], 1, 1)
+    θ = reshape([modify_fun(fun, FEMInfo.D, T)], 1, 1)
   else
     Vec_μ_sparse =
       T.(assemble_sparse_vec(FEMSpace, FEMInfo, Param, sparse_el, var))
@@ -524,7 +582,7 @@ function θ_vector(
   if var ∉ RBInfo.probl_nl
     θ = zeros(T, 1, RBVars.Nₜ)
     for (i_t, t_θ) = enumerate(timesθ)
-      θ[i_t] = T.(fun(t_θ))
+      θ[i_t] = modify_fun(fun, t_θ, T) # VERY UGLY - CHANGE NEEDED
     end
   else
     if RBInfo.st_M_DEIM
@@ -544,11 +602,12 @@ function θ_vector(
 end
 
 function compute_errors(
+  ::RBProblemS{T},
   uₕ::Vector,
-  RBVars::RBProblemS{T},
+  ũ::Matrix{T},
   norm_matrix = nothing) where T
 
-  mynorm(uₕ - RBVars.ũ[:, 1], norm_matrix) / mynorm(uₕ, norm_matrix)
+  mynorm(uₕ - ũ[:, 1], norm_matrix) / mynorm(uₕ, norm_matrix)
 
 end
 

@@ -111,7 +111,7 @@ function assemble_offline_structures(
     end
   end
 
-  save_assembled_structures(RBInfo, RBVars)
+  save_assembled_structures(RBInfo, RBVars, operators)
 
 end
 
@@ -290,7 +290,7 @@ function online_phase(
     mean_online_time = RBVars.online_time / length(Param_nbs)
     mean_reconstruction_time = reconstruction_time / length(Param_nbs)
 
-    H1_err_nb = compute_errors(uₕ_test, RBVars, RBVars.Xᵘ₀)
+    H1_err_nb = compute_errors(RBVars, uₕ_test, RBVars.ũ, RBVars.Xᵘ₀)
     mean_H1_err += H1_err_nb / length(Param_nbs)
     mean_pointwise_err += abs.(uₕ_test - RBVars.ũ) / length(Param_nbs)
 
