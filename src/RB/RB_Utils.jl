@@ -62,8 +62,8 @@ function get_affine_entries(
   affine_names::NTuple{D}) where D
 
   affine_entries = Int[]
-  for idx = eachindex(operators)
-    if (operators[idx] * "ₙ") ∈ affine_names
+  for idx = eachindex(affine_names)
+    if (affine_names[idx]) ∈ operators .* "ₙ"
       append!(affine_entries, idx)
     end
   end
@@ -163,6 +163,9 @@ function assemble_sparse_mat(
     if var == "A"
       return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Param.α*∇(FEMSpace.ϕᵤ)))*dΩ_sparse,
         FEMSpace.V, FEMSpace.V₀)
+    elseif var == "B"
+      return assemble_matrix(∫(FEMSpace.ψᵧ*(Param.b*∇⋅(FEMSpace.ϕᵤ)))*dΩ_sparse,
+        FEMSpace.V, FEMSpace.Q₀)
     else
       error("Unrecognized sparse matrix")
     end

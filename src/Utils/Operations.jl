@@ -208,9 +208,46 @@ function matrix_to_blocks(A::Array{T}) where T
 
 end
 
-function remove_small_entries(A::Array,tol=1e-15)
-  A[A.<=tol].=0
-  A
+function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
+
+  numnz = nnz(S)
+    I = Vector{Ti}(undef, numnz)
+    J = Vector{Ti}(undef, numnz)
+    V = Vector{Tv}(undef, numnz)
+
+    count = 1
+    @inbounds for col = 1 : size(S, 2), k = SparseArrays.getcolptr(S)[col] : (SparseArrays.getcolptr(S)[col+1]-1)
+        I[count] = rowvals(S)[k]
+        J[count] = col
+        V[count] = nonzeros(S)[k]
+        count += 1
+    end
+
+  nz = findall(x -> x .!= 0., V)
+
+  (I[nz], J[nz], V[nz])
+
+end
+
+function SparseArrays.findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
+
+  numnz = nnz(x)
+
+    I = Vector{Ti}(undef, numnz)
+    V = Vector{Tv}(undef, numnz)
+
+    nzind = SparseArrays.nonzeroinds(x)
+    nzval = nonzeros(x)
+
+    @inbounds for i = 1 : numnz
+        I[i] = nzind[i]
+        V[i] = nzval[i]
+    end
+
+  nz = findall(v -> v .!= 0., V)
+
+  (I[nz], V[nz])
+
 end
 
 function newton(

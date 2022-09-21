@@ -61,7 +61,6 @@ end
 function plot_stability_constants(
   FEMSpace::FEMProblem,
   RBInfo::ROMInfoST,
-  RBVars::PoissonST,
   Param::ParamInfoST)
 
   function compute_stability_constant_Nₜ(RBInfo,Nₜ,M,A)

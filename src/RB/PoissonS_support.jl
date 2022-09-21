@@ -208,7 +208,7 @@ function assemble_reduced_mat_MDEIM(
   RBVars::PoissonS{T},
   MDEIM_mat::Matrix,
   row_idx::Vector,
-  var::String) where T
+  ::String) where T
 
   Q = size(MDEIM_mat)[2]
   r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.Nₛᵘ)
@@ -221,10 +221,8 @@ function assemble_reduced_mat_MDEIM(
   Matₙ = reshape(RBVars.Φₛᵘ' *
     reshape(MatqΦ,RBVars.Nₛᵘ,:),RBVars.nₛᵘ,:,Q)::Array{T,3}
 
-  if var == "A"
-    RBVars.Aₙ = Matₙ
-    RBVars.Qᵃ = Q
-  end
+  RBVars.Aₙ = Matₙ
+  RBVars.Qᵃ = Q
 
 end
 
@@ -320,8 +318,8 @@ function save_assembled_structures(
     RBVars.Fₙ, RBVars.Hₙ, RBVars.Lₙ)
   affine_names = ("Aₙ", "Fₙ", "Hₙ", "Lₙ")
   affine_entry = get_affine_entries(operators, affine_names)
-  save_structures_in_list(affine_vars, affine_names,
-    RBInfo.ROM_structures_path, affine_entry)
+  save_structures_in_list(affine_vars[affine_entry], affine_names[affine_entry],
+    RBInfo.ROM_structures_path)
 
   M_DEIM_vars = (RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A,
     RBVars.row_idx_A, RBVars.sparse_el_A, RBVars.DEIMᵢ_F,
@@ -353,14 +351,14 @@ function get_system_blocks(
 
   for i = LHS_blocks
     LHSₙi = "LHSₙ" * string(i) * ".csv"
-    if !isfile(joinpath(RBInfo.ROM_structures_path, LHSₙi * ".csv"))
+    if !isfile(joinpath(RBInfo.ROM_structures_path, LHSₙi))
       append!(operators, ["LHS"])
       break
     end
   end
   for i = RHS_blocks
     RHSₙi = "RHSₙ" * string(i) * ".csv"
-    if !isfile(joinpath(RBInfo.ROM_structures_path, RHSₙi * ".csv"))
+    if !isfile(joinpath(RBInfo.ROM_structures_path, RHSₙi))
       append!(operators, ["RHS"])
       break
     end
@@ -457,8 +455,8 @@ end
 function assemble_param_RHS(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS,
-  RBVars::PoissonS,
-  Param::ParamInfoS)
+  RBVars::PoissonS{T},
+  Param::ParamInfoS) where T
 
   println("Assembling reduced RHS exactly")
 

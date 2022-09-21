@@ -17,17 +17,41 @@ function PODs_space(
 
 end
 
+function assemble_constraint_matrix(
+  RBInfo::Info,
+  RBVars::StokesS{T}) where T
+
+  FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
+
+  constraint_matrix = zeros(T, RBVars.Nₛᵘ, RBVars.nₛ)
+
+  for k = 1:RBVars.nₛ
+    println("Snapshot number $k, $var")
+    Param = get_ParamInfo(RBInfo, μ[k])
+    B_k = Matrix{T}(assemble_FEM_structure(FEMSpace, RBInfo, Param, "B")')
+    constraint_matrix[:, k] = B_k * RBVars.Sᵖ[:, k]
+  end
+
+  constraint_matrix
+
+end
+
 function primal_supremizers(
   RBInfo::Info,
   RBVars::StokesS{T}) where T
 
   println("Computing primal supremizers")
 
-  constraint_mat = load_CSV(sparse([],[],T[]),
-    joinpath(get_FEM_structures_path(RBInfo), "B.csv"))'
+  if "B" ∈ RBInfo.probl_nl
+    println("Matrix Bᵀ is nonaffine: must assemble constraint_matrix ∀ μ")
+    constraint_matrix = assemble_constraint_matrix(RBInfo, RBVars)
+  else
+    println("Loading matrix Bᵀ")
+    constraint_matrix = load_CSV(sparse([],[],T[]),
+      joinpath(get_FEM_structures_path(RBInfo), "B.csv"))'
+  end
 
-  #supr_primal = RBVars.Xᵘ₀ \ (constraint_mat * RBVars.Φₛᵖ)
-  supr_primal = solve_cholesky(RBVars.Xᵘ₀, constraint_mat * RBVars.Φₛᵖ)
+  supr_primal = solve_cholesky(RBVars.Xᵘ₀, constraint_matrix * RBVars.Φₛᵖ)
 
   min_norm = 1e16
   for i = 1:size(supr_primal)[2]
@@ -35,8 +59,8 @@ function primal_supremizers(
     println("Normalizing primal supremizer $i")
 
     for j in 1:RBVars.nₛᵘ
-      supr_primal[:, i] -= mydot(supr_primal[:, i], RBVars.Φₛᵘ[:,j], RBVars.Xᵘ₀) /
-      mynorm(RBVars.Φₛᵘ[:,j], RBVars.Xᵘ₀) * RBVars.Φₛᵘ[:,j]
+      supr_primal[:, i] -= mydot(supr_primal[:, i], RBVars.Φₛᵘ[:, j], RBVars.Xᵘ₀) /
+      mynorm(RBVars.Φₛᵘ[:, j], RBVars.Xᵘ₀) * RBVars.Φₛᵘ[:, j]
     end
     for j in 1:i
       supr_primal[:, i] -= mydot(supr_primal[:, i], supr_primal[:, j], RBVars.Xᵘ₀) /
@@ -90,7 +114,12 @@ function set_operators(
   RBInfo::Info,
   RBVars::StokesS)
 
-  append!(["B", "Lc"], set_operators(RBInfo, RBVars.Poisson))
+  operators = vcat(["B"], set_operators(RBInfo, RBVars.Poisson))
+  if !RBInfo.online_RHS
+    append!(operators, ["Lc"])
+  end
+
+  operators
 
 end
 
@@ -231,15 +260,15 @@ function assemble_MDEIM_matrices(
 end
 
 function assemble_reduced_mat_MDEIM(
-  RBVars::StokesS,
+  RBVars::StokesS{T},
   MDEIM_mat::Matrix,
   row_idx::Vector,
-  var::String)
+  var::String) where T
 
   if var == "B"
     Q = size(MDEIM_mat)[2]
     r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.Nₛᵖ)
-    MatqΦ = zeros(T,RBVars.Nₛᵖ,RBVars.nₛᵘ,Q)
+    MatqΦ = zeros(T,RBVars.Nₛᵖ,RBVars.nₛᵘ,Q)::Array{T,3}
     @simd for j = 1:RBVars.Nₛᵖ
       Mat_idx = findall(x -> x == j, r_idx)
       MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.Φₛᵘ[c_idx[Mat_idx],:])'
@@ -258,8 +287,8 @@ end
 
 function assemble_affine_vectors(
   RBInfo::Info,
-  RBVars::StokesS,
-  var::String)
+  RBVars::StokesS{T},
+  var::String) where T
 
   if var == "Lc"
     println("Assembling affine reduced lifting term, continuity")
@@ -279,7 +308,7 @@ function assemble_DEIM_vectors(
   var::String)
 
   println("The vector $var is non-affine:
-    running the DEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
+    running the DEIM offline phase on $(RBInfo.nₛ_DEIM) snapshots")
 
   if var == "F"
     if isempty(RBVars.DEIM_mat_F)
@@ -338,8 +367,8 @@ function save_assembled_structures(
   Bₙ = reshape(RBVars.Bₙ, RBVars.nₛᵘ * RBVars.nₛᵖ, :)::Matrix{T}
   affine_vars, affine_names = (Bₙ, RBVars.Lcₙ), ("Bₙ", "Lcₙ")
   affine_entry = get_affine_entries(operators, affine_names)
-  save_structures_in_list(affine_vars, affine_names,
-    RBInfo.ROM_structures_path, affine_entry)
+  save_structures_in_list(affine_vars[affine_entry], affine_names[affine_entry],
+    RBInfo.ROM_structures_path)
 
   M_DEIM_vars = (
     RBVars.MDEIMᵢ_B, RBVars.MDEIM_idx_B, RBVars.row_idx_B, RBVars.sparse_el_B,
@@ -436,7 +465,10 @@ function assemble_param_RHS(
   RBVars::StokesS{T},
   Param::ParamInfoS) where T
 
-  assemble_param_RHS(FEMSpace, RBInfo, RBVars.Poisson, Param)
+  F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
+  H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
+  L = assemble_FEM_structure(FEMSpace, RBInfo, Param, "L")
+  push!(RBVars.RHSₙ, reshape(RBVars.Φₛᵘ' * (F + H - L), :, 1)::Matrix{T})
 
   Lc = assemble_FEM_structure(FEMSpace, RBInfo, Param, "Lc")
   push!(RBVars.RHSₙ, reshape(- RBVars.Φₛᵖ' * Lc, :, 1)::Matrix{T})

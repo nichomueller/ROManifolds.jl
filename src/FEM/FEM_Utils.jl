@@ -32,7 +32,7 @@ function get_problem_id(problem_name::String)
     return (0,0)
   elseif problem_name == "stokes"
     return (0,0,0)
-  elseif problem_name == "navier-stokes"
+  elseif problem_name == "navier_stokes"
     return (0,0,0,0)
   else
     error("unimplemented")
@@ -230,7 +230,7 @@ function generate_dcube_discrete_model(
     domain = (0,1,0,1)
     partition = (npart,npart)
   else
-    domain = (0,1,0,1,0,1)
+    domain = (0, 1, 0, 1, 0, 1)
     partition = (npart,npart,npart)
   end
   model = CartesianDiscreteModel(domain,partition)

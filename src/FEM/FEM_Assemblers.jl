@@ -180,8 +180,13 @@ function assemble_B(
   ::Info,
   ::Info)
 
-  assemble_matrix(∫(FEMSpace.ψᵧ*(∇⋅(FEMSpace.ϕᵤ)))*FEMSpace.dΩ,
-    FEMSpace.V, FEMSpace.Q₀)
+  if "B" ∉ FEMInfo.probl_nl
+    assemble_matrix(∫(FEMSpace.ψᵧ*(∇⋅(FEMSpace.ϕᵤ)))*FEMSpace.dΩ,
+      FEMSpace.V, FEMSpace.Q₀)
+  else
+    assemble_matrix(∫(Param.b * FEMSpace.ψᵧ*(∇⋅(FEMSpace.ϕᵤ)))*FEMSpace.dΩ,
+      FEMSpace.V, FEMSpace.Q₀)
+  end
 
 end
 
@@ -192,8 +197,13 @@ function assemble_B(
   ::Info)
 
   function unsteady_primal_form(t)
-    assemble_matrix(∫(FEMSpace.ψᵧ*(∇⋅(FEMSpace.ϕᵤ(t))))*FEMSpace.dΩ,
-    FEMSpace.V(t), FEMSpace.Q₀)
+    if "B" ∉ FEMInfo.probl_nl
+      assemble_matrix(∫(FEMSpace.ψᵧ*(∇⋅(FEMSpace.ϕᵤ(t))))*FEMSpace.dΩ,
+        FEMSpace.V(t), FEMSpace.Q₀)
+    else
+      assemble_matrix(∫(Param.b(t) * FEMSpace.ψᵧ*(∇⋅(FEMSpace.ϕᵤ)))*FEMSpace.dΩ,
+        FEMSpace.V(t), FEMSpace.Q₀)
+    end
   end
 
   unsteady_primal_form

@@ -6,10 +6,8 @@ function M_DEIM_POD(S::Matrix{T}, ϵ=1e-5) where T
   V = Vᵀ'::Matrix{T}
 
   energies = cumsum(Σ .^ 2)
-  mult_factor = sqrt(size(S)[2]) * norm(inv(U'U))
-  M_DEIM_err_bound = vcat(mult_factor * Σ[2:end], 0.0)
+  M_DEIM_err_bound = vcat(sqrt(norm(inv(U'U))) * Σ[2:end], 0.0) # approx by excess, should be norm(inv(U[MDEIM_idx,:]))
 
-  energies = cumsum(Σ .^ 2)
   N₁ = findall(x -> x ≥ (1 - ϵ^2) * energies[end], energies)[1]
   N₂ = findall(x -> x ≤ ϵ, M_DEIM_err_bound)[1]
   N = max(N₁, N₂)::Int
@@ -47,6 +45,14 @@ function M_DEIM_offline(M_DEIM_mat::Matrix)
 
 end
 
+function select_FEM_dim(FEMSpace::FEMProblem, var::String)
+  if var ∈ ("B", "Lc")
+    FEMSpace.Nₛᵖ
+  else
+    FEMSpace.Nₛᵘ
+  end
+end
+
 function MDEIM_offline(
   RBInfo::ROMInfoS{T},
   RBVars::RBProblemS,
@@ -55,11 +61,12 @@ function MDEIM_offline(
   println("Building $(RBInfo.nₛ_MDEIM) snapshots of $var")
 
   FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
+  Nₕ = select_FEM_dim(FEMSpace, var)
 
   MDEIM_mat, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
   MDEIM_idx, MDEIMᵢ_mat = M_DEIM_offline(MDEIM_mat)
-  MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx, row_idx, FEMSpace.Nₛᵘ)
-  MDEIM_idx_sparse_space, _ = from_vec_to_mat_idx(MDEIM_idx_sparse, FEMSpace.Nₛᵘ)
+  MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx, row_idx, Nₕ)
+  MDEIM_idx_sparse_space, _ = from_vec_to_mat_idx(MDEIM_idx_sparse, Nₕ)
   el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(MDEIM_idx_sparse_space))
 
   MDEIM_mat, MDEIM_idx_sparse, MDEIMᵢ_mat, row_idx, el
@@ -74,12 +81,13 @@ function MDEIM_offline(
   println("Building $(RBInfo.nₛ_MDEIM) snapshots of $var")
 
   FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
+  Nₕ = select_FEM_dim(FEMSpace, var)
 
   MDEIM_mat, MDEIM_mat_time, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
 
   MDEIM_idx, MDEIMᵢ_mat = M_DEIM_offline(MDEIM_mat)
-  MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx, row_idx, FEMSpace.Nₛᵘ)
-  MDEIM_idx_sparse_space, _ = from_vec_to_mat_idx(MDEIM_idx_sparse, FEMSpace.Nₛᵘ)
+  MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx, row_idx, Nₕ)
+  MDEIM_idx_sparse_space, _ = from_vec_to_mat_idx(MDEIM_idx_sparse, Nₕ)
   el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(MDEIM_idx_sparse_space))
 
   MDEIM_idx_time, _ = M_DEIM_offline(MDEIM_mat_time)
@@ -99,6 +107,8 @@ function DEIM_offline(RBInfo::ROMInfoS{T}, var::String) where T
   DEIM_idx, DEIMᵢ_mat = M_DEIM_offline(DEIM_mat)
   if var == "H"
     el = find_FE_elements(FEMSpace.V₀, FEMSpace.Γn, unique(DEIM_idx))
+  elseif var == "Lc"
+    el = find_FE_elements(FEMSpace.Q₀, FEMSpace.Ω, unique(DEIM_idx))
   else
     el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(DEIM_idx))
   end
@@ -116,7 +126,13 @@ function DEIM_offline(RBInfo::ROMInfoST{T}) where T
   DEIM_mat, DEIM_mat_time = get_snaps_DEIM(FEMSpace, RBInfo, μ, var)
 
   DEIM_idx, DEIMᵢ_mat = M_DEIM_offline(DEIM_mat)
-  el = find_FE_elements(FEMSpace.V₀, FEMSpace.Γn, unique(DEIM_idx))
+  if var == "H"
+    el = find_FE_elements(FEMSpace.V₀, FEMSpace.Γn, unique(DEIM_idx))
+  elseif var == "Lc"
+    el = find_FE_elements(FEMSpace.Q₀, FEMSpace.Ω, unique(DEIM_idx))
+  else
+    el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(DEIM_idx))
+  end
 
   DEIM_idx_time, _ = M_DEIM_offline(DEIM_mat_time)
   unique!(sort!(DEIM_idx_time))

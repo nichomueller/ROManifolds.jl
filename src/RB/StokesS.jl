@@ -195,8 +195,6 @@ function get_RB_LHS_blocks(
   θᵃ::Matrix,
   θᵇ::Matrix) where T
 
-  println("Assembling reduced LHS")
-
   get_RB_LHS_blocks(RBVars.Poisson, θᵃ)
 
   block₂ = zeros(T, RBVars.nₛᵖ, RBVars.nₛᵘ)
@@ -276,7 +274,6 @@ function solve_RB_system(
 end
 
 function reconstruct_FEM_solution(RBVars::StokesS)
-  println("Reconstructing FEM solution from the newly computed RB one")
   reconstruct_FEM_solution(RBVars.Poisson)
   RBVars.p̃ = RBVars.Φₛᵖ * RBVars.pₙ
 end

@@ -89,15 +89,15 @@ function check_stokes_solver()
   Param = get_ParamInfo(RBInfo, μ[nb])
 
   u = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
-    DataFrame))[:, 1]
+    DataFrame))[:, nb]
   p = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"),
-    DataFrame))[:, 1]
+    DataFrame))[:, nb]
   x = vcat(u, p)
 
   A = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "A")
   B = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "B")
   F = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "F")
-  H = 0. * assemble_FEM_structure(FEMSpace, FEMInfo, Param, "H")
+  H = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "H")
   L = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "L")
   Lc = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "Lc")
 
@@ -108,28 +108,17 @@ function check_stokes_solver()
 
 end
 
-#= function check_stokes_solver()
-  A = assemble_stiffness(FEMSpace, FEMInfo, Param)(0.0)
-  M = assemble_mass(FEMSpace, FEMInfo, Param)(0.0)
-  B = assemble_primal_op(FEMSpace)(0.0)
-  F = assemble_forcing(FEMSpace, FEMInfo, Param)(0.0)
-  H = assemble_neumann_datum(FEMSpace, FEMInfo, Param)(0.0)
-
-  δt = 0.005
-  θ = 0.5
-
-  u1 = uₕ[:,1]
-  p1 = pₕ[:,1]
-  α = Param.α(0)(Point(0.,0.,0.))
-  res1 = θ*(δt*θ*A*α + M)*u1 + δt*θ*B'*p1 - δt*θ*(F+H)
-  res2 = B*u1
-
-  u2 = uₕₜ[:,1]
-  p2 = pₕₜ[:,1]
-  res1 = θ*(δt*θ*A*α + M)*u2 + ((1-θ)*δt*θ*A*α - θ*M)*u1 + δt*θ*Bᵀ*p2 - δt*θ*(F+H)
-  res2 = B*u2
-
-end =#
+function check_MDEIM_stokesS()
+  RBVars.DEIM_mat_L, RBVars.DEIM_idx_L, RBVars.DEIMᵢ_L, RBVars.sparse_el_L =
+    DEIM_offline(RBInfo,"L")
+  FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
+  Param = get_ParamInfo(RBInfo, μ[95])
+  L = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "L")
+  θˡ = M_DEIM_online(L, RBVars.DEIMᵢ_L, RBVars.DEIM_idx_L)
+  Lapp = RBVars.DEIM_mat_L * θˡ
+  errL = abs.(Lapp - L)
+  maximum(abs.(errL))
+end
 
 function check_dataset(RBInfo, RBVars, i)
 
