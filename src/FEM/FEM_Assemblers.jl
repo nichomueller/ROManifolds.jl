@@ -255,7 +255,7 @@ function assemble_convection(
   Param::ParamInfoS)
 
   C(u) = Param.Re * assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
-    ((∇FEMSpace.ϕᵤ')⋅u) )*FEMSpace.dΩ, FEMSpace.V, FEMSpace.V₀)
+    (∇(FEMSpace.ϕᵤ)'⋅u) )*FEMSpace.dΩ, FEMSpace.V, FEMSpace.V₀)
 
   C
 
@@ -267,7 +267,7 @@ function assemble_convection(
   Param::ParamInfoST)
 
   C(u,t) = Param.Re * assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
-    ((∇FEMSpace.ϕᵤ')⋅u) )*FEMSpace.dΩ, FEMSpace.V(t), FEMSpace.V₀)
+    (∇(FEMSpace.ϕᵤ(t))'⋅u(t)) )*FEMSpace.dΩ, FEMSpace.V(t), FEMSpace.V₀)
 
   C
 

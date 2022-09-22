@@ -26,7 +26,7 @@ function assemble_constraint_matrix(
   constraint_matrix = zeros(T, RBVars.Nₛᵘ, RBVars.nₛ)
 
   for k = 1:RBVars.nₛ
-    println("Snapshot number $k, $var")
+    println("Column number $k, constraint matrix")
     Param = get_ParamInfo(RBInfo, μ[k])
     B_k = Matrix{T}(assemble_FEM_structure(FEMSpace, RBInfo, Param, "B")')
     constraint_matrix[:, k] = B_k * RBVars.Sᵖ[:, k]

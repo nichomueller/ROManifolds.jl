@@ -62,7 +62,7 @@ function get_affine_entries(
   affine_names::NTuple{D}) where D
 
   affine_entries = Int[]
-  for idx = eachindex(affine_names)
+  for idx = 1:D
     if (affine_names[idx]) ∈ operators .* "ₙ"
       append!(affine_entries, idx)
     end

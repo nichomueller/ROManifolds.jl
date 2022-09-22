@@ -1,114 +1,21 @@
 include("StokesS.jl")
 include("NavierStokesS_support.jl")
 
+################################# OFFLINE ######################################
+
 function get_snapshot_matrix(
   RBInfo::ROMInfoS,
-  RBVars::NavierStokesS{T}) where T
+  RBVars::NavierStokesS)
 
   get_snapshot_matrix(RBInfo, RBVars.Stokes)
-
-  println("Importing the snapshot matrix for field u on quadrature points,
-    number of snapshots considered: $(RBInfo.nₛ)")
-  Sᵘ_quad = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ_quadp.csv"),
-    DataFrame))[:, 1:RBInfo.nₛ]
-  println("Dimension of velocity snapshot matrix on quadrature points: $(size(Sᵘ_quad))")
-  RBVars.Nₛᵘ_quad = size(Sᵘ_quad)[1]
 
 end
 
 function get_norm_matrix(
   RBInfo::Info,
-  RBVars::NavierStokesS{T}) where T
+  RBVars::NavierStokesS)
 
   get_norm_matrix(RBInfo, RBVars.Stokes)
-
-end
-
-function PODs_space(
-  RBInfo::Info,
-  RBVars::NavierStokesS)
-
-  PODs_space(RBInfo,RBVars.Stokes)
-
-  println("Performing the spatial POD for field u on quadrature points")
-  RBVars.Φₛᵘ_quad = POD(RBVars.Sᵘ_quad, RBInfo.ϵₛ, RBVars.Xᵘ₀)
-  (RBVars.Nₛᵘ_quad, RBVars.nₛᵘ_quad) = size(RBVars.Φₛᵘ_quad)
-
-end
-
-function primal_supremizers(
-  RBInfo::Info,
-  RBVars::NavierStokesS{T}) where T
-
-  println("Computing primal supremizers")
-
-  constraint_mat = load_CSV(sparse([],[],T[]),
-    joinpath(get_FEM_structures_path(RBInfo), "B.csv"))'
-
-  supr_primal = Matrix{T}(RBVars.Xᵘ) \ (Matrix{T}(constraint_mat) * RBVars.Φₛᵖ)
-  supr_primal_quad = supr_primal
-
-  min_norm = 1e16
-  for i = 1:size(supr_primal)[2]
-
-    println("Normalizing primal supremizer $i")
-
-    for j in 1:RBVars.nₛᵘ
-      supr_primal[:, i] -= mydot(supr_primal[:, i], RBVars.Φₛᵘ[:,j], RBVars.Xᵘ₀) /
-      mynorm(RBVars.Φₛᵘ[:,j], RBVars.Xᵘ₀) * RBVars.Φₛᵘ[:,j]
-    end
-    for j in 1:i
-      supr_primal[:, i] -= mydot(supr_primal[:, i], supr_primal[:, j], RBVars.Xᵘ₀) /
-      mynorm(supr_primal[:, j], RBVars.Xᵘ₀) * supr_primal[:, j]
-    end
-
-    supr_norm = mynorm(supr_primal[:, i], RBVars.Xᵘ₀)
-    min_norm = min(supr_norm, min_norm)
-    println("Norm supremizers: $supr_norm")
-    supr_primal[:, i] /= supr_norm
-
-  end
-
-  println("Primal supremizers enrichment ended with norm: $min_norm")
-
-  min_norm = 1e16
-  for i = 1:size(supr_primal_quad)[2]
-
-    println("Normalizing primal supremizer $i, quadrature points")
-
-    for j in 1:RBVars.nₛᵘ_quad
-      supr_primal_quad[:, i] -= mydot(supr_primal_quad[:, i], RBVars.Φₛᵘ_quad[:,j], RBVars.Xᵘ₀) /
-      mynorm(RBVars.Φₛᵘ_quad[:,j], RBVars.Xᵘ₀) * RBVars.Φₛᵘ_quad[:,j]
-    end
-    for j in 1:i
-      supr_primal_quad[:, i] -= mydot(supr_primal_quad[:, i], supr_primal_quad[:, j], RBVars.Xᵘ₀) /
-      mynorm(supr_primal_quad[:, j], RBVars.Xᵘ₀) * supr_primal_quad[:, j]
-    end
-
-    supr_norm = mynorm(supr_primal_quad[:, i], RBVars.Xᵘ₀)
-    min_norm = min(supr_norm, min_norm)
-    println("Norm supremizers: $supr_norm")
-    supr_primal_quad[:, i] /= supr_norm
-
-  end
-
-  println("Primal supremizers on quadrature points enrichment ended with norm: $min_norm")
-
-  supr_primal, supr_primal_quad
-
-end
-
-function supr_enrichment_space(
-  RBInfo::Info,
-  RBVars::NavierStokesS)
-
-  supr_primal, supr_primal_quad = primal_supremizers(RBInfo, RBVars)
-
-  RBVars.Φₛᵘ = hcat(RBVars.Φₛᵘ, supr_primal)
-  RBVars.nₛᵘ = size(RBVars.Φₛᵘ)[2]
-
-  RBVars.Φₛᵘ_quad = hcat(RBVars.Φₛᵘ_quad, supr_primal_quad)
-  RBVars.nₛᵘ_quad = size(RBVars.Φₛᵘ_quad)[2]
 
 end
 
@@ -116,109 +23,15 @@ function assemble_reduced_basis(
   RBInfo::ROMInfoS,
   RBVars::NavierStokesS)
 
-  RBVars.offline_time += @elapsed begin
-    PODs_space(RBInfo, RBVars)
-    supr_enrichment_space(RBInfo, RBVars)
-  end
-
-  if RBInfo.save_offline_structures
-    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.ROM_structures_path,"Φₛᵘ.csv"))
-    save_CSV(RBVars.Φₛᵖ, joinpath(RBInfo.ROM_structures_path,"Φₛᵖ.csv"))
-    save_CSV(RBVars.Φₛᵘ_quad,
-      joinpath(RBInfo.ROM_structures_path,"Φₛᵘ_quad.csv"))
-  end
-
-  return
+  assemble_reduced_basis(RBInfo, RBVars.Stokes)
 
 end
 
 function get_reduced_basis(
   RBInfo::ROMInfoS,
-  RBVars::NavierStokesS{T}) where T
+  RBVars::NavierStokesS)
 
   get_reduced_basis(RBInfo, RBVars.Stokes)
-  println("Importing the spatial reduced basis for field u, quadrature points")
-  RBVars.Φₛᵘ_quad = load_CSV(Matrix{T}(undef,0,0),
-    joinpath(RBInfo.ROM_structures_path, "Φₛᵘ_quad.csv"))
-  (RBVars.Nₛᵘ_quad, RBVars.nₛᵘ_quad) = size(RBVars.Φₛᵘ_quad)
-
-end
-
-function set_operators(
-  RBInfo::Info,
-  RBVars::NavierStokesS)
-
-  append!(["C"], set_operators(RBInfo, RBVars.Stokes))
-
-end
-
-function assemble_MDEIM_matrices(
-  RBInfo::ROMInfoS,
-  RBVars::NavierStokesS,
-  var::String)
-
-  if var == "C"
-    println("The matrix C is non-affine:
-      running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
-    if isempty(RBVars.MDEIM_mat_C)
-      (RBVars.MDEIM_mat_C, RBVars.MDEIM_idx_C, RBVars.MDEIMᵢ_C,
-      RBVars.row_idx_C,RBVars.sparse_el_C) = MDEIM_offline(RBInfo, RBVars, "C")
-    end
-    assemble_reduced_mat_MDEIM(RBVars,RBVars.MDEIM_mat_C,RBVars.row_idx_C)
-  else
-    assemble_MDEIM_matrices(RBInfo, RBVars.Stokes, var)
-  end
-
-end
-
-function assemble_DEIM_vectors(
-  RBInfo::ROMInfoS,
-  RBVars::NavierStokesS,
-  var::String)
-
-  assemble_DEIM_vectors(RBInfo, RBVars.Stokes, var)
-
-end
-
-function save_M_DEIM_structures(
-  RBInfo::ROMInfoS,
-  RBVars::NavierStokesS)
-
-  list_M_DEIM = (RBVars.MDEIM_mat_C, RBVars.MDEIMᵢ_C, RBVars.MDEIM_idx_C,
-    RBVars.row_idx_C, RBVars.sparse_el_C)
-  list_names = ("MDEIM_mat_C","MDEIMᵢ_C","MDEIM_idx_C","row_idx_C","sparse_el_C")
-
-  save_structures_in_list(list_M_DEIM, list_names,
-    RBInfo.ROM_structures_path)
-
-end
-
-function get_M_DEIM_structures(
-  RBInfo::ROMInfoS,
-  RBVars::NavierStokesS)
-
-  operators = String[]
-  append!(operators, get_M_DEIM_structures(RBInfo, RBVars.Stokes))
-
-  if "C" ∈ RBInfo.probl_nl
-
-    if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIMᵢ_B.csv"))
-      println("Importing MDEIM offline structures, B")
-      RBVars.MDEIMᵢ_C = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path,
-        "MDEIMᵢ_C.csv"))
-      RBVars.MDEIM_idx_C = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.ROM_structures_path,
-        "MDEIM_idx_C.csv"))
-      RBVars.row_idx_C = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.ROM_structures_path,
-        "row_idx_C.csv"))
-      RBVars.sparse_el_C = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.ROM_structures_path,
-        "sparse_el_C.csv"))
-    else
-      println("Failed to import MDEIM offline structures,
-        C: must build them")
-      append!(operators, ["C"])
-    end
-
-  end
 
 end
 
@@ -228,158 +41,50 @@ function get_offline_structures(
 
   operators = String[]
 
-  append!(operators, get_affine_structures(RBInfo, RBVars))
-  append!(operators, get_M_DEIM_structures(RBInfo, RBVars))
-  unique!(operators)
+  append!(operators, get_A(RBInfo, RBVars))
+  append!(operators, get_B(RBInfo, RBVars))
+  append!(operators, get_C(RBInfo, RBVars))
+
+  if !RBInfo.online_RHS
+    append!(operators, get_F(RBInfo, RBVars))
+    append!(operators, get_H(RBInfo, RBVars))
+    append!(operators, get_L(RBInfo, RBVars))
+    append!(operators, get_Lc(RBInfo, RBVars))
+  end
 
   operators
 
 end
 
-function get_system_blocks(
-  RBInfo::Info,
-  RBVars::NavierStokesS,
-  LHS_blocks::Vector{Int},
-  RHS_blocks::Vector{Int})
-
-  get_system_blocks(RBInfo, RBVars.Stokes, LHS_blocks, RHS_blocks)
-
-end
-
-function save_system_blocks(
-  RBInfo::Info,
-  RBVars::NavierStokesS,
-  LHS_blocks::Vector{Int},
-  RHS_blocks::Vector{Int},
-  operators::Vector{String})
-
-  save_system_blocks(RBInfo, RBVars.Stokes, LHS_blocks, RHS_blocks, operators)
-
-end
-
-function get_θᵃ(
-  FEMSpace::FEMProblemS,
+function assemble_offline_structures(
   RBInfo::ROMInfoS,
   RBVars::NavierStokesS,
-  Param::ParamInfoS)
+  operators=String[])
 
-  get_θᵃ(FEMSpace, RBInfo, RBVars.Stokes, Param)
-
-end
-
-function get_θᵇ(
-  FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS,
-  RBVars::NavierStokesS,
-  Param::ParamInfoS)
-
-  get_θᵇ(FEMSpace, RBInfo, RBVars.Stokes, Param)
-
-end
-
-function get_θᶜ(
-  FEMSpace::FEMProblemS,
-  RBVars::NavierStokesS,
-  Param::ParamInfoS)
-
-  C_μ_sparse = T.(assemble_sparse_mat(FEMSpace, FEMInfo, Param, RBVars.sparse_el_C))
-  θᶜ = M_DEIM_online(C_μ_sparse, RBVars.MDEIMᵢ_C, RBVars.MDEIM_idx_C)
-  θᶜ::Matrix{T}
-
-end
-
-function get_θᶠʰ(
-  FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS,
-  RBVars::NavierStokesS,
-  Param::ParamInfoS)
-
-  get_θᶠʰ(FEMSpace, RBInfo, RBVars.Stokes, Param)
-
-end
-
-function get_RB_LHS_blocks(
-  RBVars::ADRS{T},
-  θᵃ::Matrix,
-  θᵇ::Matrix) where T
-
-  println("Assembling reduced LHS")
-
-  block₁ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ)
-  for q = 1:RBVars.Qᵃ
-    block₁ += RBVars.Aₙ[:,:,q] * θᵃ[q]
+  if isempty(operators)
+    operators = set_operators(RBInfo, RBVars)
   end
-  for q = 1:RBVars.Qᶜ
-    block₁ += RBVars.Cₙ[:,:,q] * θᶜ[q]
-  end
-  push!(RBVars.LHSₙ, block₁)::Vector{Matrix{T}}
-  block₂ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵖ)
-  for q = 1:RBVars.Qᵇ
-    block₂ += RBVars.Bₙ[:,:,q] * θᵇ[q]
-  end
-  push!(RBVars.LHSₙ, block₂)::Vector{Matrix{T}}
 
-end
-
-function get_RB_system(
-  FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS,
-  RBVars::NavierStokesS,
-  Param::ParamInfoS)
-
-  initialize_RB_system(RBVars)
-  initialize_online_time(RBVars)
-
-  RBVars.online_time = @elapsed begin
-    get_Q(RBInfo, RBVars)
-    LHS_blocks = [1, 2, 3]
-    RHS_blocks = [1]
-    operators = get_system_blocks(RBInfo, RBVars, LHS_blocks, RHS_blocks)
-
-    θᵃ, θᵇ, θᶜ, θᶠ, θʰ = get_θ(FEMSpace, RBInfo, RBVars, Param)
-
-    if "LHS" ∈ operators
-      push!(RBVars.LHSₙ, get_RB_LHS_blocks(RBInfo, RBVars, θᵃ, θᵇ, θᶜ))
-    end
-
-    if "RHS" ∈ operators
-      if !RBInfo.online_RHS
-        push!(RBVars.RHSₙ, get_RB_RHS_blocks(RBInfo, RBVars, θᶠ, θʰ))
+  RBVars.offline_time += @elapsed begin
+    for var ∈ setdiff(operators, RBInfo.probl_nl)
+      if var ∈ ("A", "B")
+        assemble_affine_matrices(RBInfo, RBVars, var)
       else
-        assemble_param_RHS(FEMSpace, RBInfo, RBVars, Param)
+        assemble_affine_vectors(RBInfo, RBVars, var)
       end
-      if "L" ∈ RBInfo.probl_nl
-        assemble_RB_lifting(FEMSpace, RBInfo, RBVars, Param)
+    end
+
+    for var ∈ intersect(operators, RBInfo.probl_nl)
+      if var ∈ ("A", "B", "C")
+        assemble_MDEIM_matrices(RBInfo, RBVars, var)
+      else
+        assemble_DEIM_vectors(RBInfo, RBVars, var)
       end
     end
   end
 
-  save_system_blocks(RBInfo,RBVars,LHS_blocks,RHS_blocks,operators)
+  save_assembled_structures(RBInfo, RBVars, operators)
 
-end
-
-function solve_RB_system(
-  FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS{T},
-  RBVars::NavierStokesS,
-  Param::ParamInfoS) where T
-
-  get_RB_system(FEMSpace, RBInfo, RBVars, Param)
-  println("Solving RB problem via backslash")
-  println("Condition number of the system's matrix: $(cond(RBVars.LHSₙ[1]))")
-  RBVars.online_time += @elapsed begin
-    xₙ = (vcat(hcat(RBVars.LHSₙ[1], RBVars.LHSₙ[2]),
-      hcat(RBVars.LHSₙ[3], zeros(T, RBVars.nₛᵖ, RBVars.nₛᵖ))) \
-      vcat(RBVars.RHSₙ[1], zeros(T, RBVars.nₛᵖ, 1)))
-  end
-
-  RBVars.uₙ = xₙ[1:RBVars.nₛᵘ,:]
-  RBVars.pₙ = xₙ[RBVars.nₛᵘ+1:end,:]
-
-end
-
-function reconstruct_FEM_solution(RBVars::NavierStokesS)
-  reconstruct_FEM_solution(RBVars.Stokes)
 end
 
 function offline_phase(
@@ -421,15 +126,111 @@ function offline_phase(
 
 end
 
+################################## ONLINE ######################################
+
+function get_θ(
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS,
+  Param::ParamInfoS)
+
+  θᵃ, θᵇ, θᶠ, θʰ, θˡ, θˡᶜ = get_θ(FEMSpace, RBInfo, RBVars.Stokes, Param)
+  θᶜ = get_θᶜ(FEMSpace, RBVars, Param)
+
+  return θᵃ, θᵇ, θᶜ, θᶠ, θʰ, θˡ, θˡᶜ
+
+end
+
+function get_RB_LHS_blocks(
+  RBVars::NavierStokes{T},
+  θᵃ::Matrix,
+  θᵇ::Matrix,
+  θᶜ::Matrix) where T
+
+  get_RB_LHS_blocks(RBVars.Stokes, θᵃ, θᵇ)
+
+  for q = 1:RBVars.Qᶜ
+    RBVars.LHSₙ[1] += RBVars.Cₙ[:,:,q] * θᶜ[q]
+  end
+
+end
+
+function get_RB_RHS_blocks(
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS{T},
+  θᶠ::Matrix,
+  θʰ::Matrix,
+  θˡ::Matrix,
+  θˡᶜ::Matrix)
+
+  get_RB_RHS_blocks(RBInfo, RBVars.Stokes, θᶠ, θʰ, θˡ, θˡᶜ)
+
+end
+
+function get_RB_system(
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS,
+  Param::ParamInfoS)
+
+  initialize_RB_system(RBVars)
+  initialize_online_time(RBVars)
+  get_Q(RBVars)
+  LHS_blocks = [1, 2, 3]
+  RHS_blocks = [1, 2]
+
+  RBVars.online_time = @elapsed begin
+    operators = get_system_blocks(RBInfo, RBVars, LHS_blocks, RHS_blocks)
+
+    θᵃ, θᵇ, θᶜ, θᶠ, θʰ, θˡ, θˡᶜ = get_θ(FEMSpace, RBInfo, RBVars, Param)
+
+    if "LHS" ∈ operators
+      get_RB_LHS_blocks(RBVars, θᵃ, θᵇ, θᶜ)
+    end
+
+    if "RHS" ∈ operators
+      if !RBInfo.online_RHS
+        get_RB_RHS_blocks(RBVars, θᶠ, θʰ, θˡ, θˡᶜ)
+      else
+        assemble_param_RHS(FEMSpace, RBInfo, RBVars, Param)
+      end
+    end
+  end
+
+  save_system_blocks(RBInfo,RBVars,LHS_blocks,RHS_blocks,operators)
+
+end
+
+function solve_RB_system(
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS{T},
+  RBVars::NavierStokesS,
+  Param::ParamInfoS) where T
+
+  get_RB_system(FEMSpace, RBInfo, RBVars, Param)
+  println("Solving RB problem via backslash")
+  println("Condition number of the system's matrix: $(cond(RBVars.LHSₙ[1]))")
+  RBVars.online_time += @elapsed begin
+    xₙ = (vcat(hcat(RBVars.LHSₙ[1], RBVars.LHSₙ[2]),
+      hcat(RBVars.LHSₙ[3], zeros(T, RBVars.nₛᵖ, RBVars.nₛᵖ))) \
+      vcat(RBVars.RHSₙ[1], zeros(T, RBVars.nₛᵖ, 1)))
+  end
+
+  RBVars.uₙ = xₙ[1:RBVars.nₛᵘ,:]
+  RBVars.pₙ = xₙ[RBVars.nₛᵘ+1:end,:]
+
+end
+
+function reconstruct_FEM_solution(RBVars::NavierStokesS)
+  reconstruct_FEM_solution(RBVars.Stokes)
+end
+
 function online_phase(
   RBInfo::ROMInfoS,
   RBVars::NavierStokesS{T},
   param_nbs) where T
 
-  μ = load_CSV(Array{T}[],
-    joinpath(get_FEM_snap_path(RBInfo), "μ.csv"))::Vector{Vector{T}}
-  model = DiscreteModelFromFile(get_mesh_path(RBInfo))
-  FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id,RBInfo.FEMInfo,model)
+  FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
 
   mean_H1_err = 0.0
   mean_L2_err = 0.0
@@ -517,5 +318,117 @@ function online_phase(
   if RBInfo.post_process
     post_process(RBInfo, pass_to_pp)
   end
+
+end
+
+
+
+
+
+
+
+
+
+function save_M_DEIM_structures(
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS)
+
+  list_M_DEIM = (RBVars.MDEIM_mat_C, RBVars.MDEIMᵢ_C, RBVars.MDEIM_idx_C,
+    RBVars.row_idx_C, RBVars.sparse_el_C)
+  list_names = ("MDEIM_mat_C","MDEIMᵢ_C","MDEIM_idx_C","row_idx_C","sparse_el_C")
+
+  save_structures_in_list(list_M_DEIM, list_names,
+    RBInfo.ROM_structures_path)
+
+end
+
+function get_M_DEIM_structures(
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS)
+
+  operators = String[]
+  append!(operators, get_M_DEIM_structures(RBInfo, RBVars.Stokes))
+
+  if "C" ∈ RBInfo.probl_nl
+
+    if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIMᵢ_B.csv"))
+      println("Importing MDEIM offline structures, B")
+      RBVars.MDEIMᵢ_C = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path,
+        "MDEIMᵢ_C.csv"))
+      RBVars.MDEIM_idx_C = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.ROM_structures_path,
+        "MDEIM_idx_C.csv"))
+      RBVars.row_idx_C = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.ROM_structures_path,
+        "row_idx_C.csv"))
+      RBVars.sparse_el_C = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.ROM_structures_path,
+        "sparse_el_C.csv"))
+    else
+      println("Failed to import MDEIM offline structures,
+        C: must build them")
+      append!(operators, ["C"])
+    end
+
+  end
+
+end
+
+function get_system_blocks(
+  RBInfo::Info,
+  RBVars::NavierStokesS,
+  LHS_blocks::Vector{Int},
+  RHS_blocks::Vector{Int})
+
+  get_system_blocks(RBInfo, RBVars.Stokes, LHS_blocks, RHS_blocks)
+
+end
+
+function save_system_blocks(
+  RBInfo::Info,
+  RBVars::NavierStokesS,
+  LHS_blocks::Vector{Int},
+  RHS_blocks::Vector{Int},
+  operators::Vector{String})
+
+  save_system_blocks(RBInfo, RBVars.Stokes, LHS_blocks, RHS_blocks, operators)
+
+end
+
+function get_θᵃ(
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS,
+  Param::ParamInfoS)
+
+  get_θᵃ(FEMSpace, RBInfo, RBVars.Stokes, Param)
+
+end
+
+function get_θᵇ(
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS,
+  Param::ParamInfoS)
+
+  get_θᵇ(FEMSpace, RBInfo, RBVars.Stokes, Param)
+
+end
+
+function get_θᶜ(
+  FEMSpace::FEMProblemS,
+  RBVars::NavierStokesS,
+  Param::ParamInfoS)
+
+  C_μ_sparse = T.(assemble_sparse_mat(FEMSpace, FEMInfo, Param, RBVars.sparse_el_C))
+  θᶜ = M_DEIM_online(C_μ_sparse, RBVars.MDEIMᵢ_C, RBVars.MDEIM_idx_C)
+  θᶜ::Matrix{T}
+
+end
+
+function get_θᶠʰ(
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
+  RBVars::NavierStokesS,
+  Param::ParamInfoS)
+
+  get_θᶠʰ(FEMSpace, RBInfo, RBVars.Stokes, Param)
 
 end
