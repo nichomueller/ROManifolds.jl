@@ -280,6 +280,9 @@ struct ParamStokesST <: ParamInfoST
   αₛ::Function
   αₜ::Function
   α::Function
+  bₛ::Function
+  bₜ::Function
+  b::Function
   mₛ::Function
   mₜ::Function
   m::Function
@@ -299,6 +302,7 @@ struct ParamNavierStokesS <: ParamInfoS
   μ::Vector
   Re::Float
   α::Function
+  b::Function
   f::Function
   g::Function
   h::Function
@@ -310,6 +314,9 @@ struct ParamNavierStokesST <: ParamInfoST
   αₛ::Function
   αₜ::Function
   α::Function
+  bₛ::Function
+  bₜ::Function
+  b::Function
   mₛ::Function
   mₜ::Function
   m::Function
