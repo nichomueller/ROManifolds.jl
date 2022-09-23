@@ -641,7 +641,7 @@ function assemble_lifting(
 
   L₁ = assemble_lifting(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)
 
-  (L₁ + C(g))::Vector{Float}
+  #(L₁ + C(g))::Vector{Float}
 
 end
 
@@ -656,9 +656,9 @@ function assemble_lifting(
   g = define_g_FEM(FEMSpace, Param)
 
   L₁ = assemble_lifting(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)
-  L₁_new(t) = L₁(t) + C(g(t), t)
+  #L₁_new(t) = L₁(t) + C(g(t), t)
 
-  L₁_new
+  #L₁_new
 
 end
 

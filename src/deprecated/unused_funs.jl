@@ -201,3 +201,17 @@ function save_structures_in_list(
   end
 
 end
+
+function matrix_to_blocks(A::Array{T}) where T
+
+  A_block = Matrix{T}[]
+  N_blocks = size(A)[end]
+  dims = Tuple(size(A)[1:end-1])
+  order = prod(size(A)[1:end-1])
+  for n = 1:N_blocks
+    push!(A_block, reshape(A[:][(n-1)*order+1:n*order], dims))
+  end
+
+  A_block
+
+end

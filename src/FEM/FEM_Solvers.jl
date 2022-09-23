@@ -22,7 +22,7 @@ function FE_solve(
   FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
-  m(t, u, v) = ∫(Param.m(t)*(u*v))dΩ
+  m(t, u, v) = ∫(Param.m(t)*(u*v)) * FEMSpace.dΩ
   a(t, u, v) = ∫(∇(v)⋅(Param.α(t)*∇(u)))*FEMSpace.dΩ
   rhs(t, v) = rhs_form(t,v,FEMSpace,Param)
   operator = TransientAffineFEOperator(m, a, rhs, FEMSpace.V, FEMSpace.V₀)
@@ -40,7 +40,6 @@ function FE_solve(
   uₕₜ_field = solve(ode_solver, operator, u₀_field, FEMInfo.t₀, FEMInfo.tₗ)
   uₕₜ = zeros(FEMSpace.Nₛᵘ, Int(FEMInfo.tₗ / FEMInfo.δt))
   global count = 0
-  dΩ = FEMSpace.dΩ
   for (uₕ, _) in uₕₜ_field
     global count += 1
     uₕₜ[:, count] = get_free_dof_values(uₕ)::Vector{Float}
@@ -78,7 +77,7 @@ function FE_solve(
   FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
-  m(t, u, v) = ∫(Param.m(t)*(u*v))dΩ
+  m(t, u, v) = ∫(Param.m(t)*(u*v)) * FEMSpace.dΩ
   a(t, u, v) = ∫(∇(v)⋅(Param.α(t)*∇(u)) +
     v * Param.b(t) ⋅ ∇(u) + Param.σ(t) * v * u) * FEMSpace.dΩ
   lhs(t,u,v) = a(t,u,v)
@@ -99,7 +98,6 @@ function FE_solve(
   uₕₜ_field = solve(ode_solver, operator, u₀_field, FEMInfo.t₀, FEMInfo.tₗ)
   uₕₜ = zeros(FEMSpace.Nₛᵘ, Int(FEMInfo.tₗ / FEMInfo.δt))
   global count = 0
-  dΩ = FEMSpace.dΩ
   for (uₕ, _) in uₕₜ_field
     global count += 1
     uₕₜ[:, count] = get_free_dof_values(uₕ)::Vector{Float}
@@ -176,8 +174,8 @@ function FE_solve(
 
   conv(u,∇u) = Param.Re*(∇u')⋅u
   dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
-  c(u,v) = ∫( v⊙(conv∘(u,∇(u))) )dΩ
-  dc(u,du,v) = ∫( v⊙(dconv∘(du,∇(du),u,∇(u))) )dΩ
+  c(u,v) = ∫( v⊙(conv∘(u,∇(u))) ) * FEMSpace.dΩ
+  dc(u,du,v) = ∫( v⊙(dconv∘(du,∇(du),u,∇(u))) ) * FEMSpace.dΩ
 
   rhs((v,q)) = ∫(v ⋅ Param.f) * FEMSpace.dΩ + ∫(v ⋅ Param.h) * FEMSpace.dΓn
 
@@ -222,7 +220,6 @@ end
   uₕₜ = zeros(FEMSpace.Nₛᵘ, convert(Int, probl.T / probl.δt))
   pₕₜ = zeros(FEMSpace.Nₛᵖ, convert(Int, probl.T / probl.δt))
   global count = 0
-  dΩ = FEMSpace.dΩ
   for (xₕ, _) in xₕₜ_field
     global count += 1
     uₕₜ[:, count] = get_free_dof_values(xₕ[1])
@@ -244,7 +241,7 @@ end =#
 _, Gₕ = get_lifting_operator(FEMSpace, Param)
 
 res(u,v) = ∫( ∇(v) ⊙ (Param.α∘u ⋅ ∇(u)) - v * f) * FEMSpace.dΩ - ∫(v * Param.h) * FEMSpace.dΓn
-jac(u, du, v) = ∫( ∇(v) ⊙ (Param.dα∘(du, ∇(u))) )*dΩ
+jac(u, du, v) = ∫( ∇(v) ⊙ (Param.dα∘(du, ∇(u))) )*FEMSpace.dΩ
 operator = FEOperator(res, jac, FEMSpace.V, FEMSpace.V₀)
 
 nls = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking())

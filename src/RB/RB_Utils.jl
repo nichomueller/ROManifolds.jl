@@ -151,7 +151,7 @@ function assemble_sparse_mat(
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
 
-  function define_Mat(::FEMSpacePoissonS, var::String)
+  function define_Mat(FEMSpace::FEMSpacePoissonS, var::String)
     if var == "A"
       return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Param.α*∇(FEMSpace.ϕᵤ)))*dΩ_sparse,
         FEMSpace.V, FEMSpace.V₀)
@@ -159,7 +159,18 @@ function assemble_sparse_mat(
       error("Unrecognized sparse matrix")
     end
   end
-  function define_Mat(::FEMSpaceStokesS, var::String)
+  function define_Mat(FEMSpace::FEMSpaceStokesS, var::String)
+    if var == "A"
+      return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Param.α*∇(FEMSpace.ϕᵤ)))*dΩ_sparse,
+        FEMSpace.V, FEMSpace.V₀)
+    elseif var == "B"
+      return assemble_matrix(∫(FEMSpace.ψᵧ*(Param.b*∇⋅(FEMSpace.ϕᵤ)))*dΩ_sparse,
+        FEMSpace.V, FEMSpace.Q₀)
+    else
+      error("Unrecognized sparse matrix")
+    end
+  end
+  function define_Mat(FEMSpace::FEMSpaceNavierStokesS, var::String)
     if var == "A"
       return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Param.α*∇(FEMSpace.ϕᵤ)))*dΩ_sparse,
         FEMSpace.V, FEMSpace.V₀)
@@ -176,6 +187,43 @@ function assemble_sparse_mat(
 end
 
 function assemble_sparse_mat(
+  FEMSpace::FEMProblemS,
+  FEMInfo::FEMInfoS,
+  RBVars::RBProblemS,
+  Param::ParamInfoS,
+  el::Vector{Vector{Int}},
+  var::String)
+
+  function define_Mat(
+    FEMSpace::FEMSpaceNavierStokesS,
+    Φₖ::Vector,
+    dΩ_sparse::Measure,
+    var::String)
+
+    if var == "C"
+      Φₖ_fun = FEFunction(FEMSpace.V₀, Φₖ)
+      return Param.Re * assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
+        (∇(FEMSpace.ϕᵤ)' ⋅ Φₖ_fun) )*dΩ_sparse, FEMSpace.V, FEMSpace.V₀)
+    else
+      error("Unrecognized sparse matrix")
+    end
+  end
+
+  Mat = Vector{SparseMatrixCSC{Float, Int}}[]
+
+  @assert length(el) == RBVars.nₛᵘ
+
+  for b = eachindex(el)
+    Ω_sparse = view(FEMSpace.Ω, el[b])
+    dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
+    push!(Mat, define_Mat(FEMSpace, RBVars.Φₛᵘ[:,b], dΩ_sparse, var)::SparseMatrixCSC{Float, Int})
+  end
+
+  Mat
+
+end
+
+function assemble_sparse_mat(
   FEMSpace::FEMProblemST,
   FEMInfo::FEMInfoST,
   Param::ParamInfoST,
@@ -187,7 +235,7 @@ function assemble_sparse_mat(
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
   Nₜ = length(timesθ)
 
-  function define_Matₜ(::FEMSpacePoissonST, t::Real, var::String)
+  function define_Matₜ(FEMSpace::FEMSpacePoissonST, t::Real, var::String)
     if var == "A"
       return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Param.α(t)*∇(FEMSpace.ϕᵤ(t))))*dΩ_sparse,
         FEMSpace.V(t), FEMSpace.V₀)
@@ -198,7 +246,7 @@ function assemble_sparse_mat(
       error("Unrecognized sparse matrix")
     end
   end
-  function define_Matₜ(::FEMSpaceStokesST, t::Real, var::String)
+  function define_Matₜ(FEMSpace::FEMSpaceStokesST, t::Real, var::String)
     if var == "A"
       return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Param.α(t)*∇(FEMSpace.ϕᵤ(t))))*dΩ_sparse,
         FEMSpace.V(t), FEMSpace.V₀)
@@ -488,19 +536,24 @@ end
 function θ_matrix(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS{T},
-  ::RBProblemS,
+  RBVars::RBProblemS,
   Param::ParamInfoS,
   fun::Function,
-  MDEIMᵢ::Matrix,
-  MDEIM_idx::Vector{Int},
-  sparse_el::Vector{Int},
+  MDEIMᵢ::AbstractArray,
+  MDEIM_idx::AbstractArray,
+  sparse_el::AbstractArray,
   var::String) where T
 
   if var ∉ RBInfo.probl_nl
     θ = reshape([modify_fun(fun, FEMInfo.D, T)], 1, 1)
   else
-    Mat_μ_sparse =
-      T.(assemble_sparse_mat(FEMSpace, FEMInfo, Param, sparse_el, var))
+    if var == "C"
+      Mat_μ_sparse =
+        T.(assemble_sparse_mat(FEMSpace, FEMInfo, RBVars, Param, sparse_el, var))
+    else
+      Mat_μ_sparse =
+        T.(assemble_sparse_mat(FEMSpace, FEMInfo, Param, sparse_el, var))
+    end
     θ = M_DEIM_online(Mat_μ_sparse, MDEIMᵢ, MDEIM_idx)
   end
 

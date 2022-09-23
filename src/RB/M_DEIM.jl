@@ -45,6 +45,21 @@ function M_DEIM_offline(M_DEIM_mat::Matrix)
 
 end
 
+function M_DEIM_offline(M_DEIM_mat::Vector{Matrix{T}}) where T
+
+  M_DEIM_idx = Vector{Int}[]
+  M_DEIMᵢ_mat = Matrix{T}[]
+
+  for nb = eachindex(M_DEIM_mat)
+    M_DEIM_idx_nb, M_DEIMᵢ_mat_nb = M_DEIM_offline(M_DEIM_mat[nb])
+    push!(M_DEIM_idx, M_DEIM_idx_nb)
+    push!(M_DEIMᵢ_mat, M_DEIMᵢ_mat_nb)
+  end
+
+  M_DEIM_idx, M_DEIMᵢ_mat
+
+end
+
 function select_FEM_dim(FEMSpace::FEMProblem, var::String)
   if var ∈ ("B", "Lc")
     FEMSpace.Nₛᵖ
@@ -54,8 +69,8 @@ function select_FEM_dim(FEMSpace::FEMProblem, var::String)
 end
 
 function MDEIM_offline(
-  RBInfo::ROMInfoS{T},
-  RBVars::RBProblemS,
+  RBInfo::ROMInfoS,
+  ::RBProblemS{T},
   var::String) where T
 
   println("Building $(RBInfo.nₛ_MDEIM) snapshots of $var")
@@ -63,7 +78,7 @@ function MDEIM_offline(
   FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
   Nₕ = select_FEM_dim(FEMSpace, var)
 
-  MDEIM_mat, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
+  MDEIM_mat, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, μ, var)
   MDEIM_idx, MDEIMᵢ_mat = M_DEIM_offline(MDEIM_mat)
   MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx, row_idx, Nₕ)
   MDEIM_idx_sparse_space, _ = from_vec_to_mat_idx(MDEIM_idx_sparse, Nₕ)
@@ -73,9 +88,30 @@ function MDEIM_offline(
 
 end
 
+function MDEIM_offline_nonlinear(
+  RBInfo::ROMInfoS,
+  RBVars::RBProblemS{T},
+  var::String) where T
+
+  println("Building $(RBInfo.nₛ_MDEIM * RBVars.nₛᵘ) snapshots of $var")
+
+  FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
+  Nₕ = select_FEM_dim(FEMSpace, var)
+
+  MDEIM_mat, row_idx = get_snaps_MDEIMnonlinear(FEMSpace, RBInfo, RBVars, μ, var)
+  MDEIM_idx, MDEIMᵢ_mat = M_DEIM_offline(MDEIM_mat)
+  MDEIM_mat = blocks_to_matrix(MDEIM_mat)
+  MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx, row_idx, Nₕ)
+  MDEIM_idx_sparse_space, _ = from_vec_to_mat_idx(MDEIM_idx_sparse, Nₕ)
+  el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique_block(MDEIM_idx_sparse_space))
+
+  MDEIM_mat, MDEIM_idx_sparse, MDEIMᵢ_mat, row_idx, el
+
+end
+
 function MDEIM_offline(
-  RBInfo::ROMInfoST{T},
-  RBVars::RBProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::RBProblemST{T},
   var::String) where T
 
   println("Building $(RBInfo.nₛ_MDEIM) snapshots of $var")
@@ -141,6 +177,26 @@ function DEIM_offline(RBInfo::ROMInfoST{T}) where T
 
 end
 
-function M_DEIM_online(Mat_nonaffine, Matᵢ::Matrix{T}, idx::Vector{Int}) where T
+function M_DEIM_online(
+  Mat_nonaffine::Matrix{T},
+  Matᵢ::Matrix{T},
+  idx::Vector{Int}) where T
+
   @fastmath Matᵢ \ Matrix{T}(reshape(Mat_nonaffine, :, 1)[idx, :])
+
+end
+
+function M_DEIM_online(
+  Mat_nonaffine::Vector{Matrix{T}},
+  Matᵢ::Vector{Matrix{T}},
+  idx::Vector{Matrix{T}}) where T
+
+  θ = Matrix{T}[]
+
+  for b = eachindex(Mat_nonaffine)
+    push!(θ, Matᵢ[b] \ Matrix{T}(reshape(Mat_nonaffine[b], :, 1)[idx[b], :]))
+  end
+
+  blocks_to_matrix(θ)
+
 end

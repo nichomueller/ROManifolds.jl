@@ -37,7 +37,7 @@ function get_C(
 
     (RBVars.MDEIMᵢ_C, RBVars.MDEIM_idx_C, RBVars.row_idx_C, RBVars.sparse_el_C) =
       load_structures_in_list(("MDEIMᵢ_C", "MDEIM_idx_C", "row_idx_C", "sparse_el_C"),
-      (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
+      (Matrix{T}[], Vector{Int}[], Vector{Int}(undef,0), Vector{Int}[]),
       RBInfo.ROM_structures_path)
 
   else
@@ -115,7 +115,7 @@ function assemble_MDEIM_matrices(
   elseif var == "C"
     if isempty(RBVars.MDEIM_mat_C)
       (RBVars.MDEIM_mat_C, RBVars.MDEIM_idx_C, RBVars.MDEIMᵢ_C,
-      RBVars.row_idx_C,RBVars.sparse_el_C) = MDEIM_offline(RBInfo, RBVars, "C")
+      RBVars.row_idx_C,RBVars.sparse_el_C) = MDEIM_offline_nonlinear(RBInfo, RBVars, "C")
     end
     assemble_reduced_mat_MDEIM(RBVars, RBVars.MDEIM_mat_C, RBVars.row_idx_C, var)
   else
@@ -208,7 +208,7 @@ end
 
 function save_assembled_structures(
   RBInfo::Info,
-  RBVars::StokesS{T},
+  RBVars::NavierStokesS{T},
   operators::Vector{String}) where T
 
   Cₙ = reshape(RBVars.Cₙ, RBVars.nₛᵘ ^ 2, :)::Matrix{T}
@@ -232,22 +232,22 @@ end
 
 function get_system_blocks(
   RBInfo::Info,
-  RBVars::StokesS,
+  RBVars::NavierStokesS,
   LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int})
 
-  get_system_blocks(RBInfo, RBVars.Poisson, LHS_blocks, RHS_blocks)
+  get_system_blocks(RBInfo, RBVars.Stokes, LHS_blocks, RHS_blocks)
 
 end
 
 function save_system_blocks(
   RBInfo::Info,
-  RBVars::StokesS,
+  RBVars::NavierStokesS,
   LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int},
   operators::Vector{String})
 
-  save_system_blocks(RBInfo, RBVars.Poisson, LHS_blocks, RHS_blocks, operators)
+  save_system_blocks(RBInfo, RBVars.Stokes, LHS_blocks, RHS_blocks, operators)
 
 end
 
@@ -298,20 +298,18 @@ function get_θ_vector(
 
 end
 
-function get_Q(
-  RBInfo::Info,
-  RBVars::NavierStokesS)
+function get_Q(RBVars::NavierStokesS)
 
   RBVars.Qᶜ = size(RBVars.Cₙ)[end]
 
-  get_Q(RBInfo, RBVars.Stokes)
+  get_Q(RBVars.Stokes)
 
 end
 
 function assemble_param_RHS(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS,
-  RBVars::StokesS{T},
+  RBVars::NavierStokesS{T},
   Param::ParamInfoS) where T
 
   F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")

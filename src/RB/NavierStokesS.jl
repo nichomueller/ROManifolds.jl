@@ -134,15 +134,26 @@ function get_θ(
   RBVars::NavierStokesS,
   Param::ParamInfoS)
 
-  θᵃ, θᵇ, θᶠ, θʰ, θˡ, θˡᶜ = get_θ(FEMSpace, RBInfo, RBVars.Stokes, Param)
-  θᶜ = get_θᶜ(FEMSpace, RBVars, Param)
+  θᵃ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "A")
+  θᵇ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "B")
+  θᶜ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "C")
+
+  if !RBInfo.online_RHS
+    θᶠ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "F")
+    θʰ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "H")
+    θˡ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "L")
+    θˡᶜ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "Lc")
+  else
+    θᶠ, θʰ, θˡ, θˡᶜ = (Matrix{T}(undef,0,0), Matrix{T}(undef,0,0),
+      Matrix{T}(undef,0,0), Matrix{T}(undef,0,0))
+  end
 
   return θᵃ, θᵇ, θᶜ, θᶠ, θʰ, θˡ, θˡᶜ
 
 end
 
 function get_RB_LHS_blocks(
-  RBVars::NavierStokes{T},
+  RBVars::NavierStokesS{T},
   θᵃ::Matrix,
   θᵇ::Matrix,
   θᶜ::Matrix) where T
@@ -157,7 +168,7 @@ end
 
 function get_RB_RHS_blocks(
   RBInfo::ROMInfoS,
-  RBVars::NavierStokesS{T},
+  RBVars::NavierStokesS,
   θᶠ::Matrix,
   θʰ::Matrix,
   θˡ::Matrix,
@@ -318,117 +329,5 @@ function online_phase(
   if RBInfo.post_process
     post_process(RBInfo, pass_to_pp)
   end
-
-end
-
-
-
-
-
-
-
-
-
-function save_M_DEIM_structures(
-  RBInfo::ROMInfoS,
-  RBVars::NavierStokesS)
-
-  list_M_DEIM = (RBVars.MDEIM_mat_C, RBVars.MDEIMᵢ_C, RBVars.MDEIM_idx_C,
-    RBVars.row_idx_C, RBVars.sparse_el_C)
-  list_names = ("MDEIM_mat_C","MDEIMᵢ_C","MDEIM_idx_C","row_idx_C","sparse_el_C")
-
-  save_structures_in_list(list_M_DEIM, list_names,
-    RBInfo.ROM_structures_path)
-
-end
-
-function get_M_DEIM_structures(
-  RBInfo::ROMInfoS,
-  RBVars::NavierStokesS)
-
-  operators = String[]
-  append!(operators, get_M_DEIM_structures(RBInfo, RBVars.Stokes))
-
-  if "C" ∈ RBInfo.probl_nl
-
-    if isfile(joinpath(RBInfo.ROM_structures_path, "MDEIMᵢ_B.csv"))
-      println("Importing MDEIM offline structures, B")
-      RBVars.MDEIMᵢ_C = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path,
-        "MDEIMᵢ_C.csv"))
-      RBVars.MDEIM_idx_C = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.ROM_structures_path,
-        "MDEIM_idx_C.csv"))
-      RBVars.row_idx_C = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.ROM_structures_path,
-        "row_idx_C.csv"))
-      RBVars.sparse_el_C = load_CSV(Vector{Int}(undef,0), joinpath(RBInfo.ROM_structures_path,
-        "sparse_el_C.csv"))
-    else
-      println("Failed to import MDEIM offline structures,
-        C: must build them")
-      append!(operators, ["C"])
-    end
-
-  end
-
-end
-
-function get_system_blocks(
-  RBInfo::Info,
-  RBVars::NavierStokesS,
-  LHS_blocks::Vector{Int},
-  RHS_blocks::Vector{Int})
-
-  get_system_blocks(RBInfo, RBVars.Stokes, LHS_blocks, RHS_blocks)
-
-end
-
-function save_system_blocks(
-  RBInfo::Info,
-  RBVars::NavierStokesS,
-  LHS_blocks::Vector{Int},
-  RHS_blocks::Vector{Int},
-  operators::Vector{String})
-
-  save_system_blocks(RBInfo, RBVars.Stokes, LHS_blocks, RHS_blocks, operators)
-
-end
-
-function get_θᵃ(
-  FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS,
-  RBVars::NavierStokesS,
-  Param::ParamInfoS)
-
-  get_θᵃ(FEMSpace, RBInfo, RBVars.Stokes, Param)
-
-end
-
-function get_θᵇ(
-  FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS,
-  RBVars::NavierStokesS,
-  Param::ParamInfoS)
-
-  get_θᵇ(FEMSpace, RBInfo, RBVars.Stokes, Param)
-
-end
-
-function get_θᶜ(
-  FEMSpace::FEMProblemS,
-  RBVars::NavierStokesS,
-  Param::ParamInfoS)
-
-  C_μ_sparse = T.(assemble_sparse_mat(FEMSpace, FEMInfo, Param, RBVars.sparse_el_C))
-  θᶜ = M_DEIM_online(C_μ_sparse, RBVars.MDEIMᵢ_C, RBVars.MDEIM_idx_C)
-  θᶜ::Matrix{T}
-
-end
-
-function get_θᶠʰ(
-  FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS,
-  RBVars::NavierStokesS,
-  Param::ParamInfoS)
-
-  get_θᶠʰ(FEMSpace, RBInfo, RBVars.Stokes, Param)
 
 end

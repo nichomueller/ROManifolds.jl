@@ -165,6 +165,20 @@ function find_FE_elements(
 
 end
 
+function find_FE_elements(
+  V₀::UnconstrainedFESpace,
+  trian::Triangulation,
+  idx::Vector{Vector[Int]})
+
+  el = Vector{Int}[]
+  for nb = 1:eachindex(idx)
+    push!(el, find_FE_elements(V₀, trian, idx[nb]))
+  end
+
+  el
+
+end
+
 function define_g_FEM(
   FEMSpace::FEMProblemS,
   Param::ParamInfoS)

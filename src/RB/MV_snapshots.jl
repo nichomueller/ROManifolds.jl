@@ -54,19 +54,21 @@ function assemble_matrix_snapshots(
   μ::Vector{Vector{T}},
   var::String) where T
 
-  Matᵩ, row_idx = Matrix{T}(undef,0,0), Int[]
+  Matᵩ, row_idx = Vector{T}[], Vector{Int}[]
   for k = 1:RBInfo.nₛ_MDEIM
     Param = get_ParamInfo(RBInfo, μ[k])
     Matᵤ = assemble_FEM_structure(FEMSpace, RBInfo, Param, var)
-    i, v = findnz(Matᵤ(RBVars.Sᵘ_quad[:, k])[:])::Tuple{Vector{Int},Vector{T}}
-    if k == 1
-      row_idx = i
-      Matᵩ = zeros(T, length(row_idx), RBInfo.nₛ_MDEIM)
+    for nᵩ = 1:RBVars.nₛᵘ
+      println("Snapshot number $((k-1)*RBVars.nₛᵘ+nᵩ), $var")
+      Φₛᵘ_fun = FEFunction(FEMSpace.V₀, RBVars.Φₛᵘ[:, nᵩ])
+      i, v = findnz(Matᵤ(Φₛᵘ_fun)[:])::Tuple{Vector{Int},Vector{T}}
+      push!(Matᵩ, v)
+      push!(row_idx, i)
     end
-    Matᵩ[:, k] = v
   end
 
-  Matᵩ, row_idx
+  Matᵩ, row_idx = correct_structures(Matᵩ, row_idx)
+  matrix_to_blocks(Matᵩ, RBVars.nₛᵘ), row_idx
 
 end
 
@@ -99,21 +101,6 @@ function assemble_matrix_snapshots(
 end
 
 function call_matrix_snapshots(
-  FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS,
-  RBVars::RBProblemS,
-  μ::Vector{Vector{T}},
-  var::String) where T
-
-  if var ∈ ["C"]
-    assemble_matrix_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
-  else
-    assemble_matrix_snapshots(FEMSpace, RBInfo, μ, var)
-  end
-
-end
-
-function call_matrix_snapshots(
   FEMSpace::FEMProblemST,
   RBInfo::ROMInfoST{T},
   RBVars::RBProblemST,
@@ -133,14 +120,32 @@ end
 function get_snaps_MDEIM(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS,
+  μ::Vector{Vector{T}},
+  var::String) where T
+
+  snaps, row_idx = assemble_matrix_snapshots(FEMSpace, RBInfo, μ, var)
+
+  snaps, _ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
+  snaps, row_idx
+
+end
+
+function get_snaps_MDEIM_nonlinear(
+  FEMSpace::FEMProblemS,
+  RBInfo::ROMInfoS,
   RBVars::RBProblemS,
   μ::Vector{Vector{T}},
   var::String) where T
 
-  snaps, row_idx = call_matrix_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
+  snaps, row_idx = assemble_matrix_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
 
-  snaps, _ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
-  snaps, row_idx
+  snaps_POD = Matrix{T}[]
+  for i = eachindex(snaps)
+    snap, _ = M_DEIM_POD(snaps[i], RBInfo.ϵₛ)
+    push!(snaps_POD, snap)
+  end
+
+  snaps_POD, row_idx
 
 end
 
@@ -644,5 +649,49 @@ function assemble_parametric_FE_matrix(
   end
 
   Mat_θ
+
+end
+
+function correct_structures(
+  Matᵩ::Vector{Vector{T}},
+  row_idx::Vector{Vector{Int}}) where T
+
+  idx = 1
+  for i = 1 .+ eachindex(row_idx[2:end])
+    if length(row_idx[i]) > length(row_idx[idx])
+      idx = i
+    end
+  end
+
+  row_idx_new = row_idx[idx]
+  Matᵩ_new = zeros(T, length(row_idx_new), length(Matᵩ))
+  Matᵩ_new[:, idx] = Matᵩ[idx]
+
+  for i = setdiff(eachindex(row_idx), idx)
+    missing_idx_sparse = setdiff(row_idx_new, row_idx[i])
+    missing_idx_full = zeros(Int, length(missing_idx_sparse))
+    for j = eachindex(missing_idx_full)
+      missing_idx_full[j] = findall(x -> x == missing_idx_sparse[j], row_idx_new)[1]
+    end
+    same_idx_full = setdiff(eachindex(row_idx_new), missing_idx_full)
+
+    Matᵩ_new[same_idx_full, i] = Matᵩ[i]
+  end
+
+  Matᵩ_new, row_idx_new
+
+end
+
+function matrix_to_blocks(Matᵩ::Matrix{T}, nblocks::Int) where T
+
+  @assert size(Matᵩ)[2] % nblocks == 0 "Something is wrong"
+  nₛ_MDEIM = Int(size(Matᵩ)[2] / nblocks)
+
+  Matᵩ_new = Matrix{T}[]
+  for nb = 1:nblocks
+    push!(Matᵩ_new, Matᵩ[:, (nb-1)*nₛ_MDEIM+1:nb*nₛ_MDEIM])
+  end
+
+  Matᵩ_new
 
 end
