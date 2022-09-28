@@ -167,14 +167,13 @@ function get_RB_LHS_blocks(
 end
 
 function get_RB_RHS_blocks(
-  RBInfo::ROMInfoS,
   RBVars::NavierStokesS,
   θᶠ::Matrix,
   θʰ::Matrix,
   θˡ::Matrix,
   θˡᶜ::Matrix)
 
-  get_RB_RHS_blocks(RBInfo, RBVars.Stokes, θᶠ, θʰ, θˡ, θˡᶜ)
+  get_RB_RHS_blocks(RBVars.Stokes, θᶠ, θʰ, θˡ, θˡᶜ)
 
 end
 
@@ -254,8 +253,8 @@ function online_phase(
 
   ũ_μ = zeros(T, RBVars.Nₛᵘ, length(param_nbs))
   uₙ_μ = zeros(T, RBVars.nₛᵘ, length(param_nbs))
-  p̃_μ = zeros(T, RBVars.Nₛᵘ, length(param_nbs))
-  pₙ_μ = zeros(T, RBVars.nₛᵘ, length(param_nbs))
+  p̃_μ = zeros(T, RBVars.Nₛᵖ, length(param_nbs))
+  pₙ_μ = zeros(T, RBVars.nₛᵖ, length(param_nbs))
 
   for nb in param_nbs
     println("Considering parameter number: $nb")
@@ -274,11 +273,11 @@ function online_phase(
     mean_online_time = RBVars.online_time / length(param_nbs)
     mean_reconstruction_time = reconstruction_time / length(param_nbs)
 
-    H1_err_nb = compute_errors(uₕ_test, RBVars, RBVars.Xᵘ₀)
+    H1_err_nb = compute_errors(RBVars, uₕ_test, RBVars.ũ, RBVars.Xᵘ₀)
     mean_H1_err += H1_err_nb / length(param_nbs)
     mean_pointwise_err_u += abs.(uₕ_test - RBVars.ũ) / length(param_nbs)
 
-    L2_err_nb = compute_errors(pₕ_test, RBVars, RBVars.Xᵖ₀)
+    L2_err_nb = compute_errors(RBVars, pₕ_test, RBVars.p̃, RBVars.Xᵖ₀)
     mean_L2_err += L2_err_nb / length(param_nbs)
     mean_pointwise_err_p += abs.(pₕ_test - RBVars.p̃) / length(param_nbs)
 

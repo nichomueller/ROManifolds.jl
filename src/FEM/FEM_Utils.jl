@@ -167,11 +167,11 @@ end
 
 function find_FE_elements(
   V₀::UnconstrainedFESpace,
-  trian::Triangulation,
-  idx::Vector{Vector[Int]})
+  trian::BodyFittedTriangulation,
+  idx::Vector{Vector{Int}})
 
   el = Vector{Int}[]
-  for nb = 1:eachindex(idx)
+  for nb = eachindex(idx)
     push!(el, find_FE_elements(V₀, trian, idx[nb]))
   end
 

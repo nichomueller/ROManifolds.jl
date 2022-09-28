@@ -9,9 +9,9 @@ end
 function from_vec_to_mat_idx(idx::Vector{Vector{Int}}, Nₕ::Int)
 
   row_idx, col_idx = Vector{Int}[], Vector{Int}[]
-  for nb = 1:eachindex(idx)
+  for nb = eachindex(idx)
     push!(row_idx, from_vec_to_mat_idx(idx[nb], Nₕ)[1])
-    push!(row_idx, from_vec_to_mat_idx(idx[nb], Nₕ)[2])
+    push!(col_idx, from_vec_to_mat_idx(idx[nb], Nₕ)[2])
   end
 
   row_idx, col_idx
@@ -39,7 +39,7 @@ function from_full_idx_to_sparse_idx(
   Nₕ::Int)
 
   sparse_idx = Vector{Int}[]
-  for nb = 1:eachindex(full_idx)
+  for nb = eachindex(full_idx)
     push!(sparse_idx,
       from_full_idx_to_sparse_idx(full_idx[nb], sparse_to_full_idx, Nₕ))
   end
@@ -75,7 +75,7 @@ end
 
 function unique_block(vv::Vector{Vector{T}}) where T
   uvv = Vector{T}[]
-  for b = 1:eachindex(vv)
+  for b = eachindex(vv)
     push!(uvv, unique(vv[b]))
   end
   uvv

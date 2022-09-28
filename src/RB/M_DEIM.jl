@@ -98,7 +98,7 @@ function MDEIM_offline_nonlinear(
   FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
   Nₕ = select_FEM_dim(FEMSpace, var)
 
-  MDEIM_mat, row_idx = get_snaps_MDEIMnonlinear(FEMSpace, RBInfo, RBVars, μ, var)
+  MDEIM_mat, row_idx = get_snaps_MDEIM_nonlinear(FEMSpace, RBInfo, RBVars, μ, var)
   MDEIM_idx, MDEIMᵢ_mat = M_DEIM_offline(MDEIM_mat)
   MDEIM_mat = blocks_to_matrix(MDEIM_mat)
   MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx, row_idx, Nₕ)
@@ -178,6 +178,7 @@ function DEIM_offline(RBInfo::ROMInfoST{T}) where T
 end
 
 function M_DEIM_online(
+  ::RBProblemS,
   Mat_nonaffine::Matrix{T},
   Matᵢ::Matrix{T},
   idx::Vector{Int}) where T
@@ -187,14 +188,45 @@ function M_DEIM_online(
 end
 
 function M_DEIM_online(
-  Mat_nonaffine::Vector{Matrix{T}},
+  ::RBProblemS,
+  Mat_nonaffine::SparseMatrixCSC{T, Int},
+  Matᵢ::Matrix{T},
+  idx::Vector{Int}) where T
+
+  @fastmath Matᵢ \ Matrix{T}(reshape(Mat_nonaffine, :, 1)[idx, :])
+
+end
+
+function M_DEIM_online(
+  RBVars::RBProblemST,
+  Mat_nonaffine::Matrix{T},
+  Matᵢ::Matrix{T},
+  idx::Vector{Int}) where T
+
+  @fastmath (Matᵢ \ Matrix{T}(reshape(Mat_nonaffine, :, RBVars.Nₜ)[idx, :]))
+
+end
+
+function M_DEIM_online(
+  RBVars::RBProblemST,
+  Mat_nonaffine::SparseMatrixCSC{T, Int},
+  Matᵢ::Matrix{T},
+  idx::Vector{Int}) where T
+
+  @fastmath (Matᵢ \ Matrix{T}(reshape(Mat_nonaffine, :, RBVars.Nₜ)[idx, :]))
+
+end
+
+function M_DEIM_online(
+  RBVars::RBProblem,
+  Mat_nonaffine,
   Matᵢ::Vector{Matrix{T}},
-  idx::Vector{Matrix{T}}) where T
+  idx::Vector{Vector{Int}}) where T
 
   θ = Matrix{T}[]
 
   for b = eachindex(Mat_nonaffine)
-    push!(θ, Matᵢ[b] \ Matrix{T}(reshape(Mat_nonaffine[b], :, 1)[idx[b], :]))
+    push!(θ, M_DEIM_online(RBVars, Mat_nonaffine[b], Matᵢ[b], idx[b]))
   end
 
   blocks_to_matrix(θ)

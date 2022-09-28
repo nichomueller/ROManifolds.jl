@@ -209,7 +209,7 @@ function assemble_sparse_mat(
     end
   end
 
-  Mat = Vector{SparseMatrixCSC{Float, Int}}[]
+  Mat = SparseMatrixCSC[]
 
   @assert length(el) == RBVars.nₛᵘ
 
@@ -549,12 +549,12 @@ function θ_matrix(
   else
     if var == "C"
       Mat_μ_sparse =
-        T.(assemble_sparse_mat(FEMSpace, FEMInfo, RBVars, Param, sparse_el, var))
+        assemble_sparse_mat(FEMSpace, FEMInfo, RBVars, Param, sparse_el, var)
     else
       Mat_μ_sparse =
-        T.(assemble_sparse_mat(FEMSpace, FEMInfo, Param, sparse_el, var))
+        assemble_sparse_mat(FEMSpace, FEMInfo, Param, sparse_el, var)
     end
-    θ = M_DEIM_online(Mat_μ_sparse, MDEIMᵢ, MDEIM_idx)
+    θ = M_DEIM_online(RBVars, Mat_μ_sparse, MDEIMᵢ, MDEIM_idx)
   end
 
   θ::Matrix{T}
@@ -583,14 +583,14 @@ function θ_matrix(
   else
     if RBInfo.st_M_DEIM
       red_timesθ = timesθ[MDEIM_idx_time]
-      Mat_μ_sparse = T.(assemble_sparse_mat(
-        FEMSpace, FEMInfo, Param, sparse_el, red_timesθ, var))
+      Mat_μ_sparse = assemble_sparse_mat(
+        FEMSpace, FEMInfo, Param, sparse_el, red_timesθ, var)
       θ = interpolated_θ(RBVars, Mat_μ_sparse, timesθ, MDEIMᵢ,
         MDEIM_idx, MDEIM_idx_time)
     else
       Mat_μ_sparse = assemble_sparse_mat(
         FEMSpace, FEMInfo, Param, sparse_el,timesθ, var)
-      θ = (MDEIMᵢ \ Matrix{T}(reshape(Mat_μ_sparse, :, RBVars.Nₜ)[MDEIM_idx, :]))
+      θ = M_DEIM_online(RBVars, Mat_μ_sparse, MDEIMᵢ, MDEIM_idx)
     end
   end
 
@@ -614,7 +614,7 @@ function θ_vector(
   else
     Vec_μ_sparse =
       T.(assemble_sparse_vec(FEMSpace, FEMInfo, Param, sparse_el, var))
-    θ = M_DEIM_online(Vec_μ_sparse, DEIMᵢ, DEIM_idx)
+    θ = M_DEIM_online(RBVars, Vec_μ_sparse, DEIMᵢ, DEIM_idx)
   end
 
   θ::Matrix{T}
@@ -649,7 +649,7 @@ function θ_vector(
         DEIM_idx, DEIM_idx_time)
     else
       Vec_μ_sparse = assemble_sparse_vec(FEMSpace, FEMInfo, Param, sparse_el, timesθ, var)
-      θ = (DEIMᵢ \ Matrix{T}(Vec_μ_sparse[DEIM_idx, :]))
+      θ = M_DEIM_online(RBVars, Vec_μ_sparse, DEIMᵢ, DEIM_idx)
     end
   end
 
