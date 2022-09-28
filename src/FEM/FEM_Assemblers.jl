@@ -252,7 +252,7 @@ end
 function assemble_convection(
   ::NTuple{4,Int},
   FEMSpace::FEMProblemS,
-  Param::ParamInfoS)
+  ::ParamInfoS)
 
   C(u) = assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
     (∇(FEMSpace.ϕᵤ)'⋅u) )*FEMSpace.dΩ, FEMSpace.V, FEMSpace.V₀)
@@ -264,7 +264,7 @@ end
 function assemble_convection(
   ::NTuple{4,Int},
   FEMSpace::FEMProblemST,
-  Param::ParamInfoST)
+  ::ParamInfoST)
 
   C(u,t) = assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
     (∇(FEMSpace.ϕᵤ(t))'⋅u(t)) )*FEMSpace.dΩ, FEMSpace.V(t), FEMSpace.V₀)

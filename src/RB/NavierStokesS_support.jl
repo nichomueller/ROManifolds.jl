@@ -97,22 +97,25 @@ function assemble_MDEIM_matrices(
   RBVars::NavierStokesS,
   var::String)
 
-  println("The matrix $var is non-affine:
-    running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
-
   if var == "A"
+    println("The matrix A is non-affine:
+      running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
     if isempty(RBVars.MDEIM_mat_A)
       (RBVars.MDEIM_mat_A, RBVars.MDEIM_idx_A, RBVars.MDEIMᵢ_A,
       RBVars.row_idx_A,RBVars.sparse_el_A) = MDEIM_offline(RBInfo, RBVars, "A")
     end
     assemble_reduced_mat_MDEIM(RBVars, RBVars.MDEIM_mat_A, RBVars.row_idx_A, var)
   elseif var == "B"
+    println("The matrix B is non-affine:
+      running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
     if isempty(RBVars.MDEIM_mat_B)
       (RBVars.MDEIM_mat_B, RBVars.MDEIM_idx_B, RBVars.MDEIMᵢ_B,
       RBVars.row_idx_B,RBVars.sparse_el_B) = MDEIM_offline(RBInfo, RBVars, "B")
     end
     assemble_reduced_mat_MDEIM(RBVars, RBVars.MDEIM_mat_B, RBVars.row_idx_B, var)
   elseif var == "C"
+    println("The matrix C is non-affine:
+      running the MDEIM offline phase on $(RBVars.nₛᵘ) snapshots")
     if isempty(RBVars.MDEIM_mat_C)
       (RBVars.MDEIM_mat_C, RBVars.MDEIM_idx_C, RBVars.MDEIMᵢ_C,
       RBVars.row_idx_C,RBVars.sparse_el_C) = MDEIM_offline_nonlinear(RBInfo, RBVars, "C")

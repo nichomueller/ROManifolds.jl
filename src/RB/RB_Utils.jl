@@ -190,7 +190,7 @@ function assemble_sparse_mat(
   FEMSpace::FEMProblemS,
   FEMInfo::FEMInfoS,
   RBVars::RBProblemS,
-  Param::ParamInfoS,
+  ::ParamInfoS,
   el::Vector{Vector{Int}},
   var::String)
 

@@ -195,6 +195,20 @@ function blocks_to_matrix(Vec_block::Vector{Vector{T}}) where T
 
 end
 
+function matrix_to_blocks(Mat::Matrix{T}, nblocks::Int) where T
+
+  @assert size(Mat)[2] % nblocks == 0 "Something is wrong"
+  ncol_block = Int(size(Mat)[2] / nblocks)
+
+  Mat_new = Matrix{T}[]
+  for nb = 1:nblocks
+    push!(Mat_new, Mat[:, (nb-1)*ncol_block+1:nb*ncol_block])
+  end
+
+  Mat_new
+
+end
+
 function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
 
   numnz = nnz(S)

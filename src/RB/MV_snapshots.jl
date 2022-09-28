@@ -54,6 +54,8 @@ function assemble_matrix_snapshots(
   μ::Vector{Vector{T}},
   var::String) where T
 
+
+  #=
   Matᵩ, row_idx = Vector{T}[], Vector{Int}[]
   for k = 1:RBInfo.nₛ_MDEIM
     Param = get_ParamInfo(RBInfo, μ[k])
@@ -68,7 +70,24 @@ function assemble_matrix_snapshots(
   end
 
   Matᵩ, row_idx = correct_structures(Matᵩ, row_idx)
-  matrix_to_blocks(Matᵩ, RBVars.nₛᵘ), row_idx
+  matrix_to_blocks(Matᵩ, RBVars.nₛᵘ), row_idx =#
+
+  Matᵩ, row_idx = Matrix{T}(undef,0,0), Int[]
+  Param = get_ParamInfo(RBInfo, μ[1])
+  Matᵤ = assemble_FEM_structure(FEMSpace, RBInfo, Param, var)
+
+  for nᵩ = 1:RBVars.nₛᵘ
+    println("Snapshot number $nᵩ, $var")
+    Φₛᵘ_fun = FEFunction(FEMSpace.V₀, RBVars.Φₛᵘ[:, nᵩ])
+    i, v = findnz(Matᵤ(Φₛᵘ_fun)[:])::Tuple{Vector{Int},Vector{T}}
+    if nᵩ == 1
+      row_idx = i
+      Matᵩ = zeros(T, length(row_idx), RBVars.nₛᵘ)
+    end
+    Matᵩ[:, nᵩ] = v
+  end
+
+  Matᵩ, row_idx
 
 end
 
@@ -123,14 +142,18 @@ function get_snaps_MDEIM(
   μ::Vector{Vector{T}},
   var::String) where T
 
-  snaps, row_idx = assemble_matrix_snapshots(FEMSpace, RBInfo, μ, var)
+  if var ∈ ["C"]
+    snaps, row_idx = assemble_matrix_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
+  else
+    snaps, row_idx = assemble_matrix_snapshots(FEMSpace, RBInfo, μ, var)
+  end
 
   snaps, _ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
   snaps, row_idx
 
 end
 
-function get_snaps_MDEIM_nonlinear(
+function get_snaps_MDEIM(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS,
   RBVars::RBProblemS,
@@ -679,19 +702,5 @@ function correct_structures(
   end
 
   Matᵩ_new, row_idx_new
-
-end
-
-function matrix_to_blocks(Matᵩ::Matrix{T}, nblocks::Int) where T
-
-  @assert size(Matᵩ)[2] % nblocks == 0 "Something is wrong"
-  nₛ_MDEIM = Int(size(Matᵩ)[2] / nblocks)
-
-  Matᵩ_new = Matrix{T}[]
-  for nb = 1:nblocks
-    push!(Matᵩ_new, Matᵩ[:, (nb-1)*nₛ_MDEIM+1:nb*nₛ_MDEIM])
-  end
-
-  Matᵩ_new
 
 end

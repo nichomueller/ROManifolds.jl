@@ -93,12 +93,12 @@ function MDEIM_offline_nonlinear(
   RBVars::RBProblemS{T},
   var::String) where T
 
-  println("Building $(RBInfo.nₛ_MDEIM * RBVars.nₛᵘ) snapshots of $var")
+  println("Building $(RBVars.nₛᵘ) snapshots of $var")
 
   FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
   Nₕ = select_FEM_dim(FEMSpace, var)
 
-  MDEIM_mat, row_idx = get_snaps_MDEIM_nonlinear(FEMSpace, RBInfo, RBVars, μ, var)
+  MDEIM_mat, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
   MDEIM_idx, MDEIMᵢ_mat = M_DEIM_offline(MDEIM_mat)
   MDEIM_mat = blocks_to_matrix(MDEIM_mat)
   MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx, row_idx, Nₕ)
