@@ -202,7 +202,7 @@ function assemble_sparse_mat(
 
     if var == "C"
       Φₖ_fun = FEFunction(FEMSpace.V₀, Φₖ)
-      return Param.Re * assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
+      return assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
         (∇(FEMSpace.ϕᵤ)' ⋅ Φₖ_fun) )*dΩ_sparse, FEMSpace.V, FEMSpace.V₀)
     else
       error("Unrecognized sparse matrix")

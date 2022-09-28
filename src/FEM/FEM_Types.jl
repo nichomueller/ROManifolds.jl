@@ -300,7 +300,6 @@ end
 
 struct ParamNavierStokesS <: ParamInfoS
   μ::Vector
-  Re::Float
   α::Function
   b::Function
   f::Function
@@ -310,7 +309,6 @@ end
 
 struct ParamNavierStokesST <: ParamInfoST
   μ::Vector
-  Re::Float
   αₛ::Function
   αₜ::Function
   α::Function

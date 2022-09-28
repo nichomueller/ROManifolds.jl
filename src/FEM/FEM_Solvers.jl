@@ -172,7 +172,7 @@ function FE_solve(
 
   a((u,p),(v,q)) = ∫( ∇(v)⊙(Param.α*∇(u)) - Param.b*(∇⋅v)*p + q*(∇⋅u) ) * FEMSpace.dΩ
 
-  conv(u,∇u) = Param.Re*(∇u')⋅u
+  conv(u,∇u) = (∇u')⋅u
   dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
   c(u,v) = ∫( v⊙(conv∘(u,∇(u))) ) * FEMSpace.dΩ
   dc(u,du,v) = ∫( v⊙(dconv∘(du,∇(du),u,∇(u))) ) * FEMSpace.dΩ

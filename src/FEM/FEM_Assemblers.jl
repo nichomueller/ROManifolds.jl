@@ -254,7 +254,7 @@ function assemble_convection(
   FEMSpace::FEMProblemS,
   Param::ParamInfoS)
 
-  C(u) = Param.Re * assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
+  C(u) = assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
     (∇(FEMSpace.ϕᵤ)'⋅u) )*FEMSpace.dΩ, FEMSpace.V, FEMSpace.V₀)
 
   C
@@ -266,7 +266,7 @@ function assemble_convection(
   FEMSpace::FEMProblemST,
   Param::ParamInfoST)
 
-  C(u,t) = Param.Re * assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
+  C(u,t) = assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
     (∇(FEMSpace.ϕᵤ(t))'⋅u(t)) )*FEMSpace.dΩ, FEMSpace.V(t), FEMSpace.V₀)
 
   C
@@ -635,7 +635,7 @@ function assemble_lifting(
   FEMInfo::FEMInfoS,
   Param::ParamInfoS)
 
-  C(u) = Param.Re * assemble_vector(∫( FEMSpace.ϕᵥ ⊙
+  C(u) = assemble_vector(∫( FEMSpace.ϕᵥ ⊙
     ((FEMSpace.ϕᵥ')⋅u) )*FEMSpace.dΩ, FEMSpace.V₀)
   g = define_g_FEM(FEMSpace, Param)
 
@@ -651,7 +651,7 @@ function assemble_lifting(
   FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
-  C(u, t) = Param.Re * assemble_vector(∫( FEMSpace.ϕᵥ ⊙
+  C(u, t) = assemble_vector(∫( FEMSpace.ϕᵥ ⊙
     ((FEMSpace.ϕᵥ')⋅u(t)) )*FEMSpace.dΩ, FEMSpace.V₀)
   g = define_g_FEM(FEMSpace, Param)
 
