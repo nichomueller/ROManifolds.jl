@@ -44,6 +44,7 @@ function get_offline_structures(
   append!(operators, get_A(RBInfo, RBVars))
   append!(operators, get_B(RBInfo, RBVars))
   append!(operators, get_C(RBInfo, RBVars))
+  append!(operators, get_D(RBInfo, RBVars))
 
   if !RBInfo.online_RHS
     append!(operators, get_F(RBInfo, RBVars))
@@ -75,7 +76,7 @@ function assemble_offline_structures(
     end
 
     for var ∈ intersect(operators, RBInfo.probl_nl)
-      if var ∈ ("A", "B", "C")
+      if var ∈ ("A", "B", "C", "D")
         assemble_MDEIM_matrices(RBInfo, RBVars, var)
       else
         assemble_DEIM_vectors(RBInfo, RBVars, var)
@@ -136,7 +137,6 @@ function get_θ(
 
   θᵃ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "A")
   θᵇ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "B")
-  θᶜ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "C")
 
   if !RBInfo.online_RHS
     θᶠ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "F")
@@ -148,32 +148,28 @@ function get_θ(
       Matrix{T}(undef,0,0), Matrix{T}(undef,0,0))
   end
 
-  return θᵃ, θᵇ, θᶜ, θᶠ, θʰ, θˡ, θˡᶜ
+  return θᵃ, θᵇ, θᶠ, θʰ, θˡ, θˡᶜ
 
 end
 
-function get_RB_LHS_blocks(
-  RBVars::NavierStokesS{T},
-  θᵃ::Matrix,
-  θᵇ::Matrix,
-  θᶜ::Matrix) where T
+function get_RB_jacobian_and_residual(RBVars::NavierStokesS{T}) where T
 
-  get_RB_LHS_blocks(RBVars.Stokes, θᵃ, θᵇ)
-
-  for q = 1:RBVars.Qᶜ
-    RBVars.LHSₙ[1] += RBVars.Cₙ[:,:,q] * θᶜ[q]
+  function J(x̂::Vector{T}) where T
+    CDₙû = [(RBVars.Cₙ[:, :, nₛ] + RBVars.Dₙ[:, :, nₛ])
+      * x̂[nₛ] for nₛ = 1:RBVars.nₛᵘ]
+    return (vcat(hcat(RBVars.LHSₙ[1] + CDₙû, RBVars.LHSₙ[2]),
+      hcat(RBVars.LHSₙ[3], zeros(T, RBVars.nₛᵖ, RBVars.nₛᵖ))))
   end
 
-end
+  function res(x̂::Vector{T}) where T
+    Cₙû = [RBVars.Cₙ[:, :, nₛ] * x̂[nₛ] for nₛ = 1:RBVars.nₛᵘ]
+    LHSₙ = (vcat(hcat(RBVars.LHSₙ[1] + Cₙû, RBVars.LHSₙ[2]),
+      hcat(RBVars.LHSₙ[3], zeros(T, RBVars.nₛᵖ, RBVars.nₛᵖ))))
+    RHSₙ =  vcat(RBVars.RHSₙ[1], zeros(T, RBVars.nₛᵖ, 1))
+    return LHSₙ * x̂ - RHSₙ
+  end
 
-function get_RB_RHS_blocks(
-  RBVars::NavierStokesS,
-  θᶠ::Matrix,
-  θʰ::Matrix,
-  θˡ::Matrix,
-  θˡᶜ::Matrix)
-
-  get_RB_RHS_blocks(RBVars.Stokes, θᶠ, θʰ, θˡ, θˡᶜ)
+  J::Function, res::Function
 
 end
 
@@ -186,28 +182,45 @@ function get_RB_system(
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
   get_Q(RBVars)
-  LHS_blocks = [1, 2, 3]
-  RHS_blocks = [1, 2]
 
   RBVars.online_time = @elapsed begin
     operators = get_system_blocks(RBInfo, RBVars, LHS_blocks, RHS_blocks)
 
-    θᵃ, θᵇ, θᶜ, θᶠ, θʰ, θˡ, θˡᶜ = get_θ(FEMSpace, RBInfo, RBVars, Param)
+    θᵃ, θᵇ, θᶠ, θʰ, θˡ, θˡᶜ = get_θ(FEMSpace, RBInfo, RBVars, Param)
 
-    if "LHS" ∈ operators
-      get_RB_LHS_blocks(RBVars, θᵃ, θᵇ, θᶜ)
+    get_RB_LHS_blocks(RBVars.Stokes, θᵃ, θᵇ)
+    if !RBInfo.online_RHS
+      get_RB_RHS_blocks(RBVars.Stokes, θᶠ, θʰ, θˡ, θˡᶜ)
+    else
+      assemble_param_RHS(FEMSpace, RBInfo, RBVars.Stokes, Param)
     end
 
-    if "RHS" ∈ operators
-      if !RBInfo.online_RHS
-        get_RB_RHS_blocks(RBVars, θᶠ, θʰ, θˡ, θˡᶜ)
-      else
-        assemble_param_RHS(FEMSpace, RBInfo, RBVars, Param)
-      end
-    end
+    J, res = get_RB_jacobian_and_residual(RBVars)
   end
 
   save_system_blocks(RBInfo,RBVars,LHS_blocks,RHS_blocks,operators)
+
+  J::Function, res::Function
+
+end
+
+function newton(
+  RBVars::NavierStokesS{T},
+  J::Function,
+  res::Function,
+  ϵ::Float,
+  max_k=10) where T
+
+  k = 1
+  xᵏ = zeros(T, RBVars.nₛᵘ + RBVars.nₛᵖ, 1)
+
+  while k ≤ max_k && norm(res(xᵏ)) ≥ ϵ
+    println("Cond: $(cond(RBVars.LHSₙ[1])); iter: $k; res: $(norm(res(xᵏ)))")
+    xᵏ -= J \ res(xᵏ)
+    k += 1
+  end
+
+  xᵏ::Matrix{T}
 
 end
 
@@ -217,13 +230,10 @@ function solve_RB_system(
   RBVars::NavierStokesS,
   Param::ParamInfoS) where T
 
-  get_RB_system(FEMSpace, RBInfo, RBVars, Param)
-  println("Solving RB problem via backslash")
-  println("Condition number of the system's matrix: $(cond(RBVars.LHSₙ[1]))")
+  J, res = get_RB_system(FEMSpace, RBInfo, RBVars, Param)
+  println("Solving RB problem via Newton iterations")
   RBVars.online_time += @elapsed begin
-    xₙ = (vcat(hcat(RBVars.LHSₙ[1], RBVars.LHSₙ[2]),
-      hcat(RBVars.LHSₙ[3], zeros(T, RBVars.nₛᵖ, RBVars.nₛᵖ))) \
-      vcat(RBVars.RHSₙ[1], zeros(T, RBVars.nₛᵖ, 1)))
+    xₙ = newton(RBVars, J, res, RBInfo.ϵₛ)
   end
 
   RBVars.uₙ = xₙ[1:RBVars.nₛᵘ,:]

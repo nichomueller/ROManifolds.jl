@@ -54,24 +54,6 @@ function assemble_matrix_snapshots(
   μ::Vector{Vector{T}},
   var::String) where T
 
-
-  #=
-  Matᵩ, row_idx = Vector{T}[], Vector{Int}[]
-  for k = 1:RBInfo.nₛ_MDEIM
-    Param = get_ParamInfo(RBInfo, μ[k])
-    Matᵤ = assemble_FEM_structure(FEMSpace, RBInfo, Param, var)
-    for nᵩ = 1:RBVars.nₛᵘ
-      println("Snapshot number $((k-1)*RBVars.nₛᵘ+nᵩ), $var")
-      Φₛᵘ_fun = FEFunction(FEMSpace.V₀, RBVars.Φₛᵘ[:, nᵩ])
-      i, v = findnz(Matᵤ(Φₛᵘ_fun)[:])::Tuple{Vector{Int},Vector{T}}
-      push!(Matᵩ, v)
-      push!(row_idx, i)
-    end
-  end
-
-  Matᵩ, row_idx = correct_structures(Matᵩ, row_idx)
-  matrix_to_blocks(Matᵩ, RBVars.nₛᵘ), row_idx =#
-
   Matᵩ, row_idx = Matrix{T}(undef,0,0), Int[]
   Param = get_ParamInfo(RBInfo, μ[1])
   Matᵤ = assemble_FEM_structure(FEMSpace, RBInfo, Param, var)
@@ -142,7 +124,7 @@ function get_snaps_MDEIM(
   μ::Vector{Vector{T}},
   var::String) where T
 
-  if var ∈ ["C"]
+  if var ∈ ("C", "D")
     snaps, row_idx = assemble_matrix_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
   else
     snaps, row_idx = assemble_matrix_snapshots(FEMSpace, RBInfo, μ, var)

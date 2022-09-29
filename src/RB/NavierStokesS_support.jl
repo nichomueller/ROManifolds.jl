@@ -51,6 +51,33 @@ function get_C(
 
 end
 
+function get_D(
+  RBInfo::Info,
+  RBVars::NavierStokesS{T}) where T
+
+  op = String[]
+
+  if isfile(joinpath(RBInfo.ROM_structures_path, "Dₙ.csv"))
+
+    Dₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, "Dₙ.csv"))
+    RBVars.Dₙ = reshape(Dₙ, RBVars.nₛᵘ, RBVars.nₛᵘ, :)::Array{T,3}
+
+    (RBVars.MDEIMᵢ_D, RBVars.MDEIM_idx_D, RBVars.row_idx_D, RBVars.sparse_el_D) =
+      load_structures_in_list(("MDEIMᵢ_D", "MDEIM_idx_D", "row_idx_D", "sparse_el_D"),
+      (Matrix{T}[], Vector{Int}[], Vector{Int}(undef,0), Vector{Int}[]),
+      RBInfo.ROM_structures_path)
+
+  else
+
+    println("Failed to import offline structures for D: must build them")
+    op = ["D"]
+
+  end
+
+  op
+
+end
+
 function get_F(
   RBInfo::Info,
   RBVars::NavierStokesS)
@@ -118,9 +145,17 @@ function assemble_MDEIM_matrices(
       running the MDEIM offline phase on $(RBVars.nₛᵘ) snapshots")
     if isempty(RBVars.MDEIM_mat_C)
       (RBVars.MDEIM_mat_C, RBVars.MDEIM_idx_C, RBVars.MDEIMᵢ_C,
-      RBVars.row_idx_C,RBVars.sparse_el_C) = MDEIM_offline_nonlinear(RBInfo, RBVars, "C")
+      RBVars.row_idx_C,RBVars.sparse_el_C) = MDEIM_offline(RBInfo, RBVars, "C")
     end
     assemble_reduced_mat_MDEIM(RBVars, RBVars.MDEIM_mat_C, RBVars.row_idx_C, var)
+  elseif var == "D"
+    println("The matrix D is non-affine:
+      running the MDEIM offline phase on $(RBVars.nₛᵘ) snapshots")
+    if isempty(RBVars.MDEIM_mat_D)
+      (RBVars.MDEIM_mat_D, RBVars.MDEIM_idx_D, RBVars.MDEIMᵢ_D,
+      RBVars.row_idx_D,RBVars.sparse_el_D) = MDEIM_offline(RBInfo, RBVars, "D")
+    end
+    assemble_reduced_mat_MDEIM(RBVars, RBVars.MDEIM_mat_D, RBVars.row_idx_D, var)
   else
     error("Unrecognized variable on which to perform MDEIM")
   end
@@ -133,7 +168,7 @@ function assemble_reduced_mat_MDEIM(
   row_idx::Vector,
   var::String) where T
 
-  if var == "C"
+  if var ∈ ("C", "D")
     Q = size(MDEIM_mat)[2]
     r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.Nₛᵘ)
     MatqΦ = zeros(T,RBVars.Nₛᵘ,RBVars.nₛᵘ,Q)::Array{T,3}
@@ -144,8 +179,14 @@ function assemble_reduced_mat_MDEIM(
 
     Matₙ = reshape(RBVars.Φₛᵘ' *
       reshape(MatqΦ,RBVars.Nₛᵘ,:),RBVars.nₛᵘ,:,Q)::Array{T,3}
-    RBVars.Cₙ = Matₙ
-    RBVars.Qᶜ = Q
+
+    if var == "C"
+      RBVars.Cₙ = Matₙ
+      RBVars.Qᶜ = Q
+    else
+      RBVars.Dₙ = Matₙ
+      RBVars.Qᵈ = Q
+    end
 
   else
     assemble_reduced_mat_MDEIM(RBVars.Stokes, MDEIM_mat, row_idx, var)
@@ -215,18 +256,21 @@ function save_assembled_structures(
   operators::Vector{String}) where T
 
   Cₙ = reshape(RBVars.Cₙ, RBVars.nₛᵘ ^ 2, :)::Matrix{T}
-  affine_vars, affine_names = (Cₙ,), ("Cₙ",)
+  Dₙ = reshape(RBVars.Dₙ, RBVars.nₛᵘ ^ 2, :)::Matrix{T}
+  affine_vars, affine_names = (Cₙ, Dₙ), ("Cₙ", "Dₙ")
   affine_entry = get_affine_entries(operators, affine_names)
   save_structures_in_list(affine_vars[affine_entry], affine_names[affine_entry],
     RBInfo.ROM_structures_path)
 
   M_DEIM_vars = (
-    RBVars.MDEIMᵢ_C, RBVars.MDEIM_idx_C, RBVars.row_idx_C, RBVars.sparse_el_C)
+    RBVars.MDEIMᵢ_C, RBVars.MDEIM_idx_C, RBVars.row_idx_C, RBVars.sparse_el_C,
+    RBVars.MDEIMᵢ_D, RBVars.MDEIM_idx_D, RBVars.row_idx_D, RBVars.sparse_el_D)
   M_DEIM_names = (
-    "MDEIMᵢ_C","MDEIM_idx_C","row_idx_C","sparse_el_C")
+    "MDEIMᵢ_C","MDEIM_idx_C","row_idx_C","sparse_el_C",
+    "MDEIMᵢ_D","MDEIM_idx_D","row_idx_D","sparse_el_D")
   save_structures_in_list(M_DEIM_vars, M_DEIM_names, RBInfo.ROM_structures_path)
 
-  operators_to_pass = setdiff(operators, ("C",))
+  operators_to_pass = setdiff(operators, ("C", "D"))
   save_assembled_structures(RBInfo, RBVars.Stokes, operators_to_pass)
 
 end
@@ -236,21 +280,47 @@ end
 function get_system_blocks(
   RBInfo::Info,
   RBVars::NavierStokesS,
-  LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int})
 
-  get_system_blocks(RBInfo, RBVars.Stokes, LHS_blocks, RHS_blocks)
+  if !RBInfo.get_offline_structures
+    return ["RHS"]
+  end
+
+  operators = String[]
+
+  for i = RHS_blocks
+    RHSₙi = "RHSₙ" * string(i) * ".csv"
+    if !isfile(joinpath(RBInfo.ROM_structures_path, RHSₙi))
+      append!(operators, ["RHS"])
+      break
+    end
+  end
+  if "RHS" ∉ operators
+    for i = RHS_blocks
+      RHSₙi = "RHSₙ" * string(i) * ".csv"
+      println("Importing block number $i of the reduced affine RHS")
+      push!(RBVars.RHSₙ,
+        load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, RHSₙi)))
+    end
+  end
+
+  operators
 
 end
 
 function save_system_blocks(
   RBInfo::Info,
   RBVars::NavierStokesS,
-  LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int},
   operators::Vector{String})
 
-  save_system_blocks(RBInfo, RBVars.Stokes, LHS_blocks, RHS_blocks, operators)
+  if ("F" ∉ RBInfo.probl_nl && "H" ∉ RBInfo.probl_nl && "L" ∉ RBInfo.probl_nl
+    && "Lc" ∉ RBInfo.probl_nl && "RHS" ∈ operators)
+  for i = RHS_blocks
+    RHSₙi = "RHSₙ" * string(i) * ".csv"
+    save_CSV(RBVars.RHSₙ[i],joinpath(RBInfo.ROM_structures_path, RHSₙi))
+  end
+end
 
 end
 
@@ -267,9 +337,6 @@ function get_θ_matrix(
   elseif var == "B"
     return θ_matrix(FEMSpace, RBInfo, RBVars, Param, Param.b, RBVars.MDEIMᵢ_B,
       RBVars.MDEIM_idx_B, RBVars.sparse_el_B, "B")::Matrix{T}
-  elseif var == "C"
-    return θ_matrix(FEMSpace, RBInfo, RBVars, Param, x->1., RBVars.MDEIMᵢ_C,
-      RBVars.MDEIM_idx_C, RBVars.sparse_el_C, "C")::Matrix{T}
   else
     error("Unrecognized variable")
   end
@@ -304,23 +371,8 @@ end
 function get_Q(RBVars::NavierStokesS)
 
   RBVars.Qᶜ = size(RBVars.Cₙ)[end]
+  RBVars.Qᵈ = size(RBVars.Dₙ)[end]
 
   get_Q(RBVars.Stokes)
-
-end
-
-function assemble_param_RHS(
-  FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS,
-  RBVars::NavierStokesS{T},
-  Param::ParamInfoS) where T
-
-  F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
-  H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
-  L = assemble_FEM_structure(FEMSpace, RBInfo, Param, "L")
-  push!(RBVars.RHSₙ, reshape(RBVars.Φₛᵘ' * (F + H - L), :, 1)::Matrix{T})
-
-  Lc = assemble_FEM_structure(FEMSpace, RBInfo, Param, "Lc")
-  push!(RBVars.RHSₙ, reshape(- RBVars.Φₛᵖ' * Lc, :, 1)::Matrix{T})
 
 end

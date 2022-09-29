@@ -402,7 +402,19 @@ function save_system_blocks(
   RHS_blocks::Vector{Int},
   operators::Vector{String})
 
-  save_system_blocks(RBInfo, RBVars.Poisson, LHS_blocks, RHS_blocks, operators)
+  if "A" ∉ RBInfo.probl_nl && "B" ∉ RBInfo.probl_nl && "LHS" ∈ operators
+    for i = LHS_blocks
+      LHSₙi = "LHSₙ" * string(i) * ".csv"
+      save_CSV(RBVars.LHSₙ[i],joinpath(RBInfo.ROM_structures_path, LHSₙi))
+    end
+  end
+  if ("F" ∉ RBInfo.probl_nl && "H" ∉ RBInfo.probl_nl && "L" ∉ RBInfo.probl_nl
+      && "Lc" ∉ RBInfo.probl_nl && "RHS" ∈ operators)
+    for i = RHS_blocks
+      RHSₙi = "RHSₙ" * string(i) * ".csv"
+      save_CSV(RBVars.RHSₙ[i],joinpath(RBInfo.ROM_structures_path, RHSₙi))
+    end
+  end
 
 end
 

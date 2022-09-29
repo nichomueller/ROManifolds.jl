@@ -261,12 +261,13 @@ function solve_RB_system(
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
   println("Solving RB problem via backslash")
-  println("Condition number of the system's matrix: $(cond(RBVars.LHSₙ[1]))")
   RBVars.online_time += @elapsed begin
-    xₙ = (vcat(hcat(RBVars.LHSₙ[1], RBVars.LHSₙ[2]),
-      hcat(RBVars.LHSₙ[3], zeros(T, RBVars.nₛᵖ, RBVars.nₛᵖ))) \
-      vcat(RBVars.RHSₙ[1], RBVars.RHSₙ[2]))
+    LHSₙ = vcat(hcat(RBVars.LHSₙ[1], RBVars.LHSₙ[2]),
+      hcat(RBVars.LHSₙ[3], zeros(T, RBVars.nₛᵖ, RBVars.nₛᵖ)))
+    RHSₙ = vcat(RBVars.RHSₙ[1], RBVars.RHSₙ[2])
+    xₙ = LHSₙ \ RHSₙ
   end
+  println("Condition number of the system's matrix: $(cond(LHSₙ))")
 
   RBVars.uₙ = xₙ[1:RBVars.nₛᵘ,:]
   RBVars.pₙ = xₙ[RBVars.nₛᵘ+1:end,:]

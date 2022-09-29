@@ -149,7 +149,7 @@ function check_navier_stokes_solver()
 end
 
 function get_matrix_vector_nl_problem(nls::FESolver,op::FEOperator)
-  #= # src/Algebra/NLSolvers.jl
+  # src/Algebra/NLSolvers.jl
   x₀ = FEFunction(FEMSpace.X, zeros(FEMSpace.Nₛᵘ + FEMSpace.Nₛᵖ))
   u₀ = FEFunction(FEMSpace.V, zeros(FEMSpace.Nₛᵘ))
 
@@ -158,44 +158,17 @@ function get_matrix_vector_nl_problem(nls::FESolver,op::FEOperator)
   J₀ = jacobian(operator, x₀)
   LHS₀ = vcat(hcat(A + C(u₀), -B'), hcat(B, zeros(T, FEMSpace.Nₛᵖ, FEMSpace.Nₛᵖ)))
   res₀(x) = LHS₀ * get_free_dof_values(x) - RHS
-  intermediate_result = get_free_dof_values(x₀) - J₀ \ res₀(x₀)
-  x₁ = FEFunction(FEMSpace.X, intermediate_result)
-  u₁ = FEFunction(FEMSpace.V, intermediate_result[1:FEMSpace.Nₛᵘ])
+  result = get_free_dof_values(x₀) - J₀ \ res₀(x₀)
+  x₁ = FEFunction(FEMSpace.X, result)
+  u₁ = FEFunction(FEMSpace.V, result[1:FEMSpace.Nₛᵘ])
 
-  J₁ = jacobian(operator, x₁)
-  LHS₁ = vcat(hcat(A + C(u₁), -B'), hcat(B, zeros(T, FEMSpace.Nₛᵖ, FEMSpace.Nₛᵖ)))
-  res₁(x) = LHS₁ * get_free_dof_values(x) - RHS
-  final_result = get_free_dof_values(x₁) - J₁ \ res₁(x₁) =#
-
-  U = get_trial(op)
-  uh = zero(U)
-  x = get_free_dof_values(uh)
-  al_op = get_algebraic_operator(op)
-
-  x0 = x
-  f!(r,x) = Gridap.FESpaces.residual!(r,al_op,x)
-  j!(j,x) = Gridap.FESpaces.jacobian!(j,al_op,x)
-  fj!(r,j,x) = Gridap.FESpaces.residual_and_jacobian!(r,j,al_op,x)
-  f0, j0 = Gridap.FESpaces.residual_and_jacobian(al_op,x0)
-  df = OnceDifferentiable(f!,j!,fj!,x0,f0,j0)
-  ss = symbolic_setup(nls.nls.ls,j0)
-  ns = numerical_setup(ss,j0)
-  cache = Gridap.Algebra.NLSolversCache(f0,j0,df,ns,nothing)
-
-  df = cache.df
-  ns = cache.ns
-  kwargs = nls.nls.kwargs
-  function linsolve!(x,A,b)
-    numerical_setup!(ns,A)
-    solve!(x,ns,b)
-  end
-  r = nlsolve(df,x;linsolve=linsolve!,kwargs...)
-  cache.result = r
-  final_cache = Gridap.Algebra.copy_entries!(x,r.zero)
-
-  trial = get_trial(op)
-  u_new = FEFunction(trial,x)
-  (u_new,final_cache)
+  x1 = FEFunction(FEMSpace.X, ones(FEMSpace.Nₛᵘ + FEMSpace.Nₛᵖ))
+  u1 = FEFunction(FEMSpace.V, ones(FEMSpace.Nₛᵘ))
+  J1 = jacobian(operator, x1)
+  D(u) = assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
+    (∇(u)'⋅FEMSpace.ϕᵤ) )*FEMSpace.dΩ, FEMSpace.V, FEMSpace.V₀)
+  LHS1 = vcat(hcat(A + C(u1) + D(u1), -B'), hcat(B, zeros(T, FEMSpace.Nₛᵖ, FEMSpace.Nₛᵖ)))
+  J1 ≈ LHS1
 
 end
 

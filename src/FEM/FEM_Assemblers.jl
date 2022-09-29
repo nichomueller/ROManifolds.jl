@@ -251,8 +251,7 @@ end
 
 function assemble_convection(
   ::NTuple{4,Int},
-  FEMSpace::FEMProblemS,
-  ::ParamInfoS)
+  FEMSpace::FEMProblemST)
 
   C(u) = assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
     (∇(FEMSpace.ϕᵤ)'⋅u) )*FEMSpace.dΩ, FEMSpace.V, FEMSpace.V₀)
@@ -263,13 +262,34 @@ end
 
 function assemble_convection(
   ::NTuple{4,Int},
-  FEMSpace::FEMProblemST,
-  ::ParamInfoST)
+  FEMSpace::FEMProblemST)
 
   C(u,t) = assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
     (∇(FEMSpace.ϕᵤ(t))'⋅u(t)) )*FEMSpace.dΩ, FEMSpace.V(t), FEMSpace.V₀)
 
   C
+
+end
+
+function assemble_swapped_convection(
+  ::NTuple{4,Int},
+  FEMSpace::FEMProblemS)
+
+  D(u) = assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
+    (∇(u)'⋅FEMSpace.ϕᵤ) )*FEMSpace.dΩ, FEMSpace.V, FEMSpace.V₀)
+
+  D
+
+end
+
+function assemble_swapped_convection(
+  ::NTuple{4,Int},
+  FEMSpace::FEMProblemST)
+
+  D(u,t) = assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
+    (∇(u(t))'⋅FEMSpace.ϕᵤ(t)) )*FEMSpace.dΩ, FEMSpace.V(t), FEMSpace.V₀)
+
+  D
 
 end
 
@@ -789,9 +809,9 @@ function assemble_FEM_structure(
   elseif var == "B"
     assemble_B(NT,FEMSpace,FEMInfo,Param)
   elseif var == "C"
-    assemble_convection(NT,FEMSpace,Param)
+    assemble_convection(NT,FEMSpace)
   elseif var == "D"
-    assemble_reaction(NT,FEMSpace,FEMInfo,Param)
+    assemble_swapped_convection(NT,FEMSpace,FEMInfo,Param)
   elseif var == "F"
     assemble_forcing(NT,FEMSpace,FEMInfo,Param)
   elseif var == "H"

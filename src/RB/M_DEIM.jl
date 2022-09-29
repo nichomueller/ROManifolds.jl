@@ -88,27 +88,6 @@ function MDEIM_offline(
 
 end
 
-function MDEIM_offline_nonlinear(
-  RBInfo::ROMInfoS,
-  RBVars::RBProblemS{T},
-  var::String) where T
-
-  println("Building $(RBVars.nₛᵘ) snapshots of $var")
-
-  FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
-  Nₕ = select_FEM_dim(FEMSpace, var)
-
-  MDEIM_mat, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
-  MDEIM_idx, MDEIMᵢ_mat = M_DEIM_offline(MDEIM_mat)
-  MDEIM_mat = blocks_to_matrix(MDEIM_mat)
-  MDEIM_idx_sparse = from_full_idx_to_sparse_idx(MDEIM_idx, row_idx, Nₕ)
-  MDEIM_idx_sparse_space, _ = from_vec_to_mat_idx(MDEIM_idx_sparse, Nₕ)
-  el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique_block(MDEIM_idx_sparse_space))
-
-  MDEIM_mat, MDEIM_idx_sparse, MDEIMᵢ_mat, row_idx, el
-
-end
-
 function MDEIM_offline(
   RBInfo::ROMInfoST,
   RBVars::RBProblemST{T},

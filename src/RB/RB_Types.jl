@@ -1,6 +1,7 @@
 abstract type RBProblem <: Problem end
 abstract type RBProblemS{T} <: RBProblem end
 abstract type RBProblemST{T} <: RBProblem end
+abstract type MDEIM{T} end
 
 function init_PoissonS_variables(::Type{T}) where T
 
@@ -151,10 +152,10 @@ function init_NavierStokesS_variables(::Type{T}) where T
 
   Cₙ = Array{T}(undef,0,0,0)
   MDEIM_mat_C = Matrix{T}(undef,0,0)
-  MDEIMᵢ_C = Matrix{T}[]
-  MDEIM_idx_C = Vector{Int}[]
+  MDEIMᵢ_C = Matrix{T}(undef,0,0)
+  MDEIM_idx_C = Vector{Int}(undef,0)
   row_idx_C = Vector{Int}(undef,0)
-  sparse_el_C = Vector{Int}[]
+  sparse_el_C = Vector{Int}(undef,0)
   Qᶜ = 0
 
   Cₙ, MDEIM_mat_C, MDEIMᵢ_C, MDEIM_idx_C, row_idx_C, sparse_el_C, Qᶜ
@@ -220,8 +221,8 @@ mutable struct StokesST{T} <: RBProblemST{T}
 end
 
 mutable struct NavierStokesS{T} <: RBProblemS{T}
-  Stokes::StokesS{T}; Cₙ::Array{T}; MDEIM_mat_C::Matrix{T}; MDEIMᵢ_C::Vector{Matrix{T}};
-  MDEIM_idx_C::Vector{Vector{Int}}; row_idx_C::Vector{Int}; sparse_el_C::Vector{Vector{Int}};
+  Stokes::StokesS{T}; Cₙ::Array{T}; MDEIM_mat_C::Matrix{T}; MDEIMᵢ_C::Matrix{T};
+  MDEIM_idx_C::Vector{Int}; row_idx_C::Vector{Int}; sparse_el_C::Vector{Int};
   Qᶜ::Int
 end
 
@@ -556,4 +557,21 @@ function Base.getproperty(RBInfo::ROMInfoS, sym::Symbol)
   else
     getfield(RBInfo, sym)
   end
+end
+
+mutable struct MDEIMS{T} <: MDEIM
+  Mat
+  Matᵢ
+  idx
+  row_idx
+  el
+end
+
+mutable struct MDEIMST{T} <: MDEIM
+  Mat
+  Matᵢ
+  idx
+  time_idx
+  row_idx
+  el
 end

@@ -251,24 +251,6 @@ function SparseArrays.findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
 
 end
 
-function newton(
-  res::Function,
-  J::Matrix{T},
-  u₀,
-  ϵ::Float,
-  max_k::Int) where T
-
-  k = 0
-  uᵏ = u₀
-  while k ≤ max_k && norm(res(uᵏ)) ≥ ϵ
-    uᵏ -= J \ res(uᵏ)::Vector{T}
-    k += 1
-  end
-
-  uᵏ::Vector{T}
-
-end
-
 function get_NTuple(N::Int, T::DataType)
 
   ntupl = ()

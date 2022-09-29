@@ -170,7 +170,7 @@ function assemble_sparse_mat(
       error("Unrecognized sparse matrix")
     end
   end
-  function define_Mat(FEMSpace::FEMSpaceNavierStokesS, var::String)
+  function define_Mat(FEMSpace::FEMSpaceNavierStokesS, var::String; Φₖ::Vector)
     if var == "A"
       return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Param.α*∇(FEMSpace.ϕᵤ)))*dΩ_sparse,
         FEMSpace.V, FEMSpace.V₀)
@@ -183,43 +183,6 @@ function assemble_sparse_mat(
   end
 
   define_Mat(FEMSpace, var)::SparseMatrixCSC{Float, Int}
-
-end
-
-function assemble_sparse_mat(
-  FEMSpace::FEMProblemS,
-  FEMInfo::FEMInfoS,
-  RBVars::RBProblemS,
-  ::ParamInfoS,
-  el::Vector{Vector{Int}},
-  var::String)
-
-  function define_Mat(
-    FEMSpace::FEMSpaceNavierStokesS,
-    Φₖ::Vector,
-    dΩ_sparse::Measure,
-    var::String)
-
-    if var == "C"
-      Φₖ_fun = FEFunction(FEMSpace.V₀, Φₖ)
-      return assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
-        (∇(FEMSpace.ϕᵤ)' ⋅ Φₖ_fun) )*dΩ_sparse, FEMSpace.V, FEMSpace.V₀)
-    else
-      error("Unrecognized sparse matrix")
-    end
-  end
-
-  Mat = SparseMatrixCSC[]
-
-  @assert length(el) == RBVars.nₛᵘ
-
-  for b = eachindex(el)
-    Ω_sparse = view(FEMSpace.Ω, el[b])
-    dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
-    push!(Mat, define_Mat(FEMSpace, RBVars.Φₛᵘ[:,b], dΩ_sparse, var)::SparseMatrixCSC{Float, Int})
-  end
-
-  Mat
 
 end
 
@@ -539,21 +502,16 @@ function θ_matrix(
   RBVars::RBProblemS,
   Param::ParamInfoS,
   fun::Function,
-  MDEIMᵢ::AbstractArray,
-  MDEIM_idx::AbstractArray,
-  sparse_el::AbstractArray,
+  MDEIMᵢ::Matrix,
+  MDEIM_idx::Vector{Int},
+  sparse_el::Vector{Int},
   var::String) where T
 
   if var ∉ RBInfo.probl_nl
     θ = reshape([modify_fun(fun, FEMInfo.D, T)], 1, 1)
   else
-    if var == "C"
-      Mat_μ_sparse =
-        assemble_sparse_mat(FEMSpace, FEMInfo, RBVars, Param, sparse_el, var)
-    else
-      Mat_μ_sparse =
-        assemble_sparse_mat(FEMSpace, FEMInfo, Param, sparse_el, var)
-    end
+    Mat_μ_sparse =
+      assemble_sparse_mat(FEMSpace, FEMInfo, Param, sparse_el, var)
     θ = M_DEIM_online(RBVars, Mat_μ_sparse, MDEIMᵢ, MDEIM_idx)
   end
 
