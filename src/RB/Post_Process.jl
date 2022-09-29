@@ -176,12 +176,12 @@ function post_process(test_dir::String)
         joinpath(path_to_bases, "Φₜᵘ.csv"))
       append!(nₜᵘ, size(Φₜᵘ)[2])
 
-      append!(Qᵃ, check_basis_existence(path_to_bases, "MDEIM_idx_A"))
-      append!(Qᵃₜ, check_basis_existence(path_to_bases, "MDEIM_idx_time_A"))
-      append!(Qᶠ, check_basis_existence(path_to_bases, "DEIM_idx_F"))
-      append!(Qᶠₜ, check_basis_existence(path_to_bases, "DEIM_idx_time_F"))
-      append!(Qʰ, check_basis_existence(path_to_bases, "DEIM_idx_H"))
-      append!(Qʰₜ, check_basis_existence(path_to_bases, "DEIM_idx_time_H"))
+      append!(Qᵃ, check_basis_existence(path_to_bases, "idx_A"))
+      append!(Qᵃₜ, check_basis_existence(path_to_bases, "idx_time_A"))
+      append!(Qᶠ, check_basis_existence(path_to_bases, "idx_F"))
+      append!(Qᶠₜ, check_basis_existence(path_to_bases, "idx_time_F"))
+      append!(Qʰ, check_basis_existence(path_to_bases, "idx_H"))
+      append!(Qʰₜ, check_basis_existence(path_to_bases, "idx_time_H"))
 
     end
 

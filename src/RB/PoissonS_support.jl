@@ -60,9 +60,9 @@ function get_A(
 
     if "A" ∈ RBInfo.probl_nl
 
-      (RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A, RBVars.row_idx_A, RBVars.sparse_el_A) =
-        load_structures_in_list(("MDEIMᵢ_A", "MDEIM_idx_A", "row_idx_A", "sparse_el_A"),
-        (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
+      (RBVars.MDEIM_A.Matᵢ, RBVars.MDEIM_A.idx, RBVars.MDEIM_A.el) =
+        load_structures_in_list(("Matᵢ_A", "idx_A", "el_A"),
+        (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
         RBInfo.ROM_structures_path)
 
     end
@@ -90,8 +90,8 @@ function get_F(
 
     if "F" ∈ RBInfo.probl_nl
 
-      (RBVars.DEIMᵢ_F, RBVars.DEIM_idx_F, RBVars.sparse_el_F) =
-        load_structures_in_list(("DEIMᵢ_F", "DEIM_idx_F", "sparse_el_F"),
+      (RBVars.MDEIM_F.Matᵢ, RBVars.MDEIM_F.idx, RBVars.MDEIM_F.el) =
+        load_structures_in_list(("Matᵢ_F", "idx_F", "el_F"),
         (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
         RBInfo.ROM_structures_path)
 
@@ -120,8 +120,8 @@ function get_H(
 
     if "H" ∈ RBInfo.probl_nl
 
-      (RBVars.DEIMᵢ_H, RBVars.DEIM_idx_H, RBVars.sparse_el_H) =
-        load_structures_in_list(("DEIMᵢ_H", "DEIM_idx_H", "sparse_el_H"),
+      (RBVars.MDEIM_H.Matᵢ, RBVars.MDEIM_H.idx, RBVars.MDEIM_H.el) =
+        load_structures_in_list(("Matᵢ_H", "idx_H", "el_H"),
         (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
         RBInfo.ROM_structures_path)
 
@@ -150,8 +150,8 @@ function get_L(
 
     if "L" ∈ RBInfo.probl_nl
 
-      (RBVars.DEIMᵢ_L, RBVars.DEIM_idx_L, RBVars.sparse_el_L) =
-        load_structures_in_list(("DEIMᵢ_L", "DEIM_idx_L", "sparse_el_L"),
+      (RBVars.MDEIM_L.Matᵢ, RBVars.MDEIM_L.idx, RBVars.MDEIM_L.el) =
+        load_structures_in_list(("Matᵢ_L", "idx_L", "el_L"),
         (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
         RBInfo.ROM_structures_path)
 
@@ -168,7 +168,7 @@ function get_L(
 
 end
 
-function assemble_affine_matrices(
+function assemble_affine_structures(
   RBInfo::Info,
   RBVars::PoissonS{T},
   var::String) where T
@@ -179,25 +179,55 @@ function assemble_affine_matrices(
     RBVars.Aₙ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ, 1)
     RBVars.Aₙ[:,:,1] = (RBVars.Φₛᵘ)' * A * RBVars.Φₛᵘ
     RBVars.Qᵃ = 1
+  elseif var == "F"
+    println("Assembling affine reduced F")
+    F = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "F.csv"))
+    RBVars.Fₙ = (RBVars.Φₛᵘ)' * F
+    RBVars.Qᶠ = 1
+  elseif var == "H"
+    println("Assembling affine reduced H")
+    H = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "H.csv"))
+    RBVars.Hₙ = (RBVars.Φₛᵘ)' * H
+    RBVars.Qʰ = 1
+  elseif var == "L"
+    println("Assembling affine reduced L")
+    L = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "L.csv"))
+    RBVars.Lₙ = (RBVars.Φₛᵘ)' * L
+    RBVars.Qˡ = 1
   else
     error("Unrecognized variable to assemble")
   end
 
 end
 
-function assemble_MDEIM_matrices(
+function assemble_MDEIM_structures(
   RBInfo::ROMInfoS,
   RBVars::PoissonS,
   var::String)
 
   println("The matrix $var is non-affine:
     running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
+
   if var == "A"
-    if isempty(RBVars.MDEIM_mat_A)
-      (RBVars.MDEIM_mat_A, RBVars.MDEIM_idx_A, RBVars.MDEIMᵢ_A,
-      RBVars.row_idx_A,RBVars.sparse_el_A) = MDEIM_offline(RBInfo, RBVars, "A")
+    if isempty(RBVars.MDEIM_A.Mat)
+      MDEIM_offline!(RBVars.MDEIM_A, RBInfo, RBVars, var)
     end
-    assemble_reduced_mat_MDEIM(RBVars, RBVars.MDEIM_mat_A, RBVars.row_idx_A, var)
+    assemble_reduced_mat_MDEIM(RBVars, RBVars.MDEIM_A, var)
+  elseif var == "F"
+    if isempty(RBVars.MDEIM_F.Mat)
+      MDEIM_offline!(RBVars.MDEIM_F, RBInfo, var)
+    end
+    assemble_reduced_mat_MDEIM(RBVars, RBVars.MDEIM_F, var)
+  elseif var == "H"
+    if isempty(RBVars.MDEIM_H.Mat)
+      MDEIM_offline!(RBVars.MDEIM_H, RBInfo, var)
+    end
+    assemble_reduced_mat_MDEIM(RBVars, RBVars.MDEIM_H, var)
+  elseif var == "L"
+    if isempty(RBVars.MDEIM_L.Mat)
+      MDEIM_offline!(RBVars.MDEIM_L, RBInfo, var)
+    end
+    assemble_reduced_mat_MDEIM(RBVars, RBVars.MDEIM_L, var)
   else
     error("Unrecognized variable on which to perform MDEIM")
   end
@@ -206,16 +236,15 @@ end
 
 function assemble_reduced_mat_MDEIM(
   RBVars::PoissonS{T},
-  MDEIM_mat::Matrix,
-  row_idx::Vector,
+  MDEIM::MDEIMmS,
   ::String) where T
 
-  Q = size(MDEIM_mat)[2]
-  r_idx, c_idx = from_vec_to_mat_idx(row_idx, RBVars.Nₛᵘ)
+  Q = size(MDEIM.Mat)[2]
+  r_idx, c_idx = from_vec_to_mat_idx(MDEIM.row_idx, RBVars.Nₛᵘ)
   MatqΦ = zeros(T,RBVars.Nₛᵘ,RBVars.nₛᵘ,Q)
   @simd for j = 1:RBVars.Nₛᵘ
     Mat_idx = findall(x -> x == j, r_idx)
-    MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.Φₛᵘ[c_idx[Mat_idx],:])'
+    MatqΦ[j,:,:] = (MDEIM.Mat[Mat_idx,:]' * RBVars.Φₛᵘ[c_idx[Mat_idx],:])'
   end
 
   Matₙ = reshape(RBVars.Φₛᵘ' *
@@ -226,73 +255,15 @@ function assemble_reduced_mat_MDEIM(
 
 end
 
-function assemble_affine_vectors(
-  RBInfo::Info,
+function assemble_reduced_mat_MDEIM(
   RBVars::PoissonS{T},
+  MDEIM::MDEIMvS,
   var::String) where T
 
-  if var == "F"
-    println("Assembling affine reduced forcing term")
-    F = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "F.csv"))
-    RBVars.Fₙ = (RBVars.Φₛᵘ)' * F
-    RBVars.Qᶠ = 1
-  elseif var == "H"
-    println("Assembling affine reduced Neumann term")
-    H = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "H.csv"))
-    RBVars.Hₙ = (RBVars.Φₛᵘ)' * H
-    RBVars.Qʰ = 1
-  elseif var == "L"
-    println("Assembling affine reduced lifting term")
-    L = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "L.csv"))
-    RBVars.Lₙ = (RBVars.Φₛᵘ)' * L
-    RBVars.Qˡ = 1
-  else
-    error("Unrecognized variable to assemble")
-  end
-
-end
-
-function assemble_DEIM_vectors(
-  RBInfo::ROMInfoS,
-  RBVars::PoissonS,
-  var::String)
-
-  println("The vector $var is non-affine:
-    running the DEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
-
-  if var == "F"
-    if isempty(RBVars.DEIM_mat_F)
-      RBVars.DEIM_mat_F, RBVars.DEIM_idx_F, RBVars.DEIMᵢ_F, RBVars.sparse_el_F =
-        DEIM_offline(RBInfo,"F")
-    end
-    assemble_reduced_mat_DEIM(RBVars,RBVars.DEIM_mat_F,"F")
-  elseif var == "H"
-    if isempty(RBVars.DEIM_mat_H)
-      RBVars.DEIM_mat_H, RBVars.DEIM_idx_H, RBVars.DEIMᵢ_H, RBVars.sparse_el_H =
-        DEIM_offline(RBInfo,"H")
-    end
-    assemble_reduced_mat_DEIM(RBVars,RBVars.DEIM_mat_H,"H")
-  elseif var == "L"
-    if isempty(RBVars.DEIM_mat_L)
-      RBVars.DEIM_mat_L, RBVars.DEIM_idx_L, RBVars.DEIMᵢ_L, RBVars.sparse_el_L =
-        DEIM_offline(RBInfo,"L")
-    end
-    assemble_reduced_mat_DEIM(RBVars,RBVars.DEIM_mat_L,"L")
-  else
-    error("Unrecognized variable on which to perform DEIM")
-  end
-
-end
-
-function assemble_reduced_mat_DEIM(
-  RBVars::PoissonS{T},
-  DEIM_mat::Matrix,
-  var::String) where T
-
-  Q = size(DEIM_mat)[2]
+  Q = size(MDEIM.Mat)[2]
   Vecₙ = zeros(T,RBVars.nₛᵘ,1,Q)
   @simd for q = 1:Q
-    Vecₙ[:,:,q] = RBVars.Φₛᵘ' * Vector{T}(DEIM_mat[:, q])
+    Vecₙ[:,:,q] = RBVars.Φₛᵘ' * Vector{T}(MDEIM.Mat[:, q])
   end
   Vecₙ = reshape(Vecₙ,:,Q)
 
@@ -321,16 +292,16 @@ function save_assembled_structures(
   save_structures_in_list(affine_vars[affine_entry], affine_names[affine_entry],
     RBInfo.ROM_structures_path)
 
-  M_DEIM_vars = (RBVars.MDEIMᵢ_A, RBVars.MDEIM_idx_A,
-    RBVars.row_idx_A, RBVars.sparse_el_A, RBVars.DEIMᵢ_F,
-    RBVars.DEIM_idx_F, RBVars.sparse_el_F, RBVars.DEIMᵢ_H,
-    RBVars.DEIM_idx_H, RBVars.sparse_el_H, RBVars.DEIMᵢ_L,
-    RBVars.DEIM_idx_L, RBVars.sparse_el_L)
+  M_DEIM_vars = (
+    RBVars.MDEIM_A.Matᵢ, RBVars.MDEIM_A.idx, RBVars.MDEIM_A.el,
+    RBVars.MDEIM_F.Matᵢ, RBVars.MDEIM_F.idx, RBVars.MDEIM_F.el,
+    RBVars.MDEIM_H.Matᵢ, RBVars.MDEIM_H.idx, RBVars.MDEIM_H.el,
+    RBVars.MDEIM_L.Matᵢ, RBVars.MDEIM_L.idx, RBVars.MDEIM_L.el)
   M_DEIM_names = (
-    "MDEIMᵢ_A","MDEIM_idx_A","row_idx_A","sparse_el_A",
-    "DEIMᵢ_F","DEIM_idx_F","sparse_el_F",
-    "DEIMᵢ_H","DEIM_idx_H","sparse_el_H",
-    "DEIMᵢ_L","DEIM_idx_L","sparse_el_L")
+    "Matᵢ_A","idx_A","el_A",
+    "Matᵢ_F","idx_F","el_F",
+    "Matᵢ_H","idx_H","el_H",
+    "Matᵢ_L","idx_L","el_L")
   save_structures_in_list(M_DEIM_vars, M_DEIM_names, RBInfo.ROM_structures_path)
 
 end
@@ -413,30 +384,13 @@ function get_θ_matrix(
   var::String) where T
 
   if var == "A"
-    return θ_matrix(FEMSpace, RBInfo, RBVars, Param, Param.α, RBVars.MDEIMᵢ_A,
-      RBVars.MDEIM_idx_A, RBVars.sparse_el_A, "A")::Matrix{T}
-  else
-    error("Unrecognized variable")
-  end
-
-end
-
-function get_θ_vector(
-  FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS{T},
-  RBVars::PoissonS,
-  Param::ParamInfoS,
-  var::String) where T
-
-  if var == "F"
-    return θ_vector(FEMSpace, RBInfo, RBVars, Param, Param.f, RBVars.DEIMᵢ_F,
-      RBVars.DEIM_idx_F, RBVars.sparse_el_F, "F")::Matrix{T}
+    return θ_matrix(FEMSpace, RBInfo, RBVars, Param, Param.α, RBVars.MDEIM_A, "A")::Matrix{T}
+  elseif var == "F"
+    return θ_matrix(FEMSpace, RBInfo, RBVars, Param, Param.f, RBVars.MDEIM_F, "F")::Matrix{T}
   elseif var == "H"
-    return θ_vector(FEMSpace, RBInfo, RBVars, Param, Param.h, RBVars.DEIMᵢ_H,
-      RBVars.DEIM_idx_H, RBVars.sparse_el_H, "H")::Matrix{T}
+    return θ_matrix(FEMSpace, RBInfo, RBVars, Param, Param.h, RBVars.MDEIM_H, "H")::Matrix{T}
   elseif var == "L"
-    return θ_vector(FEMSpace, RBInfo, RBVars, Param, Param.g, RBVars.DEIMᵢ_L,
-      RBVars.DEIM_idx_L, RBVars.sparse_el_L, "L")::Matrix{T}
+    return θ_matrix(FEMSpace, RBInfo, RBVars, Param, Param.g, RBVars.MDEIM_L, "L")::Matrix{T}
   else
     error("Unrecognized variable")
   end

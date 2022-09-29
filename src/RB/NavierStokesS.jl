@@ -68,19 +68,11 @@ function assemble_offline_structures(
 
   RBVars.offline_time += @elapsed begin
     for var ∈ setdiff(operators, RBInfo.probl_nl)
-      if var ∈ ("A", "B")
-        assemble_affine_matrices(RBInfo, RBVars, var)
-      else
-        assemble_affine_vectors(RBInfo, RBVars, var)
-      end
+      assemble_affine_structures(RBInfo, RBVars, var)
     end
 
     for var ∈ intersect(operators, RBInfo.probl_nl)
-      if var ∈ ("A", "B", "C", "D")
-        assemble_MDEIM_matrices(RBInfo, RBVars, var)
-      else
-        assemble_DEIM_vectors(RBInfo, RBVars, var)
-      end
+      assemble_MDEIM_structures(RBInfo, RBVars, var)
     end
   end
 

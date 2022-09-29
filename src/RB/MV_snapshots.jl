@@ -121,6 +121,7 @@ end
 function get_snaps_MDEIM(
   FEMSpace::FEMProblemS,
   RBInfo::ROMInfoS,
+  RBVars::RBProblemS,
   μ::Vector{Vector{T}},
   var::String) where T
 
@@ -132,25 +133,6 @@ function get_snaps_MDEIM(
 
   snaps, _ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
   snaps, row_idx
-
-end
-
-function get_snaps_MDEIM(
-  FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS,
-  RBVars::RBProblemS,
-  μ::Vector{Vector{T}},
-  var::String) where T
-
-  snaps, row_idx = assemble_matrix_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
-
-  snaps_POD = Matrix{T}[]
-  for i = eachindex(snaps)
-    snap, _ = M_DEIM_POD(snaps[i], RBInfo.ϵₛ)
-    push!(snaps_POD, snap)
-  end
-
-  snaps_POD, row_idx
 
 end
 

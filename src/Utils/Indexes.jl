@@ -6,18 +6,6 @@ function from_vec_to_mat_idx(idx::Vector{Int}, Nₕ::Int)
   row_idx, col_idx
 end
 
-function from_vec_to_mat_idx(idx::Vector{Vector{Int}}, Nₕ::Int)
-
-  row_idx, col_idx = Vector{Int}[], Vector{Int}[]
-  for nb = eachindex(idx)
-    push!(row_idx, from_vec_to_mat_idx(idx[nb], Nₕ)[1])
-    push!(col_idx, from_vec_to_mat_idx(idx[nb], Nₕ)[2])
-  end
-
-  row_idx, col_idx
-
-end
-
 """Given a sparse NₕxC matrix Msparse and its NfullxC full representation Mfull,
  obtained by removing the zero-valued rows of Msparse, this function takes as
  input the vector of indexes 'full_idx' (referred to Mfull) and returns the vector
@@ -30,21 +18,6 @@ function from_full_idx_to_sparse_idx(
   Nfull = length(sparse_to_full_idx)
   full_idx_space,full_idx_time = from_vec_to_mat_idx(full_idx, Nfull)
   (full_idx_time.-1)*Nₕ^2+sparse_to_full_idx[full_idx_space]
-
-end
-
-function from_full_idx_to_sparse_idx(
-  full_idx::Vector{Vector{Int}},
-  sparse_to_full_idx::Vector{Int},
-  Nₕ::Int)
-
-  sparse_idx = Vector{Int}[]
-  for nb = eachindex(full_idx)
-    push!(sparse_idx,
-      from_full_idx_to_sparse_idx(full_idx[nb], sparse_to_full_idx, Nₕ))
-  end
-
-  sparse_idx
 
 end
 
@@ -71,12 +44,4 @@ end
 function Base.argmax(v::Vector{T},n_val::Int) where T
   s = sort(v,rev=true)
   idx = Int.(indexin(s,v))[1:n_val]
-end
-
-function unique_block(vv::Vector{Vector{T}}) where T
-  uvv = Vector{T}[]
-  for b = eachindex(vv)
-    push!(uvv, unique(vv[b]))
-  end
-  uvv
 end
