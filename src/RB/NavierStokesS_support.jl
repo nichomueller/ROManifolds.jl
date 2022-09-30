@@ -261,7 +261,13 @@ function get_θ_matrix(
   Param::ParamInfoS,
   var::String) where T
 
-  get_θ_matrix(FEMSpace, RBInfo, RBVars.Stokes, Param, var)
+  if var == "C"
+    θ_function(FEMSpace, RBVars, RBVars.MDEIM_C, "C")
+  elseif var == "D"
+    θ_function(FEMSpace, RBVars, RBVars.MDEIM_D, "D")
+  else
+    get_θ_matrix(FEMSpace, RBInfo, RBVars.Stokes, Param, var)
+  end
 
 end
 

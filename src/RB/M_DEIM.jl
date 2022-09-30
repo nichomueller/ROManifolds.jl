@@ -160,6 +160,18 @@ function M_DEIM_online(
   Matᵢ::Matrix{T},
   idx::Vector{Int}) where T
 
-  @fastmath (Matᵢ \ Matrix{T}(reshape(Mat_nonaffine, :, RBVars.Nₜ)[idx, :]))
+  @fastmath Matᵢ \ Matrix{T}(reshape(Mat_nonaffine, :, RBVars.Nₜ)[idx, :])
+
+end
+
+function M_DEIM_online(
+  ::RBProblemS,
+  Fun_nonaffine::Function,
+  Matᵢ::Matrix{T},
+  idx::Vector{Int}) where T
+
+  function θ(u)
+    @fastmath Matᵢ \ Matrix{T}(reshape(Fun_nonaffine(u), :, 1)[idx, :])
+  end
 
 end

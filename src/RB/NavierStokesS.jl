@@ -127,41 +127,32 @@ function get_θ(
   RBVars::NavierStokesS,
   Param::ParamInfoS)
 
-  θᵃ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "A")
-  θᵇ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "B")
-
-  if !RBInfo.online_RHS
-    θᶠ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "F")
-    θʰ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "H")
-    θˡ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "L")
-    θˡᶜ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "Lc")
-  else
-    θᶠ, θʰ, θˡ, θˡᶜ = (Matrix{T}(undef,0,0), Matrix{T}(undef,0,0),
-      Matrix{T}(undef,0,0), Matrix{T}(undef,0,0))
-  end
-
-  return θᵃ, θᵇ, θᶠ, θʰ, θˡ, θˡᶜ
+  θᶜ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "C")
+  θᵈ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "D")
+  get_θ(FEMSpace, RBInfo, RBVars.Stokes, Param)..., θᶜ, θᵈ
 
 end
 
-function get_RB_jacobian_and_residual(RBVars::NavierStokesS{T}) where T
+function get_RB_JinvRes(
+  RBVars::NavierStokesS{T},
+  θᶜ::Function,
+  θᵈ::Function) where T
 
-  Cₙ(x̂::Matrix{T}) = sum([RBVars.Cₙ[:, :, q] * x̂[q] for q = 1:RBVars.Qᶜ])
-  Dₙ(x̂::Matrix{T}) = sum([RBVars.Dₙ[:, :, q] * x̂[q] for q = 1:RBVars.Qᵈ])
+  Cₙ(u::FEFunction) = sum([RBVars.Cₙ[:, :, q] * θᶜ(u)[q] for q = 1:RBVars.Qᶜ])::Matrix{T}
+  Dₙ(u::FEFunction) = sum([RBVars.Dₙ[:, :, q] * θᵈ(u)[q] for q = 1:RBVars.Qᵈ])::Matrix{T}
 
-  function J(x̂::Matrix{T}) where T
-    (vcat(hcat(RBVars.LHSₙ[1] + Cₙ(x̂) + Dₙ(x̂), RBVars.LHSₙ[2]),
-      hcat(RBVars.LHSₙ[3], zeros(T, RBVars.nₛᵖ, RBVars.nₛᵖ))))
+  function JinvₙResₙ(u::FEFunction, x̂::Matrix{T}) where T
+    Cₙu, Dₙu = Cₙ(u), Dₙ(u)
+    LHSₙ = (vcat(hcat(RBVars.LHSₙ[1] + Cₙu, RBVars.LHSₙ[2]),
+      hcat(RBVars.LHSₙ[3], zeros(T, RBVars.nₛᵖ, RBVars.nₛᵖ))))::Matrix{T}
+    RHSₙ =  vcat(RBVars.RHSₙ[1], zeros(T, RBVars.nₛᵖ, 1))::Matrix{T}
+    Jₙ = LHSₙ + (vcat(hcat(Dₙu, zeros(T, RBVars.nₛᵘ, RBVars.nₛᵖ)),
+      hcat(zeros(T, RBVars.nₛᵖ, RBVars.nₛᵘ), zeros(T, RBVars.nₛᵖ, RBVars.nₛᵖ))))::Matrix{T}
+    resₙ = (LHSₙ * x̂ - RHSₙ)::Matrix{T}
+    (Jₙ \ resₙ)::Matrix{T}
   end
 
-  function res(x̂::Matrix{T}) where T
-    LHSₙ = (vcat(hcat(RBVars.LHSₙ[1] + Cₙ(x̂), RBVars.LHSₙ[2]),
-      hcat(RBVars.LHSₙ[3], zeros(T, RBVars.nₛᵖ, RBVars.nₛᵖ))))
-    RHSₙ =  vcat(RBVars.RHSₙ[1], zeros(T, RBVars.nₛᵖ, 1))
-    return LHSₙ * x̂ - RHSₙ
-  end
-
-  J::Function, res::Function
+  JinvₙResₙ::Function
 
 end
 
@@ -179,41 +170,48 @@ function get_RB_system(
   RBVars.online_time = @elapsed begin
     operators = get_system_blocks(RBInfo, RBVars, RHS_blocks)
 
-    θᵃ, θᵇ, θᶠ, θʰ, θˡ, θˡᶜ = get_θ(FEMSpace, RBInfo, RBVars, Param)
+    θᵃ, θᵇ, θᶠ, θʰ, θˡ, θˡᶜ, θᶜ, θᵈ = get_θ(FEMSpace, RBInfo, RBVars, Param)
 
     get_RB_LHS_blocks(RBVars.Stokes, θᵃ, θᵇ)
-    if !RBInfo.online_RHS
-      get_RB_RHS_blocks(RBVars.Stokes, θᶠ, θʰ, θˡ, θˡᶜ)
-    else
-      assemble_param_RHS(FEMSpace, RBInfo, RBVars.Stokes, Param)
+    if "RHS" ∈ operators
+      if !RBInfo.online_RHS
+        get_RB_RHS_blocks(RBVars.Stokes, θᶠ, θʰ, θˡ, θˡᶜ)
+      else
+        assemble_param_RHS(FEMSpace, RBInfo, RBVars.Stokes, Param)
+      end
     end
 
-    J, res = get_RB_jacobian_and_residual(RBVars)
+    JinvₙResₙ = get_RB_JinvRes(RBVars, θᶜ, θᵈ)
   end
 
   save_system_blocks(RBInfo,RBVars,RHS_blocks,operators)
 
-  J::Function, res::Function
+  JinvₙResₙ::Function
 
 end
 
 function newton(
+  FEMSpace::FEMProblemS,
   RBVars::NavierStokesS{T},
-  J::Function,
-  res::Function,
+  JinvₙResₙ::Function,
   ϵ=1e-9,
   max_k=10) where T
 
+  x̂mat = zeros(T, RBVars.nₛᵘ + RBVars.nₛᵖ, 1)
+  δx̂ = 1. .+ x̂mat
+  u = FEFunction(FEMSpace.V, zeros(T, RBVars.Nₛᵘ))
   k = 1
-  xᵏ = zeros(T, RBVars.nₛᵘ + RBVars.nₛᵖ, 1)
 
-  while k ≤ max_k && norm(res(xᵏ)) ≥ ϵ
-    println("Cond: $(cond(RBVars.LHSₙ[1])); iter: $k; res: $(norm(res(xᵏ)))")
-    xᵏ -= J(xᵏ) \ res(xᵏ)
+  while k ≤ max_k && norm(δx̂) ≥ ϵ
+    println("Iter: $k; ||δx̂||₂: $(norm(δx̂))")
+    δx̂ = JinvₙResₙ(u, x̂mat)
+    x̂mat -= δx̂
+    u = FEFunction(FEMSpace.V, RBVars.Φₛᵘ * x̂mat[1:RBVars.nₛᵘ])
     k += 1
   end
 
-  xᵏ::Matrix{T}
+  println("Newton-Raphson ended with iter: $k; ||δx̂||₂: $(norm(δx̂))")
+  x̂mat::Matrix{T}
 
 end
 
@@ -223,10 +221,10 @@ function solve_RB_system(
   RBVars::NavierStokesS,
   Param::ParamInfoS) where T
 
-  J, res = get_RB_system(FEMSpace, RBInfo, RBVars, Param)
+  JinvₙResₙ = get_RB_system(FEMSpace, RBInfo, RBVars, Param)
   println("Solving RB problem via Newton-Raphson iterations")
   RBVars.online_time += @elapsed begin
-    xₙ = newton(RBVars, J, res)
+    xₙ = newton(FEMSpace, RBVars, JinvₙResₙ)
   end
 
   RBVars.uₙ = xₙ[1:RBVars.nₛᵘ,:]
