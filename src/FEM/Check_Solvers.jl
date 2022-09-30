@@ -131,6 +131,8 @@ function check_navier_stokes_solver()
     DataFrame))[:, nb]
   x = vcat(u, p)
 
+  ufun = FEFunction(FEMSpace.V, u)
+
   A = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "A")
   B = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "B")
   C = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "C")
@@ -140,7 +142,7 @@ function check_navier_stokes_solver()
   L = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "L")
   Lc = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "Lc")
 
-  RHS = vcat(F + H - L, - Lc)
+  RHS = vcat(F + 0*H - L, - Lc)
 
   function J(x)
     xvec = get_free_dof_values(x)
@@ -163,6 +165,12 @@ function check_navier_stokes_solver()
 
   x₀ = FEFunction(FEMSpace.X, zeros(FEMSpace.Nₛᵘ + FEMSpace.Nₛᵖ))
   x₁ = x₀ - J(x₀) \ res(x₀)
+
+  û = RBVars.Φₛᵘ' * u
+  Capp = sum([RBVars.MDEIM_C.Mat[:,q] * û[q]
+    for q = 1:size(RBVars.MDEIM_C.Mat, 2)])
+  _, vc = findnz(C(ufun)[:])
+  maximum(abs.(vc - Capp))
 
 end
 

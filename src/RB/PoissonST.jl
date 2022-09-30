@@ -85,23 +85,11 @@ function assemble_offline_structures(
 
   RBVars.offline_time += @elapsed begin
     for var ∈ setdiff(operators, RBInfo.probl_nl)
-      if var ∈ ("A", "M")
-        assemble_affine_matrices(RBInfo, RBVars, var)
-      else
-        assemble_affine_vectors(RBInfo, RBVars, var)
-      end
+      assemble_affine_structures(RBInfo, RBVars, var)
     end
-  end
 
-  save_affine_structures(RBInfo, RBVars)
-
-  RBVars.offline_time += @elapsed begin
     for var ∈ intersect(operators, RBInfo.probl_nl)
-      if var ∈ ("A", "M")
-        assemble_MDEIM_matrices(RBInfo, RBVars, var)
-      else
-        assemble_DEIM_vectors(RBInfo, RBVars, var)
-      end
+      assemble_MDEIM_structures(RBInfo, RBVars, var)
     end
   end
 
@@ -164,9 +152,9 @@ function get_θ(
   θᵐ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "M")
 
   if !RBInfo.online_RHS
-    θᶠ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "F")
-    θʰ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "H")
-    θˡ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "L")
+    θᶠ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "F")
+    θʰ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "H")
+    θˡ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "L")
   else
     θᶠ, θʰ, θˡ = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
   end

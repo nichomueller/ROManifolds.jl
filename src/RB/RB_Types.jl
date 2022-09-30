@@ -305,10 +305,7 @@ end
 
 function Base.getproperty(RBVars::PoissonST, sym::Symbol)
   if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
-    :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A, :DEIM_mat_F,
-    :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H, :DEIM_idx_H,
-    :sparse_el_H, :DEIM_mat_L, :DEIMᵢ_L, :DEIM_idx_L,
-    :sparse_el_L, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :Qˡ, :offline_time, :online_time)
+    :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :Qˡ, :offline_time, :online_time)
     getfield(RBVars.Steady, sym)
   else
     getfield(RBVars, sym)
@@ -317,10 +314,7 @@ end
 
 function Base.setproperty!(RBVars::PoissonST, sym::Symbol, x::T) where T
   if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
-    :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A, :DEIM_mat_F,
-    :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H, :DEIM_idx_H,
-    :sparse_el_H, :DEIM_mat_L, :DEIMᵢ_L, :DEIM_idx_L,
-    :sparse_el_L, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :Qˡ, :offline_time, :online_time)
+    :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :Qˡ, :offline_time, :online_time)
     setfield!(RBVars.Steady, sym, x)::T
   else
     setfield!(RBVars, sym, x)::T
@@ -329,10 +323,8 @@ end
 
 function Base.getproperty(RBVars::ADRS, sym::Symbol)
   if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
-    :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A, :DEIM_mat_F,
-    :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H, :DEIM_idx_H,
-    :sparse_el_H, :DEIM_mat_L, :DEIMᵢ_L, :DEIM_idx_L,
-    :sparse_el_L, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :Qˡ, :offline_time, :online_time)
+    :MDEIM_A, :MDEIM_F, :MDEIM_H, :MDEIM_L, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :Qˡ,
+    :offline_time, :online_time)
     getfield(RBVars.Poisson, sym)
   else
     getfield(RBVars, sym)
@@ -341,10 +333,8 @@ end
 
 function Base.setproperty!(RBVars::ADRS, sym::Symbol, x::T) where T
   if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
-    :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A, :DEIM_mat_F,
-    :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H, :DEIM_idx_H,
-    :sparse_el_H, :DEIM_mat_L, :DEIMᵢ_L, :DEIM_idx_L,
-    :sparse_el_L, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :Qˡ, :offline_time, :online_time)
+    :MDEIM_A, :MDEIM_F, :MDEIM_H, :MDEIM_L, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :Qˡ,
+    :offline_time, :online_time)
     setfield!(RBVars.Poisson, sym, x)::T
   else
     setfield!(RBVars, sym, x)::T
@@ -407,16 +397,11 @@ function Base.setproperty!(RBVars::StokesS, sym::Symbol, x::T) where T
 end
 
 function Base.getproperty(RBVars::StokesST, sym::Symbol)
-  if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
-    :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A, :DEIM_mat_F,
-    :MDEIM_mat_B, :MDEIMᵢ_B, :MDEIM_idx_B, :row_idx_B, :sparse_el_B,
-    :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H, :DEIM_idx_H,
-    :sparse_el_H, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :offline_time, :online_time,
-    :Φₜᵘ, :Mₙ, :MDEIM_mat_M, :MDEIMᵢ_M, :MDEIM_idx_M, :row_idx_M, :sparse_el_M,
-    :MDEIM_idx_time_A, :MDEIM_idx_time_M, :DEIM_idx_time_F, :DEIM_idx_time_H,
-    :Nₜ, :Nᵘ, :nₜᵘ, :nᵘ, :Qᵐ, :Qᵇ)
+  if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Sᵖ, :Φₛᵘ, :p̃, :pₙ, :p̂, :Aₙ, :Bₙ, :Fₙ, :Hₙ,
+    :Lₙ, :Lcₙ, :Xᵘ₀, :LHSₙ, :RHSₙ, :Nₛᵘ, :Nₛᵖ, :nₜᵘ, :nₛᵖ, :nₛᵘ, :Qᵃ, :Qᵇ, :Qᶠ,
+    :Qʰ, :Qˡ, :Qˡᶜ, :offline_time, :online_time, :Φₜᵘ, :Mₙ, :Nₜ, :Nᵘ, :nᵘ)
     getfield(RBVars.Steady, sym)
-  elseif sym in (:Sᵖ, :Φₛᵘ, :p̃, :pₙ, :p̂, :Bₙ, :Xᵘ, :Xᵖ₀, :Nₛᵖ, :nₛᵖ)
+  elseif sym in (:Mₙ, :Xᵘ, :Xᵖ₀, :MDEIM_A, :MDEIM_M, :MDEIM_F, :MDEIM_H, :MDEIM_L, :Qᵐ)
     getfield(RBVars.Poisson, sym)
   else
     getfield(RBVars, sym)
@@ -424,16 +409,11 @@ function Base.getproperty(RBVars::StokesST, sym::Symbol)
 end
 
 function Base.setproperty!(RBVars::StokesST, sym::Symbol, x::T) where T
-  if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
-    :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A, :DEIM_mat_F,
-    :MDEIM_mat_B, :MDEIMᵢ_B, :MDEIM_idx_B, :row_idx_B, :sparse_el_B,
-    :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H, :DEIM_idx_H,
-    :sparse_el_H, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :offline_time, :online_time,
-    :Φₜᵘ, :Mₙ, :MDEIM_mat_M, :MDEIMᵢ_M, :MDEIM_idx_M, :row_idx_M, :sparse_el_M,
-    :MDEIM_idx_time_A, :MDEIM_idx_time_M, :DEIM_idx_time_F, :DEIM_idx_time_H,
-    :Nₜ, :Nᵘ, :nₜᵘ, :nᵘ, :Qᵐ, :Qᵇ)
+  if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Sᵖ, :Φₛᵘ, :p̃, :pₙ, :p̂, :Aₙ, :Bₙ, :Fₙ, :Hₙ,
+    :Lₙ, :Lcₙ, :Xᵘ₀, :LHSₙ, :RHSₙ, :Nₛᵘ, :Nₛᵖ, :nₜᵘ, :nₛᵖ, :nₛᵘ, :Qᵃ, :Qᵇ, :Qᶠ,
+    :Qʰ, :Qˡ, :Qˡᶜ, :offline_time, :online_time, :Φₜᵘ, :Mₙ, :Nₜ, :Nᵘ, :nᵘ)
     setfield!(RBVars.Steady, sym, x)::T
-  elseif sym in (:Sᵖ, :Φₛᵘ, :p̃, :pₙ, :p̂, :Bₙ, :Xᵘ, :Xᵖ₀, :Nₛᵖ, :nₛᵖ)
+  elseif sym in (:Mₙ, :Xᵘ, :Xᵖ₀, :MDEIM_A, :MDEIM_M, :MDEIM_F, :MDEIM_H, :MDEIM_L, :Qᵐ)
     setfield!(RBVars.Poisson, sym, x)::T
   else
     setfield!(RBVars, sym, x)::T

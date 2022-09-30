@@ -201,13 +201,13 @@ function newton(
   RBVars::NavierStokesS{T},
   J::Function,
   res::Function,
-  ϵ::Float,
+  ϵ=1e-9,
   max_k=10) where T
 
   k = 1
   xᵏ = zeros(T, RBVars.nₛᵘ + RBVars.nₛᵖ, 1)
 
-  while k ≤ max_k && norm(res(xᵏ)) ≥ ϵ^2
+  while k ≤ max_k && norm(res(xᵏ)) ≥ ϵ
     println("Cond: $(cond(RBVars.LHSₙ[1])); iter: $k; res: $(norm(res(xᵏ)))")
     xᵏ -= J(xᵏ) \ res(xᵏ)
     k += 1
@@ -226,7 +226,7 @@ function solve_RB_system(
   J, res = get_RB_system(FEMSpace, RBInfo, RBVars, Param)
   println("Solving RB problem via Newton-Raphson iterations")
   RBVars.online_time += @elapsed begin
-    xₙ = newton(RBVars, J, res, RBInfo.ϵₛ)
+    xₙ = newton(RBVars, J, res)
   end
 
   RBVars.uₙ = xₙ[1:RBVars.nₛᵘ,:]
