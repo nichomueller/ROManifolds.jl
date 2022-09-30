@@ -131,10 +131,10 @@ function get_θ(
   θᵇ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "B")
 
   if !RBInfo.online_RHS
-    θᶠ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "F")
-    θʰ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "H")
-    θˡ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "L")
-    θˡᶜ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "Lc")
+    θᶠ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "F")
+    θʰ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "H")
+    θˡ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "L")
+    θˡᶜ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "Lc")
   else
     θᶠ, θʰ, θˡ, θˡᶜ = (Matrix{T}(undef,0,0), Matrix{T}(undef,0,0),
       Matrix{T}(undef,0,0), Matrix{T}(undef,0,0))
@@ -146,16 +146,16 @@ end
 
 function get_RB_jacobian_and_residual(RBVars::NavierStokesS{T}) where T
 
-  function J(x̂::Vector{T}) where T
-    CDₙû = [(RBVars.Cₙ[:, :, nₛ] + RBVars.Dₙ[:, :, nₛ])
-      * x̂[nₛ] for nₛ = 1:RBVars.nₛᵘ]
-    return (vcat(hcat(RBVars.LHSₙ[1] + CDₙû, RBVars.LHSₙ[2]),
+  Cₙ(x̂::Matrix{T}) = sum([RBVars.Cₙ[:, :, q] * x̂[q] for q = 1:RBVars.Qᶜ])
+  Dₙ(x̂::Matrix{T}) = sum([RBVars.Dₙ[:, :, q] * x̂[q] for q = 1:RBVars.Qᵈ])
+
+  function J(x̂::Matrix{T}) where T
+    (vcat(hcat(RBVars.LHSₙ[1] + Cₙ(x̂) + Dₙ(x̂), RBVars.LHSₙ[2]),
       hcat(RBVars.LHSₙ[3], zeros(T, RBVars.nₛᵖ, RBVars.nₛᵖ))))
   end
 
-  function res(x̂::Vector{T}) where T
-    Cₙû = [RBVars.Cₙ[:, :, nₛ] * x̂[nₛ] for nₛ = 1:RBVars.nₛᵘ]
-    LHSₙ = (vcat(hcat(RBVars.LHSₙ[1] + Cₙû, RBVars.LHSₙ[2]),
+  function res(x̂::Matrix{T}) where T
+    LHSₙ = (vcat(hcat(RBVars.LHSₙ[1] + Cₙ(x̂), RBVars.LHSₙ[2]),
       hcat(RBVars.LHSₙ[3], zeros(T, RBVars.nₛᵖ, RBVars.nₛᵖ))))
     RHSₙ =  vcat(RBVars.RHSₙ[1], zeros(T, RBVars.nₛᵖ, 1))
     return LHSₙ * x̂ - RHSₙ
@@ -174,9 +174,10 @@ function get_RB_system(
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
   get_Q(RBVars)
+  RHS_blocks = [1, 2]
 
   RBVars.online_time = @elapsed begin
-    operators = get_system_blocks(RBInfo, RBVars, LHS_blocks, RHS_blocks)
+    operators = get_system_blocks(RBInfo, RBVars, RHS_blocks)
 
     θᵃ, θᵇ, θᶠ, θʰ, θˡ, θˡᶜ = get_θ(FEMSpace, RBInfo, RBVars, Param)
 
@@ -190,7 +191,7 @@ function get_RB_system(
     J, res = get_RB_jacobian_and_residual(RBVars)
   end
 
-  save_system_blocks(RBInfo,RBVars,LHS_blocks,RHS_blocks,operators)
+  save_system_blocks(RBInfo,RBVars,RHS_blocks,operators)
 
   J::Function, res::Function
 
@@ -206,9 +207,9 @@ function newton(
   k = 1
   xᵏ = zeros(T, RBVars.nₛᵘ + RBVars.nₛᵖ, 1)
 
-  while k ≤ max_k && norm(res(xᵏ)) ≥ ϵ
+  while k ≤ max_k && norm(res(xᵏ)) ≥ ϵ^2
     println("Cond: $(cond(RBVars.LHSₙ[1])); iter: $k; res: $(norm(res(xᵏ)))")
-    xᵏ -= J \ res(xᵏ)
+    xᵏ -= J(xᵏ) \ res(xᵏ)
     k += 1
   end
 
@@ -223,7 +224,7 @@ function solve_RB_system(
   Param::ParamInfoS) where T
 
   J, res = get_RB_system(FEMSpace, RBInfo, RBVars, Param)
-  println("Solving RB problem via Newton iterations")
+  println("Solving RB problem via Newton-Raphson iterations")
   RBVars.online_time += @elapsed begin
     xₙ = newton(RBVars, J, res, RBInfo.ϵₛ)
   end

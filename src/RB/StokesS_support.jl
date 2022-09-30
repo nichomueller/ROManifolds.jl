@@ -228,14 +228,14 @@ function assemble_affine_structures(
     RBVars.Bₙ = zeros(T, RBVars.nₛᵖ, RBVars.nₛᵘ, 1)
     RBVars.Bₙ[:,:,1] = (RBVars.Φₛᵖ)' * B * RBVars.Φₛᵘ
     RBVars.Qᵇ = 1
-  if var == "Lc"
+  elseif var == "Lc"
     println("Assembling affine reduced Lc")
     Lc = load_CSV(Matrix{T}(undef,0,0),
       joinpath(get_FEM_structures_path(RBInfo), "Lc.csv"))
     RBVars.Lcₙ = RBVars.Φₛᵖ' * Lc
     RBVars.Qˡᶜ = 1
   else
-    assemble_affine_vectors(RBInfo, RBVars.Poisson, var)
+    assemble_affine_structures(RBInfo, RBVars.Poisson, var)
   end
 
 end
@@ -323,7 +323,7 @@ function assemble_reduced_mat_MDEIM(
     RBVars.Lcₙ = reshape(Vecₙ, :, Q)
     RBVars.Qˡᶜ = Q
   else
-    assemble_reduced_mat_DEIM(RBVars.Poisson, MDEIM, var)
+    assemble_reduced_mat_MDEIM(RBVars.Poisson, MDEIM, var)
   end
 
 end

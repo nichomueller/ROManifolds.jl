@@ -325,12 +325,12 @@ function assemble_vector_snapshots(
 
   Vec = Matrix{T}(undef,0,0)
 
-  for i_nₛ = 1:RBInfo.nₛ_DEIM
+  for i_nₛ = 1:RBInfo.nₛ_MDEIM
     println("Snapshot number $i_nₛ, $var")
     Param = get_ParamInfo(RBInfo, μ[i_nₛ])
     v = assemble_FEM_structure(FEMSpace, RBInfo, Param, var)[:]
     if i_nₛ == 1
-      Vec = zeros(T, length(v), RBInfo.nₛ_DEIM)
+      Vec = zeros(T, length(v), RBInfo.nₛ_MDEIM)
     end
     Vec[:, i_nₛ] = v
   end
@@ -382,7 +382,7 @@ function standard_DEIM(
   timesθ::Vector,
   var::String) where T
 
-  (nₛ_min, nₛ_max) = sort([RBInfo.nₛ_DEIM, RBInfo.nₛ_DEIM_time])
+  (nₛ_min, nₛ_max) = sort([RBInfo.nₛ_MDEIM, RBInfo.nₛ_MDEIM_time])
   snaps_space, snaps_time = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
 
   @simd for k = 1:nₛ_min
@@ -398,7 +398,7 @@ function standard_DEIM(
     end
   end
 
-  if nₛ_min == RBInfo.nₛ_DEIM
+  if nₛ_min == RBInfo.nₛ_MDEIM
     @simd for k = nₛ_min+1:nₛ_max
       println("Considering parameter number $k/$nₛ_max")
       snapsₖ = assemble_vector_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)

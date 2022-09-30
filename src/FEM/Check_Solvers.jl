@@ -134,21 +134,39 @@ function check_navier_stokes_solver()
   A = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "A")
   B = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "B")
   C = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "C")
+  D = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "D")
   F = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "F")
   H = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "H")
   L = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "L")
   Lc = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "Lc")
 
-  ufun = FEFunction(FEMSpace.V, u)
-
-  LHS = vcat(hcat(A + C(ufun), -B'), hcat(B, zeros(T, FEMSpace.Nₛᵖ, FEMSpace.Nₛᵖ)))
   RHS = vcat(F + H - L, - Lc)
 
-  LHS * x - RHS # not exactly right, but the result should be closer
+  function J(x)
+    xvec = get_free_dof_values(x)
+    uvec = xvec[1:FEMSpace.Nₛᵘ]
+    u = FEFunction(FEMSpace.V, uvec)
+
+    vcat(hcat(A+C(u)+D(u), -B'), hcat(B, zeros(T, FEMSpace.Nₛᵖ, FEMSpace.Nₛᵖ)))
+  end
+
+  function res(x)
+    xvec = get_free_dof_values(x)
+    uvec = xvec[1:FEMSpace.Nₛᵘ]
+    u = FEFunction(FEMSpace.V, uvec)
+
+    LHS = vcat(hcat(A+C(u)+D(u), -B'), hcat(B, zeros(T, FEMSpace.Nₛᵖ, FEMSpace.Nₛᵖ)))
+    LHS * xvec - RHS
+  end
+
+  res(FEFunction(FEMSpace.X, x))
+
+  x₀ = FEFunction(FEMSpace.X, zeros(FEMSpace.Nₛᵘ + FEMSpace.Nₛᵖ))
+  x₁ = x₀ - J(x₀) \ res(x₀)
 
 end
 
-function get_matrix_vector_nl_problem(nls::FESolver,op::FEOperator)
+function get_matrix_vector_nl_problem(operator::FEOperator)
   # src/Algebra/NLSolvers.jl
   x₀ = FEFunction(FEMSpace.X, zeros(FEMSpace.Nₛᵘ + FEMSpace.Nₛᵖ))
   u₀ = FEFunction(FEMSpace.V, zeros(FEMSpace.Nₛᵘ))

@@ -64,9 +64,9 @@ function MDEIM_offline!(
 
   Mat, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
   idx_full, Matᵢ = M_DEIM_offline(Mat)
-  idx, _ = from_vec_to_mat_idx(
-    from_full_idx_to_sparse_idx(idx_full, row_idx, Nₕ), Nₕ)
-  el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(idx))
+  idx = from_full_idx_to_sparse_idx(idx_full, row_idx, Nₕ)
+  idx_space, _ = from_vec_to_mat_idx(idx, Nₕ)
+  el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(idx_space))
 
   MDEIM.Mat, MDEIM.Matᵢ, MDEIM.idx, MDEIM.row_idx, MDEIM.el =
     Mat, Matᵢ, idx, row_idx, el
@@ -85,9 +85,9 @@ function MDEIM_offline!(
   Mat, Mat_time, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
 
   idx_full, Matᵢ = M_DEIM_offline(Mat)
-  idx, _ = from_vec_to_mat_idx(
-    from_full_idx_to_sparse_idx(idx_full, row_idx, Nₕ), Nₕ)
-  el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(idx))
+  idx = from_full_idx_to_sparse_idx(idx_full, row_idx, Nₕ)
+  idx_space, _ = from_vec_to_mat_idx(idx, Nₕ)
+  el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(idx_space))
 
   idx_time, _ = M_DEIM_offline(Mat_time)
   unique!(sort!(idx_time))
@@ -107,11 +107,11 @@ function MDEIM_offline!(
   Mat = get_snaps_DEIM(FEMSpace, RBInfo, μ, var)
   idx, Matᵢ = M_DEIM_offline(Mat)
   if var == "H"
-    el = find_FE_elements(FEMSpace.V₀, FEMSpace.Γn, unique(DEIM_idx))
+    el = find_FE_elements(FEMSpace.V₀, FEMSpace.Γn, unique(idx))
   elseif var == "Lc"
-    el = find_FE_elements(FEMSpace.Q₀, FEMSpace.Ω, unique(DEIM_idx))
+    el = find_FE_elements(FEMSpace.Q₀, FEMSpace.Ω, unique(idx))
   else
-    el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(DEIM_idx))
+    el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(idx))
   end
 
   MDEIM.Mat, MDEIM.Matᵢ, MDEIM.idx, MDEIM.el = Mat, Matᵢ, idx, el
@@ -129,11 +129,11 @@ function MDEIM_offline!(
 
   idx, Matᵢ = M_DEIM_offline(Mat)
   if var == "H"
-    el = find_FE_elements(FEMSpace.V₀, FEMSpace.Γn, unique(DEIM_idx))
+    el = find_FE_elements(FEMSpace.V₀, FEMSpace.Γn, unique(idx))
   elseif var == "Lc"
-    el = find_FE_elements(FEMSpace.Q₀, FEMSpace.Ω, unique(DEIM_idx))
+    el = find_FE_elements(FEMSpace.Q₀, FEMSpace.Ω, unique(idx))
   else
-    el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(DEIM_idx))
+    el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(idx))
   end
 
   idx_time, _ = M_DEIM_offline(Mat_time)

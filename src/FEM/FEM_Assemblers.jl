@@ -251,7 +251,7 @@ end
 
 function assemble_convection(
   ::NTuple{4,Int},
-  FEMSpace::FEMProblemST)
+  FEMSpace::FEMProblemS)
 
   C(u) = assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
     (∇(FEMSpace.ϕᵤ)'⋅u) )*FEMSpace.dΩ, FEMSpace.V, FEMSpace.V₀)
@@ -811,7 +811,7 @@ function assemble_FEM_structure(
   elseif var == "C"
     assemble_convection(NT,FEMSpace)
   elseif var == "D"
-    assemble_swapped_convection(NT,FEMSpace,FEMInfo,Param)
+    assemble_swapped_convection(NT,FEMSpace)
   elseif var == "F"
     assemble_forcing(NT,FEMSpace,FEMInfo,Param)
   elseif var == "H"

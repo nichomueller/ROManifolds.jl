@@ -4,7 +4,7 @@ function set_operators(
   RBInfo::Info,
   RBVars::NavierStokesS)
 
-  append!(["C"], set_operators(RBInfo, RBVars.Stokes))
+  append!(["C", "D"], set_operators(RBInfo, RBVars.Stokes))
 
 end
 
@@ -115,7 +115,7 @@ function assemble_affine_structures(
   RBVars::NavierStokesS{T},
   var::String) where T
 
-  assemble_affine_matrices(RBInfo, RBVars.Stokes, var)
+  assemble_affine_structures(RBInfo, RBVars.Stokes, var)
 
 end
 
@@ -131,7 +131,7 @@ function assemble_MDEIM_structures(
     assemble_reduced_mat_MDEIM(RBVars, RBVars.MDEIM_C, var)
   elseif var == "D"
     if isempty(RBVars.MDEIM_D.Mat)
-      MDEIM_offline!(RBVars.MDEIM_D, RBInfo, var)
+      MDEIM_offline!(RBVars.MDEIM_D, RBInfo, RBVars, var)
     end
     assemble_reduced_mat_MDEIM(RBVars, RBVars.MDEIM_D, var)
   else
@@ -159,13 +159,24 @@ function assemble_reduced_mat_MDEIM(
 
     if var == "C"
       RBVars.Cₙ = Matₙ
+      RBVars.Qᶜ = Q
     else
       RBVars.Dₙ = Matₙ
+      RBVars.Qᵈ = Q
     end
 
   else
     assemble_reduced_mat_MDEIM(RBVars.Stokes, MDEIM, var)
   end
+
+end
+
+function assemble_reduced_mat_MDEIM(
+  RBVars::NavierStokesS{T},
+  MDEIM::MDEIMvS,
+  var::String) where T
+
+  assemble_reduced_mat_MDEIM(RBVars.Stokes, MDEIM, var)
 
 end
 
@@ -198,8 +209,8 @@ end
 
 function get_system_blocks(
   RBInfo::Info,
-  RBVars::NavierStokesS,
-  RHS_blocks::Vector{Int})
+  RBVars::NavierStokesS{T},
+  RHS_blocks::Vector{Int}) where T
 
   if !RBInfo.get_offline_structures
     return ["RHS"]
@@ -255,6 +266,9 @@ function get_θ_matrix(
 end
 
 function get_Q(RBVars::NavierStokesS)
+
+  RBVars.Qᶜ = size(RBVars.Cₙ)[end]
+  RBVars.Qᵈ = size(RBVars.Dₙ)[end]
 
   get_Q(RBVars.Stokes)
 

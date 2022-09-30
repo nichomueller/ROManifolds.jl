@@ -3,14 +3,14 @@ abstract type RBProblemS{T} <: RBProblem end
 abstract type RBProblemST{T} <: RBProblem end
 abstract type MDEIMmv{T} end
 
-mutable struct MDEIMvS{T} <: MDEIMmv
+mutable struct MDEIMvS{T} <: MDEIMmv{T}
   Mat::Matrix{T}
   Matᵢ::Matrix{T}
   idx::Vector{Int}
   el::Vector{Int}
 end
 
-mutable struct MDEIMmS{T} <: MDEIMmv
+mutable struct MDEIMmS{T} <: MDEIMmv{T}
   Mat::Matrix{T}
   Matᵢ::Matrix{T}
   idx::Vector{Int}
@@ -18,7 +18,7 @@ mutable struct MDEIMmS{T} <: MDEIMmv
   el::Vector{Int}
 end
 
-mutable struct MDEIMvST{T} <: MDEIMmv
+mutable struct MDEIMvST{T} <: MDEIMmv{T}
   Mat::Matrix{T}
   Matᵢ::Matrix{T}
   idx::Vector{Int}
@@ -27,7 +27,7 @@ mutable struct MDEIMvST{T} <: MDEIMmv
 end
 
 
-mutable struct MDEIMmST{T} <: MDEIMmv
+mutable struct MDEIMmST{T} <: MDEIMmv{T}
   Mat::Matrix{T}
   Matᵢ::Matrix{T}
   idx::Vector{Int}
@@ -41,6 +41,7 @@ function init_MDEIMvS(::Type{T}) where T
   Matᵢ = Matrix{T}(undef,0,0)
   idx = Vector{Int}(undef,0)
   el = Vector{Int}(undef,0)
+  Mat, Matᵢ, idx, el
 end
 
 function init_MDEIMmS(::Type{T}) where T
@@ -49,6 +50,7 @@ function init_MDEIMmS(::Type{T}) where T
   idx = Vector{Int}(undef,0)
   row_idx = Vector{Int}(undef,0)
   el = Vector{Int}(undef,0)
+  Mat, Matᵢ, idx, row_idx, el
 end
 
 function init_MDEIMvST(::Type{T}) where T
@@ -57,6 +59,7 @@ function init_MDEIMvST(::Type{T}) where T
   idx = Vector{Int}(undef,0)
   time_idx = Vector{Int}(undef,0)
   el = Vector{Int}(undef,0)
+  Mat, Matᵢ, idx, time_idx, el
 end
 
 function init_MDEIMmST(::Type{T}) where T
@@ -66,6 +69,7 @@ function init_MDEIMmST(::Type{T}) where T
   time_idx = Vector{Int}(undef,0)
   row_idx = Vector{Int}(undef,0)
   el = Vector{Int}(undef,0)
+  Mat, Matᵢ, idx, time_idx, row_idx, el
 end
 
 function init_RBVars(::NTuple{1,Int}, ::Type{T}) where T
@@ -100,7 +104,7 @@ function init_RBVars(::NTuple{1,Int}, ::Type{T}) where T
 
 end
 
-function init(::NTuple{2,Int}, ::Type{T}) where T
+function init_RBVars(::NTuple{2,Int}, ::Type{T}) where T
 
   Φₜᵘ = Matrix{T}(undef,0,0)
   Mₙ = Array{T}(undef,0,0,0)
@@ -119,7 +123,7 @@ function init(::NTuple{2,Int}, ::Type{T}) where T
 
 end
 
-function init(::NTuple{3,Int}, ::Type{T}) where T
+function init_RBVars(::NTuple{3,Int}, ::Type{T}) where T
 
   Bₙ = Array{T}(undef,0,0,0)
   Dₙ = Array{T}(undef,0,0,0)
@@ -130,7 +134,7 @@ function init(::NTuple{3,Int}, ::Type{T}) where T
 
 end
 
-function init(::NTuple{4,Int}, ::Type{T}) where T
+function init_RBVars(::NTuple{4,Int}, ::Type{T}) where T
 
   MDEIM_B = MDEIMmST(init_MDEIMmST(T)...)
   MDEIM_D = MDEIMmST(init_MDEIMmST(T)...)
@@ -139,7 +143,7 @@ function init(::NTuple{4,Int}, ::Type{T}) where T
 
 end
 
-function init(::NTuple{5,Int}, ::Type{T}) where T
+function init_RBVars(::NTuple{5,Int}, ::Type{T}) where T
 
   Sᵖ = Matrix{T}(undef,0,0)
   Φₛᵘ = Matrix{T}(undef,0,0)
@@ -149,7 +153,7 @@ function init(::NTuple{5,Int}, ::Type{T}) where T
   Bₙ = Array{T}(undef,0,0,0)
   Lcₙ = Matrix{T}(undef,0,0)
   MDEIM_B = MDEIMmS(init_MDEIMmS(T)...)
-  MDEIM_Lc = MDEIMmS(init_MDEIMvS(T)...)
+  MDEIM_Lc = MDEIMvS(init_MDEIMvS(T)...)
   Xᵘ = sparse([], [], T[])
   Xᵖ₀ = sparse([], [], T[])
   Nₛᵖ = 0
@@ -161,11 +165,11 @@ function init(::NTuple{5,Int}, ::Type{T}) where T
 
 end
 
-function init(::NTuple{6,Int}, ::Type{T}) where T
+function init_RBVars(::NTuple{6,Int}, ::Type{T}) where T
 
   Φₜᵖ = Matrix{T}(undef,0,0)
   MDEIM_B = MDEIMmST(init_MDEIMmST(T)...)
-  MDEIM_Lc = MDEIMmST(init_MDEIMvST(T)...)
+  MDEIM_Lc = MDEIMvST(init_MDEIMvST(T)...)
   Nᵖ = 0
   nₜᵖ = 0
   nᵖ = 0
@@ -174,18 +178,20 @@ function init(::NTuple{6,Int}, ::Type{T}) where T
 
 end
 
-function init(::NTuple{7,Int}, ::Type{T}) where T
+function init_RBVars(::NTuple{7,Int}, ::Type{T}) where T
 
   Cₙ = Array{T}(undef,0,0,0)
   Dₙ = Array{T}(undef,0,0,0)
   MDEIM_C = MDEIMmS(init_MDEIMmS(T)...)
   MDEIM_D = MDEIMmS(init_MDEIMmS(T)...)
+  Qᶜ = 0
+  Qᵈ = 0
 
-  Cₙ, Dₙ, MDEIM_C, MDEIM_D
+  Cₙ, Dₙ, MDEIM_C, MDEIM_D, Qᶜ, Qᵈ
 
 end
 
-function init(::NTuple{8,Int}, ::Type{T}) where T
+function init_RBVars(::NTuple{8,Int}, ::Type{T}) where T
 
   MDEIM_C = MDEIMmST(init_MDEIMmST(T)...)
   MDEIM_D = MDEIMmST(init_MDEIMmST(T)...)
@@ -232,6 +238,7 @@ end
 
 mutable struct NavierStokesS{T} <: RBProblemS{T}
   Stokes::StokesS{T}; Cₙ::Array{T}; Dₙ::Array{T}; MDEIM_C::MDEIMmS{T}; MDEIM_D::MDEIMmS{T}
+  Qᶜ::Int; Qᵈ::Int;
 end
 
 mutable struct NavierStokesST{T} <: RBProblemST{T}
@@ -240,21 +247,21 @@ end
 
 function setup(NT::NTuple{1,Int}, ::Type{T}) where T
 
-  PoissonS{T}(init(NT, T)...)
+  PoissonS{T}(init_RBVars(NT, T)...)
 
 end
 
 function setup(NT::NTuple{2,Int}, ::Type{T}) where T
 
   PoissonST{T}(
-    setup(get_NTuple(1, Int), T), init(NT, T)...)
+    setup(get_NTuple(1, Int), T), init_RBVars(NT, T)...)
 
 end
 
 function setup(NT::NTuple{3,Int}, ::Type{T}) where T
 
   ADRS{T}(
-    setup(get_NTuple(1, Int), T), init(NT, T)...)
+    setup(get_NTuple(1, Int), T), init_RBVars(NT, T)...)
 
 end
 
@@ -262,14 +269,14 @@ function setup(NT::NTuple{4,Int}, ::Type{T}) where T
 
   ADRST{T}(
     setup(get_NTuple(2, Int), T), setup(get_NTuple(3, Int), T),
-    init(NT, T)...)
+    init_RBVars(NT, T)...)
 
 end
 
 function setup(NT::NTuple{5,Int}, ::Type{T}) where T
 
   StokesS{T}(
-    setup(get_NTuple(1, Int), T), init(NT, T)...)
+    setup(get_NTuple(1, Int), T), init_RBVars(NT, T)...)
 
 end
 
@@ -277,14 +284,14 @@ function setup(NT::NTuple{6,Int}, ::Type{T}) where T
 
   StokesST{T}(
     setup(get_NTuple(2, Int), T), setup(get_NTuple(5, Int), T),
-    init(NT, T)...)
+    init_RBVars(NT, T)...)
 
 end
 
 function setup(NT::NTuple{7,Int}, ::Type{T}) where T
 
   NavierStokesS{T}(
-    setup(get_NTuple(5, Int), T), init(NT, T)...)
+    setup(get_NTuple(5, Int), T), init_RBVars(NT, T)...)
 
 end
 
@@ -292,7 +299,7 @@ function setup(NT::NTuple{8,Int}, ::Type{T}) where T
 
   NavierStokesST{T}(
     setup(get_NTuple(6, Int), T), setup(get_NTuple(7, Int), T),
-    init(NT, T)...)
+    init_RBVars(NT, T)...)
 
 end
 
