@@ -28,12 +28,10 @@ end
 function get_problem_id(problem_name::String)
   if problem_name == "poisson"
     return (0,)
-  elseif problem_name == "ADR"
-    return (0,0)
   elseif problem_name == "stokes"
-    return (0,0,0)
+    return (0,0)
   elseif problem_name == "navier_stokes"
-    return (0,0,0,0)
+    return (0,0,0)
   else
     error("unimplemented")
   end

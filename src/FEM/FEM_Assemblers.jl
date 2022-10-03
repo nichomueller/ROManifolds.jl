@@ -24,16 +24,6 @@ function assemble_mass(
   FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
-  assemble_mass(get_NTuple(1, Int), FEMSpace, FEMInfo, Param)
-
-end
-
-function assemble_mass(
-  ::NTuple{3,Int},
-  FEMSpace::FEMProblemST,
-  FEMInfo::FEMInfoST,
-  Param::ParamInfoST)
-
   function unsteady_mass(t)
     if "M" ∉ FEMInfo.probl_nl
       assemble_matrix(∫(FEMSpace.ϕᵥ⋅(Param.mₛ*FEMSpace.ϕᵤ(t)))*FEMSpace.dΩ,
@@ -49,7 +39,7 @@ function assemble_mass(
 end
 
 function assemble_mass(
-  ::NTuple{4,Int},
+  ::NTuple{3,Int},
   FEMSpace::FEMProblemST,
   FEMInfo::FEMInfoST,
   Param::ParamInfoST)
@@ -97,40 +87,6 @@ end
 function assemble_stiffness(
   ::NTuple{2,Int},
   FEMSpace::FEMProblemS,
-  ::FEMInfoS,
-  Param::ParamInfoS)
-
-  ####### USING PECHLET STABILIZATION OF α #######
-  α_stab = get_α_stab(FEMSpace, Param)
-  ################################################
-
-  assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(α_stab*∇(FEMSpace.ϕᵤ)))*FEMSpace.dΩ,
-    FEMSpace.V, FEMSpace.V₀)
-
-end
-
-function assemble_stiffness(
-  ::NTuple{2,Int},
-  FEMSpace::FEMProblemST,
-  ::FEMInfoST,
-  Param::ParamInfoST)
-
-  ####### USING PECHLET STABILIZATION OF α #######
-  α_stab = get_α_stab(FEMSpace, Param)
-  ################################################
-
-  function unsteady_stiffness(t)
-    assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(α_stab(t)*∇(FEMSpace.ϕᵤ(t))))*FEMSpace.dΩ,
-      FEMSpace.V(t), FEMSpace.V₀)
-  end
-
-  return unsteady_stiffness
-
-end
-
-function assemble_stiffness(
-  ::NTuple{3,Int},
-  FEMSpace::FEMProblemS,
   FEMInfo::FEMInfoS,
   Param::ParamInfoS)
 
@@ -145,7 +101,7 @@ function assemble_stiffness(
 end
 
 function assemble_stiffness(
-  ::NTuple{3,Int},
+  ::NTuple{2,Int},
   FEMSpace::FEMProblemST,
   FEMInfo::FEMInfoST,
   Param::ParamInfoST)
@@ -165,7 +121,7 @@ function assemble_stiffness(
 end
 
 function assemble_stiffness(
-  ::NTuple{4,Int},
+  ::NTuple{3,Int},
   FEMSpace::FEMProblem,
   FEMInfo::Info,
   Param::Info)
@@ -175,7 +131,7 @@ function assemble_stiffness(
 end
 
 function assemble_B(
-  ::NTuple{3,Int},
+  ::NTuple{2,Int},
   FEMSpace::FEMProblemS,
   ::Info,
   ::Info)
@@ -191,7 +147,7 @@ function assemble_B(
 end
 
 function assemble_B(
-  ::NTuple{3,Int},
+  ::NTuple{2,Int},
   FEMSpace::FEMProblemST,
   ::Info,
   ::Info)
@@ -211,7 +167,7 @@ function assemble_B(
 end
 
 function assemble_B(
-  ::NTuple{4,Int},
+  ::NTuple{3,Int},
   FEMSpace::FEMProblem,
   FEMInfo::Info,
   Param::Info)
@@ -220,37 +176,8 @@ function assemble_B(
 
 end
 
-function assemble_B(
-  ::NTuple{2,Int},
-  FEMSpace::FEMProblemS,
-  ::FEMInfoS,
-  Param::ParamInfoS)
-
-  assemble_matrix(∫(FEMSpace.ϕᵥ * (Param.b⋅∇(FEMSpace.ϕᵤ)))*FEMSpace.dΩ,
-      FEMSpace.V, FEMSpace.V₀)
-
-end
-
-function assemble_B(
-  ::NTuple{2,Int},
-  FEMSpace::FEMProblemS,
-  FEMInfo::FEMInfoST,
-  Param::ParamInfoST)
-
-  function advection(t)
-    if "B" ∉ FEMInfo.probl_nl
-      assemble_matrix(∫(FEMSpace.ϕᵥ * (Param.bₛ⋅∇(FEMSpace.ϕᵤ(t))))*FEMSpace.dΩ,
-        FEMSpace.V(t), FEMSpace.V₀)
-    else
-      assemble_matrix(∫(FEMSpace.ϕᵥ * (Param.b(t)⋅∇(FEMSpace.ϕᵤ(t))))*FEMSpace.dΩ,
-        FEMSpace.V(t), FEMSpace.V₀)
-    end
-  end
-
-end
-
 function assemble_convection(
-  ::NTuple{4,Int},
+  ::NTuple{3,Int},
   FEMSpace::FEMProblemS)
 
   C(u) = assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
@@ -261,7 +188,7 @@ function assemble_convection(
 end
 
 function assemble_convection(
-  ::NTuple{4,Int},
+  ::NTuple{3,Int},
   FEMSpace::FEMProblemST)
 
   C(u,t) = assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
@@ -272,7 +199,7 @@ function assemble_convection(
 end
 
 function assemble_swapped_convection(
-  ::NTuple{4,Int},
+  ::NTuple{3,Int},
   FEMSpace::FEMProblemS)
 
   D(u) = assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
@@ -283,7 +210,7 @@ function assemble_swapped_convection(
 end
 
 function assemble_swapped_convection(
-  ::NTuple{4,Int},
+  ::NTuple{3,Int},
   FEMSpace::FEMProblemST)
 
   D(u,t) = assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
@@ -292,97 +219,6 @@ function assemble_swapped_convection(
   D
 
 end
-
-function assemble_reaction(
-  ::NTuple{2,Int},
-  FEMSpace::FEMProblemS,
-  ::FEMInfoS,
-  Param::ParamInfoS)
-
-  assemble_matrix(∫(FEMSpace.ϕᵥ * FEMSpace.ϕᵤ)*FEMSpace.dΩ,
-    FEMSpace.V, FEMSpace.V₀)
-
-end
-
-function assemble_reaction(
-  ::NTuple{2,Int},
-  FEMSpace::FEMProblemST,
-  FEMInfo::FEMInfoST,
-  Param::ParamInfoST)
-
-  function advection(t)
-    if "R" ∉ FEMInfo.probl_nl
-      assemble_matrix(∫(Param.σₛ * FEMSpace.ϕᵥ * FEMSpace.ϕᵤ(t))*FEMSpace.dΩ,
-        FEMSpace.V(t), FEMSpace.V₀)
-    else
-      assemble_matrix(∫(Param.σ(t) * FEMSpace.ϕᵥ * FEMSpace.ϕᵤ(t))*FEMSpace.dΩ,
-        FEMSpace.V(t), FEMSpace.V₀)
-    end
-  end
-
-end
-
-#= function assemble_SUPG_term(
-  ::NTuple{2,Int},
-  FEMSpace::FEMSpaceADRS,
-  Param::ParamInfoS)
-
-  #SUPG STABILIZATION, SET ρ = 1 IF GLS STABILIZATION
-  ρ = 0
-  b₂(x) = 0.5*Param.b(x)
-  div_b₂ = ∇⋅(b₂)
-  div_b₂_σ(x) = div_b₂(x) + Param.σ(x)
-
-  factor₁(u) = - Param.α*(Δ(u)) + ∇⋅(Param.b*u) + Param.σ*u - Param.f
-
-  lₛ(v) = - Param.α*(Δ(v)) + div_b₂_σ*v
-  lₛₛ(v) = Param.b⋅∇(v) + div_b₂*v
-  h = get_h(FEMSpace)
-  Pechlet(x) = norm(Param.b(x))*h / (2*Param.α(x))
-  ξ(x) = coth(x) - 1/x
-  τ(x) = h*ξ(pechlet(x)) / (2*norm(Param.b(x)))
-
-  factor₂(v) = τ * (lₛ(v) + ρ*lₛₛ(v))
-
-  l_stab(u,v) = ∫(factor₁(u)*factor₂(v)) * FEMSpace.dΩ
-  L = assemble_matrix(l_stab(FEMSpace.ϕᵤ,FEMSpace.ϕᵥ),
-    FEMSpace.V, FEMSpace.V₀)
-
-  l_stab, L
-
-end
-
-function assemble_SUPG_term(
-  ::NTuple{2,Int},
-  FEMSpace::FEMSpaceADRST,
-  Param::ParamInfoST)
-
-  #SUPG STABILIZATION, SET ρ = 1 IF GLS STABILIZATION
-  ρ = 0
-  b₂(x,t::Real) = 0.5*Param.b(x,t)
-  b₂(t::Real) = x -> b₂(x,t)
-  div_b₂(t::Real) = ∇⋅(b₂(t))
-  div_b₂_σ(x,t::Real) = div_b₂(t)(x) + Param.σ(x,t)
-  div_b₂_σ(t::Real) = x -> div_b₂_σ(x,t)
-
-  factor₁(t,u) = - Param.α(t)*(Δ(u)) + ∇⋅(Param.b(t)*u) + Param.σ(t)*u - Param.f(t)
-
-  lₛ(t,v) = - Param.α(t)*(Δ(v)) + div_b₂_σ(t)*v
-  lₛₛ(t,v) = Param.b(t)⋅∇(v) + div_b₂(t)*v
-  h = get_h(FEMSpace)
-  Pechlet(x,t::Real) = norm(Param.b(x,t))*h / (2*Param.α(x,t))
-  ξ(x) = coth(x) - 1/x
-  τ(x,t::Real) = h*ξ(pechlet(x,t)) / (2*norm(Param.b(x,t)))
-  τ(t::Real) = x -> τ(x,t)
-  factor₂(t,v) = τ(t) * (lₛ(t,v) + ρ*lₛₛ(t,v))
-
-  l_stab(t,u,v) = ∫(factor₁(t,u)*factor₂(t,v)) * FEMSpace.dΩ
-  L(t) = assemble_matrix(l_stab(t,FEMSpace.ϕᵤ(t),FEMSpace.ϕᵥ),
-    FEMSpace.V(t), FEMSpace.V₀)
-
-  l_stab, L
-
-end =#
 
 function assemble_forcing(
   ::NTuple{1,Int},
@@ -418,16 +254,6 @@ end
 
 function assemble_forcing(
   ::NTuple{2,Int},
-  FEMSpace::FEMProblem,
-  FEMInfo::Info,
-  Param::Info)
-
-  assemble_forcing(get_NTuple(1, Int), FEMSpace, FEMInfo, Param)
-
-end
-
-function assemble_forcing(
-  ::NTuple{3,Int},
   FEMSpace::FEMProblemS{D},
   FEMInfo::FEMInfoS,
   Param::ParamInfoS) where D
@@ -442,7 +268,7 @@ function assemble_forcing(
 end
 
 function assemble_forcing(
-  ::NTuple{3,Int},
+  ::NTuple{2,Int},
   FEMSpace::FEMProblemST,
   FEMInfo::FEMInfoST,
   Param::ParamInfoST)
@@ -460,7 +286,7 @@ function assemble_forcing(
 end
 
 function assemble_forcing(
-  ::NTuple{4,Int},
+  ::NTuple{3,Int},
   FEMSpace::FEMProblem,
   FEMInfo::Info,
   Param::Info)
@@ -505,16 +331,6 @@ end
 
 function assemble_neumann_datum(
   ::NTuple{2,Int},
-  FEMSpace::FEMProblem,
-  FEMInfo::Info,
-  Param::Info)
-
-  assemble_neumann_datum(get_NTuple(1, Int), FEMSpace, FEMInfo, Param)
-
-end
-
-function assemble_neumann_datum(
-  ::NTuple{3,Int},
   FEMSpace::FEMProblemS{D},
   FEMInfo::FEMInfoS,
   Param::ParamInfoS) where D
@@ -529,7 +345,7 @@ function assemble_neumann_datum(
 end
 
 function assemble_neumann_datum(
-  ::NTuple{3,Int},
+  ::NTuple{2,Int},
   FEMSpace::FEMProblemST,
   FEMInfo::FEMInfoST,
   Param::ParamInfoST)
@@ -547,7 +363,7 @@ function assemble_neumann_datum(
 end
 
 function assemble_neumann_datum(
-  ::NTuple{4,Int},
+  ::NTuple{3,Int},
   FEMSpace::FEMProblem,
   FEMInfo::Info,
   Param::Info)
@@ -594,46 +410,13 @@ function assemble_lifting(
 
   g = define_g_FEM(FEMSpace, Param)
 
-  (assemble_vector(∫(Param.α * ∇(FEMSpace.ϕᵥ) ⋅ ∇(g))*FEMSpace.dΩ,FEMSpace.V₀) +
-    assemble_vector(∫(FEMSpace.ϕᵥ * (Param.b ⋅ ∇(g)))*FEMSpace.dΩ,FEMSpace.V₀) +
-    assemble_vector(∫(Param.σ * FEMSpace.ϕᵥ * g)*FEMSpace.dΩ,FEMSpace.V₀))::Vector{Float}
-
-end
-
-function assemble_lifting(
-  ::NTuple{2,Int},
-  FEMSpace::FEMProblemST,
-  FEMInfo::FEMInfoST,
-  Param::ParamInfoST)
-
-  δtθ = FEMInfo.δt*FEMInfo.θ
-  g = define_g_FEM(FEMSpace, Param)
-  dg = define_dg_FEM(FEMSpace, Param)
-
-  L(t) = δtθ * (assemble_vector(∫(Param.m(t) * FEMSpace.ϕᵥ * dg(t))*FEMSpace.dΩ,FEMSpace.V₀) / δtθ +
-    assemble_vector(∫(Param.α(t) * ∇(FEMSpace.ϕᵥ) ⋅ ∇(g(t)))*FEMSpace.dΩ,FEMSpace.V₀) +
-    assemble_vector(∫(FEMSpace.ϕᵥ * (Param.b(t) ⋅ ∇(g(t))))*FEMSpace.dΩ,FEMSpace.V₀) +
-    assemble_vector(∫(Param.σ(t) * FEMSpace.ϕᵥ * g(t))*FEMSpace.dΩ,FEMSpace.V₀))
-
-  L
-
-end
-
-function assemble_lifting(
-  ::NTuple{3,Int},
-  FEMSpace::FEMProblemS,
-  FEMInfo::FEMInfoS,
-  Param::ParamInfoS)
-
-  g = define_g_FEM(FEMSpace, Param)
-
   assemble_vector(∫(Param.α * ∇(FEMSpace.ϕᵥ) ⊙ ∇(g))*FEMSpace.dΩ,
     FEMSpace.V₀)::Vector{Float}
 
 end
 
 function assemble_lifting(
-  ::NTuple{3,Int},
+  ::NTuple{2,Int},
   FEMSpace::FEMProblemST,
   FEMInfo::FEMInfoST,
   Param::ParamInfoST)
@@ -650,7 +433,7 @@ function assemble_lifting(
 end
 
 function assemble_lifting(
-  ::NTuple{4,Int},
+  ::NTuple{3,Int},
   FEMSpace::FEMProblemS,
   FEMInfo::FEMInfoS,
   Param::ParamInfoS)
@@ -668,7 +451,7 @@ function assemble_lifting(
 end
 
 function assemble_lifting(
-  ::NTuple{4,Int},
+  ::NTuple{3,Int},
   FEMSpace::FEMProblemST,
   FEMInfo::FEMInfoST,
   Param::ParamInfoST)
@@ -679,7 +462,7 @@ function assemble_lifting(
 end
 
 function assemble_lifting_continuity(
-  ::NTuple{3,Int},
+  ::NTuple{2,Int},
   FEMSpace::FEMProblemS,
   FEMInfo::FEMInfoS,
   Param::ParamInfoS)
@@ -691,7 +474,7 @@ function assemble_lifting_continuity(
 end
 
 function assemble_lifting_continuity(
-  ::NTuple{3,Int},
+  ::NTuple{2,Int},
   FEMSpace::FEMProblemST,
   FEMInfo::FEMInfoST,
   Param::ParamInfoST)
@@ -705,7 +488,7 @@ function assemble_lifting_continuity(
 end
 
 function assemble_lifting_continuity(
-  ::NTuple{4,Int},
+  ::NTuple{3,Int},
   FEMSpace::FEMProblem,
   FEMInfo::Info,
   Param::Info)
@@ -715,7 +498,7 @@ function assemble_lifting_continuity(
 end
 
 function assemble_L²_norm_matrix(
-  ::NTuple{3,Int},
+  ::NTuple{2,Int},
   FEMSpace::FEMProblem)
 
   assemble_matrix(∫(FEMSpace.ψᵧ*FEMSpace.ψₚ)*FEMSpace.dΩ,
@@ -724,7 +507,7 @@ function assemble_L²_norm_matrix(
 end
 
 function assemble_L²_norm_matrix(
-  ::NTuple{4,Int},
+  ::NTuple{3,Int},
   FEMSpace::FEMProblem)
 
   assemble_L²_norm_matrix(get_NTuple(3, Int), FEMSpace)
@@ -755,14 +538,6 @@ end
 
 function assemble_H¹_norm_matrix(
   ::NTuple{2,Int},
-  FEMSpace::FEMProblem)
-
-  assemble_H¹_norm_matrix(get_NTuple(1, Int), FEMSpace)
-
-end
-
-function assemble_H¹_norm_matrix(
-  ::NTuple{3,Int},
   FEMSpace::FEMProblemS)
 
   (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙∇(FEMSpace.ϕᵤ))*FEMSpace.dΩ,
@@ -773,7 +548,7 @@ function assemble_H¹_norm_matrix(
 end
 
 function assemble_H¹_norm_matrix(
-  ::NTuple{3,Int},
+  ::NTuple{2,Int},
   FEMSpace::FEMProblemST)
 
   (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙∇(FEMSpace.ϕᵤ(0.0)))*FEMSpace.dΩ,
@@ -784,7 +559,7 @@ function assemble_H¹_norm_matrix(
 end
 
 function assemble_H¹_norm_matrix(
-  ::NTuple{4,Int},
+  ::NTuple{3,Int},
   FEMSpace::FEMProblem)
 
   assemble_H¹_norm_matrix(get_NTuple(3, Int), FEMSpace)

@@ -39,24 +39,6 @@ function select_RB_method(
 
 end
 
-function get_method_id(problem_name::String, RB_method::String)
-  if problem_name == "poisson" && RB_method == "S-GRB"
-    return (0,)
-  elseif problem_name == "poisson" && RB_method == "S-PGRB"
-    return (0,0)
-  elseif problem_name == "poisson" && RB_method == "ST-GRB"
-    return (0,0,0)
-  elseif problem_name == "poisson" && RB_method == "ST-PGRB"
-    return (0,0,0,0)
-  elseif problem_name == "stokes" && RB_method == "ST-GRB"
-    return (0,0,0,0,0)
-  elseif problem_name == "stokes" && RB_method == "ST-PGRB"
-    return (0,0,0,0,0,0)
-  else
-    error("unimplemented")
-  end
-end
-
 function get_affine_entries(
   operators::Vector{String},
   affine_names::NTuple{D}) where D

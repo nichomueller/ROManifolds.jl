@@ -83,26 +83,6 @@ function get_FEMSpace_quantities(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  get_FEMSpace_quantities(get_NTuple(1, Int), FEMInfo, model, g)
-
-end
-
-function get_FEMSpace_quantities(
-  ::NTuple{2,Int},
-  FEMInfo::FEMInfoS,
-  model::DiscreteModel{D,D},
-  g::Function) where D
-
-  get_FEMSpace_quantities(get_NTuple(1, Int), FEMInfo, model, g)
-
-end
-
-function get_FEMSpace_quantities(
-  ::NTuple{3,Int},
-  FEMInfo::FEMInfoS,
-  model::DiscreteModel{D,D},
-  g::Function) where D
-
   Ω, Γn, Qₕ, dΩ, dΓn = get_mod_meas_quad(FEMInfo, model)
 
   refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,Float}, FEMInfo.order)
@@ -131,7 +111,7 @@ function get_FEMSpace_quantities(
 end
 
 function get_FEMSpace_quantities(
-  ::NTuple{3,Int},
+  ::NTuple{2,Int},
   FEMInfo::FEMInfoST,
   model::DiscreteModel{D,D},
   g::Function) where D
@@ -165,7 +145,7 @@ function get_FEMSpace_quantities(
 end
 
 function get_FEMSpace_quantities(
-  ::NTuple{4,Int},
+  ::NTuple{3,Int},
   FEMInfo::FEMInfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
@@ -175,7 +155,7 @@ function get_FEMSpace_quantities(
 end
 
 function get_FEMSpace_quantities(
-  ::NTuple{4,Int},
+  ::NTuple{3,Int},
   FEMInfo::FEMInfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
@@ -212,7 +192,7 @@ function get_FEMSpace(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  return FEMSpaceADRS{D}(
+  return FEMSpaceStokesS{D}(
     model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
@@ -223,35 +203,13 @@ function get_FEMSpace(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  return FEMSpaceADRST{D}(
-    model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
-
-end
-
-function get_FEMSpace(
-  NT::NTuple{3,Int},
-  FEMInfo::FEMInfoS,
-  model::DiscreteModel{D,D},
-  g::Function) where D
-
-  return FEMSpaceStokesS{D}(
-    model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
-
-end
-
-function get_FEMSpace(
-  NT::NTuple{3,Int},
-  FEMInfo::FEMInfoST,
-  model::DiscreteModel{D,D},
-  g::Function) where D
-
   return FEMSpaceStokesST{D}(
     model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
 
 function get_FEMSpace(
-  NT::NTuple{4,Int},
+  NT::NTuple{3,Int},
   FEMInfo::FEMInfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
@@ -262,7 +220,7 @@ function get_FEMSpace(
 end
 
 function get_FEMSpace(
-  NT::NTuple{4,Int},
+  NT::NTuple{3,Int},
   FEMInfo::FEMInfoST,
   model::DiscreteModel{D,D},
   g::Function) where D
@@ -297,32 +255,12 @@ function get_FEMSpace₀(
   FEMInfo::FEMInfoS,
   model::DiscreteModel)
 
-  get_FEMSpace(problem_id,FEMInfo,model,x->0)
-
-end
-
-function get_FEMSpace₀(
-  problem_id::NTuple{2,Int},
-  FEMInfo::FEMInfoST,
-  model::DiscreteModel)
-
-  g₀(x, t::Real) = 0.
-  g₀(t::Real) = x -> g₀(x, t)
-  get_FEMSpace(problem_id,FEMInfo,model,g₀)
-
-end
-
-function get_FEMSpace₀(
-  problem_id::NTuple{3,Int},
-  FEMInfo::FEMInfoS,
-  model::DiscreteModel)
-
   get_FEMSpace(problem_id,FEMInfo,model, x->zero(VectorValue(FEMInfo.D, Float)))
 
 end
 
 function get_FEMSpace₀(
-  problem_id::NTuple{3,Int},
+  problem_id::NTuple{2,Int},
   FEMInfo::FEMInfoST,
   model::DiscreteModel)
 
@@ -333,7 +271,7 @@ function get_FEMSpace₀(
 end
 
 function get_FEMSpace₀(
-  problem_id::NTuple{4,Int},
+  problem_id::NTuple{3,Int},
   FEMInfo::FEMInfoS,
   model::DiscreteModel)
 
@@ -342,7 +280,7 @@ function get_FEMSpace₀(
 end
 
 function get_FEMSpace₀(
-  problem_id::NTuple{4,Int},
+  problem_id::NTuple{3,Int},
   FEMInfo::FEMInfoST,
   model::DiscreteModel)
 

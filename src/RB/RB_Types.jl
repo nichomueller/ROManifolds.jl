@@ -125,26 +125,6 @@ end
 
 function init_RBVars(::NTuple{3,Int}, ::Type{T}) where T
 
-  Bₙ = Array{T}(undef,0,0,0)
-  Dₙ = Array{T}(undef,0,0,0)
-  MDEIM_B = MDEIMmS(init_MDEIMmS(T)...)
-  MDEIM_D = MDEIMmS(init_MDEIMmS(T)...)
-
-  Bₙ, Dₙ, MDEIM_B, MDEIM_D
-
-end
-
-function init_RBVars(::NTuple{4,Int}, ::Type{T}) where T
-
-  MDEIM_B = MDEIMmST(init_MDEIMmST(T)...)
-  MDEIM_D = MDEIMmST(init_MDEIMmST(T)...)
-
-  MDEIM_B, MDEIM_D
-
-end
-
-function init_RBVars(::NTuple{5,Int}, ::Type{T}) where T
-
   Sᵖ = Matrix{T}(undef,0,0)
   Φₛᵘ = Matrix{T}(undef,0,0)
   p̃ = Matrix{T}(undef,0,0)
@@ -165,7 +145,7 @@ function init_RBVars(::NTuple{5,Int}, ::Type{T}) where T
 
 end
 
-function init_RBVars(::NTuple{6,Int}, ::Type{T}) where T
+function init_RBVars(::NTuple{4,Int}, ::Type{T}) where T
 
   Φₜᵖ = Matrix{T}(undef,0,0)
   MDEIM_B = MDEIMmST(init_MDEIMmST(T)...)
@@ -178,7 +158,7 @@ function init_RBVars(::NTuple{6,Int}, ::Type{T}) where T
 
 end
 
-function init_RBVars(::NTuple{7,Int}, ::Type{T}) where T
+function init_RBVars(::NTuple{5,Int}, ::Type{T}) where T
 
   Cₙ = Array{T}(undef,0,0,0)
   Dₙ = Array{T}(undef,0,0,0)
@@ -191,7 +171,7 @@ function init_RBVars(::NTuple{7,Int}, ::Type{T}) where T
 
 end
 
-function init_RBVars(::NTuple{8,Int}, ::Type{T}) where T
+function init_RBVars(::NTuple{6,Int}, ::Type{T}) where T
 
   MDEIM_C = MDEIMmST(init_MDEIMmST(T)...)
   MDEIM_D = MDEIMmST(init_MDEIMmST(T)...)
@@ -213,15 +193,6 @@ mutable struct PoissonST{T} <: RBProblemST{T}
   Steady::PoissonS{T}; Φₜᵘ::Matrix{T}; Mₙ::Array{T}; MDEIM_A::MDEIMmST{T};
   MDEIM_M::MDEIMmST{T}; MDEIM_F::MDEIMvST{T}; MDEIM_H::MDEIMvST{T}; MDEIM_L::MDEIMvST{T};
   Nₜ::Int; Nᵘ::Int; nₜᵘ::Int; nᵘ::Int; Qᵐ::Int;
-end
-
-mutable struct ADRS{T} <: RBProblemS{T}
-  Poisson::PoissonS{T}; Bₙ::Array{T}; Dₙ::Array{T};
-  MDEIM_B::MDEIMmS{T}; MDEIM_D::MDEIMmS{T};
-end
-
-mutable struct ADRST{T} <: RBProblemST{T}
-  Poisson::PoissonST{T}; Steady::ADRS{T}; MDEIM_B::MDEIMmST{T}; MDEIM_D::MDEIMmST{T};
 end
 
 mutable struct StokesS{T} <: RBProblemS{T}
@@ -260,30 +231,15 @@ end
 
 function setup(NT::NTuple{3,Int}, ::Type{T}) where T
 
-  ADRS{T}(
+  StokesS{T}(
     setup(get_NTuple(1, Int), T), init_RBVars(NT, T)...)
 
 end
 
 function setup(NT::NTuple{4,Int}, ::Type{T}) where T
 
-  ADRST{T}(
-    setup(get_NTuple(2, Int), T), setup(get_NTuple(3, Int), T),
-    init_RBVars(NT, T)...)
-
-end
-
-function setup(NT::NTuple{5,Int}, ::Type{T}) where T
-
-  StokesS{T}(
-    setup(get_NTuple(1, Int), T), init_RBVars(NT, T)...)
-
-end
-
-function setup(NT::NTuple{6,Int}, ::Type{T}) where T
-
   StokesST{T}(
-    setup(get_NTuple(2, Int), T), setup(get_NTuple(5, Int), T),
+    setup(get_NTuple(2, Int), T), setup(get_NTuple(3, Int), T),
     init_RBVars(NT, T)...)
 
 end
@@ -291,14 +247,14 @@ end
 function setup(NT::NTuple{7,Int}, ::Type{T}) where T
 
   NavierStokesS{T}(
-    setup(get_NTuple(5, Int), T), init_RBVars(NT, T)...)
+    setup(get_NTuple(3, Int), T), init_RBVars(NT, T)...)
 
 end
 
 function setup(NT::NTuple{8,Int}, ::Type{T}) where T
 
   NavierStokesST{T}(
-    setup(get_NTuple(6, Int), T), setup(get_NTuple(7, Int), T),
+    setup(get_NTuple(4, Int), T), setup(get_NTuple(5, Int), T),
     init_RBVars(NT, T)...)
 
 end
@@ -316,61 +272,6 @@ function Base.setproperty!(RBVars::PoissonST, sym::Symbol, x::T) where T
   if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
     :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :Qˡ, :offline_time, :online_time)
     setfield!(RBVars.Steady, sym, x)::T
-  else
-    setfield!(RBVars, sym, x)::T
-  end
-end
-
-function Base.getproperty(RBVars::ADRS, sym::Symbol)
-  if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
-    :MDEIM_A, :MDEIM_F, :MDEIM_H, :MDEIM_L, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :Qˡ,
-    :offline_time, :online_time)
-    getfield(RBVars.Poisson, sym)
-  else
-    getfield(RBVars, sym)
-  end
-end
-
-function Base.setproperty!(RBVars::ADRS, sym::Symbol, x::T) where T
-  if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
-    :MDEIM_A, :MDEIM_F, :MDEIM_H, :MDEIM_L, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :Qˡ,
-    :offline_time, :online_time)
-    setfield!(RBVars.Poisson, sym, x)::T
-  else
-    setfield!(RBVars, sym, x)::T
-  end
-end
-
-function Base.getproperty(RBVars::ADRST, sym::Symbol)
-  if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
-    :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A, :DEIM_mat_F,
-    :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H, :DEIM_idx_H,
-    :sparse_el_H, :DEIM_mat_L, :DEIMᵢ_L, :DEIM_idx_L,
-    :sparse_el_L, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :offline_time, :online_time,
-    :Φₜᵘ, :Mₙ, :MDEIM_mat_M, :MDEIMᵢ_M, :MDEIM_idx_M, :row_idx_M, :sparse_el_M,
-    :MDEIM_idx_time_A, :MDEIM_idx_time_M, :DEIM_idx_time_F, :DEIM_idx_time_H,
-    :Nₜ, :Nᵘ, :nₜᵘ, :nᵘ, :Qᵐ)
-    getfield(RBVars.Steady, sym)
-  elseif sym in (:Bₙ, :Dₙ, :MDEIMᵢ_B, :MDEIM_idx_B, :row_idx_B, :sparse_el_B,
-    :MDEIMᵢ_D, :MDEIM_idx_D, :row_idx_D, :sparse_el_D)
-    getfield(RBVars.Poisson, sym)
-  else
-    getfield(RBVars, sym)
-  end
-end
-
-function Base.setproperty!(RBVars::ADRST, sym::Symbol, x::T) where T
-  if sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
-    :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A, :DEIM_mat_F,
-    :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H, :DEIM_idx_H,
-    :sparse_el_H, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᶠ, :Qʰ, :offline_time, :online_time,
-    :Φₜᵘ, :Mₙ, :MDEIM_mat_M, :MDEIMᵢ_M, :MDEIM_idx_M, :row_idx_M, :sparse_el_M,
-    :MDEIM_idx_time_A, :MDEIM_idx_time_M, :DEIM_idx_time_F, :DEIM_idx_time_H,
-    :Nₜ, :Nᵘ, :nₜᵘ, :nᵘ, :Qᵐ)
-    setfield!(RBVars.Steady, sym, x)::T
-  elseif sym in (:Bₙ, :Dₙ, :MDEIMᵢ_B, :MDEIM_idx_B, :row_idx_B, :sparse_el_B,
-    :MDEIMᵢ_D, :MDEIM_idx_D, :row_idx_D, :sparse_el_D)
-    setfield!(RBVars.Poisson, sym, x)::T
   else
     setfield!(RBVars, sym, x)::T
   end

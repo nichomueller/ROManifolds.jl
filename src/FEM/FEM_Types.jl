@@ -41,38 +41,6 @@ struct FEMSpacePoissonST{D} <: FEMProblemST{D}
   V₀_quad::UnconstrainedFESpace
 end
 
-struct FEMSpaceADRS{D} <: FEMProblemS{D}
-  model::DiscreteModel
-  Qₕ::CellQuadrature
-  V₀::UnconstrainedFESpace
-  V::TrialFESpace
-  ϕᵥ::FEBasis
-  ϕᵤ::FEBasis
-  Nₛᵘ::Int
-  Ω::BodyFittedTriangulation
-  Γn::BoundaryTriangulation
-  dΩ::Measure
-  dΓn::Measure
-  phys_quadp::Vector{Vector{VectorValue{D,Float}}}
-  V₀_quad::UnconstrainedFESpace
-end
-
-struct FEMSpaceADRST{D} <: FEMProblemST{D}
-  model::DiscreteModel
-  Qₕ::CellQuadrature
-  V₀::UnconstrainedFESpace
-  V::TransientTrialFESpace
-  ϕᵥ::FEBasis
-  ϕᵤ::Function
-  Nₛᵘ::Int
-  Ω::BodyFittedTriangulation
-  Γn::BoundaryTriangulation
-  dΩ::Measure
-  dΓn::Measure
-  phys_quadp::Vector{Vector{VectorValue{D,Float}}}
-  V₀_quad::UnconstrainedFESpace
-end
-
 struct FEMSpaceStokesS{D} <: FEMProblemS{D}
   model::DiscreteModel
   Qₕ::CellQuadrature
@@ -218,42 +186,6 @@ struct ParamPoissonST <: ParamInfoST
   mₛ::Function
   mₜ::Function
   m::Function
-  fₛ::Function
-  fₜ::Function
-  f::Function
-  gₛ::Function
-  gₜ::Function
-  g::Function
-  hₛ::Function
-  hₜ::Function
-  h::Function
-  u₀::Function
-end
-
-struct ParamADRS <: ParamInfoS
-  μ::Vector
-  α::Function
-  b::Function
-  σ::Function
-  f::Function
-  g::Function
-  h::Function
-end
-
-struct ParamADRST <: ParamInfoST
-  μ::Vector
-  αₛ::Function
-  αₜ::Function
-  α::Function
-  mₛ::Function
-  mₜ::Function
-  m::Function
-  bₛ::Function
-  bₜ::Function
-  b::Function
-  σₛ::Function
-  σₜ::Function
-  σ::Function
   fₛ::Function
   fₜ::Function
   f::Function

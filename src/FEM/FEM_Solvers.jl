@@ -50,64 +50,6 @@ function FE_solve(
 end
 
 function FE_solve(
-  FEMSpace::FEMSpaceADRS,
-  FEMInfo::FEMInfoS,
-  Param::ParamInfoS)
-
-  a(u,v) = ∫(∇(v)⋅(Param.α*∇(u)) +
-    v * Param.b ⋅ ∇(u) + Param.σ * v * u) * FEMSpace.dΩ
-  lhs(u,v) = a(u,v)
-
-  rhs(v) = ∫(v * Param.f) * FEMSpace.dΩ + ∫(v * Param.h) * FEMSpace.dΓn
-
-  operator = AffineFEOperator(lhs, rhs, FEMSpace.V, FEMSpace.V₀)
-
-  if FEMInfo.solver == "lu"
-    uₕ_field = solve(LinearFESolver(LUSolver()), operator)
-  else
-    uₕ_field = solve(LinearFESolver(), operator)
-  end
-
-  get_free_dof_values(uₕ_field)
-
-end
-
-function FE_solve(
-  FEMSpace::FEMSpaceADRST,
-  FEMInfo::FEMInfoST,
-  Param::ParamInfoST)
-
-  m(t, u, v) = ∫(Param.m(t)*(u*v)) * FEMSpace.dΩ
-  a(t, u, v) = ∫(∇(v)⋅(Param.α(t)*∇(u)) +
-    v * Param.b(t) ⋅ ∇(u) + Param.σ(t) * v * u) * FEMSpace.dΩ
-  lhs(t,u,v) = a(t,u,v)
-  rhs(t, v) = rhs_form(t,v,FEMSpace,Param)
-
-  operator = TransientAffineFEOperator(m, a, rhs, FEMSpace.V, FEMSpace.V₀)
-
-  linear_solver = LUSolver()
-
-  if FEMInfo.time_method == "θ-method"
-    ode_solver = ThetaMethod(linear_solver, FEMInfo.δt, FEMInfo.θ)
-  else
-    ode_solver = RungeKutta(linear_solver, FEMInfo.δt, FEMInfo.RK_type)
-  end
-
-  u₀_field = interpolate_everywhere(Param.u₀, FEMSpace.V(FEMInfo.t₀))
-
-  uₕₜ_field = solve(ode_solver, operator, u₀_field, FEMInfo.t₀, FEMInfo.tₗ)
-  uₕₜ = zeros(FEMSpace.Nₛᵘ, Int(FEMInfo.tₗ / FEMInfo.δt))
-  global count = 0
-  for (uₕ, _) in uₕₜ_field
-    global count += 1
-    uₕₜ[:, count] = get_free_dof_values(uₕ)::Vector{Float}
-  end
-
-  return uₕₜ
-
-end
-
-function FE_solve(
   FEMSpace::FEMSpaceStokesS,
   FEMInfo::FEMInfoS,
   Param::ParamInfoS) where T

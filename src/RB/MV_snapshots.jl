@@ -577,30 +577,6 @@ function assemble_parametric_FE_matrix(
 
   function Mat_θ(Θ)
     if var == "A"
-      (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Θ*∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
-        FEMSpace.V(0.0), FEMSpace.V₀))
-    elseif var == "M" || var == "D"
-      (assemble_matrix(∫(FEMSpace.ϕᵥ*(Θ*FEMSpace.ϕᵤ(0.0)))*FEMSpace.dΩ,
-        FEMSpace.V(0.0), FEMSpace.V₀))
-    elseif var == "B"
-      (assemble_matrix(∫(FEMSpace.ϕᵥ * (Θ⋅∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
-        FEMSpace.V(0.0), FEMSpace.V₀))
-    else
-      error("Need to assemble an unrecognized FE structure")
-    end
-  end
-
-  Mat_θ
-
-end
-
-function assemble_parametric_FE_matrix(
-  ::NTuple{3,Int},
-  FEMSpace::FEMProblemST,
-  var::String)
-
-  function Mat_θ(Θ)
-    if var == "A"
       (assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Θ*∇(FEMSpace.ϕᵤ(0.0))))*FEMSpace.dΩ,
         FEMSpace.V(0.0), FEMSpace.V₀))
     elseif var == "M"
@@ -616,7 +592,7 @@ function assemble_parametric_FE_matrix(
 end
 
 function assemble_parametric_FE_matrix(
-  ::NTuple{4,Int},
+  ::NTuple{3,Int},
   FEMSpace::FEMProblemST,
   var::String)
 
