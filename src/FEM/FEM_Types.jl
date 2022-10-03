@@ -162,9 +162,7 @@ struct FEMInfoST <: InfoST
   solver::String
   Paths::FEMPathInfo
   nₛ::Int
-  time_method::String
   θ::Float
-  RK_type::Symbol
   t₀::Float
   tₗ::Float
   δt::Float

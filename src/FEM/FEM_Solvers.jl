@@ -28,12 +28,7 @@ function FE_solve(
   operator = TransientAffineFEOperator(m, a, rhs, FEMSpace.V, FEMSpace.V₀)
 
   linear_solver = LUSolver()
-
-  if FEMInfo.time_method == "θ-method"
-    ode_solver = ThetaMethod(linear_solver, FEMInfo.δt, FEMInfo.θ)
-  else
-    ode_solver = RungeKutta(linear_solver, FEMInfo.δt, FEMInfo.RK_type)
-  end
+  ode_solver = ThetaMethod(linear_solver, FEMInfo.δt, FEMInfo.θ)
 
   u₀_field = interpolate_everywhere(Param.u₀, FEMSpace.V(FEMInfo.t₀))
 
