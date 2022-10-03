@@ -376,7 +376,7 @@ function assemble_param_RHS(
     RHS[:,i] = F_t(tᵢ) + H_t(tᵢ) - L_t(tᵢ)
   end
 
-  RHSₙ = RBInfo.δt*RBInfo.θ * RBVars.Φₛᵘ'*(RHS*RBVars.Φₜᵘ)
+  RHSₙ = RBVars.Φₛᵘ'*(RHS*RBVars.Φₜᵘ)
   push!(RBVars.RHSₙ, reshape(RHSₙ',:,1))::Vector{Matrix{T}}
 
 end

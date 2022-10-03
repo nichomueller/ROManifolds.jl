@@ -202,6 +202,17 @@ function assemble_sparse_mat(
       error("Unrecognized sparse matrix")
     end
   end
+  function define_Matₜ(FEMSpace::FEMSpaceNavierStokesST, t::Real, var::String)
+    if var == "A"
+      return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Param.α(t)*∇(FEMSpace.ϕᵤ(t))))*dΩ_sparse,
+        FEMSpace.V(t), FEMSpace.V₀)
+    elseif var == "M"
+      return assemble_matrix(∫(FEMSpace.ϕᵥ⋅(Param.m(t)*FEMSpace.ϕᵤ(t)))*dΩ_sparse,
+        FEMSpace.V(t), FEMSpace.V₀)
+    else
+      error("Unrecognized sparse matrix")
+    end
+  end
   Matₜ(t) = define_Matₜ(FEMSpace, t, var)
 
   Mat = sparse([], [], Float[])

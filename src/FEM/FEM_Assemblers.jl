@@ -7,10 +7,10 @@ function assemble_mass(
   function unsteady_mass(t)
     if "M" ∉ FEMInfo.probl_nl
       assemble_matrix(∫(FEMSpace.ϕᵥ*(Param.mₛ*FEMSpace.ϕᵤ(t)))*FEMSpace.dΩ,
-      FEMSpace.V(t), FEMSpace.V₀)
+        FEMSpace.V(t), FEMSpace.V₀)
     else
       assemble_matrix(∫(FEMSpace.ϕᵥ*(Param.m(t)*FEMSpace.ϕᵤ(t)))*FEMSpace.dΩ,
-      FEMSpace.V(t), FEMSpace.V₀)
+        FEMSpace.V(t), FEMSpace.V₀)
     end
   end
 
@@ -391,11 +391,10 @@ function assemble_lifting(
   FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
-  δtθ = FEMInfo.δt*FEMInfo.θ
   g = define_g_FEM(FEMSpace, Param)
   dg = define_dg_FEM(FEMSpace, Param)
 
-  L(t) = (assemble_vector(∫(Param.m(t) * FEMSpace.ϕᵥ * dg(t))*FEMSpace.dΩ,FEMSpace.V₀) / δtθ +
+  L(t) = (assemble_vector(∫(Param.m(t) * FEMSpace.ϕᵥ * dg(t))*FEMSpace.dΩ,FEMSpace.V₀) +
     assemble_vector(∫(Param.α(t) * ∇(FEMSpace.ϕᵥ) ⋅ ∇(g(t)))*FEMSpace.dΩ,FEMSpace.V₀))
 
   L
@@ -421,11 +420,10 @@ function assemble_lifting(
   FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
-  δtθ = FEMInfo.δt*FEMInfo.θ
   g = define_g_FEM(FEMSpace, Param)
   dg = define_dg_FEM(FEMSpace, Param)
 
-  L₁(t) = assemble_vector(∫(Param.m(t) * FEMSpace.ϕᵥ ⋅ dg(t))*FEMSpace.dΩ,FEMSpace.V₀) / δtθ +
+  L₁(t) = assemble_vector(∫(Param.m(t) * FEMSpace.ϕᵥ ⋅ dg(t))*FEMSpace.dΩ,FEMSpace.V₀) +
     assemble_vector(∫(Param.α(t) * ∇(FEMSpace.ϕᵥ) ⊙ ∇(g(t)))*FEMSpace.dΩ,FEMSpace.V₀)
 
   L₁
@@ -441,12 +439,11 @@ function assemble_lifting(
   L_stokes = assemble_lifting(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)
 
   g = define_g_FEM(FEMSpace, Param)
-  #scalar_g_FEM = FEFunction(FEMSpace.V, get_free_dof_values(g))
   conv(u,∇u) = (∇u')⋅u
   c(u,v) = ∫( v⊙(conv∘(u,∇(u))) )FEMSpace.dΩ
   L_convection = assemble_vector(c(g, FEMSpace.ϕᵥ), FEMSpace.V₀)
 
-  (L_stokes + L_convection)::Vector{Float} #L_stokes::Vector{Float}
+  (L_stokes + L_convection)::Vector{Float}
 
 end
 

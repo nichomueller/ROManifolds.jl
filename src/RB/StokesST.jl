@@ -219,7 +219,7 @@ function get_RB_LHS_blocks(
   Bₙ = reshape(sum(Bₙ_tmp, dims=3), RBVars.nᵖ, RBVars.nᵘ)
   Bₙᵀ = Matrix(Bₙ')
 
-  block₂ = -RBInfo.δt*RBInfo.θ * Bₙᵀ
+  block₂ = - Bₙᵀ
   block₃ = Bₙ
 
   push!(RBVars.LHSₙ, block₂)::Vector{Matrix{T}}

@@ -172,7 +172,6 @@ function get_RB_LHS_blocks(
   println("Assembling LHS using θ-method time scheme, θ=$(RBInfo.θ)")
 
   θ = RBInfo.θ
-  δtθ = RBInfo.δt*θ
   nₜᵘ = RBVars.nₜᵘ
   Qᵐ = RBVars.Qᵐ
   Qᵃ = RBVars.Qᵃ
@@ -223,22 +222,22 @@ function get_RB_LHS_blocks(
   end
   Mₙ = reshape(sum(Mₙ_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
   Mₙ₁ = reshape(sum(Mₙ₁_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
-  Aₙ = δtθ*reshape(sum(Aₙ_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
-  Aₙ₁ = δtθ*reshape(sum(Aₙ₁_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
-  Cₙ = δtθ*reshape(sum(Cₙ_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
-  Cₙ₁ = δtθ*reshape(sum(Cₙ₁_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
+  Aₙ = reshape(sum(Aₙ_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
+  Aₙ₁ = reshape(sum(Aₙ₁_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
+  Cₙ = reshape(sum(Cₙ_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
+  Cₙ₁ = reshape(sum(Cₙ₁_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
 
   Jₙ = Aₙ + Cₙ
   Jₙ₁ = Aₙ₁ + Cₙ₁
 
-  block₁ = θ*(Jₙ+Mₙ) + (1-θ)*Jₙ₁ - θ*Mₙ₁
+  block₁ = RBInfo.θ*(Jₙ+Mₙ) + (1-RBInfo.θ)*Jₙ₁ - RBInfo.θ*Mₙ₁
 
   Φₜᵘᵖ = RBVars.Φₜᵘ' * RBVars.Φₜᵖ
   Bₙᵀ = permutedims(RBVars.Bₙ,[2,1,3])::Array{T,3}
   Bₙᵀ = kron(Bₙᵀ[:,:,1].*θᵇ, Φₜᵘᵖ)::Matrix{T}
   Bₙ = (Bₙᵀ)'::Matrix{T}
 
-  block₂ = -RBInfo.δt*RBInfo.θ * Bₙᵀ
+  block₂ = - Bₙᵀ
   block₃ = Bₙ
 
   push!(RBVars.LHSₙ, block₁)::Vector{Matrix{T}}

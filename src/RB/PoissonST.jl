@@ -171,8 +171,6 @@ function get_RB_LHS_blocks(
 
   println("Assembling LHS using θ-method time scheme, θ=$(RBInfo.θ)")
 
-  θ = RBInfo.θ
-  δtθ = RBInfo.δt*θ
   nₜᵘ = RBVars.nₜᵘ
   Qᵐ = RBVars.Qᵐ
   Qᵃ = RBVars.Qᵃ
@@ -208,12 +206,12 @@ function get_RB_LHS_blocks(
     Aₙ_tmp[:,:,qᵃ] = kron(RBVars.Aₙ[:,:,qᵃ],Φₜᵘ_A[:,:,qᵃ])::Matrix{T}
     Aₙ₁_tmp[:,:,qᵃ] = kron(RBVars.Aₙ[:,:,qᵃ],Φₜᵘ₁_A[:,:,qᵃ])::Matrix{T}
   end
-  Mₙ = reshape(sum(Mₙ_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
-  Mₙ₁ = reshape(sum(Mₙ₁_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
-  Aₙ = δtθ*reshape(sum(Aₙ_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
-  Aₙ₁ = δtθ*reshape(sum(Aₙ₁_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
+  Mₙ = reshape(sum(Mₙ_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ) / (RBInfo.θ*RBInfo.δt)
+  Mₙ₁ = reshape(sum(Mₙ₁_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ) / (RBInfo.θ*RBInfo.δt)
+  Aₙ = reshape(sum(Aₙ_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
+  Aₙ₁ = reshape(sum(Aₙ₁_tmp,dims=3),RBVars.nᵘ,RBVars.nᵘ)
 
-  block₁ = θ*(Aₙ+Mₙ) + (1-θ)*Aₙ₁ - θ*Mₙ₁
+  block₁ = RBInfo.θ*(Aₙ+Mₙ) + (1-RBInfo.θ)*Aₙ₁ - RBInfo.θ*Mₙ₁
   push!(RBVars.LHSₙ, block₁)::Vector{Matrix{T}}
 
 end
@@ -254,7 +252,6 @@ function get_RB_RHS_blocks(
     end
   end
 
-  block₁ *= RBInfo.δt*RBInfo.θ
   push!(RBVars.RHSₙ, block₁)::Vector{Matrix{T}}
 
 end
