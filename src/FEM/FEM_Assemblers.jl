@@ -433,7 +433,7 @@ function assemble_forcing(
   Param::ParamInfoS) where D
 
   if "F" ∉ FEMInfo.probl_nl
-    fₛ = x -> one(VectorValue(FEMInfo.D, Float))
+    fₛ = x -> one(VectorValue(D, Float))
     assemble_vector(∫(FEMSpace.ϕᵥ⋅fₛ)*FEMSpace.dΩ, FEMSpace.V₀)
   else
     assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.f)*FEMSpace.dΩ, FEMSpace.V₀)
@@ -515,12 +515,12 @@ end
 
 function assemble_neumann_datum(
   ::NTuple{3,Int},
-  FEMSpace::FEMProblemS,
+  FEMSpace::FEMProblemS{D},
   FEMInfo::FEMInfoS,
-  Param::ParamInfoS)
+  Param::ParamInfoS) where D
 
   if "H" ∉ FEMInfo.probl_nl
-    hₛ = x -> one(VectorValue(FEMInfo.D, Float))
+    hₛ = x -> one(VectorValue(D, Float))
     assemble_vector(∫(FEMSpace.ϕᵥ⋅hₛ)*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float}
   else
     assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.h)*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float}
@@ -655,13 +655,15 @@ function assemble_lifting(
   FEMInfo::FEMInfoS,
   Param::ParamInfoS)
 
-  C(u) = assemble_vector(∫( FEMSpace.ϕᵥ ⊙
-    ((FEMSpace.ϕᵥ')⋅u) )*FEMSpace.dΩ, FEMSpace.V₀)
+  L_stokes = assemble_lifting(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)
+
   g = define_g_FEM(FEMSpace, Param)
+  #scalar_g_FEM = FEFunction(FEMSpace.V, get_free_dof_values(g))
+  conv(u,∇u) = (∇u')⋅u
+  c(u,v) = ∫( v⊙(conv∘(u,∇(u))) )FEMSpace.dΩ
+  L_convection = assemble_vector(c(g, FEMSpace.ϕᵥ), FEMSpace.V₀)
 
-  L₁ = assemble_lifting(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)
-
-  #(L₁ + C(g))::Vector{Float}
+  (L_stokes + L_convection)::Vector{Float} #L_stokes::Vector{Float}
 
 end
 
@@ -671,14 +673,8 @@ function assemble_lifting(
   FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
-  C(u, t) = assemble_vector(∫( FEMSpace.ϕᵥ ⊙
-    ((FEMSpace.ϕᵥ')⋅u(t)) )*FEMSpace.dΩ, FEMSpace.V₀)
-  g = define_g_FEM(FEMSpace, Param)
-
-  L₁ = assemble_lifting(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)
-  #L₁_new(t) = L₁(t) + C(g(t), t)
-
-  #L₁_new
+  L_stokes = assemble_lifting(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)
+  L_stokes
 
 end
 

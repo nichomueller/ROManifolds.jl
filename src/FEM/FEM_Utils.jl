@@ -70,7 +70,7 @@ function get_FEMProblem_info(FEMInfo::Info)
   μ = load_CSV(Array{Float}[],
     joinpath(FEMInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{Float}}
   model = DiscreteModelFromFile(FEMInfo.Paths.mesh_path)
-  FEMSpace = get_FEMSpace₀(FEMInfo.problem_id, FEMInfo,model)
+  FEMSpace = get_FEMSpace₀(FEMInfo.problem_id, FEMInfo, model)
 
   FEMSpace, μ
 
@@ -184,6 +184,14 @@ function define_g_FEM(
   Param::ParamInfoS)
 
   interpolate_dirichlet(Param.g, FEMSpace.V)
+
+end
+
+function define_g_FEM(
+  FEMSpace::FEMProblemST,
+  Param::ParamInfoST)
+
+  g(t) = interpolate_dirichlet(Param.g(t), FEMSpace.V(t))
 
 end
 

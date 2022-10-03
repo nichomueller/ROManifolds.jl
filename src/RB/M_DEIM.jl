@@ -18,30 +18,25 @@ function M_DEIM_POD(S::Matrix{T}, ϵ=1e-5) where T
 
 end
 
-function M_DEIM_offline(M_DEIM_mat::Matrix)
+function M_DEIM_offline(Mat::Matrix)
 
-  n = size(M_DEIM_mat)[2]
-  M_DEIM_idx = Int[]
+  n = size(Mat)[2]
+  idx = Int[]
 
-  append!(M_DEIM_idx, Int(argmax(abs.(M_DEIM_mat[:, 1]))))
+  append!(idx, Int(argmax(abs.(Mat[:, 1]))))
 
   @simd for m = 2:n
 
-    res = (M_DEIM_mat[:, m] - M_DEIM_mat[:, 1:m-1] *
-      (M_DEIM_mat[M_DEIM_idx[1:m-1], 1:m-1] \ M_DEIM_mat[M_DEIM_idx[1:m-1], m]))
-    append!(M_DEIM_idx, convert(Int, argmax(abs.(res))[1]))
-
-    if abs(det(M_DEIM_mat[M_DEIM_idx[1:m], 1:m])) ≤ 1e-80
-      error("Something went wrong with the construction of (M)DEIM basis:
-        obtaining singular nested matrices")
-    end
+    res = (Mat[:, m] - Mat[:, 1:m-1] *
+      (Mat[idx[1:m-1], 1:m-1] \ Mat[idx[1:m-1], m]))
+    append!(idx, convert(Int, argmax(abs.(res))[1]))
 
   end
 
-  unique!(M_DEIM_idx)
-  M_DEIMᵢ_mat = M_DEIM_mat[M_DEIM_idx, :]
+  unique!(idx)
+  Matᵢ = Mat[idx, :]
 
-  M_DEIM_idx, M_DEIMᵢ_mat
+  idx, Matᵢ
 
 end
 

@@ -142,7 +142,8 @@ function check_navier_stokes_solver()
   L = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "L")
   Lc = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "Lc")
 
-  RHS = vcat(F + 0*H - L, - Lc)
+  RHS = vcat(F + H - L, - Lc)
+  #RHS = vcat(F + 0*H - L, - Lc)
 
   function J(x)
     xvec = get_free_dof_values(x)
@@ -157,7 +158,7 @@ function check_navier_stokes_solver()
     uvec = xvec[1:FEMSpace.Nₛᵘ]
     u = FEFunction(FEMSpace.V, uvec)
 
-    LHS = vcat(hcat(A+C(u)+D(u), -B'), hcat(B, zeros(T, FEMSpace.Nₛᵖ, FEMSpace.Nₛᵖ)))
+    LHS = vcat(hcat(A+C(u), -B'), hcat(B, zeros(T, FEMSpace.Nₛᵖ, FEMSpace.Nₛᵖ)))
     LHS * xvec - RHS
   end
 

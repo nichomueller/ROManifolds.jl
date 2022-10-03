@@ -412,60 +412,29 @@ function interpolated_θ(
 
 end
 
-function modify_fun(
-  fun::Function,
-  D::Int,
+function get_scalar_value(
+  val,
   T::Type)
 
-  val = fun(zero(VectorValue(D, T)))
   if typeof(val) != T
-    val = val[1][1]
+    T.(val[1][1])
+  else
+    T.(val)
   end
-
-  T.(val)
-
-end
-
-function modify_fun(
-  fun::Function,
-  t_θ::Vector,
-  T::Type)
-
-  val = fun(t_θ)
-  if typeof(val) != T
-    val = val[1][1]
-  end
-
-  T.(val)
-
-end
-
-function modify_fun(
-  fun::Function,
-  μ::Vector,
-  t_θ::Vector,
-  T::Type)
-
-  val = fun(t_θ, μ)
-  if typeof(val) != T
-    val = val[1][1]
-  end
-
-  T.(val)
 
 end
 
 function θ_matrix(
-  FEMSpace::FEMProblemS,
+  FEMSpace::FEMProblemS{D},
   RBInfo::ROMInfoS{T},
   RBVars::RBProblemS,
   Param::ParamInfoS,
   fun::Function,
   MDEIM::MDEIMmS,
-  var::String) where T
+  var::String) where {D,T}
 
   if var ∉ RBInfo.probl_nl
-    θ = reshape([modify_fun(fun, FEMInfo.D, T)], 1, 1)
+    θ = reshape([get_scalar_value(fun(VectorValue(D, T)), T)], 1, 1)
   else
     Mat_μ_sparse =
       assemble_sparse_mat(FEMSpace, FEMInfo, Param, MDEIM.el, var)::SparseMatrixCSC{Float, Int}
@@ -477,16 +446,16 @@ function θ_matrix(
 end
 
 function θ_matrix(
-  FEMSpace::FEMProblemS,
+  FEMSpace::FEMProblemS{D},
   RBInfo::ROMInfoS{T},
   RBVars::RBProblemS,
   Param::ParamInfoS,
   fun::Function,
   MDEIM::MDEIMvS,
-  var::String) where T
+  var::String) where {D,T}
 
   if var ∉ RBInfo.probl_nl
-    θ = reshape([modify_fun(fun, FEMInfo.D, T)], 1, 1)
+    θ = reshape([get_scalar_value(fun(VectorValue(D, T)), T)], 1, 1)
   else
     Vec_μ_sparse =
       assemble_sparse_vec(FEMSpace, FEMInfo, Param, MDEIM.el, var)::Vector{Float}
@@ -498,20 +467,20 @@ function θ_matrix(
 end
 
 function θ_matrix(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FEMProblemST{D},
   RBInfo::ROMInfoST{T},
   RBVars::RBProblemST,
   Param::ParamInfoST,
   fun::Function,
   MDEIM::MDEIMmST,
-  var::String) where T
+  var::String) where {D,T}
 
   timesθ = get_timesθ(RBInfo)
 
   if var ∉ RBInfo.probl_nl
     θ = zeros(T, 1, RBVars.Nₜ)
     for (i_t, t_θ) = enumerate(timesθ)
-      θ[i_t] = modify_fun(fun, Param.μ, t_θ, T)
+      θ[i_t] = get_scalar_value(fun(VectorValue(D, T), t_θ), T)
     end
   else
     if RBInfo.st_M_DEIM
@@ -532,20 +501,20 @@ function θ_matrix(
 end
 
 function θ_matrix(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FEMProblemST{D},
   RBInfo::ROMInfoST{T},
   RBVars::RBProblemST,
   Param::ParamInfoST,
   fun::Function,
   MDEIM::MDEIMvST,
-  var::String) where T
+  var::String) where {D,T}
 
   timesθ = get_timesθ(RBInfo)
 
   if var ∉ RBInfo.probl_nl
     θ = zeros(T, 1, RBVars.Nₜ)
     for (i_t, t_θ) = enumerate(timesθ)
-      θ[i_t] = modify_fun(fun, t_θ, T) # VERY UGLY - CHANGE NEEDED
+      θ[i_t] = get_scalar_value(fun(VectorValue(D, T), t_θ), T)
     end
   else
     if RBInfo.st_M_DEIM
