@@ -244,14 +244,14 @@ function setup(NT::NTuple{4,Int}, ::Type{T}) where T
 
 end
 
-function setup(NT::NTuple{7,Int}, ::Type{T}) where T
+function setup(NT::NTuple{5,Int}, ::Type{T}) where T
 
   NavierStokesS{T}(
     setup(get_NTuple(3, Int), T), init_RBVars(NT, T)...)
 
 end
 
-function setup(NT::NTuple{8,Int}, ::Type{T}) where T
+function setup(NT::NTuple{6,Int}, ::Type{T}) where T
 
   NavierStokesST{T}(
     setup(get_NTuple(4, Int), T), setup(get_NTuple(5, Int), T),

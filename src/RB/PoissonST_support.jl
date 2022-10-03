@@ -98,7 +98,7 @@ function get_M(
     Mₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, "Mₙ.csv"))
     RBVars.Mₙ = reshape(Mₙ,RBVars.nₛᵘ,RBVars.nₛᵘ,:)::Array{T,3}
 
-    if "A" ∈ RBInfo.probl_nl
+    if "M" ∈ RBInfo.probl_nl
 
       (RBVars.MDEIM_M.Matᵢ, RBVars.MDEIM_M.idx, RBVars.MDEIM_M.el) =
         load_structures_in_list(("Matᵢ_M", "idx_M", "el_M"),

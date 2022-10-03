@@ -1,6 +1,8 @@
 include("PoissonS.jl")
 include("PoissonST_support.jl")
 
+################################# OFFLINE ######################################
+
 function get_snapshot_matrix(
   RBInfo::ROMInfoST,
   RBVars::PoissonST{T}) where T
@@ -264,10 +266,11 @@ function get_RB_system(
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
+  get_Q(RBInfo, RBVars)
+  blocks = [1]
 
   RBVars.online_time = @elapsed begin
-    get_Q(RBInfo, RBVars)
-    blocks = [1]
+
     operators = get_system_blocks(RBInfo,RBVars,blocks,blocks)
 
     θᵃ, θᵐ, θᶠ, θʰ, θˡ = get_θ(FEMSpace, RBInfo, RBVars, Param)

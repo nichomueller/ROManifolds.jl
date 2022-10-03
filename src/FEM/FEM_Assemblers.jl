@@ -44,7 +44,7 @@ function assemble_mass(
   FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
-  assemble_mass(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)
+  assemble_mass(get_NTuple(2, Int), FEMSpace, FEMInfo, Param)
 
 end
 
@@ -126,7 +126,7 @@ function assemble_stiffness(
   FEMInfo::Info,
   Param::Info)
 
-  assemble_stiffness(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)
+  assemble_stiffness(get_NTuple(2, Int), FEMSpace, FEMInfo, Param)
 
 end
 
@@ -172,7 +172,7 @@ function assemble_B(
   FEMInfo::Info,
   Param::Info)
 
-  assemble_B(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)
+  assemble_B(get_NTuple(2, Int), FEMSpace, FEMInfo, Param)
 
 end
 
@@ -291,7 +291,7 @@ function assemble_forcing(
   FEMInfo::Info,
   Param::Info)
 
-  assemble_forcing(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)
+  assemble_forcing(get_NTuple(2, Int), FEMSpace, FEMInfo, Param)
 
 end
 
@@ -368,7 +368,7 @@ function assemble_neumann_datum(
   FEMInfo::Info,
   Param::Info)
 
-  assemble_neumann_datum(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)
+  assemble_neumann_datum(get_NTuple(2, Int), FEMSpace, FEMInfo, Param)
 
 end
 
@@ -436,7 +436,7 @@ function assemble_lifting(
   FEMInfo::FEMInfoS,
   Param::ParamInfoS)
 
-  L_stokes = assemble_lifting(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)
+  L_stokes = assemble_lifting(get_NTuple(2, Int), FEMSpace, FEMInfo, Param)
 
   g = define_g_FEM(FEMSpace, Param)
   conv(u,∇u) = (∇u')⋅u
@@ -453,7 +453,7 @@ function assemble_lifting(
   FEMInfo::FEMInfoST,
   Param::ParamInfoST)
 
-  L_stokes = assemble_lifting(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)
+  L_stokes = assemble_lifting(get_NTuple(2, Int), FEMSpace, FEMInfo, Param)
   L_stokes
 
 end
@@ -490,7 +490,7 @@ function assemble_lifting_continuity(
   FEMInfo::Info,
   Param::Info)
 
-  assemble_lifting_continuity(get_NTuple(3, Int), FEMSpace, FEMInfo, Param)
+  assemble_lifting_continuity(get_NTuple(2, Int), FEMSpace, FEMInfo, Param)
 
 end
 
@@ -507,7 +507,7 @@ function assemble_L²_norm_matrix(
   ::NTuple{3,Int},
   FEMSpace::FEMProblem)
 
-  assemble_L²_norm_matrix(get_NTuple(3, Int), FEMSpace)
+  assemble_L²_norm_matrix(get_NTuple(2, Int), FEMSpace)
 
 end
 
@@ -559,7 +559,7 @@ function assemble_H¹_norm_matrix(
   ::NTuple{3,Int},
   FEMSpace::FEMProblem)
 
-  assemble_H¹_norm_matrix(get_NTuple(3, Int), FEMSpace)
+  assemble_H¹_norm_matrix(get_NTuple(2, Int), FEMSpace)
 
 end
 

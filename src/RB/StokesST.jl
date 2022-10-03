@@ -22,10 +22,6 @@ function get_snapshot_matrix(
 
 end
 
-function get_norm_matrix(RBVars::StokesST)
-  get_norm_matrix(RBVars.Steady)
-end
-
 function assemble_reduced_basis(
   RBInfo::ROMInfoST,
   RBVars::StokesST)
@@ -89,7 +85,7 @@ end
 
 function assemble_offline_structures(
   RBInfo::ROMInfoST,
-  RBVars::StokesST,
+  RBVars::PoissonST,
   operators=String[])
 
   if isempty(operators)
@@ -98,23 +94,11 @@ function assemble_offline_structures(
 
   RBVars.offline_time += @elapsed begin
     for var ∈ setdiff(operators, RBInfo.probl_nl)
-      if var ∈ ("A", "B", "M")
-        assemble_affine_matrices(RBInfo, RBVars, var)
-      else
-        assemble_affine_vectors(RBInfo, RBVars, var)
-      end
+      assemble_affine_structures(RBInfo, RBVars, var)
     end
-  end
 
-  save_affine_structures(RBInfo, RBVars)
-
-  RBVars.offline_time += @elapsed begin
     for var ∈ intersect(operators, RBInfo.probl_nl)
-      if var ∈ ("A", "B", "M")
-        assemble_MDEIM_matrices(RBInfo, RBVars, var)
-      else
-        assemble_DEIM_vectors(RBInfo, RBVars, var)
-      end
+      assemble_MDEIM_structures(RBInfo, RBVars, var)
     end
   end
 
@@ -265,12 +249,12 @@ function get_RB_system(
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
-
+  get_Q(RBInfo, RBVars)
   LHS_blocks = [1, 2, 3]
   RHS_blocks = [1, 2]
 
   RBVars.online_time = @elapsed begin
-    get_Q(RBInfo, RBVars)
+
 
     operators = get_system_blocks(RBInfo,RBVars,LHS_blocks,RHS_blocks)
 
@@ -302,7 +286,6 @@ function solve_RB_system(
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
 
   println("Solving RB problem via backslash")
-  println("Condition number of the system's matrix: $(cond(RBVars.LHSₙ[1]))")
 
   RBVars.online_time += @elapsed begin
     @fastmath xₙ = (vcat(hcat(RBVars.LHSₙ[1], RBVars.LHSₙ[2]),

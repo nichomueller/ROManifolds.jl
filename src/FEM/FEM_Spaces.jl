@@ -150,17 +150,17 @@ function get_FEMSpace_quantities(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  get_FEMSpace_quantities(get_NTuple(3, Int), FEMInfo, model, g)
+  get_FEMSpace_quantities(get_NTuple(2, Int), FEMInfo, model, g)
 
 end
 
 function get_FEMSpace_quantities(
   ::NTuple{3,Int},
-  FEMInfo::FEMInfoS,
+  FEMInfo::FEMInfoST,
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  get_FEMSpace_quantities(get_NTuple(3, Int), FEMInfo, model, g)
+  get_FEMSpace_quantities(get_NTuple(2, Int), FEMInfo, model, g)
 
 end
 
