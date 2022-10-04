@@ -119,8 +119,7 @@ function get_FEMSpace_quantities(
   Ω, Γn, Qₕ, dΩ, dΓn = get_mod_meas_quad(FEMInfo, model)
 
   refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,Float}, FEMInfo.order)
-  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1,
-    dirichlet_tags=["dirichlet"])
+  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1, dirichlet_tags=["dirichlet"])
   V = TransientTrialFESpace(V₀, g)
 
   ϕᵥ = get_fe_basis(V₀)
@@ -128,7 +127,7 @@ function get_FEMSpace_quantities(
   Nₛᵘ = length(get_free_dof_ids(V₀))
 
   refFEₚ = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order - 1; space=:P)
-  Q₀ = TestFESpace(model, refFEₚ, conformity=:L2, constraint=:zeromean)
+  Q₀ = TestFESpace(model, refFEₚ; conformity=:L2)
   Q = TrialFESpace(Q₀)
   ψᵧ = get_fe_basis(Q₀)
   ψₚ = get_trial_fe_basis(Q)

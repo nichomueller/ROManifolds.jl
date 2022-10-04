@@ -52,6 +52,50 @@ function check_dataset(RBInfo, RBVars, i)
 
 end
 
+function check_dataset(RBInfo, RBVars, i)
+
+  FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
+  Param = get_ParamInfo(RBInfo, μ[i])
+
+  u1 = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
+    DataFrame))[:, (i-1)*RBVars.Nₜ+1]
+  u2 = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
+    DataFrame))[:, (i-1)*RBVars.Nₜ+2]
+  p1 = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"),
+    DataFrame))[:, (i-1)*RBVars.Nₜ+1]
+  p2 = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"),
+    DataFrame))[:, (i-1)*RBVars.Nₜ+2]
+
+  A = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "A")
+  B = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "B")(0.)
+  M = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "M")(0.)
+  F = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "F")
+  H = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "H")
+  L = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "L")
+  Lc = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "Lc")
+
+  δtθ = RBInfo.δt*RBInfo.θ
+  t¹_θ = RBInfo.t₀+δtθ
+  t²_θ = t¹_θ+RBInfo.δt
+
+  LHS(t) = vcat(hcat(M/δtθ+A(t), -B'), hcat(B, zeros(T, FEMSpace.Nₛᵖ, FEMSpace.Nₛᵖ)))
+  RHS(t) = vcat(F(t) + 0*H(t) - 0*L(t), - 0*Lc(t))
+
+  my_x1θ = LHS(t¹_θ) / RHS(t¹_θ)
+  my_u1 = my_x1θ[1:RBVars.Nₛᵘ] / RBInfo.θ
+  my_p1 = my_x1θ[RBVars.Nₛᵘ+1:end]
+
+  my_x2θ = LHS(t²_θ) / (RHS(t²_θ) + vcat(M/δtθ * my_u1, zeros(T, FEMSpace.Nₛᵖ)))
+  my_u2 = (my_x2θ[1:RBVars.Nₛᵘ] + (1-RBInfo.θ)*my_u1)/ RBInfo.θ
+  my_p2 = my_x2θ[RBVars.Nₛᵘ+1:end]
+
+  u1≈my_u1
+  u2≈my_u2
+  p1≈my_p1
+  p2≈my_p2
+
+end
+
 function check_stokes_solver()
 
   FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
