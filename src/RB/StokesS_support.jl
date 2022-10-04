@@ -1,9 +1,4 @@
 ################################# OFFLINE ######################################
-
-function check_norm_matrix(RBVars::StokesS)
-  isempty(RBVars.Xᵘ₀) || isempty(RBVars.Xᵖ₀)
-end
-
 function PODs_space(
   RBInfo::Info,
   RBVars::StokesS)
@@ -245,7 +240,7 @@ function assemble_MDEIM_structures(
   RBVars::StokesS,
   var::String)
 
-  println("The matrix $var is non-affine:
+  println("The variable  $var is non-affine:
     running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
 
   if var == "A"
@@ -286,7 +281,7 @@ end
 
 function assemble_reduced_mat_MDEIM(
   RBVars::StokesS{T},
-  MDEIM::MDEIMmS,
+  MDEIM::MDEIMm,
   var::String) where T
 
   if var == "B"
@@ -311,7 +306,7 @@ end
 
 function assemble_reduced_mat_MDEIM(
   RBVars::StokesS{T},
-  MDEIM::MDEIMvS,
+  MDEIM::MDEIMv,
   var::String) where T
 
   if var == "Lc"
@@ -343,7 +338,7 @@ function save_assembled_structures(
     RBVars.MDEIM_B.Matᵢ, RBVars.MDEIM_B.idx, RBVars.MDEIM_B.el,
     RBVars.MDEIM_Lc.Matᵢ, RBVars.MDEIM_Lc.idx, RBVars.MDEIM_Lc.el)
   M_DEIM_names = (
-    "Matᵢ_A","idx_A","el_A",
+    "Matᵢ_B","idx_B","el_B",
     "Matᵢ_Lc","idx_Lc","el_Lc")
   save_structures_in_list(M_DEIM_vars, M_DEIM_names, RBInfo.ROM_structures_path)
 

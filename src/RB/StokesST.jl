@@ -102,7 +102,7 @@ function assemble_offline_structures(
     end
   end
 
-  save_M_DEIM_structures(RBInfo, RBVars)
+  save_assembled_structures(RBInfo, RBVars, operators)
 
 end
 
@@ -233,7 +233,7 @@ function get_RB_RHS_blocks(
   @simd for i_s = 1:RBVars.nₛᵖ
     for i_t = 1:RBVars.nₜᵖ
       i_st = index_mapping(i_s, i_t, RBVars, "p")
-      block₂[i_st, :] = - RBVars.Lcₙ[i_s,:]' * Φₜᵘ_Lc[i_t,:]
+      block₂[i_st] = - RBVars.Lcₙ[i_s,:]' * Φₜᵘ_Lc[i_t,:]
     end
   end
 
@@ -254,7 +254,6 @@ function get_RB_system(
   RHS_blocks = [1, 2]
 
   RBVars.online_time = @elapsed begin
-
 
     operators = get_system_blocks(RBInfo,RBVars,LHS_blocks,RHS_blocks)
 

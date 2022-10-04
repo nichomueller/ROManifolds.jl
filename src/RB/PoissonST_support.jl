@@ -36,7 +36,7 @@ function get_generalized_coordinates(
   RBVars::PoissonST{T},
   snaps::Vector{Int}) where T
 
-  if check_norm_matrix(RBVars.Steady)
+  if isempty(RBVars.Xᵘ₀)
     get_norm_matrix(RBInfo, RBVars.Steady)
   end
 
@@ -76,9 +76,11 @@ function get_A(
 
   if isempty(op)
     if "A" ∈ RBInfo.probl_nl
-      if isfile(joinpath(RBInfo.ROM_structures_path, "idx_time_A.csv"))
-        RBVars.MDEIM_A.idx_time = load_CSV(Vector{Int}(undef,0),
-          joinpath(RBInfo.ROM_structures_path, "idx_time_A.csv"))
+      if isfile(joinpath(RBInfo.ROM_structures_path, "time_idx_A.csv"))
+        RBVars.MDEIM_A.time_idx = load_CSV(Vector{Int}(undef,0),
+          joinpath(RBInfo.ROM_structures_path, "time_idx_A.csv"))
+      else
+        op = ["A"]
       end
     end
   end
@@ -100,10 +102,10 @@ function get_M(
 
     if "M" ∈ RBInfo.probl_nl
 
-      (RBVars.MDEIM_M.Matᵢ, RBVars.MDEIM_M.idx, RBVars.MDEIM_M.el) =
-        load_structures_in_list(("Matᵢ_M", "idx_M", "el_M"),
-        (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
-        RBInfo.ROM_structures_path)
+      (RBVars.MDEIM_M.Matᵢ, RBVars.MDEIM_M.idx, RBVars.MDEIM_M.time_idx, RBVars.MDEIM_M.el) =
+        load_structures_in_list(("Matᵢ_M", "idx_M", "time_idx_M", "el_M"),
+        (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0),
+        Vector{Int}(undef,0)), RBInfo.ROM_structures_path)
 
     end
 
@@ -126,9 +128,11 @@ function get_F(
 
   if isempty(op)
     if "F" ∈ RBInfo.probl_nl
-      if isfile(joinpath(RBInfo.ROM_structures_path, "idx_time_F.csv"))
-        RBVars.MDEIM_F.idx_time = load_CSV(Vector{Int}(undef,0),
-          joinpath(RBInfo.ROM_structures_path, "idx_time_F.csv"))
+      if isfile(joinpath(RBInfo.ROM_structures_path, "time_idx_F.csv"))
+        RBVars.MDEIM_F.time_idx = load_CSV(Vector{Int}(undef,0),
+          joinpath(RBInfo.ROM_structures_path, "time_idx_F.csv"))
+      else
+        op = ["F"]
       end
     end
   end
@@ -145,9 +149,11 @@ function get_H(
 
   if isempty(op)
     if "H" ∈ RBInfo.probl_nl
-      if isfile(joinpath(RBInfo.ROM_structures_path, "idx_time_H.csv"))
-        RBVars.MDEIM_H.idx_time = load_CSV(Vector{Int}(undef,0),
-          joinpath(RBInfo.ROM_structures_path, "idx_time_H.csv"))
+      if isfile(joinpath(RBInfo.ROM_structures_path, "time_idx_H.csv"))
+        RBVars.MDEIM_H.time_idx = load_CSV(Vector{Int}(undef,0),
+          joinpath(RBInfo.ROM_structures_path, "time_idx_H.csv"))
+      else
+        op = ["H"]
       end
     end
   end
@@ -164,9 +170,11 @@ function get_L(
 
   if isempty(op)
     if "L" ∈ RBInfo.probl_nl
-      if isfile(joinpath(RBInfo.ROM_structures_path, "idx_time_L.csv"))
-        RBVars.MDEIM_L.idx_time = load_CSV(Vector{Int}(undef,0),
-          joinpath(RBInfo.ROM_structures_path, "idx_time_L.csv"))
+      if isfile(joinpath(RBInfo.ROM_structures_path, "time_idx_L.csv"))
+        RBVars.MDEIM_L.time_idx = load_CSV(Vector{Int}(undef,0),
+          joinpath(RBInfo.ROM_structures_path, "time_idx_L.csv"))
+      else
+        op = ["L"]
       end
     end
   end
@@ -197,7 +205,7 @@ function assemble_MDEIM_structures(
   RBVars::PoissonST,
   var::String)
 
-  println("The matrix $var is non-affine:
+  println("The variable $var is non-affine:
     running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
 
   if var == "A"
@@ -233,7 +241,7 @@ end
 
 function assemble_reduced_mat_MDEIM(
   RBVars::PoissonST{T},
-  MDEIM::MDEIMmST,
+  MDEIM::MDEIMm,
   var::String) where T
 
   Q = size(MDEIM.Mat)[2]
@@ -258,28 +266,10 @@ end
 
 function assemble_reduced_mat_MDEIM(
   RBVars::PoissonST{T},
-  MDEIM::MDEIMvST,
+  MDEIM::MDEIMv,
   var::String) where T
 
-  Q = size(MDEIM.Mat)[2]
-  Vecₙ = zeros(T, RBVars.nₛᵘ,1,Q)
-  @simd for q = 1:Q
-    Vecₙ[:,:,q] = RBVars.Φₛᵘ' * Vector{T}(MDEIM.Mat[:, q])
-  end
-  Vecₙ = reshape(Vecₙ,:,Q)::Matrix{T}
-
-  if var == "F"
-    RBVars.Fₙ = Vecₙ
-    RBVars.Qᶠ = Q
-  elseif var == "H"
-    RBVars.Hₙ = Vecₙ
-    RBVars.Qʰ = Q
-  elseif var == "L"
-    RBVars.Lₙ = Vecₙ
-    RBVars.Qˡ = Q
-  else
-    error("Unrecognized vector to assemble with DEIM")
-  end
+  assemble_reduced_mat_MDEIM(RBVars.Steady, MDEIM, var)
 
 end
 
@@ -294,8 +284,13 @@ function save_assembled_structures(
   save_structures_in_list(affine_vars[affine_entry], affine_names[affine_entry],
     RBInfo.ROM_structures_path)
 
-  M_DEIM_vars = (RBVars.MDEIM_M.Matᵢ, RBVars.MDEIM_M.idx, RBVars.MDEIM_M.el)
-  M_DEIM_names = ("Matᵢ_M","idx_M","el_M")
+  M_DEIM_vars = (
+    RBVars.MDEIM_M.Matᵢ, RBVars.MDEIM_M.idx, RBVars.MDEIM_M.time_idx, RBVars.MDEIM_M.el,
+    RBVars.MDEIM_A.time_idx, RBVars.MDEIM_F.time_idx, RBVars.MDEIM_H.time_idx,
+    RBVars.MDEIM_L.time_idx)
+  M_DEIM_names = (
+    "Matᵢ_M","idx_M","time_idx_M","el_M",
+    "time_idx_A","time_idx_F","time_idx_H","time_idx_L")
   save_structures_in_list(M_DEIM_vars, M_DEIM_names, RBInfo.ROM_structures_path)
 
   save_assembled_structures(RBInfo, RBVars.Steady, operators)
@@ -348,12 +343,10 @@ function get_θ_matrix(
 
 end
 
-function get_Q(
-  RBInfo::Info,
-  RBVars::PoissonST)
+function get_Q(RBVars::PoissonST)
 
   RBVars.Qᵐ = size(RBVars.Mₙ)[end]
-  get_Q(RBInfo, RBVars.Steady)
+  get_Q(RBVars.Steady)
 
 end
 

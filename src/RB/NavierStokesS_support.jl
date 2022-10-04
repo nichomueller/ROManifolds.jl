@@ -142,7 +142,7 @@ end
 
 function assemble_reduced_mat_MDEIM(
   RBVars::NavierStokesS{T},
-  MDEIM::MDEIMmS,
+  MDEIM::MDEIMm,
   var::String) where T
 
   if var ∈ ("C", "D")
@@ -173,7 +173,7 @@ end
 
 function assemble_reduced_mat_MDEIM(
   RBVars::NavierStokesS{T},
-  MDEIM::MDEIMvS,
+  MDEIM::MDEIMv,
   var::String) where T
 
   assemble_reduced_mat_MDEIM(RBVars.Stokes, MDEIM, var)

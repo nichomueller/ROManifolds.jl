@@ -1,9 +1,4 @@
 ################################# OFFLINE ######################################
-
-function check_norm_matrix(RBVars::PoissonS)
-  isempty(RBVars.Xᵘ₀)
-end
-
 function PODs_space(
   RBInfo::Info,
   RBVars::PoissonS)
@@ -205,7 +200,7 @@ function assemble_MDEIM_structures(
   RBVars::PoissonS,
   var::String)
 
-  println("The matrix $var is non-affine:
+  println("The variable $var is non-affine:
     running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
 
   if var == "A"
@@ -236,7 +231,7 @@ end
 
 function assemble_reduced_mat_MDEIM(
   RBVars::PoissonS{T},
-  MDEIM::MDEIMmS,
+  MDEIM::MDEIMm,
   ::String) where T
 
   Q = size(MDEIM.Mat)[2]
@@ -257,7 +252,7 @@ end
 
 function assemble_reduced_mat_MDEIM(
   RBVars::PoissonS{T},
-  MDEIM::MDEIMvS,
+  MDEIM::MDEIMv,
   var::String) where T
 
   Q = size(MDEIM.Mat)[2]

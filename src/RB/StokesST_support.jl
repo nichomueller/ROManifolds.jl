@@ -1,9 +1,4 @@
 ################################# OFFLINE ######################################
-
-function check_norm_matrix(RBVars::StokesST)
-  check_norm_matrix(RBVars.Steady)
-end
-
 function PODs_space(
   RBInfo::Info,
   RBVars::StokesST)
@@ -106,7 +101,7 @@ function get_generalized_coordinates(
   RBVars::StokesST{T},
   snaps::Vector{Int}) where T
 
-  if check_norm_matrix(RBVars)
+  if isempty(RBVars.Xᵘ₀) || isempty(RBVars.Xᵖ₀)
     get_norm_matrix(RBInfo, RBVars.Steady)
   end
 
@@ -216,7 +211,7 @@ function assemble_MDEIM_structures(
   RBVars::StokesST,
   var::String)
 
-  println("The matrix $var is non-affine:
+  println("The variable  $var is non-affine:
     running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
 
   if var == "A"
@@ -262,7 +257,7 @@ end
 
 function assemble_reduced_mat_MDEIM(
   RBVars::StokesST,
-  MDEIM::MDEIMmST,
+  MDEIM::MDEIMm,
   var::String)
 
   if var == "B"
@@ -285,21 +280,44 @@ function assemble_reduced_mat_MDEIM(
 
 end
 
+function assemble_reduced_mat_MDEIM(
+  RBVars::PoissonS{T},
+  MDEIM::MDEIMv,
+  var::String) where T
+
+  Q = size(MDEIM.Mat)[2]
+  Vecₙ = zeros(T,RBVars.nₛᵘ,1,Q)
+  @simd for q = 1:Q
+    Vecₙ[:,:,q] = RBVars.Φₛᵘ' * Vector{T}(MDEIM.Mat[:, q])
+  end
+  Vecₙ = reshape(Vecₙ,:,Q)
+
+  if var == "F"
+    RBVars.Fₙ = Vecₙ
+    RBVars.Qᶠ = Q
+  elseif var == "H"
+    RBVars.Hₙ = Vecₙ
+    RBVars.Qʰ = Q
+  elseif var == "L"
+    RBVars.Lₙ = Vecₙ
+    RBVars.Qˡ = Q
+  else var == "Lc"
+    RBVars.Lcₙ = Vecₙ
+    RBVars.Qˡᶜ = Q
+  end
+
+end
+
 function save_assembled_structures(
   RBInfo::Info,
   RBVars::StokesST{T},
   operators::Vector{String}) where T
 
-  affine_vars = (reshape(RBVars.Mₙ, RBVars.nₛᵘ ^ 2, :)::Matrix{T},)
-  affine_names = ("Mₙ",)
-  affine_entry = get_affine_entries(operators, affine_names)
-  save_structures_in_list(affine_vars[affine_entry], affine_names[affine_entry],
-    RBInfo.ROM_structures_path)
-
-  M_DEIM_vars = (RBVars.MDEIM_M.Matᵢ, RBVars.MDEIM_M.idx, RBVars.MDEIM_M.el)
-  M_DEIM_names = ("Matᵢ_M","idx_M","el_M")
+  M_DEIM_vars = (RBVars.MDEIM_B.time_idx, RBVars.MDEIM_Lc.time_idx)
+  M_DEIM_names = ("time_idx_B","time_idx_Lc")
   save_structures_in_list(M_DEIM_vars, M_DEIM_names, RBInfo.ROM_structures_path)
 
+  save_assembled_structures(RBInfo, RBVars.Poisson, operators)
   save_assembled_structures(RBInfo, RBVars.Steady, operators)
 
 end
@@ -354,12 +372,10 @@ function get_θ_matrix(
 
 end
 
-function get_Q(
-  RBInfo::Info,
-  RBVars::StokesST)
+function get_Q(RBVars::StokesST)
 
-  RBVars.Qᵐ = size(RBVars.Mₙ)[end]
-  get_Q(RBInfo, RBVars.Steady)
+  get_Q(RBVars.Poisson)
+  get_Q(RBVars.Steady)
 
 end
 

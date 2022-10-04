@@ -25,7 +25,7 @@ function get_norm_matrix(
 
   get_norm_matrix(RBInfo, RBVars.Poisson)
 
-  if check_norm_matrix(RBVars)
+  if isempty(RBVars.Xᵘ₀) || isempty(RBVars.Xᵖ₀)
 
     println("Importing the norm matrix Xᵖ₀")
 

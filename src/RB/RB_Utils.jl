@@ -178,6 +178,7 @@ function assemble_sparse_mat(
 
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
+  Nₕ = select_Nₕ(FEMSpace, var)
   Nₜ = length(timesθ)
 
   function define_Matₜ(FEMSpace::FEMSpacePoissonST, t::Real, var::String)
@@ -195,6 +196,9 @@ function assemble_sparse_mat(
     if var == "A"
       return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Param.α(t)*∇(FEMSpace.ϕᵤ(t))))*dΩ_sparse,
         FEMSpace.V(t), FEMSpace.V₀)
+    elseif var == "B"
+      return assemble_matrix(∫(FEMSpace.ψᵧ*(Param.b(t)*∇⋅(FEMSpace.ϕᵤ)))*dΩ_sparse,
+        FEMSpace.V(t), FEMSpace.Q₀)
     elseif var == "M"
       return assemble_matrix(∫(FEMSpace.ϕᵥ⋅(Param.m(t)*FEMSpace.ϕᵤ(t)))*dΩ_sparse,
         FEMSpace.V(t), FEMSpace.V₀)
@@ -206,6 +210,9 @@ function assemble_sparse_mat(
     if var == "A"
       return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Param.α(t)*∇(FEMSpace.ϕᵤ(t))))*dΩ_sparse,
         FEMSpace.V(t), FEMSpace.V₀)
+    elseif var == "B"
+      return assemble_matrix(∫(FEMSpace.ψᵧ*(Param.b(t)*∇⋅(FEMSpace.ϕᵤ)))*dΩ_sparse,
+        FEMSpace.V(t), FEMSpace.Q₀)
     elseif var == "M"
       return assemble_matrix(∫(FEMSpace.ϕᵥ⋅(Param.m(t)*FEMSpace.ϕᵤ(t)))*dΩ_sparse,
         FEMSpace.V(t), FEMSpace.V₀)
@@ -219,10 +226,10 @@ function assemble_sparse_mat(
   for (i_t,t) in enumerate(timesθ)
     i,j,v = findnz(Matₜ(t))::Tuple{Vector{Int},Vector{Int},Vector{Float}}
     if i_t == 1
-      Mat = sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ*Nₜ)
+      Mat = sparse(i,j,v,Nₕ,FEMSpace.Nₛᵘ*Nₜ)
     else
       Mat[:,(i_t-1)*FEMSpace.Nₛᵘ+1:i_t*FEMSpace.Nₛᵘ] =
-        sparse(i,j,v,FEMSpace.Nₛᵘ,FEMSpace.Nₛᵘ)
+        sparse(i,j,v,Nₕ,FEMSpace.Nₛᵘ)
     end
   end
 
@@ -385,10 +392,10 @@ function interpolated_θ(
   timesθ::Vector{T},
   Matᵢ::Matrix{T},
   idx::Vector{Int},
-  idx_time::Vector{Int}) where T
+  time_idx::Vector{Int}) where T
 
-  red_timesθ = timesθ[idx_time]
-  discarded_idx_time = setdiff(collect(1:RBVars.Nₜ), idx_time)
+  red_timesθ = timesθ[time_idx]
+  discarded_time_idx = setdiff(collect(1:RBVars.Nₜ), time_idx)
   θ = zeros(T, length(idx), RBVars.Nₜ)
 
   red_θ = (Matᵢ \
@@ -396,8 +403,8 @@ function interpolated_θ(
 
   etp = ScatteredInterpolation.interpolate(Multiquadratic(),
     reshape(red_timesθ,1,:), red_θ')
-  θ[:, idx_time] = red_θ
-  for iₜ = discarded_idx_time
+  θ[:, time_idx] = red_θ
+  for iₜ = discarded_time_idx
     θ[:, iₜ] = ScatteredInterpolation.evaluate(etp,[timesθ[iₜ]])
   end
 
@@ -423,7 +430,7 @@ function θ_matrix(
   RBVars::RBProblemS,
   Param::ParamInfoS,
   fun::Function,
-  MDEIM::MDEIMmS,
+  MDEIM::MDEIMm,
   var::String) where {D,T}
 
   if var ∉ RBInfo.probl_nl
@@ -444,7 +451,7 @@ function θ_matrix(
   RBVars::RBProblemS,
   Param::ParamInfoS,
   fun::Function,
-  MDEIM::MDEIMvS,
+  MDEIM::MDEIMv,
   var::String) where {D,T}
 
   if var ∉ RBInfo.probl_nl
@@ -465,7 +472,7 @@ function θ_matrix(
   RBVars::RBProblemST,
   Param::ParamInfoST,
   fun::Function,
-  MDEIM::MDEIMmST,
+  MDEIM::MDEIMm,
   var::String) where {D,T}
 
   timesθ = get_timesθ(RBInfo)
@@ -477,11 +484,11 @@ function θ_matrix(
     end
   else
     if RBInfo.st_M_DEIM
-      red_timesθ = timesθ[MDEIM.idx_time]
+      red_timesθ = timesθ[MDEIM.time_idx]
       Mat_μ_sparse = assemble_sparse_mat(
         FEMSpace, FEMInfo, Param, MDEIM.el, red_timesθ, var)
       θ = interpolated_θ(RBVars, Mat_μ_sparse, timesθ, MDEIM.Matᵢ,
-        MDEIM.idx, MDEIM.idx_time)
+        MDEIM.idx, MDEIM.time_idx)
     else
       Mat_μ_sparse = assemble_sparse_mat(
         FEMSpace, FEMInfo, Param, sparse_el,timesθ, var)
@@ -499,7 +506,7 @@ function θ_matrix(
   RBVars::RBProblemST,
   Param::ParamInfoST,
   fun::Function,
-  MDEIM::MDEIMvST,
+  MDEIM::MDEIMv,
   var::String) where {D,T}
 
   timesθ = get_timesθ(RBInfo)
@@ -511,11 +518,11 @@ function θ_matrix(
     end
   else
     if RBInfo.st_M_DEIM
-      red_timesθ = timesθ[MDEIM.idx_time]
+      red_timesθ = timesθ[MDEIM.time_idx]
       Vec_μ_sparse = T.(assemble_sparse_vec(
         FEMSpace, FEMInfo, Param, MDEIM.el, red_timesθ, var))
       θ = interpolated_θ(RBVars, Vec_μ_sparse, timesθ, MDEIM.Matᵢ,
-        MDEIM.idx, MDEIM.idx_time)
+        MDEIM.idx, MDEIM.time_idx)
     else
       Vec_μ_sparse = assemble_sparse_vec(FEMSpace, FEMInfo, Param, MDEIM.el, timesθ, var)
       θ = M_DEIM_online(RBVars, Vec_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
@@ -529,7 +536,7 @@ end
 function θ_function(
   FEMSpace::FEMProblemS,
   RBVars::RBProblemS,
-  MDEIM::MDEIMmS,
+  MDEIM::MDEIMm,
   var::String) where T
 
   Fun_μ_sparse =

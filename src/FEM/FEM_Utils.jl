@@ -64,6 +64,14 @@ function nonlinearity_lifting_op(FEMInfo::Info)
   end
 end
 
+function select_Nₕ(FEMSpace::FEMProblem, var::String)
+  if var ∈ ("B", "Lc")
+    FEMSpace.Nₛᵖ
+  else
+    FEMSpace.Nₛᵘ
+  end
+end
+
 function get_FEMProblem_info(FEMInfo::Info)
   μ = load_CSV(Array{Float}[],
     joinpath(FEMInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{Float}}
@@ -79,33 +87,6 @@ function get_h(FEMSpace::Problem)
   dΛ = Measure(Λ, 2)
   h = get_array(∫(1)dΛ)[1]
   h
-end
-
-function get_α_stab(
-  FEMSpace::FEMProblemS,
-  Param::ParamInfoS)
-
-  h_mesh = get_h(FEMSpace)
-  Pechlet(x) = norm(Param.b(x))*h_mesh / (2*Param.α(x))
-  ξ(x) = x - 1 + 2*x/(exp(2*x)-1)
-  α_stab(x) = Param.α(x)*(1 + ξ(Pechlet(x)))
-
-  α_stab
-
-end
-
-function get_α_stab(
-  FEMSpace::FEMProblemST,
-  Param::ParamInfoST)
-
-  h_mesh = get_h(FEMSpace)
-  Pechlet(x, t) = norm(Param.b(x, t))*h_mesh / (2*Param.α(x, t))
-  ξ(x) = x - 1 + 2*x/(exp(2*x)-1)
-  α_stab(x, t::Real) = Param.α(x, t)*(1 + ξ(Pechlet(x, t)))
-  α_stab(t::Real) = x -> α_stab(x, t)
-
-  α_stab
-
 end
 
 function get_timesθ(FEMInfo::FEMInfoST)

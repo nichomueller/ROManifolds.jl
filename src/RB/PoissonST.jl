@@ -95,7 +95,7 @@ function assemble_offline_structures(
     end
   end
 
-  save_M_DEIM_structures(RBInfo, RBVars)
+  save_assembled_structures(RBInfo, RBVars, operators)
 
 end
 
@@ -221,9 +221,9 @@ end
 function get_RB_RHS_blocks(
   RBInfo::ROMInfoST,
   RBVars::PoissonST{T},
-  θᶠ::Array{T},
-  θʰ::Array{T},
-  θˡ::Array{T}) where T
+  θᶠ::Matrix{T},
+  θʰ::Matrix{T},
+  θˡ::Matrix{T}) where T
 
   println("Assembling RHS using θ-method time scheme, θ=$(RBInfo.θ)")
 
@@ -250,7 +250,7 @@ function get_RB_RHS_blocks(
       Fₙ_μ_i_j = RBVars.Fₙ[i_s,:]'*Φₜᵘ_F[i_t,:]
       Hₙ_μ_i_j = RBVars.Hₙ[i_s,:]'*Φₜᵘ_H[i_t,:]
       Lₙ_μ_i_j = RBVars.Lₙ[i_s,:]'*Φₜᵘ_L[i_t,:]
-      block₁[i_st, :] = Fₙ_μ_i_j + Hₙ_μ_i_j - Lₙ_μ_i_j
+      block₁[i_st] = Fₙ_μ_i_j + Hₙ_μ_i_j - Lₙ_μ_i_j
     end
   end
 
@@ -266,7 +266,7 @@ function get_RB_system(
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
-  get_Q(RBInfo, RBVars)
+  get_Q(RBVars)
   blocks = [1]
 
   RBVars.online_time = @elapsed begin

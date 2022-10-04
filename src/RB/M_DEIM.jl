@@ -40,22 +40,14 @@ function M_DEIM_offline(Mat::Matrix)
 
 end
 
-function select_FEM_dim(FEMSpace::FEMProblem, var::String)
-  if var ∈ ("B", "Lc")
-    FEMSpace.Nₛᵖ
-  else
-    FEMSpace.Nₛᵘ
-  end
-end
-
 function MDEIM_offline!(
-  MDEIM::MDEIMmS,
+  MDEIM::MDEIMm,
   RBInfo::ROMInfoS,
   RBVars::RBProblemS{T},
   var::String) where T
 
   FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
-  Nₕ = select_FEM_dim(FEMSpace, var)
+  Nₕ = select_Nₕ(FEMSpace, var)
 
   Mat, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
   idx_full, Matᵢ = M_DEIM_offline(Mat)
@@ -69,13 +61,13 @@ function MDEIM_offline!(
 end
 
 function MDEIM_offline!(
-  MDEIM::MDEIMmST,
+  MDEIM::MDEIMm,
   RBInfo::ROMInfoST,
   RBVars::RBProblemST{T},
   var::String) where T
 
   FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
-  Nₕ = select_FEM_dim(FEMSpace, var)
+  Nₕ = select_Nₕ(FEMSpace, var)
 
   Mat, Mat_time, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
 
@@ -84,16 +76,16 @@ function MDEIM_offline!(
   idx_space, _ = from_vec_to_mat_idx(idx, Nₕ)
   el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(idx_space))
 
-  idx_time, _ = M_DEIM_offline(Mat_time)
-  unique!(sort!(idx_time))
+  time_idx, _ = M_DEIM_offline(Mat_time)
+  unique!(sort!(time_idx))
 
-  MDEIM.Mat, MDEIM.Matᵢ, MDEIM.idx, MDEIM.idx_time, MDEIM.row_idx, MDEIM.el =
-    Mat, Matᵢ, idx, idx_time, row_idx, el
+  MDEIM.Mat, MDEIM.Matᵢ, MDEIM.idx, MDEIM.time_idx, MDEIM.row_idx, MDEIM.el =
+    Mat, Matᵢ, idx, time_idx, row_idx, el
 
 end
 
 function MDEIM_offline!(
-  MDEIM::MDEIMvS,
+  MDEIM::MDEIMv,
   RBInfo::ROMInfoS{T},
   var::String) where T
 
@@ -114,7 +106,7 @@ function MDEIM_offline!(
 end
 
 function MDEIM_offline!(
-  MDEIM::MDEIMvST,
+  MDEIM::MDEIMv,
   RBInfo::ROMInfoST{T},
   var::String) where T
 
@@ -131,11 +123,11 @@ function MDEIM_offline!(
     el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(idx))
   end
 
-  idx_time, _ = M_DEIM_offline(Mat_time)
-  unique!(sort!(idx_time))
+  time_idx, _ = M_DEIM_offline(Mat_time)
+  unique!(sort!(time_idx))
 
-  MDEIM.Mat, MDEIM.Matᵢ, MDEIM.idx, MDEIM.idx_time, MDEIM.el =
-    Mat, Matᵢ, idx, idx_time, el
+  MDEIM.Mat, MDEIM.Matᵢ, MDEIM.idx, MDEIM.time_idx, MDEIM.el =
+    Mat, Matᵢ, idx, time_idx, el
 
 end
 

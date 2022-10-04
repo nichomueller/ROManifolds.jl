@@ -24,7 +24,7 @@ function get_norm_matrix(
   RBInfo::Info,
   RBVars::PoissonS{T}) where T
 
-  if check_norm_matrix(RBVars)
+  if isempty(RBVars.Xᵘ₀)
     println("Importing the norm matrix Xᵘ₀")
     Xᵘ₀ = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "Xᵘ₀.csv"))
     RBVars.Nₛᵘ = size(Xᵘ₀)[1]

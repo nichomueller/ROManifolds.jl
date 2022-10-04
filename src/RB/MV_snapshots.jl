@@ -78,26 +78,10 @@ function assemble_matrix_snapshots(
   RBInfo::ROMInfoST{T},
   RBVars::RBProblemST,
   μ::Vector,
-  k::Int,
   timesθ::Vector,
   var::String) where T
 
-  Param = get_ParamInfo(RBInfo, μ)
-  Matᵤ = assemble_FEM_structure(FEMSpace, RBInfo, Param, var)
-
-  Mat, row_idx = Array{T}(undef,0,0,0), Int[]
-  for i_t = 1:RBVars.Nₜ
-    # this is not precise: Sᵘ_quad is not computed at timesθ
-    Mat_i = Matᵤ(RBVars.Sᵘ_quad[:, (k-1)*RBVars.Nₜ+i_t], timesθ[i_t])
-    i, v = findnz(Mat_i[:])::Tuple{Vector{Int},Vector{T}}
-    if i_t == 1
-      row_idx = i
-      Mat = zeros(T,length(row_idx),Nₜ)
-    end
-    Mat[:,i_t] = v
-  end
-
-  reshape(Mat, length(row_idx), :)::Matrix{T}, row_idx
+  error("Not implemented yet")
 
 end
 
@@ -105,15 +89,14 @@ function call_matrix_snapshots(
   FEMSpace::FEMProblemST,
   RBInfo::ROMInfoST{T},
   RBVars::RBProblemST,
-  μ::Vector{Vector{T}},
-  k::Int,
+  μ::Vector,
   timesθ::Vector,
   var::String) where T
 
   if var ∈ ["C"]
-    assemble_matrix_snapshots(FEMSpace, RBInfo, RBVars, μ[k], k, timesθ, var)
+    assemble_matrix_snapshots(FEMSpace, RBInfo, RBVars, μ, timesθ, var)
   else
-    assemble_matrix_snapshots(FEMSpace, RBInfo, μ[k], timesθ, var)
+    assemble_matrix_snapshots(FEMSpace, RBInfo, μ, timesθ, var)
   end
 
 end
@@ -160,7 +143,7 @@ function standard_MDEIM(
   @simd for k = 1:nₛ_min
     println("Considering parameter number $k/$nₛ_max")
     snapsₖ, row_idx = call_matrix_snapshots(
-      FEMSpace,RBInfo,RBVars,μ[k],k,timesθ,var)
+      FEMSpace,RBInfo,RBVars,μ[k],timesθ,var)
     snapsₖ_space, snapsₖ_time = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
     if k == 1
       snaps_space = snapsₖ_space
@@ -175,7 +158,7 @@ function standard_MDEIM(
     @simd for k = nₛ_min+1:nₛ_max
       println("Considering parameter number $k/$nₛ_max")
       snapsₖ, row_idx = call_matrix_snapshots(
-        FEMSpace,RBInfo,RBVars,μ[k],k,timesθ,var)
+        FEMSpace,RBInfo,RBVars,μ[k],timesθ,var)
       _, snapsₖ_time = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
       if k == 1
         snaps_time = snapsₖ_time
@@ -187,7 +170,7 @@ function standard_MDEIM(
     @simd for k = nₛ_min+1:nₛ_max
       println("Considering parameter number $k/$nₛ_max")
       snapsₖ, row_idx = call_matrix_snapshots(
-        FEMSpace,RBInfo,RBVars,μ[k],k,timesθ,var)
+        FEMSpace,RBInfo,RBVars,μ[k],timesθ,var)
       snapsₖ_space, _ = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
       if k == 1
         snaps_space = snapsₖ_space
@@ -215,7 +198,7 @@ function functional_MDEIM_linear(
 
   # space
   Θmat_space, _ = M_DEIM_POD(Θmat_space,RBInfo.ϵₛ)
-  Mat_Θ = assemble_parametric_FE_matrix(RBInfo.problem_id,FEMSpace,var)
+  Mat_Θ = assemble_parametric_FE_matrix(RBInfo.FEMInfo.problem_id,FEMSpace,var)
   Q = size(Θmat_space)[2]
   snaps_space,row_idx = Matrix{T}(undef,0,0),Int[]
 
@@ -284,7 +267,7 @@ function functional_MDEIM_nonlinear(
 
 end
 
-function call_functional_MDEIM(
+function functional_MDEIM(
   FEMSpace::FEMProblemST,
   RBInfo::ROMInfoST{T},
   RBVars::RBProblemST,
@@ -310,7 +293,7 @@ function get_snaps_MDEIM(
   timesθ = get_timesθ(RBInfo)
 
   if RBInfo.functional_M_DEIM
-    return call_functional_MDEIM(FEMSpace,RBInfo,RBVars,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}, Vector{Int}}
+    return functional_MDEIM(FEMSpace,RBInfo,RBVars,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}, Vector{Int}}
   else
     return standard_MDEIM(FEMSpace,RBInfo,RBVars,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}, Vector{Int}}
   end
@@ -353,7 +336,7 @@ function assemble_vector_snapshots(
 
   for i_t = 1:Nₜ
     v = Vec_t(timesθ[i_t])[:]
-    if i_nₛ == 1
+    if i_t == 1
       Vec = zeros(T, length(v), Nₜ)
     end
     Vec[:, i_t] = v
@@ -468,7 +451,7 @@ function assemble_θmat_snapshots(
     end
   end
 
-  if nₛ_min == RBInfo.nₛ
+  if nₛ_min == nₛ
     @simd for k = nₛ_min+1:nₛ_max
       println("Considering parameter number $k/$nₛ_max")
       Param = get_ParamInfo(RBInfo, μ[k])
