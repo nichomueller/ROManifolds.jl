@@ -200,14 +200,26 @@ function matrix_to_blocks(Mat::Matrix{T}, nblocks::Int) where T
   @assert size(Mat)[2] % nblocks == 0 "Something is wrong"
   ncol_block = Int(size(Mat)[2] / nblocks)
 
-  Mat_new = Matrix{T}[]
+  blockmat = Matrix{T}[]
   for nb = 1:nblocks
-    push!(Mat_new, Mat[:, (nb-1)*ncol_block+1:nb*ncol_block])
+    push!(blockmat, Mat[:, (nb-1)*ncol_block+1:nb*ncol_block])
   end
 
-  Mat_new
+  blockmat
 
 end
+
+function matrix_to_blocks(Mat::Array{T, 3}) where T
+
+  blockmat = Matrix{T}[]
+  for nb = 1:size(Mat)[end]
+    push!(blockmat, Mat[:, :, nb])
+  end
+
+  blockmat
+
+end
+
 
 function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
 

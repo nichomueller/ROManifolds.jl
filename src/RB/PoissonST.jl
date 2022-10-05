@@ -20,6 +20,14 @@ function get_snapshot_matrix(
 
 end
 
+function get_norm_matrix(
+  RBInfo::Info,
+  RBVars::PoissonST)
+
+  get_norm_matrix(RBInfo, RBVars.Steady)
+
+end
+
 function assemble_reduced_basis(
   RBInfo::ROMInfoST,
   RBVars::PoissonST)

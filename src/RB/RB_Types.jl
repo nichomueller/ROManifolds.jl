@@ -252,13 +252,14 @@ end
 
 function Base.getproperty(RBVars::StokesST, sym::Symbol)
   if sym in (:Sᵖ, :Φₛᵖ, :p̃, :pₙ, :p̂, :Bₙ, :Lcₙ, :Xᵖ₀,
-    :MDEIM_B, :MDEIM_L, :Nₛᵖ, :nₛᵖ, :Qᵇ, :Qˡᶜ)
+    :MDEIM_B, :MDEIM_Lc, :Nₛᵖ, :nₛᵖ, :Qᵇ, :Qˡᶜ)
     getfield(RBVars.Steady, sym)
-  elseif sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Mₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀,
-    :LHSₙ, :RHSₙ, :MDEIM_A, :MDEIM_M, :MDEIM_F, :MDEIM_H,
-    :Qᵐ, :Qᵃ, :Qᶠ, :Qʰ, :Qˡ, :nₛᵘ, :Φₜᵘ, :nₜᵘ, :Mₙ, :Nₛᵘ, :Nₜ, :Nᵘ, :nᵘ,
-    :offline_time, :online_time)
+  elseif sym in (:Φₜᵘ, :Mₙ, :MDEIM_M, :nₜᵘ, :Nₜ, :Nᵘ, :nᵘ, :Qᵐ)
     getfield(RBVars.Poisson, sym)
+  elseif sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀,
+    :LHSₙ, :RHSₙ, :MDEIM_A, :MDEIM_F, :MDEIM_H, :MDEIM_L,
+    :Qᵃ, :Qᶠ, :Qʰ, :Qˡ, :nₛᵘ, :Nₛᵘ, :offline_time, :online_time)
+    getfield(RBVars.Poisson.Steady, sym)
   else
     getfield(RBVars, sym)
   end
@@ -266,13 +267,14 @@ end
 
 function Base.setproperty!(RBVars::StokesST, sym::Symbol, x::T) where T
   if sym in (:Sᵖ, :Φₛᵖ, :p̃, :pₙ, :p̂, :Bₙ, :Lcₙ, :Xᵖ₀,
-    :MDEIM_B, :MDEIM_L, :Nₛᵖ, :nₛᵖ, :Qᵇ, :Qˡᶜ)
+    :MDEIM_B, :MDEIM_Lc, :Nₛᵖ, :nₛᵖ, :Qᵇ, :Qˡᶜ)
     setfield!(RBVars.Steady, sym, x)::T
-  elseif sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Mₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀,
-    :LHSₙ, :RHSₙ, :MDEIM_A, :MDEIM_M, :MDEIM_F, :MDEIM_H,
-    :Qᵐ, :Qᵃ, :Qᶠ, :Qʰ, :Qˡ, :nₛᵘ, :Φₜᵘ, :nₜᵘ, :Mₙ, :Nₛᵘ, :Nₜ, :Nᵘ, :nᵘ,
-    :offline_time, :online_time)
+  elseif sym in (:Φₜᵘ, :Mₙ, :MDEIM_M, :nₜᵘ, :Nₜ, :Nᵘ, :nᵘ, :Qᵐ)
     setfield!(RBVars.Poisson, sym, x)::T
+  elseif sym in (:Sᵘ, :Φₛᵘ, :ũ, :uₙ, :û, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀,
+    :LHSₙ, :RHSₙ, :MDEIM_A, :MDEIM_F, :MDEIM_H, :MDEIM_L,
+    :Qᵃ, :Qᶠ, :Qʰ, :Qˡ, :nₛᵘ, :Nₛᵘ, :offline_time, :online_time)
+    setfield!(RBVars.Poisson.Steady, sym, x)::T
   else
     setfield!(RBVars, sym, x)::T
   end

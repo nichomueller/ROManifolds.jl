@@ -12,6 +12,16 @@ function PODs_space(
 
 end
 
+function supr_enrichment_space(
+  RBInfo::Info,
+  RBVars::StokesST)
+
+  supr_primal = primal_supremizers(RBInfo, RBVars.Steady)
+  RBVars.Φₛᵘ = hcat(RBVars.Φₛᵘ, supr_primal)
+  RBVars.nₛᵘ = size(RBVars.Φₛᵘ)[2]
+
+end
+
 function PODs_time(
   RBInfo::ROMInfoST,
   RBVars::StokesST{T}) where T
@@ -35,7 +45,7 @@ end
 
 function time_supremizers(Φₜᵘ::Matrix{T}, Φₜᵖ::Matrix{T}) where T
 
-  function compute_projection_on_span(
+  function projection_on_current_space(
     ξ_new::Vector{T},
     ξ::Matrix{T}) where T
 
@@ -52,6 +62,7 @@ function time_supremizers(Φₜᵘ::Matrix{T}, Φₜᵖ::Matrix{T}) where T
 
   ΦₜᵘΦₜᵖ = Φₜᵘ' * Φₜᵖ
   ξ = zeros(T, size(ΦₜᵘΦₜᵖ))
+  count = 0
 
   for l = 1:size(ΦₜᵘΦₜᵖ)[2]
 
@@ -59,19 +70,21 @@ function time_supremizers(Φₜᵘ::Matrix{T}, Φₜᵖ::Matrix{T}) where T
       ξ[:,l] = ΦₜᵘΦₜᵖ[:,1]
       enrich = (norm(ξ[:,l]) ≤ 1e-2)
     else
-      ξ[:,l] = compute_projection_on_span(ΦₜᵘΦₜᵖ[:, l], ΦₜᵘΦₜᵖ[:, 1:l-1])
+      ξ[:,l] = projection_on_current_space(ΦₜᵘΦₜᵖ[:, l], ΦₜᵘΦₜᵖ[:, 1:l-1])
       enrich = (norm(ξ[:,l] - ΦₜᵘΦₜᵖ[:,l]) ≤ 1e-2)
     end
 
     if enrich
-      Φₜᵖ_l_on_Φₜᵘ = compute_projection_on_span(Φₜᵖ[:, l], Φₜᵘ)
+      Φₜᵖ_l_on_Φₜᵘ = projection_on_current_space(Φₜᵖ[:, l], Φₜᵘ)
       Φₜᵘ_to_add = ((Φₜᵖ[:, l] - Φₜᵖ_l_on_Φₜᵘ) / norm(Φₜᵖ[:, l] - Φₜᵖ_l_on_Φₜᵘ))
       Φₜᵘ = hcat(Φₜᵘ, Φₜᵘ_to_add)
       ΦₜᵘΦₜᵖ = hcat(ΦₜᵘΦₜᵖ, Φₜᵘ_to_add' * Φₜᵖ)
+      count += 1
     end
 
   end
 
+  println("Added $count time supremizers to Φₜᵘ; final nₜᵘ is: $(size(Φₜᵘ)[1])")
   Φₜᵘ
 
 end
@@ -102,7 +115,7 @@ function get_generalized_coordinates(
   snaps::Vector{Int}) where T
 
   if isempty(RBVars.Xᵘ₀) || isempty(RBVars.Xᵖ₀)
-    get_norm_matrix(RBInfo, RBVars.Steady)
+    get_norm_matrix(RBInfo, RBVars)
   end
 
   get_generalized_coordinates(RBInfo, RBVars.Poisson)
@@ -151,9 +164,32 @@ end
 
 function get_B(
   RBInfo::Info,
-  RBVars::StokesST)
+  RBVars::StokesST{T}) where T
 
-  get_B(RBInfo, RBVars.Steady)
+  op = String[]
+
+  if isfile(joinpath(RBInfo.ROM_structures_path, "Bₙ.csv"))
+
+    Bₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, "Bₙ.csv"))
+    RBVars.Bₙ = reshape(Bₙ, RBVars.nₛᵖ, RBVars.nₛᵘ, :)::Array{T,3}
+
+    if "B" ∈ RBInfo.probl_nl
+
+      (RBVars.MDEIM_B.Matᵢ, RBVars.MDEIM_B.idx, RBVars.MDEIM_B.el) =
+        load_structures_in_list(("Matᵢ_B", "idx_B", "el_B"),
+        (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
+        RBInfo.ROM_structures_path)
+
+    end
+
+  else
+
+    println("Failed to import offline structures for B: must build them")
+    op = ["B"]
+
+  end
+
+  op
 
 end
 
@@ -183,9 +219,31 @@ end
 
 function get_Lc(
   RBInfo::Info,
-  RBVars::StokesST)
+  RBVars::StokesST{T}) where T
 
-  get_Lc(RBInfo, RBVars.Steady)
+  op = String[]
+
+  if isfile(joinpath(RBInfo.ROM_structures_path, "Lcₙ.csv"))
+
+    RBVars.Lcₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, "Lcₙ.csv"))
+
+    if "Lc" ∈ RBInfo.probl_nl
+
+      (RBVars.MDEIM_Lc.Matᵢ, RBVars.MDEIM_Lc.idx, RBVars.MDEIM_Lc.el) =
+        load_structures_in_list(("Matᵢ_Lc", "idx_Lc", "el_Lc"),
+        (Matrix{T}(undef,0,0), Vector{Int}(undef,0), Vector{Int}(undef,0)),
+        RBInfo.ROM_structures_path)
+
+    end
+
+  else
+
+    println("Failed to import offline structures for Lc: must build them")
+    op = ["Lc"]
+
+  end
+
+  op
 
 end
 
@@ -194,14 +252,21 @@ function assemble_affine_structures(
   RBVars::StokesST{T},
   var::String) where T
 
-  if var == "M"
-    println("Assembling affine reduced M")
-    M = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "M.csv"))
-    RBVars.Mₙ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ, 1)
-    RBVars.Mₙ[:,:,1] = (RBVars.Φₛᵘ)' * M * RBVars.Φₛᵘ
-    RBVars.Qᵐ = 1
+  if var == "B"
+    println("Assembling affine reduced B")
+    B = load_CSV(sparse([],[],T[]),
+      joinpath(get_FEM_structures_path(RBInfo), "B.csv"))
+    RBVars.Bₙ = zeros(T, RBVars.nₛᵖ, RBVars.nₛᵘ, 1)
+    RBVars.Bₙ[:,:,1] = (RBVars.Φₛᵖ)' * B * RBVars.Φₛᵘ
+    RBVars.Qᵇ = 1
+  elseif var == "Lc"
+    println("Assembling affine reduced Lc")
+    Lc = load_CSV(Matrix{T}(undef,0,0),
+      joinpath(get_FEM_structures_path(RBInfo), "Lc.csv"))
+    RBVars.Lcₙ = RBVars.Φₛᵖ' * Lc
+    RBVars.Qˡᶜ = 1
   else
-    assemble_affine_structures(RBInfo, RBVars.Steady, var)
+    assemble_affine_structures(RBInfo, RBVars.Poisson, var)
   end
 
 end
@@ -281,7 +346,7 @@ function assemble_reduced_mat_MDEIM(
 end
 
 function assemble_reduced_mat_MDEIM(
-  RBVars::PoissonS{T},
+  RBVars::StokesS{T},
   MDEIM::MDEIMv,
   var::String) where T
 
@@ -313,12 +378,22 @@ function save_assembled_structures(
   RBVars::StokesST{T},
   operators::Vector{String}) where T
 
-  M_DEIM_vars = (RBVars.MDEIM_B.time_idx, RBVars.MDEIM_Lc.time_idx)
-  M_DEIM_names = ("time_idx_B","time_idx_Lc")
+  Bₙ = reshape(RBVars.Bₙ, RBVars.nₛᵘ * RBVars.nₛᵖ, :)::Matrix{T}
+  affine_vars, affine_names = (Bₙ, RBVars.Lcₙ), ("Bₙ", "Lcₙ")
+  affine_entry = get_affine_entries(operators, affine_names)
+  save_structures_in_list(affine_vars[affine_entry], affine_names[affine_entry],
+    RBInfo.ROM_structures_path)
+
+  M_DEIM_vars = (
+    RBVars.MDEIM_B.time_idx, RBVars.MDEIM_B.Matᵢ, RBVars.MDEIM_B.idx, RBVars.MDEIM_B.el,
+    RBVars.MDEIM_Lc.time_idx, RBVars.MDEIM_Lc.Matᵢ, RBVars.MDEIM_Lc.idx, RBVars.MDEIM_Lc.el)
+  M_DEIM_names = (
+    "time_idx_B","Matᵢ_B","idx_B","el_B",
+    "time_idx_Lc","Matᵢ_Lc","idx_Lc","el_Lc")
   save_structures_in_list(M_DEIM_vars, M_DEIM_names, RBInfo.ROM_structures_path)
 
-  save_assembled_structures(RBInfo, RBVars.Poisson, operators)
-  save_assembled_structures(RBInfo, RBVars.Steady, operators)
+  operators_to_pass = setdiff(operators, ("B", "Lc"))
+  save_assembled_structures(RBInfo, RBVars.Poisson, operators_to_pass)
 
 end
 
@@ -346,11 +421,11 @@ function save_system_blocks(
 end
 
 function get_θ_matrix(
-  FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS,
-  RBVars::StokesS,
-  Param::ParamInfoS,
-  var::String)
+  FEMSpace::FEMProblemST,
+  RBInfo::ROMInfoST,
+  RBVars::StokesST{T},
+  Param::ParamInfoST,
+  var::String) where T
 
   if var == "A"
     return θ_matrix(FEMSpace, RBInfo, RBVars, Param, Param.α, RBVars.MDEIM_A, "A")::Matrix{T}

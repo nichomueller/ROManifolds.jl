@@ -28,7 +28,7 @@ function get_norm_matrix(
     println("Importing the norm matrix Xᵘ₀")
     Xᵘ₀ = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "Xᵘ₀.csv"))
     RBVars.Nₛᵘ = size(Xᵘ₀)[1]
-    println("Dimension of norm matrix, field u: $(size(Xᵘ₀))")
+    println("Dimension of H¹ norm matrix, field u: $(size(Xᵘ₀))")
     if RBInfo.use_norm_X
       RBVars.Xᵘ₀ = Xᵘ₀
     else

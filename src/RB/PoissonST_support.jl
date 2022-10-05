@@ -195,7 +195,7 @@ function assemble_affine_structures(
     RBVars.Mₙ[:,:,1] = (RBVars.Φₛᵘ)' * M * RBVars.Φₛᵘ
     RBVars.Qᵐ = 1
   else
-    assemble_affine_matrices(RBInfo, RBVars.Steady, var)
+    assemble_affine_structures(RBInfo, RBVars.Steady, var)
   end
 
 end
@@ -246,13 +246,15 @@ function assemble_reduced_mat_MDEIM(
 
   Q = size(MDEIM.Mat)[2]
   r_idx, c_idx = from_vec_to_mat_idx(MDEIM.row_idx, RBVars.Nₛᵘ)
-  MatqΦ = zeros(T, RBVars.Nₛᵘ,RBVars.nₛᵘ,Q)
-  @simd for j = 1:RBVars.Nₛᵘ
-    Mat_idx = findall(x -> x == j, r_idx)
-    MatqΦ[j,:,:] = (MDEIM.Mat[Mat_idx,:]' * RBVars.Φₛᵘ[c_idx[Mat_idx],:])'
+
+  function assemble_ith_row(i::Int)
+    Mat_idx = findall(x -> x == i, r_idx)
+    Matrix(reshape((MDEIM.Mat[Mat_idx,:]' * RBVars.Φₛᵘ[c_idx[Mat_idx],:])', 1, :))
   end
-  Matₙ = reshape(RBVars.Φₛᵘ' *
-    reshape(MatqΦ,RBVars.Nₛᵘ,:),RBVars.nₛᵘ,:,Q)
+
+  VecMatΦ = Broadcasting(assemble_ith_row)(1:RBVars.Nₛᵘ)::Vector{Matrix{T}}
+  MatqΦ = Matrix{T}(reduce(vcat, VecMatΦ))::Matrix{T}
+  Matₙ = Matrix{T}(reshape(RBVars.Φₛᵘ' * MatqΦ, RBVars.nₛᵘ, :, Q))::Matrix{T}
 
   if var == "M"
     RBVars.Mₙ = Matₙ

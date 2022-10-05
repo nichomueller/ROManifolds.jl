@@ -10,7 +10,7 @@ function get_snapshot_matrix(
 
   get_snapshot_matrix(RBInfo, RBVars.Poisson)
 
-  println("Importing the snapshot matrix for field u,
+  println("Importing the snapshot matrix for field p,
     number of snapshots considered: $(RBInfo.nₛ)")
   Sᵖ = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"),
     DataFrame))[:, 1:RBInfo.nₛ*RBVars.Nₜ]
@@ -22,13 +22,22 @@ function get_snapshot_matrix(
 
 end
 
+function get_norm_matrix(
+  RBInfo::Info,
+  RBVars::StokesST)
+
+  get_norm_matrix(RBInfo, RBVars.Poisson)
+  get_norm_matrix(RBInfo, RBVars.Steady)
+
+end
+
 function assemble_reduced_basis(
   RBInfo::ROMInfoST,
   RBVars::StokesST)
 
   RBVars.offline_time += @elapsed begin
     PODs_space(RBInfo, RBVars)
-    supr_enrichment_space(RBInfo, RBVars.Steady)
+    supr_enrichment_space(RBInfo, RBVars)
     PODs_time(RBInfo, RBVars)
     supr_enrichment_time(RBVars)
   end
@@ -85,7 +94,7 @@ end
 
 function assemble_offline_structures(
   RBInfo::ROMInfoST,
-  RBVars::PoissonST,
+  RBVars::StokesST,
   operators=String[])
 
   if isempty(operators)
@@ -162,10 +171,10 @@ function get_θ(
   θᵐ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "M")
 
   if !RBInfo.online_RHS
-    θᶠ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "F")
-    θʰ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "H")
-    θˡ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "L")
-    θˡᶜ = get_θ_vector(FEMSpace, RBInfo, RBVars, Param, "Lc")
+    θᶠ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "F")
+    θʰ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "H")
+    θˡ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "L")
+    θˡᶜ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "Lc")
   else
     θᶠ, θʰ, θˡ, θˡᶜ = (Matrix{T}(undef,0,0), Matrix{T}(undef,0,0),
       Matrix{T}(undef,0,0), Matrix{T}(undef,0,0))
@@ -186,25 +195,44 @@ function get_RB_LHS_blocks(
 
   Qᵇ = RBVars.Qᵇ
   Φₜᵖᵘ_B = zeros(T, RBVars.nₜᵖ, RBVars.nₜᵘ, Qᵇ)
+  Φₜᵖᵘ₁_B = zeros(T, RBVars.nₜᵖ, RBVars.nₜᵘ, Qᵇ)
 
-  @simd for i_t = 1:nₜᵖ
-    for j_t = 1:nₜᵘ
+  @simd for i_t = 1:RBVars.nₜᵖ
+    for j_t = 1:RBVars.nₜᵘ
       for q = 1:Qᵇ
         Φₜᵖᵘ_B[i_t,j_t,q] = sum(RBVars.Φₜᵖ[:,i_t].*RBVars.Φₜᵘ[:,j_t].*θᵇ[q,:])
+        Φₜᵖᵘ₁_B[i_t,j_t,q] = sum(RBVars.Φₜᵖ[2:end,i_t].*RBVars.Φₜᵘ[1:end-1,j_t].*θᵇ[q,2:end])
       end
     end
   end
 
   Bₙ_tmp = zeros(T, RBVars.nᵖ, RBVars.nᵘ, Qᵇ)
+  Bₙ₁_tmp = zeros(T, RBVars.nᵖ, RBVars.nᵘ, Qᵇ)
 
   @simd for qᵇ = 1:Qᵇ
     Bₙ_tmp[:,:,qᵇ] = kron(RBVars.Bₙ[:,:,qᵇ], Φₜᵖᵘ_B[:,:,qᵇ])::Matrix{T}
+    Bₙ₁_tmp[:,:,qᵇ] = kron(RBVars.Bₙ[:,:,qᵇ], Φₜᵖᵘ₁_B[:,:,qᵇ])::Matrix{T}
   end
-  Bₙ = reshape(sum(Bₙ_tmp, dims=3), RBVars.nᵖ, RBVars.nᵘ)
-  Bₙᵀ = Matrix(Bₙ')
 
-  block₂ = - Bₙᵀ
-  block₃ = Bₙ
+  #= Bₙ_blocks = matrix_to_blocks(RBVars.Bₙ, Qᵇ)
+  Φₜᵖᵘ_B_blocks = matrix_to_blocks(Φₜᵖᵘ_B, Qᵇ)
+  Φₜᵖᵘ₁_B_blocks = matrix_to_blocks(Φₜᵖᵘ₁_B, Qᵇ)
+  function modified()
+    Bₙ_tmp = Matrix{T}(undef, RBVars.nᵖ, RBVars.nᵘ)
+    Bₙ₁_tmp = Matrix{T}(undef, RBVars.nᵖ, RBVars.nᵘ)
+    m = Broadcasting(kron)
+
+    Bₙ_tmp = sum(m(Bₙ_blocks, Φₜᵖᵘ_B_blocks))
+    Bₙ₁_tmp = sum(m(Bₙ_blocks, Φₜᵖᵘ₁_B_blocks))
+
+    Bₙ_tmp, Bₙ₁_tmp
+  end =#
+
+  Bₙ = reshape(sum(Bₙ_tmp, dims=3), RBVars.nᵖ, RBVars.nᵘ)
+  Bₙ₁ = reshape(sum(Bₙ_tmp, dims=3), RBVars.nᵖ, RBVars.nᵘ)
+
+  block₂ = - RBInfo.θ*Matrix(Bₙ') - (1-RBInfo.θ)*Matrix(Bₙ₁')
+  block₃ = RBInfo.θ*Bₙ + (1-RBInfo.θ)*Bₙ₁
 
   push!(RBVars.LHSₙ, block₂)::Vector{Matrix{T}}
   push!(RBVars.LHSₙ, block₃)::Vector{Matrix{T}}
@@ -233,7 +261,7 @@ function get_RB_RHS_blocks(
   @simd for i_s = 1:RBVars.nₛᵖ
     for i_t = 1:RBVars.nₜᵖ
       i_st = index_mapping(i_s, i_t, RBVars, "p")
-      block₂[i_st] = - RBVars.Lcₙ[i_s,:]' * Φₜᵘ_Lc[i_t,:]
+      block₂[i_st] = - RBVars.Lcₙ[i_s,:]' * Φₜᵖ_Lc[i_t,:]
     end
   end
 
@@ -249,7 +277,7 @@ function get_RB_system(
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
-  get_Q(RBInfo, RBVars)
+  get_Q(RBVars)
   LHS_blocks = [1, 2, 3]
   RHS_blocks = [1, 2]
 
@@ -278,9 +306,9 @@ end
 
 function solve_RB_system(
   FEMSpace::FEMProblemST,
-  RBInfo::ROMInfoST,
+  RBInfo::ROMInfoST{T},
   RBVars::StokesST,
-  Param::ParamInfoST)
+  Param::ParamInfoST) where T
 
   get_RB_system(FEMSpace, RBInfo, RBVars, Param)
 
@@ -314,13 +342,15 @@ function loop_on_params(
   param_nbs) where T
 
   H1_L2_err = zeros(T, length(param_nbs))
-  L2_L2_err = zeros(T, length(param_nbs))
   mean_H1_err = zeros(T, RBVars.Nₜ)
-  mean_L2_err = zeros(T, RBVars.Nₜ)
   mean_H1_L2_err = 0.0
-  mean_L2_L2_err = 0.0
   mean_pointwise_err_u = zeros(T, RBVars.Nₛᵘ, RBVars.Nₜ)
+
+  L2_L2_err = zeros(T, length(param_nbs))
+  mean_L2_err = zeros(T, RBVars.Nₜ)
+  mean_L2_L2_err = 0.0
   mean_pointwise_err_p = zeros(T, RBVars.Nₛᵖ, RBVars.Nₜ)
+
   mean_online_time = 0.0
   mean_reconstruction_time = 0.0
 
@@ -356,13 +386,14 @@ function loop_on_params(
     end
 
     H1_err_nb, H1_L2_err_nb = compute_errors(
-      RBVars.Poisson, uₕ_test, RBVars.ũ, RBVars.Xᵘ₀)
+      RBVars, uₕ_test, RBVars.ũ, RBVars.Xᵘ₀)
     H1_L2_err[i_nb] = H1_L2_err_nb
     mean_H1_err += H1_err_nb / length(param_nbs)
     mean_H1_L2_err += H1_L2_err_nb / length(param_nbs)
     mean_pointwise_err_u += abs.(uₕ_test-RBVars.ũ)/length(param_nbs)
+
     L2_err_nb, L2_L2_err_nb = compute_errors(
-      RBVars.Poisson, pₕ_test, RBVars.p̃, RBVars.Xᵖ₀)
+      RBVars, pₕ_test, RBVars.p̃, RBVars.Xᵖ₀)
     L2_L2_err[i_nb] = L2_L2_err_nb
     mean_L2_err += L2_err_nb / length(param_nbs)
     mean_L2_L2_err += L2_L2_err_nb / length(param_nbs)
@@ -393,7 +424,7 @@ function online_phase(
 
   FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
 
-  get_norm_matrix(RBInfo, RBVars.Steady)
+  get_norm_matrix(RBInfo, RBVars)
   (ũ_μ,uₙ_μ,mean_uₕ_test,mean_pointwise_err_u,mean_H1_err,mean_H1_L2_err,
     H1_L2_err,p̃_μ,pₙ_μ,mean_pₕ_test,mean_pointwise_err_p,mean_L2_err,mean_L2_L2_err,
     L2_L2_err,mean_online_time,mean_reconstruction_time) =
@@ -422,7 +453,7 @@ function online_phase(
 
     save_CSV(ũ_μ, joinpath(path_μ, "ũ.csv"))
     save_CSV(uₙ_μ, joinpath(path_μ, "uₙ.csv"))
-    save_CSV(mean_pointwise_err_U, joinpath(path_μ, "mean_point_err_u.csv"))
+    save_CSV(mean_pointwise_err_u, joinpath(path_μ, "mean_point_err_u.csv"))
     save_CSV(mean_H1_err, joinpath(path_μ, "H1_err.csv"))
     save_CSV([mean_H1_L2_err], joinpath(path_μ, "H1L2_err.csv"))
 

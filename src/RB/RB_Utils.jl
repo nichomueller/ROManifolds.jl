@@ -491,8 +491,8 @@ function θ_matrix(
         MDEIM.idx, MDEIM.time_idx)
     else
       Mat_μ_sparse = assemble_sparse_mat(
-        FEMSpace, FEMInfo, Param, sparse_el,timesθ, var)
-      θ = M_DEIM_online(RBVars, Mat_μ_sparse, Matᵢ, MDEIM_idx)
+        FEMSpace, FEMInfo, Param, MDEIM.el, timesθ, var)
+      θ = M_DEIM_online(RBVars, Mat_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
     end
   end
 

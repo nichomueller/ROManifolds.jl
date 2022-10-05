@@ -25,14 +25,18 @@ function LagrangianQuadRefFE(
   _lagrangian_quad_ref_fe(T,p,orders)
 end
 
-function _lagrangian_quad_ref_fe(::Type{T},
+function _lagrangian_quad_ref_fe(
+  ::Type{T},
   p::Polytope{D},
   orders) where {T,D}
 
-  @assert isa(p,ExtrusionPolytope)
+  #= @assert isa(p,ExtrusionPolytope)
   @assert is_n_cube(p)
-  degrees= broadcast(*,2,orders)
-  q = Quadrature(p,Gridap.ReferenceFEs.TensorProduct(),degrees)
+  degrees = broadcast(*,2,orders)
+  q = Quadrature(p,Gridap.ReferenceFEs.TensorProduct(),degrees) =#
+  @assert isa(p,ExtrusionPolytope)
+  @assert is_n_cube(p) || is_simplex(p) "Wrong polytope"
+  q = Quadrature(p,2*last(orders))
   nodes = get_coordinates(q)
 
   prebasis = compute_monomial_basis(T,p,orders)
@@ -41,13 +45,12 @@ function _lagrangian_quad_ref_fe(::Type{T},
   face_nodes = [Int[] for i in 1:num_faces(p)]
   push!(last(face_nodes),collect(1:length(nodes))...)
 
-  # Compute face_own_nodes
+  # Compute face_own_dofs
   face_dofs = [Int[] for i in 1:num_faces(p)]
   push!(last(face_dofs),collect(1:length(nodes)*num_components(T))...)
 
   dofs = LagrangianDofBasis(T,nodes)
 
-  #nnodes = length(dofs.nodes)
   ndofs = length(dofs.dof_to_node)
   metadata = nothing
 

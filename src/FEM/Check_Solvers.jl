@@ -69,8 +69,8 @@ function check_dataset(RBInfo, RBVars, i)
   A = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "A")
   B = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "B")(0.)
   M = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "M")(0.)
-  F = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "F")
-  H = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "H")
+  F = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "F")(0.)
+  H = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "H")(0.)
   L = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "L")
   Lc = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "Lc")
 
@@ -79,15 +79,17 @@ function check_dataset(RBInfo, RBVars, i)
   t²_θ = t¹_θ+RBInfo.δt
 
   LHS(t) = vcat(hcat(M/δtθ+A(t), -B'), hcat(B, zeros(T, FEMSpace.Nₛᵖ, FEMSpace.Nₛᵖ)))
-  RHS(t) = vcat(F(t) + 0*H(t) - 0*L(t), - 0*Lc(t))
+  RHS(t) = vcat(sin(t)*(F + H) - 0. *L(t), - 0. *Lc(t))
 
-  my_x1θ = LHS(t¹_θ) / RHS(t¹_θ)
-  my_u1 = my_x1θ[1:RBVars.Nₛᵘ] / RBInfo.θ
-  my_p1 = my_x1θ[RBVars.Nₛᵘ+1:end]
+  my_x1θ = LHS(t¹_θ) \ RHS(t¹_θ)
+  my_x1 = my_x1θ / RBInfo.θ
+  my_u1 = my_x1[1:RBVars.Nₛᵘ]
+  my_p1 = my_x1[RBVars.Nₛᵘ+1:end]
 
-  my_x2θ = LHS(t²_θ) / (RHS(t²_θ) + vcat(M/δtθ * my_u1, zeros(T, FEMSpace.Nₛᵖ)))
-  my_u2 = (my_x2θ[1:RBVars.Nₛᵘ] + (1-RBInfo.θ)*my_u1)/ RBInfo.θ
-  my_p2 = my_x2θ[RBVars.Nₛᵘ+1:end]
+  my_x2θ = LHS(t²_θ) \ (RHS(t²_θ) + vcat(M/δtθ * my_u1, zeros(T, FEMSpace.Nₛᵖ)))
+  my_x2 = (my_x2θ - (1-RBInfo.θ)*my_x1)/ RBInfo.θ
+  my_u2 = my_x2[1:RBVars.Nₛᵘ]
+  my_p2 = my_x2[RBVars.Nₛᵘ+1:end]
 
   u1≈my_u1
   u2≈my_u2
