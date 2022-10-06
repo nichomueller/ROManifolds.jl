@@ -7,7 +7,7 @@ function PODs_space(
 
   println("Performing the spatial POD for field p, using a tolerance of $(RBInfo.ϵₛ)")
   get_norm_matrix(RBInfo, RBVars)
-  RBVars.Φₛᵖ = POD(RBVars.Sᵖ, RBInfo.ϵₛ, RBVars.Xᵖ₀)
+  RBVars.Φₛᵖ = POD(RBVars.Sᵖ, RBInfo.ϵₛ, RBVars.X₀[2])
   (RBVars.Nₛᵖ, RBVars.nₛᵖ) = size(RBVars.Φₛᵖ)
 
 end
@@ -46,7 +46,7 @@ function primal_supremizers(
       joinpath(get_FEM_structures_path(RBInfo), "B.csv"))'
   end
 
-  supr_primal = solve_cholesky(RBVars.Xᵘ₀, constraint_matrix * RBVars.Φₛᵖ)
+  supr_primal = solve_cholesky(RBVars.X₀[1], constraint_matrix * RBVars.Φₛᵖ)
 
   min_norm = 1e16
   for i = 1:size(supr_primal)[2]
@@ -54,15 +54,15 @@ function primal_supremizers(
     println("Normalizing primal supremizer $i")
 
     for j in 1:RBVars.nₛᵘ
-      supr_primal[:, i] -= mydot(supr_primal[:, i], RBVars.Φₛᵘ[:, j], RBVars.Xᵘ₀) /
-      mynorm(RBVars.Φₛᵘ[:, j], RBVars.Xᵘ₀) * RBVars.Φₛᵘ[:, j]
+      supr_primal[:, i] -= mydot(supr_primal[:, i], RBVars.Φₛᵘ[:, j], RBVars.X₀[1]) /
+      mynorm(RBVars.Φₛᵘ[:, j], RBVars.X₀[1]) * RBVars.Φₛᵘ[:, j]
     end
     for j in 1:i
-      supr_primal[:, i] -= mydot(supr_primal[:, i], supr_primal[:, j], RBVars.Xᵘ₀) /
-      mynorm(supr_primal[:, j], RBVars.Xᵘ₀) * supr_primal[:, j]
+      supr_primal[:, i] -= mydot(supr_primal[:, i], supr_primal[:, j], RBVars.X₀[1]) /
+      mynorm(supr_primal[:, j], RBVars.X₀[1]) * supr_primal[:, j]
     end
 
-    supr_norm = mynorm(supr_primal[:, i], RBVars.Xᵘ₀)
+    supr_norm = mynorm(supr_primal[:, i], RBVars.X₀[1])
     min_norm = min(supr_norm, min_norm)
     println("Norm supremizers: $supr_norm")
     supr_primal[:, i] /= supr_norm
@@ -82,26 +82,6 @@ function supr_enrichment_space(
   supr_primal = primal_supremizers(RBInfo, RBVars)
   RBVars.Φₛᵘ = hcat(RBVars.Φₛᵘ, supr_primal)
   RBVars.nₛᵘ = size(RBVars.Φₛᵘ)[2]
-
-end
-
-function get_generalized_coordinates(
-  RBInfo::ROMInfoS,
-  RBVars::StokesS,
-  snaps=nothing)
-
-  get_norm_matrix(RBInfo, RBVars)
-  if isnothing(snaps) || maximum(snaps) > RBInfo.nₛ
-    snaps = 1:RBInfo.nₛ
-  end
-
-  get_generalized_coordinates(RBInfo, RBVars.Poisson, snaps)
-
-  Φₛᵖ_normed = RBVars.Xᵖ₀*RBVars.Φₛᵖ
-  RBVars.p̂ = RBVars.Sᵖ[:,snaps]*Φₛᵖ_normed
-  if RBInfo.save_offline_structures
-    save_CSV(RBVars.p̂, joinpath(RBInfo.ROM_structures_path, "p̂.csv"))
-  end
 
 end
 
@@ -134,8 +114,8 @@ function get_B(
 
   if isfile(joinpath(RBInfo.ROM_structures_path, "Bₙ.csv"))
 
-    Bₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, "Bₙ.csv"))
-    RBVars.Bₙ = reshape(Bₙ, RBVars.nₛᵖ, RBVars.nₛᵘ, :)::Array{T,3}
+    RBVars.Bₙ = load_CSV(Matrix{T}[],
+      joinpath(RBInfo.ROM_structures_path, "Bₙ.csv"))
 
     if "B" ∈ RBInfo.probl_nl
 
@@ -189,7 +169,8 @@ function get_Lc(
 
   if isfile(joinpath(RBInfo.ROM_structures_path, "Lcₙ.csv"))
 
-    RBVars.Lcₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, "Lcₙ.csv"))
+    RBVars.Lcₙ = load_CSV(Matrix{T}[],
+      joinpath(RBInfo.ROM_structures_path, "Lcₙ.csv"))
 
     if "Lc" ∈ RBInfo.probl_nl
 
@@ -218,10 +199,8 @@ function assemble_affine_structures(
 
   if var == "B"
     println("Assembling affine reduced B")
-    B = load_CSV(sparse([],[],T[]),
-      joinpath(get_FEM_structures_path(RBInfo), "B.csv"))
-    RBVars.Bₙ = zeros(T, RBVars.nₛᵖ, RBVars.nₛᵘ, 1)
-    RBVars.Bₙ[:,:,1] = (RBVars.Φₛᵖ)' * B * RBVars.Φₛᵘ
+    B = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "B.csv"))
+    push!(RBVars.Bₙ, (RBVars.Φₛᵖ)' * B * RBVars.Φₛᵘ)
     RBVars.Qᵇ = 1
   elseif var == "Lc"
     println("Assembling affine reduced Lc")
@@ -287,17 +266,14 @@ function assemble_reduced_mat_MDEIM(
   if var == "B"
     Q = size(MDEIM.Mat)[2]
     r_idx, c_idx = from_vec_to_mat_idx(MDEIM.row_idx, RBVars.Nₛᵖ)
-    MatqΦ = zeros(T,RBVars.Nₛᵖ,RBVars.nₛᵘ,Q)::Array{T,3}
-    @simd for j = 1:RBVars.Nₛᵖ
-      Mat_idx = findall(x -> x == j, r_idx)
-      MatqΦ[j,:,:] = (MDEIM.Mat[Mat_idx,:]' * RBVars.Φₛᵘ[c_idx[Mat_idx],:])'
-    end
 
-    Matₙ = reshape(RBVars.Φₛᵖ' *
-      reshape(MatqΦ,RBVars.Nₛᵖ,:),RBVars.nₛᵘ,:,Q)::Array{T,3}
-    RBVars.Bₙ = Matₙ
+    assemble_VecMatΦ(i) = assemble_ith_row_MatΦ(MDEIM.Mat, RBVars.Φₛᵘ, r_idx, c_idx, i)
+    VecMatΦ = Broadcasting(assemble_VecMatΦ)(1:RBVars.Nₛᵖ)::Vector{Matrix{T}}
+    MatΦ = Matrix{T}(reduce(vcat, VecMatΦ))::Matrix{T}
+    Matₙ = permutedims(reshape(RBVars.Φₛᵖ' * MatΦ, RBVars.nₛᵖ, :, Q), (2,1,3))
+
+    RBVars.Bₙ = [Matₙ[:,:,q] for q = 1:Q]
     RBVars.Qᵇ = Q
-
   else
     assemble_reduced_mat_MDEIM(RBVars.Poisson, MDEIM, var)
   end
@@ -311,11 +287,10 @@ function assemble_reduced_mat_MDEIM(
 
   if var == "Lc"
     Q = size(MDEIM.Mat)[2]
-    Vecₙ = zeros(T, RBVars.nₛᵖ, 1, Q)
-    @simd for q = 1:Q
-      Vecₙ[:,:,q] = RBVars.Φₛᵖ' * Vector{T}(MDEIM.Mat[:, q])
-    end
-    RBVars.Lcₙ = reshape(Vecₙ, :, Q)
+    Vecₙ = RBVars.Φₛᵖ' * MDEIM.Mat
+    Vecₙ_block = [Matrix{T}(reshape(Vecₙ[:,q], :, 1)) for q = 1:Q]
+
+    RBVars.Lcₙ = Vecₙ_block
     RBVars.Qˡᶜ = Q
   else
     assemble_reduced_mat_MDEIM(RBVars.Poisson, MDEIM, var)
@@ -328,8 +303,7 @@ function save_assembled_structures(
   RBVars::StokesS{T},
   operators::Vector{String}) where T
 
-  Bₙ = reshape(RBVars.Bₙ, RBVars.nₛᵘ * RBVars.nₛᵖ, :)::Matrix{T}
-  affine_vars, affine_names = (Bₙ, RBVars.Lcₙ), ("Bₙ", "Lcₙ")
+  affine_vars, affine_names = (RBVars.Bₙ, RBVars.Lcₙ), ("Bₙ", "Lcₙ")
   affine_entry = get_affine_entries(operators, affine_names)
   save_structures_in_list(affine_vars[affine_entry], affine_names[affine_entry],
     RBInfo.ROM_structures_path)
@@ -389,18 +363,19 @@ function get_θ_matrix(
   Param::ParamInfoS,
   var::String) where T
 
+  θ = Vector{T}[]
   if var == "A"
-    return θ_matrix(FEMSpace, RBInfo, RBVars, Param, Param.α, RBVars.MDEIM_A, "A")::Matrix{T}
+    θ!(θ, FEMSpace, RBInfo, RBVars, Param, Param.α, RBVars.MDEIM_A, "A")
   elseif var == "B"
-    return θ_matrix(FEMSpace, RBInfo, RBVars, Param, Param.b, RBVars.MDEIM_B, "B")::Matrix{T}
+    θ!(θ, FEMSpace, RBInfo, RBVars, Param, Param.b, RBVars.MDEIM_B, "B")
   elseif var == "F"
-    return θ_matrix(FEMSpace, RBInfo, RBVars, Param, Param.f, RBVars.MDEIM_F, "F")::Matrix{T}
+    θ!(θ, FEMSpace, RBInfo, RBVars, Param, Param.f, RBVars.MDEIM_F, "F")
   elseif var == "H"
-    return θ_matrix(FEMSpace, RBInfo, RBVars, Param, Param.h, RBVars.MDEIM_H, "H")::Matrix{T}
+    θ!(θ, FEMSpace, RBInfo, RBVars, Param, Param.h, RBVars.MDEIM_H, "H")
   elseif var == "L"
-    return θ_matrix(FEMSpace, RBInfo, RBVars, Param, Param.g, RBVars.MDEIM_L, "L")::Matrix{T}
+    θ!(θ, FEMSpace, RBInfo, RBVars, Param, Param.g, RBVars.MDEIM_L, "L")
   elseif var == "Lc"
-    return θ_matrix(FEMSpace, RBInfo, RBVars, Param, Param.g, RBVars.MDEIM_Lc, "Lc")::Matrix{T}
+    θ!(θ, FEMSpace, RBInfo, RBVars, Param, Param.g, RBVars.MDEIM_Lc, "Lc")
   else
     error("Unrecognized variable")
   end
@@ -409,8 +384,8 @@ end
 
 function get_Q(RBVars::StokesS)
 
-  RBVars.Qᵇ = size(RBVars.Bₙ)[end]
-  RBVars.Qˡᶜ = size(RBVars.Lcₙ)[end]
+  RBVars.Qᵇ = length(RBVars.Bₙ)
+  RBVars.Qˡᶜ = length(RBVars.Lcₙ)
 
   get_Q(RBVars.Poisson)
 

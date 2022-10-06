@@ -24,15 +24,13 @@ function get_norm_matrix(
   RBInfo::Info,
   RBVars::PoissonS{T}) where T
 
-  if isempty(RBVars.Xᵘ₀)
+  if isempty(RBVars.X₀)
     println("Importing the norm matrix Xᵘ₀")
     Xᵘ₀ = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "Xᵘ₀.csv"))
-    RBVars.Nₛᵘ = size(Xᵘ₀)[1]
-    println("Dimension of H¹ norm matrix, field u: $(size(Xᵘ₀))")
     if RBInfo.use_norm_X
-      RBVars.Xᵘ₀ = Xᵘ₀
+      RBVars.X₀ = [Xᵘ₀]
     else
-      RBVars.Xᵘ₀ = one(T)*sparse(I,RBVars.Nₛᵘ,RBVars.Nₛᵘ)
+      RBVars.X₀ = [one(T)*sparse(I,RBVars.Nₛᵘ,RBVars.Nₛᵘ)]
     end
   end
 
@@ -161,7 +159,7 @@ function get_θ(
     θʰ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "H")
     θˡ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "L")
   else
-    θᶠ, θʰ, θˡ = Matrix{T}(undef,0,0), Matrix{T}(undef,0,0), Matrix{T}(undef,0,0)
+    θᶠ, θʰ, θˡ = Vector{T}[], Vector{T}[], Vector{T}[]
   end
 
   return θᵃ, θᶠ, θʰ, θˡ
@@ -170,29 +168,25 @@ end
 
 function get_RB_LHS_blocks(
   RBVars::PoissonS{T},
-  θᵃ::Matrix) where T
+  θᵃ::Vector{Vector{T}}) where T
 
   println("Assembling reduced LHS")
 
-  block₁ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ)
-  for q = 1:RBVars.Qᵃ
-    block₁ += RBVars.Aₙ[:,:,q] * θᵃ[q]
-  end
-
+  block₁ = sum(Broadcasting(.*)(RBVars.Aₙ, θᵃ))
   push!(RBVars.LHSₙ, block₁)::Vector{Matrix{T}}
 
 end
 
 function get_RB_RHS_blocks(
   RBVars::PoissonS{T},
-  θᶠ::Matrix,
-  θʰ::Matrix,
-  θˡ::Matrix) where T
+  θᶠ::Vector{Vector{T}},
+  θʰ::Vector{Vector{T}},
+  θˡ::Vector{Vector{T}}) where T
 
   println("Assembling reduced RHS")
 
-  block₁ = RBVars.Fₙ * θᶠ + RBVars.Hₙ * θʰ - RBVars.Lₙ * θˡ
-
+  mult = Broadcasting(.*)
+  block₁ = sum(mult(RBVars.Fₙ, θᶠ)) + sum(mult(RBVars.Hₙ, θʰ)) - sum(mult(RBVars.Lₙ, θˡ))
   push!(RBVars.RHSₙ, block₁)::Vector{Matrix{T}}
 
 end
@@ -282,7 +276,7 @@ function online_phase(
     mean_online_time = RBVars.online_time / length(Param_nbs)
     mean_reconstruction_time = reconstruction_time / length(Param_nbs)
 
-    H1_err_nb = compute_errors(RBVars, uₕ_test, RBVars.ũ, RBVars.Xᵘ₀)
+    H1_err_nb = compute_errors(RBVars, uₕ_test, RBVars.ũ, RBVars.X₀[1])
     mean_H1_err += H1_err_nb / length(Param_nbs)
     mean_pointwise_err += abs.(uₕ_test - RBVars.ũ) / length(Param_nbs)
 

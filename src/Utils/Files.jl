@@ -10,14 +10,36 @@ function get_all_subdirectories(path::String)
   filter(isdir,readdir(path,join=true))
 end
 
-function load_CSV(::Array{Array{T}}, path::String) where T
-  try
-    var = CSV.read(path, DataFrame)
-    return [T.(var[:,i]) for i in 1:size(var,2)]
-  catch
-    var = Array(CSV.read(path, DataFrame))
-    return [parse.(T, split(chop(var[k]; head=1, tail=1), ',')) for k in 1:size(var)[1]]
+function load_CSV(::Vector{Matrix{T}}, path::String) where T
+
+  function load_mat(varᵢ::String)
+    varᵢ_split = split(chop(varᵢ; head=1, tail=1), "; ")
+    varᵢ_mat = parse.(T, split(varᵢ_split[1], " "))
+    for j in 1 .+ eachindex(varᵢ_split[2:end])
+      varᵢ_mat = hcat(varᵢ_mat, parse.(T, split(varᵢ_split[j], " ")))
+    end
+    varᵢ_mat
   end
+
+  function load_vec(varᵢ::String)
+    reshape(parse.(T, split(chop(varᵢ; head=1, tail=3), ";")), :, 1)::Matrix{T}
+  end
+
+  var = Array(CSV.read(path, DataFrame))
+
+  try
+    Broadcasting(load_mat)(var)[:]::Vector{Matrix{T}}
+  catch
+    Broadcasting(load_vec)(var)[:]::Vector{Matrix{T}}
+  end
+
+end
+
+function load_CSV(::Vector{Vector{T}}, path::String) where T
+
+    var = Array(CSV.read(path, DataFrame))
+    [parse.(T, split(chop(var[k]; head=1, tail=1), ",")) for k in 1:size(var)[1]]
+
 end
 
 function load_CSV(::Array{T,D}, path::String) where {T,D}
@@ -39,17 +61,14 @@ function load_CSV(::SparseVector{T}, path::String) where T
 end
 
 function save_CSV(var::Array{T,D}, path::String) where {T,D}
-
   if D == 1
     var = reshape(var, :, 1)
   end
-
   try
     CSV.write(path, DataFrame(var, :auto))
   catch
     CSV.write(path, Tables.table(var))
   end
-
 end
 
 function save_CSV(var::SparseMatrixCSC{T}, path::String) where T

@@ -137,7 +137,7 @@ function M_DEIM_online(
   Matᵢ::Matrix{T},
   idx::Vector{Int}) where T
 
-  @fastmath Matᵢ \ Matrix{T}(reshape(Mat_nonaffine, :, 1)[idx, :])
+  @fastmath Matᵢ \ reshape(Mat_nonaffine, :, 1)[idx]
 
 end
 
@@ -147,7 +147,7 @@ function M_DEIM_online(
   Matᵢ::Matrix{T},
   idx::Vector{Int}) where T
 
-  @fastmath Matᵢ \ Matrix{T}(reshape(Mat_nonaffine, :, RBVars.Nₜ)[idx, :])
+  @fastmath Matᵢ \ reshape(Mat_nonaffine, :, RBVars.Nₜ)[idx]
 
 end
 
@@ -158,7 +158,7 @@ function M_DEIM_online(
   idx::Vector{Int}) where T
 
   function θ(u)
-    @fastmath Matᵢ \ Matrix{T}(reshape(Fun_nonaffine(u), :, 1)[idx, :])
+    @fastmath Matᵢ \ reshape(Fun_nonaffine(u), :, 1)[idx]
   end
 
 end

@@ -87,7 +87,6 @@ function POD(S::Matrix{T}, ϵ::Float, X::SparseMatrixCSC{T}) where T
 
   H = cholesky(X)
   L = sparse(H.L)
-  #mul!(S, L', S[H.p, :])
   U, Σ, _ = svd(L'*S[H.p, :])
 
   energies = cumsum(Σ.^2)
@@ -102,7 +101,6 @@ function POD(S::SparseMatrixCSC{T}, ϵ::Float, X::SparseMatrixCSC{T}) where T
 
   H = cholesky(X)
   L = sparse(H.L)
-  #mul!(S, L', S[H.p, :])
   U, Σ, _ = svds(L'*S[H.p, :]; nsv=size(S)[2] - 1)[1]
 
   energies = cumsum(Σ.^2)

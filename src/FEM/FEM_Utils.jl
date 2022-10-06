@@ -37,21 +37,6 @@ function get_problem_id(problem_name::String)
   end
 end
 
-function init_FEM_variables()
-
-  M = sparse([], [], Float[])
-  A = sparse([], [], Float[])
-  B = sparse([], [], Float[])
-  Xᵘ₀ = sparse([], [], Float[])
-  Xᵘ = sparse([], [], Float[])
-  Xᵖ₀ = sparse([], [], Float[])
-  F = Vector{Float}(undef,0)
-  H = Vector{Float}(undef,0)
-
-  M, A, B, Xᵘ₀, Xᵘ, Xᵖ₀, F, H
-
-end
-
 function nonlinearity_lifting_op(FEMInfo::Info)
   if "A" ∉ FEMInfo.probl_nl && "L" ∉ FEMInfo.probl_nl
     return 0
@@ -73,10 +58,10 @@ function select_Nₕ(FEMSpace::FEMProblem, var::String)
 end
 
 function get_FEMProblem_info(FEMInfo::Info)
-  μ = load_CSV(Array{Float}[],
+  μ = load_CSV(Vector{Float}[],
     joinpath(FEMInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{Float}}
   model = DiscreteModelFromFile(FEMInfo.Paths.mesh_path)
-  FEMSpace = get_FEMSpace₀(FEMInfo.problem_id, FEMInfo, model)
+  FEMSpace = get_FEMSpace₀(FEMInfo.problem_id, FEMInfo, model)::FEMProblem
 
   FEMSpace, μ
 

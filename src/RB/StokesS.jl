@@ -23,23 +23,31 @@ function get_norm_matrix(
   RBInfo::Info,
   RBVars::StokesS{T}) where T
 
-  get_norm_matrix(RBInfo, RBVars.Poisson)
-
-  if isempty(RBVars.Xᵖ₀)
-
+  if length(RBVars.X₀) == 0
+    println("Importing the norm matrix Xᵘ₀")
+    Xᵘ₀ = load_CSV(sparse([],[],T[]),
+      joinpath(get_FEM_structures_path(RBInfo), "Xᵘ₀.csv"))
     println("Importing the norm matrix Xᵖ₀")
-
     Xᵖ₀ = load_CSV(sparse([],[],T[]),
       joinpath(get_FEM_structures_path(RBInfo), "Xᵖ₀.csv"))
-    RBVars.Nₛᵖ = size(Xᵖ₀)[1]
-    println("Dimension of L² norm matrix, field p: $(size(Xᵖ₀))")
 
     if RBInfo.use_norm_X
-      RBVars.Xᵖ₀ = Xᵖ₀
+      RBVars.X₀ = [Xᵘ₀, Xᵖ₀]
     else
-      RBVars.Xᵖ₀ = one(T)*sparse(I,RBVars.Nₛᵖ,RBVars.Nₛᵖ)
+      RBVars.X₀ = [one(T)*sparse(I,RBVars.Nₛᵘ,RBVars.Nₛᵘ),
+                   one(T)*sparse(I,RBVars.Nₛᵖ,RBVars.Nₛᵖ)]
     end
 
+  elseif length(RBVars.X₀) == 1
+    println("Importing the norm matrix Xᵖ₀")
+    Xᵖ₀ = load_CSV(sparse([],[],T[]),
+      joinpath(get_FEM_structures_path(RBInfo), "Xᵖ₀.csv"))
+
+    if RBInfo.use_norm_X
+      RBVars.X₀ = [RBVars.X₀..., Xᵖ₀]
+    else
+      RBVars.X₀ = [RBVars.X₀..., one(T)*sparse(I,RBVars.Nₛᵖ,RBVars.Nₛᵖ)]
+    end
   end
 
 end
@@ -174,8 +182,7 @@ function get_θ(
     θˡ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "L")
     θˡᶜ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "Lc")
   else
-    θᶠ, θʰ, θˡ, θˡᶜ = (Matrix{T}(undef,0,0), Matrix{T}(undef,0,0),
-      Matrix{T}(undef,0,0), Matrix{T}(undef,0,0))
+    θᶠ, θʰ, θˡ, θˡᶜ = Vector{T}[], Vector{T}[], Vector{T}[], Vector{T}[]
   end
 
   return θᵃ, θᵇ, θᶠ, θʰ, θˡ, θˡᶜ
@@ -184,16 +191,12 @@ end
 
 function get_RB_LHS_blocks(
   RBVars::StokesS{T},
-  θᵃ::Matrix,
-  θᵇ::Matrix) where T
+  θᵃ::Vector{Vector{T}},
+  θᵇ::Vector{Vector{T}}) where T
 
   get_RB_LHS_blocks(RBVars.Poisson, θᵃ)
 
-  block₂ = zeros(T, RBVars.nₛᵖ, RBVars.nₛᵘ)
-  for q = 1:RBVars.Qᵇ
-    block₂ += RBVars.Bₙ[:,:,q] * θᵇ[q]
-  end
-
+  block₂ = sum(Broadcasting(.*)(RBVars.Bₙ, θᵇ))
   push!(RBVars.LHSₙ, -block₂')::Vector{Matrix{T}}
   push!(RBVars.LHSₙ, block₂)::Vector{Matrix{T}}
 
@@ -201,13 +204,15 @@ end
 
 function get_RB_RHS_blocks(
   RBVars::StokesS{T},
-  θᶠ::Matrix,
-  θʰ::Matrix,
-  θˡ::Matrix,
-  θˡᶜ::Matrix) where T
+  θᶠ::Vector{Vector{T}},
+  θʰ::Vector{Vector{T}},
+  θˡ::Vector{Vector{T}},
+  θˡᶜ::Vector{Vector{T}}) where T
 
   get_RB_RHS_blocks(RBVars.Poisson, θᶠ, θʰ, θˡ)
-  push!(RBVars.RHSₙ, -RBVars.Lcₙ * θˡᶜ)::Vector{Matrix{T}}
+
+  block₂ = - sum(Broadcasting(.*)(RBVars.Lcₙ, θˡᶜ))
+  push!(RBVars.RHSₙ, block₂)::Vector{Matrix{T}}
 
 end
 
@@ -309,11 +314,11 @@ function online_phase(
     mean_online_time = RBVars.online_time / length(param_nbs)
     mean_reconstruction_time = reconstruction_time / length(param_nbs)
 
-    H1_err_nb = compute_errors(RBVars, uₕ_test, RBVars.ũ, RBVars.Xᵘ₀)
+    H1_err_nb = compute_errors(RBVars, uₕ_test, RBVars.ũ, RBVars.X₀[1])
     mean_H1_err += H1_err_nb / length(param_nbs)
     mean_pointwise_err_u += abs.(uₕ_test - RBVars.ũ) / length(param_nbs)
 
-    L2_err_nb = compute_errors(RBVars, pₕ_test, RBVars.p̃, RBVars.Xᵖ₀)
+    L2_err_nb = compute_errors(RBVars, pₕ_test, RBVars.p̃, RBVars.X₀[2])
     mean_L2_err += L2_err_nb / length(param_nbs)
     mean_pointwise_err_p += abs.(pₕ_test - RBVars.p̃) / length(param_nbs)
 
