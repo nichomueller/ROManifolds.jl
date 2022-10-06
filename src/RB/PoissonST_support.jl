@@ -31,35 +31,6 @@ function index_mapping(
 
 end
 
-function get_generalized_coordinates(
-  RBInfo::ROMInfoST,
-  RBVars::PoissonST{T},
-  snaps::Vector{Int}) where T
-
-  if isempty(RBVars.Xᵘ₀)
-    get_norm_matrix(RBInfo, RBVars.Steady)
-  end
-
-  @assert maximum(snaps) ≤ RBInfo.nₛ
-
-  û = zeros(T, RBVars.nᵘ, length(snaps))
-  Φₛᵘ_normed = RBVars.Xᵘ₀ * RBVars.Φₛᵘ
-  Π = kron(Φₛᵘ_normed, RBVars.Φₜᵘ)::Matrix{T}
-
-  for (i, i_nₛ) = enumerate(snaps)
-    println("Assembling generalized coordinate relative to snapshot $(i_nₛ), field u")
-    S_i = RBVars.Sᵘ[:, (i_nₛ-1)*RBVars.Nₜ+1:i_nₛ*RBVars.Nₜ]
-    û[:, i] = sum(Π, dims=2) .* S_i
-  end
-
-  RBVars.û = û
-
-  if RBInfo.save_offline_structures
-    save_CSV(û, joinpath(RBInfo.ROM_structures_path, "û.csv"))
-  end
-
-end
-
 function set_operators(
   RBInfo::Info,
   RBVars::PoissonST)

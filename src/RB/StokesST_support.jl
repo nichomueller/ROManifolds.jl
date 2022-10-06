@@ -109,35 +109,6 @@ function index_mapping(i::Int, j::Int, RBVars::StokesST, var="u")
 
 end
 
-function get_generalized_coordinates(
-  RBInfo::ROMInfoST,
-  RBVars::StokesST{T},
-  snaps::Vector{Int}) where T
-
-  if isempty(RBVars.Xᵘ₀) || isempty(RBVars.Xᵖ₀)
-    get_norm_matrix(RBInfo, RBVars)
-  end
-
-  get_generalized_coordinates(RBInfo, RBVars.Poisson)
-
-  p̂ = zeros(T, RBVars.nᵖ, length(snaps))
-  Φₛᵖ_normed = RBVars.Xᵖ₀ * RBVars.Φₛᵖ
-  Π = kron(Φₛᵖ_normed, RBVars.Φₜᵘ)::Matrix{T}
-
-  for (i, i_nₛ) = enumerate(snaps)
-    println("Assembling generalized coordinate relative to snapshot $(i_nₛ), field p")
-    S_i = RBVars.Sᵖ[:, (i_nₛ-1)*RBVars.Nₜ+1:i_nₛ*RBVars.Nₜ]
-    p̂[:, i] = sum(Π, dims=2) .* S_i
-  end
-
-  RBVars.p̂ = p̂
-
-  if RBInfo.save_offline_structures
-    save_CSV(p̂, joinpath(RBInfo.ROM_structures_path, "p̂.csv"))
-  end
-
-end
-
 function set_operators(
   RBInfo::Info,
   RBVars::StokesST)
