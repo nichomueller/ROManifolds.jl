@@ -199,7 +199,7 @@ function assemble_affine_structures(
 
   if var == "B"
     println("Assembling affine reduced B")
-    B = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "B.csv"))
+    B = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "B.csv"))
     push!(RBVars.Bₙ, (RBVars.Φₛᵖ)' * B * RBVars.Φₛᵘ)
     RBVars.Qᵇ = 1
   elseif var == "Lc"
