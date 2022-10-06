@@ -193,7 +193,6 @@ function assemble_affine_structures(
     M = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "M.csv"))
     RBVars.Mₙ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ, 1)
     RBVars.Mₙ[:,:,1] = (RBVars.Φₛᵘ)' * M * RBVars.Φₛᵘ
-    RBVars.Qᵐ = 1
   else
     assemble_affine_structures(RBInfo, RBVars.Steady, var)
   end
@@ -258,10 +257,8 @@ function assemble_reduced_mat_MDEIM(
 
   if var == "M"
     RBVars.Mₙ = Matₙ
-    RBVars.Qᵐ = Q
   else
     RBVars.Aₙ = Matₙ
-    RBVars.Qᵃ = Q
   end
 
 end
@@ -345,12 +342,6 @@ function get_θ_matrix(
 
 end
 
-function get_Q(RBVars::PoissonST)
-
-  RBVars.Qᵐ = size(RBVars.Mₙ)[end]
-  get_Q(RBVars.Steady)
-
-end
 
 function assemble_param_RHS(
   FEMSpace::FEMProblemST,

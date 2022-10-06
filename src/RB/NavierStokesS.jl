@@ -138,8 +138,8 @@ function get_RB_JinvRes(
   θᶜ::Function,
   θᵈ::Function) where T
 
-  Cₙ(u::FEFunction) = sum([RBVars.Cₙ[:, :, q] * θᶜ(u)[q] for q = 1:RBVars.Qᶜ])::Matrix{T}
-  Dₙ(u::FEFunction) = sum([RBVars.Dₙ[:, :, q] * θᵈ(u)[q] for q = 1:RBVars.Qᵈ])::Matrix{T}
+  Cₙ(u::FEFunction) = sum(Broadcasting(.*)(RBVars.Cₙ, θᶜ(u)))::Matrix{T}
+  Dₙ(u::FEFunction) = sum(Broadcasting(.*)(RBVars.Dₙ, θᵈ(u)))::Matrix{T}
 
   function JinvₙResₙ(u::FEFunction, x̂::Matrix{T}) where T
     Cₙu, Dₙu = Cₙ(u), Dₙ(u)
@@ -164,7 +164,6 @@ function get_RB_system(
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
-  get_Q(RBVars)
   RHS_blocks = [1, 2]
 
   RBVars.online_time = @elapsed begin
@@ -274,11 +273,11 @@ function online_phase(
     mean_online_time = RBVars.online_time / length(param_nbs)
     mean_reconstruction_time = reconstruction_time / length(param_nbs)
 
-    H1_err_nb = compute_errors(RBVars, uₕ_test, RBVars.ũ, RBVars.Xᵘ₀)
+    H1_err_nb = compute_errors(RBVars, uₕ_test, RBVars.ũ, RBVars.X₀[1])
     mean_H1_err += H1_err_nb / length(param_nbs)
     mean_pointwise_err_u += abs.(uₕ_test - RBVars.ũ) / length(param_nbs)
 
-    L2_err_nb = compute_errors(RBVars, pₕ_test, RBVars.p̃, RBVars.Xᵖ₀)
+    L2_err_nb = compute_errors(RBVars, pₕ_test, RBVars.p̃, RBVars.X₀[2])
     mean_L2_err += L2_err_nb / length(param_nbs)
     mean_pointwise_err_p += abs.(pₕ_test - RBVars.p̃) / length(param_nbs)
 

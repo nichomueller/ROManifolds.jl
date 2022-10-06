@@ -258,13 +258,11 @@ function assemble_affine_structures(
       joinpath(get_FEM_structures_path(RBInfo), "B.csv"))
     RBVars.Bₙ = zeros(T, RBVars.nₛᵖ, RBVars.nₛᵘ, 1)
     RBVars.Bₙ[:,:,1] = (RBVars.Φₛᵖ)' * B * RBVars.Φₛᵘ
-    RBVars.Qᵇ = 1
   elseif var == "Lc"
     println("Assembling affine reduced Lc")
     Lc = load_CSV(Matrix{T}(undef,0,0),
       joinpath(get_FEM_structures_path(RBInfo), "Lc.csv"))
     RBVars.Lcₙ = RBVars.Φₛᵖ' * Lc
-    RBVars.Qˡᶜ = 1
   else
     assemble_affine_structures(RBInfo, RBVars.Poisson, var)
   end
@@ -337,7 +335,6 @@ function assemble_reduced_mat_MDEIM(
     Matₙ = reshape(RBVars.Φₛᵖ' *
       reshape(MatqΦ,RBVars.Nₛᵖ,:),RBVars.nₛᵘ,:,Q)
     RBVars.Bₙ = Matₙ
-    RBVars.Qᵇ = Q
 
   else
     assemble_reduced_mat_MDEIM(RBVars.Poisson, MDEIM, var)
@@ -359,16 +356,12 @@ function assemble_reduced_mat_MDEIM(
 
   if var == "F"
     RBVars.Fₙ = Vecₙ
-    RBVars.Qᶠ = Q
   elseif var == "H"
     RBVars.Hₙ = Vecₙ
-    RBVars.Qʰ = Q
   elseif var == "L"
     RBVars.Lₙ = Vecₙ
-    RBVars.Qˡ = Q
   else var == "Lc"
     RBVars.Lcₙ = Vecₙ
-    RBVars.Qˡᶜ = Q
   end
 
 end
@@ -444,13 +437,6 @@ function get_θ_matrix(
   else
     error("Unrecognized variable")
   end
-
-end
-
-function get_Q(RBVars::StokesST)
-
-  get_Q(RBVars.Poisson)
-  get_Q(RBVars.Steady)
 
 end
 

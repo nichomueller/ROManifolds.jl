@@ -274,7 +274,6 @@ function get_RB_system(
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
-  get_Q(RBVars)
   blocks = [1]
 
   RBVars.online_time = @elapsed begin

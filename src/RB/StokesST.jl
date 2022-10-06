@@ -277,7 +277,6 @@ function get_RB_system(
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
-  get_Q(RBVars)
   LHS_blocks = [1, 2, 3]
   RHS_blocks = [1, 2]
 

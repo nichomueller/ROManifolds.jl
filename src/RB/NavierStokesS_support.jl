@@ -32,8 +32,8 @@ function get_C(
 
   if isfile(joinpath(RBInfo.ROM_structures_path, "Cₙ.csv"))
 
-    Cₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, "Cₙ.csv"))
-    RBVars.Cₙ = reshape(Cₙ, RBVars.nₛᵘ, RBVars.nₛᵘ, :)::Array{T,3}
+    RBVars.Cₙ = load_CSV(Matrix{T}[],
+      joinpath(RBInfo.ROM_structures_path, "Cₙ.csv"))
 
     (RBVars.MDEIM_C.Matᵢ, RBVars.MDEIM_C.idx, RBVars.MDEIM_C.el) =
       load_structures_in_list(("Matᵢ_C", "idx_C", "el_C"),
@@ -59,8 +59,8 @@ function get_D(
 
   if isfile(joinpath(RBInfo.ROM_structures_path, "Dₙ.csv"))
 
-    Dₙ = load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, "Dₙ.csv"))
-    RBVars.Dₙ = reshape(Dₙ, RBVars.nₛᵘ, RBVars.nₛᵘ, :)::Array{T,3}
+    RBVars.Dₙ = load_CSV(Matrix{T}[],
+      joinpath(RBInfo.ROM_structures_path, "Dₙ.csv"))
 
     (RBVars.MDEIM_D.Matᵢ, RBVars.MDEIM_D.idx, RBVars.MDEIM_D.el) =
       load_structures_in_list(("Matᵢ_D", "idx_D", "el_D"),
@@ -148,21 +148,16 @@ function assemble_reduced_mat_MDEIM(
   if var ∈ ("C", "D")
     Q = size(MDEIM.Mat)[2]
     r_idx, c_idx = from_vec_to_mat_idx(MDEIM.row_idx, RBVars.Nₛᵘ)
-    MatqΦ = zeros(T,RBVars.Nₛᵘ,RBVars.nₛᵘ,Q)::Array{T,3}
-    @simd for j = 1:RBVars.Nₛᵘ
-      Mat_idx = findall(x -> x == j, r_idx)
-      MatqΦ[j,:,:] = (MDEIM.Mat[Mat_idx,:]' * RBVars.Φₛᵘ[c_idx[Mat_idx],:])'
-    end
 
-    Matₙ = reshape(RBVars.Φₛᵘ' *
-      reshape(MatqΦ,RBVars.Nₛᵘ,:),RBVars.nₛᵘ,:,Q)::Array{T,3}
+    assemble_VecMatΦ(i) = assemble_ith_row_MatΦ(MDEIM.Mat, RBVars.Φₛᵘ, r_idx, c_idx, i)
+    VecMatΦ = Broadcasting(assemble_VecMatΦ)(1:RBVars.Nₛᵘ)::Vector{Matrix{T}}
+    MatΦ = Matrix{T}(reduce(vcat, VecMatΦ))::Matrix{T}
+    Matₙ = reshape(RBVars.Φₛᵘ' * MatΦ, RBVars.nₛᵘ, :, Q)
 
     if var == "C"
-      RBVars.Cₙ = Matₙ
-      RBVars.Qᶜ = Q
+      RBVars.Cₙ = [Matₙ[:,:,q] for q = 1:Q]
     else
-      RBVars.Dₙ = Matₙ
-      RBVars.Qᵈ = Q
+      RBVars.Dₙ = [Matₙ[:,:,q] for q = 1:Q]
     end
 
   else
@@ -185,9 +180,7 @@ function save_assembled_structures(
   RBVars::NavierStokesS{T},
   operators::Vector{String}) where T
 
-  Cₙ = reshape(RBVars.Cₙ, RBVars.nₛᵘ ^ 2, :)::Matrix{T}
-  Dₙ = reshape(RBVars.Dₙ, RBVars.nₛᵘ ^ 2, :)::Matrix{T}
-  affine_vars, affine_names = (Cₙ, Dₙ), ("Cₙ", "Dₙ")
+  affine_vars, affine_names = (RBVars.Cₙ, RBVars.Dₙ), ("Cₙ", "Dₙ")
   affine_entry = get_affine_entries(operators, affine_names)
   save_structures_in_list(affine_vars[affine_entry], affine_names[affine_entry],
     RBInfo.ROM_structures_path)
@@ -268,14 +261,5 @@ function get_θ_matrix(
   else
     get_θ_matrix(FEMSpace, RBInfo, RBVars.Stokes, Param, var)
   end
-
-end
-
-function get_Q(RBVars::NavierStokesS)
-
-  RBVars.Qᶜ = size(RBVars.Cₙ)[end]
-  RBVars.Qᵈ = size(RBVars.Dₙ)[end]
-
-  get_Q(RBVars.Stokes)
 
 end

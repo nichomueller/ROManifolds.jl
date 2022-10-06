@@ -155,22 +155,18 @@ function assemble_affine_structures(
     println("Assembling affine reduced A")
     A = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "A.csv"))
     push!(RBVars.Aₙ, (RBVars.Φₛᵘ)' * A * RBVars.Φₛᵘ)
-    RBVars.Qᵃ = 1
   elseif var == "F"
     println("Assembling affine reduced F")
     F = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "F.csv"))
     push!(RBVars.Fₙ, (RBVars.Φₛᵘ)' * F)
-    RBVars.Qᶠ = 1
   elseif var == "H"
     println("Assembling affine reduced H")
     H = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "H.csv"))
     push!(RBVars.Hₙ, (RBVars.Φₛᵘ)' * H)
-    RBVars.Qʰ = 1
   elseif var == "L"
     println("Assembling affine reduced L")
     L = load_CSV(Matrix{T}(undef,0,0), joinpath(get_FEM_structures_path(RBInfo), "L.csv"))
     push!(RBVars.Lₙ, (RBVars.Φₛᵘ)' * L)
-    RBVars.Qˡ = 1
   else
     error("Unrecognized variable to assemble")
   end
@@ -225,7 +221,6 @@ function assemble_reduced_mat_MDEIM(
   Matₙ = reshape(RBVars.Φₛᵘ' * MatΦ, RBVars.nₛᵘ, :, Q)
 
   RBVars.Aₙ = [Matₙ[:,:,q] for q = 1:Q]
-  RBVars.Qᵃ = Q
 
 end
 
@@ -240,13 +235,10 @@ function assemble_reduced_mat_MDEIM(
 
   if var == "F"
     RBVars.Fₙ = Vecₙ_block
-    RBVars.Qᶠ = Q
   elseif var == "H"
     RBVars.Hₙ = Vecₙ_block
-    RBVars.Qʰ = Q
   else var == "L"
     RBVars.Lₙ = Vecₙ_block
-    RBVars.Qˡ = Q
   end
 
 end
@@ -365,15 +357,6 @@ function get_θ_matrix(
   else
     error("Unrecognized variable")
   end
-
-end
-
-function get_Q(RBVars::PoissonS)
-
-  RBVars.Qᵃ = length(RBVars.Aₙ)
-  RBVars.Qᶠ = length(RBVars.Fₙ)
-  RBVars.Qʰ = length(RBVars.Hₙ)
-  RBVars.Qˡ = length(RBVars.Lₙ)
 
 end
 

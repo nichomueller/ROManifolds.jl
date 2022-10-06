@@ -150,17 +150,6 @@ function get_affine_structures(
 
 end
 
-function get_Q(
-  RBInfo::Info,
-  RBVars::NavierStokesSTGRB)
-
-  if RBVars.Qᶜ == 0
-    RBVars.Qᶜ = size(RBVars.Cₙ)[end]
-  end
-  get_Q(RBInfo, RBVars.Stokes)
-
-end
-
 function get_RB_LHS_blocks(
   RBInfo::ROMInfoST,
   RBVars::NavierStokesSTGRB{T},
@@ -270,7 +259,6 @@ function get_RB_system(
   RHS_blocks = [1]
 
   RBVars.online_time = @elapsed begin
-    get_Q(RBInfo, RBVars)
 
     operators = get_system_blocks(RBInfo,RBVars,LHS_blocks,RHS_blocks)
 
