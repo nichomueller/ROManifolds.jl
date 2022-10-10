@@ -1,170 +1,9 @@
 include("RB.jl")
 include("PoissonS_support.jl")
 
-################################# OFFLINE ######################################
-
-function get_snapshot_matrix(
-  RBInfo::ROMInfoS,
-  RBVars::PoissonS{T}) where T
-
-  println("Importing the snapshot matrix for field u,
-    number of snapshots considered: $(RBInfo.nₛ)")
-
-  Sᵘ = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
-    DataFrame))[:, 1:RBInfo.nₛ]
-
-  println("Dimension of snapshot matrix: $(size(Sᵘ))")
-
-  RBVars.Sᵘ = Sᵘ
-  RBVars.Nₛᵘ = size(Sᵘ)[1]
-
-end
-
-function get_norm_matrix(
-  RBInfo::Info,
-  RBVars::PoissonS{T}) where T
-
-  if isempty(RBVars.X₀)
-    println("Importing the norm matrix Xᵘ₀")
-    Xᵘ₀ = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "Xᵘ₀.csv"))
-    if RBInfo.use_norm_X
-      RBVars.X₀ = [Xᵘ₀]
-    else
-      RBVars.X₀ = [one(T)*sparse(I,RBVars.Nₛᵘ,RBVars.Nₛᵘ)]
-    end
-  end
-
-end
-
-function assemble_reduced_basis(
-  RBInfo::ROMInfoS,
-  RBVars::PoissonS)
-
-  RBVars.offline_time += @elapsed begin
-    PODs_space(RBInfo, RBVars)
-  end
-
-  if RBInfo.save_offline_structures
-    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.ROM_structures_path,"Φₛᵘ.csv"))
-  end
-
-  return
-
-end
-
-function get_reduced_basis(
-  RBInfo::Info,
-  RBVars::PoissonS{T}) where T
-
-  println("Importing the spatial reduced basis for field u")
-
-  RBVars.Φₛᵘ = load_CSV(Matrix{T}(undef,0,0),
-    joinpath(RBInfo.ROM_structures_path, "Φₛᵘ.csv"))
-  (RBVars.Nₛᵘ, RBVars.nₛᵘ) = size(RBVars.Φₛᵘ)
-
-end
-
-function get_offline_structures(
-  RBInfo::ROMInfoS,
-  RBVars::PoissonS)
-
-  operators = String[]
-
-  append!(operators, get_A(RBInfo, RBVars))
-
-  if !RBInfo.online_RHS
-    append!(operators, get_F(RBInfo, RBVars))
-    append!(operators, get_H(RBInfo, RBVars))
-    append!(operators, get_L(RBInfo, RBVars))
-  end
-
-  operators
-
-end
-
-function assemble_offline_structures(
-  RBInfo::ROMInfoS,
-  RBVars::PoissonS,
-  operators=String[])
-
-  if isempty(operators)
-    operators = set_operators(RBInfo, RBVars)
-  end
-
-  RBVars.offline_time += @elapsed begin
-    for var ∈ setdiff(operators, RBInfo.probl_nl)
-      assemble_affine_structures(RBInfo, RBVars, var)
-    end
-
-    for var ∈ intersect(operators, RBInfo.probl_nl)
-      assemble_MDEIM_structures(RBInfo, RBVars, var)
-    end
-  end
-
-  save_assembled_structures(RBInfo, RBVars, operators)
-
-end
-
-function offline_phase(
-  RBInfo::ROMInfoS,
-  RBVars::PoissonS)
-
-  if RBInfo.get_snapshots
-    get_snapshot_matrix(RBInfo, RBVars)
-    get_snapshots_success = true
-  else
-    get_snapshots_success = false
-  end
-
-  if RBInfo.get_offline_structures
-    get_reduced_basis(RBInfo, RBVars)
-    get_basis_success = true
-  else
-    get_basis_success = false
-  end
-
-  if !get_snapshots_success && !get_basis_success
-    error("Impossible to assemble the reduced problem if
-      neither the snapshots nor the bases can be loaded")
-  end
-
-  if get_snapshots_success && !get_basis_success
-    println("Failed to import the reduced basis, building it via POD")
-    assemble_reduced_basis(RBInfo, RBVars)
-  end
-
-  if RBInfo.get_offline_structures
-    operators = get_offline_structures(RBInfo, RBVars)
-    if !isempty(operators)
-      assemble_offline_structures(RBInfo, RBVars, operators)
-    end
-  else
-    assemble_offline_structures(RBInfo, RBVars)
-  end
-
-end
-
 ################################## ONLINE ######################################
 
-function get_θ(
-  FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS,
-  RBVars::PoissonS{T},
-  Param::ParamInfoS) where T
 
-  θᵃ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "A")
-
-  if !RBInfo.online_RHS
-    θᶠ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "F")
-    θʰ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "H")
-    θˡ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "L")
-  else
-    θᶠ, θʰ, θˡ = Vector{T}[], Vector{T}[], Vector{T}[]
-  end
-
-  return θᵃ, θᶠ, θʰ, θˡ
-
-end
 
 function get_RB_LHS_blocks(
   RBVars::PoissonS{T},
@@ -239,77 +78,65 @@ function solve_RB_system(
 
 end
 
-function reconstruct_FEM_solution(RBVars::PoissonS)
+function reconstruct_FEM_solution(RBVars::ROMInfoS)
   println("Reconstructing FEM solution from the newly computed RB one")
-  RBVars.ũ = RBVars.Φₛᵘ * RBVars.uₙ
+  RBVars.x̃ = Broadcasting(*)(RBVars.Φₛ, RBVars.xₙ)
 end
 
 function online_phase(
   RBInfo::ROMInfoS,
-  RBVars::PoissonS{T},
-  Param_nbs) where T
+  RBVars::RBProblemS{T},
+  param_nbs) where T
+
+  function get_S_var(var::String, nb::Int)
+    load_CSV(Matrix{T}(undef,0,0),
+      joinpath(get_FEM_snap_path(RBInfo), "$(var)ₕ.csv"))[:, nb]
+  end
 
   FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
 
-  mean_H1_err = 0.0
-  mean_pointwise_err = zeros(T, RBVars.Nₛᵘ)
+  mean_err = T[]
+  mean_pointwise_err = Vector{T}[]
   mean_online_time = 0.0
-  mean_reconstruction_time = 0.0
 
   get_norm_matrix(RBInfo, RBVars)
 
-  ũ_μ = zeros(T, RBVars.Nₛᵘ, length(Param_nbs))
-  uₙ_μ = zeros(T, RBVars.nₛᵘ, length(Param_nbs))
-
-  for nb in Param_nbs
+  for nb in param_nbs
     println("Considering parameter number: $nb")
 
     Param = get_ParamInfo(RBInfo, μ[nb])
-
-    uₕ_test = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"), DataFrame))[:, nb]
-
     solve_RB_system(FEMSpace, RBInfo, RBVars, Param)
-    reconstruction_time = @elapsed begin
-      reconstruct_FEM_solution(RBVars)
-    end
-    mean_online_time = RBVars.online_time / length(Param_nbs)
-    mean_reconstruction_time = reconstruction_time / length(Param_nbs)
+    reconstruct_FEM_solution(RBVars)
 
-    H1_err_nb = compute_errors(RBVars, uₕ_test, RBVars.ũ, RBVars.X₀[1])
-    mean_H1_err += H1_err_nb / length(Param_nbs)
-    mean_pointwise_err += abs.(uₕ_test - RBVars.ũ) / length(Param_nbs)
+    mean_online_time = RBVars.online_time / length(param_nbs)
 
-    ũ_μ[:, nb - Param_nbs[1] + 1] = RBVars.ũ
-    uₙ_μ[:, nb - Param_nbs[1] + 1] = RBVars.uₙ
+    get_S(var) = get_S_var(var, nb)
+    xₕ = Broadcasting(get_S)(RBInfo.vars)
+    err_nb = Broadcasting(compute_errors)(xₕ, RBVars.x̃, RBVars.X₀)
+    mean_err += err_nb / length(param_nbs)
+    mean_pointwise_err += abs.(xₕ - RBVars.x̃) / length(param_nbs)
 
-    println("Online wall time: $(RBVars.online_time) s (snapshot number $nb)")
-    println("Relative reconstruction H1-error: $H1_err_nb (snapshot number $nb)")
-
+    println("Online wall time (snapshot number $nb): $(RBVars.online_time)s ")
   end
 
-  string_Param_nbs = "params"
-  for Param_nb in Param_nbs
-    string_Param_nbs *= "_" * string(Param_nb)
+  string_param_nbs = "params"
+  for param_nb in param_nbs
+    string_param_nbs *= "_" * string(param_nb)
   end
-  path_μ = joinpath(RBInfo.results_path, string_Param_nbs)
+  path_μ = joinpath(RBInfo.results_path, string_param_nbs)
 
   if RBInfo.save_results
-
     create_dir(path_μ)
-    save_CSV(ũ_μ, joinpath(path_μ, "ũ.csv"))
-    save_CSV(uₙ_μ, joinpath(path_μ, "uₙ.csv"))
     save_CSV(mean_pointwise_err, joinpath(path_μ, "mean_point_err.csv"))
-    save_CSV([mean_H1_err], joinpath(path_μ, "H1_err.csv"))
+    save_CSV(mean_err, joinpath(path_μ, "err.csv"))
 
     if RBInfo.get_offline_structures
       RBVars.offline_time = NaN
     end
 
-    times = Dict("off_time"=>RBVars.offline_time,
-      "on_time"=>mean_online_time,"rec_time"=>mean_reconstruction_time)
+    times = Dict("off_time"=>RBVars.offline_time, "on_time"=>mean_online_time)
 
     CSV.write(joinpath(path_μ, "times.csv"),times)
-
   end
 
   pass_to_pp = Dict("path_μ"=>path_μ, "FEMSpace"=>FEMSpace,

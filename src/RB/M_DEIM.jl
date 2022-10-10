@@ -47,12 +47,12 @@ function MDEIM_offline!(
   var::String) where T
 
   FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
-  Nₕ = select_Nₕ(FEMSpace, var)
+  Nₛ = get_Nₛ(RBVars, var)
 
   Mat, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
   idx_full, Matᵢ = M_DEIM_offline(Mat)
-  idx = from_full_idx_to_sparse_idx(idx_full, row_idx, Nₕ)
-  idx_space, _ = from_vec_to_mat_idx(idx, Nₕ)
+  idx = from_full_idx_to_sparse_idx(idx_full, row_idx, Nₛ)
+  idx_space, _ = from_vec_to_mat_idx(idx, Nₛ)
   el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(idx_space))
 
   MDEIM.Mat, MDEIM.Matᵢ, MDEIM.idx, MDEIM.row_idx, MDEIM.el =
@@ -67,13 +67,13 @@ function MDEIM_offline!(
   var::String) where T
 
   FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
-  Nₕ = select_Nₕ(FEMSpace, var)
+  Nₛ = get_Nₛ(RBVars, var)
 
   Mat, Mat_time, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
 
   idx_full, Matᵢ = M_DEIM_offline(Mat)
-  idx = from_full_idx_to_sparse_idx(idx_full, row_idx, Nₕ)
-  idx_space, _ = from_vec_to_mat_idx(idx, Nₕ)
+  idx = from_full_idx_to_sparse_idx(idx_full, row_idx, Nₛ)
+  idx_space, _ = from_vec_to_mat_idx(idx, Nₛ)
   el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(idx_space))
 
   time_idx, _ = M_DEIM_offline(Mat_time)

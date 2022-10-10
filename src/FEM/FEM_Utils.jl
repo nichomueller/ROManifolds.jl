@@ -37,6 +37,34 @@ function get_problem_id(problem_name::String)
   end
 end
 
+function get_FEM_unknowns(NT::NTuple)
+  if typeof(NT) == NTuple{Int, 1}
+    ["u"]
+  else
+    ["u", "p"]
+  end
+end
+
+function get_FEM_structures(NT::NTuple)
+  if typeof(NT) == NTuple{Int, 1}
+    ["A", "F", "H", "L"]
+  elseif typeof(NT) == NTuple{Int, 2}
+    ["A", "B", "F", "H", "L", "Lc"]
+  else typeof(NT) == NTuple{Int, 3}
+    ["A", "B", "C", "D", "F", "H", "L", "Lc"]
+  end
+end
+
+function get_FEM_structures(FEMInfo::FEMInfoS)
+  NT = FEMInfo.problem_id
+  get_FEM_structures(NT)
+end
+
+function get_FEM_structures(FEMInfo::FEMInfoST)
+  NT = FEMInfo.problem_id
+  append!(["M"], get_FEM_structures(NT))
+end
+
 function nonlinearity_lifting_op(FEMInfo::Info)
   if "A" ∉ FEMInfo.probl_nl && "L" ∉ FEMInfo.probl_nl
     return 0
@@ -49,14 +77,6 @@ function nonlinearity_lifting_op(FEMInfo::Info)
   end
 end
 
-function select_Nₕ(FEMSpace::FEMProblem, var::String)
-  if var ∈ ("B", "Lc")
-    FEMSpace.Nₛᵖ
-  else
-    FEMSpace.Nₛᵘ
-  end
-end
-
 function get_FEMProblem_info(FEMInfo::Info)
   μ = load_CSV(Vector{Float}[],
     joinpath(FEMInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{Float}}
@@ -64,6 +84,70 @@ function get_FEMProblem_info(FEMInfo::Info)
   FEMSpace = get_FEMSpace₀(FEMInfo.problem_id, FEMInfo, model)::FEMProblem
 
   FEMSpace, μ
+
+end
+
+function get_ParamInfo(
+  FEMInfo::FEMInfoS,
+  μ::Vector,
+  var::String)
+
+  fun = get_fun(FEMInfo, μ, var)
+  ParamInfoS(var, fun, θ)
+
+end
+
+function get_ParamInfo(
+  FEMInfo::FEMInfoST,
+  μ::Vector,
+  var::String)
+
+  funₛ, funₜ, fun  = get_fun(FEMInfo, μ, var)
+  ParamInfoST(var, funₛ, funₜ, fun, θ)
+
+end
+
+function get_ParamInfo(
+  FEMInfo::Info,
+  μ::Vector)
+
+  get_single_ParamInfo(var) = get_ParamInfo(FEMInfo, μ, var)
+  operators = get_FEM_structures(FEMInfo)
+  Broadcasting(get_single_ParamInfo)(operators)
+
+end
+
+function get_ParamFormInfo(
+  FEMSpace::Problem,
+  Param::ParamInfoS)
+
+  if Param.var != "H"
+    ParamFormInfoS(Param, FEMSpace.dΩ)
+  else
+    ParamFormInfoS(Param, FEMSpace.dΓn)
+  end
+
+end
+
+function get_ParamFormInfo(
+  FEMSpace::Problem,
+  Param::ParamInfoST)
+
+  if Param.var != "H"
+    ParamFormInfoST(Param, FEMSpace.dΩ)
+  else
+    ParamFormInfoST(Param, FEMSpace.dΓn)
+  end
+
+end
+
+function get_ParamFormInfo(
+  FEMInfo::Info,
+  μ::Vector)
+
+  get_single_ParamFormInfo(var) = get_ParamInfo(FEMInfo, μ, var)
+  operators = get_FEM_structures(FEMInfo)
+  Broadcasting(get_single_ParamFormInfo)(operators)
 
 end
 

@@ -1,11 +1,6 @@
 function FE_solve(
-  FEMSpace::FEMSpacePoissonS,
   FEMInfo::FEMInfoS,
-  Param::ParamInfoS)
-
-  a(u, v) = ∫(∇(v) ⋅ (Param.α * ∇(u))) * FEMSpace.dΩ
-  rhs(v) = ∫(v * Param.f) * FEMSpace.dΩ + ∫(v * Param.h) * FEMSpace.dΓn
-  operator = AffineFEOperator(a, rhs, FEMSpace.V, FEMSpace.V₀)
+  operator::AffineFEOperator)
 
   if FEMInfo.solver == "lu"
     uₕ_field = solve(LinearFESolver(LUSolver()), operator)
@@ -24,7 +19,7 @@ function FE_solve(
 
   m(t, u, v) = ∫(Param.m(t)*(u*v)) * FEMSpace.dΩ
   a(t, u, v) = ∫(∇(v)⋅(Param.α(t)*∇(u)))*FEMSpace.dΩ
-  rhs(t, v) = rhs_form(t,v,FEMSpace,Param)
+  rhs(t, v) = ∫(v*Param.f(t))*FEMSpace.dΩ + ∫(v*Param.h(t))*FEMSpace.dΓn
   operator = TransientAffineFEOperator(m, a, rhs, FEMSpace.V, FEMSpace.V₀)
 
   linear_solver = LUSolver()
@@ -119,30 +114,4 @@ function FE_solve(
 
   Vector(get_free_dof_values(uₕ_field)), Vector(get_free_dof_values(pₕ_field))
 
-end
-
-function rhs_form(
-  t::Real,
-  v::FEBasis,
-  FEMSpace::FEMSpacePoissonST,
-  Param::ParamInfoST)
-
-  if !isnothing(FEMSpace.dΓn)
-    return ∫(v*Param.f(t))*FEMSpace.dΩ + ∫(v*Param.h(t))*FEMSpace.dΓn
-  else
-    return ∫(v*Param.f(t))*FEMSpace.dΩ
-  end
-end
-
-function rhs_form(
-  t::Real,
-  v::FEBasis,
-  FEMSpace::FEMSpaceStokesST,
-  Param::ParamInfoST)
-
-  if !isnothing(FEMSpace.dΓn)
-    return ∫(v⋅Param.f(t))*FEMSpace.dΩ + ∫(v⋅Param.h(t))*FEMSpace.dΓn
-  else
-    return ∫(v⋅Param.f(t))*FEMSpace.dΩ
-  end
 end

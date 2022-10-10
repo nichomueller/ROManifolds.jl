@@ -1,11 +1,11 @@
 ################################# OFFLINE ######################################
-function PODs_space(
+function POD_space(
   RBInfo::Info,
   RBVars::StokesST)
 
-  PODs_space(RBInfo, RBVars.Poisson)
+  POD_space(RBInfo, RBVars.Poisson)
 
-  println("Performing the spatial POD for field p, using a tolerance of $(RBInfo.ϵₛ)")
+  println("Spatial POD for field p, tolerance: $(RBInfo.ϵₛ)")
   get_norm_matrix(RBInfo, RBVars.Steady)
   RBVars.Φₛᵖ = POD(RBVars.Sᵖ, RBInfo.ϵₛ, RBVars.Xᵖ₀)
   (RBVars.Nₛᵖ, RBVars.nₛᵖ) = size(RBVars.Φₛᵖ)
@@ -17,18 +17,18 @@ function supr_enrichment_space(
   RBVars::StokesST)
 
   supr_primal = primal_supremizers(RBInfo, RBVars.Steady)
-  RBVars.Φₛᵘ = hcat(RBVars.Φₛᵘ, supr_primal)
-  RBVars.nₛᵘ = size(RBVars.Φₛᵘ)[2]
+  RBVars.Φₛ = hcat(RBVars.Φₛ, supr_primal)
+  RBVars.nₛᵘ = size(RBVars.Φₛ)[2]
 
 end
 
-function PODs_time(
+function POD_time(
   RBInfo::ROMInfoST,
   RBVars::StokesST{T}) where T
 
-  PODs_time(RBInfo, RBVars.Poisson)
+  POD_time(RBInfo, RBVars.Poisson)
 
-  println("Performing the temporal POD for field p, using a tolerance of $(RBInfo.ϵₜ)")
+  println("Temporal POD for field p, tolerance: $(RBInfo.ϵₜ)")
 
   if RBInfo.time_reduction_technique == "ST-HOSVD"
     Sᵖ = RBVars.Φₛᵖ' * RBVars.Sᵖ
@@ -228,7 +228,7 @@ function assemble_affine_structures(
     B = load_CSV(sparse([],[],T[]),
       joinpath(get_FEM_structures_path(RBInfo), "B.csv"))
     RBVars.Bₙ = zeros(T, RBVars.nₛᵖ, RBVars.nₛᵘ, 1)
-    RBVars.Bₙ[:,:,1] = (RBVars.Φₛᵖ)' * B * RBVars.Φₛᵘ
+    RBVars.Bₙ[:,:,1] = (RBVars.Φₛᵖ)' * B * RBVars.Φₛ
   elseif var == "Lc"
     println("Assembling affine reduced Lc")
     Lc = load_CSV(Matrix{T}(undef,0,0),
@@ -300,7 +300,7 @@ function assemble_reduced_mat_MDEIM(
     MatqΦ = zeros(T,RBVars.Nₛᵖ,RBVars.nₛᵘ,Q)
     @simd for j = 1:RBVars.Nₛᵖ
       Mat_idx = findall(x -> x == j, r_idx)
-      MatqΦ[j,:,:] = (MDEIM.Mat[Mat_idx,:]' * RBVars.Φₛᵘ[c_idx[Mat_idx],:])'
+      MatqΦ[j,:,:] = (MDEIM.Mat[Mat_idx,:]' * RBVars.Φₛ[c_idx[Mat_idx],:])'
     end
 
     Matₙ = reshape(RBVars.Φₛᵖ' *
@@ -321,7 +321,7 @@ function assemble_reduced_mat_MDEIM(
   Q = size(MDEIM.Mat)[2]
   Vecₙ = zeros(T,RBVars.nₛᵘ,1,Q)
   @simd for q = 1:Q
-    Vecₙ[:,:,q] = RBVars.Φₛᵘ' * Vector{T}(MDEIM.Mat[:, q])
+    Vecₙ[:,:,q] = RBVars.Φₛ' * Vector{T}(MDEIM.Mat[:, q])
   end
   Vecₙ = reshape(Vecₙ,:,Q)
 
@@ -428,7 +428,7 @@ function assemble_param_RHS(
     RHS_c[:, i] = - Lc_t(tᵢ)
   end
 
-  RHS_cₙ = RBVars.Φₛᵘ' * (RHS_c * RBVars.Φₜᵘ)
+  RHS_cₙ = RBVars.Φₛ' * (RHS_c * RBVars.Φₜᵘ)
   push!(RBVars.RHSₙ, reshape(RHS_cₙ', :, 1))::Vector{Matrix{T}}
 
 end
@@ -491,12 +491,12 @@ function adaptive_loop_on_params(
   Sᵘ = reshape(sum(reshape(Sᵘ,RBVars.Nₛᵘ,RBVars.Nₜ,:),dims=3),RBVars.Nₛᵘ,:)
   Sᵖ = reshape(sum(reshape(Sᵖ,RBVars.Nₛᵖ,RBVars.Nₜ,:),dims=3),RBVars.Nₛᵖ,:)
 
-  Φₛᵘ_new = Matrix{T}(qr(Sᵘ[:,ind_t_u]).Q)[:,1:n_adaptive_u[2]]
+  Φₛ_new = Matrix{T}(qr(Sᵘ[:,ind_t_u]).Q)[:,1:n_adaptive_u[2]]
   Φₜᵘ_new = Matrix{T}(qr(Sᵘ[ind_s_u,:]').Q)[:,1:n_adaptive_u[1]]
   RBVars.nₛᵘ += n_adaptive_u[2]
   RBVars.nₜᵘ += n_adaptive_u[1]
   RBVars.nᵘ = RBVars.nₛᵘ*RBVars.nₜᵘ
-  RBVars.Φₛᵘ = Matrix{T}(qr(hcat(RBVars.Φₛᵘ,Φₛᵘ_new)).Q)[:,1:RBVars.nₛᵘ]
+  RBVars.Φₛ = Matrix{T}(qr(hcat(RBVars.Φₛ,Φₛ_new)).Q)[:,1:RBVars.nₛᵘ]
   RBVars.Φₜᵘ = Matrix{T}(qr(hcat(RBVars.Φₜᵘ,Φₜᵘ_new)).Q)[:,1:RBVars.nₜᵘ]
 
   Φₛᵖ_new = Matrix{T}(qr(Sᵖ[:,ind_t_p]).Q)[:,1:n_adaptive_p[2]]

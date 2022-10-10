@@ -60,8 +60,8 @@ function assemble_matrix_snapshots(
 
   for nᵩ = 1:RBVars.nₛᵘ
     println("Snapshot number $nᵩ, $var")
-    Φₛᵘ_fun = FEFunction(FEMSpace.V₀, RBVars.Φₛᵘ[:, nᵩ])
-    i, v = findnz(Matᵤ(Φₛᵘ_fun)[:])::Tuple{Vector{Int},Vector{T}}
+    Φₛ_fun = FEFunction(FEMSpace.V₀, RBVars.Φₛ[:, nᵩ])
+    i, v = findnz(Matᵤ(Φₛ_fun)[:])::Tuple{Vector{Int},Vector{T}}
     if nᵩ == 1
       row_idx = i
       Matᵩ = zeros(T, length(row_idx), RBVars.nₛᵘ)
@@ -243,10 +243,10 @@ function functional_MDEIM_nonlinear(
   for i_t = 1:RBVars.Nₜ
     for k = 1:RBVars.nᵘ_quad
       kₛ, kₜ = index_mapping_inverse(k)
-      Φₛᵘ_fun = FEFunction(FEMSpace.V₀_quad,
-        RBVars.Φₛᵘ_quad[:, kₛ] * RBVars.Φₜᵘ_quad[i_t, kₜ])
-      # this is wrong: Φₛᵘ_fun is not at time timesθ[i_t]
-      i, v = findnz(Matᵤ(Φₛᵘ_fun, timesθ[i_t])[:])::Tuple{Vector{Int},Vector{T}}
+      Φₛ_fun = FEFunction(FEMSpace.V₀_quad,
+        RBVars.Φₛ_quad[:, kₛ] * RBVars.Φₜᵘ_quad[i_t, kₜ])
+      # this is wrong: Φₛ_fun is not at time timesθ[i_t]
+      i, v = findnz(Matᵤ(Φₛ_fun, timesθ[i_t])[:])::Tuple{Vector{Int},Vector{T}}
       if i_t == 1 && k == 1
         row_idx = i
         Mat = zeros(T, length(row_idx), RBVars.Nₜ, RBVars.nᵘ_quad)
@@ -485,7 +485,7 @@ end
 
 function assemble_θmat_snapshots(RBVars::RBProblemST)
 
-  RBVars.Φₛᵘ_quad, RBVars.Φₜᵘ_quad
+  RBVars.Φₛ_quad, RBVars.Φₜᵘ_quad
 
 end
 

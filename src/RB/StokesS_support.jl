@@ -1,11 +1,11 @@
 ################################# OFFLINE ######################################
-function PODs_space(
+function POD_space(
   RBInfo::Info,
   RBVars::StokesS)
 
-  PODs_space(RBInfo,RBVars.Poisson)
+  POD_space(RBInfo,RBVars.Poisson)
 
-  println("Performing the spatial POD for field p, using a tolerance of $(RBInfo.ϵₛ)")
+  println("Spatial POD for field p, tolerance: $(RBInfo.ϵₛ)")
   get_norm_matrix(RBInfo, RBVars)
   RBVars.Φₛᵖ = POD(RBVars.Sᵖ, RBInfo.ϵₛ, RBVars.X₀[2])
   (RBVars.Nₛᵖ, RBVars.nₛᵖ) = size(RBVars.Φₛᵖ)
@@ -54,8 +54,8 @@ function primal_supremizers(
     println("Normalizing primal supremizer $i")
 
     for j in 1:RBVars.nₛᵘ
-      supr_primal[:, i] -= mydot(supr_primal[:, i], RBVars.Φₛᵘ[:, j], RBVars.X₀[1]) /
-      mynorm(RBVars.Φₛᵘ[:, j], RBVars.X₀[1]) * RBVars.Φₛᵘ[:, j]
+      supr_primal[:, i] -= mydot(supr_primal[:, i], RBVars.Φₛ[:, j], RBVars.X₀[1]) /
+      mynorm(RBVars.Φₛ[:, j], RBVars.X₀[1]) * RBVars.Φₛ[:, j]
     end
     for j in 1:i
       supr_primal[:, i] -= mydot(supr_primal[:, i], supr_primal[:, j], RBVars.X₀[1]) /
@@ -80,8 +80,8 @@ function supr_enrichment_space(
   RBVars::StokesS)
 
   supr_primal = primal_supremizers(RBInfo, RBVars)
-  RBVars.Φₛᵘ = hcat(RBVars.Φₛᵘ, supr_primal)
-  RBVars.nₛᵘ = size(RBVars.Φₛᵘ)[2]
+  RBVars.Φₛ = hcat(RBVars.Φₛ, supr_primal)
+  RBVars.nₛᵘ = size(RBVars.Φₛ)[2]
 
 end
 
@@ -200,7 +200,7 @@ function assemble_affine_structures(
   if var == "B"
     println("Assembling affine reduced B")
     B = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "B.csv"))
-    push!(RBVars.Bₙ, (RBVars.Φₛᵖ)' * B * RBVars.Φₛᵘ)
+    push!(RBVars.Bₙ, (RBVars.Φₛᵖ)' * B * RBVars.Φₛ)
   elseif var == "Lc"
     println("Assembling affine reduced Lc")
     Lc = load_CSV(Matrix{T}(undef,0,0),
@@ -265,10 +265,10 @@ function assemble_reduced_mat_MDEIM(
     Q = size(MDEIM.Mat)[2]
     r_idx, c_idx = from_vec_to_mat_idx(MDEIM.row_idx, RBVars.Nₛᵖ)
 
-    assemble_VecMatΦ(i) = assemble_ith_row_MatΦ(MDEIM.Mat, RBVars.Φₛᵘ, r_idx, c_idx, i)
+    assemble_VecMatΦ(i) = assemble_ith_row_MatΦ(MDEIM.Mat, RBVars.Φₛ, r_idx, c_idx, i)
     VecMatΦ = Broadcasting(assemble_VecMatΦ)(1:RBVars.Nₛᵖ)::Vector{Matrix{T}}
     MatΦ = Matrix{T}(reduce(vcat, VecMatΦ))::Matrix{T}
-    Matₙ = permutedims(reshape(RBVars.Φₛᵖ' * MatΦ, RBVars.nₛᵖ, :, Q), (2,1,3))
+    Matₙ = reshape(RBVars.Φₛᵖ' * MatΦ, RBVars.nₛᵖ, :, Q)
 
     RBVars.Bₙ = [Matₙ[:,:,q] for q = 1:Q]
   else
@@ -387,7 +387,7 @@ function assemble_param_RHS(
   F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
   H = assemble_FEM_structure(FEMSpace, RBInfo, Param, "H")
   L = assemble_FEM_structure(FEMSpace, RBInfo, Param, "L")
-  push!(RBVars.RHSₙ, reshape(RBVars.Φₛᵘ' * (F + H - L), :, 1)::Matrix{T})
+  push!(RBVars.RHSₙ, reshape(RBVars.Φₛ' * (F + H - L), :, 1)::Matrix{T})
 
   Lc = assemble_FEM_structure(FEMSpace, RBInfo, Param, "Lc")
   push!(RBVars.RHSₙ, reshape(- RBVars.Φₛᵖ' * Lc, :, 1)::Matrix{T})

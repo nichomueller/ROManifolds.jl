@@ -74,15 +74,53 @@ function assemble_FEM_structure(
 
 end
 
-function get_ParamInfo(RBInfo::Info, μ::Vector{T}) where T
+function get_Φₛ(RBVars::RBProblem, var::String)
+  if var ∈ ("B", "Lc")
+    RBVars.Φₛ[2]
+  else
+    RBVars.Φₛ[1]
+  end
+end
+
+function get_Nₛ(RBVars::RBProblem, var::String)
+  if var ∈ ("B", "Lc")
+    RBVars.Nₛ[2]
+  else
+    RBVars.Nₛ[1]
+  end
+end
+
+function get_ParamInfo(
+  RBInfo::Info,
+  μ::Vector,
+  var::String)
+
+  get_ParamInfo(RBInfo.FEMInfo, μ, var)
+
+end
+
+function get_ParamInfo(
+  RBInfo::Info,
+  μ::Vector)
 
   get_ParamInfo(RBInfo.FEMInfo, μ)
 
 end
 
-function get_ParamInfo(RBInfo::Info, FEMSpace::FEMProblem, μ::Vector{T}) where T
+function get_ParamFormInfo(
+  RBInfo::Info,
+  μ::Vector,
+  var::String)
 
-  get_ParamInfo(RBInfo.FEMInfo, FEMSpace, μ)
+  get_ParamFormInfo(RBInfo.FEMInfo, μ, var)
+
+end
+
+function get_ParamFormInfo(
+  RBInfo::Info,
+  μ::Vector)
+
+  get_ParamFormInfo(RBInfo.FEMInfo, μ)
 
 end
 
@@ -172,7 +210,7 @@ function assemble_sparse_mat(
 
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
-  Nₕ = select_Nₕ(FEMSpace, var)
+  Nₛ = get_Nₛ(RBVars, var)
   Nₜ = length(timesθ)
 
   function define_Matₜ(FEMSpace::FEMSpacePoissonST, t::Real, var::String)
@@ -220,10 +258,10 @@ function assemble_sparse_mat(
   for (i_t,t) in enumerate(timesθ)
     i,j,v = findnz(Matₜ(t))::Tuple{Vector{Int},Vector{Int},Vector{Float}}
     if i_t == 1
-      Mat = sparse(i,j,v,Nₕ,FEMSpace.Nₛᵘ*Nₜ)
+      Mat = sparse(i,j,v,Nₛ,FEMSpace.Nₛᵘ*Nₜ)
     else
       Mat[:,(i_t-1)*FEMSpace.Nₛᵘ+1:i_t*FEMSpace.Nₛᵘ] =
-        sparse(i,j,v,Nₕ,FEMSpace.Nₛᵘ)
+        sparse(i,j,v,Nₛ,FEMSpace.Nₛᵘ)
     end
   end
 
@@ -546,29 +584,38 @@ function θ_function(
 end
 
 function compute_errors(
-  ::RBProblemS{T},
-  uₕ::Vector,
-  ũ::Matrix{T},
-  norm_matrix = nothing) where T
+  xₕ::Vector{T},
+  x̃::Vector{T},
+  X::Matrix{T}) where T
 
-  mynorm(uₕ - ũ[:, 1], norm_matrix) / mynorm(uₕ, norm_matrix)
+  mynorm(xₕ - x̃, X) / mynorm(xₕ, X)
 
 end
 
 function compute_errors(
-  RBVars::RBProblemST{T},
-  uₕ::Matrix,
-  ũ::Matrix,
-  norm_matrix = nothing) where T
+  xₕ::Matrix{T},
+  x̃::Matrix{T},
+  X::Matrix{T}) where T
 
-  norm_err = zeros(T, RBVars.Nₜ)
-  norm_sol = zeros(T, RBVars.Nₜ)
+  @assert size(xₕ)[2] == size(x̃)[2] == 1 "Something is wrong"
+  compute_errors(xₕ[:, 1], x̃[:, 1], X)
 
-  @simd for i = 1:RBVars.Nₜ
-    norm_err[i] = mynorm(uₕ[:, i] - ũ[:, i], norm_matrix)
-    norm_sol[i] = mynorm(uₕ[:, i], norm_matrix)
+end
+
+function compute_errors(
+  xₕ::Vector{T},
+  x̃::Matrix{T},
+  X::Matrix{T},
+  Nₜ::Int) where T
+
+  norm_err = zeros(T, Nₜ)
+  norm_sol = zeros(T, Nₜ)
+
+  @simd for i = 1:Nₜ
+    norm_err[i] = mynorm(xₕ[:, i] - x̃[:, i], X)
+    norm_sol[i] = mynorm(xₕ[:, i], X)
   end
 
-  return norm_err ./ norm_sol, norm(norm_err) / norm(norm_sol)
+  norm_err ./ norm_sol, norm(norm_err) / norm(norm_sol)
 
 end

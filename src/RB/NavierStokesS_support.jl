@@ -149,10 +149,10 @@ function assemble_reduced_mat_MDEIM(
     Q = size(MDEIM.Mat)[2]
     r_idx, c_idx = from_vec_to_mat_idx(MDEIM.row_idx, RBVars.Nₛᵘ)
 
-    assemble_VecMatΦ(i) = assemble_ith_row_MatΦ(MDEIM.Mat, RBVars.Φₛᵘ, r_idx, c_idx, i)
+    assemble_VecMatΦ(i) = assemble_ith_row_MatΦ(MDEIM.Mat, RBVars.Φₛ, r_idx, c_idx, i)
     VecMatΦ = Broadcasting(assemble_VecMatΦ)(1:RBVars.Nₛᵘ)::Vector{Matrix{T}}
     MatΦ = Matrix{T}(reduce(vcat, VecMatΦ))::Matrix{T}
-    Matₙ = reshape(RBVars.Φₛᵘ' * MatΦ, RBVars.nₛᵘ, :, Q)
+    Matₙ = reshape(RBVars.Φₛ' * MatΦ, RBVars.nₛᵘ, :, Q)
 
     if var == "C"
       RBVars.Cₙ = [Matₙ[:,:,q] for q = 1:Q]

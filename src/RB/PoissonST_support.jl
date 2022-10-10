@@ -1,16 +1,16 @@
 ################################# OFFLINE ######################################
 
-PODs_space(RBInfo::Info, RBVars::PoissonST) =
-  PODs_space(RBInfo, RBVars.Steady)
+POD_space(RBInfo::Info, RBVars::PoissonST) =
+  POD_space(RBInfo, RBVars.Steady)
 
-function PODs_time(
+function POD_time(
   RBInfo::ROMInfoST,
   RBVars::PoissonST{T}) where T
 
-  println("Performing the temporal POD for field u, using a tolerance of $(RBInfo.ϵₜ)")
+  println("Spatial POD for field p, tolerance: $(RBInfo.ϵₛ)")
 
   if RBInfo.time_reduction_technique == "ST-HOSVD"
-    Sᵘ = RBVars.Φₛᵘ' * RBVars.Sᵘ
+    Sᵘ = RBVars.Φₛ' * RBVars.Sᵘ
   else
     Sᵘ = RBVars.Sᵘ
   end
@@ -163,7 +163,7 @@ function assemble_affine_structures(
     println("Assembling affine reduced M")
     M = load_CSV(sparse([],[],T[]), joinpath(get_FEM_structures_path(RBInfo), "M.csv"))
     RBVars.Mₙ = zeros(T, RBVars.nₛᵘ, RBVars.nₛᵘ, 1)
-    RBVars.Mₙ[:,:,1] = (RBVars.Φₛᵘ)' * M * RBVars.Φₛᵘ
+    RBVars.Mₙ[:,:,1] = (RBVars.Φₛ)' * M * RBVars.Φₛ
   else
     assemble_affine_structures(RBInfo, RBVars.Steady, var)
   end
@@ -219,12 +219,12 @@ function assemble_reduced_mat_MDEIM(
 
   function assemble_ith_row(i::Int)
     Mat_idx = findall(x -> x == i, r_idx)
-    Matrix(reshape((MDEIM.Mat[Mat_idx,:]' * RBVars.Φₛᵘ[c_idx[Mat_idx],:])', 1, :))
+    Matrix(reshape((MDEIM.Mat[Mat_idx,:]' * RBVars.Φₛ[c_idx[Mat_idx],:])', 1, :))
   end
 
   VecMatΦ = Broadcasting(assemble_ith_row)(1:RBVars.Nₛᵘ)::Vector{Matrix{T}}
   MatqΦ = Matrix{T}(reduce(vcat, VecMatΦ))::Matrix{T}
-  Matₙ = Matrix{T}(reshape(RBVars.Φₛᵘ' * MatqΦ, RBVars.nₛᵘ, :, Q))::Matrix{T}
+  Matₙ = Matrix{T}(reshape(RBVars.Φₛ' * MatqΦ, RBVars.nₛᵘ, :, Q))::Matrix{T}
 
   if var == "M"
     RBVars.Mₙ = Matₙ
@@ -333,7 +333,7 @@ function assemble_param_RHS(
     RHS[:,i] = F_t(tᵢ) + H_t(tᵢ) - L_t(tᵢ)
   end
 
-  RHSₙ = RBVars.Φₛᵘ'*(RHS*RBVars.Φₜᵘ)
+  RHSₙ = RBVars.Φₛ'*(RHS*RBVars.Φₜᵘ)
   push!(RBVars.RHSₙ, reshape(RHSₙ',:,1))::Vector{Matrix{T}}
 
 end
@@ -377,13 +377,13 @@ function adaptive_loop_on_params(
   end
   Sᵘ = reshape(sum(reshape(Sᵘ,RBVars.Nₛᵘ,RBVars.Nₜ,:),dims=3),RBVars.Nₛᵘ,:)
 
-  Φₛᵘ_new = Matrix{T}(qr(Sᵘ[:,ind_t]).Q)[:,1:n_adaptive[2]]
+  Φₛ_new = Matrix{T}(qr(Sᵘ[:,ind_t]).Q)[:,1:n_adaptive[2]]
   Φₜᵘ_new = Matrix{T}(qr(Sᵘ[ind_s,:]').Q)[:,1:n_adaptive[1]]
   RBVars.nₛᵘ += n_adaptive[2]
   RBVars.nₜᵘ += n_adaptive[1]
   RBVars.nᵘ = RBVars.nₛᵘ*RBVars.nₜᵘ
 
-  RBVars.Φₛᵘ = Matrix{T}(qr(hcat(RBVars.Φₛᵘ,Φₛᵘ_new)).Q)[:,1:RBVars.nₛᵘ]
+  RBVars.Φₛ = Matrix{T}(qr(hcat(RBVars.Φₛ,Φₛ_new)).Q)[:,1:RBVars.nₛᵘ]
   RBVars.Φₜᵘ = Matrix{T}(qr(hcat(RBVars.Φₜᵘ,Φₜᵘ_new)).Q)[:,1:RBVars.nₜᵘ]
   RBInfo.save_offline_structures = false
   assemble_offline_structures(RBInfo, RBVars)

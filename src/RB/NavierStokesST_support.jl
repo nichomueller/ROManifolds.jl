@@ -66,9 +66,9 @@ function assemble_reduced_mat_MDEIM(
   MatqΦ = zeros(T, RBVars.Nₛᵘ,RBVars.nₛᵘ,Q)
   @simd for j = 1:RBVars.Nₛᵘ
     Mat_idx = findall(x -> x == j, r_idx)
-    MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.Φₛᵘ[c_idx[Mat_idx],:])'
+    MatqΦ[j,:,:] = (MDEIM_mat[Mat_idx,:]' * RBVars.Φₛ[c_idx[Mat_idx],:])'
   end
-  Matₙ = reshape(RBVars.Φₛᵘ' *
+  Matₙ = reshape(RBVars.Φₛ' *
     reshape(MatqΦ,RBVars.Nₛᵘ,:),RBVars.nₛᵘ,:,Q)::Array{T,3}
 
   if var == "M"
@@ -299,7 +299,7 @@ function assemble_RB_lifting(
     L[:,i] = L_t(tᵢ)
   end
   Lₙ = Matrix{T}[]
-  push!(Lₙ, reshape((vcat(RBVars.Φₛᵘ,RBVars.Φₛᵖ)'*(L*RBVars.Φₜᵘ))',:,1))::Vector{Matrix{T}}
+  push!(Lₙ, reshape((vcat(RBVars.Φₛ,RBVars.Φₛᵖ)'*(L*RBVars.Φₜᵘ))',:,1))::Vector{Matrix{T}}
   RBVars.RHSₙ -= Lₙ
 
 end

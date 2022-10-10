@@ -16,11 +16,11 @@ function get_snapshot_matrix(
 
 end
 
-function PODs_space(
+function POD_space(
   RBInfo::Info,
   RBVars::NavierStokesST)
 
-  PODs_space(RBInfo, RBVars.Steady)
+  POD_space(RBInfo, RBVars.Steady)
 
 end
 
@@ -32,16 +32,16 @@ function supr_enrichment_space(
 
 end
 
-function PODs_time(
+function POD_time(
   RBInfo::ROMInfoST,
   RBVars::StokesST{T}) where T
 
-  PODs_time(RBInfo, RBVars.Stokes)
+  POD_time(RBInfo, RBVars.Stokes)
 
   println("Performing the temporal POD for field u on quadrature points")
 
   if RBInfo.time_reduction_technique == "ST-HOSVD"
-    Sᵘ_quad = RBVars.Φₛᵘ_quad' * RBVars.Sᵘ_quad
+    Sᵘ_quad = RBVars.Φₛ_quad' * RBVars.Sᵘ_quad
   else
     Sᵘ_quad = RBVars.Sᵘ_quad
   end
@@ -66,9 +66,9 @@ function assemble_reduced_basis(
   RBVars::NavierStokesST)
 
   RBVars.offline_time += @elapsed begin
-    PODs_space(RBInfo, RBVars)
+    POD_space(RBInfo, RBVars)
     supr_enrichment_space(RBInfo, RBVars.Steady)
-    PODs_time(RBInfo, RBVars)
+    POD_time(RBInfo, RBVars)
     supr_enrichment_time(RBVars)
   end
 
@@ -79,12 +79,12 @@ function assemble_reduced_basis(
   RBVars.nᵘ_quad = RBVars.nₛᵘ_quad * RBVars.nₜᵘ_quad
 
   if RBInfo.save_offline_structures
-    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.ROM_structures_path, "Φₛᵘ.csv"))
+    save_CSV(RBVars.Φₛ, joinpath(RBInfo.ROM_structures_path, "Φₛ.csv"))
     save_CSV(RBVars.Φₜᵘ, joinpath(RBInfo.ROM_structures_path, "Φₜᵘ.csv"))
     save_CSV(RBVars.Φₛᵖ, joinpath(RBInfo.ROM_structures_path, "Φₛᵖ.csv"))
     save_CSV(RBVars.Φₜᵖ, joinpath(RBInfo.ROM_structures_path, "Φₜᵖ.csv"))
-    save_CSV(RBVars.Φₛᵘ_quad,
-      joinpath(RBInfo.ROM_structures_path, "Φₛᵘ_quad.csv"))
+    save_CSV(RBVars.Φₛ_quad,
+      joinpath(RBInfo.ROM_structures_path, "Φₛ_quad.csv"))
     save_CSV(RBVars.Φₜᵘ_quad,
       joinpath(RBInfo.ROM_structures_path, "Φₜᵘ_quad.csv"))
   end
@@ -99,12 +99,12 @@ function get_reduced_basis(
 
   get_reduced_basis(RBInfo, RBVars.Stokes)
   println("Importing the space and time reduced basis for field u, quadrature points")
-  RBVars.Φₛᵘ_quad = load_CSV(Matrix{T}(undef,0,0),
-    joinpath(RBInfo.ROM_structures_path, "Φₛᵘ_quad.csv"))
+  RBVars.Φₛ_quad = load_CSV(Matrix{T}(undef,0,0),
+    joinpath(RBInfo.ROM_structures_path, "Φₛ_quad.csv"))
   RBVars.Φₜᵘ_quad = load_CSV(Matrix{T}(undef,0,0),
     joinpath(RBInfo.ROM_structures_path, "Φₜᵘ_quad.csv"))
 
-  RBVars.nₛᵘ_quad = size(RBVars.Φₛᵘ_quad)[2]
+  RBVars.nₛᵘ_quad = size(RBVars.Φₛ_quad)[2]
   RBVars.nₜᵘ_quad = size(RBVars.Φₜᵘ_quad)[2]
   RBVars.nᵘ_quad = RBVars.nₛᵘ_quad * RBVars.nₜᵘ_quad
 
@@ -532,12 +532,12 @@ function adaptive_loop_on_params(
   Sᵘ = reshape(sum(reshape(Sᵘ,RBVars.Nₛᵘ,RBVars.Nₜ,:),dims=3),RBVars.Nₛᵘ,:)
   Sᵖ = reshape(sum(reshape(Sᵖ,RBVars.Nₛᵖ,RBVars.Nₜ,:),dims=3),RBVars.Nₛᵖ,:)
 
-  Φₛᵘ_new = Matrix{T}(qr(Sᵘ[:,ind_t_u]).Q)[:,1:n_adaptive_u[2]]
+  Φₛ_new = Matrix{T}(qr(Sᵘ[:,ind_t_u]).Q)[:,1:n_adaptive_u[2]]
   Φₜᵘ_new = Matrix{T}(qr(Sᵘ[ind_s_u,:]').Q)[:,1:n_adaptive_u[1]]
   RBVars.nₛᵘ += n_adaptive_u[2]
   RBVars.nₜᵘ += n_adaptive_u[1]
   RBVars.nᵘ = RBVars.nₛᵘ*RBVars.nₜᵘ
-  RBVars.Φₛᵘ = Matrix{T}(qr(hcat(RBVars.Φₛᵘ,Φₛᵘ_new)).Q)[:,1:RBVars.nₛᵘ]
+  RBVars.Φₛ = Matrix{T}(qr(hcat(RBVars.Φₛ,Φₛ_new)).Q)[:,1:RBVars.nₛᵘ]
   RBVars.Φₜᵘ = Matrix{T}(qr(hcat(RBVars.Φₜᵘ,Φₜᵘ_new)).Q)[:,1:RBVars.nₜᵘ]
 
   Φₛᵖ_new = Matrix{T}(qr(Sᵖ[:,ind_t_p]).Q)[:,1:n_adaptive_p[2]]

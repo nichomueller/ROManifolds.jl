@@ -76,7 +76,9 @@ function assemble_offline_structures(
     end
   end
 
-  save_assembled_structures(RBInfo, RBVars, operators)
+  if RBInfo.save_offline_structures
+    save_assembled_structures(RBInfo, RBVars, operators)
+  end
 
 end
 
@@ -205,7 +207,7 @@ function newton(
     println("Iter: $k; ||δx̂||₂: $(norm(δx̂))")
     δx̂ = JinvₙResₙ(u, x̂mat)
     x̂mat -= δx̂
-    u = FEFunction(FEMSpace.V, RBVars.Φₛᵘ * x̂mat[1:RBVars.nₛᵘ])
+    u = FEFunction(FEMSpace.V, RBVars.Φₛ * x̂mat[1:RBVars.nₛᵘ])
     k += 1
   end
 

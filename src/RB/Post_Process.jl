@@ -168,9 +168,9 @@ function post_process(test_dir::String)
 
     if ispath(path_to_bases)
 
-      Φₛᵘ = load_CSV(Matrix{T}(undef,0,0),
-        joinpath(path_to_bases, "Φₛᵘ.csv"))
-      append!(nₛᵘ, size(Φₛᵘ)[2])
+      Φₛ = load_CSV(Matrix{T}(undef,0,0),
+        joinpath(path_to_bases, "Φₛ.csv"))
+      append!(nₛᵘ, size(Φₛ)[2])
 
       Φₜᵘ = load_CSV(Matrix{T}(undef,0,0),
         joinpath(path_to_bases, "Φₜᵘ.csv"))

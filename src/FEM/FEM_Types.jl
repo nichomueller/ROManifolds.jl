@@ -1,13 +1,8 @@
-abstract type Problem end
-abstract type FEMProblem{D} <: Problem end
+abstract type FEMProblem{D} end
 abstract type FEMProblemS{D} <: FEMProblem{D} end
 abstract type FEMProblemST{D} <: FEMProblem{D} end
 
 abstract type Info end
-abstract type InfoS <: Info end
-abstract type InfoST <: Info end
-abstract type ParamInfoS <: Info end
-abstract type ParamInfoST <: Info end
 
 struct FEMSpacePoissonS{D} <: FEMProblemS{D}
   model::DiscreteModel
@@ -140,9 +135,11 @@ struct FEMPathInfo <: Info
   FEM_structures_path::String
 end
 
-struct FEMInfoS <: InfoS
+struct FEMInfoS <: Info
   problem_id::NTuple
   D::Int
+  problem_unknowns::Vector{String}
+  problem_structures::Vector{String}
   case::Int
   probl_nl::Vector{String}
   bnd_info::Dict
@@ -152,9 +149,11 @@ struct FEMInfoS <: InfoS
   nₛ::Int
 end
 
-struct FEMInfoST <: InfoST
+struct FEMInfoST <: Info
   problem_id::NTuple
   D::Int
+  problem_unknowns::Vector{String}
+  problem_structures::Vector{String}
   case::Int
   probl_nl::Vector{String}
   bnd_info::Dict
@@ -168,94 +167,58 @@ struct FEMInfoST <: InfoST
   δt::Float
 end
 
-struct ParamPoissonS <: ParamInfoS
-  μ::Vector
-  α::Function
-  f::Function
-  g::Function
-  h::Function
+mutable struct ParamInfoS
+  var::String
+  fun::Function
+  θ::Vector
 end
 
-struct ParamPoissonST <: ParamInfoST
-  μ::Vector
-  αₛ::Function
-  αₜ::Function
-  α::Function
-  mₛ::Function
-  mₜ::Function
-  m::Function
-  fₛ::Function
-  fₜ::Function
-  f::Function
-  gₛ::Function
-  gₜ::Function
-  g::Function
-  hₛ::Function
-  hₜ::Function
-  h::Function
-  u₀::Function
+mutable struct ParamInfoST
+  var::String
+  funₛ::Function
+  funₜ::Function
+  fun::Function
+  θ::Vector
 end
 
-struct ParamStokesS <: ParamInfoS
-  μ::Vector
-  α::Function
-  b::Function
-  f::Function
-  g::Function
-  h::Function
+mutable struct ParamFormInfoS
+  Param::ParamInfoS
+  dΩ::Measure
 end
 
-struct ParamStokesST <: ParamInfoST
-  μ::Vector
-  αₛ::Function
-  αₜ::Function
-  α::Function
-  bₛ::Function
-  bₜ::Function
-  b::Function
-  mₛ::Function
-  mₜ::Function
-  m::Function
-  fₛ::Function
-  fₜ::Function
-  f::Function
-  gₛ::Function
-  gₜ::Function
-  g::Function
-  hₛ::Function
-  hₜ::Function
-  h::Function
-  x₀::Function
+mutable struct ParamFormInfoST
+  Param::ParamInfoST
+  dΩ::Measure
 end
 
-struct ParamNavierStokesS <: ParamInfoS
-  μ::Vector
-  α::Function
-  b::Function
-  f::Function
-  g::Function
-  h::Function
+function Base.getproperty(ParamForm::ParamFormInfoS, sym::Symbol)
+  if sym in (:var, :fun, :θ)
+    getfield(ParamForm.Param, sym)
+  else
+    getfield(RBInfo, sym)
+  end
 end
 
-struct ParamNavierStokesST <: ParamInfoST
-  μ::Vector
-  αₛ::Function
-  αₜ::Function
-  α::Function
-  bₛ::Function
-  bₜ::Function
-  b::Function
-  mₛ::Function
-  mₜ::Function
-  m::Function
-  fₛ::Function
-  fₜ::Function
-  f::Function
-  gₛ::Function
-  gₜ::Function
-  g::Function
-  hₛ::Function
-  hₜ::Function
-  h::Function
-  x₀::Function
+function Base.setproperty!(ParamForm::ParamFormInfoS, sym::Symbol, x::T) where T
+  if sym in (:var, :fun, :θ)
+    setfield!(ParamForm.Param, sym, x)::T
+  else
+    setfield!(RBVars, sym, x)::T
+  end
+end
+
+function Base.getproperty(ParamForm::ParamFormInfoST, sym::Symbol)
+  if sym in (:var, :funₛ, :funₜ, :fun, :θ)
+    getfield(ParamForm.Param, sym)
+  else
+    getfield(RBInfo, sym)
+  end
+end
+
+function Base.setproperty!(ParamForm::ParamFormInfoST, sym::Symbol, x::T) where T
+  if sym in (:var, :funₛ, :funₜ, :fun, :θ)
+    setfield!(ParamForm.Param, sym, x)::T
+  else
+    setfield!(RBVars, sym, x)::T
+  end
 end

@@ -1,4 +1,178 @@
-function assemble_mass(
+function assemble_form(
+  FEMSpace::FEMProblem,
+  FEMInfo::Info,
+  Param::ParamInfo)
+
+  assemble_form(FEMInfo.problem_id, FEMSpace, FEMInfo, Param)
+
+end
+
+function assemble_form(
+  ::NTuple{1,Int},
+  FEMSpace::FEMProblemS,
+  FEMInfo::FEMInfoS,
+  Param::ParamInfoS)
+
+  ParamForm = get_ParamFormInfo(FEMSpace, Param)
+  var = ParamForm.var
+
+  function bilinear_form(u, v)
+    if var == "Xᵘ"
+      ∫(∇(v) ⋅ ∇(u) + v * u)ParamForm.dΩ
+    else var == "A"
+      if var ∉ FEMInfo.probl_nl
+        ∫(∇(v) ⋅ ∇(u))ParamForm.dΩ
+      else
+        ∫(∇(v) ⋅ (ParamForm.fun * ∇(u)))ParamForm.dΩ
+      end
+    end
+  end
+
+  function linear_form(v)
+    if var == "F" || "H"
+      if var ∉ FEMInfo.probl_nl
+        ∫(v * (x->1.))ParamForm.dΩ
+      else
+        ∫(v * ParamForm.fun)ParamForm.dΩ
+      end
+    elseif var == "L"
+      g = interpolate_dirichlet(ParamForm.fun, FEMSpace.V)
+      Param_A = get_ParamInfo(FEMInfo, μ, "A")
+      ∫(∇(v) ⋅ (Param_A.fun * ∇(g)))ParamForm.dΩ
+    else
+      error("Unrecognized variable")
+    end
+  end
+
+  if var ∈ ("A", "Xᵘ")
+    bilinear_form
+  else
+    linear_form
+  end
+
+end
+
+function assemble_form(
+  ::NTuple{2,Int},
+  FEMSpace::FEMProblemS,
+  FEMInfo::FEMInfoS,
+  Param::ParamInfoS)
+
+  ParamForm = get_ParamFormInfo(FEMSpace, Param)
+  var = ParamForm.var
+
+  function bilinear_form(u, v)
+    if var == "Xᵘ"
+      ∫(∇(v) ⊙ ∇(u) + v ⋅ u)ParamForm.dΩ
+    elseif var == "Xᵖ"
+      ∫(v * u)ParamForm.dΩ
+    elseif var == "A"
+      if var ∉ FEMInfo.probl_nl
+        ∫(∇(v) ⊙ ∇(u))ParamForm.dΩ
+      else
+        ∫(∇(v) ⊙ (ParamForm.fun * ∇(u)))ParamForm.dΩ
+      end
+    else var == "B"
+      if var ∉ FEMInfo.probl_nl
+        ∫(v ⋅ ∇(u))ParamForm.dΩ
+      else
+        ∫(v ⋅ (ParamForm.fun * ∇(u)))ParamForm.dΩ
+      end
+    end
+  end
+
+  function linear_form(v)
+    if var == "F" || "H"
+      if var ∉ FEMInfo.probl_nl
+        ∫(v ⋅ (x->1.))ParamForm.dΩ
+      else
+        ∫(v ⋅ ParamForm.fun)ParamForm.dΩ
+      end
+    else
+      g = interpolate_dirichlet(ParamForm.fun, FEMSpace.V)
+      if var == "L"
+        Param_AB = get_ParamInfo(FEMInfo, μ, "A")
+      else var == "Lc"
+        Param_AB = get_ParamInfo(FEMInfo, μ, "B")
+      end
+      ∫(∇(v) ⋅ (Param_AB.fun * ∇(g)))ParamForm.dΩ
+    end
+  end
+
+  if var ∈ ("A", "B", "Xᵘ", "Xᵖ")
+    bilinear_form
+  else
+    linear_form
+  end
+
+end
+
+function assemble_form(
+  ::NTuple{3,Int},
+  FEMSpace::FEMProblemS,
+  FEMInfo::FEMInfoS,
+  Param::ParamInfoS)
+
+  ParamForm = get_ParamFormInfo(FEMSpace, Param)
+  var = ParamForm.var
+
+  function trilinear_form(u, v, z)
+    if var == "C"
+      ∫(v ⊙ (∇(u)'⋅z))ParamForm.dΩ
+    else var == "D"
+      ∫(v ⊙ (∇(z)'⋅u) )ParamForm.dΩ
+    end
+  end
+
+  function bilinear_form(u, v)
+    if var == "Xᵘ"
+      ∫(∇(v) ⊙ ∇(u) + v ⋅ u)ParamForm.dΩ
+    elseif var == "Xᵖ"
+      ∫(v * u)ParamForm.dΩ
+    elseif var == "A"
+      if var ∉ FEMInfo.probl_nl
+        ∫(∇(v) ⊙ ∇(u))ParamForm.dΩ
+      else
+        ∫(∇(v) ⊙ (ParamForm.fun * ∇(u)))ParamForm.dΩ
+      end
+    else var == "B"
+      if var ∉ FEMInfo.probl_nl
+        ∫(v ⋅ ∇(u))ParamForm.dΩ
+      else
+        ∫(v ⋅ (ParamForm.fun * ∇(u)))ParamForm.dΩ
+      end
+    end
+  end
+
+  function linear_form(v)
+    if var == "F" || "H"
+      if var ∉ FEMInfo.probl_nl
+        ∫(v ⋅ (x->1.))ParamForm.dΩ
+      else
+        ∫(v ⋅ ParamForm.fun)ParamForm.dΩ
+      end
+    else
+      g = interpolate_dirichlet(ParamForm.fun, FEMSpace.V)
+      if var == "L"
+        Param_AB = get_ParamInfo(FEMInfo, μ, "A")
+      else var == "Lc"
+        Param_AB = get_ParamInfo(FEMInfo, μ, "B")
+      end
+      ∫(∇(v) ⋅ (Param_AB.fun * ∇(g)))ParamForm.dΩ
+    end
+  end
+
+  if var ∈ ("C", "D")
+    trilinear_form
+  elseif var ∈ ("A", "B", "Xᵘ", "Xᵖ")
+    bilinear_form
+  else
+    linear_form
+  end
+
+end
+
+#= function assemble_mass(
   ::NTuple{1,Int},
   FEMSpace::FEMProblemST,
   FEMInfo::FEMInfoST,
@@ -561,8 +735,7 @@ function assemble_H¹_norm_matrix(
 
   assemble_H¹_norm_matrix(get_NTuple(2, Int), FEMSpace)
 
-end
-
+end =#
 
 function assemble_FEM_structure(
   FEMSpace::FEMProblem,
@@ -570,30 +743,28 @@ function assemble_FEM_structure(
   Param::Info,
   var::String)
 
-  NT = FEMInfo.problem_id
+  function select_FEMSpace_vectors()
+    if var == "Lc"
+      FEMSpace.Q₀
+    else
+      FEMSpace.V₀
+    end
+  end
 
-  if var == "A"
-    assemble_stiffness(NT,FEMSpace,FEMInfo,Param)
-  elseif var == "B"
-    assemble_B(NT,FEMSpace,FEMInfo,Param)
-  elseif var == "C"
-    assemble_convection(NT,FEMSpace)
-  elseif var == "D"
-    assemble_swapped_convection(NT,FEMSpace)
-  elseif var == "F"
-    assemble_forcing(NT,FEMSpace,FEMInfo,Param)
-  elseif var == "H"
-    assemble_neumann_datum(NT,FEMSpace,FEMInfo,Param)
-  elseif var == "L"
-    assemble_lifting(NT,FEMSpace,FEMInfo,Param)
-  elseif var == "Lc"
-    assemble_lifting_continuity(NT,FEMSpace,FEMInfo,Param)
-  elseif var == "M"
-    assemble_mass(NT,FEMSpace,FEMInfo,Param)
-  elseif var == "Xᵘ"
-    assemble_H¹_norm_matrix(NT,FEMSpace)
-  elseif var == "Xᵖ"
-    assemble_L²_norm_matrix(NT,FEMSpace)
+  function select_FEMSpace_matrices()
+    if var == "B"
+      FEMSpace.V, FEMSpace.Q₀
+    else
+      FEMSpace.V, FEMSpace.V₀
+    end
+  end
+
+  form = assemble_form(FEMSpace, FEMInfo, Param)
+
+  if var ∈ ("F", "H", "L", "Lc")
+    assemble_vector(form, select_FEMSpace_vectors())
+  else
+    assemble_vector(form, select_FEMSpace_matrices()...)
   end
 
 end

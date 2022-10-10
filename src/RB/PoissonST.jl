@@ -35,15 +35,15 @@ function assemble_reduced_basis(
   println("Building the space-time reduced basis for field u")
 
   RBVars.offline_time += @elapsed begin
-    PODs_space(RBInfo, RBVars)
-    PODs_time(RBInfo, RBVars)
+    POD_space(RBInfo, RBVars)
+    POD_time(RBInfo, RBVars)
   end
 
   RBVars.nᵘ = RBVars.nₛᵘ * RBVars.nₜᵘ
   RBVars.Nᵘ = RBVars.Nₛᵘ * RBVars.Nₜ
 
   if RBInfo.save_offline_structures
-    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.ROM_structures_path, "Φₛᵘ.csv"))
+    save_CSV(RBVars.Φₛ, joinpath(RBInfo.ROM_structures_path, "Φₛ.csv"))
     save_CSV(RBVars.Φₜᵘ, joinpath(RBInfo.ROM_structures_path, "Φₜᵘ.csv"))
   end
 
@@ -103,7 +103,9 @@ function assemble_offline_structures(
     end
   end
 
-  save_assembled_structures(RBInfo, RBVars, operators)
+  if RBInfo.save_offline_structures
+    save_assembled_structures(RBInfo, RBVars, operators)
+  end
 
 end
 
@@ -320,7 +322,7 @@ function reconstruct_FEM_solution(RBVars::PoissonST)
 
   println("Reconstructing FEM solution from the newly computed RB one")
   uₙ = reshape(RBVars.uₙ, (RBVars.nₜᵘ, RBVars.nₛᵘ))
-  @fastmath RBVars.ũ = RBVars.Φₛᵘ * (RBVars.Φₜᵘ * uₙ)'
+  @fastmath RBVars.ũ = RBVars.Φₛ * (RBVars.Φₜᵘ * uₙ)'
 
 end
 

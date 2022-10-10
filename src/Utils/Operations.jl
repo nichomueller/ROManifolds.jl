@@ -135,6 +135,12 @@ function POD(S::SparseMatrixCSC{T}, ϵ::Float) where T
 
 end
 
+function POD(S::AbstractArray{T}, ϵ::Float, ::Nothing) where T
+
+  POD(S, ϵ)
+
+end
+
 function solve_cholesky(A::SparseMatrixCSC{T}, b::Vector{T}) where T
 
   H = cholesky(A)
@@ -270,6 +276,10 @@ function get_NTuple(N::Int, T::DataType)
 
   ntupl::NTuple{N,T}
 
+end
+
+function get_size(Mat::Matrix)
+  size(Mat)
 end
 
 Gridap.VectorValue(D::Int, T::DataType) = VectorValue(get_NTuple(D, T))

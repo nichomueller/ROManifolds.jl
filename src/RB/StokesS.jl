@@ -57,12 +57,12 @@ function assemble_reduced_basis(
   RBVars::StokesS)
 
   RBVars.offline_time += @elapsed begin
-    PODs_space(RBInfo, RBVars)
+    POD_space(RBInfo, RBVars)
     supr_enrichment_space(RBInfo, RBVars)
   end
 
   if RBInfo.save_offline_structures
-    save_CSV(RBVars.Φₛᵘ, joinpath(RBInfo.ROM_structures_path,"Φₛᵘ.csv"))
+    save_CSV(RBVars.Φₛ, joinpath(RBInfo.ROM_structures_path,"Φₛ.csv"))
     save_CSV(RBVars.Φₛᵖ, joinpath(RBInfo.ROM_structures_path,"Φₛᵖ.csv"))
   end
 
@@ -122,7 +122,9 @@ function assemble_offline_structures(
     end
   end
 
-  save_assembled_structures(RBInfo, RBVars, operators)
+  if RBInfo.save_offline_structures
+    save_assembled_structures(RBInfo, RBVars, operators)
+  end
 
 end
 

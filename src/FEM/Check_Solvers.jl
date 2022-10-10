@@ -182,7 +182,7 @@ function check_navier_stokes_solver()
   x₀ = FEFunction(FEMSpace.X, zeros(FEMSpace.Nₛᵘ + FEMSpace.Nₛᵖ))
   x₁ = x₀ - J(x₀) \ res(x₀)
 
-  û = RBVars.Φₛᵘ' * u
+  û = RBVars.Φₛ' * u
   Capp = sum([RBVars.MDEIM_C.Mat[:,q] * û[q]
     for q = 1:size(RBVars.MDEIM_C.Mat, 2)])
   _, vc = findnz(C(ufun)[:])
