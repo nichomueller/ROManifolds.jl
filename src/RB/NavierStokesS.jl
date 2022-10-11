@@ -124,7 +124,7 @@ end
 ################################## ONLINE ######################################
 
 function get_θ(
-  FEMSpace::FEMProblemS,
+  FEMSpace::FOMS,
   RBInfo::ROMInfoS,
   RBVars::NavierStokesS,
   Param::ParamInfoS)
@@ -159,7 +159,7 @@ function get_RB_JinvRes(
 end
 
 function get_RB_system(
-  FEMSpace::FEMProblemS,
+  FEMSpace::FOMS,
   RBInfo::ROMInfoS,
   RBVars::NavierStokesS,
   Param::ParamInfoS)
@@ -192,7 +192,7 @@ function get_RB_system(
 end
 
 function newton(
-  FEMSpace::FEMProblemS,
+  FEMSpace::FOMS,
   RBVars::NavierStokesS{T},
   JinvₙResₙ::Function,
   ϵ=1e-9,
@@ -217,8 +217,8 @@ function newton(
 end
 
 function solve_RB_system(
-  FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS{T},
+  FEMSpace::FOMS,
+  RBInfo,
   RBVars::NavierStokesS,
   Param::ParamInfoS) where T
 
@@ -242,7 +242,7 @@ function online_phase(
   RBVars::NavierStokesS{T},
   param_nbs) where T
 
-  FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FOM_info(RBInfo.FEMInfo)
 
   mean_H1_err = 0.0
   mean_L2_err = 0.0

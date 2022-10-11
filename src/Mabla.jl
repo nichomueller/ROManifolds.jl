@@ -19,6 +19,6 @@ include("Utils/Utils.jl")
 include("FEM/FEM.jl")
 include("RB/RB.jl")
 
-export FEM_paths
+export FOMPath
 
 end

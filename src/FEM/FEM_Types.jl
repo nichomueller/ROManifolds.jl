@@ -1,12 +1,12 @@
-abstract type FEMProblem{D} end
-abstract type FEMProblemS{D} <: FEMProblem{D} end
-abstract type FEMProblemST{D} <: FEMProblem{D} end
+abstract type FOM{D} end
+abstract type FOMS{D} <: FOM{D} end
+abstract type FOMST{D} <: FOM{D} end
 
-abstract type Info end
+abstract type FOMInfo end
 abstract type ParamInfo end
 abstract type ParamFormInfo end
 
-struct FEMSpacePoissonS{D} <: FEMProblemS{D}
+struct FOMPoissonS{D} <: FOMS{D}
   model::DiscreteModel
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
@@ -22,7 +22,7 @@ struct FEMSpacePoissonS{D} <: FEMProblemS{D}
   V₀_quad::UnconstrainedFESpace
 end
 
-struct FEMSpacePoissonST{D} <: FEMProblemST{D}
+struct FOMPoissonST{D} <: FOMST{D}
   model::DiscreteModel
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
@@ -38,53 +38,7 @@ struct FEMSpacePoissonST{D} <: FEMProblemST{D}
   V₀_quad::UnconstrainedFESpace
 end
 
-struct FEMSpaceStokesS{D} <: FEMProblemS{D}
-  model::DiscreteModel
-  Qₕ::CellQuadrature
-  V₀::UnconstrainedFESpace
-  V::TrialFESpace
-  Q₀::UnconstrainedFESpace
-  Q::UnconstrainedFESpace
-  X₀::MultiFieldFESpace
-  X::MultiFieldFESpace
-  ϕᵥ::FEBasis
-  ϕᵤ::FEBasis
-  ψᵧ::FEBasis
-  ψₚ::FEBasis
-  Nₛᵘ::Int
-  Nₛᵖ::Int
-  Ω::BodyFittedTriangulation
-  Γn::BoundaryTriangulation
-  dΩ::Measure
-  dΓn::Measure
-  phys_quadp::Vector{Vector{VectorValue{D,Float}}}
-  V₀_quad::UnconstrainedFESpace
-end
-
-struct FEMSpaceStokesST{D} <: FEMProblemST{D}
-  model::DiscreteModel
-  Qₕ::CellQuadrature
-  V₀::UnconstrainedFESpace
-  V::TransientTrialFESpace
-  Q₀::UnconstrainedFESpace
-  Q::UnconstrainedFESpace
-  X₀::MultiFieldFESpace
-  X::TransientMultiFieldTrialFESpace
-  ϕᵥ::FEBasis
-  ϕᵤ::Function
-  ψᵧ::FEBasis
-  ψₚ::FEBasis
-  Nₛᵘ::Int
-  Nₛᵖ::Int
-  Ω::BodyFittedTriangulation
-  Γn::BoundaryTriangulation
-  dΩ::Measure
-  dΓn::Measure
-  phys_quadp::Vector{Vector{VectorValue{D,Float}}}
-  V₀_quad::UnconstrainedFESpace
-end
-
-struct FEMSpaceNavierStokesS{D} <: FEMProblemS{D}
+struct FOMStokesS{D} <: FOMS{D}
   model::DiscreteModel
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
@@ -107,7 +61,7 @@ struct FEMSpaceNavierStokesS{D} <: FEMProblemS{D}
   V₀_quad::UnconstrainedFESpace
 end
 
-struct FEMSpaceNavierStokesST{D} <: FEMProblemST{D}
+struct FOMStokesST{D} <: FOMST{D}
   model::DiscreteModel
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
@@ -130,14 +84,60 @@ struct FEMSpaceNavierStokesST{D} <: FEMProblemST{D}
   V₀_quad::UnconstrainedFESpace
 end
 
-struct FEMPathInfo <: Info
+struct FOMNavierStokesS{D} <: FOMS{D}
+  model::DiscreteModel
+  Qₕ::CellQuadrature
+  V₀::UnconstrainedFESpace
+  V::TrialFESpace
+  Q₀::UnconstrainedFESpace
+  Q::UnconstrainedFESpace
+  X₀::MultiFieldFESpace
+  X::MultiFieldFESpace
+  ϕᵥ::FEBasis
+  ϕᵤ::FEBasis
+  ψᵧ::FEBasis
+  ψₚ::FEBasis
+  Nₛᵘ::Int
+  Nₛᵖ::Int
+  Ω::BodyFittedTriangulation
+  Γn::BoundaryTriangulation
+  dΩ::Measure
+  dΓn::Measure
+  phys_quadp::Vector{Vector{VectorValue{D,Float}}}
+  V₀_quad::UnconstrainedFESpace
+end
+
+struct FOMNavierStokesST{D} <: FOMST{D}
+  model::DiscreteModel
+  Qₕ::CellQuadrature
+  V₀::UnconstrainedFESpace
+  V::TransientTrialFESpace
+  Q₀::UnconstrainedFESpace
+  Q::UnconstrainedFESpace
+  X₀::MultiFieldFESpace
+  X::TransientMultiFieldTrialFESpace
+  ϕᵥ::FEBasis
+  ϕᵤ::Function
+  ψᵧ::FEBasis
+  ψₚ::FEBasis
+  Nₛᵘ::Int
+  Nₛᵖ::Int
+  Ω::BodyFittedTriangulation
+  Γn::BoundaryTriangulation
+  dΩ::Measure
+  dΓn::Measure
+  phys_quadp::Vector{Vector{VectorValue{D,Float}}}
+  V₀_quad::UnconstrainedFESpace
+end
+
+struct FOMPath
   mesh_path::String
   current_test::String
   FEM_snap_path::String
   FEM_structures_path::String
 end
 
-struct FEMInfoS <: Info
+struct FOMInfoS <: FOMInfo
   problem_id::NTuple
   D::Int
   problem_unknowns::Vector{String}
@@ -151,7 +151,7 @@ struct FEMInfoS <: Info
   nₛ::Int
 end
 
-struct FEMInfoST <: Info
+struct FOMInfoST <: FOMInfo
   problem_id::NTuple
   D::Int
   problem_unknowns::Vector{String}

@@ -94,7 +94,7 @@ function assemble_reduced_basis(
 end
 
 function get_reduced_basis(
-  RBInfo::ROMInfoST{T},
+  RBInfo,
   RBVars::NavierStokesST) where T
 
   get_reduced_basis(RBInfo, RBVars.Stokes)
@@ -188,7 +188,7 @@ function get_offline_structures(
 end
 
 function get_θᵐ(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   RBVars::NavierStokesST,
   Param::ParamInfoST)
@@ -198,7 +198,7 @@ function get_θᵐ(
 end
 
 function get_θᵃ(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   RBVars::NavierStokesST,
   Param::ParamInfoST)
@@ -208,7 +208,7 @@ function get_θᵃ(
 end
 
 function get_θᵇ(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   RBVars::NavierStokesST,
   Param::ParamInfoST)
@@ -218,7 +218,7 @@ function get_θᵇ(
 end
 
 function get_θᶜ(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   RBVars::NavierStokesST,
   Param::ParamInfoST)
@@ -243,7 +243,7 @@ function get_θᶜ(
 end
 
 function get_θᶠʰ(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   RBVars::NavierStokesST,
   Param::ParamInfoST)
@@ -253,7 +253,7 @@ function get_θᶠʰ(
 end
 
 function solve_RB_system(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   RBVars::NavierStokesST,
   Param::ParamInfoST)
@@ -324,7 +324,7 @@ function offline_phase(
 end
 
 function online_phase(
-  RBInfo::ROMInfoST{T},
+  RBInfo,
   RBVars::NavierStokesST,
   param_nbs) where T
 
@@ -333,7 +333,7 @@ function online_phase(
   μ = load_CSV(Array{T}[],
     joinpath(get_FEM_snap_path(RBInfo), "μ.csv"))::Vector{Vector{T}}
   model = DiscreteModelFromFile(get_mesh_path(RBInfo))
-  FEMSpace = get_FEMSpace₀(RBInfo.FEMInfo.problem_id,RBInfo.FEMInfo,model)
+  FEMSpace = FEMSpace₀(RBInfo.FEMInfo.problem_id,RBInfo.FEMInfo,model)
 
   get_norm_matrix(RBInfo, RBVars.Steady)
   (ũ_μ,uₙ_μ,mean_uₕ_test,mean_pointwise_err_u,mean_H1_err,mean_H1_L2_err,
@@ -397,7 +397,7 @@ function online_phase(
 end
 
 function loop_on_params(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   RBVars::NavierStokesST{T},
   μ::Vector{Vector{T}},
@@ -475,7 +475,7 @@ function loop_on_params(
 end
 
 function adaptive_loop_on_params(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   RBVars::NavierStokesST{T},
   mean_uₕ_test::Matrix,

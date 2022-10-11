@@ -1,7 +1,7 @@
 function Mat_snapshots(
-  FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS{T},
-  RBVars::RBProblemS,
+  FEMSpace::FOMS,
+  RBInfo::ROMInfoS,
+  RBVars::RBS,
   μ::Vector{Vector{T}},
   var::String) where T
 
@@ -27,8 +27,8 @@ function Mat_snapshots(
 end
 
 function Vec_snapshots(
-  FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS{T},
+  FEMSpace::FOMS,
+  RBInfo::ROMInfoS,
   μ::Vector{Vector{T}},
   var::String) where T
 
@@ -44,9 +44,9 @@ function Vec_snapshots(
 end
 
 function snaps_MDEIM(
-  FEMSpace::FEMProblemS,
+  FEMSpace::FOMS,
   RBInfo::ROMInfoS,
-  RBVars::RBProblemS,
+  RBVars::RBS,
   μ::Vector{Vector{T}},
   var::String) where T
 
@@ -57,7 +57,7 @@ function snaps_MDEIM(
 end
 
 function snaps_MDEIM(
-  FEMSpace::FEMProblemS,
+  FEMSpace::FOMS,
   RBInfo::ROMInfoS,
   μ::Vector{Vector{T}},
   var::String) where T
@@ -69,8 +69,8 @@ function snaps_MDEIM(
 end
 
 function MV_snapshots(
-  FEMSpace::FEMProblemST,
-  RBInfo::ROMInfoST{T},
+  FEMSpace::FOMST,
+  RBInfo::ROMInfoST,
   μ::Vector,
   timesθ::Vector,
   var::String) where T
@@ -95,9 +95,9 @@ function MV_snapshots(
 end
 
 function MV_snapshots(
-  FEMSpace::FEMProblemST,
-  RBInfo::ROMInfoST{T},
-  RBVars::RBProblemST,
+  FEMSpace::FOMST,
+  RBInfo::ROMInfoST,
+  RBVars::RBST,
   μ::Vector,
   timesθ::Vector,
   var::String) where T
@@ -107,9 +107,9 @@ function MV_snapshots(
 end
 
 function call_MV_snapshots(
-  FEMSpace::FEMProblemST,
-  RBInfo::ROMInfoST{T},
-  RBVars::RBProblemST,
+  FEMSpace::FOMST,
+  RBInfo::ROMInfoST,
+  RBVars::RBST,
   μ::Vector,
   timesθ::Vector,
   var::String) where T
@@ -132,9 +132,9 @@ function get_LagrangianQuad_info(FEMSpace::Problem)
 end
 
 function standard_MDEIM(
-  FEMSpace::FEMProblemST,
-  RBInfo::ROMInfoST{T},
-  RBVars::RBProblemST,
+  FEMSpace::FOMST,
+  RBInfo::ROMInfoST,
+  RBVars::RBST,
   μ::Vector{Vector{T}},
   timesθ::Vector,
   var::String) where T
@@ -191,8 +191,8 @@ function standard_MDEIM(
 end
 
 function functional_MDEIM_linear(
-  FEMSpace::FEMProblemST,
-  RBInfo::ROMInfoST{T},
+  FEMSpace::FOMST,
+  RBInfo::ROMInfoST,
   μ::Vector{Vector{T}},
   timesθ::Vector,
   var::String) where T
@@ -226,9 +226,9 @@ function functional_MDEIM_linear(
 end
 
 function functional_MDEIM_nonlinear(
-  FEMSpace::FEMProblemST,
-  RBInfo::ROMInfoST{T},
-  RBVars::RBProblemST,
+  FEMSpace::FOMST,
+  RBInfo::ROMInfoST,
+  RBVars::RBST,
   μ::Vector{Vector{T}},
   timesθ::Vector,
   var::String) where T
@@ -271,9 +271,9 @@ function functional_MDEIM_nonlinear(
 end
 
 function functional_MDEIM(
-  FEMSpace::FEMProblemST,
-  RBInfo::ROMInfoST{T},
-  RBVars::RBProblemST,
+  FEMSpace::FOMST,
+  RBInfo::ROMInfoST,
+  RBVars::RBST,
   μ::Vector{Vector{T}},
   timesθ::Vector,
   var) where T
@@ -287,9 +287,9 @@ function functional_MDEIM(
 end
 
 function snaps_MDEIM(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::ROMInfoST,
-  RBVars::RBProblemST,
+  RBVars::RBST,
   μ::Vector{Vector{T}},
   var::String) where T
 
@@ -304,8 +304,8 @@ function snaps_MDEIM(
 end
 
 function MV_snapshots(
-  FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS{T},
+  FEMSpace::FOMS,
+  RBInfo::ROMInfoS,
   μ::Vector{Vector{T}},
   var::String) where T
 
@@ -326,8 +326,8 @@ function MV_snapshots(
 end
 
 function MV_snapshots(
-  FEMSpace::FEMProblemST,
-  RBInfo::ROMInfoST{T},
+  FEMSpace::FOMST,
+  RBInfo::ROMInfoST,
   μ::Vector,
   timesθ::Vector,
   var::String) where T
@@ -350,8 +350,8 @@ function MV_snapshots(
 end
 
 function standard_DEIM(
-  FEMSpace::FEMProblemST,
-  RBInfo::ROMInfoST{T},
+  FEMSpace::FOMST,
+  RBInfo::ROMInfoST,
   μ::Vector{Vector{T}},
   timesθ::Vector,
   var::String) where T
@@ -404,7 +404,7 @@ function standard_DEIM(
 end
 
 function snaps_DEIM(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   μ::Vector{Vector{T}},
   var::String) where T
@@ -415,8 +415,8 @@ function snaps_DEIM(
 end
 
 function assemble_θmat_snapshots(
-  FEMSpace::FEMProblemST,
-  RBInfo::ROMInfoST{T},
+  FEMSpace::FOMST,
+  RBInfo::ROMInfoST,
   μ::Vector{Vector{T}},
   timesθ::Vector,
   var::String) where T
@@ -474,19 +474,19 @@ function assemble_θmat_snapshots(
 
 end
 
-function assemble_θmat_snapshots(RBVars::RBProblemST)
+function assemble_θmat_snapshots(RBVars::RBST)
 
   RBVars.Φₛ_quad, RBVars.Φₜᵘ_quad
 
 end
 
 function call_θmat_snapshots(
-  FEMSpace::FEMProblemST,
-  RBInfo::ROMInfoST{T},
-  RBVars::RBProblemST,
+  FEMSpace::FOMST,
+  RBInfo::ROMInfoST,
+  RBVars::RBST,
   μ::Vector,
   timesθ::Vector,
-  var::String) where T
+  var::String)
 
   if var ∈ ["C"]
     assemble_θmat_snapshots(RBVars)

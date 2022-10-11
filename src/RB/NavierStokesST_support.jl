@@ -247,7 +247,7 @@ function get_RB_RHS_blocks(
 end
 
 function get_RB_system(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::Info,
   RBVars::NavierStokesSTGRB,
   Param::ParamInfoST)
@@ -285,7 +285,7 @@ function get_RB_system(
 end
 
 function assemble_RB_lifting(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   RBVars::NavierStokesSTGRB{T},
   Param::ParamInfoST) where T
@@ -305,7 +305,7 @@ function assemble_RB_lifting(
 end
 
 function assemble_param_RHS(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::Info,
   RBVars::NavierStokesSTGRB,
   Param::ParamInfoST)
@@ -315,7 +315,7 @@ function assemble_param_RHS(
 end
 
 function get_θ(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::Info,
   RBVars::NavierStokesSTGRB,
   Param::ParamInfoST)

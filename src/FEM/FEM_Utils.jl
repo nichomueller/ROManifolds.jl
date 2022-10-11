@@ -1,4 +1,4 @@
-function FEM_paths(root, problem_steadiness, problem_name, mesh_name, case)
+function FOMPath(root, problem_steadiness, problem_name, mesh_name, case)
 
   @assert isdir(root) "$root is an invalid root directory"
 
@@ -55,17 +55,17 @@ function get_FEM_structures(NT::NTuple)
   end
 end
 
-function get_FEM_structures(FEMInfo::FEMInfoS)
+function get_FEM_structures(FEMInfo::FOMInfoS)
   NT = FEMInfo.problem_id
   get_FEM_structures(NT)
 end
 
-function get_FEM_structures(FEMInfo::FEMInfoST)
+function get_FEM_structures(FEMInfo::FOMInfoST)
   NT = FEMInfo.problem_id
   append!(["M"], get_FEM_structures(NT))
 end
 
-function nonlinearity_lifting_op(FEMInfo::Info)
+function nonlinearity_lifting_op(FEMInfo::FOMInfo)
   if "A" ∉ FEMInfo.probl_nl && "L" ∉ FEMInfo.probl_nl
     return 0
   elseif "A" ∈ FEMInfo.probl_nl && "L" ∉ FEMInfo.probl_nl
@@ -77,18 +77,18 @@ function nonlinearity_lifting_op(FEMInfo::Info)
   end
 end
 
-function get_FEMProblem_info(FEMInfo::Info)
+function get_FOM_info(FEMInfo::FOMInfo)
   μ = load_CSV(Vector{Float}[],
     joinpath(FEMInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{Float}}
   model = DiscreteModelFromFile(FEMInfo.Paths.mesh_path)
-  FEMSpace = get_FEMSpace₀(FEMInfo.problem_id, FEMInfo, model)::FEMProblem
+  FEMSpace = FEMSpace₀(FEMInfo.problem_id, FEMInfo, model)::FOM
 
   FEMSpace, μ
 
 end
 
 function ParamInfo(
-  ::FEMInfoS,
+  ::FOMInfoS,
   fun::Function,
   var::String)
 
@@ -97,7 +97,7 @@ function ParamInfo(
 end
 
 function ParamInfo(
-  ::FEMInfoST,
+  ::FOMInfoST,
   fun::Function,
   var::String)
 
@@ -106,7 +106,7 @@ function ParamInfo(
 end
 
 function ParamInfo(
-  FEMInfo::FEMInfoS,
+  FEMInfo::FOMInfoS,
   μ::Vector,
   var::String)
 
@@ -116,7 +116,7 @@ function ParamInfo(
 end
 
 function ParamInfo(
-  FEMInfo::FEMInfoST,
+  FEMInfo::FOMInfoST,
   μ::Vector,
   var::String)
 
@@ -125,7 +125,9 @@ function ParamInfo(
 
 end
 
-function ParamInfo(FEMInfo::Info, μ)
+function ParamInfo(
+  FEMInfo::FOMInfo,
+  μ::Vector)
 
   get_single_ParamInfo(var) = ParamInfo(FEMInfo, μ, var)
   operators = get_FEM_structures(FEMInfo)
@@ -133,7 +135,9 @@ function ParamInfo(FEMInfo::Info, μ)
 
 end
 
-function ParamInfo(Params::Vector{ParamInfo}, var::String)
+function ParamInfo(
+  Params::Vector{ParamInfo},
+  var::String)
 
   for Param in Params
     if Param.var == var
@@ -146,7 +150,7 @@ function ParamInfo(Params::Vector{ParamInfo}, var::String)
 end
 
 function ParamFormInfo(
-  FEMSpace::FEMProblemS,
+  FEMSpace::FOMS,
   Param::ParamInfoS)
 
   ParamFormInfoS(Param, get_measure(FEMSpace, var))
@@ -154,7 +158,7 @@ function ParamFormInfo(
 end
 
 function ParamFormInfo(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   Param::ParamInfoST)
 
   ParamFormInfoST(Param, get_measure(FEMSpace, var))
@@ -178,7 +182,7 @@ function ParamFormInfo(
 end
 
 function ParamFormInfo(
-  FEMInfo::Info,
+  FEMInfo::FOMInfo,
   μ::Vector)
 
   get_single_ParamFormInfo(var) = ParamInfo(FEMInfo, μ, var)
@@ -194,12 +198,12 @@ function get_h(FEMSpace::Problem)
   h
 end
 
-function get_timesθ(FEMInfo::FEMInfoST)
+function get_timesθ(FEMInfo::FOMInfoST)
   collect(FEMInfo.t₀:FEMInfo.δt:FEMInfo.tₗ-FEMInfo.δt).+FEMInfo.δt*FEMInfo.θ
 end
 
 function generate_vtk_file(
-  FEMSpace::FEMProblem,
+  FEMSpace::FOM,
   path::String,
   var_name::String,
   var::Array)
@@ -250,7 +254,7 @@ function find_FE_elements(
 end
 
 function find_FE_elements(
-  FEMSpace::FEMProblem,
+  FEMSpace::FOM,
   idx::Vector,
   var::String)
 
@@ -260,7 +264,7 @@ function find_FE_elements(
 end
 
 function define_g_FEM(
-  FEMSpace::FEMProblemS,
+  FEMSpace::FOMS,
   Param::ParamInfoS)
 
   interpolate_dirichlet(Param.g, FEMSpace.V)
@@ -268,7 +272,7 @@ function define_g_FEM(
 end
 
 function define_g_FEM(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   Param::ParamInfoST)
 
   g(t) = interpolate_dirichlet(Param.g(t), FEMSpace.V(t))
@@ -276,7 +280,7 @@ function define_g_FEM(
 end
 
 function define_dg_FEM(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   Param::ParamInfoST)
 
   function dg(t)
@@ -305,7 +309,7 @@ function set_labels(
 end
 
 function generate_dcube_discrete_model(
-  FEMInfo::Info,
+  FEMInfo::FOMInfo,
   d::Int,
   npart::Int,
   mesh_name::String)

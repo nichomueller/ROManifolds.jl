@@ -155,7 +155,7 @@ end
 ################################## ONLINE ######################################
 
 function get_θ(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   RBVars::PoissonST{T},
   Param::ParamInfoST) where T
@@ -269,7 +269,7 @@ function get_RB_RHS_blocks(
 end
 
 function get_RB_system(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   RBVars::PoissonST,
   Param::ParamInfoST)
@@ -302,7 +302,7 @@ function get_RB_system(
 end
 
 function solve_RB_system(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   RBVars::PoissonST,
   Param::ParamInfoST)
@@ -327,7 +327,7 @@ function reconstruct_FEM_solution(RBVars::PoissonST)
 end
 
 function loop_on_params(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   RBVars::PoissonST{T},
   μ::Vector{Vector{T}},
@@ -382,13 +382,13 @@ function loop_on_params(
 end
 
 function online_phase(
-  RBInfo::ROMInfoST{T},
+  RBInfo,
   RBVars::PoissonST,
   param_nbs) where T
 
   println("Online phase of the RB solver, unsteady Poisson problem")
 
-  FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FOM_info(RBInfo.FEMInfo)
 
   get_norm_matrix(RBInfo, RBVars.Steady)
   (ũ_μ,uₙ_μ,mean_uₕ_test,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,

@@ -12,7 +12,7 @@ function post_process(::ROMInfoS, d::Dict) where T
 
 end
 
-function post_process(RBInfo::ROMInfoST{T}, d::Dict) where T
+function post_process(RBInfo, d::Dict) where T
 
   times = collect(RBInfo.t₀+RBInfo.δt:RBInfo.δt:RBInfo.tₗ)
   FEMSpace = d["FEMSpace"]
@@ -59,7 +59,7 @@ function post_process(RBInfo::ROMInfoST{T}, d::Dict) where T
 end
 
 function plot_stability_constants(
-  FEMSpace::FEMProblem,
+  FEMSpace::FOM,
   RBInfo::ROMInfoST,
   Param::ParamInfoST)
 
@@ -97,7 +97,7 @@ function plot_stability_constants(
   xval = hcat(vec_Nₜ,vec_Nₜ)
   yval = hcat(vec_Nₜ,stability_constants)
   label = ["Nₜ", "||(Aˢᵗ)⁻¹||₂"]
-  paths = FEM_paths(root,problem_steadiness,problem_name,mesh_name,case)
+  paths = FOMPath(root,problem_steadiness,problem_name,mesh_name,case)
   save_path = paths.current_test
   generate_and_save_plot(xval, yval, "Euclidean norm of (Aˢᵗ)⁻¹",
     label, "Nₜ", "||(Aˢᵗ)⁻¹||₂", save_path, true, true;

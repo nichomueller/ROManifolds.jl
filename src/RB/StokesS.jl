@@ -170,7 +170,7 @@ end
 ################################## ONLINE ######################################
 
 function get_θ(
-  FEMSpace::FEMProblemS,
+  FEMSpace::FOMS,
   RBInfo::ROMInfoS,
   RBVars::StokesS{T},
   Param::ParamInfoS) where T
@@ -219,7 +219,7 @@ function get_RB_RHS_blocks(
 end
 
 function get_RB_system(
-  FEMSpace::FEMProblemS,
+  FEMSpace::FOMS,
   RBInfo::ROMInfoS,
   RBVars::StokesS,
   Param::ParamInfoS)
@@ -252,8 +252,8 @@ function get_RB_system(
 end
 
 function solve_RB_system(
-  FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS{T},
+  FEMSpace::FOMS,
+  RBInfo,
   RBVars::StokesS,
   Param::ParamInfoS) where T
 
@@ -282,7 +282,7 @@ function online_phase(
   RBVars::StokesS{T},
   param_nbs) where T
 
-  FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FOM_info(RBInfo.FEMInfo)
 
   mean_H1_err = 0.0
   mean_L2_err = 0.0

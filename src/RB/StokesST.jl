@@ -59,7 +59,7 @@ function assemble_reduced_basis(
 end
 
 function get_reduced_basis(
-  RBInfo::ROMInfoST{T},
+  RBInfo,
   RBVars::StokesST) where T
 
   get_reduced_basis(RBInfo, RBVars.Poisson)
@@ -163,7 +163,7 @@ end
 ################################## ONLINE ######################################
 
 function get_θ(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   RBVars::StokesST{T},
   Param::ParamInfoST) where T
@@ -272,7 +272,7 @@ function get_RB_RHS_blocks(
 end
 
 function get_RB_system(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::Info,
   RBVars::StokesST,
   Param::ParamInfoST)
@@ -306,8 +306,8 @@ function get_RB_system(
 end
 
 function solve_RB_system(
-  FEMSpace::FEMProblemST,
-  RBInfo::ROMInfoST{T},
+  FEMSpace::FOMST,
+  RBInfo,
   RBVars::StokesST,
   Param::ParamInfoST) where T
 
@@ -336,7 +336,7 @@ function reconstruct_FEM_solution(RBVars::StokesST)
 end
 
 function loop_on_params(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   RBVars::StokesST{T},
   μ::Vector{Vector{T}},
@@ -417,13 +417,13 @@ function loop_on_params(
 end
 
 function online_phase(
-  RBInfo::ROMInfoST{T},
+  RBInfo,
   RBVars::StokesST,
   param_nbs) where T
 
   println("Online phase of the RB solver, unsteady Stokes problem")
 
-  FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FOM_info(RBInfo.FEMInfo)
 
   get_norm_matrix(RBInfo, RBVars)
   (ũ_μ,uₙ_μ,mean_uₕ_test,mean_pointwise_err_u,mean_H1_err,mean_H1_L2_err,

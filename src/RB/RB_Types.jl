@@ -1,9 +1,11 @@
-abstract type RBProblem{T} end
-abstract type RBProblemS{T} <: RBProblem end
-abstract type RBProblemST{T} <: RBProblem end
+abstract type RB{T} end
+abstract type RBS{T} <: RB end
+abstract type RBST{T} <: RB end
 
 abstract type MVMDEIM{T} end
 abstract type MVVariable{T} end
+
+abstract type ROMInfo end
 
 mutable struct VMDEIM{T} <: MVMDEIM{T}
   Mat::Matrix{T}
@@ -24,20 +26,20 @@ end
 
 mutable struct VVariable{T} <: MVVariable{T}
   var::String
-  Matₙ::Matrix{T}
+  Matₙ::Vector{Matrix{T}}
   MDEIM::VMDEIM{T}
 end
 
 
 mutable struct MVariable{T} <: MVVariable{T}
   var::String
-  Matₙ::Matrix{T}
+  Matₙ::Vector{Matrix{T}}
   MDEIM::MMDEIM{T}
 end
 
 function VVariable(var::String, ::Type{T}) where T
 
-  Matₙ = Matrix{T}(undef,0,0)
+  Matₙ = Matrix{T}[]
 
   Mat = Matrix{T}(undef,0,0)
   Matᵢ = Matrix{T}(undef,0,0)
@@ -52,7 +54,7 @@ end
 
 function MVariable(var::String, ::Type{T}) where T
 
-  Matₙ = Matrix{T}(undef,0,0)
+  Matₙ = Matrix{T}[]
 
   Mat = Matrix{T}(undef,0,0)
   Matᵢ = Matrix{T}(undef,0,0)
@@ -63,6 +65,18 @@ function MVariable(var::String, ::Type{T}) where T
   MDEIM_Mat = MMDEIM(Mat, Matᵢ, idx, time_idx, row_idx, el)
 
   MVariable(var, Matₙ, MDEIM_Mat)
+
+end
+
+function MVVariable(RBInfo::ROMInfo, var::String, ::Type{T}) where T
+
+  if var ∈ problem_vectors(RBInfo)
+    return VVariable(var, T)
+  elseif var ∈ problem_matrices(RBInfo)
+    return MVariable(var, T)
+  else
+    error("Unrecognized variable")
+  end
 
 end
 
@@ -78,7 +92,10 @@ function MVVariable(Vars::Vector{MVVariable}, var::String)
 
 end
 
-function init_RBVars(::NTuple{1,Int}, ::Type{T}) where T
+function RBS(RBInfo::ROMInfo, ::Type{T}) where T
+
+  MVVars(var) =  MVVariable(RBInfo, var, T)
+  Vars = Broadcasting(MVVars)(RBInfo.problem_structures)
 
   S = Matrix{T}[]
   Φₛ = Matrix{T}[]
@@ -88,18 +105,18 @@ function init_RBVars(::NTuple{1,Int}, ::Type{T}) where T
   LHSₙ = Matrix{T}[]
   RHSₙ = Matrix{T}[]
 
-  VarA = MVariable("A", T)
+  #= VarA = MVariable("A", T)
   VarF = VVariable("F", T)
   VarH = VVariable("H", T)
   VarL = VVariable("L", T)
-  Vars = [VarA, VarF, VarH, VarL]
+  Vars = [VarA, VarF, VarH, VarL] =#
 
   Nₛ = Int[]
   nₛ = Int[]
   offline_time = 0.0
   online_time = 0.0
 
-  S, Φₛ, x̃, xₙ, X₀, LHSₙ, RHSₙ, Vars, Nₛ, nₛ, offline_time, online_time
+  Vars, S, Φₛ, x̃, xₙ, X₀, LHSₙ, RHSₙ, Nₛ, nₛ, offline_time, online_time
 
 end
 
@@ -143,40 +160,46 @@ function init_RBVars(::NTuple{5,Int}, ::Type{T}) where T
 
 end
 
-mutable struct PoissonS{T} <: RBProblemS{T}
-  S::Vector{Matrix{T}}; Φₛ::Vector{Matrix{T}}; x̃::Vector{Matrix{T}}; xₙ::Vector{Matrix{T}};
-  X₀::Vector{SparseMatrixCSC{Float64, Int64}}; LHSₙ::Vector{Matrix{T}}; RHSₙ::Vector{Matrix{T}};
-  Vars::Vector{MVariable{T}}; Nₛ::Vector{Int}; nₛ::Vector{Int};
-  offline_time::Float; online_time::Float
+mutable struct PoissonS{T} <: RBS{T}
+  Vars::Vector{MVVariable{T}}
+  S::Vector{Matrix{T}}
+  Φₛ::Vector{Matrix{T}}
+  x̃::Vector{Matrix{T}}
+  xₙ::Vector{Matrix{T}}
+  X₀::Vector{SparseMatrixCSC{Float64, Int64}}
+  LHSₙ::Vector{Matrix{T}}
+  RHSₙ::Vector{Matrix{T}}
+  Nₛ::Vector{Int}
+  nₛ::Vector{Int}
+  offline_time::Float
+  online_time::Float
 end
 
-mutable struct PoissonST{T} <: RBProblemST{T}
+mutable struct PoissonST{T} <: RBST{T}
   Steady::PoissonS{T}; Φₜᵘ::Vector{Matrix{T}}; Mₙ::Vector{Matrix{T}}; MDEIM_M::MMDEIM{T};
   Nₜ::Int; N::Vector{Int}; nₜ::Vector{Int}; n::Vector{Int}
 end
 
-mutable struct StokesS{T} <: RBProblemS{T}
+mutable struct StokesS{T} <: RBS{T}
   Poisson::PoissonS{T}; Bₙ::Vector{Matrix{T}}; Lcₙ::Vector{Matrix{T}};
   MDEIM_B::MMDEIM{T}; MDEIM_Lc::VMDEIM{T};
 end
 
-mutable struct StokesST{T} <: RBProblemST{T}
+mutable struct StokesST{T} <: RBST{T}
   Poisson::PoissonST{T}; Steady::StokesS{T}
 end
 
-mutable struct NavierStokesS{T} <: RBProblemS{T}
+mutable struct NavierStokesS{T} <: RBS{T}
   Stokes::StokesS{T}; Cₙ::Vector{Matrix{T}}; Dₙ::Vector{Matrix{T}};
   MDEIM_C::MMDEIM{T}; MDEIM_D::MMDEIM{T}
 end
 
-mutable struct NavierStokesST{T} <: RBProblemST{T}
+mutable struct NavierStokesST{T} <: RBST{T}
   Stokes::StokesST{T}; Steady::NavierStokesS{T};
 end
 
-function setup(NT::NTuple{1,Int}, ::Type{T}) where T
-
-  PoissonS{T}(init_RBVars(NT, T)...)
-
+function setup(::NTuple{1,Int}, RBInfo::ROMInfo, ::Type{T}) where T
+  PoissonS{T}(RBS(RBInfo, T))
 end
 
 function setup(NT::NTuple{2,Int}, ::Type{T}) where T
@@ -334,14 +357,14 @@ function Base.setproperty!(RBVars::NavierStokesST, sym::Symbol, x::T) where T
   end
 end
 
-struct ROMPath <: Info
+struct ROMPath
   FEMPaths::FEMPathInfo
   ROM_structures_path::String
   results_path::String
 end
 
-struct ROMInfoS{T} <: InfoS
-  FEMInfo::FEMInfoS
+struct ROMInfoS <: ROMInfo
+  FEMInfo::FOMInfoS
   Paths::ROMPath
   RB_method::String
   nₛ::Int
@@ -356,8 +379,8 @@ struct ROMInfoS{T} <: InfoS
   save_online::Bool
 end
 
-mutable struct ROMInfoST{T} <: InfoST
-  FEMInfo::FEMInfoST
+mutable struct ROMInfoST <: ROMInfo
+  FEMInfo::FOMInfoST
   Paths::ROMPath
   RB_method::String
   nₛ::Int

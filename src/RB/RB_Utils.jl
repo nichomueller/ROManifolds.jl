@@ -1,4 +1,4 @@
-function ROM_paths(FEMPaths, RB_method)
+function ROMPath(FEMPaths, RB_method)
 
   ROM_path = joinpath(FEMPaths.current_test, RB_method)
   create_dir(ROM_path)
@@ -11,15 +11,15 @@ function ROM_paths(FEMPaths, RB_method)
 
 end
 
-function get_mesh_path(RBInfo::Info)
+function get_mesh_path(RBInfo::ROMInfo)
   RBInfo.Paths.FEMPaths.mesh_path
 end
 
-function get_FEM_snap_path(RBInfo::Info)
+function get_FEM_snap_path(RBInfo::ROMInfo)
   RBInfo.Paths.FEMPaths.FEM_snap_path
 end
 
-function get_FEM_structures_path(RBInfo::Info)
+function get_FEM_structures_path(RBInfo::ROMInfo)
   RBInfo.Paths.FEMPaths.FEM_structures_path
 end
 
@@ -54,7 +54,7 @@ function get_affine_entries(
 
 end
 
-function get_blocks_position(RBVars::RBProblem)
+function get_blocks_position(RBVars::RB)
   if typeof(RBVars) ∈ (::PoissonS, ::PoissonST)
     ([1], [1])
   else
@@ -63,8 +63,8 @@ function get_blocks_position(RBVars::RBProblem)
 end
 
 function assemble_FEM_structure(
-  FEMSpace::FEMProblem,
-  RBInfo::Info,
+  FEMSpace::FOM,
+  RBInfo::ROMInfo,
   fun::Function,
   var::String)
 
@@ -74,8 +74,8 @@ function assemble_FEM_structure(
 end
 
 function assemble_FEM_structure(
-  FEMSpace::FEMProblem,
-  RBInfo::Info,
+  FEMSpace::FOM,
+  RBInfo::ROMInfo,
   Param::ParamInfo)
 
   assemble_FEM_structure(FEMSpace, RBInfo.FEMInfo, Param)
@@ -83,8 +83,8 @@ function assemble_FEM_structure(
 end
 
 function assemble_FEM_structure(
-  FEMSpace::FEMProblem,
-  RBInfo::Info,
+  FEMSpace::FOM,
+  RBInfo::ROMInfo,
   μ::Vector{T},
   var::String) where T
 
@@ -94,8 +94,8 @@ function assemble_FEM_structure(
 end
 
 function assemble_FEM_structure(
-  FEMSpace::FEMProblem,
-  RBInfo::Info,
+  FEMSpace::FOM,
+  RBInfo::ROMInfo,
   μvec::Vector{Vector{T}},
   var::String) where T
 
@@ -104,7 +104,7 @@ function assemble_FEM_structure(
 
 end
 
-function get_Φₛ(RBVars::RBProblem, var::String)
+function get_Φₛ(RBVars::RB, var::String)
   if var ∈ ("B", "Lc")
     Φₛ_left = RBVars.Φₛ[2]
   else
@@ -114,7 +114,7 @@ function get_Φₛ(RBVars::RBProblem, var::String)
   Φₛ_left, Φₛ_right
 end
 
-function get_Nₛ(RBVars::RBProblem, var::String)
+function get_Nₛ(RBVars::RB, var::String)
   if var ∈ ("B", "Lc")
     RBVars.Nₛ[2]
   else
@@ -123,7 +123,7 @@ function get_Nₛ(RBVars::RBProblem, var::String)
 end
 
 function ParamInfo(
-  RBInfo::Info,
+  RBInfo::ROMInfo,
   μ::Vector,
   var::String)
 
@@ -132,7 +132,7 @@ function ParamInfo(
 end
 
 function ParamInfo(
-  RBInfo::Info,
+  RBInfo::ROMInfo,
   μ::Vector)
 
   ParamInfo(RBInfo.FEMInfo, μ)
@@ -140,7 +140,7 @@ function ParamInfo(
 end
 
 function ParamFormInfo(
-  RBInfo::Info,
+  RBInfo::ROMInfo,
   μ::Vector,
   var::String)
 
@@ -149,30 +149,30 @@ function ParamFormInfo(
 end
 
 function ParamFormInfo(
-  RBInfo::Info,
+  RBInfo::ROMInfo,
   μ::Vector)
 
   ParamFormInfo(RBInfo.FEMInfo, μ)
 
 end
 
-function problem_vectors(RBInfo::Info)
+function problem_vectors(RBInfo::ROMInfo)
   vecs = ["F", "H", "L", "Lc"]
   intersect(RBInfo.problem_structures, vecs)::Vector{String}
 end
 
-function problem_matrices(RBInfo::Info)
+function problem_matrices(RBInfo::ROMInfo)
   setdiff(RBInfo.problem_structures, problem_vectors(RBInfo))::Vector{String}
 end
 
-function get_timesθ(RBInfo::ROMInfoST{T}) where T
+function get_timesθ(RBInfo) where T
 
   T.(get_timesθ(RBInfo.FEMInfo))
 
 end
 
 function times_dictionary(
-  RBInfo::Info,
+  RBInfo::ROMInfo,
   offline_time::Float,
   online_time::Float)
 
@@ -184,13 +184,13 @@ function times_dictionary(
 
 end
 
-function initialize_RB_system(RBVars::RBProblem{T}) where T
+function initialize_RB_system(RBVars::RB{T}) where T
   RBVars.LHSₙ = Matrix{T}[]
   RBVars.RHSₙ = Matrix{T}[]
   RBVars.xₙ = Matrix{T}[]
 end
 
-function initialize_online_time(RBVars::RBProblem)
+function initialize_online_time(RBVars::RB)
   RBVars.online_time = 0.0
 end
 
@@ -227,8 +227,8 @@ function assemble_ith_row_MatΦ(
 end
 
 function assemble_sparse_structure(
-  FEMSpace::FEMProblemS,
-  FEMInfo::FEMInfoS,
+  FEMSpace::FOMS,
+  FEMInfo::FOMInfoS,
   Param::ParamInfoS,
   el::Vector{Int})
 
@@ -241,8 +241,8 @@ function assemble_sparse_structure(
 end
 
 function assemble_sparse_fun(
-  FEMSpace::FEMProblemS,
-  FEMInfo::FEMInfoS,
+  FEMSpace::FOMS,
+  FEMInfo::FOMInfoS,
   el::Vector{Int},
   var::String)
 
@@ -266,7 +266,7 @@ function assemble_sparse_fun(
 end
 
 function interpolated_θ(
-  RBVars::RBProblemST{T},
+  RBVars::RBST{T},
   Mat_μ_sparse::AbstractArray,
   timesθ::Vector{T},
   Matᵢ::Matrix{T},
@@ -292,13 +292,13 @@ function interpolated_θ(
 end
 
 function θ(
-  FEMSpace::FEMProblemS{D},
-  RBInfo::ROMInfoS{T},
+  FEMSpace::FOMS{D},
+  RBInfo::ROMInfoS,
   Param::ParamInfoS,
-  MDEIM::MVMDEIM) where {D,T}
+  MDEIM::MVMDEIM) where D
 
   if Param.var ∉ RBInfo.probl_nl
-    θ = [[Param.fun(VectorValue(D, T))[1]]]
+    θ = [[Param.fun(VectorValue(D, Float))[1]]]
   else
     Mat_μ_sparse =
       assemble_sparse_structure(FEMSpace, FEMInfo, Param, MDEIM.el)
@@ -312,9 +312,9 @@ end
 
 function θ!(
   θ::Vector{Vector{T}},
-  FEMSpace::FEMProblemST{D},
-  RBInfo::ROMInfoST{T},
-  RBVars::RBProblemST,
+  FEMSpace::FOMST{D},
+  RBInfo::ROMInfoST,
+  RBVars::RBST,
   Param::ParamInfoST,
   fun::Function,
   MDEIM::MMDEIM,
@@ -347,9 +347,9 @@ end
 
 function θ!(
   θ::Vector{Vector{T}},
-  FEMSpace::FEMProblemST{D},
-  RBInfo::ROMInfoST{T},
-  RBVars::RBProblemST,
+  FEMSpace::FOMST{D},
+  RBInfo::ROMInfoST,
+  RBVars::RBST,
   Param::ParamInfoST,
   fun::Function,
   MDEIM::VMDEIM,
@@ -380,8 +380,8 @@ function θ!(
 end
 
 function θ_function(
-  FEMSpace::FEMProblemS,
-  RBVars::RBProblemS,
+  FEMSpace::FOMS,
+  RBVars::RBS,
   MDEIM::MMDEIM,
   var::String) where T
 

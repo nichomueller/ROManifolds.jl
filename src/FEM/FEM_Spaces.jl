@@ -1,4 +1,4 @@
-function get_mod_meas_quad(FEMInfo::Info, model::DiscreteModel)
+function get_mod_meas_quad(FEMInfo::FOMInfo, model::DiscreteModel)
 
   set_labels(model, FEMInfo.bnd_info)
 
@@ -14,7 +14,7 @@ function get_mod_meas_quad(FEMInfo::Info, model::DiscreteModel)
 end
 
 function get_lagrangianQuad_info(
-  FEMInfo::Info,
+  FEMInfo::FOMInfo,
   model::DiscreteModel{Dc,Dp},
   Ω::BodyFittedTriangulation,
   Qₕ::CellQuadrature) where {Dc,Dp}
@@ -30,9 +30,9 @@ function get_lagrangianQuad_info(
 
 end
 
-function get_FEMSpace_quantities(
+function FEMSpace_quantities(
   ::NTuple{1,Int},
-  FEMInfo::FEMInfoS,
+  FEMInfo::FOMInfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
 
@@ -54,9 +54,9 @@ function get_FEMSpace_quantities(
 
 end
 
-function get_FEMSpace_quantities(
+function FEMSpace_quantities(
   ::NTuple{1,Int},
-  FEMInfo::FEMInfoST,
+  FEMInfo::FOMInfoST,
   model::DiscreteModel{D,D},
   g::Function) where D
 
@@ -77,9 +77,9 @@ function get_FEMSpace_quantities(
 
 end
 
-function get_FEMSpace_quantities(
+function FEMSpace_quantities(
   ::NTuple{2,Int},
-  FEMInfo::FEMInfoS,
+  FEMInfo::FOMInfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
 
@@ -110,9 +110,9 @@ function get_FEMSpace_quantities(
 
 end
 
-function get_FEMSpace_quantities(
+function FEMSpace_quantities(
   ::NTuple{2,Int},
-  FEMInfo::FEMInfoST,
+  FEMInfo::FOMInfoST,
   model::DiscreteModel{D,D},
   g::Function) where D
 
@@ -143,153 +143,153 @@ function get_FEMSpace_quantities(
 
 end
 
-function get_FEMSpace_quantities(
+function FEMSpace_quantities(
   ::NTuple{3,Int},
-  FEMInfo::FEMInfoS,
+  FEMInfo::FOMInfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  get_FEMSpace_quantities(get_NTuple(2, Int), FEMInfo, model, g)
+  FEMSpace_quantities(get_NTuple(2, Int), FEMInfo, model, g)
 
 end
 
-function get_FEMSpace_quantities(
+function FEMSpace_quantities(
   ::NTuple{3,Int},
-  FEMInfo::FEMInfoST,
+  FEMInfo::FOMInfoST,
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  get_FEMSpace_quantities(get_NTuple(2, Int), FEMInfo, model, g)
+  FEMSpace_quantities(get_NTuple(2, Int), FEMInfo, model, g)
 
 end
 
-function get_FEMSpace(
+function FEMSpace(
   NT::NTuple{1,Int},
-  FEMInfo::FEMInfoS,
+  FEMInfo::FOMInfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  return FEMSpacePoissonS{D}(
-    model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
+  FOMPoissonS{D}(
+    model, FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
 
-function get_FEMSpace(
+function FEMSpace(
   NT::NTuple{1,Int},
-  FEMInfo::FEMInfoST,
+  FEMInfo::FOMInfoST,
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  return FEMSpacePoissonST{D}(
-    model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
+  FOMPoissonST{D}(
+    model, FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
 
-function get_FEMSpace(
+function FEMSpace(
   NT::NTuple{2,Int},
-  FEMInfo::FEMInfoS,
+  FEMInfo::FOMInfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  return FEMSpaceStokesS{D}(
-    model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
+  FOMStokesS{D}(
+    model, FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
 
-function get_FEMSpace(
+function FEMSpace(
   NT::NTuple{2,Int},
-  FEMInfo::FEMInfoST,
+  FEMInfo::FOMInfoST,
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  return FEMSpaceStokesST{D}(
-    model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
+  FOMStokesST{D}(
+    model, FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
 
-function get_FEMSpace(
+function FEMSpace(
   NT::NTuple{3,Int},
-  FEMInfo::FEMInfoS,
+  FEMInfo::FOMInfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  return FEMSpaceNavierStokesS{D}(
-    model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
+  FOMNavierStokesS{D}(
+    model, FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
 
-function get_FEMSpace(
+function FEMSpace(
   NT::NTuple{3,Int},
-  FEMInfo::FEMInfoST,
+  FEMInfo::FOMInfoST,
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  return FEMSpaceNavierStokesST{D}(
-    model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
+  FOMNavierStokesST{D}(
+    model, FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
 
-function get_FEMSpace₀(
+function FEMSpace₀(
   problem_id::NTuple{1,Int},
-  FEMInfo::FEMInfoS,
+  FEMInfo::FOMInfoS,
   model::DiscreteModel)
 
-  get_FEMSpace(problem_id,FEMInfo,model,x->0)
+  FEMSpace(problem_id,FEMInfo,model,x->0)
 
 end
 
-function get_FEMSpace₀(
+function FEMSpace₀(
   problem_id::NTuple{1,Int},
-  FEMInfo::FEMInfoST,
+  FEMInfo::FOMInfoST,
   model::DiscreteModel)
 
   g₀(x, t::Real) = 0.
   g₀(t::Real) = x -> g₀(x, t)
-  get_FEMSpace(problem_id,FEMInfo,model,g₀)
+  FEMSpace(problem_id,FEMInfo,model,g₀)
 
 end
 
-function get_FEMSpace₀(
+function FEMSpace₀(
   problem_id::NTuple{2,Int},
-  FEMInfo::FEMInfoS,
+  FEMInfo::FOMInfoS,
   model::DiscreteModel)
 
-  get_FEMSpace(problem_id,FEMInfo,model, x->zero(VectorValue(FEMInfo.D, Float)))
+  FEMSpace(problem_id,FEMInfo,model, x->zero(VectorValue(FEMInfo.D, Float)))
 
 end
 
-function get_FEMSpace₀(
+function FEMSpace₀(
   problem_id::NTuple{2,Int},
-  FEMInfo::FEMInfoST,
+  FEMInfo::FOMInfoST,
   model::DiscreteModel)
 
   g₀(x, t::Real) = zero(VectorValue(FEMInfo.D, Float))
   g₀(t::Real) = x -> g₀(x, t)
-  get_FEMSpace(problem_id,FEMInfo,model,g₀)
+  FEMSpace(problem_id,FEMInfo,model,g₀)
 
 end
 
-function get_FEMSpace₀(
+function FEMSpace₀(
   problem_id::NTuple{3,Int},
-  FEMInfo::FEMInfoS,
+  FEMInfo::FOMInfoS,
   model::DiscreteModel)
 
-  get_FEMSpace(problem_id,FEMInfo,model, x->zero(VectorValue(FEMInfo.D, Float)))
+  FEMSpace(problem_id,FEMInfo,model, x->zero(VectorValue(FEMInfo.D, Float)))
 
 end
 
-function get_FEMSpace₀(
+function FEMSpace₀(
   problem_id::NTuple{3,Int},
-  FEMInfo::FEMInfoST,
+  FEMInfo::FOMInfoST,
   model::DiscreteModel)
 
   g₀(x, t::Real) = zero(VectorValue(FEMInfo.D, Float))
   g₀(t::Real) = x -> g₀(x, t)
-  get_FEMSpace(problem_id,FEMInfo,model,g₀)
+  FEMSpace(problem_id,FEMInfo,model,g₀)
 
 end
 
-function FEMSpace_vectors(FEMSpace::FEMProblem, var::String)
+function FEMSpace_vectors(FEMSpace::FOM, var::String)
   if var == "Lc"
     FEMSpace.Q₀
   else
@@ -297,7 +297,7 @@ function FEMSpace_vectors(FEMSpace::FEMProblem, var::String)
   end
 end
 
-function FEMSpace_matrices(FEMSpace::FEMProblem, var::String)
+function FEMSpace_matrices(FEMSpace::FOM, var::String)
   if var == "B"
     FEMSpace.V, FEMSpace.Q₀
   else
@@ -305,7 +305,7 @@ function FEMSpace_matrices(FEMSpace::FEMProblem, var::String)
   end
 end
 
-function get_measure(FEMSpace::FEMProblem, var::String)
+function get_measure(FEMSpace::FOM, var::String)
   if var == "H"
     FEMSpace.dΓn
   else

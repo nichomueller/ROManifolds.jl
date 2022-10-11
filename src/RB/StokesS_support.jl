@@ -16,7 +16,7 @@ function assemble_constraint_matrix(
   RBInfo::Info,
   RBVars::StokesS{T}) where T
 
-  FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FOM_info(RBInfo.FEMInfo)
 
   constraint_matrix = zeros(T, RBVars.Nₛᵘ, RBVars.nₛ)
 
@@ -353,8 +353,8 @@ function save_system_blocks(
 end
 
 function get_θ_matrix(
-  FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS{T},
+  FEMSpace::FOMS,
+  RBInfo,
   RBVars::StokesS,
   Param::ParamInfoS,
   var::String) where T
@@ -379,7 +379,7 @@ function get_θ_matrix(
 end
 
 function assemble_param_RHS(
-  FEMSpace::FEMProblemS,
+  FEMSpace::FOMS,
   RBInfo::ROMInfoS,
   RBVars::StokesS{T},
   Param::ParamInfoS) where T

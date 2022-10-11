@@ -1,5 +1,5 @@
 function assemble_LHSₙ(
-  RBInfo::Info,
+  RBInfo::ROMInfoS,
   RBVars::PoissonS{T},
   Params::Vector{ParamInfoS}) where T
 
@@ -9,7 +9,7 @@ function assemble_LHSₙ(
 end
 
 function assemble_RHSₙ(
-  RBInfo::Info,
+  RBInfo::ROMInfoS,
   RBVars::PoissonS{T},
   Params::Vector{ParamInfoS}) where T
 
@@ -19,7 +19,7 @@ function assemble_RHSₙ(
 end
 
 function assemble_RHSₙ(
-  FEMSpace::FEMProblemS,
+  FEMSpace::FOMS,
   RBInfo::ROMInfoS,
   RBVars::PoissonS{T},
   μ::Vector{T}) where T

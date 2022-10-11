@@ -385,7 +385,7 @@ function save_system_blocks(
 end
 
 function get_θ_matrix(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   RBVars::StokesST{T},
   Param::ParamInfoST,
@@ -412,7 +412,7 @@ function get_θ_matrix(
 end
 
 function assemble_param_RHS(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::Info,
   RBVars::StokesST,
   Param::ParamInfoST)
@@ -434,7 +434,7 @@ function assemble_param_RHS(
 end
 
 function adaptive_loop_on_params(
-  FEMSpace::FEMProblemST,
+  FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   RBVars::StokesST{T},
   mean_uₕ_test::Matrix,

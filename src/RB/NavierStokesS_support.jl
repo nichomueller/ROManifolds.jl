@@ -248,8 +248,8 @@ end
 end
 
 function get_θ_matrix(
-  FEMSpace::FEMProblemS,
-  RBInfo::ROMInfoS{T},
+  FEMSpace::FOMS,
+  RBInfo,
   RBVars::NavierStokesS,
   Param::ParamInfoS,
   var::String) where T

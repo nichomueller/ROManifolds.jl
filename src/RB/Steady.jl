@@ -2,7 +2,7 @@
 
 function get_snapshot_matrix(
   RBInfo::ROMInfoS,
-  RBVars::RBProblemS{T}) where T
+  RBVars::RBS{T}) where T
 
   function get_S_var(var::String)
     println("Importing the snapshot matrix for field $var,
@@ -20,7 +20,7 @@ end
 
 function assemble_reduced_basis(
   RBInfo::ROMInfoS,
-  RBVars::RBProblemS)
+  RBVars::RBS)
 
   assemble_reduced_basis_space(RBInfo, RBVars);
 
@@ -28,7 +28,7 @@ end
 
 function get_reduced_basis(
   RBInfo::ROMInfoS,
-  RBVars::RBProblemS)
+  RBVars::RBS)
 
   get_reduced_basis_space(RBInfo, RBVars);
 
@@ -36,7 +36,7 @@ end
 
 function get_offline_structures(
   RBInfo::ROMInfoS,
-  RBVars::RBProblemS{T}) where T
+  RBVars::RBS{T}) where T
 
   function get_Var(Var::MVVariable)
 
@@ -69,7 +69,7 @@ end
 
 function save_offline(
   RBInfo::ROMInfoS,
-  RBVars::RBProblemS{T},
+  RBVars::RBS{T},
   operators::Vector{String}) where T
 
   save_CSV(RBVars.Φₛ, joinpath(RBInfo.ROM_structures_path,"Φₛ.csv"))
@@ -81,7 +81,7 @@ end
 
 function offline_phase(
   RBInfo::ROMInfoS,
-  RBVars::RBProblemS)
+  RBVars::RBS)
 
   if RBInfo.get_snapshots
     get_snapshot_matrix(RBInfo, RBVars)
@@ -131,7 +131,7 @@ end
 
 function online_phase(
   RBInfo::ROMInfoS,
-  RBVars::RBProblemS{T},
+  RBVars::RBS{T},
   param_nbs) where T
 
   function get_S_var(var::String, nb::Int)
@@ -168,7 +168,7 @@ function online_phase(
     post_process(RBInfo, pass_to_pp)
   end
 
-  FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FOM_info(RBInfo.FEMInfo)
   get_norm_matrix(RBInfo, RBVars)
 
   mean_err, mean_pointwise_err, mean_online_time = Vector{T}[], Vector{T}[], 0.

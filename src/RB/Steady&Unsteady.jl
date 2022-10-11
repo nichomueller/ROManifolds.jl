@@ -1,7 +1,7 @@
 ################################# OFFLINE ######################################
 function get_norm_matrix(
-  RBInfo::Info,
-  RBVars::RBProblem{T}) where T
+  RBInfo::ROMInfo,
+  RBVars::RB{T}) where T
 
   function get_X_var(Nₛ::Int, var::String)
     if RBInfo.use_norm_X
@@ -20,8 +20,8 @@ function get_norm_matrix(
 end
 
 function assemble_reduced_basis_space(
-  RBInfo::Info,
-  RBVars::RBProblem)
+  RBInfo::ROMInfo,
+  RBVars::RB)
 
   function POD_space(
     S::Matrix,
@@ -44,8 +44,8 @@ function assemble_reduced_basis_space(
 end
 
 function get_reduced_basis_space(
-  RBInfo::Info,
-  RBVars::RBProblem) where T
+  RBInfo::ROMInfo,
+  RBVars::RB) where T
 
   println("Importing the spatial reduced basis")
 
@@ -55,7 +55,7 @@ function get_reduced_basis_space(
 
 end
 
-function set_operators(RBInfo::Info)
+function set_operators(RBInfo::ROMInfo)
 
   operators = RBInfo.problem_structures
   if RBInfo.online_RHS
@@ -67,7 +67,7 @@ function set_operators(RBInfo::Info)
 end
 
 function assemble_affine_structure(
-  RBInfo::Info,
+  RBInfo::ROMInfo,
   Var::VVariable{T},
   operators::Vector{String}) where T
 
@@ -88,7 +88,7 @@ function assemble_affine_structure(
 end
 
 function assemble_affine_structure(
-  RBInfo::Info,
+  RBInfo::ROMInfo,
   Var::MVariable{T},
   operators::Vector{String}) where T
 
@@ -109,8 +109,8 @@ function assemble_affine_structure(
 end
 
 function assemble_affine_structures(
-  RBInfo::Info,
-  RBVars::RBProblem,
+  RBInfo::ROMInfo,
+  RBVars::RB,
   operators::Vector{String})
 
   affine_structure(Var) = assemble_affine_structure(RBInfo, Var, operators)
@@ -119,8 +119,8 @@ function assemble_affine_structures(
 end
 
 function assemble_MDEIM_structures(
-  RBInfo::Info,
-  RBVars::RBProblem,
+  RBInfo::ROMInfo,
+  RBVars::RB,
   operators::Vector{String})
 
   function assemble_MDEIM_structure(Var::MVVariable)
@@ -179,8 +179,8 @@ function assemble_MDEIM_Matₙ(
 end
 
 function assemble_offline_structures(
-  RBInfo::Info,
-  RBVars::RBProblem,
+  RBInfo::ROMInfo,
+  RBVars::RB,
   operators=String[])
 
   if isempty(operators)
@@ -215,8 +215,8 @@ end
 ################################## ONLINE ######################################
 
 function get_system_blocks(
-  RBInfo::Info,
-  RBVars::RBProblem{T},
+  RBInfo::ROMInfo,
+  RBVars::RB{T},
   LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int}) where T
 
@@ -262,8 +262,8 @@ function get_system_blocks(
 end
 
 function save_system_blocks(
-  RBInfo::Info,
-  RBVars::RBProblem{T},
+  RBInfo::ROMInfo,
+  RBVars::RB{T},
   LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int},
   operators::Vector{String}) where T
@@ -283,8 +283,8 @@ function save_system_blocks(
 end
 
 function assemble_θ_var(
-  FEMSpace::FEMProblem,
-  RBInfo::Info,
+  FEMSpace::FOM,
+  RBInfo::ROMInfo,
   Var::MVVariable,
   μ::Vector{T},
   operators::Vector{String}) where T
@@ -303,9 +303,9 @@ function assemble_θ_var(
 end
 
 function assemble_θ(
-  FEMSpace::FEMProblem,
-  RBInfo::Info,
-  RBVars::RBProblem,
+  FEMSpace::FOM,
+  RBInfo::ROMInfo,
+  RBVars::RB,
   μ::Vector{T}) where T
 
   operators = set_operators(RBInfo)
@@ -316,8 +316,8 @@ function assemble_θ(
 end
 
 function assemble_matricesₙ(
-  RBInfo::Info,
-  RBVars::RBProblem{T},
+  RBInfo::ROMInfo,
+  RBVars::RB{T},
   Params::Vector{ParamInfo}) where T
 
   operators = problem_matrices(RBInfo)
@@ -326,8 +326,8 @@ function assemble_matricesₙ(
 end
 
 function assemble_vectorsₙ(
-  RBInfo::Info,
-  RBVars::RBProblem{T},
+  RBInfo::ROMInfo,
+  RBVars::RB{T},
   Params::Vector{ParamInfo}) where T
 
   operators = problem_vectors(RBInfo)
@@ -336,9 +336,9 @@ function assemble_vectorsₙ(
 end
 
 function assemble_RB_system(
-  FEMSpace::FEMProblem,
-  RBInfo::Info,
-  RBVars::RBProblem,
+  FEMSpace::FOM,
+  RBInfo::ROMInfo,
+  RBVars::RB,
   μ::Vector{T})
 
   initialize_RB_system(RBVars)
@@ -352,13 +352,13 @@ function assemble_RB_system(
 
     if "LHS" ∈ operators
       println("Assembling reduced LHS")
-      assemble_LHSₙ(RBVars, Params)
+      assemble_LHSₙ(RBInfo, RBVars, Params)
     end
 
     if "RHS" ∈ operators
       if !RBInfo.online_RHS
         println("Assembling reduced RHS")
-        assemble_RHSₙ(RBVars, Params)
+        assemble_RHSₙ(RBInfo, RBVars, Params)
       else
         println("Assembling reduced RHS exactly")
         assemble_RHSₙ(FEMSpace, RBInfo, RBVars, μ)

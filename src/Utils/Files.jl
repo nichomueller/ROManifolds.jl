@@ -81,6 +81,11 @@ function save_CSV(var::SparseVector{T}, path::String) where T
   CSV.write(path, DataFrame([:i => i, :v => v]))
 end
 
+function save_CSV(var::Vector{AbstractArray{T}}, path::Vector{String}) where T
+  @assert length(var) == length(path)
+  Broadcasting(save_CSV)(var, path)
+end
+
 function append_CSV(var::AbstractArray, path::String)
   if !isfile(path)
     save_CSV(var, path)

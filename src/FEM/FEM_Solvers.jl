@@ -1,5 +1,5 @@
 function FE_solve(
-  FEMInfo::FEMInfoS,
+  FEMInfo::FOMInfoS,
   operator::AffineFEOperator)
 
   if FEMInfo.solver == "lu"
@@ -13,8 +13,8 @@ function FE_solve(
 end
 
 function FE_solve(
-  FEMSpace::FEMSpacePoissonST,
-  FEMInfo::FEMInfoST,
+  FEMSpace::FOMPoissonST,
+  FEMInfo::FOMInfoST,
   Param::ParamInfoST)
 
   m(t, u, v) = ∫(Param.m(t)*(u*v)) * FEMSpace.dΩ
@@ -40,8 +40,8 @@ function FE_solve(
 end
 
 function FE_solve(
-  FEMSpace::FEMSpaceStokesS,
-  FEMInfo::FEMInfoS,
+  FEMSpace::FOMStokesS,
+  FEMInfo::FOMInfoS,
   Param::ParamInfoS)
 
   a((u,p),(v,q)) = ∫( ∇(v)⊙(Param.α*∇(u)) - Param.b*((∇⋅v)*p + q*(∇⋅u)) ) * FEMSpace.dΩ
@@ -59,8 +59,8 @@ function FE_solve(
 end
 
 function FE_solve(
-  FEMSpace::FEMSpaceStokesST,
-  FEMInfo::FEMInfoST,
+  FEMSpace::FOMStokesST,
+  FEMInfo::FOMInfoST,
   Param::ParamInfoST)
 
   m(t,(u,p),(v,q)) = ∫(Param.m(t)*(u⋅v)) * FEMSpace.dΩ
@@ -90,8 +90,8 @@ function FE_solve(
 end
 
 function FE_solve(
-  FEMSpace::FEMSpaceNavierStokesS,
-  ::FEMInfoS,
+  FEMSpace::FOMNavierStokesS,
+  ::FOMInfoS,
   Param::ParamInfoS) where T
 
   a((u,p),(v,q)) = ∫( ∇(v)⊙(Param.α*∇(u)) - Param.b*(∇⋅v)*p + q*(∇⋅u) ) * FEMSpace.dΩ
