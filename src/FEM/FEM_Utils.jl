@@ -88,12 +88,30 @@ function get_FEMProblem_info(FEMInfo::Info)
 end
 
 function ParamInfo(
+  ::FEMInfoS,
+  fun::Function,
+  var::String)
+
+  ParamInfoS(var, fun, Vector{Float}[])
+
+end
+
+function ParamInfo(
+  ::FEMInfoST,
+  fun::Function,
+  var::String)
+
+  ParamInfoST(var, fun, x->fun(x,t), t->fun(x,t), Vector{Float}[])
+
+end
+
+function ParamInfo(
   FEMInfo::FEMInfoS,
   μ::Vector,
   var::String)
 
   fun = get_fun(FEMInfo, μ, var)
-  ParamInfoS(var, fun, θ)
+  ParamInfoS(var, fun, Vector{Float}[])
 
 end
 
@@ -103,13 +121,11 @@ function ParamInfo(
   var::String)
 
   funₛ, funₜ, fun  = get_fun(FEMInfo, μ, var)
-  ParamInfoST(var, funₛ, funₜ, fun, θ)
+  ParamInfoST(var, funₛ, funₜ, fun, Vector{Float}[])
 
 end
 
-function ParamInfo(
-  FEMInfo::Info,
-  μ::Vector)
+function ParamInfo(FEMInfo::Info, μ)
 
   get_single_ParamInfo(var) = ParamInfo(FEMInfo, μ, var)
   operators = get_FEM_structures(FEMInfo)
@@ -133,11 +149,7 @@ function ParamFormInfo(
   FEMSpace::FEMProblemS,
   Param::ParamInfoS)
 
-  if Param.var != "H"
-    ParamFormInfoS(Param, FEMSpace.dΩ)
-  else
-    ParamFormInfoS(Param, FEMSpace.dΓn)
-  end
+  ParamFormInfoS(Param, get_measure(FEMSpace, var))
 
 end
 
@@ -145,11 +157,7 @@ function ParamFormInfo(
   FEMSpace::FEMProblemST,
   Param::ParamInfoST)
 
-  if Param.var != "H"
-    ParamFormInfoST(Param, FEMSpace.dΩ)
-  else
-    ParamFormInfoST(Param, FEMSpace.dΓn)
-  end
+  ParamFormInfoST(Param, get_measure(FEMSpace, var))
 
 end
 
@@ -242,16 +250,12 @@ function find_FE_elements(
 end
 
 function find_FE_elements(
-  V₀::UnconstrainedFESpace,
-  trian::BodyFittedTriangulation,
-  idx::Vector{Vector{Int}})
+  FEMSpace::FEMProblem,
+  idx::Vector,
+  var::String)
 
-  el = Vector{Int}[]
-  for nb = eachindex(idx)
-    push!(el, find_FE_elements(V₀, trian, idx[nb]))
-  end
-
-  el
+  find_FE_elements(
+    FEMSpace_vectors(FEMSpace, var), get_measure(FEMSpace, var), unique(idx))
 
 end
 

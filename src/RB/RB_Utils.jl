@@ -65,18 +65,53 @@ end
 function assemble_FEM_structure(
   FEMSpace::FEMProblem,
   RBInfo::Info,
+  fun::Function,
+  var::String)
+
+  Param = ParamInfo(FEMSpace, fun, var)
+  assemble_FEM_structure(FEMSpace, RBInfo.FEMInfo, Param)
+
+end
+
+function assemble_FEM_structure(
+  FEMSpace::FEMProblem,
+  RBInfo::Info,
   Param::ParamInfo)
 
   assemble_FEM_structure(FEMSpace, RBInfo.FEMInfo, Param)
 
 end
 
+function assemble_FEM_structure(
+  FEMSpace::FEMProblem,
+  RBInfo::Info,
+  μ::Vector{T},
+  var::String) where T
+
+  Param = ParamInfo(RBInfo, μ, var)
+  assemble_FEM_structure(FEMSpace, RBInfo, Param)
+
+end
+
+function assemble_FEM_structure(
+  FEMSpace::FEMProblem,
+  RBInfo::Info,
+  μvec::Vector{Vector{T}},
+  var::String) where T
+
+  MV(μ) = assemble_FEM_structure(FEMSpace, RBInfo, μ, var)
+  Broadcasting(MV)(μvec)
+
+end
+
 function get_Φₛ(RBVars::RBProblem, var::String)
   if var ∈ ("B", "Lc")
-    RBVars.Φₛ[2]
+    Φₛ_left = RBVars.Φₛ[2]
   else
-    RBVars.Φₛ[1]
+    Φₛ_left = RBVars.Φₛ[1]
   end
+  Φₛ_right = RBVars.Φₛ[1]
+  Φₛ_left, Φₛ_right
 end
 
 function get_Nₛ(RBVars::RBProblem, var::String)
@@ -282,7 +317,7 @@ function θ!(
   RBVars::RBProblemST,
   Param::ParamInfoST,
   fun::Function,
-  MDEIM::MDEIMm,
+  MDEIM::MMDEIM,
   var::String) where {D,T}
 
   timesθ = get_timesθ(RBInfo)
@@ -317,7 +352,7 @@ function θ!(
   RBVars::RBProblemST,
   Param::ParamInfoST,
   fun::Function,
-  MDEIM::MDEIMv,
+  MDEIM::VMDEIM,
   var::String) where {D,T}
 
   timesθ = get_timesθ(RBInfo)
@@ -347,7 +382,7 @@ end
 function θ_function(
   FEMSpace::FEMProblemS,
   RBVars::RBProblemS,
-  MDEIM::MDEIMm,
+  MDEIM::MMDEIM,
   var::String) where T
 
   Fun_μ_sparse =

@@ -291,7 +291,7 @@ end
 
 function assemble_reduced_mat_MDEIM(
   RBVars::StokesST,
-  MDEIM::MDEIMm,
+  MDEIM::MMDEIM,
   var::String)
 
   if var == "B"
@@ -315,7 +315,7 @@ end
 
 function assemble_reduced_mat_MDEIM(
   RBVars::StokesS{T},
-  MDEIM::MDEIMv,
+  MDEIM::VMDEIM,
   var::String) where T
 
   Q = size(MDEIM.Mat)[2]

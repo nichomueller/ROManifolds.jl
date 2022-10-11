@@ -211,7 +211,7 @@ end
 
 function assemble_reduced_mat_MDEIM(
   RBVars::PoissonST{T},
-  MDEIM::MDEIMm,
+  MDEIM::MMDEIM,
   var::String) where T
 
   Q = size(MDEIM.Mat)[2]
@@ -236,7 +236,7 @@ end
 
 function assemble_reduced_mat_MDEIM(
   RBVars::PoissonST{T},
-  MDEIM::MDEIMv,
+  MDEIM::VMDEIM,
   var::String) where T
 
   assemble_reduced_mat_MDEIM(RBVars.Steady, MDEIM, var)

@@ -107,7 +107,7 @@ function init_RBVars(::NTuple{2,Int}, ::Type{T}) where T
 
   Φₜ = Matrix{T}[]
   Mₙ = Matrix{T}[]
-  MDEIM_M = MDEIMm(init_MDEIMm(T)...)
+  MDEIM_M = MMDEIM(init_MMDEIM(T)...)
   Nₜ = 0
   N = 0
   nₜ = 0
@@ -121,8 +121,8 @@ function init_RBVars(::NTuple{3,Int}, ::Type{T}) where T
 
   Bₙ = Matrix{T}[]
   Lcₙ = Matrix{T}[]
-  MDEIM_B = MDEIMm(init_MDEIMm(T)...)
-  MDEIM_Lc = MDEIMv(init_MDEIMv(T)...)
+  MDEIM_B = MMDEIM(init_MMDEIM(T)...)
+  MDEIM_Lc = VMDEIM(init_VMDEIM(T)...)
 
   Bₙ, Lcₙ, MDEIM_B, MDEIM_Lc
 
@@ -136,8 +136,8 @@ function init_RBVars(::NTuple{5,Int}, ::Type{T}) where T
 
   Cₙ = Matrix{T}[]
   Dₙ = Matrix{T}[]
-  MDEIM_C = MDEIMm(init_MDEIMm(T)...)
-  MDEIM_D = MDEIMm(init_MDEIMm(T)...)
+  MDEIM_C = MMDEIM(init_MMDEIM(T)...)
+  MDEIM_D = MMDEIM(init_MMDEIM(T)...)
 
   Cₙ, Dₙ, MDEIM_C, MDEIM_D
 
@@ -151,13 +151,13 @@ mutable struct PoissonS{T} <: RBProblemS{T}
 end
 
 mutable struct PoissonST{T} <: RBProblemST{T}
-  Steady::PoissonS{T}; Φₜᵘ::Vector{Matrix{T}}; Mₙ::Vector{Matrix{T}}; MDEIM_M::MDEIMm{T};
+  Steady::PoissonS{T}; Φₜᵘ::Vector{Matrix{T}}; Mₙ::Vector{Matrix{T}}; MDEIM_M::MMDEIM{T};
   Nₜ::Int; N::Vector{Int}; nₜ::Vector{Int}; n::Vector{Int}
 end
 
 mutable struct StokesS{T} <: RBProblemS{T}
   Poisson::PoissonS{T}; Bₙ::Vector{Matrix{T}}; Lcₙ::Vector{Matrix{T}};
-  MDEIM_B::MDEIMm{T}; MDEIM_Lc::MDEIMv{T};
+  MDEIM_B::MMDEIM{T}; MDEIM_Lc::VMDEIM{T};
 end
 
 mutable struct StokesST{T} <: RBProblemST{T}
@@ -166,7 +166,7 @@ end
 
 mutable struct NavierStokesS{T} <: RBProblemS{T}
   Stokes::StokesS{T}; Cₙ::Vector{Matrix{T}}; Dₙ::Vector{Matrix{T}};
-  MDEIM_C::MDEIMm{T}; MDEIM_D::MDEIMm{T}
+  MDEIM_C::MMDEIM{T}; MDEIM_D::MMDEIM{T}
 end
 
 mutable struct NavierStokesST{T} <: RBProblemST{T}

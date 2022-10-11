@@ -288,3 +288,27 @@ function get_FEMSpace₀(
   get_FEMSpace(problem_id,FEMInfo,model,g₀)
 
 end
+
+function FEMSpace_vectors(FEMSpace::FEMProblem, var::String)
+  if var == "Lc"
+    FEMSpace.Q₀
+  else
+    FEMSpace.V₀
+  end
+end
+
+function FEMSpace_matrices(FEMSpace::FEMProblem, var::String)
+  if var == "B"
+    FEMSpace.V, FEMSpace.Q₀
+  else
+    FEMSpace.V, FEMSpace.V₀
+  end
+end
+
+function get_measure(FEMSpace::FEMProblem, var::String)
+  if var == "H"
+    FEMSpace.dΓn
+  else
+    FEMSpace.dΩ
+  end
+end

@@ -1,5 +1,3 @@
-include("RB.jl")
-
 function assemble_LHSₙ(
   RBInfo::Info,
   RBVars::PoissonS{T},

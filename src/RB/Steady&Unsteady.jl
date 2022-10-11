@@ -82,7 +82,7 @@ function assemble_affine_structure(
       RBVars.Φₛ' * Vec
     end
 
-    Var.Matₙ = affine_vector(var)
+    push!(Var.Matₙ, affine_vector(var))
   end;
 
 end
@@ -103,7 +103,7 @@ function assemble_affine_structure(
       RBVars.Φₛ' * Mat * RBVars.Φₛ
     end
 
-    Var.Matₙ = affine_matrix(var)
+    push!(Var.Matₙ, affine_matrix(var))
   end;
 
 end
@@ -132,9 +132,9 @@ function assemble_MDEIM_structures(
         running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
 
       if isempty(Var.MDEIM.Mat)
-        MDEIM_offline!(Var.MDEIM, RBInfo, RBVars, var)
+        MDEIM_offline(Var.MDEIM, RBInfo, RBVars, var)
       end
-      assemble_MDEIM_Matₙ(Var; get_Φₛ(RBVars, var), RBVars.Φₛ[1])
+      assemble_MDEIM_Matₙ(Var; get_Φₛ(RBVars, var)...)
     end;
 
   end
@@ -168,7 +168,7 @@ function assemble_MDEIM_Matₙ(
   Vars::VVariable{T};
   kwargs...) where T
 
-  Φₛ_left = kwargs
+  Φₛ_left, _ = kwargs
   MDEIM = Vars.MDEIM
 
   Q = size(MDEIM.Mat)[2]

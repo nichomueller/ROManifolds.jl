@@ -747,6 +747,17 @@ end =#
 function assemble_FEM_structure(
   FEMSpace::FEMProblem,
   FEMInfo::Info,
+  fun::Function,
+  var::String)
+
+  Param = ParamInfo(FEMSpace, fun, var)
+  assemble_FEM_structure(FEMSpace, FEMInfo, Param)
+
+end
+
+function assemble_FEM_structure(
+  FEMSpace::FEMProblem,
+  FEMInfo::Info,
   Param::ParamInfo)
 
   ParamForm = ParamFormInfo(FEMSpace, Param)
@@ -761,28 +772,12 @@ function assemble_FEM_structure(
 
   var = Param.var
 
-  function select_FEMSpace_vectors()
-    if var == "Lc"
-      FEMSpace.Q₀
-    else
-      FEMSpace.V₀
-    end
-  end
-
-  function select_FEMSpace_matrices()
-    if var == "B"
-      FEMSpace.V, FEMSpace.Q₀
-    else
-      FEMSpace.V, FEMSpace.V₀
-    end
-  end
-
   form = assemble_form(FEMSpace, FEMInfo, Param)
 
   if var ∈ ("F", "H", "L", "Lc")
-    assemble_vector(form, select_FEMSpace_vectors())
+    assemble_vector(form, FEMSpace_vectors(FEMSpace, var))
   else
-    assemble_vector(form, select_FEMSpace_matrices()...)
+    assemble_vector(form, FEMSpace_matrices(FEMSpace, var)...)
   end
 
 end
