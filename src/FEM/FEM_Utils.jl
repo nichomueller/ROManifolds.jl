@@ -87,7 +87,7 @@ function get_FEMProblem_info(FEMInfo::Info)
 
 end
 
-function get_ParamInfo(
+function ParamInfo(
   FEMInfo::FEMInfoS,
   μ::Vector,
   var::String)
@@ -97,7 +97,7 @@ function get_ParamInfo(
 
 end
 
-function get_ParamInfo(
+function ParamInfo(
   FEMInfo::FEMInfoST,
   μ::Vector,
   var::String)
@@ -107,18 +107,30 @@ function get_ParamInfo(
 
 end
 
-function get_ParamInfo(
+function ParamInfo(
   FEMInfo::Info,
   μ::Vector)
 
-  get_single_ParamInfo(var) = get_ParamInfo(FEMInfo, μ, var)
+  get_single_ParamInfo(var) = ParamInfo(FEMInfo, μ, var)
   operators = get_FEM_structures(FEMInfo)
   Broadcasting(get_single_ParamInfo)(operators)
 
 end
 
-function get_ParamFormInfo(
-  FEMSpace::Problem,
+function ParamInfo(Params::Vector{ParamInfo}, var::String)
+
+  for Param in Params
+    if Param.var == var
+      return Param
+    end
+  end
+
+  error("Unrecognized variable")
+
+end
+
+function ParamFormInfo(
+  FEMSpace::FEMProblemS,
   Param::ParamInfoS)
 
   if Param.var != "H"
@@ -129,8 +141,8 @@ function get_ParamFormInfo(
 
 end
 
-function get_ParamFormInfo(
-  FEMSpace::Problem,
+function ParamFormInfo(
+  FEMSpace::FEMProblemST,
   Param::ParamInfoST)
 
   if Param.var != "H"
@@ -141,11 +153,27 @@ function get_ParamFormInfo(
 
 end
 
-function get_ParamFormInfo(
+function ParamFormInfo(
+  dΩ::Measure,
+  Param::ParamInfoS)
+
+  ParamFormInfoS(Param, dΩ)
+
+end
+
+function ParamFormInfo(
+  dΩ::Measure,
+  Param::ParamInfoST)
+
+  ParamFormInfoST(Param, dΩ)
+
+end
+
+function ParamFormInfo(
   FEMInfo::Info,
   μ::Vector)
 
-  get_single_ParamFormInfo(var) = get_ParamInfo(FEMInfo, μ, var)
+  get_single_ParamFormInfo(var) = ParamInfo(FEMInfo, μ, var)
   operators = get_FEM_structures(FEMInfo)
   Broadcasting(get_single_ParamFormInfo)(operators)
 

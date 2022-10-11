@@ -254,14 +254,14 @@ function save_assembled_structures(
   save_structures_in_list(affine_vars[affine_entry], affine_names[affine_entry],
     RBInfo.ROM_structures_path)
 
-  M_DEIM_vars = (
+  MDEIM_vars = (
     RBVars.MDEIM_M.Matᵢ, RBVars.MDEIM_M.idx, RBVars.MDEIM_M.time_idx, RBVars.MDEIM_M.el,
     RBVars.MDEIM_A.time_idx, RBVars.MDEIM_F.time_idx, RBVars.MDEIM_H.time_idx,
     RBVars.MDEIM_L.time_idx)
-  M_DEIM_names = (
+  MDEIM_names = (
     "Matᵢ_M","idx_M","time_idx_M","el_M",
     "time_idx_A","time_idx_F","time_idx_H","time_idx_L")
-  save_structures_in_list(M_DEIM_vars, M_DEIM_names, RBInfo.ROM_structures_path)
+  save_structures_in_list(MDEIM_vars, MDEIM_names, RBInfo.ROM_structures_path)
 
   save_assembled_structures(RBInfo, RBVars.Steady, operators)
 
@@ -385,7 +385,7 @@ function adaptive_loop_on_params(
 
   RBVars.Φₛ = Matrix{T}(qr(hcat(RBVars.Φₛ,Φₛ_new)).Q)[:,1:RBVars.nₛᵘ]
   RBVars.Φₜᵘ = Matrix{T}(qr(hcat(RBVars.Φₜᵘ,Φₜᵘ_new)).Q)[:,1:RBVars.nₜᵘ]
-  RBInfo.save_offline_structures = false
+  RBInfo.save_offline = false
   assemble_offline_structures(RBInfo, RBVars)
 
   loop_on_params(FEMSpace,RBInfo,RBVars,μ,param_nbs)

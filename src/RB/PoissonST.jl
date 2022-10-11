@@ -42,7 +42,7 @@ function assemble_reduced_basis(
   RBVars.nᵘ = RBVars.nₛᵘ * RBVars.nₜᵘ
   RBVars.Nᵘ = RBVars.Nₛᵘ * RBVars.Nₜ
 
-  if RBInfo.save_offline_structures
+  if RBInfo.save_offline
     save_CSV(RBVars.Φₛ, joinpath(RBInfo.ROM_structures_path, "Φₛ.csv"))
     save_CSV(RBVars.Φₜᵘ, joinpath(RBInfo.ROM_structures_path, "Φₜᵘ.csv"))
   end
@@ -103,7 +103,7 @@ function assemble_offline_structures(
     end
   end
 
-  if RBInfo.save_offline_structures
+  if RBInfo.save_offline
     save_assembled_structures(RBInfo, RBVars, operators)
   end
 
@@ -348,7 +348,7 @@ function loop_on_params(
     println("\n")
     println("Considering parameter number: $nb/$(param_nbs[end])")
 
-    Param = get_ParamInfo(RBInfo, μ[nb])
+    Param = ParamInfo(RBInfo, μ[nb])
 
     uₕ_test = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
       DataFrame))[:,(nb-1)*RBVars.Nₜ+1:nb*RBVars.Nₜ]
@@ -409,16 +409,16 @@ function online_phase(
   for Param_nb in param_nbs
     string_param_nbs *= "_" * string(Param_nb)
   end
-  path_μ = joinpath(RBInfo.results_path, string_param_nbs)
+  res_path = joinpath(RBInfo.results_path, string_param_nbs)
 
-  if RBInfo.save_results
+  if RBInfo.save_online
     println("Saving the results...")
-    create_dir(path_μ)
-    save_CSV(ũ_μ, joinpath(path_μ, "ũ.csv"))
-    save_CSV(uₙ_μ, joinpath(path_μ, "uₙ.csv"))
-    save_CSV(mean_pointwise_err, joinpath(path_μ, "mean_point_err.csv"))
-    save_CSV(mean_H1_err, joinpath(path_μ, "H1_err.csv"))
-    save_CSV(H1_L2_err, joinpath(path_μ, "H1L2_err.csv"))
+    create_dir(res_path)
+    save_CSV(ũ_μ, joinpath(res_path, "ũ.csv"))
+    save_CSV(uₙ_μ, joinpath(res_path, "uₙ.csv"))
+    save_CSV(mean_pointwise_err, joinpath(res_path, "mean_point_err.csv"))
+    save_CSV(mean_H1_err, joinpath(res_path, "H1_err.csv"))
+    save_CSV(H1_L2_err, joinpath(res_path, "H1L2_err.csv"))
 
     if RBInfo.get_offline_structures
       RBVars.offline_time = NaN
@@ -426,10 +426,10 @@ function online_phase(
 
     times = Dict("off_time"=>RBVars.offline_time,
       "on_time"=>mean_online_time+adapt_time,"rec_time"=>mean_reconstruction_time)
-    CSV.write(joinpath(path_μ, "times.csv"),times)
+    CSV.write(joinpath(res_path, "times.csv"),times)
   end
 
-  pass_to_pp = Dict("path_μ"=>path_μ,
+  pass_to_pp = Dict("res_path"=>res_path,
     "FEMSpace"=>FEMSpace, "H1_L2_err"=>H1_L2_err,
     "mean_H1_err"=>mean_H1_err, "mean_point_err_u"=>Float.(mean_pointwise_err))
 

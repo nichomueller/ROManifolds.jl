@@ -40,7 +40,7 @@ export ParamInfoS
 export ParamInfoST
 export FEM_paths
 export generate_dcube_discrete_model
-export get_ParamInfo
+export ParamInfo
 export generate_vtk_file
 export find_FE_elements
 export generate_dcube_discrete_model

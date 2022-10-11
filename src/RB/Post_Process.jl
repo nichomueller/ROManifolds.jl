@@ -1,12 +1,12 @@
 function post_process(::ROMInfoS, d::Dict) where T
 
   FEMSpace = d["FEMSpace"]
-  writevtk(FEMSpace.Ω, joinpath(d["path_μ"], "mean_point_err_u"),
+  writevtk(FEMSpace.Ω, joinpath(d["res_path"], "mean_point_err_u"),
   cellfields = ["err"=> FEFunction(FEMSpace.V, d["mean_point_err_u"][:, 1])])
 
   if "mean_point_err_p" ∈ keys(d)
     FEMSpace = d["FEMSpace"]
-    writevtk(FEMSpace.Ω, joinpath(d["path_μ"], "mean_point_err_p"),
+    writevtk(FEMSpace.Ω, joinpath(d["res_path"], "mean_point_err_p"),
     cellfields = ["err"=> FEFunction(FEMSpace.Q, d["mean_point_err_p"][:, 1])])
   end
 
@@ -16,7 +16,7 @@ function post_process(RBInfo::ROMInfoST{T}, d::Dict) where T
 
   times = collect(RBInfo.t₀+RBInfo.δt:RBInfo.δt:RBInfo.tₗ)
   FEMSpace = d["FEMSpace"]
-  vtk_dir = joinpath(d["path_μ"], "vtk_folder")
+  vtk_dir = joinpath(d["res_path"], "vtk_folder")
 
   create_dir(vtk_dir)
   createpvd(joinpath(vtk_dir,"mean_point_err_u")) do pvd
@@ -37,21 +37,21 @@ function post_process(RBInfo::ROMInfoST{T}, d::Dict) where T
   end
 
   generate_and_save_plot(times,d["mean_H1_err"],
-    "Average ||uₕ(t) - ũ(t)||ₕ₁", ["H¹ err"], "time [s]", "H¹ error", d["path_μ"];
+    "Average ||uₕ(t) - ũ(t)||ₕ₁", ["H¹ err"], "time [s]", "H¹ error", d["res_path"];
     var="H1_err")
   xvec = collect(eachindex(d["H1_L2_err"]))
   generate_and_save_plot(xvec,d["H1_L2_err"],
-    "||uₕ - ũ||ₕ₁₋ₗ₂", ["H¹-l² err"], "Param μ number", "H¹-l² error", d["path_μ"];
+    "||uₕ - ũ||ₕ₁₋ₗ₂", ["H¹-l² err"], "Param μ number", "H¹-l² error", d["res_path"];
     var="H1_L2_err", selected_style=["markers"])
 
   if "mean_L2_err" ∈ keys(d)
 
     generate_and_save_plot(times,d["mean_L2_err"],
-      "Average ||pₕ(t) - p̃(t)||ₗ₂", ["l² err"], "time [s]", "L² error", d["path_μ"];
+      "Average ||pₕ(t) - p̃(t)||ₗ₂", ["l² err"], "time [s]", "L² error", d["res_path"];
       var="L2_err")
     xvec = collect(eachindex(d["L2_L2_err"]))
     generate_and_save_plot(xvec,d["L2_L2_err"],
-      "||pₕ - p̃||ₗ₂₋ₗ₂", ["l²-l² err"], "Param μ number", "L²-L² error", d["path_μ"];
+      "||pₕ - p̃||ₗ₂₋ₗ₂", ["l²-l² err"], "Param μ number", "L²-L² error", d["res_path"];
       var="L2_L2_err", selected_style=["markers"])
 
   end
@@ -157,9 +157,9 @@ function post_process(test_dir::String)
     function check_basis_existence(path_to_bases::String, name::String)
       Q = NaN
       if isfile(joinpath(path_to_bases, name * ".csv"))
-        M_DEIM_idx = load_CSV(Vector{Int}(undef,0),
+        MDEIM_idx = load_CSV(Vector{Int}(undef,0),
           joinpath(path_to_bases, name * ".csv"))
-        Q = length(M_DEIM_idx)
+        Q = length(MDEIM_idx)
       end
       Q
     end

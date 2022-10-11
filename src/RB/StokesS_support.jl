@@ -22,7 +22,7 @@ function assemble_constraint_matrix(
 
   for k = 1:RBVars.nₛ
     println("Column number $k, constraint matrix")
-    Param = get_ParamInfo(RBInfo, μ[k])
+    Param = ParamInfo(RBInfo, μ[k])
     B_k = Matrix{T}(assemble_FEM_structure(FEMSpace, RBInfo, Param, "B")')
     constraint_matrix[:, k] = B_k * RBVars.Sᵖ[:, k]
   end
@@ -304,13 +304,13 @@ function save_assembled_structures(
   save_structures_in_list(affine_vars[affine_entry], affine_names[affine_entry],
     RBInfo.ROM_structures_path)
 
-  M_DEIM_vars = (
+  MDEIM_vars = (
     RBVars.MDEIM_B.Matᵢ, RBVars.MDEIM_B.idx, RBVars.MDEIM_B.el,
     RBVars.MDEIM_Lc.Matᵢ, RBVars.MDEIM_Lc.idx, RBVars.MDEIM_Lc.el)
-  M_DEIM_names = (
+  MDEIM_names = (
     "Matᵢ_B","idx_B","el_B",
     "Matᵢ_Lc","idx_Lc","el_Lc")
-  save_structures_in_list(M_DEIM_vars, M_DEIM_names, RBInfo.ROM_structures_path)
+  save_structures_in_list(MDEIM_vars, MDEIM_names, RBInfo.ROM_structures_path)
 
   operators_to_pass = setdiff(operators, ("B", "Lc"))
   save_assembled_structures(RBInfo, RBVars.Poisson, operators_to_pass)

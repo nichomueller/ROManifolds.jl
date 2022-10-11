@@ -57,30 +57,12 @@ end
 
 function set_operators(RBInfo::Info)
 
-  operators = RBInfo.FE_matvec
+  operators = RBInfo.problem_structures
   if RBInfo.online_RHS
-    setdiff(operators, RBInfo.FEM_vecs)
+    setdiff(operators, problem_vectors(RBInfo))
   end
 
   operators
-
-end
-
-function assemble_offline_structures(
-  RBInfo::Info,
-  RBVars::RBProblem,
-  operators=String[])
-
-  if isempty(operators)
-    operators = set_operators(RBInfo)
-  end
-
-  RBVars.offline_time += @elapsed begin
-    assemble_affine_structures(RBInfo, RBVars,
-      setdiff(operators, RBInfo.probl_nl))
-    assemble_MDEIM_structures(RBInfo, RBVars,
-      intersect(operators, RBInfo.probl_nl))
-  end
 
 end
 
@@ -136,12 +118,12 @@ function assemble_affine_structures(
 
 end
 
-function assemble_MDEIM_structure(
+function assemble_MDEIM_structures(
   RBInfo::Info,
   RBVars::RBProblem,
   operators::Vector{String})
 
-  for Var in RBVars.Vars
+  function assemble_MDEIM_structure(Var::MVVariable)
 
     var = Var.var
 
@@ -153,19 +135,11 @@ function assemble_MDEIM_structure(
         MDEIM_offline!(Var.MDEIM, RBInfo, RBVars, var)
       end
       assemble_MDEIM_Matₙ(Var; get_Φₛ(RBVars, var), RBVars.Φₛ[1])
-    end
+    end;
 
-  end;
+  end
 
-end
-
-function assemble_MDEIM_structures(
-  RBInfo::Info,
-  RBVars::RBProblem,
-  operators::Vector{String})
-
-  MDEIM_structure(Var) = assemble_MDEIM_structure(RBInfo, Var, operators)
-  Broadcasting(MDEIM_structure)(RBVars.Vars);
+  Broadcasting(assemble_MDEIM_structure)(RBVars.Vars);
 
 end
 
@@ -204,6 +178,24 @@ function assemble_MDEIM_Matₙ(
 
 end
 
+function assemble_offline_structures(
+  RBInfo::Info,
+  RBVars::RBProblem,
+  operators=String[])
+
+  if isempty(operators)
+    operators = set_operators(RBInfo)
+  end
+
+  RBVars.offline_time += @elapsed begin
+    assemble_affine_structures(RBInfo, RBVars,
+      setdiff(operators, RBInfo.probl_nl))
+    assemble_MDEIM_structures(RBInfo, RBVars,
+      intersect(operators, RBInfo.probl_nl))
+  end
+
+end
+
 function save_Var_structures(
   Var::MVVariable{T},
   operators::Vector{String}) where T
@@ -214,52 +206,166 @@ function save_Var_structures(
     save_structures_in_list(Var.MDEIM.Matₙ, "$(var)ₙ", RBInfo.ROM_structures_path)
   end
 
-  M_DEIM_vars = (Var.MDEIM.Matᵢ, Var.MDEIM.idx, Var.MDEIM.idx_time, Var.MDEIM.el)
-  M_DEIM_names = ("Matᵢ_$(var)", "idx_$(var)", "idx_time_$(var)", "el_$(var)")
-  save_structures_in_list(M_DEIM_vars, M_DEIM_names, RBInfo.ROM_structures_path);
+  MDEIM_vars = (Var.MDEIM.Matᵢ, Var.MDEIM.idx, Var.MDEIM.idx_time, Var.MDEIM.el)
+  MDEIM_names = ("Matᵢ_$(var)", "idx_$(var)", "idx_time_$(var)", "el_$(var)")
+  save_structures_in_list(MDEIM_vars, MDEIM_names, RBInfo.ROM_structures_path);
 
 end
 
 ################################## ONLINE ######################################
 
-function get_θ_matrix(
-  FEMSpace::FEMProblem,
+function get_system_blocks(
   RBInfo::Info,
-  RBVars::RBProblem,
-  Param::ParamInfo,
-  var::String) where T
+  RBVars::RBProblem{T},
+  LHS_blocks::Vector{Int},
+  RHS_blocks::Vector{Int}) where T
 
-  θ = Vector{T}[]
-  if var == "A"
-    θ!(θ, FEMSpace, RBInfo, RBVars, Param, Param.α, RBVars.MDEIM_A, "A")
-  elseif var == "F"
-    θ!(θ, FEMSpace, RBInfo, RBVars, Param, Param.f, RBVars.MDEIM_F, "F")
-  elseif var == "H"
-    θ!(θ, FEMSpace, RBInfo, RBVars, Param, Param.h, RBVars.MDEIM_H, "H")
-  elseif var == "L"
-    θ!(θ, FEMSpace, RBInfo, RBVars, Param, Param.g, RBVars.MDEIM_L, "L")
-  else
-    error("Unrecognized variable")
+  if !RBInfo.get_offline_structures
+    return ["LHS", "RHS"]
   end
+
+  operators = String[]
+
+  for i = LHS_blocks
+    LHSₙi = "LHSₙ" * string(i) * ".csv"
+    if !isfile(joinpath(RBInfo.ROM_structures_path, LHSₙi))
+      append!(operators, ["LHS"])
+      break
+    end
+  end
+  for i = RHS_blocks
+    RHSₙi = "RHSₙ" * string(i) * ".csv"
+    if !isfile(joinpath(RBInfo.ROM_structures_path, RHSₙi))
+      append!(operators, ["RHS"])
+      break
+    end
+  end
+  if "LHS" ∉ operators
+    for i = LHS_blocks
+      LHSₙi = "LHSₙ" * string(i) * ".csv"
+      println("Importing block number $i of the reduced affine LHS")
+      push!(RBVars.LHSₙ,
+        load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, LHSₙi)))
+    end
+  end
+  if "RHS" ∉ operators
+    for i = RHS_blocks
+      RHSₙi = "RHSₙ" * string(i) * ".csv"
+      println("Importing block number $i of the reduced affine RHS")
+      push!(RBVars.RHSₙ,
+        load_CSV(Matrix{T}(undef,0,0), joinpath(RBInfo.ROM_structures_path, RHSₙi)))
+    end
+  end
+
+  operators
 
 end
 
-function get_θ(
+function save_system_blocks(
+  RBInfo::Info,
+  RBVars::RBProblem{T},
+  LHS_blocks::Vector{Int},
+  RHS_blocks::Vector{Int},
+  operators::Vector{String}) where T
+
+  if "A" ∉ RBInfo.probl_nl && "LHS" ∈ operators
+    for i = LHS_blocks
+      LHSₙi = "LHSₙ" * string(i) * ".csv"
+      save_CSV(RBVars.LHSₙ[i],joinpath(RBInfo.ROM_structures_path, LHSₙi))
+    end
+  end
+  if "F" ∉ RBInfo.probl_nl && "H" ∉ RBInfo.probl_nl && "L" ∉ RBInfo.probl_nl && "RHS" ∈ operators
+    for i = RHS_blocks
+      RHSₙi = "RHSₙ" * string(i) * ".csv"
+      save_CSV(RBVars.RHSₙ[i],joinpath(RBInfo.ROM_structures_path, RHSₙi))
+    end
+  end
+end
+
+function assemble_θ_var(
+  FEMSpace::FEMProblem,
+  RBInfo::Info,
+  Var::MVVariable,
+  μ::Vector{T},
+  operators::Vector{String}) where T
+
+  var = Var.var
+
+  if var ∈ operators
+    Param = ParamInfo(RBInfo, μ, var)
+    Param.θ = θ(FEMSpace, RBInfo, Param, MDEIM)
+  else
+    Param.θ = Vector{T}[]
+  end
+
+  Param::ParamInfo
+
+end
+
+function assemble_θ(
   FEMSpace::FEMProblem,
   RBInfo::Info,
   RBVars::RBProblem,
-  Param::ParamInfo) where T
+  μ::Vector{T}) where T
 
-  θᵃ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "A")
+  operators = set_operators(RBInfo)
 
-  if !RBInfo.online_RHS
-    θᶠ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "F")
-    θʰ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "H")
-    θˡ = get_θ_matrix(FEMSpace, RBInfo, RBVars, Param, "L")
-  else
-    θᶠ, θʰ, θˡ = Vector{T}[], Vector{T}[], Vector{T}[]
+  θ_var(Var) = assemble_θ_var(FEMSpace, RBInfo, Var, μ, operators)
+  Broadcasting(assemble_θ_var)(RBVars.Vars)
+
+end
+
+function assemble_matricesₙ(
+  RBInfo::Info,
+  RBVars::RBProblem{T},
+  Params::Vector{ParamInfo}) where T
+
+  operators = problem_matrices(RBInfo)
+  assemble_termsₙ(RBVars.Vars, Params, operators)::Vector{Matrix{T}}
+
+end
+
+function assemble_vectorsₙ(
+  RBInfo::Info,
+  RBVars::RBProblem{T},
+  Params::Vector{ParamInfo}) where T
+
+  operators = problem_vectors(RBInfo)
+  assemble_termsₙ(RBVars.Vars, Params, operators)::Vector{Matrix{T}}
+
+end
+
+function assemble_RB_system(
+  FEMSpace::FEMProblem,
+  RBInfo::Info,
+  RBVars::RBProblem,
+  μ::Vector{T})
+
+  initialize_RB_system(RBVars)
+  initialize_online_time(RBVars)
+  blocks = get_blocks_position(RBVars)
+
+  RBVars.online_time = @elapsed begin
+    operators = get_system_blocks(RBInfo, RBVars, blocks...)
+
+    Params = assemble_θ(FEMSpace, RBInfo, RBVars, μ)
+
+    if "LHS" ∈ operators
+      println("Assembling reduced LHS")
+      assemble_LHSₙ(RBVars, Params)
+    end
+
+    if "RHS" ∈ operators
+      if !RBInfo.online_RHS
+        println("Assembling reduced RHS")
+        assemble_RHSₙ(RBVars, Params)
+      else
+        println("Assembling reduced RHS exactly")
+        assemble_RHSₙ(FEMSpace, RBInfo, RBVars, μ)
+      end
+    end
   end
 
-  return θᵃ, θᶠ, θʰ, θˡ
+  save_system_blocks(RBInfo, RBVars, operators, blocks...);
 
 end

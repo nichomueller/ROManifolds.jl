@@ -30,7 +30,7 @@ import ParamInfoS
 import ParamInfoST
 import FEM_paths
 import generate_dcube_discrete_model
-import get_ParamInfo
+import ParamInfo
 import generate_vtk_file
 import find_FE_elements
 import generate_dcube_discrete_model =#
@@ -56,7 +56,7 @@ export ROM_paths
 include("RBSuperclasses.jl")
 include("RBUtils.jl")
 include("MV_snapshots.jl")
-include("M_DEIM.jl")
+include("MDEIM.jl")
 include("RBPoisson_steady.jl")
 include("RBPoisson_unsteady.jl")
 include("RBStokes_unsteady.jl")
@@ -70,4 +70,4 @@ end =#
 include("RB_Types.jl")
 include("RB_Utils.jl")
 include("Post_Process.jl")
-include("M_DEIM.jl")
+include("MDEIM.jl")

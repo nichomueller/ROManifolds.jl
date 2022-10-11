@@ -7,7 +7,7 @@ function assemble_matrix_snapshots(
   Mat, row_idx = Matrix{T}(undef,0,0), Int[]
   for k = 1:RBInfo.nₛ_MDEIM
     println("Snapshot number $k, $var")
-    Param = get_ParamInfo(RBInfo, μ[k])
+    Param = ParamInfo(RBInfo, μ[k])
     Mat_k = assemble_FEM_structure(FEMSpace, RBInfo, Param, var)
     i, v = findnz(Mat_k[:])::Tuple{Vector{Int},Vector{T}}
     if k == 1
@@ -29,7 +29,7 @@ function assemble_matrix_snapshots(
   var::String) where T
 
   Nₜ = length(timesθ)
-  Param = get_ParamInfo(RBInfo, μ)
+  Param = ParamInfo(RBInfo, μ)
   Mat_t = assemble_FEM_structure(FEMSpace, RBInfo, Param, var)
 
   Mat, row_idx = Matrix{T}(undef,0,0), Int[]
@@ -55,7 +55,7 @@ function assemble_matrix_snapshots(
   var::String) where T
 
   Matᵩ, row_idx = Matrix{T}(undef,0,0), Int[]
-  Param = get_ParamInfo(RBInfo, μ[1])
+  Param = ParamInfo(RBInfo, μ[1])
   Matᵤ = assemble_FEM_structure(FEMSpace, RBInfo, Param, var)
 
   for nᵩ = 1:RBVars.nₛᵘ
@@ -114,7 +114,7 @@ function get_snaps_MDEIM(
     snaps, row_idx = assemble_matrix_snapshots(FEMSpace, RBInfo, μ, var)
   end
 
-  snaps, _ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
+  snaps, _ = MDEIM_POD(snaps, RBInfo.ϵₛ)
   snaps, row_idx
 
 end
@@ -144,7 +144,7 @@ function standard_MDEIM(
     println("Considering parameter number $k/$nₛ_max")
     snapsₖ, row_idx = call_matrix_snapshots(
       FEMSpace,RBInfo,RBVars,μ[k],timesθ,var)
-    snapsₖ_space, snapsₖ_time = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
+    snapsₖ_space, snapsₖ_time = MDEIM_POD(snapsₖ, RBInfo.ϵₛ)
     if k == 1
       snaps_space = snapsₖ_space
       snaps_time = snapsₖ_time
@@ -159,7 +159,7 @@ function standard_MDEIM(
       println("Considering parameter number $k/$nₛ_max")
       snapsₖ, row_idx = call_matrix_snapshots(
         FEMSpace,RBInfo,RBVars,μ[k],timesθ,var)
-      _, snapsₖ_time = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
+      _, snapsₖ_time = MDEIM_POD(snapsₖ, RBInfo.ϵₛ)
       if k == 1
         snaps_time = snapsₖ_time
       else
@@ -171,7 +171,7 @@ function standard_MDEIM(
       println("Considering parameter number $k/$nₛ_max")
       snapsₖ, row_idx = call_matrix_snapshots(
         FEMSpace,RBInfo,RBVars,μ[k],timesθ,var)
-      snapsₖ_space, _ = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
+      snapsₖ_space, _ = MDEIM_POD(snapsₖ, RBInfo.ϵₛ)
       if k == 1
         snaps_space = snapsₖ_space
       else
@@ -180,8 +180,8 @@ function standard_MDEIM(
     end
   end
 
-  snaps_space, _ = M_DEIM_POD(snaps_space, RBInfo.ϵₛ)
-  snaps_time, _ = M_DEIM_POD(snaps_time, RBInfo.ϵₜ)
+  snaps_space, _ = MDEIM_POD(snaps_space, RBInfo.ϵₛ)
+  snaps_time, _ = MDEIM_POD(snaps_time, RBInfo.ϵₜ)
 
   return snaps_space, snaps_time, row_idx
 
@@ -197,7 +197,7 @@ function functional_MDEIM_linear(
   Θmat_space, Θmat_time = assemble_θmat_snapshots(FEMSpace, RBInfo, μ, timesθ, var)
 
   # space
-  Θmat_space, _ = M_DEIM_POD(Θmat_space,RBInfo.ϵₛ)
+  Θmat_space, _ = MDEIM_POD(Θmat_space,RBInfo.ϵₛ)
   Mat_Θ = assemble_parametric_FE_matrix(RBInfo.FEMInfo.problem_id,FEMSpace,var)
   Q = size(Θmat_space)[2]
   snaps_space,row_idx = Matrix{T}(undef,0,0),Int[]
@@ -213,10 +213,10 @@ function functional_MDEIM_linear(
     snaps_space[:,q] = v
   end
 
-  snaps_space, _ = M_DEIM_POD(snaps_space,RBInfo.ϵₛ)
+  snaps_space, _ = MDEIM_POD(snaps_space,RBInfo.ϵₛ)
 
   #time
-  snaps_time, _ = M_DEIM_POD(Θmat_time,RBInfo.ϵₜ)
+  snaps_time, _ = MDEIM_POD(Θmat_time,RBInfo.ϵₜ)
 
   return snaps_space, snaps_time, row_idx
 
@@ -236,7 +236,7 @@ function functional_MDEIM_nonlinear(
     iₛ, iₜ
   end
 
-  Param = get_ParamInfo(RBInfo, μ)
+  Param = ParamInfo(RBInfo, μ)
   Matᵤ = assemble_FEM_structure(FEMSpace, RBInfo, Param, var)
 
   Mat = Array{T}(undef,0,0,0)
@@ -257,11 +257,11 @@ function functional_MDEIM_nonlinear(
 
   #space
   snaps_space = reshape(Mat, length(row_idx), :)::Matrix{T}
-  snaps_space, _ = M_DEIM_POD(snaps_space, RBInfo.ϵₛ)
+  snaps_space, _ = MDEIM_POD(snaps_space, RBInfo.ϵₛ)
 
   #time
   snaps_time = reshape(permutedims(Mat, (2,1,3)), RBVars.Nₜ, :)::Matrix{T}
-  snaps_time, _ = M_DEIM_POD(snaps_time, RBInfo.ϵₜ)
+  snaps_time, _ = MDEIM_POD(snaps_time, RBInfo.ϵₜ)
 
   return snaps_space, snaps_time, row_idx
 
@@ -292,7 +292,7 @@ function get_snaps_MDEIM(
 
   timesθ = get_timesθ(RBInfo)
 
-  if RBInfo.functional_M_DEIM
+  if RBInfo.functional_MDEIM
     return functional_MDEIM(FEMSpace,RBInfo,RBVars,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}, Vector{Int}}
   else
     return standard_MDEIM(FEMSpace,RBInfo,RBVars,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}, Vector{Int}}
@@ -310,7 +310,7 @@ function assemble_vector_snapshots(
 
   for i_nₛ = 1:RBInfo.nₛ_MDEIM
     println("Snapshot number $i_nₛ, $var")
-    Param = get_ParamInfo(RBInfo, μ[i_nₛ])
+    Param = ParamInfo(RBInfo, μ[i_nₛ])
     v = assemble_FEM_structure(FEMSpace, RBInfo, Param, var)[:]
     if i_nₛ == 1
       Vec = zeros(T, length(v), RBInfo.nₛ_MDEIM)
@@ -330,7 +330,7 @@ function assemble_vector_snapshots(
   var::String) where T
 
   Nₜ = length(timesθ)
-  Param = get_ParamInfo(RBInfo, μ)
+  Param = ParamInfo(RBInfo, μ)
   Vec_t = assemble_FEM_structure(FEMSpace, RBInfo, Param, var)
   Vec = Matrix{T}(undef,0,0)
 
@@ -353,7 +353,7 @@ function get_snaps_DEIM(
   var::String) where T
 
   snaps = assemble_vector_snapshots(FEMSpace,RBInfo,μ,var)
-  snaps, _ = M_DEIM_POD(snaps, RBInfo.ϵₛ)
+  snaps, _ = MDEIM_POD(snaps, RBInfo.ϵₛ)
   return snaps
 
 end
@@ -371,7 +371,7 @@ function standard_DEIM(
   @simd for k = 1:nₛ_min
     println("Considering parameter number $k/$(RBInfo.nₛ_MDEIM)")
     snapsₖ = assemble_vector_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
-    snapsₖ_space, snapsₖ_time = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
+    snapsₖ_space, snapsₖ_time = MDEIM_POD(snapsₖ, RBInfo.ϵₛ)
     if k == 1
       snaps_space = snapsₖ_space
       snaps_time = snapsₖ_time
@@ -385,7 +385,7 @@ function standard_DEIM(
     @simd for k = nₛ_min+1:nₛ_max
       println("Considering parameter number $k/$nₛ_max")
       snapsₖ = assemble_vector_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
-      _, snapsₖ_time = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
+      _, snapsₖ_time = MDEIM_POD(snapsₖ, RBInfo.ϵₛ)
       if k == 1
         snaps_time = snapsₖ_time
       else
@@ -396,7 +396,7 @@ function standard_DEIM(
     @simd for k = nₛ_min+1:nₛ_max
       println("Considering parameter number $k/$nₛ_max")
       snapsₖ = assemble_vector_snapshots(FEMSpace,RBInfo,μ[k],timesθ,var)
-      snapsₖ_space, _ = M_DEIM_POD(snapsₖ, RBInfo.ϵₛ)
+      snapsₖ_space, _ = MDEIM_POD(snapsₖ, RBInfo.ϵₛ)
       if k == 1
         snaps_space = snapsₖ_space
       else
@@ -405,8 +405,8 @@ function standard_DEIM(
     end
   end
 
-  snaps_space, _ = M_DEIM_POD(snaps_space, RBInfo.ϵₛ)
-  snaps_time, _ = M_DEIM_POD(snaps_time, RBInfo.ϵₜ)
+  snaps_space, _ = MDEIM_POD(snaps_space, RBInfo.ϵₛ)
+  snaps_time, _ = MDEIM_POD(snaps_time, RBInfo.ϵₜ)
 
   return snaps_space, snaps_time
 
@@ -438,10 +438,10 @@ function assemble_θmat_snapshots(
 
   @simd for k = 1:nₛ_min
     println("Considering parameter number $k/$nₛ_max")
-    Param = get_ParamInfo(RBInfo, μ[k])
+    Param = ParamInfo(RBInfo, μ[k])
     Θₖ = assemble_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
       timesθ,var)
-    Θₖ_space, Θₖ_time = M_DEIM_POD(Θₖ, RBInfo.ϵₛ)
+    Θₖ_space, Θₖ_time = MDEIM_POD(Θₖ, RBInfo.ϵₛ)
     if k == 1
       Θmat_space = Θₖ_space
       Θmat_time = Θₖ_time
@@ -454,10 +454,10 @@ function assemble_θmat_snapshots(
   if nₛ_min == nₛ
     @simd for k = nₛ_min+1:nₛ_max
       println("Considering parameter number $k/$nₛ_max")
-      Param = get_ParamInfo(RBInfo, μ[k])
+      Param = ParamInfo(RBInfo, μ[k])
       Θₖ = assemble_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
         timesθ,var)
-      _, Θₖ_time = M_DEIM_POD(Θₖ, RBInfo.ϵₛ)
+      _, Θₖ_time = MDEIM_POD(Θₖ, RBInfo.ϵₛ)
       if k == 1
         Θmat_time = Θₖ_time
       else
@@ -467,10 +467,10 @@ function assemble_θmat_snapshots(
   else
     @simd for k = nₛ_min+1:nₛ_max
       println("Considering parameter number $k/$nₛ_max")
-      Param = get_ParamInfo(RBInfo, μ[k])
+      Param = ParamInfo(RBInfo, μ[k])
       Θₖ = assemble_parameter_on_phys_quadp(Param,FEMSpace.phys_quadp,ncells,nquad_cell,
         timesθ,var)
-      Θₖ_space, _ = M_DEIM_POD(Θₖ, RBInfo.ϵₛ)
+      Θₖ_space, _ = MDEIM_POD(Θₖ, RBInfo.ϵₛ)
       if k == 1
         Θmat_space = Θₖ_space
       else

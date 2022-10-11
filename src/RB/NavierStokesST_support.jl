@@ -130,7 +130,7 @@ function assemble_offline_structures(
   end
 
   save_affine_structures(RBInfo, RBVars)
-  save_M_DEIM_structures(RBInfo, RBVars)
+  save_MDEIM_structures(RBInfo, RBVars)
 
 end
 

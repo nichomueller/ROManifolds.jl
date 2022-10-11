@@ -3,6 +3,8 @@ abstract type FEMProblemS{D} <: FEMProblem{D} end
 abstract type FEMProblemST{D} <: FEMProblem{D} end
 
 abstract type Info end
+abstract type ParamInfo end
+abstract type ParamFormInfo end
 
 struct FEMSpacePoissonS{D} <: FEMProblemS{D}
   model::DiscreteModel
@@ -167,26 +169,26 @@ struct FEMInfoST <: Info
   δt::Float
 end
 
-mutable struct ParamInfoS
+mutable struct ParamInfoS <: ParamInfo
   var::String
   fun::Function
-  θ::Vector
+  θ::Vector{Vector{Float}}
 end
 
-mutable struct ParamInfoST
+mutable struct ParamInfoST <: ParamInfo
   var::String
   funₛ::Function
   funₜ::Function
   fun::Function
-  θ::Vector
+  θ::Vector{Vector{Float}}
 end
 
-mutable struct ParamFormInfoS
+mutable struct ParamFormInfoS <: ParamFormInfo
   Param::ParamInfoS
   dΩ::Measure
 end
 
-mutable struct ParamFormInfoST
+mutable struct ParamFormInfoST <: ParamFormInfo
   Param::ParamInfoST
   dΩ::Measure
 end

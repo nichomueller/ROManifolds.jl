@@ -2,10 +2,10 @@ abstract type RBProblem{T} end
 abstract type RBProblemS{T} <: RBProblem end
 abstract type RBProblemST{T} <: RBProblem end
 
-abstract type MDEIM{T} end
+abstract type MVMDEIM{T} end
 abstract type MVVariable{T} end
 
-mutable struct VMDEIM{T} <: MDEIM{T}
+mutable struct VMDEIM{T} <: MVMDEIM{T}
   Mat::Matrix{T}
   Matᵢ::Matrix{T}
   idx::Vector{Int}
@@ -13,7 +13,7 @@ mutable struct VMDEIM{T} <: MDEIM{T}
   el::Vector{Int}
 end
 
-mutable struct MMDEIM{T} <: MDEIM{T}
+mutable struct MMDEIM{T} <: MVMDEIM{T}
   Mat::Matrix{T}
   Matᵢ::Matrix{T}
   idx::Vector{Int}
@@ -22,20 +22,20 @@ mutable struct MMDEIM{T} <: MDEIM{T}
   el::Vector{Int}
 end
 
-mutable struct VVariable{T} <: MDEIMmv{T}
+mutable struct VVariable{T} <: MVVariable{T}
   var::String
   Matₙ::Matrix{T}
   MDEIM::VMDEIM{T}
 end
 
 
-mutable struct MVariable{T} <: MDEIMmv{T}
+mutable struct MVariable{T} <: MVVariable{T}
   var::String
   Matₙ::Matrix{T}
   MDEIM::MMDEIM{T}
 end
 
-function init_VVariable(var::String, ::Type{T}) where T
+function VVariable(var::String, ::Type{T}) where T
 
   Matₙ = Matrix{T}(undef,0,0)
 
@@ -50,7 +50,7 @@ function init_VVariable(var::String, ::Type{T}) where T
 
 end
 
-function init_MVariable(var::String, ::Type{T}) where T
+function MVariable(var::String, ::Type{T}) where T
 
   Matₙ = Matrix{T}(undef,0,0)
 
@@ -66,6 +66,18 @@ function init_MVariable(var::String, ::Type{T}) where T
 
 end
 
+function MVVariable(Vars::Vector{MVVariable}, var::String)
+
+  for Var in Vars
+    if Var.var == var
+      return Var
+    end
+  end
+
+  error("Unrecognized variable")
+
+end
+
 function init_RBVars(::NTuple{1,Int}, ::Type{T}) where T
 
   S = Matrix{T}[]
@@ -76,10 +88,10 @@ function init_RBVars(::NTuple{1,Int}, ::Type{T}) where T
   LHSₙ = Matrix{T}[]
   RHSₙ = Matrix{T}[]
 
-  VarA = init_MVariable("A", T)
-  VarF = init_VVariable("F", T)
-  VarH = init_VVariable("H", T)
-  VarL = init_VVariable("L", T)
+  VarA = MVariable("A", T)
+  VarF = VVariable("F", T)
+  VarH = VVariable("H", T)
+  VarL = VVariable("L", T)
   Vars = [VarA, VarF, VarH, VarL]
 
   Nₛ = Int[]
@@ -340,8 +352,8 @@ struct ROMInfoS{T} <: InfoS
   post_process::Bool
   get_snapshots::Bool
   get_offline_structures::Bool
-  save_offline_structures::Bool
-  save_results::Bool
+  save_offline::Bool
+  save_online::Bool
 end
 
 mutable struct ROMInfoST{T} <: InfoST
@@ -357,21 +369,21 @@ mutable struct ROMInfoST{T} <: InfoST
   post_process::Bool
   get_snapshots::Bool
   get_offline_structures::Bool
-  save_offline_structures::Bool
-  save_results::Bool
+  save_offline::Bool
+  save_online::Bool
   time_reduction_technique::String
   t₀::Float
   tₗ::Float
   δt::Float
   θ::Float
   ϵₜ::Float
-  st_M_DEIM::Bool
-  functional_M_DEIM::Bool
+  st_MDEIM::Bool
+  functional_MDEIM::Bool
   adaptivity::Bool
 end
 
 function Base.getproperty(RBInfo::ROMInfoS, sym::Symbol)
-  if sym in (:probl_nl,:problem_unknowns)
+  if sym in (:probl_nl, :problem_unknowns, :problem_structures)
     getfield(RBInfo.FEMInfo, sym)
   elseif sym in (:ROM_structures_path, :results_path)
     getfield(RBInfo.Paths, sym)
@@ -381,7 +393,7 @@ function Base.getproperty(RBInfo::ROMInfoS, sym::Symbol)
 end
 
 function Base.getproperty(RBInfo::ROMInfoST, sym::Symbol)
-  if sym in (:probl_nl,:problem_unknowns)
+  if sym in (:probl_nl, :problem_unknowns, :problem_structures)
     getfield(RBInfo.FEMInfo, sym)
   elseif sym in (:ROM_structures_path, :results_path)
     getfield(RBInfo.Paths, sym)

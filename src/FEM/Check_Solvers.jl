@@ -3,7 +3,7 @@ function check_dataset(
   nb::Int) where T
 
   FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
-  Param = get_ParamInfo(RBInfo, μ[nb])
+  Param = ParamInfo(RBInfo, μ[nb])
 
   A = assemble_FEM_structure(FEMSpace, RBInfo, Param, "A")
   F = assemble_FEM_structure(FEMSpace, RBInfo, Param, "F")
@@ -20,7 +20,7 @@ end
 function check_dataset(RBInfo, RBVars, i)
 
   FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
-  Param = get_ParamInfo(RBInfo, μ[i])
+  Param = ParamInfo(RBInfo, μ[i])
 
   u1 = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
     DataFrame))[:, (i-1)*RBVars.Nₜ+1]
@@ -55,7 +55,7 @@ end
 function check_dataset(RBInfo, RBVars, i)
 
   FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
-  Param = get_ParamInfo(RBInfo, μ[i])
+  Param = ParamInfo(RBInfo, μ[i])
 
   u1 = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
     DataFrame))[:, (i-1)*RBVars.Nₜ+1]
@@ -101,7 +101,7 @@ end
 function check_stokes_solver()
 
   FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
-  Param = get_ParamInfo(RBInfo, μ[nb])
+  Param = ParamInfo(RBInfo, μ[nb])
 
   u = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
     DataFrame))[:, nb]
@@ -127,9 +127,9 @@ function check_MDEIM_stokesS()
   RBVars.DEIM_mat_L, RBVars.DEIM_idx_L, RBVars.DEIMᵢ_L, RBVars.sparse_el_L =
     DEIM_offline(RBInfo,"L")
   FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
-  Param = get_ParamInfo(RBInfo, μ[95])
+  Param = ParamInfo(RBInfo, μ[95])
   L = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "L")
-  θˡ = M_DEIM_online(L, RBVars.DEIMᵢ_L, RBVars.DEIM_idx_L)
+  θˡ = MDEIM_online(L, RBVars.DEIMᵢ_L, RBVars.DEIM_idx_L)
   Lapp = RBVars.DEIM_mat_L * θˡ
   errL = abs.(Lapp - L)
   maximum(abs.(errL))
@@ -138,7 +138,7 @@ end
 function check_navier_stokes_solver()
 
   FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
-  Param = get_ParamInfo(RBInfo, μ[nb])
+  Param = ParamInfo(RBInfo, μ[nb])
 
   u = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
     DataFrame))[:, nb]

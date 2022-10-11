@@ -78,7 +78,7 @@ function assemble_reduced_basis(
   RBVars.Nᵖ = RBVars.Nₛᵖ * RBVars.Nₜ
   RBVars.nᵘ_quad = RBVars.nₛᵘ_quad * RBVars.nₜᵘ_quad
 
-  if RBInfo.save_offline_structures
+  if RBInfo.save_offline
     save_CSV(RBVars.Φₛ, joinpath(RBInfo.ROM_structures_path, "Φₛ.csv"))
     save_CSV(RBVars.Φₜᵘ, joinpath(RBInfo.ROM_structures_path, "Φₜᵘ.csv"))
     save_CSV(RBVars.Φₛᵖ, joinpath(RBInfo.ROM_structures_path, "Φₛᵖ.csv"))
@@ -152,25 +152,25 @@ function assemble_DEIM_vectors(
 
 end
 
-function save_M_DEIM_structures(
+function save_MDEIM_structures(
   RBInfo::ROMInfoST,
   RBVars::NavierStokesST)
 
-  list_M_DEIM = (RBVars.MDEIM_mat_C, RBVars.MDEIMᵢ_C, RBVars.MDEIM_idx_C,
+  list_MDEIM = (RBVars.MDEIM_mat_C, RBVars.MDEIMᵢ_C, RBVars.MDEIM_idx_C,
     RBVars.row_idx_C, RBVars.sparse_el_C, RBVars.MDEIM_idx_time_C)
   list_names = ("MDEIM_mat_C","MDEIMᵢ_C","MDEIM_idx_C","row_idx_C",
     "sparse_el_C", "MDEIM_idx_time_C")
 
-  save_structures_in_list(list_M_DEIM, list_names,
+  save_structures_in_list(list_MDEIM, list_names,
     RBInfo.ROM_structures_path)
 
 end
 
-function get_M_DEIM_structures(
+function get_MDEIM_structures(
   RBInfo::ROMInfoST,
   RBVars::NavierStokesST)
 
-  get_M_DEIM_structures(RBInfo, RBVars.Stokes)
+  get_MDEIM_structures(RBInfo, RBVars.Stokes)
 
 end
 
@@ -180,7 +180,7 @@ function get_offline_structures(
 
   operators = String[]
   append!(operators, get_affine_structures(RBInfo, RBVars))
-  append!(operators, get_M_DEIM_structures(RBInfo, RBVars))
+  append!(operators, get_MDEIM_structures(RBInfo, RBVars))
   unique!(operators)
 
   operators
@@ -225,7 +225,7 @@ function get_θᶜ(
 
   timesθ = get_timesθ(RBInfo)
 
-  if RBInfo.st_M_DEIM
+  if RBInfo.st_MDEIM
     red_timesθ = timesθ[RBVars.MDEIM_idx_time_C]
     C_μ_sparse = T.(assemble_sparse_mat(
       FEMSpace,FEMInfo,Param,RBVars.sparse_el_C,red_timesθ;var="C"))
@@ -356,23 +356,23 @@ function online_phase(
   for Param_nb in param_nbs
     string_param_nbs *= "_" * string(Param_nb)
   end
-  path_μ = joinpath(RBInfo.results_path, string_param_nbs)
+  res_path = joinpath(RBInfo.results_path, string_param_nbs)
 
-  if RBInfo.save_results
+  if RBInfo.save_online
     println("Saving the results...")
-    create_dir(path_μ)
+    create_dir(res_path)
 
-    save_CSV(ũ_μ, joinpath(path_μ, "ũ.csv"))
-    save_CSV(uₙ_μ, joinpath(path_μ, "uₙ.csv"))
-    save_CSV(mean_pointwise_err_U, joinpath(path_μ, "mean_point_err_u.csv"))
-    save_CSV(mean_H1_err, joinpath(path_μ, "H1_err.csv"))
-    save_CSV([mean_H1_L2_err], joinpath(path_μ, "H1L2_err.csv"))
+    save_CSV(ũ_μ, joinpath(res_path, "ũ.csv"))
+    save_CSV(uₙ_μ, joinpath(res_path, "uₙ.csv"))
+    save_CSV(mean_pointwise_err_U, joinpath(res_path, "mean_point_err_u.csv"))
+    save_CSV(mean_H1_err, joinpath(res_path, "H1_err.csv"))
+    save_CSV([mean_H1_L2_err], joinpath(res_path, "H1L2_err.csv"))
 
-    save_CSV(p̃_μ, joinpath(path_μ, "p̃.csv"))
-    save_CSV(Pₙ_μ, joinpath(path_μ, "Pₙ.csv"))
-    save_CSV(mean_pointwise_err_p, joinpath(path_μ, "mean_point_err_p.csv"))
-    save_CSV(mean_L2_err, joinpath(path_μ, "L2_err.csv"))
-    save_CSV([mean_L2_L2_err], joinpath(path_μ, "L2L2_err.csv"))
+    save_CSV(p̃_μ, joinpath(res_path, "p̃.csv"))
+    save_CSV(Pₙ_μ, joinpath(res_path, "Pₙ.csv"))
+    save_CSV(mean_pointwise_err_p, joinpath(res_path, "mean_point_err_p.csv"))
+    save_CSV(mean_L2_err, joinpath(res_path, "L2_err.csv"))
+    save_CSV([mean_L2_L2_err], joinpath(res_path, "L2L2_err.csv"))
 
     if RBInfo.get_offline_structures
       RBVars.offline_time = NaN
@@ -380,10 +380,10 @@ function online_phase(
 
     times = Dict("off_time"=>RBVars.offline_time,
       "on_time"=>mean_online_time+adapt_time,"rec_time"=>mean_reconstruction_time)
-    CSV.write(joinpath(path_μ, "times.csv"),times)
+    CSV.write(joinpath(res_path, "times.csv"),times)
   end
 
-  pass_to_pp = Dict("path_μ"=>path_μ,
+  pass_to_pp = Dict("res_path"=>res_path,
     "FEMSpace"=>FEMSpace, "H1_L2_err"=>H1_L2_err,
     "mean_H1_err"=>mean_H1_err, "mean_point_err_u"=>Float.(mean_pointwise_err_u),
     "L2_L2_err"=>L2_L2_err, "mean_L2_err"=>mean_L2_err,
@@ -426,7 +426,7 @@ function loop_on_params(
     println("\n")
     println("Considering parameter number: $nb/$(param_nbs[end])")
 
-    Param = get_ParamInfo(RBInfo, μ[nb])
+    Param = ParamInfo(RBInfo, μ[nb])
 
     uₕ_test = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
       DataFrame))[:,(nb-1)*RBVars.Nₜ+1:nb*RBVars.Nₜ]
@@ -548,7 +548,7 @@ function adaptive_loop_on_params(
   RBVars.Φₛᵖ = Matrix{T}(qr(hcat(RBVars.Φₛᵖ,Φₛᵖ_new)).Q)[:,1:RBVars.nₛᵖ]
   RBVars.Φₜᵖ = Matrix{T}(qr(hcat(RBVars.Φₜᵖ,Φₜᵖ_new)).Q)[:,1:RBVars.nₜᵖ]
 
-  RBInfo.save_offline_structures = false
+  RBInfo.save_offline = false
   assemble_offline_structures(RBInfo, RBVars)
 
   loop_on_params(FEMSpace,RBInfo,RBVars,μ,param_nbs)

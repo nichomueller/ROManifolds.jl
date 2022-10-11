@@ -185,13 +185,13 @@ function save_assembled_structures(
   save_structures_in_list(affine_vars[affine_entry], affine_names[affine_entry],
     RBInfo.ROM_structures_path)
 
-  M_DEIM_vars = (
+  MDEIM_vars = (
     RBVars.MDEIM_C.Matᵢ, RBVars.MDEIM_C.idx, RBVars.MDEIM_C.el,
     RBVars.MDEIM_D.Matᵢ, RBVars.MDEIM_D.idx, RBVars.MDEIM_D.el)
-  M_DEIM_names = (
+  MDEIM_names = (
     "Matᵢ_C","idx_C","el_C",
     "Matᵢ_D","idx_D","el_D")
-  save_structures_in_list(M_DEIM_vars, M_DEIM_names, RBInfo.ROM_structures_path)
+  save_structures_in_list(MDEIM_vars, MDEIM_names, RBInfo.ROM_structures_path)
 
   operators_to_pass = setdiff(operators, ("C", "D"))
   save_assembled_structures(RBInfo, RBVars.Stokes, operators_to_pass)

@@ -3,7 +3,17 @@ function assemble_form(
   FEMInfo::Info,
   Param::ParamInfo)
 
-  assemble_form(FEMInfo.problem_id, FEMSpace, FEMInfo, Param)
+  ParamForm = ParamFormInfo(FEMSpace, Param)
+  assemble_form(FEMInfo.problem_id, FEMSpace, FEMInfo, ParamForm)
+
+end
+
+function assemble_form(
+  FEMSpace::FEMProblem,
+  FEMInfo::Info,
+  ParamForm::ParamFormInfo)
+
+  assemble_form(FEMInfo.problem_id, FEMSpace, FEMInfo, ParamForm)
 
 end
 
@@ -11,9 +21,8 @@ function assemble_form(
   ::NTuple{1,Int},
   FEMSpace::FEMProblemS,
   FEMInfo::FEMInfoS,
-  Param::ParamInfoS)
+  Param::ParamFormInfoS)
 
-  ParamForm = get_ParamFormInfo(FEMSpace, Param)
   var = ParamForm.var
 
   function bilinear_form(u, v)
@@ -37,7 +46,7 @@ function assemble_form(
       end
     elseif var == "L"
       g = interpolate_dirichlet(ParamForm.fun, FEMSpace.V)
-      Param_A = get_ParamInfo(FEMInfo, μ, "A")
+      Param_A = ParamInfo(FEMInfo, μ, "A")
       ∫(∇(v) ⋅ (Param_A.fun * ∇(g)))ParamForm.dΩ
     else
       error("Unrecognized variable")
@@ -56,9 +65,8 @@ function assemble_form(
   ::NTuple{2,Int},
   FEMSpace::FEMProblemS,
   FEMInfo::FEMInfoS,
-  Param::ParamInfoS)
+  ParamForm::ParamFormInfoS)
 
-  ParamForm = get_ParamFormInfo(FEMSpace, Param)
   var = ParamForm.var
 
   function bilinear_form(u, v)
@@ -91,9 +99,9 @@ function assemble_form(
     else
       g = interpolate_dirichlet(ParamForm.fun, FEMSpace.V)
       if var == "L"
-        Param_AB = get_ParamInfo(FEMInfo, μ, "A")
+        Param_AB = ParamInfo(FEMInfo, μ, "A")
       else var == "Lc"
-        Param_AB = get_ParamInfo(FEMInfo, μ, "B")
+        Param_AB = ParamInfo(FEMInfo, μ, "B")
       end
       ∫(∇(v) ⋅ (Param_AB.fun * ∇(g)))ParamForm.dΩ
     end
@@ -111,9 +119,8 @@ function assemble_form(
   ::NTuple{3,Int},
   FEMSpace::FEMProblemS,
   FEMInfo::FEMInfoS,
-  Param::ParamInfoS)
+  ParamForm::ParamFormInfoS)
 
-  ParamForm = get_ParamFormInfo(FEMSpace, Param)
   var = ParamForm.var
 
   function trilinear_form(u, v, z)
@@ -154,9 +161,9 @@ function assemble_form(
     else
       g = interpolate_dirichlet(ParamForm.fun, FEMSpace.V)
       if var == "L"
-        Param_AB = get_ParamInfo(FEMInfo, μ, "A")
+        Param_AB = ParamInfo(FEMInfo, μ, "A")
       else var == "Lc"
-        Param_AB = get_ParamInfo(FEMInfo, μ, "B")
+        Param_AB = ParamInfo(FEMInfo, μ, "B")
       end
       ∫(∇(v) ⋅ (Param_AB.fun * ∇(g)))ParamForm.dΩ
     end
@@ -740,8 +747,19 @@ end =#
 function assemble_FEM_structure(
   FEMSpace::FEMProblem,
   FEMInfo::Info,
-  Param::Info,
-  var::String)
+  Param::ParamInfo)
+
+  ParamForm = ParamFormInfo(FEMSpace, Param)
+  assemble_FEM_structure(FEMSpace, FEMInfo, ParamForm)
+
+end
+
+function assemble_FEM_structure(
+  FEMSpace::FEMProblem,
+  FEMInfo::Info,
+  Param::ParamFormInfo)
+
+  var = Param.var
 
   function select_FEMSpace_vectors()
     if var == "Lc"

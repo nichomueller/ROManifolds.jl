@@ -28,10 +28,10 @@ function select_RB_method(
   tol::String,
   add_info::Dict) ::String
 
-  if add_info["st_M_DEIM"]
+  if add_info["st_MDEIM"]
     RB_method *= "_st"
   end
-  if add_info["fun_M_DEIM"]
+  if add_info["fun_MDEIM"]
     RB_method *= "_fun"
   end
 
@@ -54,23 +54,20 @@ function get_affine_entries(
 
 end
 
-function assemble_FEM_structure(
-  FEMSpace::FEMProblem,
-  RBInfo::ROMInfoS,
-  Param::ParamInfoS,
-  var::String)
-
-  assemble_FEM_structure(FEMSpace,RBInfo.FEMInfo,Param,var)
-
+function get_blocks_position(RBVars::RBProblem)
+  if typeof(RBVars) ∈ (::PoissonS, ::PoissonST)
+    ([1], [1])
+  else
+    ([1, 2, 3], [1, 2])
+  end
 end
 
 function assemble_FEM_structure(
   FEMSpace::FEMProblem,
-  RBInfo::ROMInfoST,
-  Param::ParamInfoST,
-  var::String)
+  RBInfo::Info,
+  Param::ParamInfo)
 
-  assemble_FEM_structure(FEMSpace,RBInfo.FEMInfo,Param,var)
+  assemble_FEM_structure(FEMSpace, RBInfo.FEMInfo, Param)
 
 end
 
@@ -90,38 +87,47 @@ function get_Nₛ(RBVars::RBProblem, var::String)
   end
 end
 
-function get_ParamInfo(
+function ParamInfo(
   RBInfo::Info,
   μ::Vector,
   var::String)
 
-  get_ParamInfo(RBInfo.FEMInfo, μ, var)
+  ParamInfo(RBInfo.FEMInfo, μ, var)
 
 end
 
-function get_ParamInfo(
+function ParamInfo(
   RBInfo::Info,
   μ::Vector)
 
-  get_ParamInfo(RBInfo.FEMInfo, μ)
+  ParamInfo(RBInfo.FEMInfo, μ)
 
 end
 
-function get_ParamFormInfo(
+function ParamFormInfo(
   RBInfo::Info,
   μ::Vector,
   var::String)
 
-  get_ParamFormInfo(RBInfo.FEMInfo, μ, var)
+  ParamFormInfo(RBInfo.FEMInfo, μ, var)
 
 end
 
-function get_ParamFormInfo(
+function ParamFormInfo(
   RBInfo::Info,
   μ::Vector)
 
-  get_ParamFormInfo(RBInfo.FEMInfo, μ)
+  ParamFormInfo(RBInfo.FEMInfo, μ)
 
+end
+
+function problem_vectors(RBInfo::Info)
+  vecs = ["F", "H", "L", "Lc"]
+  intersect(RBInfo.problem_structures, vecs)::Vector{String}
+end
+
+function problem_matrices(RBInfo::Info)
+  setdiff(RBInfo.problem_structures, problem_vectors(RBInfo))::Vector{String}
 end
 
 function get_timesθ(RBInfo::ROMInfoST{T}) where T
@@ -130,18 +136,48 @@ function get_timesθ(RBInfo::ROMInfoST{T}) where T
 
 end
 
-function initialize_RB_system(RBVars::RBProblemS{T}) where T
-  RBVars.LHSₙ = Matrix{T}[]
-  RBVars.RHSₙ = Matrix{T}[]
+function times_dictionary(
+  RBInfo::Info,
+  offline_time::Float,
+  online_time::Float)
+
+  if RBInfo.get_offline_structures
+    offline_time = NaN
+  end
+
+  Dict("off_time"=>offline_time, "on_time"=>online_time)
+
 end
 
-function initialize_RB_system(RBVars::RBProblemST{T}) where T
+function initialize_RB_system(RBVars::RBProblem{T}) where T
   RBVars.LHSₙ = Matrix{T}[]
   RBVars.RHSₙ = Matrix{T}[]
+  RBVars.xₙ = Matrix{T}[]
 end
 
 function initialize_online_time(RBVars::RBProblem)
   RBVars.online_time = 0.0
+end
+
+function assemble_termsₙ(
+  Vars::Vector{MVVariable},
+  Params::Vector{ParamInfo},
+  operators::Vector{String})
+
+  mult = Broadcasting(.*)
+
+  function assemble_termₙ(var::String)
+    Var = MVVariable(Vars, var)
+    Param = ParamInfo(Params, var)
+    if var ∈ ("L", "Lc")
+      -sum(mult(Var.Matₙ, Param.θ))
+    else
+      sum(mult(Var.Matₙ, Param.θ))
+    end
+  end
+
+  Broadcasting(assemble_termₙ)(operators)
+
 end
 
 function assemble_ith_row_MatΦ(
@@ -155,241 +191,17 @@ function assemble_ith_row_MatΦ(
   Matrix(reshape((Mat[sparse_idx,:]' * Φₛ[c_idx[sparse_idx],:])', 1, :))
 end
 
-function assemble_sparse_mat(
+function assemble_sparse_structure(
   FEMSpace::FEMProblemS,
   FEMInfo::FEMInfoS,
   Param::ParamInfoS,
-  el::Vector{Int},
-  var::String)
+  el::Vector{Int})
 
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
+  ParamForm = ParamFormInfo(dΩ_sparse, Param)
 
-  function define_Mat(FEMSpace::FEMSpacePoissonS, var::String)
-    if var == "A"
-      return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Param.α*∇(FEMSpace.ϕᵤ)))*dΩ_sparse,
-        FEMSpace.V, FEMSpace.V₀)
-    else
-      error("Unrecognized sparse matrix")
-    end
-  end
-  function define_Mat(FEMSpace::FEMSpaceStokesS, var::String)
-    if var == "A"
-      return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Param.α*∇(FEMSpace.ϕᵤ)))*dΩ_sparse,
-        FEMSpace.V, FEMSpace.V₀)
-    elseif var == "B"
-      return assemble_matrix(∫(FEMSpace.ψᵧ*(Param.b*∇⋅(FEMSpace.ϕᵤ)))*dΩ_sparse,
-        FEMSpace.V, FEMSpace.Q₀)
-    else
-      error("Unrecognized sparse matrix")
-    end
-  end
-  function define_Mat(FEMSpace::FEMSpaceNavierStokesS, var::String)
-    if var == "A"
-      return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Param.α*∇(FEMSpace.ϕᵤ)))*dΩ_sparse,
-        FEMSpace.V, FEMSpace.V₀)
-    elseif var == "B"
-      return assemble_matrix(∫(FEMSpace.ψᵧ*(Param.b*∇⋅(FEMSpace.ϕᵤ)))*dΩ_sparse,
-        FEMSpace.V, FEMSpace.Q₀)
-    else
-      error("Unrecognized sparse matrix")
-    end
-  end
-
-  define_Mat(FEMSpace, var)::SparseMatrixCSC{Float, Int}
-
-end
-
-function assemble_sparse_mat(
-  FEMSpace::FEMProblemST,
-  FEMInfo::FEMInfoST,
-  Param::ParamInfoST,
-  el::Vector{Int},
-  timesθ::Vector,
-  var::String)
-
-  Ω_sparse = view(FEMSpace.Ω, el)
-  dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
-  Nₛ = get_Nₛ(RBVars, var)
-  Nₜ = length(timesθ)
-
-  function define_Matₜ(FEMSpace::FEMSpacePoissonST, t::Real, var::String)
-    if var == "A"
-      return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Param.α(t)*∇(FEMSpace.ϕᵤ(t))))*dΩ_sparse,
-        FEMSpace.V(t), FEMSpace.V₀)
-    elseif var == "M"
-      return assemble_matrix(∫(FEMSpace.ϕᵥ*(Param.m(t)*FEMSpace.ϕᵤ(t)))*dΩ_sparse,
-        FEMSpace.V(t), FEMSpace.V₀)
-    else
-      error("Unrecognized sparse matrix")
-    end
-  end
-  function define_Matₜ(FEMSpace::FEMSpaceStokesST, t::Real, var::String)
-    if var == "A"
-      return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Param.α(t)*∇(FEMSpace.ϕᵤ(t))))*dΩ_sparse,
-        FEMSpace.V(t), FEMSpace.V₀)
-    elseif var == "B"
-      return assemble_matrix(∫(FEMSpace.ψᵧ*(Param.b(t)*∇⋅(FEMSpace.ϕᵤ)))*dΩ_sparse,
-        FEMSpace.V(t), FEMSpace.Q₀)
-    elseif var == "M"
-      return assemble_matrix(∫(FEMSpace.ϕᵥ⋅(Param.m(t)*FEMSpace.ϕᵤ(t)))*dΩ_sparse,
-        FEMSpace.V(t), FEMSpace.V₀)
-    else
-      error("Unrecognized sparse matrix")
-    end
-  end
-  function define_Matₜ(FEMSpace::FEMSpaceNavierStokesST, t::Real, var::String)
-    if var == "A"
-      return assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Param.α(t)*∇(FEMSpace.ϕᵤ(t))))*dΩ_sparse,
-        FEMSpace.V(t), FEMSpace.V₀)
-    elseif var == "B"
-      return assemble_matrix(∫(FEMSpace.ψᵧ*(Param.b(t)*∇⋅(FEMSpace.ϕᵤ)))*dΩ_sparse,
-        FEMSpace.V(t), FEMSpace.Q₀)
-    elseif var == "M"
-      return assemble_matrix(∫(FEMSpace.ϕᵥ⋅(Param.m(t)*FEMSpace.ϕᵤ(t)))*dΩ_sparse,
-        FEMSpace.V(t), FEMSpace.V₀)
-    else
-      error("Unrecognized sparse matrix")
-    end
-  end
-  Matₜ(t) = define_Matₜ(FEMSpace, t, var)
-
-  Mat = sparse([], [], Float[])
-  for (i_t,t) in enumerate(timesθ)
-    i,j,v = findnz(Matₜ(t))::Tuple{Vector{Int},Vector{Int},Vector{Float}}
-    if i_t == 1
-      Mat = sparse(i,j,v,Nₛ,FEMSpace.Nₛᵘ*Nₜ)
-    else
-      Mat[:,(i_t-1)*FEMSpace.Nₛᵘ+1:i_t*FEMSpace.Nₛᵘ] =
-        sparse(i,j,v,Nₛ,FEMSpace.Nₛᵘ)
-    end
-  end
-
-  Mat::SparseMatrixCSC{Float, Int}
-
-end
-
-function assemble_sparse_vec(
-  FEMSpace::FEMProblemS,
-  FEMInfo::FEMInfoS,
-  Param::ParamInfoS,
-  el::Vector{Int},
-  var::String)
-
-  if var == "H"
-    Ω_sparse = view(FEMSpace.Γn, el)
-  else
-    Ω_sparse = view(FEMSpace.Ω, el)
-  end
-  dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
-
-  function define_Vec(FEMSpace::FEMSpacePoissonS, var::String)
-    if var == "F"
-      return assemble_vector(∫(FEMSpace.ϕᵥ*Param.f)*dΩ_sparse, FEMSpace.V₀)
-    elseif var == "H"
-      return assemble_vector(∫(FEMSpace.ϕᵥ*Param.h)*dΩ_sparse, FEMSpace.V₀)
-    elseif var == "L"
-      g = define_g_FEM(FEMSpace, Param)
-      return assemble_vector(
-        ∫(Param.α * ∇(FEMSpace.ϕᵥ) ⋅ ∇(g))*dΩ_sparse,FEMSpace.V₀)
-    else
-      error("Unrecognized variable")
-    end
-  end
-  function define_Vec(FEMSpace::FEMSpaceStokesS, var::String)
-    if var == "F"
-      return assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.f)*dΩ_sparse, FEMSpace.V₀)
-    elseif var == "H"
-      return assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.h)*dΩ_sparse, FEMSpace.V₀)
-    elseif var == "L"
-      g = define_g_FEM(FEMSpace, Param)
-      return assemble_vector(
-        ∫(Param.α * ∇(FEMSpace.ϕᵥ) ⊙ ∇(g))*dΩ_sparse,FEMSpace.V₀)
-    elseif var == "Lc"
-      g = define_g_FEM(FEMSpace, Param)
-      return assemble_vector(
-        ∫(FEMSpace.ψᵧ * (∇⋅g))*dΩ_sparse,FEMSpace.Q₀)
-    else
-      error("Unrecognized variable")
-    end
-  end
-  function define_Vec(FEMSpace::FEMSpaceNavierStokesS, var::String)
-    if var == "F"
-      return assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.f)*dΩ_sparse, FEMSpace.V₀)
-    elseif var == "H"
-      return assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.h)*dΩ_sparse, FEMSpace.V₀)
-    elseif var == "L"
-      g = define_g_FEM(FEMSpace, Param)
-      return assemble_vector(
-        ∫(Param.α * ∇(FEMSpace.ϕᵥ) ⊙ ∇(g))*dΩ_sparse,FEMSpace.V₀)
-    elseif var == "Lc"
-      g = define_g_FEM(FEMSpace, Param)
-      return assemble_vector(
-        ∫(FEMSpace.ψᵧ * (∇⋅g))*dΩ_sparse,FEMSpace.Q₀)
-    else
-      error("Unrecognized variable")
-    end
-  end
-
-  define_Vec(FEMSpace, var)::Vector{Float}
-
-end
-
-function assemble_sparse_vec(
-  FEMSpace::FEMProblemST,
-  FEMInfo::FEMInfoST,
-  Param::ParamInfoST,
-  el::Vector{Int},
-  timesθ::Vector,
-  var::String)
-
-  if var == "H"
-    Ω_sparse = view(FEMSpace.Γn, el)
-  else
-    Ω_sparse = view(FEMSpace.Ω, el)
-  end
-  dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
-
-  function define_Vecₜ(FEMSpace::FEMSpacePoissonST, t::Real, var::String)
-    if var == "F"
-      return assemble_vector(∫(FEMSpace.ϕᵥ*Param.f(t))*dΩ_sparse, FEMSpace.V₀)
-    elseif var == "H"
-      return assemble_vector(∫(FEMSpace.ϕᵥ*Param.h(t))*dΩ_sparse, FEMSpace.V₀)
-    elseif var == "L"
-      g = define_g_FEM(FEMSpace, Param)
-      return assemble_vector(
-        ∫(Param.α(t) * ∇(FEMSpace.ϕᵥ) ⋅ ∇(g(t)))*dΩ_sparse,FEMSpace.V₀)
-    else
-      error("Unrecognized variable")
-    end
-  end
-
-  function define_Vecₜ(FEMSpace::FEMSpaceStokesST, t::Real, var::String)
-    if var == "F"
-      return assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.f(t))*dΩ_sparse, FEMSpace.V₀)
-    elseif var == "H"
-      return assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.h(t))*dΩ_sparse, FEMSpace.V₀)
-    elseif var == "L"
-      g = define_g_FEM(FEMSpace, Param)
-      return assemble_vector(
-        ∫(Param.α(t) * ∇(FEMSpace.ϕᵥ) ⊙ ∇(g(t)))*dΩ_sparse,FEMSpace.V₀)
-    elseif var == "Lc"
-      g = define_g_FEM(FEMSpace, Param)
-      return assemble_vector(
-        ∫(FEMSpace.ψᵧ * (∇⋅g(t)))*dΩ_sparse,FEMSpace.Q₀)
-    else
-      error("Unrecognized variable")
-    end
-  end
-
-  Vecₜ(t) = define_Vecₜ(FEMSpace, t, var)
-
-  Vec = zeros(FEMSpace.Nₛᵘ, length(timesθ))
-  for (i_t,t) in enumerate(timesθ)
-    Vec[:, i_t] = Vecₜ(t)
-  end
-
-  Vec::Matrix{Float}
+  assemble_FEM_structure(FEMSpace, FEMInfo, Param)
 
 end
 
@@ -444,61 +256,22 @@ function interpolated_θ(
 
 end
 
-function get_scalar_value(
-  val,
-  T::Type)
-
-  if typeof(val) != T
-    T.(val[1][1])
-  else
-    T.(val)
-  end
-
-end
-
-function θ!(
-  θ::Vector{Vector{T}},
+function θ(
   FEMSpace::FEMProblemS{D},
   RBInfo::ROMInfoS{T},
-  RBVars::RBProblemS,
   Param::ParamInfoS,
-  fun::Function,
-  MDEIM::MDEIMm,
-  var::String) where {D,T}
+  MDEIM::MVMDEIM) where {D,T}
 
-  if var ∉ RBInfo.probl_nl
-    push!(θ, [get_scalar_value(fun(VectorValue(D, T)), T)])
+  if Param.var ∉ RBInfo.probl_nl
+    θ = [[Param.fun(VectorValue(D, T))[1]]]
   else
     Mat_μ_sparse =
-      assemble_sparse_mat(FEMSpace, FEMInfo, Param, MDEIM.el, var)::SparseMatrixCSC{Float, Int}
-    θvec = M_DEIM_online(RBVars, Mat_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
+      assemble_sparse_structure(FEMSpace, FEMInfo, Param, MDEIM.el)
+    θvec = MDEIM_online(Mat_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
     θ = [[θvec[q]] for q in eachindex(θvec)]
   end
 
-  θ
-
-end
-
-function θ!(
-  θ::Vector{Vector{T}},
-  FEMSpace::FEMProblemS{D},
-  RBInfo::ROMInfoS{T},
-  RBVars::RBProblemS,
-  Param::ParamInfoS,
-  fun::Function,
-  MDEIM::MDEIMv,
-  var::String) where {D,T}
-
-  if var ∉ RBInfo.probl_nl
-    push!(θ, [get_scalar_value(fun(VectorValue(D, T)), T)])
-  else
-    Vec_μ_sparse =
-      assemble_sparse_vec(FEMSpace, FEMInfo, Param, MDEIM.el, var)::Vector{Float}
-    θvec = M_DEIM_online(RBVars, Vec_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
-    θ = [[θvec[q]] for q in eachindex(θvec)]
-  end
-
-  θ
+  θ::Vector{Vector{T}}
 
 end
 
@@ -519,7 +292,7 @@ function θ!(
       push!(θ, [get_scalar_value(fun(VectorValue(D, T), t_θ), T)])
     end
   else
-    if RBInfo.st_M_DEIM
+    if RBInfo.st_MDEIM
       red_timesθ = timesθ[MDEIM.time_idx]
       Mat_μ_sparse = assemble_sparse_mat(
         FEMSpace, FEMInfo, Param, MDEIM.el, red_timesθ, var)
@@ -528,7 +301,7 @@ function θ!(
     else
       Mat_μ_sparse = assemble_sparse_mat(
         FEMSpace, FEMInfo, Param, MDEIM.el, timesθ, var)
-      θmat = M_DEIM_online(RBVars, Mat_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
+      θmat = MDEIM_online(RBVars, Mat_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
     end
     θ = [[θmat[q, :]] for q in size(θmat)[1]]
   end
@@ -554,7 +327,7 @@ function θ!(
       push!(θ, [get_scalar_value(fun(VectorValue(D, T), t_θ), T)])
     end
   else
-    if RBInfo.st_M_DEIM
+    if RBInfo.st_MDEIM
       red_timesθ = timesθ[MDEIM.time_idx]
       Vec_μ_sparse = T.(assemble_sparse_vec(
         FEMSpace, FEMInfo, Param, MDEIM.el, red_timesθ, var))
@@ -562,7 +335,7 @@ function θ!(
         MDEIM.idx, MDEIM.time_idx)
     else
       Vec_μ_sparse = assemble_sparse_vec(FEMSpace, FEMInfo, Param, MDEIM.el, timesθ, var)
-      θmat = M_DEIM_online(RBVars, Vec_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
+      θmat = MDEIM_online(RBVars, Vec_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
     end
     θ = [[θmat[q, :]] for q in size(θmat)[1]]
   end
@@ -579,7 +352,7 @@ function θ_function(
 
   Fun_μ_sparse =
     assemble_sparse_fun(FEMSpace, FEMInfo, MDEIM.el, var)
-  M_DEIM_online(RBVars, Fun_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
+  MDEIM_online(RBVars, Fun_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
 
 end
 
@@ -603,7 +376,7 @@ function compute_errors(
 end
 
 function compute_errors(
-  xₕ::Vector{T},
+  xₕ::Matrix{T},
   x̃::Matrix{T},
   X::Matrix{T},
   Nₜ::Int) where T

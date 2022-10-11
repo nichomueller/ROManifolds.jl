@@ -1,24 +1,24 @@
 include("MV_snapshots.jl")
 
-function M_DEIM_POD(S::Matrix{T}, ϵ=1e-5) where T
+function MDEIM_POD(S::Matrix{T}, ϵ=1e-5) where T
 
   U, Σ, Vᵀ = svd(S)
   V = Vᵀ'::Matrix{T}
 
   energies = cumsum(Σ .^ 2)
-  M_DEIM_err_bound = vcat(sqrt(norm(inv(U'U))) * Σ[2:end], 0.0) # approx by excess, should be norm(inv(U[idx,:]))
+  MDEIM_err_bound = vcat(sqrt(norm(inv(U'U))) * Σ[2:end], 0.0) # approx by excess, should be norm(inv(U[idx,:]))
 
   N₁ = findall(x -> x ≥ (1 - ϵ^2) * energies[end], energies)[1]
-  N₂ = findall(x -> x ≤ ϵ, M_DEIM_err_bound)[1]
+  N₂ = findall(x -> x ≤ ϵ, MDEIM_err_bound)[1]
   N = max(N₁, N₂)::Int
-  err = max(sqrt(1-energies[N]/energies[end]),M_DEIM_err_bound[N])::Float
+  err = max(sqrt(1-energies[N]/energies[end]),MDEIM_err_bound[N])::Float
   println("Basis number obtained via POD is $N, projection error ≤ $err")
 
   U[:,1:N], V[:,1:N]
 
 end
 
-function M_DEIM_offline(Mat::Matrix)
+function MDEIM_offline(Mat::Matrix)
 
   n = size(Mat)[2]
   idx = Int[]
@@ -50,7 +50,7 @@ function MDEIM_offline!(
   Nₛ = get_Nₛ(RBVars, var)
 
   Mat, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
-  idx_full, Matᵢ = M_DEIM_offline(Mat)
+  idx_full, Matᵢ = MDEIM_offline(Mat)
   idx = from_full_idx_to_sparse_idx(idx_full, row_idx, Nₛ)
   idx_space, _ = from_vec_to_mat_idx(idx, Nₛ)
   el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(idx_space))
@@ -71,12 +71,12 @@ function MDEIM_offline!(
 
   Mat, Mat_time, row_idx = get_snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
 
-  idx_full, Matᵢ = M_DEIM_offline(Mat)
+  idx_full, Matᵢ = MDEIM_offline(Mat)
   idx = from_full_idx_to_sparse_idx(idx_full, row_idx, Nₛ)
   idx_space, _ = from_vec_to_mat_idx(idx, Nₛ)
   el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(idx_space))
 
-  time_idx, _ = M_DEIM_offline(Mat_time)
+  time_idx, _ = MDEIM_offline(Mat_time)
   unique!(sort!(time_idx))
 
   MDEIM.Mat, MDEIM.Matᵢ, MDEIM.idx, MDEIM.time_idx, MDEIM.row_idx, MDEIM.el =
@@ -92,7 +92,7 @@ function MDEIM_offline!(
   FEMSpace, μ = get_FEMProblem_info(RBInfo.FEMInfo)
 
   Mat = get_snaps_DEIM(FEMSpace, RBInfo, μ, var)
-  idx, Matᵢ = M_DEIM_offline(Mat)
+  idx, Matᵢ = MDEIM_offline(Mat)
   if var == "H"
     el = find_FE_elements(FEMSpace.V₀, FEMSpace.Γn, unique(idx))
   elseif var == "Lc"
@@ -114,7 +114,7 @@ function MDEIM_offline!(
 
   Mat, Mat_time = get_snaps_DEIM(FEMSpace, RBInfo, μ, var)
 
-  idx, Matᵢ = M_DEIM_offline(Mat)
+  idx, Matᵢ = MDEIM_offline(Mat)
   if var == "H"
     el = find_FE_elements(FEMSpace.V₀, FEMSpace.Γn, unique(idx))
   elseif var == "Lc"
@@ -123,7 +123,7 @@ function MDEIM_offline!(
     el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(idx))
   end
 
-  time_idx, _ = M_DEIM_offline(Mat_time)
+  time_idx, _ = MDEIM_offline(Mat_time)
   unique!(sort!(time_idx))
 
   MDEIM.Mat, MDEIM.Matᵢ, MDEIM.idx, MDEIM.time_idx, MDEIM.el =
@@ -131,31 +131,21 @@ function MDEIM_offline!(
 
 end
 
-function M_DEIM_online(
-  ::RBProblemS,
+function MDEIM_online(
   Mat_nonaffine::AbstractArray{T},
   Matᵢ::Matrix{T},
-  idx::Vector{Int}) where T
+  idx::Vector{Int},
+  Nₜ=1) where T
 
-  @fastmath Matᵢ \ reshape(Mat_nonaffine, :, 1)[idx]
+  @fastmath Matᵢ \ reshape(Mat_nonaffine, :, Nₜ)[idx]
 
 end
 
-function M_DEIM_online(
-  RBVars::RBProblemST,
-  Mat_nonaffine::AbstractArray{T},
-  Matᵢ::Matrix{T},
-  idx::Vector{Int}) where T
-
-  @fastmath Matᵢ \ reshape(Mat_nonaffine, :, RBVars.Nₜ)[idx]
-
-end
-
-function M_DEIM_online(
-  ::RBProblemS,
+function MDEIM_online(
   Fun_nonaffine::Function,
   Matᵢ::Matrix{T},
-  idx::Vector{Int}) where T
+  idx::Vector{Int},
+  Nₜ=1) where T
 
   function θ(u)
     @fastmath Matᵢ \ reshape(Fun_nonaffine(u), :, 1)[idx]
