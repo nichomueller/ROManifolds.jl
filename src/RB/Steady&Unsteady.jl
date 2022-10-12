@@ -181,7 +181,7 @@ end
 function assemble_offline_structures(
   RBInfo::ROMInfo,
   RBVars::RB,
-  operators=String[])
+  operators::Vector{String})
 
   if isempty(operators)
     operators = set_operators(RBInfo)
@@ -202,7 +202,7 @@ function save_Var_structures(
 
   var = Var.var
 
-  if "$(var)" ∈ operators
+  if var ∈ operators && isaffine(var)
     save_structures_in_list(Var.MDEIM.Matₙ, "$(var)ₙ", RBInfo.ROM_structures_path)
   end
 
@@ -367,5 +367,19 @@ function assemble_RB_system(
   end
 
   save_system_blocks(RBInfo, RBVars, operators, blocks...);
+
+end
+
+function assemble_solve_reconstruct(
+  FEMSpace::FOM,
+  RBInfo::ROMInfo,
+  RBVars::RB,
+  μ::Vector{T})
+
+  assemble_RB_system(FEMSpace, RBInfo, RBVars, μ)
+  RBVars.online_time += @elapsed begin
+    solve_RB_system(RBVars)
+  end
+  reconstruct_FEM_solution(RBVars);
 
 end

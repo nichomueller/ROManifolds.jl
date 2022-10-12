@@ -1,5 +1,6 @@
 include("RB_Types.jl")
 include("RB_Utils.jl")
+include("RB_to_FEM.jl")
 include("Steady.jl")
 include("Unsteady.jl")
 include("Steady&Unsteady.jl")

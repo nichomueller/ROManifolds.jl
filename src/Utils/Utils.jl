@@ -24,6 +24,7 @@ using LineSearches:BackTracking
 import Gridap:∇
 
 const Float = Float64
+abstract type Info end
 
 include("Files.jl")
 include("Indexes.jl")

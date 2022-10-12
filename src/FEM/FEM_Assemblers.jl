@@ -29,7 +29,7 @@ function assemble_form(
     if var == "Xu"
       ∫(∇(v) ⋅ ∇(u) + v * u)ParamForm.dΩ
     else var == "A"
-      if var ∈ FEMInfo.affine_structures
+      if isaffine(FEMInfo, var)
         ∫(∇(v) ⋅ ∇(u))ParamForm.dΩ
       else
         ∫(∇(v) ⋅ (ParamForm.fun * ∇(u)))ParamForm.dΩ
@@ -39,7 +39,7 @@ function assemble_form(
 
   function linear_form(v)
     if var == "F" || "H"
-      if var ∈ FEMInfo.affine_structures
+      if isaffine(FEMInfo, var)
         ∫(v * (x->1.))ParamForm.dΩ
       else
         ∫(v * ParamForm.fun)ParamForm.dΩ
@@ -75,13 +75,13 @@ function assemble_form(
     elseif var == "Xp"
       ∫(v * u)ParamForm.dΩ
     elseif var == "A"
-      if var ∈ FEMInfo.affine_structures
+      if isaffine(FEMInfo, var)
         ∫(∇(v) ⊙ ∇(u))ParamForm.dΩ
       else
         ∫(∇(v) ⊙ (ParamForm.fun * ∇(u)))ParamForm.dΩ
       end
     else var == "B"
-      if var ∈ FEMInfo.affine_structures
+      if isaffine(FEMInfo, var)
         ∫(v ⋅ ∇(u))ParamForm.dΩ
       else
         ∫(v ⋅ (ParamForm.fun * ∇(u)))ParamForm.dΩ
@@ -91,7 +91,7 @@ function assemble_form(
 
   function linear_form(v)
     if var == "F" || "H"
-      if var ∈ FEMInfo.affine_structures
+      if isaffine(FEMInfo, var)
         ∫(v ⋅ (x->1.))ParamForm.dΩ
       else
         ∫(v ⋅ ParamForm.fun)ParamForm.dΩ
@@ -137,13 +137,13 @@ function assemble_form(
     elseif var == "Xp"
       ∫(v * u)ParamForm.dΩ
     elseif var == "A"
-      if var ∈ FEMInfo.affine_structures
+      if isaffine(FEMInfo, var)
         ∫(∇(v) ⊙ ∇(u))ParamForm.dΩ
       else
         ∫(∇(v) ⊙ (ParamForm.fun * ∇(u)))ParamForm.dΩ
       end
     else var == "B"
-      if var ∈ FEMInfo.affine_structures
+      if isaffine(FEMInfo, var)
         ∫(v ⋅ ∇(u))ParamForm.dΩ
       else
         ∫(v ⋅ (ParamForm.fun * ∇(u)))ParamForm.dΩ
@@ -153,7 +153,7 @@ function assemble_form(
 
   function linear_form(v)
     if var == "F" || "H"
-      if var ∈ FEMInfo.affine_structures
+      if isaffine(FEMInfo, var)
         ∫(v ⋅ (x->1.))ParamForm.dΩ
       else
         ∫(v ⋅ ParamForm.fun)ParamForm.dΩ
@@ -762,6 +762,28 @@ function assemble_FEM_structure(
 
   ParamForm = ParamFormInfo(FEMSpace, Param)
   assemble_FEM_structure(FEMSpace, FEMInfo, ParamForm)
+
+end
+
+function assemble_FEM_structure(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo,
+  μ::Vector{T},
+  var::String) where T
+
+  Param = ParamInfo(FEMInfo, μ, var)
+  assemble_FEM_structure(FEMSpace, FEMInfo, Param)
+
+end
+
+function assemble_FEM_structure(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo,
+  μvec::Vector{Vector{T}},
+  var::String) where T
+
+  MV(μ) = assemble_FEM_structure(FEMSpace, FEMInfo, μ, var)
+  Broadcasting(MV)(μvec)
 
 end
 

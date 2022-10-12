@@ -75,7 +75,11 @@ function get_FEMμ_info(FEMInfo::FOMInfo)
 
 end
 
-function get_h(FEMSpace::Problem)
+function isaffine(FEMInfo::FOMInfo, var::String)
+  var ∈ FEMInfo.affine_structures
+end
+
+function get_h(FEMSpace::FOM)
   Λ = SkeletonTriangulation(FEMSpace.Ω)
   dΛ = Measure(Λ, 2)
   h = get_array(∫(1)dΛ)[1]
@@ -133,22 +137,5 @@ function find_FE_elements(
 
   find_FE_elements(
     FEMSpace_vectors(FEMSpace, var), get_measure(FEMSpace, var), unique(idx))
-
-end
-
-function set_labels(
-  model::DiscreteModel,
-  bnd_info::Dict)
-
-  tags = collect(keys(bnd_info))
-  bnds = collect(values(bnd_info))
-  @assert length(tags) == length(bnds)
-
-  labels = get_face_labeling(model)
-  for i = eachindex(tags)
-    if tags[i] ∉ labels.tag_to_name
-      add_tag_from_tags!(labels, tags[i], bnds[i])
-    end
-  end
 
 end

@@ -113,7 +113,8 @@ function offline_phase(
       assemble_offline_structures(RBInfo, RBVars, operators)
     end
   else
-    assemble_offline_structures(RBInfo, RBVars)
+    operators = String[]
+    assemble_offline_structures(RBInfo, RBVars, operators)
   end
 
   if RBInfo.save_offline
@@ -162,25 +163,21 @@ function online_phase(
     CSV.write(joinpath(RBInfo.results_path, "times.csv"), times)
   end
 
-  function post_process()
+  function pp()
     pass_to_pp = Dict("res_path"=>RBInfo.results_path, "FEMSpace"=>FEMSpace,
       "mean_point_err"=>Float.(mean_pointwise_err))
     post_process(RBInfo, pass_to_pp)
   end
 
-  FEMSpace, μ = get_FEMμ_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo)
   get_norm_matrix(RBInfo, RBVars)
 
   mean_err, mean_pointwise_err, mean_online_time = Vector{T}[], Vector{T}[], 0.
   for nb in param_nbs
+
     println("Considering parameter number: $nb")
-
-    assemble_RB_system(FEMSpace, RBInfo, RBVars, μ[nb])
-    solve_RB_system(RBVars)
-    reconstruct_FEM_solution(RBVars)
-
+    assemble_solve_reconstruct(FEMSpace, RBInfo, RBVars, μ[nb])
     mean_online_time += RBVars.online_time / length(param_nbs)
-
     get_S(var) = get_S_var(var, nb)
     xₕ = Broadcasting(get_S)(RBInfo.vars)
     norms = get_norms(xₕ)
@@ -188,6 +185,7 @@ function online_phase(
       Broadcasting(compute_errors)(xₕ, RBVars.x̃, RBVars.X₀, norms) / length(param_nbs)
 
     println("Online wall time (snapshot number $nb): $(RBVars.online_time)s ")
+
   end
 
   if RBInfo.save_online
@@ -195,7 +193,7 @@ function online_phase(
   end
 
   if RBInfo.post_process
-    post_process()
+    pp()
   end;
 
 end

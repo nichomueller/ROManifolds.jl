@@ -39,9 +39,6 @@ end
 function solve_RB_system(RBVars::PoissonS{T}) where T
 
   println("Solving RB problem via backslash")
-
-  RBVars.online_time += @elapsed begin
-    push!(RBVars.xₙ, RBVars.LHSₙ[1] \ RBVars.RHSₙ[1])
-  end
+  push!(RBVars.xₙ, RBVars.LHSₙ[1] \ RBVars.RHSₙ[1])
 
 end

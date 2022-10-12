@@ -16,7 +16,7 @@ function assemble_constraint_matrix(
   RBInfo::Info,
   RBVars::StokesS{T}) where T
 
-  FEMSpace, μ = get_FEMμ_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo)
 
   constraint_matrix = zeros(T, RBVars.Nₛᵘ, RBVars.nₛ)
 

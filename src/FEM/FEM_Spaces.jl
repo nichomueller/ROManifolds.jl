@@ -1,6 +1,21 @@
 function get_mod_meas_quad(FEMInfo::FOMInfo, model::DiscreteModel)
 
-  set_labels(model, FEMInfo.bnd_info)
+  function set_labels(bnd_info::Dict)
+
+    tags = collect(keys(bnd_info))
+    bnds = collect(values(bnd_info))
+    @assert length(tags) == length(bnds)
+
+    labels = get_face_labeling(model)
+    for i = eachindex(tags)
+      if tags[i] ∉ labels.tag_to_name
+        add_tag_from_tags!(labels, tags[i], bnds[i])
+      end
+    end
+
+  end
+
+  set_labels(FEMInfo.bnd_info)
 
   degree = 2 * FEMInfo.order
   Ω = Triangulation(model)

@@ -423,7 +423,7 @@ function online_phase(
 
   println("Online phase of the RB solver, unsteady Stokes problem")
 
-  FEMSpace, μ = get_FEMμ_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo)
 
   get_norm_matrix(RBInfo, RBVars)
   (ũ_μ,uₙ_μ,mean_uₕ_test,mean_pointwise_err_u,mean_H1_err,mean_H1_L2_err,

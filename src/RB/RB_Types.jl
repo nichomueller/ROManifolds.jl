@@ -92,90 +92,78 @@ function MVVariable(Vars::Vector{MVVariable}, var::String)
 
 end
 
-function RBS(RBInfo::ROMInfo, ::Type{T}) where T
-
-  MVVars(var) =  MVVariable(RBInfo, var, T)
-  Vars = Broadcasting(MVVars)(RBInfo.structures)
-
-  S = Matrix{T}[]
-  Φₛ = Matrix{T}[]
-  x̃ = Matrix{T}[]
-  xₙ = Matrix{T}[]
-  X₀ = Matrix{SparseMatrixCSC{Float, Int}}[]
-  LHSₙ = Matrix{T}[]
-  RHSₙ = Matrix{T}[]
-
-  #= VarA = MVariable("A", T)
-  VarF = VVariable("F", T)
-  VarH = VVariable("H", T)
-  VarL = VVariable("L", T)
-  Vars = [VarA, VarF, VarH, VarL] =#
-
-  Nₛ = Int[]
-  nₛ = Int[]
-  offline_time = 0.0
-  online_time = 0.0
-
-  Vars, S, Φₛ, x̃, xₙ, X₀, LHSₙ, RHSₙ, Nₛ, nₛ, offline_time, online_time
-
-end
-
-function init_RBVars(::NTuple{2,Int}, ::Type{T}) where T
-
-  Φₜ = Matrix{T}[]
-  Mₙ = Matrix{T}[]
-  MDEIM_M = MMDEIM(init_MMDEIM(T)...)
-  Nₜ = 0
-  N = 0
-  nₜ = 0
-  n = 0
-
-  Φₜ, Mₙ, MDEIM_M, Nₜ, N, nₜ, n
-
-end
-
-function init_RBVars(::NTuple{3,Int}, ::Type{T}) where T
-
-  Bₙ = Matrix{T}[]
-  Lcₙ = Matrix{T}[]
-  MDEIM_B = MMDEIM(init_MMDEIM(T)...)
-  MDEIM_Lc = VMDEIM(init_VMDEIM(T)...)
-
-  Bₙ, Lcₙ, MDEIM_B, MDEIM_Lc
-
-end
-
-function init_RBVars(::NTuple{4,Int}, ::Type{T}) where T
-  nothing
-end
-
-function init_RBVars(::NTuple{5,Int}, ::Type{T}) where T
-
-  Cₙ = Matrix{T}[]
-  Dₙ = Matrix{T}[]
-  MDEIM_C = MMDEIM(init_MMDEIM(T)...)
-  MDEIM_D = MMDEIM(init_MMDEIM(T)...)
-
-  Cₙ, Dₙ, MDEIM_C, MDEIM_D
-
-end
-
-mutable struct PoissonS{T} <: RBS{T}
-  Vars::Vector{MVVariable{T}}
+mutable struct SteadyVariables{T} <: RBS{T}
   S::Vector{Matrix{T}}
   Φₛ::Vector{Matrix{T}}
   x̃::Vector{Matrix{T}}
-  xₙ::Vector{Matrix{T}}
   X₀::Vector{SparseMatrixCSC{Float, Int}}
-  LHSₙ::Vector{Matrix{T}}
-  RHSₙ::Vector{Matrix{T}}
   Nₛ::Vector{Int}
   nₛ::Vector{Int}
   offline_time::Float
   online_time::Float
 end
 
-mutable struct PoissonST{T} <: RBST{T}
+function SteadyVariables(::Type{T}) where T
+
+  S = Matrix{T}[]
+  Φₛ = Matrix{T}[]
+  x̃ = Matrix{T}[]
+  X₀ = Matrix{SparseMatrixCSC{Float, Int}}[]
+  Nₛ = Int[]
+  nₛ = Int[]
+  offline_time = 0.0
+  online_time = 0.0
+
+  SteadyVariables{T}(S, Φₛ, x̃, X₀, Nₛ, nₛ, offline_time, online_time)
+
+end
+
+mutable struct PoissonS{T} <: RBS{T}
+  SV::SteadyVariables{T}
+  Vars::Vector{MVVariable{T}}
+  xₙ::Vector{Matrix{T}}
+  LHSₙ::Vector{Matrix{T}}
+  RHSₙ::Vector{Matrix{T}}
+end
+
+function PoissonS(RBInfo::ROMInfoS, ::Type{T}) where T
+  #= VarA = MVariable("A", T)
+  VarF = VVariable("F", T)
+  VarH = VVariable("H", T)
+  VarL = VVariable("L", T)
+  Vars = [VarA, VarF, VarH, VarL] =#
+  SV = SteadyVariables(T)
+  MVVars(var) =  MVVariable(RBInfo, var, T)
+  Vars = Broadcasting(MVVars)(RBInfo.structures)
+  xₙ = Matrix{T}[]
+  LHSₙ = Matrix{T}[]
+  RHSₙ = Matrix{T}[]
+
+  PoissonS{T}(SV, Vars, xₙ, LHSₙ, RHSₙ)
+
+end
+
+function setup_RBVars(::NTuple{1,Int}, RBInfo::ROMInfo, ::Type{T}) where T
+  PoissonS(RBInfo, T)
+end
+
+function Base.getproperty(RBVars::PoissonS, sym::Symbol)
+  if sym in (:S, :Φₛ, :x̃, :X₀, :Nₛ, :nₛ, :offline_time, :online_time)
+    getfield(RBVars.SV, sym)
+  else
+    getfield(RBVars, sym)
+  end
+end
+
+function Base.setproperty!(RBVars::PoissonS, sym::Symbol, x::T) where T
+  if sym in (:S, :Φₛ, :x̃, :X₀, :Nₛ, :nₛ, :offline_time, :online_time)
+    setfield!(RBVars.SV, sym, x)::T
+  else
+    setfield!(RBVars, sym, x)::T
+  end
+end
+
+#= mutable struct PoissonST{T} <: RBST{T}
   Steady::PoissonS{T}; Φₜᵘ::Vector{Matrix{T}}; Mₙ::Vector{Matrix{T}}; MDEIM_M::MMDEIM{T};
   Nₜ::Int; N::Vector{Int}; nₜ::Vector{Int}; n::Vector{Int}
 end
@@ -198,42 +186,38 @@ mutable struct NavierStokesST{T} <: RBST{T}
   Stokes::StokesST{T}; Steady::NavierStokesS{T};
 end
 
-function setup(::NTuple{1,Int}, RBInfo::ROMInfo, ::Type{T}) where T
-  PoissonS{T}(RBS(RBInfo, T))
-end
-
-function setup(NT::NTuple{2,Int}, ::Type{T}) where T
+function setup_RBVars(NT::NTuple{2,Int}, ::Type{T}) where T
 
   PoissonST{T}(
-    setup(NTuple(1, Int), T), init_RBVars(NT, T)...)
+    setup_RBVars(NTuple(1, Int), T), init_RBVars(NT, T)...)
 
 end
 
-function setup(NT::NTuple{3,Int}, ::Type{T}) where T
+function setup_RBVars(NT::NTuple{3,Int}, ::Type{T}) where T
 
   StokesS{T}(
-    setup(NTuple(1, Int), T), init_RBVars(NT, T)...)
+    setup_RBVars(NTuple(1, Int), T), init_RBVars(NT, T)...)
 
 end
 
-function setup(NT::NTuple{4,Int}, ::Type{T}) where T
+function setup_RBVars(NT::NTuple{4,Int}, ::Type{T}) where T
 
   StokesST{T}(
-    setup(NTuple(2, Int), T), setup(NTuple(3, Int), T))
+    setup_RBVars(NTuple(2, Int), T), setup_RBVars(NTuple(3, Int), T))
 
 end
 
-function setup(NT::NTuple{5,Int}, ::Type{T}) where T
+function setup_RBVars(NT::NTuple{5,Int}, ::Type{T}) where T
 
   NavierStokesS{T}(
-    setup(NTuple(3, Int), T), init_RBVars(NT, T)...)
+    setup_RBVars(NTuple(3, Int), T), init_RBVars(NT, T)...)
 
 end
 
-function setup(::NTuple{6,Int}, ::Type{T}) where T
+function setup_RBVars(::NTuple{6,Int}, ::Type{T}) where T
 
   NavierStokesST{T}(
-    setup(NTuple(4, Int), T), setup(NTuple(5, Int), T))
+    setup_RBVars(NTuple(4, Int), T), setup_RBVars(NTuple(5, Int), T))
 
 end
 
@@ -355,10 +339,9 @@ function Base.setproperty!(RBVars::NavierStokesST, sym::Symbol, x::T) where T
   else
     setfield!(RBVars, sym, x)::T
   end
-end
+end =#
 
 struct ROMPath
-  FEMPaths::FEMPathInfo
   ROM_structures_path::String
   results_path::String
 end
@@ -372,7 +355,7 @@ function ROMPath(FEMPaths, RB_method)
   results_path = joinpath(ROM_path, "results")
   create_dir(results_path)
 
-  ROMPath(FEMPaths, ROM_structures_path, results_path)
+  ROMPath(ROM_structures_path, results_path)
 
 end
 
@@ -437,3 +420,45 @@ function Base.getproperty(RBInfo::ROMInfoST, sym::Symbol)
     getfield(RBInfo, sym)
   end
 end
+
+
+#= function init_RBVars(::NTuple{2,Int}, ::Type{T}) where T
+
+  Φₜ = Matrix{T}[]
+  Mₙ = Matrix{T}[]
+  MDEIM_M = MMDEIM(init_MMDEIM(T)...)
+  Nₜ = 0
+  N = 0
+  nₜ = 0
+  n = 0
+
+  Φₜ, Mₙ, MDEIM_M, Nₜ, N, nₜ, n
+
+end
+
+function init_RBVars(::NTuple{3,Int}, ::Type{T}) where T
+
+  Bₙ = Matrix{T}[]
+  Lcₙ = Matrix{T}[]
+  MDEIM_B = MMDEIM(init_MMDEIM(T)...)
+  MDEIM_Lc = VMDEIM(init_VMDEIM(T)...)
+
+  Bₙ, Lcₙ, MDEIM_B, MDEIM_Lc
+
+end
+
+function init_RBVars(::NTuple{4,Int}, ::Type{T}) where T
+  nothing
+end
+
+function init_RBVars(::NTuple{5,Int}, ::Type{T}) where T
+
+  Cₙ = Matrix{T}[]
+  Dₙ = Matrix{T}[]
+  MDEIM_C = MMDEIM(init_MMDEIM(T)...)
+  MDEIM_D = MMDEIM(init_MMDEIM(T)...)
+
+  Cₙ, Dₙ, MDEIM_C, MDEIM_D
+
+end
+ =#
