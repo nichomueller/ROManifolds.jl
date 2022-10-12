@@ -248,10 +248,10 @@ end
 
 function ParamInfo(
   FEMInfo::FOMInfo,
-  μ::Vector)
+  μ::Vector,
+  operators::Vector{String})
 
   get_single_ParamInfo(var) = ParamInfo(FEMInfo, μ, var)
-  operators = get_FEM_structures(FEMInfo)
   Broadcasting(get_single_ParamInfo)(operators)
 
 end

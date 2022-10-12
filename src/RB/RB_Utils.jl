@@ -281,7 +281,7 @@ function θ(
   Param::ParamInfoS,
   MDEIM::MVMDEIM) where D
 
-  if Param.var ∉ RBInfo.affine_structures
+  if Param.var ∈ RBInfo.affine_structures
     θ = [[Param.fun(VectorValue(D, Float))[1]]]
   else
     Mat_μ_sparse =
@@ -306,7 +306,7 @@ function θ!(
 
   timesθ = get_timesθ(RBInfo)
 
-  if var ∉ RBInfo.affine_structures
+  if var ∈ RBInfo.affine_structures
     for t_θ in timesθ
       push!(θ, [get_scalar_value(fun(VectorValue(D, T), t_θ), T)])
     end
@@ -341,7 +341,7 @@ function θ!(
 
   timesθ = get_timesθ(RBInfo)
 
-  if var ∉ RBInfo.affine_structures
+  if var ∈ RBInfo.affine_structures
     for t_θ in timesθ
       push!(θ, [get_scalar_value(fun(VectorValue(D, T), t_θ), T)])
     end

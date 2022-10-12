@@ -7,7 +7,7 @@ function POD_space(
 
   println("Spatial POD for field p, tolerance: $(RBInfo.ϵₛ)")
   get_norm_matrix(RBInfo, RBVars.Steady)
-  RBVars.Φₛᵖ = POD(RBVars.Sᵖ, RBInfo.ϵₛ, RBVars.Xᵖ₀)
+  RBVars.Φₛᵖ = POD(RBVars.Sᵖ, RBInfo.ϵₛ, RBVars.Xp₀)
   (RBVars.Nₛᵖ, RBVars.nₛᵖ) = size(RBVars.Φₛᵖ)
 
 end
@@ -462,10 +462,10 @@ function adaptive_loop_on_params(
   time_err_p = zeros(T, RBVars.Nₜ)
   space_err_p = zeros(T, RBVars.Nₛᵖ)
   for iₜ = 1:RBVars.Nₜ
-    time_err_u[iₜ] = (norm(mean_pointwise_err_u[:,iₜ],RBVars.Xᵘ₀) /
-      norm(mean_uₕ_test[:,iₜ],RBVars.Xᵘ₀))
-    time_err_p[iₜ] = (norm(mean_pointwise_err_p[:,iₜ],RBVars.Xᵖ₀) /
-      norm(mean_pₕ_test[:,iₜ],RBVars.Xᵖ₀))
+    time_err_u[iₜ] = (norm(mean_pointwise_err_u[:,iₜ],RBVars.Xu₀) /
+      norm(mean_uₕ_test[:,iₜ],RBVars.Xu₀))
+    time_err_p[iₜ] = (norm(mean_pointwise_err_p[:,iₜ],RBVars.Xp₀) /
+      norm(mean_pₕ_test[:,iₜ],RBVars.Xp₀))
   end
   for iₛ = 1:RBVars.Nₛᵘ
     space_err_u[iₛ] = norm(mean_pointwise_err_u[iₛ,:])/norm(mean_uₕ_test[iₛ,:])

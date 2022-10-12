@@ -14,7 +14,7 @@ function get_norm_matrix(
 
   if isempty(RBVars.X₀[i])
     println("Importing the norm matrix")
-    RBVars.Xᵘ = Broadcasting(get_X_var)(RBInfo.vars, RBVars.Nₛ)
+    RBVars.Xu = Broadcasting(get_X_var)(RBInfo.vars, RBVars.Nₛ)
   end;
 
 end
@@ -268,13 +268,13 @@ function save_system_blocks(
   RHS_blocks::Vector{Int},
   operators::Vector{String}) where T
 
-  if "A" ∉ RBInfo.affine_structures && "LHS" ∈ operators
+  if get_FEM_matrices(RBInfo) ∈ RBInfo.affine_structures && "LHS" ∈ operators
     for i = LHS_blocks
       LHSₙi = "LHSₙ" * string(i) * ".csv"
       save_CSV(RBVars.LHSₙ[i],joinpath(RBInfo.ROM_structures_path, LHSₙi))
     end
   end
-  if "F" ∉ RBInfo.affine_structures && "H" ∉ RBInfo.affine_structures && "L" ∉ RBInfo.affine_structures && "RHS" ∈ operators
+  if get_FEM_vectors(RBInfo) ∈ RBInfo.affine_structures && "RHS" ∈ operators
     for i = RHS_blocks
       RHSₙi = "RHSₙ" * string(i) * ".csv"
       save_CSV(RBVars.RHSₙ[i],joinpath(RBInfo.ROM_structures_path, RHSₙi))

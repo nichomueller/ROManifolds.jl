@@ -46,7 +46,7 @@ function get_offline_structures(
       if isfile(joinpath(RBInfo.ROM_structures_path, "$(var)ₙ.csv"))
         Var.Matₙ = load_CSV(Matrix{T}[],
           joinpath(RBInfo.ROM_structures_path, "$(var)ₙ.csv"))
-        if var ∈ RBInfo.affine_structures
+        if var ∉ RBInfo.affine_structures
           Var.MDEIM.Matᵢ, Var.MDEIM.idx, Var.MDEIM.el =
             load_structures_in_list(("Matᵢ_$(var)", "idx_$(var)", "el_$(var)"),
             (Matᵢ, idx, el), RBInfo.ROM_structures_path)

@@ -365,7 +365,7 @@ function loop_on_params(
     end
 
     H1_err_nb, H1_L2_err_nb = compute_errors(
-        RBVars, uₕ_test, RBVars.ũ, RBVars.Xᵘ₀)
+        RBVars, uₕ_test, RBVars.ũ, RBVars.Xu₀)
     H1_L2_err[i_nb] = H1_L2_err_nb
     mean_H1_err += H1_err_nb / length(param_nbs)
     mean_H1_L2_err += H1_L2_err_nb / length(param_nbs)

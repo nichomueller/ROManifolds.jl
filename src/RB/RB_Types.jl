@@ -238,7 +238,7 @@ function setup(::NTuple{6,Int}, ::Type{T}) where T
 end
 
 function Base.getproperty(RBVars::PoissonST, sym::Symbol)
-  if sym in (:S, :Φᵘ, :x̃, :xₙ, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
+  if sym in (:S, :Φᵘ, :x̃, :xₙ, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xu₀, :LHSₙ, :RHSₙ,
     :MDEIM_A, :MDEIM_F, :MDEIM_H, :MDEIM_L, :Nₛ, :nₛ, :offline_time, :online_time)
     getfield(RBVars.Steady, sym)
   else
@@ -247,7 +247,7 @@ function Base.getproperty(RBVars::PoissonST, sym::Symbol)
 end
 
 function Base.setproperty!(RBVars::PoissonST, sym::Symbol, x::T) where T
-  if sym in (:S, :Φᵘ, :x̃, :xₙ, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
+  if sym in (:S, :Φᵘ, :x̃, :xₙ, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xu₀, :LHSₙ, :RHSₙ,
     :MDEIM_A, :MDEIM_F, :MDEIM_H, :MDEIM_L, :Nₛ, :nₛ, :offline_time, :online_time)
     setfield!(RBVars.Steady, sym, x)::T
   else
@@ -256,7 +256,7 @@ function Base.setproperty!(RBVars::PoissonST, sym::Symbol, x::T) where T
 end
 
 function Base.getproperty(RBVars::StokesS, sym::Symbol)
-  if sym in (:S, :Φᵘ, :x̃, :xₙ, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
+  if sym in (:S, :Φᵘ, :x̃, :xₙ, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xu₀, :LHSₙ, :RHSₙ,
     :MDEIM_A, :MDEIM_F, :MDEIM_H, :MDEIM_L, :Nₛ, :nₛ, :offline_time, :online_time)
     getfield(RBVars.Poisson, sym)
   else
@@ -265,7 +265,7 @@ function Base.getproperty(RBVars::StokesS, sym::Symbol)
 end
 
 function Base.setproperty!(RBVars::StokesS, sym::Symbol, x::T) where T
-  if sym in (:S, :Φᵘ, :x̃, :xₙ, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
+  if sym in (:S, :Φᵘ, :x̃, :xₙ, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xu₀, :LHSₙ, :RHSₙ,
     :MDEIM_A, :MDEIM_F, :MDEIM_H, :MDEIM_L, :Nₛ, :nₛ, :offline_time, :online_time)
     setfield!(RBVars.Poisson, sym, x)::T
   else
@@ -278,7 +278,7 @@ function Base.getproperty(RBVars::StokesST, sym::Symbol)
     getfield(RBVars.Steady, sym)
   elseif sym in (:Φₜ, :Mₙ, :MDEIM_M, :nₜ, :Nₜ, :N, :n)
     getfield(RBVars.Poisson, sym)
-  elseif sym in (:S, :Φᵘ, :x̃, :xₙ, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
+  elseif sym in (:S, :Φᵘ, :x̃, :xₙ, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xu₀, :LHSₙ, :RHSₙ,
     :MDEIM_A, :MDEIM_F, :MDEIM_H, :MDEIM_L, :Nₛ, :nₛ, :offline_time, :online_time)
     getfield(RBVars.Poisson.Steady, sym)
   else
@@ -291,7 +291,7 @@ function Base.setproperty!(RBVars::StokesST, sym::Symbol, x::T) where T
     setfield!(RBVars.Steady, sym, x)::T
   elseif sym in (:Φₜ, :Mₙ, :MDEIM_M, :nₜ, :Nₜ, :N, :n)
     setfield!(RBVars.Poisson, sym, x)::T
-  elseif sym in (:S, :Φᵘ, :x̃, :xₙ, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
+  elseif sym in (:S, :Φᵘ, :x̃, :xₙ, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xu₀, :LHSₙ, :RHSₙ,
     :MDEIM_A, :MDEIM_F, :MDEIM_H, :MDEIM_L, :Nₛ, :nₛ, :offline_time, :online_time)
     setfield!(RBVars.Poisson.Steady, sym, x)::T
   else
@@ -300,7 +300,7 @@ function Base.setproperty!(RBVars::StokesST, sym::Symbol, x::T) where T
 end
 
 function Base.getproperty(RBVars::NavierStokesS, sym::Symbol)
-  if sym in (:S, :Φᵘ, :x̃, :xₙ, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
+  if sym in (:S, :Φᵘ, :x̃, :xₙ, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xu₀, :LHSₙ, :RHSₙ,
     :MDEIM_A, :MDEIM_F, :MDEIM_H, :MDEIM_L, :Nₛ, :nₛ, :offline_time, :online_time)
     getfield(RBVars.Stokes.Poisson, sym)
   elseif sym in (:Bₙ, :Lcₙ, :MDEIM_B, :MDEIM_Lc)
@@ -311,7 +311,7 @@ function Base.getproperty(RBVars::NavierStokesS, sym::Symbol)
 end
 
 function Base.setproperty!(RBVars::NavierStokesS, sym::Symbol, x::T) where T
-  if sym in (:S, :Φᵘ, :x̃, :xₙ, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
+  if sym in (:S, :Φᵘ, :x̃, :xₙ, :Aₙ, :Fₙ, :Hₙ, :Lₙ, :Xu₀, :LHSₙ, :RHSₙ,
     :MDEIM_A, :MDEIM_F, :MDEIM_H, :MDEIM_L, :Nₛ, :nₛ, :offline_time, :online_time)
     setfield!(RBVars.Stokes.Poisson, sym, x)::T
   elseif sym in (:Bₙ, :Lcₙ, :MDEIM_B, :MDEIM_Lc)
@@ -322,13 +322,13 @@ function Base.setproperty!(RBVars::NavierStokesS, sym::Symbol, x::T) where T
 end
 
 function Base.getproperty(RBVars::NavierStokesST, sym::Symbol)
-  if sym in (:Sᵘ, :Sᵘ_quad, :Φₛ, :ũ, :uₙ, :û, :Aₙ, :Bₙ, :Cₙ, :Fₙ, :Hₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
+  if sym in (:Sᵘ, :Sᵘ_quad, :Φₛ, :ũ, :uₙ, :û, :Aₙ, :Bₙ, :Cₙ, :Fₙ, :Hₙ, :Xu₀, :LHSₙ, :RHSₙ,
     :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A,
     :MDEIM_mat_B, :MDEIMᵢ_B, :MDEIM_idx_B, :row_idx_B, :sparse_el_B,
     :MDEIM_mat_C, :MDEIMᵢ_C, :MDEIM_idx_C, :row_idx_C, :sparse_el_C,
     :DEIM_mat_F, :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H,
     :DEIM_idx_H, :sparse_el_H, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᵇ, :Qᶜ, :Qᶠ, :Qʰ, :offline_time,
-    :online_time, :Sᵖ, :Φₛ, :p̃, :pₙ, :p̂, :Xᵘ, :Xᵖ₀, :Nₛᵖ, :nₛᵖ)
+    :online_time, :Sᵖ, :Φₛ, :p̃, :pₙ, :p̂, :Xu, :Xp₀, :Nₛᵖ, :nₛᵖ)
     getfield(RBVars.Steady, sym)
   elseif sym in (:Mₙ, :MDEIM_mat_M, :MDEIMᵢ_M, :MDEIM_idx_M, :row_idx_M, :sparse_el_M,
     :MDEIM_idx_time_A, :MDEIM_idx_time_B, :MDEIM_idx_time_M, :DEIM_idx_time_F, :DEIM_idx_time_H,
@@ -340,13 +340,13 @@ function Base.getproperty(RBVars::NavierStokesST, sym::Symbol)
 end
 
 function Base.setproperty!(RBVars::NavierStokesST, sym::Symbol, x::T) where T
-  if sym in (:Sᵘ, :Sᵘ_quad, :Φₛ, :ũ, :uₙ, :û, :Aₙ, :Bₙ, :Cₙ, :Fₙ, :Hₙ, :Xᵘ₀, :LHSₙ, :RHSₙ,
+  if sym in (:Sᵘ, :Sᵘ_quad, :Φₛ, :ũ, :uₙ, :û, :Aₙ, :Bₙ, :Cₙ, :Fₙ, :Hₙ, :Xu₀, :LHSₙ, :RHSₙ,
     :MDEIM_mat_A, :MDEIMᵢ_A, :MDEIM_idx_A, :row_idx_A, :sparse_el_A,
     :MDEIM_mat_B, :MDEIMᵢ_B, :MDEIM_idx_B, :row_idx_B, :sparse_el_B,
     :MDEIM_mat_C, :MDEIMᵢ_C, :MDEIM_idx_C, :row_idx_C, :sparse_el_C,
     :DEIM_mat_F, :DEIMᵢ_F, :DEIM_idx_F, :sparse_el_F, :DEIM_mat_H, :DEIMᵢ_H,
     :DEIM_idx_H, :sparse_el_H, :Nₛᵘ, :nₛᵘ, :Qᵃ, :Qᵇ, :Qᶜ, :Qᶠ, :Qʰ, :offline_time,
-    :online_time, :Sᵖ, :Φₛ, :p̃, :pₙ, :p̂, :Xᵘ, :Xᵖ₀, :Nₛᵖ, :nₛᵖ)
+    :online_time, :Sᵖ, :Φₛ, :p̃, :pₙ, :p̂, :Xu, :Xp₀, :Nₛᵖ, :nₛᵖ)
     setfield!(RBVars.Steady, sym, x)::T
   elseif sym in (:Mₙ, :MDEIM_mat_M, :MDEIMᵢ_M, :MDEIM_idx_M, :row_idx_M, :sparse_el_M,
     :MDEIM_idx_time_A, :MDEIM_idx_time_B, :MDEIM_idx_time_M, :DEIM_idx_time_F, :DEIM_idx_time_H,

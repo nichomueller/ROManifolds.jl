@@ -17,6 +17,11 @@ function FE_solve(
   FEMInfo::FOMInfoST,
   Param::ParamInfoST)
 
+  function get_uₕ(uₕ_field)
+    uₕ, _ = uₕ_field
+    get_free_dof_values(uₕ)::Vector{Float}
+  end
+
   m(t, u, v) = ∫(Param.m(t)*(u*v)) * FEMSpace.dΩ
   a(t, u, v) = ∫(∇(v)⋅(Param.α(t)*∇(u)))*FEMSpace.dΩ
   rhs(t, v) = ∫(v*Param.f(t))*FEMSpace.dΩ + ∫(v*Param.h(t))*FEMSpace.dΓn
@@ -28,14 +33,9 @@ function FE_solve(
   u₀_field = interpolate_everywhere(Param.u₀, FEMSpace.V(FEMInfo.t₀))
 
   uₕₜ_field = solve(ode_solver, operator, u₀_field, FEMInfo.t₀, FEMInfo.tₗ)
-  uₕₜ = zeros(FEMSpace.Nₛᵘ, Int(FEMInfo.tₗ / FEMInfo.δt))
-  count = 1
-  for (uₕ, _) in uₕₜ_field
-    uₕₜ[:, count] = get_free_dof_values(uₕ)::Vector{Float}
-    count += 1
-  end
+  uₕₜ = Broadcasting(get_uₕ)(uₕₜ_field)
 
-  return uₕₜ
+  blocks_to_matrix(uₕₜ)
 
 end
 

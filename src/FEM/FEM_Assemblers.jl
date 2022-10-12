@@ -26,10 +26,10 @@ function assemble_form(
   var = ParamForm.var
 
   function bilinear_form(u, v)
-    if var == "Xᵘ"
+    if var == "Xu"
       ∫(∇(v) ⋅ ∇(u) + v * u)ParamForm.dΩ
     else var == "A"
-      if var ∉ FEMInfo.affine_structures
+      if var ∈ FEMInfo.affine_structures
         ∫(∇(v) ⋅ ∇(u))ParamForm.dΩ
       else
         ∫(∇(v) ⋅ (ParamForm.fun * ∇(u)))ParamForm.dΩ
@@ -39,7 +39,7 @@ function assemble_form(
 
   function linear_form(v)
     if var == "F" || "H"
-      if var ∉ FEMInfo.affine_structures
+      if var ∈ FEMInfo.affine_structures
         ∫(v * (x->1.))ParamForm.dΩ
       else
         ∫(v * ParamForm.fun)ParamForm.dΩ
@@ -53,7 +53,7 @@ function assemble_form(
     end
   end
 
-  if var ∈ ("A", "Xᵘ")
+  if var ∈ ("A", "Xu")
     bilinear_form
   else
     linear_form
@@ -70,18 +70,18 @@ function assemble_form(
   var = ParamForm.var
 
   function bilinear_form(u, v)
-    if var == "Xᵘ"
+    if var == "Xu"
       ∫(∇(v) ⊙ ∇(u) + v ⋅ u)ParamForm.dΩ
-    elseif var == "Xᵖ"
+    elseif var == "Xp"
       ∫(v * u)ParamForm.dΩ
     elseif var == "A"
-      if var ∉ FEMInfo.affine_structures
+      if var ∈ FEMInfo.affine_structures
         ∫(∇(v) ⊙ ∇(u))ParamForm.dΩ
       else
         ∫(∇(v) ⊙ (ParamForm.fun * ∇(u)))ParamForm.dΩ
       end
     else var == "B"
-      if var ∉ FEMInfo.affine_structures
+      if var ∈ FEMInfo.affine_structures
         ∫(v ⋅ ∇(u))ParamForm.dΩ
       else
         ∫(v ⋅ (ParamForm.fun * ∇(u)))ParamForm.dΩ
@@ -91,7 +91,7 @@ function assemble_form(
 
   function linear_form(v)
     if var == "F" || "H"
-      if var ∉ FEMInfo.affine_structures
+      if var ∈ FEMInfo.affine_structures
         ∫(v ⋅ (x->1.))ParamForm.dΩ
       else
         ∫(v ⋅ ParamForm.fun)ParamForm.dΩ
@@ -107,7 +107,7 @@ function assemble_form(
     end
   end
 
-  if var ∈ ("A", "B", "Xᵘ", "Xᵖ")
+  if var ∈ ("A", "B", "Xu", "Xp")
     bilinear_form
   else
     linear_form
@@ -132,18 +132,18 @@ function assemble_form(
   end
 
   function bilinear_form(u, v)
-    if var == "Xᵘ"
+    if var == "Xu"
       ∫(∇(v) ⊙ ∇(u) + v ⋅ u)ParamForm.dΩ
-    elseif var == "Xᵖ"
+    elseif var == "Xp"
       ∫(v * u)ParamForm.dΩ
     elseif var == "A"
-      if var ∉ FEMInfo.affine_structures
+      if var ∈ FEMInfo.affine_structures
         ∫(∇(v) ⊙ ∇(u))ParamForm.dΩ
       else
         ∫(∇(v) ⊙ (ParamForm.fun * ∇(u)))ParamForm.dΩ
       end
     else var == "B"
-      if var ∉ FEMInfo.affine_structures
+      if var ∈ FEMInfo.affine_structures
         ∫(v ⋅ ∇(u))ParamForm.dΩ
       else
         ∫(v ⋅ (ParamForm.fun * ∇(u)))ParamForm.dΩ
@@ -153,7 +153,7 @@ function assemble_form(
 
   function linear_form(v)
     if var == "F" || "H"
-      if var ∉ FEMInfo.affine_structures
+      if var ∈ FEMInfo.affine_structures
         ∫(v ⋅ (x->1.))ParamForm.dΩ
       else
         ∫(v ⋅ ParamForm.fun)ParamForm.dΩ
@@ -171,7 +171,7 @@ function assemble_form(
 
   if var ∈ ("C", "D")
     trilinear_form
-  elseif var ∈ ("A", "B", "Xᵘ", "Xᵖ")
+  elseif var ∈ ("A", "B", "Xu", "Xp")
     bilinear_form
   else
     linear_form
@@ -768,16 +768,37 @@ end
 function assemble_FEM_structure(
   FEMSpace::FOM,
   FEMInfo::FOMInfo,
-  Param::ParamFormInfo)
+  Param::Vector{ParamInfo})
 
-  var = Param.var
+  FEM_structure(P) = assemble_FEM_structure(FEMSpace, FEMInfo,
+    ParamFormInfo(FEMSpace, P))
+  Broadcasting(FEM_structure)(Param)
 
-  form = assemble_form(FEMSpace, FEMInfo, Param)
+end
+
+function assemble_FEM_structure(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo,
+  ParamForm::ParamFormInfo)
+
+  var = ParamForm.var
+
+  form = assemble_form(FEMSpace, FEMInfo, ParamForm)
 
   if var ∈ get_FEM_vectors(FEMInfo)
     assemble_vector(form, FEMSpace_vectors(FEMSpace, var))
   else
     assemble_vector(form, FEMSpace_matrices(FEMSpace, var)...)
   end
+
+end
+
+function assemble_FEM_structure(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo,
+  ParamForm::Vector{ParamFormInfo})
+
+  FEM_structure(P) = assemble_FEM_structure(FEMSpace, FEMInfo, P)
+  Broadcasting(FEM_structure)(ParamForm)
 
 end

@@ -24,27 +24,27 @@ function get_norm_matrix(
   RBVars::StokesS{T}) where T
 
   if length(RBVars.X₀) == 0
-    println("Importing the norm matrix Xᵘ₀")
-    Xᵘ₀ = load_CSV(sparse([],[],T[]),
-      joinpath(get_FEM_structures_path(RBInfo), "Xᵘ₀.csv"))
-    println("Importing the norm matrix Xᵖ₀")
-    Xᵖ₀ = load_CSV(sparse([],[],T[]),
-      joinpath(get_FEM_structures_path(RBInfo), "Xᵖ₀.csv"))
+    println("Importing the norm matrix Xu₀")
+    Xu₀ = load_CSV(sparse([],[],T[]),
+      joinpath(get_FEM_structures_path(RBInfo), "Xu₀.csv"))
+    println("Importing the norm matrix Xp₀")
+    Xp₀ = load_CSV(sparse([],[],T[]),
+      joinpath(get_FEM_structures_path(RBInfo), "Xp₀.csv"))
 
     if RBInfo.use_norm_X
-      RBVars.X₀ = [Xᵘ₀, Xᵖ₀]
+      RBVars.X₀ = [Xu₀, Xp₀]
     else
       RBVars.X₀ = [one(T)*sparse(I,RBVars.Nₛᵘ,RBVars.Nₛᵘ),
                    one(T)*sparse(I,RBVars.Nₛᵖ,RBVars.Nₛᵖ)]
     end
 
   elseif length(RBVars.X₀) == 1
-    println("Importing the norm matrix Xᵖ₀")
-    Xᵖ₀ = load_CSV(sparse([],[],T[]),
-      joinpath(get_FEM_structures_path(RBInfo), "Xᵖ₀.csv"))
+    println("Importing the norm matrix Xp₀")
+    Xp₀ = load_CSV(sparse([],[],T[]),
+      joinpath(get_FEM_structures_path(RBInfo), "Xp₀.csv"))
 
     if RBInfo.use_norm_X
-      RBVars.X₀ = [RBVars.X₀..., Xᵖ₀]
+      RBVars.X₀ = [RBVars.X₀..., Xp₀]
     else
       RBVars.X₀ = [RBVars.X₀..., one(T)*sparse(I,RBVars.Nₛᵖ,RBVars.Nₛᵖ)]
     end

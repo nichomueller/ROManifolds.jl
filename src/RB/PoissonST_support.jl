@@ -360,8 +360,8 @@ function adaptive_loop_on_params(
   time_err = zeros(T, RBVars.Nₜ)
   space_err = zeros(T, RBVars.Nₛᵘ)
   for iₜ = 1:RBVars.Nₜ
-    time_err[iₜ] = (norm(mean_pointwise_err[:,iₜ],RBVars.Xᵘ₀) /
-      norm(mean_uₕ_test[:,iₜ],RBVars.Xᵘ₀))
+    time_err[iₜ] = (norm(mean_pointwise_err[:,iₜ],RBVars.Xu₀) /
+      norm(mean_uₕ_test[:,iₜ],RBVars.Xu₀))
   end
   for iₛ = 1:RBVars.Nₛᵘ
     space_err[iₛ] = norm(mean_pointwise_err[iₛ,:])/norm(mean_uₕ_test[iₛ,:])
