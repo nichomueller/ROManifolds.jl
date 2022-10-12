@@ -23,20 +23,15 @@ end
 """Generate a uniform random vector of dimension n between the ranges set by
   the vector of ranges 'a' and 'b'"""
 function generate_parameters(
-  a::Vector{T},
-  n = 1) where T
-
-  @assert length(a) == 2 "Input vector must be a range, for eg. [0., 1.]"
-
-  [T.(rand(Uniform(a[1], a[2]))) for _ = 1:n]::Vector{T}
-
-end
-
-function generate_parameters(
   a::Vector{Vector{T}},
   n = 1) where T
 
-  Broadcasting(aᵢ -> generate_parameter(aᵢ, n))(a)
+  function generate_parameter(aᵢ::Vector{T})
+    @assert length(aᵢ) == 2 "$aᵢ must be a range, for eg. [0., 1.]"
+    T.(rand(Uniform(aᵢ[1], aᵢ[2])))
+  end
+
+  [[generate_parameter(a[i]) for i in eachindex(a)] for _ = 1:n]
 
 end
 

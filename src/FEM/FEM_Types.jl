@@ -160,7 +160,7 @@ function FOMPath(root, steadiness, name, mesh_name, case)
   FEM_structures_path = joinpath(FEM_path, "FEM_structures")
   create_dir(FEM_structures_path)
 
-  FEMPathInfo(mesh_path, current_test, FEM_snap_path, FEM_structures_path)
+  FOMPath(mesh_path, current_test, FEM_snap_path, FEM_structures_path)
 
 end
 
@@ -173,7 +173,7 @@ struct FOMInfoS <: FOMInfo
   bnd_info::Dict
   order::Int
   solver::String
-  Paths::FEMPathInfo
+  Paths::FOMPath
   nₛ::Int
 end
 
@@ -186,7 +186,7 @@ struct FOMInfoST <: FOMInfo
   bnd_info::Dict
   order::Int
   solver::String
-  Paths::FEMPathInfo
+  Paths::FOMPath
   nₛ::Int
   θ::Float
   t₀::Float
@@ -257,7 +257,7 @@ function ParamInfo(
 end
 
 function ParamInfo(
-  Params::Vector{ParamInfo},
+  Params::Vector{<:ParamInfo},
   var::String)
 
   for Param in Params
@@ -281,34 +281,26 @@ mutable struct ParamFormInfoST <: ParamFormInfo
 end
 
 function ParamFormInfo(
-  FEMSpace::FOMS,
-  Param::ParamInfoS)
-
-  ParamFormInfoS(Param, get_measure(FEMSpace, var))
-
-end
-
-function ParamFormInfo(
-  FEMSpace::FOMST,
-  Param::ParamInfoST)
-
-  ParamFormInfoST(Param, get_measure(FEMSpace, var))
-
-end
-
-function ParamFormInfo(
-  dΩ::Measure,
-  Param::ParamInfoS)
+  Param::ParamInfoS,
+  dΩ::Measure)
 
   ParamFormInfoS(Param, dΩ)
 
 end
 
 function ParamFormInfo(
-  dΩ::Measure,
-  Param::ParamInfoST)
+  Param::ParamInfoST,
+  dΩ::Measure)
 
   ParamFormInfoST(Param, dΩ)
+
+end
+
+function ParamFormInfo(
+  FEMSpace::FOM,
+  Param::ParamInfo)
+
+  ParamFormInfo(Param, get_measure(FEMSpace, Param.var))
 
 end
 
@@ -326,7 +318,7 @@ function Base.getproperty(ParamForm::ParamFormInfoS, sym::Symbol)
   if sym in (:var, :fun, :θ)
     getfield(ParamForm.Param, sym)
   else
-    getfield(RBInfo, sym)
+    getfield(ParamForm, sym)
   end
 end
 
@@ -334,7 +326,7 @@ function Base.setproperty!(ParamForm::ParamFormInfoS, sym::Symbol, x::T) where T
   if sym in (:var, :fun, :θ)
     setfield!(ParamForm.Param, sym, x)::T
   else
-    setfield!(RBVars, sym, x)::T
+    setfield!(ParamForm, sym, x)::T
   end
 end
 
@@ -342,7 +334,7 @@ function Base.getproperty(ParamForm::ParamFormInfoST, sym::Symbol)
   if sym in (:var, :funₛ, :funₜ, :fun, :θ)
     getfield(ParamForm.Param, sym)
   else
-    getfield(RBInfo, sym)
+    getfield(ParamForm, sym)
   end
 end
 
@@ -350,6 +342,6 @@ function Base.setproperty!(ParamForm::ParamFormInfoST, sym::Symbol, x::T) where 
   if sym in (:var, :funₛ, :funₜ, :fun, :θ)
     setfield!(ParamForm.Param, sym, x)::T
   else
-    setfield!(RBVars, sym, x)::T
+    setfield!(ParamForm, sym, x)::T
   end
 end

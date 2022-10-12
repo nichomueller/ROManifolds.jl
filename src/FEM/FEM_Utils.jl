@@ -35,7 +35,7 @@ function get_FEM_structures(name::String, issteady::Bool)
   else
     error("Not implemented")
   end
-  if !issteady push!(matvec, ["M"]) end
+  issteady ? matvec : push!(matvec, ["M"])
 end
 
 function get_FEM_structures(NT::NTuple)
@@ -69,9 +69,9 @@ function get_FEMμ_info(FEMInfo::FOMInfo)
   μ = load_CSV(Vector{Float}[],
     joinpath(FEMInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{Float}}
   model = DiscreteModelFromFile(FEMInfo.Paths.mesh_path)
-  FEMSpace = FEMSpace₀(FEMInfo.id, FEMInfo, model)::FOM
+  FEMSpace₀ = get_FEMSpace₀(FEMInfo.id, FEMInfo, model)::FOM
 
-  FEMSpace, μ
+  FEMSpace₀, μ
 
 end
 

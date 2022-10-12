@@ -135,21 +135,6 @@ function load_structures_in_list(
 end
 
 function generate_dcube_model(
-  FEMInfo::FOMInfo,
-  d::Int,
-  npart::Int,
-  mesh_name::String)
-
-  if !occursin(".json",mesh_name)
-    mesh_name *= ".json"
-  end
-  mesh_dir = FEMInfo.Paths.mesh_path[1:findall(x->x=='/',FEMInfo.Paths.mesh_path)[end]]
-  mesh_path = joinpath(mesh_dir,mesh_name)
-  generate_dcube_model(d, npart, mesh_path)
-
-end
-
-function generate_dcube_model(
   d::Int,
   npart::Int,
   path::String)

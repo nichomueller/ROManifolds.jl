@@ -21,7 +21,7 @@ function assemble_form(
   ::NTuple{1,Int},
   FEMSpace::FOMS,
   FEMInfo::FOMInfoS,
-  Param::ParamFormInfoS)
+  ParamForm::ParamFormInfoS)
 
   var = ParamForm.var
 
@@ -38,7 +38,7 @@ function assemble_form(
   end
 
   function linear_form(v)
-    if var == "F" || "H"
+    if var ∈ ("F", "H")
       if isaffine(FEMInfo, var)
         ∫(v * (x->1.))ParamForm.dΩ
       else
@@ -53,11 +53,7 @@ function assemble_form(
     end
   end
 
-  if var ∈ ("A", "Xu")
-    bilinear_form
-  else
-    linear_form
-  end
+  var ∈ ("A", "Xu") ? bilinear_form : linear_form
 
 end
 
@@ -90,7 +86,7 @@ function assemble_form(
   end
 
   function linear_form(v)
-    if var == "F" || "H"
+    if var ∈ ("F", "H")
       if isaffine(FEMInfo, var)
         ∫(v ⋅ (x->1.))ParamForm.dΩ
       else
@@ -107,11 +103,7 @@ function assemble_form(
     end
   end
 
-  if var ∈ ("A", "B", "Xu", "Xp")
-    bilinear_form
-  else
-    linear_form
-  end
+  var ∈ ("A", "B", "Xu", "Xp") ? bilinear_form : linear_form
 
 end
 
@@ -152,7 +144,7 @@ function assemble_form(
   end
 
   function linear_form(v)
-    if var == "F" || "H"
+    if var ∈ ("F", "H")
       if isaffine(FEMInfo, var)
         ∫(v ⋅ (x->1.))ParamForm.dΩ
       else
@@ -790,7 +782,7 @@ end
 function assemble_FEM_structure(
   FEMSpace::FOM,
   FEMInfo::FOMInfo,
-  Param::Vector{ParamInfo})
+  Param::Vector{<:ParamInfo})
 
   FEM_structure(P) = assemble_FEM_structure(FEMSpace, FEMInfo,
     ParamFormInfo(FEMSpace, P))
@@ -808,9 +800,9 @@ function assemble_FEM_structure(
   form = assemble_form(FEMSpace, FEMInfo, ParamForm)
 
   if var ∈ get_FEM_vectors(FEMInfo)
-    assemble_vector(form, FEMSpace_vectors(FEMSpace, var))
+    assemble_vector(form, get_FEMSpace_vectors(FEMSpace, var))
   else
-    assemble_vector(form, FEMSpace_matrices(FEMSpace, var)...)
+    assemble_matrix(form, get_FEMSpace_matrices(FEMSpace, var)...)
   end
 
 end
@@ -818,7 +810,7 @@ end
 function assemble_FEM_structure(
   FEMSpace::FOM,
   FEMInfo::FOMInfo,
-  ParamForm::Vector{ParamFormInfo})
+  ParamForm::Vector{<:ParamFormInfo})
 
   FEM_structure(P) = assemble_FEM_structure(FEMSpace, FEMInfo, P)
   Broadcasting(FEM_structure)(ParamForm)

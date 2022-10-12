@@ -80,7 +80,7 @@ function MVVariable(RBInfo::ROMInfo, var::String, ::Type{T}) where T
 
 end
 
-function MVVariable(Vars::Vector{MVVariable}, var::String)
+function MVVariable(Vars::Vector{<:MVVariable}, var::String)
 
   for Var in Vars
     if Var.var == var

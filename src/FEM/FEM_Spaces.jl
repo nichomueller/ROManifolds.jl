@@ -45,7 +45,7 @@ function get_lagrangianQuad_info(
 
 end
 
-function FEMSpace_quantities(
+function get_FEMSpace_quantities(
   ::NTuple{1,Int},
   FEMInfo::FOMInfoS,
   model::DiscreteModel{D,D},
@@ -69,7 +69,7 @@ function FEMSpace_quantities(
 
 end
 
-function FEMSpace_quantities(
+function get_FEMSpace_quantities(
   ::NTuple{1,Int},
   FEMInfo::FOMInfoST,
   model::DiscreteModel{D,D},
@@ -92,7 +92,7 @@ function FEMSpace_quantities(
 
 end
 
-function FEMSpace_quantities(
+function get_FEMSpace_quantities(
   ::NTuple{2,Int},
   FEMInfo::FOMInfoS,
   model::DiscreteModel{D,D},
@@ -125,7 +125,7 @@ function FEMSpace_quantities(
 
 end
 
-function FEMSpace_quantities(
+function get_FEMSpace_quantities(
   ::NTuple{2,Int},
   FEMInfo::FOMInfoST,
   model::DiscreteModel{D,D},
@@ -158,153 +158,153 @@ function FEMSpace_quantities(
 
 end
 
-function FEMSpace_quantities(
+function get_FEMSpace_quantities(
   ::NTuple{3,Int},
   FEMInfo::FOMInfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  FEMSpace_quantities(NTuple(2, Int), FEMInfo, model, g)
+  get_FEMSpace_quantities(NTuple(2, Int), FEMInfo, model, g)
 
 end
 
-function FEMSpace_quantities(
+function get_FEMSpace_quantities(
   ::NTuple{3,Int},
   FEMInfo::FOMInfoST,
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  FEMSpace_quantities(NTuple(2, Int), FEMInfo, model, g)
+  get_FEMSpace_quantities(NTuple(2, Int), FEMInfo, model, g)
 
 end
 
-function FEMSpace(
+function get_FEMSpace(
   NT::NTuple{1,Int},
   FEMInfo::FOMInfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
 
   FOMPoissonS{D}(
-    model, FEMSpace_quantities(NT, FEMInfo, model, g)...)
+    model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
 
-function FEMSpace(
+function get_FEMSpace(
   NT::NTuple{1,Int},
   FEMInfo::FOMInfoST,
   model::DiscreteModel{D,D},
   g::Function) where D
 
   FOMPoissonST{D}(
-    model, FEMSpace_quantities(NT, FEMInfo, model, g)...)
+    model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
 
-function FEMSpace(
+function get_FEMSpace(
   NT::NTuple{2,Int},
   FEMInfo::FOMInfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
 
   FOMStokesS{D}(
-    model, FEMSpace_quantities(NT, FEMInfo, model, g)...)
+    model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
 
-function FEMSpace(
+function get_FEMSpace(
   NT::NTuple{2,Int},
   FEMInfo::FOMInfoST,
   model::DiscreteModel{D,D},
   g::Function) where D
 
   FOMStokesST{D}(
-    model, FEMSpace_quantities(NT, FEMInfo, model, g)...)
+    model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
 
-function FEMSpace(
+function get_FEMSpace(
   NT::NTuple{3,Int},
   FEMInfo::FOMInfoS,
   model::DiscreteModel{D,D},
   g::Function) where D
 
   FOMNavierStokesS{D}(
-    model, FEMSpace_quantities(NT, FEMInfo, model, g)...)
+    model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
 
-function FEMSpace(
+function get_FEMSpace(
   NT::NTuple{3,Int},
   FEMInfo::FOMInfoST,
   model::DiscreteModel{D,D},
   g::Function) where D
 
   FOMNavierStokesST{D}(
-    model, FEMSpace_quantities(NT, FEMInfo, model, g)...)
+    model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
 
 end
 
-function FEMSpace₀(
+function get_FEMSpace₀(
   id::NTuple{1,Int},
   FEMInfo::FOMInfoS,
   model::DiscreteModel)
 
-  FEMSpace(id,FEMInfo,model,x->0)
+  get_FEMSpace(id,FEMInfo,model,x->0)
 
 end
 
-function FEMSpace₀(
+function get_FEMSpace₀(
   id::NTuple{1,Int},
   FEMInfo::FOMInfoST,
   model::DiscreteModel)
 
   g₀(x, t::Real) = 0.
   g₀(t::Real) = x -> g₀(x, t)
-  FEMSpace(id,FEMInfo,model,g₀)
+  get_FEMSpace(id,FEMInfo,model,g₀)
 
 end
 
-function FEMSpace₀(
+function get_FEMSpace₀(
   id::NTuple{2,Int},
   FEMInfo::FOMInfoS,
   model::DiscreteModel)
 
-  FEMSpace(id,FEMInfo,model, x->zero(VectorValue(FEMInfo.D, Float)))
+  get_FEMSpace(id,FEMInfo,model, x->zero(VectorValue(FEMInfo.D, Float)))
 
 end
 
-function FEMSpace₀(
+function get_FEMSpace₀(
   id::NTuple{2,Int},
   FEMInfo::FOMInfoST,
   model::DiscreteModel)
 
   g₀(x, t::Real) = zero(VectorValue(FEMInfo.D, Float))
   g₀(t::Real) = x -> g₀(x, t)
-  FEMSpace(id,FEMInfo,model,g₀)
+  get_FEMSpace(id,FEMInfo,model,g₀)
 
 end
 
-function FEMSpace₀(
+function get_FEMSpace₀(
   id::NTuple{3,Int},
   FEMInfo::FOMInfoS,
   model::DiscreteModel)
 
-  FEMSpace(id,FEMInfo,model, x->zero(VectorValue(FEMInfo.D, Float)))
+  get_FEMSpace(id,FEMInfo,model, x->zero(VectorValue(FEMInfo.D, Float)))
 
 end
 
-function FEMSpace₀(
+function get_FEMSpace₀(
   id::NTuple{3,Int},
   FEMInfo::FOMInfoST,
   model::DiscreteModel)
 
   g₀(x, t::Real) = zero(VectorValue(FEMInfo.D, Float))
   g₀(t::Real) = x -> g₀(x, t)
-  FEMSpace(id,FEMInfo,model,g₀)
+  get_FEMSpace(id,FEMInfo,model,g₀)
 
 end
 
-function FEMSpace_vectors(FEMSpace::FOM, var::String)
+function get_FEMSpace_vectors(FEMSpace::FOM, var::String)
   if var == "Lc"
     FEMSpace.Q₀
   else
@@ -312,7 +312,7 @@ function FEMSpace_vectors(FEMSpace::FOM, var::String)
   end
 end
 
-function FEMSpace_matrices(FEMSpace::FOM, var::String)
+function get_FEMSpace_matrices(FEMSpace::FOM, var::String)
   if var == "B"
     FEMSpace.V, FEMSpace.Q₀
   else

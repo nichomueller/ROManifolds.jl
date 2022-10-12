@@ -48,8 +48,8 @@ function initialize_online_time(RBVars::RB)
 end
 
 function assemble_termsₙ(
-  Vars::Vector{MVVariable},
-  Params::Vector{ParamInfo},
+  Vars::Vector{<:MVVariable},
+  Params::Vector{<:ParamInfo},
   operators::Vector{String})
 
   mult = Broadcasting(.*)
