@@ -82,7 +82,7 @@ function save_CSV(var::SparseVector{T}, path::String) where T
 end
 
 function save_CSV(var::Vector{AbstractArray{T}}, path::Vector{String}) where T
-  @assert length(var) == length(path)
+  @assert length(var) == length(path) "length(var) not equals to length(path)"
   Broadcasting(save_CSV)(var, path)
 end
 
@@ -132,4 +132,39 @@ function load_structures_in_list(
 
   ret_tuple
 
+end
+
+function generate_dcube_model(
+  FEMInfo::FOMInfo,
+  d::Int,
+  npart::Int,
+  mesh_name::String)
+
+  if !occursin(".json",mesh_name)
+    mesh_name *= ".json"
+  end
+  mesh_dir = FEMInfo.Paths.mesh_path[1:findall(x->x=='/',FEMInfo.Paths.mesh_path)[end]]
+  mesh_path = joinpath(mesh_dir,mesh_name)
+  generate_dcube_model(d, npart, mesh_path)
+
+end
+
+function generate_dcube_model(
+  d::Int,
+  npart::Int,
+  path::String)
+
+  @assert d ≤ 3 "Select d-dimensional domain, where d ≤ 3"
+  if d == 1
+    domain = (0,1)
+    partition = (npart)
+  elseif d == 2
+    domain = (0,1,0,1)
+    partition = (npart,npart)
+  else
+    domain = (0, 1, 0, 1, 0, 1)
+    partition = (npart,npart,npart)
+  end
+  model = CartesianDiscreteModel(domain,partition)
+  to_json_file(model,path)
 end

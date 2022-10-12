@@ -388,7 +388,7 @@ function online_phase(
 
   println("Online phase of the RB solver, unsteady Poisson problem")
 
-  FEMSpace, μ = get_FOM_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo.FEMInfo)
 
   get_norm_matrix(RBInfo, RBVars.Steady)
   (ũ_μ,uₙ_μ,mean_uₕ_test,mean_pointwise_err,mean_H1_err,mean_H1_L2_err,H1_L2_err,

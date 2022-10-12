@@ -70,9 +70,9 @@ end
 
 function MVVariable(RBInfo::ROMInfo, var::String, ::Type{T}) where T
 
-  if var ∈ problem_vectors(RBInfo)
+  if var ∈ get_FEM_vectors(RBInfo)
     return VVariable(var, T)
-  elseif var ∈ problem_matrices(RBInfo)
+  elseif var ∈ get_FEM_matrices(RBInfo)
     return MVariable(var, T)
   else
     error("Unrecognized variable")
@@ -95,7 +95,7 @@ end
 function RBS(RBInfo::ROMInfo, ::Type{T}) where T
 
   MVVars(var) =  MVVariable(RBInfo, var, T)
-  Vars = Broadcasting(MVVars)(RBInfo.problem_structures)
+  Vars = Broadcasting(MVVars)(RBInfo.structures)
 
   S = Matrix{T}[]
   Φₛ = Matrix{T}[]
@@ -166,7 +166,7 @@ mutable struct PoissonS{T} <: RBS{T}
   Φₛ::Vector{Matrix{T}}
   x̃::Vector{Matrix{T}}
   xₙ::Vector{Matrix{T}}
-  X₀::Vector{SparseMatrixCSC{Float64, Int64}}
+  X₀::Vector{SparseMatrixCSC{Float, Int}}
   LHSₙ::Vector{Matrix{T}}
   RHSₙ::Vector{Matrix{T}}
   Nₛ::Vector{Int}
@@ -205,35 +205,35 @@ end
 function setup(NT::NTuple{2,Int}, ::Type{T}) where T
 
   PoissonST{T}(
-    setup(get_NTuple(1, Int), T), init_RBVars(NT, T)...)
+    setup(NTuple(1, Int), T), init_RBVars(NT, T)...)
 
 end
 
 function setup(NT::NTuple{3,Int}, ::Type{T}) where T
 
   StokesS{T}(
-    setup(get_NTuple(1, Int), T), init_RBVars(NT, T)...)
+    setup(NTuple(1, Int), T), init_RBVars(NT, T)...)
 
 end
 
 function setup(NT::NTuple{4,Int}, ::Type{T}) where T
 
   StokesST{T}(
-    setup(get_NTuple(2, Int), T), setup(get_NTuple(3, Int), T))
+    setup(NTuple(2, Int), T), setup(NTuple(3, Int), T))
 
 end
 
 function setup(NT::NTuple{5,Int}, ::Type{T}) where T
 
   NavierStokesS{T}(
-    setup(get_NTuple(3, Int), T), init_RBVars(NT, T)...)
+    setup(NTuple(3, Int), T), init_RBVars(NT, T)...)
 
 end
 
 function setup(::NTuple{6,Int}, ::Type{T}) where T
 
   NavierStokesST{T}(
-    setup(get_NTuple(4, Int), T), setup(get_NTuple(5, Int), T))
+    setup(NTuple(4, Int), T), setup(NTuple(5, Int), T))
 
 end
 
@@ -363,6 +363,19 @@ struct ROMPath
   results_path::String
 end
 
+function ROMPath(FEMPaths, RB_method)
+
+  ROM_path = joinpath(FEMPaths.current_test, RB_method)
+  create_dir(ROM_path)
+  ROM_structures_path = joinpath(ROM_path, "ROM_structures")
+  create_dir(ROM_structures_path)
+  results_path = joinpath(ROM_path, "results")
+  create_dir(results_path)
+
+  ROMPath(FEMPaths, ROM_structures_path, results_path)
+
+end
+
 struct ROMInfoS <: ROMInfo
   FEMInfo::FOMInfoS
   Paths::ROMPath
@@ -406,7 +419,7 @@ mutable struct ROMInfoST <: ROMInfo
 end
 
 function Base.getproperty(RBInfo::ROMInfoS, sym::Symbol)
-  if sym in (:probl_nl, :problem_unknowns, :problem_structures)
+  if sym in (:affine_structures, :unknowns, :FEM_structures)
     getfield(RBInfo.FEMInfo, sym)
   elseif sym in (:ROM_structures_path, :results_path)
     getfield(RBInfo.Paths, sym)
@@ -416,7 +429,7 @@ function Base.getproperty(RBInfo::ROMInfoS, sym::Symbol)
 end
 
 function Base.getproperty(RBInfo::ROMInfoST, sym::Symbol)
-  if sym in (:probl_nl, :problem_unknowns, :problem_structures)
+  if sym in (:affine_structures, :unknowns, :FEM_structures)
     getfield(RBInfo.FEMInfo, sym)
   elseif sym in (:ROM_structures_path, :results_path)
     getfield(RBInfo.Paths, sym)

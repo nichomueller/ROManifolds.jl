@@ -1,81 +1,43 @@
-const Float = Float64
-
 """Computation of the inner product between 'vec1' and 'vec2', defined by the
   (positive definite) matrix 'norm_matrix'.
   If typeof(norm_matrix) == nothing (default), the standard inner product between
   'vec1' and 'vec2' is returned."""
-function mydot(vec1::Vector{T}, vec2::Vector{T}, norm_matrix::SparseMatrixCSC) where T
+function LinearAlgebra.dot(
+  v1::Vector{T},
+  v2::Vector{T},
+  X::SparseMatrixCSC) where T
 
-  sum(sum(vec1' * norm_matrix * vec2))
-
-end
-
-function mydot(vec1::Vector{T}, vec2::Vector{T}) where T
-
-  sum(sum(vec1' * vec2))
+  v1' * X * v2
 
 end
 
 """Computation of the norm of 'vec', defined by the (positive definite) matrix
 'norm_matrix'. If typeof(norm_matrix) == nothing (default), the Euclidean norm
 of 'vec' is returned."""
-function mynorm(vec::Vector{T}, norm_matrix::SparseMatrixCSC) where T
+function LinearAlgebra.norm(v::Vector{T}, X::SparseMatrixCSC) where T
 
-  sqrt(mydot(vec, vec, norm_matrix))
+  sqrt(dot(v, v, X))
 
-end
-
-function mynorm(vec::Vector{T}) where T
-
-  sqrt(mydot(vec, vec))
-
-end
-
-"""Computation of the standard matrix product between A, tensor of order 3,
-  and B, tensor of order 2. If transpose_A is true, then the first two dimensions
-  of A are permuted"""
-function matrix_product!(
-    AB::Array, A::Array, B::Array; transpose_A=false)
-  @assert length(size(A)) == 3 && length(size(B)) == 2 "Only implemented tensor order 3 * tensor order 2"
-  if transpose_A
-    A = permutedims(A,[2,1,3])
-  end
-  for q = 1:size(A)[3]
-    AB[:,:,q] = A[:,:,q]*B
-  end
-  AB
-end
-
-"""Computation of the standard matrix product between A, tensor of order 3,
-  and B, tensor of order 2. If transpose_A is true, then the first two dimensions
-  of A are permuted"""
-function matrix_product_vec!(
-    AB::Array, A::Array, B::Array; transpose_A=false)
-  @assert length(size(A)) == 3 && length(size(B)) == 2 || length(size(B)) == 3
-   "Only implemented tensor order 3 * tensor order 2 or 3"
-  if transpose_A
-    A = permutedims(A,[2,1,3])
-  end
-  if length(size(B)) == 2
-    for q₁ = 1:size(A)[end]
-      for q₂ = 1:size(B)[end]
-        AB[:,:,q₂+(q₁-1)*size(B)[end]] = A[:,:,q₁]*B[:,q₂]
-      end
-    end
-  else
-    for q₁ = 1:size(A)[end]
-      for q₂ = 1:size(B)[end]
-        AB[:,:,q₂+(q₁-1)*size(B)[end]] = A[:,:,q₁]*B[:,:,q₂]
-      end
-    end
-  end
-  AB
 end
 
 """Generate a uniform random vector of dimension n between the ranges set by
   the vector of ranges 'a' and 'b'"""
-function generate_parameter(a::Vector{T}, b::Vector{T}, n = 1) where T
-  [[T.(rand(Uniform(a[i], b[i]))) for i = eachindex(a)] for j in 1:n]::Vector{Vector{T}}
+function generate_parameters(
+  a::Vector{T},
+  n = 1) where T
+
+  @assert length(a) == 2 "Input vector must be a range, for eg. [0., 1.]"
+
+  [T.(rand(Uniform(a[1], a[2]))) for _ = 1:n]::Vector{T}
+
+end
+
+function generate_parameters(
+  a::Vector{Vector{T}},
+  n = 1) where T
+
+  Broadcasting(aᵢ -> generate_parameter(aᵢ, n))(a)
+
 end
 
 """Makes use of a truncated SVD (tolerance level specified by 'ϵ') to compute a
@@ -91,7 +53,8 @@ function POD(S::Matrix{T}, ϵ::Float, X::SparseMatrixCSC{T}) where T
 
   energies = cumsum(Σ.^2)
   N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  println("Basis number obtained via POD is $N, projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
+  err = sqrt(1-energies[N]/energies[end])
+  println("Basis number obtained via POD is $N, projection error ≤ $err")
 
   Matrix{T}((L' \ U[:, 1:N])[invperm(H.p), :])
 
@@ -105,7 +68,8 @@ function POD(S::SparseMatrixCSC{T}, ϵ::Float, X::SparseMatrixCSC{T}) where T
 
   energies = cumsum(Σ.^2)
   N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  println("Basis number obtained via POD is $N, projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
+  err = sqrt(1-energies[N]/energies[end])
+  println("Basis number obtained via POD is $N, projection error ≤ $err")
 
   Matrix{T}((L' \ U[:, 1:N])[invperm(H.p), :])
 
@@ -117,7 +81,8 @@ function POD(S::Matrix{T}, ϵ::Float) where T
 
   energies = cumsum(Σ.^2)
   N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  println("Basis number obtained via POD is $N, projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
+  err = sqrt(1-energies[N]/energies[end])
+  println("Basis number obtained via POD is $N, projection error ≤ $err")
 
   T.(U[:, 1:N])
 
@@ -129,7 +94,8 @@ function POD(S::SparseMatrixCSC{T}, ϵ::Float) where T
 
   energies = cumsum(Σ.^2)
   N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  println("Basis number obtained via POD is $N, projection error ≤ $(sqrt(1-energies[N]/energies[end]))")
+  err = sqrt(1-energies[N]/energies[end])
+  println("Basis number obtained via POD is $N, projection error ≤ $err")
 
   T.(U[:, 1:N])
 
@@ -141,39 +107,15 @@ function POD(S::AbstractArray{T}, ϵ::Float, ::Nothing) where T
 
 end
 
-function solve_cholesky(A::SparseMatrixCSC{T}, b::Vector{T}) where T
+function solve_cholesky(A::AbstractArray{T}, B::AbstractArray{T}) where T
 
   H = cholesky(A)
   L = sparse(H.L)
 
-  y = L[invperm(H.p), :] \ b
+  y = L[invperm(H.p), :] \ B
   x = L[invperm(H.p), :]' \ y
 
-  x::Vector{T}
-
-end
-
-function solve_cholesky(A::SparseMatrixCSC{T}, B::Matrix{T}) where T
-
-  H = cholesky(A)
-  L = sparse(H.L)
-
-  y = L[invperm(H.p), :] * B
-  x = L[invperm(H.p), :]' \ y
-
-  x::Matrix{T}
-
-end
-
-function solve_cholesky(A::SparseMatrixCSC{T}, B::SparseMatrixCSC{T}) where T
-
-  H = cholesky(A)
-  L = sparse(H.L)
-
-  y = L[invperm(H.p), :] * B
-  x = L[invperm(H.p), :]' \ y
-
-  x::Matrix{T}
+  x
 
 end
 
@@ -267,22 +209,18 @@ function SparseArrays.findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
 
 end
 
-function get_NTuple(N::Int, T::DataType)
+function Base.NTuple(N::Int, T::DataType)
 
-  ntupl = ()
+  NT = ()
   for _ = 1:N
-    ntupl = (ntupl...,zero(T))
+    NT = (NT...,zero(T))
   end
 
-  ntupl::NTuple{N,T}
+  NT::Base.NTuple{N,T}
 
 end
 
-function get_size(Mat::Matrix)
-  size(Mat)
-end
-
-Gridap.VectorValue(D::Int, T::DataType) = VectorValue(get_NTuple(D, T))
+Gridap.VectorValue(D::Int, T::DataType) = VectorValue(NTuple(D, T))
 
 function Base.one(vv::VectorValue{D,T}) where {D,T}
   vv_one = zero(vv) .+ one(T)

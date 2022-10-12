@@ -149,7 +149,7 @@ function FEMSpace_quantities(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  FEMSpace_quantities(get_NTuple(2, Int), FEMInfo, model, g)
+  FEMSpace_quantities(NTuple(2, Int), FEMInfo, model, g)
 
 end
 
@@ -159,7 +159,7 @@ function FEMSpace_quantities(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  FEMSpace_quantities(get_NTuple(2, Int), FEMInfo, model, g)
+  FEMSpace_quantities(NTuple(2, Int), FEMInfo, model, g)
 
 end
 
@@ -230,62 +230,62 @@ function FEMSpace(
 end
 
 function FEMSpace₀(
-  problem_id::NTuple{1,Int},
+  id::NTuple{1,Int},
   FEMInfo::FOMInfoS,
   model::DiscreteModel)
 
-  FEMSpace(problem_id,FEMInfo,model,x->0)
+  FEMSpace(id,FEMInfo,model,x->0)
 
 end
 
 function FEMSpace₀(
-  problem_id::NTuple{1,Int},
+  id::NTuple{1,Int},
   FEMInfo::FOMInfoST,
   model::DiscreteModel)
 
   g₀(x, t::Real) = 0.
   g₀(t::Real) = x -> g₀(x, t)
-  FEMSpace(problem_id,FEMInfo,model,g₀)
+  FEMSpace(id,FEMInfo,model,g₀)
 
 end
 
 function FEMSpace₀(
-  problem_id::NTuple{2,Int},
+  id::NTuple{2,Int},
   FEMInfo::FOMInfoS,
   model::DiscreteModel)
 
-  FEMSpace(problem_id,FEMInfo,model, x->zero(VectorValue(FEMInfo.D, Float)))
+  FEMSpace(id,FEMInfo,model, x->zero(VectorValue(FEMInfo.D, Float)))
 
 end
 
 function FEMSpace₀(
-  problem_id::NTuple{2,Int},
+  id::NTuple{2,Int},
   FEMInfo::FOMInfoST,
   model::DiscreteModel)
 
   g₀(x, t::Real) = zero(VectorValue(FEMInfo.D, Float))
   g₀(t::Real) = x -> g₀(x, t)
-  FEMSpace(problem_id,FEMInfo,model,g₀)
+  FEMSpace(id,FEMInfo,model,g₀)
 
 end
 
 function FEMSpace₀(
-  problem_id::NTuple{3,Int},
+  id::NTuple{3,Int},
   FEMInfo::FOMInfoS,
   model::DiscreteModel)
 
-  FEMSpace(problem_id,FEMInfo,model, x->zero(VectorValue(FEMInfo.D, Float)))
+  FEMSpace(id,FEMInfo,model, x->zero(VectorValue(FEMInfo.D, Float)))
 
 end
 
 function FEMSpace₀(
-  problem_id::NTuple{3,Int},
+  id::NTuple{3,Int},
   FEMInfo::FOMInfoST,
   model::DiscreteModel)
 
   g₀(x, t::Real) = zero(VectorValue(FEMInfo.D, Float))
   g₀(t::Real) = x -> g₀(x, t)
-  FEMSpace(problem_id,FEMInfo,model,g₀)
+  FEMSpace(id,FEMInfo,model,g₀)
 
 end
 

@@ -46,7 +46,7 @@ function MDEIM_offline(
   RBVars::RBS{T},
   var::String) where T
 
-  FEMSpace, μ = get_FOM_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo.FEMInfo)
   Nₛ = get_Nₛ(RBVars, var)
 
   Mat, row_idx = snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
@@ -66,7 +66,7 @@ function MDEIM_offline(
   ::RBS{T},
   var::String) where T
 
-  FEMSpace, μ = get_FOM_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo.FEMInfo)
 
   Mat = snaps_DEIM(FEMSpace, RBInfo, μ, var)
   idx, Matᵢ = MDEIM_offline(Mat)
@@ -82,7 +82,7 @@ function MDEIM_offline(
   RBVars::RBST{T},
   var::String) where T
 
-  FEMSpace, μ = get_FOM_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo.FEMInfo)
   Nₛ = get_Nₛ(RBVars, var)
 
   Mat, Mat_time, row_idx = snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
@@ -105,7 +105,7 @@ function MDEIM_offline(
   RBInfo::ROMInfoST,
   var::String)
 
-  FEMSpace, μ = get_FOM_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo.FEMInfo)
 
   Mat, Mat_time = snaps_DEIM(FEMSpace, RBInfo, μ, var)
 

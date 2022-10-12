@@ -462,16 +462,16 @@ function adaptive_loop_on_params(
   time_err_p = zeros(T, RBVars.Nₜ)
   space_err_p = zeros(T, RBVars.Nₛᵖ)
   for iₜ = 1:RBVars.Nₜ
-    time_err_u[iₜ] = (mynorm(mean_pointwise_err_u[:,iₜ],RBVars.Xᵘ₀) /
-      mynorm(mean_uₕ_test[:,iₜ],RBVars.Xᵘ₀))
-    time_err_p[iₜ] = (mynorm(mean_pointwise_err_p[:,iₜ],RBVars.Xᵖ₀) /
-      mynorm(mean_pₕ_test[:,iₜ],RBVars.Xᵖ₀))
+    time_err_u[iₜ] = (norm(mean_pointwise_err_u[:,iₜ],RBVars.Xᵘ₀) /
+      norm(mean_uₕ_test[:,iₜ],RBVars.Xᵘ₀))
+    time_err_p[iₜ] = (norm(mean_pointwise_err_p[:,iₜ],RBVars.Xᵖ₀) /
+      norm(mean_pₕ_test[:,iₜ],RBVars.Xᵖ₀))
   end
   for iₛ = 1:RBVars.Nₛᵘ
-    space_err_u[iₛ] = mynorm(mean_pointwise_err_u[iₛ,:])/mynorm(mean_uₕ_test[iₛ,:])
+    space_err_u[iₛ] = norm(mean_pointwise_err_u[iₛ,:])/norm(mean_uₕ_test[iₛ,:])
   end
   for iₛ = 1:RBVars.Nₛᵖ
-    space_err_p[iₛ] = mynorm(mean_pointwise_err_p[iₛ,:])/mynorm(mean_pₕ_test[iₛ,:])
+    space_err_p[iₛ] = norm(mean_pointwise_err_p[iₛ,:])/norm(mean_pₕ_test[iₛ,:])
   end
 
   ind_s_u = argmax(space_err_u,n_adaptive_u[1])

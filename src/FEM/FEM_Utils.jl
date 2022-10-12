@@ -1,193 +1,77 @@
-function FOMPath(root, problem_steadiness, problem_name, mesh_name, case)
-
-  @assert isdir(root) "$root is an invalid root directory"
-
-  root_tests = joinpath(root, "tests")
-  create_dir(root_tests)
-  mesh_path = joinpath(root_tests, joinpath("meshes", mesh_name))
-  @assert isfile(mesh_path) "$mesh_path is an invalid mesh path"
-  type_path = joinpath(root_tests, problem_steadiness)
-  create_dir(type_path)
-  problem_path = joinpath(type_path, problem_name)
-  create_dir(problem_path)
-  problem_and_info_path = joinpath(problem_path, "case" * string(case))
-  create_dir(problem_and_info_path)
-  current_test = joinpath(problem_and_info_path, mesh_name)
-  create_dir(current_test)
-  FEM_path = joinpath(current_test, "FEM_data")
-  create_dir(FEM_path)
-  FEM_snap_path = joinpath(FEM_path, "snapshots")
-  create_dir(FEM_snap_path)
-  FEM_structures_path = joinpath(FEM_path, "FEM_structures")
-  create_dir(FEM_structures_path)
-
-  FEMPathInfo(mesh_path, current_test, FEM_snap_path, FEM_structures_path)
-
+function setup_FEM(name::String, issteady::Bool)
+  (get_id(name, issteady), get_unknowns(name),
+    get_FEM_structures(name, issteady))
 end
 
-function get_problem_id(problem_name::String)
-  if problem_name == "poisson"
-    return (0,)
-  elseif problem_name == "stokes"
-    return (0,0)
-  elseif problem_name == "navier_stokes"
-    return (0,0,0)
+function get_id(name::String, issteady::Bool)
+  if name == "poisson"
+    issteady ? (0,) : (0,0)
+  elseif name == "stokes"
+    issteady ? (0,0,0) : (0,0,0,0)
+  elseif name == "navier_stokes"
+    issteady ? (0,0,0,0,0) : (0,0,0,0,0,0)
   else
-    error("unimplemented")
+    error("Not implemented")
   end
 end
 
-function get_FEM_unknowns(NT::NTuple)
-  if typeof(NT) == NTuple{Int, 1}
+function get_unknowns(name::String)
+  if name == "poisson"
     ["u"]
-  else
+  elseif occursin("stokes", name)
     ["u", "p"]
+  else
+    error("Not implemented")
   end
+end
+
+function get_FEM_structures(name::String, issteady::Bool)
+  if name == "poisson"
+    matvec = ["A", "F", "H", "L"]
+  elseif name == "stokes"
+    matvec = ["A", "B", "F", "H", "L", "Lc"]
+  elseif name == "navier_stokes"
+    matvec = ["A", "B", "C", "D", "F", "H", "L", "Lc"]
+  else
+    error("Not implemented")
+  end
+  if !issteady push!(matvec, ["M"]) end
 end
 
 function get_FEM_structures(NT::NTuple)
-  if typeof(NT) == NTuple{Int, 1}
+  if typeof(NT) ∈ (NTuple{1, Int}, NTuple{2, Int})
     ["A", "F", "H", "L"]
-  elseif typeof(NT) == NTuple{Int, 2}
+  elseif typeof(NT) ∈ (NTuple{3, Int}, NTuple{4, Int})
     ["A", "B", "F", "H", "L", "Lc"]
-  else typeof(NT) == NTuple{Int, 3}
+  else typeof(NT) ∈ (NTuple{5, Int}, NTuple{6, Int})
     ["A", "B", "C", "D", "F", "H", "L", "Lc"]
   end
 end
 
 function get_FEM_structures(FEMInfo::FOMInfoS)
-  NT = FEMInfo.problem_id
-  get_FEM_structures(NT)
+  get_FEM_structures(FEMInfo.id)
 end
 
 function get_FEM_structures(FEMInfo::FOMInfoST)
-  NT = FEMInfo.problem_id
-  append!(["M"], get_FEM_structures(NT))
+  append!(["M"], get_FEM_structures(FEMInfo.id))
 end
 
-function nonlinearity_lifting_op(FEMInfo::FOMInfo)
-  if "A" ∉ FEMInfo.probl_nl && "L" ∉ FEMInfo.probl_nl
-    return 0
-  elseif "A" ∈ FEMInfo.probl_nl && "L" ∉ FEMInfo.probl_nl
-    return 1
-  elseif "A" ∉ FEMInfo.probl_nl && "L" ∈ FEMInfo.probl_nl
-    return 2
-  else
-    return 3
-  end
+function get_FEM_vectors(FEMInfo::FOMInfo)
+  vecs = ["F", "H", "L", "Lc"]
+  intersect(FEMInfo.structures, vecs)::Vector{String}
 end
 
-function get_FOM_info(FEMInfo::FOMInfo)
+function get_FEM_matrices(FEMInfo::FOMInfo)
+  setdiff(FEMInfo.structures, get_FEM_vectors(FEMInfo))::Vector{String}
+end
+
+function get_FEMμ_info(FEMInfo::FOMInfo)
   μ = load_CSV(Vector{Float}[],
     joinpath(FEMInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{Float}}
   model = DiscreteModelFromFile(FEMInfo.Paths.mesh_path)
-  FEMSpace = FEMSpace₀(FEMInfo.problem_id, FEMInfo, model)::FOM
+  FEMSpace = FEMSpace₀(FEMInfo.id, FEMInfo, model)::FOM
 
   FEMSpace, μ
-
-end
-
-function ParamInfo(
-  ::FOMInfoS,
-  fun::Function,
-  var::String)
-
-  ParamInfoS(var, fun, Vector{Float}[])
-
-end
-
-function ParamInfo(
-  ::FOMInfoST,
-  fun::Function,
-  var::String)
-
-  ParamInfoST(var, fun, x->fun(x,t), t->fun(x,t), Vector{Float}[])
-
-end
-
-function ParamInfo(
-  FEMInfo::FOMInfoS,
-  μ::Vector,
-  var::String)
-
-  fun = get_fun(FEMInfo, μ, var)
-  ParamInfoS(var, fun, Vector{Float}[])
-
-end
-
-function ParamInfo(
-  FEMInfo::FOMInfoST,
-  μ::Vector,
-  var::String)
-
-  funₛ, funₜ, fun  = get_fun(FEMInfo, μ, var)
-  ParamInfoST(var, funₛ, funₜ, fun, Vector{Float}[])
-
-end
-
-function ParamInfo(
-  FEMInfo::FOMInfo,
-  μ::Vector)
-
-  get_single_ParamInfo(var) = ParamInfo(FEMInfo, μ, var)
-  operators = get_FEM_structures(FEMInfo)
-  Broadcasting(get_single_ParamInfo)(operators)
-
-end
-
-function ParamInfo(
-  Params::Vector{ParamInfo},
-  var::String)
-
-  for Param in Params
-    if Param.var == var
-      return Param
-    end
-  end
-
-  error("Unrecognized variable")
-
-end
-
-function ParamFormInfo(
-  FEMSpace::FOMS,
-  Param::ParamInfoS)
-
-  ParamFormInfoS(Param, get_measure(FEMSpace, var))
-
-end
-
-function ParamFormInfo(
-  FEMSpace::FOMST,
-  Param::ParamInfoST)
-
-  ParamFormInfoST(Param, get_measure(FEMSpace, var))
-
-end
-
-function ParamFormInfo(
-  dΩ::Measure,
-  Param::ParamInfoS)
-
-  ParamFormInfoS(Param, dΩ)
-
-end
-
-function ParamFormInfo(
-  dΩ::Measure,
-  Param::ParamInfoST)
-
-  ParamFormInfoST(Param, dΩ)
-
-end
-
-function ParamFormInfo(
-  FEMInfo::FOMInfo,
-  μ::Vector)
-
-  get_single_ParamFormInfo(var) = ParamInfo(FEMInfo, μ, var)
-  operators = get_FEM_structures(FEMInfo)
-  Broadcasting(get_single_ParamFormInfo)(operators)
 
 end
 
@@ -200,17 +84,6 @@ end
 
 function get_timesθ(FEMInfo::FOMInfoST)
   collect(FEMInfo.t₀:FEMInfo.δt:FEMInfo.tₗ-FEMInfo.δt).+FEMInfo.δt*FEMInfo.θ
-end
-
-function generate_vtk_file(
-  FEMSpace::FOM,
-  path::String,
-  var_name::String,
-  var::Array)
-
-  FE_var = FEFunction(FEMSpace.V, var)
-  writevtk(FEMSpace.Ω, path, cellfields = [var_name => FE_var])
-
 end
 
 function find_FE_elements(
@@ -263,34 +136,6 @@ function find_FE_elements(
 
 end
 
-function define_g_FEM(
-  FEMSpace::FOMS,
-  Param::ParamInfoS)
-
-  interpolate_dirichlet(Param.g, FEMSpace.V)
-
-end
-
-function define_g_FEM(
-  FEMSpace::FOMST,
-  Param::ParamInfoST)
-
-  g(t) = interpolate_dirichlet(Param.g(t), FEMSpace.V(t))
-
-end
-
-function define_dg_FEM(
-  FEMSpace::FOMST,
-  Param::ParamInfoST)
-
-  function dg(t)
-    dg(x,t::Real) = ∂t(Param.g)(x,t)
-    dg(t::Real) = x -> dg(x,t)
-    interpolate_dirichlet(dg(t), FEMSpace.V(t))
-  end
-
-end
-
 function set_labels(
   model::DiscreteModel,
   bnd_info::Dict)
@@ -306,39 +151,4 @@ function set_labels(
     end
   end
 
-end
-
-function generate_dcube_discrete_model(
-  FEMInfo::FOMInfo,
-  d::Int,
-  npart::Int,
-  mesh_name::String)
-
-  if !occursin(".json",mesh_name)
-    mesh_name *= ".json"
-  end
-  mesh_dir = FEMInfo.Paths.mesh_path[1:findall(x->x=='/',FEMInfo.Paths.mesh_path)[end]]
-  mesh_path = joinpath(mesh_dir,mesh_name)
-  generate_dcube_discrete_model(d, npart, mesh_path)
-
-end
-
-function generate_dcube_discrete_model(
-  d::Int,
-  npart::Int,
-  path::String)
-
-  @assert d ≤ 3 "Select d-dimensional domain, where d ≤ 3"
-  if d == 1
-    domain = (0,1)
-    partition = (npart)
-  elseif d == 2
-    domain = (0,1,0,1)
-    partition = (npart,npart)
-  else
-    domain = (0, 1, 0, 1, 0, 1)
-    partition = (npart,npart,npart)
-  end
-  model = CartesianDiscreteModel(domain,partition)
-  to_json_file(model,path)
 end

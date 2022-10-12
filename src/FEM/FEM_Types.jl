@@ -137,13 +137,39 @@ struct FOMPath
   FEM_structures_path::String
 end
 
+function FOMPath(root, steadiness, name, mesh_name, case)
+
+  @assert isdir(root) "$root is an invalid root directory"
+
+  root_tests = joinpath(root, "tests")
+  create_dir(root_tests)
+  mesh_path = joinpath(root_tests, joinpath("meshes", mesh_name))
+  @assert isfile(mesh_path) "$mesh_path is an invalid mesh path"
+  type_path = joinpath(root_tests, steadiness)
+  create_dir(type_path)
+  problem_path = joinpath(type_path, name)
+  create_dir(problem_path)
+  problem_and_info_path = joinpath(problem_path, "case$case")
+  create_dir(problem_and_info_path)
+  current_test = joinpath(problem_and_info_path, mesh_name)
+  create_dir(current_test)
+  FEM_path = joinpath(current_test, "FEM_data")
+  create_dir(FEM_path)
+  FEM_snap_path = joinpath(FEM_path, "snapshots")
+  create_dir(FEM_snap_path)
+  FEM_structures_path = joinpath(FEM_path, "FEM_structures")
+  create_dir(FEM_structures_path)
+
+  FEMPathInfo(mesh_path, current_test, FEM_snap_path, FEM_structures_path)
+
+end
+
 struct FOMInfoS <: FOMInfo
-  problem_id::NTuple
+  id::NTuple
   D::Int
-  problem_unknowns::Vector{String}
-  problem_structures::Vector{String}
-  case::Int
-  probl_nl::Vector{String}
+  unknowns::Vector{String}
+  structures::Vector{String}
+  affine_structures::Vector{String}
   bnd_info::Dict
   order::Int
   solver::String
@@ -152,12 +178,11 @@ struct FOMInfoS <: FOMInfo
 end
 
 struct FOMInfoST <: FOMInfo
-  problem_id::NTuple
+  id::NTuple
   D::Int
-  problem_unknowns::Vector{String}
-  problem_structures::Vector{String}
-  case::Int
-  probl_nl::Vector{String}
+  unknowns::Vector{String}
+  structures::Vector{String}
+  affine_structures::Vector{String}
   bnd_info::Dict
   order::Int
   solver::String
@@ -183,6 +208,68 @@ mutable struct ParamInfoST <: ParamInfo
   θ::Vector{Vector{Float}}
 end
 
+function ParamInfo(
+  ::FOMInfoS,
+  fun::Function,
+  var::String)
+
+  ParamInfoS(var, fun, Vector{Float}[])
+
+end
+
+function ParamInfo(
+  ::FOMInfoST,
+  fun::Function,
+  var::String)
+
+  ParamInfoST(var, fun, x->fun(x,t), t->fun(x,t), Vector{Float}[])
+
+end
+
+function ParamInfo(
+  FEMInfo::FOMInfoS,
+  μ::Vector,
+  var::String)
+
+  fun = get_fun(FEMInfo, μ, var)
+  ParamInfoS(var, fun, Vector{Float}[])
+
+end
+
+function ParamInfo(
+  FEMInfo::FOMInfoST,
+  μ::Vector,
+  var::String)
+
+  funₛ, funₜ, fun  = get_fun(FEMInfo, μ, var)
+  ParamInfoST(var, funₛ, funₜ, fun, Vector{Float}[])
+
+end
+
+function ParamInfo(
+  FEMInfo::FOMInfo,
+  μ::Vector)
+
+  get_single_ParamInfo(var) = ParamInfo(FEMInfo, μ, var)
+  operators = get_FEM_structures(FEMInfo)
+  Broadcasting(get_single_ParamInfo)(operators)
+
+end
+
+function ParamInfo(
+  Params::Vector{ParamInfo},
+  var::String)
+
+  for Param in Params
+    if Param.var == var
+      return Param
+    end
+  end
+
+  error("Unrecognized variable")
+
+end
+
 mutable struct ParamFormInfoS <: ParamFormInfo
   Param::ParamInfoS
   dΩ::Measure
@@ -191,6 +278,48 @@ end
 mutable struct ParamFormInfoST <: ParamFormInfo
   Param::ParamInfoST
   dΩ::Measure
+end
+
+function ParamFormInfo(
+  FEMSpace::FOMS,
+  Param::ParamInfoS)
+
+  ParamFormInfoS(Param, get_measure(FEMSpace, var))
+
+end
+
+function ParamFormInfo(
+  FEMSpace::FOMST,
+  Param::ParamInfoST)
+
+  ParamFormInfoST(Param, get_measure(FEMSpace, var))
+
+end
+
+function ParamFormInfo(
+  dΩ::Measure,
+  Param::ParamInfoS)
+
+  ParamFormInfoS(Param, dΩ)
+
+end
+
+function ParamFormInfo(
+  dΩ::Measure,
+  Param::ParamInfoST)
+
+  ParamFormInfoST(Param, dΩ)
+
+end
+
+function ParamFormInfo(
+  FEMInfo::FOMInfo,
+  μ::Vector)
+
+  get_single_ParamFormInfo(var) = ParamInfo(FEMInfo, μ, var)
+  operators = get_FEM_structures(FEMInfo)
+  Broadcasting(get_single_ParamFormInfo)(operators)
+
 end
 
 function Base.getproperty(ParamForm::ParamFormInfoS, sym::Symbol)

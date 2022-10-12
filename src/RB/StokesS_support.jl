@@ -16,7 +16,7 @@ function assemble_constraint_matrix(
   RBInfo::Info,
   RBVars::StokesS{T}) where T
 
-  FEMSpace, μ = get_FOM_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo.FEMInfo)
 
   constraint_matrix = zeros(T, RBVars.Nₛᵘ, RBVars.nₛ)
 
@@ -54,15 +54,15 @@ function primal_supremizers(
     println("Normalizing primal supremizer $i")
 
     for j in 1:RBVars.nₛᵘ
-      supr_primal[:, i] -= mydot(supr_primal[:, i], RBVars.Φₛ[:, j], RBVars.X₀[1]) /
-      mynorm(RBVars.Φₛ[:, j], RBVars.X₀[1]) * RBVars.Φₛ[:, j]
+      supr_primal[:, i] -= dot(supr_primal[:, i], RBVars.Φₛ[:, j], RBVars.X₀[1]) /
+      norm(RBVars.Φₛ[:, j], RBVars.X₀[1]) * RBVars.Φₛ[:, j]
     end
     for j in 1:i
-      supr_primal[:, i] -= mydot(supr_primal[:, i], supr_primal[:, j], RBVars.X₀[1]) /
-      mynorm(supr_primal[:, j], RBVars.X₀[1]) * supr_primal[:, j]
+      supr_primal[:, i] -= dot(supr_primal[:, i], supr_primal[:, j], RBVars.X₀[1]) /
+      norm(supr_primal[:, j], RBVars.X₀[1]) * supr_primal[:, j]
     end
 
-    supr_norm = mynorm(supr_primal[:, i], RBVars.X₀[1])
+    supr_norm = norm(supr_primal[:, i], RBVars.X₀[1])
     min_norm = min(supr_norm, min_norm)
     println("Norm supremizers: $supr_norm")
     supr_primal[:, i] /= supr_norm

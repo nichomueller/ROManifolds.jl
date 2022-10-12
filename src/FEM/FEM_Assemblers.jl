@@ -4,7 +4,7 @@ function assemble_form(
   Param::ParamInfo)
 
   ParamForm = ParamFormInfo(FEMSpace, Param)
-  assemble_form(FEMInfo.problem_id, FEMSpace, FEMInfo, ParamForm)
+  assemble_form(FEMInfo.id, FEMSpace, FEMInfo, ParamForm)
 
 end
 
@@ -13,7 +13,7 @@ function assemble_form(
   FEMInfo::FOMInfo,
   ParamForm::ParamFormInfo)
 
-  assemble_form(FEMInfo.problem_id, FEMSpace, FEMInfo, ParamForm)
+  assemble_form(FEMInfo.id, FEMSpace, FEMInfo, ParamForm)
 
 end
 
@@ -29,7 +29,7 @@ function assemble_form(
     if var == "Xᵘ"
       ∫(∇(v) ⋅ ∇(u) + v * u)ParamForm.dΩ
     else var == "A"
-      if var ∉ FEMInfo.probl_nl
+      if var ∉ FEMInfo.affine_structures
         ∫(∇(v) ⋅ ∇(u))ParamForm.dΩ
       else
         ∫(∇(v) ⋅ (ParamForm.fun * ∇(u)))ParamForm.dΩ
@@ -39,7 +39,7 @@ function assemble_form(
 
   function linear_form(v)
     if var == "F" || "H"
-      if var ∉ FEMInfo.probl_nl
+      if var ∉ FEMInfo.affine_structures
         ∫(v * (x->1.))ParamForm.dΩ
       else
         ∫(v * ParamForm.fun)ParamForm.dΩ
@@ -75,13 +75,13 @@ function assemble_form(
     elseif var == "Xᵖ"
       ∫(v * u)ParamForm.dΩ
     elseif var == "A"
-      if var ∉ FEMInfo.probl_nl
+      if var ∉ FEMInfo.affine_structures
         ∫(∇(v) ⊙ ∇(u))ParamForm.dΩ
       else
         ∫(∇(v) ⊙ (ParamForm.fun * ∇(u)))ParamForm.dΩ
       end
     else var == "B"
-      if var ∉ FEMInfo.probl_nl
+      if var ∉ FEMInfo.affine_structures
         ∫(v ⋅ ∇(u))ParamForm.dΩ
       else
         ∫(v ⋅ (ParamForm.fun * ∇(u)))ParamForm.dΩ
@@ -91,7 +91,7 @@ function assemble_form(
 
   function linear_form(v)
     if var == "F" || "H"
-      if var ∉ FEMInfo.probl_nl
+      if var ∉ FEMInfo.affine_structures
         ∫(v ⋅ (x->1.))ParamForm.dΩ
       else
         ∫(v ⋅ ParamForm.fun)ParamForm.dΩ
@@ -137,13 +137,13 @@ function assemble_form(
     elseif var == "Xᵖ"
       ∫(v * u)ParamForm.dΩ
     elseif var == "A"
-      if var ∉ FEMInfo.probl_nl
+      if var ∉ FEMInfo.affine_structures
         ∫(∇(v) ⊙ ∇(u))ParamForm.dΩ
       else
         ∫(∇(v) ⊙ (ParamForm.fun * ∇(u)))ParamForm.dΩ
       end
     else var == "B"
-      if var ∉ FEMInfo.probl_nl
+      if var ∉ FEMInfo.affine_structures
         ∫(v ⋅ ∇(u))ParamForm.dΩ
       else
         ∫(v ⋅ (ParamForm.fun * ∇(u)))ParamForm.dΩ
@@ -153,7 +153,7 @@ function assemble_form(
 
   function linear_form(v)
     if var == "F" || "H"
-      if var ∉ FEMInfo.probl_nl
+      if var ∉ FEMInfo.affine_structures
         ∫(v ⋅ (x->1.))ParamForm.dΩ
       else
         ∫(v ⋅ ParamForm.fun)ParamForm.dΩ
@@ -186,7 +186,7 @@ end
   Param::ParamInfoST)
 
   function unsteady_mass(t)
-    if "M" ∉ FEMInfo.probl_nl
+    if "M" ∉ FEMInfo.affine_structures
       assemble_matrix(∫(FEMSpace.ϕᵥ*(Param.mₛ*FEMSpace.ϕᵤ(t)))*FEMSpace.dΩ,
         FEMSpace.V(t), FEMSpace.V₀)
     else
@@ -206,7 +206,7 @@ function assemble_mass(
   Param::ParamInfoST)
 
   function unsteady_mass(t)
-    if "M" ∉ FEMInfo.probl_nl
+    if "M" ∉ FEMInfo.affine_structures
       assemble_matrix(∫(FEMSpace.ϕᵥ⋅(Param.mₛ*FEMSpace.ϕᵤ(t)))*FEMSpace.dΩ,
       FEMSpace.V(t), FEMSpace.V₀)
     else
@@ -225,7 +225,7 @@ function assemble_mass(
   FEMInfo::FOMInfoST,
   Param::ParamInfoST)
 
-  assemble_mass(get_NTuple(2, Int), FEMSpace, FEMInfo, Param)
+  assemble_mass(NTuple(2, Int), FEMSpace, FEMInfo, Param)
 
 end
 
@@ -235,7 +235,7 @@ function assemble_stiffness(
   FEMInfo::FOMInfoS,
   Param::ParamInfoS)
 
-  if "A" ∉ FEMInfo.probl_nl
+  if "A" ∉ FEMInfo.affine_structures
     assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅∇(FEMSpace.ϕᵤ))*FEMSpace.dΩ,
     FEMSpace.V, FEMSpace.V₀)
   else
@@ -252,7 +252,7 @@ function assemble_stiffness(
   Param::ParamInfoST)
 
   function unsteady_stiffness(t)
-    if "A" ∉ FEMInfo.probl_nl
+    if "A" ∉ FEMInfo.affine_structures
       assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⋅(Param.αₛ*∇(FEMSpace.ϕᵤ(t))))*FEMSpace.dΩ,
       FEMSpace.V(t), FEMSpace.V₀)
     else
@@ -271,7 +271,7 @@ function assemble_stiffness(
   FEMInfo::FOMInfoS,
   Param::ParamInfoS)
 
-  if "A" ∉ FEMInfo.probl_nl
+  if "A" ∉ FEMInfo.affine_structures
     assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙∇(FEMSpace.ϕᵤ))*FEMSpace.dΩ,
     FEMSpace.V, FEMSpace.V₀)
   else
@@ -288,7 +288,7 @@ function assemble_stiffness(
   Param::ParamInfoST)
 
   function unsteady_stiffness(t)
-    if "A" ∉ FEMInfo.probl_nl
+    if "A" ∉ FEMInfo.affine_structures
       assemble_matrix(∫(∇(FEMSpace.ϕᵥ)⊙(Param.αₛ*∇(FEMSpace.ϕᵤ(t))))*FEMSpace.dΩ,
       FEMSpace.V(t), FEMSpace.V₀)
     else
@@ -307,7 +307,7 @@ function assemble_stiffness(
   FEMInfo::FOMInfo,
   Param::FOMInfo)
 
-  assemble_stiffness(get_NTuple(2, Int), FEMSpace, FEMInfo, Param)
+  assemble_stiffness(NTuple(2, Int), FEMSpace, FEMInfo, Param)
 
 end
 
@@ -317,7 +317,7 @@ function assemble_B(
   ::FOMInfo,
   ::FOMInfo)
 
-  if "B" ∉ FEMInfo.probl_nl
+  if "B" ∉ FEMInfo.affine_structures
     assemble_matrix(∫(FEMSpace.ψᵧ*(∇⋅(FEMSpace.ϕᵤ)))*FEMSpace.dΩ,
       FEMSpace.V, FEMSpace.Q₀)
   else
@@ -334,7 +334,7 @@ function assemble_B(
   ::FOMInfo)
 
   function unsteady_primal_form(t)
-    if "B" ∉ FEMInfo.probl_nl
+    if "B" ∉ FEMInfo.affine_structures
       assemble_matrix(∫(FEMSpace.ψᵧ*(∇⋅(FEMSpace.ϕᵤ(t))))*FEMSpace.dΩ,
         FEMSpace.V(t), FEMSpace.Q₀)
     else
@@ -353,7 +353,7 @@ function assemble_B(
   FEMInfo::FOMInfo,
   Param::FOMInfo)
 
-  assemble_B(get_NTuple(2, Int), FEMSpace, FEMInfo, Param)
+  assemble_B(NTuple(2, Int), FEMSpace, FEMInfo, Param)
 
 end
 
@@ -407,7 +407,7 @@ function assemble_forcing(
   FEMInfo::FOMInfoS,
   Param::ParamInfoS)
 
-  if "F" ∉ FEMInfo.probl_nl
+  if "F" ∉ FEMInfo.affine_structures
     assemble_vector(∫(FEMSpace.ϕᵥ)*FEMSpace.dΩ, FEMSpace.V₀)
   else
     assemble_vector(∫(FEMSpace.ϕᵥ*Param.f)*FEMSpace.dΩ, FEMSpace.V₀)
@@ -422,7 +422,7 @@ function assemble_forcing(
   Param::ParamInfoST)
 
   function unsteady_forcing(t)
-    if "F" ∉ FEMInfo.probl_nl
+    if "F" ∉ FEMInfo.affine_structures
       assemble_vector(∫(FEMSpace.ϕᵥ*Param.fₛ)*FEMSpace.dΩ, FEMSpace.V₀)
     else
       assemble_vector(∫(FEMSpace.ϕᵥ*Param.f(t))*FEMSpace.dΩ, FEMSpace.V₀)
@@ -439,7 +439,7 @@ function assemble_forcing(
   FEMInfo::FOMInfoS,
   Param::ParamInfoS) where D
 
-  if "F" ∉ FEMInfo.probl_nl
+  if "F" ∉ FEMInfo.affine_structures
     fₛ = x -> one(VectorValue(D, Float))
     assemble_vector(∫(FEMSpace.ϕᵥ⋅fₛ)*FEMSpace.dΩ, FEMSpace.V₀)
   else
@@ -455,7 +455,7 @@ function assemble_forcing(
   Param::ParamInfoST)
 
   function unsteady_forcing(t)
-    if "F" ∉ FEMInfo.probl_nl
+    if "F" ∉ FEMInfo.affine_structures
       assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.fₛ)*FEMSpace.dΩ, FEMSpace.V₀)
     else
       assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.f(t))*FEMSpace.dΩ, FEMSpace.V₀)
@@ -472,7 +472,7 @@ function assemble_forcing(
   FEMInfo::FOMInfo,
   Param::FOMInfo)
 
-  assemble_forcing(get_NTuple(2, Int), FEMSpace, FEMInfo, Param)
+  assemble_forcing(NTuple(2, Int), FEMSpace, FEMInfo, Param)
 
 end
 
@@ -482,7 +482,7 @@ function assemble_neumann_datum(
   FEMInfo::FOMInfoS,
   Param::ParamInfoS)
 
-  if "H" ∉ FEMInfo.probl_nl
+  if "H" ∉ FEMInfo.affine_structures
     assemble_vector(∫(FEMSpace.ϕᵥ)*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float}
   else
     assemble_vector(∫(FEMSpace.ϕᵥ*Param.h)*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float}
@@ -498,7 +498,7 @@ function assemble_neumann_datum(
 
   function unsteady_neumann_datum(t)
 
-    if "H" ∉ FEMInfo.probl_nl
+    if "H" ∉ FEMInfo.affine_structures
       assemble_vector(∫(FEMSpace.ϕᵥ*Param.hₛ)*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float}
     else
       assemble_vector(∫(FEMSpace.ϕᵥ*Param.h(t))*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float}
@@ -516,7 +516,7 @@ function assemble_neumann_datum(
   FEMInfo::FOMInfoS,
   Param::ParamInfoS) where D
 
-  if "H" ∉ FEMInfo.probl_nl
+  if "H" ∉ FEMInfo.affine_structures
     hₛ = x -> one(VectorValue(D, Float))
     assemble_vector(∫(FEMSpace.ϕᵥ⋅hₛ)*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float}
   else
@@ -532,7 +532,7 @@ function assemble_neumann_datum(
   Param::ParamInfoST)
 
   function unsteady_neumann_datum(t)
-    if "H" ∉ FEMInfo.probl_nl
+    if "H" ∉ FEMInfo.affine_structures
       assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.hₛ)*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float}
     else
       assemble_vector(∫(FEMSpace.ϕᵥ⋅Param.h(t))*FEMSpace.dΓn, FEMSpace.V₀)::Vector{Float}
@@ -549,7 +549,7 @@ function assemble_neumann_datum(
   FEMInfo::FOMInfo,
   Param::FOMInfo)
 
-  assemble_neumann_datum(get_NTuple(2, Int), FEMSpace, FEMInfo, Param)
+  assemble_neumann_datum(NTuple(2, Int), FEMSpace, FEMInfo, Param)
 
 end
 
@@ -617,7 +617,7 @@ function assemble_lifting(
   FEMInfo::FOMInfoS,
   Param::ParamInfoS)
 
-  L_stokes = assemble_lifting(get_NTuple(2, Int), FEMSpace, FEMInfo, Param)
+  L_stokes = assemble_lifting(NTuple(2, Int), FEMSpace, FEMInfo, Param)
 
   g = define_g_FEM(FEMSpace, Param)
   conv(u,∇u) = (∇u')⋅u
@@ -634,7 +634,7 @@ function assemble_lifting(
   FEMInfo::FOMInfoST,
   Param::ParamInfoST)
 
-  L_stokes = assemble_lifting(get_NTuple(2, Int), FEMSpace, FEMInfo, Param)
+  L_stokes = assemble_lifting(NTuple(2, Int), FEMSpace, FEMInfo, Param)
   L_stokes
 
 end
@@ -671,7 +671,7 @@ function assemble_lifting_continuity(
   FEMInfo::FOMInfo,
   Param::FOMInfo)
 
-  assemble_lifting_continuity(get_NTuple(2, Int), FEMSpace, FEMInfo, Param)
+  assemble_lifting_continuity(NTuple(2, Int), FEMSpace, FEMInfo, Param)
 
 end
 
@@ -688,7 +688,7 @@ function assemble_L²_norm_matrix(
   ::NTuple{3,Int},
   FEMSpace::FOM)
 
-  assemble_L²_norm_matrix(get_NTuple(2, Int), FEMSpace)
+  assemble_L²_norm_matrix(NTuple(2, Int), FEMSpace)
 
 end
 
@@ -740,7 +740,7 @@ function assemble_H¹_norm_matrix(
   ::NTuple{3,Int},
   FEMSpace::FOM)
 
-  assemble_H¹_norm_matrix(get_NTuple(2, Int), FEMSpace)
+  assemble_H¹_norm_matrix(NTuple(2, Int), FEMSpace)
 
 end =#
 
@@ -774,7 +774,7 @@ function assemble_FEM_structure(
 
   form = assemble_form(FEMSpace, FEMInfo, Param)
 
-  if var ∈ ("F", "H", "L", "Lc")
+  if var ∈ get_FEM_vectors(FEMInfo)
     assemble_vector(form, FEMSpace_vectors(FEMSpace, var))
   else
     assemble_vector(form, FEMSpace_matrices(FEMSpace, var)...)

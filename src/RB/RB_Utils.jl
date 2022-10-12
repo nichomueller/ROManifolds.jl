@@ -1,16 +1,3 @@
-function ROMPath(FEMPaths, RB_method)
-
-  ROM_path = joinpath(FEMPaths.current_test, RB_method)
-  create_dir(ROM_path)
-  ROM_structures_path = joinpath(ROM_path, "ROM_structures")
-  create_dir(ROM_structures_path)
-  results_path = joinpath(ROM_path, "results")
-  create_dir(results_path)
-
-  ROMPath(FEMPaths, ROM_structures_path, results_path)
-
-end
-
 function get_mesh_path(RBInfo::ROMInfo)
   RBInfo.Paths.FEMPaths.mesh_path
 end
@@ -156,19 +143,16 @@ function ParamFormInfo(
 
 end
 
-function problem_vectors(RBInfo::ROMInfo)
-  vecs = ["F", "H", "L", "Lc"]
-  intersect(RBInfo.problem_structures, vecs)::Vector{String}
+function get_FEM_vectors(RBInfo::ROMInfo)
+  get_FEM_vectors(RBInfo.FEMInfo)
 end
 
-function problem_matrices(RBInfo::ROMInfo)
-  setdiff(RBInfo.problem_structures, problem_vectors(RBInfo))::Vector{String}
+function get_FEM_matrices(RBInfo::ROMInfo)
+  get_FEM_matrices(RBInfo.FEMInfo)
 end
 
-function get_timesθ(RBInfo) where T
-
-  T.(get_timesθ(RBInfo.FEMInfo))
-
+function get_timesθ(RBInfo)
+  get_timesθ(RBInfo.FEMInfo)
 end
 
 function times_dictionary(
@@ -297,7 +281,7 @@ function θ(
   Param::ParamInfoS,
   MDEIM::MVMDEIM) where D
 
-  if Param.var ∉ RBInfo.probl_nl
+  if Param.var ∉ RBInfo.affine_structures
     θ = [[Param.fun(VectorValue(D, Float))[1]]]
   else
     Mat_μ_sparse =
@@ -322,7 +306,7 @@ function θ!(
 
   timesθ = get_timesθ(RBInfo)
 
-  if var ∉ RBInfo.probl_nl
+  if var ∉ RBInfo.affine_structures
     for t_θ in timesθ
       push!(θ, [get_scalar_value(fun(VectorValue(D, T), t_θ), T)])
     end
@@ -357,7 +341,7 @@ function θ!(
 
   timesθ = get_timesθ(RBInfo)
 
-  if var ∉ RBInfo.probl_nl
+  if var ∉ RBInfo.affine_structures
     for t_θ in timesθ
       push!(θ, [get_scalar_value(fun(VectorValue(D, T), t_θ), T)])
     end
@@ -396,7 +380,7 @@ function compute_errors(
   x̃::Vector{T},
   X::Matrix{T}) where T
 
-  mynorm(xₕ - x̃, X) / mynorm(xₕ, X)
+  norm(xₕ - x̃, X) / norm(xₕ, X)
 
 end
 
@@ -420,8 +404,8 @@ function compute_errors(
   norm_sol = zeros(T, Nₜ)
 
   @simd for i = 1:Nₜ
-    norm_err[i] = mynorm(xₕ[:, i] - x̃[:, i], X)
-    norm_sol[i] = mynorm(xₕ[:, i], X)
+    norm_err[i] = norm(xₕ[:, i] - x̃[:, i], X)
+    norm_sol[i] = norm(xₕ[:, i], X)
   end
 
   norm_err ./ norm_sol, norm(norm_err) / norm(norm_sol)

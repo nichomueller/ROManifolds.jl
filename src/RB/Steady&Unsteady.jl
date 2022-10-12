@@ -51,15 +51,15 @@ function get_reduced_basis_space(
 
   RBVars.Φₛ = load_CSV(Matrix{T}[],
     joinpath(RBInfo.ROM_structures_path, "Φₛ.csv"))
-  RBVars.Nₛ, RBVars.nₛ = Broadcasting(get_size)(RBVars.Φₛ);
+  RBVars.Nₛ, RBVars.nₛ = Broadcasting(size)(RBVars.Φₛ);
 
 end
 
 function set_operators(RBInfo::ROMInfo)
 
-  operators = RBInfo.problem_structures
+  operators = RBInfo.structures
   if RBInfo.online_RHS
-    setdiff(operators, problem_vectors(RBInfo))
+    setdiff(operators, get_FEM_vectors(RBInfo))
   end
 
   operators
@@ -189,9 +189,9 @@ function assemble_offline_structures(
 
   RBVars.offline_time += @elapsed begin
     assemble_affine_structures(RBInfo, RBVars,
-      setdiff(operators, RBInfo.probl_nl))
+      setdiff(operators, RBInfo.affine_structures))
     assemble_MDEIM_structures(RBInfo, RBVars,
-      intersect(operators, RBInfo.probl_nl))
+      intersect(operators, RBInfo.affine_structures))
   end
 
 end
@@ -268,13 +268,13 @@ function save_system_blocks(
   RHS_blocks::Vector{Int},
   operators::Vector{String}) where T
 
-  if "A" ∉ RBInfo.probl_nl && "LHS" ∈ operators
+  if "A" ∉ RBInfo.affine_structures && "LHS" ∈ operators
     for i = LHS_blocks
       LHSₙi = "LHSₙ" * string(i) * ".csv"
       save_CSV(RBVars.LHSₙ[i],joinpath(RBInfo.ROM_structures_path, LHSₙi))
     end
   end
-  if "F" ∉ RBInfo.probl_nl && "H" ∉ RBInfo.probl_nl && "L" ∉ RBInfo.probl_nl && "RHS" ∈ operators
+  if "F" ∉ RBInfo.affine_structures && "H" ∉ RBInfo.affine_structures && "L" ∉ RBInfo.affine_structures && "RHS" ∈ operators
     for i = RHS_blocks
       RHSₙi = "RHSₙ" * string(i) * ".csv"
       save_CSV(RBVars.RHSₙ[i],joinpath(RBInfo.ROM_structures_path, RHSₙi))
@@ -320,7 +320,7 @@ function assemble_matricesₙ(
   RBVars::RB{T},
   Params::Vector{ParamInfo}) where T
 
-  operators = problem_matrices(RBInfo)
+  operators = get_FEM_matrices(RBInfo)
   assemble_termsₙ(RBVars.Vars, Params, operators)::Vector{Matrix{T}}
 
 end
@@ -330,7 +330,7 @@ function assemble_vectorsₙ(
   RBVars::RB{T},
   Params::Vector{ParamInfo}) where T
 
-  operators = problem_vectors(RBInfo)
+  operators = get_FEM_vectors(RBInfo)
   assemble_termsₙ(RBVars.Vars, Params, operators)::Vector{Matrix{T}}
 
 end

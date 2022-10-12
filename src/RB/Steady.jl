@@ -14,7 +14,7 @@ function get_snapshot_matrix(
     S, size(S)[1]
   end
 
-  RBVars.S, RBVars.Nₛ = Broadcasting(get_S_var)(RBInfo.problem_unknowns);
+  RBVars.S, RBVars.Nₛ = Broadcasting(get_S_var)(RBInfo.unknowns);
 
 end
 
@@ -42,11 +42,11 @@ function get_offline_structures(
 
     var = Var.var
 
-    if !(var ∈ problem_vectors(RBInfo) && RBInfo.online_RHS)
+    if !(var ∈ get_FEM_vectors(RBInfo) && RBInfo.online_RHS)
       if isfile(joinpath(RBInfo.ROM_structures_path, "$(var)ₙ.csv"))
         Var.Matₙ = load_CSV(Matrix{T}[],
           joinpath(RBInfo.ROM_structures_path, "$(var)ₙ.csv"))
-        if var ∈ RBInfo.probl_nl
+        if var ∈ RBInfo.affine_structures
           Var.MDEIM.Matᵢ, Var.MDEIM.idx, Var.MDEIM.el =
             load_structures_in_list(("Matᵢ_$(var)", "idx_$(var)", "el_$(var)"),
             (Matᵢ, idx, el), RBInfo.ROM_structures_path)
@@ -168,7 +168,7 @@ function online_phase(
     post_process(RBInfo, pass_to_pp)
   end
 
-  FEMSpace, μ = get_FOM_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo.FEMInfo)
   get_norm_matrix(RBInfo, RBVars)
 
   mean_err, mean_pointwise_err, mean_online_time = Vector{T}[], Vector{T}[], 0.

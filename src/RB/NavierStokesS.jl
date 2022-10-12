@@ -242,7 +242,7 @@ function online_phase(
   RBVars::NavierStokesS{T},
   param_nbs) where T
 
-  FEMSpace, μ = get_FOM_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo.FEMInfo)
 
   mean_H1_err = 0.0
   mean_L2_err = 0.0

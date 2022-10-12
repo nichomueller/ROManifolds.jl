@@ -97,7 +97,7 @@ function plot_stability_constants(
   xval = hcat(vec_Nₜ,vec_Nₜ)
   yval = hcat(vec_Nₜ,stability_constants)
   label = ["Nₜ", "||(Aˢᵗ)⁻¹||₂"]
-  paths = FOMPath(root,problem_steadiness,problem_name,mesh_name,case)
+  paths = FOMPath(root,steadiness,name,mesh_name,case)
   save_path = paths.current_test
   generate_and_save_plot(xval, yval, "Euclidean norm of (Aˢᵗ)⁻¹",
     label, "Nₜ", "||(Aˢᵗ)⁻¹||₂", save_path, true, true;
@@ -114,7 +114,7 @@ function post_process(test_dir::String)
   println("Exporting plots and tables")
 
   S = String
-  T = Float64
+  T = Float
 
   function get_err_t_paths(res_path::String)
     param_path = get_all_subdirectories(res_path)[end]

@@ -2,7 +2,7 @@ function check_dataset(
   RBInfo::Info,
   nb::Int) where T
 
-  FEMSpace, μ = get_FOM_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo.FEMInfo)
   Param = ParamInfo(RBInfo, μ[nb])
 
   A = assemble_FEM_structure(FEMSpace, RBInfo, Param, "A")
@@ -19,7 +19,7 @@ end
 
 function check_dataset(RBInfo, RBVars, i)
 
-  FEMSpace, μ = get_FOM_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo.FEMInfo)
   Param = ParamInfo(RBInfo, μ[i])
 
   u1 = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
@@ -54,7 +54,7 @@ end
 
 function check_dataset(RBInfo, RBVars, i)
 
-  FEMSpace, μ = get_FOM_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo.FEMInfo)
   Param = ParamInfo(RBInfo, μ[i])
 
   u1 = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
@@ -100,7 +100,7 @@ end
 
 function check_stokes_solver()
 
-  FEMSpace, μ = get_FOM_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo.FEMInfo)
   Param = ParamInfo(RBInfo, μ[nb])
 
   u = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
@@ -126,7 +126,7 @@ end
 function check_MDEIM_stokesS()
   RBVars.DEIM_mat_L, RBVars.DEIM_idx_L, RBVars.DEIMᵢ_L, RBVars.sparse_el_L =
     DEIM_offline(RBInfo,"L")
-  FEMSpace, μ = get_FOM_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo.FEMInfo)
   Param = ParamInfo(RBInfo, μ[95])
   L = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "L")
   θˡ = MDEIM_online(L, RBVars.DEIMᵢ_L, RBVars.DEIM_idx_L)
@@ -137,7 +137,7 @@ end
 
 function check_navier_stokes_solver()
 
-  FEMSpace, μ = get_FOM_info(RBInfo.FEMInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo.FEMInfo)
   Param = ParamInfo(RBInfo, μ[nb])
 
   u = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
