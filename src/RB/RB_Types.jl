@@ -1,11 +1,69 @@
-abstract type RB{T} end
-abstract type RBS{T} <: RB end
-abstract type RBST{T} <: RB end
+abstract type ROMInfo{ID} end
+
+struct ROMInfoS{ID} <: ROMInfo{ID}
+  FEMInfo::FOMInfoS{ID}
+  Paths::ROMPath
+  RB_method::String
+  nₛ::Int
+  ϵₛ::Float
+  use_norm_X::Bool
+  online_RHS::Bool
+  nₛ_MDEIM::Int
+  post_process::Bool
+  get_snapshots::Bool
+  get_offline_structures::Bool
+  save_offline::Bool
+  save_online::Bool
+end
+
+mutable struct ROMInfoST{ID} <: ROMInfo{ID}
+  FEMInfo::FOMInfoST{ID}
+  Paths::ROMPath
+  RB_method::String
+  nₛ::Int
+  ϵₛ::Float
+  use_norm_X::Bool
+  online_RHS::Bool
+  nₛ_MDEIM::Int
+  nₛ_MDEIM_time::Int
+  post_process::Bool
+  get_snapshots::Bool
+  get_offline_structures::Bool
+  save_offline::Bool
+  save_online::Bool
+  time_reduction_technique::String
+  t₀::Float
+  tₗ::Float
+  δt::Float
+  θ::Float
+  ϵₜ::Float
+  st_MDEIM::Bool
+  functional_MDEIM::Bool
+  adaptivity::Bool
+end
+
+function Base.getproperty(RBInfo::ROMInfoS, sym::Symbol)
+  if sym in (:affine_structures, :unknowns, :FEM_structures)
+    getfield(RBInfo.FEMInfo, sym)
+  elseif sym in (:ROM_structures_path, :results_path)
+    getfield(RBInfo.Paths, sym)
+  else
+    getfield(RBInfo, sym)
+  end
+end
+
+function Base.getproperty(RBInfo::ROMInfoST, sym::Symbol)
+  if sym in (:affine_structures, :unknowns, :FEM_structures)
+    getfield(RBInfo.FEMInfo, sym)
+  elseif sym in (:ROM_structures_path, :results_path)
+    getfield(RBInfo.Paths, sym)
+  else
+    getfield(RBInfo, sym)
+  end
+end
 
 abstract type MVMDEIM{T} end
 abstract type MVVariable{T} end
-
-abstract type ROMInfo end
 
 mutable struct VMDEIM{T} <: MVMDEIM{T}
   Mat::Matrix{T}
@@ -68,11 +126,11 @@ function MVariable(var::String, ::Type{T}) where T
 
 end
 
-function MVVariable(RBInfo::ROMInfo, var::String, ::Type{T}) where T
+function MVVariable(RBInfo::ROMInfo{ID}, var::String, ::Type{T}) where {ID,T}
 
-  if var ∈ get_FEM_vectors(RBInfo)
+  if isvector(RBInfo, var)
     return VVariable(var, T)
-  elseif var ∈ get_FEM_matrices(RBInfo)
+  elseif ismatrix(RBInfo, var)
     return MVariable(var, T)
   else
     error("Unrecognized variable")
@@ -118,6 +176,10 @@ function SteadyVariables(::Type{T}) where T
 
 end
 
+abstract type RB{T} end
+abstract type RBS{T} <: RB{T} end
+abstract type RBST{T} <: RB{T} end
+
 mutable struct PoissonS{T} <: RBS{T}
   SV::SteadyVariables{T}
   Vars::Vector{MVVariable{T}}
@@ -126,12 +188,7 @@ mutable struct PoissonS{T} <: RBS{T}
   RHSₙ::Vector{Matrix{T}}
 end
 
-function PoissonS(RBInfo::ROMInfoS, ::Type{T}) where T
-  #= VarA = MVariable("A", T)
-  VarF = VVariable("F", T)
-  VarH = VVariable("H", T)
-  VarL = VVariable("L", T)
-  Vars = [VarA, VarF, VarH, VarL] =#
+function PoissonS(RBInfo::ROMInfoS{1}, ::Type{T}) where T
   SV = SteadyVariables(T)
   MVVars(var) =  MVVariable(RBInfo, var, T)
   Vars = Broadcasting(MVVars)(RBInfo.structures)
@@ -141,10 +198,6 @@ function PoissonS(RBInfo::ROMInfoS, ::Type{T}) where T
 
   PoissonS{T}(SV, Vars, xₙ, LHSₙ, RHSₙ)
 
-end
-
-function setup_RBVars(::NTuple{1,Int}, RBInfo::ROMInfo, ::Type{T}) where T
-  PoissonS(RBInfo, T)
 end
 
 function Base.getproperty(RBVars::PoissonS, sym::Symbol)
@@ -160,6 +213,30 @@ function Base.setproperty!(RBVars::PoissonS, sym::Symbol, x::T) where T
     setfield!(RBVars.SV, sym, x)::T
   else
     setfield!(RBVars, sym, x)::T
+  end
+end
+
+function setup_RBVars(RBInfo::ROMInfoS{ID}, ::Type{T}) where {ID,T}
+  if ID == 1
+    PoissonS(RBInfo, T)
+  elseif ID == 2
+    StokesS(RBInfo, T)
+  elseif ID == 3
+    NavierStokesS(RBInfo, T)
+  else
+    error("Not implemented")
+  end
+end
+
+function setup_RBVars(RBInfo::ROMInfoST{ID}, ::Type{T}) where {ID,T}
+  if ID == 1
+    PoissonST(RBInfo, T)
+  elseif ID == 2
+    StokesST(RBInfo, T)
+  elseif ID == 3
+    NavierStokesST(RBInfo, T)
+  else
+    error("Not implemented")
   end
 end
 
@@ -357,68 +434,6 @@ function ROMPath(FEMPaths, RB_method)
 
   ROMPath(ROM_structures_path, results_path)
 
-end
-
-struct ROMInfoS <: ROMInfo
-  FEMInfo::FOMInfoS
-  Paths::ROMPath
-  RB_method::String
-  nₛ::Int
-  ϵₛ::Float
-  use_norm_X::Bool
-  online_RHS::Bool
-  nₛ_MDEIM::Int
-  post_process::Bool
-  get_snapshots::Bool
-  get_offline_structures::Bool
-  save_offline::Bool
-  save_online::Bool
-end
-
-mutable struct ROMInfoST <: ROMInfo
-  FEMInfo::FOMInfoST
-  Paths::ROMPath
-  RB_method::String
-  nₛ::Int
-  ϵₛ::Float
-  use_norm_X::Bool
-  online_RHS::Bool
-  nₛ_MDEIM::Int
-  nₛ_MDEIM_time::Int
-  post_process::Bool
-  get_snapshots::Bool
-  get_offline_structures::Bool
-  save_offline::Bool
-  save_online::Bool
-  time_reduction_technique::String
-  t₀::Float
-  tₗ::Float
-  δt::Float
-  θ::Float
-  ϵₜ::Float
-  st_MDEIM::Bool
-  functional_MDEIM::Bool
-  adaptivity::Bool
-end
-
-function Base.getproperty(RBInfo::ROMInfoS, sym::Symbol)
-  if sym in (:affine_structures, :unknowns, :FEM_structures)
-    getfield(RBInfo.FEMInfo, sym)
-  elseif sym in (:ROM_structures_path, :results_path)
-    getfield(RBInfo.Paths, sym)
-  else
-    getfield(RBInfo, sym)
-  end
-end
-
-function Base.getproperty(RBInfo::ROMInfoST, sym::Symbol)
-  if sym in (:affine_structures, :unknowns, :FEM_structures)
-    getfield(RBInfo.FEMInfo, sym)
-  elseif sym in (:ROM_structures_path, :results_path)
-    getfield(RBInfo.Paths, sym)
-  else
-    getfield(RBInfo, sym)
-  end
 end
 
 

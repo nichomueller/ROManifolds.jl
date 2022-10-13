@@ -1,26 +1,16 @@
 function assemble_form(
   FEMSpace::FOM,
-  FEMInfo::FOMInfo,
-  Param::ParamInfo)
+  FEMInfo::FOMInfo{ID},
+  Param::ParamInfo) where ID
 
   ParamForm = ParamFormInfo(FEMSpace, Param)
-  assemble_form(FEMInfo.id, FEMSpace, FEMInfo, ParamForm)
+  assemble_form(FEMSpace, FEMInfo, ParamForm)
 
 end
 
 function assemble_form(
-  FEMSpace::FOM,
-  FEMInfo::FOMInfo,
-  ParamForm::ParamFormInfo)
-
-  assemble_form(FEMInfo.id, FEMSpace, FEMInfo, ParamForm)
-
-end
-
-function assemble_form(
-  ::NTuple{1,Int},
   FEMSpace::FOMS,
-  FEMInfo::FOMInfoS,
+  FEMInfo::FOMInfoS{1},
   ParamForm::ParamFormInfoS)
 
   var = ParamForm.var
@@ -46,7 +36,7 @@ function assemble_form(
       end
     elseif var == "L"
       g = interpolate_dirichlet(ParamForm.fun, FEMSpace.V)
-      Param_A = ParamInfo(FEMInfo, μ, "A")
+      Param_A = ParamInfo(FEMInfo, ParamForm.μ, "A")
       ∫(∇(v) ⋅ (Param_A.fun * ∇(g)))ParamForm.dΩ
     else
       error("Unrecognized variable")
@@ -58,9 +48,8 @@ function assemble_form(
 end
 
 function assemble_form(
-  ::NTuple{2,Int},
   FEMSpace::FOMS,
-  FEMInfo::FOMInfoS,
+  FEMInfo::FOMInfoS{2},
   ParamForm::ParamFormInfoS)
 
   var = ParamForm.var
@@ -108,9 +97,8 @@ function assemble_form(
 end
 
 function assemble_form(
-  ::NTuple{3,Int},
   FEMSpace::FOMS,
-  FEMInfo::FOMInfoS,
+  FEMInfo::FOMInfoS{3},
   ParamForm::ParamFormInfoS)
 
   var = ParamForm.var
@@ -736,83 +724,174 @@ function assemble_H¹_norm_matrix(
 
 end =#
 
-function assemble_FEM_structure(
+function assemble_FEM_matrix(
   FEMSpace::FOM,
-  FEMInfo::FOMInfo,
-  fun::Function,
-  var::String)
-
-  Param = ParamInfo(FEMSpace, fun, var)
-  assemble_FEM_structure(FEMSpace, FEMInfo, Param)
-
-end
-
-function assemble_FEM_structure(
-  FEMSpace::FOM,
-  FEMInfo::FOMInfo,
-  Param::ParamInfo)
-
-  ParamForm = ParamFormInfo(FEMSpace, Param)
-  assemble_FEM_structure(FEMSpace, FEMInfo, ParamForm)
-
-end
-
-function assemble_FEM_structure(
-  FEMSpace::FOM,
-  FEMInfo::FOMInfo,
-  μ::Vector{T},
-  var::String) where T
-
-  Param = ParamInfo(FEMInfo, μ, var)
-  assemble_FEM_structure(FEMSpace, FEMInfo, Param)
-
-end
-
-function assemble_FEM_structure(
-  FEMSpace::FOM,
-  FEMInfo::FOMInfo,
-  μvec::Vector{Vector{T}},
-  var::String) where T
-
-  MV(μ) = assemble_FEM_structure(FEMSpace, FEMInfo, μ, var)
-  Broadcasting(MV)(μvec)
-
-end
-
-function assemble_FEM_structure(
-  FEMSpace::FOM,
-  FEMInfo::FOMInfo,
-  Param::Vector{<:ParamInfo})
-
-  FEM_structure(P) = assemble_FEM_structure(FEMSpace, FEMInfo,
-    ParamFormInfo(FEMSpace, P))
-  Broadcasting(FEM_structure)(Param)
-
-end
-
-function assemble_FEM_structure(
-  FEMSpace::FOM,
-  FEMInfo::FOMInfo,
-  ParamForm::ParamFormInfo)
+  FEMInfo::FOMInfo{ID},
+  ParamForm::ParamFormInfo) where ID
 
   var = ParamForm.var
-
   form = assemble_form(FEMSpace, FEMInfo, ParamForm)
-
-  if var ∈ get_FEM_vectors(FEMInfo)
-    assemble_vector(form, get_FEMSpace_vectors(FEMSpace, var))
-  else
-    assemble_matrix(form, get_FEMSpace_matrices(FEMSpace, var)...)
-  end
+  assemble_matrix(form, get_FEMSpace_matrix(FEMSpace, var)...)::SparseMatrixCSC{Float,Int}
 
 end
 
-function assemble_FEM_structure(
+function assemble_FEM_matrix(
   FEMSpace::FOM,
-  FEMInfo::FOMInfo,
-  ParamForm::Vector{<:ParamFormInfo})
+  FEMInfo::FOMInfo{ID},
+  ParamForm::Vector{<:ParamFormInfo}) where ID
 
-  FEM_structure(P) = assemble_FEM_structure(FEMSpace, FEMInfo, P)
-  Broadcasting(FEM_structure)(ParamForm)
+  FEM_matrix(P) = assemble_FEM_matrix(FEMSpace, FEMInfo, P)
+  Broadcasting(FEM_matrix)(ParamForm)
+
+end
+
+function assemble_FEM_matrix(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  Param::ParamInfo) where ID
+
+  ParamForm = ParamFormInfo(FEMSpace, Param)
+  assemble_FEM_matrix(FEMSpace, FEMInfo, ParamForm)
+
+end
+
+function assemble_FEM_matrix(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  Param::Vector{<:ParamInfo}) where ID
+
+  FEM_matrix(P) = assemble_FEM_matrix(FEMSpace, FEMInfo,
+    ParamFormInfo(FEMSpace, P))
+  Broadcasting(FEM_matrix)(Param)
+
+end
+
+function assemble_FEM_matrix(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  μ::Vector{T},
+  var::String) where {ID,T}
+
+  Param = ParamInfo(FEMInfo, μ, var)
+  assemble_FEM_matrix(FEMSpace, FEMInfo, Param)
+
+end
+
+function assemble_FEM_matrix(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  μvec::Vector{Vector{T}},
+  var::String) where {ID,T}
+
+  Mat(μ) = assemble_FEM_matrix(FEMSpace, FEMInfo, μ, var)
+  Broadcasting(Mat)(μvec)
+
+end
+
+function assemble_FEM_matrix(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  μ::Vector{T},
+  var::Vector{String}) where {ID,T}
+
+  Param = ParamInfo(FEMInfo, μ, var)
+  assemble_FEM_matrix(FEMSpace, FEMInfo, Param)
+
+end
+
+function assemble_affine_FEM_matrices(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  μ::Vector{T}) where {ID,T}
+
+  operators = get_affine_matrices(FEMInfo)
+  Params = ParamInfo(FEMInfo, μ, operators)
+  assemble_FEM_matrix(FEMSpace, FEMInfo, Params)
+
+end
+
+function assemble_FEM_vector(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  ParamForm::ParamFormInfo) where ID
+
+  var = ParamForm.var
+  form = assemble_form(FEMSpace, FEMInfo, ParamForm)
+  assemble_vector(form, get_FEMSpace_vector(FEMSpace, var))::Vector{Float}
+
+end
+
+function assemble_FEM_vector(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  ParamForm::Vector{<:ParamFormInfo}) where ID
+
+  FEM_vector(P) = assemble_FEM_vector(FEMSpace, FEMInfo, P)
+  Broadcasting(FEM_vector)(ParamForm)
+
+end
+
+function assemble_FEM_vector(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  Param::ParamInfo) where ID
+
+  ParamForm = ParamFormInfo(FEMSpace, Param)
+  assemble_FEM_vector(FEMSpace, FEMInfo, ParamForm)
+
+end
+
+function assemble_FEM_vector(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  Param::Vector{<:ParamInfo}) where ID
+
+  FEM_vector(P) = assemble_FEM_vector(FEMSpace, FEMInfo,
+    ParamFormInfo(FEMSpace, P))
+  Broadcasting(FEM_vector)(Param)
+
+end
+
+function assemble_FEM_vector(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  μ::Vector{T},
+  var::String) where {ID,T}
+
+  Param = ParamInfo(FEMInfo, μ, var)
+  assemble_FEM_vector(FEMSpace, FEMInfo, Param)
+
+end
+
+function assemble_FEM_vector(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  μvec::Vector{Vector{T}},
+  var::String) where {ID,T}
+
+  Vec(μ) = assemble_FEM_vector(FEMSpace, FEMInfo, μ, var)
+  Broadcasting(Vec)(μvec)
+
+end
+
+function assemble_FEM_vector(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  μ::Vector{T},
+  var::Vector{String}) where {ID,T}
+
+  Param = ParamInfo(FEMInfo, μ, var)
+  assemble_FEM_vector(FEMSpace, FEMInfo, Param)
+
+end
+
+function assemble_affine_FEM_vectors(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  μ::Vector{T}) where {ID,T}
+
+  operators = get_affine_vectors(FEMInfo)
+  Params = ParamInfo(FEMInfo, μ, operators)
+  assemble_FEM_vector(FEMSpace, FEMInfo, Params)
 
 end

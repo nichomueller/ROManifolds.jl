@@ -45,266 +45,24 @@ function get_lagrangianQuad_info(
 
 end
 
-function get_FEMSpace_quantities(
-  ::NTuple{1,Int},
-  FEMInfo::FOMInfoS,
-  model::DiscreteModel{D,D},
-  g::Function) where D
-
-  Ω, Γn, Qₕ, dΩ, dΓn = get_mod_meas_quad(FEMInfo, model)
-
-  refFE = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order)
-
-  V₀ = TestFESpace(model, refFE; conformity=:H1,
-    dirichlet_tags=["dirichlet"])
-  V = TrialFESpace(V₀, g)
-
-  ϕᵥ = get_fe_basis(V₀)
-  ϕᵤ = get_trial_fe_basis(V)
-  Nₛᵘ = length(get_free_dof_ids(V))
-
-  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
-
-  Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad
-
-end
-
-function get_FEMSpace_quantities(
-  ::NTuple{1,Int},
-  FEMInfo::FOMInfoST,
-  model::DiscreteModel{D,D},
-  g::Function) where D
-
-  Ω, Γn, Qₕ, dΩ, dΓn = get_mod_meas_quad(FEMInfo, model)
-
-  refFE = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order)
-  V₀ = TestFESpace(model, refFE; conformity=:H1,
-    dirichlet_tags=["dirichlet"])
-  V = TransientTrialFESpace(V₀, g)
-
-  ϕᵥ = get_fe_basis(V₀)
-  ϕᵤ(t) = get_trial_fe_basis(V(t))
-  Nₛᵘ = length(get_free_dof_ids(V₀))
-
-  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
-
-  Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad
-
-end
-
-function get_FEMSpace_quantities(
-  ::NTuple{2,Int},
-  FEMInfo::FOMInfoS,
-  model::DiscreteModel{D,D},
-  g::Function) where D
-
-  Ω, Γn, Qₕ, dΩ, dΓn = get_mod_meas_quad(FEMInfo, model)
-
-  refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,Float}, FEMInfo.order)
-  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1, dirichlet_tags=["dirichlet"])
-  V = TrialFESpace(V₀, g)
-
-  ϕᵥ = get_fe_basis(V₀)
-  ϕᵤ = get_trial_fe_basis(V)
-  Nₛᵘ = length(get_free_dof_ids(V))
-
-  refFEₚ = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order - 1; space=:P)
-  Q₀ = TestFESpace(model, refFEₚ; conformity=:L2)
-  Q = TrialFESpace(Q₀)
-  ψᵧ = get_fe_basis(Q₀)
-  ψₚ = get_trial_fe_basis(Q)
-  Nₛᵖ = length(get_free_dof_ids(Q))
-
-  X₀ = MultiFieldFESpace([V₀, Q₀])
-  X = MultiFieldFESpace([V, Q])
-
-  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
-
-  Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, Γn, dΩ, dΓn,
-    phys_quadp, V₀_quad
-
-end
-
-function get_FEMSpace_quantities(
-  ::NTuple{2,Int},
-  FEMInfo::FOMInfoST,
-  model::DiscreteModel{D,D},
-  g::Function) where D
-
-  Ω, Γn, Qₕ, dΩ, dΓn = get_mod_meas_quad(FEMInfo, model)
-
-  refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,Float}, FEMInfo.order)
-  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1, dirichlet_tags=["dirichlet"])
-  V = TransientTrialFESpace(V₀, g)
-
-  ϕᵥ = get_fe_basis(V₀)
-  ϕᵤ(t) = get_trial_fe_basis(V(t))
-  Nₛᵘ = length(get_free_dof_ids(V₀))
-
-  refFEₚ = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order - 1; space=:P)
-  Q₀ = TestFESpace(model, refFEₚ; conformity=:L2)
-  Q = TrialFESpace(Q₀)
-  ψᵧ = get_fe_basis(Q₀)
-  ψₚ = get_trial_fe_basis(Q)
-  Nₛᵖ = length(get_free_dof_ids(Q₀))
-
-  X₀ = MultiFieldFESpace([V₀, Q₀])
-  X = TransientMultiFieldFESpace([V, Q])
-
-  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
-
-  Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ, Ω, Γn, dΩ, dΓn,
-    phys_quadp, V₀_quad
-
-end
-
-function get_FEMSpace_quantities(
-  ::NTuple{3,Int},
-  FEMInfo::FOMInfoS,
-  model::DiscreteModel{D,D},
-  g::Function) where D
-
-  get_FEMSpace_quantities(NTuple(2, Int), FEMInfo, model, g)
-
-end
-
-function get_FEMSpace_quantities(
-  ::NTuple{3,Int},
-  FEMInfo::FOMInfoST,
-  model::DiscreteModel{D,D},
-  g::Function) where D
-
-  get_FEMSpace_quantities(NTuple(2, Int), FEMInfo, model, g)
-
-end
-
 function get_FEMSpace(
-  NT::NTuple{1,Int},
-  FEMInfo::FOMInfoS,
+  FEMInfo::FOMInfoS{ID},
   model::DiscreteModel{D,D},
-  g::Function) where D
+  args...) where {ID,D}
 
-  FOMPoissonS{D}(
-    model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
-
-end
-
-function get_FEMSpace(
-  NT::NTuple{1,Int},
-  FEMInfo::FOMInfoST,
-  model::DiscreteModel{D,D},
-  g::Function) where D
-
-  FOMPoissonST{D}(
-    model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
+  if ID == 1
+    FOMPoissonS(FEMInfo, model, args...)
+  elseif ID == 2
+    FOMStokesS(FEMInfo, model, args...)
+  elseif ID == 3
+    FOMNavierStokesS(FEMInfo, model, args...)
+  else
+    error("Not implemented")
+  end
 
 end
 
-function get_FEMSpace(
-  NT::NTuple{2,Int},
-  FEMInfo::FOMInfoS,
-  model::DiscreteModel{D,D},
-  g::Function) where D
-
-  FOMStokesS{D}(
-    model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
-
-end
-
-function get_FEMSpace(
-  NT::NTuple{2,Int},
-  FEMInfo::FOMInfoST,
-  model::DiscreteModel{D,D},
-  g::Function) where D
-
-  FOMStokesST{D}(
-    model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
-
-end
-
-function get_FEMSpace(
-  NT::NTuple{3,Int},
-  FEMInfo::FOMInfoS,
-  model::DiscreteModel{D,D},
-  g::Function) where D
-
-  FOMNavierStokesS{D}(
-    model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
-
-end
-
-function get_FEMSpace(
-  NT::NTuple{3,Int},
-  FEMInfo::FOMInfoST,
-  model::DiscreteModel{D,D},
-  g::Function) where D
-
-  FOMNavierStokesST{D}(
-    model, get_FEMSpace_quantities(NT, FEMInfo, model, g)...)
-
-end
-
-function get_FEMSpace₀(
-  id::NTuple{1,Int},
-  FEMInfo::FOMInfoS,
-  model::DiscreteModel)
-
-  get_FEMSpace(id,FEMInfo,model,x->0)
-
-end
-
-function get_FEMSpace₀(
-  id::NTuple{1,Int},
-  FEMInfo::FOMInfoST,
-  model::DiscreteModel)
-
-  g₀(x, t::Real) = 0.
-  g₀(t::Real) = x -> g₀(x, t)
-  get_FEMSpace(id,FEMInfo,model,g₀)
-
-end
-
-function get_FEMSpace₀(
-  id::NTuple{2,Int},
-  FEMInfo::FOMInfoS,
-  model::DiscreteModel)
-
-  get_FEMSpace(id,FEMInfo,model, x->zero(VectorValue(FEMInfo.D, Float)))
-
-end
-
-function get_FEMSpace₀(
-  id::NTuple{2,Int},
-  FEMInfo::FOMInfoST,
-  model::DiscreteModel)
-
-  g₀(x, t::Real) = zero(VectorValue(FEMInfo.D, Float))
-  g₀(t::Real) = x -> g₀(x, t)
-  get_FEMSpace(id,FEMInfo,model,g₀)
-
-end
-
-function get_FEMSpace₀(
-  id::NTuple{3,Int},
-  FEMInfo::FOMInfoS,
-  model::DiscreteModel)
-
-  get_FEMSpace(id,FEMInfo,model, x->zero(VectorValue(FEMInfo.D, Float)))
-
-end
-
-function get_FEMSpace₀(
-  id::NTuple{3,Int},
-  FEMInfo::FOMInfoST,
-  model::DiscreteModel)
-
-  g₀(x, t::Real) = zero(VectorValue(FEMInfo.D, Float))
-  g₀(t::Real) = x -> g₀(x, t)
-  get_FEMSpace(id,FEMInfo,model,g₀)
-
-end
-
-function get_FEMSpace_vectors(FEMSpace::FOM, var::String)
+function get_FEMSpace_vector(FEMSpace::FOM, var::String)
   if var == "Lc"
     FEMSpace.Q₀
   else
@@ -312,7 +70,7 @@ function get_FEMSpace_vectors(FEMSpace::FOM, var::String)
   end
 end
 
-function get_FEMSpace_matrices(FEMSpace::FOM, var::String)
+function get_FEMSpace_matrix(FEMSpace::FOM, var::String)
   if var == "B"
     FEMSpace.V, FEMSpace.Q₀
   else

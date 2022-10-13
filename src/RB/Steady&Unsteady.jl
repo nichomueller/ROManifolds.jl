@@ -318,7 +318,7 @@ end
 function assemble_matricesₙ(
   RBInfo::ROMInfo,
   RBVars::RB{T},
-  Params::Vector{ParamInfo}) where T
+  Params::Vector{<:ParamInfo}) where T
 
   operators = get_FEM_matrices(RBInfo)
   assemble_termsₙ(RBVars.Vars, Params, operators)::Vector{Matrix{T}}
@@ -328,7 +328,7 @@ end
 function assemble_vectorsₙ(
   RBInfo::ROMInfo,
   RBVars::RB{T},
-  Params::Vector{ParamInfo}) where T
+  Params::Vector{<:ParamInfo}) where T
 
   operators = get_FEM_vectors(RBInfo)
   assemble_termsₙ(RBVars.Vars, Params, operators)::Vector{Matrix{T}}

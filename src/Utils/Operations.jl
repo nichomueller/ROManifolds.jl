@@ -31,7 +31,7 @@ function generate_parameters(
     T.(rand(Uniform(aᵢ[1], aᵢ[2])))
   end
 
-  [[generate_parameter(a[i]) for i in eachindex(a)] for _ = 1:n]
+  [[generate_parameter(a[i]) for i in eachindex(a)] for _ = 1:n]::Vector{Vector{T}}
 
 end
 
@@ -132,7 +132,7 @@ end
 
 function blocks_to_matrix(Vec_block::Vector{Vector{T}}) where T
 
-  Matrix{T}(reduce(vcat, transpose.(Vec_block))')
+  Matrix{T}(reshape(reduce(vcat, transpose.(Vec_block))', :, 1))
 
 end
 

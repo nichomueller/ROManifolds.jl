@@ -1,15 +1,14 @@
 function setup_FEM(name::String, issteady::Bool)
-  (get_id(name, issteady), get_unknowns(name),
-    get_FEM_structures(name, issteady))
+  get_unknowns(name), get_FEM_structures(name, issteady)
 end
 
-function get_id(name::String, issteady::Bool)
+function get_id(name::String)
   if name == "poisson"
-    issteady ? (0,) : (0,0)
+    1
   elseif name == "stokes"
-    issteady ? (0,0,0) : (0,0,0,0)
+    2
   elseif name == "navier_stokes"
-    issteady ? (0,0,0,0,0) : (0,0,0,0,0,0)
+    3
   else
     error("Not implemented")
   end
@@ -38,22 +37,18 @@ function get_FEM_structures(name::String, issteady::Bool)
   issteady ? matvec : push!(matvec, ["M"])
 end
 
-function get_FEM_structures(NT::NTuple)
-  if typeof(NT) ∈ (NTuple{1, Int}, NTuple{2, Int})
+function get_FEM_structures(::FOMInfoS{ID}) where ID
+  if ID == 1
     ["A", "F", "H", "L"]
-  elseif typeof(NT) ∈ (NTuple{3, Int}, NTuple{4, Int})
+  elseif ID == 2
     ["A", "B", "F", "H", "L", "Lc"]
-  else typeof(NT) ∈ (NTuple{5, Int}, NTuple{6, Int})
+  else ID == 3
     ["A", "B", "C", "D", "F", "H", "L", "Lc"]
   end
 end
 
-function get_FEM_structures(FEMInfo::FOMInfoS)
-  get_FEM_structures(FEMInfo.id)
-end
-
-function get_FEM_structures(FEMInfo::FOMInfoST)
-  append!(["M"], get_FEM_structures(FEMInfo.id))
+function get_FEM_structures(FEMInfo::FOMInfo{ID}) where ID
+  append!(["M"], get_FEM_structures(FEMInfo))
 end
 
 function get_FEM_vectors(FEMInfo::FOMInfo)
@@ -61,22 +56,48 @@ function get_FEM_vectors(FEMInfo::FOMInfo)
   intersect(FEMInfo.structures, vecs)::Vector{String}
 end
 
+function isvector(FEMInfo::FOMInfo, var::String)
+  var ∈ get_FEM_vectors(FEMInfo)
+end
+
 function get_FEM_matrices(FEMInfo::FOMInfo)
   setdiff(FEMInfo.structures, get_FEM_vectors(FEMInfo))::Vector{String}
+end
+
+function ismatrix(FEMInfo::FOMInfo, var::String)
+  var ∈ get_FEM_matrices(FEMInfo)
+end
+
+function get_affine_vectors(FEMInfo)
+  intersect(get_FEM_vectors(FEMInfo), FEMInfo.affine_structures)
+end
+
+function get_affine_matrices(FEMInfo)
+  intersect(get_FEM_matrices(FEMInfo), FEMInfo.affine_structures)
+end
+
+function isaffine(FEMInfo::FOMInfo, var::String)
+  var ∈ FEMInfo.affine_structures
 end
 
 function get_FEMμ_info(FEMInfo::FOMInfo)
   μ = load_CSV(Vector{Float}[],
     joinpath(FEMInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{Float}}
   model = DiscreteModelFromFile(FEMInfo.Paths.mesh_path)
-  FEMSpace₀ = get_FEMSpace₀(FEMInfo.id, FEMInfo, model)::FOM
+  FEMSpace₀ = get_FEMSpace(FEMInfo, model)::FOM
 
   FEMSpace₀, μ
 
 end
 
-function isaffine(FEMInfo::FOMInfo, var::String)
-  var ∈ FEMInfo.affine_structures
+function get_g₀(::FOMInfoS)
+  x -> 0.
+end
+
+function get_g₀(::FOMInfoST)
+  g₀(x, t::Real) = 0.
+  g₀(t::Real) = x -> g₀(x, t)
+  g₀
 end
 
 function get_h(FEMSpace::FOM)

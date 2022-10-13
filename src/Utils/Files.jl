@@ -3,6 +3,7 @@ function create_dir(path::String)
   if !isdir(path)
     mkdir(path)
   end
+  return
 end
 
 """Get a full list of subdirectories at a given root directory"""
@@ -44,9 +45,9 @@ end
 
 function load_CSV(::Array{T,D}, path::String) where {T,D}
   if D == 1
-    return Matrix{T}(CSV.read(path, DataFrame))[:]
+    Matrix{T}(CSV.read(path, DataFrame))[:]
   else
-    return Array{T,D}(CSV.read(path, DataFrame))
+    Array{T,D}(CSV.read(path, DataFrame))
   end
 end
 
@@ -69,21 +70,25 @@ function save_CSV(var::Array{T,D}, path::String) where {T,D}
   catch
     CSV.write(path, Tables.table(var))
   end
+  return
 end
 
 function save_CSV(var::SparseMatrixCSC{T}, path::String) where T
   i, j, v = findnz(var)::Tuple{Vector{Int},Vector{Int},Vector{T}}
   CSV.write(path, DataFrame([:i => i, :j => j, :v => v]))
+  return
 end
 
 function save_CSV(var::SparseVector{T}, path::String) where T
   i, v = findnz(var)::Tuple{Vector{Int},Vector{T}}
   CSV.write(path, DataFrame([:i => i, :v => v]))
+  return
 end
 
-function save_CSV(var::Vector{AbstractArray{T}}, path::Vector{String}) where T
+function save_CSV(var::Vector{<:AbstractArray{T}}, path::Vector{String}) where T
   @assert length(var) == length(path) "length(var) not equals to length(path)"
   Broadcasting(save_CSV)(var, path)
+  return
 end
 
 function append_CSV(var::AbstractArray, path::String)
@@ -94,6 +99,7 @@ function append_CSV(var::AbstractArray, path::String)
     save_CSV(var, file)
     close(file)
   end
+  return
 end
 
 function save_structures_in_list(
@@ -113,6 +119,8 @@ function save_structures_in_list(
       save_CSV(l_val[i₁], joinpath(path, list_names[i₂]*".csv"))
     end
   end
+
+  return
 
 end
 
@@ -152,4 +160,5 @@ function generate_dcube_model(
   end
   model = CartesianDiscreteModel(domain,partition)
   to_json_file(model,path)
+  return
 end

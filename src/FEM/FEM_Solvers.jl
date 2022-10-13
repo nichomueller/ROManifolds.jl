@@ -1,5 +1,6 @@
-function FE_solve(
-  FEMInfo::FOMInfoS,
+function FEM_solver(
+  ::FOMPoissonS,
+  FEMInfo::FOMInfoS{1},
   operator::AffineFEOperator)
 
   if FEMInfo.solver == "lu"
@@ -8,13 +9,13 @@ function FE_solve(
     uₕ_field = solve(LinearFESolver(), operator)
   end
 
-  get_free_dof_values(uₕ_field)
+  get_free_dof_values(uₕ_field)::Vector{Float}
 
 end
 
-function FE_solve(
+function FEM_solver(
   FEMSpace::FOMPoissonST,
-  FEMInfo::FOMInfoST,
+  FEMInfo::FOMInfoST{1},
   Param::ParamInfoST)
 
   function get_uₕ(uₕ_field)
@@ -39,9 +40,9 @@ function FE_solve(
 
 end
 
-function FE_solve(
+function FEM_solver(
   FEMSpace::FOMStokesS,
-  FEMInfo::FOMInfoS,
+  FEMInfo::FOMInfoS{2},
   Param::ParamInfoS)
 
   a((u,p),(v,q)) = ∫( ∇(v)⊙(Param.α*∇(u)) - Param.b*((∇⋅v)*p + q*(∇⋅u)) )FEMSpace.dΩ
@@ -58,9 +59,9 @@ function FE_solve(
 
 end
 
-function FE_solve(
+function FEM_solver(
   FEMSpace::FOMStokesST,
-  FEMInfo::FOMInfoST,
+  FEMInfo::FOMInfoST{2},
   Param::ParamInfoST)
 
   m(t,(u,p),(v,q)) = ∫(Param.m(t)*(u⋅v))FEMSpace.dΩ
@@ -89,9 +90,9 @@ function FE_solve(
 
 end
 
-function FE_solve(
+function FEM_solver(
   FEMSpace::FOMNavierStokesS,
-  ::FOMInfoS,
+  ::FOMInfoS{3},
   Param::ParamInfoS) where T
 
   a((u,p),(v,q)) = ∫( ∇(v)⊙(Param.α*∇(u)) - Param.b*(∇⋅v)*p + q*(∇⋅u) )FEMSpace.dΩ
