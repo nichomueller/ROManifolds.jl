@@ -1,7 +1,7 @@
 ################################# OFFLINE ######################################
 function get_norm_matrix(
-  RBInfo::ROMInfo,
-  RBVars::RB{T}) where T
+  RBInfo::ROMInfo{ID},
+  RBVars::RB{T}) where {ID,T}
 
   function get_X_var(Nₛ::Int, var::String)
     if RBInfo.use_norm_X
@@ -15,13 +15,15 @@ function get_norm_matrix(
   if isempty(RBVars.X₀[i])
     println("Importing the norm matrix")
     RBVars.Xu = Broadcasting(get_X_var)(RBInfo.vars, RBVars.Nₛ)
-  end;
+  end
+
+  return
 
 end
 
 function assemble_reduced_basis_space(
-  RBInfo::ROMInfo,
-  RBVars::RB)
+  RBInfo::ROMInfo{ID},
+  RBVars::RB{T}) where {ID,T}
 
   function POD_space(
     S::Matrix,
@@ -41,21 +43,25 @@ function assemble_reduced_basis_space(
       Broadcasting(POD_space)(RBVars.S, RBInfo.ϵₛ, RBVars.X)
   end
 
+  return
+
 end
 
 function get_reduced_basis_space(
-  RBInfo::ROMInfo,
-  RBVars::RB) where T
+  RBInfo::ROMInfo{ID},
+  RBVars::RB{T}) where {ID,T}
 
   println("Importing the spatial reduced basis")
 
   RBVars.Φₛ = load_CSV(Matrix{T}[],
     joinpath(RBInfo.ROM_structures_path, "Φₛ.csv"))
-  RBVars.Nₛ, RBVars.nₛ = Broadcasting(size)(RBVars.Φₛ);
+  RBVars.Nₛ, RBVars.nₛ = Broadcasting(size)(RBVars.Φₛ)
+
+  return
 
 end
 
-function set_operators(RBInfo::ROMInfo)
+function set_operators(RBInfo::ROMInfo{ID}) where ID
 
   operators = RBInfo.structures
   if RBInfo.online_RHS
@@ -67,9 +73,9 @@ function set_operators(RBInfo::ROMInfo)
 end
 
 function assemble_affine_structure(
-  RBInfo::ROMInfo,
+  RBInfo::ROMInfo{ID},
   Var::VVariable{T},
-  operators::Vector{String}) where T
+  operators::Vector{String}) where {ID,T}
 
   var = Var.var
 
@@ -83,14 +89,16 @@ function assemble_affine_structure(
     end
 
     push!(Var.Matₙ, affine_vector(var))
-  end;
+  end
+
+  return
 
 end
 
 function assemble_affine_structure(
-  RBInfo::ROMInfo,
+  RBInfo::ROMInfo{ID},
   Var::MVariable{T},
-  operators::Vector{String}) where T
+  operators::Vector{String}) where {ID,T}
 
   var = Var.var
 
@@ -104,14 +112,16 @@ function assemble_affine_structure(
     end
 
     push!(Var.Matₙ, affine_matrix(var))
-  end;
+  end
+
+  return
 
 end
 
 function assemble_affine_structures(
-  RBInfo::ROMInfo,
-  RBVars::RB,
-  operators::Vector{String})
+  RBInfo::ROMInfo{ID},
+  RBVars::RB{T},
+  operators::Vector{String}) where {ID,T}
 
   affine_structure(Var) = assemble_affine_structure(RBInfo, Var, operators)
   Broadcasting(affine_structure)(RBVars.Vars);
@@ -119,9 +129,9 @@ function assemble_affine_structures(
 end
 
 function assemble_MDEIM_structures(
-  RBInfo::ROMInfo,
-  RBVars::RB,
-  operators::Vector{String})
+  RBInfo::ROMInfo{ID},
+  RBVars::RB{T},
+  operators::Vector{String}) where {ID,T}
 
   function assemble_MDEIM_structure(Var::MVVariable)
 
@@ -135,7 +145,9 @@ function assemble_MDEIM_structures(
         MDEIM_offline(Var.MDEIM, RBInfo, RBVars, var)
       end
       assemble_MDEIM_Matₙ(Var; get_Φₛ(RBVars, var)...)
-    end;
+    end
+
+    return
 
   end
 
@@ -160,7 +172,9 @@ function assemble_MDEIM_Matₙ(
   MatΦ = Matrix{T}(reduce(vcat, VecMatΦ))::Matrix{T}
   Matₙ = reshape(Φₛ_left' * MatΦ, n, :, Q)
 
-  Vars.Matₙ = [Matₙ[:,:,q] for q = 1:Q];
+  Vars.Matₙ = [Matₙ[:,:,q] for q = 1:Q]
+
+  return
 
 end
 
@@ -174,14 +188,16 @@ function assemble_MDEIM_Matₙ(
   Q = size(MDEIM.Mat)[2]
 
   Vecₙ = Φₛ_left' * MDEIM.Mat
-  Vars.Matₙ = [Matrix{T}(reshape(Vecₙ[:,q], :, 1)) for q = 1:Q];
+  Vars.Matₙ = [Matrix{T}(reshape(Vecₙ[:,q], :, 1)) for q = 1:Q]
+
+  return
 
 end
 
 function assemble_offline_structures(
-  RBInfo::ROMInfo,
-  RBVars::RB,
-  operators::Vector{String})
+  RBInfo::ROMInfo{ID},
+  RBVars::RB{T},
+  operators::Vector{String}) where {ID,T}
 
   if isempty(operators)
     operators = set_operators(RBInfo)
@@ -197,28 +213,29 @@ function assemble_offline_structures(
 end
 
 function save_Var_structures(
+  RBInfo::ROMInfo{ID},
   Var::MVVariable{T},
-  operators::Vector{String}) where T
+  operators::Vector{String}) where {ID,T}
 
   var = Var.var
 
-  if var ∈ operators && isaffine(var)
+  if var ∈ operators && isaffine(RBInfo, var)
     save_structures_in_list(Var.MDEIM.Matₙ, "$(var)ₙ", RBInfo.ROM_structures_path)
   end
 
   MDEIM_vars = (Var.MDEIM.Matᵢ, Var.MDEIM.idx, Var.MDEIM.idx_time, Var.MDEIM.el)
   MDEIM_names = ("Matᵢ_$(var)", "idx_$(var)", "idx_time_$(var)", "el_$(var)")
-  save_structures_in_list(MDEIM_vars, MDEIM_names, RBInfo.ROM_structures_path);
+  save_structures_in_list(MDEIM_vars, MDEIM_names, RBInfo.ROM_structures_path)
 
 end
 
 ################################## ONLINE ######################################
 
 function get_system_blocks(
-  RBInfo::ROMInfo,
+  RBInfo::ROMInfo{ID},
   RBVars::RB{T},
   LHS_blocks::Vector{Int},
-  RHS_blocks::Vector{Int}) where T
+  RHS_blocks::Vector{Int}) where {ID,T}
 
   if !RBInfo.get_offline_structures
     return ["LHS", "RHS"]
@@ -262,11 +279,11 @@ function get_system_blocks(
 end
 
 function save_system_blocks(
-  RBInfo::ROMInfo,
+  RBInfo::ROMInfo{ID},
   RBVars::RB{T},
   LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int},
-  operators::Vector{String}) where T
+  operators::Vector{String}) where {ID,T}
 
   if get_FEM_matrices(RBInfo) ∈ RBInfo.affine_structures && "LHS" ∈ operators
     for i = LHS_blocks
@@ -283,11 +300,11 @@ function save_system_blocks(
 end
 
 function assemble_θ_var(
-  FEMSpace::FOM,
-  RBInfo::ROMInfo,
-  Var::MVVariable,
+  FEMSpace::FOM{D},
+  RBInfo::ROMInfo{ID},
+  Var::MVVariable{T},
   μ::Vector{T},
-  operators::Vector{String}) where T
+  operators::Vector{String}) where {D,ID,T}
 
   var = Var.var
 
@@ -303,10 +320,10 @@ function assemble_θ_var(
 end
 
 function assemble_θ(
-  FEMSpace::FOM,
-  RBInfo::ROMInfo,
-  RBVars::RB,
-  μ::Vector{T}) where T
+  FEMSpace::FOM{D},
+  RBInfo::ROMInfo{ID},
+  RBVars::RB{T},
+  μ::Vector{T}) where {D,ID,T}
 
   operators = set_operators(RBInfo)
 
@@ -316,9 +333,9 @@ function assemble_θ(
 end
 
 function assemble_matricesₙ(
-  RBInfo::ROMInfo,
+  RBInfo::ROMInfo{ID},
   RBVars::RB{T},
-  Params::Vector{<:ParamInfo}) where T
+  Params::Vector{<:ParamInfo}) where {ID,T}
 
   operators = get_FEM_matrices(RBInfo)
   assemble_termsₙ(RBVars.Vars, Params, operators)::Vector{Matrix{T}}
@@ -326,9 +343,9 @@ function assemble_matricesₙ(
 end
 
 function assemble_vectorsₙ(
-  RBInfo::ROMInfo,
+  RBInfo::ROMInfo{ID},
   RBVars::RB{T},
-  Params::Vector{<:ParamInfo}) where T
+  Params::Vector{<:ParamInfo}) where {ID,T}
 
   operators = get_FEM_vectors(RBInfo)
   assemble_termsₙ(RBVars.Vars, Params, operators)::Vector{Matrix{T}}
@@ -336,14 +353,14 @@ function assemble_vectorsₙ(
 end
 
 function assemble_RB_system(
-  FEMSpace::FOM,
-  RBInfo::ROMInfo,
-  RBVars::RB,
-  μ::Vector{T})
+  FEMSpace::FOM{D},
+  RBInfo::ROMInfo{ID},
+  RBVars::RB{T},
+  μ::Vector{T}) where {D,ID,T}
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
-  blocks = get_blocks_position(RBVars)
+  blocks = get_blocks_position(RBInfo)
 
   RBVars.online_time = @elapsed begin
     operators = get_system_blocks(RBInfo, RBVars, blocks...)
@@ -366,20 +383,24 @@ function assemble_RB_system(
     end
   end
 
-  save_system_blocks(RBInfo, RBVars, operators, blocks...);
+  save_system_blocks(RBInfo, RBVars, operators, blocks...)
+
+  return
 
 end
 
 function assemble_solve_reconstruct(
-  FEMSpace::FOM,
-  RBInfo::ROMInfo,
-  RBVars::RB,
-  μ::Vector{T})
+  FEMSpace::FOM{D},
+  RBInfo::ROMInfo{ID},
+  RBVars::RB{T},
+  μ::Vector{T}) where {D,ID,T}
 
   assemble_RB_system(FEMSpace, RBInfo, RBVars, μ)
   RBVars.online_time += @elapsed begin
     solve_RB_system(RBVars)
   end
-  reconstruct_FEM_solution(RBVars);
+  reconstruct_FEM_solution(RBVars)
+
+  return
 
 end

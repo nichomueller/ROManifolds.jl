@@ -1,9 +1,26 @@
+struct ROMPath
+  ROM_structures_path::String
+  results_path::String
+end
+
+function ROMPath(FEMPaths)
+
+  ROM_path = joinpath(FEMPaths.current_test, "ROM")
+  create_dir(ROM_path)
+  ROM_structures_path = joinpath(ROM_path, "ROM_structures")
+  create_dir(ROM_structures_path)
+  results_path = joinpath(ROM_path, "results")
+  create_dir(results_path)
+
+  ROMPath(ROM_structures_path, results_path)
+
+end
+
 abstract type ROMInfo{ID} end
 
 struct ROMInfoS{ID} <: ROMInfo{ID}
   FEMInfo::FOMInfoS{ID}
   Paths::ROMPath
-  RB_method::String
   nₛ::Int
   ϵₛ::Float
   use_norm_X::Bool
@@ -19,7 +36,6 @@ end
 mutable struct ROMInfoST{ID} <: ROMInfo{ID}
   FEMInfo::FOMInfoST{ID}
   Paths::ROMPath
-  RB_method::String
   nₛ::Int
   ϵₛ::Float
   use_norm_X::Bool
@@ -42,18 +58,8 @@ mutable struct ROMInfoST{ID} <: ROMInfo{ID}
   adaptivity::Bool
 end
 
-function Base.getproperty(RBInfo::ROMInfoS, sym::Symbol)
-  if sym in (:affine_structures, :unknowns, :FEM_structures)
-    getfield(RBInfo.FEMInfo, sym)
-  elseif sym in (:ROM_structures_path, :results_path)
-    getfield(RBInfo.Paths, sym)
-  else
-    getfield(RBInfo, sym)
-  end
-end
-
-function Base.getproperty(RBInfo::ROMInfoST, sym::Symbol)
-  if sym in (:affine_structures, :unknowns, :FEM_structures)
+function Base.getproperty(RBInfo::ROMInfo, sym::Symbol)
+  if sym in (:affine_structures, :unknowns, :structures)
     getfield(RBInfo.FEMInfo, sym)
   elseif sym in (:ROM_structures_path, :results_path)
     getfield(RBInfo.Paths, sym)
@@ -150,6 +156,10 @@ function MVVariable(Vars::Vector{<:MVVariable}, var::String)
 
 end
 
+abstract type RB{T} end
+abstract type RBS{T} <: RB{T} end
+abstract type RBST{T} <: RB{T} end
+
 mutable struct SteadyVariables{T} <: RBS{T}
   S::Vector{Matrix{T}}
   Φₛ::Vector{Matrix{T}}
@@ -176,10 +186,6 @@ function SteadyVariables(::Type{T}) where T
 
 end
 
-abstract type RB{T} end
-abstract type RBS{T} <: RB{T} end
-abstract type RBST{T} <: RB{T} end
-
 mutable struct PoissonS{T} <: RBS{T}
   SV::SteadyVariables{T}
   Vars::Vector{MVVariable{T}}
@@ -190,7 +196,7 @@ end
 
 function PoissonS(RBInfo::ROMInfoS{1}, ::Type{T}) where T
   SV = SteadyVariables(T)
-  MVVars(var) =  MVVariable(RBInfo, var, T)
+  MVVars(var) = MVVariable(RBInfo, var, T)
   Vars = Broadcasting(MVVars)(RBInfo.structures)
   xₙ = Matrix{T}[]
   LHSₙ = Matrix{T}[]
@@ -417,24 +423,6 @@ function Base.setproperty!(RBVars::NavierStokesST, sym::Symbol, x::T) where T
     setfield!(RBVars, sym, x)::T
   end
 end =#
-
-struct ROMPath
-  ROM_structures_path::String
-  results_path::String
-end
-
-function ROMPath(FEMPaths, RB_method)
-
-  ROM_path = joinpath(FEMPaths.current_test, RB_method)
-  create_dir(ROM_path)
-  ROM_structures_path = joinpath(ROM_path, "ROM_structures")
-  create_dir(ROM_structures_path)
-  results_path = joinpath(ROM_path, "results")
-  create_dir(results_path)
-
-  ROMPath(ROM_structures_path, results_path)
-
-end
 
 
 #= function init_RBVars(::NTuple{2,Int}, ::Type{T}) where T

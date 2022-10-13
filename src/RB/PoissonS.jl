@@ -1,28 +1,32 @@
 function assemble_LHSₙ(
-  RBInfo::ROMInfoS,
+  RBInfo::ROMInfoS{1},
   RBVars::PoissonS{T},
   Params::Vector{ParamInfoS}) where T
 
   Matsₙ = assemble_matricesₙ(RBInfo, RBVars, Params)::Vector{Matrix{T}}
   push!(RBVars.LHSₙ, Matsₙ[1])
 
+  return
+
 end
 
 function assemble_RHSₙ(
-  RBInfo::ROMInfoS,
+  RBInfo::ROMInfoS{1},
   RBVars::PoissonS{T},
   Params::Vector{ParamInfoS}) where T
 
   Vecsₙ = assemble_vectorsₙ(RBInfo, RBVars, Params)::Vector{Matrix{T}}
   push!(RBVars.RHSₙ, sum(Vecsₙ))
 
+  return
+
 end
 
 function assemble_RHSₙ(
-  FEMSpace::FOMS,
-  RBInfo::ROMInfoS,
+  FEMSpace::FOMS{D},
+  RBInfo::ROMInfoS{1},
   RBVars::PoissonS{T},
-  μ::Vector{T}) where T
+  μ::Vector{T}) where {D,T}
 
   ParamF = ParamInfo(RBInfo, μ, "F")
   ParamH = ParamInfo(RBInfo, μ, "H")
@@ -34,11 +38,15 @@ function assemble_RHSₙ(
 
   push!(RBVars.RHSₙ, reshape(RBVars.Φₛ[1]' * (F + H - L), :, 1)::Matrix{T})
 
+  return
+
 end
 
 function solve_RB_system(RBVars::PoissonS{T}) where T
 
   println("Solving RB problem via backslash")
   push!(RBVars.xₙ, RBVars.LHSₙ[1] \ RBVars.RHSₙ[1])
+
+  return
 
 end

@@ -16,8 +16,8 @@ function get_Nₛ(RBVars::RB, var::String)
   end
 end
 
-function get_blocks_position(RBVars::RB)
-  if typeof(RBVars) ∈ (::PoissonS, ::PoissonST)
+function get_blocks_position(::ROMInfo{ID}) where ID
+  if ID == 1
     ([1], [1])
   else
     ([1, 2, 3], [1, 2])

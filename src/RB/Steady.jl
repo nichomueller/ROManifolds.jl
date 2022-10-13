@@ -1,8 +1,8 @@
 ################################# OFFLINE ######################################
 
 function get_snapshot_matrix(
-  RBInfo::ROMInfoS,
-  RBVars::RBS{T}) where T
+  RBInfo::ROMInfoS{ID},
+  RBVars::RBS{T}) where {ID,T}
 
   function get_S_var(var::String)
     println("Importing the snapshot matrix for field $var,
@@ -19,24 +19,24 @@ function get_snapshot_matrix(
 end
 
 function assemble_reduced_basis(
-  RBInfo::ROMInfoS,
-  RBVars::RBS)
+  RBInfo::ROMInfoS{ID},
+  RBVars::RBS{T}) where {ID,T}
 
   assemble_reduced_basis_space(RBInfo, RBVars);
 
 end
 
 function get_reduced_basis(
-  RBInfo::ROMInfoS,
-  RBVars::RBS)
+  RBInfo::ROMInfoS{ID},
+  RBVars::RBS{T}) where {ID,T}
 
-  get_reduced_basis_space(RBInfo, RBVars);
+  get_reduced_basis_space(RBInfo, RBVars)
 
 end
 
 function get_offline_structures(
-  RBInfo::ROMInfoS,
-  RBVars::RBS{T}) where T
+  RBInfo::ROMInfoS{ID},
+  RBVars::RBS{T}) where {ID,T}
 
   function get_Var(Var::MVVariable)
 
@@ -68,20 +68,20 @@ function get_offline_structures(
 end
 
 function save_offline(
-  RBInfo::ROMInfoS,
+  RBInfo::ROMInfoS{ID},
   RBVars::RBS{T},
-  operators::Vector{String}) where T
+  operators::Vector{String}) where {ID,T}
 
   save_CSV(RBVars.Φₛ, joinpath(RBInfo.ROM_structures_path,"Φₛ.csv"))
 
-  save_Var(Var) = save_Var_structures(Var, operators)
-  Broadcasting(save_Var)(RBVars.Vars);
+  save_Var(Var) = save_Var_structures(RBInfo, Var, operators)
+  Broadcasting(save_Var)(RBVars.Vars)
 
 end
 
 function offline_phase(
-  RBInfo::ROMInfoS,
-  RBVars::RBS)
+  RBInfo::ROMInfoS{ID},
+  RBVars::RBS{T}) where {ID,T}
 
   if RBInfo.get_snapshots
     get_snapshot_matrix(RBInfo, RBVars)
@@ -125,15 +125,16 @@ end
 
 ################################## ONLINE ######################################
 
-function reconstruct_FEM_solution(RBVars::ROMInfoS)
+function reconstruct_FEM_solution(RBVars::ROMInfoS{T}) where T
   println("Reconstructing FEM solution")
   RBVars.x̃ = Broadcasting(*)(RBVars.Φₛ, RBVars.xₙ)
+  return
 end
 
 function online_phase(
-  RBInfo::ROMInfoS,
+  RBInfo::ROMInfoS{ID},
   RBVars::RBS{T},
-  param_nbs) where T
+  param_nbs::Vector{Int}) where {ID,T}
 
   function get_S_var(var::String, nb::Int)
     load_CSV(Matrix{T}(undef,0,0),
@@ -194,6 +195,8 @@ function online_phase(
 
   if RBInfo.post_process
     pp()
-  end;
+  end
+
+  return
 
 end

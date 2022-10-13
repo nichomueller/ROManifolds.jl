@@ -18,8 +18,8 @@ function Mat_snapshots(
     findnz(Mat[:])::Tuple{Vector{Int},Vector{T}}
   end
 
-  var ∈ ("C", "D") ? Mat(k) = Mat_nonlinear(k) : Mat(k) = Mat_linear(k)
-  var ∈ ("C", "D") ? nₛ = RBVars.nₛᵘ : nₛ = RBInfo.nₛ_MDEIM
+  Mat(k) = var ∈ ("C", "D") ? Mat_nonlinear(k) : Mat_linear(k)
+  nₛ = var ∈ ("C", "D") ? RBVars.nₛᵘ : RBInfo.nₛ_MDEIM
 
   Mat_block, row_idx_block = Broadcasting(Mat)(1:nₛ)
   blocks_to_matrix(Mat_block), row_idx_block[1]
@@ -122,7 +122,7 @@ function call_MV_snapshots(
 
 end
 
-function get_LagrangianQuad_info(FEMSpace::Problem)
+function get_LagrangianQuad_info(FEMSpace::FOM)
 
   ncells = length(FEMSpace.phys_quadp)::Int
   nquad_cell = length(FEMSpace.phys_quadp[1])::Int
