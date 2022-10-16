@@ -1,6 +1,6 @@
 function check_saved_operators(
   RBInfo::ROMInfo{ID},
-  Var::MVVariable) where ID
+  Var::MVVariable{T}) where {ID,T}
 
   var = Var.var
   op = ""
@@ -21,7 +21,7 @@ end
 
 function check_saved_operators(
   RBInfo::ROMInfo{ID},
-  Vars::Vector{<:MVVariable}) where ID
+  Vars::Vector{<:MVVariable{T}}) where {ID,T}
 
   Broadcasting(Var -> check_saved_operators(RBInfo, Var))(Vars)
 
@@ -78,9 +78,72 @@ function initialize_online_time(RBVars::RB)
   return
 end
 
+function get_matrix_Vars(RBVars::RB{T}) where T
+  Vars_to_get = findall(x->typeof(x) == MVariable{T}, RBVars.Vars)
+  RBVars.Vars[Vars_to_get]
+end
+
+function get_matrix_Vars(
+  RBInfo::ROMInfo{ID},
+  RBVars::RB{T},
+  var::String) where {ID,T}
+
+  @assert ismatrix(RBInfo, var)
+  Vars_to_get = findall(x->x.var == var, RBVars.Vars)[1]
+  RBVars.Vars[Vars_to_get]::MVariable{T}
+end
+
+function get_matrix_Vars(
+  RBInfo::ROMInfo{ID},
+  RBVars::RB{T},
+  vars::Vector{String}) where {ID,T}
+
+  Broadcasting(var->get_matrix_Vars(RBInfo, RBVars, var))(vars)::Vector{<:MVVariable{T}}
+end
+
+function get_matrix_Vars(
+  RBInfo::ROMInfo{ID},
+  RBVars::RB{T}) where {ID,T}
+
+  operators = intersect(get_FEM_matrices(RBInfo), set_operators(RBInfo))
+  get_matrix_Vars(RBInfo, RBVars, operators)
+end
+
+function get_vector_Vars(RBVars::RB{T}) where T
+  Vars_to_get = findall(x->typeof(x) == VVariable{T}, RBVars.Vars)
+  RBVars.Vars[Vars_to_get]
+end
+
+function get_vector_Vars(
+  RBInfo::ROMInfo{ID},
+  RBVars::RB{T},
+  var::String) where {ID,T}
+
+  @assert isvector(RBInfo, var)
+  Vars_to_get = findall(x->x.var == var, RBVars.Vars)[1]
+  RBVars.Vars[Vars_to_get]::VVariable{T}
+
+end
+
+function get_vector_Vars(
+  RBInfo::ROMInfo{ID},
+  RBVars::RB{T},
+  vars::Vector{String}) where {ID,T}
+
+  Broadcasting(var->get_vector_Vars(RBInfo, RBVars, var))(vars)::Vector{<:MVVariable{T}}
+end
+
+function get_vector_Vars(
+  RBInfo::ROMInfo{ID},
+  RBVars::RB{T}) where {ID,T}
+
+  operators = intersect(get_FEM_vectors(RBInfo), set_operators(RBInfo))
+  get_vector_Vars(RBInfo, RBVars, operators)
+end
+
 function assemble_termsₙ(
-  Var::MVVariable,
-  Param::ParamInfo)
+  Var::MVVariable{T},
+  Param::ParamInfo) where T
 
   @assert Var.var == Param.var
 
@@ -90,8 +153,8 @@ function assemble_termsₙ(
 end
 
 function assemble_termsₙ(
-  Vars::Vector{<:MVVariable},
-  Params::Vector{<:ParamInfo})
+  Vars::Vector{<:MVVariable{T}},
+  Params::Vector{<:ParamInfo}) where T
 
   Broadcasting(assemble_termsₙ)(Vars, Params)
 

@@ -130,49 +130,67 @@ function MVariable(var::String, ::Type{T}) where T
 
 end
 
-function MVVariable(RBInfo::ROMInfo{ID}, var::String, ::Type{T}) where {ID,T}
+function VVariable(RBInfo::ROMInfo{ID}, var::String, ::Type{T}) where {ID,T}
 
   try
-    if isempty(var)
-      ret_Var = MVariable(var, T)
-    end
-
     if isvector(RBInfo, var)
-      ret_Var = VVariable(var, T)
-    elseif ismatrix(RBInfo, var)
-      ret_Var = MVariable(var, T)
+      return VVariable(var, T)::VVariable{T}
     end
-
-    ret_Var::MVVariable{T}
   catch
     error("Unrecognized variable")
   end
 
 end
 
-function MVVariable(Vars::Vector{<:MVVariable{T}}, var::String) where T
+function VVariable(Vars::Vector{<:VVariable{T}}, var::String) where T
 
   try
-    if isempty(var)
-      ret_Var = MVariable(var, Float)
-    end
-
     for Var in Vars
       if Var.var == var
-        ret_Var = Var
+        return Var::VVariable{T}
       end
     end
-
-    ret_Var::MVVariable{T}
   catch
     error("Unrecognized variable")
   end
 
 end
 
-function MVVariable(Vars::Vector{<:MVVariable{T}}, vars::Vector{String}) where T
+function MVariable(Vars::Vector{<:MVariable{T}}, vars::Vector{String}) where T
 
-  Broadcasting(var -> MVVariable(Vars, var))(vars)
+  Broadcasting(var -> MVariable(Vars, var))(vars)
+
+end
+
+function MVariable(RBInfo::ROMInfo{ID}, var::String, ::Type{T}) where {ID,T}
+
+  try
+    if ismatrix(RBInfo, var)
+      return MVariable(var, T)::MVariable{T}
+    end
+  catch
+    error("Unrecognized variable")
+  end
+
+end
+
+function MVariable(Vars::Vector{<:MVariable{T}}, var::String) where T
+
+  try
+    for Var in Vars
+      if Var.var == var
+        return Var::MVariable{T}
+      end
+    end
+  catch
+    error("Unrecognized variable")
+  end
+
+end
+
+function MVariable(Vars::Vector{<:MVariable{T}}, vars::Vector{String}) where T
+
+  Broadcasting(var -> MVariable(Vars, var))(vars)
 
 end
 
@@ -216,8 +234,10 @@ end
 
 function PoissonS(RBInfo::ROMInfoS{1}, ::Type{T}) where T
   SV = SteadyVariables(T)
-  MVVars(var) = MVVariable(RBInfo, var, T)
-  Vars = Broadcasting(MVVars)(RBInfo.structures)
+  MVars(var) = MVariable(RBInfo, var, T)
+  VVars(var) = VVariable(RBInfo, var, T)
+  Vars = vcat(Broadcasting(MVars)(get_FEM_matrices(RBInfo)),
+    Broadcasting(VVars)(get_FEM_vectors(RBInfo)))
   xₙ = Matrix{T}[]
   LHSₙ = Matrix{T}[]
   RHSₙ = Matrix{T}[]

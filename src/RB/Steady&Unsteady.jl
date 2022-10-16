@@ -207,10 +207,15 @@ function assemble_offline_structures(
   operators::Vector{String}) where {ID,T}
 
   RBVars.offline_time += @elapsed begin
-    affine_Vars = MVVariable(RBVars.Vars, intersect(operators, RBInfo.affine_structures))
-    assemble_affine_structure(RBInfo, affine_Vars)
-    nonaffine_Vars = MVVariable(RBVars.Vars, setdiff(operators, RBInfo.affine_structures))
-    assemble_MDEIM_structure(RBInfo, RBVars, nonaffine_Vars)
+    am = intersect(operators, get_affine_matrices(RBInfo))
+    av = intersect(operators, get_affine_vectors(RBInfo))
+    nam = intersect(operators, get_nonaffine_matrices(RBInfo))
+    nav = intersect(operators, get_nonaffine_vectors(RBInfo))
+
+    assemble_affine_structure(RBInfo, get_matrix_Vars(RBInfo, RBVars, am))
+    assemble_affine_structure(RBInfo, get_vector_Vars(RBInfo, RBVars, av))
+    assemble_MDEIM_structure(RBInfo, RBVars, get_matrix_Vars(RBInfo, RBVars, nam))
+    assemble_MDEIM_structure(RBInfo, RBVars, get_vector_Vars(RBInfo, RBVars, nav))
   end
 
   if RBInfo.save_offline
@@ -227,7 +232,11 @@ function get_offline_structures(
 
   operators = check_saved_operators(RBInfo, RBVars.Vars)
   operators_to_get = setdiff(set_operators(RBInfo), operators)
-  Vars_to_get = MVVariable(RBVars.Vars, operators_to_get)
+  Vecs_to_get = intersect(get_FEM_vectors(RBInfo), operators_to_get)
+  Mats_to_get = intersect(get_FEM_matrices(RBInfo), operators_to_get)
+
+  Vars_to_get = vcat(get_matrix_Vars(RBInfo, RBVars, Mats_to_get),
+    get_vector_Vars(RBInfo, RBVars, Vecs_to_get))
   get_offline_Var(RBInfo, Vars_to_get)
 
   operators
@@ -347,8 +356,8 @@ function assemble_θ(
   RBVars::RB{T},
   μ::Vector{T}) where {D,ID,T}
 
-  operators = set_operators(RBInfo)
-  Vars = MVVariable(RBVars.Vars, operators)
+  Vars = vcat(get_matrix_Vars(RBInfo, RBVars),
+    get_vector_Vars(RBInfo, RBVars))
   Broadcasting(Var -> assemble_θ(FEMSpace, RBInfo, Var, μ))(Vars)
 
 end
@@ -358,8 +367,8 @@ function assemble_matricesₙ(
   RBVars::RB{T},
   Params::Vector{<:ParamInfo}) where {ID,T}
 
-  operators = get_FEM_matrices(RBInfo)
-  matrix_Vars = MVVariable(RBVars.Vars, operators)
+  operators = intersect(get_FEM_matrices(RBInfo), set_operators(RBInfo))
+  matrix_Vars = get_matrix_Vars(RBInfo, RBVars, operators)
   matrix_Params = ParamInfo(Params, operators)
   assemble_termsₙ(matrix_Vars, matrix_Params)::Vector{Matrix{T}}
 
@@ -370,8 +379,8 @@ function assemble_vectorsₙ(
   RBVars::RB{T},
   Params::Vector{<:ParamInfo}) where {ID,T}
 
-  operators = get_FEM_vectors(RBInfo)
-  vector_Vars = MVVariable(RBVars.Vars, operators)
+  operators = intersect(get_FEM_vectors(RBInfo), set_operators(RBInfo))
+  vector_Vars = get_vector_Vars(RBInfo, RBVars, operators)
   vector_Params = ParamInfo(Params, operators)
   assemble_termsₙ(vector_Vars, vector_Params)::Vector{Matrix{T}}
 

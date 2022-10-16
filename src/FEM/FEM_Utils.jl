@@ -68,12 +68,20 @@ function ismatrix(FEMInfo::FOMInfo, var::String)
   var ∈ get_FEM_matrices(FEMInfo)
 end
 
-function get_affine_vectors(FEMInfo)
+function get_affine_vectors(FEMInfo::FOMInfo)
   intersect(get_FEM_vectors(FEMInfo), FEMInfo.affine_structures)
 end
 
-function get_affine_matrices(FEMInfo)
+function get_affine_matrices(FEMInfo::FOMInfo)
   intersect(get_FEM_matrices(FEMInfo), FEMInfo.affine_structures)
+end
+
+function get_nonaffine_vectors(FEMInfo::FOMInfo)
+  setdiff(get_FEM_vectors(FEMInfo), FEMInfo.affine_structures)
+end
+
+function get_nonaffine_matrices(FEMInfo::FOMInfo)
+  setdiff(get_FEM_matrices(FEMInfo), FEMInfo.affine_structures)
 end
 
 function isaffine(FEMInfo::FOMInfo, var::String)

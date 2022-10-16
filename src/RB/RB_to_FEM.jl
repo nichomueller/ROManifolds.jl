@@ -26,12 +26,36 @@ function isvector(RBInfo::ROMInfo, var::String)
   isvector(RBInfo.FEMInfo, var)
 end
 
+function isvector(RBInfo::ROMInfo, vars::Vector{String})
+  Broadcasting(var->isvector(RBInfo.FEMInfo, var))(vars)
+end
+
 function get_FEM_matrices(RBInfo::ROMInfo)
   get_FEM_matrices(RBInfo.FEMInfo)
 end
 
 function ismatrix(RBInfo::ROMInfo, var::String)
   ismatrix(RBInfo.FEMInfo, var)
+end
+
+function ismatrix(RBInfo::ROMInfo, vars::Vector{String})
+  Broadcasting(var->ismatrix(RBInfo.FEMInfo, var))(vars)
+end
+
+function get_affine_vectors(RBInfo::ROMInfo)
+  get_affine_vectors(RBInfo.FEMInfo)
+end
+
+function get_affine_matrices(RBInfo::ROMInfo)
+  get_affine_matrices(RBInfo.FEMInfo)
+end
+
+function get_nonaffine_vectors(RBInfo::ROMInfo)
+  get_nonaffine_vectors(RBInfo.FEMInfo)
+end
+
+function get_nonaffine_matrices(RBInfo::ROMInfo)
+  get_nonaffine_matrices(RBInfo.FEMInfo)
 end
 
 function get_timesθ(RBInfo::ROMInfo)

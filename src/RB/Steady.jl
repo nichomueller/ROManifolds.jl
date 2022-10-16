@@ -189,10 +189,10 @@ function online_phase(
     assemble_solve_reconstruct(FEMSpace, RBInfo, RBVars, μ[nb])
     mean_online_time += RBVars.online_time / length(param_nbs)
     get_S(var) = get_S_var(var, nb)
-    xₕ = Broadcasting(get_S)(RBInfo.unknowns)::Vector{Vector{Float}}
+    xₕ = Broadcasting(get_S)(RBInfo.unknowns)::Vector{Matrix{Float}}
     norms = get_norms(xₕ)
     errᵢ(i::Int) = errors(xₕ[i], RBVars.x̃[i], RBVars.X₀[i], norms[i])
-    err = Broadcasting(errᵢ)(eachindex(xₕ))::Vector{Tuple{Float, Vector{Float}}}
+    err = Broadcasting(errᵢ)(eachindex(xₕ))::Vector{Tuple{Float, Matrix{Float}}}
     mean_err += first.(err) / length(param_nbs)
     mean_pointwise_err += last.(err) / length(param_nbs)
 
