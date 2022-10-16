@@ -78,67 +78,29 @@ function initialize_online_time(RBVars::RB)
   return
 end
 
-function get_matrix_Vars(RBVars::RB{T}) where T
-  Vars_to_get = findall(x->typeof(x) == MVariable{T}, RBVars.Vars)
-  RBVars.Vars[Vars_to_get]
+function VVariable(RBVars::RB{T}) where T
+  VVariable(RBVars.Vars)
 end
 
-function get_matrix_Vars(
+function VVariable(
   RBInfo::ROMInfo{ID},
   RBVars::RB{T},
-  var::String) where {ID,T}
+  args...) where {ID,T}
 
-  @assert ismatrix(RBInfo, var)
-  Vars_to_get = findall(x->x.var == var, RBVars.Vars)[1]
-  RBVars.Vars[Vars_to_get]::MVariable{T}
+  VVariable(RBInfo, RBVars.Vars, args...)
 end
 
-function get_matrix_Vars(
+function MVariable(RBVars::RB{T}) where T
+
+  MVariable(RBVars.Vars)
+end
+
+function MVariable(
   RBInfo::ROMInfo{ID},
   RBVars::RB{T},
-  vars::Vector{String}) where {ID,T}
+  args...) where {ID,T}
 
-  Broadcasting(var->get_matrix_Vars(RBInfo, RBVars, var))(vars)::Vector{<:MVVariable{T}}
-end
-
-function get_matrix_Vars(
-  RBInfo::ROMInfo{ID},
-  RBVars::RB{T}) where {ID,T}
-
-  operators = intersect(get_FEM_matrices(RBInfo), set_operators(RBInfo))
-  get_matrix_Vars(RBInfo, RBVars, operators)
-end
-
-function get_vector_Vars(RBVars::RB{T}) where T
-  Vars_to_get = findall(x->typeof(x) == VVariable{T}, RBVars.Vars)
-  RBVars.Vars[Vars_to_get]
-end
-
-function get_vector_Vars(
-  RBInfo::ROMInfo{ID},
-  RBVars::RB{T},
-  var::String) where {ID,T}
-
-  @assert isvector(RBInfo, var)
-  Vars_to_get = findall(x->x.var == var, RBVars.Vars)[1]
-  RBVars.Vars[Vars_to_get]::VVariable{T}
-
-end
-
-function get_vector_Vars(
-  RBInfo::ROMInfo{ID},
-  RBVars::RB{T},
-  vars::Vector{String}) where {ID,T}
-
-  Broadcasting(var->get_vector_Vars(RBInfo, RBVars, var))(vars)::Vector{<:MVVariable{T}}
-end
-
-function get_vector_Vars(
-  RBInfo::ROMInfo{ID},
-  RBVars::RB{T}) where {ID,T}
-
-  operators = intersect(get_FEM_vectors(RBInfo), set_operators(RBInfo))
-  get_vector_Vars(RBInfo, RBVars, operators)
+  MVariable(RBInfo, RBVars.Vars, args...)
 end
 
 function assemble_termsₙ(

@@ -212,10 +212,10 @@ function assemble_offline_structures(
     nam = intersect(operators, get_nonaffine_matrices(RBInfo))
     nav = intersect(operators, get_nonaffine_vectors(RBInfo))
 
-    assemble_affine_structure(RBInfo, get_matrix_Vars(RBInfo, RBVars, am))
-    assemble_affine_structure(RBInfo, get_vector_Vars(RBInfo, RBVars, av))
-    assemble_MDEIM_structure(RBInfo, RBVars, get_matrix_Vars(RBInfo, RBVars, nam))
-    assemble_MDEIM_structure(RBInfo, RBVars, get_vector_Vars(RBInfo, RBVars, nav))
+    assemble_affine_structure(RBInfo, MVariable(RBInfo, RBVars, am))
+    assemble_affine_structure(RBInfo, VVariable(RBInfo, RBVars, av))
+    assemble_MDEIM_structure(RBInfo, RBVars, MVariable(RBInfo, RBVars, nam))
+    assemble_MDEIM_structure(RBInfo, RBVars, VVariable(RBInfo, RBVars, nav))
   end
 
   if RBInfo.save_offline
@@ -235,8 +235,8 @@ function get_offline_structures(
   Vecs_to_get = intersect(get_FEM_vectors(RBInfo), operators_to_get)
   Mats_to_get = intersect(get_FEM_matrices(RBInfo), operators_to_get)
 
-  Vars_to_get = vcat(get_matrix_Vars(RBInfo, RBVars, Mats_to_get),
-    get_vector_Vars(RBInfo, RBVars, Vecs_to_get))
+  Vars_to_get = vcat(MVariable(RBInfo, RBVars, Mats_to_get),
+    VVariable(RBInfo, RBVars, Vecs_to_get))
   get_offline_Var(RBInfo, Vars_to_get)
 
   operators
@@ -356,8 +356,8 @@ function assemble_θ(
   RBVars::RB{T},
   μ::Vector{T}) where {D,ID,T}
 
-  Vars = vcat(get_matrix_Vars(RBInfo, RBVars),
-    get_vector_Vars(RBInfo, RBVars))
+  Vars = vcat(MVariable(RBInfo, RBVars),
+    VVariable(RBInfo, RBVars))
   Broadcasting(Var -> assemble_θ(FEMSpace, RBInfo, Var, μ))(Vars)
 
 end
@@ -368,7 +368,7 @@ function assemble_matricesₙ(
   Params::Vector{<:ParamInfo}) where {ID,T}
 
   operators = intersect(get_FEM_matrices(RBInfo), set_operators(RBInfo))
-  matrix_Vars = get_matrix_Vars(RBInfo, RBVars, operators)
+  matrix_Vars = MVariable(RBInfo, RBVars, operators)
   matrix_Params = ParamInfo(Params, operators)
   assemble_termsₙ(matrix_Vars, matrix_Params)::Vector{Matrix{T}}
 
@@ -380,7 +380,7 @@ function assemble_vectorsₙ(
   Params::Vector{<:ParamInfo}) where {ID,T}
 
   operators = intersect(get_FEM_vectors(RBInfo), set_operators(RBInfo))
-  vector_Vars = get_vector_Vars(RBInfo, RBVars, operators)
+  vector_Vars = VVariable(RBInfo, RBVars, operators)
   vector_Params = ParamInfo(Params, operators)
   assemble_termsₙ(vector_Vars, vector_Params)::Vector{Matrix{T}}
 

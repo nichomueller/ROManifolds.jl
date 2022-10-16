@@ -130,68 +130,67 @@ function MVariable(var::String, ::Type{T}) where T
 
 end
 
-function VVariable(RBInfo::ROMInfo{ID}, var::String, ::Type{T}) where {ID,T}
+function VVariable(Vars::Vector{<:MVariable{T}}) where T
+  Vars_to_get = findall(x->typeof(x) == VVariable{T}, Vars)
+  Vars[Vars_to_get]
+end
 
-  try
-    if isvector(RBInfo, var)
-      return VVariable(var, T)::VVariable{T}
-    end
-  catch
-    error("Unrecognized variable")
-  end
+function VVariable(
+  RBInfo::ROMInfo{ID},
+  Vars::Vector{<:MVariable{T}},
+  var::String) where {ID,T}
+
+  @assert isvector(RBInfo, var)
+  Vars_to_get = findall(x->x.var == var, Vars)[1]
+  Vars[Vars_to_get]::VVariable{T}
 
 end
 
-function VVariable(Vars::Vector{<:VVariable{T}}, var::String) where T
+function VVariable(
+  RBInfo::ROMInfo{ID},
+  Vars::Vector{<:MVariable{T}},
+  vars::Vector{String}) where {ID,T}
 
-  try
-    for Var in Vars
-      if Var.var == var
-        return Var::VVariable{T}
-      end
-    end
-  catch
-    error("Unrecognized variable")
-  end
-
+  Broadcasting(var->VVariable(RBInfo, Vars, var))(vars)::Vector{VVariable{T}}
 end
 
-function MVariable(Vars::Vector{<:MVariable{T}}, vars::Vector{String}) where T
+function VVariable(
+  RBInfo::ROMInfo{ID},
+  Vars::Vector{<:MVariable{T}}) where {ID,T}
 
-  Broadcasting(var -> MVariable(Vars, var))(vars)
-
+  operators = intersect(get_FEM_vectors(RBInfo), set_operators(RBInfo))
+  VVariable(RBInfo, Vars, operators)
 end
 
-function MVariable(RBInfo::ROMInfo{ID}, var::String, ::Type{T}) where {ID,T}
-
-  try
-    if ismatrix(RBInfo, var)
-      return MVariable(var, T)::MVariable{T}
-    end
-  catch
-    error("Unrecognized variable")
-  end
-
+function MVariable(Vars::Vector{<:MVariable{T}}) where T
+  Vars_to_get = findall(x->typeof(x) == MVariable{T}, Vars)
+  Vars[Vars_to_get]
 end
 
-function MVariable(Vars::Vector{<:MVariable{T}}, var::String) where T
+function MVariable(
+  RBInfo::ROMInfo{ID},
+  Vars::Vector{<:MVariable{T}},
+  var::String) where {ID,T}
 
-  try
-    for Var in Vars
-      if Var.var == var
-        return Var::MVariable{T}
-      end
-    end
-  catch
-    error("Unrecognized variable")
-  end
-
+  @assert ismatrix(RBInfo, var)
+  Vars_to_get = findall(x->x.var == var, Vars)[1]
+  Vars[Vars_to_get]
 end
 
-function MVariable(Vars::Vector{<:MVariable{T}}, vars::Vector{String}) where T
+function MVariable(
+  RBInfo::ROMInfo{ID},
+  Vars::Vector{<:MVariable{T}},
+  vars::Vector{String}) where {ID,T}
 
-  Broadcasting(var -> MVariable(Vars, var))(vars)
+  Broadcasting(var->MVariable(RBInfo, Vars, var))(vars)::Vector{MVariable{T}}
+end
 
+function MVariable(
+  RBInfo::ROMInfo{ID},
+  Vars::Vector{<:MVariable{T}}) where {ID,T}
+
+  operators = intersect(get_FEM_matrices(RBInfo), set_operators(RBInfo))
+  MVariable(RBInfo, Vars, operators)
 end
 
 abstract type RB{T} end
