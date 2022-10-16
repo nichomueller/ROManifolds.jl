@@ -92,11 +92,11 @@ function isaffine(FEMInfo::FOMInfo, vars::Vector{String})
   Broadcasting(var->isaffine(FEMInfo, var))(vars)
 end
 
-function get_FEMμ_info(FEMInfo::FOMInfo)
+function get_FEMμ_info(FEMInfo::FOMInfo{ID}) where ID
   μ = load_CSV(Vector{Float}[],
     joinpath(FEMInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{Float}}
   model = DiscreteModelFromFile(FEMInfo.Paths.mesh_path)
-  FEMSpace₀ = get_FEMSpace(FEMInfo, model)::FOM
+  FEMSpace₀ = get_FEMSpace(FEMInfo, model)::FOM{FEMInfo.D}
 
   FEMSpace₀, μ
 

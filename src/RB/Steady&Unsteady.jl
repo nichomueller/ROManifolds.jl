@@ -212,10 +212,18 @@ function assemble_offline_structures(
     nam = intersect(operators, get_nonaffine_matrices(RBInfo))
     nav = intersect(operators, get_nonaffine_vectors(RBInfo))
 
-    assemble_affine_structure(RBInfo, MVariable(RBInfo, RBVars, am))
-    assemble_affine_structure(RBInfo, VVariable(RBInfo, RBVars, av))
-    assemble_MDEIM_structure(RBInfo, RBVars, MVariable(RBInfo, RBVars, nam))
-    assemble_MDEIM_structure(RBInfo, RBVars, VVariable(RBInfo, RBVars, nav))
+    if !isempty(am)
+      assemble_affine_structure(RBInfo, MVariable(RBInfo, RBVars, am))
+    end
+    if !isempty(av)
+      assemble_affine_structure(RBInfo, VVariable(RBInfo, RBVars, av))
+    end
+    if !isempty(nam)
+      assemble_MDEIM_structure(RBInfo, RBVars, MVariable(RBInfo, RBVars, nam))
+    end
+    if !isempty(nav)
+      assemble_MDEIM_structure(RBInfo, RBVars, VVariable(RBInfo, RBVars, nav))
+    end
   end
 
   if RBInfo.save_offline
@@ -236,7 +244,7 @@ function get_offline_structures(
   Mats_to_get = intersect(get_FEM_matrices(RBInfo), operators_to_get)
 
   Vars_to_get = vcat(MVariable(RBInfo, RBVars, Mats_to_get),
-    VVariable(RBInfo, RBVars, Vecs_to_get))
+    VVariable(RBInfo, RBVars, Vecs_to_get))::Vector{String}
   get_offline_Var(RBInfo, Vars_to_get)
 
   operators
