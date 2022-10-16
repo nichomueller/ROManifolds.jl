@@ -404,6 +404,14 @@ function ParamInfo(
 
 end
 
+function ParamInfo(
+  Params::Vector{<:ParamInfo},
+  vars::Vector{String})
+
+  Broadcasting(var -> ParamInfo(Params, var))(vars)
+
+end
+
 mutable struct ParamFormInfoS <: ParamFormInfo
   Param::ParamInfoS
   dΩ::Measure

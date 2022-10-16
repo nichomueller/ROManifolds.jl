@@ -1,4 +1,4 @@
-function post_process(::ROMInfoS, d::Dict) where T
+function post_process(::ROMInfoS, d::Dict)
 
   FEMSpace = d["FEMSpace"]
   writevtk(FEMSpace.Ω, joinpath(d["res_path"], "mean_point_err_u"),
@@ -12,7 +12,7 @@ function post_process(::ROMInfoS, d::Dict) where T
 
 end
 
-function post_process(RBInfo, d::Dict) where T
+function post_process(RBInfo, d::Dict)
 
   times = collect(RBInfo.t₀+RBInfo.δt:RBInfo.δt:RBInfo.tₗ)
   FEMSpace = d["FEMSpace"]

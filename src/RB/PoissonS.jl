@@ -32,9 +32,9 @@ function assemble_RHSₙ(
   ParamH = ParamInfo(RBInfo, μ, "H")
   ParamL = ParamInfo(RBInfo, μ, "L")
 
-  F = assemble_FEM_structure(FEMSpace, RBInfo, ParamF)
-  H = assemble_FEM_structure(FEMSpace, RBInfo, ParamH)
-  L = assemble_FEM_structure(FEMSpace, RBInfo, ParamL)
+  F = assemble_FEM_vector(FEMSpace, RBInfo, ParamF)
+  H = assemble_FEM_vector(FEMSpace, RBInfo, ParamH)
+  L = assemble_FEM_vector(FEMSpace, RBInfo, ParamL)
 
   push!(RBVars.RHSₙ, reshape(RBVars.Φₛ[1]' * (F + H - L), :, 1)::Matrix{T})
 

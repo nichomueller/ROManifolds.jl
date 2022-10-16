@@ -14,6 +14,10 @@ function isaffine(RBInfo::ROMInfo, var::String)
   isaffine(RBInfo.FEMInfo, var)
 end
 
+function isaffine(RBInfo::ROMInfo, vars::Vector{String})
+  isaffine(RBInfo.FEMInfo, vars)
+end
+
 function get_FEM_vectors(RBInfo::ROMInfo)
   get_FEM_vectors(RBInfo.FEMInfo)
 end
@@ -34,12 +38,21 @@ function get_timesθ(RBInfo::ROMInfo)
   get_timesθ(RBInfo.FEMInfo)
 end
 
-function assemble_FEM_structure(
+function assemble_FEM_matrix(
   FEMSpace::FOM,
   RBInfo::ROMInfo,
   args...)
 
-  assemble_FEM_structure(FEMSpace, RBInfo.FEMInfo, args...)
+  assemble_FEM_matrix(FEMSpace, RBInfo.FEMInfo, args...)
+
+end
+
+function assemble_FEM_vector(
+  FEMSpace::FOM,
+  RBInfo::ROMInfo,
+  args...)
+
+  assemble_FEM_vector(FEMSpace, RBInfo.FEMInfo, args...)
 
 end
 

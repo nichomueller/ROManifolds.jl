@@ -80,6 +80,10 @@ function isaffine(FEMInfo::FOMInfo, var::String)
   var ∈ FEMInfo.affine_structures
 end
 
+function isaffine(FEMInfo::FOMInfo, vars::Vector{String})
+  Broadcasting(var->isaffine(FEMInfo, var))(vars)
+end
+
 function get_FEMμ_info(FEMInfo::FOMInfo)
   μ = load_CSV(Vector{Float}[],
     joinpath(FEMInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{Float}}
@@ -156,7 +160,9 @@ function find_FE_elements(
   idx::Vector,
   var::String)
 
-  find_FE_elements(
-    FEMSpace_vectors(FEMSpace, var), get_measure(FEMSpace, var), unique(idx))
+  space = get_FEMSpace_vector(FEMSpace, var)
+  triang = Gridap.FESpaces.get_triangulation(FEMSpace, var)
+
+  find_FE_elements(space, triang, unique(idx))
 
 end

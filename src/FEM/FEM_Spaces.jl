@@ -85,3 +85,11 @@ function get_measure(FEMSpace::FOM, var::String)
     FEMSpace.dΩ
   end
 end
+
+function Gridap.FESpaces.get_triangulation(FEMSpace::FOM, var::String)
+  if var == "H"
+    FEMSpace.Γn
+  else
+    FEMSpace.Ω
+  end
+end

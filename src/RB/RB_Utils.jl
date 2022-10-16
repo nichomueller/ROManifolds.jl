@@ -1,3 +1,32 @@
+function check_saved_operators(
+  RBInfo::ROMInfo{ID},
+  Var::MVVariable) where ID
+
+  var = Var.var
+  op = ""
+
+  if var ∈ get_FEM_vectors(RBInfo) && RBInfo.online_RHS
+    println("Vector $var will be built online: not importing its offline structures")
+  else
+    if isfile(joinpath(RBInfo.ROM_structures_path, "$(var)ₙ.csv"))
+    else
+      println("Failed to import offline structures for $var: must build them")
+      op = var
+    end
+  end
+
+  op::String
+
+end
+
+function check_saved_operators(
+  RBInfo::ROMInfo{ID},
+  Vars::Vector{<:MVVariable}) where ID
+
+  Broadcasting(Var -> check_saved_operators(RBInfo, Var))(Vars)
+
+end
+
 function get_Φₛ(RBVars::RB, var::String)
   if var ∈ ("B", "Lc")
     Φₛ_left = RBVars.Φₛ[2]
@@ -41,46 +70,46 @@ function initialize_RB_system(RBVars::RB{T}) where T
   RBVars.LHSₙ = Matrix{T}[]
   RBVars.RHSₙ = Matrix{T}[]
   RBVars.xₙ = Matrix{T}[]
+  return
 end
 
 function initialize_online_time(RBVars::RB)
   RBVars.online_time = 0.0
+  return
+end
+
+function assemble_termsₙ(
+  Var::MVVariable,
+  Param::ParamInfo)
+
+  @assert Var.var == Param.var
+
+  mult = Broadcasting(.*)
+  Var.var ∈ ("L", "Lc") ? -sum(mult(Var.Matₙ, Param.θ)) : sum(mult(Var.Matₙ, Param.θ))
+
 end
 
 function assemble_termsₙ(
   Vars::Vector{<:MVVariable},
-  Params::Vector{<:ParamInfo},
-  operators::Vector{String})
+  Params::Vector{<:ParamInfo})
 
-  mult = Broadcasting(.*)
-
-  function assemble_termₙ(var::String)
-    Var = MVVariable(Vars, var)
-    Param = ParamInfo(Params, var)
-    if var ∈ ("L", "Lc")
-      -sum(mult(Var.Matₙ, Param.θ))
-    else
-      sum(mult(Var.Matₙ, Param.θ))
-    end
-  end
-
-  Broadcasting(assemble_termₙ)(operators)
+  Broadcasting(assemble_termsₙ)(Vars, Params)
 
 end
 
 function compute_errors(
   xₕ::Vector{T},
   x̃::Vector{T},
-  X::Matrix{T}) where T
+  X::SparseMatrixCSC{T,Int}) where T
 
-  norm(xₕ - x̃, X) / norm(xₕ, X)
+  LinearAlgebra.norm(xₕ - x̃, X) / LinearAlgebra.norm(xₕ, X)
 
 end
 
 function compute_errors(
   xₕ::Matrix{T},
   x̃::Matrix{T},
-  X::Matrix{T}) where T
+  X::SparseMatrixCSC{T,Int}) where T
 
   @assert size(xₕ)[2] == size(x̃)[2] == 1 "Something is wrong"
   compute_errors(xₕ[:, 1], x̃[:, 1], X)
@@ -90,16 +119,15 @@ end
 function compute_errors(
   xₕ::Matrix{T},
   x̃::Matrix{T},
-  X::Matrix{T},
+  X::SparseMatrixCSC{T,Int},
   Nₜ::Int) where T
 
-  norm_err = zeros(T, Nₜ)
-  norm_sol = zeros(T, Nₜ)
-
-  @simd for i = 1:Nₜ
-    norm_err[i] = norm(xₕ[:, i] - x̃[:, i], X)
-    norm_sol[i] = norm(xₕ[:, i], X)
+  function normᵢ(i::Int)
+    LinearAlgebra.norm(xₕ[:, i] - x̃[:, i], X), LinearAlgebra.norm(xₕ[:, i], X)
   end
+
+  norms = Broadcasting(normᵢ)(1:Nₜ)::Vector{Tuple{Int,Int}}
+  norm_err, norm_sol = first!(norms), last!(norms)
 
   norm_err ./ norm_sol, norm(norm_err) / norm(norm_sol)
 

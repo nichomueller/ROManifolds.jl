@@ -25,12 +25,10 @@ function MDEIM_offline(Mat::Matrix)
 
   append!(idx, Int(argmax(abs.(Mat[:, 1]))))
 
-  @simd for m = 2:n
-
+  @inbounds for m = 2:n
     res = (Mat[:, m] - Mat[:, 1:m-1] *
       (Mat[idx[1:m-1], 1:m-1] \ Mat[idx[1:m-1], m]))
-    append!(idx, convert(Int, argmax(abs.(res))[1]))
-
+    append!(idx, Int(argmax(abs.(res))[1]))
   end
 
   unique!(idx)
@@ -41,10 +39,10 @@ function MDEIM_offline(Mat::Matrix)
 end
 
 function MDEIM_offline(
-  MDEIM::MMDEIM,
-  RBInfo::ROMInfoS,
+  MDEIM::MMDEIM{T},
+  RBInfo::ROMInfoS{ID},
   RBVars::RBS{T},
-  var::String) where T
+  var::String) where {ID,T}
 
   FEMSpace, μ = get_FEMμ_info(RBInfo)
   Nₛ = get_Nₛ(RBVars, var)
@@ -61,14 +59,14 @@ function MDEIM_offline(
 end
 
 function MDEIM_offline(
-  MDEIM::VMDEIM,
-  RBInfo::ROMInfoS,
+  MDEIM::VMDEIM{T},
+  RBInfo::ROMInfoS{ID},
   ::RBS{T},
-  var::String) where T
+  var::String) where {ID,T}
 
   FEMSpace, μ = get_FEMμ_info(RBInfo)
 
-  Mat = snaps_DEIM(FEMSpace, RBInfo, μ, var)
+  Mat = snaps_MDEIM(FEMSpace, RBInfo, μ, var)
   idx, Matᵢ = MDEIM_offline(Mat)
   el = find_FE_elements(FEMSpace, idx, var)
 
@@ -77,10 +75,10 @@ function MDEIM_offline(
 end
 
 function MDEIM_offline(
-  MDEIM::MMDEIM,
-  RBInfo::ROMInfoST,
+  MDEIM::MMDEIM{T},
+  RBInfo::ROMInfoST{ID},
   RBVars::RBST{T},
-  var::String) where T
+  var::String) where {ID,T}
 
   FEMSpace, μ = get_FEMμ_info(RBInfo)
   Nₛ = get_Nₛ(RBVars, var)
@@ -101,9 +99,9 @@ function MDEIM_offline(
 end
 
 function MDEIM_offline(
-  MDEIM::VMDEIM,
-  RBInfo::ROMInfoST,
-  var::String)
+  MDEIM::VMDEIM{T},
+  RBInfo::ROMInfoST{ID},
+  var::String) where {ID,T}
 
   FEMSpace, μ = get_FEMμ_info(RBInfo)
 
@@ -126,36 +124,40 @@ function MDEIM_offline(
 
 end
 
-function assemble_ith_row_MatΦ(
-  Mat::Matrix{T},
-  Φₛ::Matrix{T},
-  r_idx::Vector{Int},
-  c_idx::Vector{Int},
-  i::Int) where T
-
-  sparse_idx = findall(x -> x == i, r_idx)
-  Matrix(reshape((Mat[sparse_idx,:]' * Φₛ[c_idx[sparse_idx],:])', 1, :))
-end
-
-function assemble_sparse_structure(
-  FEMSpace::FOMS,
-  FEMInfo::FOMInfoS,
+function assemble_sparse_matrix(
+  FEMSpace::FOMS{D},
+  FEMInfo::FOMInfoS{ID},
   Param::ParamInfoS,
-  el::Vector{Int})
+  el::Vector{Int}) where {D,ID}
 
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
-  ParamForm = ParamFormInfo(dΩ_sparse, Param)
+  ParamForm = ParamFormInfo(Param, dΩ_sparse)
 
-  assemble_FEM_structure(FEMSpace, FEMInfo, Param)
+  assemble_FEM_matrix(FEMSpace, FEMInfo, ParamForm)
+
+end
+
+function assemble_sparse_vector(
+  FEMSpace::FOMS{D},
+  FEMInfo::FOMInfoS{ID},
+  Param::ParamInfoS,
+  el::Vector{Int}) where {D,ID}
+
+  triang = Gridap.FESpaces.get_triangulation(FEMSpace, Param.var)
+  Ω_sparse = view(triang, el)
+  dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
+  ParamForm = ParamFormInfo(Param, dΩ_sparse)
+
+  assemble_FEM_vector(FEMSpace, FEMInfo, ParamForm)
 
 end
 
 function assemble_sparse_fun(
-  FEMSpace::FOMS,
-  FEMInfo::FOMInfoS,
+  FEMSpace::FOMS{D},
+  FEMInfo::FOMInfoS{ID},
   el::Vector{Int},
-  var::String)
+  var::String) where {D,ID}
 
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
@@ -204,15 +206,34 @@ end
 
 function θ(
   FEMSpace::FOMS{D},
-  RBInfo::ROMInfoS,
+  RBInfo::ROMInfoS{ID},
   Param::ParamInfoS,
-  MDEIM::MVMDEIM) where D
+  MDEIM::MMDEIM{T}) where {D,ID,T}
 
   if Param.var ∈ RBInfo.affine_structures
     θ = [[Param.fun(VectorValue(D, Float))[1]]]
   else
     Mat_μ_sparse =
-      assemble_sparse_structure(FEMSpace, FEMInfo, Param, MDEIM.el)
+      assemble_sparse_matrix(FEMSpace, FEMInfo, Param, MDEIM.el)
+    θvec = MDEIM_online(Mat_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
+    θ = [[θvec[q]] for q in eachindex(θvec)]
+  end
+
+  θ::Vector{Vector{T}}
+
+end
+
+function θ(
+  FEMSpace::FOMS{D},
+  RBInfo::ROMInfoS{ID},
+  Param::ParamInfoS,
+  MDEIM::VMDEIM{T}) where {D,ID,T}
+
+  if Param.var ∈ RBInfo.affine_structures
+    θ = [[Param.fun(VectorValue(D, Float))[1]]]
+  else
+    Mat_μ_sparse =
+      assemble_sparse_vector(FEMSpace, FEMInfo, Param, MDEIM.el)
     θvec = MDEIM_online(Mat_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
     θ = [[θvec[q]] for q in eachindex(θvec)]
   end
@@ -291,10 +312,10 @@ function θ!(
 end
 
 function θ_function(
-  FEMSpace::FOMS,
-  RBVars::RBS,
-  MDEIM::MMDEIM,
-  var::String) where T
+  FEMSpace::FOMS{D},
+  RBVars::RBS{T},
+  MDEIM::MMDEIM{T},
+  var::String) where {D,T}
 
   Fun_μ_sparse =
     assemble_sparse_fun(FEMSpace, FEMInfo, MDEIM.el, var)

@@ -93,7 +93,7 @@ end
 function FEM_solver(
   FEMSpace::FOMNavierStokesS,
   ::FOMInfoS{3},
-  Param::ParamInfoS) where T
+  Param::ParamInfoS)
 
   a((u,p),(v,q)) = ∫( ∇(v)⊙(Param.α*∇(u)) - Param.b*(∇⋅v)*p + q*(∇⋅u) )FEMSpace.dΩ
 

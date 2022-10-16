@@ -21,6 +21,23 @@ function from_full_idx_to_sparse_idx(
 
 end
 
+function from_sparse_idx_to_full_idx(
+  sparse_idx::Int,
+  sparse_to_full_idx::Vector{Int})
+
+  findall(x -> x == sparse_idx, sparse_to_full_idx)[1]
+
+end
+
+function from_sparse_idx_to_full_idx(
+  sparse_idx::Vector{Int},
+  sparse_to_full_idx::Vector{Int})
+
+  sparse_to_full(sidx) = from_sparse_idx_to_full_idx(sidx, sparse_to_full_idx)
+  Broadcasting(sparse_to_full)(sparse_idx)
+
+end
+
 """Removes zero-valued rows of a CSC matrix Msparse and returns its full
   representation Mfull"""
 function remove_zero_entries(Msparse::SparseMatrixCSC{T}) where T
@@ -44,4 +61,20 @@ end
 function Base.argmax(v::Vector{T},n_val::Int) where T
   s = sort(v,rev=true)
   idx = Int.(indexin(s,v))[1:n_val]
+end
+
+function rows(v::Array{T}) where T
+  size(v)[1]
+end
+
+function rows(Vecv::Vector{<:Array{T}}) where T
+  Broadcasting(rows)(Vecv)
+end
+
+function cols(v::Array{T}) where T
+  size(v)[2]
+end
+
+function cols(Vecv::Vector{<:Array{T}}) where T
+  Broadcasting(cols)(Vecv)
 end

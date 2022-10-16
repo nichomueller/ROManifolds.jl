@@ -2,39 +2,39 @@ function Mat_snapshots(
   FEMSpace::FOMS,
   RBInfo::ROMInfoS,
   RBVars::RBS,
-  μ::Vector{Vector{T}},
-  var::String) where T
+  μ::Vector{Vector{Float}},
+  var::String)
 
-  function Mat_linear(k::Int)
+  function Mat_linear(k::Int)::Tuple{Vector{Int},Vector{Float}}
     println("Snapshot number $k, $var")
-    Mat = assemble_FEM_structure(FEMSpace, RBInfo, μ[k], var)
-    findnz(Mat[:])::Tuple{Vector{Int},Vector{T}}
+    Mat = assemble_FEM_matrix(FEMSpace, RBInfo, μ[k], var)
+    findnz(Mat[:])
   end
 
-  function Mat_nonlinear(k::Int)
+  function Mat_nonlinear(k::Int)::Tuple{Vector{Int},Vector{Float}}
     println("Snapshot number $k, $var")
     Φₛ_fun = FEFunction(FEMSpace.V₀, RBVars.Φₛ[1][:, k])
-    Mat = assemble_FEM_structure(FEMSpace, RBInfo, Φₛ_fun, var)
-    findnz(Mat[:])::Tuple{Vector{Int},Vector{T}}
+    Mat = assemble_FEM_matrix(FEMSpace, RBInfo, Φₛ_fun, var)
+    findnz(Mat[:])
   end
 
   Mat(k) = var ∈ ("C", "D") ? Mat_nonlinear(k) : Mat_linear(k)
   nₛ = var ∈ ("C", "D") ? RBVars.nₛᵘ : RBInfo.nₛ_MDEIM
 
-  Mat_block, row_idx_block = Broadcasting(Mat)(1:nₛ)
-  blocks_to_matrix(Mat_block), row_idx_block[1]
+  i_v_block = Broadcasting(Mat)(1:nₛ)
+  correct_structures(last.(i_v_block), first.(i_v_block))::Tuple{Matrix{Float}, Vector{Int}}
 
 end
 
 function Vec_snapshots(
   FEMSpace::FOMS,
   RBInfo::ROMInfoS,
-  μ::Vector{Vector{T}},
-  var::String) where T
+  μ::Vector{Vector{Float}},
+  var::String)
 
-  function Vec(k::Int)
+  function Vec(k::Int)::Vector{Float}
     println("Snapshot number $k, $var")
-    assemble_FEM_structure(FEMSpace, RBInfo, μ[k], var)::Vector{T}
+    assemble_FEM_vector(FEMSpace, RBInfo, μ[k], var)
   end
 
   Vec_block = Broadcasting(Vec)(1:RBInfo.nₛ_MDEIM)
@@ -47,10 +47,10 @@ function snaps_MDEIM(
   FEMSpace::FOMS,
   RBInfo::ROMInfoS,
   RBVars::RBS,
-  μ::Vector{Vector{T}},
-  var::String) where T
+  μ::Vector{Vector{Float}},
+  var::String)
 
-  snaps, row_idx = M_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
+  snaps, row_idx = Mat_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
   snaps_POD, _ = MDEIM_POD(snaps, RBInfo.ϵₛ)
   snaps_POD, row_idx
 
@@ -59,10 +59,10 @@ end
 function snaps_MDEIM(
   FEMSpace::FOMS,
   RBInfo::ROMInfoS,
-  μ::Vector{Vector{T}},
-  var::String) where T
+  μ::Vector{Vector{Float}},
+  var::String)
 
-  snaps = MV_snapshots(FEMSpace, RBInfo, μ, var)
+  snaps = Vec_snapshots(FEMSpace, RBInfo, μ, var)
   snaps_POD, _ = MDEIM_POD(snaps, RBInfo.ϵₛ)
   snaps_POD
 
@@ -73,7 +73,7 @@ function MV_snapshots(
   RBInfo::ROMInfoST,
   μ::Vector,
   timesθ::Vector,
-  var::String) where T
+  var::String)
 
   Nₜ = length(timesθ)
   Param = ParamInfo(RBInfo, μ, var)
@@ -82,7 +82,7 @@ function MV_snapshots(
   Mat, row_idx = Matrix{T}(undef,0,0), Int[]
   for i_t = 1:Nₜ
     Mat_i = Mat_t(timesθ[i_t])
-    i, v = findnz(Mat_i[:])::Tuple{Vector{Int},Vector{T}}
+    i, v = findnz(Mat_i[:])::Tuple{Vector{Int},Vector{Float}}
     if i_t == 1
       row_idx = i
       Mat = zeros(T,length(row_idx),Nₜ)
@@ -100,7 +100,7 @@ function MV_snapshots(
   RBVars::RBST,
   μ::Vector,
   timesθ::Vector,
-  var::String) where T
+  var::String)
 
   error("Not implemented yet")
 
@@ -112,7 +112,7 @@ function call_MV_snapshots(
   RBVars::RBST,
   μ::Vector,
   timesθ::Vector,
-  var::String) where T
+  var::String)
 
   if var ∈ ["C"]
     MV_snapshots(FEMSpace, RBInfo, RBVars, μ, timesθ, var)
@@ -330,12 +330,12 @@ function MV_snapshots(
   RBInfo::ROMInfoST,
   μ::Vector,
   timesθ::Vector,
-  var::String) where T
+  var::String)
 
   Nₜ = length(timesθ)
   Param = ParamInfo(RBInfo, μ)
   Vec_t = assemble_FEM_structure(FEMSpace, RBInfo, Param, var)
-  Vec = Matrix{T}(undef,0,0)
+  Vec = Matrix{Float}(undef,0,0)
 
   for i_t = 1:Nₜ
     v = Vec_t(timesθ[i_t])[:]
@@ -507,5 +507,37 @@ function assemble_parameter_on_phys_quadp(
       for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
 
   reshape(Θ, ncells*nquad_cell, :)::Matrix{Float}
+
+end
+
+function correct_structures(
+  Mat::Vector{Vector{Float}},
+  row_idx::Vector{Vector{Int}})
+
+  if all(Broadcasting(a->isequal(a, row_idx[1]))(row_idx))
+
+    return blocks_to_matrix(Mat), row_idx[1]
+
+  else
+
+    println("Advanced version of findnz(⋅) is applied: correcting structures")
+    row_idx_new = blocks_to_matrix(row_idx)
+    sort!(unique!(row_idx_new))
+
+    vec_new = zeros(Float, length(row_idx_new))
+    function fix_ith_vector(i::Int)
+      missing_idx_sparse = setdiff(row_idx_new, row_idx[i])
+      missing_idx_full = from_sparse_idx_to_full_idx(missing_idx_sparse, row_idx_new)
+      same_idx_full = setdiff(eachindex(row_idx_new), missing_idx_full)
+
+      vec_new[same_idx_full] = Mat[i]
+      vec_new
+    end
+
+    Mat_new = Broadcasting(fix_ith_vector)(eachindex(row_idx))
+
+    return blocks_to_matrix(Mat_new), row_idx_new
+
+  end
 
 end

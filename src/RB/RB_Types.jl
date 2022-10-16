@@ -27,7 +27,6 @@ struct ROMInfoS{ID} <: ROMInfo{ID}
   online_RHS::Bool
   nₛ_MDEIM::Int
   post_process::Bool
-  get_snapshots::Bool
   get_offline_structures::Bool
   save_offline::Bool
   save_online::Bool
@@ -43,7 +42,6 @@ mutable struct ROMInfoST{ID} <: ROMInfo{ID}
   nₛ_MDEIM::Int
   nₛ_MDEIM_time::Int
   post_process::Bool
-  get_snapshots::Bool
   get_offline_structures::Bool
   save_offline::Bool
   save_online::Bool
@@ -110,9 +108,9 @@ function VVariable(var::String, ::Type{T}) where T
   idx = Vector{Int}(undef,0)
   time_idx = Vector{Int}(undef,0)
   el = Vector{Int}(undef,0)
-  MDEIM_Vec = VMDEIM(Mat, Matᵢ, idx, time_idx, el)
+  MDEIM_Vec = VMDEIM{T}(Mat, Matᵢ, idx, time_idx, el)
 
-  VVariable(var, Matₙ, MDEIM_Vec)
+  VVariable{T}(var, Matₙ, MDEIM_Vec)
 
 end
 
@@ -126,33 +124,55 @@ function MVariable(var::String, ::Type{T}) where T
   time_idx = Vector{Int}(undef,0)
   row_idx = Vector{Int}(undef,0)
   el = Vector{Int}(undef,0)
-  MDEIM_Mat = MMDEIM(Mat, Matᵢ, idx, time_idx, row_idx, el)
+  MDEIM_Mat = MMDEIM{T}(Mat, Matᵢ, idx, time_idx, row_idx, el)
 
-  MVariable(var, Matₙ, MDEIM_Mat)
+  MVariable{T}(var, Matₙ, MDEIM_Mat)
 
 end
 
 function MVVariable(RBInfo::ROMInfo{ID}, var::String, ::Type{T}) where {ID,T}
 
-  if isvector(RBInfo, var)
-    return VVariable(var, T)
-  elseif ismatrix(RBInfo, var)
-    return MVariable(var, T)
-  else
+  try
+    if isempty(var)
+      ret_Var = MVariable(var, T)
+    end
+
+    if isvector(RBInfo, var)
+      ret_Var = VVariable(var, T)
+    elseif ismatrix(RBInfo, var)
+      ret_Var = MVariable(var, T)
+    end
+
+    ret_Var::MVVariable{T}
+  catch
     error("Unrecognized variable")
   end
 
 end
 
-function MVVariable(Vars::Vector{<:MVVariable}, var::String)
+function MVVariable(Vars::Vector{<:MVVariable{T}}, var::String) where T
 
-  for Var in Vars
-    if Var.var == var
-      return Var
+  try
+    if isempty(var)
+      ret_Var = MVariable(var, Float)
     end
+
+    for Var in Vars
+      if Var.var == var
+        ret_Var = Var
+      end
+    end
+
+    ret_Var::MVVariable{T}
+  catch
+    error("Unrecognized variable")
   end
 
-  error("Unrecognized variable")
+end
+
+function MVVariable(Vars::Vector{<:MVVariable{T}}, vars::Vector{String}) where T
+
+  Broadcasting(var -> MVVariable(Vars, var))(vars)
 
 end
 

@@ -13,7 +13,7 @@ end
 
 function load_CSV(::Vector{Matrix{T}}, path::String) where T
 
-  function load_mat(varᵢ::String)
+  #= function load_mat(varᵢ::String)
     varᵢ_split = split(chop(varᵢ; head=1, tail=1), "; ")
     varᵢ_mat = parse.(T, split(varᵢ_split[1], " "))
     for j in 1 .+ eachindex(varᵢ_split[2:end])
@@ -32,7 +32,8 @@ function load_CSV(::Vector{Matrix{T}}, path::String) where T
     Broadcasting(load_mat)(var)[:]::Vector{Matrix{T}}
   catch
     Broadcasting(load_vec)(var)[:]::Vector{Matrix{T}}
-  end
+  end =#
+  Array(CSV.read(path, DataFrame))
 
 end
 
@@ -71,6 +72,10 @@ function save_CSV(var::Array{T,D}, path::String) where {T,D}
     CSV.write(path, Tables.table(var))
   end
   return
+end
+
+function save_CSV(var::Vector{<:AbstractArray{T}}, path::String) where T
+  save_CSV(blocks_to_matrix(var), path)
 end
 
 function save_CSV(var::SparseMatrixCSC{T}, path::String) where T

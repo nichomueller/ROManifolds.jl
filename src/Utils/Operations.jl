@@ -16,7 +16,14 @@ end
 of 'vec' is returned."""
 function LinearAlgebra.norm(v::Vector{T}, X::SparseMatrixCSC) where T
 
-  sqrt(dot(v, v, X))
+  sqrt(LinearAlgebra.dot(v, v, X))
+
+end
+
+function LinearAlgebra.norm(v::Matrix{T}, X::SparseMatrixCSC) where T
+
+  @assert size(v)[2] == 1
+  sqrt(LinearAlgebra.dot(v[:,1], v[:,1], X))
 
 end
 
@@ -118,10 +125,13 @@ function mode₂_unfolding(Mat₁::Matrix{T}, nₛ::Int) where T
   Nₛ, Nₜnₛ = size(Mat₁)
   Nₜ = Int(Nₜnₛ/nₛ)
   Mat₂ = zeros(T, Nₜ, Nₛ*nₛ)
-  @simd for i in 1:nₛ
-    Mat₂[:, (i-1)*Nₛ+1:i*Nₛ] = Mat₁[:, (i-1)*Nₜ+1:i*Nₜ]'
+
+  function mode₂(i::Int)
+    Matrix{T}(Mat₁[:, (i-1)*Nₜ+1:i*Nₜ]')
   end
-  Mat₂
+
+  blocks_to_matrix(Broadcasting(mode₂)(1:nₛ))
+
 end
 
 function blocks_to_matrix(Mat_block::Vector{Matrix{T}}) where T
@@ -132,13 +142,18 @@ end
 
 function blocks_to_matrix(Vec_block::Vector{Vector{T}}) where T
 
-  Matrix{T}(reshape(reduce(vcat, transpose.(Vec_block))', :, 1))
+  Matrix{T}(reduce(vcat, transpose.(Vec_block))')
 
 end
 
-function matrix_to_blocks(Mat::Matrix{T}, nblocks::Int) where T
+function matrix_to_blocks(Mat::Matrix{T}, nblocks=nothing) where T
 
-  @assert size(Mat)[2] % nblocks == 0 "Something is wrong"
+  if isnothing(nblocks)
+    nblocks = size(Mat)[2]
+  else
+    @assert size(Mat)[2] % nblocks == 0 "Something is wrong"
+  end
+
   ncol_block = Int(size(Mat)[2] / nblocks)
 
   blockmat = Matrix{T}[]
@@ -165,17 +180,17 @@ end
 function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
 
   numnz = nnz(S)
-    I = Vector{Ti}(undef, numnz)
-    J = Vector{Ti}(undef, numnz)
-    V = Vector{Tv}(undef, numnz)
+  I = Vector{Ti}(undef, numnz)
+  J = Vector{Ti}(undef, numnz)
+  V = Vector{Tv}(undef, numnz)
 
-    count = 1
-    @inbounds for col = 1 : size(S, 2), k = SparseArrays.getcolptr(S)[col] : (SparseArrays.getcolptr(S)[col+1]-1)
-        I[count] = rowvals(S)[k]
-        J[count] = col
-        V[count] = nonzeros(S)[k]
-        count += 1
-    end
+  count = 1
+  @inbounds for col = 1 : size(S, 2), k = SparseArrays.getcolptr(S)[col] : (SparseArrays.getcolptr(S)[col+1]-1)
+      I[count] = rowvals(S)[k]
+      J[count] = col
+      V[count] = nonzeros(S)[k]
+      count += 1
+  end
 
   nz = findall(x -> x .!= 0., V)
 
@@ -187,16 +202,16 @@ function SparseArrays.findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
 
   numnz = nnz(x)
 
-    I = Vector{Ti}(undef, numnz)
-    V = Vector{Tv}(undef, numnz)
+  I = Vector{Ti}(undef, numnz)
+  V = Vector{Tv}(undef, numnz)
 
-    nzind = SparseArrays.nonzeroinds(x)
-    nzval = nonzeros(x)
+  nzind = SparseArrays.nonzeroinds(x)
+  nzval = nonzeros(x)
 
-    @inbounds for i = 1 : numnz
-        I[i] = nzind[i]
-        V[i] = nzval[i]
-    end
+  @inbounds for i = 1 : numnz
+      I[i] = nzind[i]
+      V[i] = nzval[i]
+  end
 
   nz = findall(v -> v .!= 0., V)
 
