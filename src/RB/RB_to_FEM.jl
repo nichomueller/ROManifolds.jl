@@ -6,8 +6,12 @@ function get_FEM_structures_path(RBInfo::ROMInfo)
   RBInfo.FEMInfo.Paths.FEM_structures_path
 end
 
-function get_FEMμ_info(RBInfo::ROMInfo)
-  get_FEMμ_info(RBInfo.FEMInfo)
+function get_FEM_D(RBInfo::ROMInfo)
+  RBInfo.FEMInfo.D
+end
+
+function get_FEMμ_info(RBInfo::ROMInfo, ::Val{D}) where D
+  get_FEMμ_info(RBInfo.FEMInfo, Val(D))
 end
 
 function isaffine(RBInfo::ROMInfo, var::String)

@@ -35,7 +35,7 @@ function assemble_form(
         ∫(v * ParamForm.fun)ParamForm.dΩ
       end
     elseif var == "L"
-      g = interpolate_dirichlet(ParamForm.fun, FEMSpace.V)
+      g = interpolate_dirichlet(ParamForm.fun, FEMSpace.V[1])
       Param_A = ParamInfo(FEMInfo, ParamForm.μ, "A")
       ∫(∇(v) ⋅ (Param_A.fun * ∇(g)))ParamForm.dΩ
     else
@@ -82,7 +82,7 @@ function assemble_form(
         ∫(v ⋅ ParamForm.fun)ParamForm.dΩ
       end
     else
-      g = interpolate_dirichlet(ParamForm.fun, FEMSpace.V)
+      g = interpolate_dirichlet(ParamForm.fun, FEMSpace.V[1])
       if var == "L"
         Param_AB = ParamInfo(FEMInfo, μ, "A")
       else var == "Lc"
@@ -139,7 +139,7 @@ function assemble_form(
         ∫(v ⋅ ParamForm.fun)ParamForm.dΩ
       end
     else
-      g = interpolate_dirichlet(ParamForm.fun, FEMSpace.V)
+      g = interpolate_dirichlet(ParamForm.fun, FEMSpace.V[1])
       if var == "L"
         Param_AB = ParamInfo(FEMInfo, μ, "A")
       else var == "Lc"

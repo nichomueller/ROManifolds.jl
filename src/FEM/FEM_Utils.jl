@@ -2,18 +2,6 @@ function setup_FEM(name::String, issteady::Bool)
   get_unknowns(name), get_FEM_structures(name, issteady)
 end
 
-function get_id(name::String)
-  if name == "poisson"
-    1
-  elseif name == "stokes"
-    2
-  elseif name == "navier_stokes"
-    3
-  else
-    error("Not implemented")
-  end
-end
-
 function get_unknowns(name::String)
   if name == "poisson"
     ["u"]
@@ -51,75 +39,86 @@ function get_FEM_structures(FEMInfo::FOMInfo{ID}) where ID
   append!(["M"], get_FEM_structures(FEMInfo))
 end
 
-function get_FEM_vectors(FEMInfo::FOMInfo)
+function get_FEM_vectors(FEMInfo::FOMInfo{ID}) where ID
   vecs = ["F", "H", "L", "Lc"]
   intersect(FEMInfo.structures, vecs)::Vector{String}
 end
 
-function isvector(FEMInfo::FOMInfo, var::String)
+function isvector(FEMInfo::FOMInfo{ID}, var::String) where ID
   var ∈ get_FEM_vectors(FEMInfo)
 end
 
-function get_FEM_matrices(FEMInfo::FOMInfo)
+function get_FEM_matrices(FEMInfo::FOMInfo{ID}) where ID
   setdiff(FEMInfo.structures, get_FEM_vectors(FEMInfo))::Vector{String}
 end
 
-function ismatrix(FEMInfo::FOMInfo, var::String)
+function ismatrix(FEMInfo::FOMInfo{ID}, var::String) where ID
   var ∈ get_FEM_matrices(FEMInfo)
 end
 
-function get_affine_vectors(FEMInfo::FOMInfo)
+function get_affine_vectors(FEMInfo::FOMInfo{ID}) where ID
   intersect(get_FEM_vectors(FEMInfo), FEMInfo.affine_structures)
 end
 
-function get_affine_matrices(FEMInfo::FOMInfo)
+function get_affine_matrices(FEMInfo::FOMInfo{ID}) where ID
   intersect(get_FEM_matrices(FEMInfo), FEMInfo.affine_structures)
 end
 
-function get_nonaffine_vectors(FEMInfo::FOMInfo)
+function get_nonaffine_vectors(FEMInfo::FOMInfo{ID}) where ID
   setdiff(get_FEM_vectors(FEMInfo), FEMInfo.affine_structures)
 end
 
-function get_nonaffine_matrices(FEMInfo::FOMInfo)
+function get_nonaffine_matrices(FEMInfo::FOMInfo{ID}) where ID
   setdiff(get_FEM_matrices(FEMInfo), FEMInfo.affine_structures)
 end
 
-function isaffine(FEMInfo::FOMInfo, var::String)
+function isaffine(FEMInfo::FOMInfo{ID}, var::String) where ID
   var ∈ FEMInfo.affine_structures
 end
 
-function isaffine(FEMInfo::FOMInfo, vars::Vector{String})
+function isaffine(FEMInfo::FOMInfo{ID}, vars::Vector{String}) where ID
   Broadcasting(var->isaffine(FEMInfo, var))(vars)
 end
 
-function get_FEMμ_info(FEMInfo::FOMInfo{ID}) where ID
+function get_FEMμ_info(FEMInfo::FOMInfoS{ID}, ::Val{D}) where {ID,D}
   μ = load_CSV(Vector{Float}[],
     joinpath(FEMInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{Float}}
-  model = DiscreteModelFromFile(FEMInfo.Paths.mesh_path)
-  FEMSpace₀ = get_FEMSpace(FEMInfo, model)::FOM{FEMInfo.D}
+
+  model = DiscreteModelFromFile(FEMInfo.Paths.mesh_path)::DiscreteModel{D,D}
+  FEMSpace₀ = get_FEMSpace(FEMInfo, model)::FOMS{ID,D}
 
   FEMSpace₀, μ
 
 end
 
-function get_g₀(::FOMInfoS)
+#= function get_FEMμ_info(FEMInfo::FOMInfoST{ID}) where ID
+  μ = load_CSV(Vector{Float}[],
+    joinpath(FEMInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{Float}}
+  model = DiscreteModelFromFile(FEMInfo.Paths.mesh_path)
+  FEMSpace₀ = get_FEMSpace(FEMInfo, model)::FOMST{ID,FEMInfo.D}
+
+  FEMSpace₀, μ
+
+end =#
+
+function get_g₀(::FOMInfoS{ID}) where ID
   x -> 0.
 end
 
-function get_g₀(::FOMInfoST)
+function get_g₀(::FOMInfoST{ID}) where ID
   g₀(x, t::Real) = 0.
   g₀(t::Real) = x -> g₀(x, t)
   g₀
 end
 
-function get_h(FEMSpace::FOM)
+function get_h(FEMSpace::FOM{ID,D}) where {ID,D}
   Λ = SkeletonTriangulation(FEMSpace.Ω)
   dΛ = Measure(Λ, 2)
   h = get_array(∫(1)dΛ)[1]
   h
 end
 
-function get_timesθ(FEMInfo::FOMInfoST)
+function get_timesθ(FEMInfo::FOMInfoST{ID}) where ID
   collect(FEMInfo.t₀:FEMInfo.δt:FEMInfo.tₗ-FEMInfo.δt).+FEMInfo.δt*FEMInfo.θ
 end
 
@@ -164,9 +163,9 @@ function find_FE_elements(
 end
 
 function find_FE_elements(
-  FEMSpace::FOM,
+  FEMSpace::FOM{ID,D},
   idx::Vector,
-  var::String)
+  var::String) where {ID,D}
 
   space = get_FEMSpace_vector(FEMSpace, var)
   triang = Gridap.FESpaces.get_triangulation(FEMSpace, var)

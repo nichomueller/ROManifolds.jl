@@ -24,7 +24,7 @@ end
 
 function get_Cₙ(
   RBInfo::Info,
-  RBVars::NavierStokesSGRB{T}) where T
+  RBVars::NavierStokesSGROM{ID,T}) where T
 
   get_Cₙ(RBInfo, RBVars.Steady)
 
@@ -152,7 +152,7 @@ end
 
 function get_RB_LHS_blocks(
   RBInfo::ROMInfoST,
-  RBVars::NavierStokesSTGRB{T},
+  RBVars::NavierStokesSTGROM{ID,T},
   θᵐ::Matrix,
   θᵃ::Matrix,
   θᵇ::Matrix,
@@ -238,7 +238,7 @@ end
 
 function get_RB_RHS_blocks(
   RBInfo::Info,
-  RBVars::NavierStokesSTGRB{T},
+  RBVars::NavierStokesSTGROM{ID,T},
   θᶠ::Matrix,
   θʰ::Matrix) where T
 
@@ -287,7 +287,7 @@ end
 function assemble_RB_lifting(
   FEMSpace::FOMST,
   RBInfo::ROMInfoST,
-  RBVars::NavierStokesSTGRB{T},
+  RBVars::NavierStokesSTGROM{ID,T},
   Param::ParamInfoST) where T
 
   println("Assembling reduced lifting exactly")

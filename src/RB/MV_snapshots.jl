@@ -1,9 +1,9 @@
 function Mat_snapshots(
   FEMSpace::FOMS,
   RBInfo::ROMInfoS,
-  RBVars::RBS,
+  RBVars::ROMMethodS{ID,T},
   μ::Vector{Vector{Float}},
-  var::String)
+  var::String) where {ID,T}
 
   function Mat_linear(k::Int)::Tuple{Vector{Int},Vector{Float}}
     println("Snapshot number $k, $var")
@@ -46,9 +46,9 @@ end
 function snaps_MDEIM(
   FEMSpace::FOMS,
   RBInfo::ROMInfoS,
-  RBVars::RBS,
+  RBVars::ROMMethodS{ID,T},
   μ::Vector{Vector{Float}},
-  var::String)
+  var::String) where {ID,T}
 
   snaps, row_idx = Mat_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
   snaps_POD, _ = MDEIM_POD(snaps, RBInfo.ϵₛ)
@@ -68,7 +68,7 @@ function snaps_MDEIM(
 
 end
 
-function MV_snapshots(
+#= function MV_snapshots(
   FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   μ::Vector,
@@ -92,9 +92,9 @@ function MV_snapshots(
 
   Mat,row_idx
 
-end
+end =#
 
-function MV_snapshots(
+#= function MV_snapshots(
   FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   RBVars::RBST,
@@ -120,7 +120,7 @@ function call_MV_snapshots(
     MV_snapshots(FEMSpace, RBInfo, μ, timesθ, var)
   end
 
-end
+end =#
 
 function get_LagrangianQuad_info(FEMSpace::FOM)
 
@@ -131,7 +131,7 @@ function get_LagrangianQuad_info(FEMSpace::FOM)
 
 end
 
-function standard_MDEIM(
+#= function standard_MDEIM(
   FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   RBVars::RBST,
@@ -188,9 +188,9 @@ function standard_MDEIM(
 
   return snaps_space, snaps_time, row_idx
 
-end
+end =#
 
-function functional_MDEIM_linear(
+#= function functional_MDEIM_linear(
   FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   μ::Vector{Vector{T}},
@@ -223,9 +223,9 @@ function functional_MDEIM_linear(
 
   return snaps_space, snaps_time, row_idx
 
-end
+end =#
 
-function functional_MDEIM_nonlinear(
+#= function functional_MDEIM_nonlinear(
   FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   RBVars::RBST,
@@ -301,31 +301,9 @@ function snaps_MDEIM(
     return standard_MDEIM(FEMSpace,RBInfo,RBVars,μ,timesθ,var)::Tuple{Matrix{T}, Matrix{T}, Vector{Int}}
   end
 
-end
+end =#
 
-function MV_snapshots(
-  FEMSpace::FOMS,
-  RBInfo::ROMInfoS,
-  μ::Vector{Vector{T}},
-  var::String) where T
-
-  Vec = Matrix{T}(undef,0,0)
-
-  for i_nₛ = 1:RBInfo.nₛ_MDEIM
-    println("Snapshot number $i_nₛ, $var")
-    Param = ParamInfo(RBInfo, μ[i_nₛ])
-    v = assemble_FEM_structure(FEMSpace, RBInfo, Param, var)[:]
-    if i_nₛ == 1
-      Vec = zeros(T, length(v), RBInfo.nₛ_MDEIM)
-    end
-    Vec[:, i_nₛ] = v
-  end
-
-  Vec
-
-end
-
-function MV_snapshots(
+#= function MV_snapshots(
   FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   μ::Vector,
@@ -472,15 +450,15 @@ function assemble_θmat_snapshots(
 
   Θmat_space, Θmat_time
 
-end
+end =#
 
-function assemble_θmat_snapshots(RBVars::RBST)
+#= function assemble_θmat_snapshots(RBVars::RBST)
 
   RBVars.Φₛ_quad, RBVars.Φₜᵘ_quad
 
-end
+end =#
 
-function call_θmat_snapshots(
+#= function call_θmat_snapshots(
   FEMSpace::FOMST,
   RBInfo::ROMInfoST,
   RBVars::RBST,
@@ -494,7 +472,7 @@ function call_θmat_snapshots(
     assemble_θmat_snapshots(FEMSpace, RBInfo, μ, timesθ, var)
   end
 
-end
+end =#
 
 function assemble_parameter_on_phys_quadp(
   Param::ParamInfoST,

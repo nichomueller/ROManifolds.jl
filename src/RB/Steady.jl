@@ -2,7 +2,7 @@
 
 function get_snapshot_matrix(
   RBInfo::ROMInfoS{ID},
-  RBVars::RBS{T}) where {ID,T}
+  RBVars::ROMMethodS{ID,T}) where {ID,T}
 
   function get_S_var(var::String)
     println("Importing the snapshot matrix for field $var,
@@ -23,7 +23,7 @@ end
 
 function assemble_reduced_basis(
   RBInfo::ROMInfoS{ID},
-  RBVars::RBS{T}) where {ID,T}
+  RBVars::ROMMethodS{ID,T}) where {ID,T}
 
   assemble_reduced_basis_space(RBInfo, RBVars)
 
@@ -33,7 +33,7 @@ end
 
 function get_reduced_basis(
   RBInfo::ROMInfoS{ID},
-  RBVars::RBS{T}) where {ID,T}
+  RBVars::ROMMethodS{ID,T}) where {ID,T}
 
   get_reduced_basis_space(RBInfo, RBVars)
 
@@ -88,7 +88,7 @@ end
 
 function save_offline(
   RBInfo::ROMInfoS{ID},
-  RBVars::RBS{T},
+  RBVars::ROMMethodS{ID,T},
   operators::Vector{String}) where {ID,T}
 
 
@@ -100,7 +100,7 @@ end
 
 function offline_phase(
   RBInfo::ROMInfoS{ID},
-  RBVars::RBS{T}) where {ID,T}
+  RBVars::ROMMethodS{ID,T}) where {ID,T}
 
   if RBInfo.get_offline_structures
     get_reduced_basis(RBInfo, RBVars)
@@ -123,7 +123,7 @@ end
 
 ################################## ONLINE ######################################
 
-function reconstruct_FEM_solution(RBVars::RBS{T}) where T
+function reconstruct_FEM_solution(RBVars::ROMMethodS{ID,T}) where {ID,T}
   println("Reconstructing FEM solution")
   RBVars.x̃ = Broadcasting(*)(RBVars.Φₛ, RBVars.xₙ)
   return
@@ -131,7 +131,7 @@ end
 
 function online_phase(
   RBInfo::ROMInfoS{ID},
-  RBVars::RBS{T},
+  RBVars::ROMMethodS{ID,T},
   param_nbs) where {ID,T}
 
   function get_S_var(var::String, nb::Int)
@@ -176,7 +176,7 @@ function online_phase(
     return
   end
 
-  FEMSpace, μ = get_FEMμ_info(RBInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)))
   get_norm_matrix(RBInfo, RBVars)
 
   mean_err = zeros(length(RBVars.Nₛ))

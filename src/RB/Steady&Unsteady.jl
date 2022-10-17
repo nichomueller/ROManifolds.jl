@@ -1,7 +1,7 @@
 ################################# OFFLINE ######################################
 function get_norm_matrix(
   RBInfo::ROMInfo{ID},
-  RBVars::RB{T}) where {ID,T}
+  RBVars::ROM{ID,T}) where {ID,T}
 
   function get_X_var(Nₛ::Int, var::String)
     if RBInfo.use_norm_X
@@ -23,7 +23,7 @@ end
 
 function assemble_reduced_basis_space(
   RBInfo::ROMInfo{ID},
-  RBVars::RB{T}) where {ID,T}
+  RBVars::ROM{ID,T}) where {ID,T}
 
   function POD_space(
     S::Matrix,
@@ -55,7 +55,7 @@ end
 
 function get_reduced_basis_space(
   RBInfo::ROMInfo{ID},
-  RBVars::RB{T}) where {ID,T}
+  RBVars::ROM{ID,T}) where {ID,T}
 
   println("Importing the spatial reduced basis")
 
@@ -130,7 +130,7 @@ end
 
 function assemble_MDEIM_structure(
   RBInfo::ROMInfo{ID},
-  RBVars::RB{T},
+  RBVars::ROM{ID,T},
   Var::MVVariable{T}) where {ID,T}
 
   var = Var.var
@@ -149,7 +149,7 @@ end
 
 function assemble_MDEIM_structure(
   RBInfo::ROMInfo{ID},
-  RBVars::RB{T},
+  RBVars::ROM{ID,T},
   Vars::Vector{<:MVVariable{T}}) where {ID,T}
 
   Broadcasting(Var -> assemble_MDEIM_structure(RBInfo, RBVars, Var))(Vars)
@@ -203,7 +203,7 @@ end
 
 function assemble_offline_structures(
   RBInfo::ROMInfo{ID},
-  RBVars::RB{T},
+  RBVars::ROM{ID,T},
   operators::Vector{String}) where {ID,T}
 
   RBVars.offline_time += @elapsed begin
@@ -236,15 +236,15 @@ end
 
 function get_offline_structures(
   RBInfo::ROMInfoS{ID},
-  RBVars::RBS{T}) where {ID,T}
+  RBVars::ROMMethodS{ID,T}) where {ID,T}
 
-  operators = check_saved_operators(RBInfo, RBVars.Vars)
-  operators_to_get = setdiff(set_operators(RBInfo), operators)
-  Vecs_to_get = intersect(get_FEM_vectors(RBInfo), operators_to_get)
-  Mats_to_get = intersect(get_FEM_matrices(RBInfo), operators_to_get)
+  operators = check_saved_operators(RBInfo, RBVars.Vars)::Vector{String}
+  operators_to_get = setdiff(set_operators(RBInfo), operators)::Vector{String}
+  Vecs_to_get = intersect(get_FEM_vectors(RBInfo), operators_to_get)::Vector{String}
+  Mats_to_get = intersect(get_FEM_matrices(RBInfo), operators_to_get)::Vector{String}
 
   Vars_to_get = vcat(MVariable(RBInfo, RBVars, Mats_to_get),
-    VVariable(RBInfo, RBVars, Vecs_to_get))::Vector{String}
+    VVariable(RBInfo, RBVars, Vecs_to_get))
   get_offline_Var(RBInfo, Vars_to_get)
 
   operators
@@ -274,7 +274,7 @@ end
 
 function get_system_blocks(
   RBInfo::ROMInfo{ID},
-  RBVars::RB{T},
+  RBVars::ROM{ID,T},
   LHS_blocks::Vector{Int},
   RHS_blocks::Vector{Int}) where {ID,T}
 
@@ -321,7 +321,7 @@ end
 
 function save_system_blocks(
   RBInfo::ROMInfo{ID},
-  RBVars::RB{T},
+  RBVars::ROM{ID,T},
   operators::Vector{String},
   args...) where {ID,T}
 
@@ -347,8 +347,8 @@ end
 function assemble_θ(
   FEMSpace::FOM{D},
   RBInfo::ROMInfo{ID},
-  Var::MVVariable{T},
-  μ::Vector{T}) where {D,ID,T}
+  Var::MVariable{T},
+  μ::Vector{T}) where {ID,D,T}
 
   var = Var.var
   Param = ParamInfo(RBInfo, μ, var)
@@ -361,18 +361,33 @@ end
 function assemble_θ(
   FEMSpace::FOM{D},
   RBInfo::ROMInfo{ID},
-  RBVars::RB{T},
-  μ::Vector{T}) where {D,ID,T}
+  Var::VVariable{T},
+  μ::Vector{T}) where {ID,D,T}
 
-  Vars = vcat(MVariable(RBInfo, RBVars),
-    VVariable(RBInfo, RBVars))
-  Broadcasting(Var -> assemble_θ(FEMSpace, RBInfo, Var, μ))(Vars)
+  var = Var.var
+  Param = ParamInfo(RBInfo, μ, var)
+  Param.θ = θ(FEMSpace, RBInfo, Param, Var.MDEIM)
+
+  Param::ParamInfo
+
+end
+
+function assemble_θ(
+  FEMSpace::FOM{D},
+  RBInfo::ROMInfo{ID},
+  RBVars::ROM{ID,T},
+  μ::Vector{T}) where {ID,D,T}
+
+  MVars = MVariable(RBInfo, RBVars)
+  Broadcasting(Var -> assemble_θ(FEMSpace, RBInfo, Var, μ))(MVars)
+  VVars = VVariable(RBInfo, RBVars)
+  Broadcasting(Var -> assemble_θ(FEMSpace, RBInfo, Var, μ))(VVars)
 
 end
 
 function assemble_matricesₙ(
   RBInfo::ROMInfo{ID},
-  RBVars::RB{T},
+  RBVars::ROM{ID,T},
   Params::Vector{<:ParamInfo}) where {ID,T}
 
   operators = intersect(get_FEM_matrices(RBInfo), set_operators(RBInfo))
@@ -384,7 +399,7 @@ end
 
 function assemble_vectorsₙ(
   RBInfo::ROMInfo{ID},
-  RBVars::RB{T},
+  RBVars::ROM{ID,T},
   Params::Vector{<:ParamInfo}) where {ID,T}
 
   operators = intersect(get_FEM_vectors(RBInfo), set_operators(RBInfo))
@@ -397,8 +412,8 @@ end
 function assemble_RB_system(
   FEMSpace::FOM{D},
   RBInfo::ROMInfo{ID},
-  RBVars::RB{T},
-  μ::Vector{T}) where {D,ID,T}
+  RBVars::ROM{ID,T},
+  μ::Vector{T}) where {ID,D,T}
 
   initialize_RB_system(RBVars)
   initialize_online_time(RBVars)
@@ -434,8 +449,8 @@ end
 function assemble_solve_reconstruct(
   FEMSpace::FOM{D},
   RBInfo::ROMInfo{ID},
-  RBVars::RB{T},
-  μ::Vector{T}) where {D,ID,T}
+  RBVars::ROM{ID,T},
+  μ::Vector{T}) where {ID,D,T}
 
   assemble_RB_system(FEMSpace, RBInfo, RBVars, μ)
   RBVars.online_time += @elapsed begin

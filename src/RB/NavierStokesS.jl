@@ -200,14 +200,14 @@ function newton(
 
   x̂mat = zeros(T, RBVars.nₛᵘ + RBVars.nₛᵖ, 1)
   δx̂ = 1. .+ x̂mat
-  u = FEFunction(FEMSpace.V, zeros(T, RBVars.Nₛᵘ))
+  u = FEFunction(FEMSpace.V[1], zeros(T, RBVars.Nₛᵘ))
   k = 1
 
   while k ≤ max_k && norm(δx̂) ≥ ϵ
     println("Iter: $k; ||δx̂||₂: $(norm(δx̂))")
     δx̂ = JinvₙResₙ(u, x̂mat)
     x̂mat -= δx̂
-    u = FEFunction(FEMSpace.V, RBVars.Φₛ * x̂mat[1:RBVars.nₛᵘ])
+    u = FEFunction(FEMSpace.V[1], RBVars.Φₛ * x̂mat[1:RBVars.nₛᵘ])
     k += 1
   end
 

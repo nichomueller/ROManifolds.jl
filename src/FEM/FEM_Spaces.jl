@@ -50,31 +50,40 @@ function get_FEMSpace(
   model::DiscreteModel{D,D},
   args...) where {ID,D}
 
-  if ID == 1
-    FOMPoissonS(FEMInfo, model, args...)
-  elseif ID == 2
-    FOMStokesS(FEMInfo, model, args...)
-  elseif ID == 3
-    FOMNavierStokesS(FEMInfo, model, args...)
-  else
-    error("Not implemented")
-  end
+  FOMS(FEMInfo, model, args...)
 
 end
 
-function get_FEMSpace_vector(FEMSpace::FOM, var::String)
+function get_FEMSpace(
+  FEMInfo::FOMInfoST{ID},
+  model::DiscreteModel{D,D},
+  args...) where {ID,D}
+
+  FOMST(FEMInfo, model, args...)
+
+end
+
+function get_FEMSpace_vector(
+  FEMSpace::FOM{ID,D},
+  var::String) where {ID,D}
+
   if var == "Lc"
-    FEMSpace.Q₀
+    @assert ID != 1 "Something is wrong with problem variables"
+    FEMSpace.V₀[2]
   else
-    FEMSpace.V₀
+    FEMSpace.V₀[1]
   end
 end
 
-function get_FEMSpace_matrix(FEMSpace::FOM, var::String)
+function get_FEMSpace_matrix(
+  FEMSpace::FOM{ID,D},
+  var::String) where {ID,D}
+
   if var == "B"
-    FEMSpace.V, FEMSpace.Q₀
+    @assert ID != 1 "Something is wrong with problem variables"
+    FEMSpace.V[1], FEMSpace.V₀[2]
   else
-    FEMSpace.V, FEMSpace.V₀
+    FEMSpace.V[1], FEMSpace.V₀[1]
   end
 end
 

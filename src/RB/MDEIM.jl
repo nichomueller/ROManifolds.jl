@@ -41,10 +41,10 @@ end
 function MDEIM_offline(
   MDEIM::MMDEIM{T},
   RBInfo::ROMInfoS{ID},
-  RBVars::RBS{T},
+  RBVars::ROMMethodS{ID,T},
   var::String) where {ID,T}
 
-  FEMSpace, μ = get_FEMμ_info(RBInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)))
   Nₛ = get_Nₛ(RBVars, var)
 
   Mat, row_idx = snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
@@ -61,10 +61,10 @@ end
 function MDEIM_offline(
   MDEIM::VMDEIM{T},
   RBInfo::ROMInfoS{ID},
-  ::RBS{T},
+  ::ROMS{ID,T},
   var::String) where {ID,T}
 
-  FEMSpace, μ = get_FEMμ_info(RBInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)))
 
   Mat = snaps_MDEIM(FEMSpace, RBInfo, μ, var)
   idx, Matᵢ = MDEIM_offline(Mat)
@@ -74,10 +74,10 @@ function MDEIM_offline(
 
 end
 
-function MDEIM_offline(
+#= function MDEIM_offline(
   MDEIM::MMDEIM{T},
   RBInfo::ROMInfoST{ID},
-  RBVars::RBST{T},
+  RBVars::ROMMethodST{ID,T},
   var::String) where {ID,T}
 
   FEMSpace, μ = get_FEMμ_info(RBInfo)
@@ -96,9 +96,9 @@ function MDEIM_offline(
   MDEIM.Mat, MDEIM.Matᵢ, MDEIM.idx, MDEIM.time_idx, MDEIM.row_idx, MDEIM.el =
     Mat, Matᵢ, idx, time_idx, row_idx, el
 
-end
+end =#
 
-function MDEIM_offline(
+#= function MDEIM_offline(
   MDEIM::VMDEIM{T},
   RBInfo::ROMInfoST{ID},
   var::String) where {ID,T}
@@ -122,13 +122,13 @@ function MDEIM_offline(
   MDEIM.Mat, MDEIM.Matᵢ, MDEIM.idx, MDEIM.time_idx, MDEIM.el =
     Mat, Matᵢ, idx, time_idx, el
 
-end
+end =#
 
 function assemble_sparse_matrix(
   FEMSpace::FOMS{D},
   FEMInfo::FOMInfoS{ID},
   Param::ParamInfoS,
-  el::Vector{Int}) where {D,ID}
+  el::Vector{Int}) where {ID,D}
 
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
@@ -142,7 +142,7 @@ function assemble_sparse_vector(
   FEMSpace::FOMS{D},
   FEMInfo::FOMInfoS{ID},
   Param::ParamInfoS,
-  el::Vector{Int}) where {D,ID}
+  el::Vector{Int}) where {ID,D}
 
   triang = Gridap.FESpaces.get_triangulation(FEMSpace, Param.var)
   Ω_sparse = view(triang, el)
@@ -157,7 +157,7 @@ function assemble_sparse_fun(
   FEMSpace::FOMS{D},
   FEMInfo::FOMInfoS{ID},
   el::Vector{Int},
-  var::String) where {D,ID}
+  var::String) where {ID,D}
 
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
@@ -178,13 +178,13 @@ function assemble_sparse_fun(
 
 end
 
-function interpolated_θ(
-  RBVars::RBST{T},
+#= function interpolated_θ(
+  RBVars::ROMMethodST{ID,T},
   Mat_μ_sparse::AbstractArray,
   timesθ::Vector{T},
   Matᵢ::Matrix{T},
   idx::Vector{Int},
-  time_idx::Vector{Int}) where T
+  time_idx::Vector{Int}) where {ID,T}
 
   red_timesθ = timesθ[time_idx]
   discarded_time_idx = setdiff(collect(1:RBVars.Nₜ), time_idx)
@@ -202,13 +202,13 @@ function interpolated_θ(
 
   θ::Matrix{T}
 
-end
+end =#
 
 function θ(
   FEMSpace::FOMS{D},
   RBInfo::ROMInfoS{ID},
   Param::ParamInfoS,
-  MDEIM::MMDEIM{T}) where {D,ID,T}
+  MDEIM::MMDEIM{T}) where {ID,D,T}
 
   if Param.var ∈ RBInfo.affine_structures
     θ = [[Param.fun(VectorValue(D, Float))[1]]]
@@ -227,7 +227,7 @@ function θ(
   FEMSpace::FOMS{D},
   RBInfo::ROMInfoS{ID},
   Param::ParamInfoS,
-  MDEIM::VMDEIM{T}) where {D,ID,T}
+  MDEIM::VMDEIM{T}) where {ID,D,T}
 
   if Param.var ∈ RBInfo.affine_structures
     θ = [[Param.fun(VectorValue(D, Float))[1]]]
@@ -242,7 +242,7 @@ function θ(
 
 end
 
-function θ!(
+#= function θ!(
   θ::Vector{Vector{T}},
   FEMSpace::FOMST{D},
   RBInfo::ROMInfoST,
@@ -309,13 +309,13 @@ function θ!(
 
   θ
 
-end
+end =#
 
 function θ_function(
   FEMSpace::FOMS{D},
-  RBVars::RBS{T},
+  RBVars::ROMMethodS{ID,T},
   MDEIM::MMDEIM{T},
-  var::String) where {D,T}
+  var::String) where {ID,D,T}
 
   Fun_μ_sparse =
     assemble_sparse_fun(FEMSpace, FEMInfo, MDEIM.el, var)

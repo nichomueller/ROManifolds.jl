@@ -1,7 +1,7 @@
 function FEM_solver(
-  ::FOMPoissonS,
+  ::FOMS{1,D},
   FEMInfo::FOMInfoS{1},
-  operator::AffineFEOperator)
+  operator::AffineFEOperator) where D
 
   if FEMInfo.solver == "lu"
     uₕ_field = solve(LinearFESolver(LUSolver()), operator)
@@ -14,6 +14,48 @@ function FEM_solver(
 end
 
 function FEM_solver(
+  ::FOMS{2,D},
+  FEMInfo::FOMInfoS{2},
+  operator::AffineFEOperator) where D
+
+  if FEMInfo.solver == "lu"
+    uₕ_field, pₕ_field = solve(LinearFESolver(LUSolver()), operator)
+  else
+    uₕ_field, pₕ_field = solve(LinearFESolver(), operator)
+  end
+
+  Vector(get_free_dof_values(uₕ_field)), Vector(get_free_dof_values(pₕ_field))
+
+end
+
+function FEM_solver(
+  ::FOMS{3,D},
+  ::FOMInfoS{3},
+  operator::FEOperator) where D
+
+  a((u,p),(v,q)) = ∫( ∇(v)⊙(Param.α*∇(u)) - Param.b*(∇⋅v)*p + q*(∇⋅u) )FEMSpace.dΩ
+
+  conv(u,∇u) = (∇u')⋅u
+  dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
+  c(u,v) = ∫( v⊙(conv∘(u,∇(u))) )FEMSpace.dΩ
+  dc(u,du,v) = ∫( v⊙(dconv∘(du,∇(du),u,∇(u))) )FEMSpace.dΩ
+
+  rhs((v,q)) = ∫(v ⋅ Param.f)FEMSpace.dΩ + ∫(v ⋅ Param.h)FEMSpace.dΓn
+
+  res((u,p),(v,q)) = a((u,p),(v,q)) + c(u,v) - rhs((v,q))
+  jac((u,p),(du,dp),(v,q)) = a((du,dp),(v,q)) + dc(u,du,v)
+
+  operator = FEOperator(res, jac, FEMSpace.X, FEMSpace.X₀)
+
+  nls = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking())
+  solver = FESolver(nls)
+  uₕ_field, pₕ_field = solve(solver, operator)
+
+  Vector(get_free_dof_values(uₕ_field)), Vector(get_free_dof_values(pₕ_field))
+
+end
+
+#= function FEM_solver(
   FEMSpace::FOMPoissonST,
   FEMInfo::FOMInfoST{1},
   Param::ParamInfoST)
@@ -38,28 +80,9 @@ function FEM_solver(
 
   blocks_to_matrix(uₕₜ)
 
-end
+end =#
 
-function FEM_solver(
-  FEMSpace::FOMStokesS,
-  FEMInfo::FOMInfoS{2},
-  Param::ParamInfoS)
-
-  a((u,p),(v,q)) = ∫( ∇(v)⊙(Param.α*∇(u)) - Param.b*((∇⋅v)*p + q*(∇⋅u)) )FEMSpace.dΩ
-  rhs((v,q)) = ∫(v ⋅ Param.f)FEMSpace.dΩ + ∫(v ⋅ Param.h)FEMSpace.dΓn
-  operator = AffineFEOperator(a, rhs, FEMSpace.X, FEMSpace.X₀)
-
-  if FEMInfo.solver == "lu"
-    uₕ_field, pₕ_field = solve(LinearFESolver(LUSolver()), operator)
-  else
-    uₕ_field, pₕ_field = solve(LinearFESolver(), operator)
-  end
-
-  Vector(get_free_dof_values(uₕ_field)), Vector(get_free_dof_values(pₕ_field))
-
-end
-
-function FEM_solver(
+#= function FEM_solver(
   FEMSpace::FOMStokesST,
   FEMInfo::FOMInfoST{2},
   Param::ParamInfoST)
@@ -88,31 +111,4 @@ function FEM_solver(
 
   uₕₜ, pₕₜ
 
-end
-
-function FEM_solver(
-  FEMSpace::FOMNavierStokesS,
-  ::FOMInfoS{3},
-  Param::ParamInfoS)
-
-  a((u,p),(v,q)) = ∫( ∇(v)⊙(Param.α*∇(u)) - Param.b*(∇⋅v)*p + q*(∇⋅u) )FEMSpace.dΩ
-
-  conv(u,∇u) = (∇u')⋅u
-  dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
-  c(u,v) = ∫( v⊙(conv∘(u,∇(u))) )FEMSpace.dΩ
-  dc(u,du,v) = ∫( v⊙(dconv∘(du,∇(du),u,∇(u))) )FEMSpace.dΩ
-
-  rhs((v,q)) = ∫(v ⋅ Param.f)FEMSpace.dΩ + ∫(v ⋅ Param.h)FEMSpace.dΓn
-
-  res((u,p),(v,q)) = a((u,p),(v,q)) + c(u,v) - rhs((v,q))
-  jac((u,p),(du,dp),(v,q)) = a((du,dp),(v,q)) + dc(u,du,v)
-
-  operator = FEOperator(res, jac, FEMSpace.X, FEMSpace.X₀)
-
-  nls = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking())
-  solver = FESolver(nls)
-  uₕ_field, pₕ_field = solve(solver, operator)
-
-  Vector(get_free_dof_values(uₕ_field)), Vector(get_free_dof_values(pₕ_field))
-
-end
+end =#

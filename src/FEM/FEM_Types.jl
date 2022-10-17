@@ -62,18 +62,13 @@ struct FOMInfoST{ID} <: FOMInfo{ID}
   δt::Float
 end
 
-abstract type FOM{D} end
-abstract type FOMS{D} <: FOM{D} end
-abstract type FOMST{D} <: FOM{D} end
+abstract type FOM{ID,D} end
 
-struct FOMPoissonS{D} <: FOMS{D}
+struct FOMS{ID,D} <: FOM{ID,D}
   model::DiscreteModel
   Qₕ::CellQuadrature
-  V₀::UnconstrainedFESpace
-  V::TrialFESpace
-  ϕᵥ::FEBasis
-  ϕᵤ::FEBasis
-  Nₛᵘ::Int
+  V₀::Vector{FESpace}
+  V::Vector{FESpace}
   Ω::BodyFittedTriangulation
   Γn::BoundaryTriangulation
   dΩ::Measure
@@ -82,7 +77,7 @@ struct FOMPoissonS{D} <: FOMS{D}
   V₀_quad::UnconstrainedFESpace
 end
 
-function FOMPoissonS(
+function FOMS(
   FEMInfo::FOMInfoS{1},
   model::DiscreteModel{D,D},
   g::Function) where D
@@ -93,26 +88,62 @@ function FOMPoissonS(
   V₀ = TestFESpace(model, refFE; conformity=:H1,
     dirichlet_tags=["dirichlet"])
   V = TrialFESpace(V₀, g)
-  ϕᵥ = get_fe_basis(V₀)
-  ϕᵤ = get_trial_fe_basis(V)
-  Nₛᵘ = length(get_free_dof_ids(V))
 
   phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
 
-  FOMPoissonS{D}(
-    model, Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
+  FOMS{1,D}(model, Qₕ, [V₀], [V], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
+end
+
+function FOMS(
+  FEMInfo::FOMInfoS{2},
+  model::DiscreteModel{D,D},
+  g::Function) where D
+
+  Ω, Γn, Qₕ, dΩ, dΓn = get_mod_meas_quad(FEMInfo, model)
+
+  refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,Float}, FEMInfo.order)
+  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1, dirichlet_tags=["dirichlet"])
+  V = TrialFESpace(V₀, g)
+
+  refFEₚ = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order - 1; space=:P)
+  Q₀ = TestFESpace(model, refFEₚ; conformity=:L2)
+  Q = TrialFESpace(Q₀)
+
+  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
+
+  FOMS{2,D}(model, Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
+end
+
+function FOMS(
+  FEMInfo::FOMInfoS{3},
+  model::DiscreteModel{D,D},
+  g::Function) where D
+
+  Ω, Γn, Qₕ, dΩ, dΓn = get_mod_meas_quad(FEMInfo, model)
+
+  refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,Float}, FEMInfo.order)
+  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1, dirichlet_tags=["dirichlet"])
+  V = TrialFESpace(V₀, g)
+
+  refFEₚ = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order - 1; space=:P)
+  Q₀ = TestFESpace(model, refFEₚ; conformity=:L2)
+  Q = TrialFESpace(Q₀)
+
+  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
+
+  FOMS{3,D}(model, Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
 
 end
 
-function FOMPoissonS(
-  FEMInfo::FOMInfoS{1},
-  model::DiscreteModel)
+function FOMS(
+  FEMInfo::FOMInfoS{ID},
+  model::DiscreteModel{D,D}) where {ID,D}
 
-  FOMPoissonS(FEMInfo, model, get_g₀(FEMInfo))
+  FOMS(FEMInfo, model, get_g₀(FEMInfo))
 
 end
 
-struct FOMPoissonST{D} <: FOMST{D}
+#= struct FOMPoissonST{D} <: FOMST{D}
   model::DiscreteModel
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
@@ -156,71 +187,9 @@ function FOMPoissonST(
 
   FOMPoissonST(FEMInfo, model, get_g₀(FEMInfo))
 
-end
+end =#
 
-struct FOMStokesS{D} <: FOMS{D}
-  model::DiscreteModel
-  Qₕ::CellQuadrature
-  V₀::UnconstrainedFESpace
-  V::TrialFESpace
-  Q₀::UnconstrainedFESpace
-  Q::UnconstrainedFESpace
-  X₀::MultiFieldFESpace
-  X::MultiFieldFESpace
-  ϕᵥ::FEBasis
-  ϕᵤ::FEBasis
-  ψᵧ::FEBasis
-  ψₚ::FEBasis
-  Nₛᵘ::Int
-  Nₛᵖ::Int
-  Ω::BodyFittedTriangulation
-  Γn::BoundaryTriangulation
-  dΩ::Measure
-  dΓn::Measure
-  phys_quadp::Vector{Vector{VectorValue{D,Float}}}
-  V₀_quad::UnconstrainedFESpace
-end
-
-function FOMStokesS(
-  FEMInfo::FOMInfoS{2},
-  model::DiscreteModel{D,D},
-  g::Function) where D
-
-  Ω, Γn, Qₕ, dΩ, dΓn = get_mod_meas_quad(FEMInfo, model)
-
-  refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,Float}, FEMInfo.order)
-  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1, dirichlet_tags=["dirichlet"])
-  V = TrialFESpace(V₀, g)
-  ϕᵥ = get_fe_basis(V₀)
-  ϕᵤ = get_trial_fe_basis(V)
-  Nₛᵘ = length(get_free_dof_ids(V))
-
-  refFEₚ = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order - 1; space=:P)
-  Q₀ = TestFESpace(model, refFEₚ; conformity=:L2)
-  Q = TrialFESpace(Q₀)
-  ψᵧ = get_fe_basis(Q₀)
-  ψₚ = get_trial_fe_basis(Q)
-  Nₛᵖ = length(get_free_dof_ids(Q))
-
-  X₀ = MultiFieldFESpace([V₀, Q₀])
-  X = MultiFieldFESpace([V, Q])
-
-  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
-
-  FOMStokesS{D}(model, Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ,
-    Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
-
-end
-
-function FOMStokesS(
-  FEMInfo::FOMInfoS{2},
-  model::DiscreteModel)
-
-  FOMStokesS(FEMInfo, model, get_g₀(FEMInfo))
-
-end
-
-struct FOMStokesST{D} <: FOMST{D}
+#= struct FOMStokesST{D} <: FOMST{D}
   model::DiscreteModel
   Qₕ::CellQuadrature
   V₀::UnconstrainedFESpace
@@ -280,57 +249,7 @@ function FOMStokesST(
 
   FOMStokesST(FEMInfo, model, get_g₀(FEMInfo))
 
-end
-
-struct FOMNavierStokesS{D} <: FOMS{D}
-  FOMSS::FOMStokesS{D}
-end
-
-function FOMNavierStokesS(
-  FEMInfo::FOMInfoS{3},
-  model::DiscreteModel{D,D},
-  g::Function) where D
-
-  FOMNavierStokesS(FOMStokesS(FEMInfo, model, g))
-
-end
-
-function FOMNavierStokesS(
-  FEMInfo::FOMInfoS{3},
-  model::DiscreteModel)
-
-  FOMNavierStokesS(FEMInfo, model, get_g₀(FEMInfo))
-
-end
-
-function Base.getproperty(FEMSpace::FOMNavierStokesS, sym::Symbol)
-  getfield(FEMSpace.FOMSS, sym)
-end
-
-struct FOMNavierStokesST{D} <: FOMST{D}
-  FOMSST::FOMStokesST{D}
-end
-
-function FOMNavierStokesST(
-  FEMInfo::FOMInfoST{3},
-  model::DiscreteModel{D,D},
-  g::Function) where D
-
-  FOMNavierStokesST(FOMStokesST(FEMInfo, model, g))
-
-end
-
-function FOMNavierStokesST(
-  FEMInfo::FOMInfoST{3},
-  model::DiscreteModel)
-
-  FOMNavierStokesST(FEMInfo, model, get_g₀(FEMInfo))
-
-end
-
-function Base.getproperty(FEMSpace::FOMNavierStokesST, sym::Symbol)
-  getfield(FEMSpace.FOMSST, sym)
-end
+end =#
 
 abstract type ParamInfo end
 abstract type ParamFormInfo end
@@ -457,33 +376,57 @@ function ParamFormInfo(
 end
 
 function Base.getproperty(ParamForm::ParamFormInfoS, sym::Symbol)
-  if sym in (:μ, :var, :fun, :θ)
-    getfield(ParamForm.Param, sym)
+  if sym == :μ
+    getfield(ParamForm.Param, sym)::Vector{Float}
+  elseif sym == :var
+    getfield(ParamForm.Param, sym)::String
+  elseif sym == :fun
+    getfield(ParamForm.Param, sym)::Function
+  elseif sym == :θ
+    getfield(ParamForm.Param, sym)::Vector{Vector{Float}}
   else
     getfield(ParamForm, sym)
   end
 end
 
-function Base.setproperty!(ParamForm::ParamFormInfoS, sym::Symbol, x::T) where T
-  if sym in (:μ, :var, :fun, :θ)
-    setfield!(ParamForm.Param, sym, x)::T
+function Base.setproperty!(ParamForm::ParamFormInfoS, sym::Symbol, x)
+  if sym == :μ
+    setfield!(ParamForm.Param, sym, x)::Vector{Float}
+  elseif sym == :var
+    setfield!(ParamForm.Param, sym, x)::String
+  elseif sym == :fun
+    setfield!(ParamForm.Param, sym, x)::Function
+  elseif sym == :θ
+    setfield!(ParamForm.Param, sym, x)::Vector{Vector{Float}}
   else
-    setfield!(ParamForm, sym, x)::T
+    setfield!(ParamForm, sym, x)
   end
 end
 
 function Base.getproperty(ParamForm::ParamFormInfoST, sym::Symbol)
-  if sym in (:μ, :var, :funₛ, :funₜ, :fun, :θ)
-    getfield(ParamForm.Param, sym)
+  if sym == :μ
+    getfield(ParamForm.Param, sym)::Vector{Float}
+  elseif sym == :var
+    getfield(ParamForm.Param, sym)::String
+  elseif sym ∈ (:fun, :funₛ, :funₜ)
+    getfield(ParamForm.Param, sym)::Function
+  elseif sym == :θ
+    getfield(ParamForm.Param, sym)::Vector{Vector{Float}}
   else
     getfield(ParamForm, sym)
   end
 end
 
-function Base.setproperty!(ParamForm::ParamFormInfoST, sym::Symbol, x::T) where T
-  if sym in (:μ, :var, :funₛ, :funₜ, :fun, :θ)
-    setfield!(ParamForm.Param, sym, x)::T
+function Base.setproperty!(ParamForm::ParamFormInfoS, sym::Symbol, x)
+  if sym == :μ
+    setfield!(ParamForm.Param, sym, x)::Vector{Float}
+  elseif sym == :var
+    setfield!(ParamForm.Param, sym, x)::String
+  elseif sym ∈ (:fun, :funₛ, :funₜ)
+    setfield!(ParamForm.Param, sym, x)::Function
+  elseif sym == :θ
+    setfield!(ParamForm.Param, sym, x)::Vector{Vector{Float}}
   else
-    setfield!(ParamForm, sym, x)::T
+    setfield!(ParamForm, sym, x)
   end
 end

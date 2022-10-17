@@ -58,9 +58,9 @@ end
 
 function Base.getproperty(RBInfo::ROMInfo, sym::Symbol)
   if sym in (:affine_structures, :unknowns, :structures)
-    getfield(RBInfo.FEMInfo, sym)
+    getfield(RBInfo.FEMInfo, sym)::Vector{String}
   elseif sym in (:ROM_structures_path, :results_path)
-    getfield(RBInfo.Paths, sym)
+    getfield(RBInfo.Paths, sym)::String
   else
     getfield(RBInfo, sym)
   end
@@ -250,11 +250,11 @@ function MVariable(
 
 end
 
-abstract type RB{T} end
-abstract type RBS{T} <: RB{T} end
-abstract type RBST{T} <: RB{T} end
+abstract type ROM{ID,T} end
+abstract type ROMS{ID,T} <: ROM{ID,T} end
+abstract type ROMST{ID,T} <: ROM{ID,T} end
 
-mutable struct SteadyVariables{T} <: RBS{T}
+mutable struct VarsS{T} <: ROMS{Any,T}
   S::Vector{Matrix{T}}
   Φₛ::Vector{Matrix{T}}
   x̃::Vector{Matrix{T}}
@@ -265,7 +265,7 @@ mutable struct SteadyVariables{T} <: RBS{T}
   online_time::Float
 end
 
-function SteadyVariables(::Type{T}) where T
+function VarsS(::Type{T}) where T
 
   S = Matrix{T}[]
   Φₛ = Matrix{T}[]
@@ -276,49 +276,63 @@ function SteadyVariables(::Type{T}) where T
   offline_time = 0.0
   online_time = 0.0
 
-  SteadyVariables{T}(S, Φₛ, x̃, X₀, Nₛ, nₛ, offline_time, online_time)
+  VarsS{T}(S, Φₛ, x̃, X₀, Nₛ, nₛ, offline_time, online_time)
 
 end
 
-mutable struct PoissonS{T} <: RBS{T}
-  SV::SteadyVariables{T}
+mutable struct ROMMethodS{ID,T} <: ROMS{ID,T}
+  SV::VarsS{T}
   Vars::Vector{MVVariable{T}}
   xₙ::Vector{Matrix{T}}
   LHSₙ::Vector{Matrix{T}}
   RHSₙ::Vector{Matrix{T}}
 end
 
-function PoissonS(RBInfo::ROMInfoS{1}, ::Type{T}) where T
-  SV = SteadyVariables(T)
-  MVars(var) = MVariable(RBInfo, var, T)
-  VVars(var) = VVariable(RBInfo, var, T)
-  Vars = vcat(Broadcasting(MVars)(get_FEM_matrices(RBInfo)),
-    Broadcasting(VVars)(get_FEM_vectors(RBInfo)))
+function ROMMethodS(RBInfo::ROMInfoS{ID}, ::Type{T}) where {ID,T}
+  SV = VarsS(T)
+
+  FEM_matrices = get_FEM_matrices(RBInfo)
+  MVars = Broadcasting(var->MVariable(RBInfo, var, T))(FEM_matrices)
+  FEM_vectors = get_FEM_vectors(RBInfo)
+  VVars = Broadcasting(var->VVariable(RBInfo, var, T))(FEM_vectors)
+  Vars = vcat(MVars, VVars)::Vector{MVVariable{T}}
+
   xₙ = Matrix{T}[]
   LHSₙ = Matrix{T}[]
   RHSₙ = Matrix{T}[]
 
-  PoissonS{T}(SV, Vars, xₙ, LHSₙ, RHSₙ)
-
+  ROMMethodS{ID,T}(SV, Vars, xₙ, LHSₙ, RHSₙ)
 end
 
-function Base.getproperty(RBVars::PoissonS, sym::Symbol)
-  if sym in (:S, :Φₛ, :x̃, :X₀, :Nₛ, :nₛ, :offline_time, :online_time)
-    getfield(RBVars.SV, sym)
+function Base.getproperty(RBVars::ROMMethodS{ID,T}, sym::Symbol) where {ID,T}
+  if sym ∈ (:S, :Φₛ, :x̃)
+    getfield(RBVars.SV, sym)::Vector{Matrix{T}}
+  elseif sym == :X₀
+    getfield(RBVars.SV, sym)::Vector{SparseMatrixCSC{Float, Int}}
+  elseif sym ∈ (:Nₛ, :nₛ)
+    getfield(RBVars.SV, sym)::Vector{Int}
+  elseif sym ∈ (:offline_time, :online_time)
+    getfield(RBVars.SV, sym)::Float
   else
     getfield(RBVars, sym)
   end
 end
 
-function Base.setproperty!(RBVars::PoissonS, sym::Symbol, x::T) where T
-  if sym in (:S, :Φₛ, :x̃, :X₀, :Nₛ, :nₛ, :offline_time, :online_time)
-    setfield!(RBVars.SV, sym, x)::T
+function Base.setproperty!(RBVars::ROMMethodS{ID,T}, sym::Symbol, x) where {ID,T}
+  if sym ∈ (:S, :Φₛ, :x̃)
+    setfield!(RBVars.SV, sym, x)::Vector{Matrix{T}}
+  elseif sym == :X₀
+    setfield!(RBVars.SV, sym, x)::Vector{SparseMatrixCSC{Float, Int}}
+  elseif sym ∈ (:Nₛ, :nₛ)
+    setfield!(RBVars.SV, sym, x)::Vector{Int}
+  elseif sym ∈ (:offline_time, :online_time)
+    setfield!(RBVars.SV, sym, x)::Float
   else
-    setfield!(RBVars, sym, x)::T
+    setfield!(RBVars, sym, x)
   end
 end
 
-function setup_RBVars(RBInfo::ROMInfoS{ID}, ::Type{T}) where {ID,T}
+#= function setup_RBVars(RBInfo::ROMInfoS{ID}, ::Type{T}) where {ID,T}
   if ID == 1
     PoissonS(RBInfo, T)
   elseif ID == 2
@@ -340,28 +354,28 @@ function setup_RBVars(RBInfo::ROMInfoST{ID}, ::Type{T}) where {ID,T}
   else
     error("Not implemented")
   end
-end
+end =#
 
-#= mutable struct PoissonST{T} <: RBST{T}
+#= mutable struct PoissonST{T} <: ROMST{ID,T}
   Steady::PoissonS{T}; Φₜᵘ::Vector{Matrix{T}}; Mₙ::Vector{Matrix{T}}; MDEIM_M::MMDEIM{T};
   Nₜ::Int; N::Vector{Int}; nₜ::Vector{Int}; n::Vector{Int}
 end
 
-mutable struct StokesS{T} <: RBS{T}
+mutable struct StokesS{T} <: ROMS{ID,T}
   Poisson::PoissonS{T}; Bₙ::Vector{Matrix{T}}; Lcₙ::Vector{Matrix{T}};
   MDEIM_B::MMDEIM{T}; MDEIM_Lc::VMDEIM{T};
 end
 
-mutable struct StokesST{T} <: RBST{T}
+mutable struct StokesST{T} <: ROMST{ID,T}
   Poisson::PoissonST{T}; Steady::StokesS{T}
 end
 
-mutable struct NavierStokesS{T} <: RBS{T}
+mutable struct NavierStokesS{T} <: ROMS{ID,T}
   Stokes::StokesS{T}; Cₙ::Vector{Matrix{T}}; Dₙ::Vector{Matrix{T}};
   MDEIM_C::MMDEIM{T}; MDEIM_D::MMDEIM{T}
 end
 
-mutable struct NavierStokesST{T} <: RBST{T}
+mutable struct NavierStokesST{T} <: ROMST{ID,T}
   Stokes::StokesST{T}; Steady::NavierStokesS{T};
 end
 

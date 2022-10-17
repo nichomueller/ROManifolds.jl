@@ -27,22 +27,31 @@ function check_saved_operators(
 
 end
 
-function get_Φₛ(RBVars::RB, var::String)
+function get_Φₛ(
+  RBVars::ROM{ID,T},
+  var::String) where {ID,T}
+
   if var ∈ ("B", "Lc")
     Φₛ_left = RBVars.Φₛ[2]
   else
     Φₛ_left = RBVars.Φₛ[1]
   end
   Φₛ_right = RBVars.Φₛ[1]
+
   Φₛ_left, Φₛ_right
+
 end
 
-function get_Nₛ(RBVars::RB, var::String)
+function get_Nₛ(
+  RBVars::ROM{ID,T},
+  var::String) where {ID,T}
+
   if var ∈ ("B", "Lc")
     RBVars.Nₛ[2]
   else
     RBVars.Nₛ[1]
   end
+
 end
 
 function get_blocks_position(::ROMInfo{ID}) where ID
@@ -66,38 +75,38 @@ function times_dictionary(
 
 end
 
-function initialize_RB_system(RBVars::RB{T}) where T
+function initialize_RB_system(RBVars::ROM{ID,T}) where {ID,T}
   RBVars.LHSₙ = Matrix{T}[]
   RBVars.RHSₙ = Matrix{T}[]
   RBVars.xₙ = Matrix{T}[]
   return
 end
 
-function initialize_online_time(RBVars::RB)
+function initialize_online_time(RBVars::ROM{ID,T}) where {ID,T}
   RBVars.online_time = 0.0
   return
 end
 
-function VVariable(RBVars::RB{T}) where T
+function VVariable(RBVars::ROM{ID,T}) where {ID,T}
   VVariable(RBVars.Vars)
 end
 
 function VVariable(
   RBInfo::ROMInfo{ID},
-  RBVars::RB{T},
+  RBVars::ROM{ID,T},
   args...) where {ID,T}
 
   VVariable(RBInfo, RBVars.Vars, args...)
 end
 
-function MVariable(RBVars::RB{T}) where T
+function MVariable(RBVars::ROM{ID,T}) where {ID,T}
 
   MVariable(RBVars.Vars)
 end
 
 function MVariable(
   RBInfo::ROMInfo{ID},
-  RBVars::RB{T},
+  RBVars::ROM{ID,T},
   args...) where {ID,T}
 
   MVariable(RBInfo, RBVars.Vars, args...)
