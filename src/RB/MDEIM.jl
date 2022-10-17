@@ -153,28 +153,17 @@ function assemble_sparse_vector(
 
 end
 
-function assemble_sparse_fun(
+function assemble_sparse_function(
   FEMSpace::FOMS{D},
   FEMInfo::FOMInfoS{ID},
-  el::Vector{Int},
-  var::String) where {ID,D}
+  Param::ParamInfoS,
+  el::Vector{Int}) where {ID,D}
 
   Ω_sparse = view(FEMSpace.Ω, el)
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
+  ParamForm = ParamFormInfo(Param, dΩ_sparse)
 
-  function define_Mat(u)
-    if var == "C"
-      (assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
-        (∇(FEMSpace.ϕᵤ)'⋅u) )*dΩ_sparse, FEMSpace.V, FEMSpace.V₀))
-    elseif var == "D"
-      (assemble_matrix(∫( FEMSpace.ϕᵥ ⊙
-        (∇(u)'⋅FEMSpace.ϕᵤ) )*dΩ_sparse, FEMSpace.V, FEMSpace.V₀))
-    else
-      error("Unrecognized sparse matrix")
-    end
-  end
-
-  define_Mat::Function
+  assemble_FEM_matrix(FEMSpace, FEMInfo, ParamForm)
 
 end
 
@@ -239,6 +228,20 @@ function θ(
   end
 
   θ::Vector{Vector{T}}
+
+end
+
+function θ_function(
+  FEMSpace::FOMS{D},
+  RBInfo::ROMInfoS{ID},
+  Param::ParamInfoS,
+  MDEIM::MMDEIM{T}) where {ID,D,T}
+
+  @assert isnonlinear(RBInfo, Param.var) "This method is only for nonlinear variables"
+
+  Fun_μ_sparse =
+    assemble_sparse_function(FEMSpace, FEMInfo, Param, MDEIM.el)
+  MDEIM_online(RBVars, Fun_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
 
 end
 
@@ -311,25 +314,13 @@ function θ!(
 
 end =#
 
-function θ_function(
-  FEMSpace::FOMS{D},
-  RBVars::ROMMethodS{ID,T},
-  MDEIM::MMDEIM{T},
-  var::String) where {ID,D,T}
-
-  Fun_μ_sparse =
-    assemble_sparse_fun(FEMSpace, FEMInfo, MDEIM.el, var)
-  MDEIM_online(RBVars, Fun_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
-
-end
-
 function MDEIM_online(
   Mat_nonaffine::AbstractArray{T},
   Matᵢ::Matrix{T},
   idx::Vector{Int},
   Nₜ=1) where T
 
-  @fastmath Matᵢ \ reshape(Mat_nonaffine, :, Nₜ)[idx]
+  @inbounds Matᵢ \ reshape(Mat_nonaffine, :, Nₜ)[idx]
 
 end
 
@@ -339,8 +330,9 @@ function MDEIM_online(
   idx::Vector{Int},
   Nₜ=1) where T
 
-  function θ(u)
-    @fastmath Matᵢ \ reshape(Fun_nonaffine(u), :, 1)[idx]
-  end
+  θmat(u) = (@inbounds Matᵢ \ reshape(Fun_nonaffine(u), :, Nₜ)[idx])
+  θblock(u) = matrix_to_blocks(θmat(u))
+
+  θblock
 
 end

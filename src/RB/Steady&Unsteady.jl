@@ -352,7 +352,11 @@ function assemble_θ(
 
   var = Var.var
   Param = ParamInfo(RBInfo, μ, var)
-  Param.θ = θ(FEMSpace, RBInfo, Param, Var.MDEIM)
+  if isnonlinear(RBInfo, var)
+    Param.fun = θ_function(FEMSpace, RBInfo, Param, Var.MDEIM)
+  else
+    Param.θ = θ(FEMSpace, RBInfo, Param, Var.MDEIM)
+  end
 
   Param::ParamInfo
 
@@ -379,9 +383,11 @@ function assemble_θ(
   μ::Vector{T}) where {ID,D,T}
 
   MVars = MVariable(RBInfo, RBVars)
-  Broadcasting(Var -> assemble_θ(FEMSpace, RBInfo, Var, μ))(MVars)
+  MParams = Broadcasting(Var -> assemble_θ(FEMSpace, RBInfo, Var, μ))(MVars)
   VVars = VVariable(RBInfo, RBVars)
-  Broadcasting(Var -> assemble_θ(FEMSpace, RBInfo, Var, μ))(VVars)
+  VParams = Broadcasting(Var -> assemble_θ(FEMSpace, RBInfo, Var, μ))(VVars)
+
+  vcat(MParams, VParams)::Vector{<:ParamInfo}
 
 end
 
@@ -390,9 +396,10 @@ function assemble_matricesₙ(
   RBVars::ROM{ID,T},
   Params::Vector{<:ParamInfo}) where {ID,T}
 
-  operators = intersect(get_FEM_matrices(RBInfo), set_operators(RBInfo))
-  matrix_Vars = MVariable(RBInfo, RBVars, operators)
-  matrix_Params = ParamInfo(Params, operators)
+  operators = get_FEM_matrices(RBInfo)
+  lin_op = findall(x->isnonlinear(RBInfo, x) == false, operators)
+  matrix_Vars = MVariable(RBInfo, RBVars, lin_op)
+  matrix_Params = ParamInfo(Params, lin_op)
   assemble_termsₙ(matrix_Vars, matrix_Params)::Vector{Matrix{T}}
 
 end
@@ -406,6 +413,29 @@ function assemble_vectorsₙ(
   vector_Vars = VVariable(RBInfo, RBVars, operators)
   vector_Params = ParamInfo(Params, operators)
   assemble_termsₙ(vector_Vars, vector_Params)::Vector{Matrix{T}}
+
+end
+
+function assemble_function_matricesₙ(
+  RBInfo::ROMInfo{ID},
+  RBVars::ROM{ID,T},
+  Params::Vector{<:ParamInfo}) where {ID,T}
+
+  operators = get_FEM_matrices(RBInfo)
+  nonlin_op = findall(x->isnonlinear(RBInfo, x) == true, operators)
+  matrix_Vars = MVariable(RBInfo, RBVars, nonlin_op)
+  matrix_Params = ParamInfo(Params, nonlin_op)
+  assemble_function_termsₙ(matrix_Vars, matrix_Params)::Function
+
+end
+
+function assemble_RHS(
+  FEMSpace::FOMS{D},
+  RBInfo::ROMInfoS{1},
+  μ::Vector{T}) where {D,T}
+
+  ParamVec = ParamInfo(RBInfo, μ, get_FEM_vectors(RBInfo))
+  assemble_FEM_vector(FEMSpace, RBInfo, ParamVec)
 
 end
 
@@ -441,22 +471,6 @@ function assemble_RB_system(
   end
 
   save_system_blocks(RBInfo, RBVars, operators, blocks...)
-
-  return
-
-end
-
-function assemble_solve_reconstruct(
-  FEMSpace::FOM{D},
-  RBInfo::ROMInfo{ID},
-  RBVars::ROM{ID,T},
-  μ::Vector{T}) where {ID,D,T}
-
-  assemble_RB_system(FEMSpace, RBInfo, RBVars, μ)
-  RBVars.online_time += @elapsed begin
-    solve_RB_system(RBVars)
-  end
-  reconstruct_FEM_solution(RBVars)
 
   return
 

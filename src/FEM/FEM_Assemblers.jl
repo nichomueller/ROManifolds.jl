@@ -67,9 +67,9 @@ function assemble_form(
       end
     else var == "B"
       if isaffine(FEMInfo, var)
-        ∫(v ⋅ ∇(u))ParamForm.dΩ
+        ∫(v * (∇⋅(u)))ParamForm.dΩ
       else
-        ∫(v ⋅ (ParamForm.fun * ∇(u)))ParamForm.dΩ
+        ∫(ParamForm.fun * v * (∇⋅(u)))ParamForm.dΩ
       end
     end
   end
@@ -84,11 +84,12 @@ function assemble_form(
     else
       g = interpolate_dirichlet(ParamForm.fun, FEMSpace.V[1])
       if var == "L"
-        Param_AB = ParamInfo(FEMInfo, μ, "A")
+        Param_A = ParamInfo(FEMInfo, ParamForm.μ, "A")
+        ∫(Param_A.fun * ∇(v) ⊙ ∇(g))ParamForm.dΩ
       else var == "Lc"
-        Param_AB = ParamInfo(FEMInfo, μ, "B")
+        Param_B = ParamInfo(FEMInfo, ParamForm.μ, "B")
+        ∫(Param_B.fun * v ⋅ (∇⋅(g)))ParamForm.dΩ
       end
-      ∫(∇(v) ⋅ (Param_AB.fun * ∇(g)))ParamForm.dΩ
     end
   end
 
@@ -124,9 +125,9 @@ function assemble_form(
       end
     else var == "B"
       if isaffine(FEMInfo, var)
-        ∫(v ⋅ ∇(u))ParamForm.dΩ
+        ∫(v * (∇⋅(u)))ParamForm.dΩ
       else
-        ∫(v ⋅ (ParamForm.fun * ∇(u)))ParamForm.dΩ
+        ∫(ParamForm.fun * v * (∇⋅(u)))ParamForm.dΩ
       end
     end
   end
@@ -141,11 +142,11 @@ function assemble_form(
     else
       g = interpolate_dirichlet(ParamForm.fun, FEMSpace.V[1])
       if var == "L"
-        Param_AB = ParamInfo(FEMInfo, μ, "A")
+        Param_AB = ParamInfo(FEMInfo, ParamForm.μ, "A")
       else var == "Lc"
-        Param_AB = ParamInfo(FEMInfo, μ, "B")
+        Param_AB = ParamInfo(FEMInfo, ParamForm.μ, "B")
       end
-      ∫(∇(v) ⋅ (Param_AB.fun * ∇(g)))ParamForm.dΩ
+      ∫(Param_AB.fun * ∇(v) ⋅ (∇⋅(g)))ParamForm.dΩ
     end
   end
 
@@ -817,7 +818,11 @@ function assemble_FEM_vector(
 
   var = ParamForm.var
   form = assemble_form(FEMSpace, FEMInfo, ParamForm)
-  assemble_vector(form, get_FEMSpace_vector(FEMSpace, var))::Vector{Float}
+  if var ∈ ("L", "Lc")
+    -assemble_vector(form, get_FEMSpace_vector(FEMSpace, var))::Vector{Float}
+  else
+    assemble_vector(form, get_FEMSpace_vector(FEMSpace, var))::Vector{Float}
+  end
 
 end
 

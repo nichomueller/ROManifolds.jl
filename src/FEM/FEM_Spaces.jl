@@ -82,6 +82,9 @@ function get_FEMSpace_matrix(
   if var == "B"
     @assert ID != 1 "Something is wrong with problem variables"
     FEMSpace.V[1], FEMSpace.V₀[2]
+  elseif var == "Xp"
+    @assert ID != 1 "Something is wrong with problem variables"
+    FEMSpace.V[2], FEMSpace.V₀[2]
   else
     FEMSpace.V[1], FEMSpace.V₀[1]
   end

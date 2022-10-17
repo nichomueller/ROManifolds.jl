@@ -119,7 +119,7 @@ function assemble_termsₙ(
   @assert Var.var == Param.var
 
   mult = Broadcasting(.*)
-  Var.var ∈ ("L", "Lc") ? -sum(mult(Var.Matₙ, Param.θ)) : sum(mult(Var.Matₙ, Param.θ))
+  sum(mult(Var.Matₙ, Param.θ))
 
 end
 
@@ -128,6 +128,27 @@ function assemble_termsₙ(
   Params::Vector{<:ParamInfo}) where T
 
   Broadcasting(assemble_termsₙ)(Vars, Params)
+
+end
+
+function assemble_function_termsₙ(
+  Var::MVVariable{T},
+  Param::ParamInfo) where T
+
+  @assert Var.var == Param.var
+
+  mult = Broadcasting(.*)
+  termₙ(u) = u -> sum(mult(Var.Matₙ, Param.fun(u)))
+
+  termₙ
+
+end
+
+function assemble_function_termsₙ(
+  Vars::Vector{<:MVVariable{T}},
+  Params::Vector{<:ParamInfo}) where T
+
+  Broadcasting(assemble_function_termsₙ)(Vars, Params)
 
 end
 
@@ -161,7 +182,7 @@ function compute_errors(
   end
 
   norms = Broadcasting(normᵢ)(1:Nₜ)::Vector{Tuple{Int,Int}}
-  norm_err, norm_sol = first!(norms), last!(norms)
+  norm_err, norm_sol = first.(norms), last.(norms)
 
   norm_err ./ norm_sol, norm(norm_err) / norm(norm_sol)
 

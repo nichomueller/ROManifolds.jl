@@ -245,7 +245,7 @@ function MVariable(
   RBInfo::ROMInfo{ID},
   Vars::Vector{<:MVVariable{T}}) where {ID,T}
 
-  operators = intersect(get_FEM_matrices(RBInfo), set_operators(RBInfo))
+  operators = get_FEM_matrices(RBInfo)
   MVariable(RBInfo, Vars, operators)::Vector{MVariable{T}}
 
 end

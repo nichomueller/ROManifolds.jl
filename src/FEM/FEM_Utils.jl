@@ -101,12 +101,32 @@ end
 
 end =#
 
-function get_g₀(::FOMInfoS{ID}) where ID
+function get_g₀(::FOMInfoS{1})
   x -> 0.
 end
 
-function get_g₀(::FOMInfoST{ID}) where ID
+function get_g₀(::FOMInfoST{1})
   g₀(x, t::Real) = 0.
+  g₀(t::Real) = x -> g₀(x, t)
+  g₀
+end
+
+function get_g₀(FEMInfo::FOMInfoS{2})
+  x -> zero(VectorValue(FEMInfo.D, Float))
+end
+
+function get_g₀(FEMInfo::FOMInfoST{2})
+  g₀(x, t::Real) = zero(VectorValue(FEMInfo.D, Float))
+  g₀(t::Real) = x -> g₀(x, t)
+  g₀
+end
+
+function get_g₀(FEMInfo::FOMInfoS{3})
+  x -> zero(VectorValue(FEMInfo.D, Float))
+end
+
+function get_g₀(FEMInfo::FOMInfoST{3})
+  g₀(x, t::Real) = zero(VectorValue(FEMInfo.D, Float))
   g₀(t::Real) = x -> g₀(x, t)
   g₀
 end

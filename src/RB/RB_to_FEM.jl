@@ -22,6 +22,18 @@ function isaffine(RBInfo::ROMInfo, vars::Vector{String})
   isaffine(RBInfo.FEMInfo, vars)
 end
 
+function isnonlinear(::ROMInfo{ID}, var::String) where ID
+  if ID == 3
+    var ∈ ("C", "D")
+  else
+    false
+  end
+end
+
+function isnonlinear(RBInfo::ROMInfo{ID}, vars::Vector{String}) where ID
+  Broadcasting(var->isnonlinear(RBInfo, var))(vars)
+end
+
 function get_FEM_vectors(RBInfo::ROMInfo)
   get_FEM_vectors(RBInfo.FEMInfo)
 end

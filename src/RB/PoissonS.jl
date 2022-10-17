@@ -28,15 +28,8 @@ function assemble_RHSₙ(
   RBVars::ROMMethodS{1,T},
   μ::Vector{T}) where {D,T}
 
-  ParamF = ParamInfo(RBInfo, μ, "F")
-  ParamH = ParamInfo(RBInfo, μ, "H")
-  ParamL = ParamInfo(RBInfo, μ, "L")
-
-  F = assemble_FEM_vector(FEMSpace, RBInfo, ParamF)
-  H = assemble_FEM_vector(FEMSpace, RBInfo, ParamH)
-  L = assemble_FEM_vector(FEMSpace, RBInfo, ParamL)
-
-  push!(RBVars.RHSₙ, reshape(RBVars.Φₛ[1]' * (F + H - L), :, 1)::Matrix{T})
+  RHS = assemble_RHS(FEMSpace, RBInfo, μ)
+  push!(RBVars.RHSₙ, reshape(RBVars.Φₛ[1]' * sum(RHS), :, 1)::Matrix{T})
 
   return
 
@@ -46,6 +39,22 @@ function solve_RB_system(RBVars::ROMMethodS{1,T}) where T
 
   println("Solving RB problem via backslash")
   push!(RBVars.xₙ, RBVars.LHSₙ[1] \ RBVars.RHSₙ[1])
+
+  return
+
+end
+
+function assemble_solve_reconstruct(
+  FEMSpace::FOM{D},
+  RBInfo::ROMInfo{1},
+  RBVars::ROM{1,T},
+  μ::Vector{T}) where {D,T}
+
+  assemble_RB_system(FEMSpace, RBInfo, RBVars, μ)
+  RBVars.online_time += @elapsed begin
+    solve_RB_system(RBVars)
+  end
+  reconstruct_FEM_solution(RBVars)
 
   return
 

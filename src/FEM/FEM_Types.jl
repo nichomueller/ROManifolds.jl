@@ -67,8 +67,8 @@ abstract type FOM{ID,D} end
 struct FOMS{ID,D} <: FOM{ID,D}
   model::DiscreteModel
   Qₕ::CellQuadrature
-  V₀::Vector{FESpace}
-  V::Vector{FESpace}
+  V₀::Vector{SingleFieldFESpace}
+  V::Vector{SingleFieldFESpace}
   Ω::BodyFittedTriangulation
   Γn::BoundaryTriangulation
   dΩ::Measure
