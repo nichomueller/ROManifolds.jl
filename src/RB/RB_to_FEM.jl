@@ -34,48 +34,70 @@ function isnonlinear(RBInfo::ROMInfo{ID}, vars::Vector{String}) where ID
   Broadcasting(var->isnonlinear(RBInfo, var))(vars)
 end
 
+function islinear(RBInfo::ROMInfo{ID}, args...) where ID
+  .!isnonlinear(RBInfo, args...)
+end
+
 function get_FEM_vectors(RBInfo::ROMInfo)
-  get_FEM_vectors(RBInfo.FEMInfo)
+  get_FEM_vectors(RBInfo.FEMInfo)::Vector{String}
 end
 
 function isvector(RBInfo::ROMInfo, var::String)
-  isvector(RBInfo.FEMInfo, var)
+  isvector(RBInfo.FEMInfo, var)::Bool
 end
 
 function isvector(RBInfo::ROMInfo, vars::Vector{String})
-  Broadcasting(var->isvector(RBInfo.FEMInfo, var))(vars)
+  Broadcasting(var->isvector(RBInfo.FEMInfo, var))(vars)::Vector{Bool}
 end
 
 function get_FEM_matrices(RBInfo::ROMInfo)
-  get_FEM_matrices(RBInfo.FEMInfo)
+  get_FEM_matrices(RBInfo.FEMInfo)::Vector{String}
 end
 
 function ismatrix(RBInfo::ROMInfo, var::String)
-  ismatrix(RBInfo.FEMInfo, var)
+  ismatrix(RBInfo.FEMInfo, var)::Bool
 end
 
 function ismatrix(RBInfo::ROMInfo, vars::Vector{String})
-  Broadcasting(var->ismatrix(RBInfo.FEMInfo, var))(vars)
+  Broadcasting(var->ismatrix(RBInfo.FEMInfo, var))(vars)::Vector{Bool}
 end
 
 function get_affine_vectors(RBInfo::ROMInfo)
-  get_affine_vectors(RBInfo.FEMInfo)
-end
-
-function get_affine_matrices(RBInfo::ROMInfo)
-  get_affine_matrices(RBInfo.FEMInfo)
+  get_affine_vectors(RBInfo.FEMInfo)::Vector{String}
 end
 
 function get_nonaffine_vectors(RBInfo::ROMInfo)
-  get_nonaffine_vectors(RBInfo.FEMInfo)
+  get_nonaffine_vectors(RBInfo.FEMInfo)::Vector{String}
+end
+
+function get_nonlinear_vectors(RBInfo::ROMInfo)
+  idx = findall(x -> isnonlinear(RBInfo, x) .!= 0., get_FEM_vectors(RBInfo))
+  get_FEM_vectors(RBInfo)[idx]::Vector{String}
+end
+
+function get_linear_vectors(RBInfo::ROMInfo)
+  setdiff(get_FEM_vectors(RBInfo), get_nonlinear_vectors(RBInfo))::Vector{String}
+end
+
+function get_affine_matrices(RBInfo::ROMInfo)
+  get_affine_matrices(RBInfo.FEMInfo)::Vector{String}
 end
 
 function get_nonaffine_matrices(RBInfo::ROMInfo)
-  get_nonaffine_matrices(RBInfo.FEMInfo)
+  get_nonaffine_matrices(RBInfo.FEMInfo)::Vector{String}
+end
+
+function get_nonlinear_matrices(RBInfo::ROMInfo)
+  idx = findall(x -> isnonlinear(RBInfo, x) .!= 0., get_FEM_matrices(RBInfo))
+  get_FEM_matrices(RBInfo)[idx]::Vector{String}
+end
+
+function get_linear_matrices(RBInfo::ROMInfo)
+  setdiff(get_FEM_matrices(RBInfo), get_nonlinear_matrices(RBInfo))::Vector{String}
 end
 
 function get_timesθ(RBInfo::ROMInfo)
-  get_timesθ(RBInfo.FEMInfo)
+  get_timesθ(RBInfo.FEMInfo)::Vector{Float}
 end
 
 function assemble_FEM_matrix(

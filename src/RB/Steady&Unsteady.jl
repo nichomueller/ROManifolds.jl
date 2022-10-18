@@ -1,4 +1,5 @@
 ################################# OFFLINE ######################################
+
 function get_norm_matrix(
   RBInfo::ROMInfo{ID},
   RBVars::ROM{ID,T}) where {ID,T}
@@ -21,29 +22,68 @@ function get_norm_matrix(
 
 end
 
-function assemble_reduced_basis_space(
+function assemble_constraint_matrix(
   RBInfo::ROMInfo{ID},
   RBVars::ROM{ID,T}) where {ID,T}
 
-  function POD_space(
-    S::Matrix,
-    ϵₛ::Float,
-    X₀::SparseMatrixCSC)
+  FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)))
+  Params = ParamInfo(RBInfo, μ[1:RBVars.nₛ], "B")
+  B = assemble_FEM_matrix(FEMSpace, RBInfo, Params)
+  BₖΦₖ(k::Int) = B[k] * RBVars.S[2][:, k]
 
-    println("Spatial POD, tolerance: $(ϵₛ)")
+  Broadcasting(BₖΦₖ)(1:RBInfo.nₛ)
 
-    POD(S, ϵₛ, X₀)::Matrix{T}
+end
 
+function assemble_supremizers(
+  RBInfo::ROMInfo{ID},
+  RBVars::ROM{ID,T}) where {ID,T}
+
+  println("Computing primal supremizers")
+
+  if isaffine(RBInfo, "B")
+    println("Loading matrix Bᵀ")
+    Bᵀ = load_CSV(sparse([],[],T[]),
+      joinpath(get_FEM_structures_path(RBInfo), "B.csv"))'
+    BₖΦₖ(k) = Bᵀ * RBVars.Φₛ[2][:,k]
+    constraint_mat = Broadcasting(BₖΦₖ)(1:RBVars.nₛ[2])
+  else
+    println("Matrix Bᵀ is nonaffine: must assemble the constraint matrix")
+    constraint_mat = assemble_constraint_matrix(RBInfo, RBVars)
   end
+
+  supr = Broadcasting(x->solve_cholesky(RBVars.X₀[1], x))(constraint_mat)
+  supr_GS = Gram_Schmidt(supr, RBVars.Φₛ[1], RBVars.X₀[1])
+
+  blocks_to_matrix(supr_GS)
+end
+
+function supr_enrichment(
+  RBInfo::ROMInfo{ID},
+  RBVars::ROM{ID,T}) where {ID,T}
+
+  supr = assemble_supremizers(RBInfo, RBVars)
+  RBVars.Φₛ[1] = hcat(RBVars.Φₛ[1], supr)
+  RBVars.nₛ[1] = size(RBVars.Φₛ[1])[2]
+
+end
+
+function assemble_RB_space(
+  RBInfo::ROMInfo{ID},
+  RBVars::ROM{ID,T}) where {ID,T}
 
   get_norm_matrix(RBInfo, RBVars)
 
-  PODϵ(S, X) = POD_space(S, RBInfo.ϵₛ, X)
-
+  println("Spatial POD, tolerance: $(RBInfo.ϵₛ)")
   RBVars.offline_time += @elapsed begin
+    PODϵ(S, X) = POD(S, RBInfo.ϵₛ, X)
     RBVars.Φₛ = Broadcasting(PODϵ)(RBVars.S, RBVars.X₀)
   end
   RBVars.Nₛ, RBVars.nₛ = rows(RBVars.Φₛ), cols(RBVars.Φₛ)
+
+  if ID == 2 || ID == 3
+    supr_enrichment(RBInfo, RBVars)
+  end
 
   if RBInfo.save_offline
     save_CSV(RBVars.Φₛ, joinpath(RBInfo.ROM_structures_path,"Φₛ.csv"))
@@ -53,7 +93,7 @@ function assemble_reduced_basis_space(
 
 end
 
-function get_reduced_basis_space(
+function get_RB_space(
   RBInfo::ROMInfo{ID},
   RBVars::ROM{ID,T}) where {ID,T}
 
@@ -234,23 +274,6 @@ function assemble_offline_structures(
 
 end
 
-function get_offline_structures(
-  RBInfo::ROMInfoS{ID},
-  RBVars::ROMMethodS{ID,T}) where {ID,T}
-
-  operators = check_saved_operators(RBInfo, RBVars.Vars)::Vector{String}
-  operators_to_get = setdiff(set_operators(RBInfo), operators)::Vector{String}
-  Vecs_to_get = intersect(get_FEM_vectors(RBInfo), operators_to_get)::Vector{String}
-  Mats_to_get = intersect(get_FEM_matrices(RBInfo), operators_to_get)::Vector{String}
-
-  Vars_to_get = vcat(MVariable(RBInfo, RBVars, Mats_to_get),
-    VVariable(RBInfo, RBVars, Vecs_to_get))
-  get_offline_Var(RBInfo, Vars_to_get)
-
-  operators
-
-end
-
 function save_Var_structures(
   RBInfo::ROMInfo{ID},
   Var::MVVariable{T},
@@ -267,6 +290,78 @@ function save_Var_structures(
   save_structures_in_list(MDEIM_vars, MDEIM_names, RBInfo.ROM_structures_path)
 
   return
+
+end
+
+function save_offline(
+  RBInfo::ROMInfo{ID},
+  RBVars::ROM{ID,T},
+  operators::Vector{String}) where {ID,T}
+
+
+  Broadcasting(Var -> save_Var_structures(RBInfo, Var, operators))(RBVars.Vars)
+
+  return
+
+end
+
+function get_offline_Var(
+  RBInfo::ROMInfo{ID},
+  Var::MVariable) where ID
+
+  var = Var.var
+  println("Importing offline structures for $var")
+
+  Matₙ = load_CSV(Matrix{Float}[],
+    joinpath(RBInfo.ROM_structures_path, "$(var)ₙ.csv"))
+  Q = Int(size(Matₙ)[2] / size(Matₙ)[1])
+  Var.Matₙ = matrix_to_blocks(Matₙ, Q)
+
+  if var ∉ RBInfo.affine_structures
+    get_MDEIM_structures(RBInfo, Var)
+  end
+
+end
+
+function get_offline_Var(
+  RBInfo::ROMInfo{ID},
+  Var::VVariable) where ID
+
+  var = Var.var
+  println("Importing offline structures for $var")
+
+  Matₙ = load_CSV(Matrix{Float}[],
+    joinpath(RBInfo.ROM_structures_path, "$(var)ₙ.csv"))
+  Var.Matₙ = matrix_to_blocks(Matₙ)
+
+  if var ∉ RBInfo.affine_structures
+    get_MDEIM_structures(RBInfo, Var)
+  end
+
+end
+
+function get_offline_Var(
+  RBInfo::ROMInfo{ID},
+  Vars::Vector{<:MVVariable{T}}) where {ID,T}
+
+  Broadcasting(Var -> get_offline_Var(RBInfo, Var))(Vars)
+
+end
+
+function get_offline_structures(
+  RBInfo::ROMInfo{ID},
+  RBVars::ROM{ID,T}) where {ID,T}
+
+  operators = check_saved_operators(RBInfo, RBVars.Vars)::Vector{String}
+  operators_to_get = setdiff(set_operators(RBInfo), operators)::Vector{String}
+  Vecs_to_get = intersect(get_FEM_vectors(RBInfo), operators_to_get)::Vector{String}
+  Mats_to_get = intersect(get_FEM_matrices(RBInfo), operators_to_get)::Vector{String}
+
+  Vars_to_get = vcat(MVariable(RBInfo, RBVars, Mats_to_get),
+    VVariable(RBInfo, RBVars, Vecs_to_get))
+  get_offline_Var(RBInfo, Vars_to_get)
+
+  operators
 
 end
 
@@ -347,31 +442,14 @@ end
 function assemble_θ(
   FEMSpace::FOM{D},
   RBInfo::ROMInfo{ID},
-  Var::MVariable{T},
+  Var::MVVariable{T},
   μ::Vector{T}) where {ID,D,T}
 
   var = Var.var
-  Param = ParamInfo(RBInfo, μ, var)
-  if isnonlinear(RBInfo, var)
-    Param.fun = θ_function(FEMSpace, RBInfo, Param, Var.MDEIM)
-  else
-    Param.θ = θ(FEMSpace, RBInfo, Param, Var.MDEIM)
-  end
+  @assert islinear(RBInfo, var) "Wrong θ assembler"
 
-  Param::ParamInfo
-
-end
-
-function assemble_θ(
-  FEMSpace::FOM{D},
-  RBInfo::ROMInfo{ID},
-  Var::VVariable{T},
-  μ::Vector{T}) where {ID,D,T}
-
-  var = Var.var
   Param = ParamInfo(RBInfo, μ, var)
   Param.θ = θ(FEMSpace, RBInfo, Param, Var.MDEIM)
-
   Param::ParamInfo
 
 end
@@ -382,10 +460,44 @@ function assemble_θ(
   RBVars::ROM{ID,T},
   μ::Vector{T}) where {ID,D,T}
 
-  MVars = MVariable(RBInfo, RBVars)
+  lin_Mat_ops = get_linear_matrices(RBInfo)
+  MVars = MVariable(RBInfo, RBVars, lin_Mat_ops)
   MParams = Broadcasting(Var -> assemble_θ(FEMSpace, RBInfo, Var, μ))(MVars)
-  VVars = VVariable(RBInfo, RBVars)
+  lin_Vec_ops = get_linear_vectors(RBInfo)
+  VVars = VVariable(RBInfo, RBVars, lin_Vec_ops)
   VParams = Broadcasting(Var -> assemble_θ(FEMSpace, RBInfo, Var, μ))(VVars)
+
+  vcat(MParams, VParams)::Vector{<:ParamInfo}
+
+end
+
+function assemble_θ_function(
+  FEMSpace::FOM{D},
+  RBInfo::ROMInfo{ID},
+  Var::MVVariable{T},
+  μ::Vector{T}) where {ID,D,T}
+
+  var = Var.var
+  @assert isnonlinear(RBInfo, var) "Wrong θ assembler"
+
+  Param = ParamInfo(RBInfo, μ, var)
+  Param.fun = θ_function(FEMSpace, RBInfo, Param, Var.MDEIM)
+  Param::ParamInfo
+
+end
+
+function assemble_θ_function(
+  FEMSpace::FOM{D},
+  RBInfo::ROMInfo{ID},
+  RBVars::ROM{ID,T},
+  μ::Vector{T}) where {ID,D,T}
+
+  nonlin_Mat_ops = get_nonlinear_matrices(RBInfo)
+  MVars = MVariable(RBInfo, RBVars, nonlin_Mat_ops)
+  MParams = Broadcasting(Var -> assemble_θ_function(FEMSpace, RBInfo, Var, μ))(MVars)
+  nonlin_Vec_ops = get_nonlinear_vectors(RBInfo)
+  VVars = VVariable(RBInfo, RBVars, nonlin_Vec_ops)
+  VParams = Broadcasting(Var -> assemble_θ_function(FEMSpace, RBInfo, Var, μ))(VVars)
 
   vcat(MParams, VParams)::Vector{<:ParamInfo}
 
@@ -396,10 +508,9 @@ function assemble_matricesₙ(
   RBVars::ROM{ID,T},
   Params::Vector{<:ParamInfo}) where {ID,T}
 
-  operators = get_FEM_matrices(RBInfo)
-  lin_op = findall(x->isnonlinear(RBInfo, x) == false, operators)
-  matrix_Vars = MVariable(RBInfo, RBVars, lin_op)
-  matrix_Params = ParamInfo(Params, lin_op)
+  lin_Mat_ops = get_linear_matrices(RBInfo)
+  matrix_Vars = MVariable(RBInfo, RBVars, lin_Mat_ops)
+  matrix_Params = ParamInfo(Params, lin_Mat_ops)
   assemble_termsₙ(matrix_Vars, matrix_Params)::Vector{Matrix{T}}
 
 end
@@ -409,9 +520,9 @@ function assemble_vectorsₙ(
   RBVars::ROM{ID,T},
   Params::Vector{<:ParamInfo}) where {ID,T}
 
-  operators = intersect(get_FEM_vectors(RBInfo), set_operators(RBInfo))
-  vector_Vars = VVariable(RBInfo, RBVars, operators)
-  vector_Params = ParamInfo(Params, operators)
+  lin_Vec_ops = intersect(get_linear_vectors(RBInfo), set_operators(RBInfo))
+  vector_Vars = VVariable(RBInfo, RBVars, lin_Vec_ops)
+  vector_Params = ParamInfo(Params, lin_Vec_ops)
   assemble_termsₙ(vector_Vars, vector_Params)::Vector{Matrix{T}}
 
 end
@@ -421,11 +532,22 @@ function assemble_function_matricesₙ(
   RBVars::ROM{ID,T},
   Params::Vector{<:ParamInfo}) where {ID,T}
 
-  operators = get_FEM_matrices(RBInfo)
-  nonlin_op = findall(x->isnonlinear(RBInfo, x) == true, operators)
-  matrix_Vars = MVariable(RBInfo, RBVars, nonlin_op)
-  matrix_Params = ParamInfo(Params, nonlin_op)
+  nonlin_Mat_ops = get_nonlinear_matrices(RBInfo)
+  matrix_Vars = MVariable(RBInfo, RBVars, nonlin_Mat_ops)
+  matrix_Params = ParamInfo(Params, nonlin_Mat_ops)
   assemble_function_termsₙ(matrix_Vars, matrix_Params)::Function
+
+end
+
+function assemble_function_vectorsₙ(
+  RBInfo::ROMInfo{ID},
+  RBVars::ROM{ID,T},
+  Params::Vector{<:ParamInfo}) where {ID,T}
+
+  nonlin_Vec_ops = get_nonlinear_vectors(RBInfo)
+  vector_Vars = MVariable(RBInfo, RBVars, nonlin_Vec_ops)
+  vector_Params = ParamInfo(Params, nonlin_Vec_ops)
+  assemble_function_termsₙ(vector_Vars, vector_Params)::Function
 
 end
 
@@ -439,39 +561,13 @@ function assemble_RHS(
 
 end
 
-function assemble_RB_system(
+function assemble_solve_reconstruct(
   FEMSpace::FOM{D},
   RBInfo::ROMInfo{ID},
   RBVars::ROM{ID,T},
-  μ::Vector{T}) where {ID,D,T}
+  μ::Vector{Vector{T}}) where {ID,D,T}
 
-  initialize_RB_system(RBVars)
-  initialize_online_time(RBVars)
-  blocks = get_blocks_position(RBInfo)
-
-  RBVars.online_time = @elapsed begin
-    operators = get_system_blocks(RBInfo, RBVars, blocks...)
-
-    Params = assemble_θ(FEMSpace, RBInfo, RBVars, μ)
-
-    if "LHS" ∈ operators
-      println("Assembling reduced LHS")
-      assemble_LHSₙ(RBInfo, RBVars, Params)
-    end
-
-    if "RHS" ∈ operators
-      if !RBInfo.online_RHS
-        println("Assembling reduced RHS")
-        assemble_RHSₙ(RBInfo, RBVars, Params)
-      else
-        println("Assembling reduced RHS exactly")
-        assemble_RHSₙ(FEMSpace, RBInfo, RBVars, μ)
-      end
-    end
-  end
-
-  save_system_blocks(RBInfo, RBVars, operators, blocks...)
-
+  Broadcasting(p->assemble_solve_reconstruct(FEMSpace,RBInfo,RBVars,p))(μ)
   return
 
 end

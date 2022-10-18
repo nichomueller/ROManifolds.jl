@@ -811,6 +811,17 @@ function assemble_affine_FEM_matrices(
 
 end
 
+function assemble_all_FEM_matrices(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  μ::Vector{T}) where {ID,T}
+
+  operators = get_FEM_matrices(FEMInfo)
+  Params = ParamInfo(FEMInfo, μ, operators)
+  assemble_FEM_matrix(FEMSpace, FEMInfo, Params)
+
+end
+
 function assemble_FEM_vector(
   FEMSpace::FOM,
   FEMInfo::FOMInfo{ID},
@@ -896,6 +907,17 @@ function assemble_affine_FEM_vectors(
   μ::Vector{T}) where {ID,T}
 
   operators = get_affine_vectors(FEMInfo)
+  Params = ParamInfo(FEMInfo, μ, operators)
+  assemble_FEM_vector(FEMSpace, FEMInfo, Params)
+
+end
+
+function assemble_all_FEM_vectors(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  μ::Vector{T}) where {ID,T}
+
+  operators = get_FEM_vectors(FEMInfo)
   Params = ParamInfo(FEMInfo, μ, operators)
   assemble_FEM_vector(FEMSpace, FEMInfo, Params)
 

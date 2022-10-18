@@ -35,6 +35,43 @@ function assemble_RHSₙ(
 
 end
 
+function assemble_RB_system(
+  FEMSpace::FOM{D},
+  RBInfo::ROMInfo{1},
+  RBVars::ROM{1,T},
+  μ::Vector{T}) where {D,T}
+
+  initialize_RB_system(RBVars)
+  initialize_online_time(RBVars)
+  blocks = get_blocks_position(RBInfo)
+
+  RBVars.online_time = @elapsed begin
+    operators = get_system_blocks(RBInfo, RBVars, blocks...)
+
+    Params = assemble_θ(FEMSpace, RBInfo, RBVars, μ)
+
+    if "LHS" ∈ operators
+      println("Assembling reduced LHS")
+      assemble_LHSₙ(RBInfo, RBVars, Params)
+    end
+
+    if "RHS" ∈ operators
+      if !RBInfo.online_RHS
+        println("Assembling reduced RHS")
+        assemble_RHSₙ(RBInfo, RBVars, Params)
+      else
+        println("Assembling reduced RHS exactly")
+        assemble_RHSₙ(FEMSpace, RBInfo, RBVars, μ)
+      end
+    end
+  end
+
+  save_system_blocks(RBInfo, RBVars, operators, blocks...)
+
+  return
+
+end
+
 function solve_RB_system(RBVars::ROMMethodS{1,T}) where T
 
   println("Solving RB problem via backslash")

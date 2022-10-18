@@ -32,37 +32,42 @@ function assemble_constraint_matrix(
 end
 
 function primal_supremizers(
-  RBInfo::Info,
-  RBVars::StokesS{T}) where T
+  RBInfo::ROMInfoS{ID},
+  RBVars::ROMMethodS{ID,T}) where {ID,T}
 
   println("Computing primal supremizers")
 
-  if "B" ∈ RBInfo.probl_nl
+  #= if "B" ∈ RBInfo.probl_nl
     println("Matrix Bᵀ is nonaffine: must assemble constraint_matrix ∀ μ")
     constraint_matrix = assemble_constraint_matrix(RBInfo, RBVars)
-  else
-    println("Loading matrix Bᵀ")
-    constraint_matrix = load_CSV(sparse([],[],T[]),
-      joinpath(get_FEM_structures_path(RBInfo), "B.csv"))'
-  end
+  else =#
+  println("Loading matrix Bᵀ")
+  constraint_matrix = load_CSV(sparse([],[],T[]),
+    joinpath(get_FEM_structures_path(RBInfo), "B.csv"))'
+  #end
 
-  supr_primal = solve_cholesky(RBVars.X₀[1], constraint_matrix * RBVars.Φₛᵖ)
+  supr_primal = solve_cholesky(RBVars.X₀[1], constraint_matrix * RBVars.Φₛ[2])
+  supr_primal[:,1] /= norm(supr_primal[:,1])
 
   min_norm = 1e16
-  for i = 1:size(supr_primal)[2]
+  for i = 2:size(supr_primal)[2]
 
     println("Normalizing primal supremizer $i")
 
-    for j in 1:RBVars.nₛᵘ
-      supr_primal[:, i] -= dot(supr_primal[:, i], RBVars.Φₛ[:, j], RBVars.X₀[1]) /
-      norm(RBVars.Φₛ[:, j], RBVars.X₀[1]) * RBVars.Φₛ[:, j]
+    for j in 1:RBVars.nₛ[1]
+      #= supr_primal[:, i] -= dot(supr_primal[:, i], RBVars.Φₛ[1][:, j], RBVars.X₀[1]) /
+      norm(RBVars.Φₛ[:, j], RBVars.X₀[1]) * RBVars.Φₛ[1][:, j] =#
+      supr_primal[:, i] -= (supr_primal[:, i]' * RBVars.Φₛ[1][:, j])*RBVars.Φₛ[1][:, j]
     end
-    for j in 1:i
-      supr_primal[:, i] -= dot(supr_primal[:, i], supr_primal[:, j], RBVars.X₀[1]) /
-      norm(supr_primal[:, j], RBVars.X₀[1]) * supr_primal[:, j]
+    for j in 1:i-1
+      #= supr_primal[:, i] -= dot(supr_primal[:, i], supr_primal[:, j], RBVars.X₀[1]) /
+      norm(supr_primal[:, j], RBVars.X₀[1]) * supr_primal[:, j] =#
+      supr_primal[:, i] -= ((supr_primal[:, i]' * supr_primal[:, j])/
+        (supr_primal[:, j]' * supr_primal[:, j]) * supr_primal[:, j])
     end
 
-    supr_norm = norm(supr_primal[:, i], RBVars.X₀[1])
+    #supr_norm = norm(supr_primal[:, i], RBVars.X₀[1])
+    supr_norm = norm(supr_primal[:, i])
     min_norm = min(supr_norm, min_norm)
     println("Norm supremizers: $supr_norm")
     supr_primal[:, i] /= supr_norm

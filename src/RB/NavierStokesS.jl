@@ -23,13 +23,10 @@ end
 
 function newton(
   FEMSpace::FOMS,
-  RBInfo::ROMInfoS{3},
   RBVars::ROMMethodS{3,T},
-  Params::Vector{ParamInfoS},
+  JinvₙResₙ::Function,
   ϵ=1e-9,
   max_k=10) where T
-
-  JinvₙResₙ = get_JinvₙResₙ(RBInfo, RBVars, Params)
 
   x̂mat = zeros(T, sum(RBVars.nₛ), 1)
   δx̂ = 1. .+ x̂mat
@@ -92,26 +89,64 @@ function assemble_RHSₙ(
 
 end
 
+function assemble_RB_system(
+  FEMSpace::FOM{D},
+  RBInfo::ROMInfo{3},
+  RBVars::ROM{3,T},
+  μ::Vector{T}) where {D,T}
+
+  initialize_RB_system(RBVars)
+  initialize_online_time(RBVars)
+  blocks = get_blocks_position(RBInfo)
+
+  RBVars.online_time = @elapsed begin
+    operators = get_system_blocks(RBInfo, RBVars, blocks...)
+
+    Params_lin = assemble_θ(FEMSpace, RBInfo, RBVars, μ)
+    Params_nonlin = assemble_θ_function(FEMSpace, RBInfo, RBVars, μ)
+
+    if "LHS" ∈ operators
+      println("Assembling reduced LHS")
+      assemble_LHSₙ(RBInfo, RBVars, Params_lin)
+    end
+
+    if "RHS" ∈ operators
+      if !RBInfo.online_RHS
+        println("Assembling reduced RHS")
+        assemble_RHSₙ(RBInfo, RBVars, Params_lin)
+      else
+        println("Assembling reduced RHS exactly")
+        assemble_RHSₙ(FEMSpace, RBInfo, RBVars, μ)
+      end
+    end
+
+    JinvₙResₙ = get_JinvₙResₙ(RBInfo, RBVars, Params_nonlin)
+  end
+
+  save_system_blocks(RBInfo, RBVars, operators, blocks...)
+
+  JinvₙResₙ::Function
+
+end
+
 function solve_RB_system(
   FEMSpace::FOMS,
-  RBInfo::ROMInfoS{3},
   RBVars::NavierStokesS{3,T},
-  Params::Vector{ParamInfoS}) where T
+  JinvₙResₙ::Function) where T
 
   println("Solving RB problem via Newton-Raphson iterations")
-  push!(RBVars.xₙ, newton(FEMSpace, RBInfo, RBVars, Params))
+  push!(RBVars.xₙ, newton(FEMSpace, RBVars, JinvₙResₙ))
 
 end
 
 function assemble_solve_reconstruct(
   FEMSpace::FOM{D},
-  RBInfo::ROMInfo{3},
   RBVars::ROM{3,T},
   μ::Vector{T}) where {D,T}
-#careful -> need params
-  assemble_RB_system(FEMSpace, RBInfo, RBVars, μ)
+
+  JinvₙResₙ = assemble_RB_system(FEMSpace, RBInfo, RBVars, μ)
   RBVars.online_time += @elapsed begin
-    solve_RB_system(RBVars)
+    solve_RB_system(FEMSpace, RBVars, JinvₙResₙ)
   end
   reconstruct_FEM_solution(RBVars)
 

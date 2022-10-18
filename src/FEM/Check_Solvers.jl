@@ -2,7 +2,7 @@ function check_dataset(
   RBInfo::Info,
   nb::Int) where T
 
-  FEMSpace, μ = get_FEMμ_info(RBInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)))
   Param = ParamInfo(RBInfo, μ[nb])
 
   A = assemble_FEM_structure(FEMSpace, RBInfo, Param, "A")
@@ -14,6 +14,35 @@ function check_dataset(
     DataFrame))[:, nb]
 
   A \ (F + H - L) ≈ u
+
+end
+
+function check_stokes_solver()
+
+  FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)))
+
+  u = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
+    DataFrame))[:, 1]
+  p = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"),
+    DataFrame))[:, 1]
+  x = vcat(u, p)
+
+  Mats = assemble_all_FEM_matrices(FEMSpace, FEMInfo, μ[1])
+  Vecs = assemble_all_FEM_vectors(FEMSpace, FEMInfo, μ[1])
+
+  Nₛᵖ = length(get_free_dof_ids(FEMSpace.V₀[2]))
+
+  #= A = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "A")
+  B = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "B")
+  F = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "F")
+  H = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "H")
+  L = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "L")
+  Lc = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "Lc") =#
+
+  LHS = vcat(hcat(Mats[1], -Mats[2]'), hcat(Mats[2], zeros(T, Nₛᵖ, Nₛᵖ)))
+  RHS = vcat(sum(Vecs[1:3]), Vecs[4])
+
+  LHS * x - RHS
 
 end
 
@@ -95,31 +124,6 @@ function check_dataset(RBInfo, RBVars, i)
   u2≈my_u2
   p1≈my_p1
   p2≈my_p2
-
-end
-
-function check_stokes_solver()
-
-  FEMSpace, μ = get_FEMμ_info(RBInfo)
-  Param = ParamInfo(RBInfo, μ[nb])
-
-  u = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
-    DataFrame))[:, nb]
-  p = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"),
-    DataFrame))[:, nb]
-  x = vcat(u, p)
-
-  A = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "A")
-  B = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "B")
-  F = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "F")
-  H = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "H")
-  L = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "L")
-  Lc = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "Lc")
-
-  LHS = vcat(hcat(A, -B'), hcat(B, zeros(T, FEMSpace.Nₛᵖ, FEMSpace.Nₛᵖ)))
-  RHS = vcat(F + H - L, - Lc)
-
-  LHS * x - RHS
 
 end
 

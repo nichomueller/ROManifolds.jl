@@ -11,54 +11,38 @@ function get_all_subdirectories(path::String)
   filter(isdir,readdir(path,join=true))
 end
 
+function correct_path(path::String)
+  path[end-3:end] == ".csv" ? path : path * ".csv"
+end
+
 function load_CSV(::Vector{Matrix{T}}, path::String) where T
-
-  #= function load_mat(varᵢ::String)
-    varᵢ_split = split(chop(varᵢ; head=1, tail=1), "; ")
-    varᵢ_mat = parse.(T, split(varᵢ_split[1], " "))
-    for j in 1 .+ eachindex(varᵢ_split[2:end])
-      varᵢ_mat = hcat(varᵢ_mat, parse.(T, split(varᵢ_split[j], " ")))
-    end
-    varᵢ_mat
-  end
-
-  function load_vec(varᵢ::String)
-    reshape(parse.(T, split(chop(varᵢ; head=1, tail=3), ";")), :, 1)::Matrix{T}
-  end
-
-  var = Array(CSV.read(path, DataFrame))
-
-  try
-    Broadcasting(load_mat)(var)[:]::Vector{Matrix{T}}
-  catch
-    Broadcasting(load_vec)(var)[:]::Vector{Matrix{T}}
-  end =#
-  Array(CSV.read(path, DataFrame))
-
+  Array(CSV.read(correct_path(path), DataFrame))
 end
 
 function load_CSV(::Vector{Vector{T}}, path::String) where T
-
-    var = Array(CSV.read(path, DataFrame))
+  var = Array(CSV.read(correct_path(path), DataFrame))
+  try
+    matrix_to_vecblocks(var)
+  catch
     [parse.(T, split(chop(var[k]; head=1, tail=1), ",")) for k in 1:size(var)[1]]
-
+  end
 end
 
 function load_CSV(::Array{T,D}, path::String) where {T,D}
   if D == 1
-    Matrix{T}(CSV.read(path, DataFrame))[:]
+    Matrix{T}(CSV.read(correct_path(path), DataFrame))[:]
   else
-    Array{T,D}(CSV.read(path, DataFrame))
+    Array{T,D}(CSV.read(correct_path(path), DataFrame))
   end
 end
 
 function load_CSV(::SparseMatrixCSC{T}, path::String) where T
-  var = Matrix{T}(CSV.read(path, DataFrame))
+  var = Matrix{T}(CSV.read(correct_path(path), DataFrame))
   sparse(Int.(var[:,1]), Int.(var[:,2]), var[:,3])
 end
 
 function load_CSV(::SparseVector{T}, path::String) where T
-  var = Matrix{T}(CSV.read(path, DataFrame))
+  var = Matrix{T}(CSV.read(correct_path(path), DataFrame))
   sparse(Int.(var[:,1]), var[:,2])
 end
 
@@ -67,26 +51,26 @@ function save_CSV(var::Array{T,D}, path::String) where {T,D}
     var = reshape(var, :, 1)
   end
   try
-    CSV.write(path, DataFrame(var, :auto))
+    CSV.write(correct_path(path), DataFrame(var, :auto))
   catch
-    CSV.write(path, Tables.table(var))
+    CSV.write(correct_path(path), Tables.table(var))
   end
   return
 end
 
 function save_CSV(var::Vector{<:AbstractArray{T}}, path::String) where T
-  save_CSV(blocks_to_matrix(var), path)
+  save_CSV(blocks_to_matrix(var), correct_path(path))
 end
 
 function save_CSV(var::SparseMatrixCSC{T}, path::String) where T
   i, j, v = findnz(var)::Tuple{Vector{Int},Vector{Int},Vector{T}}
-  CSV.write(path, DataFrame([:i => i, :j => j, :v => v]))
+  CSV.write(correct_path(path), DataFrame([:i => i, :j => j, :v => v]))
   return
 end
 
 function save_CSV(var::SparseVector{T}, path::String) where T
   i, v = findnz(var)::Tuple{Vector{Int},Vector{T}}
-  CSV.write(path, DataFrame([:i => i, :v => v]))
+  CSV.write(correct_path(path), DataFrame([:i => i, :v => v]))
   return
 end
 
@@ -97,10 +81,11 @@ function save_CSV(var::Vector{<:AbstractArray{T}}, path::Vector{String}) where T
 end
 
 function append_CSV(var::AbstractArray, path::String)
-  if !isfile(path)
-    save_CSV(var, path)
+  pathCSV = correct_path(path)
+  if !isfile(pathCSV)
+    save_CSV(var, pathCSV)
   else
-    file = open(path)
+    file = open(pathCSV)
     save_CSV(var, file)
     close(file)
   end

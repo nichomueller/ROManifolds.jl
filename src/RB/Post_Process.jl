@@ -1,3 +1,23 @@
+function pp(
+  FEMSpace::FOM{D},
+  RBInfo::ROMInfoS{ID},
+  mean_pointwise_err::Matrix{T}) where {ID,D,T}
+
+  pass_to_pp = Dict("res_path"=>RBInfo.results_path, "FEMSpace"=>FEMSpace,
+    "mean_point_err"=>Float.(mean_pointwise_err))
+  post_process(RBInfo, pass_to_pp)
+  return
+end
+
+function pp(
+  FEMSpace::FOM{D},
+  RBInfo::ROMInfoS{ID},
+  mean_pointwise_err::Vector{Matrix{T}}) where {ID,D,T}
+
+  Broadcasting(err -> pp(FEMSpace, RBInfo, err))(mean_pointwise_err)
+  return
+end
+
 function post_process(::ROMInfoS, d::Dict)
 
   FEMSpace = d["FEMSpace"]

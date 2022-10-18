@@ -152,6 +152,60 @@ function assemble_function_termsₙ(
 
 end
 
+function get_S_var(var::String, nb::Int)
+  Snb = load_CSV(Matrix{T}(undef,0,0),
+    joinpath(get_FEM_snap_path(RBInfo), "$(var)ₕ.csv"))[:, nb]
+  Matrix{T}(reshape(Snb, :, 1))
+end
+
+function get_S_var(vars::Vector{String}, nb::Int)
+  Broadcasting(var -> get_S_var(var, nb))(vars)
+end
+
+function get_S_var(vars::Vector{String}, nbs::Vector{Int})
+  Broadcasting(nb -> get_S_var(vars, nb))(nbs)
+end
+
+function get_norms(solₕ)
+  norms = ["H¹"]
+  if length(solₕ) == 2
+    push!(norms, "L²")
+  end
+  norms
+end
+
+function errors(
+  solₕ::Matrix{T},
+  sõl::Matrix{T},
+  X::SparseMatrixCSC{Float,Int},
+  norm::String) where T
+
+  err_nb = compute_errors(solₕ, sõl, X)
+  pointwise_err = abs.(solₕ - sõl)
+  println("Online error, norm $norm: $err_nb")
+  (err_nb, pointwise_err)::Tuple{Float64, Matrix{Float64}}
+end
+
+function errors(
+  solsₕ::Vector{Matrix{T}},
+  sõls::Vector{Matrix{T}},
+  Xs::Vector{SparseMatrixCSC{Float,Int}},
+  norms::Vector{String}) where T
+
+  errs = Broadcasting(errors)(solsₕ, sõls, Xs, norms)
+  errs::Vector{Tuple{Float64, Matrix{Float64}}}
+end
+
+function errors(
+  solsₕ::Vector{Vector{Matrix{T}}},
+  sõls::Vector{Vector{Matrix{T}}},
+  X::Vector{SparseMatrixCSC{Float,Int}},
+  norm::Vector{String}) where T
+
+  errs = Broadcasting((solₕ, sõl) -> errors(solₕ, sõl, X, norm))(solsₕ, sõls)
+  errs::Vector{Vector{Tuple{Float64, Matrix{Float64}}}}
+end
+
 function compute_errors(
   xₕ::Vector{T},
   x̃::Vector{T},

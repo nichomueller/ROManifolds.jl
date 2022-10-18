@@ -109,7 +109,35 @@ function POD(S::AbstractArray{T}, ϵ::Float, ::Nothing) where T
 
 end
 
-function solve_cholesky(A::AbstractArray{T}, B::AbstractArray{T}) where T
+function Gram_Schmidt(
+  Vecs::Vector{Vector{T}},
+  Φₛ::Matrix{T},
+  X₀::SparseMatrixCSC{Float, Int}) where T
+
+  Vecs[1] /= norm(Vecs[1], X₀)
+
+  function orthogonalize(Vec::Vector{T}, Φ::Matrix{T})
+    q(j::Int) = dot(Vec, Φ[:, j], X₀) / norm(Φ[:, j], X₀) * Φ[:, j]
+    Vec - sum(Broadcasting(q)(1:size(Φ)[2]))
+  end
+
+  for i = 2:length(Vecs)
+    println("Normalizing primal supremizer $i")
+
+    Vecs[i] = orthogonalize(Vecs[i], Φₛ)
+    Vecs[i] = orthogonalize(Vecs[i], blocks_to_matrix(Vecs[1:i-1]))
+    supr_norm = norm(Vecs[i], X₀)
+
+    println("Norm supremizers: $supr_norm")
+    Vecs[i] /= supr_norm
+  end
+
+  Vecs::Vector{Vector{T}}
+end
+
+function solve_cholesky(
+  A::SparseMatrixCSC{Float, Int},
+  B::SparseMatrixCSC{Float, Int})
 
   H = cholesky(A)
   L = sparse(H.L)
@@ -118,7 +146,32 @@ function solve_cholesky(A::AbstractArray{T}, B::AbstractArray{T}) where T
   x = L[invperm(H.p), :]' \ y
 
   x
+end
 
+function solve_cholesky(
+  A::SparseMatrixCSC{Float, Int},
+  B::Matrix{T}) where T
+
+  H = cholesky(A)
+  L = sparse(H.L)
+
+  y = L[invperm(H.p), :] \ B
+  x = L[invperm(H.p), :]' \ y
+
+  Matrix{T}(x)
+end
+
+function solve_cholesky(
+  A::SparseMatrixCSC{Float, Int},
+  B::Vector{T}) where T
+
+  H = cholesky(A)
+  L = sparse(H.L)
+
+  y = L[invperm(H.p), :] \ B
+  x = L[invperm(H.p), :]' \ y
+
+  Vector{T}(x)
 end
 
 function mode₂_unfolding(Mat₁::Matrix{T}, nₛ::Int) where T
@@ -130,8 +183,29 @@ function mode₂_unfolding(Mat₁::Matrix{T}, nₛ::Int) where T
     Matrix{T}(Mat₁[:, (i-1)*Nₜ+1:i*Nₜ]')
   end
 
-  blocks_to_matrix(Broadcasting(mode₂)(1:nₛ))
+  blocks_to_matrix(Broadcasting(mode₂)(1:nₛ))::Matrix{T}
 
+end
+
+function mode₂_unfolding(Mat₁::Vector{Matrix{T}}, nₛ::Int) where T
+  Broadcasting(mat₁ -> mode₂_unfolding(mat₁, nₛ))(Mat₁)::Vector{Matrix{T}}
+end
+
+function vector_to_matrix(
+  Vec::Vector{T},
+  r::Int,
+  c::Int) where T
+
+  @assert length(Vec) == r*c "Wrong dimensions"
+  Matrix{T}(reshape(Vec, r, c))
+end
+
+function vector_to_matrix(
+  Vec::Vector{Vector{T}},
+  r::Vector{Int},
+  c::Vector{Int}) where T
+
+  Broadcasting(vector_to_matrix)(Vec, r, c)
 end
 
 function blocks_to_matrix(Mat_block::Vector{Matrix{T}}) where T
@@ -146,6 +220,14 @@ function blocks_to_matrix(Vec_block::Vector{Vector{T}}) where T
 
 end
 
+function block_to_push()
+
+end
+
+function matrix_to_vecblocks(Mat::Matrix{T}) where T
+  [Mat[:, i] for i = 1:size(Mat)[2]]::Vector{Vector{T}}
+end
+
 function matrix_to_blocks(Mat::Matrix{T}, nblocks=nothing) where T
 
   if isnothing(nblocks)
@@ -155,13 +237,15 @@ function matrix_to_blocks(Mat::Matrix{T}, nblocks=nothing) where T
   end
 
   ncol_block = Int(size(Mat)[2] / nblocks)
+  idx2 = ncol_block:ncol_block:size(Mat)[2]
+  idx1 = idx2 .- ncol_block .+ 1
 
   blockmat = Matrix{T}[]
-  for nb = 1:nblocks
-    push!(blockmat, Mat[:, (nb-1)*ncol_block+1:nb*ncol_block])
+  for i in eachindex(idx1)
+    push!(blockmat, Mat[:, idx1[i]:idx2[i]])
   end
 
-  blockmat
+  blockmat::Vector{Matrix{T}}
 
 end
 
