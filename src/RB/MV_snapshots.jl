@@ -13,13 +13,13 @@ function Mat_snapshots(
 
   function Mat_nonlinear(k::Int)::Tuple{Vector{Int},Vector{Float}}
     println("Snapshot number $k, $var")
-    Φₛ_fun = FEFunction(FEMSpace.V₀, RBVars.Φₛ[1][:, k])
-    Mat = assemble_FEM_matrix(FEMSpace, RBInfo, Φₛ_fun, var)
+    Φₛ_fun = FEFunction(FEMSpace.V₀[1], RBVars.Φₛ[1][:, k])
+    Mat = assemble_FEM_nonlinear_matrix(FEMSpace, RBInfo, μ[k], var)(Φₛ_fun)
     findnz(Mat[:])
   end
 
-  Mat(k) = var ∈ ("C", "D") ? Mat_nonlinear(k) : Mat_linear(k)
-  nₛ = var ∈ ("C", "D") ? RBVars.nₛᵘ : RBInfo.nₛ_MDEIM
+  Mat(k) = isnonlinear(RBInfo, var) ? Mat_nonlinear(k) : Mat_linear(k)
+  nₛ = isnonlinear(RBInfo, var) ? RBVars.nₛ[1] : RBInfo.nₛ_MDEIM
 
   i_v_block = Broadcasting(Mat)(1:nₛ)
   correct_structures(last.(i_v_block), first.(i_v_block))::Tuple{Matrix{Float}, Vector{Int}}

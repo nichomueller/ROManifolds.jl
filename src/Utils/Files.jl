@@ -67,12 +67,12 @@ end
 
 function load_CSV(::SparseMatrixCSC{T, Int}, path::String) where T
   ijv = readdlm(correct_path(path), ',')
-  sparse(Int.(ijv), Int.(ijv), T.(ijv))::SparseMatrixCSC{T, Int}
+  sparse(Int.(ijv[1,:]), Int.(ijv[2,:]), T.(ijv[3,:]))::SparseMatrixCSC{T, Int}
 end
 
 function load_CSV(::SparseVector{T, Int}, path::String) where T
   iv = readdlm(correct_path(path), ',')
-  sparse(Int.(iv), T.(iv))::SparseVector{T, Int}
+  sparse(Int.(iv[1,:]), T.(iv[2,:]))::SparseVector{T, Int}
 end
 
 function save_structures_in_list(

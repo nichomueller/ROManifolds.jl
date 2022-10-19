@@ -109,6 +109,15 @@ function assemble_FEM_matrix(
 
 end
 
+function assemble_FEM_nonlinear_matrix(
+  FEMSpace::FOM,
+  RBInfo::ROMInfo,
+  args...)
+
+  assemble_FEM_nonlinear_matrix(FEMSpace, RBInfo.FEMInfo, args...)
+
+end
+
 function assemble_FEM_vector(
   FEMSpace::FOM,
   RBInfo::ROMInfo,

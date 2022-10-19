@@ -120,6 +120,7 @@ end
 
 function assemble_affine_structure(
   RBInfo::ROMInfo{ID},
+  RBVars::ROM{ID,T},
   Var::VVariable{T}) where {ID,T}
 
   var = Var.var
@@ -127,9 +128,10 @@ function assemble_affine_structure(
   println("Assembling affine reduced $var")
 
   function affine_vector(var)
+    Φₛ_left, _ = get_Φₛ(RBVars, var)
     Vec = load_CSV(Matrix{T}(undef,0,0),
       joinpath(get_FEM_structures_path(RBInfo), "$(var).csv"))
-    (RBVars.Φₛ' * Vec)
+    (Φₛ_left' * Vec)
   end
 
   push!(Var.Matₙ, affine_vector(var)::Matrix{T})
@@ -140,6 +142,7 @@ end
 
 function assemble_affine_structure(
   RBInfo::ROMInfo{ID},
+  RBVars::ROM{ID,T},
   Var::MVariable{T}) where {ID,T}
 
   var = Var.var
@@ -147,9 +150,10 @@ function assemble_affine_structure(
   println("Assembling affine reduced $var")
 
   function affine_matrix(var)
+    Φₛ_left, Φₛ_right = get_Φₛ(RBVars, var)
     Mat = load_CSV(sparse([],[],T[]),
       joinpath(get_FEM_structures_path(RBInfo), "$(var).csv"))
-    (RBVars.Φₛ' * Mat * RBVars.Φₛ)
+    (Φₛ_left' * Mat * Φₛ_right)
   end
 
   push!(Var.Matₙ, affine_matrix(var)::Matrix{T})
@@ -160,9 +164,10 @@ end
 
 function assemble_affine_structure(
   RBInfo::ROMInfo{ID},
+  RBVars::ROM{ID,T},
   Vars::Vector{<:MVVariable{T}}) where {ID,T}
 
-  Broadcasting(Var -> assemble_affine_structure(RBInfo, Var))(Vars)
+  Broadcasting(Var -> assemble_affine_structure(RBInfo, RBVars, Var))(Vars)
 
   return
 
@@ -202,6 +207,8 @@ function assemble_MDEIM_Matₙ(
   Vars::MVariable{T},
   args...) where T
 
+  println("Multiplying MDEIM basis of $(Vars.var) by the RB, this might take some time...")
+
   Φₛ_left, Φₛ_right = args
   MDEIM = Vars.MDEIM
 
@@ -229,6 +236,8 @@ function assemble_MDEIM_Matₙ(
   Vars::VVariable{T},
   args...) where T
 
+  println("Multiplying MDEIM basis of $(Vars.var) by the RB")
+
   Φₛ_left, _ = args
   MDEIM = Vars.MDEIM
 
@@ -253,10 +262,10 @@ function assemble_offline_structures(
     nav = intersect(operators, get_nonaffine_vectors(RBInfo))
 
     if !isempty(am)
-      assemble_affine_structure(RBInfo, MVariable(RBInfo, RBVars, am))
+      assemble_affine_structure(RBInfo, RBVars, MVariable(RBInfo, RBVars, am))
     end
     if !isempty(av)
-      assemble_affine_structure(RBInfo, VVariable(RBInfo, RBVars, av))
+      assemble_affine_structure(RBInfo, RBVars, VVariable(RBInfo, RBVars, av))
     end
     if !isempty(nam)
       assemble_MDEIM_structure(RBInfo, RBVars, MVariable(RBInfo, RBVars, nam))
@@ -495,11 +504,8 @@ function assemble_θ_function(
   nonlin_Mat_ops = get_nonlinear_matrices(RBInfo)
   MVars = MVariable(RBInfo, RBVars, nonlin_Mat_ops)
   MParams = Broadcasting(Var -> assemble_θ_function(FEMSpace, RBInfo, Var, μ))(MVars)
-  nonlin_Vec_ops = get_nonlinear_vectors(RBInfo)
-  VVars = VVariable(RBInfo, RBVars, nonlin_Vec_ops)
-  VParams = Broadcasting(Var -> assemble_θ_function(FEMSpace, RBInfo, Var, μ))(VVars)
 
-  vcat(MParams, VParams)::Vector{<:ParamInfo}
+  MParams::Vector{<:ParamInfo}
 
 end
 
@@ -535,7 +541,7 @@ function assemble_function_matricesₙ(
   nonlin_Mat_ops = get_nonlinear_matrices(RBInfo)
   matrix_Vars = MVariable(RBInfo, RBVars, nonlin_Mat_ops)
   matrix_Params = ParamInfo(Params, nonlin_Mat_ops)
-  assemble_function_termsₙ(matrix_Vars, matrix_Params)::Function
+  assemble_function_termsₙ(matrix_Vars, matrix_Params)::Vector{<:Function}
 
 end
 
@@ -547,7 +553,7 @@ function assemble_function_vectorsₙ(
   nonlin_Vec_ops = get_nonlinear_vectors(RBInfo)
   vector_Vars = MVariable(RBInfo, RBVars, nonlin_Vec_ops)
   vector_Params = ParamInfo(Params, nonlin_Vec_ops)
-  assemble_function_termsₙ(vector_Vars, vector_Params)::Function
+  assemble_function_termsₙ(vector_Vars, vector_Params)::Vector{<:Function}
 
 end
 

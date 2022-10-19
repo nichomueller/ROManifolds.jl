@@ -111,6 +111,7 @@ function assemble_form(
       ∫(v ⊙ (∇(z)'⋅u) )ParamForm.dΩ
     end
   end
+  trilinear_form(z) = (u, v) -> trilinear_form(u, v, z)
 
   function bilinear_form(u, v)
     if var == "Xu"
@@ -142,11 +143,12 @@ function assemble_form(
     else
       g = interpolate_dirichlet(ParamForm.fun, FEMSpace.V[1])
       if var == "L"
-        Param_AB = ParamInfo(FEMInfo, ParamForm.μ, "A")
+        Param_A = ParamInfo(FEMInfo, ParamForm.μ, "A")
+        ∫(Param_A.fun * ∇(v) ⊙ ∇(g))ParamForm.dΩ
       else var == "Lc"
-        Param_AB = ParamInfo(FEMInfo, ParamForm.μ, "B")
+        Param_B = ParamInfo(FEMInfo, ParamForm.μ, "B")
+        ∫(Param_B.fun * v ⋅ (∇⋅(g)))ParamForm.dΩ
       end
-      ∫(Param_AB.fun * ∇(v) ⋅ (∇⋅(g)))ParamForm.dΩ
     end
   end
 
@@ -799,6 +801,86 @@ function assemble_FEM_matrix(
   assemble_FEM_matrix(FEMSpace, FEMInfo, Param)
 
 end
+
+##############################################################################
+
+function assemble_FEM_nonlinear_matrix(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  ParamForm::ParamFormInfo) where ID
+
+  var = ParamForm.var
+  form(z) = assemble_form(FEMSpace, FEMInfo, ParamForm)(z)
+  Mat(z) = assemble_matrix(form(z), get_FEMSpace_matrix(FEMSpace, var)...)
+  Mat::Function
+
+end
+
+function assemble_FEM_nonlinear_matrix(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  ParamForm::Vector{<:ParamFormInfo}) where ID
+
+  FEM_matrix(P) = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, P)
+  Broadcasting(FEM_matrix)(ParamForm)
+
+end
+
+function assemble_FEM_nonlinear_matrix(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  Param::ParamInfo) where ID
+
+  ParamForm = ParamFormInfo(FEMSpace, Param)
+  assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, ParamForm)
+
+end
+
+function assemble_FEM_nonlinear_matrix(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  Param::Vector{<:ParamInfo}) where ID
+
+  FEM_matrix(P) = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo,
+    ParamFormInfo(FEMSpace, P))
+  Broadcasting(FEM_matrix)(Param)
+
+end
+
+function assemble_FEM_nonlinear_matrix(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  μ::Vector{T},
+  var::String) where {ID,T}
+
+  Param = ParamInfo(FEMInfo, μ, var)
+  assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, Param)
+
+end
+
+function assemble_FEM_nonlinear_matrix(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  μvec::Vector{Vector{T}},
+  var::String) where {ID,T}
+
+  Mat(μ) = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ, var)
+  Broadcasting(Mat)(μvec)
+
+end
+
+function assemble_FEM_nonlinear_matrix(
+  FEMSpace::FOM,
+  FEMInfo::FOMInfo{ID},
+  μ::Vector{T},
+  var::Vector{String}) where {ID,T}
+
+  Param = ParamInfo(FEMInfo, μ, var)
+  assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, Param)
+
+end
+
+##############################################################################
 
 function assemble_affine_FEM_matrices(
   FEMSpace::FOM,

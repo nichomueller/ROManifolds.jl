@@ -163,7 +163,7 @@ function assemble_sparse_function(
   dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
   ParamForm = ParamFormInfo(Param, dΩ_sparse)
 
-  assemble_FEM_matrix(FEMSpace, FEMInfo, ParamForm)
+  assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, ParamForm)
 
 end
 
@@ -241,7 +241,7 @@ function θ_function(
 
   Fun_μ_sparse =
     assemble_sparse_function(FEMSpace, FEMInfo, Param, MDEIM.el)
-  MDEIM_online(RBVars, Fun_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
+  MDEIM_online(Fun_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
 
 end
 

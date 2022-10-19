@@ -22,58 +22,63 @@ function get_snapshot_matrix(
 
 end
 
-function time_supremizers(Φₜᵘ::Matrix{T}, Φₜᵖ::Matrix{T}) where T
+function time_supremizers(
+  RBVars::ROMMethodST{ID,T},
+  tol=1e-2) where {ID,T}
 
-  function projection_on_current_space(
-    ξ_new::Vector{T},
-    ξ::Matrix{T}) where T
+  println("Checking if supremizers in time need to be added")
 
-    proj = zeros(T, size(ξ_new))
-    for j = 1:size(ξ)[2]
-      proj += ξ[:,j] * (ξ_new' * ξ[:,j]) / (ξ[:,j]' * ξ[:,j])
-    end
-
-    proj
-
-  end
-
-  println("Checking if primal supremizers in time need to be added")
-
-  ΦₜᵘΦₜᵖ = Φₜᵘ' * Φₜᵖ
-  ξ = zeros(T, size(ΦₜᵘΦₜᵖ))
+  Φₜ = RBVars.Φₜ[1]' * RBVars.Φₜ[2]
   count = 0
 
-  for l = 1:size(ΦₜᵘΦₜᵖ)[2]
-
-    if l == 1
-      ξ[:,l] = ΦₜᵘΦₜᵖ[:,1]
-      enrich = (norm(ξ[:,l]) ≤ 1e-2)
-    else
-      ξ[:,l] = projection_on_current_space(ΦₜᵘΦₜᵖ[:, l], ΦₜᵘΦₜᵖ[:, 1:l-1])
-      enrich = (norm(ξ[:,l] - ΦₜᵘΦₜᵖ[:,l]) ≤ 1e-2)
-    end
-
-    if enrich
-      Φₜᵖ_l_on_Φₜᵘ = projection_on_current_space(Φₜᵖ[:, l], Φₜᵘ)
-      Φₜᵘ_to_add = ((Φₜᵖ[:, l] - Φₜᵖ_l_on_Φₜᵘ) / norm(Φₜᵖ[:, l] - Φₜᵖ_l_on_Φₜᵘ))
-      Φₜᵘ = hcat(Φₜᵘ, Φₜᵘ_to_add)
-      ΦₜᵘΦₜᵖ = hcat(ΦₜᵘΦₜᵖ, Φₜᵘ_to_add' * Φₜᵖ)
-      count += 1
-    end
-
+  function projection(ξnew::Vector{T}, ξ::Vector{T})
+    ξ * (ξnew' * ξ)
   end
 
-  println("Added $count time supremizers to Φₜᵘ; final nₜᵘ is: $(size(Φₜᵘ)[1])")
-  Φₜᵘ
+  function projection(ξnew::Vector{T}, Φ::Vector{Vector{T}})
+    sum(Broadcasting(ξold -> orth_projection(ξnew, ξold))(Φ))
+  end
+
+  function orth_projection(ξnew::Vector{T}, ξ::Vector{T})
+    ξ * (ξnew' * ξ) / (ξ' * ξ)
+  end
+
+  function orth_projection(ξnew::Vector{T}, Φ::Vector{Vector{T}})
+    sum(Broadcasting(ξold -> orth_projection(ξnew, ξold))(Φ))
+  end
+
+  function enrich(Φₜ::Matrix{T}, count::Int, l::Int)
+    ξˣ = RBVars.Φₜ[2][:,l]
+    ξnew = (ξˣ - projection(ξˣ, RBVars.Φₜ[1]))
+    ξnew /= norm(ξnew)
+    RBVars.Φₜ[1] = hcat(RBVars.Φₜ[1], ξnew)
+    RBVars.nₜ[1] += 1
+    Φₜ = hcat(Φₜ, ξnew' * RBVars.Φₜ[2])
+    count += 1
+    Φₜ, count
+  end
+
+  function loop(Φₜ::Matrix{T}, count::Int, l::Int)
+    πₗ = l == 1 ? Φₜ[:,1] : orth_projection(Φₜ[:,j], Φₜ[:,1:j-1])
+    if norm(Φₜ[:,l] - πₗ) ≤ tol
+      Φₜ, count = enrich(Φₜ, count, l)
+    end
+    Φₜ, count
+  end
+
+  for l = 1:RBVars.nₜ[2]
+    Φₜ, count = loop(Φₜ, count, l)
+  end
+
+  println("Added $count time supremizers to Φₜᵘ")
 
 end
 
-function supr_enrichment_time(
-  RBInfo::ROMInfoST{ID},
-  RBVars::ROMMethodST{ID,T}) where {ID,T}
+function supr_enrichment_time(RBVars::ROMMethodST{ID,T}) where {ID,T}
 
-  RBVars.Φₜᵘ = time_supremizers(RBVars.Φₜᵘ, RBVars.Φₜᵖ)
-  RBVars.nₜᵘ = size(RBVars.Φₜᵘ)[2]
+  supr = assemble_supremizers_time(RBVars)
+  RBVars.Φₜ[1] = hcat(RBVars.Φₜ[1], supr)
+  RBVars.nₜ[1] = size(RBVars.Φₜ[1])[2]
 
 end
 
@@ -98,7 +103,7 @@ function assemble_RB_time(
   RBVars.nₜ = cols(RBVars.Φₛ)
 
   if ID == 2 || ID == 3
-    supr_enrichment_time(RBInfo, RBVars)
+    supr_enrichment_time(RBVars)
   end
 
   if RBInfo.save_offline
@@ -217,7 +222,7 @@ function online_phase(
   mean_online_time = RBVars.online_time / length(param_nbs)
   println("Online wall time: $(RBVars.online_time)s ")
 
-  xₕ = get_S_var(RBInfo.unknowns, param_nbs)
+  xₕ = get_S_var(RBInfo.unknowns, param_nbs, get_FEM_snap_path(RBInfo))
   norms = get_norms(xₕ[1])
   err = errors(xₕ, RBVars.x̃, RBVars.X₀, norms)
   mean_err = sum(first.(first.(err))) / length(param_nbs)

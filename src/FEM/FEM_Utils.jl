@@ -17,7 +17,7 @@ function get_FEM_structures(name::String, issteady::Bool)
     matvec = ["A", "F", "H", "L"]
   elseif name == "stokes"
     matvec = ["A", "B", "F", "H", "L", "Lc"]
-  elseif name == "navier_stokes"
+  elseif name == "navier-stokes"
     matvec = ["A", "B", "C", "D", "F", "H", "L", "Lc"]
   else
     error("Not implemented")
