@@ -204,8 +204,7 @@ function θ(
   else
     Mat_μ_sparse =
       assemble_sparse_matrix(FEMSpace, FEMInfo, Param, MDEIM.el)
-    θvec = MDEIM_online(Mat_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
-    θ = [[θvec[q]] for q in eachindex(θvec)]
+    θ = MDEIM_online(Mat_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
   end
 
   θ::Vector{Vector{T}}
@@ -223,8 +222,7 @@ function θ(
   else
     Mat_μ_sparse =
       assemble_sparse_vector(FEMSpace, FEMInfo, Param, MDEIM.el)
-    θvec = MDEIM_online(Mat_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
-    θ = [[θvec[q]] for q in eachindex(θvec)]
+    θ = MDEIM_online(Mat_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
   end
 
   θ::Vector{Vector{T}}
@@ -320,7 +318,8 @@ function MDEIM_online(
   idx::Vector{Int},
   Nₜ=1) where T
 
-  @inbounds Matᵢ \ reshape(Mat_nonaffine, :, Nₜ)[idx]
+  θvec = Matᵢ \ reshape(Mat_nonaffine, :, Nₜ)[idx,:]
+  matrix_to_vecblocks(Matrix{T}(θvec'))
 
 end
 
@@ -330,8 +329,8 @@ function MDEIM_online(
   idx::Vector{Int},
   Nₜ=1) where T
 
-  θmat(u) = (@inbounds Matᵢ \ reshape(Fun_nonaffine(u), :, Nₜ)[idx])
-  θblock(u) = matrix_to_blocks(θmat(u))
+  θmat(u) = Matᵢ \ reshape(Fun_nonaffine(u), :, Nₜ)[idx,:]
+  θblock(u) = matrix_to_vecblocks(Matrix{T}(θmat(u)'))
 
   θblock
 

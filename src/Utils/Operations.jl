@@ -264,7 +264,6 @@ function matrix_to_blocks(Mat::Array{T, 3}) where T
 
 end
 
-
 function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
 
   numnz = nnz(S)

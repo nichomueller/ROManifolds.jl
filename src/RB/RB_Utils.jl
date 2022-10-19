@@ -138,7 +138,7 @@ function assemble_function_termsₙ(
   @assert Var.var == Param.var
 
   mult = Broadcasting(.*)
-  termₙ(u) = u -> sum(mult(Var.Matₙ, Param.fun(u)))
+  termₙ(u) = sum(mult(Var.Matₙ, Param.fun(u)))
 
   termₙ
 

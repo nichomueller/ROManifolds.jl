@@ -4,18 +4,19 @@ function get_JinvₙResₙ(
   Params::Vector{ParamInfoS}) where T
 
   Cₙu, Dₙu = assemble_function_matricesₙ(RBInfo, RBVars, Params)
-  RHSₙ = RBVars.RHSₙ[1]
+  RHSₙ = vcat(RBVars.RHSₙ[1], RBVars.RHSₙ[2])
 
   block2 = zeros(T, RBVars.nₛ[1], RBVars.nₛ[2])
   block3 = zeros(T, RBVars.nₛ[2], RBVars.nₛ[1])
   block4 = zeros(T, RBVars.nₛ[2], RBVars.nₛ[2])
-  LHSₙ_lin = RBVars.LHSₙ[1]
+  LHSₙ_lin = vcat(hcat(RBVars.LHSₙ[1], Matrix{T}(-RBVars.LHSₙ[2]')),
+    hcat(RBVars.LHSₙ[2], zeros(T, RBVars.nₛ[2], RBVars.nₛ[2])))
 
   LHSₙ_nonlin1(u) = vcat(hcat(Cₙu(u), block2), hcat(block3, block4))
   LHSₙ_nonlin2(u) = vcat(hcat(Cₙu(u) + Dₙu(u), block2), hcat(block3, block4))
 
-  Jₙ(u::Function) = LHSₙ_lin(u) + LHSₙ_nonlin2(u)
-  resₙ(u::FEFunction, x̂::Matrix{T}) = (LHSₙ_lin(u) + LHSₙ_nonlin1(u)) * x̂ - RHSₙ
+  Jₙ(u::FEFunction) = LHSₙ_lin + LHSₙ_nonlin2(u)
+  resₙ(u::FEFunction, x̂::Matrix{T}) = (LHSₙ_lin + LHSₙ_nonlin1(u)) * x̂ - RHSₙ
 
   JinvₙResₙ(u::FEFunction, x̂::Matrix{T}) = (Jₙ(u) \ resₙ(u, x̂))::Matrix{T}
   JinvₙResₙ::Function
@@ -30,7 +31,7 @@ function newton(
 
   x̂mat = zeros(T, sum(RBVars.nₛ), 1)
   δx̂ = 1. .+ x̂mat
-  u = FEFunction(FEMSpace.V[1], zeros(T, RBVars.Nₛᵘ))
+  u = FEFunction(FEMSpace.V[1], zeros(T, RBVars.Nₛ[1]))
   k = 0
   err = norm(δx̂)
 
@@ -54,9 +55,8 @@ function assemble_LHSₙ(
   Params::Vector{ParamInfoS}) where T
 
   Matsₙ = assemble_matricesₙ(RBInfo, RBVars, Params)::Vector{Matrix{T}}
-  LHSₙ = vcat(hcat(Matsₙ[1], Matrix{T}(-Matsₙ[2]')), hcat(Matsₙ[2],
-    zeros(T, RBVars.nₛ[2], RBVars.nₛ[2])))
-  push!(RBVars.LHSₙ, LHSₙ)
+  push!(RBVars.LHSₙ, Matsₙ[1])
+  push!(RBVars.LHSₙ, Matsₙ[2])
 
   return
 
@@ -68,8 +68,8 @@ function assemble_RHSₙ(
   Params::Vector{ParamInfoS}) where T
 
   Vecsₙ = assemble_vectorsₙ(RBInfo, RBVars, Params)::Vector{Matrix{T}}
-  RHSₙ = vcat(sum(Vecsₙ[1:3]), Vecsₙ[end])
-  push!(RBVars.RHSₙ, RHSₙ)
+  push!(RBVars.RHSₙ, sum(Vecsₙ[1:end-1]))
+  push!(RBVars.RHSₙ, Vecsₙ[end])
 
   return
 
@@ -82,8 +82,8 @@ function assemble_RHSₙ(
   μ::Vector{T}) where {D,T}
 
   RHS = assemble_RHS(FEMSpace, RBInfo, μ)
-  RHSₙ = vcat(RBVars.Φₛ[1]' * sum(RHS[1:3]), RBVars.Φₛ[2]' * RHS[end])
-  push!(RBVars.RHSₙ, reshape(RHSₙ, :, 1)::Matrix{T})
+  push!(RBVars.RHSₙ, RBVars.Φₛ[1]' * sum(RHS[1:end-1]))
+  push!(RBVars.RHSₙ, RBVars.Φₛ[2]' * RHS[end])
 
   return
 
@@ -135,13 +135,15 @@ function solve_RB_system(
   JinvₙResₙ::Function) where {D,T}
 
   println("Solving RB problem via Newton-Raphson iterations")
-  push!(RBVars.xₙ, newton(FEMSpace, RBVars, JinvₙResₙ))
+  xₙ = newton(FEMSpace, RBVars, JinvₙResₙ)
+  push!(RBVars.xₙ, xₙ[1:RBVars.nₛ[1],:])
+  push!(RBVars.xₙ, xₙ[RBVars.nₛ[1]+1:end,:])
 
 end
 
 function assemble_solve_reconstruct(
   FEMSpace::FOM{D},
-  ::ROMInfo{3},
+  RBInfo::ROMInfo{3},
   RBVars::ROM{3,T},
   μ::Vector{T}) where {D,T}
 

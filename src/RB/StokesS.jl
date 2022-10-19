@@ -6,9 +6,8 @@ function assemble_LHSₙ(
   Params::Vector{ParamInfoS}) where T
 
   Matsₙ = assemble_matricesₙ(RBInfo, RBVars, Params)::Vector{Matrix{T}}
-  LHSₙ = vcat(hcat(Matsₙ[1], Matrix{T}(-Matsₙ[2]')), hcat(Matsₙ[2],
-    zeros(T, RBVars.nₛ[2], RBVars.nₛ[2])))
-  push!(RBVars.LHSₙ, LHSₙ)
+  push!(RBVars.LHSₙ, Matsₙ[1])
+  push!(RBVars.LHSₙ, Matsₙ[2])
 
   return
 
@@ -20,8 +19,8 @@ function assemble_RHSₙ(
   Params::Vector{ParamInfoS}) where T
 
   Vecsₙ = assemble_vectorsₙ(RBInfo, RBVars, Params)::Vector{Matrix{T}}
-  RHSₙ = vcat(sum(Vecsₙ[1:3]), Vecsₙ[end])
-  push!(RBVars.RHSₙ, RHSₙ)
+  push!(RBVars.RHSₙ, sum(Vecsₙ[1:end-1]))
+  push!(RBVars.RHSₙ, Vecsₙ[end])
 
   return
 
@@ -34,8 +33,8 @@ function assemble_RHSₙ(
   μ::Vector{T}) where {D,T}
 
   RHS = assemble_RHS(FEMSpace, RBInfo, μ)
-  RHS = vcat(sum(RHS[1:3]), RHS[end])
-  push!(RBVars.RHSₙ, reshape(RBVars.Φₛ[1]' * RHS, :, 1)::Matrix{T})
+  push!(RBVars.RHSₙ, RBVars.Φₛ[1]' * sum(RHS[1:end-1]))
+  push!(RBVars.RHSₙ, RBVars.Φₛ[2]' * RHS[end])
 
   return
 
@@ -81,7 +80,11 @@ end
 function solve_RB_system(RBVars::ROMMethodS{2,T}) where T
 
   println("Solving RB problem via backslash")
-  xₙ = RBVars.LHSₙ[1] \ RBVars.RHSₙ[1]
+  LHSₙ = vcat(hcat(RBVars.LHSₙ[1], Matrix{T}(-RBVars.LHSₙ[2]')),
+    hcat(RBVars.LHSₙ[2], zeros(T, RBVars.nₛ[2], RBVars.nₛ[2])))
+  RHSₙ = vcat(RBVars.RHSₙ[1], RBVars.RHSₙ[2])
+
+  xₙ = LHSₙ \ RHSₙ
   push!(RBVars.xₙ, xₙ[1:RBVars.nₛ[1],:])
   push!(RBVars.xₙ, xₙ[RBVars.nₛ[1]+1:end,:])
 
