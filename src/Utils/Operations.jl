@@ -210,6 +210,10 @@ end
 
 function blocks_to_matrix(Mat_block::Vector{Matrix{T}}) where T
 
+  for i = 1 .+ eachindex(Mat_block)
+    @assert size(Mat_block[i])[1] == size(Mat_block[1])[1] "Rows in Mat_block must be the same"
+  end
+
   Matrix{T}(reduce(vcat, transpose.(Mat_block))')
 
 end

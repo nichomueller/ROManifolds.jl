@@ -147,6 +147,8 @@ function get_MDEIM_structures(
   RBInfo::ROMInfoST{ID},
   Var::MVariable) where ID
 
+  var = Var.var
+
   Var.MDEIM.Matᵢ, Var.MDEIM.idx, Var.MDEIM.el =
     load_structures_in_list(("Matᵢ_$(var)", "idx_$(var)", "time_idx_$(var)", "el_$(var)"),
     (Var.MDEIM.Matᵢ, Var.MDEIM.idx, Var.MDEIM.time_idx, Var.MDEIM.el), RBInfo.ROM_structures_path)
@@ -156,6 +158,8 @@ end
 function get_MDEIM_structures(
   RBInfo::ROMInfoST{ID},
   Var::VVariable) where ID
+
+  var = Var.var
 
   Var.MDEIM.Matᵢ, Var.MDEIM.idx, Var.MDEIM.el =
     load_structures_in_list(("Matᵢ_$(var)", "idx_$(var)", "time_idx_$(var)", "el_$(var)"),

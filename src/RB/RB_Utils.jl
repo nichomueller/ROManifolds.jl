@@ -152,18 +152,18 @@ function assemble_function_termsₙ(
 
 end
 
-function get_S_var(var::String, nb::Int)
-  Snb = load_CSV(Matrix{T}(undef,0,0),
-    joinpath(get_FEM_snap_path(RBInfo), "$(var)ₕ.csv"))[:, nb]
-  Matrix{T}(reshape(Snb, :, 1))
+function get_S_var(var::String, nb::Int, path::String)
+  Snb = load_CSV(Matrix{Float}(undef,0,0),
+    joinpath(path, "$(var)ₕ.csv"))[:, nb]
+  Matrix{Float}(reshape(Snb, :, 1))
 end
 
-function get_S_var(vars::Vector{String}, nb::Int)
-  Broadcasting(var -> get_S_var(var, nb))(vars)
+function get_S_var(vars::Vector{String}, nb::Int, path::String)
+  Broadcasting(var -> get_S_var(var, nb, path))(vars)
 end
 
-function get_S_var(vars::Vector{String}, nbs::Vector{Int})
-  Broadcasting(nb -> get_S_var(vars, nb))(nbs)
+function get_S_var(vars::Vector{String}, nbs::Vector{Int}, path::String)
+  Broadcasting(nb -> get_S_var(vars, nb, path))(nbs)
 end
 
 function get_norms(solₕ)

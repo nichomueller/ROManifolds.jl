@@ -5,8 +5,7 @@ using Distributions
 using SuiteSparse
 using SparseArrays
 using Arpack
-using CSV
-using JLD
+using DelimitedFiles
 using Test
 using ScatteredInterpolation
 using PlotlyJS

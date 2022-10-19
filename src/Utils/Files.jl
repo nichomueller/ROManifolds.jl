@@ -15,63 +15,14 @@ function correct_path(path::String)
   path[end-3:end] == ".csv" ? path : path * ".csv"
 end
 
-function load_CSV(::Vector{Matrix{T}}, path::String) where T
-  Array(CSV.read(correct_path(path), DataFrame))
+function save_CSV(var, path::String)
+  writedlm(correct_path(path), var, ','; header=false)
 end
 
-function load_CSV(::Vector{Vector{T}}, path::String) where T
-  var = Array(CSV.read(correct_path(path), DataFrame))
-  try
-    matrix_to_vecblocks(var)
-  catch
-    [parse.(T, split(chop(var[k]; head=1, tail=1), ",")) for k in 1:size(var)[1]]
-  end
-end
-
-function load_CSV(::Array{T,D}, path::String) where {T,D}
-  if D == 1
-    Matrix{T}(CSV.read(correct_path(path), DataFrame))[:]
-  else
-    Array{T,D}(CSV.read(correct_path(path), DataFrame))
-  end
-end
-
-function load_CSV(::SparseMatrixCSC{T}, path::String) where T
-  var = Matrix{T}(CSV.read(correct_path(path), DataFrame))
-  sparse(Int.(var[:,1]), Int.(var[:,2]), var[:,3])
-end
-
-function load_CSV(::SparseVector{T}, path::String) where T
-  var = Matrix{T}(CSV.read(correct_path(path), DataFrame))
-  sparse(Int.(var[:,1]), var[:,2])
-end
-
-function save_CSV(var::Array{T,D}, path::String) where {T,D}
-  if D == 1
-    var = reshape(var, :, 1)
-  end
-  try
-    CSV.write(correct_path(path), DataFrame(var, :auto))
-  catch
-    CSV.write(correct_path(path), Tables.table(var))
-  end
-  return
-end
-
-function save_CSV(var::Vector{<:AbstractArray{T}}, path::String) where T
-  save_CSV(blocks_to_matrix(var), correct_path(path))
-end
-
-function save_CSV(var::SparseMatrixCSC{T}, path::String) where T
-  i, j, v = findnz(var)::Tuple{Vector{Int},Vector{Int},Vector{T}}
-  CSV.write(correct_path(path), DataFrame([:i => i, :j => j, :v => v]))
-  return
-end
-
-function save_CSV(var::SparseVector{T}, path::String) where T
-  i, v = findnz(var)::Tuple{Vector{Int},Vector{T}}
-  CSV.write(correct_path(path), DataFrame([:i => i, :v => v]))
-  return
+function save_CSV(var::Vector{Matrix{T}}, path::String) where T
+  vec_string = ["$(var[i])" for i = eachindex(var)]
+  mod_vec_string = Broadcasting(str -> replace(str, ";;" => ""))(vec_string)
+  save_CSV(mod_vec_string, path)
 end
 
 function save_CSV(var::Vector{<:AbstractArray{T}}, path::Vector{String}) where T
@@ -80,16 +31,48 @@ function save_CSV(var::Vector{<:AbstractArray{T}}, path::Vector{String}) where T
   return
 end
 
-function append_CSV(var::AbstractArray, path::String)
-  pathCSV = correct_path(path)
-  if !isfile(pathCSV)
-    save_CSV(var, pathCSV)
-  else
-    file = open(pathCSV)
-    save_CSV(var, file)
-    close(file)
+function save_CSV(var::SparseMatrixCSC, path::String)
+  writedlm(correct_path(path), findnz(var), ','; header=false)
+end
+
+function save_CSV(var::SparseVector, path::String)
+  writedlm(correct_path(path), findnz(var), ','; header=false)
+end
+
+function load_CSV(::Array{T,D}, path::String) where {T,D}
+  var = readdlm(correct_path(path), ',', T)
+  var_ret = D == 1 ? var[:,1] : var
+  var_ret::Array{T,D}
+end
+
+function load_CSV(::Vector{Vector{T}}, path::String) where T
+  mat_any = Matrix{T}(readdlm(correct_path(path), ',')')
+  matrix_to_vecblocks(mat_any)::Vector{Vector{T}}
+end
+
+function load_CSV(::Vector{Matrix{T}}, path::String) where T
+  mat_any = readdlm(correct_path(path), ',')
+  function to_matrix(i::Int)
+    vec_substring = split(chop(mat_any[i]; head=1, tail=1), "; ")
+    vecvec_substring = Broadcasting(y -> split(y, " "))(vec_substring)
+    vecvec = Broadcasting(y->parse.(T, y))(vecvec_substring)
+    Matrix{T}(blocks_to_matrix(vecvec)')
   end
-  return
+  Broadcasting(to_matrix)(eachindex(mat_any))::Vector{Matrix{T}}
+end
+
+function load_CSV(::Vector{Matrix{T}}, path::Vector{String}) where T
+  Broadcasting(p -> load_CSV(Matrix{T}(undef,0,0), p))(path)::Vector{Matrix{T}}
+end
+
+function load_CSV(::SparseMatrixCSC{T, Int}, path::String) where T
+  ijv = readdlm(correct_path(path), ',')
+  sparse(Int.(ijv), Int.(ijv), T.(ijv))::SparseMatrixCSC{T, Int}
+end
+
+function load_CSV(::SparseVector{T, Int}, path::String) where T
+  iv = readdlm(correct_path(path), ',')
+  sparse(Int.(iv), T.(iv))::SparseVector{T, Int}
 end
 
 function save_structures_in_list(

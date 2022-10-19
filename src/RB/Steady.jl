@@ -43,6 +43,8 @@ function get_MDEIM_structures(
   RBInfo::ROMInfoS{ID},
   Var::MVariable) where ID
 
+  var = Var.var
+
   Var.MDEIM.Matᵢ, Var.MDEIM.idx, Var.MDEIM.el =
     load_structures_in_list(("Matᵢ_$(var)", "idx_$(var)", "el_$(var)"),
     (Var.MDEIM.Matᵢ, Var.MDEIM.idx, Var.MDEIM.el), RBInfo.ROM_structures_path)
@@ -52,6 +54,8 @@ end
 function get_MDEIM_structures(
   RBInfo::ROMInfoS{ID},
   Var::VVariable) where ID
+
+  var = Var.var
 
   Var.MDEIM.Matᵢ, Var.MDEIM.idx, Var.MDEIM.el =
     load_structures_in_list(("Matᵢ_$(var)", "idx_$(var)", "el_$(var)"),
@@ -103,14 +107,15 @@ function online_phase(
   mean_online_time = RBVars.online_time / length(param_nbs)
   println("Online wall time: $(RBVars.online_time)s ")
 
-  xₕ = get_S_var(RBInfo.unknowns, param_nbs)
+  xₕ = get_S_var(RBInfo.unknowns, param_nbs, get_FEM_snap_path(RBInfo))
   norms = get_norms(xₕ[1])
   err = errors(xₕ, RBVars.x̃, RBVars.X₀, norms)
   mean_err = sum(first.(first.(err))) / length(param_nbs)
   mean_pointwise_err = sum(last.(last.(err))) / length(param_nbs)
 
   if RBInfo.save_online
-    save_online(RBInfo, mean_pointwise_err, mean_err, mean_online_time)
+    save_online(RBInfo, RBVars.offline_time,
+      mean_pointwise_err, mean_err, mean_online_time)
   end
 
   if RBInfo.post_process
@@ -123,12 +128,13 @@ end
 
 function save_online(
   RBInfo::ROMInfoS{ID},
+  offline_time::Float,
   mean_pointwise_err::Matrix{T},
   mean_err::T,
   mean_online_time::Float) where {ID,T}
 
-  times = times_dictionary(RBInfo, RBVars.offline_time, mean_online_time)
-  CSV.write(joinpath(RBInfo.results_path, "times.csv"), times)
+  times = times_dictionary(RBInfo, offline_time, mean_online_time)
+  writedlm(joinpath(RBInfo.results_path, "times.csv"), times)
 
   path_err = joinpath(RBInfo.results_path, "mean_err.csv")
   save_CSV([mean_err], path_err)

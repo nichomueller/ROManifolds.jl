@@ -99,8 +99,8 @@ function get_RB_space(
 
   println("Importing the spatial reduced basis")
 
-  RBVars.Φₛ = matrix_to_blocks(load_CSV(Matrix{T}[],
-    joinpath(RBInfo.ROM_structures_path, "Φₛ.csv")), length(RBInfo.unknowns))
+  RBVars.Φₛ = load_CSV(Matrix{T}[],
+    joinpath(RBInfo.ROM_structures_path, "Φₛ.csv"))
   RBVars.Nₛ, RBVars.nₛ = rows(RBVars.Φₛ), cols(RBVars.Φₛ)
 
   return
@@ -312,10 +312,10 @@ function get_offline_Var(
   var = Var.var
   println("Importing offline structures for $var")
 
-  Matₙ = load_CSV(Matrix{Float}[],
+  Var.Matₙ = load_CSV(Matrix{Float}[],
     joinpath(RBInfo.ROM_structures_path, "$(var)ₙ.csv"))
-  Q = Int(size(Matₙ)[2] / size(Matₙ)[1])
-  Var.Matₙ = matrix_to_blocks(Matₙ, Q)
+  #= Q = Int(size(Matₙ)[2] / size(Matₙ)[1])
+  Var.Matₙ = matrix_to_blocks(Matₙ, Q) =#
 
   if var ∉ RBInfo.affine_structures
     get_MDEIM_structures(RBInfo, Var)
@@ -330,9 +330,9 @@ function get_offline_Var(
   var = Var.var
   println("Importing offline structures for $var")
 
-  Matₙ = load_CSV(Matrix{Float}[],
+  Var.Matₙ = load_CSV(Matrix{Float}[],
     joinpath(RBInfo.ROM_structures_path, "$(var)ₙ.csv"))
-  Var.Matₙ = matrix_to_blocks(Matₙ)
+  #= Var.Matₙ = matrix_to_blocks(Matₙ) =#
 
   if var ∉ RBInfo.affine_structures
     get_MDEIM_structures(RBInfo, Var)
