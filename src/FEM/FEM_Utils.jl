@@ -91,7 +91,7 @@ function get_FEMμ_info(FEMInfo::FOMInfoS{ID}, ::Val{D}) where {ID,D}
 
 end
 
-function get_FEMμ_info(FEMInfo::FOMInfoST{ID}) where ID
+function get_FEMμ_info(FEMInfo::FOMInfoST{ID}, ::Val{D}) where {ID,D}
   μ = load_CSV(Vector{Float}[],
     joinpath(FEMInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{Float}}
   model = DiscreteModelFromFile(FEMInfo.Paths.mesh_path)
@@ -159,6 +159,13 @@ function get_g₁(FEMInfo::FOMInfoST{3})
   g₁(x, t::Real) = one(VectorValue(FEMInfo.D, Float))
   g₁(t::Real) = x -> g₁(x, t)
   g₁
+end
+
+function get_∂g(FEMSpace::FOM{ID,D}, g::Function) where {ID,D}
+  ∂g_all(x,t::Real) = ∂t(g)(x,t)
+  ∂g_all(t::Real) = x -> ∂g_all(x,t)
+  ∂g(t) = interpolate_dirichlet(∂g_all(t), FEMSpace.V[1](t))
+  ∂g
 end
 
 function get_h(FEMSpace::FOM{ID,D}) where {ID,D}

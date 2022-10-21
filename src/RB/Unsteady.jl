@@ -88,11 +88,12 @@ function assemble_RB_time(
 
   get_norm_matrix(RBInfo, RBVars)
 
-  println("Spatial POD, tolerance: $(RBInfo.ϵₛ)")
+  println("Temporal POD, tolerance: $(RBInfo.ϵₛ)")
   RBVars.offline_time += @elapsed begin
 
     if RBInfo.t_red_method == "ST-HOSVD"
-      S = Broadcasting(*)(RBVars.Φₛ, RBVars.S)
+      ΦₛᵀS(i) = RBVars.Φₛ[i]' * RBVars.S[i]
+      S = Broadcasting(ΦₛᵀS)(eachindex(RBVars.S))
     else
       S = RBVars.S
     end
@@ -100,14 +101,14 @@ function assemble_RB_time(
 
     RBVars.Φₜ = Broadcasting(S -> POD(S, RBInfo.ϵₜ))(S₂)
   end
-  RBVars.nₜ = cols(RBVars.Φₛ)
+  RBVars.nₜ = cols(RBVars.Φₜ)
 
   if ID == 2 || ID == 3
     supr_enrichment_time(RBVars)
   end
 
   if RBInfo.save_offline
-    save_CSV(RBVars.Φₛ, joinpath(RBInfo.ROM_structures_path,"Φₜ.csv"))
+    save_CSV(RBVars.Φₜ, joinpath(RBInfo.ROM_structures_path,"Φₜ.csv"))
   end
 
   return
@@ -131,9 +132,9 @@ function get_RB_time(
 
   println("Importing the temporal reduced basis")
 
-  RBVars.Φₜ = matrix_to_blocks(load_CSV(Matrix{T}[],
-    joinpath(RBInfo.ROM_structures_path, "Φₜ.csv")), length(RBInfo.unknowns))
-  RBVars.Nₜ, RBVars.nₛ = first(rows(RBVars.Φₛ)), cols(RBVars.Φₛ)
+  RBVars.Φₜ = load_CSV(Matrix{T}[],
+    joinpath(RBInfo.ROM_structures_path, "Φₜ.csv"))
+  RBVars.nₜ = cols(RBVars.Φₜ)
 
   return
 
@@ -209,12 +210,22 @@ function assemble_ϕₜθ(
   Φₜ_left, Φₜ_right = get_Φₜ(RBVars, var)
   nₜ_left, nₜ_right = size(Φₜ_left)[2], size(Φₜ_right)[2]
 
-  Φₜ_by_Φₜ_by_θ(iₜ,jₜ,q) = sum(Φₜ_left[:,iₜ] .* Φₜ_right[:,jₜ] .* Param.θ[q])
-  Φₜ_by_Φₜ_by_θ(iₜ,q) = Broadcasting(jₜ -> Φₜ_by_Φₜ_by_θ(iₜ,jₜ,q))(1:nₜ_right)
-  Φₜ_by_Φₜ_by_θ(q) = Broadcasting(z -> Φₜ_by_Φₜ_by_θ(z,q))(1:nₜ_left)
+  Φₜ_by_Φₜ_by_θ(iₜ,jₜ,q,idx1,idx2) =
+    sum(Φₜ_left[idx1,iₜ] .* Φₜ_right[idx2,jₜ] .* Param.θ[idx1][q])
+  Φₜ_by_Φₜ_by_θ(iₜ,q,idx1,idx2) =
+    Broadcasting(jₜ -> Φₜ_by_Φₜ_by_θ(iₜ,jₜ,q,idx1,idx2))(1:nₜ_right)
+  Φₜ_by_Φₜ_by_θ(q,idx1,idx2) =
+    Broadcasting(z -> Φₜ_by_Φₜ_by_θ(z,q,idx1,idx2))(1:nₜ_left)
 
-  ΦₜΦₜθ = Broadcasting(Φₜ_by_Φₜ_by_θ)(eachindex(Param.θ))
-  Broadcasting(blocks_to_matrix)(ΦₜΦₜθ)::Vector{Matrix{T}}
+  idx1, idx2 = 1:RBVars.Nₜ, 1:RBVars.Nₜ
+  ΦₜΦₜθ = Broadcasting(q -> Φₜ_by_Φₜ_by_θ(q,idx1,idx2))(eachindex(Param.θ))
+  ΦₜΦₜθ_vec = Broadcasting(blocks_to_matrix)(ΦₜΦₜθ)::Vector{Matrix{T}}
+
+  idx3, idx4 = 2:RBVars.Nₜ, 1:RBVars.Nₜ-1
+  ΦₜΦₜθ₁ = Broadcasting(q -> Φₜ_by_Φₜ_by_θ(q,idx3,idx4))(eachindex(Param.θ))
+  ΦₜΦₜθ₁_vec = Broadcasting(blocks_to_matrix)(ΦₜΦₜθ₁)::Vector{Matrix{T}}
+
+  hcat(ΦₜΦₜθ_vec, ΦₜΦₜθ₁_vec)::Vector{Matrix{T}}
 
 end
 
@@ -253,9 +264,13 @@ function assemble_matricesₙ(
   lin_Mat_ops = get_linear_matrices(RBInfo)
   matrix_Vars = MVariable(RBInfo, RBVars, lin_Mat_ops)
   matrix_Params = ParamInfo(Params, lin_Mat_ops)
-  ΦₜΦₜθ = assemble_ϕₜθ(RBVars, matrix_Vars, matrix_Params)
+  ΦₜΦₜθ_all = assemble_ϕₜθ(RBVars, matrix_Vars, matrix_Params)
+  ΦₜΦₜθ, ΦₜΦₜθ₁ = first.(ΦₜΦₜθ_all), last.(ΦₜΦₜθ_all)
 
-  assemble_termsₙ(matrix_Vars, ΦₜΦₜθ)::Vector{Matrix{T}}
+  Matsₙ = assemble_termsₙ(matrix_Vars, ΦₜΦₜθ)::Vector{Matrix{T}}
+  Mats₁ₙ = assemble_termsₙ(matrix_Vars, ΦₜΦₜθ₁)::Vector{Matrix{T}}
+
+  (Matsₙ, Mats₁ₙ)::Tuple{Vector{Matrix{T}}}
 
 end
 
@@ -278,7 +293,7 @@ function reconstruct_FEM_solution(RBVars::ROMMethodST{ID,T}) where {ID,T}
 
   xₙ = vector_to_matrix(RBVars.xₙ, RBVars.nₜ, RBVars.nₛ)
   m = Broadcasting(*)
-  push!(RBVars.x̃, m(RBVars.Φₛ, m(RBVars.Φₜᵘ, xₙ)'))
+  push!(RBVars.x̃, m(RBVars.Φₛ, m(RBVars.Φₜ, xₙ)'))
 
   return
 end

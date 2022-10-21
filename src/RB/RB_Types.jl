@@ -375,7 +375,7 @@ end
 
 function ROMMethodST(RBInfo::ROMInfoST{ID}, ::Type{T}) where {ID,T}
   SV = VarsS(T)
-  ST = VarsT(T)
+  TV = VarsT(T)
 
   FEM_matrices = get_FEM_matrices(RBInfo)
   MVars = Broadcasting(var->MVariable(RBInfo, var, T))(FEM_matrices)
@@ -387,7 +387,7 @@ function ROMMethodST(RBInfo::ROMInfoST{ID}, ::Type{T}) where {ID,T}
   LHSₙ = Matrix{T}[]
   RHSₙ = Matrix{T}[]
 
-  ROMMethodS{ID,T}(SV, Vars, xₙ, LHSₙ, RHSₙ)
+  ROMMethodST{ID,T}(SV, TV, Vars, xₙ, LHSₙ, RHSₙ)
 end
 
 function Base.getproperty(RBVars::ROMMethodST{ID,T}, sym::Symbol) where {ID,T}
@@ -402,11 +402,11 @@ function Base.getproperty(RBVars::ROMMethodST{ID,T}, sym::Symbol) where {ID,T}
   elseif sym ∈ (:offline_time, :online_time)
     getfield(RBVars.SV, sym)::Float
   elseif sym == :Φₜ
-    getfield(RBVars.ST, sym)::Vector{Matrix{T}}
+    getfield(RBVars.TV, sym)::Vector{Matrix{T}}
   elseif sym == :Nₜ
-    getfield(RBVars.ST, sym)::Int
+    getfield(RBVars.TV, sym)::Int
   elseif sym ∈ (:nₜ, :N, :n)
-    getfield(RBVars.ST, sym)::Vector{Int}
+    getfield(RBVars.TV, sym)::Vector{Int}
   else
     getfield(RBVars, sym)
   end
@@ -424,11 +424,11 @@ function Base.setproperty!(RBVars::ROMMethodST{ID,T}, sym::Symbol, x) where {ID,
   elseif sym ∈ (:offline_time, :online_time)
     setfield!(RBVars.SV, sym, x)::Float
   elseif sym == :Φₜ
-    setfield!(RBVars.ST, sym, x)::Vector{Matrix{T}}
+    setfield!(RBVars.TV, sym, x)::Vector{Matrix{T}}
   elseif sym == :Nₜ
-    setfield!(RBVars.ST, sym, x)::Int
+    setfield!(RBVars.TV, sym, x)::Int
   elseif sym ∈ (:nₜ, :N, :n)
-    setfield!(RBVars.ST, sym, x)::Vector{Int}
+    setfield!(RBVars.TV, sym, x)::Vector{Int}
   else
     setfield!(RBVars, sym, x)
   end

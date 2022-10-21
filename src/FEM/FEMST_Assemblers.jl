@@ -33,8 +33,11 @@ function assemble_form(
       end
     elseif var == "L"
       g(t) = interpolate_dirichlet(ParamForm.fun(t), FEMSpace.V[1](t))
+      ∂g(t) = get_∂g(FEMSpace, ParamForm.fun)(t)
       Param_A = ParamInfo(FEMInfo, ParamForm.μ, "A")
-      ∫(∇(v) ⋅ (Param_A.fun(t) * ∇(g(t))))ParamForm.dΩ
+      Param_M = ParamInfo(FEMInfo, ParamForm.μ, "M")
+      (∫(∇(v) ⋅ (Param_A.fun(t) * ∇(g(t))))ParamForm.dΩ +
+        ∫(Param_M.fun(t) * v * ∂g(t))ParamForm.dΩ)
     else
       error("Unrecognized variable")
     end
@@ -89,8 +92,11 @@ function assemble_form(
     else
       g(t) = interpolate_dirichlet(ParamForm.fun(t), FEMSpace.V[1](t))
       if var == "L"
+        ∂g(t) = get_∂g(FEMSpace, ParamForm.fun)(t)
         Param_A = ParamInfo(FEMInfo, ParamForm.μ, "A")
-        ∫(Param_A.fun(t) * ∇(v) ⊙ ∇(g(t)))ParamForm.dΩ
+        Param_M = ParamInfo(FEMInfo, ParamForm.μ, "M")
+        (∫(Param_A.fun(t) * ∇(v) ⊙ ∇(g(t)))ParamForm.dΩ +
+          ∫(Param_M.fun(t) * v ⋅ ∂g(t))ParamForm.dΩ)
       else var == "Lc"
         Param_B = ParamInfo(FEMInfo, ParamForm.μ, "B")
         ∫(Param_B.fun(t) * v ⋅ (∇⋅(g(t))))ParamForm.dΩ
@@ -157,8 +163,11 @@ function assemble_form(
     else
       g(t) = interpolate_dirichlet(ParamForm.fun(t), FEMSpace.V[1](t))
       if var == "L"
+        ∂g(t) = get_∂g(FEMSpace, ParamForm.fun)(t)
         Param_A = ParamInfo(FEMInfo, ParamForm.μ, "A")
-        ∫(Param_A.fun(t) * ∇(v) ⊙ ∇(g(t)))ParamForm.dΩ
+        Param_M = ParamInfo(FEMInfo, ParamForm.μ, "M")
+        (∫(Param_A.fun(t) * ∇(v) ⊙ ∇(g(t)))ParamForm.dΩ +
+          ∫(Param_M.fun(t) * v ⋅ ∂g(t))ParamForm.dΩ)
       else var == "Lc"
         Param_B = ParamInfo(FEMInfo, ParamForm.μ, "B")
         ∫(Param_B.fun(t) * v ⋅ (∇⋅(g(t))))ParamForm.dΩ
@@ -350,8 +359,7 @@ function assemble_FEM_matrix(
   ParamForm::ParamFormInfo,
   timesθ::Vector{<:Real}) where {ID,D}
 
-  Broadcasting(tθ ->
-    assemble_FEM_matrix(FEMSpace, FEMInfo, ParamForm, tθ))(timesθ)::Vector{SparseMatrixCSC{Float,Int}}
+  [assemble_FEM_matrix(FEMSpace, FEMInfo, ParamForm, tθ) for tθ = timesθ]
 
 end
 
@@ -361,8 +369,7 @@ function assemble_FEM_matrix(
   ParamForm::Vector{<:ParamFormInfo},
   timesθ::Vector{<:Real}) where {ID,D}
 
-  Broadcasting(tθ ->
-    assemble_FEM_matrix(FEMSpace, FEMInfo, ParamForm, tθ))(timesθ)
+  [assemble_FEM_matrix(FEMSpace, FEMInfo, ParamForm, tθ) for tθ = timesθ]
 
 end
 
@@ -372,8 +379,7 @@ function assemble_FEM_matrix(
   Param::ParamInfo,
   timesθ::Vector{<:Real}) where {ID,D}
 
-  Broadcasting(tθ ->
-    assemble_FEM_matrix(FEMSpace, FEMInfo, Param, tθ))(timesθ)
+  [assemble_FEM_matrix(FEMSpace, FEMInfo, Param, tθ) for tθ = timesθ]
 
 end
 
@@ -383,8 +389,7 @@ function assemble_FEM_matrix(
   Param::Vector{<:ParamInfo},
   timesθ::Vector{<:Real}) where {ID,D}
 
-  Broadcasting(tθ ->
-    assemble_FEM_matrix(FEMSpace, FEMInfo, Param, tθ))(timesθ)
+  [assemble_FEM_matrix(FEMSpace, FEMInfo, Param, tθ) for tθ = timesθ]
 
 end
 
@@ -395,8 +400,7 @@ function assemble_FEM_matrix(
   var::String,
   timesθ::Vector{<:Real}) where {ID,D,T}
 
-  Broadcasting(tθ ->
-    assemble_FEM_matrix(FEMSpace, FEMInfo, μ, var, tθ))(timesθ)
+  [assemble_FEM_matrix(FEMSpace, FEMInfo, μ, var, tθ) for tθ = timesθ]
 
 end
 
@@ -407,8 +411,7 @@ function assemble_FEM_matrix(
   var::String,
   timesθ::Vector{<:Real}) where {ID,D,T}
 
-  Broadcasting(tθ ->
-    assemble_FEM_matrix(FEMSpace, FEMInfo, μvec, var, tθ))(timesθ)
+  [assemble_FEM_matrix(FEMSpace, FEMInfo, μvec, var, tθ) for tθ = timesθ]
 
 end
 
@@ -419,8 +422,7 @@ function assemble_FEM_matrix(
   var::Vector{String},
   timesθ::Vector{<:Real}) where {ID,D,T}
 
-  Broadcasting(tθ ->
-    assemble_FEM_matrix(FEMSpace, FEMInfo, μ, var, tθ))(timesθ)
+  [assemble_FEM_matrix(FEMSpace, FEMInfo, μ, var, tθ) for tθ = timesθ]
 
 end
 
@@ -587,8 +589,7 @@ function assemble_FEM_nonlinear_matrix(
   ParamForm::ParamFormInfo,
   timesθ::Vector{<:Real}) where {ID,D}
 
-  Broadcasting(tθ ->
-    assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, ParamForm, tθ))(timesθ)::Vector{SparseMatrixCSC{Float,Int}}
+  [assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, ParamForm, tθ) for tθ = timesθ]
 
 end
 
@@ -598,8 +599,7 @@ function assemble_FEM_nonlinear_matrix(
   ParamForm::Vector{<:ParamFormInfo},
   timesθ::Vector{<:Real}) where {ID,D}
 
-  Broadcasting(tθ ->
-    assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, ParamForm, tθ))(timesθ)
+  [assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, ParamForm, tθ) for tθ = timesθ]
 
 end
 
@@ -609,8 +609,7 @@ function assemble_FEM_nonlinear_matrix(
   Param::ParamInfo,
   timesθ::Vector{<:Real}) where {ID,D}
 
-  Broadcasting(tθ ->
-    assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, Param, tθ))(timesθ)
+  [assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, Param, tθ) for tθ = timesθ]
 
 end
 
@@ -620,8 +619,7 @@ function assemble_FEM_nonlinear_matrix(
   Param::Vector{<:ParamInfo},
   timesθ::Vector{<:Real}) where {ID,D}
 
-  Broadcasting(tθ ->
-    assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, Param, tθ))(timesθ)
+  [assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, Param, tθ) for tθ = timesθ]
 
 end
 
@@ -632,8 +630,7 @@ function assemble_FEM_nonlinear_matrix(
   var::String,
   timesθ::Vector{<:Real}) where {ID,D,T}
 
-  Broadcasting(tθ ->
-    assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ, var, tθ))(timesθ)
+  [assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ, var, tθ) for tθ = timesθ]
 
 end
 
@@ -644,8 +641,7 @@ function assemble_FEM_nonlinear_matrix(
   var::String,
   timesθ::Vector{<:Real}) where {ID,D,T}
 
-  Broadcasting(tθ ->
-    assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μvec, var, tθ))(timesθ)
+  [assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μvec, var, tθ) for tθ = timesθ]
 
 end
 
@@ -656,8 +652,7 @@ function assemble_FEM_nonlinear_matrix(
   var::Vector{String},
   timesθ::Vector{<:Real}) where {ID,D,T}
 
-  Broadcasting(tθ ->
-    assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ, var, tθ))(timesθ)
+  [assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ, var, tθ) for tθ = timesθ]
 
 end
 
@@ -830,8 +825,7 @@ function assemble_FEM_vector(
   ParamForm::ParamFormInfo,
   timesθ::Vector{<:Real}) where {ID,D}
 
-  Broadcasting(tθ ->
-    assemble_FEM_vector(FEMSpace, FEMInfo, ParamForm, tθ))(timesθ)
+  [assemble_FEM_vector(FEMSpace, FEMInfo, ParamForm, tθ) for tθ = timesθ]
 
 end
 
@@ -841,8 +835,7 @@ function assemble_FEM_vector(
   ParamForm::Vector{<:ParamFormInfo},
   timesθ::Vector{<:Real}) where {ID,D}
 
-  Broadcasting(tθ ->
-    assemble_FEM_vector(FEMSpace, FEMInfo, ParamForm, tθ))(timesθ)
+  [assemble_FEM_vector(FEMSpace, FEMInfo, ParamForm, tθ) for tθ = timesθ]
 
 end
 
@@ -852,8 +845,7 @@ function assemble_FEM_vector(
   Param::ParamInfo,
   timesθ::Vector{<:Real}) where {ID,D}
 
-  Broadcasting(tθ ->
-    assemble_FEM_vector(FEMSpace, FEMInfo, Param, tθ))(timesθ)
+  [assemble_FEM_vector(FEMSpace, FEMInfo, Param, tθ) for tθ = timesθ]
 
 end
 
@@ -863,8 +855,7 @@ function assemble_FEM_vector(
   Param::Vector{<:ParamInfo},
   timesθ::Vector{<:Real}) where {ID,D}
 
-  Broadcasting(tθ ->
-    assemble_FEM_vector(FEMSpace, FEMInfo, Param, tθ))(timesθ)
+  [assemble_FEM_vector(FEMSpace, FEMInfo, Param, tθ) for tθ = timesθ]
 
 end
 
@@ -875,8 +866,7 @@ function assemble_FEM_vector(
   var::String,
   timesθ::Vector{<:Real}) where {ID,D,T}
 
-  Broadcasting(tθ ->
-    assemble_FEM_vector(FEMSpace, FEMInfo, μ, var, tθ))(timesθ)
+  [assemble_FEM_vector(FEMSpace, FEMInfo, μ, var, tθ) for tθ = timesθ]
 
 end
 
@@ -887,8 +877,7 @@ function assemble_FEM_vector(
   var::String,
   timesθ::Vector{<:Real}) where {ID,D,T}
 
-  Broadcasting(tθ ->
-    assemble_FEM_vector(FEMSpace, FEMInfo, μvec, var, tθ))(timesθ)
+  [assemble_FEM_vector(FEMSpace, FEMInfo, μvec, var, tθ) for tθ = timesθ]
 
 end
 
@@ -899,8 +888,7 @@ function assemble_FEM_vector(
   var::Vector{String},
   timesθ::Vector{<:Real}) where {ID,D,T}
 
-  Broadcasting(tθ ->
-    assemble_FEM_vector(FEMSpace, FEMInfo, μ, var, tθ))(timesθ)
+  [assemble_FEM_vector(FEMSpace, FEMInfo, μ, var, tθ) for tθ = timesθ]
 
 end
 
@@ -938,8 +926,7 @@ function assemble_affine_FEM_matrices(
   μ::Vector{T},
   timesθ::Vector{<:Real}) where {ID,D,T}
 
-  Broadcasting(tθ ->
-    assemble_affine_FEM_matrices(FEMSpace, FEMInfo, μ, tθ))(timesθ)
+  [assemble_affine_FEM_matrices(FEMSpace, FEMInfo, μ, tθ) for tθ = timesθ]
 
 end
 
@@ -975,8 +962,7 @@ function assemble_all_FEM_matrices(
   μ::Vector{T},
   timesθ::Vector{<:Real}) where {ID,D,T}
 
-  Broadcasting(tθ ->
-    assemble_all_FEM_matrices(FEMSpace, FEMInfo, μ, tθ))(timesθ)
+  [assemble_all_FEM_matrices(FEMSpace, FEMInfo, μ, tθ) for tθ = timesθ]
 
 end
 
@@ -1012,8 +998,7 @@ function assemble_affine_FEM_vectors(
   μ::Vector{T},
   timesθ::Vector{<:Real}) where {ID,D,T}
 
-  Broadcasting(tθ ->
-    assemble_affine_FEM_vectors(FEMSpace, FEMInfo, μ, tθ))(timesθ)
+  [assemble_affine_FEM_vectors(FEMSpace, FEMInfo, μ, tθ) for tθ = timesθ]
 
 end
 
@@ -1049,7 +1034,6 @@ function assemble_all_FEM_vectors(
   μ::Vector{T},
   timesθ::Vector{<:Real}) where {ID,D,T}
 
-  Broadcasting(tθ ->
-    assemble_all_FEM_vectors(FEMSpace, FEMInfo, μ, tθ))(timesθ)
+  [assemble_all_FEM_vectors(FEMSpace, FEMInfo, μ, tθ) for tθ = timesθ]
 
 end

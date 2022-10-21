@@ -229,6 +229,44 @@ function ParamInfo(
 end
 
 function ParamInfo(
+  FEMSpace::FOMS{ID},
+  θ::Vector{T},
+  var::String) where ID
+
+  Θfun = FEFunction(FEMSpace.V₀_quad, Θ)
+  ParamInfoS(μ, var, Θfun, Vector{Float}[])
+
+end
+
+function ParamInfo(
+  FEMSpace::FOMS{ID},
+  θvec::Vector{Vector{T}},
+  var::String) where ID
+
+  Broadcasting(θ -> ParamInfo(FEMSpace, θ, var))(θvec)
+
+end
+
+function ParamInfo(
+  FEMSpace::FOMST{ID},
+  θ::Vector{T},
+  var::String) where ID
+
+  Θfun = FEFunction(FEMSpace.V₀_quad, Θ)
+  ParamInfoST(μ, var, Θfun, Θfun, Θfun, Vector{Float}[])
+
+end
+
+function ParamInfo(
+  FEMSpace::FOMST{ID},
+  θvec::Vector{Vector{T}},
+  var::String) where ID
+
+  Broadcasting(θ -> ParamInfo(FEMSpace, θ, var))(θvec)
+
+end
+
+function ParamInfo(
   Params::Vector{<:ParamInfo},
   var::String)
 

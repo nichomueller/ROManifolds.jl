@@ -323,8 +323,6 @@ function get_offline_Var(
 
   Var.Matₙ = load_CSV(Matrix{Float}[],
     joinpath(RBInfo.ROM_structures_path, "$(var)ₙ.csv"))
-  #= Q = Int(size(Matₙ)[2] / size(Matₙ)[1])
-  Var.Matₙ = matrix_to_blocks(Matₙ, Q) =#
 
   if var ∉ RBInfo.affine_structures
     get_MDEIM_structures(RBInfo, Var)
@@ -341,7 +339,6 @@ function get_offline_Var(
 
   Var.Matₙ = load_CSV(Matrix{Float}[],
     joinpath(RBInfo.ROM_structures_path, "$(var)ₙ.csv"))
-  #= Var.Matₙ = matrix_to_blocks(Matₙ) =#
 
   if var ∉ RBInfo.affine_structures
     get_MDEIM_structures(RBInfo, Var)
