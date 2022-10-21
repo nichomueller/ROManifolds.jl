@@ -37,7 +37,9 @@ mutable struct ROMInfoST{ID} <: ROMInfo{ID}
   Paths::ROMPath
   nₛ::Int
   ϵₛ::Float
+  ϵₜ::Float
   use_norm_X::Bool
+  t_red_method::String
   online_RHS::Bool
   nₛ_MDEIM::Int
   nₛ_MDEIM_time::Int
@@ -45,20 +47,26 @@ mutable struct ROMInfoST{ID} <: ROMInfo{ID}
   get_offline_structures::Bool
   save_offline::Bool
   save_online::Bool
-  time_reduction_technique::String
-  t₀::Float
-  tₗ::Float
-  δt::Float
-  θ::Float
-  ϵₜ::Float
   st_MDEIM::Bool
   functional_MDEIM::Bool
   adaptivity::Bool
 end
 
-function Base.getproperty(RBInfo::ROMInfo, sym::Symbol)
+function Base.getproperty(RBInfo::ROMInfoS, sym::Symbol)
   if sym in (:affine_structures, :unknowns, :structures)
     getfield(RBInfo.FEMInfo, sym)::Vector{String}
+  elseif sym in (:ROM_structures_path, :results_path)
+    getfield(RBInfo.Paths, sym)::String
+  else
+    getfield(RBInfo, sym)
+  end
+end
+
+function Base.getproperty(RBInfo::ROMInfoST, sym::Symbol)
+  if sym in (:affine_structures, :unknowns, :structures)
+    getfield(RBInfo.FEMInfo, sym)::Vector{String}
+  elseif sym in (:θ, :t₀, :tₗ, :δt)
+      getfield(RBInfo.FEMInfo, sym)::Float
   elseif sym in (:ROM_structures_path, :results_path)
     getfield(RBInfo.Paths, sym)::String
   else

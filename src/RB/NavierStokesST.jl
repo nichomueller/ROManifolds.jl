@@ -40,7 +40,7 @@ function POD_time(
 
   println("Performing the temporal POD for field u on quadrature points")
 
-  if RBInfo.time_reduction_technique == "ST-HOSVD"
+  if RBInfo.t_red_method == "ST-HOSVD"
     Sᵘ_quad = RBVars.Φₛ_quad' * RBVars.Sᵘ_quad
   else
     Sᵘ_quad = RBVars.Sᵘ_quad

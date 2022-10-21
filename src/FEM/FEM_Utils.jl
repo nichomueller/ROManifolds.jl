@@ -22,7 +22,7 @@ function get_FEM_structures(name::String, issteady::Bool)
   else
     error("Not implemented")
   end
-  issteady ? matvec : push!(matvec, ["M"])
+  issteady ? matvec : push!(matvec, "M")
 end
 
 function get_FEM_structures(::FOMInfoS{ID}) where ID
@@ -129,6 +129,36 @@ function get_g₀(FEMInfo::FOMInfoST{3})
   g₀(x, t::Real) = zero(VectorValue(FEMInfo.D, Float))
   g₀(t::Real) = x -> g₀(x, t)
   g₀
+end
+
+function get_g₁(::FOMInfoS{1})
+  x -> 1.
+end
+
+function get_g₁(::FOMInfoST{1})
+  g₁(x, t::Real) = 1.
+  g₁(t::Real) = x -> g₁(x, t)
+  g₁
+end
+
+function get_g₁(FEMInfo::FOMInfoS{2})
+  x -> one(VectorValue(FEMInfo.D, Float))
+end
+
+function get_g₁(FEMInfo::FOMInfoST{2})
+  g₁(x, t::Real) = one(VectorValue(FEMInfo.D, Float))
+  g₁(t::Real) = x -> g₁(x, t)
+  g₁
+end
+
+function get_g₁(FEMInfo::FOMInfoS{3})
+  x -> one(VectorValue(FEMInfo.D, Float))
+end
+
+function get_g₁(FEMInfo::FOMInfoST{3})
+  g₁(x, t::Real) = one(VectorValue(FEMInfo.D, Float))
+  g₁(t::Real) = x -> g₁(x, t)
+  g₁
 end
 
 function get_h(FEMSpace::FOM{ID,D}) where {ID,D}

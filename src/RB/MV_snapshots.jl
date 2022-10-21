@@ -1,9 +1,9 @@
 function Mat_snapshots(
-  FEMSpace::FOMS,
-  RBInfo::ROMInfoS,
+  FEMSpace::FOMS{ID,D},
+  RBInfo::ROMInfoS{ID},
   RBVars::ROMMethodS{ID,T},
   μ::Vector{Vector{Float}},
-  var::String) where {ID,T}
+  var::String) where {ID,D,T}
 
   function Mat_linear(k::Int)::Tuple{Vector{Int},Vector{Float}}
     println("Snapshot number $k, $var")
@@ -27,10 +27,10 @@ function Mat_snapshots(
 end
 
 function Vec_snapshots(
-  FEMSpace::FOMS,
-  RBInfo::ROMInfoS,
+  FEMSpace::FOMS{ID,D},
+  RBInfo::ROMInfoS{ID},
   μ::Vector{Vector{Float}},
-  var::String)
+  var::String) where {ID,D}
 
   function Vec(k::Int)::Vector{Float}
     println("Snapshot number $k, $var")
@@ -44,11 +44,11 @@ function Vec_snapshots(
 end
 
 function snaps_MDEIM(
-  FEMSpace::FOMS,
-  RBInfo::ROMInfoS,
+  FEMSpace::FOMS{ID,D},
+  RBInfo::ROMInfoS{ID},
   RBVars::ROMMethodS{ID,T},
   μ::Vector{Vector{Float}},
-  var::String) where {ID,T}
+  var::String) where {ID,D,T}
 
   snaps, row_idx = Mat_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
   snaps_POD, _ = MDEIM_POD(snaps, RBInfo.ϵₛ)
@@ -57,10 +57,10 @@ function snaps_MDEIM(
 end
 
 function snaps_MDEIM(
-  FEMSpace::FOMS,
-  RBInfo::ROMInfoS,
+  FEMSpace::FOMS{ID,D},
+  RBInfo::ROMInfoS{ID},
   μ::Vector{Vector{Float}},
-  var::String)
+  var::String) where {ID,D}
 
   snaps = Vec_snapshots(FEMSpace, RBInfo, μ, var)
   snaps_POD, _ = MDEIM_POD(snaps, RBInfo.ϵₛ)
@@ -68,14 +68,35 @@ function snaps_MDEIM(
 
 end
 
-#= function MV_snapshots(
-  FEMSpace::FOMST,
-  RBInfo::ROMInfoST,
-  μ::Vector,
-  timesθ::Vector,
-  var::String)
+function Mat_snapshots(
+  FEMSpace::FOMST{ID,D},
+  RBInfo::ROMInfoS{ID},
+  RBVars::ROMMethodS{ID,T},
+  μ::Vector{Vector{Float}},
+  var::String) where {ID,D,T}
 
-  Nₜ = length(timesθ)
+  timesθ = get_timesθ(RBInfo)
+
+  function Mat_linear(k::Int)::Tuple{Vector{Int},Vector{Float}}
+    println("Snapshot number $k, $var")
+    Mat = assemble_FEM_matrix(FEMSpace, RBInfo, μ[k], var)
+    findnz(Mat[:])
+  end
+
+  function Mat_nonlinear(k::Int)::Tuple{Vector{Int},Vector{Float}}
+    println("Snapshot number $k, $var")
+    Φₛ_fun = FEFunction(FEMSpace.V₀[1], RBVars.Φₛ[1][:, k])
+    Mat = assemble_FEM_nonlinear_matrix(FEMSpace, RBInfo, μ[k], var)(Φₛ_fun)
+    findnz(Mat[:])
+  end
+
+  Mat(k) = isnonlinear(RBInfo, var) ? Mat_nonlinear(k) : Mat_linear(k)
+  nₛ = isnonlinear(RBInfo, var) ? RBVars.nₛ[1] : RBInfo.nₛ_MDEIM
+
+  i_v_block = Broadcasting(Mat)(1:nₛ)
+  correct_structures(last.(i_v_block), first.(i_v_block))::Tuple{Matrix{Float}, Vector{Int}}
+
+  #= Nₜ = length(timesθ)
   Param = ParamInfo(RBInfo, μ, var)
   Mat_t = assemble_FEM_structure(FEMSpace, RBInfo, Param)
 
@@ -90,37 +111,9 @@ end
     Mat[:,i_t] = v
   end
 
-  Mat,row_idx
-
-end =#
-
-#= function MV_snapshots(
-  FEMSpace::FOMST,
-  RBInfo::ROMInfoST,
-  RBVars::RBST,
-  μ::Vector,
-  timesθ::Vector,
-  var::String)
-
-  error("Not implemented yet")
+  Mat,row_idx =#
 
 end
-
-function call_MV_snapshots(
-  FEMSpace::FOMST,
-  RBInfo::ROMInfoST,
-  RBVars::RBST,
-  μ::Vector,
-  timesθ::Vector,
-  var::String)
-
-  if var ∈ ["C"]
-    MV_snapshots(FEMSpace, RBInfo, RBVars, μ, timesθ, var)
-  else
-    MV_snapshots(FEMSpace, RBInfo, μ, timesθ, var)
-  end
-
-end =#
 
 function get_LagrangianQuad_info(FEMSpace::FOM)
 

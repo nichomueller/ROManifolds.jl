@@ -45,6 +45,60 @@ function get_lagrangianQuad_info(
 
 end
 
+function get_FEMSpace_quantities(
+  FEMInfo::FOMInfo{1},
+  model::DiscreteModel{D,D}) where D
+
+  Ω, Γn, Qₕ, dΩ, dΓn = get_mod_meas_quad(FEMInfo, model)
+
+  refFE = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order)
+  V₀ = TestFESpace(model, refFE; conformity=:H1,
+    dirichlet_tags=["dirichlet"])
+
+  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
+
+  Qₕ, V₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad
+
+end
+
+function get_FEMSpace_quantities(
+  FEMInfo::FOMInfo{2},
+  model::DiscreteModel{D,D}) where D
+
+  Ω, Γn, Qₕ, dΩ, dΓn = get_mod_meas_quad(FEMInfo, model)
+
+  refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,Float}, FEMInfo.order)
+  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1, dirichlet_tags=["dirichlet"])
+
+  refFEₚ = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order - 1; space=:P)
+  Q₀ = TestFESpace(model, refFEₚ; conformity=:L2)
+  Q = TrialFESpace(Q₀)
+
+  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
+
+  Qₕ, V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad
+
+end
+
+function get_FEMSpace_quantities(
+  FEMInfo::FOMInfo{3},
+  model::DiscreteModel{D,D}) where D
+
+  Ω, Γn, Qₕ, dΩ, dΓn = get_mod_meas_quad(FEMInfo, model)
+
+  refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,Float}, FEMInfo.order)
+  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1, dirichlet_tags=["dirichlet"])
+
+  refFEₚ = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order - 1; space=:P)
+  Q₀ = TestFESpace(model, refFEₚ; conformity=:L2)
+  Q = TrialFESpace(Q₀)
+
+  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
+
+  Qₕ, V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad
+
+end
+
 function get_FEMSpace(
   FEMInfo::FOMInfoS{ID},
   model::DiscreteModel{D,D},

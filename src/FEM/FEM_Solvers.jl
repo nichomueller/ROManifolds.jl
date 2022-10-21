@@ -1,7 +1,6 @@
 function FEM_solver(
-  ::FOMS{1,D},
   FEMInfo::FOMInfoS{1},
-  operator::AffineFEOperator) where D
+  operator::AffineFEOperator)
 
   if FEMInfo.solver == "lu"
     uₕ_field = solve(LinearFESolver(LUSolver()), operator)
@@ -14,9 +13,8 @@ function FEM_solver(
 end
 
 function FEM_solver(
-  ::FOMS{2,D},
   FEMInfo::FOMInfoS{2},
-  operator::AffineFEOperator) where D
+  operator::AffineFEOperator)
 
   if FEMInfo.solver == "lu"
     uₕ_field, pₕ_field = solve(LinearFESolver(LUSolver()), operator)
@@ -29,9 +27,8 @@ function FEM_solver(
 end
 
 function FEM_solver(
-  ::FOMS{3,D},
   ::FOMInfoS{3},
-  operator::FEOperator) where D
+  operator::FEOperator)
 
   nls = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking())
   solver = FESolver(nls)
@@ -41,32 +38,33 @@ function FEM_solver(
 
 end
 
-#= function FEM_solver(
-  FEMSpace::FOMPoissonST,
+function FEM_solver(
   FEMInfo::FOMInfoST{1},
-  Param::ParamInfoST)
+  operator::TransientFEOperator,
+  x₀_field::FEFunction)
 
-  function get_uₕ(uₕ_field)
-    uₕ, _ = uₕ_field
-    get_free_dof_values(uₕ)::Vector{Float}
+  function xₕᵢ!(xₕ, xₕₜ)
+    xₕ[1] = get_free_dof_values(xₕₜ)
+    nothing
   end
 
-  m(t, u, v) = ∫(Param.m(t)*(u*v))FEMSpace.dΩ
-  a(t, u, v) = ∫(∇(v)⋅(Param.α(t)*∇(u)))FEMSpace.dΩ
-  rhs(t, v) = ∫(v*Param.f(t))FEMSpace.dΩ + ∫(v*Param.h(t))FEMSpace.dΓn
-  operator = TransientAffineFEOperator(m, a, rhs, FEMSpace.V, FEMSpace.V₀)
+  ode_solver = ThetaMethod(LUSolver(), FEMInfo.δt, FEMInfo.θ)
+  xₕₜ_field = solve(ode_solver, operator, x₀_field, FEMInfo.t₀, FEMInfo.tₗ)
 
-  linear_solver = LUSolver()
-  ode_solver = ThetaMethod(linear_solver, FEMInfo.δt, FEMInfo.θ)
+  count = 1
+  Nₛ = length(get_free_dof_values(x₀_field))
+  Nₜ = Int((FEMInfo.tₗ - FEMInfo.t₀) / FEMInfo.δt)
+  xₕₜ = Matrix{Float}(undef, Nₛ, Nₜ)
+  for (xₕ, _) in xₕₜ_field
+    println("Time step: $count")
+    xₕₜ[:,count] = get_free_dof_values(xₕ)
+    #xₕᵢ!(xₕ[:,count], xₕₜ)
+    count += 1
+  end
 
-  u₀_field = interpolate_everywhere(Param.u₀, FEMSpace.V(FEMInfo.t₀))
+  xₕₜ::Matrix{Float}
 
-  uₕₜ_field = solve(ode_solver, operator, u₀_field, FEMInfo.t₀, FEMInfo.tₗ)
-  uₕₜ = Broadcasting(get_uₕ)(uₕₜ_field)
-
-  blocks_to_matrix(uₕₜ)
-
-end =#
+end
 
 #= function FEM_solver(
   FEMSpace::FOMStokesST,

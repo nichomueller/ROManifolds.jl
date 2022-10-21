@@ -509,54 +509,6 @@ function assemble_θ_function(
 
 end
 
-function assemble_matricesₙ(
-  RBInfo::ROMInfo{ID},
-  RBVars::ROM{ID,T},
-  Params::Vector{<:ParamInfo}) where {ID,T}
-
-  lin_Mat_ops = get_linear_matrices(RBInfo)
-  matrix_Vars = MVariable(RBInfo, RBVars, lin_Mat_ops)
-  matrix_Params = ParamInfo(Params, lin_Mat_ops)
-  assemble_termsₙ(matrix_Vars, matrix_Params)::Vector{Matrix{T}}
-
-end
-
-function assemble_vectorsₙ(
-  RBInfo::ROMInfo{ID},
-  RBVars::ROM{ID,T},
-  Params::Vector{<:ParamInfo}) where {ID,T}
-
-  lin_Vec_ops = intersect(get_linear_vectors(RBInfo), set_operators(RBInfo))
-  vector_Vars = VVariable(RBInfo, RBVars, lin_Vec_ops)
-  vector_Params = ParamInfo(Params, lin_Vec_ops)
-  assemble_termsₙ(vector_Vars, vector_Params)::Vector{Matrix{T}}
-
-end
-
-function assemble_function_matricesₙ(
-  RBInfo::ROMInfo{ID},
-  RBVars::ROM{ID,T},
-  Params::Vector{<:ParamInfo}) where {ID,T}
-
-  nonlin_Mat_ops = get_nonlinear_matrices(RBInfo)
-  matrix_Vars = MVariable(RBInfo, RBVars, nonlin_Mat_ops)
-  matrix_Params = ParamInfo(Params, nonlin_Mat_ops)
-  assemble_function_termsₙ(matrix_Vars, matrix_Params)::Vector{<:Function}
-
-end
-
-function assemble_function_vectorsₙ(
-  RBInfo::ROMInfo{ID},
-  RBVars::ROM{ID,T},
-  Params::Vector{<:ParamInfo}) where {ID,T}
-
-  nonlin_Vec_ops = get_nonlinear_vectors(RBInfo)
-  vector_Vars = MVariable(RBInfo, RBVars, nonlin_Vec_ops)
-  vector_Params = ParamInfo(Params, nonlin_Vec_ops)
-  assemble_function_termsₙ(vector_Vars, vector_Params)::Vector{<:Function}
-
-end
-
 function assemble_RHS(
   FEMSpace::FOMS{D},
   RBInfo::ROMInfoS{1},

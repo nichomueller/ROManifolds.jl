@@ -23,11 +23,11 @@ function get_JinvₙResₙ(
 end
 
 function newton(
-  FEMSpace::FOMS,
+  FEMSpace::FOMS{3,D},
   RBVars::ROMMethodS{3,T},
   JinvₙResₙ::Function,
   ϵ=1e-9,
-  max_k=10) where T
+  max_k=10) where {D,T}
 
   x̂mat = zeros(T, sum(RBVars.nₛ), 1)
   δx̂ = 1. .+ x̂mat
@@ -76,7 +76,7 @@ function assemble_RHSₙ(
 end
 
 function assemble_RHSₙ(
-  FEMSpace::FOMS{D},
+  FEMSpace::FOMS{3,D},
   RBInfo::ROMInfoS{3},
   RBVars::ROMMethodS{3,T},
   μ::Vector{T}) where {D,T}
@@ -90,7 +90,7 @@ function assemble_RHSₙ(
 end
 
 function assemble_RB_system(
-  FEMSpace::FOM{D},
+  FEMSpace::FOMS{3,D},
   RBInfo::ROMInfo{3},
   RBVars::ROM{3,T},
   μ::Vector{T}) where {D,T}
@@ -130,8 +130,8 @@ function assemble_RB_system(
 end
 
 function solve_RB_system(
-  FEMSpace::FOMS{D},
-  RBVars::ROM{3,T},
+  FEMSpace::FOMS{3,D},
+  RBVars::ROMMethodS{3,T},
   JinvₙResₙ::Function) where {D,T}
 
   println("Solving RB problem via Newton-Raphson iterations")
@@ -142,9 +142,9 @@ function solve_RB_system(
 end
 
 function assemble_solve_reconstruct(
-  FEMSpace::FOM{D},
-  RBInfo::ROMInfo{3},
-  RBVars::ROM{3,T},
+  FEMSpace::FOMS{3,D},
+  RBInfo::ROMInfoS{3},
+  RBVars::ROMMethodS{3,T},
   μ::Vector{T}) where {D,T}
 
   JinvₙResₙ = assemble_RB_system(FEMSpace, RBInfo, RBVars, μ)

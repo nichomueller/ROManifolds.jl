@@ -30,7 +30,7 @@ function POD_time(
 
   println("Temporal POD for field p, tolerance: $(RBInfo.ϵₜ)")
 
-  if RBInfo.time_reduction_technique == "ST-HOSVD"
+  if RBInfo.t_red_method == "ST-HOSVD"
     Sᵖ = RBVars.Φₛᵖ' * RBVars.Sᵖ
   else
     Sᵖ = RBVars.Sᵖ

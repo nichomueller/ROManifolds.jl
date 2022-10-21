@@ -74,21 +74,20 @@ function MDEIM_offline(
 
 end
 
-#= function MDEIM_offline(
+function MDEIM_offline(
   MDEIM::MMDEIM{T},
   RBInfo::ROMInfoST{ID},
   RBVars::ROMMethodST{ID,T},
   var::String) where {ID,T}
 
-  FEMSpace, μ = get_FEMμ_info(RBInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)))
   Nₛ = get_Nₛ(RBVars, var)
 
   Mat, Mat_time, row_idx = snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
-
   idx_full, Matᵢ = MDEIM_offline(Mat)
   idx = from_full_idx_to_sparse_idx(idx_full, row_idx, Nₛ)
   idx_space, _ = from_vec_to_mat_idx(idx, Nₛ)
-  el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(idx_space))
+  el = find_FE_elements(FEMSpace, idx_space, var)
 
   time_idx, _ = MDEIM_offline(Mat_time)
   unique!(sort!(time_idx))
@@ -96,25 +95,19 @@ end
   MDEIM.Mat, MDEIM.Matᵢ, MDEIM.idx, MDEIM.time_idx, MDEIM.row_idx, MDEIM.el =
     Mat, Matᵢ, idx, time_idx, row_idx, el
 
-end =#
+end
 
-#= function MDEIM_offline(
+function MDEIM_offline(
   MDEIM::VMDEIM{T},
   RBInfo::ROMInfoST{ID},
+  ::ROMST{ID,T},
   var::String) where {ID,T}
 
-  FEMSpace, μ = get_FEMμ_info(RBInfo)
+  FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)))
 
-  Mat, Mat_time = snaps_DEIM(FEMSpace, RBInfo, μ, var)
-
+  Mat, Mat_time = snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
   idx, Matᵢ = MDEIM_offline(Mat)
-  if var == "H"
-    el = find_FE_elements(FEMSpace.V₀, FEMSpace.Γn, unique(idx))
-  elseif var == "Lc"
-    el = find_FE_elements(FEMSpace.Q₀, FEMSpace.Ω, unique(idx))
-  else
-    el = find_FE_elements(FEMSpace.V₀, FEMSpace.Ω, unique(idx))
-  end
+  el = find_FE_elements(FEMSpace, idx_space, var)
 
   time_idx, _ = MDEIM_offline(Mat_time)
   unique!(sort!(time_idx))
@@ -122,7 +115,7 @@ end =#
   MDEIM.Mat, MDEIM.Matᵢ, MDEIM.idx, MDEIM.time_idx, MDEIM.el =
     Mat, Matᵢ, idx, time_idx, el
 
-end =#
+end
 
 function assemble_sparse_matrix(
   FEMSpace::FOMS{D},
@@ -167,31 +160,51 @@ function assemble_sparse_function(
 
 end
 
-#= function interpolated_θ(
-  RBVars::ROMMethodST{ID,T},
-  Mat_μ_sparse::AbstractArray,
-  timesθ::Vector{T},
-  Matᵢ::Matrix{T},
-  idx::Vector{Int},
-  time_idx::Vector{Int}) where {ID,T}
+function assemble_sparse_matrix(
+  FEMSpace::FOMST{D},
+  FEMInfo::FOMInfoST{ID},
+  Param::ParamInfoST,
+  el::Vector{Int},
+  timesθ::Vector{T}) where {ID,D,T}
 
-  red_timesθ = timesθ[time_idx]
-  discarded_time_idx = setdiff(collect(1:RBVars.Nₜ), time_idx)
-  θ = zeros(T, length(idx), RBVars.Nₜ)
+  Ω_sparse = view(FEMSpace.Ω, el)
+  dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
+  ParamForm = ParamFormInfo(Param, dΩ_sparse)
 
-  red_θ = (Matᵢ \
-    Matrix{T}(reshape(Mat_μ_sparse, :, length(red_timesθ))[idx, :]))
+  assemble_FEM_matrix(FEMSpace, FEMInfo, ParamForm)(timesθ)
 
-  etp = ScatteredInterpolation.interpolate(Multiquadratic(),
-    reshape(red_timesθ,1,:), red_θ')
-  θ[:, time_idx] = red_θ
-  for iₜ = discarded_time_idx
-    θ[:, iₜ] = ScatteredInterpolation.evaluate(etp,[timesθ[iₜ]])
-  end
+end
 
-  θ::Matrix{T}
+function assemble_sparse_vector(
+  FEMSpace::FOMST{D},
+  FEMInfo::FOMInfoST{ID},
+  Param::ParamInfoST,
+  el::Vector{Int},
+  timesθ::Vector{T}) where {ID,D,T}
 
-end =#
+  triang = Gridap.FESpaces.get_triangulation(FEMSpace, Param.var)
+  Ω_sparse = view(triang, el)
+  dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
+  ParamForm = ParamFormInfo(Param, dΩ_sparse)
+
+  assemble_FEM_vector(FEMSpace, FEMInfo, ParamForm)(timesθ)
+
+end
+
+function assemble_sparse_function(
+  FEMSpace::FOMST{D},
+  FEMInfo::FOMInfoST{ID},
+  Param::ParamInfoST,
+  el::Vector{Int},
+  timesθ::Vector{T}) where {ID,D,T}
+
+  Ω_sparse = view(FEMSpace.Ω, el)
+  dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
+  ParamForm = ParamFormInfo(Param, dΩ_sparse)
+
+  assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, ParamForm)(timesθ)
+
+end
 
 function θ(
   FEMSpace::FOMS{D},
@@ -200,7 +213,7 @@ function θ(
   MDEIM::MMDEIM{T}) where {ID,D,T}
 
   if Param.var ∈ RBInfo.affine_structures
-    θ = [[Param.fun(VectorValue(D, Float))[1]]]
+    θ = [[Param.fun(VectorValue(D, T))[1]]]
   else
     Mat_μ_sparse =
       assemble_sparse_matrix(FEMSpace, FEMInfo, Param, MDEIM.el)
@@ -218,11 +231,11 @@ function θ(
   MDEIM::VMDEIM{T}) where {ID,D,T}
 
   if Param.var ∈ RBInfo.affine_structures
-    θ = [[Param.fun(VectorValue(D, Float))[1]]]
+    θ = [[Param.fun(VectorValue(D, T))[1]]]
   else
-    Mat_μ_sparse =
+    Vec_μ_sparse =
       assemble_sparse_vector(FEMSpace, FEMInfo, Param, MDEIM.el)
-    θ = MDEIM_online(Mat_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
+    θ = MDEIM_online(Vec_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
   end
 
   θ::Vector{Vector{T}}
@@ -243,74 +256,82 @@ function θ_function(
 
 end
 
-#= function θ!(
-  θ::Vector{Vector{T}},
-  FEMSpace::FOMST{D},
-  RBInfo::ROMInfoST,
-  RBVars::RBST,
-  Param::ParamInfoST,
-  fun::Function,
-  MDEIM::MMDEIM,
-  var::String) where {D,T}
+function interpolate_θ(
+  Mat_μ_sparse::AbstractArray,
+  MDEIM::MVMDEIM{T},
+  timesθ::Vector{T}) where T
 
-  timesθ = get_timesθ(RBInfo)
+  idx, time_idx = MDEIM.idx, MDEIM.time_idx
+  red_timesθ = timesθ[time_idx]
+  discarded_time_idx = setdiff(eachindex(timesθ), time_idx)
+  θ = zeros(T, length(idx), length(timesθ))
 
-  if var ∈ RBInfo.affine_structures
-    for t_θ in timesθ
-      push!(θ, [get_scalar_value(fun(VectorValue(D, T), t_θ), T)])
-    end
-  else
-    if RBInfo.st_MDEIM
-      red_timesθ = timesθ[MDEIM.time_idx]
-      Mat_μ_sparse = assemble_sparse_mat(
-        FEMSpace, FEMInfo, Param, MDEIM.el, red_timesθ, var)
-      θmat = interpolated_θ(RBVars, Mat_μ_sparse, timesθ, MDEIM.Matᵢ,
-        MDEIM.idx, MDEIM.time_idx)
-    else
-      Mat_μ_sparse = assemble_sparse_mat(
-        FEMSpace, FEMInfo, Param, MDEIM.el, timesθ, var)
-      θmat = MDEIM_online(RBVars, Mat_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
-    end
-    θ = [[θmat[q, :]] for q in size(θmat)[1]]
+  red_θ = (MDEIM.Matᵢ \
+    Matrix{T}(reshape(Mat_μ_sparse, :, length(red_timesθ))[idx, :]))
+  etp = ScatteredInterpolation.interpolate(Multiquadratic(),
+    reshape(red_timesθ, 1, :), red_θ')
+  θ[:, time_idx] = red_θ
+  for iₜ = discarded_time_idx
+    θ[:, iₜ] = ScatteredInterpolation.evaluate(etp,[timesθ[iₜ]])
   end
 
-  θ
+  [[θ[q, :]] for q in size(θ)[1]]
 
 end
 
-function θ!(
-  θ::Vector{Vector{T}},
+function θ(
   FEMSpace::FOMST{D},
-  RBInfo::ROMInfoST,
-  RBVars::RBST,
+  RBInfo::ROMInfoST{ID},
   Param::ParamInfoST,
-  fun::Function,
-  MDEIM::VMDEIM,
-  var::String) where {D,T}
+  MDEIM::MMDEIM{T}) where {ID,D,T}
 
   timesθ = get_timesθ(RBInfo)
 
-  if var ∈ RBInfo.affine_structures
-    for t_θ in timesθ
-      push!(θ, [get_scalar_value(fun(VectorValue(D, T), t_θ), T)])
-    end
+  if Param.var ∈ RBInfo.affine_structures
+    θ = [[Param.fun(VectorValue(D, T), tθ)[1]] for tθ in timesθ]
   else
     if RBInfo.st_MDEIM
       red_timesθ = timesθ[MDEIM.time_idx]
-      Vec_μ_sparse = T.(assemble_sparse_vec(
-        FEMSpace, FEMInfo, Param, MDEIM.el, red_timesθ, var))
-      θmat = interpolated_θ(RBVars, Vec_μ_sparse, timesθ, MDEIM.Matᵢ,
-        MDEIM.idx, MDEIM.time_idx)
+      Mat_μ_sparse = assemble_sparse_matrix(
+        FEMSpace, FEMInfo, Param, MDEIM.el, red_timesθ)
+      θ = interpolate_θ(Mat_μ_sparse, MDEIM, timesθ)
     else
-      Vec_μ_sparse = assemble_sparse_vec(FEMSpace, FEMInfo, Param, MDEIM.el, timesθ, var)
-      θmat = MDEIM_online(RBVars, Vec_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
+      Mat_μ_sparse = assemble_sparse_matrix(
+        FEMSpace, FEMInfo, Param, MDEIM.el, timesθ)
+      θ = MDEIM_online(RBVars, Mat_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
     end
-    θ = [[θmat[q, :]] for q in size(θmat)[1]]
   end
 
-  θ
+  θ::Vector{Vector{T}}
 
-end =#
+end
+
+function θ(
+  FEMSpace::FOMST{D},
+  RBInfo::ROMInfoST{ID},
+  Param::ParamInfoST,
+  MDEIM::MMDEIM{T}) where {ID,D,T}
+
+  timesθ = get_timesθ(RBInfo)
+
+  if Param.var ∈ RBInfo.affine_structures
+    θ = [[Param.fun(VectorValue(D, T), tθ)[1]] for tθ in timesθ]
+  else
+    if RBInfo.st_MDEIM
+      red_timesθ = timesθ[MDEIM.time_idx]
+      Vec_μ_sparse = assemble_sparse_vector(
+        FEMSpace, FEMInfo, Param, MDEIM.el, red_timesθ)
+      θ = interpolate_θ(Vec_μ_sparse, MDEIM, timesθ)
+    else
+      Vec_μ_sparse = assemble_sparse_vector(
+        FEMSpace, FEMInfo, Param, MDEIM.el, timesθ)
+      θ = MDEIM_online(RBVars, Vec_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
+    end
+  end
+
+  θ::Vector{Vector{T}}
+
+end
 
 function MDEIM_online(
   Mat_nonaffine::AbstractArray{T},

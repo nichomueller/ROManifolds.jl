@@ -65,7 +65,6 @@ end
 abstract type FOM{ID,D} end
 
 struct FOMS{ID,D} <: FOM{ID,D}
-  model::DiscreteModel
   Qₕ::CellQuadrature
   V₀::Vector{SingleFieldFESpace}
   V::Vector{SingleFieldFESpace}
@@ -82,16 +81,10 @@ function FOMS(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  Ω, Γn, Qₕ, dΩ, dΓn = get_mod_meas_quad(FEMInfo, model)
-
-  refFE = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order)
-  V₀ = TestFESpace(model, refFE; conformity=:H1,
-    dirichlet_tags=["dirichlet"])
+  Qₕ, V₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad = get_FEMSpace_quantities(FEMInfo, model)
   V = TrialFESpace(V₀, g)
+  FOMS{1,D}(Qₕ, [V₀], [V], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
 
-  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
-
-  FOMS{1,D}(model, Qₕ, [V₀], [V], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
 end
 
 function FOMS(
@@ -99,19 +92,10 @@ function FOMS(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  Ω, Γn, Qₕ, dΩ, dΓn = get_mod_meas_quad(FEMInfo, model)
-
-  refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,Float}, FEMInfo.order)
-  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1, dirichlet_tags=["dirichlet"])
+  Qₕ, V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad = get_FEMSpace_quantities(FEMInfo, model)
   V = TrialFESpace(V₀, g)
+  FOMS{2,D}(Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
 
-  refFEₚ = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order - 1; space=:P)
-  Q₀ = TestFESpace(model, refFEₚ; conformity=:L2)
-  Q = TrialFESpace(Q₀)
-
-  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
-
-  FOMS{2,D}(model, Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
 end
 
 function FOMS(
@@ -119,19 +103,9 @@ function FOMS(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  Ω, Γn, Qₕ, dΩ, dΓn = get_mod_meas_quad(FEMInfo, model)
-
-  refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,Float}, FEMInfo.order)
-  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1, dirichlet_tags=["dirichlet"])
+  Qₕ, V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad = get_FEMSpace_quantities(FEMInfo, model)
   V = TrialFESpace(V₀, g)
-
-  refFEₚ = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order - 1; space=:P)
-  Q₀ = TestFESpace(model, refFEₚ; conformity=:L2)
-  Q = TrialFESpace(Q₀)
-
-  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
-
-  FOMS{3,D}(model, Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
+  FOMS{3,D}(Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
 
 end
 
@@ -143,14 +117,10 @@ function FOMS(
 
 end
 
-#= struct FOMPoissonST{D} <: FOMST{D}
-  model::DiscreteModel
+struct FOMST{ID,D} <: FOM{ID,D}
   Qₕ::CellQuadrature
-  V₀::UnconstrainedFESpace
-  V::TransientTrialFESpace
-  ϕᵥ::FEBasis
-  ϕᵤ::Function
-  Nₛᵘ::Int
+  V₀::Vector{SingleFieldFESpace}
+  V::Vector{<:Union{SingleFieldFESpace, TransientTrialFESpace}}
   Ω::BodyFittedTriangulation
   Γn::BoundaryTriangulation
   dΩ::Measure
@@ -159,97 +129,46 @@ end
   V₀_quad::UnconstrainedFESpace
 end
 
-function FOMPoissonST(
+function FOMST(
   FEMInfo::FOMInfoST{1},
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  Ω, Γn, Qₕ, dΩ, dΓn = get_mod_meas_quad(FEMInfo, model)
-
-  refFE = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order)
-  V₀ = TestFESpace(model, refFE; conformity=:H1,
-    dirichlet_tags=["dirichlet"])
+  Qₕ, V₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad = get_FEMSpace_quantities(FEMInfo, model)
   V = TransientTrialFESpace(V₀, g)
-  ϕᵥ = get_fe_basis(V₀)
-  ϕᵤ(t) = get_trial_fe_basis(V(t))
-  Nₛᵘ = length(get_free_dof_ids(V₀))
-
-  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
-
-  FOMPoissonST{D}(
-    model, Qₕ, V₀, V, ϕᵥ, ϕᵤ, Nₛᵘ, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
+  FOMST{1,D}(Qₕ, [V₀], [V], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
 
 end
 
-function FOMPoissonST(
-  FEMInfo::FOMInfoST{1},
-  model::DiscreteModel)
-
-  FOMPoissonST(FEMInfo, model, get_g₀(FEMInfo))
-
-end =#
-
-#= struct FOMStokesST{D} <: FOMST{D}
-  model::DiscreteModel
-  Qₕ::CellQuadrature
-  V₀::UnconstrainedFESpace
-  V::TransientTrialFESpace
-  Q₀::UnconstrainedFESpace
-  Q::UnconstrainedFESpace
-  X₀::MultiFieldFESpace
-  X::TransientMultiFieldTrialFESpace
-  ϕᵥ::FEBasis
-  ϕᵤ::Function
-  ψᵧ::FEBasis
-  ψₚ::FEBasis
-  Nₛᵘ::Int
-  Nₛᵖ::Int
-  Ω::BodyFittedTriangulation
-  Γn::BoundaryTriangulation
-  dΩ::Measure
-  dΓn::Measure
-  phys_quadp::Vector{Vector{VectorValue{D,Float}}}
-  V₀_quad::UnconstrainedFESpace
-end
-
-function FOMStokesST(
+function FOMST(
   FEMInfo::FOMInfoST{2},
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  Ω, Γn, Qₕ, dΩ, dΓn = get_mod_meas_quad(FEMInfo, model)
-
-  refFEᵤ = Gridap.ReferenceFE(lagrangian, VectorValue{D,Float}, FEMInfo.order)
-  V₀ = TestFESpace(model, refFEᵤ; conformity=:H1, dirichlet_tags=["dirichlet"])
+  Qₕ, V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad = get_FEMSpace_quantities(FEMInfo, model)
   V = TransientTrialFESpace(V₀, g)
-  ϕᵥ = get_fe_basis(V₀)
-  ϕᵤ(t) = get_trial_fe_basis(V(t))
-  Nₛᵘ = length(get_free_dof_ids(V₀))
-
-  refFEₚ = Gridap.ReferenceFE(lagrangian, Float, FEMInfo.order - 1; space=:P)
-  Q₀ = TestFESpace(model, refFEₚ; conformity=:L2)
-  Q = TrialFESpace(Q₀)
-  ψᵧ = get_fe_basis(Q₀)
-  ψₚ = get_trial_fe_basis(Q)
-  Nₛᵖ = length(get_free_dof_ids(Q₀))
-
-  X₀ = MultiFieldFESpace([V₀, Q₀])
-  X = TransientMultiFieldFESpace([V, Q])
-
-  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
-
-  FOMStokesST{D}(model, Qₕ, V₀, V, Q₀, Q, X₀, X, ϕᵥ, ϕᵤ, ψᵧ, ψₚ, Nₛᵘ, Nₛᵖ,
-    Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
+  FOMST{2,D}(Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
 
 end
 
-function FOMStokesST(
-  FEMInfo::FOMInfoST{2},
-  model::DiscreteModel)
+function FOMST(
+  FEMInfo::FOMInfoST{3},
+  model::DiscreteModel{D,D},
+  g::Function) where D
 
-  FOMStokesST(FEMInfo, model, get_g₀(FEMInfo))
+  Qₕ, V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad = get_FEMSpace_quantities(FEMInfo, model)
+  V = TransientTrialFESpace(V₀, g)
+  FOMST{3,D}(Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
 
-end =#
+end
+
+function FOMST(
+  FEMInfo::FOMInfoST{ID},
+  model::DiscreteModel{D,D}) where {ID,D}
+
+  FOMST(FEMInfo, model, get_g₀(FEMInfo))
+
+end
 
 abstract type ParamInfo end
 abstract type ParamFormInfo end
@@ -285,7 +204,7 @@ function ParamInfo(
   μ::Vector,
   var::String) where ID
 
-  funₛ, funₜ, fun  = get_fun(FEMInfo, μ, var)
+  fun, funₛ, funₜ = get_fun(FEMInfo, μ, var)
   ParamInfoST(μ, var, funₛ, funₜ, fun, Vector{Float}[])
 
 end

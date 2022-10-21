@@ -91,7 +91,7 @@ function assemble_RB_time(
   println("Spatial POD, tolerance: $(RBInfo.ϵₛ)")
   RBVars.offline_time += @elapsed begin
 
-    if RBInfo.time_reduction_technique == "ST-HOSVD"
+    if RBInfo.t_red_method == "ST-HOSVD"
       S = Broadcasting(*)(RBVars.Φₛ, RBVars.S)
     else
       S = RBVars.S
@@ -199,6 +199,80 @@ end
 
 ################################## ONLINE ######################################
 
+function assemble_ϕₜθ(
+  RBVars::ROMMethodST{ID,T},
+  Var::MVariable{T},
+  Param::ParamInfo) where {ID,T}
+
+  var = Var.var
+
+  Φₜ_left, Φₜ_right = get_Φₜ(RBVars, var)
+  nₜ_left, nₜ_right = size(Φₜ_left)[2], size(Φₜ_right)[2]
+
+  Φₜ_by_Φₜ_by_θ(iₜ,jₜ,q) = sum(Φₜ_left[:,iₜ] .* Φₜ_right[:,jₜ] .* Param.θ[q])
+  Φₜ_by_Φₜ_by_θ(iₜ,q) = Broadcasting(jₜ -> Φₜ_by_Φₜ_by_θ(iₜ,jₜ,q))(1:nₜ_right)
+  Φₜ_by_Φₜ_by_θ(q) = Broadcasting(z -> Φₜ_by_Φₜ_by_θ(z,q))(1:nₜ_left)
+
+  ΦₜΦₜθ = Broadcasting(Φₜ_by_Φₜ_by_θ)(eachindex(Param.θ))
+  Broadcasting(blocks_to_matrix)(ΦₜΦₜθ)::Vector{Matrix{T}}
+
+end
+
+function assemble_ϕₜθ(
+  RBVars::ROMMethodST{ID,T},
+  Var::VVariable{T},
+  Param::ParamInfo) where {ID,T}
+
+  var = Var.var
+
+  Φₜ_left, _ = get_Φₜ(RBVars, var)
+  nₜ_left = size(Φₜ_left)[2]
+
+  Φₜ_by_θ(iₜ,q) = sum(Φₜ_left[:,iₜ] .* Param.θ[q])
+  Φₜ_by_θ(q) = Broadcasting(iₜ -> Φₜ_by_θ(iₜ,q))(1:nₜ_left)
+
+  Φₜθ = Broadcasting(Φₜ_by_θ)(eachindex(Param.θ))
+  blocks_to_matrix(Φₜθ)::Vector{Matrix{T}}
+
+end
+
+function assemble_ϕₜθ(
+  RBVars::ROMMethodST{ID,T},
+  Vars::Vector{<:MVVariable{T}},
+  Params::Vector{<:ParamInfo}) where {ID,T}
+
+  Broadcasting((Var, Param) -> assemble_ϕₜθ(RBVars, Var, Param))(Vars, Params)
+
+end
+
+function assemble_matricesₙ(
+  RBInfo::ROMInfoST{ID},
+  RBVars::ROMMethodST{ID,T},
+  Params::Vector{<:ParamInfo}) where {ID,T}
+
+  lin_Mat_ops = get_linear_matrices(RBInfo)
+  matrix_Vars = MVariable(RBInfo, RBVars, lin_Mat_ops)
+  matrix_Params = ParamInfo(Params, lin_Mat_ops)
+  ΦₜΦₜθ = assemble_ϕₜθ(RBVars, matrix_Vars, matrix_Params)
+
+  assemble_termsₙ(matrix_Vars, ΦₜΦₜθ)::Vector{Matrix{T}}
+
+end
+
+function assemble_vectorsₙ(
+  RBInfo::ROMInfoST{ID},
+  RBVars::ROMMethodST{ID,T},
+  Params::Vector{<:ParamInfo}) where {ID,T}
+
+  lin_Vec_ops = intersect(get_linear_vectors(RBInfo), set_operators(RBInfo))
+  vector_Vars = VVariable(RBInfo, RBVars, lin_Vec_ops)
+  vector_Params = ParamInfo(Params, lin_Vec_ops)
+  Φₜθ = assemble_ϕₜθ(RBVars, vector_Vars, vector_Params)
+
+  assemble_termsₙ(vector_Vars, Φₜθ)::Vector{Matrix{T}}
+
+end
+
 function reconstruct_FEM_solution(RBVars::ROMMethodST{ID,T}) where {ID,T}
   println("Reconstructing FEM solution")
 
@@ -257,20 +331,3 @@ function save_online(
 
   return
 end
-
-#= function save_online(
-  RBInfo::ROMInfoST{ID},
-  mean_pointwise_err::Vector{Matrix{T}},
-  mean_err::Vector{T},
-  mean_online_time::Float) where {ID,T}
-
-  times = times_dictionary(RBInfo, RBVars.offline_time, mean_online_time)
-  CSV.write(joinpath(RBInfo.results_path, "times.csv"), times)
-
-  path_err = joinpath(RBInfo.results_path, "mean_err.csv")
-  save_CSV(mean_err, path_err)
-
-  save_on(i::Int) = save_online(RBInfo, mean_pointwise_err[i], RBInfo.unknowns[i])
-  Broadcasting(save_on)(eachindex(RBInfo.unknowns))
-  return
-end =#

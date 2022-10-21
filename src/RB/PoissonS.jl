@@ -23,7 +23,7 @@ function assemble_RHSₙ(
 end
 
 function assemble_RHSₙ(
-  FEMSpace::FOMS{D},
+  FEMSpace::FOMS{1,D},
   RBInfo::ROMInfoS{1},
   RBVars::ROMMethodS{1,T},
   μ::Vector{T}) where {D,T}
@@ -36,9 +36,9 @@ function assemble_RHSₙ(
 end
 
 function assemble_RB_system(
-  FEMSpace::FOM{D},
-  RBInfo::ROMInfo{1},
-  RBVars::ROM{1,T},
+  FEMSpace::FOMS{1,D},
+  RBInfo::ROMInfoS{1},
+  RBVars::ROMMethodS{1,T},
   μ::Vector{T}) where {D,T}
 
   initialize_RB_system(RBVars)
@@ -82,9 +82,9 @@ function solve_RB_system(RBVars::ROMMethodS{1,T}) where T
 end
 
 function assemble_solve_reconstruct(
-  FEMSpace::FOM{D},
-  RBInfo::ROMInfo{1},
-  RBVars::ROM{1,T},
+  FEMSpace::FOMS{1,D},
+  RBInfo::ROMInfoS{1},
+  RBVars::ROMMethodS{1,T},
   μ::Vector{T}) where {D,T}
 
   assemble_RB_system(FEMSpace, RBInfo, RBVars, μ)

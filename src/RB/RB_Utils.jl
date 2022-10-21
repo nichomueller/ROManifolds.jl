@@ -42,6 +42,21 @@ function get_Φₛ(
 
 end
 
+function get_Φₜ(
+  RBVars::ROMMethodST{ID,T},
+  var::String) where {ID,T}
+
+  if var ∈ ("B", "Lc")
+    Φₜ_left = RBVars.Φₜ[2]
+  else
+    Φₜ_left = RBVars.Φₜ[1]
+  end
+  Φₜ_right = RBVars.Φₜ[1]
+
+  Φₜ_left, Φₜ_right
+
+end
+
 function get_Nₛ(
   RBVars::ROM{ID,T},
   var::String) where {ID,T}
@@ -128,6 +143,22 @@ function assemble_termsₙ(
   Params::Vector{<:ParamInfo}) where T
 
   Broadcasting(assemble_termsₙ)(Vars, Params)
+
+end
+
+function assemble_termsₙ(
+  Var::MVVariable{T},
+  Φₜθ::Matrix{T}) where T
+
+  kron(Var.Matₙ, Φₜθ)
+
+end
+
+function assemble_termsₙ(
+  Vars::Vector{<:MVVariable{T}},
+  Φₜθ::Vector{Matrix{T}}) where T
+
+  Broadcasting(assemble_termsₙ)(Vars, Φₜθ)
 
 end
 
@@ -221,15 +252,8 @@ function compute_errors(
   X::SparseMatrixCSC{T,Int}) where T
 
   @assert size(xₕ)[2] == size(x̃)[2] == 1 "Something is wrong"
-  compute_errors(xₕ[:, 1], x̃[:, 1], X)
 
-end
-
-function compute_errors(
-  xₕ::Matrix{T},
-  x̃::Matrix{T},
-  X::SparseMatrixCSC{T,Int},
-  Nₜ::Int) where T
+  Nₜ = size(xₕ)[2]
 
   function normᵢ(i::Int)
     LinearAlgebra.norm(xₕ[:, i] - x̃[:, i], X), LinearAlgebra.norm(xₕ[:, i], X)
