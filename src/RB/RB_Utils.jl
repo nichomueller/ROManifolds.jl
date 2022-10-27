@@ -77,6 +77,14 @@ function get_blocks_position(::ROMInfo{ID}) where ID
   end
 end
 
+function get_norms(solₕ)
+  norms = ["H¹"]
+  if length(solₕ) == 2
+    push!(norms, "L²")
+  end
+  norms
+end
+
 function times_dictionary(
   RBInfo::ROMInfo,
   offline_time::Float,
@@ -132,6 +140,7 @@ function assemble_termsₙ(
   Param::ParamInfo) where T
 
   @assert Var.var == Param.var
+  println("--> Assembling reduced $(Var.var)")
 
   mult = Broadcasting(.*)
   sum(mult(Var.Matₙ, Param.θ))
@@ -147,16 +156,25 @@ function assemble_termsₙ(
 end
 
 function assemble_termsₙ(
-  Var::MVVariable{T},
+  Matₙ::Matrix{T},
   Φₜθ::Matrix{T}) where T
 
-  kron(Var.Matₙ, Φₜθ)
+  kron(Matₙ, Φₜθ)
+
+end
+
+function assemble_termsₙ(
+  Var::MVVariable{T},
+  Φₜθ::Vector{Matrix{T}}) where T
+
+  println("--> Assembling reduced $(Var.var)")
+  sum(Broadcasting(assemble_termsₙ)(Var.Matₙ, Φₜθ))
 
 end
 
 function assemble_termsₙ(
   Vars::Vector{<:MVVariable{T}},
-  Φₜθ::Vector{Matrix{T}}) where T
+  Φₜθ::Vector{Vector{Matrix{T}}}) where T
 
   Broadcasting(assemble_termsₙ)(Vars, Φₜθ)
 
@@ -181,28 +199,6 @@ function assemble_function_termsₙ(
 
   Broadcasting(assemble_function_termsₙ)(Vars, Params)
 
-end
-
-function get_S_var(var::String, nb::Int, path::String)
-  Snb = load_CSV(Matrix{Float}(undef,0,0),
-    joinpath(path, "$(var)ₕ.csv"))[:, nb]
-  Matrix{Float}(reshape(Snb, :, 1))
-end
-
-function get_S_var(vars::Vector{String}, nb::Int, path::String)
-  Broadcasting(var -> get_S_var(var, nb, path))(vars)
-end
-
-function get_S_var(vars::Vector{String}, nbs::Vector{Int}, path::String)
-  Broadcasting(nb -> get_S_var(vars, nb, path))(nbs)
-end
-
-function get_norms(solₕ)
-  norms = ["H¹"]
-  if length(solₕ) == 2
-    push!(norms, "L²")
-  end
-  norms
 end
 
 function errors(
@@ -230,10 +226,10 @@ end
 function errors(
   solsₕ::Vector{Vector{Matrix{T}}},
   sõls::Vector{Vector{Matrix{T}}},
-  X::Vector{SparseMatrixCSC{Float,Int}},
-  norm::Vector{String}) where T
+  Xs::Vector{SparseMatrixCSC{Float,Int}},
+  norms::Vector{String}) where T
 
-  errs = Broadcasting((solₕ, sõl) -> errors(solₕ, sõl, X, norm))(solsₕ, sõls)
+  errs = Broadcasting((solₕ, sõl) -> errors(solₕ, sõl, Xs, norms))(solsₕ, sõls)
   errs::Vector{Vector{Tuple{Float64, Matrix{Float64}}}}
 end
 
@@ -251,7 +247,7 @@ function compute_errors(
   x̃::Matrix{T},
   X::SparseMatrixCSC{T,Int}) where T
 
-  @assert size(xₕ)[2] == size(x̃)[2] == 1 "Something is wrong"
+  @assert size(xₕ)[2] == size(x̃)[2] "Something is wrong"
 
   Nₜ = size(xₕ)[2]
 
@@ -259,9 +255,9 @@ function compute_errors(
     LinearAlgebra.norm(xₕ[:, i] - x̃[:, i], X), LinearAlgebra.norm(xₕ[:, i], X)
   end
 
-  norms = Broadcasting(normᵢ)(1:Nₜ)::Vector{Tuple{Int,Int}}
+  norms = Broadcasting(normᵢ)(1:Nₜ)::Vector{Tuple{T,T}}
   norm_err, norm_sol = first.(norms), last.(norms)
 
-  norm_err ./ norm_sol, norm(norm_err) / norm(norm_sol)
+  norm(norm_err) / norm(norm_sol)
 
 end

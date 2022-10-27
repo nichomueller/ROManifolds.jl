@@ -176,23 +176,23 @@ abstract type ParamFormInfo end
 mutable struct ParamInfoS <: ParamInfo
   μ::Vector{Float}
   var::String
-  fun::Function
+  fun::Union{Function,FEFunction}
   θ::Vector{Vector{Float}}
 end
 
 mutable struct ParamInfoST <: ParamInfo
   μ::Vector{Float}
   var::String
-  funₛ::Function
-  funₜ::Function
-  fun::Function
+  funₛ::Union{Function,FEFunction}
+  funₜ::Union{Function,FEFunction}
+  fun::Union{Function,FEFunction}
   θ::Vector{Vector{Float}}
 end
 
 function ParamInfo(
   FEMInfo::FOMInfoS{ID},
-  μ::Vector,
-  var::String) where ID
+  μ::Vector{T},
+  var::String) where {ID,T}
 
   fun = get_fun(FEMInfo, μ, var)
   ParamInfoS(μ, var, fun, Vector{Float}[])
@@ -201,8 +201,8 @@ end
 
 function ParamInfo(
   FEMInfo::FOMInfoST{ID},
-  μ::Vector,
-  var::String) where ID
+  μ::Vector{T},
+  var::String) where {ID,T}
 
   fun, funₛ, funₜ = get_fun(FEMInfo, μ, var)
   ParamInfoST(μ, var, funₛ, funₜ, fun, Vector{Float}[])
@@ -210,18 +210,27 @@ function ParamInfo(
 end
 
 function ParamInfo(
-  FEMInfo::FOMInfo{ID},
-  μ::Vector{<:Vector},
-  var::String) where ID
+  FEMInfo::FOMInfoS{ID},
+  μvec::Vector{Vector{T}},
+  var::String) where {ID,T}
 
-  Broadcasting(μᵢ -> ParamInfo(FEMInfo, μᵢ, var))(μ)
+  Broadcasting(μ -> ParamInfo(FEMInfo, μ, var))(μvec)
+
+end
+
+function ParamInfo(
+  FEMInfo::FOMInfoST{ID},
+  μvec::Vector{Vector{T}},
+  var::String) where {ID,T}
+
+  Broadcasting(μ -> ParamInfo(FEMInfo, μ, var))(μvec)
 
 end
 
 function ParamInfo(
   FEMInfo::FOMInfo{ID},
-  μ::Vector,
-  operators::Vector{String}) where ID
+  μ::Vector{T},
+  operators::Vector{String}) where {ID,T}
 
   get_single_ParamInfo(var) = ParamInfo(FEMInfo, μ, var)
   Broadcasting(get_single_ParamInfo)(operators)
@@ -229,38 +238,28 @@ function ParamInfo(
 end
 
 function ParamInfo(
-  FEMSpace::FOMS{ID},
+  FEMSpace::FOM{ID},
   θ::Vector{T},
-  var::String) where ID
+  var::String) where {ID,T}
 
-  Θfun = FEFunction(FEMSpace.V₀_quad, Θ)
-  ParamInfoS(μ, var, Θfun, Vector{Float}[])
+  θfun = FEFunction(FEMSpace.V₀_quad, θ)
+  ParamInfoS(Float[], var, θfun, Vector{Float}[])
 
 end
 
 function ParamInfo(
-  FEMSpace::FOMS{ID},
+  FEMSpace::FOM{ID},
+  θ::Matrix{T},
+  var::String) where {ID,T}
+
+  [ParamInfo(FEMSpace, θ[:,i], var) for i = 1:size(θ)[2]]
+
+end
+
+function ParamInfo(
+  FEMSpace::FOM{ID},
   θvec::Vector{Vector{T}},
-  var::String) where ID
-
-  Broadcasting(θ -> ParamInfo(FEMSpace, θ, var))(θvec)
-
-end
-
-function ParamInfo(
-  FEMSpace::FOMST{ID},
-  θ::Vector{T},
-  var::String) where ID
-
-  Θfun = FEFunction(FEMSpace.V₀_quad, Θ)
-  ParamInfoST(μ, var, Θfun, Θfun, Θfun, Vector{Float}[])
-
-end
-
-function ParamInfo(
-  FEMSpace::FOMST{ID},
-  θvec::Vector{Vector{T}},
-  var::String) where ID
+  var::String) where {ID,T}
 
   Broadcasting(θ -> ParamInfo(FEMSpace, θ, var))(θvec)
 
@@ -338,7 +337,7 @@ function Base.getproperty(ParamForm::ParamFormInfoS, sym::Symbol)
   elseif sym == :var
     getfield(ParamForm.Param, sym)::String
   elseif sym == :fun
-    getfield(ParamForm.Param, sym)::Function
+    getfield(ParamForm.Param, sym)::Union{Function,FEFunction}
   elseif sym == :θ
     getfield(ParamForm.Param, sym)::Vector{Vector{Float}}
   else
@@ -352,7 +351,7 @@ function Base.setproperty!(ParamForm::ParamFormInfoS, sym::Symbol, x)
   elseif sym == :var
     setfield!(ParamForm.Param, sym, x)::String
   elseif sym == :fun
-    setfield!(ParamForm.Param, sym, x)::Function
+    setfield!(ParamForm.Param, sym, x)::Union{Function,FEFunction}
   elseif sym == :θ
     setfield!(ParamForm.Param, sym, x)::Vector{Vector{Float}}
   else
@@ -366,7 +365,7 @@ function Base.getproperty(ParamForm::ParamFormInfoST, sym::Symbol)
   elseif sym == :var
     getfield(ParamForm.Param, sym)::String
   elseif sym ∈ (:fun, :funₛ, :funₜ)
-    getfield(ParamForm.Param, sym)::Function
+    getfield(ParamForm.Param, sym)::Union{Function,FEFunction}
   elseif sym == :θ
     getfield(ParamForm.Param, sym)::Vector{Vector{Float}}
   else
@@ -380,7 +379,7 @@ function Base.setproperty!(ParamForm::ParamFormInfoS, sym::Symbol, x)
   elseif sym == :var
     setfield!(ParamForm.Param, sym, x)::String
   elseif sym ∈ (:fun, :funₛ, :funₜ)
-    setfield!(ParamForm.Param, sym, x)::Function
+    setfield!(ParamForm.Param, sym, x)::Union{Function,FEFunction}
   elseif sym == :θ
     setfield!(ParamForm.Param, sym, x)::Vector{Vector{Float}}
   else

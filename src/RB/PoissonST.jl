@@ -3,8 +3,9 @@ function assemble_LHSₙ(
   RBVars::ROMMethodST{1,T},
   Params::Vector{ParamInfoST}) where T
 
-  Matsₙ, Mats₁ₙ = assemble_matricesₙ(RBInfo, RBVars, Params)::Vector{Matrix{T}}
-  push!(RBVars.LHSₙ, Matsₙ[1])
+  Matsₙ, Mats₁ₙ = assemble_matricesₙ(RBInfo, RBVars, Params)
+  LHSₙ = RBInfo.θ*(sum(Matsₙ)) + (1-RBInfo.θ)*Mats₁ₙ[1] - RBInfo.θ*Mats₁ₙ[2]
+  push!(RBVars.LHSₙ, LHSₙ)
 
   return
 

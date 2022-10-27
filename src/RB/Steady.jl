@@ -147,6 +147,20 @@ function online_phase(
   RBVars::ROMMethodS{ID,T},
   param_nbs::Vector{Int}) where {ID,T}
 
+  function get_S_var(var::String, nb::Int, path::String)
+    Snb = load_CSV(Matrix{Float}(undef,0,0),
+      joinpath(path, "$(var)ₕ.csv"))[:, nb]
+    Matrix{Float}(reshape(Snb, :, 1))
+  end
+
+  function get_S_var(vars::Vector{String}, nb::Int, path::String)
+    Broadcasting(var -> get_S_var(var, nb, path))(vars)
+  end
+
+  function get_S_var(vars::Vector{String}, nbs::Vector{Int}, path::String)
+    Broadcasting(nb -> get_S_var(vars, nb, path))(nbs)
+  end
+
   FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)))
   get_norm_matrix(RBInfo, RBVars)
 
@@ -172,23 +186,4 @@ function online_phase(
 
   return
 
-end
-
-function save_online(
-  RBInfo::ROMInfoS{ID},
-  offline_time::Float,
-  mean_pointwise_err::Matrix{T},
-  mean_err::T,
-  mean_online_time::Float) where {ID,T}
-
-  times = times_dictionary(RBInfo, offline_time, mean_online_time)
-  writedlm(joinpath(RBInfo.results_path, "times.csv"), times)
-
-  path_err = joinpath(RBInfo.results_path, "mean_err.csv")
-  save_CSV([mean_err], path_err)
-
-  path_pwise_err = joinpath(RBInfo.results_path, "mean_point_err.csv")
-  save_CSV(mean_pointwise_err, path_pwise_err)
-
-  return
 end

@@ -70,7 +70,7 @@ function time_supremizers(
     Φₜ, count = loop(Φₜ, count, l)
   end
 
-  println("Added $count time supremizers to Φₜᵘ")
+  println("Added $count time supremizers to Φₜ")
 
 end
 
@@ -155,7 +155,7 @@ function get_MDEIM_structures(
 
   var = Var.var
 
-  Var.MDEIM.Matᵢ, Var.MDEIM.idx, Var.MDEIM.el =
+  Var.MDEIM.Matᵢ, Var.MDEIM.idx, Var.MDEIM.time_idx, Var.MDEIM.el =
     load_structures_in_list(("Matᵢ_$(var)", "idx_$(var)", "time_idx_$(var)", "el_$(var)"),
     (Var.MDEIM.Matᵢ, Var.MDEIM.idx, Var.MDEIM.time_idx, Var.MDEIM.el), RBInfo.ROM_structures_path)
 
@@ -167,7 +167,7 @@ function get_MDEIM_structures(
 
   var = Var.var
 
-  Var.MDEIM.Matᵢ, Var.MDEIM.idx, Var.MDEIM.el =
+  Var.MDEIM.Matᵢ, Var.MDEIM.idx, Var.MDEIM.time_idx, Var.MDEIM.el =
     load_structures_in_list(("Matᵢ_$(var)", "idx_$(var)", "time_idx_$(var)", "el_$(var)"),
     (Var.MDEIM.Matᵢ, Var.MDEIM.idx, Var.MDEIM.time_idx, Var.MDEIM.el), RBInfo.ROM_structures_path)
 
@@ -200,59 +200,72 @@ end
 
 ################################## ONLINE ######################################
 
-function assemble_ϕₜθ(
+function assemble_ϕₜϕₜθ(
+  RBInfo::ROMInfoST{ID},
   RBVars::ROMMethodST{ID,T},
-  Var::MVariable{T},
   Param::ParamInfo) where {ID,T}
 
-  var = Var.var
+  var = Param.var
 
   Φₜ_left, Φₜ_right = get_Φₜ(RBVars, var)
   nₜ_left, nₜ_right = size(Φₜ_left)[2], size(Φₜ_right)[2]
 
   Φₜ_by_Φₜ_by_θ(iₜ,jₜ,q,idx1,idx2) =
-    sum(Φₜ_left[idx1,iₜ] .* Φₜ_right[idx2,jₜ] .* Param.θ[idx1][q])
-  Φₜ_by_Φₜ_by_θ(iₜ,q,idx1,idx2) =
-    Broadcasting(jₜ -> Φₜ_by_Φₜ_by_θ(iₜ,jₜ,q,idx1,idx2))(1:nₜ_right)
+    sum(Φₜ_left[idx1,iₜ] .* Φₜ_right[idx2,jₜ] .* Param.θ[q][idx1])
+  Φₜ_by_Φₜ_by_θ(jₜ,q,idx1,idx2) =
+    Broadcasting(iₜ -> Φₜ_by_Φₜ_by_θ(iₜ,jₜ,q,idx1,idx2))(1:nₜ_left)
   Φₜ_by_Φₜ_by_θ(q,idx1,idx2) =
-    Broadcasting(z -> Φₜ_by_Φₜ_by_θ(z,q,idx1,idx2))(1:nₜ_left)
+    Broadcasting(jₜ -> Φₜ_by_Φₜ_by_θ(jₜ,q,idx1,idx2))(1:nₜ_right)
 
-  idx1, idx2 = 1:RBVars.Nₜ, 1:RBVars.Nₜ
-  ΦₜΦₜθ = Broadcasting(q -> Φₜ_by_Φₜ_by_θ(q,idx1,idx2))(eachindex(Param.θ))
+  idx = 1:RBVars.Nₜ
+  ΦₜΦₜθ = Broadcasting(q -> Φₜ_by_Φₜ_by_θ(q,idx,idx))(eachindex(Param.θ))
   ΦₜΦₜθ_vec = Broadcasting(blocks_to_matrix)(ΦₜΦₜθ)::Vector{Matrix{T}}
 
-  idx3, idx4 = 2:RBVars.Nₜ, 1:RBVars.Nₜ-1
-  ΦₜΦₜθ₁ = Broadcasting(q -> Φₜ_by_Φₜ_by_θ(q,idx3,idx4))(eachindex(Param.θ))
+  idx₁, idx₂ = 2:RBVars.Nₜ, 1:RBVars.Nₜ-1
+  ΦₜΦₜθ₁ = Broadcasting(q -> Φₜ_by_Φₜ_by_θ(q,idx₁,idx₂))(eachindex(Param.θ))
   ΦₜΦₜθ₁_vec = Broadcasting(blocks_to_matrix)(ΦₜΦₜθ₁)::Vector{Matrix{T}}
 
-  hcat(ΦₜΦₜθ_vec, ΦₜΦₜθ₁_vec)::Vector{Matrix{T}}
+  if var == "M"
+    ΦₜΦₜθ_vec /= RBInfo.δt*RBInfo.θ
+    ΦₜΦₜθ₁_vec /= RBInfo.δt*RBInfo.θ
+  end
+
+  ΦₜΦₜθ_vec, ΦₜΦₜθ₁_vec
+
+end
+
+function assemble_ϕₜϕₜθ(
+  RBInfo::ROMInfoST{ID},
+  RBVars::ROMMethodST{ID,T},
+  Params::Vector{<:ParamInfo}) where {ID,T}
+
+  Broadcasting(Param -> assemble_ϕₜϕₜθ(RBInfo, RBVars, Param))(Params)
 
 end
 
 function assemble_ϕₜθ(
+  ::ROMInfoST{ID},
   RBVars::ROMMethodST{ID,T},
-  Var::VVariable{T},
   Param::ParamInfo) where {ID,T}
 
-  var = Var.var
+  var = Param.var
 
   Φₜ_left, _ = get_Φₜ(RBVars, var)
   nₜ_left = size(Φₜ_left)[2]
 
   Φₜ_by_θ(iₜ,q) = sum(Φₜ_left[:,iₜ] .* Param.θ[q])
-  Φₜ_by_θ(q) = Broadcasting(iₜ -> Φₜ_by_θ(iₜ,q))(1:nₜ_left)
+  Φₜ_by_θ(q) = reshape(Broadcasting(iₜ -> Φₜ_by_θ(iₜ,q))(1:nₜ_left), :, 1)
 
-  Φₜθ = Broadcasting(Φₜ_by_θ)(eachindex(Param.θ))
-  blocks_to_matrix(Φₜθ)::Vector{Matrix{T}}
+  Broadcasting(Φₜ_by_θ)(eachindex(Param.θ))::Vector{Matrix{T}}
 
 end
 
 function assemble_ϕₜθ(
+  RBInfo::ROMInfoST{ID},
   RBVars::ROMMethodST{ID,T},
-  Vars::Vector{<:MVVariable{T}},
   Params::Vector{<:ParamInfo}) where {ID,T}
 
-  Broadcasting((Var, Param) -> assemble_ϕₜθ(RBVars, Var, Param))(Vars, Params)
+  Broadcasting(Param -> assemble_ϕₜθ(RBInfo, RBVars, Param))(Params)
 
 end
 
@@ -264,13 +277,13 @@ function assemble_matricesₙ(
   lin_Mat_ops = get_linear_matrices(RBInfo)
   matrix_Vars = MVariable(RBInfo, RBVars, lin_Mat_ops)
   matrix_Params = ParamInfo(Params, lin_Mat_ops)
-  ΦₜΦₜθ_all = assemble_ϕₜθ(RBVars, matrix_Vars, matrix_Params)
+  ΦₜΦₜθ_all = assemble_ϕₜϕₜθ(RBInfo, RBVars, matrix_Params)
   ΦₜΦₜθ, ΦₜΦₜθ₁ = first.(ΦₜΦₜθ_all), last.(ΦₜΦₜθ_all)
 
   Matsₙ = assemble_termsₙ(matrix_Vars, ΦₜΦₜθ)::Vector{Matrix{T}}
   Mats₁ₙ = assemble_termsₙ(matrix_Vars, ΦₜΦₜθ₁)::Vector{Matrix{T}}
 
-  (Matsₙ, Mats₁ₙ)::Tuple{Vector{Matrix{T}}}
+  Matsₙ, Mats₁ₙ
 
 end
 
@@ -282,7 +295,7 @@ function assemble_vectorsₙ(
   lin_Vec_ops = intersect(get_linear_vectors(RBInfo), set_operators(RBInfo))
   vector_Vars = VVariable(RBInfo, RBVars, lin_Vec_ops)
   vector_Params = ParamInfo(Params, lin_Vec_ops)
-  Φₜθ = assemble_ϕₜθ(RBVars, vector_Vars, vector_Params)
+  Φₜθ = assemble_ϕₜθ(RBInfo, RBVars, vector_Params)
 
   assemble_termsₙ(vector_Vars, Φₜθ)::Vector{Matrix{T}}
 
@@ -291,9 +304,10 @@ end
 function reconstruct_FEM_solution(RBVars::ROMMethodST{ID,T}) where {ID,T}
   println("Reconstructing FEM solution")
 
-  xₙ = vector_to_matrix(RBVars.xₙ, RBVars.nₜ, RBVars.nₛ)
-  m = Broadcasting(*)
-  push!(RBVars.x̃, m(RBVars.Φₛ, m(RBVars.Φₜ, xₙ)'))
+  xₙ = Broadcasting(reshape)(RBVars.xₙ, RBVars.nₜ, RBVars.nₛ)
+  ΦₛxₙΦₜ(i) = RBVars.Φₛ[i] * (RBVars.Φₜ[i] * xₙ[i])'
+
+  push!(RBVars.x̃, Broadcasting(ΦₛxₙΦₜ)(eachindex(xₙ)))
 
   return
 end
@@ -302,6 +316,19 @@ function online_phase(
   RBInfo::ROMInfoST{ID},
   RBVars::ROMMethodST{ID,T},
   param_nbs::Vector{Int}) where {ID,T}
+
+  function get_S_var(var::String, nb::Int, path::String)
+    load_CSV(Matrix{Float}(undef,0,0),
+      joinpath(path, "$(var)ₕ.csv"))[:, (nb-1)*RBVars.Nₜ+1:nb*RBVars.Nₜ]
+  end
+
+  function get_S_var(vars::Vector{String}, nb::Int, path::String)
+    Broadcasting(var -> get_S_var(var, nb, path))(vars)
+  end
+
+  function get_S_var(vars::Vector{String}, nbs::Vector{Int}, path::String)
+    Broadcasting(nb -> get_S_var(vars, nb, path))(nbs)
+  end
 
   FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)))
   get_norm_matrix(RBInfo, RBVars)
@@ -318,7 +345,8 @@ function online_phase(
   mean_pointwise_err = sum(last.(last.(err))) / length(param_nbs)
 
   if RBInfo.save_online
-    save_online(RBInfo, mean_pointwise_err, mean_err, mean_online_time)
+    save_online(RBInfo, RBVars.offline_time,
+      mean_pointwise_err, mean_err, mean_online_time)
   end
 
   if RBInfo.post_process
@@ -327,22 +355,4 @@ function online_phase(
 
   return
 
-end
-
-function save_online(
-  RBInfo::ROMInfoST{ID},
-  mean_pointwise_err::Matrix{T},
-  mean_err::T,
-  mean_online_time::Float) where {ID,T}
-
-  times = times_dictionary(RBInfo, RBVars.offline_time, mean_online_time)
-  CSV.write(joinpath(RBInfo.results_path, "times.csv"), times)
-
-  path_err = joinpath(RBInfo.results_path, "mean_err.csv")
-  save_CSV([mean_err], path_err)
-
-  path_pwise_err = joinpath(RBInfo.results_path, "mean_point_err.csv")
-  save_CSV(mean_pointwise_err, path_pwise_err)
-
-  return
 end

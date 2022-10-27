@@ -70,23 +70,23 @@ end
 
 function Mat_snapshots(
   FEMSpace::FOMST{ID,D},
-  RBInfo::ROMInfoS{ID},
-  RBVars::ROMMethodS{ID,T},
+  RBInfo::ROMInfoST{ID},
+  RBVars::ROMMethodST{ID,T},
   μ::Vector{Vector{Float}},
   var::String) where {ID,D,T}
 
   timesθ = get_timesθ(RBInfo)
 
-  function Mat_linear(k::Int)::Tuple{Vector{Int},Vector{Float}}
+  function Mat_linear(k::Int)::Tuple{Vector{Int},Matrix{Float}}
     println("Snapshot number $k, $var")
     Mats = assemble_FEM_matrix(FEMSpace, RBInfo, μ[k], var, timesθ)
     iv = Broadcasting(Mat -> findnz(Mat[:]))(Mats)
     i, v = first.(iv), last.(iv)
-    @assert [length(i[1]) == length(i[j]) for j = eachindex(i)]
+    @assert all([length(i[1]) == length(i[j]) for j = eachindex(i)])
     i[1], blocks_to_matrix(v)
   end
 
-  function Mat_nonlinear(k::Int)::Tuple{Vector{Int},Vector{Float}}
+  function Mat_nonlinear(k::Int)::Tuple{Vector{Int},Matrix{Float}}
     println("Snapshot number $k, $var")
     Φₛ_fun = FEFunction(FEMSpace.V₀[1], RBVars.Φₛ[1][:, k])
     Mats = assemble_FEM_nonlinear_matrix(FEMSpace, RBInfo, μ[k], var, timesθ)(Φₛ_fun)
@@ -101,21 +101,19 @@ end
 
 function Vec_snapshots(
   FEMSpace::FOMST{ID,D},
-  RBInfo::ROMInfoS{ID},
+  RBInfo::ROMInfoST{ID},
   μ::Vector{Vector{Float}},
   var::String) where {ID,D}
 
   timesθ = get_timesθ(RBInfo)
 
-  function Vec(k::Int)::Vector{Float}
+  function Vec(k::Int)::Matrix{Float}
     println("Snapshot number $k, $var")
     Vec_block = assemble_FEM_vector(FEMSpace, RBInfo, μ[k], var, timesθ)
     blocks_to_matrix(Vec_block)
   end
 
-  Vec_block = Broadcasting(Vec)(1:RBInfo.nₛ_MDEIM)
-
-  blocks_to_matrix(Vec_block)
+  Vec
 
 end
 
@@ -140,14 +138,14 @@ function snaps_MDEIM(
   μ::Vector{Vector{Float}},
   var::String) where {ID,D}
 
-  standard_MDEIM(FEMSpace, RBInfo, μ, var)::Tuple{Matrix{T}, Matrix{T}, Vector{Int}}
+  standard_MDEIM(FEMSpace, RBInfo, μ, var)
 
 end
 
 function standard_MDEIM(
   FEMSpace::FOMST{ID,D},
-  RBInfo::ROMInfoS{ID},
-  RBVars::ROMMethodS{ID,T},
+  RBInfo::ROMInfoST{ID},
+  RBVars::ROMMethodST{ID,T},
   μ::Vector{Vector{Float}},
   var::String) where {ID,D,T}
 
@@ -163,8 +161,8 @@ function standard_MDEIM(
   ivals = Broadcasting(loop_k)(1:nₛ)
   row_idx = first.(ivals)[1]
   vals = last.(ivals)
-  vals_space = first.(vals)
-  vals_time = last.(vals)
+  vals_space = blocks_to_matrix(first.(vals))
+  vals_time = blocks_to_matrix(last.(vals))
 
   snaps_space, _ = MDEIM_POD(vals_space, RBInfo.ϵₛ)
   snaps_time, _ = MDEIM_POD(vals_time, RBInfo.ϵₜ)
@@ -175,50 +173,49 @@ end
 
 function standard_MDEIM(
   FEMSpace::FOMST{ID,D},
-  RBInfo::ROMInfoS{ID},
+  RBInfo::ROMInfoST{ID},
   μ::Vector{Vector{Float}},
-  var::String) where {ID,D,T}
+  var::String) where {ID,D}
 
   nₛ = isnonlinear(RBInfo, var) ? RBVars.nₛ[1] : RBInfo.nₛ_MDEIM
-  Mat = Vec_snapshots(FEMSpace, RBInfo, μ, var)
+  Vec = Vec_snapshots(FEMSpace, RBInfo, μ, var)
 
   function loop_k(k::Int)
-    v = Mat(k)
+    v = Vec(k)
     vs, vt = MDEIM_POD(v, RBInfo.ϵₛ)
     vs, vt
   end
 
   vals = Broadcasting(loop_k)(1:nₛ)
-  vals_space = first.(vals)
-  vals_time = last.(vals)
+  vals_space = blocks_to_matrix(first.(vals))
+  vals_time = blocks_to_matrix(last.(vals))
 
   snaps_space, _ = MDEIM_POD(vals_space, RBInfo.ϵₛ)
   snaps_time, _ = MDEIM_POD(vals_time, RBInfo.ϵₜ)
 
-  snaps_space, snaps_time, row_idx
+  snaps_space, snaps_time
 
 end
 
 function functional_MDEIM(
   FEMSpace::FOMST{ID,D},
-  RBInfo::ROMInfoS{ID},
-  RBVars::ROMMethodS{ID,T},
+  RBInfo::ROMInfoST{ID},
+  RBVars::ROMMethodST{ID,T},
   μ::Vector{Vector{Float}},
   var::String) where {ID,D,T}
 
-  Θ_space, Θ_time = θ_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
+  θ_space, θ_time = θ_snapshots(FEMSpace, RBInfo, RBVars, μ[1:RBInfo.nₛ_MDEIM], var)
 
   #time
-  #snaps_time, _ = MDEIM_POD(Θ_time, RBInfo.ϵₜ)
-  snaps_time = Θ_time
+  snaps_time, _ = MDEIM_POD(θ_time, RBInfo.ϵₜ)
 
   # space
-  #Θ_space, _ = MDEIM_POD(Θ_space, RBInfo.ϵₛ)
-  Paramθ = ParamInfo(FEMInfo, Θ_space, var)
+  θ_space, _ = MDEIM_POD(θ_space, RBInfo.ϵₛ)
+  Paramθ = ParamInfo(FEMSpace, θ_space, var)
   Mats = assemble_FEM_matrix(FEMSpace, RBInfo, Paramθ)
   iv = Broadcasting(Mat -> findnz(Mat[:]))(Mats)
   i, v = first.(iv), last.(iv)
-  @assert [length(i[1]) == length(i[j]) for j = eachindex(i)]
+  @assert all([length(i[1]) == length(i[j]) for j = eachindex(i)])
   row_idx, vals_space = i[1], blocks_to_matrix(v)
   snaps_space, _ = MDEIM_POD(vals_space, RBInfo.ϵₛ)
 
@@ -228,54 +225,58 @@ end
 
 function θ_snapshots(
   FEMSpace::FOMST{ID,D},
-  RBInfo::ROMInfoS{ID},
-  RBVars::ROMMethodS{ID,T},
+  RBInfo::ROMInfoST{ID},
+  RBVars::ROMMethodST{ID,T},
   μ::Vector{Vector{Float}},
-  var::String) where {ID,D}
+  var::String) where {ID,D,T}
 
   timesθ = get_timesθ(RBInfo)
 
-  function Θ_st_linear()
+  function θ_st_linear()
     Param = ParamInfo(RBInfo, μ, var)
-    Θ = θ_phys_quadp(Param, FEMSpace.phys_quadp, timesθ)
-    Θ_space, Θ_time = Broadcasting(Θₖ -> MDEIM_POD(Θₖ, RBInfo.ϵₛ))(Θ)
-    Θ_space, Θ_time
+    θinfo = θ_phys_quadp(RBInfo, Param, FEMSpace.phys_quadp, timesθ)
+    θ_space, θ_time = first.(θinfo), last.(θinfo)
+    blocks_to_matrix(θ_space), blocks_to_matrix(θ_time)
   end
 
-  function Θ_st_nonlinear()
+  function θ_st_nonlinear()
     RBVars.Φₛ[1], RBVars.Φₜ[1]
   end
 
-  isnonlinear(RBInfo, var) ? Θ_st_nonlinear() : Θ_st_linear()
+  isnonlinear(RBInfo, var) ? θ_st_nonlinear() : θ_st_linear()
 
 end
 
 function θ_phys_quadp(
+  RBInfo::ROMInfoST{ID},
   Param::ParamInfoST,
   phys_quadp::Vector{Vector{VectorValue{D,Float}}},
-  timesθ::Vector{T}) where {D,T}
+  timesθ::Vector{T}) where {ID,D,T}
 
-  ncells = length(FEMSpace.phys_quadp)
-  nquad_cell = length(FEMSpace.phys_quadp[1])
-
-  #= Θ = [Param.fun(phys_quadp[n][q], t_θ)
-        for t_θ = timesθ for n = 1:ncells for q = 1:nquad_cell]
-  reshape(Θ, ncells*nquad_cell, :)::Matrix{Float}=#
+  ncells = length(phys_quadp)
+  nquad_cell = length(phys_quadp[1])
 
   θfun(tθ,n,q) = Param.fun(phys_quadp[n][q], tθ)
-  θfun(tθ,n) = Broadcasting(q -> θfun(tθ,n,q))(tθ,n)
-  θfun(tθ) = Broadcasting(n -> θfun(tθ,n))(tθ)
+  θfun(tθ,n) = Broadcasting(q -> θfun(tθ,n,q))(1:nquad_cell)
+  θfun(tθ) = blocks_to_matrix(Broadcasting(n -> θfun(tθ,n))(1:ncells))[:]
 
-  Broadcasting(θfun)(timesθ)
+  θ = blocks_to_matrix(Broadcasting(θfun)(timesθ))
+  MDEIM_POD(θ, RBInfo.ϵₛ)
 
 end
 
-function assemble_parameter_on_phys_quadp(
+function θ_phys_quadp(
+  RBInfo::ROMInfoST{ID},
   Param::Vector{ParamInfoST},
   phys_quadp::Vector{Vector{VectorValue{D,Float}}},
-  timesθ::Vector{T}) where {D,T}
+  timesθ::Vector{T}) where {ID,D,T}
 
-  Broadcasting(P -> assemble_parameter_on_phys_quadp(P, phys_quadp, timesθ))(Param)
+  function loop_k(k::Int)
+    println("Parametric snapshot number $k, $(Param[k].var)")
+    θ_phys_quadp(RBInfo, Param[k], phys_quadp, timesθ)
+  end
+
+  Broadcasting(loop_k)(eachindex(Param))
 
 end
 

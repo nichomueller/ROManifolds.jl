@@ -224,7 +224,13 @@ function blocks_to_matrix(Vec_block::Vector{Vector{T}}) where T
 
 end
 
-function block_to_push()
+function blocks_to_matrix(Mat_block::Vector{SparseMatrixCSC{T,Int}}) where T
+
+  for i = 1 .+ eachindex(Mat_block[2:end])
+    @assert size(Mat_block[i])[1] == size(Mat_block[1])[1] "Rows in Mat_block must be the same"
+  end
+
+  sparse(reduce(vcat, transpose.(Mat_block))')
 
 end
 

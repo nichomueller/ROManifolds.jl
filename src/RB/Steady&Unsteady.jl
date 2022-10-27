@@ -526,3 +526,22 @@ function assemble_solve_reconstruct(
   return
 
 end
+
+function save_online(
+  RBInfo::ROMInfo{ID},
+  offline_time::Float,
+  mean_pointwise_err::Matrix{T},
+  mean_err::T,
+  mean_online_time::Float) where {ID,T}
+
+  times = times_dictionary(RBInfo, offline_time, mean_online_time)
+  writedlm(joinpath(RBInfo.results_path, "times.csv"), times)
+
+  path_err = joinpath(RBInfo.results_path, "mean_err.csv")
+  save_CSV([mean_err], path_err)
+
+  path_pwise_err = joinpath(RBInfo.results_path, "mean_point_err.csv")
+  save_CSV(mean_pointwise_err, path_pwise_err)
+
+  return
+end

@@ -49,6 +49,33 @@ function assemble_form(
 end
 
 function assemble_form(
+  ::FOMST{1,D},
+  FEMInfo::FOMInfoST{1},
+  ParamForm::ParamFormInfoS) where D
+
+  var = ParamForm.var
+
+  function bilinear_form(u, v)
+    if var == "A"
+      if isaffine(FEMInfo, var)
+        ∫(∇(v) ⋅ ∇(u))ParamForm.dΩ
+      else
+        ∫(∇(v) ⋅ (ParamForm.fun * ∇(u)))ParamForm.dΩ
+      end
+    else var == "M"
+      if isaffine(FEMInfo, var)
+        ∫(v * u)ParamForm.dΩ
+      else
+        ∫(ParamForm.fun * v * u)ParamForm.dΩ
+      end
+    end
+  end
+
+  bilinear_form
+
+end
+
+function assemble_form(
   FEMSpace::FOMST{2,D},
   FEMInfo::FOMInfoST{2},
   ParamForm::ParamFormInfoST) where D
@@ -106,6 +133,39 @@ function assemble_form(
   linear_form(t) = v -> linear_form(v, t)
 
   var ∈ ("A", "B", "M", "Xu", "Xp") ? bilinear_form : linear_form
+
+end
+
+function assemble_form(
+  ::FOMST{2,D},
+  FEMInfo::FOMInfoST{2},
+  ParamForm::ParamFormInfoST) where D
+
+  var = ParamForm.var
+
+  function bilinear_form(u, v)
+    if var == "A"
+      if isaffine(FEMInfo, var)
+        ∫(∇(v) ⊙ ∇(u))ParamForm.dΩ
+      else
+        ∫(∇(v) ⊙ (ParamForm.fun * ∇(u)))ParamForm.dΩ
+      end
+    elseif var == "B"
+      if isaffine(FEMInfo, var)
+        ∫(v * (∇⋅(u)))ParamForm.dΩ
+      else
+        ∫(ParamForm.fun * v * (∇⋅(u)))ParamForm.dΩ
+      end
+    else var == "M"
+      if isaffine(FEMInfo, var)
+        ∫(v ⋅ u)ParamForm.dΩ
+      else
+        ∫(ParamForm.fun * v ⋅ u)ParamForm.dΩ
+      end
+    end
+  end
+
+  bilinear_form
 
 end
 
@@ -187,6 +247,48 @@ function assemble_form(
 end
 
 function assemble_form(
+  ::FOMST{3,D},
+  FEMInfo::FOMInfoST{3},
+  ParamForm::ParamFormInfoST) where D
+
+  var = ParamForm.var
+
+  function trilinear_form(u, v, z)
+    if var == "C"
+      ∫(v ⊙ (∇(u)'⋅z))ParamForm.dΩ
+    else var == "D"
+      ∫(v ⊙ (∇(z)'⋅u) )ParamForm.dΩ
+    end
+  end
+  trilinear_form(z) = (u, v) -> trilinear_form(u, v, z)
+
+  function bilinear_form(u, v)
+    if var == "A"
+      if isaffine(FEMInfo, var)
+        ∫(∇(v) ⊙ ∇(u))ParamForm.dΩ
+      else
+        ∫(∇(v) ⊙ (ParamForm.fun * ∇(u)))ParamForm.dΩ
+      end
+    elseif var == "B"
+      if isaffine(FEMInfo, var)
+        ∫(v * (∇⋅(u)))ParamForm.dΩ
+      else
+        ∫(ParamForm.fun * v * (∇⋅(u)))ParamForm.dΩ
+      end
+    else var == "M"
+      if isaffine(FEMInfo, var)
+        ∫(v ⋅ u)ParamForm.dΩ
+      else
+        ∫(ParamForm.fun * v ⋅ u)ParamForm.dΩ
+      end
+    end
+  end
+
+  var ∈ ("C", "D") ? trilinear_form : bilinear_form
+
+end
+
+function assemble_form(
   FEMSpace::FOMST{ID,D},
   FEMInfo::FOMInfoST{ID},
   Param::ParamInfo) where {ID,D}
@@ -201,12 +303,24 @@ end
 function assemble_FEM_matrix(
   FEMSpace::FOMST{ID,D},
   FEMInfo::FOMInfoST{ID},
-  ParamForm::ParamFormInfo) where {ID,D}
+  ParamForm::ParamFormInfoST) where {ID,D}
 
   var = ParamForm.var
   form = assemble_form(FEMSpace, FEMInfo, ParamForm)
   V, V₀ = get_FEMSpace_matrix(FEMSpace, var)
   t -> assemble_matrix(form(t), V(t), V₀)::SparseMatrixCSC{Float,Int}
+
+end
+
+function assemble_FEM_matrix(
+  FEMSpace::FOMST{ID,D},
+  FEMInfo::FOMInfoST{ID},
+  ParamForm::ParamFormInfoS) where {ID,D}
+
+  var = ParamForm.var
+  form = assemble_form(FEMSpace, FEMInfo, ParamForm)
+  V, V₀ = get_FEMSpace_matrix(FEMSpace, var)
+  assemble_matrix(form, V(0.), V₀)::SparseMatrixCSC{Float,Int}
 
 end
 
