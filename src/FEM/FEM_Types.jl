@@ -66,8 +66,8 @@ abstract type FOM{ID,D} end
 
 struct FOMS{ID,D} <: FOM{ID,D}
   Qₕ::CellQuadrature
-  V₀::Vector{SingleFieldFESpace}
-  V::Vector{SingleFieldFESpace}
+  V₀::Vector{<:SingleFieldFESpace}
+  V::Vector{<:SingleFieldFESpace}
   Ω::BodyFittedTriangulation
   Γn::BoundaryTriangulation
   dΩ::Measure
@@ -119,7 +119,7 @@ end
 
 struct FOMST{ID,D} <: FOM{ID,D}
   Qₕ::CellQuadrature
-  V₀::Vector{SingleFieldFESpace}
+  V₀::Vector{<:SingleFieldFESpace}
   V::Vector{<:Union{SingleFieldFESpace, TransientTrialFESpace}}
   Ω::BodyFittedTriangulation
   Γn::BoundaryTriangulation

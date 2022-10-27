@@ -42,7 +42,6 @@ mutable struct ROMInfoST{ID} <: ROMInfo{ID}
   t_red_method::String
   online_RHS::Bool
   nₛ_MDEIM::Int
-  nₛ_MDEIM_time::Int
   post_process::Bool
   get_offline_structures::Bool
   save_offline::Bool
