@@ -36,7 +36,7 @@ function assemble_RHSₙ(
   μ::Vector{T}) where {D,T}
 
   RHS = assemble_RHS(FEMSpace, RBInfo, μ)
-  RHS1 = blocks_to_matrix(getindex.(RHS,1)[i] + getindex.(RHS,2)[i] + getindex.(RHS,3))
+  RHS1 = blocks_to_matrix(getindex.(RHS,1) + getindex.(RHS,2) + getindex.(RHS,3))
   RHS2 = blocks_to_matrix(getindex.(RHS,4))
   push!(RBVars.RHSₙ, reshape(RBVars.Φₛ[1]' * RHS1 * RBVars.Φₜ[1], :, 1)::Matrix{T})
   push!(RBVars.RHSₙ, reshape(RBVars.Φₛ[2]' * RHS2 * RBVars.Φₜ[2], :, 1)::Matrix{T})

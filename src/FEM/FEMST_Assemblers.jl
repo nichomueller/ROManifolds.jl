@@ -176,15 +176,14 @@ function assemble_form(
 
   var = ParamForm.var
 
-  function trilinear_form(u, v, z, t)
+  function trilinear_form(u, v, z)
     if var == "C"
-      ∫(v ⊙ (∇(u)'⋅z(t)))ParamForm.dΩ
+      ∫(v ⊙ (∇(u)'⋅z))ParamForm.dΩ
     else var == "D"
-      ∫(v ⊙ (∇(z(t))'⋅u) )ParamForm.dΩ
+      ∫(v ⊙ (∇(z)'⋅u) )ParamForm.dΩ
     end
   end
-  trilinear_form(z, t) = (u, v) -> trilinear_form(u, v, z, t)
-  trilinear_form(t) = z -> trilinear_form(z, t)
+  trilinear_form(z) = (u, v) -> trilinear_form(u, v, z)
 
   function bilinear_form(u, v, t)
     if var == "Xu"
@@ -329,8 +328,8 @@ function assemble_FEM_matrix(
   FEMInfo::FOMInfoST{ID},
   ParamForm::Vector{<:ParamFormInfo}) where {ID,D}
 
-  FEM_matrix(P) = assemble_FEM_matrix(FEMSpace, FEMInfo, P)
-  Broadcasting(FEM_matrix)(ParamForm)
+  Mat(P) = assemble_FEM_matrix(FEMSpace, FEMInfo, P)
+  Broadcasting(Mat)(ParamForm)
 
 end
 
@@ -349,9 +348,9 @@ function assemble_FEM_matrix(
   FEMInfo::FOMInfoST{ID},
   Param::Vector{<:ParamInfo}) where {ID,D}
 
-  FEM_matrix(P) = assemble_FEM_matrix(FEMSpace, FEMInfo,
+  Mat(P) = assemble_FEM_matrix(FEMSpace, FEMInfo,
     ParamFormInfo(FEMSpace, P))
-  Broadcasting(FEM_matrix)(Param)
+  Broadcasting(Mat)(Param)
 
 end
 
@@ -548,9 +547,9 @@ function assemble_FEM_nonlinear_matrix(
   ParamForm::ParamFormInfo) where {ID,D}
 
   var = ParamForm.var
-  form = assemble_form(FEMSpace, FEMInfo, ParamForm)
+  form(z) = assemble_form(FEMSpace, FEMInfo, ParamForm)(z)
   V, V₀ = get_FEMSpace_matrix(FEMSpace, var)
-  t -> assemble_matrix(form(t), V(t), V₀)::SparseMatrixCSC{Float,Int}
+  z -> assemble_matrix(form(z), V(0.), V₀)::SparseMatrixCSC{Float,Int}
 
 end
 
@@ -559,8 +558,8 @@ function assemble_FEM_nonlinear_matrix(
   FEMInfo::FOMInfoST{ID},
   ParamForm::Vector{<:ParamFormInfo}) where {ID,D}
 
-  FEM_matrix(P) = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, P)
-  Broadcasting(FEM_matrix)(ParamForm)
+  Mat(P,z) = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, P)(z)
+  z -> Broadcasting(P -> Mat(P,z))(ParamForm)
 
 end
 
@@ -570,7 +569,7 @@ function assemble_FEM_nonlinear_matrix(
   Param::ParamInfo) where {ID,D}
 
   ParamForm = ParamFormInfo(FEMSpace, Param)
-  assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, ParamForm)
+  z -> assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, ParamForm)(z)
 
 end
 
@@ -579,9 +578,9 @@ function assemble_FEM_nonlinear_matrix(
   FEMInfo::FOMInfoST{ID},
   Param::Vector{<:ParamInfo}) where {ID,D}
 
-  FEM_matrix(P) = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo,
-    ParamFormInfo(FEMSpace, P))
-  Broadcasting(FEM_matrix)(Param)
+  Mat(P,z) = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo,
+    ParamFormInfo(FEMSpace, P))(z)
+  z -> Broadcasting(P -> Mat(P,z))(Param)
 
 end
 
@@ -592,7 +591,7 @@ function assemble_FEM_nonlinear_matrix(
   var::String) where {ID,D,T}
 
   Param = ParamInfo(FEMInfo, μ, var)
-  assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, Param)
+  z -> assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, Param)(z)
 
 end
 
@@ -602,8 +601,8 @@ function assemble_FEM_nonlinear_matrix(
   μvec::Vector{Vector{T}},
   var::String) where {ID,D,T}
 
-  Mat(μ) = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ, var)
-  Broadcasting(Mat)(μvec)
+  Mat(μ,z) = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ, var)(z)
+  z -> Broadcasting(μ -> Mat(μ,z))(μvec)
 
 end
 
@@ -615,158 +614,6 @@ function assemble_FEM_nonlinear_matrix(
 
   Param = ParamInfo(FEMInfo, μ, var)
   assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, Param)
-
-end
-
-################################################################################
-
-function assemble_FEM_nonlinear_matrix(
-  FEMSpace::FOMST{ID,D},
-  FEMInfo::FOMInfoST{ID},
-  ParamForm::ParamFormInfo,
-  tθ::Real) where {ID,D}
-
-  assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, ParamForm)(tθ)::SparseMatrixCSC{Float,Int}
-
-end
-
-function assemble_FEM_nonlinear_matrix(
-  FEMSpace::FOMST{ID,D},
-  FEMInfo::FOMInfoST{ID},
-  ParamForm::Vector{<:ParamFormInfo},
-  tθ::Real) where {ID,D}
-
-  Mats = assemble_FEM_matrix(FEMSpace, FEMInfo, ParamForm)
-  Broadcasting(Mat -> Gridap.evaluate(Mat, tθ))(Mats)
-
-end
-
-function assemble_FEM_nonlinear_matrix(
-  FEMSpace::FOMST{ID,D},
-  FEMInfo::FOMInfoST{ID},
-  Param::ParamInfo,
-  tθ::Real) where {ID,D}
-
-  assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, Param)(tθ)
-
-end
-
-function assemble_FEM_nonlinear_matrix(
-  FEMSpace::FOMST{ID,D},
-  FEMInfo::FOMInfoST{ID},
-  Param::Vector{<:ParamInfo},
-  tθ::Real) where {ID,D}
-
-  Mats = assemble_FEM_matrix(FEMSpace, FEMInfo, Param)
-  Broadcasting(Mat -> Gridap.evaluate(Mat, tθ))(Mats)
-
-end
-
-function assemble_FEM_nonlinear_matrix(
-  FEMSpace::FOMST{ID,D},
-  FEMInfo::FOMInfoST{ID},
-  μ::Vector{T},
-  var::String,
-  tθ::Real) where {ID,D,T}
-
-  assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ, var)(tθ)
-
-end
-
-function assemble_FEM_nonlinear_matrix(
-  FEMSpace::FOMST{ID,D},
-  FEMInfo::FOMInfoST{ID},
-  μvec::Vector{Vector{T}},
-  var::String,
-  tθ::Real) where {ID,D,T}
-
-  Mats = assemble_FEM_matrix(FEMSpace, FEMInfo, μvec, var)
-  Broadcasting(Mat -> Gridap.evaluate(Mat, tθ))(Mats)
-
-end
-
-function assemble_FEM_nonlinear_matrix(
-  FEMSpace::FOMST{ID,D},
-  FEMInfo::FOMInfoST{ID},
-  μ::Vector{T},
-  var::Vector{String},
-  tθ::Real) where {ID,D,T}
-
-  Mats = assemble_FEM_matrix(FEMSpace, FEMInfo, μ, var)
-  Broadcasting(Mat -> Gridap.evaluate(Mat, tθ))(Mats)
-
-end
-
-function assemble_FEM_nonlinear_matrix(
-  FEMSpace::FOMST{ID,D},
-  FEMInfo::FOMInfoST{ID},
-  ParamForm::ParamFormInfo,
-  timesθ::Vector{<:Real}) where {ID,D}
-
-  [assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, ParamForm, tθ) for tθ = timesθ]
-
-end
-
-function assemble_FEM_nonlinear_matrix(
-  FEMSpace::FOMST{ID,D},
-  FEMInfo::FOMInfoST{ID},
-  ParamForm::Vector{<:ParamFormInfo},
-  timesθ::Vector{<:Real}) where {ID,D}
-
-  [assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, ParamForm, tθ) for tθ = timesθ]
-
-end
-
-function assemble_FEM_nonlinear_matrix(
-  FEMSpace::FOMST{ID,D},
-  FEMInfo::FOMInfoST{ID},
-  Param::ParamInfo,
-  timesθ::Vector{<:Real}) where {ID,D}
-
-  [assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, Param, tθ) for tθ = timesθ]
-
-end
-
-function assemble_FEM_nonlinear_matrix(
-  FEMSpace::FOMST{ID,D},
-  FEMInfo::FOMInfoST{ID},
-  Param::Vector{<:ParamInfo},
-  timesθ::Vector{<:Real}) where {ID,D}
-
-  [assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, Param, tθ) for tθ = timesθ]
-
-end
-
-function assemble_FEM_nonlinear_matrix(
-  FEMSpace::FOMST{ID,D},
-  FEMInfo::FOMInfoST{ID},
-  μ::Vector{T},
-  var::String,
-  timesθ::Vector{<:Real}) where {ID,D,T}
-
-  [assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ, var, tθ) for tθ = timesθ]
-
-end
-
-function assemble_FEM_nonlinear_matrix(
-  FEMSpace::FOMST{ID,D},
-  FEMInfo::FOMInfoST{ID},
-  μvec::Vector{Vector{T}},
-  var::String,
-  timesθ::Vector{<:Real}) where {ID,D,T}
-
-  [assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μvec, var, tθ) for tθ = timesθ]
-
-end
-
-function assemble_FEM_nonlinear_matrix(
-  FEMSpace::FOMST{ID,D},
-  FEMInfo::FOMInfoST{ID},
-  μ::Vector{T},
-  var::Vector{String},
-  timesθ::Vector{<:Real}) where {ID,D,T}
-
-  [assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ, var, tθ) for tθ = timesθ]
 
 end
 
@@ -797,8 +644,8 @@ function assemble_FEM_vector(
   FEMInfo::FOMInfoST{ID},
   ParamForm::Vector{<:ParamFormInfo}) where {ID,D}
 
-  FEM_vector(P) = assemble_FEM_vector(FEMSpace, FEMInfo, P)
-  Broadcasting(FEM_vector)(ParamForm)
+  Vec(P) = assemble_FEM_vector(FEMSpace, FEMInfo, P)
+  Broadcasting(Vec)(ParamForm)
 
 end
 
@@ -817,9 +664,9 @@ function assemble_FEM_vector(
   FEMInfo::FOMInfoST{ID},
   Param::Vector{<:ParamInfo}) where {ID,D}
 
-  FEM_vector(P) = assemble_FEM_vector(FEMSpace, FEMInfo,
+  Vec(P) = assemble_FEM_vector(FEMSpace, FEMInfo,
     ParamFormInfo(FEMSpace, P))
-  Broadcasting(FEM_vector)(Param)
+  Broadcasting(Vec)(Param)
 
 end
 

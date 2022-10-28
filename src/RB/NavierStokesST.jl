@@ -56,8 +56,11 @@ function assemble_LHSₙ(
 
   Matsₙ, Mats₁ₙ = assemble_matricesₙ(RBInfo, RBVars, Params)
   LHSₙ11 = RBInfo.θ*(Matsₙ[1]+Matsₙ[3]) + (1-RBInfo.θ)*Mats₁ₙ[1] - RBInfo.θ*Mats₁ₙ[3]
-  LHSₙ21 = RBInfo.θ*Matsₙ[2] + (1-RBInfo.θ)*Mats₁ₙ[2]
+  LHSₙ12 = - RBInfo.θ*Matsₙ[2]' - (1-RBInfo.θ)*Mats₁ₙ[2][2]
+  LHSₙ21 = RBInfo.θ*Matsₙ[2] + (1-RBInfo.θ)*Mats₁ₙ[2][1]
+
   push!(RBVars.LHSₙ, LHSₙ11)
+  push!(RBVars.LHSₙ, LHSₙ12)
   push!(RBVars.LHSₙ, LHSₙ21)
 
   return
@@ -84,10 +87,10 @@ function assemble_RHSₙ(
   μ::Vector{T}) where {D,T}
 
   RHS = assemble_RHS(FEMSpace, RBInfo, μ)
-  push!(RBVars.RHSₙ, reshape(RBVars.Φₛ[1]' *
-    sum(RHS[1:3]) * RBVars.Φₜ[1], :, 1)::Matrix{T})
-  push!(RBVars.RHSₙ, reshape(RBVars.Φₛ[2]' *
-    RHS[end] * RBVars.Φₜ[1], :, 1)::Matrix{T})
+  RHS1 = blocks_to_matrix(getindex.(RHS,1) + getindex.(RHS,2) + getindex.(RHS,3))
+  RHS2 = blocks_to_matrix(getindex.(RHS,4))
+  push!(RBVars.RHSₙ, reshape(RBVars.Φₛ[1]' * RHS1 * RBVars.Φₜ[1], :, 1)::Matrix{T})
+  push!(RBVars.RHSₙ, reshape(RBVars.Φₛ[2]' * RHS2 * RBVars.Φₜ[2], :, 1)::Matrix{T})
 
   return
 
@@ -140,8 +143,9 @@ function solve_RB_system(
 
   println("Solving RB problem via Newton-Raphson iterations")
   xₙ = newton(FEMSpace, RBVars, JinvₙResₙ)
-  push!(RBVars.xₙ, xₙ[1:RBVars.nₛ[1],:])
-  push!(RBVars.xₙ, xₙ[RBVars.nₛ[1]+1:end,:])
+  n = RBVars.nₛ .* RBVars.nₜ
+  push!(RBVars.xₙ, xₙ[1:n[1],:])
+  push!(RBVars.xₙ, xₙ[n[1]+1:end,:])
 
 end
 

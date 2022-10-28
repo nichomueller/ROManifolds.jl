@@ -169,14 +169,10 @@ function assemble_FEM_matrix(
   FEMInfo::FOMInfoS{ID},
   ParamForm::ParamFormInfo) where {ID,D}
 
-  if isempty(ParamForm)
-    Mat = SparseMatrixCSC(Matrix{Float}(undef,0,0))
-  else
-    var = ParamForm.var
-    form = assemble_form(FEMSpace, FEMInfo, ParamForm)
-    Mat = assemble_matrix(form, get_FEMSpace_matrix(FEMSpace, var)...)
-  end
 
+  var = ParamForm.var
+  form = assemble_form(FEMSpace, FEMInfo, ParamForm)
+  Mat = assemble_matrix(form, get_FEMSpace_matrix(FEMSpace, var)...)
   Mat::SparseMatrixCSC{Float,Int}
 
 end
@@ -252,14 +248,10 @@ function assemble_FEM_nonlinear_matrix(
   FEMInfo::FOMInfoS{ID},
   ParamForm::ParamFormInfo) where {ID,D}
 
-  if isempty(ParamForm)
-    _ -> SparseMatrixCSC(Matrix{Float}(undef,0,0))
-  else
     var = ParamForm.var
     form(z) = assemble_form(FEMSpace, FEMInfo, ParamForm)(z)
     Mat(z) = assemble_matrix(form(z), get_FEMSpace_matrix(FEMSpace, var)...)
     Mat
-  end
 
 end
 
@@ -334,16 +326,12 @@ function assemble_FEM_vector(
   FEMInfo::FOMInfoS{ID},
   ParamForm::ParamFormInfo) where {ID,D}
 
-  if isempty(ParamForm)
-    Vec = Float[]
+  var = ParamForm.var
+  form = assemble_form(FEMSpace, FEMInfo, ParamForm)
+  if var ∈ ("L", "Lc")
+    Vec = -assemble_vector(form, get_FEMSpace_vector(FEMSpace, var))
   else
-    var = ParamForm.var
-    form = assemble_form(FEMSpace, FEMInfo, ParamForm)
-    if var ∈ ("L", "Lc")
-      Vec = -assemble_vector(form, get_FEMSpace_vector(FEMSpace, var))
-    else
-      Vec = assemble_vector(form, get_FEMSpace_vector(FEMSpace, var))
-    end
+    Vec = assemble_vector(form, get_FEMSpace_vector(FEMSpace, var))
   end
 
   Vec::Vector{Float}

@@ -43,11 +43,6 @@ function FEM_solver(
   operator::TransientFEOperator,
   x₀_field::FEFunction)
 
-  function xₕᵢ!(xₕ, xₕₜ)
-    xₕ[1] = get_free_dof_values(xₕₜ)
-    nothing
-  end
-
   ode_solver = ThetaMethod(LUSolver(), FEMInfo.δt, FEMInfo.θ)
   xₕₜ_field = solve(ode_solver, operator, x₀_field, FEMInfo.t₀, FEMInfo.tₗ)
 
@@ -58,7 +53,6 @@ function FEM_solver(
   for (xₕ, _) in xₕₜ_field
     println("Time step: $count")
     xₕₜ[:,count] = get_free_dof_values(xₕ)
-    #xₕᵢ!(xₕ[:,count], xₕₜ)
     count += 1
   end
 
@@ -72,6 +66,32 @@ function FEM_solver(
   x₀_field::FEFunction)
 
   ode_solver = ThetaMethod(LUSolver(), FEMInfo.δt, FEMInfo.θ)
+  xₕₜ_field = solve(ode_solver, operator, x₀_field, FEMInfo.t₀, FEMInfo.tₗ)
+
+  count = 1
+  Nₛᵘ = length(get_free_dof_values(x₀_field[1]))
+  Nₛᵖ = length(get_free_dof_values(x₀_field[2]))
+  Nₜ = Int((FEMInfo.tₗ - FEMInfo.t₀) / FEMInfo.δt)
+
+  xₕₜ = zeros(Nₛᵘ+Nₛᵖ, Nₜ)
+  count = 1
+  for (xₕ, _) in xₕₜ_field
+    println("Time step: $count")
+    xₕₜ[:,count] = get_free_dof_values(xₕ)
+    count += 1
+  end
+
+  (xₕₜ[1:Nₛᵘ,:], xₕₜ[Nₛᵘ+1:end,:])::NTuple{2,Matrix{Float}}
+
+end
+
+function FEM_solver(
+  FEMInfo::FOMInfoST{3},
+  operator::TransientFEOperator,
+  x₀_field::FEFunction)
+
+  nls = NLSolver(show_trace=true, method=:newton, linesearch=BackTracking())
+  ode_solver = ThetaMethod(nls, FEMInfo.δt, FEMInfo.θ)
   xₕₜ_field = solve(ode_solver, operator, x₀_field, FEMInfo.t₀, FEMInfo.tₗ)
 
   count = 1
