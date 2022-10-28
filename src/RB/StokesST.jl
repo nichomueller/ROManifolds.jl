@@ -5,8 +5,9 @@ function assemble_LHSₙ(
 
   Matsₙ, Mats₁ₙ = assemble_matricesₙ(RBInfo, RBVars, Params)
   LHSₙ11 = RBInfo.θ*(Matsₙ[1]+Matsₙ[3]) + (1-RBInfo.θ)*Mats₁ₙ[1] - RBInfo.θ*Mats₁ₙ[3]
-  LHSₙ21 = RBInfo.θ*Matsₙ[2] + (1-RBInfo.θ)*Mats₁ₙ[2]
-  LHSₙ12 = RBInfo.θ*Matsₙ[2]' + (1-RBInfo.θ)*Matred
+  LHSₙ12 = - RBInfo.θ*Matsₙ[2]' - (1-RBInfo.θ)*Mats₁ₙ[2][2]
+  LHSₙ21 = RBInfo.θ*Matsₙ[2] + (1-RBInfo.θ)*Mats₁ₙ[2][1]
+
   push!(RBVars.LHSₙ, LHSₙ11)
   push!(RBVars.LHSₙ, LHSₙ12)
   push!(RBVars.LHSₙ, LHSₙ21)
@@ -85,7 +86,7 @@ function solve_RB_system(RBVars::ROMMethodST{2,T}) where T
 
   println("Solving RB problem via backslash")
   n = RBVars.nₛ .* RBVars.nₜ
-  LHSₙ = vcat(hcat(RBVars.LHSₙ[1], -RBVars.LHSₙ[2]),
+  LHSₙ = vcat(hcat(RBVars.LHSₙ[1], RBVars.LHSₙ[2]),
     hcat(RBVars.LHSₙ[3], zeros(T, n[2], n[2])))
   RHSₙ = vcat(RBVars.RHSₙ[1], RBVars.RHSₙ[2])
 

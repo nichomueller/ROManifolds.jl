@@ -308,7 +308,7 @@ function θ(
     else
       Mats_μ_hyp = assemble_hyperred_matrix(
         FEMSpace, FEMInfo, Param, MDEIM.el, timesθ)
-      θ = MDEIM_online(Mats_μ_hyp, MDEIM.Matᵢ, MDEIM.idx, RBVars.Nₜ)
+      θ = MDEIM_online(Mats_μ_hyp, MDEIM.Matᵢ, MDEIM.idx, length(timesθ))
     end
   end
 
@@ -335,7 +335,7 @@ function θ(
     else
       Vecs_μ_hyp = assemble_hyperred_vector(
         FEMSpace, FEMInfo, Param, MDEIM.el, timesθ)
-      θ = MDEIM_online(Vecs_μ_hyp, MDEIM.Matᵢ, MDEIM.idx, RBVars.Nₜ)
+      θ = MDEIM_online(Vecs_μ_hyp, MDEIM.Matᵢ, MDEIM.idx, length(timesθ))
     end
   end
 
