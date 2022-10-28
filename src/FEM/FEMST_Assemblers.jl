@@ -139,7 +139,7 @@ end
 function assemble_form(
   ::FOMST{2,D},
   FEMInfo::FOMInfoST{2},
-  ParamForm::ParamFormInfoST) where D
+  ParamForm::ParamFormInfoS) where D
 
   var = ParamForm.var
 
@@ -249,7 +249,7 @@ end
 function assemble_form(
   ::FOMST{3,D},
   FEMInfo::FOMInfoST{3},
-  ParamForm::ParamFormInfoST) where D
+  ParamForm::ParamFormInfoS) where D
 
   var = ParamForm.var
 

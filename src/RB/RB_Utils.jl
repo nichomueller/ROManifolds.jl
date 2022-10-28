@@ -201,6 +201,26 @@ function assemble_function_termsₙ(
 
 end
 
+function Φₜ_by_Φₜ_by_θ(
+  Φₜ_left::Matrix{T},
+  Φₜ_right::Matrix{T},
+  θ::Vector{Vector{T}}) where T
+
+  nₜ_left, nₜ_right = size(Φₜ_left)[2], size(Φₜ_right)[2]
+
+  ΦₜΦₜθ_fun(iₜ,jₜ,q,idx1,idx2) =
+    sum(Φₜ_left[idx1,iₜ] .* Φₜ_right[idx2,jₜ] .* θ[q][idx1])
+  ΦₜΦₜθ_fun(jₜ,q,idx1,idx2) =
+    Broadcasting(iₜ -> ΦₜΦₜθ_fun(iₜ,jₜ,q,idx1,idx2))(1:nₜ_left)
+  ΦₜΦₜθ_fun(q,idx1,idx2) =
+    Broadcasting(jₜ -> ΦₜΦₜθ_fun(jₜ,q,idx1,idx2))(1:nₜ_right)
+  ΦₜΦₜθ_fun(idx1,idx2) =
+    Broadcasting(q -> ΦₜΦₜθ_fun(q,idx1,idx2))(eachindex(θ))
+
+  ΦₜΦₜθ_fun
+
+end
+
 function errors(
   solₕ::Matrix{T},
   sõl::Matrix{T},

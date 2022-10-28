@@ -30,7 +30,7 @@ function assemble_RHSₙ(
   μ::Vector{T}) where {D,T}
 
   RHS = assemble_RHS(FEMSpace, RBInfo, μ)
-  push!(RBVars.RHSₙ, reshape(RBVars.Φₛ[1]' * sum(RHS), :, 1)::Matrix{T})
+  push!(RBVars.RHSₙ, reshape(RBVars.Φₛ[1]' * sum(RHS) *RBVars.Φₜ[1], :, 1)::Matrix{T})
 
   return
 

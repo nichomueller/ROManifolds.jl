@@ -62,7 +62,7 @@ function check_dataset()
 
 end
 
-#= function check_dataset()
+function check_dataset(RBInfo)
 
   FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)))
 
@@ -70,74 +70,31 @@ end
   t¹_θ = RBInfo.t₀+δtθ
   t²_θ = t¹_θ+RBInfo.δt
 
-  u = readdlm(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"), ',', T)
-  u1, u2 = u[:, 1], u[:, 2]
+  u1 = readdlm(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"), ',', T)[:, 1]
+  u2 = readdlm(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"), ',', T)[:, 2]
+  p1 = readdlm(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"), ',', T)[:, 1]
+  p2 = readdlm(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"), ',', T)[:, 2]
 
-  ParamA = ParamInfo(FEMInfo, μ[1], "A")
-  ParamM = ParamInfo(FEMInfo, μ[1], "M")
-  ParamF = ParamInfo(FEMInfo, μ[1], "F")
-  ParamH = ParamInfo(FEMInfo, μ[1], "H")
-  ParamL = ParamInfo(FEMInfo, μ[1], "L")
+  Mats(t) = assemble_all_FEM_matrices(FEMSpace, FEMInfo, μ[1], t)
+  Vecs(t) = assemble_all_FEM_vectors(FEMSpace, FEMInfo, μ[1], t)
 
-  A(t) = assemble_FEM_matrix(FEMSpace, FEMInfo, ParamA, t)
-  M(t) = assemble_FEM_matrix(FEMSpace, FEMInfo, ParamM, t)
-  F(t) = assemble_FEM_vector(FEMSpace, FEMInfo, ParamF, t)
-  H(t) = assemble_FEM_vector(FEMSpace, FEMInfo, ParamH, t)
-  L(t) = assemble_FEM_vector(FEMSpace, FEMInfo, ParamL, t)
+  Nₛᵘ = length(get_free_dof_ids(FEMSpace.V₀[1]))
+  Nₛᵖ = length(get_free_dof_ids(FEMSpace.V₀[2]))
 
-  LHS1 = A(t¹_θ) + M(t¹_θ)/δtθ
-  RHS1 = F(t¹_θ) + H(t¹_θ) + L(t¹_θ)
-  uθ1 = LHS1\RHS1
-  my_u1 = uθ1 / RBInfo.θ
-
-  LHS2 = A(t²_θ) + M(t²_θ)/δtθ
-  RHS2 = F(t²_θ) + H(t²_θ) + L(t²_θ)
-  uθ2 = LHS2 \ (RHS2 + M(t²_θ)/δtθ * u1)
-  my_u2 = (uθ2 - (1-RBInfo.θ)*u1)/ RBInfo.θ
-
-  u1≈my_u1
-  u2≈my_u2
-
-end =#
-
-function check_dataset(RBInfo, RBVars, i)
-
-  FEMSpace, μ = get_FEMμ_info(RBInfo)
-  Param = ParamInfo(RBInfo, μ[i])
-
-  u1 = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
-    DataFrame))[:, (i-1)*RBVars.Nₜ+1]
-  u2 = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
-    DataFrame))[:, (i-1)*RBVars.Nₜ+2]
-  p1 = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"),
-    DataFrame))[:, (i-1)*RBVars.Nₜ+1]
-  p2 = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"),
-    DataFrame))[:, (i-1)*RBVars.Nₜ+2]
-
-  A = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "A")
-  B = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "B")(0.)
-  M = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "M")(0.)
-  F = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "F")(0.)
-  H = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "H")(0.)
-  L = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "L")
-  Lc = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "Lc")
-
-  δtθ = RBInfo.δt*RBInfo.θ
-  t¹_θ = RBInfo.t₀+δtθ
-  t²_θ = t¹_θ+RBInfo.δt
-
-  LHS(t) = vcat(hcat(M/δtθ+A(t), -B'), hcat(B, zeros(T, FEMSpace.Nₛᵖ, FEMSpace.Nₛᵖ)))
-  RHS(t) = vcat(sin(t)*(F + H) - 0. *L(t), - 0. *Lc(t))
+  L11(t) = Mats(t)[1] + Mats(t)[3]/δtθ
+  L21(t) = Mats(t)[2]
+  LHS(t) = vcat(hcat(L11(t), -L21(t)'), hcat(L21(t), zeros(T, Nₛᵖ, Nₛᵖ)))
+  RHS(t) = vcat(sum(Vecs(t)[1:3]), Vecs(t)[end])
 
   my_x1θ = LHS(t¹_θ) \ RHS(t¹_θ)
   my_x1 = my_x1θ / RBInfo.θ
-  my_u1 = my_x1[1:RBVars.Nₛᵘ]
-  my_p1 = my_x1[RBVars.Nₛᵘ+1:end]
+  my_u1 = my_x1[1:Nₛᵘ]
+  my_p1 = my_x1[Nₛᵘ+1:end]
 
-  my_x2θ = LHS(t²_θ) \ (RHS(t²_θ) + vcat(M/δtθ * my_u1, zeros(T, FEMSpace.Nₛᵖ)))
+  my_x2θ = LHS(t²_θ) \ (RHS(t²_θ) + vcat(Mats(t²_θ)[3]/δtθ * my_u1, zeros(T, Nₛᵖ)))
   my_x2 = (my_x2θ - (1-RBInfo.θ)*my_x1)/ RBInfo.θ
-  my_u2 = my_x2[1:RBVars.Nₛᵘ]
-  my_p2 = my_x2[RBVars.Nₛᵘ+1:end]
+  my_u2 = my_x2[1:Nₛᵘ]
+  my_p2 = my_x2[Nₛᵘ+1:end]
 
   u1≈my_u1
   u2≈my_u2
@@ -260,3 +217,58 @@ function get_A_b(op,u0_field,Δtθ,ode_solver)
 end
 
 LHS_1 , RHS_1 = get_A_b(op_SUPG,u0_field,Δtθ,ode_solver)
+
+Q = 1
+n = RBVars.nₛ .* RBVars.nₜ
+Param = ParamInfo(RBInfo, μ[95], "B");
+MDEIM = RBVars.Vars[2].MDEIM;
+Mat = assemble_FEM_matrix(FEMSpace, RBInfo.FEMInfo, μ[95], "B", timesθ)';
+Param.θ = θ(FEMSpace, RBInfo, Param, MDEIM);
+Matn = zeros(n[1], n[2], Q);
+function idxx1(i,j)
+  (i-1)*RBVars.nₜ[1] + j
+end
+function idxx2(i,j)
+  (i-1)*RBVars.nₜ[2] + j
+end
+for q = 1:Q
+  for is = 1:RBVars.nₛ[1]
+    for it = 1:RBVars.nₜ[1]
+      i = idxx1(is,it)
+      for js = 1:RBVars.nₛ[2]
+        for jt = 1:RBVars.nₜ[2]
+          j = idxx2(js,jt)
+          Matn[i,j,q] = RBVars.Vars[2].Matₙ[q][js,is] * sum(RBVars.Φₜ[1][2:end,it] .* RBVars.Φₜ[2][1:end-1,jt] .* Param.θ[q][2:end])
+        end
+      end
+    end
+  end
+end
+
+Matred = sum([Matn[:,:,q] for q = 1:Q])
+maximum(abs.(Matred - Mats₁ₙ[2]'))
+
+#= Q = 1
+n = RBVars.nₛ .* RBVars.nₜ
+Param = ParamInfo(RBInfo, μ[95], "Lc");
+MDEIM = RBVars.Vars[7].MDEIM;
+Mat = assemble_FEM_vector(FEMSpace, RBInfo.FEMInfo, μ[95], "Lc", timesθ);
+Param.θ = θ(FEMSpace, RBInfo, Param, MDEIM);
+Matn = zeros(n[2], 1, Q);
+function idxx1(i,j)
+  (i-1)*RBVars.nₜ[1] + j
+end
+function idxx2(i,j)
+  (i-1)*RBVars.nₜ[2] + j
+end
+for q = 1:Q
+  for is = 1:RBVars.nₛ[2]
+    for it = 1:RBVars.nₜ[2]
+      i = idxx2(is,it)
+      Matn[i,1,q] = RBVars.Vars[7].Matₙ[q][is,1] * sum(RBVars.Φₜ[1][:,it] .* Param.θ[q])
+    end
+  end
+end
+
+Matred = sum([Matn[:,:,q] for q = 1:Q])
+maximum(abs.(Matred - Vecsₙ[4])) =#

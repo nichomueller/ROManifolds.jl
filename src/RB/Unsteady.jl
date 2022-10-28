@@ -35,16 +35,16 @@ function time_supremizers(
     ξ * (ξnew' * ξ)
   end
 
-  function projection(ξnew::Vector{T}, Φ::Vector{Vector{T}})
-    sum(Broadcasting(ξold -> orth_projection(ξnew, ξold))(Φ))
+  function projection(ξnew::Vector{T}, Φ::Matrix{T})
+    sum([projection(ξnew, Φ[:, i]) for i=1:size(Φ)[2]])
   end
 
   function orth_projection(ξnew::Vector{T}, ξ::Vector{T})
     ξ * (ξnew' * ξ) / (ξ' * ξ)
   end
 
-  function orth_projection(ξnew::Vector{T}, Φ::Vector{Vector{T}})
-    sum(Broadcasting(ξold -> orth_projection(ξnew, ξold))(Φ))
+  function orth_projection(ξnew::Vector{T}, Φ::Matrix{T})
+    sum([orth_projection(ξnew, Φ[:, i]) for i=1:size(Φ)[2]])
   end
 
   function enrich(Φₜ::Matrix{T}, count::Int, l::Int)
@@ -59,8 +59,10 @@ function time_supremizers(
   end
 
   function loop(Φₜ::Matrix{T}, count::Int, l::Int)
-    πₗ = l == 1 ? Φₜ[:,1] : orth_projection(Φₜ[:,j], Φₜ[:,1:j-1])
-    if norm(Φₜ[:,l] - πₗ) ≤ tol
+    πₗ = l == 1 ? zeros(T, RBVars.nₜ[1]) : orth_projection(Φₜ[:,l], Φₜ[:,1:l-1])
+    dist = norm(Φₜ[:,l] - πₗ)
+    println("Distance basis number $l is: $dist")
+    if dist ≤ tol
       Φₜ, count = enrich(Φₜ, count, l)
     end
     Φₜ, count
@@ -76,9 +78,7 @@ end
 
 function supr_enrichment_time(RBVars::ROMMethodST{ID,T}) where {ID,T}
 
-  supr = assemble_supremizers_time(RBVars)
-  RBVars.Φₜ[1] = hcat(RBVars.Φₜ[1], supr)
-  RBVars.nₜ[1] = size(RBVars.Φₜ[1])[2]
+  time_supremizers(RBVars)
 
 end
 
@@ -208,21 +208,14 @@ function assemble_ϕₜϕₜθ(
   var = Param.var
 
   Φₜ_left, Φₜ_right = get_Φₜ(RBVars, var)
-  nₜ_left, nₜ_right = size(Φₜ_left)[2], size(Φₜ_right)[2]
-
-  Φₜ_by_Φₜ_by_θ(iₜ,jₜ,q,idx1,idx2) =
-    sum(Φₜ_left[idx1,iₜ] .* Φₜ_right[idx2,jₜ] .* Param.θ[q][idx1])
-  Φₜ_by_Φₜ_by_θ(jₜ,q,idx1,idx2) =
-    Broadcasting(iₜ -> Φₜ_by_Φₜ_by_θ(iₜ,jₜ,q,idx1,idx2))(1:nₜ_left)
-  Φₜ_by_Φₜ_by_θ(q,idx1,idx2) =
-    Broadcasting(jₜ -> Φₜ_by_Φₜ_by_θ(jₜ,q,idx1,idx2))(1:nₜ_right)
+  ΦₜΦₜθ_fun = Φₜ_by_Φₜ_by_θ(Φₜ_left, Φₜ_right, Param.θ)
 
   idx = 1:RBVars.Nₜ
-  ΦₜΦₜθ = Broadcasting(q -> Φₜ_by_Φₜ_by_θ(q,idx,idx))(eachindex(Param.θ))
+  ΦₜΦₜθ = ΦₜΦₜθ_fun(idx,idx)
   ΦₜΦₜθ_vec = Broadcasting(blocks_to_matrix)(ΦₜΦₜθ)::Vector{Matrix{T}}
 
   idx₁, idx₂ = 2:RBVars.Nₜ, 1:RBVars.Nₜ-1
-  ΦₜΦₜθ₁ = Broadcasting(q -> Φₜ_by_Φₜ_by_θ(q,idx₁,idx₂))(eachindex(Param.θ))
+  ΦₜΦₜθ₁ = ΦₜΦₜθ_fun(q,idx₁,idx₂)
   ΦₜΦₜθ₁_vec = Broadcasting(blocks_to_matrix)(ΦₜΦₜθ₁)::Vector{Matrix{T}}
 
   if var == "M"
@@ -298,6 +291,16 @@ function assemble_vectorsₙ(
   Φₜθ = assemble_ϕₜθ(RBInfo, RBVars, vector_Params)
 
   assemble_termsₙ(vector_Vars, Φₜθ)::Vector{Matrix{T}}
+
+end
+
+function assemble_RHS(
+  FEMSpace::FOMST{D},
+  RBInfo::ROMInfoST{ID},
+  μ::Vector{T}) where {ID,D,T}
+
+  ParamVec = ParamInfo(RBInfo, μ, get_FEM_vectors(RBInfo))
+  assemble_FEM_vector(FEMSpace, RBInfo, ParamVec, get_timesθ(RBInfo))
 
 end
 

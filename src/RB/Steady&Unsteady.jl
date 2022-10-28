@@ -506,16 +506,6 @@ function assemble_θ_function(
 
 end
 
-function assemble_RHS(
-  FEMSpace::FOMS{D},
-  RBInfo::ROMInfoS{1},
-  μ::Vector{T}) where {D,T}
-
-  ParamVec = ParamInfo(RBInfo, μ, get_FEM_vectors(RBInfo))
-  assemble_FEM_vector(FEMSpace, RBInfo, ParamVec)
-
-end
-
 function assemble_solve_reconstruct(
   FEMSpace::FOM{D},
   RBInfo::ROMInfo{ID},

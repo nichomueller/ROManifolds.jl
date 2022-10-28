@@ -117,65 +117,65 @@ function MDEIM_offline(
 
 end
 
-function assemble_sparse_matrix(
+function assemble_hyperred_matrix(
   FEMSpace::FOMS{D},
   FEMInfo::FOMInfoS{ID},
   Param::ParamInfoS,
   el::Vector{Int}) where {ID,D}
 
-  Ω_sparse = view(FEMSpace.Ω, el)
-  dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
-  ParamForm = ParamFormInfo(Param, dΩ_sparse)
+  Ω_hyp = view(FEMSpace.Ω, el)
+  dΩ_hyp = Measure(Ω_hyp, 2 * FEMInfo.order)
+  ParamForm = ParamFormInfo(Param, dΩ_hyp)
 
   assemble_FEM_matrix(FEMSpace, FEMInfo, ParamForm)
 
 end
 
-function assemble_sparse_vector(
+function assemble_hyperred_vector(
   FEMSpace::FOMS{D},
   FEMInfo::FOMInfoS{ID},
   Param::ParamInfoS,
   el::Vector{Int}) where {ID,D}
 
   triang = Gridap.FESpaces.get_triangulation(FEMSpace, Param.var)
-  Ω_sparse = view(triang, el)
-  dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
-  ParamForm = ParamFormInfo(Param, dΩ_sparse)
+  Ω_hyp = view(triang, el)
+  dΩ_hyp = Measure(Ω_hyp, 2 * FEMInfo.order)
+  ParamForm = ParamFormInfo(Param, dΩ_hyp)
 
   assemble_FEM_vector(FEMSpace, FEMInfo, ParamForm)
 
 end
 
-function assemble_sparse_function(
+function assemble_hyperred_function(
   FEMSpace::FOMS{D},
   FEMInfo::FOMInfoS{ID},
   Param::ParamInfoS,
   el::Vector{Int}) where {ID,D}
 
-  Ω_sparse = view(FEMSpace.Ω, el)
-  dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
-  ParamForm = ParamFormInfo(Param, dΩ_sparse)
+  Ω_hyp = view(FEMSpace.Ω, el)
+  dΩ_hyp = Measure(Ω_hyp, 2 * FEMInfo.order)
+  ParamForm = ParamFormInfo(Param, dΩ_hyp)
 
   assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, ParamForm)
 
 end
 
-function assemble_sparse_matrix(
+function assemble_hyperred_matrix(
   FEMSpace::FOMST{D},
   FEMInfo::FOMInfoST{ID},
   Param::ParamInfoST,
   el::Vector{Int},
   timesθ::Vector{T}) where {ID,D,T}
 
-  Ω_sparse = view(FEMSpace.Ω, el)
-  dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
-  ParamForm = ParamFormInfo(Param, dΩ_sparse)
+  Ω_hyp = view(FEMSpace.Ω, el)
+  dΩ_hyp = Measure(Ω_hyp, 2 * FEMInfo.order)
+  ParamForm = ParamFormInfo(Param, dΩ_hyp)
 
   assemble_FEM_matrix(FEMSpace, FEMInfo, ParamForm, timesθ)
 
 end
 
-function assemble_sparse_vector(
+function assemble_hyperred_vector(
   FEMSpace::FOMST{D},
   FEMInfo::FOMInfoST{ID},
   Param::ParamInfoST,
@@ -183,24 +183,24 @@ function assemble_sparse_vector(
   timesθ::Vector{T}) where {ID,D,T}
 
   triang = Gridap.FESpaces.get_triangulation(FEMSpace, Param.var)
-  Ω_sparse = view(triang, el)
-  dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
-  ParamForm = ParamFormInfo(Param, dΩ_sparse)
+  Ω_hyp = view(triang, el)
+  dΩ_hyp = Measure(Ω_hyp, 2 * FEMInfo.order)
+  ParamForm = ParamFormInfo(Param, dΩ_hyp)
 
   assemble_FEM_vector(FEMSpace, FEMInfo, ParamForm, timesθ)
 
 end
 
-function assemble_sparse_function(
+function assemble_hyperred_function(
   FEMSpace::FOMST{D},
   FEMInfo::FOMInfoST{ID},
   Param::ParamInfoST,
   el::Vector{Int},
   timesθ::Vector{T}) where {ID,D,T}
 
-  Ω_sparse = view(FEMSpace.Ω, el)
-  dΩ_sparse = Measure(Ω_sparse, 2 * FEMInfo.order)
-  ParamForm = ParamFormInfo(Param, dΩ_sparse)
+  Ω_hyp = view(FEMSpace.Ω, el)
+  dΩ_hyp = Measure(Ω_hyp, 2 * FEMInfo.order)
+  ParamForm = ParamFormInfo(Param, dΩ_hyp)
 
   assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, ParamForm)(timesθ)
 
@@ -215,9 +215,9 @@ function θ(
   if Param.var ∈ RBInfo.affine_structures
     θ = [[Param.fun(VectorValue(D, T))[1]]]
   else
-    Mat_μ_sparse =
-      assemble_sparse_matrix(FEMSpace, FEMInfo, Param, MDEIM.el)
-    θ = MDEIM_online(Mat_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
+    Mat_μ_hyp =
+      assemble_hyperred_matrix(FEMSpace, FEMInfo, Param, MDEIM.el)
+    θ = MDEIM_online(Mat_μ_hyp, MDEIM.Matᵢ, MDEIM.idx)
   end
 
   θ::Vector{Vector{T}}
@@ -233,9 +233,9 @@ function θ(
   if Param.var ∈ RBInfo.affine_structures
     θ = [[Param.fun(VectorValue(D, T))[1]]]
   else
-    Vec_μ_sparse =
-      assemble_sparse_vector(FEMSpace, FEMInfo, Param, MDEIM.el)
-    θ = MDEIM_online(Vec_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
+    Vec_μ_hyp =
+      assemble_hyperred_vector(FEMSpace, FEMInfo, Param, MDEIM.el)
+    θ = MDEIM_online(Vec_μ_hyp, MDEIM.Matᵢ, MDEIM.idx)
   end
 
   θ::Vector{Vector{T}}
@@ -250,14 +250,14 @@ function θ_function(
 
   @assert isnonlinear(RBInfo, Param.var) "This method is only for nonlinear variables"
 
-  Fun_μ_sparse =
-    assemble_sparse_function(FEMSpace, FEMInfo, Param, MDEIM.el)
-  MDEIM_online(Fun_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
+  Fun_μ_hyp =
+    assemble_hyperred_function(FEMSpace, FEMInfo, Param, MDEIM.el)
+  MDEIM_online(Fun_μ_hyp, MDEIM.Matᵢ, MDEIM.idx)
 
 end
 
 function interpolate_θ(
-  Mat_μ_sparse::AbstractArray{T},
+  Mat_μ_hyp::AbstractArray{T},
   MDEIM::MVMDEIM{T},
   timesθ::Vector{T}) where T
 
@@ -267,7 +267,7 @@ function interpolate_θ(
   θ = zeros(T, length(idx), length(timesθ))
 
   red_θ = (MDEIM.Matᵢ \
-    Matrix{T}(reshape(Mat_μ_sparse, :, length(red_timesθ))[idx, :]))
+    Matrix{T}(reshape(Mat_μ_hyp, :, length(red_timesθ))[idx, :]))
   etp = ScatteredInterpolation.interpolate(Multiquadratic(),
     reshape(red_timesθ, 1, :), red_θ')
   θ[:, time_idx] = red_θ
@@ -280,12 +280,12 @@ function interpolate_θ(
 end
 
 function interpolate_θ(
-  Mats_μ_sparse::Vector{<:AbstractArray{T}},
+  Mats_μ_hyp::Vector{<:AbstractArray{T}},
   MDEIM::MVMDEIM{T},
   timesθ::Vector{T}) where T
 
-  Mat_μ_sparse = blocks_to_matrix(Mats_μ_sparse)
-  interpolate_θ(Mat_μ_sparse, MDEIM, timesθ)
+  Mat_μ_hyp = blocks_to_matrix(Mats_μ_hyp)
+  interpolate_θ(Mat_μ_hyp, MDEIM, timesθ)
 
 end
 
@@ -302,13 +302,13 @@ function θ(
   else
     if RBInfo.st_MDEIM
       red_timesθ = timesθ[MDEIM.time_idx]
-      Mats_μ_sparse = assemble_sparse_matrix(
+      Mats_μ_hyp = assemble_hyperred_matrix(
         FEMSpace, FEMInfo, Param, MDEIM.el, red_timesθ)
-      θ = interpolate_θ(Mats_μ_sparse, MDEIM, timesθ)
+      θ = interpolate_θ(Mats_μ_hyp, MDEIM, timesθ)
     else
-      Mats_μ_sparse = assemble_sparse_matrix(
+      Mats_μ_hyp = assemble_hyperred_matrix(
         FEMSpace, FEMInfo, Param, MDEIM.el, timesθ)
-      θ = MDEIM_online(RBVars, Mats_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
+      θ = MDEIM_online(Mats_μ_hyp, MDEIM.Matᵢ, MDEIM.idx, RBVars.Nₜ)
     end
   end
 
@@ -329,13 +329,13 @@ function θ(
   else
     if RBInfo.st_MDEIM
       red_timesθ = timesθ[MDEIM.time_idx]
-      Vecs_μ_sparse = assemble_sparse_vector(
+      Vecs_μ_hyp = assemble_hyperred_vector(
         FEMSpace, FEMInfo, Param, MDEIM.el, red_timesθ)
-      θ = interpolate_θ(Vecs_μ_sparse, MDEIM, timesθ)
+      θ = interpolate_θ(Vecs_μ_hyp, MDEIM, timesθ)
     else
-      Vecs_μ_sparse = assemble_sparse_vector(
+      Vecs_μ_hyp = assemble_hyperred_vector(
         FEMSpace, FEMInfo, Param, MDEIM.el, timesθ)
-      θ = MDEIM_online(RBVars, Vecs_μ_sparse, MDEIM.Matᵢ, MDEIM.idx)
+      θ = MDEIM_online(Vecs_μ_hyp, MDEIM.Matᵢ, MDEIM.idx, RBVars.Nₜ)
     end
   end
 

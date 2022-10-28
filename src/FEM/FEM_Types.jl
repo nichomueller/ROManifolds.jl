@@ -120,7 +120,7 @@ end
 struct FOMST{ID,D} <: FOM{ID,D}
   Qₕ::CellQuadrature
   V₀::Vector{<:SingleFieldFESpace}
-  V::Vector{<:Union{SingleFieldFESpace, TransientTrialFESpace}}
+  V::Vector
   Ω::BodyFittedTriangulation
   Γn::BoundaryTriangulation
   dΩ::Measure
@@ -134,8 +134,8 @@ function FOMST(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  Qₕ, V₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad = get_FEMSpace_quantities(FEMInfo, model)
-  V = TransientTrialFESpace(V₀, g)
+  Qₕ, V₀::SingleFieldFESpace, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad = get_FEMSpace_quantities(FEMInfo, model)
+  V = TransientTrialFESpace(V₀, g)::TransientTrialFESpace
   FOMST{1,D}(Qₕ, [V₀], [V], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
 
 end
@@ -145,8 +145,8 @@ function FOMST(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  Qₕ, V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad = get_FEMSpace_quantities(FEMInfo, model)
-  V = TransientTrialFESpace(V₀, g)
+  Qₕ, V₀::SingleFieldFESpace, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad = get_FEMSpace_quantities(FEMInfo, model)
+  V = TransientTrialFESpace(V₀, g)::TransientTrialFESpace
   FOMST{2,D}(Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
 
 end
@@ -156,8 +156,8 @@ function FOMST(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  Qₕ, V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad = get_FEMSpace_quantities(FEMInfo, model)
-  V = TransientTrialFESpace(V₀, g)
+  Qₕ, V₀::SingleFieldFESpace, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad = get_FEMSpace_quantities(FEMInfo, model)
+  V = TransientTrialFESpace(V₀, g)::TransientTrialFESpace
   FOMST{3,D}(Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
 
 end

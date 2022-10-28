@@ -66,33 +66,27 @@ function FEM_solver(
 
 end
 
-#= function FEM_solver(
-  FEMSpace::FOMStokesST,
+function FEM_solver(
   FEMInfo::FOMInfoST{2},
-  Param::ParamInfoST)
+  operator::TransientFEOperator,
+  x₀_field::FEFunction)
 
-  m(t,(u,p),(v,q)) = ∫(Param.m(t)*(u⋅v))FEMSpace.dΩ
-  a(t,(u,p),(v,q)) = ∫( ∇(v)⊙(Param.α(t)*∇(u)) - Param.b(t)*((∇⋅v)*p + q*(∇⋅u)) )FEMSpace.dΩ
-  rhs(t,(v,q)) = ∫(v ⋅ Param.f(t))FEMSpace.dΩ + ∫(v ⋅ Param.h(t))FEMSpace.dΓn
-  operator = TransientAffineFEOperator(m, a, rhs, FEMSpace.X, FEMSpace.X₀)
-
-  linear_solver = LUSolver()
-  ode_solver = ThetaMethod(linear_solver, FEMInfo.δt, FEMInfo.θ)
-
-  u₀_field = interpolate_everywhere(Param.x₀(0.)[1], FEMSpace.V(FEMInfo.t₀))
-  p₀_field = interpolate_everywhere(Param.x₀(0.)[2], FEMSpace.Q(FEMInfo.t₀))
-  x₀_field = interpolate_everywhere([u₀_field, p₀_field], FEMSpace.X(FEMInfo.t₀))
-
+  ode_solver = ThetaMethod(LUSolver(), FEMInfo.δt, FEMInfo.θ)
   xₕₜ_field = solve(ode_solver, operator, x₀_field, FEMInfo.t₀, FEMInfo.tₗ)
-  uₕₜ = zeros(FEMSpace.Nₛᵘ, convert(Int, FEMInfo.tₗ / FEMInfo.δt))
-  pₕₜ = zeros(FEMSpace.Nₛᵖ, convert(Int, FEMInfo.tₗ / FEMInfo.δt))
+
+  count = 1
+  Nₛᵘ = length(get_free_dof_values(x₀_field[1]))
+  Nₛᵖ = length(get_free_dof_values(x₀_field[2]))
+  Nₜ = Int((FEMInfo.tₗ - FEMInfo.t₀) / FEMInfo.δt)
+
+  xₕₜ = zeros(Nₛᵘ+Nₛᵖ, Nₜ)
   count = 1
   for (xₕ, _) in xₕₜ_field
-    uₕₜ[:, count] = get_free_dof_values(xₕ[1])
-    pₕₜ[:, count] = get_free_dof_values(xₕ[2])
+    println("Time step: $count")
+    xₕₜ[:,count] = get_free_dof_values(xₕ)
     count += 1
   end
 
-  uₕₜ, pₕₜ
+  (xₕₜ[1:Nₛᵘ,:], xₕₜ[Nₛᵘ+1:end,:])::NTuple{2,Matrix{Float}}
 
-end =#
+end

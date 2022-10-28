@@ -136,6 +136,16 @@ function assemble_function_vectorsₙ(
 
 end
 
+function assemble_RHS(
+  FEMSpace::FOMS{D},
+  RBInfo::ROMInfoS{ID},
+  μ::Vector{T}) where {ID,D,T}
+
+  ParamVec = ParamInfo(RBInfo, μ, get_FEM_vectors(RBInfo))
+  assemble_FEM_vector(FEMSpace, RBInfo, ParamVec)
+
+end
+
 function reconstruct_FEM_solution(RBVars::ROMMethodS{ID,T}) where {ID,T}
   println("Reconstructing FEM solution")
   push!(RBVars.x̃, Broadcasting(*)(RBVars.Φₛ, RBVars.xₙ))

@@ -1,556 +1,162 @@
-include("StokesST.jl")
-include("NavierStokesS.jl")
-include("NavierStokesST_support.jl")
+function get_JinvₙResₙ(
+  RBInfo::ROMInfoST{3},
+  RBVars::ROMMethodST{3,T},
+  Params::Vector{ParamInfoST}) where T
 
-function get_snapshot_matrix(
-  RBInfo::ROMInfoST,
-  RBVars::NavierStokesST{T}) where T
+  Cₙu, Dₙu = assemble_function_matricesₙ(RBInfo, RBVars, Params)
+  RHSₙ = vcat(RBVars.RHSₙ[1], RBVars.RHSₙ[2])
 
-  get_snapshot_matrix(RBInfo, RBVars.Stokes)
+  block2 = zeros(T, RBVars.nₛ[1], RBVars.nₛ[2])
+  block3 = zeros(T, RBVars.nₛ[2], RBVars.nₛ[1])
+  block4 = zeros(T, RBVars.nₛ[2], RBVars.nₛ[2])
+  LHSₙ_lin = vcat(hcat(RBVars.LHSₙ[1], Matrix{T}(-RBVars.LHSₙ[2]')),
+    hcat(RBVars.LHSₙ[2], zeros(T, RBVars.nₛ[2], RBVars.nₛ[2])))
 
-  println("Importing the snapshot matrix for field u on quadrature points,
-    number of snapshots considered: $(RBInfo.nₛ)")
-  Sᵘ_quad = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ_quadp.csv"),
-    DataFrame))[:, 1:RBInfo.nₛ*RBVars.Nₜ]
-  println("Dimension of velocity snapshot matrix on quadrature points: $(size(Sᵘ_quad))")
+  LHSₙ_nonlin1(u) = vcat(hcat(Cₙu(u), block2), hcat(block3, block4))
+  LHSₙ_nonlin2(u) = vcat(hcat(Cₙu(u) + Dₙu(u), block2), hcat(block3, block4))
 
+  Jₙ(u::FEFunction) = LHSₙ_lin + LHSₙ_nonlin2(u)
+  resₙ(u::FEFunction, x̂::Matrix{T}) = (LHSₙ_lin + LHSₙ_nonlin1(u)) * x̂ - RHSₙ
+
+  JinvₙResₙ(u::FEFunction, x̂::Matrix{T}) = (Jₙ(u) \ resₙ(u, x̂))::Matrix{T}
+  JinvₙResₙ::Function
 end
 
-function POD_space(
-  RBInfo::Info,
-  RBVars::NavierStokesST)
+function newton(
+  FEMSpace::FOMST{3,D},
+  RBVars::ROMMethodST{3,T},
+  JinvₙResₙ::Function,
+  ϵ=1e-9,
+  max_k=10) where {D,T}
 
-  POD_space(RBInfo, RBVars.Steady)
+  x̂mat = zeros(T, sum(RBVars.nₛ), 1)
+  δx̂ = 1. .+ x̂mat
+  u = FEFunction(FEMSpace.V[1], zeros(T, RBVars.Nₛ[1]))
+  k = 0
+  err = norm(δx̂)
 
-end
-
-function supr_enrichment_space(
-  RBInfo::Info,
-  RBVars::NavierStokesST)
-
-  supr_enrichment_space(RBInfo, RBVars.Steady)
-
-end
-
-function POD_time(
-  RBInfo::ROMInfoST,
-  RBVars::StokesST{T}) where T
-
-  POD_time(RBInfo, RBVars.Stokes)
-
-  println("Performing the temporal POD for field u on quadrature points")
-
-  if RBInfo.t_red_method == "ST-HOSVD"
-    Sᵘ_quad = RBVars.Φₛ_quad' * RBVars.Sᵘ_quad
-  else
-    Sᵘ_quad = RBVars.Sᵘ_quad
-  end
-  Sᵘₜ_quad = mode₂_unfolding(Sᵘ_quad, RBInfo.nₛ)
-
-  RBVars.Φₜᵘ_quad = POD(Sᵘₜ_quad, RBInfo.ϵₜ)
-  RBVars.nₜᵘ_quad = size(RBVars.Φₜᵘ_quad)[2]
-
-end
-
-function supr_enrichment_time(
-  RBVars::NavierStokesST)
-
-  supr_enrichment_time(RBVars.Stokes)
-  RBVars.Φₜᵘ_quad = time_supremizers(RBVars.Φₜᵘ_quad, RBVars.Φₜᵖ)
-  RBVars.nₜᵘ_quad = size(RBVars.Φₜᵘ_quad)[2]
-
-end
-
-function assemble_reduced_basis(
-  RBInfo::ROMInfoST,
-  RBVars::NavierStokesST)
-
-  RBVars.offline_time += @elapsed begin
-    POD_space(RBInfo, RBVars)
-    supr_enrichment_space(RBInfo, RBVars.Steady)
-    POD_time(RBInfo, RBVars)
-    supr_enrichment_time(RBVars)
+  while k < max_k && err ≥ ϵ
+    δx̂ = JinvₙResₙ(u, x̂mat)
+    x̂mat -= δx̂
+    u = FEFunction(FEMSpace.V[1], RBVars.Φₛ[1] * x̂mat[1:RBVars.nₛ[1]])
+    k += 1
+    err = norm(δx̂)
+    println("Iter: $k; ||δx̂||₂: $(norm(δx̂))")
   end
 
-  RBVars.nᵘ = RBVars.nₛᵘ * RBVars.nₜᵘ
-  RBVars.Nᵘ = RBVars.Nₛᵘ * RBVars.Nₜ
-  RBVars.nᵖ = RBVars.nₛᵖ * RBVars.nₜᵖ
-  RBVars.Nᵖ = RBVars.Nₛᵖ * RBVars.Nₜ
-  RBVars.nᵘ_quad = RBVars.nₛᵘ_quad * RBVars.nₜᵘ_quad
+  println("Newton-Raphson ended with iter: $k; ||δx̂||₂: $(norm(δx̂))")
+  x̂mat::Matrix{T}
 
-  if RBInfo.save_offline
-    save_CSV(RBVars.Φₛ, joinpath(RBInfo.ROM_structures_path, "Φₛ.csv"))
-    save_CSV(RBVars.Φₜᵘ, joinpath(RBInfo.ROM_structures_path, "Φₜᵘ.csv"))
-    save_CSV(RBVars.Φₛᵖ, joinpath(RBInfo.ROM_structures_path, "Φₛᵖ.csv"))
-    save_CSV(RBVars.Φₜᵖ, joinpath(RBInfo.ROM_structures_path, "Φₜᵖ.csv"))
-    save_CSV(RBVars.Φₛ_quad,
-      joinpath(RBInfo.ROM_structures_path, "Φₛ_quad.csv"))
-    save_CSV(RBVars.Φₜᵘ_quad,
-      joinpath(RBInfo.ROM_structures_path, "Φₜᵘ_quad.csv"))
-  end
+end
+
+function assemble_LHSₙ(
+  RBInfo::ROMInfoST{3},
+  RBVars::ROMMethodST{3,T},
+  Params::Vector{ParamInfoST}) where T
+
+  Matsₙ, Mats₁ₙ = assemble_matricesₙ(RBInfo, RBVars, Params)
+  LHSₙ11 = RBInfo.θ*(Matsₙ[1]+Matsₙ[3]) + (1-RBInfo.θ)*Mats₁ₙ[1] - RBInfo.θ*Mats₁ₙ[3]
+  LHSₙ21 = RBInfo.θ*Matsₙ[2] + (1-RBInfo.θ)*Mats₁ₙ[2]
+  push!(RBVars.LHSₙ, LHSₙ11)
+  push!(RBVars.LHSₙ, LHSₙ21)
 
   return
 
 end
 
-function get_reduced_basis(
-  RBInfo,
-  RBVars::NavierStokesST) where T
+function assemble_RHSₙ(
+  RBInfo::ROMInfoST{3},
+  RBVars::ROMMethodST{3,T},
+  Params::Vector{ParamInfoST}) where T
 
-  get_reduced_basis(RBInfo, RBVars.Stokes)
-  println("Importing the space and time reduced basis for field u, quadrature points")
-  RBVars.Φₛ_quad = load_CSV(Matrix{T}(undef,0,0),
-    joinpath(RBInfo.ROM_structures_path, "Φₛ_quad.csv"))
-  RBVars.Φₜᵘ_quad = load_CSV(Matrix{T}(undef,0,0),
-    joinpath(RBInfo.ROM_structures_path, "Φₜᵘ_quad.csv"))
+  Vecsₙ = assemble_vectorsₙ(RBInfo, RBVars, Params)::Vector{Matrix{T}}
+  push!(RBVars.RHSₙ, sum(Vecsₙ[1:3]))
+  push!(RBVars.RHSₙ, Vecsₙ[end])
 
-  RBVars.nₛᵘ_quad = size(RBVars.Φₛ_quad)[2]
-  RBVars.nₜᵘ_quad = size(RBVars.Φₜᵘ_quad)[2]
-  RBVars.nᵘ_quad = RBVars.nₛᵘ_quad * RBVars.nₜᵘ_quad
+  return
 
 end
 
-function index_mapping(i::Int, j::Int, RBVars::NavierStokesST, var="u")
+function assemble_RHSₙ(
+  FEMSpace::FOMST{3,D},
+  RBInfo::ROMInfoST{3},
+  RBVars::ROMMethodST{3,T},
+  μ::Vector{T}) where {D,T}
 
-  index_mapping(i, j, RBVars.Stokes, var)
+  RHS = assemble_RHS(FEMSpace, RBInfo, μ)
+  push!(RBVars.RHSₙ, reshape(RBVars.Φₛ[1]' *
+    sum(RHS[1:3]) * RBVars.Φₜ[1], :, 1)::Matrix{T})
+  push!(RBVars.RHSₙ, reshape(RBVars.Φₛ[2]' *
+    RHS[end] * RBVars.Φₜ[1], :, 1)::Matrix{T})
+
+  return
 
 end
 
-function set_operators(
-  RBInfo::Info,
-  RBVars::NavierStokesST)
+function assemble_RB_system(
+  FEMSpace::FOMST{3,D},
+  RBInfo::ROMInfo{3},
+  RBVars::ROM{3,T},
+  μ::Vector{T}) where {D,T}
 
-  append!(["M"], set_operators(RBInfo, RBVars.Steady))
+  initialize_RB_system(RBVars)
+  initialize_online_time(RBVars)
+  blocks = get_blocks_position(RBInfo)
 
-end
+  RBVars.online_time = @elapsed begin
+    operators = get_system_blocks(RBInfo, RBVars, blocks...)
 
-function assemble_MDEIM_matrices(
-  RBInfo::ROMInfoST,
-  RBVars::NavierStokesST,
-  var::String)
+    Params_lin = assemble_θ(FEMSpace, RBInfo, RBVars, μ)
+    Params_nonlin = assemble_θ_function(FEMSpace, RBInfo, RBVars, μ)
 
-  if var == "C"
-    println("The matrix C is non-affine:
-      running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
-    if isempty(RBVars.MDEIM_mat_C)
-      (RBVars.MDEIM_mat_C, RBVars.MDEIM_idx_C, RBVars.MDEIMᵢ_C, RBVars.row_idx_C,
-      RBVars.sparse_el_C, RBVars.MDEIM_idx_time_C) = MDEIM_offline(RBInfo, RBVars, "C")
+    if "LHS" ∈ operators
+      println("Assembling reduced LHS")
+      assemble_LHSₙ(RBInfo, RBVars, Params_lin)
     end
-    assemble_reduced_mat_MDEIM(RBVars,RBVars.MDEIM_mat_C,RBVars.row_idx_C)
-  else
-    assemble_MDEIM_matrices(RBInfo, RBVars.Stokes, var)
+
+    if "RHS" ∈ operators
+      if !RBInfo.online_RHS
+        println("Assembling reduced RHS")
+        assemble_RHSₙ(RBInfo, RBVars, Params_lin)
+      else
+        println("Assembling reduced RHS exactly")
+        assemble_RHSₙ(FEMSpace, RBInfo, RBVars, μ)
+      end
+    end
+
+    JinvₙResₙ = get_JinvₙResₙ(RBInfo, RBVars, Params_nonlin)
   end
 
-end
+  save_system_blocks(RBInfo, RBVars, operators, blocks...)
 
-function assemble_DEIM_vectors(
-  RBInfo::ROMInfoST,
-  RBVars::NavierStokesST,
-  var::String)
-
-  assemble_DEIM_vectors(RBInfo, RBVars.Stokes, var)
-
-end
-
-function save_MDEIM_structures(
-  RBInfo::ROMInfoST,
-  RBVars::NavierStokesST)
-
-  list_MDEIM = (RBVars.MDEIM_mat_C, RBVars.MDEIMᵢ_C, RBVars.MDEIM_idx_C,
-    RBVars.row_idx_C, RBVars.sparse_el_C, RBVars.MDEIM_idx_time_C)
-  list_names = ("MDEIM_mat_C","MDEIMᵢ_C","MDEIM_idx_C","row_idx_C",
-    "sparse_el_C", "MDEIM_idx_time_C")
-
-  save_structures_in_list(list_MDEIM, list_names,
-    RBInfo.ROM_structures_path)
-
-end
-
-function get_MDEIM_structures(
-  RBInfo::ROMInfoST,
-  RBVars::NavierStokesST)
-
-  get_MDEIM_structures(RBInfo, RBVars.Stokes)
-
-end
-
-function get_offline_structures(
-  RBInfo::ROMInfoST,
-  RBVars::NavierStokesST)
-
-  operators = String[]
-  append!(operators, get_affine_structures(RBInfo, RBVars))
-  append!(operators, get_MDEIM_structures(RBInfo, RBVars))
-  unique!(operators)
-
-  operators
-
-end
-
-function get_θᵐ(
-  FEMSpace::FOMST,
-  RBInfo::ROMInfoST,
-  RBVars::NavierStokesST,
-  Param::ParamInfoST)
-
-  get_θᵐ(FEMSpace, RBInfo, RBVars.Stokes, Param)
-
-end
-
-function get_θᵃ(
-  FEMSpace::FOMST,
-  RBInfo::ROMInfoST,
-  RBVars::NavierStokesST,
-  Param::ParamInfoST)
-
-  get_θᵃ(FEMSpace, RBInfo, RBVars.Stokes, Param)
-
-end
-
-function get_θᵇ(
-  FEMSpace::FOMST,
-  RBInfo::ROMInfoST,
-  RBVars::NavierStokesST,
-  Param::ParamInfoST)
-
-  get_θᵇ(FEMSpace, RBInfo, RBVars.Stokes, Param)
-
-end
-
-function get_θᶜ(
-  FEMSpace::FOMST,
-  RBInfo::ROMInfoST,
-  RBVars::NavierStokesST,
-  Param::ParamInfoST)
-
-  timesθ = get_timesθ(RBInfo)
-
-  if RBInfo.st_MDEIM
-    red_timesθ = timesθ[RBVars.MDEIM_idx_time_C]
-    C_μ_sparse = T.(assemble_sparse_mat(
-      FEMSpace,FEMInfo,Param,RBVars.sparse_el_C,red_timesθ;var="C"))
-    θᶜ = interpolated_θ(RBVars, C_μ_sparse, timesθ, RBVars.MDEIMᵢ_C,
-      RBVars.MDEIM_idx_C, RBVars.MDEIM_idx_time_C, RBVars.Qᵐ)
-  else
-    C_μ_sparse = T.(assemble_sparse_mat(
-      FEMSpace,FEMInfo,Param,RBVars.sparse_el_C,timesθ;var="C"))
-    θᶜ = (RBVars.MDEIMᵢ_C \
-      Matrix{T}(reshape(C_μ_sparse, :, RBVars.Nₜ)[RBVars.MDEIM_idx_C, :]))
-  end
-
-  θᶜ::Matrix{T}
-
-end
-
-function get_θᶠʰ(
-  FEMSpace::FOMST,
-  RBInfo::ROMInfoST,
-  RBVars::NavierStokesST,
-  Param::ParamInfoST)
-
-  get_θᶠʰ(FEMSpace, RBInfo, RBVars.Stokes, Param)
+  JinvₙResₙ::Function
 
 end
 
 function solve_RB_system(
-  FEMSpace::FOMST,
-  RBInfo::ROMInfoST,
-  RBVars::NavierStokesST,
-  Param::ParamInfoST)
+  FEMSpace::FOMST{3,D},
+  RBVars::ROMMethodST{3,T},
+  JinvₙResₙ::Function) where {D,T}
 
-  get_RB_system(FEMSpace, RBInfo, RBVars, Param)
+  println("Solving RB problem via Newton-Raphson iterations")
+  xₙ = newton(FEMSpace, RBVars, JinvₙResₙ)
+  push!(RBVars.xₙ, xₙ[1:RBVars.nₛ[1],:])
+  push!(RBVars.xₙ, xₙ[RBVars.nₛ[1]+1:end,:])
 
-  println("Solving RB problem via backslash")
-  println("Condition number of the system's matrix: $(cond(RBVars.LHSₙ[1]))")
+end
 
+function assemble_solve_reconstruct(
+  FEMSpace::FOMST{3,D},
+  RBInfo::ROMInfoST{3},
+  RBVars::ROMMethodST{3,T},
+  μ::Vector{T}) where {D,T}
+
+  JinvₙResₙ = assemble_RB_system(FEMSpace, RBInfo, RBVars, μ)
   RBVars.online_time += @elapsed begin
-    @fastmath xₙ = (vcat(hcat(RBVars.LHSₙ[1], RBVars.LHSₙ[2]),
-      hcat(RBVars.LHSₙ[3], zeros(T, RBVars.nᵖ, RBVars.nᵖ))) \
-      vcat(RBVars.RHSₙ[1], zeros(T, RBVars.nᵖ, 1)))
+    solve_RB_system(FEMSpace, RBVars, JinvₙResₙ)
   end
+  reconstruct_FEM_solution(RBVars)
 
-  RBVars.uₙ = xₙ[1:RBVars.nᵘ,:]
-  RBVars.pₙ = xₙ[RBVars.nᵘ+1:end,:]
-
-end
-
-function reconstruct_FEM_solution(RBVars::NavierStokesST)
-
-  reconstruct_FEM_solution(RBVars.Stokes)
-
-end
-
-function offline_phase(
-  RBInfo::ROMInfoST,
-  RBVars::NavierStokesST)
-
-  println("Offline phase of the RB solver, unsteady Stokes problem")
-
-  RBVars.Nₜ = Int(RBInfo.tₗ / RBInfo.δt)
-
-  if RBInfo.get_snapshots
-    get_snapshot_matrix(RBInfo, RBVars)
-    get_snapshots_success = true
-  else
-    get_snapshots_success = false
-  end
-
-  if RBInfo.get_offline_structures
-    get_reduced_basis(RBInfo, RBVars)
-    get_basis_success = true
-  else
-    get_basis_success = false
-  end
-
-  if !get_snapshots_success && !get_basis_success
-    error("Impossible to assemble the reduced problem if neither
-      the snapshots nor the bases can be loaded")
-  end
-
-  if get_snapshots_success && !get_basis_success
-    println("Failed to import the reduced basis, building it via POD")
-    assemble_reduced_basis(RBInfo, RBVars)
-  end
-
-  if RBInfo.get_offline_structures
-    operators = get_offline_structures(RBInfo, RBVars)
-    if !isempty(operators)
-      assemble_offline_structures(RBInfo, RBVars, operators)
-    end
-  else
-    assemble_offline_structures(RBInfo, RBVars)
-  end
-
-end
-
-function online_phase(
-  RBInfo,
-  RBVars::NavierStokesST,
-  param_nbs) where T
-
-  println("Online phase of the RB solver, unsteady Stokes problem")
-
-  μ = load_CSV(Array{T}[],
-    joinpath(get_FEM_snap_path(RBInfo), "μ.csv"))::Vector{Vector{T}}
-  model = DiscreteModelFromFile(get_mesh_path(RBInfo))
-  FEMSpace = get_FEMSpace(RBInfo.FEMInfo.problem_id,RBInfo.FEMInfo,model)
-
-  get_norm_matrix(RBInfo, RBVars.Steady)
-  (ũ_μ,uₙ_μ,mean_uₕ_test,mean_pointwise_err_u,mean_H1_err,mean_H1_L2_err,
-    H1_L2_err,p̃_μ,pₙ_μ,mean_pₕ_test,mean_pointwise_err_p,mean_L2_err,mean_L2_L2_err,
-    L2_L2_err,mean_online_time,mean_reconstruction_time) =
-    loop_on_params(FEMSpace, RBInfo, RBVars, μ, param_nbs)
-
-  adapt_time = 0.
-  if RBInfo.adaptivity
-    adapt_time = @elapsed begin
-      (ũ_μ,uₙ_μ,mean_uₕ_test,_,mean_H1_err,mean_H1_L2_err,
-        H1_L2_err,p̃_μ,pₙ_μ,mean_pₕ_test,_,mean_L2_err,mean_L2_L2_err,
-        L2_L2_err,_,_) =
-      adaptive_loop_on_params(FEMSpace, RBInfo, RBVars, mean_uₕ_test,
-      mean_pointwise_err_u, mean_pₕ_test, mean_pointwise_err_p, μ, param_nbs)
-    end
-  end
-
-  string_param_nbs = "params"
-  for Param_nb in param_nbs
-    string_param_nbs *= "_" * string(Param_nb)
-  end
-  res_path = joinpath(RBInfo.results_path, string_param_nbs)
-
-  if RBInfo.save_online
-    println("Saving the results...")
-    create_dir(res_path)
-
-    save_CSV(ũ_μ, joinpath(res_path, "ũ.csv"))
-    save_CSV(uₙ_μ, joinpath(res_path, "uₙ.csv"))
-    save_CSV(mean_pointwise_err_U, joinpath(res_path, "mean_point_err_u.csv"))
-    save_CSV(mean_H1_err, joinpath(res_path, "H1_err.csv"))
-    save_CSV([mean_H1_L2_err], joinpath(res_path, "H1L2_err.csv"))
-
-    save_CSV(p̃_μ, joinpath(res_path, "p̃.csv"))
-    save_CSV(Pₙ_μ, joinpath(res_path, "Pₙ.csv"))
-    save_CSV(mean_pointwise_err_p, joinpath(res_path, "mean_point_err_p.csv"))
-    save_CSV(mean_L2_err, joinpath(res_path, "L2_err.csv"))
-    save_CSV([mean_L2_L2_err], joinpath(res_path, "L2L2_err.csv"))
-
-    if RBInfo.get_offline_structures
-      RBVars.offline_time = NaN
-    end
-
-    times = Dict("off_time"=>RBVars.offline_time,
-      "on_time"=>mean_online_time+adapt_time,"rec_time"=>mean_reconstruction_time)
-    CSV.write(joinpath(res_path, "times.csv"),times)
-  end
-
-  pass_to_pp = Dict("res_path"=>res_path,
-    "FEMSpace"=>FEMSpace, "H1_L2_err"=>H1_L2_err,
-    "mean_H1_err"=>mean_H1_err, "mean_point_err_u"=>Float.(mean_pointwise_err_u),
-    "L2_L2_err"=>L2_L2_err, "mean_L2_err"=>mean_L2_err,
-    "mean_point_err_p"=>Float.(mean_pointwise_err_p))
-
-  if RBInfo.post_process
-    println("Post-processing the results...")
-    post_process(RBInfo, pass_to_pp)
-  end
-
-end
-
-function loop_on_params(
-  FEMSpace::FOMST,
-  RBInfo::ROMInfoST,
-  RBVars::NavierStokesST{T},
-  μ::Vector{Vector{T}},
-  param_nbs) where T
-
-  H1_L2_err = zeros(T, length(param_nbs))
-  L2_L2_err = zeros(T, length(param_nbs))
-  mean_H1_err = zeros(T, RBVars.Nₜ)
-  mean_L2_err = zeros(T, RBVars.Nₜ)
-  mean_H1_L2_err = 0.0
-  mean_L2_L2_err = 0.0
-  mean_pointwise_err_u = zeros(T, RBVars.Nₛᵘ, RBVars.Nₜ)
-  mean_pointwise_err_p = zeros(T, RBVars.Nₛᵖ, RBVars.Nₜ)
-  mean_online_time = 0.0
-  mean_reconstruction_time = 0.0
-
-  ũ_μ = zeros(T, RBVars.Nₛᵘ, length(param_nbs)*RBVars.Nₜ)
-  uₙ_μ = zeros(T, RBVars.nᵘ, length(param_nbs))
-  mean_uₕ_test = zeros(T, RBVars.Nₛᵘ, RBVars.Nₜ)
-
-  p̃_μ = zeros(T, RBVars.Nₛᵖ, length(param_nbs)*RBVars.Nₜ)
-  pₙ_μ = zeros(T, RBVars.nᵖ, length(param_nbs))
-  mean_pₕ_test = zeros(T, RBVars.Nₛᵖ, RBVars.Nₜ)
-
-  for (i_nb, nb) in enumerate(param_nbs)
-    println("\n")
-    println("Considering parameter number: $nb/$(param_nbs[end])")
-
-    Param = ParamInfo(RBInfo, μ[nb])
-
-    uₕ_test = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
-      DataFrame))[:,(nb-1)*RBVars.Nₜ+1:nb*RBVars.Nₜ]
-    pₕ_test = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"),
-      DataFrame))[:,(nb-1)*RBVars.Nₜ+1:nb*RBVars.Nₜ]
-
-    mean_uₕ_test += uₕ_test
-    mean_pₕ_test += pₕ_test
-
-    solve_RB_system(FEMSpace, RBInfo, RBVars, Param)
-    reconstruction_time = @elapsed begin
-      reconstruct_FEM_solution(RBVars)
-    end
-    if i_nb > 1
-      mean_online_time = RBVars.online_time/(length(param_nbs)-1)
-      mean_reconstruction_time = reconstruction_time/(length(param_nbs)-1)
-    end
-
-    H1_err_nb, H1_L2_err_nb = compute_errors(
-      RBVars.Stokes, uₕ_test, RBVars.ũ, RBVars.Xu₀)
-    H1_L2_err[i_nb] = H1_L2_err_nb
-    mean_H1_err += H1_err_nb / length(param_nbs)
-    mean_H1_L2_err += H1_L2_err_nb / length(param_nbs)
-    mean_pointwise_err_u += abs.(uₕ_test-RBVars.ũ)/length(param_nbs)
-    L2_err_nb, L2_L2_err_nb = compute_errors(
-      RBVars.Stokes, pₕ_test, RBVars.p̃, RBVars.Xp₀)
-    L2_L2_err[i_nb] = L2_L2_err_nb
-    mean_L2_err += L2_err_nb / length(param_nbs)
-    mean_L2_L2_err += L2_L2_err_nb / length(param_nbs)
-    mean_pointwise_err_p += abs.(pₕ_test-RBVars.p̃)/length(param_nbs)
-
-    ũ_μ[:, (i_nb-1)*RBVars.Nₜ+1:i_nb*RBVars.Nₜ] = RBVars.ũ
-    uₙ_μ[:, i_nb] = RBVars.uₙ
-    p̃_μ[:, (i_nb-1)*RBVars.Nₜ+1:i_nb*RBVars.Nₜ] = RBVars.p̃
-    pₙ_μ[:, i_nb] = RBVars.pₙ
-
-    println("Online wall time: $(RBVars.online_time) s (snapshot number $nb)")
-    println("Relative reconstruction H1-L2 error: $H1_L2_err_nb (snapshot number $nb)")
-    println("Relative reconstruction L2-L2 error: $L2_L2_err_nb (snapshot number $nb)")
-  end
-
-  return (ũ_μ,uₙ_μ,mean_uₕ_test,mean_pointwise_err_u,mean_H1_err,mean_H1_L2_err,
-    H1_L2_err,p̃_μ,pₙ_μ,mean_pₕ_test,mean_pointwise_err_p,mean_L2_err,mean_L2_L2_err,
-    L2_L2_err,mean_online_time,mean_reconstruction_time)
-
-end
-
-function adaptive_loop_on_params(
-  FEMSpace::FOMST,
-  RBInfo::ROMInfoST,
-  RBVars::NavierStokesST{T},
-  mean_uₕ_test::Matrix,
-  mean_pointwise_err_u::Matrix,
-  mean_pₕ_test::Matrix,
-  mean_pointwise_err_p::Matrix,
-  μ::Vector{Vector{T}},
-  param_nbs,
-  n_adaptive=nothing) where T
-
-  if isnothing(n_adaptive)
-    nₛᵘ_add = floor(Int,RBVars.nₛᵘ*0.1)
-    nₜᵘ_add = floor(Int,RBVars.nₜᵘ*0.1)
-    n_adaptive_u = maximum(hcat([1,1],[nₛᵘ_add,nₜᵘ_add]),dims=2)::Vector{Int}
-    nₛᵖ_add = floor(Int,RBVars.nₛᵖ*0.1)
-    nₜᵖ_add = floor(Int,RBVars.nₜᵖ*0.1)
-    n_adaptive_p = maximum(hcat([1,1],[nₛᵖ_add,nₜᵖ_add]),dims=2)::Vector{Int}
-  end
-
-  println("Running adaptive cycle: adding $n_adaptive_u temporal and spatial bases
-    for u, and $n_adaptive_p temporal and spatial bases for p")
-
-  time_err_u = zeros(T, RBVars.Nₜ)
-  space_err_u = zeros(T, RBVars.Nₛᵘ)
-  time_err_p = zeros(T, RBVars.Nₜ)
-  space_err_p = zeros(T, RBVars.Nₛᵖ)
-  for iₜ = 1:RBVars.Nₜ
-    time_err_u[iₜ] = (mynorm(mean_pointwise_err_u[:,iₜ],RBVars.Xu₀) /
-      mynorm(mean_uₕ_test[:,iₜ],RBVars.Xu₀))
-    time_err_p[iₜ] = (mynorm(mean_pointwise_err_p[:,iₜ],RBVars.Xp₀) /
-      mynorm(mean_pₕ_test[:,iₜ],RBVars.Xp₀))
-  end
-  for iₛ = 1:RBVars.Nₛᵘ
-    space_err_u[iₛ] = mynorm(mean_pointwise_err_u[iₛ,:])/mynorm(mean_uₕ_test[iₛ,:])
-  end
-  for iₛ = 1:RBVars.Nₛᵖ
-    space_err_p[iₛ] = mynorm(mean_pointwise_err_p[iₛ,:])/mynorm(mean_pₕ_test[iₛ,:])
-  end
-
-  ind_s_u = argmax(space_err_u,n_adaptive_u[1])
-  ind_t_u = argmax(time_err_u,n_adaptive_u[2])
-  ind_s_p = argmax(space_err_p,n_adaptive_p[1])
-  ind_t_p = argmax(time_err_p,n_adaptive_p[2])
-
-  if isempty(RBVars.Pᵘ)
-    Sᵘ = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
-      DataFrame))[:,1:RBInfo.nₛ*RBVars.Nₜ]
-    Sᵖ = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"),
-      DataFrame))[:,1:RBInfo.nₛ*RBVars.Nₜ]
-  else
-    Sᵘ = RBVars.Pᵘ
-    Sᵖ = RBVars.Sᵖ
-  end
-  Sᵘ = reshape(sum(reshape(Sᵘ,RBVars.Nₛᵘ,RBVars.Nₜ,:),dims=3),RBVars.Nₛᵘ,:)
-  Sᵖ = reshape(sum(reshape(Sᵖ,RBVars.Nₛᵖ,RBVars.Nₜ,:),dims=3),RBVars.Nₛᵖ,:)
-
-  Φₛ_new = Matrix{T}(qr(Sᵘ[:,ind_t_u]).Q)[:,1:n_adaptive_u[2]]
-  Φₜᵘ_new = Matrix{T}(qr(Sᵘ[ind_s_u,:]').Q)[:,1:n_adaptive_u[1]]
-  RBVars.nₛᵘ += n_adaptive_u[2]
-  RBVars.nₜᵘ += n_adaptive_u[1]
-  RBVars.nᵘ = RBVars.nₛᵘ*RBVars.nₜᵘ
-  RBVars.Φₛ = Matrix{T}(qr(hcat(RBVars.Φₛ,Φₛ_new)).Q)[:,1:RBVars.nₛᵘ]
-  RBVars.Φₜᵘ = Matrix{T}(qr(hcat(RBVars.Φₜᵘ,Φₜᵘ_new)).Q)[:,1:RBVars.nₜᵘ]
-
-  Φₛᵖ_new = Matrix{T}(qr(Sᵖ[:,ind_t_p]).Q)[:,1:n_adaptive_p[2]]
-  Φₜᵖ_new = Matrix{T}(qr(Sᵖ[ind_s_p,:]').Q)[:,1:n_adaptive_p[1]]
-  RBVars.nₛᵖ += n_adaptive_p[2]
-  RBVars.nₜᵖ += n_adaptive_p[1]
-  RBVars.nᵖ = RBVars.nₛᵖ*RBVars.nₜᵖ
-  RBVars.Φₛᵖ = Matrix{T}(qr(hcat(RBVars.Φₛᵖ,Φₛᵖ_new)).Q)[:,1:RBVars.nₛᵖ]
-  RBVars.Φₜᵖ = Matrix{T}(qr(hcat(RBVars.Φₜᵖ,Φₜᵖ_new)).Q)[:,1:RBVars.nₜᵖ]
-
-  RBInfo.save_offline = false
-  assemble_offline_structures(RBInfo, RBVars)
-
-  loop_on_params(FEMSpace,RBInfo,RBVars,μ,param_nbs)
+  return
 
 end
