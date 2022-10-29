@@ -199,7 +199,7 @@ function check_dataset(RBInfo)
   function J(t,x)
     xvec = get_free_dof_values(x)
     uvec = xvec[1:Nₛᵘ]
-    u = FEFunction(FEMSpace.V[1](0.), uvec)
+    u = FEFunction(FEMSpace.V[1](t), uvec)
 
     vcat(hcat(J11(t,u), -L21(t)'), hcat(L21(t), zeros(T, Nₛᵖ, Nₛᵖ)))
   end
@@ -207,7 +207,7 @@ function check_dataset(RBInfo)
   function res(t,x,uprev)
     xvec = get_free_dof_values(x)
     uvec = xvec[1:Nₛᵘ]
-    u = FEFunction(FEMSpace.V[1](0.), uvec)
+    u = FEFunction(FEMSpace.V[1](t), uvec)
 
     LHS(t,u) * xvec - RHS(t,uprev)
   end
@@ -246,27 +246,3 @@ function get_matrix_vector_nl_problem(operator::FEOperator)
   J1 ≈ LHS1
 
 end
-
-using ForwardDiff
-using LinearAlgebra
-using Test
-using Gridap.ODEs.ODETools
-using Gridap.ODEs.TransientFETools
-using Gridap.FESpaces: get_algebraic_operator
-using Gridap.ODEs.ODETools: ThetaMethodNonlinearOperator
-
-function get_A_b(op,u0_field,Δtθ,ode_solver)
-  odeop = get_algebraic_operator(op)
-  ode_cache = allocate_cache(odeop)
-  u0 = get_free_dof_values(u0_field)
-  uf = copy(u0)
-  vθ = similar(u0)
-  nl_cache = nothing
-  tθ = Δtθ
-  ode_cache = update_cache!(ode_cache,odeop,tθ)
-  nlop = ThetaMethodNonlinearOperator(odeop,tθ,Δtθ,u0,ode_cache,vθ)
-  nl_cache = solve!(uf,ode_solver.nls,nlop,nl_cache)
-  nl_cache.A, nl_cache.b
-end
-
-LHS_1 , RHS_1 = get_A_b(op_SUPG,u0_field,Δtθ,ode_solver)

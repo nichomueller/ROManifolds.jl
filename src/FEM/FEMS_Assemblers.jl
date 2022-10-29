@@ -98,7 +98,7 @@ function assemble_form(
     if var == "C"
       ∫(v ⊙ (∇(u)'⋅z))ParamForm.dΩ
     else var == "D"
-      ∫(v ⊙ (∇(z)'⋅u) )ParamForm.dΩ
+      ∫(v ⊙ (∇(z)'⋅u))ParamForm.dΩ
     end
   end
   trilinear_form(z) = (u, v) -> trilinear_form(u, v, z)
