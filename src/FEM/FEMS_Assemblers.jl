@@ -134,7 +134,9 @@ function assemble_form(
       g = interpolate_dirichlet(ParamForm.fun, FEMSpace.V[1])
       if var == "L"
         Param_A = ParamInfo(FEMInfo, ParamForm.μ, "A")
-        ∫(Param_A.fun * ∇(v) ⊙ ∇(g))ParamForm.dΩ
+        conv(u,∇u) = (∇u')⋅u
+        c(u,v) = ∫( v⊙(conv∘(u,∇(u))) )ParamForm.dΩ
+        ∫(Param_A.fun * ∇(v) ⊙ ∇(g))ParamForm.dΩ + c(g,v)
       else var == "Lc"
         Param_B = ParamInfo(FEMInfo, ParamForm.μ, "B")
         ∫(Param_B.fun * v ⋅ (∇⋅(g)))ParamForm.dΩ

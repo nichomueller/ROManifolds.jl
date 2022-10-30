@@ -117,51 +117,49 @@ end
 
 function check_navier_stokes_solver()
 
-  FEMSpace, μ = get_FEMμ_info(RBInfo)
-  Param = ParamInfo(RBInfo, μ[nb])
+  FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)))
+  FEMSpaceG = get_FEMSpace(FEMInfo,
+    DiscreteModelFromFile(FEMInfo.Paths.mesh_path), get_fun(FEMInfo, μ[1], "L"))
 
-  u = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
-    DataFrame))[:, nb]
-  p = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"),
-    DataFrame))[:, nb]
+  u = readdlm(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"), ',', T)[:, 1]
+  p = readdlm(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"), ',', T)[:, 1]
   x = vcat(u, p)
 
-  ufun = FEFunction(FEMSpace.V, u)
-
-  A = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "A")
-  B = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "B")
-  C = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "C")
-  D = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "D")
-  F = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "F")
-  H = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "H")
-  L = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "L")
-  Lc = assemble_FEM_structure(FEMSpace, FEMInfo, Param, "Lc")
+  A = assemble_FEM_matrix(FEMSpace, FEMInfo, μ[1], "A")
+  B = assemble_FEM_matrix(FEMSpace, FEMInfo, μ[1], "B")
+  C = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ[1], "C")
+  D = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ[1], "D")
+  F = assemble_FEM_vector(FEMSpace, FEMInfo, μ[1], "F")
+  H = assemble_FEM_vector(FEMSpace, FEMInfo, μ[1], "H")
+  L = assemble_FEM_vector(FEMSpace, FEMInfo, μ[1], "L")
+  Lc = assemble_FEM_vector(FEMSpace, FEMInfo, μ[1], "Lc")
 
   RHS = vcat(F + H - L, - Lc)
-  #RHS = vcat(F + 0*H - L, - Lc)
+  #RHS = vcat(F + H + 0*L, 0*Lc)
+
+  Nₛᵘ = length(get_free_dof_ids(FEMSpace.V₀[1]))
+  Nₛᵖ = length(get_free_dof_ids(FEMSpace.V₀[2]))
+  X = MultiFieldFESpace(FEMSpace.V)
 
   function J(x)
-    xvec = get_free_dof_values(x)
-    uvec = xvec[1:FEMSpace.Nₛᵘ]
-    u = FEFunction(FEMSpace.V, uvec)
-
-    vcat(hcat(A+C(u)+D(u), -B'), hcat(B, zeros(T, FEMSpace.Nₛᵖ, FEMSpace.Nₛᵖ)))
+    u = x[1]
+    vcat(hcat(A+C(u)+D(u), -B'), hcat(B, zeros(T, Nₛᵖ, Nₛᵖ)))
   end
 
   function res(x)
     xvec = get_free_dof_values(x)
-    uvec = xvec[1:FEMSpace.Nₛᵘ]
-    u = FEFunction(FEMSpace.V, uvec)
-
-    LHS = vcat(hcat(A+C(u), -B'), hcat(B, zeros(T, FEMSpace.Nₛᵖ, FEMSpace.Nₛᵖ)))
+    u = x[1]
+    LHS = vcat(hcat(A+C(u), -B'), hcat(B, zeros(T, Nₛᵖ, Nₛᵖ)))
     LHS * xvec - RHS
   end
 
-  res(FEFunction(FEMSpace.X, x))
+  res(FEFunction(X, x))
+  rok, Jok = residual_and_jacobian(operator, x)#FEFunction(X, x))
 
-  x₀ = FEFunction(FEMSpace.X, zeros(FEMSpace.Nₛᵘ + FEMSpace.Nₛᵖ))
+  x₀ = FEFunction(X, zeros(Nₛᵘ + Nₛᵖ))
   x₁ = x₀ - J(x₀) \ res(x₀)
 
+  ufun = FEFunction(FEMSpace.V[1], u)
   û = RBVars.Φₛ' * u
   Capp = sum([RBVars.MDEIM_C.Mat[:,q] * û[q]
     for q = 1:size(RBVars.MDEIM_C.Mat, 2)])

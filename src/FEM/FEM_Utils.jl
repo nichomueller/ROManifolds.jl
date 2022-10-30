@@ -83,7 +83,6 @@ end
 function get_FEMμ_info(FEMInfo::FOMInfoS{ID}, ::Val{D}) where {ID,D}
   μ = load_CSV(Vector{Float}[],
     joinpath(FEMInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{Float}}
-
   model = DiscreteModelFromFile(FEMInfo.Paths.mesh_path)::DiscreteModel{D,D}
   FEMSpace₀ = get_FEMSpace(FEMInfo, model)::FOMS{ID,D}
 
@@ -94,7 +93,7 @@ end
 function get_FEMμ_info(FEMInfo::FOMInfoST{ID}, ::Val{D}) where {ID,D}
   μ = load_CSV(Vector{Float}[],
     joinpath(FEMInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{Float}}
-  model = DiscreteModelFromFile(FEMInfo.Paths.mesh_path)
+  model = DiscreteModelFromFile(FEMInfo.Paths.mesh_path)::DiscreteModel{D,D}
   FEMSpace₀ = get_FEMSpace(FEMInfo, model)::FOMST{ID,FEMInfo.D}
 
   FEMSpace₀, μ
