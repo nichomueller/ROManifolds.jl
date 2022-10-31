@@ -6,7 +6,7 @@ function MDEIM_POD(S::Matrix{T}, ϵ=1e-5) where T
   V = Vᵀ'::Matrix{T}
 
   energies = cumsum(Σ .^ 2)
-  MDEIM_err_bound = vcat(sqrt(norm(inv(U'U))) * Σ[2:end], 0.0) # approx by excess, should be norm(inv(U[idx,:]))
+  MDEIM_err_bound = vcat(sqrt(norm(inv(U'U))) * Σ[2:end], 0.0) # approx by excess, should be norm(inv(U[idx,:]))*Σ[2:end]
 
   N₁ = findall(x -> x ≥ (1 - ϵ^2) * energies[end], energies)[1]
   N₂ = findall(x -> x ≤ ϵ, MDEIM_err_bound)[1]

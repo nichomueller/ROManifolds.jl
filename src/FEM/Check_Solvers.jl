@@ -117,54 +117,79 @@ end
 
 function check_navier_stokes_solver()
 
-  FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)))
-  FEMSpaceG = get_FEMSpace(FEMInfo,
-    DiscreteModelFromFile(FEMInfo.Paths.mesh_path), get_fun(FEMInfo, μ[1], "L"))
+  using Gridap.FESpaces: residual_and_jacobian
+
+  FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)));
+  μ = μ[1]
+  α = get_fun(FEMInfo, μ, "A")
+  b = get_fun(FEMInfo, μ, "B")
+  f = get_fun(FEMInfo, μ, "F")
+  h = get_fun(FEMInfo, μ, "H")
+  g = get_fun(FEMInfo, μ, "L")
+  model = DiscreteModelFromFile(FEMInfo.Paths.mesh_path)
+  FEMSpaceG = get_FEMSpace(FEMInfo, model, g)
 
   u = readdlm(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"), ',', T)[:, 1]
   p = readdlm(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"), ',', T)[:, 1]
   x = vcat(u, p)
 
-  A = assemble_FEM_matrix(FEMSpace, FEMInfo, μ[1], "A")
-  B = assemble_FEM_matrix(FEMSpace, FEMInfo, μ[1], "B")
-  C = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ[1], "C")
-  D = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ[1], "D")
-  F = assemble_FEM_vector(FEMSpace, FEMInfo, μ[1], "F")
-  H = assemble_FEM_vector(FEMSpace, FEMInfo, μ[1], "H")
-  L = assemble_FEM_vector(FEMSpace, FEMInfo, μ[1], "L")
-  Lc = assemble_FEM_vector(FEMSpace, FEMInfo, μ[1], "Lc")
+  A = assemble_FEM_matrix(FEMSpace, FEMInfo, μ, "A")
+  B = assemble_FEM_matrix(FEMSpace, FEMInfo, μ, "B")
+  C = assemble_FEM_nonlinear_matrix(FEMSpaceG, FEMInfo, μ, "C")
+  Cflat = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ, "C")
+  D = assemble_FEM_nonlinear_matrix(FEMSpaceG, FEMInfo, μ, "D")
+  F = assemble_FEM_vector(FEMSpace, FEMInfo, μ, "F")
+  H = assemble_FEM_vector(FEMSpace, FEMInfo, μ, "H")
+  L = assemble_FEM_vector(FEMSpace, FEMInfo, μ, "L")
+  Lc = assemble_FEM_vector(FEMSpace, FEMInfo, μ, "Lc")
+  #= conv(u,∇u) = (∇u')⋅u
+  c(u,v) = ∫( v⊙(conv∘(u,∇(u))) )FEMSpaceG.dΩ
+  ginterp = interpolate_dirichlet(g, FEMSpace.V[1])
+  Lnew = assemble_vector(v->∫(α * ∇(v) ⊙ ∇(g))FEMSpace.dΩ + c(g,v),FEMSpace.V₀)
+  Lcnew = assemble_vector(v->∫(b * v ⋅ (∇⋅(g)))FEMSpace.dΩ + c(g,v),FEMSpace.V) =#
 
-  RHS = vcat(F + H - L, - Lc)
-  #RHS = vcat(F + H + 0*L, 0*Lc)
+  RHS = vcat(F + H + L, Lc)
 
   Nₛᵘ = length(get_free_dof_ids(FEMSpace.V₀[1]))
   Nₛᵖ = length(get_free_dof_ids(FEMSpace.V₀[2]))
-  X = MultiFieldFESpace(FEMSpace.V)
+  X₀ = MultiFieldFESpace(FEMSpaceG.V₀)
+  X = MultiFieldFESpace(FEMSpaceG.V)
+  Xflat = MultiFieldFESpace(FEMSpace.V)
 
   function J(x)
     u = x[1]
     vcat(hcat(A+C(u)+D(u), -B'), hcat(B, zeros(T, Nₛᵖ, Nₛᵖ)))
   end
 
-  function res(x)
-    xvec = get_free_dof_values(x)
-    u = x[1]
-    LHS = vcat(hcat(A+C(u), -B'), hcat(B, zeros(T, Nₛᵖ, Nₛᵖ)))
-    LHS * xvec - RHS
+  function res(xflat)
+    xvecflat = get_free_dof_values(xflat)
+    uflat = xflat[1]
+    LHS = vcat(hcat(A+Cflat(uflat), -B'), hcat(B, zeros(T, Nₛᵖ, Nₛᵖ)))
+    LHS * xvecflat - RHS
   end
 
-  res(FEFunction(X, x))
-  rok, Jok = residual_and_jacobian(operator, x)#FEFunction(X, x))
+  xfun = FEFunction(X, x)
+  xfunflat = FEFunction(Xflat, x)
+  rok, Jok = residual_and_jacobian(operator, x)
+
+  a((u,p),(v,q)) = ∫( ∇(v)⊙(α*∇(u)) + b*(-(∇⋅v)*p + q*(∇⋅u)) )FEMSpaceG.dΩ
+  rhs((v,q)) = ∫(v ⋅ f)FEMSpaceG.dΩ + ∫(v ⋅ h)FEMSpaceG.dΓn
+
+  conv(u,∇u) = (∇u')⋅u
+  dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
+  c(u,v) = ∫( v⊙(conv∘(u,∇(u))) )FEMSpaceG.dΩ
+  dc(u,du,v) = ∫( v⊙(dconv∘(du,∇(du),u,∇(u))) )FEMSpaceG.dΩ
+
+  anew((u,p),(v,q)) = a((u,p),(v,q)) + c(u,v)
+  opAffine = AffineFEOperator(anew, rhs, X, X₀)
+  LHSok = get_matrix(opAffine)
+  RHSok = get_vector(opAffine)
+
+  res(xfun)
+  res(xfunflat)
 
   x₀ = FEFunction(X, zeros(Nₛᵘ + Nₛᵖ))
   x₁ = x₀ - J(x₀) \ res(x₀)
-
-  ufun = FEFunction(FEMSpace.V[1], u)
-  û = RBVars.Φₛ' * u
-  Capp = sum([RBVars.MDEIM_C.Mat[:,q] * û[q]
-    for q = 1:size(RBVars.MDEIM_C.Mat, 2)])
-  _, vc = findnz(C(ufun)[:])
-  maximum(abs.(vc - Capp))
 
 end
 
