@@ -2,19 +2,40 @@ include("MV_snapshots.jl")
 
 function MDEIM_POD(S::Matrix{T}, ϵ=1e-5) where T
 
-  U, Σ, Vᵀ = svd(S)
-  V = Vᵀ'::Matrix{T}
+  case = size(S)[1] > size(S)[2]
 
-  energies = cumsum(Σ .^ 2)
-  MDEIM_err_bound = vcat(sqrt(norm(inv(U'U))) * Σ[2:end], 0.0) # approx by excess, should be norm(inv(U[idx,:]))*Σ[2:end]
+  C = case ? S'*S : S
+  U, Σ², _ = svd(C)
+  Σ = sqrt.(Σ²)
 
-  N₁ = findall(x -> x ≥ (1 - ϵ^2) * energies[end], energies)[1]
+  function compute_N()
+    vecN = Int[]
+    k = 0
+    while isempty(vecN)
+      vecN = findall(x -> x ≤ (10^k)*ϵ^2, Σ²)
+      k += 1
+    end
+    vecN[1], sum(Σ²[vecN[1]:end]) / sum(Σ²)
+  end
+
+  N₁, err₁ = compute_N()
+
+  if case
+    Utemp = S*U
+    U = blocks_to_matrix([Utemp[:,i]/Σ[i] for i = eachindex(Σ)])
+  end
+
+  # approx by excess, should be norm(inv(U[idx,:]))*Σ[2:end]
+  MDEIM_err_bound = vcat(sqrt(norm(inv(U'*U))) * Σ[2:end], 0.0)
   N₂ = findall(x -> x ≤ ϵ, MDEIM_err_bound)[1]
-  N = max(N₁, N₂)::Int
-  err = max(sqrt(1-energies[N]/energies[end]), MDEIM_err_bound[N])::Float
+  err₂ = MDEIM_err_bound[N₂]
+
+  err = err₁ > err₂ ? err₁ : err₂
+  N = err₁ > err₂ ? N₁ : N₂
+
   println("Basis number obtained via POD is $N, projection error ≤ $err")
 
-  U[:,1:N], V[:,1:N]
+  U[:,1:N]
 
 end
 
@@ -47,7 +68,7 @@ function MDEIM_offline(
   FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)))
   Nₛ = get_Nₛ(RBVars, var)
 
-  Mat, row_idx = snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
+  Mat, row_idx = assemble_Mat_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
   idx_full, Matᵢ = MDEIM_offline(Mat)
   idx = from_full_idx_to_sparse_idx(idx_full, row_idx, Nₛ)
   idx_space, _ = from_vec_to_mat_idx(idx, Nₛ)
@@ -61,12 +82,12 @@ end
 function MDEIM_offline(
   MDEIM::VMDEIM{T},
   RBInfo::ROMInfoS{ID},
-  ::ROMS{ID,T},
+  RBVars::ROMS{ID,T},
   var::String) where {ID,T}
 
   FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)))
 
-  Mat = snaps_MDEIM(FEMSpace, RBInfo, μ, var)
+  Mat = assemble_Vec_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
   idx, Matᵢ = MDEIM_offline(Mat)
   el = find_FE_elements(FEMSpace, idx, var)
 
@@ -83,7 +104,7 @@ function MDEIM_offline(
   FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)))
   Nₛ = get_Nₛ(RBVars, var)
 
-  Mat, Mat_time, row_idx = snaps_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)
+  Mat, Mat_time, row_idx = assemble_Mat_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
   idx_full, Matᵢ = MDEIM_offline(Mat)
   idx = from_full_idx_to_sparse_idx(idx_full, row_idx, Nₛ)
   idx_space, _ = from_vec_to_mat_idx(idx, Nₛ)
@@ -100,12 +121,12 @@ end
 function MDEIM_offline(
   MDEIM::VMDEIM{T},
   RBInfo::ROMInfoST{ID},
-  ::ROMST{ID,T},
+  RBVars::ROMST{ID,T},
   var::String) where {ID,T}
 
   FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)))
 
-  Mat, Mat_time = snaps_MDEIM(FEMSpace, RBInfo, μ, var)
+  Mat, Mat_time = assemble_Vec_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
   idx, Matᵢ = MDEIM_offline(Mat)
   el = find_FE_elements(FEMSpace, idx, var)
 
@@ -146,7 +167,7 @@ function assemble_hyperred_vector(
 
 end
 
-function assemble_hyperred_function(
+function assemble_hyperred_fun_mat(
   FEMSpace::FOMS{D},
   FEMInfo::FOMInfoS{ID},
   Param::ParamInfoS,
@@ -157,6 +178,21 @@ function assemble_hyperred_function(
   ParamForm = ParamFormInfo(Param, dΩ_hyp)
 
   assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, ParamForm)
+
+end
+
+function assemble_hyperred_fun_vec(
+  FEMSpace::FOMS{D},
+  FEMInfo::FOMInfoS{ID},
+  Param::ParamInfoS,
+  el::Vector{Int}) where {ID,D}
+
+  triang = Gridap.FESpaces.get_triangulation(FEMSpace, Param.var)
+  Ω_hyp = view(triang, el)
+  dΩ_hyp = Measure(Ω_hyp, 2 * FEMInfo.order)
+  ParamForm = ParamFormInfo(Param, dΩ_hyp)
+
+  assemble_FEM_nonlinear_vector(FEMSpace, FEMInfo, ParamForm)
 
 end
 
@@ -191,7 +227,7 @@ function assemble_hyperred_vector(
 
 end
 
-function assemble_hyperred_function(
+function assemble_hyperred_fun_mat(
   FEMSpace::FOMST{D},
   FEMInfo::FOMInfoST{ID},
   Param::ParamInfoST,
@@ -203,6 +239,22 @@ function assemble_hyperred_function(
   ParamForm = ParamFormInfo(Param, dΩ_hyp)
 
   assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, ParamForm)(timesθ)
+
+end
+
+
+function assemble_hyperred_fun_vec(
+  FEMSpace::FOMST{D},
+  FEMInfo::FOMInfoST{ID},
+  Param::ParamInfoST,
+  el::Vector{Int}) where {ID,D}
+
+  triang = Gridap.FESpaces.get_triangulation(FEMSpace, Param.var)
+  Ω_hyp = view(triang, el)
+  dΩ_hyp = Measure(Ω_hyp, 2 * FEMInfo.order)
+  ParamForm = ParamFormInfo(Param, dΩ_hyp)
+
+  assemble_FEM_nonlinear_vector(FEMSpace, FEMInfo, ParamForm, timesθ)
 
 end
 
@@ -251,7 +303,21 @@ function θ_function(
   @assert isnonlinear(RBInfo, Param.var) "This method is only for nonlinear variables"
 
   Fun_μ_hyp =
-    assemble_hyperred_function(FEMSpace, FEMInfo, Param, MDEIM.el)
+    assemble_hyperred_fun_mat(FEMSpace, FEMInfo, Param, MDEIM.el)
+  MDEIM_online(Fun_μ_hyp, MDEIM.Matᵢ, MDEIM.idx)
+
+end
+
+function θ_function(
+  FEMSpace::FOMS{D},
+  RBInfo::ROMInfoS{ID},
+  Param::ParamInfoS,
+  MDEIM::VMDEIM{T}) where {ID,D,T}
+
+  @assert isnonlinear(RBInfo, Param.var) "This method is only for nonlinear variables"
+
+  Fun_μ_hyp =
+    assemble_hyperred_fun_vec(FEMSpace, FEMInfo, Param, MDEIM.el)
   MDEIM_online(Fun_μ_hyp, MDEIM.Matᵢ, MDEIM.idx)
 
 end

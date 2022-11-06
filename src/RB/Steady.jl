@@ -130,7 +130,7 @@ function assemble_function_vectorsₙ(
   Params::Vector{<:ParamInfo}) where {ID,T}
 
   nonlin_Vec_ops = get_nonlinear_vectors(RBInfo)
-  vector_Vars = MVariable(RBInfo, RBVars, nonlin_Vec_ops)
+  vector_Vars = VVariable(RBInfo, RBVars, nonlin_Vec_ops)
   vector_Params = ParamInfo(Params, nonlin_Vec_ops)
   assemble_function_termsₙ(vector_Vars, vector_Params)::Vector{<:Function}
 
@@ -171,11 +171,11 @@ function online_phase(
     Broadcasting(nb -> get_S_var(vars, nb, path))(nbs)
   end
 
-  FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)))
+  μ = get_μ(RBInfo)
   get_norm_matrix(RBInfo, RBVars)
 
   println("Considering parameter numbers: $param_nbs")
-  assemble_solve_reconstruct(FEMSpace, RBInfo, RBVars, μ[param_nbs])
+  assemble_solve_reconstruct(RBInfo, RBVars, μ[param_nbs])
   mean_online_time = RBVars.online_time / length(param_nbs)
   println("Online wall time: $(RBVars.online_time)s ")
 

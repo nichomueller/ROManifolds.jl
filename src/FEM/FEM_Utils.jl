@@ -14,33 +14,30 @@ end
 
 function get_FEM_structures(name::String, issteady::Bool)
   if name == "poisson"
-    matvec = ["A", "F", "H", "L"]
+    matvec = ["A", "F", "H", "LA"]
   elseif name == "stokes"
-    matvec = ["A", "B", "F", "H", "L", "Lc"]
+    matvec = ["A", "B", "F", "H", "LA", "LB"]
   elseif name == "navier-stokes"
-    matvec = ["A", "B", "C", "D", "F", "H", "L", "Lc"]
+    matvec = ["A", "B", "C", "D", "F", "H", "LA", "LB"]
   else
     error("Not implemented")
   end
   issteady ? matvec : push!(matvec, "M")
 end
 
-function get_FEM_structures(::FOMInfoS{ID}) where ID
-  if ID == 1
-    ["A", "F", "H", "L"]
-  elseif ID == 2
-    ["A", "B", "F", "H", "L", "Lc"]
-  else ID == 3
-    ["A", "B", "C", "D", "F", "H", "L", "Lc"]
-  end
-end
-
 function get_FEM_structures(FEMInfo::FOMInfo{ID}) where ID
-  append!(["M"], get_FEM_structures(FEMInfo))
+  if ID == 1
+    matvec = ["A", "F", "H", "LA"]
+  elseif ID == 2
+    matvec = ["A", "B", "F", "H", "LA", "LB"]
+  else ID == 3
+    matvec = ["A", "B", "C", "D", "F", "H", "LA", "LB"]
+  end
+  (typeof(FEMInfo) <: FOMInfoST{ID}) ? matvec : vcat(matvec, ["M", "LM"])
 end
 
 function get_FEM_vectors(FEMInfo::FOMInfo{ID}) where ID
-  vecs = ["F", "H", "L", "Lc"]
+  vecs = ["F", "H", "LA", "LB"]
   intersect(FEMInfo.structures, vecs)::Vector{String}
 end
 
@@ -80,9 +77,18 @@ function isaffine(FEMInfo::FOMInfo{ID}, vars::Vector{String}) where ID
   Broadcasting(var->isaffine(FEMInfo, var))(vars)
 end
 
-function get_FEMμ_info(FEMInfo::FOMInfoS{ID}, ::Val{D}) where {ID,D}
-  μ = load_CSV(Vector{Float}[],
+function add_affine_lifts(affine_structures::Vector{String})
+  affine_matrices = intersect(affine_structures, ["A", "B"])
+  vcat(affine_structures, "L" .* affine_matrices)
+end
+
+function get_μ(FEMInfo::FOMInfo{ID}) where ID
+  load_CSV(Vector{Float}[],
     joinpath(FEMInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{Float}}
+end
+
+function get_FEMμ_info(FEMInfo::FOMInfoS{ID}, ::Val{D}) where {ID,D}
+  μ = get_μ(FEMInfo)::Vector{Vector{Float}}
   model = DiscreteModelFromFile(FEMInfo.Paths.mesh_path)::DiscreteModel{D,D}
   FEMSpace₀ = get_FEMSpace(FEMInfo, model)::FOMS{ID,D}
 
@@ -91,13 +97,22 @@ function get_FEMμ_info(FEMInfo::FOMInfoS{ID}, ::Val{D}) where {ID,D}
 end
 
 function get_FEMμ_info(FEMInfo::FOMInfoST{ID}, ::Val{D}) where {ID,D}
-  μ = load_CSV(Vector{Float}[],
-    joinpath(FEMInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{Float}}
+  μ = get_μ(FEMInfo)::Vector{Vector{Float}}
   model = DiscreteModelFromFile(FEMInfo.Paths.mesh_path)::DiscreteModel{D,D}
   FEMSpace₀ = get_FEMSpace(FEMInfo, model)::FOMST{ID,FEMInfo.D}
 
   FEMSpace₀, μ
 
+end
+
+function get_FEMμ_info(FEMInfo::FOMInfoS{ID}, μ::Vector{T}, ::Val{D}) where {ID,D,T}
+  model = DiscreteModelFromFile(FEMInfo.Paths.mesh_path)::DiscreteModel{D,D}
+  get_FEMSpace(FEMInfo, model, μ)::FOMS{ID,D}
+end
+
+function get_FEMμ_info(FEMInfo::FOMInfoST{ID}, μ::Vector{T}, ::Val{D}) where {ID,D,T}
+  model = DiscreteModelFromFile(FEMInfo.Paths.mesh_path)::DiscreteModel{D,D}
+  get_FEMSpace(FEMInfo, model, μ)::FOMST{ID,D}
 end
 
 function get_g₀(::FOMInfoS{1})
@@ -172,6 +187,24 @@ function get_h(FEMSpace::FOM{ID,D}) where {ID,D}
   dΛ = Measure(Λ, 2)
   h = get_array(∫(1)dΛ)[1]
   h
+end
+
+function get_dirichlet_dofs(V₀, V₀_no_bnd)
+
+  cell_dof_ids_V  = get_cell_dof_ids(V₀)
+  cell_dof_ids_V_no_bnd= get_cell_dof_ids(V₀_no_bnd)
+
+  dirichlet_dofs = zeros(Int, V₀.ndirichlet)
+  for cell=eachindex(cell_dof_ids_V)
+    for (idsV,idsV_no_bnd) in zip(cell_dof_ids_V[cell],cell_dof_ids_V_no_bnd[cell])
+      if idsV<0
+        dirichlet_dofs[abs(idsV)]=idsV_no_bnd
+      end
+    end
+  end
+
+  dirichlet_dofs
+
 end
 
 function get_timesθ(FEMInfo::FOMInfoST{ID}) where ID

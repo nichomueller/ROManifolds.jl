@@ -38,8 +38,8 @@ function assemble_RHSₙ(
   RHS = assemble_RHS(FEMSpace, RBInfo, μ)
   RHS1 = blocks_to_matrix(getindex.(RHS,1) + getindex.(RHS,2) + getindex.(RHS,3))
   RHS2 = blocks_to_matrix(getindex.(RHS,4))
-  push!(RBVars.RHSₙ, reshape(RBVars.Φₛ[1]' * RHS1 * RBVars.Φₜ[1], :, 1)::Matrix{T})
-  push!(RBVars.RHSₙ, reshape(RBVars.Φₛ[2]' * RHS2 * RBVars.Φₜ[2], :, 1)::Matrix{T})
+  push!(RBVars.RHSₙ, reshape((RHS1 * RBVars.Φₜ[1])' * RBVars.Φₛ[1], :, 1)::Matrix{T})
+  push!(RBVars.RHSₙ, reshape((RHS2 * RBVars.Φₜ[2])' * RBVars.Φₛ[2], :, 1)::Matrix{T})
 
   return
 
@@ -99,10 +99,11 @@ function solve_RB_system(RBVars::ROMMethodST{2,T}) where T
 end
 
 function assemble_solve_reconstruct(
-  FEMSpace::FOMST{2,D},
   RBInfo::ROMInfo{2},
   RBVars::ROM{2,T},
-  μ::Vector{T}) where {D,T}
+  μ::Vector{T}) where T
+
+  FEMSpace = get_FEMμ_info(RBInfo, μ, Val(get_FEM_D(RBInfo)))
 
   assemble_RB_system(FEMSpace, RBInfo, RBVars, μ)
   RBVars.online_time += @elapsed begin

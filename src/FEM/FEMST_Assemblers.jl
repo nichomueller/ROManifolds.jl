@@ -31,7 +31,7 @@ function assemble_form(
       else
         ∫(v * ParamForm.fun(t))ParamForm.dΩ
       end
-    elseif var == "L"
+    elseif var == "LA"
       g(t) = interpolate_dirichlet(ParamForm.fun(t), FEMSpace.V[1](t))
       ∂g(t) = get_∂g(FEMSpace, ParamForm.fun)(t)
       Param_A = ParamInfo(FEMInfo, ParamForm.μ, "A")
@@ -118,13 +118,13 @@ function assemble_form(
       end
     else
       g(t) = interpolate_dirichlet(ParamForm.fun(t), FEMSpace.V[1](t))
-      if var == "L"
+      if var == "LA"
         ∂g(t) = get_∂g(FEMSpace, ParamForm.fun)(t)
         Param_A = ParamInfo(FEMInfo, ParamForm.μ, "A")
         Param_M = ParamInfo(FEMInfo, ParamForm.μ, "M")
         (∫(Param_A.fun(t) * ∇(v) ⊙ ∇(g(t)))ParamForm.dΩ +
           ∫(Param_M.fun(t) * v ⋅ ∂g(t))ParamForm.dΩ)
-      else var == "Lc"
+      else var == "LB"
         Param_B = ParamInfo(FEMInfo, ParamForm.μ, "B")
         ∫(Param_B.fun(t) * v ⋅ (∇⋅(g(t))))ParamForm.dΩ
       end
@@ -221,13 +221,13 @@ function assemble_form(
       end
     else
       g(t) = interpolate_dirichlet(ParamForm.fun(t), FEMSpace.V[1](t))
-      if var == "L"
+      if var == "LA"
         ∂g(t) = get_∂g(FEMSpace, ParamForm.fun)(t)
         Param_A = ParamInfo(FEMInfo, ParamForm.μ, "A")
         Param_M = ParamInfo(FEMInfo, ParamForm.μ, "M")
         (∫(Param_A.fun(t) * ∇(v) ⊙ ∇(g(t)))ParamForm.dΩ +
           ∫(Param_M.fun(t) * v ⋅ ∂g(t))ParamForm.dΩ)
-      else var == "Lc"
+      else var == "LB"
         Param_B = ParamInfo(FEMInfo, ParamForm.μ, "B")
         ∫(Param_B.fun(t) * v ⋅ (∇⋅(g(t))))ParamForm.dΩ
       end
@@ -628,7 +628,7 @@ function assemble_FEM_vector(
   form = assemble_form(FEMSpace, FEMInfo, ParamForm)
 
   function Vec(t)
-    if var ∈ ("L", "Lc")
+    if var[1] == 'L'
       -assemble_vector(form(t), get_FEMSpace_vector(FEMSpace, var))::Vector{Float}
     else
       assemble_vector(form(t), get_FEMSpace_vector(FEMSpace, var))::Vector{Float}

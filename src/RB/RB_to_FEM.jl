@@ -10,8 +10,16 @@ function get_FEM_D(RBInfo::ROMInfo)
   RBInfo.FEMInfo.D
 end
 
+function get_μ(RBInfo::ROMInfo)
+  get_μ(RBInfo.FEMInfo)
+end
+
 function get_FEMμ_info(RBInfo::ROMInfo, ::Val{D}) where D
   get_FEMμ_info(RBInfo.FEMInfo, Val(D))
+end
+
+function get_FEMμ_info(RBInfo::ROMInfo, μ::Vector{T}, ::Val{D}) where {D,T}
+  get_FEMμ_info(RBInfo.FEMInfo, μ, Val(D))
 end
 
 function isaffine(RBInfo::ROMInfo, var::String)
@@ -24,7 +32,7 @@ end
 
 function isnonlinear(::ROMInfo{ID}, var::String) where ID
   if ID == 3
-    var ∈ ("C", "D")
+    var ∈ ("C", "D", "LC")
   else
     false
   end
@@ -76,7 +84,8 @@ function get_nonlinear_vectors(RBInfo::ROMInfo)
 end
 
 function get_linear_vectors(RBInfo::ROMInfo)
-  setdiff(get_FEM_vectors(RBInfo), get_nonlinear_vectors(RBInfo))::Vector{String}
+  lv = setdiff(get_FEM_vectors(RBInfo), get_nonlinear_vectors(RBInfo))::Vector{String}
+  RBInfo.online_RHS ? String[] : lv
 end
 
 function get_affine_matrices(RBInfo::ROMInfo)
@@ -124,6 +133,15 @@ function assemble_FEM_vector(
   args...)
 
   assemble_FEM_vector(FEMSpace, RBInfo.FEMInfo, args...)
+
+end
+
+function assemble_FEM_nonlinear_vector(
+  FEMSpace::FOM,
+  RBInfo::ROMInfo,
+  args...)
+
+  assemble_FEM_nonlinear_vector(FEMSpace, RBInfo.FEMInfo, args...)
 
 end
 

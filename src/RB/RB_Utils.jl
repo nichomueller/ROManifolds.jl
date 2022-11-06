@@ -31,7 +31,7 @@ function get_Φₛ(
   RBVars::ROM{ID,T},
   var::String) where {ID,T}
 
-  if var ∈ ("B", "Lc")
+  if var ∈ ("B", "LB")
     Φₛ_left = RBVars.Φₛ[2]
   else
     Φₛ_left = RBVars.Φₛ[1]
@@ -46,7 +46,7 @@ function get_Φₜ(
   RBVars::ROMMethodST{ID,T},
   var::String) where {ID,T}
 
-  if var ∈ ("B", "Lc")
+  if var ∈ ("B", "LB")
     RBVars.Φₜ[2], RBVars.Φₜ[1]
   elseif var == "Bᵀ"
     RBVars.Φₜ[1], RBVars.Φₜ[2]
@@ -60,7 +60,7 @@ function get_Nₛ(
   RBVars::ROM{ID,T},
   var::String) where {ID,T}
 
-  if var ∈ ("B", "Lc")
+  if var ∈ ("B", "LB")
     RBVars.Nₛ[2]
   else
     RBVars.Nₛ[1]
@@ -171,7 +171,6 @@ function assemble_termsₙ(
   Var::MVVariable{T},
   Φₜθ::Vector{Matrix{T}}) where T
 
-  println("--> Assembling reduced $(Var.var)")
   sum(Broadcasting(assemble_termsₙ)(Var.Matₙ, Φₜθ))
 
 end
@@ -290,4 +289,16 @@ function compute_errors(
 
   norm(norm_err) / norm(norm_sol)
 
+end
+
+function Base.isempty(Var::MVVariable{T}) where T
+  isempty(Var.var)
+end
+
+function Base.isempty(Param::ParamInfo)
+  isempty(Param.var)
+end
+
+function get_nonempty_Vars(Vars::Vector{<:MVVariable{T}}) where T
+  Vars[.!Broadcasting(isempty)(Vars)]
 end

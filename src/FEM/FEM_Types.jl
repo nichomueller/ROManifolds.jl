@@ -74,6 +74,8 @@ struct FOMS{ID,D} <: FOM{ID,D}
   dΓn::Measure
   phys_quadp::Vector{Vector{VectorValue{D,Float}}}
   V₀_quad::UnconstrainedFESpace
+  V_no_bnd::Vector{<:UnconstrainedFESpace}
+  dirichlet_dofs::Vector{Int}
 end
 
 function FOMS(
@@ -81,9 +83,12 @@ function FOMS(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  Qₕ, V₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad = get_FEMSpace_quantities(FEMInfo, model)
+  (Qₕ, V₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+    V₀_no_bnd, V_no_bnd, dirichlet_dofs) = get_FEMSpace_quantities(FEMInfo, model)
   V = TrialFESpace(V₀, g)
-  FOMS{1,D}(Qₕ, [V₀], [V], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
+
+  FOMS{1,D}(Qₕ, [V₀], [V], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+    [V₀_no_bnd, V_no_bnd], dirichlet_dofs)
 
 end
 
@@ -92,9 +97,12 @@ function FOMS(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  Qₕ, V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad = get_FEMSpace_quantities(FEMInfo, model)
+  (Qₕ, V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+    V₀_no_bnd, V_no_bnd, dirichlet_dofs) = get_FEMSpace_quantities(FEMInfo, model)
   V = TrialFESpace(V₀, g)
-  FOMS{2,D}(Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
+
+  FOMS{2,D}(Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+    [V₀_no_bnd, V_no_bnd], dirichlet_dofs)
 
 end
 
@@ -103,9 +111,21 @@ function FOMS(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  Qₕ, V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad = get_FEMSpace_quantities(FEMInfo, model)
+  (Qₕ, V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+    V₀_no_bnd, V_no_bnd, dirichlet_dofs) = get_FEMSpace_quantities(FEMInfo, model)
   V = TrialFESpace(V₀, g)
-  FOMS{3,D}(Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
+
+  FOMS{3,D}(Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+    [V₀_no_bnd, V_no_bnd], dirichlet_dofs)
+
+end
+
+function FOMS(
+  FEMInfo::FOMInfoS{ID},
+  model::DiscreteModel{D,D},
+  μ::Vector{T}) where {ID,D,T}
+
+  FOMS(FEMInfo, model, get_fun(FEMInfo, μ, "L"))
 
 end
 
@@ -127,6 +147,8 @@ struct FOMST{ID,D} <: FOM{ID,D}
   dΓn::Measure
   phys_quadp::Vector{Vector{VectorValue{D,Float}}}
   V₀_quad::UnconstrainedFESpace
+  V_no_bnd::Vector{<:UnconstrainedFESpace}
+  dirichlet_dofs::Vector{Int}
 end
 
 function FOMST(
@@ -134,9 +156,12 @@ function FOMST(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  Qₕ, V₀::SingleFieldFESpace, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad = get_FEMSpace_quantities(FEMInfo, model)
+  (Qₕ, V₀::SingleFieldFESpace, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+    V₀_no_bnd, V_no_bnd, dirichlet_dofs) = get_FEMSpace_quantities(FEMInfo, model)
   V = TransientTrialFESpace(V₀, g)::TransientTrialFESpace
-  FOMST{1,D}(Qₕ, [V₀], [V], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
+
+  FOMST{1,D}(Qₕ, [V₀], [V], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+    [V₀_no_bnd, V_no_bnd], dirichlet_dofs)
 
 end
 
@@ -145,9 +170,12 @@ function FOMST(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  Qₕ, V₀::SingleFieldFESpace, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad = get_FEMSpace_quantities(FEMInfo, model)
+  (Qₕ, V₀::SingleFieldFESpace, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+    V₀_no_bnd, V_no_bnd, dirichlet_dofs) = get_FEMSpace_quantities(FEMInfo, model)
   V = TransientTrialFESpace(V₀, g)::TransientTrialFESpace
-  FOMST{2,D}(Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
+
+  FOMST{2,D}(Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+    [V₀_no_bnd, V_no_bnd], dirichlet_dofs)
 
 end
 
@@ -156,9 +184,21 @@ function FOMST(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  Qₕ, V₀::SingleFieldFESpace, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad = get_FEMSpace_quantities(FEMInfo, model)
+  (Qₕ, V₀::SingleFieldFESpace, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+    V₀_no_bnd, V_no_bnd, dirichlet_dofs) = get_FEMSpace_quantities(FEMInfo, model)
   V = TransientTrialFESpace(V₀, g)::TransientTrialFESpace
-  FOMST{3,D}(Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad)
+
+  FOMST{3,D}(Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+    [V₀_no_bnd, V_no_bnd], dirichlet_dofs)
+
+end
+
+function FOMST(
+  FEMInfo::FOMInfoST{ID},
+  model::DiscreteModel{D,D},
+  μ::Vector{T}) where {ID,D,T}
+
+  FOMST(FEMInfo, model, get_fun(FEMInfo, μ, "L")[1])
 
 end
 

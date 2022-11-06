@@ -93,10 +93,11 @@ function solve_RB_system(RBVars::ROMMethodS{2,T}) where T
 end
 
 function assemble_solve_reconstruct(
-  FEMSpace::FOMS{2,D},
   RBInfo::ROMInfo{2},
   RBVars::ROM{2,T},
-  μ::Vector{T}) where {D,T}
+  μ::Vector{T}) where T
+
+  FEMSpace = get_FEMμ_info(RBInfo, μ, Val(get_FEM_D(RBInfo)))
 
   assemble_RB_system(FEMSpace, RBInfo, RBVars, μ)
   RBVars.online_time += @elapsed begin

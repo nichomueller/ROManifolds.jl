@@ -4,19 +4,19 @@ function get_JinvₙResₙ(
   Params::Vector{ParamInfoS}) where T
 
   Cₙu, Dₙu = assemble_function_matricesₙ(RBInfo, RBVars, Params)
-  RHSₙ = vcat(RBVars.RHSₙ[1], RBVars.RHSₙ[2])
-
   block2 = zeros(T, RBVars.nₛ[1], RBVars.nₛ[2])
   block3 = zeros(T, RBVars.nₛ[2], RBVars.nₛ[1])
   block4 = zeros(T, RBVars.nₛ[2], RBVars.nₛ[2])
   LHSₙ_lin = vcat(hcat(RBVars.LHSₙ[1], Matrix{T}(-RBVars.LHSₙ[2]')),
     hcat(RBVars.LHSₙ[2], zeros(T, RBVars.nₛ[2], RBVars.nₛ[2])))
-
   LHSₙ_nonlin1(u) = vcat(hcat(Cₙu(u), block2), hcat(block3, block4))
   LHSₙ_nonlin2(u) = vcat(hcat(Cₙu(u) + Dₙu(u), block2), hcat(block3, block4))
 
+  LCₙu = assemble_function_vectorsₙ(RBInfo, RBVars, Params)[1]
+  RHSₙ(u) = vcat(RBVars.RHSₙ[1] + LCₙu(u), RBVars.RHSₙ[2])
+
   Jₙ(u::FEFunction) = LHSₙ_lin + LHSₙ_nonlin2(u)
-  resₙ(u::FEFunction, x̂::Matrix{T}) = (LHSₙ_lin + LHSₙ_nonlin1(u)) * x̂ - RHSₙ
+  resₙ(u::FEFunction, x̂::Matrix{T}) = (LHSₙ_lin + LHSₙ_nonlin1(u)) * x̂ - RHSₙ(u)
 
   JinvₙResₙ(u::FEFunction, x̂::Matrix{T}) = (Jₙ(u) \ resₙ(u, x̂))::Matrix{T}
   JinvₙResₙ::Function
@@ -142,10 +142,11 @@ function solve_RB_system(
 end
 
 function assemble_solve_reconstruct(
-  FEMSpace::FOMS{3,D},
   RBInfo::ROMInfoS{3},
   RBVars::ROMMethodS{3,T},
-  μ::Vector{T}) where {D,T}
+  μ::Vector{T}) where T
+
+  FEMSpace = get_FEMμ_info(RBInfo, μ, Val(get_FEM_D(RBInfo)))
 
   JinvₙResₙ = assemble_RB_system(FEMSpace, RBInfo, RBVars, μ)
   RBVars.online_time += @elapsed begin

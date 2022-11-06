@@ -45,6 +45,19 @@ function get_lagrangianQuad_info(
 
 end
 
+function get_FEMSpace_nobnd_info(
+  model::DiscreteModel{Dc,Dp},
+  refFE::Tuple,
+  V₀::SingleFieldFESpace) where {Dc,Dp}
+
+  V₀_no_bnd = FESpace(model, refFE)
+  V_no_bnd = TrialFESpace(V₀_no_bnd)
+  dirichlet_dofs = get_dirichlet_dofs(V₀, V_no_bnd)
+
+  V₀_no_bnd, V_no_bnd, dirichlet_dofs
+
+end
+
 function get_FEMSpace_quantities(
   FEMInfo::FOMInfo{1},
   model::DiscreteModel{D,D}) where D
@@ -56,8 +69,9 @@ function get_FEMSpace_quantities(
     dirichlet_tags=["dirichlet"])
 
   phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
+  V₀_no_bnd, V_no_bnd, dirichlet_dofs = get_FEMSpace_nobnd_info(model, refFE, V₀)
 
-  Qₕ, V₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad
+  Qₕ, V₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad, V₀_no_bnd, V_no_bnd, dirichlet_dofs
 
 end
 
@@ -75,8 +89,9 @@ function get_FEMSpace_quantities(
   Q = TrialFESpace(Q₀)
 
   phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
+  V₀_no_bnd, V_no_bnd, dirichlet_dofs = get_FEMSpace_nobnd_info(model, refFEᵤ, V₀)
 
-  Qₕ, V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad
+  Qₕ, V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad, V₀_no_bnd, V_no_bnd, dirichlet_dofs
 
 end
 
@@ -94,8 +109,9 @@ function get_FEMSpace_quantities(
   Q = TrialFESpace(Q₀)
 
   phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
+  V₀_no_bnd, V_no_bnd, dirichlet_dofs = get_FEMSpace_nobnd_info(model, refFEᵤ, V₀)
 
-  Qₕ, V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad
+  Qₕ, V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad, V₀_no_bnd, V_no_bnd, dirichlet_dofs
 
 end
 
@@ -121,7 +137,7 @@ function get_FEMSpace_vector(
   FEMSpace::FOM{ID,D},
   var::String) where {ID,D}
 
-  if var == "Lc"
+  if var == "LB"
     @assert ID != 1 "Something is wrong with problem variables"
     FEMSpace.V₀[2]
   else

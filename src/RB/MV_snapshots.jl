@@ -13,8 +13,8 @@ function Mat_snapshots(
 
   function Mat_nonlinear(k::Int)::Tuple{Vector{Int},Vector{Float}}
     println("Snapshot number $k, $var")
-    Φₛ_fun = FEFunction(FEMSpace.V₀[1], RBVars.Φₛ[1][:, k])
-    Mat = assemble_FEM_nonlinear_matrix(FEMSpace, RBInfo, μ[k], var)(Φₛ_fun)
+    Mat = assemble_FEM_nonlinear_matrix(FEMSpace, RBInfo, μ[k],
+      RBVars.Φₛ[1][:, k], var)
     findnz(Mat[:])
   end
 
@@ -29,21 +29,29 @@ end
 function Vec_snapshots(
   FEMSpace::FOMS{ID,D},
   RBInfo::ROMInfoS{ID},
+  RBVars::ROMMethodS{ID,T},
   μ::Vector{Vector{Float}},
-  var::String) where {ID,D}
+  var::String) where {ID,D,T}
 
-  function Vec(k::Int)::Vector{Float}
+  function Vec_linear(k::Int)::Vector{Float}
     println("Snapshot number $k, $var")
     assemble_FEM_vector(FEMSpace, RBInfo, μ[k], var)
   end
 
-  Vec_block = Broadcasting(Vec)(1:RBInfo.nₛ_MDEIM)
+  function Vec_nonlinear(k::Int)::Vector{Float}
+    println("Snapshot number $k, $var")
+    assemble_FEM_nonlinear_vector(FEMSpace, RBInfo, μ[k],
+      RBVars.Φₛ[1][:, k], var)
+  end
 
-  blocks_to_matrix(Vec_block)
+  Vec(k) = isnonlinear(RBInfo, var) ? Vec_nonlinear(k) : Vec_linear(k)
+  nₛ = isnonlinear(RBInfo, var) ? RBVars.nₛ[1] : RBInfo.nₛ_MDEIM
+
+  blocks_to_matrix(Broadcasting(Vec)(1:nₛ))::Matrix{T}
 
 end
 
-function snaps_MDEIM(
+function assemble_Mat_snapshots(
   FEMSpace::FOMS{ID,D},
   RBInfo::ROMInfoS{ID},
   RBVars::ROMMethodS{ID,T},
@@ -51,19 +59,20 @@ function snaps_MDEIM(
   var::String) where {ID,D,T}
 
   snaps, row_idx = Mat_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
-  snaps_POD, _ = MDEIM_POD(snaps, RBInfo.ϵₛ)
+  snaps_POD = MDEIM_POD(snaps, RBInfo.ϵₛ)
   snaps_POD, row_idx
 
 end
 
-function snaps_MDEIM(
+function assemble_Vec_snapshots(
   FEMSpace::FOMS{ID,D},
   RBInfo::ROMInfoS{ID},
+  RBVars::ROMMethodS{ID,T},
   μ::Vector{Vector{Float}},
-  var::String) where {ID,D}
+  var::String) where {ID,D,T}
 
-  snaps = Vec_snapshots(FEMSpace, RBInfo, μ, var)
-  snaps_POD, _ = MDEIM_POD(snaps, RBInfo.ϵₛ)
+  snaps = Vec_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
+  snaps_POD = MDEIM_POD(snaps, RBInfo.ϵₛ)
   snaps_POD
 
 end
@@ -102,22 +111,31 @@ end
 function Vec_snapshots(
   FEMSpace::FOMST{ID,D},
   RBInfo::ROMInfoST{ID},
+  RBVars::ROMMethodST{ID,T},
   μ::Vector{Vector{Float}},
-  var::String) where {ID,D}
+  var::String) where {ID,D,T}
 
   timesθ = get_timesθ(RBInfo)
 
-  function Vec(k::Int)::Matrix{Float}
+  function Vec_linear(k::Int)::Matrix{Float}
     println("Snapshot number $k, $var")
     Vec_block = assemble_FEM_vector(FEMSpace, RBInfo, μ[k], var, timesθ)
     blocks_to_matrix(Vec_block)
   end
 
+  function Vec_nonlinear(k::Int)::Matrix{Float}
+    println("Snapshot number $k, $var")
+    Vec_block = assemble_FEM_nonlinear_vector(FEMSpace, RBInfo, μ[k],
+      RBVars.Φₛ[1][:, k], var)#, timesθ)
+    blocks_to_matrix(Vec_block)
+  end
+
+  Vec(k) = isnonlinear(RBInfo, var) ? Vec_nonlinear(k) : Vec_linear(k)
   Vec
 
 end
 
-function snaps_MDEIM(
+function assemble_Mat_snapshots(
   FEMSpace::FOMST{ID,D},
   RBInfo::ROMInfoST{ID},
   RBVars::ROMMethodST{ID,T},
@@ -127,22 +145,23 @@ function snaps_MDEIM(
   if RBInfo.functional_MDEIM
     functional_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)::Tuple{Matrix{T}, Matrix{T}, Vector{Int}}
   else
-    standard_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)::Tuple{Matrix{T}, Matrix{T}, Vector{Int}}
+    standard_MMDEIM(FEMSpace, RBInfo, RBVars, μ, var)::Tuple{Matrix{T}, Matrix{T}, Vector{Int}}
   end
 
 end
 
-function snaps_MDEIM(
+function assemble_Vec_snapshots(
   FEMSpace::FOMST{ID,D},
   RBInfo::ROMInfoST{ID},
+  RBVars::ROMMethodST{ID,T},
   μ::Vector{Vector{Float}},
-  var::String) where {ID,D}
+  var::String) where {ID,D,T}
 
-  standard_MDEIM(FEMSpace, RBInfo, μ, var)
+  standard_VMDEIM(FEMSpace, RBInfo, RBVars, μ, var)::Tuple{Matrix{T}, Matrix{T}}
 
 end
 
-function standard_MDEIM(
+function standard_MMDEIM(
   FEMSpace::FOMST{ID,D},
   RBInfo::ROMInfoST{ID},
   RBVars::ROMMethodST{ID,T},
@@ -152,46 +171,35 @@ function standard_MDEIM(
   nₛ = isnonlinear(RBInfo, var) ? RBVars.nₛ[1] : RBInfo.nₛ_MDEIM
   Mat = Mat_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
 
-  function loop_k(k::Int)
-    i, v = Mat(k)
-    vs, vt = MDEIM_POD(v, RBInfo.ϵₛ)
-    i, (vs, vt)
-  end
-
-  ivals = Broadcasting(loop_k)(1:nₛ)
+  ivals = Broadcasting(Mat)(1:nₛ)
   row_idx = first.(ivals)[1]
   vals = last.(ivals)
-  vals_space = blocks_to_matrix(first.(vals))
-  vals_time = blocks_to_matrix(last.(vals))
+  vals_space = blocks_to_matrix(vals)
+  vals_time = mode₂_unfolding(vals_space, nₛ)
 
-  snaps_space, _ = MDEIM_POD(vals_space, RBInfo.ϵₛ)
-  snaps_time, _ = MDEIM_POD(vals_time, RBInfo.ϵₜ)
+  snaps_space = MDEIM_POD(vals_space, RBInfo.ϵₛ)
+  snaps_time = MDEIM_POD(vals_time, RBInfo.ϵₜ*1e-2)
 
   snaps_space, snaps_time, row_idx
 
 end
 
-function standard_MDEIM(
+function standard_VMDEIM(
   FEMSpace::FOMST{ID,D},
   RBInfo::ROMInfoST{ID},
+  RBVars::ROMMethodST{ID,T},
   μ::Vector{Vector{Float}},
-  var::String) where {ID,D}
+  var::String) where {ID,D,T}
 
   nₛ = isnonlinear(RBInfo, var) ? RBVars.nₛ[1] : RBInfo.nₛ_MDEIM
-  Vec = Vec_snapshots(FEMSpace, RBInfo, μ, var)
+  Vec = Vec_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
 
-  function loop_k(k::Int)
-    v = Vec(k)
-    vs, vt = MDEIM_POD(v, RBInfo.ϵₛ)
-    vs, vt
-  end
+  vals = Broadcasting(Vec)(1:nₛ)
+  vals_space = blocks_to_matrix(vals)
+  vals_time = mode₂_unfolding(vals_space, nₛ)
 
-  vals = Broadcasting(loop_k)(1:nₛ)
-  vals_space = blocks_to_matrix(first.(vals))
-  vals_time = blocks_to_matrix(last.(vals))
-
-  snaps_space, _ = MDEIM_POD(vals_space, RBInfo.ϵₛ)
-  snaps_time, _ = MDEIM_POD(vals_time, RBInfo.ϵₜ)
+  snaps_space = MDEIM_POD(vals_space, RBInfo.ϵₛ)
+  snaps_time = MDEIM_POD(vals_time, RBInfo.ϵₜ*1e-2)
 
   snaps_space, snaps_time
 
@@ -204,10 +212,10 @@ function functional_MDEIM(
   μ::Vector{Vector{Float}},
   var::String) where {ID,D,T}
 
-  θ_space, θ_time = θ_snapshots(FEMSpace, RBInfo, RBVars, μ[1:RBInfo.nₛ_MDEIM], var)
+  θ_space, θ_time = θ_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
 
   #time
-  snaps_time, _ = MDEIM_POD(θ_time, RBInfo.ϵₜ)
+  snaps_time = MDEIM_POD(θ_time, RBInfo.ϵₜ*1e-2)
 
   # space
   θ_space, _ = MDEIM_POD(θ_space, RBInfo.ϵₛ)
@@ -217,7 +225,7 @@ function functional_MDEIM(
   i, v = first.(iv), last.(iv)
   @assert all([length(i[1]) == length(i[j]) for j = eachindex(i)])
   row_idx, vals_space = i[1], blocks_to_matrix(v)
-  snaps_space, _ = MDEIM_POD(vals_space, RBInfo.ϵₛ)
+  snaps_space = MDEIM_POD(vals_space, RBInfo.ϵₛ)
 
   snaps_space, snaps_time, row_idx
 
@@ -231,12 +239,14 @@ function θ_snapshots(
   var::String) where {ID,D,T}
 
   timesθ = get_timesθ(RBInfo)
+  nₛ = isnonlinear(RBInfo, var) ? RBVars.nₛ[1] : RBInfo.nₛ_MDEIM
 
   function θ_st_linear()
-    Param = ParamInfo(RBInfo, μ, var)
-    θinfo = θ_phys_quadp(RBInfo, Param, FEMSpace.phys_quadp, timesθ)
-    θ_space, θ_time = first.(θinfo), last.(θinfo)
-    blocks_to_matrix(θ_space), blocks_to_matrix(θ_time)
+    Param = ParamInfo(RBInfo, μ[1:nₛ], var)
+    θinfo = θ_phys_quadp(Param, FEMSpace.phys_quadp, timesθ)
+    θblock_space, θblock_time = first.(θinfo), last.(θinfo)
+    θ_space, θ_time = blocks_to_matrix(θblock_space), blocks_to_matrix(θblock_time)
+    MDEIM_POD(θ_space, RBInfo.ϵₛ), MDEIM_POD(θ_time, RBInfo.ϵₜ*1e-2)
   end
 
   function θ_st_nonlinear()
@@ -247,11 +257,10 @@ function θ_snapshots(
 
 end
 
-function θ_phys_quadp(
-  RBInfo::ROMInfoST{ID},
+function θ_phys_quadp_snapshot(
   Param::ParamInfoST,
   phys_quadp::Vector{Vector{VectorValue{D,Float}}},
-  timesθ::Vector{T}) where {ID,D,T}
+  timesθ::Vector{T}) where {D,T}
 
   ncells = length(phys_quadp)
   nquad_cell = length(phys_quadp[1])
@@ -260,20 +269,21 @@ function θ_phys_quadp(
   θfun(tθ,n) = Broadcasting(q -> θfun(tθ,n,q))(1:nquad_cell)
   θfun(tθ) = blocks_to_matrix(Broadcasting(n -> θfun(tθ,n))(1:ncells))[:]
 
-  θ = blocks_to_matrix(Broadcasting(θfun)(timesθ))
-  MDEIM_POD(θ, RBInfo.ϵₛ)
+  θ_space = blocks_to_matrix(Broadcasting(θfun)(timesθ))
+  θ_time = mode₂_unfolding(θ_space, nₛ)
+
+  θ_space, θ_time
 
 end
 
 function θ_phys_quadp(
-  RBInfo::ROMInfoST{ID},
   Param::Vector{ParamInfoST},
   phys_quadp::Vector{Vector{VectorValue{D,Float}}},
-  timesθ::Vector{T}) where {ID,D,T}
+  timesθ::Vector{T}) where {D,T}
 
   function loop_k(k::Int)
     println("Parametric snapshot number $k, $(Param[k].var)")
-    θ_phys_quadp(RBInfo, Param[k], phys_quadp, timesθ)
+    θ_phys_quadp_snapshot(Param[k], phys_quadp, timesθ)
   end
 
   Broadcasting(loop_k)(eachindex(Param))

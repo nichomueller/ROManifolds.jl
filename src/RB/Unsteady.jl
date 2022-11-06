@@ -356,11 +356,11 @@ function online_phase(
     Broadcasting(nb -> get_S_var(vars, nb, path))(nbs)
   end
 
-  FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)))
+  μ = get_μ(RBInfo)
   get_norm_matrix(RBInfo, RBVars)
 
   println("Considering parameter numbers: $param_nbs")
-  assemble_solve_reconstruct(FEMSpace, RBInfo, RBVars, μ[param_nbs])
+  assemble_solve_reconstruct(RBInfo, RBVars, μ[param_nbs])
   mean_online_time = RBVars.online_time / length(param_nbs)
   println("Online wall time: $(RBVars.online_time)s ")
 
