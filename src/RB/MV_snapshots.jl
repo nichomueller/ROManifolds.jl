@@ -178,7 +178,7 @@ function standard_MMDEIM(
   vals_time = mode₂_unfolding(vals_space, nₛ)
 
   snaps_space = MDEIM_POD(vals_space, RBInfo.ϵₛ)
-  snaps_time = MDEIM_POD(vals_time, RBInfo.ϵₜ*1e-2)
+  snaps_time = MDEIM_POD(vals_time, RBInfo.ϵₜ*1e-5)
 
   snaps_space, snaps_time, row_idx
 
@@ -199,7 +199,7 @@ function standard_VMDEIM(
   vals_time = mode₂_unfolding(vals_space, nₛ)
 
   snaps_space = MDEIM_POD(vals_space, RBInfo.ϵₛ)
-  snaps_time = MDEIM_POD(vals_time, RBInfo.ϵₜ*1e-2)
+  snaps_time = MDEIM_POD(vals_time, RBInfo.ϵₜ*1e-5)
 
   snaps_space, snaps_time
 
@@ -215,7 +215,7 @@ function functional_MDEIM(
   θ_space, θ_time = θ_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
 
   #time
-  snaps_time = MDEIM_POD(θ_time, RBInfo.ϵₜ*1e-2)
+  snaps_time = MDEIM_POD(θ_time, RBInfo.ϵₜ*1e-5)
 
   # space
   θ_space, _ = MDEIM_POD(θ_space, RBInfo.ϵₛ)
@@ -246,7 +246,7 @@ function θ_snapshots(
     θinfo = θ_phys_quadp(Param, FEMSpace.phys_quadp, timesθ)
     θblock_space, θblock_time = first.(θinfo), last.(θinfo)
     θ_space, θ_time = blocks_to_matrix(θblock_space), blocks_to_matrix(θblock_time)
-    MDEIM_POD(θ_space, RBInfo.ϵₛ), MDEIM_POD(θ_time, RBInfo.ϵₜ*1e-2)
+    MDEIM_POD(θ_space, RBInfo.ϵₛ), MDEIM_POD(θ_time, RBInfo.ϵₜ*1e-5)
   end
 
   function θ_st_nonlinear()

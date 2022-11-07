@@ -149,20 +149,29 @@ end
 
 function check_dataset(RBInfo)
 
-  FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)))
+  μ = get_μ(RBInfo)
+  μ = μ[1]
+  FEMSpace = get_FEMμ_info(RBInfo, μ, Val(get_FEM_D(RBInfo)))
+  X = TransientMultiFieldFESpace(FEMSpace.V)
 
   δtθ = RBInfo.δt*RBInfo.θ
   t¹_θ = RBInfo.t₀+δtθ
 
-  u1 = readdlm(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"), ',', T)[:, 1]
-  p1 = readdlm(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"), ',', T)[:, 1]
+  u1 = readdlm(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"), ',')[:, 1]
+  p1 = readdlm(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"), ',')[:, 1]
+  x1 = vcat(u1,p1)
+  xfun1 = FEFunction(X(RBInfo.δt),x1)
 
-  A(t) = assemble_FEM_matrix(FEMSpace, FEMInfo, μ[1], "A", t)
-  B(t) = assemble_FEM_matrix(FEMSpace, FEMInfo, μ[1], "B", t)
-  M(t) = assemble_FEM_matrix(FEMSpace, FEMInfo, μ[1], "M", t)
-  Cfun = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ[1], "C")
-  Dfun = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ[1], "D")
-  Vecs(t) = assemble_all_FEM_vectors(FEMSpace, FEMInfo, μ[1], t)
+  A(t) = assemble_FEM_matrix(FEMSpace, FEMInfo, μ, "A", t)
+  B(t) = assemble_FEM_matrix(FEMSpace, FEMInfo, μ, "B", t)
+  M(t) = assemble_FEM_matrix(FEMSpace, FEMInfo, μ, "M", t)
+  Cfun = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ, "C")
+  Dfun = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ, "D")
+  F(t) = assemble_FEM_vector(FEMSpace, FEMInfo, μ, "F", t)
+  H(t) = assemble_FEM_vector(FEMSpace, FEMInfo, μ, "H", t)
+  LA(t) = assemble_FEM_vector(FEMSpace, FEMInfo, μ, "LA", t)
+  LB(t) = assemble_FEM_vector(FEMSpace, FEMInfo, μ, "LB", t)
+  LC = assemble_FEM_nonlinear_vector(FEMSpace, FEMInfo, μ, "LC")
 
   Nₛᵘ = length(get_free_dof_ids(FEMSpace.V₀[1]))
   Nₛᵖ = length(get_free_dof_ids(FEMSpace.V₀[2]))
@@ -171,26 +180,14 @@ function check_dataset(RBInfo)
   J11(t,u) = A(t) + Cfun(u) + M(t)/δtθ + Dfun(u)
   L21(t) = B(t)
   LHS(t,u) = vcat(hcat(L11(t,u), -L21(t)'), hcat(L21(t), zeros(T, Nₛᵖ, Nₛᵖ)))
-  RHS(t,u) = vcat(sum(Vecs(t)[1:3]) - M(t)*u/δtθ, Vecs(t)[end])
+  RHS(t,u,uh) = vcat(F(t) + H(t) + LA(t) + LC(u) - M(t)*uh/δtθ, LB(t))
 
-  function J(t,x)
-    xvec = get_free_dof_values(x)
-    uvec = xvec[1:Nₛᵘ]
-    u = FEFunction(FEMSpace.V[1](t), uvec)
+  J(t,x) = vcat(hcat(J11(t,x[1]), -L21(t)'), hcat(L21(t), zeros(T, Nₛᵖ, Nₛᵖ)))
+  res(t,x,xh) = LHS(t,x[1]) * xh - RHS(t,x[1],xh[1:Nₛᵘ])
 
-    vcat(hcat(J11(t,u), -L21(t)'), hcat(L21(t), zeros(T, Nₛᵖ, Nₛᵖ)))
-  end
-
-  function res(t,x,uprev)
-    xvec = get_free_dof_values(x)
-    uvec = xvec[1:Nₛᵘ]
-    u = FEFunction(FEMSpace.V[1](t), uvec)
-
-    LHS(t,u) * xvec - RHS(t,uprev)
-  end
-
-  x₀ = FEFunction(X(0.), zeros(Nₛᵘ + Nₛᵖ))
-  my_x1θ = zeros(Nₛᵘ + Nₛᵖ) - J(t¹_θ,x₀) \ res(t¹_θ,x₀,zeros(Nₛᵘ))
+  x₀h =zeros(Nₛᵘ + Nₛᵖ)
+  x₀ = FEFunction(X(0.), x₀h)
+  my_x1θ = zeros(Nₛᵘ + Nₛᵖ) - J(t¹_θ,x₀) \ res(t¹_θ,x₀,x₀h)
   my_x1 = my_x1θ / RBInfo.θ
   my_u1 = my_x1[1:Nₛᵘ]
   my_p1 = my_x1[Nₛᵘ+1:end]

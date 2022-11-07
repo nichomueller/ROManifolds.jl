@@ -256,8 +256,8 @@ function assemble_FEM_nonlinear_matrix(
 end
 
 function assemble_FEM_nonlinear_matrix(
-  FEMSpace::FOMS{ID,D},
-  FEMInfo::FOMInfoS{ID},
+  FEMSpace::FOM{ID,D},
+  FEMInfo::FOMInfo{ID},
   ParamForm::Vector{<:ParamFormInfo}) where {ID,D}
 
   FEM_matrix(P) = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, P)
@@ -266,8 +266,8 @@ function assemble_FEM_nonlinear_matrix(
 end
 
 function assemble_FEM_nonlinear_matrix(
-  FEMSpace::FOMS{ID,D},
-  FEMInfo::FOMInfoS{ID},
+  FEMSpace::FOM{ID,D},
+  FEMInfo::FOMInfo{ID},
   Param::ParamInfo) where {ID,D}
 
   ParamForm = ParamFormInfo(FEMSpace, Param)
@@ -276,8 +276,8 @@ function assemble_FEM_nonlinear_matrix(
 end
 
 function assemble_FEM_nonlinear_matrix(
-  FEMSpace::FOMS{ID,D},
-  FEMInfo::FOMInfoS{ID},
+  FEMSpace::FOM{ID,D},
+  FEMInfo::FOMInfo{ID},
   Param::Vector{<:ParamInfo}) where {ID,D}
 
   FEM_matrix(P) = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo,
@@ -287,8 +287,8 @@ function assemble_FEM_nonlinear_matrix(
 end
 
 function assemble_FEM_nonlinear_matrix(
-  FEMSpace::FOMS{ID,D},
-  FEMInfo::FOMInfoS{ID},
+  FEMSpace::FOM{ID,D},
+  FEMInfo::FOMInfo{ID},
   μ::Vector{T},
   var::String) where {ID,D,T}
 
@@ -298,8 +298,8 @@ function assemble_FEM_nonlinear_matrix(
 end
 
 function assemble_FEM_nonlinear_matrix(
-  FEMSpace::FOMS{ID,D},
-  FEMInfo::FOMInfoS{ID},
+  FEMSpace::FOM{ID,D},
+  FEMInfo::FOMInfo{ID},
   μvec::Vector{Vector{T}},
   var::String) where {ID,D,T}
 
@@ -309,8 +309,8 @@ function assemble_FEM_nonlinear_matrix(
 end
 
 function assemble_FEM_nonlinear_matrix(
-  FEMSpace::FOMS{ID,D},
-  FEMInfo::FOMInfoS{ID},
+  FEMSpace::FOM{ID,D},
+  FEMInfo::FOMInfo{ID},
   μ::Vector{T},
   var::Vector{String}) where {ID,D,T}
 
@@ -330,7 +330,7 @@ function assemble_FEM_nonlinear_matrix(
   V = get_FEMSpace_vector(FEMSpace, var)
   Φ_fun = FEFunction(V, Φ)
 
-  assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ, var)(Φ_fun)
+  assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ, var)(Φ_fun)::SparseMatrixCSC{Float,Int}
 
 end
 
@@ -420,9 +420,9 @@ end
 ###################################NONLINEAR####################################
 
 function assemble_FEM_nonlinear_vector(
-  FEMSpace::FOMS{3,D},
-  FEMInfo::FOMInfoS{3},
-  ParamForm::ParamFormInfoS) where D
+  FEMSpace::FOM{3,D},
+  FEMInfo::FOMInfo{3},
+  ParamForm::ParamFormInfo) where D
 
   free_dofs = setdiff(collect(1:FEMSpace.V_no_bnd[2].nfree),
     FEMSpace.dirichlet_dofs)
@@ -436,8 +436,8 @@ function assemble_FEM_nonlinear_vector(
 end
 
 function assemble_FEM_nonlinear_vector(
-  FEMSpace::FOMS{ID,D},
-  FEMInfo::FOMInfoS{ID},
+  FEMSpace::FOM{ID,D},
+  FEMInfo::FOMInfo{ID},
   ParamForm::Vector{<:ParamFormInfo}) where {ID,D}
 
   FEM_vector(P) = assemble_FEM_nonlinear_vector(FEMSpace, FEMInfo, P)
@@ -446,8 +446,8 @@ function assemble_FEM_nonlinear_vector(
 end
 
 function assemble_FEM_nonlinear_vector(
-  FEMSpace::FOMS{ID,D},
-  FEMInfo::FOMInfoS{ID},
+  FEMSpace::FOM{ID,D},
+  FEMInfo::FOMInfo{ID},
   Param::ParamInfo) where {ID,D}
 
   ParamForm = ParamFormInfo(FEMSpace, Param)
@@ -456,8 +456,8 @@ function assemble_FEM_nonlinear_vector(
 end
 
 function assemble_FEM_nonlinear_vector(
-  FEMSpace::FOMS{ID,D},
-  FEMInfo::FOMInfoS{ID},
+  FEMSpace::FOM{ID,D},
+  FEMInfo::FOMInfo{ID},
   Param::Vector{<:ParamInfo}) where {ID,D}
 
   FEM_vector(P) = assemble_FEM_nonlinear_vector(FEMSpace, FEMInfo,
@@ -467,8 +467,8 @@ function assemble_FEM_nonlinear_vector(
 end
 
 function assemble_FEM_nonlinear_vector(
-  FEMSpace::FOMS{ID,D},
-  FEMInfo::FOMInfoS{ID},
+  FEMSpace::FOM{ID,D},
+  FEMInfo::FOMInfo{ID},
   μ::Vector{T},
   var::String) where {ID,D,T}
 
@@ -478,8 +478,8 @@ function assemble_FEM_nonlinear_vector(
 end
 
 function assemble_FEM_nonlinear_vector(
-  FEMSpace::FOMS{ID,D},
-  FEMInfo::FOMInfoS{ID},
+  FEMSpace::FOM{ID,D},
+  FEMInfo::FOMInfo{ID},
   μvec::Vector{Vector{T}},
   var::String) where {ID,D,T}
 
@@ -489,8 +489,8 @@ function assemble_FEM_nonlinear_vector(
 end
 
 function assemble_FEM_nonlinear_vector(
-  FEMSpace::FOMS{ID,D},
-  FEMInfo::FOMInfoS{ID},
+  FEMSpace::FOM{ID,D},
+  FEMInfo::FOMInfo{ID},
   μ::Vector{T},
   var::Vector{String}) where {ID,D,T}
 
@@ -500,8 +500,8 @@ function assemble_FEM_nonlinear_vector(
 end
 
 function assemble_FEM_nonlinear_vector(
-  ::FOMS{ID,D},
-  FEMInfo::FOMInfoS{ID},
+  ::FOM{ID,D},
+  FEMInfo::FOMInfo{ID},
   μ::Vector{T},
   Φ::Vector{T},
   var::String) where {ID,D,T}

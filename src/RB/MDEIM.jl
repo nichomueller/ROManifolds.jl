@@ -2,11 +2,12 @@ include("MV_snapshots.jl")
 
 function MDEIM_POD(S::Matrix{T}, ϵ=1e-5) where T
 
-  case = size(S)[1] > size(S)[2]
-
-  C = case ? S'*S : S
-  U, Σ², _ = svd(C)
-  Σ = sqrt.(Σ²)
+  #= case = size(S)[1] > size(S)[2]
+  C = case ? S : S*S'
+  U, Σ, _ = svd(C)
+  Σ, Σ² = case ? (Σ, Σ .^ 2) : (sqrt.(Σ), Σ) =#
+  U, Σ, _ = svd(S)
+  Σ² = Σ .^ 2
 
   function compute_N()
     vecN = Int[]
@@ -15,23 +16,22 @@ function MDEIM_POD(S::Matrix{T}, ϵ=1e-5) where T
       vecN = findall(x -> x ≤ (10^k)*ϵ^2, Σ²)
       k += 1
     end
-    vecN[1], sum(Σ²[vecN[1]:end]) / sum(Σ²)
+    vecN[1], sqrt(sum(Σ²[vecN[1]:end]) / sum(Σ²))
   end
 
-  N₁, err₁ = compute_N()
+  #= if case
+    energies = cumsum(Σ²)
+    N = findall(x -> x ≥ (1 - ϵ^2) * energies[end], energies)[1]
+    err = sqrt(1-energies[N₁]/energies[end])
+  else
+    N, err = compute_N()
+  end =#
+  N, err = compute_N()
 
-  if case
-    Utemp = S*U
-    U = blocks_to_matrix([Utemp[:,i]/Σ[i] for i = eachindex(Σ)])
-  end
-
-  # approx by excess, should be norm(inv(U[idx,:]))*Σ[2:end]
-  MDEIM_err_bound = vcat(sqrt(norm(inv(U'*U))) * Σ[2:end], 0.0)
-  N₂ = findall(x -> x ≤ ϵ, MDEIM_err_bound)[1]
-  err₂ = MDEIM_err_bound[N₂]
-
-  err = err₁ > err₂ ? err₁ : err₂
-  N = err₁ > err₂ ? N₁ : N₂
+  # approx, should actually be norm(inv(U[idx,:]))*Σ[2:end]
+  MDEIM_err_bound = vcat(sqrt(norm(inv(U[:,1:N]'*U[:,1:N]))) * Σ[2:end], 0.0)
+  N = findall(x -> x ≤ ϵ, MDEIM_err_bound)[1]
+  err = MDEIM_err_bound[N]
 
   println("Basis number obtained via POD is $N, projection error ≤ $err")
 

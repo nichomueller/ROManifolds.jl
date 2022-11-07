@@ -114,12 +114,14 @@ function Gram_Schmidt(
   Φₛ::Matrix{T},
   X₀::SparseMatrixCSC{Float, Int}) where T
 
-  Vecs[1] /= norm(Vecs[1], X₀)
-
-  function orthogonalize(Vec::Vector{T}, Φ::Matrix{T})
-    q(j::Int) = dot(Vec, Φ[:, j], X₀) / norm(Φ[:, j], X₀) * Φ[:, j]
-    Vec - sum(Broadcasting(q)(1:size(Φ)[2]))
+  function orthogonalize(vec::Vector{T}, Φ::Matrix{T})
+    proj(j::Int) = (dot(vec, Φ[:, j], X₀) / norm(Φ[:, j], X₀)) * Φ[:, j]
+    vec - sum(Broadcasting(proj)(1:size(Φ)[2]))
   end
+
+  println("Normalizing primal supremizer 1")
+  Vecs[1] = orthogonalize(Vecs[1], Φₛ)
+  Vecs[1] /= norm(Vecs[1], X₀)
 
   for i = 2:length(Vecs)
     println("Normalizing primal supremizer $i")
