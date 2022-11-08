@@ -120,12 +120,12 @@ function check_navier_stokes_solver()
   using Gridap.FESpaces: residual_and_jacobian
 
   μ = get_μ(RBInfo)
-  μ = μ[1]
+  μ = μ[95]
   FEMSpace = get_FEMμ_info(RBInfo, μ, Val(get_FEM_D(RBInfo)))
 
   X = MultiFieldFESpace(FEMSpace.V)
-  u = readdlm(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"), ',', Float)[:, 1]
-  p = readdlm(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"), ',', Float)[:, 1]
+  u = readdlm(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"), ',', Float)[:, 95]
+  p = readdlm(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"), ',', Float)[:, 95]
   x = vcat(u, p)
   xfun = FEFunction(X, x)
   Nₛᵖ = length(get_free_dof_ids(FEMSpace.V₀[2]))
@@ -133,7 +133,7 @@ function check_navier_stokes_solver()
   A = assemble_FEM_matrix(FEMSpace, FEMInfo, μ, "A")
   B = assemble_FEM_matrix(FEMSpace, FEMInfo, μ, "B")
   C = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ, "C")
-  #D = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ, "D")
+  D = assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, μ, "D")
   F = assemble_FEM_vector(FEMSpace, FEMInfo, μ, "F")
   H = assemble_FEM_vector(FEMSpace, FEMInfo, μ, "H")
   LA = assemble_FEM_vector(FEMSpace, FEMInfo, μ, "LA")
@@ -141,26 +141,36 @@ function check_navier_stokes_solver()
   LC = assemble_FEM_nonlinear_vector(FEMSpace, FEMInfo, μ, "LC")
 
   LHS(u) = vcat(hcat(A+C(u), -B'), hcat(B, zeros(Nₛᵖ, Nₛᵖ)))
+  J(xfun) = vcat(hcat(A+C(xfun[1])+D(xfun[1]), -B'), hcat(B, zeros(Nₛᵖ, Nₛᵖ)))
   RHS(u) = vcat(F + H + LA + LC(u), LB)
+  res(xfun, xh) = LHS(xfun[1]) * xh - RHS(xfun[1])
 
-  LHS(xfun[1]) * x - RHS(xfun[1]), norm(C(xfun[1])), norm(LC(xfun[1]))
+  #LHS(xfun[1]) * x - RHS(xfun[1])
+
+  function newton(res::Function, J::Function, x)
+    err = 1.
+    tolerance = 10^(-10)
+    xh = get_free_dof_values(x)
+    xn = Vector{Float}[]
+    iter = 0
+    while (norm(err) > tolerance)
+      Jx, rx = J(x), res(x,xh)
+      err = Jx \ rx
+      xh -= err
+      push!(xn,xh)
+      x = FEFunction(X, xh)
+      iter += 1
+      println("err = $(norm(err)), iter = $iter")
+    end
+    xn
+  end
+
+  x₀ = zeros(length(x))
+  xnew = newton(res, J, FEFunction(X, x₀))
 
 end
 
 function check_dataset(RBInfo)
-
-  μ = get_μ(RBInfo)
-  μ = μ[1]
-  FEMSpace = get_FEMμ_info(RBInfo, μ, Val(get_FEM_D(RBInfo)))
-  X = TransientMultiFieldFESpace(FEMSpace.V)
-
-  δtθ = RBInfo.δt*RBInfo.θ
-  t¹_θ = RBInfo.t₀+δtθ
-
-  u1 = readdlm(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"), ',')[:, 1]
-  p1 = readdlm(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"), ',')[:, 1]
-  x1 = vcat(u1,p1)
-  xfun1 = FEFunction(X(RBInfo.δt),x1)
 
   A(t) = assemble_FEM_matrix(FEMSpace, FEMInfo, μ, "A", t)
   B(t) = assemble_FEM_matrix(FEMSpace, FEMInfo, μ, "B", t)
@@ -177,20 +187,38 @@ function check_dataset(RBInfo)
   Nₛᵖ = length(get_free_dof_ids(FEMSpace.V₀[2]))
 
   L11(t,u) = A(t) + Cfun(u) + M(t)/δtθ
-  J11(t,u) = A(t) + Cfun(u) + M(t)/δtθ + Dfun(u)
+  J11(t,u) = A(t) + Cfun(u) + Dfun(u) + M(t)/δtθ
   L21(t) = B(t)
   LHS(t,u) = vcat(hcat(L11(t,u), -L21(t)'), hcat(L21(t), zeros(T, Nₛᵖ, Nₛᵖ)))
-  RHS(t,u,uh) = vcat(F(t) + H(t) + LA(t) + LC(u) - M(t)*uh/δtθ, LB(t))
+  RHS(t,u,uprev) = vcat(F(t) + H(t) + LA(t) + LC(u) - M(t)*uprev/δtθ, LB(t))
 
   J(t,x) = vcat(hcat(J11(t,x[1]), -L21(t)'), hcat(L21(t), zeros(T, Nₛᵖ, Nₛᵖ)))
-  res(t,x,xh) = LHS(t,x[1]) * xh - RHS(t,x[1],xh[1:Nₛᵘ])
+  res(t,x,xh,xprev) = LHS(t,x[1]) * xh - RHS(t,x[1],xprev[1:Nₛᵘ])
 
-  x₀h =zeros(Nₛᵘ + Nₛᵖ)
+  x₀h = zeros(Nₛᵘ + Nₛᵖ)
   x₀ = FEFunction(X(0.), x₀h)
-  my_x1θ = zeros(Nₛᵘ + Nₛᵖ) - J(t¹_θ,x₀) \ res(t¹_θ,x₀,x₀h)
+
+  function newton(res::Function, J::Function, x, t)
+    err = 1.
+    tolerance = 10^(-10)
+    xh = get_free_dof_values(x)
+    iter = 0
+    while (norm(err) > tolerance)
+       err = J(t,x)\res(t,x,xh,x₀h)
+       xh -= err
+       x = FEFunction(X(t), xh[:,1])
+       iter += 1
+       println("err = $(norm(err)), iter = $iter")
+    end
+    xh
+  end
+
+  newtonδt(res::Function, J::Function, x) = newton(res, J, x, t¹_θ)
+  my_x1θ = newtonδt(res, J, x₀)
   my_x1 = my_x1θ / RBInfo.θ
   my_u1 = my_x1[1:Nₛᵘ]
   my_p1 = my_x1[Nₛᵘ+1:end]
+
 
   u1≈my_u1
   p1≈my_p1

@@ -113,7 +113,7 @@ function set_operators(RBInfo::ROMInfo{ID}) where ID
   if RBInfo.online_RHS
     vec_ops = get_FEM_vectors(RBInfo)
     println("Exact vectors $vec_ops will be built online: skipping their offline phase")
-    setdiff(operators, vec_ops)
+    operators = setdiff(operators, vec_ops)
   end
 
   operators::Vector{String}

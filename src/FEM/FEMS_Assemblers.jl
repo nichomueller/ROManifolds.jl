@@ -507,8 +507,7 @@ function assemble_FEM_nonlinear_vector(
   var::String) where {ID,D,T}
 
   FEMSpace = get_FEMμ_info(FEMInfo, μ, Val(D))
-  V = get_FEMSpace_vector(FEMSpace, var)
-  Φ_fun = FEFunction(V, Φ)
+  Φ_fun = FEFunction(FEMSpace.V[1], Φ)
 
   assemble_FEM_nonlinear_vector(FEMSpace, FEMInfo, μ, var)(Φ_fun)
 

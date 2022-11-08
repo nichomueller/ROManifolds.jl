@@ -322,7 +322,8 @@ function assemble_RHS(
   RBInfo::ROMInfoST{ID},
   μ::Vector{T}) where {ID,D,T}
 
-  ParamVec = ParamInfo(RBInfo, μ, get_FEM_vectors(RBInfo))
+  lv = setdiff(get_FEM_vectors(RBInfo), get_nonlinear_vectors(RBInfo))
+  ParamVec = ParamInfo(RBInfo, μ, lv)
   assemble_FEM_vector(FEMSpace, RBInfo, ParamVec, get_timesθ(RBInfo))
 
 end

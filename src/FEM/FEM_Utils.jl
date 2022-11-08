@@ -18,7 +18,7 @@ function get_FEM_structures(name::String, issteady::Bool)
   elseif name == "stokes"
     matvec = ["A", "B", "F", "H", "LA", "LB"]
   elseif name == "navier-stokes"
-    matvec = ["A", "B", "C", "D", "F", "H", "LA", "LB"]
+    matvec = ["A", "B", "C", "D", "F", "H", "LA", "LB", "LC"]
   else
     error("Not implemented")
   end
@@ -31,13 +31,13 @@ function get_FEM_structures(FEMInfo::FOMInfo{ID}) where ID
   elseif ID == 2
     matvec = ["A", "B", "F", "H", "LA", "LB"]
   else ID == 3
-    matvec = ["A", "B", "C", "D", "F", "H", "LA", "LB"]
+    matvec = ["A", "B", "C", "D", "F", "H", "LA", "LB", "LC"]
   end
   (typeof(FEMInfo) <: FOMInfoST{ID}) ? matvec : vcat(matvec, ["M", "LM"])
 end
 
 function get_FEM_vectors(FEMInfo::FOMInfo{ID}) where ID
-  vecs = ["F", "H", "LA", "LB"]
+  vecs = ["F", "H", "LA", "LB", "LC"]
   intersect(FEMInfo.structures, vecs)::Vector{String}
 end
 
@@ -78,8 +78,13 @@ function isaffine(FEMInfo::FOMInfo{ID}, vars::Vector{String}) where ID
 end
 
 function add_affine_lifts(affine_structures::Vector{String})
-  affine_matrices = intersect(affine_structures, ["A", "B"])
-  vcat(affine_structures, "L" .* affine_matrices)
+  if "L" ∈ affine_structures
+    aff_structs = setdiff(affine_structures, "L")
+    aff_mats = intersect(aff_structs, ["A", "B"])
+    vcat(aff_structs, "L" .* aff_mats)
+  else
+    affine_structures
+  end
 end
 
 function get_μ(FEMInfo::FOMInfo{ID}) where ID

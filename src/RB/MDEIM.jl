@@ -2,10 +2,6 @@ include("MV_snapshots.jl")
 
 function MDEIM_POD(S::Matrix{T}, ϵ=1e-5) where T
 
-  #= case = size(S)[1] > size(S)[2]
-  C = case ? S : S*S'
-  U, Σ, _ = svd(C)
-  Σ, Σ² = case ? (Σ, Σ .^ 2) : (sqrt.(Σ), Σ) =#
   U, Σ, _ = svd(S)
   Σ² = Σ .^ 2
 
@@ -19,13 +15,6 @@ function MDEIM_POD(S::Matrix{T}, ϵ=1e-5) where T
     vecN[1], sqrt(sum(Σ²[vecN[1]:end]) / sum(Σ²))
   end
 
-  #= if case
-    energies = cumsum(Σ²)
-    N = findall(x -> x ≥ (1 - ϵ^2) * energies[end], energies)[1]
-    err = sqrt(1-energies[N₁]/energies[end])
-  else
-    N, err = compute_N()
-  end =#
   N, err = compute_N()
 
   # approx, should actually be norm(inv(U[idx,:]))*Σ[2:end]
@@ -238,7 +227,7 @@ function assemble_hyperred_fun_mat(
   dΩ_hyp = Measure(Ω_hyp, 2 * FEMInfo.order)
   ParamForm = ParamFormInfo(Param, dΩ_hyp)
 
-  assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, ParamForm)(timesθ)
+  assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, ParamForm, timesθ)
 
 end
 
@@ -318,6 +307,7 @@ function θ_function(
 
   Fun_μ_hyp =
     assemble_hyperred_fun_vec(FEMSpace, FEMInfo, Param, MDEIM.el)
+  #Fun_μ_hyp = assemble_FEM_nonlinear_vector(FEMSpace, FEMInfo, Param.μ, "LC")
   MDEIM_online(Fun_μ_hyp, MDEIM.Matᵢ, MDEIM.idx)
 
 end
