@@ -86,7 +86,7 @@ function Mat_snapshots(
 
   timesθ = get_timesθ(RBInfo)
 
-  function Mat_linear(k::Int)::Tuple{Vector{Int},Matrix{Float}}
+  function Mat_linear(k::Int)
     println("Snapshot number $k, $var")
     Mats = assemble_FEM_matrix(FEMSpace, RBInfo, μ[k], var, timesθ)
     iv = Broadcasting(Mat -> findnz(Mat[:]))(Mats)
@@ -95,12 +95,12 @@ function Mat_snapshots(
     i[1], blocks_to_matrix(v)
   end
 
-  function Mat_nonlinear(k::Int)::Tuple{Vector{Int},Matrix{Float}}
+  function Mat_nonlinear(k::Int)
     println("Snapshot number $k, $var")
     Mat = assemble_FEM_nonlinear_matrix(FEMSpace, RBInfo, μ[k],
       RBVars.Φₛ[1][:, k], var)
-    i, v = Broadcasting(Mat -> findnz(Mat[:]))(Mats)
-    first.(i), first(v)
+    typeof(Mat)
+    findnz(Mat[:])
   end
 
   Mat(k) = isnonlinear(RBInfo, var) ? Mat_nonlinear(k) : Mat_linear(k)
@@ -117,17 +117,16 @@ function Vec_snapshots(
 
   timesθ = get_timesθ(RBInfo)
 
-  function Vec_linear(k::Int)::Matrix{Float}
+  function Vec_linear(k::Int)
     println("Snapshot number $k, $var")
     Vec_block = assemble_FEM_vector(FEMSpace, RBInfo, μ[k], var, timesθ)
     blocks_to_matrix(Vec_block)
   end
 
-  function Vec_nonlinear(k::Int)::Matrix{Float}
+  function Vec_nonlinear(k::Int)
     println("Snapshot number $k, $var")
-    Vec_block = assemble_FEM_nonlinear_vector(FEMSpace, RBInfo, μ[k],
+    assemble_FEM_nonlinear_vector(FEMSpace, RBInfo, μ[k],
       RBVars.Φₛ[1][:, k], var)
-    blocks_to_matrix(Vec_block)
   end
 
   Vec(k) = isnonlinear(RBInfo, var) ? Vec_nonlinear(k) : Vec_linear(k)

@@ -172,6 +172,19 @@ end
 
 function check_dataset(RBInfo)
 
+  μ = get_μ(RBInfo)
+  μ = μ[1]
+  FEMSpace = get_FEMμ_info(RBInfo, μ, Val(get_FEM_D(RBInfo)))
+  X = TransientMultiFieldFESpace(FEMSpace.V)
+
+  δtθ = RBInfo.δt*RBInfo.θ
+  t¹_θ = RBInfo.t₀+δtθ
+
+  u1 = readdlm(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"), ',')[:, 1]
+  p1 = readdlm(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"), ',')[:, 1]
+  x1 = vcat(u1,p1)
+  xfun1 = FEFunction(X(RBInfo.δt),x1)
+
   A(t) = assemble_FEM_matrix(FEMSpace, FEMInfo, μ, "A", t)
   B(t) = assemble_FEM_matrix(FEMSpace, FEMInfo, μ, "B", t)
   M(t) = assemble_FEM_matrix(FEMSpace, FEMInfo, μ, "M", t)

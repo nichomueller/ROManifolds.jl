@@ -237,7 +237,7 @@ function assemble_hyperred_fun_vec(
   FEMInfo::FOMInfoST{ID},
   Param::ParamInfoST,
   el::Vector{Int},
-  timesθ::Vector{T}) where {ID,D}
+  timesθ::Vector{T}) where {ID,D,T}
 
   triang = Gridap.FESpaces.get_triangulation(FEMSpace, Param.var)
   Ω_hyp = view(triang, el)

@@ -579,7 +579,7 @@ function assemble_FEM_nonlinear_vector(
   form(z) = assemble_form(FEMSpace, FEMInfo, ParamForm)(z)
   Mat(z) = assemble_matrix(form(z), FEMSpace.V_no_bnd[2], FEMSpace.V_no_bnd[1])
 
-  nl_lift(t,z) = - Mat(z(0.))[free_dofs, FEMSpace.dirichlet_dofs] * z(t).dirichlet_values
+  nl_lift(z) = - Mat(z(0.))[free_dofs, FEMSpace.dirichlet_dofs] * z.dirichlet_values
   nl_lift
 
 end
