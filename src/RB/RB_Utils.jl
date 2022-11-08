@@ -158,22 +158,6 @@ function assemble_termsₙ(
 
 end
 
-function assemble_termsₙ(
-  Matₙ::Vector{Matrix{T}},
-  Φₜθ::Vector{Matrix{T}}) where T
-
-  sum(Broadcasting(assemble_termsₙ)(Matₙ, Φₜθ))
-
-end
-
-function assemble_termsₙ(
-  Var::MVVariable{T},
-  Φₜθ::Vector{Matrix{T}}) where T
-
-  sum(Broadcasting(assemble_termsₙ)(Var.Matₙ, Φₜθ))
-
-end
-
 function assemble_function_termsₙ(
   Var::MVVariable{T},
   Param::ParamInfo) where T
@@ -192,6 +176,15 @@ function assemble_function_termsₙ(
   Params::Vector{<:ParamInfo}) where T
 
   Broadcasting(assemble_function_termsₙ)(Vars, Params)
+
+end
+
+function assemble_function_termsₙ(
+  Matₙ::Matrix{T},
+  Φₜθ::Function) where T
+
+  termₙ(u) = kron(Matₙ, Φₜθ(u))
+  termₙ
 
 end
 
@@ -226,6 +219,42 @@ function Φₜ_by_θ(
   Φₜθ_fun(q) = reshape(Broadcasting(iₜ -> Φₜθ_fun(iₜ,q))(1:nₜ_left), :, 1)
 
   Broadcasting(Φₜθ_fun)(eachindex(θ))::Vector{Matrix{T}}
+
+end
+
+function Φₜ_by_Φₜ_by_θ(
+  Φₜ_left::Matrix{T},
+  Φₜ_right::Matrix{T},
+  idx₁::UnitRange{Int},
+  idx₂::UnitRange{Int},
+  θ::Function) where T
+
+  nₜ_left, nₜ_right = size(Φₜ_left)[2], size(Φₜ_right)[2]
+
+  ΦₜΦₜθ_fun(u,iₜ,jₜ,q) =
+    sum(Φₜ_left[idx₁,iₜ] .* Φₜ_right[idx₂,jₜ] .* θ(u)[q][idx₁])
+  ΦₜΦₜθ_fun(u,jₜ,q) =
+    Broadcasting(iₜ -> ΦₜΦₜθ_fun(u,iₜ,jₜ,q))(1:nₜ_left)
+  ΦₜΦₜθ_fun(u,q) =
+    Broadcasting(jₜ -> ΦₜΦₜθ_fun(u,jₜ,q))(1:nₜ_right)
+  ΦₜΦₜθ_fun(u) =
+    blocks_to_matrix(Broadcasting(q -> ΦₜΦₜθ_fun(u,q))(eachindex(θ)))
+
+  ΦₜΦₜθ_fun::Function
+
+end
+
+function Φₜ_by_θ(
+  Φₜ_left::Matrix{T},
+  θ::Function) where T
+
+  nₜ_left = size(Φₜ_left)[2]
+
+  Φₜθ_fun(u,iₜ,q) = sum(Φₜ_left[:,iₜ] .* θ(u)[q])
+  Φₜθ_fun(u,q) = reshape(Broadcasting(iₜ -> Φₜθ_fun(u,iₜ,q))(1:nₜ_left), :, 1)
+  Φₜθ_fun(u) = Broadcasting(q -> Φₜθ_fun(u,q))(eachindex(θ))
+
+  Φₜθ_fun::Function
 
 end
 

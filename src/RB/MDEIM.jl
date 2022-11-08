@@ -236,7 +236,8 @@ function assemble_hyperred_fun_vec(
   FEMSpace::FOMST{D},
   FEMInfo::FOMInfoST{ID},
   Param::ParamInfoST,
-  el::Vector{Int}) where {ID,D}
+  el::Vector{Int},
+  timesθ::Vector{T}) where {ID,D}
 
   triang = Gridap.FESpaces.get_triangulation(FEMSpace, Param.var)
   Ω_hyp = view(triang, el)
@@ -307,7 +308,6 @@ function θ_function(
 
   Fun_μ_hyp =
     assemble_hyperred_fun_vec(FEMSpace, FEMInfo, Param, MDEIM.el)
-  #Fun_μ_hyp = assemble_FEM_nonlinear_vector(FEMSpace, FEMInfo, Param.μ, "LC")
   MDEIM_online(Fun_μ_hyp, MDEIM.Matᵢ, MDEIM.idx)
 
 end
@@ -396,6 +396,48 @@ function θ(
   end
 
   θ::Vector{Vector{T}}
+
+end
+
+function θ_function(
+  FEMSpace::FOMST{D},
+  RBInfo::ROMInfoST{ID},
+  Param::ParamInfoST,
+  MDEIM::MMDEIM{T}) where {ID,D,T}
+
+  @assert isnonlinear(RBInfo, Param.var) "This method is only for nonlinear variables"
+
+  if RBInfo.st_MDEIM
+    red_timesθ = timesθ[MDEIM.time_idx]
+    Fun_μ_hyp = assemble_hyperred_fun_mat(
+      FEMSpace, FEMInfo, Param, MDEIM.el, red_timesθ)
+    interpolate_θ(Fun_μ_hyp, MDEIM, timesθ)::Function
+  else
+    Fun_μ_hyp = assemble_hyperred_fun_mat(
+      FEMSpace, FEMInfo, Param, MDEIM.el, timesθ)
+    MDEIM_online(Fun_μ_hyp, MDEIM.Matᵢ, MDEIM.idx, length(timesθ))::Function
+  end
+
+end
+
+function θ_function(
+  FEMSpace::FOMST{D},
+  RBInfo::ROMInfoST{ID},
+  Param::ParamInfoST,
+  MDEIM::VMDEIM{T}) where {ID,D,T}
+
+  @assert isnonlinear(RBInfo, Param.var) "This method is only for nonlinear variables"
+
+  if RBInfo.st_MDEIM
+    red_timesθ = timesθ[MDEIM.time_idx]
+    Fun_μ_hyp = assemble_hyperred_fun_vec(
+      FEMSpace, FEMInfo, Param, MDEIM.el, red_timesθ)
+    interpolate_θ(Fun_μ_hyp, MDEIM, timesθ)::Function
+  else
+    Fun_μ_hyp = assemble_hyperred_fun_vec(
+      FEMSpace, FEMInfo, Param, MDEIM.el, timesθ)
+    MDEIM_online(Fun_μ_hyp, MDEIM.Matᵢ, MDEIM.idx, length(timesθ))::Function
+  end
 
 end
 

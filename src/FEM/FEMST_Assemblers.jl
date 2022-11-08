@@ -568,6 +568,36 @@ function assemble_FEM_nonlinear_matrix(
 
 end
 
+function assemble_FEM_nonlinear_vector(
+  FEMSpace::FOMST{3,D},
+  FEMInfo::FOMInfoST{3},
+  ParamForm::ParamFormInfo) where D
+
+  free_dofs = setdiff(collect(1:FEMSpace.V_no_bnd[2].nfree),
+    FEMSpace.dirichlet_dofs)
+
+  form(z) = assemble_form(FEMSpace, FEMInfo, ParamForm)(z)
+  Mat(z) = assemble_matrix(form(z), FEMSpace.V_no_bnd[2], FEMSpace.V_no_bnd[1])
+
+  nl_lift(t,z) = - Mat(z(0.))[free_dofs, FEMSpace.dirichlet_dofs] * z(t).dirichlet_values
+  nl_lift
+
+end
+
+function assemble_FEM_nonlinear_vector(
+  ::FOMST{ID,D},
+  FEMInfo::FOMInfoST{ID},
+  μ::Vector{T},
+  Φ::Vector{T},
+  var::String) where {ID,D,T}
+
+  FEMSpace = get_FEMμ_info(FEMInfo, μ, Val(D))
+  Φ_fun(t) = FEFunction(FEMSpace.V[1](t), Φ)
+
+  t -> assemble_FEM_nonlinear_vector(FEMSpace, FEMInfo, μ, var)(Φ_fun(t))
+
+end
+
 #####################################LINEAR#####################################
 
 function assemble_FEM_vector(

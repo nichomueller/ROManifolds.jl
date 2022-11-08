@@ -221,6 +221,27 @@ function assemble_ϕₜϕₜθ(
 
 end
 
+function assemble_ϕₜϕₜθ(
+  RBInfo::ROMInfoST{ID},
+  RBVars::ROMMethodST{ID,T},
+  θ::Function,
+  var::String) where {ID,T}
+
+  Φₜ_left, Φₜ_right = get_Φₜ(RBVars, var)
+  idx, idx₁, idx₂ = 1:RBVars.Nₜ, 2:RBVars.Nₜ, 1:RBVars.Nₜ-1
+
+  ΦₜΦₜθ_vec = Φₜ_by_Φₜ_by_θ(Φₜ_left, Φₜ_right, idx, idx, θ)
+  ΦₜΦₜθ₁_vec = Φₜ_by_Φₜ_by_θ(Φₜ_left, Φₜ_right, idx₁, idx₂, θ)
+
+  if var == "M"
+    ΦₜΦₜθ_vec /= RBInfo.δt*RBInfo.θ
+    ΦₜΦₜθ₁_vec /= RBInfo.δt*RBInfo.θ
+  end
+
+  ΦₜΦₜθ_vec, ΦₜΦₜθ₁_vec
+
+end
+
 function assemble_matricesₙ(
   RBInfo::ROMInfoST{ID},
   RBVars::ROMMethodST{ID,T},
@@ -256,7 +277,6 @@ function assemble_matricesₙ(
   first.(Matsₙ), last.(Matsₙ)
 
 end
-
 
 function assemble_matricesₙ(
   RBInfo::ROMInfoST{ID},
@@ -314,6 +334,91 @@ function assemble_vectorsₙ(
   VParams = ParamInfo(Params, lin_Vec_ops)
 
   assemble_vectorsₙ(RBVars, VVars, VParams)
+
+end
+
+function assemble_function_matricesₙ(
+  RBInfo::ROMInfoST{ID},
+  RBVars::ROMMethodST{ID,T},
+  MVar::MVariable{T},
+  MParam::ParamInfo) where {ID,T}
+
+  @assert MVar.var == MParam.var
+  println("--> Assembling reduced $(MVar.var)")
+
+  ΦₜΦₜθ, ΦₜΦₜθ₁ = assemble_ϕₜϕₜθ(RBInfo, RBVars, MParam.θ, MParam.var)
+  Matₙ = assemble_function_termsₙ(MVar, ΦₜΦₜθ)::Matrix{T}
+  Mat₁ₙ = assemble_function_termsₙ(MVar, ΦₜΦₜθ₁)::Matrix{T}
+
+  if MParam.var == "B"
+    _, ΦₜΦₜθ₁ᵀ = assemble_ϕₜϕₜθ(RBInfo, RBVars, MParam.θ, "Bᵀ")
+    Mat₁ₙᵀ = assemble_function_termsₙ(Matrix{T}.(transpose.(MVar.Matₙ)), ΦₜΦₜθ₁ᵀ)::Matrix{T}
+    Mat₁ₙ = [Mat₁ₙ, Mat₁ₙᵀ]
+  end
+
+  Matₙ, Mat₁ₙ
+
+end
+
+function assemble_function_matricesₙ(
+  RBInfo::ROMInfoST{ID},
+  RBVars::ROMMethodST{ID,T},
+  MVars::Vector{MVariable{T}},
+  MParams::Vector{<:ParamInfo}) where {ID,T}
+
+  Matsₙ = Broadcasting((MVar, MParam) ->
+    assemble_function_matricesₙ(RBInfo, RBVars, MVar, MParam))(MVars, MParams)
+
+  first.(Matsₙ), last.(Matsₙ)
+
+end
+
+function assemble_function_matricesₙ(
+  RBInfo::ROMInfoST{ID},
+  RBVars::ROMMethodST{ID,T},
+  Params::Vector{<:ParamInfo}) where {ID,T}
+
+  nonlin_Mat_ops = get_nonlinear_matrices(RBInfo)
+  matrix_Vars = MVariable(RBInfo, RBVars, nonlin_Mat_ops)
+  matrix_Params = ParamInfo(Params, nonlin_Mat_ops)
+
+  assemble_function_termsₙ(matrix_Vars, matrix_Params)::Vector{<:Function}
+
+end
+
+function assemble_function_vectorsₙ(
+  RBVars::ROMMethodST{ID,T},
+  VVar::VVariable{T},
+  VParam::ParamInfo) where {ID,T}
+
+  @assert VVar.var == VParam.var
+  println("--> Assembling reduced $(VVar.var)")
+
+  Φₜθ = assemble_ϕₜθ(RBVars, VParam.θ, VParam.var)
+  assemble_function_termsₙ(VVar, Φₜθ)::Matrix{T}
+
+end
+
+function assemble_function_vectorsₙ(
+  RBVars::ROMMethodST{ID,T},
+  VVars::Vector{VVariable{T}},
+  VParams::Vector{<:ParamInfo}) where {ID,T}
+
+  Broadcasting((VVar, VParam) ->
+    assemble_function_vectorsₙ(RBVars, VVar, VParam))(VVars, VParams)
+
+end
+
+function assemble_function_vectorsₙ(
+  RBInfo::ROMInfoST{ID},
+  RBVars::ROMMethodST{ID,T},
+  Params::Vector{<:ParamInfo}) where {ID,T}
+
+  nonlin_Vec_ops = get_nonlinear_vectors(RBInfo)
+  vector_Vars = VVariable(RBInfo, RBVars, nonlin_Vec_ops)
+  vector_Params = ParamInfo(Params, nonlin_Vec_ops)
+
+  assemble_function_termsₙ(vector_Vars, vector_Params)::Vector{<:Function}
 
 end
 

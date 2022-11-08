@@ -248,10 +248,10 @@ function assemble_FEM_nonlinear_matrix(
   FEMInfo::FOMInfoS{ID},
   ParamForm::ParamFormInfo) where {ID,D}
 
-    var = ParamForm.var
-    form(z) = assemble_form(FEMSpace, FEMInfo, ParamForm)(z)
-    Mat(z) = assemble_matrix(form(z), get_FEMSpace_matrix(FEMSpace, var)...)
-    Mat
+  var = ParamForm.var
+  form(z) = assemble_form(FEMSpace, FEMInfo, ParamForm)(z)
+  Mat(z) = assemble_matrix(form(z), get_FEMSpace_matrix(FEMSpace, var)...)
+  Mat
 
 end
 
@@ -500,8 +500,8 @@ function assemble_FEM_nonlinear_vector(
 end
 
 function assemble_FEM_nonlinear_vector(
-  ::FOM{ID,D},
-  FEMInfo::FOMInfo{ID},
+  ::FOMS{ID,D},
+  FEMInfo::FOMInfoS{ID},
   μ::Vector{T},
   Φ::Vector{T},
   var::String) where {ID,D,T}

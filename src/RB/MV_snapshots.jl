@@ -97,8 +97,8 @@ function Mat_snapshots(
 
   function Mat_nonlinear(k::Int)::Tuple{Vector{Int},Matrix{Float}}
     println("Snapshot number $k, $var")
-    Φₛ_fun = FEFunction(FEMSpace.V₀[1], RBVars.Φₛ[1][:, k])
-    Mats = assemble_FEM_nonlinear_matrix(FEMSpace, RBInfo, μ[k], var, timesθ)(Φₛ_fun)
+    Mat = assemble_FEM_nonlinear_matrix(FEMSpace, RBInfo, μ[k],
+      RBVars.Φₛ[1][:, k], var)
     i, v = Broadcasting(Mat -> findnz(Mat[:]))(Mats)
     first.(i), first(v)
   end
@@ -126,7 +126,7 @@ function Vec_snapshots(
   function Vec_nonlinear(k::Int)::Matrix{Float}
     println("Snapshot number $k, $var")
     Vec_block = assemble_FEM_nonlinear_vector(FEMSpace, RBInfo, μ[k],
-      RBVars.Φₛ[1][:, k], var)#, timesθ)
+      RBVars.Φₛ[1][:, k], var)
     blocks_to_matrix(Vec_block)
   end
 
