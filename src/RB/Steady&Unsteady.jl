@@ -7,7 +7,7 @@ function get_norm_matrix(
   function get_X_var(Nₛ::Int, var::String)
     if RBInfo.use_norm_X
       X₀ = load_CSV(sparse([],[],T[]),
-        joinpath(get_FEM_structures_path(RBInfo), "X$(var)₀.csv"))
+        joinpath(get_structures_path(RBInfo), "X$(var)₀.csv"))
     else
       X₀ = one(T)*sparse(I, Nₛ, Nₛ)
     end
@@ -44,7 +44,7 @@ function assemble_supremizers(
   if isaffine(RBInfo, "B")
     println("Loading matrix Bᵀ")
     Bᵀ = load_CSV(sparse([],[],T[]),
-      joinpath(get_FEM_structures_path(RBInfo), "B.csv"))'
+      joinpath(get_structures_path(RBInfo), "B.csv"))'
     BₖΦₖ(k) = Bᵀ * RBVars.Φₛ[2][:,k]
     constraint_mat = Broadcasting(BₖΦₖ)(1:RBVars.nₛ[2])
   else
@@ -132,7 +132,7 @@ function assemble_affine_structure(
   function affine_vector(var)
     Φₛ_left, _ = get_Φₛ(RBVars, var)
     Vec = load_CSV(Matrix{T}(undef,0,0),
-      joinpath(get_FEM_structures_path(RBInfo), "$(var).csv"))
+      joinpath(get_structures_path(RBInfo), "$(var).csv"))
     (Φₛ_left' * Vec)
   end
 
@@ -154,7 +154,7 @@ function assemble_affine_structure(
   function affine_matrix(var)
     Φₛ_left, Φₛ_right = get_Φₛ(RBVars, var)
     Mat = load_CSV(sparse([],[],T[]),
-      joinpath(get_FEM_structures_path(RBInfo), "$(var).csv"))
+      joinpath(get_structures_path(RBInfo), "$(var).csv"))
     (Φₛ_left' * Mat * Φₛ_right)
   end
 

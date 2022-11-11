@@ -6,6 +6,7 @@ using SuiteSparse
 using SparseArrays
 using Arpack
 using DelimitedFiles
+using Parameters
 using Test
 using ScatteredInterpolation
 using PlotlyJS

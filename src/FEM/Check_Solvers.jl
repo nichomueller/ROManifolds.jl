@@ -7,7 +7,7 @@ function check_dataset(
   Mats = assemble_all_FEM_matrices(FEMSpace, FEMInfo, μ[1])
   Vecs = assemble_all_FEM_vectors(FEMSpace, FEMInfo, μ[1])
 
-  u = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
+  u = Matrix{T}(CSV.read(joinpath(get_snap_path(RBInfo), "uₕ.csv"),
     DataFrame))[:, nb]
 
   Mats[1] \ sum(Vecs) ≈ u
@@ -18,8 +18,8 @@ function check_stokes_solver()
 
   FEMSpace, μ = get_FEMμ_info(RBInfo, Val(get_FEM_D(RBInfo)))
 
-  u = readdlm(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"), ',', T)[:,1]
-  p = readdlm(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"), ',', T)[:,1]
+  u = readdlm(joinpath(get_snap_path(RBInfo), "uₕ.csv"), ',', T)[:,1]
+  p = readdlm(joinpath(get_snap_path(RBInfo), "pₕ.csv"), ',', T)[:,1]
   x = vcat(u, p)
 
   Mats = assemble_all_FEM_matrices(FEMSpace, FEMInfo, μ[1])
@@ -45,7 +45,7 @@ function check_dataset()
   Mats(t) = assemble_all_FEM_matrices(FEMSpace, FEMInfo, μ[1], t)
   Vecs(t) = assemble_all_FEM_vectors(FEMSpace, FEMInfo, μ[1], t)
 
-  u = readdlm(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"), ',', T)
+  u = readdlm(joinpath(get_snap_path(RBInfo), "uₕ.csv"), ',', T)
   u1, u2 = u[:, 1], u[:, 2]
 
   LHS1 = RBInfo.θ*(Mats(t¹_θ)[2]/δtθ+Mats(t¹_θ)[1])
@@ -70,10 +70,10 @@ function check_dataset(RBInfo)
   t¹_θ = RBInfo.t₀+δtθ
   t²_θ = t¹_θ+RBInfo.δt
 
-  u1 = readdlm(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"), ',', T)[:, 1]
-  u2 = readdlm(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"), ',', T)[:, 2]
-  p1 = readdlm(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"), ',', T)[:, 1]
-  p2 = readdlm(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"), ',', T)[:, 2]
+  u1 = readdlm(joinpath(get_snap_path(RBInfo), "uₕ.csv"), ',', T)[:, 1]
+  u2 = readdlm(joinpath(get_snap_path(RBInfo), "uₕ.csv"), ',', T)[:, 2]
+  p1 = readdlm(joinpath(get_snap_path(RBInfo), "pₕ.csv"), ',', T)[:, 1]
+  p2 = readdlm(joinpath(get_snap_path(RBInfo), "pₕ.csv"), ',', T)[:, 2]
 
   Mats(t) = assemble_all_FEM_matrices(FEMSpace, FEMInfo, μ[1], t)
   Vecs(t) = assemble_all_FEM_vectors(FEMSpace, FEMInfo, μ[1], t)
@@ -124,8 +124,8 @@ function check_navier_stokes_solver()
   FEMSpace = get_FEMμ_info(RBInfo, μ, Val(get_FEM_D(RBInfo)))
 
   X = MultiFieldFESpace(FEMSpace.V)
-  u = readdlm(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"), ',', Float)[:, 95]
-  p = readdlm(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"), ',', Float)[:, 95]
+  u = readdlm(joinpath(get_snap_path(RBInfo), "uₕ.csv"), ',', Float)[:, 95]
+  p = readdlm(joinpath(get_snap_path(RBInfo), "pₕ.csv"), ',', Float)[:, 95]
   x = vcat(u, p)
   xfun = FEFunction(X, x)
   Nₛᵖ = length(get_free_dof_ids(FEMSpace.V₀[2]))
@@ -180,8 +180,8 @@ function check_dataset(RBInfo)
   δtθ = RBInfo.δt*RBInfo.θ
   t¹_θ = RBInfo.t₀+δtθ
 
-  u1 = readdlm(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"), ',')[:, 1]
-  p1 = readdlm(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"), ',')[:, 1]
+  u1 = readdlm(joinpath(get_snap_path(RBInfo), "uₕ.csv"), ',')[:, 1]
+  p1 = readdlm(joinpath(get_snap_path(RBInfo), "pₕ.csv"), ',')[:, 1]
   x1 = vcat(u1,p1)
   xfun1 = FEFunction(X(RBInfo.δt),x1)
 

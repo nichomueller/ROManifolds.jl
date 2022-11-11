@@ -89,7 +89,7 @@ end
 
 function get_μ(FEMInfo::FOMInfo{ID}) where ID
   load_CSV(Vector{Float}[],
-    joinpath(FEMInfo.Paths.FEM_snap_path, "μ.csv"))::Vector{Vector{Float}}
+    joinpath(FEMInfo.Paths.snap_path, "μ.csv"))::Vector{Vector{Float}}
 end
 
 function get_FEMμ_info(FEMInfo::FOMInfoS{ID}, ::Val{D}) where {ID,D}

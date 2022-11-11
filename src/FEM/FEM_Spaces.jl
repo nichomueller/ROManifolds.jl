@@ -71,7 +71,7 @@ function get_FEMSpace_quantities(
   phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
   V₀_no_bnd, V_no_bnd, dirichlet_dofs = get_FEMSpace_nobnd_info(model, refFE, V₀)
 
-  Qₕ, V₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad, V₀_no_bnd, V_no_bnd, dirichlet_dofs
+  V₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad, V₀_no_bnd, V_no_bnd, dirichlet_dofs
 
 end
 
@@ -91,7 +91,7 @@ function get_FEMSpace_quantities(
   phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
   V₀_no_bnd, V_no_bnd, dirichlet_dofs = get_FEMSpace_nobnd_info(model, refFEᵤ, V₀)
 
-  Qₕ, V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad, V₀_no_bnd, V_no_bnd, dirichlet_dofs
+  V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad, V₀_no_bnd, V_no_bnd, dirichlet_dofs
 
 end
 
@@ -111,7 +111,7 @@ function get_FEMSpace_quantities(
   phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
   V₀_no_bnd, V_no_bnd, dirichlet_dofs = get_FEMSpace_nobnd_info(model, refFEᵤ, V₀)
 
-  Qₕ, V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad, V₀_no_bnd, V_no_bnd, dirichlet_dofs
+  V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad, V₀_no_bnd, V_no_bnd, dirichlet_dofs
 
 end
 

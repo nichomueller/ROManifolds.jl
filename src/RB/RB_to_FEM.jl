@@ -1,9 +1,9 @@
-function get_FEM_snap_path(RBInfo::ROMInfo)
-  RBInfo.FEMInfo.Paths.FEM_snap_path
+function get_snap_path(RBInfo::ROMInfo)
+  RBInfo.FEMInfo.Paths.snap_path
 end
 
-function get_FEM_structures_path(RBInfo::ROMInfo)
-  RBInfo.FEMInfo.Paths.FEM_structures_path
+function get_structures_path(RBInfo::ROMInfo)
+  RBInfo.FEMInfo.Paths.structures_path
 end
 
 function get_FEM_D(RBInfo::ROMInfo)

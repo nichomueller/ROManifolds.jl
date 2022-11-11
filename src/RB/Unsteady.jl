@@ -8,7 +8,7 @@ function get_snapshot_matrix(
     println("Importing the snapshot matrix for field $var,
       number of snapshots considered: $(RBInfo.nₛ)")
     S = load_CSV(Matrix{T}(undef,0,0),
-      joinpath(get_FEM_snap_path(RBInfo), "$(var)ₕ.csv"))[:, 1:RBInfo.nₛ*RBVars.Nₜ]
+      joinpath(get_snap_path(RBInfo), "$(var)ₕ.csv"))[:, 1:RBInfo.nₛ*RBVars.Nₜ]
     println("Dimension of snapshot matrix: $(size(S))")
 
     S, size(S)[1]
@@ -470,7 +470,7 @@ function online_phase(
   mean_online_time = RBVars.online_time / length(param_nbs)
   println("Online wall time: $(RBVars.online_time)s ")
 
-  xₕ = get_S_var(RBInfo.unknowns, param_nbs, get_FEM_snap_path(RBInfo))
+  xₕ = get_S_var(RBInfo.unknowns, param_nbs, get_snap_path(RBInfo))
   norms = get_norms(xₕ[1])
   err = errors(xₕ, RBVars.x̃, RBVars.X₀, norms)
   mean_err = sum(first.(first.(err))) / length(param_nbs)

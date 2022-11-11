@@ -1,8 +1,8 @@
 struct FOMPath
   mesh_path::String
   current_test::String
-  FEM_snap_path::String
-  FEM_structures_path::String
+  snap_path::String
+  structures_path::String
 end
 
 function FOMPath(root, steadiness, name, mesh_name, case)
@@ -21,14 +21,14 @@ function FOMPath(root, steadiness, name, mesh_name, case)
   create_dir(problem_and_info_path)
   current_test = joinpath(problem_and_info_path, mesh_name)
   create_dir(current_test)
-  FEM_path = joinpath(current_test, "FEM_data")
-  create_dir(FEM_path)
-  FEM_snap_path = joinpath(FEM_path, "snapshots")
-  create_dir(FEM_snap_path)
-  FEM_structures_path = joinpath(FEM_path, "FEM_structures")
-  create_dir(FEM_structures_path)
+  path = joinpath(current_test, "FEM_data")
+  create_dir(path)
+  snap_path = joinpath(FEM_path, "snapshots")
+  create_dir(snap_path)
+  structures_path = joinpath(FEM_path, "structures")
+  create_dir(structures_path)
 
-  FOMPath(mesh_path, current_test, FEM_snap_path, FEM_structures_path)
+  FOMPath(mesh_path, current_test, snap_path, structures_path)
 
 end
 
@@ -65,7 +65,6 @@ end
 abstract type FOM{ID,D} end
 
 struct FOMS{ID,D} <: FOM{ID,D}
-  Qₕ::CellQuadrature
   V₀::Vector{<:SingleFieldFESpace}
   V::Vector{<:SingleFieldFESpace}
   Ω::BodyFittedTriangulation
@@ -83,11 +82,11 @@ function FOMS(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  (Qₕ, V₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+  (V₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
     V₀_no_bnd, V_no_bnd, dirichlet_dofs) = get_FEMSpace_quantities(FEMInfo, model)
   V = TrialFESpace(V₀, g)
 
-  FOMS{1,D}(Qₕ, [V₀], [V], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+  FOMS{1,D}([V₀], [V], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
     [V₀_no_bnd, V_no_bnd], dirichlet_dofs)
 
 end
@@ -97,11 +96,11 @@ function FOMS(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  (Qₕ, V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+  (V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
     V₀_no_bnd, V_no_bnd, dirichlet_dofs) = get_FEMSpace_quantities(FEMInfo, model)
   V = TrialFESpace(V₀, g)
 
-  FOMS{2,D}(Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+  FOMS{2,D}([V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
     [V₀_no_bnd, V_no_bnd], dirichlet_dofs)
 
 end
@@ -111,11 +110,11 @@ function FOMS(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  (Qₕ, V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+  (V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
     V₀_no_bnd, V_no_bnd, dirichlet_dofs) = get_FEMSpace_quantities(FEMInfo, model)
   V = TrialFESpace(V₀, g)
 
-  FOMS{3,D}(Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+  FOMS{3,D}([V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
     [V₀_no_bnd, V_no_bnd], dirichlet_dofs)
 
 end
@@ -138,7 +137,6 @@ function FOMS(
 end
 
 struct FOMST{ID,D} <: FOM{ID,D}
-  Qₕ::CellQuadrature
   V₀::Vector{<:SingleFieldFESpace}
   V::Vector
   Ω::BodyFittedTriangulation
@@ -156,11 +154,11 @@ function FOMST(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  (Qₕ, V₀::SingleFieldFESpace, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+  (V₀::SingleFieldFESpace, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
     V₀_no_bnd, V_no_bnd, dirichlet_dofs) = get_FEMSpace_quantities(FEMInfo, model)
   V = TransientTrialFESpace(V₀, g)::TransientTrialFESpace
 
-  FOMST{1,D}(Qₕ, [V₀], [V], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+  FOMST{1,D}([V₀], [V], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
     [V₀_no_bnd, V_no_bnd], dirichlet_dofs)
 
 end
@@ -170,11 +168,11 @@ function FOMST(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  (Qₕ, V₀::SingleFieldFESpace, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+  (V₀::SingleFieldFESpace, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
     V₀_no_bnd, V_no_bnd, dirichlet_dofs) = get_FEMSpace_quantities(FEMInfo, model)
   V = TransientTrialFESpace(V₀, g)::TransientTrialFESpace
 
-  FOMST{2,D}(Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+  FOMST{2,D}([V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
     [V₀_no_bnd, V_no_bnd], dirichlet_dofs)
 
 end
@@ -184,11 +182,11 @@ function FOMST(
   model::DiscreteModel{D,D},
   g::Function) where D
 
-  (Qₕ, V₀::SingleFieldFESpace, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+  (V₀::SingleFieldFESpace, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
     V₀_no_bnd, V_no_bnd, dirichlet_dofs) = get_FEMSpace_quantities(FEMInfo, model)
   V = TransientTrialFESpace(V₀, g)::TransientTrialFESpace
 
-  FOMST{3,D}(Qₕ, [V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
+  FOMST{3,D}([V₀, Q₀], [V, Q], Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad,
     [V₀_no_bnd, V_no_bnd], dirichlet_dofs)
 
 end

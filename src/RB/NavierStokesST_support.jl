@@ -341,7 +341,7 @@ function get_snapshot_matrix(
 
   println("Importing the snapshot matrix for field u on quadrature points,
     number of snapshots considered: $(RBInfo.nₛ)")
-  Sᵘ_quad = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ_quadp.csv"),
+  Sᵘ_quad = Matrix{T}(CSV.read(joinpath(get_snap_path(RBInfo), "uₕ_quadp.csv"),
     DataFrame))[:, 1:RBInfo.nₛ*RBVars.Nₜ]
   println("Dimension of velocity snapshot matrix on quadrature points: $(size(Sᵘ_quad))")
 
@@ -662,7 +662,7 @@ function online_phase(
   println("Online phase of the RB solver, unsteady Stokes problem")
 
   μ = load_CSV(Array{T}[],
-    joinpath(get_FEM_snap_path(RBInfo), "μ.csv"))::Vector{Vector{T}}
+    joinpath(get_snap_path(RBInfo), "μ.csv"))::Vector{Vector{T}}
   model = DiscreteModelFromFile(get_mesh_path(RBInfo))
   FEMSpace = get_FEMSpace(RBInfo.FEMInfo.problem_id,RBInfo.FEMInfo,model)
 
@@ -759,9 +759,9 @@ function loop_on_params(
 
     Param = ParamInfo(RBInfo, μ[nb])
 
-    uₕ_test = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
+    uₕ_test = Matrix{T}(CSV.read(joinpath(get_snap_path(RBInfo), "uₕ.csv"),
       DataFrame))[:,(nb-1)*RBVars.Nₜ+1:nb*RBVars.Nₜ]
-    pₕ_test = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"),
+    pₕ_test = Matrix{T}(CSV.read(joinpath(get_snap_path(RBInfo), "pₕ.csv"),
       DataFrame))[:,(nb-1)*RBVars.Nₜ+1:nb*RBVars.Nₜ]
 
     mean_uₕ_test += uₕ_test
@@ -852,9 +852,9 @@ function adaptive_loop_on_params(
   ind_t_p = argmax(time_err_p,n_adaptive_p[2])
 
   if isempty(RBVars.Pᵘ)
-    Sᵘ = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "uₕ.csv"),
+    Sᵘ = Matrix{T}(CSV.read(joinpath(get_snap_path(RBInfo), "uₕ.csv"),
       DataFrame))[:,1:RBInfo.nₛ*RBVars.Nₜ]
-    Sᵖ = Matrix{T}(CSV.read(joinpath(get_FEM_snap_path(RBInfo), "pₕ.csv"),
+    Sᵖ = Matrix{T}(CSV.read(joinpath(get_snap_path(RBInfo), "pₕ.csv"),
       DataFrame))[:,1:RBInfo.nₛ*RBVars.Nₜ]
   else
     Sᵘ = RBVars.Pᵘ
