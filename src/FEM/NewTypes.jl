@@ -1,9 +1,9 @@
 abstract type ParameterType end
 
 abstract type SamplingStyle end
-struct Uniform <: FunctionalStyle end
-struct Gaussian <: FunctionalStyle end
-struct LatinHypercube <: FunctionalStyle end
+struct Uniform <: SamplingStyle end
+struct Gaussian <: SamplingStyle end
+struct LatinHypercube <: SamplingStyle end
 
 mutable struct ParameterSpace{PT<:ParameterType}
   domain::PT
@@ -24,15 +24,13 @@ function realization(P::ParameterSpace{Vector{Vector{T}}}) where T
   realization(P.sampling_style, dim)
 end
 
-
-
 abstract type FunctionalStyle end
 struct Affine <: FunctionalStyle end
 struct NonAffine <: FunctionalStyle end
 struct NonLinear <: FunctionalStyle end
 
-mutable struct ParametricFunctional{FS<:FunctionalStyle,PT<:ParameterType,S<:Bool}
-  param_domain::ParameterSpace{PT}
+mutable struct ParametricFunctional{FS<:FunctionalStyle,PT<:ParameterType,S}
+  param_space::ParameterSpace{PT}
   f::Function
 end
 
@@ -64,7 +62,8 @@ end
 function realization(
   Fμ::ParametricFunctional{FS,PT,S}) where {FS,PT,S}
 
-  _get_functional(Fμ)(realization(Fμ.param_domain))
+  μ = realization(Fμ.param_space)
+  μ, _get_functional(Fμ)(μ)
 end
 
 function realization(
@@ -76,67 +75,127 @@ function realization(
   realization(Fμ)
 end
 
-abstract type FEFunctional{S<:Bool,DBC<:Bool,N<:Int}  end
+abstract type MyFESpace{DBC} end
 
-mutable struct LinFEFunctional{S} <: FEFunctional{S,false,1}
+struct MyTestFESpace <: MyFESpace{false}
+  space::UnconstrainedFESpace
+  space_no_bc::UnconstrainedFESpace
+end
+
+struct MyTrialFESpace <: MyFESpace{true}
+  space::ParamTrialFESpace
+  space_no_bc::UnconstrainedFESpace
+end
+
+struct MyTransientTrialFESpace <: MyFESpace{true}
+  space::ParamTransientTrialFESpace
+  space_no_bc::UnconstrainedFESpace
+end
+
+function get_fespace_no_bc(reffe,model)
+  test_no_bnd = FESpace(model,reffe)
+  trial_no_bnd = TrialFESpace(test_no_bnd)
+  test_no_bnd,trial_no_bnd
+end
+
+function MyFESpace(
+  space::UnconstrainedFESpace,
+  reffe::Tuple,
+  model::DiscreteModel)
+
+  space_no_bc = get_fespace_no_bc(reffe,model)
+  MyTestFESpace(space,space_no_bc)
+end
+
+function MyFESpace(
+  space::TrialFESpace,
+  reffe::Tuple,
+  model::DiscreteModel)
+
+  space_no_bc = get_fespace_no_bc(reffe,model)
+  MyTrialFESpace(space,space_no_bc)
+end
+
+function MyFESpace(
+  space::TransientTrialFESpace,
+  reffe::Tuple,
+  model::DiscreteModel)
+
+  space_no_bc = get_fespace_no_bc(reffe,model)
+  MyTransientTrialFESpace(space,space_no_bc)
+end
+
+abstract type FEFunctional{N,DBC}  end
+
+mutable struct LinFEFunctional <: FEFunctional{1,false}
   measure::Measure
-  test::UnconstrainedFESpace
+  test::MyTestFESpace
   f::Function
 end
 
 function LinFEFunctional(
   dΩ::Measure,
   V::UnconstrainedFESpace,
-  f::Function;S=true)
+  f::Function)
 
-  LinFEFunctional{S}(dΩ,V,f)
+  LinFEFunctional(dΩ,MyFESpace(V),f)
 end
 
-mutable struct BilinFEFunctional{S,DBC} <: FEFunctional{S,DBC,2}
+mutable struct BilinFEFunctional{DBC} <: FEFunctional{2,DBC}
   measure::Measure
-  trial::MyTrialFESpace{DBC}
-  test::UnconstrainedFESpace
+  trial::MyFESpace{DBC}
+  test::MyTestFESpace
   f::Function
 end
 
 function BilinFEFunctional(
   dΩ::Measure,
-  U::MyTrialFESpace{DBC},
+  U::GridapType,
   V::UnconstrainedFESpace,
-  f::Function;S=true)
+  f::Function)
 
-  BilinFEFunctional{S,DBC}(dΩ,U,V,f)
+  BilinFEFunctional{true}(dΩ,MyFESpace(U),MyFESpace(V),f)
 end
 
-abstract type ParamFEFunctional{FS<:FunctionalStyle,PT<:ParameterType,S<:Bool,DBC<:Bool} end
+function BilinFEFunctional(
+  dΩ::Measure,
+  U::UnconstrainedFESpace,
+  V::UnconstrainedFESpace,
+  f::Function)
 
-mutable struct ParamLinFEFunctional{FS,PT,S} <: FEFunctional{FS,PT,S,false}
-  fe_functional::LinFEFunctional{S}
-  param_functional::ParametricFunctional{FS,PT,S}
+  BilinFEFunctional{false}(dΩ,MyFESpace(U),MyFESpace(V),f)
 end
 
-mutable struct ParamBilinFEFunctional{FS,PT,S,DBC} <: FEFunctional{FS,PT,S,DBC}
-  fe_functional::BilinFEFunctional{S,DBC}
+abstract type ParamFEQuantity{FS<:FunctionalStyle,PT<:ParameterType,S,DBC} end
+abstract type ParamFEFunctional{FS<:FunctionalStyle,PT<:ParameterType,S,DBC} <: ParamFEQuantity{FS,PT,S,DBC} end
+
+mutable struct ParamLinFEFunctional{FS,PT,S} <: ParamFEFunctional{FS,PT,S,false}
   param_functional::ParametricFunctional{FS,PT,S}
+  fe_functional::LinFEFunctional
+end
+
+mutable struct ParamBilinFEFunctional{FS,PT,S,DBC} <: ParamFEFunctional{FS,PT,S,DBC}
+  param_functional::ParametricFunctional{FS,PT,S}
+  fe_functional::BilinFEFunctional{DBC}
 end
 
 function ParamFEFunctional(
-  Fv::FEFunctional{S,false,1},
-  Fμ::ParametricFunctional{FS,PT,S}) where {FS,PT,S}
+  Fμ::ParametricFunctional{FS,PT,S},
+  Fv::LinFEFunctional) where {FS,PT,S}
 
-  ParamLinFEFunctional{FS,PT,S}(Fv,Fμ)
+  ParamLinFEFunctional{FS,PT,S}(Fμ,Fv)
 end
 
 function ParamFEFunctional(
-  Fuv::FEFunctional{S,DBC,2},
-  Fμ::ParametricFunctional{FS,PT,S}) where {FS,PT,S,DBC}
+  Fμ::ParametricFunctional{FS,PT,S},
+  Fuv::BilinFEFunctional{DBC}) where {FS,PT,S,DBC}
 
-  ParamLinFEFunctional{FS,PT,S,DBC}(Fuv,Fμ)
+  ParamBilinFEFunctional{FS,PT,S,DBC}(Fμ,Fuv)
 end
 
 function _compose_functionals(
-  Fuv::FEFunctional{true,DBC,N},
-  Fμ::ParametricFunctional{FS,PT,true}) where {FS,PT,DBC,N}
+  Fμ::ParametricFunctional{FS,PT,true},
+  Fuv::FEFunctional{N,DBC}) where {FS,PT,N,DBC}
 
   form(μ,args...) = ∫(Fuv.f(Fμ(μ),args...))Fuv.measure
   form(μ) = args -> form(μ,args...)
@@ -144,8 +203,8 @@ function _compose_functionals(
 end
 
 function _compose_functionals(
-  Fuv::FEFunctional{false,DBC,N},
-  Fμ::ParametricFunctional{FS,PT,false}) where {FS,PT,DBC,N}
+  Fμ::ParametricFunctional{FS,PT,false},
+  Fuv::FEFunctional{N,DBC}) where {FS,PT,N,DBC}
 
   args = (N == 2) ? (v) : (u,v)
 
@@ -159,229 +218,137 @@ function realization(
   Fuvμ::ParamFEFunctional{FS,PT,S,DBC}) where {FS,PT,S,DBC}
 
   Fuv, Fμ = Fuvμ.fe_functional, Fuvμ.param_functional
-  param_form = _compose_functionals(Fuv, Fμ)
-  param_form(realization(Fμ.param_functional))
+  param_form = _compose_functionals(Fμ,Fuv)
+  μ, Fμ_μ = realization(Fμ.param_functional)
+  μ, param_form(Fμ_μ)
 end
 
-#= function Functional(
-  id::String,
-  f::Function,
-  μ::Parameter;
-  FS=NonAffine(), Di=3, Do=3, N=2, S=true)
+abstract type FEArray{FS<:FunctionalStyle,PT<:ParameterType,N,S,DBC} <: ParamFEQuantity{FS,PT,S,DBC} end
 
-  @assert N ∈ (1,2)
-  Functional{FS,Di,Do,N,S}(id,f,μ)
-end
-
-get_id(fun::Functional) = fun.id
-get_f(fun::Functional) = fun.f =#
-
-const AffineFunctional{Di,Do,N,S} = Functional{Affine(),Di,Do,N,S}
-const NonAffineFunctional{Di,Do,N,S} = Functional{NonAffine(),Di,Do,N,S}
-const NonLinearFunctional{Di,Do,N,S} = Functional{NonLinear(),Di,Do,N,S}
-
-function isaffine(::Functional{FS,Di,Do,N,S}) where {FS,Di,Do,N,S}
-  FS==Affine() ? true : false
-end
-
-function islinear(::Functional{FS,Di,Do,N,S}) where {FS,Di,Do,N,S}
-  FS==NonLinear() ? false : true
-end
-
-mutable struct FEForm{FS<:FunctionalStyle,Di<:Int,Do<:Int,N<:Int,S<:Bool}
-  functional::Functional{FS,Di,Do,N,S}
-  trian::Triangulation{Di,Di}
-end
-
-abstract type FEQuantity end
-
-abstract type FEArray{FS<:FunctionalStyle,Di<:Int,Do<:Int,N<:Int,S<:Bool,DBC<:Bool} <: FEQuantity end
-
-mutable struct FEVector{FS<:FunctionalStyle,Di<:Int,Do<:Int,S<:Bool} <: FEArray{FS,Di,Do,1,S,False}
-  functional::Functional{FS,Di,Do,2,S}
-  form::Function
-  test::UnconstrainedFESpace
-  trian::Triangulation{Di,Di}
+mutable struct FEVector{FS<:FunctionalStyle,PT<:ParameterType,S} <: FEArray{FS,PT,1,S,false}
+  id::String
+  param_fe_functional::ParamLinFEFunctional{FS,PT,S}
   array::Function
 end
 
-function FEVector(
-  FEMInfo::FOMInfo,
-  functional::Functional{FS,Di,Do,1,S},
-  form::Function,
-  test::UnconstrainedFESpace,
-  trian::Triangulation{Di,Di}) where {FS,Di,Do,S}
-
-  m = Measure(trian,FEMInfo.order)
-  array = _assemble_array(functional,form,test,m)
-  FEVector{FS,Di,Do,S}(functional,form,test,trian,array)
-end
-
-mutable struct FEMatrix{FS<:FunctionalStyle,Di<:Int,Do<:Int,S<:Bool,DBC<:Bool} <: FEArray{FS,Di,Do,2,S,DBC}
-  functional::Functional{FS,Di,Do,2,S}
-  form::Function
-  trial_no_bc::UnconstrainedFESpace
-  trial::MyFESpace{DBC}
-  test::UnconstrainedFESpace
-  trian::Triangulation{Di,Di}
+mutable struct FEMatrix{FS<:FunctionalStyle,PT<:ParameterType,S,DBC} <: FEArray{FS,PT,2,S,DBC}
+  id::String
+  param_fe_functional::ParamBilinFEFunctional{FS,PT,S,DBC}
   array::Vector{<:Function}
 end
 
-function FEMatrix(
-  FEMInfo::FOMInfo,
-  functional::Functional{FS,Di,Do,2,S},
-  form::Function,
-  trial_no_bc::UnconstrainedFESpace,
-  trial::MyFESpace{DBC},
-  test::UnconstrainedFESpace,
-  trian::Triangulation{Di,Di}) where {FS,Di,Do,S}
-
-  m = Measure(trian,FEMInfo.order)
-  array = _assemble_array(FEMInfo,functional,form,trial_no_bc,trial,test,m)
-  FEMatrix{FS,Di,Do,S,DBC}(functional,form,trial_no_bc,trial,test,trian,array)
+function Base.getproperty(fe_array::FEArray, sym::Symbol)
+  if sym ∈ (param_functional,fe_functional)
+    getfield(fe_array.param_fe_functional, sym)
+  else
+    getfield(fe_array, sym)
+  end
 end
 
-function get_array(arr::FEArray{FS,Di,Do,N,True,DBC}) where {FS,Di,Do,N,DBC}
-  μ -> arr.array[1](μ)
+function Base.setproperty!(fe_array::FEArray, sym::Symbol, x)
+  if sym ∈ (param_functional,fe_functional)
+    setfield!(fe_array.param_fe_functional, sym, x)
+  else
+    setfield!(fe_array, sym, x)
+  end
 end
 
-function get_array(arr::FEArray{FS,Di,Do,N,False,DBC}) where {FS,Di,Do,N,DBC}
-  (t,μ) -> arr.array[1](t,μ)
+function FEArray(
+  id::String,
+  Fvμ::ParamLinFEFunctional{FS,PT,S}) where {FS,PT,S}
+
+  FEVector{FS,PT,S}(id,Fvμ,_assemble_array(Fvμ))
 end
 
-function get_array(arr::FEArray{Affine,Di,Do,N,True,DBC}) where {Di,Do,N,DBC}
-  arr.array[1](get_μ(arr))
+function FEArray(
+  id::String,
+  Fuvμ::ParamBilinFEFunctional{FS,PT,S,DBC}) where {FS,PT,S,DBC}
+
+  FEMatrix{FS,PT,S,DBC}(id,Fuvμ,_assemble_array(Fuvμ))
 end
 
-function get_array(arr::FEArray{Affine,Di,Do,N,False,DBC}) where {Di,Do,N,DBC}
-  t -> arr.array[1](t,get_μ(arr))
+function FEArray(
+  id::String,
+  Fμ::ParametricFunctional{FS,PT,S},
+  Fuv::FEFunctional{N,DBC}) where {FS,PT,N,S,DBC}
+
+  Fuvμ = ParamFEFunctional(Fμ,Fuv)
+  FEArray(id,Fuvμ)
 end
 
-function get_lift(arr::FEArray{FS,Di,Do,N,S,False}) where {FS,Di,Do,N,S}
-  error("No lifting associated to the variable $(get_id(arr))")
+function _assemble_array(Fvμ::ParamLinFEFunctional{FS,PT,S}) where {FS,PT,S}
+
+  V = get_test(Fvμ)
+  lin_form = _compose_functionals(Fvμ.param_functional,Fvμ.fe_functional)
+  μ -> assemble_vector(∫(lin_form(μ))get_measure(Fvμ),V)
 end
 
-function get_lift(arr::FEArray{FS,Di,Do,N,True,True}) where {FS,Di,Do,N}
-  μ -> arr.array[2](μ)
+function _assemble_array(Fuvμ::ParamBilinFEFunctional{FS,PT,S,false}) where {FS,PT,S}
+
+  U,V = get_trial(Fvμ),get_test(Fvμ)
+  bilin_form = _compose_functionals(Fuvμ.param_functional,Fuvμ.fe_functional)
+  μ -> assemble_matrix(∫(bilin_form(μ))get_measure(Fvμ),U,V)
 end
 
-function get_lift(arr::FEArray{FS,Di,Do,N,False,True}) where {FS,Di,Do,N}
-  (t,μ) -> arr.array[2](t,μ)
-end
+function _assemble_array(Fuvμ::ParamBilinFEFunctional{FS,PT,S,true}) where {FS,PT,S}
 
-function get_lift(arr::FEArray{Affine,Di,Do,N,True,True}) where {Di,Do,N}
-  arr.array[2](get_μ(arr))
-end
-
-function get_lift(arr::FEArray{Affine,Di,Do,N,False,True}) where {Di,Do,N}
-  t -> arr.array[2](t,get_μ(arr))
-end
-
-const FEVectorS{FS,Di,Do} = FEVector{FS,Di,Do,true}
-const FEVectorST{FS,Di,Do} = FEVector{FS,Di,Do,false}
-const FEMatrixS{FS,Di,Do} = FEMatrix{FS,Di,Do,true}
-const FEMatrixST{FS,Di,Do} = FEMatrix{FS,Di,Do,false}
-
-const AffineFEVectorS{Di,Do} = FEVectorS{Affine(),Di,Do}
-const NonAffineFEVectorS{Di,Do} = FEVectorS{NonAffine(),Di,Do}
-const NonLinearFEVectorS{Di,Do} = FEVectorS{NonLinear(),Di,Do}
-const AffineFEMatrixS{Di,Do,DBC} = FEMatrixS{Affine(),Di,Do,DBC}
-const NonAffineFEMatrixS{Di,Do,DBC} = FEMatrixS{NonAffine(),Di,Do,DBC}
-const NonLinearFEMatrixS{Di,Do,DBC} = FEMatrixS{NonLinear(),Di,Do,DBC}
-
-const AffineFEVectorST{Di,Do} = FEVectorST{Affine(),Di,Do}
-const NonAffineFEVectorST{Di,Do} = FEVectorST{NonAffine(),Di,Do}
-const NonLinearFEVectorST{Di,Do} = FEVectorST{NonLinear(),Di,Do}
-const AffineFEMatrixST{Di,Do,DBC} = FEMatrixST{Affine(),Di,Do,DBC}
-const NonAffineFEMatrixST{Di,Do,DBC} = FEMatrixST{NonAffine(),Di,Do,DBC}
-const NonLinearFEMatrixST{Di,Do,DBC} = FEMatrixST{NonLinear(),Di,Do,DBC}
-
-function _assemble_array(
-  functional::Functional{FS,Di,Do,1,true},
-  form::Function,
-  test::UnconstrainedFESpace,
-  m::Measure) where {FS,Di,Do}
-
-  param_form(v,μ) = form(functional(μ),v)
-  param_form(μ) = v -> param_form(v,μ)
-  μ -> assemble_vector(∫(param_form(μ))m,test)
-end
-
-function _assemble_array(
-  functional::Functional{FS,Di,Do,1,false},
-  form::Function,
-  test::UnconstrainedFESpace,
-  m::Measure) where {FS,Di,Do}
-
-  param_form(t,v,μ) = form(functional(μ),t,v)
-  param_form(t,μ) = v -> param_form(t,v,μ)
-  (t,μ) -> assemble_vector(∫(param_form(t,μ))m,test)
-end
-
-function _assemble_array(
-  FEMInfo::FOMInfo,
-  functional::Functional{FS,Di,Do,2,true},
-  form::Function,
-  trial_no_bc::UnconstrainedFESpace,
-  trial::MyFESpace{DBC},
-  test::UnconstrainedFESpace,
-  m::Measure) where {FS,Di,Do,DBC}
-
-  param_form(u,v,μ) = form(functional(μ),u,v)
-  param_form(μ) = (u,v) -> param_form(u,v,μ)
-  mat_all_dofs(μ) = assemble_matrix(∫(param_form(μ))m,trial_no_bc,test)
-  mat_free_dofs(μ) = mat_all_dofs(μ)[FEMInfo.free_dofs,FEMInfo.free_dofs]
-  DBC ? [mat_free_dofs, _assemble_lift(functional,mat_all_dofs,trial)] : [mat_free_dofs]
-end
-
-function _assemble_array(
-  FEMInfo::FOMInfo,
-  functional::Functional{FS,Di,Do,2,true},
-  form::Function,
-  trial_no_bc::UnconstrainedFESpace,
-  trial::MyFESpace{DBC},
-  test::UnconstrainedFESpace,
-  m::Measure) where {FS,Di,Do,DBC}
-
-  param_form(t,u,v,μ) = form(functional(μ),t,u,v)
-  param_form(t,μ) = (u,v) -> param_form(t,u,v,μ)
-  mat_all_dofs(t,μ) = assemble_matrix(∫(param_form(t,μ))m,trial_no_bc,test)
-  mat_free_dofs(t,μ) = mat_all_dofs(t,μ)[FEMInfo.free_dofs,FEMInfo.free_dofs]
-  DBC ? [mat_free_dofs, _assemble_lift(functional,mat_all_dofs,trial)] : [mat_free_dofs]
+  bilin_form = _compose_functionals(Fuvμ.param_functional,Fuvμ.fe_functional)
+  mat_all_dofs(μ) = assemble_matrix(∫(bilin_form(μ))get_measure(Fvμ),
+    trial.space_no_bc,test.space_no_bc)
+  mat_free_dofs(μ) = mat_all_dofs(μ)[trial.space.free_dofs,trial.space.free_dofs]
+  [mat_free_dofs, _assemble_lift(mat_all_dofs,trial)]
 end
 
 function _assemble_lift(
-  ::Functional{FS,Di,Do,2,true},
   mat_all_dofs::Function,
-  trial::MyFESpace) where {FS,Di,Do}
+  trial::MyFESpace)
 
-  g = trial.dirichlet_values
-  mat_all_dofs(μ)[FEMInfo.free_dofs,FEMInfo.dirichlet_dofs]*g
-
+  g(μ) = trial(μ).dirichlet_values
+  μ -> mat_all_dofs(μ)[FEMInfo.free_dofs,FEMInfo.dirichlet_dofs]*g(μ)
 end
 
-function _assemble_lift(
-  ::Functional{FS,Di,Do,2,false},
-  mat_all_dofs::Function,
-  trial::MyFESpace) where {FS,Di,Do}
+get_trial(q::ParamFEQuantity) = q.fe_functional.trial.space
+get_trial_no_bcs(q::ParamFEQuantity) = q.fe_functional.trial.space_no_bc
+get_test(q::ParamFEQuantity) = q.fe_functional.test.space
+get_test_no_bcs(q::ParamFEQuantity) = q.fe_functional.test.space_no_bc
+get_measure(q::ParamFEQuantity) = q.fe_functional.measure
+Gridap.get_triangulation(q::ParamFEQuantity) = get_triangulation(get_test(q))
 
-  g(t) = trial(t).dirichlet_values
-  mat_all_dofs(t,μ)[FEMInfo.free_dofs,FEMInfo.dirichlet_dofs]*g(t)
+isaffine(::ParamFEQuantity{FS,PT,S,DBC}) where {FS,PT,S,DBC} = (FS == Affine())
+islinear(::ParamFEQuantity{FS,PT,S,DBC}) where {FS,PT,S,DBC} = !(FS == NonLinear())
+issteady(::ParamFEQuantity{FS,PT,S,DBC}) where {FS,PT,S,DBC} = S
+has_dirichlet_bc(::ParamFEQuantity{FS,PT,S,DBC}) where {FS,PT,S,DBC} = DBC
 
+mutable struct ParamFEProblem{D,PT<:ParameterType,Ind,S}
+  param_space::ParameterSpace{PT}
+  param_fe_functional::Vector{<:ParamFEFunctional}
+  param_fe_array::Vector{<:FEArray}
+
+  function ParamFEProblem(
+    param_space::ParameterSpace{PT},
+    param_fe_functional::Vector{<:ParamFEFunctional},
+    param_fe_array::Vector{<:FEArray};
+    Ind=true) where PT
+
+    D = num_cell_dims(get_triangulation(first(param_fe_functional)))
+    S = issteady(first(param_fe_functional))
+    new{D,PT,Ind,S}(param_space,param_fe_functional,param_fe_array)
+  end
 end
 
-get_functional(arr::FEArray) = arr.functional
-get_id(arr::FEArray) = arr.fun.id
-get_f(arr::FEArray) = arr.fun.f
-get_μ(arr::FEArray) = arr.fun.μ
-isaffine(arr::FEArray) = isaffine(get_functional(arr))
-islinear(arr::FEArray) = islinear(get_functional(arr))
-issteady(::FEArray{FS,Di,Do,N,S,DBC}) where {FS,Di,Do,N,S,DBC} = S
-has_dirichlet_bc(::FEArray{FS,Di,Do,N,S,DBC}) where {FS,Di,Do,N,S,DBC} = DBC
+function ParamFEProblem(
+  P::ParameterSpace{PT},
+  Fμ_dict::Dict{String,ParametricFunctional},
+  Ffe_dict::Dict{String,FEFunctional};
+  Ind=true) where PT
 
-struct FEProblem{Di,Do,S,DBC,Ind}
-  ids::Vector{String}
-  fs::Vector{Function}
-  μs::Vector{Parameter}
-  problem::Vector{<:FEArray}
+  @assert keys(Fμ_dict) == keys(Ffe_dict) "Use same variable names"
+  id_iter = keys(Fμ_dict)
+
+  Fμ_iter = values(Fμ_dict)
+  Ffe_iter = values(Ffe_dict)
+  param_fe_funs = Broadcasting(ParamFEFunctional)(Fμ_iter,Ffe_iter)
+  param_fe_arrays = Broadcasting(FEArray)(id_iter,param_fe_funs)
+
+  FEProblem{PT,Ind}(P,param_fe_funs,param_fe_arrays)
 end
