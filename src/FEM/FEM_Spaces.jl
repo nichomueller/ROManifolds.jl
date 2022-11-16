@@ -52,7 +52,7 @@ function get_FEMSpace_nobnd_info(
 
   V₀_no_bnd = FESpace(model, refFE)
   V_no_bnd = TrialFESpace(V₀_no_bnd)
-  dirichlet_dofs = get_dirichlet_dofs(V₀, V_no_bnd)
+  dirichlet_dofs = dirichlet_dofs_on_full_trian(V₀, V_no_bnd)
 
   V₀_no_bnd, V_no_bnd, dirichlet_dofs
 

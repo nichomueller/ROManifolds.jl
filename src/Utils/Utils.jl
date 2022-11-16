@@ -2,6 +2,7 @@ using DataFrames
 using FillArrays
 using LinearAlgebra
 using Distributions
+using Random
 using SuiteSparse
 using SparseArrays
 using Arpack
@@ -20,8 +21,11 @@ using Gridap.CellData
 using Gridap.Io
 using GridapGmsh
 using Gridap.TensorValues
-using LineSearches:BackTracking
+
 import Gridap:∇
+import Gridap.ODEs.TransientFETools:TransientCellField
+import LineSearches:BackTracking
+import Gridap.ODEs.TransientFETools:ODEOperator
 
 const Float = Float64
 
