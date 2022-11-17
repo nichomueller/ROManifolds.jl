@@ -1,12 +1,15 @@
 """
 A single field FE space with parametric Dirichlet data (see Multifield below).
 """
-struct ParamTrialFESpace{S}
-  space::S
+struct ParamTrialFESpace{A,B}
+  space::A
   dirichlet_μ::Union{Function,Vector{<:Function}}
+  Ud0::B
 
-  function ParamTrialFESpace(space::S,dirichlet_μ::Union{Function,Vector{<:Function}}) where S
-    new{S}(space,dirichlet_μ)
+  function ParamTrialFESpace(space::A,dirichlet_μ::Union{Function,Vector{<:Function}}) where A
+    Ud0 = HomogeneousTrialFESpace(space)
+    B = typeof(Ud0)
+    new{A,B}(space,dirichlet_μ,Ud0)
   end
 end
 
@@ -17,7 +20,7 @@ end
 """
 Parameter evaluation without allocating Dirichlet vals
 """
-function Gridap.evaluate!(Uμ::T,U::ParamTrialFESpace,μ::Vector{Float}) where T
+function evaluate!(Uμ::T,U::ParamTrialFESpace,μ::Vector{Float}) where T
   if isa(U.dirichlet_μ,Vector)
     objects_at_μ = map(o->o(μ), U.dirichlet_μ)
   else
@@ -37,24 +40,29 @@ end
 """
 Parameter evaluation allocating Dirichlet vals
 """
-function Gridap.evaluate(U::ParamTrialFESpace,μ::Vector{Float})
+function evaluate(U::ParamTrialFESpace,μ::Vector{Float})
   Uμ = allocate_trial_space(U)
-  Gridap.evaluate!(Uμ,U,μ)
+  evaluate!(Uμ,U,μ)
   Uμ
 end
 
 """
+We can evaluate at `nothing` when we do not care about the Dirichlet vals
+"""
+evaluate(U::ParamTrialFESpace,::Nothing) = U.Ud0
+
+"""
 Functor-like evaluation. It allocates Dirichlet vals in general.
 """
-(U::ParamTrialFESpace)(μ) = Gridap.evaluate(U,μ)
+(U::ParamTrialFESpace)(μ) = evaluate(U,μ)
 
 # Define the ParamTrialFESpace interface for affine spaces
 
-function Gridap.evaluate!(::FESpace,U::FESpace,::Vector{Float})
+function evaluate!(::FESpace,U::FESpace,::Vector{Float})
   U
 end
 
-function Gridap.evaluate(U::FESpace,::Vector{Float})
+function evaluate(U::FESpace,::Vector{Float})
   U
 end
 
@@ -73,32 +81,30 @@ function ParamMultiFieldFESpace(spaces::Vector)
 end
 
 function ParamMultiFieldFESpace(spaces::Vector{<:SingleFieldFESpace})
-  Gridap.MultiFieldFESpace(spaces)
+  MultiFieldFESpace(spaces)
 end
 
-function Gridap.evaluate!(Uμ::T,U::ParamMultiFieldTrialFESpace,μ::Vector{Float}) where T
-  spaces_at_μ = [Gridap.evaluate!(Uμi,Ui,μ) for (Uμi,Ui) in zip(Uμ,U)]
-  Gridap.MultiFieldFESpace(spaces_at_μ)
+function evaluate!(Uμ::T,U::ParamMultiFieldTrialFESpace,μ::Vector{Float}) where T
+  spaces_at_μ = [evaluate!(Uμi,Ui,μ) for (Uμi,Ui) in zip(Uμ,U)]
+  MultiFieldFESpace(spaces_at_μ)
 end
 
 function allocate_trial_space(U::ParamMultiFieldTrialFESpace)
   spaces = allocate_trial_space.(U.spaces)
-  Gridap.MultiFieldFESpace(spaces)
+  MultiFieldFESpace(spaces)
 end
 
-function Gridap.evaluate(U::ParamMultiFieldTrialFESpace,μ::Vector{Float})
+function evaluate(U::ParamMultiFieldTrialFESpace,μ::Vector{Float})
   Uμ = allocate_trial_space(U)
-  Gridap.evaluate!(Uμ,U,μ)
+  evaluate!(Uμ,U,μ)
   Uμ
 end
 
-function Gridap.evaluate(U::ParamMultiFieldTrialFESpace,::Nothing)
-  Gridap.MultiFieldFESpace([evaluate(fesp,nothing) for fesp in U.spaces])
+function evaluate(U::ParamMultiFieldTrialFESpace,::Nothing)
+  MultiFieldFESpace([evaluate(fesp,nothing) for fesp in U.spaces])
 end
 
-(U::ParamMultiFieldTrialFESpace)(μ) = Gridap.evaluate(U,μ)
-
-Gridap.get_cell_dof_ids(U::ParamTrialFESpace) = get_cell_dof_ids(U(rand()))
+(U::ParamMultiFieldTrialFESpace)(μ) = evaluate(U,μ)
 
 """
 A single field FE space with parametric, transient Dirichlet data.
@@ -106,12 +112,12 @@ A single field FE space with parametric, transient Dirichlet data.
 struct ParamTransientTrialFESpace{S,B}
   space::S
   dirichlet_μt::Union{Function,Vector{<:Function}}
-  Ud0_μ::B
+  Ud0::B
 
   function ParamTransientTrialFESpace(space::S,dirichlet_μt::Union{Function,Vector{<:Function}}) where S
-    Ud0_μ = HomogeneousTrialFESpace(space)
-    B = typeof(Ud0_μ)
-    new{S,B}(space,dirichlet_μt)
+    Ud0 = HomogeneousTrialFESpace(space)
+    B = typeof(Ud0)
+    new{S,B}(space,dirichlet_μt,Ud0)
   end
 end
 
@@ -122,7 +128,7 @@ end
 """
 Parameter, time evaluation without allocating Dirichlet vals
 """
-function Gridap.evaluate!(Uμt::T,U::ParamTransientTrialFESpace,μ::Vector{Float},t::Real) where T
+function evaluate!(Uμt::T,U::ParamTransientTrialFESpace,μ::Vector{Float},t::Real) where T
   if isa(U.dirichlet_μt,Vector)
     objects_at_μt = map(o->o(μ,t), U.dirichlet_μt)
   else
@@ -142,16 +148,16 @@ end
 """
 Parameter, time evaluation allocating Dirichlet vals
 """
-function Gridap.evaluate(U::ParamTransientTrialFESpace,μ::Vector{Float},t::Real)
+function evaluate(U::ParamTransientTrialFESpace,μ::Vector{Float},t::Real)
   Uμt = allocate_trial_space(U)
-  Gridap.evaluate!(Uμt,U,μ,t)
+  evaluate!(Uμt,U,μ,t)
   Uμt
 end
 
 """
 Parameter evaluation without allocating Dirichlet vals (returns a TransientTrialFESpace)
 """
-function Gridap.evaluate!(Uμt::T,U::ParamTransientTrialFESpace,μ::Vector{Float}) where T
+function evaluate!(Uμt::T,U::ParamTransientTrialFESpace,μ::Vector{Float}) where T
   if isa(U.dirichlet_μt,Vector)
     objects_at_μt = t -> map(o->o(μ,t), U.dirichlet_μt(μ))
   else
@@ -171,21 +177,21 @@ end
 """
 Parameter evaluation allocating Dirichlet vals (returns a TransientTrialFESpace)
 """
-function Gridap.evaluate(U::ParamTransientTrialFESpace,μ::Vector{Float})
+function evaluate(U::ParamTransientTrialFESpace,μ::Vector{Float})
   Uμt = allocate_trial_space(U)
-  Gridap.evaluate!(Uμt,U,μ)
+  evaluate!(Uμt,U,μ)
   Uμt
 end
 
 """
 We can evaluate at `nothing` when we do not care about the Dirichlet vals
 """
-evaluate(U::ParamTransientTrialFESpace,::Nothing) = U.Ud0_μ
+evaluate(U::ParamTransientTrialFESpace,::Nothing) = U.Ud0
 
 """
 Functor-like evaluation. It allocates Dirichlet vals in general.
 """
-(U::ParamTransientTrialFESpace)(μ,t) = Gridap.evaluate(U,μ,t)
+(U::ParamTransientTrialFESpace)(μ,t) = evaluate(U,μ,t)
 (U::TrialFESpace)(μ,t) = U
 (U::ZeroMeanFESpace)(μ,t) = U
 
@@ -201,15 +207,15 @@ Time 2nd derivative of the Dirichlet functions
 
 # Define the ParamTrialFESpace interface for affine spaces
 
-function Gridap.evaluate!(::FESpace,U::FESpace,::Vector{Float},::Real)
+function evaluate!(::FESpace,U::FESpace,::Vector{Float},::Real)
   U
 end
 
-function Gridap.evaluate(U::FESpace,::Vector{Float},::Real)
+function evaluate(U::FESpace,::Vector{Float},::Real)
   U
 end
 
-function Gridap.evaluate(U::FESpace,::Vector{Float},::Nothing)
+function evaluate(U::FESpace,::Vector{Float},::Nothing)
   U
 end
 
