@@ -1,4 +1,4 @@
-abstract type ParamOperator{C<:FunctionalStyle} <: GridapType end
+abstract type ParamOperator{C} <: GridapType end
 const AffineParamOperator = ParamOperator{Affine}
 
 """
@@ -10,7 +10,77 @@ struct ParamOpFromFEOp{C} <: ParamOperator{C}
   feop::ParamFEOperator{C}
 end
 
-abstract type ParamODEOperator{C<:FunctionalStyle} <: ODEOperator{C} end
+function Gridap.ODEs.TransientFETools.allocate_residual(op::ParamOpFromFEOp,uh)
+  Gridap.ODEs.TransientFETools.allocate_residual(op.feop,uh)
+end
+
+function Gridap.ODEs.TransientFETools.allocate_jacobian(op::ParamOpFromFEOp,uh)
+  Gridap.ODEs.TransientFETools.allocate_jacobian(op.feop,uh)
+end
+
+function _allocate_matrix_and_vector(op::ParamOpFromFEOp,uh)
+  b = Gridap.ODEs.TransientFETools.allocate_residual(op,uh)
+  A = Gridap.ODEs.TransientFETools.allocate_jacobian(op,uh)
+  A,b
+end
+
+function _matrix!(
+  A::AbstractMatrix,
+  op::ParamOpFromFEOp,
+  uh,
+  μ::Vector{Float})
+
+  z = zero(eltype(A))
+  LinearAlgebra.fillstored!(A,z)
+  Gridap.ODEs.TransientFETools.jacobian!(A,op.feop,μ,uh)
+end
+
+function _vector!(
+  b::AbstractVector,
+  op::ParamOpFromFEOp,
+  uh,
+  μ::Vector{Float})
+
+  Gridap.ODEs.TransientFETools.residual!(b,op.feop,μ,uh)
+  b .*= -1.0
+end
+
+struct ParamNonlinearOperator{T} <: Gridap.Algebra.NonlinearOperator
+  param_op::ParamOperator
+  uh::T
+  μ::Vector{Float}
+  cache
+end
+
+function residual!(b::AbstractVector,op::ParamNonlinearOperator)
+  Gridap.ODEs.TransientFETools.residual!(b,op.param_op,op.uh,op.μ)
+end
+
+function jacobian!(A::AbstractMatrix,op::ParamNonlinearOperator)
+  Gridap.ODEs.TransientFETools.jacobian!(A,op.param_op,op.uh,op.μ)
+end
+
+function Gridap.ODEs.TransientFETools.allocate_residual(op::ParamNonlinearOperator)
+  allocate_residual(op.param_op,op.uh)
+end
+
+function Gridap.ODEs.TransientFETools.allocate_jacobian(op::ParamNonlinearOperator)
+  allocate_jacobian(op.param_op,op.uh)
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+abstract type ParamODEOperator{C} <: ODEOperator{C} end
 const AffineParamODEOperator = ParamODEOperator{<:Affine}
 
 """

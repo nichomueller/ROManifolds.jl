@@ -194,16 +194,16 @@ function get_h(FEMSpace::FOM{ID,D}) where {ID,D}
   h
 end
 
-function dirichlet_dofs_on_full_trian(V₀, V₀_no_bnd)
+function dirichlet_dofs_on_full_trian(V, V_no_bc)
 
-  cell_dof_ids_V = get_cell_dof_ids(V₀)
-  cell_dof_ids_V_no_bnd = get_cell_dof_ids(V₀_no_bnd)
+  cell_dof_ids_V = get_cell_dof_ids(V)
+  cell_dof_ids_V_no_bc = get_cell_dof_ids(V_no_bc)
 
-  dirichlet_dofs = zeros(Int, V₀.ndirichlet)
+  dirichlet_dofs = zeros(Int, V.ndirichlet)
   for cell=eachindex(cell_dof_ids_V)
-    for (idsV,idsV_no_bnd) in zip(cell_dof_ids_V[cell],cell_dof_ids_V_no_bnd[cell])
+    for (idsV,idsV_no_bc) in zip(cell_dof_ids_V[cell],cell_dof_ids_V_no_bc[cell])
       if idsV<0
-        dirichlet_dofs[abs(idsV)]=idsV_no_bnd
+        dirichlet_dofs[abs(idsV)]=idsV_no_bc
       end
     end
   end

@@ -28,7 +28,7 @@ function get_mod_meas_quad(FEMInfo::FOMInfo, model::DiscreteModel)
 
 end
 
-function get_lagrangianQuad_info(
+function get_lagrangian_quad_info(
   FEMInfo::FOMInfo,
   model::DiscreteModel{Dc,Dp},
   Ω::BodyFittedTriangulation,
@@ -38,7 +38,7 @@ function get_lagrangianQuad_info(
   Qₕ_cell_point = get_cell_points(Qₕ)
   qₖ = get_data(Qₕ_cell_point)
   phys_quadp = map(Gridap.evaluate,ξₖ,qₖ)::Vector{Vector{VectorValue{Dp,Float}}}
-  refFE_quad = Gridap.ReferenceFE(lagrangianQuad,Float,FEMInfo.order)
+  refFE_quad = Gridap.ReferenceFE(lagrangian_quad,Float,FEMInfo.order)
   V₀_quad = TestFESpace(model,refFE_quad,conformity=:L2)
 
   phys_quadp, V₀_quad
@@ -68,7 +68,7 @@ function get_FEMSpace_quantities(
   V₀ = TestFESpace(model, refFE; conformity=:H1,
     dirichlet_tags=["dirichlet"])
 
-  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
+  phys_quadp, V₀_quad = get_lagrangian_quad_info(FEMInfo, model, Ω, Qₕ)
   V₀_no_bnd, V_no_bnd, dirichlet_dofs = get_FEMSpace_nobnd_info(model, refFE, V₀)
 
   V₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad, V₀_no_bnd, V_no_bnd, dirichlet_dofs
@@ -88,7 +88,7 @@ function get_FEMSpace_quantities(
   Q₀ = TestFESpace(model, refFEₚ; conformity=:L2)
   Q = TrialFESpace(Q₀)
 
-  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
+  phys_quadp, V₀_quad = get_lagrangian_quad_info(FEMInfo, model, Ω, Qₕ)
   V₀_no_bnd, V_no_bnd, dirichlet_dofs = get_FEMSpace_nobnd_info(model, refFEᵤ, V₀)
 
   V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad, V₀_no_bnd, V_no_bnd, dirichlet_dofs
@@ -108,7 +108,7 @@ function get_FEMSpace_quantities(
   Q₀ = TestFESpace(model, refFEₚ; conformity=:L2)
   Q = TrialFESpace(Q₀)
 
-  phys_quadp, V₀_quad = get_lagrangianQuad_info(FEMInfo, model, Ω, Qₕ)
+  phys_quadp, V₀_quad = get_lagrangian_quad_info(FEMInfo, model, Ω, Qₕ)
   V₀_no_bnd, V_no_bnd, dirichlet_dofs = get_FEMSpace_nobnd_info(model, refFEᵤ, V₀)
 
   V₀, Q, Q₀, Ω, Γn, dΩ, dΓn, phys_quadp, V₀_quad, V₀_no_bnd, V_no_bnd, dirichlet_dofs
