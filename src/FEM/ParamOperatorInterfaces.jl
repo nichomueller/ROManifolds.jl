@@ -58,7 +58,7 @@ function Gridap.ODEs.TransientFETools.residual!(
   x::AbstractVector)
 
   feop = op.param_op.feop
-  trial = Gridap.ODEs.TransientFETools.get_trial(feop)
+  trial = get_trial(feop)
   u = EvaluationFunction(trial(op.μ),x)
   Gridap.ODEs.TransientFETools.residual!(b,feop,op.μ,u)
 end
@@ -69,7 +69,7 @@ function Gridap.ODEs.TransientFETools.jacobian!(
   x::AbstractVector)
 
   feop = op.param_op.feop
-  trial = Gridap.ODEs.TransientFETools.get_trial(feop)
+  trial = get_trial(feop)
   u = EvaluationFunction(trial(op.μ),x)
   z = zero(eltype(A))
   LinearAlgebra.fillstored!(A,z)
@@ -81,7 +81,7 @@ function Gridap.ODEs.TransientFETools.allocate_residual(
   x::AbstractVector)
 
   feop = op.param_op.feop
-  trial = Gridap.ODEs.TransientFETools.get_trial(feop)
+  trial = get_trial(feop)
   u = EvaluationFunction(trial(op.μ),x)
   Gridap.ODEs.TransientFETools.allocate_residual(feop,u)
 end
@@ -91,7 +91,7 @@ function Gridap.ODEs.TransientFETools.allocate_jacobian(
   x::AbstractVector)
 
   feop = op.param_op.feop
-  trial = Gridap.ODEs.TransientFETools.get_trial(feop)
+  trial = get_trial(feop)
   u = EvaluationFunction(trial(op.μ),x)
   Gridap.ODEs.TransientFETools.allocate_jacobian(feop,u)
 end

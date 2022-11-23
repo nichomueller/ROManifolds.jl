@@ -22,7 +22,7 @@ function Gridap.ODEs.ODETools.solve(
   uh::T,
   μ::Vector{Float}) where {C,T}
 
-  trial = Gridap.ODEs.TransientFETools.get_trial(op.feop)
+  trial = get_trial(op.feop)
   sol = GenericParamSolution{C,T}(solver,op,uh,μ)
   solve!(sol)
 
@@ -62,9 +62,9 @@ function Gridap.ODEs.ODETools.solve(
   n=100)
 
   μ = realization(op,n)
-  trial = Gridap.ODEs.TransientFETools.get_trial(op)
-  uh = Base.zero(trial(first(μ)))
-  param_op = Gridap.ODEs.TransientFETools.get_algebraic_operator(op)
+  trial = get_trial(op)
+  uh = zero(trial(first(μ)))
+  param_op = get_algebraic_operator(op)
 
   Gridap.ODEs.ODETools.solve(solver,param_op,uh,μ)
 end

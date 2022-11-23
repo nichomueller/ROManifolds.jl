@@ -38,8 +38,7 @@ end
 function Gridap.ODEs.TransientFETools.SparseMatrixAssembler(
   trial::Union{ParamTrialFESpace,ParamMultiFieldTrialFESpace},
   test::FESpace)
-  Gridap.ODEs.TransientFETools.SparseMatrixAssembler(
-    Gridap.ODEs.TransientFETools.evaluate(trial,nothing),test)
+  SparseMatrixAssembler(Gridap.ODEs.TransientFETools.evaluate(trial,nothing),test)
 end
 
 Gridap.ODEs.TransientFETools.get_assembler(op::ParamFEOperatorFromWeakForm) = op.assem
@@ -50,7 +49,7 @@ function Gridap.ODEs.TransientFETools.allocate_residual(
   op::ParamFEOperatorFromWeakForm,
   uh::CellField)
 
-  V = Gridap.ODEs.TransientFETools.get_test(op)
+  V = get_test(op)
   v = get_fe_basis(V)
   vecdata = collect_cell_vector(V,op.res(realization(op),uh,v))
   allocate_vector(op.assem,vecdata)
@@ -60,7 +59,7 @@ function Gridap.ODEs.TransientFETools.allocate_jacobian(
   op::ParamFEOperatorFromWeakForm,
   uh::CellField)
 
-  Uμ = Gridap.ODEs.TransientFETools.get_trial(op)
+  Uμ = get_trial(op)
   U = Gridap.ODEs.TransientFETools.evaluate(Uμ,nothing)
   V = get_test(op)
   du = get_trial_fe_basis(U)
@@ -75,7 +74,7 @@ function Gridap.ODEs.TransientFETools.residual!(
   μ::Vector{Float},
   uh::CellField)
 
-  V = Gridap.ODEs.TransientFETools.get_test(op)
+  V = get_test(op)
   v = get_fe_basis(V)
   vecdata = collect_cell_vector(V,op.res(μ,uh,v))
   assemble_vector!(b,op.assem,vecdata)
@@ -88,9 +87,9 @@ function Gridap.ODEs.TransientFETools.jacobian!(
   μ::Vector{Float},
   uh::CellField)
 
-  Uμ = Gridap.ODEs.TransientFETools.get_trial(op)
+  Uμ = get_trial(op)
   U = Gridap.ODEs.TransientFETools.evaluate(Uμ,nothing)
-  V = Gridap.ODEs.TransientFETools.get_test(op)
+  V = get_test(op)
   du = get_trial_fe_basis(U)
   v = get_fe_basis(V)
   matdata = collect_cell_matrix(U,V,op.jac(μ,uh,du,v))
@@ -177,10 +176,10 @@ end
 function Gridap.ODEs.TransientFETools.SparseMatrixAssembler(
   trial::ParamTransientTrialFESpace,
   test::FESpace)
-  Gridap.ODEs.TransientFETools.SparseMatrixAssembler(evaluate(trial,nothing),test)
+  SparseMatrixAssembler(evaluate(trial,nothing),test)
 end
 
-get_assembler(op::ParamTransientFEOperatorFromWeakForm) = op.assem_t
+Gridap.ODEs.TransientFETools.get_assembler(op::ParamTransientFEOperatorFromWeakForm) = op.assem_t
 Gridap.ODEs.TransientFETools.get_test(op::ParamTransientFEOperatorFromWeakForm) = op.test
 Gridap.ODEs.TransientFETools.get_trial(op::ParamTransientFEOperatorFromWeakForm) = op.trials[1]
 Gridap.ODEs.TransientFETools.get_order(op::ParamTransientFEOperatorFromWeakForm) = op.order
