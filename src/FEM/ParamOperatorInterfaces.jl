@@ -52,20 +52,54 @@ struct ParamNonlinearOperator{T} <: Gridap.Algebra.NonlinearOperator
   cache
 end
 
-function residual!(b::AbstractVector,op::ParamNonlinearOperator)
-  Gridap.ODEs.TransientFETools.residual!(b,op.param_op,op.uh,op.μ)
+function Gridap.ODEs.TransientFETools.residual!(
+  b::AbstractVector,
+  op::ParamNonlinearOperator,
+  x::AbstractVector)
+
+  feop = op.param_op.feop
+  trial = Gridap.ODEs.TransientFETools.get_trial(feop)
+  u = EvaluationFunction(trial(op.μ),x)
+  Gridap.ODEs.TransientFETools.residual!(b,feop,op.μ,u)
 end
 
-function jacobian!(A::AbstractMatrix,op::ParamNonlinearOperator)
-  Gridap.ODEs.TransientFETools.jacobian!(A,op.param_op,op.uh,op.μ)
+function Gridap.ODEs.TransientFETools.jacobian!(
+  A::AbstractMatrix,
+  op::ParamNonlinearOperator,
+  x::AbstractVector)
+
+  feop = op.param_op.feop
+  trial = Gridap.ODEs.TransientFETools.get_trial(feop)
+  u = EvaluationFunction(trial(op.μ),x)
+  z = zero(eltype(A))
+  LinearAlgebra.fillstored!(A,z)
+  Gridap.ODEs.TransientFETools.jacobian!(A,feop,op.μ,u)
 end
 
-function Gridap.ODEs.TransientFETools.allocate_residual(op::ParamNonlinearOperator)
-  allocate_residual(op.param_op,op.uh)
+function Gridap.ODEs.TransientFETools.allocate_residual(
+  op::ParamNonlinearOperator,
+  x::AbstractVector)
+
+  feop = op.param_op.feop
+  trial = Gridap.ODEs.TransientFETools.get_trial(feop)
+  u = EvaluationFunction(trial(op.μ),x)
+  Gridap.ODEs.TransientFETools.allocate_residual(feop,u)
 end
 
-function Gridap.ODEs.TransientFETools.allocate_jacobian(op::ParamNonlinearOperator)
-  allocate_jacobian(op.param_op,op.uh)
+function Gridap.ODEs.TransientFETools.allocate_jacobian(
+  op::ParamNonlinearOperator,
+  x::AbstractVector)
+
+  feop = op.param_op.feop
+  trial = Gridap.ODEs.TransientFETools.get_trial(feop)
+  u = EvaluationFunction(trial(op.μ),x)
+  Gridap.ODEs.TransientFETools.allocate_jacobian(feop,u)
+end
+
+function zero_initial_guess(op::ParamNonlinearOperator)
+  xh = similar(op.uh)
+  fill!(xh,zero(eltype(xh)))
+  xh
 end
 
 

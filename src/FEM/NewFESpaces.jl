@@ -66,6 +66,9 @@ function Gridap.ODEs.TransientFETools.evaluate(U::FESpace,::Vector{Float})
   U
 end
 
+Gridap.FESpaces.get_free_dof_ids(f::ParamTrialFESpace) = get_dirichlet_dof_ids(f.space)
+Gridap.FESpaces.num_free_dofs(f::ParamTrialFESpace) = length(get_free_dof_ids(f))
+
 # Define the interface for MultiField
 
 struct ParamMultiFieldTrialFESpace
@@ -75,6 +78,13 @@ Base.iterate(m::ParamMultiFieldTrialFESpace) = iterate(m.spaces)
 Base.iterate(m::ParamMultiFieldTrialFESpace,state) = iterate(m.spaces,state)
 Base.getindex(m::ParamMultiFieldTrialFESpace,field_id::Integer) = m.spaces[field_id]
 Base.length(m::ParamMultiFieldTrialFESpace) = length(m.spaces)
+function Gridap.FESpaces.num_free_dofs(m::ParamMultiFieldTrialFESpace)
+  n = 0
+  for U in m.spaces
+    n += num_free_dofs(U)
+  end
+  n
+end
 
 function evaluate!(Uμ::T,U::ParamMultiFieldTrialFESpace,μ::Vector{Float}) where T
   spaces_at_μ = [evaluate!(Uμi,Ui,μ) for (Uμi,Ui) in zip(Uμ,U)]
@@ -301,4 +311,53 @@ end
 
   r = first(s.spaces).nfree
   isnothing(c) ? zeros(r) : zeros(r,c)
+end =#
+
+#= function Gridap.MultiField.restrict_to_field(
+  f::ParamMultiFieldTrialFESpace,
+  free_values::AbstractVector,
+  field::Integer)
+
+  offsets = Gridap.MultiField.compute_field_offsets(f)
+  U = f.spaces
+  pini = offsets[field] + 1
+  pend = offsets[field] + num_free_dofs(U[field])
+  SubVector(free_values,pini,pend)
+end
+
+function Gridap.MultiField.compute_field_offsets(f::ParamMultiFieldTrialFESpace)
+  U = f.spaces
+  n = length(U)
+  offsets = zeros(Int,n)
+  for i in 1:(n-1)
+    Ui = U[i]
+    offsets[i+1] = offsets[i] + num_free_dofs(Ui)
+  end
+  offsets
+end
+
+function Gridap.FESpaces.FEFunction(fe::ParamTrialFESpace,free_values)
+  diri_values = get_dirichlet_dof_values(fe)
+  FEFunction(fe,free_values,diri_values)
+end
+
+function Gridap.FESpaces.FEFunction(fe::ParamMultiFieldTrialFESpace,free_values)
+  blocks = map(1:length(fe.spaces)) do i
+    free_values_i = Gridap.MultiField.restrict_to_field(fe,free_values,i)
+    FEFunction(fe.spaces[i],free_values_i)
+  end
+  MultiFieldFEFunction(free_values,fe,blocks)
+end
+
+function Gridap.FESpaces.EvaluationFunction(fe::ParamTrialFESpace,free_values)
+  diri_values = get_dirichlet_dof_values(fe)
+  FEFunction(fe,free_values,diri_values)
+end
+
+function Gridap.FESpaces.EvaluationFunction(fe::ParamMultiFieldTrialFESpace,free_values)
+  blocks = map(1:length(fe.spaces)) do i
+    free_values_i = Gridap.MultiField.restrict_to_field(fe,free_values,i)
+    EvaluationFunction(fe.spaces[i],free_values_i)
+  end
+  MultiFieldFEFunction(free_values,fe,blocks)
 end =#

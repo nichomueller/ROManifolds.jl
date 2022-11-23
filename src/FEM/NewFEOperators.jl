@@ -48,8 +48,7 @@ Gridap.ODEs.TransientFETools.get_trial(op::ParamFEOperatorFromWeakForm) = op.tri
 
 function Gridap.ODEs.TransientFETools.allocate_residual(
   op::ParamFEOperatorFromWeakForm,
-  uh::T,
-  args...) where T
+  uh::CellField)
 
   V = Gridap.ODEs.TransientFETools.get_test(op)
   v = get_fe_basis(V)
@@ -57,24 +56,9 @@ function Gridap.ODEs.TransientFETools.allocate_residual(
   allocate_vector(op.assem,vecdata)
 end
 
-function Gridap.ODEs.TransientFETools.residual!(
-  b::AbstractVector,
-  op::ParamFEOperatorFromWeakForm,
-  μ::Vector{Float},
-  uh::T,
-  args...) where T
-
-  V = Gridap.ODEs.TransientFETools.get_test(op)
-  v = get_fe_basis(V)
-  vecdata = collect_cell_vector(V,op.res(μ,uh,v))
-  assemble_vector!(b,op.assem,vecdata)
-  b
-end
-
 function Gridap.ODEs.TransientFETools.allocate_jacobian(
   op::ParamFEOperatorFromWeakForm,
-  uh::CellField,
-  args...)
+  uh::CellField)
 
   Uμ = Gridap.ODEs.TransientFETools.get_trial(op)
   U = Gridap.ODEs.TransientFETools.evaluate(Uμ,nothing)
@@ -85,16 +69,28 @@ function Gridap.ODEs.TransientFETools.allocate_jacobian(
   allocate_matrix(op.assem,matdata)
 end
 
+function Gridap.ODEs.TransientFETools.residual!(
+  b::AbstractVector,
+  op::ParamFEOperatorFromWeakForm,
+  μ::Vector{Float},
+  uh::CellField)
+
+  V = Gridap.ODEs.TransientFETools.get_test(op)
+  v = get_fe_basis(V)
+  vecdata = collect_cell_vector(V,op.res(μ,uh,v))
+  assemble_vector!(b,op.assem,vecdata)
+  b
+end
+
 function Gridap.ODEs.TransientFETools.jacobian!(
   A::AbstractMatrix,
   op::ParamFEOperatorFromWeakForm,
   μ::Vector{Float},
-  uh::T,
-  args...) where T
+  uh::CellField)
 
   Uμ = Gridap.ODEs.TransientFETools.get_trial(op)
   U = Gridap.ODEs.TransientFETools.evaluate(Uμ,nothing)
-  V = get_test(op)
+  V = Gridap.ODEs.TransientFETools.get_test(op)
   du = get_trial_fe_basis(U)
   v = get_fe_basis(V)
   matdata = collect_cell_matrix(U,V,op.jac(μ,uh,du,v))
@@ -102,8 +98,6 @@ function Gridap.ODEs.TransientFETools.jacobian!(
   A
 end
 
-Gridap.FESpaces.get_test(op::ParamFEOperatorFromWeakForm) = op.test
-Gridap.FESpaces.get_trial(op::ParamFEOperatorFromWeakForm) = op.trial
 get_pspace(op::ParamFEOperatorFromWeakForm) = op.pspace
 realization(op::ParamFEOperator,args...) = realization(op.pspace,args...)
 
