@@ -1,7 +1,6 @@
 include("../Utils/Utils.jl")
 
-include("../FEM/LagrangianQuadFESpaces.jl")
-
+include("../FEM/Param.jl")
 include("../FEM/ParamFESpaces.jl")
 include("../FEM/ParamTransientFESpaces.jl")
 
@@ -19,3 +18,4 @@ include("../FEM/AffineThetaMethod.jl")
 include("../FEM/ThetaMethod.jl")
 
 include("../FEM/DiffOperators.jl")
+include("../FEM/LagrangianQuadFESpaces.jl")

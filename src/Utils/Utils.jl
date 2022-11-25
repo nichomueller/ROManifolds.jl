@@ -30,7 +30,10 @@ import Gridap.Algebra:AffineOperator
 import Gridap.Algebra:NonlinearOperator
 import Gridap.Algebra:LinearSolver
 import Gridap.Algebra:NonlinearSolver
-import Gridap.ODEs.ODETools:ODESolver
+import Gridap.ODEs.TransientFETools:ODESolver
+import Gridap.ODEs.TransientFETools:OperatorType
+import Gridap.ODEs.TransientFETools:Affine
+import Gridap.ODEs.TransientFETools:Nonlinear
 import Gridap.ODEs.TransientFETools:solve_step!
 import Gridap.ODEs.TransientFETools:ODEOperator
 import Gridap.ODEs.TransientFETools:evaluate!

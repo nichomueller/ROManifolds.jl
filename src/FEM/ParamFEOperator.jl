@@ -1,4 +1,4 @@
-abstract type ParamFEOperator{C<:FunctionalStyle} <: GridapType end
+abstract type ParamFEOperator{C<:OperatorType} <: GridapType end
 
 # Default API
 
@@ -14,7 +14,7 @@ end
 """
 Parametric FE operator that is defined by a parametric weak form
 """
-struct ParamFEOperatorFromWeakForm{C<:FunctionalStyle} <: ParamFEOperator{C}
+struct ParamFEOperatorFromWeakForm{C<:OperatorType} <: ParamFEOperator{C}
   res::Function
   jac::Function
   assem::Assembler

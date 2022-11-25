@@ -1,68 +1,3 @@
-abstract type SamplingStyle end
-struct UniformSampling <: SamplingStyle end
-struct NormalSampling <: SamplingStyle end
-
-#= abstract type ParamSpace end
-
-struct MyParamSpace <: ParamSpace
-  ρ::Float
-  ν::Function
-  f::Function
-
-  u::FEFunction
-end
-
-struct ParamSample{P<:MyParamSpace}
-  cache
-end
-
-function realization(P::MyParamSpace)
-  uvec = rand(get_free_dof_values(P.u))
-  cache = uvec
-  ParamSample{P}(cache)
-end =#
-
-mutable struct ParamSpace
-  domain::Vector{Vector{Float}}
-  sampling_style::SamplingStyle
-end
-
-realization(d::Vector{Float},::UniformSampling) = rand(Uniform(first(d),last(d)))
-realization(d::Vector{Float},::NormalSampling) = rand(Normal(first(d),last(d)))
-realization(P::ParamSpace) = Broadcasting(d->realization(d,P.sampling_style))(P.domain)
-realization(P::ParamSpace,n::Int) = [realization(P) for _ = 1:n]
-
-abstract type FunctionalStyle end
-struct Affine <: FunctionalStyle end
-struct Nonaffine <: FunctionalStyle end
-struct Nonlinear <: FunctionalStyle end
-
-mutable struct ParamFunctional{S}
-  param_space::ParamSpace
-  f::Function
-
-  function ParamFunctional(
-    P::ParamSpace,
-    f::Function;
-    S=false)
-    new{S}(P,f)
-  end
-end
-
-function realization(Fμ::ParamFunctional{S}) where S
-  μ = realization(Fμ.param_space)
-  μ, Fμ.f(μ)
-end
-
-function realization(
-  P::ParamSpace,
-  f::Function;
-  S=false)
-
-  Fμ = ParamFunctional(P,f;S)
-  realization(Fμ)
-end
-
 abstract type MySpaces end
 
 function dirichlet_dofs_on_full_trian(space,space_no_bc)
@@ -171,9 +106,10 @@ function get_fd_dofs(tests::MyTests,trials::MyTrials)
   (fdofs_test,fdofs_trial),ddofs
 end
 
-abstract type ParamVarOperator{FS,S,TT} end
+struct Nonaffine <: OperatorType end
+abstract type ParamVarOperator{OT,S,TT} end
 
-struct ParamLinOperator{FS,S} <: ParamVarOperator{FS,S,nothing}
+struct ParamLinOperator{OT,S} <: ParamVarOperator{OT,S,nothing}
   a::Function
   afe::Function
   A::Function
@@ -181,7 +117,7 @@ struct ParamLinOperator{FS,S} <: ParamVarOperator{FS,S,nothing}
   tests::MyTests
 end
 
-struct ParamBilinOperator{FS,S,TT} <: ParamVarOperator{FS,S,TT}
+struct ParamBilinOperator{OT,S,TT} <: ParamVarOperator{OT,S,TT}
   a::Function
   afe::Function
   A::Vector{<:Function}
@@ -195,10 +131,10 @@ function ParamVarOperator(
   afe::Function,
   pparam::ParamSpace,
   tests::MyTests;
-  FS=Nonaffine(),S=false)
+  OT=Nonaffine(),S=false)
 
   A(μ) = assemble_vector(afe(μ),tests.test)
-  ParamLinOperator{FS,S}(a,afe,A,pparam,tests)
+  ParamLinOperator{OT,S}(a,afe,A,pparam,tests)
 end
 
 function ParamVarOperator(
@@ -207,10 +143,10 @@ function ParamVarOperator(
   pparam::ParamSpace,
   trials::MyTrials{TT},
   tests::MyTests;
-  FS=Nonaffine(),S=false) where TT
+  OT=Nonaffine(),S=false) where TT
 
   A = assemble_matrix_and_lifting(afe,trials,tests)
-  ParamBilinOperator{FS,S,TT}(a,afe,A,pparam,trials,tests)
+  ParamBilinOperator{OT,S,TT}(a,afe,A,pparam,trials,tests)
 end
 
 function assemble_matrix_and_lifting(

@@ -1,7 +1,7 @@
 """
 A parametric version of the `Gridap` `TransientFEOperator` that depends on a parameter μ
 """
-abstract type ParamTransientFEOperator{C<:FunctionalStyle} <: GridapType end
+abstract type ParamTransientFEOperator{C<:OperatorType} <: GridapType end
 
 # Default API
 
@@ -32,7 +32,7 @@ end
 """
 Transient FE operator that is defined by a transient Weak form
 """
-struct ParamTransientFEOperatorFromWeakForm{C<:FunctionalStyle} <: ParamTransientFEOperator{C}
+struct ParamTransientFEOperatorFromWeakForm{C<:OperatorType} <: ParamTransientFEOperator{C}
   res::Function
   jacs::Tuple{Vararg{Function}}
   assem::Assembler
