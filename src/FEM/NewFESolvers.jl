@@ -13,7 +13,7 @@ function Gridap.ODEs.ODETools.solve(
   uh,
   μ::Vector{Vector{Float}})
 
-  Broadcasting(p->Gridap.ODEs.ODETools.solve(solver,op,uh,p))(μ)
+  Broadcasting(p->solve(solver,op,uh,p))(μ)
 end
 
 function Gridap.ODEs.ODETools.solve(
@@ -63,8 +63,8 @@ function Gridap.ODEs.ODETools.solve(
 
   μ = realization(op,n)
   trial = get_trial(op)
-  uh = zero(trial(first(μ)))
+  uh = zero(trial(first(μ),0.))
   param_op = get_algebraic_operator(op)
 
-  Gridap.ODEs.ODETools.solve(solver,param_op,uh,μ)
+  solve(solver,param_op,uh,μ)
 end

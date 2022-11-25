@@ -11,6 +11,7 @@ using Parameters
 using Test
 using ScatteredInterpolation
 using PlotlyJS
+using ForwardDiff
 using Gridap
 using Gridap.FESpaces
 using Gridap.ReferenceFEs
@@ -29,20 +30,14 @@ import Gridap.Algebra:LinearSolver
 import Gridap.Algebra:NonlinearSolver
 import LineSearches:BackTracking
 import Gridap.ODEs.TransientFETools:ODEOperator
+using Gridap.ODEs.ODETools:ODESolver
 import Gridap.ODEs.TransientFETools:evaluate!
-
-#=
-import Gridap.ODEs.TransientFETools:get_algebraic_operator
-import Gridap.ODEs.TransientFETools:SparseMatrixAssembler
-import Gridap.ODEs.TransientFETools:evaluate
-import Gridap.ODEs.TransientFETools:evaluate!
+import Gridap.ODEs.TransientFETools:allocate_trial_space
+import Gridap.ODEs.TransientFETools:allocate_cache
 import Gridap.ODEs.TransientFETools:allocate_jacobian
 import Gridap.ODEs.TransientFETools:allocate_residual
-import Gridap.ODEs.TransientFETools:jacobian!
-import Gridap.ODEs.TransientFETools:jacobians!
 import Gridap.ODEs.TransientFETools:fill_initial_jacobians
 import Gridap.ODEs.TransientFETools:fill_jacobians
-import Gridap.ODEs.TransientFETools:residual! =#
 
 const Float = Float64
 
