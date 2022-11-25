@@ -24,13 +24,15 @@ using GridapGmsh
 using Gridap.TensorValues
 using Gridap.ODEs.TransientFETools
 
+import Gridap:solve!
 import Gridap:∇
-import Gridap.ODEs.TransientFETools:TransientCellField
+import Gridap.Algebra:AffineOperator
+import Gridap.Algebra:NonlinearOperator
 import Gridap.Algebra:LinearSolver
 import Gridap.Algebra:NonlinearSolver
-import LineSearches:BackTracking
+import Gridap.ODEs.ODETools:ODESolver
+import Gridap.ODEs.TransientFETools:solve_step!
 import Gridap.ODEs.TransientFETools:ODEOperator
-using Gridap.ODEs.ODETools:ODESolver
 import Gridap.ODEs.TransientFETools:evaluate!
 import Gridap.ODEs.TransientFETools:allocate_trial_space
 import Gridap.ODEs.TransientFETools:allocate_cache
@@ -38,6 +40,13 @@ import Gridap.ODEs.TransientFETools:allocate_jacobian
 import Gridap.ODEs.TransientFETools:allocate_residual
 import Gridap.ODEs.TransientFETools:fill_initial_jacobians
 import Gridap.ODEs.TransientFETools:fill_jacobians
+import Gridap.ODEs.TransientFETools:get_order
+import Gridap.ODEs.TransientFETools:TransientCellField
+import Gridap.ODEs.TransientFETools:update_cache!
+import Gridap.ODEs.TransientFETools:residual!
+import Gridap.ODEs.TransientFETools:jacobian!
+import Gridap.ODEs.TransientFETools:jacobians!
+import LineSearches:BackTracking
 
 const Float = Float64
 

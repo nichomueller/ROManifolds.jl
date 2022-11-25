@@ -1,102 +1,4 @@
-abstract type ParamOperator{C} <: GridapType end
-const AffineParamOperator = ParamOperator{Affine}
-
-"""
-A wrapper of `ParamFEOperator` that transforms it to `ParamOperator`, i.e.,
-takes A(μ,uh,vh) and returns A(μ,uF), where uF represents the free values
-of the `EvaluationFunction` uh
-"""
-struct ParamOpFromFEOp{C} <: ParamOperator{C}
-  feop::ParamFEOperator{C}
-end
-
-function Gridap.ODEs.TransientFETools.allocate_residual(op::ParamOpFromFEOp,uh)
-  allocate_residual(op.feop,uh)
-end
-
-function Gridap.ODEs.TransientFETools.allocate_jacobian(op::ParamOpFromFEOp,uh)
-  allocate_jacobian(op.feop,uh)
-end
-
-function _allocate_matrix_and_vector(op::ParamOpFromFEOp,uh)
-  b = allocate_residual(op,uh)
-  A = allocate_jacobian(op,uh)
-  A,b
-end
-
-function _matrix!(
-  A::AbstractMatrix,
-  op::ParamOpFromFEOp,
-  uh,
-  μ::Vector{Float})
-
-  z = zero(eltype(A))
-  LinearAlgebra.fillstored!(A,z)
-  Gridap.ODEs.TransientFETools.jacobian!(A,op.feop,μ,uh)
-end
-
-function _vector!(
-  b::AbstractVector,
-  op::ParamOpFromFEOp,
-  uh,
-  μ::Vector{Float})
-
-  Gridap.ODEs.TransientFETools.residual!(b,op.feop,μ,uh)
-  b .*= -1.0
-end
-
-struct ParamNonlinearOperator{T} <: Gridap.Algebra.NonlinearOperator
-  param_op::ParamOperator
-  uh::T
-  μ::Vector{Float}
-  cache
-end
-
-function Gridap.ODEs.TransientFETools.residual!(
-  b::AbstractVector,
-  op::ParamNonlinearOperator,
-  x::AbstractVector)
-
-  feop = op.param_op.feop
-  trial = get_trial(feop)
-  u = EvaluationFunction(trial(op.μ),x)
-  Gridap.ODEs.TransientFETools.residual!(b,feop,op.μ,u)
-end
-
-function Gridap.ODEs.TransientFETools.jacobian!(
-  A::AbstractMatrix,
-  op::ParamNonlinearOperator,
-  x::AbstractVector)
-
-  feop = op.param_op.feop
-  trial = get_trial(feop)
-  u = EvaluationFunction(trial(op.μ),x)
-  z = zero(eltype(A))
-  LinearAlgebra.fillstored!(A,z)
-  Gridap.ODEs.TransientFETools.jacobian!(A,feop,op.μ,u)
-end
-
-function Gridap.ODEs.TransientFETools.allocate_residual(
-  op::ParamNonlinearOperator,
-  x::AbstractVector)
-
-  feop = op.param_op.feop
-  trial = get_trial(feop)
-  u = EvaluationFunction(trial(op.μ),x)
-  allocate_residual(feop,u)
-end
-
-function Gridap.ODEs.TransientFETools.allocate_jacobian(
-  op::ParamNonlinearOperator,
-  x::AbstractVector)
-
-  feop = op.param_op.feop
-  trial = get_trial(feop)
-  u = EvaluationFunction(trial(op.μ),x)
-  allocate_jacobian(feop,u)
-end
-
-
+# Interface
 
 abstract type ParamODEOperator{C} <: GridapType end
 const AffineParamODEOperator = ParamODEOperator{Affine}
@@ -112,14 +14,14 @@ struct ParamODEOpFromFEOp{C} <: ParamODEOperator{C}
 end
 
 Gridap.ODEs.TransientFETools.get_order(op::ParamODEOpFromFEOp) =
-  Gridap.ODEs.TransientFETools.get_order(op.feop)
+  get_order(op.feop)
 
 function Gridap.ODEs.TransientFETools.allocate_cache(op::ParamODEOpFromFEOp)
   Ut = get_trial(op.feop)
   U = allocate_trial_space(Ut)
   Uts = (Ut,)
   Us = (U,)
-  for i in 1:Gridap.ODEs.TransientFETools.get_order(op)
+  for i in 1:get_order(op)
     Uts = (Uts...,∂t(Uts[i]))
     Us = (Us...,allocate_trial_space(Uts[i+1]))
   end
@@ -145,10 +47,10 @@ function Gridap.ODEs.TransientFETools.update_cache!(
 
   _Us,Uts,fecache = ode_cache
   Us = ()
-  for i in 1:Gridap.ODEs.TransientFETools.get_order(op)+1
+  for i in 1:get_order(op)+1
     Us = (Us...,evaluate!(_Us[i],Uts[i],μ,t))
   end
-  fecache = Gridap.ODEs.TransientFETools.update_cache!(fecache,op.feop,μ,t)
+  fecache = update_cache!(fecache,op.feop,μ,t)
   (Us,Uts,fecache)
 end
 
@@ -184,11 +86,11 @@ function Gridap.ODEs.TransientFETools.residual!(
   ode_cache)
   Xh, = ode_cache
   dxh = ()
-  for i in 2:Gridap.ODEs.TransientFETools.get_order(op)+1
+  for i in 2:get_order(op)+1
     dxh = (dxh...,EvaluationFunction(Xh[i],xhF[i]))
   end
   xh=TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
-  Gridap.ODEs.TransientFETools.residual!(b,op.feop,μ,t,xh,ode_cache)
+  residual!(b,op.feop,μ,t,xh,ode_cache)
 end
 
 """
@@ -210,11 +112,11 @@ function Gridap.ODEs.TransientFETools.jacobian!(
   ode_cache)
   Xh, = ode_cache
   dxh = ()
-  for i in 2:Gridap.ODEs.TransientFETools.get_order(op)+1
+  for i in 2:get_order(op)+1
     dxh = (dxh...,EvaluationFunction(Xh[i],xhF[i]))
   end
   xh=TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
-  Gridap.ODEs.TransientFETools.jacobian!(A,op.feop,μ,t,xh,i,γᵢ,ode_cache)
+  jacobian!(A,op.feop,μ,t,xh,i,γᵢ,ode_cache)
 end
 
 """
@@ -230,9 +132,9 @@ function Gridap.ODEs.TransientFETools.jacobians!(
   ode_cache)
   Xh, = ode_cache
   dxh = ()
-  for i in 2:Gridap.ODEs.TransientFETools.get_order(op)+1
+  for i in 2:get_order(op)+1
     dxh = (dxh...,EvaluationFunction(Xh[i],xhF[i]))
   end
   xh=TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
-  Gridap.ODEs.TransientFETools.jacobians!(J,op.feop,μ,t,xh,γ,ode_cache)
+  jacobians!(J,op.feop,μ,t,xh,γ,ode_cache)
 end

@@ -9,7 +9,7 @@ struct GenericParamODESolution{T} <: ParamODESolution
   tF::Real
 end
 
-function Gridap.ODEs.ODETools.solve_step!(
+function Gridap.ODEs.TransientFETools.solve_step!(
   uF::Union{AbstractVector,Tuple{Vararg{AbstractVector}}},
   solver::ODESolver,
   op::ParamODEOperator,
@@ -17,10 +17,10 @@ function Gridap.ODEs.ODETools.solve_step!(
   u0::Union{AbstractVector,Tuple{Vararg{AbstractVector}}},
   t0::Real) # -> (uF,tF,cache)
 
-  Gridap.ODEs.ODETools.solve_step!(uF,solver,op,μ,u0,t0,nothing)
+  solve_step!(uF,solver,op,μ,u0,t0,nothing)
 end
 
-function Gridap.ODEs.ODETools.solve(
+function solve(
   solver::ODESolver,
   op::ParamODEOperator,
   μ::Vector{Float},
@@ -39,7 +39,7 @@ function Base.iterate(
   t0 = sol.t0
 
   # Solve step
-  uf,tf,cache = Gridap.ODEs.ODETools.solve_step!(uf,sol.solver,sol.op,sol.μ,u0,t0)
+  uf,tf,cache = solve_step!(uf,sol.solver,sol.op,sol.μ,u0,t0)
 
   # Update
   u0 .= uf
@@ -59,7 +59,7 @@ function Base.iterate(
   end
 
   # Solve step
-  uf,tf,cache = Gridap.ODEs.ODETools.solve_step!(uf,sol.solver,sol.op,sol.μ,u0,t0,cache)
+  uf,tf,cache = solve_step!(uf,sol.solver,sol.op,sol.μ,u0,t0,cache)
 
   # Update
   u0 .= uf
@@ -80,7 +80,7 @@ function Base.iterate(
   t0 = sol.t0
 
   # Solve step
-  uf,tf,cache = Gridap.ODEs.ODETools.solve_step!(uf,sol.solver,sol.op,sol.μ,u0,t0)
+  uf,tf,cache = solve_step!(uf,sol.solver,sol.op,sol.μ,u0,t0)
 
   # Update
   for i in 1:length(uf)
@@ -102,7 +102,7 @@ function Base.iterate(
   end
 
   # Solve step
-  uf,tf,cache = Gridap.ODEs.ODETools.solve_step!(uf,sol.solver,sol.op,sol.μ,u0,t0,cache)
+  uf,tf,cache = solve_step!(uf,sol.solver,sol.op,sol.μ,u0,t0,cache)
 
   # Update
   for i in 1:length(uf)
@@ -156,7 +156,7 @@ function ParamTransientFESolution(
   ParamTransientFESolution(ode_sol,trial)
 end
 
-function Gridap.ODEs.ODETools.solve(
+function solve(
   solver::ODESolver,
   op::ParamTransientFEOperator,
   μ::Vector{Vector{Float}},
@@ -167,7 +167,7 @@ function Gridap.ODEs.ODETools.solve(
   Broadcasting(p -> ParamTransientFESolution(solver,op,p,u0,t0,tF))(μ)
 end
 
-function Gridap.ODEs.ODETools.solve(
+function solve(
   solver::ODESolver,
   op::ParamTransientFEOperator,
   t0::Real,
@@ -176,7 +176,7 @@ function Gridap.ODEs.ODETools.solve(
 
   μ = realization(op,n)
   trial = get_trial(op)
-  u0 = zero(trial(first(μ),t0))
+  u0 = zero(trial(nothing))
   solve(solver,op,μ,u0,t0,tF)
 end
 

@@ -1,11 +1,11 @@
-function Gridap.ODEs.ODETools.solve_step!(
+function Gridap.ODEs.TransientFETools.solve_step!(
   uf::AbstractVector,
   solver::ThetaMethod,
   op::ParamODEOperator,
   μ::Vector{Float},
   u0::AbstractVector,
   t0::Real,
-  cache) # -> (uF,tF)
+  cache)
 
   dt = solver.dt
   solver.θ == 0.0 ? dtθ = dt : dtθ = dt*solver.θ
@@ -19,11 +19,11 @@ function Gridap.ODEs.ODETools.solve_step!(
     ode_cache,vθ,nl_cache = cache
   end
 
-  ode_cache = Gridap.ODEs.TransientFETools.update_cache!(ode_cache,op,μ,tθ)
+  ode_cache = update_cache!(ode_cache,op,μ,tθ)
 
   nlop = ParamThetaMethodNonlinearOperator(op,μ,tθ,dtθ,u0,ode_cache,vθ)
 
-  nl_cache = Gridap.ODEs.ODETools.solve!(uf,solver.nls,nlop,nl_cache)
+  nl_cache = solve!(uf,solver.nls,nlop,nl_cache)
 
   if 0.0 < solver.θ < 1.0
     uf = uf*(1.0/solver.θ)-u0*((1-solver.θ)/solver.θ)
@@ -39,7 +39,7 @@ end
 Nonlinear operator that represents the θ-method nonlinear operator at a
 given time step, i.e., A(t,u_n+θ,(u_n+θ-u_n)/dt)
 """
-struct ParamThetaMethodNonlinearOperator <: Gridap.Algebra.NonlinearOperator
+struct ParamThetaMethodNonlinearOperator <: NonlinearOperator
   odeop::ParamODEOperator
   μ::Vector{Float}
   tθ::Float64
@@ -57,7 +57,7 @@ function Gridap.ODEs.TransientFETools.residual!(
   uθ = x
   vθ = op.vθ
   vθ = (x-op.u0)/op.dtθ
-  Gridap.ODEs.TransientFETools.residual!(b,op.odeop,op.μ,op.tθ,(uθ,vθ),op.ode_cache)
+  residual!(b,op.odeop,op.μ,op.tθ,(uθ,vθ),op.ode_cache)
 end
 
 function Gridap.ODEs.TransientFETools.jacobian!(
@@ -70,7 +70,7 @@ function Gridap.ODEs.TransientFETools.jacobian!(
   vθ = (x-op.u0)/op.dtθ
   z = zero(eltype(A))
   LinearAlgebra.fillstored!(A,z)
-  Gridap.ODEs.TransientFETools.jacobians!(A,op.odeop,op.μ,op.tθ,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)
+  jacobians!(A,op.odeop,op.μ,op.tθ,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)
 end
 
 function Gridap.ODEs.ODETools.allocate_residual(

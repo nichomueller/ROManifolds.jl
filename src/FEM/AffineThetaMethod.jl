@@ -1,11 +1,11 @@
-function Gridap.ODEs.ODETools.solve_step!(
+function Gridap.ODEs.TransientFETools.solve_step!(
   uf::AbstractVector,
   solver::ThetaMethod,
   op::AffineParamODEOperator,
   μ::Vector{Float},
   u0::AbstractVector,
   t0::Real,
-  cache) # -> (uF,tF)
+  cache)
 
   dt = solver.dt
   solver.θ == 0.0 ? dtθ = dt : dtθ = dt*solver.θ
@@ -21,13 +21,13 @@ function Gridap.ODEs.ODETools.solve_step!(
     ode_cache,vθ,A,b,l_cache = cache
   end
 
-  ode_cache = Gridap.ODEs.TransientFETools.update_cache!(ode_cache,op,μ,tθ)
+  ode_cache = update_cache!(ode_cache,op,μ,tθ)
 
   _matrix_and_vector!(A,b,op,μ,tθ,dtθ,u0,ode_cache,vθ)
-  afop = Gridap.Algebra.AffineOperator(A,b)
+  afop = AffineOperator(A,b)
 
   newmatrix = true
-  l_cache = Gridap.ODEs.ODETools.solve!(uf,solver.nls,afop,l_cache,newmatrix)
+  l_cache = solve!(uf,solver.nls,afop,l_cache,newmatrix)
 
   uf = uf + u0
   if 0.0 < solver.θ < 1.0
@@ -55,7 +55,7 @@ function ParamThetaMethodAffineOperator(
 
   A,b = _allocate_matrix_and_vector(odeop,u0,ode_cache)
   _matrix_and_vector!(A,b,odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
-  Gridap.Algebra.AffineOperator(A,b)
+  AffineOperator(A,b)
 end
 
 function _matrix_and_vector!(A,b,odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
@@ -66,17 +66,17 @@ end
 function _matrix!(A,odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
   z = zero(eltype(A))
   LinearAlgebra.fillstored!(A,z)
-  Gridap.ODEs.TransientFETools.jacobians!(A,odeop,μ,tθ,(vθ,vθ),(1.0,1/dtθ),ode_cache)
+  jacobians!(A,odeop,μ,tθ,(vθ,vθ),(1.0,1/dtθ),ode_cache)
 end
 
 function _mass_matrix!(A,odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
   z = zero(eltype(A))
   LinearAlgebra.fillstored!(A,z)
-  Gridap.ODEs.TransientFETools.jacobian!(A,odeop,μ,tθ,(vθ,vθ),2,(1/dtθ),ode_cache)
+  jacobian!(A,odeop,μ,tθ,(vθ,vθ),2,(1/dtθ),ode_cache)
 end
 
 function _vector!(b,odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
-  Gridap.ODEs.TransientFETools.residual!(b,odeop,μ,tθ,(u0,vθ),ode_cache)
+  residual!(b,odeop,μ,tθ,(u0,vθ),ode_cache)
   b .*= -1.0
 end
 

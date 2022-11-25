@@ -63,6 +63,97 @@ function realization(
   realization(Fμ)
 end
 
+abstract type MySpaces end
+
+function dirichlet_dofs_on_full_trian(space,space_no_bc)
+
+  cell_dof_ids = get_cell_dof_ids(space)
+  cell_dof_ids_no_bc = get_cell_dof_ids(space_no_bc)
+
+  dirichlet_dofs = zeros(Int,space.ndirichlet)
+  for cell = eachindex(cell_dof_ids)
+    for (ids,ids_no_bc) in zip(cell_dof_ids[cell],cell_dof_ids_no_bc[cell])
+      if ids<0
+        dirichlet_dofs[abs(ids)]=ids_no_bc
+      end
+    end
+  end
+
+  dirichlet_dofs
+end
+
+struct MyTests <: MySpaces
+  test::UnconstrainedFESpace
+  test_no_bc::UnconstrainedFESpace
+  ddofs_on_full_trian::Vector{Int}
+
+  function MyTests(
+    test::UnconstrainedFESpace,
+    test_no_bc::UnconstrainedFESpace)
+
+    ddofs_on_full_trian = dirichlet_dofs_on_full_trian(test,test_no_bc)
+    new(test,test_no_bc,ddofs_on_full_trian)
+  end
+end
+
+function MyTests(model,reffe;kwargs...)
+  test = TestFESpace(model,reffe;kwargs...)
+  test_no_bc = FESpace(model,reffe)
+  MyTests(test,test_no_bc)
+end
+
+function MyTrial(test::UnconstrainedFESpace)
+  HomogeneousTrialFESpace(test)
+end
+
+function MyTrial(
+  test::UnconstrainedFESpace,
+  Gμ::ParamFunctional{true})
+  ParamTrialFESpace(test,Gμ.f)
+end
+
+function MyTrial(
+  test::UnconstrainedFESpace,
+  Gμ::ParamFunctional{false})
+  ParamTransientTrialFESpace(test,Gμ.f)
+end
+
+struct MyTrials{TT} <: MySpaces
+  trial::TT
+  trial_no_bc::UnconstrainedFESpace
+  ddofs_on_full_trian::Vector{Int}
+
+  function MyTrials(
+    trial::TT,
+    trial_no_bc::UnconstrainedFESpace) where TT
+
+    ddofs_on_full_trian = dirichlet_dofs_on_full_trian(trial.space,trial_no_bc)
+    new{TT}(trial,trial_no_bc,ddofs_on_full_trian)
+  end
+end
+
+function MyTrials(tests::MyTests,args...)
+  trial = MyTrial(tests.test,args...)
+  trial_no_bc = TrialFESpace(tests.test_no_bc)
+  MyTrials(trial,trial_no_bc)
+end
+
+function ParamMultiFieldFESpace(spaces::Vector{MyTrials})
+  ParamMultiFieldFESpace([first(spaces).trial,last(spaces).trial])
+end
+
+function ParamMultiFieldFESpace(spaces::Vector{MyTests})
+  ParamMultiFieldFESpace([first(spaces).test,last(spaces).test])
+end
+
+function ParamTransientMultiFieldFESpace(spaces::Vector{MyTrials})
+  ParamTransientMultiFieldFESpace([first(spaces).trial,last(spaces).trial])
+end
+
+function ParamTransientMultiFieldFESpace(spaces::Vector{MyTests})
+  ParamTransientMultiFieldFESpace([first(spaces).test,last(spaces).test])
+end
+
 function free_dofs_on_full_trian(tests::MyTests)
   nfree_on_full_trian = tests.test_no_bc.nfree
   setdiff(collect(1:nfree_on_full_trian),tests.ddofs_on_full_trian)
