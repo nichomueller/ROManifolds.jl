@@ -29,9 +29,9 @@ Parameter, time evaluation without allocating Dirichlet vals (returns a TrialFES
 """
 function evaluate!(Uμt::T,U::ParamTransientTrialFESpace,μ::Vector{Float},t::Real) where T
   if isa(U.dirichlet_μt,Vector)
-    objects_at_μt = map(o->o(t,μ), U.dirichlet_μt)
+    objects_at_μt = map(o->o(μ,t), U.dirichlet_μt)
   else
-    objects_at_μt = U.dirichlet_μt(t,μ)
+    objects_at_μt = U.dirichlet_μt(μ,t)
   end
   TrialFESpace!(Uμt,objects_at_μt)
   Uμt
@@ -42,9 +42,9 @@ Parameter evaluation without allocating Dirichlet vals (returns a TransientTrial
 """
 function evaluate!(Uμt::T,U::ParamTransientTrialFESpace,μ::Vector{Float}) where T
   if isa(U.dirichlet_μt,Vector)
-    objects_at_μt = map(o->o(t,μ), U.dirichlet_μt)
+    objects_at_μt = map(o->o(μ,t), U.dirichlet_μt)
   else
-    objects_at_μt = U.dirichlet_μt(t,μ)
+    objects_at_μt = U.dirichlet_μt(μ,t)
   end
   TrialFESpace!(Uμt,objects_at_μt)
   Uμt

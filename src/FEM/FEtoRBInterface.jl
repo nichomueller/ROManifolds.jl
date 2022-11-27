@@ -107,9 +107,9 @@ function get_fd_dofs(tests::MyTests,trials::MyTrials)
 end
 
 struct Nonaffine <: OperatorType end
-abstract type ParamVarOperator{OT,S,TT} end
+abstract type ParamVarOperator{OT,TT} end
 
-struct ParamLinOperator{OT,S} <: ParamVarOperator{OT,S,nothing}
+struct ParamLinOperator{OT} <: ParamVarOperator{OT,nothing}
   a::Function
   afe::Function
   A::Function
@@ -117,7 +117,7 @@ struct ParamLinOperator{OT,S} <: ParamVarOperator{OT,S,nothing}
   tests::MyTests
 end
 
-struct ParamBilinOperator{OT,S,TT} <: ParamVarOperator{OT,S,TT}
+struct ParamBilinOperator{OT,TT} <: ParamVarOperator{OT,TT}
   a::Function
   afe::Function
   A::Vector{<:Function}
@@ -130,11 +130,11 @@ function ParamVarOperator(
   a::Function,
   afe::Function,
   pparam::ParamSpace,
-  tests::MyTests;
-  OT=Nonaffine(),S=false)
+  tests::MyTests,
+  OT=Nonaffine())
 
   A(μ) = assemble_vector(afe(μ),tests.test)
-  ParamLinOperator{OT,S}(a,afe,A,pparam,tests)
+  ParamLinOperator{OT}(a,afe,A,pparam,tests)
 end
 
 function ParamVarOperator(
@@ -142,11 +142,11 @@ function ParamVarOperator(
   afe::Function,
   pparam::ParamSpace,
   trials::MyTrials{TT},
-  tests::MyTests;
-  OT=Nonaffine(),S=false) where TT
+  tests::MyTests,
+  OT=Nonaffine()) where TT
 
   A = assemble_matrix_and_lifting(afe,trials,tests)
-  ParamBilinOperator{OT,S,TT}(a,afe,A,pparam,trials,tests)
+  ParamBilinOperator{OT,TT}(a,afe,A,pparam,trials,tests)
 end
 
 function assemble_matrix_and_lifting(
@@ -173,20 +173,75 @@ function assemble_matrix_and_lifting(
   [μ -> assemble_matrix(afe(μ),trials.trial,tests.test)]
 end
 
-function Gridap.FEFunction(
-  spaces::Tuple{ParamSpace,MyTrials},
-  values::Tuple)
-
-  _,trials = spaces
-  μ,free_values = values
-  FEFunction(trials.trial(μ),free_values)
+struct Snapshot{T}
+  id::Symbol
+  snap::AbstractArray{T}
 end
 
-function Gridap.FEFunction(
-  spaces::Tuple{ParamSpace,MyTests},
-  values::Tuple)
-
-  _,tests = spaces
-  μ,free_values = values
-  FEFunction(tests.test(μ),free_values)
+correct_path(s::Snapshot,path::String) = joinpath(path,"$(s.id).csv")
+save(s::Snapshot,path::String) = writedlm(correct_path(s,path),s.snap, ','; header=false)
+save(s::Snapshot,::Nothing) = @warn "Could not save variable $(s.id): no path provided"
+load(path::String) = readdlm(path, ',')
+function load!(s::Snapshot,path::String)
+  s.snap = readdlm(correct_path(s,path), ',')
+  s
 end
+
+
+abstract type Problem{I,S} end
+
+struct SteadyProblem{I} <: Problem{I,true}
+  μ::Snapshot{Vector{Float}}
+  xh::Snapshot{Float}
+  param_op::Vector{ParamVarOperator}
+end
+
+struct TimeInfo
+  t0::Real
+  tF::Real
+  dt::Real
+  θ::Real
+end
+
+get_dt(ti::TimeInfo) = ti.dt
+get_θ(ti::TimeInfo) = ti.θ
+get_timesθ(ti::TimeInfo) = collect(ti.t0:ti.dt:ti.tF-ti.dt).+ti.dt*ti.θ
+
+struct UnsteadyProblem{I} <: Problem{I,false}
+  μ::Snapshot{Vector{Float}}
+  xh::Snapshot{Float}
+  param_op::Vector{ParamVarOperator}
+  time_info::TimeInfo
+end
+
+function Problem(
+  μ::Snapshot,
+  xh::Snapshot,
+  param_op::Vector{ParamVarOperator},
+  I=true)
+
+  SteadyProblem{I}(μ,xh,param_op)
+end
+
+function Problem(
+  μ::Snapshot,
+  xh::Snapshot,
+  param_op::Vector{ParamVarOperator},
+  time_info::TimeInfo,
+  I=true)
+
+  UnsteadyProblem{I}(μ,xh,param_op,time_info)
+end
+
+function Problem(
+  μ::Snapshot,
+  xh::Snapshot,
+  param_op::Vector{ParamVarOperator},
+  t0,tF,dt,θ,
+  I=true)
+
+  time_info = TimeInfo(t0,tF,dt,θ)
+  UnsteadyProblem{I}(μ,xh,param_op,time_info)
+end
+
+num_of_snapshots(p::Problem) = length(p.μ)

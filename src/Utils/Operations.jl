@@ -236,6 +236,17 @@ function blocks_to_matrix(Mat_block::Vector{SparseMatrixCSC{T,Int}}) where T
 
 end
 
+function blocks_to_matrix(Vec_block::Vector{Vector{Vector{T}}}) where T
+  n = length(Vec_block)
+  mat = blocks_to_matrix(Vec_block[1])
+  if n > 1
+    for i = 2:n
+      mat = hcat(mat,blocks_to_matrix(Vec_block[i]))
+    end
+  end
+  mat
+end
+
 function matrix_to_vecblocks(Mat::Matrix{T}) where T
   [Mat[:, i] for i = 1:size(Mat)[2]]::Vector{Vector{T}}
 end

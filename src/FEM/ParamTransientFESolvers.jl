@@ -199,9 +199,9 @@ function Base.iterate(sol::ParamTransientFESolution)
   (uh,tF),state
 end
 
-function Base.iterate(sol::ParamTransientFESolution, state)
+function Base.iterate(sol::ParamTransientFESolution,state)
 
-  Uh, odesolstate = state
+  Uh,odesolstate = state
 
   odesolnext = iterate(sol.odesol,odesolstate)
 
@@ -218,3 +218,6 @@ function Base.iterate(sol::ParamTransientFESolution, state)
 
   (uh,tF),state
 end
+
+get_Nt(sol::ParamTransientFESolution) = Int(sol.odesol.tF/sol.odesol.solver.dt)
+get_Nt(sol::Vector{ParamTransientFESolution}) = get_Nt(first(sol))

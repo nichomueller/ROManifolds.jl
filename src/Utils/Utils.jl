@@ -26,6 +26,8 @@ using Gridap.ODEs.TransientFETools
 
 import Gridap:solve!
 import Gridap:∇
+import Gridap.Algebra:allocate_matrix
+import Gridap.Algebra:allocate_vector
 import Gridap.Algebra:AffineOperator
 import Gridap.Algebra:NonlinearOperator
 import Gridap.Algebra:LinearSolver
@@ -57,3 +59,4 @@ include("Files.jl")
 include("Indexes.jl")
 include("Operations.jl")
 include("Plots.jl")
+include("Structures.jl")

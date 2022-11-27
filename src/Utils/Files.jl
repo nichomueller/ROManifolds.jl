@@ -1,6 +1,11 @@
+function get_parent_dir(dir::String)
+  dir[1:findall(x->x=='/',dir)[end]-1]
+end
+
 """Create a directory at the given path"""
-function create_dir(path::String)
+function create_dir!(path::String)
   if !isdir(path)
+    create_dir!(get_parent_dir(path))
     mkdir(path)
   end
   return
@@ -11,11 +16,7 @@ function get_all_subdirectories(path::String)
   filter(isdir,readdir(path,join=true))
 end
 
-function correct_path(path::String)
-  path[end-3:end] == ".csv" ? path : path * ".csv"
-end
-
-function save_CSV(var, path::String)
+#= function save_CSV(var, path::String)
   writedlm(correct_path(path), var, ','; header=false)
 end
 
@@ -73,7 +74,7 @@ end
 function load_CSV(::SparseVector{T, Int}, path::String) where T
   iv = readdlm(correct_path(path), ',')
   sparse(Int.(iv[1,:]), T.(iv[2,:]))::SparseVector{T, Int}
-end
+end =#
 
 function save_structures_in_list(
   list_structures::Tuple,

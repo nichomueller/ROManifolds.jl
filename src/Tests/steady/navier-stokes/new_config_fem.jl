@@ -1,10 +1,4 @@
-include("../../../src/Utils/Utils.jl")
-include("../../../src/FEM/FEM.jl")
-include("../../../src/FEM/NewFESpaces.jl")
-include("../../../src/FEM/NewTypes.jl")
-include("../../../src/FEM/NewFEOperators.jl")
-include("../../../src/FEM/ParamOperatorInterfaces.jl")
-include("../../../src/FEM/NewFESolvers.jl")
+include("../../../FEM/FEM.jl")
 
 root = "/home/nicholasmueller/git_repos/Mabla.jl"
 mesh_name = "cube5x5x5.json"
@@ -50,9 +44,7 @@ bfe(μ,u,q) = ∫(b(μ) * q * (∇⋅(u)))dΩ
 ffe(μ,v) = ∫(f(μ) ⋅ v)dΩ
 hfe(μ,v) = ∫(h(μ) ⋅ v)dΓn
 #= c(μ,u,v) = ∫(v ⊙ (∇(u)'⋅μ))dΩ
-c(u,v) = c(u,u,v)
-dc(μ,u,du,v) = ∫(v ⊙ (∇(μ)'⋅u))dΩ
-dc(u,du,v) = dc(u,u,du,v) =#
+dc(μ,u,v) = ∫(v ⊙ (∇(μ)'⋅u))dΩ =#
 conv(u,∇u) = (∇u')⋅u
 dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
 c(u,v) = ∫(v⊙(conv∘(u,∇(u))))dΩ
