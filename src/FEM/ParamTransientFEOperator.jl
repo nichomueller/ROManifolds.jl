@@ -22,7 +22,7 @@ end
 function Gridap.ODEs.TransientFETools.update_cache!(
   ::Nothing,
   ::ParamTransientFEOperator,
-  ::Vector{Float},
+  ::Param,
   ::Real)
   nothing
 end
@@ -112,7 +112,7 @@ end
 function Gridap.ODEs.TransientFETools.residual!(
   b::AbstractVector,
   op::ParamTransientFEOperatorFromWeakForm,
-  μ::Vector{Float},
+  μ::Param,
   t::Real,
   uh::T,
   cache) where T
@@ -137,7 +137,7 @@ end
 function Gridap.ODEs.TransientFETools.jacobian!(
   A::AbstractMatrix,
   op::ParamTransientFEOperatorFromWeakForm,
-  μ::Vector{Float},
+  μ::Param,
   t::Real,
   uh::T,
   i::Integer,
@@ -152,7 +152,7 @@ end
 function Gridap.ODEs.TransientFETools.jacobians!(
   A::AbstractMatrix,
   op::ParamTransientFEOperatorFromWeakForm,
-  μ::Vector{Float},
+  μ::Param,
   t::Real,
   uh::TransientCellField,
   γ::Tuple{Vararg{Real}},
@@ -181,7 +181,7 @@ end
 
 function Gridap.ODEs.TransientFETools.fill_jacobians(
   op::ParamTransientFEOperatorFromWeakForm,
-  μ::Vector{Float},
+  μ::Param,
   t::Real,
   uh::T,
   γ::Tuple{Vararg{Real}}) where T
@@ -215,7 +215,7 @@ end
 
 function _matdata_jacobian(
   op::ParamTransientFEOperatorFromWeakForm,
-  μ::Vector{Float},
+  μ::Param,
   t::Real,
   uh::T,
   i::Integer,

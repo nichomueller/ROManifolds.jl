@@ -481,7 +481,7 @@ function online_phase(
       mean_pointwise_err, mean_err, mean_online_time)
   end
 
-  if RBInfo.post_process
+  if RBInfo.postprocess
     pp(FEMSpace, RBInfo, mean_pointwise_err)
   end
 

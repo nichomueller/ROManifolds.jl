@@ -30,7 +30,7 @@ function _matrix!(
   A::AbstractMatrix,
   op::ParamOpFromFEOp,
   uh,
-  μ::Vector{Float})
+  μ::Param)
 
   z = zero(eltype(A))
   LinearAlgebra.fillstored!(A,z)
@@ -41,7 +41,7 @@ function _vector!(
   b::AbstractVector,
   op::ParamOpFromFEOp,
   uh,
-  μ::Vector{Float})
+  μ::Param)
 
   residual!(b,op.feop,μ,uh)
   b .*= -1.0
@@ -52,7 +52,7 @@ end
 struct ParamNonlinearOperator{T} <: NonlinearOperator
   param_op::ParamOperator
   uh::T
-  μ::Vector{Float}
+  μ::Param
   cache
 end
 

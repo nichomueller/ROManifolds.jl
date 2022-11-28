@@ -23,9 +23,9 @@ struct ROMInfoS{ID} <: ROMInfo{ID}
   Paths::ROMPath
   nₛ::Int
   ϵₛ::Float
-  use_norm_X::Bool
-  online_RHS::Bool
-  nₛ_MDEIM::Int
+  use_energy_norm::Bool
+  online_rhs::Bool
+  mdeim_nsnap::Int
   post_process::Bool
   get_offline_structures::Bool
   save_offline::Bool
@@ -38,16 +38,16 @@ mutable struct ROMInfoST{ID} <: ROMInfo{ID}
   nₛ::Int
   ϵₛ::Float
   ϵₜ::Float
-  use_norm_X::Bool
+  use_energy_norm::Bool
   t_red_method::String
-  online_RHS::Bool
-  nₛ_MDEIM::Int
+  online_rhs::Bool
+  mdeim_nsnap::Int
   post_process::Bool
   get_offline_structures::Bool
   save_offline::Bool
   save_online::Bool
-  st_MDEIM::Bool
-  functional_MDEIM::Bool
+  st_mdeim::Bool
+  fun_mdeim::Bool
   adaptivity::Bool
 end
 

@@ -5,7 +5,7 @@ function get_norm_matrix(
   RBVars::ROM{ID,T}) where {ID,T}
 
   function get_X_var(Nₛ::Int, var::String)
-    if RBInfo.use_norm_X
+    if RBInfo.use_energy_norm
       X₀ = load_CSV(sparse([],[],T[]),
         joinpath(get_structures_path(RBInfo), "X$(var)₀.csv"))
     else
@@ -110,7 +110,7 @@ end
 function set_operators(RBInfo::ROMInfo{ID}) where ID
 
   operators = RBInfo.structures
-  if RBInfo.online_RHS
+  if RBInfo.online_rhs
     vec_ops = get_FEM_vectors(RBInfo)
     println("Exact vectors $vec_ops will be built online: skipping their offline phase")
     operators = setdiff(operators, vec_ops)
@@ -183,7 +183,7 @@ function assemble_MDEIM_structure(
   var = Var.var
 
   println("The variable $var is non-affine:
-    running the MDEIM offline phase on $(RBInfo.nₛ_MDEIM) snapshots")
+    running the MDEIM offline phase on $(RBInfo.mdeim_nsnap) snapshots")
 
   if isempty(Var.MDEIM.Mat)
     MDEIM_offline(Var.MDEIM, RBInfo, RBVars, var)

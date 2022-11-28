@@ -2,7 +2,7 @@ function Gridap.ODEs.TransientFETools.solve_step!(
   uf::AbstractVector,
   solver::ThetaMethod,
   op::ParamODEOperator,
-  μ::Vector{Float},
+  μ::Param,
   u0::AbstractVector,
   t0::Real,
   cache)
@@ -41,7 +41,7 @@ given time step, i.e., A(t,u_n+θ,(u_n+θ-u_n)/dt)
 """
 struct ParamThetaMethodNonlinearOperator <: NonlinearOperator
   odeop::ParamODEOperator
-  μ::Vector{Float}
+  μ::Param
   tθ::Float64
   dtθ::Float64
   u0::AbstractVector

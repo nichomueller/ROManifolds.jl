@@ -58,7 +58,7 @@ function assemble_RB_system(
     end
 
     if "RHS" ∈ operators
-      if !RBInfo.online_RHS
+      if !RBInfo.online_rhs
         println("Assembling reduced RHS")
         assemble_RHSₙ(RBInfo, RBVars, Params)
       else

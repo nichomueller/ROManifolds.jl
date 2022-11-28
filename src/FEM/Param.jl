@@ -2,58 +2,52 @@ abstract type SamplingStyle end
 struct UniformSampling <: SamplingStyle end
 struct NormalSampling <: SamplingStyle end
 
-#= abstract type ParamSpace end
-
-struct MyParamSpace <: ParamSpace
-  ρ::Float
-  ν::Function
-  f::Function
-
-  u::FEFunction
+struct ProblemType
+  steady::Bool
+  indef::Bool
+  pdomain::Bool
 end
 
-struct ParamSample{P<:MyParamSpace}
-  cache
+issteady(p::ProblemType) = Val(p.steady)
+isindef(p::ProblemType) = Val(p.indef)
+ispdomain(p::ProblemType) = Val(p.pdomain)
+
+struct Param
+  param::Vector{Float}
 end
 
-function realization(P::MyParamSpace)
-  uvec = rand(get_free_dof_values(P.u))
-  cache = uvec
-  ParamSample{P}(cache)
-end =#
-
-mutable struct ParamSpace
-  domain::Vector{Vector{Float}}
+struct ParamSpace
+  domain::Vector{Param}
   sampling_style::SamplingStyle
 end
 
-realization(d::Vector{Float},::UniformSampling) = rand(Uniform(first(d),last(d)))
-realization(d::Vector{Float},::NormalSampling) = rand(Normal(first(d),last(d)))
-realization(P::ParamSpace) = Broadcasting(d->realization(d,P.sampling_style))(P.domain)
-realization(P::ParamSpace,n::Int) = [realization(P) for _ = 1:n]
+generate_param(d::Param,::UniformSampling) = rand(Uniform(first(d.param),last(d.param)))
+generate_param(d::Param,::NormalSampling) = rand(Normal(first(d.param),last(d.param)))
+generate_param(P::ParamSpace) = Broadcasting(d->generate_param(d,P.sampling_style))(P.domain)
+generate_param(P::ParamSpace,n::Int) = [generate_param(P) for _ = 1:n]
+realization(P::ParamSpace) = Param(generate_param(P))
+realization(P::ParamSpace,n) = Param.(generate_param(P,n))
+get_μ(p::Param) = p.param
 
-mutable struct ParamFunctional{S}
-  param_space::ParamSpace
+mutable struct ParamFunction{S}
+  id::Symbol
+  pspace::ParamSpace
   f::Function
 
-  function ParamFunctional(
-    P::ParamSpace,
-    f::Function;
-    S=false)
-    new{S}(P,f)
+  function ParamFunction(
+    ::ProblemType{I,S,M},
+    id::Symbol,
+    pspace::ParamSpace,
+    f::Function) where {I,S,M}
+    new{S}(id,pspace,f)
   end
 end
 
-function realization(Fμ::ParamFunctional{S}) where S
-  μ = realization(Fμ.param_space)
-  μ, Fμ.f(μ)
+function realization(fμ::ParamFunction)
+  μ = realization(fμ.pspace)
+  μ,fμ.f(μ)
 end
 
-function realization(
-  P::ParamSpace,
-  f::Function;
-  S=false)
-
-  Fμ = ParamFunctional(P,f;S)
-  realization(Fμ)
-end
+Base.zero(::Type{Param}) = 0.
+Base.iterate(p::Param,i = 1) = iterate(p.param,i)
+Base.getindex(p::Param,args...) = getindex(p.param,args...)

@@ -5,7 +5,7 @@ function check_saved_operators(
   var = Var.var
   op = ""
 
-  if var ∈ get_FEM_vectors(RBInfo) && RBInfo.online_RHS
+  if var ∈ get_FEM_vectors(RBInfo) && RBInfo.online_rhs
     println("Vector $var will be built online: not importing its offline structures")
   else
     if !isfile(joinpath(RBInfo.ROM_structures_path, "$(var)ₙ.csv"))

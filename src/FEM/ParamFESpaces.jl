@@ -20,7 +20,7 @@ end
 """
 Parameter evaluation without allocating Dirichlet vals
 """
-function evaluate!(Uμ::T,U::ParamTrialFESpace,μ::Vector{Float}) where T
+function evaluate!(Uμ::T,U::ParamTrialFESpace,μ::Param) where T
   if isa(U.dirichlet_μ,Vector)
     objects_at_μ = map(o->o(μ), U.dirichlet_μ)
   else
@@ -40,7 +40,7 @@ end
 """
 Parameter evaluation allocating Dirichlet vals
 """
-function Gridap.evaluate(U::ParamTrialFESpace,μ::Vector{Float})
+function Gridap.evaluate(U::ParamTrialFESpace,μ::Param)
   Uμ = allocate_trial_space(U)
   evaluate!(Uμ,U,μ)
   Uμ
@@ -58,11 +58,11 @@ Functor-like evaluation. It allocates Dirichlet vals in general.
 
 # Define the ParamTrialFESpace interface for affine spaces
 
-function evaluate!(::FESpace,U::FESpace,::Vector{Float})
+function evaluate!(::FESpace,U::FESpace,::Param)
   U
 end
 
-function Gridap.evaluate(U::FESpace,::Vector{Float})
+function Gridap.evaluate(U::FESpace,::Param)
   U
 end
 
@@ -84,7 +84,7 @@ function ParamMultiFieldFESpace(spaces::Vector{<:SingleFieldFESpace})
   MultiFieldFESpace(spaces)
 end
 
-function evaluate!(Uμ::T,U::ParamMultiFieldTrialFESpace,μ::Vector{Float}) where T
+function evaluate!(Uμ::T,U::ParamMultiFieldTrialFESpace,μ::Param) where T
   spaces_at_μ = [evaluate!(Uμi,Ui,μ) for (Uμi,Ui) in zip(Uμ,U)]
   MultiFieldFESpace(spaces_at_μ)
 end
@@ -94,7 +94,7 @@ function Gridap.ODEs.TransientFETools.allocate_trial_space(U::ParamMultiFieldTri
   MultiFieldFESpace(spaces)
 end
 
-function Gridap.evaluate(U::ParamMultiFieldTrialFESpace,μ::Vector{Float})
+function Gridap.evaluate(U::ParamMultiFieldTrialFESpace,μ::Param)
   Uμ = allocate_trial_space(U)
   evaluate!(Uμ,U,μ)
   Uμ

@@ -43,14 +43,23 @@ end
 
 function MyTrial(
   test::UnconstrainedFESpace,
-  Gμ::ParamFunctional{true})
-  ParamTrialFESpace(test,Gμ.f)
+  g::Function,
+  ::Val{true})
+  ParamTrialFESpace(test,g)
 end
 
 function MyTrial(
   test::UnconstrainedFESpace,
-  Gμ::ParamFunctional{false})
-  ParamTransientTrialFESpace(test,Gμ.f)
+  g::Function,
+  ::Val{false})
+  ParamTransientTrialFESpace(test,g)
+end
+
+function MyTrial(
+  test::UnconstrainedFESpace,
+  g::Function,
+  ptype::ProblemType)
+  MyTrial(test,g,issteady(ptype))
 end
 
 struct MyTrials{TT} <: MySpaces
@@ -113,7 +122,7 @@ struct ParamLinOperator{OT} <: ParamVarOperator{OT,nothing}
   a::Function
   afe::Function
   A::Function
-  pparam::ParamSpace
+  pspace::ParamSpace
   tests::MyTests
 end
 
@@ -121,7 +130,7 @@ struct ParamBilinOperator{OT,TT} <: ParamVarOperator{OT,TT}
   a::Function
   afe::Function
   A::Vector{<:Function}
-  pparam::ParamSpace
+  pspace::ParamSpace
   trials::MyTrials{TT}
   tests::MyTests
 end
@@ -129,24 +138,24 @@ end
 function ParamVarOperator(
   a::Function,
   afe::Function,
-  pparam::ParamSpace,
+  pspace::ParamSpace,
   tests::MyTests,
   OT=Nonaffine())
 
   A(μ) = assemble_vector(afe(μ),tests.test)
-  ParamLinOperator{OT}(a,afe,A,pparam,tests)
+  ParamLinOperator{OT}(a,afe,A,pspace,tests)
 end
 
 function ParamVarOperator(
   a::Function,
   afe::Function,
-  pparam::ParamSpace,
+  pspace::ParamSpace,
   trials::MyTrials{TT},
   tests::MyTests,
   OT=Nonaffine()) where TT
 
   A = assemble_matrix_and_lifting(afe,trials,tests)
-  ParamBilinOperator{OT,TT}(a,afe,A,pparam,trials,tests)
+  ParamBilinOperator{OT,TT}(a,afe,A,pspace,trials,tests)
 end
 
 function assemble_matrix_and_lifting(
@@ -173,7 +182,7 @@ function assemble_matrix_and_lifting(
   [μ -> assemble_matrix(afe(μ),trials.trial,tests.test)]
 end
 
-struct Snapshot{T}
+mutable struct Snapshot{T}
   id::Symbol
   snap::AbstractArray{T}
 end
@@ -187,11 +196,10 @@ function load!(s::Snapshot,path::String)
   s
 end
 
+abstract type Problem{PT<:ProblemType} end
 
-abstract type Problem{I,S} end
-
-struct SteadyProblem{I} <: Problem{I,true}
-  μ::Snapshot{Vector{Float}}
+struct SteadyProblem{PT} <: Problem{PT}
+  μ::Snapshot{Param}
   xh::Snapshot{Float}
   param_op::Vector{ParamVarOperator}
 end
@@ -207,41 +215,41 @@ get_dt(ti::TimeInfo) = ti.dt
 get_θ(ti::TimeInfo) = ti.θ
 get_timesθ(ti::TimeInfo) = collect(ti.t0:ti.dt:ti.tF-ti.dt).+ti.dt*ti.θ
 
-struct UnsteadyProblem{I} <: Problem{I,false}
-  μ::Snapshot{Vector{Float}}
+struct UnsteadyProblem{PT} <: Problem{PT}
+  μ::Snapshot{Param}
   xh::Snapshot{Float}
   param_op::Vector{ParamVarOperator}
   time_info::TimeInfo
 end
 
 function Problem(
+  ::PT,
   μ::Snapshot,
   xh::Snapshot,
-  param_op::Vector{ParamVarOperator},
-  I=true)
+  param_op::Vector{ParamVarOperator})
 
-  SteadyProblem{I}(μ,xh,param_op)
+  SteadyProblem{PT}(μ,xh,param_op)
 end
 
 function Problem(
+  ::PT,
   μ::Snapshot,
   xh::Snapshot,
   param_op::Vector{ParamVarOperator},
-  time_info::TimeInfo,
-  I=true)
+  time_info::TimeInfo)
 
-  UnsteadyProblem{I}(μ,xh,param_op,time_info)
+  UnsteadyProblem{PT}(μ,xh,param_op,time_info)
 end
 
 function Problem(
+  ::PT,
   μ::Snapshot,
   xh::Snapshot,
   param_op::Vector{ParamVarOperator},
-  t0,tF,dt,θ,
-  I=true)
+  t0,tF,dt,θ)
 
   time_info = TimeInfo(t0,tF,dt,θ)
-  UnsteadyProblem{I}(μ,xh,param_op,time_info)
+  UnsteadyProblem{PT}(μ,xh,param_op,time_info)
 end
 
 num_of_snapshots(p::Problem) = length(p.μ)

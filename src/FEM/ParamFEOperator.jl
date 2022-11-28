@@ -71,7 +71,7 @@ end
 function Gridap.ODEs.TransientFETools.residual!(
   b::AbstractVector,
   op::ParamFEOperatorFromWeakForm,
-  μ::Vector{Float},
+  μ::Param,
   uh::CellField)
 
   V = get_test(op)
@@ -84,7 +84,7 @@ end
 function Gridap.ODEs.TransientFETools.jacobian!(
   A::AbstractMatrix,
   op::ParamFEOperatorFromWeakForm,
-  μ::Vector{Float},
+  μ::Param,
   uh::CellField)
 
   Uμ = get_trial(op)

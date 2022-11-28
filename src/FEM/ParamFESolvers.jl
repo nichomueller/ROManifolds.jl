@@ -4,7 +4,7 @@ mutable struct GenericParamSolution{C,T} <: ParamSolution
   solver::FESolver
   op::ParamOperator{C}
   uh::T
-  μ::Vector{Float}
+  μ::Param
 end
 
 struct ParamFESolution
@@ -34,20 +34,20 @@ function Gridap.solve!(sol::GenericParamSolution{Affine,T}) where T
   sol
 end
 
-function solve(
+function Gridap.solve(
   solver::FESolver,
   op::ParamOperator,
   uh,
-  μ::Vector{Vector{Float}})
+  μ::Vector{Param})
 
   Broadcasting(p->solve(solver,op,uh,p))(μ)
 end
 
-function solve(
+function Gridap.solve(
   solver::FESolver,
   op::ParamOperator{C},
   uh::T,
-  μ::Vector{Float}) where {C,T}
+  μ::Param) where {C,T}
 
   trial = get_trial(op.feop)
   sol = GenericParamSolution{C,T}(solver,op,uh,μ)
@@ -56,7 +56,7 @@ function solve(
   ParamFESolution(sol,trial)
 end
 
-function solve(
+function Gridap.solve(
   solver::FESolver,
   op::ParamFEOperator,
   n=100)

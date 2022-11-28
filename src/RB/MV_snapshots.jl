@@ -19,7 +19,7 @@ function Mat_snapshots(
   end
 
   Mat(k) = isnonlinear(RBInfo, var) ? Mat_nonlinear(k) : Mat_linear(k)
-  nₛ = isnonlinear(RBInfo, var) ? RBVars.nₛ[1] : RBInfo.nₛ_MDEIM
+  nₛ = isnonlinear(RBInfo, var) ? RBVars.nₛ[1] : RBInfo.mdeim_nsnap
 
   i_v_block = Broadcasting(Mat)(1:nₛ)
   correct_structures(last.(i_v_block), first.(i_v_block))::Tuple{Matrix{Float}, Vector{Int}}
@@ -45,7 +45,7 @@ function Vec_snapshots(
   end
 
   Vec(k) = isnonlinear(RBInfo, var) ? Vec_nonlinear(k) : Vec_linear(k)
-  nₛ = isnonlinear(RBInfo, var) ? RBVars.nₛ[1] : RBInfo.nₛ_MDEIM
+  nₛ = isnonlinear(RBInfo, var) ? RBVars.nₛ[1] : RBInfo.mdeim_nsnap
 
   blocks_to_matrix(Broadcasting(Vec)(1:nₛ))::Matrix{T}
 
@@ -141,8 +141,8 @@ function assemble_Mat_snapshots(
   μ::Vector{Vector{Float}},
   var::String) where {ID,D,T}
 
-  if RBInfo.functional_MDEIM
-    functional_MDEIM(FEMSpace, RBInfo, RBVars, μ, var)::Tuple{Matrix{T}, Matrix{T}, Vector{Int}}
+  if RBInfo.fun_mdeim
+    fun_mdeim(FEMSpace, RBInfo, RBVars, μ, var)::Tuple{Matrix{T}, Matrix{T}, Vector{Int}}
   else
     standard_MMDEIM(FEMSpace, RBInfo, RBVars, μ, var)::Tuple{Matrix{T}, Matrix{T}, Vector{Int}}
   end
@@ -167,7 +167,7 @@ function standard_MMDEIM(
   μ::Vector{Vector{Float}},
   var::String) where {ID,D,T}
 
-  nₛ = isnonlinear(RBInfo, var) ? RBVars.nₛ[1] : RBInfo.nₛ_MDEIM
+  nₛ = isnonlinear(RBInfo, var) ? RBVars.nₛ[1] : RBInfo.mdeim_nsnap
   Mat = Mat_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
 
   ivals = Broadcasting(Mat)(1:nₛ)
@@ -190,7 +190,7 @@ function standard_VMDEIM(
   μ::Vector{Vector{Float}},
   var::String) where {ID,D,T}
 
-  nₛ = isnonlinear(RBInfo, var) ? RBVars.nₛ[1] : RBInfo.nₛ_MDEIM
+  nₛ = isnonlinear(RBInfo, var) ? RBVars.nₛ[1] : RBInfo.mdeim_nsnap
   Vec = Vec_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
 
   vals = Broadcasting(Vec)(1:nₛ)
@@ -204,7 +204,7 @@ function standard_VMDEIM(
 
 end
 
-function functional_MDEIM(
+function fun_mdeim(
   FEMSpace::FOMST{ID,D},
   RBInfo::ROMInfoST{ID},
   RBVars::ROMMethodST{ID,T},
@@ -238,7 +238,7 @@ function θ_snapshots(
   var::String) where {ID,D,T}
 
   timesθ = get_timesθ(RBInfo)
-  nₛ = isnonlinear(RBInfo, var) ? RBVars.nₛ[1] : RBInfo.nₛ_MDEIM
+  nₛ = isnonlinear(RBInfo, var) ? RBVars.nₛ[1] : RBInfo.mdeim_nsnap
 
   function θ_st_linear()
     Param = ParamInfo(RBInfo, μ[1:nₛ], var)

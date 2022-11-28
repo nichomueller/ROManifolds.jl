@@ -356,7 +356,7 @@ function θ(
   if Param.var ∈ RBInfo.affine_structures
     θ = [[Param.funₜ(tθ) for tθ in timesθ]]
   else
-    if RBInfo.st_MDEIM
+    if RBInfo.st_mdeim
       red_timesθ = timesθ[MDEIM.time_idx]
       Mats_μ_hyp = assemble_hyperred_matrix(
         FEMSpace, FEMInfo, Param, MDEIM.el, red_timesθ)
@@ -383,7 +383,7 @@ function θ(
   if Param.var ∈ RBInfo.affine_structures
     θ = [[Param.funₜ(tθ) for tθ in timesθ]]
   else
-    if RBInfo.st_MDEIM
+    if RBInfo.st_mdeim
       red_timesθ = timesθ[MDEIM.time_idx]
       Vecs_μ_hyp = assemble_hyperred_vector(
         FEMSpace, FEMInfo, Param, MDEIM.el, red_timesθ)
@@ -407,7 +407,7 @@ function θ_function(
 
   @assert isnonlinear(RBInfo, Param.var) "This method is only for nonlinear variables"
 
-  if RBInfo.st_MDEIM
+  if RBInfo.st_mdeim
     red_timesθ = timesθ[MDEIM.time_idx]
     Fun_μ_hyp = assemble_hyperred_fun_mat(
       FEMSpace, FEMInfo, Param, MDEIM.el, red_timesθ)
@@ -428,7 +428,7 @@ function θ_function(
 
   @assert isnonlinear(RBInfo, Param.var) "This method is only for nonlinear variables"
 
-  if RBInfo.st_MDEIM
+  if RBInfo.st_mdeim
     red_timesθ = timesθ[MDEIM.time_idx]
     Fun_μ_hyp = assemble_hyperred_fun_vec(
       FEMSpace, FEMInfo, Param, MDEIM.el, red_timesθ)

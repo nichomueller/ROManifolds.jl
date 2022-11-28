@@ -85,7 +85,7 @@ end
 
 function get_linear_vectors(RBInfo::ROMInfo)
   lv = setdiff(get_FEM_vectors(RBInfo), get_nonlinear_vectors(RBInfo))::Vector{String}
-  RBInfo.online_RHS ? String[] : lv
+  RBInfo.online_rhs ? String[] : lv
 end
 
 function get_affine_matrices(RBInfo::ROMInfo)
