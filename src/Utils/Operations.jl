@@ -42,99 +42,80 @@ function generate_parameters(
 
 end
 
-"""Makes use of a truncated SVD (tolerance level specified by 'ϵ') to compute a
-  reduced basis 'U' that spans a vector space minimizing the l² distance from
-  the vector space spanned by the columns of 'S', the so-called snapshots matrix.
-  If the SPD matrix 'X' is provided, the columns of 'U' are orthogonal w.r.t.
-  the norm induced by 'X'"""
-function POD(S::Matrix{T}, ϵ::Float, X::SparseMatrixCSC{T}) where T
+get_Nt(S::AbstractMatrix,ns::Int) = Int(size(S,2)/ns)
+function mode2_unfolding(S::AbstractMatrix,ns::Int)
+  Nt = get_Nt(S,ns)
+  idx_fun(ns) = (ns .- 1)*Nt .+ 1:ns*Nt
+  idx = idx_fun.(1:ns)
+  mode2 = Matrix.(transpose.(S[idx]))
 
+  blocks_to_matrix(mode2)
+end
+
+my_svd(s::Matrix) = svd(s)
+my_svd(s::SparseMatrixCSC) = svds(s;nsv=size(S)[2]-1)[1]
+my_svd(s::Vector{AbstractMatrix}) = my_svd(blocks_to_matrix(s))
+
+function POD(S::AbstractMatrix,ϵ=1e-5)
+  U, Σ, _ = my_svd(S)
+  energies = cumsum(Σ.^2)
+  N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
+  err = sqrt(1-energies[N]/energies[end])
+  println("Basis number obtained via POD is $N, projection error ≤ $err")
+
+  U[:, 1:N]
+end
+
+function POD(S::AbstractMatrix,X::SparseMatrixCSC,ϵ=1e-5)
   H = cholesky(X)
   L = sparse(H.L)
-  U, Σ, _ = svd(L'*S[H.p, :])
+  U, Σ, _ = my_svd(L'*S[H.p, :])
 
   energies = cumsum(Σ.^2)
   N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
   err = sqrt(1-energies[N]/energies[end])
   println("Basis number obtained via POD is $N, projection error ≤ $err")
 
-  Matrix{T}((L' \ U[:, 1:N])[invperm(H.p), :])
-
+  Matrix((L' \ U[:, 1:N])[invperm(H.p), :])
 end
 
-function POD(S::SparseMatrixCSC{T}, ϵ::Float, X::SparseMatrixCSC{T}) where T
+projection(vnew::AbstractVector,v::AbstractVector) = v*(vnew'*v)
+projection(vnew::AbstractVector,basis::AbstractMatrix) =
+  sum([projection(vnew,basis[:,i]) for i=axis(basis,2)])
+orth_projection(vnew::AbstractVector,v::AbstractVector) = projection(vnew,v)/(v'*v)
+orth_projection(vnew::AbstractVector,basis::AbstractMatrix) =
+  sum([orth_projection(vnew,basis[:,i]) for i=axis(basis,2)])
 
-  H = cholesky(X)
-  L = sparse(H.L)
-  U, Σ, _ = svds(L'*S[H.p, :]; nsv=size(S)[2] - 1)[1]
+isbasis(basis,args...) =
+  all([isapprox(norm(basis[:,j],args...),1) for j=axes(basis,2)])
 
-  energies = cumsum(Σ.^2)
-  N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  err = sqrt(1-energies[N]/energies[end])
-  println("Basis number obtained via POD is $N, projection error ≤ $err")
+function orth_complement(
+  v::AbstractVector{T},
+  basis::AbstractMatrix{T}) where T
 
-  Matrix{T}((L' \ U[:, 1:N])[invperm(H.p), :])
-
+  @assert isbasis(basis) "Provide a basis"
+  v - projection(v,basis)
 end
 
-function POD(S::Matrix{T}, ϵ::Float) where T
-
-  U, Σ, _ = svd(S)
-
-  energies = cumsum(Σ.^2)
-  N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  err = sqrt(1-energies[N]/energies[end])
-  println("Basis number obtained via POD is $N, projection error ≤ $err")
-
-  T.(U[:, 1:N])
-
-end
-
-function POD(S::SparseMatrixCSC{T}, ϵ::Float) where T
-
-  U, Σ, _ = svds(S; nsv=size(S)[2] - 1)[1]
-
-  energies = cumsum(Σ.^2)
-  N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  err = sqrt(1-energies[N]/energies[end])
-  println("Basis number obtained via POD is $N, projection error ≤ $err")
-
-  T.(U[:, 1:N])
-
-end
-
-function POD(S::AbstractArray{T}, ϵ::Float, ::Nothing) where T
-
-  POD(S, ϵ)
-
-end
-
-function Gram_Schmidt(
-  Vecs::Vector{Vector{T}},
-  Φₛ::Matrix{T},
-  X₀::SparseMatrixCSC{Float, Int}) where T
-
-  function orthogonalize(vec::Vector{T}, Φ::Matrix{T})
-    proj(j::Int) = (dot(vec, Φ[:, j], X₀) / norm(Φ[:, j], X₀)) * Φ[:, j]
-    vec - sum(Broadcasting(proj)(1:size(Φ)[2]))
-  end
+function gram_schmidt!(vec::Matrix,basis::Vector)
 
   println("Normalizing primal supremizer 1")
-  Vecs[1] = orthogonalize(Vecs[1], Φₛ)
-  Vecs[1] /= norm(Vecs[1], X₀)
+  vec[:,1] = orth_complement(vec[:,1],basis)
 
-  for i = 2:length(Vecs)
+  for i = 2:size(vec,2)
     println("Normalizing primal supremizer $i")
-
-    Vecs[i] = orthogonalize(Vecs[i], Φₛ)
-    Vecs[i] = orthogonalize(Vecs[i], blocks_to_matrix(Vecs[1:i-1]))
-    supr_norm = norm(Vecs[i], X₀)
-
+    vec[:,i] = orth_complement(vec[:,i],basis)
+    vec[:,i] = orth_complement(vec[:,i],vec[:,1:i-1])
+    supr_norm = norm(vec[:,i])
     println("Norm supremizers: $supr_norm")
-    Vecs[i] /= supr_norm
+    vec[:,i] /= supr_norm
   end
 
-  Vecs::Vector{Vector{T}}
+  vec::Vector{Vector{T}}
+end
+
+function gram_schmidt!(vec::Vector{Vector},basis::Matrix)
+  gram_schmidt!(blocks_to_matrix(vec),basis)
 end
 
 function solve_cholesky(
@@ -174,23 +155,6 @@ function solve_cholesky(
   x = L[invperm(H.p), :]' \ y
 
   Vector{T}(x)
-end
-
-function mode₂_unfolding(Mat₁::Matrix{T}, nₛ::Int) where T
-  Nₛ, Nₜnₛ = size(Mat₁)
-  Nₜ = Int(Nₜnₛ/nₛ)
-  Mat₂ = zeros(T, Nₜ, Nₛ*nₛ)
-
-  function mode₂(i::Int)
-    Matrix{T}(Mat₁[:, (i-1)*Nₜ+1:i*Nₜ]')
-  end
-
-  blocks_to_matrix(Broadcasting(mode₂)(1:nₛ))::Matrix{T}
-
-end
-
-function mode₂_unfolding(Mat₁::Vector{Matrix{T}}, nₛ::Int) where T
-  Broadcasting(mat₁ -> mode₂_unfolding(mat₁, nₛ))(Mat₁)::Vector{Matrix{T}}
 end
 
 function vector_to_matrix(

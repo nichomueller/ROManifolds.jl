@@ -174,7 +174,7 @@ function standard_MMDEIM(
   row_idx = first.(ivals)[1]
   vals = last.(ivals)
   vals_space = blocks_to_matrix(vals)
-  vals_time = mode₂_unfolding(vals_space, nₛ)
+  vals_time = mode2_unfolding(vals_space, nₛ)
 
   snaps_space = MDEIM_POD(vals_space, RBInfo.ϵₛ)
   snaps_time = MDEIM_POD(vals_time, RBInfo.ϵₜ*1e-5)
@@ -195,7 +195,7 @@ function standard_VMDEIM(
 
   vals = Broadcasting(Vec)(1:nₛ)
   vals_space = blocks_to_matrix(vals)
-  vals_time = mode₂_unfolding(vals_space, nₛ)
+  vals_time = mode2_unfolding(vals_space, nₛ)
 
   snaps_space = MDEIM_POD(vals_space, RBInfo.ϵₛ)
   snaps_time = MDEIM_POD(vals_time, RBInfo.ϵₜ*1e-5)
@@ -269,7 +269,7 @@ function θ_phys_quadp_snapshot(
   θfun(tθ) = blocks_to_matrix(Broadcasting(n -> θfun(tθ,n))(1:ncells))[:]
 
   θ_space = blocks_to_matrix(Broadcasting(θfun)(timesθ))
-  θ_time = mode₂_unfolding(θ_space, nₛ)
+  θ_time = mode2_unfolding(θ_space, nₛ)
 
   θ_space, θ_time
 

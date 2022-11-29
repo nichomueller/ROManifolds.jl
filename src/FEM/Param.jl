@@ -29,25 +29,6 @@ realization(P::ParamSpace) = Param(generate_param(P))
 realization(P::ParamSpace,n) = Param.(generate_param(P,n))
 get_μ(p::Param) = p.param
 
-mutable struct ParamFunction{S}
-  id::Symbol
-  pspace::ParamSpace
-  f::Function
-
-  function ParamFunction(
-    ::ProblemType{I,S,M},
-    id::Symbol,
-    pspace::ParamSpace,
-    f::Function) where {I,S,M}
-    new{S}(id,pspace,f)
-  end
-end
-
-function realization(fμ::ParamFunction)
-  μ = realization(fμ.pspace)
-  μ,fμ.f(μ)
-end
-
 Base.zero(::Type{Param}) = 0.
 Base.iterate(p::Param,i = 1) = iterate(p.param,i)
 Base.getindex(p::Param,args...) = getindex(p.param,args...)

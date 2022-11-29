@@ -1,11 +1,7 @@
 function Gridap.Algebra.allocate_matrix(::Type{T}) where T
-  Matrix{T}[]
+  Matrix{T}(undef,0,0)
 end
 
 function Gridap.Algebra.allocate_vector(::Type{T}) where T
-  Vector{T}[]
-end
-
-function allocate_snapshot(id::Symbol,empty_snap::AbstractArray{T}) where T
-  Snapshot(id,empty_snap)
+  Vector{T}(undef,0,0)
 end

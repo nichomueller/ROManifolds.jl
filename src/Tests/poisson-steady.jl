@@ -10,7 +10,7 @@ function configure()
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/poisson"
   mesh = "cube5x5x5.json"
   bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
-  degree = 2
+  degree = 1
 
   ranges = Param.(fill([1.,10.],6))
   sampling = UniformSampling()
@@ -28,18 +28,33 @@ function configure()
   op = ParamAffineFEOperator(lhs,rhs,PS,U,V)
 
   solver = LinearFESolver()
-  uh,μ = get_fe_snapshots(solver,op,fepath,execute_fem,1)
+  uh,ph,μ = get_fe_snapshots(solver,op,fepath,execute_fem,1)
 
   opA = ParamVarOperator(a,afe,PS,U,V,Nonaffine())
   opF = ParamVarOperator(f,ffe,PS,V,Nonaffine())
   opH = ParamVarOperator(h,hfe,PS,V,Nonaffine())
 
-  ϵ = 1e-5
-  use_energy_norm = false
-  mdeim_nsnap = 20
-  online_rhs = false
-  get_offline_structures = false
-  save_offline = true
-  save_online = true
-  postprocess = false
+  rbinfo = RBInfo(ptype,mesh,root;ϵ=1e-5,mdeim_nsnap=20)
+
+  offline_phase()
+  online_phase()
+end
+
+function offline_phase()
+  if get_offline_structures
+    get_rb(RBInfo,RBVars)
+    operators = get_offline_structures(RBInfo,RBVars)
+    if !all(isempty.(operators))
+      assemble_offline_structures(RBInfo,RBVars,operators)
+    end
+  else
+    println("Building reduced basis via POD")
+    assemble_rb.(uh,ph)
+    operators = set_operators(RBInfo)
+    assemble_offline_structures(RBInfo,RBVars,operators)
+  end
+end
+
+function online_phase()
+
 end

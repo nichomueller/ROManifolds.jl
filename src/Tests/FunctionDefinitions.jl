@@ -34,10 +34,13 @@ function poisson_functions(
   a,afe,f,ffe,h,hfe,g,lhs,rhs
 end
 
+function navier_stokes_functions(dΩ::Measure,dΓn::Measure,ptype::ProblemType)
+  navier_stokes_functions(dΩ,dΓn,issteady(ptype))
+end
+
 function navier_stokes_functions(
   dΩ::Measure,
   dΓn::Measure,
-  P::ParamSpace,
   ::Val{true})
 
   function a(x,p::Param)
@@ -65,12 +68,10 @@ function navier_stokes_functions(
 
   afe(μ,u,v) = ∫(a(μ) * ∇(v) ⊙ ∇(u))dΩ
   bfe(μ,u,q) = ∫(b(μ) * q * (∇⋅(u)))dΩ
-  cfe(μ,z,u,v) = ∫(c(μ)*v⊙(∇(u)'⋅z))dΩ
-  cfe(μ,z) = (u,v) -> cfe(μ,z,u,v)
-  cfe(z) = cfe(realization(P),z)
-  dfe(μ,z,u,v) = ∫(d(μ)*v⊙(∇(z)'⋅u))dΩ
-  dfe(μ,z) = (u,v) -> dfe(μ,z,u,v)
-  dfe(z) = dfe(realization(P),z)
+  cfe(z,u,v) = ∫(c(realization(P))*v⊙(∇(u)'⋅z))dΩ
+  cfe(z) = (u,v) -> cfe(z,u,v)
+  dfe(z,u,v) = ∫(d(realization(P))*v⊙(∇(z)'⋅u))dΩ
+  dfe(z) = (u,v) -> dfe(z,u,v)
   ffe(μ,v) = ∫(f(μ) ⋅ v)dΩ
   hfe(μ,v) = ∫(h(μ) ⋅ v)dΓn
 
@@ -85,13 +86,12 @@ function navier_stokes_functions(
   res(μ,(u,p),(v,q)) = lhs(μ,(u,p),(v,q)) + c(u,v) - rhs(μ,(v,q))
   jac(μ,(u,p),(du,dp),(v,q)) = lhs(μ,(du,dp),(v,q)) + dc(u,du,v)
 
-  afe,bfe,cfe,dfe,ffe,hfe,aμ,bμ,cμ,dμ,fμ,hμ,gμ,res,jac
+  a,b,f,h,g,afe,bfe,cfe,dfe,ffe,hfe,res,jac
 end
 
 function navier_stokes_functions(
   dΩ::Measure,
   dΓn::Measure,
-  P::ParamSpace,
   ::Val{false})
 
   function a(x,p::Param,t::Real)
@@ -100,44 +100,43 @@ function navier_stokes_functions(
   end
   a(μ::Param,t::Real) = x->a(x,μ,t)
   a(μ::Param) = t->a(μ,t)
-  aμ = ParamFunction(ptype,:A,P,a)
+
   b(x,μ::Param,t::Real) = 1.
   b(μ::Param,t::Real) = x->b(x,μ,t)
   b(μ::Param) = t->b(μ,t)
-  bμ = ParamFunction(ptype,:B,P,b)
+
   c(x,μ::Param,t::Real) = 1.
   c(μ::Param,t::Real) = x->c(x,μ,t)
   c(μ::Param) = t->c(μ,t)
-  cμ = ParamFunction(ptype,:C,P,c)
+
   d(x,μ::Param,t::Real) = 1.
   d(μ::Param,t::Real) = x->d(x,μ,t)
   d(μ::Param) = t->d(μ,t)
-  dμ = ParamFunction(ptype,:D,P,d)
+
   function f(x,p::Param,t::Real)
     μ = get_μ(p)
     1. + sin(t)*Point(μ[4:6]).*x
   end
   f(μ::Param,t::Real) = x->f(x,μ,t)
   f(μ::Param) = t->f(μ,t)
-  fμ = ParamFunction(ptype,:F,P,f)
+
   function h(x,p::Param,t::Real)
     μ = get_μ(p)
     1. + sin(t)*Point(μ[4:6]).*x
   end
   h(μ::Param,t::Real) = x->h(x,μ,t)
   h(μ::Param) = t->h(μ,t)
-  hμ = ParamFunction(ptype,:H,P,h)
+
   function g(x,p::Param,t::Real)
     μ = get_μ(p)
     1. + sin(t)*Point(μ[4:6]).*x
   end
   g(μ::Param,t::Real) = x->g(x,μ,t)
   g(μ::Param) = t->g(μ,t)
-  gμ = ParamFunction(ptype,:G,P,g)
+
   m(x,μ::Param,t::Real) = 1.
   m(μ::Param,t::Real) = x->m(x,μ,t)
   m(μ::Param) = t->m(μ,t)
-  mμ = ParamFunction(ptype,:M,P,m)
 
   mfe(μ,t,u,v) = ∫(v⋅u)dΩ
   afe(μ,t,u,v) = ∫(a(μ,t)*∇(v) ⊙ ∇(u))dΩ
@@ -163,5 +162,5 @@ function navier_stokes_functions(
   jac(μ,t,(u,p),(du,dp),(v,q)) = lhs(μ,t,(du,dp),(v,q)) + dcgridap(u,du,v)
   jac_t(μ,t,(u,p),(dut,dpt),(v,q)) = mfe(μ,t,(dut,dpt),(v,q))
 
-  afe,bfe,cfe,dfe,ffe,hfe,mfe,aμ,bμ,cμ,dμ,fμ,hμ,gμ,mμ,res,jac,jac_t
+  a,b,c,d,f,h,m,g,afe,bfe,cfe,dfe,ffe,hfe,mfe,res,jac,jac_t
 end

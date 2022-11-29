@@ -91,13 +91,13 @@ function assemble_RB_time(
   println("Temporal POD, tolerance: $(RBInfo.ϵₛ)")
   RBVars.offline_time += @elapsed begin
 
-    if RBInfo.t_red_method == "ST-HOSVD"
+    if RBInfo.time_red_method == "ST-HOSVD"
       ΦₛᵀS(i) = RBVars.Φₛ[i]' * RBVars.S[i]
       S = Broadcasting(ΦₛᵀS)(eachindex(RBVars.S))
     else
       S = RBVars.S
     end
-    S₂ = mode₂_unfolding(S, RBInfo.nₛ)
+    S₂ = mode2_unfolding(S, RBInfo.nₛ)
 
     RBVars.Φₜ = Broadcasting(S -> POD(S, RBInfo.ϵₜ))(S₂)
   end

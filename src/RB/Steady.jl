@@ -1,26 +1,5 @@
 ################################# OFFLINE ######################################
 
-function get_snapshot_matrix(
-  RBInfo::ROMInfoS{ID},
-  RBVars::ROMMethodS{ID,T}) where {ID,T}
-
-  function get_S_var(var::String)
-    println("Importing the snapshot matrix for field $var,
-      number of snapshots considered: $(RBInfo.nₛ)")
-    S = load_CSV(Matrix{T}(undef,0,0),
-      joinpath(get_snap_path(RBInfo), "$(var)ₕ.csv"))[:, 1:RBInfo.nₛ]
-    println("Dimension of snapshot matrix: $(size(S))")
-
-    S, size(S)[1]
-  end
-
-  S_info = Broadcasting(get_S_var)(RBInfo.unknowns)::Vector{Tuple{Matrix{T}, Int}}
-  RBVars.S, RBVars.Nₛ = first.(S_info), last.(S_info)
-
-  return
-
-end
-
 function assemble_RB(
   RBInfo::ROMInfoS{ID},
   RBVars::ROMMethodS{ID,T}) where {ID,T}
@@ -93,10 +72,6 @@ function assemble_matricesₙ(
   RBVars::ROMMethodS{ID,T},
   Params::Vector{<:ParamInfo}) where {ID,T}
 
-  lin_Mat_ops = get_linear_matrices(RBInfo)
-  matrix_Vars = MVariable(RBInfo, RBVars, lin_Mat_ops)
-  matrix_Params = ParamInfo(Params, lin_Mat_ops)
-  assemble_termsₙ(matrix_Vars, matrix_Params)::Vector{Matrix{T}}
 
 end
 
@@ -105,10 +80,6 @@ function assemble_vectorsₙ(
   RBVars::ROMMethodS{ID,T},
   Params::Vector{<:ParamInfo}) where {ID,T}
 
-  lin_Vec_ops = intersect(get_linear_vectors(RBInfo), set_operators(RBInfo))
-  vector_Vars = VVariable(RBInfo, RBVars, lin_Vec_ops)
-  vector_Params = ParamInfo(Params, lin_Vec_ops)
-  assemble_termsₙ(vector_Vars, vector_Params)::Vector{Matrix{T}}
 
 end
 
@@ -117,10 +88,6 @@ function assemble_function_matricesₙ(
   RBVars::ROMMethodS{ID,T},
   Params::Vector{<:ParamInfo}) where {ID,T}
 
-  nonlin_Mat_ops = get_nonlinear_matrices(RBInfo)
-  matrix_Vars = MVariable(RBInfo, RBVars, nonlin_Mat_ops)
-  matrix_Params = ParamInfo(Params, nonlin_Mat_ops)
-  assemble_function_termsₙ(matrix_Vars, matrix_Params)::Vector{<:Function}
 
 end
 
@@ -129,10 +96,6 @@ function assemble_function_vectorsₙ(
   RBVars::ROMMethodS{ID,T},
   Params::Vector{<:ParamInfo}) where {ID,T}
 
-  nonlin_Vec_ops = get_nonlinear_vectors(RBInfo)
-  vector_Vars = VVariable(RBInfo, RBVars, nonlin_Vec_ops)
-  vector_Params = ParamInfo(Params, nonlin_Vec_ops)
-  assemble_function_termsₙ(vector_Vars, vector_Params)::Vector{<:Function}
 
 end
 
@@ -141,9 +104,6 @@ function assemble_RHS(
   RBInfo::ROMInfoS{ID},
   μ::Vector{T}) where {ID,D,T}
 
-  lv = setdiff(get_FEM_vectors(RBInfo), get_nonlinear_vectors(RBInfo))
-  ParamVec = ParamInfo(RBInfo, μ, lv)
-  assemble_FEM_vector(FEMSpace, RBInfo, ParamVec)
 
 end
 

@@ -5,8 +5,8 @@ test_path(root,mesh,::Val{true}) = joinpath(root,"steady/$mesh")
 test_path(root,mesh,::Val{false}) = joinpath(root,"unsteady/$mesh")
 
 function fem_path(
-  mesh::String,
   ptype::ProblemType,
+  mesh::String,
   root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes")
 
   @assert isdir(root) "Provide valid root path"
@@ -17,8 +17,8 @@ function fem_path(
 end
 
 function rom_path(
-  mesh::String,
   ptype::ProblemType,
+  mesh::String,
   root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes")
 
   @assert isdir(root) "Provide valid root path"
@@ -33,19 +33,26 @@ function rom_offline_path(
   ptype::ProblemType,
   root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes")
 
-  rb_off_path = joinpath(rom_path(mesh,ptype,root),"offline")
+  rb_off_path = joinpath(rom_path(ptype,mesh,root),"offline")
   create_dir!(rb_off_path)
   rb_off_path
 end
 
 function rom_online_path(
-  mesh::String,
   ptype::ProblemType,
+  mesh::String,
   root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes")
 
-  rb_on_path = joinpath(rom_path(mesh,ptype,root),"online")
+  rb_on_path = joinpath(rom_path(ptype,mesh,root),"online")
   create_dir!(rb_on_path)
   rb_on_path
+end
+
+function rom_off_on_paths(
+  ptype::ProblemType,
+  mesh::String,
+  root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes")
+  rom_offline_path(ptype,mesh,root)
 end
 
 function mesh_path(
@@ -87,7 +94,7 @@ function model_info(
   ::String,
   bnd_info::Dict,
   degree::Int,
-  ::Val{false})
+  ::Val{true})
 
   function model(μ) end
   set_labels!(model,bnd_info)
@@ -108,29 +115,40 @@ function model_info(
   model_info(mshpath,bnd_info,degree,ispdomain(ptype))
 end
 
-function get_fe_snapshots(solver,op,fepath::String,run_fe::Bool,args...)
-  run_fe ? get_fe_snapshots(solver,op,fepath,args...) : get_fe_snapshots(fepath)
+function get_fe_snapshots(ptype::ProblemType,solver,op,fepath::String,run_fe::Bool,args...)
+  if run_fe
+    get_fe_snapshots(ptype,solver,op,fepath,args...)
+  else
+    get_fe_snapshots(ptype,fepath)
+  end
 end
 
-function get_fe_snapshots(fepath::String)
-  uh,μ = allocate_snapshot.([:u,:μ],[Matrix{Float},Vector{Param}])
-  load!(uh,fepath),load!(μ,fepath)
+get_fe_snapshots(ptype::ProblemType,fepath::String) =
+  get_fe_snapshots(isindef(ptype),fepath)
+
+function get_fe_snapshots(::Val{false},fepath::String)
+  uh,μ = load.(joinpath(fepath,"uh"),joinpath(fepath,"μ"))
+  Snapshots.([:u,:μ],[uh,μ])
+end
+
+function get_fe_snapshots(::Val{true},fepath::String)
+  uh,ph,μ = load.(joinpath(fepath,"uh"),joinpath(fepath,"ph"),joinpath(fepath,"μ"))
+  Snapshots.([:u,:p,:μ],[uh,ph,μ])
 end
 
 function get_fe_snapshots(
+  ptype::ProblemType,
   solver::FESolver,
   op::ParamFEOperator,
   fepath::String,
   n=100)
 
   sol = solve(solver,op,n)
-  uh,μ = collect_solutions(sol)
-  usnap,μsnap = Snapshot(:u,uh),Snapshot(:μ,μ)
-  save(usnap,fepath),save(μsnap,fepath)
-  usnap,μsnap
+  get_fe_snapshots(isindef(ptype),sol,fepath)
 end
 
 function get_fe_snapshots(
+  ptype::ProblemType,
   solver::ThetaMethod,
   op::ParamTransientFEOperator,
   fepath::String,
@@ -139,10 +157,23 @@ function get_fe_snapshots(
   n=100)
 
   sol = solve(solver,op,t0,tF,n)
+  get_fe_snapshots(isindef(ptype),sol,fepath)
+end
+
+function get_fe_snapshots(::Val{false},sol,fepath::String)
   uh,μ = collect_solutions(sol)
-  usnap,μsnap = Snapshot(:u,uh),Snapshot(:μ,μ)
-  save(usnap,fepath),save(μsnap,fepath)
+  usnap,μsnap = Snapshots.([:u,:μ],[uh,μ])
+  save([usnap,μsnap],[fepath,fepath])
   usnap,μsnap
+end
+
+function get_fe_snapshots(::Val{false},sol,fepath::String)
+  Ns = get_Ns(op)
+  uh,μ = collect_solutions(sol)
+  uh,ph = uh[1:Ns[1],:],uh[Ns[1]+1:end,:]
+  usnap,psnap,μsnap = Snapshots.([:u,:p,:μ],[uh,ph,μ])
+  save([usnap,psnap,μsnap],[fepath,fepath,fepath])
+  usnap,psnap,μsnap
 end
 
 function collect_solutions(sol)

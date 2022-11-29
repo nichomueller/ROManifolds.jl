@@ -115,6 +115,9 @@ function get_fd_dofs(tests::MyTests,trials::MyTrials)
   (fdofs_test,fdofs_trial),ddofs
 end
 
+get_Ns(s) = num_free_dofs(s)
+get_Ns(s::MultiFieldFESpace) = num_free_dofs.(s.spaces)
+
 struct Nonaffine <: OperatorType end
 abstract type ParamVarOperator{OT,TT} end
 
@@ -182,27 +185,60 @@ function assemble_matrix_and_lifting(
   [μ -> assemble_matrix(afe(μ),trials.trial,tests.test)]
 end
 
-mutable struct Snapshot{T}
+get_structure(p::ParamLinOperator) = μ -> p.A(μ)
+get_structure(p::ParamBilinOperator) = μ -> p.A[1](μ)
+get_lift(::ParamVarOperator) = error("This param var has no lifting")
+get_lift(p::ParamBilinOperator) = μ -> p.A[2](μ)
+get_nsnap(v::AbstractVector) = length(v)
+get_nsnap(m::AbstractMatrix) = size(m,2)
+
+mutable struct Snapshots{T}
   id::Symbol
   snap::AbstractArray{T}
+  nsnap::Int
+  function Snapshots(id::Symbol,snap::AbstractArray{T}) where T
+    new{T}(id,snap,get_nsnap(snap))
+  end
 end
 
-correct_path(s::Snapshot,path::String) = joinpath(path,"$(s.id).csv")
-save(s::Snapshot,path::String) = writedlm(correct_path(s,path),s.snap, ','; header=false)
-save(s::Snapshot,::Nothing) = @warn "Could not save variable $(s.id): no path provided"
-load(path::String) = readdlm(path, ',')
-function load!(s::Snapshot,path::String)
-  s.snap = readdlm(correct_path(s,path), ',')
+function allocate_snapshot(id::Symbol,::Type{T}) where T
+  emat = allocate_matrix(T)
+  Snapshots(id,emat)
+end
+
+get_id(s::Snapshots) = s.id
+get_snap(s::Snapshots) = s.snap
+get_nsnap(s::Snapshots) = s.nsnap
+cut_snapshots(s::Snapshots,idx) = Snapshots(s.id,getindex(s.snap,idx))
+correct_path(path::String) = joinpath(path,".csv")
+correct_path(s::Snapshots,path::String) = joinpath(path,"$(s.id).csv")
+save(s,path::String) = writedlm(correct_path(path),s, ','; header=false)
+save(s::Snapshots,path::String) = save(s.snap,correct_path(s,path))
+
+function load_snap!(s::Snapshots,path::String)
+  snap = load(correct_path(s,path))
+  s.snap = snap
+  s.nsnap = get_nsnap(snap)
   s
 end
 
-abstract type Problem{PT<:ProblemType} end
+function load_snap(id::Symbol,path::String)
+  s = allocate_snapshot(id,T)
+  load_snap!(s,path)
+end
+
+get_Nt(s::Snapshots) = get_Nt(get_snap(s),get_nsnap(s))
+mode2_unfolding(s::Snapshots) = mode2_unfolding(get_snap(s),get_nsnap(s))
+POD(s::Snapshots,args...) = POD(s.snap,args...)
+POD(s::Vector{Snapshots},args...) = Broadcasting(si->POD(si,args...))(s)
+
+#= abstract type Problem{PT<:ProblemType} end
 
 struct SteadyProblem{PT} <: Problem{PT}
-  μ::Snapshot{Param}
-  xh::Snapshot{Float}
+  μ::Snapshots{Param}
+  xh::Snapshots{Float}
   param_op::Vector{ParamVarOperator}
-end
+end =#
 
 struct TimeInfo
   t0::Real
@@ -215,17 +251,17 @@ get_dt(ti::TimeInfo) = ti.dt
 get_θ(ti::TimeInfo) = ti.θ
 get_timesθ(ti::TimeInfo) = collect(ti.t0:ti.dt:ti.tF-ti.dt).+ti.dt*ti.θ
 
-struct UnsteadyProblem{PT} <: Problem{PT}
-  μ::Snapshot{Param}
-  xh::Snapshot{Float}
+#= struct UnsteadyProblem{PT} <: Problem{PT}
+  μ::Snapshots{Param}
+  xh::Snapshots{Float}
   param_op::Vector{ParamVarOperator}
   time_info::TimeInfo
 end
 
 function Problem(
   ::PT,
-  μ::Snapshot,
-  xh::Snapshot,
+  μ::Snapshots,
+  xh::Snapshots,
   param_op::Vector{ParamVarOperator})
 
   SteadyProblem{PT}(μ,xh,param_op)
@@ -233,8 +269,8 @@ end
 
 function Problem(
   ::PT,
-  μ::Snapshot,
-  xh::Snapshot,
+  μ::Snapshots,
+  xh::Snapshots,
   param_op::Vector{ParamVarOperator},
   time_info::TimeInfo)
 
@@ -243,13 +279,11 @@ end
 
 function Problem(
   ::PT,
-  μ::Snapshot,
-  xh::Snapshot,
+  μ::Snapshots,
+  xh::Snapshots,
   param_op::Vector{ParamVarOperator},
   t0,tF,dt,θ)
 
   time_info = TimeInfo(t0,tF,dt,θ)
   UnsteadyProblem{PT}(μ,xh,param_op,time_info)
-end
-
-num_of_snapshots(p::Problem) = length(p.μ)
+end =#

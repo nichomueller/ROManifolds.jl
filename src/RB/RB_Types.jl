@@ -1,434 +1,196 @@
-struct ROMPath
-  ROM_structures_path::String
-  results_path::String
+abstract type RBSpace{T} end
+
+struct RBSpaceSteady{T} <: RBSpace{T}
+  snaps::Snapshots{T}
+  basis_space::Matrix{T}
+
+  function RBSpaceSteady(
+    snaps::Snapshots{T},
+    basis_space::Matrix{T}) where T
+
+    new{T}(snaps,basis_space)
+  end
 end
 
-function ROMPath(FEMPaths)
+struct RBSpaceUnsteady{T} <: RBSpace{T}
+  snaps::Snapshots{T}
+  basis_space::Matrix{T}
+  basis_time::Matrix{T}
 
-  ROM_path = joinpath(FEMPaths.current_test, "ROM")
-  create_dir(ROM_path)
-  ROM_structures_path = joinpath(ROM_path, "ROM_structures")
-  create_dir(ROM_structures_path)
-  results_path = joinpath(ROM_path, "results")
-  create_dir(results_path)
+  function RBSpaceUnsteady(
+    snaps::Snapshots{T},
+    basis_space::Matrix{T},
+    basis_time::Matrix{T}) where T
 
-  ROMPath(ROM_structures_path, results_path)
-
+    new{T}(snaps,basis_space,basis_time)
+  end
 end
 
-abstract type ROMInfo{ID} end
+function allocate_rbspace_steady(id::Symbol,::Type{T}) where T
+  esnap = allocate_snapshot(id,T)
+  emat = allocate_matrix(T)
+  RBSpaceSteady(esnap,emat)
+end
 
-struct ROMInfoS{ID} <: ROMInfo{ID}
-  FEMInfo::FOMInfoS{ID}
-  Paths::ROMPath
-  nₛ::Int
-  ϵₛ::Float
+function allocate_rbspace_unsteady(id::Symbol,::Type{T}) where T
+  esnap = allocate_snapshot(id,T)
+  emat = allocate_matrix(T)
+  RBSpaceUnsteady(esnap,emat,emat)
+end
+
+get_snaps(rb::RBSpace) = rb.snaps
+get_basis_space(rb::RBSpace) = rb.basis_space
+get_basis_time(rb::RBSpaceUnsteady) = rb.basis_time
+get_basis_spacetime(rb::RBSpaceUnsteady) = kron(rb.basis_space,rb.basis_time)
+correct_path(rb::RBSpace,path::String) = correct_path(rb.snaps,path)
+
+function save(rb::RBSpaceSteady,info::RBInfoSteady)
+  off_path = info.offline_path
+  save(rb.basis_space,correct_path(rb,joinpath(off_path,"basis_space_")))
+end
+
+function save(rb::RBSpaceUnsteady,info::RBInfoUnsteady)
+  off_path = info.offline_path
+  save(rb.basis_space,correct_path(rb,joinpath(off_path,"basis_space_")))
+  save(rb.basis_time,correct_path(rb,joinpath(off_path,"basis_time_")))
+end
+
+function load_rb!(rb::RBSpaceSteady,path::String)
+  load_snap!(rb.snaps,path)
+  rb.basis_space = load(correct_path(rb,joinpath(path,"basis_space_")))
+  rb
+end
+
+function load_rb!(rb::RBSpaceUnsteady,path::String)
+  load_snap!(rb.snaps,path)
+  rb.basis_space = load(correct_path(rb,joinpath(path,"basis_space_")))
+  rb.basis_time = load(correct_path(rb,joinpath(path,"basis_time_")))
+  rb
+end
+
+function load_rb(info::RBSpaceSteady,id::Symbol)
+  rb = allocate_rbspace_steady(id,T)
+  off_path = info.offline_path
+  load_rb!(rb,off_path)
+end
+
+function load_rb(info::RBSpaceUnsteady,id::Symbol)
+  rb = allocate_rbspace_unsteady(id,T)
+  off_path = info.offline_path
+  load_rb!(rb,off_path)
+end
+
+function rb_spatial_subspace(rb::RBSpaceUnsteady{T}) where T
+  RBSpaceSteady{T}(rb.snap,rb.basis_space)
+end
+
+function allocate_rb_solution(rb::RBSpaceSteady{T}) where T
+  ns = get_ns(rb)
+  Vector{T}(undef,ns)
+end
+
+function allocate_rb_solution(rb::RBSpaceUnsteady{T}) where T
+  ns,nt = get_ns(rb),get_nt(rb)
+  Vector{T}(undef,ns*nt)
+end
+
+get_Ns(rb::RBSpace) = size(rb.basis_space,1)
+get_ns(rb::RBSpace) = size(rb.basis_space,2)
+get_Nt(rb::RBSpaceUnsteady) = size(rb.basis_time,1)
+get_nt(rb::RBSpaceUnsteady) = size(rb.basis_time,2)
+get_dims(rb::RBSpaceSteady) = get_Ns(rb),get_ns(rb)
+get_dims(rb::RBSpaceUnsteady) = get_Ns(rb),get_ns(rb),get_Nt(rb),get_nt(rb)
+
+abstract type RBInfo end
+
+struct RBInfoSteady <: RBInfo
+  ptype::ProblemType
+  ϵ::Float
+  nsnap::Int
+  mdeim_nsnap::Int
+  offline_path::String
+  online_path::String
   use_energy_norm::Bool
   online_rhs::Bool
-  mdeim_nsnap::Int
-  post_process::Bool
   get_offline_structures::Bool
   save_offline::Bool
   save_online::Bool
+  adaptivity::Bool
+  postprocess::Bool
 end
 
-mutable struct ROMInfoST{ID} <: ROMInfo{ID}
-  FEMInfo::FOMInfoST{ID}
-  Paths::ROMPath
-  nₛ::Int
-  ϵₛ::Float
-  ϵₜ::Float
-  use_energy_norm::Bool
-  t_red_method::String
-  online_rhs::Bool
+mutable struct RBInfoUnsteady <: RBInfo
+  ptype::ProblemType
+  time_info::TimeInfo
+  ϵ::Float
+  nsnap::Int
   mdeim_nsnap::Int
-  post_process::Bool
+  offline_path::String
+  online_path::String
+  time_red_method::String
+  use_energy_norm::Bool
+  online_rhs::Bool
   get_offline_structures::Bool
   save_offline::Bool
   save_online::Bool
   st_mdeim::Bool
   fun_mdeim::Bool
   adaptivity::Bool
+  postprocess::Bool
 end
 
-function Base.getproperty(RBInfo::ROMInfoS, sym::Symbol)
-  if sym in (:affine_structures, :unknowns, :structures)
-    getfield(RBInfo.FEMInfo, sym)::Vector{String}
-  elseif sym in (:ROM_structures_path, :results_path)
-    getfield(RBInfo.Paths, sym)::String
-  else
-    getfield(RBInfo, sym)
-  end
+function RBInfo(
+  ptype::ProblemType,
+  mesh::String,
+  root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes";
+  ϵ=1e-5,nsnap=80,mdeim_snap=20,use_energy_norm=false,online_rhs=false,
+  get_offline_structures=true,save_offline=true,save_online=true,
+  adaptivity=false,postprocess=false)
+
+  offline_path,online_path = rom_off_on_paths(ptype,mesh,root)
+  RBInfoSteady(ptype,offline_path,online_path,ϵ,nsnap,mdeim_snap,
+    use_energy_norm,online_rhs,get_offline_structures,
+    save_offline,save_online,adaptivity,postprocess)
 end
 
-function Base.getproperty(RBInfo::ROMInfoST, sym::Symbol)
-  if sym in (:affine_structures, :unknowns, :structures)
-    getfield(RBInfo.FEMInfo, sym)::Vector{String}
-  elseif sym in (:θ, :t₀, :tₗ, :δt)
-      getfield(RBInfo.FEMInfo, sym)::Float
-  elseif sym in (:ROM_structures_path, :results_path)
-    getfield(RBInfo.Paths, sym)::String
-  else
-    getfield(RBInfo, sym)
-  end
+function RBInfo(
+  ptype::ProblemType,
+  time_info::TimeInfo,
+  mesh::String,
+  root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes";
+  ϵ=1e-5,nsnap=80,mdeim_snap=20,time_red_method="ST-HOSVD",
+  use_energy_norm=false,online_rhs=false,get_offline_structures=true,
+  save_offline=true,save_online=true,st_mdeim=true,fun_mdeim=false,
+  adaptivity=false,postprocess=false)
+
+  offline_path,online_path = rom_off_on_paths(ptype,mesh,root)
+  RBInfoUnsteady(ptype,time_info,offline_path,online_path,ϵ,nsnap,mdeim_snap,
+    time_red_method,use_energy_norm,online_rhs,get_offline_structures,
+    save_offline,save_online,st_mdeim,fun_mdeim,
+    adaptivity,postprocess)
 end
 
-abstract type MVMDEIM{T} end
-abstract type MVVariable{T} end
+issteady(info::RBInfo) = issteady(info.ptype)
+isindef(info::RBInfo) = isindef(info.ptype)
+ispdomain(info::RBInfo) = ispdomain(info.ptype)
+save(rb::RBSpace,info::RBInfo) = if info.save_offline save(rb,info.offline_path) end
 
-mutable struct VMDEIM{T} <: MVMDEIM{T}
-  Mat::Matrix{T}
-  Matᵢ::Matrix{T}
-  idx::Vector{Int}
-  time_idx::Vector{Int}
-  el::Vector{Int}
-end
-
-mutable struct MMDEIM{T} <: MVMDEIM{T}
-  Mat::Matrix{T}
-  Matᵢ::Matrix{T}
-  idx::Vector{Int}
-  time_idx::Vector{Int}
-  row_idx::Vector{Int}
-  el::Vector{Int}
-end
-
-mutable struct VVariable{T} <: MVVariable{T}
-  var::String
-  Matₙ::Vector{Matrix{T}}
-  MDEIM::VMDEIM{T}
-end
-
-
-mutable struct MVariable{T} <: MVVariable{T}
-  var::String
-  Matₙ::Vector{Matrix{T}}
-  MDEIM::MMDEIM{T}
-end
-
-function VVariable(var::String, ::Type{T}) where T
-
-  Matₙ = Matrix{T}[]
-
-  Mat = Matrix{T}(undef,0,0)
-  Matᵢ = Matrix{T}(undef,0,0)
-  idx = Vector{Int}(undef,0)
-  time_idx = Vector{Int}(undef,0)
-  el = Vector{Int}(undef,0)
-  MDEIM_Vec = VMDEIM{T}(Mat, Matᵢ, idx, time_idx, el)
-
-  VVariable{T}(var, Matₙ, MDEIM_Vec)
-
-end
-
-function VVariable(RBInfo::ROMInfo{ID}, var::String, ::Type{T}) where {ID,T}
-
-  if isempty(var)
-    VVariable(var, T)::VVariable{T}
-  else
-    if isvector(RBInfo, var)
-      VVariable(var, T)::VVariable{T}
-    else
-      error("Unrecognized variable")
-    end
-  end
-
-end
-
-function MVariable(var::String, ::Type{T}) where T
-
-  Matₙ = Matrix{T}[]
-
-  Mat = Matrix{T}(undef,0,0)
-  Matᵢ = Matrix{T}(undef,0,0)
-  idx = Vector{Int}(undef,0)
-  time_idx = Vector{Int}(undef,0)
-  row_idx = Vector{Int}(undef,0)
-  el = Vector{Int}(undef,0)
-  MDEIM_Mat = MMDEIM{T}(Mat, Matᵢ, idx, time_idx, row_idx, el)
-
-  MVariable{T}(var, Matₙ, MDEIM_Mat)
-
-end
-
-function MVariable(RBInfo::ROMInfo{ID}, var::String, ::Type{T}) where {ID,T}
-
-  if isempty(var)
-    MVariable(var, T)::MVariable{T}
-  else
-    if ismatrix(RBInfo, var)
-      MVariable(var, T)::MVariable{T}
-    else
-      error("Unrecognized variable")
-    end
-  end
-
-end
-
-function VVariable(Vars::Vector{<:MVVariable{T}}) where T
-  Vars_to_get = findall(x->typeof(x) == VVariable{T}, Vars)
-  Broadcasting(idx->getindex(Vars, idx))(Vars_to_get)::Vector{VVariable{T}}
-end
-
-function VVariable(
-  RBInfo::ROMInfo{ID},
-  Vars::Vector{<:MVVariable{T}},
-  var::String) where {ID,T}
-
-  if isempty(var)
-    VV = MVariable(RBInfo, "", T)
-  else
-    @assert isvector(RBInfo, var)
-    Var_to_get = findall(x->x.var == var, Vars)[1]
-    VV = Vars[Var_to_get]
-  end
-
-  VV::VVariable{T}
-
-end
-
-function VVariable(
-  RBInfo::ROMInfo{ID},
-  Vars::Vector{<:MVVariable{T}},
-  vars::Vector{String}) where {ID,T}
-
-  if isempty(vars)
-    VV = [VVariable(RBInfo, "", T)]
-  else
-    VV = Broadcasting(var->VVariable(RBInfo, Vars, var))(vars)
-  end
-
-  VV::Vector{VVariable{T}}
-
-end
-
-function VVariable(
-  RBInfo::ROMInfo{ID},
-  Vars::Vector{<:MVVariable{T}}) where {ID,T}
-
-  operators = intersect(get_FEM_vectors(RBInfo), set_operators(RBInfo))
-  VVariable(RBInfo, Vars, operators)::Vector{VVariable{T}}
-
-end
-
-function MVariable(Vars::Vector{<:MVVariable{T}}) where T
-  Vars_to_get = findall(x->typeof(x) == MVariable{T}, Vars)
-  Broadcasting(idx->getindex(Vars, idx))(Vars_to_get)::Vector{MVariable{T}}
-end
-
-function MVariable(
-  RBInfo::ROMInfo{ID},
-  Vars::Vector{<:MVVariable{T}},
-  var::String) where {ID,T}
-
-  if isempty(var)
-    MV = MVariable(RBInfo, "", T)
-  else
-    @assert ismatrix(RBInfo, var)
-    Var_to_get = findall(x->x.var == var, Vars)[1]
-    MV = Vars[Var_to_get]
-  end
-
-  MV::MVariable{T}
-
-end
-
-function MVariable(
-  RBInfo::ROMInfo{ID},
-  Vars::Vector{<:MVVariable{T}},
-  vars::Vector{String}) where {ID,T}
-
-  if isempty(vars)
-    MV = [MVariable(RBInfo, "", T)]
-  else
-    MV = Broadcasting(var->MVariable(RBInfo, Vars, var))(vars)
-  end
-
-  MV::Vector{MVariable{T}}
-
-end
-
-function MVariable(
-  RBInfo::ROMInfo{ID},
-  Vars::Vector{<:MVVariable{T}}) where {ID,T}
-
-  operators = get_FEM_matrices(RBInfo)
-  MVariable(RBInfo, Vars, operators)::Vector{MVariable{T}}
-
-end
-
-abstract type ROM{ID,T} end
-abstract type ROMS{ID,T} <: ROM{ID,T} end
-abstract type ROMST{ID,T} <: ROM{ID,T} end
-
-mutable struct VarsS{T} <: ROMS{Any,T}
-  S::Vector{Matrix{T}}
-  Φₛ::Vector{Matrix{T}}
-  x̃::Vector{Vector{Matrix{T}}}
-  X₀::Vector{SparseMatrixCSC{Float, Int}}
-  Nₛ::Vector{Int}
-  nₛ::Vector{Int}
+mutable struct RBResults
   offline_time::Float
   online_time::Float
-end
+  err::Float
+  pointwise_err::Matrix{Float}
 
-function VarsS(::Type{T}) where T
-
-  S = Matrix{T}[]
-  Φₛ = Matrix{T}[]
-  x̃ = Vector{Matrix{T}}[]
-  X₀ = Matrix{SparseMatrixCSC{Float, Int}}[]
-  Nₛ = Int[]
-  nₛ = Int[]
-  offline_time = 0.0
-  online_time = 0.0
-
-  VarsS{T}(S, Φₛ, x̃, X₀, Nₛ, nₛ, offline_time, online_time)
-
-end
-
-mutable struct ROMMethodS{ID,T} <: ROMS{ID,T}
-  SV::VarsS{T}
-  Vars::Vector{MVVariable{T}}
-  xₙ::Vector{Matrix{T}}
-  LHSₙ::Vector{Matrix{T}}
-  RHSₙ::Vector{Matrix{T}}
-end
-
-function ROMMethodS(RBInfo::ROMInfoS{ID}, ::Type{T}) where {ID,T}
-  SV = VarsS(T)
-
-  FEM_matrices = get_FEM_matrices(RBInfo)
-  MVars = Broadcasting(var->MVariable(RBInfo, var, T))(FEM_matrices)
-  FEM_vectors = get_FEM_vectors(RBInfo)
-  VVars = Broadcasting(var->VVariable(RBInfo, var, T))(FEM_vectors)
-  Vars = vcat(MVars, VVars)::Vector{MVVariable{T}}
-
-  xₙ = Matrix{T}[]
-  LHSₙ = Matrix{T}[]
-  RHSₙ = Matrix{T}[]
-
-  ROMMethodS{ID,T}(SV, Vars, xₙ, LHSₙ, RHSₙ)
-end
-
-function Base.getproperty(RBVars::ROMMethodS{ID,T}, sym::Symbol) where {ID,T}
-  if sym ∈ (:S, :Φₛ)
-    getfield(RBVars.SV, sym)::Vector{Matrix{T}}
-  elseif sym == :x̃
-    getfield(RBVars.SV, sym)::Vector{Vector{Matrix{T}}}
-  elseif sym == :X₀
-    getfield(RBVars.SV, sym)::Vector{SparseMatrixCSC{Float, Int}}
-  elseif sym ∈ (:Nₛ, :nₛ)
-    getfield(RBVars.SV, sym)::Vector{Int}
-  elseif sym ∈ (:offline_time, :online_time)
-    getfield(RBVars.SV, sym)::Float
-  else
-    getfield(RBVars, sym)
+  function RBResults()
+    new(0.,0.,0.,Matrix{Float}(undef,0,0))
   end
 end
 
-function Base.setproperty!(RBVars::ROMMethodS{ID,T}, sym::Symbol, x) where {ID,T}
-  if sym ∈ (:S, :Φₛ)
-    setfield!(RBVars.SV, sym, x)::Vector{Matrix{T}}
-  elseif sym == :x̃
-    setfield!(RBVars.SV, sym, x)::Vector{Vector{Matrix{T}}}
-  elseif sym == :X₀
-    setfield!(RBVars.SV, sym, x)::Vector{SparseMatrixCSC{Float, Int}}
-  elseif sym ∈ (:Nₛ, :nₛ)
-    setfield!(RBVars.SV, sym, x)::Vector{Int}
-  elseif sym ∈ (:offline_time, :online_time)
-    setfield!(RBVars.SV, sym, x)::Float
-  else
-    setfield!(RBVars, sym, x)
-  end
-end
+time_dict(r::RBResults) = Dict("offline_time"=>r.offline_time,"online_time"=>r.online_time)
+err_dict(r::RBResults) = Dict("err"=>r.err,"pointwise_err"=>r.pointwise_err)
 
-mutable struct VarsT{T} <: ROMST{Any,T}
-  Φₜ::Vector{Matrix{T}}
-  Nₜ::Int
-  nₜ::Vector{Int}
-  N::Vector{Int}
-  n::Vector{Int}
-end
-
-function VarsT(::Type{T}) where T
-
-  Φₜ = Matrix{T}[]
-  Nₜ = 0
-  nₜ = Int[]
-  N = Int[]
-  n = Int[]
-
-  VarsT{T}(Φₜ, Nₜ, nₜ, N, n)
-
-end
-
-mutable struct ROMMethodST{ID,T} <: ROMST{ID,T}
-  SV::VarsS{T}
-  TV::VarsT{T}
-  Vars::Vector{MVVariable{T}}
-  xₙ::Vector{Matrix{T}}
-  LHSₙ::Vector{Matrix{T}}
-  RHSₙ::Vector{Matrix{T}}
-end
-
-function ROMMethodST(RBInfo::ROMInfoST{ID}, ::Type{T}) where {ID,T}
-  SV = VarsS(T)
-  TV = VarsT(T)
-
-  FEM_matrices = get_FEM_matrices(RBInfo)
-  MVars = Broadcasting(var->MVariable(RBInfo, var, T))(FEM_matrices)
-  FEM_vectors = get_FEM_vectors(RBInfo)
-  VVars = Broadcasting(var->VVariable(RBInfo, var, T))(FEM_vectors)
-  Vars = vcat(MVars, VVars)::Vector{MVVariable{T}}
-
-  xₙ = Matrix{T}[]
-  LHSₙ = Matrix{T}[]
-  RHSₙ = Matrix{T}[]
-
-  ROMMethodST{ID,T}(SV, TV, Vars, xₙ, LHSₙ, RHSₙ)
-end
-
-function Base.getproperty(RBVars::ROMMethodST{ID,T}, sym::Symbol) where {ID,T}
-  if sym ∈ (:S, :Φₛ)
-    getfield(RBVars.SV, sym)::Vector{Matrix{T}}
-  elseif sym == :x̃
-    getfield(RBVars.SV, sym)::Vector{Vector{Matrix{T}}}
-  elseif sym == :X₀
-    getfield(RBVars.SV, sym)::Vector{SparseMatrixCSC{Float, Int}}
-  elseif sym ∈ (:Nₛ, :nₛ)
-    getfield(RBVars.SV, sym)::Vector{Int}
-  elseif sym ∈ (:offline_time, :online_time)
-    getfield(RBVars.SV, sym)::Float
-  elseif sym == :Φₜ
-    getfield(RBVars.TV, sym)::Vector{Matrix{T}}
-  elseif sym == :Nₜ
-    getfield(RBVars.TV, sym)::Int
-  elseif sym ∈ (:nₜ, :N, :n)
-    getfield(RBVars.TV, sym)::Vector{Int}
-  else
-    getfield(RBVars, sym)
-  end
-end
-
-function Base.setproperty!(RBVars::ROMMethodST{ID,T}, sym::Symbol, x) where {ID,T}
-  if sym ∈ (:S, :Φₛ)
-    setfield!(RBVars.SV, sym, x)::Vector{Matrix{T}}
-  elseif sym == :x̃
-    setfield!(RBVars.SV, sym, x)::Vector{Vector{Matrix{T}}}
-  elseif sym == :X₀
-    setfield!(RBVars.SV, sym, x)::Vector{SparseMatrixCSC{Float, Int}}
-  elseif sym ∈ (:Nₛ, :nₛ)
-    setfield!(RBVars.SV, sym, x)::Vector{Int}
-  elseif sym ∈ (:offline_time, :online_time)
-    setfield!(RBVars.SV, sym, x)::Float
-  elseif sym == :Φₜ
-    setfield!(RBVars.TV, sym, x)::Vector{Matrix{T}}
-  elseif sym == :Nₜ
-    setfield!(RBVars.TV, sym, x)::Int
-  elseif sym ∈ (:nₜ, :N, :n)
-    setfield!(RBVars.TV, sym, x)::Vector{Int}
-  else
-    setfield!(RBVars, sym, x)
-  end
+function save(rbinfo::RBInfo,r::RBResults)
+  on_path = rbinfo.online_path
+  save(time_dict(r),joinpath(on_path,"times"))
+  save(err_dict(r),joinpath(on_path,"errors"))
 end
