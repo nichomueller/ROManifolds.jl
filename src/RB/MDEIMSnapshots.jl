@@ -1,3 +1,211 @@
+basis_as_fefun(::RBLinOperator) = error("Not implemented")
+
+function basis_as_fefun(
+  op::RBBilinOperator{OT,ParamTrialFESpace,RBSpaceSteady}) where OT
+
+  bspace = get_basis_space(op)
+  ns = get_ns(bspace)
+  trial = get_trial(op)
+  fefuns(k::Int) = FEFunction(trial,bspace[:,k])
+  eval.(fefuns,1:ns)
+end
+
+function basis_as_fefun(
+  op::RBBilinOperator{OT,ParamTransientTrialFESpace,RBSpaceUnsteady}) where OT
+
+  bspace = get_basis_space(op)
+  ns = get_ns(bspace)
+  trial = get_trial(op)
+  fefuns(t::Real,k::Int) = FEFunction(trial(t),bspace[:,k])
+  fefuns(t::Real) = k->fefuns(t,k)
+  t -> eval.(fefuns(t),1:ns)
+end
+
+mdeim_snapshots(op::RBLinOperator,args...) = vector_snapshots(op,args...)
+mdeim_snapshots(op::RBLinOperator,args...) = matrix_snapshots(op,args...)
+
+function vector_snapshots(
+  op::RBLinOperator{Nonaffine,RBSpaceSteady},
+  μ::Snapshots)
+
+  id = get_id(op)
+
+  function snapshot(k::Int)
+    println("Snapshot number $k, $id")
+    assemble_vector(op)(μ[k])
+  end
+
+  values = blocks_to_matrix(snapshot.(eachindex(μ)))
+  Snapshots(id,values)
+end
+
+function vector_snapshots(
+  op::RBLinOperator{Nonlinear,RBSpaceSteady},
+  ::Snapshots)
+
+  id = get_id(op)
+  bfun = basis_as_fefun(op)
+
+  function snapshot(k::Int)
+    println("Snapshot number $k, $id")
+    assemble_vector(op)(bfun[k])
+  end
+
+  values = blocks_to_matrix(snapshot.(eachindex(bfun)))
+  Snapshots(id,values)
+end
+
+function vector_snapshots(
+  op::RBLinOperator{Nonaffine,RBSpaceUnsteady},
+  μ::Snapshots)
+
+  id = get_id(op)
+  timesθ = get_timesθ(op)
+
+  function snapshot(k::Int)
+    println("Snapshot number $k, $id")
+    assemble_vector(op)(μ[k],timesθ)
+  end
+
+  values = blocks_to_matrix(snapshot.(eachindex(μ)))
+  snaps_space = Snapshots(id,values)
+  snaps_time = Snapshots(id,mode2_unfolding(values))
+  snaps_space,snaps_time
+end
+
+function vector_snapshots(
+  op::RBLinOperator{Nonlinear,RBSpaceUnsteady},
+  ::Snapshots)
+
+  id = get_id(op)
+  bfun = basis_as_fefun(op)
+  timesθ = get_timesθ(op)
+
+  function snapshot(k::Int)
+    println("Snapshot number $k, $id")
+    assemble_vector(op)(bfun[k],timesθ)
+  end
+
+  values = blocks_to_matrix(snapshot.(eachindex(bfun)))
+  snaps_space = Snapshots(id,values)
+  snaps_time = Snapshots(id,mode2_unfolding(values))
+  snaps_space,snaps_time
+end
+
+function matrix_snapshots(
+  op::RBBilinOperator{Nonaffine,ParamTrialFESpace,RBSpaceSteady},
+  μ::Snapshots)
+
+  id = get_id(op)
+
+  function snapshot(k::Int)
+    println("Snapshot number $k, $id")
+    M = assemble_matrix(op)(μ[k])
+    i,v = findnz(M[:])
+    i,v
+  end
+
+  iv = blocks_to_matrix(snapshot.(eachindex(μ)))
+  row_idx,values = first.(iv),last.(iv)
+  check_row_idx(row_idx)
+  Snapshots(id,values)
+end
+
+function matrix_snapshots(
+  op::RBLinOperator{Nonlinear,ParamTrialFESpace,RBSpaceSteady},
+  ::Snapshots)
+
+  id = get_id(op)
+  bfun = basis_as_fefun(op)
+
+  function snapshot(k::Int)
+    println("Snapshot number $k, $id")
+    M = assemble_matrix(op)(bfun[k])
+    i,v = findnz(M[:])
+    i,v
+  end
+
+  iv = blocks_to_matrix(snapshot.(eachindex(bfun)))
+  row_idx,values = first.(iv),last.(iv)
+  check_row_idx(row_idx)
+  Snapshots(id,values)
+end
+
+function matrix_snapshots(
+  op::RBBilinOperator{Nonaffine,ParamTrialFESpace,RBSpaceUnsteady},
+  μ::Snapshots)
+
+  id = get_id(op)
+  timesθ = get_timesθ(op)
+
+  function snapshot(k::Int)
+    println("Snapshot number $k, $id")
+    M = assemble_matrix(op)(μ[k],timesθ)
+    i,v = findnz(M[:])
+    i,v
+  end
+
+  iv = blocks_to_matrix(snapshot.(eachindex(μ)))
+  row_idx,values = first.(iv),last.(iv)
+  check_row_idx(row_idx)
+  snaps_space = Snapshots(id,values)
+  snaps_time = Snapshots(id,mode2_unfolding(values))
+  snaps_space,snaps_time
+end
+
+function matrix_snapshots(
+  op::RBLinOperator{Nonlinear,ParamTransientTrialFESpace,RBSpaceUnsteady},
+  ::Snapshots)
+
+  id = get_id(op)
+  bfun = basis_as_fefun(op)
+  timesθ = get_timesθ(op)
+
+  function snapshot(k::Int)
+    println("Snapshot number $k, $id")
+    M = assemble_matrix(op)(bfun[k],timesθ)
+    i,v = findnz(M[:])
+    i,v
+  end
+
+  iv = snapshot.(eachindex(bfun))
+  row_idx,values = first.(iv),last.(iv)
+  check_row_idx(row_idx)
+  snaps_space = Snapshots(id,values)
+  snaps_time = Snapshots(id,mode2_unfolding(values))
+  snaps_space,snaps_time
+end
+
+function check_row_idx(row_idx::Vector{Vector{Int}})
+  @assert all(Broadcasting(a->isequal(a,row_idx[1]))(row_idx)) "Need to correct snaps"
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function Mat_snapshots(
   FEMSpace::FOMS{ID,D},
   RBInfo::ROMInfoS{ID},
@@ -26,31 +234,6 @@ function Mat_snapshots(
 
 end
 
-function Vec_snapshots(
-  FEMSpace::FOMS{ID,D},
-  RBInfo::ROMInfoS{ID},
-  RBVars::ROMMethodS{ID,T},
-  μ::Vector{Vector{Float}},
-  var::String) where {ID,D,T}
-
-  function Vec_linear(k::Int)::Vector{Float}
-    println("Snapshot number $k, $var")
-    assemble_FEM_vector(FEMSpace, RBInfo, μ[k], var)
-  end
-
-  function Vec_nonlinear(k::Int)::Vector{Float}
-    println("Snapshot number $k, $var")
-    assemble_FEM_nonlinear_vector(FEMSpace, RBInfo, μ[k],
-      RBVars.Φₛ[1][:, k], var)
-  end
-
-  Vec(k) = isnonlinear(RBInfo, var) ? Vec_nonlinear(k) : Vec_linear(k)
-  nₛ = isnonlinear(RBInfo, var) ? RBVars.nₛ[1] : RBInfo.mdeim_nsnap
-
-  blocks_to_matrix(Broadcasting(Vec)(1:nₛ))::Matrix{T}
-
-end
-
 function assemble_Mat_snapshots(
   FEMSpace::FOMS{ID,D},
   RBInfo::ROMInfoS{ID},
@@ -59,7 +242,7 @@ function assemble_Mat_snapshots(
   var::String) where {ID,D,T}
 
   snaps, row_idx = Mat_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
-  snaps_POD = MDEIM_POD(snaps, RBInfo.ϵₛ)
+  snaps_POD = POD_for_MDEIM(snaps, RBInfo.ϵₛ)
   snaps_POD, row_idx
 
 end
@@ -72,7 +255,7 @@ function assemble_Vec_snapshots(
   var::String) where {ID,D,T}
 
   snaps = Vec_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
-  snaps_POD = MDEIM_POD(snaps, RBInfo.ϵₛ)
+  snaps_POD = POD_for_MDEIM(snaps, RBInfo.ϵₛ)
   snaps_POD
 
 end
@@ -176,8 +359,8 @@ function standard_MMDEIM(
   vals_space = blocks_to_matrix(vals)
   vals_time = mode2_unfolding(vals_space, nₛ)
 
-  snaps_space = MDEIM_POD(vals_space, RBInfo.ϵₛ)
-  snaps_time = MDEIM_POD(vals_time, RBInfo.ϵₜ*1e-5)
+  snaps_space = POD_for_MDEIM(vals_space, RBInfo.ϵₛ)
+  snaps_time = POD_for_MDEIM(vals_time, RBInfo.ϵₜ*1e-5)
 
   snaps_space, snaps_time, row_idx
 
@@ -197,8 +380,8 @@ function standard_VMDEIM(
   vals_space = blocks_to_matrix(vals)
   vals_time = mode2_unfolding(vals_space, nₛ)
 
-  snaps_space = MDEIM_POD(vals_space, RBInfo.ϵₛ)
-  snaps_time = MDEIM_POD(vals_time, RBInfo.ϵₜ*1e-5)
+  snaps_space = POD_for_MDEIM(vals_space, RBInfo.ϵₛ)
+  snaps_time = POD_for_MDEIM(vals_time, RBInfo.ϵₜ*1e-5)
 
   snaps_space, snaps_time
 
@@ -214,17 +397,17 @@ function fun_mdeim(
   θ_space, θ_time = θ_snapshots(FEMSpace, RBInfo, RBVars, μ, var)
 
   #time
-  snaps_time = MDEIM_POD(θ_time, RBInfo.ϵₜ*1e-5)
+  snaps_time = POD_for_MDEIM(θ_time, RBInfo.ϵₜ*1e-5)
 
   # space
-  θ_space, _ = MDEIM_POD(θ_space, RBInfo.ϵₛ)
+  θ_space, _ = POD_for_MDEIM(θ_space, RBInfo.ϵₛ)
   Paramθ = ParamInfo(FEMSpace, θ_space, var)
   Mats = assemble_FEM_matrix(FEMSpace, RBInfo, Paramθ)
   iv = Broadcasting(Mat -> findnz(Mat[:]))(Mats)
   i, v = first.(iv), last.(iv)
   @assert all([length(i[1]) == length(i[j]) for j = eachindex(i)])
   row_idx, vals_space = i[1], blocks_to_matrix(v)
-  snaps_space = MDEIM_POD(vals_space, RBInfo.ϵₛ)
+  snaps_space = POD_for_MDEIM(vals_space, RBInfo.ϵₛ)
 
   snaps_space, snaps_time, row_idx
 
@@ -245,7 +428,7 @@ function θ_snapshots(
     θinfo = θ_phys_quadp(Param, FEMSpace.phys_quadp, timesθ)
     θblock_space, θblock_time = first.(θinfo), last.(θinfo)
     θ_space, θ_time = blocks_to_matrix(θblock_space), blocks_to_matrix(θblock_time)
-    MDEIM_POD(θ_space, RBInfo.ϵₛ), MDEIM_POD(θ_time, RBInfo.ϵₜ*1e-5)
+    POD_for_MDEIM(θ_space, RBInfo.ϵₛ), POD_for_MDEIM(θ_time, RBInfo.ϵₜ*1e-5)
   end
 
   function θ_st_nonlinear()
@@ -290,8 +473,8 @@ function θ_phys_quadp(
 end
 
 function correct_structures(
-  Mat::Vector{Vector{Float}},
-  row_idx::Vector{Vector{Int}})
+  row_idx::Vector{Vector{Int}},
+  Mat::Vector{Vector{Float}})
 
   if all(Broadcasting(a->isequal(a, row_idx[1]))(row_idx))
 

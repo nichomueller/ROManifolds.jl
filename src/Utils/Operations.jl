@@ -47,9 +47,10 @@ function mode2_unfolding(S::AbstractMatrix,ns::Int)
   Nt = get_Nt(S,ns)
   idx_fun(ns) = (ns .- 1)*Nt .+ 1:ns*Nt
   idx = idx_fun.(1:ns)
-  mode2 = Matrix.(transpose.(S[idx]))
+  mode2_blocks = Matrix.(transpose.(S[idx]))
+  mode2 = blocks_to_matrix(mode2_blocks)
 
-  blocks_to_matrix(mode2)
+  mode2
 end
 
 my_svd(s::Matrix) = svd(s)
@@ -57,26 +58,41 @@ my_svd(s::SparseMatrixCSC) = svds(s;nsv=size(S)[2]-1)[1]
 my_svd(s::Vector{AbstractMatrix}) = my_svd(blocks_to_matrix(s))
 
 function POD(S::AbstractMatrix,ϵ=1e-5)
-  U, Σ, _ = my_svd(S)
+  U,Σ,_ = my_svd(S)
   energies = cumsum(Σ.^2)
-  N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  err = sqrt(1-energies[N]/energies[end])
-  println("Basis number obtained via POD is $N, projection error ≤ $err")
+  n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
+  err = sqrt(1-energies[n]/energies[end])
+  println("Basis number obtained via POD is $n, projection error ≤ $err")
 
-  U[:, 1:N]
+  U[:,1:n]
 end
 
 function POD(S::AbstractMatrix,X::SparseMatrixCSC,ϵ=1e-5)
   H = cholesky(X)
   L = sparse(H.L)
-  U, Σ, _ = my_svd(L'*S[H.p, :])
+  U,Σ,_ = my_svd(L'*S[H.p, :])
 
   energies = cumsum(Σ.^2)
-  N = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  err = sqrt(1-energies[N]/energies[end])
-  println("Basis number obtained via POD is $N, projection error ≤ $err")
+  n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
+  err = sqrt(1-energies[n]/energies[end])
+  println("Basis number obtained via POD is $n, projection error ≤ $err")
 
-  Matrix((L' \ U[:, 1:N])[invperm(H.p), :])
+  Matrix((L'\U[:,1:n])[invperm(H.p),:])
+end
+
+function POD_for_MDEIM(S::AbstractMatrix,ϵ=1e-5)
+  U,Σ,_ = my_svd(S)
+  energies = cumsum(Σ.^2)
+  ntemp = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
+  Utemp = U[:,1:ntemp]
+
+  # approx, should actually be norm(inv(U[idx,:]))*Σ[2:end]
+  matrix_err = vcat(sqrt(norm(inv(Utemp'*Utemp)))*Σ[2:end],0.0)
+  n = findall(x -> x ≤ ϵ,matrix_err)[1]
+  err = matrix_err[n]
+  println("Basis number obtained via POD is $n, projection error ≤ $err")
+
+  U[:,1:n]
 end
 
 projection(vnew::AbstractVector,v::AbstractVector) = v*(vnew'*v)

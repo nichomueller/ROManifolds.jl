@@ -2,104 +2,71 @@ get_rb(info::RBInfo) = get_rb(info,isindef(info))
 get_rb(info::RBInfo,::Val{false}) = load_rb(info,:u)
 get_rb(info::RBInfo,::Val{true}) = load_rb(info,:u),load_rb(info,:p)
 
-function assemble_rb(info::RBInfoSteady,res::RBResults,snaps)
-  basis_space = rb_space(info,res,snaps)
+function assemble_rb(info::RBInfoSteady,res::RBResults,snaps,args...)
+  res.offline_time += @elapsed begin
+    basis_space = rb_space(info,snaps,args...)
+  end
   RBSpaceSteady.(snaps,basis_space)
 end
 
-function assemble_rb(info::RBInfoUnsteady,res::RBResults,snaps)
-  basis_space = rb_space(info,res,snaps)
-  basis_time = rb_time(info,res,snaps,basis_space,isindef(info))
+function assemble_rb(info::RBInfoUnsteady,res::RBResults,snaps,args...)
+  res.offline_time += @elapsed begin
+    basis_space = rb_space(info,snaps,args...)
+    basis_time = rb_time(info,snaps,basis_space)
+  end
   RBSpaceUnsteady.(snaps,basis_space,basis_time)
 end
 
 function rb_space(
   info::RBInfo,
-  res::RBResults,
-  snaps,
-  opB::ParamBilinOperator,
-  μ::Snapshots)
+  snap::Snapshots,
+  args...)
 
   println("Spatial POD, tolerance: $(info.ϵ)")
-  res.offline_time += @elapsed begin
-    basis_space = POD(snaps,info.ϵ)
-  end
 
-  add_space_supremizers(isindef(info),basis_space,snaps,opB,μ)
+  basis_space = POD(snap,info.ϵ)
+  add_space_supremizers(isindef(info),basis_space,snap,args...)
 end
+
+rb_space(info::RBInfo,res::RBResults,snaps::Vector{Snapshots},args...) =
+  Broadcasting(s->rb_space(info,res,s,args...))(snaps)
 
 function rb_time(
   info::RBInfoUnsteady,
-  res::RBResults,
   snap::Snapshots,
-  basis_space::Matrix,
-  ::Val{true})
+  basis_space::Matrix)
 
   println("Temporal POD, tolerance: $(info.ϵ)")
 
   s1 = get_snap(snap)
   Nt = get_Nt(snap)
 
-  res.offline_time += @elapsed begin
-    if info.time_red_method == "ST-HOSVD"
-      s2 = mode2_unfolding(basis_space'*s1,Nt)
-    else
-      s2 = mode2_unfolding(s1,Nt)
-    end
-    basis_time = POD(s2,info.ϵ)
+  if info.time_red_method == "ST-HOSVD"
+    s2 = mode2_unfolding(basis_space'.*s1,Nt)
+  else
+    s2 = mode2_unfolding(s1,Nt)
   end
-  basis_time
+  basis_time = POD(s2,info.ϵ)
+  add_time_supremizers(isindef(info),basis_time)
 end
 
-function rb_time(
-  info::RBInfoUnsteady,
-  res::RBResults,
-  snap::Vector{Snapshots},
-  basis_space::Vector{Matrix},
-  ::Val{true})
+rb_time(info::RBInfo,res::RBResults,snaps::Vector{Snapshots},basis_space::Vector{Matrix}) =
+  Broadcasting((s,b)->rb_time(info,res,s,b))(snaps,basis_space)
 
-  println("Temporal POD, tolerance: $(info.ϵ)")
+add_space_supremizers(args...) = error("Not implemented")
+add_space_supremizers(::Val{false},basis_u::Matrix,args...) = basis_u
+add_space_supremizers(::Val{false},basis::Vector{Matrix},args...) = basis...
 
-  s1 = get_snap.(snap)
-  Nt = get_Nt.(snap)
-
-  res.offline_time += @elapsed begin
-    if info.time_red_method == "ST-HOSVD"
-      s2 = mode2_unfolding.(basis_space'.*s1,Nt)
-    else
-      s2 = mode2_unfolding.(s1,Nt)
-    end
-    basis_time = Broadcating(s -> POD(s,info.ϵ))(s2)
-  end
-  add_time_supremizers(basis_time...)
-end
-
-function assemble_constraint_matrix(
-  opB::ParamBilinOperator{Affine,TT},
-  basis_p::Matrix,
-  ::Snapshots,
-  μ::Snapshots) where TT
-
-  @assert opB.id == :B
-  println("Loading matrix Bᵀ")
-
-  B = get_structure(opB)(first(μ))
-  Brb(k::Int) = B*basis_p[:,k]
-  Brb.(1:get_ns(bp))
-end
-
-function assemble_constraint_matrix(
+function add_space_supremizers(
+  ::Val{true},
+  basis::Vector{Matrix},
   opB::ParamBilinOperator,
-  ::Matrix,
   ph::Snapshots,
   μ::Snapshots)
 
-  @assert opB.id == :B
-  println("Matrix Bᵀ is nonaffine: must assemble the constraint matrix")
-
-  B = get_structure(opB).(μ)
-  Brb(k::Int) = B[k]*ph.snaps[:,k]
-  Brb.(1:get_ns(bp))
+  basis_u,basis_p = basis
+  supr = space_supremizers(opB,basis_u,basis_p,ph,μ)
+  hcat(basis_u,supr)
 end
 
 function space_supremizers(
@@ -115,38 +82,46 @@ function space_supremizers(
   gram_schmidt!(constraint_mat,get_basis_space(basis_u))
 end
 
-add_space_supremizers(::Val{false},basis_u::Matrix,args...) = basis_u
-
-function add_space_supremizers(
-  ::Val{true},
-  basis_u::Matrix,
-  opB::ParamBilinOperator,
-  ph::Snapshots,
-  μ::Snapshots)
-
-  supr = space_supremizers(opB,basis_u,basis_p,ph,μ)
-  hcat(basis_u,supr)
-end
-
-function add_space_supremizers(
-  ::Val{true},
-  basis_u::Matrix,
+function assemble_constraint_matrix(
+  opB::ParamBilinOperator{Affine,TT},
   basis_p::Matrix,
+  ::Snapshots,
+  μ::Snapshots) where TT
+
+  @assert opB.id == :B
+  println("Loading matrix Bᵀ")
+
+  B = assemble_matrix(opB)(first(μ))
+  Brb(k::Int) = B*basis_p[:,k]
+  Brb.(1:get_ns(bp))
+end
+
+function assemble_constraint_matrix(
   opB::ParamBilinOperator,
+  ::Matrix,
   ph::Snapshots,
   μ::Snapshots)
 
-  supr = space_supremizers(opB,basis_u,basis_p,ph,μ)
-  hcat(basis_u,supr)
+  @assert opB.id == :B
+  println("Matrix Bᵀ is nonaffine: must assemble the constraint matrix")
+
+  B = assemble_matrix(opB).(μ)
+  Brb(k::Int) = B[k]*ph.snaps[:,k]
+  Brb.(1:get_ns(bp))
 end
+
+add_time_supremizers(args...) = error("Not implemented")
+add_time_supremizers(::Val{false},basis_u::Matrix,args...) = basis_u
+add_time_supremizers(::Val{false},basis::Vector{Matrix},args...) = basis
 
 function add_time_supremizers(
-  basis_u::Matrix,
-  basis_p::Matrix,
+  ::Val{true},
+  basis::Vector{Matrix},
   tol=1e-2)
 
   println("Checking if supremizers in time need to be added")
 
+  basis_u,basis_p = basis
   basis_up = basis_u'*basis_p
   count = 0
 
@@ -167,5 +142,5 @@ function add_time_supremizers(
   end
 
   println("Added $count time supremizers")
-  return
+  basis_u,basis_p
 end

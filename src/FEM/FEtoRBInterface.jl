@@ -124,7 +124,6 @@ abstract type ParamVarOperator{OT,TT} end
 struct ParamLinOperator{OT} <: ParamVarOperator{OT,nothing}
   a::Function
   afe::Function
-  A::Function
   pspace::ParamSpace
   tests::MyTests
 end
@@ -132,63 +131,93 @@ end
 struct ParamBilinOperator{OT,TT} <: ParamVarOperator{OT,TT}
   a::Function
   afe::Function
-  A::Vector{<:Function}
   pspace::ParamSpace
   trials::MyTrials{TT}
   tests::MyTests
 end
 
-function ParamVarOperator(
-  a::Function,
-  afe::Function,
-  pspace::ParamSpace,
-  tests::MyTests,
-  OT=Nonaffine())
+get_param_function(op::ParamVarOperator) = op.a
+get_fe_function(op::ParamVarOperator) = op.afe
+Gridap.ODEs.TransientFETools.get_test(op::ParamVarOperator) = op.tests.test
+Gridap.ODEs.TransientFETools.get_trial(op::ParamBilinOperator) = op.trials.trial
+get_tests(op::ParamVarOperator) = op.tests
+get_trials(op::ParamVarOperator) = op.trials
+get_test_no_bc(op::ParamVarOperator) = op.tests.test_no_bc
+get_trial_no_bc(op::ParamBilinOperator) = op.trial.trial_no_bc
 
-  A(μ) = assemble_vector(afe(μ),tests.test)
-  ParamLinOperator{OT}(a,afe,A,pspace,tests)
+function AffineParamVarOperator(
+  a::Function,afe::Function,pspace::ParamSpace,tests::MyTests)
+  ParamLinOperator{Affine}(a,afe,pspace,tests)
+end
+
+function NonaffineParamVarOperator(
+  a::Function,afe::Function,pspace::ParamSpace,tests::MyTests)
+  ParamLinOperator{Nonaffine}(a,afe,pspace,tests)
 end
 
 function ParamVarOperator(
-  a::Function,
-  afe::Function,
-  pspace::ParamSpace,
-  trials::MyTrials{TT},
-  tests::MyTests,
-  OT=Nonaffine()) where TT
-
-  A = assemble_matrix_and_lifting(afe,trials,tests)
-  ParamBilinOperator{OT,TT}(a,afe,A,pspace,trials,tests)
+  a::Function,afe::Function,pspace::ParamSpace,tests::MyTests)
+  ParamLinOperator{Nonlinear}(a,afe,pspace,tests)
 end
 
-function assemble_matrix_and_lifting(
-  afe::Function,
-  trials::MyTrials{TT},
-  tests::MyTests) where TT
+function AffineParamVarOperator(
+  a::Function,afe::Function,pspace::ParamSpace,
+  trials::MyTrials{TT},tests::MyTests) where TT
+  ParamBilinOperator{Affine,TT}(a,afe,pspace,trials,tests)
+end
 
-  U,U_no_bc,V_no_bc = trials.trial,trials.trial_no_bc,tests.test_no_bc
-  fdofs,ddofs = get_fd_dofs(tests,trials)
+function NonaffineParamVarOperator(
+  a::Function,afe::Function,pspace::ParamSpace,
+  trials::MyTrials{TT},tests::MyTests) where TT
+  ParamBilinOperator{Nonaffine,TT}(a,afe,pspace,trials,tests)
+end
+
+function ParamVarOperator(
+  a::Function,afe::Function,pspace::ParamSpace,
+  trials::MyTrials{TT},tests::MyTests) where TT
+  ParamBilinOperator{Nonlinear,TT}(a,afe,pspace,trials,tests)
+end
+
+function Gridap.FESpaces.assemble_vector(op::ParamLinOperator)
+  afe = get_fe_function(op)
+  test = get_test(op)
+  μ -> assemble_vector(afe(μ),test)
+end
+
+function Gridap.FESpaces.assemble_matrix(op::ParamBilinOperator)
+  afe = get_fe_function(op)
+  trial = get_trial(op)
+  test = get_test(op)
+  μ -> assemble_matrix(afe(μ),trial,test)
+end
+
+function assemble_lifting(op::ParamBilinOperator)
+  trial = get_trial(op)
+  trial_no_bc = get_trial_no_bc(op)
+  test_no_bc = get_test_no_bc(op)
+  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
+  fdofs_test,_ = fdofs
+
+  A_no_bc(μ) = assemble_matrix(afe(μ),trial_no_bc,test_no_bc)
+  dir(μ) = trial(μ).dirichlet_values
+
+  μ -> A_no_bc(μ)[fdofs_test,ddofs]*dir(μ)
+end
+
+function assemble_matrix_and_lifting(op::ParamBilinOperator)
+  trial = get_trial(op)
+  trial_no_bc = get_trial_no_bc(op)
+  test_no_bc = get_test_no_bc(op)
+  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
   fdofs_test,fdofs_trial = fdofs
 
-  A_no_bc(μ) = assemble_matrix(afe(μ),U_no_bc,V_no_bc)
+  A_no_bc(μ) = assemble_matrix(afe(μ),trial_no_bc,test_no_bc)
   A_bc(μ) = A_no_bc(μ)[fdofs_test,fdofs_trial]
-  dir(μ) = U(μ).dirichlet_values
+  dir(μ) = trial(μ).dirichlet_values
 
   [μ -> A_bc(μ),μ -> A_no_bc(μ)[fdofs_test,ddofs]*dir(μ)]
 end
 
-function assemble_matrix_and_lifting(
-  afe::Function,
-  trials::MyTrials{TrialFESpace},
-  tests::MyTests)
-
-  [μ -> assemble_matrix(afe(μ),trials.trial,tests.test)]
-end
-
-get_structure(p::ParamLinOperator) = μ -> p.A(μ)
-get_structure(p::ParamBilinOperator) = μ -> p.A[1](μ)
-get_lift(::ParamVarOperator) = error("This param var has no lifting")
-get_lift(p::ParamBilinOperator) = μ -> p.A[2](μ)
 get_nsnap(v::AbstractVector) = length(v)
 get_nsnap(m::AbstractMatrix) = size(m,2)
 
@@ -201,6 +230,8 @@ mutable struct Snapshots{T}
   end
 end
 
+Snapshots(s::Snapshots,idx) = Snapshots(s.id,getindex(s.snap,idx))
+
 function allocate_snapshot(id::Symbol,::Type{T}) where T
   emat = allocate_matrix(T)
   Snapshots(id,emat)
@@ -209,7 +240,6 @@ end
 get_id(s::Snapshots) = s.id
 get_snap(s::Snapshots) = s.snap
 get_nsnap(s::Snapshots) = s.nsnap
-cut_snapshots(s::Snapshots,idx) = Snapshots(s.id,getindex(s.snap,idx))
 correct_path(path::String) = joinpath(path,".csv")
 correct_path(s::Snapshots,path::String) = joinpath(path,"$(s.id).csv")
 save(s,path::String) = writedlm(correct_path(path),s, ','; header=false)

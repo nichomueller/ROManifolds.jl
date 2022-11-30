@@ -7,22 +7,22 @@ function poisson_functions(
     μ = get_μ(p)
     1. + μ[6] + 1. / μ[5] * exp(-norm(x-Point(μ[1:3]))^2 / μ[4])
   end
-  a(p::Param) = x->a(p,x)
+  a(p::Param) = x->a(x,p)
   function f(x,p::Param)
     μ = get_μ(p)
     1. + Point(μ[4:6]) .* x
   end
-  f(p::Param) = x->f(p,x)
+  f(p::Param) = x->f(x,p)
   function h(x,p::Param)
     μ = get_μ(p)
     1. + Point(μ[4:6]) .* x
   end
-  h(p::Param) = x->h(p,x)
+  h(p::Param) = x->h(x,p)
   function g(x,p::Param)
     μ = get_μ(p)
     1. + Point(μ[4:6]) .* x
   end
-  g(p::Param) = x->g(p,x)
+  g(p::Param) = x->g(x,p)
 
   afe(p,u,v) = ∫(a(p) * ∇(v) ⋅ ∇(u))dΩ
   ffe(p,v) = ∫(f(p) * v)dΩ

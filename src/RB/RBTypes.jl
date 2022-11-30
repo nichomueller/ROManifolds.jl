@@ -101,6 +101,68 @@ get_nt(rb::RBSpaceUnsteady) = size(rb.basis_time,2)
 get_dims(rb::RBSpaceSteady) = get_Ns(rb),get_ns(rb)
 get_dims(rb::RBSpaceUnsteady) = get_Ns(rb),get_ns(rb),get_Nt(rb),get_nt(rb)
 
+abstract type RBVarOperator{Top,TT,Tsp} end
+
+mutable struct RBLinOperator{Top,Tsp} <: RBVarOperator{Top,nothing,Tsp}
+  feop::ParamLinOperator{Top}
+  rbspace_row::Tsp
+
+  function RBVarOperator(
+    feop::ParamLinOperator{Top},
+    rbspace_row::Tsp) where {Top,Tsp}
+
+    new{Top,Tsp}(feop,rbspace_row)
+  end
+end
+
+mutable struct RBBilinOperator{Top,TT,Tsp} <: RBVarOperator{Top,TT,Tsp}
+  feop::ParamBilinOperator{Top,TT}
+  rbspace_row::Tsp
+  rbspace_col::Tsp
+
+  function RBVarOperator(
+    feop::ParamBilinOperator{Top,TT},
+    rbspace_row::Tsp,
+    rbspace_col::Tsp) where {Top,TT,Tsp}
+
+    new{Top,TT,Tsp}(feop,rbspace_row,rbspace_col)
+  end
+end
+
+get_background_feop(rbop::RBVarOperator) = rbop.feop
+get_rbspace_row(rbop::RBVarOperator) = rbop.rbspace_row
+get_rbspace_col(rbop::RBBilinOperator) = rbop.rbspace_col
+get_snaps(rbop::RBVarOperator) = get_snaps(get_rbspace(rbop))
+get_basis_space_row(rbop::RBVarOperator) = get_basis_space(get_rbspace_row(rbop))
+get_basis_space_col(rbop::RBVarOperator) = get_basis_space(get_rbspace_col(rbop))
+get_basis_time_row(rbop::RBVarOperator{Top,TT,RBSpaceUnsteady}) where {Top,TT} =
+  get_basis_time(get_rbspace_row(rbop))
+get_basis_time_col(rbop::RBVarOperator{Top,TT,RBSpaceUnsteady}) where {Top,TT} =
+  get_basis_time(get_rbspace_col(rbop))
+
+function compute_rb_projection(op::RBLinOperator{Affine,Tsp}) where Tsp
+  id = get_id(op)
+  println("Vector $id is affine: computing Φᵀ$id")
+
+  feop = get_background_feop(op)
+  rbspace_row = get_rbspace_row(op)
+  vec = assemble_affine_vector(feop)
+
+  rbspace_row'*vec
+end
+
+function compute_rb_projection(op::RBBilinOperator{Affine,TT,Tsp}) where {TT,Tsp}
+  id = get_id(op)
+  println("Matrix $id is affine: computing Φᵀ$id Φ")
+
+  feop = get_background_feop(op)
+  rbspace_row = get_rbspace_row(op)
+  rbspace_col = get_rbspace_col(op)
+  mat = assemble_affine_matrix(feop)
+
+  rbspace_row'*mat*rbspace_col
+end
+
 abstract type RBInfo end
 
 struct RBInfoSteady <: RBInfo
