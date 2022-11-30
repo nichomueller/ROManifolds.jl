@@ -1,44 +1,35 @@
 abstract type RBSpace{T} end
 
 struct RBSpaceSteady{T} <: RBSpace{T}
-  snaps::Snapshots{T}
+  id::Symbol
   basis_space::Matrix{T}
 
   function RBSpaceSteady(
-    snaps::Snapshots{T},
-    basis_space::Matrix{T}) where T
+    snaps::Snapshots{T};ϵ=1e-5) where T
 
-    new{T}(snaps,basis_space)
+    id = get_id(snaps)
+    basis_space = POD(snaps,ϵ)
+    new{T}(id,basis_space)
   end
 end
 
 struct RBSpaceUnsteady{T} <: RBSpace{T}
-  snaps::Snapshots{T}
+  id::Symbol
   basis_space::Matrix{T}
   basis_time::Matrix{T}
 
   function RBSpaceUnsteady(
-    snaps::Snapshots{T},
-    basis_space::Matrix{T},
-    basis_time::Matrix{T}) where T
+    snaps::Snapshots{T};ϵ=1e-5) where T
 
-    new{T}(snaps,basis_space,basis_time)
+    id = get_id(snaps)
+    snaps2 = mode2(snaps)
+    basis_space = POD(snaps,ϵ)
+    basis_time = POD(snaps2,ϵ)
+    new{T}(id,basis_space,basis_time)
   end
 end
 
-function allocate_rbspace_steady(id::Symbol,::Type{T}) where T
-  esnap = allocate_snapshot(id,T)
-  emat = allocate_matrix(T)
-  RBSpaceSteady(esnap,emat)
-end
-
-function allocate_rbspace_unsteady(id::Symbol,::Type{T}) where T
-  esnap = allocate_snapshot(id,T)
-  emat = allocate_matrix(T)
-  RBSpaceUnsteady(esnap,emat,emat)
-end
-
-get_snaps(rb::RBSpace) = rb.snaps
+allocate_rbspace(id::Symbol,::Type{T}) where T = RBSpaceSteady(allocate_snapshot(id,T))
 get_basis_space(rb::RBSpace) = rb.basis_space
 get_basis_time(rb::RBSpaceUnsteady) = rb.basis_time
 get_basis_spacetime(rb::RBSpaceUnsteady) = kron(rb.basis_space,rb.basis_time)
@@ -69,13 +60,13 @@ function load_rb!(rb::RBSpaceUnsteady,path::String)
 end
 
 function load_rb(info::RBSpaceSteady,id::Symbol)
-  rb = allocate_rbspace_steady(id,T)
+  rb = allocate_rbspace(id,T)
   off_path = info.offline_path
   load_rb!(rb,off_path)
 end
 
 function load_rb(info::RBSpaceUnsteady,id::Symbol)
-  rb = allocate_rbspace_unsteady(id,T)
+  rb = allocate_rbspace(id,T)
   off_path = info.offline_path
   load_rb!(rb,off_path)
 end
@@ -132,7 +123,6 @@ end
 get_background_feop(rbop::RBVarOperator) = rbop.feop
 get_rbspace_row(rbop::RBVarOperator) = rbop.rbspace_row
 get_rbspace_col(rbop::RBBilinOperator) = rbop.rbspace_col
-get_snaps(rbop::RBVarOperator) = get_snaps(get_rbspace(rbop))
 get_basis_space_row(rbop::RBVarOperator) = get_basis_space(get_rbspace_row(rbop))
 get_basis_space_col(rbop::RBVarOperator) = get_basis_space(get_rbspace_col(rbop))
 get_basis_time_row(rbop::RBVarOperator{Top,TT,RBSpaceUnsteady}) where {Top,TT} =
@@ -140,25 +130,59 @@ get_basis_time_row(rbop::RBVarOperator{Top,TT,RBSpaceUnsteady}) where {Top,TT} =
 get_basis_time_col(rbop::RBVarOperator{Top,TT,RBSpaceUnsteady}) where {Top,TT} =
   get_basis_time(get_rbspace_col(rbop))
 
-function compute_rb_projection(op::RBLinOperator{Affine,Tsp}) where Tsp
+function Gridap.FESpaces.get_cell_dof_ids(
+  rbop::RBVarOperator,
+  trian::Triangulation)
+  get_cell_dof_ids(get_background_feop(rbop),trian)
+end
+
+Gridap.FESpaces.assemble_vector(op::RBLinOperator) = assemble_vector(op.feop)
+Gridap.FESpaces.assemble_matrix(op::RBBilinOperator) = assemble_matrix(op.feop)
+
+realization(op::RBVarOperator) = realization(get_pspace(op))
+
+Gridap.Algebra.allocate_vector(op::RBLinOperator) = assemble_vector(op.feop)
+Gridap.Algebra.allocate_matrix(op::RBBilinOperator) = assemble_matrix(op.feop)
+allocate_structure(op::RBLinOperator) = allocate_vector(op)
+allocate_structure(op::RBBilinOperator) = allocate_matrix(op)
+
+function get_findnz_mapping(op::RBLinOperator)
+  v = assemble_structure(op)
+  collect(eachindex(v))
+end
+
+"Small, full vector -> large, sparse vector"
+function get_findnz_mapping(op::RBBilinOperator)
+  M = assemble_structure(op)
+  first(findnz(M[:]))
+end
+
+"Viceversa"
+function get_inverse_findnz_mapping(op::RBVarOperator)
+  findnz_map = get_findnz_mapping(op)
+  inv_map(i::Int) = findall(x -> x == i,findnz_map)[1]
+  inv_map
+end
+
+function rb_projection(op::RBLinOperator{Affine,Tsp}) where Tsp
   id = get_id(op)
   println("Vector $id is affine: computing Φᵀ$id")
 
   feop = get_background_feop(op)
-  rbspace_row = get_rbspace_row(op)
   vec = assemble_affine_vector(feop)
+  rbspace_row = get_rbspace_row(op)
 
   rbspace_row'*vec
 end
 
-function compute_rb_projection(op::RBBilinOperator{Affine,TT,Tsp}) where {TT,Tsp}
+function rb_projection(op::RBBilinOperator{Affine,TT,Tsp}) where {TT,Tsp}
   id = get_id(op)
   println("Matrix $id is affine: computing Φᵀ$id Φ")
 
   feop = get_background_feop(op)
+  mat = assemble_affine_matrix(feop)
   rbspace_row = get_rbspace_row(op)
   rbspace_col = get_rbspace_col(op)
-  mat = assemble_affine_matrix(feop)
 
   rbspace_row'*mat*rbspace_col
 end

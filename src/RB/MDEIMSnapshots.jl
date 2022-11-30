@@ -68,9 +68,7 @@ function vector_snapshots(
   end
 
   values = blocks_to_matrix(snapshot.(eachindex(μ)))
-  snaps_space = Snapshots(id,values)
-  snaps_time = Snapshots(id,mode2_unfolding(values))
-  snaps_space,snaps_time
+  Snapshots(id,values)
 end
 
 function vector_snapshots(
@@ -87,9 +85,7 @@ function vector_snapshots(
   end
 
   values = blocks_to_matrix(snapshot.(eachindex(bfun)))
-  snaps_space = Snapshots(id,values)
-  snaps_time = Snapshots(id,mode2_unfolding(values))
-  snaps_space,snaps_time
+  Snapshots(id,values)
 end
 
 function matrix_snapshots(
@@ -148,9 +144,7 @@ function matrix_snapshots(
   iv = blocks_to_matrix(snapshot.(eachindex(μ)))
   row_idx,values = first.(iv),last.(iv)
   check_row_idx(row_idx)
-  snaps_space = Snapshots(id,values)
-  snaps_time = Snapshots(id,mode2_unfolding(values))
-  snaps_space,snaps_time
+  Snapshots(id,values)
 end
 
 function matrix_snapshots(
@@ -171,9 +165,7 @@ function matrix_snapshots(
   iv = snapshot.(eachindex(bfun))
   row_idx,values = first.(iv),last.(iv)
   check_row_idx(row_idx)
-  snaps_space = Snapshots(id,values)
-  snaps_time = Snapshots(id,mode2_unfolding(values))
-  snaps_space,snaps_time
+  Snapshots(id,values)
 end
 
 function check_row_idx(row_idx::Vector{Vector{Int}})

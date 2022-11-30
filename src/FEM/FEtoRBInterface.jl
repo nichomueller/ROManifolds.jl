@@ -141,9 +141,16 @@ get_fe_function(op::ParamVarOperator) = op.afe
 Gridap.ODEs.TransientFETools.get_test(op::ParamVarOperator) = op.tests.test
 Gridap.ODEs.TransientFETools.get_trial(op::ParamBilinOperator) = op.trials.trial
 get_tests(op::ParamVarOperator) = op.tests
-get_trials(op::ParamVarOperator) = op.trials
+get_trials(op::ParamBilinOperator) = op.trials
 get_test_no_bc(op::ParamVarOperator) = op.tests.test_no_bc
 get_trial_no_bc(op::ParamBilinOperator) = op.trial.trial_no_bc
+get_pspace(op::ParamVarOperator) = op.pspace
+
+function Gridap.FESpaces.get_cell_dof_ids(
+  op::ParamVarOperator,
+  trian::Triangulation)
+  collect(get_cell_dof_ids(get_test(op),trian))
+end
 
 function AffineParamVarOperator(
   a::Function,afe::Function,pspace::ParamSpace,tests::MyTests)
@@ -190,6 +197,14 @@ function Gridap.FESpaces.assemble_matrix(op::ParamBilinOperator)
   test = get_test(op)
   μ -> assemble_matrix(afe(μ),trial,test)
 end
+
+realization(op::ParamVarOperator) = realization(get_pspace(op))
+Gridap.Algebra.allocate_vector(op::ParamLinOperator) =
+  assemble_vector(op)(realization(op))
+Gridap.Algebra.allocate_matrix(op::ParamBilinOperator) =
+  assemble_matrix(op)(realization(op))
+allocate_structure(op::ParamLinOperator) = allocate_vector(op)
+allocate_structure(op::ParamBilinOperator) = allocate_matrix(op)
 
 function assemble_lifting(op::ParamBilinOperator)
   trial = get_trial(op)

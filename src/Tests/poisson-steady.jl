@@ -16,7 +16,7 @@ function configure()
   sampling = UniformSampling()
   PS = ParamSpace(ranges,sampling)
 
-  fepath = fem_path(mesh,ptype,root)
+  fepath = fem_path(ptype,mesh,root)
   model,dΩ,dΓn = model_info(bnd_info,degree,ptype)
 
   a,afe,f,ffe,h,hfe,g,lhs,rhs = poisson_functions(ptype,dΩ,dΓn)
