@@ -77,42 +77,29 @@ end
 function model_info(
   mshpath::String,
   bnd_info::Dict,
-  degree::Int,
   ::Val{false})
 
   model = DiscreteModelFromFile(mshpath)
   set_labels!(model,bnd_info)
-  Ω = Triangulation(model)
-  dΩ = Measure(Ω,degree)
-  Γn = BoundaryTriangulation(model,tags=["neumann"])
-  dΓn = Measure(Γn,degree)
-
-  model,dΩ,dΓn
+  model
 end
 
 function model_info(
   ::String,
   bnd_info::Dict,
-  degree::Int,
   ::Val{true})
 
   function model(μ) end
   set_labels!(model,bnd_info)
-  Ω(μ) = Triangulation(model(μ))
-  dΩ(μ) = Measure(Ω(μ),degree)
-  Γn(μ) = BoundaryTriangulation(model(μ),tags=["neumann"])
-  dΓn(μ) = Measure(Γn(μ),degree)
-
-  model,dΩ,dΓn
+  model
 end
 
 function model_info(
   bnd_info::Dict,
-  degree::Int,
   ptype::ProblemType)
 
   mshpath = mesh_path(mesh,root)
-  model_info(mshpath,bnd_info,degree,ispdomain(ptype))
+  model_info(mshpath,bnd_info,ispdomain(ptype))
 end
 
 function get_fe_snapshots(ptype::ProblemType,solver,op,fepath::String,run_fe::Bool,args...)
@@ -163,7 +150,7 @@ end
 function get_fe_snapshots(::Val{false},sol,fepath::String)
   uh,μ = collect_solutions(sol)
   usnap,μsnap = Snapshots.([:u,:μ],[uh,μ])
-  save([usnap,μsnap],[fepath,fepath])
+  save.([fepath,fepath],[usnap,μsnap])
   usnap,μsnap
 end
 
@@ -172,14 +159,14 @@ function get_fe_snapshots(::Val{false},sol,fepath::String)
   uh,μ = collect_solutions(sol)
   uh,ph = uh[1:Ns[1],:],uh[Ns[1]+1:end,:]
   usnap,psnap,μsnap = Snapshots.([:u,:p,:μ],[uh,ph,μ])
-  save([usnap,psnap,μsnap],[fepath,fepath,fepath])
+  save.([fepath,fepath,fepath],[usnap,psnap,μsnap])
   usnap,psnap,μsnap
 end
 
 function collect_solutions(sol)
   solk(k::Int) = collect_solutions(sol[k],k)
   results = solk.(eachindex(sol))
-  blocks_to_matrix(first.(results)),last.(results)
+  Matrix(first.(results)),last.(results)
 end
 
 function collect_solutions(solk::ParamFESolution,k::Int)
@@ -204,5 +191,5 @@ function collect_solutions!(
     push!(x,get_free_dof_values(uh))
     k += 1
   end
-  blocks_to_matrix(x)
+  Matrix(x)
 end

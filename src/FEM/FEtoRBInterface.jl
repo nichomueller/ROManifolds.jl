@@ -118,10 +118,61 @@ end
 get_Ns(s) = num_free_dofs(s)
 get_Ns(s::MultiFieldFESpace) = num_free_dofs.(s.spaces)
 
+function Gridap.get_background_model(test::UnconstrainedFESpace)
+  get_background_model(get_triangulation(test))
+end
+
+function Gridap.FESpaces.get_order(test::UnconstrainedFESpace)
+  Gridap.FESpaces.get_order(first(get_background_model(test).grid.reffes))
+end
+
+Gridap.FESpaces.get_test(tests::MyTests) = tests.test
+Gridap.FESpaces.get_trial(trials::MyTrials) = trials.trial
+get_test_no_bc(tests::MyTests) = tests.test_no_bc
+get_trial_no_bc(trials::MyTrials) = trials.trial_no_bc
+get_degree(order::Int,c=2) = c*order
+get_degree(test::UnconstrainedFESpace,c=2) = get_degree(Gridap.FESpaces.get_order(test),c)
+
+function get_cell_quadrature(test::UnconstrainedFESpace)
+  CellQuadrature(get_triangulation(test),get_degree(test))
+end
+
+struct LagrangianQuadFESpace
+  test::UnconstrainedFESpace
+  function LagrangianQuadFESpace(model::DiscreteModel,order::Int)
+    reffe_quad = Gridap.ReferenceFE(lagrangian_quad,Float,order)
+    test = TestFESpace(model,reffe_quad,conformity=:L2)
+    new(test)
+  end
+end
+
+function LagrangianQuadFESpace(test::UnconstrainedFESpace)
+  model = get_background_model(test)
+  order = Gridap.FESpaces.get_order(test)
+  LagrangianQuadFESpace(model,order)
+end
+
+function LagrangianQuadFESpace(tests::MyTests)
+  LagrangianQuadFESpace(get_test(tests))
+end
+
+function get_phys_quad_points(test::UnconstrainedFESpace)
+  trian = get_triangulation(test)
+  phys_map = get_cell_map(trian)
+  cell_quad = get_cell_quadrature(test)
+  cell_points = get_data(get_cell_points(cell_quad))
+  map(Gridap.evaluate,phys_map,cell_points)
+end
+
+function get_phys_quad_points(tests::MyTests)
+  get_phys_quad_points(get_test(tests))
+end
+
 struct Nonaffine <: OperatorType end
 abstract type ParamVarOperator{OT,TT} end
 
 struct ParamLinOperator{OT} <: ParamVarOperator{OT,nothing}
+  id::Symbol
   a::Function
   afe::Function
   pspace::ParamSpace
@@ -129,6 +180,7 @@ struct ParamLinOperator{OT} <: ParamVarOperator{OT,nothing}
 end
 
 struct ParamBilinOperator{OT,TT} <: ParamVarOperator{OT,TT}
+  id::Symbol
   a::Function
   afe::Function
   pspace::ParamSpace
@@ -136,6 +188,7 @@ struct ParamBilinOperator{OT,TT} <: ParamVarOperator{OT,TT}
   tests::MyTests
 end
 
+get_id(op::ParamVarOperator) = op.id
 get_param_function(op::ParamVarOperator) = op.a
 get_fe_function(op::ParamVarOperator) = op.afe
 Gridap.ODEs.TransientFETools.get_test(op::ParamVarOperator) = op.tests.test
@@ -240,50 +293,43 @@ mutable struct Snapshots{T}
   id::Symbol
   snap::AbstractArray{T}
   nsnap::Int
-  function Snapshots(id::Symbol,snap::AbstractArray{T}) where T
-    new{T}(id,snap,get_nsnap(snap))
+  function Snapshots(id::Symbol,blocks::AbstractVector{T}) where T
+    snap = Matrix(blocks)
+    nsnap = get_nsnap(blocks)
+    new{T}(id,snap,nsnap)
   end
 end
 
 Snapshots(s::Snapshots,idx) = Snapshots(s.id,getindex(s.snap,idx))
 
-function allocate_snapshot(id::Symbol,::Type{T}) where T
-  emat = allocate_matrix(T)
-  Snapshots(id,emat)
-end
+allocate_snapshot(id::Symbol,::Type{T}) where T = Snapshots(id,T[])
 
 get_id(s::Snapshots) = s.id
 get_snap(s::Snapshots) = s.snap
 get_nsnap(s::Snapshots) = s.nsnap
 correct_path(path::String) = joinpath(path,".csv")
-correct_path(s::Snapshots,path::String) = joinpath(path,"$(s.id).csv")
-save(s,path::String) = writedlm(correct_path(path),s, ','; header=false)
-save(s::Snapshots,path::String) = save(s.snap,correct_path(s,path))
+correct_path(path::String,s::Snapshots) = correct_path(joinpath(path,"$(s.id)"))
 
-function load_snap!(s::Snapshots,path::String)
+save(path::String,s::Snapshots) = save(correct_path(s,path),s.snap)
+
+function load!(s::Snapshots,path::String)
   snap = load(correct_path(s,path))
   s.snap = snap
   s.nsnap = get_nsnap(snap)
   s
 end
 
-function load_snap(id::Symbol,path::String)
+load(path::String,id::Symbol) = load(path,id,Float)
+
+function load(path::String,id::Symbol,::Type{T}) where T
   s = allocate_snapshot(id,T)
-  load_snap!(s,path)
+  load!(s,path)
 end
 
 get_Nt(s::Snapshots) = get_Nt(get_snap(s),get_nsnap(s))
 mode2_unfolding(s::Snapshots) = mode2_unfolding(get_snap(s),get_nsnap(s))
 POD(s::Snapshots,args...) = POD(s.snap,args...)
 POD(s::Vector{Snapshots},args...) = Broadcasting(si->POD(si,args...))(s)
-
-#= abstract type Problem{PT<:ProblemType} end
-
-struct SteadyProblem{PT} <: Problem{PT}
-  μ::Snapshots{Param}
-  xh::Snapshots{Float}
-  param_op::Vector{ParamVarOperator}
-end =#
 
 struct TimeInfo
   t0::Real
@@ -295,40 +341,3 @@ end
 get_dt(ti::TimeInfo) = ti.dt
 get_θ(ti::TimeInfo) = ti.θ
 get_timesθ(ti::TimeInfo) = collect(ti.t0:ti.dt:ti.tF-ti.dt).+ti.dt*ti.θ
-
-#= struct UnsteadyProblem{PT} <: Problem{PT}
-  μ::Snapshots{Param}
-  xh::Snapshots{Float}
-  param_op::Vector{ParamVarOperator}
-  time_info::TimeInfo
-end
-
-function Problem(
-  ::PT,
-  μ::Snapshots,
-  xh::Snapshots,
-  param_op::Vector{ParamVarOperator})
-
-  SteadyProblem{PT}(μ,xh,param_op)
-end
-
-function Problem(
-  ::PT,
-  μ::Snapshots,
-  xh::Snapshots,
-  param_op::Vector{ParamVarOperator},
-  time_info::TimeInfo)
-
-  UnsteadyProblem{PT}(μ,xh,param_op,time_info)
-end
-
-function Problem(
-  ::PT,
-  μ::Snapshots,
-  xh::Snapshots,
-  param_op::Vector{ParamVarOperator},
-  t0,tF,dt,θ)
-
-  time_info = TimeInfo(t0,tF,dt,θ)
-  UnsteadyProblem{PT}(μ,xh,param_op,time_info)
-end =#

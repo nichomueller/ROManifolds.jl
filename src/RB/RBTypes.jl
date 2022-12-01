@@ -3,72 +3,79 @@ abstract type RBSpace{T} end
 struct RBSpaceSteady{T} <: RBSpace{T}
   id::Symbol
   basis_space::Matrix{T}
-
-  function RBSpaceSteady(
-    snaps::Snapshots{T};ϵ=1e-5) where T
-
-    id = get_id(snaps)
-    basis_space = POD(snaps,ϵ)
-    new{T}(id,basis_space)
-  end
 end
 
 struct RBSpaceUnsteady{T} <: RBSpace{T}
   id::Symbol
   basis_space::Matrix{T}
   basis_time::Matrix{T}
+end
 
-  function RBSpaceUnsteady(
-    snaps::Snapshots{T};ϵ=1e-5) where T
+function RBSpaceSteady(
+  snaps::Snapshots{T};ϵ=1e-5) where T
 
-    id = get_id(snaps)
-    snaps2 = mode2(snaps)
-    basis_space = POD(snaps,ϵ)
-    basis_time = POD(snaps2,ϵ)
-    new{T}(id,basis_space,basis_time)
-  end
+  id = get_id(snaps)
+  basis_space = POD(snaps,ϵ)
+  RBSpaceSteady{T}(id,basis_space)
+end
+
+function RBSpaceUnsteady(
+  snaps::Snapshots{T};ϵ=1e-5) where T
+
+  id = get_id(snaps)
+  snaps2 = mode2(snaps)
+  basis_space = POD(snaps,ϵ)
+  basis_time = POD(snaps2,ϵ)
+  RBSpaceUnsteady{T}(id,basis_space,basis_time)
+end
+
+function RBSpace(
+  id::Symbol,
+  basis_space::Matrix{T}) where T
+
+  RBSpaceSteady{T}(id,basis_space)
+end
+
+function RBSpace(
+  id::Symbol,
+  basis_space::Matrix{T},
+  basis_time::Matrix{T}) where T
+
+  RBSpaceSteady{T}(id,basis_space,basis_time)
 end
 
 allocate_rbspace(id::Symbol,::Type{T}) where T = RBSpaceSteady(allocate_snapshot(id,T))
+allocate_rbspace(rb::RBSpaceSteady{T}) where T = RBSpaceSteady{T}(rb.id,rb.basis_space)
+allocate_rbspace(rb::RBSpaceUnsteady{T}) where T =
+  RBSpaceUnsteady{T}(rb.id,rb.basis_space,rb.basis_time)
+get_id(rb::RBSpace) = rb.id
 get_basis_space(rb::RBSpace) = rb.basis_space
 get_basis_time(rb::RBSpaceUnsteady) = rb.basis_time
 get_basis_spacetime(rb::RBSpaceUnsteady) = kron(rb.basis_space,rb.basis_time)
-correct_path(rb::RBSpace,path::String) = correct_path(rb.snaps,path)
 
-function save(rb::RBSpaceSteady,info::RBInfoSteady)
-  off_path = info.offline_path
-  save(rb.basis_space,correct_path(rb,joinpath(off_path,"basis_space_")))
+function save(path::String,rb::RBSpaceSteady,id::Symbol)
+  save(correct_path(joinpath(path,"basis_space_$id")),rb.basis_space)
 end
 
-function save(rb::RBSpaceUnsteady,info::RBInfoUnsteady)
-  off_path = info.offline_path
-  save(rb.basis_space,correct_path(rb,joinpath(off_path,"basis_space_")))
-  save(rb.basis_time,correct_path(rb,joinpath(off_path,"basis_time_")))
+function save(path::String,rb::RBSpaceUnsteady,id::Symbol)
+  save(correct_path(joinpath(path,"basis_space_$id")),rb.basis_space)
+  save(correct_path(joinpath(path,"basis_time_$id")),rb.basis_time)
 end
 
-function load_rb!(rb::RBSpaceSteady,path::String)
-  load_snap!(rb.snaps,path)
-  rb.basis_space = load(correct_path(rb,joinpath(path,"basis_space_")))
+function load!(rb::RBSpaceSteady,path::String,id::Symbol)
+  rb.basis_space = load(correct_path(joinpath(path,"basis_space_$id")))
   rb
 end
 
-function load_rb!(rb::RBSpaceUnsteady,path::String)
-  load_snap!(rb.snaps,path)
-  rb.basis_space = load(correct_path(rb,joinpath(path,"basis_space_")))
-  rb.basis_time = load(correct_path(rb,joinpath(path,"basis_time_")))
+function load!(rb::RBSpaceUnsteady,path::String,id::Symbol)
+  rb.basis_space = load(correct_path(joinpath(path,"basis_space_$id")))
+  rb.basis_time = load(correct_path(joinpath(path,"basis_time_$id")))
   rb
 end
 
-function load_rb(info::RBSpaceSteady,id::Symbol)
+function load(path::String,id::Symbol,::Type{T}) where T
   rb = allocate_rbspace(id,T)
-  off_path = info.offline_path
-  load_rb!(rb,off_path)
-end
-
-function load_rb(info::RBSpaceUnsteady,id::Symbol)
-  rb = allocate_rbspace(id,T)
-  off_path = info.offline_path
-  load_rb!(rb,off_path)
+  load!(rb,path,T)
 end
 
 function rb_spatial_subspace(rb::RBSpaceUnsteady{T}) where T
@@ -123,6 +130,7 @@ end
 get_background_feop(rbop::RBVarOperator) = rbop.feop
 get_rbspace_row(rbop::RBVarOperator) = rbop.rbspace_row
 get_rbspace_col(rbop::RBBilinOperator) = rbop.rbspace_col
+get_id(rbop::RBBilinOperator) = get_id(get_background_feop(rbop))
 get_basis_space_row(rbop::RBVarOperator) = get_basis_space(get_rbspace_row(rbop))
 get_basis_space_col(rbop::RBVarOperator) = get_basis_space(get_rbspace_col(rbop))
 get_basis_time_row(rbop::RBVarOperator{Top,TT,RBSpaceUnsteady}) where {Top,TT} =
@@ -164,6 +172,28 @@ function get_inverse_findnz_mapping(op::RBVarOperator)
   inv_map
 end
 
+function unfold_spacetime(
+  op::RBVarOperator{Top,TT,RBSpaceUnsteady},
+  vals::AbstractVector{Tv}) where {Top,TT,Tv}
+
+  Ns = get_Ns(op)
+  Nt = get_Nt(op)
+  @assert size(vals,1) == Ns*Nt "Wrong space-time dimensions"
+
+  space_vals = Matrix{Tv}(reshape(vals,Ns,Nt))
+  time_vals = Matrix{Tv}(reshape(vals,Nt,Ns))
+  space_vals,time_vals
+end
+
+function unfold_spacetime(
+  op::RBVarOperator{Top,TT,RBSpaceUnsteady},
+  vals::AbstractMatrix{Tv}) where {Top,TT,Tv}
+
+  unfold_vec(k::Int) = unfold_spacetime(op,vals[:,k])
+  vals = Broadcasting(unfold_vec)(axis(vals,2))
+  Matrix(first.(vals)),Matrix(last.(vals))
+end
+
 function rb_projection(op::RBLinOperator{Affine,Tsp}) where Tsp
   id = get_id(op)
   println("Vector $id is affine: computing Φᵀ$id")
@@ -198,7 +228,7 @@ struct RBInfoSteady <: RBInfo
   online_path::String
   use_energy_norm::Bool
   online_rhs::Bool
-  get_offline_structures::Bool
+  load_offline::Bool
   save_offline::Bool
   save_online::Bool
   adaptivity::Bool
@@ -216,7 +246,7 @@ mutable struct RBInfoUnsteady <: RBInfo
   time_red_method::String
   use_energy_norm::Bool
   online_rhs::Bool
-  get_offline_structures::Bool
+  load_offline::Bool
   save_offline::Bool
   save_online::Bool
   st_mdeim::Bool
@@ -230,12 +260,12 @@ function RBInfo(
   mesh::String,
   root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes";
   ϵ=1e-5,nsnap=80,mdeim_snap=20,use_energy_norm=false,online_rhs=false,
-  get_offline_structures=true,save_offline=true,save_online=true,
+  load_offline=true,save_offline=true,save_online=true,
   adaptivity=false,postprocess=false)
 
   offline_path,online_path = rom_off_on_paths(ptype,mesh,root)
   RBInfoSteady(ptype,offline_path,online_path,ϵ,nsnap,mdeim_snap,
-    use_energy_norm,online_rhs,get_offline_structures,
+    use_energy_norm,online_rhs,load_offline,
     save_offline,save_online,adaptivity,postprocess)
 end
 
@@ -245,13 +275,13 @@ function RBInfo(
   mesh::String,
   root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes";
   ϵ=1e-5,nsnap=80,mdeim_snap=20,time_red_method="ST-HOSVD",
-  use_energy_norm=false,online_rhs=false,get_offline_structures=true,
+  use_energy_norm=false,online_rhs=false,load_offline=true,
   save_offline=true,save_online=true,st_mdeim=true,fun_mdeim=false,
   adaptivity=false,postprocess=false)
 
   offline_path,online_path = rom_off_on_paths(ptype,mesh,root)
   RBInfoUnsteady(ptype,time_info,offline_path,online_path,ϵ,nsnap,mdeim_snap,
-    time_red_method,use_energy_norm,online_rhs,get_offline_structures,
+    time_red_method,use_energy_norm,online_rhs,load_offline,
     save_offline,save_online,st_mdeim,fun_mdeim,
     adaptivity,postprocess)
 end
@@ -259,7 +289,8 @@ end
 issteady(info::RBInfo) = issteady(info.ptype)
 isindef(info::RBInfo) = isindef(info.ptype)
 ispdomain(info::RBInfo) = ispdomain(info.ptype)
-save(rb::RBSpace,info::RBInfo) = if info.save_offline save(rb,info.offline_path) end
+save(info::RBInfo,args...) = if info.save_offline save(info.offline_path,args...) end
+load(info::RBInfo,args...) = if info.load_offline load(info.offline_path,args...) end
 
 mutable struct RBResults
   offline_time::Float

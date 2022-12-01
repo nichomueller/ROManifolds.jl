@@ -1,7 +1,8 @@
-function poisson_functions(
-  dΩ::Measure,
-  dΓn::Measure,
-  ::Val{true})
+function poisson_functions(ptype::ProblemType,measures::ProblemMeasures)
+  poisson_functions(issteady(ptype),measures)
+end
+
+function poisson_functions(::Val{true},measures::ProblemFixedMeasures)
 
   function a(x,p::Param)
     μ = get_μ(p)
@@ -10,23 +11,28 @@ function poisson_functions(
   a(p::Param) = x->a(x,p)
   function f(x,p::Param)
     μ = get_μ(p)
-    1. + Point(μ[4:6]) .* x
+    1. + sum(Point(μ[2:4]) .* x)
   end
   f(p::Param) = x->f(x,p)
   function h(x,p::Param)
     μ = get_μ(p)
-    1. + Point(μ[4:6]) .* x
+    1. + sum(Point(μ[3:5]) .* x)
   end
   h(p::Param) = x->h(x,p)
   function g(x,p::Param)
     μ = get_μ(p)
-    1. + Point(μ[4:6]) .* x
+    1. + sum(Point(μ[4:6]) .* x)
   end
   g(p::Param) = x->g(x,p)
 
-  afe(p,u,v) = ∫(a(p) * ∇(v) ⋅ ∇(u))dΩ
-  ffe(p,v) = ∫(f(p) * v)dΩ
-  hfe(p,v) = ∫(h(p) * v)dΓn
+  afe(p,dΩ,u,v) = ∫(a(p) * ∇(v) ⋅ ∇(u))dΩ
+  ffe(p,dΩ,v) = ∫(f(p) * v)dΩ
+  hfe(p,dΓn,v) = ∫(h(p) * v)dΓn
+
+  dΩ,dΓn = get_dΩ(measures),get_dΓn(measures)
+  afe(p,u,v) = afe(p,dΩ,u,v)
+  ffe(p,v) = ffe(p,dΩ,v)
+  hfe(p,v) = hfe(p,dΓn,v)
 
   lhs(p,u,v) = afe(p,u,v)
   rhs(p,v) = ffe(p,v) + hfe(p,v)

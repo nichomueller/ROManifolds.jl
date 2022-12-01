@@ -1,3 +1,54 @@
+function get_parameter()
+
+end
+
+function mdeim_online(
+  Mat_nonaffine::AbstractArray{T},
+  Matᵢ::Matrix{T},
+  idx::Vector{Int},
+  Nₜ=1) where T
+
+  θvec = Matᵢ \ reshape(Mat_nonaffine, :, Nₜ)[idx,:]
+  blocks(Matrix{T}(θvec'))
+end
+
+function mdeim_online(
+  Mats_nonaffine::Vector{<:AbstractArray{T}},
+  Matᵢ::Matrix{T},
+  idx::Vector{Int},
+  Nₜ=1) where T
+
+  Mat_nonaffine = Matrix(Mats_nonaffine)
+  MDEIM_online(Mat_nonaffine, Matᵢ, idx, Nₜ)
+end
+
+function mdeim_online(
+  Fun_nonaffine::Function,
+  Matᵢ::Matrix{T},
+  idx::Vector{Int},
+  Nₜ=1) where T
+
+  θmat(u) = Matᵢ \ reshape(Fun_nonaffine(u), :, Nₜ)[idx,:]
+  θblock(u) = blocks(Matrix{T}(θmat(u)'))
+
+  θblock
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function assemble_hyperred_matrix(
   FEMSpace::FOMS{D},
   FEMInfo::FOMInfoS{ID},
@@ -202,7 +253,7 @@ function interpolate_θ(
     θ[:, iₜ] = ScatteredInterpolation.evaluate(etp,[timesθ[iₜ]])
   end
 
-  matrix_to_vecblocks(Matrix{T}(θ'))
+  blocks(Matrix{T}(θ'))
 
 end
 
@@ -211,7 +262,7 @@ function interpolate_θ(
   MDEIM::MVMDEIM{T},
   timesθ::Vector{T}) where T
 
-  Mat_μ_hyp = blocks_to_matrix(Mats_μ_hyp)
+  Mat_μ_hyp = Matrix(Mats_μ_hyp)
   interpolate_θ(Mat_μ_hyp, MDEIM, timesθ)
 
 end
@@ -319,7 +370,7 @@ function MDEIM_online(
   Nₜ=1) where T
 
   θvec = Matᵢ \ reshape(Mat_nonaffine, :, Nₜ)[idx,:]
-  matrix_to_vecblocks(Matrix{T}(θvec'))
+  blocks(Matrix{T}(θvec'))
 
 end
 
@@ -329,7 +380,7 @@ function MDEIM_online(
   idx::Vector{Int},
   Nₜ=1) where T
 
-  Mat_nonaffine = blocks_to_matrix(Mats_nonaffine)
+  Mat_nonaffine = Matrix(Mats_nonaffine)
   MDEIM_online(Mat_nonaffine, Matᵢ, idx, Nₜ)
 
 end
@@ -341,7 +392,7 @@ function MDEIM_online(
   Nₜ=1) where T
 
   θmat(u) = Matᵢ \ reshape(Fun_nonaffine(u), :, Nₜ)[idx,:]
-  θblock(u) = matrix_to_vecblocks(Matrix{T}(θmat(u)'))
+  θblock(u) = blocks(Matrix{T}(θmat(u)'))
 
   θblock
 

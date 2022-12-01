@@ -1,7 +1,3 @@
-abstract type SamplingStyle end
-struct UniformSampling <: SamplingStyle end
-struct NormalSampling <: SamplingStyle end
-
 struct ProblemType
   steady::Bool
   indef::Bool
@@ -12,23 +8,66 @@ issteady(p::ProblemType) = Val(p.steady)
 isindef(p::ProblemType) = Val(p.indef)
 ispdomain(p::ProblemType) = Val(p.pdomain)
 
-struct Param
-  param::Vector{Float}
-end
+abstract type SamplingStyle end
+struct UniformSampling <: SamplingStyle end
+struct NormalSampling <: SamplingStyle end
 
 struct ParamSpace
-  domain::Vector{Param}
+  domain::Vector{<:Vector{Number}}
   sampling_style::SamplingStyle
 end
 
-generate_param(d::Param,::UniformSampling) = rand(Uniform(first(d.param),last(d.param)))
-generate_param(d::Param,::NormalSampling) = rand(Normal(first(d.param),last(d.param)))
+generate_param(d::Vector{Number},::UniformSampling) = rand(Uniform(first(d),last(d)))
+generate_param(d::Vector{Number},::NormalSampling) = rand(Normal(first(get_μ(d)),last(get_μ(d))))
 generate_param(P::ParamSpace) = Broadcasting(d->generate_param(d,P.sampling_style))(P.domain)
 generate_param(P::ParamSpace,n::Int) = [generate_param(P) for _ = 1:n]
+
+struct Param
+  μ::Vector{Number}
+end
+
+get_μ(p::Param) = p.μ
 realization(P::ParamSpace) = Param(generate_param(P))
 realization(P::ParamSpace,n) = Param.(generate_param(P,n))
-get_μ(p::Param) = p.param
 
 Base.zero(::Type{Param}) = 0.
 Base.iterate(p::Param,i = 1) = iterate(p.param,i)
 Base.getindex(p::Param,args...) = getindex(p.param,args...)
+Base.Matrix(pblock::Vector{Param}) = pblock
+
+abstract type ProblemMeasures end
+
+mutable struct ProblemFixedMeasures <: ProblemMeasures
+  dΩ::Measure
+  dΓn::Measure
+end
+
+mutable struct ProblemParamMeasures <: ProblemMeasures
+  dΩ::Function
+  dΓn::Function
+end
+
+function ProblemMeasures(model::DiscreteModel,order=1)
+  degree = get_degree(order)
+  Ω = Triangulation(model)
+  dΩ = Measure(Ω,degree)
+  Γn = BoundaryTriangulation(model,tags=["neumann"])
+  dΓn = Measure(Γn,degree)
+
+  ProblemFixedMeasures(dΩ,dΓn)
+end
+
+function ProblemMeasures(model::Function,order=1)
+  degree = get_degree(order)
+  Ω(μ) = Triangulation(model(μ))
+  dΩ(μ) = Measure(Ω(μ),degree)
+  Γn(μ) = BoundaryTriangulation(model(μ),tags=["neumann"])
+  dΓn(μ) = Measure(Γn(μ),degree)
+
+  ProblemFixedMeasures(dΩ,dΓn)
+end
+
+get_dΩ(meas::ProblemFixedMeasures) = meas.dΩ
+get_dΓn(meas::ProblemFixedMeasures) = meas.dΓn
+get_dΩ(meas::ProblemParametricMeasures,p::Param) = meas.dΩ(p)
+get_dΓn(meas::ProblemParametricMeasures,p::Param) = meas.dΓn(p)

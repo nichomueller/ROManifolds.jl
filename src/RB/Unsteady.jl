@@ -179,10 +179,10 @@ function offline_phase(
 
   RBVars.Nₜ = Int(RBInfo.tₗ / RBInfo.δt)
 
-  if RBInfo.get_offline_structures
+  if RBInfo.load_offline
     get_RB(RBInfo, RBVars)
 
-    operators = get_offline_structures(RBInfo, RBVars)
+    operators = load_offline(RBInfo, RBVars)
     if !all(isempty.(operators))
       assemble_offline_structures(RBInfo, RBVars, operators)
     end

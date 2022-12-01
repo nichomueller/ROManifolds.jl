@@ -48,14 +48,14 @@ function mode2_unfolding(S::AbstractMatrix,ns::Int)
   idx_fun(ns) = (ns .- 1)*Nt .+ 1:ns*Nt
   idx = idx_fun.(1:ns)
   mode2_blocks = Matrix.(transpose.(S[idx]))
-  mode2 = blocks_to_matrix(mode2_blocks)
+  mode2 = Matrix(mode2_blocks)
 
   mode2
 end
 
 my_svd(s::Matrix) = svd(s)
 my_svd(s::SparseMatrixCSC) = svds(s;nsv=size(S)[2]-1)[1]
-my_svd(s::Vector{AbstractMatrix}) = my_svd(blocks_to_matrix(s))
+my_svd(s::Vector{AbstractMatrix}) = my_svd(Matrix(s))
 
 function POD(S::AbstractMatrix,ϵ=1e-5)
   U,Σ,_ = my_svd(S)
@@ -113,25 +113,25 @@ function orth_complement(
   v - projection(v,basis)
 end
 
-function gram_schmidt!(vec::Matrix,basis::Vector)
+function gram_schmidt!(mat::Matrix,basis::Matrix)
 
   println("Normalizing primal supremizer 1")
-  vec[:,1] = orth_complement(vec[:,1],basis)
+  mat[:,1] = orth_complement(mat[:,1],basis)
 
-  for i = 2:size(vec,2)
+  for i = 2:size(mat,2)
     println("Normalizing primal supremizer $i")
-    vec[:,i] = orth_complement(vec[:,i],basis)
-    vec[:,i] = orth_complement(vec[:,i],vec[:,1:i-1])
-    supr_norm = norm(vec[:,i])
+    mat[:,i] = orth_complement(mat[:,i],basis)
+    mat[:,i] = orth_complement(mat[:,i],vec[:,1:i-1])
+    supr_norm = norm(mat[:,i])
     println("Norm supremizers: $supr_norm")
-    vec[:,i] /= supr_norm
+    mat[:,i] /= supr_norm
   end
 
-  vec::Vector{Vector{T}}
+  mat
 end
 
 function gram_schmidt!(vec::Vector{Vector},basis::Matrix)
-  gram_schmidt!(blocks_to_matrix(vec),basis)
+  gram_schmidt!(Matrix(vec),basis)
 end
 
 function solve_cholesky(
@@ -173,98 +173,54 @@ function solve_cholesky(
   Vector{T}(x)
 end
 
-function vector_to_matrix(
-  Vec::Vector{T},
-  r::Int,
-  c::Int) where T
-
-  @assert length(Vec) == r*c "Wrong dimensions"
-  Matrix{T}(reshape(Vec, r, c))
+function Base.Matrix(vblock::Vector{Vector{T}}) where T
+  Matrix{T}(reduce(vcat,transpose.(vblock))')
 end
 
-function vector_to_matrix(
-  Vec::Vector{Vector{T}},
-  r::Vector{Int},
-  c::Vector{Int}) where T
-
-  Broadcasting(vector_to_matrix)(Vec, r, c)
+function Base.Matrix(mblock::Vector{T}) where {T<:AbstractMatrix}
+  @assert check_dimensions(mblock) "Wrong dimensions"
+  T(reduce(vcat,transpose.(mblock))')
 end
 
-function blocks_to_matrix(Mat_block::Vector{Matrix{T}}) where T
-
-  for i = 1 .+ eachindex(Mat_block[2:end])
-    @assert size(Mat_block[i])[1] == size(Mat_block[1])[1] "Rows in Mat_block must be the same"
-  end
-
-  Matrix{T}(reduce(vcat, transpose.(Mat_block))')
-
-end
-
-function blocks_to_matrix(Vec_block::Vector{Vector{T}}) where T
-
-  Matrix{T}(reduce(vcat, transpose.(Vec_block))')
-
-end
-
-function blocks_to_matrix(Mat_block::Vector{SparseMatrixCSC{T,Int}}) where T
-
-  for i = 1 .+ eachindex(Mat_block[2:end])
-    @assert size(Mat_block[i])[1] == size(Mat_block[1])[1] "Rows in Mat_block must be the same"
-  end
-
-  sparse(reduce(vcat, transpose.(Mat_block))')
-
-end
-
-function blocks_to_matrix(Vec_block::Vector{Vector{Vector{T}}}) where T
+function Base.Matrix(Vec_block::Vector{Vector{Vector{T}}}) where T
   n = length(Vec_block)
-  mat = blocks_to_matrix(Vec_block[1])
+  mat = Matrix(Vec_block[1])
   if n > 1
     for i = 2:n
-      mat = hcat(mat,blocks_to_matrix(Vec_block[i]))
+      mat = hcat(mat,Matrix(Vec_block[i]))
     end
   end
   mat
 end
 
-function matrix_to_vecblocks(Mat::Matrix{T}) where T
-  [Mat[:, i] for i = 1:size(Mat)[2]]::Vector{Vector{T}}
-end
+function blocks(m::Matrix{T},nblocks=size(m)[2]) where T
+  @assert check_dimensions(m,nblocks) "Wrong dimensions"
 
-function matrix_to_blocks(Mat::Matrix{T}, nblocks=nothing) where T
-
-  if isnothing(nblocks)
-    nblocks = size(Mat)[2]
-  else
-    @assert size(Mat)[2] % nblocks == 0 "Something is wrong"
-  end
-
-  ncol_block = Int(size(Mat)[2] / nblocks)
-  idx2 = ncol_block:ncol_block:size(Mat)[2]
+  ncol_block = Int(size(m)[2]/nblocks)
+  idx2 = ncol_block:ncol_block:size(m)[2]
   idx1 = idx2 .- ncol_block .+ 1
 
   blockmat = Matrix{T}[]
   for i in eachindex(idx1)
-    push!(blockmat, Mat[:, idx1[i]:idx2[i]])
+    push!(blockmat,m[:,idx1[i]:idx2[i]])
   end
-
   blockmat::Vector{Matrix{T}}
-
 end
 
-function matrix_to_blocks(Mat::Array{T, 3}) where T
-
+function blocks(Mat::Array{T,3}) where T
   blockmat = Matrix{T}[]
   for nb = 1:size(Mat)[end]
     push!(blockmat, Mat[:, :, nb])
   end
 
   blockmat
-
 end
 
-function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
+check_dimensions(vb::AbstractVector) =
+  all([size(vb[i])[1] == size(vb[1])[1] for i = 2:length(vb)])
+check_dimensions(m::AbstractMatrix,nb::Int) = iszero(size(m)[2]%nb)
 
+function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
   numnz = nnz(S)
   I = Vector{Ti}(undef, numnz)
   J = Vector{Ti}(undef, numnz)
@@ -281,11 +237,9 @@ function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
   nz = findall(x -> x .!= 0., V)
 
   (I[nz], J[nz], V[nz])
-
 end
 
 function SparseArrays.findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
-
   numnz = nnz(x)
 
   I = Vector{Ti}(undef, numnz)
@@ -302,18 +256,14 @@ function SparseArrays.findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
   nz = findall(v -> v .!= 0., V)
 
   (I[nz], V[nz])
-
 end
 
-function Base.NTuple(N::Int, T::DataType)
-
+function Base.NTuple(N::Int,T::DataType)
   NT = ()
   for _ = 1:N
     NT = (NT...,zero(T))
   end
-
-  NT::Base.NTuple{N,T}
-
+  NT::NTuple{N,T}
 end
 
 Gridap.VectorValue(D::Int, T::DataType) = VectorValue(NTuple(D, T))

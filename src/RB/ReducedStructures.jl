@@ -1,16 +1,3 @@
-function get_rb_structure(
-  info::RBInfo,
-  res::RBResults,
-  op::ParamVarOperator{Affine,TT}) where TT
-
-  id = get_id(op)
-  println("Importing reduced $id")
-
-  res.offline_time += @elapsed begin
-
-  end
-end
-
 function assemble_rb_structures(info::RBInfo,res::RBResults,op::ParamVarOperator,args...)
   res.offline_time += @elapsed begin
     assemble_rb_structures(info,op,args...)
@@ -18,17 +5,13 @@ function assemble_rb_structures(info::RBInfo,res::RBResults,op::ParamVarOperator
 end
 
 function assemble_rb_structures(
-  ::RBInfo,
-  op::RBLinOperator{Affine,Tsp},
-  args...) where Tsp
-  rb_projection(op)
-end
-
-function assemble_rb_structures(
-  ::RBInfo,
-  op::RBBilinOperator{Affine,TT,Tsp},
+  info::RBInfo,
+  op::RBVarOperator{Affine,TT,Tsp},
   args...) where {TT,Tsp}
-  rb_projection(op)
+
+  rb_structure = rb_projection(op)
+  save_rb_structure(info,get_id(op),rb_structure)
+  rb_structure
 end
 
 function assemble_rb_structures(
@@ -40,27 +23,54 @@ function assemble_rb_structures(
   println("Matrix $id is non-affine: running the MDEIM offline phase on $(info.mdeim_nsnap) snapshots")
 
   mdeim = MDEIM(info,op,args...)
-  project_mdeim_space(mdeim,op)
-end
-
-function project_mdeim_space!(mdeim::MDEIM,op::RBLinOperator)
-  basis_space = get_basis_space(mdeim)
-  findnz_map = get_findnz_mapping(op)
-  full_basis_space = fill_rows_with_zeros(basis_space,findnz_map)
-  rbspace_row = get_rbspace_row(op)
-
-  mdeim.rbspace.basis_space = rbspace_row'*full_basis_space
+  save_rb_structure(info,get_id(op),mdeim)
   mdeim
 end
 
-function project_mdeim_space!(mdeim::MDEIM,op::RBBilinOperator)
-  basis_space = get_basis_space(mdeim)
-  findnz_map = get_findnz_mapping(op)
-  full_basis_space = fill_rows_with_zeros(basis_space,findnz_map)
+function reduced_measure!(
+  ::RBVarOperator,
+  ::AbstractArray,
+  meas::ProblemMeasures,
+  args...)
 
-  rbspace_row = get_rbspace_row(op)
-  rbspace_col = get_rbspace_col(op)
+  meas
+end
 
-  mdeim.rbspace.basis_space = rbspace_row'*full_basis_space*rbspace_col
-  mdeim
+function reduced_measure!(
+  op::RBVarOperator,
+  mdeim::MDEIM,
+  meas::ProblemMeasures,
+  field=:dΩ)
+
+  m = getproperty(meas,field)
+  red_meas = get_reduced_measure(op,mdeim,m)
+  setproperty!(meas,field,red_meas)
+end
+
+function save_rb_structure(
+  info::RBInfo,
+  id::Symbol,
+  val)
+
+  if info.save_offline
+    off_path = info.offline_path
+    save(joinpath(off_path,"$(id)_rb"),val)
+  end
+end
+
+function load_rb_structure(
+  info::RBInfo,
+  op::ParamVarOperator{Affine,TT,Tsp},
+  args...) where {TT,Tsp}
+
+  off_path = info.offline_path
+  path = correct_path(joinpath(off_path,"$(id)_rb"))
+
+  if isfile(path)
+    id = get_id(op)
+    println("Importing reduced $id")
+    load(path)
+  else
+    assemble_rb_structures(info,op,args...)
+  end
 end

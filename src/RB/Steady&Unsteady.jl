@@ -128,7 +128,7 @@ function get_offline_Var(
 
 end
 
-function get_offline_structures(
+function load_offline(
   rbinfo::ROMInfo{ID},
   RBVars::ROM{ID,T}) where {ID,T}
 

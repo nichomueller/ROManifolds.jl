@@ -88,7 +88,7 @@ function times_dictionary(
   offline_time::Float,
   online_time::Float)
 
-  if RBInfo.get_offline_structures
+  if RBInfo.load_offline
     offline_time = NaN
   end
 
@@ -205,7 +205,7 @@ function Φₜ_by_Φₜ_by_θ(
     Broadcasting(jₜ -> ΦₜΦₜθ_fun(jₜ,q))(1:nₜ_right)
 
   ϕₜϕₜθ_block = Broadcasting(ΦₜΦₜθ_fun)(eachindex(θ))
-  Broadcasting(blocks_to_matrix)(ϕₜϕₜθ_block)::Vector{Matrix{T}}
+  Broadcasting(Matrix)(ϕₜϕₜθ_block)::Vector{Matrix{T}}
 
 end
 
@@ -238,7 +238,7 @@ function Φₜ_by_Φₜ_by_θ(
   ΦₜΦₜθ_fun(u,q) =
     Broadcasting(jₜ -> ΦₜΦₜθ_fun(u,jₜ,q))(1:nₜ_right)
   ΦₜΦₜθ_fun(u) =
-    blocks_to_matrix(Broadcasting(q -> ΦₜΦₜθ_fun(u,q))(eachindex(θ)))
+    Matrix(Broadcasting(q -> ΦₜΦₜθ_fun(u,q))(eachindex(θ)))
 
   ΦₜΦₜθ_fun::Function
 

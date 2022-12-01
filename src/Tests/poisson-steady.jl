@@ -10,16 +10,17 @@ function configure()
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/poisson"
   mesh = "cube5x5x5.json"
   bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
-  degree = 1
+  order = 1
 
   ranges = Param.(fill([1.,10.],6))
   sampling = UniformSampling()
   PS = ParamSpace(ranges,sampling)
 
   fepath = fem_path(ptype,mesh,root)
-  model,dΩ,dΓn = model_info(bnd_info,degree,ptype)
+  model = model_info(bnd_info,ptype)
+  measures = ProblemMeasures(model,order)
 
-  a,afe,f,ffe,h,hfe,g,lhs,rhs = poisson_functions(ptype,dΩ,dΓn)
+  a,afe,f,ffe,h,hfe,g,lhs,rhs = poisson_functions(ptype,measures)
 
   reffe = Gridap.ReferenceFE(lagrangian,Float,degree)
   V = MyTests(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
@@ -41,9 +42,9 @@ function configure()
 end
 
 function offline_phase()
-  if get_offline_structures
+  if load_offline
     get_rb(RBInfo,RBVars)
-    operators = get_offline_structures(RBInfo,RBVars)
+    operators = load_offline(RBInfo,RBVars)
     if !all(isempty.(operators))
       assemble_offline_structures(RBInfo,RBVars,operators)
     end
