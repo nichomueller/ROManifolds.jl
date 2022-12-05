@@ -1,51 +1,39 @@
-function assemble_rb_structures(info::RBInfo,res::RBResults,op::ParamVarOperator,args...)
-  res.offline_time += @elapsed begin
-    assemble_rb_structures(info,op,args...)
+function assemble_rb_structures(info::RBInfo,tt::TimeTracker,op::RBVarOperator,args...)
+  tt.offline_time += @elapsed begin
+    rb_variable = assemble_rb_structures(info,op,args...)
   end
+  save_rb_structure(info,get_id(op),rb_variable)
+  blocks(id_rb)
 end
 
 function assemble_rb_structures(
-  info::RBInfo,
+  ::RBInfo,
   op::RBVarOperator{Affine,TT,Tsp},
   args...) where {TT,Tsp}
 
-  rb_structure = rb_projection(op)
-  save_rb_structure(info,get_id(op),rb_structure)
-  rb_structure
+  rb_projection(op)
 end
 
 function assemble_rb_structures(
   info::RBInfo,
   op::RBVarOperator,
+  μ::Snapshots,
   args...)
 
   id = get_id(op)
   println("Matrix $id is non-affine: running the MDEIM offline phase on $(info.mdeim_nsnap) snapshots")
 
-  mdeim = MDEIM(info,op,args...)
-  save_rb_structure(info,get_id(op),mdeim)
-  mdeim
+  mdeim_offline(info,op,μ,args...)
 end
 
-function reduced_measure!(
+#= function reduced_measure!(
   ::RBVarOperator,
   ::AbstractArray,
   meas::ProblemMeasures,
   args...)
 
   meas
-end
-
-function reduced_measure!(
-  op::RBVarOperator,
-  mdeim::MDEIM,
-  meas::ProblemMeasures,
-  field=:dΩ)
-
-  m = getproperty(meas,field)
-  red_meas = get_reduced_measure(op,mdeim,m)
-  setproperty!(meas,field,red_meas)
-end
+end =#
 
 function save_rb_structure(
   info::RBInfo,
@@ -58,9 +46,32 @@ function save_rb_structure(
   end
 end
 
+load(::ParamVarOperator{Affine,TT,Tsp},path::String) where {TT,Tsp} = load(path)
+load(::ParamVarOperator{Top,TT,Tsp},path::String) where {Top,TT,Tsp} = load_mdeim(path)
+
 function load_rb_structure(
   info::RBInfo,
-  op::ParamVarOperator{Affine,TT,Tsp},
+  op::ParamLinOperator{Affine,Tsp},
+  args...) where Tsp
+
+  off_path = info.offline_path
+  path = correct_path(joinpath(off_path,"$(id)_rb"))
+
+  if isfile(path)
+    id = get_id(op)
+    println("Importing reduced $id")
+    id_rb = load(op,path)
+  else
+    basis,other_args = args
+    rbop = RBVarOperator(op,basis)
+    id_rb = assemble_rb_structures(info,rbop,other_args...)
+  end
+  blocks(id_rb)
+end
+
+function load_rb_structure(
+  info::RBInfo,
+  op::ParamBilinOperator{Affine,TT,Tsp},
   args...) where {TT,Tsp}
 
   off_path = info.offline_path
@@ -69,8 +80,11 @@ function load_rb_structure(
   if isfile(path)
     id = get_id(op)
     println("Importing reduced $id")
-    load(path)
+    id_rb = load(op,path)
   else
-    assemble_rb_structures(info,op,args...)
+    basis_row,basis_col,other_args = args
+    rbop = RBVarOperator(op,basis_row,basis_col)
+    id_rb = assemble_rb_structures(info,rbop,other_args...)
   end
+  blocks(id_rb)
 end

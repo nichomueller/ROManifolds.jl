@@ -6,14 +6,18 @@ mutable struct MDEIMSteady{T} <: MDEIM{T}
   rbspace::RBSpaceSteady{T}
   rbspace_idx::RBSpaceSteady{T}
   idx_space::Vector{Int}
+  red_measure::Measure
 
   function MDEIMSteady(
     op::RBVarOperator,
-    rbspace::RBSpaceSteady{T}) where T
+    rbspace::RBSpaceSteady{T},
+    meas::ProblemMeasures,
+    field=:dΩ) where T
 
     idx_space = mdeim_idx(op,rbspace)
     rbspace_idx = get_rbspace_idx(rbspace,idx_space)
-    new{T}(rbspace,rbspace_idx,idx_space)
+    red_meas = get_reduced_measure(op,idx_space,meas,field)
+    new{T}(rbspace,rbspace_idx,idx_space,red_meas)
   end
 end
 
@@ -25,28 +29,55 @@ mutable struct MDEIMUnsteady{T} <: MDEIM{T}
 
   function MDEIMUnsteady(
     op::RBVarOperator,
-    rbspace::RBSpaceUnsteady{T}) where T
+    rbspace::RBSpaceUnsteady{T},
+    meas::ProblemMeasures,
+    field=:dΩ) where T
 
     idx_space,idx_time = mdeim_idx(op,rbspace)...
     rbspace_idx = get_rbspace_idx(rbspace,idx_space,idx_time)
-    new{T}(rbspace,rbspace_idx,idx_space,idx_time)
+    red_meas = get_reduced_measure(op,idx_space,meas,field)
+    new{T}(rbspace,rbspace_idx,idx_space,idx_time,red_meas)
   end
 end
 
-function mdeim_offline(info::RBInfo,op::RBVarOperator,μ::Snapshots,args...)
+function mdeim_offline(
+  info::RBInfo,
+  op::RBVarOperator{Top,UnconstrainedFESpace,Tsp},
+  μ::Snapshots,
+  meas::ProblemMeasures,
+  field=:dΩ) where {Top,Tsp}
+
   μ_mdeim = Snapshots(μ,1:info.mdeim_nsnap)
   snaps = mdeim_snapshots(op,info,μ_mdeim)
   rbspace = mdeim_basis(info,snaps)
-  mdeim = MDEIM(op,rbspace)
+  mdeim = MDEIM(op,rbspace,meas,field)
   project_mdeim_space!(mdeim,op)
 end
 
+function mdeim_offline(
+  info::RBInfo,
+  op::RBVarOperator,
+  μ::Snapshots,
+  meas::ProblemMeasures,
+  field=:dΩ)
+
+  μ_mdeim = Snapshots(μ,1:info.mdeim_nsnap)
+  snaps,snaps_lift = mdeim_snapshots(op,info,μ_mdeim)
+  rbspace = mdeim_basis(info,snaps)
+  rbspace_lift = mdeim_basis(info,snaps_lift)
+  mdeim = MDEIM(op,rbspace,meas,field)
+  mdeim_lift = MDEIM(op,rbspace_lift,meas,field)
+  project_mdeim_space!(mdeim,op),project_mdeim_space!(mdeim_lift,op)
+end
+
 get_rbspace(mdeim::MDEIM) = mdeim.rbspace
+get_rbspace_idx(mdeim::MDEIM) = mdeim.rbspace_idx
 get_id(mdeim::MDEIM) = get_id(mdeim::MDEIM)
 get_basis_space(mdeim::MDEIM) = get_basis_space(mdeim.rbspace)
 get_basis_time(mdeim::MDEIMUnsteady) = get_basis_time(mdeim.rbspace)
 get_idx_space(mdeim::MDEIM) = mdeim.idx_space
 get_idx_time(mdeim::MDEIMUnsteady) = mdeim.idx_time
+get_reduced_measure(mdeim::MDEIM) = mdeim.red_measure
 
 function get_rbspace_idx(
   rbspace::RBSpaceSteady,
@@ -97,7 +128,22 @@ function save(path::String,mdeim::MDEIMUnsteady)
   save(correct_path(joinpath(path,"idx_time"),mdeim),get_idx_time(mdeim))
 end
 
-function load!(mdeim::RBSpaceUnsteady,path::String)
+function save(path::String,mdeim::NTuple{2,<:MDEIM})
+  m,mlift = mdeim
+  save(path,m)
+  save(joinpath(path,"_lift"),mlift)
+end
+
+function load!(mdeim::MDEIMSteady,path::String)
+  basis_space = load(correct_path(joinpath(path,"basis_space"),mdeim))
+  idx_space = load(correct_path(joinpath(path,"idx_space"),mdeim))
+
+  mdeim.rbspace = RBSpace(get_id(mdeim),basis_space)
+  mdeim.idx_space = idx_space
+  mdeim
+end
+
+function load!(mdeim::MDEIMUnsteady,path::String)
   basis_space = load(correct_path(joinpath(path,"basis_space"),mdeim))
   basis_time = load(correct_path(joinpath(path,"basis_time"),mdeim))
   idx_space = load(correct_path(joinpath(path,"idx_space"),mdeim))
@@ -109,18 +155,21 @@ function load!(mdeim::RBSpaceUnsteady,path::String)
   mdeim
 end
 
-function load!(mdeim::RBSpaceUnsteady,path::String)
-  basis_space = load(correct_path(joinpath(path,"basis_space"),mdeim))
-  idx_space = load(correct_path(joinpath(path,"idx_space"),mdeim))
+load_mdeim(info::RBInfo,args...) = if info.load_offline load_mdeim(info.offline_path,args...) end
 
-  mdeim.rbspace = RBSpace(get_id(mdeim),basis_space)
-  mdeim.idx_space = idx_space
-  mdeim
-end
-
-function load(path::String,T=Float)
+function load_mdeim(path::String,T=Float)
   mdeim = allocate_mdeim(op,T)
   load!(mdeim,path)
+end
+
+function blocks(mdeim::MDEIMSteady)
+  mdeim.rbspace.basis_space = blocks(mdeim.rbspace.basis_space)
+end
+
+function blocks(mdeim::MDEIMUnsteady)
+  mdeim.rbspace.basis_space = blocks(mdeim.rbspace.basis_space)
+  mdeim.rbspace.basis_time = blocks(mdeim.rbspace.basis_time)
+  mdeim
 end
 
 mdeim_basis(info::RBInfoSteady,snaps::Snapshots) = RBSpaceSteady(snaps;info.ϵ)
@@ -175,20 +224,25 @@ function project_mdeim_space!(op::RBBilinOperator,mdeim::MDEIM)
   basis_space = get_basis_space(mdeim)
   findnz_map = get_findnz_mapping(op)
   full_basis_space = fill_rows_with_zeros(basis_space,findnz_map)
-
   rbspace_row = get_rbspace_row(op)
   rbspace_col = get_rbspace_col(op)
 
-  mdeim.rbspace.basis_space = rbspace_row'*full_basis_space*rbspace_col
+  Ns,Q = get_Ns(op),size(full_basis_space)[2]
+  full_basis_space_resh = reshape(full_basis_space,Ns,Ns,Q)
+
+  mdeim.rbspace.basis_space =
+    [rbspace_row'*full_basis_space_resh[:,:,q]*rbspace_col for q=1:Q]
   mdeim
 end
 
 function get_reduced_measure(
   op::RBVarOperator,
-  mdeim::MDEIM,
-  meas::Measure)
+  idx::Vector{Int},
+  meas::ProblemMeasures,
+  field=:dΩ)
 
-  get_reduced_measure(op,meas,get_idx_space(mdeim))
+  m = getproperty(meas,field)
+  get_reduced_measure(op,m,idx)
 end
 
 function get_reduced_measure(

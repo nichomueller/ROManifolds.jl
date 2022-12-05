@@ -272,6 +272,11 @@ function assemble_lifting(op::ParamBilinOperator)
   μ -> A_no_bc(μ)[fdofs_test,ddofs]*dir(μ)
 end
 
+function assemble_lifting(
+  op::ParamBilinOperator{OT,UnconstrainedFESpace}) where OT
+  return
+end
+
 function assemble_matrix_and_lifting(op::ParamBilinOperator)
   trial = get_trial(op)
   trial_no_bc = get_trial_no_bc(op)
@@ -286,8 +291,13 @@ function assemble_matrix_and_lifting(op::ParamBilinOperator)
   [μ -> A_bc(μ),μ -> A_no_bc(μ)[fdofs_test,ddofs]*dir(μ)]
 end
 
+function assemble_matrix_assemble_lifting(
+  op::ParamBilinOperator{OT,UnconstrainedFESpace}) where OT
+  assemble_matrix(op)
+end
+
 get_nsnap(v::AbstractVector) = length(v)
-get_nsnap(m::AbstractMatrix) = size(m,2)
+get_nsnap(m::AbstractMatrix) = size(m)[2]
 
 mutable struct Snapshots{T}
   id::Symbol
@@ -319,9 +329,10 @@ function load!(s::Snapshots,path::String)
   s
 end
 
-load(path::String,id::Symbol) = load(path,id,Float)
+load_snap(info::RBInfo,args...) = if info.load_offline load_snap(info.offline_path,args...) end
+load_snap(path::String,id::Symbol) = load_snap(path,id,Float)
 
-function load(path::String,id::Symbol,::Type{T}) where T
+function load_snap(path::String,id::Symbol,::Type{T}) where T
   s = allocate_snapshot(id,T)
   load!(s,path)
 end

@@ -2,15 +2,15 @@ get_rb(info::RBInfo) = get_rb(info,isindef(info))
 get_rb(info::RBInfo,::Val{false}) = load_rb(info,:u)
 get_rb(info::RBInfo,::Val{true}) = load_rb(info,:u),load_rb(info,:p)
 
-function assemble_rb(info::RBInfoSteady,res::RBResults,snaps,args...)
-  res.offline_time += @elapsed begin
+function assemble_rb(info::RBInfoSteady,tt::TimeTracker,snaps,args...)
+  tt.offline_time += @elapsed begin
     basis_space = rb_space(info,snaps,args...)
   end
   RBSpaceSteady.(snaps,basis_space)
 end
 
-function assemble_rb(info::RBInfoUnsteady,res::RBResults,snaps,args...)
-  res.offline_time += @elapsed begin
+function assemble_rb(info::RBInfoUnsteady,tt::TimeTracker,snaps,args...)
+  tt.offline_time += @elapsed begin
     basis_space = rb_space(info,snaps,args...)
     basis_time = rb_time(info,snaps,basis_space)
   end
@@ -28,8 +28,8 @@ function rb_space(
   add_space_supremizers(isindef(info),basis_space,snap,args...)
 end
 
-rb_space(info::RBInfo,res::RBResults,snaps::Vector{Snapshots},args...) =
-  Broadcasting(s->rb_space(info,res,s,args...))(snaps)
+rb_space(info::RBInfo,tt::TimeTracker,snaps::Vector{Snapshots},args...) =
+  Broadcasting(s->rb_space(info,tt,s,args...))(snaps)
 
 function rb_time(
   info::RBInfoUnsteady,
@@ -50,8 +50,8 @@ function rb_time(
   add_time_supremizers(isindef(info),basis_time)
 end
 
-rb_time(info::RBInfo,res::RBResults,snaps::Vector{Snapshots},basis_space::Vector{Matrix}) =
-  Broadcasting((s,b)->rb_time(info,res,s,b))(snaps,basis_space)
+rb_time(info::RBInfo,tt::TimeTracker,snaps::Vector{Snapshots},basis_space::Vector{Matrix}) =
+  Broadcasting((s,b)->rb_time(info,tt,s,b))(snaps,basis_space)
 
 add_space_supremizers(args...) = error("Not implemented")
 add_space_supremizers(::Val{false},basis_u::Matrix,args...) = basis_u

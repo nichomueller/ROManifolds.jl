@@ -1,399 +1,180 @@
-function get_parameter()
+function get_parameter(
+  op::RBVarOperator{Affine,TT,RBSpaceSteady},
+  μ::Param,
+  args...) where TT
 
+  fun = get_param_function(op)
+  param = fun(μ)
+  param
+end
+
+function get_parameter(
+  op::RBVarOperator{Affine,TT,RBSpaceUnsteady},
+  μ::Param,
+  args...) where TT
+
+  fun = get_param_function(op)
+  timesθ = get_timesθ(op)
+  param(tθ) = fun(μ,tθ)
+  param.(timesθ)
+end
+
+function get_parameter(
+  op::RBVarOperator{Top,TT,RBSpaceSteady},
+  μ::Param,
+  mdeim::MDEIM,
+  args...) where {Top,TT}
+
+  meas,field,_ = args...
+  bs = get_basis_space(mdeim)
+  idx_space = get_idx_space(mdeim)
+
+  A = assemble_red_structure(op,μ,meas,field)
+  mdeim_online(A,bs,idx_space)
+end
+
+function get_parameter(
+  op::RBVarOperator{Top,TT,RBSpaceUnsteady},
+  μ::Param,
+  mdeim::MDEIM,
+  info::RBInfo) where {Top,TT}
+
+  bs = get_basis_space(mdeim)
+  idx_space = get_idx_space(mdeim)
+  timesθ = get_timesθ(op)
+  meas = get_reduced_measure(mdeim)
+
+  if info.st_mdeim
+    idx_time = get_idx_time(mdeim)
+    red_timesθ = timesθ[idx_time]
+    A = assemble_red_structure(op,μ,meas,red_timesθ)
+    mdeim_online(A,bs,idx_space,get_Nt(op))
+  else
+    A = assemble_red_structure(op,μ,meas,timesθ)
+    interpolate_mdeim_online(A,basis_idx,idx_space,timesθ,idx_time)
+  end
+end
+
+function assemble_red_structure(
+  op::RBLinOperator{Nonaffine,RBSpaceSteady},
+  μ::Param,
+  m::Measure)
+
+  fun = get_fe_function(op)
+  assemble_vector(v->fun(μ,m,v),get_test(op))
+end
+
+function assemble_red_structure(
+  op::RBBilinOperator{Nonaffine,TT,RBSpaceSteady},
+  μ::Param,
+  m::Measure) where TT
+
+  fun = get_fe_function(op)
+  assemble_matrix((u,v)->fun(μ,m,u,v),get_trial(op),get_test(op))
+end
+
+function assemble_red_structure(
+  op::RBBilinOperator{Nonlinear,TT,RBSpaceSteady},
+  ::Param,
+  m::Measure) where TT
+
+  fun = get_fe_function(op)
+  M(u) = assemble_matrix(v->fun(m,u,v),get_trial(op),get_test(op))
+end
+
+function assemble_red_structure(
+  op::RBLinOperator{Nonaffine,RBSpaceUnsteady},
+  μ::Param,
+  m::Measure,
+  timesθ::Vector{Real})
+
+  fun = get_fe_function(op)
+  v(tθ) =  assemble_vector(v->fun(μ,tθ,m,v),get_test(op))
+  Matrix(v.(timesθ))
+end
+
+function assemble_red_structure(
+  op::RBBilinOperator{Nonaffine,TT,RBSpaceUnsteady},
+  μ::Param,
+  m::Measure,
+  timesθ::Vector{Real}) where TT
+
+  fun = get_fe_function(op)
+  M(tθ) = assemble_matrix((u,v)->fun(μ,tθ,m,u,v),get_trial(op),get_test(op))
+  Matrix(M.(timesθ))
+end
+
+function assemble_red_structure(
+  op::RBBilinOperator{Nonlinear,TT,RBSpaceUnsteady},
+  ::Param,
+  m::Measure,
+  timesθ::Vector{Real}) where TT
+
+  fun = get_fe_function(op)
+  M(tθ,u) = assemble_matrix(v->fun(μ,tθ,m,u,v),get_trial(op),get_test(op))
+  M(u) = Matrix(Broadcasting(tθ -> M(tθ,u))(timesθ))
+  M
 end
 
 function mdeim_online(
-  Mat_nonaffine::AbstractArray{T},
-  Matᵢ::Matrix{T},
-  idx::Vector{Int},
-  Nₜ=1) where T
+  A::AbstractArray,
+  basis_idx::Matrix,
+  idx_space::Vector{Int},
+  Nt=1)
 
-  θvec = Matᵢ \ reshape(Mat_nonaffine, :, Nₜ)[idx,:]
-  blocks(Matrix{T}(θvec'))
+  param = basis_idx \ reshape(A,:,Nt)[idx_space,:]
+  param
 end
 
 function mdeim_online(
-  Mats_nonaffine::Vector{<:AbstractArray{T}},
-  Matᵢ::Matrix{T},
-  idx::Vector{Int},
-  Nₜ=1) where T
+  A::Function,
+  basis_idx::Matrix,
+  idx_space::Vector{Int},
+  Nt=1)
 
-  Mat_nonaffine = Matrix(Mats_nonaffine)
-  MDEIM_online(Mat_nonaffine, Matᵢ, idx, Nₜ)
+  param(u) = basis_idx \ reshape(A(u),:,Nt)[idx_space,:]
+  param
 end
 
-function mdeim_online(
-  Fun_nonaffine::Function,
-  Matᵢ::Matrix{T},
-  idx::Vector{Int},
-  Nₜ=1) where T
+function interpolate_mdeim_online(
+  A::AbstractArray,
+  basis_idx::Matrix,
+  idx_space::Vector{Int},
+  timesθ::Vector{Real},
+  idx_time::Vector{Int})
 
-  θmat(u) = Matᵢ \ reshape(Fun_nonaffine(u), :, Nₜ)[idx,:]
-  θblock(u) = blocks(Matrix{T}(θmat(u)'))
+  red_timesθ = timesθ[idx_time]
+  discarded_idx_time = setdiff(eachindex(timesθ),idx_time)
+  red_param = basis_idx \ reshape(A,:,length(idx_time))[idx_space,:]
 
-  θblock
-end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-function assemble_hyperred_matrix(
-  FEMSpace::FOMS{D},
-  FEMInfo::FOMInfoS{ID},
-  Param::ParamInfoS,
-  el::Vector{Int}) where {ID,D}
-
-  Ω_hyp = view(FEMSpace.Ω, el)
-  dΩ_hyp = Measure(Ω_hyp, 2 * FEMInfo.order)
-  ParamForm = ParamFormInfo(Param, dΩ_hyp)
-
-  assemble_FEM_matrix(FEMSpace, FEMInfo, ParamForm)
-
-end
-
-function assemble_hyperred_vector(
-  FEMSpace::FOMS{D},
-  FEMInfo::FOMInfoS{ID},
-  Param::ParamInfoS,
-  el::Vector{Int}) where {ID,D}
-
-  triang = Gridap.FESpaces.get_triangulation(FEMSpace, Param.var)
-  Ω_hyp = view(triang, el)
-  dΩ_hyp = Measure(Ω_hyp, 2 * FEMInfo.order)
-  ParamForm = ParamFormInfo(Param, dΩ_hyp)
-
-  assemble_FEM_vector(FEMSpace, FEMInfo, ParamForm)
-
-end
-
-function assemble_hyperred_fun_mat(
-  FEMSpace::FOMS{D},
-  FEMInfo::FOMInfoS{ID},
-  Param::ParamInfoS,
-  el::Vector{Int}) where {ID,D}
-
-  Ω_hyp = view(FEMSpace.Ω, el)
-  dΩ_hyp = Measure(Ω_hyp, 2 * FEMInfo.order)
-  ParamForm = ParamFormInfo(Param, dΩ_hyp)
-
-  assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, ParamForm)
-
-end
-
-function assemble_hyperred_fun_vec(
-  FEMSpace::FOMS{D},
-  FEMInfo::FOMInfoS{ID},
-  Param::ParamInfoS,
-  el::Vector{Int}) where {ID,D}
-
-  triang = Gridap.FESpaces.get_triangulation(FEMSpace, Param.var)
-  Ω_hyp = view(triang, el)
-  dΩ_hyp = Measure(Ω_hyp, 2 * FEMInfo.order)
-  ParamForm = ParamFormInfo(Param, dΩ_hyp)
-
-  assemble_FEM_nonlinear_vector(FEMSpace, FEMInfo, ParamForm)
-
-end
-
-function assemble_hyperred_matrix(
-  FEMSpace::FOMST{D},
-  FEMInfo::FOMInfoST{ID},
-  Param::ParamInfoST,
-  el::Vector{Int},
-  timesθ::Vector{T}) where {ID,D,T}
-
-  Ω_hyp = view(FEMSpace.Ω, el)
-  dΩ_hyp = Measure(Ω_hyp, 2 * FEMInfo.order)
-  ParamForm = ParamFormInfo(Param, dΩ_hyp)
-
-  assemble_FEM_matrix(FEMSpace, FEMInfo, ParamForm, timesθ)
-
-end
-
-function assemble_hyperred_vector(
-  FEMSpace::FOMST{D},
-  FEMInfo::FOMInfoST{ID},
-  Param::ParamInfoST,
-  el::Vector{Int},
-  timesθ::Vector{T}) where {ID,D,T}
-
-  triang = Gridap.FESpaces.get_triangulation(FEMSpace, Param.var)
-  Ω_hyp = view(triang, el)
-  dΩ_hyp = Measure(Ω_hyp, 2 * FEMInfo.order)
-  ParamForm = ParamFormInfo(Param, dΩ_hyp)
-
-  assemble_FEM_vector(FEMSpace, FEMInfo, ParamForm, timesθ)
-
-end
-
-function assemble_hyperred_fun_mat(
-  FEMSpace::FOMST{D},
-  FEMInfo::FOMInfoST{ID},
-  Param::ParamInfoST,
-  el::Vector{Int},
-  timesθ::Vector{T}) where {ID,D,T}
-
-  Ω_hyp = view(FEMSpace.Ω, el)
-  dΩ_hyp = Measure(Ω_hyp, 2 * FEMInfo.order)
-  ParamForm = ParamFormInfo(Param, dΩ_hyp)
-
-  assemble_FEM_nonlinear_matrix(FEMSpace, FEMInfo, ParamForm, timesθ)
-
-end
-
-
-function assemble_hyperred_fun_vec(
-  FEMSpace::FOMST{D},
-  FEMInfo::FOMInfoST{ID},
-  Param::ParamInfoST,
-  el::Vector{Int},
-  timesθ::Vector{T}) where {ID,D,T}
-
-  triang = Gridap.FESpaces.get_triangulation(FEMSpace, Param.var)
-  Ω_hyp = view(triang, el)
-  dΩ_hyp = Measure(Ω_hyp, 2 * FEMInfo.order)
-  ParamForm = ParamFormInfo(Param, dΩ_hyp)
-
-  assemble_FEM_nonlinear_vector(FEMSpace, FEMInfo, ParamForm, timesθ)
-
-end
-
-function θ(
-  FEMSpace::FOMS{D},
-  RBInfo::ROMInfoS{ID},
-  Param::ParamInfoS,
-  MDEIM::MMDEIM{T}) where {ID,D,T}
-
-  if Param.var ∈ RBInfo.affine_structures
-    θ = [[Param.fun(VectorValue(D, T))[1]]]
-  else
-    Mat_μ_hyp =
-      assemble_hyperred_matrix(FEMSpace, FEMInfo, Param, MDEIM.el)
-    θ = MDEIM_online(Mat_μ_hyp, MDEIM.Matᵢ, MDEIM.idx)
+  itp = ScatteredInterpolation.interpolate(Multiquadratic(),
+    reshape(red_timesθ,1,:),red_param')
+  param = zeros(length(idx_space),length(timesθ))
+  param[:,idx_time] = red_param
+  for it = discarded_idx_time
+    param[:,it] = ScatteredInterpolation.evaluate(itp,[timesθ[it]])
   end
 
-  θ::Vector{Vector{T}}
-
+  param
 end
 
-function θ(
-  FEMSpace::FOMS{D},
-  RBInfo::ROMInfoS{ID},
-  Param::ParamInfoS,
-  MDEIM::VMDEIM{T}) where {ID,D,T}
+function interpolate_mdeim_online(
+  A::Function,
+  basis_idx::Matrix,
+  idx_space::Vector{Int},
+  timesθ::Vector{Real},
+  idx_time::Vector{Int})
 
-  if Param.var ∈ RBInfo.affine_structures
-    θ = [[Param.fun(VectorValue(D, T))[1]]]
-  else
-    Vec_μ_hyp =
-      assemble_hyperred_vector(FEMSpace, FEMInfo, Param, MDEIM.el)
-    θ = MDEIM_online(Vec_μ_hyp, MDEIM.Matᵢ, MDEIM.idx)
+  red_timesθ = timesθ[idx_time]
+  discarded_idx_time = setdiff(eachindex(timesθ),idx_time)
+  red_param(u) = basis_idx \ reshape(A(u),:,length(idx_time))[idx_space,:]
+
+  itp(u) = ScatteredInterpolation.interpolate(Multiquadratic(),
+    reshape(red_timesθ,1,:),red_param(u)')
+  param(u)[:,idx_time] = red_param(u)
+  for it = discarded_idx_time
+    param(u)[:,it] = ScatteredInterpolation.evaluate(itp(u),[timesθ[it]])
   end
 
-  θ::Vector{Vector{T}}
-
-end
-
-function θ_function(
-  FEMSpace::FOMS{D},
-  RBInfo::ROMInfoS{ID},
-  Param::ParamInfoS,
-  MDEIM::MMDEIM{T}) where {ID,D,T}
-
-  @assert isnonlinear(RBInfo, Param.var) "This method is only for nonlinear variables"
-
-  Fun_μ_hyp =
-    assemble_hyperred_fun_mat(FEMSpace, FEMInfo, Param, MDEIM.el)
-  MDEIM_online(Fun_μ_hyp, MDEIM.Matᵢ, MDEIM.idx)
-
-end
-
-function θ_function(
-  FEMSpace::FOMS{D},
-  RBInfo::ROMInfoS{ID},
-  Param::ParamInfoS,
-  MDEIM::VMDEIM{T}) where {ID,D,T}
-
-  @assert isnonlinear(RBInfo, Param.var) "This method is only for nonlinear variables"
-
-  Fun_μ_hyp =
-    assemble_hyperred_fun_vec(FEMSpace, FEMInfo, Param, MDEIM.el)
-  MDEIM_online(Fun_μ_hyp, MDEIM.Matᵢ, MDEIM.idx)
-
-end
-
-function interpolate_θ(
-  Mat_μ_hyp::AbstractArray{T},
-  MDEIM::MVMDEIM{T},
-  timesθ::Vector{T}) where T
-
-  idx, time_idx = MDEIM.idx, MDEIM.time_idx
-  red_timesθ = timesθ[time_idx]
-  discarded_time_idx = setdiff(eachindex(timesθ), time_idx)
-  θ = zeros(T, length(idx), length(timesθ))
-
-  red_θ = (MDEIM.Matᵢ \
-    Matrix{T}(reshape(Mat_μ_hyp, :, length(red_timesθ))[idx, :]))
-  etp = ScatteredInterpolation.interpolate(Multiquadratic(),
-    reshape(red_timesθ, 1, :), red_θ')
-  θ[:, time_idx] = red_θ
-  for iₜ = discarded_time_idx
-    θ[:, iₜ] = ScatteredInterpolation.evaluate(etp,[timesθ[iₜ]])
-  end
-
-  blocks(Matrix{T}(θ'))
-
-end
-
-function interpolate_θ(
-  Mats_μ_hyp::Vector{<:AbstractArray{T}},
-  MDEIM::MVMDEIM{T},
-  timesθ::Vector{T}) where T
-
-  Mat_μ_hyp = Matrix(Mats_μ_hyp)
-  interpolate_θ(Mat_μ_hyp, MDEIM, timesθ)
-
-end
-
-function θ(
-  FEMSpace::FOMST{D},
-  RBInfo::ROMInfoST{ID},
-  Param::ParamInfoST,
-  MDEIM::MMDEIM{T}) where {ID,D,T}
-
-  timesθ = get_timesθ(RBInfo)
-
-  if Param.var ∈ RBInfo.affine_structures
-    θ = [[Param.funₜ(tθ) for tθ in timesθ]]
-  else
-    if RBInfo.st_mdeim
-      red_timesθ = timesθ[MDEIM.time_idx]
-      Mats_μ_hyp = assemble_hyperred_matrix(
-        FEMSpace, FEMInfo, Param, MDEIM.el, red_timesθ)
-      θ = interpolate_θ(Mats_μ_hyp, MDEIM, timesθ)
-    else
-      Mats_μ_hyp = assemble_hyperred_matrix(
-        FEMSpace, FEMInfo, Param, MDEIM.el, timesθ)
-      θ = MDEIM_online(Mats_μ_hyp, MDEIM.Matᵢ, MDEIM.idx, length(timesθ))
-    end
-  end
-
-  θ::Vector{Vector{T}}
-
-end
-
-function θ(
-  FEMSpace::FOMST{D},
-  RBInfo::ROMInfoST{ID},
-  Param::ParamInfoST,
-  MDEIM::VMDEIM{T}) where {ID,D,T}
-
-  timesθ = get_timesθ(RBInfo)
-
-  if Param.var ∈ RBInfo.affine_structures
-    θ = [[Param.funₜ(tθ) for tθ in timesθ]]
-  else
-    if RBInfo.st_mdeim
-      red_timesθ = timesθ[MDEIM.time_idx]
-      Vecs_μ_hyp = assemble_hyperred_vector(
-        FEMSpace, FEMInfo, Param, MDEIM.el, red_timesθ)
-      θ = interpolate_θ(Vecs_μ_hyp, MDEIM, timesθ)
-    else
-      Vecs_μ_hyp = assemble_hyperred_vector(
-        FEMSpace, FEMInfo, Param, MDEIM.el, timesθ)
-      θ = MDEIM_online(Vecs_μ_hyp, MDEIM.Matᵢ, MDEIM.idx, length(timesθ))
-    end
-  end
-
-  θ::Vector{Vector{T}}
-
-end
-
-function θ_function(
-  FEMSpace::FOMST{D},
-  RBInfo::ROMInfoST{ID},
-  Param::ParamInfoST,
-  MDEIM::MMDEIM{T}) where {ID,D,T}
-
-  @assert isnonlinear(RBInfo, Param.var) "This method is only for nonlinear variables"
-
-  if RBInfo.st_mdeim
-    red_timesθ = timesθ[MDEIM.time_idx]
-    Fun_μ_hyp = assemble_hyperred_fun_mat(
-      FEMSpace, FEMInfo, Param, MDEIM.el, red_timesθ)
-    interpolate_θ(Fun_μ_hyp, MDEIM, timesθ)::Function
-  else
-    Fun_μ_hyp = assemble_hyperred_fun_mat(
-      FEMSpace, FEMInfo, Param, MDEIM.el, timesθ)
-    MDEIM_online(Fun_μ_hyp, MDEIM.Matᵢ, MDEIM.idx, length(timesθ))::Function
-  end
-
-end
-
-function θ_function(
-  FEMSpace::FOMST{D},
-  RBInfo::ROMInfoST{ID},
-  Param::ParamInfoST,
-  MDEIM::VMDEIM{T}) where {ID,D,T}
-
-  @assert isnonlinear(RBInfo, Param.var) "This method is only for nonlinear variables"
-
-  if RBInfo.st_mdeim
-    red_timesθ = timesθ[MDEIM.time_idx]
-    Fun_μ_hyp = assemble_hyperred_fun_vec(
-      FEMSpace, FEMInfo, Param, MDEIM.el, red_timesθ)
-    interpolate_θ(Fun_μ_hyp, MDEIM, timesθ)::Function
-  else
-    Fun_μ_hyp = assemble_hyperred_fun_vec(
-      FEMSpace, FEMInfo, Param, MDEIM.el, timesθ)
-    MDEIM_online(Fun_μ_hyp, MDEIM.Matᵢ, MDEIM.idx, length(timesθ))::Function
-  end
-
-end
-
-function MDEIM_online(
-  Mat_nonaffine::AbstractArray{T},
-  Matᵢ::Matrix{T},
-  idx::Vector{Int},
-  Nₜ=1) where T
-
-  θvec = Matᵢ \ reshape(Mat_nonaffine, :, Nₜ)[idx,:]
-  blocks(Matrix{T}(θvec'))
-
-end
-
-function MDEIM_online(
-  Mats_nonaffine::Vector{<:AbstractArray{T}},
-  Matᵢ::Matrix{T},
-  idx::Vector{Int},
-  Nₜ=1) where T
-
-  Mat_nonaffine = Matrix(Mats_nonaffine)
-  MDEIM_online(Mat_nonaffine, Matᵢ, idx, Nₜ)
-
-end
-
-function MDEIM_online(
-  Fun_nonaffine::Function,
-  Matᵢ::Matrix{T},
-  idx::Vector{Int},
-  Nₜ=1) where T
-
-  θmat(u) = Matᵢ \ reshape(Fun_nonaffine(u), :, Nₜ)[idx,:]
-  θblock(u) = blocks(Matrix{T}(θmat(u)'))
-
-  θblock
-
+  param
 end

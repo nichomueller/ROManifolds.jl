@@ -182,18 +182,18 @@ function Base.Matrix(mblock::Vector{T}) where {T<:AbstractMatrix}
   T(reduce(vcat,transpose.(mblock))')
 end
 
-function Base.Matrix(Vec_block::Vector{Vector{Vector{T}}}) where T
-  n = length(Vec_block)
-  mat = Matrix(Vec_block[1])
+function Base.Matrix(vblock::Vector{Vector{Vector{T}}}) where T
+  n = length(vblock)
+  mat = Matrix(vblock[1])
   if n > 1
     for i = 2:n
-      mat = hcat(mat,Matrix(Vec_block[i]))
+      mat = hcat(mat,Matrix(vblock[i]))
     end
   end
   mat
 end
 
-function blocks(m::Matrix{T},nblocks=size(m)[2]) where T
+function blocks(m::Matrix{T},nblocks=1) where T
   @assert check_dimensions(m,nblocks) "Wrong dimensions"
 
   ncol_block = Int(size(m)[2]/nblocks)
@@ -207,12 +207,11 @@ function blocks(m::Matrix{T},nblocks=size(m)[2]) where T
   blockmat::Vector{Matrix{T}}
 end
 
-function blocks(Mat::Array{T,3}) where T
+function blocks(mat::Array{T,3}) where T
   blockmat = Matrix{T}[]
-  for nb = 1:size(Mat)[end]
-    push!(blockmat, Mat[:, :, nb])
+  for nb = 1:size(mat)[end]
+    push!(blockmat,mat[:,:,nb])
   end
-
   blockmat
 end
 
@@ -288,3 +287,5 @@ end
 function Base.Int32(vv::VectorValue{D,Int32}) where D
   VectorValue(Int32.([vv...]))
 end
+
+Base.:(*)(a::Symbol,b::Symbol) = Symbol(String(a)*String(b))

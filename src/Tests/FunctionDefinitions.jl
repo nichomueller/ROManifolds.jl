@@ -11,7 +11,7 @@ function poisson_functions(::Val{true},measures::ProblemFixedMeasures)
   a(p::Param) = x->a(x,p)
   function f(x,p::Param)
     μ = get_μ(p)
-    1. + sum(Point(μ[2:4]) .* x)
+    1. #+ sum(Point(μ[2:4]) .* x)
   end
   f(p::Param) = x->f(x,p)
   function h(x,p::Param)

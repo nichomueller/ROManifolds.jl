@@ -2,13 +2,13 @@ abstract type RBSpace{T} end
 
 struct RBSpaceSteady{T} <: RBSpace{T}
   id::Symbol
-  basis_space::Matrix{T}
+  basis_space::AbstractArray{T}
 end
 
 struct RBSpaceUnsteady{T} <: RBSpace{T}
   id::Symbol
-  basis_space::Matrix{T}
-  basis_time::Matrix{T}
+  basis_space::AbstractArray{T}
+  basis_time::AbstractArray{T}
 end
 
 function RBSpaceSteady(
@@ -73,7 +73,9 @@ function load!(rb::RBSpaceUnsteady,path::String,id::Symbol)
   rb
 end
 
-function load(path::String,id::Symbol,::Type{T}) where T
+load_rb(info::RBInfo,args...) = if info.load_offline load_rb(info.offline_path,args...) end
+
+function load_rb(path::String,id::Symbol,T=Float)
   rb = allocate_rbspace(id,T)
   load!(rb,path,T)
 end
@@ -104,27 +106,27 @@ abstract type RBVarOperator{Top,TT,Tsp} end
 mutable struct RBLinOperator{Top,Tsp} <: RBVarOperator{Top,nothing,Tsp}
   feop::ParamLinOperator{Top}
   rbspace_row::Tsp
-
-  function RBVarOperator(
-    feop::ParamLinOperator{Top},
-    rbspace_row::Tsp) where {Top,Tsp}
-
-    new{Top,Tsp}(feop,rbspace_row)
-  end
 end
 
 mutable struct RBBilinOperator{Top,TT,Tsp} <: RBVarOperator{Top,TT,Tsp}
   feop::ParamBilinOperator{Top,TT}
   rbspace_row::Tsp
   rbspace_col::Tsp
+end
 
-  function RBVarOperator(
-    feop::ParamBilinOperator{Top,TT},
-    rbspace_row::Tsp,
-    rbspace_col::Tsp) where {Top,TT,Tsp}
+function RBVarOperator(
+  feop::ParamLinOperator{Top},
+  rbspace_row::Tsp) where {Top,Tsp}
 
-    new{Top,TT,Tsp}(feop,rbspace_row,rbspace_col)
-  end
+  RBLinOperator{Top,Tsp}(feop,rbspace_row)
+end
+
+function RBVarOperator(
+  feop::ParamBilinOperator{Top,TT},
+  rbspace_row::Tsp,
+  rbspace_col::Tsp) where {Top,TT,Tsp}
+
+  RBBilinOperator{Top,TT,Tsp}(feop,rbspace_row,rbspace_col)
 end
 
 get_background_feop(rbop::RBVarOperator) = rbop.feop
@@ -146,6 +148,8 @@ end
 
 Gridap.FESpaces.assemble_vector(op::RBLinOperator) = assemble_vector(op.feop)
 Gridap.FESpaces.assemble_matrix(op::RBBilinOperator) = assemble_matrix(op.feop)
+assemble_lifting(op::RBBilinOperator) = assemble_lifting(op.feop)
+assemble_matrix_and_lifting(op::RBBilinOperator) = assemble_matrix_and_lifting(op.feop)
 
 realization(op::RBVarOperator) = realization(get_pspace(op))
 
@@ -153,6 +157,42 @@ Gridap.Algebra.allocate_vector(op::RBLinOperator) = assemble_vector(op.feop)
 Gridap.Algebra.allocate_matrix(op::RBBilinOperator) = assemble_matrix(op.feop)
 allocate_structure(op::RBLinOperator) = allocate_vector(op)
 allocate_structure(op::RBBilinOperator) = allocate_matrix(op)
+
+function assemble_affine_vector(
+  op::RBLinOperator{Affine,RBSpaceSteady})
+  assemble_vector(op)(realization(op))
+end
+
+function assemble_affine_vector(
+  op::RBLinOperator{Affine,RBSpaceUnsteady})
+  assemble_vector(op)(realization(op),first(get_timesθ(op)))
+end
+
+function assemble_affine_matrix(
+  op::RBBilinOperator{Affine,TT,RBSpaceSteady}) where TT
+  assemble_matrix(op)(realization(op))
+end
+
+function assemble_affine_matrix(
+  op::RBBilinOperator{Affine,TT,RBSpaceUnsteady}) where TT
+  assemble_matrix(op)(realization(op),first(get_timesθ(op)))
+end
+
+function assemble_affine_matrix_and_lifting(
+  op::RBBilinOperator{Affine,TT,RBSpaceSteady}) where TT
+  assemble_matrix_and_lifting(op)(realization(op))
+end
+
+function assemble_affine_matrix_and_lifting(
+  op::RBBilinOperator{Affine,TT,RBSpaceUnsteady}) where TT
+  assemble_matrix_and_lifting(op)(realization(op),first(get_timesθ(op)))
+end
+
+function save(path::String,mat_and_lift::NTuple{2,AbstractArray})
+  mat,lift = mat_and_lift
+  save(path,mat)
+  save(joinpath(path,"_lift"),lift)
+end
 
 function get_findnz_mapping(op::RBLinOperator)
   v = assemble_structure(op)
@@ -207,14 +247,14 @@ end
 
 function rb_projection(op::RBBilinOperator{Affine,TT,Tsp}) where {TT,Tsp}
   id = get_id(op)
-  println("Matrix $id is affine: computing Φᵀ$id Φ")
+  println("Matrix $id and its lifting are affine: computing Φᵀ$(id)Φ and Φᵀlift_$id")
 
   feop = get_background_feop(op)
-  mat = assemble_affine_matrix(feop)
+  mat,lift = assemble_affine_matrix_and_lifting(feop)
   rbspace_row = get_rbspace_row(op)
   rbspace_col = get_rbspace_col(op)
 
-  rbspace_row'*mat*rbspace_col
+  rbspace_row'*mat*rbspace_col,rbspace_row'*lift
 end
 
 abstract type RBInfo end
@@ -223,6 +263,7 @@ struct RBInfoSteady <: RBInfo
   ptype::ProblemType
   ϵ::Float
   nsnap::Int
+  online_snaps::UnitRange{Int64}
   mdeim_nsnap::Int
   offline_path::String
   online_path::String
@@ -240,6 +281,7 @@ mutable struct RBInfoUnsteady <: RBInfo
   time_info::TimeInfo
   ϵ::Float
   nsnap::Int
+  online_snaps::UnitRange{Int64}
   mdeim_nsnap::Int
   offline_path::String
   online_path::String
@@ -259,12 +301,12 @@ function RBInfo(
   ptype::ProblemType,
   mesh::String,
   root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes";
-  ϵ=1e-5,nsnap=80,mdeim_snap=20,use_energy_norm=false,online_rhs=false,
-  load_offline=true,save_offline=true,save_online=true,
+  ϵ=1e-5,nsnap=80,online_snaps=95:100,mdeim_snap=20,use_energy_norm=false,
+  online_rhs=false,load_offline=true,save_offline=true,save_online=true,
   adaptivity=false,postprocess=false)
 
   offline_path,online_path = rom_off_on_paths(ptype,mesh,root)
-  RBInfoSteady(ptype,offline_path,online_path,ϵ,nsnap,mdeim_snap,
+  RBInfoSteady(ptype,offline_path,online_path,ϵ,nsnap,online_snaps,mdeim_snap,
     use_energy_norm,online_rhs,load_offline,
     save_offline,save_online,adaptivity,postprocess)
 end
@@ -274,13 +316,13 @@ function RBInfo(
   time_info::TimeInfo,
   mesh::String,
   root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes";
-  ϵ=1e-5,nsnap=80,mdeim_snap=20,time_red_method="ST-HOSVD",
+  ϵ=1e-5,nsnap=80,online_snaps=95:100,mdeim_snap=20,time_red_method="ST-HOSVD",
   use_energy_norm=false,online_rhs=false,load_offline=true,
   save_offline=true,save_online=true,st_mdeim=true,fun_mdeim=false,
   adaptivity=false,postprocess=false)
 
   offline_path,online_path = rom_off_on_paths(ptype,mesh,root)
-  RBInfoUnsteady(ptype,time_info,offline_path,online_path,ϵ,nsnap,mdeim_snap,
+  RBInfoUnsteady(ptype,time_info,offline_path,online_path,ϵ,nsnap,online_snaps,mdeim_snap,
     time_red_method,use_energy_norm,online_rhs,load_offline,
     save_offline,save_online,st_mdeim,fun_mdeim,
     adaptivity,postprocess)
@@ -291,23 +333,3 @@ isindef(info::RBInfo) = isindef(info.ptype)
 ispdomain(info::RBInfo) = ispdomain(info.ptype)
 save(info::RBInfo,args...) = if info.save_offline save(info.offline_path,args...) end
 load(info::RBInfo,args...) = if info.load_offline load(info.offline_path,args...) end
-
-mutable struct RBResults
-  offline_time::Float
-  online_time::Float
-  err::Float
-  pointwise_err::Matrix{Float}
-
-  function RBResults()
-    new(0.,0.,0.,Matrix{Float}(undef,0,0))
-  end
-end
-
-time_dict(r::RBResults) = Dict("offline_time"=>r.offline_time,"online_time"=>r.online_time)
-err_dict(r::RBResults) = Dict("err"=>r.err,"pointwise_err"=>r.pointwise_err)
-
-function save(rbinfo::RBInfo,r::RBResults)
-  on_path = rbinfo.online_path
-  save(time_dict(r),joinpath(on_path,"times"))
-  save(err_dict(r),joinpath(on_path,"errors"))
-end
