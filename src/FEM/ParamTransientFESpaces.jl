@@ -89,6 +89,8 @@ Functor-like evaluation. It allocates Dirichlet vals in general.
 (U::ParamTransientTrialFESpace)(μ::Param,t::Real) = Gridap.evaluate(U,μ,t)
 (U::ParamTransientTrialFESpace)(μ::Param) = Gridap.evaluate(U,μ)
 (U::ParamTransientTrialFESpace)(t::Real) = Gridap.evaluate(U,t)
+(U::ParamTransientTrialFESpace)(::Nothing,::Nothing) = Gridap.evaluate(U,nothing,nothing)
+(U::ParamTransientTrialFESpace)(::Nothing) = Gridap.evaluate(U,nothing)
 
 """
 Time derivative of the Dirichlet functions

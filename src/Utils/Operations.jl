@@ -215,6 +215,14 @@ function blocks(mat::Array{T,3}) where T
   blockmat
 end
 
+function vblocks(m::Matrix{T}) where T
+  blockvec = Vector{T}[]
+  for i in axes(m,2)
+    push!(blockvec,m[:,i])
+  end
+  blockvec::Vector{Vector{T}}
+end
+
 check_dimensions(vb::AbstractVector) =
   all([size(vb[i])[1] == size(vb[1])[1] for i = 2:length(vb)])
 check_dimensions(m::AbstractMatrix,nb::Int) = iszero(size(m)[2]%nb)

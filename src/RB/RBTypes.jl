@@ -54,26 +54,24 @@ get_basis_time(rb::RBSpaceUnsteady) = rb.basis_time
 get_basis_spacetime(rb::RBSpaceUnsteady) = kron(rb.basis_space,rb.basis_time)
 
 function save(path::String,rb::RBSpaceSteady,id::Symbol)
-  save(correct_path(joinpath(path,"basis_space_$id")),rb.basis_space)
+  save(path*"basis_space_$id",rb.basis_space)
 end
 
 function save(path::String,rb::RBSpaceUnsteady,id::Symbol)
-  save(correct_path(joinpath(path,"basis_space_$id")),rb.basis_space)
-  save(correct_path(joinpath(path,"basis_time_$id")),rb.basis_time)
+  save(path*"basis_space_$id",rb.basis_space)
+  save(path*"basis_time_$id",rb.basis_time)
 end
 
 function load!(rb::RBSpaceSteady,path::String,id::Symbol)
-  rb.basis_space = load(correct_path(joinpath(path,"basis_space_$id")))
+  rb.basis_space = load(path*"basis_space_$id")
   rb
 end
 
 function load!(rb::RBSpaceUnsteady,path::String,id::Symbol)
-  rb.basis_space = load(correct_path(joinpath(path,"basis_space_$id")))
-  rb.basis_time = load(correct_path(joinpath(path,"basis_time_$id")))
+  rb.basis_space = load(path*"basis_space_$id")
+  rb.basis_time = load(path*"basis_time_$id")
   rb
 end
-
-load_rb(info::RBInfo,args...) = if info.load_offline load_rb(info.offline_path,args...) end
 
 function load_rb(path::String,id::Symbol,T=Float)
   rb = allocate_rbspace(id,T)
@@ -191,7 +189,7 @@ end
 function save(path::String,mat_and_lift::NTuple{2,AbstractArray})
   mat,lift = mat_and_lift
   save(path,mat)
-  save(joinpath(path,"_lift"),lift)
+  save(path*"_lift",lift)
 end
 
 function get_findnz_mapping(op::RBLinOperator)
@@ -333,3 +331,6 @@ isindef(info::RBInfo) = isindef(info.ptype)
 ispdomain(info::RBInfo) = ispdomain(info.ptype)
 save(info::RBInfo,args...) = if info.save_offline save(info.offline_path,args...) end
 load(info::RBInfo,args...) = if info.load_offline load(info.offline_path,args...) end
+load_snap(info::RBInfo,args...) = if info.load_offline load_snap(info.offline_path,args...) end
+load_rb(info::RBInfo,args...) = if info.load_offline load_rb(info.offline_path,args...) end
+load_mdeim(info::RBInfo,args...) = if info.load_offline load_mdeim(info.offline_path,args...) end

@@ -1,84 +1,45 @@
-include("../../../src/FEM/FEM.jl")
-include("../../../src/FEM/NewFESpaces.jl")
-include("../../../src/FEM/NewTypes.jl")
-include("../../../src/FEM/NewFEOperators.jl")
-include("../../../src/FEM/ParamOperatorInterfaces.jl")
-include("../../../src/FEM/NewFESolvers.jl")
-include("../../../src/FEM/TransientFESolutions.jl")
-include("../../../src/FEM/AffineThetaMethod.jl")
-include("../../../src/FEM/ThetaMethod.jl")
-include("../../../src/FEM/DiffOperators.jl")
+include("../FEM/FEM.jl")
+include("../RB/RB.jl")
+include("tests.jl")
 
-root = "/home/nicholasmueller/git_repos/Mabla.jl"
-mesh_name = "cube5x5x5.json"
-model = DiscreteModelFromFile(joinpath(root, "tests/meshes/$mesh_name"))
+function poisson_steady()
+  steady = false
+  indef = false
+  pdomain = false
+  ptype = ProblemType(steady,indef,pdomain)
+  run_fem = true
 
-function set_labels!(bnd_info::Dict)
-  tags = collect(keys(bnd_info))
-  bnds = collect(values(bnd_info))
-  @assert length(tags) == length(bnds)
-  labels = get_face_labeling(model)
-  for i = eachindex(tags)
-    if tags[i] ∉ labels.tag_to_name
-      add_tag_from_tags!(labels, tags[i], bnds[i])
-    end
-  end
+  root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/poisson"
+  mesh = "cube5x5x5.json"
+  bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
+  order = 1
+  degree = get_degree(order)
+
+  ranges = fill([1.,10.],6)
+  sampling = UniformSampling()
+  PS = ParamSpace(ranges,sampling)
+
+  fepath = fem_path(ptype,mesh,root)
+  model = model_info(bnd_info,ptype)
+  measures = ProblemMeasures(model,order)
+
+  a,afe,f,ffe,h,hfe,g,mfe,lhs,rhs = poisson_functions(ptype,measures)
+
+  reffe = Gridap.ReferenceFE(lagrangian,Float,degree)
+  V = MyTests(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
+  U = MyTrials(V,g,ptype)
+
+  op = ParamTransientAffineFEOperator(mfe,lhs,rhs,PS,U.trial,V.test)
+
+  solver = ThetaMethod(LUSolver(),0.025,0.5)
+  uh,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,0.,0.5,100)
+
+  opA = ParamVarOperator(a,afe,PS,U,V;id=:A)
+  opF = AffineParamVarOperator(f,ffe,PS,V;id=:F)
+  opH = ParamVarOperator(h,hfe,PS,V;id=:H)
+
+  rbinfo = RBInfo(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_nsnap=20)
+
+  tt,basis,rb_A,rb_F,rb_H = offline_phase(rbinfo,[uh,μ],[opA,opF,opH],measures)
+  online_phase(info,[uh,μ],basis,tt,rb_A,rb_F,rb_H)
 end
-bnd_info = Dict("dirichlet" => collect(1:25), "neumann" => [26])
-set_labels!(bnd_info)
-
-degree=2
-Ω = Triangulation(model)
-dΩ = Measure(Ω, degree)
-Γn = BoundaryTriangulation(model, tags=["neumann"])
-dΓn = Measure(Γn, degree)
-
-ranges = [[1., 10.], [1., 10.], [1., 10.],
-          [1., 10.], [1., 10.], [1., 10.]]
-pspace = ParamSpace(ranges,UniformSampling())
-
-a(x,t::Real,μ::Param) = 1. + μ[6] + 1. / μ[5] * exp(-sin(t)*norm(x-Point(μ[1:3]))^2 / μ[4])
-a(t::Real,μ::Param) = x->a(x,t,μ)
-a(μ::Param) = t->a(t,μ)
-f(x,t::Real,μ::Param) = 1. + μ[6] + 1. / μ[5] * exp(-sin(t)*norm(x-Point(μ[1:3]))^2 / μ[4])
-f(t::Real,μ::Param) = x->f(x,t,μ)
-f(μ::Param) = t->f(t,μ)
-h(x,t::Real,μ::Param) = 1. + μ[6] + 1. / μ[5] * exp(-sin(t)*norm(x-Point(μ[1:3]))^2 / μ[4])
-h(t::Real,μ::Param) = x->h(x,t,μ)
-h(μ::Param) = t->h(t,μ)
-g(x,t::Real,μ::Param) = 1. + μ[6] + 1. / μ[5] * exp(-sin(t)*norm(x-Point(μ[1:3]))^2 / μ[4])
-g(t::Real,μ::Param) = x->g(x,t,μ)
-g(μ::Param) = t->g(t,μ)
-
-mfe(μ,t,u,v) = ∫(v * u)dΩ
-afe(μ,t,u,v) = ∫(a(t,μ) * ∇(v) ⋅ ∇(u))dΩ
-ffe(μ,t,v) = ∫(f(t,μ) * v)dΩ
-hfe(μ,t,v) = ∫(h(t,μ) * v)dΓn
-
-rhs(μ,t,v) = ffe(μ,t,v) + hfe(μ,t,v)
-
-reffe = Gridap.ReferenceFE(lagrangian,Float,1)
-
-I=false
-S=false
-
-Gμ = ParamFunction(pspace,g;S)
-myV = MyTests(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-myU = MyTrials(myV,Gμ)
-
-op = ParamTransientAffineFEOperator(mfe,afe,rhs,pspace,myU.trial,myV.test)
-ode_solver = ThetaMethod(LUSolver(),0.025,0.5)
-ye = solve(ode_solver,op,0.,0.5)
-count = 1
-for (xₕ, _) in ye[1]
-  println("Time step: $count")
-  println(get_free_dof_values(xₕ))
-  count += 1
-end
-
-opA = ParamVarOperator(a,afe,pspace,myU,myV)
-opB = ParamVarOperator(b,bfe,pspace,myU,myQ)
-opF = ParamVarOperator(f,ffe,pspace,myV)
-opH = ParamVarOperator(h,hfe,pspace,myV)
-
-stokes_problem = Problem(μ,[uh,ph],[opA,opB,opF,opH])

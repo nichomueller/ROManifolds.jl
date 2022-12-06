@@ -196,7 +196,7 @@ Gridap.ODEs.TransientFETools.get_trial(op::ParamBilinOperator) = op.trials.trial
 get_tests(op::ParamVarOperator) = op.tests
 get_trials(op::ParamBilinOperator) = op.trials
 get_test_no_bc(op::ParamVarOperator) = op.tests.test_no_bc
-get_trial_no_bc(op::ParamBilinOperator) = op.trial.trial_no_bc
+get_trial_no_bc(op::ParamBilinOperator) = op.trials.trial_no_bc
 get_pspace(op::ParamVarOperator) = op.pspace
 
 function Gridap.FESpaces.get_cell_dof_ids(
@@ -206,36 +206,36 @@ function Gridap.FESpaces.get_cell_dof_ids(
 end
 
 function AffineParamVarOperator(
-  a::Function,afe::Function,pspace::ParamSpace,tests::MyTests)
-  ParamLinOperator{Affine}(a,afe,pspace,tests)
+  a::Function,afe::Function,pspace::ParamSpace,tests::MyTests;id=:F)
+  ParamLinOperator{Affine}(id,a,afe,pspace,tests)
 end
 
 function NonaffineParamVarOperator(
-  a::Function,afe::Function,pspace::ParamSpace,tests::MyTests)
-  ParamLinOperator{Nonaffine}(a,afe,pspace,tests)
+  a::Function,afe::Function,pspace::ParamSpace,tests::MyTests;id=:F)
+  ParamLinOperator{Nonaffine}(id,a,afe,pspace,tests)
 end
 
 function ParamVarOperator(
-  a::Function,afe::Function,pspace::ParamSpace,tests::MyTests)
-  ParamLinOperator{Nonlinear}(a,afe,pspace,tests)
+  a::Function,afe::Function,pspace::ParamSpace,tests::MyTests;id=:F)
+  ParamLinOperator{Nonlinear}(id,a,afe,pspace,tests)
 end
 
 function AffineParamVarOperator(
   a::Function,afe::Function,pspace::ParamSpace,
-  trials::MyTrials{TT},tests::MyTests) where TT
-  ParamBilinOperator{Affine,TT}(a,afe,pspace,trials,tests)
+  trials::MyTrials{TT},tests::MyTests;id=:A) where TT
+  ParamBilinOperator{Affine,TT}(id,a,afe,pspace,trials,tests)
 end
 
 function NonaffineParamVarOperator(
   a::Function,afe::Function,pspace::ParamSpace,
-  trials::MyTrials{TT},tests::MyTests) where TT
-  ParamBilinOperator{Nonaffine,TT}(a,afe,pspace,trials,tests)
+  trials::MyTrials{TT},tests::MyTests;id=:A) where TT
+  ParamBilinOperator{Nonaffine,TT}(id,a,afe,pspace,trials,tests)
 end
 
 function ParamVarOperator(
   a::Function,afe::Function,pspace::ParamSpace,
-  trials::MyTrials{TT},tests::MyTests) where TT
-  ParamBilinOperator{Nonlinear,TT}(a,afe,pspace,trials,tests)
+  trials::MyTrials{TT},tests::MyTests;id=:A) where TT
+  ParamBilinOperator{Nonlinear,TT}(id,a,afe,pspace,trials,tests)
 end
 
 function Gridap.FESpaces.assemble_vector(op::ParamLinOperator)
@@ -248,7 +248,7 @@ function Gridap.FESpaces.assemble_matrix(op::ParamBilinOperator)
   afe = get_fe_function(op)
   trial = get_trial(op)
   test = get_test(op)
-  μ -> assemble_matrix(afe(μ),trial,test)
+  μ -> assemble_matrix(afe(μ),trial(μ),test)
 end
 
 realization(op::ParamVarOperator) = realization(get_pspace(op))
@@ -268,12 +268,13 @@ function assemble_lifting(op::ParamBilinOperator)
 
   A_no_bc(μ) = assemble_matrix(afe(μ),trial_no_bc,test_no_bc)
   dir(μ) = trial(μ).dirichlet_values
+  lift(μ) = A_no_bc(μ)[fdofs_test,ddofs]*dir(μ)
 
-  μ -> A_no_bc(μ)[fdofs_test,ddofs]*dir(μ)
+  lift
 end
 
 function assemble_lifting(
-  op::ParamBilinOperator{OT,UnconstrainedFESpace}) where OT
+  ::ParamBilinOperator{OT,UnconstrainedFESpace}) where OT
   return
 end
 
@@ -287,8 +288,9 @@ function assemble_matrix_and_lifting(op::ParamBilinOperator)
   A_no_bc(μ) = assemble_matrix(afe(μ),trial_no_bc,test_no_bc)
   A_bc(μ) = A_no_bc(μ)[fdofs_test,fdofs_trial]
   dir(μ) = trial(μ).dirichlet_values
+  lift(μ) = A_no_bc(μ)[fdofs_test,ddofs]*dir(μ)
 
-  [μ -> A_bc(μ),μ -> A_no_bc(μ)[fdofs_test,ddofs]*dir(μ)]
+  A_bc,lift
 end
 
 function assemble_matrix_assemble_lifting(
@@ -303,38 +305,32 @@ mutable struct Snapshots{T}
   id::Symbol
   snap::AbstractArray{T}
   nsnap::Int
-  function Snapshots(id::Symbol,blocks::AbstractVector{T}) where T
-    snap = Matrix(blocks)
-    nsnap = get_nsnap(blocks)
-    new{T}(id,snap,nsnap)
-  end
+end
+
+function Snapshots(id::Symbol,snap::AbstractArray{T}) where T
+  nsnap = get_nsnap(snap)
+  Snapshots{T}(id,snap,nsnap)
+end
+
+function Snapshots(id::Symbol,blocks::Vector{<:AbstractArray{T}}) where T
+  snap = Matrix(blocks)
+  nsnap = get_nsnap(blocks)
+  Snapshots{T}(id,snap,nsnap)
 end
 
 Snapshots(s::Snapshots,idx) = Snapshots(s.id,getindex(s.snap,idx))
 
-allocate_snapshot(id::Symbol,::Type{T}) where T = Snapshots(id,T[])
+allocate_snapshot(id::Symbol,::Type{T}) where T = Snapshots(id,allocate_vblock(T))
 
 get_id(s::Snapshots) = s.id
 get_snap(s::Snapshots) = s.snap
 get_nsnap(s::Snapshots) = s.nsnap
-correct_path(path::String) = joinpath(path,".csv")
-correct_path(path::String,s::Snapshots) = correct_path(joinpath(path,"$(s.id)"))
 
-save(path::String,s::Snapshots) = save(correct_path(s,path),s.snap)
+save(path::String,s::Snapshots) = save(joinpath(path,"$(s.id)"),s.snap)
 
-function load!(s::Snapshots,path::String)
-  snap = load(correct_path(s,path))
-  s.snap = snap
-  s.nsnap = get_nsnap(snap)
-  s
-end
-
-load_snap(info::RBInfo,args...) = if info.load_offline load_snap(info.offline_path,args...) end
-load_snap(path::String,id::Symbol) = load_snap(path,id,Float)
-
-function load_snap(path::String,id::Symbol,::Type{T}) where T
-  s = allocate_snapshot(id,T)
-  load!(s,path)
+function load_snap(path::String,id::Symbol)
+  s = load(joinpath(path,"$(id)"))
+  Snapshots(id,s)
 end
 
 get_Nt(s::Snapshots) = get_Nt(get_snap(s),get_nsnap(s))

@@ -13,12 +13,12 @@ struct UniformSampling <: SamplingStyle end
 struct NormalSampling <: SamplingStyle end
 
 struct ParamSpace
-  domain::Vector{<:Vector{Number}}
+  domain::Vector{<:Vector{<:Number}}
   sampling_style::SamplingStyle
 end
 
-generate_param(d::Vector{Number},::UniformSampling) = rand(Uniform(first(d),last(d)))
-generate_param(d::Vector{Number},::NormalSampling) = rand(Normal(first(get_μ(d)),last(get_μ(d))))
+generate_param(d::Vector{<:Number},::UniformSampling) = rand(Uniform(first(d),last(d)))
+generate_param(d::Vector{<:Number},::NormalSampling) = rand(Normal(first(get_μ(d)),last(get_μ(d))))
 generate_param(P::ParamSpace) = Broadcasting(d->generate_param(d,P.sampling_style))(P.domain)
 generate_param(P::ParamSpace,n::Int) = [generate_param(P) for _ = 1:n]
 
@@ -33,7 +33,15 @@ realization(P::ParamSpace,n) = Param.(generate_param(P,n))
 Base.zero(::Type{Param}) = 0.
 Base.iterate(p::Param,i = 1) = iterate(p.param,i)
 Base.getindex(p::Param,args...) = getindex(p.param,args...)
-Base.Matrix(pblock::Vector{Param}) = pblock
+Base.Matrix(pvec::Vector{Param}) = Matrix{Float}(reduce(vcat,transpose.(getproperty.(pvec,:μ)))')
+
+save(path::String,pvec::Vector{Param}) = save(joinpath(path,"param"),Matrix(pvec))
+
+function load_param(path::String)
+  param_mat = load(joinpath(path,"param"))
+  param_block = vblocks(param_mat)
+  Param.(param_block)
+end
 
 abstract type ProblemMeasures end
 
@@ -69,5 +77,5 @@ end
 
 get_dΩ(meas::ProblemFixedMeasures) = meas.dΩ
 get_dΓn(meas::ProblemFixedMeasures) = meas.dΓn
-get_dΩ(meas::ProblemParametricMeasures,p::Param) = meas.dΩ(p)
-get_dΓn(meas::ProblemParametricMeasures,p::Param) = meas.dΓn(p)
+get_dΩ(meas::ProblemParamMeasures,p::Param) = meas.dΩ(p)
+get_dΓn(meas::ProblemParamMeasures,p::Param) = meas.dΓn(p)

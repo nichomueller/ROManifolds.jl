@@ -1,4 +1,3 @@
-include("../FEM/FEM.jl")
 include("FunctionDefinitions.jl")
 
 test_path(root,mesh,::Val{true}) = joinpath(root,"steady/$mesh")
@@ -102,28 +101,26 @@ function model_info(
   model_info(mshpath,bnd_info,ispdomain(ptype))
 end
 
-function get_fe_snapshots(ptype::ProblemType,solver,op,fepath::String,run_fe::Bool,args...)
-  if run_fe
-    get_fe_snapshots(ptype,solver,op,fepath,args...)
+function fe_snapshots(ptype::ProblemType,solver,op,fepath::String,run_fem::Bool,args...)
+  if run_fem
+    generate_fe_snapshots(ptype,solver,op,fepath,args...)
   else
-    get_fe_snapshots(ptype,fepath)
+    load_fe_snapshots(ptype,fepath)
   end
 end
 
-get_fe_snapshots(ptype::ProblemType,fepath::String) =
-  get_fe_snapshots(isindef(ptype),fepath)
+load_fe_snapshots(ptype::ProblemType,fepath::String) =
+  load_fe_snapshots(isindef(ptype),fepath)
 
-function get_fe_snapshots(::Val{false},fepath::String)
-  uh,μ = load.(joinpath(fepath,"uh"),joinpath(fepath,"μ"))
-  Snapshots.([:u,:μ],[uh,μ])
+function load_fe_snapshots(::Val{false},fepath::String)
+  load_snap(fepath,:u),load_param(fepath)
 end
 
-function get_fe_snapshots(::Val{true},fepath::String)
-  uh,ph,μ = load.(joinpath(fepath,"uh"),joinpath(fepath,"ph"),joinpath(fepath,"μ"))
-  Snapshots.([:u,:p,:μ],[uh,ph,μ])
+function load_fe_snapshots(::Val{true},fepath::String)
+  load_snap(fepath,:u),load_snap(fepath,:p),load_param(fepath)
 end
 
-function get_fe_snapshots(
+function generate_fe_snapshots(
   ptype::ProblemType,
   solver::FESolver,
   op::ParamFEOperator,
@@ -131,10 +128,10 @@ function get_fe_snapshots(
   n=100)
 
   sol = solve(solver,op,n)
-  get_fe_snapshots(isindef(ptype),sol,fepath)
+  generate_fe_snapshots(isindef(ptype),sol,fepath)
 end
 
-function get_fe_snapshots(
+function generate_fe_snapshots(
   ptype::ProblemType,
   solver::ThetaMethod,
   op::ParamTransientFEOperator,
@@ -144,41 +141,46 @@ function get_fe_snapshots(
   n=100)
 
   sol = solve(solver,op,t0,tF,n)
-  get_fe_snapshots(isindef(ptype),sol,fepath)
+  generate_fe_snapshots(isindef(ptype),sol,fepath)
 end
 
-function get_fe_snapshots(::Val{false},sol,fepath::String)
+function generate_fe_snapshots(::Val{false},sol,fepath::String)
   uh,μ = collect_solutions(sol)
-  usnap,μsnap = Snapshots.([:u,:μ],[uh,μ])
-  save.([fepath,fepath],[usnap,μsnap])
-  usnap,μsnap
+  usnap = Snapshots(:u,uh)
+  save(fepath,usnap)
+  save(fepath,μ)
+  usnap,μ
 end
 
-function get_fe_snapshots(::Val{false},sol,fepath::String)
+function generate_fe_snapshots(::Val{true},sol,fepath::String)
   Ns = get_Ns(op)
   uh,μ = collect_solutions(sol)
   uh,ph = uh[1:Ns[1],:],uh[Ns[1]+1:end,:]
-  usnap,psnap,μsnap = Snapshots.([:u,:p,:μ],[uh,ph,μ])
-  save.([fepath,fepath,fepath],[usnap,psnap,μsnap])
-  usnap,psnap,μsnap
+  usnap,psnap = Snapshots.([:u,:p],[uh,ph])
+  save.([fepath,fepath],[usnap,psnap])
+  save(joinpath(fepath),μ)
+  usnap,psnap,μ
 end
 
 function collect_solutions(sol)
   solk(k::Int) = collect_solutions(sol[k],k)
   results = solk.(eachindex(sol))
-  Matrix(first.(results)),last.(results)
+  Matrix.(first.(results)),last.(results)
 end
 
-function collect_solutions(solk::ParamFESolution,k::Int)
+function collect_solutions(solk,k::Int)
   println("\n Collecting solution $k")
-  solk.uh,solk.μ
-end
-
-function collect_solutions(solk::ParamTransientFESolution,k::Int)
-  println("\n Collecting solution $k")
-  uh = allocate_vector(Float)
+  uh = allocate_vblock(Float)
   collect_solutions!(uh,solk)
-  uh,solk.odesol.μ
+  uh,solk.psol.μ
+end
+
+function collect_solutions!(
+  x::Vector{Vector{Float}},
+  solk::ParamFESolution)
+
+  push!(x,get_free_dof_values(solk.psol.uh))
+  x
 end
 
 function collect_solutions!(
@@ -191,5 +193,5 @@ function collect_solutions!(
     push!(x,get_free_dof_values(uh))
     k += 1
   end
-  Matrix(x)
+  x
 end

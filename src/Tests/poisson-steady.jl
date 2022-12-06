@@ -1,18 +1,21 @@
+include("../FEM/FEM.jl")
+include("../RB/RB.jl")
 include("tests.jl")
 
-function configure()
+function poisson_steady()
   steady = true
   indef = false
   pdomain = false
   ptype = ProblemType(steady,indef,pdomain)
-  execute_fem = true
+  run_fem = true
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/poisson"
   mesh = "cube5x5x5.json"
   bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
   order = 1
+  degree = get_degree(order)
 
-  ranges = Param.(fill([1.,10.],6))
+  ranges = fill([1.,10.],6)
   sampling = UniformSampling()
   PS = ParamSpace(ranges,sampling)
 
@@ -26,14 +29,14 @@ function configure()
   V = MyTests(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
   U = MyTrials(V,g,ptype)
 
-  op = ParamAffineFEOperator(lhs,rhs,PS,U,V)
+  op = ParamAffineFEOperator(lhs,rhs,PS,get_trial(U),get_test(V))
 
   solver = LinearFESolver()
-  uh,μ = get_fe_snapshots(solver,op,fepath,execute_fem,100)
+  uh,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,100)
 
-  opA = ParamVarOperator(a,afe,PS,U,V,Nonaffine())
-  opF = ParamVarOperator(f,ffe,PS,V,Affine())
-  opH = ParamVarOperator(h,hfe,PS,V,Nonaffine())
+  opA = ParamVarOperator(a,afe,PS,U,V;id=:A)
+  opF = AffineParamVarOperator(f,ffe,PS,V;id=:F)
+  opH = ParamVarOperator(h,hfe,PS,V;id=:H)
 
   rbinfo = RBInfo(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_nsnap=20)
 

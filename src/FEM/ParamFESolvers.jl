@@ -8,7 +8,7 @@ mutable struct GenericParamSolution{C,T} <: ParamSolution
 end
 
 struct ParamFESolution
-  param_sol::ParamSolution
+  psol::ParamSolution
   trial
 end
 

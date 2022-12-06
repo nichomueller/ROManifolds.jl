@@ -25,7 +25,7 @@ function get_parameter(
   mdeim::MDEIM,
   args...) where {Top,TT}
 
-  meas,field,_ = args...
+  meas,field,_ = args
   bs = get_basis_space(mdeim)
   idx_space = get_idx_space(mdeim)
 

@@ -17,7 +17,7 @@ end
 function assemble_rb_structures(
   info::RBInfo,
   op::RBVarOperator,
-  μ::Snapshots,
+  μ::Vector{Param},
   args...)
 
   id = get_id(op)
@@ -42,20 +42,19 @@ function save_rb_structure(
 
   if info.save_offline
     off_path = info.offline_path
-    save(joinpath(off_path,"$(id)_rb"),val)
+    save(off_path*"$(id)_rb",val)
   end
 end
 
-load(::ParamVarOperator{Affine,TT,Tsp},path::String) where {TT,Tsp} = load(path)
-load(::ParamVarOperator{Top,TT,Tsp},path::String) where {Top,TT,Tsp} = load_mdeim(path)
+load(::RBVarOperator{Affine,TT,Tsp},path::String) where {TT,Tsp} = load(path)
+load(::RBVarOperator{Top,TT,Tsp},path::String) where {Top,TT,Tsp} = load_mdeim(path)
 
 function load_rb_structure(
   info::RBInfo,
-  op::ParamLinOperator{Affine,Tsp},
+  op::RBLinOperator{Affine,Tsp},
   args...) where Tsp
 
-  off_path = info.offline_path
-  path = correct_path(joinpath(off_path,"$(id)_rb"))
+  path = info.offline_path
 
   if isfile(path)
     id = get_id(op)
@@ -71,11 +70,10 @@ end
 
 function load_rb_structure(
   info::RBInfo,
-  op::ParamBilinOperator{Affine,TT,Tsp},
+  op::RBBilinOperator{Affine,TT,Tsp},
   args...) where {TT,Tsp}
 
-  off_path = info.offline_path
-  path = correct_path(joinpath(off_path,"$(id)_rb"))
+  path = info.offline_path
 
   if isfile(path)
     id = get_id(op)

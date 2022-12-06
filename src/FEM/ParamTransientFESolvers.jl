@@ -120,7 +120,7 @@ lazy iterator that computes the solution at each time step when accessing the
 solution.
 """
 struct ParamTransientFESolution
-  odesol::ParamODESolution
+  psol::ParamODESolution
   trial
 end
 
@@ -182,42 +182,42 @@ end
 
 function Base.iterate(sol::ParamTransientFESolution)
 
-  odesolnext = iterate(sol.odesol)
+  psolnext = iterate(sol.psol)
 
-  if isnothing(odesolnext)
+  if isnothing(psolnext)
     return nothing
   end
 
-  (uf,tF),odesolstate = odesolnext
+  (uf,tF),psolstate = psolnext
 
   Uh = allocate_trial_space(sol.trial)
-  Uh = evaluate!(Uh,sol.trial,sol.odesol.μ,tF)
+  Uh = evaluate!(Uh,sol.trial,sol.psol.μ,tF)
   uh = FEFunction(Uh,uf)
 
-  state = (Uh,odesolstate)
+  state = (Uh,psolstate)
 
   (uh,tF),state
 end
 
 function Base.iterate(sol::ParamTransientFESolution,state)
 
-  Uh,odesolstate = state
+  Uh,psolstate = state
 
-  odesolnext = iterate(sol.odesol,odesolstate)
+  psolnext = iterate(sol.psol,psolstate)
 
-  if isnothing(odesolnext)
+  if isnothing(psolnext)
     return nothing
   end
 
-  (uf,tF),odesolstate = odesolnext
+  (uf,tF),psolstate = psolnext
 
-  Uh = evaluate!(Uh,sol.trial,sol.odesol.μ,tF)
+  Uh = evaluate!(Uh,sol.trial,sol.psol.μ,tF)
   uh = FEFunction(Uh,uf)
 
-  state = (Uh,odesolstate)
+  state = (Uh,psolstate)
 
   (uh,tF),state
 end
 
-get_Nt(sol::ParamTransientFESolution) = Int(sol.odesol.tF/sol.odesol.solver.dt)
+get_Nt(sol::ParamTransientFESolution) = Int(sol.psol.tF/sol.psol.solver.dt)
 get_Nt(sol::Vector{ParamTransientFESolution}) = get_Nt(first(sol))

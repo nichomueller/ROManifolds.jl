@@ -3,7 +3,15 @@ function Gridap.Algebra.allocate_matrix(::Type{T}) where T
 end
 
 function Gridap.Algebra.allocate_vector(::Type{T}) where T
-  Vector{T}(undef,0,0)
+  Vector{T}(undef,0)
+end
+
+function allocate_mblock(::Type{T}) where T
+  Matrix{T}[]
+end
+
+function allocate_vblock(::Type{T}) where T
+  Vector{T}[]
 end
 
 function fill_rows_with_zeros(M::Matrix,row_idx::Vector{Int})

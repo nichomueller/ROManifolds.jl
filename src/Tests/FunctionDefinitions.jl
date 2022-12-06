@@ -25,19 +25,68 @@ function poisson_functions(::Val{true},measures::ProblemFixedMeasures)
   end
   g(p::Param) = x->g(x,p)
 
-  afe(p,dΩ,u,v) = ∫(a(p) * ∇(v) ⋅ ∇(u))dΩ
-  ffe(p,dΩ,v) = ∫(f(p) * v)dΩ
-  hfe(p,dΓn,v) = ∫(h(p) * v)dΓn
+  afe(p::Param,dΩ,u,v) = ∫(a(p) * ∇(v) ⋅ ∇(u))dΩ
+  ffe(p::Param,dΩ,v) = ∫(f(p) * v)dΩ
+  hfe(p::Param,dΓn,v) = ∫(h(p) * v)dΓn
 
   dΩ,dΓn = get_dΩ(measures),get_dΓn(measures)
-  afe(p,u,v) = afe(p,dΩ,u,v)
-  ffe(p,v) = ffe(p,dΩ,v)
-  hfe(p,v) = hfe(p,dΓn,v)
+  afe(p::Param,u,v) = afe(p,dΩ,u,v)
+  afe(p::Param) = (u,v) -> afe(p,u,v)
+  ffe(p::Param,v) = ffe(p,dΩ,v)
+  ffe(p::Param) = v -> ffe(p,v)
+  hfe(p::Param,v) = hfe(p,dΓn,v)
+  hfe(p::Param) = v -> hfe(p,v)
 
   lhs(p,u,v) = afe(p,u,v)
   rhs(p,v) = ffe(p,v) + hfe(p,v)
 
   a,afe,f,ffe,h,hfe,g,lhs,rhs
+end
+
+function poisson_functions(::Val{false},measures::ProblemFixedMeasures)
+
+  function a(x,p::Param,t::Real)
+    μ = get_μ(p)
+    1. + μ[6] + 1. / μ[5] * exp(norm(x-Point(μ[1:3]))^2 / μ[4])
+  end
+  a(p::Param,t::Real) = x->a(x,p,t)
+  a(p::Param) = t->a(p,t)
+  function f(x,p::Param,t::Real)
+    μ = get_μ(p)
+    1.
+  end
+  f(p::Param,t::Real) = x->f(x,p,t)
+  f(p::Param) = t->f(p,t)
+  function h(x,p::Param,t::Real)
+    μ = get_μ(p)
+    1. + sum(Point(μ[3:5]) .* x)
+  end
+  h(p::Param,t::Real) = x->h(x,p,t)
+  h(p::Param) = t->h(p,t)
+  function g(x,p::Param,t::Real)
+    μ = get_μ(p)
+    1. + sum(Point(μ[4:6]) .* x)
+  end
+  g(p::Param,t::Real) = x->g(x,p,t)
+  g(p::Param) = t->g(p,t)
+
+  afe(p::Param,t::Real,dΩ,u,v) = ∫(a(p,t) * ∇(v) ⋅ ∇(u))dΩ
+  ffe(p::Param,t::Real,dΩ,v) = ∫(f(p,t) * v)dΩ
+  hfe(p::Param,t::Real,dΓn,v) = ∫(h(p,t) * v)dΓn
+
+  dΩ,dΓn = get_dΩ(measures),get_dΓn(measures)
+  afe(p::Param,t::Real,u,v) = afe(p,t,dΩ,u,v)
+  afe(p::Param,t::Real) = (u,v) -> afe(p,t,u,v)
+  ffe(p::Param,t::Real,v) = ffe(p,t,dΩ,v)
+  ffe(p::Param,t::Real) = v -> ffe(p,t,v)
+  hfe(p::Param,t::Real,v) = hfe(p,t,dΓn,v)
+  hfe(p::Param,t::Real) = v -> hfe(p,v)
+
+  lhs(p,t,u,v) = afe(p,t,u,v)
+  rhs(p,t,v) = ffe(p,t,v) + hfe(p,t,v)
+  mfe(p,t,u,v) = ∫(0. * v ⋅ u)dΩ
+
+  a,afe,f,ffe,h,hfe,g,mfe,lhs,rhs
 end
 
 function navier_stokes_functions(dΩ::Measure,dΓn::Measure,ptype::ProblemType)

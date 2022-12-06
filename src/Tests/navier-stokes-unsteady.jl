@@ -5,7 +5,7 @@ function configure()
   S=false
   M=false
   ptype = ProblemType{I,S,M}()
-  execute_fem = true
+  run_fem = true
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes"
   mesh = "cube5x5x5.json"
@@ -35,7 +35,7 @@ function configure()
   op = ParamTransientFEOperator(res,jac,jac_t,PS,X,Y)
   nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking())
   solver = ThetaMethod(nls,dt,θ)
-  uh,μ = get_fe_snapshots(solver,op,fepath,execute_fem,t0,tF,1)
+  uh,μ = get_fe_snapshots(solver,op,fepath,run_fem,t0,tF,1)
 
   opA = ParamVarOperator(aμ,afe,U,V,Nonaffine())
   opB = ParamVarOperator(bμ,bfe,U,Q,Affine())

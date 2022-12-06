@@ -55,14 +55,14 @@ rb_time(info::RBInfo,tt::TimeTracker,snaps::Vector{Snapshots},basis_space::Vecto
 
 add_space_supremizers(args...) = error("Not implemented")
 add_space_supremizers(::Val{false},basis_u::Matrix,args...) = basis_u
-add_space_supremizers(::Val{false},basis::Vector{Matrix},args...) = basis...
+add_space_supremizers(::Val{false},basis::Vector{Matrix},args...) = basis
 
 function add_space_supremizers(
   ::Val{true},
   basis::Vector{Matrix},
   opB::ParamBilinOperator,
   ph::Snapshots,
-  μ::Snapshots)
+  μ::Vector{Param})
 
   basis_u,basis_p = basis
   supr = space_supremizers(opB,basis_u,basis_p,ph,μ)
@@ -74,7 +74,7 @@ function space_supremizers(
   basis_u::Matrix,
   basis_p::Matrix,
   ph::Snapshots,
-  μ::Snapshots)
+  μ::Vector{Param})
 
   println("Computing primal supremizers")
 
@@ -86,7 +86,7 @@ function assemble_constraint_matrix(
   opB::ParamBilinOperator{Affine,TT},
   basis_p::Matrix,
   ::Snapshots,
-  μ::Snapshots) where TT
+  μ::Vector{Param}) where TT
 
   @assert opB.id == :B
   println("Loading matrix Bᵀ")
@@ -100,7 +100,7 @@ function assemble_constraint_matrix(
   opB::ParamBilinOperator,
   ::Matrix,
   ph::Snapshots,
-  μ::Snapshots)
+  μ::Vector{Param})
 
   @assert opB.id == :B
   println("Matrix Bᵀ is nonaffine: must assemble the constraint matrix")
@@ -125,7 +125,7 @@ function add_time_supremizers(
   basis_up = basis_u'*basis_p
   count = 0
 
-  function enrich(basis_u::Matrix{T},basis_up::Matrix{T},v::Vector)
+  function enrich(basis_u::Matrix,basis_up::Matrix,v::Vector)
     vnew = orth_complement(v,basis_up)
     vnew /= norm(vnew)
     hcat(basis_u,vnew),hcat(basis_up,vnew'*bp)

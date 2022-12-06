@@ -16,8 +16,9 @@ function get_all_subdirectories(path::String)
   filter(isdir,readdir(path,join=true))
 end
 
+correct_path(path::String) = path*".csv"
 save(path::String,s) = writedlm(correct_path(path),s, ','; header=false)
-load(path::String) = readdlm(path, ',')
+load(path::String) = readdlm(correct_path(path), ',')
 
 function save_structures_in_list(
   list_structures::Tuple,

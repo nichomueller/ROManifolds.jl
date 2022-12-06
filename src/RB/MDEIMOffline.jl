@@ -33,7 +33,7 @@ mutable struct MDEIMUnsteady{T} <: MDEIM{T}
     meas::ProblemMeasures,
     field=:dΩ) where T
 
-    idx_space,idx_time = mdeim_idx(op,rbspace)...
+    idx_space,idx_time = mdeim_idx(op,rbspace)
     rbspace_idx = get_rbspace_idx(rbspace,idx_space,idx_time)
     red_meas = get_reduced_measure(op,idx_space,meas,field)
     new{T}(rbspace,rbspace_idx,idx_space,idx_time,red_meas)
@@ -43,11 +43,11 @@ end
 function mdeim_offline(
   info::RBInfo,
   op::RBVarOperator{Top,UnconstrainedFESpace,Tsp},
-  μ::Snapshots,
+  μ::Vector{Param},
   meas::ProblemMeasures,
   field=:dΩ) where {Top,Tsp}
 
-  μ_mdeim = Snapshots(μ,1:info.mdeim_nsnap)
+  μ_mdeim = μ[1:info.mdeim_nsnap]
   snaps = mdeim_snapshots(op,info,μ_mdeim)
   rbspace = mdeim_basis(info,snaps)
   mdeim = MDEIM(op,rbspace,meas,field)
@@ -57,11 +57,11 @@ end
 function mdeim_offline(
   info::RBInfo,
   op::RBVarOperator,
-  μ::Snapshots,
+  μ::Vector{Param},
   meas::ProblemMeasures,
   field=:dΩ)
 
-  μ_mdeim = Snapshots(μ,1:info.mdeim_nsnap)
+  μ_mdeim = μ[1:info.mdeim_nsnap]
   snaps,snaps_lift = mdeim_snapshots(op,info,μ_mdeim)
   rbspace = mdeim_basis(info,snaps)
   rbspace_lift = mdeim_basis(info,snaps_lift)
@@ -114,18 +114,18 @@ function allocate_mdeim(
   MDEIM(allocate_rbspace(get_id(op),T))
 end
 
-correct_path(path::String,mdeim::MDEIM) = correct_path(joinpath(path,"$(get_id(mdeim))"))
+correct_path(path::String,mdeim::MDEIM) = path*"$(get_id(mdeim))"
 
 function save(path::String,mdeim::MDEIMSteady)
-  save(correct_path(joinpath(path,"basis_space"),mdeim),get_basis_space(mdeim))
-  save(correct_path(joinpath(path,"idx_space"),mdeim),get_idx_space(mdeim))
+  save(joinpath(path,"basis_space"*"$(get_id(mdeim))"),get_basis_space(mdeim))
+  save(joinpath(path,"idx_space"*"$(get_id(mdeim))"),get_idx_space(mdeim))
 end
 
 function save(path::String,mdeim::MDEIMUnsteady)
-  save(correct_path(joinpath(path,"basis_space"),mdeim),get_basis_space(mdeim))
-  save(correct_path(joinpath(path,"idx_space"),mdeim),get_idx_space(mdeim))
-  save(correct_path(joinpath(path,"basis_time"),mdeim),get_basis_time(mdeim))
-  save(correct_path(joinpath(path,"idx_time"),mdeim),get_idx_time(mdeim))
+  save(joinpath(path,"basis_space"*"$(get_id(mdeim))"),get_basis_space(mdeim))
+  save(joinpath(path,"idx_space"*"$(get_id(mdeim))"),get_idx_space(mdeim))
+  save(joinpath(path,"basis_time"*"$(get_id(mdeim))"),get_basis_time(mdeim))
+  save(joinpath(path,"idx_time"*"$(get_id(mdeim))"),get_idx_time(mdeim))
 end
 
 function save(path::String,mdeim::NTuple{2,<:MDEIM})
@@ -145,8 +145,8 @@ end
 
 function load!(mdeim::MDEIMUnsteady,path::String)
   basis_space = load(correct_path(joinpath(path,"basis_space"),mdeim))
-  basis_time = load(correct_path(joinpath(path,"basis_time"),mdeim))
   idx_space = load(correct_path(joinpath(path,"idx_space"),mdeim))
+  basis_time = load(correct_path(joinpath(path,"basis_time"),mdeim))
   idx_time = load(correct_path(joinpath(path,"idx_time"),mdeim))
 
   mdeim.rbspace = RBSpace(basis_space,basis_time)

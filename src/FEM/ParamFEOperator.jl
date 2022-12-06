@@ -88,7 +88,7 @@ function Gridap.ODEs.TransientFETools.jacobian!(
   uh::CellField)
 
   Uμ = get_trial(op)
-  U = Gridap.evaluate(Uμ,nothing)
+  U = Gridap.evaluate(Uμ,μ)
   V = get_test(op)
   du = get_trial_fe_basis(U)
   v = get_fe_basis(V)
