@@ -6,7 +6,8 @@ function assemble_rb(info::RBInfoSteady,tt::TimeTracker,snaps,args...)
   tt.offline_time += @elapsed begin
     basis_space = rb_space(info,snaps,args...)
   end
-  RBSpaceSteady.(snaps,basis_space)
+  id = get_id(snaps)
+  RBSpaceSteady(id,basis_space)
 end
 
 function assemble_rb(info::RBInfoUnsteady,tt::TimeTracker,snaps,args...)
@@ -14,22 +15,19 @@ function assemble_rb(info::RBInfoUnsteady,tt::TimeTracker,snaps,args...)
     basis_space = rb_space(info,snaps,args...)
     basis_time = rb_time(info,snaps,basis_space)
   end
-  RBSpaceUnsteady.(snaps,basis_space,basis_time)
+  RBSpaceUnsteady(id,basis_space,basis_time)
 end
 
 function rb_space(
   info::RBInfo,
-  snap::Snapshots,
-  args...)
+  snap::Snapshots)
 
   println("Spatial POD, tolerance: $(info.ϵ)")
-
-  basis_space = POD(snap,info.ϵ)
-  add_space_supremizers(isindef(info),basis_space,snap,args...)
+  POD(snap,info.ϵ)
 end
 
-rb_space(info::RBInfo,tt::TimeTracker,snaps::Vector{Snapshots},args...) =
-  Broadcasting(s->rb_space(info,tt,s,args...))(snaps)
+rb_space(info::RBInfo,snaps::Vector{Snapshots}) =
+  Broadcasting(s->rb_space(info,s))(snaps)
 
 function rb_time(
   info::RBInfoUnsteady,
@@ -46,21 +44,15 @@ function rb_time(
   else
     s2 = mode2_unfolding(s1,Nt)
   end
-  basis_time = POD(s2,info.ϵ)
-  add_time_supremizers(isindef(info),basis_time)
+  POD(s2,info.ϵ)
 end
 
 rb_time(info::RBInfo,tt::TimeTracker,snaps::Vector{Snapshots},basis_space::Vector{Matrix}) =
   Broadcasting((s,b)->rb_time(info,tt,s,b))(snaps,basis_space)
 
-add_space_supremizers(args...) = error("Not implemented")
-add_space_supremizers(::Val{false},basis_u::Matrix,args...) = basis_u
-add_space_supremizers(::Val{false},basis::Vector{Matrix},args...) = basis
-
 function add_space_supremizers(
-  ::Val{true},
-  basis::Vector{Matrix},
   opB::ParamBilinOperator,
+  basis::Vector{Matrix},
   ph::Snapshots,
   μ::Vector{Param})
 
@@ -110,12 +102,7 @@ function assemble_constraint_matrix(
   Brb.(1:get_ns(bp))
 end
 
-add_time_supremizers(args...) = error("Not implemented")
-add_time_supremizers(::Val{false},basis_u::Matrix,args...) = basis_u
-add_time_supremizers(::Val{false},basis::Vector{Matrix},args...) = basis
-
 function add_time_supremizers(
-  ::Val{true},
   basis::Vector{Matrix},
   tol=1e-2)
 

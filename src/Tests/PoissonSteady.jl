@@ -7,7 +7,7 @@ function poisson_steady()
   indef = false
   pdomain = false
   ptype = ProblemType(steady,indef,pdomain)
-  run_fem = true
+  run_fem = false
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/poisson"
   mesh = "cube5x5x5.json"
@@ -34,14 +34,14 @@ function poisson_steady()
   solver = LinearFESolver()
   uh,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,100)
 
-  opA = ParamVarOperator(a,afe,PS,U,V;id=:A)
+  opA = NonaffineParamVarOperator(a,afe,PS,U,V;id=:A)
   opF = AffineParamVarOperator(f,ffe,PS,V;id=:F)
-  opH = ParamVarOperator(h,hfe,PS,V;id=:H)
+  opH = NonaffineParamVarOperator(h,hfe,PS,V;id=:H)
 
-  rbinfo = RBInfo(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_nsnap=20)
+  info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false)
 
-  tt,basis,rb_A,rb_F,rb_H = offline_phase(rbinfo,[uh,μ],[opA,opF,opH],measures)
-  online_phase(info,[uh,μ],basis,tt,rb_A,rb_F,rb_H)
+  tt,rbspace,rbA,rbF,rbH = offline_phase(info,[uh,μ],[opA,opF,opH],measures)
+  online_phase(info,[uh,μ],rbspace,tt,rbA,rbF,rbH)
 end
 
 function offline_phase(
@@ -55,46 +55,46 @@ function offline_phase(
   tt = TimeTracker(0.,0.)
 
   if info.load_offline
-    basis = get_rb(info)
-    rb_A = load_rb_structure(info,opA,basis,basis,tt,μ,meas,:dΩ)
-    rb_F = load_rb_structure(info,opF)
-    rb_H = load_rb_structure(info,opH,basis,tt,μ,meas,:dΓn)
-    tt,basis,rb_A,rb_F,rb_H
+    rbspace = get_rb(info)
+    rbA = load_rb_structure(info,opA,rbspace,rbspace,tt,μ,meas,:dΩ)
+    rbF = load_rb_structure(info,opF)
+    rbH = load_rb_structure(info,opH,rbspace,tt,μ,meas,:dΓn)
+    tt,rbspace,rbA,rbF,rbH
   else
-    basis = assemble_rb(info,tt,uh)
-    rbopA = RBVarOperator(opA,basis,basis)
-    rbopF = RBVarOperator(opF,basis)
-    rbopH = RBVarOperator(opH,basis)
-    rb_A = assemble_rb_structures(info,tt,rbopA,μ,meas,:dΩ)
-    rb_F = assemble_rb_structures(info,tt,rbopF)
-    rb_H = assemble_rb_structures(info,tt,rbopH,μ,meas,:dΓn)
-    tt,basis,rb_A,rb_F,rb_H
+    rbspace = assemble_rb(info,tt,uh)
+    rbopA = RBVarOperator(opA,rbspace,rbspace)
+    rbopF = RBVarOperator(opF,rbspace)
+    rbopH = RBVarOperator(opH,rbspace)
+    rbA = assemble_rb_structures(info,tt,rbopA,μ,meas,:dΩ)
+    rbF = assemble_rb_structures(info,tt,rbopF)
+    rbH = assemble_rb_structures(info,tt,rbopH,μ,meas,:dΓn)
+    tt,rbspace,rbA,rbF,rbH
   end
 end
 
 function online_phase(
   info::RBInfo,
   fe_sol::Vector{Snapshots},
-  basis::RBSpace,
+  rbspace::RBSpace,
   op::Vector{<:RBVarOperator},
   tt::TimeTracker,
   args...)
 
   uh,μ = fe_sol
   rbopA,rbopF,rbopH = op
-  rb_A,rb_F,rb_H = args
+  rbA,rbF,rbH = args
 
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
-      get_parameter(rbopA,μ[k],rb_A)
-      get_parameter(rbopF,μ[k],rb_F)
-      get_parameter(rbopH,μ[k],rb_H)
-      lhs = assemble_rb_system(rbopA,rb_A,μ[k])
-      rhs = assemble_rb_system(rbopF,rb_F,μ[k]),assemble_rb_system(rbopH,rb_H,μ[k])
+      get_parameter(rbopA,μ[k],rbA)
+      get_parameter(rbopF,μ[k],rbF)
+      get_parameter(rbopH,μ[k],rbH)
+      lhs = assemble_rb_system(rbopA,rbA,μ[k])
+      rhs = assemble_rb_system(rbopF,rbF,μ[k]),assemble_rb_system(rbopH,rbH,μ[k])
       sys = poisson_rb_system(lhs,rhs)
       rb_sol = solve_rb_system(sys...)
     end
-    uh_rb = reconstruct_fe_sol(basis,rb_sol)
+    uh_rb = reconstruct_fe_sol(rbspace,rb_sol)
     ErrorTracker(:u,uh,uh_rb,k)
   end
 

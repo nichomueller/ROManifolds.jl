@@ -1,5 +1,5 @@
 function assemble_rb_system(
-  op::RBVarOperator{Affine,TT,RBSpaceSteady},
+  op::RBVarOperator{Affine,TT,<:RBSpaceSteady},
   basis::Matrix,
   μ::Param) where TT
 
@@ -8,7 +8,7 @@ function assemble_rb_system(
 end
 
 function assemble_rb_system(
-  op::RBVarOperator{Nonaffine,TT,RBSpaceSteady},
+  op::RBVarOperator{Nonaffine,TT,<:RBSpaceSteady},
   mdeim::MDEIM,
   μ::Param) where TT
 
@@ -18,7 +18,7 @@ function assemble_rb_system(
 end
 
 function assemble_rb_system(
-  op::RBVarOperator{Nonlinear,TT,RBSpaceSteady},
+  op::RBVarOperator{Nonlinear,TT,<:RBSpaceSteady},
   mdeim::MDEIM,
   μ::Param) where TT
 
@@ -28,7 +28,7 @@ function assemble_rb_system(
 end
 
 function assemble_rb_system(
-  op::RBVarOperator{Affine,TT,RBSpaceUnsteady},
+  op::RBVarOperator{Affine,TT,<:RBSpaceUnsteady},
   basis::Matrix,
   μ::Param) where TT
 
@@ -39,7 +39,7 @@ function assemble_rb_system(
 end
 
 function assemble_rb_system(
-  op::RBVarOperator{Nonaffine,TT,RBSpaceUnsteady},
+  op::RBVarOperator{Nonaffine,TT,<:RBSpaceUnsteady},
   mdeim::MDEIM,
   μ::Param) where TT
 
@@ -51,7 +51,7 @@ function assemble_rb_system(
 end
 
 function assemble_rb_system(
-  op::RBVarOperator{Nonlinear,TT,RBSpaceUnsteady},
+  op::RBVarOperator{Nonlinear,TT,<:RBSpaceUnsteady},
   mdeim::MDEIM,
   μ::Param) where TT
 
@@ -63,7 +63,7 @@ function assemble_rb_system(
 end
 
 function multiply_time_bases(
-  op::RBLinOperator{Top,RBSpaceUnsteady},
+  op::RBLinOperator{Top,<:RBSpaceUnsteady},
   param::AbstractMatrix) where Top
 
   bt_row = get_basis_time_row(op)
@@ -75,7 +75,7 @@ function multiply_time_bases(
 end
 
 function multiply_time_bases(
-  op::RBBilinOperator{Top,TT,RBSpaceUnsteady},
+  op::RBBilinOperator{Top,TT,<:RBSpaceUnsteady},
   param::AbstractMatrix) where {Top,TT}
 
   Nt = get_Nt(op)
@@ -101,7 +101,7 @@ function multiply_time_bases(
 end
 
 function multiply_time_bases(
-  op::RBLinOperator{Top,RBSpaceUnsteady},
+  op::RBLinOperator{Top,<:RBSpaceUnsteady},
   param::Function) where Top
 
   bt_row = get_basis_time_row(op)
@@ -114,7 +114,7 @@ function multiply_time_bases(
 end
 
 function multiply_time_bases(
-  op::RBBilinOperator{Top,TT,RBSpaceUnsteady},
+  op::RBBilinOperator{Top,TT,<:RBSpaceUnsteady},
   param::Function) where {Top,TT}
 
   Nt = get_Nt(op)

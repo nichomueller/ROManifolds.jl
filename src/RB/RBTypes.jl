@@ -1,3 +1,43 @@
+get_nsnap(v::AbstractVector) = length(v)
+get_nsnap(m::AbstractMatrix) = size(m)[2]
+
+mutable struct Snapshots{T}
+  id::Symbol
+  snap::AbstractArray{T}
+  nsnap::Int
+end
+
+function Snapshots(id::Symbol,snap::AbstractArray{T}) where T
+  nsnap = get_nsnap(snap)
+  Snapshots{T}(id,snap,nsnap)
+end
+
+function Snapshots(id::Symbol,blocks::Vector{<:AbstractArray{T}}) where T
+  snap = Matrix(blocks)
+  nsnap = get_nsnap(blocks)
+  Snapshots{T}(id,snap,nsnap)
+end
+
+Snapshots(s::Snapshots,idx) = Snapshots(s.id,getindex(s.snap,idx))
+
+allocate_snapshot(id::Symbol,::Type{T}) where T = Snapshots(id,allocate_vblock(T))
+
+get_id(s::Snapshots) = s.id
+get_snap(s::Snapshots) = s.snap
+get_nsnap(s::Snapshots) = s.nsnap
+
+save(path::String,s::Snapshots) = save(joinpath(path,"$(s.id)"),s.snap)
+
+function load_snap(path::String,id::Symbol)
+  s = load(joinpath(path,"$(id)"))
+  Snapshots(id,s)
+end
+
+get_Nt(s::Snapshots) = get_Nt(get_snap(s),get_nsnap(s))
+mode2_unfolding(s::Snapshots) = mode2_unfolding(get_snap(s),get_nsnap(s))
+POD(s::Snapshots,args...) = POD(s.snap,args...)
+POD(s::Vector{Snapshots},args...) = Broadcasting(si->POD(si,args...))(s)
+
 abstract type RBSpace{T} end
 
 struct RBSpaceSteady{T} <: RBSpace{T}
@@ -5,10 +45,15 @@ struct RBSpaceSteady{T} <: RBSpace{T}
   basis_space::AbstractArray{T}
 end
 
-struct RBSpaceUnsteady{T} <: RBSpace{T}
-  id::Symbol
-  basis_space::AbstractArray{T}
-  basis_time::AbstractArray{T}
+function RBSpaceSteady(
+  id::Symbol,
+  basis_space::NTuple{N,AbstractArray{T}}) where {N,T}
+
+  rbspace = ()
+  for bs = basis_space
+    rbspace = (rbspace...,RBSpaceSteady{T}(id,bs))
+  end
+  rbspace
 end
 
 function RBSpaceSteady(
@@ -19,6 +64,29 @@ function RBSpaceSteady(
   RBSpaceSteady{T}(id,basis_space)
 end
 
+function RBSpaceSteady(
+  snaps::NTuple{N,Snapshots{T}};ϵ=1e-5) where {N,T}
+  Broadcasting(s->RBSpaceSteady(s;ϵ=ϵ))(snaps)
+end
+
+struct RBSpaceUnsteady{T} <: RBSpace{T}
+  id::Symbol
+  basis_space::AbstractArray{T}
+  basis_time::AbstractArray{T}
+end
+
+function RBSpaceUnsteady(
+  id::Symbol,
+  basis_space::NTuple{N,AbstractArray{T}},
+  basis_time::NTuple{N,AbstractArray{T}}) where {N,T}
+
+  rbspace = ()
+  for bst = zip(basis_space,basis_time)
+    rbspace = (rbspace...,RBSpaceUnsteady{T}(id,bst...))
+  end
+  rbspace
+end
+
 function RBSpaceUnsteady(
   snaps::Snapshots{T};ϵ=1e-5) where T
 
@@ -27,6 +95,11 @@ function RBSpaceUnsteady(
   basis_space = POD(snaps,ϵ)
   basis_time = POD(snaps2,ϵ)
   RBSpaceUnsteady{T}(id,basis_space,basis_time)
+end
+
+function RBSpaceUnsteady(
+  snaps::NTuple{N,Snapshots{T}};ϵ=1e-5) where {N,T}
+  Broadcasting(s->RBSpaceUnsteady(s;ϵ=ϵ))(snaps)
 end
 
 function RBSpace(
@@ -41,7 +114,7 @@ function RBSpace(
   basis_space::Matrix{T},
   basis_time::Matrix{T}) where T
 
-  RBSpaceSteady{T}(id,basis_space,basis_time)
+  RBSpaceUnsteady{T}(id,basis_space,basis_time)
 end
 
 allocate_rbspace(id::Symbol,::Type{T}) where T = RBSpaceSteady(allocate_snapshot(id,T))
@@ -137,6 +210,8 @@ get_basis_time_row(rbop::RBVarOperator{Top,TT,RBSpaceUnsteady}) where {Top,TT} =
   get_basis_time(get_rbspace_row(rbop))
 get_basis_time_col(rbop::RBVarOperator{Top,TT,RBSpaceUnsteady}) where {Top,TT} =
   get_basis_time(get_rbspace_col(rbop))
+Gridap.FESpaces.get_test(op::RBVarOperator) = get_test(op.feop)
+Gridap.FESpaces.get_trial(op::RBBilinOperator) = get_trial(op.feop)
 
 function Gridap.FESpaces.get_cell_dof_ids(
   rbop::RBVarOperator,
@@ -149,6 +224,7 @@ Gridap.FESpaces.assemble_matrix(op::RBBilinOperator) = assemble_matrix(op.feop)
 assemble_lifting(op::RBBilinOperator) = assemble_lifting(op.feop)
 assemble_matrix_and_lifting(op::RBBilinOperator) = assemble_matrix_and_lifting(op.feop)
 
+get_pspace(op::RBVarOperator) = get_pspace(op.feop)
 realization(op::RBVarOperator) = realization(get_pspace(op))
 
 Gridap.Algebra.allocate_vector(op::RBLinOperator) = assemble_vector(op.feop)
@@ -157,32 +233,32 @@ allocate_structure(op::RBLinOperator) = allocate_vector(op)
 allocate_structure(op::RBBilinOperator) = allocate_matrix(op)
 
 function assemble_affine_vector(
-  op::RBLinOperator{Affine,RBSpaceSteady})
+  op::RBLinOperator{Affine,<:RBSpaceSteady})
   assemble_vector(op)(realization(op))
 end
 
 function assemble_affine_vector(
-  op::RBLinOperator{Affine,RBSpaceUnsteady})
+  op::RBLinOperator{Affine,<:RBSpaceUnsteady})
   assemble_vector(op)(realization(op),first(get_timesθ(op)))
 end
 
 function assemble_affine_matrix(
-  op::RBBilinOperator{Affine,TT,RBSpaceSteady}) where TT
+  op::RBBilinOperator{Affine,TT,<:RBSpaceSteady}) where TT
   assemble_matrix(op)(realization(op))
 end
 
 function assemble_affine_matrix(
-  op::RBBilinOperator{Affine,TT,RBSpaceUnsteady}) where TT
+  op::RBBilinOperator{Affine,TT,<:RBSpaceUnsteady}) where TT
   assemble_matrix(op)(realization(op),first(get_timesθ(op)))
 end
 
 function assemble_affine_matrix_and_lifting(
-  op::RBBilinOperator{Affine,TT,RBSpaceSteady}) where TT
+  op::RBBilinOperator{Affine,TT,<:RBSpaceSteady}) where TT
   assemble_matrix_and_lifting(op)(realization(op))
 end
 
 function assemble_affine_matrix_and_lifting(
-  op::RBBilinOperator{Affine,TT,RBSpaceUnsteady}) where TT
+  op::RBBilinOperator{Affine,TT,<:RBSpaceUnsteady}) where TT
   assemble_matrix_and_lifting(op)(realization(op),first(get_timesθ(op)))
 end
 
@@ -193,13 +269,13 @@ function save(path::String,mat_and_lift::NTuple{2,AbstractArray})
 end
 
 function get_findnz_mapping(op::RBLinOperator)
-  v = assemble_structure(op)
+  v = assemble_vector(op)(realization(op))
   collect(eachindex(v))
 end
 
 "Small, full vector -> large, sparse vector"
 function get_findnz_mapping(op::RBBilinOperator)
-  M = assemble_structure(op)
+  M = assemble_matrix(op)(realization(op))
   first(findnz(M[:]))
 end
 
@@ -211,7 +287,7 @@ function get_inverse_findnz_mapping(op::RBVarOperator)
 end
 
 function unfold_spacetime(
-  op::RBVarOperator{Top,TT,RBSpaceUnsteady},
+  op::RBVarOperator{Top,TT,<:RBSpaceUnsteady},
   vals::AbstractVector{Tv}) where {Top,TT,Tv}
 
   Ns = get_Ns(op)
@@ -224,7 +300,7 @@ function unfold_spacetime(
 end
 
 function unfold_spacetime(
-  op::RBVarOperator{Top,TT,RBSpaceUnsteady},
+  op::RBVarOperator{Top,TT,<:RBSpaceUnsteady},
   vals::AbstractMatrix{Tv}) where {Top,TT,Tv}
 
   unfold_vec(k::Int) = unfold_spacetime(op,vals[:,k])
@@ -255,6 +331,17 @@ function rb_projection(op::RBBilinOperator{Affine,TT,Tsp}) where {TT,Tsp}
   rbspace_row'*mat*rbspace_col,rbspace_row'*lift
 end
 
+struct TimeInfo
+  t0::Real
+  tF::Real
+  dt::Real
+  θ::Real
+end
+
+get_dt(ti::TimeInfo) = ti.dt
+get_θ(ti::TimeInfo) = ti.θ
+get_timesθ(ti::TimeInfo) = collect(ti.t0:ti.dt:ti.tF-ti.dt).+ti.dt*ti.θ
+
 abstract type RBInfo end
 
 struct RBInfoSteady <: RBInfo
@@ -270,8 +357,23 @@ struct RBInfoSteady <: RBInfo
   load_offline::Bool
   save_offline::Bool
   save_online::Bool
+  fun_mdeim::Bool
   adaptivity::Bool
   postprocess::Bool
+end
+
+function RBInfoSteady(
+  ptype::ProblemType,
+  mesh="cube5x5x5.json",
+  root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes";
+  ϵ=1e-5,nsnap=80,online_snaps=95:100,mdeim_snap=20,use_energy_norm=false,
+  online_rhs=false,load_offline=true,save_offline=true,save_online=true,
+  fun_mdeim=false,adaptivity=false,postprocess=false)
+
+  offline_path,online_path = rom_off_on_paths(ptype,mesh,root)
+  RBInfoSteady(ptype,ϵ,nsnap,online_snaps,mdeim_snap,offline_path,online_path,
+    use_energy_norm,online_rhs,load_offline,
+    save_offline,save_online,fun_mdeim,adaptivity,postprocess)
 end
 
 mutable struct RBInfoUnsteady <: RBInfo
@@ -295,24 +397,10 @@ mutable struct RBInfoUnsteady <: RBInfo
   postprocess::Bool
 end
 
-function RBInfo(
-  ptype::ProblemType,
-  mesh::String,
-  root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes";
-  ϵ=1e-5,nsnap=80,online_snaps=95:100,mdeim_snap=20,use_energy_norm=false,
-  online_rhs=false,load_offline=true,save_offline=true,save_online=true,
-  adaptivity=false,postprocess=false)
-
-  offline_path,online_path = rom_off_on_paths(ptype,mesh,root)
-  RBInfoSteady(ptype,offline_path,online_path,ϵ,nsnap,online_snaps,mdeim_snap,
-    use_energy_norm,online_rhs,load_offline,
-    save_offline,save_online,adaptivity,postprocess)
-end
-
-function RBInfo(
+function RBInfoUnsteady(
   ptype::ProblemType,
   time_info::TimeInfo,
-  mesh::String,
+  mesh="cube5x5x5.json",
   root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes";
   ϵ=1e-5,nsnap=80,online_snaps=95:100,mdeim_snap=20,time_red_method="ST-HOSVD",
   use_energy_norm=false,online_rhs=false,load_offline=true,
@@ -320,8 +408,8 @@ function RBInfo(
   adaptivity=false,postprocess=false)
 
   offline_path,online_path = rom_off_on_paths(ptype,mesh,root)
-  RBInfoUnsteady(ptype,time_info,offline_path,online_path,ϵ,nsnap,online_snaps,mdeim_snap,
-    time_red_method,use_energy_norm,online_rhs,load_offline,
+  RBInfoUnsteady(ptype,time_info,ϵ,nsnap,online_snaps,mdeim_snap,offline_path,
+    online_path,time_red_method,use_energy_norm,online_rhs,load_offline,
     save_offline,save_online,st_mdeim,fun_mdeim,
     adaptivity,postprocess)
 end

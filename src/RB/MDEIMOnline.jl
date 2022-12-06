@@ -1,5 +1,5 @@
 function get_parameter(
-  op::RBVarOperator{Affine,TT,RBSpaceSteady},
+  op::RBVarOperator{Affine,TT,<:RBSpaceSteady},
   μ::Param,
   args...) where TT
 
@@ -9,7 +9,7 @@ function get_parameter(
 end
 
 function get_parameter(
-  op::RBVarOperator{Affine,TT,RBSpaceUnsteady},
+  op::RBVarOperator{Affine,TT,<:RBSpaceUnsteady},
   μ::Param,
   args...) where TT
 
@@ -20,7 +20,7 @@ function get_parameter(
 end
 
 function get_parameter(
-  op::RBVarOperator{Top,TT,RBSpaceSteady},
+  op::RBVarOperator{Top,TT,<:RBSpaceSteady},
   μ::Param,
   mdeim::MDEIM,
   args...) where {Top,TT}
@@ -34,7 +34,7 @@ function get_parameter(
 end
 
 function get_parameter(
-  op::RBVarOperator{Top,TT,RBSpaceUnsteady},
+  op::RBVarOperator{Top,TT,<:RBSpaceUnsteady},
   μ::Param,
   mdeim::MDEIM,
   info::RBInfo) where {Top,TT}
@@ -56,7 +56,7 @@ function get_parameter(
 end
 
 function assemble_red_structure(
-  op::RBLinOperator{Nonaffine,RBSpaceSteady},
+  op::RBLinOperator{Nonaffine,<:RBSpaceSteady},
   μ::Param,
   m::Measure)
 
@@ -65,7 +65,7 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBBilinOperator{Nonaffine,TT,RBSpaceSteady},
+  op::RBBilinOperator{Nonaffine,TT,<:RBSpaceSteady},
   μ::Param,
   m::Measure) where TT
 
@@ -74,7 +74,7 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBBilinOperator{Nonlinear,TT,RBSpaceSteady},
+  op::RBBilinOperator{Nonlinear,TT,<:RBSpaceSteady},
   ::Param,
   m::Measure) where TT
 
@@ -83,18 +83,18 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBLinOperator{Nonaffine,RBSpaceUnsteady},
+  op::RBLinOperator{Nonaffine,<:RBSpaceUnsteady},
   μ::Param,
   m::Measure,
   timesθ::Vector{Real})
 
   fun = get_fe_function(op)
-  v(tθ) =  assemble_vector(v->fun(μ,tθ,m,v),get_test(op))
+  v(tθ) = assemble_vector(v->fun(μ,tθ,m,v),get_test(op))
   Matrix(v.(timesθ))
 end
 
 function assemble_red_structure(
-  op::RBBilinOperator{Nonaffine,TT,RBSpaceUnsteady},
+  op::RBBilinOperator{Nonaffine,TT,<:RBSpaceUnsteady},
   μ::Param,
   m::Measure,
   timesθ::Vector{Real}) where TT
@@ -105,7 +105,7 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBBilinOperator{Nonlinear,TT,RBSpaceUnsteady},
+  op::RBBilinOperator{Nonlinear,TT,<:RBSpaceUnsteady},
   ::Param,
   m::Measure,
   timesθ::Vector{Real}) where TT

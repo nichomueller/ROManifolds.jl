@@ -5,7 +5,7 @@ test_path(root,mesh,::Val{false}) = joinpath(root,"unsteady/$mesh")
 
 function fem_path(
   ptype::ProblemType,
-  mesh::String,
+  mesh="cube5x5x5.json",
   root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes")
 
   @assert isdir(root) "Provide valid root path"
@@ -17,7 +17,7 @@ end
 
 function rom_path(
   ptype::ProblemType,
-  mesh::String,
+  mesh="cube5x5x5.json",
   root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes")
 
   @assert isdir(root) "Provide valid root path"
@@ -28,8 +28,8 @@ function rom_path(
 end
 
 function rom_offline_path(
-  mesh::String,
   ptype::ProblemType,
+  mesh="cube5x5x5.json",
   root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes")
 
   rb_off_path = joinpath(rom_path(ptype,mesh,root),"offline")
@@ -39,7 +39,7 @@ end
 
 function rom_online_path(
   ptype::ProblemType,
-  mesh::String,
+  mesh="cube5x5x5.json",
   root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes")
 
   rb_on_path = joinpath(rom_path(ptype,mesh,root),"online")
@@ -49,13 +49,16 @@ end
 
 function rom_off_on_paths(
   ptype::ProblemType,
-  mesh::String,
+  mesh="cube5x5x5.json",
   root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes")
-  rom_offline_path(ptype,mesh,root)
+
+  offpath = rom_offline_path(ptype,mesh,root)
+  onpath = rom_online_path(ptype,mesh,root)
+  onpath,offpath
 end
 
 function mesh_path(
-  mesh::String,
+  mesh="cube5x5x5.json",
   root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes")
 
   joinpath(get_parent_dir(root),"meshes/$mesh")

@@ -99,4 +99,3 @@ end
 
 get_pspace(op::ParamFEOperatorFromWeakForm) = op.pspace
 realization(op::ParamFEOperator,args...) = realization(op.pspace,args...)
-get_Ns(op::ParamFEOperatorFromWeakForm) = get_Ns(op.test)

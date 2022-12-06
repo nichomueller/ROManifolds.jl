@@ -230,4 +230,3 @@ end
 
 get_pspace(op::ParamTransientFEOperatorFromWeakForm) = op.pspace
 realization(op::ParamTransientFEOperator,args...) = realization(op.pspace,args...)
-get_Ns(op::ParamTransientFEOperatorFromWeakForm) = get_Ns(op.test)

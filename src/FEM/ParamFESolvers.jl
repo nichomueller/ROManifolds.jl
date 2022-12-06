@@ -1,9 +1,9 @@
 abstract type ParamSolution <: GridapType end
 
-mutable struct GenericParamSolution{C,T} <: ParamSolution
+mutable struct GenericParamSolution{C} <: ParamSolution
   solver::FESolver
   op::ParamOperator{C}
-  uh::T
+  uh::FEFunction
   μ::Param
 end
 
@@ -12,7 +12,7 @@ struct ParamFESolution
   trial
 end
 
-function Gridap.solve!(sol::GenericParamSolution{C,T}) where {C,T}
+function Gridap.solve!(sol::GenericParamSolution{C}) where C
   solver,op,uh,μ = sol.solver,sol.op,sol.uh,sol.μ
   cache = nothing
   nlop = ParamNonlinearOperator(op,uh,μ,cache)
@@ -21,7 +21,7 @@ function Gridap.solve!(sol::GenericParamSolution{C,T}) where {C,T}
   sol
 end
 
-function Gridap.solve!(sol::GenericParamSolution{Affine,T}) where T
+function Gridap.solve!(sol::GenericParamSolution{Affine})
   solver,op,uh,μ = sol.solver,sol.op,sol.uh,sol.μ
   A,b = _allocate_matrix_and_vector(op,uh)
   A = _matrix!(A,op,uh,μ)
@@ -37,20 +37,19 @@ end
 function Gridap.solve(
   solver::FESolver,
   op::ParamOperator,
-  uh,
   μ::Vector{Param})
 
-  Broadcasting(p->solve(solver,op,uh,p))(μ)
+  Broadcasting(p->solve(solver,op,p))(μ)
 end
 
 function Gridap.solve(
   solver::FESolver,
   op::ParamOperator{C},
-  uh::T,
-  μ::Param) where {C,T}
+  μ::Param) where C
 
   trial = get_trial(op.feop)
-  sol = GenericParamSolution{C,T}(solver,op,uh,μ)
+  uh = interpolate_dirichlet(trial.dirichlet_μ(μ),trial(μ))
+  sol = GenericParamSolution{C}(solver,op,uh,μ)
   solve!(sol)
 
   ParamFESolution(sol,trial)
@@ -62,9 +61,7 @@ function Gridap.solve(
   n=100)
 
   μ = realization(op,n)
-  trial = get_trial(op)
-  uh = zero(trial(nothing))
   param_op = get_algebraic_operator(op)
 
-  solve(solver,param_op,uh,μ)
+  solve(solver,param_op,μ)
 end

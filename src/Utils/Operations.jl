@@ -227,7 +227,7 @@ check_dimensions(vb::AbstractVector) =
   all([size(vb[i])[1] == size(vb[1])[1] for i = 2:length(vb)])
 check_dimensions(m::AbstractMatrix,nb::Int) = iszero(size(m)[2]%nb)
 
-function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
+#= function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
   numnz = nnz(S)
   I = Vector{Ti}(undef, numnz)
   J = Vector{Ti}(undef, numnz)
@@ -263,7 +263,7 @@ function SparseArrays.findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
   nz = findall(v -> v .!= 0., V)
 
   (I[nz], V[nz])
-end
+end =#
 
 function Base.NTuple(N::Int,T::DataType)
   NT = ()
@@ -297,3 +297,5 @@ function Base.Int32(vv::VectorValue{D,Int32}) where D
 end
 
 Base.:(*)(a::Symbol,b::Symbol) = Symbol(String(a)*String(b))
+
+Gridap.get_triangulation(m::Measure) = m.quad.trian

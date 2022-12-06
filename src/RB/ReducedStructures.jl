@@ -26,15 +26,6 @@ function assemble_rb_structures(
   mdeim_offline(info,op,μ,args...)
 end
 
-#= function reduced_measure!(
-  ::RBVarOperator,
-  ::AbstractArray,
-  meas::ProblemMeasures,
-  args...)
-
-  meas
-end =#
-
 function save_rb_structure(
   info::RBInfo,
   id::Symbol,

@@ -14,10 +14,17 @@ function allocate_vblock(::Type{T}) where T
   Vector{T}[]
 end
 
-function fill_rows_with_zeros(M::Matrix,row_idx::Vector{Int})
-  r = size(M)[1]+length(idx)
-  c = size(M)[2]
-  col_idx = collect(1:c)
+function SparseArrays.sparsevec(M::Matrix{T},row_idx::Vector{Int}) where T
+  sparse_vblocks = SparseVector{T}[]
+  for j = axes(M,2)
+    push!(sparse_vblocks,sparsevec(row_idx,M[:,j],maximum(row_idx)))
+  end
 
-  sparse(row_idx,col_idx,M,r,c)
+  sparse_vblocks
+end
+
+function sparsevec_to_sparsemat(svec::SparseVector{T},Nc::Int) where T
+  ij,v = findnz(svec)
+  i,j = from_vec_to_mat_idx(ij,Nc)
+  sparse(i,j,v,maximum(i),Nc)
 end
