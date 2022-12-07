@@ -1,5 +1,6 @@
-include("RBTypes.jl")
-
+include("RBInfo.jl")
+include("RBSpace.jl")
+include("RBVarOperator.jl")
 include("MDEIMOffline.jl")
 include("MDEIMOnline.jl")
 

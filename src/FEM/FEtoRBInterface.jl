@@ -294,3 +294,41 @@ function assemble_matrix_assemble_lifting(
   op::ParamBilinOperator{OT,<:UnconstrainedFESpace}) where OT
   assemble_matrix(op)
 end
+
+get_nsnap(v::AbstractVector) = length(v)
+get_nsnap(m::AbstractMatrix) = size(m)[2]
+
+mutable struct Snapshots{T}
+  id::Symbol
+  snap::AbstractArray{T}
+  nsnap::Int
+end
+
+function Snapshots(id::Symbol,snap::AbstractArray{T}) where T
+  nsnap = get_nsnap(snap)
+  Snapshots{T}(id,snap,nsnap)
+end
+
+function Snapshots(id::Symbol,blocks::Vector{<:AbstractArray{T}}) where T
+  snap = Matrix(blocks)
+  nsnap = get_nsnap(blocks)
+  Snapshots{T}(id,snap,nsnap)
+end
+
+Snapshots(s::Snapshots,idx) = Snapshots(s.id,getindex(s.snap,idx))
+
+get_id(s::Snapshots) = s.id
+get_snap(s::Snapshots) = s.snap
+get_nsnap(s::Snapshots) = s.nsnap
+
+save(path::String,s::Snapshots) = save(joinpath(path,"$(s.id)"),s.snap)
+
+function load_snap(path::String,id::Symbol)
+  s = load(joinpath(path,"$(id)"))
+  Snapshots(id,s)
+end
+
+get_Nt(s::Snapshots) = get_Nt(get_snap(s),get_nsnap(s))
+mode2_unfolding(s::Snapshots) = mode2_unfolding(get_snap(s),get_nsnap(s))
+POD(s::Snapshots,args...) = POD(s.snap,args...)
+POD(s::Vector{Snapshots},args...) = Broadcasting(si->POD(si,args...))(s)

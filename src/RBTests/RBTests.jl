@@ -54,7 +54,7 @@ function rom_off_on_paths(
 
   offpath = rom_offline_path(ptype,mesh,root)
   onpath = rom_online_path(ptype,mesh,root)
-  onpath,offpath
+  offpath,onpath
 end
 
 function mesh_path(

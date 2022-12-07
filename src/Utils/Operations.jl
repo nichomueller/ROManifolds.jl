@@ -1,48 +1,5 @@
-"""Computation of the inner product between 'vec1' and 'vec2', defined by the
-  (positive definite) matrix 'norm_matrix'.
-  If typeof(norm_matrix) == nothing (default), the standard inner product between
-  'vec1' and 'vec2' is returned."""
-function LinearAlgebra.dot(
-  v1::Vector{T},
-  v2::Vector{T},
-  X::SparseMatrixCSC) where T
-
-  v1' * X * v2
-
-end
-
-"""Computation of the norm of 'vec', defined by the (positive definite) matrix
-'norm_matrix'. If typeof(norm_matrix) == nothing (default), the Euclidean norm
-of 'vec' is returned."""
-function LinearAlgebra.norm(v::Vector{T}, X::SparseMatrixCSC) where T
-
-  sqrt(LinearAlgebra.dot(v, v, X))
-
-end
-
-function LinearAlgebra.norm(v::Matrix{T}, X::SparseMatrixCSC) where T
-
-  @assert size(v)[2] == 1
-  sqrt(LinearAlgebra.dot(v[:,1], v[:,1], X))
-
-end
-
-"""Generate a uniform random vector of dimension n between the ranges set by
-  the vector of ranges 'a' and 'b'"""
-function generate_parameters(
-  a::Vector{Vector{T}},
-  n = 1) where T
-
-  function generate_parameter(aᵢ::Vector{T})
-    @assert length(aᵢ) == 2 "$aᵢ must be a range, for eg. [0., 1.]"
-    T.(rand(Uniform(aᵢ[1], aᵢ[2])))
-  end
-
-  [[generate_parameter(a[i]) for i in eachindex(a)] for _ = 1:n]::Vector{Vector{T}}
-
-end
-
 get_Nt(S::AbstractMatrix,ns::Int) = Int(size(S,2)/ns)
+
 function mode2_unfolding(S::AbstractMatrix,ns::Int)
   Nt = get_Nt(S,ns)
   idx_fun(ns) = (ns .- 1)*Nt .+ 1:ns*Nt
@@ -53,7 +10,7 @@ function mode2_unfolding(S::AbstractMatrix,ns::Int)
   mode2
 end
 
-my_svd(s::Matrix) = svd(s)
+my_svd(s::Matrix{Float}) = svd(s)
 my_svd(s::SparseMatrixCSC) = svds(s;nsv=size(S)[2]-1)[1]
 my_svd(s::Vector{AbstractMatrix}) = my_svd(Matrix(s))
 
@@ -106,19 +63,19 @@ isbasis(basis,args...) =
   all([isapprox(norm(basis[:,j],args...),1) for j=axes(basis,2)])
 
 function orth_complement(
-  v::AbstractVector{T},
-  basis::AbstractMatrix{T}) where T
+  v::AbstractVector,
+  basis::AbstractMatrix)
 
   @assert isbasis(basis) "Provide a basis"
   v - projection(v,basis)
 end
 
-function gram_schmidt!(mat::Matrix,basis::Matrix)
+function gram_schmidt!(mat::Matrix{Float},basis::Matrix{Float})
 
   println("Normalizing primal supremizer 1")
   mat[:,1] = orth_complement(mat[:,1],basis)
 
-  for i = 2:size(mat,2)
+  for i = axes(mat,2)[2:end]
     println("Normalizing primal supremizer $i")
     mat[:,i] = orth_complement(mat[:,i],basis)
     mat[:,i] = orth_complement(mat[:,i],vec[:,1:i-1])
@@ -130,8 +87,18 @@ function gram_schmidt!(mat::Matrix,basis::Matrix)
   mat
 end
 
-function gram_schmidt!(vec::Vector{Vector},basis::Matrix)
+function gram_schmidt!(vec::Vector{Vector},basis::Matrix{Float})
   gram_schmidt!(Matrix(vec),basis)
+end
+
+function basis_by_coeff_mult(basis::Matrix{Float},coeff::Vector{Float},nr::Int)
+  bc = sum([basis[:,k]*coeff[k] for k=eachindex(coeff)])
+  Matrix(reshape(bc,nr,:))
+end
+
+function basis_by_coeff_mult(basis::Matrix{Float},coeff::Matrix{Float},nr::Int)
+  bc = sum([kron(basis[:,k],coeff[:,k]) for k=eachindex(coeff)])
+  Matrix(reshape(bc,nr,:))
 end
 
 function solve_cholesky(
@@ -171,6 +138,10 @@ function solve_cholesky(
   x = L[invperm(H.p), :]' \ y
 
   Vector{T}(x)
+end
+
+function Base.Matrix(v::Vector{T}) where T
+  Matrix{T}(reshape(v,:,1))
 end
 
 function Base.Matrix(vblock::Vector{Vector{T}}) where T

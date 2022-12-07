@@ -3,19 +3,24 @@ get_rb(info::RBInfo,::Val{false}) = load_rb(info,:u)
 get_rb(info::RBInfo,::Val{true}) = load_rb(info,:u),load_rb(info,:p)
 
 function assemble_rb(info::RBInfoSteady,tt::TimeTracker,snaps,args...)
+  id = get_id(snaps)
   tt.offline_time += @elapsed begin
     basis_space = rb_space(info,snaps,args...)
   end
-  id = get_id(snaps)
-  RBSpaceSteady(id,basis_space)
+  rbspace = RBSpaceSteady(id,basis_space)
+  save(info,rbspace)
+  rbspace
 end
 
 function assemble_rb(info::RBInfoUnsteady,tt::TimeTracker,snaps,args...)
+  id = get_id(snaps)
   tt.offline_time += @elapsed begin
     basis_space = rb_space(info,snaps,args...)
     basis_time = rb_time(info,snaps,basis_space)
   end
-  RBSpaceUnsteady(id,basis_space,basis_time)
+  rbspace = RBSpaceUnsteady(id,basis_space,basis_time)
+  save(info,rbspace)
+  rbspace
 end
 
 function rb_space(
@@ -32,7 +37,7 @@ rb_space(info::RBInfo,snaps::Vector{Snapshots}) =
 function rb_time(
   info::RBInfoUnsteady,
   snap::Snapshots,
-  basis_space::Matrix)
+  basis_space::Matrix{Float})
 
   println("Temporal POD, tolerance: $(info.ϵ)")
 
@@ -63,8 +68,8 @@ end
 
 function space_supremizers(
   opB::ParamBilinOperator,
-  basis_u::Matrix,
-  basis_p::Matrix,
+  basis_u::Matrix{Float},
+  basis_p::Matrix{Float},
   ph::Snapshots,
   μ::Vector{Param})
 
@@ -76,7 +81,7 @@ end
 
 function assemble_constraint_matrix(
   opB::ParamBilinOperator{Affine,TT},
-  basis_p::Matrix,
+  basis_p::Matrix{Float},
   ::Snapshots,
   μ::Vector{Param}) where TT
 
@@ -90,7 +95,7 @@ end
 
 function assemble_constraint_matrix(
   opB::ParamBilinOperator,
-  ::Matrix,
+  ::Matrix{Float},
   ph::Snapshots,
   μ::Vector{Param})
 
@@ -112,7 +117,7 @@ function add_time_supremizers(
   basis_up = basis_u'*basis_p
   count = 0
 
-  function enrich(basis_u::Matrix,basis_up::Matrix,v::Vector)
+  function enrich(basis_u::Matrix{Float},basis_up::Matrix{Float},v::Vector)
     vnew = orth_complement(v,basis_up)
     vnew /= norm(vnew)
     hcat(basis_u,vnew),hcat(basis_up,vnew'*bp)

@@ -1,7 +1,7 @@
 basis_as_fefun(::RBLinOperator) = error("Not implemented")
 
 function basis_as_fefun(
-  op::RBBilinOperator{OT,<:ParamTrialFESpace,<:RBSpaceSteady}) where OT
+  op::RBBilinOperator{OT,<:ParamTrialFESpace,RBSpaceSteady}) where OT
 
   bspace = get_basis_space(op)
   ns = get_ns(bspace)
@@ -11,7 +11,7 @@ function basis_as_fefun(
 end
 
 function basis_as_fefun(
-  op::RBBilinOperator{OT,<:ParamTransientTrialFESpace,<:RBSpaceUnsteady}) where OT
+  op::RBBilinOperator{OT,<:ParamTransientTrialFESpace,RBSpaceUnsteady}) where OT
 
   bspace = get_basis_space(op)
   ns = get_ns(bspace)
@@ -21,7 +21,10 @@ function basis_as_fefun(
   t -> eval.(fefuns(t),1:ns)
 end
 
-function mdeim_snapshots(op::RBLinOperator,args...)
+function mdeim_snapshots(
+  op::RBLinOperator,
+  ::RBInfo,
+  args...)
   vector_snapshots(op,args...)
 end
 
@@ -33,7 +36,7 @@ function mdeim_snapshots(
 end
 
 function vector_snapshots(
-  op::RBLinOperator{Nonaffine,<:RBSpaceSteady},
+  op::RBLinOperator{Nonaffine,RBSpaceSteady},
   μ::Vector{Param})
 
   id = get_id(op)
@@ -48,7 +51,7 @@ function vector_snapshots(
 end
 
 function vector_snapshots(
-  op::RBLinOperator{Nonlinear,<:RBSpaceSteady},
+  op::RBLinOperator{Nonlinear,RBSpaceSteady},
   args...)
 
   id = get_id(op)
@@ -64,7 +67,7 @@ function vector_snapshots(
 end
 
 function vector_snapshots(
-  op::RBLinOperator{Nonaffine,<:RBSpaceUnsteady},
+  op::RBLinOperator{Nonaffine,RBSpaceUnsteady},
   μ::Vector{Param})
 
   id = get_id(op)
@@ -80,7 +83,7 @@ function vector_snapshots(
 end
 
 function vector_snapshots(
-  op::RBLinOperator{Nonlinear,<:RBSpaceUnsteady},
+  op::RBLinOperator{Nonlinear,RBSpaceUnsteady},
   args...)
 
   id = get_id(op)
@@ -139,7 +142,7 @@ end
 
 function matrix_snapshots(
   ::Val{false},
-  op::RBBilinOperator{Nonaffine,<:ParamTrialFESpace,<:RBSpaceSteady},
+  op::RBBilinOperator{Nonaffine,<:ParamTrialFESpace,RBSpaceSteady},
   μ::Vector{Param})
 
   id = get_id(op)
@@ -159,7 +162,7 @@ end
 
 function matrix_snapshots(
   ::Val{false},
-  op::RBBilinOperator{Nonlinear,<:ParamTrialFESpace,<:RBSpaceSteady},
+  op::RBBilinOperator{Nonlinear,<:ParamTrialFESpace,RBSpaceSteady},
   args...)
 
   id = get_id(op)
@@ -180,7 +183,7 @@ end
 
 function matrix_snapshots(
   ::Val{false},
-  op::RBBilinOperator{Nonaffine,<:ParamTrialFESpace,<:RBSpaceUnsteady},
+  op::RBBilinOperator{Nonaffine,<:ParamTrialFESpace,RBSpaceUnsteady},
   μ::Vector{Param})
 
   id = get_id(op)
@@ -201,7 +204,7 @@ end
 
 function matrix_snapshots(
   ::Val{false},
-  op::RBBilinOperator{Nonlinear,<:ParamTransientTrialFESpace,<:RBSpaceUnsteady},
+  op::RBBilinOperator{Nonlinear,<:ParamTransientTrialFESpace,RBSpaceUnsteady},
   args...)
 
   id = get_id(op)
@@ -227,7 +230,7 @@ end
 
 function matrix_snapshots(
   ::Val{true},
-  op::RBBilinOperator{Top,<:ParamTransientTrialFESpace,<:RBSpaceUnsteady},
+  op::RBBilinOperator{Top,<:ParamTransientTrialFESpace,RBSpaceUnsteady},
   μ::Vector{Param}) where Top
 
   id = get_id(op)

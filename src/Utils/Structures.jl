@@ -23,7 +23,7 @@ function SparseArrays.sparsevec(M::Matrix{T},row_idx::Vector{Int}) where T
   sparse_vblocks
 end
 
-function sparsevec_to_sparsemat(svec::SparseVector{T},Nc::Int) where T
+function sparsevec_to_sparsemat(svec::SparseVector,Nc::Int)
   ij,v = findnz(svec)
   i,j = from_vec_to_mat_idx(ij,Nc)
   sparse(i,j,v,maximum(i),Nc)

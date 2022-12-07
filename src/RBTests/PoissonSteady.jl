@@ -1,6 +1,6 @@
 include("../FEM/FEM.jl")
 include("../RB/RB.jl")
-include("tests.jl")
+include("RBTests.jl")
 
 function poisson_steady()
   steady = true
@@ -56,9 +56,9 @@ function offline_phase(
 
   if info.load_offline
     rbspace = get_rb(info)
-    rbA = load_rb_structure(info,opA,rbspace,rbspace,tt,μ,meas,:dΩ)
+    rbA = load_rb_structure(info,opA,(rbspace,rbspace,tt,μ,meas,:dΩ))
     rbF = load_rb_structure(info,opF)
-    rbH = load_rb_structure(info,opH,rbspace,tt,μ,meas,:dΓn)
+    rbH = load_rb_structure(info,opH,(rbspace,tt,μ,meas,:dΓn))
     tt,rbspace,rbA,rbF,rbH
   else
     rbspace = assemble_rb(info,tt,uh)
@@ -86,9 +86,6 @@ function online_phase(
 
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
-      get_parameter(rbopA,μ[k],rbA)
-      get_parameter(rbopF,μ[k],rbF)
-      get_parameter(rbopH,μ[k],rbH)
       lhs = assemble_rb_system(rbopA,rbA,μ[k])
       rhs = assemble_rb_system(rbopF,rbF,μ[k]),assemble_rb_system(rbopH,rbH,μ[k])
       sys = poisson_rb_system(lhs,rhs)

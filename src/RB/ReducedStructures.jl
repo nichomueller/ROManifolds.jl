@@ -2,8 +2,8 @@ function assemble_rb_structures(info::RBInfo,tt::TimeTracker,op::RBVarOperator,a
   tt.offline_time += @elapsed begin
     rb_variable = assemble_rb_structures(info,op,args...)
   end
-  save_rb_structure(info,get_id(op),rb_variable)
-  blocks(id_rb)
+  save(info,rb_variable,get_id(op))
+  rb_variable
 end
 
 function assemble_rb_structures(
@@ -26,54 +26,68 @@ function assemble_rb_structures(
   mdeim_offline(info,op,μ,args...)
 end
 
-function save_rb_structure(
-  info::RBInfo,
-  id::Symbol,
-  val)
+save(info::RBInfo,b,id::Symbol) =
+  if info.save_offline save(info.offline_path,b,id) end
 
-  if info.save_offline
-    off_path = info.offline_path
-    save(off_path*"$(id)_rb",val)
-  end
+function save(path::String,basis::Matrix{Float},id::Symbol)
+  save(joinpath(path,"basis_space_"*"$id"),basis)
 end
 
-load(::RBVarOperator{Affine,TT,Tsp},path::String) where {TT,Tsp} = load(path)
-load(::RBVarOperator{Top,TT,Tsp},path::String) where {Top,TT,Tsp} = load_mdeim(path)
+function save(path::String,b::NTuple{2,Matrix{Float}},id::Symbol)
+  basis,basis_lift = b
+  save(path,basis,id)
+  save(path,basis_lift,id*:_lift)
+end
 
-function load_rb_structure(
+function save(path::String,mdeim::MDEIMSteady,id::Symbol)
+  save(joinpath(path,"basis_space_"*"$id"),get_basis_space(mdeim))
+  save(joinpath(path,"idx_space_"*"$id"),get_idx_space(mdeim))
+  save_idx_lu_factors(path,mdeim,id)
+end
+
+function save(path::String,mdeim::MDEIMUnsteady,id::Symbol)
+  save(joinpath(path,"basis_space_"*"$id"),get_basis_space(mdeim))
+  save(joinpath(path,"idx_space_"*"$id"),get_idx_space(mdeim))
+  save(joinpath(path,"basis_time_"*"$id"),get_basis_time(mdeim))
+  save(joinpath(path,"idx_time_"*"$id"),get_idx_time(mdeim))
+  save_idx_lu_factors(path,mdeim,id)
+end
+
+function save(path::String,m::NTuple{2,<:MDEIM},id::Symbol)
+  mdeim,mdeim_lift = m
+  save(path,mdeim,id)
+  save(path,mdeim_lift,id*:_lift)
+end
+
+function load_rb_structures(
   info::RBInfo,
   op::RBLinOperator{Affine,Tsp},
   args...) where Tsp
 
-  path = info.offline_path
-
   if isfile(path)
-    id = get_id(op)
     println("Importing reduced $id")
-    id_rb = load(op,path)
+    path = info.offline_path
+    id = get_id(op)
+    id_rb = load(joinpath(path,"basis_space_$id"))
   else
     basis,other_args = args
     rbop = RBVarOperator(op,basis)
     id_rb = assemble_rb_structures(info,rbop,other_args...)
   end
-  blocks(id_rb)
+  id_rb
 end
 
-function load_rb_structure(
+function load_rb_structures(
   info::RBInfo,
   op::RBBilinOperator{Affine,TT,Tsp},
   args...) where {TT,Tsp}
 
-  path = info.offline_path
-
   if isfile(path)
-    id = get_id(op)
     println("Importing reduced $id")
-    id_rb = load(op,path)
+    _,meas,_ = args
+    id_rb = load_mdeim(info,op,meas)
   else
-    basis_row,basis_col,other_args = args
-    rbop = RBVarOperator(op,basis_row,basis_col)
-    id_rb = assemble_rb_structures(info,rbop,other_args...)
+    id_rb = assemble_rb_structures(info,op,args...)
   end
-  blocks(id_rb)
+  id_rb
 end

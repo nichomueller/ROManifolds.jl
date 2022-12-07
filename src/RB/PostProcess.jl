@@ -8,14 +8,14 @@ struct ErrorTracker
   pointwise_err::Matrix{Float}
 end
 
-function ErrorTracker(id::Symbol,uh::Matrix,uh_rb::Matrix,k::Int)
+function ErrorTracker(id::Symbol,uh::Matrix{Float},uh_rb::Matrix{Float},k::Int)
   err,pointwise_err = compute_errors(uh,uh_rb)
   println("-----------------------------------------------------------")
   println("Online error of variable $id for μ=μ[$k] is: $(norm(err))")
   ErrorTracker(err,pointwise_err)
 end
 
-function compute_errors(uh::Matrix,uh_rb::Matrix)
+function compute_errors(uh::Matrix{Float},uh_rb::Matrix{Float})
   pointwise_err = abs.(uh-uh_rb)
   Nt = size(uh,2)
   err = zeros(Nt)
