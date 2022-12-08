@@ -1,3 +1,7 @@
+function rb(info::RBInfoSteady,args...)
+  info.load_offline ? get_rb(info) : assemble_rb(info,args...)
+end
+
 get_rb(info::RBInfo) = get_rb(info,isindef(info))
 get_rb(info::RBInfo,::Val{false}) = load_rb(info,:u)
 get_rb(info::RBInfo,::Val{true}) = load_rb(info,:u),load_rb(info,:p)
@@ -28,7 +32,7 @@ function rb_space(
   snap::Snapshots)
 
   println("Spatial POD, tolerance: $(info.ϵ)")
-  POD(snap,info.ϵ)
+  POD(snap;ϵ=info.ϵ)
 end
 
 rb_space(info::RBInfo,snaps::Vector{Snapshots}) =
@@ -49,7 +53,7 @@ function rb_time(
   else
     s2 = mode2_unfolding(s1,Nt)
   end
-  POD(s2,info.ϵ)
+  POD(s2;ϵ=info.ϵ)
 end
 
 rb_time(info::RBInfo,tt::TimeTracker,snaps::Vector{Snapshots},basis_space::Vector{Matrix}) =

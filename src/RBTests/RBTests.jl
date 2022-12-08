@@ -97,10 +97,10 @@ function model_info(
 end
 
 function model_info(
+  mshpath::String,
   bnd_info::Dict,
   ptype::ProblemType)
 
-  mshpath = mesh_path(mesh,root)
   model_info(mshpath,bnd_info,ispdomain(ptype))
 end
 
@@ -161,7 +161,7 @@ function generate_fe_snapshots(::Val{true},sol,fepath::String)
   uh,ph = uh[1:Ns[1],:],uh[Ns[1]+1:end,:]
   usnap,psnap = Snapshots.([:u,:p],[uh,ph])
   save.([fepath,fepath],[usnap,psnap])
-  save(joinpath(fepath),μ)
+  save(fepath,μ)
   usnap,psnap,μ
 end
 

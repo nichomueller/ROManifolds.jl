@@ -276,6 +276,7 @@ function assemble_lifting(
 end
 
 function assemble_matrix_and_lifting(op::ParamBilinOperator)
+  afe = get_fe_function(op)
   trial = get_trial(op)
   trial_no_bc = get_trial_no_bc(op)
   test_no_bc = get_test_no_bc(op)
@@ -330,5 +331,5 @@ end
 
 get_Nt(s::Snapshots) = get_Nt(get_snap(s),get_nsnap(s))
 mode2_unfolding(s::Snapshots) = mode2_unfolding(get_snap(s),get_nsnap(s))
-POD(s::Snapshots,args...) = POD(s.snap,args...)
-POD(s::Vector{Snapshots},args...) = Broadcasting(si->POD(si,args...))(s)
+POD(s::Snapshots,args...;kwargs...) = POD(s.snap,args...;kwargs...)
+POD(s::Vector{Snapshots},args...;kwargs...) = Broadcasting(si->POD(si,args...;kwargs...))(s)

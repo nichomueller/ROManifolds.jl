@@ -43,22 +43,46 @@ function MDEIM(
   MDEIM.(red_rbspace,idx_lu_factors,idx,red_measure)
 end
 
-function load_mdeim(info::RBInfoSteady,op::RBVarOperator,meas::Measure)
+function load_mdeim(
+  info::RBInfo,
+  op::RBVarOperator{Top,UnconstrainedFESpace,Tsp},
+  meas::Measure) where {Top,Tsp}
+
+  load_mdeim(get_id(op),info,meas)
+end
+
+function load_mdeim(
+  info::RBInfo,
+  op::RBVarOperator,
+  meas::Measure)
+
+  load_mdeim(get_id(op),info,meas),load_mdeim(get_id(op)*:_lift,info,meas)
+end
+
+function load_mdeim(
+  id::Symbol,
+  info::RBInfoSteady,
+  op::RBVarOperator,
+  meas::Measure)
+
   path = info.offline_path
-  id = get_id(op)
 
   basis_space = load(joinpath(path,"basis_space_"*"$id"))
   rbspace = RBSpace(id,basis_space)
-  idx_space = load(joinpath(path,"idx_space_"*"$id"))
+  idx_space = Int.(load(joinpath(path,"idx_space_"*"$id"))[:,1])
   idx_lu_factors = load_idx_lu_factors(path,id)
   red_measure = get_reduced_measure(op,meas,idx_space)
 
   MDEIM(rbspace,idx_lu_factors,idx_space,red_measure)
 end
 
-function load_mdeim(info::RBInfoSteady,op::RBVarOperator,meas::Measure)
+function load_mdeim(
+  id::Symbol,
+  info::RBInfoUnsteady,
+  op::RBVarOperator,
+  meas::Measure)
+
   path = info.offline_path
-  id = get_id(op)
 
   basis_space = load(joinpath(path,"basis_space_"*"$id"))
   basis_time = load(joinpath(path,"basis_time_"*"$id"))
@@ -84,6 +108,13 @@ get_idx_space(mdeim::MDEIMUnsteady) = first(mdeim.idx)
 get_idx_time(mdeim::MDEIMUnsteady) = last(mdeim.idx)
 get_reduced_measure(mdeim::MDEIM) = mdeim.red_measure
 
+get_basis_space(mdeim::NTuple{2,MDEIM}) = get_basis_space.(mdeim)
+get_basis_time(mdeim::NTuple{2,MDEIMUnsteady}) = get_basis_time.(mdeim)
+get_idx_lu_factors(mdeim::NTuple{2,MDEIM}) = get_idx_lu_factors.(mdeim)
+get_idx_space(mdeim::NTuple{2,MDEIM}) = get_idx_space.(mdeim)
+get_idx_time(mdeim::NTuple{2,MDEIMUnsteady}) = get_idx_time.(mdeim)
+get_reduced_measure(mdeim::NTuple{2,MDEIM}) = get_reduced_measure.(mdeim)
+
 function mdeim_offline(
   info::RBInfo,
   op::RBVarOperator,
@@ -97,8 +128,8 @@ function mdeim_offline(
   red_rbspace = project_mdeim_basis(op,rbspace)
   idx = mdeim_idx(rbspace)
   idx_lu_factors = get_idx_lu_factors(rbspace,idx)
+  idx = recast_in_full_dim(op,idx)
   red_meas = get_reduced_measure(op,idx,meas,field)
-  idx = fix_idx_space(op,idx)
 
   MDEIM(red_rbspace,idx_lu_factors,idx,red_meas)
 end
@@ -150,12 +181,12 @@ end
 function load_idx_lu_factors(path::String,id::Symbol)
   path_lu = joinpath(path,"LU_$id")
   factors = load(joinpath(path_lu,"LU"))
-  ipiv = load(joinpath(path_lu,"p"))
+  ipiv = Int.(load(joinpath(path_lu,"p"))[:,1])
   LU(factors,ipiv,0)
 end
 
-mdeim_basis(info::RBInfoSteady,snaps) = RBSpaceSteady(snaps;info.ϵ)
-mdeim_basis(info::RBInfoUnsteady,snaps) = RBSpaceUnsteady(snaps;info.ϵ)
+mdeim_basis(info::RBInfoSteady,snaps) = RBSpaceSteady(snaps;ismdeim=Val(true),ϵ=info.ϵ)
+mdeim_basis(info::RBInfoUnsteady,snaps) = RBSpaceUnsteady(snaps;ismdeim=Val(true),ϵ=info.ϵ)
 
 function project_mdeim_basis(
   op::RBVarOperator{Top,TT,RBSpaceSteady},
@@ -246,6 +277,8 @@ function project_mdeim_basis_time(
   get_basis_time(rbspace),get_basis_time(rbspace_lift)
 end
 
+mdeim_idx(rbspace::NTuple{2,<:RBSpace}) = mdeim_idx.(rbspace)
+
 function mdeim_idx(rbspace::RBSpaceSteady)
   idx_space = mdeim_idx(get_basis_space(rbspace))
   idx_space
@@ -256,8 +289,6 @@ function mdeim_idx(rbspace::RBSpaceUnsteady)
   idx_time = mdeim_idx(get_basis_time(rbspace))
   idx_space,idx_time
 end
-
-mdeim_idx(rbspace::NTuple{2,<:RBSpace}) = mdeim_idx.(rbspace)
 
 function mdeim_idx(M::Matrix{Float})
   n = size(M)[2]
@@ -273,26 +304,16 @@ function mdeim_idx(M::Matrix{Float})
   unique!(idx)
 end
 
-fix_idx_space(::RBLinOperator,idx_tmp::Vector{Int}) = idx_tmp
+recast_in_full_dim(::RBLinOperator,idx_tmp::Vector{Int}) = idx_tmp
 
-fix_idx_space(op::RBBilinOperator,idx_tmp::Vector{Int}) = get_findnz_mapping(op)[idx_tmp]
+recast_in_full_dim(op::RBBilinOperator,idx_tmp::Vector{Int}) = get_findnz_mapping(op)[idx_tmp]
 
-function fix_idx_space(
-  op::RBBilinOperator{Top,TT,RBSpaceSteady},
-  idx_tmp::NTuple{2,Vector{Int}}) where {Top,TT}
-  Broadcasting(i->fix_idx_space(op,i))(idx_tmp)
+function recast_in_full_dim(op::RBBilinOperator,idx_tmp::NTuple{2,Vector{Int}})
+  recast_in_full_dim(op,first(idx_tmp)),last(idx_tmp)
 end
 
-function fix_idx_space(
-  op::RBBilinOperator{Top,TT,RBSpaceUnsteady},
-  idx_tmp::NTuple{2,Vector{Int}}) where {Top,TT}
-  fix_idx_space(op,first(idx_tmp)),last(idx_tmp)
-end
-
-function fix_idx_space(
-  op::RBBilinOperator{Top,TT,RBSpaceUnsteady},
-  idx_tmp::NTuple{2,NTuple{2,Vector{Int}}}) where {Top,TT}
-  Broadcasting(i->fix_idx_space(op,i))(idx_tmp)
+function recast_in_full_dim(op::RBBilinOperator,idx_tmp::NTuple{2,NTuple{2,Vector{Int}}})
+  Broadcasting(i->recast_in_full_dim(op,i))(idx_tmp)
 end
 
 function get_reduced_measure(
@@ -350,8 +371,9 @@ end
 function find_mesh_elements(
   op::RBVarOperator,
   trian::Triangulation,
-  idx::Vector{Int})
+  idx_tmp::Vector{Int})
 
+  idx = recast_in_mat_form(op,idx_tmp)
   connectivity = get_cell_dof_ids(op,trian)
 
   el = Int[]
@@ -364,4 +386,14 @@ function find_mesh_elements(
   end
 
   unique(el)
+end
+
+function recast_in_mat_form(::RBLinOperator,idx_tmp::Vector{Int})
+  idx_tmp
+end
+
+function recast_in_mat_form(op::RBBilinOperator,idx_tmp::Vector{Int})
+  Ns = get_Ns(get_rbspace_row(op))
+  idx_space,_ = from_vec_to_mat_idx(idx_tmp,Ns)
+  idx_space
 end

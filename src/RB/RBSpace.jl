@@ -17,16 +17,16 @@ function RBSpaceSteady(
 end
 
 function RBSpaceSteady(
-  snaps::Snapshots;ϵ=1e-5)
+  snaps::Snapshots;ismdeim=Val(false),ϵ=1e-5)
 
   id = get_id(snaps)
-  basis_space = POD(snaps,ϵ)
+  basis_space = POD(snaps,ismdeim;ϵ=ϵ)
   RBSpaceSteady(id,basis_space)
 end
 
 function RBSpaceSteady(
-  snaps::NTuple{N,Snapshots};ϵ=1e-5) where N
-  Broadcasting(s->RBSpaceSteady(s;ϵ=ϵ))(snaps)
+  snaps::NTuple{N,Snapshots};ismdeim=Val(false),ϵ=1e-5) where N
+  Broadcasting(s->RBSpaceSteady(s;ismdeim=ismdeim,ϵ=ϵ))(snaps)
 end
 
 struct RBSpaceUnsteady <: RBSpace
@@ -48,18 +48,18 @@ function RBSpaceUnsteady(
 end
 
 function RBSpaceUnsteady(
-  snaps::Snapshots;ϵ=1e-5)
+  snaps::Snapshots;ismdeim=Val(false),ϵ=1e-5)
 
   id = get_id(snaps)
   snaps2 = mode2(snaps)
-  basis_space = POD(snaps,ϵ)
-  basis_time = POD(snaps2,ϵ)
+  basis_space = POD(snaps,ismdeim;ϵ)
+  basis_time = POD(snaps2,ismdeim;ϵ)
   RBSpaceUnsteady(id,basis_space,basis_time)
 end
 
 function RBSpaceUnsteady(
-  snaps::NTuple{N,Snapshots};ϵ=1e-5) where N
-  Broadcasting(s->RBSpaceUnsteady(s;ϵ=ϵ))(snaps)
+  snaps::NTuple{N,Snapshots};ismdeim=Val(false),ϵ=1e-5) where N
+  Broadcasting(s->RBSpaceUnsteady(s;ismdeim=ismdeim,ϵ=ϵ))(snaps)
 end
 
 function RBSpace(

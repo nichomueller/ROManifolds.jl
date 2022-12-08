@@ -46,7 +46,7 @@ function vector_snapshots(
     assemble_vector(op)(μ[k])
   end
 
-  vals = Matrix(snapshot.(eachindex(μ)))
+  vals = snapshot.(eachindex(μ))
   Snapshots(id,vals)
 end
 
@@ -62,7 +62,7 @@ function vector_snapshots(
     assemble_vector(op)(bfun[k])
   end
 
-  vals = Matrix(snapshot.(eachindex(bfun)))
+  vals = snapshot.(eachindex(bfun))
   Snapshots(id,vals)
 end
 
@@ -78,7 +78,7 @@ function vector_snapshots(
     assemble_vector(op)(μ[k],timesθ)
   end
 
-  vals = Matrix(snapshot.(eachindex(μ)))
+  vals = snapshot.(eachindex(μ))
   Snapshots(id,vals)
 end
 
@@ -95,7 +95,7 @@ function vector_snapshots(
     assemble_vector(op)(bfun[k],timesθ)
   end
 
-  vals = Matrix(snapshot.(eachindex(bfun)))
+  vals = snapshot.(eachindex(bfun))
   Snapshots(id,vals)
 end
 
@@ -113,7 +113,7 @@ function matrix_snapshots(
     i,v
   end
 
-  iv = Matrix(snapshot.(eachindex(μ)))
+  iv = snapshot.(eachindex(μ))
   row_idx,vals = first.(iv),last.(iv)
   check_row_idx(row_idx)
   Snapshots(id,vals)
@@ -134,7 +134,7 @@ function matrix_snapshots(
     i,v
   end
 
-  iv = Matrix(snapshot.(eachindex(bfun)))
+  iv = snapshot.(eachindex(μ))
   row_idx,vals = first.(iv),last.(iv)
   check_row_idx(row_idx)
   Snapshots(id,vals)

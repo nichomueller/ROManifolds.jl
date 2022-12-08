@@ -1,12 +1,12 @@
-function assemble_rb_structures(info::RBInfo,tt::TimeTracker,op::RBVarOperator,args...)
+function assemble_rb_structure(info::RBInfo,tt::TimeTracker,op::RBVarOperator,args...)
   tt.offline_time += @elapsed begin
-    rb_variable = assemble_rb_structures(info,op,args...)
+    rb_variable = assemble_rb_structure(info,op,args...)
   end
   save(info,rb_variable,get_id(op))
   rb_variable
 end
 
-function assemble_rb_structures(
+function assemble_rb_structure(
   ::RBInfo,
   op::RBVarOperator{Affine,TT,Tsp},
   args...) where {TT,Tsp}
@@ -14,7 +14,7 @@ function assemble_rb_structures(
   rb_projection(op)
 end
 
-function assemble_rb_structures(
+function assemble_rb_structure(
   info::RBInfo,
   op::RBVarOperator,
   μ::Vector{Param},
@@ -59,35 +59,36 @@ function save(path::String,m::NTuple{2,<:MDEIM},id::Symbol)
   save(path,mdeim_lift,id*:_lift)
 end
 
-function load_rb_structures(
+function load_rb_structure(
   info::RBInfo,
-  op::RBLinOperator{Affine,Tsp},
-  args...) where Tsp
+  op::RBVarOperator,
+  meas::Measure)
 
-  if isfile(path)
+  id = get_id(op)
+  id_path = joinpath(info.offline_path,"basis_space_$id")
+  if myisfile(id_path)
     println("Importing reduced $id")
-    path = info.offline_path
-    id = get_id(op)
-    id_rb = load(joinpath(path,"basis_space_$id"))
+    load_mdeim(info,op,meas)
   else
-    basis,other_args = args
-    rbop = RBVarOperator(op,basis)
-    id_rb = assemble_rb_structures(info,rbop,other_args...)
+    error("Not implemented")
+    #assemble_rb_structure(info,op,args...)
   end
-  id_rb
+
 end
 
-function load_rb_structures(
+function load_rb_structure(
   info::RBInfo,
-  op::RBBilinOperator{Affine,TT,Tsp},
+  op::RBVarOperator{Affine,TT,Tsp},
   args...) where {TT,Tsp}
 
-  if isfile(path)
+  id = get_id(op)
+  id_path = joinpath(info.offline_path,"basis_space_$id")
+  if myisfile(id_path)
     println("Importing reduced $id")
-    _,meas,_ = args
-    id_rb = load_mdeim(info,op,meas)
+    load(id_path)
   else
-    id_rb = assemble_rb_structures(info,op,args...)
+    error("Not implemented")
+    #assemble_rb_structure(info,op,args...)
   end
-  id_rb
+
 end

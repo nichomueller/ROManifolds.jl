@@ -32,22 +32,24 @@ mutable struct RBResults
 end
 
 function RBResults(id::Symbol,tt::TimeTracker,ets::Vector{ErrorTracker})
+  nruns = length(ets)
+
   println("----------------------------------------------------------------")
-  println("Average online wall time: $(tt.online_time) s")
+  println("Average online wall time: $(tt.online_time/nruns) s")
 
   errs = Broadcasting(et->getproperty(et,:err))(ets)
   pointwise_errs = Broadcasting(et->getproperty(et,:pointwise_err))(ets)
-  et = ErrorTracker(sum(errs),sum(pointwise_errs))
+  et = ErrorTracker(sum(errs)/nruns,sum(pointwise_errs)/nruns)
 
   RBResults(id,tt,et)
 end
 
 time_dict(r::RBResults) = Dict("offline_time"=>r.tt.offline_time,"online_time"=>r.tt.online_time)
-err_dict(r::RBResults) = Dict("err"=>r.err,"pointwise_err"=>r.pointwise_err)
+err_dict(r::RBResults) = Dict("err"=>r.et.err,"pointwise_err"=>r.et.pointwise_err)
 
-save(info::RBInfo,r::RBResults) = if info.save_online save(rbinfo.online_path,r) end
+save(info::RBInfo,r::RBResults) = if info.save_online save(info.online_path,r) end
 
 function save(path::String,r::RBResults)
-  save(time_dict(r),joinpath(path,"times_$(r.id)"))
-  save(err_dict(r),joinpath(path,"errors_$(r.id)"))
+  save(joinpath(path,"times_$(r.id)"),time_dict(r))
+  save(joinpath(path,"errors_$(r.id)"),err_dict(r))
 end

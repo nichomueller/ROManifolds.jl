@@ -38,8 +38,12 @@ get_basis_time_row(rbop::RBVarOperator{Top,TT,RBSpaceUnsteady}) where {Top,TT} =
   get_basis_time(get_rbspace_row(rbop))
 get_basis_time_col(rbop::RBVarOperator{Top,TT,RBSpaceUnsteady}) where {Top,TT} =
   get_basis_time(get_rbspace_col(rbop))
+get_tests(op::RBVarOperator) = get_tests(op.feop)
+get_trials(op::RBBilinOperator) = get_trials(op.feop)
 Gridap.FESpaces.get_test(op::RBVarOperator) = get_test(op.feop)
 Gridap.FESpaces.get_trial(op::RBBilinOperator) = get_trial(op.feop)
+get_test_no_bc(op::RBVarOperator) = get_test_no_bc(op.feop)
+get_trial_no_bc(op::RBBilinOperator) = get_trial_no_bc(op.feop)
 
 function get_nrows(op::RBVarOperator{Top,TT,RBSpaceSteady}) where {Top,TT}
   get_ns(get_rbspace_row(op))

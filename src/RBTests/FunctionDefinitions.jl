@@ -6,22 +6,24 @@ function poisson_functions(::Val{true},measures::ProblemFixedMeasures)
 
   function a(x,p::Param)
     μ = get_μ(p)
-    1. + μ[6] + 1. / μ[5] * exp(-norm(x-Point(μ[1:3]))^2 / μ[4])
+    #1. + μ[6] + 1. / μ[5] * exp(-norm(x-Point(μ[1:3]))^2 / μ[4])
+    1. + μ[3] + 1. / μ[3] * exp(-norm(x-Point(μ[1:3]))^2 / μ[3])
   end
   a(p::Param) = x->a(x,p)
   function f(x,p::Param)
     μ = get_μ(p)
-    1. #+ sum(Point(μ[2:4]) .* x)
+    #1. #+ sum(Point(μ[2:4]) .* x)
+    1. + sin(norm(Point(μ[4:6]) .* x))
   end
   f(p::Param) = x->f(x,p)
   function h(x,p::Param)
     μ = get_μ(p)
-    1. + sum(Point(μ[3:5]) .* x)
+    1. + cos(norm(Point(μ[7:9]) .* x))
   end
   h(p::Param) = x->h(x,p)
   function g(x,p::Param)
     μ = get_μ(p)
-    1. + sum(Point(μ[4:6]) .* x)
+    norm(μ[7:9]) - 1.5
   end
   g(p::Param) = x->g(x,p)
 

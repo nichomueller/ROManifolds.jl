@@ -11,20 +11,10 @@ function mode2_unfolding(S::AbstractMatrix,ns::Int)
 end
 
 my_svd(s::Matrix{Float}) = svd(s)
-my_svd(s::SparseMatrixCSC) = svds(s;nsv=size(S)[2]-1)[1]
+my_svd(s::SparseMatrixCSC) = svds(s;nsv=size(s)[2]-1)[1]
 my_svd(s::Vector{AbstractMatrix}) = my_svd(Matrix(s))
 
-function POD(S::AbstractMatrix,ϵ=1e-5)
-  U,Σ,_ = my_svd(S)
-  energies = cumsum(Σ.^2)
-  n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  err = sqrt(1-energies[n]/energies[end])
-  println("Basis number obtained via POD is $n, projection error ≤ $err")
-
-  U[:,1:n]
-end
-
-function POD(S::AbstractMatrix,X::SparseMatrixCSC,ϵ=1e-5)
+function POD(S::AbstractMatrix,X::SparseMatrixCSC;ϵ=1e-5)
   H = cholesky(X)
   L = sparse(H.L)
   U,Σ,_ = my_svd(L'*S[H.p, :])
@@ -37,7 +27,19 @@ function POD(S::AbstractMatrix,X::SparseMatrixCSC,ϵ=1e-5)
   Matrix((L'\U[:,1:n])[invperm(H.p),:])
 end
 
-function POD_for_MDEIM(S::AbstractMatrix,ϵ=1e-5)
+POD(S::AbstractMatrix;ϵ=1e-5) = POD(S,Val(false);ϵ=ϵ)
+
+function POD(S::AbstractMatrix,::Val{false};ϵ=1e-5)
+  U,Σ,_ = my_svd(S)
+  energies = cumsum(Σ.^2)
+  n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
+  err = sqrt(1-energies[n]/energies[end])
+  println("Basis number obtained via POD is $n, projection error ≤ $err")
+
+  U[:,1:n]
+end
+
+function POD(S::AbstractMatrix,::Val{true};ϵ=1e-5)
   U,Σ,_ = my_svd(S)
   energies = cumsum(Σ.^2)
   ntemp = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
@@ -99,6 +101,13 @@ end
 function basis_by_coeff_mult(basis::Matrix{Float},coeff::Matrix{Float},nr::Int)
   bc = sum([kron(basis[:,k],coeff[:,k]) for k=eachindex(coeff)])
   Matrix(reshape(bc,nr,:))
+end
+
+function basis_by_coeff_mult(
+  basis::NTuple{2,Matrix{Float}},
+  coeff::Tuple,
+  nr::Int)
+  Broadcasting((b,c)->basis_by_coeff_mult(b,c,nr))(basis,coeff)
 end
 
 function solve_cholesky(

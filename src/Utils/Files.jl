@@ -19,6 +19,7 @@ end
 correct_path(path::String) = path*".csv"
 save(path::String,s) = writedlm(correct_path(path),s, ','; header=false)
 load(path::String) = readdlm(correct_path(path), ',')
+myisfile(path::String) = isfile(correct_path(path))
 
 function save_structures_in_list(
   list_structures::Tuple,
