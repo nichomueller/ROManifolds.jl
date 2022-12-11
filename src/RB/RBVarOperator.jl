@@ -162,3 +162,14 @@ function rb_projection(op::RBBilinOperator{Affine,TT,Tsp}) where {TT,Tsp}
 
   brow'*mat*bcol,Matrix(brow'*lift)
 end
+
+function rb_projection(op::RBBilinOperator{Affine,UnconstrainedFESpace,Tsp}) where Tsp
+  id = get_id(op)
+  println("Matrix $id is affine: computing Φᵀ$(id)Φ")
+
+  mat = assemble_affine_matrix_and_lifting(op)
+  brow = get_basis_space_row(op)
+  bcol = get_basis_space_col(op)
+
+  brow'*mat*bcol
+end

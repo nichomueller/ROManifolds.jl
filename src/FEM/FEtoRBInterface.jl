@@ -291,7 +291,7 @@ function assemble_matrix_and_lifting(op::ParamBilinOperator)
   A_bc,lift
 end
 
-function assemble_matrix_assemble_lifting(
+function assemble_matrix_and_lifting(
   op::ParamBilinOperator{OT,<:UnconstrainedFESpace}) where OT
   assemble_matrix(op)
 end
