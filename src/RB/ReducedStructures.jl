@@ -8,9 +8,60 @@ end
 
 function assemble_rb_structure(
   ::RBInfo,
-  op::RBVarOperator{Affine,TT,Tsp},
-  args...) where {TT,Tsp}
+  op::RBLinOperator,
+  args...)
 
+  println("Linear operator $id is non-affine:
+    running the MDEIM offline phase on $mdeim_nsnap snapshots")
+  mdeim_offline(info,op,args...)
+end
+
+function assemble_rb_structure(
+  ::RBInfo,
+  op::RBLinOperator{Affine},
+  args...)
+
+  println("Linear operator $id is affine: computing Φᵀ$id")
+  rb_projection(op)
+end
+
+function assemble_rb_structure(
+  ::RBInfo,
+  op::RBBilinOperator,
+  args...)
+
+  println("Bilinear operator $id and its lifting are non-affine:
+    running the MDEIM offline phase on $mdeim_nsnap snapshots")
+  mdeim_offline(info,op,args...)
+end
+
+function assemble_rb_structure(
+  ::RBInfo,
+  op::RBBilinOperator{Top,UnconstrainedFESpace},
+  args...) where Top
+
+  println("Bilinear operator $id is non-affine and has no lifting:
+    running the MDEIM offline phase on $mdeim_nsnap snapshots")
+  mdeim_offline(info,op,args...)
+end
+
+function assemble_rb_structure(
+  ::RBInfo,
+  op::RBBilinOperator{Affine,TT},
+  args...) where TT
+
+  println("Bilinear operator $id is affine but its lifting is non-affine:
+    running the MDEIM offline phase on $mdeim_nsnap snapshots")
+  op_lift = RBLiftingOperator(op)
+  rb_projection(op),mdeim_offline(info,op_lift,args...)
+end
+
+function assemble_rb_structure(
+  ::RBInfo,
+  op::RBBilinOperator{Affine,UnconstrainedFESpace},
+  args...)
+
+  println("Bilinear operator $id is affine and has no lifting: computing Φᵀ$(id)Φ")
   rb_projection(op)
 end
 
@@ -19,9 +70,7 @@ function assemble_rb_structure(
   op::RBVarOperator,
   args...)
 
-  id = get_id(op)
-  println("Matrix $id is non-affine: running the MDEIM offline phase on $(info.mdeim_nsnap) snapshots")
-
+  print_case(info,op)
   mdeim_offline(info,op,args...)
 end
 
@@ -64,30 +113,26 @@ function load_rb_structure(
   meas::Measure)
 
   id = get_id(op)
-  id_path = joinpath(info.offline_path,"basis_space_$id")
-  if myisfile(id_path)
-    println("Importing reduced $id")
-    load_mdeim(info,op,meas)
-  else
-    error("Not implemented")
-    #assemble_rb_structure(info,op,args...)
-  end
-
+  println("Importing reduced $id")
+  load_mdeim(info,op,meas)
 end
 
 function load_rb_structure(
   info::RBInfo,
-  op::RBVarOperator{Affine,TT,Tsp},
-  args...) where {TT,Tsp}
+  op::Union{RBLinOperator{Affine},RBBilinOperator{Affine,TT}}
+  args...) where TT
 
   id = get_id(op)
-  id_path = joinpath(info.offline_path,"basis_space_$id")
-  if myisfile(id_path)
-    println("Importing reduced $id")
-    load(id_path)
-  else
-    error("Not implemented")
-    #assemble_rb_structure(info,op,args...)
-  end
+  println("Importing reduced $id")
+  load_rb(info,id),load_rb(info,id*:_lift)
+end
 
+function load_rb_structure(
+  info::RBInfo,
+  op::Union{RBLinOperator{Affine},RBBilinOperator{Affine,<:UnconstrainedFESpace}}
+  args...)
+
+  id = get_id(op)
+  println("Importing reduced $id")
+  load_rb(info,id)
 end

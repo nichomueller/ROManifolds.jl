@@ -1,7 +1,7 @@
 basis_as_fefun(::RBLinOperator) = error("Not implemented")
 
 function basis_as_fefun(
-  op::RBBilinOperator{OT,<:ParamTrialFESpace,RBSpaceSteady}) where OT
+  op::RBSteadyBilinOperator{OT,<:ParamTrialFESpace}) where OT
 
   bspace = get_basis_space(op)
   ns = get_ns(bspace)
@@ -11,7 +11,7 @@ function basis_as_fefun(
 end
 
 function basis_as_fefun(
-  op::RBBilinOperator{OT,<:ParamTransientTrialFESpace,RBSpaceUnsteady}) where OT
+  op::RBUnsteadyBilinOperator{OT,<:ParamTransientTrialFESpace}) where OT
 
   bspace = get_basis_space(op)
   ns = get_ns(bspace)
@@ -35,8 +35,15 @@ function mdeim_snapshots(
   matrix_snapshots(Val(info.fun_mdeim),op,args...)
 end
 
+function mdeim_snapshots(
+  op::RBLiftingOperator,
+  ::RBInfo,
+  args...)
+  lift_snapshots(op,args...)
+end
+
 function vector_snapshots(
-  op::RBLinOperator{Nonaffine,RBSpaceSteady},
+  op::RBLinOperator{Nonaffine},
   μ::Vector{Param})
 
   id = get_id(op)
@@ -52,7 +59,7 @@ function vector_snapshots(
 end
 
 function vector_snapshots(
-  op::RBLinOperator{Nonlinear,RBSpaceSteady},
+  op::RBLinOperator{Nonlinear},
   args...)
 
   id = get_id(op)
@@ -68,45 +75,10 @@ function vector_snapshots(
   Snapshots(id,vals)
 end
 
-function vector_snapshots(
-  op::RBLinOperator{Nonaffine,RBSpaceUnsteady},
-  μ::Vector{Param},
-  time_info::TimeInfo)
-
-  id = get_id(op)
-  timesθ = get_timesθ(time_info)
-
-  function snapshot(k::Int)
-    println("Snapshot number $k, $id")
-    assemble_vector(op)(μ[k],timesθ)
-  end
-
-  vals = snapshot.(eachindex(μ))
-  Snapshots(id,vals)
-end
-
-function vector_snapshots(
-  op::RBLinOperator{Nonlinear,RBSpaceUnsteady},
-  ::Vector{Param},
-  time_info::TimeInfo)
-
-  id = get_id(op)
-  bfun = basis_as_fefun(op)
-  timesθ = get_timesθ(time_info)
-
-  function snapshot(k::Int)
-    println("Snapshot number $k, $id")
-    assemble_vector(op)(bfun[k],timesθ)
-  end
-
-  vals = snapshot.(eachindex(bfun))
-  Snapshots(id,vals)
-end
-
 function matrix_snapshots(
   ::Val{false},
-  op::RBBilinOperator{Nonaffine,<:UnconstrainedFESpace,Tsp},
-  μ::Vector{Param}) where Tsp
+  op::RBBilinOperator{Nonaffine,<:UnconstrainedFESpace},
+  μ::Vector{Param})
 
   id = get_id(op)
   M = assemble_matrix(op)
@@ -125,28 +97,7 @@ end
 
 function matrix_snapshots(
   ::Val{false},
-  op::RBBilinOperator{Nonlinear,<:UnconstrainedFESpace,Tsp},
-  args...) where Tsp
-
-  id = get_id(op)
-  bfun = basis_as_fefun(op)
-  M = assemble_matrix(op)
-
-  function snapshot(k::Int)
-    println("Snapshot number $k, $id")
-    i,v = findnz(M(bfun[k])[:])
-    i,v
-  end
-
-  ivl = snapshot.(eachindex(bfun))
-  row_idx,vals = getindex.(ivl,1),getindex.(ivl,2)
-  check_row_idx(row_idx)
-  Snapshots(id,vals)
-end
-
-function matrix_snapshots(
-  ::Val{false},
-  op::RBBilinOperator{Nonaffine,<:ParamTrialFESpace,RBSpaceSteady},
+  op::RBSteadyBilinOperator{Nonaffine,<:ParamTrialFESpace},
   μ::Vector{Param})
 
   id = get_id(op)
@@ -166,7 +117,7 @@ end
 
 function matrix_snapshots(
   ::Val{false},
-  op::RBBilinOperator{Nonlinear,<:ParamTrialFESpace,RBSpaceSteady},
+  op::RBSteadyBilinOperator{Nonlinear,<:ParamTrialFESpace},
   args...)
 
   id = get_id(op)
@@ -187,7 +138,7 @@ end
 
 function matrix_snapshots(
   ::Val{false},
-  op::RBBilinOperator{Nonaffine,<:ParamTransientTrialFESpace,RBSpaceUnsteady},
+  op::RBUnsteadyBilinOperator{Nonaffine,<:ParamTransientTrialFESpace},
   μ::Vector{Param},
   time_info::TimeInfo)
 
@@ -211,7 +162,7 @@ end
 
 function matrix_snapshots(
   ::Val{false},
-  op::RBBilinOperator{Nonlinear,<:ParamTransientTrialFESpace,RBSpaceUnsteady},
+  op::RBUnsteadyBilinOperator{Nonlinear,<:ParamTransientTrialFESpace},
   ::Vector{Param},
   time_info::TimeInfo)
 
@@ -234,7 +185,7 @@ end
 
 function matrix_snapshots(
   ::Val{true},
-  op::RBBilinOperator{Top,<:ParamTransientTrialFESpace,RBSpaceUnsteady},
+  op::RBUnsteadyBilinOperator{Top,<:ParamTransientTrialFESpace},
   μ::Vector{Param},
   time_info::TimeInfo) where Top
 
@@ -274,4 +225,37 @@ end
 
 function check_row_idx(row_idx::Vector{Vector{Int}})
   @assert all(Broadcasting(a->isequal(a,row_idx[1]))(row_idx)) "Need to correct snaps"
+end
+
+function lift_snapshots(
+  op::RBLiftingOperator{Nonaffine},
+  μ::Vector{Param})
+
+  id = get_id(op)*:_lift
+  lift = assemble_lifting(op)
+
+  function snapshot(k::Int)
+    println("Snapshot number $k, $id")
+    lift(μ[k])
+  end
+
+  vals = snapshot.(eachindex(μ))
+  Snapshots(id,vals)
+end
+
+function lift_snapshots(
+  op::RBLiftingOperator{Nonlinear},
+  args...)
+
+  id = get_id(op)*:_lift
+  bfun = basis_as_fefun(op)
+  lift = assemble_lifting(op)
+
+  function snapshot(k::Int)
+    println("Snapshot number $k, $id")
+    lift(bfun[k])
+  end
+
+  vals = snapshot.(eachindex(bfun))
+  Snapshots(id,vals)
 end

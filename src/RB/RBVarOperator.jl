@@ -1,29 +1,83 @@
-abstract type RBVarOperator{Top,TT,Tsp} end
+abstract type RBVarOperator{Top,TT} end
+abstract type RBLinOperator{Top} <: RBVarOperator{Top,nothing} end
+abstract type RBBilinOperator{Top,TT} <: RBVarOperator{Top,TT} end
 
-mutable struct RBLinOperator{Top,Tsp} <: RBVarOperator{Top,nothing,Tsp}
-  feop::ParamLinOperator{Top}
-  rbspace_row::Tsp
+mutable struct RBSteadyLinOperator{Top} <: RBLinOperator{Top}
+  feop::ParamSteadyLinOperator{Top}
+  rbspace_row::RBSpaceSteady
 end
 
-mutable struct RBBilinOperator{Top,TT,Tsp} <: RBVarOperator{Top,TT,Tsp}
-  feop::ParamBilinOperator{Top,TT}
-  rbspace_row::Tsp
-  rbspace_col::Tsp
+mutable struct RBUnsteadyLinOperator{Top} <: RBLinOperator{Top}
+  feop::ParamUnsteadyLinOperator{Top}
+  rbspace_row::RBSpaceUnsteady
+end
+
+mutable struct RBSteadyBilinOperator{Top,TT} <: RBBilinOperator{Top,TT}
+  feop::ParamSteadyBilinOperator{Top,TT}
+  rbspace_row::RBSpaceSteady
+  rbspace_col::RBSpaceSteady
+end
+
+mutable struct RBUnsteadyBilinOperator{Top,TT} <: RBBilinOperator{Top,TT}
+  feop::ParamUnsteadyBilinOperator{Top,TT}
+  rbspace_row::RBSpaceUnsteady
+  rbspace_col::RBSpaceUnsteady
 end
 
 function RBVarOperator(
-  feop::ParamLinOperator{Top},
-  rbspace_row::Tsp) where {Top,Tsp}
+  feop::ParamSteadyLinOperator{Top},
+  rbspace_row::RBSpaceSteady) where Top
 
-  RBLinOperator{Top,Tsp}(feop,rbspace_row)
+  RBSteadyLinOperator{Top}(feop,rbspace_row)
 end
 
 function RBVarOperator(
-  feop::ParamBilinOperator{Top,TT},
-  rbspace_row::Tsp,
-  rbspace_col::Tsp) where {Top,TT,Tsp}
+  feop::ParamUnsteadyLinOperator{Top},
+  rbspace_row::RBSpaceUnsteady) where Top
 
-  RBBilinOperator{Top,TT,Tsp}(feop,rbspace_row,rbspace_col)
+  RBUnsteadyLinOperator{Top}(feop,rbspace_row)
+end
+
+function RBVarOperator(
+  feop::ParamSteadyBilinOperator{Top,TT},
+  rbspace_row::RBSpaceSteady,
+  rbspace_col::RBSpaceSteady) where {Top,TT}
+
+  RBSteadyBilinOperator{Top,TT}(feop,rbspace_row,rbspace_col)
+end
+
+function RBVarOperator(
+  feop::ParamUnsteadyBilinOperator{Top,TT},
+  rbspace_row::RBSpaceUnsteady,
+  rbspace_col::RBSpaceUnsteady) where {Top,TT}
+
+  RBUnsteadyBilinOperator{Top,TT}(feop,rbspace_row,rbspace_col)
+end
+
+abstract type RBLiftingOperator{Top,TT} <: RBBilinOperator{Top,TT} end
+
+mutable struct RBSteadyLiftingOperator{Top,TT} <: RBLiftingOperator{Top,TT}
+  feop::ParamSteadyLiftingOperator{Top,TT}
+  rbspace_row::RBSpaceSteady
+end
+
+mutable struct RBUnsteadyLiftingOperator{Top,TT} <: RBLiftingOperator{Top,TT}
+  feop::ParamUnsteadyLiftingOperator{Top,TT}
+  rbspace_row::RBSpaceUnsteady
+end
+
+function RBLiftingOperator(op::RBSteadyBilinOperator{Top,TT}) where {OT,TT}
+  feop = get_background_feop(op)
+  rbs = get_rbspace_row(op)
+  rbs_lift = RBSpace(get_id(rbs)*:_lift,get_basis_space(rbs))
+  ParamSteadyLiftingOperator{OT,TT}(feop,rbs_lift)
+end
+
+function RBLiftingOperator(op::RBUnsteadyBilinOperator{Top,TT}) where {OT,TT}
+  feop = get_background_feop(op)
+  rbs = get_rbspace_row(op)
+  rbs_lift = RBSpace(get_id(rbs)*:_lift,get_basis_space(rbs),get_basis_time(rbs))
+  ParamUnsteadyLiftingOperator{OT,TT}(feop,rbs_lift)
 end
 
 get_background_feop(rbop::RBVarOperator) = rbop.feop
@@ -34,25 +88,20 @@ get_rbspace_col(rbop::RBBilinOperator) = rbop.rbspace_col
 get_id(rbop::RBVarOperator) = get_id(get_background_feop(rbop))
 get_basis_space_row(rbop::RBVarOperator) = get_basis_space(get_rbspace_row(rbop))
 get_basis_space_col(rbop::RBVarOperator) = get_basis_space(get_rbspace_col(rbop))
-get_basis_time_row(rbop::RBVarOperator{Top,TT,RBSpaceUnsteady}) where {Top,TT} =
-  get_basis_time(get_rbspace_row(rbop))
-get_basis_time_col(rbop::RBVarOperator{Top,TT,RBSpaceUnsteady}) where {Top,TT} =
-  get_basis_time(get_rbspace_col(rbop))
 get_tests(op::RBVarOperator) = get_tests(op.feop)
 get_trials(op::RBBilinOperator) = get_trials(op.feop)
 Gridap.FESpaces.get_test(op::RBVarOperator) = get_test(op.feop)
 Gridap.FESpaces.get_trial(op::RBBilinOperator) = get_trial(op.feop)
 get_test_no_bc(op::RBVarOperator) = get_test_no_bc(op.feop)
 get_trial_no_bc(op::RBBilinOperator) = get_trial_no_bc(op.feop)
-get_Nt(op::RBVarOperator{Top,TT,RBSpaceUnsteady}) where {Top,TT} = get_Nt(op.rbspace_row)
 
-function get_nrows(op::RBVarOperator{Top,TT,RBSpaceSteady}) where {Top,TT}
-  get_ns(get_rbspace_row(op))
-end
+get_basis_time_row(rbop::RBVarOperator) = get_basis_time(get_rbspace_row(rbop))
+get_basis_time_col(rbop::RBVarOperator) = get_basis_time(get_rbspace_col(rbop))
+get_Nt(op::RBVarOperator) = get_Nt(op.rbspace_row)
 
-function get_nrows(op::RBVarOperator{Top,TT,RBSpaceUnsteady}) where {Top,TT}
-  get_ns(get_rbspace_row(op))*get_nt(get_rbspace_row(op))
-end
+get_nrows(op::RBVarOperator) = get_ns(get_rbspace_row(op))
+get_nrows(op::RBUnsteadyLinOperator) = get_ns(get_rbspace_row(op))*get_nt(get_rbspace_row(op))
+get_nrows(op::RBUnsteadyBilinOperator) = get_ns(get_rbspace_row(op))*get_nt(get_rbspace_row(op))
 
 function Gridap.FESpaces.get_cell_dof_ids(
   rbop::RBVarOperator,
@@ -63,67 +112,51 @@ end
 Gridap.FESpaces.assemble_vector(op::RBLinOperator,args...) = assemble_vector(op.feop,args...)
 Gridap.FESpaces.assemble_matrix(op::RBBilinOperator,args...) = assemble_matrix(op.feop,args...)
 assemble_matrix_and_lifting(op::RBBilinOperator,args...) = assemble_matrix_and_lifting(op.feop,args...)
+assemble_lift(op::RBLiftingOperator,args...) = assemble_lift(op.feop,args...)
+
+function Gridap.FESpaces.assemble_vector(op::RBLinOperator{Affine},args...)
+  assemble_vector(op,args...)(realization(op))
+end
+
+function Gridap.FESpaces.assemble_matrix(op::RBBilinOperator{Affine,TT},args...) where TT
+  assemble_matrix(op,args...)(realization(op))
+end
+
+function assemble_matrix_and_lifting(op::RBBilinOperator{Affine,TT},args...) where TT
+  assemble_matrix_and_lifting(op,args...)(realization(op))
+end
 
 get_pspace(op::RBVarOperator) = get_pspace(op.feop)
 realization(op::RBVarOperator) = realization(get_pspace(op))
-
-Gridap.Algebra.allocate_vector(op::RBLinOperator) = assemble_vector(op.feop)
-Gridap.Algebra.allocate_matrix(op::RBBilinOperator) = assemble_matrix(op.feop)
-allocate_structure(op::RBLinOperator) = allocate_vector(op)
-allocate_structure(op::RBBilinOperator) = allocate_matrix(op)
-
-function assemble_affine_vector(
-  op::RBLinOperator{Affine,RBSpaceSteady})
-  assemble_vector(op)(realization(op))
-end
-
-function assemble_affine_vector(
-  op::RBLinOperator{Affine,RBSpaceUnsteady})
-  assemble_vector(op)(realization(op),0.)
-end
-
-function assemble_affine_matrix(
-  op::RBBilinOperator{Affine,TT,RBSpaceSteady}) where TT
-  assemble_matrix(op)(realization(op))
-end
-
-function assemble_affine_matrix(
-  op::RBBilinOperator{Affine,TT,RBSpaceUnsteady}) where TT
-  assemble_matrix(op,0.)(realization(op))
-end
-
-function assemble_affine_matrix_and_lifting(
-  op::RBBilinOperator{Affine,TT,RBSpaceSteady}) where TT
-  assemble_matrix_and_lifting(op)(realization(op))
-end
-
-function assemble_affine_matrix_and_lifting(
-  op::RBBilinOperator{Affine,TT,RBSpaceUnsteady}) where TT
-  assemble_matrix_and_lifting(op,0.)(realization(op))
-end
+get_time_info(op::RBUnsteadyLinOperator) = get_time_info(op.feop)
+get_time_info(op::RBUnsteadyBilinOperator) = get_time_info(op.feop)
+get_dt(op::RBVarOperator) = get_dt(op.feop)
+get_Nt(op::RBVarOperator) = get_Nt(op.feop)
+get_θ(op::RBVarOperator) = get_θ(op.feop)
+get_timesθ(op::RBVarOperator) = get_timesθ(op.feop)
 
 "Small, full vector -> large, sparse vector"
-function get_findnz_mapping(op::RBBilinOperator{Top,TT,RBSpaceSteady}) where {Top,TT}
+function get_findnz_mapping(op::RBSteadyBilinOperator)
   M = assemble_matrix(op)(realization(op))
   first(findnz(M[:]))
 end
 
 "Small, full vector -> large, sparse vector"
-function get_findnz_mapping(op::RBBilinOperator{Top,TT,RBSpaceUnsteady}) where {Top,TT}
-  M = assemble_matrix(op,0.)(realization(op))
+function get_findnz_mapping(op::RBUnsteadyBilinOperator)
+  M = assemble_matrix(op,get_dt(op))(realization(op))
   first(findnz(M[:]))
 end
 
 "Viceversa"
-function get_inverse_findnz_mapping(op::RBVarOperator)
+function get_inverse_findnz_mapping(op::RBBilinOperator)
   findnz_map = get_findnz_mapping(op)
   inv_map(i::Int) = findall(x -> x == i,findnz_map)[1]
   inv_map
 end
 
 function unfold_spacetime(
-  op::RBVarOperator{Top,TT,RBSpaceUnsteady},
-  vals::AbstractVector{Tv}) where {Top,TT,Tv}
+  op::RBUnsteadyBilinOperator,
+  vals::AbstractVector{T}) where T
 
   Ns = get_Ns(op)
   Nt = get_Nt(op)
@@ -135,42 +168,72 @@ function unfold_spacetime(
 end
 
 function unfold_spacetime(
-  op::RBVarOperator{Top,TT,RBSpaceUnsteady},
-  vals::AbstractMatrix{Tv}) where {Top,TT,Tv}
+  op::RBUnsteadyBilinOperator,
+  vals::AbstractMatrix{T}) where T
 
   unfold_vec(k::Int) = unfold_spacetime(op,vals[:,k])
   vals = Broadcasting(unfold_vec)(axis(vals,2))
   Matrix(first.(vals)),Matrix(last.(vals))
 end
 
-function rb_projection(op::RBLinOperator{Affine,Tsp}) where Tsp
+function rb_projection(op::RBSteadyLinOperator)
   id = get_id(op)
-  println("Vector $id is affine: computing Φᵀ$id")
+  println("Linear operator $id is affine: computing Φᵀ$id")
 
-  vec = assemble_affine_vector(op)
+  vec = assemble_vector(op)
   brow = get_basis_space_row(op)
 
   Matrix(brow'*vec)
 end
 
-function rb_projection(op::RBBilinOperator{Affine,TT,Tsp}) where {TT,Tsp}
+function rb_projection(op::RBUnsteadyLinOperator)
   id = get_id(op)
-  println("Matrix $id and its lifting are affine: computing Φᵀ$(id)Φ and Φᵀlift_$id")
+  println("Linear operator $id is affine: computing Φᵀ$id")
 
-  mat,lift = assemble_affine_matrix_and_lifting(op)
+  vec = assemble_vector(op,get_dt(op))
   brow = get_basis_space_row(op)
-  bcol = get_basis_space_col(op)
 
-  brow'*mat*bcol,Matrix(brow'*lift)
+  Matrix(brow'*vec)
 end
 
-function rb_projection(op::RBBilinOperator{Affine,UnconstrainedFESpace,Tsp}) where Tsp
+function rb_projection(op::RBSteadyBilinOperator)
   id = get_id(op)
-  println("Matrix $id is affine: computing Φᵀ$(id)Φ")
+  println("Bilinear operator $id is affine: computing Φᵀ$(id)Φ")
 
-  mat = assemble_affine_matrix_and_lifting(op)
+  mat = assemble_matrix(op)
   brow = get_basis_space_row(op)
   bcol = get_basis_space_col(op)
 
   brow'*mat*bcol
+end
+
+function rb_projection(op::RBUnsteadyBilinOperator)
+  id = get_id(op)
+  println("Bilinear operator $id is affine: computing Φᵀ$(id)Φ")
+
+  mat = assemble_matrix(op,get_dt(op))
+  brow = get_basis_space_row(op)
+  bcol = get_basis_space_col(op)
+
+  brow'*mat*bcol
+end
+
+function rb_projection(op::RBSteadyLiftingOperator)
+  id = get_id(op)
+  println("Lifting operator $id is affine: computing Φᵀ$id")
+
+  vec = assemble_lift(op)
+  brow = get_basis_space_row(op)
+
+  Matrix(brow'*vec)
+end
+
+function rb_projection(op::RBUnsteadyLiftingOperator)
+  id = get_id(op)
+  println("Lifting operator $id is affine: computing Φᵀ$id")
+
+  vec = assemble_lift(op,get_dt(op))
+  brow = get_basis_space_row(op)
+
+  Matrix(brow'*vec)
 end

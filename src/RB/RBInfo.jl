@@ -32,18 +32,6 @@ function RBInfoSteady(
     save_offline,save_online,fun_mdeim,adaptivity,postprocess)
 end
 
-struct TimeInfo
-  t0::Real
-  tF::Real
-  dt::Real
-  θ::Real
-end
-
-get_dt(ti::TimeInfo) = ti.dt
-get_Nt(ti::TimeInfo) = Int((ti.tF-ti.t0)/ti.dt)
-get_θ(ti::TimeInfo) = ti.θ
-get_timesθ(ti::TimeInfo) = collect(ti.t0:ti.dt:ti.tF-ti.dt).+ti.dt*ti.θ
-
 mutable struct RBInfoUnsteady <: RBInfo
   ptype::ProblemType
   ϵ::Float
