@@ -104,23 +104,23 @@ function model_info(
   model_info(mshpath,bnd_info,ispdomain(ptype))
 end
 
-function fe_snapshots(ptype::ProblemType,solver,op,fepath::String,run_fem::Bool,args...)
+function fe_snapshots(ptype::ProblemType,solver,op,fepath::String,run_fem::Bool,nsnap::Int,args...)
   if run_fem
-    generate_fe_snapshots(ptype,solver,op,fepath,args...)
+    generate_fe_snapshots(ptype,solver,op,fepath,nsnap)
   else
-    load_fe_snapshots(ptype,fepath)
+    load_fe_snapshots(ptype,fepath,nsnap)
   end
 end
 
-load_fe_snapshots(ptype::ProblemType,fepath::String) =
-  load_fe_snapshots(isindef(ptype),fepath)
+load_fe_snapshots(ptype::ProblemType,fepath::String,nsnap::Int) =
+  load_fe_snapshots(isindef(ptype),fepath,nsnap)
 
-function load_fe_snapshots(::Val{false},fepath::String)
-  load_snap(fepath,:u),load_param(fepath)
+function load_fe_snapshots(::Val{false},fepath::String,nsnap::Int)
+  load_snap(fepath,:u,nsnap),load_param(fepath)
 end
 
-function load_fe_snapshots(::Val{true},fepath::String)
-  load_snap(fepath,:u),load_snap(fepath,:p),load_param(fepath)
+function load_fe_snapshots(::Val{true},fepath::String,nsnap::Int)
+  load_snap(fepath,:u,nsnap),load_snap(fepath,:p,nsnap),load_param(fepath)
 end
 
 function generate_fe_snapshots(
@@ -128,9 +128,9 @@ function generate_fe_snapshots(
   solver::FESolver,
   op::ParamFEOperator,
   fepath::String,
-  n=100)
+  nsnap::Int)
 
-  sol = solve(solver,op,n)
+  sol = solve(solver,op,nsnap)
   generate_fe_snapshots(isindef(ptype),sol,fepath)
 end
 
@@ -141,9 +141,9 @@ function generate_fe_snapshots(
   fepath::String,
   t0::Real,
   tF::Real,
-  n=100)
+  nsnap::Int)
 
-  sol = solve(solver,op,t0,tF,n)
+  sol = solve(solver,op,t0,tF,nsnap)
   generate_fe_snapshots(isindef(ptype),sol,fepath)
 end
 

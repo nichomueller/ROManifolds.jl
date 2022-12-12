@@ -4,8 +4,8 @@ function mode2_unfolding(S::AbstractMatrix,ns::Int)
   Nt = get_Nt(S,ns)
   idx_fun(ns) = (ns .- 1)*Nt .+ 1:ns*Nt
   idx = idx_fun.(1:ns)
-  mode2_blocks = Matrix.(transpose.(S[idx]))
-  mode2 = Matrix(mode2_blocks)
+  mode2_blocks(i) = Matrix(transpose(getindex(S,:,i)))
+  mode2 = Matrix(mode2_blocks.(idx))
 
   mode2
 end
@@ -157,9 +157,13 @@ function Base.Matrix(vblock::Vector{Vector{T}}) where T
   Matrix{T}(reduce(vcat,transpose.(vblock))')
 end
 
-function Base.Matrix(mblock::Vector{T}) where {T<:AbstractMatrix}
+#= function Base.Matrix(mblock::Vector{T}) where {T<:AbstractMatrix}
   @assert check_dimensions(mblock) "Wrong dimensions"
   T(reduce(vcat,transpose.(mblock))')
+end =#
+function Base.Matrix(mblock::Vector{T}) where {T<:AbstractMatrix}
+  @assert check_dimensions(mblock) "Wrong dimensions"
+  T(reduce(hcat,mblock))
 end
 
 function Base.Matrix(vblock::Vector{Vector{Vector{T}}}) where T

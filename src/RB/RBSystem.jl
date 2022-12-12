@@ -13,7 +13,7 @@ function assemble_rb_system(
   μ::Param,
   args...)
 
-  coeff = compute_coefficient(op,μ)
+  coeff = compute_coefficient(op,μ,args...)
   assemble_rb_system(op,basis,coeff)
 end
 
@@ -23,7 +23,7 @@ function assemble_rb_system(
   μ::Param,
   args...)
 
-  coeff = compute_coefficient(op,μ,mdeim)
+  coeff = compute_coefficient(op,mdeim,μ,args...)
   basis = get_basis_space(mdeim)
   assemble_rb_system(op,basis,coeff,args...)
 end
@@ -41,10 +41,12 @@ function assemble_rb_system(
   op::RBVarOperator{Top,TT,RBSpaceUnsteady},
   basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
   coeff::Union{Array{Float},NTuple{2,Array{Float}}},
-  dt::Real,θ::Real) where {Top,TT}
+  time_info::TimeInfo,
+  args...) where {Top,TT}
 
   btbtp = multiply_time_bases(op,coeff)
-  if get_id(op) == :M coeff /= (dt*θ) end
+  dtθ = time_info.dt*time_info.θ
+  if get_id(op) == :M coeff /= dtθ end
   nr = get_nrows(op)
   basis_by_coeff_mult(basis,btbtp,nr)
 end
@@ -62,10 +64,12 @@ function assemble_rb_system(
   op::RBVarOperator{Nonlinear,TT,RBSpaceUnsteady},
   basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
   coeff::Union{Array{Function},NTuple{2,Array{Function}}},
-  dt::Real,θ::Real) where TT
+  time_info::TimeInfo,
+  args...) where TT
 
   btbtp = multiply_time_bases(op,coeff)
-  if get_id(op) == :M coeff /= (dt*θ) end
+  dtθ = time_info.dt*time_info.θ
+  if get_id(op) == :M coeff /= dtθ end
   nr = get_nrows(op)
   u -> basis_by_coeff_mult(basis,btbtp(u),nr)
 end

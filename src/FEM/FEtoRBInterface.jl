@@ -241,6 +241,19 @@ function Gridap.FESpaces.assemble_vector(op::ParamLinOperator)
   μ -> assemble_vector(afe(μ),test)
 end
 
+function Gridap.FESpaces.assemble_vector(op::ParamLinOperator,t::Real)
+  afe = get_fe_function(op)
+  test = get_test(op)
+  μ -> assemble_vector(afe(μ,t),test)
+end
+
+function Gridap.FESpaces.assemble_vector(op::ParamLinOperator,t::Vector{<:Real})
+  afe = get_fe_function(op)
+  test = get_test(op)
+  V(μ,ti) = assemble_vector(afe(μ,ti),test)
+  μ -> Matrix([V(μ,ti) for ti = t])
+end
+
 function Gridap.FESpaces.assemble_matrix(op::ParamBilinOperator)
   afe = get_fe_function(op)
   trial = get_trial(op)
@@ -248,32 +261,35 @@ function Gridap.FESpaces.assemble_matrix(op::ParamBilinOperator)
   μ -> assemble_matrix(afe(μ),trial(μ),test)
 end
 
+function Gridap.FESpaces.assemble_matrix(op::ParamBilinOperator)
+  afe = get_fe_function(op)
+  trial = get_trial(op)
+  test = get_test(op)
+  μ -> assemble_matrix(afe(μ),trial(μ),test)
+end
+
+function Gridap.FESpaces.assemble_matrix(op::ParamBilinOperator,t::Real)
+  afe = get_fe_function(op)
+  trial = get_trial(op)
+  test = get_test(op)
+  μ -> assemble_matrix(afe(μ,t),trial(μ,t),test)
+end
+
+function Gridap.FESpaces.assemble_matrix(op::ParamBilinOperator,t::Vector{<:Real})
+  afe = get_fe_function(op)
+  trial = get_trial(op)
+  test = get_test(op)
+  M(μ,ti) = assemble_matrix(afe(μ,ti),trial(μ,ti),test)
+  μ -> [M(μ,ti) for ti = t]
+end
+
 realization(op::ParamVarOperator) = realization(get_pspace(op))
-Gridap.Algebra.allocate_vector(op::ParamLinOperator) =
-  assemble_vector(op)(realization(op))
-Gridap.Algebra.allocate_matrix(op::ParamBilinOperator) =
-  assemble_matrix(op)(realization(op))
+Gridap.Algebra.allocate_vector(op::ParamLinOperator,args...) =
+  assemble_vector(op,args...)(realization(op))
+Gridap.Algebra.allocate_matrix(op::ParamBilinOperator,args...) =
+  assemble_matrix(op,args...)(realization(op))
 allocate_structure(op::ParamLinOperator) = allocate_vector(op)
 allocate_structure(op::ParamBilinOperator) = allocate_matrix(op)
-
-function assemble_lifting(op::ParamBilinOperator)
-  trial = get_trial(op)
-  trial_no_bc = get_trial_no_bc(op)
-  test_no_bc = get_test_no_bc(op)
-  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
-  fdofs_test,_ = fdofs
-
-  A_no_bc(μ) = assemble_matrix(afe(μ),trial_no_bc,test_no_bc)
-  dir(μ) = trial(μ).dirichlet_values
-  lift(μ) = A_no_bc(μ)[fdofs_test,ddofs]*dir(μ)
-
-  lift
-end
-
-function assemble_lifting(
-  ::ParamBilinOperator{OT,UnconstrainedFESpace}) where OT
-  return
-end
 
 function assemble_matrix_and_lifting(op::ParamBilinOperator)
   afe = get_fe_function(op)
@@ -291,9 +307,43 @@ function assemble_matrix_and_lifting(op::ParamBilinOperator)
   A_bc,lift
 end
 
+function assemble_matrix_and_lifting(op::ParamBilinOperator,t::Real)
+  afe = get_fe_function(op)
+  trial = get_trial(op)
+  trial_no_bc = get_trial_no_bc(op)
+  test_no_bc = get_test_no_bc(op)
+  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
+  fdofs_test,fdofs_trial = fdofs
+
+  A_no_bc(μ) = assemble_matrix(afe(μ,t),trial_no_bc,test_no_bc)
+  A_bc(μ) = A_no_bc(μ)[fdofs_test,fdofs_trial]
+  dir(μ) = trial(μ,t).dirichlet_values
+  lift(μ) = A_no_bc(μ)[fdofs_test,ddofs]*dir(μ)
+
+  A_bc,lift
+end
+
+function assemble_matrix_and_lifting(op::ParamBilinOperator,t::Vector{<:Real})
+  afe = get_fe_function(op)
+  trial = get_trial(op)
+  trial_no_bc = get_trial_no_bc(op)
+  test_no_bc = get_test_no_bc(op)
+  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
+  fdofs_test,fdofs_trial = fdofs
+
+  A_no_bc(μ,t) = assemble_matrix(afe(μ,t),trial_no_bc,test_no_bc)
+  A_bc(μ,t) = A_no_bc(μ,t)[fdofs_test,fdofs_trial]
+  A_bc(μ) = [A_bc(μ,ti) for ti = t]
+  dir(μ,t) = trial(μ,t).dirichlet_values
+  lift(μ,t) = A_no_bc(μ,t)[fdofs_test,ddofs]*dir(μ,t)
+  lift(μ) = Matrix([lift(μ,ti) for ti = t])
+
+  A_bc,lift
+end
+
 function assemble_matrix_and_lifting(
-  op::ParamBilinOperator{OT,<:UnconstrainedFESpace}) where OT
-  assemble_matrix(op)
+  op::ParamBilinOperator{OT,<:UnconstrainedFESpace},args...) where OT
+  assemble_matrix(op,args...)
 end
 
 get_nsnap(v::AbstractVector) = length(v)
@@ -305,15 +355,19 @@ mutable struct Snapshots{T}
   nsnap::Int
 end
 
-function Snapshots(id::Symbol,snap::AbstractArray{T}) where T
-  nsnap = get_nsnap(snap)
+function Snapshots(id::Symbol,snap::AbstractArray{T},nsnap::Int) where T
   Snapshots{T}(id,snap,nsnap)
 end
 
-function Snapshots(id::Symbol,blocks::Vector{<:AbstractArray{T}}) where T
+function Snapshots(id::Symbol,snap::AbstractArray)
+  nsnap = get_nsnap(snap)
+  Snapshots(id,snap,nsnap)
+end
+
+function Snapshots(id::Symbol,blocks::Vector{<:AbstractArray})
   snap = Matrix(blocks)
   nsnap = get_nsnap(blocks)
-  Snapshots{T}(id,snap,nsnap)
+  Snapshots(id,snap,nsnap)
 end
 
 Snapshots(s::Snapshots,idx) = Snapshots(s.id,getindex(s.snap,idx))
@@ -324,9 +378,9 @@ get_nsnap(s::Snapshots) = s.nsnap
 
 save(path::String,s::Snapshots) = save(joinpath(path,"$(s.id)"),s.snap)
 
-function load_snap(path::String,id::Symbol)
+function load_snap(path::String,id::Symbol,nsnap::Int)
   s = load(joinpath(path,"$(id)"))
-  Snapshots(id,s)
+  Snapshots(id,s,nsnap)
 end
 
 get_Nt(s::Snapshots) = get_Nt(get_snap(s),get_nsnap(s))

@@ -3,18 +3,19 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function poisson_steady()
+  run_fem = false
+
   steady = true
   indef = false
   pdomain = false
   ptype = ProblemType(steady,indef,pdomain)
-  run_fem = false
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/poisson"
   mesh = "cube15x15x15.json"
   bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
   order = 1
 
-  ranges = fill([1.,2.],9)
+  ranges = fill([1.,20.],6)
   sampling = UniformSampling()
   PS = ParamSpace(ranges,sampling)
 
@@ -32,13 +33,14 @@ function poisson_steady()
   op = ParamAffineFEOperator(lhs,rhs,PS,get_trial(U),get_test(V))
 
   solver = LinearFESolver()
-  uh,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,100)
+  nsnap = 100
+  uh,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
 
   opA = NonaffineParamVarOperator(a,afe,PS,U,V;id=:A)
-  opF = NonaffineParamVarOperator(f,ffe,PS,V;id=:F)
+  opF = AffineParamVarOperator(f,ffe,PS,V;id=:F)
   opH = NonaffineParamVarOperator(h,hfe,PS,V;id=:H)
 
-  info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=true)
+  info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false)
 
   tt,rbspace,Ainfo,Finfo,Hinfo = offline_phase(info,[uh,μ],[opA,opF,opH],measures)
   online_phase(info,[uh,μ],rbspace,[Ainfo,Finfo,Hinfo],tt)

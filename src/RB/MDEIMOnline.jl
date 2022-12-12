@@ -9,18 +9,19 @@ end
 
 function compute_coefficient(
   op::RBVarOperator{Affine,TT,RBSpaceUnsteady},
-  μ::Param) where TT
+  μ::Param,
+  time_info::TimeInfo) where TT
 
   fun = get_param_function(op)
-  timesθ = get_timesθ(op)
+  timesθ = get_timesθ(time_info)
   coeff(tθ) = fun(nothing,μ,tθ)
   coeff.(timesθ)
 end
 
 function compute_coefficient(
   op::RBVarOperator{Top,TT,RBSpaceSteady},
-  μ::Param,
-  mdeim::Union{MDEIM,NTuple{2,<:MDEIM}}) where {Top,TT}
+  mdeim::Union{MDEIM,NTuple{2,<:MDEIM}},
+  μ::Param) where {Top,TT}
 
   idx_lu = get_idx_lu_factors(mdeim)
   idx_space = get_idx_space(mdeim)
@@ -32,20 +33,21 @@ end
 
 function compute_coefficient(
   op::RBVarOperator{Top,TT,RBSpaceUnsteady},
-  μ::Param,
   mdeim::Union{MDEIM,NTuple{2,<:MDEIM}},
-  info::RBInfo) where {Top,TT}
+  μ::Param,
+  time_info::TimeInfo,
+  st_mdeim=true) where {Top,TT}
 
-  timesθ = get_timesθ(op)
+  timesθ = get_timesθ(time_info)
   idx_lu = get_idx_lu_factors(mdeim)
   idx_space = get_idx_space(mdeim)
   red_meas = get_reduced_measure(mdeim)
 
-  if info.st_mdeim
+  if st_mdeim
     idx_time = get_idx_time(mdeim)
     red_timesθ = timesθ[idx_time]
     A = assemble_red_structure(op,μ,red_meas,red_timesθ)
-    mdeim_online(A,idx_lu,idx_space,get_Nt(op))
+    mdeim_online(A,idx_lu,idx_space,get_Nt(time_info))
   else
     A = assemble_red_structure(op,μ,red_meas,timesθ)
     interpolate_mdeim_online(A,idx_lu,idx_space,idx_time,timesθ)

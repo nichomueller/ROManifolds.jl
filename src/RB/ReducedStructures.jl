@@ -17,13 +17,12 @@ end
 function assemble_rb_structure(
   info::RBInfo,
   op::RBVarOperator,
-  μ::Vector{Param},
   args...)
 
   id = get_id(op)
   println("Matrix $id is non-affine: running the MDEIM offline phase on $(info.mdeim_nsnap) snapshots")
 
-  mdeim_offline(info,op,μ,args...)
+  mdeim_offline(info,op,args...)
 end
 
 save(info::RBInfo,b,id::Symbol) =

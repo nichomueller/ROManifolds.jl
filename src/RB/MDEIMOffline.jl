@@ -45,18 +45,26 @@ end
 
 function load_mdeim(
   info::RBInfo,
-  op::RBVarOperator{Top,UnconstrainedFESpace,Tsp},
-  meas::Measure) where {Top,Tsp}
+  op::RBLinOperator,
+  meas::Measure)
 
-  load_mdeim(get_id(op),info,meas)
+  load_mdeim(get_id(op),info,op,meas)
 end
 
 function load_mdeim(
   info::RBInfo,
-  op::RBVarOperator,
+  op::RBBilinOperator,
   meas::Measure)
 
-  load_mdeim(get_id(op),info,meas),load_mdeim(get_id(op)*:_lift,info,meas)
+  load_mdeim(get_id(op),info,op,meas),load_mdeim(get_id(op)*:_lift,info,op,meas)
+end
+
+function load_mdeim(
+  info::RBInfo,
+  op::RBBilinOperator{Top,UnconstrainedFESpace,Tsp},
+  meas::Measure) where {Top,Tsp}
+
+  load_mdeim(get_id(op),info,op,meas)
 end
 
 function load_mdeim(
@@ -120,10 +128,11 @@ function mdeim_offline(
   op::RBVarOperator,
   μ::Vector{Param},
   meas::ProblemMeasures,
-  field=:dΩ)
+  field=:dΩ,
+  args...)
 
   μ_mdeim = μ[1:info.mdeim_nsnap]
-  snaps = mdeim_snapshots(op,info,μ_mdeim)
+  snaps = mdeim_snapshots(op,info,μ_mdeim,args...)
   rbspace = mdeim_basis(info,snaps)
   red_rbspace = project_mdeim_basis(op,rbspace)
   idx = mdeim_idx(rbspace)
@@ -192,7 +201,7 @@ function project_mdeim_basis(
   op::RBVarOperator{Top,TT,RBSpaceSteady},
   rbspace) where {Top,TT}
 
-  id = get_id(op)
+  id = get_id(rbspace)
   bs = project_mdeim_basis_space(op,rbspace)
   RBSpaceSteady(id,bs)
 end
@@ -201,7 +210,7 @@ function project_mdeim_basis(
   op::RBVarOperator{Top,TT,RBSpaceUnsteady},
   rbspace) where {Top,TT}
 
-  id = get_id(op)
+  id = get_id(rbspace)
   bs = project_mdeim_basis_space(op,rbspace)
   bt = project_mdeim_basis_time(op,rbspace)
   RBSpaceUnsteady(id,bs,bt)
@@ -365,7 +374,10 @@ function get_reduced_measure(
   idx::NTuple{2,NTuple{2,Vector{Int}}},
   meas::ProblemMeasures,
   field=:dΩ) where {Top,TT}
-  get_reduced_measure(op,first.(idx),meas,field)
+  idx_space,idx_space_lift = first.(idx)
+  m = get_reduced_measure(op,idx_space,meas,field)
+  m_lift = get_reduced_measure(op,idx_space_lift,meas,field)
+  m,m_lift
 end
 
 function find_mesh_elements(

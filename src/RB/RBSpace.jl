@@ -6,12 +6,12 @@ struct RBSpaceSteady <: RBSpace
 end
 
 function RBSpaceSteady(
-  id::Symbol,
+  id::NTuple{N,Symbol},
   basis_space::NTuple{N,Matrix{Float}}) where N
 
   rbspace = ()
-  for bs = basis_space
-    rbspace = (rbspace...,RBSpaceSteady(id,bs))
+  for n = 1:N
+    rbspace = (rbspace...,RBSpaceSteady(id[n],basis_space[n]))
   end
   rbspace
 end
@@ -36,13 +36,13 @@ struct RBSpaceUnsteady <: RBSpace
 end
 
 function RBSpaceUnsteady(
-  id::Symbol,
+  id::NTuple{N,Symbol},
   basis_space::NTuple{N,Matrix{Float}},
   basis_time::NTuple{N,Matrix{Float}}) where N
 
   rbspace = ()
-  for bst = zip(basis_space,basis_time)
-    rbspace = (rbspace...,RBSpaceUnsteady(id,bst...))
+  for n = 1:N
+    rbspace = (rbspace...,RBSpaceUnsteady(id[n],basis_space[n],basis_time[n]))
   end
   rbspace
 end
@@ -51,7 +51,7 @@ function RBSpaceUnsteady(
   snaps::Snapshots;ismdeim=Val(false),ϵ=1e-5)
 
   id = get_id(snaps)
-  snaps2 = mode2(snaps)
+  snaps2 = mode2_unfolding(snaps)
   basis_space = POD(snaps,ismdeim;ϵ)
   basis_time = POD(snaps2,ismdeim;ϵ)
   RBSpaceUnsteady(id,basis_space,basis_time)
@@ -78,6 +78,7 @@ function RBSpace(
 end
 
 get_id(rb::RBSpace) = rb.id
+get_id(rb::NTuple{2,RBSpace}) = get_id.(rb)
 get_basis_space(rb::RBSpace) = rb.basis_space
 get_basis_time(rb::RBSpaceUnsteady) = rb.basis_time
 get_basis_spacetime(rb::RBSpaceUnsteady) = kron(rb.basis_space,rb.basis_time)

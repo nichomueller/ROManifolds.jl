@@ -44,6 +44,7 @@ Gridap.FESpaces.get_test(op::RBVarOperator) = get_test(op.feop)
 Gridap.FESpaces.get_trial(op::RBBilinOperator) = get_trial(op.feop)
 get_test_no_bc(op::RBVarOperator) = get_test_no_bc(op.feop)
 get_trial_no_bc(op::RBBilinOperator) = get_trial_no_bc(op.feop)
+get_Nt(op::RBVarOperator{Top,TT,RBSpaceUnsteady}) where {Top,TT} = get_Nt(op.rbspace_row)
 
 function get_nrows(op::RBVarOperator{Top,TT,RBSpaceSteady}) where {Top,TT}
   get_ns(get_rbspace_row(op))
@@ -59,10 +60,9 @@ function Gridap.FESpaces.get_cell_dof_ids(
   get_cell_dof_ids(get_background_feop(rbop),trian)
 end
 
-Gridap.FESpaces.assemble_vector(op::RBLinOperator) = assemble_vector(op.feop)
-Gridap.FESpaces.assemble_matrix(op::RBBilinOperator) = assemble_matrix(op.feop)
-assemble_lifting(op::RBBilinOperator) = assemble_lifting(op.feop)
-assemble_matrix_and_lifting(op::RBBilinOperator) = assemble_matrix_and_lifting(op.feop)
+Gridap.FESpaces.assemble_vector(op::RBLinOperator,args...) = assemble_vector(op.feop,args...)
+Gridap.FESpaces.assemble_matrix(op::RBBilinOperator,args...) = assemble_matrix(op.feop,args...)
+assemble_matrix_and_lifting(op::RBBilinOperator,args...) = assemble_matrix_and_lifting(op.feop,args...)
 
 get_pspace(op::RBVarOperator) = get_pspace(op.feop)
 realization(op::RBVarOperator) = realization(get_pspace(op))
@@ -79,7 +79,7 @@ end
 
 function assemble_affine_vector(
   op::RBLinOperator{Affine,RBSpaceUnsteady})
-  assemble_vector(op)(realization(op),first(get_timesθ(op)))
+  assemble_vector(op)(realization(op),0.)
 end
 
 function assemble_affine_matrix(
@@ -89,7 +89,7 @@ end
 
 function assemble_affine_matrix(
   op::RBBilinOperator{Affine,TT,RBSpaceUnsteady}) where TT
-  assemble_matrix(op)(realization(op),first(get_timesθ(op)))
+  assemble_matrix(op,0.)(realization(op))
 end
 
 function assemble_affine_matrix_and_lifting(
@@ -99,17 +99,18 @@ end
 
 function assemble_affine_matrix_and_lifting(
   op::RBBilinOperator{Affine,TT,RBSpaceUnsteady}) where TT
-  assemble_matrix_and_lifting(op)(realization(op),first(get_timesθ(op)))
-end
-
-function get_findnz_mapping(op::RBLinOperator)
-  v = assemble_vector(op)(realization(op))
-  collect(eachindex(v))
+  assemble_matrix_and_lifting(op,0.)(realization(op))
 end
 
 "Small, full vector -> large, sparse vector"
-function get_findnz_mapping(op::RBBilinOperator)
+function get_findnz_mapping(op::RBBilinOperator{Top,TT,RBSpaceSteady}) where {Top,TT}
   M = assemble_matrix(op)(realization(op))
+  first(findnz(M[:]))
+end
+
+"Small, full vector -> large, sparse vector"
+function get_findnz_mapping(op::RBBilinOperator{Top,TT,RBSpaceUnsteady}) where {Top,TT}
+  M = assemble_matrix(op,0.)(realization(op))
   first(findnz(M[:]))
 end
 

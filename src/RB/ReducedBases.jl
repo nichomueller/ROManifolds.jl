@@ -1,4 +1,4 @@
-function rb(info::RBInfoSteady,args...)
+function rb(info::RBInfo,args...)
   info.load_offline ? get_rb(info) : assemble_rb(info,args...)
 end
 
@@ -46,12 +46,12 @@ function rb_time(
   println("Temporal POD, tolerance: $(info.ϵ)")
 
   s1 = get_snap(snap)
-  Nt = get_Nt(snap)
+  ns = get_nsnap(snap)
 
   if info.time_red_method == "ST-HOSVD"
-    s2 = mode2_unfolding(basis_space'.*s1,Nt)
+    s2 = mode2_unfolding(basis_space'*s1,ns)
   else
-    s2 = mode2_unfolding(s1,Nt)
+    s2 = mode2_unfolding(snap)
   end
   POD(s2;ϵ=info.ϵ)
 end
