@@ -43,7 +43,7 @@ end
 
 Gridap.ODEs.TransientFETools.get_assembler(op::ParamFEOperatorFromWeakForm) = op.assem
 Gridap.ODEs.TransientFETools.get_test(op::ParamFEOperatorFromWeakForm) = op.test
-Gridap.ODEs.TransientFETools.get_trial(op::ParamFEOperatorFromWeakForm) = op.trial
+Gridap.FESpaces.get_trial(op::ParamFEOperatorFromWeakForm) = op.trial
 
 function Gridap.ODEs.TransientFETools.allocate_residual(
   op::ParamFEOperatorFromWeakForm,

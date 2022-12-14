@@ -26,91 +26,91 @@ function Gridap.solve(
   μ::Param,
   u0::T,
   t0::Real,
-  tf::Real) where {T}
+  tF::Real) where {T}
 
-  GenericParamODESolution{T}(solver,op,μ,u0,t0,tf)
+  GenericParamODESolution{T}(solver,op,μ,u0,t0,tF)
 end
 
 function Base.iterate(
   sol::GenericParamODESolution{T}) where {T<:AbstractVector}
 
-  uf = copy(sol.u0)
+  uF = copy(sol.u0)
   u0 = copy(sol.u0)
   t0 = sol.t0
 
   # Solve step
-  uf,tf,cache = solve_step!(uf,sol.solver,sol.op,sol.μ,u0,t0)
+  uF,tF,cache = solve_step!(uF,sol.solver,sol.op,sol.μ,u0,t0)
 
   # Update
-  u0 .= uf
-  state = (uf,u0,tf,cache)
+  u0 .= uF
+  state = (uF,u0,tF,cache)
 
-  return (uf, tf), state
+  return (uF,tF),state
 end
 
 function Base.iterate(
   sol::GenericParamODESolution{T},
   state) where {T<:AbstractVector}
 
-  uf,u0,t0,cache = state
+  uF,u0,t0,cache = state
 
   if t0 >= sol.tF - 100*eps()
     return nothing
   end
 
   # Solve step
-  uf,tf,cache = solve_step!(uf,sol.solver,sol.op,sol.μ,u0,t0,cache)
+  uF,tF,cache = solve_step!(uF,sol.solver,sol.op,sol.μ,u0,t0,cache)
 
   # Update
-  u0 .= uf
-  state = (uf,u0,tf,cache)
+  u0 .= uF
+  state = (uF,u0,tF,cache)
 
-  return (uf,tf),state
+  return (uF,tF),state
 end
 
 function Base.iterate(
   sol::GenericParamODESolution{T}) where {T<:Tuple{Vararg{AbstractVector}}}
 
-  uf = ()
+  uF = ()
   u0 = ()
-  for i in 1:length(sol.u0)
-    uf = (uf...,copy(sol.u0[i]))
+  for i in eachindex(sol.u0)
+    uF = (uF...,copy(sol.u0[i]))
     u0 = (u0...,copy(sol.u0[i]))
   end
   t0 = sol.t0
 
   # Solve step
-  uf,tf,cache = solve_step!(uf,sol.solver,sol.op,sol.μ,u0,t0)
+  uF,tF,cache = solve_step!(uF,sol.solver,sol.op,sol.μ,u0,t0)
 
   # Update
-  for i in 1:length(uf)
-    u0[i] .= uf[i]
+  for i in eachindex(uF)
+    u0[i] .= uF[i]
   end
-  state = (uf,u0,tf,cache)
+  state = (uF,u0,tF,cache)
 
-  return (uf[1],tf),state
+  return (uF[1],tF),state
 end
 
 function Base.iterate(
   sol::GenericParamODESolution{T},
   state) where {T<:Tuple{Vararg{AbstractVector}}}
 
-  uf,u0,t0,cache = state
+  uF,u0,t0,cache = state
 
   if t0 >= sol.tF - 100*eps()
     return nothing
   end
 
   # Solve step
-  uf,tf,cache = solve_step!(uf,sol.solver,sol.op,sol.μ,u0,t0,cache)
+  uF,tF,cache = solve_step!(uF,sol.solver,sol.op,sol.μ,u0,t0,cache)
 
   # Update
-  for i in 1:length(uf)
-    u0[i] .= uf[i]
+  for i in eachindex(uF)
+    u0[i] .= uF[i]
   end
-  state = (uf,u0,tf,cache)
+  state = (uF,u0,tF,cache)
 
-  return (uf[1],tf),state
+  return (uF[1],tF),state
 end
 
 """
@@ -188,15 +188,15 @@ function Base.iterate(sol::ParamTransientFESolution)
     return nothing
   end
 
-  (uf,tF),psolstate = psolnext
+  (uF,tF),psolstate = psolnext
 
   Uh = allocate_trial_space(sol.trial)
   Uh = evaluate!(Uh,sol.trial,sol.psol.μ,tF)
-  uh = FEFunction(Uh,uf)
+  uh = uF#FEFunction(Uh,uF)
 
   state = (Uh,psolstate)
 
-  (uh,tF),state
+  return (uh,tF),state
 end
 
 function Base.iterate(sol::ParamTransientFESolution,state)
@@ -209,15 +209,14 @@ function Base.iterate(sol::ParamTransientFESolution,state)
     return nothing
   end
 
-  (uf,tF),psolstate = psolnext
+  (uF,tF),psolstate = psolnext
 
   Uh = evaluate!(Uh,sol.trial,sol.psol.μ,tF)
-  uh = FEFunction(Uh,uf)
+  uh = uF#FEFunction(Uh,uF)
 
   state = (Uh,psolstate)
 
-  (uh,tF),state
+  return (uh,tF),state
 end
 
 get_Nt(sol::ParamTransientFESolution) = Int(sol.psol.tF/sol.psol.solver.dt)
-get_Nt(sol::Vector{ParamTransientFESolution}) = get_Nt(first(sol))

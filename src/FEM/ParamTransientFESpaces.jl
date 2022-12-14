@@ -64,7 +64,7 @@ Time evaluation allocating Dirichlet vals
 """
 function Gridap.evaluate(U::ParamTransientTrialFESpace,t::Real)
   Ut = allocate_trial_space(U)
-  evaluate!(Ut,U,t)
+  evaluate!(Uμ,U,t)
   Ut
 end
 
@@ -73,7 +73,7 @@ Parameter evaluation allocating Dirichlet vals
 """
 function Gridap.evaluate(U::ParamTransientTrialFESpace,μ::Param)
   Uμ = allocate_trial_space(U)
-  evaluate!(Ut,U,μ)
+  evaluate!(Uμ,U,μ)
   Uμ
 end
 
@@ -115,6 +115,10 @@ function Gridap.evaluate(U::FESpace,::Param,::Real)
 end
 
 function Gridap.evaluate(U::FESpace,::Param,::Nothing)
+  U
+end
+
+function Gridap.evaluate(U::FESpace,::Nothing,::Nothing)
   U
 end
 

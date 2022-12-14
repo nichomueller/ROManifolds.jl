@@ -199,7 +199,7 @@ struct ParamUnsteadyLinOperator{OT} <: ParamLinOperator{OT}
   tests::MyTests
 end
 
-struct ParamSteadyBilinOperator{OT,TT} <: ParamVarOperator{OT,TT}
+struct ParamSteadyBilinOperator{OT,TT} <: ParamBilinOperator{OT,TT}
   id::Symbol
   a::Function
   afe::Function
@@ -208,7 +208,7 @@ struct ParamSteadyBilinOperator{OT,TT} <: ParamVarOperator{OT,TT}
   tests::MyTests
 end
 
-struct ParamUnsteadyBilinOperator{OT,TT} <: ParamVarOperator{OT,TT}
+struct ParamUnsteadyBilinOperator{OT,TT} <: ParamBilinOperator{OT,TT}
   id::Symbol
   a::Function
   afe::Function
@@ -222,15 +222,14 @@ get_id(op::ParamVarOperator) = op.id
 get_param_function(op::ParamVarOperator) = op.a
 get_fe_function(op::ParamVarOperator) = op.afe
 Gridap.ODEs.TransientFETools.get_test(op::ParamVarOperator) = op.tests.test
-Gridap.ODEs.TransientFETools.get_trial(op::ParamBilinOperator) = op.trials.trial
+Gridap.FESpaces.get_trial(op::ParamBilinOperator) = op.trials.trial
 get_tests(op::ParamVarOperator) = op.tests
 get_trials(op::ParamBilinOperator) = op.trials
 get_test_no_bc(op::ParamVarOperator) = op.tests.test_no_bc
 get_trial_no_bc(op::ParamBilinOperator) = op.trials.trial_no_bc
 get_pspace(op::ParamVarOperator) = op.pspace
 
-get_time_info(op::ParamUnsteadyLinOperator) = op.tinfo
-get_time_info(op::ParamUnsteadyBilinOperator) = op.tinfo
+get_time_info(op::ParamVarOperator) = op.tinfo
 get_dt(op::ParamVarOperator) = get_dt(get_time_info(op))
 get_Nt(op::ParamVarOperator) = get_Nt(get_time_info(op))
 get_θ(op::ParamVarOperator) = get_θ(get_time_info(op))
@@ -289,7 +288,7 @@ function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLinOperator)
   μ -> Matrix([V(μ,tθ) for tθ = timesθ])
 end
 
-function Gridap.FESpaces.assemble_matrix(op::ParamUnsteadyLinOperator,t::Real)
+function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLinOperator,t::Real)
   afe = get_fe_function(op)
   test = get_test(op)
   μ -> assemble_vector(afe(μ,t),test)
@@ -356,9 +355,37 @@ end
 
 realization(op::ParamVarOperator) = realization(get_pspace(op))
 
+function get_dirichlet_function(::Val,trial::ParamTrialFESpace)
+  μ -> trial(μ).dirichlet_values
+end
+
+function get_dirichlet_function(::Val{false},trial::ParamTransientTrialFESpace)
+  (μ,t) -> trial(μ,t).dirichlet_values
+end
+
+function get_dirichlet_function(::Val{true},trial::ParamTransientTrialFESpace)
+  g(x,μ,t) = trial.dirichlet_μt(x,μ,t)
+  g(μ,t) = x -> g(x,μ,t)
+  dg(x,μ,t) = ForwardDiff.derivative(t->g(μ,t)(x),t)
+  dg(μ,t) = x -> dg(x,μ,t)
+  dg_dirichlet(μ,t) = interpolate_dirichlet(dg(μ,t),trial(μ,t)).dirichlet_values
+  dg_dirichlet
+end
+
+function get_dirichlet_function(op)
+  id = get_id(op)
+  trial = get_trial(op)
+  μ -> get_dirichlet_function(Val(id ∈ (:M,:M_lift)),trial)(μ)
+end
+
+function get_dirichlet_function(op)
+  id = get_id(op)
+  trial = get_trial(op)
+  (μ,t) -> get_dirichlet_function(Val(id ∈ (:M,:M_lift)),trial)(μ,t)
+end
+
 function assemble_matrix_and_lifting(op::ParamSteadyBilinOperator)
   afe = get_fe_function(op)
-  trial = get_trial(op)
   trial_no_bc = get_trial_no_bc(op)
   test_no_bc = get_test_no_bc(op)
   fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
@@ -366,7 +393,7 @@ function assemble_matrix_and_lifting(op::ParamSteadyBilinOperator)
 
   A_no_bc(μ) = assemble_matrix(afe(μ),trial_no_bc,test_no_bc)
   A_bc(μ) = A_no_bc(μ)[fdofs_test,fdofs_trial]
-  dir(μ) = trial(μ).dirichlet_values
+  dir = get_dirichlet_function(op)
   lift(μ) = A_no_bc(μ)[fdofs_test,ddofs]*dir(μ)
 
   A_bc,lift
@@ -375,7 +402,6 @@ end
 function assemble_matrix_and_lifting(op::ParamUnsteadyBilinOperator)
   timesθ = get_timesθ(op)
   afe = get_fe_function(op)
-  trial = get_trial(op)
   trial_no_bc = get_trial_no_bc(op)
   test_no_bc = get_test_no_bc(op)
   fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
@@ -384,7 +410,7 @@ function assemble_matrix_and_lifting(op::ParamUnsteadyBilinOperator)
   A_no_bc(μ,tθ) = assemble_matrix(afe(μ,tθ),trial_no_bc,test_no_bc)
   A_bc(μ,tθ) = A_no_bc(μ,tθ)[fdofs_test,fdofs_trial]
   A_bc(μ) = [A_bc(μ,tθ) for tθ = timesθ]
-  dir(μ,tθ) = trial(μ,tθ).dirichlet_values
+  dir = get_dirichlet_function(op)
   lift(μ,tθ) = A_no_bc(μ,tθ)[fdofs_test,ddofs]*dir(μ,tθ)
   lift(μ) = Matrix([lift(μ,tθ) for tθ = timesθ])
 
@@ -393,7 +419,6 @@ end
 
 function assemble_matrix_and_lifting(op::ParamUnsteadyBilinOperator,t::Real)
   afe = get_fe_function(op)
-  trial = get_trial(op)
   trial_no_bc = get_trial_no_bc(op)
   test_no_bc = get_test_no_bc(op)
   fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
@@ -401,8 +426,8 @@ function assemble_matrix_and_lifting(op::ParamUnsteadyBilinOperator,t::Real)
 
   A_no_bc(μ) = assemble_matrix(afe(μ,t),trial_no_bc,test_no_bc)
   A_bc(μ) = A_no_bc(μ)[fdofs_test,fdofs_trial]
-  dir(μ) = trial(μ).dirichlet_values
-  lift(μ) = A_no_bc(μ)[fdofs_test,ddofs]*dir(μ)
+  dir = get_dirichlet_function(op)
+  lift(μ) = A_no_bc(μ)[fdofs_test,ddofs]*dir(μ,t)
 
   A_bc,lift
 end
@@ -412,7 +437,7 @@ function assemble_matrix_and_lifting(
   assemble_matrix(op,args...),nothing
 end
 
-abstract type ParamLiftingOperator{OT,TT} <: ParamBilinOperator{OT,TT} end
+abstract type ParamLiftingOperator{OT,TT} <: ParamLinOperator{OT} end
 
 struct ParamSteadyLiftingOperator{OT,TT} <: ParamLiftingOperator{OT,TT}
   id::Symbol
@@ -433,70 +458,78 @@ struct ParamUnsteadyLiftingOperator{OT,TT} <: ParamLiftingOperator{OT,TT}
   tests::MyTests
 end
 
-function ParamLiftingOperator(op::ParamSteadyBilinOperator{OT,TT}) where {OT,TT}
-  id = get_id(op)
-  a = get_param_fun(op)
-  afe = get_fe_fun(op)
-  pspace = get_pspace(op)
-  tests = get_tests(op)
-  trials = get_trials(op)
-  ParamSteadyLiftingOperator{OT,TT}(id,a,afe,pspace,trials,tests)
+function ParamLiftingOperator(::ParamBilinOperator{OT,UnconstrainedFESpace}) where OT
+  error("No lifting operator associated to a trial space of type UnconstrainedFESpace")
+end
+
+function ParamLiftingOperator(op::ParamSteadyBilinOperator{Affine,TT}) where TT
+  id = get_id(op)*:_lift
+  ParamSteadyLiftingOperator{Nonaffine,TT}(id,get_param_function(op),
+    get_fe_function(op),get_pspace(op),get_trials(op),get_tests(op))
 end
 
 function ParamLiftingOperator(op::ParamSteadyBilinOperator{OT,TT}) where {OT,TT}
-  id = get_id(op)
-  a = get_param_fun(op)
-  afe = get_fe_fun(op)
-  pspace = get_pspace(op)
-  tinfo = get_time_info(op)
-  tests = get_tests(op)
-  trials = get_trials(op)
-  ParamUnsteadyLiftingOperator{OT,TT}(id,a,afe,pspace,tinfo,trials,tests)
+  id = get_id(op)*:_lift
+  ParamSteadyLiftingOperator{OT,TT}(id,get_param_function(op),
+    get_fe_function(op),get_pspace(op),get_trials(op),get_tests(op))
 end
 
-function assemble_lift(op::ParamSteadyLiftingOperator)
+function ParamLiftingOperator(op::ParamUnsteadyBilinOperator{Affine,TT}) where TT
+  id = get_id(op)*:_lift
+  ParamUnsteadyLiftingOperator{Nonaffine,TT}(id,get_param_function(op),
+    get_fe_function(op),get_pspace(op),get_time_info(op),get_trials(op),get_tests(op))
+end
+
+function ParamLiftingOperator(op::ParamUnsteadyBilinOperator{OT,TT}) where {OT,TT}
+  id = get_id(op)*:_lift
+  ParamUnsteadyLiftingOperator{OT,TT}(id,get_param_function(op),
+    get_fe_function(op),get_pspace(op),get_time_info(op),get_trials(op),get_tests(op))
+end
+
+Gridap.FESpaces.get_trial(op::ParamLiftingOperator) = op.trials.trial
+get_trials(op::ParamLiftingOperator) = op.trials
+get_trial_no_bc(op::ParamLiftingOperator) = op.trials.trial_no_bc
+
+function Gridap.FESpaces.assemble_vector(op::ParamSteadyLiftingOperator)
   afe = get_fe_function(op)
-  trial = get_trial(op)
   trial_no_bc = get_trial_no_bc(op)
   test_no_bc = get_test_no_bc(op)
   fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
   fdofs_test,_ = fdofs
 
   A_no_bc(μ) = assemble_matrix(afe(μ),trial_no_bc,test_no_bc)
-  dir(μ) = trial(μ).dirichlet_values
+  dir = get_dirichlet_function(op)
   lift(μ) = A_no_bc(μ)[fdofs_test,ddofs]*dir(μ)
 
   lift
 end
 
-function assemble_lift(op::ParamUnsteadyLiftingOperator)
+function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLiftingOperator)
   timesθ = get_timesθ(op)
   afe = get_fe_function(op)
-  trial = get_trial(op)
   trial_no_bc = get_trial_no_bc(op)
   test_no_bc = get_test_no_bc(op)
   fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
   fdofs_test,_ = fdofs
 
   A_no_bc(μ,tθ) = assemble_matrix(afe(μ,tθ),trial_no_bc,test_no_bc)
-  dir(μ,tθ) = trial(μ,tθ).dirichlet_values
+  dir = get_dirichlet_function(op)
   lift(μ,tθ) = A_no_bc(μ,tθ)[fdofs_test,ddofs]*dir(μ,tθ)
   lift(μ) = Matrix([lift(μ,tθ) for tθ = timesθ])
 
   lift
 end
 
-function assemble_lift(op::ParamUnsteadyLiftingOperator,t::Real)
+function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLiftingOperator,t::Real)
   afe = get_fe_function(op)
-  trial = get_trial(op)
   trial_no_bc = get_trial_no_bc(op)
   test_no_bc = get_test_no_bc(op)
   fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
   fdofs_test,_ = fdofs
 
   A_no_bc(μ) = assemble_matrix(afe(μ,t),trial_no_bc,test_no_bc)
-  dir(μ) = trial(μ).dirichlet_values
-  lift(μ) = A_no_bc(μ)[fdofs_test,ddofs]*dir(μ)
+  dir = get_dirichlet_function(op)
+  lift(μ) = A_no_bc(μ)[fdofs_test,ddofs]*dir(μ,t)
 
   lift
 end
@@ -525,7 +558,17 @@ function Snapshots(id::Symbol,blocks::Vector{<:AbstractArray})
   Snapshots(id,snap,nsnap)
 end
 
-Snapshots(s::Snapshots,idx) = Snapshots(s.id,getindex(s.snap,idx))
+function Base.getindex(s::Snapshots,idx::Int)
+  Nt = get_Nt(s)
+  snap_idx = s.snap[:,(idx-1)*Nt+1:idx*Nt]
+  Snapshots(s.id,snap_idx,1)
+end
+
+function Base.getindex(s::Snapshots,idx::UnitRange{Int})
+  Nt = get_Nt(s)
+  snap(i) = getindex(s.snap,:,(i-1)*Nt+1:i*Nt)
+  Snapshots(s.id,Matrix(snap.(idx)),length(idx))
+end
 
 get_id(s::Snapshots) = s.id
 get_snap(s::Snapshots) = s.snap

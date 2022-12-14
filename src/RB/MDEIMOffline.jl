@@ -61,8 +61,8 @@ end
 
 function load_mdeim(
   info::RBInfo,
-  op::RBBilinOperator{Top,UnconstrainedFESpace,Tsp},
-  meas::Measure) where {Top,Tsp}
+  op::RBBilinOperator{Top,UnconstrainedFESpace},
+  meas::Measure) where Top
 
   load_mdeim(get_id(op),info,op,meas)
 end
@@ -147,7 +147,7 @@ mdeim_basis(info::RBInfoSteady,snaps) = RBSpaceSteady(snaps;ismdeim=Val(true),ϵ
 mdeim_basis(info::RBInfoUnsteady,snaps) = RBSpaceUnsteady(snaps;ismdeim=Val(true),ϵ=info.ϵ)
 
 function project_mdeim_basis(
-  op::Union{RBSteadyLinOperator,RBSteadyBilinOperator,RBSteadyLiftingOperator}
+  op::Union{RBSteadyLinOperator,RBSteadyBilinOperator,RBSteadyLiftingOperator},
   rbspace)
 
   id = get_id(rbspace)
@@ -213,16 +213,6 @@ function project_mdeim_basis_space(
   red_basis_space,red_basis_space_lift
 end
 
-function project_mdeim_basis_space(
-  op::RBLiftingOperator,
-  rbspace::RBSpace)
-
-  basis_space = get_basis_space(rbspace)
-  rbspace_row = get_rbspace_row(op)
-  brow = get_basis_space(rbspace_row)
-  brow'*basis_space
-end
-
 # CORRECT THIS!
 function project_mdeim_basis_time(
   ::RBLinOperator,
@@ -243,13 +233,6 @@ function project_mdeim_basis_time(
   rb::NTuple{2,<:RBSpace})
   rbspace,rbspace_lift = rb
   get_basis_time(rbspace),get_basis_time(rbspace_lift)
-end
-
-# CORRECT THIS!
-function project_mdeim_basis_time(
-  ::RBLiftingOperator,
-  rbspace::RBSpace)
-  get_basis_time(rbspace)
 end
 
 mdeim_idx(rbspace::NTuple{2,<:RBSpace}) = mdeim_idx.(rbspace)
@@ -330,7 +313,7 @@ function load_idx_lu_factors(path::String,id::Symbol)
   LU(factors,ipiv,0)
 end
 
-recast_in_full_dim(::RBLinOperator,idx_tmp::Vector{Int}) = idx_tmp
+recast_in_full_dim(::RBLinOperator,idx_tmp) = idx_tmp
 
 recast_in_full_dim(op::RBBilinOperator,idx_tmp::Vector{Int}) =
   get_findnz_mapping(op)[idx_tmp]
@@ -338,10 +321,13 @@ recast_in_full_dim(op::RBBilinOperator,idx_tmp::Vector{Int}) =
 recast_in_full_dim(op::RBBilinOperator,idx_tmp::NTuple{2,Vector{Int}}) =
   recast_in_full_dim(op,first(idx_tmp)),last(idx_tmp)
 
-recast_in_full_dim(op::RBBilinOperator,idx_tmp::NTuple{2,NTuple{2,Vector{Int}}}) =
-  Broadcasting(i->recast_in_full_dim(op,i))(idx_tmp)
+function recast_in_full_dim(
+  op::RBBilinOperator,
+  idx_tmp::NTuple{2,NTuple{2,Vector{Int}}})
 
-recast_in_full_dim(::RBLiftingOperator,idx_tmp::Vector{Int}) = idx_tmp
+  idx,idx_lift = idx_tmp
+  (recast_in_full_dim(op,first(idx)),last(idx)),idx_lift
+end
 
 function get_reduced_measure(
   op::Union{RBSteadyLinOperator,RBSteadyBilinOperator,RBSteadyLiftingOperator},
@@ -350,7 +336,7 @@ function get_reduced_measure(
   field=:dΩ)
 
   m = getproperty(meas,field)
-  get_reduced_measure(op,m,idx)
+  get_reduced_measure(op,idx,m)
 end
 
 function get_reduced_measure(
@@ -381,7 +367,7 @@ function get_reduced_measure(
   meas::ProblemMeasures,
   field=:dΩ)
 
-  idx_space,idx_space_lift = first.(idx)
+  idx_space,idx_space_lift = idx
   m = get_reduced_measure(op,idx_space,meas,field)
   m_lift = get_reduced_measure(op,idx_space_lift,meas,field)
   m,m_lift
@@ -389,26 +375,26 @@ end
 
 function get_reduced_measure(
   op::RBVarOperator,
-  meas::Measure,
-  idx::Vector{Int})
+  idx::Vector{Int},
+  meas::Measure)
 
-  get_reduced_measure(op,get_triangulation(meas),idx)
+  get_reduced_measure(op,idx,get_triangulation(meas))
 end
 
 function get_reduced_measure(
   op::RBVarOperator,
-  trian::Triangulation,
-  idx::Vector{Int})
+  idx::Vector{Int},
+  trian::Triangulation)
 
-  el = find_mesh_elements(op,trian,idx)
+  el = find_mesh_elements(op,idx,trian)
   red_trian = view(trian,el)
   Measure(red_trian,get_degree(get_test(op)))
 end
 
 function find_mesh_elements(
   op::RBVarOperator,
-  trian::Triangulation,
-  idx_tmp::Vector{Int})
+  idx_tmp::Vector{Int},
+  trian::Triangulation)
 
   idx = recast_in_mat_form(op,idx_tmp)
   connectivity = get_cell_dof_ids(op,trian)
@@ -432,5 +418,3 @@ function recast_in_mat_form(op::RBBilinOperator,idx_tmp::Vector{Int})
   idx_space,_ = from_vec_to_mat_idx(idx_tmp,Ns)
   idx_space
 end
-
-recast_in_mat_form(::RBLiftingOperator,idx_tmp::Vector{Int}) = idx_tmp

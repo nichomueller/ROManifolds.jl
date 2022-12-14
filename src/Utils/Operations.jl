@@ -94,20 +94,22 @@ function gram_schmidt!(vec::Vector{Vector},basis::Matrix{Float})
 end
 
 function basis_by_coeff_mult(basis::Matrix{Float},coeff::Vector{Float},nr::Int)
+  @assert size(basis,2) == length(coeff) "Something is wrong"
   bc = sum([basis[:,k]*coeff[k] for k=eachindex(coeff)])
   Matrix(reshape(bc,nr,:))
 end
 
 function basis_by_coeff_mult(basis::Matrix{Float},coeff::Matrix{Float},nr::Int)
-  bc = sum([kron(basis[:,k],coeff[:,k]) for k=eachindex(coeff)])
+  @assert size(basis,2) == size(coeff,2) "Something is wrong"
+  bc = sum([kron(basis[:,k],coeff[:,k]) for k=axes(coeff,2)])
   Matrix(reshape(bc,nr,:))
 end
 
 function basis_by_coeff_mult(
-  basis::NTuple{2,Matrix{Float}},
-  coeff::Tuple,
+  basis::Matrix{Float},
+  coeff::NTuple{2,Matrix{Float}},
   nr::Int)
-  Broadcasting((b,c)->basis_by_coeff_mult(b,c,nr))(basis,coeff)
+  Broadcasting(c->basis_by_coeff_mult(basis,c,nr))(coeff)
 end
 
 function solve_cholesky(

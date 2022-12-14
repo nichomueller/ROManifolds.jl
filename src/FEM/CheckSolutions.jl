@@ -11,6 +11,31 @@ function steady_poisson()
   isapprox(A(μ1)*uh.snap,F(μ1)+H(μ1)-LA(μ1))
 end
 
+function unsteady_poisson()
+  dt = get_dt(opA)
+  θ = get_θ(opA)
+  μ1 = μ[1]
+  u1 = uh.snap[:,1]
+  u2 = uh.snap[:,2]
+
+  tθ1 = dt*θ
+  A1,LA1 = assemble_matrix_and_lifting(opA,tθ1)
+  M1,LM1 = assemble_matrix_and_lifting(opM,tθ1)
+  F1 = assemble_vector(opF,tθ1)
+  H1 = assemble_vector(opH,tθ1)
+  isapprox(θ*(A1(μ1)+M1(μ1)/(dt*θ))*u1,F1(μ1)+H1(μ1)-LA1(μ1)-LM1(μ1))
+
+  tθ2 = dt+dt*θ
+  A2,LA2 = assemble_matrix_and_lifting(opA,tθ2)
+  M2,LM2 = assemble_matrix_and_lifting(opM,tθ2)
+  F2 = assemble_vector(opF,tθ2)
+  H2 = assemble_vector(opH,tθ2)
+  LHS2 = θ*(A2(μ1)+M2(μ1)/(dt*θ))
+  RHS2 = F2(μ1)+H2(μ1)-LA2(μ1)-LM2(μ1)
+  RHS1 = ((1-θ)*A2(μ1) - θ*M2(μ1)/(dt*θ))*u1
+  isapprox(LHS2*u2,RHS2-RHS1)
+end
+
 function spaces_steady()
   PS = ParamSpace(ranges,sampling)
   μ = realization(PS)

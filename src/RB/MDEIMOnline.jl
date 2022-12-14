@@ -1,5 +1,5 @@
 function compute_coefficient(
-  op::RBVarOperator{Affine,TT,RBSpaceSteady},
+  op::Union{RBSteadyLinOperator{Affine},RBSteadyBilinOperator{Affine,TT},RBSteadyLiftingOperator{Affine,TT}},
   μ::Param) where TT
 
   fun = get_param_function(op)
@@ -8,20 +8,19 @@ function compute_coefficient(
 end
 
 function compute_coefficient(
-  op::RBVarOperator{Affine,TT,RBSpaceUnsteady},
-  μ::Param,
-  time_info::TimeInfo) where TT
+  op::Union{RBUnsteadyLinOperator{Affine},RBUnsteadyBilinOperator{Affine,TT},RBUnsteadyLiftingOperator{Affine,TT}},
+  μ::Param) where TT
 
   fun = get_param_function(op)
-  timesθ = get_timesθ(time_info)
+  timesθ = get_timesθ(op)
   coeff(tθ) = fun(nothing,μ,tθ)
-  coeff.(timesθ)
+  Matrix(coeff.(timesθ)')
 end
 
 function compute_coefficient(
-  op::RBVarOperator{Top,TT,RBSpaceSteady},
-  mdeim::Union{MDEIM,NTuple{2,<:MDEIM}},
-  μ::Param) where {Top,TT}
+  op::Union{RBSteadyLinOperator,RBSteadyBilinOperator,RBSteadyLiftingOperator},
+  mdeim::MDEIM,
+  μ::Param)
 
   idx_lu = get_idx_lu_factors(mdeim)
   idx_space = get_idx_space(mdeim)
@@ -32,30 +31,29 @@ function compute_coefficient(
 end
 
 function compute_coefficient(
-  op::RBVarOperator{Top,TT,RBSpaceUnsteady},
-  mdeim::Union{MDEIM,NTuple{2,<:MDEIM}},
+  op::Union{RBUnsteadyLinOperator,RBUnsteadyBilinOperator,RBUnsteadyLiftingOperator},
+  mdeim::MDEIM,
   μ::Param,
-  time_info::TimeInfo,
-  st_mdeim=true) where {Top,TT}
+  st_mdeim=true)
 
-  timesθ = get_timesθ(time_info)
+  timesθ = get_timesθ(op)
   idx_lu = get_idx_lu_factors(mdeim)
   idx_space = get_idx_space(mdeim)
   red_meas = get_reduced_measure(mdeim)
 
-  if st_mdeim
+  if !st_mdeim
     idx_time = get_idx_time(mdeim)
     red_timesθ = timesθ[idx_time]
     A = assemble_red_structure(op,μ,red_meas,red_timesθ)
-    mdeim_online(A,idx_lu,idx_space,get_Nt(time_info))
+    interpolate_mdeim_online(A,idx_lu,idx_space,idx_time,timesθ)
   else
     A = assemble_red_structure(op,μ,red_meas,timesθ)
-    interpolate_mdeim_online(A,idx_lu,idx_space,idx_time,timesθ)
+    mdeim_online(A,idx_lu,idx_space,get_Nt(op))
   end
 end
 
 function assemble_red_structure(
-  op::RBLinOperator{Nonaffine,RBSpaceSteady},
+  op::RBSteadyLinOperator{Nonaffine},
   μ::Param,
   m::Measure)
 
@@ -64,10 +62,10 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBLinOperator{Nonaffine,RBSpaceUnsteady},
+  op::RBUnsteadyLinOperator{Nonaffine},
   μ::Param,
   m::Measure,
-  timesθ::Vector{Real})
+  timesθ::Vector{<:Real})
 
   fun = get_fe_function(op)
   v(tθ) = assemble_vector(v->fun(μ,tθ,m,v),get_test(op))
@@ -75,7 +73,7 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBBilinOperator{Nonaffine,TT,RBSpaceSteady},
+  op::RBSteadyBilinOperator{Nonaffine,TT},
   μ::Param,
   m::Measure) where TT
 
@@ -84,7 +82,7 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBBilinOperator{Nonlinear,TT,RBSpaceSteady},
+  op::RBSteadyBilinOperator{Nonlinear,TT},
   μ::Param,
   m::Measure) where TT
 
@@ -93,10 +91,10 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBBilinOperator{Nonaffine,TT,RBSpaceUnsteady},
+  op::RBUnsteadyBilinOperator{Nonaffine,TT},
   μ::Param,
   m::Measure,
-  timesθ::Vector{Real}) where TT
+  timesθ::Vector{<:Real}) where TT
 
   fun = get_fe_function(op)
   M(tθ) = assemble_matrix((u,v)->fun(μ,tθ,m,u,v),get_trial(op)(μ,tθ),get_test(op))
@@ -104,10 +102,10 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBBilinOperator{Nonlinear,TT,RBSpaceUnsteady},
+  op::RBUnsteadyBilinOperator{Nonlinear,TT},
   μ::Param,
   m::Measure,
-  timesθ::Vector{Real}) where TT
+  timesθ::Vector{<:Real}) where TT
 
   fun = get_fe_function(op)
   M(tθ,u) = assemble_matrix(v->fun(μ,tθ,m,u,v),get_trial(op)(μ,tθ),get_test(op))
@@ -116,6 +114,67 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
+  op::RBSteadyLiftingOperator{Nonaffine,TT},
+  μ::Param,
+  m::Measure) where TT
+
+  fun = get_fe_function(op)
+  dir = get_dirichlet_function(op)
+  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
+  fdofs_test,_ = fdofs
+
+  Mlift = assemble_matrix((u,v)->fun(μ,m,u,v),get_trial_no_bc(op),get_test_no_bc(op))
+  Mlift[fdofs_test,ddofs]*dir
+end
+
+function assemble_red_structure(
+  op::RBSteadyLiftingOperator{Nonlinear,TT},
+  μ::Param,
+  m::Measure) where TT
+
+  fun = get_fe_function(op)
+  dir = get_dirichlet_function(op)
+  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trial(op))
+  fdofs_test,_ = fdofs
+
+  Mlift(u) = assemble_matrix(v->fun(μ,m,u,v),get_trial_no_bc(op),get_test_no_bc(op))
+  u -> Mlift(u)[fdofs_test,ddofs]*dir
+end
+
+function assemble_red_structure(
+  op::RBUnsteadyLiftingOperator{Nonaffine,TT},
+  μ::Param,
+  m::Measure,
+  timesθ::Vector{<:Real}) where TT
+
+  fun = get_fe_function(op)
+  dir(tθ) = get_dirichlet_function(op)(μ,tθ)
+  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
+  fdofs_test,_ = fdofs
+
+  Mlift(tθ) = assemble_matrix((u,v)->fun(μ,tθ,m,u,v),get_trial_no_bc(op),get_test_no_bc(op))
+  lift(tθ) = Mlift(tθ)[fdofs_test,ddofs]*dir(tθ)
+  Matrix(lift.(timesθ))
+end
+
+function assemble_red_structure(
+  op::RBUnsteadyLiftingOperator{Nonlinear,TT},
+  μ::Param,
+  m::Measure,
+  timesθ::Vector{<:Real}) where TT
+
+  fun = get_fe_function(op)
+  dir(tθ) = get_dirichlet_function(op)(μ,tθ)
+  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
+  fdofs_test,_ = fdofs
+
+  Mlift(tθ,u) = assemble_matrix(v->fun(μ,tθ,m,u,v),get_trial_no_bc(op),get_test_no_bc(op))
+  lift(tθ,u) = Mlift(tθ,u)[fdofs_test,ddofs]*dir(tθ)
+  lift(u) = Matrix(Broadcasting(tθ -> lift(tθ,u))(timesθ))
+  lift
+end
+
+#= function assemble_red_structure(
   op::RBBilinOperator{Nonaffine,TT,RBSpaceSteady},
   μ::Param,
   meas::NTuple{2,Measure}) where TT
@@ -155,7 +214,7 @@ function assemble_red_structure(
   op::RBBilinOperator{Nonaffine,TT,RBSpaceUnsteady},
   μ::Param,
   meas::NTuple{2,Measure},
-  timesθ::Vector{Real}) where TT
+  timesθ::Vector{<:Real}) where TT
 
   mmat,mlift = meas
   fun = get_fe_function(op)
@@ -174,7 +233,7 @@ function assemble_red_structure(
   op::RBBilinOperator{Nonlinear,TT,RBSpaceUnsteady},
   μ::Param,
   meas::NTuple{2,Measure},
-  timesθ::Vector{Real}) where TT
+  timesθ::Vector{<:Real}) where TT
 
   mmat,mlift = meas
   fun = get_fe_function(op)
@@ -189,7 +248,7 @@ function assemble_red_structure(
   lift(u) = Matrix(Broadcasting(tθ -> lift(tθ,u))(timesθ))
 
   M,lift
-end
+end =#
 
 function solve_lu(A::AbstractArray,lu::LU)
   P_A = lu.P*A
@@ -221,7 +280,7 @@ function mdeim_online(
   u -> mdeim_online(A(u),idx_lu,idx_space,Nt)
 end
 
-function mdeim_online(
+#= function mdeim_online(
   A::NTuple{2,AbstractArray},
   idx_lu::NTuple{2,LU},
   idx_space::NTuple{2,Vector{Int}},
@@ -241,14 +300,14 @@ function mdeim_online(
   M(u) = mdeim_online(A[1](u),idx_lu[1],idx_space[1],Nt)
   lift(u) = mdeim_online(A[1](u),idx_lu[1],idx_space[1],Nt)
   M,lift
-end
+end =#
 
 function interpolate_mdeim_online(
   A::AbstractArray,
   idx_lu::LU,
   idx_space::Vector{Int},
   idx_time::Vector{Int},
-  timesθ::Vector{Real})
+  timesθ::Vector{<:Real})
 
   red_timesθ = timesθ[idx_time]
   discarded_idx_time = setdiff(eachindex(timesθ),idx_time)
@@ -270,16 +329,16 @@ function interpolate_mdeim_online(
   idx_lu::LU,
   idx_space::Vector{Int},
   idx_time::Vector{Int},
-  timesθ::Vector{Real})
+  timesθ::Vector{<:Real})
 
   u -> interpolate_mdeim_online(A(u),idx_lu,idx_space,idx_time,timesθ)
 end
 
-function mdeim_online(
+#= function mdeim_online(
   A::NTuple{2,T},
   idx_lu::NTuple{2,LU},
   idx_space::NTuple{2,Vector{Int}},
   Nt=1) where T
 
   Broadcasting((a,lu,idx)->mdeim_online(a,lu,idx,Nt))(A,idx_lu,idx_space)
-end
+end =#

@@ -106,7 +106,7 @@ end
 
 function fe_snapshots(ptype::ProblemType,solver,op,fepath::String,run_fem::Bool,nsnap::Int,args...)
   if run_fem
-    generate_fe_snapshots(ptype,solver,op,fepath,nsnap)
+    generate_fe_snapshots(ptype,solver,op,fepath,nsnap,args...)
   else
     load_fe_snapshots(ptype,fepath,nsnap)
   end
@@ -139,9 +139,9 @@ function generate_fe_snapshots(
   solver::ThetaMethod,
   op::ParamTransientFEOperator,
   fepath::String,
+  nsnap::Int,
   t0::Real,
-  tF::Real,
-  nsnap::Int)
+  tF::Real)
 
   sol = solve(solver,op,t0,tF,nsnap)
   generate_fe_snapshots(isindef(ptype),sol,fepath)
@@ -193,8 +193,9 @@ function collect_solutions!(
   k = 1
   for (uh,_) in solk
     println("Time step: $k")
-    push!(x,get_free_dof_values(uh))
+    push!(x,copy(uh))
     k += 1
   end
+
   x
 end

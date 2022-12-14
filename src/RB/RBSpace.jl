@@ -9,11 +9,7 @@ function RBSpaceSteady(
   id::NTuple{N,Symbol},
   basis_space::NTuple{N,Matrix{Float}}) where N
 
-  rbspace = ()
-  for n = 1:N
-    rbspace = (rbspace...,RBSpaceSteady(id[n],basis_space[n]))
-  end
-  rbspace
+  RBSpaceSteady.(id,basis_space,basis_time)
 end
 
 function RBSpaceSteady(
@@ -40,11 +36,7 @@ function RBSpaceUnsteady(
   basis_space::NTuple{N,Matrix{Float}},
   basis_time::NTuple{N,Matrix{Float}}) where N
 
-  rbspace = ()
-  for n = 1:N
-    rbspace = (rbspace...,RBSpaceUnsteady(id[n],basis_space[n],basis_time[n]))
-  end
-  rbspace
+  RBSpaceUnsteady.(id,basis_space,basis_time)
 end
 
 function RBSpaceUnsteady(

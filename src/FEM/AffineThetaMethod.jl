@@ -37,7 +37,7 @@ function Gridap.ODEs.TransientFETools.solve_step!(
   cache = (ode_cache,vθ,A,b,l_cache)
 
   tf = t0+dt
-  (uf,tf,cache)
+  return (uf,tf,cache)
 end
 
 """

@@ -85,12 +85,12 @@ end
 function Gridap.ODEs.TransientFETools.SparseMatrixAssembler(
   trial::Union{ParamTransientTrialFESpace,ParamTransientMultiFieldTrialFESpace},
   test::FESpace)
-  SparseMatrixAssembler(Gridap.evaluate(trial,nothing),test)
+  SparseMatrixAssembler(Gridap.evaluate(trial,nothing,nothing),test)
 end
 
 Gridap.ODEs.TransientFETools.get_assembler(op::ParamTransientFEOperatorFromWeakForm) = op.assem
 Gridap.ODEs.TransientFETools.get_test(op::ParamTransientFEOperatorFromWeakForm) = op.test
-Gridap.ODEs.TransientFETools.get_trial(op::ParamTransientFEOperatorFromWeakForm) = op.trials[1]
+Gridap.FESpaces.get_trial(op::ParamTransientFEOperatorFromWeakForm) = op.trials[1]
 Gridap.ODEs.TransientFETools.get_order(op::ParamTransientFEOperatorFromWeakForm) = op.order
 
 function Gridap.ODEs.TransientFETools.allocate_residual(
@@ -221,7 +221,7 @@ function _matdata_jacobian(
   i::Integer,
   γᵢ::Real) where T
 
-  Uh = Gridap.evaluate(get_trial(op),nothing,nothing)
+  Uh = Gridap.evaluate(get_trial(op),μ,t)
   V = get_test(op)
   du = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
