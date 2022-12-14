@@ -118,6 +118,10 @@ get_nrows(op::RBVarOperator) = get_ns(get_rbspace_row(op))
 get_nrows(op::RBUnsteadyLinOperator) = get_ns(get_rbspace_row(op))*get_nt(get_rbspace_row(op))
 get_nrows(op::RBUnsteadyBilinOperator) = get_ns(get_rbspace_row(op))*get_nt(get_rbspace_row(op))
 get_nrows(op::RBUnsteadyLiftingOperator) = get_ns(get_rbspace_row(op))*get_nt(get_rbspace_row(op))
+#= get_ncols(op::RBVarOperator) = get_ns(get_rbspace_col(op))
+get_ncols(op::RBUnsteadyLinOperator) = 1
+get_ncols(op::RBUnsteadyBilinOperator) = get_ns(get_rbspace_col(op))*get_nt(get_rbspace_col(op))
+get_ncols(op::RBUnsteadyLiftingOperator) = 1 =#
 
 function Gridap.FESpaces.get_cell_dof_ids(
   rbop::RBVarOperator,

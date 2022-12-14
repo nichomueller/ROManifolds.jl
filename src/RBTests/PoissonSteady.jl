@@ -53,10 +53,11 @@ function offline_phase(
   meas::ProblemMeasures)
 
   uh,μ = fe_sol
+  uh_offline = uh[1:info.nsnap]
   opA,opF,opH = op
   tt = TimeTracker(0.,0.)
 
-  rbspace = rb(info,tt,uh)
+  rbspace = rb(info,tt,uh_offline)
   rbopA = RBVarOperator(opA,rbspace,rbspace)
   rbopF = RBVarOperator(opF,rbspace)
   rbopH = RBVarOperator(opH,rbspace)

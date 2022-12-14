@@ -46,7 +46,7 @@ function POD(S::AbstractMatrix,::Val{true};ϵ=1e-5)
   Utemp = U[:,1:ntemp]
 
   # approx, should actually be norm(inv(U[idx,:]))*Σ[2:end]
-  matrix_err = vcat(sqrt(norm(inv(Utemp'*Utemp)))*Σ[2:end],0.0)
+  matrix_err = sqrt(norm(inv(Utemp'*Utemp)))*vcat(Σ[2:end],0.0)
   n = findall(x -> x ≤ ϵ,matrix_err)[1]
   err = matrix_err[n]
   println("Basis number obtained via POD is $n, projection error ≤ $err")
@@ -99,16 +99,17 @@ function basis_by_coeff_mult(basis::Matrix{Float},coeff::Vector{Float},nr::Int)
   Matrix(reshape(bc,nr,:))
 end
 
-function basis_by_coeff_mult(basis::Matrix{Float},coeff::Matrix{Float},nr::Int)
-  @assert size(basis,2) == size(coeff,2) "Something is wrong"
-  bc = sum([kron(basis[:,k],coeff[:,k]) for k=axes(coeff,2)])
+function basis_by_coeff_mult(basis::Vector{Matrix{Float}},coeff::Vector{Matrix{Float}},nr::Int)
+  @assert length(basis) == length(coeff) "Something is wrong"
+  bc = sum([kron(basis[k],coeff[k]) for k=eachindex(coeff)])
   Matrix(reshape(bc,nr,:))
 end
 
 function basis_by_coeff_mult(
-  basis::Matrix{Float},
-  coeff::NTuple{2,Matrix{Float}},
-  nr::Int)
+  basis::T,
+  coeff::NTuple{2,T},
+  nr::Int) where T
+
   Broadcasting(c->basis_by_coeff_mult(basis,c,nr))(coeff)
 end
 
@@ -179,32 +180,34 @@ function Base.Matrix(vblock::Vector{Vector{Vector{T}}}) where T
   mat
 end
 
-function blocks(m::Matrix{T},nblocks=1) where T
-  @assert check_dimensions(m,nblocks) "Wrong dimensions"
+function blocks(mat::Matrix{T},nblocks=1;dims=(size(mat,1),1)) where T
+  @assert check_dimensions(mat,nblocks) "Wrong dimensions"
 
-  ncol_block = Int(size(m)[2]/nblocks)
-  idx2 = ncol_block:ncol_block:size(m)[2]
+  ncol_block = Int(size(mat)[2]/nblocks)
+  idx2 = ncol_block:ncol_block:size(mat)[2]
   idx1 = idx2 .- ncol_block .+ 1
 
   blockmat = Matrix{T}[]
   for i in eachindex(idx1)
-    push!(blockmat,m[:,idx1[i]:idx2[i]])
+    block_i = Matrix(reshape(mat[:,idx1[i]:idx2[i]],dims))
+    push!(blockmat,block_i)
   end
   blockmat::Vector{Matrix{T}}
 end
 
-function blocks(mat::Array{T,3}) where T
+function blocks(mat::Array{T,3};dims=size(mat)[1:2]) where T
   blockmat = Matrix{T}[]
-  for nb = 1:size(mat)[end]
-    push!(blockmat,mat[:,:,nb])
+  for nb = 1:size(mat,3)
+    block_i = Matrix(reshape(mat[:,:,nb],dims))
+    push!(blockmat,block_i)
   end
-  blockmat
+  blockmat::Vector{Matrix{T}}
 end
 
-function vblocks(m::Matrix{T}) where T
+function vblocks(mat::Matrix{T}) where T
   blockvec = Vector{T}[]
-  for i in axes(m,2)
-    push!(blockvec,m[:,i])
+  for i in axes(mat,2)
+    push!(blockvec,mat[:,i])
   end
   blockvec::Vector{Vector{T}}
 end

@@ -4,25 +4,27 @@ mutable struct TimeTracker
 end
 
 struct ErrorTracker
-  err::Vector{Float}
+  relative_err::Float
   pointwise_err::Matrix{Float}
 end
 
 function ErrorTracker(id::Symbol,uh::Matrix{Float},uh_rb::Matrix{Float},k::Int)
-  err,pointwise_err = compute_errors(uh,uh_rb)
+  relative_err,pointwise_err = compute_errors(uh,uh_rb)
   println("-----------------------------------------------------------")
-  println("Online error of variable $id for μ=μ[$k] is: $(norm(err))")
-  ErrorTracker(err,pointwise_err)
+  println("Online relative error of variable $id for μ=μ[$k] is: $relative_err")
+  ErrorTracker(relative_err,pointwise_err)
 end
 
 function compute_errors(uh::Matrix{Float},uh_rb::Matrix{Float})
   pointwise_err = abs.(uh-uh_rb)
   Nt = size(uh,2)
-  err = zeros(Nt)
+  absolute_err,uh_norm = zeros(Nt),zeros(Nt)
   for i = 1:Nt
-    err[i] = norm(uh[:,i]-uh_rb[:,i])/norm(uh_rb[:,i])
+    absolute_err[i] = norm(uh[:,i]-uh_rb[:,i])
+    uh_norm[i] = norm(uh[:,i])
   end
-  err,pointwise_err
+  relative_err = norm(absolute_err)/norm(uh_norm)
+  relative_err,pointwise_err
 end
 
 mutable struct RBResults
@@ -37,15 +39,15 @@ function RBResults(id::Symbol,tt::TimeTracker,ets::Vector{ErrorTracker})
   println("----------------------------------------------------------------")
   println("Average online wall time: $(tt.online_time/nruns) s")
 
-  errs = Broadcasting(et->getproperty(et,:err))(ets)
+  relative_errs = Broadcasting(et->getproperty(et,:relative_err))(ets)
   pointwise_errs = Broadcasting(et->getproperty(et,:pointwise_err))(ets)
-  et = ErrorTracker(sum(errs)/nruns,sum(pointwise_errs)/nruns)
+  et = ErrorTracker(sum(relative_errs)/nruns,sum(pointwise_errs)/nruns)
 
   RBResults(id,tt,et)
 end
 
 time_dict(r::RBResults) = Dict("offline_time"=>r.tt.offline_time,"online_time"=>r.tt.online_time)
-err_dict(r::RBResults) = Dict("err"=>r.et.err,"pointwise_err"=>r.et.pointwise_err)
+err_dict(r::RBResults) = Dict("relative_err"=>r.et.relative_err,"pointwise_err"=>r.et.pointwise_err)
 
 save(info::RBInfo,r::RBResults) = if info.save_online save(info.online_path,r) end
 

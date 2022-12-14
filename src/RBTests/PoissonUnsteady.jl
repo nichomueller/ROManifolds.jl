@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function poisson_unsteady()
-  run_fem = false
+  run_fem = true
 
   steady = false
   indef = false
@@ -11,7 +11,7 @@ function poisson_unsteady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/poisson"
-  mesh = "cube5x5x5.json"
+  mesh = "cube15x15x15.json"
   bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
   order = 1
 

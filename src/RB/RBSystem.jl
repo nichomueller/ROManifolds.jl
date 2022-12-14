@@ -61,11 +61,15 @@ function assemble_rb_system(
   basis::Matrix{Float},
   coeff::Array{Float})
 
-  btbtp = multiply_time_bases(op,coeff)
   dtθ = get_dt(op)*get_θ(op)
   if get_id(op) == :M coeff /= dtθ end
+
+  btbtp = multiply_time_bases(op,coeff)
+  ns_row = get_ns(get_rbspace_row(op))
+  basis_block = blocks(basis,size(basis,2);dims=(ns_row,:))
+
   nr = get_nrows(op)
-  basis_by_coeff_mult(basis,btbtp,nr)
+  basis_by_coeff_mult(basis_block,btbtp,nr)
 end
 
 function assemble_rb_system(
@@ -82,11 +86,15 @@ function assemble_rb_system(
   basis::Matrix{Float},
   coeff::Array{Function}) where TT
 
-  btbtp = multiply_time_bases(op,coeff)
   dtθ = get_dt(op)*get_θ(op)
   if get_id(op) == :M coeff /= dtθ end
+
+  btbtp = multiply_time_bases(op,coeff)
   nr = get_nrows(op)
-  u -> basis_by_coeff_mult(basis,btbtp(u),nr)
+  nc = get_ncols(op)
+  basis_block = blocks(basis,size(basis,2);dims=(nr,nc))
+
+  u -> basis_by_coeff_mult(basis_block,btbtp(u),nr)
 end
 
 function multiply_time_bases(
@@ -98,8 +106,8 @@ function multiply_time_bases(
   Q = size(coeff,1)
 
   btp_fun(it,q) = sum(bt_row[:,it].*coeff[q,:])
-  btp_fun(q) = Broadcasting(it -> btp_fun(it,q))(1:nt_row)
-  Matrix(reshape(Matrix(btp_fun.(1:Q)),:,Q))
+  btp_fun(q) = Matrix(Broadcasting(it -> btp_fun(it,q))(1:nt_row))
+  btp_fun.(1:Q)
 end
 
 function multiply_time_bases(
@@ -119,8 +127,8 @@ function multiply_time_bases(
   function define_btbtp_fun(idx1,idx2)
     btbtp_fun(it,jt,q) = sum(bt_row[idx1,it].*bt_col[idx2,jt].*coeff[q,idx1])
     btbtp_fun(jt,q) = Broadcasting(it -> btbtp_fun(it,jt,q))(1:nt_row)
-    btbtp_fun(q) = Matrix(Broadcasting(jt -> btbtp_fun(jt,q))(1:nt_col))[:]
-    btbtp_block = Matrix(btbtp_fun.(1:Q))
+    btbtp_fun(q) = Broadcasting(jt -> btbtp_fun(jt,q))(1:nt_col)
+    btbtp_block = Matrix.(btbtp_fun.(1:Q))
     btbtp_block
   end
 
@@ -162,8 +170,8 @@ function multiply_time_bases(
   function define_btbtp_fun(idx1,idx2)
     btbtp_fun(u,it,jt,q) = sum(bt_row[idx1,it].*bt_col[idx2,jt].*coeff(u)[q,idx1])
     btbtp_fun(u,jt,q) = Broadcasting(it -> btbtp_fun(u,it,jt,q))(1:nt_row)
-    btbtp_fun(u,q) = Matrix(Broadcasting(jt -> btbtp_fun(u,jt,q))(1:nt_col))[:]
-    btbtp_fun(u) = Matrix(Broadcasting(q -> btbtp_fun(u,q))(1:Q))
+    btbtp_fun(u,q) = Broadcasting(jt -> btbtp_fun(u,jt,q))(1:nt_col)
+    btbtp_fun(u) = Matrix.(Broadcasting(q -> btbtp_fun(u,q))(1:Q))
     btbtp_fun
   end
 
@@ -191,39 +199,39 @@ end =#
 
 function poisson_rb_system(lhs::Matrix{Float},rhs::Vector{Matrix{Float}})
   A_rb = lhs
-  F_rb,H_rb,lifts = rhs
-  A_rb,F_rb+H_rb-sum(lifts,dims=2)
+  F_rb,H_rb,lifts... = rhs
+  A_rb,F_rb+H_rb-sum(lifts)
 end
 
 function poisson_rb_system(lhs::Vector{Matrix{Float}},rhs::Vector{Matrix{Float}},θ::Float)
   A_rb,Ashift_rb,M_rb,Mshift_rb = lhs
-  F_rb,H_rb,lifts = rhs
+  F_rb,H_rb,lifts... = rhs
 
   rb_lhs = θ*(A_rb+M_rb) + (1-θ)*Ashift_rb - θ*Mshift_rb
-  rb_rhs = F_rb+H_rb-sum(lifts,dims=2)
+  rb_rhs = F_rb+H_rb-sum(lifts)
   rb_lhs,rb_rhs
 end
 
 function stokes_rb_system(lhs::Vector{Matrix{Float}},rhs::Vector{Matrix{Float}})
   A_rb,B_rb = lhs
-  F_rb,H_rb,lifts = rhs
+  F_rb,H_rb,lifts... = rhs
 
   np = size(B_rb)[1]
   rb_lhs = vcat(hcat(A_rb,-B_rb'),hcat(B_rb,zeros(np,np)))
-  rb_rhs = vcat(F_rb+H_rb-sum(lifts[1:end-1],dims=2),-lifts[end])
+  rb_rhs = vcat(F_rb+H_rb-sum(lifts[1:end-1]),-lifts[end])
   rb_lhs,rb_rhs
 end
 
 function stokes_rb_system(lhs::Vector{Matrix{Float}},rhs::Vector{Matrix{Float}},θ::Float)
   A_rb,Ashift_rb,BT_rb,BTshift_rb,B_rb,Bshift_rb,M_rb,Mshift_rb = lhs
-  F_rb,H_rb,lifts = rhs
+  F_rb,H_rb,lifts... = rhs
 
   rb_lhs_11 = θ*(A_rb+M_rb) + (1-θ)*Ashift_rb - θ*Mshift_rb
   rb_lhs_12 = - θ*BT_rb - (1-θ)*BTshift_rb
   rb_lhs_21 = θ*B_rb + (1-θ)*Bshift_rb
   rb_lhs = vcat(hcat(rb_lhs_11,rb_lhs_12),hcat(rb_lhs_21,zeros(np,np)))
 
-  rb_rhs = vcat(F_rb+H_rb-sum(lifts[1:end-1],dims=2),-lifts[end])
+  rb_rhs = vcat(F_rb+H_rb-sum(lifts[1:end-1]),-lifts[end])
   rb_lhs,rb_rhs
 end
 
