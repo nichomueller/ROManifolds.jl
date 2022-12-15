@@ -10,7 +10,7 @@ end
 
 function ErrorTracker(id::Symbol,uh::Matrix{Float},uh_rb::Matrix{Float},k::Int)
   relative_err,pointwise_err = compute_errors(uh,uh_rb)
-  println("-----------------------------------------------------------")
+  println("-----------------------------------------------------------------------------")
   println("Online relative error of variable $id for μ=μ[$k] is: $relative_err")
   ErrorTracker(relative_err,pointwise_err)
 end
@@ -36,7 +36,7 @@ end
 function RBResults(id::Symbol,tt::TimeTracker,ets::Vector{ErrorTracker})
   nruns = length(ets)
 
-  println("----------------------------------------------------------------")
+  println("----------------------------------------------------------------------------------")
   println("Average online wall time: $(tt.online_time/nruns) s")
 
   relative_errs = Broadcasting(et->getproperty(et,:relative_err))(ets)

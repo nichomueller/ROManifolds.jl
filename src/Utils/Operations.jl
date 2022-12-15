@@ -56,10 +56,10 @@ end
 
 projection(vnew::AbstractVector,v::AbstractVector) = v*(vnew'*v)
 projection(vnew::AbstractVector,basis::AbstractMatrix) =
-  sum([projection(vnew,basis[:,i]) for i=axis(basis,2)])
+  sum([projection(vnew,basis[:,i]) for i=axes(basis,2)])
 orth_projection(vnew::AbstractVector,v::AbstractVector) = projection(vnew,v)/(v'*v)
 orth_projection(vnew::AbstractVector,basis::AbstractMatrix) =
-  sum([orth_projection(vnew,basis[:,i]) for i=axis(basis,2)])
+  sum([orth_projection(vnew,basis[:,i]) for i=axes(basis,2)])
 
 isbasis(basis,args...) =
   all([isapprox(norm(basis[:,j],args...),1) for j=axes(basis,2)])
@@ -68,19 +68,18 @@ function orth_complement(
   v::AbstractVector,
   basis::AbstractMatrix)
 
-  @assert isbasis(basis) "Provide a basis"
+  #@assert isbasis(basis) "Provide a basis"
   v - projection(v,basis)
 end
 
-function gram_schmidt!(mat::Matrix{Float},basis::Matrix{Float})
+function gram_schmidt(mat::Matrix{Float},basis::Matrix{Float})
 
-  println("Normalizing primal supremizer 1")
-  mat[:,1] = orth_complement(mat[:,1],basis)
-
-  for i = axes(mat,2)[2:end]
+  for i = axes(mat,2)
     println("Normalizing primal supremizer $i")
     mat[:,i] = orth_complement(mat[:,i],basis)
-    mat[:,i] = orth_complement(mat[:,i],vec[:,1:i-1])
+    if i > 1
+      mat[:,i] = orth_complement(mat[:,i],mat[:,1:i-1])
+    end
     supr_norm = norm(mat[:,i])
     println("Norm supremizers: $supr_norm")
     mat[:,i] /= supr_norm
@@ -89,14 +88,22 @@ function gram_schmidt!(mat::Matrix{Float},basis::Matrix{Float})
   mat
 end
 
-function gram_schmidt!(vec::Vector{Vector},basis::Matrix{Float})
-  gram_schmidt!(Matrix(vec),basis)
+function gram_schmidt(vec::Vector{Vector},basis::Matrix{Float})
+  gram_schmidt(Matrix(vec),basis)
 end
 
 function basis_by_coeff_mult(basis::Matrix{Float},coeff::Vector{Float},nr::Int)
   @assert size(basis,2) == length(coeff) "Something is wrong"
   bc = sum([basis[:,k]*coeff[k] for k=eachindex(coeff)])
   Matrix(reshape(bc,nr,:))
+end
+
+function basis_by_coeff_mult(
+  basis::NTuple{2,Matrix{Float}},
+  coeff::NTuple{2,Vector{Float}},
+  nr::Int)
+
+  Broadcasting((b,c)->basis_by_coeff_mult(b,c,nr))(basis,coeff)
 end
 
 function basis_by_coeff_mult(basis::Vector{Matrix{Float}},coeff::Vector{Matrix{Float}},nr::Int)
@@ -111,6 +118,16 @@ function basis_by_coeff_mult(
   nr::Int) where T
 
   Broadcasting(c->basis_by_coeff_mult(basis,c,nr))(coeff)
+end
+
+function basis_by_coeff_mult(
+  basis::NTuple{2,T},
+  coeff::Tuple{NTuple{2,T},T},
+  nr::Int) where T
+
+  matinfo = first(basis),first(coeff)
+  liftinfo = last(basis),last(coeff)
+  basis_by_coeff_mult(matinfo...,nr),basis_by_coeff_mult(liftinfo...,nr)
 end
 
 function solve_cholesky(
@@ -180,6 +197,14 @@ function Base.Matrix(vblock::Vector{Vector{Vector{T}}}) where T
   mat
 end
 
+function blocks(mat::NTuple{2,Matrix{T}},nrow::Int) where T
+  Broadcasting(m -> blocks(m,nrow))(mat)
+end
+
+function blocks(mat::Matrix{T},nrow::Int) where T
+  blocks(mat,size(mat,2);dims=(nrow,:))
+end
+
 function blocks(mat::Matrix{T},nblocks=1;dims=(size(mat,1),1)) where T
   @assert check_dimensions(mat,nblocks) "Wrong dimensions"
 
@@ -216,7 +241,13 @@ check_dimensions(vb::AbstractVector) =
   all([size(vb[i])[1] == size(vb[1])[1] for i = 2:length(vb)])
 check_dimensions(m::AbstractMatrix,nb::Int) = iszero(size(m)[2]%nb)
 
-#= function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
+#= function remove_zero_rows(m::AbstractMatrix)
+  sum_row = sum(abs.(m),dims=2)[:,1]
+  significant_rows = findall(x -> x > eps(),sum_row)
+  m[significant_rows,:]
+end =#
+
+function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
   numnz = nnz(S)
   I = Vector{Ti}(undef, numnz)
   J = Vector{Ti}(undef, numnz)
@@ -252,7 +283,7 @@ function SparseArrays.findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
   nz = findall(v -> v .!= 0., V)
 
   (I[nz], V[nz])
-end =#
+end
 
 function Base.NTuple(N::Int,T::DataType)
   NT = ()

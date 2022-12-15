@@ -9,7 +9,6 @@ struct RBInfoSteady <: RBInfo
   offline_path::String
   online_path::String
   use_energy_norm::Bool
-  online_rhs::Bool
   load_offline::Bool
   save_offline::Bool
   save_online::Bool
@@ -20,16 +19,15 @@ end
 
 function RBInfoSteady(
   ptype::ProblemType,
-  mesh="cube5x5x5.json",
-  root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes";
+  mesh::String,
+  root::String;
   ϵ=1e-5,nsnap=80,online_snaps=95:100,mdeim_snap=20,use_energy_norm=false,
-  online_rhs=false,load_offline=true,save_offline=true,save_online=true,
+  load_offline=true,save_offline=true,save_online=true,
   fun_mdeim=false,adaptivity=false,postprocess=false)
 
-  offline_path,online_path = rom_off_on_paths(ptype,mesh,root)
+  offline_path,online_path = rom_off_on_paths(ptype,mesh,root,ϵ)
   RBInfoSteady(ptype,ϵ,nsnap,online_snaps,mdeim_snap,offline_path,online_path,
-    use_energy_norm,online_rhs,load_offline,
-    save_offline,save_online,fun_mdeim,adaptivity,postprocess)
+    use_energy_norm,load_offline,save_offline,save_online,fun_mdeim,adaptivity,postprocess)
 end
 
 mutable struct RBInfoUnsteady <: RBInfo
@@ -42,7 +40,6 @@ mutable struct RBInfoUnsteady <: RBInfo
   online_path::String
   time_red_method::String
   use_energy_norm::Bool
-  online_rhs::Bool
   load_offline::Bool
   save_offline::Bool
   save_online::Bool
@@ -54,16 +51,16 @@ end
 
 function RBInfoUnsteady(
   ptype::ProblemType,
-  mesh="cube5x5x5.json",
-  root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes";
+  mesh::String,
+  root::String;
   ϵ=1e-5,nsnap=80,online_snaps=95:100,mdeim_snap=20,time_red_method="ST-HOSVD",
-  use_energy_norm=false,online_rhs=false,load_offline=true,
+  use_energy_norm=false,load_offline=true,
   save_offline=true,save_online=true,st_mdeim=true,fun_mdeim=false,
   adaptivity=false,postprocess=false)
 
-  offline_path,online_path = rom_off_on_paths(ptype,mesh,root)
+  offline_path,online_path = rom_off_on_paths(ptype,mesh,root,ϵ)
   RBInfoUnsteady(ptype,ϵ,nsnap,online_snaps,mdeim_snap,offline_path,
-    online_path,time_red_method,use_energy_norm,online_rhs,load_offline,
+    online_path,time_red_method,use_energy_norm,load_offline,
     save_offline,save_online,st_mdeim,fun_mdeim,
     adaptivity,postprocess)
 end

@@ -44,63 +44,68 @@ function MDEIM(
 end
 
 function load_mdeim(
-  info::RBInfo,
+  path::String,
   op::RBLinOperator,
   meas::Measure)
 
-  load_mdeim(get_id(op),info,op,meas)
+  load_mdeim(path,op,meas)
 end
 
 function load_mdeim(
-  info::RBInfo,
+  path::String,
   op::RBBilinOperator,
   meas::Measure)
 
-  load_mdeim(get_id(op),info,op,meas),load_mdeim(get_id(op)*:_lift,info,op,meas)
+  load_mdeim(path,op,meas),load_mdeim(path*"_lift",op,meas)
 end
 
 function load_mdeim(
-  info::RBInfo,
+  path::String,
   op::RBBilinOperator{Top,UnconstrainedFESpace},
   meas::Measure) where Top
 
-  load_mdeim(get_id(op),info,op,meas)
+  load_mdeim(path,op,meas)
 end
 
 function load_mdeim(
-  id::Symbol,
-  info::RBInfoSteady,
+  path::String,
   op::RBVarOperator,
   meas::Measure)
 
-  path = info.offline_path
+  id = Symbol(last(split(path,'/')))
 
-  basis_space = load(joinpath(path,"basis_space_"*"$id"))
+  basis_space = load(joinpath(path,"basis_space"))
   rbspace = RBSpace(id,basis_space)
-  idx_space = Int.(load(joinpath(path,"idx_space_"*"$id"))[:,1])
-  idx_lu_factors = load_idx_lu_factors(path,id)
+  idx_space = Int.(load(joinpath(path,"idx_space"))[:,1])
+
+  factors = load(joinpath(path,"LU"))
+  ipiv = Int.(load(joinpath(path,"p"))[:,1])
+  idx_lu_factors = LU(factors,ipiv,0)
+
   red_measure = get_reduced_measure(op,meas,idx_space)
 
   MDEIM(rbspace,idx_lu_factors,idx_space,red_measure)
 end
 
 function load_mdeim(
-  id::Symbol,
-  info::RBInfoUnsteady,
+  path::String,
   op::RBVarOperator,
   meas::Measure)
 
-  path = info.offline_path
+  id = Symbol(last(split(path,'/')))
 
-  basis_space = load(joinpath(path,"basis_space_"*"$id"))
-  basis_time = load(joinpath(path,"basis_time_"*"$id"))
+  basis_space = load(joinpath(path,"basis_space"))
+  basis_time = load(joinpath(path,"basis_time"))
   rbspace = RBSpace(id,basis_space,basis_time)
 
-  idx_space = load(joinpath(path,"idx_space_"*"$id"))
-  idx_time = load(joinpath(path,"idx_time_"*"$id"))
+  idx_space = load(joinpath(path,"idx_space"))
+  idx_time = load(joinpath(path,"idx_time"))
   idx = [idx_space,idx_time]
 
-  idx_lu_factors = load_idx_lu_factors(path,id)
+  factors = load(joinpath(path,"LU"))
+  ipiv = Int.(load(joinpath(path,"p"))[:,1])
+  idx_lu_factors = LU(factors,ipiv,0)
+
   red_measure = get_reduced_measure(op,meas,idx_space)
 
   MDEIM(rbspace,idx_lu_factors,idx,red_measure)
@@ -296,21 +301,6 @@ function get_idx_lu_factors(
   rbspace::NTuple{2,RBSpaceUnsteady},
   idx_st::NTuple{2,NTuple{2,Vector{Int}}})
   get_idx_lu_factors.(rbspace,idx_st)
-end
-
-function save_idx_lu_factors(path::String,mdeim::MDEIM,id::Symbol)
-  idx_lu = get_idx_lu_factors(mdeim)
-  path_lu = joinpath(path,"LU_$id")
-  create_dir!(path_lu)
-  save(joinpath(path_lu,"LU"),idx_lu.factors)
-  save(joinpath(path_lu,"p"),idx_lu.ipiv)
-end
-
-function load_idx_lu_factors(path::String,id::Symbol)
-  path_lu = joinpath(path,"LU_$id")
-  factors = load(joinpath(path_lu,"LU"))
-  ipiv = Int.(load(joinpath(path_lu,"p"))[:,1])
-  LU(factors,ipiv,0)
 end
 
 recast_in_full_dim(::RBLinOperator,idx_tmp) = idx_tmp

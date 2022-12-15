@@ -30,7 +30,7 @@ function poisson_steady()
   V = MyTests(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
   U = MyTrials(V,g,ptype)
 
-  op = ParamAffineFEOperator(lhs,rhs,PS,get_trial(U),get_test(V))
+  op = ParamAffineFEOperator(lhs,rhs,PS,U,V)
 
   solver = LinearFESolver()
   nsnap = 100
@@ -41,21 +41,21 @@ function poisson_steady()
   opH = NonaffineParamVarOperator(h,hfe,PS,V;id=:H)
 
   info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false)
-
-  tt,rbspace,Ainfo,Finfo,Hinfo = offline_phase(info,[uh,μ],[opA,opF,opH],measures)
-  online_phase(info,[uh,μ],rbspace,[Ainfo,Finfo,Hinfo],tt)
+  tt = TimeTracker(0.,0.)
+  rbspace,varinfo = offline_phase(info,(uh,μ),(opA,opF,opH),measures,tt)
+  online_phase(info,(uh,μ),rbspace,varinfo,tt)
 end
 
 function offline_phase(
   info::RBInfo,
   fe_sol,
   op::Vector{<:ParamVarOperator},
-  meas::ProblemMeasures)
+  meas::ProblemMeasures,
+  tt::TimeTracker)
 
   uh,μ = fe_sol
   uh_offline = uh[1:info.nsnap]
   opA,opF,opH = op
-  tt = TimeTracker(0.,0.)
 
   rbspace = rb(info,tt,uh_offline)
   rbopA = RBVarOperator(opA,rbspace,rbspace)
@@ -72,14 +72,15 @@ function offline_phase(
     H_rb = assemble_rb_structure(info,tt,rbopH,μ,meas,:dΓn)
   end
 
-  tt,rbspace,(rbopA,A_rb),(rbopF,F_rb),(rbopH,H_rb)
+  varinfo = ((rbopA,A_rb),(rbopF,F_rb),(rbopH,H_rb))
+  rbspace,varinfo
 end
 
 function online_phase(
   info::RBInfo,
   fe_sol,
   rbspace::RBSpace,
-  varinfo::Vector{<:Tuple},
+  varinfo::Tuple,
   tt::TimeTracker)
 
   uh,μ = fe_sol
@@ -91,12 +92,12 @@ function online_phase(
 
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
-      lhs = assemble_rb_system(rbopA,A_rb,μ[k])
-      rhs = assemble_rb_system(rbopF,F_rb,μ[k]),assemble_rb_system(rbopH,H_rb,μ[k])
-      sys = poisson_rb_system(lhs[1],[rhs...,lhs[2]])
+      lhs = online_assembler(rbopA,A_rb,μ[k])
+      rhs = online_assembler(rbopF,F_rb,μ[k]),online_assembler(rbopH,H_rb,μ[k])
+      sys = poisson_rb_system(lhs[1],(rhs...,lhs[2]))
       rb_sol = solve_rb_system(sys...)
     end
-    uhk = Matrix(get_snap(uh)[:,k])
+    uhk = get_snap(uh[k])
     uhk_rb = reconstruct_fe_sol(rbspace,rb_sol)
     ErrorTracker(:u,uhk,uhk_rb,k)
   end

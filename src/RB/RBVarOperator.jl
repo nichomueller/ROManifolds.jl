@@ -1,6 +1,7 @@
 abstract type RBVarOperator{Top,TT} end
 abstract type RBLinOperator{Top} <: RBVarOperator{Top,nothing} end
 abstract type RBBilinOperator{Top,TT} <: RBVarOperator{Top,TT} end
+abstract type RBLiftingOperator{Top,TT} <: RBLinOperator{Top} end
 
 mutable struct RBSteadyLinOperator{Top} <: RBLinOperator{Top}
   feop::ParamSteadyLinOperator{Top}
@@ -22,6 +23,28 @@ mutable struct RBUnsteadyBilinOperator{Top,TT} <: RBBilinOperator{Top,TT}
   feop::ParamUnsteadyBilinOperator{Top,TT}
   rbspace_row::RBSpaceUnsteady
   rbspace_col::RBSpaceUnsteady
+end
+
+mutable struct RBSteadyLiftingOperator{Top,TT} <: RBLiftingOperator{Top,TT}
+  feop::ParamSteadyLiftingOperator{Top,TT}
+  rbspace_row::RBSpaceSteady
+
+  function RBSteadyLiftingOperator(
+    feop::ParamSteadyLiftingOperator{Top,TT},
+    rbspace_row::RBSpaceSteady) where {Top,TT}
+    new{Top,TT}(feop,rbspace_row)
+  end
+end
+
+mutable struct RBUnsteadyLiftingOperator{Top,TT} <: RBLiftingOperator{Top,TT}
+  feop::ParamUnsteadyLiftingOperator{Top,TT}
+  rbspace_row::RBSpaceUnsteady
+
+  function RBUnsteadyLiftingOperator(
+    feop::ParamUnsteadyLiftingOperator{Top,TT},
+    rbspace_row::RBSpaceUnsteady) where {Top,TT}
+    new{Top,TT}(feop,rbspace_row)
+  end
 end
 
 function RBVarOperator(
@@ -52,30 +75,6 @@ function RBVarOperator(
   rbspace_col::RBSpaceUnsteady) where {Top,TT}
 
   RBUnsteadyBilinOperator{Top,TT}(feop,rbspace_row,rbspace_col)
-end
-
-abstract type RBLiftingOperator{Top,TT} <: RBLinOperator{Top} end
-
-mutable struct RBSteadyLiftingOperator{Top,TT} <: RBLiftingOperator{Top,TT}
-  feop::ParamSteadyLiftingOperator{Top,TT}
-  rbspace_row::RBSpaceSteady
-
-  function RBSteadyLiftingOperator(
-    feop::ParamSteadyLiftingOperator{Top,TT},
-    rbspace_row::RBSpaceSteady) where {Top,TT}
-    new{Top,TT}(feop,rbspace_row)
-  end
-end
-
-mutable struct RBUnsteadyLiftingOperator{Top,TT} <: RBLiftingOperator{Top,TT}
-  feop::ParamUnsteadyLiftingOperator{Top,TT}
-  rbspace_row::RBSpaceUnsteady
-
-  function RBUnsteadyLiftingOperator(
-    feop::ParamUnsteadyLiftingOperator{Top,TT},
-    rbspace_row::RBSpaceUnsteady) where {Top,TT}
-    new{Top,TT}(feop,rbspace_row)
-  end
 end
 
 function RBLiftingOperator(op::RBSteadyBilinOperator)
@@ -118,10 +117,6 @@ get_nrows(op::RBVarOperator) = get_ns(get_rbspace_row(op))
 get_nrows(op::RBUnsteadyLinOperator) = get_ns(get_rbspace_row(op))*get_nt(get_rbspace_row(op))
 get_nrows(op::RBUnsteadyBilinOperator) = get_ns(get_rbspace_row(op))*get_nt(get_rbspace_row(op))
 get_nrows(op::RBUnsteadyLiftingOperator) = get_ns(get_rbspace_row(op))*get_nt(get_rbspace_row(op))
-#= get_ncols(op::RBVarOperator) = get_ns(get_rbspace_col(op))
-get_ncols(op::RBUnsteadyLinOperator) = 1
-get_ncols(op::RBUnsteadyBilinOperator) = get_ns(get_rbspace_col(op))*get_nt(get_rbspace_col(op))
-get_ncols(op::RBUnsteadyLiftingOperator) = 1 =#
 
 function Gridap.FESpaces.get_cell_dof_ids(
   rbop::RBVarOperator,
@@ -144,6 +139,8 @@ end
 function assemble_matrix_and_lifting(op::RBBilinOperator{Affine,TT},args...) where TT
   assemble_matrix_and_lifting(op.feop,args...)(realization(op))
 end
+
+get_dirichlet_function(op::RBVarOperator) = get_dirichlet_function(op.feop)
 
 get_pspace(op::RBVarOperator) = get_pspace(op.feop)
 realization(op::RBVarOperator) = realization(get_pspace(op))
@@ -191,12 +188,11 @@ function unfold_spacetime(
   vals::AbstractMatrix{T}) where T
 
   unfold_vec(k::Int) = unfold_spacetime(op,vals[:,k])
-  vals = Broadcasting(unfold_vec)(axis(vals,2))
+  vals = Broadcasting(unfold_vec)(axes(vals,2))
   Matrix(first.(vals)),Matrix(last.(vals))
 end
 
 function rb_projection(op::RBSteadyLinOperator)
-  print_case(op)
   vec = assemble_vector(op)
   brow = get_basis_space_row(op)
 
@@ -204,7 +200,6 @@ function rb_projection(op::RBSteadyLinOperator)
 end
 
 function rb_projection(op::RBUnsteadyLinOperator)
-  print_case(op)
   vec = assemble_vector(op,get_dt(op))
   brow = get_basis_space_row(op)
 
@@ -212,7 +207,6 @@ function rb_projection(op::RBUnsteadyLinOperator)
 end
 
 function rb_projection(op::RBSteadyBilinOperator)
-  print_case(op)
   mat = assemble_matrix(op)
   brow = get_basis_space_row(op)
   bcol = get_basis_space_col(op)
@@ -221,25 +215,9 @@ function rb_projection(op::RBSteadyBilinOperator)
 end
 
 function rb_projection(op::RBUnsteadyBilinOperator)
-  print_case(op)
   mat = assemble_matrix(op,get_dt(op))
   brow = get_basis_space_row(op)
   bcol = get_basis_space_col(op)
 
   Matrix((brow'*mat*bcol)[:])
-end
-
-function print_case(op::RBLinOperator)
-  id = get_id(op)
-  println("Linear operator $id is affine: computing Φᵀ$id")
-end
-
-function print_case(op::RBBilinOperator)
-  id = get_id(op)
-  println("Bilinear operator $id is affine: computing Φᵀ$(id)Φ")
-end
-
-function print_case(op::RBLiftingOperator)
-  id = get_id(op)
-  println("Lifting operator $id is affine: computing Φᵀ$id")
 end

@@ -97,13 +97,4 @@ function unsteady_poisson()
   u1 = uh[1].snap
   Π = get_basis_spacetime(rbspace)
   uhat1 = Π'*u1[:]
-
-  #= A1rb_st = sum([kron(A1rb_s[:,:,k],btbt) for k=1:Nt])
-  M1rb_st = sum([kron(M1rb_s[:,:,k],btbt) for k=1:Nt])
-  F1rb_st = sum([kron(F1rb_s[:,:,k],Matrix(I(nt))) for k=1:Nt])
-  M1rb_st = sum([kron(M1rb_s[:,:,k],Matrix(I(nt))) for k=1:Nt])
-  M1rb_st = sum([kron(M1rb_s[:,:,k],Matrix(I(nt))) for k=1:Nt])
-
-  norm(lhs[1][1]-kron(A1rb,Matrix(I(nt))))
-  norm(lhs[2][1]-kron(M1rb,Matrix(I(nt)))) =#
 end

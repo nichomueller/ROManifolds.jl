@@ -36,6 +36,28 @@ function unsteady_poisson()
   isapprox(LHS2*u2,RHS2-RHS1)
 end
 
+function steady_stokes()
+  #uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,1)
+  #xh = vcat(uh.snap,ph.snap)
+  u1,p1 = uh.snap[:,1],ph.snap[:,1]
+  Np = size(p1,1)
+  xh = vcat(u1,p1)
+  opA = NonaffineParamVarOperator(a,afe,PS,U,V;id=:A)
+  opB = AffineParamVarOperator(b,bfe,PS,U,Q;id=:B)
+  opF = AffineParamVarOperator(f,ffe,PS,V;id=:F)
+  opH = NonaffineParamVarOperator(h,hfe,PS,V;id=:H)
+
+  A,LA = assemble_matrix_and_lifting(opA)
+  B,LB = assemble_matrix_and_lifting(opB)
+  F = assemble_vector(opF)
+  H = assemble_vector(opH)
+  μ1 = μ[1]
+  LHS = vcat(hcat(A(μ1),-B(μ1)'),(hcat(B(μ1),zeros(Np,Np))))
+  RHS = vcat(F(μ1)+H(μ1)-LA(μ1),-LB(μ1))
+
+  isapprox(LHS*xh,RHS)
+end
+
 function spaces_steady()
   PS = ParamSpace(ranges,sampling)
   μ = realization(PS)

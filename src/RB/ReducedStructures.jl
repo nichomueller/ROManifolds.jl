@@ -2,7 +2,7 @@ function assemble_rb_structure(info::RBInfo,tt::TimeTracker,op::RBVarOperator,ar
   tt.offline_time += @elapsed begin
     rb_variable = assemble_rb_structure(info,op,args...)
   end
-  save(info,rb_variable,get_id(op))
+  save_rb_structure(info,rb_variable,get_id(op))
   rb_variable
 end
 
@@ -77,31 +77,42 @@ function assemble_rb_structure(
   rb_projection(op)
 end
 
-save(info::RBInfo,b,id::Symbol) =
-  if info.save_offline save(info.offline_path,b,id) end
-
-function save(path::String,basis::Matrix{Float},id::Symbol)
-  save(joinpath(path,"basis_space_"*"$id"),basis)
+function save_rb_structure(info::RBInfo,b,id::Symbol)
+  path_id = joinpath(info.offline_path,"$id")
+  create_dir!(path_id)
+  if info.save_offline
+    save_rb_structure(path_id,b)
+  end
 end
 
-function save(path::String,rbv::Tuple,id::Symbol)
+function save_rb_structure(path::String,rbv::Tuple)
   rbvar,rbvar_lift = rbv
-  save(path,rbvar,id)
-  save(path,rbvar_lift,id*:_lift)
+  save_rb_structure(path,rbvar)
+  path_lift = path*"_lift"
+  create_dir!(path_lift)
+  save_rb_structure(path_lift,rbvar_lift)
 end
 
-function save(path::String,mdeim::MDEIMSteady,id::Symbol)
-  save(joinpath(path,"basis_space_"*"$id"),get_basis_space(mdeim))
-  save(joinpath(path,"idx_space_"*"$id"),get_idx_space(mdeim))
-  save_idx_lu_factors(path,mdeim,id)
+function save_rb_structure(path::String,basis::Matrix{Float})
+  save(joinpath(path,"basis_space"),basis)
 end
 
-function save(path::String,mdeim::MDEIMUnsteady,id::Symbol)
-  save(joinpath(path,"basis_space_"*"$id"),get_basis_space(mdeim))
-  save(joinpath(path,"idx_space_"*"$id"),get_idx_space(mdeim))
-  save(joinpath(path,"basis_time_"*"$id"),get_basis_time(mdeim))
-  save(joinpath(path,"idx_time_"*"$id"),get_idx_time(mdeim))
-  save_idx_lu_factors(path,mdeim,id)
+function save_rb_structure(path::String,mdeim::MDEIMSteady)
+  save(joinpath(path,"basis_space"),get_basis_space(mdeim))
+  save(joinpath(path,"idx_space"),get_idx_space(mdeim))
+  idx_lu = get_idx_lu_factors(mdeim)
+  save(joinpath(path,"LU"),idx_lu.factors)
+  save(joinpath(path,"p"),idx_lu.ipiv)
+end
+
+function save_rb_structure(path::String,mdeim::MDEIMUnsteady)
+  save(joinpath(path,"basis_space"),get_basis_space(mdeim))
+  save(joinpath(path,"idx_space"),get_idx_space(mdeim))
+  save(joinpath(path,"basis_time"),get_basis_time(mdeim))
+  save(joinpath(path,"idx_time"),get_idx_time(mdeim))
+  idx_lu = get_idx_lu_factors(mdeim)
+  save(joinpath(path,"LU"),idx_lu.factors)
+  save(joinpath(path,"p"),idx_lu.ipiv)
 end
 
 function load_rb_structure(
@@ -111,7 +122,8 @@ function load_rb_structure(
 
   id = get_id(op)
   println("Importing reduced $id")
-  load_mdeim(info,op,meas)
+  path_id = joinpath(info.offline_path,"$id")
+  load_mdeim(path_id,op,meas)
 end
 
 function load_rb_structure(
@@ -121,7 +133,8 @@ function load_rb_structure(
 
   id = get_id(op)
   println("Importing reduced $id")
-  load_rb(info,id),load_rb(info,id*:_lift)
+  path_id = joinpath(info.offline_path,"$id")
+  load(joinpath(path_id,"basis_space")),load(joinpath(path_id*"_lift","basis_space"))
 end
 
 function load_rb_structure(
@@ -131,5 +144,6 @@ function load_rb_structure(
 
   id = get_id(op)
   println("Importing reduced $id")
-  load_rb(info,id)
+  path_id = joinpath(info.offline_path,"$id")
+  load(joinpath(path_id,"basis_space"))
 end

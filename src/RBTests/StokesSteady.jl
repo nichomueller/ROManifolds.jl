@@ -1,78 +1,133 @@
-include("../../../src/Utils/Utils.jl")
-include("../../../src/FEM/FEM.jl")
-include("../../../src/FEM/NewFESpaces.jl")
-include("../../../src/FEM/NewTypes.jl")
-include("../../../src/FEM/NewFEOperators.jl")
-include("../../../src/FEM/ParamOperatorInterfaces.jl")
-include("../../../src/FEM/NewFESolvers.jl")
+include("../FEM/FEM.jl")
+include("../RB/RB.jl")
+include("RBTests.jl")
 
-root = "/home/nicholasmueller/git_repos/Mabla.jl"
-mesh_name = "cube5x5x5.json"
-model = DiscreteModelFromFile(joinpath(root, "tests/meshes/$mesh_name"))
+function stokes_steady()
+  run_fem = false
 
-function set_labels!(bnd_info::Dict)
-  tags = collect(keys(bnd_info))
-  bnds = collect(values(bnd_info))
-  @assert length(tags) == length(bnds)
-  labels = get_face_labeling(model)
-  for i = eachindex(tags)
-    if tags[i] ∉ labels.tag_to_name
-      add_tag_from_tags!(labels, tags[i], bnds[i])
+  steady = true
+  indef = true
+  pdomain = false
+  ptype = ProblemType(steady,indef,pdomain)
+
+  root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/stokes"
+  mesh = "cube5x5x5.json"
+  bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
+  order = 2
+
+  ranges = fill([1.,20.],6)
+  sampling = UniformSampling()
+  PS = ParamSpace(ranges,sampling)
+
+  fepath = fem_path(ptype,mesh,root)
+  mshpath = mesh_path(mesh,root)
+  model = model_info(mshpath,bnd_info,ptype)
+  measures = ProblemMeasures(model,order)
+
+  a,afe,b,bfe,f,ffe,h,hfe,g,lhs,rhs = stokes_functions(ptype,measures)
+
+  reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{3,Float},order)
+  reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1;space=:P)
+  V = MyTests(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet"])
+  U = MyTrials(V,g,ptype)
+  Q = MyTests(model,reffe2;conformity=:L2)
+  P = MyTrials(Q)
+  Y = ParamMultiFieldFESpace([V,Q])
+  X = ParamMultiFieldFESpace([U,P])
+
+  op = ParamAffineFEOperator(lhs,rhs,PS,X,Y)
+
+  solver = LinearFESolver()
+  nsnap = 100
+  uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
+
+  opA = NonaffineParamVarOperator(a,afe,PS,U,V;id=:A)
+  opB = AffineParamVarOperator(b,bfe,PS,U,Q;id=:B)
+  opF = NonaffineParamVarOperator(f,ffe,PS,V;id=:F)
+  opH = NonaffineParamVarOperator(h,hfe,PS,V;id=:H)
+
+  info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false)
+  tt = TimeTracker(0.,0.)
+  rbspace,varinfo = offline_phase(info,(uh,ph,μ),(opA,opB,opF,opH),measures,tt)
+  online_phase(info,(uh,ph,μ),rbspace,varinfo,tt)
+end
+
+function offline_phase(
+  info::RBInfo,
+  fe_sol,
+  op::NTuple{N,ParamVarOperator},
+  meas::ProblemMeasures,
+  tt::TimeTracker) where N
+
+  uh,ph,μ = fe_sol
+  uh_offline = uh[1:info.nsnap]
+  ph_offline = ph[1:info.nsnap]
+  opA,opB,opF,opH = op
+
+  rbspace_u,rbspace_p = rb(info,tt,(uh_offline,ph_offline),opB,ph,μ)
+
+  rbopA = RBVarOperator(opA,rbspace_u,rbspace_u)
+  rbopB = RBVarOperator(opB,rbspace_p,rbspace_u)
+  rbopF = RBVarOperator(opF,rbspace_u)
+  rbopH = RBVarOperator(opH,rbspace_u)
+
+  if info.load_offline
+    A_rb = load_rb_structure(info,rbopA,meas.dΩ)
+    B_rb = load_rb_structure(info,rbopB,meas.dΩ)
+    F_rb = load_rb_structure(info,rbopF,meas.dΩ)
+    H_rb = load_rb_structure(info,rbopH,meas.dΓn)
+  else
+    A_rb = assemble_rb_structure(info,tt,rbopA,μ,meas,:dΩ)
+    B_rb = assemble_rb_structure(info,tt,rbopB,μ,meas,:dΩ)
+    F_rb = assemble_rb_structure(info,tt,rbopF,μ,meas,:dΩ)
+    H_rb = assemble_rb_structure(info,tt,rbopH,μ,meas,:dΓn)
+  end
+
+  rbspace = (rbspace_u,rbspace_p)
+  varinfo = ((rbopA,A_rb),(rbopB,B_rb),(rbopF,F_rb),(rbopH,H_rb))
+  rbspace,varinfo
+end
+
+function online_phase(
+  info::RBInfo,
+  fe_sol,
+  rbspace::NTuple{2,RBSpace},
+  varinfo::Tuple,
+  tt::TimeTracker)
+
+  uh,ph,μ = fe_sol
+
+  Ainfo,Binfo,Finfo,Hinfo = varinfo
+  rbopA,A_rb = Ainfo
+  rbopB,B_rb = Binfo
+  rbopF,F_rb = Finfo
+  rbopH,H_rb = Hinfo
+
+  function online_loop(k::Int)
+    tt.online_time += @elapsed begin
+      Aon = online_assembler(rbopA,A_rb,μ[k])
+      Bon = online_assembler(rbopB,B_rb,μ[k])
+      Fon = online_assembler(rbopF,F_rb,μ[k])
+      Hon = online_assembler(rbopH,H_rb,μ[k])
+      lift = Aon[2],Bon[2]
+      sys = stokes_rb_system((Aon[1],Bon[1]),(Fon,Hon,lift...))
+      rb_sol = solve_rb_system(sys...)
     end
+    uhk = get_snap(uh[k])
+    phk = get_snap(ph[k])
+    uhk_rb,phk_rb = reconstruct_fe_sol(rbspace,rb_sol)
+    ErrorTracker(:u,uhk,uhk_rb,k),ErrorTracker(:p,phk,phk_rb,k)
+  end
+
+  ets = online_loop.(info.online_snaps)
+  ets_u,ets_p = first.(ets),last.(ets)
+  res_u,res_p = RBResults(:u,tt,ets_u),RBResults(:p,tt,ets_p)
+  save(info,res_u)
+  save(info,res_p)
+
+  if info.postprocess
+    postprocess(info,(res_u,res_p))
   end
 end
-bnd_info = Dict("dirichlet" => collect(1:25), "neumann" => [26])
-set_labels!(bnd_info)
 
-degree=2
-Ω = Triangulation(model)
-dΩ = Measure(Ω, degree)
-Γn = BoundaryTriangulation(model, tags=["neumann"])
-dΓn = Measure(Γn, degree)
-
-ranges = [[1., 10.], [1., 10.], [1., 10.],
-          [1., 10.], [1., 10.], [1., 10.]]
-P = ParamSpace(ranges,UniformSampling())
-
-a(μ::Param,x) = 1. + μ[6] + 1. / μ[5] * exp(-norm(x-Point(μ[1:3]))^2 / μ[4])
-a(μ::Param) = x->a(μ,x)
-b(μ::Param,x) = 1.
-b(μ::Param) = x->b(μ,x)
-f(μ::Param,x) = 1. + Point(μ[4:6]) .* x
-f(μ::Param) = x->f(μ,x)
-h(μ::Param,x) = 1. + Point(μ[4:6]) .* x
-h(μ::Param) = x->h(μ,x)
-g(μ::Param,x) = 1. + Point(μ[4:6]) .* x
-g(μ::Param) = x->g(μ,x)
-
-afe(μ,u,v) = ∫(a(μ) * ∇(v) ⊙ ∇(u))dΩ
-bfe(μ,u,q) = ∫(b(μ) * q * (∇⋅(u)))dΩ
-ffe(μ,v) = ∫(f(μ) ⋅ v)dΩ
-hfe(μ,v) = ∫(h(μ) ⋅ v)dΓn
-
-#lhs(μ,(u,p),(v,q)) = afe(μ,u,v) - bfe(μ,p,v) - bfe(μ,u,q)
-rhs(μ,(v,q)) = ffe(μ,v) + hfe(μ,v)
-lhs(μ,(u,p),(v,q)) = ∫(a(μ)*∇(v)⊙∇(u) - b(μ)*((∇⋅v)*p + q*(∇⋅u)))dΩ
-
-reffe1 = Gridap.ReferenceFE(lagrangian, VectorValue{3,Float}, 2)
-reffe2 = Gridap.ReferenceFE(lagrangian, Float, 1; space=:P)
-
-I=true
-S=true
-
-Gμ = ParamFunction(P,g;S)
-myV = MyTests(model, reffe1; conformity=:H1, dirichlet_tags=["dirichlet"])
-myU = MyTrials(myV,Gμ)
-myQ = MyTests(model, reffe2; conformity=:L2)
-myP = MyTrials(myQ)
-
-X = ParamMultiFieldTrialFESpace([myU.trial,myP.trial])
-Y = MultiFieldFESpace([myV.test,myQ.test])
-op = ParamAffineFEOperator(lhs,rhs,P,X,Y)
-ye = solve(LinearFESolver(),op,1)
-
-opA = ParamVarOperator(a,afe,P,myU,myV)
-opB = ParamVarOperator(b,bfe,P,myU,myQ)
-opF = ParamVarOperator(f,ffe,P,myV)
-opH = ParamVarOperator(h,hfe,P,myV)
-stokes_problem = Problem(μ,[uh,ph],[opA,opB,opF,opH])
+stokes_steady()

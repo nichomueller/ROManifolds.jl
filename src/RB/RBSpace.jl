@@ -9,7 +9,7 @@ function RBSpaceSteady(
   id::NTuple{N,Symbol},
   basis_space::NTuple{N,Matrix{Float}}) where N
 
-  RBSpaceSteady.(id,basis_space,basis_time)
+  RBSpaceSteady.(id,basis_space)
 end
 
 function RBSpaceSteady(
@@ -75,29 +75,34 @@ get_basis_space(rb::RBSpace) = rb.basis_space
 get_basis_time(rb::RBSpaceUnsteady) = rb.basis_time
 get_basis_spacetime(rb::RBSpaceUnsteady) = kron(rb.basis_space,rb.basis_time)
 
-save(info::RBInfo,rb::RBSpace) = if info.save_offline save(info.offline_path,rb) end
+function save(info::RBInfo,rb::RBSpace)
+  id = get_id(rb)
+  path_id = joinpath(info.offline_path,"$id")
+  create_dir!(path_id)
+  if info.save_offline
+    save(path_id,rb)
+  end
+end
 
 function save(path::String,rb::RBSpaceSteady)
-  id = get_id(rb)
-  save(joinpath(path,"basis_space_$id"),rb.basis_space)
+  save(joinpath(path,"basis_space"),rb.basis_space)
 end
 
 function save(path::String,rb::RBSpaceUnsteady)
-  id = get_id(rb)
-  save(joinpath(path,"basis_space_$id"),rb.basis_space)
-  save(joinpath(path,"basis_time_$id"),rb.basis_time)
+  save(joinpath(path,"basis_space"),rb.basis_space)
+  save(joinpath(path,"basis_time"),rb.basis_time)
 end
 
 function load_rb(info::RBInfoSteady,id::Symbol)
-  path = info.offline_path
-  basis_space = load(joinpath(path,"basis_space_$id"))
+  path_id = joinpath(info.offline_path,"$id")
+  basis_space = load(joinpath(path_id,"basis_space"))
   RBSpaceSteady(id,basis_space)
 end
 
 function load_rb(info::RBInfoUnsteady,id::Symbol)
-  path = info.offline_path
-  basis_space = load(joinpath(path,"basis_space_$id"))
-  basis_time = load(joinpath(path,"basis_time_$id"))
+  path_id = joinpath(info.offline_path,"$id")
+  basis_space = load(joinpath(path_id,"basis_space"))
+  basis_time = load(joinpath(path_id,"basis_time"))
   RBSpaceUnsteady(id,basis_space,basis_time)
 end
 

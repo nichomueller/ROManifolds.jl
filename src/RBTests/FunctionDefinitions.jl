@@ -96,6 +96,57 @@ function poisson_functions(::Val{false},measures::ProblemFixedMeasures)
   a,afe,m,mfe,f,ffe,h,hfe,g,lhs,rhs
 end
 
+function stokes_functions(ptype::ProblemType,measures::ProblemMeasures)
+  stokes_functions(issteady(ptype),measures)
+end
+
+function stokes_functions(::Val{true},measures::ProblemFixedMeasures)
+
+  function a(x,p::Param)
+    μ = get_μ(p)
+    μ[1] + sin(norm(x.*Point(μ[2:4])))*μ[5]
+  end
+  a(p::Param) = x->a(x,p)
+  b(x,p::Param) = 1.
+  b(p::Param) = x->b(x,p)
+  function f(x,p::Param)
+    μ = get_μ(p)
+    1. .+ Point(μ[1:3]) .* x
+  end
+  f(p::Param) = x->f(x,p)
+  function h(x,p::Param)
+    μ = get_μ(p)
+    1. .+ Point(μ[4:6]) .* x
+  end
+  h(p::Param) = x->h(x,p)
+  function g(x,p::Param)
+    μ = get_μ(p)
+    gxp = 1. .+ Point(μ[3:5]) .* x
+    gxp / norm(gxp)
+  end
+  g(p::Param) = x->g(x,p)
+
+  afe(p::Param,dΩ,u,v) = ∫(a(p) * ∇(v) ⊙ ∇(u))dΩ
+  bfe(p::Param,dΩ,u,q) = ∫(b(p) * q * (∇⋅(u)))dΩ
+  ffe(p::Param,dΩ,v) = ∫(f(p) ⋅ v)dΩ
+  hfe(p::Param,dΓn,v) = ∫(h(p) ⋅ v)dΓn
+
+  dΩ,dΓn = get_dΩ(measures),get_dΓn(measures)
+  afe(p::Param,u,v) = afe(p,dΩ,u,v)
+  afe(p::Param) = (u,v) -> afe(p,u,v)
+  bfe(p::Param,u,v) = bfe(p,dΩ,u,v)
+  bfe(p::Param) = (u,v) -> bfe(p,u,v)
+  ffe(p::Param,v) = ffe(p,dΩ,v)
+  ffe(p::Param) = v -> ffe(p,v)
+  hfe(p::Param,v) = hfe(p,dΓn,v)
+  hfe(p::Param) = v -> hfe(p,v)
+
+  rhs(μ,(v,q)) = ffe(μ,v) + hfe(μ,v)
+  lhs(μ,(u,p),(v,q)) = afe(μ,u,v) - bfe(μ,v,p) - bfe(μ,u,q)
+
+  a,afe,b,bfe,f,ffe,h,hfe,g,lhs,rhs
+end
+
 function navier_stokes_functions(dΩ::Measure,dΓn::Measure,ptype::ProblemType)
   navier_stokes_functions(dΩ,dΓn,issteady(ptype))
 end

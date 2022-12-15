@@ -3,11 +3,7 @@ include("FunctionDefinitions.jl")
 test_path(root,mesh,::Val{true}) = joinpath(root,"steady/$mesh")
 test_path(root,mesh,::Val{false}) = joinpath(root,"unsteady/$mesh")
 
-function fem_path(
-  ptype::ProblemType,
-  mesh="cube5x5x5.json",
-  root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes")
-
+function fem_path(ptype::ProblemType,mesh::String,root::String)
   @assert isdir(root) "Provide valid root path"
   tpath = test_path(root,mesh,issteady(ptype))
   fepath = joinpath(tpath,"fem")
@@ -15,52 +11,33 @@ function fem_path(
   fepath
 end
 
-function rom_path(
-  ptype::ProblemType,
-  mesh="cube5x5x5.json",
-  root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes")
-
+function rom_path(ptype::ProblemType,mesh::String,root::String,ϵ::Float)
   @assert isdir(root) "Provide valid root path"
   tpath = test_path(root,mesh,issteady(ptype))
-  rbpath = joinpath(tpath,"rom")
+  rbpath = joinpath(joinpath(tpath,"rom"),"$ϵ")
   create_dir!(rbpath)
   rbpath
 end
 
-function rom_offline_path(
-  ptype::ProblemType,
-  mesh="cube5x5x5.json",
-  root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes")
-
-  rb_off_path = joinpath(rom_path(ptype,mesh,root),"offline")
+function rom_offline_path(ptype::ProblemType,mesh::String,root::String,ϵ::Float)
+  rb_off_path = joinpath(rom_path(ptype,mesh,root,ϵ),"offline")
   create_dir!(rb_off_path)
   rb_off_path
 end
 
-function rom_online_path(
-  ptype::ProblemType,
-  mesh="cube5x5x5.json",
-  root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes")
-
-  rb_on_path = joinpath(rom_path(ptype,mesh,root),"online")
+function rom_online_path(ptype::ProblemType,mesh::String,root::String,ϵ::Float)
+  rb_on_path = joinpath(rom_path(ptype,mesh,root,ϵ),"online")
   create_dir!(rb_on_path)
   rb_on_path
 end
 
-function rom_off_on_paths(
-  ptype::ProblemType,
-  mesh="cube5x5x5.json",
-  root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes")
-
-  offpath = rom_offline_path(ptype,mesh,root)
-  onpath = rom_online_path(ptype,mesh,root)
+function rom_off_on_paths(ptype::ProblemType,mesh::String,root::String,ϵ::Float)
+  offpath = rom_offline_path(ptype,mesh,root,ϵ)
+  onpath = rom_online_path(ptype,mesh,root,ϵ)
   offpath,onpath
 end
 
-function mesh_path(
-  mesh="cube5x5x5.json",
-  root="/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes")
-
+function mesh_path(mesh::String,root::String)
   joinpath(get_parent_dir(root),"meshes/$mesh")
 end
 
@@ -156,9 +133,10 @@ function generate_fe_snapshots(::Val{false},sol,fepath::String)
 end
 
 function generate_fe_snapshots(::Val{true},sol,fepath::String)
-  Ns = get_Ns(op)
-  uh,μ = collect_solutions(sol)
-  uh,ph = uh[1:Ns[1],:],uh[Ns[1]+1:end,:]
+  Ns = get_Ns(sol)
+  xh,μ = collect_solutions(sol)
+  uh = Broadcasting(x->getindex(x,1:Ns[1],:))(xh)
+  ph = Broadcasting(x->getindex(x,Ns[1]+1:Ns[1]+Ns[2],:))(xh)
   usnap,psnap = Snapshots.([:u,:p],[uh,ph])
   save.([fepath,fepath],[usnap,psnap])
   save(fepath,μ)
@@ -182,7 +160,8 @@ function collect_solutions!(
   x::Vector{Vector{Float}},
   solk::ParamFESolution)
 
-  push!(x,get_free_dof_values(solk.psol.uh))
+  uh = get_free_dof_values(solk.psol.uh)
+  push!(x,copy(uh))
   x
 end
 
@@ -196,6 +175,5 @@ function collect_solutions!(
     push!(x,copy(uh))
     k += 1
   end
-
   x
 end

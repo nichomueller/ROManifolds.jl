@@ -1,95 +1,92 @@
-#= function assemble_rb_system(
+function online_assembler(
   op::RBVarOperator,
   basis::NTuple{2,Matrix{Float}},
-  μ::Param,
-  args...)
+  μ::Param)
 
-  Broadcasting(b->assemble_rb_system(op,b,μ,args...))(basis)
-end =#
-
-function assemble_rb_system(
-  op::NTuple{N,<:RBVarOperator},
-  rbvar::Tuple,
-  args...) where N
-
-  Broadcasting((o,rbv)->assemble_rb_system(o,rbv,args...))(op,rbvar)
+  Broadcasting(b->online_assembler(op,b,μ))(basis)
 end
 
-function assemble_rb_system(
+function online_assembler(
   op::RBVarOperator,
   basis::Matrix{Float},
-  μ::Param,
-  args...)
+  μ::Param)
 
   coeff = compute_coefficient(op,μ)
-  assemble_rb_system(op,basis,coeff)
+  online_structure(op,basis,coeff)
 end
 
-#= function assemble_rb_system(
+function online_assembler(
   op::RBVarOperator,
-  mdeim::Union{MDEIM,NTuple{2,<:MDEIM}},
+  mdeim::Union{MDEIM,NTuple{2,MDEIM}},
   μ::Param,
   args...)
 
-  coeff = compute_coefficient(op,mdeim,μ,args...)
   basis = get_basis_space(mdeim)
-  assemble_rb_system(op,basis,coeff,args...)
-end =#
+  coeff = compute_coefficient(op,mdeim,μ,args...)
+  online_structure(op,basis,coeff)
+end
 
-function assemble_rb_system(
-  op::RBVarOperator,
-  mdeim::MDEIM,
+function online_assembler(
+  op::RBBilinOperator,
+  basis_mdeim::Tuple{Matrix{Float},MDEIM},
   μ::Param,
   args...)
 
-  coeff = compute_coefficient(op,mdeim,μ,args...)
-  basis = get_basis_space(mdeim)
-  assemble_rb_system(op,basis,coeff)
+  affine_basis,mdeim = basis_mdeim
+  affine_structure = online_assembler(op,affine_basis,μ)
+
+  op_lift = RBLiftingOperator(op)
+  nonaffine_basis = get_basis_space(mdeim)
+  coeff = compute_coefficient(op_lift,mdeim,μ,args...)
+  nonaffine_structure = online_structure(op_lift,nonaffine_basis,coeff)
+
+  affine_structure,nonaffine_structure
 end
 
-function assemble_rb_system(
+function online_structure(
   op::Union{RBSteadyLinOperator,RBSteadyBilinOperator,RBSteadyLiftingOperator},
-  basis::Matrix{Float},
-  coeff::Array{Float})
+  basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
+  coeff::Any)
 
   nr = get_nrows(op)
   basis_by_coeff_mult(basis,coeff,nr)
 end
 
-function assemble_rb_system(
+function online_structure(
   op::Union{RBUnsteadyLinOperator,RBUnsteadyBilinOperator,RBUnsteadyLiftingOperator},
-  basis::Matrix{Float},
-  coeff::Array{Float})
+  basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
+  coeff::Any)
 
   dtθ = get_dt(op)*get_θ(op)
   if get_id(op) == :M coeff /= dtθ end
 
-  btbtp = multiply_time_bases(op,coeff)
+  btbtp = coeff_by_time_bases(op,coeff)
   ns_row = get_ns(get_rbspace_row(op))
-  basis_block = blocks(basis,size(basis,2);dims=(ns_row,:))
+
+  basis_block = blocks(basis,ns_row)
 
   nr = get_nrows(op)
   basis_by_coeff_mult(basis_block,btbtp,nr)
 end
 
-function assemble_rb_system(
+function online_structure(
   op::Union{RBSteadyLinOperator{Nonlinear},RBSteadyBilinOperator{Nonlinear,TT},RBSteadyLiftingOperator{Nonlinear,TT}},
-  basis::Matrix{Float},
-  coeff::Array{Function}) where TT
+  basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
+  coeff::Any) where TT
 
   nr = get_nrows(op)
   u -> basis_by_coeff_mult(basis,coeff(u),nr)
 end
 
-function assemble_rb_system(
+function online_structure(
   op::Union{RBUnsteadyLinOperator{Nonlinear},RBUnsteadyBilinOperator{Nonlinear,TT},RBUnsteadyLiftingOperator{Nonlinear,TT}},
-  basis::Matrix{Float},
-  coeff::Array{Function}) where TT
+  basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
+  coeff::Any) where TT
 
   dtθ = get_dt(op)*get_θ(op)
   if get_id(op) == :M coeff /= dtθ end
 
-  btbtp = multiply_time_bases(op,coeff)
+  btbtp = coeff_by_time_bases(op,coeff)
   nr = get_nrows(op)
   nc = get_ncols(op)
   basis_block = blocks(basis,size(basis,2);dims=(nr,nc))
@@ -97,8 +94,27 @@ function assemble_rb_system(
   u -> basis_by_coeff_mult(basis_block,btbtp(u),nr)
 end
 
-function multiply_time_bases(
-  op::Union{RBUnsteadyLinOperator,RBUnsteadyLiftingOperator},
+function coeff_by_time_bases(op::RBUnsteadyLinOperator,coeff)
+  coeff_by_time_bases_lin(op,coeff)
+end
+
+function coeff_by_time_bases(op::RBUnsteadyBilinOperator,coeff)
+  coeff_by_time_bases_bilin(op,coeff)
+end
+
+function coeff_by_time_bases(op::RBUnsteadyLiftingOperator,coeff)
+  coeff_by_time_bases_lin(op,coeff)
+end
+
+function coeff_by_time_bases(
+  op::RBUnsteadyBilinOperator,
+  coeff::NTuple{2,T}) where T
+
+  coeff_by_time_bases_bilin(op,first(coeff)),coeff_by_time_bases_lin(op,last(coeff))
+end
+
+function coeff_by_time_bases_lin(
+  op::RBVarOperator,
   coeff::AbstractMatrix)
 
   bt_row = get_basis_time_row(op)
@@ -110,8 +126,22 @@ function multiply_time_bases(
   btp_fun.(1:Q)
 end
 
-function multiply_time_bases(
-  op::RBUnsteadyBilinOperator,
+function coeff_by_time_bases_lin(
+  op::RBVarOperator{Nonlinear,ParamTransientTrialFESpace},
+  coeff::Function)
+
+  bt_row = get_basis_time_row(op)
+  nt_row = size(bt_row,2)
+  Q = size(coeff,1)
+
+  btp_fun(u,it,q) = sum(bt_row[:,it].*coeff(u)[q,:])
+  btp_fun(u,q) = Matrix(Broadcasting(it -> btp_fun(u,it,q))(1:nt_row))
+  btp_fun(u) = Broadcasting(q -> btp_fun(u,q))(1:Q)
+  btp_fun
+end
+
+function coeff_by_time_bases_bilin(
+  op::RBVarOperator,
   coeff::AbstractMatrix)
 
   Nt = get_Nt(op)
@@ -137,24 +167,8 @@ function multiply_time_bases(
   M,M_shift
 end
 
-#= function multiply_time_bases(
-  op::RBBilinOperator{Top,TT,RBSpaceUnsteady},
-  coeff::NTuple{2,AbstractMatrix}) where {Top,TT}
-
-  c,clift = coeff
-  M,M_shift = multiply_time_bases(op,c)
-
-  bt_row = get_basis_time_row(op)
-  nt_row = size(bt_row)[2]
-  btp_fun(it,q) = sum(bt_row[:,it].*clift[q])
-  btp_fun(q) = reshape(Broadcasting(it -> btp_fun(it,q))(1:nt_row),:,1)
-  M_lift = Matrix(btp_fun.(eachindex(clift)))
-
-  M,M_shift,M_lift
-end =#
-
-function multiply_time_bases(
-  op::RBUnsteadyBilinOperator,
+function coeff_by_time_bases_bilin(
+  op::RBVarOperator{Nonlinear,ParamTransientTrialFESpace},
   coeff::Function)
 
   Nt = get_Nt(op)
@@ -180,30 +194,20 @@ function multiply_time_bases(
   M,M_shift
 end
 
-#= function multiply_time_bases(
-  op::RBBilinOperator{Top,TT,RBSpaceUnsteady},
-  coeff::NTuple{2,Function}) where {Top,TT}
+function poisson_rb_system(
+  lhs::Matrix{Float},
+  rhs::NTuple{N,Matrix{Float}}) where N
 
-  c(u) = first(coeff)(u)
-  M,M_shift = multiply_time_bases(op,c)
-
-  clift(u) = last(coeff)(u)
-  bt_row = get_basis_time_row(op)
-  nt_row = size(bt_row)[2]
-  btp_fun(u,it,q) = sum(bt_row[:,it].*clift(u)[q])
-  btp_fun(u,q) = reshape(Broadcasting(it -> btp_fun(u,it,q))(1:nt_row),:,1)
-  Mlift(u) = Matrix(btp_fun.(eachindex(clift(u))))
-
-  M,M_shift,Mlift
-end =#
-
-function poisson_rb_system(lhs::Matrix{Float},rhs::Vector{Matrix{Float}})
   A_rb = lhs
   F_rb,H_rb,lifts... = rhs
   A_rb,F_rb+H_rb-sum(lifts)
 end
 
-function poisson_rb_system(lhs::Vector{Matrix{Float}},rhs::Vector{Matrix{Float}},θ::Float)
+function poisson_rb_system(
+  lhs::NTuple{4,Matrix{Float}},
+  rhs::NTuple{N,Matrix{Float}},
+  θ::Float) where N
+
   A_rb,Ashift_rb,M_rb,Mshift_rb = lhs
   F_rb,H_rb,lifts... = rhs
 
@@ -212,7 +216,10 @@ function poisson_rb_system(lhs::Vector{Matrix{Float}},rhs::Vector{Matrix{Float}}
   rb_lhs,rb_rhs
 end
 
-function stokes_rb_system(lhs::Vector{Matrix{Float}},rhs::Vector{Matrix{Float}})
+function stokes_rb_system(
+  lhs::NTuple{2,Matrix{Float}},
+  rhs::NTuple{N,Matrix{Float}}) where N
+
   A_rb,B_rb = lhs
   F_rb,H_rb,lifts... = rhs
 
@@ -222,7 +229,11 @@ function stokes_rb_system(lhs::Vector{Matrix{Float}},rhs::Vector{Matrix{Float}})
   rb_lhs,rb_rhs
 end
 
-function stokes_rb_system(lhs::Vector{Matrix{Float}},rhs::Vector{Matrix{Float}},θ::Float)
+function stokes_rb_system(
+  lhs::NTuple{8,Matrix{Float}},
+  rhs::NTuple{N,Matrix{Float}},
+  θ::Float) where N
+
   A_rb,Ashift_rb,BT_rb,BTshift_rb,B_rb,Bshift_rb,M_rb,Mshift_rb = lhs
   F_rb,H_rb,lifts... = rhs
 
@@ -235,7 +246,7 @@ function stokes_rb_system(lhs::Vector{Matrix{Float}},rhs::Vector{Matrix{Float}},
   rb_lhs,rb_rhs
 end
 
-function navier_stokes_rb_system(lhs::Vector,rhs::Vector{Matrix{Float}})
+function navier_stokes_rb_system(lhs::Tuple,rhs::Tuple)
   A_rb,B_rb,C_rb,D_rb = lhs
   F_rb,H_rb,lifts = rhs
   liftA,liftB,liftC,_ = lifts
@@ -294,17 +305,40 @@ function newton(
   x_rb
 end
 
-function reconstruct_fe_sol(bspace::RBSpaceSteady,rb_sol::Matrix{Float})
-  bs = get_basis_space(bspace)
+function reconstruct_fe_sol(rbspace::RBSpaceSteady,rb_sol::Matrix{Float})
+  bs = get_basis_space(rbspace)
   bs*rb_sol
 end
 
-function reconstruct_fe_sol(bspace::RBSpaceUnsteady,rb_sol::Matrix{Float})
-  bs = get_basis_space(bspace)
-  bt = get_basis_time(bspace)
-  ns = get_ns(bspace)
-  nt = get_nt(bspace)
+function reconstruct_fe_sol(rbspace::RBSpaceUnsteady,rb_sol::Matrix{Float})
+  bs = get_basis_space(rbspace)
+  bt = get_basis_time(rbspace)
+  ns = get_ns(rbspace)
+  nt = get_nt(rbspace)
 
   rb_sol_resh = reshape(rb_sol,nt,ns)
   bs*(bt*rb_sol_resh)'
+end
+
+function reconstruct_fe_sol(rbspace::NTuple{2,RBSpaceSteady},rb_sol::Matrix{Float})
+  bs_u,bs_p = get_basis_space.(rbspace)
+
+  ns = get_ns.(rbspace)
+  rb_sol_u,rb_sol_p = rb_sol[1:ns[1],:],rb_sol[1+ns[1]:end,:]
+
+  bs_u*rb_sol_u,bs_p*rb_sol_p
+end
+
+function reconstruct_fe_sol(rbspace::NTuple{2,RBSpaceUnsteady},rb_sol::Matrix{Float})
+  bs_u,bs_p = get_basis_space.(rbspace)
+  bt_u,bt_p = get_basis_time.(rbspace)
+
+  ns = get_ns.(rbspace)
+  nt = get_nt.(rbspace)
+  n = ns.*nt
+  rb_sol_u,rb_sol_p = rb_sol[1:n[1],:],rb_sol[1+n[1]:end,:]
+  u_rb_resh = reshape(rb_sol_u,nt[1],ns[1])
+  p_rb_resh = reshape(rb_sol_p,nt[2],ns[2])
+
+  bs_u*(bt_u*u_rb_resh)',bs_p*(bt_p*p_rb_resh)'
 end

@@ -1,30 +1,94 @@
 function rb(info::RBInfo,args...)
-  info.load_offline ? get_rb(info) : assemble_rb(info,args...)
+  info.load_offline ? get_rb(isindef(info),info) : assemble_rb(isindef(info),info,args...)
 end
 
-get_rb(info::RBInfo) = get_rb(info,isindef(info))
-get_rb(info::RBInfo,::Val{false}) = load_rb(info,:u)
-get_rb(info::RBInfo,::Val{true}) = load_rb(info,:u),load_rb(info,:p)
+get_rb(::Val{false},info::RBInfo) = load_rb(info,:u)
+get_rb(::Val{true},info::RBInfo) = load_rb(info,:u),load_rb(info,:p)
 
-function assemble_rb(info::RBInfoSteady,tt::TimeTracker,snaps,args...)
+function assemble_rb(
+  ::Val{false},
+  info::RBInfoSteady,
+  tt::TimeTracker,
+  snaps::Snapshots,
+  args...)
+
   id = get_id(snaps)
   tt.offline_time += @elapsed begin
-    basis_space = rb_space(info,snaps,args...)
+    basis_space = rb_space(info,snaps)
   end
+
   rbspace = RBSpaceSteady(id,basis_space)
   save(info,rbspace)
+
   rbspace
 end
 
-function assemble_rb(info::RBInfoUnsteady,tt::TimeTracker,snaps,args...)
+function assemble_rb(
+  ::Val{false},
+  info::RBInfoUnsteady,
+  tt::TimeTracker,
+  snaps::Snapshots,
+  args...)
+
   id = get_id(snaps)
   tt.offline_time += @elapsed begin
-    basis_space = rb_space(info,snaps,args...)
+    basis_space = rb_space(info,snaps)
     basis_time = rb_time(info,snaps,basis_space)
   end
+
   rbspace = RBSpaceUnsteady(id,basis_space,basis_time)
   save(info,rbspace)
+
   rbspace
+end
+
+function assemble_rb(
+  ::Val{true},
+  info::RBInfoSteady,
+  tt::TimeTracker,
+  snaps::NTuple{2,Snapshots},
+  args...)
+
+  snaps_u,snaps_p = snaps
+
+  tt.offline_time += @elapsed begin
+    bs_p = rb_space(info,snaps_p)
+    bs_u = rb_space(info,snaps_u)
+    bs_u_supr = add_space_supremizers((bs_u,bs_p),args...)
+  end
+
+  rbspace_u = RBSpaceSteady(get_id(snaps_u),bs_u_supr)
+  rbspace_p = RBSpaceSteady(get_id(snaps_p),bs_p)
+  save(info,rbspace_u)
+  save(info,rbspace_p)
+
+  rbspace_u,rbspace_p
+end
+
+function assemble_rb(
+  ::Val{true},
+  info::RBInfoUnsteady,
+  tt::TimeTracker,
+  snaps::NTuple{2,Snapshots},
+  args...)
+
+  snaps_u,snaps_p = snaps
+
+  tt.offline_time += @elapsed begin
+    bs_p = rb_space(info,snaps_p)
+    bs_u = rb_space(info,snaps_u)
+    bs_u_supr = add_space_supremizers((bs_u,bs_p),args...)
+    bt_p = rb_time(info,snaps_p,bs_p)
+    bt_u = rb_time(info,snaps_u,bs_u)
+    bt_u_supr =add_time_supremizers((bt_u,bt_p))
+  end
+
+  rbspace_u = RBSpaceUnsteady(get_id(snaps_u),bs_u_supr,bt_u_supr)
+  rbspace_p = RBSpaceUnsteady(get_id(snaps_p),bs_p,bt_p)
+  save(info,rbspace_u)
+  save(info,rbspace_p)
+
+  rbspace_u,rbspace_p
 end
 
 function rb_space(
@@ -34,9 +98,6 @@ function rb_space(
   println("Spatial POD, tolerance: $(info.ϵ)")
   POD(snap;ϵ=info.ϵ)
 end
-
-rb_space(info::RBInfo,snaps::Vector{Snapshots}) =
-  Broadcasting(s->rb_space(info,s))(snaps)
 
 function rb_time(
   info::RBInfoUnsteady,
@@ -56,31 +117,28 @@ function rb_time(
   POD(s2;ϵ=info.ϵ)
 end
 
-rb_time(info::RBInfo,tt::TimeTracker,snaps::Vector{Snapshots},basis_space::Vector{Matrix}) =
-  Broadcasting((s,b)->rb_time(info,tt,s,b))(snaps,basis_space)
-
 function add_space_supremizers(
+  basis::NTuple{N,Matrix{Float}},
   opB::ParamBilinOperator,
-  basis::Vector{Matrix},
   ph::Snapshots,
-  μ::Vector{Param})
+  μ::Vector{Param}) where N
 
-  basis_u,basis_p = basis
-  supr = space_supremizers(opB,basis_u,basis_p,ph,μ)
+  basis_u, = basis
+  supr = space_supremizers(basis,opB,ph,μ)
   hcat(basis_u,supr)
 end
 
 function space_supremizers(
+  basis::NTuple{N,Matrix{Float}},
   opB::ParamBilinOperator,
-  basis_u::Matrix{Float},
-  basis_p::Matrix{Float},
   ph::Snapshots,
-  μ::Vector{Param})
+  μ::Vector{Param}) where N
 
   println("Computing primal supremizers")
 
+  basis_u,basis_p = basis
   constraint_mat = assemble_constraint_matrix(opB,basis_p,ph,μ)
-  gram_schmidt!(constraint_mat,get_basis_space(basis_u))
+  gram_schmidt(constraint_mat,basis_u)
 end
 
 function assemble_constraint_matrix(
@@ -90,11 +148,10 @@ function assemble_constraint_matrix(
   μ::Vector{Param}) where TT
 
   @assert opB.id == :B
-  println("Loading matrix Bᵀ")
+  println("Fetching Bᵀ")
 
   B = assemble_matrix(opB)(first(μ))
-  Brb(k::Int) = B*basis_p[:,k]
-  Brb.(1:get_ns(bp))
+  Matrix(B')*basis_p
 end
 
 function assemble_constraint_matrix(
@@ -104,16 +161,16 @@ function assemble_constraint_matrix(
   μ::Vector{Param})
 
   @assert opB.id == :B
-  println("Matrix Bᵀ is nonaffine: must assemble the constraint matrix")
+  println("Bᵀ is nonaffine: must assemble the constraint matrix")
 
-  B = assemble_matrix(opB).(μ)
-  Brb(k::Int) = B[k]*ph.snaps[:,k]
-  Brb.(1:get_ns(bp))
+  B = assemble_matrix(opB)(μ)
+  Brb(k::Int) = Matrix(B[k]')*ph.snaps[:,k]
+  Matrix(Brb.(axes(basis_p,2)))
 end
 
 function add_time_supremizers(
-  basis::Vector{Matrix},
-  tol=1e-2)
+  basis::NTuple{N,Matrix{Float}},
+  tol=1e-2) where N
 
   println("Checking if supremizers in time need to be added")
 
