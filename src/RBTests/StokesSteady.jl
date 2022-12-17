@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function stokes_steady()
-  run_fem = false
+  run_fem = true
 
   steady = true
   indef = true
@@ -11,11 +11,13 @@ function stokes_steady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/stokes"
+  #mesh = "cube15x15x15.json"
   mesh = "cube5x5x5.json"
-  bnd_info = Dict("dirichlet" => collect(25:26),"neumann" => collect(1:24))
+  bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
   order = 2
 
   ranges = fill([1.,2.],6)
+  #ranges = fill([1.,2.],9)
   sampling = UniformSampling()
   PS = ParamSpace(ranges,sampling)
 
@@ -46,7 +48,7 @@ function stokes_steady()
   opF = AffineParamVarOperator(f,ffe,PS,V;id=:F)
   opH = AffineParamVarOperator(h,hfe,PS,V;id=:H)
 
-  info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false)
+  info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=false)
   tt = TimeTracker(0.,0.)
   rbspace,varinfo = offline_phase(info,(uh,ph,μ),(opA,opB,opF,opH),measures,tt)
   online_phase(info,(uh,ph,μ),rbspace,varinfo,tt)

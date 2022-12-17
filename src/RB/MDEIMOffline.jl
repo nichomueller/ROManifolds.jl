@@ -261,7 +261,7 @@ function mdeim_idx(M::Matrix{Float})
   @inbounds for i = 2:n
     res = (M[:,i] - M[:,1:i-1] *
       (M[idx[1:i-1],1:i-1] \ M[idx[1:i-1],i]))
-    append!(idx,Int(argmax(abs.(res))[1]))
+    append!(idx,Int(argmax(abs.(res))))
   end
 
   unique(idx)

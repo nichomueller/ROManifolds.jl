@@ -99,8 +99,7 @@ function unsteady_poisson()
   uhat1 = Π'*u1[:]
 end
 
-function steady_stokes()
-  μ1 = μ[1]
+function steady_stokes(μ1::Param)
   A,LA = assemble_matrix_and_lifting(opA)
   A1,LA1 = A(μ1),LA(μ1)
   B,LB = assemble_matrix_and_lifting(opB)
@@ -124,6 +123,9 @@ function steady_stokes()
 
   coeffA = compute_coefficient(rbopA,A_rb,μ1)
   errA1,errLA1 = A1rb - basisA*coeffA[1],LA1rb - basisLA*coeffA[2]
-  coeffB = compute_coefficient(rbopB,B_rb,μ1)
-  errB1,errLB1 = B1rb - basisB*coeffB[1],LB1rb - basisLB*coeffB[2]
+  opB_lift = RBLiftingOperator(rbopB)
+  coeffLB1 = compute_coefficient(opB_lift,B_rb[2],μ1)
+  errLB1 = LB1rb - basisLB*coeffLB1
+
+  norm(errA1),norm(errLA1),norm(errLB1)
 end
