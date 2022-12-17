@@ -12,10 +12,10 @@ function stokes_steady()
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/stokes"
   mesh = "cube5x5x5.json"
-  bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
+  bnd_info = Dict("dirichlet" => collect(25:26),"neumann" => collect(1:24))
   order = 2
 
-  ranges = fill([1.,20.],6)
+  ranges = fill([1.,2.],6)
   sampling = UniformSampling()
   PS = ParamSpace(ranges,sampling)
 
@@ -43,8 +43,8 @@ function stokes_steady()
 
   opA = NonaffineParamVarOperator(a,afe,PS,U,V;id=:A)
   opB = AffineParamVarOperator(b,bfe,PS,U,Q;id=:B)
-  opF = NonaffineParamVarOperator(f,ffe,PS,V;id=:F)
-  opH = NonaffineParamVarOperator(h,hfe,PS,V;id=:H)
+  opF = AffineParamVarOperator(f,ffe,PS,V;id=:F)
+  opH = AffineParamVarOperator(h,hfe,PS,V;id=:H)
 
   info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false)
   tt = TimeTracker(0.,0.)

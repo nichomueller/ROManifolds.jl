@@ -139,8 +139,14 @@ function Gridap.get_background_model(test::UnconstrainedFESpace)
   get_background_model(get_triangulation(test))
 end
 
+function get_dimension(test::UnconstrainedFESpace)
+  model = get_background_model(test)
+  maximum(model.grid.reffes[1].reffe.polytope.dface.dims)
+end
+
 function Gridap.FESpaces.get_order(test::UnconstrainedFESpace)
-  Gridap.FESpaces.get_order(first(get_background_model(test).grid.reffes))
+  basis = get_fe_basis(test)
+  first(basis.cell_basis.values[1].fields.orders)
 end
 
 Gridap.FESpaces.get_test(tests::MyTests) = tests.test

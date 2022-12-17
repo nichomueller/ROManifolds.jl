@@ -39,13 +39,13 @@ end
 function steady_stokes()
   #uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,1)
   #xh = vcat(uh.snap,ph.snap)
-  u1,p1 = uh.snap[:,1],ph.snap[:,1]
+  u1,p1,μ1 = uh.snap[:,1],ph.snap[:,1],μ[1]
   Np = size(p1,1)
   xh = vcat(u1,p1)
   opA = NonaffineParamVarOperator(a,afe,PS,U,V;id=:A)
   opB = AffineParamVarOperator(b,bfe,PS,U,Q;id=:B)
   opF = AffineParamVarOperator(f,ffe,PS,V;id=:F)
-  opH = NonaffineParamVarOperator(h,hfe,PS,V;id=:H)
+  opH = AffineParamVarOperator(h,hfe,PS,V;id=:H)
 
   A,LA = assemble_matrix_and_lifting(opA)
   B,LB = assemble_matrix_and_lifting(opB)

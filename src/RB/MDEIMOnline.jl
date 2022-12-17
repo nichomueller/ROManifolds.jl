@@ -3,7 +3,7 @@ function compute_coefficient(
   μ::Param) where TT
 
   fun = get_param_function(op)
-  coeff = fun(nothing,μ)
+  coeff = fun(nothing,μ)[1]
   [coeff]
 end
 
@@ -13,7 +13,7 @@ function compute_coefficient(
 
   fun = get_param_function(op)
   timesθ = get_timesθ(op)
-  coeff(tθ) = fun(nothing,μ,tθ)
+  coeff(tθ) = fun(nothing,μ,tθ)[1]
   Matrix(coeff.(timesθ)')
 end
 

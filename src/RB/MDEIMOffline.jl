@@ -43,7 +43,7 @@ function MDEIM(
   MDEIM.(red_rbspace,idx_lu_factors,idx,red_measure)
 end
 
-function load_mdeim(
+#= function load_mdeim(
   path::String,
   op::RBLinOperator,
   meas::Measure)
@@ -65,11 +65,11 @@ function load_mdeim(
   meas::Measure) where Top
 
   load_mdeim(path,op,meas)
-end
+end =#
 
 function load_mdeim(
   path::String,
-  op::RBVarOperator,
+  op::Union{RBSteadyLinOperator,RBSteadyBilinOperator},
   meas::Measure)
 
   id = Symbol(last(split(path,'/')))
@@ -89,7 +89,7 @@ end
 
 function load_mdeim(
   path::String,
-  op::RBVarOperator,
+  op::Union{RBUnsteadyLinOperator,RBUnsteadyBilinOperator},
   meas::Measure)
 
   id = Symbol(last(split(path,'/')))
@@ -264,7 +264,7 @@ function mdeim_idx(M::Matrix{Float})
     append!(idx,Int(argmax(abs.(res))[1]))
   end
 
-  unique!(idx)
+  unique(idx)
 end
 
 function get_idx_lu_factors(

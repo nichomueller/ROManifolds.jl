@@ -104,24 +104,24 @@ function stokes_functions(::Val{true},measures::ProblemFixedMeasures)
 
   function a(x,p::Param)
     μ = get_μ(p)
-    μ[1] + sin(norm(x.*Point(μ[2:4])))*μ[5]
+    μ[1] + abs(sin(norm(x.*Point(μ[1:3])))*μ[4])
   end
   a(p::Param) = x->a(x,p)
   b(x,p::Param) = 1.
   b(p::Param) = x->b(x,p)
   function f(x,p::Param)
     μ = get_μ(p)
-    1. .+ Point(μ[1:3]) .* x
+    VectorValue(0.,0.,0.)
   end
   f(p::Param) = x->f(x,p)
   function h(x,p::Param)
     μ = get_μ(p)
-    1. .+ Point(μ[4:6]) .* x
+    VectorValue(0.,0.,0.)
   end
   h(p::Param) = x->h(x,p)
   function g(x,p::Param)
     μ = get_μ(p)
-    gxp = 1. .+ Point(μ[3:5]) .* x
+    gxp = VectorValue(μ[1]*abs(x[1]-0.5)^2,μ[2]*abs(x[2]-0.5)^2,μ[3]*abs(x[3]-0.5)^2)
     gxp / norm(gxp)
   end
   g(p::Param) = x->g(x,p)

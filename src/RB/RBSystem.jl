@@ -268,11 +268,13 @@ function navier_stokes_rb_system(lhs::Tuple,rhs::Tuple)
 end
 
 function solve_rb_system(rb_lhs::Matrix{Float},rb_rhs::Matrix{Float})
+  println("Solving system via backslash")
   rb_lhs \ rb_rhs
 end
 
 function solve_rb_system(
   V::GridapType,rbspace::Vector{<:RBSpace},dx_rb::Function,args...)
+  println("Solving system via Newton method")
   newton(V,rbspace,dx_rb,args...)
 end
 

@@ -1,3 +1,15 @@
+function norm_test(matrb,basis)
+  coeff = basis \ matrb
+  err = matrb - basis*coeff
+  norm(err)
+end
+
+function norm_test_app(rbop,mdeim,matrb,basis)
+  coeff = compute_coefficient(rbop,mdeim,μ1)
+  err = matrb - basis*coeff
+  norm(err)
+end
+
 function unsteady_poisson()
   Nt = get_Nt(opA)
   μ1 = μ[1]
@@ -25,21 +37,9 @@ function unsteady_poisson()
   basisLA = A_rb_lift.rbspace.basis_space
   basisLM = M_rb_lift.rbspace.basis_space
 
-  function norm_test(matrb,basis)
-    coeff = basis \ matrb
-    err = matrb - basis*coeff
-    norm(err)
-  end
-
   norm_test(A1rb,basisA)
   norm_test(LA1rb,basisLA)
   norm_test(LM1rb,basisLM)
-
-  function norm_test_app(rbop,mdeim,matrb,basis)
-    coeff = compute_coefficient(rbop,mdeim,μ1)
-    err = matrb - basis*coeff
-    norm(err)
-  end
 
   norm_test_app(rbopA,A_rb,A1rb,basisA)
   norm_test_app(rbopF,F_rb,F1rb,basisF)
@@ -97,4 +97,33 @@ function unsteady_poisson()
   u1 = uh[1].snap
   Π = get_basis_spacetime(rbspace)
   uhat1 = Π'*u1[:]
+end
+
+function steady_stokes()
+  μ1 = μ[1]
+  A,LA = assemble_matrix_and_lifting(opA)
+  A1,LA1 = A(μ1),LA(μ1)
+  B,LB = assemble_matrix_and_lifting(opB)
+  B1,LB1 = B(μ1),LB(μ1)
+
+  bsu = rbspace[1].basis_space
+  bsp = rbspace[2].basis_space
+
+  A1rb = bsu'*A1*bsu
+  A1rb = Matrix(A1rb[:])
+  LA1rb = bsu'*LA1
+  LB1rb = bsp'*LB1
+
+  basisA = A_rb[1].rbspace.basis_space
+  basisLA = A_rb[2].rbspace.basis_space
+  basisLB = B_rb[2].rbspace.basis_space
+
+  norm_test(A1rb,basisA)
+  norm_test(LA1rb,basisLA)
+  norm_test(LB1rb,basisLB)
+
+  coeffA = compute_coefficient(rbopA,A_rb,μ1)
+  errA1,errLA1 = A1rb - basisA*coeffA[1],LA1rb - basisLA*coeffA[2]
+  coeffB = compute_coefficient(rbopB,B_rb,μ1)
+  errB1,errLB1 = B1rb - basisB*coeffB[1],LB1rb - basisLB*coeffB[2]
 end
