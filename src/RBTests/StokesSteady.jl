@@ -11,13 +11,11 @@ function stokes_steady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/stokes"
-  #mesh = "cube15x15x15.json"
   mesh = "cube5x5x5.json"
   bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
   order = 2
 
-  ranges = fill([1.,2.],6)
-  #ranges = fill([1.,2.],9)
+  ranges = fill([1.,5.],6)
   sampling = UniformSampling()
   PS = ParamSpace(ranges,sampling)
 

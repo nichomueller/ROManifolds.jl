@@ -73,14 +73,15 @@ function assemble_rb(
   args...)
 
   snaps_u,snaps_p = snaps
+  opB,ph,μ,tol... = args
 
   tt.offline_time += @elapsed begin
     bs_p = rb_space(info,snaps_p)
     bs_u = rb_space(info,snaps_u)
-    bs_u_supr = add_space_supremizers((bs_u,bs_p),args...)
+    bs_u_supr = add_space_supremizers((bs_u,bs_p),opB,ph,μ)
     bt_p = rb_time(info,snaps_p,bs_p)
     bt_u = rb_time(info,snaps_u,bs_u)
-    bt_u_supr =add_time_supremizers((bt_u,bt_p))
+    bt_u_supr = add_time_supremizers((bt_u,bt_p),tol...)
   end
 
   rbspace_u = RBSpaceUnsteady(get_id(snaps_u),bs_u_supr,bt_u_supr)
@@ -141,16 +142,25 @@ function space_supremizers(
   gram_schmidt(constraint_mat,basis_u)
 end
 
+matrix_B(opB::ParamSteadyBilinOperator{Affine,Ttr},μ::Vector{Param}) where Ttr =
+  assemble_matrix(opB)(first(μ))
+matrix_B(opB::ParamSteadyBilinOperator,μ::Vector{Param}) =
+  assemble_matrix(opB).(μ)
+matrix_B(opB::ParamUnsteadyBilinOperator{Affine,Ttr},μ::Vector{Param}) where Ttr =
+  assemble_matrix(opB,0.)(first(μ))
+matrix_B(opB::ParamUnsteadyBilinOperator,μ::Vector{Param}) =
+  assemble_matrix(opB,0.).(μ)
+
 function assemble_constraint_matrix(
-  opB::ParamBilinOperator{Affine,TT},
+  opB::ParamBilinOperator{Affine,Ttr},
   basis_p::Matrix{Float},
   ::Snapshots,
-  μ::Vector{Param}) where TT
+  μ::Vector{Param}) where Ttr
 
   @assert opB.id == :B
   println("Fetching Bᵀ")
 
-  B = assemble_matrix(opB)(first(μ))
+  B = matrix_B(opB,μ)
   Matrix(B')*basis_p
 end
 
@@ -163,14 +173,14 @@ function assemble_constraint_matrix(
   @assert opB.id == :B
   println("Bᵀ is nonaffine: must assemble the constraint matrix")
 
-  B = assemble_matrix(opB)(μ)
+  B = matrix_B(opB,μ)
   Brb(k::Int) = Matrix(B[k]')*ph.snaps[:,k]
   Matrix(Brb.(axes(basis_p,2)))
 end
 
 function add_time_supremizers(
-  basis::NTuple{N,Matrix{Float}},
-  tol=1e-2) where N
+  basis::NTuple{2,Matrix{Float}},
+  tol=1e-2)
 
   println("Checking if supremizers in time need to be added")
 
@@ -179,21 +189,21 @@ function add_time_supremizers(
   count = 0
 
   function enrich(basis_u::Matrix{Float},basis_up::Matrix{Float},v::Vector)
-    vnew = orth_complement(v,basis_up)
+    vnew = orth_complement(v,basis_u)
     vnew /= norm(vnew)
-    hcat(basis_u,vnew),hcat(basis_up,vnew'*bp)
+    hcat(basis_u,vnew),hcat(basis_up,basis_p'*vnew)
   end
 
-  dist = norm(bp[:,1])
-  for np = 1:get_nt(bp)
-    println("Distance measure of basis vector number $np is: $dist")
+  dist = norm(basis_up[:,1])
+  for ntp = axes(basis_up,2)
+    dist = ntp == 1 ? norm(basis_up[:,1]) : norm(orth_projection(basis_up[:,ntp],basis_up[:,1:ntp-1]))
+    println("Distance measure of basis vector number $ntp is: $dist")
     if dist ≤ tol
-      basis_u,basis_up = enrich(basis_u,basis_up,basis_p[:,np])
+      basis_u,basis_up = enrich(basis_u,basis_up,basis_p[:,ntp])
       count += 1
     end
-    dist = orth_projection(basis_up[:,np],basis_up[:,1:np-1])
   end
 
   println("Added $count time supremizers")
-  basis_u,basis_p
+  basis_u
 end

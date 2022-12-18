@@ -1,7 +1,7 @@
 basis_as_fefun(::RBLinOperator) = error("Not implemented")
 
 function basis_as_fefun(
-  op::RBSteadyBilinOperator{OT,<:ParamTrialFESpace}) where OT
+  op::RBSteadyBilinOperator{Top,<:ParamTrialFESpace}) where Top
 
   bspace = get_basis_space(op)
   ns = get_ns(bspace)
@@ -11,7 +11,7 @@ function basis_as_fefun(
 end
 
 function basis_as_fefun(
-  op::RBUnsteadyBilinOperator{OT,<:ParamTransientTrialFESpace}) where OT
+  op::RBUnsteadyBilinOperator{Top,<:ParamTransientTrialFESpace}) where Top
 
   bspace = get_basis_space(op)
   ns = get_ns(bspace)
@@ -70,7 +70,7 @@ end
 
 function matrix_snapshots(
   ::Val{false},
-  op::RBBilinOperator{Nonaffine,<:UnconstrainedFESpace},
+  op::RBBilinOperator{Nonaffine,<:TrialFESpace},
   μ::Vector{Param})
 
   id = get_id(op)

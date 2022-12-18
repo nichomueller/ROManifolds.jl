@@ -1,7 +1,7 @@
-abstract type RBVarOperator{Top,TT} end
+abstract type RBVarOperator{Top,Ttr} end
 abstract type RBLinOperator{Top} <: RBVarOperator{Top,nothing} end
-abstract type RBBilinOperator{Top,TT} <: RBVarOperator{Top,TT} end
-abstract type RBLiftingOperator{Top,TT} <: RBLinOperator{Top} end
+abstract type RBBilinOperator{Top,Ttr} <: RBVarOperator{Top,Ttr} end
+abstract type RBLiftingOperator{Top,Ttr} <: RBLinOperator{Top} end
 
 mutable struct RBSteadyLinOperator{Top} <: RBLinOperator{Top}
   feop::ParamSteadyLinOperator{Top}
@@ -13,37 +13,37 @@ mutable struct RBUnsteadyLinOperator{Top} <: RBLinOperator{Top}
   rbspace_row::RBSpaceUnsteady
 end
 
-mutable struct RBSteadyBilinOperator{Top,TT} <: RBBilinOperator{Top,TT}
-  feop::ParamSteadyBilinOperator{Top,TT}
+mutable struct RBSteadyBilinOperator{Top,Ttr} <: RBBilinOperator{Top,Ttr}
+  feop::ParamSteadyBilinOperator{Top,Ttr}
   rbspace_row::RBSpaceSteady
   rbspace_col::RBSpaceSteady
 end
 
-mutable struct RBUnsteadyBilinOperator{Top,TT} <: RBBilinOperator{Top,TT}
-  feop::ParamUnsteadyBilinOperator{Top,TT}
+mutable struct RBUnsteadyBilinOperator{Top,Ttr} <: RBBilinOperator{Top,Ttr}
+  feop::ParamUnsteadyBilinOperator{Top,Ttr}
   rbspace_row::RBSpaceUnsteady
   rbspace_col::RBSpaceUnsteady
 end
 
-mutable struct RBSteadyLiftingOperator{Top,TT} <: RBLiftingOperator{Top,TT}
-  feop::ParamSteadyLiftingOperator{Top,TT}
+mutable struct RBSteadyLiftingOperator{Top,Ttr} <: RBLiftingOperator{Top,Ttr}
+  feop::ParamSteadyLiftingOperator{Top,Ttr}
   rbspace_row::RBSpaceSteady
 
   function RBSteadyLiftingOperator(
-    feop::ParamSteadyLiftingOperator{Top,TT},
-    rbspace_row::RBSpaceSteady) where {Top,TT}
-    new{Top,TT}(feop,rbspace_row)
+    feop::ParamSteadyLiftingOperator{Top,Ttr},
+    rbspace_row::RBSpaceSteady) where {Top,Ttr}
+    new{Top,Ttr}(feop,rbspace_row)
   end
 end
 
-mutable struct RBUnsteadyLiftingOperator{Top,TT} <: RBLiftingOperator{Top,TT}
-  feop::ParamUnsteadyLiftingOperator{Top,TT}
+mutable struct RBUnsteadyLiftingOperator{Top,Ttr} <: RBLiftingOperator{Top,Ttr}
+  feop::ParamUnsteadyLiftingOperator{Top,Ttr}
   rbspace_row::RBSpaceUnsteady
 
   function RBUnsteadyLiftingOperator(
-    feop::ParamUnsteadyLiftingOperator{Top,TT},
-    rbspace_row::RBSpaceUnsteady) where {Top,TT}
-    new{Top,TT}(feop,rbspace_row)
+    feop::ParamUnsteadyLiftingOperator{Top,Ttr},
+    rbspace_row::RBSpaceUnsteady) where {Top,Ttr}
+    new{Top,Ttr}(feop,rbspace_row)
   end
 end
 
@@ -62,19 +62,19 @@ function RBVarOperator(
 end
 
 function RBVarOperator(
-  feop::ParamSteadyBilinOperator{Top,TT},
+  feop::ParamSteadyBilinOperator{Top,Ttr},
   rbspace_row::RBSpaceSteady,
-  rbspace_col::RBSpaceSteady) where {Top,TT}
+  rbspace_col::RBSpaceSteady) where {Top,Ttr}
 
-  RBSteadyBilinOperator{Top,TT}(feop,rbspace_row,rbspace_col)
+  RBSteadyBilinOperator{Top,Ttr}(feop,rbspace_row,rbspace_col)
 end
 
 function RBVarOperator(
-  feop::ParamUnsteadyBilinOperator{Top,TT},
+  feop::ParamUnsteadyBilinOperator{Top,Ttr},
   rbspace_row::RBSpaceUnsteady,
-  rbspace_col::RBSpaceUnsteady) where {Top,TT}
+  rbspace_col::RBSpaceUnsteady) where {Top,Ttr}
 
-  RBUnsteadyBilinOperator{Top,TT}(feop,rbspace_row,rbspace_col)
+  RBUnsteadyBilinOperator{Top,Ttr}(feop,rbspace_row,rbspace_col)
 end
 
 function RBLiftingOperator(op::RBSteadyBilinOperator)
@@ -132,11 +132,11 @@ function Gridap.FESpaces.assemble_vector(op::RBLinOperator{Affine},args...)
   assemble_vector(op.feop,args...)(realization(op))
 end
 
-function Gridap.FESpaces.assemble_matrix(op::RBBilinOperator{Affine,TT},args...) where TT
+function Gridap.FESpaces.assemble_matrix(op::RBBilinOperator{Affine,Ttr},args...) where Ttr
   assemble_matrix(op.feop,args...)(realization(op))
 end
 
-function assemble_matrix_and_lifting(op::RBBilinOperator{Affine,TT},args...) where TT
+function assemble_matrix_and_lifting(op::RBBilinOperator{Affine,Ttr},args...) where Ttr
   assemble_matrix_and_lifting(op.feop,args...)(realization(op))
 end
 

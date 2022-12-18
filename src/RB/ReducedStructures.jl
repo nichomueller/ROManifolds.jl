@@ -43,7 +43,7 @@ end
 
 function assemble_rb_structure(
   info::RBInfo,
-  op::RBBilinOperator{Top,UnconstrainedFESpace},
+  op::RBBilinOperator{Top,<:TrialFESpace},
   args...) where Top
 
   id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
@@ -55,8 +55,8 @@ end
 
 function assemble_rb_structure(
   info::RBInfo,
-  op::RBBilinOperator{Affine,TT},
-  args...) where TT
+  op::RBBilinOperator{Affine,Ttr},
+  args...) where Ttr
 
   id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
   println("Bilinear operator $id is affine but its lifting is non-affine:
@@ -68,7 +68,7 @@ end
 
 function assemble_rb_structure(
   ::RBInfo,
-  op::RBBilinOperator{Affine,UnconstrainedFESpace},
+  op::RBBilinOperator{Affine,<:TrialFESpace},
   args...)
 
   id = get_id(op)
@@ -128,8 +128,8 @@ end
 
 function load_rb_structure(
   info::RBInfo,
-  op::Union{RBLinOperator{Affine},RBBilinOperator{Affine,TT}},
-  args...) where TT
+  op::Union{RBLinOperator{Affine},RBBilinOperator{Affine,Ttr}},
+  args...) where Ttr
 
   id = get_id(op)
   println("Importing reduced $id")
@@ -139,7 +139,7 @@ end
 
 function load_rb_structure(
   info::RBInfo,
-  op::Union{RBLinOperator{Affine},RBBilinOperator{Affine,<:UnconstrainedFESpace}},
+  op::Union{RBLinOperator{Affine},RBBilinOperator{Affine,<:TrialFESpace}},
   args...)
 
   id = get_id(op)

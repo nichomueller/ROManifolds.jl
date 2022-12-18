@@ -2,10 +2,10 @@ include("../FEM/FEM.jl")
 include("../RB/RB.jl")
 include("RBTests.jl")
 
-function stokes_steady()
-  run_fem = true
+function stokes_unsteady()
+  run_fem = false
 
-  steady = true
+  steady = false
   indef = true
   pdomain = false
   ptype = ProblemType(steady,indef,pdomain)
@@ -15,7 +15,10 @@ function stokes_steady()
   bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
   order = 2
 
-  ranges = fill([1.,20.],6)
+  t0,tF,dt,θ = 0.,0.5,0.05,0.5
+  time_info = TimeInfo(t0,tF,dt,θ)
+
+  ranges = fill([1.,2.],6)
   sampling = UniformSampling()
   PS = ParamSpace(ranges,sampling)
 
@@ -24,7 +27,7 @@ function stokes_steady()
   model = model_info(mshpath,bnd_info,ptype)
   measures = ProblemMeasures(model,order)
 
-  a,afe,b,bfe,f,ffe,h,hfe,g,lhs,rhs = stokes_functions(ptype,measures)
+  a,afe,m,mfe,mfe_gridap,b,bfe,bTfe,f,ffe,h,hfe,g,lhs,rhs = stokes_functions(ptype,measures)
 
   reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{3,Float},order)
   reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1;space=:P)
@@ -32,23 +35,25 @@ function stokes_steady()
   U = MyTrials(V,g,ptype)
   Q = MyTests(model,reffe2;conformity=:L2)
   P = MyTrials(Q)
-  Y = ParamMultiFieldFESpace([V,Q])
-  X = ParamMultiFieldFESpace([U,P])
+  Y = ParamTransientMultiFieldFESpace([V,Q])
+  X = ParamTransientMultiFieldFESpace([U,P])
 
-  op = ParamAffineFEOperator(lhs,rhs,PS,X,Y)
+  op = ParamTransientAffineFEOperator(mfe_gridap,lhs,rhs,PS,X,Y)
 
-  solver = LinearFESolver()
+  solver = ThetaMethod(LUSolver(),dt,θ)
   nsnap = 100
-  uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
+  uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
 
-  opA = NonaffineParamVarOperator(a,afe,PS,U,V;id=:A)
-  opB = AffineParamVarOperator(b,bfe,PS,U,Q;id=:B)
-  opF = NonaffineParamVarOperator(f,ffe,PS,V;id=:F)
-  opH = NonaffineParamVarOperator(h,hfe,PS,V;id=:H)
+  opA = NonaffineParamVarOperator(a,afe,PS,time_info,U,V;id=:A)
+  opM = AffineParamVarOperator(m,mfe,PS,time_info,U,V;id=:M)
+  opB = AffineParamVarOperator(b,bfe,PS,time_info,U,Q;id=:B)
+  opBT = AffineParamVarOperator(b,bTfe,PS,time_info,P,V;id=:BT)
+  opF = AffineParamVarOperator(f,ffe,PS,time_info,V;id=:F)
+  opH = AffineParamVarOperator(h,hfe,PS,time_info,V;id=:H)
 
-  info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false)
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false)
   tt = TimeTracker(0.,0.)
-  rbspace,varinfo = offline_phase(info,(uh,ph,μ),(opA,opB,opF,opH),measures,tt)
+  rbspace,varinfo = offline_phase(info,(uh,ph,μ),(opA,opM,opB,opBT,opF,opH),measures,tt)
   online_phase(info,(uh,ph,μ),rbspace,varinfo,tt)
 end
 
@@ -62,29 +67,35 @@ function offline_phase(
   uh,ph,μ = fe_sol
   uh_offline = uh[1:info.nsnap]
   ph_offline = ph[1:info.nsnap]
-  opA,opB,opF,opH = op
+  opA,opM,opB,opBT,opF,opH = op
 
   rbspace_u,rbspace_p = rb(info,tt,(uh_offline,ph_offline),opB,ph,μ)
 
   rbopA = RBVarOperator(opA,rbspace_u,rbspace_u)
+  rbopM = RBVarOperator(opM,rbspace_u,rbspace_u)
   rbopB = RBVarOperator(opB,rbspace_p,rbspace_u)
+  rbopBT = RBVarOperator(opBT,rbspace_u,rbspace_p)
   rbopF = RBVarOperator(opF,rbspace_u)
   rbopH = RBVarOperator(opH,rbspace_u)
 
   if info.load_offline
     A_rb = load_rb_structure(info,rbopA,meas.dΩ)
+    M_rb = load_rb_structure(info,rbopM,meas.dΩ)
     B_rb = load_rb_structure(info,rbopB,meas.dΩ)
+    BT_rb = load_rb_structure(info,rbopBT,meas.dΩ)
     F_rb = load_rb_structure(info,rbopF,meas.dΩ)
     H_rb = load_rb_structure(info,rbopH,meas.dΓn)
   else
     A_rb = assemble_rb_structure(info,tt,rbopA,μ,meas,:dΩ)
+    M_rb = assemble_rb_structure(info,tt,rbopM,μ,meas,:dΩ)
     B_rb = assemble_rb_structure(info,tt,rbopB,μ,meas,:dΩ)
+    BT_rb = assemble_rb_structure(info,tt,rbopBT,μ,meas,:dΩ)
     F_rb = assemble_rb_structure(info,tt,rbopF,μ,meas,:dΩ)
     H_rb = assemble_rb_structure(info,tt,rbopH,μ,meas,:dΓn)
   end
 
   rbspace = (rbspace_u,rbspace_p)
-  varinfo = ((rbopA,A_rb),(rbopB,B_rb),(rbopF,F_rb),(rbopH,H_rb))
+  varinfo = ((rbopA,A_rb),(rbopM,M_rb),(rbopB,B_rb),(rbopBT,BT_rb),(rbopF,F_rb),(rbopH,H_rb))
   rbspace,varinfo
 end
 
@@ -97,21 +108,26 @@ function online_phase(
 
   uh,ph,μ = fe_sol
 
-  Ainfo,Minfo,Binfo,Finfo,Hinfo = varinfo
+  Ainfo,Minfo,Binfo,BTinfo,Finfo,Hinfo = varinfo
   rbopA,A_rb = Ainfo
+  rbopM,M_rb = Minfo
   rbopB,B_rb = Binfo
-  rbopM,M_rb = Ainfo
+  rbopBT,BT_rb = BTinfo
   rbopF,F_rb = Finfo
   rbopH,H_rb = Hinfo
+
+  θ = get_θ(rbopA)
 
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
       Aon = online_assembler(rbopA,A_rb,μ[k])
+      Mon = online_assembler(rbopM,M_rb,μ[k])
       Bon = online_assembler(rbopB,B_rb,μ[k])
+      BTon = online_assembler(rbopBT,BT_rb,μ[k])
       Fon = online_assembler(rbopF,F_rb,μ[k])
       Hon = online_assembler(rbopH,H_rb,μ[k])
-      lift = Aon[2],Bon[2]
-      sys = stokes_rb_system((Aon[1],Bon[1]),(Fon,Hon,lift...))
+      lift = Aon[2],Mon[2],Bon[2]
+      sys = stokes_rb_system((Aon[1]...,Mon[1]...,BTon...,Bon[1]...),(Fon,Hon,lift...),θ)
       rb_sol = solve_rb_system(sys...)
     end
     uhk = get_snap(uh[k])
@@ -131,4 +147,4 @@ function online_phase(
   end
 end
 
-stokes_steady()
+stokes_unsteady()

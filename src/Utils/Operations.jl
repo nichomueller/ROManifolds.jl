@@ -54,12 +54,21 @@ function POD(S::AbstractMatrix,::Val{true};ϵ=1e-5)
   U[:,1:n]
 end
 
-projection(vnew::AbstractVector,v::AbstractVector) = v*(vnew'*v)
-projection(vnew::AbstractVector,basis::AbstractMatrix) =
+function projection(vnew::AbstractVector,v::AbstractVector)
+  v*(vnew'*v)
+end
+
+function projection(vnew::AbstractVector,basis::AbstractMatrix)
   sum([projection(vnew,basis[:,i]) for i=axes(basis,2)])
-orth_projection(vnew::AbstractVector,v::AbstractVector) = projection(vnew,v)/(v'*v)
-orth_projection(vnew::AbstractVector,basis::AbstractMatrix) =
+end
+
+function orth_projection(vnew::AbstractVector,v::AbstractVector)
+  projection(vnew,v)/(v'*v)
+end
+
+function orth_projection(vnew::AbstractVector,basis::AbstractMatrix)
   sum([orth_projection(vnew,basis[:,i]) for i=axes(basis,2)])
+end
 
 isbasis(basis,args...) =
   all([isapprox(norm(basis[:,j],args...),1) for j=axes(basis,2)])
@@ -68,21 +77,18 @@ function orth_complement(
   v::AbstractVector,
   basis::AbstractMatrix)
 
-  #@assert isbasis(basis) "Provide a basis"
   v - projection(v,basis)
 end
 
 function gram_schmidt(mat::Matrix{Float},basis::Matrix{Float})
 
   for i = axes(mat,2)
-    println("Normalizing primal supremizer $i")
-    mat[:,i] = orth_complement(mat[:,i],basis)
+    mat_i = mat[:,i]
+    mat_i = orth_complement(mat_i,basis)
     if i > 1
-      mat[:,i] = orth_complement(mat[:,i],mat[:,1:i-1])
+      mat_i = orth_complement(mat_i,mat[:,1:i-1])
     end
-    supr_norm = norm(mat[:,i])
-    println("Norm supremizers: $supr_norm")
-    mat[:,i] /= supr_norm
+    mat[:,i] = mat_i/norm(mat_i)
   end
 
   mat
@@ -317,5 +323,8 @@ function Base.Int32(vv::VectorValue{D,Int32}) where D
 end
 
 Base.:(*)(a::Symbol,b::Symbol) = Symbol(String(a)*String(b))
+
+Base.:(^)(vv::VectorValue,n::Int) = VectorValue([vv[k]^n for k=eachindex(vv)])
+Base.:(^)(vv::VectorValue,n::Float) = VectorValue([vv[k]^n for k=eachindex(vv)])
 
 Gridap.get_triangulation(m::Measure) = m.quad.trian

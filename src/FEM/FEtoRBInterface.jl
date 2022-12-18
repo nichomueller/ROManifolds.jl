@@ -62,17 +62,17 @@ function MyTrial(
   MyTrial(test,g,issteady(ptype))
 end
 
-struct MyTrials{TT} <: MySpaces
-  trial::TT
+struct MyTrials{Ttr} <: MySpaces
+  trial::Ttr
   trial_no_bc::UnconstrainedFESpace
   ddofs_on_full_trian::Vector{Int}
 
   function MyTrials(
-    trial::TT,
-    trial_no_bc::UnconstrainedFESpace) where TT
+    trial::Ttr,
+    trial_no_bc::UnconstrainedFESpace) where Ttr
 
     ddofs_on_full_trian = dirichlet_dofs_on_full_trian(trial.space,trial_no_bc)
-    new{TT}(trial,trial_no_bc,ddofs_on_full_trian)
+    new{Ttr}(trial,trial_no_bc,ddofs_on_full_trian)
   end
 end
 
@@ -205,11 +205,11 @@ get_θ(ti::TimeInfo) = ti.θ
 get_timesθ(ti::TimeInfo) = collect(ti.t0:ti.dt:ti.tF-ti.dt).+ti.dt*ti.θ
 
 struct Nonaffine <: OperatorType end
-abstract type ParamVarOperator{OT,TT} end
-abstract type ParamLinOperator{OT} <: ParamVarOperator{OT,nothing} end
-abstract type ParamBilinOperator{OT,TT} <: ParamVarOperator{OT,TT} end
+abstract type ParamVarOperator{Top,Ttr} end
+abstract type ParamLinOperator{Top} <: ParamVarOperator{Top,nothing} end
+abstract type ParamBilinOperator{Top,Ttr} <: ParamVarOperator{Top,Ttr} end
 
-struct ParamSteadyLinOperator{OT} <: ParamLinOperator{OT}
+struct ParamSteadyLinOperator{Top} <: ParamLinOperator{Top}
   id::Symbol
   a::Function
   afe::Function
@@ -217,7 +217,7 @@ struct ParamSteadyLinOperator{OT} <: ParamLinOperator{OT}
   tests::MyTests
 end
 
-struct ParamUnsteadyLinOperator{OT} <: ParamLinOperator{OT}
+struct ParamUnsteadyLinOperator{Top} <: ParamLinOperator{Top}
   id::Symbol
   a::Function
   afe::Function
@@ -226,43 +226,43 @@ struct ParamUnsteadyLinOperator{OT} <: ParamLinOperator{OT}
   tests::MyTests
 end
 
-struct ParamSteadyBilinOperator{OT,TT} <: ParamBilinOperator{OT,TT}
+struct ParamSteadyBilinOperator{Top,Ttr} <: ParamBilinOperator{Top,Ttr}
   id::Symbol
   a::Function
   afe::Function
   pspace::ParamSpace
-  trials::MyTrials{TT}
+  trials::MyTrials{Ttr}
   tests::MyTests
 end
 
-struct ParamUnsteadyBilinOperator{OT,TT} <: ParamBilinOperator{OT,TT}
+struct ParamUnsteadyBilinOperator{Top,Ttr} <: ParamBilinOperator{Top,Ttr}
   id::Symbol
   a::Function
   afe::Function
   pspace::ParamSpace
   tinfo::TimeInfo
-  trials::MyTrials{TT}
+  trials::MyTrials{Ttr}
   tests::MyTests
 end
 
-abstract type ParamLiftingOperator{OT,TT} <: ParamLinOperator{OT} end
+abstract type ParamLiftingOperator{Top,Ttr} <: ParamLinOperator{Top} end
 
-struct ParamSteadyLiftingOperator{OT,TT} <: ParamLiftingOperator{OT,TT}
+struct ParamSteadyLiftingOperator{Top,Ttr} <: ParamLiftingOperator{Top,Ttr}
   id::Symbol
   a::Function
   afe::Function
   pspace::ParamSpace
-  trials::MyTrials{TT}
+  trials::MyTrials{Ttr}
   tests::MyTests
 end
 
-struct ParamUnsteadyLiftingOperator{OT,TT} <: ParamLiftingOperator{OT,TT}
+struct ParamUnsteadyLiftingOperator{Top,Ttr} <: ParamLiftingOperator{Top,Ttr}
   id::Symbol
   a::Function
   afe::Function
   pspace::ParamSpace
   tinfo::TimeInfo
-  trials::MyTrials{TT}
+  trials::MyTrials{Ttr}
   tests::MyTests
 end
 
@@ -342,7 +342,7 @@ function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLinOperator)
   μ -> Matrix([V(μ,tθ) for tθ = timesθ])
 end
 
-function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLinOperator,t::Real)
+function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLinOperator,t)
   afe = get_fe_function(op)
   test = get_test(op)
   μ -> assemble_vector(afe(μ,t),test)
@@ -350,65 +350,65 @@ end
 
 function AffineParamVarOperator(
   a::Function,afe::Function,pspace::ParamSpace,
-  trials::MyTrials{TT},tests::MyTests;id=:A) where TT
-  ParamSteadyBilinOperator{Affine,TT}(id,a,afe,pspace,trials,tests)
+  trials::MyTrials{Ttr},tests::MyTests;id=:A) where Ttr
+  ParamSteadyBilinOperator{Affine,Ttr}(id,a,afe,pspace,trials,tests)
 end
 
 function NonaffineParamVarOperator(
   a::Function,afe::Function,pspace::ParamSpace,
-  trials::MyTrials{TT},tests::MyTests;id=:A) where TT
-  ParamSteadyBilinOperator{Nonaffine,TT}(id,a,afe,pspace,trials,tests)
+  trials::MyTrials{Ttr},tests::MyTests;id=:A) where Ttr
+  ParamSteadyBilinOperator{Nonaffine,Ttr}(id,a,afe,pspace,trials,tests)
 end
 
 function NonlinearParamVarOperator(
   a::Function,afe::Function,pspace::ParamSpace,
-  trials::MyTrials{TT},tests::MyTests;id=:A) where TT
-  ParamSteadyBilinOperator{Nonlinear,TT}(id,a,afe,pspace,trials,tests)
+  trials::MyTrials{Ttr},tests::MyTests;id=:A) where Ttr
+  ParamSteadyBilinOperator{Nonlinear,Ttr}(id,a,afe,pspace,trials,tests)
 end
 
 function AffineParamVarOperator(
   a::Function,afe::Function,pspace::ParamSpace,time_info::TimeInfo,
-  trials::MyTrials{TT},tests::MyTests;id=:A) where TT
-  ParamUnsteadyBilinOperator{Affine,TT}(id,a,afe,pspace,time_info,trials,tests)
+  trials::MyTrials{Ttr},tests::MyTests;id=:A) where Ttr
+  ParamUnsteadyBilinOperator{Affine,Ttr}(id,a,afe,pspace,time_info,trials,tests)
 end
 
 function NonaffineParamVarOperator(
   a::Function,afe::Function,pspace::ParamSpace,time_info::TimeInfo,
-  trials::MyTrials{TT},tests::MyTests;id=:A) where TT
-  ParamUnsteadyBilinOperator{Nonaffine,TT}(id,a,afe,pspace,time_info,trials,tests)
+  trials::MyTrials{Ttr},tests::MyTests;id=:A) where Ttr
+  ParamUnsteadyBilinOperator{Nonaffine,Ttr}(id,a,afe,pspace,time_info,trials,tests)
 end
 
 function NonlinearParamVarOperator(
   a::Function,afe::Function,pspace::ParamSpace,time_info::TimeInfo,
-  trials::MyTrials{TT},tests::MyTests;id=:A) where TT
-  ParamUnsteadyBilinOperator{Nonlinear,TT}(id,a,afe,pspace,time_info,trials,tests)
+  trials::MyTrials{Ttr},tests::MyTests;id=:A) where Ttr
+  ParamUnsteadyBilinOperator{Nonlinear,Ttr}(id,a,afe,pspace,time_info,trials,tests)
 end
 
-function ParamLiftingOperator(::ParamBilinOperator{OT,UnconstrainedFESpace}) where OT
-  error("No lifting operator associated to a trial space of type UnconstrainedFESpace")
+function ParamLiftingOperator(::ParamBilinOperator{Top,<:TrialFESpace}) where Top
+  error("No lifting operator associated to a trial space of type TrialFESpace")
 end
 
-function ParamLiftingOperator(op::ParamSteadyBilinOperator{Affine,TT}) where TT
+function ParamLiftingOperator(op::ParamSteadyBilinOperator{Affine,Ttr}) where Ttr
   id = get_id(op)*:_lift
-  ParamSteadyLiftingOperator{Nonaffine,TT}(id,get_param_function(op),
+  ParamSteadyLiftingOperator{Nonaffine,Ttr}(id,get_param_function(op),
     get_fe_function(op),get_pspace(op),get_trials(op),get_tests(op))
 end
 
-function ParamLiftingOperator(op::ParamSteadyBilinOperator{OT,TT}) where {OT,TT}
+function ParamLiftingOperator(op::ParamSteadyBilinOperator{Top,Ttr}) where {Top,Ttr}
   id = get_id(op)*:_lift
-  ParamSteadyLiftingOperator{OT,TT}(id,get_param_function(op),
+  ParamSteadyLiftingOperator{Top,Ttr}(id,get_param_function(op),
     get_fe_function(op),get_pspace(op),get_trials(op),get_tests(op))
 end
 
-function ParamLiftingOperator(op::ParamUnsteadyBilinOperator{Affine,TT}) where TT
+function ParamLiftingOperator(op::ParamUnsteadyBilinOperator{Affine,Ttr}) where Ttr
   id = get_id(op)*:_lift
-  ParamUnsteadyLiftingOperator{Nonaffine,TT}(id,get_param_function(op),
+  ParamUnsteadyLiftingOperator{Nonaffine,Ttr}(id,get_param_function(op),
     get_fe_function(op),get_pspace(op),get_time_info(op),get_trials(op),get_tests(op))
 end
 
-function ParamLiftingOperator(op::ParamUnsteadyBilinOperator{OT,TT}) where {OT,TT}
+function ParamLiftingOperator(op::ParamUnsteadyBilinOperator{Top,Ttr}) where {Top,Ttr}
   id = get_id(op)*:_lift
-  ParamUnsteadyLiftingOperator{OT,TT}(id,get_param_function(op),
+  ParamUnsteadyLiftingOperator{Top,Ttr}(id,get_param_function(op),
     get_fe_function(op),get_pspace(op),get_time_info(op),get_trials(op),get_tests(op))
 end
 
@@ -428,11 +428,31 @@ function Gridap.FESpaces.assemble_matrix(op::ParamUnsteadyBilinOperator)
   μ -> [M(μ,tθ) for tθ = timesθ]
 end
 
-function Gridap.FESpaces.assemble_matrix(op::ParamUnsteadyBilinOperator,t::Real)
+function Gridap.FESpaces.assemble_matrix(op::ParamUnsteadyBilinOperator,t)
   afe = get_fe_function(op)
   trial = get_trial(op)
   test = get_test(op)
   μ -> assemble_matrix(afe(μ,t),trial(μ,t),test)
+end
+
+function Gridap.FESpaces.assemble_matrix(
+  op::ParamSteadyBilinOperator{Top,<:TrialFESpace},
+  args...) where Top
+
+  afe = get_fe_function(op)
+  trial = get_trial(op)
+  test = get_test(op)
+  μ -> assemble_matrix(afe(μ),trial,test)
+end
+
+function Gridap.FESpaces.assemble_matrix(
+  op::ParamUnsteadyBilinOperator{Top,<:TrialFESpace},
+  args...) where Top
+
+  afe = get_fe_function(op)
+  trial = get_trial(op)
+  test = get_test(op)
+  μ -> assemble_matrix(afe(μ,0.),trial,test)
 end
 
 function Gridap.FESpaces.assemble_vector(op::ParamSteadyLiftingOperator)
@@ -465,7 +485,7 @@ function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLiftingOperator)
   lift
 end
 
-function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLiftingOperator,t::Real)
+function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLiftingOperator,t)
   afe = get_fe_function(op)
   trial_no_bc = get_trial_no_bc(op)
   test_no_bc = get_test_no_bc(op)
@@ -479,6 +499,18 @@ function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLiftingOperator,t::Rea
   lift
 end
 
+function Gridap.FESpaces.assemble_vector(op::ParamSteadyLinOperator{TrialFESpace},args...)
+  afe = get_fe_function(op)
+  test = get_test(op)
+  μ -> assemble_vector(afe(μ),test)
+end
+
+function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLinOperator{TrialFESpace},args...)
+  afe = get_fe_function(op)
+  test = get_test(op)
+  μ -> assemble_vector(afe(μ,0.),test)
+end
+
 function get_dirichlet_function(::Val,trial::ParamTrialFESpace)
   μ -> trial(μ).dirichlet_values
 end
@@ -488,10 +520,7 @@ function get_dirichlet_function(::Val{false},trial::ParamTransientTrialFESpace)
 end
 
 function get_dirichlet_function(::Val{true},trial::ParamTransientTrialFESpace)
-  g(x,μ,t) = trial.dirichlet_μt(x,μ,t)
-  g(μ,t) = x -> g(x,μ,t)
-  dg(x,μ,t) = ForwardDiff.derivative(t->g(μ,t)(x),t)
-  dg(μ,t) = x -> dg(x,μ,t)
+  dg = ∂t(trial.dirichlet_μt)
   dg_dirichlet(μ,t) = interpolate_dirichlet(dg(μ,t),trial(μ,t)).dirichlet_values
   dg_dirichlet
 end
@@ -545,7 +574,7 @@ function assemble_matrix_and_lifting(op::ParamUnsteadyBilinOperator)
   A_bc,lift
 end
 
-function assemble_matrix_and_lifting(op::ParamUnsteadyBilinOperator,t::Real)
+function assemble_matrix_and_lifting(op::ParamUnsteadyBilinOperator,t)
   afe = get_fe_function(op)
   trial_no_bc = get_trial_no_bc(op)
   test_no_bc = get_test_no_bc(op)
@@ -561,7 +590,13 @@ function assemble_matrix_and_lifting(op::ParamUnsteadyBilinOperator,t::Real)
 end
 
 function assemble_matrix_and_lifting(
-  op::ParamBilinOperator{OT,<:UnconstrainedFESpace},args...) where OT
+  op::ParamBilinOperator{Top,<:TrialFESpace},
+  args...) where Top
+  error("Operator $(get_id(op)) has no lifting")
+end
+
+function assemble_matrix_and_lifting(
+  op::ParamBilinOperator{Top,<:TrialFESpace},args...) where Top
   assemble_matrix(op,args...),nothing
 end
 

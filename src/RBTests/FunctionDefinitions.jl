@@ -104,29 +104,22 @@ function stokes_functions(::Val{true},measures::ProblemFixedMeasures)
 
   function a(x,p::Param)
     μ = get_μ(p)
-    #1. + μ[3] + 1. / μ[3] * exp(-norm(x-Point(μ[1:3]))^2 / μ[3])
     5*μ[1] + abs(sin(norm(x.*Point(μ[1:3])))*μ[4])
   end
   a(p::Param) = x->a(x,p)
   b(x,p::Param) = 1.
   b(p::Param) = x->b(x,p)
-  function f(x,p::Param)
-    μ = get_μ(p)
-    #1. + Point(μ[4:6]) .* x
-    VectorValue(0.,0.,0.)
-  end
+  f(x,p::Param) = VectorValue(0.,0.,0.)
   f(p::Param) = x->f(x,p)
-  function h(x,p::Param)
-    μ = get_μ(p)
-    #1. + Point(μ[7:9]) .* x
-    VectorValue(0.,0.,0.)
-  end
+  h(x,p::Param) = VectorValue(0.,0.,0.)
   h(p::Param) = x->h(x,p)
   function g(x,p::Param)
     μ = get_μ(p)
-    1e-4*VectorValue(μ[2]*abs(x[2]-0.5)^2+μ[3]*abs(x[3]-0.5)^2,0.,0.)
-    #gxp = VectorValue(μ[1]*abs(x[1]-0.5)^2,μ[2]*abs(x[2]-0.5)^2,μ[3]*abs(x[3]-0.5)^2)
-    #gxp / norm(gxp)
+    R = 0.5
+    #xc = x-Point(R,R,R)
+    #VectorValue(sum((xc.*Point(μ[1:3]))^2),0.,0.)/norm(μ[1:3])^2
+    xc = x-Point(0,R,R)
+    VectorValue(sum((xc.*Point(μ[1:3]))^2),0.,0.)*(x[1]==0)/norm(μ[1:3])^2
   end
   g(p::Param) = x->g(x,p)
 
@@ -151,14 +144,65 @@ function stokes_functions(::Val{true},measures::ProblemFixedMeasures)
   a,afe,b,bfe,f,ffe,h,hfe,g,lhs,rhs
 end
 
-function navier_stokes_functions(dΩ::Measure,dΓn::Measure,ptype::ProblemType)
-  navier_stokes_functions(dΩ,dΓn,issteady(ptype))
+function stokes_functions(::Val{false},measures::ProblemFixedMeasures)
+
+  function a(x,p::Param,t::Real)
+    μ = get_μ(p)
+    5*μ[1] + abs(sin(t*norm(x.*Point(μ[1:3])))*μ[4])
+  end
+  a(p::Param,t::Real) = x->a(x,p,t)
+  a(p::Param) = t->a(p,t)
+  m(x,p::Param,t::Real) = 1.
+  m(p::Param,t::Real) = x->m(x,p,t)
+  m(p::Param) = t->m(p,t)
+  b(x,p::Param,t::Real) = 1.
+  b(p::Param,t::Real) = x->b(x,p,t)
+  b(p::Param) = t->b(p,t)
+  f(x,p::Param,t::Real) = VectorValue(0.,0.,0.)
+  f(p::Param,t::Real) = x->f(x,p,t)
+  h(x,p::Param,t::Real) = VectorValue(0.,0.,0.)
+  h(p::Param,t::Real) = x->h(x,p,t)
+  function g(x,p::Param,t::Real)
+    μ = get_μ(p)
+    R = 0.5
+    xc = x-Point(0,R,R)
+    (1. +eps()-cos(t))*VectorValue(sum((xc.*Point(μ[1:3]))^2),0.,0.)*(x[1]==0)/norm(μ[1:3])^2
+  end
+  g(p::Param,t::Real) = x->g(x,p,t)
+
+  afe(p::Param,t::Real,dΩ,u,v) = ∫(a(p,t) * ∇(v) ⊙ ∇(u))dΩ
+  mfe(p::Param,t::Real,dΩ,u,v) = ∫(v ⋅ u)dΩ
+  bfe(p::Param,t::Real,dΩ,u,q) = ∫(b(p,t) * q * (∇⋅(u)))dΩ
+  bTfe(p::Param,t::Real,dΩ,u,q) = ∫(b(p,t) * (∇⋅(q)) * u)dΩ
+  ffe(p::Param,t::Real,dΩ,v) = ∫(f(p,t) ⋅ v)dΩ
+  hfe(p::Param,t::Real,dΓn,v) = ∫(h(p,t) ⋅ v)dΓn
+
+  dΩ,dΓn = get_dΩ(measures),get_dΓn(measures)
+  afe(p::Param,t::Real,u,v) = afe(p,t,dΩ,u,v)
+  afe(p::Param,t::Real) = (u,v) -> afe(p,t,u,v)
+  mfe(p::Param,t::Real,u,v) = mfe(p,t,dΩ,u,v)
+  mfe(p::Param,t::Real) = (u,v) -> mfe(p,t,u,v)
+  bfe(p::Param,t::Real,u,v) = bfe(p,t,dΩ,u,v)
+  bfe(p::Param,t::Real) = (u,v) -> bfe(p,t,u,v)
+  bTfe(p::Param,t::Real,u,v) = bTfe(p,t,dΩ,u,v)
+  bTfe(p::Param,t::Real) = (u,v) -> bTfe(p,t,u,v)
+  ffe(p::Param,t::Real,v) = ffe(p,t,dΩ,v)
+  ffe(p::Param,t::Real) = v -> ffe(p,t,v)
+  hfe(p::Param,t::Real,v) = hfe(p,t,dΓn,v)
+  hfe(p::Param,t::Real) = v -> hfe(p,t,v)
+
+  rhs(μ,t,(v,q)) = ffe(μ,t,v) + hfe(μ,t,v)
+  mfe_gridap(μ,t,(u,p),(v,q)) = mfe(μ,t,u,v)
+  lhs(μ,t,(u,p),(v,q)) = afe(μ,t,u,v) - bfe(μ,t,v,p) - bfe(μ,t,u,q)
+
+  a,afe,m,mfe,mfe_gridap,b,bfe,bTfe,f,ffe,h,hfe,g,lhs,rhs
 end
 
-function navier_stokes_functions(
-  dΩ::Measure,
-  dΓn::Measure,
-  ::Val{true})
+function navier_stokes_functions(ptype::ProblemType,measures::ProblemMeasures)
+  navier_stokes_functions(issteady(ptype),measures)
+end
+
+function navier_stokes_functions(::Val{true},measures::ProblemFixedMeasures)
 
   function a(x,p::Param)
     μ = get_μ(p)

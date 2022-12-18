@@ -116,6 +116,7 @@ get_idx_lu_factors(mdeim::MDEIM) = mdeim.idx_lu_factors
 get_id(mdeim::MDEIM) = get_id(mdeim.rbspace)
 get_basis_space(mdeim::MDEIM) = get_basis_space(mdeim.rbspace)
 get_basis_time(mdeim::MDEIMUnsteady) = get_basis_time(mdeim.rbspace)
+get_idx(mdeim::MDEIM) = mdeim.idx
 get_idx_space(mdeim::MDEIMSteady) = mdeim.idx
 get_idx_space(mdeim::MDEIMUnsteady) = first(mdeim.idx)
 get_idx_time(mdeim::MDEIMUnsteady) = last(mdeim.idx)

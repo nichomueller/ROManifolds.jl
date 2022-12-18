@@ -1,6 +1,6 @@
 function compute_coefficient(
-  op::Union{RBSteadyLinOperator{Affine},RBSteadyBilinOperator{Affine,TT},RBSteadyLiftingOperator{Affine,TT}},
-  μ::Param) where TT
+  op::Union{RBSteadyLinOperator{Affine},RBSteadyBilinOperator{Affine,Ttr},RBSteadyLiftingOperator{Affine,Ttr}},
+  μ::Param) where Ttr
 
   fun = get_param_function(op)
   coeff = fun(nothing,μ)[1]
@@ -8,8 +8,8 @@ function compute_coefficient(
 end
 
 function compute_coefficient(
-  op::Union{RBUnsteadyLinOperator{Affine},RBUnsteadyBilinOperator{Affine,TT},RBUnsteadyLiftingOperator{Affine,TT}},
-  μ::Param) where TT
+  op::Union{RBUnsteadyLinOperator{Affine},RBUnsteadyBilinOperator{Affine,Ttr},RBUnsteadyLiftingOperator{Affine,Ttr}},
+  μ::Param) where Ttr
 
   fun = get_param_function(op)
   timesθ = get_timesθ(op)
@@ -73,7 +73,7 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBSteadyBilinOperator{Nonaffine,UnconstrainedFESpace},
+  op::RBSteadyBilinOperator{Nonaffine,<:TrialFESpace},
   m::Measure,
   μ::Param)
 
@@ -82,7 +82,7 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBSteadyBilinOperator{Nonlinear,UnconstrainedFESpace},
+  op::RBSteadyBilinOperator{Nonlinear,<:TrialFESpace},
   m::Measure,
   μ::Param)
 
@@ -91,7 +91,7 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBUnsteadyBilinOperator{Nonaffine,UnconstrainedFESpace},
+  op::RBUnsteadyBilinOperator{Nonaffine,<:TrialFESpace},
   m::Measure,
   μ::Param,
   timesθ::Vector{<:Real})
@@ -102,7 +102,7 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBUnsteadyBilinOperator{Nonlinear,UnconstrainedFESpace},
+  op::RBUnsteadyBilinOperator{Nonlinear,<:TrialFESpace},
   m::Measure,
   μ::Param,
   timesθ::Vector{<:Real})
@@ -114,9 +114,9 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBSteadyBilinOperator{Nonaffine,TT},
+  op::RBSteadyBilinOperator{Nonaffine,Ttr},
   m_mat_lift::NTuple{2,Measure},
-  μ::Param) where TT
+  μ::Param) where Ttr
 
   mmat,mlift = m_mat_lift
 
@@ -133,9 +133,9 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBSteadyBilinOperator{Nonlinear,TT},
+  op::RBSteadyBilinOperator{Nonlinear,Ttr},
   m_mat_lift::NTuple{2,Measure},
-  μ::Param) where TT
+  μ::Param) where Ttr
 
   mmat,mlift = m_mat_lift
 
@@ -152,10 +152,10 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBUnsteadyBilinOperator{Nonaffine,TT},
+  op::RBUnsteadyBilinOperator{Nonaffine,Ttr},
   m_mat_lift::NTuple{2,Measure},
   μ::Param,
-  timesθ::Vector{<:Real}) where TT
+  timesθ::Vector{<:Real}) where Ttr
 
   mmat,mlift = m_mat_lift
 
@@ -172,10 +172,10 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBUnsteadyBilinOperator{Nonlinear,TT},
+  op::RBUnsteadyBilinOperator{Nonlinear,Ttr},
   m_mat_lift::NTuple{2,Measure},
   μ::Param,
-  timesθ::Vector{<:Real}) where TT
+  timesθ::Vector{<:Real}) where Ttr
 
   mmat,mlift = m_mat_lift
 
@@ -194,9 +194,9 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBSteadyBilinOperator{Nonaffine,TT},
+  op::RBSteadyBilinOperator{Nonaffine,Ttr},
   m::Measure,
-  μ::Param) where TT
+  μ::Param) where Ttr
 
   fun = get_fe_function(op)
   dir = get_dirichlet_function(op)(μ)

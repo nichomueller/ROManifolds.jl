@@ -58,6 +58,39 @@ function steady_stokes()
   isapprox(LHS*xh,RHS)
 end
 
+function unsteady_poisson()
+  dt = get_dt(opA)
+  θ = get_θ(opA)
+  μ1 = μ[1]
+  Nu = size(uh.snap[:,1],1)
+  Np = size(ph.snap[:,1],1)
+  x1 = vcat(uh.snap[:,1],ph.snap[:,1])
+  x2 = vcat(uh.snap[:,2],ph.snap[:,2])
+
+  ALA(t) = assemble_matrix_and_lifting(opA,t)
+  BLB(t) = assemble_matrix_and_lifting(opB,t)
+  MLM(t) = assemble_matrix_and_lifting(opM,t)
+  F(μ,t) = assemble_vector(opF,t)(μ)
+  H(μ,t) = assemble_vector(opH,t)(μ)
+  A(μ,t) = ALA(t)[1](μ)
+  LA(μ,t) = ALA(t)[2](μ)
+  B(μ,t) = BLB(t)[1](μ)
+  LB(μ,t) = BLB(t)[2](μ)
+  M(μ,t) = MLM(t)[1](μ)
+  LM(μ,t) = MLM(t)[2](μ)
+
+  LHS(μ,t) = vcat(hcat(A(μ,t)+M(μ,t)/(dt*θ),-B(μ,t)'),hcat(B(μ,t),zeros(Np,Np)))
+  RHS(μ,t) = vcat(F(μ,t)+H(μ,t)-LA(μ,t)-LM(μ,t),-LB(μ,t))
+  RHSadd(μ,t,u) = vcat(M(μ,t)*u/(dt*θ),zeros(Np,1))
+  xθ(μ,t,u) = LHS(μ,t) \ (RHS(μ,t)+RHSadd(μ,t,u))
+  x(μ,t,x) = (xθ(μ,t,x[1:Nu,:])-(1-θ)*x)/θ
+
+  tθ1 = dt*θ
+  tθ2 = dt+dt*θ
+  isapprox(x(μ1,tθ1,zeros(Nu+Np,1)),x1)
+  isapprox(x(μ1,tθ2,x1),x2)
+end
+
 function spaces_steady()
   PS = ParamSpace(ranges,sampling)
   μ = realization(PS)

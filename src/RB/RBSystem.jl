@@ -70,18 +70,18 @@ function online_structure(
 end
 
 function online_structure(
-  op::Union{RBSteadyLinOperator{Nonlinear},RBSteadyBilinOperator{Nonlinear,TT},RBSteadyLiftingOperator{Nonlinear,TT}},
+  op::Union{RBSteadyLinOperator{Nonlinear},RBSteadyBilinOperator{Nonlinear,Ttr},RBSteadyLiftingOperator{Nonlinear,Ttr}},
   basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
-  coeff::Any) where TT
+  coeff::Any) where Ttr
 
   nr = get_nrows(op)
   u -> basis_by_coeff_mult(basis,coeff(u),nr)
 end
 
 function online_structure(
-  op::Union{RBUnsteadyLinOperator{Nonlinear},RBUnsteadyBilinOperator{Nonlinear,TT},RBUnsteadyLiftingOperator{Nonlinear,TT}},
+  op::Union{RBUnsteadyLinOperator{Nonlinear},RBUnsteadyBilinOperator{Nonlinear,Ttr},RBUnsteadyLiftingOperator{Nonlinear,Ttr}},
   basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
-  coeff::Any) where TT
+  coeff::Any) where Ttr
 
   dtθ = get_dt(op)*get_θ(op)
   if get_id(op) == :M coeff /= dtθ end
@@ -234,8 +234,10 @@ function stokes_rb_system(
   rhs::NTuple{N,Matrix{Float}},
   θ::Float) where N
 
-  A_rb,Ashift_rb,BT_rb,BTshift_rb,B_rb,Bshift_rb,M_rb,Mshift_rb = lhs
+  A_rb,Ashift_rb,M_rb,Mshift_rb,BT_rb,BTshift_rb,B_rb,Bshift_rb = lhs
   F_rb,H_rb,lifts... = rhs
+
+  np = size(B_rb,1)
 
   rb_lhs_11 = θ*(A_rb+M_rb) + (1-θ)*Ashift_rb - θ*Mshift_rb
   rb_lhs_12 = - θ*BT_rb - (1-θ)*BTshift_rb
@@ -253,7 +255,7 @@ function navier_stokes_rb_system(lhs::Tuple,rhs::Tuple)
 
   lin_rb_lhs,lin_rb_rhs = stokes_rb_system([A_rb,B_rb],[F_rb,H_rb,liftA,liftB])
 
-  nu,np = size(A_rb)[1],size(B_rb)[1]
+  nu,np = size(A_rb,1),size(B_rb,1)
   block12 = zeros(nu,np)
   block21 = zeros(np,nu)
   block22 = zeros(np,np)
