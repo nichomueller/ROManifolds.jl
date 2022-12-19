@@ -37,15 +37,9 @@ function unsteady_poisson()
 end
 
 function steady_stokes()
-  #uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,1)
-  #xh = vcat(uh.snap,ph.snap)
   u1,p1,μ1 = uh.snap[:,1],ph.snap[:,1],μ[1]
   Np = size(p1,1)
   xh = vcat(u1,p1)
-  opA = NonaffineParamVarOperator(a,afe,PS,U,V;id=:A)
-  opB = AffineParamVarOperator(b,bfe,PS,U,Q;id=:B)
-  opF = AffineParamVarOperator(f,ffe,PS,V;id=:F)
-  opH = AffineParamVarOperator(h,hfe,PS,V;id=:H)
 
   A,LA = assemble_matrix_and_lifting(opA)
   B,LB = assemble_matrix_and_lifting(opB)
@@ -89,6 +83,28 @@ function unsteady_poisson()
   tθ2 = dt+dt*θ
   isapprox(x(μ1,tθ1,zeros(Nu+Np,1)),x1)
   isapprox(x(μ1,tθ2,x1),x2)
+end
+
+function navier_steady_stokes()
+  u1,p1,μ1 = uh.snap[:,1],ph.snap[:,1],μ[1]
+  Np = size(p1,1)
+  x1 = vcat(u1,p1)
+  μ1 = μ[1]
+
+  A,LA = assemble_matrix_and_lifting(opA)
+  B,LB = assemble_matrix_and_lifting(opB)
+  C,LC = assemble_matrix_and_lifting(opC)
+  D = assemble_matrix(opD)
+  F = assemble_vector(opF)
+  H = assemble_vector(opH)
+
+  LHS(u) = vcat(hcat(A(μ1)+C(u),-B(μ1)'),(hcat(B(μ1),zeros(Np,Np))))
+  RHS(u) = vcat(F(μ1)+H(μ1)-LA(μ1)-LC(u),-LB(μ1))
+  J(x) = vcat(hcat(A(μ1)+C(x[1])+D(x[1]),-B(μ1)'),(hcat(B(μ1),zeros(Np,Np))))
+  res(x,xh) = LHS(x[1])*xh-RHS(x[1])
+
+  xnewt = newton(res,J,X(μ1))
+  isapprox(xnewt,x1)
 end
 
 function spaces_steady()

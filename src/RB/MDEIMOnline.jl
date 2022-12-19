@@ -87,7 +87,7 @@ function assemble_red_structure(
   μ::Param)
 
   fun = get_fe_function(op)
-  M(u) = assemble_matrix(v->fun(m,u,v),get_trial(op)(μ),get_test(op))
+  z -> assemble_matrix((u,v)->fun(m,z,u,v),get_trial(op)(μ),get_test(op))
 end
 
 function assemble_red_structure(
@@ -108,8 +108,8 @@ function assemble_red_structure(
   timesθ::Vector{<:Real})
 
   fun = get_fe_function(op)
-  M(tθ,u) = assemble_matrix(v->fun(μ,tθ,m,u,v),get_trial(op)(μ,tθ),get_test(op))
-  M(u) = Matrix(Broadcasting(tθ -> M(tθ,u))(timesθ))
+  tθ = rand(timesθ)
+  M(z) = assemble_matrix(v->fun(m,z,u,v),get_trial(op)(μ,tθ),get_test(op))
   M
 end
 
@@ -141,12 +141,12 @@ function assemble_red_structure(
 
   fun = get_fe_function(op)
   dir = get_dirichlet_function(op)(μ)
-  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trial(op))
+  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
   fdofs_test,_ = fdofs
 
-  M(u) = assemble_matrix(v->fun(μ,mmat,u,v),get_trial(op)(μ),get_test(op))
-  Mlift(u) = assemble_matrix(v->fun(μ,mlift,u,v),get_trial_no_bc(op),get_test_no_bc(op))
-  lift(u) = Mlift(u)[fdofs_test,ddofs]*dir
+  M(z) = assemble_matrix((u,v)->fun(mmat,z,u,v),get_trial(op)(μ),get_test(op))
+  Mlift(z) = assemble_matrix((u,v)->fun(mlift,z,u,v),get_trial_no_bc(op),get_test_no_bc(op))
+  lift(z) = Mlift(z)[fdofs_test,ddofs]*dir
 
   M,lift
 end
@@ -184,10 +184,9 @@ function assemble_red_structure(
   fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
   fdofs_test,_ = fdofs
 
-  M(tθ,u) = assemble_matrix(v->fun(μ,tθ,mmat,u,v),get_trial(op)(μ,tθ),get_test(op))
-  M(u) = Matrix.(Broadcasting(tθ -> M(tθ,u))(timesθ))
-  Mlift(tθ,u) = assemble_matrix(v->fun(μ,tθ,mlift,u,v),get_trial_no_bc(op),get_test_no_bc(op))
-  lift(tθ,u) = Mlift(tθ,u)[fdofs_test,ddofs]*dir(tθ)
+  M(z) = assemble_matrix((u,v)->fun(mmat,z,u,v),get_trial(op)(μ,rand(timesθ)),get_test(op))
+  Mlift(z) = assemble_matrix((u,v)->fun(mlift,z,u,v),get_trial_no_bc(op),get_test_no_bc(op))
+  lift(tθ,u) = Mlift(u)[fdofs_test,ddofs]*dir(tθ)
   lift(u) = Matrix.(Broadcasting(tθ -> lift(tθ,u))(timesθ))
 
   M,lift
@@ -290,7 +289,7 @@ function mdeim_online(
   Nt=1)
 
   M(u) = mdeim_online(A[1](u),idx_lu[1],idx_space[1],Nt)
-  lift(u) = mdeim_online(A[1](u),idx_lu[1],idx_space[1],Nt)
+  lift(u) = mdeim_online(A[2](u),idx_lu[2],idx_space[2],Nt)
   M,lift
 end
 

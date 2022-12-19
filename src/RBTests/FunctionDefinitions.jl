@@ -206,35 +206,49 @@ function navier_stokes_functions(::Val{true},measures::ProblemFixedMeasures)
 
   function a(x,p::Param)
     μ = get_μ(p)
-    1. + μ[6] + 1. / μ[5] * exp(-norm(x-Point(μ[1:3]))^2 / μ[4])
+    1+μ[3]+1/μ[3]*exp(-norm(x-Point(μ[1:3]))^2/μ[3])
+    #5*μ[1] + abs(sin(norm(x.*Point(μ[1:3])))*μ[4])
   end
-  a(μ::Param) = x->a(μ,x)
-  b(μ::Param,x) = 1.
-  b(μ::Param) = x->b(μ,x)
-  function f(x,p::Param)
-    μ = get_μ(p)
-    1. + Point(μ[4:6]) .* x
-  end
-  f(μ::Param) = x->f(μ,x)
-  function h(x,p::Param)
-    μ = get_μ(p)
-    1. + Point(μ[4:6]) .* x
-  end
-  h(μ::Param) = x->h(μ,x)
+  a(p::Param) = x->a(x,p)
+  b(x,p::Param) = 1.
+  b(p::Param) = x->b(x,p)
+  c(x,p::Param) = 1.
+  c(p::Param) = x->c(x,p)
+  d(x,p::Param) = 1.
+  d(p::Param) = x->d(x,p)
+  f(x,p::Param) = VectorValue(1.,1.,1.)#VectorValue(0.,0.,0.)
+  f(p::Param) = x->f(x,p)
+  h(x,p::Param) = VectorValue(1.,1.,1.)#VectorValue(0.,0.,0.)
+  h(p::Param) = x->h(x,p)
   function g(x,p::Param)
     μ = get_μ(p)
-    1. + Point(μ[4:6]) .* x
+    1e-4*VectorValue(μ[7]*cos(x[2])+μ[8]*sin(x[3]),0.,0.)*(x[1] == 0.)
+    #R = 0.5
+    #xc = x-Point(0,R,R)
+    #VectorValue(sum((xc.*Point(μ[1:3]))^2),0.,0.)*(x[1]==0)/norm(μ[1:3])^2
   end
-  g(μ::Param) = x->g(μ,x)
+  g(p::Param) = x->g(x,p)
 
-  afe(μ,u,v) = ∫(a(μ) * ∇(v) ⊙ ∇(u))dΩ
-  bfe(μ,u,q) = ∫(b(μ) * q * (∇⋅(u)))dΩ
-  cfe(z,u,v) = ∫(c(realization(P))*v⊙(∇(u)'⋅z))dΩ
+  afe(p::Param,dΩ,u,v) = ∫(a(p) * ∇(v) ⊙ ∇(u))dΩ
+  bfe(p::Param,dΩ,u,q) = ∫(b(p) * q * (∇⋅(u)))dΩ
+  cfe(dΩ,z,u,v) = ∫(v⊙(∇(u)'⋅z))dΩ
+  dfe(dΩ,z,u,v) = ∫(v⊙(∇(z)'⋅u))dΩ
+  ffe(p::Param,dΩ,v) = ∫(f(p) ⋅ v)dΩ
+  hfe(p::Param,dΓn,v) = ∫(h(p) ⋅ v)dΓn
+
+  dΩ,dΓn = get_dΩ(measures),get_dΓn(measures)
+  afe(p::Param,u,v) = afe(p,dΩ,u,v)
+  afe(p::Param) = (u,v) -> afe(p,u,v)
+  bfe(p::Param,u,v) = bfe(p,dΩ,u,v)
+  bfe(p::Param) = (u,v) -> bfe(p,u,v)
+  cfe(z,u,v) = cfe(dΩ,z,u,v)
   cfe(z) = (u,v) -> cfe(z,u,v)
-  dfe(z,u,v) = ∫(d(realization(P))*v⊙(∇(z)'⋅u))dΩ
+  dfe(z,u,v) = dfe(dΩ,z,u,v)
   dfe(z) = (u,v) -> dfe(z,u,v)
-  ffe(μ,v) = ∫(f(μ) ⋅ v)dΩ
-  hfe(μ,v) = ∫(h(μ) ⋅ v)dΓn
+  ffe(p::Param,v) = ffe(p,dΩ,v)
+  ffe(p::Param) = v -> ffe(p,v)
+  hfe(p::Param,v) = hfe(p,dΓn,v)
+  hfe(p::Param) = v -> hfe(p,v)
 
   conv(u,∇u) = (∇u')⋅u
   dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
@@ -244,10 +258,10 @@ function navier_stokes_functions(::Val{true},measures::ProblemFixedMeasures)
   rhs(μ,(v,q)) = ffe(μ,v) + hfe(μ,v)
   lhs(μ,(u,p),(v,q)) = afe(μ,u,v) - bfe(μ,v,p) - bfe(μ,u,q)
 
-  res(μ,(u,p),(v,q)) = lhs(μ,(u,p),(v,q)) + c(u,v) - rhs(μ,(v,q))
-  jac(μ,(u,p),(du,dp),(v,q)) = lhs(μ,(du,dp),(v,q)) + dc(u,du,v)
+  res(μ,(u,p),(v,q)) = lhs(μ,(u,p),(v,q)) + cgridap(u,v) - rhs(μ,(v,q))
+  jac(μ,(u,p),(du,dp),(v,q)) = lhs(μ,(du,dp),(v,q)) + dcgridap(u,du,v)
 
-  a,b,f,h,g,afe,bfe,cfe,dfe,ffe,hfe,res,jac
+  a,afe,b,bfe,c,cfe,d,dfe,f,ffe,h,hfe,g,res,jac
 end
 
 function navier_stokes_functions(

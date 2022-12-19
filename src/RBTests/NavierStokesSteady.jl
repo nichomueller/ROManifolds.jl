@@ -1,50 +1,146 @@
-include("tests.jl")
+include("../FEM/FEM.jl")
+include("../RB/RB.jl")
+include("RBTests.jl")
 
-function configure()
-  steady = true
-  indef = false
-  pdomain = false
-  ptype = ProblemType(steady,indef,pdomain)
+function navier_stokes_steady()
   run_fem = true
 
-  root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes"
-  mesh = "cube5x5x5.json"
-  bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
-  degree = 2
+  steady = true
+  indef = true
+  pdomain = false
+  ptype = ProblemType(steady,indef,pdomain)
 
-  ranges = Param.(fill([1.,10.],6))
+  root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/stokes"
+  mesh = "cube10x10x10.json"#"cube5x5x5.json"
+  bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
+  order = 2
+
+  ranges = fill([1.,2.],9)
   sampling = UniformSampling()
   PS = ParamSpace(ranges,sampling)
 
-  fepath = fem_path(mesh,ptype,root)
-  model,dΩ,dΓn = model_info(bnd_info,degree,ptype)
+  fepath = fem_path(ptype,mesh,root)
+  mshpath = mesh_path(mesh,root)
+  model = model_info(mshpath,bnd_info,ptype)
+  measures = ProblemMeasures(model,order)
 
-  a,b,f,h,g,afe,bfe,cfe,dfe,ffe,hfe,res,jac =
-    navier_stokes_functions(dΩ,dΓn,ptype)
+  a,afe,b,bfe,c,cfe,d,dfe,f,ffe,h,hfe,g,res,jac = navier_stokes_functions(ptype,measures)
 
-  reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{3,Float},degree)
-  reffe2 = Gridap.ReferenceFE(lagrangian,Float,degree-1;space=:P)
-
+  reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{3,Float},order)
+  reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1;space=:P)
   V = MyTests(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet"])
   U = MyTrials(V,g,ptype)
   Q = MyTests(model,reffe2;conformity=:L2)
   P = MyTrials(Q)
-
-  X = ParamMultiFieldFESpace([U,P])
   Y = ParamMultiFieldFESpace([V,Q])
+  X = ParamMultiFieldFESpace([U,P])
+
   op = ParamFEOperator(res,jac,PS,X,Y)
+
   nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking())
   solver = FESolver(nls)
-  uh,μ = get_fe_snapshots(solver,op,fepath,run_fem,1)
+  nsnap = 100
+  uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
 
-  opA = ParamVarOperator(a,afe,U,V,Nonaffine())
-  opB = ParamVarOperator(b,bfe,U,Q,Affine())
-  opC = ParamVarOperator(c,cfe,U,V,Nonlinear())
-  opD = ParamVarOperator(d,dfe,U,V,Nonlinear())
-  opF = ParamVarOperator(f,ffe,V,Nonaffine())
-  opH = ParamVarOperator(h,hfe,V,Nonaffine())
+  opA = NonaffineParamVarOperator(a,afe,PS,U,V;id=:A)
+  opB = AffineParamVarOperator(b,bfe,PS,U,Q;id=:B)
+  opC = NonlinearParamVarOperator(c,cfe,PS,U,V;id=:C)
+  opD = NonlinearParamVarOperator(d,dfe,PS,U,V;id=:D)
+  opF = AffineParamVarOperator(f,ffe,PS,V;id=:F)
+  opH = AffineParamVarOperator(h,hfe,PS,V;id=:H)
 
-  Problem(ptype,μ,uh,[opA,opB,opC,opD,opM,opF,opH])
+  info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=false)
+  tt = TimeTracker(0.,0.)
+  rbspace,varinfo = offline_phase(info,(uh,ph,μ,X),(opA,opB,opC,opD,opF,opH),measures,tt)
+  online_phase(info,(uh,ph,μ,X),rbspace,varinfo,tt)
 end
 
-const feproblem = configure()
+function offline_phase(
+  info::RBInfo,
+  fe_sol,
+  op::NTuple{N,ParamVarOperator},
+  meas::ProblemMeasures,
+  tt::TimeTracker) where N
+
+  uh,ph,μ, = fe_sol
+  uh_offline = uh[1:info.nsnap]
+  ph_offline = ph[1:info.nsnap]
+  opA,opB,opC,opD,opF,opH = op
+
+  rbspace_u,rbspace_p = rb(info,tt,(uh_offline,ph_offline),opB,ph,μ)
+
+  rbopA = RBVarOperator(opA,rbspace_u,rbspace_u)
+  rbopB = RBVarOperator(opB,rbspace_p,rbspace_u)
+  rbopC = RBVarOperator(opC,rbspace_u,rbspace_u)
+  rbopD = RBVarOperator(opD,rbspace_u,rbspace_u)
+  rbopF = RBVarOperator(opF,rbspace_u)
+  rbopH = RBVarOperator(opH,rbspace_u)
+
+  if info.load_offline
+    A_rb = load_rb_structure(info,rbopA,meas.dΩ)
+    B_rb = load_rb_structure(info,rbopB,meas.dΩ)
+    C_rb = load_rb_structure(info,rbopC,meas.dΩ)
+    D_rb = load_rb_structure(info,rbopD,meas.dΩ)
+    F_rb = load_rb_structure(info,rbopF,meas.dΩ)
+    H_rb = load_rb_structure(info,rbopH,meas.dΓn)
+  else
+    A_rb = assemble_rb_structure(info,tt,rbopA,μ,meas,:dΩ)
+    B_rb = assemble_rb_structure(info,tt,rbopB,μ,meas,:dΩ)
+    C_rb = assemble_rb_structure(info,tt,rbopC,μ,meas,:dΩ)
+    D_rb = assemble_rb_structure(info,tt,rbopD,μ,meas,:dΩ)
+    F_rb = assemble_rb_structure(info,tt,rbopF,μ,meas,:dΩ)
+    H_rb = assemble_rb_structure(info,tt,rbopH,μ,meas,:dΓn)
+  end
+
+  rbspace = (rbspace_u,rbspace_p)
+  varinfo = ((rbopA,A_rb),(rbopB,B_rb),(rbopC,C_rb),(rbopD,D_rb),(rbopF,F_rb),(rbopH,H_rb))
+  rbspace,varinfo
+end
+
+function online_phase(
+  info::RBInfo,
+  fe_sol,
+  rbspace::NTuple{2,RBSpace},
+  varinfo::Tuple,
+  tt::TimeTracker)
+
+  uh,ph,μ,X = fe_sol
+
+  Ainfo,Binfo,Cinfo,Dinfo,Finfo,Hinfo = varinfo
+  rbopA,A_rb = Ainfo
+  rbopB,B_rb = Binfo
+  rbopC,C_rb = Cinfo
+  rbopD,D_rb = Dinfo
+  rbopF,F_rb = Finfo
+  rbopH,H_rb = Hinfo
+
+  function online_loop(k::Int)
+    tt.online_time += @elapsed begin
+      Aon = online_assembler(rbopA,A_rb,μ[k])
+      Bon = online_assembler(rbopB,B_rb,μ[k])
+      Con = online_assembler(rbopC,C_rb,μ[k])
+      Don = online_assembler(rbopD,D_rb,μ[k])
+      Fon = online_assembler(rbopF,F_rb,μ[k])
+      Hon = online_assembler(rbopH,H_rb,μ[k])
+      lift = Aon[2],Bon[2],Con[2]
+      sys = navier_stokes_rb_system((Aon[1],Bon[1],Con[1],Don[1]),(Fon,Hon,lift...))
+      rb_sol = solve_rb_system(sys...,X(μ[k]),rbspace)
+    end
+    uhk = get_snap(uh[k])
+    phk = get_snap(ph[k])
+    uhk_rb,phk_rb = reconstruct_fe_sol(rbspace,rb_sol)
+    ErrorTracker(:u,uhk,uhk_rb,k),ErrorTracker(:p,phk,phk_rb,k)
+  end
+
+  ets = online_loop.(info.online_snaps)
+  ets_u,ets_p = first.(ets),last.(ets)
+  res_u,res_p = RBResults(:u,tt,ets_u),RBResults(:p,tt,ets_p)
+  save(info,res_u)
+  save(info,res_p)
+
+  if info.postprocess
+    postprocess(info,(res_u,res_p))
+  end
+end
+
+navier_stokes_steady()

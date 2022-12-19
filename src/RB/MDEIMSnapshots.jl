@@ -3,22 +3,25 @@ basis_as_fefun(::RBLinOperator) = error("Not implemented")
 function basis_as_fefun(
   op::RBSteadyBilinOperator{Top,<:ParamTrialFESpace}) where Top
 
-  bspace = get_basis_space(op)
-  ns = get_ns(bspace)
+  bspace = get_basis_space_col(op)
+  ns = size(bspace,2)
   trial = get_trial(op)
-  fefuns(k::Int) = FEFunction(trial,bspace[:,k])
-  eval.(fefuns,1:ns)
+  μ = realization(op)
+  fefuns(k::Int) = FEFunction(trial(μ),bspace[:,k])
+  fefuns.(1:ns)
 end
 
 function basis_as_fefun(
   op::RBUnsteadyBilinOperator{Top,<:ParamTransientTrialFESpace}) where Top
 
-  bspace = get_basis_space(op)
-  ns = get_ns(bspace)
+  bspace = get_basis_space_col(op)
+  ns = size(bspace,2)
   trial = get_trial(op)
-  fefuns(t::Real,k::Int) = FEFunction(trial(t),bspace[:,k])
-  fefuns(t::Real) = k->fefuns(t,k)
-  t -> eval.(fefuns(t),1:ns)
+  μ = realization(op)
+  tinfo = get_time_info(op)
+  t = realization(tinfo)
+  fefuns(k::Int) = FEFunction(trial(μ,t),bspace[:,k])
+  fefuns.(1:ns)
 end
 
 function mdeim_snapshots(
@@ -120,7 +123,7 @@ function matrix_snapshots(
   function snapshot(k::Int)
     println("Snapshot number $k, $id")
     i,v = findnz(M(bfun[k])[:])
-    i,v,lift
+    i,v,lift(bfun[k])
   end
 
   ivl = snapshot.(eachindex(bfun))
@@ -153,17 +156,19 @@ end
 
 function matrix_snapshots(
   ::Val{false},
-  op::RBUnsteadyBilinOperator{Nonlinear,<:ParamTransientTrialFESpace},
-  ::Vector{Param})
+  op::RBUnsteadyBilinOperator{Nonlinear,<:ParamTrialFESpace},
+  args...)
 
   id = get_id(op)
   bfun = basis_as_fefun(op)
+  M,lift = assemble_matrix_and_lifting(op)
 
   function snapshot(k::Int)
     println("Snapshot number $k, $id")
-    M,lift = assemble_matrix_and_lifting(op)(bfun[k])
-    i,v = findnz(M[:])
-    i,v,lift
+    iv = findnz.(M(bfun[k]))
+    i,v = first.(iv),last.(iv)
+    check_row_idx(i)
+    first(i),Matrix(v),lift(bfun[k])
   end
 
   ivl = snapshot.(eachindex(bfun))

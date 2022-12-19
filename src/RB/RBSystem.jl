@@ -46,7 +46,7 @@ end
 function online_structure(
   op::Union{RBSteadyLinOperator,RBSteadyBilinOperator,RBSteadyLiftingOperator},
   basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
-  coeff::Any)
+  coeff)
 
   nr = get_nrows(op)
   basis_by_coeff_mult(basis,coeff,nr)
@@ -55,7 +55,7 @@ end
 function online_structure(
   op::Union{RBUnsteadyLinOperator,RBUnsteadyBilinOperator,RBUnsteadyLiftingOperator},
   basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
-  coeff::Any)
+  coeff)
 
   dtθ = get_dt(op)*get_θ(op)
   if get_id(op) == :M coeff /= dtθ end
@@ -71,17 +71,28 @@ end
 
 function online_structure(
   op::Union{RBSteadyLinOperator{Nonlinear},RBSteadyBilinOperator{Nonlinear,Ttr},RBSteadyLiftingOperator{Nonlinear,Ttr}},
-  basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
-  coeff::Any) where Ttr
+  basis::Matrix{Float},
+  coeff) where Ttr
 
   nr = get_nrows(op)
   u -> basis_by_coeff_mult(basis,coeff(u),nr)
 end
 
 function online_structure(
+  op::Union{RBSteadyBilinOperator{Nonlinear,Ttr}},
+  basis::NTuple{2,Matrix{Float}},
+  coeff) where Ttr
+
+  nr = get_nrows(op)
+  M(u) = basis_by_coeff_mult(basis[1],coeff[1](u),nr)
+  lift(u) = basis_by_coeff_mult(basis[2],coeff[2](u),nr)
+  M,lift
+end
+
+function online_structure(
   op::Union{RBUnsteadyLinOperator{Nonlinear},RBUnsteadyBilinOperator{Nonlinear,Ttr},RBUnsteadyLiftingOperator{Nonlinear,Ttr}},
-  basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
-  coeff::Any) where Ttr
+  basis::Matrix{Float},
+  coeff) where Ttr
 
   dtθ = get_dt(op)*get_θ(op)
   if get_id(op) == :M coeff /= dtθ end
@@ -92,6 +103,24 @@ function online_structure(
   basis_block = blocks(basis,size(basis,2);dims=(nr,nc))
 
   u -> basis_by_coeff_mult(basis_block,btbtp(u),nr)
+end
+
+function online_structure(
+  op::RBUnsteadyBilinOperator{Nonlinear,Ttr},
+  basis::NTuple{2,Matrix{Float}},
+  coeff) where Ttr
+
+  dtθ = get_dt(op)*get_θ(op)
+  if get_id(op) == :M coeff /= dtθ end
+
+  btbtp = coeff_by_time_bases(op,coeff)
+  nr = get_nrows(op)
+  nc = get_ncols(op)
+  basis_block = blocks(basis,size(basis,2);dims=(nr,nc))
+
+  M(u) = basis_by_coeff_mult(basis_block[1],btbtp[1](u),nr)
+  lift(u) = basis_by_coeff_mult(basis_block[2],btbtp[2](u),nr)
+  M,lift
 end
 
 function coeff_by_time_bases(op::RBUnsteadyLinOperator,coeff)
@@ -250,23 +279,25 @@ end
 
 function navier_stokes_rb_system(lhs::Tuple,rhs::Tuple)
   A_rb,B_rb,C_rb,D_rb = lhs
-  F_rb,H_rb,lifts = rhs
-  liftA,liftB,liftC,_ = lifts
+  F_rb,H_rb,lifts... = rhs
+  liftA,liftB,liftC, = lifts
 
-  lin_rb_lhs,lin_rb_rhs = stokes_rb_system([A_rb,B_rb],[F_rb,H_rb,liftA,liftB])
+  lin_rb_lhs,lin_rb_rhs = stokes_rb_system((A_rb,B_rb),(F_rb,H_rb,liftA,liftB))
 
   nu,np = size(A_rb,1),size(B_rb,1)
   block12 = zeros(nu,np)
   block21 = zeros(np,nu)
   block22 = zeros(np,np)
-  nonlin_rb_lhs1(u) = vcat(hcat(Cₙu(u),block12),hcat(block21,block22))
-  nonlin_rb_lhs2(u) = vcat(hcat(C_rb(u)+D_rb(u),block12),hcat(block21,block22))
-  nonlin_rb_rhs(u) = vcat(liftC(u),zeros(np,1))
+  nonlin_rb_lhs1(x) = vcat(hcat(C_rb(x[1]),block12),hcat(block21,block22))
+  nonlin_rb_lhs2(x) = vcat(hcat(C_rb(x[1])+D_rb(x[1]),block12),hcat(block21,block22))
+  nonlin_rb_rhs(x) = vcat(liftC(x[1]),zeros(np,1))
 
-  jac_rb(u) = lin_rb_lhs + nonlin_rb_lhs1(u)
-  res_rb(u) = lin_rb_rhs + nonlin_rb_rhs(u)
-  dx_rb(u) = jac_rb(u) \ res_rb(u)
-  dx_rb
+  jac_rb(x) = lin_rb_lhs + nonlin_rb_lhs2(x)
+  lhs_rb(x) = lin_rb_lhs + nonlin_rb_lhs1(x)
+  rhs_rb(x) = lin_rb_rhs + nonlin_rb_rhs(x)
+  res_rb(x,x_rb) = lhs_rb(x)*x_rb - rhs_rb(x)
+
+  res_rb,jac_rb
 end
 
 function solve_rb_system(rb_lhs::Matrix{Float},rb_rhs::Matrix{Float})
@@ -275,12 +306,42 @@ function solve_rb_system(rb_lhs::Matrix{Float},rb_rhs::Matrix{Float})
 end
 
 function solve_rb_system(
-  V::GridapType,rbspace::Vector{<:RBSpace},dx_rb::Function,args...)
+  res::Function,
+  jac::Function,
+  X::FESpace,
+  rbspace::NTuple{2,RBSpaceSteady};
+  kwargs...)
+
   println("Solving system via Newton method")
-  newton(V,rbspace,dx_rb,args...)
+  rb_newton(res,jac,X,rbspace;kwargs...)
 end
 
-function newton(
+function rb_newton(
+  res::Function,
+  jac::Function,
+  X::FESpace,
+  rbspace::NTuple{2,<:RBSpace};
+  tol=1e-10,maxit=10)
+
+  bsu,bsp = get_basis_space.(rbspace)
+  nsu,nsp = size(bsu,2),size(bsp,2)
+  x_rb = zeros(nsu+nsp,1)
+
+  err = 1.
+  x = zero(X)
+  iter = 0
+  while norm(err) > tol && iter < maxit
+    jx_rb,rx_rb = jac(x),res(x,x_rb)
+    err = jx_rb \ rx_rb
+    x_rb -= err
+    x = FEFunction(X,vcat(bsu*x_rb[1:nsu],bsp*x_rb[1+nsu:end]))
+    iter += 1
+    println("err = $(norm(err)), iter = $iter")
+  end
+  x_rb
+end
+
+#= function newton(
   rbspace::Vector{<:RBSpace},
   dx_rb::Function,
   ϵ=1e-9,max_iter=10)
@@ -307,7 +368,7 @@ function newton(
 
   println("Newton-Raphson ended with iter: $iter; ||δx̂||₂: $(norm(δx̂))")
   x_rb
-end
+end =#
 
 function reconstruct_fe_sol(rbspace::RBSpaceSteady,rb_sol::Matrix{Float})
   bs = get_basis_space(rbspace)

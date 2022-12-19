@@ -140,6 +140,24 @@ function assemble_matrix_and_lifting(op::RBBilinOperator{Affine,Ttr},args...) wh
   assemble_matrix_and_lifting(op.feop,args...)(realization(op))
 end
 
+function assemble_affine_matrix(op::RBSteadyBilinOperator)
+  assemble_matrix(op.feop)(realization(op))
+end
+
+function assemble_affine_matrix(op::RBUnsteadyBilinOperator)
+  assemble_matrix(op.feop,realization(op.tinfo))(realization(op))
+end
+
+function assemble_affine_matrix(op::RBSteadyBilinOperator{Nonlinear,Ttr}) where Ttr
+  u = realization(op.feop.tests)
+  assemble_matrix(op.feop)(u)
+end
+
+function assemble_affine_matrix(op::RBUnsteadyBilinOperator{Nonlinear,Ttr}) where Ttr
+  u = realization(op.feop.tests)
+  assemble_matrix(op.feop,realization(op.tinfo))(u)
+end
+
 get_dirichlet_function(op::RBVarOperator) = get_dirichlet_function(op.feop)
 
 get_pspace(op::RBVarOperator) = get_pspace(op.feop)
@@ -152,14 +170,8 @@ get_θ(op::RBVarOperator) = get_θ(op.feop)
 get_timesθ(op::RBVarOperator) = get_timesθ(op.feop)
 
 "Small, full vector -> large, sparse vector"
-function get_findnz_mapping(op::RBSteadyBilinOperator)
-  M = assemble_matrix(op)(realization(op))
-  first(findnz(M[:]))
-end
-
-"Small, full vector -> large, sparse vector"
-function get_findnz_mapping(op::RBUnsteadyBilinOperator)
-  M = assemble_matrix(op,get_dt(op))(realization(op))
+function get_findnz_mapping(op::RBBilinOperator)
+  M = assemble_affine_matrix(op)
   first(findnz(M[:]))
 end
 
