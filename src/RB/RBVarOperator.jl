@@ -140,6 +140,14 @@ function assemble_matrix_and_lifting(op::RBBilinOperator{Affine,Ttr},args...) wh
   assemble_matrix_and_lifting(op.feop,args...)(realization(op))
 end
 
+function assemble_affine_vector(op::RBSteadyLinOperator)
+  assemble_vector(op.feop)(realization(op))
+end
+
+function assemble_affine_vector(op::RBUnsteadyLinOperator)
+  assemble_vector(op.feop,realization(op.tinfo))(realization(op))
+end
+
 function assemble_affine_matrix(op::RBSteadyBilinOperator)
   assemble_matrix(op.feop)(realization(op))
 end
@@ -204,30 +212,15 @@ function unfold_spacetime(
   Matrix(first.(vals)),Matrix(last.(vals))
 end
 
-function rb_projection(op::RBSteadyLinOperator)
-  vec = assemble_vector(op)
+function rb_projection(op::RBLinOperator)
+  vec = assemble_affine_vector(op)
   brow = get_basis_space_row(op)
 
   Matrix(brow'*vec)
 end
 
-function rb_projection(op::RBUnsteadyLinOperator)
-  vec = assemble_vector(op,get_dt(op))
-  brow = get_basis_space_row(op)
-
-  Matrix(brow'*vec)
-end
-
-function rb_projection(op::RBSteadyBilinOperator)
-  mat = assemble_matrix(op)
-  brow = get_basis_space_row(op)
-  bcol = get_basis_space_col(op)
-
-  Matrix((brow'*mat*bcol)[:])
-end
-
-function rb_projection(op::RBUnsteadyBilinOperator)
-  mat = assemble_matrix(op,get_dt(op))
+function rb_projection(op::RBBilinOperator)
+  mat = assemble_affine_matrix(op)
   brow = get_basis_space_row(op)
   bcol = get_basis_space_col(op)
 

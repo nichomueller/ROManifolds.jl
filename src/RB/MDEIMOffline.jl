@@ -43,33 +43,9 @@ function MDEIM(
   MDEIM.(red_rbspace,idx_lu_factors,idx,red_measure)
 end
 
-#= function load_mdeim(
-  path::String,
-  op::RBLinOperator,
-  meas::Measure)
-
-  load_mdeim(path,op,meas)
-end
-
 function load_mdeim(
   path::String,
-  op::RBBilinOperator,
-  meas::Measure)
-
-  load_mdeim(path,op,meas),load_mdeim(path*"_lift",op,meas)
-end
-
-function load_mdeim(
-  path::String,
-  op::RBBilinOperator{Top,UnconstrainedFESpace},
-  meas::Measure) where Top
-
-  load_mdeim(path,op,meas)
-end =#
-
-function load_mdeim(
-  path::String,
-  op::Union{RBSteadyLinOperator,RBSteadyBilinOperator},
+  op::Union{RBSteadyLinOperator,RBSteadyBilinOperator,RBSteadyLiftingOperator},
   meas::Measure)
 
   id = Symbol(last(split(path,'/')))

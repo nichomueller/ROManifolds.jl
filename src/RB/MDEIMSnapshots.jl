@@ -4,24 +4,18 @@ function basis_as_fefun(
   op::RBSteadyBilinOperator{Top,<:ParamTrialFESpace}) where Top
 
   bspace = get_basis_space_col(op)
-  ns = size(bspace,2)
   trial = get_trial(op)
-  μ = realization(op)
-  fefuns(k::Int) = FEFunction(trial(μ),bspace[:,k])
-  fefuns.(1:ns)
+  fefuns(μ::Param,n::Int) = FEFunction(trial(μ),bspace[:,n])
+  fefuns
 end
 
 function basis_as_fefun(
-  op::RBUnsteadyBilinOperator{Top,<:ParamTransientTrialFESpace}) where Top
+  op::RBSteadyBilinOperator{Top,<:ParamTrialFESpace}) where Top
 
   bspace = get_basis_space_col(op)
-  ns = size(bspace,2)
   trial = get_trial(op)
-  μ = realization(op)
-  tinfo = get_time_info(op)
-  t = realization(tinfo)
-  fefuns(k::Int) = FEFunction(trial(μ,t),bspace[:,k])
-  fefuns.(1:ns)
+  fefuns(μ::Param,tθ::Real,n::Int) = FEFunction(trial(μ,tθ),bspace[:,n])
+  fefuns
 end
 
 function mdeim_snapshots(
@@ -106,30 +100,45 @@ function matrix_snapshots(
   end
 
   ivl = snapshot.(eachindex(μ))
-  row_idx,vals,lift = getindex.(ivl,1),getindex.(ivl,2),getindex.(ivl,3)
+  row_idx,vals,lifts = getindex.(ivl,1),getindex.(ivl,2),getindex.(ivl,3)
   check_row_idx(row_idx)
-  Snapshots(id,vals),Snapshots(id*:_lift,lift)
+  Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
 function matrix_snapshots(
   ::Val{false},
   op::RBSteadyBilinOperator{Nonlinear,<:ParamTrialFESpace},
-  args...)
+  μ::Vector{Param})
+
+  μ_mdeim = length(μ) > 5 ? μ[1:5] : μ
+  nparam = length(μ_mdeim)
 
   id = get_id(op)
   bfun = basis_as_fefun(op)
+  ns = size(get_basis_space_col(op),2)
   M,lift = assemble_matrix_and_lifting(op)
 
-  function snapshot(k::Int)
-    println("Snapshot number $k, $id")
-    i,v = findnz(M(bfun[k])[:])
-    i,v,lift(bfun[k])
+  function snapshot(k::Int,n::Int)
+    println("Nonlinear snapshot number $((n-1)*nparam+k), $id")
+    bfun(μ_mdeim[k],n)
+  end
+  row_idx = Vector{Int}[]
+  vals = Vector{Float}[]
+  lifts = Vector{Float}[]
+
+  for n = 1:ns
+    for k = 1:nparam
+      bfun_nk = snapshot(k,n)
+      i_nk,v_nk = findnz(M(bfun_nk)[:])
+      l_nk = lift(bfun_nk)
+      push!(row_idx,i_nk)
+      push!(vals,v_nk)
+      push!(lifts,l_nk)
+    end
   end
 
-  ivl = snapshot.(eachindex(bfun))
-  row_idx,vals,lift = getindex.(ivl,1),getindex.(ivl,2),getindex.(ivl,3)
   check_row_idx(row_idx)
-  Snapshots(id,vals),Snapshots(id*:_lift,lift)
+  Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
 function matrix_snapshots(
@@ -149,32 +158,33 @@ function matrix_snapshots(
   end
 
   ivl = snapshot.(eachindex(μ))
-  row_idx,vals,lift = getindex.(ivl,1),getindex.(ivl,2),getindex.(ivl,3)
+  row_idx,vals,lifts = getindex.(ivl,1),getindex.(ivl,2),getindex.(ivl,3)
   check_row_idx(row_idx)
-  Snapshots(id,vals),Snapshots(id*:_lift,lift)
+  Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
 function matrix_snapshots(
   ::Val{false},
   op::RBUnsteadyBilinOperator{Nonlinear,<:ParamTrialFESpace},
-  args...)
+  μ::Vector{Param})
 
   id = get_id(op)
   bfun = basis_as_fefun(op)
   M,lift = assemble_matrix_and_lifting(op)
 
-  function snapshot(k::Int)
+  function snapshot(ns::Int,k::Int)
     println("Snapshot number $k, $id")
-    iv = findnz.(M(bfun[k]))
+    bfun_nk = bfun(μ,k)
+    iv = findnz.(M.(μ)(k))
     i,v = first.(iv),last.(iv)
     check_row_idx(i)
     first(i),Matrix(v),lift(bfun[k])
   end
 
   ivl = snapshot.(eachindex(bfun))
-  row_idx,vals,lift = getindex.(ivl,1),getindex.(ivl,2),getindex.(ivl,3)
+  row_idx,vals,lifts = getindex.(ivl,1),getindex.(ivl,2),getindex.(ivl,3)
   check_row_idx(row_idx)
-  Snapshots(id,vals),Snapshots(id*:_lift,lift)
+  Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
 function matrix_snapshots(
@@ -203,17 +213,18 @@ function matrix_snapshots(
   test_quad = LagrangianQuadFESpace(get_test(op))
   param_fefuns = FEFunction(test_quad,red_vals_space)
 
+  M,lift = assemble_matrix_and_lifting(op)
+
   function snapshot(k::Int)
     println("Snapshot number $k, $id")
-    M,lift = assemble_matrix_and_lifting(op)(param_fefuns[k])
-    i,v = findnz(M[:])
-    i,v,lift
+    i,v = findnz(M(param_fefuns[k])[:])
+    i,v,lift(param_fefuns[k])
   end
 
   ivl = snapshot.(eachindex(μ))
-  row_idx,vals,lift = getindex.(ivl,1),getindex.(ivl,2),getindex.(ivl,3)
+  row_idx,vals,lifts = getindex.(ivl,1),getindex.(ivl,2),getindex.(ivl,3)
   check_row_idx(row_idx)
-  Snapshots(id,vals),Snapshots(id*:_lift,lift)
+  Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
 function check_row_idx(row_idx::Vector{Vector{Int}})

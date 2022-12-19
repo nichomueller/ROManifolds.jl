@@ -1,9 +1,9 @@
 function rb(info::RBInfo,args...)
-  info.load_offline ? get_rb(isindef(info),info) : assemble_rb(isindef(info),info,args...)
+  info.load_offline ? load_rb(isindef(info),info) : assemble_rb(isindef(info),info,args...)
 end
 
-get_rb(::Val{false},info::RBInfo) = load_rb(info,:u)
-get_rb(::Val{true},info::RBInfo) = load_rb(info,:u),load_rb(info,:p)
+load_rb(::Val{false},info::RBInfo) = load_rb(info,:u)
+load_rb(::Val{true},info::RBInfo) = load_rb(info,:u),load_rb(info,:p)
 
 function assemble_rb(
   ::Val{false},

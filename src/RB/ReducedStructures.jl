@@ -1,3 +1,11 @@
+function rb_structure(info::RBInfo,args...)
+  if info.load_offline
+    load_rb_structure(info,args...)
+  else
+    assemble_rb_structure(info,args...)
+  end
+end
+
 function assemble_rb_structure(info::RBInfo,tt::TimeTracker,op::RBVarOperator,args...)
   tt.offline_time += @elapsed begin
     rb_variable = assemble_rb_structure(info,op,args...)
@@ -117,33 +125,91 @@ end
 
 function load_rb_structure(
   info::RBInfo,
+  tt::TimeTracker,
   op::RBVarOperator,
+  args...)
+
+  path_id = joinpath(info.offline_path,"$id")
+  if ispath(path_id)
+    _,meas,field = args
+    load_rb_structure(info,op,getproperty(meas,field))
+  else
+    println("Failed to load variable $(id): running offline assembler instead")
+    assemble_rb_structure(info,tt,op,args...)
+  end
+
+end
+
+function load_rb_structure(
+  info::RBInfo,
+  op::RBLinOperator,
   meas::Measure)
 
   id = get_id(op)
-  println("Importing reduced $id")
+  println("Loading MDEIM structures for non-affine variable $id")
   path_id = joinpath(info.offline_path,"$id")
+
   load_mdeim(path_id,op,meas)
 end
 
 function load_rb_structure(
   info::RBInfo,
-  op::Union{RBLinOperator{Affine},RBBilinOperator{Affine,Ttr}},
-  args...) where Ttr
+  op::RBLinOperator{Affine},
+  args...)
 
   id = get_id(op)
-  println("Importing reduced $id")
+  println("Loading projected affine variable $id")
   path_id = joinpath(info.offline_path,"$id")
-  load(joinpath(path_id,"basis_space")),load(joinpath(path_id*"_lift","basis_space"))
+
+  load(joinpath(path_id,"basis_space"))
 end
 
 function load_rb_structure(
   info::RBInfo,
-  op::Union{RBLinOperator{Affine},RBBilinOperator{Affine,<:TrialFESpace}},
+  op::RBBilinOperator,
+  meas::Measure)
+
+  id = get_id(op)
+  println("Loading MDEIM structures for non-affine variable $id and its lifting")
+  path_id = joinpath(info.offline_path,"$id")
+  path_id_lift = joinpath(info.offline_path,"$(id)_lift")
+
+  load_mdeim(path_id,op,meas),load_mdeim(path_id_lift,op,meas)
+end
+
+function load_rb_structure(
+  info::RBInfo,
+  op::RBBilinOperator{Top,<:TrialFESpace},
+  meas::Measure) where Top
+
+  id = get_id(op)
+  println("Loading MDEIM structures for non-affine variable $id")
+  path_id = joinpath(info.offline_path,"$id")
+
+  load_mdeim(path_id,op,meas)
+end
+
+function load_rb_structure(
+  info::RBInfo,
+  op::RBBilinOperator{Affine,Ttr},
+  meas::Measure) where Ttr
+
+  id = get_id(op)
+  println("Loading projected affine variable $id and MDEIM structures for its lifting")
+  path_id = joinpath(info.offline_path,"$id")
+  path_id_lift = joinpath(info.offline_path,"$(id)_lift")
+
+  load(joinpath(path_id,"basis_space")),load_mdeim(path_id_lift,op,meas)
+end
+
+function load_rb_structure(
+  ::RBInfo,
+  op::RBBilinOperator{Affine,<:TrialFESpace},
   args...)
 
   id = get_id(op)
-  println("Importing reduced $id")
+  println("Loading projected affine variable $id")
   path_id = joinpath(info.offline_path,"$id")
+
   load(joinpath(path_id,"basis_space"))
 end

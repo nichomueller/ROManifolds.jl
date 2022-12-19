@@ -10,7 +10,7 @@ function navier_stokes_unsteady()
   pdomain = false
   ptype = ProblemType(steady,indef,pdomain)
 
-  root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/stokes"
+  root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes"
   mesh = "cube5x5x5.json"
   bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
   order = 2
