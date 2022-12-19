@@ -129,3 +129,52 @@ function steady_stokes(μ1::Param)
 
   norm(errA1),norm(errLA1),norm(errLB1)
 end
+
+function steady_navier_stokes()
+  u1,μ1 = uh.snap[:,1],μ[1]
+  u1fun = FEFunction(U.trial(μ1),u1)
+
+  A,LA = assemble_matrix_and_lifting(opA)
+  A1,LA1 = A(μ1),LA(μ1)
+  _,LB = assemble_matrix_and_lifting(opB)
+  LB1 = LB(μ1)
+  C,LC = assemble_matrix_and_lifting(opC)
+  C1,LC1 = C(u1fun),LC(u1fun)
+  D = assemble_matrix(opD)
+  D1 = D(u1fun)
+
+  bsu = rbspace[1].basis_space
+  bsp = rbspace[2].basis_space
+
+  A1rb = bsu'*A1*bsu
+  A1rb = Matrix(A1rb[:])
+  C1rb = bsu'*C1*bsu
+  C1rb = Matrix(C1rb[:])
+  D1rb = bsu'*D1*bsu
+  D1rb = Matrix(D1rb[:])
+  LA1rb = bsu'*LA1
+  LB1rb = bsp'*LB1
+  LC1rb = bsu'*LC1
+
+  basisA = A_rb[1].rbspace.basis_space
+  basisC = C_rb[1].rbspace.basis_space
+  basisD = D_rb[1].rbspace.basis_space
+  basisLA = A_rb[2].rbspace.basis_space
+  basisLB = B_rb[2].rbspace.basis_space
+  basisLC = C_rb[2].rbspace.basis_space
+
+  #norm_test(C1rb,basisC)
+  #norm_test(D1rb,basisD)
+
+  coeffA = compute_coefficient(rbopA,A_rb,μ1)
+  errA1,errLA1 = A1rb - basisA*coeffA[1],LA1rb - basisLA*coeffA[2]
+  opB_lift = RBLiftingOperator(rbopB)
+  coeffLB1 = compute_coefficient(opB_lift,B_rb[2],μ1)
+  errLB1 = LB1rb - basisLB*coeffLB1
+  coeffC = compute_coefficient(rbopC,C_rb,μ1)
+  errC1,errLC1 = C1rb - basisC*coeffC[1](u1fun),LC1rb - basisLC*coeffC[2](u1fun)
+  coeffD = compute_coefficient(rbopD,D_rb,μ1)
+  errD1 = D1rb - basisD*coeffD[1](u1fun)
+
+  norm(errA1),norm(errLA1),norm(errLB1),norm(errC1),norm(errLC1),norm(errD1)
+end

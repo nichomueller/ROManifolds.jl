@@ -6,7 +6,7 @@ function poisson_functions(::Val{true},measures::ProblemFixedMeasures)
 
   function a(x,p::Param)
     μ = get_μ(p)
-    1. + μ[6] + 1. / μ[5] * exp(-norm(x-Point(μ[1:3]))^2 / μ[4])
+    1. + μ[6] + 1. / μ[5]*exp(-norm(x-Point(μ[1:3]))^2 / μ[4])
   end
   a(p::Param) = x->a(x,p)
   function f(x,p::Param)
@@ -15,7 +15,7 @@ function poisson_functions(::Val{true},measures::ProblemFixedMeasures)
   f(p::Param) = x->f(x,p)
   function h(x,p::Param)
     μ = get_μ(p)
-    1. + μ[6] + 1. / μ[5] * exp(-norm(x-Point(μ[1:3]))^2 / μ[4])
+    1. + μ[6] + 1. / μ[5]*exp(-norm(x-Point(μ[1:3]))^2 / μ[4])
   end
   h(p::Param) = x->h(x,p)
   function g(x,p::Param)
@@ -24,9 +24,9 @@ function poisson_functions(::Val{true},measures::ProblemFixedMeasures)
   end
   g(p::Param) = x->g(x,p)
 
-  afe(p::Param,dΩ,u,v) = ∫(a(p) * ∇(v) ⋅ ∇(u))dΩ
-  ffe(p::Param,dΩ,v) = ∫(f(p) * v)dΩ
-  hfe(p::Param,dΓn,v) = ∫(h(p) * v)dΓn
+  afe(p::Param,dΩ,u,v) = ∫(a(p)*∇(v)⋅∇(u))dΩ
+  ffe(p::Param,dΩ,v) = ∫(f(p)*v)dΩ
+  hfe(p::Param,dΓn,v) = ∫(h(p)*v)dΓn
 
   dΩ,dΓn = get_dΩ(measures),get_dΓn(measures)
   afe(p::Param,u,v) = afe(p,dΩ,u,v)
@@ -46,7 +46,7 @@ function poisson_functions(::Val{false},measures::ProblemFixedMeasures)
 
   function a(x,p::Param,t::Real)
     μ = get_μ(p)
-    1. + μ[6] + 1. / μ[5] * exp(-sin(t)*norm(x-Point(μ[1:3]))^2 / μ[4])
+    1. + μ[6] + 1. / μ[5]*exp(-sin(t)*norm(x-Point(μ[1:3]))^2 / μ[4])
   end
   a(p::Param,t::Real) = x->a(x,p,t)
   a(p::Param) = t->a(p,t)
@@ -75,10 +75,10 @@ function poisson_functions(::Val{false},measures::ProblemFixedMeasures)
   g(p::Param,t::Real) = x->g(x,p,t)
   g(p::Param) = t->g(p,t)
 
-  afe(p::Param,t::Real,dΩ,u,v) = ∫(a(p,t) * ∇(v) ⋅ ∇(u))dΩ
-  mfe(p,t,dΩ,u,v) = ∫(v ⋅ u)dΩ
-  ffe(p::Param,t::Real,dΩ,v) = ∫(f(p,t) * v)dΩ
-  hfe(p::Param,t::Real,dΓn,v) = ∫(h(p,t) * v)dΓn
+  afe(p::Param,t::Real,dΩ,u,v) = ∫(a(p,t)*∇(v)⋅∇(u))dΩ
+  mfe(p,t,dΩ,u,v) = ∫(v⋅u)dΩ
+  ffe(p::Param,t::Real,dΩ,v) = ∫(f(p,t)*v)dΩ
+  hfe(p::Param,t::Real,dΓn,v) = ∫(h(p,t)*v)dΓn
 
   dΩ,dΓn = get_dΩ(measures),get_dΓn(measures)
   afe(p::Param,t::Real,u,v) = afe(p,t,dΩ,u,v)
@@ -123,10 +123,10 @@ function stokes_functions(::Val{true},measures::ProblemFixedMeasures)
   end
   g(p::Param) = x->g(x,p)
 
-  afe(p::Param,dΩ,u,v) = ∫(a(p) * ∇(v) ⊙ ∇(u))dΩ
-  bfe(p::Param,dΩ,u,q) = ∫(b(p) * q * (∇⋅(u)))dΩ
-  ffe(p::Param,dΩ,v) = ∫(f(p) ⋅ v)dΩ
-  hfe(p::Param,dΓn,v) = ∫(h(p) ⋅ v)dΓn
+  afe(p::Param,dΩ,u,v) = ∫(a(p)*∇(v)⊙∇(u))dΩ
+  bfe(p::Param,dΩ,u,q) = ∫(b(p)*q*(∇⋅(u)))dΩ
+  ffe(p::Param,dΩ,v) = ∫(f(p)⋅v)dΩ
+  hfe(p::Param,dΓn,v) = ∫(h(p)⋅v)dΓn
 
   dΩ,dΓn = get_dΩ(measures),get_dΓn(measures)
   afe(p::Param,u,v) = afe(p,dΩ,u,v)
@@ -170,12 +170,12 @@ function stokes_functions(::Val{false},measures::ProblemFixedMeasures)
   end
   g(p::Param,t::Real) = x->g(x,p,t)
 
-  afe(p::Param,t::Real,dΩ,u,v) = ∫(a(p,t) * ∇(v) ⊙ ∇(u))dΩ
-  mfe(p::Param,t::Real,dΩ,u,v) = ∫(v ⋅ u)dΩ
-  bfe(p::Param,t::Real,dΩ,u,q) = ∫(b(p,t) * q * (∇⋅(u)))dΩ
-  bTfe(p::Param,t::Real,dΩ,u,q) = ∫(b(p,t) * (∇⋅(q)) * u)dΩ
-  ffe(p::Param,t::Real,dΩ,v) = ∫(f(p,t) ⋅ v)dΩ
-  hfe(p::Param,t::Real,dΓn,v) = ∫(h(p,t) ⋅ v)dΓn
+  afe(p::Param,t::Real,dΩ,u,v) = ∫(a(p,t)*∇(v)⊙∇(u))dΩ
+  mfe(p::Param,t::Real,dΩ,u,v) = ∫(v⋅u)dΩ
+  bfe(p::Param,t::Real,dΩ,u,q) = ∫(b(p,t)*q*(∇⋅(u)))dΩ
+  bTfe(p::Param,t::Real,dΩ,u,q) = ∫(b(p,t)*(∇⋅(q))*u)dΩ
+  ffe(p::Param,t::Real,dΩ,v) = ∫(f(p,t)⋅v)dΩ
+  hfe(p::Param,t::Real,dΓn,v) = ∫(h(p,t)⋅v)dΓn
 
   dΩ,dΓn = get_dΩ(measures),get_dΓn(measures)
   afe(p::Param,t::Real,u,v) = afe(p,t,dΩ,u,v)
@@ -206,8 +206,8 @@ function navier_stokes_functions(::Val{true},measures::ProblemFixedMeasures)
 
   function a(x,p::Param)
     μ = get_μ(p)
-    1+μ[3]+1/μ[3]*exp(-norm(x-Point(μ[1:3]))^2/μ[3])
-    #5*μ[1] + abs(sin(norm(x.*Point(μ[1:3])))*μ[4])
+    #1+μ[3]+1/μ[3]*exp(-norm(x-Point(μ[1:3]))^2/μ[3])
+    5*μ[1] + abs(sin(norm(x.*Point(μ[1:3])))*μ[4])
   end
   a(p::Param) = x->a(x,p)
   b(x,p::Param) = 1.
@@ -216,25 +216,25 @@ function navier_stokes_functions(::Val{true},measures::ProblemFixedMeasures)
   c(p::Param) = x->c(x,p)
   d(x,p::Param) = 1.
   d(p::Param) = x->d(x,p)
-  f(x,p::Param) = VectorValue(1.,1.,1.)#VectorValue(0.,0.,0.)
+  f(x,p::Param) = VectorValue(0.,0.,0.)
   f(p::Param) = x->f(x,p)
-  h(x,p::Param) = VectorValue(1.,1.,1.)#VectorValue(0.,0.,0.)
+  h(x,p::Param) = VectorValue(0.,0.,0.)
   h(p::Param) = x->h(x,p)
   function g(x,p::Param)
     μ = get_μ(p)
-    1e-4*VectorValue(μ[7]*cos(x[2])+μ[8]*sin(x[3]),0.,0.)*(x[1] == 0.)
-    #R = 0.5
-    #xc = x-Point(0,R,R)
-    #VectorValue(sum((xc.*Point(μ[1:3]))^2),0.,0.)*(x[1]==0)/norm(μ[1:3])^2
+    #1e-4*VectorValue(μ[7]*cos(x[2])+μ[8]*sin(x[3]),0.,0.)*(x[1] == 0.)
+    R = 0.5
+    xc = x-Point(0,R,R)
+    VectorValue(sum((xc.*Point(μ[1:3]))^2),0.,0.)*(x[1]==0)/norm(μ[1:3])^2
   end
   g(p::Param) = x->g(x,p)
 
-  afe(p::Param,dΩ,u,v) = ∫(a(p) * ∇(v) ⊙ ∇(u))dΩ
-  bfe(p::Param,dΩ,u,q) = ∫(b(p) * q * (∇⋅(u)))dΩ
+  afe(p::Param,dΩ,u,v) = ∫(a(p)*∇(v)⊙∇(u))dΩ
+  bfe(p::Param,dΩ,u,q) = ∫(b(p)*q*(∇⋅(u)))dΩ
   cfe(dΩ,z,u,v) = ∫(v⊙(∇(u)'⋅z))dΩ
   dfe(dΩ,z,u,v) = ∫(v⊙(∇(z)'⋅u))dΩ
-  ffe(p::Param,dΩ,v) = ∫(f(p) ⋅ v)dΩ
-  hfe(p::Param,dΓn,v) = ∫(h(p) ⋅ v)dΓn
+  ffe(p::Param,dΩ,v) = ∫(f(p)⋅v)dΩ
+  hfe(p::Param,dΓn,v) = ∫(h(p)⋅v)dΓn
 
   dΩ,dΓn = get_dΩ(measures),get_dΓn(measures)
   afe(p::Param,u,v) = afe(p,dΩ,u,v)
@@ -264,57 +264,50 @@ function navier_stokes_functions(::Val{true},measures::ProblemFixedMeasures)
   a,afe,b,bfe,c,cfe,d,dfe,f,ffe,h,hfe,g,res,jac
 end
 
-function navier_stokes_functions(
-  dΩ::Measure,
-  dΓn::Measure,
-  ::Val{false})
+function navier_stokes_functions(::Val{false},measures::ProblemFixedMeasures)
 
   function a(x,p::Param,t::Real)
     μ = get_μ(p)
-    1. + μ[6] + 1. / μ[5] * exp(-sin(t)*norm(x-Point(μ[1:3]))^2 / μ[4])
+    1. + μ[6] + 1. / μ[5]*exp(-sin(t)*norm(x-Point(μ[1:3]))^2 / μ[4])
   end
   a(μ::Param,t::Real) = x->a(x,μ,t)
-  a(μ::Param) = t->a(μ,t)
 
   b(x,μ::Param,t::Real) = 1.
   b(μ::Param,t::Real) = x->b(x,μ,t)
-  b(μ::Param) = t->b(μ,t)
 
   c(x,μ::Param,t::Real) = 1.
   c(μ::Param,t::Real) = x->c(x,μ,t)
-  c(μ::Param) = t->c(μ,t)
 
   d(x,μ::Param,t::Real) = 1.
   d(μ::Param,t::Real) = x->d(x,μ,t)
-  d(μ::Param) = t->d(μ,t)
 
-  function f(x,p::Param,t::Real)
-    μ = get_μ(p)
-    1. + sin(t)*Point(μ[4:6]).*x
-  end
+  f(x,p::Param,t::Real) = VectorValue(1.,1.,1.)
   f(μ::Param,t::Real) = x->f(x,μ,t)
-  f(μ::Param) = t->f(μ,t)
 
-  function h(x,p::Param,t::Real)
-    μ = get_μ(p)
-    1. + sin(t)*Point(μ[4:6]).*x
-  end
+  h(x,p::Param,t::Real) = VectorValue(1.,1.,1.)
   h(μ::Param,t::Real) = x->h(x,μ,t)
-  h(μ::Param) = t->h(μ,t)
 
   function g(x,p::Param,t::Real)
     μ = get_μ(p)
-    1. + sin(t)*Point(μ[4:6]).*x
+    R = 0.5
+    xc = x-Point(0,R,R)
+    (1. +eps()-cos(t))*VectorValue(sum((xc.*Point(μ[1:3]))^2),0.,0.)*(x[1]==0)/norm(μ[1:3])^2
   end
   g(μ::Param,t::Real) = x->g(x,μ,t)
-  g(μ::Param) = t->g(μ,t)
 
   m(x,μ::Param,t::Real) = 1.
   m(μ::Param,t::Real) = x->m(x,μ,t)
-  m(μ::Param) = t->m(μ,t)
+
+  afe(p::Param,t::Real,dΩ,u,v) = ∫(a(p,t)*∇(v)⊙∇(u))dΩ
+  mfe(p::Param,t::Real,dΩ,u,v) = ∫(v⋅u)dΩ
+  bfe(p::Param,t::Real,dΩ,u,q) = ∫(b(p,t)*q*(∇⋅(u)))dΩ
+  cfe(dΩ,z,u,v) = ∫(v⊙(∇(u)'⋅z))dΩ
+  dfe(dΩ,z,u,v) = ∫(v⊙(∇(z)'⋅u))dΩ
+  ffe(p::Param,t::Real,dΩ,v) = ∫(f(p,t)⋅v)dΩ
+  hfe(p::Param,t::Real,dΓn,v) = ∫(h(p,t)⋅v)dΓn
 
   mfe(μ,t,u,v) = ∫(v⋅u)dΩ
-  afe(μ,t,u,v) = ∫(a(μ,t)*∇(v) ⊙ ∇(u))dΩ
+  afe(μ,t,u,v) = ∫(a(μ,t)*∇(v)⊙∇(u))dΩ
   bfe(μ,t,u,q) = ∫(b(μ,t)*q*(∇⋅(u)))dΩ
   cfe(μ,t,z,u,v) = ∫(c(μ,t)*v⊙(∇(u)'⋅z))dΩ
   cfe(μ,t,z) = (u,v) -> cfe(μ,t,z,u,v)

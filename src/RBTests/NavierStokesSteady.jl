@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function navier_stokes_steady()
-  run_fem = true
+  run_fem = false
 
   steady = true
   indef = true
@@ -11,7 +11,7 @@ function navier_stokes_steady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/stokes"
-  mesh = "cube10x10x10.json"#"cube5x5x5.json"
+  mesh = "cube5x5x5.json"
   bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
   order = 2
 

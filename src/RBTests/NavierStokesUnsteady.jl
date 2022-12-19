@@ -5,7 +5,7 @@ include("RBTests.jl")
 function navier_stokes_unsteady()
   run_fem = true
 
-  steady = true
+  steady = false
   indef = true
   pdomain = false
   ptype = ProblemType(steady,indef,pdomain)
@@ -129,6 +129,8 @@ function online_phase(
   rbopF,F_rb = Finfo
   rbopH,H_rb = Hinfo
 
+  θ = get_θ(rbopA)
+
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
       Aon = online_assembler(rbopA,A_rb,μ[k])
@@ -140,8 +142,9 @@ function online_phase(
       Fon = online_assembler(rbopF,F_rb,μ[k])
       Hon = online_assembler(rbopH,H_rb,μ[k])
       lift = Aon[2],Mon[2],Bon[2],Con[2]
-      sys = navier_stokes_rb_system((Aon[1],Bon[1],Con[1],Don[1]),(Fon,Hon,lift...))
-      rb_sol = solve_rb_system(sys...,X(μ[k]),rbspace)
+      sys = navier_stokes_rb_system((Aon[1]...,Mon[1]...,BTon...,Bon[1]...,
+        Con[1]...,Don[1]...),(Fon,Hon,lift...))
+      rb_sol = solve_rb_system(sys...,X(μ[k]),rbspace,θ)
     end
     uhk = get_snap(uh[k])
     phk = get_snap(ph[k])
@@ -160,4 +163,4 @@ function online_phase(
   end
 end
 
-navier_stokes_steady()
+navier_stokes_unsteady()
