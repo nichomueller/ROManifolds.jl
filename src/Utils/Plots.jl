@@ -1,52 +1,62 @@
-"""Plot the surface of the function 'f':R²->R between ranges specificed by
-  'xrange' and 'yrange'. The plotting grid is composed of 'n' points/direction"""
-function plot_R²_R(f::Function, xrange::Vector, yrange::Vector, n::Int)
-  x = range(xrange[1], xrange[2], n)
-  y = range(yrange[1], yrange[2], n)
-  suface(x, y, f)
+mutable struct PlotInfo{T}
+  xval::Vector{Vector{T}}
+  yval::Vector{Vector{T}}
+  title::String
+  path::String
+  label::Vector{String}
+  color::Vector{String}
+  style::Vector{String}
+  dash::Vector{String}
 end
 
-"""Plot the vector-valued function 'f':R->R² between range specificed by
-  'xrange'. The plotting grid is composed of 'n' points"""
-function plot_R_R²(f::Function, xrange::Vector, n::Int)
-  xs_ys(vs) = Tuple(eltype(vs[1])[vs[i][j] for i in eachindex(vs)]
-    for j in eachindex(first(vs)))
-  xs_ys(v, vs...) = xs_ys([v, vs...])
-  xs_ys(g::Function, a, b, n=100) = xs_ys(g.(range(a, b, n)))
-  Plot.plot(xs_ys(f, xrange[1], xrange[2], n)...)
+function PlotInfo(
+  xval::AbstractArray{T},
+  yval::AbstractArray{T},
+  title::String,
+  path::String,
+  label::Vector{String};
+  color=["blue"],style=["lines"],dash=[""]) where T
+
+  xvec = vblocks(xval)
+  yvec = vblocks(yval)
+  @assert length(xvec) == length(xvec) == length(label) "Sizes must be equal"
+
+  function modify_kwarg(kwarg::Vector{String})
+    right_len = length(xvec)
+    length(kwarg) != right_len ? repeat(first(kwarg),right_len) : kwarg
+  end
+
+  new_color = modify_csd(color)
+  new_style = modify_csd(style)
+  new_dash = modify_csd(dash)
+
+  PlotInfo{T}(xvec,yvec,title,path,label,new_color,new_style,new_dash)
 end
 
-function generate_and_save_plot(xval::Array, yval::Array, title::String,
-  label::Array, xlab::String, ylab::String, save_path::String,
-  semilogx=false, semilogy=true; var="u",selected_color=["blue"],
-  selected_style=["lines"],selected_dash=[""])
+function get_layout(pinfo::PlotInfo,::Val{false},::Val{false})
+  Layout(title=pinfo.title,xaxis_title=pinfo.xlab,yaxis_title=pinfo.ylab)
+end
 
-  @assert size(xval) == size(yval) "Invalid plot: provide an input with the same
-    x-values as its y-values"
-  @assert length(size(xval)) <= 2 "Invalid plot: provide an input which is at
-    most a matrix"
-  if length(size(xval)) == 1
-    xval = reshape(xval,:,1)
-    yval = reshape(yval,:,1)
-  end
+function get_layout(pinfo::PlotInfo,::Val{true},::Val{false})
+  Layout(title=pinfo.title,xaxis_title=pinfo.xlab,yaxis_title=pinfo.ylab,
+    xaxis_type="log")
+end
 
-  if !semilogx && !semilogy
-    layout = Layout(title=title,xaxis_title=xlab,yaxis_title=ylab)
-  elseif semilogx && !semilogy
-    layout = Layout(title=title,xaxis_title=xlab,yaxis_title=ylab,
-      xaxis_type="log")
-  elseif !semilogx && semilogy
-    layout = Layout(title=title,xaxis_title=xlab,yaxis_title=ylab,
-      yaxis_type="log")
-  else
-    layout = Layout(title=title,xaxis_title=xlab,yaxis_title=ylab,
-      xaxis_type="log",yaxis_type="log")
-  end
+function get_layout(pinfo::PlotInfo,::Val{false},::Val{true})
+  Layout(title=pinfo.title,xaxis_title=pinfo.xlab,yaxis_title=pinfo.ylab,
+    yaxis_type="log")
+end
 
-  n_traces = size(xval)[2]
-  traces = [scatter(x=xval[:,i],y=yval[:,i],mode=selected_style[i],name=label[i],
-    line=attr(width=4,color=selected_color[i],dash=selected_dash[i])) for i=1:n_traces]
+function get_layout(pinfo::PlotInfo,::Val{true},::Val{true})
+  Layout(title=pinfo.title,xaxis_title=pinfo.xlab,yaxis_title=pinfo.ylab,
+    xaxis_type="log",yaxis_type="log")
+end
+
+function PlotlyJS.plot(pinfo::PlotInfo,semilogx::Bool=false,semilogy::Bool=true)
+  layout = get_layout(pinfo,Val(semilogx),Val(semilogy))
+  pinfo_zip = zip(pinfo.xval,pinfo.yval,pinfo.style,pinfo.label,pinfo.color,pinfo.dash)
+  traces = [scatter(x=x,y=y,mode=s,name=l,line=attr(width=4,color=c,dash=d))
+    for (x,y,s,l,c,d) in pinfo_zip]
   p = plot(traces,layout)
-  savefig(p, joinpath(save_path, string(var)*".eps"))
-
+  savefig(p,pinfo.path*".eps")
 end

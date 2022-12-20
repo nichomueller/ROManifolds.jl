@@ -58,7 +58,7 @@ function load_mdeim(
   ipiv = Int.(load(joinpath(path,"p"))[:,1])
   idx_lu_factors = LU(factors,ipiv,0)
 
-  red_measure = get_reduced_measure(op,meas,idx_space)
+  red_measure = get_reduced_measure(op,idx_space,meas)
 
   MDEIM(rbspace,idx_lu_factors,idx_space,red_measure)
 end
@@ -82,7 +82,7 @@ function load_mdeim(
   ipiv = Int.(load(joinpath(path,"p"))[:,1])
   idx_lu_factors = LU(factors,ipiv,0)
 
-  red_measure = get_reduced_measure(op,meas,idx_space)
+  red_measure = get_reduced_measure(op,idx_space,meas)
 
   MDEIM(rbspace,idx_lu_factors,idx,red_measure)
 end

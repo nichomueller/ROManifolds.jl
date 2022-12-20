@@ -34,8 +34,8 @@ function save_structures_in_list(
   if !isempty(l_info_vec)
     l_info_mat = reduce(vcat,transpose.(l_info_vec))
     l_idx,l_val = l_info_mat[:,1], transpose.(l_info_mat[:,2])
-    for (i₁,i₂) in enumerate(l_idx)
-      save_CSV(l_val[i₁], joinpath(path, list_names[i₂]*".csv"))
+    for (i1,i2) in enumerate(l_idx)
+      save_CSV(l_val[i1],joinpath(path, list_names[i2]*".csv"))
     end
   end
 
@@ -54,7 +54,7 @@ function load_structures_in_list(
 
   for (idx, name) in enumerate(list_names)
     ret_tuple = (ret_tuple...,
-      load_CSV(list_types[idx], joinpath(path, name*".csv")))
+      load_CSV(list_types[idx],joinpath(path,name*".csv")))
   end
 
   ret_tuple

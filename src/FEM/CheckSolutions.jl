@@ -101,9 +101,9 @@ function navier_steady_stokes()
   LHS(u) = vcat(hcat(A(μ1)+C(u),-B(μ1)'),(hcat(B(μ1),zeros(Np,Np))))
   RHS(u) = vcat(F(μ1)+H(μ1)-LA(μ1)-LC(u),-LB(μ1))
   J(x) = vcat(hcat(A(μ1)+C(x[1])+D(x[1]),-B(μ1)'),(hcat(B(μ1),zeros(Np,Np))))
-  res(x,xh) = LHS(x[1])*xh-RHS(x[1])
+  Res(x,xh) = LHS(x[1])*xh-RHS(x[1])
 
-  xnewt = newton(res,J,X(μ1))
+  xnewt = newton(Res,J,X(μ1))
   isapprox(xnewt,x1)
 end
 

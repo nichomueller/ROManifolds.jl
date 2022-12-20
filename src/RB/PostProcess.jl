@@ -55,3 +55,61 @@ function save(path::String,r::RBResults)
   save(joinpath(path,"times_$(r.id)"),time_dict(r))
   save(joinpath(path,"errors_$(r.id)"),err_dict(r))
 end
+
+function Gridap.writevtk(
+  info::RBInfoSteady,
+  s::Snapshots,
+  X::FESpace,
+  trian::Triangulation)
+
+  id = get_id(s)
+  path = joinpath(info.online_path,"$(id)h")
+  fefun = FEFunction(X,s.snap[:,1])
+  writevtk(trian,path,cellfields=["$(id)h"=>fefun])
+end
+
+function Gridap.writevtk(
+  info::RBInfoSteady,
+  res::RBResults,
+  X::FESpace,
+  trian::Triangulation)
+
+  path = joinpath(info.online_path,"pwise_err_$(res.id)")
+  fefun = FEFunction(X,res.pointwise_err[:,1])
+  writevtk(trian,path,cellfields=["err"=>fefun])
+end
+
+function Gridap.writevtk(
+  info::RBInfoUnsteady,
+  s::Snapshots,
+  X,
+  trian::Triangulation)
+
+  timesθ = get_timesθ(info)
+  id = get_id(s)
+  path = joinpath(info.online_path,"$(id)h")
+
+  createpvd(path) do pvd
+    for (it,t) in enumerate(timesθ)
+      fefun = FEFunction(X(t),s.snap[:,it])
+      pvd[it] = writevtk(trian,path*"_$(it).vtu",cellfields=["$(id)h"=>fefun])
+    end
+  end
+end
+
+function Gridap.writevtk(
+  info::RBInfoUnsteady,
+  res::RBResults,
+  X,
+  trian::Triangulation)
+
+  timesθ = get_timesθ(info)
+  path = joinpath(info.online_path,"pwise_err_$(res.id)")
+
+  createpvd(path) do pvd
+    for (it,t) in enumerate(timesθ)
+      fefun = FEFunction(X(t),res.pointwise_err[:,it])
+      pvd[it] = writevtk(trian,path*"_$(it).vtu",cellfields=["err"=>fefun])
+    end
+  end
+end

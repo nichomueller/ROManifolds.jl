@@ -206,7 +206,6 @@ function navier_stokes_functions(::Val{true},measures::ProblemFixedMeasures)
 
   function a(x,p::Param)
     μ = get_μ(p)
-    #1+μ[3]+1/μ[3]*exp(-norm(x-Point(μ[1:3]))^2/μ[3])
     5*μ[1] + abs(sin(norm(x.*Point(μ[1:3])))*μ[4])
   end
   a(p::Param) = x->a(x,p)
@@ -222,10 +221,9 @@ function navier_stokes_functions(::Val{true},measures::ProblemFixedMeasures)
   h(p::Param) = x->h(x,p)
   function g(x,p::Param)
     μ = get_μ(p)
-    #1e-4*VectorValue(μ[7]*cos(x[2])+μ[8]*sin(x[3]),0.,0.)*(x[1] == 0.)
     R = 0.5
     xc = x-Point(0,R,R)
-    VectorValue(sum((xc.*Point(μ[1:3]))^2),0.,0.)*(x[1]==0)/norm(μ[1:3])^2
+    VectorValue(1-sum(abs(xc.*Point(μ[1:3])))/norm(0.5*μ[1:3]),0.,0.)*(x[1]==0)
   end
   g(p::Param) = x->g(x,p)
 

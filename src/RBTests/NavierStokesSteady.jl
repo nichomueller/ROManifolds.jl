@@ -3,16 +3,16 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function navier_stokes_steady()
-  run_fem = false
+  run_fem = true
 
   steady = true
   indef = true
   pdomain = false
   ptype = ProblemType(steady,indef,pdomain)
 
-  root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes"
-  mesh = "cube5x5x5.json"
-  bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
+  root = joinpath(pwd(),"tests/navier-stokes")
+  mesh = "flow_cylinder.json"
+  bnd_info = Dict("dirichlet" => ["inflow","walls"],"neumann" => ["cylinder","outflow"])
   order = 2
 
   ranges = fill([1.,2.],9)
@@ -26,7 +26,7 @@ function navier_stokes_steady()
 
   a,afe,b,bfe,c,cfe,d,dfe,f,ffe,h,hfe,g,res,jac = navier_stokes_functions(ptype,measures)
 
-  reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{3,Float},order)
+  reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{2,Float},order)
   reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1;space=:P)
   V = MyTests(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet"])
   U = MyTrials(V,g,ptype)
@@ -39,7 +39,7 @@ function navier_stokes_steady()
 
   nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking())
   solver = FESolver(nls)
-  nsnap = 100
+  nsnap = 1
   uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
 
   opA = NonaffineParamVarOperator(a,afe,PS,U,V;id=:A)
@@ -49,7 +49,7 @@ function navier_stokes_steady()
   opF = AffineParamVarOperator(f,ffe,PS,V;id=:F)
   opH = AffineParamVarOperator(h,hfe,PS,V;id=:H)
 
-  info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=false)
+  info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=true)
   tt = TimeTracker(0.,0.)
   rbspace,varinfo = offline_phase(info,(uh,ph,μ,X),(opA,opB,opC,opD,opF,opH),measures,tt)
   online_phase(info,(uh,ph,μ,X),rbspace,varinfo,tt)
@@ -76,21 +76,12 @@ function offline_phase(
   rbopF = RBVarOperator(opF,rbspace_u)
   rbopH = RBVarOperator(opH,rbspace_u)
 
-  if info.load_offline
-    A_rb = load_rb_structure(info,rbopA,meas.dΩ)
-    B_rb = load_rb_structure(info,rbopB,meas.dΩ)
-    C_rb = load_rb_structure(info,rbopC,meas.dΩ)
-    D_rb = load_rb_structure(info,rbopD,meas.dΩ)
-    F_rb = load_rb_structure(info,rbopF,meas.dΩ)
-    H_rb = load_rb_structure(info,rbopH,meas.dΓn)
-  else
-    A_rb = assemble_rb_structure(info,tt,rbopA,μ,meas,:dΩ)
-    B_rb = assemble_rb_structure(info,tt,rbopB,μ,meas,:dΩ)
-    C_rb = assemble_rb_structure(info,tt,rbopC,μ,meas,:dΩ)
-    D_rb = assemble_rb_structure(info,tt,rbopD,μ,meas,:dΩ)
-    F_rb = assemble_rb_structure(info,tt,rbopF,μ,meas,:dΩ)
-    H_rb = assemble_rb_structure(info,tt,rbopH,μ,meas,:dΓn)
-  end
+  A_rb = rb_structure(info,tt,rbopA,μ,meas,:dΩ)
+  B_rb = rb_structure(info,tt,rbopB,μ,meas,:dΩ)
+  C_rb = rb_structure(info,tt,rbopC,μ,meas,:dΩ)
+  D_rb = rb_structure(info,tt,rbopD,μ,meas,:dΩ)
+  F_rb = rb_structure(info,tt,rbopF,μ,meas,:dΩ)
+  H_rb = rb_structure(info,tt,rbopH,μ,meas,:dΓn)
 
   rbspace = (rbspace_u,rbspace_p)
   varinfo = ((rbopA,A_rb),(rbopB,B_rb),(rbopC,C_rb),(rbopD,D_rb),(rbopF,F_rb),(rbopH,H_rb))

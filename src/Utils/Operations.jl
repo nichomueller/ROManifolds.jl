@@ -199,10 +199,6 @@ function Base.Matrix(vblock::Vector{Vector{T}}) where T
   Matrix{T}(reduce(vcat,transpose.(vblock))')
 end
 
-#= function Base.Matrix(mblock::Vector{T}) where {T<:AbstractMatrix}
-  @assert check_dimensions(mblock) "Wrong dimensions"
-  T(reduce(vcat,transpose.(mblock))')
-end =#
 function Base.Matrix(mblock::Vector{T}) where {T<:AbstractMatrix}
   @assert check_dimensions(mblock) "Wrong dimensions"
   T(reduce(hcat,mblock))
@@ -251,6 +247,10 @@ function blocks(mat::Array{T,3};dims=size(mat)[1:2]) where T
   blockmat::Vector{Matrix{T}}
 end
 
+function vblocks(vec::Vector{T}) where T
+  [vec]::Vector{Vector{T}}
+end
+
 function vblocks(mat::Matrix{T}) where T
   blockvec = Vector{T}[]
   for i in axes(mat,2)
@@ -262,12 +262,6 @@ end
 check_dimensions(vb::AbstractVector) =
   all([size(vb[i])[1] == size(vb[1])[1] for i = 2:length(vb)])
 check_dimensions(m::AbstractMatrix,nb::Int) = iszero(size(m)[2]%nb)
-
-#= function remove_zero_rows(m::AbstractMatrix)
-  sum_row = sum(abs.(m),dims=2)[:,1]
-  significant_rows = findall(x -> x > eps(),sum_row)
-  m[significant_rows,:]
-end =#
 
 function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
   numnz = nnz(S)
@@ -342,5 +336,6 @@ Base.:(*)(a::Symbol,b::Symbol) = Symbol(String(a)*String(b))
 
 Base.:(^)(vv::VectorValue,n::Int) = VectorValue([vv[k]^n for k=eachindex(vv)])
 Base.:(^)(vv::VectorValue,n::Float) = VectorValue([vv[k]^n for k=eachindex(vv)])
+Base.abs(vv::VectorValue) = VectorValue([abs(vv[k]) for k=eachindex(vv)])
 
 Gridap.get_triangulation(m::Measure) = m.quad.trian

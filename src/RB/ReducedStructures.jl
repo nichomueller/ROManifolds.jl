@@ -129,6 +129,7 @@ function load_rb_structure(
   op::RBVarOperator,
   args...)
 
+  id = get_id(op)
   path_id = joinpath(info.offline_path,"$id")
   if ispath(path_id)
     _,meas,field = args
@@ -155,7 +156,7 @@ end
 function load_rb_structure(
   info::RBInfo,
   op::RBLinOperator{Affine},
-  args...)
+  ::Measure)
 
   id = get_id(op)
   println("Loading projected affine variable $id")
@@ -205,7 +206,7 @@ end
 function load_rb_structure(
   ::RBInfo,
   op::RBBilinOperator{Affine,<:TrialFESpace},
-  args...)
+  ::Measure)
 
   id = get_id(op)
   println("Loading projected affine variable $id")
