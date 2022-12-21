@@ -204,7 +204,7 @@ get_dt(ti::TimeInfo) = ti.dt
 get_Nt(ti::TimeInfo) = Int((ti.tF-ti.t0)/ti.dt)
 get_θ(ti::TimeInfo) = ti.θ
 get_timesθ(ti::TimeInfo) = collect(ti.t0:ti.dt:ti.tF-ti.dt).+ti.dt*ti.θ
-realization(ti::TimeInfo) = Uniform(ti.t0,ti.tF)
+realization(ti::TimeInfo) = rand(Uniform(ti.t0,ti.tF))
 
 struct Nonaffine <: OperatorType end
 abstract type ParamVarOperator{Top,Ttr} end

@@ -34,22 +34,42 @@ function compute_coefficient(
   op::Union{RBUnsteadyLinOperator,RBUnsteadyBilinOperator,RBUnsteadyLiftingOperator},
   mdeim,
   μ::Param,
-  st_mdeim=true)
+  st_mdeim=false)
+
+  compute_coefficient(op,mdeim,μ,Val(st_mdeim))
+end
+
+function compute_coefficient(
+  op::Union{RBUnsteadyLinOperator,RBUnsteadyBilinOperator,RBUnsteadyLiftingOperator},
+  mdeim,
+  μ::Param,
+  ::Val{false})
 
   timesθ = get_timesθ(op)
   idx_lu = get_idx_lu_factors(mdeim)
   idx_space = get_idx_space(mdeim)
   m = get_reduced_measure(mdeim)
+  A = assemble_red_structure(op,m,μ,timesθ)
 
-  if !st_mdeim
-    idx_time = get_idx_time(mdeim)
-    red_timesθ = timesθ[idx_time]
-    A = assemble_red_structure(op,m,μ,red_timesθ)
-    interpolate_mdeim_online(A,idx_lu,idx_space,idx_time,timesθ)
-  else
-    A = assemble_red_structure(op,m,μ,timesθ)
-    mdeim_online(A,idx_lu,idx_space,get_Nt(op))
-  end
+  mdeim_online(A,idx_lu,idx_space)
+end
+
+function compute_coefficient(
+  op::Union{RBUnsteadyLinOperator,RBUnsteadyBilinOperator,RBUnsteadyLiftingOperator},
+  mdeim,
+  μ::Param,
+  ::Val{true})
+
+  timesθ = get_timesθ(op)
+  idx_lu = get_idx_lu_factors(mdeim)
+  idx_space,idx_time = get_idx(mdeim)
+  m = get_reduced_measure(mdeim)
+
+  idx_time = get_idx_time(mdeim)
+  red_timesθ = timesθ[idx_time]
+  A_idx_time = assemble_red_structure(op,m,μ,red_timesθ)
+
+  mdeim_online(A_idx_time,idx_lu,idx_space)[:]
 end
 
 function assemble_red_structure(
@@ -78,7 +98,7 @@ function assemble_red_structure(
   μ::Param)
 
   fun = get_fe_function(op)
-  assemble_matrix((u,v)->fun(μ,m,u,v),get_trial(op)(μ),get_test(op))
+  assemble_matrix((u,v)->fun(μ,m,u,v),get_trial(op)(μ),get_test(op))[:]
 end
 
 function assemble_red_structure(
@@ -87,7 +107,7 @@ function assemble_red_structure(
   μ::Param)
 
   fun = get_fe_function(op)
-  z -> assemble_matrix((u,v)->fun(m,z,u,v),get_trial(op)(μ),get_test(op))
+  z -> assemble_matrix((u,v)->fun(m,z,u,v),get_trial(op)(μ),get_test(op))[:]
 end
 
 function assemble_red_structure(
@@ -96,9 +116,10 @@ function assemble_red_structure(
   μ::Param,
   timesθ::Vector{<:Real})
 
+  Nt = length(timesθ)
   fun = get_fe_function(op)
   M(tθ) = assemble_matrix((u,v)->fun(μ,tθ,m,u,v),get_trial(op)(μ,tθ),get_test(op))
-  Matrix(M.(timesθ))
+  Matrix(rehsape(M.(timesθ),:,Nt))
 end
 
 function assemble_red_structure(
@@ -108,8 +129,8 @@ function assemble_red_structure(
   timesθ::Vector{<:Real})
 
   fun = get_fe_function(op)
-  tθ = rand(timesθ)
-  M(z) = assemble_matrix(v->fun(m,z,u,v),get_trial(op)(μ,tθ),get_test(op))
+  M(tθ,z) = assemble_matrix(v->fun(m,z,u,v),get_trial(op)(μ,tθ),get_test(op))
+  M(z) = Matrix(rehsape(Broadcasting(tθ->M(tθ,z))(timesθ),:,Nt))
   M
 end
 
@@ -125,7 +146,7 @@ function assemble_red_structure(
   fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
   fdofs_test,_ = fdofs
 
-  M = assemble_matrix((u,v)->fun(μ,mmat,u,v),get_trial(op)(μ),get_test(op))
+  M = assemble_matrix((u,v)->fun(μ,mmat,u,v),get_trial(op)(μ),get_test(op))[:]
   Mlift = assemble_matrix((u,v)->fun(μ,mlift,u,v),get_trial_no_bc(op),get_test_no_bc(op))
   lift = Mlift[fdofs_test,ddofs]*dir
 
@@ -144,7 +165,7 @@ function assemble_red_structure(
   fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
   fdofs_test,_ = fdofs
 
-  M(z) = assemble_matrix((u,v)->fun(mmat,z,u,v),get_trial(op)(μ),get_test(op))
+  M(z) = assemble_matrix((u,v)->fun(mmat,z,u,v),get_trial(op)(μ),get_test(op))[:]
   Mlift(z) = assemble_matrix((u,v)->fun(mlift,z,u,v),get_trial_no_bc(op),get_test_no_bc(op))
   lift(z) = Mlift(z)[fdofs_test,ddofs]*dir
 
@@ -168,7 +189,7 @@ function assemble_red_structure(
   Mlift(tθ) = assemble_matrix((u,v)->fun(μ,tθ,mlift,u,v),get_trial_no_bc(op),get_test_no_bc(op))
   lift(tθ) = Mlift(tθ)[fdofs_test,ddofs]*dir(tθ)
 
-  Matrix(M.(timesθ)),Matrix(lift.(timesθ))
+  Matrix(rehsape(M.(timesθ),:,Nt)),Matrix(rehsape(lift.(timesθ),:,Nt))
 end
 
 function assemble_red_structure(
@@ -184,10 +205,11 @@ function assemble_red_structure(
   fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
   fdofs_test,_ = fdofs
 
-  M(z) = assemble_matrix((u,v)->fun(mmat,z,u,v),get_trial(op)(μ,rand(timesθ)),get_test(op))
+  M(tθ,z) = assemble_matrix(v->fun(mmat,z,u,v),get_trial(op)(μ,tθ),get_test(op))
+  M(z) = Matrix(rehsape(Broadcasting(tθ->M(tθ,z))(timesθ),:,Nt))
   Mlift(z) = assemble_matrix((u,v)->fun(mlift,z,u,v),get_trial_no_bc(op),get_test_no_bc(op))
-  lift(tθ,u) = Mlift(u)[fdofs_test,ddofs]*dir(tθ)
-  lift(u) = Matrix.(Broadcasting(tθ -> lift(tθ,u))(timesθ))
+  lift(tθ,z) = Mlift(z)[fdofs_test,ddofs]*dir(tθ)
+  lift(z) = Matrix.(Broadcasting(tθ -> lift(tθ,z))(timesθ))
 
   M,lift
 end
@@ -202,7 +224,7 @@ function assemble_red_structure(
   fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
   fdofs_test,_ = fdofs
 
-  Mlift = assemble_matrix((u,v)->fun(μ,m,u,v),get_trial_no_bc(op),get_test_no_bc(op))
+  Mlift = assemble_matrix((u,v)->fun(μ,m,u,v),get_trial_no_bc(op),get_test_no_bc(op))[:]
   lift = Mlift[fdofs_test,ddofs]*dir
 
   lift
@@ -249,16 +271,20 @@ function solve_lu(A::AbstractArray,lu::LU)
 end
 
 function mdeim_online(
-  A::AbstractArray,
+  A::Matrix{Float},
   idx_lu::LU,
-  idx_space::Vector{Int},
-  Nt=1)
+  idx_space::Vector{Int})
 
-  if Nt > 1
-    Aidx = Matrix(reshape(A,:,Nt)[idx_space,:])
-  else
-    Aidx = A[:][idx_space]
-  end
+  Aidx = A[idx_space,:]
+  solve_lu(Aidx,idx_lu)
+end
+
+function mdeim_online(
+  A::Vector{Float},
+  idx_lu::LU,
+  idx_space::Vector{Int})
+
+  Aidx = A[idx_space]
   solve_lu(Aidx,idx_lu)
 end
 
@@ -274,22 +300,20 @@ end
 function mdeim_online(
   A::NTuple{2,AbstractArray},
   idx_lu::NTuple{2,LU},
-  idx_space::NTuple{2,Vector{Int}},
-  Nt=1)
+  idx_space::NTuple{2,Vector{Int}})
 
-  M = mdeim_online(A[1],idx_lu[1],idx_space[1],Nt)
-  lift = mdeim_online(A[2],idx_lu[2],idx_space[2],Nt)
+  M = mdeim_online(A[1],idx_lu[1],idx_space[1])
+  lift = mdeim_online(A[2],idx_lu[2],idx_space[2])
   M,lift
 end
 
 function mdeim_online(
   A::NTuple{2,Function},
   idx_lu::NTuple{2,LU},
-  idx_space::NTuple{2,Vector{Int}},
-  Nt=1)
+  idx_space::NTuple{2,Vector{Int}})
 
-  M(u) = mdeim_online(A[1](u),idx_lu[1],idx_space[1],Nt)
-  lift(u) = mdeim_online(A[2](u),idx_lu[2],idx_space[2],Nt)
+  M(u) = mdeim_online(A[1](u),idx_lu[1],idx_space[1])
+  lift(u) = mdeim_online(A[2](u),idx_lu[2],idx_space[2])
   M,lift
 end
 
@@ -324,12 +348,3 @@ function interpolate_mdeim_online(
 
   u -> interpolate_mdeim_online(A(u),idx_lu,idx_space,idx_time,timesθ)
 end
-
-#= function mdeim_online(
-  A::NTuple{2,T},
-  idx_lu::NTuple{2,LU},
-  idx_space::NTuple{2,Vector{Int}},
-  Nt=1) where T
-
-  Broadcasting((a,lu,idx)->mdeim_online(a,lu,idx,Nt))(A,idx_lu,idx_space)
-end =#

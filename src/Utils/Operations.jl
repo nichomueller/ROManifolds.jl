@@ -263,6 +263,21 @@ check_dimensions(vb::AbstractVector) =
   all([size(vb[i])[1] == size(vb[1])[1] for i = 2:length(vb)])
 check_dimensions(m::AbstractMatrix,nb::Int) = iszero(size(m)[2]%nb)
 
+function SparseArrays.sparsevec(M::Matrix{T},row_idx::Vector{Int}) where T
+  sparse_vblocks = SparseVector{T}[]
+  for j = axes(M,2)
+    push!(sparse_vblocks,sparsevec(row_idx,M[:,j],maximum(row_idx)))
+  end
+
+  sparse_vblocks
+end
+
+function sparsevec_to_sparsemat(svec::SparseVector,Nc::Int)
+  ij,v = findnz(svec)
+  i,j = from_vec_to_mat_idx(ij,Nc)
+  sparse(i,j,v,maximum(i),Nc)
+end
+
 function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
   numnz = nnz(S)
   I = Vector{Ti}(undef, numnz)

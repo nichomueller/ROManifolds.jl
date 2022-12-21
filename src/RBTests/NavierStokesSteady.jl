@@ -11,8 +11,9 @@ function navier_stokes_steady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = joinpath(pwd(),"tests/navier-stokes")
-  mesh = "flow_cylinder.json"
-  bnd_info = Dict("dirichlet" => ["inflow","walls"],"neumann" => ["cylinder","outflow"])
+  mesh = "cylinder.json"
+  #bnd_info = Dict("dirichlet" => vcat(collect(1:21),collect(23:26)),"neumann" => [22])
+  bnd_info = Dict("dirichlet" => ["wall","inlet","inlet_curve"],"neumann" => ["outlet","outlet_curve"])
   order = 2
 
   ranges = fill([1.,2.],9)
@@ -26,7 +27,7 @@ function navier_stokes_steady()
 
   a,afe,b,bfe,c,cfe,d,dfe,f,ffe,h,hfe,g,res,jac = navier_stokes_functions(ptype,measures)
 
-  reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{2,Float},order)
+  reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{3,Float},order)
   reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1;space=:P)
   V = MyTests(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet"])
   U = MyTrials(V,g,ptype)
@@ -49,7 +50,7 @@ function navier_stokes_steady()
   opF = AffineParamVarOperator(f,ffe,PS,V;id=:F)
   opH = AffineParamVarOperator(h,hfe,PS,V;id=:H)
 
-  info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=true)
+  info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=false)
   tt = TimeTracker(0.,0.)
   rbspace,varinfo = offline_phase(info,(uh,ph,μ,X),(opA,opB,opC,opD,opF,opH),measures,tt)
   online_phase(info,(uh,ph,μ,X),rbspace,varinfo,tt)
@@ -98,21 +99,15 @@ function online_phase(
   uh,ph,μ,X = fe_sol
 
   Ainfo,Binfo,Cinfo,Dinfo,Finfo,Hinfo = varinfo
-  rbopA,A_rb = Ainfo
-  rbopB,B_rb = Binfo
-  rbopC,C_rb = Cinfo
-  rbopD,D_rb = Dinfo
-  rbopF,F_rb = Finfo
-  rbopH,H_rb = Hinfo
 
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
-      Aon = online_assembler(rbopA,A_rb,μ[k])
-      Bon = online_assembler(rbopB,B_rb,μ[k])
-      Con = online_assembler(rbopC,C_rb,μ[k])
-      Don = online_assembler(rbopD,D_rb,μ[k])
-      Fon = online_assembler(rbopF,F_rb,μ[k])
-      Hon = online_assembler(rbopH,H_rb,μ[k])
+      Aon = online_assembler(Ainfo...,μ[k])
+      Bon = online_assembler(Binfo...,μ[k])
+      Con = online_assembler(Cinfo...,μ[k])
+      Don = online_assembler(Dinfo...,μ[k])
+      Fon = online_assembler(Finfo...,μ[k])
+      Hon = online_assembler(Hinfo...,μ[k])
       lift = Aon[2],Bon[2],Con[2]
       sys = navier_stokes_rb_system((Aon[1],Bon[1],Con[1],Don[1]),(Fon,Hon,lift...))
       rb_sol = solve_rb_system(sys...,X(μ[k]),rbspace)

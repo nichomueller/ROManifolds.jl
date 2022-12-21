@@ -153,7 +153,8 @@ function assemble_affine_matrix(op::RBSteadyBilinOperator)
 end
 
 function assemble_affine_matrix(op::RBUnsteadyBilinOperator)
-  assemble_matrix(op.feop,realization(op.tinfo))(realization(op))
+  t = realization(op.feop.tinfo)
+  assemble_matrix(op.feop,t)(realization(op))
 end
 
 function assemble_affine_matrix(op::RBSteadyBilinOperator{Nonlinear,Ttr}) where Ttr
@@ -162,8 +163,9 @@ function assemble_affine_matrix(op::RBSteadyBilinOperator{Nonlinear,Ttr}) where 
 end
 
 function assemble_affine_matrix(op::RBUnsteadyBilinOperator{Nonlinear,Ttr}) where Ttr
+  t = realization(op.feop.tinfo)
   u = realization(op.feop.tests)
-  assemble_matrix(op.feop,realization(op.tinfo))(u)
+  assemble_matrix(op.feop,t)(u)
 end
 
 get_dirichlet_function(op::RBVarOperator) = get_dirichlet_function(op.feop)
@@ -212,14 +214,14 @@ function unfold_spacetime(
   Matrix(first.(vals)),Matrix(last.(vals))
 end
 
-function rb_projection(op::RBLinOperator)
+function rb_space_projection(op::RBLinOperator)
   vec = assemble_affine_vector(op)
   brow = get_basis_space_row(op)
 
   Matrix(brow'*vec)
 end
 
-function rb_projection(op::RBBilinOperator)
+function rb_space_projection(op::RBBilinOperator)
   mat = assemble_affine_matrix(op)
   brow = get_basis_space_row(op)
   bcol = get_basis_space_col(op)

@@ -74,6 +74,12 @@ get_id(rb::NTuple{2,RBSpace}) = get_id.(rb)
 get_basis_space(rb::RBSpace) = rb.basis_space
 get_basis_time(rb::RBSpaceUnsteady) = rb.basis_time
 get_basis_spacetime(rb::RBSpaceUnsteady) = kron(rb.basis_space,rb.basis_time)
+get_Ns(rb::RBSpace) = size(rb.basis_space,1)
+get_ns(rb::RBSpace) = size(rb.basis_space,2)
+get_Nt(rb::RBSpaceUnsteady) = size(rb.basis_time,1)
+get_nt(rb::RBSpaceUnsteady) = size(rb.basis_time,2)
+get_dims(rb::RBSpaceSteady) = get_Ns(rb),get_ns(rb)
+get_dims(rb::RBSpaceUnsteady) = get_Ns(rb),get_ns(rb),get_Nt(rb),get_nt(rb)
 
 function save(info::RBInfo,rb::RBSpace)
   id = get_id(rb)
@@ -106,9 +112,48 @@ function load_rb(info::RBInfoUnsteady,id::Symbol)
   RBSpaceUnsteady(id,basis_space,basis_time)
 end
 
-get_Ns(rb::RBSpace) = size(rb.basis_space,1)
-get_ns(rb::RBSpace) = size(rb.basis_space,2)
-get_Nt(rb::RBSpaceUnsteady) = size(rb.basis_time,1)
-get_nt(rb::RBSpaceUnsteady) = size(rb.basis_time,2)
-get_dims(rb::RBSpaceSteady) = get_Ns(rb),get_ns(rb)
-get_dims(rb::RBSpaceUnsteady) = get_Ns(rb),get_ns(rb),get_Nt(rb),get_nt(rb)
+function rb_space_projection(rbrow::RBSpace,mat::Array{Float})
+  brow = get_basis_space(rbrow)
+  @assert size(brow,1) == size(mat,1) "Cannot project array"
+  brow'*mat
+end
+
+function rb_space_projection(rbrow::RBSpace,rbcol::RBSpace,mat::Matrix{Float})
+  brow,bcol = get_basis_space(rbrow),get_basis_space(rbcol)
+  @assert size(brow,1) == size(mat,1) && size(bcol,1) == size(mat,2) "Cannot project matrix"
+  brow'*mat*bcol
+end
+
+function rb_time_projection(rbrow::RBSpaceUnsteady,mat::Array{Float})
+  brow = get_basis_time(rbrow)
+  @assert size(brow,1) == size(mat,1) "Cannot project array"
+
+  nrow = size(brow,2)
+  Q = size(mat,2)
+
+  btp_fun(it,q) = sum(brow[:,it].*mat[:,q])
+  btp_fun(q) = Matrix(Broadcasting(it -> btp_fun(it,q))(1:nrow))
+  btp_fun.(1:Q)
+end
+
+function rb_time_projection(
+  rbrow::RBSpaceUnsteady,
+  rbcol::RBSpaceUnsteady,
+  mat::Matrix{Float};
+  idx_forwards=1:size(mat,1),
+  idx_backwards=1:size(mat,1))
+
+  brow = get_basis_time(rbrow)
+  bcol = get_basis_time(rbcol)
+  @assert size(brow,1) == size(mat,1) && size(bcol,1) == size(mat,2) "Cannot project matrix"
+
+  nrow = size(brow,2)
+  ncol = size(bcol,2)
+  Q = size(coeff,2)
+
+  time_proj_fun(it,jt,q) =
+    sum(brow[idx_forwards,it].*bcol[idx_backwards,jt].*mat[idx_forwards,q])
+  time_proj_fun(jt,q) = Broadcasting(it -> time_proj_fun(it,jt,q))(1:nrow)
+  time_proj_fun(q) = Broadcasting(jt -> time_proj_fun(jt,q))(1:ncol)
+  Matrix.(time_proj_fun.(1:Q))
+end

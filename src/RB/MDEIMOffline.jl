@@ -169,9 +169,9 @@ function project_mdeim_basis_space(
   rbspace_col = get_rbspace_col(op)
   bcol = get_basis_space(rbspace_col)
 
-  Q = length(sparse_basis_space)
-  red_basis_space = zeros(get_ns(rbspace_row)*get_ns(rbspace_col),Q)
-  for q = 1:Q
+  Qs = length(sparse_basis_space)
+  red_basis_space = zeros(get_ns(rbspace_row)*get_ns(rbspace_col),Qs)
+  for q = 1:Qs
     smat = sparsevec_to_sparsemat(sparse_basis_space[q],get_Ns(rbspace_col))
     red_basis_space[:,q] = (brow'*smat*bcol)[:]
   end
@@ -184,37 +184,63 @@ function project_mdeim_basis_space(
   rb::NTuple{2,<:RBSpace})
 
   rbspace,rbspace_lift = rb
+  op_lift = RBLiftingOperator(op)
 
   red_basis_space = project_mdeim_basis_space(op,rbspace)
-
-  basis_space_lift = get_basis_space(rbspace_lift)
-  rbspace_row_lift = get_rbspace_row(op)
-  brow_lift = get_basis_space(rbspace_row_lift)
-  red_basis_space_lift = brow_lift'*basis_space_lift
+  red_basis_space_lift = project_mdeim_basis_space(op_lift,rbspace_lift)
 
   red_basis_space,red_basis_space_lift
 end
 
-# CORRECT THIS!
 function project_mdeim_basis_time(
-  ::RBLinOperator,
+  op::RBLinOperator,
   rbspace::RBSpace)
-  get_basis_time(rbspace)
+
+  basis_time = get_basis_time(rbspace)
+  rbspace_row = get_rbspace_row(op)
+  brow = get_basis_time(rbspace_row)
+  brow'*basis_time
 end
 
-# CORRECT THIS!
 function project_mdeim_basis_time(
-  ::RBBilinOperator,
+  op::RBBilinOperator,
   rbspace::RBSpace)
-  get_basis_time(rbspace)
+
+  basis_time = get_basis_time(rbspace)
+  Qt = size(basis_time,2)
+
+  rbspace_row = get_rbspace_row(op)
+  brow = get_basis_time(rbspace_row)
+  ntrow = size(brow,2)
+
+  rbspace_col = get_rbspace_col(op)
+  bcol = get_basis_time(rbspace_col)
+  ntcol = size(bcol,2)
+
+  red_basis_time = zeros(ntrow*ntcol,Qt)
+  for it = 1:ntrow
+    for jt = 1:ntcol
+      ijt = (it-1)*ntcol+jt
+      for q = 1:Qt
+        red_basis_time[ijt,q] = sum(brow[:,it].*bcol[:,it].*basis_time[:,q])
+      end
+    end
+  end
+
+  red_basis_time
 end
 
-# CORRECT THIS!
 function project_mdeim_basis_time(
-  ::RBBilinOperator,
+  op::RBBilinOperator,
   rb::NTuple{2,<:RBSpace})
+
   rbspace,rbspace_lift = rb
-  get_basis_time(rbspace),get_basis_time(rbspace_lift)
+  op_lift = RBLiftingOperator(op)
+
+  red_basis_time = project_mdeim_basis_time(op,rbspace)
+  red_basis_time_lift = project_mdeim_basis_time(op_lift,rbspace_lift)
+
+  red_basis_time,red_basis_time_lift
 end
 
 mdeim_idx(rbspace::NTuple{2,<:RBSpace}) = mdeim_idx.(rbspace)
@@ -259,7 +285,6 @@ function get_idx_lu_factors(
   get_idx_lu_factors.(rbspace,idx_space)
 end
 
-# CORRECT THIS!
 function get_idx_lu_factors(
   rbspace::RBSpaceUnsteady,
   idx_st::NTuple{2,Vector{Int}})
@@ -270,8 +295,9 @@ function get_idx_lu_factors(
   bt = get_basis_time(rbspace)
   bs_idx = bs[idx_space,:]
   bt_idx = bt[idx_time,:]
+  bst_idx = kron(bs_idx,bt_idx)
 
-  lu(bs_idx)
+  lu(bst_idx)
 end
 
 function get_idx_lu_factors(

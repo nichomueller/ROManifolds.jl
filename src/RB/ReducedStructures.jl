@@ -34,7 +34,7 @@ function assemble_rb_structure(
   id = get_id(op)
   println("Linear operator $id is affine: computing Φᵀ$id")
 
-  rb_projection(op)
+  rb_space_projection(op)
 end
 
 function assemble_rb_structure(
@@ -71,7 +71,7 @@ function assemble_rb_structure(
     running the MDEIM offline phase on $mdeim_nsnap snapshots")
 
   op_lift = RBLiftingOperator(op)
-  rb_projection(op),mdeim_offline(info,op_lift,args...)
+  rb_space_projection(op),mdeim_offline(info,op_lift,args...)
 end
 
 function assemble_rb_structure(
@@ -82,7 +82,7 @@ function assemble_rb_structure(
   id = get_id(op)
   println("Bilinear operator $id is affine and has no lifting: computing Φᵀ$(id)Φ")
 
-  rb_projection(op)
+  rb_space_projection(op)
 end
 
 function save_rb_structure(info::RBInfo,b,id::Symbol)

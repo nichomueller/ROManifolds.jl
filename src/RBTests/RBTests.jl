@@ -151,7 +151,7 @@ end
 
 function collect_solutions(solk,k::Int)
   println("\n Collecting solution $k")
-  uh = allocate_vblock(Float)
+  uh = Vector{Float}[]
   collect_solutions!(uh,solk)
   uh,solk.psol.μ
 end

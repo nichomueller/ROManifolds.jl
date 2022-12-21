@@ -43,7 +43,8 @@ function poisson_unsteady()
   opF = AffineParamVarOperator(f,ffe,PS,time_info,V;id=:F)
   opH = NonaffineParamVarOperator(h,hfe,PS,time_info,V;id=:H)
 
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false)
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false,
+    save_offline=false)
   tt = TimeTracker(0.,0.)
   rbspace,varinfo = offline_phase(info,(uh,μ),(opA,opM,opF,opH),measures,tt)
   online_phase(info,(uh,μ),rbspace,varinfo,tt)
@@ -67,17 +68,10 @@ function offline_phase(
   rbopF = RBVarOperator(opF,rbspace)
   rbopH = RBVarOperator(opH,rbspace)
 
-  if info.load_offline
-    A_rb = load_rb_structure(info,rbopA,get_dΩ(meas))
-    M_rb = load_rb_structure(info,rbopM,get_dΩ(meas))
-    F_rb = load_rb_structure(info,rbopF,get_dΩ(meas))
-    H_rb = load_rb_structure(info,rbopH,get_dΓn(meas))
-  else
-    A_rb = assemble_rb_structure(info,tt,rbopA,μ,meas,:dΩ)
-    M_rb = assemble_rb_structure(info,tt,rbopM,μ,meas,:dΩ)
-    F_rb = assemble_rb_structure(info,tt,rbopF,μ,meas,:dΩ)
-    H_rb = assemble_rb_structure(info,tt,rbopH,μ,meas,:dΓn)
-  end
+  A_rb = rb_structure(info,tt,rbopA,μ,meas,:dΩ)
+  M_rb = rb_structure(info,tt,rbopM,μ,meas,:dΩ)
+  F_rb = rb_structure(info,tt,rbopF,μ,meas,:dΩ)
+  H_rb = rb_structure(info,tt,rbopH,μ,meas,:dΓn)
 
   varinfo = ((rbopA,A_rb),(rbopM,M_rb),(rbopF,F_rb),(rbopH,H_rb))
   rbspace,varinfo

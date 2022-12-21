@@ -3,7 +3,7 @@ basis_as_fefun(::RBLinOperator) = error("Not implemented")
 function basis_as_fefun(
   op::RBSteadyBilinOperator{Top,<:ParamTrialFESpace}) where Top
 
-  bspace = get_basis_space_col(op)
+  bspace = get_basis_space_row(op)
   trial = get_trial(op)
   fefuns(μ::Param,n::Int) = FEFunction(trial(μ),bspace[:,n])
   fefuns
@@ -12,7 +12,7 @@ end
 function basis_as_fefun(
   op::RBSteadyBilinOperator{Top,<:ParamTrialFESpace}) where Top
 
-  bspace = get_basis_space_col(op)
+  bspace = get_basis_space_row(op)
   trial = get_trial(op)
   fefuns(μ::Param,tθ::Real,n::Int) = FEFunction(trial(μ,tθ),bspace[:,n])
   fefuns
@@ -49,20 +49,62 @@ function vector_snapshots(
 end
 
 function vector_snapshots(
-  op::RBLinOperator{Nonlinear},
-  args...)
+  op::RBSteadyLinOperator{Nonlinear},
+  μ::Vector{Param})
+
+  μ_mdeim = length(μ) > 5 ? μ[1:5] : μ
+  nparam = length(μ_mdeim)
 
   id = get_id(op)
   bfun = basis_as_fefun(op)
+  ns = size(get_basis_space_row(op),2)
   V = assemble_vector(op)
 
-  function snapshot(k::Int)
-    println("Snapshot number $k, $id")
-    V(bfun[k])
+  function snapshot(k::Int,n::Int)
+    println("Nonlinear snapshot number $((n-1)*nparam+k), $id")
+    bfun(μ_mdeim[k],n)
+  end
+  vals = Vector{Float}[]
+
+  for n = 1:ns
+    for k = 1:nparam
+      bfun_nk = snapshot(k,n)
+      push!(vals,V(bfun_nk))
+    end
   end
 
-  vals = snapshot.(eachindex(bfun))
   Snapshots(id,vals)
+end
+
+function vector_snapshots(
+  op::RBUnsteadyLinOperator{Nonlinear},
+  μ::Vector{Param})
+
+  μ_mdeim = length(μ) > 2 ? μ[1:2] : μ
+  nparam = length(μ_mdeim)
+
+  id = get_id(op)
+  timesθ = get_timesθ(op)
+  bfun = basis_as_fefun(op)
+  ns = size(get_basis_space_row(op),2)
+  V(t) = assemble_vector(op,t)
+
+  function snapshot(k::Int,tθ::Real,n::Int)
+    println("Nonlinear snapshot number $((n-1)*nparam+k), $id")
+    bfun(μ_mdeim[k],tθ,n)
+  end
+
+  vals = Matrix{Float}[]
+  for n = 1:ns
+    for k = 1:nparam
+      for tθ = timesθ
+        bfun_nk = snapshot(k,tθ,n)
+        push!(vals,V(tθ)(bfun_nk))
+      end
+    end
+  end
+
+  Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
 function matrix_snapshots(
@@ -115,17 +157,17 @@ function matrix_snapshots(
 
   id = get_id(op)
   bfun = basis_as_fefun(op)
-  ns = size(get_basis_space_col(op),2)
+  ns = size(get_basis_space_row(op),2)
   M,lift = assemble_matrix_and_lifting(op)
 
   function snapshot(k::Int,n::Int)
     println("Nonlinear snapshot number $((n-1)*nparam+k), $id")
     bfun(μ_mdeim[k],n)
   end
+
   row_idx = Vector{Int}[]
   vals = Vector{Float}[]
   lifts = Vector{Float}[]
-
   for n = 1:ns
     for k = 1:nparam
       bfun_nk = snapshot(k,n)
@@ -168,21 +210,39 @@ function matrix_snapshots(
   op::RBUnsteadyBilinOperator{Nonlinear,<:ParamTrialFESpace},
   μ::Vector{Param})
 
-  id = get_id(op)
-  bfun = basis_as_fefun(op)
-  M,lift = assemble_matrix_and_lifting(op)
+  μ_mdeim = length(μ) > 2 ? μ[1:2] : μ
+  nparam = length(μ_mdeim)
 
-  function snapshot(ns::Int,k::Int)
-    println("Snapshot number $k, $id")
-    bfun_nk = bfun(μ,k)
-    iv = findnz.(M.(μ)(k))
-    i,v = first.(iv),last.(iv)
-    check_row_idx(i)
-    first(i),Matrix(v),lift(bfun[k])
+  id = get_id(op)
+  timesθ = get_timesθ(op)
+  bfun = basis_as_fefun(op)
+  ns = size(get_basis_space_row(op),2)
+  M_lift(t) = assemble_matrix_and_lifting(op,t)
+
+  function snapshot(k::Int,tθ::Real,n::Int)
+    println("Nonlinear snapshot number $((n-1)*nparam+k), $id")
+    bfun(μ_mdeim[k],tθ,n)
   end
 
-  ivl = snapshot.(eachindex(bfun))
-  row_idx,vals,lifts = getindex.(ivl,1),getindex.(ivl,2),getindex.(ivl,3)
+  row_idx = Vector{Int}[]
+  vals = Matrix{Float}[]
+  lifts = Matrix{Float}[]
+  for n = 1:ns
+    for k = 1:nparam
+      for tθ = timesθ
+        bfun_nk = snapshot(k,tθ,n)
+        M,lift = M_lift(tθ)(bfun_nk)
+        iv_nk = findnz(M)
+        i_nk,v_nk = first.(iv_nk),last.(iv_nk)
+        l_nk = lift
+        check_row_idx(i_nk)
+        push!(row_idx,first(i_nk))
+        push!(vals,Matrix(v_nk))
+        push!(lifts,l_nk)
+      end
+    end
+  end
+
   check_row_idx(row_idx)
   Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end

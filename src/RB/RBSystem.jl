@@ -38,7 +38,7 @@ function online_assembler(
   op_lift = RBLiftingOperator(op)
   nonaffine_basis = get_basis_space(mdeim)
   coeff = compute_coefficient(op_lift,mdeim,μ,args...)
-  nonaffine_structure = online_structure(op_lift,nonaffine_basis,coeff)
+  nonaffine_structure = online_structure(op_lift,nonaffine_basis,coeff,args...)
 
   affine_structure,nonaffine_structure
 end
@@ -50,23 +50,6 @@ function online_structure(
 
   nr = get_nrows(op)
   basis_by_coeff_mult(basis,coeff,nr)
-end
-
-function online_structure(
-  op::Union{RBUnsteadyLinOperator,RBUnsteadyBilinOperator,RBUnsteadyLiftingOperator},
-  basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
-  coeff)
-
-  dtθ = get_dt(op)*get_θ(op)
-  if get_id(op) == :M coeff /= dtθ end
-
-  btbtp = coeff_by_time_bases(op,coeff)
-  ns_row = get_ns(get_rbspace_row(op))
-
-  basis_block = blocks(basis,ns_row)
-
-  nr = get_nrows(op)
-  basis_by_coeff_mult(basis_block,btbtp,nr)
 end
 
 function online_structure(
@@ -90,9 +73,37 @@ function online_structure(
 end
 
 function online_structure(
+  op::Union{RBUnsteadyLinOperator,RBUnsteadyBilinOperator,RBUnsteadyLiftingOperator},
+  basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
+  coeff,
+  st_mdeim=true)
+
+  online_structure(op,basis,coeff,Val(st_mdeim))
+end
+
+function online_structure(
+  op::Union{RBUnsteadyLinOperator,RBUnsteadyBilinOperator,RBUnsteadyLiftingOperator},
+  basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
+  coeff,
+  ::Val{false})
+
+  dtθ = get_dt(op)*get_θ(op)
+  if get_id(op) == :M coeff /= dtθ end
+
+  btbtp = coeff_by_time_bases(op,coeff)
+  ns_row = get_ns(get_rbspace_row(op))
+
+  basis_block = blocks(basis,ns_row)
+
+  nr = get_nrows(op)
+  basis_by_coeff_mult(basis_block,btbtp,nr)
+end
+
+function online_structure(
   op::Union{RBUnsteadyLinOperator{Nonlinear},RBUnsteadyBilinOperator{Nonlinear,Ttr},RBUnsteadyLiftingOperator{Nonlinear,Ttr}},
   basis::Matrix{Float},
-  coeff) where Ttr
+  coeff,
+  ::Val{false}) where Ttr
 
   dtθ = get_dt(op)*get_θ(op)
   if get_id(op) == :M coeff /= dtθ end
@@ -108,7 +119,8 @@ end
 function online_structure(
   op::RBUnsteadyBilinOperator{Nonlinear,Ttr},
   basis::NTuple{2,Matrix{Float}},
-  coeff) where Ttr
+  coeff,
+  ::Val{false}) where Ttr
 
   dtθ = get_dt(op)*get_θ(op)
   if get_id(op) == :M coeff /= dtθ end
@@ -123,16 +135,31 @@ function online_structure(
   M,lift
 end
 
-function coeff_by_time_bases(op::RBUnsteadyLinOperator,coeff)
+function online_structure(
+  op::Union{RBUnsteadyLinOperator,RBUnsteadyBilinOperator,RBUnsteadyLiftingOperator},
+  basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
+  coeff,
+  ::Val{true})
+
+  dtθ = get_dt(op)*get_θ(op)
+  if get_id(op) == :M coeff /= dtθ end
+
+  nr = get_nrows(op)
+  basis_by_coeff_mult(basis,coeff,nr)
+end
+
+function coeff_by_time_bases(
+  op::Union{RBUnsteadyLinOperator,RBUnsteadyLiftingOperator},
+  coeff)
+
   coeff_by_time_bases_lin(op,coeff)
 end
 
-function coeff_by_time_bases(op::RBUnsteadyBilinOperator,coeff)
+function coeff_by_time_bases(
+  op::RBUnsteadyBilinOperator,
+  coeff)
+
   coeff_by_time_bases_bilin(op,coeff)
-end
-
-function coeff_by_time_bases(op::RBUnsteadyLiftingOperator,coeff)
-  coeff_by_time_bases_lin(op,coeff)
 end
 
 function coeff_by_time_bases(

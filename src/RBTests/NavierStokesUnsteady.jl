@@ -84,25 +84,14 @@ function offline_phase(
   rbopF = RBVarOperator(opF,rbspace_u)
   rbopH = RBVarOperator(opH,rbspace_u)
 
-  if info.load_offline
-    A_rb = load_rb_structure(info,rbopA,meas.dΩ)
-    M_rb = load_rb_structure(info,rbopM,meas.dΩ)
-    B_rb = load_rb_structure(info,rbopB,meas.dΩ)
-    BT_rb = load_rb_structure(info,rbopBT,meas.dΩ)
-    C_rb = load_rb_structure(info,rbopC,meas.dΩ)
-    D_rb = load_rb_structure(info,rbopD,meas.dΩ)
-    F_rb = load_rb_structure(info,rbopF,meas.dΩ)
-    H_rb = load_rb_structure(info,rbopH,meas.dΓn)
-  else
-    A_rb = assemble_rb_structure(info,tt,rbopA,μ,meas,:dΩ)
-    M_rb = assemble_rb_structure(info,tt,rbopM,μ,meas,:dΩ)
-    B_rb = assemble_rb_structure(info,tt,rbopB,μ,meas,:dΩ)
-    BT_rb = assemble_rb_structure(info,tt,rbopBT,μ,meas,:dΩ)
-    C_rb = assemble_rb_structure(info,tt,rbopC,μ,meas,:dΩ)
-    D_rb = assemble_rb_structure(info,tt,rbopD,μ,meas,:dΩ)
-    F_rb = assemble_rb_structure(info,tt,rbopF,μ,meas,:dΩ)
-    H_rb = assemble_rb_structure(info,tt,rbopH,μ,meas,:dΓn)
-  end
+  A_rb = rb_structure(info,tt,rbopA,μ,meas,:dΩ)
+  M_rb = rb_structure(info,tt,rbopM,μ,meas,:dΩ)
+  B_rb = rb_structure(info,tt,rbopB,μ,meas,:dΩ)
+  BT_rb = rb_structure(info,tt,rbopBT,μ,meas,:dΩ)
+  C_rb = rb_structure(info,tt,rbopC,μ,meas,:dΩ)
+  D_rb = rb_structure(info,tt,rbopD,μ,meas,:dΩ)
+  F_rb = rb_structure(info,tt,rbopF,μ,meas,:dΩ)
+  H_rb = rb_structure(info,tt,rbopH,μ,meas,:dΓn)
 
   rbspace = (rbspace_u,rbspace_p)
   varinfo = ((rbopA,A_rb),(rbopM,M_rb),(rbopB,B_rb),(rbopBT,BT_rb),

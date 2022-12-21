@@ -52,7 +52,7 @@ function steady_stokes()
   isapprox(LHS*xh,RHS)
 end
 
-function unsteady_poisson()
+function unsteady_stokes()
   dt = get_dt(opA)
   θ = get_θ(opA)
   μ1 = μ[1]

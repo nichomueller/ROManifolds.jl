@@ -74,7 +74,7 @@ function generate_dcube_model(
     domain = (0,1,0,1)
     partition = (npart,npart)
   else
-    domain = (0, 1, 0, 1, 0, 1)
+    domain = (0,1,0,1,0,1)
     partition = (npart,npart,npart)
   end
   model = CartesianDiscreteModel(domain,partition)
