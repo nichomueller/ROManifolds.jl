@@ -107,7 +107,6 @@ get_id(mdeim::MDEIM) = get_id(mdeim.rbspace)
 get_basis_space(mdeim::MDEIMSteady) = get_basis_space(mdeim.rbspace)
 get_basis_space(mdeim::MDEIMUnsteady) = get_basis_space(first(mdeim.rbspace))
 get_basis_time(mdeim::MDEIMUnsteady) = get_basis_time.(mdeim.rbspace)
-get_idx(mdeim::MDEIM) = mdeim.idx
 get_idx_space(mdeim::MDEIMSteady) = mdeim.idx
 get_idx_space(mdeim::MDEIMUnsteady) = first(mdeim.idx)
 get_idx_time(mdeim::MDEIMUnsteady) = last(mdeim.idx)
@@ -134,7 +133,7 @@ function mdeim_offline(
   red_rbspace = project_mdeim_basis(op,rbspace)
   idx = mdeim_idx(rbspace)
   idx_lu_factors = get_idx_lu_factors(rbspace,idx)
-  #idx = recast_in_full_dim(op,idx)
+  idx = recast_in_full_dim(op,idx)
   red_meas = get_reduced_measure(op,idx,meas,field)
 
   MDEIM(red_rbspace,idx_lu_factors,idx,red_meas)

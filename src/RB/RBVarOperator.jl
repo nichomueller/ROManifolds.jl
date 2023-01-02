@@ -186,6 +186,14 @@ get_dt(op::RBVarOperator) = get_dt(op.feop)
 get_Nt(op::RBVarOperator) = get_Nt(op.feop)
 get_θ(op::RBVarOperator) = get_θ(op.feop)
 get_timesθ(op::RBVarOperator) = get_timesθ(op.feop)
+get_reduced_timesθ(op::RBVarOperator,idx::Vector{Int}) = get_timesθ(op)[idx]
+
+function get_reduced_timesθ(
+  op::RBVarOperator,
+  idx::NTuple{N,Vector{Int}}) where N
+
+  Broadcasting(i->get_reduced_timesθ(op,i))(idx)
+end
 
 "Small, full vector -> large, sparse vector"
 function get_findnz_mapping(op::RBBilinOperator)
