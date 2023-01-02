@@ -44,7 +44,7 @@ function poisson_unsteady()
   opH = NonaffineParamVarOperator(h,hfe,PS,time_info,V;id=:H)
 
   info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false,
-    save_offline=false)
+    save_offline=false,st_mdeim=true)
   tt = TimeTracker(0.,0.)
   rbspace,varinfo = offline_phase(info,(uh,μ),(opA,opM,opF,opH),measures,tt)
   online_phase(info,(uh,μ),rbspace,varinfo,tt)
@@ -92,14 +92,15 @@ function online_phase(
   rbopF,F_rb = Finfo
   rbopH,H_rb = Hinfo
 
+  st_mdeim = info.st_mdeim
   θ = get_θ(rbopA)
 
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
-      Aon = online_assembler(rbopA,A_rb,μ[k])
-      Mon = online_assembler(rbopM,M_rb,μ[k])
-      Fon = online_assembler(rbopF,F_rb,μ[k])
-      Hon = online_assembler(rbopH,H_rb,μ[k])
+      Aon = online_assembler(rbopA,A_rb,μ[k],st_mdeim)
+      Mon = online_assembler(rbopM,M_rb,μ[k],st_mdeim)
+      Fon = online_assembler(rbopF,F_rb,μ[k],st_mdeim)
+      Hon = online_assembler(rbopH,H_rb,μ[k],st_mdeim)
       lift = Aon[2],Mon[2]
       sys = poisson_rb_system((Aon[1]...,Mon[1]...),(Fon,Hon,lift...),θ)
       rb_sol = solve_rb_system(sys...)

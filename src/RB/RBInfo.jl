@@ -55,7 +55,7 @@ function RBInfoUnsteady(
   root::String;
   ϵ=1e-5,nsnap=80,online_snaps=95:100,mdeim_snap=20,time_red_method="ST-HOSVD",
   use_energy_norm=false,load_offline=true,
-  save_offline=true,save_online=true,st_mdeim=true,fun_mdeim=false,
+  save_offline=true,save_online=true,st_mdeim=false,fun_mdeim=false,
   adaptivity=false,postprocess=false)
 
   offline_path,online_path = rom_off_on_paths(ptype,mesh,root,ϵ)

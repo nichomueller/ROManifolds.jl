@@ -1,7 +1,7 @@
 function online_assembler(
   op::RBVarOperator,
   basis::NTuple{2,Matrix{Float}},
-  μ::Param)
+  μ::Param,)
 
   Broadcasting(b->online_assembler(op,b,μ))(basis)
 end
@@ -9,7 +9,7 @@ end
 function online_assembler(
   op::RBVarOperator,
   basis::Matrix{Float},
-  μ::Param)
+  μ::Param,)
 
   coeff = compute_coefficient(op,μ)
   online_structure(op,basis,coeff)
@@ -23,7 +23,7 @@ function online_assembler(
 
   basis = get_basis_space(mdeim)
   coeff = compute_coefficient(op,mdeim,μ,args...)
-  online_structure(op,basis,coeff)
+  online_structure(op,basis,coeff,args...)
 end
 
 function online_assembler(

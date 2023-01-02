@@ -11,29 +11,35 @@ function fem_path(ptype::ProblemType,mesh::String,root::String)
   fepath
 end
 
-function rom_path(ptype::ProblemType,mesh::String,root::String,ϵ::Float)
-  @assert isdir(root) "Provide valid root path"
-  tpath = test_path(root,mesh,issteady(ptype))
+function rom_path(tpath::String,ϵ::Float)
   rbpath = joinpath(joinpath(tpath,"rom"),"$ϵ")
   create_dir!(rbpath)
   rbpath
 end
 
-function rom_offline_path(ptype::ProblemType,mesh::String,root::String,ϵ::Float)
-  rb_off_path = joinpath(rom_path(ptype,mesh,root,ϵ),"offline")
+function rom_offline_path(tpath::String,ϵ::Float)
+  rb_off_path = joinpath(rom_path(tpath,ϵ),"offline")
   create_dir!(rb_off_path)
   rb_off_path
 end
 
-function rom_online_path(ptype::ProblemType,mesh::String,root::String,ϵ::Float)
-  rb_on_path = joinpath(rom_path(ptype,mesh,root,ϵ),"online")
+function rom_online_path(tpath::String,ϵ::Float)
+  rb_on_path = joinpath(rom_path(tpath,ϵ),"online")
   create_dir!(rb_on_path)
   rb_on_path
 end
 
-function rom_off_on_paths(ptype::ProblemType,mesh::String,root::String,ϵ::Float)
-  offpath = rom_offline_path(ptype,mesh,root,ϵ)
-  onpath = rom_online_path(ptype,mesh,root,ϵ)
+function rom_off_on_paths(ptype::ProblemType,mesh::String,root::String,ϵ::Float,
+  st_mdeim=false,fun_mdeim=false)
+
+  @assert isdir(root) "Provide valid root path"
+  st = st_mdeim ? "st" : ""
+  fun = fun_mdeim ? "fun" : ""
+  tpath = test_path(root,mesh,issteady(ptype))
+  new_tpath = joinpath(tpath,st*fun)
+
+  offpath = rom_offline_path(new_tpath,ϵ)
+  onpath = rom_online_path(new_tpath,ϵ)
   offpath,onpath
 end
 

@@ -1,6 +1,7 @@
 include("MDEIMSnapshots.jl")
 
 abstract type MDEIM end
+abstract type MDEIMUnsteady <: MDEIM end
 
 mutable struct MDEIMSteady <: MDEIM
   rbspace::RBSpaceSteady
@@ -9,8 +10,17 @@ mutable struct MDEIMSteady <: MDEIM
   red_measure::Measure
 end
 
-mutable struct MDEIMUnsteady{N} <: MDEIM
-  rbspace::NTuple{N,RBSpaceUnsteady}
+mutable struct MDEIMUnsteadyStandard <: MDEIM
+  rbspace::RBSpaceUnsteady
+  idx_lu_factors::LU
+  idx::NTuple{2,Vector{Int}}
+  red_measure::Measure
+end
+
+mutable struct MDEIMUnsteadySpaceTime <: MDEIM
+  id::Symbol
+  basis::Matrix{Float}
+  basis_shift::Matrix{Float}
   idx_lu_factors::LU
   idx::NTuple{2,Vector{Int}}
   red_measure::Measure
@@ -31,16 +41,16 @@ function MDEIM(
   idx::NTuple{2,Vector{Int}},
   red_measure::Measure)
 
-  MDEIMUnsteady{1}((red_rbspace,),idx_lu_factors,idx,red_measure)
+  MDEIMUnsteadyStandard(red_rbspace,idx_lu_factors,idx,red_measure)
 end
 
 function MDEIM(
-  red_rbspace::NTuple{N,RBSpaceUnsteady},
+  red_rbspace::NTuple{2,RBSpaceUnsteady},
   idx_lu_factors::LU,
   idx::NTuple{2,Vector{Int}},
   red_measure::Measure) where N
 
-  MDEIMUnsteady{N}(red_rbspace,idx_lu_factors,idx,red_measure)
+  MDEIMUnsteady(red_rbspace,idx_lu_factors,idx,red_measure)
 end
 
 function MDEIM(
@@ -130,9 +140,9 @@ function mdeim_offline(
   μ_mdeim = μ[1:info.mdeim_nsnap]
   snaps = mdeim_snapshots(op,info,μ_mdeim,args...)
   rbspace = mdeim_basis(info,snaps)
-  red_rbspace = project_mdeim_basis(op,rbspace)
+  red_rbspace = project_mdeim_basis(info,op,rbspace)
   idx = mdeim_idx(rbspace)
-  idx_lu_factors = get_idx_lu_factors(rbspace,idx)
+  idx_lu_factors = get_idx_lu_factors(info,rbspace,idx)
   idx = recast_in_full_dim(op,idx)
   red_meas = get_reduced_measure(op,idx,meas,field)
 
@@ -143,6 +153,7 @@ mdeim_basis(info::RBInfoSteady,snaps) = RBSpaceSteady(snaps;ismdeim=Val(true),ϵ
 mdeim_basis(info::RBInfoUnsteady,snaps) = RBSpaceUnsteady(snaps;ismdeim=Val(true),ϵ=info.ϵ)
 
 function project_mdeim_basis(
+  ::RBInfo,
   op::Union{RBSteadyLinOperator,RBSteadyBilinOperator,RBSteadyLiftingOperator},
   rbspace)
 
@@ -152,22 +163,13 @@ function project_mdeim_basis(
 end
 
 function project_mdeim_basis(
+  info::RBInfo,
   op::Union{RBUnsteadyLinOperator,RBUnsteadyBilinOperator,RBUnsteadyLiftingOperator},
   rbspace)
 
   id = get_id(rbspace)
   bs = rb_space_projection(op,rbspace)
-  bt = rb_time_projection(op,rbspace)
-  RBSpaceUnsteady(id,bs,bt)
-end
-
-function project_mdeim_basis(
-  op::RBUnsteadyBilinOperator,
-  rbspace)
-
-  id = get_id(rbspace)
-  bs = rb_space_projection(op,rbspace)
-  bt = rb_time_projection(op,rbspace)
+  bt = rb_time_projection(info,op,rbspace)
   RBSpaceUnsteady(id,bs,bt)
 end
 
@@ -217,7 +219,16 @@ function rb_space_projection(
   red_basis_space,red_basis_space_lift
 end
 
+function rb_time_projection(info::RBInfo,op::RBVarOperator,rbspace)
+  rb_time_projection(Val(info.st_mdeim),op,rbspace)
+end
+
+function rb_time_projection(::Val{false},op::RBVarOperator,rbspace)
+  get_basis_time(rbspace)
+end
+
 function rb_time_projection(
+  ::Val{true},
   op::RBLinOperator,
   rbspace::RBSpace)
 
@@ -227,6 +238,7 @@ function rb_time_projection(
 end
 
 function rb_time_projection(
+  ::Val{true},
   op::RBBilinOperator,
   rbspace::RBSpace)
 
@@ -245,14 +257,15 @@ function rb_time_projection(
 end
 
 function rb_time_projection(
+  info::RBInfo,
   op::RBBilinOperator,
   rb::NTuple{2,<:RBSpace})
 
   rbspace,rbspace_lift = rb
   op_lift = RBLiftingOperator(op)
 
-  red_basis_time = rb_time_projection(op,rbspace)
-  red_basis_time_lift = rb_time_projection(op_lift,rbspace_lift)
+  red_basis_time = rb_time_projection(Val(info.st_mdeim),op,rbspace)
+  red_basis_time_lift = rb_time_projection(Val(info.st_mdeim),op_lift,rbspace_lift)
 
   red_basis_time,red_basis_time_lift
 end
@@ -285,6 +298,7 @@ function mdeim_idx(M::Matrix{Float})
 end
 
 function get_idx_lu_factors(
+  ::RBInfoSteady,
   rbspace::RBSpaceSteady,
   idx_space::Vector{Int})
 
@@ -294,12 +308,30 @@ function get_idx_lu_factors(
 end
 
 function get_idx_lu_factors(
+  info::RBInfoSteady,
   rbspace::NTuple{2,RBSpaceSteady},
   idx_space::NTuple{2,Vector{Int}})
-  get_idx_lu_factors.(rbspace,idx_space)
+
+  get_idx_lu_factors.(info,rbspace,idx_space)
+end
+
+function get_idx_lu_factors(info::RBInfoUnsteady,rbspace,idx_st)
+  get_idx_lu_factors(Val(info.st_mdeim),rbspace,idx_st)
 end
 
 function get_idx_lu_factors(
+  ::Val{false},
+  rbspace::RBSpaceUnsteady,
+  idx_st::NTuple{2,Vector{Int}})
+
+  idx_space,_ = idx_st
+  bs = get_basis_space(rbspace)
+  bs_idx = bs[idx_space,:]
+  lu(bs_idx)
+end
+
+function get_idx_lu_factors(
+  ::Val{true},
   rbspace::RBSpaceUnsteady,
   idx_st::NTuple{2,Vector{Int}})
 
@@ -315,9 +347,11 @@ function get_idx_lu_factors(
 end
 
 function get_idx_lu_factors(
+  info::RBInfoUnsteady,
   rbspace::NTuple{2,RBSpaceUnsteady},
   idx_st::NTuple{2,NTuple{2,Vector{Int}}})
-  get_idx_lu_factors.(rbspace,idx_st)
+
+  Broadcasting((rb,idx)->get_idx_lu_factors(info,rb,idx))(rbspace,idx_st)
 end
 
 recast_in_full_dim(::RBLinOperator,idx_tmp) = idx_tmp

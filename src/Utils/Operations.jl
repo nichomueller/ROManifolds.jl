@@ -263,6 +263,9 @@ check_dimensions(vb::AbstractVector) =
   all([size(vb[i])[1] == size(vb[1])[1] for i = 2:length(vb)])
 check_dimensions(m::AbstractMatrix,nb::Int) = iszero(size(m)[2]%nb)
 
+spacetime_vector(mat::AbstractMatrix) = mat[:]
+spacetime_vector(mat::NTuple{N,AbstractMatrix}) where N = spacetime_vector.(mat)
+
 function SparseArrays.sparsevec(M::Matrix{T},row_idx::Vector{Int}) where T
   sparse_vblocks = SparseVector{T}[]
   for j = axes(M,2)

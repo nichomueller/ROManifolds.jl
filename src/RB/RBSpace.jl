@@ -81,7 +81,9 @@ end
 get_id(rb::RBSpace) = rb.id
 get_id(rb::NTuple{2,RBSpace}) = get_id.(rb)
 get_basis_space(rb::RBSpace) = rb.basis_space
+get_basis_space(rb::NTuple{N,RBSpace}) where N = get_basis_space.(rb)
 get_basis_time(rb::RBSpaceUnsteady) = rb.basis_time
+get_basis_time(rb::NTuple{N,RBSpaceUnsteady}) where N = get_basis_time.(rb)
 get_basis_spacetime(rb::RBSpaceUnsteady) = kron(rb.basis_space,rb.basis_time)
 get_Ns(rb::RBSpace) = size(rb.basis_space,1)
 get_ns(rb::RBSpace) = size(rb.basis_space,2)
