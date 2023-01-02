@@ -76,7 +76,7 @@ function online_structure(
   op::Union{RBUnsteadyLinOperator,RBUnsteadyBilinOperator,RBUnsteadyLiftingOperator},
   basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
   coeff,
-  st_mdeim=true)
+  st_mdeim=false)
 
   online_structure(op,basis,coeff,Val(st_mdeim))
 end
@@ -173,81 +173,50 @@ function coeff_by_time_bases_lin(
   op::RBVarOperator,
   coeff::AbstractMatrix)
 
-  bt_row = get_basis_time_row(op)
-  nt_row = size(bt_row,2)
-  Q = size(coeff,1)
-
-  btp_fun(it,q) = sum(bt_row[:,it].*coeff[q,:])
-  btp_fun(q) = Matrix(Broadcasting(it -> btp_fun(it,q))(1:nt_row))
-  btp_fun.(1:Q)
+  rbrow = get_rbspace_row(op)
+  rb_time_projection(rbrow,coeff)
 end
 
 function coeff_by_time_bases_lin(
   op::RBVarOperator{Nonlinear,ParamTransientTrialFESpace},
   coeff::Function)
 
-  bt_row = get_basis_time_row(op)
-  nt_row = size(bt_row,2)
-  Q = size(coeff,1)
-
-  btp_fun(u,it,q) = sum(bt_row[:,it].*coeff(u)[q,:])
-  btp_fun(u,q) = Matrix(Broadcasting(it -> btp_fun(u,it,q))(1:nt_row))
-  btp_fun(u) = Broadcasting(q -> btp_fun(u,q))(1:Q)
-  btp_fun
+  rbrow = get_rbspace_row(op)
+  u->rb_time_projection(rbrow,coeff(u))
 end
 
 function coeff_by_time_bases_bilin(
   op::RBVarOperator,
   coeff::AbstractMatrix)
 
+  rbrow = get_rbspace_row(op)
+  rbcol = get_rbspace_col(op)
+  time_proj(idx1,idx2) = rb_time_projection(rbrow,rbcol,coeff,idx1,idx2)
+
   Nt = get_Nt(op)
   idx = 1:Nt
-  idx_shift_backward,idx_shift_forward = 1:Nt-1,2:Nt
-  bt_row = get_basis_time_row(op)
-  bt_col = get_basis_time_col(op)
+  idx_backwards,idx_forwards = 1:Nt-1,2:Nt
 
-  nt_row = size(bt_row,2)
-  nt_col = size(bt_col,2)
-  Q = size(coeff,1)
-
-  function define_btbtp_fun(idx1,idx2)
-    btbtp_fun(it,jt,q) = sum(bt_row[idx1,it].*bt_col[idx2,jt].*coeff[q,idx1])
-    btbtp_fun(jt,q) = Broadcasting(it -> btbtp_fun(it,jt,q))(1:nt_row)
-    btbtp_fun(q) = Broadcasting(jt -> btbtp_fun(jt,q))(1:nt_col)
-    btbtp_block = Matrix.(btbtp_fun.(1:Q))
-    btbtp_block
-  end
-
-  M = define_btbtp_fun(idx,idx)
-  M_shift = define_btbtp_fun(idx_shift_forward,idx_shift_backward)
-  M,M_shift
+  btbtp = time_proj(idx,idx)
+  btbtp_shift = time_proj(idx_forwards,idx_backwards)
+  btbtp,btbtp_shift
 end
 
 function coeff_by_time_bases_bilin(
   op::RBVarOperator{Nonlinear,ParamTransientTrialFESpace},
   coeff::Function)
 
+  rbrow = get_rbspace_row(op)
+  rbcol = get_rbspace_col(op)
+  time_proj(u,idx1,idx2) = rb_time_projection(rbrow,rbcol,coeff(u),idx1,idx2)
+
   Nt = get_Nt(op)
   idx = 1:Nt
-  idx_shift_back,idx_shift_forward = 1:Nt-1,2:Nt
-  bt_row = get_basis_time_row(op)
-  bt_col = get_basis_time_col(op)
+  idx_backwards,idx_forwards = 1:Nt-1,2:Nt
 
-  nt_row = size(bt_row)[2]
-  nt_col = size(bt_col)[2]
-  Q = size(coeff,1)
-
-  function define_btbtp_fun(idx1,idx2)
-    btbtp_fun(u,it,jt,q) = sum(bt_row[idx1,it].*bt_col[idx2,jt].*coeff(u)[q,idx1])
-    btbtp_fun(u,jt,q) = Broadcasting(it -> btbtp_fun(u,it,jt,q))(1:nt_row)
-    btbtp_fun(u,q) = Broadcasting(jt -> btbtp_fun(u,jt,q))(1:nt_col)
-    btbtp_fun(u) = Matrix.(Broadcasting(q -> btbtp_fun(u,q))(1:Q))
-    btbtp_fun
-  end
-
-  M = define_btbtp_fun(idx,idx)
-  M_shift = define_btbtp_fun(idx_shift_forward,idx_shift_back)
-  M,M_shift
+  btbtp(u) = time_proj(u,idx,idx)
+  btbtp_shift(u) = time_proj(u,idx_forwards,idx_backwards)
+  btbtp,btbtp_shift
 end
 
 function poisson_rb_system(

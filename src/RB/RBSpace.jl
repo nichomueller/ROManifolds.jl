@@ -32,9 +32,18 @@ struct RBSpaceUnsteady <: RBSpace
 end
 
 function RBSpaceUnsteady(
+  id::Symbol,
+  basis_space::Matrix{Float},
+  basis_time::NTuple{2,Matrix{Float}})
+
+  bt,bt_shift = basis_time
+  RBSpaceUnsteady(id,basis_space,bt),RBSpaceUnsteady(id,basis_space,bt_shift)
+end
+
+function RBSpaceUnsteady(
   id::NTuple{N,Symbol},
   basis_space::NTuple{N,Matrix{Float}},
-  basis_time::NTuple{N,Matrix{Float}}) where N
+  basis_time::Tuple) where N
 
   RBSpaceUnsteady.(id,basis_space,basis_time)
 end
@@ -112,19 +121,19 @@ function load_rb(info::RBInfoUnsteady,id::Symbol)
   RBSpaceUnsteady(id,basis_space,basis_time)
 end
 
-function rb_space_projection(rbrow::RBSpace,mat::Array{Float})
+function rb_space_projection(rbrow::RBSpace,mat::AbstractArray)
   brow = get_basis_space(rbrow)
   @assert size(brow,1) == size(mat,1) "Cannot project array"
-  brow'*mat
+  Matrix(brow'*mat)
 end
 
-function rb_space_projection(rbrow::RBSpace,rbcol::RBSpace,mat::Matrix{Float})
+function rb_space_projection(rbrow::RBSpace,rbcol::RBSpace,mat::AbstractMatrix)
   brow,bcol = get_basis_space(rbrow),get_basis_space(rbcol)
   @assert size(brow,1) == size(mat,1) && size(bcol,1) == size(mat,2) "Cannot project matrix"
-  brow'*mat*bcol
+  Matrix((brow'*mat*bcol)[:])
 end
 
-function rb_time_projection(rbrow::RBSpaceUnsteady,mat::Array{Float})
+function rb_time_projection(rbrow::RBSpaceUnsteady,mat::AbstractArray)
   brow = get_basis_time(rbrow)
   @assert size(brow,1) == size(mat,1) "Cannot project array"
 
@@ -139,17 +148,17 @@ end
 function rb_time_projection(
   rbrow::RBSpaceUnsteady,
   rbcol::RBSpaceUnsteady,
-  mat::Matrix{Float};
+  mat::AbstractMatrix,
   idx_forwards=1:size(mat,1),
   idx_backwards=1:size(mat,1))
 
   brow = get_basis_time(rbrow)
   bcol = get_basis_time(rbcol)
-  @assert size(brow,1) == size(mat,1) && size(bcol,1) == size(mat,2) "Cannot project matrix"
+  @assert size(brow,1) == size(bcol,1) == size(mat,1) "Cannot project matrix"
 
   nrow = size(brow,2)
   ncol = size(bcol,2)
-  Q = size(coeff,2)
+  Q = size(mat,2)
 
   time_proj_fun(it,jt,q) =
     sum(brow[idx_forwards,it].*bcol[idx_backwards,jt].*mat[idx_forwards,q])

@@ -9,8 +9,8 @@ mutable struct MDEIMSteady <: MDEIM
   red_measure::Measure
 end
 
-mutable struct MDEIMUnsteady <: MDEIM
-  rbspace::RBSpaceUnsteady
+mutable struct MDEIMUnsteady{N} <: MDEIM
+  rbspace::NTuple{N,RBSpaceUnsteady}
   idx_lu_factors::LU
   idx::NTuple{2,Vector{Int}}
   red_measure::Measure
@@ -31,11 +31,20 @@ function MDEIM(
   idx::NTuple{2,Vector{Int}},
   red_measure::Measure)
 
-  MDEIMUnsteady(red_rbspace,idx_lu_factors,idx,red_measure)
+  MDEIMUnsteady{1}((red_rbspace,),idx_lu_factors,idx,red_measure)
 end
 
 function MDEIM(
-  red_rbspace::NTuple{2,<:RBSpace},
+  red_rbspace::NTuple{N,RBSpaceUnsteady},
+  idx_lu_factors::LU,
+  idx::NTuple{2,Vector{Int}},
+  red_measure::Measure) where N
+
+  MDEIMUnsteady{N}(red_rbspace,idx_lu_factors,idx,red_measure)
+end
+
+function MDEIM(
+  red_rbspace::Tuple,
   idx_lu_factors::NTuple{2,LU},
   idx::NTuple{2,T},
   red_measure::NTuple{2,Measure}) where T
@@ -65,14 +74,19 @@ end
 
 function load_mdeim(
   path::String,
-  op::Union{RBUnsteadyLinOperator,RBUnsteadyBilinOperator},
+  op::Union{RBUnsteadyLinOperator,RBUnsteadyBilinOperator,RBUnsteadyLiftingOperator},
   meas::Measure)
 
   id = Symbol(last(split(path,'/')))
 
   basis_space = load(joinpath(path,"basis_space"))
   basis_time = load(joinpath(path,"basis_time"))
-  rbspace = RBSpace(id,basis_space,basis_time)
+  rbspace = (RBSpace(id,basis_space,basis_time),)
+  if isfile(joinpath(path,"basis_time_shift.csv"))
+    basis_time_shift = load(joinpath(path,"basis_time_shift"))
+    rbspace_shift = RBSpace(id,basis_space,basis_time_shift)
+    rbspace = (rbspace...,rbspace_shift)
+  end
 
   idx_space = load(joinpath(path,"idx_space"))
   idx_time = load(joinpath(path,"idx_time"))
@@ -90,8 +104,9 @@ end
 get_rbspace(mdeim::MDEIM) = mdeim.rbspace
 get_idx_lu_factors(mdeim::MDEIM) = mdeim.idx_lu_factors
 get_id(mdeim::MDEIM) = get_id(mdeim.rbspace)
-get_basis_space(mdeim::MDEIM) = get_basis_space(mdeim.rbspace)
-get_basis_time(mdeim::MDEIMUnsteady) = get_basis_time(mdeim.rbspace)
+get_basis_space(mdeim::MDEIMSteady) = get_basis_space(mdeim.rbspace)
+get_basis_space(mdeim::MDEIMUnsteady) = get_basis_space(first(mdeim.rbspace))
+get_basis_time(mdeim::MDEIMUnsteady) = get_basis_time.(mdeim.rbspace)
 get_idx(mdeim::MDEIM) = mdeim.idx
 get_idx_space(mdeim::MDEIMSteady) = mdeim.idx
 get_idx_space(mdeim::MDEIMUnsteady) = first(mdeim.idx)
@@ -99,10 +114,10 @@ get_idx_time(mdeim::MDEIMUnsteady) = last(mdeim.idx)
 get_reduced_measure(mdeim::MDEIM) = mdeim.red_measure
 
 get_basis_space(mdeim::NTuple{2,MDEIM}) = get_basis_space.(mdeim)
-get_basis_time(mdeim::NTuple{2,MDEIMUnsteady}) = get_basis_time.(mdeim)
+get_basis_time(mdeim::NTuple{2,MDEIM}) = get_basis_time.(mdeim)
 get_idx_lu_factors(mdeim::NTuple{2,MDEIM}) = get_idx_lu_factors.(mdeim)
 get_idx_space(mdeim::NTuple{2,MDEIM}) = get_idx_space.(mdeim)
-get_idx_time(mdeim::NTuple{2,MDEIMUnsteady}) = get_idx_time.(mdeim)
+get_idx_time(mdeim::NTuple{2,MDEIM}) = get_idx_time.(mdeim)
 get_reduced_measure(mdeim::NTuple{2,MDEIM}) = get_reduced_measure.(mdeim)
 
 function mdeim_offline(
@@ -119,7 +134,7 @@ function mdeim_offline(
   red_rbspace = project_mdeim_basis(op,rbspace)
   idx = mdeim_idx(rbspace)
   idx_lu_factors = get_idx_lu_factors(rbspace,idx)
-  idx = recast_in_full_dim(op,idx)
+  #idx = recast_in_full_dim(op,idx)
   red_meas = get_reduced_measure(op,idx,meas,field)
 
   MDEIM(red_rbspace,idx_lu_factors,idx,red_meas)
@@ -133,7 +148,7 @@ function project_mdeim_basis(
   rbspace)
 
   id = get_id(rbspace)
-  bs = project_mdeim_basis_space(op,rbspace)
+  bs = rb_space_projection(op,rbspace)
   RBSpaceSteady(id,bs)
 end
 
@@ -142,12 +157,22 @@ function project_mdeim_basis(
   rbspace)
 
   id = get_id(rbspace)
-  bs = project_mdeim_basis_space(op,rbspace)
-  bt = project_mdeim_basis_time(op,rbspace)
+  bs = rb_space_projection(op,rbspace)
+  bt = rb_time_projection(op,rbspace)
   RBSpaceUnsteady(id,bs,bt)
 end
 
-function project_mdeim_basis_space(
+function project_mdeim_basis(
+  op::RBUnsteadyBilinOperator,
+  rbspace)
+
+  id = get_id(rbspace)
+  bs = rb_space_projection(op,rbspace)
+  bt = rb_time_projection(op,rbspace)
+  RBSpaceUnsteady(id,bs,bt)
+end
+
+function rb_space_projection(
   op::RBLinOperator,
   rbspace::RBSpace)
 
@@ -157,7 +182,7 @@ function project_mdeim_basis_space(
   brow'*basis_space
 end
 
-function project_mdeim_basis_space(
+function rb_space_projection(
   op::RBBilinOperator,
   rbspace::RBSpace)
 
@@ -170,75 +195,65 @@ function project_mdeim_basis_space(
   bcol = get_basis_space(rbspace_col)
 
   Qs = length(sparse_basis_space)
+  Ns = get_Ns(rbspace_col)
   red_basis_space = zeros(get_ns(rbspace_row)*get_ns(rbspace_col),Qs)
   for q = 1:Qs
-    smat = sparsevec_to_sparsemat(sparse_basis_space[q],get_Ns(rbspace_col))
+    smat = sparsevec_to_sparsemat(sparse_basis_space[q],Ns)
     red_basis_space[:,q] = (brow'*smat*bcol)[:]
   end
 
   red_basis_space
 end
 
-function project_mdeim_basis_space(
+function rb_space_projection(
   op::RBBilinOperator,
   rb::NTuple{2,<:RBSpace})
 
   rbspace,rbspace_lift = rb
   op_lift = RBLiftingOperator(op)
 
-  red_basis_space = project_mdeim_basis_space(op,rbspace)
-  red_basis_space_lift = project_mdeim_basis_space(op_lift,rbspace_lift)
+  red_basis_space = rb_space_projection(op,rbspace)
+  red_basis_space_lift = rb_space_projection(op_lift,rbspace_lift)
 
   red_basis_space,red_basis_space_lift
 end
 
-function project_mdeim_basis_time(
+function rb_time_projection(
   op::RBLinOperator,
   rbspace::RBSpace)
 
-  basis_time = get_basis_time(rbspace)
-  rbspace_row = get_rbspace_row(op)
-  brow = get_basis_time(rbspace_row)
-  brow'*basis_time
+  rbrow = get_rbspace_row(op)
+  bt = get_basis_time(rbspace)
+  Matrix(rb_time_projection(rbrow,bt))
 end
 
-function project_mdeim_basis_time(
+function rb_time_projection(
   op::RBBilinOperator,
   rbspace::RBSpace)
 
-  basis_time = get_basis_time(rbspace)
-  Qt = size(basis_time,2)
+  rbrow = get_rbspace_row(op)
+  rbcol = get_rbspace_col(op)
+  bt = get_basis_time(rbspace)
+  time_proj(idx1,idx2) = rb_time_projection(rbrow,rbcol,bt,idx1,idx2)
 
-  rbspace_row = get_rbspace_row(op)
-  brow = get_basis_time(rbspace_row)
-  ntrow = size(brow,2)
+  Nt = get_Nt(op)
+  idx = 1:Nt
+  idx_backwards,idx_forwards = 1:Nt-1,2:Nt
 
-  rbspace_col = get_rbspace_col(op)
-  bcol = get_basis_time(rbspace_col)
-  ntcol = size(bcol,2)
-
-  red_basis_time = zeros(ntrow*ntcol,Qt)
-  for it = 1:ntrow
-    for jt = 1:ntcol
-      ijt = (it-1)*ntcol+jt
-      for q = 1:Qt
-        red_basis_time[ijt,q] = sum(brow[:,it].*bcol[:,it].*basis_time[:,q])
-      end
-    end
-  end
-
-  red_basis_time
+  red_basis_time = Matrix(time_proj(idx,idx))
+  red_basis_time_shift = Matrix(time_proj(idx_forwards,idx_backwards))
+  red_basis_time,red_basis_time_shift
 end
 
-function project_mdeim_basis_time(
+function rb_time_projection(
   op::RBBilinOperator,
   rb::NTuple{2,<:RBSpace})
 
   rbspace,rbspace_lift = rb
   op_lift = RBLiftingOperator(op)
 
-  red_basis_time = project_mdeim_basis_time(op,rbspace)
-  red_basis_time_lift = project_mdeim_basis_time(op_lift,rbspace_lift)
+  red_basis_time = rb_time_projection(op,rbspace)
+  red_basis_time_lift = rb_time_projection(op_lift,rbspace_lift)
 
   red_basis_time,red_basis_time_lift
 end

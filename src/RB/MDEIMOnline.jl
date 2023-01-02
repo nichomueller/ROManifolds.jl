@@ -14,7 +14,7 @@ function compute_coefficient(
   fun = get_param_function(op)
   timesθ = get_timesθ(op)
   coeff(tθ) = fun(nothing,μ,tθ)[1]
-  Matrix(coeff.(timesθ)')
+  Matrix(coeff.(timesθ))
 end
 
 function compute_coefficient(
@@ -116,10 +116,9 @@ function assemble_red_structure(
   μ::Param,
   timesθ::Vector{<:Real})
 
-  Nt = length(timesθ)
   fun = get_fe_function(op)
-  M(tθ) = assemble_matrix((u,v)->fun(μ,tθ,m,u,v),get_trial(op)(μ,tθ),get_test(op))
-  Matrix(rehsape(M.(timesθ),:,Nt))
+  M(tθ) = assemble_matrix((u,v)->fun(μ,tθ,m,u,v),get_trial(op)(μ,tθ),get_test(op))[:]
+  Matrix(M.(timesθ))
 end
 
 function assemble_red_structure(
@@ -129,8 +128,8 @@ function assemble_red_structure(
   timesθ::Vector{<:Real})
 
   fun = get_fe_function(op)
-  M(tθ,z) = assemble_matrix(v->fun(m,z,u,v),get_trial(op)(μ,tθ),get_test(op))
-  M(z) = Matrix(rehsape(Broadcasting(tθ->M(tθ,z))(timesθ),:,Nt))
+  M(tθ,z) = assemble_matrix(v->fun(m,z,u,v),get_trial(op)(μ,tθ),get_test(op))[:]
+  M(z) = Matrix(reshape(Broadcasting(tθ->M(tθ,z))(timesθ),:,Nt))
   M
 end
 
@@ -165,7 +164,7 @@ function assemble_red_structure(
   fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
   fdofs_test,_ = fdofs
 
-  M(z) = assemble_matrix((u,v)->fun(mmat,z,u,v),get_trial(op)(μ),get_test(op))[:]
+  M(z) = assemble_matrix((u,v)->fun(mmat,z,u,v),get_trial(op)(μ),get_test(op))
   Mlift(z) = assemble_matrix((u,v)->fun(mlift,z,u,v),get_trial_no_bc(op),get_test_no_bc(op))
   lift(z) = Mlift(z)[fdofs_test,ddofs]*dir
 
@@ -189,7 +188,8 @@ function assemble_red_structure(
   Mlift(tθ) = assemble_matrix((u,v)->fun(μ,tθ,mlift,u,v),get_trial_no_bc(op),get_test_no_bc(op))
   lift(tθ) = Mlift(tθ)[fdofs_test,ddofs]*dir(tθ)
 
-  Matrix(rehsape(M.(timesθ),:,Nt)),Matrix(rehsape(lift.(timesθ),:,Nt))
+  iv = findnz.(M.(timesθ))
+  Matrix(last.(iv)),Matrix(lift.(timesθ))
 end
 
 function assemble_red_structure(
@@ -205,8 +205,8 @@ function assemble_red_structure(
   fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
   fdofs_test,_ = fdofs
 
-  M(tθ,z) = assemble_matrix(v->fun(mmat,z,u,v),get_trial(op)(μ,tθ),get_test(op))
-  M(z) = Matrix(rehsape(Broadcasting(tθ->M(tθ,z))(timesθ),:,Nt))
+  M(tθ,z) = assemble_matrix(v->fun(mmat,z,u,v),get_trial(op)(μ,tθ),get_test(op))[:]
+  M(z) = Matrix(Broadcasting(tθ->M(tθ,z))(timesθ))
   Mlift(z) = assemble_matrix((u,v)->fun(mlift,z,u,v),get_trial_no_bc(op),get_test_no_bc(op))
   lift(tθ,z) = Mlift(z)[fdofs_test,ddofs]*dir(tθ)
   lift(z) = Matrix.(Broadcasting(tθ -> lift(tθ,z))(timesθ))
@@ -263,15 +263,22 @@ function assemble_red_structure(
   Matrix(lift.(timesθ))
 end
 
-function solve_lu(A::AbstractArray,lu::LU)
+function solve_lu(A::Vector{Float},lu::LU)
   P_A = lu.P*A
   y = lu.L \ P_A
   x = lu.U \ y
   x
 end
 
+function solve_lu(A::Matrix{Float},lu::LU)
+  P_A = lu.P*A
+  y = lu.L \ P_A
+  x = lu.U \ y
+  Matrix(x')
+end
+
 function mdeim_online(
-  A::Matrix{Float},
+  A::AbstractMatrix,
   idx_lu::LU,
   idx_space::Vector{Int})
 
@@ -280,7 +287,7 @@ function mdeim_online(
 end
 
 function mdeim_online(
-  A::Vector{Float},
+  A::AbstractVector,
   idx_lu::LU,
   idx_space::Vector{Int})
 

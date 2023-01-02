@@ -145,7 +145,15 @@ function assemble_affine_vector(op::RBSteadyLinOperator)
 end
 
 function assemble_affine_vector(op::RBUnsteadyLinOperator)
-  assemble_vector(op.feop,realization(op.tinfo))(realization(op))
+  assemble_vector(op.feop,realization(op.feop.tinfo))(realization(op))
+end
+
+function assemble_affine_vector(op::RBSteadyLiftingOperator)
+  assemble_vector(op.feop)(realization(op))
+end
+
+function assemble_affine_vector(op::RBUnsteadyLiftingOperator)
+  assemble_vector(op.feop,realization(op.feop.tinfo))(realization(op))
 end
 
 function assemble_affine_matrix(op::RBSteadyBilinOperator)
@@ -216,15 +224,15 @@ end
 
 function rb_space_projection(op::RBLinOperator)
   vec = assemble_affine_vector(op)
-  brow = get_basis_space_row(op)
+  rbrow = get_rbspace_row(op)
 
-  Matrix(brow'*vec)
+  rb_space_projection(rbrow,vec)
 end
 
 function rb_space_projection(op::RBBilinOperator)
   mat = assemble_affine_matrix(op)
-  brow = get_basis_space_row(op)
-  bcol = get_basis_space_col(op)
+  rbrow = get_rbspace_row(op)
+  rbcol = get_rbspace_col(op)
 
-  Matrix((brow'*mat*bcol)[:])
+  rb_space_projection(rbrow,rbcol,mat)
 end
