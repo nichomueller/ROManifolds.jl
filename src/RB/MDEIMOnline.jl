@@ -1,5 +1,5 @@
 function compute_coefficient(
-  op::Union{RBSteadyLinOperator{Affine},RBSteadyBilinOperator{Affine,Ttr},RBSteadyLiftingOperator{Affine,Ttr}},
+  op::RBSteadyVarOperator{Affine,Ttr},
   μ::Param) where Ttr
 
   fun = get_param_function(op)
@@ -8,7 +8,7 @@ function compute_coefficient(
 end
 
 function compute_coefficient(
-  op::Union{RBUnsteadyLinOperator{Affine},RBUnsteadyBilinOperator{Affine,Ttr},RBUnsteadyLiftingOperator{Affine,Ttr}},
+  op::RBUnsteadyVarOperator{Affine,Ttr},
   μ::Param) where Ttr
 
   fun = get_param_function(op)
@@ -18,20 +18,20 @@ function compute_coefficient(
 end
 
 function compute_coefficient(
-  op::Union{RBSteadyLinOperator,RBSteadyBilinOperator,RBSteadyLiftingOperator},
+  op::RBSteadyVarOperator,
   mdeim,
   μ::Param)
 
-  idx_lu = get_idx_lu_factors(mdeim)
-  idx_space = get_idx_space(mdeim)
+  idx_lu = get_red_lu_factors(mdeim)
+  idx = get_idx(mdeim)
   m = get_reduced_measure(mdeim)
 
-  A = assemble_red_structure(op,m,μ,idx_space)
+  A = assemble_red_structure(op,m,μ,idx)
   mdeim_online(A,idx_lu)
 end
 
 function compute_coefficient(
-  op::Union{RBUnsteadyLinOperator,RBUnsteadyBilinOperator,RBUnsteadyLiftingOperator},
+  op::RBUnsteadyVarOperator,
   mdeim,
   μ::Param,
   st_mdeim=false)
@@ -40,34 +40,33 @@ function compute_coefficient(
 end
 
 function compute_coefficient(
-  op::Union{RBUnsteadyLinOperator,RBUnsteadyBilinOperator,RBUnsteadyLiftingOperator},
+  op::RBUnsteadyVarOperator,
   mdeim,
   μ::Param,
   ::Val{false})
 
   timesθ = get_timesθ(op)
-  idx_lu = get_idx_lu_factors(mdeim)
-  idx_space = get_idx_space(mdeim)
+  idx_lu = get_red_lu_factors(mdeim)
+  idx = get_idx_space(mdeim)
   m = get_reduced_measure(mdeim)
-  A = assemble_red_structure(op,m,μ,idx_space,timesθ)
+  A = assemble_red_structure(op,m,μ,idx,timesθ)
 
   mdeim_online(A,idx_lu)
 end
 
 function compute_coefficient(
-  op::Union{RBUnsteadyLinOperator,RBUnsteadyBilinOperator,RBUnsteadyLiftingOperator},
+  op::RBUnsteadyVarOperator,
   mdeim,
   μ::Param,
   ::Val{true})
 
-  idx_lu = get_idx_lu_factors(mdeim)
-  idx_space = get_idx_space(mdeim)
-  idx_time = get_idx_time(mdeim)
+  idx_lu = get_red_lu_factors(mdeim)
+  idx = get_idx(mdeim)
   red_timesθ = get_reduced_timesθ(op,idx_time)
   m = get_reduced_measure(mdeim)
 
-  A_idx_time = assemble_red_structure(op,m,μ,idx_space,red_timesθ)
-  A_st = spacetime_vector(A_idx_time)
+  A_idx = assemble_red_structure(op,m,μ,idx,red_timesθ)
+  A_st = spacetime_vector(A_idx)
 
   mdeim_online(A_st,idx_lu)
 end

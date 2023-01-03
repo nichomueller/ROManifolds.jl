@@ -35,6 +35,14 @@ function from_sparse_idx_to_full_idx(
   sparse_to_full.(sparse_idx)
 end
 
+function spacetime_idx(
+  space_idx::Vector{Int},
+  time_idx::Vector{Int},
+  Ns=maximum(space_idx))
+
+  (time_idx .- 1)*Ns .+ space_idx
+end
+
 function Base.argmax(v::Vector,nval::Int)
   s = sort(v,rev=true)
   Int.(indexin(s,v))[1:nval]

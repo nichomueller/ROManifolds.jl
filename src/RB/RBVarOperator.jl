@@ -244,3 +244,8 @@ function rb_space_projection(op::RBBilinOperator)
 
   rb_space_projection(rbrow,rbcol,mat)
 end
+
+const RBSteadyVarOperator{Top,Ttr} =
+  Union{RBSteadyLinOperator{Top},RBSteadyBilinOperator{Top,Ttr},RBSteadyLiftingOperator{Top,Ttr}}
+const RBUnsteadyVarOperator{Top,Ttr} =
+  Union{RBUnsteadyLinOperator{Top},RBUnsteadyBilinOperator{Top,Ttr},RBUnsteadyLiftingOperator{Top,Ttr}}

@@ -266,10 +266,10 @@ check_dimensions(m::AbstractMatrix,nb::Int) = iszero(size(m)[2]%nb)
 spacetime_vector(mat::AbstractMatrix) = mat[:]
 spacetime_vector(mat::NTuple{N,AbstractMatrix}) where N = spacetime_vector.(mat)
 
-function SparseArrays.sparsevec(M::Matrix{T},row_idx::Vector{Int}) where T
+function SparseArrays.sparsevec(M::Matrix{T},findnz_map::Vector{Int}) where T
   sparse_vblocks = SparseVector{T}[]
   for j = axes(M,2)
-    push!(sparse_vblocks,sparsevec(row_idx,M[:,j],maximum(row_idx)))
+    push!(sparse_vblocks,sparsevec(findnz_map,M[:,j],maximum(findnz_map)))
   end
 
   sparse_vblocks

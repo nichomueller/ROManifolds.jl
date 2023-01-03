@@ -105,20 +105,10 @@ function save_rb_structure(path::String,basis::Matrix{Float})
   save(joinpath(path,"basis_space"),basis)
 end
 
-function save_rb_structure(path::String,mdeim::MDEIMSteady)
-  save(joinpath(path,"basis_space"),get_basis_space(mdeim))
-  save(joinpath(path,"idx_space"),get_idx_space(mdeim))
-  idx_lu = get_idx_lu_factors(mdeim)
-  save(joinpath(path,"LU"),idx_lu.factors)
-  save(joinpath(path,"p"),idx_lu.ipiv)
-end
-
-function save_rb_structure(path::String,mdeim::MDEIMUnsteady)
-  save(joinpath(path,"basis_space"),get_basis_space(mdeim))
-  save(joinpath(path,"idx_space"),get_idx_space(mdeim))
-  save(joinpath(path,"basis_time"),get_basis_time(mdeim))
-  save(joinpath(path,"idx_time"),get_idx_time(mdeim))
-  idx_lu = get_idx_lu_factors(mdeim)
+function save_rb_structure(path::String,mdeim::MDEIM)
+  save(joinpath(path,"basis"),get_basis(mdeim))
+  save(joinpath(path,"idx"),get_idx(mdeim))
+  idx_lu = get_red_lu_factors(mdeim)
   save(joinpath(path,"LU"),idx_lu.factors)
   save(joinpath(path,"p"),idx_lu.ipiv)
 end
@@ -150,7 +140,7 @@ function load_rb_structure(
   println("Loading MDEIM structures for non-affine variable $id")
   path_id = joinpath(info.offline_path,"$id")
 
-  load_mdeim(path_id,op,meas)
+  load_mdeim(path_id,op,meas,Val(info.st_mdeim))
 end
 
 function load_rb_structure(
@@ -175,7 +165,7 @@ function load_rb_structure(
   path_id = joinpath(info.offline_path,"$id")
   path_id_lift = joinpath(info.offline_path,"$(id)_lift")
 
-  load_mdeim(path_id,op,meas),load_mdeim(path_id_lift,op,meas)
+  load_mdeim(path_id,op,meas,Val(info.st_mdeim)),load_mdeim(path_id_lift,op,meas,Val(info.st_mdeim))
 end
 
 function load_rb_structure(
@@ -187,7 +177,7 @@ function load_rb_structure(
   println("Loading MDEIM structures for non-affine variable $id")
   path_id = joinpath(info.offline_path,"$id")
 
-  load_mdeim(path_id,op,meas)
+  load_mdeim(path_id,op,meas,Val(info.st_mdeim))
 end
 
 function load_rb_structure(
@@ -200,7 +190,7 @@ function load_rb_structure(
   path_id = joinpath(info.offline_path,"$id")
   path_id_lift = joinpath(info.offline_path,"$(id)_lift")
 
-  load(joinpath(path_id,"basis_space")),load_mdeim(path_id_lift,op,meas)
+  load(joinpath(path_id,"basis_space")),load_mdeim(path_id_lift,op,meas,Val(info.st_mdeim))
 end
 
 function load_rb_structure(
