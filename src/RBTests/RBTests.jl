@@ -29,14 +29,22 @@ function rom_online_path(tpath::String,ϵ::Float)
   rb_on_path
 end
 
-function rom_off_on_paths(ptype::ProblemType,mesh::String,root::String,ϵ::Float,
+function rom_off_on_paths(ptype::ProblemType,mesh::String,root::String,ϵ::Float;
   st_mdeim=false,fun_mdeim=false)
 
   @assert isdir(root) "Provide valid root path"
-  st = st_mdeim ? "st" : ""
-  fun = fun_mdeim ? "fun" : ""
+  function keyword()
+    if !st_mdeim && !fun_mdeim
+      return "standard"
+    else
+      st = st_mdeim ? "st" : ""
+      fun = fun_mdeim ? "fun" : ""
+      return st*fun
+    end
+  end
+
   tpath = test_path(root,mesh,issteady(ptype))
-  new_tpath = joinpath(tpath,st*fun)
+  new_tpath = joinpath(tpath,keyword())
 
   offpath = rom_offline_path(new_tpath,ϵ)
   onpath = rom_online_path(new_tpath,ϵ)

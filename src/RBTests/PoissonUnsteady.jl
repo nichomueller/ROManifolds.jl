@@ -11,11 +11,11 @@ function poisson_unsteady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/poisson"
-  mesh = "cube15x15x15.json"
+  mesh = "cube5x5x5.json"
   bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
   order = 1
 
-  t0,tF,dt,θ = 0.,0.5,0.05,0.5
+  t0,tF,dt,θ = 0.,2.5,0.05,0.5
   time_info = TimeInfo(t0,tF,dt,θ)
 
   ranges = fill([1.,20.],6)

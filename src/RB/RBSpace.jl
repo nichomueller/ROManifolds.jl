@@ -32,18 +32,9 @@ struct RBSpaceUnsteady <: RBSpace
 end
 
 function RBSpaceUnsteady(
-  id::Symbol,
-  basis_space::Matrix{Float},
-  basis_time::NTuple{2,Matrix{Float}})
-
-  bt,bt_shift = basis_time
-  RBSpaceUnsteady(id,basis_space,bt),RBSpaceUnsteady(id,basis_space,bt_shift)
-end
-
-function RBSpaceUnsteady(
   id::NTuple{N,Symbol},
   basis_space::NTuple{N,Matrix{Float}},
-  basis_time::Tuple) where N
+  basis_time::NTuple{N,Matrix{Float}}) where N
 
   RBSpaceUnsteady.(id,basis_space,basis_time)
 end

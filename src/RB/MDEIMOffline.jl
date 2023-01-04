@@ -54,7 +54,7 @@ function mdeim_offline(
   μ_mdeim = μ[1:info.mdeim_nsnap]
   snaps = mdeim_snapshots(op,info,μ_mdeim,args...)
   rbspace = mdeim_basis(info,snaps)
-  red_rbspace = project_mdeim_basis(info,op,rbspace)
+  red_rbspace = project_mdeim_basis(op,rbspace)
   idx = mdeim_idx(rbspace)
   red_lu_factors = get_red_lu_factors(info,rbspace,idx)
   idx = recast_in_full_dim(op,idx)
@@ -128,7 +128,6 @@ mdeim_basis(info::RBInfoSteady,snaps) = RBSpaceSteady(snaps;ismdeim=Val(true),ϵ
 mdeim_basis(info::RBInfoUnsteady,snaps) = RBSpaceUnsteady(snaps;ismdeim=Val(true),ϵ=info.ϵ)
 
 function project_mdeim_basis(
-  ::RBInfo,
   op::RBSteadyVarOperator,
   rbspace)
 
@@ -138,13 +137,12 @@ function project_mdeim_basis(
 end
 
 function project_mdeim_basis(
-  info::RBInfo,
   op::RBUnsteadyVarOperator,
   rbspace)
 
   id = get_id(rbspace)
   bs = rb_space_projection(op,rbspace)
-  bt = rb_time_projection(info,op,rbspace)
+  bt = get_basis_time(rbspace)
   RBSpaceUnsteady(id,bs,bt)
 end
 
@@ -192,57 +190,6 @@ function rb_space_projection(
   red_basis_space_lift = rb_space_projection(op_lift,rbspace_lift)
 
   red_basis_space,red_basis_space_lift
-end
-
-function rb_time_projection(info::RBInfo,op::RBVarOperator,rbspace)
-  rb_time_projection(Val(info.st_mdeim),op,rbspace)
-end
-
-function rb_time_projection(::Val{false},op::RBVarOperator,rbspace)
-  get_basis_time(rbspace)
-end
-
-function rb_time_projection(
-  ::Val{true},
-  op::RBLinOperator,
-  rbspace::RBSpace)
-
-  rbrow = get_rbspace_row(op)
-  bt = get_basis_time(rbspace)
-  Matrix(rb_time_projection(rbrow,bt))
-end
-
-function rb_time_projection(
-  ::Val{true},
-  op::RBBilinOperator,
-  rbspace::RBSpace)
-
-  rbrow = get_rbspace_row(op)
-  rbcol = get_rbspace_col(op)
-  bt = get_basis_time(rbspace)
-  time_proj(idx1,idx2) = rb_time_projection(rbrow,rbcol,bt,idx1,idx2)
-
-  Nt = get_Nt(op)
-  idx = 1:Nt
-  idx_backwards,idx_forwards = 1:Nt-1,2:Nt
-
-  red_basis_time = Matrix(time_proj(idx,idx))
-  red_basis_time_shift = Matrix(time_proj(idx_forwards,idx_backwards))
-  red_basis_time,red_basis_time_shift
-end
-
-function rb_time_projection(
-  info::RBInfo,
-  op::RBBilinOperator,
-  rb::NTuple{2,<:RBSpace})
-
-  rbspace,rbspace_lift = rb
-  op_lift = RBLiftingOperator(op)
-
-  red_basis_time = rb_time_projection(Val(info.st_mdeim),op,rbspace)
-  red_basis_time_lift = rb_time_projection(Val(info.st_mdeim),op_lift,rbspace_lift)
-
-  red_basis_time,red_basis_time_lift
 end
 
 mdeim_idx(rbspace::NTuple{2,<:RBSpace}) = mdeim_idx.(rbspace)

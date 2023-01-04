@@ -23,10 +23,10 @@ function compute_coefficient(
   μ::Param)
 
   red_lu = get_red_lu_factors(mdeim)
-  idx = get_idx(mdeim)
+  idx_space = get_idx(mdeim)
   m = get_red_measure(mdeim)
 
-  A = assemble_red_structure(op,m,μ,idx)
+  A = assemble_red_structure(op,m,μ,idx_space)
   mdeim_online(A,red_lu)
 end
 
@@ -47,9 +47,9 @@ function compute_coefficient(
 
   timesθ = get_timesθ(op)
   red_lu = get_red_lu_factors(mdeim)
-  idx = get_idx_space(mdeim)
+  idx_space = get_idx_space(mdeim)
   m = get_red_measure(mdeim)
-  A = assemble_red_structure(op,m,μ,idx,timesθ)
+  A = assemble_red_structure(op,m,μ,idx_space,timesθ)
 
   mdeim_online(A,red_lu)
 end
@@ -61,20 +61,14 @@ function compute_coefficient(
   ::Val{true})
 
   red_lu = get_red_lu_factors(mdeim)
-  idx = get_idx(mdeim)
+  idx_space,idx_time = get_idx_space(mdeim),get_idx_time(mdeim)
   red_timesθ = get_reduced_timesθ(op,idx_time)
   m = get_red_measure(mdeim)
 
-  A_idx = assemble_red_structure(op,m,μ,idx,red_timesθ)
+  A_idx = assemble_red_structure(op,m,μ,idx_space,red_timesθ)
   A_st = spacetime_vector(A_idx)
-
-  Qs = size(get_basis_space(mdeim),2)
-  Qt = size(get_basis_time(mdeim),2)
-  sorted_idx(qs) = [(i-1)*Qs+qs for i=1:Qt]
-
   coeff = mdeim_online(A_st,red_lu)
-  sorted_coeff = coeff[sorted_idx.(1:Qs)]
-  Matrix(reshape(sorted_coeff,:,Qs))
+  interp_coeff_time(mdeim,coeff)
 end
 
 function assemble_red_structure(
@@ -292,6 +286,33 @@ function mdeim_online(
   M(u) = mdeim_online(A[1](u),red_lu[1])
   lift(u) = mdeim_online(A[2](u),red_lu[2])
   M,lift
+end
+
+function interp_coeff_time(
+  mdeim::MDEIMUnsteady,
+  coeff::AbstractVector)
+
+  bs = get_basis_space(mdeim)
+  bt = get_basis_time(mdeim)
+  Qs = size(bs,2)
+  Qt = size(bt,2)
+  sorted_idx(qs) = [(i-1)*Qs+qs for i=1:Qt]
+  bt_times_coeff(qs) = bt*coeff[sorted_idx(qs)]
+  Matrix(bt_times_coeff.(1:Qs))
+end
+
+function interp_coeff_time(
+  mdeim::MDEIMUnsteady,
+  coeff::Function)
+
+  u -> interp_coeff_time(mdeim,coeff(u))
+end
+
+function interp_coeff_time(
+  mdeim::NTuple{2,MDEIMUnsteady},
+  coeff::NTuple{2,Tcf}) where Tcf
+
+  interp_coeff_time.(mdeim,coeff)
 end
 
 function interpolate_mdeim_online(

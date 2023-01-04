@@ -2,8 +2,8 @@
  this function computes the row-column indexes of the NsxNs matrix associated to 'vec'"""
 function from_vec_to_mat_idx(idx::Vector{Int},Ns::Int)
   col_idx = 1 .+ Int.(floor.((idx.-1)/Ns))
-  row_idx = idx - (col_idx.-1)*Ns
-  row_idx,col_idx
+  findnz_map = idx - (col_idx.-1)*Ns
+  findnz_map,col_idx
 end
 
 """Given a sparse NsxC matrix Msparse and its NfullxC full representation Mfull,

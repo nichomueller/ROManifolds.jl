@@ -25,7 +25,7 @@ function RBInfoSteady(
   load_offline=true,save_offline=true,save_online=true,
   fun_mdeim=false,adaptivity=false,postprocess=false)
 
-  offline_path,online_path = rom_off_on_paths(ptype,mesh,root,ϵ)
+  offline_path,online_path = rom_off_on_paths(ptype,mesh,root,ϵ;fun_mdeim=fun_mdeim)
   RBInfoSteady(ptype,ϵ,nsnap,online_snaps,mdeim_snap,offline_path,online_path,
     use_energy_norm,load_offline,save_offline,save_online,fun_mdeim,adaptivity,postprocess)
 end
@@ -58,7 +58,8 @@ function RBInfoUnsteady(
   save_offline=true,save_online=true,st_mdeim=false,fun_mdeim=false,
   adaptivity=false,postprocess=false)
 
-  offline_path,online_path = rom_off_on_paths(ptype,mesh,root,ϵ)
+  offline_path,online_path = rom_off_on_paths(ptype,mesh,root,ϵ;
+    st_mdeim=st_mdeim,fun_mdeim=fun_mdeim)
   RBInfoUnsteady(ptype,ϵ,nsnap,online_snaps,mdeim_snap,offline_path,
     online_path,time_red_method,use_energy_norm,load_offline,
     save_offline,save_online,st_mdeim,fun_mdeim,

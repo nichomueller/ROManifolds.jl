@@ -46,7 +46,7 @@ function poisson_functions(::Val{false},measures::ProblemFixedMeasures)
 
   function a(x,p::Param,t::Real)
     μ = get_μ(p)
-    1. + μ[6] + 1. / μ[5]*exp(-sin(t)*norm(x-Point(μ[1:3]))^2 / μ[4])
+    1. + μ[6] + exp(-abs(sin(t)*norm(x-Point(μ[1:3]))^2 / μ[4])) / μ[5]
   end
   a(p::Param,t::Real) = x->a(x,p,t)
   a(p::Param) = t->a(p,t)
@@ -69,7 +69,7 @@ function poisson_functions(::Val{false},measures::ProblemFixedMeasures)
   h(p::Param) = t->h(p,t)
   function g(x,p::Param,t::Real)
     μ = get_μ(p)
-    g_xpt = 1. + sin(t)*sum(Point(μ[4:6]) .* x)
+    g_xpt = 1. + abs.(sin(t))*sum(Point(μ[4:6]) .* x)
     g_xpt / norm(g_xpt)
   end
   g(p::Param,t::Real) = x->g(x,p,t)

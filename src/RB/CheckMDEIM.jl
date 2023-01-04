@@ -179,35 +179,6 @@ function steady_navier_stokes()
   norm(errA1),norm(errLA1),norm(errLB1),norm(errC1),norm(errLC1),norm(errD1)
 end
 
-function space_time_mdeim()
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false,
-    save_offline=false,st_mdeim=true)
-
-  μ_mdeim = μ[1:info.mdeim_nsnap]
-  snaps = mdeim_snapshots(op,info,μ_mdeim)[1]
-  rbspace = mdeim_basis(info,snaps)
-  red_rbspace = project_mdeim_basis(info,op,rbspace)[1]
-  idx = mdeim_idx(rbspace)
-  red_lu_factors = get_red_lu_factors(info,rbspace,idx)
-  idx = recast_in_full_dim(op,idx)
-  red_meas = get_red_measure(op,idx,measures,:dΩ)
-
-  idx_space,_ = idx
-  idx_time = collect(1:get_Nt(op))
-  red_timesθ = get_reduced_timesθ(op,idx_time)
-  A_idx = assemble_red_structure(op,red_meas,μ[1],idx_space,red_timesθ)
-  A_st = spacetime_vector(A_idx)
-  coeff = mdeim_online(A_st,red_lu_factors)
-
-  Qt = length(idx_time)
-  bs = get_basis_space(red_rbspace)
-  bt = reshape(get_basis_time(red_rbspace),:,Qt)
-  basis = kron(bt,bs)
-  Arb_st_tmp = basis*coeff
-  nst = Int(sqrt(size(Arb_st_tmp,1)))
-  Arb_st = reshape(Arb_st_tmp,nst,nst)
-end
-
 function spacetime_mdeim1()
   μ_mdeim = μ[1:info.mdeim_nsnap]
   snaps = mdeim_snapshots(op,info,μ_mdeim)[1]
@@ -237,37 +208,6 @@ function spacetime_mdeim1()
   norm(A1-A1mdeim) # small =#
 end
 
-function spacetime_mdeim2()
-  θ = redΠ \ A1[idx] # for now
-  bs = get_basis_space(red_rbspace)
-  ns_row = get_ns(get_rbspace_row(op))
-  bs_block = blocks(bs,ns_row)
-
-  bt_full = get_basis_time(rbspace)
-  Nt,Qt = size(bt_full)
-  rbrow = get_rbspace_row(op)
-  rbcol = get_rbspace_col(op)
-  brow = get_basis_time(rbrow)
-  bcol = get_basis_time(rbcol)
-  nrow = size(brow,2)
-  ncol = size(bcol,2)
-  idx = 1:Nt
-  time_proj_fun(it,jt,q) = sum(brow[idx,it].*bcol[idx,jt].*bt_full[idx,q])
-  time_proj_fun(jt,q) = Broadcasting(it -> time_proj_fun(it,jt,q))(1:nrow)
-  time_proj_fun(q) = Matrix(Broadcasting(jt -> time_proj_fun(jt,q))(1:ncol))
-  bt_block = time_proj_fun.(1:Qt)
-
-  ns,nt = ns_row,nrow
-  A1rb_approx = zeros(ns*nt,ns*nt)
-  for qt=1:Qt
-    for qs=1:Qs
-      q = qs+(qt-1)*Qs
-      A1rb_approx += kron(bt_block[qt],bs_block[qs])*θ[q]
-    end
-  end
-
-end
-
 function important()
   op = rbopA
   μ_mdeim = μ[1:info.mdeim_nsnap]
@@ -284,7 +224,7 @@ function important()
   timesθ = get_timesθ(op)
   A = assemble_red_structure(op,measures.dΩ,μ[1],idx[1],timesθ)
   θ_s = solve_lu(A,red_lu_factors)
-  btbtp = coeff_by_time_bases_bilin(op,θ_s)[1]
+  btbtc = coeff_by_time_bases_bilin(op,θ_s)[1]
 
   # space-time method
   info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false,
@@ -334,6 +274,22 @@ function important()
   temp(it,jt,qs) = sum(brow[idx,it].*bcol[idx,jt].*dog(qs)[idx])
   temp(jt,qs) = Broadcasting(it -> temp(it,jt,qs))(1:nrow)
   temp(qs) = Matrix(Broadcasting(jt -> temp(jt,qs))(1:ncol))
-  v(qs) = maximum(abs.(temp(qs)-btbtp[qs]))
+  v(qs) = maximum(abs.(temp(qs)-btbtc[qs]))
   yee = v.(1:Qs)
+end
+
+function compare()
+  μ_mdeim = μ[1:info.mdeim_nsnap]
+  snaps = mdeim_snapshots(op,info,μ_mdeim)[1]
+  rbspace = mdeim_basis(info,snaps)
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false,
+    save_offline=false,st_mdeim=true)
+  red_rbspace = project_mdeim_basis(op,rbspace)[1]
+  idx = mdeim_idx(rbspace)
+  red_lu_factors = get_red_lu_factors(info,rbspace,idx)
+  idx_space = mdeim_idx(rbspace.basis_space)
+  idx_time = mdeim_idx(rbspace.basis_time)
+  idx = recast_in_full_dim(op,(idx_space,idx_time))
+
+  idx_space,idx_time = get_idx_space(mdeim),get_idx_time(mdeim)
 end

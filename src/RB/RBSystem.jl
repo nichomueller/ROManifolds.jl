@@ -25,7 +25,7 @@ function online_assembler(
 
   basis = get_basis_space(mdeim)
   coeff = compute_coefficient(op,mdeim,μ,args...)
-  online_structure(op,basis,coeff,args...)
+  online_structure(op,basis,coeff)
 end
 
 function online_assembler(
@@ -40,7 +40,7 @@ function online_assembler(
   op_lift = RBLiftingOperator(op)
   nonaffine_basis = get_basis_space(mdeim)
   coeff = compute_coefficient(op_lift,mdeim,μ,args...)
-  nonaffine_structure = online_structure(op_lift,nonaffine_basis,coeff,args...)
+  nonaffine_structure = online_structure(op_lift,nonaffine_basis,coeff)
 
   affine_structure,nonaffine_structure
 end
@@ -77,80 +77,51 @@ end
 function online_structure(
   op::RBUnsteadyVarOperator,
   basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
-  coeff,
-  st_mdeim=false)
-
-  online_structure(op,basis,coeff,Val(st_mdeim))
-end
-
-function online_structure(
-  op::RBUnsteadyVarOperator,
-  basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
-  coeff,
-  ::Val{false})
+  coeff)
 
   dtθ = get_dt(op)*get_θ(op)
   if get_id(op) == :M coeff /= dtθ end
 
-  btbtp = coeff_by_time_bases(op,coeff)
+  btbtc = coeff_by_time_bases(op,coeff)
   ns_row = get_ns(get_rbspace_row(op))
   basis_block = blocks(basis,ns_row)
 
   nr = get_nrows(op)
-  basis_by_coeff_mult(basis_block,btbtp,nr)
+  basis_by_coeff_mult(basis_block,btbtc,nr)
 end
 
 function online_structure(
   op::RBUnsteadyVarOperator{Nonlinear,Ttr},
   basis::Matrix{Float},
-  coeff,
-  ::Val{false}) where Ttr
+  coeff) where Ttr
 
   dtθ = get_dt(op)*get_θ(op)
   if get_id(op) == :M coeff /= dtθ end
 
-  btbtp = coeff_by_time_bases(op,coeff)
+  btbtc = coeff_by_time_bases(op,coeff)
   ns_row = get_ns(get_rbspace_row(op))
   basis_block = blocks(basis,ns_row)
 
   nr = get_nrows(op)
-  u -> basis_by_coeff_mult(basis_block,btbtp(u),nr)
+  u -> basis_by_coeff_mult(basis_block,btbtc(u),nr)
 end
 
 function online_structure(
   op::RBUnsteadyBilinOperator{Nonlinear,Ttr},
   basis::NTuple{2,Matrix{Float}},
-  coeff,
-  ::Val{false}) where Ttr
+  coeff) where Ttr
 
   dtθ = get_dt(op)*get_θ(op)
   if get_id(op) == :M coeff /= dtθ end
 
-  btbtp = coeff_by_time_bases(op,coeff)
+  btbtc = coeff_by_time_bases(op,coeff)
   ns_row = get_ns(get_rbspace_row(op))
   basis_block = blocks(basis,ns_row)
 
   nr = get_nrows(op)
-  M(u) = basis_by_coeff_mult(basis_block[1],btbtp[1](u),nr)
-  lift(u) = basis_by_coeff_mult(basis_block[2],btbtp[2](u),nr)
+  M(u) = basis_by_coeff_mult(basis_block[1],btbtc[1](u),nr)
+  lift(u) = basis_by_coeff_mult(basis_block[2],btbtc[2](u),nr)
   M,lift
-end
-
-function online_structure(
-  op::RBUnsteadyVarOperator,
-  basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
-  coeff,
-  ::Val{true})
-
-  dtθ = get_dt(op)*get_θ(op)
-  if get_id(op) == :M coeff /= dtθ end
-
-  btbtp = coeff_by_time_bases(op,coeff)
-  ns_row = get_ns(get_rbspace_row(op))
-  basis_block = blocks(basis,ns_row)
-
-  nr = get_nrows(op)
-  basis_by_coeff_mult(basis_block,btbtp,nr)
 end
 
 function coeff_by_time_bases(
@@ -202,9 +173,9 @@ function coeff_by_time_bases_bilin(
   idx = 1:Nt
   idx_backwards,idx_forwards = 1:Nt-1,2:Nt
 
-  btbtp = time_proj(idx,idx)
-  btbtp_shift = time_proj(idx_forwards,idx_backwards)
-  btbtp,btbtp_shift
+  btbtc = time_proj(idx,idx)
+  btbtc_shift = time_proj(idx_forwards,idx_backwards)
+  btbtc,btbtc_shift
 end
 
 function coeff_by_time_bases_bilin(
@@ -219,9 +190,9 @@ function coeff_by_time_bases_bilin(
   idx = 1:Nt
   idx_backwards,idx_forwards = 1:Nt-1,2:Nt
 
-  btbtp(u) = time_proj(u,idx,idx)
-  btbtp_shift(u) = time_proj(u,idx_forwards,idx_backwards)
-  btbtp,btbtp_shift
+  btbtc(u) = time_proj(u,idx,idx)
+  btbtc_shift(u) = time_proj(u,idx_forwards,idx_backwards)
+  btbtc,btbtc_shift
 end
 
 function poisson_rb_system(

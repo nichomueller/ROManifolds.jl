@@ -122,8 +122,8 @@ function matrix_snapshots(
   end
 
   ivl = snapshot.(eachindex(μ))
-  row_idx,vals = getindex.(ivl,1),getindex.(ivl,2)
-  check_row_idx(row_idx)
+  findnz_map,vals = getindex.(ivl,1),getindex.(ivl,2)
+  check_findnz_map(findnz_map)
   Snapshots(id,vals)
 end
 
@@ -142,8 +142,8 @@ function matrix_snapshots(
   end
 
   ivl = snapshot.(eachindex(μ))
-  row_idx,vals,lifts = getindex.(ivl,1),getindex.(ivl,2),getindex.(ivl,3)
-  check_row_idx(row_idx)
+  findnz_map,vals,lifts = getindex.(ivl,1),getindex.(ivl,2),getindex.(ivl,3)
+  check_findnz_map(findnz_map)
   Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
@@ -165,7 +165,7 @@ function matrix_snapshots(
     bfun(μ_mdeim[k],n)
   end
 
-  row_idx = Vector{Int}[]
+  findnz_map = Vector{Int}[]
   vals = Vector{Float}[]
   lifts = Vector{Float}[]
   for n = 1:ns
@@ -173,13 +173,13 @@ function matrix_snapshots(
       bfun_nk = snapshot(k,n)
       i_nk,v_nk = findnz(M(bfun_nk)[:])
       l_nk = lift(bfun_nk)
-      push!(row_idx,i_nk)
+      push!(findnz_map,i_nk)
       push!(vals,v_nk)
       push!(lifts,l_nk)
     end
   end
 
-  check_row_idx(row_idx)
+  check_findnz_map(findnz_map)
   Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
@@ -195,13 +195,13 @@ function matrix_snapshots(
     println("Snapshot number $k, $id")
     iv = findnz.(M(μ[k]))
     i,v = first.(iv),last.(iv)
-    check_row_idx(i)
+    check_findnz_map(i)
     first(i),Matrix(v),lift(μ[k])
   end
 
   ivl = snapshot.(eachindex(μ))
-  row_idx,vals,lifts = getindex.(ivl,1),getindex.(ivl,2),getindex.(ivl,3)
-  check_row_idx(row_idx)
+  findnz_map,vals,lifts = getindex.(ivl,1),getindex.(ivl,2),getindex.(ivl,3)
+  check_findnz_map(findnz_map)
   Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
@@ -224,7 +224,7 @@ function matrix_snapshots(
     bfun(μ_mdeim[k],tθ,n)
   end
 
-  row_idx = Vector{Int}[]
+  findnz_map = Vector{Int}[]
   vals = Matrix{Float}[]
   lifts = Matrix{Float}[]
   for n = 1:ns
@@ -235,15 +235,15 @@ function matrix_snapshots(
         iv_nk = findnz(M)
         i_nk,v_nk = first.(iv_nk),last.(iv_nk)
         l_nk = lift
-        check_row_idx(i_nk)
-        push!(row_idx,first(i_nk))
+        check_findnz_map(i_nk)
+        push!(findnz_map,first(i_nk))
         push!(vals,Matrix(v_nk))
         push!(lifts,l_nk)
       end
     end
   end
 
-  check_row_idx(row_idx)
+  check_findnz_map(findnz_map)
   Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
@@ -282,11 +282,11 @@ function matrix_snapshots(
   end
 
   ivl = snapshot.(eachindex(μ))
-  row_idx,vals,lifts = getindex.(ivl,1),getindex.(ivl,2),getindex.(ivl,3)
-  check_row_idx(row_idx)
+  findnz_map,vals,lifts = getindex.(ivl,1),getindex.(ivl,2),getindex.(ivl,3)
+  check_findnz_map(findnz_map)
   Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
-function check_row_idx(row_idx::Vector{Vector{Int}})
-  @assert all(Broadcasting(a->isequal(a,row_idx[1]))(row_idx)) "Need to correct snaps"
+function check_findnz_map(findnz_map::Vector{Vector{Int}})
+  @assert all(Broadcasting(a->isequal(a,findnz_map[1]))(findnz_map)) "Need to correct snaps"
 end
