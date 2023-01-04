@@ -319,16 +319,21 @@ function important()
   time_proj_fun(q) = Matrix(Broadcasting(it -> time_proj_fun(it,q))(1:nrow)) =#
   bt_block = time_proj_fun.(1:Qt)
   my_idx(qs) = [(i-1)*Qs+qs for i=1:Qt]
-  btbtp_try(qs) = sum([bt_block[1]*θ_st[q] for q=my_idx(qs)])
-  check(qs) = abs.(btbtp_try(qs)-btbtp[qs]) ./ abs.(btbtp[qs]) # almost!
+  function trythis(q)
+    qt = 1 + Int.(floor.((q-1)/Qs))
+    qs = q - (qt-1)*Qs
+    sum(bt_block[qt] .* θ_st[my_idx(qs)])
+  end
+  yee1 = Matrix([trythis(q) for q=1:Qs*Qt])
 
   ############### YYYYYYYYYYYYYYYYEAAAAAAAAAAAAAHHHHHHHHHHHHHH #################
   dog(qs) = bt_full*θ_st[my_idx(qs)]
   cane = Matrix([dog(qs) for qs=1:Qs])
   isapprox(cane,θ_s)
   ############### YYYYYYYYYYYYYYYYEAAAAAAAAAAAAAHHHHHHHHHHHHHH #################
-  temp(it,jt,q) = sum(brow[idx,it].*bcol[idx,jt].*dog(q)[idx])
-  temp(jt,q) = Broadcasting(it -> temp(it,jt,q))(1:nrow)
-  temp(q) = Matrix(Broadcasting(jt -> temp(jt,q))(1:ncol))
-  v(q) = maximum(abs.(temp(q)-btbtp[q]))
+  temp(it,jt,qs) = sum(brow[idx,it].*bcol[idx,jt].*dog(qs)[idx])
+  temp(jt,qs) = Broadcasting(it -> temp(it,jt,qs))(1:nrow)
+  temp(qs) = Matrix(Broadcasting(jt -> temp(jt,qs))(1:ncol))
+  v(qs) = maximum(abs.(temp(qs)-btbtp[qs]))
+  yee = v.(1:Qs)
 end
