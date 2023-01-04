@@ -1,29 +1,18 @@
 include("MDEIMSnapshots.jl")
 
 abstract type MDEIM end
-abstract type MDEIMUnsteady <: MDEIM end
 
 mutable struct MDEIMSteady <: MDEIM
-  id::Symbol
-  basis::Matrix{Float}
+  rbspace::RBSpaceSteady
   red_lu_factors::LU
   idx::Vector{Int}
   red_measure::Measure
 end
 
-mutable struct MDEIMUnsteadyStandard <: MDEIMUnsteady
-  id::Symbol
-  basis::Matrix{Float}
+mutable struct MDEIMUnsteady <: MDEIM
+  rbspace::RBSpaceUnsteady
   red_lu_factors::LU
   idx::NTuple{2,Vector{Int}}
-  red_measure::Measure
-end
-
-mutable struct MDEIMUnsteadySpaceTime{N} <: MDEIMUnsteady
-  id::Symbol
-  basis::NTuple{N,Matrix{Float}}
-  red_lu_factors::NTuple{N,LU}
-  idx::Vector{Int}
   red_measure::Measure
 end
 
@@ -33,9 +22,7 @@ function MDEIM(
   idx::Vector{Int},
   red_measure::Measure)
 
-  id = get_id(red_rbspace)
-  bs = get_basis_space(red_rbspace)
-  MDEIMSteady(id,bs,red_lu_factors,idx,red_measure)
+  MDEIMSteady(red_rbspace,red_lu_factors,idx,red_measure)
 end
 
 function MDEIM(
@@ -44,143 +31,17 @@ function MDEIM(
   idx::NTuple{2,Vector{Int}},
   red_measure::Measure)
 
-  id = get_id(red_rbspace)
-  bs = get_basis_space(red_rbspace)
-  MDEIMUnsteadyStandard(id,bs,red_lu_factors,idx,red_measure)
-end
-
-function MDEIM(
-  red_rbspace::NTuple{1,RBSpaceUnsteady},
-  red_lu_factors::NTuple{1,LU},
-  idx::NTuple{2,Vector{Int}},
-  red_measure::Measure)
-
-  rrbspace, = red_rbspace
-  id = get_id(rrbspace)
-
-  bs = get_basis_space(rrbspace)
-  bt = get_basis_space(rrbspace)
-  bst = kron(bs,bt)
-
-  Ns = get_Ns(rrbspace)
-  idx_st = spacetime_idx(idx...,Ns)
-
-  MDEIMUnsteadySpaceTime{1}(id,(bst,),red_lu_factors,idx_st,red_measure)
-end
-
-function MDEIM(
-  red_rbspace::NTuple{2,RBSpaceUnsteady},
-  red_lu_factors::NTuple{2,LU},
-  idx::NTuple{2,Vector{Int}},
-  red_measure::Measure)
-
-  rrbspace,rrbspace_shift = red_rbspace
-  id = get_id(rrbspace)
-
-  bs = get_basis_space(rrbspace)
-  bt = get_basis_time(rrbspace)
-  bst = kron(bs,bt)
-  bs_shift = get_basis_space(rrbspace_shift)
-  bt_shift = get_basis_time(rrbspace_shift)
-  bst_shift = kron(bs_shift,bt_shift)
-
-  Ns = get_Ns(rrbspace)
-  idx_st = spacetime_idx(idx...,Ns)
-
-  MDEIMUnsteadySpaceTime{2}(id,(bst,bst_shift),red_lu_factors,idx_st,red_measure)
-end
-
-function MDEIM(
-  red_rbspace::Tuple{NTuple{2,RBSpaceUnsteady},RBSpaceUnsteady},
-  red_lu_factors::Tuple{NTuple{2,LU},LU},
-  idx::NTuple{2,NTuple{2,Vector{Int}}},
-  red_measure::NTuple{2,Measure})
-
-  rb,rb_lift = red_rbspace
-  red_rbspace_new = rb,(rb_lift,)
-  red_lu,red_lu_lift = red_lu_factors
-  red_lu_factors_new = red_lu,(red_lu_lift,)
-  MDEIM.(red_rbspace_new,red_lu_factors_new,idx,red_measure)
+  MDEIMUnsteady(red_rbspace,red_lu_factors,idx,red_measure)
 end
 
 function MDEIM(
   red_rbspace::NTuple{2,RBSpace},
   red_lu_factors::NTuple{2,LU},
-  idx::NTuple{2,T},
-  red_measure::NTuple{2,Measure}) where T
+  idx::NTuple{2,Tidx},
+  red_measure::NTuple{2,Measure}) where Tidx
 
   MDEIM.(red_rbspace,red_lu_factors,idx,red_measure)
 end
-
-function load_mdeim(
-  path::String,
-  op::RBVarOperator,
-  meas::Measure,
-  args...)
-
-  id = Symbol(last(split(path,'/')))
-
-  basis = load(joinpath(path,"basis"))
-
-  idx = load(joinpath(path,"idx"))
-  if length(size(idx)) == 1
-    idx = Int.(idx[:,1])
-  else length(size(idx)) == 2
-    idx = [Int.(idx[1,:]),Int.(idx[2,:])]
-  end
-
-  factors = load(joinpath(path,"LU"))
-  ipiv = Int.(load(joinpath(path,"p"))[:,1])
-  red_lu_factors = LU(factors,ipiv,0)
-
-  red_measure = get_reduced_measure(op,idx_space,meas)
-
-  MDEIM(id,basis,red_lu_factors,idx,red_measure)
-end
-
-function load_mdeim(
-  path::String,
-  op::RBUnsteadyVarOperator,
-  meas::Measure,
-  ::Val{true})
-
-  id = Symbol(last(split(path,'/')))
-
-  basis = (load(joinpath(path,"basis")),)
-  if myisfile(joinpath(path,"basis_shift"))
-    basis_shift = load(joinpath(path,"basis_shift"))
-    basis = (basis...,basis_shift)
-  end
-
-  idx = load(joinpath(path,"idx"))
-
-  factors = load(joinpath(path,"LU"))
-  ipiv = Int.(load(joinpath(path,"p"))[:,1])
-  red_lu_factors = LU(factors,ipiv,0)
-
-  red_measure = get_reduced_measure(op,idx_space,meas)
-
-  MDEIM(id,basis,red_lu_factors,idx,red_measure)
-end
-
-get_id(mdeim::MDEIM) = mdeim.id
-get_basis(mdeim::MDEIM) = mdeim.basis
-get_basis(mdeim::MDEIMUnsteadySpaceTime) = first(mdeim.basis)
-get_basis_shift(mdeim::MDEIMUnsteadySpaceTime) = last(mdeim.basis)
-get_red_lu_factors(mdeim::MDEIM) = mdeim.red_lu_factors
-get_idx(mdeim::MDEIM) = mdeim.idx
-get_idx_space(mdeim::MDEIMUnsteadyStandard) = first(get_idx(mdeim))
-get_idx_time(mdeim::MDEIMUnsteadyStandard) = last(get_idx(mdeim))
-get_reduced_measure(mdeim::MDEIM) = mdeim.red_measure
-
-get_id(mdeim::NTuple{2,MDEIM}) = get_id.(mdeim)
-get_basis(mdeim::NTuple{2,MDEIM}) = get_basis.(mdeim)
-get_basis_shift(mdeim::NTuple{2,MDEIM}) = get_basis_shift.(mdeim)
-get_red_lu_factors(mdeim::NTuple{2,MDEIM}) = get_red_lu_factors.(mdeim)
-get_idx(mdeim::NTuple{2,MDEIM}) = get_idx.(mdeim)
-get_idx_space(mdeim::NTuple{2,MDEIM}) = get_idx_space.(mdeim)
-get_idx_time(mdeim::NTuple{2,MDEIM}) = get_idx_time.(mdeim)
-get_reduced_measure(mdeim::NTuple{2,MDEIM}) = get_reduced_measure.(mdeim)
 
 function mdeim_offline(
   info::RBInfo,
@@ -197,10 +58,71 @@ function mdeim_offline(
   idx = mdeim_idx(rbspace)
   red_lu_factors = get_red_lu_factors(info,rbspace,idx)
   idx = recast_in_full_dim(op,idx)
-  red_meas = get_reduced_measure(op,idx,meas,field)
+  red_meas = get_red_measure(op,idx,meas,field)
 
   MDEIM(red_rbspace,red_lu_factors,idx,red_meas)
 end
+
+function load_mdeim(
+  path::String,
+  op::RBSteadyVarOperator,
+  meas::Measure)
+
+  id = Symbol(last(split(path,'/')))
+
+  basis_space = load(joinpath(path,"basis_space"))
+  rbspace = RBSpace(id,basis_space)
+  idx_space = Int.(load(joinpath(path,"idx_space"))[:,1])
+
+  factors = load(joinpath(path,"LU"))
+  ipiv = Int.(load(joinpath(path,"p"))[:,1])
+  red_lu_factors = LU(factors,ipiv,0)
+
+  red_measure = get_red_measure(op,idx_space,meas)
+
+  MDEIM(rbspace,red_lu_factors,idx_space,red_measure)
+end
+
+function load_mdeim(
+  path::String,
+  op::RBUnsteadyVarOperator,
+  meas::Measure)
+
+  id = Symbol(last(split(path,'/')))
+
+  basis_space = load(joinpath(path,"basis_space"))
+  basis_time = load(joinpath(path,"basis_time"))
+  rbspace = RBSpace(id,basis_space,basis_time)
+
+  idx_space = load(joinpath(path,"idx_space"))
+  idx_time = load(joinpath(path,"idx_time"))
+  idx = [idx_space,idx_time]
+
+  factors = load(joinpath(path,"LU"))
+  ipiv = Int.(load(joinpath(path,"p"))[:,1])
+  red_lu_factors = LU(factors,ipiv,0)
+
+  red_measure = get_red_measure(op,idx_space,meas)
+
+  MDEIM(rbspace,red_lu_factors,idx,red_measure)
+end
+
+get_rbspace(mdeim::MDEIM) = mdeim.rbspace
+get_red_lu_factors(mdeim::MDEIM) = mdeim.red_lu_factors
+get_id(mdeim::MDEIM) = get_id(mdeim.rbspace)
+get_basis_space(mdeim::MDEIM) = get_basis_space(mdeim.rbspace)
+get_basis_time(mdeim::MDEIMUnsteady) = get_basis_time(mdeim.rbspace)
+get_idx_space(mdeim::MDEIMSteady) = mdeim.idx
+get_idx_space(mdeim::MDEIMUnsteady) = first(mdeim.idx)
+get_idx_time(mdeim::MDEIMUnsteady) = last(mdeim.idx)
+get_red_measure(mdeim::MDEIM) = mdeim.red_measure
+
+get_basis_space(mdeim::NTuple{2,MDEIM}) = get_basis_space.(mdeim)
+get_basis_time(mdeim::NTuple{2,MDEIMUnsteady}) = get_basis_time.(mdeim)
+get_red_lu_factors(mdeim::NTuple{2,MDEIM}) = get_red_lu_factors.(mdeim)
+get_idx_space(mdeim::NTuple{2,MDEIM}) = get_idx_space.(mdeim)
+get_idx_time(mdeim::NTuple{2,MDEIMUnsteady}) = get_idx_time.(mdeim)
+get_red_measure(mdeim::NTuple{2,MDEIM}) = get_red_measure.(mdeim)
 
 mdeim_basis(info::RBInfoSteady,snaps) = RBSpaceSteady(snaps;ismdeim=Val(true),ϵ=info.ϵ)
 mdeim_basis(info::RBInfoUnsteady,snaps) = RBSpaceUnsteady(snaps;ismdeim=Val(true),ϵ=info.ϵ)
@@ -394,7 +316,7 @@ function get_red_lu_factors(
   bt = get_basis_time(rbspace)
   bs_idx = bs[idx_space,:]
   bt_idx = bt[idx_time,:]
-  bst_idx = kron(bs_idx,bt_idx)
+  bst_idx = kron(bt_idx,bs_idx)
 
   lu(bst_idx)
 end
@@ -423,59 +345,59 @@ function recast_in_full_dim(
   (recast_in_full_dim(op,first(idx)),last(idx)),idx_lift
 end
 
-function get_reduced_measure(
+function get_red_measure(
   op::RBSteadyVarOperator,
   idx::Vector{Int},
   meas::ProblemMeasures,
   field=:dΩ)
 
   m = getproperty(meas,field)
-  get_reduced_measure(op,idx,m)
+  get_red_measure(op,idx,m)
 end
 
-function get_reduced_measure(
+function get_red_measure(
   op::RBUnsteadyVarOperator,
   idx::NTuple{2,Vector{Int}},
   meas::ProblemMeasures,
   field=:dΩ)
 
   m = getproperty(meas,field)
-  get_reduced_measure(op,first(idx),m)
+  get_red_measure(op,first(idx),m)
 end
 
-function get_reduced_measure(
+function get_red_measure(
   op::RBSteadyBilinOperator,
   idx::NTuple{2,Vector{Int}},
   meas::ProblemMeasures,
   field=:dΩ)
 
   idx_space,idx_space_lift = idx
-  m = get_reduced_measure(op,idx_space,meas,field)
-  m_lift = get_reduced_measure(op,idx_space_lift,meas,field)
+  m = get_red_measure(op,idx_space,meas,field)
+  m_lift = get_red_measure(op,idx_space_lift,meas,field)
   m,m_lift
 end
 
-function get_reduced_measure(
+function get_red_measure(
   op::RBUnsteadyBilinOperator,
   idx::NTuple{2,NTuple{2,Vector{Int}}},
   meas::ProblemMeasures,
   field=:dΩ)
 
   idx_space,idx_space_lift = idx
-  m = get_reduced_measure(op,idx_space,meas,field)
-  m_lift = get_reduced_measure(op,idx_space_lift,meas,field)
+  m = get_red_measure(op,idx_space,meas,field)
+  m_lift = get_red_measure(op,idx_space_lift,meas,field)
   m,m_lift
 end
 
-function get_reduced_measure(
+function get_red_measure(
   op::RBVarOperator,
   idx::Vector{Int},
   meas::Measure)
 
-  get_reduced_measure(op,idx,get_triangulation(meas))
+  get_red_measure(op,idx,get_triangulation(meas))
 end
 
-function get_reduced_measure(
+function get_red_measure(
   op::RBVarOperator,
   idx::Vector{Int},
   trian::Triangulation)

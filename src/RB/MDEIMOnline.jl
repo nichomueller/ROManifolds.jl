@@ -22,12 +22,12 @@ function compute_coefficient(
   mdeim,
   μ::Param)
 
-  idx_lu = get_red_lu_factors(mdeim)
+  red_lu = get_red_lu_factors(mdeim)
   idx = get_idx(mdeim)
-  m = get_reduced_measure(mdeim)
+  m = get_red_measure(mdeim)
 
   A = assemble_red_structure(op,m,μ,idx)
-  mdeim_online(A,idx_lu)
+  mdeim_online(A,red_lu)
 end
 
 function compute_coefficient(
@@ -46,12 +46,12 @@ function compute_coefficient(
   ::Val{false})
 
   timesθ = get_timesθ(op)
-  idx_lu = get_red_lu_factors(mdeim)
+  red_lu = get_red_lu_factors(mdeim)
   idx = get_idx_space(mdeim)
-  m = get_reduced_measure(mdeim)
+  m = get_red_measure(mdeim)
   A = assemble_red_structure(op,m,μ,idx,timesθ)
 
-  mdeim_online(A,idx_lu)
+  mdeim_online(A,red_lu)
 end
 
 function compute_coefficient(
@@ -60,15 +60,21 @@ function compute_coefficient(
   μ::Param,
   ::Val{true})
 
-  idx_lu = get_red_lu_factors(mdeim)
+  red_lu = get_red_lu_factors(mdeim)
   idx = get_idx(mdeim)
   red_timesθ = get_reduced_timesθ(op,idx_time)
-  m = get_reduced_measure(mdeim)
+  m = get_red_measure(mdeim)
 
   A_idx = assemble_red_structure(op,m,μ,idx,red_timesθ)
   A_st = spacetime_vector(A_idx)
 
-  mdeim_online(A_st,idx_lu)
+  Qs = size(get_basis_space(mdeim),2)
+  Qt = size(get_basis_time(mdeim),2)
+  sorted_idx(qs) = [(i-1)*Qs+qs for i=1:Qt]
+
+  coeff = mdeim_online(A_st,red_lu)
+  sorted_coeff = coeff[sorted_idx.(1:Qs)]
+  Matrix(reshape(sorted_coeff,:,Qs))
 end
 
 function assemble_red_structure(
@@ -258,46 +264,46 @@ end
 
 function mdeim_online(
   Aidx::AbstractArray,
-  idx_lu::LU)
+  red_lu::LU)
 
-  solve_lu(Aidx,idx_lu)
+  solve_lu(Aidx,red_lu)
 end
 
 function mdeim_online(
   A::Function,
-  idx_lu::LU)
+  red_lu::LU)
 
-  u -> mdeim_online(A(u),idx_lu)
+  u -> mdeim_online(A(u),red_lu)
 end
 
 function mdeim_online(
   A::NTuple{2,AbstractArray},
-  idx_lu::NTuple{2,LU})
+  red_lu::NTuple{2,LU})
 
-  M = mdeim_online(A[1],idx_lu[1])
-  lift = mdeim_online(A[2],idx_lu[2])
+  M = mdeim_online(A[1],red_lu[1])
+  lift = mdeim_online(A[2],red_lu[2])
   M,lift
 end
 
 function mdeim_online(
   A::NTuple{2,Function},
-  idx_lu::NTuple{2,LU})
+  red_lu::NTuple{2,LU})
 
-  M(u) = mdeim_online(A[1](u),idx_lu[1])
-  lift(u) = mdeim_online(A[2](u),idx_lu[2])
+  M(u) = mdeim_online(A[1](u),red_lu[1])
+  lift(u) = mdeim_online(A[2](u),red_lu[2])
   M,lift
 end
 
 function interpolate_mdeim_online(
   A::AbstractArray,
-  idx_lu::LU,
+  red_lu::LU,
   idx_space::Vector{Int},
   idx_time::Vector{Int},
   timesθ::Vector{<:Real})
 
   red_timesθ = timesθ[idx_time]
   discarded_idx_time = setdiff(eachindex(timesθ),idx_time)
-  red_coeff = mdeim_online(A,idx_lu)
+  red_coeff = mdeim_online(A,red_lu)
 
   itp = ScatteredInterpolation.interpolate(Multiquadratic(),
     reshape(red_timesθ,1,:),red_coeff')
@@ -312,10 +318,10 @@ end
 
 function interpolate_mdeim_online(
   A::Function,
-  idx_lu::LU,
+  red_lu::LU,
   idx_space::Vector{Int},
   idx_time::Vector{Int},
   timesθ::Vector{<:Real})
 
-  u -> interpolate_mdeim_online(A(u),idx_lu,idx_space,idx_time,timesθ)
+  u -> interpolate_mdeim_online(A(u),red_lu,idx_space,idx_time,timesθ)
 end

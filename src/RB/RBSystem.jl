@@ -23,7 +23,7 @@ function online_assembler(
   μ::Param,
   args...)
 
-  basis = get_basis(mdeim)
+  basis = get_basis_space(mdeim)
   coeff = compute_coefficient(op,mdeim,μ,args...)
   online_structure(op,basis,coeff,args...)
 end
@@ -145,8 +145,12 @@ function online_structure(
   dtθ = get_dt(op)*get_θ(op)
   if get_id(op) == :M coeff /= dtθ end
 
+  btbtp = coeff_by_time_bases(op,coeff)
+  ns_row = get_ns(get_rbspace_row(op))
+  basis_block = blocks(basis,ns_row)
+
   nr = get_nrows(op)
-  basis_by_coeff_mult(basis,coeff,nr)
+  basis_by_coeff_mult(basis_block,btbtp,nr)
 end
 
 function coeff_by_time_bases(

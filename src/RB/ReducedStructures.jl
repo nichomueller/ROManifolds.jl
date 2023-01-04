@@ -108,9 +108,9 @@ end
 function save_rb_structure(path::String,mdeim::MDEIM)
   save(joinpath(path,"basis"),get_basis(mdeim))
   save(joinpath(path,"idx"),get_idx(mdeim))
-  idx_lu = get_red_lu_factors(mdeim)
-  save(joinpath(path,"LU"),idx_lu.factors)
-  save(joinpath(path,"p"),idx_lu.ipiv)
+  red_lu = get_red_lu_factors(mdeim)
+  save(joinpath(path,"LU"),red_lu.factors)
+  save(joinpath(path,"p"),red_lu.ipiv)
 end
 
 function load_rb_structure(
