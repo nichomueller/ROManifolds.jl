@@ -314,35 +314,3 @@ function interp_coeff_time(
 
   interp_coeff_time.(mdeim,coeff)
 end
-
-function interpolate_mdeim_online(
-  A::AbstractArray,
-  red_lu::LU,
-  idx_space::Vector{Int},
-  idx_time::Vector{Int},
-  timesθ::Vector{<:Real})
-
-  red_timesθ = timesθ[idx_time]
-  discarded_idx_time = setdiff(eachindex(timesθ),idx_time)
-  red_coeff = mdeim_online(A,red_lu)
-
-  itp = ScatteredInterpolation.interpolate(Multiquadratic(),
-    reshape(red_timesθ,1,:),red_coeff')
-  coeff = zeros(length(idx_space),length(timesθ))
-  coeff[:,idx_time] = red_coeff
-  for it = discarded_idx_time
-    coeff[:,it] = ScatteredInterpolation.evaluate(itp,[timesθ[it]])
-  end
-
-  coeff
-end
-
-function interpolate_mdeim_online(
-  A::Function,
-  red_lu::LU,
-  idx_space::Vector{Int},
-  idx_time::Vector{Int},
-  timesθ::Vector{<:Real})
-
-  u -> interpolate_mdeim_online(A(u),red_lu,idx_space,idx_time,timesθ)
-end

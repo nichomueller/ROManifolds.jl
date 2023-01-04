@@ -9,7 +9,6 @@ using Arpack
 using DelimitedFiles
 using Parameters
 using Test
-using ScatteredInterpolation
 using PlotlyJS
 using ForwardDiff
 using Gridap

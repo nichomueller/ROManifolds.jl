@@ -438,8 +438,7 @@ function Gridap.FESpaces.assemble_matrix(op::ParamUnsteadyBilinOperator,t::Real)
 end
 
 function Gridap.FESpaces.assemble_matrix(
-  op::ParamSteadyBilinOperator{Top,<:TrialFESpace},
-  args...) where Top
+  op::ParamSteadyBilinOperator{Top,<:TrialFESpace}) where Top
 
   afe = get_fe_function(op)
   trial = get_trial(op)
@@ -448,13 +447,22 @@ function Gridap.FESpaces.assemble_matrix(
 end
 
 function Gridap.FESpaces.assemble_matrix(
-  op::ParamUnsteadyBilinOperator{Top,<:TrialFESpace},
-  args...) where Top
+  op::ParamUnsteadyBilinOperator{Top,<:TrialFESpace}) where Top
 
   afe = get_fe_function(op)
   trial = get_trial(op)
   test = get_test(op)
   t = realization(op.tinfo)
+  μ -> assemble_matrix(afe(μ,t),trial,test)
+end
+
+function Gridap.FESpaces.assemble_matrix(
+  op::ParamUnsteadyBilinOperator{Top,<:TrialFESpace},
+  t::Real) where Top
+
+  afe = get_fe_function(op)
+  trial = get_trial(op)
+  test = get_test(op)
   μ -> assemble_matrix(afe(μ,t),trial,test)
 end
 
@@ -523,16 +531,29 @@ function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLiftingOperator,t::Rea
   lift
 end
 
-function Gridap.FESpaces.assemble_vector(op::ParamSteadyLinOperator{TrialFESpace},args...)
+function Gridap.FESpaces.assemble_vector(
+  op::ParamSteadyLinOperator{TrialFESpace})
+
   afe = get_fe_function(op)
   test = get_test(op)
   μ -> assemble_vector(afe(μ),test)
 end
 
-function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLinOperator{TrialFESpace},args...)
+function Gridap.FESpaces.assemble_vector(
+  op::ParamUnsteadyLinOperator{TrialFESpace})
+
   afe = get_fe_function(op)
   test = get_test(op)
   t = realization(op.tinfo)
+  μ -> assemble_vector(afe(μ,t),test)
+end
+
+function Gridap.FESpaces.assemble_vector(
+  op::ParamUnsteadyLinOperator{TrialFESpace},
+  t::Real)
+
+  afe = get_fe_function(op)
+  test = get_test(op)
   μ -> assemble_vector(afe(μ,t),test)
 end
 

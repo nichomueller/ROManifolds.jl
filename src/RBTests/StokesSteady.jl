@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function stokes_steady()
-  run_fem = false
+  run_fem = true
 
   steady = true
   indef = true
@@ -11,8 +11,10 @@ function stokes_steady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/stokes"
-  mesh = "cube5x5x5.json"
-  bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
+  mesh = "cylinder.json"
+  bnd_info = Dict("dirichlet" => ["wall","inlet","inlet_curve"],"neumann" => ["outlet","outlet_curve"])
+  #mesh = "cube5x5x5.json"
+  #bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
   order = 2
 
   ranges = fill([1.,5.],6)
@@ -38,7 +40,7 @@ function stokes_steady()
   op = ParamAffineFEOperator(lhs,rhs,PS,X,Y)
 
   solver = LinearFESolver()
-  nsnap = 100
+  nsnap = 1
   uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
 
   opA = NonaffineParamVarOperator(a,afe,PS,U,V;id=:A)

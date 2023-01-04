@@ -108,16 +108,17 @@ function online_phase(
   rbopF,F_rb = Finfo
   rbopH,H_rb = Hinfo
 
+  st_mdeim = info.st_mdeim
   θ = get_θ(rbopA)
 
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
-      Aon = online_assembler(rbopA,A_rb,μ[k])
-      Mon = online_assembler(rbopM,M_rb,μ[k])
-      Bon = online_assembler(rbopB,B_rb,μ[k])
-      BTon = online_assembler(rbopBT,BT_rb,μ[k])
-      Fon = online_assembler(rbopF,F_rb,μ[k])
-      Hon = online_assembler(rbopH,H_rb,μ[k])
+      Aon = online_assembler(rbopA,A_rb,μ[k],st_mdeim)
+      Mon = online_assembler(rbopM,M_rb,μ[k],st_mdeim)
+      Bon = online_assembler(rbopB,B_rb,μ[k],st_mdeim)
+      BTon = online_assembler(rbopBT,BT_rb,μ[k],st_mdeim)
+      Fon = online_assembler(rbopF,F_rb,μ[k],st_mdeim)
+      Hon = online_assembler(rbopH,H_rb,μ[k],st_mdeim)
       lift = Aon[2],Mon[2],Bon[2]
       sys = stokes_rb_system((Aon[1]...,Mon[1]...,BTon...,Bon[1]...),(Fon,Hon,lift...),θ)
       rb_sol = solve_rb_system(sys...)

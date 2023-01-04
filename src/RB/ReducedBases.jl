@@ -147,9 +147,9 @@ matrix_B(opB::ParamSteadyBilinOperator{Affine,Ttr},μ::Vector{Param}) where Ttr 
 matrix_B(opB::ParamSteadyBilinOperator,μ::Vector{Param}) =
   assemble_matrix(opB).(μ)
 matrix_B(opB::ParamUnsteadyBilinOperator{Affine,Ttr},μ::Vector{Param}) where Ttr =
-  assemble_matrix(opB,realization(op.tinfo))(first(μ))
+  assemble_matrix(opB,realization(opB.tinfo))(first(μ))
 matrix_B(opB::ParamUnsteadyBilinOperator,μ::Vector{Param}) =
-  assemble_matrix(opB,realization(op.tinfo)).(μ)
+  assemble_matrix(opB,realization(opB.tinfo)).(μ)
 
 function assemble_constraint_matrix(
   opB::ParamBilinOperator{Affine,Ttr},
