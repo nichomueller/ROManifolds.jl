@@ -51,7 +51,8 @@ function stokes_unsteady()
   opF = AffineParamVarOperator(f,ffe,PS,time_info,V;id=:F)
   opH = AffineParamVarOperator(h,hfe,PS,time_info,V;id=:H)
 
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false)
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false,
+    st_mdeim=true)
   tt = TimeTracker(0.,0.)
   rbspace,varinfo = offline_phase(info,(uh,ph,μ),(opA,opM,opB,opBT,opF,opH),measures,tt)
   online_phase(info,(uh,ph,μ),rbspace,varinfo,tt)
@@ -78,21 +79,12 @@ function offline_phase(
   rbopF = RBVarOperator(opF,rbspace_u)
   rbopH = RBVarOperator(opH,rbspace_u)
 
-  if info.load_offline
-    A_rb = load_rb_structure(info,rbopA,meas.dΩ)
-    M_rb = load_rb_structure(info,rbopM,meas.dΩ)
-    B_rb = load_rb_structure(info,rbopB,meas.dΩ)
-    BT_rb = load_rb_structure(info,rbopBT,meas.dΩ)
-    F_rb = load_rb_structure(info,rbopF,meas.dΩ)
-    H_rb = load_rb_structure(info,rbopH,meas.dΓn)
-  else
-    A_rb = assemble_rb_structure(info,tt,rbopA,μ,meas,:dΩ)
-    M_rb = assemble_rb_structure(info,tt,rbopM,μ,meas,:dΩ)
-    B_rb = assemble_rb_structure(info,tt,rbopB,μ,meas,:dΩ)
-    BT_rb = assemble_rb_structure(info,tt,rbopBT,μ,meas,:dΩ)
-    F_rb = assemble_rb_structure(info,tt,rbopF,μ,meas,:dΩ)
-    H_rb = assemble_rb_structure(info,tt,rbopH,μ,meas,:dΓn)
-  end
+  A_rb = rb_structure(info,tt,rbopA,μ,meas,:dΩ)
+  M_rb = rb_structure(info,tt,rbopM,μ,meas,:dΩ)
+  B_rb = rb_structure(info,tt,rbopB,μ,meas,:dΩ)
+  BT_rb = rb_structure(info,tt,rbopBT,μ,meas,:dΩ)
+  F_rb = rb_structure(info,tt,rbopF,μ,meas,:dΩ)
+  H_rb = rb_structure(info,tt,rbopH,μ,meas,:dΓn)
 
   rbspace = (rbspace_u,rbspace_p)
   varinfo = ((rbopA,A_rb),(rbopM,M_rb),(rbopB,B_rb),(rbopBT,BT_rb),(rbopF,F_rb),(rbopH,H_rb))

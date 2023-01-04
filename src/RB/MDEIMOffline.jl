@@ -54,10 +54,10 @@ function mdeim_offline(
   μ_mdeim = μ[1:info.mdeim_nsnap]
   snaps = mdeim_snapshots(op,info,μ_mdeim,args...)
   rbspace = mdeim_basis(info,snaps)
-  red_rbspace = project_mdeim_basis(op,rbspace)
+  red_rbspace = project_mdeim_basis(op,rbspace,μ_mdeim)
   idx = mdeim_idx(rbspace)
   red_lu_factors = get_red_lu_factors(info,rbspace,idx)
-  idx = recast_in_full_dim(op,idx)
+  idx = recast_in_full_dim(op,idx,μ_mdeim)
   red_meas = get_red_measure(op,idx,meas,field)
 
   MDEIM(red_rbspace,red_lu_factors,idx,red_meas)
@@ -129,26 +129,29 @@ mdeim_basis(info::RBInfoUnsteady,snaps) = RBSpaceUnsteady(snaps;ismdeim=Val(true
 
 function project_mdeim_basis(
   op::RBSteadyVarOperator,
-  rbspace)
+  rbspace,
+  μ::Vector{Param})
 
   id = get_id(rbspace)
-  bs = rb_space_projection(op,rbspace)
+  bs = rb_space_projection(op,rbspace,μ)
   RBSpaceSteady(id,bs)
 end
 
 function project_mdeim_basis(
   op::RBUnsteadyVarOperator,
-  rbspace)
+  rbspace,
+  μ::Vector{Param})
 
   id = get_id(rbspace)
-  bs = rb_space_projection(op,rbspace)
+  bs = rb_space_projection(op,rbspace,μ)
   bt = get_basis_time(rbspace)
   RBSpaceUnsteady(id,bs,bt)
 end
 
 function rb_space_projection(
   op::RBLinOperator,
-  rbspace::RBSpace)
+  rbspace::RBSpace,
+  ::Vector{Param})
 
   basis_space = get_basis_space(rbspace)
   rbspace_row = get_rbspace_row(op)
@@ -158,10 +161,11 @@ end
 
 function rb_space_projection(
   op::RBBilinOperator,
-  rbspace::RBSpace)
+  rbspace::RBSpace,
+  μ::Vector{Param})
 
   basis_space = get_basis_space(rbspace)
-  findnz_map = get_findnz_mapping(op)
+  findnz_map = get_findnz_map(op,μ)
   sparse_basis_space = sparsevec(basis_space,findnz_map)
   rbspace_row = get_rbspace_row(op)
   brow = get_basis_space(rbspace_row)
@@ -181,13 +185,14 @@ end
 
 function rb_space_projection(
   op::RBBilinOperator,
-  rb::NTuple{2,<:RBSpace})
+  rb::NTuple{2,<:RBSpace},
+  μ::Vector{Param})
 
   rbspace,rbspace_lift = rb
   op_lift = RBLiftingOperator(op)
 
-  red_basis_space = rb_space_projection(op,rbspace)
-  red_basis_space_lift = rb_space_projection(op_lift,rbspace_lift)
+  red_basis_space = rb_space_projection(op,rbspace,μ)
+  red_basis_space_lift = rb_space_projection(op_lift,rbspace_lift,μ)
 
   red_basis_space,red_basis_space_lift
 end
@@ -276,20 +281,21 @@ function get_red_lu_factors(
   Broadcasting((rb,idx)->get_red_lu_factors(info,rb,idx))(rbspace,idx_st)
 end
 
-recast_in_full_dim(::RBLinOperator,idx_tmp) = idx_tmp
+recast_in_full_dim(::RBLinOperator,idx_tmp,::Vector{Param}) = idx_tmp
 
-recast_in_full_dim(op::RBBilinOperator,idx_tmp::Vector{Int}) =
-  get_findnz_mapping(op)[idx_tmp]
+recast_in_full_dim(op::RBBilinOperator,idx_tmp::Vector{Int},μ::Vector{Param}) =
+  get_findnz_map(op,μ)[idx_tmp]
 
-recast_in_full_dim(op::RBBilinOperator,idx_tmp::NTuple{2,Vector{Int}}) =
-  recast_in_full_dim(op,first(idx_tmp)),last(idx_tmp)
+recast_in_full_dim(op::RBBilinOperator,idx_tmp::NTuple{2,Vector{Int}},μ::Vector{Param}) =
+  recast_in_full_dim(op,first(idx_tmp),μ),last(idx_tmp)
 
 function recast_in_full_dim(
   op::RBBilinOperator,
-  idx_tmp::NTuple{2,NTuple{2,Vector{Int}}})
+  idx_tmp::NTuple{2,NTuple{2,Vector{Int}}},
+  μ::Vector{Param})
 
   idx,idx_lift = idx_tmp
-  (recast_in_full_dim(op,first(idx)),last(idx)),idx_lift
+  (recast_in_full_dim(op,first(idx),μ),last(idx)),idx_lift
 end
 
 function get_red_measure(

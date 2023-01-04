@@ -43,6 +43,14 @@ function spacetime_idx(
   (time_idx .- 1)*Ns .+ space_idx
 end
 
+function nonzero_values(mat::AbstractMatrix,findnz_map::Vector{Int})
+  Vector(mat[:][findnz_map])
+end
+
+function nonzero_values(mat::Vector{<:AbstractMatrix},findnz_map::Vector{Int})
+  Broadcasting(m -> nonzero_values(m,findnz_map))(mat)
+end
+
 function Base.argmax(v::Vector,nval::Int)
   s = sort(v,rev=true)
   Int.(indexin(s,v))[1:nval]

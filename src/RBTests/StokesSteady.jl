@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function stokes_steady()
-  run_fem = true
+  run_fem = false
 
   steady = true
   indef = true
@@ -71,17 +71,10 @@ function offline_phase(
   rbopF = RBVarOperator(opF,rbspace_u)
   rbopH = RBVarOperator(opH,rbspace_u)
 
-  if info.load_offline
-    A_rb = load_rb_structure(info,rbopA,meas.dΩ)
-    B_rb = load_rb_structure(info,rbopB,meas.dΩ)
-    F_rb = load_rb_structure(info,rbopF,meas.dΩ)
-    H_rb = load_rb_structure(info,rbopH,meas.dΓn)
-  else
-    A_rb = assemble_rb_structure(info,tt,rbopA,μ,meas,:dΩ)
-    B_rb = assemble_rb_structure(info,tt,rbopB,μ,meas,:dΩ)
-    F_rb = assemble_rb_structure(info,tt,rbopF,μ,meas,:dΩ)
-    H_rb = assemble_rb_structure(info,tt,rbopH,μ,meas,:dΓn)
-  end
+  A_rb = rb_structure(info,tt,rbopA,μ,meas,:dΩ)
+  B_rb = rb_structure(info,tt,rbopB,μ,meas,:dΩ)
+  F_rb = rb_structure(info,tt,rbopF,μ,meas,:dΩ)
+  H_rb = rb_structure(info,tt,rbopH,μ,meas,:dΓn)
 
   rbspace = (rbspace_u,rbspace_p)
   varinfo = ((rbopA,A_rb),(rbopB,B_rb),(rbopF,F_rb),(rbopH,H_rb))

@@ -105,9 +105,19 @@ function save_rb_structure(path::String,basis::Matrix{Float})
   save(joinpath(path,"basis_space"),basis)
 end
 
-function save_rb_structure(path::String,mdeim::MDEIM)
-  save(joinpath(path,"basis"),get_basis(mdeim))
-  save(joinpath(path,"idx"),get_idx(mdeim))
+function save_rb_structure(path::String,mdeim::MDEIMSteady)
+  save(joinpath(path,"basis_space"),get_basis_space(mdeim))
+  save(joinpath(path,"idx_space"),get_idx_space(mdeim))
+  red_lu = get_red_lu_factors(mdeim)
+  save(joinpath(path,"LU"),red_lu.factors)
+  save(joinpath(path,"p"),red_lu.ipiv)
+end
+
+function save_rb_structure(path::String,mdeim::MDEIMUnsteady)
+  save(joinpath(path,"basis_space"),get_basis_space(mdeim))
+  save(joinpath(path,"idx_space"),get_idx_space(mdeim))
+  save(joinpath(path,"basis_time"),get_basis_time(mdeim))
+  save(joinpath(path,"idx_time"),get_idx_time(mdeim))
   red_lu = get_red_lu_factors(mdeim)
   save(joinpath(path,"LU"),red_lu.factors)
   save(joinpath(path,"p"),red_lu.ipiv)

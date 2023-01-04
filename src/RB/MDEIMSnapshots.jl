@@ -113,17 +113,15 @@ function matrix_snapshots(
   μ::Vector{Param})
 
   id = get_id(op)
+  findnz_map = get_findnz_map(op,μ)
   M = assemble_matrix(op)
 
   function snapshot(k::Int)
     println("Snapshot number $k, $id")
-    i,v = findnz(M(μ[k])[:])
-    i,v
+    nonzero_values(M(μ[k]),findnz_map)
   end
 
-  ivl = snapshot.(eachindex(μ))
-  findnz_map,vals = getindex.(ivl,1),getindex.(ivl,2)
-  check_findnz_map(findnz_map)
+  vals = snapshot.(eachindex(μ))
   Snapshots(id,vals)
 end
 
@@ -133,17 +131,18 @@ function matrix_snapshots(
   μ::Vector{Param})
 
   id = get_id(op)
+  findnz_map = get_findnz_map(op,μ)
   M,lift = assemble_matrix_and_lifting(op)
 
   function snapshot(k::Int)
     println("Snapshot number $k, $id")
-    i,v = findnz(M(μ[k])[:])
-    i,v,lift(μ[k])
+    v = nonzero_values(M(μ[k]),findnz_map)
+    l = lift(μ[k])
+    v,l
   end
 
-  ivl = snapshot.(eachindex(μ))
-  findnz_map,vals,lifts = getindex.(ivl,1),getindex.(ivl,2),getindex.(ivl,3)
-  check_findnz_map(findnz_map)
+  vl = snapshot.(eachindex(μ))
+  vals,lifts = first.(vl),last.(vl)
   Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
@@ -158,6 +157,7 @@ function matrix_snapshots(
   id = get_id(op)
   bfun = basis_as_fefun(op)
   ns = size(get_basis_space_row(op),2)
+  findnz_map = get_findnz_map(op,μ)
   M,lift = assemble_matrix_and_lifting(op)
 
   function snapshot(k::Int,n::Int)
@@ -165,21 +165,18 @@ function matrix_snapshots(
     bfun(μ_mdeim[k],n)
   end
 
-  findnz_map = Vector{Int}[]
   vals = Vector{Float}[]
   lifts = Vector{Float}[]
   for n = 1:ns
     for k = 1:nparam
       bfun_nk = snapshot(k,n)
-      i_nk,v_nk = findnz(M(bfun_nk)[:])
+      v_nk = nonzero_values(M(μ[k]),findnz_map)
       l_nk = lift(bfun_nk)
-      push!(findnz_map,i_nk)
       push!(vals,v_nk)
       push!(lifts,l_nk)
     end
   end
 
-  check_findnz_map(findnz_map)
   Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
@@ -189,19 +186,18 @@ function matrix_snapshots(
   μ::Vector{Param})
 
   id = get_id(op)
+  findnz_map = get_findnz_map(op,μ)
   M,lift = assemble_matrix_and_lifting(op)
 
   function snapshot(k::Int)
     println("Snapshot number $k, $id")
-    iv = findnz.(M(μ[k]))
-    i,v = first.(iv),last.(iv)
-    check_findnz_map(i)
-    first(i),Matrix(v),lift(μ[k])
+    v = Matrix(nonzero_values(M(μ[k]),findnz_map))
+    l = lift(μ[k])
+    v,l
   end
 
-  ivl = snapshot.(eachindex(μ))
-  findnz_map,vals,lifts = getindex.(ivl,1),getindex.(ivl,2),getindex.(ivl,3)
-  check_findnz_map(findnz_map)
+  vl = snapshot.(eachindex(μ))
+  vals,lifts = first.(vl),last.(vl)
   Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
@@ -217,6 +213,7 @@ function matrix_snapshots(
   timesθ = get_timesθ(op)
   bfun = basis_as_fefun(op)
   ns = size(get_basis_space_row(op),2)
+  findnz_map = get_findnz_map(op,μ)
   M_lift(t) = assemble_matrix_and_lifting(op,t)
 
   function snapshot(k::Int,tθ::Real,n::Int)
@@ -224,7 +221,6 @@ function matrix_snapshots(
     bfun(μ_mdeim[k],tθ,n)
   end
 
-  findnz_map = Vector{Int}[]
   vals = Matrix{Float}[]
   lifts = Matrix{Float}[]
   for n = 1:ns
@@ -232,18 +228,14 @@ function matrix_snapshots(
       for tθ = timesθ
         bfun_nk = snapshot(k,tθ,n)
         M,lift = M_lift(tθ)(bfun_nk)
-        iv_nk = findnz(M)
-        i_nk,v_nk = first.(iv_nk),last.(iv_nk)
+        v_nk = nonzero_values(M(μ[k]),findnz_map)
         l_nk = lift
-        check_findnz_map(i_nk)
-        push!(findnz_map,first(i_nk))
         push!(vals,Matrix(v_nk))
         push!(lifts,l_nk)
       end
     end
   end
 
-  check_findnz_map(findnz_map)
   Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
@@ -273,20 +265,17 @@ function matrix_snapshots(
   test_quad = LagrangianQuadFESpace(get_test(op))
   param_fefuns = FEFunction(test_quad,red_vals_space)
 
+  findnz_map = get_findnz_map(op,μ)
   M,lift = assemble_matrix_and_lifting(op)
 
   function snapshot(k::Int)
     println("Snapshot number $k, $id")
-    i,v = findnz(M(param_fefuns[k])[:])
-    i,v,lift(param_fefuns[k])
+    v = nonzero_values(M(param_fefuns[k]),findnz_map)
+    l = lift(param_fefuns[k])
+    v,l
   end
 
-  ivl = snapshot.(eachindex(μ))
-  findnz_map,vals,lifts = getindex.(ivl,1),getindex.(ivl,2),getindex.(ivl,3)
-  check_findnz_map(findnz_map)
+  vl = snapshot.(eachindex(μ))
+  vals,lifts = first.(vl),last.(vl)
   Snapshots(id,vals),Snapshots(id*:_lift,lifts)
-end
-
-function check_findnz_map(findnz_map::Vector{Vector{Int}})
-  @assert all(Broadcasting(a->isequal(a,findnz_map[1]))(findnz_map)) "Need to correct snaps"
 end
