@@ -259,30 +259,76 @@ function spacetime_mdeim2()
 
   ns,nt = ns_row,nrow
   A1rb_approx = zeros(ns*nt,ns*nt)
-  #= for qt=1:Qt
-    for qs=1:Qs
-      q = qs+(qt-1)*Qs
-      A1rb_approx += kron(bt_block[qt],bs_block[qs])*θ[q]
-    end
-  end =#
-  #= for qs=1:Qs
-    for qt=1:Qt
-      q = qt+(qs-1)*Qt
-      A1rb_approx += kron(bs_block[qs],bt_block[qt])*θ[q]
-    end
-  end =#
-  #= for qs=1:Qs
-    for qt=1:Qt
-      q = qt+(qs-1)*Qt
-      A1rb_approx += kron(bt_block[qt],bs_block[qs])*θ[q]
-    end
-  end =#
   for qt=1:Qt
     for qs=1:Qs
       q = qs+(qt-1)*Qs
-      A1rb_approx += kron(bs_block[qs],bt_block[qt])*θ[q]
+      A1rb_approx += kron(bt_block[qt],bs_block[qs])*θ[q]
     end
   end
 
+end
 
+function important()
+  op = rbopA
+  μ_mdeim = μ[1:info.mdeim_nsnap]
+  snaps = mdeim_snapshots(op,info,μ_mdeim)[1]
+  rbspace = mdeim_basis(info,snaps)
+
+  # traditional method
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false,
+    save_offline=false,st_mdeim=false)
+  idx = mdeim_idx(rbspace)
+  red_lu_factors = get_red_lu_factors(info,rbspace,idx)
+  idx = recast_in_full_dim(op,idx)
+  #red_meas = get_reduced_measure(op,idx,measures,:dΩ)
+  timesθ = get_timesθ(op)
+  A = assemble_red_structure(op,measures.dΩ,μ[1],idx[1],timesθ)
+  θ_s = solve_lu(A,red_lu_factors)
+  btbtp = coeff_by_time_bases_bilin(op,θ_s)[1]
+
+  # space-time method
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false,
+    save_offline=false,st_mdeim=true)
+  red_rbspace = project_mdeim_basis(info,op,rbspace)[1]
+  idx = mdeim_idx(rbspace)
+  red_lu_factors = get_red_lu_factors(info,rbspace,idx)
+  idx_space = mdeim_idx(rbspace.basis_space)
+  idx_time = mdeim_idx(rbspace.basis_time)
+  idx_st = zeros(Int,216)
+  Qs,Qt,Nz = 36,6,68800
+  for it=1:Qt
+    idx_st[(it-1)*Qs+1:it*Qs] = idx_space .+ (idx_time[it]-1)*Nz
+  end
+  redΠ = kron(rbspace.basis_time[idx_time,:],rbspace.basis_space[idx_space,:])
+  A1 = snaps[1].snap[:]
+  θ_st = redΠ \ A1[idx_st]
+  bt_full = get_basis_time(rbspace)
+  Nt,Qt = size(bt_full)
+  rbrow = get_rbspace_row(op)
+  rbcol = get_rbspace_col(op)
+  brow = get_basis_time(rbrow)
+  bcol = get_basis_time(rbcol)
+  nrow = size(brow,2)
+  ncol = size(bcol,2)
+  idx = 1:Nt
+  time_proj_fun(it,jt,q) = sum(brow[idx,it].*bcol[idx,jt].*bt_full[idx,q])
+  time_proj_fun(jt,q) = Broadcasting(it -> time_proj_fun(it,jt,q))(1:nrow)
+  time_proj_fun(q) = Matrix(Broadcasting(jt -> time_proj_fun(jt,q))(1:ncol))
+  #= time_proj_fun(it,jt,q) = sum(brow[idx,it].*bcol[idx,jt].*bt_full[idx,q])
+  time_proj_fun(it,q) = Broadcasting(jt -> time_proj_fun(it,jt,q))(1:ncol)
+  time_proj_fun(q) = Matrix(Broadcasting(it -> time_proj_fun(it,q))(1:nrow)) =#
+  bt_block = time_proj_fun.(1:Qt)
+  my_idx(qs) = [(i-1)*Qs+qs for i=1:Qt]
+  btbtp_try(qs) = sum([bt_block[1]*θ_st[q] for q=my_idx(qs)])
+  check(qs) = abs.(btbtp_try(qs)-btbtp[qs]) ./ abs.(btbtp[qs]) # almost!
+
+  ############### YYYYYYYYYYYYYYYYEAAAAAAAAAAAAAHHHHHHHHHHHHHH #################
+  dog(qs) = bt_full*θ_st[my_idx(qs)]
+  cane = Matrix([dog(qs) for qs=1:Qs])
+  isapprox(cane,θ_s)
+  ############### YYYYYYYYYYYYYYYYEAAAAAAAAAAAAAHHHHHHHHHHHHHH #################
+  temp(it,jt,q) = sum(brow[idx,it].*bcol[idx,jt].*dog(q)[idx])
+  temp(jt,q) = Broadcasting(it -> temp(it,jt,q))(1:nrow)
+  temp(q) = Matrix(Broadcasting(jt -> temp(jt,q))(1:ncol))
+  v(q) = maximum(abs.(temp(q)-btbtp[q]))
 end
