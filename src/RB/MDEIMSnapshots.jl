@@ -1,20 +1,7 @@
-basis_as_fefun(::RBLinOperator) = error("Not implemented")
-
-function basis_as_fefun(
-  op::RBSteadyBilinOperator{Top,<:ParamTrialFESpace}) where Top
-
+function basis_as_fefun(op::RBVarOperator)
   bspace = get_basis_space_row(op)
-  trial = get_trial(op)
-  fefuns(μ::Param,n::Int) = FEFunction(trial(μ),bspace[:,n])
-  fefuns
-end
-
-function basis_as_fefun(
-  op::RBUnsteadyBilinOperator{Top,<:ParamTrialFESpace}) where Top
-
-  bspace = get_basis_space_row(op)
-  trial = get_trial(op)
-  fefuns(μ::Param,tθ::Real,n::Int) = FEFunction(trial(μ,tθ),bspace[:,n])
+  test = get_test(op)
+  fefuns(n::Int) = FEFunction(test,bspace[:,n])
   fefuns
 end
 
@@ -153,28 +140,20 @@ function matrix_snapshots(
 
   id = get_id(op)
   bfun = basis_as_fefun(op)
-  findnz_map = get_findnz_map(op,bfun(μ[1],1))
+  findnz_map = get_findnz_map(op,bfun(1))
   M,lift = assemble_matrix_and_lifting(op)
 
-  function snapshot(k::Int,n::Int)
-    println("Nonlinear snapshot number $((n-1)*nparam+k), $id")
-    b = bfun(μ[k],n)
+  function snapshot(n::Int)
+    println("Nonlinear snapshot number $n, $id")
+    b = bfun(n)
     v = nonzero_values(M(b),findnz_map)
     l = lift(b)
     v,l
   end
 
-  ns,nparam = get_length_nonlin_snaps(op,μ)
-  vals = Vector{Float}[]
-  lifts = Vector{Float}[]
-  for n = 1:ns
-    for k = 1:nparam
-      v_nk,l_nk = snapshot(k,n)
-      push!(vals,v_nk)
-      push!(lifts,l_nk)
-    end
-  end
-
+  ns = size(get_basis_space_row(op),2)
+  vl = snapshot.(1:ns)
+  vals,lifts = first.(vl),last.(vl)
   findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
@@ -205,34 +184,30 @@ function matrix_snapshots(
   μ::Vector{Param})
 
   id = get_id(op)
-  timesθ = get_timesθ(op)
   bfun = basis_as_fefun(op)
-  findnz_map = get_findnz_map(op,bfun(μ[1],1))
+  bt = get_basis_time_row(op)
+  btθ = compute_in_timesθ(op,bt)
+  findnz_map = get_findnz_map(op,bfun(1))
   M_lift(t) = assemble_matrix_and_lifting(op,t)
 
-  function snapshot(k::Int,tθ::Real,n::Int)
-    println("Nonlinear snapshot number $((n-1)*nparam+k), $id")
-    b = bfun(μ[k],tθ,n)
+  function snapshot(n::Int)
+    println("Nonlinear snapshot number $n, $id")
+    b = bfun(n)
     vl = M_lift(b)
     v = nonzero_values(first(vl),findnz_map)
     l = last(vl)
     v,l
   end
 
-  ns,nparam = get_length_nonlin_snaps(op,μ)
-  vals = Matrix{Float}[]
-  lifts = Matrix{Float}[]
-  for n = 1:ns
-    for k = 1:nparam
-      for tθ = timesθ
-        v_nk,l_nk = snapshot(k,tθ,n)
-        push!(vals,Matrix(v_nk))
-        push!(lifts,l_nk)
-      end
-    end
-  end
+  Nt = length(get_timesθ(op))
+  ns = size(get_basis_space_row(op),2)
 
-  findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
+  vl = snapshot.(1:ns)
+  vals_space,lifts_space = first.(vl),last.(vl)
+  vals,lifts = kron(btθ,vals_space),kron(btθ,lifts_space)
+  vals_bk = blocks(vals,size(vals,2);dims=(:,Nt))
+  lifts_bk = blocks(lifts,size(lifts,2);dims=(:,Nt))
+  findnz_map,Snapshots(id,vals_bk),Snapshots(id*:_lift,lifts_bk)
 end
 
 function matrix_snapshots(
@@ -274,27 +249,4 @@ function matrix_snapshots(
   vl = snapshot.(eachindex(μ))
   vals,lifts = first.(vl),last.(vl)
   findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
-end
-
-function get_length_nonlin_snaps(
-  op::RBSteadyBilinOperator{Nonlinear,<:ParamTrialFESpace},
-  μ::Vector{Param},
-  limit::Int=120)
-
-  ns = size(get_basis_space_row(op),2)
-  nparam = length(μ)
-  nparam_new = ns*nparam > limit ? nparam = ceil(Int,limit/ns) : nparam
-  ns,nparam_new
-end
-
-function get_length_nonlin_snaps(
-  op::RBUnsteadyBilinOperator{Nonlinear,<:ParamTrialFESpace},
-  μ::Vector{Param},
-  limit::Int=240)
-
-  ns = size(get_basis_space_row(op),2)
-  Nt = get_Nt(op)
-  nparam = length(μ)
-  nparam_new = nparam*ns*Nt > limit ? nparam = ceil(Int,limit/(ns*Nt)) : nparam
-  ns,nparam_new
 end

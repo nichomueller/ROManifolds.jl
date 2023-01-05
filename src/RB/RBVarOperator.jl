@@ -189,10 +189,20 @@ get_timesθ(op::RBVarOperator) = get_timesθ(op.feop)
 get_reduced_timesθ(op::RBVarOperator,idx::Vector{Int}) = get_timesθ(op)[idx]
 
 function get_reduced_timesθ(
-  op::RBVarOperator,
+  op::RBUnsteadyVarOperator,
   idx::NTuple{N,Vector{Int}}) where N
 
   Broadcasting(i->get_reduced_timesθ(op,i))(idx)
+end
+
+function compute_in_timesθ(
+  op::RBUnsteadyVarOperator,
+  bt::Matrix{Float})
+
+  θ = get_θ(op)
+  Nt = size(bt,1)
+  bt_prev = hcat(zeros(Nt),bt[1:end-1])
+  θ*bt + (1-θ)*bt_prev
 end
 
 "Small, full vector -> large, sparse vector"
