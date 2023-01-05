@@ -137,12 +137,11 @@ function unsteady_navier_stokes()
   RHSadd(t,uprev) = vcat(M(μ1,t)*uprev/(dt*θ),zeros(Np,1))
 
   J(t,x) = LHS(t,x[1]) + vcat(hcat(D(x[1]),zeros(Nu,Np)),hcat(zeros(Np,Nu),zeros(Np,Np)))
-  Res(t,x,xh,xprev) = LHS(t,x[1])*xh - (RHS(t,x[1])-RHSadd(t,xprev[1:Nu]))
+  Res(t,x,xh,xprev) = LHS(t,x[1])*xh - (RHS(t,x[1])+RHSadd(t,xprev[1:Nu]))
 
   tθ1 = dt*θ
   t1 = dt
   tθ2 = dt+dt*θ
-  t2 = 2*dt
   xh1θ = newton(Res,J,X(μ1,tθ1),tθ1,zero(X(μ1,tθ1)))
   xh1 = xh1θ/θ
   isapprox(xh1,x1)
@@ -150,10 +149,6 @@ function unsteady_navier_stokes()
   xh2θ = newton(Res,J,X(μ1,tθ2),tθ2,x1fun)
   xh2 = (xh2θ - (1-θ)*xh1)/θ
   isapprox(xh2,x2)
-
-  #x0 = zero(X(μ1,tθ2))
-  assemble_vector(res(μ1,tθ2,x1fun,get_fe_basis(Y)),Y)
-  #r = assemble_vector(Res(tθ2,x,xh,xprev) res(xfun,get_fe_basis(X₀)),X₀)
 end
 
 function spaces_steady()

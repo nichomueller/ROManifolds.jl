@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function navier_stokes_unsteady()
-  run_fem = false
+  run_fem = true
 
   steady = false
   indef = true
@@ -43,22 +43,22 @@ function navier_stokes_unsteady()
 
   nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking())
   solver = ThetaMethod(nls,dt,θ)
-  nsnap = 1
+  nsnap = 100
   uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
 
   opA = NonaffineParamVarOperator(a,afe,PS,time_info,U,V;id=:A)
-  opM = NonaffineParamVarOperator(m,mfe,PS,time_info,U,V;id=:M)
   opB = AffineParamVarOperator(b,bfe,PS,time_info,U,Q;id=:B)
   opBT = AffineParamVarOperator(b,bTfe,PS,time_info,P,V;id=:BT)
   opC = NonlinearParamVarOperator(c,cfe,PS,time_info,U,V;id=:C)
   opD = NonlinearParamVarOperator(d,dfe,PS,time_info,U,V;id=:D)
+  opM = NonaffineParamVarOperator(m,mfe,PS,time_info,U,V;id=:M)
   opF = AffineParamVarOperator(f,ffe,PS,time_info,V;id=:F)
   opH = AffineParamVarOperator(h,hfe,PS,time_info,V;id=:H)
 
   info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=false)
   tt = TimeTracker(0.,0.)
-  rbspace,varinfo = offline_phase(info,(uh,ph,μ,X),(opA,opM,opB,opBT,opC,opD,opF,opH),measures,tt)
-  online_phase(info,(uh,ph,μ,X),rbspace,varinfo,tt)
+  rbspace,varinfo = offline_phase(info,(uh,ph,μ,Y),(opA,opB,opBT,opC,opD,opM,opF,opH),measures,tt)
+  online_phase(info,(uh,ph,μ,Y),rbspace,varinfo,tt)
 end
 
 function offline_phase(
@@ -71,31 +71,31 @@ function offline_phase(
   uh,ph,μ, = fe_sol
   uh_offline = uh[1:info.nsnap]
   ph_offline = ph[1:info.nsnap]
-  opA,opM,opB,opBT,opC,opD,opF,opH = op
+  opA,opB,opBT,opC,opD,opM,opF,opH = op
 
   rbspace_u,rbspace_p = rb(info,tt,(uh_offline,ph_offline),opB,ph,μ)
 
   rbopA = RBVarOperator(opA,rbspace_u,rbspace_u)
-  rbopM = RBVarOperator(opM,rbspace_u,rbspace_u)
   rbopB = RBVarOperator(opB,rbspace_p,rbspace_u)
   rbopBT = RBVarOperator(opBT,rbspace_u,rbspace_p)
   rbopC = RBVarOperator(opC,rbspace_u,rbspace_u)
   rbopD = RBVarOperator(opD,rbspace_u,rbspace_u)
+  rbopM = RBVarOperator(opM,rbspace_u,rbspace_u)
   rbopF = RBVarOperator(opF,rbspace_u)
   rbopH = RBVarOperator(opH,rbspace_u)
 
   A_rb = rb_structure(info,tt,rbopA,μ,meas,:dΩ)
-  M_rb = rb_structure(info,tt,rbopM,μ,meas,:dΩ)
   B_rb = rb_structure(info,tt,rbopB,μ,meas,:dΩ)
   BT_rb = rb_structure(info,tt,rbopBT,μ,meas,:dΩ)
   C_rb = rb_structure(info,tt,rbopC,μ,meas,:dΩ)
   D_rb = rb_structure(info,tt,rbopD,μ,meas,:dΩ)
+  M_rb = rb_structure(info,tt,rbopM,μ,meas,:dΩ)
   F_rb = rb_structure(info,tt,rbopF,μ,meas,:dΩ)
   H_rb = rb_structure(info,tt,rbopH,μ,meas,:dΓn)
 
   rbspace = (rbspace_u,rbspace_p)
-  varinfo = ((rbopA,A_rb),(rbopM,M_rb),(rbopB,B_rb),(rbopBT,BT_rb),
-    (rbopC,C_rb),(rbopD,D_rb),(rbopF,F_rb),(rbopH,H_rb))
+  varinfo = ((rbopA,A_rb),(rbopB,B_rb),(rbopBT,BT_rb),
+    (rbopC,C_rb),(rbopD,D_rb),(rbopM,M_rb),(rbopF,F_rb),(rbopH,H_rb))
   rbspace,varinfo
 end
 
@@ -106,9 +106,9 @@ function online_phase(
   varinfo::Tuple,
   tt::TimeTracker)
 
-  uh,ph,μ,X = fe_sol
+  uh,ph,μ,Y = fe_sol
 
-  Ainfo,Minfo,Binfo,BTinfo,Cinfo,Dinfo,Finfo,Hinfo = varinfo
+  Ainfo,Binfo,BTinfo,Cinfo,Dinfo,Minfo,Finfo,Hinfo = varinfo
 
   st_mdeim = info.st_mdeim
   θ = get_θ(rbopA)
@@ -116,17 +116,17 @@ function online_phase(
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
       Aon = online_assembler(Ainfo...,μ[k],st_mdeim)
-      Mon = online_assembler(Minfo...,μ[k],st_mdeim)
       Bon = online_assembler(Binfo...,μ[k],st_mdeim)
       BTon = online_assembler(BTinfo...,μ[k],st_mdeim)
       Con = online_assembler(Cinfo...,μ[k],st_mdeim)
       Don = online_assembler(Dinfo...,μ[k],st_mdeim)
+      Mon = online_assembler(Minfo...,μ[k],st_mdeim)
       Fon = online_assembler(Finfo...,μ[k],st_mdeim)
       Hon = online_assembler(Hinfo...,μ[k],st_mdeim)
-      lift = Aon[2],Mon[2],Bon[2],Con[2]
-      sys = navier_stokes_rb_system((Aon[1]...,Mon[1]...,BTon...,Bon[1]...,
-        Con[1]...,Don[1]...),(Fon,Hon,lift...))
-      rb_sol = solve_rb_system(sys...,X(μ[k]),rbspace,θ)
+      lift = Aon[2],Bon[2],Con[2],Mon[2]
+      sys = navier_stokes_rb_system((Aon[1],BTon,Bon[1],
+        Con[1]...,Don[1]...,Mon[1]),(Fon,Hon,lift...))
+      rb_sol = solve_rb_system(sys...,Y,rbspace,θ)
     end
     uhk = get_snap(uh[k])
     phk = get_snap(ph[k])

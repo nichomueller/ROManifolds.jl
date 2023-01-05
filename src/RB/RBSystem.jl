@@ -235,7 +235,7 @@ function stokes_rb_system(
   rhs::NTuple{N,Matrix{Float}},
   θ::Float) where N
 
-  A_rb,Ashift_rb,M_rb,Mshift_rb,BT_rb,BTshift_rb,B_rb,Bshift_rb = lhs
+  A_rb,Ashift_rb,M_rb,Mshift_rb,B_rb,Bshift_rb,BT_rb,BTshift_rb = lhs
   F_rb,H_rb,lifts... = rhs
 
   np = size(B_rb,1)
@@ -272,6 +272,32 @@ function navier_stokes_rb_system(lhs::Tuple,rhs::Tuple)
   res_rb,jac_rb
 end
 
+function navier_stokes_rb_system(lhs::Tuple,rhs::Tuple,θ::Float)
+  Aon,Bon,BTon,C_rb,Cshift_rb,D_rb,Dshift_rb,Mon = lhs
+  F_rb,H_rb,lifts... = rhs
+  liftA,liftB,liftC,liftM, = lifts
+
+  lin_rb_lhs,lin_rb_rhs = stokes_rb_system((Aon...,Bon...,BTon...,Mon...),
+    (F_rb,H_rb,liftA,liftB,liftM),θ)
+
+  nu,np = size(A_rb,1),size(B_rb,1)
+  block12 = zeros(nu,np)
+  block21 = zeros(np,nu)
+  block22 = zeros(np,np)
+  nonlin_rb_lhs1(x) = vcat(hcat(θ*C_rb(x[1]) + (1-θ)*Cshift_rb(x[1]),block12),
+    hcat(block21,block22))
+  nonlin_rb_lhs2(x) = vcat(hcat(θ*(C_rb(x[1])+D_rb(x[1])) +
+    (1-θ)*(Cshift_rb(x[1])+Dshift_rb(x[1])),block12),hcat(block21,block22))
+  nonlin_rb_rhs(x) = vcat(liftC(x[1]),zeros(np,1))
+
+  jac_rb(x) = lin_rb_lhs + nonlin_rb_lhs2(x)
+  lhs_rb(x) = lin_rb_lhs + nonlin_rb_lhs1(x)
+  rhs_rb(x) = lin_rb_rhs + nonlin_rb_rhs(x)
+  res_rb(x,x_rb) = lhs_rb(x)*x_rb - rhs_rb(x)
+
+  res_rb,jac_rb
+end
+
 function solve_rb_system(rb_lhs::Matrix{Float},rb_rhs::Matrix{Float})
   println("Solving system via backslash")
   rb_lhs \ rb_rhs
@@ -281,19 +307,10 @@ function solve_rb_system(
   res::Function,
   jac::Function,
   X::FESpace,
-  rbspace::NTuple{2,RBSpaceSteady};
-  kwargs...)
-
-  println("Solving system via Newton method")
-  rb_newton(res,jac,X,rbspace;kwargs...)
-end
-
-function rb_newton(
-  res::Function,
-  jac::Function,
-  X::FESpace,
   rbspace::NTuple{2,<:RBSpace};
   tol=1e-10,maxit=10)
+
+  println("Solving system via Newton method")
 
   bsu,bsp = get_basis_space.(rbspace)
   nsu,nsp = size(bsu,2),size(bsp,2)

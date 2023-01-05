@@ -53,8 +53,8 @@ function navier_stokes_steady()
 
   info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=false)
   tt = TimeTracker(0.,0.)
-  rbspace,varinfo = offline_phase(info,(uh,ph,μ,X),(opA,opB,opC,opD,opF,opH),measures,tt)
-  online_phase(info,(uh,ph,μ,X),rbspace,varinfo,tt)
+  rbspace,varinfo = offline_phase(info,(uh,ph,μ,Y),(opA,opB,opC,opD,opF,opH),measures,tt)
+  online_phase(info,(uh,ph,μ,Y),rbspace,varinfo,tt)
 end
 
 function offline_phase(
@@ -97,7 +97,7 @@ function online_phase(
   varinfo::Tuple,
   tt::TimeTracker)
 
-  uh,ph,μ,X = fe_sol
+  uh,ph,μ,Y = fe_sol
 
   Ainfo,Binfo,Cinfo,Dinfo,Finfo,Hinfo = varinfo
 
@@ -111,7 +111,7 @@ function online_phase(
       Hon = online_assembler(Hinfo...,μ[k])
       lift = Aon[2],Bon[2],Con[2]
       sys = navier_stokes_rb_system((Aon[1],Bon[1],Con[1],Don[1]),(Fon,Hon,lift...))
-      rb_sol = solve_rb_system(sys...,X(μ[k]),rbspace)
+      rb_sol = solve_rb_system(sys...,Y,rbspace)
     end
     uhk = get_snap(uh[k])
     phk = get_snap(ph[k])
