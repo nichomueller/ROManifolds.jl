@@ -85,7 +85,7 @@ function unsteady_stokes()
   isapprox(x(μ1,tθ2,x1),x2)
 end
 
-function navier_steady_stokes()
+function steady_navier_stokes()
   u1,p1,μ1 = uh.snap[:,1],ph.snap[:,1],μ[1]
   Np = size(p1,1)
   x1 = vcat(u1,p1)
@@ -105,6 +105,55 @@ function navier_steady_stokes()
 
   xnewt = newton(Res,J,X(μ1))
   isapprox(xnewt,x1)
+end
+
+function unsteady_navier_stokes()
+  dt = get_dt(opA)
+  θ = get_θ(opA)
+  μ1 = μ[1]
+  Nu = size(uh.snap[:,1],1)
+  Np = size(ph.snap[:,1],1)
+  x1 = vcat(uh.snap[:,1],ph.snap[:,1])
+  x2 = vcat(uh.snap[:,2],ph.snap[:,2])
+
+  ALA(t) = assemble_matrix_and_lifting(opA,t)
+  BLB(t) = assemble_matrix_and_lifting(opB,t)
+  CLC = assemble_matrix_and_lifting(opC)
+  D = assemble_matrix(opD)
+  MLM(t) = assemble_matrix_and_lifting(opM,t)
+  F(μ,t) = assemble_vector(opF,t)(μ)
+  H(μ,t) = assemble_vector(opH,t)(μ)
+  A(μ,t) = ALA(t)[1](μ)
+  LA(μ,t) = ALA(t)[2](μ)
+  B(μ,t) = BLB(t)[1](μ)
+  LB(μ,t) = BLB(t)[2](μ)
+  C(u) = CLC[1](u)
+  LC(u) = CLC[2](u)
+  M(μ,t) = MLM(t)[1](μ)
+  LM(μ,t) = MLM(t)[2](μ)
+
+  LHS(t,u) = vcat(hcat(A(μ1,t)+M(μ1,t)/(dt*θ)+C(u),-B(μ1,t)'),hcat(B(μ1,t),zeros(Np,Np)))
+  RHS(t,u) = vcat(F(μ1,t)+H(μ1,t)-LA(μ1,t)-LC(u)-LM(μ1,t),-LB(μ1,t))
+  RHSadd(t,uprev) = vcat(M(μ1,t)*uprev/(dt*θ),zeros(Np,1))
+
+  J(t,x) = LHS(t,x[1]) + vcat(hcat(D(x[1]),zeros(Nu,Np)),hcat(zeros(Np,Nu),zeros(Np,Np)))
+  Res(t,x,xh,xprev) = LHS(t,x[1])*xh - (RHS(t,x[1])-RHSadd(t,xprev[1:Nu]))
+
+  tθ1 = dt*θ
+  t1 = dt
+  tθ2 = dt+dt*θ
+  t2 = 2*dt
+  xh1θ = newton(Res,J,X(μ1,tθ1),tθ1,zero(X(μ1,tθ1)))
+  xh1 = xh1θ/θ
+  isapprox(xh1,x1)
+  x1fun = FEFunction(X(μ1,t1),xh1[:,1])
+  xh2θ = newton(Res,J,X(μ1,tθ2),tθ2,x1fun)
+  xh2 = (xh2θ - (1-θ)*xh1)/θ
+  isapprox(xh2,x2)
+
+  #x0 = zero(X(μ1,tθ2))
+  assemble_vector(res(μ1,tθ2,x1fun,get_fe_basis(Y)),Y)
+  #r = assemble_vector(Res(tθ2,x,xh,xprev) res(xfun,get_fe_basis(X₀)),X₀)
 end
 
 function spaces_steady()

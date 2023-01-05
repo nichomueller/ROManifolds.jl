@@ -290,8 +290,8 @@ function navier_stokes_functions(::Val{false},measures::ProblemFixedMeasures)
   function g(x,p::Param,t::Real)
     μ = get_μ(p)
     R = 0.5
-    xc = x-Point(0,R,R)
-    (1. +eps()-cos(t))*VectorValue(sum((xc.*Point(μ[1:3]))^2),0.,0.)*(x[1]==0)/norm(μ[1:3])^2
+    xc = x-Point(R,R,0)
+    VectorValue(0.,0.,1-sin(t)*sum((xc.*Point(μ[1:3]))^2)/norm(R^2*μ[1:3]))*(x[3]==0.)
   end
   g(μ::Param,t::Real) = x->g(x,μ,t)
 
@@ -301,22 +301,30 @@ function navier_stokes_functions(::Val{false},measures::ProblemFixedMeasures)
   afe(p::Param,t::Real,dΩ,u,v) = ∫(a(p,t)*∇(v)⊙∇(u))dΩ
   mfe(p::Param,t::Real,dΩ,u,v) = ∫(v⋅u)dΩ
   bfe(p::Param,t::Real,dΩ,u,q) = ∫(b(p,t)*q*(∇⋅(u)))dΩ
+  bTfe(p::Param,t::Real,dΩ,u,q) = ∫(b(p,t)*(∇⋅(q))*u)dΩ
   cfe(dΩ,z,u,v) = ∫(v⊙(∇(u)'⋅z))dΩ
   dfe(dΩ,z,u,v) = ∫(v⊙(∇(z)'⋅u))dΩ
   ffe(p::Param,t::Real,dΩ,v) = ∫(f(p,t)⋅v)dΩ
   hfe(p::Param,t::Real,dΓn,v) = ∫(h(p,t)⋅v)dΓn
 
-  mfe(μ,t,u,v) = ∫(v⋅u)dΩ
-  afe(μ,t,u,v) = ∫(a(μ,t)*∇(v)⊙∇(u))dΩ
-  bfe(μ,t,u,q) = ∫(b(μ,t)*q*(∇⋅(u)))dΩ
-  cfe(μ,t,z,u,v) = ∫(c(μ,t)*v⊙(∇(u)'⋅z))dΩ
-  cfe(μ,t,z) = (u,v) -> cfe(μ,t,z,u,v)
-  cfe(z) = cfe(realization(P),0.,z)
-  dfe(μ,t,z,u,v) = ∫(d(μ,t)*v⊙(∇(z)'⋅u))dΩ
-  dfe(μ,t,z) = (u,v) -> dfe(μ,t,z,u,v)
-  dfe(z) = dfe(realization(P),0.,z)
-  ffe(μ,t,v) = ∫(f(μ,t)⋅v)dΩ
-  hfe(μ,t,v) = ∫(h(μ,t)⋅v)dΓn
+  dΩ,dΓn = get_dΩ(measures),get_dΓn(measures)
+  afe(p::Param,t::Real,u,v) = afe(p,t,dΩ,u,v)
+  afe(p::Param,t::Real) = (u,v) -> afe(p,t,u,v)
+  mfe(p::Param,t::Real,u,v) = mfe(p,t,dΩ,u,v)
+  mfe(p::Param,t::Real) = (u,v) -> mfe(p,t,u,v)
+  bfe(p::Param,t::Real,u,v) = bfe(p,t,dΩ,u,v)
+  bfe(p::Param,t::Real) = (u,v) -> bfe(p,t,u,v)
+  bTfe(p::Param,t::Real,u,v) = bTfe(p,t,dΩ,u,v)
+  bTfe(p::Param,t::Real) = (u,v) -> bTfe(p,t,u,v)
+  cfe(z,u,v) = cfe(dΩ,z,u,v)
+  cfe(z) = (u,v) -> cfe(z,u,v)
+  dfe(z,u,v) = dfe(dΩ,z,u,v)
+  dfe(z) = (u,v) -> dfe(z,u,v)
+  ffe(p::Param,t::Real,v) = ffe(p,t,dΩ,v)
+  ffe(p::Param,t::Real) = v -> ffe(p,t,v)
+  hfe(p::Param,t::Real,v) = hfe(p,t,dΓn,v)
+  hfe(p::Param,t::Real) = v -> hfe(p,t,v)
+
   #FOR SOME REASON, BETTER CONVERGENCE WITH THIS DEF OF NONLINEAR TERM
   conv(u,∇u) = (∇u')⋅u
   dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
@@ -326,9 +334,9 @@ function navier_stokes_functions(::Val{false},measures::ProblemFixedMeasures)
   rhs(μ,t,(v,q)) = ffe(μ,t,v) + hfe(μ,t,v)
   lhs(μ,t,(u,p),(v,q)) = afe(μ,t,u,v) - bfe(μ,t,v,p) - bfe(μ,t,u,q)
 
-  res(μ,t,(u,p),(v,q)) = mfe(μ,t,(∂t(u),∂t(p)),(v,q)) + lhs(μ,t,(u,p),(v,q)) + cgridap(u,v) - rhs(μ,t,(v,q))
+  res(μ,t,(u,p),(v,q)) = mfe(μ,t,∂t(u),v) + lhs(μ,t,(u,p),(v,q)) + cgridap(u,v) - rhs(μ,t,(v,q))
   jac(μ,t,(u,p),(du,dp),(v,q)) = lhs(μ,t,(du,dp),(v,q)) + dcgridap(u,du,v)
-  jac_t(μ,t,(u,p),(dut,dpt),(v,q)) = mfe(μ,t,(dut,dpt),(v,q))
+  jac_t(μ,t,(u,p),(dut,dpt),(v,q)) = mfe(μ,t,dut,v)
 
-  a,b,c,d,f,h,m,g,afe,bfe,cfe,dfe,ffe,hfe,mfe,res,jac,jac_t
+  a,afe,m,mfe,b,bfe,bTfe,c,cfe,d,dfe,f,ffe,h,hfe,g,res,jac,jac_t
 end

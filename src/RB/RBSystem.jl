@@ -313,35 +313,6 @@ function rb_newton(
   x_rb
 end
 
-#= function newton(
-  rbspace::Vector{<:RBSpace},
-  dx_rb::Function,
-  ϵ=1e-9,max_iter=10)
-
-  basis_space_u,basis_space_p = get_basis_space.(rbspace)
-  Ns_u,ns_u = size(basis_space_u)
-  _,ns_p = size(basis_space_p)
-
-  u = FEFunction(V,zeros(Ns_u))
-  x_rb = zeros(ns_u+ns_p,1)
-  δx̂ = 1. .+ x_rb
-  u = FEFunction(V,zeros(Ns_u))
-  iter = 0
-  err = norm(δx̂)
-
-  while iter < max_iter && err ≥ ϵ
-    δx̂ = dx_rb(u,x_rb)
-    x_rb -= δx̂
-    u = FEFunction(V,basis_space_u*x_rb[1:ns_u])
-    iter += 1
-    err = norm(δx̂)
-    println("Iter: $iter; ||δx̂||₂: $(norm(δx̂))")
-  end
-
-  println("Newton-Raphson ended with iter: $iter; ||δx̂||₂: $(norm(δx̂))")
-  x_rb
-end =#
-
 function reconstruct_fe_sol(rbspace::RBSpaceSteady,rb_sol::Matrix{Float})
   bs = get_basis_space(rbspace)
   bs*rb_sol

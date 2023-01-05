@@ -114,6 +114,23 @@ function newton(res::Function,jac::Function,X::FESpace;tol=1e-10,maxit=10)
   xh
 end
 
+function newton(res::Function,jac::Function,X::FESpace,t::Real,x0;tol=1e-10,maxit=10)
+  err = 1.
+  x = x0#zero(X)
+  xh = get_free_dof_values(x)
+  xh0 = get_free_dof_values(x0)
+  iter = 0
+  while norm(err) > tol && iter < maxit
+    jtx,rtx = jac(t,x),res(t,x,xh,xh0)
+    err = jtx \ rtx
+    xh -= err
+    x = FEFunction(X,xh[:,1])
+    iter += 1
+    println("err = $(norm(err)), iter = $iter")
+  end
+  xh
+end
+
 function basis_by_coeff_mult(basis::Matrix{Float},coeff::Vector{Float},nr::Int)
   @assert size(basis,2) == length(coeff) "Something is wrong"
   bc = sum([basis[:,k]*coeff[k] for k=eachindex(coeff)])

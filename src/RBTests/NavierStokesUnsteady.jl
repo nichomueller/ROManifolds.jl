@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function navier_stokes_unsteady()
-  run_fem = true
+  run_fem = false
 
   steady = false
   indef = true
@@ -12,7 +12,7 @@ function navier_stokes_unsteady()
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes"
   mesh = "cube5x5x5.json"
-  bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
+  bnd_info = Dict("dirichlet" => vcat(collect(1:21),collect(23:26)),"neumann" => [22])
   order = 2
 
   t0,tF,dt,θ = 0.,0.5,0.05,0.5
@@ -27,7 +27,7 @@ function navier_stokes_unsteady()
   model = model_info(mshpath,bnd_info,ptype)
   measures = ProblemMeasures(model,order)
 
-  a,afe,m,mfe,mfe_gridap,b,bfe,bTfe,c,cfe,d,dfe,f,ffe,h,hfe,g,res,jac =
+  a,afe,m,mfe,b,bfe,bTfe,c,cfe,d,dfe,f,ffe,h,hfe,g,res,jac,jac_t =
     navier_stokes_functions(ptype,measures)
 
   reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{3,Float},order)
@@ -39,11 +39,11 @@ function navier_stokes_unsteady()
   Y = ParamTransientMultiFieldFESpace([V,Q])
   X = ParamTransientMultiFieldFESpace([U,P])
 
-  op = ParamTransientFEOperator(mfe_gridap,res,jac,PS,X,Y)
+  op = ParamTransientFEOperator(res,jac,jac_t,PS,X,Y)
 
   nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking())
   solver = ThetaMethod(nls,dt,θ)
-  nsnap = 100
+  nsnap = 1
   uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
 
   opA = NonaffineParamVarOperator(a,afe,PS,time_info,U,V;id=:A)
@@ -109,28 +109,20 @@ function online_phase(
   uh,ph,μ,X = fe_sol
 
   Ainfo,Minfo,Binfo,BTinfo,Cinfo,Dinfo,Finfo,Hinfo = varinfo
-  rbopA,A_rb = Ainfo
-  rbopM,M_rb = Minfo
-  rbopB,B_rb = Binfo
-  rbopBT,BT_rb = BTinfo
-  rbopC,C_rb = Cinfo
-  rbopD,D_rb = Dinfo
-  rbopF,F_rb = Finfo
-  rbopH,H_rb = Hinfo
 
   st_mdeim = info.st_mdeim
   θ = get_θ(rbopA)
 
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
-      Aon = online_assembler(rbopA,A_rb,μ[k],st_mdeim)
-      Mon = online_assembler(rbopM,M_rb,μ[k],st_mdeim)
-      Bon = online_assembler(rbopB,B_rb,μ[k],st_mdeim)
-      BTon = online_assembler(rbopBT,BT_rb,μ[k],st_mdeim)
-      Con = online_assembler(rbopC,C_rb,μ[k],st_mdeim)
-      Don = online_assembler(rbopD,D_rb,μ[k],st_mdeim)
-      Fon = online_assembler(rbopF,F_rb,μ[k],st_mdeim)
-      Hon = online_assembler(rbopH,H_rb,μ[k],st_mdeim)
+      Aon = online_assembler(Ainfo...,μ[k],st_mdeim)
+      Mon = online_assembler(Minfo...,μ[k],st_mdeim)
+      Bon = online_assembler(Binfo...,μ[k],st_mdeim)
+      BTon = online_assembler(BTinfo...,μ[k],st_mdeim)
+      Con = online_assembler(Cinfo...,μ[k],st_mdeim)
+      Don = online_assembler(Dinfo...,μ[k],st_mdeim)
+      Fon = online_assembler(Finfo...,μ[k],st_mdeim)
+      Hon = online_assembler(Hinfo...,μ[k],st_mdeim)
       lift = Aon[2],Mon[2],Bon[2],Con[2]
       sys = navier_stokes_rb_system((Aon[1]...,Mon[1]...,BTon...,Bon[1]...,
         Con[1]...,Don[1]...),(Fon,Hon,lift...))
