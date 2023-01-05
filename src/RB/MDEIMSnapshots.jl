@@ -10,7 +10,7 @@ function basis_as_fefun(
 end
 
 function basis_as_fefun(
-  op::RBSteadyBilinOperator{Top,<:ParamTrialFESpace}) where Top
+  op::RBUnsteadyBilinOperator{Top,<:ParamTrialFESpace}) where Top
 
   bspace = get_basis_space_row(op)
   trial = get_trial(op)
@@ -122,7 +122,7 @@ function matrix_snapshots(
   end
 
   vals = snapshot.(eachindex(μ))
-  Snapshots(id,vals)
+  findnz_map,Snapshots(id,vals)
 end
 
 function matrix_snapshots(
@@ -143,7 +143,7 @@ function matrix_snapshots(
 
   vl = snapshot.(eachindex(μ))
   vals,lifts = first.(vl),last.(vl)
-  Snapshots(id,vals),Snapshots(id*:_lift,lifts)
+  findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
 function matrix_snapshots(
@@ -151,33 +151,31 @@ function matrix_snapshots(
   op::RBSteadyBilinOperator{Nonlinear,<:ParamTrialFESpace},
   μ::Vector{Param})
 
-  μ_mdeim = length(μ) > 5 ? μ[1:5] : μ
-  nparam = length(μ_mdeim)
-
   id = get_id(op)
   bfun = basis_as_fefun(op)
-  ns = size(get_basis_space_row(op),2)
-  findnz_map = get_findnz_map(op,μ)
+  findnz_map = get_findnz_map(op,bfun(μ[1],1))
   M,lift = assemble_matrix_and_lifting(op)
 
   function snapshot(k::Int,n::Int)
     println("Nonlinear snapshot number $((n-1)*nparam+k), $id")
-    bfun(μ_mdeim[k],n)
+    b = bfun(μ[k],n)
+    v = nonzero_values(M(b),findnz_map)
+    l = lift(b)
+    v,l
   end
 
+  ns,nparam = get_length_nonlin_snaps(op,μ)
   vals = Vector{Float}[]
   lifts = Vector{Float}[]
   for n = 1:ns
     for k = 1:nparam
-      bfun_nk = snapshot(k,n)
-      v_nk = nonzero_values(M(μ[k]),findnz_map)
-      l_nk = lift(bfun_nk)
+      v_nk,l_nk = snapshot(k,n)
       push!(vals,v_nk)
       push!(lifts,l_nk)
     end
   end
 
-  Snapshots(id,vals),Snapshots(id*:_lift,lifts)
+  findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
 function matrix_snapshots(
@@ -198,7 +196,7 @@ function matrix_snapshots(
 
   vl = snapshot.(eachindex(μ))
   vals,lifts = first.(vl),last.(vl)
-  Snapshots(id,vals),Snapshots(id*:_lift,lifts)
+  findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
 function matrix_snapshots(
@@ -206,37 +204,35 @@ function matrix_snapshots(
   op::RBUnsteadyBilinOperator{Nonlinear,<:ParamTrialFESpace},
   μ::Vector{Param})
 
-  μ_mdeim = length(μ) > 2 ? μ[1:2] : μ
-  nparam = length(μ_mdeim)
-
   id = get_id(op)
   timesθ = get_timesθ(op)
   bfun = basis_as_fefun(op)
-  ns = size(get_basis_space_row(op),2)
-  findnz_map = get_findnz_map(op,μ)
+  findnz_map = get_findnz_map(op,bfun(μ[1],1))
   M_lift(t) = assemble_matrix_and_lifting(op,t)
 
   function snapshot(k::Int,tθ::Real,n::Int)
     println("Nonlinear snapshot number $((n-1)*nparam+k), $id")
-    bfun(μ_mdeim[k],tθ,n)
+    b = bfun(μ[k],tθ,n)
+    vl = M_lift(b)
+    v = nonzero_values(first(vl),findnz_map)
+    l = last(vl)
+    v,l
   end
 
+  ns,nparam = get_length_nonlin_snaps(op,μ)
   vals = Matrix{Float}[]
   lifts = Matrix{Float}[]
   for n = 1:ns
     for k = 1:nparam
       for tθ = timesθ
-        bfun_nk = snapshot(k,tθ,n)
-        M,lift = M_lift(tθ)(bfun_nk)
-        v_nk = nonzero_values(M(μ[k]),findnz_map)
-        l_nk = lift
+        v_nk,l_nk = snapshot(k,tθ,n)
         push!(vals,Matrix(v_nk))
         push!(lifts,l_nk)
       end
     end
   end
 
-  Snapshots(id,vals),Snapshots(id*:_lift,lifts)
+  findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
 function matrix_snapshots(
@@ -277,5 +273,28 @@ function matrix_snapshots(
 
   vl = snapshot.(eachindex(μ))
   vals,lifts = first.(vl),last.(vl)
-  Snapshots(id,vals),Snapshots(id*:_lift,lifts)
+  findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
+end
+
+function get_length_nonlin_snaps(
+  op::RBSteadyBilinOperator{Nonlinear,<:ParamTrialFESpace},
+  μ::Vector{Param},
+  limit::Int=120)
+
+  ns = size(get_basis_space_row(op),2)
+  nparam = length(μ)
+  nparam_new = ns*nparam > limit ? nparam = ceil(Int,limit/ns) : nparam
+  ns,nparam_new
+end
+
+function get_length_nonlin_snaps(
+  op::RBUnsteadyBilinOperator{Nonlinear,<:ParamTrialFESpace},
+  μ::Vector{Param},
+  limit::Int=240)
+
+  ns = size(get_basis_space_row(op),2)
+  Nt = get_Nt(op)
+  nparam = length(μ)
+  nparam_new = nparam*ns*Nt > limit ? nparam = ceil(Int,limit/(ns*Nt)) : nparam
+  ns,nparam_new
 end

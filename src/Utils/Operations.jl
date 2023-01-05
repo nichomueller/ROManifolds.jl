@@ -281,7 +281,7 @@ function sparsevec_to_sparsemat(svec::SparseVector,Nc::Int)
   sparse(i,j,v,maximum(i),Nc)
 end
 
-function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
+#= function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
   numnz = nnz(S)
   I = Vector{Ti}(undef, numnz)
   J = Vector{Ti}(undef, numnz)
@@ -317,7 +317,7 @@ function SparseArrays.findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
   nz = findall(v -> abs.(v) .>= eps(), V)
 
   (I[nz], V[nz])
-end
+end =#
 
 function Base.NTuple(N::Int,T::DataType)
   NT = ()

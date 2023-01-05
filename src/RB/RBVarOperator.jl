@@ -196,24 +196,33 @@ function get_reduced_timesθ(
 end
 
 "Small, full vector -> large, sparse vector"
-function get_findnz_map(op::RBBilinOperator,μ::Vector{Param})
-  get_findnz_map(op,first(μ))
+function get_findnz_map(
+  op::RBBilinOperator,
+  q::Vector{T}) where {T<:Union{<:Param,<:FEFunction}}
+
+  get_findnz_map(op,first(q))
 end
 
-function get_findnz_map(op::RBSteadyBilinOperator,μ::Param)
-  M = assemble_matrix(op)(μ)
+function get_findnz_map(
+  op::RBSteadyBilinOperator,
+  q::T) where {T<:Union{<:Param,<:FEFunction}}
+
+  M = assemble_matrix(op)(q)
   first(findnz(M[:]))
 end
 
-function get_findnz_map(op::RBUnsteadyBilinOperator,μ::Param)
+function get_findnz_map(
+  op::RBUnsteadyBilinOperator,
+  q::T) where {T<:Union{<:Param,<:FEFunction}}
+
   dtθ = get_dt(op)*get_θ(op)
-  M = assemble_matrix(op,dtθ)(μ)
+  M = assemble_matrix(op,dtθ)(q)
   first(findnz(M[:]))
 end
 
 "Viceversa"
-function get_inverse_findnz_map(op::RBBilinOperator,μ::Param)
-  findnz_map = get_findnz_map(op,μ)
+function get_inverse_findnz_map(op::RBBilinOperator,q::T) where T
+  findnz_map = get_findnz_map(op,q)
   inv_map(i::Int) = findall(x -> x == i,findnz_map)[1]
   inv_map
 end

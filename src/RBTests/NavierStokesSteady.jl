@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function navier_stokes_steady()
-  run_fem = true
+  run_fem = false
 
   steady = true
   indef = true
@@ -11,9 +11,10 @@ function navier_stokes_steady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = joinpath(pwd(),"tests/navier-stokes")
-  mesh = "cylinder.json"
-  #bnd_info = Dict("dirichlet" => vcat(collect(1:21),collect(23:26)),"neumann" => [22])
-  bnd_info = Dict("dirichlet" => ["wall","inlet","inlet_curve"],"neumann" => ["outlet","outlet_curve"])
+  mesh = "cube5x5x5.json"
+  bnd_info = Dict("dirichlet" => vcat(collect(1:21),collect(23:26)),"neumann" => [22])
+  #= mesh = "cylinder.json"
+  bnd_info = Dict("dirichlet" => ["wall","inlet","inlet_curve"],"neumann" => ["outlet","outlet_curve"]) =#
   order = 2
 
   ranges = fill([1.,2.],9)
@@ -40,7 +41,7 @@ function navier_stokes_steady()
 
   nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking())
   solver = FESolver(nls)
-  nsnap = 1
+  nsnap = 100
   uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
 
   opA = NonaffineParamVarOperator(a,afe,PS,U,V;id=:A)

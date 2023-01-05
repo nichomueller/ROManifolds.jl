@@ -150,7 +150,7 @@ function load_rb_structure(
   println("Loading MDEIM structures for non-affine variable $id")
   path_id = joinpath(info.offline_path,"$id")
 
-  load_mdeim(path_id,op,meas,Val(info.st_mdeim))
+  load_mdeim(path_id,op,meas)
 end
 
 function load_rb_structure(
@@ -175,7 +175,7 @@ function load_rb_structure(
   path_id = joinpath(info.offline_path,"$id")
   path_id_lift = joinpath(info.offline_path,"$(id)_lift")
 
-  load_mdeim(path_id,op,meas,Val(info.st_mdeim)),load_mdeim(path_id_lift,op,meas,Val(info.st_mdeim))
+  load_mdeim(path_id,op,meas),load_mdeim(path_id_lift,op,meas)
 end
 
 function load_rb_structure(
@@ -187,7 +187,7 @@ function load_rb_structure(
   println("Loading MDEIM structures for non-affine variable $id")
   path_id = joinpath(info.offline_path,"$id")
 
-  load_mdeim(path_id,op,meas,Val(info.st_mdeim))
+  load_mdeim(path_id,op,meas)
 end
 
 function load_rb_structure(
@@ -200,7 +200,7 @@ function load_rb_structure(
   path_id = joinpath(info.offline_path,"$id")
   path_id_lift = joinpath(info.offline_path,"$(id)_lift")
 
-  load(joinpath(path_id,"basis_space")),load_mdeim(path_id_lift,op,meas,Val(info.st_mdeim))
+  load(joinpath(path_id,"basis_space")),load_mdeim(path_id_lift,op,meas)
 end
 
 function load_rb_structure(

@@ -23,7 +23,7 @@ function compute_coefficient(
   μ::Param)
 
   red_lu = get_red_lu_factors(mdeim)
-  idx_space = get_idx(mdeim)
+  idx_space = get_idx_space(mdeim)
   m = get_red_measure(mdeim)
 
   A = assemble_red_structure(op,m,μ,idx_space)
@@ -101,7 +101,7 @@ function assemble_red_structure(
 
   fun = get_fe_function(op)
   M = assemble_matrix((u,v)->fun(μ,m,u,v),get_trial(op)(μ),get_test(op))
-  M[:][idx_space]
+  Vector(M[:][idx_space])
 end
 
 function assemble_red_structure(
@@ -112,7 +112,7 @@ function assemble_red_structure(
 
   fun = get_fe_function(op)
   M(z) = assemble_matrix((u,v)->fun(m,z,u,v),get_trial(op)(μ),get_test(op))
-  Midx(z) = M(z)[:][idx_space]
+  Midx(z) = Vector(M(z)[:][idx_space])
   Midx
 end
 
@@ -208,7 +208,7 @@ function assemble_red_structure(
 end
 
 function assemble_red_lifting(
-  op,
+  op::RBSteadyVarOperator,
   m::Measure,
   μ::Param,
   idx_space::Vector{Int})
@@ -225,7 +225,24 @@ function assemble_red_lifting(
 end
 
 function assemble_red_lifting(
-  op,
+  op::RBSteadyVarOperator{Nonlinear,Ttr},
+  m::Measure,
+  μ::Param,
+  idx_space::Vector{Int}) where Ttr
+
+  fun = get_fe_function(op)
+  dir = get_dirichlet_function(op)(μ)
+  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
+  fdofs_test,_ = fdofs
+
+  Mlift(z) = assemble_matrix((u,v)->fun(m,z,u,v),get_trial_no_bc(op),get_test_no_bc(op))
+  lift(z) = (Mlift(z)[fdofs_test,ddofs]*dir)[idx_space]
+
+  lift
+end
+
+function assemble_red_lifting(
+  op::RBUnsteadyVarOperator,
   m::Measure,
   μ::Param,
   idx_space::Vector{Int},
@@ -240,6 +257,25 @@ function assemble_red_lifting(
   lift(tθ) = (Mlift(tθ)[fdofs_test,ddofs]*dir(tθ))[idx_space]
 
   Matrix(lift.(timesθ))
+end
+
+function assemble_red_lifting(
+  op::RBUnsteadyVarOperator{Nonlinear,Ttr},
+  m::Measure,
+  μ::Param,
+  idx_space::Vector{Int},
+  timesθ::Vector{<:Real}) where Ttr
+
+  fun = get_fe_function(op)
+  dir(tθ) = get_dirichlet_function(op)(μ,tθ)
+  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
+  fdofs_test,_ = fdofs
+
+  Mlift(z) = assemble_matrix((u,v)->fun(m,z,u,v),get_trial_no_bc(op),get_test_no_bc(op))
+  lift(tθ,z) = (Mlift(z)[fdofs_test,ddofs]*dir(tθ))[idx_space]
+  lift(z) = Matrix.(Broadcasting(tθ -> lift(tθ,z))(timesθ))
+
+  lift
 end
 
 function solve_lu(A::Vector{Float},lu::LU)
