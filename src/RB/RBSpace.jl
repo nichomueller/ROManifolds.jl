@@ -40,18 +40,18 @@ function RBSpaceUnsteady(
 end
 
 function RBSpaceUnsteady(
-  snaps::Snapshots;ismdeim=Val(false),fast_svd=Val(false),ϵ=1e-5)
+  snaps::Snapshots;ismdeim=Val(false),ϵ=1e-5)
 
   id = get_id(snaps)
   snaps2 = mode2_unfolding(snaps)
-  basis_space = POD(snaps,ismdeim,fast_svd;ϵ)
-  basis_time = POD(snaps2,ismdeim,fast_svd;ϵ)
+  basis_space = POD(snaps,ismdeim;ϵ)
+  basis_time = POD(snaps2,ismdeim;ϵ)
   RBSpaceUnsteady(id,basis_space,basis_time)
 end
 
 function RBSpaceUnsteady(
-  snaps::NTuple{N,Snapshots};ismdeim=Val(false),fast_svd=Val(false),ϵ=1e-5) where N
-  Broadcasting(s->RBSpaceUnsteady(s;ismdeim=ismdeim,fast_svd=fast_svd,ϵ=ϵ))(snaps)
+  snaps::NTuple{N,Snapshots};ismdeim=Val(false),ϵ=1e-5) where N
+  Broadcasting(s->RBSpaceUnsteady(s;ismdeim=ismdeim,ϵ=ϵ))(snaps)
 end
 
 function RBSpace(

@@ -136,7 +136,7 @@ end
 function matrix_snapshots(
   ::Val{false},
   op::RBSteadyBilinOperator{Nonlinear,<:ParamTrialFESpace},
-  μ::Vector{Param})
+  args...)
 
   id = get_id(op)
   bfun = basis_as_fefun(op)
@@ -180,13 +180,11 @@ end
 
 function matrix_snapshots(
   ::Val{false},
-  op::RBUnsteadyBilinOperator{Nonlinear,<:ParamTransientTrialFESpace},
-  μ::Vector{Param})
+  op::RBBilinOperator{Nonlinear,Ttr},
+  args...) where Ttr
 
   id = get_id(op)
   bfun = basis_as_fefun(op)
-  bt = get_basis_time_row(op)
-  btθ = compute_in_timesθ(op,bt)
   findnz_map = get_findnz_map(op,bfun(1))
   M,lift = assemble_matrix_and_lifting(op)
 
@@ -198,15 +196,10 @@ function matrix_snapshots(
     v,l
   end
 
-  Nt = length(get_timesθ(op))
   ns = size(get_basis_space_row(op),2)
-
   vl = snapshot.(1:ns)
-  vals_space,lifts_space = Matrix(first.(vl)),Matrix(last.(vl))
-  vals,lifts = kron(btθ,vals_space),kron(btθ,lifts_space)
-  vals_bk = blocks(vals,size(vals,2);dims=(:,Nt))
-  lifts_bk = blocks(lifts,size(lifts,2);dims=(:,Nt))
-  findnz_map,Snapshots(id,vals_bk),Snapshots(id*:_lift,lifts_bk)
+  vals,lifts = first.(vl),last.(vl)
+  findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
 function matrix_snapshots(

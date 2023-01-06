@@ -82,6 +82,46 @@ function mdeim_offline(
   MDEIM(red_rbspace,red_lu_factors,idx,red_meas)
 end
 
+function mdeim_offline(
+  info::RBInfo,
+  op::RBBilinOperator{Nonlinear,ParamTransientTrialFESpace},
+  μ::Vector{Param},
+  meas::ProblemMeasures,
+  field=:dΩ,
+  args...)
+
+
+  μ_mdeim = μ[1:info.mdeim_nsnap]
+  findnz_map,snaps... = mdeim_snapshots(op,info,μ_mdeim,args...)
+
+  ##################fix this###################
+  id = get_id(op)
+  Nt = get_Nt(op)
+  rbspace = RBSpaceSteady(snaps;ismdeim=Val(true),ϵ=info.ϵ)
+  bs,bs_lift = rb_space_projection(op,rbspace,findnz_map)
+  bt = get_basis_time_row(op)
+  btθ = compute_in_timesθ(op,bt)
+  red_vals,red_lifts = kron(btθ,bs),kron(btθ,bs_lift)
+  vals_bk = blocks(red_vals,size(red_vals,2);dims=(:,Nt))
+  lifts_bk = blocks(red_lifts,size(red_lifts,2);dims=(:,Nt))
+  snaps = Snapshots(id,vals_bk),Snapshots(id*:_lift,lifts_bk)
+  s2 = mode2_unfolding.(snaps)
+  bt = POD(s2;ϵ=info.ϵ)
+  red_rbspace = RBSpaceUnsteady(id,(bs,bs_lift),bt)
+
+  idx = mdeim_idx(rbspace),mdeim_idx(bt)
+  #red_lu_factors = get_red_lu_factors(info,rbspace,idx)
+  bs_idx = bs[idx_space,:]
+  bt_idx = bt[idx_time,:]
+  bst_idx = kron(bt_idx,bs_idx)
+  red_lu_factors = lu(bst_idx)
+  idx = recast_in_full_dim(idx,findnz_map)
+  red_meas = get_red_measure(op,idx,meas,field)
+  ##################fix this###################
+
+  MDEIM(red_rbspace,red_lu_factors,idx,red_meas)
+end
+
 function load_mdeim(
   path::String,
   op::RBSteadyVarOperator,
@@ -144,7 +184,7 @@ get_idx_time(mdeim::NTuple{2,MDEIMUnsteady}) = get_idx_time.(mdeim)
 get_red_measure(mdeim::NTuple{2,MDEIM}) = get_red_measure.(mdeim)
 
 mdeim_basis(info::RBInfoSteady,snaps) = RBSpaceSteady(snaps;ismdeim=Val(true),ϵ=info.ϵ)
-mdeim_basis(info::RBInfoUnsteady,snaps) = RBSpaceUnsteady(snaps;ismdeim=Val(true),fast_svd=Val(true),ϵ=info.ϵ)
+mdeim_basis(info::RBInfoUnsteady,snaps) = RBSpaceUnsteady(snaps;ismdeim=Val(true),ϵ=info.ϵ)
 
 function project_mdeim_basis(
   op::RBSteadyVarOperator,
