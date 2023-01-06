@@ -27,9 +27,9 @@ function POD(S::AbstractMatrix,X::SparseMatrixCSC;ϵ=1e-5)
   Matrix((L'\U[:,1:n])[invperm(H.p),:])
 end
 
-POD(S::AbstractMatrix;ϵ=1e-5) = POD(S,Val(false);ϵ=ϵ)
+POD(S::AbstractMatrix;ϵ=1e-5) = POD(S,Val(false),Val(false);ϵ=ϵ)
 
-function POD(S::AbstractMatrix,::Val{false};ϵ=1e-5)
+function POD(S::AbstractMatrix,::Val{false},::Val{false};ϵ=1e-5)
   U,Σ,_ = my_svd(S)
   energies = cumsum(Σ.^2)
   n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
@@ -39,17 +39,59 @@ function POD(S::AbstractMatrix,::Val{false};ϵ=1e-5)
   U[:,1:n]
 end
 
-function POD(S::AbstractMatrix,::Val{true};ϵ=1e-5)
+function POD(S::AbstractMatrix,::Val{true},::Val{false};ϵ=1e-5)
   U,Σ,_ = my_svd(S)
   energies = cumsum(Σ.^2)
   ntemp = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  Utemp = U[:,1:ntemp]
 
   # approx, should actually be norm(inv(U[idx,:]))*Σ[2:end]
-  matrix_err = sqrt(norm(inv(Utemp'*Utemp)))*vcat(Σ[2:end],0.0)
+  # Utemp = U[:,1:ntemp]
+  # matrix_err = sqrt(norm(inv(Utemp'*Utemp)))*vcat(Σ[2:end],0.0)
+  matrix_err = sqrt(ntemp)*vcat(Σ[2:end],0.0)
   n = findall(x -> x ≤ ϵ,matrix_err)[1]
   err = matrix_err[n]
   println("Basis number obtained via POD is $n, projection error ≤ $err")
+
+  U[:,1:n]
+end
+
+function POD(S::AbstractMatrix,::Val{true},::Val{true};ϵ=1e-5)
+  nrow,ncol = size(S)
+  approx_POD(S,Val(nrow>ncol);ϵ=ϵ)
+end
+
+function approx_POD(S::AbstractMatrix,::Val{true};ϵ=1e-5)
+  C = S'*S
+  _,_,V = my_svd(C)
+  Σ = svdvals(S)
+
+  energies = cumsum(Σ²)
+  ntemp = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
+
+  matrix_err = sqrt(ntemp)*vcat(Σ[2:end],0.0)
+  n = findall(x -> x ≤ ϵ,matrix_err)[1]
+  err = matrix_err[n]
+  println("Basis number obtained via approximated POD is $n, projection error ≤ $err")
+
+  U = S*V[:,1:n]
+  for i = axes(U,2)
+    U[:,i] /= Σ[i]
+  end
+  U
+end
+
+function approx_POD(S::AbstractMatrix,::Val{false};ϵ=1e-5)
+  C = S*S'
+  U,_ = my_svd(C)
+  Σ = svdvals(S)
+
+  energies = cumsum(Σ)
+  ntemp = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
+
+  matrix_err = sqrt(ntemp)*vcat(Σ[2:end],0.0)
+  n = findall(x -> x ≤ ϵ,matrix_err)[1]
+  err = matrix_err[n]
+  println("Basis number obtained via approximated POD is $n, projection error ≤ $err")
 
   U[:,1:n]
 end
@@ -298,7 +340,7 @@ function sparsevec_to_sparsemat(svec::SparseVector,Nc::Int)
   sparse(i,j,v,maximum(i),Nc)
 end
 
-#= function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
+function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
   numnz = nnz(S)
   I = Vector{Ti}(undef, numnz)
   J = Vector{Ti}(undef, numnz)
@@ -334,7 +376,7 @@ function SparseArrays.findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
   nz = findall(v -> abs.(v) .>= eps(), V)
 
   (I[nz], V[nz])
-end =#
+end
 
 function Base.NTuple(N::Int,T::DataType)
   NT = ()

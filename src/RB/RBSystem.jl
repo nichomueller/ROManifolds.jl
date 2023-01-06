@@ -235,7 +235,7 @@ function stokes_rb_system(
   rhs::NTuple{N,Matrix{Float}},
   θ::Float) where N
 
-  A_rb,Ashift_rb,M_rb,Mshift_rb,B_rb,Bshift_rb,BT_rb,BTshift_rb = lhs
+  A_rb,Ashift_rb,B_rb,Bshift_rb,BT_rb,BTshift_rb,M_rb,Mshift_rb = lhs
   F_rb,H_rb,lifts... = rhs
 
   np = size(B_rb,1)

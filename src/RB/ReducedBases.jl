@@ -191,10 +191,9 @@ function add_time_supremizers(
   function enrich(basis_u::Matrix{Float},basis_up::Matrix{Float},v::Vector)
     vnew = orth_complement(v,basis_u)
     vnew /= norm(vnew)
-    hcat(basis_u,vnew),hcat(basis_up,basis_p'*vnew)
+    hcat(basis_u,vnew),vcat(basis_up,vnew'*basis_p)
   end
 
-  dist = norm(basis_up[:,1])
   for ntp = axes(basis_up,2)
     dist = ntp == 1 ? norm(basis_up[:,1]) : norm(orth_projection(basis_up[:,ntp],basis_up[:,1:ntp-1]))
     println("Distance measure of basis vector number $ntp is: $dist")

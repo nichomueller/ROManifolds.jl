@@ -206,7 +206,7 @@ function compute_in_timesθ(
 
   θ = get_θ(op)
   Nt = size(bt,1)
-  bt_prev = hcat(zeros(Nt),bt[1:end-1])
+  bt_prev = hcat(zeros(Nt),bt[:,1:end-1])
   θ*bt + (1-θ)*bt_prev
 end
 
@@ -220,18 +220,26 @@ end
 
 function get_findnz_map(
   op::RBSteadyBilinOperator,
-  q::T) where {T<:Union{<:Param,<:FEFunction}}
+  μ::Param)
 
-  M = assemble_matrix(op)(q)
+  M = assemble_matrix(op)(μ)
   first(findnz(M[:]))
 end
 
 function get_findnz_map(
   op::RBUnsteadyBilinOperator,
-  q::T) where {T<:Union{<:Param,<:FEFunction}}
+  μ::Param)
 
   dtθ = get_dt(op)*get_θ(op)
-  M = assemble_matrix(op,dtθ)(q)
+  M = assemble_matrix(op,dtθ)(μ)
+  first(findnz(M[:]))
+end
+
+function get_findnz_map(
+  op::RBVarOperator{Nonlinear,Ttr},
+  f::FEFunction) where Ttr
+
+  M = assemble_matrix(op)(f)
   first(findnz(M[:]))
 end
 

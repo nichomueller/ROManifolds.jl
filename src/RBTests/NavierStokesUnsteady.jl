@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function navier_stokes_unsteady()
-  run_fem = true
+  run_fem = false
 
   steady = false
   indef = true
@@ -55,20 +55,22 @@ function navier_stokes_unsteady()
   opF = AffineParamVarOperator(f,ffe,PS,time_info,V;id=:F)
   opH = AffineParamVarOperator(h,hfe,PS,time_info,V;id=:H)
 
+  varop = (opA,opB,opBT,opC,opD,opM,opF,opH)
   info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=false)
+  fesol = (uh,ph,μ,Y)
   tt = TimeTracker(0.,0.)
-  rbspace,varinfo = offline_phase(info,(uh,ph,μ,Y),(opA,opB,opBT,opC,opD,opM,opF,opH),measures,tt)
-  online_phase(info,(uh,ph,μ,Y),rbspace,varinfo,tt)
+  rbspace,offinfo = offline_phase(info,fesol,varop,measures,tt)
+  online_phase(info,fesol,rbspace,offinfo,tt)
 end
 
 function offline_phase(
   info::RBInfo,
-  fe_sol,
+  fesol,
   op::NTuple{N,ParamVarOperator},
   meas::ProblemMeasures,
   tt::TimeTracker) where N
 
-  uh,ph,μ, = fe_sol
+  uh,ph,μ, = fesol
   uh_offline = uh[1:info.nsnap]
   ph_offline = ph[1:info.nsnap]
   opA,opB,opBT,opC,opD,opM,opF,opH = op
@@ -94,23 +96,24 @@ function offline_phase(
   H_rb = rb_structure(info,tt,rbopH,μ,meas,:dΓn)
 
   rbspace = (rbspace_u,rbspace_p)
-  varinfo = ((rbopA,A_rb),(rbopB,B_rb),(rbopBT,BT_rb),
+  offinfo = ((rbopA,A_rb),(rbopB,B_rb),(rbopBT,BT_rb),
     (rbopC,C_rb),(rbopD,D_rb),(rbopM,M_rb),(rbopF,F_rb),(rbopH,H_rb))
-  rbspace,varinfo
+  rbspace,offinfo
 end
 
 function online_phase(
   info::RBInfo,
-  fe_sol,
+  fesol,
   rbspace::NTuple{2,RBSpace},
-  varinfo::Tuple,
+  offinfo::Tuple,
   tt::TimeTracker)
 
-  uh,ph,μ,Y = fe_sol
+  uh,ph,μ,Y = fesol
 
-  Ainfo,Binfo,BTinfo,Cinfo,Dinfo,Minfo,Finfo,Hinfo = varinfo
+  Ainfo,Binfo,BTinfo,Cinfo,Dinfo,Minfo,Finfo,Hinfo = offinfo
 
   st_mdeim = info.st_mdeim
+  rbopA = Ainfo[1]
   θ = get_θ(rbopA)
 
   function online_loop(k::Int)

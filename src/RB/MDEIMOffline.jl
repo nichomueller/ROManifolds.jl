@@ -144,7 +144,7 @@ get_idx_time(mdeim::NTuple{2,MDEIMUnsteady}) = get_idx_time.(mdeim)
 get_red_measure(mdeim::NTuple{2,MDEIM}) = get_red_measure.(mdeim)
 
 mdeim_basis(info::RBInfoSteady,snaps) = RBSpaceSteady(snaps;ismdeim=Val(true),ϵ=info.ϵ)
-mdeim_basis(info::RBInfoUnsteady,snaps) = RBSpaceUnsteady(snaps;ismdeim=Val(true),ϵ=info.ϵ)
+mdeim_basis(info::RBInfoUnsteady,snaps) = RBSpaceUnsteady(snaps;ismdeim=Val(true),fast_svd=Val(true),ϵ=info.ϵ)
 
 function project_mdeim_basis(
   op::RBSteadyVarOperator,

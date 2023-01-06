@@ -44,20 +44,20 @@ function poisson_unsteady()
   opH = NonaffineParamVarOperator(h,hfe,PS,time_info,V;id=:H)
 
   info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false,
-    st_mdeim=true)
+    st_mdeim=true,save_offline=false,save_online=false)
   tt = TimeTracker(0.,0.)
-  rbspace,varinfo = offline_phase(info,(uh,μ),(opA,opM,opF,opH),measures,tt)
-  online_phase(info,(uh,μ),rbspace,varinfo,tt)
+  rbspace,offinfo = offline_phase(info,(uh,μ),(opA,opM,opF,opH),measures,tt)
+  online_phase(info,(uh,μ),rbspace,offinfo,tt)
 end
 
 function offline_phase(
   info::RBInfo,
-  fe_sol,
+  fesol,
   op::NTuple{N,ParamVarOperator},
   meas::ProblemMeasures,
   tt::TimeTracker) where N
 
-  uh,μ = fe_sol
+  uh,μ = fesol
   uh_offline = uh[1:info.nsnap]
   opA,opM,opF,opH = op
 
@@ -73,20 +73,20 @@ function offline_phase(
   F_rb = rb_structure(info,tt,rbopF,μ,meas,:dΩ)
   H_rb = rb_structure(info,tt,rbopH,μ,meas,:dΓn)
 
-  varinfo = ((rbopA,A_rb),(rbopM,M_rb),(rbopF,F_rb),(rbopH,H_rb))
-  rbspace,varinfo
+  offinfo = ((rbopA,A_rb),(rbopM,M_rb),(rbopF,F_rb),(rbopH,H_rb))
+  rbspace,offinfo
 end
 
 function online_phase(
   info::RBInfo,
-  fe_sol,
+  fesol,
   rbspace::RBSpace,
-  varinfo::Tuple,
+  offinfo::Tuple,
   tt::TimeTracker)
 
-  uh,μ = fe_sol
+  uh,μ = fesol
 
-  Ainfo,Minfo,Finfo,Hinfo = varinfo
+  Ainfo,Minfo,Finfo,Hinfo = offinfo
   rbopA,A_rb = Ainfo
   rbopM,M_rb = Minfo
   rbopF,F_rb = Finfo

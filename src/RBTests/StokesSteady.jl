@@ -50,18 +50,18 @@ function stokes_steady()
 
   info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=false)
   tt = TimeTracker(0.,0.)
-  rbspace,varinfo = offline_phase(info,(uh,ph,μ),(opA,opB,opF,opH),measures,tt)
-  online_phase(info,(uh,ph,μ),rbspace,varinfo,tt)
+  rbspace,offinfo = offline_phase(info,(uh,ph,μ),(opA,opB,opF,opH),measures,tt)
+  online_phase(info,(uh,ph,μ),rbspace,offinfo,tt)
 end
 
 function offline_phase(
   info::RBInfo,
-  fe_sol,
+  fesol,
   op::NTuple{N,ParamVarOperator},
   meas::ProblemMeasures,
   tt::TimeTracker) where N
 
-  uh,ph,μ = fe_sol
+  uh,ph,μ = fesol
   uh_offline = uh[1:info.nsnap]
   ph_offline = ph[1:info.nsnap]
   opA,opB,opF,opH = op
@@ -79,20 +79,20 @@ function offline_phase(
   H_rb = rb_structure(info,tt,rbopH,μ,meas,:dΓn)
 
   rbspace = (rbspace_u,rbspace_p)
-  varinfo = ((rbopA,A_rb),(rbopB,B_rb),(rbopF,F_rb),(rbopH,H_rb))
-  rbspace,varinfo
+  offinfo = ((rbopA,A_rb),(rbopB,B_rb),(rbopF,F_rb),(rbopH,H_rb))
+  rbspace,offinfo
 end
 
 function online_phase(
   info::RBInfo,
-  fe_sol,
+  fesol,
   rbspace::NTuple{2,RBSpace},
-  varinfo::Tuple,
+  offinfo::Tuple,
   tt::TimeTracker)
 
-  uh,ph,μ = fe_sol
+  uh,ph,μ = fesol
 
-  Ainfo,Binfo,Finfo,Hinfo = varinfo
+  Ainfo,Binfo,Finfo,Hinfo = offinfo
   rbopA,A_rb = Ainfo
   rbopB,B_rb = Binfo
   rbopF,F_rb = Finfo
