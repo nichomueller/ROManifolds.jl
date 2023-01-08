@@ -727,5 +727,6 @@ end
 
 get_Nt(s::Snapshots) = get_Nt(get_snap(s),get_nsnap(s))
 mode2_unfolding(s::Snapshots) = mode2_unfolding(get_snap(s),get_nsnap(s))
+mode2_unfolding(s::NTuple{N,Snapshots}) where N = mode2_unfolding.(s)
 POD(s::Snapshots,args...;kwargs...) = POD(s.snap,args...;kwargs...)
 POD(s::Vector{Snapshots},args...;kwargs...) = Broadcasting(si->POD(si,args...;kwargs...))(s)

@@ -132,7 +132,7 @@ end
 
 function steady_navier_stokes()
   u1,μ1 = uh.snap[:,1],μ[1]
-  u1fun = FEFunction(U.trial(μ1),u1)
+  u1fun = FEFunction(V.test,u1)#FEFunction(U.trial(μ1),u1)
 
   A,LA = assemble_matrix_and_lifting(opA)
   A1,LA1 = A(μ1),LA(μ1)
@@ -177,6 +177,39 @@ function steady_navier_stokes()
   errD1 = D1rb - basisD*coeffD[1](u1fun)
 
   norm(errA1),norm(errLA1),norm(errLB1),norm(errC1),norm(errLC1),norm(errD1)
+end
+
+function steady_navier_stokes1()
+  u1,μ1 = uh.snap[:,1],μ[1]
+  u1fun = FEFunction(U.trial(μ1),u1)
+
+  op = rbopC
+  id = get_id(op)
+  bfun,bfun_lift = basis_as_fefun(op)
+  findnz_map = get_findnz_map(op,bfun_lift(μ1,1))
+  C = assemble_matrix(op)
+
+  function snapshot(k::Int,n::Int)
+    println("Nonlinear lift snapshot number $((k-1)*ns+n), $id")
+    b = bfun_lift(μ[k],n)
+    v = nonzero_values(C(b),findnz_map)
+    v
+  end
+  ns = size(get_basis_space_col(op),2)
+  nparam = 2
+  vals = Vector{Float}[]
+  for k = 1:nparam
+    for n = 1:ns
+      push!(vals,snapshot(k,n))
+    end
+  end
+  snaps = Snapshots(id,vals)
+  rbspaceC = mdeim_basis(info,snaps)
+
+  C1 = Vector(C(u1fun)[:][findnz_map])
+  basis_C = rbspaceC.basis_space
+  errC = C1-basis_C*basis_C'*C1
+  norm(errC)
 end
 
 function spacetime_mdeim1()

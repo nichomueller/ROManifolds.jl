@@ -1,8 +1,19 @@
-function basis_as_fefun(op::RBVarOperator)
-  bspace = get_basis_space_row(op)
+function basis_as_fefun(op::RBSteadyVarOperator)
+  bspace = get_basis_space_col(op)
   test = get_test(op)
-  fefuns(n::Int) = FEFunction(test,bspace[:,n])
-  fefuns
+  trial = get_trial(op)
+  fefun(n::Int) = FEFunction(test,bspace[:,n])
+  fefun_lift(μ::Param,n::Int) = FEFunction(trial(μ),bspace[:,n])
+  fefun,fefun_lift
+end
+
+function basis_as_fefun(op::RBUnsteadyVarOperator)
+  bspace = get_basis_space_col(op)
+  test = get_test(op)
+  trial = get_trial(op)
+  fefun(n::Int) = FEFunction(test,bspace[:,n])
+  fefun_lift(μ::Param,tθ::Real,n::Int) = FEFunction(trial(μ,tθ),bspace[:,n])
+  fefun,fefun_lift
 end
 
 function mdeim_snapshots(
@@ -44,7 +55,7 @@ function vector_snapshots(
 
   id = get_id(op)
   bfun = basis_as_fefun(op)
-  ns = size(get_basis_space_row(op),2)
+  ns = size(get_basis_space_col(op),2)
   V = assemble_vector(op)
 
   function snapshot(k::Int,n::Int)
@@ -73,7 +84,7 @@ function vector_snapshots(
   id = get_id(op)
   timesθ = get_timesθ(op)
   bfun = basis_as_fefun(op)
-  ns = size(get_basis_space_row(op),2)
+  ns = size(get_basis_space_col(op),2)
   V(t) = assemble_vector(op,t)
 
   function snapshot(k::Int,tθ::Real,n::Int)
@@ -136,10 +147,10 @@ end
 function matrix_snapshots(
   ::Val{false},
   op::RBSteadyBilinOperator{Nonlinear,<:ParamTrialFESpace},
-  args...)
+  μ::Vector{Param})
 
   id = get_id(op)
-  bfun = basis_as_fefun(op)
+  bfun,bfun_lift = basis_as_fefun(op)
   findnz_map = get_findnz_map(op,bfun(1))
   M,lift = assemble_matrix_and_lifting(op)
 
@@ -147,13 +158,27 @@ function matrix_snapshots(
     println("Nonlinear snapshot number $n, $id")
     b = bfun(n)
     v = nonzero_values(M(b),findnz_map)
-    l = lift(b)
-    v,l
+    v
   end
 
-  ns = size(get_basis_space_row(op),2)
-  vl = snapshot.(1:ns)
-  vals,lifts = first.(vl),last.(vl)
+  function snapshot_lift(k::Int,n::Int)
+    println("Nonlinear lift snapshot number $((k-1)*ns+n), $id")
+    b = bfun_lift(μ[k],n)
+    l = lift(b)
+    l
+  end
+
+  ns = size(get_basis_space_col(op),2)
+  nparam = min(length(μ),5)
+  vals = snapshot.(1:ns)
+
+  lifts = Vector{Float}[]
+  for k = 1:nparam
+    for n = 1:ns
+      push!(lifts,snapshot_lift(k,n))
+    end
+  end
+
   findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
@@ -180,11 +205,12 @@ end
 
 function matrix_snapshots(
   ::Val{false},
-  op::RBBilinOperator{Nonlinear,Ttr},
-  args...) where Ttr
+  op::RBUnsteadyBilinOperator{Nonlinear,<:ParamTransientTrialFESpace},
+  μ::Vector{Param})
 
   id = get_id(op)
-  bfun = basis_as_fefun(op)
+  timesθ = get_timesθ(op)
+  bfun,bfun_lift = basis_as_fefun(op)
   findnz_map = get_findnz_map(op,bfun(1))
   M,lift = assemble_matrix_and_lifting(op)
 
@@ -192,13 +218,28 @@ function matrix_snapshots(
     println("Nonlinear snapshot number $n, $id")
     b = bfun(n)
     v = Matrix(nonzero_values(M(b),findnz_map))
-    l = lift(b)
-    v,l
+    v
   end
 
-  ns = size(get_basis_space_row(op),2)
-  vl = snapshot.(1:ns)
-  vals,lifts = first.(vl),last.(vl)
+  function snapshot_lift(k::Param,tθ::Real,n::Int)
+    println("Nonlinear lift snapshot number $((k-1)*ns+n) at time $tθ, $id")
+    b = bfun_lift(k,tθ,n)
+    l = lift(b)
+    l
+  end
+  snapshot_lift(k::Param,n::Int) = Broadcasting(tθ->snapshot_lift(k,tθ,n))(timesθ)
+
+  ns = size(get_basis_space_col(op),2)
+  nparam = min(length(μ),5)
+  vals = snapshot.(1:ns)
+
+  lifts = Vector{Float}[]
+  for k = 1:nparam
+    for n = 1:ns
+      push!(lifts,Matrix(snapshot_lift(k,n)))
+    end
+  end
+
   findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
@@ -226,15 +267,15 @@ function matrix_snapshots(
   red_vals_space,_ = unfold_spacetime(op,red_param_vals)
 
   test_quad = LagrangianQuadFESpace(get_test(op))
-  param_fefuns = FEFunction(test_quad,red_vals_space)
+  param_fefun = FEFunction(test_quad,red_vals_space)
 
   findnz_map = get_findnz_map(op,μ)
   M,lift = assemble_matrix_and_lifting(op)
 
   function snapshot(k::Int)
     println("Snapshot number $k, $id")
-    v = nonzero_values(M(param_fefuns[k]),findnz_map)
-    l = lift(param_fefuns[k])
+    v = nonzero_values(M(param_fefun[k]),findnz_map)
+    l = lift(param_fefun[k])
     v,l
   end
 

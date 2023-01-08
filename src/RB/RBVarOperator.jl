@@ -210,6 +210,11 @@ function compute_in_timesθ(
   θ*bt + (1-θ)*bt_prev
 end
 
+function get_basis_timesθ_col(op::RBUnsteadyVarOperator)
+  bt = get_basis_time_col(op)
+  compute_in_timesθ(op,bt)
+end
+
 "Small, full vector -> large, sparse vector"
 function get_findnz_map(
   op::RBBilinOperator,

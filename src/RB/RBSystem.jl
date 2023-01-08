@@ -292,7 +292,7 @@ function navier_stokes_rb_system(lhs::Tuple,rhs::Tuple,θ::Float)
 
   jac_rb(x) = lin_rb_lhs + nonlin_rb_lhs2(x)
   lhs_rb(x) = lin_rb_lhs + nonlin_rb_lhs1(x)
-  rhs_rb(x) = lin_rb_rhs + nonlin_rb_rhs(x)
+  rhs_rb(x) = lin_rb_rhs #+ nonlin_rb_rhs(x)
   res_rb(x,x_rb) = lhs_rb(x)*x_rb - rhs_rb(x)
 
   res_rb,jac_rb

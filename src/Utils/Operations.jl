@@ -49,7 +49,7 @@ function approx_POD(S::AbstractMatrix,::Val{true};ϵ=1e-5)
   _,_,V = my_svd(C)
   Σ = svdvals(S)
 
-  energies = cumsum(Σ²)
+  energies = cumsum(Σ.^2)
   ntemp = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
 
   matrix_err = sqrt(ntemp)*vcat(Σ[2:end],0.0)
@@ -59,7 +59,7 @@ function approx_POD(S::AbstractMatrix,::Val{true};ϵ=1e-5)
 
   U = S*V[:,1:n]
   for i = axes(U,2)
-    U[:,i] /= Σ[i]
+    U[:,i] /= (Σ[i]+eps())
   end
   U
 end
@@ -258,15 +258,15 @@ function Base.Matrix(vblock::Vector{Vector{Vector{T}}}) where T
   mat
 end
 
-function blocks(mat::NTuple{2,Matrix{T}},nrow::Int) where T
+#= function blocks(mat::NTuple{N,Matrix{T}},nrow::Int) where {N,T}
   Broadcasting(m -> blocks(m,nrow))(mat)
-end
+end =#
 
 function blocks(mat::Matrix{T},nrow::Int) where T
   blocks(mat,size(mat,2);dims=(nrow,:))
 end
 
-function blocks(mat::Matrix{T},nblocks=1;dims=(size(mat,1),1)) where T
+function blocks(mat::Matrix{T},nblocks=size(mat,2);dims=(size(mat,1),1)) where T
   @assert check_dimensions(mat,nblocks) "Wrong dimensions"
 
   ncol_block = Int(size(mat)[2]/nblocks)
@@ -279,6 +279,10 @@ function blocks(mat::Matrix{T},nblocks=1;dims=(size(mat,1),1)) where T
     push!(blockmat,block_i)
   end
   blockmat::Vector{Matrix{T}}
+end
+
+function blocks(mat::NTuple{N,Matrix{T}},args...;kwargs...) where {N,T}
+  Broadcasting(m->blocks(m,args...;kwargs...))(mat)
 end
 
 function blocks(mat::Array{T,3};dims=size(mat)[1:2]) where T
@@ -360,6 +364,24 @@ function SparseArrays.findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
   nz = findall(v -> abs.(v) .>= eps(), V)
 
   (I[nz], V[nz])
+end
+
+function LinearAlgebra.kron(
+  mat1::AbstractArray,
+  mat2::NTuple{N,AbstractArray}) where N
+  Broadcasting(m2->kron(mat1,m2))(mat2)
+end
+
+function LinearAlgebra.kron(
+  mat1::NTuple{N,AbstractArray},
+  mat2::AbstractArray) where N
+  Broadcasting(m1->kron(m1,mat2))(mat1)
+end
+
+function LinearAlgebra.kron(
+  mat1::NTuple{N,AbstractArray},
+  mat2::NTuple{N,AbstractArray}) where N
+  kron.(mat1,mat2)
 end
 
 function Base.NTuple(N::Int,T::DataType)

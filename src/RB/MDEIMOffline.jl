@@ -84,40 +84,28 @@ end
 
 function mdeim_offline(
   info::RBInfo,
-  op::RBBilinOperator{Nonlinear,ParamTransientTrialFESpace},
+  op::RBBilinOperator{Nonlinear,<:ParamTransientTrialFESpace},
   μ::Vector{Param},
   meas::ProblemMeasures,
   field=:dΩ,
   args...)
 
-
   μ_mdeim = μ[1:info.mdeim_nsnap]
   findnz_map,snaps... = mdeim_snapshots(op,info,μ_mdeim,args...)
-
-  ##################fix this###################
-  id = get_id(op)
-  Nt = get_Nt(op)
-  rbspace = RBSpaceSteady(snaps;ismdeim=Val(true),ϵ=info.ϵ)
-  bs,bs_lift = rb_space_projection(op,rbspace,findnz_map)
-  bt = get_basis_time_row(op)
-  btθ = compute_in_timesθ(op,bt)
-  red_vals,red_lifts = kron(btθ,bs),kron(btθ,bs_lift)
-  vals_bk = blocks(red_vals,size(red_vals,2);dims=(:,Nt))
-  lifts_bk = blocks(red_lifts,size(red_lifts,2);dims=(:,Nt))
-  snaps = Snapshots(id,vals_bk),Snapshots(id*:_lift,lifts_bk)
-  s2 = mode2_unfolding.(snaps)
+  rbspace_s = RBSpaceSteady(snaps;ismdeim=Val(true),ϵ=info.ϵ)
+  idx_space = mdeim_idx(rbspace_s)
+  bs = rb_space_projection(op,rbspace_s,findnz_map)
+  btθ = get_basis_timesθ_col(op)
+  red_vals = kron(btθ,bs)
+  vals_bk = blocks(red_vals;dims=(:,get_Nt(op)))
+  snaps = Snapshots(get_id(op),vals_bk)
+  s2 = mode2_unfolding(snaps)
   bt = POD(s2;ϵ=info.ϵ)
+  idx_time = mdeim_idx(bt)
   red_rbspace = RBSpaceUnsteady(id,(bs,bs_lift),bt)
-
-  idx = mdeim_idx(rbspace),mdeim_idx(bt)
-  #red_lu_factors = get_red_lu_factors(info,rbspace,idx)
-  bs_idx = bs[idx_space,:]
-  bt_idx = bt[idx_time,:]
-  bst_idx = kron(bt_idx,bs_idx)
-  red_lu_factors = lu(bst_idx)
+  red_lu_factors = get_red_lu_factors((bs,bt),(idx_space,idx_time))
   idx = recast_in_full_dim(idx,findnz_map)
   red_meas = get_red_measure(op,idx,meas,field)
-  ##################fix this###################
 
   MDEIM(red_rbspace,red_lu_factors,idx,red_meas)
 end
@@ -287,9 +275,8 @@ function get_red_lu_factors(
   rbspace::RBSpaceSteady,
   idx_space::Vector{Int})
 
-  bs = get_basis_space(rbspace)
-  bs_idx = bs[idx_space,:]
-  lu(bs_idx)
+  basis = get_basis_space(rbspace)
+  get_red_lu_factors(basis,idx_space)
 end
 
 function get_red_lu_factors(
@@ -309,10 +296,8 @@ function get_red_lu_factors(
   rbspace::RBSpaceUnsteady,
   idx_st::NTuple{2,Vector{Int}})
 
-  idx_space,_ = idx_st
-  bs = get_basis_space(rbspace)
-  bs_idx = bs[idx_space,:]
-  lu(bs_idx)
+  basis = get_basis_space(rbspace)
+  get_red_lu_factors(basis,first(idx_st))
 end
 
 function get_red_lu_factors(
@@ -320,15 +305,8 @@ function get_red_lu_factors(
   rbspace::RBSpaceUnsteady,
   idx_st::NTuple{2,Vector{Int}})
 
-  idx_space,idx_time = idx_st
-
-  bs = get_basis_space(rbspace)
-  bt = get_basis_time(rbspace)
-  bs_idx = bs[idx_space,:]
-  bt_idx = bt[idx_time,:]
-  bst_idx = kron(bt_idx,bs_idx)
-
-  lu(bst_idx)
+  basis = get_basis_space(rbspace),get_basis_time(rbspace)
+  get_red_lu_factors(basis,idx_st)
 end
 
 function get_red_lu_factors(
@@ -337,6 +315,34 @@ function get_red_lu_factors(
   idx_st::NTuple{2,NTuple{2,Vector{Int}}})
 
   Broadcasting((rb,idx)->get_red_lu_factors(info,rb,idx))(rbspace,idx_st)
+end
+
+function get_red_lu_factors(
+  basis::Matrix{Float},
+  idx::Vector{Int})
+
+  basis_idx = basis[idx,:]
+  lu(basis_idx)
+end
+
+function get_red_lu_factors(
+  basis::NTuple{2,Matrix{Float}},
+  idx::NTuple{2,Vector{Int}})
+
+  bs,bt = basis
+  idx_space,idx_time = idx
+  bs_idx = bs[idx_space,:]
+  bt_idx = bt[idx_time,:]
+  bst_idx = kron(bt_idx,bs_idx)
+
+  lu(bst_idx)
+end
+
+function get_red_lu_factors(
+  basis::NTuple{2,NTuple{2,Matrix{Float}}},
+  idx::NTuple{2,NTuple{2,Vector{Int}}})
+
+  get_red_lu_factors.(basis,idx)
 end
 
 recast_in_full_dim(idx_tmp::Vector{Int},findnz_map::Vector{Int}) =
