@@ -217,26 +217,26 @@ function matrix_snapshots(
   function snapshot(n::Int)
     println("Nonlinear snapshot number $n, $id")
     b = bfun(n)
-    v = Matrix(nonzero_values(M(b),findnz_map))
+    v = nonzero_values(M(b),findnz_map)
     v
   end
 
-  function snapshot_lift(k::Param,tθ::Real,n::Int)
+  function snapshot_lift(k::Int,tθ::Real,n::Int)
     println("Nonlinear lift snapshot number $((k-1)*ns+n) at time $tθ, $id")
-    b = bfun_lift(k,tθ,n)
+    b = bfun_lift(μ[k],tθ,n)
     l = lift(b)
     l
   end
-  snapshot_lift(k::Param,n::Int) = Broadcasting(tθ->snapshot_lift(k,tθ,n))(timesθ)
+  snapshot_lift(k::Int,n::Int) = Matrix(Broadcasting(tθ->snapshot_lift(k,tθ,n))(timesθ))
 
   ns = size(get_basis_space_col(op),2)
-  nparam = min(length(μ),5)
+  nparam = min(length(μ),2)
   vals = snapshot.(1:ns)
 
-  lifts = Vector{Float}[]
+  lifts = Matrix{Float}[]
   for k = 1:nparam
     for n = 1:ns
-      push!(lifts,Matrix(snapshot_lift(k,n)))
+      push!(lifts,snapshot_lift(k,n))
     end
   end
 

@@ -702,6 +702,10 @@ function Snapshots(id::Symbol,blocks::Vector{<:AbstractArray})
   Snapshots(id,snap,nsnap)
 end
 
+function Snapshots(id::Symbol,snap::NTuple{N,AbstractArray}) where N
+  Broadcasting(si->Snapshots(id,si))(snap)
+end
+
 function Base.getindex(s::Snapshots,idx::Int)
   Nt = get_Nt(s)
   snap_idx = s.snap[:,(idx-1)*Nt+1:idx*Nt]
@@ -729,4 +733,4 @@ get_Nt(s::Snapshots) = get_Nt(get_snap(s),get_nsnap(s))
 mode2_unfolding(s::Snapshots) = mode2_unfolding(get_snap(s),get_nsnap(s))
 mode2_unfolding(s::NTuple{N,Snapshots}) where N = mode2_unfolding.(s)
 POD(s::Snapshots,args...;kwargs...) = POD(s.snap,args...;kwargs...)
-POD(s::Vector{Snapshots},args...;kwargs...) = Broadcasting(si->POD(si,args...;kwargs...))(s)
+POD(s::NTuple{N,Snapshots},args...;kwargs...) where N = Broadcasting(si->POD(si,args...;kwargs...))(s)

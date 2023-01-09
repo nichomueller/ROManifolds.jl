@@ -56,8 +56,8 @@ function navier_stokes_unsteady()
   opH = AffineParamVarOperator(h,hfe,PS,time_info,V;id=:H)
 
   varop = (opA,opB,opBT,opC,opD,opM,opF,opH)
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=false)
-  fesol = (uh,ph,μ,Y)
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=true)
+  fesol = (uh,ph,μ,X,Y)
   tt = TimeTracker(0.,0.)
   rbspace,offinfo = offline_phase(info,fesol,varop,measures,tt)
   online_phase(info,fesol,rbspace,offinfo,tt)
@@ -108,7 +108,7 @@ function online_phase(
   offinfo::Tuple,
   tt::TimeTracker)
 
-  uh,ph,μ,Y = fesol
+  uh,ph,μ,X,Y = fesol
 
   Ainfo,Binfo,BTinfo,Cinfo,Dinfo,Minfo,Finfo,Hinfo = offinfo
 
@@ -127,9 +127,9 @@ function online_phase(
       Fon = online_assembler(Finfo...,μ[k],st_mdeim)
       Hon = online_assembler(Hinfo...,μ[k],st_mdeim)
       lift = Aon[2],Bon[2],Con[2],Mon[2]
-      sys = navier_stokes_rb_system((Aon[1],BTon,Bon[1],
-        Con[1]...,Don[1]...,Mon[1]),(Fon,Hon,lift...))
-      rb_sol = solve_rb_system(sys...,Y,rbspace,θ)
+      sys = navier_stokes_rb_system((Aon[1],Bon[1],BTon,
+        Con[1],Don[1],Mon[1]),(Fon,Hon,lift...),θ)
+      rb_sol = solve_rb_system(sys...,X,Y,rbspace)
     end
     uhk = get_snap(uh[k])
     phk = get_snap(ph[k])

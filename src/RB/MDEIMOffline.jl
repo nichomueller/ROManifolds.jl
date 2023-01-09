@@ -93,17 +93,21 @@ function mdeim_offline(
   μ_mdeim = μ[1:info.mdeim_nsnap]
   findnz_map,snaps... = mdeim_snapshots(op,info,μ_mdeim,args...)
   rbspace_s = RBSpaceSteady(snaps;ismdeim=Val(true),ϵ=info.ϵ)
+  bs = get_basis_space(rbspace_s)
   idx_space = mdeim_idx(rbspace_s)
-  bs = rb_space_projection(op,rbspace_s,findnz_map)
+  red_bs = rb_space_projection(op,rbspace_s,findnz_map)
   btθ = get_basis_timesθ_col(op)
-  red_vals = kron(btθ,bs)
+  red_vals = kron(btθ,red_bs)
   vals_bk = blocks(red_vals;dims=(:,get_Nt(op)))
-  snaps = Snapshots(get_id(op),vals_bk)
+  id = get_id(op)
+  snaps = Snapshots(id,vals_bk)
   s2 = mode2_unfolding(snaps)
   bt = POD(s2;ϵ=info.ϵ)
   idx_time = mdeim_idx(bt)
-  red_rbspace = RBSpaceUnsteady(id,(bs,bs_lift),bt)
-  red_lu_factors = get_red_lu_factors((bs,bt),(idx_space,idx_time))
+  bst = ((bs[1],bt[1]),(bs[2],bt[2]))
+  idx = ((idx_space[1],idx_time[1]),(idx_space[2],idx_time[2]))
+  red_rbspace = RBSpaceUnsteady((id,id*:_lift),red_bs,bt)
+  red_lu_factors = get_red_lu_factors(bst,idx)
   idx = recast_in_full_dim(idx,findnz_map)
   red_meas = get_red_measure(op,idx,meas,field)
 
@@ -141,9 +145,9 @@ function load_mdeim(
   basis_time = load(joinpath(path,"basis_time"))
   rbspace = RBSpace(id,basis_space,basis_time)
 
-  idx_space = load(joinpath(path,"idx_space"))
-  idx_time = load(joinpath(path,"idx_time"))
-  idx = [idx_space,idx_time]
+  idx_space = Int.(load(joinpath(path,"idx_space"))[:,1])
+  idx_time = Int.(load(joinpath(path,"idx_time"))[:,1])
+  idx = (idx_space,idx_time)
 
   factors = load(joinpath(path,"LU"))
   ipiv = Int.(load(joinpath(path,"p"))[:,1])
@@ -269,6 +273,8 @@ function mdeim_idx(M::Matrix{Float})
 
   unique(idx)
 end
+
+mdeim_idx(M::NTuple{N,Matrix{Float}}) where N = mdeim_idx.(M)
 
 function get_red_lu_factors(
   ::RBInfoSteady,

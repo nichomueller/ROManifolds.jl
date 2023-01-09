@@ -14,6 +14,10 @@ my_svd(s::Matrix{Float}) = svd(s)
 my_svd(s::SparseMatrixCSC) = svds(s;nsv=size(s)[2]-1)[1]
 my_svd(s::Vector{AbstractMatrix}) = my_svd(Matrix(s))
 
+function POD(S::NTuple{N,AbstractMatrix},args...;kwargs...) where N
+  Broadcasting(si -> POD(si,args...;kwargs...))(S)
+end
+
 function POD(S::AbstractMatrix,X::SparseMatrixCSC;ϵ=1e-5)
   H = cholesky(X)
   L = sparse(H.L)
@@ -311,7 +315,8 @@ check_dimensions(vb::AbstractVector) =
 check_dimensions(m::AbstractMatrix,nb::Int) = iszero(size(m)[2]%nb)
 
 spacetime_vector(mat::AbstractMatrix) = mat[:]
-spacetime_vector(mat::NTuple{N,AbstractMatrix}) where N = spacetime_vector.(mat)
+spacetime_vector(fun::Function) = u -> fun(u)[:]
+spacetime_vector(q::Tuple) = spacetime_vector.(q)
 
 function SparseArrays.sparsevec(M::Matrix{T},findnz_map::Vector{Int}) where T
   sparse_vblocks = SparseVector{T}[]

@@ -137,7 +137,7 @@ function assemble_red_structure(
   timesθ::Vector{<:Real}) where Ttr
 
   fun = get_fe_function(op)
-  M(tθ,z) = assemble_matrix(v->fun(m,z,u,v),get_trial(op)(μ,tθ),get_test(op))
+  M(tθ,z) = assemble_matrix((u,v)->fun(m,z,u,v),get_trial(op)(μ,tθ),get_test(op))
   Midx(tθ,z) = Vector(M(tθ,z)[:][idx_space])
   Midx(z) = Matrix(Broadcasting(tθ->Midx(tθ,z))(timesθ))
   Midx

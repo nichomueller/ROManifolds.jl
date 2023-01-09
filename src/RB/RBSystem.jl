@@ -80,7 +80,7 @@ function online_structure(
   coeff)
 
   dtθ = get_dt(op)*get_θ(op)
-  if get_id(op) == :M coeff /= dtθ end
+  if get_id(op) == :M coeff = coeff ./ dtθ end
 
   btbtc = coeff_by_time_bases(op,coeff)
   ns_row = get_ns(get_rbspace_row(op))
@@ -140,8 +140,9 @@ end
 
 function coeff_by_time_bases(
   op::RBUnsteadyBilinOperator,
-  coeff::NTuple{2,T}) where T
+  coeff::Tuple{<:T,<:T}) where T
 
+  @assert length(coeff) == 2 "Something is wrong"
   coeff_by_time_bases_bilin(op,first(coeff)),coeff_by_time_bases_lin(op,last(coeff))
 end
 
@@ -154,7 +155,7 @@ function coeff_by_time_bases_lin(
 end
 
 function coeff_by_time_bases_lin(
-  op::RBVarOperator{Nonlinear,ParamTransientTrialFESpace},
+  op::RBVarOperator{Nonlinear,<:ParamTransientTrialFESpace},
   coeff::Function)
 
   rbrow = get_rbspace_row(op)
@@ -179,7 +180,7 @@ function coeff_by_time_bases_bilin(
 end
 
 function coeff_by_time_bases_bilin(
-  op::RBVarOperator{Nonlinear,ParamTransientTrialFESpace},
+  op::RBVarOperator{Nonlinear,<:ParamTransientTrialFESpace},
   coeff::Function)
 
   rbrow = get_rbspace_row(op)
@@ -267,13 +268,13 @@ function navier_stokes_rb_system(lhs::Tuple,rhs::Tuple)
   jac_rb(x) = lin_rb_lhs + nonlin_rb_lhs2(x)
   lhs_rb(x) = lin_rb_lhs + nonlin_rb_lhs1(x)
   rhs_rb(x) = lin_rb_rhs + nonlin_rb_rhs(x)
-  res_rb(x,x_rb) = lhs_rb(x)*x_rb - rhs_rb(x)
+  res_rb(x,xd,x_rb) = lhs_rb(x)*x_rb - rhs_rb(xd)
 
   res_rb,jac_rb
 end
 
 function navier_stokes_rb_system(lhs::Tuple,rhs::Tuple,θ::Float)
-  Aon,Bon,BTon,C_rb,Cshift_rb,D_rb,Dshift_rb,Mon = lhs
+  Aon,Bon,BTon,C_rb,Cshift_rb,D_rb,Dshift_rb,Mon... = lhs
   F_rb,H_rb,lifts... = rhs
   liftA,liftB,liftC,liftM, = lifts
 
@@ -292,8 +293,8 @@ function navier_stokes_rb_system(lhs::Tuple,rhs::Tuple,θ::Float)
 
   jac_rb(x) = lin_rb_lhs + nonlin_rb_lhs2(x)
   lhs_rb(x) = lin_rb_lhs + nonlin_rb_lhs1(x)
-  rhs_rb(x) = lin_rb_rhs #+ nonlin_rb_rhs(x)
-  res_rb(x,x_rb) = lhs_rb(x)*x_rb - rhs_rb(x)
+  rhs_rb(xd) = lin_rb_rhs + nonlin_rb_rhs(xd)
+  res_rb(x,xd,x_rb) = lhs_rb(x)*x_rb - rhs_rb(xd)
 
   res_rb,jac_rb
 end
@@ -307,6 +308,7 @@ function solve_rb_system(
   res::Function,
   jac::Function,
   X::FESpace,
+  Y::FESpace,
   rbspace::NTuple{2,<:RBSpace};
   tol=1e-10,maxit=10)
 
@@ -317,13 +319,47 @@ function solve_rb_system(
   x_rb = zeros(nsu+nsp,1)
 
   err = 1.
-  x = zero(X)
+  x = zero(Y)
+  xd = zero(X)
   iter = 0
   while norm(err) > tol && iter < maxit
-    jx_rb,rx_rb = jac(x),res(x,x_rb)
+    jx_rb,rx_rb = jac(x),res(x,xd,x_rb)
     err = jx_rb \ rx_rb
     x_rb -= err
-    x = FEFunction(X,vcat(bsu*x_rb[1:nsu],bsp*x_rb[1+nsu:end]))
+    x = FEFunction(Y,vcat(bsu*x_rb[1:nsu],bsp*x_rb[1+nsu:end]))
+    xd = FEFunction(X,vcat(bsu*x_rb[1:nsu],bsp*x_rb[1+nsu:end]))
+    iter += 1
+    println("err = $(norm(err)), iter = $iter")
+  end
+  x_rb
+end
+
+function solve_rb_system(
+  res::Function,
+  jac::Function,
+  X::ParamTransientTrialFESpace,
+  Y::FESpace,
+  rbspace::NTuple{2,<:RBSpace},
+  tol=1e-10,maxit=10)
+
+  println("Solving system via Newton method")
+
+  bsu,bsp = get_basis_space.(rbspace)
+  btu,btp = get_basis_time.(rbspace)
+  nsu,nsp = size(bsu,2),size(bsp,2)
+  ntu,ntp = size(btu,2),size(btp,2)
+  x_rb = zeros(nsu*ntu+nsp*ntp,1)
+
+  err = 1.
+  x = zero(Y)
+  xd = zero(X)
+  iter = 0
+  while norm(err) > tol && iter < maxit
+    jx_rb,rx_rb = jac(x),res(x,xd,x_rb)
+    err = jx_rb \ rx_rb
+    x_rb -= err
+    x = FEFunction(Y,vcat(bsu*x_rb[1:nsu],bsp*x_rb[1+nsu:end]))
+    xd = FEFunction(X,vcat(bsu*x_rb[1:nsu],bsp*x_rb[1+nsu:end]))
     iter += 1
     println("err = $(norm(err)), iter = $iter")
   end
