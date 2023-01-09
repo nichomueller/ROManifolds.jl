@@ -115,6 +115,7 @@ function online_phase(
   st_mdeim = info.st_mdeim
   rbopA = Ainfo[1]
   θ = get_θ(rbopA)
+  timesθ = get_timesθ(rbopA)
 
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
@@ -127,9 +128,11 @@ function online_phase(
       Fon = online_assembler(Finfo...,μ[k],st_mdeim)
       Hon = online_assembler(Hinfo...,μ[k],st_mdeim)
       lift = Aon[2],Bon[2],Con[2],Mon[2]
-      sys = navier_stokes_rb_system((Aon[1],Bon[1],BTon,
-        Con[1],Don[1],Mon[1]),(Fon,Hon,lift...),θ)
-      rb_sol = solve_rb_system(sys...,X,Y,rbspace)
+      sys = navier_stokes_rb_system((Aon[1],Bon[1],BTon,Con[1]...,Don[1]...,Mon[1]),
+        (Fon,Hon,lift...),θ)
+      Uk(tθ) = X[1](μ[k],tθ)
+      Vk = Y[1]
+      rb_sol = solve_rb_system(sys...,(Uk,Vk),rbspace,timesθ)
     end
     uhk = get_snap(uh[k])
     phk = get_snap(ph[k])

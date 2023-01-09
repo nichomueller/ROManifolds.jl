@@ -182,17 +182,17 @@ function basis_by_coeff_mult(basis::Vector{Matrix{Float}},coeff::Vector{Matrix{F
 end
 
 function basis_by_coeff_mult(
-  basis::T,
-  coeff::NTuple{2,T},
-  nr::Int) where T
+  basis,
+  coeff::NTuple{2,Any},
+  nr::Int)
 
   Broadcasting(c->basis_by_coeff_mult(basis,c,nr))(coeff)
 end
 
 function basis_by_coeff_mult(
-  basis::NTuple{2,T},
-  coeff::Tuple{NTuple{2,T},T},
-  nr::Int) where T
+  basis::NTuple{2,Any},
+  coeff::Tuple{NTuple{2,Any},Any},
+  nr::Int)
 
   matinfo = first(basis),first(coeff)
   liftinfo = last(basis),last(coeff)

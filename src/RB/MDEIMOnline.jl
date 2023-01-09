@@ -138,7 +138,7 @@ function assemble_red_structure(
 
   fun = get_fe_function(op)
   M(tθ,z) = assemble_matrix((u,v)->fun(m,z,u,v),get_trial(op)(μ,tθ),get_test(op))
-  Midx(tθ,z) = Vector(M(tθ,z)[:][idx_space])
+  Midx(tθ,z) = Vector(M(tθ,z(tθ))[:][idx_space])
   Midx(z) = Matrix(Broadcasting(tθ->Midx(tθ,z))(timesθ))
   Midx
 end
@@ -272,8 +272,8 @@ function assemble_red_lifting(
   fdofs_test,_ = fdofs
 
   Mlift(z) = assemble_matrix((u,v)->fun(m,z,u,v),get_trial_no_bc(op),get_test_no_bc(op))
-  lift(tθ,z) = (Mlift(z)[fdofs_test,ddofs]*dir(tθ))[idx_space]
-  lift(z) = Matrix.(Broadcasting(tθ -> lift(tθ,z))(timesθ))
+  lift(tθ,z) = (Mlift(z(tθ))[fdofs_test,ddofs]*dir(tθ))[idx_space]
+  lift(z) = Matrix(Broadcasting(tθ -> lift(tθ,z))(timesθ))
 
   lift
 end
@@ -346,7 +346,7 @@ end
 
 function interp_coeff_time(
   mdeim::NTuple{2,MDEIMUnsteady},
-  coeff::NTuple{2,Tcf}) where Tcf
+  coeff::NTuple{2,Any})
 
   interp_coeff_time.(mdeim,coeff)
 end

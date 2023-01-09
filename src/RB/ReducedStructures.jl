@@ -204,7 +204,7 @@ function load_rb_structure(
 end
 
 function load_rb_structure(
-  ::RBInfo,
+  info::RBInfo,
   op::RBBilinOperator{Affine,<:TrialFESpace},
   ::Measure)
 
