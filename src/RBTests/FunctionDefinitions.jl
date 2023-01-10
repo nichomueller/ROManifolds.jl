@@ -281,17 +281,18 @@ function navier_stokes_functions(::Val{false},measures::ProblemFixedMeasures)
   d(x,μ::Param,t::Real) = 1.
   d(μ::Param,t::Real) = x->d(x,μ,t)
 
-  f(x,p::Param,t::Real) = VectorValue(1.,1.,1.)
+  f(x,p::Param,t::Real) = Point(get_μ(p)[4:6])*10
   f(μ::Param,t::Real) = x->f(x,μ,t)
 
-  h(x,p::Param,t::Real) = VectorValue(1.,1.,1.)
+  h(x,p::Param,t::Real) = Point(get_μ(p)[1:3])*10
   h(μ::Param,t::Real) = x->h(x,μ,t)
 
   function g(x,p::Param,t::Real)
     μ = get_μ(p)
-    R = 0.5
-    xc = x-Point(R,R,0)
-    VectorValue(0.,0.,1-sin(t)*sum((xc.*Point(μ[1:3]))^2)/norm(R^2*μ[1:3]))*(x[3]==0.)
+    #R = 0.5
+    #xc = x-Point(R,R,0)
+    #VectorValue(0.,0.,1-sin(t)*sum((xc.*Point(μ[1:3]))^2)/norm(R^2*μ[1:3]))*(x[3]==0.)
+    Point(0.,0.,0.)
   end
   g(μ::Param,t::Real) = x->g(x,μ,t)
 

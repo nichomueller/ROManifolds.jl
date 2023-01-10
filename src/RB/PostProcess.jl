@@ -81,35 +81,37 @@ end
 
 function Gridap.writevtk(
   info::RBInfoUnsteady,
+  tinfo::TimeInfo,
   s::Snapshots,
   X,
   trian::Triangulation)
 
-  timesθ = get_timesθ(info)
+  timesθ = get_timesθ(tinfo)
   id = get_id(s)
   path = joinpath(info.online_path,"$(id)h")
 
   createpvd(path) do pvd
     for (it,t) in enumerate(timesθ)
       fefun = FEFunction(X(t),s.snap[:,it])
-      pvd[it] = writevtk(trian,path*"_$(it).vtu",cellfields=["$(id)h"=>fefun])
+      pvd = writevtk(trian,path*"_$(it).vtu",cellfields=["$(id)h"=>fefun])
     end
   end
 end
 
 function Gridap.writevtk(
   info::RBInfoUnsteady,
+  tinfo::TimeInfo,
   res::RBResults,
   X,
   trian::Triangulation)
 
-  timesθ = get_timesθ(info)
+  timesθ = get_timesθ(tinfo)
   path = joinpath(info.online_path,"pwise_err_$(res.id)")
 
   createpvd(path) do pvd
     for (it,t) in enumerate(timesθ)
       fefun = FEFunction(X(t),res.pointwise_err[:,it])
-      pvd[it] = writevtk(trian,path*"_$(it).vtu",cellfields=["err"=>fefun])
+      pvd = writevtk(trian,path*"_$(it).vtu",cellfields=["err"=>fefun])
     end
   end
 end

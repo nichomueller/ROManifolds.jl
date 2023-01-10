@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function navier_stokes_unsteady()
-  run_fem = false
+  run_fem = true
 
   steady = false
   indef = true
@@ -11,11 +11,13 @@ function navier_stokes_unsteady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes"
-  mesh = "cube5x5x5.json"
-  bnd_info = Dict("dirichlet" => vcat(collect(1:21),collect(23:26)),"neumann" => [22])
+  mesh = "cube15x15x15.json"
+  neum_set = [11,12,15,16,22]
+  dir_set = setdiff(collect(1:26),neum_set)
+  bnd_info = Dict("dirichlet" => dir_set,"neumann" => neum_set)
   order = 2
 
-  t0,tF,dt,θ = 0.,0.5,0.05,0.5
+  t0,tF,dt,θ = 0.,0.05,0.05,0.5
   time_info = TimeInfo(t0,tF,dt,θ)
 
   ranges = fill([1.,2.],6)
@@ -43,7 +45,7 @@ function navier_stokes_unsteady()
 
   nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking())
   solver = ThetaMethod(nls,dt,θ)
-  nsnap = 100
+  nsnap = 1
   uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
 
   opA = NonaffineParamVarOperator(a,afe,PS,time_info,U,V;id=:A)
