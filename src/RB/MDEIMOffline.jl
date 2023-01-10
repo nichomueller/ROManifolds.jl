@@ -48,7 +48,7 @@ function mdeim_offline(
   op::RBLinOperator,
   μ::Vector{Param},
   meas::ProblemMeasures,
-  field=:dΩ,
+  field::Symbol,
   args...)
 
   μ_mdeim = μ[1:info.mdeim_nsnap]
@@ -67,7 +67,7 @@ function mdeim_offline(
   op::RBBilinOperator,
   μ::Vector{Param},
   meas::ProblemMeasures,
-  field=:dΩ,
+  field::Symbol,
   args...)
 
   μ_mdeim = μ[1:info.mdeim_nsnap]
@@ -87,7 +87,8 @@ function mdeim_offline(
   op::RBBilinOperator{Nonlinear,<:ParamTransientTrialFESpace},
   μ::Vector{Param},
   meas::ProblemMeasures,
-  field=:dΩ,
+  field::Symbol,
+  rbspaceθ::RBSpaceUnsteady,
   args...)
 
   function space_quantities(snaps,findnz_map)
@@ -99,7 +100,7 @@ function mdeim_offline(
   end
 
   function spacetime_quantities(bs,idx_space,red_bs)
-    btθ = get_basis_timesθ_col(op)
+    btθ = get_basis_time(rbspaceθ)
     red_vals = kron(btθ,red_bs)
     vals_bk = blocks(red_vals;dims=(:,get_Nt(op)))
     id = get_id(op)
@@ -114,7 +115,7 @@ function mdeim_offline(
   end
 
   μ_mdeim = μ[1:info.mdeim_nsnap]
-  findnz_map,snaps... = mdeim_snapshots(op,info,μ_mdeim,args...)
+  findnz_map,snaps... = mdeim_snapshots(op,info,μ_mdeim,rbspaceθ)
 
   bs,idx_space,red_bs = space_quantities(snaps,findnz_map)
   bst,idx,red_rbspace = spacetime_quantities(bs,idx_space,red_bs)

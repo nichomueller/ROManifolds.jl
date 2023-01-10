@@ -103,7 +103,9 @@ function online_structure(
   basis_block = blocks(basis,ns_row)
 
   nr = get_nrows(op)
-  u -> basis_by_coeff_mult(basis_block,btbtc(u),nr)
+  M(u) = basis_by_coeff_mult(basis_block,btbtc[1](u),nr)
+  Mshift(u) = basis_by_coeff_mult(basis_block,btbtc[2](u),nr)
+  M,Mshift
 end
 
 function online_structure(
@@ -308,19 +310,19 @@ end
 function solve_rb_system(
   res::Function,
   jac::Function,
-  X::FESpace,
-  Y::FESpace,
-  rbspace::NTuple{2,<:RBSpace};
+  fespaces::NTuple{2,FESpace},
+  rbspace::NTuple{2,RBSpace};
   tol=1e-10,maxit=10)
 
   println("Solving system via Newton method")
 
+  Uk,Vk = fespaces
   bsu,bsp = get_basis_space(rbspace)
   nsu,nsp = size(bsu,2),size(bsp,2)
   x_rb = zeros(nsu+nsp,1)
 
-  u(x_rb::AbstractArray) = FEFunction(Y[1],bsu*x_rb[1:nstu])
-  ud(x_rb::AbstractArray) = FEFunction(X[1],bsu*x_rb[1:nstu])
+  u(x_rb::AbstractArray) = FEFunction(Vk,bsu*x_rb[1:nsu])
+  ud(x_rb::AbstractArray) = FEFunction(Uk,bsu*x_rb[1:nsu])
 
   err = 1.
   iter = 0
@@ -341,6 +343,7 @@ function solve_rb_system(
   fespaces::Tuple{Function,FESpace},
   rbspace::NTuple{2,<:RBSpace},
   timesθ::Vector{<:Real},
+  θ::Real,
   tol=1e-10,maxit=10)
 
   println("Solving system via Newton method")
@@ -351,22 +354,26 @@ function solve_rb_system(
   nstu,nstp = size(bstu,2),size(bstp,2)
   x_rb = zeros(nstu+nstp,1)
 
-  function u(x_rb::AbstractArray)
+  function uθfe(x_rb::AbstractArray)
     ufe = reshape(bstu*x_rb[1:nstu],:,length(timesθ))
-    n(tθ) = findall(x -> x == tθ,timesθ)[1]
-    tθ -> FEFunction(Vk,ufe[:,n(tθ)])
+    compute_in_timesθ(ufe,θ)
   end
 
-  function ud(x_rb::AbstractArray)
-    ufe = reshape(bstu*x_rb[1:nstu],:,length(timesθ))
+  function ufun(uθfe::AbstractArray)
     n(tθ) = findall(x -> x == tθ,timesθ)[1]
-    tθ -> FEFunction(Uk(tθ),ufe[:,n(tθ)])
+    tθ -> FEFunction(Vk,uθfe[:,n(tθ)])
+  end
+
+  function udfun(uθfe::AbstractArray)
+    n(tθ) = findall(x -> x == tθ,timesθ)[1]
+    tθ -> FEFunction(Uk(tθ),uθfe[:,n(tθ)])
   end
 
   err = 1.
   iter = 0
   while norm(err) > tol && iter < maxit
-    jx_rb,rx_rb = jac(u(x_rb)),res(u(x_rb),ud(x_rb),x_rb)
+    uθh = uθfe(x_rb)
+    jx_rb,rx_rb = jac(ufun(uθh)),res(ufun(uθh),udfun(uθh),x_rb)
     err = jx_rb \ rx_rb
     x_rb -= err
     iter += 1

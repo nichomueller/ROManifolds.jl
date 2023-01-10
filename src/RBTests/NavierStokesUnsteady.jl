@@ -71,11 +71,15 @@ function offline_phase(
   tt::TimeTracker) where N
 
   uh,ph,μ, = fesol
+  opA,opB,opBT,opC,opD,opM,opF,opH = op
+  θ = get_θ(opA)
   uh_offline = uh[1:info.nsnap]
   ph_offline = ph[1:info.nsnap]
-  opA,opB,opBT,opC,opD,opM,opF,opH = op
+  uhθ_offline = compute_in_timesθ(uh_offline,θ)
+  phθ_offline = compute_in_timesθ(ph_offline,θ)
 
   rbspace_u,rbspace_p = rb(info,tt,(uh_offline,ph_offline),opB,ph,μ)
+  rbspace_uθ, = rb(info,tt,(uhθ_offline,phθ_offline),opB,ph,μ)
 
   rbopA = RBVarOperator(opA,rbspace_u,rbspace_u)
   rbopB = RBVarOperator(opB,rbspace_p,rbspace_u)
@@ -89,8 +93,8 @@ function offline_phase(
   A_rb = rb_structure(info,tt,rbopA,μ,meas,:dΩ)
   B_rb = rb_structure(info,tt,rbopB,μ,meas,:dΩ)
   BT_rb = rb_structure(info,tt,rbopBT,μ,meas,:dΩ)
-  C_rb = rb_structure(info,tt,rbopC,μ,meas,:dΩ)
-  D_rb = rb_structure(info,tt,rbopD,μ,meas,:dΩ)
+  C_rb = rb_structure(info,tt,rbopC,μ,meas,:dΩ,rbspace_uθ)
+  D_rb = rb_structure(info,tt,rbopD,μ,meas,:dΩ,rbspace_uθ)
   M_rb = rb_structure(info,tt,rbopM,μ,meas,:dΩ)
   F_rb = rb_structure(info,tt,rbopF,μ,meas,:dΩ)
   H_rb = rb_structure(info,tt,rbopH,μ,meas,:dΓn)
@@ -132,7 +136,7 @@ function online_phase(
         (Fon,Hon,lift...),θ)
       Uk(tθ) = X[1](μ[k],tθ)
       Vk = Y[1]
-      rb_sol = solve_rb_system(sys...,(Uk,Vk),rbspace,timesθ)
+      rb_sol = solve_rb_system(sys...,(Uk,Vk),rbspace,timesθ,θ)
     end
     uhk = get_snap(uh[k])
     phk = get_snap(ph[k])

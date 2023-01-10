@@ -200,19 +200,11 @@ function get_reduced_timesθ(
   Broadcasting(i->get_reduced_timesθ(op,i))(idx)
 end
 
-function compute_in_timesθ(
-  op::RBUnsteadyVarOperator,
-  bt::Matrix{Float})
-
-  θ = get_θ(op)
-  Nt = size(bt,1)
-  bt_prev = hcat(zeros(Nt),bt[:,1:end-1])
-  θ*bt + (1-θ)*bt_prev
-end
-
-function get_basis_timesθ_col(op::RBUnsteadyVarOperator)
-  bt = get_basis_time_col(op)
-  compute_in_timesθ(op,bt)
+function compute_in_timesθ(snaps::Snapshots,args...;kwargs...)
+  id = get_id(snaps)
+  snap = get_snap(snaps)
+  nsnap = get_nsnap(snaps)
+  Snapshots(id,compute_in_timesθ(snap,args...;kwargs...),nsnap)
 end
 
 "Small, full vector -> large, sparse vector"

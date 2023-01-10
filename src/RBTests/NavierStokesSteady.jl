@@ -111,7 +111,9 @@ function online_phase(
       Hon = online_assembler(Hinfo...,μ[k])
       lift = Aon[2],Bon[2],Con[2]
       sys = navier_stokes_rb_system((Aon[1],Bon[1],Con[1],Don[1]),(Fon,Hon,lift...))
-      rb_sol = solve_rb_system(sys...,X(μ[k]),Y,rbspace)
+      Uk = X[1](μ[k])
+      Vk = Y[1]
+      rb_sol = solve_rb_system(sys...,(Uk,Vk),rbspace)
     end
     uhk = get_snap(uh[k])
     phk = get_snap(ph[k])

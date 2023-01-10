@@ -7,13 +7,13 @@ function basis_as_fefun(op::RBSteadyVarOperator)
   fefun,fefun_lift
 end
 
-function basis_as_fefun(op::RBUnsteadyVarOperator)
-  bspace = get_basis_space_col(op)
+function basis_as_fefun(op::RBUnsteadyVarOperator,rbspaceθ::RBSpaceUnsteady)
+  bspaceθ = get_basis_space(rbspaceθ)
   test = get_test(op)
   trial = get_trial(op)
-  fefun(n::Int) = FEFunction(test,bspace[:,n])
-  fefun_lift(μ::Param,tθ::Real,n::Int) = FEFunction(trial(μ,tθ),bspace[:,n])
-  fefun,fefun_lift
+  fefunθ(n::Int) = FEFunction(test,bspaceθ[:,n])
+  fefunθ_lift(μ::Param,tθ::Real,n::Int) = FEFunction(trial(μ,tθ),bspaceθ[:,n])
+  fefunθ,fefunθ_lift
 end
 
 function mdeim_snapshots(
@@ -206,11 +206,12 @@ end
 function matrix_snapshots(
   ::Val{false},
   op::RBUnsteadyBilinOperator{Nonlinear,<:ParamTransientTrialFESpace},
-  μ::Vector{Param})
+  μ::Vector{Param},
+  rbspaceθ::RBSpaceUnsteady)
 
   id = get_id(op)
   timesθ = get_timesθ(op)
-  bfun,bfun_lift = basis_as_fefun(op)
+  bfun,bfun_lift = basis_as_fefun(op,rbspaceθ)
   findnz_map = get_findnz_map(op,bfun(1))
   M,lift = assemble_matrix_and_lifting(op)
 

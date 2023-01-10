@@ -146,7 +146,7 @@ end
 
 function newton(res::Function,jac::Function,X::FESpace,t::Real,x0;tol=1e-10,maxit=10)
   err = 1.
-  x = x0#zero(X)
+  x = x0
   xh = get_free_dof_values(x)
   xh0 = get_free_dof_values(x0)
   iter = 0
@@ -197,6 +197,11 @@ function basis_by_coeff_mult(
   matinfo = first(basis),first(coeff)
   liftinfo = last(basis),last(coeff)
   basis_by_coeff_mult(matinfo...,nr),basis_by_coeff_mult(liftinfo...,nr)
+end
+
+function compute_in_timesθ(mat::Matrix{Float},θ::Real;mat0=zeros(size(mat,1)))
+  mat_prev = hcat(mat0,mat[:,1:end-1])
+  θ*mat + (1-θ)*mat_prev
 end
 
 function solve_cholesky(

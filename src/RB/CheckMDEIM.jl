@@ -179,3 +179,74 @@ function steady_navier_stokes()
 
   norm(errA1),norm(errLA1),norm(errLB1),norm(errC1),norm(errLC1),norm(errD1)
 end
+
+function unsteady_navier_stokes()
+  op = rbopC
+  u1,μ1 = uh[1].snap,μ[1]
+  timesθ = get_timesθ(op)
+  μ_mdeim = μ[1:info.mdeim_nsnap]
+  findnz_map,snaps... = mdeim_snapshots(op,info,μ_mdeim,rbspace_uθ)
+  bs,_,red_bs = space_quantities(snaps,findnz_map)
+  btθ = get_basis_time(rbspace_uθ)
+  bst = kron(btθ,bs)
+  red_bst = kron(btθ,red_bs)
+
+  function u(tθ)
+    n = findall(x -> x == tθ,timesθ)[1]
+    FEFunction(V.test,u1[:,n])
+  end
+  function ud(tθ)
+    n = findall(x -> x == tθ,timesθ)[1]
+    FEFunction(U.trial(μ1,tθ),u1[:,n])
+  end
+
+  ########################### OK ###########################
+  C,LC = assemble_matrix_and_lifting(op)
+  C1 = Matrix([nonzero_values(C(u(tθ)),findnz_map) for tθ = timesθ])[:]
+  C1rb = Matrix([bsu'*C(u(tθ))*bsu for tθ = timesθ])[:]
+  errC = C1 - bst[1]*bst[1]'*C1
+  errCrb = C1rb - red_bst[1]*red_bst[1]'*C1rb
+  LC1 = Matrix([LC(ud(tθ)) for tθ = timesθ])[:]
+  LC1rb = Matrix([bsu'*LC(ud(tθ)) for tθ = timesθ])[:]
+  errLC = LC1 - bst[2]*bst[2]'*LC1
+  norm(errC),norm(errCrb),norm(errLC)
+  ########################### OK ###########################
+end
+
+function unsteady_navier_stokes()
+  op = rbopC
+  u1,μ1 = uh[1].snap,μ[1]
+  timesθ = get_timesθ(op)
+
+  function u(tθ)
+    n = findall(x -> x == tθ,timesθ)[1]
+    FEFunction(V.test,u1[:,n])
+  end
+  function ud(tθ)
+    n = findall(x -> x == tθ,timesθ)[1]
+    FEFunction(U.trial(μ1,tθ),u1[:,n])
+  end
+
+  C,LC = assemble_matrix_and_lifting(op)
+
+  bsu = rbspace[1].basis_space
+  C1rb = Matrix([bsu'*C(u(tθ))*bsu for tθ = timesθ])[:]
+  basisC = kron(C_rb[1].rbspace.basis_time,C_rb[1].rbspace.basis_space)
+  coeffC = compute_coefficient(rbopC,C_rb,μ1)
+  errC = C1rb - basisC*coeffC[1](u)[:]
+
+  LC1rb = Matrix([bsu'*LC(ud(tθ)) for tθ = timesθ])[:]
+  basisLC = kron(C_rb[2].rbspace.basis_time,C_rb[2].rbspace.basis_space)
+  errLC = LC1rb - basisLC*coeffC[2](u)[:]
+
+  norm(errC),norm(errLC)
+end
+
+function unsteady_navier_stokes()
+  u90 = uh[90].snap
+  p90 = ph[90].snap
+  bstu = get_basis_spacetime(first(rbspace))
+  bstp = get_basis_spacetime(last(rbspace))
+  u90rb = bstu'*u90[:]
+  p90rb = bstp'*p90[:]
+end
