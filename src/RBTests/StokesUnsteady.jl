@@ -11,8 +11,8 @@ function stokes_unsteady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/stokes"
-  mesh = "cube5x5x5.json"
-  bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
+  mesh = "cylinder.json"
+  bnd_info = Dict("dirichlet" => ["wall","inlet"],"neumann" => ["outlet"])
   order = 2
 
   t0,tF,dt,θ = 0.,0.5,0.05,0.5
@@ -30,10 +30,10 @@ function stokes_unsteady()
   a,afe,m,mfe,mfe_gridap,b,bfe,bTfe,f,ffe,h,hfe,g,lhs,rhs = stokes_functions(ptype,measures)
 
   reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{3,Float},order)
-  reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1;space=:P)
+  reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1)
   V = MyTests(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet"])
   U = MyTrials(V,g,ptype)
-  Q = MyTests(model,reffe2;conformity=:L2)
+  Q = MyTests(model,reffe2;conformity=:C0)
   P = MyTrials(Q)
   Y = ParamTransientMultiFieldFESpace([V,Q])
   X = ParamTransientMultiFieldFESpace([U,P])

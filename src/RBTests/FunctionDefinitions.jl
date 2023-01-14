@@ -116,10 +116,8 @@ function stokes_functions(::Val{true},measures::ProblemFixedMeasures)
   function g(x,p::Param)
     μ = get_μ(p)
     R = 0.5
-    #xc = x-Point(R,R,R)
-    #VectorValue(sum((xc.*Point(μ[1:3]))^2),0.,0.)/norm(μ[1:3])^2
-    xc = x-Point(0,R,R)
-    VectorValue(sum((xc.*Point(μ[1:3]))^2),0.,0.)*(x[1]==0)/norm(μ[1:3])^2
+    dist = sum(x^2)/(R^2)
+    abs(sin(μ[1]))*VectorValue(0.,0.,1-dist)*(x[3]==0.)
   end
   g(p::Param) = x->g(x,p)
 
@@ -165,8 +163,8 @@ function stokes_functions(::Val{false},measures::ProblemFixedMeasures)
   function g(x,p::Param,t::Real)
     μ = get_μ(p)
     R = 0.5
-    xc = x-Point(0,R,R)
-    (1. +eps()-cos(t))*VectorValue(sum((xc.*Point(μ[1:3]))^2),0.,0.)*(x[1]==0)/norm(μ[1:3])^2
+    dist = sum(x^2)/(R^2)
+    (1-cos(2*pi*t/0.5)+μ[1]*sin(2*pi*μ[2]*t/0.5))*VectorValue(0.,0.,1-dist)*(x[3]==0.)
   end
   g(p::Param,t::Real) = x->g(x,p,t)
 
@@ -222,10 +220,8 @@ function navier_stokes_functions(::Val{true},measures::ProblemFixedMeasures)
   function g(x,p::Param)
     μ = get_μ(p)
     R = 0.5
-    xc = x-Point(R,R,0)
-    VectorValue(0.,0.,1-sum((xc.*Point(μ[1:3]))^2)/norm(R^2*μ[1:3]))*(x[3]==0.)
-    #R = 0.05
-    #VectorValue(0.,0.,1-sum(abs(xc.*Point(μ[1:3])))/norm(R*μ[1:3]))*(x[3]==0.)
+    dist = sum(x^2)/(R^2)
+    μ[1]*VectorValue(0.,0.,1-dist)*(x[3]==0.)
   end
   g(p::Param) = x->g(x,p)
 
@@ -289,10 +285,9 @@ function navier_stokes_functions(::Val{false},measures::ProblemFixedMeasures)
 
   function g(x,p::Param,t::Real)
     μ = get_μ(p)
-    #R = 0.5
-    #xc = x-Point(R,R,0)
-    #VectorValue(0.,0.,1-sin(t)*sum((xc.*Point(μ[1:3]))^2)/norm(R^2*μ[1:3]))*(x[3]==0.)
-    Point(0.,0.,0.)
+    R = 0.5
+    dist = sum(x^2)/(R^2)
+    (1-cos(2*pi*t/0.5)+μ[1]*sin(2*pi*μ[2]*t/0.5))*VectorValue(0.,0.,1-dist)*(x[3]==0.)
   end
   g(μ::Param,t::Real) = x->g(x,μ,t)
 

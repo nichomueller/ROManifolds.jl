@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function poisson_steady()
-  run_fem = false
+  run_fem = true
 
   steady = true
   indef = false
@@ -11,8 +11,10 @@ function poisson_steady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/poisson"
-  mesh = "cube15x15x15.json"
-  bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
+  #= mesh = "cube15x15x15.json"
+  bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26]) =#
+  mesh = "man_cylinder.json"
+  bnd_info = Dict("dirichlet" => ["wall","wall_c","inlet","inlet_c"],"neumann" => ["outlet"])
   order = 1
 
   ranges = fill([1.,20.],6)

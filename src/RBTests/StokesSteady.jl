@@ -12,9 +12,7 @@ function stokes_steady()
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/stokes"
   mesh = "cylinder.json"
-  bnd_info = Dict("dirichlet" => ["wall","inlet","inlet_curve"],"neumann" => ["outlet","outlet_curve"])
-  #mesh = "cube5x5x5.json"
-  #bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
+  bnd_info = Dict("dirichlet" => ["wall","inlet"],"neumann" => ["outlet"])
   order = 2
 
   ranges = fill([1.,5.],6)
@@ -29,10 +27,10 @@ function stokes_steady()
   a,afe,b,bfe,f,ffe,h,hfe,g,lhs,rhs = stokes_functions(ptype,measures)
 
   reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{3,Float},order)
-  reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1;space=:P)
+  reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1)
   V = MyTests(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet"])
   U = MyTrials(V,g,ptype)
-  Q = MyTests(model,reffe2;conformity=:L2)
+  Q = MyTests(model,reffe2;conformity=:C0)
   P = MyTrials(Q)
   Y = ParamMultiFieldFESpace([V,Q])
   X = ParamMultiFieldFESpace([U,P])

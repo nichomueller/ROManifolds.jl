@@ -3,18 +3,16 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function navier_stokes_steady()
-  run_fem = false
+  run_fem = true
 
   steady = true
   indef = true
   pdomain = false
   ptype = ProblemType(steady,indef,pdomain)
 
-  root = joinpath(pwd(),"tests/navier-stokes")
-  mesh = "cube5x5x5.json"
-  bnd_info = Dict("dirichlet" => vcat(collect(1:21),collect(23:26)),"neumann" => [22])
-  #= mesh = "cylinder.json"
-  bnd_info = Dict("dirichlet" => ["wall","inlet","inlet_curve"],"neumann" => ["outlet","outlet_curve"]) =#
+  root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes"
+  mesh = "cylinder.json"
+  bnd_info = Dict("dirichlet" => ["wall","inlet"],"neumann" => ["outlet"])
   order = 2
 
   ranges = fill([1.,2.],9)
@@ -29,10 +27,10 @@ function navier_stokes_steady()
   a,afe,b,bfe,c,cfe,d,dfe,f,ffe,h,hfe,g,res,jac = navier_stokes_functions(ptype,measures)
 
   reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{3,Float},order)
-  reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1;space=:P)
+  reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1)
   V = MyTests(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet"])
   U = MyTrials(V,g,ptype)
-  Q = MyTests(model,reffe2;conformity=:L2)
+  Q = MyTests(model,reffe2;conformity=:C0)
   P = MyTrials(Q)
   Y = ParamMultiFieldFESpace([V,Q])
   X = ParamMultiFieldFESpace([U,P])
@@ -41,7 +39,7 @@ function navier_stokes_steady()
 
   nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking())
   solver = FESolver(nls)
-  nsnap = 100
+  nsnap = 1
   uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
 
   opA = NonaffineParamVarOperator(a,afe,PS,U,V;id=:A)

@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function navier_stokes_unsteady()
-  run_fem = true
+  run_fem = false
 
   steady = false
   indef = true
@@ -11,13 +11,11 @@ function navier_stokes_unsteady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes"
-  mesh = "cube15x15x15.json"
-  neum_set = [11,12,15,16,22]
-  dir_set = setdiff(collect(1:26),neum_set)
-  bnd_info = Dict("dirichlet" => dir_set,"neumann" => neum_set)
+  mesh = "cylinder.json"
+  bnd_info = Dict("dirichlet" => ["wall","inlet"],"neumann" => ["outlet"])
   order = 2
 
-  t0,tF,dt,θ = 0.,0.05,0.05,0.5
+  t0,tF,dt,θ = 0.,0.5,0.05,0.5
   time_info = TimeInfo(t0,tF,dt,θ)
 
   ranges = fill([1.,2.],6)
@@ -33,10 +31,10 @@ function navier_stokes_unsteady()
     navier_stokes_functions(ptype,measures)
 
   reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{3,Float},order)
-  reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1;space=:P)
+  reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1)
   V = MyTests(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet"])
   U = MyTrials(V,g,ptype)
-  Q = MyTests(model,reffe2;conformity=:L2)
+  Q = MyTests(model,reffe2;conformity=:C0)
   P = MyTrials(Q)
   Y = ParamTransientMultiFieldFESpace([V,Q])
   X = ParamTransientMultiFieldFESpace([U,P])
@@ -45,7 +43,7 @@ function navier_stokes_unsteady()
 
   nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking())
   solver = ThetaMethod(nls,dt,θ)
-  nsnap = 1
+  nsnap = 100
   uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
 
   opA = NonaffineParamVarOperator(a,afe,PS,time_info,U,V;id=:A)
@@ -58,7 +56,7 @@ function navier_stokes_unsteady()
   opH = AffineParamVarOperator(h,hfe,PS,time_info,V;id=:H)
 
   varop = (opA,opB,opBT,opC,opD,opM,opF,opH)
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=true)
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=false)
   fesol = (uh,ph,μ,X,Y)
   tt = TimeTracker(0.,0.)
   rbspace,offinfo = offline_phase(info,fesol,varop,measures,tt)

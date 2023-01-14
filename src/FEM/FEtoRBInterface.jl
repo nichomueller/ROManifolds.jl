@@ -31,8 +31,8 @@ struct MyTests <: MySpaces
   end
 end
 
-function MyTests(model,reffe;kwargs...)
-  test = TestFESpace(model,reffe;kwargs...)
+function MyTests(model,reffe,args...;kwargs...)
+  test = TestFESpace(model,reffe,args...;kwargs...)
   test_no_bc = FESpace(model,reffe)
   MyTests(test,test_no_bc)
 end
