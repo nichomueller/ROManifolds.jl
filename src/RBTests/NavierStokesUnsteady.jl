@@ -15,7 +15,7 @@ function navier_stokes_unsteady()
   bnd_info = Dict("dirichlet" => ["wall","inlet"],"neumann" => ["outlet"])
   order = 2
 
-  t0,tF,dt,θ = 0.,0.5,0.05,0.5
+  t0,tF,dt,θ = 0.,1.0,0.05,0.5
   time_info = TimeInfo(t0,tF,dt,θ)
 
   ranges = fill([1.,2.],6)

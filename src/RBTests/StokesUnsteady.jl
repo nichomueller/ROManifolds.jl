@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function stokes_unsteady()
-  run_fem = false
+  run_fem = true
 
   steady = false
   indef = true
@@ -15,7 +15,7 @@ function stokes_unsteady()
   bnd_info = Dict("dirichlet" => ["wall","inlet"],"neumann" => ["outlet"])
   order = 2
 
-  t0,tF,dt,θ = 0.,0.5,0.05,0.5
+  t0,tF,dt,θ = 0.,0.3,0.0025,0.5
   time_info = TimeInfo(t0,tF,dt,θ)
 
   ranges = fill([1.,2.],6)
