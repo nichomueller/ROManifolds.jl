@@ -1,15 +1,19 @@
 abstract type MySpaces end
 
-function dirichlet_dofs_on_full_trian(space,space_no_bc)
+function dirichlet_dofs_on_full_trian(
+  space::FESpace,
+  space_no_bc::UnconstrainedFESpace)
 
   cell_dof_ids = get_cell_dof_ids(space)
   cell_dof_ids_no_bc = get_cell_dof_ids(space_no_bc)
 
-  dirichlet_dofs = zeros(Int,space.ndirichlet)
-  for cell = eachindex(cell_dof_ids)
-    for (ids,ids_no_bc) in zip(cell_dof_ids[cell],cell_dof_ids_no_bc[cell])
-      if ids<0
-        dirichlet_dofs[abs(ids)]=ids_no_bc
+  dirichlet_dofs = zeros(Int,num_dirichlet_dofs(space))
+  if !isempty(dirichlet_dofs)
+    for cell = eachindex(cell_dof_ids)
+      for (ids,ids_no_bc) in zip(cell_dof_ids[cell],cell_dof_ids_no_bc[cell])
+        if ids<0
+          dirichlet_dofs[abs(ids)]=ids_no_bc
+        end
       end
     end
   end
@@ -18,13 +22,13 @@ function dirichlet_dofs_on_full_trian(space,space_no_bc)
 end
 
 struct MyTests <: MySpaces
-  test::UnconstrainedFESpace
-  test_no_bc::UnconstrainedFESpace
+  test::SingleFieldFESpace
+  test_no_bc::SingleFieldFESpace
   ddofs_on_full_trian::Vector{Int}
 
   function MyTests(
-    test::UnconstrainedFESpace,
-    test_no_bc::UnconstrainedFESpace)
+    test::SingleFieldFESpace,
+    test_no_bc::SingleFieldFESpace)
 
     ddofs_on_full_trian = dirichlet_dofs_on_full_trian(test,test_no_bc)
     new(test,test_no_bc,ddofs_on_full_trian)
@@ -37,26 +41,26 @@ function MyTests(model,reffe,args...;kwargs...)
   MyTests(test,test_no_bc)
 end
 
-function MyTrial(test::UnconstrainedFESpace)
+function MyTrial(test::SingleFieldFESpace)
   HomogeneousTrialFESpace(test)
 end
 
 function MyTrial(
-  test::UnconstrainedFESpace,
+  test::SingleFieldFESpace,
   g::Function,
   ::Val{true})
   ParamTrialFESpace(test,g)
 end
 
 function MyTrial(
-  test::UnconstrainedFESpace,
+  test::SingleFieldFESpace,
   g::Function,
   ::Val{false})
   ParamTransientTrialFESpace(test,g)
 end
 
 function MyTrial(
-  test::UnconstrainedFESpace,
+  test::SingleFieldFESpace,
   g::Function,
   ptype::ProblemType)
   MyTrial(test,g,issteady(ptype))
@@ -64,12 +68,12 @@ end
 
 struct MyTrials{Ttr} <: MySpaces
   trial::Ttr
-  trial_no_bc::UnconstrainedFESpace
+  trial_no_bc::SingleFieldFESpace
   ddofs_on_full_trian::Vector{Int}
 
   function MyTrials(
     trial::Ttr,
-    trial_no_bc::UnconstrainedFESpace) where Ttr
+    trial_no_bc::SingleFieldFESpace) where Ttr
 
     ddofs_on_full_trian = dirichlet_dofs_on_full_trian(trial.space,trial_no_bc)
     new{Ttr}(trial,trial_no_bc,ddofs_on_full_trian)
@@ -135,16 +139,16 @@ function get_fd_dofs(tests::MyTests,trials::MyTrials)
   (fdofs_test,fdofs_trial),ddofs
 end
 
-function Gridap.get_background_model(test::UnconstrainedFESpace)
+function Gridap.get_background_model(test::SingleFieldFESpace)
   get_background_model(get_triangulation(test))
 end
 
-function get_dimension(test::UnconstrainedFESpace)
+function get_dimension(test::SingleFieldFESpace)
   model = get_background_model(test)
   maximum(model.grid.reffes[1].reffe.polytope.dface.dims)
 end
 
-function Gridap.FESpaces.get_order(test::UnconstrainedFESpace)
+function Gridap.FESpaces.get_order(test::SingleFieldFESpace)
   basis = get_fe_basis(test)
   first(basis.cell_basis.values[1].fields.orders)
 end
@@ -154,15 +158,15 @@ Gridap.FESpaces.get_trial(trials::MyTrials) = trials.trial
 get_test_no_bc(tests::MyTests) = tests.test_no_bc
 get_trial_no_bc(trials::MyTrials) = trials.trial_no_bc
 get_degree(order::Int,c=2) = c*order
-get_degree(test::UnconstrainedFESpace,c=2) = get_degree(Gridap.FESpaces.get_order(test),c)
+get_degree(test::SingleFieldFESpace,c=2) = get_degree(Gridap.FESpaces.get_order(test),c)
 realization(fes::MySpaces) = FEFunction(fes.test,rand(num_free_dofs(fes.test)))
 
-function get_cell_quadrature(test::UnconstrainedFESpace)
+function get_cell_quadrature(test::SingleFieldFESpace)
   CellQuadrature(get_triangulation(test),get_degree(test))
 end
 
 struct LagrangianQuadFESpace
-  test::UnconstrainedFESpace
+  test::SingleFieldFESpace
 end
 
 function LagrangianQuadFESpace(model::DiscreteModel,order::Int)
@@ -171,7 +175,7 @@ function LagrangianQuadFESpace(model::DiscreteModel,order::Int)
   LagrangianQuadFESpace(test)
 end
 
-function LagrangianQuadFESpace(test::UnconstrainedFESpace)
+function LagrangianQuadFESpace(test::SingleFieldFESpace)
   model = get_background_model(test)
   order = Gridap.FESpaces.get_order(test)
   LagrangianQuadFESpace(model,order)
@@ -181,7 +185,7 @@ function LagrangianQuadFESpace(tests::MyTests)
   LagrangianQuadFESpace(get_test(tests))
 end
 
-function get_phys_quad_points(test::UnconstrainedFESpace)
+function get_phys_quad_points(test::SingleFieldFESpace)
   trian = get_triangulation(test)
   phys_map = get_cell_map(trian)
   cell_quad = get_cell_quadrature(test)
