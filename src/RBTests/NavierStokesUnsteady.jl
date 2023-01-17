@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function navier_stokes_unsteady()
-  run_fem = true
+  run_fem = false
 
   steady = false
   indef = true
@@ -15,7 +15,7 @@ function navier_stokes_unsteady()
   bnd_info = Dict("dirichlet" => collect(1:8),"neumann" => Int[])
   order = 2
 
-  t0,tF,dt,θ = 0.,0.3,0.005,0.5
+  t0,tF,dt,θ = 0.,0.1,0.005,0.5
   time_info = TimeInfo(t0,tF,dt,θ)
 
   ranges = fill([1.,2.],6)
@@ -43,7 +43,7 @@ function navier_stokes_unsteady()
 
   nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking())
   solver = ThetaMethod(nls,dt,θ)
-  nsnap = 1
+  nsnap = 100
   uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
 
   opA = NonaffineParamVarOperator(a,afe,PS,time_info,U,V;id=:A)
@@ -51,12 +51,12 @@ function navier_stokes_unsteady()
   opBT = AffineParamVarOperator(b,bTfe,PS,time_info,P,V;id=:BT)
   opC = NonlinearParamVarOperator(c,cfe,PS,time_info,U,V;id=:C)
   opD = NonlinearParamVarOperator(d,dfe,PS,time_info,U,V;id=:D)
-  opM = NonaffineParamVarOperator(m,mfe,PS,time_info,U,V;id=:M)
+  opM = AffineParamVarOperator(m,mfe,PS,time_info,U,V;id=:M)
   opF = AffineParamVarOperator(f,ffe,PS,time_info,V;id=:F)
   opH = AffineParamVarOperator(h,hfe,PS,time_info,V;id=:H)
 
   varop = (opA,opB,opBT,opC,opD,opM,opF,opH)
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=false)
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,online_snaps=95:100,mdeim_snap=30,load_offline=true)
   fesol = (uh,ph,μ,X,Y)
   tt = TimeTracker(0.,0.)
   rbspace,offinfo = offline_phase(info,fesol,varop,measures,tt)

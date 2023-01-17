@@ -420,3 +420,92 @@ function reconstruct_fe_sol(rbspace::NTuple{2,RBSpaceUnsteady},rb_sol::Matrix{Fl
 
   bs_u*(bt_u*u_rb_resh)',bs_p*(bt_p*p_rb_resh)'
 end
+
+function build_exact_online_structure(
+  op::RBUnsteadyBilinOperator,
+  μ::Param)
+
+  M,lift = assemble_matrix_and_lifting(op)
+  Mμ,liftμ = M(μ),lift(μ)
+  brow,bcol = get_basis_space_row(op),get_basis_space_col(op)
+  Ms = Matrix(Matrix([(brow'*Mμ[k]*bcol)[:] for k=eachindex(Mμ)])')
+  Mst,Mst_shift = coeff_by_time_bases_bilin(op,Ms)
+
+  lifts = Matrix(Matrix([(brow'*liftμ[:,k]) for k=axes(liftμ,2)])')
+  liftst = coeff_by_time_bases_lin(op,lifts)
+
+  ns = length(liftst)
+  nt = length(first(liftst))
+
+  Mon = zeros(ns*nt,ns*nt)
+  Mon_shift = zeros(ns*nt,ns*nt)
+  lifton = zeros(ns*nt,1)
+  for i = 1:ns
+    lifton[1+(i-1)*nt:i*nt,1] = liftst[i]
+    for j = 1:ns
+      Mon[1+(i-1)*nt:i*nt,1+(j-1)*nt:j*nt] = Mst[(i-1)*ns+j]
+      Mon_shift[1+(i-1)*nt:i*nt,1+(j-1)*nt:j*nt] = Mst_shift[(i-1)*ns+j]
+    end
+  end
+
+  (Mon,Mon_shift),lifton
+end
+
+function build_exact_online_structure(
+  op::RBUnsteadyBilinOperator{Nonlinear,<:ParamTransientTrialFESpace})
+
+  println("Exact online construction of $(get_id(op)) and lifting")
+  timesθ = get_timesθ(op)
+  #= Uk,Vk = fespaces
+  function ufun(u::AbstractArray)
+    uθ = compute_in_timesθ(u,θ)
+    n(tθ) = findall(x -> x == tθ,timesθ)[1]
+    tθ -> FEFunction(Vk,uθ[:,n(tθ)])
+  end
+  function udfun(u::AbstractArray)
+    uθ = compute_in_timesθ(u,θ)
+    n(tθ) = findall(x -> x == tθ,timesθ)[1]
+    tθ -> FEFunction(Uk(tθ),uθ[:,n(tθ)])
+  end =#
+
+  M,lift = assemble_matrix_and_lifting(op)
+  Mμ(u) = [M(u(tθ)) for tθ=timesθ]
+  liftμ(ud) = [lift(ud(tθ)) for tθ=timesθ]
+  brow,bcol = get_basis_space_row(op),get_basis_space_col(op)
+  Ms(u) = Matrix(Matrix([(brow'*Mμ(u)[k]*bcol)[:] for k=eachindex(Mμ(u))])')
+  Mst,Mst_shift = coeff_by_time_bases_bilin(op,Ms)
+
+  lifts(ud) = Matrix(Matrix([(brow'*liftμ(ud)[k]) for k=eachindex(liftμ(ud))])')
+  liftst = coeff_by_time_bases_lin(op,lifts)
+
+  ns = get_ns(get_rbspace_row(op))
+  nt = get_nt(get_rbspace_col(op))
+
+  function nl_M(u)
+    Mon = zeros(ns*nt,ns*nt)
+    for i = 1:ns
+      for j = 1:ns
+        Mon[1+(i-1)*nt:i*nt,1+(j-1)*nt:j*nt] = Mst(u)[(i-1)*ns+j]
+      end
+    end
+    Mon
+  end
+  function nl_M_shift(u)
+    Mon_shift = zeros(ns*nt,ns*nt)
+    for i = 1:ns
+      for j = 1:ns
+        Mon_shift[1+(i-1)*nt:i*nt,1+(j-1)*nt:j*nt] = Mst_shift(u)[(i-1)*ns+j]
+      end
+    end
+    Mon_shift
+  end
+  function nl_lift(ud)
+    lifton = zeros(ns*nt,1)
+    for i = 1:ns
+      lifton[1+(i-1)*nt:i*nt,1] = liftst(ud)[i]
+    end
+    lifton
+  end
+
+  (nl_M,nl_M_shift),nl_lift
+end

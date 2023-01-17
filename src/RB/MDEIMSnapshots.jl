@@ -230,7 +230,7 @@ function matrix_snapshots(
   end
   snapshot_lift(k::Int,n::Int) = Matrix(Broadcasting(tθ->snapshot_lift(k,tθ,n))(timesθ))
 
-  ns = size(get_basis_space_col(op),2)
+  ns = size(get_basis_space(rbspaceθ),2)
   nparam = min(length(μ),2)
   vals = snapshot.(1:ns)
 

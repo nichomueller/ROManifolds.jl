@@ -183,6 +183,7 @@ end
 function unsteady_navier_stokes()
   op = rbopC
   u1,μ1 = uh[1].snap,μ[1]
+  u90,μ90 = uh[90].snap,μ[90]
   timesθ = get_timesθ(op)
   μ_mdeim = μ[1:info.mdeim_nsnap]
   findnz_map,snaps... = mdeim_snapshots(op,info,μ_mdeim,rbspace_uθ)
@@ -199,6 +200,14 @@ function unsteady_navier_stokes()
     n = findall(x -> x == tθ,timesθ)[1]
     FEFunction(U.trial(μ1,tθ),u1[:,n])
   end
+  function uK(tθ)
+    n = findall(x -> x == tθ,timesθ)[1]
+    FEFunction(V.test,u90[:,n])
+  end
+  function udK(tθ)
+    n = findall(x -> x == tθ,timesθ)[1]
+    FEFunction(U.trial(μ90,tθ),u90[:,n])
+  end
 
   ########################### OK ###########################
   C,LC = assemble_matrix_and_lifting(op)
@@ -209,7 +218,8 @@ function unsteady_navier_stokes()
   LC1 = Matrix([LC(ud(tθ)) for tθ = timesθ])[:]
   LC1rb = Matrix([bsu'*LC(ud(tθ)) for tθ = timesθ])[:]
   errLC = LC1 - bst[2]*bst[2]'*LC1
-  norm(errC),norm(errCrb),norm(errLC)
+  errLCrb = LC1rb - red_bst[2]*red_bst[2]'*LC1rb
+  norm(errC),norm(errCrb),norm(errLC),norm(errLCrb)
   ########################### OK ###########################
 end
 
@@ -243,10 +253,104 @@ function unsteady_navier_stokes()
 end
 
 function unsteady_navier_stokes()
-  u90 = uh[90].snap
-  p90 = ph[90].snap
-  bstu = get_basis_spacetime(first(rbspace))
-  bstp = get_basis_spacetime(last(rbspace))
-  u90rb = bstu'*u90[:]
-  p90rb = bstp'*p90[:]
+  bsC = C_rb[1].rbspace.basis_space
+  coeffC = compute_coefficient(rbopC,C_rb,μ1)
+  c1θ = coeffC[1](u)[:]
+  Nt = length(timesθ)
+  err = Float[]
+  for k = 1:Nt
+    C11rb = (bsu'*C(u(timesθ[k]))*bsu)[:]
+    errk = abs.(C11rb - bsC*c1θ[:,k])
+    push!(err,maximum(errk))
+  end
 end
+
+function unsteady_navier_stokes()
+  u,μ = uh[90].snap[:,1],μ[90]
+  timesθ = get_timesθ(opA)
+  k = 60
+  tθ = timesθ[k]
+  ufun = FEFunction(V.test,u)
+  udfun = FEFunction(U.trial(μ,tθ),u)
+
+  function uall(tθ)
+    n = findall(x -> x == tθ,timesθ)[1]
+    FEFunction(V.test,uh[90].snap[:,n])
+  end
+  function udall(tθ)
+    n = findall(x -> x == tθ,timesθ)[1]
+    FEFunction(U.trial(μ,tθ),uh[90].snap[:,n])
+  end
+
+  A,LA = assemble_matrix_and_lifting(opA)
+  A1,LA1 = A(μ,tθ),LA(μ,tθ)
+  C,LC = assemble_matrix_and_lifting(opC)
+  C1,LC1 = C(ufun),LC(udfun)
+  D = assemble_matrix(opD)
+  D1 = D(ufun)
+
+  bsu = rbspace[1].basis_space
+  btu = rbspace[1].basis_time
+  bsp = rbspace[2].basis_space
+  btp = rbspace[2].basis_time
+
+  A1rb = bsu'*A1*bsu
+  A1rb = Matrix(A1rb[:])
+  C1rb = bsu'*C1*bsu
+  C1rb = Matrix(C1rb[:])
+  D1rb = bsu'*D1*bsu
+  D1rb = Matrix(D1rb[:])
+  LA1rb = bsu'*LA1
+  LC1rb = bsu'*LC1
+
+  Ainfo,_,_,Cinfo,Dinfo,_ = offinfo
+  rbopA,A_rb = Ainfo
+  rbopC,C_rb = Cinfo
+  rbopD,D_rb = Dinfo
+
+  basisA = A_rb[1].rbspace.basis_space
+  basisC = C_rb[1].rbspace.basis_space
+  basisD = D_rb[1].rbspace.basis_space
+  basisLA = A_rb[2].rbspace.basis_space
+  basisLC = C_rb[2].rbspace.basis_space
+
+  coeffA = compute_coefficient(rbopA,A_rb,μ)
+  errA1,errLA1 = A1rb - basisA*coeffA[1][k,:],LA1rb - basisLA*coeffA[2][k,:]
+  coeffC = compute_coefficient(rbopC,C_rb,μ)
+  errC1,errLC1 = C1rb - basisC*coeffC[1](uall)[k,:],LC1rb - basisLC*coeffC[2](udall)[k,:]
+  coeffD = compute_coefficient(rbopD,D_rb,μ)
+  errD1 = D1rb - basisD*coeffD[1](uall)[k,:]
+
+  norm(errA1),norm(errLA1),norm(errC1),norm(errLC1),norm(errD1)
+end
+
+k = 90
+function uall(tθ)
+  n = findall(x -> x == tθ,timesθ)[1]
+  FEFunction(V.test,uh[k].snap[:,n])
+end
+Con = online_assembler(Cinfo...,μ[k],false)[1]
+Con90,Con90_shift = Con[1](uall),Con[2](uall)
+C90(tθ) = assemble_matrix(rbopC)(uall(tθ))
+C90rb = Matrix(Matrix([(bsu'*C90(tθ)*bsu)[:] for tθ=timesθ])')
+myCon,myCon_shift = coeff_by_time_bases_bilin(rbopC,C90rb)
+mm = zeros(size(Con90))
+mm_shift = zeros(size(Con90_shift))
+for i = 1:24
+  for j = 1:24
+    mm[1+(i-1)*13:i*13,1+(j-1)*13:j*13] = myCon[(i-1)*24+j]
+    mm_shift[1+(i-1)*13:i*13,1+(j-1)*13:j*13] = myCon_shift[(i-1)*24+j]
+  end
+end
+
+#= Aon = online_assembler(Ainfo...,μ[k],false)
+Aon90 = Aon[1][1]
+A90(t) = assemble_matrix(rbopA,t)(μ[k])
+A90rb = Matrix(Matrix([(bsu'*A90(tθ)*bsu)[:] for tθ=timesθ])')
+myAon,_ = coeff_by_time_bases_bilin(rbopA,A90rb)
+mm = zeros(size(Aon90))
+for i = 1:24
+  for j = 1:24
+    mm[1+(i-1)*13:i*13,1+(j-1)*13:j*13] = myAon[(i-1)*24+j]
+  end
+end =#

@@ -1,9 +1,17 @@
 function rb(info::RBInfo,args...)
-  info.load_offline ? load_rb(isindef(info),info) : assemble_rb(isindef(info),info,args...)
+  _,snaps,_ = args
+  def = isindef(info)
+  info.load_offline ? load_rb(info,snaps) : assemble_rb(def,info,args...)
 end
 
-load_rb(::Val{false},info::RBInfo) = load_rb(info,:u)
-load_rb(::Val{true},info::RBInfo) = load_rb(info,:u),load_rb(info,:p)
+function load_rb(info::RBInfo,snaps::Snapshots)
+  id = get_id(snaps)
+  load_rb(info,id)
+end
+
+function load_rb(info::RBInfo,snaps::NTuple{N,Snapshots}) where N
+  Broadcasting(si -> load_rb(info,si))(snaps)
+end
 
 function assemble_rb(
   ::Val{false},

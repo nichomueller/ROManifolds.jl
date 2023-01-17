@@ -156,13 +156,15 @@ function stokes_functions(::Val{false},measures::ProblemFixedMeasures)
   b(x,p::Param,t::Real) = 1.
   b(p::Param,t::Real) = x->b(x,p,t)
   b(p::Param) = t->b(p,t)
-  f(x,p::Param,t::Real) = VectorValue(0.,0.)
+  f(x,p::Param,t::Real) = VectorValue(0.,0.,0.)
   f(p::Param,t::Real) = x->f(x,p,t)
-  h(x,p::Param,t::Real) = VectorValue(0.,0.)
+  h(x,p::Param,t::Real) = VectorValue(0.,0.,0.)
   h(p::Param,t::Real) = x->h(x,p,t)
   function g(x,p::Param,t::Real)
     μ = get_μ(p)
-    abs.(sin(t))*VectorValue(1.,0.)*(x[2]==1.)
+    R = 0.5
+    dist = (x[1]^2+x[2])/(R^2)
+    abs.(1-cos(2*pi*t/0.5)+μ[1]*sin(2*pi*μ[2]*t/0.5))*VectorValue(0.,0.,1-dist)*(x[3]==0.)
   end
   g(p::Param,t::Real) = x->g(x,p,t)
 
@@ -262,7 +264,7 @@ function navier_stokes_functions(::Val{false},measures::ProblemFixedMeasures)
 
   function a(x,p::Param,t::Real)
     μ = get_μ(p)
-    (5*sum(μ[1:3]))*abs(sin(t))
+    5*sum(μ[1:3])
   end
   a(μ::Param,t::Real) = x->a(x,μ,t)
 

@@ -201,7 +201,7 @@ function get_reduced_timesθ(
 end
 
 function compute_in_timesθ(snaps::Snapshots,args...;kwargs...)
-  id = get_id(snaps)
+  id = get_id(snaps)*:θ
   snap = get_snap(snaps)
   nsnap = get_nsnap(snaps)
   Snapshots(id,compute_in_timesθ(snap,args...;kwargs...),nsnap)
