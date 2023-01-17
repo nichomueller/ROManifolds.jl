@@ -163,7 +163,7 @@ function stokes_functions(::Val{false},measures::ProblemFixedMeasures)
   function g(x,p::Param,t::Real)
     μ = get_μ(p)
     R = 0.5
-    dist = (x[1]^2+x[2])/(R^2)
+    dist = (x[1]^2+x[2]^2)/(R^2)
     abs.(1-cos(2*pi*t/0.5)+μ[1]*sin(2*pi*μ[2]*t/0.5))*VectorValue(0.,0.,1-dist)*(x[3]==0.)
   end
   g(p::Param,t::Real) = x->g(x,p,t)

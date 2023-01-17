@@ -11,11 +11,11 @@ function navier_stokes_unsteady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes"
-  mesh = "square20x20.json"
+  mesh = "square100x100.json"
   bnd_info = Dict("dirichlet" => collect(1:8),"neumann" => Int[])
   order = 2
 
-  t0,tF,dt,θ = 0.,0.1,0.005,0.5
+  t0,tF,dt,θ = 0.,0.2,0.005,0.5
   time_info = TimeInfo(t0,tF,dt,θ)
 
   ranges = fill([1.,2.],6)
