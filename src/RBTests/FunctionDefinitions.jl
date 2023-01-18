@@ -44,7 +44,7 @@ end
 
 function poisson_functions(::Val{false},measures::ProblemFixedMeasures)
 
-  #= function a(x,p::Param,t::Real)
+  function a(x,p::Param,t::Real)
     μ = get_μ(p)
     (μ[1]*(x[1] ≤ 0.75 && x[2] ≤ 0.5) + μ[1]*(x[2] ≤ 0.75 && x[2] > 0.5) +
       μ[3]*(x[1] > 0.75 && x[2] ≤ 0.5) + μ[4]*(x[2] > 0.75 && x[2] > 0.5))
@@ -75,8 +75,8 @@ function poisson_functions(::Val{false},measures::ProblemFixedMeasures)
     exp(-x[1])*abs.(sin(2*pi*μ[1]*t/T))
   end
   g(p::Param,t::Real) = x->g(x,p,t)
-  g(p::Param) = t->g(p,t) =#
-  function a(x,p::Param,t::Real)
+  g(p::Param) = t->g(p,t)
+  #= function a(x,p::Param,t::Real)
     μ = get_μ(p)
     1. + μ[6] + exp(-abs(sin(t)*norm(x-Point(μ[1:3]))^2 / μ[4])) / μ[5]
   end
@@ -105,7 +105,7 @@ function poisson_functions(::Val{false},measures::ProblemFixedMeasures)
     g_xpt / norm(g_xpt)
   end
   g(p::Param,t::Real) = x->g(x,p,t)
-  g(p::Param) = t->g(p,t)
+  g(p::Param) = t->g(p,t) =#
 
   afe(p::Param,t::Real,dΩ,u,v) = ∫(a(p,t)*∇(v)⋅∇(u))dΩ
   mfe(p,t,dΩ,u,v) = ∫(v⋅u)dΩ
