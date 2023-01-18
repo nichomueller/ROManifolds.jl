@@ -44,6 +44,38 @@ end
 
 function poisson_functions(::Val{false},measures::ProblemFixedMeasures)
 
+  #= function a(x,p::Param,t::Real)
+    μ = get_μ(p)
+    (μ[1]*(x[1] ≤ 0.75 && x[2] ≤ 0.5) + μ[1]*(x[2] ≤ 0.75 && x[2] > 0.5) +
+      μ[3]*(x[1] > 0.75 && x[2] ≤ 0.5) + μ[4]*(x[2] > 0.75 && x[2] > 0.5))
+  end
+  a(p::Param,t::Real) = x->a(x,p,t)
+  a(p::Param) = t->a(p,t)
+  function m(x,p::Param,t::Real)
+    1.
+  end
+  m(p::Param,t::Real) = x->m(x,p,t)
+  m(p::Param) = t->m(p,t)
+  function f(x,p::Param,t::Real)
+    μ = get_μ(p)
+    0.
+    #1+abs.(μ[5]*sin(2*pi*μ[6]*t/T))
+  end
+  f(p::Param,t::Real) = x->f(x,p,t)
+  f(p::Param) = t->f(p,t)
+  function h(x,p::Param,t::Real)
+    μ = get_μ(p)
+    0.
+  end
+  h(p::Param,t::Real) = x->h(x,p,t)
+  h(p::Param) = t->h(p,t)
+  function g(x,p::Param,t::Real)
+    μ = get_μ(p)
+    T = 0.5
+    exp(-x[1])*abs.(sin(2*pi*μ[1]*t/T))
+  end
+  g(p::Param,t::Real) = x->g(x,p,t)
+  g(p::Param) = t->g(p,t) =#
   function a(x,p::Param,t::Real)
     μ = get_μ(p)
     1. + μ[6] + exp(-abs(sin(t)*norm(x-Point(μ[1:3]))^2 / μ[4])) / μ[5]
@@ -163,8 +195,10 @@ function stokes_functions(::Val{false},measures::ProblemFixedMeasures)
   function g(x,p::Param,t::Real)
     μ = get_μ(p)
     R = 0.5
-    dist = (x[1]^2+x[2]^2)/(R^2)
-    abs.(1-cos(2*pi*t/0.5)+μ[1]*sin(2*pi*μ[2]*t/0.5))*VectorValue(0.,0.,1-dist)*(x[3]==0.)
+    T,dt = 0.03,0.005
+    gt = abs.(1-cos(2*pi*(t)/T)+μ[1]*sin(2*pi*μ[2]*(t)/T))
+    gx = VectorValue(0.,0.,1-(x[1]^2+x[2]^2)/(R^2))*(x[3]==0.)
+    gt*gx
   end
   g(p::Param,t::Real) = x->g(x,p,t)
 
@@ -264,7 +298,7 @@ function navier_stokes_functions(::Val{false},measures::ProblemFixedMeasures)
 
   function a(x,p::Param,t::Real)
     μ = get_μ(p)
-    5*sum(μ[1:3])
+    sum(μ[1:3])
   end
   a(μ::Param,t::Real) = x->a(x,μ,t)
 
@@ -277,15 +311,18 @@ function navier_stokes_functions(::Val{false},measures::ProblemFixedMeasures)
   d(x,μ::Param,t::Real) = 1.
   d(μ::Param,t::Real) = x->d(x,μ,t)
 
-  f(x,p::Param,t::Real) = VectorValue(0.,0.)
+  f(x,p::Param,t::Real) = VectorValue(0.,0.,0.)
   f(μ::Param,t::Real) = x->f(x,μ,t)
 
-  h(x,p::Param,t::Real) = VectorValue(0.,0.)
+  h(x,p::Param,t::Real) = VectorValue(0.,0.,0.)
   h(μ::Param,t::Real) = x->h(x,μ,t)
 
   function g(x,p::Param,t::Real)
     μ = get_μ(p)
-    VectorValue(sin(t),0.)*(x[2]==1.)
+    R = 0.5
+    T = 0.1
+    dist = (x[1]^2+x[2]^2)/(R^2)
+    abs.(1-cos(2*pi*t/T)+μ[1]*sin(2*pi*μ[2]*t/T))*VectorValue(0.,0.,1-dist)*(x[3]==0.)
   end
   g(μ::Param,t::Real) = x->g(x,μ,t)
 

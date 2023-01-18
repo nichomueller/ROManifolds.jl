@@ -1,5 +1,5 @@
 function rb(info::RBInfo,args...)
-  _,snaps,_ = args
+  _,snaps, = args
   def = isindef(info)
   info.load_offline ? load_rb(info,snaps) : assemble_rb(def,info,args...)
 end

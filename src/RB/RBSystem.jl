@@ -211,7 +211,7 @@ end
 function poisson_rb_system(
   lhs::NTuple{4,Matrix{Float}},
   rhs::NTuple{N,Matrix{Float}},
-  θ::Float) where N
+  θ::Real) where N
 
   A_rb,Ashift_rb,M_rb,Mshift_rb = lhs
   F_rb,H_rb,lifts... = rhs
@@ -237,7 +237,7 @@ end
 function stokes_rb_system(
   lhs::NTuple{8,Matrix{Float}},
   rhs::NTuple{N,Matrix{Float}},
-  θ::Float) where N
+  θ::Real) where N
 
   A_rb,Ashift_rb,B_rb,Bshift_rb,BT_rb,BTshift_rb,M_rb,Mshift_rb = lhs
   F_rb,H_rb,lifts... = rhs
@@ -276,7 +276,7 @@ function navier_stokes_rb_system(lhs::Tuple,rhs::Tuple)
   res_rb,jac_rb
 end
 
-function navier_stokes_rb_system(lhs::Tuple,rhs::Tuple,θ::Float)
+function navier_stokes_rb_system(lhs::Tuple,rhs::Tuple,θ::Real)
   A_rb,B_rb,BT_rb,C_rb,Cshift_rb,D_rb,Dshift_rb,M_rb = lhs
   F_rb,H_rb,lifts... = rhs
   liftA,liftB,liftC,liftM, = lifts

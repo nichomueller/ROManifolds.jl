@@ -11,11 +11,11 @@ function navier_stokes_unsteady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes"
-  mesh = "square100x100.json"
-  bnd_info = Dict("dirichlet" => collect(1:8),"neumann" => Int[])
+  mesh = "cylinder.json"
+  bnd_info = Dict("dirichlet" => ["wall","inlet"],"neumann" => ["outlet"])
   order = 2
 
-  t0,tF,dt,θ = 0.,0.2,0.005,0.5
+  t0,tF,dt,θ = 0.,0.1,0.0025,1
   time_info = TimeInfo(t0,tF,dt,θ)
 
   ranges = fill([1.,2.],6)
@@ -30,11 +30,11 @@ function navier_stokes_unsteady()
   a,afe,m,mfe,b,bfe,bTfe,c,cfe,d,dfe,f,ffe,h,hfe,g,res,jac,jac_t =
     navier_stokes_functions(ptype,measures)
 
-  reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{2,Float},order)
-  reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1;space=:P)
+  reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{3,Float},order)
+  reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1)
   V = MyTests(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet"])
   U = MyTrials(V,g,ptype)
-  Q = MyTests(model,reffe2;conformity=:L2,constraint=:zeromean)
+  Q = MyTests(model,reffe2;conformity=:C0)
   P = MyTrials(Q)
   Y = ParamTransientMultiFieldFESpace([V,Q])
   X = ParamTransientMultiFieldFESpace([U,P])
@@ -56,7 +56,7 @@ function navier_stokes_unsteady()
   opH = AffineParamVarOperator(h,hfe,PS,time_info,V;id=:H)
 
   varop = (opA,opB,opBT,opC,opD,opM,opF,opH)
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,online_snaps=95:100,mdeim_snap=30,load_offline=true)
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,online_snaps=95:100,mdeim_snap=10,load_offline=true)
   fesol = (uh,ph,μ,X,Y)
   tt = TimeTracker(0.,0.)
   rbspace,offinfo = offline_phase(info,fesol,varop,measures,tt)
