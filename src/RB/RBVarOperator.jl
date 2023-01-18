@@ -145,6 +145,10 @@ function assemble_matrix_and_lifting(op::RBBilinOperator{Affine,Ttr},args...) wh
   assemble_matrix_and_lifting(op.feop,args...)(realization(op))
 end
 
+function assemble_functional_matrix_and_lifting(op::RBUnsteadyBilinOperator)
+  assemble_functional_matrix_and_lifting(op.feop)
+end
+
 function assemble_affine_vector(op::RBSteadyLinOperator)
   assemble_vector(op.feop)(realization(op))
 end
@@ -192,6 +196,7 @@ get_Nt(op::RBVarOperator) = get_Nt(op.feop)
 get_θ(op::RBVarOperator) = get_θ(op.feop)
 get_timesθ(op::RBVarOperator) = get_timesθ(op.feop)
 get_reduced_timesθ(op::RBVarOperator,idx::Vector{Int}) = get_timesθ(op)[idx]
+get_phys_quad_points(op::RBVarOperator) = get_phys_quad_points(op.feop)
 
 function get_reduced_timesθ(
   op::RBUnsteadyVarOperator,
@@ -251,12 +256,11 @@ function unfold_spacetime(
   op::RBUnsteadyBilinOperator,
   vals::AbstractVector{T}) where T
 
-  Ns = get_Ns(op)
   Nt = get_Nt(op)
-  @assert size(vals,1) == Ns*Nt "Wrong space-time dimensions"
+  Ns = Int(size(vals,1)/Nt)
 
-  space_vals = Matrix{Tv}(reshape(vals,Ns,Nt))
-  time_vals = Matrix{Tv}(reshape(vals,Nt,Ns))
+  space_vals = Matrix{T}(reshape(vals,Ns,Nt))
+  time_vals = Matrix{T}(reshape(vals,Nt,Ns))
   space_vals,time_vals
 end
 

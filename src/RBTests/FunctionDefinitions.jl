@@ -44,39 +44,19 @@ end
 
 function poisson_functions(::Val{false},measures::ProblemFixedMeasures)
 
-  function a(x,p::Param,t::Real)
-    μ = get_μ(p)
-    (μ[1]*(x[1] ≤ 0.75 && x[2] ≤ 0.5) + μ[1]*(x[2] ≤ 0.75 && x[2] > 0.5) +
-      μ[3]*(x[1] > 0.75 && x[2] ≤ 0.5) + μ[4]*(x[2] > 0.75 && x[2] > 0.5))
-  end
-  a(p::Param,t::Real) = x->a(x,p,t)
-  a(p::Param) = t->a(p,t)
-  function m(x,p::Param,t::Real)
-    1.
-  end
-  m(p::Param,t::Real) = x->m(x,p,t)
-  m(p::Param) = t->m(p,t)
-  function f(x,p::Param,t::Real)
-    μ = get_μ(p)
-    0.
-    #1+abs.(μ[5]*sin(2*pi*μ[6]*t/T))
-  end
-  f(p::Param,t::Real) = x->f(x,p,t)
-  f(p::Param) = t->f(p,t)
-  function h(x,p::Param,t::Real)
-    μ = get_μ(p)
-    0.
-  end
-  h(p::Param,t::Real) = x->h(x,p,t)
-  h(p::Param) = t->h(p,t)
-  function g(x,p::Param,t::Real)
-    μ = get_μ(p)
-    T = 0.5
-    exp(-x[1])*abs.(sin(2*pi*μ[1]*t/T))
-  end
-  g(p::Param,t::Real) = x->g(x,p,t)
-  g(p::Param) = t->g(p,t)
   #= function a(x,p::Param,t::Real)
+    μ = get_μ(p)
+    if (x[1] ≤ 0.75 && x[2] ≤ 0.5)
+      μ[1]
+    elseif (x[1] ≤ 0.75 && x[2] > 0.5)
+      μ[2]
+    elseif (x[1] > 0.75 && x[2] ≤ 0.5)
+      μ[3]
+    else
+      μ[4]
+    end
+  end =#
+  function a(x,p::Param,t::Real)
     μ = get_μ(p)
     1. + μ[6] + exp(-abs(sin(t)*norm(x-Point(μ[1:3]))^2 / μ[4])) / μ[5]
   end
@@ -89,26 +69,30 @@ function poisson_functions(::Val{false},measures::ProblemFixedMeasures)
   m(p::Param) = t->m(p,t)
   function f(x,p::Param,t::Real)
     μ = get_μ(p)
+    #0.
     1.
   end
   f(p::Param,t::Real) = x->f(x,p,t)
   f(p::Param) = t->f(p,t)
   function h(x,p::Param,t::Real)
     μ = get_μ(p)
+    #0.
     1. + sin(t)*sum(Point(μ[3:5]) .* x)
   end
   h(p::Param,t::Real) = x->h(x,p,t)
   h(p::Param) = t->h(p,t)
   function g(x,p::Param,t::Real)
     μ = get_μ(p)
+    #T = 0.5
+    #exp(-x[1])*abs.(sin(2*pi*μ[1]*t/T))
     g_xpt = 1. + abs.(sin(t))*sum(Point(μ[4:6]) .* x)
     g_xpt / norm(g_xpt)
   end
   g(p::Param,t::Real) = x->g(x,p,t)
-  g(p::Param) = t->g(p,t) =#
+  g(p::Param) = t->g(p,t)
 
   afe(p::Param,t::Real,dΩ,u,v) = ∫(a(p,t)*∇(v)⋅∇(u))dΩ
-  mfe(p,t,dΩ,u,v) = ∫(v⋅u)dΩ
+  mfe(p::Param,t::Real,dΩ,u,v) = ∫(m(p,t)*v⋅u)dΩ
   ffe(p::Param,t::Real,dΩ,v) = ∫(f(p,t)*v)dΩ
   hfe(p::Param,t::Real,dΓn,v) = ∫(h(p,t)*v)dΓn
 
@@ -121,6 +105,11 @@ function poisson_functions(::Val{false},measures::ProblemFixedMeasures)
   ffe(p::Param,t::Real) = v -> ffe(p,t,v)
   hfe(p::Param,t::Real,v) = hfe(p,t,dΓn,v)
   hfe(p::Param,t::Real) = v -> hfe(p,t,v)
+  # FUNCTIONAL MDEIM REPRESENTATION
+  afe(a,u,v) = ∫(a*∇(v)⋅∇(u))dΩ
+  mfe(m,u,v) = ∫(m*v⋅u)dΩ
+  ffe(f,v) = ∫(f*v)dΩ
+  hfe(h,v) = ∫(h*v)dΓn
 
   lhs(p,t,u,v) = afe(p,t,u,v)
   rhs(p,t,v) = ffe(p,t,v) + hfe(p,t,v)

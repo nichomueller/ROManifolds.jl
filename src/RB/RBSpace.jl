@@ -70,7 +70,7 @@ function RBSpace(
 end
 
 get_id(rb::RBSpace) = rb.id
-get_id(rb::NTuple{2,RBSpace}) = get_id.(rb)
+get_id(rb::NTuple{N,RBSpace}) where N = get_id.(rb)
 get_basis_space(rb::RBSpace) = rb.basis_space
 get_basis_space(rb::NTuple{N,RBSpace}) where N = get_basis_space.(rb)
 get_basis_time(rb::RBSpaceUnsteady) = rb.basis_time

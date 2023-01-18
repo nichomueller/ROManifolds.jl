@@ -167,12 +167,12 @@ end
 
 struct LagrangianQuadFESpace
   test::SingleFieldFESpace
-end
 
-function LagrangianQuadFESpace(model::DiscreteModel,order::Int)
-  reffe_quad = Gridap.ReferenceFE(lagrangian_quad,Float,order)
-  test = TestFESpace(model,reffe_quad,conformity=:L2)
-  LagrangianQuadFESpace(test)
+  function LagrangianQuadFESpace(model::DiscreteModel,order::Int)
+    reffe_quad = Gridap.ReferenceFE(lagrangian_quad,Float,order)
+    test = TestFESpace(model,reffe_quad,conformity=:L2)
+    new(test)
+  end
 end
 
 function LagrangianQuadFESpace(test::SingleFieldFESpace)
@@ -185,16 +185,26 @@ function LagrangianQuadFESpace(tests::MyTests)
   LagrangianQuadFESpace(get_test(tests))
 end
 
+function Gridap.FEFunction(
+  quad_fespace::LagrangianQuadFESpace,
+  vec::AbstractVector)
+
+  FEFunction(quad_fespace.test,vec)
+end
+
+function Gridap.FEFunction(
+  quad_fespace::LagrangianQuadFESpace,
+  mat::AbstractMatrix)
+
+  n -> FEFunction(quad_fespace.test,mat[:,n])
+end
+
 function get_phys_quad_points(test::SingleFieldFESpace)
   trian = get_triangulation(test)
   phys_map = get_cell_map(trian)
   cell_quad = get_cell_quadrature(test)
   cell_points = get_data(get_cell_points(cell_quad))
   map(Gridap.evaluate,phys_map,cell_points)
-end
-
-function get_phys_quad_points(tests::MyTests)
-  get_phys_quad_points(get_test(tests))
 end
 
 struct TimeInfo
@@ -292,6 +302,7 @@ get_timesθ(op::ParamVarOperator) = get_timesθ(get_time_info(op))
 Gridap.FESpaces.get_trial(op::ParamLiftingOperator) = op.trials.trial
 get_trials(op::ParamLiftingOperator) = op.trials
 get_trial_no_bc(op::ParamLiftingOperator) = op.trials.trial_no_bc
+get_phys_quad_points(op::ParamVarOperator) = get_phys_quad_points(get_test(op))
 
 realization(op::ParamVarOperator) = realization(get_pspace(op))
 
@@ -635,6 +646,21 @@ function assemble_matrix_and_lifting(op::ParamUnsteadyBilinOperator,t::Real)
   A_bc(μ) = A_no_bc(μ)[fdofs_test,fdofs_trial]
   dir = get_dirichlet_function(op)
   lift(μ) = A_no_bc(μ)[fdofs_test,ddofs]*dir(μ,t)
+
+  A_bc,lift
+end
+
+function assemble_functional_matrix_and_lifting(op::ParamUnsteadyBilinOperator)
+  afe = get_fe_function(op)
+  trial_no_bc = get_trial_no_bc(op)
+  test_no_bc = get_test_no_bc(op)
+  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
+  fdofs_test,fdofs_trial = fdofs
+
+  A_no_bc(fun) = assemble_matrix((u,v)->afe(fun,u,v),trial_no_bc,test_no_bc)
+  A_bc(fun) = A_no_bc(fun)[fdofs_test,fdofs_trial]
+  dir = get_dirichlet_function(op)
+  lift(fun,μ,tθ) = A_no_bc(fun)[fdofs_test,ddofs]*dir(μ,tθ)
 
   A_bc,lift
 end

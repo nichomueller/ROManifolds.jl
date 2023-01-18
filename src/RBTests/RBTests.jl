@@ -139,21 +139,27 @@ function generate_fe_snapshots(
 end
 
 function generate_fe_snapshots(::Val{false},sol,fepath::String)
-  uh,μ = collect_solutions(sol)
+  time = @elapsed begin
+    uh,μ = collect_solutions(sol)
+  end
   usnap = Snapshots(:u,uh)
   save(fepath,usnap)
   save(fepath,μ)
+  save(fepath,Dict("FE time"=>time))
   usnap,μ
 end
 
 function generate_fe_snapshots(::Val{true},sol,fepath::String)
   Ns = get_Ns(sol)
-  xh,μ = collect_solutions(sol)
+  time = @elapsed begin
+    xh,μ = collect_solutions(sol)
+  end
   uh = Broadcasting(x->getindex(x,1:Ns[1],:))(xh)
   ph = Broadcasting(x->getindex(x,Ns[1]+1:Ns[1]+Ns[2],:))(xh)
   usnap,psnap = Snapshots.([:u,:p],[uh,ph])
   save.([fepath,fepath],[usnap,psnap])
   save(fepath,μ)
+  save(fepath,Dict("FE time"=>time))
   usnap,psnap,μ
 end
 
