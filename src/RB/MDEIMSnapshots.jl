@@ -1,26 +1,8 @@
-function basis_as_fefun(op::RBSteadyVarOperator)
-  bspace = get_basis_space_col(op)
-  test = get_test(op)
-  trial = get_trial(op)
-  fefun(n::Int) = FEFunction(test,bspace[:,n])
-  fefun_lift(μ::Param,n::Int) = FEFunction(trial(μ),bspace[:,n])
-  fefun,fefun_lift
-end
-
-function basis_as_fefun(op::RBUnsteadyVarOperator,rbspaceθ::RBSpaceUnsteady)
-  bspaceθ = get_basis_space(rbspaceθ)
-  test = get_test(op)
-  trial = get_trial(op)
-  fefunθ(n::Int) = FEFunction(test,bspaceθ[:,n])
-  fefunθ_lift(μ::Param,tθ::Real,n::Int) = FEFunction(trial(μ,tθ),bspaceθ[:,n])
-  fefunθ,fefunθ_lift
-end
-
 function mdeim_snapshots(
   ::RBInfo,
   op::RBLinOperator,
   args...)
-  vector_snapshots(op,args...)
+  vector_snapshots(Val(info.fun_mdeim),op,args...)
 end
 
 function mdeim_snapshots(
@@ -31,6 +13,7 @@ function mdeim_snapshots(
 end
 
 function vector_snapshots(
+  ::Val{false},
   op::RBLinOperator{Nonaffine},
   μ::Vector{Param})
 
@@ -196,15 +179,15 @@ function matrix_snapshots(
   Nt = get_Nt(op)
   timesθ = get_timesθ(op)
   phys_quadp = get_phys_quad_points(op)
-  ncells = length(phys_quadp)
-  nquad_cell = length(phys_quadp[1])
 
   param_fun = get_param_function(op)
-  param(k,tθ,n,q) = param_fun(phys_quadp[n][q],μ[k],tθ)
-  param(k,tθ,n) = Broadcasting(q -> param(k,tθ,n,q))(1:nquad_cell)
-  param(k,tθ) = Matrix(Broadcasting(n -> param(k,tθ,n))(1:ncells))[:]
-  param(k) = Matrix(Broadcasting(tθ -> param(k,tθ))(timesθ))[:]
-  param_vals = Matrix(param.(eachindex(μ)))
+  param(xvec::Vector{Point{D,Float}},μk::Param,tθ::Real) where D =
+    Broadcasting(x->param_fun(x,μk,tθ))(xvec)[:]
+  param(n::Int,μk::Param,tθ::Real) = param(phys_quadp[n],μk,tθ)
+  param(μk::Param,tθ::Real) =
+    Matrix(Broadcasting(n->param(n,μk,tθ))(eachindex(phys_quadp)))[:]
+  param(μk::Param) = Matrix(Broadcasting(tθ->param(μk,tθ))(timesθ))[:]
+  param_vals = Matrix(param.(μ))
 
   red_param_vals = POD(param_vals,Val(true))
   nparam = size(red_param_vals,2)
@@ -230,4 +213,49 @@ function matrix_snapshots(
   vl = snapshot.(1:nparam)
   vals,lifts = first.(vl),last.(vl)
   findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
+end
+
+function basis_as_fefun(op::RBSteadyVarOperator)
+  bspace = get_basis_space_col(op)
+  test = get_test(op)
+  trial = get_trial(op)
+  fefun(n::Int) = FEFunction(test,bspace[:,n])
+  fefun_lift(μ::Param,n::Int) = FEFunction(trial(μ),bspace[:,n])
+  fefun,fefun_lift
+end
+
+function basis_as_fefun(op::RBUnsteadyVarOperator,rbspaceθ::RBSpaceUnsteady)
+  bspaceθ = get_basis_space(rbspaceθ)
+  test = get_test(op)
+  trial = get_trial(op)
+  fefunθ(n::Int) = FEFunction(test,bspaceθ[:,n])
+  fefunθ_lift(μ::Param,tθ::Real,n::Int) = FEFunction(trial(μ,tθ),bspaceθ[:,n])
+  fefunθ,fefunθ_lift
+end
+
+function evaluate_param_function(op::RBUnsteadyVarOperator)
+  timesθ = get_timesθ(op)
+  phys_quadp = get_phys_quad_points(op)
+  param_fun = get_param_function(op)
+
+  param(xvec::Vector{Point{D,Float}},μk::Param,tθ::Real) where D =
+    Broadcasting(x->param_fun(x,μk,tθ))(xvec)[:]
+  param(n::Int,μk::Param,tθ::Real) = param(phys_quadp[n],μk,tθ)
+  param(μk::Param,tθ::Real) =
+    Matrix(Broadcasting(n->param(n,μk,tθ))(eachindex(phys_quadp)))[:]
+  param(μk::Param) = Matrix(Broadcasting(tθ->param(μk,tθ))(timesθ))[:]
+
+  Matrix(param.(μ))
+end
+
+function reduce_param_function(op::RBUnsteadyVarOperator,vals::Matrix{Float})
+  red_vals = POD(vals,Val(true))
+  red_vals_space,_ = unfold_spacetime(op,red_vals)
+  red_vals_space
+end
+
+function interpolate_param_function(op::RBUnsteadyVarOperator,vals::Matrix{Float})
+  test_quad = LagrangianQuadFESpace(get_test(op))
+  param_fun = FEFunction(test_quad,vals)
+  param_fun
 end

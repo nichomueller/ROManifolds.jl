@@ -343,14 +343,56 @@ for i = 1:24
   end
 end
 
-#= Aon = online_assembler(Ainfo...,μ[k],false)
-Aon90 = Aon[1][1]
-A90(t) = assemble_matrix(rbopA,t)(μ[k])
-A90rb = Matrix(Matrix([(bsu'*A90(tθ)*bsu)[:] for tθ=timesθ])')
-myAon,_ = coeff_by_time_bases_bilin(rbopA,A90rb)
-mm = zeros(size(Aon90))
-for i = 1:24
-  for j = 1:24
-    mm[1+(i-1)*13:i*13,1+(j-1)*13:j*13] = myAon[(i-1)*24+j]
+
+
+
+
+
+function assemble_functional_vector(op::RBUnsteadyLinOperator)
+  afe = get_fe_function(op)
+  test = get_test(op)
+  fun -> assemble_vector(v->afe(fun,v),test)
+end
+
+function fun_deim(
+  op::RBUnsteadyLinOperator,
+  μ::Vector{Param})
+
+  id = get_id(op)
+  println("Building snapshots by evaluating the parametric function on the quadrature points, $id")
+
+  Nt = get_Nt(op)
+  timesθ = get_timesθ(op)
+  phys_quadp = get_phys_quad_points(op)
+
+  param_fun = get_param_function(op)
+  param(xvec::Vector{Point{D,Float}},μk::Param,tθ::Real) where D =
+    Broadcasting(x->param_fun(x,μk,tθ))(xvec)[:]
+  param(n::Int,μk::Param,tθ::Real) = param(phys_quadp[n],μk,tθ)
+  param(μk::Param,tθ::Real) =
+    Matrix(Broadcasting(n->param(n,μk,tθ))(eachindex(phys_quadp)))[:]
+  param(μk::Param) = Matrix(Broadcasting(tθ->param(μk,tθ))(timesθ))[:]
+  param_vals = Matrix(param.(μ))
+
+  red_param_vals = POD(param_vals,Val(true))
+  nparam = size(red_param_vals,2)
+  red_vals_space,_ = unfold_spacetime(op,red_param_vals)
+
+  test_quad = LagrangianQuadFESpace(get_test(op))
+  param_fefun = FEFunction(test_quad,red_vals_space)
+
+  V = assemble_functional_vector(op)
+
+  function snapshot(k::Int)
+    v = Vector{Float}[]
+    for (nt,tθ) in enumerate(timesθ)
+      println("Snapshot number $((k-1)*Nt+nt) at time $tθ, $id")
+      b = param_fefun((k-1)*Nt+nt)
+      push!(v,V(b))
+    end
+    Matrix(v)
   end
-end =#
+
+  vals = snapshot.(1:nparam)
+  Snapshots(id,vals)
+end

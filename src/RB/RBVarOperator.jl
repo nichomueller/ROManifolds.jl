@@ -275,7 +275,7 @@ function get_inverse_findnz_map(op::RBBilinOperator,q::T) where T
 end
 
 function unfold_spacetime(
-  op::RBUnsteadyBilinOperator,
+  op::RBUnsteadyVarOperator,
   vals::AbstractVector{T}) where T
 
   Nt = get_Nt(op)
@@ -287,7 +287,7 @@ function unfold_spacetime(
 end
 
 function unfold_spacetime(
-  op::RBUnsteadyBilinOperator,
+  op::RBUnsteadyVarOperator,
   vals::AbstractMatrix{T}) where T
 
   unfold_vec(k::Int) = unfold_spacetime(op,vals[:,k])
