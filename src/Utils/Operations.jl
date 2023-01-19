@@ -52,6 +52,7 @@ function approx_POD(S::AbstractMatrix,::Val{true};ϵ=1e-5)
   C = S'*S
   _,_,V = my_svd(C)
   Σ = svdvals(S)
+  #U,Σ,_ = my_svd(S)
 
   energies = cumsum(Σ.^2)
   ntemp = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
@@ -66,12 +67,14 @@ function approx_POD(S::AbstractMatrix,::Val{true};ϵ=1e-5)
     U[:,i] /= (Σ[i]+eps())
   end
   U
+  #U[:,1:n]
 end
 
 function approx_POD(S::AbstractMatrix,::Val{false};ϵ=1e-5)
   C = S*S'
   U,_ = my_svd(C)
   Σ = svdvals(S)
+  #U,Σ,_ = my_svd(S)
 
   energies = cumsum(Σ)
   ntemp = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
@@ -319,6 +322,14 @@ spacetime_vector(mat::AbstractMatrix) = mat[:]
 spacetime_vector(fun::Function) = u -> fun(u)[:]
 spacetime_vector(q::Tuple) = spacetime_vector.(q)
 
+function infty_norm(q::AbstractArray)
+  maximum(abs.(q))
+end
+
+function infty_norm(q::NTuple{N,AbstractArray}) where N
+  infty_norm.(q)
+end
+
 function SparseArrays.sparsevec(M::Matrix{T},findnz_map::Vector{Int}) where T
   sparse_vblocks = SparseVector{T}[]
   for j = axes(M,2)
@@ -398,7 +409,7 @@ function Base.NTuple(N::Int,T::DataType)
   NT::NTuple{N,T}
 end
 
-Gridap.VectorValue(D::Int, T::DataType) = VectorValue(NTuple(D, T))
+Gridap.VectorValue(D::Int,T::DataType) = VectorValue(NTuple(D,T))
 
 function Base.one(vv::VectorValue{D,T}) where {D,T}
   vv_one = zero(vv) .+ one(T)
@@ -421,7 +432,19 @@ function Base.Int32(vv::VectorValue{D,Int32}) where D
   VectorValue(Int32.([vv...]))
 end
 
+function Gridap.evaluate(ntuple_fun::NTuple{N,Function},args...) where N
+  tup = ()
+  for fun in ntuple_fun
+    tup = (tup...,fun(args...))
+  end
+  tup
+end
+
 Base.:(*)(a::Symbol,b::Symbol) = Symbol(String(a)*String(b))
+Base.:(*)(a::Symbol,b::Symbol) = Symbol(String(a)*String(b))
+Base.:(-)(a::NTuple{N,T1},b::NTuple{N,T2}) where {N,T1,T2} = a.-b
+Base.:(*)(a::NTuple{N,T1},b::NTuple{N,T2}) where {N,T1,T2} = a.*b
+Base.adjoint(nt::NTuple{N,T}) where {N,T} = adjoint.(nt)
 
 Base.:(^)(vv::VectorValue,n::Int) = VectorValue([vv[k]^n for k=eachindex(vv)])
 Base.:(^)(vv::VectorValue,n::Float) = VectorValue([vv[k]^n for k=eachindex(vv)])

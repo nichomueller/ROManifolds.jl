@@ -185,6 +185,28 @@ function assemble_affine_matrix(op::RBUnsteadyBilinOperator{Nonlinear,Ttr}) wher
   assemble_matrix(op.feop,t)(u)
 end
 
+function assemble_fe_structure(op::RBLinOperator,args...)
+  assemble_vector(op,args...)
+end
+
+function assemble_fe_structure(op::RBBilinOperator,args...)
+  assemble_matrix(op,args...)
+end
+
+function assemble_fe_structure(
+  op::RBSteadyBilinOperator{Top,<:ParamTrialFESpace},
+  args...) where Top
+
+  assemble_matrix_and_lifting(op,args...)
+end
+
+function assemble_fe_structure(
+  op::RBUnsteadyBilinOperator{Top,<:ParamTransientTrialFESpace},
+  args...) where Top
+
+  assemble_matrix_and_lifting(op,args...)
+end
+
 get_dirichlet_function(op::RBVarOperator) = get_dirichlet_function(op.feop)
 
 get_pspace(op::RBVarOperator) = get_pspace(op.feop)
@@ -273,17 +295,92 @@ function unfold_spacetime(
   Matrix(first.(vals)),Matrix(last.(vals))
 end
 
-function rb_space_projection(op::RBLinOperator)
-  vec = assemble_affine_vector(op)
-  rbrow = get_rbspace_row(op)
+function rb_space_projection(
+  op::RBLinOperator;
+  mv=assemble_affine_vector(op))
 
-  rb_space_projection(rbrow,vec)
+  rbrow = get_rbspace_row(op)
+  rb_space_projection(rbrow,mv)
 end
 
-function rb_space_projection(op::RBBilinOperator)
-  mat = assemble_affine_matrix(op)
+function rb_space_projection(
+  op::RBBilinOperator;
+  mv=assemble_affine_matrix(op))
+
   rbrow = get_rbspace_row(op)
   rbcol = get_rbspace_col(op)
+  rb_space_projection(rbrow,rbcol,mv)
+end
 
-  rb_space_projection(rbrow,rbcol,mat)
+function rb_time_projection(
+  op::RBLinOperator;
+  mv=assemble_vector(op)(realization(op)))
+
+  rbrow = get_rbspace_row(op)
+  rb_time_projection(rbrow,mv)
+end
+
+function rb_time_projection(
+  op::RBBilinOperator;
+  mv=assemble_matrix(op)(realization(op)))
+
+  rbrow = get_rbspace_row(op)
+  rbcol = get_rbspace_col(op)
+  rb_time_projection(rbrow,rbcol,mv)
+end
+
+function rb_spacetime_projection(
+  op::RBLinOperator;
+  mv=assemble_vector(op)(realization(op)))
+
+  proj_space = [rb_space_projection(op;mv=mv[:,i]) for i=axes(mv,2)]
+  resh_proj = Matrix(proj_space)'
+  proj_spacetime_block =rb_time_projection(op;mv=resh_proj)
+  rbrow = get_rbspace_row(op)
+  ns,nt = get_ns(rbrow),get_nt(rbrow)
+  proj_spacetime = zeros(ns*nt,1)
+  for i = 1:ns
+    proj_spacetime[1+(i-1)*nt:i*nt,1] = proj_spacetime_block[i]
+  end
+  proj_spacetime
+end
+
+function rb_spacetime_projection(
+  op::RBBilinOperator;
+  mv=assemble_matrix(op)(realization(op)))
+
+  proj_space = [rb_space_projection(op;mv=mv[i])[:] for i=eachindex(mv)]
+  resh_proj = Matrix(proj_space)'
+  proj_spacetime_block =rb_time_projection(op;mv=resh_proj)
+  rbrow = get_rbspace_row(op)
+  ns,nt = get_ns(rbrow),get_nt(rbrow)
+  proj_spacetime = zeros(ns*nt,ns*nt)
+  for i = 1:ns
+    for j = 1:ns
+      proj_spacetime[1+(i-1)*nt:i*nt,1+(j-1)*nt:j*nt] = proj_spacetime_block[(i-1)*ns+j]
+    end
+  end
+  proj_spacetime
+end
+
+function rb_projection(
+  op::RBSteadyVarOperator,
+  mv::AbstractArray)
+
+  rb_space_projection(op;mv=mv)
+end
+
+function rb_projection(
+  op::RBUnsteadyVarOperator,
+  mv::AbstractArray)
+
+  rb_spacetime_projection(op;mv=mv)
+end
+
+function rb_projection(
+  op::RBVarOperator,
+  mv::NTuple{2,AbstractArray})
+
+  op_lift = RBLiftingOperator(op)
+  rb_projection(op,first(mv)),rb_projection(op_lift,last(mv))
 end

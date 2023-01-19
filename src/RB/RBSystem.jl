@@ -199,6 +199,14 @@ function coeff_by_time_bases_bilin(
   btbtc,btbtc_shift
 end
 
+function elim_shifted_matrix(nt)
+  nt
+end
+
+function elim_shifted_matrix(nt::Tuple{NTuple{2,Matrix{Float}},Matrix{Float}})
+  first(nt[1]),nt[2]
+end
+
 function poisson_rb_system(
   lhs::Matrix{Float},
   rhs::NTuple{N,Matrix{Float}}) where N

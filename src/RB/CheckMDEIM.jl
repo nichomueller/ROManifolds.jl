@@ -186,7 +186,7 @@ function unsteady_navier_stokes()
   u90,μ90 = uh[90].snap,μ[90]
   timesθ = get_timesθ(op)
   μ_mdeim = μ[1:info.mdeim_nsnap]
-  findnz_map,snaps... = mdeim_snapshots(op,info,μ_mdeim,rbspace_uθ)
+  findnz_map,snaps... = mdeim_snapshots(info,op,μ_mdeim,rbspace_uθ)
   bs,_,red_bs = space_quantities(snaps,findnz_map)
   btθ = get_basis_time(rbspace_uθ)
   bst = kron(btθ,bs)

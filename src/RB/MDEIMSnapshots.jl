@@ -17,15 +17,15 @@ function basis_as_fefun(op::RBUnsteadyVarOperator,rbspaceθ::RBSpaceUnsteady)
 end
 
 function mdeim_snapshots(
-  op::RBLinOperator,
   ::RBInfo,
+  op::RBLinOperator,
   args...)
   vector_snapshots(op,args...)
 end
 
 function mdeim_snapshots(
-  op::RBBilinOperator,
   info::RBInfo,
+  op::RBBilinOperator,
   args...)
   matrix_snapshots(Val(info.fun_mdeim),op,args...)
 end
@@ -213,18 +213,21 @@ function matrix_snapshots(
   test_quad = LagrangianQuadFESpace(get_test(op))
   param_fefun = FEFunction(test_quad,red_vals_space)
 
-  findnz_map, = get_findnz_map(op,param_fefun(1))
+  findnz_map = get_findnz_map(op,μ)
   M,lift = assemble_functional_matrix_and_lifting(op)
 
-  function snapshot(k::Int,nt::Int)
-    tθ = timesθ[nt]
-    println("Snapshot number $((k-1)*Nt+nt) at time $tθ, $id")
-    v = nonzero_values(M(param_fefun((k-1)*Nt+nt)),findnz_map)
-    l = lift(param_fefun((k-1)*Nt+nt),μ[k],tθ)
-    v,l
+  function snapshot(k::Int)
+    v,l = Vector{Float}[],Vector{Float}[]
+    for (nt,tθ) in enumerate(timesθ)
+      println("Snapshot number $((k-1)*Nt+nt) at time $tθ, $id")
+      b = param_fefun((k-1)*Nt+nt)
+      push!(v,nonzero_values(M(b),findnz_map))
+      push!(l,lift(b,μ[k],tθ))
+    end
+    Matrix(v),Matrix(l)
   end
 
-  vl = [snapshot(k,nt) for k=1:nparam for nt=1:Nt]
+  vl = snapshot.(1:nparam)
   vals,lifts = first.(vl),last.(vl)
   findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end

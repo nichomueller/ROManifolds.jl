@@ -1,5 +1,10 @@
+mutable struct OfflineTime
+  basis_time::Float
+  assembly_time::Float
+end
+
 mutable struct TimeTracker
-  offline_time::Float
+  offline_time::OfflineTime
   online_time::Float
 end
 
@@ -114,4 +119,54 @@ function Gridap.writevtk(
       pvd = writevtk(trian,path*"_$(it).vtu",cellfields=["err"=>fefun])
     end
   end
+end
+
+struct MDEIMError
+  id::Symbol
+  offline_error::Float
+  online_error::Float
+end
+
+function MDEIMError(
+  id::NTuple{N,Symbol},
+  offline_error::NTuple{N,Float},
+  online_error::NTuple{N,Float}) where N
+
+  MDEIMError.(id,offline_error,online_error)
+end
+
+function MDEIMError(
+  op::RBVarOperator,
+  mdeim,
+  μ::Param,
+  args...)
+
+  id = get_id(mdeim)
+  offline_error = mdeim_offline_error(op,mdeim,μ,args...)
+  online_error = mdeim_online_error(op,mdeim,μ,args...)
+  MDEIMError(id,offline_error,online_error)
+end
+
+#= function mdeim_offline_error(
+  op::RBVarOperator,
+  mdeim::MDEIM,
+  μ::Param,)
+
+  mat = evaluate(assemble_fe_structure(op),μ)
+  mat_rb = rb_space_projection(op,mat)
+  basis = get_basis(mdeim)
+  infty_norm(mat-basis*basis'*mat)
+end =#
+
+function mdeim_online_error(
+  op::RBVarOperator,
+  mdeim,
+  μ::Param,
+  st_mdeim=false)
+
+  mat = evaluate(assemble_fe_structure(op),μ)
+  mat_rb = rb_projection(op,mat)
+  mdeim_rb_tmp = online_assembler(op,mdeim,μ,st_mdeim)
+  mdeim_rb = elim_shifted_matrix(mdeim_rb_tmp)
+  infty_norm(mat_rb-mdeim_rb)
 end

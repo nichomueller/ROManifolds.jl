@@ -52,7 +52,7 @@ function mdeim_offline(
   args...)
 
   μ_mdeim = μ[1:info.mdeim_nsnap]
-  snaps = mdeim_snapshots(op,info,μ_mdeim,args...)
+  snaps = mdeim_snapshots(info,op,μ_mdeim,args...)
   rbspace = mdeim_basis(info,snaps)
   red_rbspace = project_mdeim_basis(op,rbspace)
   idx = mdeim_idx(rbspace)
@@ -71,7 +71,7 @@ function mdeim_offline(
   args...)
 
   μ_mdeim = μ[1:info.mdeim_nsnap]
-  findnz_map,snaps... = mdeim_snapshots(op,info,μ_mdeim,args...)
+  findnz_map,snaps... = mdeim_snapshots(info,op,μ_mdeim,args...)
   rbspace = mdeim_basis(info,snaps)
   red_rbspace = project_mdeim_basis(op,rbspace,findnz_map)
   idx = mdeim_idx(rbspace)
@@ -115,7 +115,7 @@ function mdeim_offline(
   end
 
   μ_mdeim = μ[1:info.mdeim_nsnap]
-  findnz_map,snaps... = mdeim_snapshots(op,info,μ_mdeim,rbspaceθ)
+  findnz_map,snaps... = mdeim_snapshots(info,op,μ_mdeim,rbspaceθ)
 
   bs,idx_space,red_bs = space_quantities(snaps,findnz_map)
   bst,idx,red_rbspace = spacetime_quantities(bs,idx_space,red_bs)
@@ -176,6 +176,10 @@ get_red_lu_factors(mdeim::MDEIM) = mdeim.red_lu_factors
 get_id(mdeim::MDEIM) = get_id(mdeim.rbspace)
 get_basis_space(mdeim::MDEIM) = get_basis_space(mdeim.rbspace)
 get_basis_time(mdeim::MDEIMUnsteady) = get_basis_time(mdeim.rbspace)
+get_basis_spacetime(mdeim::MDEIMUnsteady) = kron(get_basis_time(mdeim.rbspace),
+  get_basis_space(mdeim.rbspace))
+get_basis(mdeim::MDEIMSteady) = get_basis_space(mdeim)
+get_basis(mdeim::MDEIMUnsteady) = get_basis_spacetime(mdeim)
 get_idx_space(mdeim::MDEIMSteady) = mdeim.idx
 get_idx_space(mdeim::MDEIMUnsteady) = first(mdeim.idx)
 get_idx_time(mdeim::MDEIMUnsteady) = last(mdeim.idx)
@@ -183,6 +187,8 @@ get_red_measure(mdeim::MDEIM) = mdeim.red_measure
 
 get_basis_space(mdeim::NTuple{2,MDEIM}) = get_basis_space.(mdeim)
 get_basis_time(mdeim::NTuple{2,MDEIMUnsteady}) = get_basis_time.(mdeim)
+get_basis_spacetime(mdeim::NTuple{2,MDEIMUnsteady}) = get_basis_spacetime.(mdeim)
+get_basis(mdeim::NTuple{2,MDEIM}) = get_basis.(mdeim)
 get_red_lu_factors(mdeim::NTuple{2,MDEIM}) = get_red_lu_factors.(mdeim)
 get_idx_space(mdeim::NTuple{2,MDEIM}) = get_idx_space.(mdeim)
 get_idx_time(mdeim::NTuple{2,MDEIMUnsteady}) = get_idx_time.(mdeim)

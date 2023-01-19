@@ -11,18 +11,18 @@ function poisson_unsteady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/poisson"
-  #mesh = "model.json"
-  #bnd_info = Dict("dirichlet" => ["sides"],"neumann" => ["circle","triangle","square"])
-  mesh = "cube5x5x5.json"
-  bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
+  mesh = "model.json"
+  bnd_info = Dict("dirichlet" => ["sides"],"neumann" => ["circle","triangle","square"])
+  #mesh = "cube5x5x5.json"
+  #bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26])
   order = 1
 
-  #t0,tF,dt,θ = 0.,0.5,0.025,1
-  t0,tF,dt,θ = 0.,2.5,0.05,0.5
+  t0,tF,dt,θ = 0.,1.5,0.025,1
+  #t0,tF,dt,θ = 0.,2.5,0.05,0.5
   time_info = TimeInfo(t0,tF,dt,θ)
 
-  #ranges = fill([1.,3.],6)
-  ranges = fill([1.,20.],6)
+  ranges = fill([1.,3.],6)
+  #ranges = fill([1.,20.],6)
   sampling = UniformSampling()
   PS = ParamSpace(ranges,sampling)
 
@@ -45,12 +45,12 @@ function poisson_unsteady()
   opA = NonaffineParamVarOperator(a,afe,PS,time_info,U,V;id=:A)
   opM = AffineParamVarOperator(m,mfe,PS,time_info,U,V;id=:M)
   opF = AffineParamVarOperator(f,ffe,PS,time_info,V;id=:F)
-  opH = NonaffineParamVarOperator(h,hfe,PS,time_info,V;id=:H)
-  #opH = AffineParamVarOperator(h,hfe,PS,time_info,V;id=:H)
+  #opH = NonaffineParamVarOperator(h,hfe,PS,time_info,V;id=:H)
+  opH = AffineParamVarOperator(h,hfe,PS,time_info,V;id=:H)
 
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=10,load_offline=false,
-    st_mdeim=true,fun_mdeim=true)
-  tt = TimeTracker(0.,0.)
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=true,
+    st_mdeim=true,fun_mdeim=false)
+  tt = TimeTracker(OfflineTime(0.,0.),0.)
   rbspace,offinfo = offline_phase(info,(uh,μ),(opA,opM,opF,opH),measures,tt)
   online_phase(info,(uh,μ),rbspace,offinfo,tt)
 end

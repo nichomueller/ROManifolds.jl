@@ -7,7 +7,7 @@ function rb_structure(info::RBInfo,args...)
 end
 
 function assemble_rb_structure(info::RBInfo,tt::TimeTracker,op::RBVarOperator,args...)
-  tt.offline_time += @elapsed begin
+  tt.offline_time.assembly_time += @elapsed begin
     rb_variable = assemble_rb_structure(info,op,args...)
   end
   save_rb_structure(info,rb_variable,get_id(op))

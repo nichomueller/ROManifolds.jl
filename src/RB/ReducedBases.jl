@@ -21,7 +21,7 @@ function assemble_rb(
   args...)
 
   id = get_id(snaps)
-  tt.offline_time += @elapsed begin
+  tt.offline_time.basis_time += @elapsed begin
     basis_space = rb_space(info,snaps)
   end
 
@@ -39,7 +39,7 @@ function assemble_rb(
   args...)
 
   id = get_id(snaps)
-  tt.offline_time += @elapsed begin
+  tt.offline_time.basis_time += @elapsed begin
     basis_space = rb_space(info,snaps)
     basis_time = rb_time(info,snaps,basis_space)
   end
@@ -59,7 +59,7 @@ function assemble_rb(
 
   snaps_u,snaps_p = snaps
 
-  tt.offline_time += @elapsed begin
+  tt.offline_time.basis_time += @elapsed begin
     bs_u = rb_space(info,snaps_u)
     bs_p = rb_space(info,snaps_p)
     bs_u_supr = add_space_supremizers((bs_u,bs_p),args...)
@@ -83,7 +83,7 @@ function assemble_rb(
   snaps_u,snaps_p = snaps
   opB,ph,μ,tol... = args
 
-  tt.offline_time += @elapsed begin
+  tt.offline_time.basis_time += @elapsed begin
     bs_u = rb_space(info,snaps_u)
     bs_p = rb_space(info,snaps_p)
     bs_u_supr = add_space_supremizers((bs_u,bs_p),opB,ph,μ)
