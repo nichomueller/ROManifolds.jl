@@ -44,7 +44,7 @@ end
 
 function poisson_functions(::Val{false},measures::ProblemFixedMeasures)
 
-  #= function a(x,p::Param,t::Real)
+  function a(x,p::Param,t::Real)
     μ = get_μ(p)
     if (x[1] ≤ 0.75 && x[2] ≤ 0.5)
       μ[1]
@@ -55,10 +55,6 @@ function poisson_functions(::Val{false},measures::ProblemFixedMeasures)
     else
       μ[4]
     end
-  end =#
-  function a(x,p::Param,t::Real)
-    μ = get_μ(p)
-    1. + μ[6] + exp(-abs(sin(t)*norm(x-Point(μ[1:3]))^2 / μ[4])) / μ[5]
   end
   a(p::Param,t::Real) = x->a(x,p,t)
   a(p::Param) = t->a(p,t)
@@ -69,25 +65,20 @@ function poisson_functions(::Val{false},measures::ProblemFixedMeasures)
   m(p::Param) = t->m(p,t)
   function f(x,p::Param,t::Real)
     μ = get_μ(p)
-    #0.
     1.
   end
   f(p::Param,t::Real) = x->f(x,p,t)
   f(p::Param) = t->f(p,t)
   function h(x,p::Param,t::Real)
     μ = get_μ(p)
-    #0.
-    1. + sin(t)*sum(Point(μ[3:5]) .* x)
+    1.
   end
   h(p::Param,t::Real) = x->h(x,p,t)
   h(p::Param) = t->h(p,t)
   function g(x,p::Param,t::Real)
     μ = get_μ(p)
-    #T = 1.5
-    #exp(-x[1])*abs.(sin(2*pi*t/(μ[1]*T)))
-    #μ[1]*exp(-x[1])*abs.(sin(2*pi*t/T)) #THIS WORKS
-    g_xpt = 1. + abs.(sin(t))*sum(Point(μ[4:6]) .* x)
-    g_xpt / norm(g_xpt)
+    tF = 2.5
+    exp(-x[1]/μ[2])*abs.(sin(μ[3]*t))
   end
   g(p::Param,t::Real) = x->g(x,p,t)
   g(p::Param) = t->g(p,t)
@@ -288,7 +279,7 @@ function navier_stokes_functions(::Val{false},measures::ProblemFixedMeasures)
 
   function a(x,p::Param,t::Real)
     μ = get_μ(p)
-    sum(μ[1:3])
+    1/sum(μ)
   end
   a(μ::Param,t::Real) = x->a(x,μ,t)
 
@@ -310,9 +301,10 @@ function navier_stokes_functions(::Val{false},measures::ProblemFixedMeasures)
   function g(x,p::Param,t::Real)
     μ = get_μ(p)
     R = 0.5
-    T = 0.1
+    T = 2
     dist = (x[1]^2+x[2]^2)/(R^2)
-    abs.(1-cos(2*pi*t/T)+μ[1]*sin(2*pi*μ[2]*t/T))*VectorValue(0.,0.,1-dist)*(x[3]==0.)
+    #(1-cos(2*pi*t/T)+sin(μ[2]*2*pi*t/T)/μ[3])*
+    abs(1-cos(2*pi*t/T)+sin(μ[1]*2*pi*t/T)/μ[2])*VectorValue(0.,0.,1-dist)*(x[3]==0.)
   end
   g(μ::Param,t::Real) = x->g(x,μ,t)
 

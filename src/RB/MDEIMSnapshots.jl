@@ -110,7 +110,7 @@ function matrix_snapshots(
 end
 
 function matrix_snapshots(
-  ::Val{false},
+  ::Val,
   op::RBSteadyBilinOperator{Nonlinear,<:ParamTrialFESpace},
   μ::Vector{Param})
 
@@ -147,29 +147,8 @@ function matrix_snapshots(
   findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
-#= function matrix_snapshots(
-  ::Val{false},
-  op::RBUnsteadyBilinOperator{Nonaffine,<:ParamTransientTrialFESpace},
-  μ::Vector{Param})
-
-  id = get_id(op)
-  findnz_map = get_findnz_map(op,μ)
-  M,lift = assemble_matrix_and_lifting(op)
-
-  function snapshot(k::Int)
-    println("Snapshot number $k, $id")
-    v = Matrix(nonzero_values(M(μ[k]),findnz_map))
-    l = lift(μ[k])
-    v,l
-  end
-
-  vl = snapshot.(eachindex(μ))
-  vals,lifts = first.(vl),last.(vl)
-  findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
-end =#
-
 function matrix_snapshots(
-  ::Val{false},
+  ::Val,
   op::RBUnsteadyBilinOperator{Nonlinear,<:ParamTransientTrialFESpace},
   μ::Vector{Param},
   rbspaceθ::RBSpaceUnsteady)
