@@ -650,6 +650,27 @@ function assemble_matrix_and_lifting(op::ParamUnsteadyBilinOperator,t::Real)
   A_bc,lift
 end
 
+function assemble_functional_vector(op::ParamLinOperator)
+  afe = get_fe_function(op)
+  test = get_test(op)
+  fun -> assemble_vector(v->afe(fun,v),test)
+end
+
+function assemble_functional_vector(op::ParamUnsteadyLiftingOperator)
+  afe = get_fe_function(op)
+  trial_no_bc = get_trial_no_bc(op)
+  test_no_bc = get_test_no_bc(op)
+  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
+  fdofs_test,_ = fdofs
+
+  A_no_bc(fun) = assemble_matrix((u,v)->afe(fun,u,v),trial_no_bc,test_no_bc)
+  dir = get_dirichlet_function(op)
+
+  lift(fun,μ,tθ) = A_no_bc(fun)[fdofs_test,ddofs]*dir(μ,tθ)
+
+  lift
+end
+
 function assemble_functional_matrix_and_lifting(op::ParamUnsteadyBilinOperator)
   afe = get_fe_function(op)
   trial_no_bc = get_trial_no_bc(op)

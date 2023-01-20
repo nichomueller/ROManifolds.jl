@@ -1,5 +1,5 @@
 function mdeim_snapshots(
-  ::RBInfo,
+  info::RBInfo,
   op::RBLinOperator,
   args...)
   vector_snapshots(Val(info.fun_mdeim),op,args...)
@@ -29,6 +29,47 @@ function vector_snapshots(
   Snapshots(id,vals)
 end
 
+function vector_snapshots(
+  ::Val{true},
+  op::RBLinOperator{Nonaffine},
+  μ::Vector{Param})
+
+  id = get_id(op)
+  println("Building snapshots by evaluating the parametric function on the quadrature points, $id")
+
+  Nt = get_Nt(op)
+  timesθ = get_timesθ(op)
+
+  param_vals = evaluate_param_function(op,μ)
+  nred_param_vals,red_param_vals = reduce_param_function(op,param_vals)
+  param_fun = interpolate_param_function(op,red_param_vals)
+
+  V = assemble_functional_vector(op)
+
+  function snapshot(::RBLinOperator,k::Int)
+    println("Snapshot number $k at every time, $id")
+    v = Vector{Float}[]
+    for nt in eachindex(timesθ)
+      b = param_fun((k-1)*Nt+nt)
+      push!(v,V(b))
+    end
+    Matrix(v)
+  end
+
+  function snapshot(::RBLiftingOperator,k::Int)
+    println("Snapshot number $k at every time, $id")
+    v = Vector{Float}[]
+    for (nt,tθ) in enumerate(timesθ)
+      b = param_fun((k-1)*Nt+nt)
+      push!(v,V(b,μ[k],tθ))
+    end
+    Matrix(v)
+  end
+
+  vals = Broadcasting(k->snapshot(op,k))(1:nred_param_vals)
+  Snapshots(id,vals)
+end
+
 function matrix_snapshots(
   ::Val{false},
   op::RBBilinOperator{Nonaffine,<:TrialFESpace},
@@ -49,8 +90,8 @@ end
 
 function matrix_snapshots(
   ::Val{false},
-  op::RBSteadyBilinOperator{Nonaffine,<:ParamTrialFESpace},
-  μ::Vector{Param})
+  op::RBBilinOperator{Nonaffine,Ttr},
+  μ::Vector{Param}) where Ttr
 
   id = get_id(op)
   findnz_map = get_findnz_map(op,μ)
@@ -106,7 +147,7 @@ function matrix_snapshots(
   findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
-function matrix_snapshots(
+#= function matrix_snapshots(
   ::Val{false},
   op::RBUnsteadyBilinOperator{Nonaffine,<:ParamTransientTrialFESpace},
   μ::Vector{Param})
@@ -125,7 +166,7 @@ function matrix_snapshots(
   vl = snapshot.(eachindex(μ))
   vals,lifts = first.(vl),last.(vl)
   findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
-end
+end =#
 
 function matrix_snapshots(
   ::Val{false},
@@ -178,39 +219,26 @@ function matrix_snapshots(
 
   Nt = get_Nt(op)
   timesθ = get_timesθ(op)
-  phys_quadp = get_phys_quad_points(op)
 
-  param_fun = get_param_function(op)
-  param(xvec::Vector{Point{D,Float}},μk::Param,tθ::Real) where D =
-    Broadcasting(x->param_fun(x,μk,tθ))(xvec)[:]
-  param(n::Int,μk::Param,tθ::Real) = param(phys_quadp[n],μk,tθ)
-  param(μk::Param,tθ::Real) =
-    Matrix(Broadcasting(n->param(n,μk,tθ))(eachindex(phys_quadp)))[:]
-  param(μk::Param) = Matrix(Broadcasting(tθ->param(μk,tθ))(timesθ))[:]
-  param_vals = Matrix(param.(μ))
-
-  red_param_vals = POD(param_vals,Val(true))
-  nparam = size(red_param_vals,2)
-  red_vals_space,_ = unfold_spacetime(op,red_param_vals)
-
-  test_quad = LagrangianQuadFESpace(get_test(op))
-  param_fefun = FEFunction(test_quad,red_vals_space)
+  param_vals = evaluate_param_function(op,μ)
+  nred_param_vals,red_param_vals = reduce_param_function(op,param_vals)
+  param_fun = interpolate_param_function(op,red_param_vals)
 
   findnz_map = get_findnz_map(op,μ)
   M,lift = assemble_functional_matrix_and_lifting(op)
 
   function snapshot(k::Int)
+    println("Snapshot number $k at every time, $id")
     v,l = Vector{Float}[],Vector{Float}[]
     for (nt,tθ) in enumerate(timesθ)
-      println("Snapshot number $((k-1)*Nt+nt) at time $tθ, $id")
-      b = param_fefun((k-1)*Nt+nt)
+      b = param_fun((k-1)*Nt+nt)
       push!(v,nonzero_values(M(b),findnz_map))
       push!(l,lift(b,μ[k],tθ))
     end
     Matrix(v),Matrix(l)
   end
 
-  vl = snapshot.(1:nparam)
+  vl = snapshot.(1:nred_param_vals)
   vals,lifts = first.(vl),last.(vl)
   findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
@@ -233,7 +261,7 @@ function basis_as_fefun(op::RBUnsteadyVarOperator,rbspaceθ::RBSpaceUnsteady)
   fefunθ,fefunθ_lift
 end
 
-function evaluate_param_function(op::RBUnsteadyVarOperator)
+function evaluate_param_function(op::RBUnsteadyVarOperator,μ::Vector{Param})
   timesθ = get_timesθ(op)
   phys_quadp = get_phys_quad_points(op)
   param_fun = get_param_function(op)
@@ -250,8 +278,9 @@ end
 
 function reduce_param_function(op::RBUnsteadyVarOperator,vals::Matrix{Float})
   red_vals = POD(vals,Val(true))
+  nred_vals = size(red_vals,2)
   red_vals_space,_ = unfold_spacetime(op,red_vals)
-  red_vals_space
+  nred_vals,red_vals_space
 end
 
 function interpolate_param_function(op::RBUnsteadyVarOperator,vals::Matrix{Float})

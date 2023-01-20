@@ -348,11 +348,6 @@ end
 
 
 
-function assemble_functional_vector(op::RBUnsteadyLinOperator)
-  afe = get_fe_function(op)
-  test = get_test(op)
-  fun -> assemble_vector(v->afe(fun,v),test)
-end
 
 function fun_deim(
   op::RBUnsteadyLinOperator,

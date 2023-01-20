@@ -145,6 +145,10 @@ function assemble_matrix_and_lifting(op::RBBilinOperator{Affine,Ttr},args...) wh
   assemble_matrix_and_lifting(op.feop,args...)(realization(op))
 end
 
+function assemble_functional_vector(op::RBLinOperator)
+  assemble_functional_vector(op.feop)
+end
+
 function assemble_functional_matrix_and_lifting(op::RBUnsteadyBilinOperator)
   assemble_functional_matrix_and_lifting(op.feop)
 end

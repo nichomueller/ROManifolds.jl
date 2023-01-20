@@ -48,8 +48,8 @@ function poisson_unsteady()
   opH = NonaffineParamVarOperator(h,hfe,PS,time_info,V;id=:H)
   #opH = AffineParamVarOperator(h,hfe,PS,time_info,V;id=:H)
 
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=true,
-    st_mdeim=true,fun_mdeim=false)
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false,
+    st_mdeim=true,fun_mdeim=true)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
   rbspace,offinfo = offline_phase(info,(uh,μ),(opA,opM,opF,opH),measures,tt)
   online_phase(info,(uh,μ),rbspace,offinfo,tt)
