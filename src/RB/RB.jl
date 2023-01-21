@@ -8,5 +8,6 @@ include("MDEIMOnline.jl")
 include("PostProcess.jl")
 
 include("ReducedBases.jl")
-include("ReducedStructures.jl")
+include("RBStructure.jl")
+include("RBOnlineStructure.jl")
 include("RBSystem.jl")

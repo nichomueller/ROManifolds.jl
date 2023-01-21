@@ -161,44 +161,6 @@ function newton(res::Function,jac::Function,X::FESpace,t::Real,x0;tol=1e-10,maxi
   xh
 end
 
-function basis_by_coeff_mult(basis::Matrix{Float},coeff::Vector{Float},nr::Int)
-  @assert size(basis,2) == length(coeff) "Something is wrong"
-  bc = sum([basis[:,k]*coeff[k] for k=eachindex(coeff)])
-  Matrix(reshape(bc,nr,:))
-end
-
-function basis_by_coeff_mult(
-  basis::NTuple{2,Matrix{Float}},
-  coeff::NTuple{2,Vector{Float}},
-  nr::Int)
-
-  Broadcasting((b,c)->basis_by_coeff_mult(b,c,nr))(basis,coeff)
-end
-
-function basis_by_coeff_mult(basis::Vector{Matrix{Float}},coeff::Vector{Matrix{Float}},nr::Int)
-  @assert length(basis) == length(coeff) "Something is wrong"
-  bc = sum([kron(basis[k],coeff[k]) for k=eachindex(coeff)])
-  Matrix(reshape(bc,nr,:))
-end
-
-function basis_by_coeff_mult(
-  basis,
-  coeff::NTuple{2,Any},
-  nr::Int)
-
-  Broadcasting(c->basis_by_coeff_mult(basis,c,nr))(coeff)
-end
-
-function basis_by_coeff_mult(
-  basis::NTuple{2,Any},
-  coeff::Tuple{NTuple{2,Any},Any},
-  nr::Int)
-
-  matinfo = first(basis),first(coeff)
-  liftinfo = last(basis),last(coeff)
-  basis_by_coeff_mult(matinfo...,nr),basis_by_coeff_mult(liftinfo...,nr)
-end
-
 function compute_in_timesθ(mat::Matrix{Float},θ::Real;mat0=zeros(size(mat,1)))
   mat_prev = hcat(mat0,mat[:,1:end-1])
   θ*mat + (1-θ)*mat_prev

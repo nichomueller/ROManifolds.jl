@@ -1,10 +1,18 @@
 function online_assembler(
-  op::RBVariable,
-  basis::NTuple{2,Matrix{Float}},
+  rb_structure::NTuple{N,RBStructure},
   μ::Param,
+  args...) where N
+
+  Broadcasting(rb->online_assembler(rb,μ,args...))(rb_structure)
+end
+
+function online_assembler(
+  rb_structure::RBStructure,
   args...)
 
-  Broadcasting(b->online_assembler(op,b,μ))(basis)
+  op = get_op(rb_structure)
+  q = get_offline_quantity(rb_structure)
+  online_assembler(op,q,args...)
 end
 
 function online_assembler(
@@ -14,117 +22,18 @@ function online_assembler(
   args...)
 
   coeff = compute_coefficient(op,μ)
-  online_structure(op,basis,coeff)
+  RBOnlineStructure(op,basis,coeff)
 end
 
 function online_assembler(
   op::RBVariable,
-  mdeim::Union{MDEIM,NTuple{2,MDEIM}},
+  mdeim::MDEIM,
   μ::Param,
   args...)
 
   basis = get_basis_space(mdeim)
   coeff = compute_coefficient(op,mdeim,μ,args...)
-  online_structure(op,basis,coeff)
-end
-
-function online_assembler(
-  op::RBBilinVariable,
-  basis_mdeim::Tuple{Matrix{Float},MDEIM},
-  μ::Param,
-  args...)
-
-  affine_basis,mdeim = basis_mdeim
-  affine_structure = online_assembler(op,affine_basis,μ)
-
-  op_lift = RBLiftVariable(op)
-  nonaffine_basis = get_basis_space(mdeim)
-  coeff = compute_coefficient(op_lift,mdeim,μ,args...)
-  nonaffine_structure = online_structure(op_lift,nonaffine_basis,coeff)
-
-  affine_structure,nonaffine_structure
-end
-
-function online_structure(
-  op::RBSteadyVarOperator,
-  basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
-  coeff)
-
-  nr = get_nrows(op)
-  basis_by_coeff_mult(basis,coeff,nr)
-end
-
-function online_structure(
-  op::RBSteadyVarOperator{Nonlinear,<:ParamTrialFESpace},
-  basis::Matrix{Float},
-  coeff)
-
-  nr = get_nrows(op)
-  u -> basis_by_coeff_mult(basis,coeff(u),nr)
-end
-
-function online_structure(
-  op::RBSteadyBilinVariable{Nonlinear,<:ParamTrialFESpace},
-  basis::NTuple{2,Matrix{Float}},
-  coeff)
-
-  nr = get_nrows(op)
-  M(u) = basis_by_coeff_mult(basis[1],coeff[1](u),nr)
-  lift(u) = basis_by_coeff_mult(basis[2],coeff[2](u),nr)
-  M,lift
-end
-
-function online_structure(
-  op::RBUnsteadyVarOperator,
-  basis::Union{Matrix{Float},NTuple{2,Matrix{Float}}},
-  coeff)
-
-  dtθ = get_dt(op)*get_θ(op)
-  if get_id(op) == :M coeff = coeff ./ dtθ end
-
-  btbtc = coeff_by_time_bases(op,coeff)
-  ns_row = get_ns(get_rbspace_row(op))
-  basis_block = blocks(basis,ns_row)
-
-  nr = get_nrows(op)
-  basis_by_coeff_mult(basis_block,btbtc,nr)
-end
-
-function online_structure(
-  op::RBUnsteadyVarOperator{Nonlinear,<:ParamTransientTrialFESpace},
-  basis::Matrix{Float},
-  coeff)
-
-  dtθ = get_dt(op)*get_θ(op)
-  if get_id(op) == :M coeff = coeff ./ dtθ end
-
-  btbtc = coeff_by_time_bases(op,coeff)
-  ns_row = get_ns(get_rbspace_row(op))
-  basis_block = blocks(basis,ns_row)
-
-  nr = get_nrows(op)
-  M(u) = basis_by_coeff_mult(basis_block,btbtc[1](u),nr)
-  Mshift(u) = basis_by_coeff_mult(basis_block,btbtc[2](u),nr)
-  M,Mshift
-end
-
-function online_structure(
-  op::RBUnsteadyBilinVariable{Nonlinear,<:ParamTransientTrialFESpace},
-  basis::NTuple{2,Matrix{Float}},
-  coeff)
-
-  dtθ = get_dt(op)*get_θ(op)
-  if get_id(op) == :M coeff = coeff ./ dtθ end
-
-  btbtc,btbtc_lift = coeff_by_time_bases(op,coeff)
-  ns_row = get_ns(get_rbspace_row(op))
-  basis_block = blocks(basis,ns_row)
-
-  nr = get_nrows(op)
-  M(u) = basis_by_coeff_mult(basis_block[1],btbtc[1](u),nr)
-  Mshift(u) = basis_by_coeff_mult(basis_block[1],btbtc[2](u),nr)
-  lift(u) = basis_by_coeff_mult(basis_block[2],btbtc_lift(u),nr)
-  (M,Mshift),lift
+  RBOnlineStructure(op,basis,coeff)
 end
 
 function coeff_by_time_bases(
@@ -199,82 +108,53 @@ function coeff_by_time_bases_bilin(
   btbtc,btbtc_shift
 end
 
-function elim_shifted_matrix(nt)
-  nt
+function steady_poisson_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
+  lhs = get_on_structure(rbos,:A)
+  rhs = get_on_structure(rbos,(:F,:H,:A_lift))
+  lhs,sum(rhs)
 end
 
-function elim_shifted_matrix(nt::Tuple{NTuple{2,Matrix{Float}},Matrix{Float}})
-  first(nt[1]),nt[2]
+function unsteady_poisson_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
+  lhs = get_on_structure(rbos,(:A,:M))
+  rhs = get_on_structure(rbos,(:F,:H,:A_lift,:M_lift))
+  sum(lhs),sum(rhs)
 end
 
-function poisson_rb_system(
-  lhs::Matrix{Float},
-  rhs::NTuple{N,Matrix{Float}}) where N
+function steady_stokes_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
+  lhs = get_on_structure(rbos,(:A,:B))
+  rhs = get_on_structure(rbos,(:F,:H,:A_lift,:B_lift))
 
-  Arb = lhs
-  Frb,Hrb,lifts... = rhs
-  Arb,Frb+Hrb-sum(lifts)
-end
-
-function poisson_rb_system(
-  lhs::NTuple{4,Matrix{Float}},
-  rhs::NTuple{N,Matrix{Float}},
-  θ::Real) where N
-
-  Arb,Ashift_rb,Mrb,Mshift_rb = lhs
-  Frb,Hrb,lifts... = rhs
-
-  rb_lhs = θ*(Arb+Mrb) + (1-θ)*Ashift_rb - θ*Mshift_rb
-  rb_rhs = Frb+Hrb-sum(lifts)
+  np = size(lhs[2],1)
+  rb_lhs = vcat(hcat(lhs[1],-lhs[2]'),hcat(lhs[2],zeros(np,np)))
+  rb_rhs = vcat(sum(rhs[1:end-1]),rhs[end])
   rb_lhs,rb_rhs
 end
 
-function stokes_rb_system(
-  lhs::NTuple{2,Matrix{Float}},
-  rhs::NTuple{N,Matrix{Float}}) where N
+function unsteady_stokes_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
+  lhs = get_on_structure(rbos,(:A,:B,:BT,:M))
+  rhs = get_on_structure(rbos,(:F,:H,:A_lift,:B_lift,:M_lift))
 
-  Arb,Brb = lhs
-  Frb,Hrb,lifts... = rhs
-
-  np = size(Brb)[1]
-  rb_lhs = vcat(hcat(Arb,-Brb'),hcat(Brb,zeros(np,np)))
-  rb_rhs = vcat(Frb+Hrb-sum(lifts[1:end-1]),-lifts[end])
+  np = size(lhs[2],1)
+  rb_lhs = vcat(hcat(lhs[1]+lhs[4],-lhs[3]),hcat(lhs[2],zeros(np,np)))
+  rb_rhs = vcat(rhs[1]+rhs[2]+rhs[3]+rhs[5],rhs[4])
   rb_lhs,rb_rhs
 end
 
-function stokes_rb_system(
-  lhs::NTuple{8,Matrix{Float}},
-  rhs::NTuple{N,Matrix{Float}},
-  θ::Real) where N
+function steady_navier_stokes_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
+  lin_rb_lhs,lin_rb_rhs = steady_stokes_rb_system(rbos)
+  nonlin_lhs = get_on_structure(rbos,(:C,:D))
+  nonlin_rhs = get_on_structure(rbos,:C_lift)
 
-  Arb,Ashift_rb,Brb,Bshift_rb,BTrb,BTshift_rb,Mrb,Mshift_rb = lhs
-  Frb,Hrb,lifts... = rhs
+  opA,opB = get_op(rbos,(:A,:B))
+  rbu,rbp = get_rbspace_row(opA),get_rbspace_row(opB)
+  nu,np = get_ns(rbu),get_ns(rbp)
 
-  np = size(Brb,1)
-
-  rb_lhs_11 = θ*(Arb+Mrb) + (1-θ)*Ashift_rb - θ*Mshift_rb
-  rb_lhs_12 = - θ*BTrb - (1-θ)*BTshift_rb
-  rb_lhs_21 = θ*Brb + (1-θ)*Bshift_rb
-  rb_lhs = vcat(hcat(rb_lhs_11,rb_lhs_12),hcat(rb_lhs_21,zeros(np,np)))
-
-  rb_rhs = vcat(Frb+Hrb-sum(lifts[1:end-1]),-lifts[end])
-  rb_lhs,rb_rhs
-end
-
-function navier_stokes_rb_system(lhs::Tuple,rhs::Tuple)
-  Arb,Brb,Crb,Drb = lhs
-  Frb,Hrb,lifts... = rhs
-  liftA,liftB,liftC, = lifts
-
-  lin_rb_lhs,lin_rb_rhs = stokes_rb_system((Arb,Brb),(Frb,Hrb,liftA,liftB))
-
-  nu,np = size(Arb,1),size(Brb,1)
-  block12 = zeros(nu,np)
-  block21 = zeros(np,nu)
-  block22 = zeros(np,np)
-  nonlin_rb_lhs1(u) = vcat(hcat(Crb(u),block12),hcat(block21,block22))
-  nonlin_rb_lhs2(u) = vcat(hcat(Crb(u)+Drb(u),block12),hcat(block21,block22))
-  nonlin_rb_rhs(u) = vcat(liftC(u),zeros(np,1))
+  block12,block21,block22 = zeros(nu,np),zeros(np,nu),zeros(np,np)
+  nonlin_rb_lhs1(u) = vcat(hcat(nonlin_lhs[1](u),block12),
+                           hcat(block21,block22))
+  nonlin_rb_lhs2(u) = vcat(hcat(nonlin_lhs[1](u)+nonlin_lhs[2](u),block12),
+                           hcat(block21,block22))
+  nonlin_rb_rhs(u) = vcat(nonlin_rhs(u),zeros(np,1))
 
   jac_rb(u) = lin_rb_lhs + nonlin_rb_lhs2(u)
   lhs_rb(u) = lin_rb_lhs + nonlin_rb_lhs1(u)
@@ -284,23 +164,21 @@ function navier_stokes_rb_system(lhs::Tuple,rhs::Tuple)
   res_rb,jac_rb
 end
 
-function navier_stokes_rb_system(lhs::Tuple,rhs::Tuple,θ::Real)
-  Arb,Brb,BTrb,Crb,Cshift_rb,Drb,Dshift_rb,Mrb = lhs
-  Frb,Hrb,lifts... = rhs
-  liftA,liftB,liftC,liftM, = lifts
+function unsteady_navier_stokes_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
+  lin_rb_lhs,lin_rb_rhs = unsteady_stokes_rb_system(rbos)
+  nonlin_lhs = get_on_structure(rbos,(:C,:D))
+  nonlin_rhs = get_on_structure(rbos,:C_lift)
 
-  lin_rb_lhs,lin_rb_rhs = stokes_rb_system((Arb...,Brb...,BTrb...,Mrb...),
-    (Frb,Hrb,liftA,liftM,liftB),θ)
+  opA,opB = get_op(rbos,(:A,:B))
+  rbu,rbp = get_rbspace_row(opA),get_rbspace_row(opB)
+  nu,np = get_ns(rbu)*get_nt(rbu),get_ns(rbp)*get_nt(rbp)
 
-  nu,np = size(first(Arb),1),size(first(Brb),1)
-  block12 = zeros(nu,np)
-  block21 = zeros(np,nu)
-  block22 = zeros(np,np)
-  nonlin_rb_lhs1(u) = vcat(hcat(θ*Crb(u) + (1-θ)*Cshift_rb(u),block12),
-    hcat(block21,block22))
-  nonlin_rb_lhs2(u) = vcat(hcat(θ*(Crb(u)+Drb(u)) +
-    (1-θ)*(Cshift_rb(u)+Dshift_rb(u)),block12),hcat(block21,block22))
-  nonlin_rb_rhs(u) = vcat(liftC(u),zeros(np,1))
+  block12,block21,block22 = zeros(nu,np),zeros(np,nu),zeros(np,np)
+  nonlin_rb_lhs1(u) = vcat(hcat(nonlin_lhs[1](u),block12),
+                           hcat(block21,block22))
+  nonlin_rb_lhs2(u) = vcat(hcat(nonlin_lhs[1](u)+nonlin_lhs[2](u),block12),
+                           hcat(block21,block22))
+  nonlin_rb_rhs(u) = vcat(nonlin_rhs(u),zeros(np,1))
 
   jac_rb(u) = lin_rb_lhs + nonlin_rb_lhs2(u)
   lhs_rb(u) = lin_rb_lhs + nonlin_rb_lhs1(u)

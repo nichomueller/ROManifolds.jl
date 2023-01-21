@@ -222,7 +222,7 @@ function matrix_snapshots(
   findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
-function basis_as_fefun(op::RBSteadyVarOperator)
+function basis_as_fefun(op::RBSteadyVariable)
   bspace = get_basis_space_col(op)
   test = get_test(op)
   trial = get_trial(op)
@@ -231,7 +231,7 @@ function basis_as_fefun(op::RBSteadyVarOperator)
   fefun,fefun_lift
 end
 
-function basis_as_fefun(op::RBUnsteadyVarOperator,rbspaceθ::RBSpaceUnsteady)
+function basis_as_fefun(op::RBUnsteadyVariable,rbspaceθ::RBSpaceUnsteady)
   bspaceθ = get_basis_space(rbspaceθ)
   test = get_test(op)
   trial = get_trial(op)
@@ -240,7 +240,7 @@ function basis_as_fefun(op::RBUnsteadyVarOperator,rbspaceθ::RBSpaceUnsteady)
   fefunθ,fefunθ_lift
 end
 
-function evaluate_param_function(op::RBUnsteadyVarOperator,μ::Vector{Param})
+function evaluate_param_function(op::RBUnsteadyVariable,μ::Vector{Param})
   timesθ = get_timesθ(op)
   phys_quadp = get_phys_quad_points(op)
   param_fun = get_param_function(op)
@@ -255,14 +255,14 @@ function evaluate_param_function(op::RBUnsteadyVarOperator,μ::Vector{Param})
   Matrix(param.(μ))
 end
 
-function reduce_param_function(op::RBUnsteadyVarOperator,vals::Matrix{Float})
+function reduce_param_function(op::RBUnsteadyVariable,vals::Matrix{Float})
   red_vals = POD(vals,Val(true))
   nred_vals = size(red_vals,2)
   red_vals_space,_ = unfold_spacetime(op,red_vals)
   nred_vals,red_vals_space
 end
 
-function interpolate_param_function(op::RBUnsteadyVarOperator,vals::Matrix{Float})
+function interpolate_param_function(op::RBUnsteadyVariable,vals::Matrix{Float})
   test_quad = LagrangianQuadFESpace(get_test(op))
   param_fun = FEFunction(test_quad,vals)
   param_fun

@@ -1,5 +1,25 @@
+#= abstract type Coefficient end
+
+mutable struct CoefficientSteady <: Coefficient
+  coeff::Vector{Float}
+end
+
+mutable struct CoefficientUnsteady <: Coefficient
+  coeff::Matrix{Float}
+end
+
+function Coefficient(op::RBSteadyVariable,args...)
+  coeff = compute_coefficient(op,args...)
+  CoefficientSteady(coeff)
+end
+
+function Coefficient(op::RBUnsteadyVariable,args...)
+  coeff = compute_coefficient(op,args...)
+  CoefficientUnsteady(coeff)
+end =#
+
 function compute_coefficient(
-  op::RBSteadyVarOperator{Affine,Ttr},
+  op::RBSteadyVariable{Affine,Ttr},
   μ::Param) where Ttr
 
   fun = get_param_function(op)
@@ -8,7 +28,7 @@ function compute_coefficient(
 end
 
 function compute_coefficient(
-  op::RBUnsteadyVarOperator{Affine,Ttr},
+  op::RBUnsteadyVariable{Affine,Ttr},
   μ::Param) where Ttr
 
   fun = get_param_function(op)
@@ -18,21 +38,21 @@ function compute_coefficient(
 end
 
 function compute_coefficient(
-  op::RBSteadyVarOperator,
-  mdeim,
+  op::RBSteadyVariable,
+  mdeim::MDEIMSteady,
   μ::Param)
 
   red_lu = get_red_lu_factors(mdeim)
   idx_space = get_idx_space(mdeim)
   m = get_red_measure(mdeim)
 
-  A = assemble_red_structure(op,m,μ,idx_space)
+  A = hyperred_structure(op,m,μ,idx_space)
   mdeim_online(A,red_lu)
 end
 
 function compute_coefficient(
-  op::RBUnsteadyVarOperator,
-  mdeim,
+  op::RBUnsteadyVariable,
+  mdeim::MDEIMUnsteady,
   μ::Param,
   st_mdeim=false)
 
@@ -40,8 +60,8 @@ function compute_coefficient(
 end
 
 function compute_coefficient(
-  op::RBUnsteadyVarOperator,
-  mdeim,
+  op::RBUnsteadyVariable,
+  mdeim::MDEIMUnsteady,
   μ::Param,
   ::Val{false})
 
@@ -49,14 +69,14 @@ function compute_coefficient(
   red_lu = get_red_lu_factors(mdeim)
   idx_space = get_idx_space(mdeim)
   m = get_red_measure(mdeim)
-  A = assemble_red_structure(op,m,μ,idx_space,timesθ)
+  A = hyperred_structure(op,m,μ,idx_space,timesθ)
 
   mdeim_online(A,red_lu)
 end
 
 function compute_coefficient(
-  op::RBUnsteadyVarOperator,
-  mdeim,
+  op::RBUnsteadyVariable,
+  mdeim::MDEIMUnsteady,
   μ::Param,
   ::Val{true})
 
@@ -65,13 +85,13 @@ function compute_coefficient(
   red_timesθ = get_reduced_timesθ(op,idx_time)
   m = get_red_measure(mdeim)
 
-  A_idx = assemble_red_structure(op,m,μ,idx_space,red_timesθ)
+  A_idx = hyperred_structure(op,m,μ,idx_space,red_timesθ)
   A_st = spacetime_vector(A_idx)
   coeff = mdeim_online(A_st,red_lu)
   interp_coeff_time(mdeim,coeff)
 end
 
-function assemble_red_structure(
+function hyperred_structure(
   op::RBSteadyLinVariable{Nonaffine},
   m::Measure,
   μ::Param,
@@ -81,7 +101,7 @@ function assemble_red_structure(
   assemble_vector(v->fun(μ,m,v),get_test(op))[idx_space]
 end
 
-function assemble_red_structure(
+function hyperred_structure(
   op::RBUnsteadyLinVariable{Nonaffine},
   m::Measure,
   μ::Param,
@@ -93,7 +113,7 @@ function assemble_red_structure(
   Matrix(v.(timesθ))
 end
 
-function assemble_red_structure(
+function hyperred_structure(
   op::RBSteadyBilinVariable{Nonaffine,Ttr},
   m::Measure,
   μ::Param,
@@ -104,7 +124,7 @@ function assemble_red_structure(
   Vector(M[:][idx_space])
 end
 
-function assemble_red_structure(
+function hyperred_structure(
   op::RBSteadyBilinVariable{Nonlinear,Ttr},
   m::Measure,
   μ::Param,
@@ -116,7 +136,7 @@ function assemble_red_structure(
   Midx
 end
 
-function assemble_red_structure(
+function hyperred_structure(
   op::RBUnsteadyBilinVariable{Nonaffine,Ttr},
   m::Measure,
   μ::Param,
@@ -129,7 +149,7 @@ function assemble_red_structure(
   Matrix(Midx.(timesθ))
 end
 
-function assemble_red_structure(
+function hyperred_structure(
   op::RBUnsteadyBilinVariable{Nonlinear,Ttr},
   m::Measure,
   μ::Param,
@@ -143,72 +163,8 @@ function assemble_red_structure(
   Midx
 end
 
-function assemble_red_structure(
-  op::RBSteadyBilinVariable,
-  m_mat_lift::NTuple{2,Measure},
-  μ::Param,
-  idx_space::NTuple{2,Vector{Int}})
-
-  mmat,mlift = m_mat_lift
-  idx,idx_lift = idx_space
-  Midx = assemble_red_structure(op,mmat,μ,idx)
-  lift = assemble_red_lifting(op,mlift,μ,idx_lift)
-
-  Midx,lift
-end
-
-function assemble_red_structure(
-  op::RBUnsteadyBilinVariable,
-  m_mat_lift::NTuple{2,Measure},
-  μ::Param,
-  idx_space::NTuple{2,Vector{Int}},
-  timesθ::Vector{<:Real})
-
-  mmat,mlift = m_mat_lift
-  idx,idx_lift = idx_space
-  Midx = assemble_red_structure(op,mmat,μ,idx,timesθ)
-  lift = assemble_red_lifting(op,mlift,μ,idx_lift,timesθ)
-
-  Midx,lift
-end
-
-function assemble_red_structure(
-  op::RBUnsteadyBilinVariable,
-  m_mat_lift::NTuple{2,Measure},
-  μ::Param,
-  idx_space::NTuple{2,Vector{Int}},
-  timesθ::NTuple{2,Vector{<:Real}})
-
-  mmat,mlift = m_mat_lift
-  idx,idx_lift = idx_space
-  tθ,tθ_lift = timesθ
-  Midx = assemble_red_structure(op,mmat,μ,idx,tθ)
-  lift = assemble_red_lifting(op,mlift,μ,idx_lift,tθ_lift)
-
-  Midx,lift
-end
-
-function assemble_red_structure(
+function hyperred_structure(
   op::RBSteadyLiftVariable,
-  m::Measure,
-  μ::Param,
-  idx_space::Vector{Int})
-
-  assemble_red_lifting(op,m,μ,idx_space)
-end
-
-function assemble_red_structure(
-  op::RBUnsteadyLiftVariable,
-  m::Measure,
-  μ::Param,
-  idx_space::Vector{Int},
-  timesθ::Vector{<:Real})
-
-  assemble_red_lifting(op,m,μ,idx_space,timesθ)
-end
-
-function assemble_red_lifting(
-  op::RBSteadyVarOperator,
   m::Measure,
   μ::Param,
   idx_space::Vector{Int})
@@ -224,8 +180,8 @@ function assemble_red_lifting(
   lift
 end
 
-function assemble_red_lifting(
-  op::RBSteadyVarOperator{Nonlinear,Ttr},
+function hyperred_structure(
+  op::RBSteadyVariable{Nonlinear,Ttr},
   m::Measure,
   μ::Param,
   idx_space::Vector{Int}) where Ttr
@@ -241,8 +197,8 @@ function assemble_red_lifting(
   lift
 end
 
-function assemble_red_lifting(
-  op::RBUnsteadyVarOperator,
+function hyperred_structure(
+  op::RBUnsteadyVariable,
   m::Measure,
   μ::Param,
   idx_space::Vector{Int},
@@ -259,8 +215,8 @@ function assemble_red_lifting(
   Matrix(lift.(timesθ))
 end
 
-function assemble_red_lifting(
-  op::RBUnsteadyVarOperator{Nonlinear,Ttr},
+function hyperred_structure(
+  op::RBUnsteadyVariable{Nonlinear,Ttr},
   m::Measure,
   μ::Param,
   idx_space::Vector{Int},
@@ -306,24 +262,6 @@ function mdeim_online(
   u -> mdeim_online(A(u),red_lu)
 end
 
-function mdeim_online(
-  A::NTuple{2,AbstractArray},
-  red_lu::NTuple{2,LU})
-
-  M = mdeim_online(A[1],red_lu[1])
-  lift = mdeim_online(A[2],red_lu[2])
-  M,lift
-end
-
-function mdeim_online(
-  A::NTuple{2,Function},
-  red_lu::NTuple{2,LU})
-
-  M(u) = mdeim_online(A[1](u),red_lu[1])
-  lift(u) = mdeim_online(A[2](u),red_lu[2])
-  M,lift
-end
-
 function interp_coeff_time(
   mdeim::MDEIMUnsteady,
   coeff::AbstractVector)
@@ -344,9 +282,30 @@ function interp_coeff_time(
   u -> interp_coeff_time(mdeim,coeff(u))
 end
 
-function interp_coeff_time(
-  mdeim::NTuple{2,MDEIMUnsteady},
-  coeff::NTuple{2,Any})
+function basis_by_coeff_mult(
+  basis::Matrix{Float},
+  coeff::Vector{Float},
+  nr::Int)
 
-  interp_coeff_time.(mdeim,coeff)
+  @assert size(basis,2) == length(coeff) "Something is wrong"
+  bc = sum([basis[:,k]*coeff[k] for k=eachindex(coeff)])
+  Matrix(reshape(bc,nr,:))
+end
+
+function basis_by_coeff_mult(
+  basis::Vector{Matrix{Float}},
+  coeff::Vector{Matrix{Float}},
+  nr::Int)
+
+  @assert length(basis) == length(coeff) "Something is wrong"
+  bc = sum([kron(basis[k],coeff[k]) for k=eachindex(coeff)])
+  Matrix(reshape(bc,nr,:))
+end
+
+function basis_by_coeff_mult(
+  basis::Vector{Matrix{Float}},
+  coeff::NTuple{2,Vector{Matrix{Float}}},
+  nr::Int)
+
+  Broadcasting(c->basis_by_coeff_mult(basis,c,nr))(coeff)
 end

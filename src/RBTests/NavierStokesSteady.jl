@@ -96,25 +96,15 @@ function online_phase(
   tt::TimeTracker)
 
   uh,ph,μ,X,Y = fesol
-
-  Arb,Brb,Crb,Drb,Frb,Hrb = rb_structures
+  rb_solver(res,jac,μ) = solve_rb_system(res,jac,(X[1](μ),Y[1]),rbspace)
 
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
-      Aon = online_assembler(Arb,μ[k])
-      Bon = online_assembler(Brb,μ[k])
-      Con = online_assembler(Crb,μ[k])
-      Don = online_assembler(Drb,μ[k])
-      Fon = online_assembler(Frb,μ[k])
-      Hon = online_assembler(Hrb,μ[k])
-      lift = Aon[2],Bon[2],Con[2]
-      sys = navier_stokes_rb_system((Aon[1],Bon[1],Con[1],Don[1]),(Fon,Hon,lift...))
-      Uk = X[1](μ[k])
-      Vk = Y[1]
-      rb_sol = solve_rb_system(sys...,(Uk,Vk),rbspace)
+      online_structures = online_assembler(rb_structures,μ[k])
+      res,jac = navier_stokes_rb_system(online_structures)
+      rb_sol = rb_solver(res,jac,μ[k])
     end
-    uhk = get_snap(uh[k])
-    phk = get_snap(ph[k])
+    uhk,phk = get_snap(uh[k]),get_snap(ph[k])
     uhk_rb,phk_rb = reconstruct_fe_sol(rbspace,rb_sol)
     ErrorTracker(:u,uhk,uhk_rb,k),ErrorTracker(:p,phk,phk_rb,k)
   end

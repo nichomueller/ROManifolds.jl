@@ -147,7 +147,7 @@ end
 
 function load(
   path::String,
-  op::RBSteadyVarOperator,
+  op::RBSteadyVariable,
   meas::Measure)
 
   id = Symbol(last(split(path,'/')))
@@ -167,7 +167,7 @@ end
 
 function load(
   path::String,
-  op::RBUnsteadyVarOperator,
+  op::RBUnsteadyVariable,
   meas::Measure)
 
   id = Symbol(last(split(path,'/')))
@@ -203,20 +203,11 @@ get_idx_space(mdeim::MDEIMUnsteady) = first(mdeim.idx)
 get_idx_time(mdeim::MDEIMUnsteady) = last(mdeim.idx)
 get_red_measure(mdeim::MDEIM) = mdeim.red_measure
 
-get_basis_space(mdeim::NTuple{2,MDEIM}) = get_basis_space.(mdeim)
-get_basis_time(mdeim::NTuple{2,MDEIMUnsteady}) = get_basis_time.(mdeim)
-get_basis_spacetime(mdeim::NTuple{2,MDEIMUnsteady}) = get_basis_spacetime.(mdeim)
-get_basis(mdeim::NTuple{2,MDEIM}) = get_basis.(mdeim)
-get_red_lu_factors(mdeim::NTuple{2,MDEIM}) = get_red_lu_factors.(mdeim)
-get_idx_space(mdeim::NTuple{2,MDEIM}) = get_idx_space.(mdeim)
-get_idx_time(mdeim::NTuple{2,MDEIMUnsteady}) = get_idx_time.(mdeim)
-get_red_measure(mdeim::NTuple{2,MDEIM}) = get_red_measure.(mdeim)
-
 mdeim_basis(info::RBInfoSteady,snaps) = RBSpaceSteady(snaps;ismdeim=Val(true),ϵ=info.ϵ)
 mdeim_basis(info::RBInfoUnsteady,snaps) = RBSpaceUnsteady(snaps;ismdeim=Val(true),ϵ=info.ϵ)
 
 function project_mdeim_basis(
-  op::RBSteadyVarOperator,
+  op::RBSteadyVariable,
   rbspace,
   args...)
 
@@ -226,7 +217,7 @@ function project_mdeim_basis(
 end
 
 function project_mdeim_basis(
-  op::RBUnsteadyVarOperator,
+  op::RBUnsteadyVariable,
   rbspace,
   args...)
 
@@ -420,7 +411,7 @@ function recast_in_full_dim(
 end
 
 function get_red_measure(
-  op::RBSteadyVarOperator,
+  op::RBSteadyVariable,
   idx::Vector{Int},
   meas::ProblemMeasures,
   field=:dΩ)
@@ -430,7 +421,7 @@ function get_red_measure(
 end
 
 function get_red_measure(
-  op::RBUnsteadyVarOperator,
+  op::RBUnsteadyVariable,
   idx::NTuple{2,Vector{Int}},
   meas::ProblemMeasures,
   field=:dΩ)
