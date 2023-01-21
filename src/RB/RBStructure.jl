@@ -34,28 +34,28 @@ end
 
 function RBStructure(
   op::RBLinVariable{Top},
-  mdeim::MDEIM)
+  mdeim::MDEIM) where Top
 
   RBLinStructure{Top}(op,mdeim)
 end
 
 function RBStructure(
   op::RBBilinVariable{Affine,Ttr},
-  basis::Matrix{Float})
+  basis::Matrix{Float}) where Ttr
 
   RBAffineBilinStructure{Ttr}(op,basis)
 end
 
 function RBStructure(
   op::RBBilinVariable{Top,Ttr},
-  mdeim::MDEIM)
+  mdeim::MDEIM) where {Top,Ttr}
 
   RBBilinStructure{Top,Ttr}(op,mdeim)
 end
 
 function RBStructure(
   op::RBLiftVariable{Top,Ttr},
-  mdeim::MDEIM)
+  mdeim::MDEIM) where {Top,Ttr}
 
   RBLiftStructure{Top,Ttr}(op,mdeim)
 end
@@ -154,6 +154,8 @@ function assemble_rb_structure(
   op_lift = RBLiftVariable(op)
   RBStructure(op,mdeim),RBStructure(op_lift,mdeim_lift)
 end
+
+get_op(rbs::RBStructure) = rbs.op
 
 function get_offline_quantity(
   rbs::Union{RBAffineLinStructure,RBAffineBilinStructure})

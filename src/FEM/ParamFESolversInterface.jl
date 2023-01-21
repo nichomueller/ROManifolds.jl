@@ -1,12 +1,12 @@
-abstract type ParamOperator{C} <: GridapType end
-const AffineParamOperator = ParamOperator{Affine}
+abstract type ParamOp{C} <: GridapType end
+const AffineParamOp = ParamOp{Affine}
 
 """
-A wrapper of `ParamFEOperator` that transforms it to `ParamOperator`, i.e.,
+A wrapper of `ParamFEOperator` that transforms it to `ParamOp`, i.e.,
 takes A(μ,uh,vh) and returns A(μ,uF), where uF represents the free values
 of the `EvaluationFunction` uh
 """
-struct ParamOpFromFEOp{C} <: ParamOperator{C}
+struct ParamOpFromFEOp{C} <: ParamOp{C}
   feop::ParamFEOperator{C}
 end
 
@@ -50,7 +50,7 @@ end
 # Nonlinear
 
 struct ParamNonlinearOperator{T} <: NonlinearOperator
-  param_op::ParamOperator
+  param_op::ParamOp
   uh::T
   μ::Param
   cache

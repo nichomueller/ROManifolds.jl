@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function poisson_unsteady()
-  run_fem = true
+  run_fem = false
 
   steady = false
   indef = false
@@ -44,7 +44,7 @@ function poisson_unsteady()
   opF = AffineParamOperator(f,ffe,PS,time_info,V;id=:F)
   opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
 
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false,
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=true,
     st_mdeim=true,fun_mdeim=true)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
   rbspace,rb_structures = offline_phase(info,(uh,μ),(opA,opM,opF,opH),measures,tt)
@@ -74,7 +74,7 @@ function offline_phase(
   Frb = RBStructure(info,tt,rbopF,μ,meas,:dΩ)
   Hrb = RBStructure(info,tt,rbopH,μ,meas,:dΓn)
 
-  rb_structures = ((rbopA,Arb),(rbopM,Mrb),(rbopF,Frb),(rbopH,Hrb))
+  rb_structures = Arb,Mrb,Frb,Hrb
   rbspace,rb_structures
 end
 
@@ -86,25 +86,13 @@ function online_phase(
   tt::TimeTracker)
 
   uh,μ = fesol
-
-  Arb,Mrb,Frb,Hrb = rb_structures
-  rbopA,Arb = Arb
-  rbopM,Mrb = Mrb
-  rbopF,Frb = Frb
-  rbopH,Hrb = Hrb
-
   st_mdeim = info.st_mdeim
-  θ = get_θ(rbopA)
 
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
-      Aon = online_assembler(rbopA,Arb,μ[k],st_mdeim)
-      Mon = online_assembler(rbopM,Mrb,μ[k],st_mdeim)
-      Fon = online_assembler(rbopF,Frb,μ[k],st_mdeim)
-      Hon = online_assembler(rbopH,Hrb,μ[k],st_mdeim)
-      lift = Aon[2],Mon[2]
-      sys = poisson_rb_system((Aon[1]...,Mon[1]...),(Fon,Hon,lift...),θ)
-      rb_sol = solve_rb_system(sys...)
+      online_structures = online_assembler(rb_structures,μ[k],st_mdeim)
+      lhs,rhs = steady_poisson_rb_system(online_structures)
+      rb_sol = solve_rb_system(lhs,rhs)
     end
     uhk = get_snap(uh[k])
     uhk_rb = reconstruct_fe_sol(rbspace,rb_sol)

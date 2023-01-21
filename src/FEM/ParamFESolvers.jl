@@ -2,7 +2,7 @@ abstract type ParamSolution <: GridapType end
 
 mutable struct GenericParamSolution{C} <: ParamSolution
   solver::FESolver
-  op::ParamOperator{C}
+  op::ParamOp{C}
   uh::FEFunction
   μ::Param
 end
@@ -36,7 +36,7 @@ end
 
 function Gridap.solve(
   solver::FESolver,
-  op::ParamOperator,
+  op::ParamOp,
   μ::Vector{Param})
 
   Broadcasting(p->solve(solver,op,p))(μ)
@@ -44,7 +44,7 @@ end
 
 function Gridap.solve(
   solver::FESolver,
-  op::ParamOperator{C},
+  op::ParamOp{C},
   μ::Param) where C
 
   trial = get_trial(op.feop)

@@ -57,4 +57,6 @@ const Float = Float64
 include("Files.jl")
 include("Indexes.jl")
 include("Operations.jl")
+include("BasesConstruction.jl")
+include("SystemSolvers.jl")
 include("Plots.jl")

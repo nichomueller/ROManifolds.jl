@@ -39,7 +39,7 @@ function navier_stokes_steady()
 
   nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking())
   solver = FESolver(nls)
-  nsnap = 1
+  nsnap = 100
   uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
 
   opA = NonaffineParamOperator(a,afe,PS,U,V;id=:A)
@@ -51,8 +51,9 @@ function navier_stokes_steady()
 
   info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=true)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
-  rbspace,rb_structures = offline_phase(info,(uh,ph,μ,X,Y),(opA,opB,opC,opD,opF,opH),measures,tt)
-  online_phase(info,(uh,ph,μ,X,Y),rbspace,rb_structures,tt)
+  fesol = (uh,ph,μ,U,V)
+  rbspace,rb_structures = offline_phase(info,fesol,(opA,opB,opC,opD,opF,opH),measures,tt)
+  online_phase(info,fesol,rbspace,rb_structures,tt)
 end
 
 function offline_phase(
@@ -95,14 +96,16 @@ function online_phase(
   rb_structures::Tuple,
   tt::TimeTracker)
 
-  uh,ph,μ,X,Y = fesol
-  rb_solver(res,jac,μ) = solve_rb_system(res,jac,(X[1](μ),Y[1]),rbspace)
+  uh,ph,μ,U,V = fesol
+  rb_solver(res,jac,x0,μ) = solve_rb_system(res,jac,x0,(U(μ),V),rbspace)
+  rb_structures = expand(rb_structures)
 
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
       online_structures = online_assembler(rb_structures,μ[k])
-      res,jac = navier_stokes_rb_system(online_structures)
-      rb_sol = rb_solver(res,jac,μ[k])
+      res,jac = steady_navier_stokes_rb_system(online_structures)
+      x0 = initial_guess(rbspace,uh,ph,μ,μ[k])
+      rb_sol = rb_solver(res,jac,x0,μ[k])
     end
     uhk,phk = get_snap(uh[k]),get_snap(ph[k])
     uhk_rb,phk_rb = reconstruct_fe_sol(rbspace,rb_sol)

@@ -1,4 +1,13 @@
 function online_assembler(
+  rb_structure::Tuple,
+  μ::Param,
+  args...)
+
+  ntup_rb_structure = expand(rb_structure)
+  online_assembler(ntup_rb_structure,μ,args...)
+end
+
+function online_assembler(
   rb_structure::NTuple{N,RBStructure},
   μ::Param,
   args...) where N
@@ -109,20 +118,20 @@ function coeff_by_time_bases_bilin(
 end
 
 function steady_poisson_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
-  lhs = get_on_structure(rbos,:A)
-  rhs = get_on_structure(rbos,(:F,:H,:A_lift))
+  lhs = eval_on_structure(rbos,:A)
+  rhs = eval_on_structure(rbos,(:F,:H,:A_lift))
   lhs,sum(rhs)
 end
 
 function unsteady_poisson_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
-  lhs = get_on_structure(rbos,(:A,:M))
-  rhs = get_on_structure(rbos,(:F,:H,:A_lift,:M_lift))
+  lhs = eval_on_structure(rbos,(:A,:M))
+  rhs = eval_on_structure(rbos,(:F,:H,:A_lift,:M_lift))
   sum(lhs),sum(rhs)
 end
 
 function steady_stokes_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
-  lhs = get_on_structure(rbos,(:A,:B))
-  rhs = get_on_structure(rbos,(:F,:H,:A_lift,:B_lift))
+  lhs = eval_on_structure(rbos,(:A,:B))
+  rhs = eval_on_structure(rbos,(:F,:H,:A_lift,:B_lift))
 
   np = size(lhs[2],1)
   rb_lhs = vcat(hcat(lhs[1],-lhs[2]'),hcat(lhs[2],zeros(np,np)))
@@ -131,8 +140,8 @@ function steady_stokes_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
 end
 
 function unsteady_stokes_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
-  lhs = get_on_structure(rbos,(:A,:B,:BT,:M))
-  rhs = get_on_structure(rbos,(:F,:H,:A_lift,:B_lift,:M_lift))
+  lhs = eval_on_structure(rbos,(:A,:B,:BT,:M))
+  rhs = eval_on_structure(rbos,(:F,:H,:A_lift,:B_lift,:M_lift))
 
   np = size(lhs[2],1)
   rb_lhs = vcat(hcat(lhs[1]+lhs[4],-lhs[3]),hcat(lhs[2],zeros(np,np)))
@@ -142,8 +151,8 @@ end
 
 function steady_navier_stokes_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
   lin_rb_lhs,lin_rb_rhs = steady_stokes_rb_system(rbos)
-  nonlin_lhs = get_on_structure(rbos,(:C,:D))
-  nonlin_rhs = get_on_structure(rbos,:C_lift)
+  nonlin_lhs = eval_on_structure(rbos,(:C,:D))
+  nonlin_rhs = eval_on_structure(rbos,:C_lift)
 
   opA,opB = get_op(rbos,(:A,:B))
   rbu,rbp = get_rbspace_row(opA),get_rbspace_row(opB)
@@ -166,8 +175,8 @@ end
 
 function unsteady_navier_stokes_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
   lin_rb_lhs,lin_rb_rhs = unsteady_stokes_rb_system(rbos)
-  nonlin_lhs = get_on_structure(rbos,(:C,:D))
-  nonlin_rhs = get_on_structure(rbos,:C_lift)
+  nonlin_lhs = eval_on_structure(rbos,(:C,:D))
+  nonlin_rhs = eval_on_structure(rbos,:C_lift)
 
   opA,opB = get_op(rbos,(:A,:B))
   rbu,rbp = get_rbspace_row(opA),get_rbspace_row(opB)
@@ -196,6 +205,7 @@ end
 function solve_rb_system(
   res::Function,
   jac::Function,
+  x0::Matrix{Float},
   fespaces::NTuple{2,FESpace},
   rbspace::NTuple{2,RBSpace};
   tol=1e-10,maxit=10)
@@ -203,9 +213,9 @@ function solve_rb_system(
   println("Solving system via Newton method")
 
   Uk,Vk = fespaces
-  bsu,bsp = get_basis_space(rbspace)
-  nsu,nsp = size(bsu,2),size(bsp,2)
-  x_rb = zeros(nsu+nsp,1)
+  bsu = get_basis_space(rbspace[1])
+  nsu = size(bsu,2)
+  x_rb = x0
 
   u(x_rb::AbstractArray) = FEFunction(Vk,bsu*x_rb[1:nsu])
   ud(x_rb::AbstractArray) = FEFunction(Uk,bsu*x_rb[1:nsu])
@@ -226,6 +236,7 @@ end
 function solve_rb_system(
   res::Function,
   jac::Function,
+  x0::Matrix{Float},
   fespaces::Tuple{Function,FESpace},
   rbspace::NTuple{2,<:RBSpace},
   timesθ::Vector{<:Real},
@@ -235,10 +246,9 @@ function solve_rb_system(
   println("Solving system via Newton method")
 
   Uk,Vk = fespaces
-  bstu = get_basis_spacetime(first(rbspace))
-  bstp = get_basis_spacetime(last(rbspace))
-  nstu,nstp = size(bstu,2),size(bstp,2)
-  x_rb = zeros(nstu+nstp,1)
+  bstu = get_basis_spacetime(rbspace[1])
+  nstu = size(bstu,2)
+  x_rb = x0
 
   function uθfe(x_rb::AbstractArray)
     ufe = reshape(bstu*x_rb[1:nstu],:,length(timesθ))
@@ -267,6 +277,37 @@ function solve_rb_system(
   end
 
   x_rb
+end
+
+function initial_guess(
+  rbspace::NTuple{2,<:RBSpaceSteady},
+  uh::Snapshots,
+  ph::Snapshots,
+  μ::Vector{Param},
+  μk::Param)
+
+  bsu,bsp = get_basis_space(rbspace)
+  kmin = nearest_solution(μ,μk)
+  x0 = vcat(bsu'*uh[kmin],bsp'*ph[kmin])
+  Matrix(x0)
+end
+
+function initial_guess(
+  rbspace::NTuple{2,<:RBSpaceUnsteady},
+  uh::Snapshots,
+  ph::Snapshots,
+  μ::Vector{Param},
+  μk::Param)
+
+  bstu,bstp = get_basis_spacetime(rbspace)
+  kmin = nearest_solution(μ,μk)
+  x0 = vcat(bstu'*uh[kmin][:],bstp'*ph[kmin][:])
+  Matrix(x0)
+end
+
+function nearest_solution(μ::Vector{Param},μk::Param)
+  vars = [var(μi-μk) for μi=μ]
+  argmin(vars)
 end
 
 function reconstruct_fe_sol(rbspace::RBSpaceSteady,rb_sol::Matrix{Float})

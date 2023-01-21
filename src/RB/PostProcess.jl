@@ -170,3 +170,11 @@ function mdeim_online_error(
   mdeim_rb = elim_shifted_matrix(mdeim_rb_tmp)
   infty_norm(mat_rb-mdeim_rb)
 end
+
+function infty_norm(q::AbstractArray)
+  maximum(abs.(q))
+end
+
+function infty_norm(q::NTuple{N,AbstractArray}) where N
+  infty_norm.(q)
+end

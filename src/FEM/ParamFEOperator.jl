@@ -3,7 +3,7 @@ abstract type ParamFEOperator{C<:OperatorType} <: GridapType end
 # Default API
 
 """
-Returns a `ParamOperator` wrapper of the `ParamFEOperator`
+Returns a `ParamOp` wrapper of the `ParamFEOperator`
 """
 function Gridap.ODEs.TransientFETools.get_algebraic_operator(feop::ParamFEOperator{C}) where C
   ParamOpFromFEOp{C}(feop)

@@ -71,7 +71,7 @@ function RBOnlineStructure(
 end
 
 function RBOnlineStructure(
-  op::RBUnsteadyBilinOperator{Nonlinear,<:ParamTransientTrialFESpace},
+  op::RBUnsteadyBilinVariable{Nonlinear,<:ParamTransientTrialFESpace},
   basis::Matrix{Float},
   coeff::Function)
 
@@ -85,7 +85,8 @@ function RBOnlineStructure(
   RBOnlineStructure(op,(mat,mat_shift))
 end
 
-get_id(rbos::RBOnlineStructure) = get_id(rbos.op)
+get_op(rbos::RBOnlineStructure) = rbos.op
+get_id(rbos::RBOnlineStructure) = get_id(get_op(rbos))
 
 function get_op(
   rbos::RBOnlineStructure,
@@ -110,16 +111,19 @@ function get_op(
   filter(!isnothing,all_rbos)
 end
 
-function get_on_structure(rbos::RBOnlineStructure)
-  rbos.on_structure
+get_on_structure(rbos::RBOnlineStructure) = rbos.on_structure
+
+function eval_on_structure(rbos::RBOnlineStructure)
+  get_on_structure(rbos)
 end
 
-function get_on_structure(
+function eval_on_structure(
   rbos::RBOnlineBilinStructure{Top,Ttr,NTuple{2,Matrix{Float}}}) where {Top,Ttr}
 
-  θ = get_θ(rbos.op)
-  dt = get_dt(rbos.op)
-  mat,mat_shift = rbos.on_structure
+  op = get_op(rbos)
+  θ = get_θ(op)
+  dt = get_dt(op)
+  mat,mat_shift = get_on_structure(rbos)
 
   if get_id(op) == :M
     mat/dt - mat_shift/dt
@@ -128,43 +132,45 @@ function get_on_structure(
   end
 end
 
-function get_on_structure(
+function eval_on_structure(
   rbos::RBOnlineBilinStructure{Top,Ttr,NTuple{2,Function}}) where {Top,Ttr}
 
-  θ = get_θ(rbos.op)
-  mat,mat_shift = rbos.on_structure
+  op = get_op(rbos)
+  θ = get_θ(op)
+  mat,mat_shift = get_on_structure(rbos)
   u -> θ*mat(u) + (1-θ)*mat_shift(u)
 end
 
-function get_on_structure(rbos::RBOnlineLiftStructure)
-  -rbos.on_structure
+function eval_on_structure(rbos::RBOnlineLiftStructure)
+  -get_on_structure(rbos)
 end
 
-function get_on_structure(
+function eval_on_structure(
   rbos::RBOnlineLiftStructure{Top,Ttr,Function}) where {Top,Ttr}
 
-  u -> -rbos.on_structure(u)
+  u -> -get_on_structure(rbos)(u)
 end
 
-function get_on_structure(
+function eval_on_structure(
   rbos::RBOnlineStructure,
   sym::Symbol)
 
-  get_id(rbos) == sym ? get_on_structure(rbos) : return
+  get_id(rbos) == sym ? eval_on_structure(rbos) : return
 end
 
-function get_on_structure(
+function eval_on_structure(
   rbos::NTuple{N,RBOnlineStructure},
   sym::Symbol) where N
 
-  all_rbos = Broadcasting(os -> get_on_structure(os,sym))(rbos)
-  filter(!isnothing,all_rbos)
+  ids = get_id.(rbos)
+  idx = findall(x -> x == sym,ids)
+  !isempty(idx) ? eval_on_structure(rbos[first(idx)],sym) : return
 end
 
-function get_on_structure(
+function eval_on_structure(
   rbos::NTuple{N1,RBOnlineStructure},
   syms::NTuple{N2,Symbol}) where {N1,N2}
 
-  all_rbos = Broadcasting(sym -> get_on_structure(rbos,sym))(syms)
+  all_rbos = Broadcasting(sym -> eval_on_structure(rbos,sym))(syms)
   filter(!isnothing,all_rbos)
 end

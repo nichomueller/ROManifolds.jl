@@ -11,6 +11,11 @@ get_θ(ti::TimeInfo) = ti.θ
 get_timesθ(ti::TimeInfo) = collect(ti.t0:ti.dt:ti.tF-ti.dt).+ti.dt*ti.θ
 realization(ti::TimeInfo) = rand(Uniform(ti.t0,ti.tF))
 
+function compute_in_timesθ(mat::Matrix{Float},θ::Real;mat0=zeros(size(mat,1)))
+  mat_prev = hcat(mat0,mat[:,1:end-1])
+  θ*mat + (1-θ)*mat_prev
+end
+
 struct Nonaffine <: OperatorType end
 abstract type ParamOperator{Top,Ttr} end
 abstract type ParamLinOperator{Top} <: ParamOperator{Top,nothing} end
