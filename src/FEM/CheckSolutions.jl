@@ -1,8 +1,8 @@
 function steady_poisson()
   uh,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,1)
-  opA = ParamVarOperator(a,afe,PS,U,V;id=:A)
-  opF = ParamVarOperator(f,ffe,PS,V;id=:F)
-  opH = ParamVarOperator(h,hfe,PS,V;id=:H)
+  opA = ParamOperator(a,afe,PS,U,V;id=:A)
+  opF = ParamOperator(f,ffe,PS,V;id=:F)
+  opH = ParamOperator(h,hfe,PS,V;id=:H)
 
   A,LA = assemble_matrix_and_lifting(opA)
   F = assemble_vector(opF)

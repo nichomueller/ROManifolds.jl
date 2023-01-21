@@ -39,22 +39,22 @@ function poisson_unsteady()
   nsnap = 100
   uh,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
 
-  opA = NonaffineParamVarOperator(a,afe,PS,time_info,U,V;id=:A)
-  opM = AffineParamVarOperator(m,mfe,PS,time_info,U,V;id=:M)
-  opF = AffineParamVarOperator(f,ffe,PS,time_info,V;id=:F)
-  opH = AffineParamVarOperator(h,hfe,PS,time_info,V;id=:H)
+  opA = NonaffineParamOperator(a,afe,PS,time_info,U,V;id=:A)
+  opM = AffineParamOperator(m,mfe,PS,time_info,U,V;id=:M)
+  opF = AffineParamOperator(f,ffe,PS,time_info,V;id=:F)
+  opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
 
   info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false,
     st_mdeim=true,fun_mdeim=true)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
-  rbspace,offinfo = offline_phase(info,(uh,μ),(opA,opM,opF,opH),measures,tt)
-  online_phase(info,(uh,μ),rbspace,offinfo,tt)
+  rbspace,rb_structures = offline_phase(info,(uh,μ),(opA,opM,opF,opH),measures,tt)
+  online_phase(info,(uh,μ),rbspace,rb_structures,tt)
 end
 
 function offline_phase(
   info::RBInfo,
   fesol,
-  op::NTuple{N,ParamVarOperator},
+  op::NTuple{N,ParamOperator},
   meas::ProblemMeasures,
   tt::TimeTracker) where N
 
@@ -64,44 +64,44 @@ function offline_phase(
 
   rbspace = rb(info,tt,uh_offline)
 
-  rbopA = RBVarOperator(opA,rbspace,rbspace)
-  rbopM = RBVarOperator(opM,rbspace,rbspace)
-  rbopF = RBVarOperator(opF,rbspace)
-  rbopH = RBVarOperator(opH,rbspace)
+  rbopA = RBVariable(opA,rbspace,rbspace)
+  rbopM = RBVariable(opM,rbspace,rbspace)
+  rbopF = RBVariable(opF,rbspace)
+  rbopH = RBVariable(opH,rbspace)
 
-  A_rb = rb_structure(info,tt,rbopA,μ,meas,:dΩ)
-  M_rb = rb_structure(info,tt,rbopM,μ,meas,:dΩ)
-  F_rb = rb_structure(info,tt,rbopF,μ,meas,:dΩ)
-  H_rb = rb_structure(info,tt,rbopH,μ,meas,:dΓn)
+  Arb = RBStructure(info,tt,rbopA,μ,meas,:dΩ)
+  Mrb = RBStructure(info,tt,rbopM,μ,meas,:dΩ)
+  Frb = RBStructure(info,tt,rbopF,μ,meas,:dΩ)
+  Hrb = RBStructure(info,tt,rbopH,μ,meas,:dΓn)
 
-  offinfo = ((rbopA,A_rb),(rbopM,M_rb),(rbopF,F_rb),(rbopH,H_rb))
-  rbspace,offinfo
+  rb_structures = ((rbopA,Arb),(rbopM,Mrb),(rbopF,Frb),(rbopH,Hrb))
+  rbspace,rb_structures
 end
 
 function online_phase(
   info::RBInfo,
   fesol,
   rbspace::RBSpace,
-  offinfo::Tuple,
+  rb_structures::Tuple,
   tt::TimeTracker)
 
   uh,μ = fesol
 
-  Ainfo,Minfo,Finfo,Hinfo = offinfo
-  rbopA,A_rb = Ainfo
-  rbopM,M_rb = Minfo
-  rbopF,F_rb = Finfo
-  rbopH,H_rb = Hinfo
+  Arb,Mrb,Frb,Hrb = rb_structures
+  rbopA,Arb = Arb
+  rbopM,Mrb = Mrb
+  rbopF,Frb = Frb
+  rbopH,Hrb = Hrb
 
   st_mdeim = info.st_mdeim
   θ = get_θ(rbopA)
 
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
-      Aon = online_assembler(rbopA,A_rb,μ[k],st_mdeim)
-      Mon = online_assembler(rbopM,M_rb,μ[k],st_mdeim)
-      Fon = online_assembler(rbopF,F_rb,μ[k],st_mdeim)
-      Hon = online_assembler(rbopH,H_rb,μ[k],st_mdeim)
+      Aon = online_assembler(rbopA,Arb,μ[k],st_mdeim)
+      Mon = online_assembler(rbopM,Mrb,μ[k],st_mdeim)
+      Fon = online_assembler(rbopF,Frb,μ[k],st_mdeim)
+      Hon = online_assembler(rbopH,Hrb,μ[k],st_mdeim)
       lift = Aon[2],Mon[2]
       sys = poisson_rb_system((Aon[1]...,Mon[1]...),(Fon,Hon,lift...),θ)
       rb_sol = solve_rb_system(sys...)

@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function navier_stokes_steady()
-  run_fem = true
+  run_fem = false
 
   steady = true
   indef = true
@@ -42,23 +42,23 @@ function navier_stokes_steady()
   nsnap = 1
   uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
 
-  opA = NonaffineParamVarOperator(a,afe,PS,U,V;id=:A)
-  opB = AffineParamVarOperator(b,bfe,PS,U,Q;id=:B)
-  opC = NonlinearParamVarOperator(c,cfe,PS,U,V;id=:C)
-  opD = NonlinearParamVarOperator(d,dfe,PS,U,V;id=:D)
-  opF = AffineParamVarOperator(f,ffe,PS,V;id=:F)
-  opH = AffineParamVarOperator(h,hfe,PS,V;id=:H)
+  opA = NonaffineParamOperator(a,afe,PS,U,V;id=:A)
+  opB = AffineParamOperator(b,bfe,PS,U,Q;id=:B)
+  opC = NonlinearParamOperator(c,cfe,PS,U,V;id=:C)
+  opD = NonlinearParamOperator(d,dfe,PS,U,V;id=:D)
+  opF = AffineParamOperator(f,ffe,PS,V;id=:F)
+  opH = AffineParamOperator(h,hfe,PS,V;id=:H)
 
   info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=true)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
-  rbspace,offinfo = offline_phase(info,(uh,ph,μ,X,Y),(opA,opB,opC,opD,opF,opH),measures,tt)
-  online_phase(info,(uh,ph,μ,X,Y),rbspace,offinfo,tt)
+  rbspace,rb_structures = offline_phase(info,(uh,ph,μ,X,Y),(opA,opB,opC,opD,opF,opH),measures,tt)
+  online_phase(info,(uh,ph,μ,X,Y),rbspace,rb_structures,tt)
 end
 
 function offline_phase(
   info::RBInfo,
   fesol,
-  op::NTuple{N,ParamVarOperator},
+  op::NTuple{N,ParamOperator},
   meas::ProblemMeasures,
   tt::TimeTracker) where N
 
@@ -69,44 +69,44 @@ function offline_phase(
 
   rbspace_u,rbspace_p = rb(info,tt,(uh_offline,ph_offline),opB,ph,μ)
 
-  rbopA = RBVarOperator(opA,rbspace_u,rbspace_u)
-  rbopB = RBVarOperator(opB,rbspace_p,rbspace_u)
-  rbopC = RBVarOperator(opC,rbspace_u,rbspace_u)
-  rbopD = RBVarOperator(opD,rbspace_u,rbspace_u)
-  rbopF = RBVarOperator(opF,rbspace_u)
-  rbopH = RBVarOperator(opH,rbspace_u)
+  rbopA = RBVariable(opA,rbspace_u,rbspace_u)
+  rbopB = RBVariable(opB,rbspace_p,rbspace_u)
+  rbopC = RBVariable(opC,rbspace_u,rbspace_u)
+  rbopD = RBVariable(opD,rbspace_u,rbspace_u)
+  rbopF = RBVariable(opF,rbspace_u)
+  rbopH = RBVariable(opH,rbspace_u)
 
-  A_rb = rb_structure(info,tt,rbopA,μ,meas,:dΩ)
-  B_rb = rb_structure(info,tt,rbopB,μ,meas,:dΩ)
-  C_rb = rb_structure(info,tt,rbopC,μ,meas,:dΩ)
-  D_rb = rb_structure(info,tt,rbopD,μ,meas,:dΩ)
-  F_rb = rb_structure(info,tt,rbopF,μ,meas,:dΩ)
-  H_rb = rb_structure(info,tt,rbopH,μ,meas,:dΓn)
+  Arb = RBStructure(info,tt,rbopA,μ,meas,:dΩ)
+  Brb = RBStructure(info,tt,rbopB,μ,meas,:dΩ)
+  Crb = RBStructure(info,tt,rbopC,μ,meas,:dΩ)
+  Drb = RBStructure(info,tt,rbopD,μ,meas,:dΩ)
+  Frb = RBStructure(info,tt,rbopF,μ,meas,:dΩ)
+  Hrb = RBStructure(info,tt,rbopH,μ,meas,:dΓn)
 
   rbspace = (rbspace_u,rbspace_p)
-  offinfo = ((rbopA,A_rb),(rbopB,B_rb),(rbopC,C_rb),(rbopD,D_rb),(rbopF,F_rb),(rbopH,H_rb))
-  rbspace,offinfo
+  rb_structures = Arb,Brb,Crb,Drb,Frb,Hrb
+  rbspace,rb_structures
 end
 
 function online_phase(
   info::RBInfo,
   fesol,
   rbspace::NTuple{2,RBSpace},
-  offinfo::Tuple,
+  rb_structures::Tuple,
   tt::TimeTracker)
 
   uh,ph,μ,X,Y = fesol
 
-  Ainfo,Binfo,Cinfo,Dinfo,Finfo,Hinfo = offinfo
+  Arb,Brb,Crb,Drb,Frb,Hrb = rb_structures
 
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
-      Aon = online_assembler(Ainfo...,μ[k])
-      Bon = online_assembler(Binfo...,μ[k])
-      Con = online_assembler(Cinfo...,μ[k])
-      Don = online_assembler(Dinfo...,μ[k])
-      Fon = online_assembler(Finfo...,μ[k])
-      Hon = online_assembler(Hinfo...,μ[k])
+      Aon = online_assembler(Arb,μ[k])
+      Bon = online_assembler(Brb,μ[k])
+      Con = online_assembler(Crb,μ[k])
+      Don = online_assembler(Drb,μ[k])
+      Fon = online_assembler(Frb,μ[k])
+      Hon = online_assembler(Hrb,μ[k])
       lift = Aon[2],Bon[2],Con[2]
       sys = navier_stokes_rb_system((Aon[1],Bon[1],Con[1],Don[1]),(Fon,Hon,lift...))
       Uk = X[1](μ[k])

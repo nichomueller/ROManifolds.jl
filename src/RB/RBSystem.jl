@@ -1,5 +1,5 @@
 function online_assembler(
-  op::RBVarOperator,
+  op::RBVariable,
   basis::NTuple{2,Matrix{Float}},
   μ::Param,
   args...)
@@ -8,7 +8,7 @@ function online_assembler(
 end
 
 function online_assembler(
-  op::RBVarOperator,
+  op::RBVariable,
   basis::Matrix{Float},
   μ::Param,
   args...)
@@ -18,7 +18,7 @@ function online_assembler(
 end
 
 function online_assembler(
-  op::RBVarOperator,
+  op::RBVariable,
   mdeim::Union{MDEIM,NTuple{2,MDEIM}},
   μ::Param,
   args...)
@@ -29,7 +29,7 @@ function online_assembler(
 end
 
 function online_assembler(
-  op::RBBilinOperator,
+  op::RBBilinVariable,
   basis_mdeim::Tuple{Matrix{Float},MDEIM},
   μ::Param,
   args...)
@@ -37,7 +37,7 @@ function online_assembler(
   affine_basis,mdeim = basis_mdeim
   affine_structure = online_assembler(op,affine_basis,μ)
 
-  op_lift = RBLiftingOperator(op)
+  op_lift = RBLiftVariable(op)
   nonaffine_basis = get_basis_space(mdeim)
   coeff = compute_coefficient(op_lift,mdeim,μ,args...)
   nonaffine_structure = online_structure(op_lift,nonaffine_basis,coeff)
@@ -64,7 +64,7 @@ function online_structure(
 end
 
 function online_structure(
-  op::RBSteadyBilinOperator{Nonlinear,<:ParamTrialFESpace},
+  op::RBSteadyBilinVariable{Nonlinear,<:ParamTrialFESpace},
   basis::NTuple{2,Matrix{Float}},
   coeff)
 
@@ -109,7 +109,7 @@ function online_structure(
 end
 
 function online_structure(
-  op::RBUnsteadyBilinOperator{Nonlinear,<:ParamTransientTrialFESpace},
+  op::RBUnsteadyBilinVariable{Nonlinear,<:ParamTransientTrialFESpace},
   basis::NTuple{2,Matrix{Float}},
   coeff)
 
@@ -128,21 +128,21 @@ function online_structure(
 end
 
 function coeff_by_time_bases(
-  op::Union{RBUnsteadyLinOperator,RBUnsteadyLiftingOperator},
+  op::Union{RBUnsteadyLinVariable,RBUnsteadyLiftVariable},
   coeff)
 
   coeff_by_time_bases_lin(op,coeff)
 end
 
 function coeff_by_time_bases(
-  op::RBUnsteadyBilinOperator,
+  op::RBUnsteadyBilinVariable,
   coeff)
 
   coeff_by_time_bases_bilin(op,coeff)
 end
 
 function coeff_by_time_bases(
-  op::RBUnsteadyBilinOperator,
+  op::RBUnsteadyBilinVariable,
   coeff::NTuple{2,Any})
 
   @assert length(coeff) == 2 "Something is wrong"
@@ -150,7 +150,7 @@ function coeff_by_time_bases(
 end
 
 function coeff_by_time_bases_lin(
-  op::RBVarOperator,
+  op::RBVariable,
   coeff::AbstractMatrix)
 
   rbrow = get_rbspace_row(op)
@@ -158,7 +158,7 @@ function coeff_by_time_bases_lin(
 end
 
 function coeff_by_time_bases_lin(
-  op::RBVarOperator{Nonlinear,<:ParamTransientTrialFESpace},
+  op::RBVariable{Nonlinear,<:ParamTransientTrialFESpace},
   coeff::Function)
 
   rbrow = get_rbspace_row(op)
@@ -166,7 +166,7 @@ function coeff_by_time_bases_lin(
 end
 
 function coeff_by_time_bases_bilin(
-  op::RBVarOperator,
+  op::RBVariable,
   coeff::AbstractMatrix)
 
   rbrow = get_rbspace_row(op)
@@ -183,7 +183,7 @@ function coeff_by_time_bases_bilin(
 end
 
 function coeff_by_time_bases_bilin(
-  op::RBVarOperator{Nonlinear,<:ParamTransientTrialFESpace},
+  op::RBVariable{Nonlinear,<:ParamTransientTrialFESpace},
   coeff::Function)
 
   rbrow = get_rbspace_row(op)
@@ -211,9 +211,9 @@ function poisson_rb_system(
   lhs::Matrix{Float},
   rhs::NTuple{N,Matrix{Float}}) where N
 
-  A_rb = lhs
-  F_rb,H_rb,lifts... = rhs
-  A_rb,F_rb+H_rb-sum(lifts)
+  Arb = lhs
+  Frb,Hrb,lifts... = rhs
+  Arb,Frb+Hrb-sum(lifts)
 end
 
 function poisson_rb_system(
@@ -221,11 +221,11 @@ function poisson_rb_system(
   rhs::NTuple{N,Matrix{Float}},
   θ::Real) where N
 
-  A_rb,Ashift_rb,M_rb,Mshift_rb = lhs
-  F_rb,H_rb,lifts... = rhs
+  Arb,Ashift_rb,Mrb,Mshift_rb = lhs
+  Frb,Hrb,lifts... = rhs
 
-  rb_lhs = θ*(A_rb+M_rb) + (1-θ)*Ashift_rb - θ*Mshift_rb
-  rb_rhs = F_rb+H_rb-sum(lifts)
+  rb_lhs = θ*(Arb+Mrb) + (1-θ)*Ashift_rb - θ*Mshift_rb
+  rb_rhs = Frb+Hrb-sum(lifts)
   rb_lhs,rb_rhs
 end
 
@@ -233,12 +233,12 @@ function stokes_rb_system(
   lhs::NTuple{2,Matrix{Float}},
   rhs::NTuple{N,Matrix{Float}}) where N
 
-  A_rb,B_rb = lhs
-  F_rb,H_rb,lifts... = rhs
+  Arb,Brb = lhs
+  Frb,Hrb,lifts... = rhs
 
-  np = size(B_rb)[1]
-  rb_lhs = vcat(hcat(A_rb,-B_rb'),hcat(B_rb,zeros(np,np)))
-  rb_rhs = vcat(F_rb+H_rb-sum(lifts[1:end-1]),-lifts[end])
+  np = size(Brb)[1]
+  rb_lhs = vcat(hcat(Arb,-Brb'),hcat(Brb,zeros(np,np)))
+  rb_rhs = vcat(Frb+Hrb-sum(lifts[1:end-1]),-lifts[end])
   rb_lhs,rb_rhs
 end
 
@@ -247,33 +247,33 @@ function stokes_rb_system(
   rhs::NTuple{N,Matrix{Float}},
   θ::Real) where N
 
-  A_rb,Ashift_rb,B_rb,Bshift_rb,BT_rb,BTshift_rb,M_rb,Mshift_rb = lhs
-  F_rb,H_rb,lifts... = rhs
+  Arb,Ashift_rb,Brb,Bshift_rb,BTrb,BTshift_rb,Mrb,Mshift_rb = lhs
+  Frb,Hrb,lifts... = rhs
 
-  np = size(B_rb,1)
+  np = size(Brb,1)
 
-  rb_lhs_11 = θ*(A_rb+M_rb) + (1-θ)*Ashift_rb - θ*Mshift_rb
-  rb_lhs_12 = - θ*BT_rb - (1-θ)*BTshift_rb
-  rb_lhs_21 = θ*B_rb + (1-θ)*Bshift_rb
+  rb_lhs_11 = θ*(Arb+Mrb) + (1-θ)*Ashift_rb - θ*Mshift_rb
+  rb_lhs_12 = - θ*BTrb - (1-θ)*BTshift_rb
+  rb_lhs_21 = θ*Brb + (1-θ)*Bshift_rb
   rb_lhs = vcat(hcat(rb_lhs_11,rb_lhs_12),hcat(rb_lhs_21,zeros(np,np)))
 
-  rb_rhs = vcat(F_rb+H_rb-sum(lifts[1:end-1]),-lifts[end])
+  rb_rhs = vcat(Frb+Hrb-sum(lifts[1:end-1]),-lifts[end])
   rb_lhs,rb_rhs
 end
 
 function navier_stokes_rb_system(lhs::Tuple,rhs::Tuple)
-  A_rb,B_rb,C_rb,D_rb = lhs
-  F_rb,H_rb,lifts... = rhs
+  Arb,Brb,Crb,Drb = lhs
+  Frb,Hrb,lifts... = rhs
   liftA,liftB,liftC, = lifts
 
-  lin_rb_lhs,lin_rb_rhs = stokes_rb_system((A_rb,B_rb),(F_rb,H_rb,liftA,liftB))
+  lin_rb_lhs,lin_rb_rhs = stokes_rb_system((Arb,Brb),(Frb,Hrb,liftA,liftB))
 
-  nu,np = size(A_rb,1),size(B_rb,1)
+  nu,np = size(Arb,1),size(Brb,1)
   block12 = zeros(nu,np)
   block21 = zeros(np,nu)
   block22 = zeros(np,np)
-  nonlin_rb_lhs1(u) = vcat(hcat(C_rb(u),block12),hcat(block21,block22))
-  nonlin_rb_lhs2(u) = vcat(hcat(C_rb(u)+D_rb(u),block12),hcat(block21,block22))
+  nonlin_rb_lhs1(u) = vcat(hcat(Crb(u),block12),hcat(block21,block22))
+  nonlin_rb_lhs2(u) = vcat(hcat(Crb(u)+Drb(u),block12),hcat(block21,block22))
   nonlin_rb_rhs(u) = vcat(liftC(u),zeros(np,1))
 
   jac_rb(u) = lin_rb_lhs + nonlin_rb_lhs2(u)
@@ -285,20 +285,20 @@ function navier_stokes_rb_system(lhs::Tuple,rhs::Tuple)
 end
 
 function navier_stokes_rb_system(lhs::Tuple,rhs::Tuple,θ::Real)
-  A_rb,B_rb,BT_rb,C_rb,Cshift_rb,D_rb,Dshift_rb,M_rb = lhs
-  F_rb,H_rb,lifts... = rhs
+  Arb,Brb,BTrb,Crb,Cshift_rb,Drb,Dshift_rb,Mrb = lhs
+  Frb,Hrb,lifts... = rhs
   liftA,liftB,liftC,liftM, = lifts
 
-  lin_rb_lhs,lin_rb_rhs = stokes_rb_system((A_rb...,B_rb...,BT_rb...,M_rb...),
-    (F_rb,H_rb,liftA,liftM,liftB),θ)
+  lin_rb_lhs,lin_rb_rhs = stokes_rb_system((Arb...,Brb...,BTrb...,Mrb...),
+    (Frb,Hrb,liftA,liftM,liftB),θ)
 
-  nu,np = size(first(A_rb),1),size(first(B_rb),1)
+  nu,np = size(first(Arb),1),size(first(Brb),1)
   block12 = zeros(nu,np)
   block21 = zeros(np,nu)
   block22 = zeros(np,np)
-  nonlin_rb_lhs1(u) = vcat(hcat(θ*C_rb(u) + (1-θ)*Cshift_rb(u),block12),
+  nonlin_rb_lhs1(u) = vcat(hcat(θ*Crb(u) + (1-θ)*Cshift_rb(u),block12),
     hcat(block21,block22))
-  nonlin_rb_lhs2(u) = vcat(hcat(θ*(C_rb(u)+D_rb(u)) +
+  nonlin_rb_lhs2(u) = vcat(hcat(θ*(Crb(u)+Drb(u)) +
     (1-θ)*(Cshift_rb(u)+Dshift_rb(u)),block12),hcat(block21,block22))
   nonlin_rb_rhs(u) = vcat(liftC(u),zeros(np,1))
 

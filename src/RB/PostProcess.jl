@@ -136,7 +136,7 @@ function MDEIMError(
 end
 
 function MDEIMError(
-  op::RBVarOperator,
+  op::RBVariable,
   mdeim,
   μ::Param,
   args...)
@@ -148,7 +148,7 @@ function MDEIMError(
 end
 
 #= function mdeim_offline_error(
-  op::RBVarOperator,
+  op::RBVariable,
   mdeim::MDEIM,
   μ::Param,)
 
@@ -159,7 +159,7 @@ end
 end =#
 
 function mdeim_online_error(
-  op::RBVarOperator,
+  op::RBVariable,
   mdeim,
   μ::Param,
   st_mdeim=false)

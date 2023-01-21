@@ -72,7 +72,7 @@ function compute_coefficient(
 end
 
 function assemble_red_structure(
-  op::RBSteadyLinOperator{Nonaffine},
+  op::RBSteadyLinVariable{Nonaffine},
   m::Measure,
   μ::Param,
   idx_space::Vector{Int})
@@ -82,7 +82,7 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBUnsteadyLinOperator{Nonaffine},
+  op::RBUnsteadyLinVariable{Nonaffine},
   m::Measure,
   μ::Param,
   idx_space::Vector{Int},
@@ -94,7 +94,7 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBSteadyBilinOperator{Nonaffine,Ttr},
+  op::RBSteadyBilinVariable{Nonaffine,Ttr},
   m::Measure,
   μ::Param,
   idx_space::Vector{Int}) where Ttr
@@ -105,7 +105,7 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBSteadyBilinOperator{Nonlinear,Ttr},
+  op::RBSteadyBilinVariable{Nonlinear,Ttr},
   m::Measure,
   μ::Param,
   idx_space::Vector{Int}) where Ttr
@@ -117,7 +117,7 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBUnsteadyBilinOperator{Nonaffine,Ttr},
+  op::RBUnsteadyBilinVariable{Nonaffine,Ttr},
   m::Measure,
   μ::Param,
   idx_space::Vector{Int},
@@ -130,7 +130,7 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBUnsteadyBilinOperator{Nonlinear,Ttr},
+  op::RBUnsteadyBilinVariable{Nonlinear,Ttr},
   m::Measure,
   μ::Param,
   idx_space::Vector{Int},
@@ -144,7 +144,7 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBSteadyBilinOperator,
+  op::RBSteadyBilinVariable,
   m_mat_lift::NTuple{2,Measure},
   μ::Param,
   idx_space::NTuple{2,Vector{Int}})
@@ -158,7 +158,7 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBUnsteadyBilinOperator,
+  op::RBUnsteadyBilinVariable,
   m_mat_lift::NTuple{2,Measure},
   μ::Param,
   idx_space::NTuple{2,Vector{Int}},
@@ -173,7 +173,7 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBUnsteadyBilinOperator,
+  op::RBUnsteadyBilinVariable,
   m_mat_lift::NTuple{2,Measure},
   μ::Param,
   idx_space::NTuple{2,Vector{Int}},
@@ -189,7 +189,7 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBSteadyLiftingOperator,
+  op::RBSteadyLiftVariable,
   m::Measure,
   μ::Param,
   idx_space::Vector{Int})
@@ -198,7 +198,7 @@ function assemble_red_structure(
 end
 
 function assemble_red_structure(
-  op::RBUnsteadyLiftingOperator,
+  op::RBUnsteadyLiftVariable,
   m::Measure,
   μ::Param,
   idx_space::Vector{Int},

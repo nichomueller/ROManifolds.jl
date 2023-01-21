@@ -43,9 +43,9 @@ function MDEIM(
   MDEIM.(red_rbspace,red_lu_factors,idx,red_measure)
 end
 
-function mdeim_offline(
+function MDEIM(
   info::RBInfo,
-  op::RBLinOperator,
+  op::RBLinVariable,
   μ::Vector{Param},
   meas::ProblemMeasures,
   field::Symbol,
@@ -62,9 +62,9 @@ function mdeim_offline(
   MDEIM(red_rbspace,red_lu_factors,idx,red_meas)
 end
 
-function mdeim_offline(
+function MDEIM(
   info::RBInfo,
-  op::RBBilinOperator,
+  op::RBBilinVariable,
   μ::Vector{Param},
   meas::ProblemMeasures,
   field::Symbol,
@@ -82,9 +82,9 @@ function mdeim_offline(
   MDEIM(red_rbspace,red_lu_factors,idx,red_meas)
 end
 
-function mdeim_offline(
+function MDEIM(
   info::RBInfo,
-  op::RBBilinOperator{Nonlinear,<:ParamTransientTrialFESpace},
+  op::RBBilinVariable{Nonlinear,<:ParamTransientTrialFESpace},
   μ::Vector{Param},
   meas::ProblemMeasures,
   field::Symbol,
@@ -127,7 +127,25 @@ function mdeim_offline(
   MDEIM(red_rbspace,red_lu_factors,idx,red_meas)
 end
 
-function load_mdeim(
+function save(path::String,mdeim::MDEIMSteady)
+  save(joinpath(path,"basis_space"),get_basis_space(mdeim))
+  save(joinpath(path,"idx_space"),get_idx_space(mdeim))
+  red_lu = get_red_lu_factors(mdeim)
+  save(joinpath(path,"LU"),red_lu.factors)
+  save(joinpath(path,"p"),red_lu.ipiv)
+end
+
+function save(path::String,mdeim::MDEIMUnsteady)
+  save(joinpath(path,"basis_space"),get_basis_space(mdeim))
+  save(joinpath(path,"idx_space"),get_idx_space(mdeim))
+  save(joinpath(path,"basis_time"),get_basis_time(mdeim))
+  save(joinpath(path,"idx_time"),get_idx_time(mdeim))
+  red_lu = get_red_lu_factors(mdeim)
+  save(joinpath(path,"LU"),red_lu.factors)
+  save(joinpath(path,"p"),red_lu.ipiv)
+end
+
+function load(
   path::String,
   op::RBSteadyVarOperator,
   meas::Measure)
@@ -147,7 +165,7 @@ function load_mdeim(
   MDEIM(rbspace,red_lu_factors,idx_space,red_measure)
 end
 
-function load_mdeim(
+function load(
   path::String,
   op::RBUnsteadyVarOperator,
   meas::Measure)
@@ -219,7 +237,7 @@ function project_mdeim_basis(
 end
 
 function rb_space_projection(
-  op::RBLinOperator,
+  op::RBLinVariable,
   rbspace::RBSpace,
   args...)
 
@@ -230,7 +248,7 @@ function rb_space_projection(
 end
 
 function rb_space_projection(
-  op::RBBilinOperator,
+  op::RBBilinVariable,
   rbspace::RBSpace,
   findnz_map::Vector{Int})
 
@@ -253,12 +271,12 @@ function rb_space_projection(
 end
 
 function rb_space_projection(
-  op::RBBilinOperator,
+  op::RBBilinVariable,
   rb::NTuple{2,<:RBSpace},
   findnz_map::Vector{Int})
 
   rbspace,rbspace_lift = rb
-  op_lift = RBLiftingOperator(op)
+  op_lift = RBLiftVariable(op)
 
   red_basis_space = rb_space_projection(op,rbspace,findnz_map)
   red_basis_space_lift = rb_space_projection(op_lift,rbspace_lift,findnz_map)
@@ -422,7 +440,7 @@ function get_red_measure(
 end
 
 function get_red_measure(
-  op::RBSteadyBilinOperator,
+  op::RBSteadyBilinVariable,
   idx::NTuple{2,Vector{Int}},
   meas::ProblemMeasures,
   field=:dΩ)
@@ -434,7 +452,7 @@ function get_red_measure(
 end
 
 function get_red_measure(
-  op::RBUnsteadyBilinOperator,
+  op::RBUnsteadyBilinVariable,
   idx::NTuple{2,NTuple{2,Vector{Int}}},
   meas::ProblemMeasures,
   field=:dΩ)
@@ -446,7 +464,7 @@ function get_red_measure(
 end
 
 function get_red_measure(
-  op::RBVarOperator,
+  op::RBVariable,
   idx::Vector{Int},
   meas::Measure)
 
@@ -454,7 +472,7 @@ function get_red_measure(
 end
 
 function get_red_measure(
-  op::RBVarOperator,
+  op::RBVariable,
   idx::Vector{Int},
   trian::Triangulation)
 
@@ -464,7 +482,7 @@ function get_red_measure(
 end
 
 function find_mesh_elements(
-  op::RBVarOperator,
+  op::RBVariable,
   idx_tmp::Vector{Int},
   trian::Triangulation)
 
@@ -483,9 +501,9 @@ function find_mesh_elements(
   unique(el)
 end
 
-recast_in_mat_form(::RBLinOperator,idx_tmp::Vector{Int}) = idx_tmp
+recast_in_mat_form(::RBLinVariable,idx_tmp::Vector{Int}) = idx_tmp
 
-function recast_in_mat_form(op::RBBilinOperator,idx_tmp::Vector{Int})
+function recast_in_mat_form(op::RBBilinVariable,idx_tmp::Vector{Int})
   Ns = get_Ns(get_rbspace_row(op))
   idx_space,_ = from_vec_to_mat_idx(idx_tmp,Ns)
   idx_space

@@ -1,139 +1,200 @@
-function rb_structure(info::RBInfo,args...)
+abstract type RBStructure{Top,Ttr} end
+
+struct RBAffineLinStructure <: RBStructure{Affine,nothing}
+  op::RBLinVariable{Affine}
+  rb_structure::Vector{Float}
+end
+
+struct RBLinStructure{Top} <: RBStructure{Top,nothing}
+  op::RBLinVariable{Top}
+  mdeim::MDEIM
+end
+
+struct RBAffineBilinStructure{Ttr} <: RBStructure{Affine,Ttr}
+  op::RBBilinVariable{Affine,Ttr}
+  rb_structure::Matrix{Float}
+end
+
+struct RBBilinStructure{Top,Ttr} <: RBStructure{Top,Ttr}
+  op::RBBilinVariable{Top,Ttr}
+  mdeim::MDEIM
+end
+
+struct RBLiftStructure{Top,Ttr} <: RBStructure{Top,Ttr}
+  op::RBLiftVariable{Top,Ttr}
+  mdeim::MDEIM
+end
+
+function RBStructure(
+  op::RBLinVariable{Affine},
+  rb_structure::Vector{Float})
+
+  RBAffineLinStructure(op,rb_structure)
+end
+
+function RBStructure(
+  op::RBLinVariable{Top},
+  mdeim::MDEIM)
+
+  RBLinStructure{Top}(op,mdeim)
+end
+
+function RBStructure(
+  op::RBBilinVariable{Affine,Ttr},
+  rb_structure::Vector{Float})
+
+  RBAffineBilinStructure{Ttr}(op,rb_structure)
+end
+
+function RBStructure(
+  op::RBBilinVariable{Top,Ttr},
+  mdeim::MDEIM)
+
+  RBBilinStructure{Top,Ttr}(op,mdeim)
+end
+
+function RBStructure(
+  op::RBLiftVariable{Top,Ttr},
+  mdeim::MDEIM)
+
+  RBLiftStructure{Top,Ttr}(op,mdeim)
+end
+
+function RBStructure(info::RBInfo,args...)
   if info.load_offline
-    load_rb_structure(info,args...)
+    load(info,args...)
   else
     assemble_rb_structure(info,args...)
   end
 end
 
-function assemble_rb_structure(info::RBInfo,tt::TimeTracker,op::RBVarOperator,args...)
+function assemble_rb_structure(info::RBInfo,tt::TimeTracker,op::RBVariable,args...)
   tt.offline_time.assembly_time += @elapsed begin
     rb_variable = assemble_rb_structure(info,op,args...)
   end
-  save_rb_structure(info,rb_variable,get_id(op))
+  save(info,rb_variable,get_id(op))
   rb_variable
 end
 
 function assemble_rb_structure(
+  ::RBInfo,
+  op::RBLinVariable{Affine},
+  args...)
+
+  id = get_id(op)
+  println("Linear operator $id is affine: computing Φᵀ$id")
+
+  rb_structure = rb_space_projection(op)
+  RBStructure(op,rb_structure)
+end
+
+function assemble_rb_structure(
   info::RBInfo,
-  op::RBLinOperator,
+  op::RBLinVariable,
   args...)
 
   id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
   println("Linear operator $id is non-affine:
     running the MDEIM offline phase on $mdeim_nsnap snapshots")
 
-  mdeim_offline(info,op,args...)
+  mdeim = MDEIM(info,op,args...)
+  RBStructure(op,mdeim)
 end
 
 function assemble_rb_structure(
   ::RBInfo,
-  op::RBLinOperator{Affine},
+  op::RBBilinVariable{Affine,<:TrialFESpace},
   args...)
 
   id = get_id(op)
-  println("Linear operator $id is affine: computing Φᵀ$id")
+  println("Bilinear operator $id is affine and has no lifting: computing Φᵀ$(id)Φ")
 
-  rb_space_projection(op)
+  rb_structure = rb_space_projection(op)
+  RBStructure(op,rb_structure)
 end
 
 function assemble_rb_structure(
   info::RBInfo,
-  op::RBBilinOperator,
-  args...)
-
-  id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
-  println("Bilinear operator $id and its lifting are non-affine:
-    running the MDEIM offline phase on $mdeim_nsnap snapshots")
-
-  mdeim_offline(info,op,args...)
-end
-
-function assemble_rb_structure(
-  info::RBInfo,
-  op::RBBilinOperator{Top,<:TrialFESpace},
-  args...) where Top
-
-  id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
-  println("Bilinear operator $id is non-affine and has no lifting:
-    running the MDEIM offline phase on $mdeim_nsnap snapshots")
-
-  mdeim_offline(info,op,args...)
-end
-
-function assemble_rb_structure(
-  info::RBInfo,
-  op::RBBilinOperator{Affine,Ttr},
+  op::RBBilinVariable{Affine,Ttr},
   args...) where Ttr
 
   id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
   println("Bilinear operator $id is affine but its lifting is non-affine:
     running the MDEIM offline phase on $mdeim_nsnap snapshots")
 
-  op_lift = RBLiftingOperator(op)
-  rb_space_projection(op),mdeim_offline(info,op_lift,args...)
+  rb_structure = rb_space_projection(op)
+  op_lift = RBLiftVariable(op)
+  mdeim_lift = MDEIM(info,op_lift,args...)
+  RBStructure(op,rb_structure),RBStructure(op_lift,mdeim_lift)
 end
 
 function assemble_rb_structure(
-  ::RBInfo,
-  op::RBBilinOperator{Affine,<:TrialFESpace},
-  args...)
+  info::RBInfo,
+  op::RBBilinVariable{Top,<:TrialFESpace},
+  args...) where Top
 
-  id = get_id(op)
-  println("Bilinear operator $id is affine and has no lifting: computing Φᵀ$(id)Φ")
+  id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
+  println("Bilinear operator $id is non-affine and has no lifting:
+    running the MDEIM offline phase on $mdeim_nsnap snapshots")
 
-  rb_space_projection(op)
+  mdeim = MDEIM(info,op,args...)
+  RBStructure(op,mdeim)
 end
 
-function save_rb_structure(info::RBInfo,b,id::Symbol)
+function assemble_rb_structure(
+  info::RBInfo,
+  op::RBBilinVariable,
+  args...)
+
+  id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
+  println("Bilinear operator $id and its lifting are non-affine:
+    running the MDEIM offline phase on $mdeim_nsnap snapshots")
+
+  mdeim,mdeim_lift = MDEIM(info,op,args...)
+  op_lift = RBLiftVariable(op)
+  RBStructure(op,mdeim),RBStructure(op_lift,mdeim_lift)
+end
+
+function save(info::RBInfo,b,id::Symbol)
   path_id = joinpath(info.offline_path,"$id")
   create_dir!(path_id)
   if info.save_offline
-    save_rb_structure(path_id,b)
+    save(path_id,b)
   end
 end
 
-function save_rb_structure(path::String,rbv::Tuple)
+function save(path::String,rbv::NTuple{2,RBStructure})
   rbvar,rbvar_lift = rbv
-  save_rb_structure(path,rbvar)
+  save(path,rbvar)
   path_lift = path*"_lift"
   create_dir!(path_lift)
-  save_rb_structure(path_lift,rbvar_lift)
+  save(path_lift,rbvar_lift)
 end
 
-function save_rb_structure(path::String,basis::Matrix{Float})
-  save(joinpath(path,"basis_space"),basis)
+function save(
+  path::String,
+  rbv::Union{RBAffineLinStructure,RBAffineBilinStructure})
+
+  rb_structure = get_rb_structure(rbv)
+  save(joinpath(path,"basis_space"),rb_structure)
 end
 
-function save_rb_structure(path::String,mdeim::MDEIMSteady)
-  save(joinpath(path,"basis_space"),get_basis_space(mdeim))
-  save(joinpath(path,"idx_space"),get_idx_space(mdeim))
-  red_lu = get_red_lu_factors(mdeim)
-  save(joinpath(path,"LU"),red_lu.factors)
-  save(joinpath(path,"p"),red_lu.ipiv)
+function save(path::String,rbv::RBStructure)
+  mdeim = get_mdeim(rbv)
+  save(path,mdeim)
 end
 
-function save_rb_structure(path::String,mdeim::MDEIMUnsteady)
-  save(joinpath(path,"basis_space"),get_basis_space(mdeim))
-  save(joinpath(path,"idx_space"),get_idx_space(mdeim))
-  save(joinpath(path,"basis_time"),get_basis_time(mdeim))
-  save(joinpath(path,"idx_time"),get_idx_time(mdeim))
-  red_lu = get_red_lu_factors(mdeim)
-  save(joinpath(path,"LU"),red_lu.factors)
-  save(joinpath(path,"p"),red_lu.ipiv)
-end
-
-function load_rb_structure(
+function load(
   info::RBInfo,
   tt::TimeTracker,
-  op::RBVarOperator,
+  op::RBVariable,
   args...)
 
   id = get_id(op)
   path_id = joinpath(info.offline_path,"$id")
   if ispath(path_id)
     _,meas,field = args
-    load_rb_structure(info,op,getproperty(meas,field))
+    load(info,op,getproperty(meas,field))
   else
     println("Failed to load variable $(id): running offline assembler instead")
     assemble_rb_structure(info,tt,op,args...)
@@ -141,33 +202,35 @@ function load_rb_structure(
 
 end
 
-function load_rb_structure(
+function load(
   info::RBInfo,
-  op::RBLinOperator,
+  op::RBLinVariable,
   meas::Measure)
 
   id = get_id(op)
   println("Loading MDEIM structures for non-affine variable $id")
   path_id = joinpath(info.offline_path,"$id")
 
-  load_mdeim(path_id,op,meas)
+  mdeim = load(path_id,op,meas)
+  RBStructure(op,mdeim)
 end
 
-function load_rb_structure(
+function load(
   info::RBInfo,
-  op::RBLinOperator{Affine},
+  op::RBLinVariable{Affine},
   ::Measure)
 
   id = get_id(op)
   println("Loading projected affine variable $id")
   path_id = joinpath(info.offline_path,"$id")
 
-  load(joinpath(path_id,"basis_space"))
+  rb_structure = load(joinpath(path_id,"basis_space"))
+  RBStructure(op,rb_structure)
 end
 
-function load_rb_structure(
+function load(
   info::RBInfo,
-  op::RBBilinOperator,
+  op::RBBilinVariable,
   meas::Measure)
 
   id = get_id(op)
@@ -175,24 +238,28 @@ function load_rb_structure(
   path_id = joinpath(info.offline_path,"$id")
   path_id_lift = joinpath(info.offline_path,"$(id)_lift")
 
-  load_mdeim(path_id,op,meas),load_mdeim(path_id_lift,op,meas)
+  mdeim = load(path_id,op,meas)
+  op_lift = RBLiftVariable(op)
+  mdeim_lift = load(path_id_lift,op,meas)
+  RBStructure(op,mdeim),RBStructure(op_lift,mdeim_lift)
 end
 
-function load_rb_structure(
+function load(
   info::RBInfo,
-  op::RBBilinOperator{Top,<:TrialFESpace},
+  op::RBBilinVariable{Top,<:TrialFESpace},
   meas::Measure) where Top
 
   id = get_id(op)
   println("Loading MDEIM structures for non-affine variable $id")
   path_id = joinpath(info.offline_path,"$id")
 
-  load_mdeim(path_id,op,meas)
+  mdeim = load(path_id,op,meas)
+  RBStructure(op,mdeim)
 end
 
-function load_rb_structure(
+function load(
   info::RBInfo,
-  op::RBBilinOperator{Affine,Ttr},
+  op::RBBilinVariable{Affine,Ttr},
   meas::Measure) where Ttr
 
   id = get_id(op)
@@ -200,17 +267,21 @@ function load_rb_structure(
   path_id = joinpath(info.offline_path,"$id")
   path_id_lift = joinpath(info.offline_path,"$(id)_lift")
 
-  load(joinpath(path_id,"basis_space")),load_mdeim(path_id_lift,op,meas)
+  rb_structure = load(joinpath(path_id,"basis_space"))
+  op_lift = RBLiftVariable(op)
+  mdeim_lift = load(path_id_lift,op,meas)
+  RBStructure(op,rb_structure),RBStructure(op_lift,mdeim_lift)
 end
 
-function load_rb_structure(
+function load(
   info::RBInfo,
-  op::RBBilinOperator{Affine,<:TrialFESpace},
+  op::RBBilinVariable{Affine,<:TrialFESpace},
   ::Measure)
 
   id = get_id(op)
   println("Loading projected affine variable $id")
   path_id = joinpath(info.offline_path,"$id")
 
-  load(joinpath(path_id,"basis_space"))
+  rb_structure = load(joinpath(path_id,"basis_space"))
+  RBStructure(op,rb_structure)
 end

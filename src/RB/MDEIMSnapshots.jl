@@ -1,20 +1,20 @@
 function mdeim_snapshots(
   info::RBInfo,
-  op::RBLinOperator,
+  op::RBLinVariable,
   args...)
   vector_snapshots(Val(info.fun_mdeim),op,args...)
 end
 
 function mdeim_snapshots(
   info::RBInfo,
-  op::RBBilinOperator,
+  op::RBBilinVariable,
   args...)
   matrix_snapshots(Val(info.fun_mdeim),op,args...)
 end
 
 function vector_snapshots(
   ::Val{false},
-  op::RBLinOperator{Nonaffine},
+  op::RBLinVariable{Nonaffine},
   μ::Vector{Param})
 
   id = get_id(op)
@@ -31,7 +31,7 @@ end
 
 function vector_snapshots(
   ::Val{true},
-  op::RBLinOperator{Nonaffine},
+  op::RBLinVariable{Nonaffine},
   μ::Vector{Param})
 
   id = get_id(op)
@@ -46,7 +46,7 @@ function vector_snapshots(
 
   V = assemble_functional_vector(op)
 
-  function snapshot(::RBLinOperator,k::Int)
+  function snapshot(::RBLinVariable,k::Int)
     println("Snapshot number $k at every time, $id")
     v = Vector{Float}[]
     for nt in eachindex(timesθ)
@@ -56,7 +56,7 @@ function vector_snapshots(
     Matrix(v)
   end
 
-  function snapshot(::RBLiftingOperator,k::Int)
+  function snapshot(::RBLiftVariable,k::Int)
     println("Snapshot number $k at every time, $id")
     v = Vector{Float}[]
     for (nt,tθ) in enumerate(timesθ)
@@ -72,7 +72,7 @@ end
 
 function matrix_snapshots(
   ::Val{false},
-  op::RBBilinOperator{Nonaffine,<:TrialFESpace},
+  op::RBBilinVariable{Nonaffine,<:TrialFESpace},
   μ::Vector{Param})
 
   id = get_id(op)
@@ -90,7 +90,7 @@ end
 
 function matrix_snapshots(
   ::Val{false},
-  op::RBBilinOperator{Nonaffine,Ttr},
+  op::RBBilinVariable{Nonaffine,Ttr},
   μ::Vector{Param}) where Ttr
 
   id = get_id(op)
@@ -111,7 +111,7 @@ end
 
 function matrix_snapshots(
   ::Val,
-  op::RBSteadyBilinOperator{Nonlinear,<:ParamTrialFESpace},
+  op::RBSteadyBilinVariable{Nonlinear,<:ParamTrialFESpace},
   μ::Vector{Param})
 
   id = get_id(op)
@@ -149,7 +149,7 @@ end
 
 function matrix_snapshots(
   ::Val,
-  op::RBUnsteadyBilinOperator{Nonlinear,<:ParamTransientTrialFESpace},
+  op::RBUnsteadyBilinVariable{Nonlinear,<:ParamTransientTrialFESpace},
   μ::Vector{Param},
   rbspaceθ::RBSpaceUnsteady)
 
@@ -190,7 +190,7 @@ end
 
 function matrix_snapshots(
   ::Val{true},
-  op::RBUnsteadyBilinOperator{Top,<:ParamTransientTrialFESpace},
+  op::RBUnsteadyBilinVariable{Top,<:ParamTransientTrialFESpace},
   μ::Vector{Param}) where Top
 
   id = get_id(op)

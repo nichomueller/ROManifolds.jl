@@ -47,27 +47,27 @@ function navier_stokes_unsteady()
   nsnap = 100
   uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
 
-  opA = NonaffineParamVarOperator(a,afe,PS,time_info,U,V;id=:A)
-  opB = AffineParamVarOperator(b,bfe,PS,time_info,U,Q;id=:B)
-  opBT = AffineParamVarOperator(b,bTfe,PS,time_info,P,V;id=:BT)
-  opC = NonlinearParamVarOperator(c,cfe,PS,time_info,U,V;id=:C)
-  opD = NonlinearParamVarOperator(d,dfe,PS,time_info,U,V;id=:D)
-  opM = AffineParamVarOperator(m,mfe,PS,time_info,U,V;id=:M)
-  opF = AffineParamVarOperator(f,ffe,PS,time_info,V;id=:F)
-  opH = AffineParamVarOperator(h,hfe,PS,time_info,V;id=:H)
+  opA = NonaffineParamOperator(a,afe,PS,time_info,U,V;id=:A)
+  opB = AffineParamOperator(b,bfe,PS,time_info,U,Q;id=:B)
+  opBT = AffineParamOperator(b,bTfe,PS,time_info,P,V;id=:BT)
+  opC = NonlinearParamOperator(c,cfe,PS,time_info,U,V;id=:C)
+  opD = NonlinearParamOperator(d,dfe,PS,time_info,U,V;id=:D)
+  opM = AffineParamOperator(m,mfe,PS,time_info,U,V;id=:M)
+  opF = AffineParamOperator(f,ffe,PS,time_info,V;id=:F)
+  opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
 
   varop = (opA,opB,opBT,opC,opD,opM,opF,opH)
   info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,online_snaps=95:100,mdeim_snap=10,load_offline=true)
   fesol = (uh,ph,μ,X,Y)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
-  rbspace,offinfo = offline_phase(info,fesol,varop,measures,tt)
-  online_phase(info,fesol,rbspace,offinfo,tt)
+  rbspace,rb_structures = offline_phase(info,fesol,varop,measures,tt)
+  online_phase(info,fesol,rbspace,rb_structures,tt)
 end
 
 function offline_phase(
   info::RBInfo,
   fesol,
-  op::NTuple{N,ParamVarOperator},
+  op::NTuple{N,ParamOperator},
   meas::ProblemMeasures,
   tt::TimeTracker) where N
 
@@ -82,56 +82,56 @@ function offline_phase(
   rbspace_u,rbspace_p = rb(info,tt,(uh_offline,ph_offline),opB,ph,μ)
   rbspace_uθ, = rb(info,tt,(uhθ_offline,phθ_offline),opB,ph,μ)
 
-  rbopA = RBVarOperator(opA,rbspace_u,rbspace_u)
-  rbopB = RBVarOperator(opB,rbspace_p,rbspace_u)
-  rbopBT = RBVarOperator(opBT,rbspace_u,rbspace_p)
-  rbopC = RBVarOperator(opC,rbspace_u,rbspace_u)
-  rbopD = RBVarOperator(opD,rbspace_u,rbspace_u)
-  rbopM = RBVarOperator(opM,rbspace_u,rbspace_u)
-  rbopF = RBVarOperator(opF,rbspace_u)
-  rbopH = RBVarOperator(opH,rbspace_u)
+  rbopA = RBVariable(opA,rbspace_u,rbspace_u)
+  rbopB = RBVariable(opB,rbspace_p,rbspace_u)
+  rbopBT = RBVariable(opBT,rbspace_u,rbspace_p)
+  rbopC = RBVariable(opC,rbspace_u,rbspace_u)
+  rbopD = RBVariable(opD,rbspace_u,rbspace_u)
+  rbopM = RBVariable(opM,rbspace_u,rbspace_u)
+  rbopF = RBVariable(opF,rbspace_u)
+  rbopH = RBVariable(opH,rbspace_u)
 
-  A_rb = rb_structure(info,tt,rbopA,μ,meas,:dΩ)
-  B_rb = rb_structure(info,tt,rbopB,μ,meas,:dΩ)
-  BT_rb = rb_structure(info,tt,rbopBT,μ,meas,:dΩ)
-  C_rb = rb_structure(info,tt,rbopC,μ,meas,:dΩ,rbspace_uθ)
-  D_rb = rb_structure(info,tt,rbopD,μ,meas,:dΩ,rbspace_uθ)
-  M_rb = rb_structure(info,tt,rbopM,μ,meas,:dΩ)
-  F_rb = rb_structure(info,tt,rbopF,μ,meas,:dΩ)
-  H_rb = rb_structure(info,tt,rbopH,μ,meas,:dΓn)
+  Arb = RBStructure(info,tt,rbopA,μ,meas,:dΩ)
+  Brb = RBStructure(info,tt,rbopB,μ,meas,:dΩ)
+  BTrb = RBStructure(info,tt,rbopBT,μ,meas,:dΩ)
+  Crb = RBStructure(info,tt,rbopC,μ,meas,:dΩ,rbspace_uθ)
+  Drb = RBStructure(info,tt,rbopD,μ,meas,:dΩ,rbspace_uθ)
+  Mrb = RBStructure(info,tt,rbopM,μ,meas,:dΩ)
+  Frb = RBStructure(info,tt,rbopF,μ,meas,:dΩ)
+  Hrb = RBStructure(info,tt,rbopH,μ,meas,:dΓn)
 
   rbspace = (rbspace_u,rbspace_p)
-  offinfo = ((rbopA,A_rb),(rbopB,B_rb),(rbopBT,BT_rb),
-    (rbopC,C_rb),(rbopD,D_rb),(rbopM,M_rb),(rbopF,F_rb),(rbopH,H_rb))
-  rbspace,offinfo
+  rb_structures = ((rbopA,Arb),(rbopB,Brb),(rbopBT,BTrb),
+    (rbopC,Crb),(rbopD,Drb),(rbopM,Mrb),(rbopF,Frb),(rbopH,Hrb))
+  rbspace,rb_structures
 end
 
 function online_phase(
   info::RBInfo,
   fesol,
   rbspace::NTuple{2,RBSpace},
-  offinfo::Tuple,
+  rb_structures::Tuple,
   tt::TimeTracker)
 
   uh,ph,μ,X,Y = fesol
 
-  Ainfo,Binfo,BTinfo,Cinfo,Dinfo,Minfo,Finfo,Hinfo = offinfo
+  Arb,Brb,BTrb,Crb,Drb,Mrb,Frb,Hrb = rb_structures
 
   st_mdeim = info.st_mdeim
-  rbopA = Ainfo[1]
+  rbopA = Arb[1]
   θ = get_θ(rbopA)
   timesθ = get_timesθ(rbopA)
 
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
-      Aon = online_assembler(Ainfo...,μ[k],st_mdeim)
-      Bon = online_assembler(Binfo...,μ[k],st_mdeim)
-      BTon = online_assembler(BTinfo...,μ[k],st_mdeim)
-      Con = online_assembler(Cinfo...,μ[k],st_mdeim)
-      Don = online_assembler(Dinfo...,μ[k],st_mdeim)
-      Mon = online_assembler(Minfo...,μ[k],st_mdeim)
-      Fon = online_assembler(Finfo...,μ[k],st_mdeim)
-      Hon = online_assembler(Hinfo...,μ[k],st_mdeim)
+      Aon = online_assembler(Arb,μ[k],st_mdeim)
+      Bon = online_assembler(Brb,μ[k],st_mdeim)
+      BTon = online_assembler(BTrb,μ[k],st_mdeim)
+      Con = online_assembler(Crb,μ[k],st_mdeim)
+      Don = online_assembler(Drb,μ[k],st_mdeim)
+      Mon = online_assembler(Mrb,μ[k],st_mdeim)
+      Fon = online_assembler(Frb,μ[k],st_mdeim)
+      Hon = online_assembler(Hrb,μ[k],st_mdeim)
       lift = Aon[2],Bon[2],Con[2],Mon[2]
       sys = navier_stokes_rb_system((Aon[1],Bon[1],BTon,Con[1]...,Don[1]...,Mon[1]),
         (Fon,Hon,lift...),θ)

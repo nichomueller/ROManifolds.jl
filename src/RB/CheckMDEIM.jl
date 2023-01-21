@@ -31,25 +31,25 @@ function unsteady_poisson()
   LA1rb = bsu'*LA1
   LM1rb = bsu'*LM1
 
-  basisA = A_rb.rbspace.basis_space
-  basisF = F_rb.rbspace.basis_space
-  basisH = H_rb.rbspace.basis_space
-  basisLA = A_rb_lift.rbspace.basis_space
-  basisLM = M_rb_lift.rbspace.basis_space
+  basisA = Arb.rbspace.basis_space
+  basisF = Frb.rbspace.basis_space
+  basisH = Hrb.rbspace.basis_space
+  basisLA = Arb_lift.rbspace.basis_space
+  basisLM = Mrb_lift.rbspace.basis_space
 
   norm_test(A1rb,basisA)
   norm_test(LA1rb,basisLA)
   norm_test(LM1rb,basisLM)
 
-  norm_test_app(rbopA,A_rb,A1rb,basisA)
-  norm_test_app(rbopF,F_rb,F1rb,basisF)
-  norm_test_app(rbopH,H_rb,H1rb,basisH)
-  norm_test_app(rbopA_lift,A_rb_lift,LA1rb,basisLA)
-  norm_test_app(rbopM_lift,M_rb_lift,LM1rb,basisLM)
+  norm_test_app(rbopA,Arb,A1rb,basisA)
+  norm_test_app(rbopF,Frb,F1rb,basisF)
+  norm_test_app(rbopH,Hrb,H1rb,basisH)
+  norm_test_app(rbopA_lift,Arb_lift,LA1rb,basisLA)
+  norm_test_app(rbopM_lift,Mrb_lift,LM1rb,basisLM)
 
-  lhs = assemble_rb_system(rbopA,A_rb,μ1),assemble_rb_system(rbopM,M_rb,μ1)
-  rhs = assemble_rb_system(rbopF,F_rb,μ1),assemble_rb_system(rbopH,H_rb,μ1)
-  lift = assemble_rb_system(rbopA_lift,A_rb_lift,μ1),assemble_rb_system(rbopM_lift,M_rb_lift,μ1)
+  lhs = assemble_rb_system(rbopA,Arb,μ1),assemble_rb_system(rbopM,Mrb,μ1)
+  rhs = assemble_rb_system(rbopF,Frb,μ1),assemble_rb_system(rbopH,Hrb,μ1)
+  lift = assemble_rb_system(rbopA_lift,Arb_lift,μ1),assemble_rb_system(rbopM_lift,Mrb_lift,μ1)
 
   ns,nt = get_ns(get_rbspace_row(rbopA)),get_nt(get_rbspace_row(rbopA))
   A1rb_s = reshape(A1rb,ns,ns,Nt)
@@ -113,18 +113,18 @@ function steady_stokes(μ1::Param)
   LA1rb = bsu'*LA1
   LB1rb = bsp'*LB1
 
-  basisA = A_rb[1].rbspace.basis_space
-  basisLA = A_rb[2].rbspace.basis_space
-  basisLB = B_rb[2].rbspace.basis_space
+  basisA = Arb[1].rbspace.basis_space
+  basisLA = Arb[2].rbspace.basis_space
+  basisLB = Brb[2].rbspace.basis_space
 
   norm_test(A1rb,basisA)
   norm_test(LA1rb,basisLA)
   norm_test(LB1rb,basisLB)
 
-  coeffA = compute_coefficient(rbopA,A_rb,μ1)
+  coeffA = compute_coefficient(rbopA,Arb,μ1)
   errA1,errLA1 = A1rb - basisA*coeffA[1],LA1rb - basisLA*coeffA[2]
-  opB_lift = RBLiftingOperator(rbopB)
-  coeffLB1 = compute_coefficient(opB_lift,B_rb[2],μ1)
+  opB_lift = RBLiftVariable(rbopB)
+  coeffLB1 = compute_coefficient(opB_lift,Brb[2],μ1)
   errLB1 = LB1rb - basisLB*coeffLB1
 
   norm(errA1),norm(errLA1),norm(errLB1)
@@ -157,24 +157,24 @@ function steady_navier_stokes()
   LB1rb = bsp'*LB1
   LC1rb = bsu'*LC1
 
-  basisA = A_rb[1].rbspace.basis_space
-  basisC = C_rb[1].rbspace.basis_space
-  basisD = D_rb[1].rbspace.basis_space
-  basisLA = A_rb[2].rbspace.basis_space
-  basisLB = B_rb[2].rbspace.basis_space
-  basisLC = C_rb[2].rbspace.basis_space
+  basisA = Arb[1].rbspace.basis_space
+  basisC = Crb[1].rbspace.basis_space
+  basisD = Drb[1].rbspace.basis_space
+  basisLA = Arb[2].rbspace.basis_space
+  basisLB = Brb[2].rbspace.basis_space
+  basisLC = Crb[2].rbspace.basis_space
 
   #norm_test(C1rb,basisC)
   #norm_test(D1rb,basisD)
 
-  coeffA = compute_coefficient(rbopA,A_rb,μ1)
+  coeffA = compute_coefficient(rbopA,Arb,μ1)
   errA1,errLA1 = A1rb - basisA*coeffA[1],LA1rb - basisLA*coeffA[2]
-  opB_lift = RBLiftingOperator(rbopB)
-  coeffLB1 = compute_coefficient(opB_lift,B_rb[2],μ1)
+  opB_lift = RBLiftVariable(rbopB)
+  coeffLB1 = compute_coefficient(opB_lift,Brb[2],μ1)
   errLB1 = LB1rb - basisLB*coeffLB1
-  coeffC = compute_coefficient(rbopC,C_rb,μ1)
+  coeffC = compute_coefficient(rbopC,Crb,μ1)
   errC1,errLC1 = C1rb - basisC*coeffC[1](u1fun),LC1rb - basisLC*coeffC[2](u1dfun)
-  coeffD = compute_coefficient(rbopD,D_rb,μ1)
+  coeffD = compute_coefficient(rbopD,Drb,μ1)
   errD1 = D1rb - basisD*coeffD[1](u1fun)
 
   norm(errA1),norm(errLA1),norm(errLB1),norm(errC1),norm(errLC1),norm(errD1)
@@ -241,20 +241,20 @@ function unsteady_navier_stokes()
 
   bsu = rbspace[1].basis_space
   C1rb = Matrix([bsu'*C(u(tθ))*bsu for tθ = timesθ])[:]
-  basisC = kron(C_rb[1].rbspace.basis_time,C_rb[1].rbspace.basis_space)
-  coeffC = compute_coefficient(rbopC,C_rb,μ1)
+  basisC = kron(Crb[1].rbspace.basis_time,Crb[1].rbspace.basis_space)
+  coeffC = compute_coefficient(rbopC,Crb,μ1)
   errC = C1rb - basisC*coeffC[1](u)[:]
 
   LC1rb = Matrix([bsu'*LC(ud(tθ)) for tθ = timesθ])[:]
-  basisLC = kron(C_rb[2].rbspace.basis_time,C_rb[2].rbspace.basis_space)
+  basisLC = kron(Crb[2].rbspace.basis_time,Crb[2].rbspace.basis_space)
   errLC = LC1rb - basisLC*coeffC[2](u)[:]
 
   norm(errC),norm(errLC)
 end
 
 function unsteady_navier_stokes()
-  bsC = C_rb[1].rbspace.basis_space
-  coeffC = compute_coefficient(rbopC,C_rb,μ1)
+  bsC = Crb[1].rbspace.basis_space
+  coeffC = compute_coefficient(rbopC,Crb,μ1)
   c1θ = coeffC[1](u)[:]
   Nt = length(timesθ)
   err = Float[]
@@ -303,22 +303,22 @@ function unsteady_navier_stokes()
   LA1rb = bsu'*LA1
   LC1rb = bsu'*LC1
 
-  Ainfo,_,_,Cinfo,Dinfo,_ = offinfo
-  rbopA,A_rb = Ainfo
-  rbopC,C_rb = Cinfo
-  rbopD,D_rb = Dinfo
+  Arb,_,_,Crb,Drb,_ = rb_structures
+  rbopA,Arb = Arb
+  rbopC,Crb = Crb
+  rbopD,Drb = Drb
 
-  basisA = A_rb[1].rbspace.basis_space
-  basisC = C_rb[1].rbspace.basis_space
-  basisD = D_rb[1].rbspace.basis_space
-  basisLA = A_rb[2].rbspace.basis_space
-  basisLC = C_rb[2].rbspace.basis_space
+  basisA = Arb[1].rbspace.basis_space
+  basisC = Crb[1].rbspace.basis_space
+  basisD = Drb[1].rbspace.basis_space
+  basisLA = Arb[2].rbspace.basis_space
+  basisLC = Crb[2].rbspace.basis_space
 
-  coeffA = compute_coefficient(rbopA,A_rb,μ)
+  coeffA = compute_coefficient(rbopA,Arb,μ)
   errA1,errLA1 = A1rb - basisA*coeffA[1][k,:],LA1rb - basisLA*coeffA[2][k,:]
-  coeffC = compute_coefficient(rbopC,C_rb,μ)
+  coeffC = compute_coefficient(rbopC,Crb,μ)
   errC1,errLC1 = C1rb - basisC*coeffC[1](uall)[k,:],LC1rb - basisLC*coeffC[2](udall)[k,:]
-  coeffD = compute_coefficient(rbopD,D_rb,μ)
+  coeffD = compute_coefficient(rbopD,Drb,μ)
   errD1 = D1rb - basisD*coeffD[1](uall)[k,:]
 
   norm(errA1),norm(errLA1),norm(errC1),norm(errLC1),norm(errD1)
@@ -329,7 +329,7 @@ function uall(tθ)
   n = findall(x -> x == tθ,timesθ)[1]
   FEFunction(V.test,uh[k].snap[:,n])
 end
-Con = online_assembler(Cinfo...,μ[k],false)[1]
+Con = online_assembler(Crb,μ[k],false)[1]
 Con90,Con90_shift = Con[1](uall),Con[2](uall)
 C90(tθ) = assemble_matrix(rbopC)(uall(tθ))
 C90rb = Matrix(Matrix([(bsu'*C90(tθ)*bsu)[:] for tθ=timesθ])')
@@ -370,7 +370,7 @@ errC = maximum(abs.(C1rb-Capp))
 
 
 function fun_deim(
-  op::RBUnsteadyLinOperator,
+  op::RBUnsteadyLinVariable,
   μ::Vector{Param})
 
   id = get_id(op)
