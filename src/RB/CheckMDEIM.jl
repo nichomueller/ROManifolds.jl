@@ -344,9 +344,29 @@ for i = 1:24
 end
 
 
+u1 = uh[90].snap
+timesθ = get_timesθ(opC)
+function uall(tθ)
+  n = findall(x -> x == tθ,timesθ)[1]
+  FEFunction(V.test,u1[:,n])
+end
+C,LC = assemble_matrix_and_lifting(opC)
+bsu,btu = rbspace_u.basis_space,rbspace_u.basis_time
+C1rb = Matrix([bsu'*C(uall(tθ))*bsu for tθ=timesθ])[:]
 
+Π = kron(btu,bsu)
+u1_rb = Π'*u1[:]
+Φ,_ = basis_as_fefun(rbopC,rbspace_u)
+CΦrb = Matrix([(bsu'*C(Φ(n))*bsu)[:] for n=axes(bsu,2)])
+CΦΨ = kron(btu,CΦrb)
+#maximum(abs.(C1rb-CΦΨ*u1_rb)) is very low
+#CΦrb_pod = POD(CΦrb)
+CΦΨ = kron(btu,CΦrb)
+Qc = size(CΦΨ,2)
+maximum(abs.(C1rb-CΦΨ*CΦΨ'*C1rb))
+Capp = CΦΨ*u1_rb[1:Qc] # not accurate
 
-
+errC = maximum(abs.(C1rb-Capp))
 
 
 function fun_deim(

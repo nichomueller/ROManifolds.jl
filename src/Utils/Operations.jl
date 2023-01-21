@@ -52,7 +52,6 @@ function approx_POD(S::AbstractMatrix,::Val{true};ϵ=1e-5)
   C = S'*S
   _,_,V = my_svd(C)
   Σ = svdvals(S)
-  #U,Σ,_ = my_svd(S)
 
   energies = cumsum(Σ.^2)
   ntemp = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
@@ -67,14 +66,12 @@ function approx_POD(S::AbstractMatrix,::Val{true};ϵ=1e-5)
     U[:,i] /= (Σ[i]+eps())
   end
   U
-  #U[:,1:n]
 end
 
 function approx_POD(S::AbstractMatrix,::Val{false};ϵ=1e-5)
   C = S*S'
   U,_ = my_svd(C)
   Σ = svdvals(S)
-  #U,Σ,_ = my_svd(S)
 
   energies = cumsum(Σ)
   ntemp = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
