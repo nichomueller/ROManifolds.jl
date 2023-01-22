@@ -210,3 +210,7 @@ Base.:(^)(vv::VectorValue,n::Float) = VectorValue([vv[k]^n for k=eachindex(vv)])
 Base.abs(vv::VectorValue) = VectorValue([abs(vv[k]) for k=eachindex(vv)])
 
 Gridap.get_triangulation(m::Measure) = m.quad.trian
+
+function Gridap.get_dirichlet_dof_values(f::MultiFieldFESpace)
+  get_dirichlet_dof_values(first(f))
+end

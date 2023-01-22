@@ -48,7 +48,6 @@ function Gridap.solve(
   μ::Param) where C
 
   trial = get_trial(op.feop)
-  #uh = interpolate_dirichlet(trial.dirichlet_μ(μ),trial(μ))
   uh = zero(trial(μ))
   sol = GenericParamSolution{C}(solver,op,uh,μ)
   solve!(sol)

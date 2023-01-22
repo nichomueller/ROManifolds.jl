@@ -1,23 +1,3 @@
-#= abstract type Coefficient end
-
-mutable struct CoefficientSteady <: Coefficient
-  coeff::Vector{Float}
-end
-
-mutable struct CoefficientUnsteady <: Coefficient
-  coeff::Matrix{Float}
-end
-
-function Coefficient(op::RBSteadyVariable,args...)
-  coeff = compute_coefficient(op,args...)
-  CoefficientSteady(coeff)
-end
-
-function Coefficient(op::RBUnsteadyVariable,args...)
-  coeff = compute_coefficient(op,args...)
-  CoefficientUnsteady(coeff)
-end =#
-
 function compute_coefficient(
   op::RBSteadyVariable{Affine,Ttr},
   μ::Param) where Ttr
@@ -125,18 +105,6 @@ function hyperred_structure(
 end
 
 function hyperred_structure(
-  op::RBSteadyBilinVariable{Nonlinear,Ttr},
-  m::Measure,
-  μ::Param,
-  idx_space::Vector{Int}) where Ttr
-
-  fun = get_fe_function(op)
-  M(z) = assemble_matrix((u,v)->fun(m,z,u,v),get_trial(op)(μ),get_test(op))
-  Midx(z) = Vector(M(z)[:][idx_space])
-  Midx
-end
-
-function hyperred_structure(
   op::RBUnsteadyBilinVariable{Nonaffine,Ttr},
   m::Measure,
   μ::Param,
@@ -147,20 +115,6 @@ function hyperred_structure(
   M(tθ) = assemble_matrix((u,v)->fun(μ,tθ,m,u,v),get_trial(op)(μ,tθ),get_test(op))
   Midx(tθ) = Vector(M(tθ)[:][idx_space])
   Matrix(Midx.(timesθ))
-end
-
-function hyperred_structure(
-  op::RBUnsteadyBilinVariable{Nonlinear,Ttr},
-  m::Measure,
-  μ::Param,
-  idx_space::Vector{Int},
-  timesθ::Vector{<:Real}) where Ttr
-
-  fun = get_fe_function(op)
-  M(tθ,z) = assemble_matrix((u,v)->fun(m,z,u,v),get_trial(op)(μ,tθ),get_test(op))
-  Midx(tθ,z) = Vector(M(tθ,z(tθ))[:][idx_space])
-  Midx(z) = Matrix(Broadcasting(tθ->Midx(tθ,z))(timesθ))
-  Midx
 end
 
 function hyperred_structure(
@@ -181,23 +135,6 @@ function hyperred_structure(
 end
 
 function hyperred_structure(
-  op::RBSteadyVariable{Nonlinear,Ttr},
-  m::Measure,
-  μ::Param,
-  idx_space::Vector{Int}) where Ttr
-
-  fun = get_fe_function(op)
-  dir = get_dirichlet_function(op)(μ)
-  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
-  fdofs_test,_ = fdofs
-
-  Mlift(z) = assemble_matrix((u,v)->fun(m,z,u,v),get_trial_no_bc(op),get_test_no_bc(op))
-  lift(z) = (Mlift(z)[fdofs_test,ddofs]*dir)[idx_space]
-
-  lift
-end
-
-function hyperred_structure(
   op::RBUnsteadyVariable,
   m::Measure,
   μ::Param,
@@ -213,25 +150,6 @@ function hyperred_structure(
   lift(tθ) = (Mlift(tθ)[fdofs_test,ddofs]*dir(tθ))[idx_space]
 
   Matrix(lift.(timesθ))
-end
-
-function hyperred_structure(
-  op::RBUnsteadyVariable{Nonlinear,Ttr},
-  m::Measure,
-  μ::Param,
-  idx_space::Vector{Int},
-  timesθ::Vector{<:Real}) where Ttr
-
-  fun = get_fe_function(op)
-  dir(tθ) = get_dirichlet_function(op)(μ,tθ)
-  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
-  fdofs_test,_ = fdofs
-
-  Mlift(z) = assemble_matrix((u,v)->fun(m,z,u,v),get_trial_no_bc(op),get_test_no_bc(op))
-  lift(tθ,z) = (Mlift(z(tθ))[fdofs_test,ddofs]*dir(tθ))[idx_space]
-  lift(z) = Matrix(Broadcasting(tθ -> lift(tθ,z))(timesθ))
-
-  lift
 end
 
 function solve_lu(A::Vector{Float},lu::LU)

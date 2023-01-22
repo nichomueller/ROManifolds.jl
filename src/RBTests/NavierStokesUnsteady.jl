@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function navier_stokes_unsteady()
-  run_fem = false
+  run_fem = true
 
   steady = false
   indef = true
@@ -45,7 +45,7 @@ function navier_stokes_unsteady()
   nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking())
   solver = ThetaMethod(nls,dt,θ)
   nsnap = 100
-  uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
+  uh,ph,μ,ghθ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
 
   opA = NonaffineParamOperator(a,afe,PS,time_info,U,V;id=:A)
   opB = AffineParamOperator(b,bfe,PS,time_info,U,Q;id=:B)
@@ -56,12 +56,12 @@ function navier_stokes_unsteady()
   opF = AffineParamOperator(f,ffe,PS,time_info,V;id=:F)
   opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
 
-  varop = (opA,opB,opBT,opC,opD,opM,opF,opH)
+  #= varop = (opA,opB,opBT,opC,opD,opM,opF,opH)
   info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,online_snaps=95:100,mdeim_snap=10,load_offline=true)
-  fesol = (uh,ph,μ,U,V)
+  fesol = (uh,ph,ghθ,μ,U,V)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
   rbspace,rb_structures = offline_phase(info,fesol,varop,measures,tt)
-  online_phase(info,fesol,rbspace,rb_structures,tt)
+  online_phase(info,fesol,rbspace,rb_structures,tt)  =#
 end
 
 function offline_phase(
@@ -71,16 +71,17 @@ function offline_phase(
   meas::ProblemMeasures,
   tt::TimeTracker) where N
 
-  uh,ph,μ, = fesol
+  uh,ph,ghθ,μ, = fesol
   opA,opB,opBT,opC,opD,opM,opF,opH = op
   θ = get_θ(opA)
   uh_offline = uh[1:info.nsnap]
   ph_offline = ph[1:info.nsnap]
+  ghθ_offline = ghθ[1:info.nsnap]
   uhθ_offline = compute_in_timesθ(uh_offline,θ)
-  phθ_offline = compute_in_timesθ(ph_offline,θ)
 
   rbspace_u,rbspace_p = rb(info,tt,(uh_offline,ph_offline),opB,ph,μ)
   rbspace_uθ, = rb(info,tt,(uhθ_offline,phθ_offline),opB,ph,μ)
+  rbspace_gθ = rb(info,tt,ghθ_offline)
 
   rbopA = RBVariable(opA,rbspace_u,rbspace_u)
   rbopB = RBVariable(opB,rbspace_p,rbspace_u)
@@ -94,8 +95,8 @@ function offline_phase(
   Arb = RBStructure(info,tt,rbopA,μ,meas,:dΩ)
   Brb = RBStructure(info,tt,rbopB,μ,meas,:dΩ)
   BTrb = RBStructure(info,tt,rbopBT,μ,meas,:dΩ)
-  Crb = RBStructure(info,tt,rbopC,μ,meas,:dΩ,rbspace_uθ)
-  Drb = RBStructure(info,tt,rbopD,μ,meas,:dΩ,rbspace_uθ)
+  Crb = RBStructure(info,tt,rbopC,μ,meas,:dΩ,rbspace_uθ,rbspace_gθ)
+  Drb = RBStructure(info,tt,rbopD,μ,meas,:dΩ,rbspace_uθ,rbspace_gθ)
   Mrb = RBStructure(info,tt,rbopM,μ,meas,:dΩ)
   Frb = RBStructure(info,tt,rbopF,μ,meas,:dΩ)
   Hrb = RBStructure(info,tt,rbopH,μ,meas,:dΓn)

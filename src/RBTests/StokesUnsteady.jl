@@ -42,7 +42,7 @@ function stokes_unsteady()
 
   solver = ThetaMethod(LUSolver(),dt,θ)
   nsnap = 1
-  uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
+  uh,ph,μ, = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
 
   opA = NonaffineParamOperator(a,afe,PS,time_info,U,V;id=:A)
   opB = AffineParamOperator(b,bfe,PS,time_info,U,Q;id=:B)

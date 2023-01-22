@@ -359,7 +359,7 @@ u1_rb = Π'*u1[:]
 Φ,_ = basis_as_fefun(rbopC,rbspace_u)
 CΦrb = Matrix([(bsu'*C(Φ(n))*bsu)[:] for n=axes(bsu,2)])
 CΦΨ = kron(btu,CΦrb)
-#maximum(abs.(C1rb-CΦΨ*u1_rb)) is very low
+#maximum(abs.(C1rb-CΦΨ*u1_rb)) accurate
 #CΦrb_pod = POD(CΦrb)
 CΦΨ = kron(btu,CΦrb)
 Qc = size(CΦΨ,2)

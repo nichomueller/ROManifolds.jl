@@ -37,7 +37,7 @@ function poisson_unsteady()
 
   solver = ThetaMethod(LUSolver(),dt,θ)
   nsnap = 100
-  uh,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
+  uh,μ, = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
 
   opA = NonaffineParamOperator(a,afe,PS,time_info,U,V;id=:A)
   opM = AffineParamOperator(m,mfe,PS,time_info,U,V;id=:M)

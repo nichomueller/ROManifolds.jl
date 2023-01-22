@@ -151,40 +151,32 @@ function matrix_snapshots(
   ::Val,
   op::RBUnsteadyBilinVariable{Nonlinear,<:ParamTransientTrialFESpace},
   μ::Vector{Param},
-  rbspaceθ::RBSpaceUnsteady)
+  rbspace_uθ::RBSpaceUnsteady,
+  rbspace_gθ::RBSpaceUnsteady)
 
   id = get_id(op)
-  timesθ = get_timesθ(op)
-  bfun,bfun_lift = basis_as_fefun(op,rbspaceθ)
+  bfun = basis_as_fefun(op,rbspace_uθ)
+  bfun_lift = basis_as_fefun(op,rbspace_gθ)
   findnz_map = get_findnz_map(op,bfun(1))
-  M,lift = assemble_matrix_and_lifting(op)
+  M,lift = assemble_matrix_and_lifting_temp(op)
+
+  bsuθ = get_basis_space(rbspace_uθ)
+  bsgθ = get_basis_space(rbspace_gθ)
+  nsuθ,nsgθ = size(bsuθ,2),size(bsgθ,2)
 
   function snapshot(n::Int)
     println("Nonlinear snapshot number $n, $id")
     b = bfun(n)
-    v = nonzero_values(M(b),findnz_map)
-    v
+    nonzero_values(M(b),findnz_map)
   end
 
-  function snapshot_lift(k::Int,tθ::Real,n::Int)
-    println("Nonlinear lift snapshot number $((k-1)*ns+n) at time $tθ, $id")
-    b = bfun_lift(μ[k],tθ,n)
-    l = lift(b)
-    l
-  end
-  snapshot_lift(k::Int,n::Int) = Matrix(Broadcasting(tθ->snapshot_lift(k,tθ,n))(timesθ))
-
-  ns = size(get_basis_space(rbspaceθ),2)
-  nparam = min(length(μ),2)
-  vals = snapshot.(1:ns)
-
-  lifts = Matrix{Float}[]
-  for k = 1:nparam
-    for n = 1:ns
-      push!(lifts,snapshot_lift(k,n))
-    end
+  function snapshot_lift(n::Int)
+    println("Nonlinear lift snapshot number $n, $id")
+    b_lift = bfun_lift(n)
+    lift(b_lift)
   end
 
+  vals,lifts = snapshot.(1:nsuθ),snapshot_lift.(1:nsgθ)
   findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
@@ -234,10 +226,11 @@ end
 function basis_as_fefun(op::RBUnsteadyVariable,rbspaceθ::RBSpaceUnsteady)
   bspaceθ = get_basis_space(rbspaceθ)
   test = get_test(op)
-  trial = get_trial(op)
-  fefunθ(n::Int) = FEFunction(test,bspaceθ[:,n])
-  fefunθ_lift(μ::Param,tθ::Real,n::Int) = FEFunction(trial(μ,tθ),bspaceθ[:,n])
-  fefunθ,fefunθ_lift
+  basis_as_fefun(test,bspaceθ)
+end
+
+function basis_as_fefun(space::FESpace,basis::Matrix{Float})
+  n -> FEFunction(space,basis[:,n])
 end
 
 function evaluate_param_function(op::RBUnsteadyVariable,μ::Vector{Param})
@@ -266,4 +259,20 @@ function interpolate_param_function(op::RBUnsteadyVariable,vals::Matrix{Float})
   test_quad = LagrangianQuadFESpace(get_test(op))
   param_fun = FEFunction(test_quad,vals)
   param_fun
+end
+
+function assemble_matrix_and_lifting_temp(
+  op::RBUnsteadyBilinVariable{Nonlinear,Ttr}) where Ttr
+
+  afe = get_fe_function(op)
+  trial_no_bc = get_trial_no_bc(op)
+  test_no_bc = get_test_no_bc(op)
+  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
+  fdofs_test,fdofs_trial = fdofs
+
+  A_no_bc(u) = assemble_matrix(afe(u),trial_no_bc,test_no_bc)
+  A_bc(u) = A_no_bc(u)[fdofs_test,fdofs_trial]
+  lift(u,gh) = A_no_bc(u)[fdofs_test,ddofs]*gh[ddofs]
+
+  A_bc,lift
 end

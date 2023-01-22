@@ -39,7 +39,7 @@ function stokes_steady()
 
   solver = LinearFESolver()
   nsnap = 1
-  uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
+  uh,ph,μ, = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
 
   opA = NonaffineParamOperator(a,afe,PS,U,V;id=:A)
   opB = AffineParamOperator(b,bfe,PS,U,Q;id=:B)

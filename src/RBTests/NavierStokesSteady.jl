@@ -40,7 +40,7 @@ function navier_stokes_steady()
   nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking())
   solver = FESolver(nls)
   nsnap = 100
-  uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
+  uh,ph,μ, = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
 
   opA = NonaffineParamOperator(a,afe,PS,U,V;id=:A)
   opB = AffineParamOperator(b,bfe,PS,U,Q;id=:B)

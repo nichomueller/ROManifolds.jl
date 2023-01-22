@@ -1,7 +1,6 @@
 function rb(info::RBInfo,args...)
   _,snaps, = args
-  def = isindef(info)
-  info.load_offline ? load_rb(info,snaps) : assemble_rb(def,info,args...)
+  info.load_offline ? load_rb(info,snaps) : assemble_rb(info,args...)
 end
 
 function load_rb(info::RBInfo,snaps::Snapshots)
@@ -14,7 +13,6 @@ function load_rb(info::RBInfo,snaps::NTuple{N,Snapshots}) where N
 end
 
 function assemble_rb(
-  ::Val{false},
   info::RBInfoSteady,
   tt::TimeTracker,
   snaps::Snapshots,
@@ -32,7 +30,6 @@ function assemble_rb(
 end
 
 function assemble_rb(
-  ::Val{false},
   info::RBInfoUnsteady,
   tt::TimeTracker,
   snaps::Snapshots,
@@ -51,18 +48,18 @@ function assemble_rb(
 end
 
 function assemble_rb(
-  ::Val{true},
   info::RBInfoSteady,
   tt::TimeTracker,
   snaps::NTuple{2,Snapshots},
   args...)
 
+  def = isindef(info)
   snaps_u,snaps_p = snaps
 
   tt.offline_time.basis_time += @elapsed begin
     bs_u = rb_space(info,snaps_u)
     bs_p = rb_space(info,snaps_p)
-    bs_u_supr = add_space_supremizers((bs_u,bs_p),args...)
+    bs_u_supr = add_space_supremizers(def,(bs_u,bs_p),args...)
   end
 
   rbspace_u = RBSpaceSteady(get_id(snaps_u),bs_u_supr)
@@ -74,22 +71,22 @@ function assemble_rb(
 end
 
 function assemble_rb(
-  ::Val{true},
   info::RBInfoUnsteady,
   tt::TimeTracker,
   snaps::NTuple{2,Snapshots},
   args...)
 
+  def = isindef(info)
   snaps_u,snaps_p = snaps
   opB,ph,μ,tol... = args
 
   tt.offline_time.basis_time += @elapsed begin
     bs_u = rb_space(info,snaps_u)
     bs_p = rb_space(info,snaps_p)
-    bs_u_supr = add_space_supremizers((bs_u,bs_p),opB,ph,μ)
+    bs_u_supr = add_space_supremizers(def,(bs_u,bs_p),opB,ph,μ)
     bt_u = rb_time(info,snaps_u,bs_u)
     bt_p = rb_time(info,snaps_p,bs_p)
-    bt_u_supr = add_time_supremizers((bt_u,bt_p),tol...)
+    bt_u_supr = add_time_supremizers(def,(bt_u,bt_p),tol...)
   end
 
   rbspace_u = RBSpaceUnsteady(get_id(snaps_u),bs_u_supr,bt_u_supr)
@@ -127,10 +124,19 @@ function rb_time(
 end
 
 function add_space_supremizers(
-  basis::NTuple{N,Matrix{Float}},
+  ::Val{false},
+  basis::NTuple{2,Matrix{Float}},
+  args...)
+
+  first(basis)
+end
+
+function add_space_supremizers(
+  ::Val{true},
+  basis::NTuple{2,Matrix{Float}},
   opB::ParamBilinOperator,
   ph::Snapshots,
-  μ::Vector{Param}) where N
+  μ::Vector{Param})
 
   basis_u, = basis
   supr = space_supremizers(basis,opB,ph,μ)
@@ -138,10 +144,10 @@ function add_space_supremizers(
 end
 
 function space_supremizers(
-  basis::NTuple{N,Matrix{Float}},
+  basis::NTuple{2,Matrix{Float}},
   opB::ParamBilinOperator,
   ph::Snapshots,
-  μ::Vector{Param}) where N
+  μ::Vector{Param})
 
   println("Computing primal supremizers")
 
@@ -187,6 +193,15 @@ function assemble_constraint_matrix(
 end
 
 function add_time_supremizers(
+  ::Val{false},
+  basis::NTuple{2,Matrix{Float}},
+  args...)
+
+  first(basis)
+end
+
+function add_time_supremizers(
+  ::Val{true},
   basis::NTuple{2,Matrix{Float}},
   tol=1e-2)
 

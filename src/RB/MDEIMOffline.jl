@@ -16,6 +16,10 @@ mutable struct MDEIMUnsteady <: MDEIM
   red_measure::Measure
 end
 
+mutable struct MDEIMNonlinear <: MDEIM
+  rb_projection::Matrix{Float}
+end
+
 function MDEIM(
   red_rbspace::RBSpaceSteady,
   red_lu_factors::LU,
@@ -84,47 +88,36 @@ end
 
 function MDEIM(
   info::RBInfo,
-  op::RBBilinVariable{Nonlinear,<:ParamTransientTrialFESpace},
+  op::RBBilinVariable{Nonlinear,<:ParamTrialFESpace},
   μ::Vector{Param},
-  meas::ProblemMeasures,
-  field::Symbol,
-  rbspaceθ::RBSpaceUnsteady,
-  args...)
-
-  function space_quantities(snaps,findnz_map)
-    rbspace_s = RBSpaceSteady(snaps;ismdeim=Val(true),ϵ=info.ϵ)
-    bs = get_basis_space(rbspace_s)
-    idx_space = mdeim_idx(rbspace_s)
-    red_bs = rb_space_projection(op,rbspace_s,findnz_map)
-    bs,idx_space,red_bs
-  end
-
-  function spacetime_quantities(bs,idx_space,red_bs)
-    btθ = get_basis_time(rbspaceθ)
-    red_vals = kron(btθ,red_bs)
-    vals_bk = blocks(red_vals;dims=(:,get_Nt(op)))
-    id = get_id(op)
-    snaps = Snapshots(id,vals_bk)
-    s2 = mode2_unfolding(snaps)
-    bt = POD(s2;ϵ=info.ϵ)
-    idx_time = mdeim_idx(bt)
-    red_rbspace = RBSpaceUnsteady((id,id*:_lift),red_bs,bt)
-    bst = ((bs[1],bt[1]),(bs[2],bt[2]))
-    idx = ((idx_space[1],idx_time[1]),(idx_space[2],idx_time[2]))
-    bst,idx,red_rbspace
-  end
+  ::ProblemMeasures,
+  ::Symbol,
+  rbspace_u::RBSpaceSteady,
+  rbspace_g::RBSpaceSteady)
 
   μ_mdeim = μ[1:info.mdeim_nsnap]
-  findnz_map,snaps... = mdeim_snapshots(info,op,μ_mdeim,rbspaceθ)
+  findnz_map,snaps... = mdeim_snapshots(info,op,μ_mdeim,rbspace_uθ,rbspace_gθ)
+  red_vals_space = rb_space_projection(op,snaps,findnz_map)
 
-  bs,idx_space,red_bs = space_quantities(snaps,findnz_map)
-  bst,idx,red_rbspace = spacetime_quantities(bs,idx_space,red_bs)
+  MDEIMNonlinear(red_vals_space)
+end
 
-  red_lu_factors = get_red_lu_factors(info,bst,idx)
-  idx = recast_in_full_dim(idx,findnz_map)
-  red_meas = get_red_measure(op,idx,meas,field)
+function MDEIM(
+  info::RBInfo,
+  op::RBBilinVariable{Nonlinear,<:ParamTransientTrialFESpace},
+  μ::Vector{Param},
+  ::ProblemMeasures,
+  ::Symbol,
+  rbspace_uθ::RBSpaceUnsteady,
+  rbspace_gθ::RBSpaceUnsteady)
 
-  MDEIM(red_rbspace,red_lu_factors,idx,red_meas)
+  μ_mdeim = μ[1:info.mdeim_nsnap]
+  findnz_map,snaps... = mdeim_snapshots(info,op,μ_mdeim,rbspace_uθ,rbspace_gθ)
+  red_vals_space = rb_space_projection(op,snaps,findnz_map)
+  btθ = get_basis_time((rbspace_uθ,rbspace_gθ))
+  red_vals_spacetime = kron(btθ,red_vals_space)
+
+  MDEIMNonlinear(red_vals_spacetime)
 end
 
 function save(path::String,mdeim::MDEIMSteady)
@@ -143,6 +136,10 @@ function save(path::String,mdeim::MDEIMUnsteady)
   red_lu = get_red_lu_factors(mdeim)
   save(joinpath(path,"LU"),red_lu.factors)
   save(joinpath(path,"p"),red_lu.ipiv)
+end
+
+function save(path::String,mdeim::MDEIMNonlinear)
+  save(joinpath(path,"basis_space"),mdeim.rb_projection)
 end
 
 function load(
@@ -187,6 +184,10 @@ function load(
   red_measure = get_red_measure(op,idx_space,meas)
 
   MDEIM(rbspace,red_lu_factors,idx,red_measure)
+end
+
+function save(path::String,mdeim::MDEIMNonlinear)
+  save(joinpath(path,"rb_projection"),mdeim.rb_projection)
 end
 
 get_rbspace(mdeim::MDEIM) = mdeim.rbspace

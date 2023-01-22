@@ -11,10 +11,9 @@ function poisson_steady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/poisson"
-  #= mesh = "cube15x15x15.json"
-  bnd_info = Dict("dirichlet" => collect(1:25),"neumann" => [26]) =#
-  mesh = "man_cylinder.json"
-  bnd_info = Dict("dirichlet" => ["wall","wall_c","inlet","inlet_c"],"neumann" => ["outlet"])
+  mesh = "model.json"
+  bnd_info = Dict("dirichlet" => ["sides","sides_c"],
+                  "neumann" => ["circle","triangle","square"])
   order = 1
 
   ranges = fill([1.,20.],6)
@@ -35,8 +34,8 @@ function poisson_steady()
   op = ParamAffineFEOperator(lhs,rhs,PS,U,V)
 
   solver = LinearFESolver()
-  nsnap = 100
-  uh,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
+  nsnap = 1
+  uh,μ, = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
 
   opA = NonaffineParamOperator(a,afe,PS,U,V;id=:A)
   opF = AffineParamOperator(f,ffe,PS,V;id=:F)
