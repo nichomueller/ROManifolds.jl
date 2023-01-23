@@ -122,21 +122,85 @@ function ParamTransientMultiFieldFESpace(spaces::Vector{MyTests})
   ParamTransientMultiFieldFESpace([get_test(first(spaces)),get_test(last(spaces))])
 end
 
-function free_dofs_on_full_trian(tests::MyTests)
-  nfree_on_full_trian = tests.test_no_bc.nfree
-  setdiff(collect(1:nfree_on_full_trian),tests.ddofs_on_full_trian)
+Gridap.FESpaces.get_test(tests::MyTests) = tests.test
+
+Gridap.FESpaces.get_trial(trials::MyTrials) = trials.trial
+
+get_test_no_bc(tests::MyTests) = tests.test_no_bc
+
+get_trial_no_bc(trials::MyTrials) = trials.trial_no_bc
+
+get_space_no_bc(tests::MyTests) = tests.test_no_bc
+
+get_space_no_bc(trial::MyTrials) = trial.trial_no_bc
+
+get_ddofs_on_full_trian(space::MySpaces) = space.ddofs_on_full_trian
+
+get_nfree_dofs_on_full_trian(space::MySpaces) = get_space_no_bc(space).nfree
+
+get_degree(order::Int,c=2) = c*order
+
+get_degree(test::SingleFieldFESpace,c=2) = get_degree(Gridap.FESpaces.get_order(test),c)
+
+realization(fes::MySpaces) = FEFunction(fes.test,rand(num_free_dofs(fes.test)))
+
+function get_fdofs_on_full_trian(space::MySpaces)
+  ddofs = get_ddofs_on_full_trian(space)
+  nfree_on_full_trian = get_nfree_dofs_on_full_trian(space)
+  setdiff(collect(1:nfree_on_full_trian),ddofs)
 end
 
-function free_dofs_on_full_trian(trials::MyTrials)
-  nfree_on_full_trian = trials.trial_no_bc.nfree
-  setdiff(collect(1:nfree_on_full_trian),trials.ddofs_on_full_trian)
+function build_on_fd_dofs(space::MySpaces,x::AbstractVector)
+  fdofs = get_fdofs_on_full_trian(space)
+  ddofs = get_ddofs_on_full_trian(space)
+  nfree,ndir = length(fdofs),length(ddofs)
+  @assert length(x) ∈ (nfree,ndir) "Wrong dimensions"
+
+  xall = zeros(nfree+ndir)
+  length(x) == nfree ? xall[fdofs] = x : xall[ddofs] = x
+  xall
 end
 
-function get_fd_dofs(tests::MyTests,trials::MyTrials)
-  fdofs_test = free_dofs_on_full_trian(tests)
-  fdofs_trial = free_dofs_on_full_trian(trials)
-  ddofs = trials.ddofs_on_full_trian
-  (fdofs_test,fdofs_trial),ddofs
+function build_on_fd_dofs(space::MySpaces,x::AbstractMatrix)
+  fdofs = get_fdofs_on_full_trian(space)
+  ddofs = get_ddofs_on_full_trian(space)
+  nfree,ndir = length(fdofs),length(ddofs)
+  @assert size(x,1) ∈ (nfree,ndir) "Wrong dimensions"
+
+  xall = zeros(nfree+ndir,size(x,2))
+  size(x,1) == nfree ? xall[fdofs,:] = x : xall[ddofs,:] = x
+  xall
+end
+
+function build_on_fd_dofs(space::MySpaces,x::AbstractVector,xd::AbstractVector)
+  fdofs = get_fdofs_on_full_trian(space)
+  ddofs = get_ddofs_on_full_trian(space)
+  nfree,ndir = length(fdofs),length(ddofs)
+  @assert length(x) == nfree && length(xd) == ndir "Wrong dimensions"
+
+  xall = zeros(nfree+ndir)
+  xall[fdofs] = x
+  xall[ddofs] = xd
+  xall
+end
+
+function build_on_fd_dofs(space::MySpaces,x::AbstractMatrix,xd::AbstractMatrix)
+  fdofs = get_fdofs_on_full_trian(space)
+  ddofs = get_ddofs_on_full_trian(space)
+  nfree,ndir = length(fdofs),length(ddofs)
+  @assert size(x,1) == nfree && size(xd,1) == ndir "Wrong dimensions"
+  @assert size(x,2) == size(xd,2) "Wrong dimensions"
+
+  xall = zeros(nfree+ndir,size(x,2))
+  xall[fdofs,:] = x
+  xall[ddofs,:] = xd
+  xall
+end
+
+function fe_function_fd_dofs(space::MySpaces,args...)
+  xall = build_on_fd_dofs(space,args...)
+  fsp_no_bc = get_space_no_bc(space)
+  FEFunction(fsp_no_bc,xall)
 end
 
 function Gridap.get_background_model(test::SingleFieldFESpace)
@@ -152,14 +216,6 @@ function Gridap.FESpaces.get_order(test::SingleFieldFESpace)
   basis = get_fe_basis(test)
   first(basis.cell_basis.values[1].fields.orders)
 end
-
-Gridap.FESpaces.get_test(tests::MyTests) = tests.test
-Gridap.FESpaces.get_trial(trials::MyTrials) = trials.trial
-get_test_no_bc(tests::MyTests) = tests.test_no_bc
-get_trial_no_bc(trials::MyTrials) = trials.trial_no_bc
-get_degree(order::Int,c=2) = c*order
-get_degree(test::SingleFieldFESpace,c=2) = get_degree(Gridap.FESpaces.get_order(test),c)
-realization(fes::MySpaces) = FEFunction(fes.test,rand(num_free_dofs(fes.test)))
 
 function get_cell_quadrature(test::SingleFieldFESpace)
   CellQuadrature(get_triangulation(test),get_degree(test))

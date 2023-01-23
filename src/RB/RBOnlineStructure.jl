@@ -1,17 +1,22 @@
-abstract type RBOnlineStructure{Top,Ttr,Tst} end
+#= abstract type RBOnlineStructure{Top,Tst} end
 
-mutable struct RBOnlineLinStructure{Top,Tst} <: RBOnlineStructure{Top,nothing,Tst}
-  op::RBLinVariable{Top}
+mutable struct RBOnlineLinStructure{Top,Tst} <: RBOnlineStructure{Top<:RBLinVariable,Tst}
+  op::Top
   on_structure::Tst
 end
 
-mutable struct RBOnlineBilinStructure{Top,Ttr,Tst} <: RBOnlineStructure{Top,Ttr,Tst}
-  op::RBBilinVariable{Top,Ttr}
+mutable struct RBOnlineBilinStructure{Top,Tst} <: RBOnlineStructure{Top<:RBBilinVariable,Tst}
+  op::Top
   on_structure::Tst
 end
 
-mutable struct RBOnlineLiftStructure{Top,Ttr,Tst} <: RBOnlineStructure{Top,Ttr,Tst}
-  op::RBLiftVariable{Top,Ttr}
+mutable struct RBOnlineLiftStructure{Top,Tst} <: RBOnlineStructure{Top<:RBLiftVariable,Tst}
+  op::Top
+  on_structure::Tst
+end =#
+
+mutable struct RBOnlineStructure{Top,Tst}
+  op::Top
   on_structure::Tst
 end
 
@@ -19,21 +24,21 @@ function RBOnlineStructure(
   op::RBLinVariable{Top},
   on_structure::Tst) where {Top,Tst}
 
-  RBOnlineLinStructure{Top,Tst}(op,on_structure)
+  RBOnlineStructure{RBLinVariable{Top},Tst}(op,on_structure)
 end
 
 function RBOnlineStructure(
   op::RBBilinVariable{Top,Ttr},
   on_structure::Tst) where {Top,Ttr,Tst}
 
-  RBOnlineBilinStructure{Top,Ttr,Tst}(op,on_structure)
+  RBOnlineStructure{RBBilinVariable{Top,Ttr},Tst}(op,on_structure)
 end
 
 function RBOnlineStructure(
   op::RBLiftVariable{Top,Ttr},
   on_structure::Tst) where {Top,Ttr,Tst}
 
-  RBOnlineLiftStructure{Top,Ttr,Tst}(op,on_structure)
+  RBOnlineStructure{RBLiftVariable{Top,Ttr},Tst}(op,on_structure)
 end
 
 function RBOnlineStructure(
@@ -111,19 +116,19 @@ function get_op(
   filter(!isnothing,all_rbos)
 end
 
-get_on_structure(rbos::RBOnlineStructure) = rbos.on_structure
+get_online_structure(rbos::RBOnlineStructure) = rbos.on_structure
 
 function eval_on_structure(rbos::RBOnlineStructure)
-  get_on_structure(rbos)
+  get_online_structure(rbos)
 end
 
 function eval_on_structure(
-  rbos::RBOnlineBilinStructure{Top,Ttr,NTuple{2,Matrix{Float}}}) where {Top,Ttr}
+  rbos::RBOnlineStructure{RBUnsteadyBilinVariable,NTuple{2,Matrix{Float}}})
 
   op = get_op(rbos)
   θ = get_θ(op)
   dt = get_dt(op)
-  mat,mat_shift = get_on_structure(rbos)
+  mat,mat_shift = get_online_structure(rbos)
 
   if get_id(op) == :M
     mat/dt - mat_shift/dt
@@ -133,22 +138,23 @@ function eval_on_structure(
 end
 
 function eval_on_structure(
-  rbos::RBOnlineBilinStructure{Top,Ttr,NTuple{2,Function}}) where {Top,Ttr}
+  rbos::RBOnlineStructure{RBUnsteadyBilinVariable,NTuple{2,Function}})
 
   op = get_op(rbos)
   θ = get_θ(op)
-  mat,mat_shift = get_on_structure(rbos)
+  mat,mat_shift = get_online_structure(rbos)
   u -> θ*mat(u) + (1-θ)*mat_shift(u)
 end
 
-function eval_on_structure(rbos::RBOnlineLiftStructure)
-  -get_on_structure(rbos)
+function eval_on_structure(
+  rbos::RBOnlineStructure{RBLiftVariable,Matrix{Float}})
+  -get_online_structure(rbos)
 end
 
 function eval_on_structure(
-  rbos::RBOnlineLiftStructure{Top,Ttr,Function}) where {Top,Ttr}
+  rbos::RBOnlineStructure{RBLiftVariable,Function})
 
-  u -> -get_on_structure(rbos)(u)
+  u -> -get_online_structure(rbos)(u)
 end
 
 function eval_on_structure(

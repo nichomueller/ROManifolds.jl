@@ -37,6 +37,7 @@ end
 
 get_id(s::Snapshots) = s.id
 get_snap(s::Snapshots) = s.snap
+get_snap(s::NTuple{N,Snapshots}) where N = get_snap.(s)
 get_nsnap(s::Snapshots) = s.nsnap
 get_nsnap(v::AbstractVector) = length(v)
 get_nsnap(m::AbstractMatrix) = size(m)[2]
@@ -53,3 +54,30 @@ mode2_unfolding(s::Snapshots) = mode2_unfolding(get_snap(s),get_nsnap(s))
 mode2_unfolding(s::NTuple{N,Snapshots}) where N = mode2_unfolding.(s)
 POD(s::Snapshots,args...;kwargs...) = POD(s.snap,args...;kwargs...)
 POD(s::NTuple{N,Snapshots},args...;kwargs...) where N = Broadcasting(si->POD(si,args...;kwargs...))(s)
+
+function build_on_fd_dofs(space::MySpaces,s::Snapshots;id=get_id(s))
+  snap,nsnap = get_snap(s),get_nsnap(s)
+  s_on_fd_dofs = build_on_fd_dofs(space,snap)
+  Snapshots(id,s_on_fd_dofs,nsnap)
+end
+
+function build_on_fd_dofs(
+  space::MySpaces,
+  s::Snapshots,
+  sd::Snapshots;
+  id=get_id(s)*get_id(sd))
+
+  snap,nsnap = get_snap(s),get_nsnap(s)
+  snapd,nsnapd = get_snap(sd),get_nsnap(sd)
+  @assert nsnap == nsnapd
+
+  s_on_fd_dofs = build_on_fd_dofs(space,snap,snapd)
+  Snapshots(id,s_on_fd_dofs,nsnap)
+end
+
+function SparseArrays.findnz(s::Snapshots)
+  id,snap,nsnap = get_id(s),get_snap(s),get_nsnap(s)
+  i,j,v = findnz(sparse(snap))
+  snap_nnz = reshape(v,:,get_Nt(s)*nsnap)
+  i,j,Snapshots(id,snap_nnz,nsnap)
+end

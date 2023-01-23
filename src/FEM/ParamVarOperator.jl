@@ -402,8 +402,9 @@ function assemble_matrix_and_lifting(op::ParamSteadyBilinOperator)
   afe = get_fe_function(op)
   trial_no_bc = get_trial_no_bc(op)
   test_no_bc = get_test_no_bc(op)
-  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
-  fdofs_test,fdofs_trial = fdofs
+  fdofs_test = get_fdofs_on_full_trian(get_tests(op))
+  fdofs_trial = get_fdofs_on_full_trian(get_trials(op))
+  ddofs = get_ddofs_on_full_trian(get_trials(op))
 
   A_no_bc(μ) = assemble_matrix(afe(μ),trial_no_bc,test_no_bc)
   A_bc(μ) = A_no_bc(μ)[fdofs_test,fdofs_trial]
@@ -418,8 +419,9 @@ function assemble_matrix_and_lifting(op::ParamUnsteadyBilinOperator)
   afe = get_fe_function(op)
   trial_no_bc = get_trial_no_bc(op)
   test_no_bc = get_test_no_bc(op)
-  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
-  fdofs_test,fdofs_trial = fdofs
+  fdofs_test = get_fdofs_on_full_trian(get_tests(op))
+  fdofs_trial = get_fdofs_on_full_trian(get_trials(op))
+  ddofs = get_ddofs_on_full_trian(get_trials(op))
 
   A_no_bc(μ,tθ) = assemble_matrix(afe(μ,tθ),trial_no_bc,test_no_bc)
   A_bc(μ,tθ) = A_no_bc(μ,tθ)[fdofs_test,fdofs_trial]
@@ -435,8 +437,9 @@ function assemble_matrix_and_lifting(op::ParamUnsteadyBilinOperator,t::Real)
   afe = get_fe_function(op)
   trial_no_bc = get_trial_no_bc(op)
   test_no_bc = get_test_no_bc(op)
-  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
-  fdofs_test,fdofs_trial = fdofs
+  fdofs_test = get_fdofs_on_full_trian(get_tests(op))
+  fdofs_trial = get_fdofs_on_full_trian(get_trials(op))
+  ddofs = get_ddofs_on_full_trian(get_trials(op))
 
   A_no_bc(μ) = assemble_matrix(afe(μ,t),trial_no_bc,test_no_bc)
   A_bc(μ) = A_no_bc(μ)[fdofs_test,fdofs_trial]
@@ -471,8 +474,9 @@ function assemble_functional_matrix_and_lifting(op::ParamUnsteadyBilinOperator)
   afe = get_fe_function(op)
   trial_no_bc = get_trial_no_bc(op)
   test_no_bc = get_test_no_bc(op)
-  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
-  fdofs_test,fdofs_trial = fdofs
+  fdofs_test = get_fdofs_on_full_trian(get_tests(op))
+  fdofs_trial = get_fdofs_on_full_trian(get_trials(op))
+  ddofs = get_ddofs_on_full_trian(get_trials(op))
 
   A_no_bc(fun) = assemble_matrix((u,v)->afe(fun,u,v),trial_no_bc,test_no_bc)
   A_bc(fun) = A_no_bc(fun)[fdofs_test,fdofs_trial]
@@ -499,8 +503,9 @@ function assemble_matrix_and_lifting(
   afe = get_fe_function(op)
   trial_no_bc = get_trial_no_bc(op)
   test_no_bc = get_test_no_bc(op)
-  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
-  fdofs_test,fdofs_trial = fdofs
+  fdofs_test = get_fdofs_on_full_trian(get_tests(op))
+  fdofs_trial = get_fdofs_on_full_trian(get_trials(op))
+  ddofs = get_ddofs_on_full_trian(get_trials(op))
 
   A_no_bc(u) = assemble_matrix(afe(u),trial_no_bc,test_no_bc)
   A_bc(u) = A_no_bc(u)[fdofs_test,fdofs_trial]
@@ -515,8 +520,9 @@ function assemble_matrix_and_lifting(
   afe = get_fe_function(op)
   trial_no_bc = get_trial_no_bc(op)
   test_no_bc = get_test_no_bc(op)
-  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
-  fdofs_test,fdofs_trial = fdofs
+  fdofs_test = get_fdofs_on_full_trian(get_tests(op))
+  fdofs_trial = get_fdofs_on_full_trian(get_trials(op))
+  ddofs = get_ddofs_on_full_trian(get_trials(op))
 
   A_no_bc(u) = assemble_matrix(afe(u),trial_no_bc,test_no_bc)
   A_bc(u) = A_no_bc(u)[fdofs_test,fdofs_trial]

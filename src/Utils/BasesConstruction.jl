@@ -11,7 +11,9 @@ function mode2_unfolding(S::AbstractMatrix,ns::Int)
 end
 
 my_svd(s::Matrix{Float}) = svd(s)
+
 my_svd(s::SparseMatrixCSC) = svds(s;nsv=size(s)[2]-1)[1]
+
 my_svd(s::Vector{AbstractMatrix}) = my_svd(Matrix(s))
 
 function POD(S::NTuple{N,AbstractMatrix},args...;kwargs...) where N

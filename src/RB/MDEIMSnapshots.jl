@@ -156,27 +156,26 @@ function matrix_snapshots(
 
   id = get_id(op)
   bfun = basis_as_fefun(op,rbspace_uθ)
-  bfun_lift = basis_as_fefun(op,rbspace_gθ)
   findnz_map = get_findnz_map(op,bfun(1))
-  M,lift = assemble_matrix_and_lifting_temp(op)
+  M,Mlift = assemble_matrix_and_lifting_temp(op)
 
   bsuθ = get_basis_space(rbspace_uθ)
   bsgθ = get_basis_space(rbspace_gθ)
-  nsuθ,nsgθ = size(bsuθ,2),size(bsgθ,2)
+  nsuθ = size(bsuθ,2)
+  nsgθ = size(bsgθ,2)
 
   function snapshot(n::Int)
     println("Nonlinear snapshot number $n, $id")
     b = bfun(n)
-    nonzero_values(M(b),findnz_map)
+    v = nonzero_values(M(b),findnz_map)
+    ml = Mlift(b)
+    v,ml
   end
 
-  function snapshot_lift(n::Int)
-    println("Nonlinear lift snapshot number $n, $id")
-    b_lift = bfun_lift(n)
-    lift(b_lift)
-  end
+  vml = snapshot.(1:nsuθ)
+  vals,Mlifts = first.(vml),last.(vml)
+  lifts = [Mlifts[n]*bsgθ[:,k] for n=1:nsuθ for k=1:nsgθ]
 
-  vals,lifts = snapshot.(1:nsuθ),snapshot_lift.(1:nsgθ)
   findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
@@ -267,12 +266,13 @@ function assemble_matrix_and_lifting_temp(
   afe = get_fe_function(op)
   trial_no_bc = get_trial_no_bc(op)
   test_no_bc = get_test_no_bc(op)
-  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
-  fdofs_test,fdofs_trial = fdofs
+  fdofs_test = get_fdofs_on_full_trian(get_tests(op))
+  fdofs_trial = get_fdofs_on_full_trian(get_trials(op))
+  ddofs = get_ddofs_on_full_trian(get_trials(op))
 
-  A_no_bc(u) = assemble_matrix(afe(u),trial_no_bc,test_no_bc)
-  A_bc(u) = A_no_bc(u)[fdofs_test,fdofs_trial]
-  lift(u,gh) = A_no_bc(u)[fdofs_test,ddofs]*gh[ddofs]
+  A_all(u) = assemble_matrix(afe(u),trial_no_bc,test_no_bc)
+  A_free_free(u) = A_no_bc(u)[fdofs_test,fdofs_trial]
+  A_free_dir(u) = A_no_bc(u)[fdofs_test,ddofs]
 
-  A_bc,lift
+  A_free_free,A_free_dir
 end

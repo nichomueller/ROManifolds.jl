@@ -142,6 +142,12 @@ function SparseArrays.findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
   (I[nz], V[nz])
 end
 
+function remove_zero_rows(mat::AbstractMatrix;tol=eps())
+  sum_cols = sum(mat,dims=2)
+  nzrows = findall(x -> abs(x) ≥ tol,sum_cols)
+  mat[nzrows,:]
+end
+
 function LinearAlgebra.kron(
   mat1::AbstractArray,
   mat2::NTuple{N,AbstractArray}) where N

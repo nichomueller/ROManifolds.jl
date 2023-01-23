@@ -8,7 +8,7 @@ function online_assembler(
 end
 
 function online_assembler(
-  rb_structure::NTuple{N,RBStructure},
+  rb_structure::NTuple{N,RBOfflineStructure},
   μ::Param,
   args...) where N
 
@@ -16,21 +16,20 @@ function online_assembler(
 end
 
 function online_assembler(
-  rb_structure::RBStructure,
+  rb_structure::RBOfflineStructure,
   args...)
 
   op = get_op(rb_structure)
-  q = get_offline_quantity(rb_structure)
-  online_assembler(op,q,args...)
+  os = get_offline_structure(rb_structure)
+  online_assembler(op,os,args...)
 end
 
 function online_assembler(
   op::RBVariable,
   basis::Matrix{Float},
-  μ::Param,
   args...)
 
-  coeff = compute_coefficient(op,μ)
+  coeff = compute_coefficient(op)
   RBOnlineStructure(op,basis,coeff)
 end
 
@@ -45,26 +44,12 @@ function online_assembler(
   RBOnlineStructure(op,basis,coeff)
 end
 
-function coeff_by_time_bases(
-  op::Union{RBUnsteadyLinVariable,RBUnsteadyLiftVariable},
-  coeff)
-
+function coeff_by_time_bases(op::RBUnsteadyVariable,coeff)
   coeff_by_time_bases_lin(op,coeff)
 end
 
-function coeff_by_time_bases(
-  op::RBUnsteadyBilinVariable,
-  coeff)
-
+function coeff_by_time_bases(op::RBUnsteadyBilinVariable,coeff)
   coeff_by_time_bases_bilin(op,coeff)
-end
-
-function coeff_by_time_bases(
-  op::RBUnsteadyBilinVariable,
-  coeff::NTuple{2,Any})
-
-  @assert length(coeff) == 2 "Something is wrong"
-  coeff_by_time_bases_bilin(op,first(coeff)),coeff_by_time_bases_lin(op,last(coeff))
 end
 
 function coeff_by_time_bases_lin(

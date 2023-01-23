@@ -79,12 +79,12 @@ function offline_phase(
   rbopF = RBVariable(opF,rbspace_u)
   rbopH = RBVariable(opH,rbspace_u)
 
-  Arb = RBStructure(info,tt,rbopA,μ,meas,:dΩ)
-  Brb = RBStructure(info,tt,rbopB,μ,meas,:dΩ)
-  BTrb = RBStructure(info,tt,rbopBT,μ,meas,:dΩ)
-  Mrb = RBStructure(info,tt,rbopM,μ,meas,:dΩ)
-  Frb = RBStructure(info,tt,rbopF,μ,meas,:dΩ)
-  Hrb = RBStructure(info,tt,rbopH,μ,meas,:dΓn)
+  Arb = RBOfflineStructure(info,tt,rbopA,μ,meas,:dΩ)
+  Brb = RBOfflineStructure(info,tt,rbopB,μ,meas,:dΩ)
+  BTrb = RBOfflineStructure(info,tt,rbopBT,μ,meas,:dΩ)
+  Mrb = RBOfflineStructure(info,tt,rbopM,μ,meas,:dΩ)
+  Frb = RBOfflineStructure(info,tt,rbopF,μ,meas,:dΩ)
+  Hrb = RBOfflineStructure(info,tt,rbopH,μ,meas,:dΓn)
 
   rbspace = (rbspace_u,rbspace_p)
   rb_structures = ((rbopA,Arb),(rbopB,Brb),(rbopBT,BTrb),(rbopM,Mrb),(rbopF,Frb),(rbopH,Hrb))

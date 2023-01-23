@@ -1,26 +1,22 @@
-function compute_coefficient(
-  op::RBSteadyVariable{Affine,Ttr},
-  μ::Param) where Ttr
-
+function compute_coefficient(op::RBSteadyVariable{Affine,Ttr}) where Ttr
   fun = get_param_function(op)
-  coeff = fun(nothing,μ)[1]
+  μ = realization(op)
+  coeff = first(fun(nothing,μ))
   [coeff]
 end
 
-function compute_coefficient(
-  op::RBUnsteadyVariable{Affine,Ttr},
-  μ::Param) where Ttr
-
+function compute_coefficient(op::RBUnsteadyVariable{Affine,Ttr}) where Ttr
   fun = get_param_function(op)
+  μ = realization(op)
   timesθ = get_timesθ(op)
-  coeff(tθ) = fun(nothing,μ,tθ)[1]
+  coeff(tθ) = first(fun(nothing,μ,tθ))
   Matrix(coeff.(timesθ))
 end
 
 function compute_coefficient(
-  op::RBSteadyVariable,
+  op::RBSteadyVariable{Nonaffine,Ttr},
   mdeim::MDEIMSteady,
-  μ::Param)
+  μ::Param) where Ttr
 
   red_lu = get_red_lu_factors(mdeim)
   idx_space = get_idx_space(mdeim)
@@ -31,19 +27,19 @@ function compute_coefficient(
 end
 
 function compute_coefficient(
-  op::RBUnsteadyVariable,
+  op::RBUnsteadyVariable{Nonaffine,Ttr},
   mdeim::MDEIMUnsteady,
   μ::Param,
-  st_mdeim=false)
+  st_mdeim=false) where Ttr
 
   compute_coefficient(op,mdeim,μ,Val(st_mdeim))
 end
 
 function compute_coefficient(
-  op::RBUnsteadyVariable,
+  op::RBUnsteadyVariable{Nonaffine,Ttr},
   mdeim::MDEIMUnsteady,
   μ::Param,
-  ::Val{false})
+  ::Val{false}) where Ttr
 
   timesθ = get_timesθ(op)
   red_lu = get_red_lu_factors(mdeim)
@@ -55,10 +51,10 @@ function compute_coefficient(
 end
 
 function compute_coefficient(
-  op::RBUnsteadyVariable,
+  op::RBUnsteadyVariable{Nonaffine,Ttr},
   mdeim::MDEIMUnsteady,
   μ::Param,
-  ::Val{true})
+  ::Val{true}) where Ttr
 
   red_lu = get_red_lu_factors(mdeim)
   idx_space,idx_time = get_idx_space(mdeim),get_idx_time(mdeim)
@@ -69,6 +65,17 @@ function compute_coefficient(
   A_st = spacetime_vector(A_idx)
   coeff = mdeim_online(A_st,red_lu)
   interp_coeff_time(mdeim,coeff)
+end
+
+function compute_coefficient(::RBSteadyVariable{Nonlinear,Ttr}) where Ttr
+  coeff(u) = u
+  coeff
+end
+
+function compute_coefficient(::RBUnsteadyVariable{Nonlinear,Ttr}) where Ttr
+  coeff(u,tθ) = u(tθ)
+  coeff(tθ) = u -> u(tθ)
+  coeff
 end
 
 function hyperred_structure(

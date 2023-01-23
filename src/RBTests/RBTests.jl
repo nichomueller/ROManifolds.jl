@@ -198,12 +198,13 @@ function collect_solution!(
   solk::ParamTransientFESolution)
 
   μk = solk.psol.μ
-  dtθ = solk.psol.solver.dt*solk.psol.solver.θ
+  dt = solk.psol.solver.dt
+  θ = solk.psol.solver.θ
 
   k = 1
   for (xk,t) in solk
     println("Time step: $k")
-    tθ = t-dtθ
+    tθ = t-dt*(1-θ)
     push!(x,copy(xk))
     push!(g,copy(get_dirichlet_dof_values(solk.trial(μk,tθ))))
     k += 1

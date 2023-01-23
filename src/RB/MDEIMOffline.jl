@@ -113,9 +113,26 @@ function MDEIM(
 
   μ_mdeim = μ[1:info.mdeim_nsnap]
   findnz_map,snaps... = mdeim_snapshots(info,op,μ_mdeim,rbspace_uθ,rbspace_gθ)
-  red_vals_space = rb_space_projection(op,snaps,findnz_map)
-  btθ = get_basis_time((rbspace_uθ,rbspace_gθ))
-  red_vals_spacetime = kron(btθ,red_vals_space)
+  rbs = rb_space_projection(op,get_snap(snaps),findnz_map)
+  basis_block = blocks(rbs[1],size(rbs[1],2))
+  basis_block_lift = blocks(rbs[2],size(rbs[2],2))
+
+  btuθ,btgθ = get_basis_time((rbspace_uθ,rbspace_gθ))
+  rbrow = get_rbspace_row(op)
+  rbcol = get_rbspace_col(op)
+  Nt = get_Nt(op)
+  idx = 1:Nt
+  idx_backwards,idx_forwards = 1:Nt-1,2:Nt
+
+  btbtbt = rb_time_projection(rbrow,rbcol,btuθ,idx,idx)
+  btbtbt_shift = rb_time_projection(rbrow,rbcol,btuθ,idx_forwards,idx_backwards)
+  btbt_lift = rb_time_projection(rbrow,rbspace_gθ,btgθ)
+
+  ns_row = get_ns(get_rbspace_row(op))
+
+  rbst = basis_by_coeff_mult(basis_block,btbtbt,ns_row)
+  rbst_shift = basis_by_coeff_mult(basis_block,btbtbt_shift,ns_row)
+  rbst_lift = basis_by_coeff_mult(basis_block_lift,btbt_lift,ns_row)
 
   MDEIMNonlinear(red_vals_spacetime)
 end
@@ -229,11 +246,18 @@ function project_mdeim_basis(
 end
 
 function rb_space_projection(
-  op::RBLinVariable,
+  op::RBVariable,
   rbspace::RBSpace,
   args...)
 
-  basis_space = get_basis_space(rbspace)
+  rb_space_projection(op,get_basis_space(rbspace),args...)
+end
+
+function rb_space_projection(
+  op::RBLinVariable,
+  basis_space::Matrix{Float},
+  args...)
+
   rbspace_row = get_rbspace_row(op)
   brow = get_basis_space(rbspace_row)
   brow'*basis_space
@@ -241,10 +265,9 @@ end
 
 function rb_space_projection(
   op::RBBilinVariable,
-  rbspace::RBSpace,
+  basis_space::Matrix{Float},
   findnz_map::Vector{Int})
 
-  basis_space = get_basis_space(rbspace)
   sparse_basis_space = sparsevec(basis_space,findnz_map)
   rbspace_row = get_rbspace_row(op)
   brow = get_basis_space(rbspace_row)
@@ -264,14 +287,12 @@ end
 
 function rb_space_projection(
   op::RBBilinVariable,
-  rb::NTuple{2,<:RBSpace},
-  findnz_map::Vector{Int})
+  rb::NTuple{2,T},
+  findnz_map::Vector{Int}) where T
 
-  rbspace,rbspace_lift = rb
+  red_basis_space = rb_space_projection(op,first(rb),findnz_map)
   op_lift = RBLiftVariable(op)
-
-  red_basis_space = rb_space_projection(op,rbspace,findnz_map)
-  red_basis_space_lift = rb_space_projection(op_lift,rbspace_lift,findnz_map)
+  red_basis_space_lift = rb_space_projection(op_lift,last(rb),findnz_map)
 
   red_basis_space,red_basis_space_lift
 end
