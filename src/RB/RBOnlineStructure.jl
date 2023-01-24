@@ -47,7 +47,7 @@ function RBOnlineStructure(
   coeff::Vector{Float})
 
   nr = get_nrows(op)
-  on_structure = basis_by_coeff_mult(basis,coeff,nr)
+  on_structure = rb_online_structure(basis,coeff,nr)
   RBOnlineStructure(op,on_structure)
 end
 
@@ -57,7 +57,7 @@ function RBOnlineStructure(
   coeff::Function)
 
   nr = get_nrows(op)
-  on_structure(u) = basis_by_coeff_mult(basis,coeff(u),nr)
+  on_structure(u) = rb_online_structure(basis,coeff(u),nr)
   RBOnlineStructure(op,on_structure)
 end
 
@@ -71,7 +71,7 @@ function RBOnlineStructure(
   basis_block = blocks(basis,ns_row)
 
   nr = get_nrows(op)
-  on_structure = basis_by_coeff_mult(basis_block,btbtc,nr)
+  on_structure = rb_online_structure(basis_block,btbtc,nr)
   RBOnlineStructure(op,on_structure)
 end
 
@@ -85,8 +85,8 @@ function RBOnlineStructure(
   basis_block = blocks(basis,ns_row)
 
   nr = get_nrows(op)
-  mat(u) = basis_by_coeff_mult(basis_block,btbtc[1](u),nr)
-  mat_shift(u) = basis_by_coeff_mult(basis_block,btbtc[2](u),nr)
+  mat(u) = rb_online_structure(basis_block,btbtc[1](u),nr)
+  mat_shift(u) = rb_online_structure(basis_block,btbtc[2](u),nr)
   RBOnlineStructure(op,(mat,mat_shift))
 end
 

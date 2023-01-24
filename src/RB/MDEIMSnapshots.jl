@@ -271,8 +271,8 @@ function assemble_matrix_and_lifting_temp(
   ddofs = get_ddofs_on_full_trian(get_trials(op))
 
   A_all(u) = assemble_matrix(afe(u),trial_no_bc,test_no_bc)
-  A_free_free(u) = A_no_bc(u)[fdofs_test,fdofs_trial]
-  A_free_dir(u) = A_no_bc(u)[fdofs_test,ddofs]
+  A_free_free(u) = A_all(u)[fdofs_test,fdofs_trial]
+  A_free_dir(u) = A_all(u)[fdofs_test,ddofs]
 
   A_free_free,A_free_dir
 end

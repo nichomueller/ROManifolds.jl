@@ -22,6 +22,9 @@ function Base.Matrix(vblock::Vector{Vector{Vector{T}}}) where T
   mat
 end
 
+const Block{T} = Vector{T} where {T<:AbstractArray{Ts} where Ts}
+const BlockMatrix{T} = Block{Matrix{T}} where T
+
 function blocks(mat::Matrix{T},nrow::Int) where T
   blocks(mat,size(mat,2);dims=(nrow,:))
 end
@@ -38,7 +41,7 @@ function blocks(mat::Matrix{T},nblocks=size(mat,2);dims=(size(mat,1),1)) where T
     block_i = Matrix(reshape(mat[:,idx1[i]:idx2[i]],dims))
     push!(blockmat,block_i)
   end
-  blockmat::Vector{Matrix{T}}
+  blockmat
 end
 
 function blocks(mat::NTuple{N,Matrix{T}},args...;kwargs...) where {N,T}
@@ -51,11 +54,11 @@ function blocks(mat::Array{T,3};dims=size(mat)[1:2]) where T
     block_i = Matrix(reshape(mat[:,:,nb],dims))
     push!(blockmat,block_i)
   end
-  blockmat::Vector{Matrix{T}}
+  blockmat
 end
 
 function vblocks(vec::Vector{T}) where T
-  [vec]::Vector{Vector{T}}
+  [vec]
 end
 
 function vblocks(mat::Matrix{T}) where T
@@ -63,7 +66,7 @@ function vblocks(mat::Matrix{T}) where T
   for i in axes(mat,2)
     push!(blockvec,mat[:,i])
   end
-  blockvec::Vector{Vector{T}}
+  blockvec
 end
 
 check_dimensions(vb::AbstractVector) =
@@ -72,7 +75,6 @@ check_dimensions(m::AbstractMatrix,nb::Int) = iszero(size(m)[2]%nb)
 
 spacetime_vector(mat::AbstractMatrix) = mat[:]
 spacetime_vector(fun::Function) = u -> fun(u)[:]
-spacetime_vector(q::Tuple) = spacetime_vector.(q)
 
 istuple(tup::Any) = false
 istuple(tup::Tuple) = true
@@ -164,6 +166,16 @@ function LinearAlgebra.kron(
   mat1::NTuple{N,AbstractArray},
   mat2::NTuple{N,AbstractArray}) where N
   kron.(mat1,mat2)
+end
+
+function LinearAlgebra.kron(
+  b1::BlockMatrix,
+  b2::BlockMatrix)
+
+  n1 = length(b1)
+  n2 = length(b2)
+  b1b2 = [kron(b1[i],b2[j]) for i=1:n1 for j=1:n2]
+  Matrix(reshape(b1b2,:,n1*n2))
 end
 
 function Base.NTuple(N::Int,T::DataType)

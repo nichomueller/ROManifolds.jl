@@ -123,7 +123,7 @@ function rb_time(
   info::RBInfoUnsteady,
   snap::Snapshots,
   basis_space::Matrix{Float};
-  ϵ=info.ϵ,)
+  ϵ=info.ϵ)
 
   println("Temporal POD, tolerance: $ϵ")
 

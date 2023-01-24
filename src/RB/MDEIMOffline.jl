@@ -17,7 +17,7 @@ mutable struct MDEIMUnsteady <: MDEIM
 end
 
 mutable struct MDEIMNonlinear <: MDEIM
-  rb_projection::Matrix{Float}
+  rbspace::RBSpaceSteady
 end
 
 function MDEIM(
@@ -86,55 +86,30 @@ function MDEIM(
   MDEIM(red_rbspace,red_lu_factors,idx,red_meas)
 end
 
-function MDEIM(
-  info::RBInfo,
-  op::RBBilinVariable{Nonlinear,<:ParamTrialFESpace},
-  μ::Vector{Param},
-  ::ProblemMeasures,
-  ::Symbol,
-  rbspace_u::RBSpaceSteady,
-  rbspace_g::RBSpaceSteady)
+function MDEIM(rbspace::RBSpaceSteady)
+  MDEIMNonlinear(rbspace)
+end
 
-  μ_mdeim = μ[1:info.mdeim_nsnap]
-  findnz_map,snaps... = mdeim_snapshots(info,op,μ_mdeim,rbspace_uθ,rbspace_gθ)
-  red_vals_space = rb_space_projection(op,snaps,findnz_map)
-
-  MDEIMNonlinear(red_vals_space)
+function MDEIM(rbspace::NTuple{N,RBSpaceSteady}) where N
+  MDEIMNonlinear.(rbspace)
 end
 
 function MDEIM(
   info::RBInfo,
-  op::RBBilinVariable{Nonlinear,<:ParamTransientTrialFESpace},
+  op::RBBilinVariable{Nonlinear,Ttr},
   μ::Vector{Param},
   ::ProblemMeasures,
   ::Symbol,
-  rbspace_uθ::RBSpaceUnsteady,
-  rbspace_gθ::RBSpaceUnsteady)
+  rbspace_uθ::RBSpace,
+  rbspace_gθ::RBSpace) where Ttr
 
+  id = get_id(op)
   μ_mdeim = μ[1:info.mdeim_nsnap]
   findnz_map,snaps... = mdeim_snapshots(info,op,μ_mdeim,rbspace_uθ,rbspace_gθ)
-  rbs = rb_space_projection(op,get_snap(snaps),findnz_map)
-  basis_block = blocks(rbs[1],size(rbs[1],2))
-  basis_block_lift = blocks(rbs[2],size(rbs[2],2))
+  rbspace = RBSpaceSteady((id,id*:lift),snaps)
+  red_rbspace = rb_space_projection(op,rbspace,findnz_map)
 
-  btuθ,btgθ = get_basis_time((rbspace_uθ,rbspace_gθ))
-  rbrow = get_rbspace_row(op)
-  rbcol = get_rbspace_col(op)
-  Nt = get_Nt(op)
-  idx = 1:Nt
-  idx_backwards,idx_forwards = 1:Nt-1,2:Nt
-
-  btbtbt = rb_time_projection(rbrow,rbcol,btuθ,idx,idx)
-  btbtbt_shift = rb_time_projection(rbrow,rbcol,btuθ,idx_forwards,idx_backwards)
-  btbt_lift = rb_time_projection(rbrow,rbspace_gθ,btgθ)
-
-  ns_row = get_ns(get_rbspace_row(op))
-
-  rbst = basis_by_coeff_mult(basis_block,btbtbt,ns_row)
-  rbst_shift = basis_by_coeff_mult(basis_block,btbtbt_shift,ns_row)
-  rbst_lift = basis_by_coeff_mult(basis_block_lift,btbt_lift,ns_row)
-
-  MDEIMNonlinear(red_vals_spacetime)
+  MDEIM(red_rbspace)
 end
 
 function save(path::String,mdeim::MDEIMSteady)
@@ -156,7 +131,7 @@ function save(path::String,mdeim::MDEIMUnsteady)
 end
 
 function save(path::String,mdeim::MDEIMNonlinear)
-  save(joinpath(path,"basis_space"),mdeim.rb_projection)
+  save(joinpath(path,"basis_space"),mdeim.basis_space)
 end
 
 function load(
@@ -204,7 +179,7 @@ function load(
 end
 
 function save(path::String,mdeim::MDEIMNonlinear)
-  save(joinpath(path,"rb_projection"),mdeim.rb_projection)
+  save(joinpath(path,"basis_space"),mdeim.basis_space)
 end
 
 get_rbspace(mdeim::MDEIM) = mdeim.rbspace

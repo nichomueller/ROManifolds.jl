@@ -150,7 +150,7 @@ end
 #= function mdeim_offline_error(
   op::RBVariable,
   mdeim::MDEIM,
-  μ::Param,)
+  μ::Param,args...)
 
   mat = evaluate(assemble_fe_structure(op),μ)
   mat_rb = rb_space_projection(op,mat)
