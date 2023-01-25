@@ -3,7 +3,7 @@ function compute_coefficient(
   args...;kwargs...) where Ttr
 
   fun = get_param_function(op)
-  coeff(μ) = [first(fun(nothing,μ))]
+  coeff(μ) = [fun(nothing,μ)[1]]
 
   coeff
 end
@@ -14,7 +14,7 @@ function compute_coefficient(
 
   fun = get_param_function(op)
   timesθ = get_timesθ(op)
-  coeff(μ,tθ) = first(fun(nothing,μ,tθ))
+  coeff(μ,tθ) = fun(nothing,μ,tθ)[1]
   coeff(μ) = Matrix(Broadcasting(tθ -> coeff(μ,tθ))(timesθ))
   coeff_bt(μ) = coeff_by_time_bases(op,coeff(μ))
 

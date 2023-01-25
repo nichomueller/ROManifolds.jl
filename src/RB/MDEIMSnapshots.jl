@@ -124,7 +124,6 @@ function matrix_snapshots(
   bsuθ = get_basis_space(rbspace_uθ)
   bsgθ = get_basis_space(rbspace_gθ)
   nsuθ = size(bsuθ,2)
-  nsgθ = size(bsgθ,2)
 
   function snapshot(n::Int)
     println("Nonlinear snapshot number $n, $id")
@@ -136,7 +135,7 @@ function matrix_snapshots(
 
   vml = snapshot.(1:nsuθ)
   vals,Mlifts = first.(vml),last.(vml)
-  lifts = [Mlifts[n]*bsgθ[:,k] for n=1:nsuθ for k=1:nsgθ]
+  lifts = [Mlifts[n]*bsgθ for n=1:nsuθ]
 
   findnz_map,Matrix(vals),Matrix(lifts)
 end

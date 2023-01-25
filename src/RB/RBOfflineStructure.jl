@@ -263,42 +263,36 @@ function load(
   RBOfflineStructure(op,os)
 end
 
-function eval_off_structure(
-  rbs::RBOfflineStructure,
-  args...)
+function eval_off_structure(rbs::Tuple)
+  eval_off_structure.(expand(rbs))
+end
 
+function eval_off_structure(rbs::Tuple,bsθ::Tuple)
+  @assert length(rbs) == length(bsθ) "Wrong length"
+  eval_off_structure.(expand(rbs),expand(bsθ))
+end
+
+function eval_off_structure(rbs::RBOfflineStructure,args...)
   op = get_op(rbs)
   eval_off_structure(Val(issteady(op)),rbs,args...)
 end
 
-function eval_off_structure(
-  ::Val{true},
-  rbs::RBAffineStructure)
-
+function eval_off_structure(::Val{true},rbs::RBAffineStructure)
   get_offline_structure(rbs)
 end
 
-function eval_off_structure(
-  ::Val{true},
-  rbs::RBNonaffineStructure)
-
+function eval_off_structure(::Val{true},rbs::RBNonaffineStructure)
   mdeim = get_offline_structure(rbs)
   get_basis_space(mdeim)
 end
 
-function eval_off_structure(
-  ::Val{true},
-  rbs::RBNonlinearStructure)
-
+function eval_off_structure(::Val{true},rbs::RBNonlinearStructure)
   mdeim = get_offline_structure(rbs)
   bs = get_basis_space(mdeim)
   blocks(bs,size(bs,2))
 end
 
-function eval_off_structure(
-  ::Val{false},
-  rbs::RBAffineStructure)
-
+function eval_off_structure(::Val{false},rbs::RBAffineStructure)
   op = get_op(rbs)
   ns_row = get_ns(get_rbspace_row(op))
 
@@ -306,10 +300,7 @@ function eval_off_structure(
   blocks(os,ns_row)
 end
 
-function eval_off_structure(
-  ::Val{false},
-  rbs::RBNonaffineStructure)
-
+function eval_off_structure(::Val{false},rbs::RBNonaffineStructure)
   op = get_op(rbs)
   ns_row = get_ns(get_rbspace_row(op))
 
@@ -338,9 +329,12 @@ function eval_off_structure(
   bs = get_basis_space(mdeim)
   basis_block = blocks(bs,size(bs,2))
 
-  btθ = get_basis_time(rbspaceθ)
+  Nt = get_Nt(op)
+  idx = 1:Nt
+  btθ = get_basis_time(get_rbspace_row(op))
   rbrow = get_rbspace_row(op)
-  btbtbt = rb_time_projection(rbrow,rbspaceθ,btθ)
+  rbcol = rbspaceθ
+  btbtbt = rb_time_projection(rbrow,rbcol,btθ,idx,idx)
 
   kron(btbtbt,basis_block)
 end

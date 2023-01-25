@@ -30,7 +30,7 @@ function online_assembler(
   args...)
 
   coeff = compute_coefficient(op)
-  RBOnlineStructure(op,basis,coeff)
+  RBParamOnlineStructure(op,basis,coeff)
 end
 
 function online_assembler(
@@ -41,7 +41,7 @@ function online_assembler(
 
   basis = get_basis_space(mdeim)
   coeff = compute_coefficient(op,mdeim,μ,args...)
-  RBOnlineStructure(op,basis,coeff)
+  RBParamOnlineStructure(op,basis,coeff)
 end
 
 function coeff_by_time_bases(op::RBUnsteadyVariable,coeff)
@@ -102,21 +102,30 @@ function coeff_by_time_bases_bilin(
   btbtc,btbtc_shift
 end =#
 
-function steady_poisson_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
-  lhs = eval_on_structure(rbos,:A)
-  rhs = eval_on_structure(rbos,(:F,:H,:A_lift))
+function steady_poisson_rb_system(
+  rbpos::NTuple{N,RBParamOnlineStructure},
+  μ::Param) where N
+
+  lhs = eval_on_structure(rbpos,:A,μ)
+  rhs = eval_on_structure(rbpos,(:F,:H,:A_lift),μ)
   lhs,sum(rhs)
 end
 
-function unsteady_poisson_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
-  lhs = eval_on_structure(rbos,(:A,:M))
-  rhs = eval_on_structure(rbos,(:F,:H,:A_lift,:M_lift))
+function unsteady_poisson_rb_system(
+  rbpos::NTuple{N,RBParamOnlineStructure},
+  μ::Param) where N
+
+  lhs = eval_on_structure(rbpos,(:A,:M),μ)
+  rhs = eval_on_structure(rbpos,(:F,:H,:A_lift,:M_lift),μ)
   sum(lhs),sum(rhs)
 end
 
-function steady_stokes_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
-  lhs = eval_on_structure(rbos,(:A,:B))
-  rhs = eval_on_structure(rbos,(:F,:H,:A_lift,:B_lift))
+function steady_stokes_rb_system(
+  rbpos::NTuple{N,RBParamOnlineStructure},
+  μ::Param) where N
+
+  lhs = eval_on_structure(rbpos,(:A,:B),μ)
+  rhs = eval_on_structure(rbpos,(:F,:H,:A_lift,:B_lift),μ)
 
   np = size(lhs[2],1)
   rb_lhs = vcat(hcat(lhs[1],-lhs[2]'),hcat(lhs[2],zeros(np,np)))
@@ -124,9 +133,12 @@ function steady_stokes_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
   rb_lhs,rb_rhs
 end
 
-function unsteady_stokes_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
-  lhs = eval_on_structure(rbos,(:A,:B,:BT,:M))
-  rhs = eval_on_structure(rbos,(:F,:H,:A_lift,:B_lift,:M_lift))
+function unsteady_stokes_rb_system(
+  rbpos::NTuple{N,RBParamOnlineStructure},
+  μ::Param) where N
+
+  lhs = eval_on_structure(rbpos,(:A,:B,:BT,:M),μ)
+  rhs = eval_on_structure(rbpos,(:F,:H,:A_lift,:B_lift,:M_lift),μ)
 
   np = size(lhs[2],1)
   rb_lhs = vcat(hcat(lhs[1]+lhs[4],-lhs[3]),hcat(lhs[2],zeros(np,np)))
@@ -134,12 +146,15 @@ function unsteady_stokes_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
   rb_lhs,rb_rhs
 end
 
-function steady_navier_stokes_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
-  lin_rb_lhs,lin_rb_rhs = steady_stokes_rb_system(rbos)
-  nonlin_lhs = eval_on_structure(rbos,(:C,:D))
-  nonlin_rhs = eval_on_structure(rbos,:C_lift)
+function steady_navier_stokes_rb_system(
+  rbpos::NTuple{N,RBParamOnlineStructure},
+  μ::Param) where N
 
-  opA,opB = get_op(rbos,(:A,:B))
+  lin_rb_lhs,lin_rb_rhs = steady_stokes_rb_system(rbpos,μ)
+  nonlin_lhs(u) = eval_on_structure(rbpos,(:C,:D),u)
+  nonlin_rhs(u) = eval_on_structure(rbpos,:C_lift,u)
+
+  opA,opB = get_op(rbpos,(:A,:B))
   rbu,rbp = get_rbspace_row(opA),get_rbspace_row(opB)
   nu,np = get_ns(rbu),get_ns(rbp)
 
@@ -148,22 +163,25 @@ function steady_navier_stokes_rb_system(rbos::NTuple{N,RBOnlineStructure}) where
                            hcat(block21,block22))
   nonlin_rb_lhs2(u) = vcat(hcat(nonlin_lhs[1](u)+nonlin_lhs[2](u),block12),
                            hcat(block21,block22))
-  nonlin_rb_rhs(u) = vcat(nonlin_rhs(u),zeros(np,1))
+  nonlin_rb_rhs(ud) = vcat(nonlin_rhs(ud),zeros(np,1))
 
   jac_rb(u) = lin_rb_lhs + nonlin_rb_lhs2(u)
   lhs_rb(u) = lin_rb_lhs + nonlin_rb_lhs1(u)
-  rhs_rb(u) = lin_rb_rhs + nonlin_rb_rhs(u)
+  rhs_rb(ud) = lin_rb_rhs + nonlin_rb_rhs(ud)
   res_rb(u,ud,x_rb) = lhs_rb(u)*x_rb - rhs_rb(ud)
 
   res_rb,jac_rb
 end
 
-function unsteady_navier_stokes_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
-  lin_rb_lhs,lin_rb_rhs = unsteady_stokes_rb_system(rbos)
-  nonlin_lhs = eval_on_structure(rbos,(:C,:D))
-  nonlin_rhs = eval_on_structure(rbos,:C_lift)
+function unsteady_navier_stokes_rb_system(
+  rbpos::NTuple{N,RBParamOnlineStructure},
+  μ::Param) where N
 
-  opA,opB = get_op(rbos,(:A,:B))
+  lin_rb_lhs,lin_rb_rhs = unsteady_stokes_rb_system(rbpos,μ)
+  nonlin_lhs(u) = eval_on_structure(rbpos,(:C,:D),u)
+  nonlin_rhs(u) = eval_on_structure(rbpos,:C_lift,u)
+
+  opA,opB = get_op(rbpos,(:A,:B))
   rbu,rbp = get_rbspace_row(opA),get_rbspace_row(opB)
   nu,np = get_ns(rbu)*get_nt(rbu),get_ns(rbp)*get_nt(rbp)
 
@@ -172,12 +190,12 @@ function unsteady_navier_stokes_rb_system(rbos::NTuple{N,RBOnlineStructure}) whe
                            hcat(block21,block22))
   nonlin_rb_lhs2(u) = vcat(hcat(nonlin_lhs[1](u)+nonlin_lhs[2](u),block12),
                            hcat(block21,block22))
-  nonlin_rb_rhs(u) = vcat(nonlin_rhs(u),zeros(np,1))
+  nonlin_rb_rhs(u,xd_rb) = vcat(nonlin_rhs(u)*xd_rb,zeros(np,1))
 
   jac_rb(u) = lin_rb_lhs + nonlin_rb_lhs2(u)
   lhs_rb(u) = lin_rb_lhs + nonlin_rb_lhs1(u)
-  rhs_rb(ud) = lin_rb_rhs + nonlin_rb_rhs(ud)
-  res_rb(u,ud,x_rb) = lhs_rb(u)*x_rb - rhs_rb(ud)
+  rhs_rb(u,xd_rb) = lin_rb_rhs + nonlin_rb_rhs(u,xd_rb)
+  res_rb(u,x_rb,xd_rb) = lhs_rb(u)*x_rb - rhs_rb(ud,xd_rb)
 
   res_rb,jac_rb
 end
@@ -224,6 +242,7 @@ function solve_rb_system(
   x0::Matrix{Float},
   fespaces::Tuple{Function,FESpace},
   rbspace::NTuple{2,<:RBSpace},
+  rbspaceθ::NTuple{2,<:RBSpace},
   timesθ::Vector{<:Real},
   θ::Real,
   tol=1e-10,maxit=10)
@@ -273,8 +292,8 @@ function initial_guess(
 
   bsu,bsp = get_basis_space(rbspace)
   kmin = nearest_solution(μ,μk)
-  x0 = vcat(bsu'*uh[kmin],bsp'*ph[kmin])
-  Matrix(x0)
+  x0 = vcat(bsu'*get_snap(uh[kmin])[:],bsp'*get_snap(ph[kmin])[:])
+  x0
 end
 
 function initial_guess(
@@ -286,8 +305,8 @@ function initial_guess(
 
   bstu,bstp = get_basis_spacetime(rbspace)
   kmin = nearest_solution(μ,μk)
-  x0 = vcat(bstu'*uh[kmin][:],bstp'*ph[kmin][:])
-  Matrix(x0)
+  x0 = vcat(bstu'*get_snap(uh[kmin])[:],bstp'*get_snap(ph[kmin])[:])
+  x0
 end
 
 function nearest_solution(μ::Vector{Param},μk::Param)
