@@ -37,7 +37,7 @@ function poisson_unsteady()
 
   solver = ThetaMethod(LUSolver(),dt,θ)
   nsnap = 100
-  uh,μ, = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
+  uh,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
 
   opA = NonaffineParamOperator(a,afe,PS,time_info,U,V;id=:A)
   opM = AffineParamOperator(m,mfe,PS,time_info,U,V;id=:M)
@@ -74,8 +74,9 @@ function offline_phase(
   Frb = RBOfflineStructure(info,tt,rbopF,μ,meas,:dΩ)
   Hrb = RBOfflineStructure(info,tt,rbopH,μ,meas,:dΓn)
 
-  rb_structures = Arb,Mrb,Frb,Hrb
-  rbspace,rb_structures
+  rb_off_structures = Arb,Mrb,Frb,Hrb
+  rb_on_structures = RBParamOnlineStructure(rb_off_structures,info.st_mdeim)
+  rbspace,rb_on_structures
 end
 
 function online_phase(

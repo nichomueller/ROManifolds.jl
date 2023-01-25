@@ -302,8 +302,8 @@ function Gridap.FESpaces.assemble_vector(op::ParamSteadyLiftOperator)
   afe = get_fe_function(op)
   trial_no_bc = get_trial_no_bc(op)
   test_no_bc = get_test_no_bc(op)
-  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
-  fdofs_test,_ = fdofs
+  fdofs_test = get_fdofs_on_full_trian(get_tests(op))
+  ddofs = get_ddofs_on_full_trian(get_trials(op))
 
   A_no_bc(μ) = assemble_matrix(afe(μ),trial_no_bc,test_no_bc)
   dir = get_dirichlet_function(op)
@@ -317,8 +317,8 @@ function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLiftOperator)
   afe = get_fe_function(op)
   trial_no_bc = get_trial_no_bc(op)
   test_no_bc = get_test_no_bc(op)
-  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
-  fdofs_test,_ = fdofs
+  fdofs_test = get_fdofs_on_full_trian(get_tests(op))
+  ddofs = get_ddofs_on_full_trian(get_trials(op))
 
   A_no_bc(μ,tθ) = assemble_matrix(afe(μ,tθ),trial_no_bc,test_no_bc)
   dir = get_dirichlet_function(op)
@@ -332,8 +332,8 @@ function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLiftOperator,t::Real)
   afe = get_fe_function(op)
   trial_no_bc = get_trial_no_bc(op)
   test_no_bc = get_test_no_bc(op)
-  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
-  fdofs_test,_ = fdofs
+  fdofs_test = get_fdofs_on_full_trian(get_tests(op))
+  ddofs = get_ddofs_on_full_trian(get_trials(op))
 
   A_no_bc(μ) = assemble_matrix(afe(μ,t),trial_no_bc,test_no_bc)
   dir = get_dirichlet_function(op)
@@ -459,8 +459,8 @@ function assemble_functional_vector(op::ParamUnsteadyLiftOperator)
   afe = get_fe_function(op)
   trial_no_bc = get_trial_no_bc(op)
   test_no_bc = get_test_no_bc(op)
-  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
-  fdofs_test,_ = fdofs
+  fdofs_test = get_fdofs_on_full_trian(get_tests(op))
+  ddofs = get_ddofs_on_full_trian(get_trials(op))
 
   A_no_bc(fun) = assemble_matrix((u,v)->afe(fun,u,v),trial_no_bc,test_no_bc)
   dir = get_dirichlet_function(op)

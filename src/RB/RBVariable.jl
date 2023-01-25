@@ -93,6 +93,7 @@ end
 
 const RBSteadyVariable{Top,Ttr} =
   Union{RBSteadyLinVariable{Top},RBSteadyBilinVariable{Top,Ttr},RBSteadyLiftVariable{Top,Ttr}}
+
 const RBUnsteadyVariable{Top,Ttr} =
   Union{RBUnsteadyLinVariable{Top},RBUnsteadyBilinVariable{Top,Ttr},RBUnsteadyLiftVariable{Top,Ttr}}
 
@@ -118,10 +119,14 @@ get_basis_time_row(rbop::RBVariable) = get_basis_time(get_rbspace_row(rbop))
 get_basis_time_col(rbop::RBVariable) = get_basis_time(get_rbspace_col(rbop))
 get_Nt(op::RBVariable) = get_Nt(op.rbspace_row)
 
-get_nrows(op::RBVariable) = get_ns(get_rbspace_row(op))
-get_nrows(op::RBUnsteadyLinVariable) = get_ns(get_rbspace_row(op))*get_nt(get_rbspace_row(op))
-get_nrows(op::RBUnsteadyBilinVariable) = get_ns(get_rbspace_row(op))*get_nt(get_rbspace_row(op))
-get_nrows(op::RBUnsteadyLiftVariable) = get_ns(get_rbspace_row(op))*get_nt(get_rbspace_row(op))
+get_nrows(op::RBSteadyVariable) = get_ns(get_rbspace_row(op))
+get_nrows(op::RBUnsteadyVariable) = get_ns(get_rbspace_row(op))*get_nt(get_rbspace_row(op))
+
+issteady(::RBSteadyVariable) = true
+issteady(::RBUnsteadyVariable) = false
+
+islinear(::RBVariable) = true
+islinear(::RBBilinVariable) = false
 
 function Gridap.FESpaces.get_cell_dof_ids(
   rbop::RBVariable,

@@ -26,7 +26,7 @@ function RBOfflineStructure(
   op::RBVariable{Nonaffine,Ttr},
   off_structure::MDEIM) where Ttr
 
-  RBNonaffineStructure{Top,Ttr}(op,off_structure)
+  RBNonaffineStructure{Ttr}(op,off_structure)
 end
 
 function RBOfflineStructure(
@@ -195,7 +195,7 @@ end
 function load(
   info::RBInfo,
   op::RBLinVariable{Affine},
-  args...)
+  ::Measure)
 
   id = get_id(op)
   println("Loading projected affine variable $id")
@@ -253,7 +253,7 @@ end
 function load(
   info::RBInfo,
   op::RBBilinVariable{Affine,<:TrialFESpace},
-  args...)
+  ::Measure)
 
   id = get_id(op)
   println("Loading projected affine variable $id")
@@ -263,39 +263,73 @@ function load(
   RBOfflineStructure(op,os)
 end
 
-function load(
-  info::RBInfo,
-  op::RBBilinVariable{Nonlinear,<:TrialFESpace},
+function eval_off_structure(
+  rbs::RBOfflineStructure,
   args...)
 
-  id = get_id(op)
-  println("Loading projected nonlinear variable $id")
-  path_id = joinpath(info.offline_path,"$id")
-
-  os = load(joinpath(path_id,"basis_space"))
-  RBOfflineStructure(op,os)
+  op = get_op(rbs)
+  eval_off_structure(Val(issteady(op)),rbs,args...)
 end
 
-function load(
-  info::RBInfo,
-  op::RBBilinVariable{Nonlinear,Ttr},
-  args...) where Ttr
+function eval_off_structure(
+  ::Val{true},
+  rbs::RBAffineStructure)
 
-  id = get_id(op)
-  println("Loading projected nonlinear variable $id and its lifting")
-  path_id = joinpath(info.offline_path,"$id")
-  path_id_lift = joinpath(info.offline_path,"$(id)_lift")
-
-  os = load(joinpath(path_id,"basis_space"))
-  os_lift = load(joinpath(path_id_lift,"basis_space"))
-  RBOfflineStructure(op,os),RBOfflineStructure(op_lift,os_lift)
-end
-
-function eval_off_structure(rbs::RBOfflineStructure,args...)
   get_offline_structure(rbs)
 end
 
 function eval_off_structure(
+  ::Val{true},
+  rbs::RBNonaffineStructure)
+
+  mdeim = get_offline_structure(rbs)
+  get_basis_space(mdeim)
+end
+
+function eval_off_structure(
+  ::Val{true},
+  rbs::RBNonlinearStructure)
+
+  mdeim = get_offline_structure(rbs)
+  bs = get_basis_space(mdeim)
+  blocks(bs,size(bs,2))
+end
+
+function eval_off_structure(
+  ::Val{false},
+  rbs::RBAffineStructure)
+
+  op = get_op(rbs)
+  ns_row = get_ns(get_rbspace_row(op))
+
+  os = get_offline_structure(rbs)
+  blocks(os,ns_row)
+end
+
+function eval_off_structure(
+  ::Val{false},
+  rbs::RBNonaffineStructure)
+
+  op = get_op(rbs)
+  ns_row = get_ns(get_rbspace_row(op))
+
+  mdeim = get_offline_structure(rbs)
+  os = get_basis_space(mdeim)
+  blocks(os,ns_row)
+end
+
+function eval_off_structure(
+  val::Val{false},
+  rbs::RBNonlinearStructure,
+  rbspaceθ::RBSpaceUnsteady)
+
+  op = get_op(rbs)
+  eval_off_structure(val,Val(islinear(op)),rbs,rbspaceθ)
+end
+
+function eval_off_structure(
+  ::Val{false},
+  ::Val{true},
   rbs::RBNonlinearStructure,
   rbspaceθ::RBSpaceUnsteady)
 
@@ -312,6 +346,8 @@ function eval_off_structure(
 end
 
 function eval_off_structure(
+  ::Val{false},
+  ::Val{false},
   rbs::RBNonlinearStructure,
   rbspaceθ::RBSpaceUnsteady)
 

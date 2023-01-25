@@ -111,48 +111,10 @@ end
 
 function matrix_snapshots(
   ::Val,
-  op::RBSteadyBilinVariable{Nonlinear,<:ParamTrialFESpace},
-  μ::Vector{Param})
-
-  id = get_id(op)
-  bfun,bfun_lift = basis_as_fefun(op)
-  findnz_map = get_findnz_map(op,bfun(1))
-  M,lift = assemble_matrix_and_lifting(op)
-
-  function snapshot(n::Int)
-    println("Nonlinear snapshot number $n, $id")
-    b = bfun(n)
-    v = nonzero_values(M(b),findnz_map)
-    v
-  end
-
-  function snapshot_lift(k::Int,n::Int)
-    println("Nonlinear lift snapshot number $((k-1)*ns+n), $id")
-    b = bfun_lift(μ[k],n)
-    l = lift(b)
-    l
-  end
-
-  ns = size(get_basis_space_col(op),2)
-  nparam = min(length(μ),5)
-  vals = snapshot.(1:ns)
-
-  lifts = Vector{Float}[]
-  for k = 1:nparam
-    for n = 1:ns
-      push!(lifts,snapshot_lift(k,n))
-    end
-  end
-
-  findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
-end
-
-function matrix_snapshots(
-  ::Val,
-  op::RBUnsteadyBilinVariable{Nonlinear,<:ParamTransientTrialFESpace},
+  op::RBUnsteadyBilinVariable{Nonlinear,Ttr},
   μ::Vector{Param},
   rbspace_uθ::RBSpaceUnsteady,
-  rbspace_gθ::RBSpaceUnsteady)
+  rbspace_gθ::RBSpaceUnsteady) where Ttr
 
   id = get_id(op)
   bfun = basis_as_fefun(op,rbspace_uθ)
@@ -176,7 +138,7 @@ function matrix_snapshots(
   vals,Mlifts = first.(vml),last.(vml)
   lifts = [Mlifts[n]*bsgθ[:,k] for n=1:nsuθ for k=1:nsgθ]
 
-  findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
+  findnz_map,Matrix(vals),Matrix(lifts)
 end
 
 function matrix_snapshots(

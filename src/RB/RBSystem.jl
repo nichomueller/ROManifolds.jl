@@ -1,4 +1,4 @@
-function online_assembler(
+#= function online_assembler(
   rb_structure::Tuple,
   μ::Param,
   args...)
@@ -100,7 +100,7 @@ function coeff_by_time_bases_bilin(
   btbtc(u) = time_proj(u,idx,idx)
   btbtc_shift(u) = time_proj(u,idx_forwards,idx_backwards)
   btbtc,btbtc_shift
-end
+end =#
 
 function steady_poisson_rb_system(rbos::NTuple{N,RBOnlineStructure}) where N
   lhs = eval_on_structure(rbos,:A)

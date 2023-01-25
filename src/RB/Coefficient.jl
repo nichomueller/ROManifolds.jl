@@ -1,11 +1,17 @@
-function compute_coefficient(op::RBSteadyVariable{Affine,Ttr},args...) where Ttr
+function compute_coefficient(
+  op::RBSteadyVariable{Affine,Ttr},
+  args...;kwargs...) where Ttr
+
   fun = get_param_function(op)
   coeff(μ) = [first(fun(nothing,μ))]
 
   coeff
 end
 
-function compute_coefficient(op::RBUnsteadyVariable{Affine,Ttr},args...) where Ttr
+function compute_coefficient(
+  op::RBUnsteadyVariable{Affine,Ttr},
+  args...;kwargs...) where Ttr
+
   fun = get_param_function(op)
   timesθ = get_timesθ(op)
   coeff(μ,tθ) = first(fun(nothing,μ,tθ))
@@ -17,7 +23,8 @@ end
 
 function compute_coefficient(
   op::RBSteadyVariable{Nonaffine,Ttr},
-  mdeim::MDEIMSteady) where Ttr
+  mdeim::MDEIMSteady;
+  kwargs...) where Ttr
 
   red_lu = get_red_lu_factors(mdeim)
   idx_space = get_idx_space(mdeim)
@@ -71,8 +78,12 @@ function compute_coefficient(
   coeff_bt
 end
 
-function compute_coefficient(::RBVariable{Nonlinear,Ttr},args...) where Ttr
-  coeff(u1::Vector,u2::Vector) = [u1[i]*u2[j] for i=eachindex(u1) for j=eachindex(u2)]
+function compute_coefficient(
+  ::RBVariable{Nonlinear,Ttr},
+  args...;
+  kwargs...) where Ttr
+
+  coeff(u::Vector) = [Matrix([u[i]]) for i=eachindex(u)]
   coeff
 end
 
@@ -128,8 +139,8 @@ function hyperred_structure(
 
   fun = get_fe_function(op)
   dir(μ) = get_dirichlet_function(op)(μ)
-  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
-  fdofs_test,_ = fdofs
+  fdofs_test = get_fdofs_on_full_trian(get_tests(op))
+  ddofs = get_ddofs_on_full_trian(get_trials(op))
 
   Mlift(μ) = assemble_matrix((u,v)->fun(μ,m,u,v),get_trial_no_bc(op),get_test_no_bc(op))
   lift(μ) = (Mlift(μ)[fdofs_test,ddofs]*dir(μ))[idx_space]
@@ -145,8 +156,8 @@ function hyperred_structure(
 
   fun = get_fe_function(op)
   dir(μ,tθ) = get_dirichlet_function(op)(μ,tθ)
-  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
-  fdofs_test,_ = fdofs
+  fdofs_test = get_fdofs_on_full_trian(get_tests(op))
+  ddofs = get_ddofs_on_full_trian(get_trials(op))
 
   Mlift(μ,tθ) = assemble_matrix((u,v)->fun(μ,tθ,m,u,v),get_trial_no_bc(op),get_test_no_bc(op))
   lift(μ,tθ) = (Mlift(μ,tθ)[fdofs_test,ddofs]*dir(μ,tθ))[idx_space]

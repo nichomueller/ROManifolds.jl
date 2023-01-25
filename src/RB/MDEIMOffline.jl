@@ -107,7 +107,7 @@ function MDEIM(
   μ_mdeim = μ[1:info.mdeim_nsnap]
   findnz_map,snaps... = mdeim_snapshots(info,op,μ_mdeim,rbspace_uθ,rbspace_gθ)
   rbspace = RBSpaceSteady((id,id*:lift),snaps)
-  red_rbspace = rb_space_projection(op,rbspace,findnz_map)
+  red_rbspace = RBSpaceSteady((id,id*:lift),rb_space_projection(op,rbspace,findnz_map))
 
   MDEIM(red_rbspace)
 end
@@ -131,7 +131,7 @@ function save(path::String,mdeim::MDEIMUnsteady)
 end
 
 function save(path::String,mdeim::MDEIMNonlinear)
-  save(joinpath(path,"basis_space"),mdeim.basis_space)
+  save(joinpath(path,"basis_space"),get_basis_space(mdeim))
 end
 
 function load(
@@ -178,8 +178,15 @@ function load(
   MDEIM(rbspace,red_lu_factors,idx,red_measure)
 end
 
-function save(path::String,mdeim::MDEIMNonlinear)
-  save(joinpath(path,"basis_space"),mdeim.basis_space)
+function load(
+  path::String,
+  args...)
+
+  id = Symbol(last(split(path,'/')))
+
+  basis_space = load(joinpath(path,"basis_space"))
+  rbspace = RBSpace(id,basis_space)
+  MDEIM(rbspace)
 end
 
 get_rbspace(mdeim::MDEIM) = mdeim.rbspace

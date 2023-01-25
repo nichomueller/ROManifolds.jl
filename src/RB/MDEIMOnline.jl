@@ -132,8 +132,8 @@ function hyperred_structure(
 
   fun = get_fe_function(op)
   dir = get_dirichlet_function(op)(μ)
-  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
-  fdofs_test,_ = fdofs
+  fdofs_test = get_fdofs_on_full_trian(get_tests(op))
+  ddofs = get_ddofs_on_full_trian(get_trials(op))
 
   Mlift = assemble_matrix((u,v)->fun(μ,m,u,v),get_trial_no_bc(op),get_test_no_bc(op))
   lift = (Mlift[fdofs_test,ddofs]*dir)[idx_space]
@@ -150,8 +150,8 @@ function hyperred_structure(
 
   fun = get_fe_function(op)
   dir(tθ) = get_dirichlet_function(op)(μ,tθ)
-  fdofs,ddofs = get_fd_dofs(get_tests(op),get_trials(op))
-  fdofs_test,_ = fdofs
+  fdofs_test = get_fdofs_on_full_trian(get_tests(op))
+  ddofs = get_ddofs_on_full_trian(get_trials(op))
 
   Mlift(tθ) = assemble_matrix((u,v)->fun(μ,tθ,m,u,v),get_trial_no_bc(op),get_test_no_bc(op))
   lift(tθ) = (Mlift(tθ)[fdofs_test,ddofs]*dir(tθ))[idx_space]

@@ -174,8 +174,7 @@ function LinearAlgebra.kron(
 
   n1 = length(b1)
   n2 = length(b2)
-  b1b2 = [kron(b1[i],b2[j]) for i=1:n1 for j=1:n2]
-  Matrix(reshape(b1b2,:,n1*n2))
+  [kron(b1[i],b2[j]) for i=1:n1 for j=1:n2]
 end
 
 function Base.NTuple(N::Int,T::DataType)

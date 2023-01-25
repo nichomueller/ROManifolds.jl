@@ -45,7 +45,7 @@ function navier_stokes_unsteady()
   nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking())
   solver = ThetaMethod(nls,dt,θ)
   nsnap = 100
-  uh,ph,μ,ghθ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
+  uh,ph,μ,ghθ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF;get_lift=true)
 
   opA = NonaffineParamOperator(a,afe,PS,time_info,U,V;id=:A)
   opB = AffineParamOperator(b,bfe,PS,time_info,U,Q;id=:B)
@@ -57,7 +57,7 @@ function navier_stokes_unsteady()
   opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
 
   varop = (opA,opB,opBT,opC,opD,opM,opF,opH)
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,online_snaps=95:100,mdeim_snap=10,load_offline=false)
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,online_snaps=95:100,mdeim_snap=10,load_offline=true)
   fesol = (uh,ph,ghθ,μ,U,V)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
   rbspace,rb_structures = offline_phase(info,fesol,varop,measures,tt)
@@ -96,6 +96,9 @@ function offline_phase(
   rbopF = RBVariable(opF,rbspace_u)
   rbopH = RBVariable(opH,rbspace_u)
 
+  rbspace = (rbspace_u,rbspace_p)
+  rbspaceθ = (rbspace_uθ,rbspace_gθ)
+
   Arb = RBOfflineStructure(info,tt,rbopA,μ,meas,:dΩ)
   Brb = RBOfflineStructure(info,tt,rbopB,μ,meas,:dΩ)
   BTrb = RBOfflineStructure(info,tt,rbopBT,μ,meas,:dΩ)
@@ -105,9 +108,18 @@ function offline_phase(
   Frb = RBOfflineStructure(info,tt,rbopF,μ,meas,:dΩ)
   Hrb = RBOfflineStructure(info,tt,rbopH,μ,meas,:dΓn)
 
-  rbspace = (rbspace_u,rbspace_p)
-  rb_structures = Arb,Brb,BTrb,Crb,Drb,Mrb,Frb,Hrb
-  rbspace,rb_structures
+  Aon = RBParamOnlineStructure(Arb;st_mdeim=info.st_mdeim);
+  Bon = RBParamOnlineStructure(Brb;st_mdeim=info.st_mdeim);
+  BTon = RBParamOnlineStructure(BTrb;st_mdeim=info.st_mdeim);
+  Con = RBParamOnlineStructure(Crb,rbspaceθ;st_mdeim=info.st_mdeim);
+  Don = RBParamOnlineStructure(Drb,rbspaceθ;st_mdeim=info.st_mdeim);
+  Mon = RBParamOnlineStructure(Mrb;st_mdeim=info.st_mdeim);
+  Fon = RBParamOnlineStructure(Frb;st_mdeim=info.st_mdeim);
+  Hon = RBParamOnlineStructure(Hrb;st_mdeim=info.st_mdeim);
+
+  on_structures = Aon,Bon,BTon,Con,Don,Mon,Fon,Hon
+
+  rbspace,on_structures
 end
 
 function online_phase(
