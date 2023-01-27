@@ -2,6 +2,8 @@ function steady_poisson_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
 
+  println("Steady Poisson problem: evaluating RB system for μ = $μ")
+
   lhs = eval_on_structure(rbpos,:A,μ)
   rhs = eval_on_structure(rbpos,(:F,:H,:A_lift),μ)
   lhs,sum(rhs)
@@ -11,6 +13,8 @@ function unsteady_poisson_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
 
+  println("Unsteady Poisson problem: evaluating RB system for μ = $μ")
+
   lhs = eval_on_structure(rbpos,(:A,:M),μ)
   rhs = eval_on_structure(rbpos,(:F,:H,:A_lift,:M_lift),μ)
   sum(lhs),sum(rhs)
@@ -19,6 +23,8 @@ end
 function steady_stokes_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
+
+  println("Steady Stokes problem: evaluating RB system for μ = $μ")
 
   lhs = eval_on_structure(rbpos,(:A,:B),μ)
   rhs = eval_on_structure(rbpos,(:F,:H,:A_lift,:B_lift),μ)
@@ -33,6 +39,8 @@ function unsteady_stokes_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
 
+  println("Unsteady Stokes problem: evaluating RB system for μ = $μ")
+
   lhs = eval_on_structure(rbpos,(:A,:B,:BT,:M),μ)
   rhs = eval_on_structure(rbpos,(:F,:H,:A_lift,:B_lift,:M_lift),μ)
 
@@ -45,6 +53,8 @@ end
 function steady_navier_stokes_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
+
+  println("Steady Navier-Stokes problem: evaluating RB system for μ = $μ")
 
   lin_rb_lhs,lin_rb_rhs = steady_stokes_rb_system(rbpos,μ)
   nonlin_lhs(u) = eval_on_structure(rbpos,(:C,:D),u)
@@ -73,6 +83,8 @@ function unsteady_navier_stokes_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
 
+  println("Unsteady Navier-Stokes problem: evaluating RB system for μ = $μ")
+
   lin_rb_lhs,lin_rb_rhs = unsteady_stokes_rb_system(rbpos,μ)
   nonlin_lhs(uθ_rb) = eval_on_structure(rbpos,(:C,:D),uθ_rb)
   nonlin_rhs(uθ_rb) = eval_on_structure(rbpos,:C_lift,uθ_rb)
@@ -93,7 +105,7 @@ function unsteady_navier_stokes_rb_system(
     vcat(hcat(Cuθ_rb+Duθ_rb,block12),hcat(block21,block22))
   end
 
-  nonlin_rb_rhs(uθ_rb,uθd_rb) = vcat(nonlin_rhs(uθ_rb)*uθd_rb,zeros(np,1))
+  nonlin_rb_rhs(uθ_rb,uθd_rb) = vcat(-LChat,zeros(np,1))#vcat(nonlin_rhs(uθ_rb)*uθd_rb,zeros(np,1))
 
   jac_rb(uθ_rb) = lin_rb_lhs + nonlin_rb_lhs2(uθ_rb)
   lhs_rb(uθ_rb) = lin_rb_lhs + nonlin_rb_lhs1(uθ_rb)
@@ -114,7 +126,7 @@ function solve_rb_system(
   x0::Matrix{Float},
   fespaces::NTuple{2,FESpace},
   rbspace::NTuple{2,RBSpace};
-  tol=1e-10,maxit=10)
+  tol=1e-10,maxtol=1e10,maxit=10)
 
   println("Solving system via Newton method")
 
@@ -129,6 +141,10 @@ function solve_rb_system(
   err = 1.
   iter = 0
   while norm(err) > tol && iter < maxit
+    if norm(err) > maxtol
+      println("Newton iterations did not converge")
+      return x_rb
+    end
     jx_rb,rx_rb = jac(u(x_rb)),res(u(x_rb),ud(x_rb),x_rb)
     err = jx_rb \ rx_rb
     x_rb -= err
@@ -148,7 +164,7 @@ function solve_rb_system(
   rbspaceθ::NTuple{2,<:RBSpace},
   timesθ::Vector{<:Real},
   θ::Real,
-  tol=1e-10,maxit=10)
+  tol=1e-10,maxtol=1e10,maxit=10)
 
   println("Solving system via Newton method")
 
@@ -168,6 +184,10 @@ function solve_rb_system(
   err = 1.
   iter = 0
   while norm(err) > tol && iter < maxit
+    if norm(err) > maxtol
+      println("Newton iterations did not converge")
+      return x_rb
+    end
     uθ_rb = get_uθ_rb(x_rb)
     jx_rb,rx_rb = jac(uθ_rb),res(uθ_rb,uθd_rb,x_rb)
     err = jx_rb \ rx_rb
@@ -210,12 +230,12 @@ function nearest_solution(μ::Vector{Param},μk::Param)
   argmin(vars)
 end
 
-function reconstruct_fe_sol(rbspace::RBSpaceSteady,rb_sol::Matrix{Float})
+function reconstruct_fe_sol(rbspace::RBSpaceSteady,rb_sol::Array{Float})
   bs = get_basis_space(rbspace)
   bs*rb_sol
 end
 
-function reconstruct_fe_sol(rbspace::RBSpaceUnsteady,rb_sol::Matrix{Float})
+function reconstruct_fe_sol(rbspace::RBSpaceUnsteady,rb_sol::Array{Float})
   bs = get_basis_space(rbspace)
   bt = get_basis_time(rbspace)
   ns = get_ns(rbspace)
@@ -225,7 +245,7 @@ function reconstruct_fe_sol(rbspace::RBSpaceUnsteady,rb_sol::Matrix{Float})
   bs*(bt*rb_sol_resh)'
 end
 
-function reconstruct_fe_sol(rbspace::NTuple{2,RBSpaceSteady},rb_sol::Matrix{Float})
+function reconstruct_fe_sol(rbspace::NTuple{2,RBSpaceSteady},rb_sol::Array{Float})
   bs_u,bs_p = get_basis_space.(rbspace)
 
   ns = get_ns.(rbspace)
@@ -234,7 +254,7 @@ function reconstruct_fe_sol(rbspace::NTuple{2,RBSpaceSteady},rb_sol::Matrix{Floa
   bs_u*rb_sol_u,bs_p*rb_sol_p
 end
 
-function reconstruct_fe_sol(rbspace::NTuple{2,RBSpaceUnsteady},rb_sol::Matrix{Float})
+function reconstruct_fe_sol(rbspace::NTuple{2,RBSpaceUnsteady},rb_sol::Array{Float})
   bs_u,bs_p = get_basis_space.(rbspace)
   bt_u,bt_p = get_basis_time.(rbspace)
 

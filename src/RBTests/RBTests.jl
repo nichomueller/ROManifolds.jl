@@ -105,8 +105,10 @@ function fe_snapshots(
   args...;kwargs...)
 
   if run_fem
+    println("Generating $nsnap full order snapshots")
     generate_fe_snapshots(ptype,solver,op,fepath,nsnap,args...)
   else
+    println("Loading $nsnap full order snapshots")
     load_fe_snapshots(ptype,fepath,nsnap;kwargs...)
   end
 end

@@ -324,11 +324,13 @@ end
 
 function rb_time_projection(
   op::RBBilinVariable;
-  mv=assemble_matrix(op)(realization(op)))
+  mv=assemble_matrix(op)(realization(op)),
+  idx_forwards=1:size(mv,1),
+  idx_backwards=1:size(mv,1))
 
   rbrow = get_rbspace_row(op)
   rbcol = get_rbspace_col(op)
-  rb_time_projection(rbrow,rbcol,mv)
+  rb_time_projection(rbrow,rbcol,mv,idx_forwards,idx_backwards)
 end
 
 function rb_spacetime_projection(
@@ -349,11 +351,14 @@ end
 
 function rb_spacetime_projection(
   op::RBBilinVariable;
-  mv=assemble_matrix(op)(realization(op)))
+  mv=assemble_matrix(op)(realization(op)),
+  idx_forwards=1:size(mv,1),
+  idx_backwards=1:size(mv,1))
 
   proj_space = [rb_space_projection(op;mv=mv[i])[:] for i=eachindex(mv)]
   resh_proj = Matrix(proj_space)'
-  proj_spacetime_block = rb_time_projection(op;mv=resh_proj)
+  proj_spacetime_block = rb_time_projection(op;
+    mv=resh_proj,idx_forwards=idx_forwards,idx_backwards=idx_backwards)
   rbrow = get_rbspace_row(op)
   rbcol = get_rbspace_col(op)
   nsrow,ntrow = get_ns(rbrow),get_nt(rbrow)
@@ -377,15 +382,17 @@ end
 
 function rb_projection(
   op::RBUnsteadyVariable,
-  mv::AbstractArray)
+  mv::AbstractArray;
+  kwargs...)
 
-  rb_spacetime_projection(op;mv=mv)
+  rb_spacetime_projection(op;mv=mv,kwargs...)
 end
 
 function rb_projection(
   op::RBVariable,
-  mv::NTuple{2,AbstractArray})
+  mv::NTuple{2,AbstractArray};
+  kwargs...)
 
   op_lift = RBLiftVariable(op)
-  rb_projection(op,first(mv)),rb_projection(op_lift,last(mv))
+  rb_projection(op,first(mv);kwargs...),rb_projection(op_lift,last(mv))
 end

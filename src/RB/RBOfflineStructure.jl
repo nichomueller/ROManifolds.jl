@@ -181,11 +181,11 @@ end
 
 function load(
   info::RBInfo,
-  op::RBLinVariable,
-  meas::Measure)
+  op::RBLinVariable{Top},
+  meas::Measure) where Top
 
   id = get_id(op)
-  println("Loading MDEIM structures for non-affine variable $id")
+  println("Loading MDEIM structures for $Top variable $id")
   path_id = joinpath(info.offline_path,"$id")
 
   os = load(path_id,op,meas)
@@ -198,7 +198,7 @@ function load(
   ::Measure)
 
   id = get_id(op)
-  println("Loading projected affine variable $id")
+  println("Loading projected Affine variable $id")
   path_id = joinpath(info.offline_path,"$id")
 
   os = load(joinpath(path_id,"basis_space"))
@@ -207,11 +207,11 @@ end
 
 function load(
   info::RBInfo,
-  op::RBBilinVariable,
-  meas::Measure)
+  op::RBBilinVariable{Top,Ttr},
+  meas::Measure) where {Top,Ttr}
 
   id = get_id(op)
-  println("Loading MDEIM structures for non-affine variable $id and its lifting")
+  println("Loading MDEIM structures for $Top variable $id and its lifting")
   path_id = joinpath(info.offline_path,"$id")
   path_id_lift = joinpath(info.offline_path,"$(id)_lift")
 
@@ -227,7 +227,7 @@ function load(
   meas::Measure) where Top
 
   id = get_id(op)
-  println("Loading MDEIM structures for non-affine variable $id")
+  println("Loading MDEIM structures for $Top variable $id")
   path_id = joinpath(info.offline_path,"$id")
 
   os = load(path_id,op,meas)
@@ -240,7 +240,7 @@ function load(
   meas::Measure) where Ttr
 
   id = get_id(op)
-  println("Loading projected affine variable $id and MDEIM structures for its lifting")
+  println("Loading projected Affine variable $id and MDEIM structures for its lifting")
   path_id = joinpath(info.offline_path,"$id")
   path_id_lift = joinpath(info.offline_path,"$(id)_lift")
 
@@ -256,7 +256,7 @@ function load(
   ::Measure)
 
   id = get_id(op)
-  println("Loading projected affine variable $id")
+  println("Loading projected Affine variable $id")
   path_id = joinpath(info.offline_path,"$id")
 
   os = load(joinpath(path_id,"basis_space"))
@@ -274,6 +274,9 @@ end
 
 function eval_off_structure(rbs::RBOfflineStructure,args...)
   op = get_op(rbs)
+  id = get_id(op)
+  println("Evaluating the RB offline quantity for $id")
+
   eval_off_structure(Val(issteady(op)),rbs,args...)
 end
 
