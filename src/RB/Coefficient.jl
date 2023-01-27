@@ -83,7 +83,7 @@ function compute_coefficient(
   args...;
   kwargs...) where Ttr
 
-  coeff(u::Vector) = [Matrix([u[i]]) for i=eachindex(u)]
+  coeff(u::Vector) = u#[Matrix([u[i]]) for i=eachindex(u)]
   coeff
 end
 

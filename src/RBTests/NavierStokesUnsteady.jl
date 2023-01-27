@@ -11,12 +11,12 @@ function navier_stokes_unsteady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes"
-  mesh = "cylinder_h03.json"
+  mesh = "cylinder.json"#"cylinder_h03.json"
   bnd_info = Dict("dirichlet" => ["wall","inlet","inlet_c","inlet_p","outlet_c","outlet_p"],
                   "neumann" => ["outlet"])
   order = 2
 
-  t0,tF,dt,θ = 0.,2,0.05,1
+  t0,tF,dt,θ = 0.,5,0.05,1#0.,2,0.05,1
   time_info = TimeInfo(t0,tF,dt,θ)
 
   ranges = fill([1.,2.],6)
@@ -57,10 +57,10 @@ function navier_stokes_unsteady()
   opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
 
   varop = (opA,opB,opBT,opC,opD,opM,opF,opH)
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,online_snaps=95:100,mdeim_snap=10,load_offline=true)
-  fesol = (uh,ph,ghθ,μ,U,V,time_info)
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-3,nsnap=80,online_snaps=95:100,mdeim_snap=10,load_offline=true)
+  fesol = (uh,ph,ghθ,μ,time_info)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
-  rbspace,rbspaceθ,param_on_structures = offline_phase(info,fesol,varop,measures,tt)
+  rbspace,rbspaceθ,param_on_structures = offline_phase(info,fesol,varop,measures,tt);
   online_phase(info,fesol,rbspace,rbspaceθ,param_on_structures,tt)
 end
 
@@ -99,8 +99,8 @@ function offline_phase(
   Arb = RBOfflineStructure(info,tt,rbopA,μ,meas,:dΩ)
   Brb = RBOfflineStructure(info,tt,rbopB,μ,meas,:dΩ)
   BTrb = RBOfflineStructure(info,tt,rbopBT,μ,meas,:dΩ)
-  Crb = RBOfflineStructure(info,tt,rbopC,μ,meas,:dΩ,rbspace_uθ,rbspace_gθ)
-  Drb = RBOfflineStructure(info,tt,rbopD,μ,meas,:dΩ,rbspace_uθ,rbspace_gθ)
+  Crb = RBOfflineStructure(info,tt,rbopC,μ,meas,:dΩ,rbspaceθ)
+  Drb = RBOfflineStructure(info,tt,rbopD,μ,meas,:dΩ,rbspaceθ)
   Mrb = RBOfflineStructure(info,tt,rbopM,μ,meas,:dΩ)
   Frb = RBOfflineStructure(info,tt,rbopF,μ,meas,:dΩ)
   Hrb = RBOfflineStructure(info,tt,rbopH,μ,meas,:dΓn)
@@ -136,18 +136,18 @@ function online_phase(
   param_on_structures::Tuple,
   tt::TimeTracker)
 
-  uh,ph,μ,U,V,time_info = fesol
+  uh,ph,ghθ,μ,time_info = fesol
   timesθ = get_timesθ(time_info)
   θ = get_θ(time_info)
   μ_offline = μ[1:info.nsnap]
 
-  rb_solver(res,jac,x0,μ) = solve_rb_system(res,jac,x0,(tθ->U(μ,tθ),V),rbspace,rbspaceθ,timesθ,θ)
+  rb_solver(res,jac,x0,ud) = solve_rb_system(res,jac,x0,ud,rbspace,rbspaceθ,timesθ,θ)
 
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
       res,jac = unsteady_navier_stokes_rb_system(expand(param_on_structures),μ[k])
       x0 = initial_guess(rbspace,uh,ph,μ_offline,μ[k])
-      rb_sol = rb_solver(res,jac,x0,μ[k])
+      rb_sol = rb_solver(res,jac,x0,get_snap(ghθ[k])[:])
     end
     uhk,phk = get_snap(uh[k]),get_snap(ph[k])
     uhk_rb,phk_rb = reconstruct_fe_sol(rbspace,rb_sol)

@@ -264,12 +264,12 @@ function load(
 end
 
 function eval_off_structure(rbs::Tuple)
-  eval_off_structure.(expand(rbs))
+  eval_off_structure.(rbs)
 end
 
 function eval_off_structure(rbs::Tuple,bsθ::Tuple)
   @assert length(rbs) == length(bsθ) "Wrong length"
-  eval_off_structure.(expand(rbs),expand(bsθ))
+  eval_off_structure.(rbs,bsθ)
 end
 
 function eval_off_structure(rbs::RBOfflineStructure,args...)
@@ -348,7 +348,9 @@ function eval_off_structure(
   op = get_op(rbs)
   mdeim = get_offline_structure(rbs)
   bs = get_basis_space(mdeim)
-  basis_block = blocks(bs,size(bs,2))
+  ns = size(bs,2)
+  basis_block = blocks(bs,ns)
+  basis_blockT = Matrix.([bb' for bb = basis_block])
 
   Nt = get_Nt(op)
   idx = 1:Nt
@@ -358,9 +360,10 @@ function eval_off_structure(
   rbcol = get_rbspace_col(op)
   btbtbt = rb_time_projection(rbrow,rbcol,btθ,idx,idx)
   btbtbt_shift = rb_time_projection(rbrow,rbcol,btθ,idx_forwards,idx_backwards)
+  nt = length(btbtbt)
 
-  bst = kron(btbtbt,basis_block)
-  bst_shift = kron(btbtbt_shift,basis_block)
+  bst = [kron(basis_blockT[space_idx(k,ns)],btbtbt[time_idx(k,ns)]) for k=1:ns*nt]
+  bst_shift = [kron(basis_blockT[space_idx(k,ns)],btbtbt_shift[time_idx(k,ns)]) for k=1:ns*nt]
 
   bst,bst_shift
 end

@@ -337,7 +337,7 @@ function rb_spacetime_projection(
 
   proj_space = [rb_space_projection(op;mv=mv[:,i]) for i=axes(mv,2)]
   resh_proj = Matrix(proj_space)'
-  proj_spacetime_block =rb_time_projection(op;mv=resh_proj)
+  proj_spacetime_block = rb_time_projection(op;mv=resh_proj)
   rbrow = get_rbspace_row(op)
   ns,nt = get_ns(rbrow),get_nt(rbrow)
   proj_spacetime = zeros(ns*nt,1)
@@ -353,13 +353,16 @@ function rb_spacetime_projection(
 
   proj_space = [rb_space_projection(op;mv=mv[i])[:] for i=eachindex(mv)]
   resh_proj = Matrix(proj_space)'
-  proj_spacetime_block =rb_time_projection(op;mv=resh_proj)
+  proj_spacetime_block = rb_time_projection(op;mv=resh_proj)
   rbrow = get_rbspace_row(op)
-  ns,nt = get_ns(rbrow),get_nt(rbrow)
-  proj_spacetime = zeros(ns*nt,ns*nt)
-  for i = 1:ns
-    for j = 1:ns
-      proj_spacetime[1+(i-1)*nt:i*nt,1+(j-1)*nt:j*nt] = proj_spacetime_block[(i-1)*ns+j]
+  rbcol = get_rbspace_col(op)
+  nsrow,ntrow = get_ns(rbrow),get_nt(rbrow)
+  nscol,ntcol = get_ns(rbcol),get_nt(rbcol)
+  proj_spacetime = zeros(nsrow*ntrow,nscol*ntcol)
+  for i = 1:nsrow
+    for j = 1:nscol
+      proj_spacetime[1+(i-1)*ntrow:i*ntrow,1+(j-1)*ntcol:j*ntcol] =
+        proj_spacetime_block[(i-1)*nscol+j]
     end
   end
   proj_spacetime

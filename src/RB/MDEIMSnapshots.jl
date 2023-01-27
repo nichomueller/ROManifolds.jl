@@ -113,8 +113,9 @@ function matrix_snapshots(
   ::Val,
   op::RBUnsteadyBilinVariable{Nonlinear,Ttr},
   μ::Vector{Param},
-  rbspace_uθ::RBSpaceUnsteady,
-  rbspace_gθ::RBSpaceUnsteady) where Ttr
+  rbspaceθ::NTuple{2,RBSpaceUnsteady}) where Ttr
+
+  rbspace_uθ,rbspace_gθ = rbspaceθ
 
   id = get_id(op)
   bfun = basis_as_fefun(op,rbspace_uθ)

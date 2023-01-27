@@ -43,6 +43,15 @@ function spacetime_idx(
   (time_idx .- 1)*Ns .+ space_idx
 end
 
+function space_idx(kst::Int,ns::Int)
+  ks = mod(kst,ns)
+  ks == 0 ? ns : ks
+end
+
+function time_idx(kst::Int,ns::Int)
+  Int(floor((kst-1)/ns)+1)
+end
+
 function nonzero_values(mat::AbstractMatrix,findnz_map::Vector{Int})
   Vector(mat[:][findnz_map])
 end

@@ -57,6 +57,16 @@ end
 
 function rb_online_product(
   basis::BlockMatrix{Float},
+  coeff::Vector{Float};
+  nr=size(basis,1))
+
+  @assert length(basis) == length(coeff) "Something is wrong"
+  bc = sum([basis[k]*coeff[k] for k=eachindex(coeff)])
+  Matrix(reshape(bc,nr,:))
+end
+
+function rb_online_product(
+  basis::BlockMatrix{Float},
   coeff::BlockMatrix{Float};
   nr=size(first(basis),1)*size(first(coeff),1))
 

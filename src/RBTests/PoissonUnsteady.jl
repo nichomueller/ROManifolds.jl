@@ -16,10 +16,10 @@ function poisson_unsteady()
                   "neumann" => ["circle","triangle","square"])
   order = 1
 
-  t0,tF,dt,θ = 0.,2.5,0.05,0.5
+  t0,tF,dt,θ = 0.,5,0.05,0.5
   time_info = TimeInfo(t0,tF,dt,θ)
 
-  ranges = fill([1.,3.],6)
+  ranges = fill([1.,10.],6)
   sampling = UniformSampling()
   PS = ParamSpace(ranges,sampling)
 
@@ -44,11 +44,10 @@ function poisson_unsteady()
   opF = AffineParamOperator(f,ffe,PS,time_info,V;id=:F)
   opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
 
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=true,
-    st_mdeim=true,fun_mdeim=true)
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=true)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
-  rbspace,rb_structures = offline_phase(info,(uh,μ),(opA,opM,opF,opH),measures,tt)
-  online_phase(info,(uh,μ),rbspace,rb_structures,tt)
+  rbspace,param_on_structures = offline_phase(info,(uh,μ),(opA,opM,opF,opH),measures,tt)
+  online_phase(info,(uh,μ),rbspace,param_on_structures,tt)
 end
 
 function offline_phase(
@@ -74,25 +73,32 @@ function offline_phase(
   Frb = RBOfflineStructure(info,tt,rbopF,μ,meas,:dΩ)
   Hrb = RBOfflineStructure(info,tt,rbopH,μ,meas,:dΓn)
 
-  rb_off_structures = Arb,Mrb,Frb,Hrb
-  rb_on_structures = RBParamOnlineStructure(rb_off_structures,info.st_mdeim)
-  rbspace,rb_on_structures
+  Arb_eval = eval_off_structure(Arb)
+  Mrb_eval = eval_off_structure(Mrb)
+  Frb_eval = eval_off_structure(Frb)
+  Hrb_eval = eval_off_structure(Hrb)
+
+  Aon_param = RBParamOnlineStructure(Arb,Arb_eval;st_mdeim=info.st_mdeim)
+  Mon_param = RBParamOnlineStructure(Mrb,Mrb_eval;st_mdeim=info.st_mdeim)
+  Fon_param = RBParamOnlineStructure(Frb,Frb_eval;st_mdeim=info.st_mdeim)
+  Hon_param = RBParamOnlineStructure(Hrb,Hrb_eval;st_mdeim=info.st_mdeim)
+
+  param_on_structures = Aon_param,Mon_param,Fon_param,Hon_param
+  rbspace,param_on_structures
 end
 
 function online_phase(
   info::RBInfo,
   fesol,
   rbspace::RBSpace,
-  rb_structures::Tuple,
+  param_on_structures::Tuple,
   tt::TimeTracker)
 
   uh,μ = fesol
-  st_mdeim = info.st_mdeim
 
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
-      online_structures = online_assembler(rb_structures,μ[k],st_mdeim)
-      lhs,rhs = steady_poisson_rb_system(online_structures)
+      lhs,rhs = steady_poisson_rb_system(expand(param_on_structures),μ[k])
       rb_sol = solve_rb_system(lhs,rhs)
     end
     uhk = get_snap(uh[k])

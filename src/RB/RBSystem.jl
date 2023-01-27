@@ -1,107 +1,3 @@
-#= function online_assembler(
-  rb_structure::Tuple,
-  μ::Param,
-  args...)
-
-  ntup_rb_structure = expand(rb_structure)
-  online_assembler(ntup_rb_structure,μ,args...)
-end
-
-function online_assembler(
-  rb_structure::NTuple{N,RBOfflineStructure},
-  μ::Param,
-  args...) where N
-
-  Broadcasting(rb->online_assembler(rb,μ,args...))(rb_structure)
-end
-
-function online_assembler(
-  rb_structure::RBOfflineStructure,
-  args...)
-
-  op = get_op(rb_structure)
-  os = get_offline_structure(rb_structure)
-  online_assembler(op,os,args...)
-end
-
-function online_assembler(
-  op::RBVariable,
-  basis::Matrix{Float},
-  args...)
-
-  coeff = compute_coefficient(op)
-  RBParamOnlineStructure(op,basis,coeff)
-end
-
-function online_assembler(
-  op::RBVariable,
-  mdeim::MDEIM,
-  μ::Param,
-  args...)
-
-  basis = get_basis_space(mdeim)
-  coeff = compute_coefficient(op,mdeim,μ,args...)
-  RBParamOnlineStructure(op,basis,coeff)
-end
-
-function coeff_by_time_bases(op::RBUnsteadyVariable,coeff)
-  coeff_by_time_bases_lin(op,coeff)
-end
-
-function coeff_by_time_bases(op::RBUnsteadyBilinVariable,coeff)
-  coeff_by_time_bases_bilin(op,coeff)
-end
-
-function coeff_by_time_bases_lin(
-  op::RBVariable,
-  coeff::AbstractMatrix)
-
-  rbrow = get_rbspace_row(op)
-  rb_time_projection(rbrow,coeff)
-end
-
-function coeff_by_time_bases_lin(
-  op::RBVariable{Nonlinear,<:ParamTransientTrialFESpace},
-  coeff::Function)
-
-  rbrow = get_rbspace_row(op)
-  u->rb_time_projection(rbrow,coeff(u))
-end
-
-function coeff_by_time_bases_bilin(
-  op::RBVariable,
-  coeff::AbstractMatrix)
-
-  rbrow = get_rbspace_row(op)
-  rbcol = get_rbspace_col(op)
-  time_proj(idx1,idx2) = rb_time_projection(rbrow,rbcol,coeff,idx1,idx2)
-
-  Nt = get_Nt(op)
-  idx = 1:Nt
-  idx_backwards,idx_forwards = 1:Nt-1,2:Nt
-
-  btbtc = time_proj(idx,idx)
-  btbtc_shift = time_proj(idx_forwards,idx_backwards)
-  btbtc,btbtc_shift
-end
-
-function coeff_by_time_bases_bilin(
-  op::RBVariable{Nonlinear,<:ParamTransientTrialFESpace},
-  coeff::Function)
-
-  rbrow = get_rbspace_row(op)
-  rbcol = get_rbspace_col(op)
-  time_proj(u,idx1,idx2) = rb_time_projection(rbrow,rbcol,coeff(u),idx1,idx2)
-
-  Nt = get_Nt(op)
-  idx = 1:Nt
-  idx_backwards,idx_forwards = 1:Nt-1,2:Nt
-
-  btbtc(u) = time_proj(u,idx,idx)
-  btbtc_shift(u) = time_proj(u,idx_forwards,idx_backwards)
-  btbtc,btbtc_shift
-end =#
-
 function steady_poisson_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
@@ -178,24 +74,31 @@ function unsteady_navier_stokes_rb_system(
   μ::Param) where N
 
   lin_rb_lhs,lin_rb_rhs = unsteady_stokes_rb_system(rbpos,μ)
-  nonlin_lhs(u) = eval_on_structure(rbpos,(:C,:D),u)
-  nonlin_rhs(u) = eval_on_structure(rbpos,:C_lift,u)
+  nonlin_lhs(uθ_rb) = eval_on_structure(rbpos,(:C,:D),uθ_rb)
+  nonlin_rhs(uθ_rb) = eval_on_structure(rbpos,:C_lift,uθ_rb)
 
   opA,opB = get_op(rbpos,(:A,:B))
   rbu,rbp = get_rbspace_row(opA),get_rbspace_row(opB)
   nu,np = get_ns(rbu)*get_nt(rbu),get_ns(rbp)*get_nt(rbp)
 
   block12,block21,block22 = zeros(nu,np),zeros(np,nu),zeros(np,np)
-  nonlin_rb_lhs1(u) = vcat(hcat(nonlin_lhs[1](u),block12),
-                           hcat(block21,block22))
-  nonlin_rb_lhs2(u) = vcat(hcat(nonlin_lhs[1](u)+nonlin_lhs[2](u),block12),
-                           hcat(block21,block22))
-  nonlin_rb_rhs(u,xd_rb) = vcat(nonlin_rhs(u)*xd_rb,zeros(np,1))
 
-  jac_rb(u) = lin_rb_lhs + nonlin_rb_lhs2(u)
-  lhs_rb(u) = lin_rb_lhs + nonlin_rb_lhs1(u)
-  rhs_rb(u,xd_rb) = lin_rb_rhs + nonlin_rb_rhs(u,xd_rb)
-  res_rb(u,x_rb,xd_rb) = lhs_rb(u)*x_rb - rhs_rb(ud,xd_rb)
+  function nonlin_rb_lhs1(uθ_rb)
+    Cuθ_rb,_ = nonlin_lhs(uθ_rb)
+    vcat(hcat(Cuθ_rb,block12),hcat(block21,block22))
+  end
+
+  function nonlin_rb_lhs2(uθ_rb)
+    Cuθ_rb,Duθ_rb = nonlin_lhs(uθ_rb)
+    vcat(hcat(Cuθ_rb+Duθ_rb,block12),hcat(block21,block22))
+  end
+
+  nonlin_rb_rhs(uθ_rb,uθd_rb) = vcat(nonlin_rhs(uθ_rb)*uθd_rb,zeros(np,1))
+
+  jac_rb(uθ_rb) = lin_rb_lhs + nonlin_rb_lhs2(uθ_rb)
+  lhs_rb(uθ_rb) = lin_rb_lhs + nonlin_rb_lhs1(uθ_rb)
+  rhs_rb(uθ_rb,uθd_rb) = lin_rb_rhs + nonlin_rb_rhs(uθ_rb,uθd_rb)
+  res_rb(uθ_rb,uθd_rb,x_rb) = lhs_rb(uθ_rb)*x_rb - rhs_rb(uθ_rb,uθd_rb)
 
   res_rb,jac_rb
 end
@@ -239,8 +142,8 @@ end
 function solve_rb_system(
   res::Function,
   jac::Function,
-  x0::Matrix{Float},
-  fespaces::Tuple{Function,FESpace},
+  x0::Vector{Float},
+  ud::Vector{Float},
   rbspace::NTuple{2,<:RBSpace},
   rbspaceθ::NTuple{2,<:RBSpace},
   timesθ::Vector{<:Real},
@@ -249,31 +152,24 @@ function solve_rb_system(
 
   println("Solving system via Newton method")
 
-  Uk,Vk = fespaces
   bstu = get_basis_spacetime(rbspace[1])
   nstu = size(bstu,2)
   x_rb = x0
+  bstuθ = get_basis_spacetime(rbspaceθ[1])
+  bstuθd = get_basis_spacetime(rbspaceθ[2])
+  uθd_rb = bstuθd'*ud
 
-  function uθfe(x_rb::AbstractArray)
+  function get_uθ_rb(x_rb::AbstractArray)
     ufe = reshape(bstu*x_rb[1:nstu],:,length(timesθ))
-    compute_in_timesθ(ufe,θ)
-  end
-
-  function ufun(uθfe::AbstractArray)
-    n(tθ) = findall(x -> x == tθ,timesθ)[1]
-    tθ -> FEFunction(Vk,uθfe[:,n(tθ)])
-  end
-
-  function udfun(uθfe::AbstractArray)
-    n(tθ) = findall(x -> x == tθ,timesθ)[1]
-    tθ -> FEFunction(Uk(tθ),uθfe[:,n(tθ)])
+    uθfe = compute_in_timesθ(ufe,θ)
+    bstuθ'*uθfe[:]
   end
 
   err = 1.
   iter = 0
   while norm(err) > tol && iter < maxit
-    uθh = uθfe(x_rb)
-    jx_rb,rx_rb = jac(ufun(uθh)),res(ufun(uθh),udfun(uθh),x_rb)
+    uθ_rb = get_uθ_rb(x_rb)
+    jx_rb,rx_rb = jac(uθ_rb),res(uθ_rb,uθd_rb,x_rb)
     err = jx_rb \ rx_rb
     x_rb -= err
     iter += 1

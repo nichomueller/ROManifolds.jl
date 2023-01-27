@@ -100,12 +100,11 @@ function MDEIM(
   μ::Vector{Param},
   ::ProblemMeasures,
   ::Symbol,
-  rbspace_uθ::RBSpace,
-  rbspace_gθ::RBSpace) where Ttr
+  rbspaceθ::NTuple{2,RBSpace}) where Ttr
 
   id = get_id(op)
   μ_mdeim = μ[1:info.mdeim_nsnap]
-  findnz_map,snaps... = mdeim_snapshots(info,op,μ_mdeim,rbspace_uθ,rbspace_gθ)
+  findnz_map,snaps... = mdeim_snapshots(info,op,μ_mdeim,rbspaceθ)
   rbspace = RBSpaceSteady((id,id*:lift),snaps)
   red_rbspace = RBSpaceSteady((id,id*:lift),rb_space_projection(op,rbspace,findnz_map))
 
@@ -156,8 +155,8 @@ end
 
 function load(
   path::String,
-  op::RBUnsteadyVariable,
-  meas::Measure)
+  op::RBUnsteadyVariable{Top,Ttr},
+  meas::Measure) where {Top<:Union{Affine,Nonaffine},Ttr}
 
   id = Symbol(last(split(path,'/')))
 
@@ -180,7 +179,8 @@ end
 
 function load(
   path::String,
-  args...)
+  ::RBVariable{Nonlinear,Ttr},
+  ::Measure) where Ttr
 
   id = Symbol(last(split(path,'/')))
 
