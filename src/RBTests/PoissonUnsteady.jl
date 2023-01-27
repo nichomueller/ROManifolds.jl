@@ -98,7 +98,7 @@ function online_phase(
 
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
-      lhs,rhs = steady_poisson_rb_system(expand(param_on_structures),μ[k])
+      lhs,rhs = unsteady_poisson_rb_system(expand(param_on_structures),μ[k])
       rb_sol = solve_rb_system(lhs,rhs)
     end
     uhk = get_snap(uh[k])

@@ -359,10 +359,10 @@ function rb_spacetime_projection(
   nsrow,ntrow = get_ns(rbrow),get_nt(rbrow)
   nscol,ntcol = get_ns(rbcol),get_nt(rbcol)
   proj_spacetime = zeros(nsrow*ntrow,nscol*ntcol)
-  for i = 1:nsrow
-    for j = 1:nscol
-      proj_spacetime[1+(i-1)*ntrow:i*ntrow,1+(j-1)*ntcol:j*ntcol] =
-        proj_spacetime_block[(i-1)*nscol+j]
+  for i = 1:nscol
+    for j = 1:nsrow
+      proj_spacetime[1+(j-1)*ntrow:j*ntrow,1+(i-1)*ntcol:i*ntcol] =
+        proj_spacetime_block[(i-1)*nsrow+j]
     end
   end
   proj_spacetime

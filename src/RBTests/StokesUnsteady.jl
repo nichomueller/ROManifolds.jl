@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function stokes_unsteady()
-  run_fem = true
+  run_fem = false
 
   steady = false
   indef = true
@@ -11,14 +11,15 @@ function stokes_unsteady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/stokes"
-  mesh = "cylinder.json"
-  bnd_info = Dict("dirichlet" => ["wall","inlet"],"neumann" => ["outlet"])
+  mesh = "cylinder_h03.json"
+  bnd_info = Dict("dirichlet" => ["wall","inlet","inlet_c","inlet_p","outlet_c","outlet_p"],
+                  "neumann" => ["outlet"])
   order = 2
 
-  t0,tF,dt,θ = 0.,0.03,0.0025,1
+  t0,tF,dt,θ = 0.,2.5,0.05,1
   time_info = TimeInfo(t0,tF,dt,θ)
 
-  ranges = fill([1.,2.],6)
+  ranges = fill([1.,3.],6)
   sampling = UniformSampling()
   PS = ParamSpace(ranges,sampling)
 
@@ -41,7 +42,7 @@ function stokes_unsteady()
   op = ParamTransientAffineFEOperator(mfe_gridap,lhs,rhs,PS,X,Y)
 
   solver = ThetaMethod(LUSolver(),dt,θ)
-  nsnap = 1
+  nsnap = 100
   uh,ph,μ, = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
 
   opA = NonaffineParamOperator(a,afe,PS,time_info,U,V;id=:A)
@@ -51,11 +52,10 @@ function stokes_unsteady()
   opF = AffineParamOperator(f,ffe,PS,time_info,V;id=:F)
   opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
 
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=true,
-    st_mdeim=true)
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
-  rbspace,rb_structures = offline_phase(info,(uh,ph,μ),(opA,opB,opBT,opM,opF,opH),measures,tt)
-  online_phase(info,(uh,ph,μ),rbspace,rb_structures,tt)
+  rbspace,param_on_structures = offline_phase(info,(uh,ph,μ),(opA,opB,opBT,opM,opF,opH),measures,tt)
+  online_phase(info,(uh,ph,μ),rbspace,param_on_structures,tt)
 end
 
 function offline_phase(
@@ -86,37 +86,39 @@ function offline_phase(
   Frb = RBOfflineStructure(info,tt,rbopF,μ,meas,:dΩ)
   Hrb = RBOfflineStructure(info,tt,rbopH,μ,meas,:dΓn)
 
+  Arb_eval = eval_off_structure(Arb)
+  Brb_eval = eval_off_structure(Brb)
+  BTrb_eval = eval_off_structure(BTrb)
+  Mrb_eval = eval_off_structure(Mrb)
+  Frb_eval = eval_off_structure(Frb)
+  Hrb_eval = eval_off_structure(Hrb)
+
+  Aon_param = RBParamOnlineStructure(Arb,Arb_eval;st_mdeim=info.st_mdeim)
+  Bon_param = RBParamOnlineStructure(Brb,Brb_eval;st_mdeim=info.st_mdeim)
+  BTon_param = RBParamOnlineStructure(BTrb,BTrb_eval;st_mdeim=info.st_mdeim)
+  Mon_param = RBParamOnlineStructure(Mrb,Mrb_eval;st_mdeim=info.st_mdeim)
+  Fon_param = RBParamOnlineStructure(Frb,Frb_eval;st_mdeim=info.st_mdeim)
+  Hon_param = RBParamOnlineStructure(Hrb,Hrb_eval;st_mdeim=info.st_mdeim)
+
+  param_on_structures = Aon_param,Bon_param,BTon_param,Mon_param,Fon_param,Hon_param
+
   rbspace = (rbspace_u,rbspace_p)
-  rb_structures = ((rbopA,Arb),(rbopB,Brb),(rbopBT,BTrb),(rbopM,Mrb),(rbopF,Frb),(rbopH,Hrb))
-  rbspace,rb_structures
+  rbspace,param_on_structures
 end
 
 function online_phase(
   info::RBInfo,
   fesol,
   rbspace::NTuple{2,RBSpace},
-  rb_structures::Tuple,
+  param_on_structures::Tuple,
   tt::TimeTracker)
 
   uh,ph,μ = fesol
 
-  Arb,Brb,BTrb,Mrb,Frb,Hrb = rb_structures
-
-  st_mdeim = info.st_mdeim
-  rbopA = Arb[1]
-  θ = get_θ(rbopA)
-
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
-      Aon = online_assembler(Arb,μ[k],st_mdeim)
-      Bon = online_assembler(Brb,μ[k],st_mdeim)
-      BTon = online_assembler(BTrb,μ[k],st_mdeim)
-      Mon = online_assembler(Mrb,μ[k],st_mdeim)
-      Fon = online_assembler(Frb,μ[k],st_mdeim)
-      Hon = online_assembler(Hrb,μ[k],st_mdeim)
-      lift = Aon[2],Mon[2],Bon[2]
-      sys = stokes_rb_system((Aon[1]...,Bon[1]...,BTon...,Mon[1]...),(Fon,Hon,lift...),θ)
-      rb_sol = solve_rb_system(sys...)
+      lhs,rhs = unsteady_stokes_rb_system(expand(param_on_structures),μ[k])
+      rb_sol = solve_rb_system(lhs,rhs)
     end
     uhk = get_snap(uh[k])
     phk = get_snap(ph[k])

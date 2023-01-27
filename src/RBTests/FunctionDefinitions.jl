@@ -159,7 +159,7 @@ function stokes_functions(::Val{false},measures::ProblemFixedMeasures)
 
   function a(x,p::Param,t::Real)
     μ = get_μ(p)
-    μ[1]
+    1/sum(μ)
   end
   a(p::Param,t::Real) = x->a(x,p,t)
   a(p::Param) = t->a(p,t)
@@ -176,10 +176,9 @@ function stokes_functions(::Val{false},measures::ProblemFixedMeasures)
   function g(x,p::Param,t::Real)
     μ = get_μ(p)
     R = 0.5
-    T,dt = 0.03,0.005
-    gt = abs.(1-cos(2*pi*(t)/T)+μ[1]*sin(2*pi*μ[2]*(t)/T))
-    gx = VectorValue(0.,0.,1-(x[1]^2+x[2]^2)/(R^2))*(x[3]==0.)
-    gt*gx
+    T = 2.5
+    dist = (x[1]^2+x[2]^2)/(R^2)
+    abs(1-cos(2*pi*t/T)+sin(μ[1]*2*pi*t/T)/μ[2])*VectorValue(0.,0.,1-dist)*(x[3]==0.)
   end
   g(p::Param,t::Real) = x->g(x,p,t)
 
