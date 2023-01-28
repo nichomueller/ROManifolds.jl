@@ -79,12 +79,9 @@ function offline_phase(
   uh_offline = uh[1:info.nsnap]
   ph_offline = ph[1:info.nsnap]
   uhθ_offline = compute_in_timesθ(uh_offline,θ)
-  phθ_offline = compute_in_timesθ(uh_offline,θ)
 
   rbspace_u,rbspace_p = rb(info,tt,(uh_offline,ph_offline),opB,ph,μ)
-  rbspace_uθ,rbspace_pθ = rb(info,tt,(uhθ_offline,phθ_offline),opB,ph,μ)
   rbspace = rbspace_u,rbspace_p
-  rbspaceθ = rbspace_uθ,rbspace_pθ
 
   rbopA = RBVariable(opA,rbspace_u,rbspace_u)
   rbopB = RBVariable(opB,rbspace_p,rbspace_u)

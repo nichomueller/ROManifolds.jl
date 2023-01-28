@@ -111,6 +111,30 @@ end
 
 function matrix_snapshots(
   ::Val,
+  op::RBSteadyBilinVariable{Nonlinear,Ttr},
+  μ::Vector{Param},
+  uh::Snapshots) where Ttr
+
+  u_fun(k::Int) = FEFunction(get_trial(op),uh[k],μ[k])
+
+  id = get_id(op)
+  findnz_map = get_findnz_map(op,u_fun(1))
+  M,lift = assemble_matrix_and_lifting(op)
+
+  function snapshot(k::Int)
+    println("Snapshot number $k at every time, $id")
+    v = nonzero_values(M(u_fun(k)),findnz_map)
+    l = lift(u_fun(k))
+    v,l
+  end
+
+  vl = snapshot.(eachindex(μ))
+  vals,lifts = first.(vl),last.(vl)
+  findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
+end
+
+function matrix_snapshots(
+  ::Val,
   op::RBUnsteadyBilinVariable{Nonlinear,Ttr},
   μ::Vector{Param},
   uhθ::Snapshots) where Ttr
@@ -135,7 +159,6 @@ function matrix_snapshots(
 
   vl = snapshot.(eachindex(μ))
   vals,lifts = first.(vl),last.(vl)
-
   findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 

@@ -43,8 +43,8 @@ function poisson_steady()
 
   info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
-  rbspace,rb_structures = offline_phase(info,(uh,μ),(opA,opF,opH),measures,tt)
-  online_phase(info,(uh,μ),rbspace,rb_structures,tt)
+  rbspace,param_on_structures = offline_phase(info,(uh,μ),(opA,opF,opH),measures,tt)
+  online_phase(info,(uh,μ),rbspace,param_on_structures,tt)
 end
 
 function offline_phase(
@@ -59,44 +59,36 @@ function offline_phase(
   opA,opF,opH = op
 
   rbspace = rb(info,tt,uh_offline)
+
   rbopA = RBVariable(opA,rbspace,rbspace)
   rbopF = RBVariable(opF,rbspace)
   rbopH = RBVariable(opH,rbspace)
 
-  if info.load_offline
-    Arb = load(info,rbopA,meas.dΩ)
-    Frb = load(info,rbopF,meas.dΩ)
-    Hrb = load(info,rbopH,meas.dΓn)
-  else
-    Arb = assemble_affine_decomposition(info,tt,rbopA,μ,meas,:dΩ)
-    Frb = assemble_affine_decomposition(info,tt,rbopF,μ,meas,:dΩ)
-    Hrb = assemble_affine_decomposition(info,tt,rbopH,μ,meas,:dΓn)
-  end
+  Arb = RBAffineDecomposition(info,tt,rbopA,μ,meas,:dΩ)
+  Frb = RBAffineDecomposition(info,tt,rbopF,μ,meas,:dΩ)
+  Hrb = RBAffineDecomposition(info,tt,rbopH,μ,meas,:dΓn)
 
-  rb_structures = ((rbopA,Arb),(rbopF,Frb),(rbopH,Hrb))
-  rbspace,rb_structures
+  ad = (Arb,Frb,Hrb)
+  ad_eval = eval_affine_decomposition(ad)
+  param_on_structures = RBParamOnlineStructure(ad,ad_eval)
+
+  rbspace,param_on_structures
 end
 
 function online_phase(
   info::RBInfo,
   fesol,
   rbspace::RBSpace,
-  rb_structures::Tuple,
+  param_on_structures::Tuple,
   tt::TimeTracker)
 
   uh,μ = fesol
 
-  Arb,Frb,Hrb = rb_structures
-  rbopA,Arb = Arb
-  rbopF,Frb = Frb
-  rbopH,Hrb = Hrb
-
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
-      lhs = online_assembler(rbopA,Arb,μ[k])
-      rhs = online_assembler(rbopF,Frb,μ[k]),online_assembler(rbopH,Hrb,μ[k])
-      sys = poisson_rb_system(lhs[1],(rhs...,lhs[2]))
-      rb_sol = solve_rb_system(sys...)
+      println("Evaluating RB system for μ = μ[$k]")
+      lhs,rhs = steady_poisson_rb_system(param_on_structures,μ[k])
+      rb_sol = solve_rb_system(lhs,rhs)
     end
     uhk = get_snap(uh[k])
     uhk_rb = reconstruct_fe_sol(rbspace,rb_sol)

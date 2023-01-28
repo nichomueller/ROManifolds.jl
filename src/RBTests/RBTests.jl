@@ -102,28 +102,14 @@ function fe_snapshots(
   fepath::String,
   run_fem::Bool,
   nsnap::Int,
-  args...;kwargs...)
+  args...)
 
   if run_fem
     println("Generating $nsnap full order snapshots")
     generate_fe_snapshots(ptype,solver,op,fepath,nsnap,args...)
   else
     println("Loading $nsnap full order snapshots")
-    load_fe_snapshots(ptype,fepath,nsnap;kwargs...)
-  end
-end
-
-function load_fe_snapshots(
-  ptype::ProblemType,
-  fepath::String,
-  nsnap::Int;
-  get_lift=false)
-
-  snaps = load_fe_snapshots(isindef(ptype),fepath,nsnap)
-  if get_lift
-    snaps...,load_snap(fepath,:g,nsnap)
-  else
-    snaps
+    load_fe_snapshots(isindef(ptype),fepath,nsnap)
   end
 end
 
@@ -161,73 +147,58 @@ end
 
 function generate_fe_snapshots(::Val{false},sol,fepath::String)
   time = @elapsed begin
-    uh,gh,μ = collect_solutions(sol)
+    uh,μ = collect_solutions(sol)
   end
-  usnap,gsnap = Snapshots(:u,uh),Snapshots(:g,gh)
-  save.((fepath,fepath,fepath),(usnap,gsnap,μ))
+  usnap = Snapshots(:u,uh)
+  save.((fepath,fepath),(usnap,μ))
   save(fepath,Dict("FE time"=>time))
-  usnap,μ,gsnap
+  usnap,μ
 end
 
 function generate_fe_snapshots(::Val{true},sol,fepath::String)
   Ns = get_Ns(sol)
   time = @elapsed begin
-    xh,gh,μ = collect_solutions(sol)
+    xh,μ = collect_solutions(sol)
   end
   uh = Broadcasting(x->getindex(x,1:Ns[1],:))(xh)
   ph = Broadcasting(x->getindex(x,Ns[1]+1:Ns[1]+Ns[2],:))(xh)
-  usnap,psnap,gsnap = Snapshots(:u,uh),Snapshots(:p,ph),Snapshots(:g,gh)
-  save.((fepath,fepath,fepath,fepath),(usnap,psnap,gsnap,μ))
+  usnap,psnap = Snapshots(:u,uh),Snapshots(:p,ph)
+  save.((fepath,fepath,fepath),(usnap,psnap,μ))
   save(fepath,Dict("FE time"=>time))
-  usnap,psnap,μ,gsnap
+  usnap,psnap,μ
 end
 
 function collect_solutions(sol)
   solk(k::Int) = collect_solutions(sol[k],k)
   results = solk.(eachindex(sol))
-  xh = Matrix.(Broadcasting(r->getindex(r,1))(results))
-  gh = Matrix.(Broadcasting(r->getindex(r,2))(results))
-  μ = Broadcasting(r->getindex(r,3))(results)
-  xh,gh,μ
+  Matrix.(first.(results)),last.(results)
 end
 
 function collect_solutions(solk,k::Int)
   println("\n Collecting solution $k")
-  xh,gh = Vector{Float}[],Vector{Float}[]
-  collect_solution!(xh,gh,solk)
-  xh,gh,solk.psol.μ
+  xh = Vector{Float}[]
+  collect_solution!(xh,solk)
+  xh,solk.psol.μ
 end
 
 function collect_solution!(
   x::Vector{Vector{Float}},
-  g::Vector{Vector{Float}},
   solk::ParamFESolution)
 
-  μk = solk.psol.μ
-
   xk = get_free_dof_values(solk.psol.uh)
-  gk = get_dirichlet_dof_values(solk.trial(μk))
   push!(x,copy(xk))
-  push!(g,copy(gk))
   x,g
 end
 
 function collect_solution!(
   x::Vector{Vector{Float}},
-  g::Vector{Vector{Float}},
   solk::ParamTransientFESolution)
 
-  μk = solk.psol.μ
-  dt = solk.psol.solver.dt
-  θ = solk.psol.solver.θ
-
   k = 1
-  for (xk,t) in solk
+  for (xk,_) in solk
     println("Time step: $k")
-    tθ = t-dt*(1-θ)
     push!(x,copy(xk))
-    push!(g,copy(get_dirichlet_dof_values(solk.trial(μk,tθ))))
     k += 1
   end
-  x,g
+  x
 end

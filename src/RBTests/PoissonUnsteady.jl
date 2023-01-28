@@ -11,7 +11,7 @@ function poisson_unsteady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/poisson"
-  mesh = "model.json"
+  mesh = "model_coarse.json"
   bnd_info = Dict("dirichlet" => ["sides","sides_c"],
                   "neumann" => ["circle","triangle","square"])
   order = 1
@@ -44,7 +44,8 @@ function poisson_unsteady()
   opF = AffineParamOperator(f,ffe,PS,time_info,V;id=:F)
   opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
 
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=true)
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=60,load_offline=false,
+    st_mdeim=true)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
   rbspace,param_on_structures = offline_phase(info,(uh,μ),(opA,opM,opF,opH),measures,tt)
   online_phase(info,(uh,μ),rbspace,param_on_structures,tt)
@@ -73,17 +74,10 @@ function offline_phase(
   Frb = RBAffineDecomposition(info,tt,rbopF,μ,meas,:dΩ)
   Hrb = RBAffineDecomposition(info,tt,rbopH,μ,meas,:dΓn)
 
-  Arb_eval = eval_affine_decomposition(Arb)
-  Mrb_eval = eval_affine_decomposition(Mrb)
-  Frb_eval = eval_affine_decomposition(Frb)
-  Hrb_eval = eval_affine_decomposition(Hrb)
+  ad = (Arb,Mrb,Frb,Hrb)
+  ad_eval = eval_affine_decomposition(ad)
+  param_on_structures = RBParamOnlineStructure(ad,ad_eval;st_mdeim=info.st_mdeim)
 
-  Aon_param = RBParamOnlineStructure(Arb,Arb_eval;st_mdeim=info.st_mdeim)
-  Mon_param = RBParamOnlineStructure(Mrb,Mrb_eval;st_mdeim=info.st_mdeim)
-  Fon_param = RBParamOnlineStructure(Frb,Frb_eval;st_mdeim=info.st_mdeim)
-  Hon_param = RBParamOnlineStructure(Hrb,Hrb_eval;st_mdeim=info.st_mdeim)
-
-  param_on_structures = Aon_param,Mon_param,Fon_param,Hon_param
   rbspace,param_on_structures
 end
 
@@ -98,7 +92,8 @@ function online_phase(
 
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
-      lhs,rhs = unsteady_poisson_rb_system(expand(param_on_structures),μ[k])
+      println("Evaluating RB system for μ = μ[$k]")
+      lhs,rhs = unsteady_poisson_rb_system(param_on_structures,μ[k])
       rb_sol = solve_rb_system(lhs,rhs)
     end
     uhk = get_snap(uh[k])

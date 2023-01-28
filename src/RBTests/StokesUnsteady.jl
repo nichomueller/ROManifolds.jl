@@ -71,6 +71,7 @@ function offline_phase(
   opA,opB,opBT,opM,opF,opH = op
 
   rbspace_u,rbspace_p = rb(info,tt,(uh_offline,ph_offline),opB,ph,μ)
+  rbspace = rbspace_u,rbspace_p
 
   rbopA = RBVariable(opA,rbspace_u,rbspace_u)
   rbopB = RBVariable(opB,rbspace_p,rbspace_u)
@@ -86,23 +87,11 @@ function offline_phase(
   Frb = RBAffineDecomposition(info,tt,rbopF,μ,meas,:dΩ)
   Hrb = RBAffineDecomposition(info,tt,rbopH,μ,meas,:dΓn)
 
-  Arb_eval = eval_affine_decomposition(Arb)
-  Brb_eval = eval_affine_decomposition(Brb)
-  BTrb_eval = eval_affine_decomposition(BTrb)
-  Mrb_eval = eval_affine_decomposition(Mrb)
-  Frb_eval = eval_affine_decomposition(Frb)
-  Hrb_eval = eval_affine_decomposition(Hrb)
 
-  Aon_param = RBParamOnlineStructure(Arb,Arb_eval;st_mdeim=info.st_mdeim)
-  Bon_param = RBParamOnlineStructure(Brb,Brb_eval;st_mdeim=info.st_mdeim)
-  BTon_param = RBParamOnlineStructure(BTrb,BTrb_eval;st_mdeim=info.st_mdeim)
-  Mon_param = RBParamOnlineStructure(Mrb,Mrb_eval;st_mdeim=info.st_mdeim)
-  Fon_param = RBParamOnlineStructure(Frb,Frb_eval;st_mdeim=info.st_mdeim)
-  Hon_param = RBParamOnlineStructure(Hrb,Hrb_eval;st_mdeim=info.st_mdeim)
+  ad = (Arb,Brb,BTrb,Mrb,Frb,Hrb)
+  ad_eval = eval_affine_decomposition(ad)
+  param_on_structures = RBParamOnlineStructure(ad,ad_eval;st_mdeim=info.st_mdeim)
 
-  param_on_structures = Aon_param,Bon_param,BTon_param,Mon_param,Fon_param,Hon_param
-
-  rbspace = (rbspace_u,rbspace_p)
   rbspace,param_on_structures
 end
 
@@ -117,7 +106,7 @@ function online_phase(
 
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
-      lhs,rhs = unsteady_stokes_rb_system(expand(param_on_structures),μ[k])
+      lhs,rhs = unsteady_stokes_rb_system(param_on_structures,μ[k])
       rb_sol = solve_rb_system(lhs,rhs)
     end
     uhk = get_snap(uh[k])

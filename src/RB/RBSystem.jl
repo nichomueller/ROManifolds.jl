@@ -2,8 +2,6 @@ function steady_poisson_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
 
-  println("Steady Poisson problem: evaluating RB system for μ = $μ")
-
   lhs = eval_on_structure(rbpos,:A,μ)
   rhs = eval_on_structure(rbpos,(:F,:H,:A_lift),μ)
   lhs,sum(rhs)
@@ -13,8 +11,6 @@ function unsteady_poisson_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
 
-  println("Unsteady Poisson problem: evaluating RB system for μ = $μ")
-
   lhs = eval_on_structure(rbpos,(:A,:M),μ)
   rhs = eval_on_structure(rbpos,(:F,:H,:A_lift,:M_lift),μ)
   sum(lhs),sum(rhs)
@@ -23,8 +19,6 @@ end
 function steady_stokes_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
-
-  println("Steady Stokes problem: evaluating RB system for μ = $μ")
 
   lhs = eval_on_structure(rbpos,(:A,:B),μ)
   rhs = eval_on_structure(rbpos,(:F,:H,:A_lift,:B_lift),μ)
@@ -39,8 +33,6 @@ function unsteady_stokes_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
 
-  println("Unsteady Stokes problem: evaluating RB system for μ = $μ")
-
   lhs = eval_on_structure(rbpos,(:A,:B,:BT,:M),μ)
   rhs = eval_on_structure(rbpos,(:F,:H,:A_lift,:B_lift,:M_lift),μ)
 
@@ -53,8 +45,6 @@ end
 function steady_navier_stokes_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
-
-  println("Steady Navier-Stokes problem: evaluating RB system for μ = $μ")
 
   lin_rb_lhs,lin_rb_rhs = steady_stokes_rb_system(rbpos,μ)
   nonlin_lhs(u) = eval_on_structure(rbpos,(:C,:D),u)
@@ -114,7 +104,6 @@ function unsteady_navier_stokes_rb_system(
 end
 
 function solve_rb_system(rb_lhs::Matrix{Float},rb_rhs::Matrix{Float})
-  println("Solving system via backslash")
   rb_lhs \ rb_rhs
 end
 
@@ -125,8 +114,6 @@ function solve_rb_system(
   fespaces::NTuple{2,FESpace},
   rbspace::NTuple{2,RBSpace};
   tol=1e-10,maxtol=1e10,maxit=10)
-
-  println("Solving system via Newton method")
 
   Uk,Vk = fespaces
   bsu = get_basis_space(rbspace[1])
@@ -147,7 +134,7 @@ function solve_rb_system(
     err = jx_rb \ rx_rb
     x_rb -= err
     iter += 1
-    println("err = $(norm(err)), iter = $iter")
+    println("Newton method: err = $(norm(err)), iter = $iter")
   end
 
   x_rb
@@ -161,8 +148,6 @@ function solve_rb_system(
   rbspace::NTuple{2,<:RBSpace},
   time_info::TimeInfo,
   tol=1e-10,maxtol=1e10,maxit=10)
-
-  println("Solving system via Newton method")
 
   timesθ = get_timesθ(time_info)
   θ = get_θ(time_info)
@@ -202,7 +187,7 @@ function solve_rb_system(
     uθ_fun = get_uθ_fun(x_rb)
     iter += 1
 
-    println("err = $(norm(err)), iter = $iter")
+    println("Newton method: err = $(norm(err)), iter = $iter")
   end
 
   x_rb

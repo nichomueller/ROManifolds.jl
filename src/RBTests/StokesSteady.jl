@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function stokes_steady()
-  run_fem = true
+  run_fem = false
 
   steady = true
   indef = true
@@ -38,7 +38,7 @@ function stokes_steady()
   op = ParamAffineFEOperator(lhs,rhs,PS,X,Y)
 
   solver = LinearFESolver()
-  nsnap = 1
+  nsnap = 100
   uh,ph,μ, = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
 
   opA = NonaffineParamOperator(a,afe,PS,U,V;id=:A)
@@ -48,8 +48,8 @@ function stokes_steady()
 
   info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=false)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
-  rbspace,rb_structures = offline_phase(info,(uh,ph,μ),(opA,opB,opF,opH),measures,tt)
-  online_phase(info,(uh,ph,μ),rbspace,rb_structures,tt)
+  rbspace,param_on_structures = offline_phase(info,(uh,ph,μ),(opA,opB,opF,opH),measures,tt)
+  online_phase(info,(uh,ph,μ),rbspace,param_on_structures,tt)
 end
 
 function offline_phase(
@@ -76,35 +76,27 @@ function offline_phase(
   Frb = RBAffineDecomposition(info,tt,rbopF,μ,meas,:dΩ)
   Hrb = RBAffineDecomposition(info,tt,rbopH,μ,meas,:dΓn)
 
-  rbspace = (rbspace_u,rbspace_p)
-  rb_structures = ((rbopA,Arb),(rbopB,Brb),(rbopF,Frb),(rbopH,Hrb))
-  rbspace,rb_structures
+  ad = (Arb,Brb,Frb,Hrb)
+  ad_eval = eval_affine_decomposition(ad)
+  param_on_structures = RBParamOnlineStructure(ad,ad_eval)
+
+  rbspace,param_on_structures
 end
 
 function online_phase(
   info::RBInfo,
   fesol,
   rbspace::NTuple{2,RBSpace},
-  rb_structures::Tuple,
+  param_on_structures::Tuple,
   tt::TimeTracker)
 
   uh,ph,μ = fesol
 
-  Arb,Brb,Frb,Hrb = rb_structures
-  rbopA,Arb = Arb
-  rbopB,Brb = Brb
-  rbopF,Frb = Frb
-  rbopH,Hrb = Hrb
-
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
-      Aon = online_assembler(rbopA,Arb,μ[k])
-      Bon = online_assembler(rbopB,Brb,μ[k])
-      Fon = online_assembler(rbopF,Frb,μ[k])
-      Hon = online_assembler(rbopH,Hrb,μ[k])
-      lift = Aon[2],Bon[2]
-      sys = stokes_rb_system((Aon[1],Bon[1]),(Fon,Hon,lift...))
-      rb_sol = solve_rb_system(sys...)
+      println("Evaluating RB system for μ = μ[$k]")
+      lhs,rhs = steady_stokes_rb_system(param_on_structures,μ[k])
+      rb_sol = solve_rb_system(lhs,rhs)
     end
     uhk = get_snap(uh[k])
     phk = get_snap(ph[k])

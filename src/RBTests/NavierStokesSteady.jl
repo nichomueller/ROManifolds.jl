@@ -52,8 +52,8 @@ function navier_stokes_steady()
   info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=true)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
   fesol = (uh,ph,μ,U,V)
-  rbspace,rb_structures = offline_phase(info,fesol,(opA,opB,opC,opD,opF,opH),measures,tt)
-  online_phase(info,fesol,rbspace,rb_structures,tt)
+  rbspace,param_on_structures = offline_phase(info,fesol,(opA,opB,opC,opD,opF,opH),measures,tt)
+  online_phase(info,fesol,rbspace,param_on_structures,tt)
 end
 
 function offline_phase(
@@ -69,6 +69,7 @@ function offline_phase(
   opA,opB,opC,opD,opF,opH = op
 
   rbspace_u,rbspace_p = rb(info,tt,(uh_offline,ph_offline),opB,ph,μ)
+  rbspace = rbspace_u,rbspace_p
 
   rbopA = RBVariable(opA,rbspace_u,rbspace_u)
   rbopB = RBVariable(opB,rbspace_p,rbspace_u)
@@ -84,28 +85,31 @@ function offline_phase(
   Frb = RBAffineDecomposition(info,tt,rbopF,μ,meas,:dΩ)
   Hrb = RBAffineDecomposition(info,tt,rbopH,μ,meas,:dΓn)
 
-  rbspace = (rbspace_u,rbspace_p)
-  rb_structures = Arb,Brb,Crb,Drb,Frb,Hrb
-  rbspace,rb_structures
+  ad = (Arb,Brb,BTrb,Crb,Drb,Mrb,Frb,Hrb)
+  ad_eval = eval_affine_decomposition(ad)
+  param_on_structures = RBParamOnlineStructure(ad,ad_eval;st_mdeim=info.st_mdeim)
+
+  rbspace,param_on_structures
 end
 
 function online_phase(
   info::RBInfo,
   fesol,
   rbspace::NTuple{2,RBSpace},
-  rb_structures::Tuple,
+  param_on_structures::Tuple,
   tt::TimeTracker)
 
-  uh,ph,μ,U,V = fesol
-  rb_solver(res,jac,x0,μ) = solve_rb_system(res,jac,x0,(U(μ),V),rbspace)
-  rb_structures = expand(rb_structures)
+  uh,ph,μ,U = fesol
+  μ_offline = μ[1:info.nsnap]
+  rb_solver(res,jac,x0,Uk) = solve_rb_system(res,jac,x0,Uk,rbspace)
 
   function online_loop(k::Int)
+    println("Evaluating RB system for μ = μ[$k]")
     tt.online_time += @elapsed begin
-      online_structures = online_assembler(rb_structures,μ[k])
-      res,jac = steady_navier_stokes_rb_system(online_structures)
-      x0 = initial_guess(rbspace,uh,ph,μ,μ[k])
-      rb_sol = rb_solver(res,jac,x0,μ[k])
+      res,jac = unsteady_navier_stokes_rb_system(param_on_structures,μ[k])
+      Uk = get_trial(U)(μ[k])
+      x0 = initial_guess(uh,ph,μ_offline,μ[k])
+      rb_sol = rb_solver(res,jac,x0,Uk)
     end
     uhk,phk = get_snap(uh[k]),get_snap(ph[k])
     uhk_rb,phk_rb = reconstruct_fe_sol(rbspace,rb_sol)
