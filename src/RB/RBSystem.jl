@@ -162,23 +162,19 @@ function solve_rb_system(
   ud::Vector{Float},
   rbspace::NTuple{2,<:RBSpace},
   rbspaceθ::NTuple{2,<:RBSpace},
-  timesθ::Vector{<:Real},
   θ::Real,
   tol=1e-10,maxtol=1e10,maxit=10)
 
   println("Solving system via Newton method")
 
-  bstu = get_basis_spacetime(rbspace[1])
   nstu = size(bstu,2)
   x_rb = x0
-  bstuθ = get_basis_spacetime(rbspaceθ[1])
-  bstuθd = get_basis_spacetime(rbspaceθ[2])
-  uθd_rb = bstuθd'*ud
+  uθd_rb = rb_spacetime_projection(rbspaceθ[2],ud)[:,1]
 
   function get_uθ_rb(x_rb::AbstractArray)
-    ufe = reshape(bstu*x_rb[1:nstu],:,length(timesθ))
+    ufe = reconstruct_fe_sol(rbspace[1],x_rb[1:nstu])#reshape(bstu*x_rb[1:nstu],:,length(timesθ))
     uθfe = compute_in_timesθ(ufe,θ)
-    bstuθ'*uθfe[:]
+    rb_spacetime_projection(rbspace[1],uθfe)[:,1]
   end
 
   err = 1.

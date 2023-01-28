@@ -330,7 +330,8 @@ function rb_time_projection(
 
   rbrow = get_rbspace_row(op)
   rbcol = get_rbspace_col(op)
-  rb_time_projection(rbrow,rbcol,mv,idx_forwards,idx_backwards)
+  rb_time_projection(rbrow,rbcol,mv;
+    idx_forwards=idx_forwards,idx_backwards=idx_backwards)
 end
 
 function rb_spacetime_projection(
@@ -342,10 +343,12 @@ function rb_spacetime_projection(
   proj_spacetime_block = rb_time_projection(op;mv=resh_proj)
   rbrow = get_rbspace_row(op)
   ns,nt = get_ns(rbrow),get_nt(rbrow)
+
   proj_spacetime = zeros(ns*nt,1)
   for i = 1:ns
     proj_spacetime[1+(i-1)*nt:i*nt,1] = proj_spacetime_block[i]
   end
+
   proj_spacetime
 end
 
@@ -363,6 +366,7 @@ function rb_spacetime_projection(
   rbcol = get_rbspace_col(op)
   nsrow,ntrow = get_ns(rbrow),get_nt(rbrow)
   nscol,ntcol = get_ns(rbcol),get_nt(rbcol)
+
   proj_spacetime = zeros(nsrow*ntrow,nscol*ntcol)
   for i = 1:nscol
     for j = 1:nsrow
@@ -370,6 +374,7 @@ function rb_spacetime_projection(
         proj_spacetime_block[(i-1)*nsrow+j]
     end
   end
+
   proj_spacetime
 end
 

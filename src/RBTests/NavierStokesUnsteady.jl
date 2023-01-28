@@ -11,12 +11,12 @@ function navier_stokes_unsteady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes"
-  mesh = "cylinder_h03.json"#"cylinder.json"
+  mesh = "cylinder.json"#"cylinder_h03.json"#
   bnd_info = Dict("dirichlet" => ["wall","inlet","inlet_c","inlet_p","outlet_c","outlet_p"],
                   "neumann" => ["outlet"])
   order = 2
 
-  t0,tF,dt,θ = 0.,2,0.05,1#0.,5,0.05,1
+  t0,tF,dt,θ = 0.,5,0.05,1#0.,2,0.05,1
   time_info = TimeInfo(t0,tF,dt,θ)
 
   ranges = fill([1.,2.],6)
@@ -57,7 +57,7 @@ function navier_stokes_unsteady()
   opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
 
   varop = (opA,opB,opBT,opC,opD,opM,opF,opH)
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,online_snaps=95:100,mdeim_snap=20,load_offline=true)
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-3,nsnap=80,online_snaps=95:100,mdeim_snap=20,load_offline=true)
   fesol = (uh,ph,ghθ,μ,time_info)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
   rbspace,rbspaceθ,param_on_structures = offline_phase(info,fesol,varop,measures,tt);

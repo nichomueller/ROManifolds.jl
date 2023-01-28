@@ -221,7 +221,8 @@ function coeff_by_time_bases(
 
   rbrow = get_rbspace_row(op)
   rbcol = get_rbspace_col(op)
-  time_proj(idx1,idx2) = rb_time_projection(rbrow,rbcol,coeff,idx1,idx2)
+  time_proj(idx1,idx2) = rb_time_projection(rbrow,rbcol,coeff;
+    idx_forwards=idx1,idx_backwards=idx2)
 
   Nt = get_Nt(op)
   idx = 1:Nt

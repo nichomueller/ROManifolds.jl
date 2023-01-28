@@ -142,7 +142,7 @@ end
 function rb_time_projection(
   rbrow::RBSpaceUnsteady,
   rbcol::RBSpaceUnsteady,
-  mat::AbstractMatrix,
+  mat::AbstractMatrix;
   idx_forwards=1:size(mat,1),
   idx_backwards=1:size(mat,1))
 
@@ -159,4 +159,41 @@ function rb_time_projection(
   time_proj_fun(jt,q) = Broadcasting(it -> time_proj_fun(it,jt,q))(1:nrow)
   time_proj_fun(q) = Broadcasting(jt -> time_proj_fun(jt,q))(1:ncol)
   Matrix.(time_proj_fun.(1:Q))
+end
+
+function rb_spacetime_projection(rbrow::RBSpaceUnsteady,mat::AbstractMatrix)
+  proj_space = [rb_space_projection(rbrow,mat[:,i]) for i=axes(mat,2)]
+  proj_spacetime_block = rb_time_projection(rbrow,Matrix(proj_space)')
+  ns,nt = get_ns(rbrow),get_nt(rbrow)
+
+  proj_spacetime = zeros(ns*nt,1)
+  for i = 1:ns
+    proj_spacetime[1+(i-1)*nt:i*nt,1] = proj_spacetime_block[i]
+  end
+
+  proj_spacetime
+end
+
+function rb_spacetime_projection(
+  rbrow::RBSpaceUnsteady,
+  rbcol::RBSpaceUnsteady,
+  mat::BlockMatrix;
+  idx_forwards=1:size(mat,1),
+  idx_backwards=1:size(mat,1))
+
+  proj_space = [rb_space_projection(rbrow,rbcol,mat[i])[:] for i=eachindex(mat)]
+  proj_spacetime_block = rb_time_projection(rbrow,rbcol,Matrix(proj_space)';
+    idx_forwards=idx_forwards,idx_backwards=idx_backwards)
+  nsrow,ntrow = get_ns(rbrow),get_nt(rbrow)
+  nscol,ntcol = get_ns(rbcol),get_nt(rbcol)
+
+  proj_spacetime = zeros(nsrow*ntrow,nscol*ntcol)
+  for i = 1:nscol
+    for j = 1:nsrow
+      proj_spacetime[1+(j-1)*ntrow:j*ntrow,1+(i-1)*ntcol:i*ntcol] =
+        proj_spacetime_block[(i-1)*nsrow+j]
+    end
+  end
+
+  proj_spacetime
 end

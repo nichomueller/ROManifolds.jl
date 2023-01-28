@@ -337,7 +337,8 @@ function eval_off_structure(
   btθ = get_basis_time(get_rbspace_row(op))
   rbrow = get_rbspace_row(op)
   rbcol = rbspaceθ
-  btbtbt = rb_time_projection(rbrow,rbcol,btθ,idx,idx)
+  btbtbt = rb_time_projection(rbrow,rbcol,btθ;
+    idx_forwards=idx,idx_backwards=idx)
 
   kron(btbtbt,basis_block)
 end
@@ -361,8 +362,9 @@ function eval_off_structure(
   btθ = get_basis_time(rbspaceθ)
   rbrow = get_rbspace_row(op)
   rbcol = get_rbspace_col(op)
-  btbtbt = rb_time_projection(rbrow,rbcol,btθ,idx,idx)
-  btbtbt_shift = rb_time_projection(rbrow,rbcol,btθ,idx_forwards,idx_backwards)
+  btbtbt = rb_time_projection(rbrow,rbcol,btθ;idx_forwards=idx,idx_backwards=idx)
+  btbtbt_shift = rb_time_projection(rbrow,rbcol,btθ;
+    idx_forwards=idx_forwards,idx_backwards=idx_backwards)
   nt = length(btbtbt)
 
   bst = [kron(basis_blockT[space_idx(k,ns)],btbtbt[time_idx(k,ns)]) for k=1:ns*nt]
