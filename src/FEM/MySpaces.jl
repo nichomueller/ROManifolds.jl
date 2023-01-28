@@ -144,6 +144,35 @@ get_degree(test::SingleFieldFESpace,c=2) = get_degree(Gridap.FESpaces.get_order(
 
 realization(fes::MySpaces) = FEFunction(fes.test,rand(num_free_dofs(fes.test)))
 
+function Gridap.FESpaces.FEFunction(
+  trial::ParamTrialFESpace,
+  u::AbstractVector,
+  μ::Param)
+
+  FEFunction(trial(μ),u)
+end
+
+function Gridap.FESpaces.FEFunction(
+  trial::ParamTransientTrialFESpace,
+  u::AbstractVector,
+  μ::Param,
+  t::Real)
+
+  FEFunction(trial(μ,t),u)
+end
+
+function Gridap.FESpaces.FEFunction(
+  trial::ParamTransientTrialFESpace,
+  u::AbstractMatrix,
+  μ::Param,
+  times::Vector{<:Real})
+
+  Nt = length(times)
+  @assert size(u,2) == Nt "Wrong dimensions"
+
+  n -> FEFunction(trial,u[:,n],μ,times[n])
+end
+
 function get_fdofs_on_full_trian(space::MySpaces)
   ddofs = get_ddofs_on_full_trian(space)
   nfree_on_full_trian = get_nfree_dofs_on_full_trian(space)

@@ -73,8 +73,17 @@ check_dimensions(vb::AbstractVector) =
   all([size(vb[i])[1] == size(vb[1])[1] for i = 2:length(vb)])
 check_dimensions(m::AbstractMatrix,nb::Int) = iszero(size(m)[2]%nb)
 
-spacetime_vector(mat::AbstractMatrix) = mat[:]
-spacetime_vector(fun::Function) = u -> fun(u)[:]
+function spacetime_vector(mat::AbstractMatrix)
+  mat[:]
+end
+
+function spacetime_vector(fun::Function,::Val{false})
+  μ -> fun(μ)[:]
+end
+
+function spacetime_vector(fun::Function,::Val{true})
+  (μ,u) -> fun(μ,u)[:]
+end
 
 istuple(tup::Any) = false
 istuple(tup::Tuple) = true

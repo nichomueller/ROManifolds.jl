@@ -68,15 +68,15 @@ function offline_phase(
   rbopF = RBVariable(opF,rbspace)
   rbopH = RBVariable(opH,rbspace)
 
-  Arb = RBOfflineStructure(info,tt,rbopA,μ,meas,:dΩ)
-  Mrb = RBOfflineStructure(info,tt,rbopM,μ,meas,:dΩ)
-  Frb = RBOfflineStructure(info,tt,rbopF,μ,meas,:dΩ)
-  Hrb = RBOfflineStructure(info,tt,rbopH,μ,meas,:dΓn)
+  Arb = RBAffineDecomposition(info,tt,rbopA,μ,meas,:dΩ)
+  Mrb = RBAffineDecomposition(info,tt,rbopM,μ,meas,:dΩ)
+  Frb = RBAffineDecomposition(info,tt,rbopF,μ,meas,:dΩ)
+  Hrb = RBAffineDecomposition(info,tt,rbopH,μ,meas,:dΓn)
 
-  Arb_eval = eval_off_structure(Arb)
-  Mrb_eval = eval_off_structure(Mrb)
-  Frb_eval = eval_off_structure(Frb)
-  Hrb_eval = eval_off_structure(Hrb)
+  Arb_eval = eval_affine_decomposition(Arb)
+  Mrb_eval = eval_affine_decomposition(Mrb)
+  Frb_eval = eval_affine_decomposition(Frb)
+  Hrb_eval = eval_affine_decomposition(Hrb)
 
   Aon_param = RBParamOnlineStructure(Arb,Arb_eval;st_mdeim=info.st_mdeim)
   Mon_param = RBParamOnlineStructure(Mrb,Mrb_eval;st_mdeim=info.st_mdeim)

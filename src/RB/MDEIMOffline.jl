@@ -16,10 +16,6 @@ mutable struct MDEIMUnsteady <: MDEIM
   red_measure::Measure
 end
 
-mutable struct MDEIMNonlinear <: MDEIM
-  rbspace::RBSpaceSteady
-end
-
 function MDEIM(
   red_rbspace::RBSpaceSteady,
   red_lu_factors::LU,
@@ -86,31 +82,6 @@ function MDEIM(
   MDEIM(red_rbspace,red_lu_factors,idx,red_meas)
 end
 
-function MDEIM(rbspace::RBSpaceSteady)
-  MDEIMNonlinear(rbspace)
-end
-
-function MDEIM(rbspace::NTuple{N,RBSpaceSteady}) where N
-  MDEIMNonlinear.(rbspace)
-end
-
-function MDEIM(
-  info::RBInfo,
-  op::RBBilinVariable{Nonlinear,Ttr},
-  μ::Vector{Param},
-  ::ProblemMeasures,
-  ::Symbol,
-  rbspaceθ::NTuple{2,RBSpace}) where Ttr
-
-  id = get_id(op)
-  μ_mdeim = μ[1:info.mdeim_nsnap]
-  findnz_map,snaps... = mdeim_snapshots(info,op,μ_mdeim,rbspaceθ)
-  rbspace = RBSpaceSteady((id,id*:lift),snaps)
-  red_rbspace = RBSpaceSteady((id,id*:lift),rb_space_projection(op,rbspace,findnz_map))
-
-  MDEIM(red_rbspace)
-end
-
 function save(path::String,mdeim::MDEIMSteady)
   save(joinpath(path,"basis_space"),get_basis_space(mdeim))
   save(joinpath(path,"idx_space"),get_idx_space(mdeim))
@@ -127,10 +98,6 @@ function save(path::String,mdeim::MDEIMUnsteady)
   red_lu = get_red_lu_factors(mdeim)
   save(joinpath(path,"LU"),red_lu.factors)
   save(joinpath(path,"p"),red_lu.ipiv)
-end
-
-function save(path::String,mdeim::MDEIMNonlinear)
-  save(joinpath(path,"basis_space"),get_basis_space(mdeim))
 end
 
 function load(
@@ -155,8 +122,8 @@ end
 
 function load(
   path::String,
-  op::RBUnsteadyVariable{Top,Ttr},
-  meas::Measure) where {Top<:Union{Affine,Nonaffine},Ttr}
+  op::RBUnsteadyVariable,
+  meas::Measure)
 
   id = Symbol(last(split(path,'/')))
 
@@ -175,18 +142,6 @@ function load(
   red_measure = get_red_measure(op,idx_space,meas)
 
   MDEIM(rbspace,red_lu_factors,idx,red_measure)
-end
-
-function load(
-  path::String,
-  ::RBVariable{Nonlinear,Ttr},
-  ::Measure) where Ttr
-
-  id = Symbol(last(split(path,'/')))
-
-  basis_space = load(joinpath(path,"basis_space"))
-  rbspace = RBSpace(id,basis_space)
-  MDEIM(rbspace)
 end
 
 get_rbspace(mdeim::MDEIM) = mdeim.rbspace

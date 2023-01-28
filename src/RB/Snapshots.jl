@@ -81,3 +81,7 @@ function SparseArrays.findnz(s::Snapshots)
   snap_nnz = reshape(v,:,get_Nt(s)*nsnap)
   i,j,Snapshots(id,snap_nnz,nsnap)
 end
+
+function Gridap.FESpaces.FEFunction(fespace,u::Snapshots,args...)
+  FEFunction(fespace,get_snap(u),args...)
+end

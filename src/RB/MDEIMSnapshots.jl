@@ -113,32 +113,30 @@ function matrix_snapshots(
   ::Val,
   op::RBUnsteadyBilinVariable{Nonlinear,Ttr},
   μ::Vector{Param},
-  rbspaceθ::NTuple{2,RBSpaceUnsteady}) where Ttr
+  uhθ::Snapshots) where Ttr
 
-  rbspace_uθ,rbspace_gθ = rbspaceθ
+  timesθ = get_timesθ(op)
+  uhθ_fun(k::Int,n::Int) = FEFunction(get_trial(op),uhθ[k],μ[k],timesθ)(n)
 
   id = get_id(op)
-  bfun = basis_as_fefun(op,rbspace_uθ)
-  findnz_map = get_findnz_map(op,bfun(1))
-  M,Mlift = assemble_matrix_and_lifting_temp(op)
+  findnz_map = get_findnz_map(op,uhθ_fun(1,1))
+  M,lift = assemble_matrix_and_lifting(op)
 
-  bsuθ = get_basis_space(rbspace_uθ)
-  bsgθ = get_basis_space(rbspace_gθ)
-  nsuθ = size(bsuθ,2)
-
-  function snapshot(n::Int)
-    println("Nonlinear snapshot number $n, $id")
-    b = bfun(n)
-    v = nonzero_values(M(b),findnz_map)
-    ml = Mlift(b)
-    v,ml
+  function snapshot(k::Int)
+    println("Snapshot number $k at every time, $id")
+    v,l = Vector{Float}[],Vector{Float}[]
+    uk(n::Int) = uhθ_fun(k,n)
+    for n in eachindex(timesθ)
+      push!(v,nonzero_values(M(uk(n)),findnz_map))
+      push!(l,lift(uk(n)))
+    end
+    Matrix(v),Matrix(l)
   end
 
-  vml = snapshot.(1:nsuθ)
-  vals,Mlifts = first.(vml),last.(vml)
-  lifts = [Mlifts[n]*bsgθ for n=1:nsuθ]
+  vl = snapshot.(eachindex(μ))
+  vals,lifts = first.(vl),last.(vl)
 
-  findnz_map,Matrix(vals),Matrix(lifts)
+  findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
 end
 
 function matrix_snapshots(
@@ -220,21 +218,4 @@ function interpolate_param_function(op::RBUnsteadyVariable,vals::Matrix{Float})
   test_quad = LagrangianQuadFESpace(get_test(op))
   param_fun = FEFunction(test_quad,vals)
   param_fun
-end
-
-function assemble_matrix_and_lifting_temp(
-  op::RBUnsteadyBilinVariable{Nonlinear,Ttr}) where Ttr
-
-  afe = get_fe_function(op)
-  trial_no_bc = get_trial_no_bc(op)
-  test_no_bc = get_test_no_bc(op)
-  fdofs_test = get_fdofs_on_full_trian(get_tests(op))
-  fdofs_trial = get_fdofs_on_full_trian(get_trials(op))
-  ddofs = get_ddofs_on_full_trian(get_trials(op))
-
-  A_all(u) = assemble_matrix(afe(u),trial_no_bc,test_no_bc)
-  A_free_free(u) = A_all(u)[fdofs_test,fdofs_trial]
-  A_free_dir(u) = A_all(u)[fdofs_test,ddofs]
-
-  A_free_free,A_free_dir
 end

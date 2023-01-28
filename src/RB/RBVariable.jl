@@ -125,8 +125,8 @@ get_nrows(op::RBUnsteadyVariable) = get_ns(get_rbspace_row(op))*get_nt(get_rbspa
 issteady(::RBSteadyVariable) = true
 issteady(::RBUnsteadyVariable) = false
 
-islinear(::RBVariable) = true
-islinear(::RBBilinVariable) = false
+isnonlinear(::RBVariable) = false
+isnonlinear(::RBVariable{Nonlinear,Ttr}) where Ttr = true
 
 function Gridap.FESpaces.get_cell_dof_ids(
   rbop::RBVariable,
@@ -338,18 +338,8 @@ function rb_spacetime_projection(
   op::RBLinVariable;
   mv=assemble_vector(op)(realization(op)))
 
-  proj_space = [rb_space_projection(op;mv=mv[:,i]) for i=axes(mv,2)]
-  resh_proj = Matrix(proj_space)'
-  proj_spacetime_block = rb_time_projection(op;mv=resh_proj)
   rbrow = get_rbspace_row(op)
-  ns,nt = get_ns(rbrow),get_nt(rbrow)
-
-  proj_spacetime = zeros(ns*nt,1)
-  for i = 1:ns
-    proj_spacetime[1+(i-1)*nt:i*nt,1] = proj_spacetime_block[i]
-  end
-
-  proj_spacetime
+  rb_spacetime_projection(rbrow,mv)
 end
 
 function rb_spacetime_projection(
@@ -358,24 +348,10 @@ function rb_spacetime_projection(
   idx_forwards=1:size(mv,1),
   idx_backwards=1:size(mv,1))
 
-  proj_space = [rb_space_projection(op;mv=mv[i])[:] for i=eachindex(mv)]
-  resh_proj = Matrix(proj_space)'
-  proj_spacetime_block = rb_time_projection(op;
-    mv=resh_proj,idx_forwards=idx_forwards,idx_backwards=idx_backwards)
   rbrow = get_rbspace_row(op)
   rbcol = get_rbspace_col(op)
-  nsrow,ntrow = get_ns(rbrow),get_nt(rbrow)
-  nscol,ntcol = get_ns(rbcol),get_nt(rbcol)
-
-  proj_spacetime = zeros(nsrow*ntrow,nscol*ntcol)
-  for i = 1:nscol
-    for j = 1:nsrow
-      proj_spacetime[1+(j-1)*ntrow:j*ntrow,1+(i-1)*ntcol:i*ntcol] =
-        proj_spacetime_block[(i-1)*nsrow+j]
-    end
-  end
-
-  proj_spacetime
+  rb_spacetime_projection(rbrow,rbcol,mv;
+    idx_forwards=idx_forwards,idx_backwards=idx_backwards)
 end
 
 function rb_projection(

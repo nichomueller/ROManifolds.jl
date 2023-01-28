@@ -11,12 +11,12 @@ function navier_stokes_unsteady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes"
-  mesh = "cylinder.json"#"cylinder_h03.json"#
+  mesh = "cylinder_h03.json"
   bnd_info = Dict("dirichlet" => ["wall","inlet","inlet_c","inlet_p","outlet_c","outlet_p"],
                   "neumann" => ["outlet"])
   order = 2
 
-  t0,tF,dt,θ = 0.,5,0.05,1#0.,2,0.05,1
+  t0,tF,dt,θ = 0.,2,0.05,1
   time_info = TimeInfo(t0,tF,dt,θ)
 
   ranges = fill([1.,2.],6)
@@ -45,7 +45,7 @@ function navier_stokes_unsteady()
   nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking())
   solver = ThetaMethod(nls,dt,θ)
   nsnap = 100
-  uh,ph,μ,ghθ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF;get_lift=true)
+  uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
 
   opA = NonaffineParamOperator(a,afe,PS,time_info,U,V;id=:A)
   opB = AffineParamOperator(b,bfe,PS,time_info,U,Q;id=:B)
@@ -57,34 +57,34 @@ function navier_stokes_unsteady()
   opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
 
   varop = (opA,opB,opBT,opC,opD,opM,opF,opH)
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-3,nsnap=80,online_snaps=95:100,mdeim_snap=20,load_offline=true)
-  fesol = (uh,ph,ghθ,μ,time_info)
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,online_snaps=95:100,mdeim_snap=20,load_offline=true)
+  fesol = (uh,ph,μ,time_info,U)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
-  rbspace,rbspaceθ,param_on_structures = offline_phase(info,fesol,varop,measures,tt);
-  online_phase(info,fesol,rbspace,rbspaceθ,param_on_structures,tt)
+  rbspace,param_on_structures = offline_phase(info,fesol,varop,measures,tt);
+  online_phase(info,fesol,rbspace,param_on_structures,tt)
 end
 
 function offline_phase(
   info::RBInfo,
   fesol,
   op::NTuple{N,ParamOperator},
-  meas::ProblemMeasures,
+  measures::ProblemMeasures,
   tt::TimeTracker) where N
 
   println("\n Offline phase, reduced basis method")
 
-  uh,ph,ghθ,μ,_ = fesol
+  uh,ph,μ,_ = fesol
   opA,opB,opBT,opC,opD,opM,opF,opH = op
   θ = get_θ(opA)
   uh_offline = uh[1:info.nsnap]
   ph_offline = ph[1:info.nsnap]
-  ghθ_offline = ghθ[1:info.nsnap]
   uhθ_offline = compute_in_timesθ(uh_offline,θ)
-  phθ_offline = compute_in_timesθ(ph_offline,θ)
+  phθ_offline = compute_in_timesθ(uh_offline,θ)
 
   rbspace_u,rbspace_p = rb(info,tt,(uh_offline,ph_offline),opB,ph,μ)
-  rbspace_uθ, = rb(info,tt,(uhθ_offline,phθ_offline),opB,ph,μ)
-  rbspace_gθ = rb(info,tt,ghθ_offline;sparsity=true)
+  rbspace_uθ,rbspace_pθ = rb(info,tt,(uhθ_offline,phθ_offline),opB,ph,μ)
+  rbspace = rbspace_u,rbspace_p
+  rbspaceθ = rbspace_uθ,rbspace_pθ
 
   rbopA = RBVariable(opA,rbspace_u,rbspace_u)
   rbopB = RBVariable(opB,rbspace_p,rbspace_u)
@@ -95,63 +95,42 @@ function offline_phase(
   rbopF = RBVariable(opF,rbspace_u)
   rbopH = RBVariable(opH,rbspace_u)
 
-  rbspace = (rbspace_u,rbspace_p)
-  rbspaceθ = (rbspace_uθ,rbspace_gθ)
+  Arb = RBAffineDecomposition(info,tt,rbopA,μ,measures,:dΩ)
+  Brb = RBAffineDecomposition(info,tt,rbopB,μ,measures,:dΩ)
+  BTrb = RBAffineDecomposition(info,tt,rbopBT,μ,measures,:dΩ)
+  Crb = RBAffineDecomposition(info,tt,rbopC,μ,measures,:dΩ,uhθ_offline)
+  Drb = RBAffineDecomposition(info,tt,rbopD,μ,measures,:dΩ,uhθ_offline)
+  Mrb = RBAffineDecomposition(info,tt,rbopM,μ,measures,:dΩ)
+  Frb = RBAffineDecomposition(info,tt,rbopF,μ,measures,:dΩ)
+  Hrb = RBAffineDecomposition(info,tt,rbopH,μ,measures,:dΓn)
 
-  Arb = RBOfflineStructure(info,tt,rbopA,μ,meas,:dΩ)
-  Brb = RBOfflineStructure(info,tt,rbopB,μ,meas,:dΩ)
-  BTrb = RBOfflineStructure(info,tt,rbopBT,μ,meas,:dΩ)
-  Crb = RBOfflineStructure(info,tt,rbopC,μ,meas,:dΩ,rbspaceθ)
-  Drb = RBOfflineStructure(info,tt,rbopD,μ,meas,:dΩ,rbspaceθ)
-  Mrb = RBOfflineStructure(info,tt,rbopM,μ,meas,:dΩ)
-  Frb = RBOfflineStructure(info,tt,rbopF,μ,meas,:dΩ)
-  Hrb = RBOfflineStructure(info,tt,rbopH,μ,meas,:dΓn)
+  ad = (Arb,Brb,BTrb,Crb,Drb,Mrb,Frb,Hrb)
+  ad_eval = eval_affine_decomposition(ad)
+  param_on_structures = RBParamOnlineStructure(ad,ad_eval;st_mdeim=info.st_mdeim)
 
-  Arb_eval = eval_off_structure(Arb)
-  Brb_eval = eval_off_structure(Brb)
-  BTrb_eval = eval_off_structure(BTrb)
-  Crb_eval = eval_off_structure(Crb,rbspaceθ)
-  Drb_eval = eval_off_structure(Drb,rbspaceθ)
-  Mrb_eval = eval_off_structure(Mrb)
-  Frb_eval = eval_off_structure(Frb)
-  Hrb_eval = eval_off_structure(Hrb)
-
-  Aon_param = RBParamOnlineStructure(Arb,Arb_eval;st_mdeim=info.st_mdeim)
-  Bon_param = RBParamOnlineStructure(Brb,Brb_eval;st_mdeim=info.st_mdeim)
-  BTon_param = RBParamOnlineStructure(BTrb,BTrb_eval;st_mdeim=info.st_mdeim)
-  Con_param = RBParamOnlineStructure(Crb,Crb_eval;st_mdeim=info.st_mdeim)
-  Don_param = RBParamOnlineStructure(Drb,Drb_eval;st_mdeim=info.st_mdeim)
-  Mon_param = RBParamOnlineStructure(Mrb,Mrb_eval;st_mdeim=info.st_mdeim)
-  Fon_param = RBParamOnlineStructure(Frb,Frb_eval;st_mdeim=info.st_mdeim)
-  Hon_param = RBParamOnlineStructure(Hrb,Hrb_eval;st_mdeim=info.st_mdeim)
-
-  param_on_structures = Aon_param,Bon_param,BTon_param,Con_param,Don_param,Mon_param,Fon_param,Hon_param
-
-  rbspace,rbspaceθ,param_on_structures
+  rbspace,param_on_structures
 end
 
 function online_phase(
   info::RBInfo,
   fesol,
   rbspace::NTuple{2,RBSpace},
-  rbspaceθ::NTuple{2,RBSpace},
   param_on_structures::Tuple,
   tt::TimeTracker)
 
   println("\n Online phase, reduced basis method")
 
-  uh,ph,ghθ,μ,time_info = fesol
-  timesθ = get_timesθ(time_info)
-  θ = get_θ(time_info)
+  uh,ph,μ,time_info,U = fesol
   μ_offline = μ[1:info.nsnap]
-
-  rb_solver(res,jac,x0,ud) = solve_rb_system(res,jac,x0,ud,rbspace,rbspaceθ,timesθ,θ)
+  rb_solver(res,jac,x0,Uk) = solve_rb_system(res,jac,x0,Uk,rbspace,time_info)
 
   function online_loop(k::Int)
+    println("Evaluating RB system for μ = μ[$k]")
     tt.online_time += @elapsed begin
-      res,jac = unsteady_navier_stokes_rb_system(expand(param_on_structures),μ[k])
-      x0 = initial_guess(rbspace,uh,ph,μ_offline,μ[k])
-      rb_sol = rb_solver(res,jac,x0,get_snap(ghθ[k])[:])
+      res,jac = unsteady_navier_stokes_rb_system(param_on_structures,μ[k])
+      Uk(t) = get_trial(U)(μ[k],t)
+      x0 = initial_guess(uh,ph,μ_offline,μ[k])
+      rb_sol = rb_solver(res,jac,x0,Uk)
     end
     uhk,phk = get_snap(uh[k]),get_snap(ph[k])
     uhk_rb,phk_rb = reconstruct_fe_sol(rbspace,rb_sol)

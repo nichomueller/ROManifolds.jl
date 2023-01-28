@@ -166,9 +166,9 @@ function rb_spacetime_projection(rbrow::RBSpaceUnsteady,mat::AbstractMatrix)
   proj_spacetime_block = rb_time_projection(rbrow,Matrix(proj_space)')
   ns,nt = get_ns(rbrow),get_nt(rbrow)
 
-  proj_spacetime = zeros(ns*nt,1)
+  proj_spacetime = zeros(ns*nt)
   for i = 1:ns
-    proj_spacetime[1+(i-1)*nt:i*nt,1] = proj_spacetime_block[i]
+    proj_spacetime[1+(i-1)*nt:i*nt] = proj_spacetime_block[i]
   end
 
   proj_spacetime

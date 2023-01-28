@@ -68,9 +68,9 @@ function offline_phase(
     Frb = load(info,rbopF,meas.dΩ)
     Hrb = load(info,rbopH,meas.dΓn)
   else
-    Arb = assemble_rb_structure(info,tt,rbopA,μ,meas,:dΩ)
-    Frb = assemble_rb_structure(info,tt,rbopF,μ,meas,:dΩ)
-    Hrb = assemble_rb_structure(info,tt,rbopH,μ,meas,:dΓn)
+    Arb = assemble_affine_decomposition(info,tt,rbopA,μ,meas,:dΩ)
+    Frb = assemble_affine_decomposition(info,tt,rbopF,μ,meas,:dΩ)
+    Hrb = assemble_affine_decomposition(info,tt,rbopH,μ,meas,:dΓn)
   end
 
   rb_structures = ((rbopA,Arb),(rbopF,Frb),(rbopH,Hrb))
