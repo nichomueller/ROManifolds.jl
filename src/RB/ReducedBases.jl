@@ -106,7 +106,7 @@ function rb_space(
   snap::Snapshots;
   ϵ=info.ϵ,sparsity=false)
 
-  println("Spatial POD, tolerance: $ϵ")
+  printstyled("\n Spatial POD, tolerance: $ϵ";color=:blue)
   if sparsity
     i,j,snap_nnz = findnz(snap)
     basis_space_nnz = POD(snap_nnz;ϵ=ϵ)
@@ -125,7 +125,7 @@ function rb_time(
   basis_space::Matrix{Float};
   ϵ=info.ϵ)
 
-  println("Temporal POD, tolerance: $ϵ")
+  printstyled("\n Temporal POD, tolerance: $ϵ";color=:blue)
 
   s1 = get_snap(snap)
   ns = get_nsnap(snap)
@@ -164,7 +164,7 @@ function space_supremizers(
   ph::Snapshots,
   μ::Vector{Param})
 
-  println("Computing primal supremizers")
+  printstyled("\n Computing primal supremizers";color=:blue)
 
   basis_u,basis_p = basis
   constraint_mat = assemble_constraint_matrix(opB,basis_p,ph,μ)
@@ -187,7 +187,7 @@ function assemble_constraint_matrix(
   μ::Vector{Param}) where Ttr
 
   @assert opB.id == :B
-  println("Fetching Bᵀ")
+  printstyled("\n Fetching supremizing operator Bᵀ";color=:blue)
 
   B = matrix_B(opB,μ)
   Matrix(B')*basis_p
@@ -200,7 +200,7 @@ function assemble_constraint_matrix(
   μ::Vector{Param})
 
   @assert opB.id == :B
-  println("Bᵀ is nonaffine: must assemble the constraint matrix")
+  printstyled("\n Bᵀ is nonaffine: must assemble the constraint matrix";color=:blue)
 
   B = matrix_B(opB,μ)
   Brb(k::Int) = Matrix(B[k]')*ph.snaps[:,k]
@@ -220,11 +220,10 @@ function add_time_supremizers(
   basis::NTuple{2,Matrix{Float}},
   tol=1e-2)
 
-  println("Checking if supremizers in time need to be added")
+  printstyled("\n Checking if supremizers in time need to be added";color=:blue)
 
   basis_u,basis_p = basis
   basis_up = basis_u'*basis_p
-  count = 0
 
   function enrich(basis_u::Matrix{Float},basis_up::Matrix{Float},v::Vector)
     vnew = orth_complement(v,basis_u)
@@ -232,15 +231,22 @@ function add_time_supremizers(
     hcat(basis_u,vnew),vcat(basis_up,vnew'*basis_p)
   end
 
-  for ntp = axes(basis_up,2)
-    dist = ntp == 1 ? norm(basis_up[:,1]) : norm(orth_projection(basis_up[:,ntp],basis_up[:,1:ntp-1]))
-    println("Distance measure of basis vector number $ntp is: $dist")
-    if dist ≤ tol
+  count = 0
+  ntp = 1
+  while ntp ≤ size(basis_up,2)
+    proj = ntp == 1 ? zeros(size(basis_up[:,1])) : orth_projection(basis_up[:,ntp],basis_up[:,1:ntp-1])
+    dist = norm(basis_up[:,1]-proj)
+    printstyled("\n Distance measure of basis vector number $ntp is: $dist";color=:blue)
+    if dist ≤ 1e-2
       basis_u,basis_up = enrich(basis_u,basis_up,basis_p[:,ntp])
       count += 1
+      ntp = 0
+    else
+      basis_up[:,ntp] -= proj
     end
+    ntp += 1
   end
 
-  println("Added $count time supremizers")
+  printstyled("\n Added $count time supremizers";color=:blue)
   basis_u
 end

@@ -56,93 +56,86 @@ function navier_stokes_unsteady()
   opF = AffineParamOperator(f,ffe,PS,time_info,V;id=:F)
   opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
 
-  varop = (opA,opB,opBT,opC,opD,opM,opF,opH)
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,online_snaps=95:100,mdeim_snap=20,load_offline=true)
-  fesol = (uh,ph,μ,time_info,U)
-  tt = TimeTracker(OfflineTime(0.,0.),0.)
-  rbspace,param_on_structures = offline_phase(info,fesol,varop,measures,tt);
-  online_phase(info,fesol,rbspace,param_on_structures,tt)
-end
+  for st_mdeim = (false,true)
+    for tol = (1e-2,1e-3,1e-4,1e-5)
 
-function offline_phase(
-  info::RBInfo,
-  fesol,
-  op::NTuple{N,ParamOperator},
-  measures::ProblemMeasures,
-  tt::TimeTracker) where N
+      info = RBInfoUnsteady(ptype,mesh,root;ϵ=tol,nsnap=80,online_snaps=95:100,
+        mdeim_snap=20,load_offline=false,st_mdeim=st_mdeim,postprocess=true)
+      tt = TimeTracker(OfflineTime(0.,0.),0.)
 
-  println("\n Offline phase, reduced basis method")
+      printstyled("\n Offline phase; tol=$tol, st_mdeim=$st_mdeim";color=:blue)
 
-  uh,ph,μ,_ = fesol
-  opA,opB,opBT,opC,opD,opM,opF,opH = op
-  θ = get_θ(opA)
-  uh_offline = uh[1:info.nsnap]
-  ph_offline = ph[1:info.nsnap]
-  uhθ_offline = compute_in_timesθ(uh_offline,θ)
+      μ_offline = μ[1:info.nsnap]
+      uh_offline = uh[1:info.nsnap]
+      ph_offline = ph[1:info.nsnap]
+      uhθ_offline = compute_in_timesθ(uh_offline,θ)
 
-  rbspace_u,rbspace_p = rb(info,tt,(uh_offline,ph_offline),opB,ph,μ)
-  rbspace = rbspace_u,rbspace_p
+      rbspace_u,rbspace_p = rb(info,tt,(uh_offline,ph_offline),opB,ph,μ)
+      rbspace = rbspace_u,rbspace_p
 
-  rbopA = RBVariable(opA,rbspace_u,rbspace_u)
-  rbopB = RBVariable(opB,rbspace_p,rbspace_u)
-  rbopBT = RBVariable(opBT,rbspace_u,rbspace_p)
-  rbopC = RBVariable(opC,rbspace_u,rbspace_u)
-  rbopD = RBVariable(opD,rbspace_u,rbspace_u)
-  rbopM = RBVariable(opM,rbspace_u,rbspace_u)
-  rbopF = RBVariable(opF,rbspace_u)
-  rbopH = RBVariable(opH,rbspace_u)
+      rbopA = RBVariable(opA,rbspace_u,rbspace_u)
+      rbopB = RBVariable(opB,rbspace_p,rbspace_u)
+      rbopBT = RBVariable(opBT,rbspace_u,rbspace_p)
+      rbopC = RBVariable(opC,rbspace_u,rbspace_u)
+      rbopD = RBVariable(opD,rbspace_u,rbspace_u)
+      rbopM = RBVariable(opM,rbspace_u,rbspace_u)
+      rbopF = RBVariable(opF,rbspace_u)
+      rbopH = RBVariable(opH,rbspace_u)
 
-  Arb = RBAffineDecomposition(info,tt,rbopA,μ,measures,:dΩ)
-  Brb = RBAffineDecomposition(info,tt,rbopB,μ,measures,:dΩ)
-  BTrb = RBAffineDecomposition(info,tt,rbopBT,μ,measures,:dΩ)
-  Crb = RBAffineDecomposition(info,tt,rbopC,μ,measures,:dΩ,uhθ_offline)
-  Drb = RBAffineDecomposition(info,tt,rbopD,μ,measures,:dΩ,uhθ_offline)
-  Mrb = RBAffineDecomposition(info,tt,rbopM,μ,measures,:dΩ)
-  Frb = RBAffineDecomposition(info,tt,rbopF,μ,measures,:dΩ)
-  Hrb = RBAffineDecomposition(info,tt,rbopH,μ,measures,:dΓn)
+      Arb = RBAffineDecomposition(info,tt,rbopA,μ,measures,:dΩ)
+      Brb = RBAffineDecomposition(info,tt,rbopB,μ,measures,:dΩ)
+      BTrb = RBAffineDecomposition(info,tt,rbopBT,μ,measures,:dΩ)
+      Crb = RBAffineDecomposition(info,tt,rbopC,μ,measures,:dΩ,uhθ_offline)
+      Drb = RBAffineDecomposition(info,tt,rbopD,μ,measures,:dΩ,uhθ_offline)
+      Mrb = RBAffineDecomposition(info,tt,rbopM,μ,measures,:dΩ)
+      Frb = RBAffineDecomposition(info,tt,rbopF,μ,measures,:dΩ)
+      Hrb = RBAffineDecomposition(info,tt,rbopH,μ,measures,:dΓn)
 
-  ad = (Arb,Brb,BTrb,Crb,Drb,Mrb,Frb,Hrb)
-  ad_eval = eval_affine_decomposition(ad)
-  param_on_structures = RBParamOnlineStructure(ad,ad_eval;st_mdeim=info.st_mdeim)
+      ad = (Arb,Brb,BTrb,Crb,Drb,Mrb,Frb,Hrb)
+      ad_eval = eval_affine_decomposition(ad)
+      param_on_structures = RBParamOnlineStructure(ad,ad_eval;st_mdeim=info.st_mdeim)
 
-  rbspace,param_on_structures
-end
+      printstyled("\n Online phase; tol=$tol, st_mdeim=$st_mdeim";color=:red)
 
-function online_phase(
-  info::RBInfo,
-  fesol,
-  rbspace::NTuple{2,RBSpace},
-  param_on_structures::Tuple,
-  tt::TimeTracker)
+      rb_solver(res,jac,x0,Uk) = solve_rb_system(res,jac,x0,Uk,rbspace,time_info;tol=info.ϵ)
 
-  println("\n Online phase, reduced basis method")
+      function online_loop(k::Int)
+        printstyled("\n -------------------------------------------------------------")
+        printstyled("\n Evaluating RB system for μ = μ[$k]";color=:red)
+        tt.online_time += @elapsed begin
+          res,jac = unsteady_navier_stokes_rb_system(param_on_structures,μ[k])
+          Uk(t) = get_trial(U)(μ[k],t)
+          x0 = initial_guess(uh,ph,μ_offline,μ[k])
+          rb_sol = rb_solver(res,jac,x0,Uk)
+        end
+        uhk,phk = get_snap(uh[k]),get_snap(ph[k])
+        uhk_rb,phk_rb = reconstruct_fe_sol(rbspace,rb_sol)
+        ErrorTracker(:u,uhk,uhk_rb),ErrorTracker(:p,phk,phk_rb)
+      end
 
-  uh,ph,μ,time_info,U = fesol
-  μ_offline = μ[1:info.nsnap]
-  rb_solver(res,jac,x0,Uk) = solve_rb_system(res,jac,x0,Uk,rbspace,time_info)
+      ets = online_loop.(info.online_snaps)
+      ets_u,ets_p = first.(ets),last.(ets)
+      res_u,res_p = RBResults(:u,tt,ets_u),RBResults(:p,tt,ets_p)
+      save(info,res_u)
+      save(info,res_p)
+      printstyled("\n Average online wall time: $(tt.online_time/length(ets_u)) s";
+        color=:red)
 
-  function online_loop(k::Int)
-    println("Evaluating RB system for μ = μ[$k]")
-    tt.online_time += @elapsed begin
-      res,jac = unsteady_navier_stokes_rb_system(param_on_structures,μ[k])
-      Uk(t) = get_trial(U)(μ[k],t)
-      x0 = initial_guess(uh,ph,μ_offline,μ[k])
-      rb_sol = rb_solver(res,jac,x0,Uk)
+      if info.postprocess
+        trian = get_triangulation(model)
+        k = rand(info.online_snaps)
+        writevtk(info,time_info,uh[k],t->get_trial(U)(μ[k],t),trian)
+        writevtk(info,time_info,ph[k],t->get_trial(P),trian)
+        writevtk(info,time_info,res_u,get_test(V),trian)
+        writevtk(info,time_info,res_u,get_test(Q),trian)
+      end
     end
-    uhk,phk = get_snap(uh[k]),get_snap(ph[k])
-    uhk_rb,phk_rb = reconstruct_fe_sol(rbspace,rb_sol)
-    ErrorTracker(:u,uhk,uhk_rb,k),ErrorTracker(:p,phk,phk_rb,k)
   end
 
-  ets = online_loop.(info.online_snaps)
-  ets_u,ets_p = first.(ets),last.(ets)
-  res_u,res_p = RBResults(:u,tt,ets_u),RBResults(:p,tt,ets_p)
-  save(info,res_u)
-  save(info,res_p)
+  #= if info.postprocess
+    postprocess(info)
+  end =#
 
-  if info.postprocess
-    postprocess(info,(res_u,res_p))
-  end
 end
 
 navier_stokes_unsteady()

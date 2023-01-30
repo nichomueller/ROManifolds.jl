@@ -43,9 +43,10 @@ function RBSpaceUnsteady(
   snaps::Snapshots;ismdeim=Val(false),ϵ=1e-5)
 
   id = get_id(snaps)
-  snaps2 = mode2_unfolding(snaps)
-  basis_space = POD(snaps,ismdeim;ϵ)
-  basis_time = POD(snaps2,ismdeim;ϵ)
+  s,ns = get_snap(snaps),get_nsnap(snaps)
+  basis_space = POD(s,ismdeim;ϵ)
+  s2 = mode2_unfolding(basis_space'*s,ns)
+  basis_time = POD(s2,ismdeim;ϵ)
   RBSpaceUnsteady(id,basis_space,basis_time)
 end
 
@@ -75,8 +76,6 @@ get_basis_space(rb::RBSpace) = rb.basis_space
 get_basis_space(rb::NTuple{N,RBSpace}) where N = get_basis_space.(rb)
 get_basis_time(rb::RBSpaceUnsteady) = rb.basis_time
 get_basis_time(rb::NTuple{N,RBSpaceUnsteady}) where N = get_basis_time.(rb)
-get_basis_spacetime(rb::RBSpaceUnsteady) = kron(rb.basis_time,rb.basis_space)
-get_basis_spacetime(rb::NTuple{N,RBSpaceUnsteady}) where N = get_basis_spacetime.(rb)
 get_Ns(rb::RBSpace) = size(rb.basis_space,1)
 get_ns(rb::RBSpace) = size(rb.basis_space,2)
 get_Nt(rb::RBSpaceUnsteady) = size(rb.basis_time,1)

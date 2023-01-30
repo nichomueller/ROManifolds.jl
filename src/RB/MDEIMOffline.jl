@@ -149,10 +149,6 @@ get_red_lu_factors(mdeim::MDEIM) = mdeim.red_lu_factors
 get_id(mdeim::MDEIM) = get_id(mdeim.rbspace)
 get_basis_space(mdeim::MDEIM) = get_basis_space(mdeim.rbspace)
 get_basis_time(mdeim::MDEIMUnsteady) = get_basis_time(mdeim.rbspace)
-get_basis_spacetime(mdeim::MDEIMUnsteady) = kron(get_basis_time(mdeim.rbspace),
-  get_basis_space(mdeim.rbspace))
-get_basis(mdeim::MDEIMSteady) = get_basis_space(mdeim)
-get_basis(mdeim::MDEIMUnsteady) = get_basis_spacetime(mdeim)
 get_idx_space(mdeim::MDEIMSteady) = mdeim.idx
 get_idx_space(mdeim::MDEIMUnsteady) = first(mdeim.idx)
 get_idx_time(mdeim::MDEIMUnsteady) = last(mdeim.idx)

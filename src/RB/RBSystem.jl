@@ -125,16 +125,16 @@ function solve_rb_system(
 
   err = 1.
   iter = 0
-  while norm(err) > tol && iter < maxit
-    if norm(err) > maxtol
-      println("Newton iterations did not converge")
+  while norm(err) ≥ tol && iter < maxit
+    if norm(err) ≥ maxtol
+      printstyled("\n Newton iterations did not converge";color=:red)
       return x_rb
     end
     jx_rb,rx_rb = jac(u(x_rb)),res(u(x_rb),ud(x_rb),x_rb)
     err = jx_rb \ rx_rb
     x_rb -= err
     iter += 1
-    println("Newton method: err = $(norm(err)), iter = $iter")
+    printstyled("\n Newton method: err = $(norm(err)), iter = $iter";color=:red)
   end
 
   x_rb
@@ -146,7 +146,7 @@ function solve_rb_system(
   x0::Matrix{Float},
   Uk::Function,
   rbspace::NTuple{2,<:RBSpace},
-  time_info::TimeInfo,
+  time_info::TimeInfo;
   tol=1e-10,maxtol=1e10,maxit=10)
 
   timesθ = get_timesθ(time_info)
@@ -174,10 +174,10 @@ function solve_rb_system(
 
   err = 1.
   iter = 0
-  while norm(err) > tol && iter < maxit
+  while norm(err) ≥ tol && iter < maxit
 
-    if norm(err) > maxtol
-      println("Newton iterations did not converge")
+    if norm(err) ≥ maxtol
+      printstyled("\n Newton iterations did not converge";color=:red)
       return x_rb
     end
 
@@ -187,7 +187,7 @@ function solve_rb_system(
     uθ_fun = get_uθ_fun(x_rb)
     iter += 1
 
-    println("Newton method: err = $(norm(err)), iter = $iter")
+    printstyled("\n Newton method: err = $(norm(err)), iter = $iter";color=:red)
   end
 
   x_rb

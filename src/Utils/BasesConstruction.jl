@@ -28,7 +28,8 @@ function POD(S::AbstractMatrix,X::SparseMatrixCSC;ϵ=1e-5)
   energies = cumsum(Σ.^2)
   n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
   err = sqrt(1-energies[n]/energies[end])
-  println("Basis number obtained via POD is $n, projection error ≤ $err")
+  printstyled("\n Basis number obtained via POD is $n, projection error ≤ $err";
+    color=:blue)
 
   Matrix((L'\U[:,1:n])[invperm(H.p),:])
 end
@@ -40,7 +41,8 @@ function POD(S::AbstractMatrix,::Val{false};ϵ=1e-5)
   energies = cumsum(Σ.^2)
   n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
   err = sqrt(1-energies[n]/energies[end])
-  println("Basis number obtained via POD is $n, projection error ≤ $err")
+  printstyled("\n Basis number obtained via POD is $n, projection error ≤ $err"
+    ;color=:blue)
 
   U[:,1:n]
 end
@@ -61,7 +63,8 @@ function approx_POD(S::AbstractMatrix,::Val{true};ϵ=1e-5)
   matrix_err = sqrt(ntemp)*vcat(Σ[2:end],0.0)
   n = findall(x -> x ≤ ϵ,matrix_err)[1]
   err = matrix_err[n]
-  println("Basis number obtained via approximated POD is $n, projection error ≤ $err")
+  printstyled("\n Basis number obtained via approximated POD is $n,
+    projection error ≤ $err";color=:blue)
 
   U = S*V[:,1:n]
   for i = axes(U,2)
@@ -81,7 +84,8 @@ function approx_POD(S::AbstractMatrix,::Val{false};ϵ=1e-5)
   matrix_err = sqrt(ntemp)*vcat(Σ[2:end],0.0)
   n = findall(x -> x ≤ ϵ,matrix_err)[1]
   err = matrix_err[n]
-  println("Basis number obtained via approximated POD is $n, projection error ≤ $err")
+  printstyled("\n Basis number obtained via approximated POD is $n,
+    projection error ≤ $err";color=:blue)
 
   U[:,1:n]
 end

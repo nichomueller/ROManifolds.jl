@@ -63,6 +63,8 @@ function offline_phase(
   meas::ProblemMeasures,
   tt::TimeTracker) where N
 
+  printstyled("\n Offline phase, reduced basis method";color=:blue)
+
   uh,ph,μ, = fesol
   uh_offline = uh[1:info.nsnap]
   ph_offline = ph[1:info.nsnap]
@@ -99,12 +101,15 @@ function online_phase(
   param_on_structures::Tuple,
   tt::TimeTracker)
 
+  printstyled("\n Online phase, reduced basis method";color=:red)
+
   uh,ph,μ,U = fesol
   μ_offline = μ[1:info.nsnap]
   rb_solver(res,jac,x0,Uk) = solve_rb_system(res,jac,x0,Uk,rbspace)
 
   function online_loop(k::Int)
-    println("Evaluating RB system for μ = μ[$k]")
+    printstyled("\n -------------------------------------------------------------")
+    printstyled("\n Evaluating RB system for μ = μ[$k]";color=:red)
     tt.online_time += @elapsed begin
       res,jac = unsteady_navier_stokes_rb_system(param_on_structures,μ[k])
       Uk = get_trial(U)(μ[k])
@@ -113,7 +118,7 @@ function online_phase(
     end
     uhk,phk = get_snap(uh[k]),get_snap(ph[k])
     uhk_rb,phk_rb = reconstruct_fe_sol(rbspace,rb_sol)
-    ErrorTracker(:u,uhk,uhk_rb,k),ErrorTracker(:p,phk,phk_rb,k)
+    ErrorTracker(:u,uhk,uhk_rb),ErrorTracker(:p,phk,phk_rb)
   end
 
   ets = online_loop.(info.online_snaps)
@@ -121,6 +126,8 @@ function online_phase(
   res_u,res_p = RBResults(:u,tt,ets_u),RBResults(:p,tt,ets_p)
   save(info,res_u)
   save(info,res_p)
+  printstyled("\n Average online wall time: $(tt.online_time/length(ets_u)) s";
+    color=:red)
 
   if info.postprocess
     postprocess(info,(res_u,res_p))

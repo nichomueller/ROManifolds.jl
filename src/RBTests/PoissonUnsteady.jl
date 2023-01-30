@@ -91,19 +91,23 @@ function online_phase(
   uh,μ = fesol
 
   function online_loop(k::Int)
+    printstyled("\n -------------------------------------------------------------")
+    printstyled("\n Evaluating RB system for μ = μ[$k]";color=:red)
     tt.online_time += @elapsed begin
-      println("Evaluating RB system for μ = μ[$k]")
+      printstyled("Evaluating RB system for μ = μ[$k]";color=:red)
       lhs,rhs = unsteady_poisson_rb_system(param_on_structures,μ[k])
       rb_sol = solve_rb_system(lhs,rhs)
     end
     uhk = get_snap(uh[k])
     uhk_rb = reconstruct_fe_sol(rbspace,rb_sol)
-    ErrorTracker(:u,uhk,uhk_rb,k)
+    ErrorTracker(:u,uhk,uhk_rb)
   end
 
   ets = online_loop.(info.online_snaps)
   res = RBResults(:u,tt,ets)
   save(info,res)
+  printstyled("\n Average online wall time: $(tt.online_time/length(ets_u)) s";
+    color=:red)
 
   if info.postprocess
     postprocess(info,res)

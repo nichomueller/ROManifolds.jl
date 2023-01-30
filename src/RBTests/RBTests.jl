@@ -12,7 +12,7 @@ function fem_path(ptype::ProblemType,mesh::String,root::String)
 end
 
 function rom_path(tpath::String,ϵ::Float)
-  rbpath = joinpath(joinpath(tpath,"rom"),"$ϵ")
+  rbpath = joinpath(tpath,"$ϵ")
   create_dir!(rbpath)
   rbpath
 end
@@ -105,10 +105,10 @@ function fe_snapshots(
   args...)
 
   if run_fem
-    println("Generating $nsnap full order snapshots")
+    printstyled("\n Generating $nsnap full order snapshots";color=:blue)
     generate_fe_snapshots(ptype,solver,op,fepath,nsnap,args...)
   else
-    println("Loading $nsnap full order snapshots")
+    printstyled("\n Loading $nsnap full order snapshots";color=:blue)
     load_fe_snapshots(isindef(ptype),fepath,nsnap)
   end
 end
@@ -175,7 +175,7 @@ function collect_solutions(sol)
 end
 
 function collect_solutions(solk,k::Int)
-  println("\n Collecting solution $k")
+  printstyled("\n Collecting solution $k";color=:blue)
   xh = Vector{Float}[]
   collect_solution!(xh,solk)
   xh,solk.psol.μ
@@ -196,7 +196,7 @@ function collect_solution!(
 
   k = 1
   for (xk,_) in solk
-    println("Time step: $k")
+    printstyled("\n Time step: $k";color=:blue)
     push!(x,copy(xk))
     k += 1
   end
