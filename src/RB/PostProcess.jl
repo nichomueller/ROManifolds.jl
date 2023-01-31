@@ -15,7 +15,7 @@ end
 
 function ErrorTracker(id::Symbol,uh::Matrix{Float},uh_rb::Matrix{Float})
   relative_err,pointwise_err = compute_errors(uh,uh_rb)
-  printstyled("\n Online relative error of variable $id is: $relative_err";
+  printstyled("Online relative error of variable $id is: $relative_err \n";
     color=:red)
   ErrorTracker(relative_err,pointwise_err)
 end

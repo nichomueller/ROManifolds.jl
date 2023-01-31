@@ -32,7 +32,7 @@ function assemble_affine_decomposition(
   args...)
 
   id = get_id(op)
-  printstyled("\n Linear operator $id is Affine: computing Φᵀ$id";color=:blue)
+  printstyled("Linear operator $id is Affine: computing Φᵀ$id \n";color=:blue)
 
   ad = rb_space_projection(op)
   RBAffineDecomposition(op,ad)
@@ -44,8 +44,8 @@ function assemble_affine_decomposition(
   args...) where Top
 
   id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
-  printstyled("\n Linear operator $id is $Top:
-    running the MDEIM offline phase on $mdeim_nsnap snapshots";color=:blue)
+  printstyled("Linear operator $id is $Top:
+    running the MDEIM offline phase on $mdeim_nsnap snapshots \n";color=:blue)
 
   ad = MDEIM(info,op,args...)
   RBAffineDecomposition(op,ad)
@@ -57,8 +57,8 @@ function assemble_affine_decomposition(
   args...)
 
   id = get_id(op)
-  printstyled("\n Bilinear operator $id is Affine and has no lifting:
-    computing Φᵀ$(id)Φ";color=:blue)
+  printstyled("Bilinear operator $id is Affine and has no lifting:
+    computing Φᵀ$(id)Φ\n";color=:blue)
 
   ad = rb_space_projection(op)
   RBAffineDecomposition(op,ad)
@@ -70,8 +70,8 @@ function assemble_affine_decomposition(
   args...) where Ttr
 
   id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
-  printstyled("\n Bilinear operator $id is Affine but its lifting is non-affine:
-    running the MDEIM offline phase on $mdeim_nsnap snapshots";color=:blue)
+  printstyled("Bilinear operator $id is Affine but its lifting is non-affine:
+    running the MDEIM offline phase on $mdeim_nsnap snapshots\n";color=:blue)
 
   ad = rb_space_projection(op)
   op_lift = RBLiftVariable(op)
@@ -85,8 +85,8 @@ function assemble_affine_decomposition(
   args...) where Top
 
   id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
-  printstyled("\n Bilinear operator $id is $Top and has no lifting:
-    running the MDEIM offline phase on $mdeim_nsnap snapshots";color=:blue)
+  printstyled("Bilinear operator $id is $Top and has no lifting:
+    running the MDEIM offline phase on $mdeim_nsnap snapshots\n";color=:blue)
 
   ad = MDEIM(info,op,args...)
   RBAffineDecomposition(op,ad)
@@ -98,8 +98,8 @@ function assemble_affine_decomposition(
   args...) where {Top,Ttr}
 
   id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
-  printstyled("\n Bilinear operator $id and its lifting are $Top:
-    running the MDEIM offline phase on $mdeim_nsnap snapshots";color=:blue)
+  printstyled("Bilinear operator $id and its lifting are $Top:
+    running the MDEIM offline phase on $mdeim_nsnap snapshots\n";color=:blue)
 
   ad,ad_lift = MDEIM(info,op,args...)
   op_lift = RBLiftVariable(op)
@@ -151,8 +151,8 @@ function load(
     _,meas,field = args
     load(info,op,getproperty(meas,field))
   else
-    printstyled("\n Failed to load variable $(id):
-      running offline assembler instead";color=:blue)
+    printstyled("Failed to load variable $(id):
+      running offline assembler instead\n";color=:blue)
     assemble_affine_decomposition(info,tt,op,args...)
   end
 
@@ -164,7 +164,7 @@ function load(
   meas::Measure) where Top
 
   id = get_id(op)
-  printstyled("\n Loading MDEIM structures for $Top variable $id";color=:blue)
+  printstyled("Loading MDEIM structures for $Top variable $id \n";color=:blue)
   path_id = joinpath(info.offline_path,"$id")
 
   os = load(path_id,op,meas)
@@ -177,7 +177,7 @@ function load(
   ::Measure)
 
   id = get_id(op)
-  printstyled("\n Loading projected Affine variable $id";color=:blue)
+  printstyled("Loading projected Affine variable $id \n";color=:blue)
   path_id = joinpath(info.offline_path,"$id")
 
   os = load(joinpath(path_id,"basis_space"))
@@ -190,7 +190,7 @@ function load(
   meas::Measure) where {Top,Ttr}
 
   id = get_id(op)
-  printstyled("\n Loading MDEIM structures for $Top variable $id and its lifting";
+  printstyled("Loading MDEIM structures for $Top variable $id and its lifting";
     color=:blue)
   path_id = joinpath(info.offline_path,"$id")
   path_id_lift = joinpath(info.offline_path,"$(id)_lift")
@@ -207,7 +207,7 @@ function load(
   meas::Measure) where Top
 
   id = get_id(op)
-  printstyled("\n Loading MDEIM structures for $Top variable $id";color=:blue)
+  printstyled("Loading MDEIM structures for $Top variable $id \n";color=:blue)
   path_id = joinpath(info.offline_path,"$id")
 
   os = load(path_id,op,meas)
@@ -220,8 +220,8 @@ function load(
   meas::Measure) where Ttr
 
   id = get_id(op)
-  printstyled("\n Loading projected Affine variable $id and MDEIM structures
-    for its lifting";color=:blue)
+  printstyled("Loading projected Affine variable $id and MDEIM structures
+    for its lifting\n";color=:blue)
   path_id = joinpath(info.offline_path,"$id")
   path_id_lift = joinpath(info.offline_path,"$(id)_lift")
 
@@ -237,7 +237,7 @@ function load(
   ::Measure)
 
   id = get_id(op)
-  printstyled("\n Loading projected Affine variable $id";color=:blue)
+  printstyled("Loading projected Affine variable $id \n";color=:blue)
   path_id = joinpath(info.offline_path,"$id")
 
   os = load(joinpath(path_id,"basis_space"))
@@ -251,7 +251,7 @@ end
 function eval_affine_decomposition(rbs::RBAffineDecomposition)
   op = get_op(rbs)
   id = get_id(op)
-  printstyled("\n Evaluating the RB offline quantity for $id";color=:blue)
+  printstyled("Evaluating the RB offline quantity for $id \n";color=:blue)
 
   eval_affine_decomposition(Val(issteady(op)),rbs)
 end

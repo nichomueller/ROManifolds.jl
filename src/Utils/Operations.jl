@@ -85,6 +85,11 @@ function spacetime_vector(fun::Function,::Val{true})
   (μ,u) -> fun(μ,u)[:]
 end
 
+function compute_rank(mat::AbstractMatrix;tol=1e-10)
+  Σ = svdvals(mat)
+  length(findall(x->abs(x)>tol,Σ))
+end
+
 istuple(tup::Any) = false
 istuple(tup::Tuple) = true
 

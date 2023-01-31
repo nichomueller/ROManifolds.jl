@@ -20,7 +20,7 @@ function Gridap.ODEs.TransientFETools.solve_step!(
   solve_step!(uF,solver,op,μ,u0,t0,nothing)
 end
 
-function Gridap.solve(
+function Gridap.FESpaces.solve(
   solver::ODESolver,
   op::ParamODEOperator,
   μ::Param,
@@ -156,7 +156,7 @@ function ParamTransientFESolution(
   ParamTransientFESolution(ode_sol,trial)
 end
 
-function Gridap.solve(
+function Gridap.FESpaces.solve(
   solver::ODESolver,
   op::ParamTransientFEOperator,
   μ::Vector{Param},
@@ -167,7 +167,7 @@ function Gridap.solve(
   Broadcasting(p -> ParamTransientFESolution(solver,op,p,u0,t0,tF))(μ)
 end
 
-function Gridap.solve(
+function Gridap.FESpaces.solve(
   solver::ODESolver,
   op::ParamTransientFEOperator,
   t0::Real,

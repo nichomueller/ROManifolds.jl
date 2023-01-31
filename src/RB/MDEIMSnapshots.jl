@@ -21,7 +21,7 @@ function vector_snapshots(
   V = assemble_vector(op)
 
   function snapshot(k::Int)
-    printstyled("\n Snapshot number $k, $id";color=:blue)
+    printstyled("Snapshot number $k, $id \n";color=:blue)
     V(μ[k])
   end
 
@@ -35,8 +35,8 @@ function vector_snapshots(
   μ::Vector{Param})
 
   id = get_id(op)
-  printstyled("\n Building snapshots by evaluating the parametric function
-    on the quadrature points, $id";color=:blue)
+  printstyled("Building snapshots by evaluating the parametric function
+    on the quadrature points, $id \n";color=:blue)
 
   Nt = get_Nt(op)
   timesθ = get_timesθ(op)
@@ -48,7 +48,7 @@ function vector_snapshots(
   V = assemble_functional_vector(op)
 
   function snapshot(::RBLinVariable,k::Int)
-    printstyled("\n Snapshot number $k at every time, $id";color=:blue)
+    printstyled("Snapshot number $k at every time, $id \n";color=:blue)
     v = Vector{Float}[]
     for nt in eachindex(timesθ)
       b = param_fun((k-1)*Nt+nt)
@@ -58,7 +58,7 @@ function vector_snapshots(
   end
 
   function snapshot(::RBLiftVariable,k::Int)
-    printstyled("\n Snapshot number $k at every time, $id";color=:blue)
+    printstyled("Snapshot number $k at every time, $id \n";color=:blue)
     v = Vector{Float}[]
     for (nt,tθ) in enumerate(timesθ)
       b = param_fun((k-1)*Nt+nt)
@@ -81,7 +81,7 @@ function matrix_snapshots(
   M = assemble_matrix(op)
 
   function snapshot(k::Int)
-    printstyled("\n Snapshot number $k, $id";color=:blue)
+    printstyled("Snapshot number $k, $id \n";color=:blue)
     nonzero_values(M(μ[k]),findnz_map)
   end
 
@@ -99,7 +99,7 @@ function matrix_snapshots(
   M,lift = assemble_matrix_and_lifting(op)
 
   function snapshot(k::Int)
-    printstyled("\n Snapshot number $k, $id";color=:blue)
+    printstyled("Snapshot number $k, $id \n";color=:blue)
     v = nonzero_values(M(μ[k]),findnz_map)
     l = lift(μ[k])
     v,l
@@ -123,7 +123,7 @@ function matrix_snapshots(
   M,lift = assemble_matrix_and_lifting(op)
 
   function snapshot(k::Int)
-    printstyled("\n Snapshot number $k at every time, $id";color=:blue)
+    printstyled("Snapshot number $k at every time, $id \n";color=:blue)
     v = nonzero_values(M(u_fun(k)),findnz_map)
     l = lift(u_fun(k))
     v,l
@@ -148,7 +148,7 @@ function matrix_snapshots(
   M,lift = assemble_matrix_and_lifting(op)
 
   function snapshot(k::Int)
-    printstyled("\n Snapshot number $k at every time, $id";color=:blue)
+    printstyled("Snapshot number $k at every time, $id \n";color=:blue)
     v,l = Vector{Float}[],Vector{Float}[]
     uk(n::Int) = uhθ_fun(k,n)
     for n in eachindex(timesθ)
@@ -169,8 +169,8 @@ function matrix_snapshots(
   μ::Vector{Param}) where Top
 
   id = get_id(op)
-  printstyled("\n Building snapshots by evaluating the parametric function
-    on the quadrature points, $id";color=:blue)
+  printstyled("Building snapshots by evaluating the parametric function
+    on the quadrature points, $id \n";color=:blue)
 
   Nt = get_Nt(op)
   timesθ = get_timesθ(op)
@@ -183,7 +183,7 @@ function matrix_snapshots(
   M,lift = assemble_functional_matrix_and_lifting(op)
 
   function snapshot(k::Int)
-    printstyled("\n Snapshot number $k at every time, $id";color=:blue)
+    printstyled("Snapshot number $k at every time, $id \n";color=:blue)
     v,l = Vector{Float}[],Vector{Float}[]
     for (nt,tθ) in enumerate(timesθ)
       b = param_fun((k-1)*Nt+nt)

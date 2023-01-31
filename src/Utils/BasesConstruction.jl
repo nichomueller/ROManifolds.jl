@@ -28,7 +28,7 @@ function POD(S::AbstractMatrix,X::SparseMatrixCSC;ϵ=1e-5)
   energies = cumsum(Σ.^2)
   n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
   err = sqrt(1-energies[n]/energies[end])
-  printstyled("\n Basis number obtained via POD is $n, projection error ≤ $err";
+  printstyled("Basis number obtained via POD is $n, projection error ≤ $err\n";
     color=:blue)
 
   Matrix((L'\U[:,1:n])[invperm(H.p),:])
@@ -41,8 +41,8 @@ function POD(S::AbstractMatrix,::Val{false};ϵ=1e-5)
   energies = cumsum(Σ.^2)
   n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
   err = sqrt(1-energies[n]/energies[end])
-  printstyled("\n Basis number obtained via POD is $n, projection error ≤ $err"
-    ;color=:blue)
+  printstyled("Basis number obtained via POD is $n, projection error ≤ $err\n";
+    color=:blue)
 
   U[:,1:n]
 end
@@ -63,8 +63,8 @@ function approx_POD(S::AbstractMatrix,::Val{true};ϵ=1e-5)
   matrix_err = sqrt(ntemp)*vcat(Σ[2:end],0.0)
   n = findall(x -> x ≤ ϵ,matrix_err)[1]
   err = matrix_err[n]
-  printstyled("\n Basis number obtained via approximated POD is $n,
-    projection error ≤ $err";color=:blue)
+  printstyled("Basis number obtained via approximated POD is $n,
+    projection error ≤ $err\n";color=:blue)
 
   U = S*V[:,1:n]
   for i = axes(U,2)
@@ -84,10 +84,21 @@ function approx_POD(S::AbstractMatrix,::Val{false};ϵ=1e-5)
   matrix_err = sqrt(ntemp)*vcat(Σ[2:end],0.0)
   n = findall(x -> x ≤ ϵ,matrix_err)[1]
   err = matrix_err[n]
-  printstyled("\n Basis number obtained via approximated POD is $n,
-    projection error ≤ $err";color=:blue)
+  printstyled("Basis number obtained via approximated POD is $n,
+    projection error ≤ $err\n";color=:blue)
 
   U[:,1:n]
+end
+
+function randomized_POD(S::AbstractMatrix;ϵ=1e-5,q=1)
+  nrow,ncol = size(S)
+  r = compute_rank(S;tol=ϵ)
+  gauss_mat = rand(Normal(0.,1.),ncol,2*r)
+  Y = nrow>ncol ? S*(S'*S)^q*gauss_mat : (S*S')^q*S*gauss_mat
+  Q,_ = qr(Y)
+  B = Q'*S
+  Utemp = POD(B;ϵ=ϵ)
+  Q*Utemp
 end
 
 function projection(vnew::AbstractVector,v::AbstractVector)

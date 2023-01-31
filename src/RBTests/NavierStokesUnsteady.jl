@@ -56,14 +56,15 @@ function navier_stokes_unsteady()
   opF = AffineParamOperator(f,ffe,PS,time_info,V;id=:F)
   opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
 
-  for st_mdeim = (false,true)
-    for tol = (1e-2,1e-3,1e-4,1e-5)
+  for st_mdeim = (false)#(false,true)
+    for
+      tol = (1e-3)#(1e-2,1e-3,1e-4,1e-5)
 
       info = RBInfoUnsteady(ptype,mesh,root;ϵ=tol,nsnap=80,online_snaps=95:100,
-        mdeim_snap=20,load_offline=false,st_mdeim=st_mdeim,postprocess=true)
+        mdeim_snap=20,load_offline=true,st_mdeim=st_mdeim,postprocess=true)
       tt = TimeTracker(OfflineTime(0.,0.),0.)
 
-      printstyled("\n Offline phase; tol=$tol, st_mdeim=$st_mdeim";color=:blue)
+      printstyled("Offline phase; tol=$tol, st_mdeim=$st_mdeim\n";color=:blue)
 
       μ_offline = μ[1:info.nsnap]
       uh_offline = uh[1:info.nsnap]
@@ -95,13 +96,13 @@ function navier_stokes_unsteady()
       ad_eval = eval_affine_decomposition(ad)
       param_on_structures = RBParamOnlineStructure(ad,ad_eval;st_mdeim=info.st_mdeim)
 
-      printstyled("\n Online phase; tol=$tol, st_mdeim=$st_mdeim";color=:red)
+      printstyled("Online phase; tol=$tol, st_mdeim=$st_mdeim\n";color=:red)
 
       rb_solver(res,jac,x0,Uk) = solve_rb_system(res,jac,x0,Uk,rbspace,time_info;tol=info.ϵ)
 
       function online_loop(k::Int)
-        printstyled("\n -------------------------------------------------------------")
-        printstyled("\n Evaluating RB system for μ = μ[$k]";color=:red)
+        printstyled("-------------------------------------------------------------\n")
+        printstyled("Evaluating RB system for μ = μ[$k]\n";color=:red)
         tt.online_time += @elapsed begin
           res,jac = unsteady_navier_stokes_rb_system(param_on_structures,μ[k])
           Uk(t) = get_trial(U)(μ[k],t)
@@ -118,7 +119,7 @@ function navier_stokes_unsteady()
       res_u,res_p = RBResults(:u,tt,ets_u),RBResults(:p,tt,ets_p)
       save(info,res_u)
       save(info,res_p)
-      printstyled("\n Average online wall time: $(tt.online_time/length(ets_u)) s";
+      printstyled("Average online wall time: $(tt.online_time/length(ets_u)) s";
         color=:red)
 
       if info.postprocess

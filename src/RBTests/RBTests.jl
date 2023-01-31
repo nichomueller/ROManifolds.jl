@@ -105,10 +105,10 @@ function fe_snapshots(
   args...)
 
   if run_fem
-    printstyled("\n Generating $nsnap full order snapshots";color=:blue)
+    printstyled("Generating $nsnap full order snapshots\n";color=:blue)
     generate_fe_snapshots(ptype,solver,op,fepath,nsnap,args...)
   else
-    printstyled("\n Loading $nsnap full order snapshots";color=:blue)
+    printstyled("Loading $nsnap full order snapshots\n";color=:blue)
     load_fe_snapshots(isindef(ptype),fepath,nsnap)
   end
 end
@@ -175,7 +175,7 @@ function collect_solutions(sol)
 end
 
 function collect_solutions(solk,k::Int)
-  printstyled("\n Collecting solution $k";color=:blue)
+  printstyled("Collecting solution $k\n";color=:blue)
   xh = Vector{Float}[]
   collect_solution!(xh,solk)
   xh,solk.psol.μ
@@ -196,7 +196,7 @@ function collect_solution!(
 
   k = 1
   for (xk,_) in solk
-    printstyled("\n Time step: $k";color=:blue)
+    printstyled("Time step: $k\n";color=:blue)
     push!(x,copy(xk))
     k += 1
   end

@@ -54,7 +54,7 @@ function offline_phase(
   meas::ProblemMeasures,
   tt::TimeTracker)
 
-  printstyled("\n Offline phase, reduced basis method";color=:blue)
+  printstyled("Offline phase, reduced basis method\n";color=:blue)
 
   uh,μ = fesol
   uh_offline = uh[1:info.nsnap]
@@ -84,13 +84,13 @@ function online_phase(
   param_on_structures::Tuple,
   tt::TimeTracker)
 
-  printstyled("\n Online phase, reduced basis method";color=:red)
+  printstyled("Online phase, reduced basis method\n";color=:red)
 
   uh,μ = fesol
 
   function online_loop(k::Int)
-    printstyled("\n -------------------------------------------------------------")
-    printstyled("Evaluating RB system for μ = μ[$k]";color=:red)
+    printstyled("-------------------------------------------------------------\n")
+    printstyled("Evaluating RB system for μ = μ[$k]\n";color=:red)
     tt.online_time += @elapsed begin
       lhs,rhs = steady_poisson_rb_system(param_on_structures,μ[k])
       rb_sol = solve_rb_system(lhs,rhs)
@@ -103,7 +103,7 @@ function online_phase(
   ets = online_loop.(info.online_snaps)
   res = RBResults(:u,tt,ets)
   save(info,res)
-  printstyled("\n Average online wall time: $(tt.online_time/length(ets_u)) s";
+  printstyled("Average online wall time: $(tt.online_time/length(ets_u)) s";
     color=:red)
 
   if info.postprocess

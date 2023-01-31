@@ -127,14 +127,14 @@ function solve_rb_system(
   iter = 0
   while norm(err) ≥ tol && iter < maxit
     if norm(err) ≥ maxtol
-      printstyled("\n Newton iterations did not converge";color=:red)
+      printstyled("Newton iterations did not converge\n";color=:red)
       return x_rb
     end
     jx_rb,rx_rb = jac(u(x_rb)),res(u(x_rb),ud(x_rb),x_rb)
     err = jx_rb \ rx_rb
     x_rb -= err
     iter += 1
-    printstyled("\n Newton method: err = $(norm(err)), iter = $iter";color=:red)
+    printstyled("Newton method: err = $(norm(err)), iter = $iter\n";color=:red)
   end
 
   x_rb
@@ -177,7 +177,7 @@ function solve_rb_system(
   while norm(err) ≥ tol && iter < maxit
 
     if norm(err) ≥ maxtol
-      printstyled("\n Newton iterations did not converge";color=:red)
+      printstyled("Newton iterations did not converge\n";color=:red)
       return x_rb
     end
 
@@ -187,7 +187,7 @@ function solve_rb_system(
     uθ_fun = get_uθ_fun(x_rb)
     iter += 1
 
-    printstyled("\n Newton method: err = $(norm(err)), iter = $iter";color=:red)
+    printstyled("Newton method: err = $(norm(err)), iter = $iter\n";color=:red)
   end
 
   x_rb

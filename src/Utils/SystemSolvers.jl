@@ -9,7 +9,7 @@ function newton(res::Function,jac::Function,X::FESpace;tol=1e-10,maxit=10)
     xh -= err
     x = FEFunction(X,xh)
     iter += 1
-    printstyled("\n err = $(norm(err)), iter = $iter";color=:red)
+    printstyled("err = $(norm(err)), iter = $iter\n";color=:red)
   end
   xh
 end
@@ -26,7 +26,7 @@ function newton(res::Function,jac::Function,X::FESpace,t::Real,x0;tol=1e-10,maxi
     xh -= err
     x = FEFunction(X,xh[:,1])
     iter += 1
-    printstyled("\n err = $(norm(err)), iter = $iter";color=:red)
+    printstyled("err = $(norm(err)), iter = $iter\n";color=:red)
   end
   xh
 end

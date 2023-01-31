@@ -52,7 +52,7 @@ function stokes_unsteady()
   opF = AffineParamOperator(f,ffe,PS,time_info,V;id=:F)
   opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
 
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=true)
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-3,nsnap=80,mdeim_snap=20,load_offline=true)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
   rbspace,param_on_structures = offline_phase(info,(uh,ph,μ),(opA,opB,opBT,opM,opF,opH),measures,tt)
   online_phase(info,(uh,ph,μ),rbspace,param_on_structures,tt)
@@ -65,7 +65,7 @@ function offline_phase(
   meas::ProblemMeasures,
   tt::TimeTracker) where N
 
-  printstyled("\n Offline phase, reduced basis method";color=:blue)
+  printstyled("Offline phase, reduced basis method\n";color=:blue)
 
   uh,ph,μ = fesol
   uh_offline = uh[1:info.nsnap]
@@ -104,13 +104,13 @@ function online_phase(
   param_on_structures::Tuple,
   tt::TimeTracker)
 
-  printstyled("\n Online phase, reduced basis method";color=:red)
+  printstyled("Online phase, reduced basis method\n";color=:red)
 
   uh,ph,μ = fesol
 
   function online_loop(k::Int)
-    printstyled("\n -------------------------------------------------------------")
-    printstyled("Evaluating RB system for μ = μ[$k]";color=:red)
+    printstyled("-------------------------------------------------------------\n")
+    printstyled("Evaluating RB system for μ = μ[$k]\n";color=:red)
     tt.online_time += @elapsed begin
       lhs,rhs = unsteady_stokes_rb_system(param_on_structures,μ[k])
       rb_sol = solve_rb_system(lhs,rhs)
@@ -126,12 +126,12 @@ function online_phase(
   res_u,res_p = RBResults(:u,tt,ets_u),RBResults(:p,tt,ets_p)
   save(info,res_u)
   save(info,res_p)
-  printstyled("\n Average online wall time: $(tt.online_time/length(ets_u)) s";
+  printstyled("Average online wall time: $(tt.online_time/length(ets_u)) s";
     color=:red)
 
-  if info.postprocess
+  #= if info.postprocess
     postprocess(info,(res_u,res_p))
-  end
+  end =#
 end
 
 stokes_unsteady()

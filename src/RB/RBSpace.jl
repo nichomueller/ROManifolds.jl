@@ -176,7 +176,7 @@ end
 function rb_spacetime_projection(
   rbrow::RBSpaceUnsteady,
   rbcol::RBSpaceUnsteady,
-  mat::BlockMatrix;
+  mat::Block;
   idx_forwards=1:size(mat,1),
   idx_backwards=1:size(mat,1))
 

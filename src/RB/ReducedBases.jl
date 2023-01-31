@@ -86,9 +86,9 @@ function assemble_rb(
 
   tt.offline_time.basis_time += @elapsed begin
     bs_u = rb_space(info,snaps_u;kwargs...)
-    bs_p = rb_space(info,snaps_p)
+    bs_p = rb_space(info,snaps_p;kwargs...)
     bs_u_supr = add_space_supremizers(def,(bs_u,bs_p),opB,ph,μ)
-    bt_u = rb_time(info,snaps_u,bs_u;kwargs...)
+    bt_u = rb_time(info,snaps_u,bs_u)
     bt_p = rb_time(info,snaps_p,bs_p)
     bt_u_supr = add_time_supremizers(def,(bt_u,bt_p),tol...)
   end
@@ -106,7 +106,7 @@ function rb_space(
   snap::Snapshots;
   ϵ=info.ϵ,sparsity=false)
 
-  printstyled("\n Spatial POD, tolerance: $ϵ";color=:blue)
+  printstyled("Spatial POD, tolerance: $ϵ\n";color=:blue)
   if sparsity
     i,j,snap_nnz = findnz(snap)
     basis_space_nnz = POD(snap_nnz;ϵ=ϵ)
@@ -125,7 +125,7 @@ function rb_time(
   basis_space::Matrix{Float};
   ϵ=info.ϵ)
 
-  printstyled("\n Temporal POD, tolerance: $ϵ";color=:blue)
+  printstyled("Temporal POD, tolerance: $ϵ\n";color=:blue)
 
   s1 = get_snap(snap)
   ns = get_nsnap(snap)
@@ -164,7 +164,7 @@ function space_supremizers(
   ph::Snapshots,
   μ::Vector{Param})
 
-  printstyled("\n Computing primal supremizers";color=:blue)
+  printstyled("Computing primal supremizers\n";color=:blue)
 
   basis_u,basis_p = basis
   constraint_mat = assemble_constraint_matrix(opB,basis_p,ph,μ)
@@ -187,7 +187,7 @@ function assemble_constraint_matrix(
   μ::Vector{Param}) where Ttr
 
   @assert opB.id == :B
-  printstyled("\n Fetching supremizing operator Bᵀ";color=:blue)
+  printstyled("Fetching supremizing operator Bᵀ\n";color=:blue)
 
   B = matrix_B(opB,μ)
   Matrix(B')*basis_p
@@ -200,7 +200,7 @@ function assemble_constraint_matrix(
   μ::Vector{Param})
 
   @assert opB.id == :B
-  printstyled("\n Bᵀ is nonaffine: must assemble the constraint matrix";color=:blue)
+  printstyled("Bᵀ is nonaffine: must assemble the constraint matrix\n";color=:blue)
 
   B = matrix_B(opB,μ)
   Brb(k::Int) = Matrix(B[k]')*ph.snaps[:,k]
@@ -220,7 +220,7 @@ function add_time_supremizers(
   basis::NTuple{2,Matrix{Float}},
   tol=1e-2)
 
-  printstyled("\n Checking if supremizers in time need to be added";color=:blue)
+  printstyled("Checking if supremizers in time need to be added\n";color=:blue)
 
   basis_u,basis_p = basis
   basis_up = basis_u'*basis_p
@@ -232,11 +232,19 @@ function add_time_supremizers(
   end
 
   count = 0
+  ntp_minus_ntu = size(basis_p,2) - size(basis_u,2)
+  if ntp_minus_ntu > 0
+    for ntp = 1:ntp_minus_ntu
+      basis_u,basis_up = enrich(basis_u,basis_up,basis_p[:,ntp])
+      count += 1
+    end
+  end
+
   ntp = 1
   while ntp ≤ size(basis_up,2)
     proj = ntp == 1 ? zeros(size(basis_up[:,1])) : orth_projection(basis_up[:,ntp],basis_up[:,1:ntp-1])
     dist = norm(basis_up[:,1]-proj)
-    printstyled("\n Distance measure of basis vector number $ntp is: $dist";color=:blue)
+    printstyled("Distance measure of basis vector number $ntp is: $dist\n";color=:blue)
     if dist ≤ 1e-2
       basis_u,basis_up = enrich(basis_u,basis_up,basis_p[:,ntp])
       count += 1
@@ -247,6 +255,6 @@ function add_time_supremizers(
     ntp += 1
   end
 
-  printstyled("\n Added $count time supremizers";color=:blue)
+  printstyled("Added $count time supremizers\n";color=:blue)
   basis_u
 end
