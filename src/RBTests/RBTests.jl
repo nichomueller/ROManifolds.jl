@@ -44,10 +44,11 @@ function rom_off_on_paths(ptype::ProblemType,mesh::String,root::String,ϵ::Float
   end
 
   tpath = test_path(root,mesh,issteady(ptype))
-  new_tpath = joinpath(tpath,keyword())
+  rompath = joinpath(tpath,"rom")
+  keytpath = joinpath(rompath,keyword())
 
-  offpath = rom_offline_path(new_tpath,ϵ)
-  onpath = rom_online_path(new_tpath,ϵ)
+  offpath = rom_offline_path(keytpath,ϵ)
+  onpath = rom_online_path(keytpath,ϵ)
   offpath,onpath
 end
 

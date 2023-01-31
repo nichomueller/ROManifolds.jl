@@ -137,27 +137,28 @@ function offline_results_dict(info::RBInfoUnsteady)
   tests_path = get_parent_dir(info.offline_path;nparent=3)
 
   for tpath in get_all_subdirectories(tests_path)
-    case = tpath[findall(x->x=='/',tpath)[end]]
-    tol_case,ns,nt,toff_case = Float[],Float[],Float[],Vector{Float}[]
-    for tolpath in get_all_subdirectories(tpath)
-      push!(tol_case,tolpath[findall(x->x=='/',tolpath)[end]])
-      offpath = joinpath(tolpath,"offline")
-      for varpath in get_all_subdirectories(offpath)
-        push!(ns,size(load(joinpath(varpath,"basis_space")),2))
-        push!(nt,size(load(joinpath(varpath,"basis_time")),2))
-      end
-      onpath = joinpath(tolpath,"online")
-      if myisfile(joinpath(onpath,"times"))
-        toff = load(joinpath(onpath,"times"))[:,1]
-        push!(toff_case,toff)
+    case = last(split(tpath,'/'))
+    ns,nt,toff = (),(),""
+    tolpath = last(get_all_subdirectories(tpath))
+    offpath = joinpath(tolpath,"offline")
+    for varpath in get_all_subdirectories(offpath)
+      var = last(split(varpath,'/'))
+      bspath = joinpath(varpath,"basis_space")
+      btpath = joinpath(varpath,"basis_time")
+      if myisfile(bspath) && myisfile(btpath)
+        ns = (ns...,(var,size(load(bspath),2)))
+        nt = (nt...,(var,size(load(btpath),2)))
       end
     end
-    dict = merge(dict,Dict("tol_$case"=>tol_case,
-      "err_$(case)_u"=>err_case_u,"err_$(case)_p"=>err_case_p,
-      "toff_$(case)_case"=>toff_case,"ton_$(case)_case"=>ton_case))
+    onpath = joinpath(tolpath,"online")
+    if myisfile(joinpath(onpath,"times"))
+      toff = prod(load(joinpath(onpath,"times"))[1,2:3])
+    end
+    dict = merge(dict,Dict("ns_$(case)"=>ns,"nt_$(case)"=>nt,
+      "toff_$(case)"=>toff))
   end
 
-  save(joinpath(tests_path,"online_results"),dict)
+  save(joinpath(tests_path,"offline_results"),dict)
 end
 
 function online_results_dict(info::RBInfo)
@@ -165,24 +166,24 @@ function online_results_dict(info::RBInfo)
   tests_path = get_parent_dir(info.offline_path;nparent=3)
 
   for tpath in get_all_subdirectories(tests_path)
-    case = tpath[findall(x->x=='/',dir)[end]]
-    tol_case,err_case_u,err_case_p,ton_case = Float[],Float[],Float[],Float[]
+    case = last(split(tpath,'/'))
+    err_case_u,err_case_p,ton_case = NaN,NaN,NaN
     for tolpath in get_all_subdirectories(tpath)
-      push!(tol_case,tolpath[findall(x->x=='/',dir)[end]])
+      tol = parse(Float,last(split(tolpath,'/')))
       onpath = joinpath(tolpath,"online")
       if myisfile(joinpath(onpath,"errors_u"))
-        push!(err_case_u,last(load(joinpath(onpath,"errors_u"))))
+        err_case_u = last(load(joinpath(onpath,"errors_u")))
       end
       if myisfile(joinpath(onpath,"errors_p"))
-        push!(err_case_p,last(load(joinpath(onpath,"errors_p"))))
+        err_case_p = last(load(joinpath(onpath,"errors_p")))
       end
       if myisfile(joinpath(onpath,"times"))
-        ton = last(load(joinpath(onpath,"times")))
-        push!(ton_case,ton)
+        ton = load(joinpath(onpath,"times"))[2,2]
+        ton_case = ton
       end
+      dict = merge(dict,Dict("ns_$(case)_$tol"=>err_case_u,
+      "nt_$(case)_$tol"=>err_case_p,"ton_$(case)_$tol"=>ton_case))
     end
-    dict = merge(dict,Dict("tol_$case"=>tol_case,"err_$(case)_u"=>err_case_u,
-      "err_$(case)_p"=>err_case_p,"ton_$(case)_case"=>ton_case))
   end
 
   save(joinpath(tests_path,"online_results"),dict)
