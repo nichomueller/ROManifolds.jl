@@ -86,11 +86,11 @@ Gridap.evaluate(U::ParamTransientTrialFESpace,::Nothing) = U.Ud0
 """
 Functor-like evaluation. It allocates Dirichlet vals in general.
 """
+(U::SingleFieldFESpace)(::Param,::Real) = U
 (U::ParamTransientTrialFESpace)(μ::Param,t::Real) = Gridap.evaluate(U,μ,t)
-(U::ParamTransientTrialFESpace)(μ::Param) = Gridap.evaluate(U,μ)
-(U::ParamTransientTrialFESpace)(t::Real) = Gridap.evaluate(U,t)
+(U::ParamTransientTrialFESpace)(μ::Param) = t -> Gridap.evaluate(U,μ,t)
+(U::ParamTransientTrialFESpace)(t::Real) = μ -> Gridap.evaluate(U,μ,t)
 (U::ParamTransientTrialFESpace)(::Nothing,::Nothing) = Gridap.evaluate(U,nothing,nothing)
-(U::ParamTransientTrialFESpace)(::Nothing) = Gridap.evaluate(U,nothing)
 
 """
 Time derivative of the Dirichlet functions
@@ -164,13 +164,10 @@ function Gridap.evaluate(U::ParamTransientMultiFieldTrialFESpace,μ::Param)
 end
 
 function Gridap.evaluate(U::ParamTransientMultiFieldTrialFESpace,::Nothing,::Nothing)
-  MultiFieldFESpace([Gridap.evaluate(fesp,nothing) for fesp in U.spaces])
+  MultiFieldFESpace([Gridap.evaluate(fesp,nothing,nothing) for fesp in U.spaces])
 end
 
-function Gridap.evaluate(U::ParamTransientMultiFieldTrialFESpace,::Nothing)
-  Gridap.evaluate(U,nothing,nothing)
-end
-
+(U::TransientMultiFieldTrialFESpace)(::Param,::Real) = U
 (U::ParamTransientMultiFieldTrialFESpace)(μ,t) = Gridap.evaluate(U,μ,t)
 (U::ParamTransientMultiFieldTrialFESpace)(μ) = Gridap.evaluate(U,μ)
 
@@ -185,4 +182,25 @@ end
 
 function ParamTransientMultiFieldFESpace(spaces::Vector{<:SingleFieldFESpace})
   MultiFieldFESpace(spaces)
+end
+function Gridap.FESpaces.FEFunction(
+  trial::ParamTransientTrialFESpace,
+  u::AbstractVector,
+  μ::Param,
+  t::Real)
+
+  FEFunction(trial(μ,t),u)
+end
+
+function Gridap.FESpaces.FEFunction(
+  trial::ParamTransientTrialFESpace,
+  u::AbstractMatrix,
+  μ::Param,
+  times::Vector{<:Real})
+
+  Nt = length(times)
+  @assert size(u,2) == Nt "Wrong dimensions"
+
+  n(tθ) = findall(x -> x == tθ,timesθ)[1]
+  tθ -> FEFunction(trial,uk[:,n(tθ)],μ,tθ)
 end

@@ -104,4 +104,13 @@ function Gridap.evaluate(U::ParamMultiFieldTrialFESpace,::Nothing)
   MultiFieldFESpace([Gridap.evaluate(fesp,nothing) for fesp in U.spaces])
 end
 
+(U::MultiFieldFESpace)(::Param) = U
 (U::ParamMultiFieldTrialFESpace)(μ) = Gridap.evaluate(U,μ)
+
+function Gridap.FESpaces.FEFunction(
+  trial::ParamTrialFESpace,
+  u::AbstractVector,
+  μ::Param)
+
+  FEFunction(trial(μ),u)
+end

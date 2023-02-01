@@ -32,10 +32,10 @@ function stokes_unsteady()
 
   reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{3,Float},order)
   reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1)
-  V = MyTests(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet"])
-  U = MyTrials(V,g,ptype)
-  Q = MyTests(model,reffe2;conformity=:C0)
-  P = MyTrials(Q)
+  V = TestFESpace(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet"])
+  U = ParamTransientTrialFESpace(V,g)
+  Q = TestFESpace(model,reffe2;conformity=:C0)
+  P = TrialFESpace(Q)
   Y = ParamTransientMultiFieldFESpace([V,Q])
   X = ParamTransientMultiFieldFESpace([U,P])
 
@@ -52,7 +52,7 @@ function stokes_unsteady()
   opF = AffineParamOperator(f,ffe,PS,time_info,V;id=:F)
   opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
 
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-3,nsnap=80,mdeim_snap=20,load_offline=true)
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-3,nsnap=80,mdeim_snap=5,load_offline=true)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
   rbspace,param_on_structures = offline_phase(info,(uh,ph,μ),(opA,opB,opBT,opM,opF,opH),measures,tt)
   online_phase(info,(uh,ph,μ),rbspace,param_on_structures,tt)
@@ -62,7 +62,7 @@ function offline_phase(
   info::RBInfo,
   fesol,
   op::NTuple{N,ParamOperator},
-  meas::ProblemMeasures,
+  measures::ProblemMeasures,
   tt::TimeTracker) where N
 
   printstyled("Offline phase, reduced basis method\n";color=:blue)
@@ -82,13 +82,12 @@ function offline_phase(
   rbopF = RBVariable(opF,rbspace_u)
   rbopH = RBVariable(opH,rbspace_u)
 
-  Arb = RBAffineDecomposition(info,tt,rbopA,μ,meas,:dΩ)
-  Brb = RBAffineDecomposition(info,tt,rbopB,μ,meas,:dΩ)
-  BTrb = RBAffineDecomposition(info,tt,rbopBT,μ,meas,:dΩ)
-  Mrb = RBAffineDecomposition(info,tt,rbopM,μ,meas,:dΩ)
-  Frb = RBAffineDecomposition(info,tt,rbopF,μ,meas,:dΩ)
-  Hrb = RBAffineDecomposition(info,tt,rbopH,μ,meas,:dΓn)
-
+  Arb = RBAffineDecomposition(info,tt,rbopA,μ,measures,:dΩ)
+  Brb = RBAffineDecomposition(info,tt,rbopB,μ,measures,:dΩ)
+  BTrb = RBAffineDecomposition(info,tt,rbopBT,μ,measures,:dΩ)
+  Mrb = RBAffineDecomposition(info,tt,rbopM,μ,measures,:dΩ)
+  Frb = RBAffineDecomposition(info,tt,rbopF,μ,measures,:dΩ)
+  Hrb = RBAffineDecomposition(info,tt,rbopH,μ,measures,:dΓn)
 
   ad = (Arb,Brb,BTrb,Mrb,Frb,Hrb)
   ad_eval = eval_affine_decomposition(ad)

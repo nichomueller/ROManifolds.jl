@@ -53,7 +53,7 @@ end
 
 function assemble_affine_decomposition(
   ::RBInfo,
-  op::RBBilinVariable{Affine,<:TrialFESpace},
+  op::RBBilinVariable{Affine,<:SingleFieldFESpace},
   args...)
 
   id = get_id(op)
@@ -81,7 +81,7 @@ end
 
 function assemble_affine_decomposition(
   info::RBInfo,
-  op::RBBilinVariable{Top,<:TrialFESpace},
+  op::RBBilinVariable{Top,<:SingleFieldFESpace},
   args...) where Top
 
   id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
@@ -101,8 +101,9 @@ function assemble_affine_decomposition(
   printstyled("Bilinear operator $id and its lifting are $Top:
     running the MDEIM offline phase on $mdeim_nsnap snapshots\n";color=:blue)
 
-  ad,ad_lift = MDEIM(info,op,args...)
+  ad = MDEIM(info,op,args...)
   op_lift = RBLiftVariable(op)
+  ad_lift = MDEIM(info,op_lift,args...)
   RBAffineDecomposition(op,ad),RBAffineDecomposition(op_lift,ad_lift)
 end
 
@@ -110,11 +111,11 @@ get_op(rbs::RBAffineDecomposition) = rbs.op
 
 get_affine_decomposition(rbs::RBAffineDecomposition) = rbs.affine_decomposition
 
-function save(info::RBInfo,b,id::Symbol)
+function save(info::RBInfo,ad,id::Symbol)
   path_id = joinpath(info.offline_path,"$id")
   create_dir!(path_id)
   if info.save_offline
-    save(path_id,b)
+    save(path_id,ad)
   end
 end
 
@@ -128,14 +129,14 @@ end
 
 function save(
   path::String,
-  rbv::RBAffineDecomposition{Affine,Ttr,Matrix{Float}}) where Ttr
+  ad::RBAffineDecomposition{Affine,Ttr,Matrix{Float}}) where Ttr
 
-  os = get_affine_decomposition(rbv)
+  os = get_affine_decomposition(ad)
   save(joinpath(path,"basis_space"),os)
 end
 
-function save(path::String,rbv::RBAffineDecomposition)
-  os = get_affine_decomposition(rbv)
+function save(path::String,ad::RBAffineDecomposition)
+  os = get_affine_decomposition(ad)
   save(path,os)
 end
 
@@ -190,7 +191,7 @@ function load(
   meas::Measure) where {Top,Ttr}
 
   id = get_id(op)
-  printstyled("Loading MDEIM structures for $Top variable $id and its lifting";
+  printstyled("Loading MDEIM structures for $Top variable $id and its lifting \n";
     color=:blue)
   path_id = joinpath(info.offline_path,"$id")
   path_id_lift = joinpath(info.offline_path,"$(id)_lift")
@@ -203,7 +204,7 @@ end
 
 function load(
   info::RBInfo,
-  op::RBBilinVariable{Top,<:TrialFESpace},
+  op::RBBilinVariable{Top,<:SingleFieldFESpace},
   meas::Measure) where Top
 
   id = get_id(op)
@@ -233,7 +234,7 @@ end
 
 function load(
   info::RBInfo,
-  op::RBBilinVariable{Affine,<:TrialFESpace},
+  op::RBBilinVariable{Affine,<:SingleFieldFESpace},
   ::Measure)
 
   id = get_id(op)

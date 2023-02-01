@@ -33,10 +33,10 @@ function navier_stokes_unsteady()
 
   reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{3,Float},order)
   reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1)
-  V = MyTests(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet"])
-  U = MyTrials(V,g,ptype)
-  Q = MyTests(model,reffe2;conformity=:C0)
-  P = MyTrials(Q)
+  V = TestFESpace(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet"])
+  U = ParamTransientTrialFESpace(V,g)
+  Q = TestFESpace(model,reffe2;conformity=:C0)
+  P = TrialFESpace(Q)
   Y = ParamTransientMultiFieldFESpace([V,Q])
   X = ParamTransientMultiFieldFESpace([U,P])
 
@@ -61,7 +61,7 @@ function navier_stokes_unsteady()
       tol = (1e-3)#(1e-2,1e-3,1e-4,1e-5)
 
       info = RBInfoUnsteady(ptype,mesh,root;ϵ=tol,nsnap=80,online_snaps=95:100,
-        mdeim_snap=20,load_offline=true,st_mdeim=st_mdeim,postprocess=true)
+        mdeim_snap=20,load_offline=true,st_mdeim=st_mdeim,postprocess=false,save_online=false)
       tt = TimeTracker(OfflineTime(0.,0.),0.)
 
       printstyled("Offline phase; tol=$tol, st_mdeim=$st_mdeim\n";color=:blue)
@@ -105,7 +105,7 @@ function navier_stokes_unsteady()
         printstyled("Evaluating RB system for μ = μ[$k]\n";color=:red)
         tt.online_time += @elapsed begin
           res,jac = unsteady_navier_stokes_rb_system(param_on_structures,μ[k])
-          Uk(t) = get_trial(U)(μ[k],t)
+          Uk = U(μ[k])
           x0 = initial_guess(uh,ph,μ_offline,μ[k])
           rb_sol = rb_solver(res,jac,x0,Uk)
         end

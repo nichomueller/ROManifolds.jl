@@ -14,7 +14,7 @@ function LagrangianQuadRefFE(
   ::Type{T},
   p::Polytope{D},
   order::Int) where {T,D}
-  orders = tfill(order,Val{D}())
+  orders = Gridap.FESpaces.tfill(order,Val{D}())
   LagrangianQuadRefFE(T,p,orders)
 end
 
@@ -66,12 +66,62 @@ function _lagrangian_quad_ref_fe(
   GenericLagrangianRefFE(reffe,face_nodes)
 end
 
-function tfill(v, ::Val{D}) where D
-  t = tfill(v, Val{D-1}())
-  (v,t...)
+get_degree(order::Int,c=2) = c*order
+
+get_degree(test::SingleFieldFESpace,c=2) = get_degree(Gridap.FESpaces.get_order(test),c)
+
+function Gridap.get_background_model(test::SingleFieldFESpace)
+  get_background_model(get_triangulation(test))
 end
 
-tfill(v,::Val{0}) = ()
-tfill(v,::Val{1}) = (v,)
-tfill(v,::Val{2}) = (v,v)
-tfill(v,::Val{3}) = (v,v,v)
+function get_dimension(test::SingleFieldFESpace)
+  model = get_background_model(test)
+  maximum(model.grid.reffes[1].reffe.polytope.dface.dims)
+end
+
+function Gridap.FESpaces.get_order(test::SingleFieldFESpace)
+  basis = get_fe_basis(test)
+  first(basis.cell_basis.values[1].fields.orders)
+end
+
+function get_cell_quadrature(test::SingleFieldFESpace)
+  CellQuadrature(get_triangulation(test),get_degree(test))
+end
+
+struct LagrangianQuadFESpace
+  test::SingleFieldFESpace
+
+  function LagrangianQuadFESpace(model::DiscreteModel,order::Int)
+    reffe_quad = Gridap.ReferenceFE(lagrangian_quad,Float,order)
+    test = TestFESpace(model,reffe_quad,conformity=:L2)
+    new(test)
+  end
+end
+
+function LagrangianQuadFESpace(test::SingleFieldFESpace)
+  model = get_background_model(test)
+  order = Gridap.FESpaces.get_order(test)
+  LagrangianQuadFESpace(model,order)
+end
+
+function Gridap.FEFunction(
+  quad_fespace::LagrangianQuadFESpace,
+  vec::AbstractVector)
+
+  FEFunction(quad_fespace.test,vec)
+end
+
+function Gridap.FEFunction(
+  quad_fespace::LagrangianQuadFESpace,
+  mat::AbstractMatrix)
+
+  n -> FEFunction(quad_fespace.test,mat[:,n])
+end
+
+function get_phys_quad_points(test::SingleFieldFESpace)
+  trian = get_triangulation(test)
+  phys_map = get_cell_map(trian)
+  cell_quad = get_cell_quadrature(test)
+  cell_points = get_data(get_cell_points(cell_quad))
+  map(Gridap.evaluate,phys_map,cell_points)
+end

@@ -8,6 +8,8 @@ using SparseArrays
 using Arpack
 using DelimitedFiles
 using Parameters
+using Distributed
+using DistributedArrays
 using Test
 using PlotlyJS
 using ForwardDiff

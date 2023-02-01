@@ -72,7 +72,7 @@ function compute_coefficient(
 
   red_lu = get_red_lu_factors(mdeim)
   idx_space,idx_time = get_idx_space(mdeim),get_idx_time(mdeim)
-  red_timesθ = get_reduced_timesθ(op,idx_time)
+  red_timesθ = get_timesθ(op)[idx_time]
   m = get_red_measure(mdeim)
 
   A_idx = hyperred_structure(op,m,idx_space,red_timesθ)
@@ -130,34 +130,26 @@ function hyperred_structure(
 end
 
 function hyperred_structure(
-  op::RBSteadyLiftVariable{Nonaffine,Ttr},
+  op::RBSteadyLiftVariable{Nonaffine},
   m::Measure,
-  idx_space::Vector{Int}) where Ttr
+  idx_space::Vector{Int})
 
   fun = get_fe_function(op)
   dir(μ) = get_dirichlet_function(op)(μ)
-  fdofs_test = get_fdofs_on_full_trian(get_tests(op))
-  ddofs = get_ddofs_on_full_trian(get_trials(op))
-
-  Mlift(μ) = assemble_matrix((u,v)->fun(μ,m,u,v),get_trial_no_bc(op),get_test_no_bc(op))
-  lift(μ) = (Mlift(μ)[fdofs_test,ddofs]*dir(μ))[idx_space]
+  lift(μ) = assemble_vector(v->fun(μ,m,dir(μ),v),get_test(op))[idx_space]
 
   lift
 end
 
 function hyperred_structure(
-  op::RBUnsteadyLiftVariable{Nonaffine,Ttr},
+  op::RBUnsteadyLiftVariable{Nonaffine},
   m::Measure,
   idx_space::Vector{Int},
-  timesθ::Vector{<:Real}) where Ttr
+  timesθ::Vector{<:Real})
 
   fun = get_fe_function(op)
   dir(μ,tθ) = get_dirichlet_function(op)(μ,tθ)
-  fdofs_test = get_fdofs_on_full_trian(get_tests(op))
-  ddofs = get_ddofs_on_full_trian(get_trials(op))
-
-  Mlift(μ,tθ) = assemble_matrix((u,v)->fun(μ,tθ,m,u,v),get_trial_no_bc(op),get_test_no_bc(op))
-  lift(μ,tθ) = (Mlift(μ,tθ)[fdofs_test,ddofs]*dir(μ,tθ))[idx_space]
+  lift(μ,tθ) = assemble_vector(v->fun(μ,tθ,m,dir(μ,tθ),v),get_test(op))[idx_space]
   lift(μ) = Matrix(Broadcasting(tθ -> lift(μ,tθ))(timesθ))
 
   lift
@@ -193,35 +185,27 @@ function hyperred_structure(
 end
 
 function hyperred_structure(
-  op::RBSteadyLiftVariable{Nonlinear,Ttr},
+  op::RBSteadyLiftVariable{Nonlinear},
   m::Measure,
-  idx_space::Vector{Int}) where Ttr
+  idx_space::Vector{Int})
 
   fun = get_fe_function(op)
   dir(μ) = get_dirichlet_function(op)(μ)
-  fdofs_test = get_fdofs_on_full_trian(get_tests(op))
-  ddofs = get_ddofs_on_full_trian(get_trials(op))
-
-  Mlift(z) = assemble_matrix((u,v)->fun(m,z,u,v),get_trial_no_bc(op),get_test_no_bc(op))
-  lift(μ::Param,z) = (Mlift(z)[fdofs_test,ddofs]*dir(μ))[idx_space]
+  lift(μ) = assemble_vector(v->fun(m,z,dir(μ),v),get_test(op))[idx_space]
 
   lift
 end
 
 function hyperred_structure(
-  op::RBUnsteadyLiftVariable{Nonlinear,Ttr},
+  op::RBUnsteadyLiftVariable{Nonlinear},
   m::Measure,
   idx_space::Vector{Int},
-  timesθ::Vector{<:Real}) where Ttr
+  timesθ::Vector{<:Real})
 
   fun = get_fe_function(op)
   dir(μ,tθ) = get_dirichlet_function(op)(μ,tθ)
-  fdofs_test = get_fdofs_on_full_trian(get_tests(op))
-  ddofs = get_ddofs_on_full_trian(get_trials(op))
-
-  Mlift(tθ::Real,z) = assemble_matrix((u,v)->fun(m,z(tθ),u,v),get_trial_no_bc(op),get_test_no_bc(op))
-  lift(μ::Param,tθ::Real,z) = (Mlift(tθ,z)[fdofs_test,ddofs]*dir(μ,tθ))[idx_space]
-  lift(μ::Param,z) = Matrix(Broadcasting(tθ -> lift(μ,tθ,z))(timesθ))
+  lift(μ,tθ,z) = assemble_vector(v->fun(m,z(tθ),dir(μ,tθ),v),get_test(op))[idx_space]
+  lift(μ,z) = Matrix(Broadcasting(tθ -> lift(μ,tθ,z))(timesθ))
 
   lift
 end

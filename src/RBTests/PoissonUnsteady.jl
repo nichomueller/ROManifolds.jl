@@ -31,8 +31,8 @@ function poisson_unsteady()
   a,afe,m,mfe,f,ffe,h,hfe,g,lhs,rhs = poisson_functions(ptype,measures)
 
   reffe = Gridap.ReferenceFE(lagrangian,Float,order)
-  V = MyTests(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-  U = MyTrials(V,g,ptype)
+  V = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
+  U = ParamTransientTrialFESpace(V,g)
   op = ParamTransientAffineFEOperator(mfe,lhs,rhs,PS,U,V)
 
   solver = ThetaMethod(LUSolver(),dt,θ)

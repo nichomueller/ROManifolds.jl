@@ -30,6 +30,25 @@ function vector_snapshots(
 end
 
 function vector_snapshots(
+  ::Val,
+  op::RBLinVariable{Nonlinear},
+  μ::Vector{Param},
+  uh::Snapshots)
+
+  u_fun(k::Int) = FEFunction(op,uh[k],μ[k])
+  id = get_id(op)
+  V = assemble_vector(op)
+
+  function snapshot(k::Int)
+    printstyled("Snapshot number $k, $id \n";color=:blue)
+    V(μ[k],u_fun(k))
+  end
+
+  vals = snapshot.(eachindex(μ))
+  Snapshots(id,vals)
+end
+
+function vector_snapshots(
   ::Val{true},
   op::RBLinVariable{Nonaffine},
   μ::Vector{Param})
@@ -45,10 +64,10 @@ function vector_snapshots(
   nred_param_vals,red_param_vals = reduce_param_function(op,param_vals)
   param_fun = interpolate_param_function(op,red_param_vals)
 
-  V = assemble_functional_vector(op)
+  V = assemble_functional_variable(op)
 
   function snapshot(::RBLinVariable,k::Int)
-    printstyled("Snapshot number $k at every time, $id \n";color=:blue)
+    printstyled("Snapshot number $k, $id \n";color=:blue)
     v = Vector{Float}[]
     for nt in eachindex(timesθ)
       b = param_fun((k-1)*Nt+nt)
@@ -58,7 +77,7 @@ function vector_snapshots(
   end
 
   function snapshot(::RBLiftVariable,k::Int)
-    printstyled("Snapshot number $k at every time, $id \n";color=:blue)
+    printstyled("Snapshot number $k, $id \n";color=:blue)
     v = Vector{Float}[]
     for (nt,tθ) in enumerate(timesθ)
       b = param_fun((k-1)*Nt+nt)
@@ -73,7 +92,7 @@ end
 
 function matrix_snapshots(
   ::Val{false},
-  op::RBBilinVariable{Nonaffine,<:TrialFESpace},
+  op::RBBilinVariable,
   μ::Vector{Param})
 
   id = get_id(op)
@@ -90,77 +109,23 @@ function matrix_snapshots(
 end
 
 function matrix_snapshots(
-  ::Val{false},
-  op::RBBilinVariable{Nonaffine,Ttr},
-  μ::Vector{Param}) where Ttr
-
-  id = get_id(op)
-  findnz_map = get_findnz_map(op,μ)
-  M,lift = assemble_matrix_and_lifting(op)
-
-  function snapshot(k::Int)
-    printstyled("Snapshot number $k, $id \n";color=:blue)
-    v = nonzero_values(M(μ[k]),findnz_map)
-    l = lift(μ[k])
-    v,l
-  end
-
-  vl = snapshot.(eachindex(μ))
-  vals,lifts = first.(vl),last.(vl)
-  findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
-end
-
-function matrix_snapshots(
   ::Val,
-  op::RBSteadyBilinVariable{Nonlinear,Ttr},
+  op::RBBilinVariable{Nonlinear,Ttr},
   μ::Vector{Param},
   uh::Snapshots) where Ttr
 
-  u_fun(k::Int) = FEFunction(get_trial(op),uh[k],μ[k])
-
+  u_fun(k::Int) = FEFunction(op,uh[k],μ[k])
   id = get_id(op)
-  findnz_map = get_findnz_map(op,u_fun(1))
-  M,lift = assemble_matrix_and_lifting(op)
+  findnz_map = get_findnz_map(op,μ,u_fun)
+  M = assemble_matrix(op)
 
   function snapshot(k::Int)
-    printstyled("Snapshot number $k at every time, $id \n";color=:blue)
-    v = nonzero_values(M(u_fun(k)),findnz_map)
-    l = lift(u_fun(k))
-    v,l
+    printstyled("Snapshot number $k, $id \n";color=:blue)
+    nonzero_values(M(μ[k],u_fun(k)),findnz_map)
   end
 
-  vl = snapshot.(eachindex(μ))
-  vals,lifts = first.(vl),last.(vl)
-  findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
-end
-
-function matrix_snapshots(
-  ::Val,
-  op::RBUnsteadyBilinVariable{Nonlinear,Ttr},
-  μ::Vector{Param},
-  uhθ::Snapshots) where Ttr
-
-  timesθ = get_timesθ(op)
-  uhθ_fun(k::Int,n::Int) = FEFunction(get_trial(op),uhθ[k],μ[k],timesθ)(n)
-
-  id = get_id(op)
-  findnz_map = get_findnz_map(op,uhθ_fun(1,1))
-  M,lift = assemble_matrix_and_lifting(op)
-
-  function snapshot(k::Int)
-    printstyled("Snapshot number $k at every time, $id \n";color=:blue)
-    v,l = Vector{Float}[],Vector{Float}[]
-    uk(n::Int) = uhθ_fun(k,n)
-    for n in eachindex(timesθ)
-      push!(v,nonzero_values(M(uk(n)),findnz_map))
-      push!(l,lift(uk(n)))
-    end
-    Matrix(v),Matrix(l)
-  end
-
-  vl = snapshot.(eachindex(μ))
-  vals,lifts = first.(vl),last.(vl)
-  findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
+  vals = snapshot.(eachindex(μ))
+  findnz_map,Snapshots(id,vals)
 end
 
 function matrix_snapshots(
@@ -180,10 +145,10 @@ function matrix_snapshots(
   param_fun = interpolate_param_function(op,red_param_vals)
 
   findnz_map = get_findnz_map(op,μ)
-  M,lift = assemble_functional_matrix_and_lifting(op)
+  M,lift = assemble_functional_variable(op)
 
   function snapshot(k::Int)
-    printstyled("Snapshot number $k at every time, $id \n";color=:blue)
+    printstyled("Snapshot number $k, $id \n";color=:blue)
     v,l = Vector{Float}[],Vector{Float}[]
     for (nt,tθ) in enumerate(timesθ)
       b = param_fun((k-1)*Nt+nt)
@@ -196,25 +161,6 @@ function matrix_snapshots(
   vl = snapshot.(1:nred_param_vals)
   vals,lifts = first.(vl),last.(vl)
   findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
-end
-
-function basis_as_fefun(op::RBSteadyVariable)
-  bspace = get_basis_space_col(op)
-  test = get_test(op)
-  trial = get_trial(op)
-  fefun(n::Int) = FEFunction(test,bspace[:,n])
-  fefun_lift(μ::Param,n::Int) = FEFunction(trial(μ),bspace[:,n])
-  fefun,fefun_lift
-end
-
-function basis_as_fefun(op::RBUnsteadyVariable,rbspaceθ::RBSpaceUnsteady)
-  bspaceθ = get_basis_space(rbspaceθ)
-  test = get_test(op)
-  basis_as_fefun(test,bspaceθ)
-end
-
-function basis_as_fefun(space::FESpace,basis::Matrix{Float})
-  n -> FEFunction(space,basis[:,n])
 end
 
 function evaluate_param_function(op::RBUnsteadyVariable,μ::Vector{Param})

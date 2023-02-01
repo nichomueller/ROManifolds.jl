@@ -35,15 +35,6 @@ function MDEIM(
 end
 
 function MDEIM(
-  red_rbspace::NTuple{2,RBSpace},
-  red_lu_factors::NTuple{2,LU},
-  idx::NTuple{2,Tidx},
-  red_measure::NTuple{2,Measure}) where Tidx
-
-  MDEIM.(red_rbspace,red_lu_factors,idx,red_measure)
-end
-
-function MDEIM(
   info::RBInfo,
   op::RBLinVariable,
   μ::Vector{Param},
@@ -71,7 +62,7 @@ function MDEIM(
   args...)
 
   μ_mdeim = μ[1:info.mdeim_nsnap]
-  findnz_map,snaps... = mdeim_snapshots(info,op,μ_mdeim,args...)
+  findnz_map,snaps = mdeim_snapshots(info,op,μ_mdeim,args...)
   rbspace = mdeim_basis(info,snaps)
   red_rbspace = project_mdeim_basis(op,rbspace,findnz_map)
   idx = mdeim_idx(rbspace)
@@ -218,20 +209,6 @@ function rb_space_projection(
   red_basis_space
 end
 
-function rb_space_projection(
-  op::RBBilinVariable,
-  rb::NTuple{2,T},
-  findnz_map::Vector{Int}) where T
-
-  red_basis_space = rb_space_projection(op,first(rb),findnz_map)
-  op_lift = RBLiftVariable(op)
-  red_basis_space_lift = rb_space_projection(op_lift,last(rb),findnz_map)
-
-  red_basis_space,red_basis_space_lift
-end
-
-mdeim_idx(rbspace::NTuple{2,<:RBSpace}) = mdeim_idx.(rbspace)
-
 function mdeim_idx(rbspace::RBSpaceSteady)
   idx_space = mdeim_idx(get_basis_space(rbspace))
   idx_space
@@ -257,8 +234,6 @@ function mdeim_idx(M::Matrix{Float})
   unique(idx)
 end
 
-mdeim_idx(M::NTuple{N,Matrix{Float}}) where N = mdeim_idx.(M)
-
 function get_red_lu_factors(
   ::RBInfoSteady,
   rbspace::RBSpaceSteady,
@@ -268,32 +243,8 @@ function get_red_lu_factors(
   get_red_lu_factors(basis,idx_space)
 end
 
-function get_red_lu_factors(
-  info::RBInfoSteady,
-  rbspace::NTuple{2,RBSpaceSteady},
-  idx_space::NTuple{2,Vector{Int}})
-
-  Broadcasting((rb,idx)->get_red_lu_factors(info,rb,idx))(rbspace,idx_space)
-end
-
 function get_red_lu_factors(info::RBInfoUnsteady,args...)
   get_red_lu_factors(Val(info.st_mdeim),args...)
-end
-
-function get_red_lu_factors(
-  val::Val,
-  rbspace::NTuple{2,RBSpaceUnsteady},
-  idx_st::NTuple{2,NTuple{2,Vector{Int}}})
-
-  Broadcasting((rb,idx)->get_red_lu_factors(val,rb,idx))(rbspace,idx_st)
-end
-
-function get_red_lu_factors(
-  val::Val,
-  basis::NTuple{2,NTuple{2,Matrix{Float}}},
-  idx_st::NTuple{2,NTuple{2,Vector{Int}}})
-
-  Broadcasting((b,idx)->get_red_lu_factors(val,b,idx))(basis,idx_st)
 end
 
 function get_red_lu_factors(
@@ -305,13 +256,13 @@ function get_red_lu_factors(
   get_red_lu_factors(basis,first(idx_st))
 end
 
-function get_red_lu_factors(
+#= function get_red_lu_factors(
   ::Val{false},
   basis_st::NTuple{2,Matrix{Float}},
   idx_st::NTuple{2,Vector{Int}})
 
   get_red_lu_factors(first(basis_st),first(idx_st))
-end
+end =#
 
 function get_red_lu_factors(
   ::Val{true},
@@ -322,13 +273,13 @@ function get_red_lu_factors(
   get_red_lu_factors(basis,idx_st)
 end
 
-function get_red_lu_factors(
+#= function get_red_lu_factors(
   ::Val{true},
   basis_st::NTuple{2,Matrix{Float}},
   idx_st::NTuple{2,Vector{Int}})
 
   get_red_lu_factors(basis_st,idx_st)
-end
+end =#
 
 function get_red_lu_factors(
   basis::Matrix{Float},
@@ -357,14 +308,6 @@ recast_in_full_dim(idx_tmp::Vector{Int},findnz_map::Vector{Int}) =
 recast_in_full_dim(idx_tmp::NTuple{2,Vector{Int}},findnz_map::Vector{Int}) =
   recast_in_full_dim(first(idx_tmp),findnz_map),last(idx_tmp)
 
-function recast_in_full_dim(
-  idx_tmp::NTuple{2,NTuple{2,Vector{Int}}},
-  findnz_map::Vector{Int})
-
-  idx,idx_lift = idx_tmp
-  (recast_in_full_dim(first(idx),findnz_map),last(idx)),idx_lift
-end
-
 function get_red_measure(
   op::RBSteadyVariable,
   idx::Vector{Int},
@@ -383,30 +326,6 @@ function get_red_measure(
 
   m = getproperty(meas,field)
   get_red_measure(op,first(idx),m)
-end
-
-function get_red_measure(
-  op::RBSteadyBilinVariable,
-  idx::NTuple{2,Vector{Int}},
-  meas::ProblemMeasures,
-  field=:dΩ)
-
-  idx_space,idx_space_lift = idx
-  m = get_red_measure(op,idx_space,meas,field)
-  m_lift = get_red_measure(op,idx_space_lift,meas,field)
-  m,m_lift
-end
-
-function get_red_measure(
-  op::RBUnsteadyBilinVariable,
-  idx::NTuple{2,NTuple{2,Vector{Int}}},
-  meas::ProblemMeasures,
-  field=:dΩ)
-
-  idx_space,idx_space_lift = idx
-  m = get_red_measure(op,idx_space,meas,field)
-  m_lift = get_red_measure(op,idx_space_lift,meas,field)
-  m,m_lift
 end
 
 function get_red_measure(

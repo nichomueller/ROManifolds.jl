@@ -195,8 +195,8 @@ function mdeim_online_error(
   μ::Param,
   st_mdeim=false)
 
-  mat = evaluate(assemble_fe_structure(op),μ)
-  mat_rb = rb_projection(op,mat)
+  #mat = evaluate(assemble_fe_structure(op),μ)
+  #mat_rb = rb_projection(op,mat)
   mdeim_rb_tmp = online_assembler(op,mdeim,μ,st_mdeim)
   mdeim_rb = elim_shifted_matrix(mdeim_rb_tmp)
   infty_norm(mat_rb-mdeim_rb)
