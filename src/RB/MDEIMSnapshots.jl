@@ -80,7 +80,7 @@ function vector_snapshots(
     push!(vals,snapshot(k))
   end
 
-  findnz_map,Snapshots(id,vals)
+  Snapshots(id,vals)
 end
 
 function matrix_snapshots(
