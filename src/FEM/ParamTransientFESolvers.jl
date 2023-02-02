@@ -176,7 +176,7 @@ function Gridap.FESpaces.solve(
 
   μ = realization(op,n)
   trial = get_trial(op)
-  u0 = zero(trial(nothing))
+  u0 = zero(trial(nothing,nothing))
   solve(solver,op,μ,u0,t0,tF)
 end
 

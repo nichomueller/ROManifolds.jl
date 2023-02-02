@@ -260,37 +260,43 @@ function eval_affine_decomposition(rbs::RBAffineDecomposition)
   id = get_id(op)
   printstyled("Evaluating the RB offline quantity for $id \n";color=:blue)
 
-  eval_affine_decomposition(Val(issteady(op)),rbs)
+  eval_affine_decomposition(op,rbs)
 end
 
 function eval_affine_decomposition(
-  ::Val{true},
+  ::RBSteadyVariable,
   rbs::RBAffineDecomposition{Affine,Ttr,Matrix{Float}}) where Ttr
 
-  get_affine_decomposition(rbs)::Matrix{Float}
-end
-
-function eval_affine_decomposition(::Val{true},rbs::RBAffineDecomposition)
-  mdeim = get_affine_decomposition(rbs)
-  get_basis_space(mdeim)::Matrix{Float}
+  get_affine_decomposition(rbs)
 end
 
 function eval_affine_decomposition(
-  ::Val{false},
+  ::RBSteadyVariable,
+  rbs::RBAffineDecomposition)
+
+  mdeim = get_affine_decomposition(rbs)
+  get_basis_space(mdeim)
+end
+
+function eval_affine_decomposition(
+  ::RBUnsteadyVariable,
   rbs::RBAffineDecomposition{Affine,Ttr,Matrix{Float}}) where Ttr
 
   op = get_op(rbs)
   ns_row = get_ns(get_rbspace_row(op))
 
   os = get_affine_decomposition(rbs)
-  blocks(os,ns_row)::Vector{Matrix{Float}}
+  blocks(os,ns_row)
 end
 
-function eval_affine_decomposition(::Val{false},rbs::RBAffineDecomposition)
+function eval_affine_decomposition(
+  ::RBUnsteadyVariable,
+  rbs::RBAffineDecomposition)
+
   op = get_op(rbs)
   ns_row = get_ns(get_rbspace_row(op))
 
   mdeim = get_affine_decomposition(rbs)
   os = get_basis_space(mdeim)
-  blocks(os,ns_row)::Vector{Matrix{Float}}
+  blocks(os,ns_row)
 end

@@ -100,7 +100,7 @@ end
 
 function LagrangianQuadFESpace(test::SingleFieldFESpace)
   model = get_background_model(test)
-  order = Gridap.FESpaces.get_order(test)
+  order = 1
   LagrangianQuadFESpace(model,order)
 end
 

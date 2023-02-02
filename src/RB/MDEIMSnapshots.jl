@@ -50,7 +50,7 @@ end
 
 function vector_snapshots(
   ::Val{true},
-  op::RBLinVariable{Nonaffine},
+  op::RBLinVariable,
   μ::Vector{Param})
 
   id = get_id(op)
@@ -66,18 +66,7 @@ function vector_snapshots(
 
   V = assemble_functional_variable(op)
 
-  function snapshot(::RBLinVariable,k::Int)
-    printstyled("Snapshot number $k, $id \n";color=:blue)
-    v = Vector{Float}[]
-    for nt in eachindex(timesθ)
-      b = param_fun((k-1)*Nt+nt)
-      push!(v,V(b))
-    end
-    Matrix(v)
-  end
-
-  function snapshot(::RBLiftVariable,k::Int)
-    printstyled("Snapshot number $k, $id \n";color=:blue)
+  function snapshot(k::Int)
     v = Vector{Float}[]
     for (nt,tθ) in enumerate(timesθ)
       b = param_fun((k-1)*Nt+nt)
@@ -86,8 +75,12 @@ function vector_snapshots(
     Matrix(v)
   end
 
-  vals = Broadcasting(k->snapshot(op,k))(1:nred_param_vals)
-  Snapshots(id,vals)
+  vals = Matrix{Float}[]
+  @threads for k = 1:nred_param_vals
+    push!(vals,snapshot(k))
+  end
+
+  findnz_map,Snapshots(id,vals)
 end
 
 function matrix_snapshots(
@@ -145,22 +138,23 @@ function matrix_snapshots(
   param_fun = interpolate_param_function(op,red_param_vals)
 
   findnz_map = get_findnz_map(op,μ)
-  M,lift = assemble_functional_variable(op)
+  M = assemble_functional_variable(op)
 
   function snapshot(k::Int)
-    printstyled("Snapshot number $k, $id \n";color=:blue)
-    v,l = Vector{Float}[],Vector{Float}[]
+    v = Vector{Float}[]
     for (nt,tθ) in enumerate(timesθ)
       b = param_fun((k-1)*Nt+nt)
-      push!(v,nonzero_values(M(b),findnz_map))
-      push!(l,lift(b,μ[k],tθ))
+      push!(v,nonzero_values(M(b,μ[k],tθ),findnz_map))
     end
-    Matrix(v),Matrix(l)
+    Matrix(v)
   end
 
-  vl = snapshot.(1:nred_param_vals)
-  vals,lifts = first.(vl),last.(vl)
-  findnz_map,Snapshots(id,vals),Snapshots(id*:_lift,lifts)
+  vals = Matrix{Float}[]
+  @threads for k = 1:nred_param_vals
+    push!(vals,snapshot(k))
+  end
+
+  findnz_map,Snapshots(id,vals)
 end
 
 function evaluate_param_function(op::RBUnsteadyVariable,μ::Vector{Param})
@@ -175,7 +169,12 @@ function evaluate_param_function(op::RBUnsteadyVariable,μ::Vector{Param})
     Matrix(Broadcasting(n->param(n,μk,tθ))(eachindex(phys_quadp)))[:]
   param(μk::Param) = Matrix(Broadcasting(tθ->param(μk,tθ))(timesθ))[:]
 
-  Matrix(param.(μ))
+  param_vals = Vector{Float}[]
+  @threads for μk = μ
+    push!(param_vals,param(μk))
+  end
+
+  Matrix(param_vals)
 end
 
 function reduce_param_function(op::RBUnsteadyVariable,vals::Matrix{Float})

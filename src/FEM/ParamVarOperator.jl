@@ -358,12 +358,10 @@ function assemble_functional_variable(op::ParamSteadyBilinOperator)
 end
 
 function assemble_functional_variable(op::ParamUnsteadyBilinOperator)
-  timesθ = get_timesθ(op)
   afe = get_fe_function(op)
   trial = get_trial(op)
   test = get_test(op)
-  M(fun,μ,t) = assemble_matrix((u,v)->afe(fun,u,v),trial(μ,t),test)
-  (fun,μ) -> [M(fun,μ,tθ) for tθ = timesθ]
+  (fun,μ,t) -> assemble_matrix((u,v)->afe(fun,u,v),trial(μ,t),test)
 end
 
 function assemble_functional_variable(op::ParamSteadyLiftOperator)
@@ -374,12 +372,10 @@ function assemble_functional_variable(op::ParamSteadyLiftOperator)
 end
 
 function assemble_functional_variable(op::ParamUnsteadyLiftOperator)
-  timesθ = get_timesθ(op)
   afe = get_fe_function(op)
   dir = get_dirichlet_function(op)
   test = get_test(op)
-  lift(fun,μ,t) = assemble_vector(v->afe(fun,dir(μ,t),v),test)
-  (fun,μ) -> Matrix([lift(fun,μ,tθ) for tθ = timesθ])
+  (fun,μ,t) -> assemble_vector(v->afe(fun,dir(μ,t),v),test)
 end
 
 function assemble_affine_variable(op::ParamSteadyLinOperator)

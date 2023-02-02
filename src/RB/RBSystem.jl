@@ -56,10 +56,10 @@ function steady_navier_stokes_rb_system(
 
   block12,block21,block22 = zeros(nu,np),zeros(np,nu),zeros(np,np)
   nonlin_rb_lhs1(u) = vcat(hcat(nonlin_lhs[1](u),block12),
-                           hcat(block21,block22))
+                           hcat(block21,block22))::Matrix{Float}
   nonlin_rb_lhs2(u) = vcat(hcat(nonlin_lhs[1](u)+nonlin_lhs[2](u),block12),
-                           hcat(block21,block22))
-  nonlin_rb_rhs(ud) = vcat(nonlin_rhs(ud),zeros(np,1))
+                           hcat(block21,block22))::Matrix{Float}
+  nonlin_rb_rhs(ud) = vcat(nonlin_rhs(ud),zeros(np,1))::Matrix{Float}
 
   jac_rb(u) = lin_rb_lhs + nonlin_rb_lhs2(u)
   lhs_rb(u) = lin_rb_lhs + nonlin_rb_lhs1(u)
@@ -83,17 +83,17 @@ function unsteady_navier_stokes_rb_system(
 
   block12,block21,block22 = zeros(nu,np),zeros(np,nu),zeros(np,np)
 
-  function nonlin_rb_lhs1(uθ)
+  function nonlin_rb_lhs1(uθ)::Matrix{Float}
     Cuθ,_ = nonlin_lhs(uθ)
     vcat(hcat(Cuθ,block12),hcat(block21,block22))
   end
 
-  function nonlin_rb_lhs2(uθ)
+  function nonlin_rb_lhs2(uθ)::Matrix{Float}
     Cuθ,Duθ = nonlin_lhs(uθ)
     vcat(hcat(Cuθ+Duθ,block12),hcat(block21,block22))
   end
 
-  nonlin_rb_rhs(uθ) = vcat(nonlin_rhs(uθ),zeros(np,1))
+  nonlin_rb_rhs(uθ) = vcat(nonlin_rhs(uθ),zeros(np,1))::Matrix{Float}
 
   jac_rb(uθ) = lin_rb_lhs + nonlin_rb_lhs2(uθ)
   lhs_rb(uθ) = lin_rb_lhs + nonlin_rb_lhs1(uθ)

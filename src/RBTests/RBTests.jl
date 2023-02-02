@@ -103,11 +103,12 @@ function fe_snapshots(
   fepath::String,
   run_fem::Bool,
   nsnap::Int,
-  args...)
+  args...;
+  kwargs...)
 
   if run_fem
     printstyled("Generating $nsnap full order snapshots\n";color=:blue)
-    generate_fe_snapshots(ptype,solver,op,fepath,nsnap,args...)
+    generate_fe_snapshots(ptype,solver,op,fepath,nsnap,args...;kwargs...)
   else
     printstyled("Loading $nsnap full order snapshots\n";color=:blue)
     load_fe_snapshots(isindef(ptype),fepath,nsnap)
@@ -127,10 +128,11 @@ function generate_fe_snapshots(
   solver::FESolver,
   op::ParamFEOperator,
   fepath::String,
-  nsnap::Int)
+  nsnap::Int;
+  kwargs...)
 
   sol = solve(solver,op,nsnap)
-  generate_fe_snapshots(isindef(ptype),sol,fepath)
+  generate_fe_snapshots(isindef(ptype),sol,fepath;kwargs...)
 end
 
 function generate_fe_snapshots(
@@ -140,23 +142,26 @@ function generate_fe_snapshots(
   fepath::String,
   nsnap::Int,
   t0::Real,
-  tF::Real)
+  tF::Real;
+  kwargs...)
 
   sol = solve(solver,op,t0,tF,nsnap)
-  generate_fe_snapshots(isindef(ptype),sol,fepath)
+  generate_fe_snapshots(isindef(ptype),sol,fepath;kwargs...)
 end
 
-function generate_fe_snapshots(::Val{false},sol,fepath::String)
+function generate_fe_snapshots(::Val{false},sol,fepath::String;save_snap=true)
   time = @elapsed begin
     uh,μ = collect_solutions(sol)
   end
   usnap = Snapshots(:u,uh)
-  save.((fepath,fepath),(usnap,μ))
-  save(fepath,Dict("FE time"=>time))
+  if save_snap
+    save.((fepath,fepath),(usnap,μ))
+    save(fepath,Dict("FE time"=>time))
+  end
   usnap,μ
 end
 
-function generate_fe_snapshots(::Val{true},sol,fepath::String)
+function generate_fe_snapshots(::Val{true},sol,fepath::String;save_snap=true)
   Ns = get_Ns(sol)
   time = @elapsed begin
     xh,μ = collect_solutions(sol)
@@ -164,22 +169,24 @@ function generate_fe_snapshots(::Val{true},sol,fepath::String)
   uh = Broadcasting(x->getindex(x,1:Ns[1],:))(xh)
   ph = Broadcasting(x->getindex(x,Ns[1]+1:Ns[1]+Ns[2],:))(xh)
   usnap,psnap = Snapshots(:u,uh),Snapshots(:p,ph)
-  save.((fepath,fepath,fepath),(usnap,psnap,μ))
-  save(fepath,Dict("FE time"=>time))
+  if save_snap
+    save.((fepath,fepath,fepath),(usnap,psnap,μ))
+    save(fepath,Dict("FE time"=>time))
+  end
   usnap,psnap,μ
 end
 
 function collect_solutions(sol)
-  solk(k::Int) = collect_solutions(sol[k],k)
-  results = solk.(eachindex(sol))
-  Matrix.(first.(results)),last.(results)
+  x,μ = Vector{Float}[],Param[]
+  @threads for k in eachindex(sol)
+    printstyled("Collecting solution $k\n";color=:blue)
+    collect_solutions!(x,μ,sol[k])
+  end
+  Matrix.(x),μ
 end
 
-function collect_solutions(solk,k::Int)
-  printstyled("Collecting solution $k\n";color=:blue)
-  xh = Vector{Float}[]
-  collect_solution!(xh,solk)
-  xh,solk.psol.μ
+function collect_solutions!(x,μ,solk)
+  collect_solution!(x,solk),push!(μ,solk.psol.μ)
 end
 
 function collect_solution!(
@@ -197,7 +204,6 @@ function collect_solution!(
 
   k = 1
   for (xk,_) in solk
-    printstyled("Time step: $k\n";color=:blue)
     push!(x,copy(xk))
     k += 1
   end

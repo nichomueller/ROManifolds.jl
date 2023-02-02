@@ -337,6 +337,14 @@ function navier_stokes_functions(::Val{false},measures::ProblemFixedMeasures)
   hfe(p::Param,t::Real,v) = hfe(p,t,dΓn,v)
   hfe(p::Param,t::Real) = v -> hfe(p,t,v)
 
+  # FUNCTIONAL MDEIM REPRESENTATION
+  afe(a,u,v) = ∫(a*∇(v)⊙∇(u))dΩ
+  bfe(b,u,q) = ∫(b*q*(∇⋅(u)))dΩ
+  bTfe(b,u,q) = ∫(b*(∇⋅(q))*u)dΩ
+  mfe(m,u,v) = ∫(m*v⋅u)dΩ
+  ffe(f,v) = ∫(f*v)dΩ
+  hfe(h,v) = ∫(h*v)dΓn
+
   #FOR SOME REASON, BETTER CONVERGENCE WITH THIS DEF OF NONLINEAR TERM
   conv(u,∇u) = (∇u')⋅u
   dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)

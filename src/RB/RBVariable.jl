@@ -154,8 +154,8 @@ function Gridap.FESpaces.assemble_matrix(op::RBBilinVariable{Affine,Ttr},args...
   assemble_matrix(op.feop,args...)(realization(op))
 end
 
-function assemble_functional_variable(op::RBVariable)
-  assemble_functional_variable(op.feop)
+function assemble_functional_variable(op::RBVariable,args...)
+  assemble_functional_variable(op.feop,args...)
 end
 
 function assemble_affine_variable(op::RBVariable)
