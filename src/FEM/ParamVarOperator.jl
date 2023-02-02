@@ -383,17 +383,17 @@ function assemble_functional_variable(op::ParamUnsteadyLiftOperator)
 end
 
 function assemble_affine_variable(op::ParamSteadyLinOperator)
-  assemble_vector(op)(realization(op))
+  assemble_vector(op)(realization(op))::Vector{Float}
 end
 
 function assemble_affine_variable(op::ParamUnsteadyLinOperator)
-  assemble_vector(op,realization(op.tinfo))(realization(op))
+  assemble_vector(op,realization(op.tinfo))(realization(op))::Vector{Float}
 end
 
 function assemble_affine_variable(op::ParamSteadyBilinOperator)
-  assemble_matrix(op)(realization(op))
+  assemble_matrix(op)(realization(op))::SparseMatrixCSC{Float,Int}
 end
 
 function assemble_affine_variable(op::ParamUnsteadyBilinOperator)
-  assemble_matrix(op,realization(op.tinfo))(realization(op))
+  assemble_matrix(op,realization(op.tinfo))(realization(op))::SparseMatrixCSC{Float,Int}
 end
