@@ -18,14 +18,14 @@ function vector_snapshots(
   μ::Vector{Param})
 
   id = get_id(op)
-  V = assemble_vector(op)
+  printstyled("MDEIM: generating snapshots for $id \n";color=:blue)
 
-  function snapshot(k::Int)
-    printstyled("Snapshot number $k, $id \n";color=:blue)
-    V(μ[k])
+  V = assemble_vector(op)
+  vals = Array{Float}[]
+  @threads for k in eachindex(μ)
+    push!(vals,V(μ[k]))
   end
 
-  vals = snapshot.(eachindex(μ))
   Snapshots(id,vals)
 end
 
@@ -35,16 +35,16 @@ function vector_snapshots(
   μ::Vector{Param},
   uh::Snapshots)
 
-  u_fun(k::Int) = FEFunction(op,uh[k],μ[k])
   id = get_id(op)
-  V = assemble_vector(op)
+  printstyled("MDEIM: generating snapshots for $id \n";color=:blue)
 
-  function snapshot(k::Int)
-    printstyled("Snapshot number $k, $id \n";color=:blue)
-    V(μ[k],u_fun(k))
+  u_fun(k::Int) = FEFunction(op,uh[k],μ[k])
+  V = assemble_vector(op)
+  vals = Array{Float}[]
+  @threads for k in eachindex(μ)
+    push!(vals,V(μ[k],u_fun(k)))
   end
 
-  vals = snapshot.(eachindex(μ))
   Snapshots(id,vals)
 end
 
@@ -96,15 +96,15 @@ function matrix_snapshots(
   μ::Vector{Param})
 
   id = get_id(op)
+  printstyled("MDEIM: generating snapshots for $id \n";color=:blue)
+
   findnz_map = get_findnz_map(op,μ)
   M = assemble_matrix(op)
-
-  function snapshot(k::Int)
-    printstyled("Snapshot number $k, $id \n";color=:blue)
-    nonzero_values(M(μ[k]),findnz_map)
+  vals = Matrix{Float}[]
+  @threads for k in eachindex(μ)
+    push!(vals,nonzero_values(M(μ[k]),findnz_map))
   end
 
-  vals = snapshot.(eachindex(μ))
   findnz_map,Snapshots(id,vals)
 end
 
@@ -114,17 +114,17 @@ function matrix_snapshots(
   μ::Vector{Param},
   uh::Snapshots) where Ttr
 
-  u_fun(k::Int) = FEFunction(op,uh[k],μ[k])
   id = get_id(op)
+  printstyled("MDEIM: generating snapshots for $id \n";color=:blue)
+
+  u_fun(k::Int) = FEFunction(op,uh[k],μ[k])
   findnz_map = get_findnz_map(op,μ,u_fun)
   M = assemble_matrix(op)
-
-  function snapshot(k::Int)
-    printstyled("Snapshot number $k, $id \n";color=:blue)
-    nonzero_values(M(μ[k],u_fun(k)),findnz_map)
+  vals = Matrix{Float}[]
+  @threads for k in eachindex(μ)
+    push!(vals,nonzero_values(M(μ[k],u_fun(k)),findnz_map))
   end
 
-  vals = snapshot.(eachindex(μ))
   findnz_map,Snapshots(id,vals)
 end
 

@@ -4,19 +4,19 @@ mutable struct Snapshots{T}
   nsnap::Int
 end
 
-function Snapshots(id::Symbol,snap::AbstractArray{T},nsnap::Int) where T
+function Snapshots(id::Symbol,snap::AbstractArray{T},nsnap::Int) where {T<:DataType}
   Snapshots{T}(id,snap,nsnap)
 end
 
-function Snapshots(id::Symbol,snap::AbstractArray)
+function Snapshots(id::Symbol,snap::AbstractArray{T}) where {T<:DataType}
   nsnap = get_nsnap(snap)
-  Snapshots(id,snap,nsnap)
+  Snapshots{T}(id,snap,nsnap)
 end
 
-function Snapshots(id::Symbol,blocks::Vector{<:AbstractArray})
+function Snapshots(id::Symbol,blocks::Vector{<:AbstractArray{T}}) where T
   snap = Matrix(blocks)
   nsnap = get_nsnap(blocks)
-  Snapshots(id,snap,nsnap)
+  Snapshots{T}(id,snap,nsnap)
 end
 
 function Snapshots(id::Symbol,snap::NTuple{N,AbstractArray}) where N

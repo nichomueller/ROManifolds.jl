@@ -2,16 +2,11 @@ function Base.Matrix(v::Vector{T}) where T
   Matrix{T}(reshape(v,:,1))
 end
 
-function Base.Matrix(vblock::Vector{Vector{T}}) where T
-  Matrix{T}(reduce(vcat,transpose.(vblock))')
+function Base.Matrix(block::Vector{<:AbstractArray{T}}) where T
+  Matrix{T}(reduce(hcat,block))
 end
 
-function Base.Matrix(mblock::Vector{T}) where {T<:AbstractMatrix}
-  @assert check_dimensions(mblock) "Wrong dimensions"
-  T(reduce(hcat,mblock))
-end
-
-function Base.Matrix(vblock::Vector{Vector{Vector{T}}}) where T
+function Base.Matrix(vblock::Vector{<:Vector{Vector{T}}}) where T
   n = length(vblock)
   mat = Matrix(vblock[1])
   if n > 1
@@ -71,19 +66,8 @@ end
 
 check_dimensions(vb::AbstractVector) =
   all([size(vb[i])[1] == size(vb[1])[1] for i = 2:length(vb)])
+
 check_dimensions(m::AbstractMatrix,nb::Int) = iszero(size(m)[2]%nb)
-
-function spacetime_vector(mat::AbstractMatrix)
-  mat[:]
-end
-
-function spacetime_vector(fun::Function,::Val{false})
-  μ -> fun(μ)[:]
-end
-
-function spacetime_vector(fun::Function,::Val{true})
-  (μ,u) -> fun(μ,u)[:]
-end
 
 function compute_rank(mat::AbstractMatrix;tol=1e-10)
   Σ = svdvals(mat)
@@ -91,6 +75,7 @@ function compute_rank(mat::AbstractMatrix;tol=1e-10)
 end
 
 istuple(tup::Any) = false
+
 istuple(tup::Tuple) = true
 
 function expand(tup::Tuple)

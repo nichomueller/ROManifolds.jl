@@ -61,7 +61,7 @@ function navier_stokes_unsteady()
       tol = (1e-3)#(1e-2,1e-3,1e-4,1e-5)
 
       info = RBInfoUnsteady(ptype,mesh,root;ϵ=tol,nsnap=80,online_snaps=95:100,
-        mdeim_snap=20,load_offline=true,st_mdeim=st_mdeim,postprocess=false,save_online=false)
+        mdeim_snap=20,load_offline=false,st_mdeim=st_mdeim,postprocess=false,save_online=false)
       tt = TimeTracker(OfflineTime(0.,0.),0.)
 
       printstyled("Offline phase; tol=$tol, st_mdeim=$st_mdeim\n";color=:blue)
@@ -87,7 +87,7 @@ function navier_stokes_unsteady()
       Brb = RBAffineDecomposition(info,tt,rbopB,μ,measures,:dΩ)
       BTrb = RBAffineDecomposition(info,tt,rbopBT,μ,measures,:dΩ)
       Crb = RBAffineDecomposition(info,tt,rbopC,μ,measures,:dΩ,uhθ_offline)
-      Drb = RBAffineDecomposition(info,tt,rbopD,μ,measures,:dΩ,uhθ_offline)
+      Drb = RBAffineDecomposition(info,tt,rbopD,μ,measures,:dΩ,uhθ_offline;lift=false)
       Mrb = RBAffineDecomposition(info,tt,rbopM,μ,measures,:dΩ)
       Frb = RBAffineDecomposition(info,tt,rbopF,μ,measures,:dΩ)
       Hrb = RBAffineDecomposition(info,tt,rbopH,μ,measures,:dΓn)

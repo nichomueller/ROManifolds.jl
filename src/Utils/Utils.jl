@@ -53,6 +53,7 @@ import Gridap.ODEs.TransientFETools:residual!
 import Gridap.ODEs.TransientFETools:jacobian!
 import Gridap.ODEs.TransientFETools:jacobians!
 import LineSearches:BackTracking
+import Base.Threads.@threads
 
 const Float = Float64
 

@@ -68,6 +68,9 @@ function compute_coefficient(
   mdeim::MDEIMUnsteady,
   ::Val{true})
 
+  spacetime_vector(fun::Function,::Val{false}) = μ -> fun(μ)[:]
+  spacetime_vector(fun::Function,::Val{true}) = (μ,u) -> fun(μ,u)[:]
+
   nnl = isnonlinear(op)
 
   red_lu = get_red_lu_factors(mdeim)

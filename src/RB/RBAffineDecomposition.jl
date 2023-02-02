@@ -10,17 +10,23 @@ function RBAffineDecomposition(
   RBAffineDecomposition{Top,Ttr,Tad}(op,affine_decomposition)
 end
 
-function RBAffineDecomposition(info::RBInfo,args...)
+function RBAffineDecomposition(info::RBInfo,args...;kwargs...)
   if info.load_offline
-    load(info,args...)
+    load(info,args...;kwargs...)
   else
-    assemble_affine_decomposition(info,args...)
+    assemble_affine_decomposition(info,args...;kwargs...)
   end
 end
 
-function assemble_affine_decomposition(info::RBInfo,tt::TimeTracker,op::RBVariable,args...)
+function assemble_affine_decomposition(
+  info::RBInfo,
+  tt::TimeTracker,
+  op::RBVariable,
+  args...;
+  lift=true)
+
   tt.offline_time.assembly_time += @elapsed begin
-    ad = assemble_affine_decomposition(info,op,args...)
+    ad = assemble_affine_decomposition(info,op,Val(lift),args...)
   end
   save(info,ad,get_id(op))
   ad
@@ -66,21 +72,6 @@ end
 
 function assemble_affine_decomposition(
   info::RBInfo,
-  op::RBBilinVariable{Affine,Ttr},
-  args...) where Ttr
-
-  id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
-  printstyled("Bilinear operator $id is Affine but its lifting is non-affine:
-    running the MDEIM offline phase on $mdeim_nsnap snapshots\n";color=:blue)
-
-  ad = rb_space_projection(op)
-  op_lift = RBLiftVariable(op)
-  ad_lift = MDEIM(info,op_lift,args...)
-  RBAffineDecomposition(op,ad),RBAffineDecomposition(op_lift,ad_lift)
-end
-
-function assemble_affine_decomposition(
-  info::RBInfo,
   op::RBBilinVariable{Top,<:SingleFieldFESpace},
   args...) where Top
 
@@ -94,7 +85,38 @@ end
 
 function assemble_affine_decomposition(
   info::RBInfo,
+  op::RBBilinVariable{Affine,Ttr},
+  ::Val{true},
+  args...) where Ttr
+
+  id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
+  printstyled("Bilinear operator $id is Affine but its lifting is non-affine:
+    running the MDEIM offline phase on $mdeim_nsnap snapshots\n";color=:blue)
+
+  ad = rb_space_projection(op)
+  op_lift = RBLiftVariable(op)
+  ad_lift = MDEIM(info,op_lift,args...)
+  RBAffineDecomposition(op,ad),RBAffineDecomposition(op_lift,ad_lift)
+end
+
+function assemble_affine_decomposition(
+  ::RBInfo,
+  op::RBBilinVariable{Affine,Ttr},
+  ::Val{false},
+  args...) where Ttr
+
+  id = get_id(op)
+  printstyled("Bilinear operator $id is Affine, not building its lifting\n";
+    color=:blue)
+
+  ad = rb_space_projection(op)
+  RBAffineDecomposition(op,ad)
+end
+
+function assemble_affine_decomposition(
+  info::RBInfo,
   op::RBBilinVariable{Top,Ttr},
+  ::Val{true},
   args...) where {Top,Ttr}
 
   id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
@@ -105,6 +127,20 @@ function assemble_affine_decomposition(
   op_lift = RBLiftVariable(op)
   ad_lift = MDEIM(info,op_lift,args...)
   RBAffineDecomposition(op,ad),RBAffineDecomposition(op_lift,ad_lift)
+end
+
+function assemble_affine_decomposition(
+  info::RBInfo,
+  op::RBBilinVariable{Top,Ttr},
+  ::Val{false},
+  args...) where {Top,Ttr}
+
+  id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
+  printstyled("Bilinear operator $id is $Top: running the MDEIM offline phase
+    on $mdeim_nsnap snapshots; not building its lifting\n";color=:blue)
+
+  ad = MDEIM(info,op,args...)
+  RBAffineDecomposition(op,ad)
 end
 
 get_op(rbs::RBAffineDecomposition) = rbs.op
@@ -144,17 +180,18 @@ function load(
   info::RBInfo,
   tt::TimeTracker,
   op::RBVariable,
-  args...)
+  args...;
+  lift=true)
 
   id = get_id(op)
   path_id = joinpath(info.offline_path,"$id")
   if ispath(path_id)
     _,meas,field = args
-    load(info,op,getproperty(meas,field))
+    load(info,op,getproperty(meas,field),Val(lift))
   else
     printstyled("Failed to load variable $(id):
       running offline assembler instead\n";color=:blue)
-    assemble_affine_decomposition(info,tt,op,args...)
+    assemble_affine_decomposition(info,tt,op,args...;lift=lift)
   end
 
 end
@@ -162,7 +199,8 @@ end
 function load(
   info::RBInfo,
   op::RBLinVariable{Top},
-  meas::Measure) where Top
+  meas::Measure,
+  args...) where Top
 
   id = get_id(op)
   printstyled("Loading MDEIM structures for $Top variable $id \n";color=:blue)
@@ -175,7 +213,8 @@ end
 function load(
   info::RBInfo,
   op::RBLinVariable{Affine},
-  ::Measure)
+  ::Measure,
+  args...)
 
   id = get_id(op)
   printstyled("Loading projected Affine variable $id \n";color=:blue)
@@ -187,8 +226,38 @@ end
 
 function load(
   info::RBInfo,
+  op::RBBilinVariable{Top,<:SingleFieldFESpace},
+  meas::Measure,
+  args...) where Top
+
+  id = get_id(op)
+  printstyled("Loading MDEIM structures for $Top variable $id \n";color=:blue)
+  path_id = joinpath(info.offline_path,"$id")
+
+  os = load(path_id,op,meas)
+  RBAffineDecomposition(op,os)
+end
+
+function load(
+  info::RBInfo,
+  op::RBBilinVariable{Affine,<:SingleFieldFESpace},
+  ::Measure,
+  args...)
+
+  id = get_id(op)
+  printstyled("Loading projected Affine variable $id \n";color=:blue)
+  path_id = joinpath(info.offline_path,"$id")
+
+  os = load(joinpath(path_id,"basis_space"))
+  RBAffineDecomposition(op,os)
+end
+
+
+function load(
+  info::RBInfo,
   op::RBBilinVariable{Top,Ttr},
-  meas::Measure) where {Top,Ttr}
+  meas::Measure,
+  ::Val{true}) where {Top,Ttr}
 
   id = get_id(op)
   printstyled("Loading MDEIM structures for $Top variable $id and its lifting \n";
@@ -204,11 +273,12 @@ end
 
 function load(
   info::RBInfo,
-  op::RBBilinVariable{Top,<:SingleFieldFESpace},
-  meas::Measure) where Top
+  op::RBBilinVariable{Top,Ttr},
+  meas::Measure,
+  ::Val{false}) where {Top,Ttr}
 
   id = get_id(op)
-  printstyled("Loading MDEIM structures for $Top variable $id \n";color=:blue)
+  printstyled("Loading MDEIM structures for $Top variable $id\n";color=:blue)
   path_id = joinpath(info.offline_path,"$id")
 
   os = load(path_id,op,meas)
@@ -218,7 +288,8 @@ end
 function load(
   info::RBInfo,
   op::RBBilinVariable{Affine,Ttr},
-  meas::Measure) where Ttr
+  meas::Measure,
+  ::Val{true}) where Ttr
 
   id = get_id(op)
   printstyled("Loading projected Affine variable $id and MDEIM structures
@@ -234,8 +305,9 @@ end
 
 function load(
   info::RBInfo,
-  op::RBBilinVariable{Affine,<:SingleFieldFESpace},
-  ::Measure)
+  op::RBBilinVariable{Affine,Ttr},
+  ::Measure,
+  ::Val{false}) where Ttr
 
   id = get_id(op)
   printstyled("Loading projected Affine variable $id \n";color=:blue)
