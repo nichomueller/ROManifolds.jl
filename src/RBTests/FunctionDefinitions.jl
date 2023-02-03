@@ -278,7 +278,7 @@ function navier_stokes_functions(::Val{false},measures::ProblemFixedMeasures)
 
   function a(x,p::Param,t::Real)
     μ = get_μ(p)
-    1/sum(μ)
+    1e-2/μ[3]
   end
   a(μ::Param,t::Real) = x->a(x,μ,t)
 
@@ -300,10 +300,11 @@ function navier_stokes_functions(::Val{false},measures::ProblemFixedMeasures)
   function g(x,p::Param,t::Real)
     μ = get_μ(p)
     R = 0.5
-    T = 2
+    T = 0.3
     dist = (x[1]^2+x[2]^2)/(R^2)
     #(1-cos(2*pi*t/T)+sin(μ[2]*2*pi*t/T)/μ[3])*
-    abs(1-cos(2*pi*t/T)+sin(μ[1]*2*pi*t/T)/μ[2])*VectorValue(0.,0.,1-dist)*(x[3]==0.)
+    abs(1-cos(2*pi*t/T)+μ[2]*sin(μ[1]*2*pi*t/T))*VectorValue(0.,0.,1-dist)*(x[3]==0.)
+    #abs(1-cos(2*pi*t/T)+sin(μ[1]*2*pi*t/T)/μ[2])*VectorValue(0.,0.,1-dist)*(x[3]==0.)
   end
   g(μ::Param,t::Real) = x->g(x,μ,t)
 

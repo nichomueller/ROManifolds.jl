@@ -177,13 +177,17 @@ function generate_fe_snapshots(::Val{true},sol,fepath::String;save_snap=true)
 end
 
 function collect_solutions(sol)
-  x,μ = Vector{Float}[],Param[]
+  x,μ = allocate_solutions(first(sol))
   @threads for k in eachindex(sol)
     printstyled("Collecting solution $k\n";color=:blue)
     collect_solutions!(x,μ,sol[k])
   end
   Matrix.(x),μ
 end
+
+allocate_solutions(::ParamFESolution) = Vector{Float}[],Param[]
+
+allocate_solutions(::ParamTransientFESolution) = Matrix{Float}[],Param[]
 
 function collect_solutions!(x,μ,solk)
   collect_solution!(x,solk),push!(μ,solk.psol.μ)
@@ -199,13 +203,15 @@ function collect_solution!(
 end
 
 function collect_solution!(
-  x::Vector{Vector{Float}},
+  x::Vector{Matrix{Float}},
   solk::ParamTransientFESolution)
 
-  k = 1
-  for (xk,_) in solk
-    push!(x,copy(xk))
-    k += 1
+  n = 1
+  xk = Vector{Float}[]
+  for (xn,n) in solk
+    printstyled("Time $n\n";color=:blue)
+    push!(xk,copy(xn))
   end
+  push!(x,Matrix(xk))
   x
 end
