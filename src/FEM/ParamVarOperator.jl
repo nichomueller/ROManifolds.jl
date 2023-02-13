@@ -313,7 +313,7 @@ function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLiftOperator{Nonlinear
   dir = get_dirichlet_function(op)
   test = get_test(op)
   lift(μ,t,u) = assemble_vector(v->afe(u(t),dir(μ,t),v),test)
-  (μ,u) -> [lift(μ,tθ,u) for tθ = timesθ]
+  (μ,u) -> Matrix([lift(μ,tθ,u) for tθ = timesθ])
 end
 
 function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLiftOperator{Nonlinear},t::Real)

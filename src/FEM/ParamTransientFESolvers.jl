@@ -140,22 +140,6 @@ function ParamTransientFESolution(
   ParamTransientFESolution(ode_sol,trial)
 end
 
-function ParamTransientFESolution(
-  solver::ODESolver,
-  op::ParamTransientFEOperator,
-  μ::Param,
-  uh0,
-  t0::Real,
-  tF::Real)
-
-  ode_op = get_algebraic_operator(op)
-  u0 = get_free_dof_values(uh0)
-  ode_sol = solve(solver,ode_op,μ,u0,t0,tF)
-  trial = get_trial(op)
-
-  ParamTransientFESolution(ode_sol,trial)
-end
-
 function Gridap.FESpaces.solve(
   solver::ODESolver,
   op::ParamTransientFEOperator,

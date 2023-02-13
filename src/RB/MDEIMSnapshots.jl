@@ -1,8 +1,8 @@
 function mdeim_snapshots(
-  info::RBInfo,
+  ::RBInfo,
   op::RBLinVariable,
   args...)
-  vector_snapshots(Val(info.fun_mdeim),op,args...)
+  vector_snapshots(op,args...)
 end
 
 function mdeim_snapshots(
@@ -13,7 +13,6 @@ function mdeim_snapshots(
 end
 
 function vector_snapshots(
-  ::Val{false},
   op::RBLinVariable{Nonaffine},
   μ::Vector{Param})
 
@@ -30,7 +29,6 @@ function vector_snapshots(
 end
 
 function vector_snapshots(
-  ::Val,
   op::RBLinVariable{Nonlinear},
   μ::Vector{Param},
   uh::Snapshots)

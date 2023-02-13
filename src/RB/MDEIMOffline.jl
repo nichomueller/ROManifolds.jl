@@ -256,14 +256,6 @@ function get_red_lu_factors(
   get_red_lu_factors(basis,first(idx_st))
 end
 
-#= function get_red_lu_factors(
-  ::Val{false},
-  basis_st::NTuple{2,Matrix{Float}},
-  idx_st::NTuple{2,Vector{Int}})
-
-  get_red_lu_factors(first(basis_st),first(idx_st))
-end =#
-
 function get_red_lu_factors(
   ::Val{true},
   rbspace::RBSpaceUnsteady,
@@ -272,14 +264,6 @@ function get_red_lu_factors(
   basis = get_basis_space(rbspace),get_basis_time(rbspace)
   get_red_lu_factors(basis,idx_st)
 end
-
-#= function get_red_lu_factors(
-  ::Val{true},
-  basis_st::NTuple{2,Matrix{Float}},
-  idx_st::NTuple{2,Vector{Int}})
-
-  get_red_lu_factors(basis_st,idx_st)
-end =#
 
 function get_red_lu_factors(
   basis::Matrix{Float},

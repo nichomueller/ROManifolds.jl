@@ -113,7 +113,7 @@ function solve_rb_system(
   x0::Matrix{Float},
   fespaces::NTuple{2,FESpace},
   rbspace::NTuple{2,RBSpace};
-  tol=1e-10,maxtol=1e10,maxit=10)
+  tol=1e-10,maxtol=1e10,maxit=20)
 
   Uk,Vk = fespaces
   bsu = get_basis_space(rbspace[1])
@@ -147,7 +147,7 @@ function solve_rb_system(
   Uk::Function,
   rbspace::NTuple{2,<:RBSpace},
   time_info::TimeInfo;
-  tol=1e-10,maxtol=1e10,maxit=10)
+  tol=1e-10,maxtol=1e10,maxit=20)
 
   timesθ = get_timesθ(time_info)
   θ = get_θ(time_info)

@@ -77,8 +77,7 @@ function poisson_functions(::Val{false},measures::ProblemFixedMeasures)
   h(p::Param) = t->h(p,t)
   function g(x,p::Param,t::Real)
     μ = get_μ(p)
-    tF = 2.5
-    exp(-x[1]/μ[2])*abs.(sin(μ[3]*t))
+    exp(-x[1]/μ[2])*abs.(sin(μ[3]*t))*minimum(μ)
   end
   g(p::Param,t::Real) = x->g(x,p,t)
   g(p::Param) = t->g(p,t)

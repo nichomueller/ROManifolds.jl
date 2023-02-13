@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function navier_stokes_unsteady()
-  run_fem = true
+  run_fem = false
 
   steady = false
   indef = true
@@ -16,10 +16,10 @@ function navier_stokes_unsteady()
                   "neumann" => ["outlet"])
   order = 2
 
-  t0,tF,dt,θ = 0.,0.3,0.0025,1
+  t0,tF,dt,θ = 0.,0.15,0.0025,1
   time_info = TimeInfo(t0,tF,dt,θ)
 
-  ranges = fill([1.,2.],3)
+  ranges = [[5.,10.],[0.3,0.8],[1.,2.]]
   sampling = UniformSampling()
   PS = ParamSpace(ranges,sampling)
 
@@ -44,7 +44,7 @@ function navier_stokes_unsteady()
 
   nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking())
   solver = ThetaMethod(nls,dt,θ)
-  nsnap = 1
+  nsnap = 100
   uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
 
   opA = NonaffineParamOperator(a,afe,PS,time_info,U,V;id=:A)
@@ -57,8 +57,8 @@ function navier_stokes_unsteady()
   opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
 
   for fun_mdeim = (true)#(false,true)
-    for st_mdeim = (false)#(false,true)
-      for tol = (1e-3) #(1e-2,1e-3,1e-4,1e-5)
+    for st_mdeim = (true)#(false,true)
+      for tol = (1e-2,1e-3,1e-4,1e-5)
 
         info = RBInfoUnsteady(ptype,mesh,root;ϵ=tol,nsnap=80,online_snaps=95:100,
           mdeim_snap=20,load_offline=false,postprocess=true,
@@ -126,10 +126,10 @@ function navier_stokes_unsteady()
         if info.postprocess
           trian = get_triangulation(model)
           k = rand(info.online_snaps)
-          writevtk(info,time_info,uh[k],t->get_trial(U)(μ[k],t),trian)
-          writevtk(info,time_info,ph[k],t->get_trial(P),trian)
-          writevtk(info,time_info,res_u,get_test(V),trian)
-          writevtk(info,time_info,res_u,get_test(Q),trian)
+          writevtk(info,time_info,uh[k],t->U(μ[k],t),trian)
+          writevtk(info,time_info,ph[k],t->P,trian)
+          writevtk(info,time_info,res_u,V,trian)
+          writevtk(info,time_info,res_u,Q,trian)
         end
       end
     end
