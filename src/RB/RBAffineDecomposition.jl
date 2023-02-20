@@ -49,8 +49,8 @@ function assemble_affine_decomposition(
   args...) where Top
 
   id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
-  printstyled("Linear operator $id is $Top:
-    running the MDEIM offline phase on $mdeim_nsnap snapshots \n";color=:blue)
+  printstyled("Linear operator $id is $Top:running the MDEIM offline phase on $mdeim_nsnap snapshots \n";
+    color=:blue)
 
   ad = MDEIM(info,op,args...)
   RBAffineDecomposition(op,ad)
@@ -62,8 +62,8 @@ function assemble_affine_decomposition(
   args...)
 
   id = get_id(op)
-  printstyled("Bilinear operator $id is Affine and has no lifting:
-    computing Φᵀ$(id)Φ\n";color=:blue)
+  printstyled("Bilinear operator $id is Affine and has no lifting: computing Φᵀ$(id)Φ\n";
+    color=:blue)
 
   ad = rb_space_projection(op)
   RBAffineDecomposition(op,ad)
@@ -75,8 +75,8 @@ function assemble_affine_decomposition(
   args...) where Top
 
   id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
-  printstyled("Bilinear operator $id is $Top and has no lifting:
-    running the MDEIM offline phase on $mdeim_nsnap snapshots\n";color=:blue)
+  printstyled("Bilinear operator $id is $Top and has no lifting: running the MDEIM offline phase on $mdeim_nsnap snapshots\n";
+    color=:blue)
 
   ad = MDEIM(info,op,args...)
   RBAffineDecomposition(op,ad)
@@ -88,8 +88,8 @@ function assemble_affine_decomposition(
   args...) where Ttr
 
   id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
-  printstyled("Bilinear operator $id is Affine but its lifting is non-affine:
-    running the MDEIM offline phase on $mdeim_nsnap snapshots\n";color=:blue)
+  printstyled("Bilinear operator $id is Affine but its lifting is non-affine: running the MDEIM offline phase on $mdeim_nsnap snapshots\n";
+    color=:blue)
 
   ad = rb_space_projection(op)
   op_lift = RBLiftVariable(op)
@@ -103,8 +103,8 @@ function assemble_affine_decomposition(
   args...) where {Top,Ttr}
 
   id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
-  printstyled("Bilinear operator $id and its lifting are $Top:
-    running the MDEIM offline phase on $mdeim_nsnap snapshots\n";color=:blue)
+  printstyled("Bilinear operator $id and its lifting are $Top: running the MDEIM offline phase on $mdeim_nsnap snapshots\n";
+    color=:blue)
 
   ad = MDEIM(info,op,args...)
   op_lift = RBLiftVariable(op)
@@ -157,8 +157,8 @@ function load(
     _,meas,field = args
     load(info,op,getproperty(meas,field))
   else
-    printstyled("Failed to load variable $(id):
-      running offline assembler instead\n";color=:blue)
+    printstyled("Failed to load variable $(id): running offline assembler instead\n";
+      color=:blue)
     assemble_affine_decomposition(info,tt,op,args...)
   end
 
@@ -240,8 +240,8 @@ function load(
   meas::Measure) where Ttr
 
   id = get_id(op)
-  printstyled("Loading projected Affine variable $id and MDEIM structures
-    for its lifting\n";color=:blue)
+  printstyled("Loading projected Affine variable $id and MDEIM structures for its lifting\n";
+    color=:blue)
   path_id = joinpath(info.offline_path,"$id")
   path_id_lift = joinpath(info.offline_path,"$(id)_lift")
 

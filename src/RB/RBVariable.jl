@@ -186,14 +186,14 @@ get_phys_quad_points(op::RBVariable) = get_phys_quad_points(op.feop)
 function get_findnz_map(
   op::RBBilinVariable,
   μ::Vector{Param},
-  args...)
+  args...)::Vector{Int}
 
   get_findnz_map(op,first(μ),args...)
 end
 
 function get_findnz_map(
   op::RBSteadyBilinVariable,
-  μ::Param)
+  μ::Param)::Vector{Int}
 
   M = assemble_matrix(op)(μ)
   first(findnz(M[:]))
@@ -201,7 +201,7 @@ end
 
 function get_findnz_map(
   op::RBUnsteadyBilinVariable,
-  μ::Param)
+  μ::Param)::Vector{Int}
 
   dtθ = get_dt(op)*get_θ(op)
   M = assemble_matrix(op,dtθ)(μ)
@@ -211,7 +211,7 @@ end
 function get_findnz_map(
   op::RBSteadyVariable{Nonlinear,Ttr},
   μ::Param,
-  f::Function) where Ttr
+  f::Function)::Vector{Int} where Ttr
 
   M = assemble_matrix(op)(μ,f(1))
   first(findnz(M[:]))
@@ -220,7 +220,7 @@ end
 function get_findnz_map(
   op::RBUnsteadyVariable{Nonlinear,Ttr},
   μ::Param,
-  f::Function) where Ttr
+  f::Function)::Vector{Int} where Ttr
 
   dtθ = get_dt(op)*get_θ(op)
   M = assemble_matrix(op,dtθ)(μ,f(1)(dtθ))

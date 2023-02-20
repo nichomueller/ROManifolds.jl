@@ -123,5 +123,5 @@ function get_phys_quad_points(test::SingleFieldFESpace)
   phys_map = get_cell_map(trian)
   cell_quad = get_cell_quadrature(test)
   cell_points = get_data(get_cell_points(cell_quad))
-  map(Gridap.evaluate,phys_map,cell_points)
+  map(evaluate,phys_map,cell_points)
 end

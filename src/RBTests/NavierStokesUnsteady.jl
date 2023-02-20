@@ -19,7 +19,7 @@ function navier_stokes_unsteady()
   t0,tF,dt,θ = 0.,0.15,0.0025,1
   time_info = TimeInfo(t0,tF,dt,θ)
 
-  ranges = [[5.,10.],[0.3,0.8],[1.,2.]]
+  ranges = [[1.,2.],[0.3,0.8],[1.,2.]]
   sampling = UniformSampling()
   PS = ParamSpace(ranges,sampling)
 
@@ -56,16 +56,16 @@ function navier_stokes_unsteady()
   opF = AffineParamOperator(f,ffe,PS,time_info,V;id=:F)
   opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
 
-  for fun_mdeim = (true)#(false,true)
-    for st_mdeim = (true)#(false,true)
+  for fun_mdeim = (false,true)
+    for st_mdeim = (false,true)
       for tol = (1e-2,1e-3,1e-4,1e-5)
 
-        info = RBInfoUnsteady(ptype,mesh,root;ϵ=tol,nsnap=80,online_snaps=95:100,
+        global info = RBInfoUnsteady(ptype,mesh,root;ϵ=tol,nsnap=80,online_snaps=95:100,
           mdeim_snap=20,load_offline=false,postprocess=true,
           fun_mdeim=fun_mdeim,st_mdeim=st_mdeim)
         tt = TimeTracker(OfflineTime(0.,0.),0.)
 
-        printstyled("Offline phase; tol=$tol, st_mdeim=$st_mdeim\n";color=:blue)
+        printstyled("Offline phase; tol=$tol, st_mdeim=$st_mdeim, fun_mdeim=$fun_mdeim\n";color=:blue)
 
         μ_offline = μ[1:info.nsnap]
         uh_offline = uh[1:info.nsnap]
@@ -120,16 +120,16 @@ function navier_stokes_unsteady()
         res_u,res_p = RBResults(:u,tt,ets_u),RBResults(:p,tt,ets_p)
         save(info,res_u)
         save(info,res_p)
-        printstyled("Average online wall time: $(tt.online_time/length(ets_u)) s";
+        printstyled("Average online wall time: $(tt.online_time/length(ets_u)) s\n";
           color=:red)
 
         if info.postprocess
           trian = get_triangulation(model)
-          k = rand(info.online_snaps)
+          k = first(info.online_snaps)
           writevtk(info,time_info,uh[k],t->U(μ[k],t),trian)
           writevtk(info,time_info,ph[k],t->P,trian)
           writevtk(info,time_info,res_u,V,trian)
-          writevtk(info,time_info,res_u,Q,trian)
+          writevtk(info,time_info,res_p,Q,trian)
         end
       end
     end

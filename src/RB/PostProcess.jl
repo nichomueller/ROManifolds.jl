@@ -135,58 +135,66 @@ end
 function offline_results_dict(info::RBInfoUnsteady)
   dict = Dict("")
   tests_path = get_parent_dir(info.offline_path;nparent=3)
+  summary_path = joinpath(tests_path,"results_summary")
+  create_dir!(summary_path)
 
   for tpath in get_all_subdirectories(tests_path)
-    case = last(split(tpath,'/'))
-    ns,nt,toff = (),(),""
-    tolpath = last(get_all_subdirectories(tpath))
-    offpath = joinpath(tolpath,"offline")
-    for varpath in get_all_subdirectories(offpath)
-      var = last(split(varpath,'/'))
-      bspath = joinpath(varpath,"basis_space")
-      btpath = joinpath(varpath,"basis_time")
-      if myisfile(bspath) && myisfile(btpath)
-        ns = (ns...,(var,size(load(bspath),2)))
-        nt = (nt...,(var,size(load(btpath),2)))
+    if tpath != summary_path
+      case = last(split(tpath,'/'))
+      ns,nt,toff = (),(),""
+      tolpath = first(get_all_subdirectories(tpath))
+      offpath = joinpath(tolpath,"offline")
+      for varpath in get_all_subdirectories(offpath)
+        var = last(split(varpath,'/'))
+        bspath = joinpath(varpath,"basis_space")
+        btpath = joinpath(varpath,"basis_time")
+        if myisfile(bspath) && myisfile(btpath)
+          ns = (ns...,(var,size(load(bspath),2)))
+          nt = (nt...,(var,size(load(btpath),2)))
+        end
       end
+      onpath = joinpath(tolpath,"online")
+      if myisfile(joinpath(onpath,"times"))
+        toff = prod(load(joinpath(onpath,"times"))[1,2:3])
+      end
+      dict = merge(dict,Dict("ns_$(case)"=>ns,"nt_$(case)"=>nt,
+        "toff_$(case)"=>toff))
     end
-    onpath = joinpath(tolpath,"online")
-    if myisfile(joinpath(onpath,"times"))
-      toff = prod(load(joinpath(onpath,"times"))[1,2:3])
-    end
-    dict = merge(dict,Dict("ns_$(case)"=>ns,"nt_$(case)"=>nt,
-      "toff_$(case)"=>toff))
   end
 
-  save(joinpath(tests_path,"offline_results"),dict)
+  save(joinpath(summary_path,"offline_results"),dict)
 end
 
 function online_results_dict(info::RBInfo)
   dict = Dict("")
   tests_path = get_parent_dir(info.offline_path;nparent=3)
+  summary_path = joinpath(tests_path,"results_summary")
+  create_dir!(summary_path)
 
   for tpath in get_all_subdirectories(tests_path)
-    case = last(split(tpath,'/'))
-    err_case_u,err_case_p,ton_case = NaN,NaN,NaN
-    for tolpath in get_all_subdirectories(tpath)
-      tol = parse(Float,last(split(tolpath,'/')))
-      onpath = joinpath(tolpath,"online")
-      if myisfile(joinpath(onpath,"errors_u"))
-        err_case_u = last(load(joinpath(onpath,"errors_u")))
+    if tpath != summary_path
+      case = last(split(tpath,'/'))
+      err_case_u,err_case_p,ton_case = NaN,NaN,NaN
+      for tolpath in get_all_subdirectories(tpath)
+        tol = parse(Float,last(split(tolpath,'/')))
+        onpath = joinpath(tolpath,"online")
+        if myisfile(joinpath(onpath,"errors_u"))
+          err_case_u = last(load(joinpath(onpath,"errors_u")))
+        end
+        if myisfile(joinpath(onpath,"errors_p"))
+          err_case_p = last(load(joinpath(onpath,"errors_p")))
+        end
+        if myisfile(joinpath(onpath,"times"))
+          ton = load(joinpath(onpath,"times"))[2,2]
+          ton_case = ton
+        end
+        dict = merge(dict,Dict("erru_$(case)_$tol"=>err_case_u,
+        "errp_$(case)_$tol"=>err_case_p,"ton_$(case)_$tol"=>ton_case))
       end
-      if myisfile(joinpath(onpath,"errors_p"))
-        err_case_p = last(load(joinpath(onpath,"errors_p")))
-      end
-      if myisfile(joinpath(onpath,"times"))
-        ton = load(joinpath(onpath,"times"))[2,2]
-        ton_case = ton
-      end
-      dict = merge(dict,Dict("ns_$(case)_$tol"=>err_case_u,
-      "nt_$(case)_$tol"=>err_case_p,"ton_$(case)_$tol"=>ton_case))
     end
   end
 
-  save(joinpath(tests_path,"online_results"),dict)
+  save(joinpath(summary_path,"online_results"),dict)
 end
 
 function mdeim_online_error(

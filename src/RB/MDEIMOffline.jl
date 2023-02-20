@@ -38,17 +38,19 @@ function MDEIM(
   info::RBInfo,
   op::RBLinVariable,
   μ::Vector{Param},
-  meas::ProblemMeasures,
-  field::Symbol,
+  measures::ProblemMeasures,
+  field::Symbol=:dΩ,
   args...)
 
   μ_mdeim = μ[1:info.mdeim_nsnap]
+  meas = getproperty(measures,field)
+
   snaps = mdeim_snapshots(info,op,μ_mdeim,args...)
   rbspace = mdeim_basis(info,snaps)
   red_rbspace = project_mdeim_basis(op,rbspace)
   idx = mdeim_idx(rbspace)
   red_lu_factors = get_red_lu_factors(info,rbspace,idx)
-  red_meas = get_red_measure(op,idx,meas,field)
+  red_meas = get_red_measure(op,idx,meas)
 
   MDEIM(red_rbspace,red_lu_factors,idx,red_meas)
 end
@@ -57,18 +59,20 @@ function MDEIM(
   info::RBInfo,
   op::RBBilinVariable,
   μ::Vector{Param},
-  meas::ProblemMeasures,
-  field::Symbol,
+  measures::ProblemMeasures,
+  field::Symbol=:dΩ,
   args...)
 
   μ_mdeim = μ[1:info.mdeim_nsnap]
+  meas = getproperty(measures,field)
+
   findnz_map,snaps = mdeim_snapshots(info,op,μ_mdeim,args...)
   rbspace = mdeim_basis(info,snaps)
   red_rbspace = project_mdeim_basis(op,rbspace,findnz_map)
   idx = mdeim_idx(rbspace)
   red_lu_factors = get_red_lu_factors(info,rbspace,idx)
   idx = recast_in_full_dim(idx,findnz_map)
-  red_meas = get_red_measure(op,idx,meas,field)
+  red_meas = get_red_measure(op,idx,meas)
 
   MDEIM(red_rbspace,red_lu_factors,idx,red_meas)
 end
@@ -145,8 +149,41 @@ get_idx_space(mdeim::MDEIMUnsteady) = first(mdeim.idx)
 get_idx_time(mdeim::MDEIMUnsteady) = last(mdeim.idx)
 get_red_measure(mdeim::MDEIM) = mdeim.red_measure
 
-mdeim_basis(info::RBInfoSteady,snaps) = RBSpaceSteady(snaps;ismdeim=Val(true),ϵ=info.ϵ)
-mdeim_basis(info::RBInfoUnsteady,snaps) = RBSpaceUnsteady(snaps;ismdeim=Val(true),ϵ=info.ϵ)
+function mdeim_basis(info::RBInfoSteady,snaps)
+  id = get_id(snaps)
+  basis_space = mdeim_POD(snaps;ϵ=info.ϵ)
+  RBSpaceSteady(id,basis_space)
+end
+
+function mdeim_basis(info::RBInfoUnsteady,snaps)
+  id = get_id(snaps)
+  s,ns = get_snap(snaps),get_nsnap(snaps)
+  basis_space = reduced_POD(s;ϵ=info.ϵ)#mdeim_POD(s;info.ϵ)
+  s2 = mode2_unfolding(basis_space'*s,ns)
+  basis_time = reduced_POD(s2;ϵ=info.ϵ)#mdeim_POD(s2;info.ϵ)
+  RBSpaceUnsteady(id,basis_space,basis_time)
+end
+
+function mdeim_POD(S::AbstractMatrix;ϵ=1e-5)
+  U,Σ,ntemp = iterative_reduced_POD(S;ϵ=ϵ)
+  energies = cumsum(Σ.^2)
+  idx = mdeim_idx(U[:,1:ntemp])
+
+  corrective_term = norm(inv(U[idx,1:ntemp]))
+  n = findall(x->x ≥ (1-ϵ^2)*energies[end]*corrective_term,energies)
+  if isempty(n)
+    rtol = min(size(S)...)*eps()*Σ[1]
+    r = count(x->x>rtol,Σ)
+    n = max(r,ntemp)
+  else
+    n = n[1]
+  end
+  err = sqrt(1-energies[n]/energies[end])
+  printstyled("Basis number obtained via POD is $n, projection error ≤ $err\n";
+    color=:blue)
+
+  U[:,1:n]
+end
 
 function project_mdeim_basis(
   op::RBSteadyVariable,
@@ -293,23 +330,11 @@ recast_in_full_dim(idx_tmp::NTuple{2,Vector{Int}},findnz_map::Vector{Int}) =
   recast_in_full_dim(first(idx_tmp),findnz_map),last(idx_tmp)
 
 function get_red_measure(
-  op::RBSteadyVariable,
-  idx::Vector{Int},
-  meas::ProblemMeasures,
-  field=:dΩ)
-
-  m = getproperty(meas,field)
-  get_red_measure(op,idx,m)
-end
-
-function get_red_measure(
-  op::RBUnsteadyVariable,
+  op::RBVariable,
   idx::NTuple{2,Vector{Int}},
-  meas::ProblemMeasures,
-  field=:dΩ)
+  meas::Measure)
 
-  m = getproperty(meas,field)
-  get_red_measure(op,first(idx),m)
+  get_red_measure(op,first(idx),meas)
 end
 
 function get_red_measure(
@@ -337,17 +362,28 @@ function find_mesh_elements(
 
   idx = recast_in_mat_form(op,idx_tmp)
   connectivity = get_cell_dof_ids(op,trian)
+  find_mesh_elements(Val{length(idx)>length(connectivity)}(),idx,connectivity)
+end
 
+function find_mesh_elements(::Val{true},idx::Vector{Int},connectivity)
   el = Int[]
-  for i = eachindex(idx)
-    for j = axes(connectivity,1)
-      if idx[i] in abs.(connectivity[j])
-        append!(el,j)
-      end
+  for eli = eachindex(connectivity)
+    if !isempty(intersect(idx,abs.(connectivity[eli])))
+      append!(el,eli)
     end
   end
 
   unique(el)
+end
+
+function find_mesh_elements(::Val{false},idx::Vector{Int},connectivity)
+  el = Vector{Int}[]
+  for i = idx
+    eli = findall(x->!isempty(intersect(abs.(x),i)),connectivity)
+    el = isempty(eli) ? el : push!(el,eli)
+  end
+
+  unique(reduce(vcat,el))
 end
 
 recast_in_mat_form(::RBLinVariable,idx_tmp::Vector{Int}) = idx_tmp

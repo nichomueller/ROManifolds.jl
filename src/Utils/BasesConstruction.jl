@@ -34,9 +34,7 @@ function POD(S::AbstractMatrix,X::SparseMatrixCSC;ϵ=1e-5)
   Matrix((L'\U[:,1:n])[invperm(H.p),:])
 end
 
-POD(S::AbstractMatrix;ϵ=1e-5) = POD(S,Val(false);ϵ=ϵ)
-
-function POD(S::AbstractMatrix,::Val{false};ϵ=1e-5)
+function POD(S::AbstractMatrix;ϵ=1e-5)
   U,Σ,_ = my_svd(S)
   energies = cumsum(Σ.^2)
   n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
@@ -48,23 +46,23 @@ function POD(S::AbstractMatrix,::Val{false};ϵ=1e-5)
 end
 
 function POD(S::AbstractMatrix,::Val{true};ϵ=1e-5)
-  nrow,ncol = size(S)
-  approx_POD(S,Val(nrow>ncol);ϵ=ϵ)
+  reduced_POD(S;ϵ=ϵ)
 end
 
-function approx_POD(S::AbstractMatrix,::Val{true};ϵ=1e-5)
+function reduced_POD(S::AbstractMatrix;ϵ=1e-5)
+  reduced_POD(Val{size(S,1)>size(S,2)}(),S;ϵ=ϵ)
+end
+
+function reduced_POD(::Val{true},S::AbstractMatrix;ϵ=1e-5)
   C = S'*S
   _,_,V = my_svd(C)
   Σ = svdvals(S)
 
   energies = cumsum(Σ.^2)
-  ntemp = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-
-  matrix_err = sqrt(ntemp)*vcat(Σ[2:end],0.0)
-  n = findall(x -> x ≤ ϵ,matrix_err)[1]
-  err = matrix_err[n]
-  printstyled("Basis number obtained via approximated POD is $n,
-    projection error ≤ $err\n";color=:blue)
+  n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
+  err = sqrt(1-energies[n]/energies[end])
+  printstyled("Basis number obtained via POD is $n, projection error ≤ $err\n";
+    color=:blue)
 
   U = S*V[:,1:n]
   for i = axes(U,2)
@@ -73,21 +71,48 @@ function approx_POD(S::AbstractMatrix,::Val{true};ϵ=1e-5)
   U
 end
 
-function approx_POD(S::AbstractMatrix,::Val{false};ϵ=1e-5)
+function reduced_POD(::Val{false},S::AbstractMatrix;ϵ=1e-5)
   C = S*S'
   U,_ = my_svd(C)
   Σ = svdvals(S)
 
-  energies = cumsum(Σ)
-  ntemp = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-
-  matrix_err = sqrt(ntemp)*vcat(Σ[2:end],0.0)
-  n = findall(x -> x ≤ ϵ,matrix_err)[1]
-  err = matrix_err[n]
-  printstyled("Basis number obtained via approximated POD is $n,
-    projection error ≤ $err\n";color=:blue)
+  energies = cumsum(Σ.^2)
+  n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
+  err = sqrt(1-energies[n]/energies[end])
+  printstyled("Basis number obtained via POD is $n, projection error ≤ $err\n";
+    color=:blue)
 
   U[:,1:n]
+end
+
+function iterative_reduced_POD(S::AbstractMatrix;ϵ=1e-5)
+  iterative_reduced_POD(Val{size(S,1)>size(S,2)}(),S;ϵ=ϵ)
+end
+
+function iterative_reduced_POD(::Val{true},S::AbstractMatrix;ϵ=1e-5)
+  C = S'*S
+  _,_,V = my_svd(C)
+  Σ = svdvals(S)
+
+  energies = cumsum(Σ.^2)
+  n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
+
+  U = S*V
+  for i = axes(U,2)
+    U[:,i] /= (Σ[i]+eps())
+  end
+  U,Σ,n
+end
+
+function iterative_reduced_POD(::Val{false},S::AbstractMatrix;ϵ=1e-5)
+  C = S*S'
+  U,_ = my_svd(C)
+  Σ = svdvals(S)
+
+  energies = cumsum(Σ.^2)
+  n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
+
+  U,Σ,n
 end
 
 function randomized_POD(S::AbstractMatrix;ϵ=1e-5,q=1)

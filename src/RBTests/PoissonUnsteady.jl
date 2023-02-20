@@ -44,12 +44,12 @@ function poisson_unsteady()
   opF = AffineParamOperator(f,ffe,PS,time_info,V;id=:F)
   opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
 
-  for fun_mdeim = (true)#(false,true)
+  for fun_mdeim = (false,true)
     for st_mdeim = (false,true)
       for tol = (1e-2,1e-3,1e-4,1e-5)
 
-        info = RBInfoUnsteady(ptype,mesh,root;ϵ=tol,nsnap=80,online_snaps=95:100,
-          mdeim_snap=20,load_offline=false,postprocess=true,
+        global info = RBInfoUnsteady(ptype,mesh,root;ϵ=tol,nsnap=80,online_snaps=95:100,
+          mdeim_snap=20,load_offline=true,postprocess=true,
           fun_mdeim=fun_mdeim,st_mdeim=st_mdeim)
         tt = TimeTracker(OfflineTime(0.,0.),0.)
 
@@ -90,12 +90,12 @@ function poisson_unsteady()
         ets = online_loop.(info.online_snaps)
         res = RBResults(:u,tt,ets)
         save(info,res)
-        printstyled("Average online wall time: $(tt.online_time/length(ets)) s";
+        printstyled("Average online wall time: $(tt.online_time/length(ets)) s\n";
           color=:red)
 
         if info.postprocess
           trian = get_triangulation(model)
-          k = rand(info.online_snaps)
+          k = first(info.online_snaps)
           writevtk(info,time_info,uh[k],t->U(μ[k],t),trian)
           writevtk(info,time_info,res,V,trian)
         end

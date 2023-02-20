@@ -28,7 +28,7 @@ function stokes_unsteady()
   model = model_info(mshpath,bnd_info,ptype)
   measures = ProblemMeasures(model,order)
 
-  a,afe,m,mfe,mfe_gridap,b,bfe,bTfe,f,ffe,h,hfe,g,lhs,rhs = stokes_functions(ptype,measures)
+  a,afe,m,mfe,jac_t,b,bfe,bTfe,f,ffe,h,hfe,g,lhs,rhs = stokes_functions(ptype,measures)
 
   reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{3,Float},order)
   reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1)
@@ -39,7 +39,7 @@ function stokes_unsteady()
   Y = ParamTransientMultiFieldFESpace([V,Q])
   X = ParamTransientMultiFieldFESpace([U,P])
 
-  op = ParamTransientAffineFEOperator(mfe_gridap,lhs,rhs,PS,X,Y)
+  op = ParamTransientAffineFEOperator(jac_t,lhs,rhs,PS,X,Y)
 
   solver = ThetaMethod(LUSolver(),dt,θ)
   nsnap = 100

@@ -60,6 +60,19 @@ function nonzero_values(mat::Vector{<:AbstractMatrix},findnz_map::Vector{Int})
   Matrix(Broadcasting(m -> nonzero_values(m,findnz_map))(mat))
 end
 
+function get_batches(mv::AbstractArray)
+  nthreads = Threads.nthreads()
+  batch_size = floor(Int,length(mv)/nthreads)
+  batch_idx = [(i-1)*batch_size+1:i*batch_size for i=1:nthreads]
+  batches = Broadcasting(idx->getindex(mv,idx))(batch_idx)
+  if batch_size*nthreads == length(mv)
+    batches
+  else
+    last_batch = nthreads*batch_size+1:length(mv)
+    [batches...,mv[last_batch]]
+  end
+end
+
 function Base.argmax(v::Vector,nval::Int)
   s = sort(v,rev=true)
   Int.(indexin(s,v))[1:nval]
