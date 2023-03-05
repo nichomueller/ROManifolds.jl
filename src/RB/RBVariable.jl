@@ -113,9 +113,7 @@ get_basis_space_col(rbop::RBVariable) = get_basis_space(get_rbspace_col(rbop))
 
 Gridap.FESpaces.get_test(rbop::RBVariable) = get_test(rbop.feop)
 
-Gridap.FESpaces.get_trial(rbop::RBBilinVariable) = get_trial(rbop.feop)
-
-Gridap.FESpaces.get_trial(rbop::RBLiftVariable) = get_trial(rbop.feop)
+Gridap.FESpaces.get_trial(rbop::RBVariable) = get_trial(rbop.feop)
 
 get_basis_time_row(rbop::RBVariable) = get_basis_time(get_rbspace_row(rbop))
 
@@ -167,6 +165,10 @@ get_dirichlet_function(op::RBVariable) = get_dirichlet_function(op.feop)
 get_pspace(op::RBVariable) = get_pspace(op.feop)
 
 realization(op::RBVariable) = realization(get_pspace(op))
+
+realization_trial(op::RBSteadyVariable) = get_trial(op)(realization(op))
+
+realization_trial(op::RBUnsteadyVariable) = get_trial(op)(realization(op),realization(get_time_info(op)))
 
 get_time_info(op::RBUnsteadyLinVariable) = get_time_info(op.feop)
 

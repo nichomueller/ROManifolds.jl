@@ -85,36 +85,6 @@ function reduced_POD(::Val{false},S::AbstractMatrix;ϵ=1e-5)
   U[:,1:n]
 end
 
-function iterative_reduced_POD(S::AbstractMatrix;ϵ=1e-5)
-  iterative_reduced_POD(Val{size(S,1)>size(S,2)}(),S;ϵ=ϵ)
-end
-
-function iterative_reduced_POD(::Val{true},S::AbstractMatrix;ϵ=1e-5)
-  C = S'*S
-  _,_,V = my_svd(C)
-  Σ = svdvals(S)
-
-  energies = cumsum(Σ.^2)
-  n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-
-  U = S*V
-  for i = axes(U,2)
-    U[:,i] /= (Σ[i]+eps())
-  end
-  U,Σ,n
-end
-
-function iterative_reduced_POD(::Val{false},S::AbstractMatrix;ϵ=1e-5)
-  C = S*S'
-  U,_ = my_svd(C)
-  Σ = svdvals(S)
-
-  energies = cumsum(Σ.^2)
-  n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-
-  U,Σ,n
-end
-
 function randomized_POD(S::AbstractMatrix;ϵ=1e-5,q=1)
   nrow,ncol = size(S)
   r = compute_rank(S;tol=ϵ)

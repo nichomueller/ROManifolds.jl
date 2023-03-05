@@ -46,15 +46,7 @@ function poisson_functions(::Val{false},measures::ProblemFixedMeasures)
 
   function a(x,p::Param,t::Real)
     μ = get_μ(p)
-    if (x[1] ≤ 0.75 && x[2] ≤ 0.5)
-      μ[1]
-    elseif (x[1] ≤ 0.75 && x[2] > 0.5)
-      μ[2]
-    elseif (x[1] > 0.75 && x[2] ≤ 0.5)
-      μ[3]
-    else
-      μ[4]
-    end
+    exp(x[1]/sum(μ))
   end
   a(p::Param,t::Real) = x->a(x,p,t)
   a(p::Param) = t->a(p,t)
@@ -277,7 +269,7 @@ function navier_stokes_functions(::Val{false},measures::ProblemFixedMeasures)
 
   function a(x,p::Param,t::Real)
     μ = get_μ(p)
-    1e-2*μ[1]
+    1e-3*μ[1]
   end
   a(μ::Param,t::Real) = x->a(x,μ,t)
 
@@ -299,6 +291,7 @@ function navier_stokes_functions(::Val{false},measures::ProblemFixedMeasures)
   function g(x,p::Param,t::Real)
     μ = get_μ(p)
     R = 0.5
+    tf = pi*t/0.15
     dist = (x[1]^2+x[2]^2)/(R^2)
     abs(1-cos(t)+μ[2]*sin(μ[3]*t))*VectorValue(0.,0.,1-dist)*(x[3]==0.)
   end

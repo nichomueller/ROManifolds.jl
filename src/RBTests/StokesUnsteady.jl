@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function stokes_unsteady()
-  run_fem = false
+  run_fem = true
 
   steady = false
   indef = true
@@ -11,12 +11,11 @@ function stokes_unsteady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/stokes"
-  mesh = "cylinder_h03.json"
-  bnd_info = Dict("dirichlet" => ["wall","inlet","inlet_c","inlet_p","outlet_c","outlet_p"],
-                  "neumann" => ["outlet"])
+  mesh = "bifurcation_coarse.json"
+  bnd_info = Dict("dirichlet0" => [4],"dirichlet_in1" => [2],"dirichlet_in2" => [3],"neumann" => [1])
   order = 2
 
-  t0,tF,dt,θ = 0.,2.5,0.05,1
+  t0,tF,dt,θ = 0.,0.15,0.0025,1
   time_info = TimeInfo(t0,tF,dt,θ)
 
   ranges = fill([1.,3.],6)
@@ -29,11 +28,15 @@ function stokes_unsteady()
   measures = ProblemMeasures(model,order)
 
   a,afe,m,mfe,jac_t,b,bfe,bTfe,f,ffe,h,hfe,g,lhs,rhs = stokes_functions(ptype,measures)
+  g0(x,p::Param,t::Real) = VectorValue(0,0,0)
+  g0(p::Param,t::Real) = x->g0(x,p,t)
+  gout(x,p::Param,t::Real) = 0.3*g(x,p,t)
+  gout(p::Param,t::Real) = x->gout(x,p,t)
 
   reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{3,Float},order)
   reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1)
-  V = TestFESpace(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet"])
-  U = ParamTransientTrialFESpace(V,g)
+  V = TestFESpace(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet_in1","dirichlet_in2"])
+  U = ParamTransientTrialFESpace(V,[g0,g,gout])
   Q = TestFESpace(model,reffe2;conformity=:C0)
   P = TrialFESpace(Q)
   Y = ParamTransientMultiFieldFESpace([V,Q])
@@ -42,9 +45,9 @@ function stokes_unsteady()
   op = ParamTransientAffineFEOperator(jac_t,lhs,rhs,PS,X,Y)
 
   solver = ThetaMethod(LUSolver(),dt,θ)
-  nsnap = 100
+  nsnap = 1
   uh,ph,μ, = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
-
+#=
   opA = NonaffineParamOperator(a,afe,PS,time_info,U,V;id=:A)
   opB = AffineParamOperator(b,bfe,PS,time_info,U,Q;id=:B)
   opBT = AffineParamOperator(b,bTfe,PS,time_info,P,V;id=:BT)
@@ -54,16 +57,6 @@ function stokes_unsteady()
 
   info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-3,nsnap=80,mdeim_snap=5,load_offline=true)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
-  rbspace,param_on_structures = offline_phase(info,(uh,ph,μ),(opA,opB,opBT,opM,opF,opH),measures,tt)
-  online_phase(info,(uh,ph,μ),rbspace,param_on_structures,tt)
-end
-
-function offline_phase(
-  info::RBInfo,
-  fesol,
-  op::NTuple{N,ParamOperator},
-  measures::ProblemMeasures,
-  tt::TimeTracker) where N
 
   printstyled("Offline phase, reduced basis method\n";color=:blue)
 
@@ -93,19 +86,7 @@ function offline_phase(
   ad_eval = eval_affine_decomposition(ad)
   param_on_structures = RBParamOnlineStructure(ad,ad_eval;st_mdeim=info.st_mdeim)
 
-  rbspace,param_on_structures
-end
-
-function online_phase(
-  info::RBInfo,
-  fesol,
-  rbspace::NTuple{2,RBSpace},
-  param_on_structures::Tuple,
-  tt::TimeTracker)
-
   printstyled("Online phase, reduced basis method\n";color=:red)
-
-  uh,ph,μ = fesol
 
   function online_loop(k::Int)
     printstyled("-------------------------------------------------------------\n")
@@ -128,8 +109,8 @@ function online_phase(
   printstyled("Average online wall time: $(tt.online_time/length(ets_u)) s";
     color=:red)
 
-  #= if info.postprocess
-    postprocess(info,(res_u,res_p))
+  if info.postprocess
+    postprocess(info)
   end =#
 end
 

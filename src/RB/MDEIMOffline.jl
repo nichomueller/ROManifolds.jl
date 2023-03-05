@@ -158,31 +158,10 @@ end
 function mdeim_basis(info::RBInfoUnsteady,snaps)
   id = get_id(snaps)
   s,ns = get_snap(snaps),get_nsnap(snaps)
-  basis_space = reduced_POD(s;ϵ=info.ϵ)#mdeim_POD(s;info.ϵ)
+  basis_space = reduced_POD(s;ϵ=info.ϵ)
   s2 = mode2_unfolding(basis_space'*s,ns)
-  basis_time = reduced_POD(s2;ϵ=info.ϵ)#mdeim_POD(s2;info.ϵ)
+  basis_time = reduced_POD(s2;ϵ=info.ϵ)
   RBSpaceUnsteady(id,basis_space,basis_time)
-end
-
-function mdeim_POD(S::AbstractMatrix;ϵ=1e-5)
-  U,Σ,ntemp = iterative_reduced_POD(S;ϵ=ϵ)
-  energies = cumsum(Σ.^2)
-  idx = mdeim_idx(U[:,1:ntemp])
-
-  corrective_term = norm(inv(U[idx,1:ntemp]))
-  n = findall(x->x ≥ (1-ϵ^2)*energies[end]*corrective_term,energies)
-  if isempty(n)
-    rtol = min(size(S)...)*eps()*Σ[1]
-    r = count(x->x>rtol,Σ)
-    n = max(r,ntemp)
-  else
-    n = n[1]
-  end
-  err = sqrt(1-energies[n]/energies[end])
-  printstyled("Basis number obtained via POD is $n, projection error ≤ $err\n";
-    color=:blue)
-
-  U[:,1:n]
 end
 
 function project_mdeim_basis(

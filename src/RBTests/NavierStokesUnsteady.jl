@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function navier_stokes_unsteady()
-  run_fem = false
+  run_fem = true
 
   steady = false
   indef = true
@@ -19,7 +19,7 @@ function navier_stokes_unsteady()
   t0,tF,dt,θ = 0.,0.15,0.0025,1
   time_info = TimeInfo(t0,tF,dt,θ)
 
-  ranges = [[1.,2.],[0.3,0.8],[1.,2.]]
+  ranges = [[1.,10.],[0.5,1.],[0.5,1.]]
   sampling = UniformSampling()
   PS = ParamSpace(ranges,sampling)
 

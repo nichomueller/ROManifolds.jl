@@ -197,23 +197,19 @@ function online_results_dict(info::RBInfo)
   save(joinpath(summary_path,"online_results"),dict)
 end
 
-function mdeim_online_error(
-  op::RBVariable,
-  mdeim,
-  μ::Param,
-  st_mdeim=false)
-
-  #mat = evaluate(assemble_fe_structure(op),μ)
-  #mat_rb = rb_projection(op,mat)
-  mdeim_rb_tmp = online_assembler(op,mdeim,μ,st_mdeim)
-  mdeim_rb = elim_shifted_matrix(mdeim_rb_tmp)
-  infty_norm(mat_rb-mdeim_rb)
+function H1_norm_matrix(opA::RBBilinVariable,opM::RBBilinVariable)
+  afe = get_fe_function(opA)
+  mfe = get_fe_function(opM)
+  trial = realization_trial(opA)
+  test = get_test(opA)
+  A = assemble_matrix((u,v)->afe(1,u,v),trial,test)
+  M = assemble_matrix((u,v)->mfe(1,u,v),trial,test)
+  A+M
 end
 
-function infty_norm(q::AbstractArray)
-  maximum(abs.(q))
-end
-
-function infty_norm(q::NTuple{N,AbstractArray}) where N
-  infty_norm.(q)
+function L2_norm_matrix(opM::RBBilinVariable)
+  mfe = get_fe_function(opM)
+  trial = realization_trial(opM)
+  test = get_test(opM)
+  assemble_matrix((u,v)->mfe(1,u,v),trial,test)
 end
