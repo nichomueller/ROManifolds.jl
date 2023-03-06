@@ -163,29 +163,6 @@ function matrix_snapshots(
   findnz_map,Snapshots(id,vals_st)
 end
 
-#= function evaluate_param_function(
-  op::RBUnsteadyVariable,
-  μ::Vector{Param})::Matrix{Float}
-
-  timesθ = get_timesθ(op)
-  phys_quadp = get_phys_quad_points(op)
-  param_fun = get_param_function(op)
-
-  param(xvec::Vector{Point{D,Float}},μk::Param,tθ::Real) where D =
-    Broadcasting(x->param_fun(x,μk,tθ))(xvec)[:]
-  param(n::Int,μk::Param,tθ::Real) = param(phys_quadp[n],μk,tθ)
-  param(μk::Param,tθ::Real) =
-    Matrix(Broadcasting(n->param(n,μk,tθ))(eachindex(phys_quadp)))[:]
-  param(μk::Param) = Matrix(Broadcasting(tθ->param(μk,tθ))(timesθ))
-
-  param_vals = Matrix{Float}[]
-  @threads for μk = μ
-    push!(param_vals,param(μk))
-  end
-
-  Matrix(param_vals)
-end =#
-
 function evaluate_param_function(
   op::RBUnsteadyVariable,
   μ::Vector{Param})::Matrix{Float}

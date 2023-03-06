@@ -13,20 +13,21 @@ struct ErrorTracker
   pointwise_err::Matrix{Float}
 end
 
-function ErrorTracker(id::Symbol,uh::Matrix{Float},uh_rb::Matrix{Float})
-  relative_err,pointwise_err = compute_errors(uh,uh_rb)
+function ErrorTracker(id::Symbol,uh::Matrix{Float},uh_rb::Matrix{Float};Y=nothing)
+  X = isnothing(Y) ? I(size(uh,1)) : Y
+  relative_err,pointwise_err = compute_errors(uh,uh_rb,X)
   printstyled("Online relative error of variable $id is: $relative_err \n";
     color=:red)
   ErrorTracker(relative_err,pointwise_err)
 end
 
-function compute_errors(uh::Matrix{Float},uh_rb::Matrix{Float})
+function compute_errors(uh::Matrix{Float},uh_rb::Matrix{Float},X::AbstractMatrix)
   pointwise_err = abs.(uh-uh_rb)
   Nt = size(uh,2)
   absolute_err,uh_norm = zeros(Nt),zeros(Nt)
   for i = 1:Nt
-    absolute_err[i] = norm(uh[:,i]-uh_rb[:,i])
-    uh_norm[i] = norm(uh[:,i])
+    absolute_err[i] = sqrt((uh[:,i]-uh_rb[:,i])'*X*(uh[:,i]-uh_rb[:,i]))
+    uh_norm[i] = sqrt(uh[:,i]'*X*uh[:,i])
   end
   relative_err = norm(absolute_err)/norm(uh_norm)
   relative_err,pointwise_err
@@ -197,7 +198,7 @@ function online_results_dict(info::RBInfo)
   save(joinpath(summary_path,"online_results"),dict)
 end
 
-function H1_norm_matrix(opA::RBBilinVariable,opM::RBBilinVariable)
+function H1_norm_matrix(opA::ParamBilinOperator,opM::ParamBilinOperator)
   afe = get_fe_function(opA)
   mfe = get_fe_function(opM)
   trial = realization_trial(opA)
@@ -207,7 +208,7 @@ function H1_norm_matrix(opA::RBBilinVariable,opM::RBBilinVariable)
   A+M
 end
 
-function L2_norm_matrix(opM::RBBilinVariable)
+function L2_norm_matrix(opM::ParamBilinOperator)
   mfe = get_fe_function(opM)
   trial = realization_trial(opM)
   test = get_test(opM)

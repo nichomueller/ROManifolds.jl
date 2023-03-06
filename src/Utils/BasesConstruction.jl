@@ -86,30 +86,54 @@ function reduced_POD(::Val{false},S::AbstractMatrix;ϵ=1e-5)
 end
 
 function randomized_POD(S::AbstractMatrix;ϵ=1e-5,q=1)
-  nrow,ncol = size(S)
-  r = compute_rank(S;tol=ϵ)
-  gauss_mat = rand(Normal(0.,1.),ncol,2*r)
-  Y = nrow>ncol ? S*(S'*S)^q*gauss_mat : (S*S')^q*S*gauss_mat
-  Q,_ = qr(Y)
-  B = Q'*S
-  Utemp = POD(B;ϵ=ϵ)
-  Q*Utemp
+  randomized_POD(Val{size(S,1)>size(S,2)}(),S;ϵ=ϵ,q=q)
 end
 
-function projection(vnew::AbstractVector,v::AbstractVector)
-  v*(vnew'*v)
+function randomized_POD(::Val{true},S::AbstractMatrix;ϵ=1e-5,q=1)
+  Matrix(randomized_POD(Val{false}(),S';ϵ=ϵ,q=q)')
 end
 
-function projection(vnew::AbstractVector,basis::AbstractMatrix)
-  sum([projection(vnew,basis[:,i]) for i=axes(basis,2)])
+function randomized_POD(::Val{false},S::AbstractMatrix;ϵ=1e-5,q=1)
+  Σ = svdvals(S)
+  r = count(x->x>min(size(S)...)*eps()*Σ[1],Σ)
+  G = rand(Normal(0.,1.),size(S,1),min(2*r,size(S,2)))
+  Y = G'*(S*S')^q*S
+  Q,R = qr(Y')
+  B = S*Matrix(Q)
+  QRb = qr(B)
+  QRr = qr(R',ColumnNorm())
+
+  energies = cumsum(Σ.^2)
+  n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
+  err = sqrt(1-energies[n]/energies[end])
+  printstyled("Basis number obtained via POD is $n, projection error ≤ $err\n";
+    color=:blue)
+
+  QRb.Q*QRr.P[:,1:n]
 end
 
-function orth_projection(vnew::AbstractVector,v::AbstractVector)
-  projection(vnew,v)/(v'*v)
+function projection(vnew::AbstractVector,v::AbstractVector;X=nothing)
+  isnothing(X) ? projection(vnew,v,I(length(v))) : projection(vnew,v,X)
 end
 
-function orth_projection(vnew::AbstractVector,basis::AbstractMatrix)
-  sum([orth_projection(vnew,basis[:,i]) for i=axes(basis,2)])
+function projection(vnew::AbstractVector,v::AbstractVector,X::AbstractMatrix)
+  v*(vnew'*X*v)
+end
+
+function projection(vnew::AbstractVector,basis::AbstractMatrix,X::AbstractMatrix)
+  sum([projection(vnew,basis[:,i],X) for i=axes(basis,2)])
+end
+
+function orth_projection(vnew::AbstractVector,v::AbstractVector;X=nothing)
+  isnothing(X) ? orth_projection(vnew,v,I(length(v))) : orth_projection(vnew,v,X)
+end
+
+function orth_projection(vnew::AbstractVector,v::AbstractVector,X::AbstractMatrix)
+  projection(vnew,v,X)/(v'*X*v)
+end
+
+function orth_projection(vnew::AbstractVector,basis::AbstractMatrix,X::AbstractMatrix)
+  sum([orth_projection(vnew,basis[:,i],X) for i=axes(basis,2)])
 end
 
 isbasis(basis,args...) =
@@ -117,18 +141,18 @@ isbasis(basis,args...) =
 
 function orth_complement(
   v::AbstractVector,
-  basis::AbstractMatrix)
+  basis::AbstractMatrix;
+  kwargs...)
 
-  v - projection(v,basis)
+  v - orth_projection(v,basis;kwargs...)
 end
 
-function gram_schmidt(mat::Matrix{Float},basis::Matrix{Float})
-
+function gram_schmidt(mat::Matrix{Float},basis::Matrix{Float};kwargs...)
   for i = axes(mat,2)
     mat_i = mat[:,i]
-    mat_i = orth_complement(mat_i,basis)
+    mat_i = orth_complement(mat_i,basis;kwargs...)
     if i > 1
-      mat_i = orth_complement(mat_i,mat[:,1:i-1])
+      mat_i = orth_complement(mat_i,mat[:,1:i-1];kwargs...)
     end
     mat[:,i] = mat_i/norm(mat_i)
   end
@@ -136,6 +160,6 @@ function gram_schmidt(mat::Matrix{Float},basis::Matrix{Float})
   mat
 end
 
-function gram_schmidt(vec::Vector{Vector},basis::Matrix{Float})
-  gram_schmidt(Matrix(vec),basis)
+function gram_schmidt(vec::Vector{Vector{T}},basis::Matrix{Float};kwargs...) where T
+  gram_schmidt(Matrix(vec),basis;kwargs...)
 end

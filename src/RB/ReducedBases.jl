@@ -58,11 +58,12 @@ function assemble_rb(
 
   def = isindef(info)
   snaps_u,snaps_p = snaps
+  _,Xu,Xp = kwargs
 
   tt.offline_time.basis_time += @elapsed begin
     bs_u = rb_space(info,snaps_u;kwargs...)
     bs_p = rb_space(info,snaps_p;kwargs...)
-    bs_u_supr = add_space_supremizers(def,(bs_u,bs_p),args...)
+    bs_u_supr = add_space_supremizers(def,(bs_u,bs_p),args...;Xu,Xp)
   end
 
   rbspace_u = RBSpaceSteady(get_id(snaps_u),bs_u_supr)
@@ -83,11 +84,12 @@ function assemble_rb(
   def = isindef(info)
   snaps_u,snaps_p = snaps
   opB,ph,μ,tol... = args
+  _,Xu,Xp = kwargs
 
   tt.offline_time.basis_time += @elapsed begin
     bs_u = rb_space(info,snaps_u;kwargs...)
     bs_p = rb_space(info,snaps_p;kwargs...)
-    bs_u_supr = add_space_supremizers(def,(bs_u,bs_p),opB,ph,μ)
+    bs_u_supr = add_space_supremizers(def,(bs_u,bs_p),opB,ph,μ;Xu,Xp)
     bt_u = rb_time(info,snaps_u,bs_u)
     bt_p = rb_time(info,snaps_p,bs_p)
     bt_u_supr = add_time_supremizers(def,(bt_u,bt_p),tol...)
@@ -104,19 +106,14 @@ end
 function rb_space(
   info::RBInfo,
   snap::Snapshots;
-  ϵ=info.ϵ,sparsity=false)
+  ϵ=info.ϵ,X=nothing)
 
   printstyled("Spatial POD, tolerance: $ϵ\n";color=:blue)
-  if sparsity
-    i,j,snap_nnz = findnz(snap)
-    basis_space_nnz = POD(snap_nnz;ϵ=ϵ)
-    Ns,ns = size(get_snap(snap),1),size(basis_space_nnz,2)
-    nz = length(basis_space_nnz[:])
-    basis_space = Matrix(sparse(i[1:nz],j[1:nz],basis_space_nnz[:],Ns,ns))
+  if isnothing(X)
+    POD(snap;ϵ=ϵ)
   else
-    basis_space = POD(snap;ϵ=ϵ)
+    POD(snap,X;ϵ=ϵ)
   end
-  basis_space
 end
 
 function rb_time(
@@ -141,7 +138,8 @@ end
 function add_space_supremizers(
   ::Val{false},
   basis::NTuple{2,Matrix{Float}},
-  args...)
+  args...;
+  kwargs...)
 
   first(basis)
 end
@@ -151,10 +149,11 @@ function add_space_supremizers(
   basis::NTuple{2,Matrix{Float}},
   opB::ParamBilinOperator,
   ph::Snapshots,
-  μ::Vector{Param})
+  μ::Vector{Param};
+  kwargs...)
 
   basis_u, = basis
-  supr = space_supremizers(basis,opB,ph,μ)
+  supr = space_supremizers(basis,opB,ph,μ;kwargs...)
   hcat(basis_u,supr)
 end
 
@@ -162,13 +161,14 @@ function space_supremizers(
   basis::NTuple{2,Matrix{Float}},
   opB::ParamBilinOperator,
   ph::Snapshots,
-  μ::Vector{Param})
+  μ::Vector{Param};
+  kwargs...)
 
   printstyled("Computing primal supremizers\n";color=:blue)
 
   basis_u,basis_p = basis
-  constraint_mat = assemble_constraint_matrix(opB,basis_p,ph,μ)
-  gram_schmidt(constraint_mat,basis_u)
+  constraint_mat = assemble_constraint_matrix(opB,basis_p,ph,μ;kwargs...)
+  gram_schmidt(constraint_mat,basis_u;kwargs...)
 end
 
 matrix_B(opB::ParamSteadyBilinOperator{Affine,Ttr},μ::Vector{Param}) where Ttr =
@@ -184,12 +184,17 @@ function assemble_constraint_matrix(
   opB::ParamBilinOperator{Affine,Ttr},
   basis_p::Matrix{Float},
   ::Snapshots,
-  μ::Vector{Param}) where Ttr
+  μ::Vector{Param};
+  X=nothing) where Ttr
 
   @assert opB.id == :B
   printstyled("Fetching supremizing operator Bᵀ\n";color=:blue)
 
-  B = matrix_B(opB,μ)
+  if isnothing(X)
+    B = matrix_B(opB,μ)
+  else
+    B = X\matrix_B(opB,μ)
+  end
   Matrix(B')*basis_p
 end
 
@@ -197,13 +202,20 @@ function assemble_constraint_matrix(
   opB::ParamBilinOperator,
   ::Matrix{Float},
   ph::Snapshots,
-  μ::Vector{Param})
+  μ::Vector{Param};
+  X=nothing)
 
   @assert opB.id == :B
   printstyled("Bᵀ is nonaffine: must assemble the constraint matrix\n";color=:blue)
 
   B = matrix_B(opB,μ)
-  Brb(k::Int) = Matrix(B[k]')*ph.snaps[:,k]
+  function Brb(k::Int)
+    if isnothing(X)
+      Matrix(B[k]')*ph.snaps[:,k]
+    else
+      X\(Matrix(B[k]')*ph.snaps[:,k])
+    end
+  end
   Matrix(Brb.(axes(basis_p,2)))
 end
 

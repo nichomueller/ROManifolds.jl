@@ -56,7 +56,8 @@ function poisson_unsteady()
         printstyled("Offline phase; tol=$tol, st_mdeim=$st_mdeim, fun_mdeim=$fun_mdeim\n";color=:blue)
 
         uh_offline = uh[1:info.nsnap]
-        rbspace = rb(info,tt,uh_offline)
+        X = H1_norm_matrix(opA,opM)
+        rbspace = rb(info,tt,uh_offline;X)
 
         rbopA = RBVariable(opA,rbspace,rbspace)
         rbopM = RBVariable(opM,rbspace,rbspace)
@@ -84,7 +85,7 @@ function poisson_unsteady()
           end
           uhk = get_snap(uh[k])
           uhk_rb = reconstruct_fe_sol(rbspace,rb_sol)
-          ErrorTracker(:u,uhk,uhk_rb)
+          ErrorTracker(:u,uhk,uhk_rb;X)
         end
 
         ets = online_loop.(info.online_snaps)
