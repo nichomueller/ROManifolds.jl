@@ -13,9 +13,9 @@ struct ErrorTracker
   pointwise_err::Matrix{Float}
 end
 
-function ErrorTracker(id::Symbol,uh::Matrix{Float},uh_rb::Matrix{Float};Y=nothing)
-  X = isnothing(Y) ? I(size(uh,1)) : Y
-  relative_err,pointwise_err = compute_errors(uh,uh_rb,X)
+function ErrorTracker(id::Symbol,uh::Matrix{Float},uh_rb::Matrix{Float};X=nothing)
+  Y = isnothing(X) ? I(size(uh,1)) : X
+  relative_err,pointwise_err = compute_errors(uh,uh_rb,Y)
   printstyled("Online relative error of variable $id is: $relative_err \n";
     color=:red)
   ErrorTracker(relative_err,pointwise_err)

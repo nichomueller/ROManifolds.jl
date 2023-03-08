@@ -77,6 +77,12 @@ struct ParamUnsteadyLiftOperator{Top} <: ParamLiftOperator{Top}
   test::SingleFieldFESpace
 end
 
+const ParamSteadyOperator{Top,Ttr} =
+  Union{ParamSteadyLinOperator{Top},ParamSteadyBilinOperator{Top,Ttr},ParamSteadyLiftOperator{Top}}
+
+const ParamUnsteadyOperator{Top,Ttr} =
+  Union{ParamUnsteadyLinOperator{Top},ParamUnsteadyBilinOperator{Top,Ttr},ParamUnsteadyLiftOperator{Top}}
+
 get_id(op::ParamOperator) = op.id
 
 get_param_function(op::ParamOperator) = op.a
@@ -101,7 +107,13 @@ get_timesθ(op::ParamOperator) = get_timesθ(get_time_info(op))
 
 get_phys_quad_points(op::ParamOperator) = get_phys_quad_points(get_test(op))
 
+get_dimension(op::ParamOperator) = get_dimension(get_test(op))
+
 realization(op::ParamOperator) = realization(get_pspace(op))
+
+realization_trial(op::ParamSteadyOperator) = get_trial(op)(realization(op))
+
+realization_trial(op::ParamUnsteadyOperator) = get_trial(op)(realization(op),realization(get_time_info(op)))
 
 function Gridap.FESpaces.get_cell_dof_ids(
   op::ParamOperator,

@@ -123,8 +123,50 @@ end
 
 function matrix_snapshots(
   ::Val{true},
-  op::RBUnsteadyBilinVariable{Top,<:ParamTransientTrialFESpace},
-  μ::Vector{Param}) where Top
+  op::RBUnsteadyBilinVariable{Nonaffine,<:ParamTransientTrialFESpace},
+  μ::Vector{Param})
+
+  id = get_id(op)
+  printstyled("MDEIM: generating snapshots on the quadrature points, $id \n";
+   color=:blue)
+
+  param_vals = evaluate_param_function(op,μ)
+  param_bs,param_bt = reduce_param_function(op,param_vals)
+  param_fun = interpolate_param_function(op,param_bs)
+
+  findnz_map = get_findnz_map(op,μ)
+  M = assemble_functional_variable(op)
+
+  function snapshot(k::Int)
+    b = param_fun(k)
+    nonzero_values(M(b,μ[k],0.),findnz_map)
+  end
+
+  ns,nt = size(param_bs,2),size(param_bt,2)
+  vals = Vector{Float}[]
+  @threads for k = 1:ns
+    push!(vals,snapshot(k))
+  end
+
+  function space_idx(kst::Int,ns::Int)
+    ks = mod(kst,ns)
+    ks == 0 ? ns : ks
+  end
+
+  function time_idx(kst::Int,ns::Int)
+    Int(floor((kst-1)/ns)+1)
+  end
+
+  vals_st = [reshape(kron(param_bt[:,time_idx(k,ns)],vals[space_idx(k,ns)]),:,
+    get_Nt(op)) for k = 1:ns*nt]
+
+  findnz_map,Snapshots(id,vals_st)
+end
+
+function matrix_snapshots(
+  ::Val{true},
+  op::RBUnsteadyBilinVariable{Nonlinear,<:ParamTransientTrialFESpace},
+  μ::Vector{Param})
 
   id = get_id(op)
   printstyled("MDEIM: generating snapshots on the quadrature points, $id \n";
@@ -172,7 +214,8 @@ function evaluate_param_function(
   ncells = length(phys_cells)
   nquad_cell = length(first(phys_cells))
   nquadp = ncells*nquad_cell
-  quadp = zeros(VectorValue{3,Float},nquadp)
+  dim = get_dimension(op)
+  quadp = zeros(VectorValue{dim,Float},nquadp)
   for (i,celli) = enumerate(phys_cells)
     quadp[(i-1)*nquad_cell+1:i*nquad_cell] = celli
   end

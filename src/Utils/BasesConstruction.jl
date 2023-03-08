@@ -20,10 +20,26 @@ function POD(S::NTuple{N,AbstractMatrix},args...;kwargs...) where N
   Broadcasting(si -> POD(si,args...;kwargs...))(S)
 end
 
+#= function POD(S::AbstractMatrix,X::SparseMatrixCSC;ϵ=1e-5)
+  Sx = S'*X*S
+  Ux,Σ,_ = my_svd(Sx)
+  energies = cumsum(Σ)
+  n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
+  err = sqrt(1-energies[n]/energies[end])
+  printstyled("Basis number obtained via POD is $n, projection error ≤ $err\n";
+    color=:blue)
+
+  U = S*Ux[:,1:n]
+  for i = axes(U,2)
+    U[:,i] /= (sqrt(Σ[i])+eps())
+  end
+  U
+end =#
+
 function POD(S::AbstractMatrix,X::SparseMatrixCSC;ϵ=1e-5)
   H = cholesky(X)
   L = sparse(H.L)
-  U,Σ,_ = my_svd(L'*S[H.p, :])
+  U,Σ,_ = my_svd(L'*S[H.p,:])
 
   energies = cumsum(Σ.^2)
   n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
@@ -46,11 +62,11 @@ function POD(S::AbstractMatrix;ϵ=1e-5)
 end
 
 function POD(S::AbstractMatrix,::Val{true};ϵ=1e-5)
-  reduced_POD(S;ϵ=ϵ)
+  reduced_POD(S;ϵ)
 end
 
 function reduced_POD(S::AbstractMatrix;ϵ=1e-5)
-  reduced_POD(Val{size(S,1)>size(S,2)}(),S;ϵ=ϵ)
+  reduced_POD(Val{size(S,1)>size(S,2)}(),S;ϵ)
 end
 
 function reduced_POD(::Val{true},S::AbstractMatrix;ϵ=1e-5)
@@ -86,11 +102,11 @@ function reduced_POD(::Val{false},S::AbstractMatrix;ϵ=1e-5)
 end
 
 function randomized_POD(S::AbstractMatrix;ϵ=1e-5,q=1)
-  randomized_POD(Val{size(S,1)>size(S,2)}(),S;ϵ=ϵ,q=q)
+  randomized_POD(Val{size(S,1)>size(S,2)}(),S;ϵ,q=q)
 end
 
 function randomized_POD(::Val{true},S::AbstractMatrix;ϵ=1e-5,q=1)
-  Matrix(randomized_POD(Val{false}(),S';ϵ=ϵ,q=q)')
+  Matrix(randomized_POD(Val{false}(),S';ϵ,q=q)')
 end
 
 function randomized_POD(::Val{false},S::AbstractMatrix;ϵ=1e-5,q=1)

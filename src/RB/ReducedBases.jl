@@ -58,7 +58,7 @@ function assemble_rb(
 
   def = isindef(info)
   snaps_u,snaps_p = snaps
-  _,Xu,Xp = kwargs
+  Xu,Xp = kwargs
 
   tt.offline_time.basis_time += @elapsed begin
     bs_u = rb_space(info,snaps_u;kwargs...)
@@ -84,14 +84,14 @@ function assemble_rb(
   def = isindef(info)
   snaps_u,snaps_p = snaps
   opB,ph,μ,tol... = args
-  _,Xu,Xp = kwargs
+  Xu,Xp = kwargs
 
   tt.offline_time.basis_time += @elapsed begin
-    bs_u = rb_space(info,snaps_u;kwargs...)
-    bs_p = rb_space(info,snaps_p;kwargs...)
+    bs_u = rb_space(info,snaps_u;X=Xu)
+    bs_p = rb_space(info,snaps_p;X=Xp)
     bs_u_supr = add_space_supremizers(def,(bs_u,bs_p),opB,ph,μ;Xu,Xp)
-    bt_u = rb_time(info,snaps_u,bs_u)
-    bt_p = rb_time(info,snaps_p,bs_p)
+    bt_u = rb_time(info,snaps_u,bs_u;X=Xu)
+    bt_p = rb_time(info,snaps_p,bs_p;X=Xp)
     bt_u_supr = add_time_supremizers(def,(bt_u,bt_p),tol...)
   end
 
@@ -106,13 +106,15 @@ end
 function rb_space(
   info::RBInfo,
   snap::Snapshots;
-  ϵ=info.ϵ,X=nothing)
+  X=nothing)
 
+  ϵ = info.ϵ
   printstyled("Spatial POD, tolerance: $ϵ\n";color=:blue)
+
   if isnothing(X)
-    POD(snap;ϵ=ϵ)
+    POD(snap;ϵ)
   else
-    POD(snap,X;ϵ=ϵ)
+    POD(snap,X;ϵ)
   end
 end
 
@@ -120,19 +122,21 @@ function rb_time(
   info::RBInfoUnsteady,
   snap::Snapshots,
   basis_space::Matrix{Float};
-  ϵ=info.ϵ)
+  X=nothing)
 
+  ϵ = info.ϵ
   printstyled("Temporal POD, tolerance: $ϵ\n";color=:blue)
 
   s1 = get_snap(snap)
   ns = get_nsnap(snap)
+  bs = isnothing(X) ? basis_space : X*basis_space
 
   if info.time_red_method == "ST-HOSVD"
-    s2 = mode2_unfolding(basis_space'*s1,ns)
+    s2 = mode2_unfolding(bs'*s1,ns)
   else
     s2 = mode2_unfolding(snap)
   end
-  POD(s2;ϵ=ϵ)
+  POD(s2;ϵ)
 end
 
 function add_space_supremizers(
