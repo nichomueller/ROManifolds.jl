@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function navier_stokes_unsteady()
-  run_fem = true
+  run_fem = false
 
   steady = false
   indef = true
@@ -11,10 +11,11 @@ function navier_stokes_unsteady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes"
-  mesh = "flow_cylinder3D.json"
+  mesh = "new_flow_cyl.json"
   bnd_info = Dict("dirichlet0" => ["noslip","noslip_c","cylinder","cylinder_c","cylinder_p"],
+                  "dirichlet1" => ["nopenetration"],
                   "dirichlet" => ["inlet","inlet_c","inlet_p",
-                                  "nopenetration","outlet_c","outlet_p"],
+                                  "outlet_c","outlet_p"],
                   "neumann" => ["outlet"])
   order = 2
 
@@ -37,8 +38,10 @@ function navier_stokes_unsteady()
 
   reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{3,Float},order)
   reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1)
-  V = TestFESpace(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
-  U = ParamTransientTrialFESpace(V,[g0,g])
+  V = TestFESpace(model,reffe1;conformity=:H1,
+    dirichlet_tags=["dirichlet0","dirichlet1","dirichlet"],
+    dirichlet_masks=[(true,true,true),(false,false,true),(true,true,true)])
+  U = ParamTransientTrialFESpace(V,[g0,g,g])
   Q = TestFESpace(model,reffe2;conformity=:C0)
   P = TrialFESpace(Q)
   Y = ParamTransientMultiFieldFESpace([V,Q])
@@ -48,7 +51,7 @@ function navier_stokes_unsteady()
 
   nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking())
   solver = ThetaMethod(nls,dt,θ)
-  nsnap = 1
+  nsnap = 100
   uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
 
   opA = NonaffineParamOperator(a,afe,PS,time_info,U,V;id=:A)

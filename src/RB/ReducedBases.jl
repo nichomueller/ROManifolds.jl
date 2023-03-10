@@ -84,7 +84,7 @@ function assemble_rb(
   def = isindef(info)
   snaps_u,snaps_p = snaps
   opB,ph,μ,tol... = args
-  Xu,Xp = kwargs
+  Xu,Xp = nothing,nothing#kwargs
 
   tt.offline_time.basis_time += @elapsed begin
     bs_u = rb_space(info,snaps_u;X=Xu)
