@@ -194,3 +194,39 @@ function rb_spacetime_projection(
 
   proj_spacetime
 end
+
+struct RBFEFunction{T<:CellField} <: FEFunction
+  cell_field::T
+  cell_dof_values::AbstractArray{<:AbstractVector{<:Number}}
+  free_values::AbstractVector{<:Number}
+  dirichlet_values::AbstractVector{<:Number}
+  fe_space::SingleFieldFESpace
+
+  function RBFEFunction(
+    cell_field::T,
+    cell_dof_values::AbstractArray{<:AbstractVector{<:Number}},
+    free_values::AbstractVector{<:Number},
+    dirichlet_values::AbstractVector{<:Number},
+    fe_space::SingleFieldFESpace)
+
+    new{T}(cell_field,cell_dof_values,free_values,dirichlet_values,fe_space)
+  end
+end
+
+function Gridap.FEFunction(
+  op::RBVariable,
+  vec::AbstractVector)
+
+  test = get_test(op)
+  dir_vals = get_dirichlet_dof_values(test)
+  cell_vals = scatter_free_and_dirichlet_values(test,vec,dir_vals)
+  cell_field = CellField(test,cell_vals)
+  RBFEFunction(cell_field,cell_vals,vec,dir_vals,test)
+end
+
+function Gridap.FEFunction(
+  op::LagrangianQuadFESpace,
+  mat::AbstractMatrix)
+
+  n -> FEFunction(op,mat[:,n])
+end

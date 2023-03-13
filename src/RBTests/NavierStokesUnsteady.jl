@@ -22,7 +22,7 @@ function navier_stokes_unsteady()
   t0,tF,dt,θ = 0.,0.15,0.0025,1
   time_info = TimeInfo(t0,tF,dt,θ)
 
-  ranges = [[1.,10.],[0.5,1.],[0.5,1.]]
+  ranges = [[1.,10.],[0.5,1.],[0.5,1.],[1.,2.]]
   sampling = UniformSampling()
   PS = ParamSpace(ranges,sampling)
 
@@ -34,7 +34,7 @@ function navier_stokes_unsteady()
   a,afe,m,mfe,b,bfe,bTfe,c,cfe,d,dfe,f,ffe,h,hfe,g,res,jac,jac_t =
     navier_stokes_functions(ptype,measures)
   g0(x,p::Param,t::Real) = VectorValue(0.,0.,0.)
-  g0(μ::Param,t::Real) = x->g0(x,μ,t)
+  g0(p::Param,t::Real) = x->g0(x,p,t)
 
   reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{3,Float},order)
   reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1)
@@ -63,12 +63,12 @@ function navier_stokes_unsteady()
   opF = AffineParamOperator(f,ffe,PS,time_info,V;id=:F)
   opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
 
-  for fun_mdeim = (false,true)
+  for fun_mdeim = (true)#(false,true)
     for st_mdeim = (false,true)
-      for tol = (1e-2,1e-3,1e-4,1e-5)
+      for tol = (1e-2,1e-3,1e-4)#,1e-5)
 
         global info = RBInfoUnsteady(ptype,mesh,root;ϵ=tol,nsnap=80,online_snaps=95:100,
-          mdeim_snap=20,load_offline=false,postprocess=true,
+          mdeim_snap=15,load_offline=false,postprocess=true,
           fun_mdeim=fun_mdeim,st_mdeim=st_mdeim)
         tt = TimeTracker(OfflineTime(0.,0.),0.)
 
@@ -81,6 +81,7 @@ function navier_stokes_unsteady()
 
         rbspace_u,rbspace_p = rb(info,tt,(uh_offline,ph_offline),opB,ph,μ)
         rbspace = rbspace_u,rbspace_p
+        rbspace_uθ = rb(info,tt,uhθ_offline)
 
         rbopA = RBVariable(opA,rbspace_u,rbspace_u)
         rbopB = RBVariable(opB,rbspace_p,rbspace_u)
@@ -94,8 +95,8 @@ function navier_stokes_unsteady()
         Arb = RBAffineDecomposition(info,tt,rbopA,μ,measures,:dΩ)
         Brb = RBAffineDecomposition(info,tt,rbopB,μ,measures,:dΩ)
         BTrb = RBAffineDecomposition(info,tt,rbopBT,μ,measures,:dΩ)
-        Crb = RBAffineDecomposition(info,tt,rbopC,μ,measures,:dΩ,uhθ_offline)
-        Drb = RBAffineDecomposition(info,tt,rbopD,μ,measures,:dΩ,uhθ_offline)
+        Crb = RBAffineDecomposition(info,tt,rbopC,μ,measures,:dΩ,rbspace_uθ)
+        Drb = RBAffineDecomposition(info,tt,rbopD,μ,measures,:dΩ,rbspace_uθ)
         Mrb = RBAffineDecomposition(info,tt,rbopM,μ,measures,:dΩ)
         Frb = RBAffineDecomposition(info,tt,rbopF,μ,measures,:dΩ)
         Hrb = RBAffineDecomposition(info,tt,rbopH,μ,measures,:dΓn)

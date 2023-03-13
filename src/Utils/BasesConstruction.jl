@@ -20,22 +20,6 @@ function POD(S::NTuple{N,AbstractMatrix},args...;kwargs...) where N
   Broadcasting(si -> POD(si,args...;kwargs...))(S)
 end
 
-#= function POD(S::AbstractMatrix,X::SparseMatrixCSC;ϵ=1e-5)
-  Sx = S'*X*S
-  Ux,Σ,_ = my_svd(Sx)
-  energies = cumsum(Σ)
-  n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  err = sqrt(1-energies[n]/energies[end])
-  printstyled("Basis number obtained via POD is $n, projection error ≤ $err\n";
-    color=:blue)
-
-  U = S*Ux[:,1:n]
-  for i = axes(U,2)
-    U[:,i] /= (sqrt(Σ[i])+eps())
-  end
-  U
-end =#
-
 function POD(S::AbstractMatrix,X::SparseMatrixCSC;ϵ=1e-5)
   H = cholesky(X)
   L = sparse(H.L)
@@ -136,8 +120,8 @@ function projection(vnew::AbstractVector,v::AbstractVector,X::AbstractMatrix)
   v*(vnew'*X*v)
 end
 
-function projection(vnew::AbstractVector,basis::AbstractMatrix,X::AbstractMatrix)
-  sum([projection(vnew,basis[:,i],X) for i=axes(basis,2)])
+function projection(vnew::AbstractVector,basis::AbstractMatrix;X=nothing)
+  sum([projection(vnew,basis[:,i];X) for i=axes(basis,2)])
 end
 
 function orth_projection(vnew::AbstractVector,v::AbstractVector;X=nothing)
@@ -148,8 +132,8 @@ function orth_projection(vnew::AbstractVector,v::AbstractVector,X::AbstractMatri
   projection(vnew,v,X)/(v'*X*v)
 end
 
-function orth_projection(vnew::AbstractVector,basis::AbstractMatrix,X::AbstractMatrix)
-  sum([orth_projection(vnew,basis[:,i],X) for i=axes(basis,2)])
+function orth_projection(vnew::AbstractVector,basis::AbstractMatrix;X=nothing)
+  sum([orth_projection(vnew,basis[:,i];X) for i=axes(basis,2)])
 end
 
 isbasis(basis,args...) =

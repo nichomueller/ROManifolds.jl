@@ -56,8 +56,8 @@ function poisson_unsteady()
         printstyled("Offline phase; tol=$tol, st_mdeim=$st_mdeim, fun_mdeim=$fun_mdeim\n";color=:blue)
 
         uh_offline = uh[1:info.nsnap]
-        X = H1_norm_matrix(opA,opM)
-        rbspace = rb(info,tt,uh_offline;X)
+        #X = H1_norm_matrix(opA,opM)
+        rbspace = rb(info,tt,uh_offline)#;X)
 
         rbopA = RBVariable(opA,rbspace,rbspace)
         rbopM = RBVariable(opM,rbspace,rbspace)

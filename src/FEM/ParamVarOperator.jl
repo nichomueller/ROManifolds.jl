@@ -336,18 +336,15 @@ function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLiftOperator{Nonlinear
 end
 
 function get_dirichlet_function(::Val,trial::ParamTrialFESpace)
-  dir = trial.dirichlet_μt
-  μ -> interpolate_dirichlet(dir(μ),trial(μ))
+  μ -> zero(trial(μ))
 end
 
 function get_dirichlet_function(::Val{false},trial::ParamTransientTrialFESpace)
-  dir = trial.dirichlet_μt
-  (μ,t) -> interpolate_dirichlet(dir(μ,t),trial(μ,t))
+  (μ,t) -> zero(trial(μ,t))
 end
 
 function get_dirichlet_function(::Val{true},trial::ParamTransientTrialFESpace)
-  ddir = ∂t(trial.dirichlet_μt)
-  (μ,t) -> interpolate_dirichlet(ddir(μ,t),trial(μ,t))
+  (μ,t) -> zero(∂t(trial)(μ,t))
 end
 
 function get_dirichlet_function(op::ParamOperator)

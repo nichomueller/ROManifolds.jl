@@ -3,7 +3,7 @@ function mdeim_snapshots(
   op::RBLinVariable,
   args...)::Snapshots{Float}
 
-  vector_snapshots(Val(info.fun_mdeim),op,args...)
+  vector_snapshots(op,args...)
 end
 
 function mdeim_snapshots(
@@ -15,7 +15,6 @@ function mdeim_snapshots(
 end
 
 function vector_snapshots(
-  ::Val{false},
   op::RBLinVariable{Nonaffine},
   μ::Vector{Param})
 
@@ -32,7 +31,6 @@ function vector_snapshots(
 end
 
 function vector_snapshots(
-  ::Val{false},
   op::RBLinVariable{Nonlinear},
   μ::Vector{Param},
   uh::Snapshots)
@@ -53,19 +51,15 @@ end
 function vector_snapshots(
   ::Val{true},
   op::RBLinVariable,
-  μ::Vector{Param},
-  rbspace_uθ=nothing)
+  μ::Vector{Param})
 
   id = get_id(op)
   printstyled("MDEIM: generating snapshots on the quadrature points, $id \n";
    color=:blue)
 
-  if isnothing(rbspace_uθ)
-    param_vals = evaluate_param_function(op,μ)
-    param_bs,param_bt = reduce_param_function(op,param_vals)
-  else
-    param_bs,param_bt = get_basis_space(rbspace_uθ),get_basis_time(rbspace_uθ)
-  end
+  param_vals = evaluate_param_function(op,μ)
+  param_bs,param_bt = reduce_param_function(op,param_vals)
+
   param_fun = interpolate_param_function(op,param_bs)
 
   V = assemble_functional_variable(op)
@@ -81,13 +75,36 @@ function vector_snapshots(
     push!(vals,snapshot(k))
   end
 
-  function space_idx(kst::Int,ns::Int)
-    ks = mod(kst,ns)
-    ks == 0 ? ns : ks
+  vals_st = [reshape(kron(param_bt[:,time_idx(k,ns)],vals[space_idx(k,ns)]),:,
+    get_Nt(op)) for k = 1:ns*nt]
+
+  Snapshots(id,vals_st)
+end
+
+function vector_snapshots(
+  ::Val{true},
+  op::RBLinVariable,
+  μ::Vector{Param},
+  rbspace_uθ::RBSpaceUnsteady)
+
+  id = get_id(op)
+  printstyled("MDEIM: generating snapshots on the quadrature points, $id \n";
+   color=:blue)
+
+  param_bs,param_bt = get_basis_space(rbspace_uθ),get_basis_time(rbspace_uθ)
+
+  param_fun = interpolate_param_function(op,param_bs)
+  V = assemble_functional_variable(op)
+
+  function snapshot(k::Int)::Vector{Float}
+    b = param_fun(k)
+    V(b,μ[k],0.)
   end
 
-  function time_idx(kst::Int,ns::Int)
-    Int(floor((kst-1)/ns)+1)
+  ns,nt = size(param_bs,2),size(param_bt,2)
+  vals = Vector{Float}[]
+  @threads for k = 1:ns
+    push!(vals,snapshot(k))
   end
 
   vals_st = [reshape(kron(param_bt[:,time_idx(k,ns)],vals[space_idx(k,ns)]),:,
@@ -137,19 +154,14 @@ end
 function matrix_snapshots(
   ::Val{true},
   op::RBUnsteadyBilinVariable{Top,<:ParamTransientTrialFESpace},
-  μ::Vector{Param},
-  rbspace_uθ=nothing) where Top
+  μ::Vector{Param}) where Top
 
   id = get_id(op)
   printstyled("MDEIM: generating snapshots on the quadrature points, $id \n";
    color=:blue)
 
-  if isnothing(rbspace_uθ)
-    param_vals = evaluate_param_function(op,μ)
-    param_bs,param_bt = reduce_param_function(op,param_vals)
-  else
-    param_bs,param_bt = get_basis_space(rbspace_uθ),get_basis_time(rbspace_uθ)
-  end
+  param_vals = evaluate_param_function(op,μ)
+  param_bs,param_bt = reduce_param_function(op,param_vals)
   param_fun = interpolate_param_function(op,param_bs)
 
   findnz_map = get_findnz_map(op,μ)
@@ -166,13 +178,37 @@ function matrix_snapshots(
     push!(vals,snapshot(k))
   end
 
-  function space_idx(kst::Int,ns::Int)
-    ks = mod(kst,ns)
-    ks == 0 ? ns : ks
+  vals_st = [reshape(kron(param_bt[:,time_idx(k,ns)],vals[space_idx(k,ns)]),:,
+    get_Nt(op)) for k = 1:ns*nt]
+
+  findnz_map,Snapshots(id,vals_st)
+end
+
+function matrix_snapshots(
+  ::Val{true},
+  op::RBUnsteadyBilinVariable{Nonlinear,<:ParamTransientTrialFESpace},
+  μ::Vector{Param},
+  rbspace_uθ::RBSpaceUnsteady)
+
+  id = get_id(op)
+  printstyled("MDEIM: generating snapshots on the quadrature points, $id \n";
+   color=:blue)
+
+  param_bs,param_bt = get_basis_space(rbspace_uθ),get_basis_time(rbspace_uθ)
+  param_fun = interpolate_param_function(op,param_bs)
+
+  findnz_map = get_findnz_map(op,μ,param_fun)
+  M = assemble_functional_variable(op)
+
+  function snapshot(k::Int)
+    b = param_fun(k)
+    nonzero_values(M(b,μ[k],0.),findnz_map)
   end
 
-  function time_idx(kst::Int,ns::Int)
-    Int(floor((kst-1)/ns)+1)
+  ns,nt = size(param_bs,2),size(param_bt,2)
+  vals = Vector{Float}[]
+  @threads for k = 1:ns
+    push!(vals,snapshot(k))
   end
 
   vals_st = [reshape(kron(param_bt[:,time_idx(k,ns)],vals[space_idx(k,ns)]),:,
@@ -220,7 +256,7 @@ end
 
 function interpolate_param_function(
   op::RBUnsteadyVariable,
-  vals::Matrix{Float})::Function
+  vals::Matrix{Float})::LagrangianQuadFEFunction
 
   test_quad = LagrangianQuadFESpace(get_test(op))
   param_fun = FEFunction(test_quad,vals)
@@ -229,7 +265,7 @@ end
 
 function interpolate_param_function(
   op::RBUnsteadyVariable{Nonlinear,Top},
-  rbspace_uθ::RBSpaceUnsteady)::Function where Top
+  rbspace_uθ::RBSpaceUnsteady)::RBFEFunction where Top
 
   bsθ = get_basis_space(rbspace_uθ)
   test = get_test(op)
