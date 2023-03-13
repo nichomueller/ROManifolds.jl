@@ -104,40 +104,18 @@ function LagrangianQuadFESpace(test::SingleFieldFESpace)
   LagrangianQuadFESpace(model,order)
 end
 
-struct LagrangianQuadFEFunction{T<:CellField} <: FEFunction
-  cell_field::T
-  cell_dof_values::AbstractArray{<:AbstractVector{<:Number}}
-  free_values::AbstractVector{<:Number}
-  dirichlet_values::AbstractVector{<:Number}
-  fe_space::SingleFieldFESpace
-
-  function LagrangianQuadFEFunction(
-    cell_field::T,
-    cell_dof_values::AbstractArray{<:AbstractVector{<:Number}},
-    free_values::AbstractVector{<:Number},
-    dirichlet_values::AbstractVector{<:Number},
-    fe_space::SingleFieldFESpace)
-
-    new{T}(cell_field,cell_dof_values,free_values,dirichlet_values,fe_space)
-  end
-end
-
 function Gridap.FEFunction(
   quad_fespace::LagrangianQuadFESpace,
   vec::AbstractVector)
 
-  test = quad_fespace.test
-  dir_vals = get_dirichlet_dof_values(test)
-  cell_vals = scatter_free_and_dirichlet_values(test,vec,dir_vals)
-  cell_field = CellField(test,cell_vals)
-  LagrangianQuadFEFunction(cell_field,cell_vals,vec,dir_vals,test)
+  FEFunction(quad_fespace.test,vec)
 end
 
 function Gridap.FEFunction(
   quad_fespace::LagrangianQuadFESpace,
   mat::AbstractMatrix)
 
-  n -> FEFunction(quad_fespace,mat[:,n])
+  n -> FEFunction(quad_fespace.test,mat[:,n])
 end
 
 function get_phys_quad_points(test::SingleFieldFESpace)
