@@ -1,19 +1,3 @@
-function mdeim_snapshots(
-  ::RBInfo,
-  op::RBLinVariable,
-  args...)::Snapshots{Float}
-
-  vector_snapshots(op,args...)
-end
-
-function mdeim_snapshots(
-  info::RBInfo,
-  op::RBBilinVariable,
-  args...)::Tuple{Vector{Int},Snapshots{Float}}
-
-  matrix_snapshots(Val(info.fun_mdeim),op,args...)
-end
-
 function vector_snapshots(
   op::RBLinVariable{Nonaffine},
   μ::Vector{Param})
@@ -48,8 +32,7 @@ function vector_snapshots(
   Snapshots(id,vals)
 end
 
-function vector_snapshots(
-  ::Val{true},
+#= function vector_snapshots(
   op::RBLinVariable,
   μ::Vector{Param})
 
@@ -79,10 +62,9 @@ function vector_snapshots(
     get_Nt(op)) for k = 1:ns*nt]
 
   Snapshots(id,vals_st)
-end
+end =#
 
-function vector_snapshots(
-  ::Val{true},
+#= function vector_snapshots(
   op::RBLinVariable,
   μ::Vector{Param},
   rbspace_uθ::RBSpaceUnsteady)
@@ -111,10 +93,9 @@ function vector_snapshots(
     get_Nt(op)) for k = 1:ns*nt]
 
   Snapshots(id,vals_st)
-end
+end =#
 
 function matrix_snapshots(
-  ::Val{false},
   op::RBBilinVariable,
   μ::Vector{Param})
 
@@ -132,7 +113,6 @@ function matrix_snapshots(
 end
 
 function matrix_snapshots(
-  ::Val,
   op::RBBilinVariable{Nonlinear,Ttr},
   μ::Vector{Param},
   uh::Snapshots) where Ttr
@@ -152,7 +132,7 @@ function matrix_snapshots(
 end
 
 function matrix_snapshots(
-  ::Val{true},
+  info::RBInfo,
   op::RBUnsteadyBilinVariable{Top,<:ParamTransientTrialFESpace},
   μ::Vector{Param}) where Top
 
@@ -172,23 +152,25 @@ function matrix_snapshots(
     nonzero_values(M(b,μ[k],0.),findnz_map)
   end
 
-  ns,nt = size(param_bs,2),size(param_bt,2)
+  #ns,nt = size(param_bs,2),size(param_bt,2)
+  ns = size(param_bs,2)
   vals = Vector{Float}[]
   @threads for k = 1:ns
     push!(vals,snapshot(k))
   end
+  bs = rb_space(info,Snapshots(id,vals))
 
-  vals_st = [reshape(kron(param_bt[:,time_idx(k,ns)],vals[space_idx(k,ns)]),:,
-    get_Nt(op)) for k = 1:ns*nt]
+  #= vals_st = [reshape(kron(param_bt[:,time_idx(k,ns)],vals[space_idx(k,ns)]),:,
+    get_Nt(op)) for k = 1:ns*nt] =#
 
-  findnz_map,Snapshots(id,vals_st)
+  findnz_map,RBSpaceUnsteady(id,bs,param_bt)#Snapshots(id,vals_st)
 end
 
 function matrix_snapshots(
-  ::Val{true},
+  info::RBInfo,
   op::RBUnsteadyBilinVariable{Nonlinear,<:ParamTransientTrialFESpace},
   μ::Vector{Param},
-  rbspace_uθ::RBSpaceUnsteady)
+  uh::Snapshots)
 
   id = get_id(op)
   printstyled("MDEIM: generating snapshots on the quadrature points, $id \n";
@@ -205,28 +187,34 @@ function matrix_snapshots(
     first(findnz(M[:]))
   end
 
-  param_bs,param_bt = get_basis_space(rbspace_uθ),get_basis_time(rbspace_uθ)
-  param_fun = interpolate_param_function(op,rbspace_uθ)
+  bst_u = rb(info,uh)
+  bs_u,bt_u = get_basis_space(bst_u),get_basis_time(bst_u)
+  bst_u_fun = interpolate_param_function(op,bst_u)
 
-  findnz_map = get_findnz_map(op,μ,param_fun)
+  findnz_map = get_findnz_map(op,μ,bst_u_fun)
   M = assemble_functional_variable(op)
 
   function snapshot(k::Int)
-    b = param_fun(k)
-    np = rand(eachindex(μ))
-    nonzero_values(M(b,μ[np],0.),findnz_map)
+    b = bst_u_fun(k)
+    nonzero_values(M(b,first(μ),0.),findnz_map)
   end
 
-  ns,nt = size(param_bs,2),size(param_bt,2)
+  #ns,nt = size(bs_u,2),size(bt_u,2)
+  ns = size(bs_u,2)
   vals = Vector{Float}[]
   @threads for k = 1:ns
     push!(vals,snapshot(k))
   end
+  bs = rb_space(info,Snapshots(id,vals))
+  #= red_vals = rb_space_projection(op,bs,findnz_map)
 
-  vals_st = [reshape(kron(param_bt[:,time_idx(k,ns)],vals[space_idx(k,ns)]),:,
-    get_Nt(op)) for k = 1:ns*nt]
+  vals_st = Matrix{Float}[]
+  @threads for k = 1:ns*nt
+    val_k = reshape(kron(bt_u[:,time_idx(k,ns)],red_vals[:,space_idx(k,ns)]),:,get_Nt(op))
+    push!(vals_st,val_k)
+  end =#
 
-  findnz_map,Snapshots(id,vals_st)
+  findnz_map,RBSpaceUnsteady(id,bs,bt_u)#Snapshots(id,vals_st)
 end
 
 function evaluate_param_function(

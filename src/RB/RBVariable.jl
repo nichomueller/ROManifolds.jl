@@ -115,7 +115,7 @@ Gridap.FESpaces.get_test(rbop::RBVariable) = get_test(rbop.feop)
 
 Gridap.FESpaces.get_trial(rbop::RBVariable) = get_trial(rbop.feop)
 
-get_dimension(rbop::ParamOperator) = get_dimension(rbop.feop)
+get_dimension(rbop::RBVariable) = get_dimension(rbop.feop)
 
 get_basis_time_row(rbop::RBVariable) = get_basis_time(get_rbspace_row(rbop))
 

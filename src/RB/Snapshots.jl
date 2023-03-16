@@ -4,12 +4,11 @@ mutable struct Snapshots{T}
   nsnap::Int
 end
 
-function Snapshots(id::Symbol,snap::AbstractArray{T},nsnap::Int) where {T<:DataType}
-  Snapshots{T}(id,snap,nsnap)
-end
+function Snapshots(
+  id::Symbol,
+  snap::AbstractArray{T},
+  nsnap::Int=get_nsnap(snap)) where {T<:DataType}
 
-function Snapshots(id::Symbol,snap::AbstractArray{T}) where {T<:DataType}
-  nsnap = get_nsnap(snap)
   Snapshots{T}(id,snap,nsnap)
 end
 
@@ -45,7 +44,7 @@ get_nsnap(s::Snapshots) = s.nsnap
 
 get_nsnap(v::AbstractVector) = length(v)
 
-get_nsnap(m::AbstractMatrix) = size(m)[2]
+get_nsnap(m::AbstractMatrix) = size(m,2)
 
 save(path::String,s::Snapshots) = save(joinpath(path,"$(s.id)"),s.snap)
 

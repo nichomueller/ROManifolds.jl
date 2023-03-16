@@ -45,7 +45,7 @@ function MDEIM(
   μ_mdeim = μ[1:info.mdeim_nsnap]
   meas = getproperty(measures,field)
 
-  snaps = mdeim_snapshots(info,op,μ_mdeim,args...)
+  snaps = vector_snapshots(op,μ_mdeim,args...)
   rbspace = mdeim_basis(info,snaps)
   red_rbspace = project_mdeim_basis(op,rbspace)
   idx = mdeim_idx(rbspace)
@@ -58,6 +58,15 @@ end
 function MDEIM(
   info::RBInfo,
   op::RBBilinVariable,
+  args...)
+
+  MDEIM(Val(info.fun_mdeim),info,op,args...)
+end
+
+function MDEIM(
+  ::Val{false},
+  info::RBInfo,
+  op::RBBilinVariable,
   μ::Vector{Param},
   measures::ProblemMeasures,
   field::Symbol=:dΩ,
@@ -66,8 +75,30 @@ function MDEIM(
   μ_mdeim = μ[1:info.mdeim_nsnap]
   meas = getproperty(measures,field)
 
-  findnz_map,snaps = mdeim_snapshots(info,op,μ_mdeim,args...)
+  findnz_map,snaps = matrix_snapshots(op,μ_mdeim,args...)
   rbspace = mdeim_basis(info,snaps)
+  red_rbspace = project_mdeim_basis(op,rbspace,findnz_map)
+  idx = mdeim_idx(rbspace)
+  red_lu_factors = get_red_lu_factors(info,rbspace,idx)
+  idx = recast_in_full_dim(idx,findnz_map)
+  red_meas = get_red_measure(op,idx,meas)
+
+  MDEIM(red_rbspace,red_lu_factors,idx,red_meas)
+end
+
+function MDEIM(
+  ::Val{true},
+  info::RBInfo,
+  op::RBBilinVariable,
+  μ::Vector{Param},
+  measures::ProblemMeasures,
+  field::Symbol=:dΩ,
+  args...)
+
+  μ_mdeim = μ[1:info.mdeim_nsnap]
+  meas = getproperty(measures,field)
+
+  findnz_map,rbspace = matrix_snapshots(info,op,μ_mdeim,args...)
   red_rbspace = project_mdeim_basis(op,rbspace,findnz_map)
   idx = mdeim_idx(rbspace)
   red_lu_factors = get_red_lu_factors(info,rbspace,idx)
@@ -149,13 +180,13 @@ get_idx_space(mdeim::MDEIMUnsteady) = first(mdeim.idx)
 get_idx_time(mdeim::MDEIMUnsteady) = last(mdeim.idx)
 get_red_measure(mdeim::MDEIM) = mdeim.red_measure
 
-function mdeim_basis(info::RBInfoSteady,snaps)
+function mdeim_basis(info::RBInfoSteady,snaps::Snapshots)
   id = get_id(snaps)
   basis_space = mdeim_POD(snaps;ϵ=info.ϵ)
   RBSpaceSteady(id,basis_space)
 end
 
-function mdeim_basis(info::RBInfoUnsteady,snaps)
+function mdeim_basis(info::RBInfoUnsteady,snaps::Snapshots)
   id = get_id(snaps)
   s,ns = get_snap(snaps),get_nsnap(snaps)
   basis_space = reduced_POD(s;ϵ=info.ϵ)
@@ -166,7 +197,7 @@ end
 
 function project_mdeim_basis(
   op::RBSteadyVariable,
-  rbspace,
+  rbspace::RBSpace,
   args...)
 
   id = get_id(rbspace)
@@ -176,7 +207,7 @@ end
 
 function project_mdeim_basis(
   op::RBUnsteadyVariable,
-  rbspace,
+  rbspace::RBSpace,
   args...)
 
   id = get_id(rbspace)

@@ -1,6 +1,6 @@
-function rb(info::RBInfo,args...)
-  _,snaps, = args
-  info.load_offline ? load_rb(info,snaps) : assemble_rb(info,args...)
+function rb(info::RBInfo,args...;kwargs...)
+  snaps, = args
+  info.load_offline ? load_rb(info,snaps) : assemble_rb(info,args...;kwargs...)
 end
 
 function load_rb(info::RBInfo,snaps::Snapshots)
@@ -14,9 +14,9 @@ end
 
 function assemble_rb(
   info::RBInfoSteady,
-  tt::TimeTracker,
   snaps::Snapshots,
-  args...)
+  args...;
+  tt=TimeTracker(OfflineTime(0.,0.),0.))
 
   id = get_id(snaps)
   tt.offline_time.basis_time += @elapsed begin
@@ -31,9 +31,9 @@ end
 
 function assemble_rb(
   info::RBInfoUnsteady,
-  tt::TimeTracker,
   snaps::Snapshots,
-  args...)
+  args...;
+  tt=TimeTracker(OfflineTime(0.,0.),0.))
 
   id = get_id(snaps)
   tt.offline_time.basis_time += @elapsed begin
@@ -49,9 +49,9 @@ end
 
 function assemble_rb(
   info::RBInfoSteady,
-  tt::TimeTracker,
   snaps::NTuple{2,Snapshots},
-  args...)
+  args...;
+  tt=TimeTracker(OfflineTime(0.,0.),0.))
 
   def = isindef(info)
   snaps_u,snaps_p = snaps
@@ -72,9 +72,9 @@ end
 
 function assemble_rb(
   info::RBInfoUnsteady,
-  tt::TimeTracker,
   snaps::NTuple{2,Snapshots},
-  args...)
+  args...;
+  tt=TimeTracker(OfflineTime(0.,0.),0.))
 
   def = isindef(info)
   snaps_u,snaps_p = snaps

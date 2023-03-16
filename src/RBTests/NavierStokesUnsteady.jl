@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function navier_stokes_unsteady()
-  run_fem = false
+  run_fem = true
 
   steady = false
   indef = true
@@ -11,12 +11,9 @@ function navier_stokes_unsteady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes"
-  mesh = "new_flow_cyl.json"
-  bnd_info = Dict("dirichlet0" => ["noslip","noslip_c","cylinder","cylinder_c","cylinder_p"],
-                  "dirichlet1" => ["nopenetration"],
-                  "dirichlet" => ["inlet","inlet_c","inlet_p",
-                                  "outlet_c","outlet_p"],
-                  "neumann" => ["outlet"])
+  mesh = "flow_3cyl.json"
+  bnd_info = Dict("dirichlet0" => ["noslip","cylinder"],"dirichlet1" => ["nopenetration"],
+                  "dirichlet" => ["inlet","inlet_c"],"neumann" => ["outlet"])
   order = 2
 
   t0,tF,dt,θ = 0.,0.15,0.0025,1
@@ -53,6 +50,11 @@ function navier_stokes_unsteady()
   solver = ThetaMethod(nls,dt,θ)
   nsnap = 100
   uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
+  trian = get_triangulation(V)
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-4,nsnap=80,online_snaps=95:100,
+    mdeim_snap=15,load_offline=true,postprocess=true)
+  writevtk(info,time_info,uh[1],t->U(μ[1],t),trian)
+  writevtk(info,time_info,ph[1],P,trian)
 
   opA = NonaffineParamOperator(a,afe,PS,time_info,U,V;id=:A)
   opB = AffineParamOperator(b,bfe,PS,time_info,U,Q;id=:B)
@@ -63,9 +65,9 @@ function navier_stokes_unsteady()
   opF = AffineParamOperator(f,ffe,PS,time_info,V;id=:F)
   opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
 
-  for fun_mdeim = (true)#(false,true)
+  for fun_mdeim = (false,true)
     for st_mdeim = (false,true)
-      for tol = (1e-2,1e-3,1e-4)#,1e-5)
+      for tol = (1e-1,1e-2,1e-3,1e-4)
 
         global info = RBInfoUnsteady(ptype,mesh,root;ϵ=tol,nsnap=80,online_snaps=95:100,
           mdeim_snap=15,load_offline=false,postprocess=true,
@@ -79,9 +81,8 @@ function navier_stokes_unsteady()
         ph_offline = ph[1:info.nsnap]
         uhθ_offline = compute_in_timesθ(uh_offline,θ)
 
-        rbspace_u,rbspace_p = rb(info,tt,(uh_offline,ph_offline),opB,ph,μ)
+        rbspace_u,rbspace_p = rb(info,(uh_offline,ph_offline),opB,ph,μ;tt)
         rbspace = rbspace_u,rbspace_p
-        rbspace_uθ = rb(info,tt,uhθ_offline)
 
         rbopA = RBVariable(opA,rbspace_u,rbspace_u)
         rbopB = RBVariable(opB,rbspace_p,rbspace_u)
@@ -95,8 +96,8 @@ function navier_stokes_unsteady()
         Arb = RBAffineDecomposition(info,tt,rbopA,μ,measures,:dΩ)
         Brb = RBAffineDecomposition(info,tt,rbopB,μ,measures,:dΩ)
         BTrb = RBAffineDecomposition(info,tt,rbopBT,μ,measures,:dΩ)
-        Crb = RBAffineDecomposition(info,tt,rbopC,μ,measures,:dΩ,rbspace_uθ)
-        Drb = RBAffineDecomposition(info,tt,rbopD,μ,measures,:dΩ,rbspace_uθ)
+        Crb = RBAffineDecomposition(info,tt,rbopC,μ,measures,:dΩ,uhθ_offline)
+        Drb = RBAffineDecomposition(info,tt,rbopD,μ,measures,:dΩ,uhθ_offline)
         Mrb = RBAffineDecomposition(info,tt,rbopM,μ,measures,:dΩ)
         Frb = RBAffineDecomposition(info,tt,rbopF,μ,measures,:dΩ)
         Hrb = RBAffineDecomposition(info,tt,rbopH,μ,measures,:dΓn)
