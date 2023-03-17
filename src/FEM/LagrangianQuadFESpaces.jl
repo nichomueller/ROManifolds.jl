@@ -100,7 +100,7 @@ end
 
 function LagrangianQuadFESpace(test::SingleFieldFESpace)
   model = get_background_model(test)
-  order = 1
+  order = get_dimension(test)-2
   LagrangianQuadFESpace(model,order)
 end
 

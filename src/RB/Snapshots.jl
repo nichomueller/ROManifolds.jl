@@ -80,3 +80,29 @@ function compute_in_timesθ(snaps::Snapshots,args...;kwargs...)
   nsnap = get_nsnap(snaps)
   Snapshots(id,compute_in_timesθ(snap,args...;kwargs...),nsnap)
 end
+
+function get_dirichlet_values(
+  U::ParamTrialFESpace,
+  μ::Vector{Param})
+
+  dir(μ) = U(μ).dirichlet_values
+  Snapshots(:g,dir.(μ))
+end
+
+function get_dirichlet_values(
+  U::ParamTransientTrialFESpace,
+  μ::Vector{Param},
+  tinfo::TimeInfo)
+
+  timesθ = get_timesθ(tinfo)
+  dir(μ) = Matrix([U(μ,t).dirichlet_values for t=timesθ])
+  Snapshots(:g,dir.(μ))
+end
+
+function Base.vcat(s1::Snapshots,s2::Snapshots)
+  @assert get_nsnap(s1) == get_nsnap(s2) "Cannot concatenate input snapshots"
+  id = get_id(s1)*get_id(s2)
+  snap = vcat(get_snap(s1),get_snap(s2))
+  nsnap = get_nsnap(s1)
+  Snapshots(id,snap,nsnap)
+end

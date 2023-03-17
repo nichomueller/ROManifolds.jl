@@ -152,7 +152,6 @@ function matrix_snapshots(
     nonzero_values(M(b,μ[k],0.),findnz_map)
   end
 
-  #ns,nt = size(param_bs,2),size(param_bt,2)
   ns = size(param_bs,2)
   vals = Vector{Float}[]
   @threads for k = 1:ns
@@ -160,17 +159,14 @@ function matrix_snapshots(
   end
   bs = rb_space(info,Snapshots(id,vals))
 
-  #= vals_st = [reshape(kron(param_bt[:,time_idx(k,ns)],vals[space_idx(k,ns)]),:,
-    get_Nt(op)) for k = 1:ns*nt] =#
-
-  findnz_map,RBSpaceUnsteady(id,bs,param_bt)#Snapshots(id,vals_st)
+  findnz_map,RBSpaceUnsteady(id,bs,param_bt)
 end
 
 function matrix_snapshots(
   info::RBInfo,
   op::RBUnsteadyBilinVariable{Nonlinear,<:ParamTransientTrialFESpace},
   μ::Vector{Param},
-  uh::Snapshots)
+  ugh::Snapshots)
 
   id = get_id(op)
   printstyled("MDEIM: generating snapshots on the quadrature points, $id \n";
@@ -187,9 +183,12 @@ function matrix_snapshots(
     first(findnz(M[:]))
   end
 
-  bst_u = rb(info,uh)
-  bs_u,bt_u = get_basis_space(bst_u),get_basis_time(bst_u)
-  bst_u_fun = interpolate_param_function(op,bst_u)
+  Ns = get_Ns(get_rbspace_row(op))
+  bs_ug = reduced_POD(get_snap(ugh);ϵ=info.ϵ)
+  bs_u,bs_g = bs_ug[1:Ns,:],bs_ug[1+Ns:end,:]
+  s2 = mode2_unfolding(bs_u'*get_snap(uh),get_nsnap(uh))
+  bt_u = reduced_POD(s2;ϵ=info.ϵ)
+  bst_u_fun = interpolate_param_function(op,bs_u,bs_g)
 
   findnz_map = get_findnz_map(op,μ,bst_u_fun)
   M = assemble_functional_variable(op)
@@ -199,22 +198,14 @@ function matrix_snapshots(
     nonzero_values(M(b,first(μ),0.),findnz_map)
   end
 
-  #ns,nt = size(bs_u,2),size(bt_u,2)
   ns = size(bs_u,2)
   vals = Vector{Float}[]
   @threads for k = 1:ns
     push!(vals,snapshot(k))
   end
   bs = rb_space(info,Snapshots(id,vals))
-  #= red_vals = rb_space_projection(op,bs,findnz_map)
 
-  vals_st = Matrix{Float}[]
-  @threads for k = 1:ns*nt
-    val_k = reshape(kron(bt_u[:,time_idx(k,ns)],red_vals[:,space_idx(k,ns)]),:,get_Nt(op))
-    push!(vals_st,val_k)
-  end =#
-
-  findnz_map,RBSpaceUnsteady(id,bs,bt_u)#Snapshots(id,vals_st)
+  findnz_map,RBSpaceUnsteady(id,bs,bt_u)
 end
 
 function evaluate_param_function(
@@ -265,10 +256,10 @@ end
 
 function interpolate_param_function(
   op::RBUnsteadyVariable{Nonlinear,Top},
-  rbspace_uθ::RBSpaceUnsteady)::Function where Top
+  bsuθ::Matrix{Float},
+  bsgθ::Matrix{Float})::Function where Top
 
-  bsθ = get_basis_space(rbspace_uθ)
   test = get_test(op)
-  param_fun(k::Int) = FEFunction(test,bsθ[:,k])
+  param_fun(k::Int) = FEFunction(test,bsuθ[:,k],bsgθ[:,k])
   param_fun
 end
