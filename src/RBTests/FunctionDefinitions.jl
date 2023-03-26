@@ -282,18 +282,18 @@ function navier_stokes_functions(::Val{false},measures::ProblemFixedMeasures)
   d(x,μ::Param,t::Real) = 1.
   d(μ::Param,t::Real) = x->d(x,μ,t)
 
-  f(x,p::Param,t::Real) = VectorValue(0.,0.)
+  f(x,p::Param,t::Real) = VectorValue(0.,0.,0.)
   f(μ::Param,t::Real) = x->f(x,μ,t)
 
-  h(x,p::Param,t::Real) = VectorValue(0.,0.)
+  h(x,p::Param,t::Real) = VectorValue(0.,0.,0.)
   h(μ::Param,t::Real) = x->h(x,μ,t)
 
   function g(x,p::Param,t::Real)
     μ = get_μ(p)
-    W,H = 1.5,0.1
+    W = 1.5
     T = 0.16
     flow_rate = μ[4]*abs(1-cos(pi*t/T)+μ[2]*sin(μ[3]*pi*t/T))
-    parab_prof = VectorValue(abs.(x[2]*(x[2]-W))/(W/2)^2,0.)
+    parab_prof = VectorValue(abs.(x[2]*(x[2]-W))/(W/2)^2,0.,0.)
     parab_prof*flow_rate
   end
   g(μ::Param,t::Real) = x->g(x,μ,t)

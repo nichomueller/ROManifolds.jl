@@ -5,6 +5,8 @@ function vector_snapshots(
   id = get_id(op)
   printstyled("MDEIM: generating snapshots for $id \n";color=:blue)
 
+  #MyFunc = whatever(ProblemDescription)
+  #push!(vals, MyFunc(V, k))
   V = assemble_vector(op)
   vals = Array{Float}[]
   @threads for k in eachindex(μ)
@@ -31,69 +33,6 @@ function vector_snapshots(
 
   Snapshots(id,vals)
 end
-
-#= function vector_snapshots(
-  op::RBLinVariable,
-  μ::Vector{Param})
-
-  id = get_id(op)
-  printstyled("MDEIM: generating snapshots on the quadrature points, $id \n";
-   color=:blue)
-
-  param_vals = evaluate_param_function(op,μ)
-  param_bs,param_bt = reduce_param_function(op,param_vals)
-
-  param_fun = interpolate_param_function(op,param_bs)
-
-  V = assemble_functional_variable(op)
-
-  function snapshot(k::Int)::Vector{Float}
-    b = param_fun(k)
-    V(b,μ[k],0.)
-  end
-
-  ns,nt = size(param_bs,2),size(param_bt,2)
-  vals = Vector{Float}[]
-  @threads for k = 1:ns
-    push!(vals,snapshot(k))
-  end
-
-  vals_st = [reshape(kron(param_bt[:,time_idx(k,ns)],vals[space_idx(k,ns)]),:,
-    get_Nt(op)) for k = 1:ns*nt]
-
-  Snapshots(id,vals_st)
-end =#
-
-#= function vector_snapshots(
-  op::RBLinVariable,
-  μ::Vector{Param},
-  rbspace_uθ::RBSpaceUnsteady)
-
-  id = get_id(op)
-  printstyled("MDEIM: generating snapshots on the quadrature points, $id \n";
-   color=:blue)
-
-  param_bs,param_bt = get_basis_space(rbspace_uθ),get_basis_time(rbspace_uθ)
-
-  param_fun = interpolate_param_function(op,param_bs)
-  V = assemble_functional_variable(op)
-
-  function snapshot(k::Int)::Vector{Float}
-    b = param_fun(k)
-    V(b,μ[k],0.)
-  end
-
-  ns,nt = size(param_bs,2),size(param_bt,2)
-  vals = Vector{Float}[]
-  @threads for k = 1:ns
-    push!(vals,snapshot(k))
-  end
-
-  vals_st = [reshape(kron(param_bt[:,time_idx(k,ns)],vals[space_idx(k,ns)]),:,
-    get_Nt(op)) for k = 1:ns*nt]
-
-  Snapshots(id,vals_st)
-end =#
 
 function matrix_snapshots(
   op::RBBilinVariable,
@@ -186,7 +125,7 @@ function matrix_snapshots(
   Ns = get_Ns(get_rbspace_row(op))
   bs_ug = reduced_POD(get_snap(ugh);ϵ=info.ϵ)
   bs_u,bs_g = bs_ug[1:Ns,:],bs_ug[1+Ns:end,:]
-  s2 = mode2_unfolding(bs_u'*get_snap(uh),get_nsnap(uh))
+  s2 = mode2_unfolding(bs_u'*get_snap(ugh)[1:Ns,:],get_nsnap(ugh))
   bt_u = reduced_POD(s2;ϵ=info.ϵ)
   bst_u_fun = interpolate_param_function(op,bs_u,bs_g)
 
