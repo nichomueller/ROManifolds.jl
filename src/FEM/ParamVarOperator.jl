@@ -115,6 +115,30 @@ realization_trial(op::ParamSteadyOperator) = get_trial(op)(realization(op))
 
 realization_trial(op::ParamUnsteadyOperator) = get_trial(op)(realization(op),realization(get_time_info(op)))
 
+function unpack_for_assembly(op::ParamSteadyLinOperator)
+  get_fe_function(op),get_test(op)
+end
+
+function unpack_for_assembly(op::ParamSteadyBilinOperator)
+  get_fe_function(op),get_test(op),get_trial(op)
+end
+
+function unpack_for_assembly(op::ParamSteadyLiftOperator)
+  get_fe_function(op),get_dirichlet_function(op),get_test(op)
+end
+
+function unpack_for_assembly(op::ParamUnsteadyLinOperator)
+  get_timesθ(op),get_fe_function(op),get_test(op)
+end
+
+function unpack_for_assembly(op::ParamUnsteadyBilinOperator)
+  get_timesθ(op),get_fe_function(op),get_test(op),get_trial(op)
+end
+
+function unpack_for_assembly(op::ParamUnsteadyLiftOperator)
+  get_timesθ(op),get_fe_function(op),get_dirichlet_function(op),get_test(op)
+end
+
 function Gridap.FESpaces.get_cell_dof_ids(
   op::ParamOperator,
   trian::Triangulation)
@@ -225,13 +249,7 @@ function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLinOperator)
   afe = get_fe_function(op)
   test = get_test(op)
   V(μ,tθ) = assemble_vector(afe(μ,tθ),test)
-  μ -> Matrix([V(μ,tθ) for tθ = timesθ])
-end
-
-function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLinOperator,t::Real)
-  afe = get_fe_function(op)
-  test = get_test(op)
-  μ -> assemble_vector(afe(μ,t),test)
+  μ -> [V(μ,tθ) for tθ = timesθ]
 end
 
 function Gridap.FESpaces.assemble_matrix(op::ParamSteadyBilinOperator)
@@ -248,13 +266,6 @@ function Gridap.FESpaces.assemble_matrix(op::ParamUnsteadyBilinOperator)
   test = get_test(op)
   M(μ,tθ) = assemble_matrix(afe(μ,tθ),trial(μ,tθ),test)
   μ -> [M(μ,tθ) for tθ = timesθ]
-end
-
-function Gridap.FESpaces.assemble_matrix(op::ParamUnsteadyBilinOperator,t::Real)
-  afe = get_fe_function(op)
-  trial = get_trial(op)
-  test = get_test(op)
-  μ -> assemble_matrix(afe(μ,t),trial(μ,t),test)
 end
 
 function Gridap.FESpaces.assemble_matrix(
@@ -277,16 +288,6 @@ function Gridap.FESpaces.assemble_matrix(
   (μ,u) -> [M(μ,tθ,u) for tθ = timesθ]
 end
 
-function Gridap.FESpaces.assemble_matrix(
-  op::ParamUnsteadyBilinOperator{Nonlinear,Ttr},
-  t::Real) where Ttr
-
-  afe = get_fe_function(op)
-  trial = get_trial(op)
-  test = get_test(op)
-  (μ,u) -> assemble_matrix(afe(u),trial(μ,t),test)
-end
-
 function Gridap.FESpaces.assemble_vector(op::ParamSteadyLiftOperator)
   afe = get_fe_function(op)
   dir = get_dirichlet_function(op)
@@ -304,14 +305,6 @@ function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLiftOperator)
   μ -> Matrix([lift(μ,tθ) for tθ = timesθ])
 end
 
-function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLiftOperator,t::Real)
-  afe = get_fe_function(op)
-  dir = get_dirichlet_function(op)
-  test = get_test(op)
-  lift(μ) = assemble_vector(v->afe(μ,t,dir(μ,t),v),test)
-  lift
-end
-
 function Gridap.FESpaces.assemble_vector(op::ParamSteadyLiftOperator{Nonlinear})
   afe = get_fe_function(op)
   dir = get_dirichlet_function(op)
@@ -325,14 +318,7 @@ function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLiftOperator{Nonlinear
   dir = get_dirichlet_function(op)
   test = get_test(op)
   lift(μ,t,u) = assemble_vector(v->afe(u(t),dir(μ,t),v),test)
-  (μ,u) -> Matrix([lift(μ,tθ,u) for tθ = timesθ])
-end
-
-function Gridap.FESpaces.assemble_vector(op::ParamUnsteadyLiftOperator{Nonlinear},t::Real)
-  afe = get_fe_function(op)
-  dir = get_dirichlet_function(op)
-  test = get_test(op)
-  (μ,u) -> assemble_vector(v->afe(u,dir(μ,t),v),test)
+  (μ,u) -> [lift(μ,tθ,u) for tθ = timesθ]
 end
 
 function get_dirichlet_function(::Val,trial::ParamTrialFESpace)

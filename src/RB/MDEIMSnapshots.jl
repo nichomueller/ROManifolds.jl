@@ -1,3 +1,22 @@
+function fe_snapshots(op::RBVariable,args...)
+  id = get_id(op)
+  printstyled("MDEIM: generating snapshots for $id \n";color=:blue)
+
+  V = assemble_vector(op)
+  vals = lazy_map(V,get_argument(args...))
+
+  Snapshots(id,vals)
+end
+
+function get_argument(μ::Vector{Param})
+  μ
+end
+
+function get_argument(μ::Vector{Param},uh::Snapshots)
+  u_fun(k::Int) = FEFunction(op,uh[k],μ[k])
+  μ,u_fun
+end
+
 function vector_snapshots(
   op::RBLinVariable{Nonaffine},
   μ::Vector{Param})
@@ -5,8 +24,6 @@ function vector_snapshots(
   id = get_id(op)
   printstyled("MDEIM: generating snapshots for $id \n";color=:blue)
 
-  #MyFunc = whatever(ProblemDescription)
-  #push!(vals, MyFunc(V, k))
   V = assemble_vector(op)
   vals = Array{Float}[]
   @threads for k in eachindex(μ)
