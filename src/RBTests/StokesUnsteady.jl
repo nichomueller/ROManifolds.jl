@@ -2,6 +2,55 @@ include("../FEM/FEM.jl")
 include("../RB/RB.jl")
 include("RBTests.jl")
 
+function run_fem(parts)
+  options = "-ksp_type cg -pc_type gamg -ksp_monitor"
+  GridapPETSc.with(args=split(options)) do
+    steady = false
+    indef = true
+    pdomain = false
+    ptype = ProblemType(steady,indef,pdomain)
+
+    root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/stokes"
+    mesh = "flow_3cyl2D.json"
+    bnd_info = Dict("dirichlet0" => ["noslip"],"dirichlet" => ["inlet"],"neumann" => ["outlet"])
+    order = 2
+    dim = 2
+
+    t0,tF,dt,θ = 0.,0.15,0.0025,1
+    time_info = TimeInfo(t0,tF,dt,θ)
+
+    ranges = [[1.,10.],[0.5,1.],[0.5,1.],[1.,2.]]
+    sampling = UniformSampling()
+    PS = ParamSpace(ranges,sampling)
+
+    fepath = fem_path(ptype,mesh,root)
+    mshpath = mesh_path(mesh,root)
+    #model = model_info(mshpath,bnd_info,ptype)
+    model = GmshDiscreteModel(parts,mshpath)
+    set_labels!(model,bnd_info)
+    measures = ProblemMeasures(model,order)
+
+    a,afe,m,mfe,jac_t,b,bfe,bTfe,f,ffe,h,hfe,g,lhs,rhs = stokes_functions(ptype,measures)
+    g0(x,p::Param,t::Real) = VectorValue(0,0)
+    g0(p::Param,t::Real) = x->g0(x,p,t)
+
+    reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{dim,Float},order)
+    reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1)
+    V = TestFESpace(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
+    U = ParamTransientTrialFESpace(V,[g0,g])
+    Q = TestFESpace(model,reffe2;conformity=:C0)
+    P = TrialFESpace(Q)
+    Y = ParamTransientMultiFieldFESpace([V,Q])
+    X = ParamTransientMultiFieldFESpace([U,P])
+
+    op = ParamTransientAffineFEOperator(jac_t,lhs,rhs,PS,X,Y)
+
+    solver = PETScLinearSolver()
+    nsnap = 10
+    uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
+  end
+end
+
 function stokes_unsteady()
   run_fem = true
 
@@ -11,14 +60,15 @@ function stokes_unsteady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/stokes"
-  mesh = "bifurcation_coarse.json"
-  bnd_info = Dict("dirichlet0" => [4],"dirichlet_in1" => [2],"dirichlet_in2" => [3],"neumann" => [1])
+  mesh = "flow_3cyl2D.json"
+  bnd_info = Dict("dirichlet0" => ["noslip"],"dirichlet" => ["inlet"],"neumann" => ["outlet"])
   order = 2
+  dim = 2
 
   t0,tF,dt,θ = 0.,0.15,0.0025,1
   time_info = TimeInfo(t0,tF,dt,θ)
 
-  ranges = fill([1.,3.],6)
+  ranges = [[1.,10.],[0.5,1.],[0.5,1.],[1.,2.]]
   sampling = UniformSampling()
   PS = ParamSpace(ranges,sampling)
 
@@ -28,15 +78,13 @@ function stokes_unsteady()
   measures = ProblemMeasures(model,order)
 
   a,afe,m,mfe,jac_t,b,bfe,bTfe,f,ffe,h,hfe,g,lhs,rhs = stokes_functions(ptype,measures)
-  g0(x,p::Param,t::Real) = VectorValue(0,0,0)
+  g0(x,p::Param,t::Real) = VectorValue(0,0)
   g0(p::Param,t::Real) = x->g0(x,p,t)
-  gout(x,p::Param,t::Real) = 0.3*g(x,p,t)
-  gout(p::Param,t::Real) = x->gout(x,p,t)
 
-  reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{3,Float},order)
+  reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{dim,Float},order)
   reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1)
-  V = TestFESpace(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet_in1","dirichlet_in2"])
-  U = ParamTransientTrialFESpace(V,[g0,g,gout])
+  V = TestFESpace(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
+  U = ParamTransientTrialFESpace(V,[g0,g])
   Q = TestFESpace(model,reffe2;conformity=:C0)
   P = TrialFESpace(Q)
   Y = ParamTransientMultiFieldFESpace([V,Q])
@@ -47,7 +95,7 @@ function stokes_unsteady()
   solver = ThetaMethod(LUSolver(),dt,θ)
   nsnap = 1
   uh,ph,μ, = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
-#=
+
   opA = NonaffineParamOperator(a,afe,PS,time_info,U,V;id=:A)
   opB = AffineParamOperator(b,bfe,PS,time_info,U,Q;id=:B)
   opBT = AffineParamOperator(b,bTfe,PS,time_info,P,V;id=:BT)
@@ -111,7 +159,7 @@ function stokes_unsteady()
 
   if info.postprocess
     postprocess(info)
-  end =#
+  end
 end
 
 stokes_unsteady()

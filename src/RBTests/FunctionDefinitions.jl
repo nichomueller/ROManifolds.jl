@@ -160,16 +160,17 @@ function stokes_functions(::Val{false},measures::ProblemFixedMeasures)
   b(x,p::Param,t::Real) = 1.
   b(p::Param,t::Real) = x->b(x,p,t)
   b(p::Param) = t->b(p,t)
-  f(x,p::Param,t::Real) = VectorValue(0.,0.,0.)
+  f(x,p::Param,t::Real) = VectorValue(0.,0.)
   f(p::Param,t::Real) = x->f(x,p,t)
-  h(x,p::Param,t::Real) = VectorValue(0.,0.,0.)
+  h(x,p::Param,t::Real) = VectorValue(0.,0.)
   h(p::Param,t::Real) = x->h(x,p,t)
   function g(x,p::Param,t::Real)
     μ = get_μ(p)
-    R = 0.5
-    T = 2.5
-    dist = (x[1]^2+x[2]^2)/(R^2)
-    abs(1-cos(2*pi*t/T)+sin(μ[1]*2*pi*t/T)/μ[2])*VectorValue(0.,0.,1-dist)*(x[3]==0.)
+    W = 1.5
+    T = 0.16
+    flow_rate = μ[4]*abs(1-cos(pi*t/T)+μ[2]*sin(μ[3]*pi*t/T))
+    parab_prof = VectorValue(abs.(x[2]*(x[2]-W))/(W/2)^2,0.)
+    parab_prof*flow_rate
   end
   g(p::Param,t::Real) = x->g(x,p,t)
 
