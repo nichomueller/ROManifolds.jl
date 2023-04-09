@@ -107,7 +107,7 @@ get_Nt(op::ParamUnsteadyOperator) = get_Nt(get_time_info(op))
 
 get_θ(op::ParamUnsteadyOperator) = get_θ(get_time_info(op))
 
-get_timesθ(::ParamSteadyOperator) = nothing
+get_timesθ(::ParamSteadyOperator) = fill(nothing,1)
 
 get_timesθ(op::ParamUnsteadyOperator) = get_timesθ(get_time_info(op))
 
@@ -130,7 +130,7 @@ function unpack_for_assembly(op::ParamBilinOperator)
 end
 
 function unpack_for_assembly(op::ParamLiftOperator)
-  get_param_fefunction(op),get_dirichlet_function(op),get_test(op)
+  get_param_fefunction(op),get_test(op),get_dirichlet_function(op)
 end
 
 function Gridap.FESpaces.get_cell_dof_ids(
@@ -232,8 +232,12 @@ function ParamLiftOperator(op::ParamUnsteadyBilinOperator{Top,Ttr}) where {Top,T
     get_pspace(op),get_time_info(op),get_trial(op),get_test(op))
 end
 
+assemble_fe_quantity(op::ParamLinOperator;kwargs...) = assemble_vector(op;kwargs...)
+
+assemble_fe_quantity(op::ParamBilinOperator;kwargs...) = assemble_matrix(op;kwargs...)
+
 function Gridap.FESpaces.assemble_vector(
-  op::ParamOperator;
+  op::ParamLinOperator;
   μ=realization(op),t=get_timesθ(op))
 
   assemble_vector(unpack_for_assembly(op)...,μ,t)
@@ -244,7 +248,7 @@ function Gridap.FESpaces.assemble_vector(
   μ=realization(op),t=get_timesθ(op),u=nothing)
 
   mat = assemble_matrix(unpack_for_assembly(op),μ,t,u)
-  findnz_map = findnz(first(mat)[:])
+  findnz_map, = findnz(first(mat)[:])
   nonzero_values(mat,findnz_map)
 end
 
@@ -263,10 +267,9 @@ end
 
 function Gridap.FESpaces.assemble_vector(
   fefun::Function,
-  dir::Function,
   test::FESpace,
-  μ::Param,
-  t,u)
+  dir::Function,
+  μ::Param,t,u)
 
   if isnothing(t)
     if isnothing(u)
@@ -286,7 +289,7 @@ function Gridap.FESpaces.assemble_vector(
 end
 
 function Gridap.FESpaces.assemble_matrix(
-  op::ParamOperator;
+  op::ParamBilinOperator;
   μ=realization(op),t=get_timesθ(op),u=nothing)
 
   assemble_matrix(unpack_for_assembly(op)...,μ,t,u)
@@ -295,25 +298,45 @@ end
 function Gridap.FESpaces.assemble_matrix(
   fefun::Function,
   test::FESpace,
-  trial::ParamTransientTrialFESpace,
-  μ::Param,
-  t,u)
+  trial::ParamTrialFESpace,
+  μ::Param,t,u)
 
-  if isnothing(t)
-    if isnothing(u)
-      [assemble_matrix(fefun(μ),trial(μ),test)]
-    else
-      [assemble_matrix(fefun(u),trial(μ),test)]
-    end
+  if isnothing(u)
+    [assemble_matrix(fefun(μ),trial(μ),test)]
   else
-    if isnothing(u)
-      [assemble_matrix(fefun(μ,tθ),trial(μ,tθ),test) for tθ = t]
-    elseif typeof(u) == Function
-      [assemble_matrix(fefun(u(tθ)),trial(μ,tθ),test) for tθ = t]
-    else typeof(u) == FEFunction
-      [assemble_matrix(fefun(u),trial(μ,tθ),test) for tθ = t]
-    end
+    [assemble_matrix(fefun(u),trial(μ),test)]
   end
+end
+
+function Gridap.FESpaces.assemble_matrix(
+  fefun::Function,
+  test::FESpace,
+  trial::ParamTransientTrialFESpace,
+  μ::Param,t,u)
+
+  if isnothing(u)
+    [assemble_matrix(fefun(μ,tθ),trial(μ,tθ),test) for tθ = t]
+  elseif typeof(u) == Function
+    [assemble_matrix(fefun(u(tθ)),trial(μ,tθ),test) for tθ = t]
+  else typeof(u) == FEFunction
+    [assemble_matrix(fefun(u),trial(μ,tθ),test) for tθ = t]
+  end
+end
+
+function assemble_affine_quantity(op::ParamOperator)
+  assemble_affine_quantity(unpack_for_assembly(op)...,realization(op),first(get_timesθ(op)))
+end
+
+function assemble_affine_quantity(fefun::Function,test::FESpace,args...)
+  assemble_vector(fefun(x->1),test)
+end
+
+function assemble_affine_quantity(fefun::Function,test::FESpace,trial::ParamTrialFESpace,μ::Param)
+  assemble_matrix(fefun(x->1),test,trial(μ))
+end
+
+function assemble_affine_quantity(fefun::Function,test::FESpace,trial::ParamTransientTrialFESpace,μ::Param,t::Real)
+  assemble_matrix(fefun(x->1),test,trial(μ,t))
 end
 
 function get_dirichlet_function(::Val,trial::ParamTrialFESpace)
@@ -332,4 +355,21 @@ function get_dirichlet_function(op::ParamOperator)
   id = get_id(op)
   trial = get_trial(op)
   get_dirichlet_function(Val(id ∈ (:M,:M_lift)),trial)
+end
+
+function get_findnz_map(op::ParamLinOperator;kwargs...)
+  Ns = get_Ns(get_test(op))
+  collect(1:Ns)
+end
+
+function get_findnz_map(op::ParamBilinOperator;kwargs...)
+  mat = assemble_matrix(op;kwargs...)
+  findnz_map, = findnz(first(mat)[:])
+  findnz_map
+end
+
+function get_inverse_findnz_map(op::RBVariable;kwargs...)
+  findnz_map = get_findnz_map(op;kwargs...)
+  inv_map(i::Int) = findall(x -> x == i,findnz_map)[1]
+  inv_map
 end

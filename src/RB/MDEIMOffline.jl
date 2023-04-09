@@ -36,7 +36,7 @@ end
 
 function MDEIM(
   info::RBInfo,
-  op::RBLinVariable,
+  op::RBVariable,
   μ::Vector{Param},
   measures::ProblemMeasures,
   field::Symbol=:dΩ,
@@ -45,38 +45,7 @@ function MDEIM(
   μ_mdeim = μ[1:info.mdeim_nsnap]
   meas = getproperty(measures,field)
 
-  snaps = vector_snapshots(op,μ_mdeim,args...)
-  rbspace = mdeim_basis(info,snaps)
-  red_rbspace = project_mdeim_basis(op,rbspace)
-  idx = mdeim_idx(rbspace)
-  red_lu_factors = get_red_lu_factors(info,rbspace,idx)
-  red_meas = get_red_measure(op,idx,meas)
-
-  MDEIM(red_rbspace,red_lu_factors,idx,red_meas)
-end
-
-function MDEIM(
-  info::RBInfo,
-  op::RBBilinVariable,
-  args...)
-
-  MDEIM(Val(info.fun_mdeim),info,op,args...)
-end
-
-function MDEIM(
-  ::Val{false},
-  info::RBInfo,
-  op::RBBilinVariable,
-  μ::Vector{Param},
-  measures::ProblemMeasures,
-  field::Symbol=:dΩ,
-  args...)
-
-  μ_mdeim = μ[1:info.mdeim_nsnap]
-  meas = getproperty(measures,field)
-
-  findnz_map,snaps = matrix_snapshots(op,μ_mdeim,args...)
-  rbspace = mdeim_basis(info,snaps)
+  rbspace,findnz_map = mdeim_basis(info,op,μ_mdeim,args...)
   red_rbspace = project_mdeim_basis(op,rbspace,findnz_map)
   idx = mdeim_idx(rbspace)
   red_lu_factors = get_red_lu_factors(info,rbspace,idx)
@@ -84,90 +53,6 @@ function MDEIM(
   red_meas = get_red_measure(op,idx,meas)
 
   MDEIM(red_rbspace,red_lu_factors,idx,red_meas)
-end
-
-function MDEIM(
-  ::Val{true},
-  info::RBInfo,
-  op::RBBilinVariable,
-  μ::Vector{Param},
-  measures::ProblemMeasures,
-  field::Symbol=:dΩ,
-  args...)
-
-  μ_mdeim = μ[1:info.mdeim_nsnap]
-  meas = getproperty(measures,field)
-
-  findnz_map,rbspace = matrix_snapshots(info,op,μ_mdeim,args...)
-  red_rbspace = project_mdeim_basis(op,rbspace,findnz_map)
-  idx = mdeim_idx(rbspace)
-  red_lu_factors = get_red_lu_factors(info,rbspace,idx)
-  idx = recast_in_full_dim(idx,findnz_map)
-  red_meas = get_red_measure(op,idx,meas)
-
-  MDEIM(red_rbspace,red_lu_factors,idx,red_meas)
-end
-
-function save(path::String,mdeim::MDEIMSteady)
-  save(joinpath(path,"basis_space"),get_basis_space(mdeim))
-  save(joinpath(path,"idx_space"),get_idx_space(mdeim))
-  red_lu = get_red_lu_factors(mdeim)
-  save(joinpath(path,"LU"),red_lu.factors)
-  save(joinpath(path,"p"),red_lu.ipiv)
-end
-
-function save(path::String,mdeim::MDEIMUnsteady)
-  save(joinpath(path,"basis_space"),get_basis_space(mdeim))
-  save(joinpath(path,"idx_space"),get_idx_space(mdeim))
-  save(joinpath(path,"basis_time"),get_basis_time(mdeim))
-  save(joinpath(path,"idx_time"),get_idx_time(mdeim))
-  red_lu = get_red_lu_factors(mdeim)
-  save(joinpath(path,"LU"),red_lu.factors)
-  save(joinpath(path,"p"),red_lu.ipiv)
-end
-
-function load(
-  path::String,
-  op::RBSteadyVariable,
-  meas::Measure)
-
-  id = Symbol(last(split(path,'/')))
-
-  basis_space = load(joinpath(path,"basis_space"))
-  rbspace = RBSpace(id,basis_space)
-  idx_space = Int.(load(joinpath(path,"idx_space"))[:,1])
-
-  factors = load(joinpath(path,"LU"))
-  ipiv = Int.(load(joinpath(path,"p"))[:,1])
-  red_lu_factors = LU(factors,ipiv,0)
-
-  red_measure = get_red_measure(op,idx_space,meas)
-
-  MDEIM(rbspace,red_lu_factors,idx_space,red_measure)
-end
-
-function load(
-  path::String,
-  op::RBUnsteadyVariable,
-  meas::Measure)
-
-  id = Symbol(last(split(path,'/')))
-
-  basis_space = load(joinpath(path,"basis_space"))
-  basis_time = load(joinpath(path,"basis_time"))
-  rbspace = RBSpace(id,basis_space,basis_time)
-
-  idx_space = Int.(load(joinpath(path,"idx_space"))[:,1])
-  idx_time = Int.(load(joinpath(path,"idx_time"))[:,1])
-  idx = (idx_space,idx_time)
-
-  factors = load(joinpath(path,"LU"))
-  ipiv = Int.(load(joinpath(path,"p"))[:,1])
-  red_lu_factors = LU(factors,ipiv,0)
-
-  red_measure = get_red_measure(op,idx_space,meas)
-
-  MDEIM(rbspace,red_lu_factors,idx,red_measure)
 end
 
 get_rbspace(mdeim::MDEIM) = mdeim.rbspace
@@ -179,21 +64,6 @@ get_idx_space(mdeim::MDEIMSteady) = mdeim.idx
 get_idx_space(mdeim::MDEIMUnsteady) = first(mdeim.idx)
 get_idx_time(mdeim::MDEIMUnsteady) = last(mdeim.idx)
 get_red_measure(mdeim::MDEIM) = mdeim.red_measure
-
-function mdeim_basis(info::RBInfoSteady,snaps::Snapshots)
-  id = get_id(snaps)
-  basis_space = mdeim_POD(snaps;ϵ=info.ϵ)
-  RBSpaceSteady(id,basis_space)
-end
-
-function mdeim_basis(info::RBInfoUnsteady,snaps::Snapshots)
-  id = get_id(snaps)
-  s,ns = get_snap(snaps),get_nsnap(snaps)
-  basis_space = reduced_POD(s;ϵ=info.ϵ)
-  s2 = mode2_unfolding(basis_space'*s,ns)
-  basis_time = reduced_POD(s2;ϵ=info.ϵ)
-  RBSpaceUnsteady(id,basis_space,basis_time)
-end
 
 function project_mdeim_basis(
   op::RBSteadyVariable,
@@ -402,4 +272,66 @@ function recast_in_mat_form(op::RBBilinVariable,idx_tmp::Vector{Int})
   Ns = get_Ns(get_rbspace_row(op))
   idx_space,_ = from_vec_to_mat_idx(idx_tmp,Ns)
   idx_space
+end
+
+function save(path::String,mdeim::MDEIMSteady)
+  save(joinpath(path,"basis_space"),get_basis_space(mdeim))
+  save(joinpath(path,"idx_space"),get_idx_space(mdeim))
+  red_lu = get_red_lu_factors(mdeim)
+  save(joinpath(path,"LU"),red_lu.factors)
+  save(joinpath(path,"p"),red_lu.ipiv)
+end
+
+function save(path::String,mdeim::MDEIMUnsteady)
+  save(joinpath(path,"basis_space"),get_basis_space(mdeim))
+  save(joinpath(path,"idx_space"),get_idx_space(mdeim))
+  save(joinpath(path,"basis_time"),get_basis_time(mdeim))
+  save(joinpath(path,"idx_time"),get_idx_time(mdeim))
+  red_lu = get_red_lu_factors(mdeim)
+  save(joinpath(path,"LU"),red_lu.factors)
+  save(joinpath(path,"p"),red_lu.ipiv)
+end
+
+function load(
+  path::String,
+  op::RBSteadyVariable,
+  meas::Measure)
+
+  id = Symbol(last(split(path,'/')))
+
+  basis_space = load(joinpath(path,"basis_space"))
+  rbspace = RBSpace(id,basis_space)
+  idx_space = Int.(load(joinpath(path,"idx_space"))[:,1])
+
+  factors = load(joinpath(path,"LU"))
+  ipiv = Int.(load(joinpath(path,"p"))[:,1])
+  red_lu_factors = LU(factors,ipiv,0)
+
+  red_measure = get_red_measure(op,idx_space,meas)
+
+  MDEIM(rbspace,red_lu_factors,idx_space,red_measure)
+end
+
+function load(
+  path::String,
+  op::RBUnsteadyVariable,
+  meas::Measure)
+
+  id = Symbol(last(split(path,'/')))
+
+  basis_space = load(joinpath(path,"basis_space"))
+  basis_time = load(joinpath(path,"basis_time"))
+  rbspace = RBSpace(id,basis_space,basis_time)
+
+  idx_space = Int.(load(joinpath(path,"idx_space"))[:,1])
+  idx_time = Int.(load(joinpath(path,"idx_time"))[:,1])
+  idx = (idx_space,idx_time)
+
+  factors = load(joinpath(path,"LU"))
+  ipiv = Int.(load(joinpath(path,"p"))[:,1])
+  red_lu_factors = LU(factors,ipiv,0)
+
+  red_measure = get_red_measure(op,idx_space,meas)
+
+  MDEIM(rbspace,red_lu_factors,idx,red_measure)
 end

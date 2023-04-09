@@ -168,39 +168,45 @@ function stokes_operators(
   afe(p::Param,t::Real,u,v) = afe(p,t,dΩ,u,v)
   afe(p::Param,t::Real) = (u,v) -> afe(p,t,u,v)
   afe(a::Function,u,v) = ∫(a*∇(v)⊙∇(u))dΩ
+  afe(a::Function) = (u,v) -> afe(a,u,v)
   A = ParamFunctions(a,afe)
 
   mfe(p::Param,t::Real,dΩ,u,v) = ∫(m(p,t)*v⋅u)dΩ
   mfe(p::Param,t::Real,u,v) = mfe(p,t,dΩ,u,v)
   mfe(p::Param,t::Real) = (u,v) -> mfe(p,t,u,v)
   mfe(m::Function,u,v) = ∫(m*v⋅u)dΩ
+  mfe(m::Function) = (u,v) -> mfe(m,u,v)
   M = ParamFunctions(m,mfe)
 
   bfe(p::Param,t::Real,dΩ,u,q) = ∫(b(p,t)*q*(∇⋅(u)))dΩ
   bfe(p::Param,t::Real,u,q) = bfe(p,t,dΩ,u,q)
   bfe(p::Param,t::Real) = (u,q) -> bfe(p,t,u,q)
   bfe(b::Function,u,q) = ∫(b*q*(∇⋅(u)))dΩ
+  bfe(b::Function) = (u,v) -> bfe(b,u,v)
   B = ParamFunctions(b,bfe)
 
   btfe(p::Param,t::Real,dΩ,u,v) = ∫(b(p,t)*(∇⋅(v))*u)dΩ
   btfe(p::Param,t::Real,u,v) = btfe(p,t,dΩ,u,v)
   btfe(p::Param,t::Real) = (u,v) -> btfe(p,t,u,v)
   btfe(b::Function,u,v) = ∫(b*(∇⋅(v))*u)dΩ
+  btfe(b::Function) = (u,v) -> btfe(b,u,v)
   BT = ParamFunctions(b,btfe)
 
   ffe(p::Param,t::Real,dΩ,v) = ∫(f(p,t)⋅v)dΩ
   ffe(p::Param,t::Real,v) = ffe(p,t,dΩ,v)
   ffe(p::Param,t::Real) = v -> ffe(p,t,v)
   ffe(f::Function,v) = ∫(f⋅v)dΩ
+  ffe(f::Function) = v -> ffe(f,u,v)
   F = ParamFunctions(f,ffe)
 
   hfe(p::Param,t::Real,dΓn,v) = ∫(h(p,t)⋅v)dΓn
   hfe(p::Param,t::Real,v) = hfe(p,t,dΓn,v)
   hfe(p::Param,t::Real) = v -> hfe(p,t,v)
   hfe(h::Function,v) = ∫(h⋅v)dΓn
+  hfe(h::Function) = v -> hfe(h,u,v)
   H = ParamFunctions(h,hfe)
 
-  opA = NonaffineParamOperator(A,PS,time_info,U,V;id=:A)
+  opA = AffineParamOperator(A,PS,time_info,U,V;id=:A)
   opB = AffineParamOperator(B,PS,time_info,U,Q;id=:B)
   opBT = AffineParamOperator(BT,PS,time_info,P,V;id=:BT)
   opM = AffineParamOperator(M,PS,time_info,U,V;id=:M)

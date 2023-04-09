@@ -142,21 +142,17 @@ function Gridap.FESpaces.get_cell_dof_ids(
   get_cell_dof_ids(rbop.feop,trian)
 end
 
-Gridap.FESpaces.assemble_vector(op::RBLinVariable,args...) = assemble_vector(op.feop,args...)
+assemble_fe_quantity(op::RBVariable;kwargs...) = assemble_fe_quantity(op.feop;kwargs...)
 
-Gridap.FESpaces.assemble_matrix(op::RBBilinVariable,args...) = assemble_matrix(op.feop,args...)
-
-function Gridap.FESpaces.assemble_vector(op::RBLinVariable{Affine},args...)
-  assemble_vector(op.feop,args...)(realization(op))
+function Gridap.FESpaces.assemble_vector(op::RBLinVariable;kwargs...)
+  assemble_vector(op.feop;kwargs...)
 end
 
-function Gridap.FESpaces.assemble_matrix(op::RBBilinVariable{Affine,Ttr},args...) where Ttr
-  assemble_matrix(op.feop,args...)(realization(op))
+function Gridap.FESpaces.assemble_matrix(op::RBBilinVariable;kwargs...)
+  assemble_matrix(op.feop;kwargs...)
 end
 
-function assemble_functional_variable(op::RBVariable,args...)
-  assemble_functional_variable(op.feop,args...)
-end
+assemble_affine_quantity(op::RBVariable,args...) = assemble_affine_quantity(op.feop)
 
 get_dirichlet_function(op::RBVariable) = get_dirichlet_function(op.feop)
 
@@ -178,57 +174,9 @@ get_timesθ(op::RBVariable) = get_timesθ(op.feop)
 
 get_phys_quad_points(op::RBVariable) = get_phys_quad_points(op.feop)
 
-# "Small, full vector -> large, sparse vector"
-# function get_findnz_map(
-#   op::RBBilinVariable,
-#   μ::Vector{Param},
-#   args...)::Vector{Int}
+get_findnz_map(op::RBVariable;kwargs...) = get_findnz_map(op.feop;kwargs...)
 
-#   get_findnz_map(op,first(μ),args...)
-# end
-
-# function get_findnz_map(
-#   op::RBSteadyBilinVariable,
-#   μ::Param)::Vector{Int}
-
-#   M = assemble_matrix(op)(μ)
-#   first(findnz(M[:]))
-# end
-
-# function get_findnz_map(
-#   op::RBUnsteadyBilinVariable,
-#   μ::Param)::Vector{Int}
-
-#   dtθ = get_dt(op)*get_θ(op)
-#   M = assemble_matrix(op,dtθ)(μ)
-#   first(findnz(M[:]))
-# end
-
-# function get_findnz_map(
-#   op::RBSteadyVariable{Nonlinear,Ttr},
-#   μ::Param,
-#   f::Function)::Vector{Int} where Ttr
-
-#   M = assemble_matrix(op)(μ,f(1))
-#   first(findnz(M[:]))
-# end
-
-# function get_findnz_map(
-#   op::RBUnsteadyVariable{Nonlinear,Ttr},
-#   μ::Param,
-#   f::Function)::Vector{Int} where Ttr
-
-#   dtθ = get_dt(op)*get_θ(op)
-#   M = assemble_matrix(op,dtθ)(μ,f(1)(dtθ))
-#   first(findnz(M[:]))
-# end
-
-"Viceversa"
-function get_inverse_findnz_map(op::RBBilinVariable,q::T) where T
-  findnz_map = get_findnz_map(op,q)
-  inv_map(i::Int) = findall(x -> x == i,findnz_map)[1]
-  inv_map
-end
+get_inverse_findnz_map(op::RBVariable;kwargs...) = get_inverse_findnz_map(op.feop;kwargs...)
 
 function unfold_spacetime(
   op::RBUnsteadyVariable,
@@ -269,7 +217,7 @@ function rb_space_projection(
 end
 
 function rb_space_projection(op::RBVariable)
-  mv = assemble_affine_variable(op)
+  mv = assemble_affine_quantity(op)
   rb_space_projection(op,mv)
 end
 

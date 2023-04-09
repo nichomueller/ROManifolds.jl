@@ -50,7 +50,7 @@ function stokes_unsteady()
     parab_prof*flow_rate
   end
   g(p::Param,t::Real) = x->g(x,p,t)
-  g0(x,p::Param,t::Real) = VectorValue(0,0)
+  g0(x,p::Param,t::Real) = VectorValue(0.,0.)
   g0(p::Param,t::Real) = x->g0(x,p,t)
 
   reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{dim,Float},order)

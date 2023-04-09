@@ -158,15 +158,6 @@ function space_supremizers(
   gram_schmidt(constraint_mat,basis_u)
 end
 
-matrix_B(opB::ParamSteadyBilinOperator{Affine,Ttr},μ::Vector{Param}) where Ttr =
-  assemble_matrix(opB)(first(μ))
-matrix_B(opB::ParamSteadyBilinOperator,μ::Vector{Param}) =
-  assemble_matrix(opB).(μ)
-matrix_B(opB::ParamUnsteadyBilinOperator{Affine,Ttr},μ::Vector{Param}) where Ttr =
-  assemble_matrix(opB,realization(opB.tinfo))(first(μ))
-matrix_B(opB::ParamUnsteadyBilinOperator,μ::Vector{Param}) =
-  assemble_matrix(opB,realization(opB.tinfo)).(μ)
-
 function assemble_constraint_matrix(
   opB::ParamBilinOperator{Affine,Ttr},
   basis_p::Matrix{Float},
@@ -176,7 +167,7 @@ function assemble_constraint_matrix(
   @assert opB.id == :B
   printstyled("Fetching supremizing operator Bᵀ\n";color=:blue)
 
-  B = matrix_B(opB,μ)
+  B = assemble_affine_quantity(opB)
   Matrix(B')*basis_p
 end
 
@@ -189,7 +180,7 @@ function assemble_constraint_matrix(
   @assert opB.id == :B
   printstyled("Bᵀ is nonaffine: must assemble the constraint matrix\n";color=:blue)
 
-  B = matrix_B(opB,μ)
+  B = assemble_matrix(opB;μ,t=first(get_timesθ(opB)))
   Brb(k::Int) = Matrix(B[k]')*ph.snaps[:,k]
   Matrix(Brb.(axes(basis_p,2)))
 end
