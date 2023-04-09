@@ -11,12 +11,9 @@ function navier_stokes_unsteady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes"
-  mesh = "flow_3cyl.json"
-  bnd_info = Dict("dirichlet0" => ["noslip","cylinder"],
-                  "dirichlet1" => ["nopenetration"],
-                  "dirichlet2" => ["inlet","inlet_c"],
-                  "neumann" => ["outlet"])
-  dim = 3
+  mesh = "flow_3cyl2D.json"
+  bnd_info = Dict("dirichlet0" => ["noslip"],"dirichlet" => ["inlet"],"neumann" => ["outlet"])
+  dim = 2
   order = 2
 
   t0,tF,dt,θ = 0.,0.15,0.0025,1
@@ -33,14 +30,12 @@ function navier_stokes_unsteady()
 
   a,afe,m,mfe,b,bfe,bTfe,c,cfe,d,dfe,f,ffe,h,hfe,g,res,jac,jac_t =
     navier_stokes_functions(ptype,measures)
-  g0(x,p::Param,t::Real) = VectorValue(0.,0.,0.)
+  g0(x,p::Param,t::Real) = VectorValue(0.,0.)
   g0(p::Param,t::Real) = x->g0(x,p,t)
 
   reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{dim,Float},order)
   reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1)
-  V = TestFESpace(model,reffe1;conformity=:H1,
-    dirichlet_tags=["dirichlet0","dirichlet1","dirichlet2"],
-    dirichlet_masks=[(true,true,true),(false,false,true),(true,true,true)])
+  V = TestFESpace(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
   U = ParamTransientTrialFESpace(V,[g0,g,g])
   Q = TestFESpace(model,reffe2;conformity=:C0)
   P = TrialFESpace(Q)

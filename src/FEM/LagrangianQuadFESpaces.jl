@@ -74,9 +74,13 @@ function Gridap.get_background_model(test::SingleFieldFESpace)
   get_background_model(get_triangulation(test))
 end
 
+function get_dimension(::UnstructuredDiscreteModel{Dc,Dp,Tp,B}) where {Dc,Dp,Tp,B}
+  Dp
+end
+
 function get_dimension(test::SingleFieldFESpace)
   model = get_background_model(test)
-  maximum(model.grid.reffes[1].reffe.polytope.dface.dims)
+  get_dimension(model)
 end
 
 function Gridap.FESpaces.get_order(test::SingleFieldFESpace)

@@ -92,7 +92,7 @@ function hyperred_structure(
   m::Measure,
   idx_space::Vector{Int})
 
-  fun = get_fe_function(op)
+  fun = get_param_fefunction(op)
   V(μ) = assemble_vector(v->fun(μ,m,v),get_test(op))[idx_space]
   V
 end
@@ -103,7 +103,7 @@ function hyperred_structure(
   idx_space::Vector{Int},
   timesθ::Vector{<:Real})
 
-  fun = get_fe_function(op)
+  fun = get_param_fefunction(op)
   V(μ,tθ) = assemble_vector(v->fun(μ,tθ,m,v),get_test(op))[idx_space]
   V(μ) = Matrix(Broadcasting(tθ -> V(μ,tθ))(timesθ))
   V
@@ -114,7 +114,7 @@ function hyperred_structure(
   m::Measure,
   idx_space::Vector{Int}) where Ttr
 
-  fun = get_fe_function(op)
+  fun = get_param_fefunction(op)
   M(μ) = assemble_matrix((u,v)->fun(μ,m,u,v),get_trial(op)(μ),get_test(op))
   μ -> Vector(M(μ)[:][idx_space])
 end
@@ -125,7 +125,7 @@ function hyperred_structure(
   idx_space::Vector{Int},
   timesθ::Vector{<:Real}) where Ttr
 
-  fun = get_fe_function(op)
+  fun = get_param_fefunction(op)
   M(μ,tθ) = assemble_matrix((u,v)->fun(μ,tθ,m,u,v),get_trial(op)(μ,tθ),get_test(op))
   Midx(μ,tθ) = Vector(M(μ,tθ)[:][idx_space])
   Midx(μ) = Matrix(Broadcasting(tθ -> Midx(μ,tθ))(timesθ))
@@ -137,7 +137,7 @@ function hyperred_structure(
   m::Measure,
   idx_space::Vector{Int})
 
-  fun = get_fe_function(op)
+  fun = get_param_fefunction(op)
   dir(μ) = get_dirichlet_function(op)(μ)
   lift(μ) = assemble_vector(v->fun(μ,m,dir(μ),v),get_test(op))[idx_space]
 
@@ -150,7 +150,7 @@ function hyperred_structure(
   idx_space::Vector{Int},
   timesθ::Vector{<:Real})
 
-  fun = get_fe_function(op)
+  fun = get_param_fefunction(op)
   dir(μ,tθ) = get_dirichlet_function(op)(μ,tθ)
   lift(μ,tθ) = assemble_vector(v->fun(μ,tθ,m,dir(μ,tθ),v),get_test(op))[idx_space]
   lift(μ) = Matrix(Broadcasting(tθ -> lift(μ,tθ))(timesθ))
@@ -163,7 +163,7 @@ function hyperred_structure(
   m::Measure,
   idx_space::Vector{Int}) where Ttr
 
-  fun = get_fe_function(op)
+  fun = get_param_fefunction(op)
   trial = get_trial(op)
   test = get_test(op)
 
@@ -177,7 +177,7 @@ function hyperred_structure(
   idx_space::Vector{Int},
   timesθ::Vector{<:Real}) where Ttr
 
-  fun = get_fe_function(op)
+  fun = get_param_fefunction(op)
   trial = get_trial(op)
   test = get_test(op)
 
@@ -192,7 +192,7 @@ function hyperred_structure(
   m::Measure,
   idx_space::Vector{Int})
 
-  fun = get_fe_function(op)
+  fun = get_param_fefunction(op)
   dir(μ) = get_dirichlet_function(op)(μ)
   lift(μ) = assemble_vector(v->fun(m,z,dir(μ),v),get_test(op))[idx_space]
 
@@ -205,7 +205,7 @@ function hyperred_structure(
   idx_space::Vector{Int},
   timesθ::Vector{<:Real})
 
-  fun = get_fe_function(op)
+  fun = get_param_fefunction(op)
   dir(μ,tθ) = get_dirichlet_function(op)(μ,tθ)
   lift(μ,tθ,z) = assemble_vector(v->fun(m,z(tθ),dir(μ,tθ),v),get_test(op))[idx_space]
   lift(μ,z) = Matrix(Broadcasting(tθ -> lift(μ,tθ,z))(timesθ))

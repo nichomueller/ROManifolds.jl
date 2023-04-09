@@ -99,7 +99,7 @@ const RBUnsteadyVariable{Top,Ttr} =
 
 get_param_function(rbop::RBVariable) = get_param_function(rbop.feop)
 
-get_fe_function(rbop::RBVariable) = get_fe_function(rbop.feop)
+get_param_fefunction(rbop::RBVariable) = get_param_fefunction(rbop.feop)
 
 get_rbspace_row(rbop::RBVariable) = rbop.rbspace_row
 
@@ -158,10 +158,6 @@ function assemble_functional_variable(op::RBVariable,args...)
   assemble_functional_variable(op.feop,args...)
 end
 
-function assemble_affine_variable(op::RBVariable)
-  assemble_affine_variable(op.feop)
-end
-
 get_dirichlet_function(op::RBVariable) = get_dirichlet_function(op.feop)
 
 get_pspace(op::RBVariable) = get_pspace(op.feop)
@@ -182,50 +178,50 @@ get_timesθ(op::RBVariable) = get_timesθ(op.feop)
 
 get_phys_quad_points(op::RBVariable) = get_phys_quad_points(op.feop)
 
-"Small, full vector -> large, sparse vector"
-function get_findnz_map(
-  op::RBBilinVariable,
-  μ::Vector{Param},
-  args...)::Vector{Int}
+# "Small, full vector -> large, sparse vector"
+# function get_findnz_map(
+#   op::RBBilinVariable,
+#   μ::Vector{Param},
+#   args...)::Vector{Int}
 
-  get_findnz_map(op,first(μ),args...)
-end
+#   get_findnz_map(op,first(μ),args...)
+# end
 
-function get_findnz_map(
-  op::RBSteadyBilinVariable,
-  μ::Param)::Vector{Int}
+# function get_findnz_map(
+#   op::RBSteadyBilinVariable,
+#   μ::Param)::Vector{Int}
 
-  M = assemble_matrix(op)(μ)
-  first(findnz(M[:]))
-end
+#   M = assemble_matrix(op)(μ)
+#   first(findnz(M[:]))
+# end
 
-function get_findnz_map(
-  op::RBUnsteadyBilinVariable,
-  μ::Param)::Vector{Int}
+# function get_findnz_map(
+#   op::RBUnsteadyBilinVariable,
+#   μ::Param)::Vector{Int}
 
-  dtθ = get_dt(op)*get_θ(op)
-  M = assemble_matrix(op,dtθ)(μ)
-  first(findnz(M[:]))
-end
+#   dtθ = get_dt(op)*get_θ(op)
+#   M = assemble_matrix(op,dtθ)(μ)
+#   first(findnz(M[:]))
+# end
 
-function get_findnz_map(
-  op::RBSteadyVariable{Nonlinear,Ttr},
-  μ::Param,
-  f::Function)::Vector{Int} where Ttr
+# function get_findnz_map(
+#   op::RBSteadyVariable{Nonlinear,Ttr},
+#   μ::Param,
+#   f::Function)::Vector{Int} where Ttr
 
-  M = assemble_matrix(op)(μ,f(1))
-  first(findnz(M[:]))
-end
+#   M = assemble_matrix(op)(μ,f(1))
+#   first(findnz(M[:]))
+# end
 
-function get_findnz_map(
-  op::RBUnsteadyVariable{Nonlinear,Ttr},
-  μ::Param,
-  f::Function)::Vector{Int} where Ttr
+# function get_findnz_map(
+#   op::RBUnsteadyVariable{Nonlinear,Ttr},
+#   μ::Param,
+#   f::Function)::Vector{Int} where Ttr
 
-  dtθ = get_dt(op)*get_θ(op)
-  M = assemble_matrix(op,dtθ)(μ,f(1)(dtθ))
-  first(findnz(M[:]))
-end
+#   dtθ = get_dt(op)*get_θ(op)
+#   M = assemble_matrix(op,dtθ)(μ,f(1)(dtθ))
+#   first(findnz(M[:]))
+# end
 
 "Viceversa"
 function get_inverse_findnz_map(op::RBBilinVariable,q::T) where T

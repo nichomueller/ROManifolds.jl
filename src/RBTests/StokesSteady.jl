@@ -24,7 +24,7 @@ function stokes_steady()
   model = model_info(mshpath,bnd_info,ptype)
   measures = ProblemMeasures(model,order)
 
-  a,afe,b,bfe,f,ffe,h,hfe,g,lhs,rhs = stokes_functions(ptype,measures)
+  a,afe,b,bfe,f,ffe,h,hfe,g,lhs,rhs = stokes_operators(ptype,measures)
 
   reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{3,Float},order)
   reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1)

@@ -3,7 +3,7 @@ include("../RB/RB.jl")
 include("RBTests.jl")
 
 function stokes_unsteady()
-  run_fem = true
+  run_fem = false
 
   steady = false
   indef = true
@@ -11,61 +11,70 @@ function stokes_unsteady()
   ptype = ProblemType(steady,indef,pdomain)
 
   root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/stokes"
-  mesh = "bifurcation_coarse.json"
-  bnd_info = Dict("dirichlet0" => [4],"dirichlet_in1" => [2],"dirichlet_in2" => [3],"neumann" => [1])
+  mesh = "flow_3cyl2D.json"
+  bnd_info = Dict("dirichlet0" => ["noslip"],"dirichlet" => ["inlet"],"neumann" => ["outlet"])
   order = 2
-
-  t0,tF,dt,θ = 0.,0.15,0.0025,1
-  time_info = TimeInfo(t0,tF,dt,θ)
-
-  ranges = fill([1.,3.],6)
-  sampling = UniformSampling()
-  PS = ParamSpace(ranges,sampling)
 
   fepath = fem_path(ptype,mesh,root)
   mshpath = mesh_path(mesh,root)
   model = model_info(mshpath,bnd_info,ptype)
   measures = ProblemMeasures(model,order)
+  dim = get_dimension(model)
 
-  a,afe,m,mfe,jac_t,b,bfe,bTfe,f,ffe,h,hfe,g,lhs,rhs = stokes_functions(ptype,measures)
-  g0(x,p::Param,t::Real) = VectorValue(0,0,0)
+  ranges = fill([1.,10.],4)
+  sampling = UniformSampling()
+  PS = ParamSpace(ranges,sampling)
+
+  t0,tF,dt,θ = 0.,0.15,0.0025,1
+  time_info = TimeInfo(t0,tF,dt,θ)
+
+  function a(x,p::Param,t::Real)
+    μ = get_μ(p)
+    1/sum(μ)
+  end
+  a(p::Param,t::Real) = x->a(x,p,t)
+  m(x,p::Param,t::Real) = 1.
+  m(p::Param,t::Real) = x->m(x,p,t)
+  b(x,p::Param,t::Real) = 1.
+  b(p::Param,t::Real) = x->b(x,p,t)
+  f(x,p::Param,t::Real) = VectorValue(0.,0.)
+  f(p::Param,t::Real) = x->f(x,p,t)
+  h(x,p::Param,t::Real) = VectorValue(0.,0.)
+  h(p::Param,t::Real) = x->h(x,p,t)
+  function g(x,p::Param,t::Real)
+    μ = get_μ(p)
+    W = 1.5
+    T = 0.16
+    flow_rate = μ[4]*abs(1-cos(pi*t/T)+μ[2]*sin(μ[3]*pi*t/T))
+    parab_prof = VectorValue(abs.(x[2]*(x[2]-W))/(W/2)^2,0.)
+    parab_prof*flow_rate
+  end
+  g(p::Param,t::Real) = x->g(x,p,t)
+  g0(x,p::Param,t::Real) = VectorValue(0,0)
   g0(p::Param,t::Real) = x->g0(x,p,t)
-  gout(x,p::Param,t::Real) = 0.3*g(x,p,t)
-  gout(p::Param,t::Real) = x->gout(x,p,t)
 
-  reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{3,Float},order)
+  reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{dim,Float},order)
   reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1)
-  V = TestFESpace(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet_in1","dirichlet_in2"])
-  U = ParamTransientTrialFESpace(V,[g0,g,gout])
+  V = TestFESpace(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
+  U = ParamTransientTrialFESpace(V,[g0,g])
   Q = TestFESpace(model,reffe2;conformity=:C0)
   P = TrialFESpace(Q)
-  Y = ParamTransientMultiFieldFESpace([V,Q])
-  X = ParamTransientMultiFieldFESpace([U,P])
 
-  op = ParamTransientAffineFEOperator(jac_t,lhs,rhs,PS,X,Y)
+  feop,opA,opB,opBT,opM,opF,opH = stokes_operators(measures,PS,time_info,V,U,Q,P;a,b,m,f,h)
 
   solver = ThetaMethod(LUSolver(),dt,θ)
-  nsnap = 1
-  uh,ph,μ, = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
-#=
-  opA = NonaffineParamOperator(a,afe,PS,time_info,U,V;id=:A)
-  opB = AffineParamOperator(b,bfe,PS,time_info,U,Q;id=:B)
-  opBT = AffineParamOperator(b,bTfe,PS,time_info,P,V;id=:BT)
-  opM = AffineParamOperator(m,mfe,PS,time_info,U,V;id=:M)
-  opF = AffineParamOperator(f,ffe,PS,time_info,V;id=:F)
-  opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
+  nsnap = 100
+  uh,ph,μ = fe_snapshots(ptype,solver,feop,fepath,run_fem,nsnap,t0,tF)
 
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-3,nsnap=80,mdeim_snap=5,load_offline=true)
+  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-3,nsnap=80,mdeim_snap=10,load_offline=false)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
 
   printstyled("Offline phase, reduced basis method\n";color=:blue)
 
-  uh,ph,μ = fesol
   uh_offline = uh[1:info.nsnap]
   ph_offline = ph[1:info.nsnap]
-  opA,opB,opBT,opM,opF,opH = op
 
-  rbspace_u,rbspace_p = rb(info,tt,(uh_offline,ph_offline),opB,ph,μ)
+  rbspace_u,rbspace_p = rb(info,(uh_offline,ph_offline),opB,ph,μ;tt)
   rbspace = rbspace_u,rbspace_p
 
   rbopA = RBVariable(opA,rbspace_u,rbspace_u)
@@ -111,7 +120,7 @@ function stokes_unsteady()
 
   if info.postprocess
     postprocess(info)
-  end =#
+  end
 end
 
 stokes_unsteady()

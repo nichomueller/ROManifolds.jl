@@ -199,8 +199,8 @@ function online_results_dict(info::RBInfo)
 end
 
 function H1_norm_matrix(opA::ParamBilinOperator,opM::ParamBilinOperator)
-  afe = get_fe_function(opA)
-  mfe = get_fe_function(opM)
+  afe = get_param_fefunction(opA)
+  mfe = get_param_fefunction(opM)
   trial = realization_trial(opA)
   test = get_test(opA)
   A = assemble_matrix((u,v)->afe(1,u,v),trial,test)
@@ -209,7 +209,7 @@ function H1_norm_matrix(opA::ParamBilinOperator,opM::ParamBilinOperator)
 end
 
 function L2_norm_matrix(opM::ParamBilinOperator)
-  mfe = get_fe_function(opM)
+  mfe = get_param_fefunction(opM)
   trial = realization_trial(opM)
   test = get_test(opM)
   assemble_matrix((u,v)->mfe(1,u,v),trial,test)
