@@ -232,27 +232,33 @@ function ParamLiftOperator(op::ParamUnsteadyBilinOperator{Top,Ttr}) where {Top,T
     get_pspace(op),get_time_info(op),get_trial(op),get_test(op))
 end
 
+abstract type AssemblyStyle end
+struct DefaultStyle <: AssemblyStyle end
+struct DistributedStyle <: AssemblyStyle end
+struct GetFindnzMapStyle <: AssemblyStyle end
+
 assemble_fe_quantity(op::ParamLinOperator;kwargs...) = assemble_vector(op;kwargs...)
 
 assemble_fe_quantity(op::ParamBilinOperator;kwargs...) = assemble_matrix(op;kwargs...)
 
 function Gridap.FESpaces.assemble_vector(
   op::ParamLinOperator;
-  μ=realization(op),t=get_timesθ(op),u=nothing)
+  μ=realization(op),t=get_timesθ(op),u=nothing,style=DefaultStyle())
 
-  assemble_vector(unpack_for_assembly(op)...,μ,t,u)
+  assemble_vector(style,unpack_for_assembly(op)...,μ,t,u)
 end
 
 function Gridap.FESpaces.assemble_vector(
   op::ParamBilinOperator;
-  μ=realization(op),t=get_timesθ(op),u=nothing)
+  μ=realization(op),t=get_timesθ(op),u=nothing,style=DefaultStyle())
 
-  mat = assemble_matrix(unpack_for_assembly(op)...,μ,t,u)
+  mat = assemble_matrix(style,unpack_for_assembly(op)...,μ,t,u)
   findnz_map = get_findnz_map(first(mat))
   nonzero_values(mat,findnz_map)
 end
 
 function Gridap.FESpaces.assemble_vector(
+  ::DefaultStyle,
   fefun::Function,
   test::FESpace,
   μ::Param,t,args...)
@@ -265,6 +271,7 @@ function Gridap.FESpaces.assemble_vector(
 end
 
 function Gridap.FESpaces.assemble_vector(
+  ::DefaultStyle,
   fefun::Function,
   test::FESpace,
   dir::Function,
@@ -285,6 +292,10 @@ function Gridap.FESpaces.assemble_vector(
       [assemble_vector(v->fefun(u,dir(μ,tθ),v),test) for tθ = t]
     end
   end
+end
+
+function Gridap.FESpaces.assemble_vector(::DistributedStyle,args...)
+  DistMatrix(assemble_vector(DefaultStyle(),args...))
 end
 
 function Gridap.FESpaces.assemble_matrix(

@@ -26,7 +26,7 @@ function rom_online_path(tpath::String,ϵ::Float)
 end
 
 function rom_off_on_paths(
-  tpath::String,mesh::String,ϵ::Float;
+  tpath::String,ϵ::Float;
   st_mdeim=false,fun_mdeim=false)
 
   @assert isdir(tpath) "Provide valid path for the current test"

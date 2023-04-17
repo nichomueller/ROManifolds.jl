@@ -1,8 +1,8 @@
 root = pwd()
 
-@everywhere include("$root/FEM/FEM.jl")
-@everywhere include("$root/RB/RB.jl")
-@everywhere include("$root/RBTests/RBTests.jl")
+@everywhere include("$root/src/FEM/FEM.jl")
+@everywhere include("$root/src/RB/RB.jl")
+@everywhere include("$root/src/RBTests/RBTests.jl")
 
 function navier_stokes_steady()
   run_fem = false
@@ -51,7 +51,7 @@ function navier_stokes_steady()
   opF = AffineParamOperator(f,ffe,PS,V;id=:F)
   opH = AffineParamOperator(h,hfe,PS,V;id=:H)
 
-  info = RBInfoSteady(ptype,test_path,mesh;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=true)
+  info = RBInfoSteady(ptype,test_path;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=true)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
   fesol = (uh,ph,μ,U,V)
   rbspace,param_on_structures = offline_phase(info,fesol,(opA,opB,opC,opD,opF,opH),measures,tt)

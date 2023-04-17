@@ -1,8 +1,8 @@
 root = pwd()
 
-@everywhere include("$root/FEM/FEM.jl")
-@everywhere include("$root/RB/RB.jl")
-@everywhere include("$root/RBTests/RBTests.jl")
+@everywhere include("$root/src/FEM/FEM.jl")
+@everywhere include("$root/src/RB/RB.jl")
+@everywhere include("$root/src/RBTests/RBTests.jl")
 
 function navier_stokes_unsteady()
   run_fem = false
@@ -78,7 +78,7 @@ function navier_stokes_unsteady()
     for st_mdeim = (true)
       for tol = (1e-1,1e-2,1e-3,1e-4)
 
-        global info = RBInfoUnsteady(ptype,test_path,mesh;ϵ=tol,nsnap=80,online_snaps=95:100,
+        global info = RBInfoUnsteady(ptype,test_path;ϵ=tol,nsnap=80,online_snaps=95:100,
           mdeim_snap=15,load_offline=false,postprocess=true,
           fun_mdeim=fun_mdeim,st_mdeim=st_mdeim)
         tt = TimeTracker(OfflineTime(0.,0.),0.)
