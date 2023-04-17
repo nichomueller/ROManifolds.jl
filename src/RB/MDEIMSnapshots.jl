@@ -1,3 +1,7 @@
+abstract type SnapshotAssemblerMode end
+struct SnapshotMatrixAssembler <: SnapshotAssemblerMode end
+struct SparseToFullAssembler <: SnapshotAssemblerMode end
+
 function mdeim_basis(info::RBInfo,op::RBVariable,args...)
   state = info.fun_mdeim && typeof(op) == RBBilinVariable
   mdeim_basis(Val(state),info,op,args...)
@@ -24,13 +28,13 @@ function fe_snapshots(op::RBVariable,args...)
   id = get_id(op)
   printstyled("MDEIM: generating snapshots for $id \n";color=:blue)
 
-  fe_quantity = get_assembler(op,args...)
+  fe_snap = get_assembler(SnapshotMatrixAssembler(),op,args...)
   vals = Vector{Float}[]
   @threads for k in eachindex(μ)
-    push!(vals,fe_quantity(k))
+    push!(vals,fe_snap(k))
   end
 
-  findnz_map = get_findnz_map(op;args...)
+  findnz_map = get_assembler(SparseToFullAssembler(),op,args...)
 
   Snapshots(id,vals),findnz_map
 end
@@ -63,36 +67,48 @@ function mdeim_basis(
   RBSpaceUnsteady(id,bs,param_bt),findnz_map
 end
 
-function get_assembler(
-  op::RBVariable{Nonaffine,Ttr},
-  μ::Vector{Param}) where Ttr
+function get_assembler(::SnapshotMatrixAssembler,args...)
+  get_assembler(assemble_vector,args...)
+end
 
-  k -> assemble_vector(op;μ=μ[k])
+function get_assembler(::SparseToFullAssembler,args...)
+  get_assembler(assemble_fe_quantity,args...)
 end
 
 function get_assembler(
+  assembler::Function,
+  op::RBVariable{Nonaffine,Ttr},
+  μ::Vector{Param}) where Ttr
+
+  k -> assembler(op;μ=μ[k])
+end
+
+function get_assembler(
+  assembler::Function,
   op::RBVariable{Nonlinear,Ttr},
   μ::Vector{Param},
   uh::Snapshots) where Ttr
 
   u_fun(k) = FEFunction(op,uh[k],μ[k])
-  k -> assemble_vector(op;μ=μ[k],u=u_fun(k))
+  k -> assembler(op;μ=μ[k],u=u_fun(k))
 end
 
 function get_assembler(
+  assembler::Function,
   op::RBBilinVariable{Nonaffine,Ttr},
   μ::Vector{Param},
   fun::Function) where Ttr
 
-  k -> assemble_vector(op;μ=μ[k],u=fun(k),t=first(get_timesθ(op)))
+  k -> assembler(op;μ=μ[k],u=fun(k),t=first(get_timesθ(op)))
 end
 
 function get_assembler(
+  assembler::Function,
   op::RBBilinVariable{Nonlinear,Ttr},
   μ::Vector{Param},
   fun::Function) where Ttr
 
-  k -> assemble_vector(op;μ=first(μ),u=fun(k),t=first(get_timesθ(op)))
+  k -> assembler(op;μ=first(μ),u=fun(k),t=first(get_timesθ(op)))
 end
 
 function evaluate_param_function(

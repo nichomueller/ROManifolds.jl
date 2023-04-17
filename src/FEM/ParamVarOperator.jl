@@ -238,9 +238,9 @@ assemble_fe_quantity(op::ParamBilinOperator;kwargs...) = assemble_matrix(op;kwar
 
 function Gridap.FESpaces.assemble_vector(
   op::ParamLinOperator;
-  μ=realization(op),t=get_timesθ(op))
+  μ=realization(op),t=get_timesθ(op),u=nothing)
 
-  assemble_vector(unpack_for_assembly(op)...,μ,t)
+  assemble_vector(unpack_for_assembly(op)...,μ,t,u)
 end
 
 function Gridap.FESpaces.assemble_vector(
@@ -254,9 +254,8 @@ end
 
 function Gridap.FESpaces.assemble_vector(
   fefun::Function,
-  test::FESpace;
-  μ::Param,
-  t)
+  test::FESpace,
+  μ::Param,t,args...)
 
   if isnothing(t)
     [assemble_vector(fefun(μ),test)]
@@ -331,7 +330,7 @@ function assemble_affine_quantity(fefun::Function,test::FESpace,args...)
   assemble_vector(fefun(x->1),test)
 end
 
-function assemble_affine_quantity(fefun::Function,test::FESpace,trial::ParamTrialFESpace,μ::Param)
+function assemble_affine_quantity(fefun::Function,test::FESpace,trial::ParamTrialFESpace,μ::Param,args...)
   assemble_matrix(fefun(x->1),test,trial(μ))
 end
 
@@ -357,13 +356,11 @@ function get_dirichlet_function(op::ParamOperator)
   get_dirichlet_function(Val(id ∈ (:M,:M_lift)),trial)
 end
 
-function get_findnz_map(op::ParamLinOperator;kwargs...)
-  Ns = get_Ns(get_test(op))
-  collect(1:Ns)
+function get_findnz_map(vec::AbstractVector)
+  collect(length(vec))
 end
 
-function get_findnz_map(op::ParamBilinOperator;kwargs...)
-  mat = assemble_matrix(op;kwargs...)
+function get_findnz_map(mat::AbstractMatrix)
   findnz_map, = findnz(first(mat)[:])
   findnz_map
 end

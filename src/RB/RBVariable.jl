@@ -148,16 +148,8 @@ function Gridap.FESpaces.assemble_vector(op::RBLinVariable;kwargs...)
   assemble_vector(op.feop;kwargs...)
 end
 
-function Gridap.FESpaces.assemble_vector(op::RBLinVariable;u::Snapshots,kwargs...)
-  assemble_vector(op.feop;u=get_snap(u),kwargs...)
-end
-
 function Gridap.FESpaces.assemble_matrix(op::RBBilinVariable;kwargs...)
   assemble_matrix(op.feop;kwargs...)
-end
-
-function Gridap.FESpaces.assemble_matrix(op::RBBilinVariable;u::Snapshots,kwargs...)
-  assemble_matrix(op.feop;u=get_snap(u),kwargs...)
 end
 
 assemble_affine_quantity(op::RBVariable,args...) = assemble_affine_quantity(op.feop)
@@ -183,8 +175,6 @@ get_timesθ(op::RBVariable) = get_timesθ(op.feop)
 get_phys_quad_points(op::RBVariable) = get_phys_quad_points(op.feop)
 
 get_findnz_map(op::RBVariable;kwargs...) = get_findnz_map(op.feop;kwargs...)
-
-get_findnz_map(op::RBVariable;u::Snapshots,kwargs...) = get_findnz_map(op.feop;u=get_snap(u),kwargs...)
 
 get_inverse_findnz_map(op::RBVariable;kwargs...) = get_inverse_findnz_map(op.feop;kwargs...)
 

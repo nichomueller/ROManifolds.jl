@@ -10,7 +10,7 @@ function stokes_unsteady()
   pdomain = false
   ptype = ProblemType(steady,indef,pdomain)
 
-  root = "/home/user1/git_repos/Mabla.jl/tests/"
+  root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/stokes"
   mesh = "flow_3cyl2D.json"
   bnd_info = Dict("dirichlet0" => ["noslip"],"dirichlet" => ["inlet"],"neumann" => ["outlet"])
   order = 2
