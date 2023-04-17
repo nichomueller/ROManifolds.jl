@@ -62,7 +62,7 @@ function mdeim_basis(
 end
 
 function get_assembler(::SnapshotMatrixAssembler,args...)
-  get_assembler(assemble_vector,args...)
+  i->DistMatrix(get_assembler(assemble_vector,args...)(i))
 end
 
 function get_assembler(::SparseToFullAssembler,args...)

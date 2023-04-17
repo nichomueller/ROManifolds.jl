@@ -19,13 +19,13 @@ end
 
 function RBInfoSteady(
   ptype::ProblemType,
-  mesh::String,
-  root::String;
+  tpath::String,
+  mesh::String;
   ϵ=1e-5,nsnap=80,online_snaps=95:100,mdeim_snap=20,use_energy_norm=false,
   load_offline=true,save_offline=true,save_online=true,
   fun_mdeim=false,adaptivity=false,postprocess=false)
 
-  offline_path,online_path = rom_off_on_paths(ptype,mesh,root,ϵ;fun_mdeim=fun_mdeim)
+  offline_path,online_path = rom_off_on_paths(ptype,mesh,tpath,ϵ;fun_mdeim=fun_mdeim)
   RBInfoSteady(ptype,ϵ,nsnap,online_snaps,mdeim_snap,offline_path,online_path,
     use_energy_norm,load_offline,save_offline,save_online,fun_mdeim,adaptivity,postprocess)
 end
@@ -51,14 +51,14 @@ end
 
 function RBInfoUnsteady(
   ptype::ProblemType,
-  mesh::String,
-  root::String;
+  tpath::String,
+  mesh::String;
   ϵ=1e-5,nsnap=80,online_snaps=95:100,mdeim_snap=20,time_red_method="ST-HOSVD",
   use_energy_norm=false,load_offline=true,
   save_offline=true,save_online=true,st_mdeim=false,fun_mdeim=false,
   adaptivity=false,postprocess=false)
 
-  offline_path,online_path = rom_off_on_paths(ptype,mesh,root,ϵ;
+  offline_path,online_path = rom_off_on_paths(ptype,mesh,tpath,ϵ;
     st_mdeim=st_mdeim,fun_mdeim=fun_mdeim)
   RBInfoUnsteady(ptype,ϵ,nsnap,online_snaps,mdeim_snap,offline_path,
     online_path,time_red_method,use_energy_norm,load_offline,

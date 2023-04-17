@@ -1,11 +1,7 @@
 include("FunctionDefinitions.jl")
 
-test_path(root,mesh,::Val{true}) = joinpath(root,"steady/$mesh")
-test_path(root,mesh,::Val{false}) = joinpath(root,"unsteady/$mesh")
-
-function fem_path(ptype::ProblemType,mesh::String,root::String)
-  @assert isdir(root) "Provide valid root path"
-  tpath = test_path(root,mesh,issteady(ptype))
+function fem_path(tpath::String,mesh::String)
+  @assert isdir(tpath) "Provide valid path for the current test"
   fepath = joinpath(tpath,"fem")
   create_dir!(fepath)
   fepath
@@ -29,10 +25,11 @@ function rom_online_path(tpath::String,ϵ::Float)
   rb_on_path
 end
 
-function rom_off_on_paths(ptype::ProblemType,mesh::String,root::String,ϵ::Float;
+function rom_off_on_paths(
+  tpath::String,mesh::String,ϵ::Float;
   st_mdeim=false,fun_mdeim=false)
 
-  @assert isdir(root) "Provide valid root path"
+  @assert isdir(tpath) "Provide valid path for the current test"
   function keyword()
     if !st_mdeim && !fun_mdeim
       return "standard"
@@ -43,7 +40,6 @@ function rom_off_on_paths(ptype::ProblemType,mesh::String,root::String,ϵ::Float
     end
   end
 
-  tpath = test_path(root,mesh,issteady(ptype))
   rompath = joinpath(tpath,"rom")
   keytpath = joinpath(rompath,keyword())
 
@@ -52,8 +48,8 @@ function rom_off_on_paths(ptype::ProblemType,mesh::String,root::String,ϵ::Float
   offpath,onpath
 end
 
-function mesh_path(mesh::String,root::String)
-  joinpath(get_parent_dir(root),"meshes/$mesh")
+function mesh_path(tpath::String,mesh::String)
+  joinpath(get_parent_dir(tpath;nparent=3),"meshes/$mesh")
 end
 
 function set_labels!(model,bnd_info)

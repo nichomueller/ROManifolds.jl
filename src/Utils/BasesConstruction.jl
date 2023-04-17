@@ -10,11 +10,11 @@ function mode2_unfolding(S::AbstractMatrix,ns::Int)
   mode2
 end
 
-@everywhere my_svd(s::Matrix{Float}) = svd(s)
+my_svd(s::Matrix{Float}) = svd(s)
 
-@everywhere my_svd(s::SparseMatrixCSC) = svds(s;nsv=size(s)[2]-1)[1]
+my_svd(s::SparseMatrixCSC) = svds(s;nsv=size(s)[2]-1)[1]
 
-@everywhere my_svd(s::Vector{AbstractMatrix}) = my_svd(Matrix(s))
+my_svd(s::Vector{AbstractMatrix}) = my_svd(Matrix(s))
 
 function POD(S::NTuple{N,AbstractMatrix},args...;kwargs...) where N
   Broadcasting(si -> POD(si,args...;kwargs...))(S)
@@ -45,11 +45,11 @@ function POD(S::AbstractMatrix;ϵ=1e-5)
   U[:,1:n]
 end
 
-@everywhere function reduced_POD(S::AbstractMatrix;ϵ=1e-5)
+function reduced_POD(S::AbstractMatrix;ϵ=1e-5)
   reduced_POD(Val{size(S,1)>size(S,2)}(),S;ϵ)
 end
 
-@everywhere function reduced_POD(::Val{true},S::AbstractMatrix;ϵ=1e-5)
+function reduced_POD(::Val{true},S::AbstractMatrix;ϵ=1e-5)
   C = S'*S
   _,_,V = my_svd(C)
   Σ = svdvals(S)
@@ -67,7 +67,7 @@ end
   U
 end
 
-@everywhere function reduced_POD(::Val{false},S::AbstractMatrix;ϵ=1e-5)
+function reduced_POD(::Val{false},S::AbstractMatrix;ϵ=1e-5)
   C = S*S'
   U,_ = my_svd(C)
   Σ = svdvals(S)
@@ -81,11 +81,18 @@ end
   U[:,1:n]
 end
 
+function reduced_POD(
+  la::LazyArray{<:Fill{<:Function},DistMatrix{Float},1,Tuple{Base.OneTo{Int}}};
+  ϵ=1e-5,nproc=4)
+
+  reduced_POD(DistMatrix(la);ϵ,nproc)
+end
+
 function reduced_POD(S::DistMatrix{Float};ϵ=1e-5,nproc=4)
   man = MPIManager(np=nproc);
   addprocs(man);
   @mpi_do man begin
-    reduced_POD(S;ϵ)
+    reduced_POD(S;ϵ=ϵ)
   end
 end
 

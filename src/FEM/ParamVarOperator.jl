@@ -248,7 +248,7 @@ function Gridap.FESpaces.assemble_vector(
   μ=realization(op),t=get_timesθ(op),u=nothing)
 
   mat = assemble_matrix(unpack_for_assembly(op)...,μ,t,u)
-  findnz_map, = findnz(first(mat)[:])
+  findnz_map = get_findnz_map(first(mat))
   nonzero_values(mat,findnz_map)
 end
 

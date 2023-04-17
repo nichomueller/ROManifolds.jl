@@ -17,15 +17,10 @@ function Base.Matrix(vblock::Vector{<:Vector{Vector{T}}}) where T
   mat
 end
 
-function Elemental.DistMatrix(vecs::Vector{Vector{T}}) where T
-  mat = Matrix(vecs)
-  convert(DistMatrix{T},mat)
-end
-
 function Elemental.DistMatrix(
-  la::LazyArray{<:Fill{<:Function},Vector{Vector{Float}},1,Tuple{Base.OneTo{Int}}})
+  la::LazyArray{<:Fill{<:Function},DistMatrix{Float},1,Tuple{Base.OneTo{Int}}})
 
-  vec_of_mat = pmap(idx->DistMatrix(la[idx]),eachindex(la))
+  vec_of_mat = pmap(idx->la[idx],eachindex(la))
   hcat(vec_of_mat)
 end
 

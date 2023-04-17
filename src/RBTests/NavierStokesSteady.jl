@@ -1,6 +1,8 @@
-include("../FEM/FEM.jl")
-include("../RB/RB.jl")
-include("RBTests.jl")
+root = pwd()
+
+@everywhere include("$root/FEM/FEM.jl")
+@everywhere include("$root/RB/RB.jl")
+@everywhere include("$root/RBTests/RBTests.jl")
 
 function navier_stokes_steady()
   run_fem = false
@@ -10,7 +12,7 @@ function navier_stokes_steady()
   pdomain = false
   ptype = ProblemType(steady,indef,pdomain)
 
-  root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes"
+  test_path = "$root/tests/navier-stokes/$mesh"
   mesh = "cylinder.json"
   bnd_info = Dict("dirichlet" => ["wall","inlet"],"neumann" => ["outlet"])
   order = 2
@@ -19,8 +21,8 @@ function navier_stokes_steady()
   sampling = UniformSampling()
   PS = ParamSpace(ranges,sampling)
 
-  fepath = fem_path(ptype,mesh,root)
-  mshpath = mesh_path(mesh,root)
+  fepath = fem_path(test_path,mesh)
+  mshpath = mesh_path(test_path,mesh)
   model = model_info(mshpath,bnd_info,ptype)
   measures = ProblemMeasures(model,order)
 
@@ -49,7 +51,7 @@ function navier_stokes_steady()
   opF = AffineParamOperator(f,ffe,PS,V;id=:F)
   opH = AffineParamOperator(h,hfe,PS,V;id=:H)
 
-  info = RBInfoSteady(ptype,mesh,root;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=true)
+  info = RBInfoSteady(ptype,test_path,mesh;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=true)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
   fesol = (uh,ph,μ,U,V)
   rbspace,param_on_structures = offline_phase(info,fesol,(opA,opB,opC,opD,opF,opH),measures,tt)

@@ -1,6 +1,8 @@
-include("../FEM/FEM.jl")
-include("../RB/RB.jl")
-include("RBTests.jl")
+root = pwd()
+
+@everywhere include("$root/FEM/FEM.jl")
+@everywhere include("$root/RB/RB.jl")
+@everywhere include("$root/RBTests/RBTests.jl")
 
 function navier_stokes_unsteady()
   run_fem = false
@@ -10,7 +12,7 @@ function navier_stokes_unsteady()
   pdomain = false
   ptype = ProblemType(steady,indef,pdomain)
 
-  root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/navier-stokes"
+  test_path = "$root/tests/navier-stokes/$mesh"
   mesh = "flow_3cyl2D.json"
   bnd_info = Dict("dirichlet0" => ["noslip"],"dirichlet" => ["inlet"],"neumann" => ["outlet"])
   dim = 2
@@ -23,8 +25,8 @@ function navier_stokes_unsteady()
   sampling = UniformSampling()
   PS = ParamSpace(ranges,sampling)
 
-  fepath = fem_path(ptype,mesh,root)
-  mshpath = mesh_path(mesh,root)
+  fepath = fem_path(test_path,mesh)
+  mshpath = mesh_path(test_path,mesh)
   model = model_info(mshpath,bnd_info,ptype)
   measures = ProblemMeasures(model,order)
 
@@ -76,7 +78,7 @@ function navier_stokes_unsteady()
     for st_mdeim = (true)
       for tol = (1e-1,1e-2,1e-3,1e-4)
 
-        global info = RBInfoUnsteady(ptype,mesh,root;ϵ=tol,nsnap=80,online_snaps=95:100,
+        global info = RBInfoUnsteady(ptype,test_path,mesh;ϵ=tol,nsnap=80,online_snaps=95:100,
           mdeim_snap=15,load_offline=false,postprocess=true,
           fun_mdeim=fun_mdeim,st_mdeim=st_mdeim)
         tt = TimeTracker(OfflineTime(0.,0.),0.)

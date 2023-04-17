@@ -1,6 +1,8 @@
-include("../FEM/FEM.jl")
-include("../RB/RB.jl")
-include("RBTests.jl")
+root = pwd()
+
+@everywhere include("$root/FEM/FEM.jl")
+@everywhere include("$root/RB/RB.jl")
+@everywhere include("$root/RBTests/RBTests.jl")
 
 function stokes_unsteady()
   run_fem = false
@@ -10,13 +12,13 @@ function stokes_unsteady()
   pdomain = false
   ptype = ProblemType(steady,indef,pdomain)
 
-  root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/stokes"
+  test_path = "$root/tests/stokes/unsteady/$mesh"
   mesh = "flow_3cyl2D.json"
   bnd_info = Dict("dirichlet0" => ["noslip"],"dirichlet" => ["inlet"],"neumann" => ["outlet"])
   order = 2
 
-  fepath = fem_path(ptype,mesh,root)
-  mshpath = mesh_path(mesh,root)
+  fepath = fem_path(test_path,mesh)
+  mshpath = mesh_path(test_path,mesh)
   model = model_info(mshpath,bnd_info,ptype)
   measures = ProblemMeasures(model,order)
   D = get_dimension(model)
@@ -69,7 +71,7 @@ function stokes_unsteady()
   nsnap = 100
   uh,ph,μ = fe_snapshots(ptype,solver,feop,fepath,run_fem,nsnap,t0,tF)
 
-  info = RBInfoUnsteady(ptype,mesh,root;ϵ=1e-3,nsnap=80,mdeim_snap=10,load_offline=false)
+  info = RBInfoUnsteady(ptype,test_path,mesh;ϵ=1e-3,nsnap=80,mdeim_snap=10,load_offline=false)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
 
   printstyled("Offline phase, reduced basis method\n";color=:blue)
