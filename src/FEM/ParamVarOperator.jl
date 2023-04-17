@@ -232,37 +232,14 @@ function ParamLiftOperator(op::ParamUnsteadyBilinOperator{Top,Ttr}) where {Top,T
     get_pspace(op),get_time_info(op),get_trial(op),get_test(op))
 end
 
-abstract type AssemblyStyle end
-struct DefaultStyle <: AssemblyStyle end
-struct DistributedStyle <: AssemblyStyle end
-
-function assemble_fe_quantity(op::ParamLinOperator,args...;kwargs...)
-  assemble_vector(op,args...;kwargs...)
-end
-
-function assemble_fe_quantity(op::ParamBilinOperator,args...;kwargs...)
-  assemble_matrix(op,args...;kwargs...)
-end
-
 function Gridap.FESpaces.assemble_vector(
-  op::ParamOperator;
-  μ=realization(op),t=get_timesθ(op),u=nothing,style=DefaultStyle())
-
-  assemble_vector(style,unpack_for_assembly(op)...,μ,t,u)
-end
-
-function Gridap.FESpaces.assemble_vector(
-  style::DistributedStyle,
   op::ParamOperator;
   μ=realization(op),t=get_timesθ(op),u=nothing)
 
-  fe_quantity = assemble_fe_quantity(style,unpack_for_assembly(op)...,μ,t,u)
-  findnz_map = get_findnz_map(fe_quantity)
-  nonzero_values(fe_quantity,findnz_map),findnz_map
+  assemble_vector(unpack_for_assembly(op)...,μ,t,u)
 end
 
 function Gridap.FESpaces.assemble_vector(
-  ::DefaultStyle,
   fefun::Function,
   test::FESpace,
   μ::Param,t,args...)
@@ -275,7 +252,6 @@ function Gridap.FESpaces.assemble_vector(
 end
 
 function Gridap.FESpaces.assemble_vector(
-  ::DefaultStyle,
   fefun::Function,
   test::FESpace,
   dir::Function,
@@ -298,8 +274,28 @@ function Gridap.FESpaces.assemble_vector(
   end
 end
 
-function Gridap.FESpaces.assemble_vector(::DistributedStyle,args...)
-  DistMatrix(assemble_vector(DefaultStyle(),args...))
+function assemble_distributed_vector(op::ParamLinOperator;kwargs...)
+  assembler = assemble_vector
+  assemble_distributed_vector(assembler,unpack_for_assembly(op)...;kwargs...)
+end
+
+function assemble_distributed_vector(op::ParamBilinOperator;kwargs...)
+  assembler = assemble_matrix
+  assemble_distributed_vector(assembler,unpack_for_assembly(op)...;kwargs...)
+end
+
+function assemble_distributed_vector(
+  assembler::Function;
+  μ=realization(op),t=get_timesθ(op),u=nothing)
+
+  assemble_distributed_vector(assembler,unpack_for_assembly(op)...,μ,t,u)
+  fe_quantity = assemble_fe_quantity(unpack_for_assembly(op)...,μ,t,u)
+  findnz_map = get_findnz_map(fe_quantity)
+  nonzero_values(fe_quantity,findnz_map),findnz_map
+end
+
+function assemble_distributed_vector(assembler::Function,args...)
+  DistMatrix(assembler(args...))
 end
 
 function Gridap.FESpaces.assemble_matrix(
@@ -393,8 +389,7 @@ function get_findnz_map(vecs::Vector{<:SparseMatrixCSC})
   get_findnz_map(first(vecs))
 end
 
-#= function get_inverse_findnz_map(op::ParamOperator;kwargs...)
-  findnz_map = get_findnz_map(op;kwargs...)
-  inv_map(i::Int) = findall(x -> x == i,findnz_map)[1]
-  inv_map
-end =#
+function get_inverse_findnz_map(q::AbstractArray)
+  findnz_map = get_findnz_map(q)
+  (i::Int) -> findall(x -> x == i,findnz_map)[1]
+end
