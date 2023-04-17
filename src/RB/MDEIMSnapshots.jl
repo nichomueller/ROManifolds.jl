@@ -9,34 +9,28 @@ end
 
 function mdeim_basis(::Val{false},info::RBInfoSteady,op::RBVariable,args...)
   snaps = fe_snapshots(op,args...)
-  id = get_id(snaps)
-  basis_space = mdeim_POD(snaps;ϵ=info.ϵ)
-  RBSpaceSteady(id,basis_space)
+  basis_space = reduced_POD(snaps;ϵ=info.ϵ)
+  RBSpaceSteady(get_id(op),basis_space)
 end
 
 function mdeim_basis(::Val{false},info::RBInfoUnsteady,op::RBVariable,args...)
   snaps = fe_snapshots(op,args...)
-  id = get_id(snaps)
-  s,ns = get_snap(snaps),get_nsnap(snaps)
-  basis_space = reduced_POD(s;ϵ=info.ϵ)
-  s2 = mode2_unfolding(basis_space'*s,ns)
-  basis_time = reduced_POD(s2;ϵ=info.ϵ)
-  RBSpaceUnsteady(id,basis_space,basis_time)
+  basis_space = reduced_POD(snaps;ϵ=info.ϵ)
+  snaps2 = mode2_unfolding(basis_space'*snaps,info.mdeim_nsnap)
+  basis_time = reduced_POD(snaps2;ϵ=info.ϵ)
+  RBSpaceUnsteady(get_id(op),basis_space,basis_time)
 end
 
-function fe_snapshots(op::RBVariable,args...)
+function fe_snapshots(op::RBVariable,μ::Vector{Param},args...)
   id = get_id(op)
   printstyled("MDEIM: generating snapshots for $id \n";color=:blue)
 
-  fe_snap = get_assembler(SnapshotMatrixAssembler(),op,args...)
-  vals = Vector{Float}[]
-  @threads for k in eachindex(μ)
-    push!(vals,fe_snap(k))
-  end
+  fe_vec_snaps = get_assembler(SnapshotMatrixAssembler(),op,μ,args...)
+  vals = lazy_map(fe_vec_snaps,eachindex(μ))
+  fe_snap = get_assembler(SparseToFullAssembler(),op,μ,args...)(1)
+  findnz_map = get_findnz_map(fe_snap)
 
-  findnz_map = get_assembler(SparseToFullAssembler(),op,args...)
-
-  Snapshots(id,vals),findnz_map
+  vals,findnz_map
 end
 
 function mdeim_basis(

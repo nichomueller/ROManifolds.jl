@@ -17,7 +17,42 @@ function Base.Matrix(vblock::Vector{<:Vector{Vector{T}}}) where T
   mat
 end
 
-const Block{T} = Vector{T} where {T<:AbstractArray{Ts} where Ts}
+function Elemental.DistMatrix(vecs::Vector{Vector{T}}) where T
+  mat = Matrix(vecs)
+  convert(DistMatrix{T},mat)
+end
+
+function Elemental.DistMatrix(
+  la::LazyArray{<:Fill{<:Function},Vector{Vector{Float}},1,Tuple{Base.OneTo{Int}}})
+
+  vec_of_mat = pmap(idx->DistMatrix(la[idx]),eachindex(la))
+  hcat(vec_of_mat)
+end
+
+function Elemental.hcat(x::Vector{DistMatrix{T}}) where {T}
+  l = length(x)
+  if l == 0
+    throw(ArgumentError("cannot flatten empty vector"))
+  else
+    x1 = x[1]
+    m,n = size(x1,1),size(x1,2)
+    A = DistMatrix(T)
+    Elemental.zeros!(A,m,l*n)
+    for j = 1:l
+      xj = x[j]
+      for k = 1:Elemental.localWidth(xj)
+        for i = 1:Elemental.localHeight(xj)
+          xjik = Elemental.getLocal(xj,i,k)
+          Elemental.queueUpdate(A,Elemental.globalRow(xj,i),j,xjik)
+        end
+      end
+    end
+    Elemental.processQueues(A)
+    return A
+  end
+end
+
+const Block{T} = Vector{T} where T
 const BlockMatrix{T} = Block{Matrix{T}} where T
 
 function blocks(mat::Matrix{T},nrow::Int) where T

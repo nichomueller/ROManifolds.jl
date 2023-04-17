@@ -357,12 +357,16 @@ function get_dirichlet_function(op::ParamOperator)
 end
 
 function get_findnz_map(vec::AbstractVector)
-  collect(length(vec))
+  collect(eachindex(vec))
 end
 
 function get_findnz_map(mat::AbstractMatrix)
   findnz_map, = findnz(first(mat)[:])
   findnz_map
+end
+
+function get_findnz_map(q::Vector{<:AbstractArray})
+  get_findnz_map(first(q))
 end
 
 function get_inverse_findnz_map(op::ParamOperator;kwargs...)

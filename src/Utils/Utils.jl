@@ -6,7 +6,7 @@ using Random
 using SuiteSparse
 using SparseArrays
 using Arpack
-using MPI,MPIClusterManagers,PartitionedArrays
+using MPI,MPIClusterManagers,PartitionedArrays,SharedArrays
 using Distributed,Elemental
 using DelimitedFiles
 using Parameters
@@ -27,6 +27,8 @@ using GridapP4est
 using Gridap.TensorValues
 using Gridap.ODEs.TransientFETools
 
+import Elemental:DistMatrix
+import Base.Threads.@threads
 import Gridap:solve!
 import Gridap:∇
 import Gridap.Algebra:allocate_matrix
@@ -55,7 +57,6 @@ import Gridap.ODEs.TransientFETools:residual!
 import Gridap.ODEs.TransientFETools:jacobian!
 import Gridap.ODEs.TransientFETools:jacobians!
 import LineSearches:BackTracking
-import Base.Threads.@threads
 
 const Float = Float64
 
