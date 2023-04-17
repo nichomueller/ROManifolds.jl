@@ -142,7 +142,9 @@ function Gridap.FESpaces.get_cell_dof_ids(
   get_cell_dof_ids(rbop.feop,trian)
 end
 
-assemble_fe_quantity(op::RBVariable;kwargs...) = assemble_fe_quantity(op.feop;kwargs...)
+function assemble_fe_quantity(op::RBVariable,args...;kwargs...)
+  assemble_fe_quantity(op.feop,args...;kwargs...)
+end
 
 function Gridap.FESpaces.assemble_vector(op::RBLinVariable;kwargs...)
   assemble_vector(op.feop;kwargs...)

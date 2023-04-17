@@ -12,7 +12,9 @@ end
 
 my_svd(s::Matrix{Float}) = svd(s)
 
-my_svd(s::SparseMatrixCSC) = svds(s;nsv=size(s)[2]-1)[1]
+my_svd(s::SparseMatrixCSC{Float,Int}) = svds(s;nsv=size(s)[2]-1)[1]
+
+my_svd(s::DistMatrix{Float}) = Elemental.svd(s)
 
 my_svd(s::Vector{AbstractMatrix}) = my_svd(Matrix(s))
 
@@ -83,17 +85,9 @@ end
 
 function reduced_POD(
   la::LazyArray{<:Fill{<:Function},DistMatrix{Float},1,Tuple{Base.OneTo{Int}}};
-  ϵ=1e-5,nproc=4)
+  ϵ=1e-5)
 
-  reduced_POD(DistMatrix(la);ϵ,nproc)
-end
-
-function reduced_POD(S::DistMatrix{Float};ϵ=1e-5,nproc=4)
-  man = MPIManager(np=nproc);
-  addprocs(man);
-  @mpi_do man begin
-    reduced_POD(S;ϵ=ϵ)
-  end
+  reduced_POD(DistMatrix(la);ϵ)
 end
 
 function randomized_POD(S::AbstractMatrix;ϵ=1e-5,q=1)

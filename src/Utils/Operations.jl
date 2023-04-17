@@ -17,14 +17,18 @@ function Base.Matrix(vblock::Vector{<:Vector{Vector{T}}}) where T
   mat
 end
 
+function Elemental.DistMatrix(vecs::Vector{Vector{T}}) where T
+  convert(DistMatrix{T},Matrix(vecs))
+end
+
 function Elemental.DistMatrix(
-  la::LazyArray{<:Fill{<:Function},DistMatrix{Float},1,Tuple{Base.OneTo{Int}}})
+  la::LazyArray{<:Fill{<:Function},DistMatrix{T},1,Tuple{Base.OneTo{Int}}}) where T
 
   vec_of_mat = pmap(idx->la[idx],eachindex(la))
   hcat(vec_of_mat)
 end
 
-function Elemental.hcat(x::Vector{DistMatrix{T}}) where {T}
+function Elemental.hcat(x::Vector{DistMatrix{T}}) where T
   l = length(x)
   if l == 0
     throw(ArgumentError("cannot flatten empty vector"))
@@ -173,9 +177,13 @@ function SparseArrays.findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
   (I[nz], V[nz])
 end
 
-function remove_zero_rows(mat::AbstractMatrix;tol=eps())
+function remove_zero_rows(vec::AbstractVector)
+  vec[findall(x -> abs(x) ≥ eps(),vec)]
+end
+
+function remove_zero_rows(mat::AbstractMatrix)
   sum_cols = sum(mat,dims=2)
-  nzrows = findall(x -> abs(x) ≥ tol,sum_cols)
+  nzrows = findall(x -> abs(x) ≥ eps(),sum_cols)
   mat[nzrows,:]
 end
 

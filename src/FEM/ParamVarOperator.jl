@@ -235,26 +235,30 @@ end
 abstract type AssemblyStyle end
 struct DefaultStyle <: AssemblyStyle end
 struct DistributedStyle <: AssemblyStyle end
-struct GetFindnzMapStyle <: AssemblyStyle end
 
-assemble_fe_quantity(op::ParamLinOperator;kwargs...) = assemble_vector(op;kwargs...)
+function assemble_fe_quantity(op::ParamLinOperator,args...;kwargs...)
+  assemble_vector(op,args...;kwargs...)
+end
 
-assemble_fe_quantity(op::ParamBilinOperator;kwargs...) = assemble_matrix(op;kwargs...)
+function assemble_fe_quantity(op::ParamBilinOperator,args...;kwargs...)
+  assemble_matrix(op,args...;kwargs...)
+end
 
 function Gridap.FESpaces.assemble_vector(
-  op::ParamLinOperator;
+  op::ParamOperator;
   μ=realization(op),t=get_timesθ(op),u=nothing,style=DefaultStyle())
 
   assemble_vector(style,unpack_for_assembly(op)...,μ,t,u)
 end
 
 function Gridap.FESpaces.assemble_vector(
-  op::ParamBilinOperator;
-  μ=realization(op),t=get_timesθ(op),u=nothing,style=DefaultStyle())
+  style::DistributedStyle,
+  op::ParamOperator;
+  μ=realization(op),t=get_timesθ(op),u=nothing)
 
-  mat = assemble_matrix(style,unpack_for_assembly(op)...,μ,t,u)
-  findnz_map = get_findnz_map(first(mat))
-  nonzero_values(mat,findnz_map)
+  fe_quantity = assemble_fe_quantity(style,unpack_for_assembly(op)...,μ,t,u)
+  findnz_map = get_findnz_map(fe_quantity)
+  nonzero_values(fe_quantity,findnz_map),findnz_map
 end
 
 function Gridap.FESpaces.assemble_vector(
@@ -368,20 +372,29 @@ function get_dirichlet_function(op::ParamOperator)
 end
 
 function get_findnz_map(vec::AbstractVector)
-  collect(eachindex(vec))
+  findall(x -> abs(x) ≥ eps(),vec)
 end
 
 function get_findnz_map(mat::AbstractMatrix)
+  sum_cols = sum(mat,dims=2)[:]
+  findall(x -> abs(x) ≥ eps(),sum_cols)
+end
+
+function get_findnz_map(mat::SparseMatrixCSC)
   findnz_map, = findnz(first(mat)[:])
   findnz_map
 end
 
-function get_findnz_map(q::Vector{<:AbstractArray})
-  get_findnz_map(first(q))
+function get_findnz_map(vecs::Vector{AbstractArray})
+  get_findnz_map(Matrix(vecs))
 end
 
-function get_inverse_findnz_map(op::ParamOperator;kwargs...)
+function get_findnz_map(vecs::Vector{<:SparseMatrixCSC})
+  get_findnz_map(first(vecs))
+end
+
+#= function get_inverse_findnz_map(op::ParamOperator;kwargs...)
   findnz_map = get_findnz_map(op;kwargs...)
   inv_map(i::Int) = findall(x -> x == i,findnz_map)[1]
   inv_map
-end
+end =#

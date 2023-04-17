@@ -21,11 +21,8 @@ function fe_snapshots(op::RBVariable,μ::Vector{Param},args...)
   id = get_id(op)
   printstyled("MDEIM: generating snapshots for $id \n";color=:blue)
 
-  fe_vec_snaps = get_assembler(DistributedStyle(),op,μ,args...)
+  fe_vec_snaps,findnz_map = assemble_vector(op,μ,args...;style=DistributedStyle())
   vals = lazy_map(fe_vec_snaps,eachindex(μ))
-  fe_snap = get_assembler(GetFindnzMapStyle(),op,μ,args...)
-  findnz_map = get_findnz_map(fe_snap)
-
   vals,findnz_map
 end
 
@@ -57,49 +54,53 @@ function mdeim_basis(
   RBSpaceUnsteady(id,bs,param_bt),findnz_map
 end
 
-function get_assembler(::DistributedStyle,args...)
-  get_assembler(assemble_vector,args...)
+#= function get_assembler(style::DistributedStyle,args...)
+  get_assembler(assemble_vector,args...;style)
 end
 
-function get_assembler(::GetFindnzMapStyle,args...)
-  fe_quantity = get_assembler(assemble_fe_quantity,args...)
+function get_assembler(style::GetFindnzMapStyle,args...)
+  fe_quantity = get_assembler(assemble_fe_quantity,args...;style)
   get_findnz_map(fe_quantity(1))
-end
+end =#
 
 function get_assembler(
   assembler::Function,
   op::RBVariable{Nonaffine,Ttr},
-  μ::Vector{Param}) where Ttr
+  μ::Vector{Param};
+  style=DistributedStyle()) where Ttr
 
-  k -> assembler(op;μ=μ[k])
+  k -> assembler(op;μ=μ[k],style)
 end
 
 function get_assembler(
   assembler::Function,
   op::RBVariable{Nonlinear,Ttr},
   μ::Vector{Param},
-  uh::Snapshots) where Ttr
+  uh::Snapshots;
+  style=DistributedStyle()) where Ttr
 
   u_fun(k) = FEFunction(op,uh[k],μ[k])
-  k -> assembler(op;μ=μ[k],u=u_fun(k))
+  k -> assembler(op;μ=μ[k],u=u_fun(k),style)
 end
 
 function get_assembler(
   assembler::Function,
   op::RBBilinVariable{Nonaffine,Ttr},
   μ::Vector{Param},
-  fun::Function) where Ttr
+  fun::Function;
+  style=DistributedStyle()) where Ttr
 
-  k -> assembler(op;μ=μ[k],u=fun(k),t=first(get_timesθ(op)))
+  k -> assembler(op;μ=μ[k],u=fun(k),t=first(get_timesθ(op)),style)
 end
 
 function get_assembler(
   assembler::Function,
   op::RBBilinVariable{Nonlinear,Ttr},
   μ::Vector{Param},
-  fun::Function) where Ttr
+  fun::Function;
+  style=DistributedStyle()) where Ttr
 
-  k -> assembler(op;μ=first(μ),u=fun(k),t=first(get_timesθ(op)))
+  k -> assembler(op;μ=first(μ),u=fun(k),t=first(get_timesθ(op)),style)
 end
 
 function evaluate_param_function(
