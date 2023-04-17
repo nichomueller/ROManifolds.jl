@@ -247,7 +247,7 @@ function Gridap.FESpaces.assemble_vector(
   op::ParamBilinOperator;
   μ=realization(op),t=get_timesθ(op),u=nothing)
 
-  mat = assemble_matrix(unpack_for_assembly(op),μ,t,u)
+  mat = assemble_matrix(unpack_for_assembly(op)...,μ,t,u)
   findnz_map, = findnz(first(mat)[:])
   nonzero_values(mat,findnz_map)
 end
@@ -368,7 +368,7 @@ function get_findnz_map(op::ParamBilinOperator;kwargs...)
   findnz_map
 end
 
-function get_inverse_findnz_map(op::RBVariable;kwargs...)
+function get_inverse_findnz_map(op::ParamOperator;kwargs...)
   findnz_map = get_findnz_map(op;kwargs...)
   inv_map(i::Int) = findall(x -> x == i,findnz_map)[1]
   inv_map

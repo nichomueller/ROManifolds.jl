@@ -67,5 +67,13 @@ function RBInfoUnsteady(
 end
 
 issteady(info::RBInfo) = issteady(info.ptype)
+
 isindef(info::RBInfo) = isindef(info.ptype)
+
 ispdomain(info::RBInfo) = ispdomain(info.ptype)
+
+function save(info::RBInfo,args::Tuple)
+  if info.save_offline
+    Broadcasting(arg->save(info,arg))(expand(args))
+  end
+end

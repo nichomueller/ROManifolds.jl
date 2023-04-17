@@ -6,7 +6,8 @@ using Random
 using SuiteSparse
 using SparseArrays
 using Arpack
-using MPI,Distributed,MPIClusterManagers,Elemental,PartitionedArrays
+#using MPI,MPIClusterManagers,PartitionedArrays
+using Distributed,Elemental
 using DelimitedFiles
 using Parameters
 using Test
@@ -20,8 +21,8 @@ using Gridap.Geometry
 using Gridap.Fields
 using Gridap.CellData
 using Gridap.Io
-using GridapGmsh
-using GridapDistributed,GridapPETSc
+#using GridapGmsh
+#using GridapDistributed,GridapPETSc
 # using GridapP4est
 using Gridap.TensorValues
 using Gridap.ODEs.TransientFETools

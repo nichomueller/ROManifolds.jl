@@ -39,7 +39,7 @@ function mdeim_basis(
   ::Val{true},
   info::RBInfo,
   op::RBUnsteadyBilinVariable{Top,<:ParamTransientTrialFESpace},
-  μ::Vector{Param};
+  μ::Vector{Param},
   u=nothing) where Top
 
   id = get_id(op)
@@ -58,7 +58,7 @@ function mdeim_basis(
   end
   bs = rb_space(info,Snapshots(id,vals))
 
-  findnz_map = get_findnz_map(op;μ)
+  findnz_map = get_findnz_map(op;μ,u)
 
   RBSpaceUnsteady(id,bs,param_bt),findnz_map
 end
@@ -67,7 +67,7 @@ function get_assembler(
   op::RBVariable{Nonaffine,Ttr},
   μ::Vector{Param}) where Ttr
 
-  k -> assemble_fe_quantity(op;μ=μ[k])
+  k -> assemble_vector(op;μ=μ[k])
 end
 
 function get_assembler(
@@ -76,7 +76,7 @@ function get_assembler(
   uh::Snapshots) where Ttr
 
   u_fun(k) = FEFunction(op,uh[k],μ[k])
-  k -> assemble_fe_quantity(op;μ=μ[k],u=u_fun(k))
+  k -> assemble_vector(op;μ=μ[k],u=u_fun(k))
 end
 
 function get_assembler(
@@ -84,7 +84,7 @@ function get_assembler(
   μ::Vector{Param},
   fun::Function) where Ttr
 
-  k -> assemble_fe_quantity(op;μ=μ[k],u=fun(k),t=first(get_timesθ(op)))
+  k -> assemble_vector(op;μ=μ[k],u=fun(k),t=first(get_timesθ(op)))
 end
 
 function get_assembler(
@@ -92,7 +92,7 @@ function get_assembler(
   μ::Vector{Param},
   fun::Function) where Ttr
 
-  k -> assemble_fe_quantity(op;μ=first(μ),u=fun(k),t=first(get_timesθ(op)))
+  k -> assemble_vector(op;μ=first(μ),u=fun(k),t=first(get_timesθ(op)))
 end
 
 function evaluate_param_function(

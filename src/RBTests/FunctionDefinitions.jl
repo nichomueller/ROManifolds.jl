@@ -286,78 +286,88 @@ function navier_stokes_functions(::Val{true},measures::ProblemFixedMeasures)
   a,afe,b,bfe,c,cfe,d,dfe,f,ffe,h,hfe,g,res,jac
 end
 
-function navier_stokes_functions(::Val{false},measures::ProblemFixedMeasures)
-
-  function a(x,p::Param,t::Real)
-    μ = get_μ(p)
-    1e-3*μ[1]
-  end
-  a(μ::Param,t::Real) = x->a(x,μ,t)
-
-  b(x,μ::Param,t::Real) = 1.
-  b(μ::Param,t::Real) = x->b(x,μ,t)
-
-  c(x,μ::Param,t::Real) = 1.
-  c(μ::Param,t::Real) = x->c(x,μ,t)
-
-  d(x,μ::Param,t::Real) = 1.
-  d(μ::Param,t::Real) = x->d(x,μ,t)
-
-  f(x,p::Param,t::Real) = VectorValue(0.,0.)
-  f(μ::Param,t::Real) = x->f(x,μ,t)
-
-  h(x,p::Param,t::Real) = VectorValue(0.,0.)
-  h(μ::Param,t::Real) = x->h(x,μ,t)
-
-  function g(x,p::Param,t::Real)
-    μ = get_μ(p)
-    W = 1.5
-    T = 0.16
-    flow_rate = μ[4]*abs(1-cos(pi*t/T)+μ[2]*sin(μ[3]*pi*t/T))
-    parab_prof = VectorValue(abs.(x[2]*(x[2]-W))/(W/2)^2,0.)
-    parab_prof*flow_rate
-  end
-  g(μ::Param,t::Real) = x->g(x,μ,t)
-
-  m(x,μ::Param,t::Real) = 1.
-  m(μ::Param,t::Real) = x->m(x,μ,t)
-
-  afe(p::Param,t::Real,dΩ,u,v) = ∫(a(p,t)*∇(v)⊙∇(u))dΩ
-  mfe(p::Param,t::Real,dΩ,u,v) = ∫(v⋅u)dΩ
-  bfe(p::Param,t::Real,dΩ,u,q) = ∫(b(p,t)*q*(∇⋅(u)))dΩ
-  bTfe(p::Param,t::Real,dΩ,u,q) = ∫(b(p,t)*(∇⋅(q))*u)dΩ
-  cfe(dΩ,z,u,v) = ∫(v⊙(∇(u)'⋅z))dΩ
-  dfe(dΩ,z,u,v) = ∫(v⊙(∇(z)'⋅u))dΩ
-  ffe(p::Param,t::Real,dΩ,v) = ∫(f(p,t)⋅v)dΩ
-  hfe(p::Param,t::Real,dΓn,v) = ∫(h(p,t)⋅v)dΓn
+function navier_stokes_functions(
+  measures::ProblemFixedMeasures,
+  PS::ParamSpace,
+  time_info::TimeInfo,
+  V::FESpace,
+  U::ParamTransientTrialFESpace,
+  Q::FESpace,
+  P::FESpace;
+  a::Function = (x,p::Param,t::Real)->1,
+  b::Function = (x,p::Param,t::Real)->1,
+  c::Function = (x,p::Param,t::Real)->1,
+  d::Function = (x,p::Param,t::Real)->1,
+  m::Function = (x,p::Param,t::Real)->1,
+  f::Function = (x,p::Param,t::Real)->VectorValue(0,0),
+  h::Function = (x,p::Param,t::Real)->VectorValue(0,0))
 
   dΩ,dΓn = get_dΩ(measures),get_dΓn(measures)
+  Y = ParamTransientMultiFieldFESpace([V,Q])
+  X = ParamTransientMultiFieldFESpace([U,P])
+
+  afe(p::Param,t::Real,dΩ,u,v) = ∫(a(p,t)*∇(v)⊙∇(u))dΩ
   afe(p::Param,t::Real,u,v) = afe(p,t,dΩ,u,v)
   afe(p::Param,t::Real) = (u,v) -> afe(p,t,u,v)
+  afe(a::Function,u,v) = ∫(a*∇(v)⊙∇(u))dΩ
+  afe(a::Function) = (u,v) -> afe(a,u,v)
+  A = ParamFunctions(a,afe)
+
+  mfe(p::Param,t::Real,dΩ,u,v) = ∫(m(p,t)*v⋅u)dΩ
   mfe(p::Param,t::Real,u,v) = mfe(p,t,dΩ,u,v)
   mfe(p::Param,t::Real) = (u,v) -> mfe(p,t,u,v)
-  bfe(p::Param,t::Real,u,v) = bfe(p,t,dΩ,u,v)
-  bfe(p::Param,t::Real) = (u,v) -> bfe(p,t,u,v)
-  bTfe(p::Param,t::Real,u,v) = bTfe(p,t,dΩ,u,v)
-  bTfe(p::Param,t::Real) = (u,v) -> bTfe(p,t,u,v)
+  mfe(m::Function,u,v) = ∫(m*v⋅u)dΩ
+  mfe(m::Function) = (u,v) -> mfe(m,u,v)
+  M = ParamFunctions(m,mfe)
+
+  bfe(p::Param,t::Real,dΩ,u,q) = ∫(b(p,t)*q*(∇⋅(u)))dΩ
+  bfe(p::Param,t::Real,u,q) = bfe(p,t,dΩ,u,q)
+  bfe(p::Param,t::Real) = (u,q) -> bfe(p,t,u,q)
+  bfe(b::Function,u,q) = ∫(b*q*(∇⋅(u)))dΩ
+  bfe(b::Function) = (u,v) -> bfe(b,u,v)
+  B = ParamFunctions(b,bfe)
+
+  btfe(p::Param,t::Real,dΩ,u,v) = ∫(b(p,t)*(∇⋅(v))*u)dΩ
+  btfe(p::Param,t::Real,u,v) = btfe(p,t,dΩ,u,v)
+  btfe(p::Param,t::Real) = (u,v) -> btfe(p,t,u,v)
+  btfe(b::Function,u,v) = ∫(b*(∇⋅(v))*u)dΩ
+  btfe(b::Function) = (u,v) -> btfe(b,u,v)
+  BT = ParamFunctions(b,btfe)
+
+  cfe(dΩ,z,u,v) = ∫(v⊙(∇(u)'⋅z))dΩ
   cfe(z,u,v) = cfe(dΩ,z,u,v)
   cfe(z) = (u,v) -> cfe(z,u,v)
+  C = ParamFunctions(c,cfe)
+
+  dfe(dΩ,z,u,v) = ∫(v⊙(∇(z)'⋅u))dΩ
   dfe(z,u,v) = dfe(dΩ,z,u,v)
   dfe(z) = (u,v) -> dfe(z,u,v)
+  D = ParamFunctions(d,dfe)
+
+  ffe(p::Param,t::Real,dΩ,v) = ∫(f(p,t)⋅v)dΩ
   ffe(p::Param,t::Real,v) = ffe(p,t,dΩ,v)
   ffe(p::Param,t::Real) = v -> ffe(p,t,v)
+  ffe(f::Function,v) = ∫(f⋅v)dΩ
+  ffe(f::Function) = v -> ffe(f,u,v)
+  F = ParamFunctions(f,ffe)
+
+  hfe(p::Param,t::Real,dΓn,v) = ∫(h(p,t)⋅v)dΓn
   hfe(p::Param,t::Real,v) = hfe(p,t,dΓn,v)
   hfe(p::Param,t::Real) = v -> hfe(p,t,v)
+  hfe(h::Function,v) = ∫(h⋅v)dΓn
+  hfe(h::Function) = v -> hfe(h,u,v)
+  H = ParamFunctions(h,hfe)
 
-  # FUNCTIONAL MDEIM REPRESENTATION
-  afe(a,u,v) = ∫(a*∇(v)⊙∇(u))dΩ
-  bfe(b,u,q) = ∫(b*q*(∇⋅(u)))dΩ
-  bTfe(b,u,q) = ∫(b*(∇⋅(q))*u)dΩ
-  mfe(m,u,v) = ∫(m*v⋅u)dΩ
-  ffe(f,v) = ∫(f*v)dΩ
-  hfe(h,v) = ∫(h*v)dΓn
+  opA = AffineParamOperator(A,PS,time_info,U,V;id=:A)
+  opB = AffineParamOperator(B,PS,time_info,U,Q;id=:B)
+  opBT = AffineParamOperator(BT,PS,time_info,P,V;id=:BT)
+  opC = NonlinearParamOperator(C,PS,time_info,U,V;id=:C)
+  opD = NonlinearParamOperator(D,PS,time_info,U,V;id=:D)
+  opM = AffineParamOperator(M,PS,time_info,U,V;id=:M)
+  opF = AffineParamOperator(F,PS,time_info,V;id=:F)
+  opH = AffineParamOperator(H,PS,time_info,V;id=:H)
 
-  #FOR SOME REASON, BETTER CONVERGENCE WITH THIS DEF OF NONLINEAR TERM
+  # BETTER CONVERGENCE WITH THIS DEF OF NONLINEAR TERM
   conv(u,∇u) = (∇u')⋅u
   dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
   cgridap(u,v) = ∫(v⊙(conv∘(u,∇(u))))dΩ
@@ -370,5 +380,7 @@ function navier_stokes_functions(::Val{false},measures::ProblemFixedMeasures)
   jac(μ,t,(u,p),(du,dp),(v,q)) = lhs(μ,t,(du,dp),(v,q)) + dcgridap(u,du,v)
   jac_t(μ,t,(u,p),(dut,dpt),(v,q)) = mfe(μ,t,dut,v)
 
-  a,afe,m,mfe,b,bfe,bTfe,c,cfe,d,dfe,f,ffe,h,hfe,g,res,jac,jac_t
+  feop = ParamTransientFEOperator(res,jac,jac_t,PS,X,Y)
+
+  feop,opA,opB,opBT,opC,opD,opM,opF,opH
 end

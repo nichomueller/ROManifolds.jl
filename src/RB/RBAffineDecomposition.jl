@@ -10,25 +10,14 @@ function RBAffineDecomposition(
   RBAffineDecomposition{Top,Ttr,Tad}(op,affine_decomposition)
 end
 
-function RBAffineDecomposition(info::RBInfo,args...)
+function RBAffineDecomposition(info::RBInfo,tt::TimeTracker,args...)
   if info.load_offline
     load(info,args...)
   else
-    assemble_affine_decomposition(info,args...)
+    tt.offline_time.assembly_time += @elapsed begin
+      assemble_affine_decomposition(info,args...)
+    end
   end
-end
-
-function assemble_affine_decomposition(
-  info::RBInfo,
-  tt::TimeTracker,
-  op::RBVariable,
-  args...)
-
-  tt.offline_time.assembly_time += @elapsed begin
-    ad = assemble_affine_decomposition(info,op,args...)
-  end
-  save(info,ad,get_id(op))
-  ad
 end
 
 function assemble_affine_decomposition(
@@ -112,74 +101,71 @@ function assemble_affine_decomposition(
   RBAffineDecomposition(op,ad),RBAffineDecomposition(op_lift,ad_lift)
 end
 
-get_op(rbs::RBAffineDecomposition) = rbs.op
+get_op(ad::RBAffineDecomposition) = ad.op
 
-get_affine_decomposition(rbs::RBAffineDecomposition) = rbs.affine_decomposition
+get_affine_decomposition(ad::RBAffineDecomposition) = ad.affine_decomposition
 
-function eval_affine_decomposition(rbs::Tuple)
-  eval_affine_decomposition.(expand(rbs))
+get_id(ad::RBAffineDecomposition) = get_id(get_op(ad))
+
+function eval_affine_decomposition(ad::Tuple)
+  eval_affine_decomposition.(expand(ad))
 end
 
-function eval_affine_decomposition(rbs::RBAffineDecomposition)
-  op = get_op(rbs)
+function eval_affine_decomposition(ad::RBAffineDecomposition)
+  op = get_op(ad)
   id = get_id(op)
   printstyled("Evaluating the RB offline quantity for $id \n";color=:blue)
 
-  eval_affine_decomposition(op,rbs)
+  eval_affine_decomposition(op,ad)
 end
 
 function eval_affine_decomposition(
   ::RBSteadyVariable,
-  rbs::RBAffineDecomposition{Affine,Ttr,Matrix{Float}}) where Ttr
+  ad::RBAffineDecomposition{Affine,Ttr,Matrix{Float}}) where Ttr
 
-  get_affine_decomposition(rbs)
+  get_affine_decomposition(ad)
 end
 
 function eval_affine_decomposition(
   ::RBSteadyVariable,
-  rbs::RBAffineDecomposition)
+  ad::RBAffineDecomposition)
 
-  mdeim = get_affine_decomposition(rbs)
+  mdeim = get_affine_decomposition(ad)
   get_basis_space(mdeim)
 end
 
 function eval_affine_decomposition(
   ::RBUnsteadyVariable,
-  rbs::RBAffineDecomposition{Affine,Ttr,Matrix{Float}}) where Ttr
+  ad::RBAffineDecomposition{Affine,Ttr,Matrix{Float}}) where Ttr
 
-  op = get_op(rbs)
+  op = get_op(ad)
   ns_row = get_ns(get_rbspace_row(op))
 
-  ad = get_affine_decomposition(rbs)
+  ad = get_affine_decomposition(ad)
   blocks(ad,ns_row)
 end
 
 function eval_affine_decomposition(
   ::RBUnsteadyVariable,
-  rbs::RBAffineDecomposition)
+  ad::RBAffineDecomposition)
 
-  op = get_op(rbs)
+  op = get_op(ad)
   ns_row = get_ns(get_rbspace_row(op))
 
-  mdeim = get_affine_decomposition(rbs)
+  mdeim = get_affine_decomposition(ad)
   ad = get_basis_space(mdeim)
   blocks(ad,ns_row)
 end
 
-function save(info::RBInfo,ad,id::Symbol)
+function save(info::RBInfo,ad::RBAffineDecomposition)
+  id = get_id(ad)
   path_id = joinpath(info.offline_path,"$id")
   create_dir!(path_id)
-  if info.save_offline
-    save(path_id,ad)
-  end
+  save(path_id,ad)
 end
 
-function save(path::String,rbv::NTuple{2,RBAffineDecomposition})
-  rbvar,rbvar_lift = rbv
-  save(path,rbvar)
-  path_lift = path*"_lift"
-  create_dir!(path_lift)
-  save(path_lift,rbvar_lift)
+function save(info::RBInfo,ad::NTuple{2,RBAffineDecomposition})
+  Broadcasting(x->save(info,x))(ad)
 end
 
 function save(

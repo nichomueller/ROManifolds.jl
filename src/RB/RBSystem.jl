@@ -224,24 +224,15 @@ function reconstruct_fe_sol(rbspace::RBSpaceUnsteady,rb_sol::Array{Float})
 end
 
 function reconstruct_fe_sol(rbspace::NTuple{2,RBSpaceSteady},rb_sol::Array{Float})
-  bs_u,bs_p = get_basis_space.(rbspace)
-
   ns = get_ns.(rbspace)
   rb_sol_u,rb_sol_p = rb_sol[1:ns[1],:],rb_sol[1+ns[1]:end,:]
-
-  bs_u*rb_sol_u,bs_p*rb_sol_p
+  reconstruct_fe_sol.(rbspace,(rb_sol_u,rb_sol_p))
 end
 
 function reconstruct_fe_sol(rbspace::NTuple{2,RBSpaceUnsteady},rb_sol::Array{Float})
-  bs_u,bs_p = get_basis_space.(rbspace)
-  bt_u,bt_p = get_basis_time.(rbspace)
-
   ns = get_ns.(rbspace)
   nt = get_nt.(rbspace)
   n = ns.*nt
   rb_sol_u,rb_sol_p = rb_sol[1:n[1],:],rb_sol[1+n[1]:end,:]
-  u_rb_resh = reshape(rb_sol_u,nt[1],ns[1])
-  p_rb_resh = reshape(rb_sol_p,nt[2],ns[2])
-
-  bs_u*(bt_u*u_rb_resh)',bs_p*(bt_p*p_rb_resh)'
+  reconstruct_fe_sol.(rbspace,(rb_sol_u,rb_sol_p))
 end

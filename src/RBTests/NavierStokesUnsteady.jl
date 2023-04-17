@@ -28,8 +28,32 @@ function navier_stokes_unsteady()
   model = model_info(mshpath,bnd_info,ptype)
   measures = ProblemMeasures(model,order)
 
-  a,afe,m,mfe,b,bfe,bTfe,c,cfe,d,dfe,f,ffe,h,hfe,g,res,jac,jac_t =
-    navier_stokes_functions(ptype,measures)
+  function a(x,p::Param,t::Real)
+    μ = get_μ(p)
+    1e-3*μ[1]
+  end
+  a(μ::Param,t::Real) = x->a(x,μ,t)
+  b(x,μ::Param,t::Real) = 1.
+  b(μ::Param,t::Real) = x->b(x,μ,t)
+  c(x,μ::Param,t::Real) = 1.
+  c(μ::Param,t::Real) = x->c(x,μ,t)
+  d(x,μ::Param,t::Real) = 1.
+  d(μ::Param,t::Real) = x->d(x,μ,t)
+  m(x,μ::Param,t::Real) = 1.
+  m(μ::Param,t::Real) = x->m(x,μ,t)
+  f(x,p::Param,t::Real) = VectorValue(0.,0.)
+  f(μ::Param,t::Real) = x->f(x,μ,t)
+  h(x,p::Param,t::Real) = VectorValue(0.,0.)
+  h(μ::Param,t::Real) = x->h(x,μ,t)
+  function g(x,p::Param,t::Real)
+    μ = get_μ(p)
+    W = 1.5
+    T = 0.16
+    flow_rate = μ[4]*abs(1-cos(pi*t/T)+μ[2]*sin(μ[3]*pi*t/T))
+    parab_prof = VectorValue(abs.(x[2]*(x[2]-W))/(W/2)^2,0.)
+    parab_prof*flow_rate
+  end
+  g(μ::Param,t::Real) = x->g(x,μ,t)
   g0(x,p::Param,t::Real) = VectorValue(0.,0.)
   g0(p::Param,t::Real) = x->g0(x,p,t)
 
@@ -39,24 +63,14 @@ function navier_stokes_unsteady()
   U = ParamTransientTrialFESpace(V,[g0,g,g])
   Q = TestFESpace(model,reffe2;conformity=:C0)
   P = TrialFESpace(Q)
-  Y = ParamTransientMultiFieldFESpace([V,Q])
-  X = ParamTransientMultiFieldFESpace([U,P])
 
-  op = ParamTransientFEOperator(res,jac,jac_t,PS,X,Y)
+  feop,opA,opB,opBT,opC,opD,opM,opF,opH =
+    navier_stokes_operators(measures,PS,time_info,V,U,Q,P;a,b,c,d,m,f,h)
 
   nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking())
   solver = ThetaMethod(nls,dt,θ)
   nsnap = 100
-  uh,ph,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
-
-  opA = NonaffineParamOperator(a,afe,PS,time_info,U,V;id=:A)
-  opB = AffineParamOperator(b,bfe,PS,time_info,U,Q;id=:B)
-  opBT = AffineParamOperator(b,bTfe,PS,time_info,P,V;id=:BT)
-  opC = NonlinearParamOperator(c,cfe,PS,time_info,U,V;id=:C)
-  opD = NonlinearParamOperator(d,dfe,PS,time_info,U,V;id=:D)
-  opM = AffineParamOperator(m,mfe,PS,time_info,U,V;id=:M)
-  opF = AffineParamOperator(f,ffe,PS,time_info,V;id=:F)
-  opH = AffineParamOperator(h,hfe,PS,time_info,V;id=:H)
+  uh,ph,μ = fe_snapshots(ptype,solver,feop,fepath,run_fem,nsnap,t0,tF)
 
   for fun_mdeim = (false)
     for st_mdeim = (true)
@@ -100,6 +114,8 @@ function navier_stokes_unsteady()
         ad = (Arb,Brb,BTrb,Crb,Drb,Mrb,Frb,Hrb)
         ad_eval = eval_affine_decomposition(ad)
         param_on_structures = RBParamOnlineStructure(ad,ad_eval;st_mdeim=info.st_mdeim)
+
+        save(info,(rbspace,ad))
 
         printstyled("Online phase; tol=$tol, st_mdeim=$st_mdeim\n";color=:red)
 

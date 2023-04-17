@@ -10,7 +10,7 @@ function stokes_unsteady()
   pdomain = false
   ptype = ProblemType(steady,indef,pdomain)
 
-  root = "/home/nicholasmueller/git_repos/Mabla.jl/tests/stokes"
+  root = "/home/user1/git_repos/Mabla.jl/tests/"
   mesh = "flow_3cyl2D.json"
   bnd_info = Dict("dirichlet0" => ["noslip"],"dirichlet" => ["inlet"],"neumann" => ["outlet"])
   order = 2
@@ -19,7 +19,7 @@ function stokes_unsteady()
   mshpath = mesh_path(mesh,root)
   model = model_info(mshpath,bnd_info,ptype)
   measures = ProblemMeasures(model,order)
-  dim = get_dimension(model)
+  D = get_dimension(model)
 
   ranges = fill([1.,10.],4)
   sampling = UniformSampling()
@@ -33,10 +33,10 @@ function stokes_unsteady()
     1/sum(μ)
   end
   a(p::Param,t::Real) = x->a(x,p,t)
-  m(x,p::Param,t::Real) = 1.
-  m(p::Param,t::Real) = x->m(x,p,t)
   b(x,p::Param,t::Real) = 1.
   b(p::Param,t::Real) = x->b(x,p,t)
+  m(x,p::Param,t::Real) = 1.
+  m(p::Param,t::Real) = x->m(x,p,t)
   f(x,p::Param,t::Real) = VectorValue(0.,0.)
   f(p::Param,t::Real) = x->f(x,p,t)
   h(x,p::Param,t::Real) = VectorValue(0.,0.)
@@ -53,8 +53,8 @@ function stokes_unsteady()
   g0(x,p::Param,t::Real) = VectorValue(0.,0.)
   g0(p::Param,t::Real) = x->g0(x,p,t)
 
-  reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{dim,Float},order)
-  reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{dim,Float},order)
+  reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{D,Float},order)
+  reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{D,Float},order)
   reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1)
   V = TestFESpace(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
   U = ParamTransientTrialFESpace(V,[g0,g])
@@ -98,6 +98,8 @@ function stokes_unsteady()
   ad_eval = eval_affine_decomposition(ad)
   param_on_structures = RBParamOnlineStructure(ad,ad_eval;st_mdeim=info.st_mdeim)
 
+  save(info,(rbspace,ad))
+
   printstyled("Online phase, reduced basis method\n";color=:red)
 
   function online_loop(k::Int)
@@ -118,11 +120,17 @@ function stokes_unsteady()
   res_u,res_p = RBResults(:u,tt,ets_u),RBResults(:p,tt,ets_p)
   save(info,res_u)
   save(info,res_p)
-  printstyled("Average online wall time: $(tt.online_time/length(ets_u)) s";
+  printstyled("Average online wall time: $(tt.online_time/length(ets_u)) s\n";
     color=:red)
 
   if info.postprocess
     postprocess(info)
+    trian = get_triangulation(model)
+    k = first(info.online_snaps)
+    writevtk(info,time_info,uh[k],t->U(μ[k],t),trian)
+    writevtk(info,time_info,ph[k],t->P,trian)
+    writevtk(info,time_info,res_u,V,trian)
+    writevtk(info,time_info,res_p,Q,trian)
   end
 end
 

@@ -11,7 +11,7 @@ function compute_coefficient(
   args...;kwargs...) where Ttr
 
   fun = get_param_function(op)
-  coeff(μ) = [fun(nothing,μ)[1]]
+  coeff(μ::Param) = [fun(nothing,μ)[1]]
 
   coeff
 end
@@ -22,9 +22,9 @@ function compute_coefficient(
 
   fun = get_param_function(op)
   timesθ = get_timesθ(op)
-  coeff(μ,tθ) = fun(nothing,μ,tθ)[1]
-  coeff(μ) = Matrix(Broadcasting(tθ -> coeff(μ,tθ))(timesθ))
-  coeff_bt(μ) = coeff_by_time_bases(op,coeff(μ))
+  coeff(μ::Param,tθ::Real) = fun(nothing,μ,tθ)[1]
+  coeff(μ::Param) = Matrix(Broadcasting(tθ -> coeff(μ,tθ))(timesθ))
+  coeff_bt(μ::Param) = coeff_by_time_bases(op,coeff(μ))
 
   coeff_bt
 end
@@ -93,7 +93,7 @@ function hyperred_structure(
   idx_space::Vector{Int})
 
   fun = get_param_fefunction(op)
-  V(μ) = assemble_vector(v->fun(μ,m,v),get_test(op))[idx_space]
+  V(μ::Param) = assemble_vector(v->fun(μ,m,v),get_test(op))[idx_space]
   V
 end
 
@@ -104,8 +104,8 @@ function hyperred_structure(
   timesθ::Vector{<:Real})
 
   fun = get_param_fefunction(op)
-  V(μ,tθ) = assemble_vector(v->fun(μ,tθ,m,v),get_test(op))[idx_space]
-  V(μ) = Matrix(Broadcasting(tθ -> V(μ,tθ))(timesθ))
+  V(μ::Param,tθ::Real) = assemble_vector(v->fun(μ,tθ,m,v),get_test(op))[idx_space]
+  V(μ::Param) = Matrix(Broadcasting(tθ -> V(μ,tθ))(timesθ))
   V
 end
 
@@ -115,7 +115,7 @@ function hyperred_structure(
   idx_space::Vector{Int}) where Ttr
 
   fun = get_param_fefunction(op)
-  M(μ) = assemble_matrix((u,v)->fun(μ,m,u,v),get_trial(op)(μ),get_test(op))
+  M(μ::Param) = assemble_matrix((u,v)->fun(μ,m,u,v),get_trial(op)(μ),get_test(op))
   μ -> Vector(M(μ)[:][idx_space])
 end
 
@@ -126,9 +126,9 @@ function hyperred_structure(
   timesθ::Vector{<:Real}) where Ttr
 
   fun = get_param_fefunction(op)
-  M(μ,tθ) = assemble_matrix((u,v)->fun(μ,tθ,m,u,v),get_trial(op)(μ,tθ),get_test(op))
-  Midx(μ,tθ) = Vector(M(μ,tθ)[:][idx_space])
-  Midx(μ) = Matrix(Broadcasting(tθ -> Midx(μ,tθ))(timesθ))
+  M(μ::Param,tθ::Real) = assemble_matrix((u,v)->fun(μ,tθ,m,u,v),get_trial(op)(μ,tθ),get_test(op))
+  Midx(μ::Param,tθ::Real) = Vector(M(μ,tθ)[:][idx_space])
+  Midx(μ::Param) = Matrix(Broadcasting(tθ -> Midx(μ,tθ))(timesθ))
   Midx
 end
 
@@ -138,8 +138,8 @@ function hyperred_structure(
   idx_space::Vector{Int})
 
   fun = get_param_fefunction(op)
-  dir(μ) = get_dirichlet_function(op)(μ)
-  lift(μ) = assemble_vector(v->fun(μ,m,dir(μ),v),get_test(op))[idx_space]
+  dir(μ::Param) = get_dirichlet_function(op)(μ)
+  lift(μ::Param) = assemble_vector(v->fun(μ,m,dir(μ),v),get_test(op))[idx_space]
 
   lift
 end
@@ -151,9 +151,9 @@ function hyperred_structure(
   timesθ::Vector{<:Real})
 
   fun = get_param_fefunction(op)
-  dir(μ,tθ) = get_dirichlet_function(op)(μ,tθ)
-  lift(μ,tθ) = assemble_vector(v->fun(μ,tθ,m,dir(μ,tθ),v),get_test(op))[idx_space]
-  lift(μ) = Matrix(Broadcasting(tθ -> lift(μ,tθ))(timesθ))
+  dir(μ::Param,tθ::Real) = get_dirichlet_function(op)(μ,tθ)
+  lift(μ::Param,tθ::Real) = assemble_vector(v->fun(μ,tθ,m,dir(μ,tθ),v),get_test(op))[idx_space]
+  lift(μ::Param) = Matrix(Broadcasting(tθ -> lift(μ,tθ))(timesθ))
 
   lift
 end
@@ -193,8 +193,8 @@ function hyperred_structure(
   idx_space::Vector{Int})
 
   fun = get_param_fefunction(op)
-  dir(μ) = get_dirichlet_function(op)(μ)
-  lift(μ) = assemble_vector(v->fun(m,z,dir(μ),v),get_test(op))[idx_space]
+  dir(μ::Param) = get_dirichlet_function(op)(μ)
+  lift(μ::Param) = assemble_vector(v->fun(m,z,dir(μ),v),get_test(op))[idx_space]
 
   lift
 end
@@ -206,9 +206,9 @@ function hyperred_structure(
   timesθ::Vector{<:Real})
 
   fun = get_param_fefunction(op)
-  dir(μ,tθ) = get_dirichlet_function(op)(μ,tθ)
-  lift(μ,tθ,z) = assemble_vector(v->fun(m,z(tθ),dir(μ,tθ),v),get_test(op))[idx_space]
-  lift(μ,z) = Matrix(Broadcasting(tθ -> lift(μ,tθ,z))(timesθ))
+  dir(μ::Param,tθ::Real) = get_dirichlet_function(op)(μ,tθ)
+  lift(μ::Param,tθ::Real,z) = assemble_vector(v->fun(m,z(tθ),dir(μ,tθ),v),get_test(op))[idx_space]
+  lift(μ::Param,z) = Matrix(Broadcasting(tθ -> lift(μ,tθ,z))(timesθ))
 
   lift
 end

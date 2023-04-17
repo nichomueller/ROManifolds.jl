@@ -1,6 +1,12 @@
-function rb(info::RBInfo,args...;kwargs...)
+function rb(info::RBInfo,args...;tt=TimeTracker(OfflineTime(0.,0.),0.))
   snaps, = args
-  info.load_offline ? load_rb(info,snaps) : assemble_rb(info,args...;kwargs...)
+  if info.load_offline
+    load_rb(info,snaps)
+  else
+    tt.offline_time.basis_time += @elapsed begin
+      assemble_rb(info,args...)
+    end
+  end
 end
 
 function load_rb(info::RBInfo,snaps::Snapshots)
@@ -15,57 +21,38 @@ end
 function assemble_rb(
   info::RBInfoSteady,
   snaps::Snapshots,
-  args...;
-  tt=TimeTracker(OfflineTime(0.,0.),0.))
+  args...)
 
   id = get_id(snaps)
-  tt.offline_time.basis_time += @elapsed begin
-    basis_space = rb_space(info,snaps)
-  end
-
-  rbspace = RBSpaceSteady(id,basis_space)
-  save(info,rbspace)
-
-  rbspace
+  basis_space = rb_space(info,snaps)
+  RBSpaceSteady(id,basis_space)
 end
 
 function assemble_rb(
   info::RBInfoUnsteady,
   snaps::Snapshots,
-  args...;
-  tt=TimeTracker(OfflineTime(0.,0.),0.))
+  args...)
 
   id = get_id(snaps)
-  tt.offline_time.basis_time += @elapsed begin
-    basis_space = rb_space(info,snaps)
-    basis_time = rb_time(info,snaps,basis_space)
-  end
-
-  rbspace = RBSpaceUnsteady(id,basis_space,basis_time)
-  save(info,rbspace)
-
-  rbspace
+  basis_space = rb_space(info,snaps)
+  basis_time = rb_time(info,snaps,basis_space)
+  RBSpaceUnsteady(id,basis_space,basis_time)
 end
 
 function assemble_rb(
   info::RBInfoSteady,
   snaps::NTuple{2,Snapshots},
-  args...;
-  tt=TimeTracker(OfflineTime(0.,0.),0.))
+  args...)
 
   def = isindef(info)
   snaps_u,snaps_p = snaps
 
-  tt.offline_time.basis_time += @elapsed begin
-    bs_u = rb_space(info,snaps_u)
-    bs_p = rb_space(info,snaps_p)
-    bs_u_supr = add_space_supremizers(def,(bs_u,bs_p),args...)
-  end
+  bs_u = rb_space(info,snaps_u)
+  bs_p = rb_space(info,snaps_p)
+  bs_u_supr = add_space_supremizers(def,(bs_u,bs_p),args...)
 
   rbspace_u = RBSpaceSteady(get_id(snaps_u),bs_u_supr)
   rbspace_p = RBSpaceSteady(get_id(snaps_p),bs_p)
-  save(info,rbspace_u)
-  save(info,rbspace_p)
 
   rbspace_u,rbspace_p
 end
@@ -73,26 +60,21 @@ end
 function assemble_rb(
   info::RBInfoUnsteady,
   snaps::NTuple{2,Snapshots},
-  args...;
-  tt=TimeTracker(OfflineTime(0.,0.),0.))
+  args...)
 
   def = isindef(info)
   snaps_u,snaps_p = snaps
   opB,ph,μ,tol... = args
 
-  tt.offline_time.basis_time += @elapsed begin
-    bs_u = rb_space(info,snaps_u)
-    bs_p = rb_space(info,snaps_p)
-    bs_u_supr = add_space_supremizers(def,(bs_u,bs_p),opB,ph,μ)
-    bt_u = rb_time(info,snaps_u,bs_u)
-    bt_p = rb_time(info,snaps_p,bs_p)
-    bt_u_supr = add_time_supremizers(def,(bt_u,bt_p),tol...)
-  end
+  bs_u = rb_space(info,snaps_u)
+  bs_p = rb_space(info,snaps_p)
+  bs_u_supr = add_space_supremizers(def,(bs_u,bs_p),opB,ph,μ)
+  bt_u = rb_time(info,snaps_u,bs_u)
+  bt_p = rb_time(info,snaps_p,bs_p)
+  bt_u_supr = add_time_supremizers(def,(bt_u,bt_p),tol...)
 
   rbspace_u = RBSpaceUnsteady(get_id(snaps_u),bs_u_supr,bt_u_supr)
   rbspace_p = RBSpaceUnsteady(get_id(snaps_p),bs_p,bt_p)
-  save(info,rbspace_u)
-  save(info,rbspace_p)
 
   rbspace_u,rbspace_p
 end
