@@ -232,8 +232,12 @@ function ParamLiftOperator(op::ParamUnsteadyBilinOperator{Top,Ttr}) where {Top,T
     get_pspace(op),get_time_info(op),get_trial(op),get_test(op))
 end
 
+get_assembler(::ParamLinOperator) = assemble_vector
+
+get_assembler(::ParamBilinOperator) = assemble_matrix
+
 function Gridap.FESpaces.assemble_vector(
-  op::ParamOperator;
+  op::ParamLinOperator;
   μ=realization(op),t=get_timesθ(op),u=nothing)
 
   assemble_vector(unpack_for_assembly(op)...,μ,t,u)
@@ -274,30 +278,6 @@ function Gridap.FESpaces.assemble_vector(
   end
 end
 
-function assemble_distributed_vector(op::ParamLinOperator;kwargs...)
-  assembler = assemble_vector
-  assemble_distributed_vector(assembler,unpack_for_assembly(op)...;kwargs...)
-end
-
-function assemble_distributed_vector(op::ParamBilinOperator;kwargs...)
-  assembler = assemble_matrix
-  assemble_distributed_vector(assembler,unpack_for_assembly(op)...;kwargs...)
-end
-
-function assemble_distributed_vector(
-  assembler::Function;
-  μ=realization(op),t=get_timesθ(op),u=nothing)
-
-  assemble_distributed_vector(assembler,unpack_for_assembly(op)...,μ,t,u)
-  fe_quantity = assemble_fe_quantity(unpack_for_assembly(op)...,μ,t,u)
-  findnz_map = get_findnz_map(fe_quantity)
-  nonzero_values(fe_quantity,findnz_map),findnz_map
-end
-
-function assemble_distributed_vector(assembler::Function,args...)
-  DistMatrix(assembler(args...))
-end
-
 function Gridap.FESpaces.assemble_matrix(
   op::ParamBilinOperator;
   μ=realization(op),t=get_timesθ(op),u=nothing)
@@ -331,6 +311,15 @@ function Gridap.FESpaces.assemble_matrix(
   else typeof(u) == FEFunction
     [assemble_matrix(fefun(u),trial(μ,tθ),test) for tθ = t]
   end
+end
+
+function assemble_first_dvec(
+  op::ParamLinOperator,
+  μ::Vector{Param},
+  u::Vector{Any};
+  t=get_timesθ(op))
+
+  assemble_vector(unpack_for_assembly(op)...,first(μ),t,first(u))
 end
 
 function assemble_affine_quantity(op::ParamOperator)
@@ -381,15 +370,20 @@ function get_findnz_map(mat::SparseMatrixCSC)
   findnz_map
 end
 
-function get_findnz_map(vecs::Vector{AbstractArray})
+function get_findnz_map(vecs::Vector{<:AbstractArray})
   get_findnz_map(Matrix(vecs))
 end
 
-function get_findnz_map(vecs::Vector{<:SparseMatrixCSC})
+function get_findnz_map(vecs::Vector{SparseMatrixCSC})
   get_findnz_map(first(vecs))
 end
 
-function get_inverse_findnz_map(q::AbstractArray)
+function get_findnz_map(assembler::Function,args...)
+  fe_quantity = assembler(args...)
+  get_findnz_map(fe_quantity)
+end
+
+#= function get_inverse_findnz_map(q::AbstractArray)
   findnz_map = get_findnz_map(q)
   (i::Int) -> findall(x -> x == i,findnz_map)[1]
-end
+end =#

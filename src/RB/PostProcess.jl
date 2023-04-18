@@ -57,11 +57,14 @@ end
 
 err_dict(r::RBResults) = Dict("relative_err"=>r.et.relative_err,"pointwise_err"=>r.et.pointwise_err)
 
-save(info::RBInfo,r::RBResults) = if info.save_online save(info.online_path,r) end
-
-function save(path::String,r::RBResults)
-  save(joinpath(path,"times"),time_dict(r))
-  save(joinpath(path,"errors_$(r.id)"),err_dict(r))
+function save(info::RBInfo,r::RBResults)
+  if info.save_online
+    save(joinpath(path,"errors_$(r.id)"),err_dict(r))
+    if !info.load_offline
+      save(joinpath(path,"times"),time_dict(r))
+    end
+  end
+  return nothing
 end
 
 function Gridap.writevtk(

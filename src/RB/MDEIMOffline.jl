@@ -2,14 +2,14 @@ include("MDEIMSnapshots.jl")
 
 abstract type MDEIM end
 
-mutable struct MDEIMSteady <: MDEIM
+struct MDEIMSteady <: MDEIM
   rbspace::RBSpaceSteady
   red_lu_factors::LU
   idx::Vector{Int}
   red_measure::Measure
 end
 
-mutable struct MDEIMUnsteady <: MDEIM
+struct MDEIMUnsteady <: MDEIM
   rbspace::RBSpaceUnsteady
   red_lu_factors::LU
   idx::NTuple{2,Vector{Int}}

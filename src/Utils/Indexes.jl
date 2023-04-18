@@ -52,14 +52,6 @@ function time_idx(kst::Int,ns::Int)
   Int(floor((kst-1)/ns)+1)
 end
 
-function nonzero_values(mat::AbstractMatrix,findnz_map::Vector{Int})
-  Vector(mat[:][findnz_map])
-end
-
-function nonzero_values(mat::Vector{<:AbstractMatrix},findnz_map::Vector{Int})
-  Matrix(Broadcasting(m -> nonzero_values(m,findnz_map))(mat))
-end
-
 function get_batches(mv::AbstractArray)
   nthreads = Threads.nthreads()
   batch_size = floor(Int,length(mv)/nthreads)

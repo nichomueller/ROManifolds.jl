@@ -17,11 +17,15 @@ function Base.Matrix(vblock::Vector{<:Vector{Vector{T}}}) where T
   mat
 end
 
+Base.Matrix(dmat::DistMatrix{T}) where T = convert(Matrix{T},dmat)
+
+Elemental.DistMatrix(mat::Matrix{T}) where T = convert(DistMatrix{T},mat)
+
 function Elemental.DistMatrix(vecs::Vector{Vector{T}}) where T
-  convert(DistMatrix{T},Matrix(vecs))
+  DistMatrix(Matrix(vecs))
 end
 
-function Elemental.DistMatrix(
+#= function Elemental.DistMatrix(
   la::LazyArray{<:Fill{<:Function},DistMatrix{T},1,Tuple{Base.OneTo{Int}}}) where T
 
   vec_of_mat = pmap(idx->la[idx],eachindex(la))
@@ -49,7 +53,7 @@ function Elemental.hcat(x::Vector{DistMatrix{T}}) where T
     Elemental.processQueues(A)
     return A
   end
-end
+end =#
 
 const Block{T} = Vector{T} where T
 const BlockMatrix{T} = Block{Matrix{T}} where T
@@ -177,14 +181,16 @@ function SparseArrays.findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
   (I[nz], V[nz])
 end
 
-function remove_zero_rows(vec::AbstractVector)
-  vec[findall(x -> abs(x) ≥ eps(),vec)]
+function nonzero_values(mat::SparseMatrixCSC,findnz_map::Vector{Int})
+  Matrix(mat[:][findnz_map])
 end
 
-function remove_zero_rows(mat::AbstractMatrix)
-  sum_cols = sum(mat,dims=2)
-  nzrows = findall(x -> abs(x) ≥ eps(),sum_cols)
-  mat[nzrows,:]
+function nonzero_values(arr::AbstractArray,findnz_map::Vector{Int})
+  Matrix(selectdim(arr,1,findnz_map))
+end
+
+function nonzero_values(vec::Vector{<:AbstractArray},findnz_map::Vector{Int})
+  Matrix(Broadcasting(v -> nonzero_values(v,findnz_map))(vec))
 end
 
 function LinearAlgebra.kron(

@@ -1,4 +1,4 @@
-mutable struct PlotInfo{T}
+struct PlotInfo{T}
   xval::Vector{Vector{T}}
   yval::Vector{Vector{T}}
   title::String

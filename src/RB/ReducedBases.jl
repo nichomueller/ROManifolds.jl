@@ -1,12 +1,6 @@
-function rb(info::RBInfo,args...;tt=TimeTracker(OfflineTime(0.,0.),0.))
+function rb(info::RBInfo,args...)
   snaps, = args
-  if info.load_offline
-    load_rb(info,snaps)
-  else
-    tt.offline_time.basis_time += @elapsed begin
-      assemble_rb(info,args...)
-    end
-  end
+  info.load_offline ? load_rb(info,snaps) : assemble_rb(info,args...)
 end
 
 function load_rb(info::RBInfo,snaps::Snapshots)

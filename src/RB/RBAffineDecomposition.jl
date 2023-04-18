@@ -10,14 +10,8 @@ function RBAffineDecomposition(
   RBAffineDecomposition{Top,Ttr,Tad}(op,affine_decomposition)
 end
 
-function RBAffineDecomposition(info::RBInfo,tt::TimeTracker,args...)
-  if info.load_offline
-    load(info,args...)
-  else
-    tt.offline_time.assembly_time += @elapsed begin
-      assemble_affine_decomposition(info,args...)
-    end
-  end
+function RBAffineDecomposition(info::RBInfo,args...)
+  info.load_offline ? load(info,args...) : assemble_affine_decomposition(info,args...)
 end
 
 function assemble_affine_decomposition(
@@ -183,7 +177,6 @@ end
 
 function load(
   info::RBInfo,
-  tt::TimeTracker,
   op::RBVariable,
   args...)
 
@@ -195,7 +188,7 @@ function load(
   else
     printstyled("Failed to load variable $(id): running offline assembler instead\n";
       color=:blue)
-    assemble_affine_decomposition(info,tt,op,args...)
+    assemble_affine_decomposition(info,op,args...)
   end
 
 end

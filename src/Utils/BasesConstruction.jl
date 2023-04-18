@@ -1,12 +1,20 @@
 get_Nt(S::AbstractMatrix,ns::Int) = Int(size(S,2)/ns)
 
-function mode2_unfolding(S::AbstractMatrix,ns::Int)
-  Nt = get_Nt(S,ns)
-  idx_fun(ns) = (ns .- 1)*Nt .+ 1:ns*Nt
-  idx = idx_fun.(1:ns)
-  mode2_blocks(i) = Matrix(transpose(getindex(S,:,i)))
-  mode2 = Matrix(mode2_blocks.(idx))
+function mode2_unfolding(S::Matrix{Float},ns::Int)
+  mode2 = zeros(get_Nt(S,ns),size(S,1)*ns)
+  mode2_unfolding!(mode2,S,ns)
+end
 
+function mode2_unfolding(S::DistMatrix{Float},ns::Int)
+  mode2 = mode2_unfolding(Matrix(S),ns)
+  DistMatrix(mode2)
+end
+
+function mode2_unfolding!(mode2::AbstractMatrix,S::AbstractMatrix,ns::Int)
+  Ns,Nt = size(S,1),get_Nt(S,ns)
+  @inbounds for k = 1:ns
+    mode2[:,(k.-1)*Ns.+1:k*Ns] = S[:,(k.-1)*Nt.+1:k*Nt]'
+  end
   mode2
 end
 
@@ -26,24 +34,13 @@ function POD(S::AbstractMatrix,X::SparseMatrixCSC;ϵ=1e-5)
   H = cholesky(X)
   L = sparse(H.L)
   U,Σ,_ = my_svd(L'*S[H.p,:])
-
-  energies = cumsum(Σ.^2)
-  n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  err = sqrt(1-energies[n]/energies[end])
-  printstyled("Basis number obtained via POD is $n, projection error ≤ $err\n";
-    color=:blue)
-
+  n = truncation(Σ,ϵ)
   Matrix((L'\U[:,1:n])[invperm(H.p),:])
 end
 
 function POD(S::AbstractMatrix;ϵ=1e-5)
   U,Σ,_ = my_svd(S)
-  energies = cumsum(Σ.^2)
-  n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  err = sqrt(1-energies[n]/energies[end])
-  printstyled("Basis number obtained via POD is $n, projection error ≤ $err\n";
-    color=:blue)
-
+  n = truncation(Σ,ϵ)
   U[:,1:n]
 end
 
@@ -55,39 +52,40 @@ function reduced_POD(::Val{true},S::AbstractMatrix;ϵ=1e-5)
   C = S'*S
   _,_,V = my_svd(C)
   Σ = svdvals(S)
-
-  energies = cumsum(Σ.^2)
-  n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  err = sqrt(1-energies[n]/energies[end])
-  printstyled("Basis number obtained via POD is $n, projection error ≤ $err\n";
-    color=:blue)
-
-  U = S*V[:,1:n]
-  for i = axes(U,2)
-    U[:,i] /= (Σ[i]+eps())
-  end
-  U
+  n = truncation(Σ,ϵ)
+  correct_basis(S,V[:,1:n],Σ)
 end
 
 function reduced_POD(::Val{false},S::AbstractMatrix;ϵ=1e-5)
   C = S*S'
   U,_ = my_svd(C)
   Σ = svdvals(S)
+  n = truncation(Σ,ϵ)
+  U[:,1:n]
+end
 
+function truncation(Σ::Vector{Float},ϵ::Real)
   energies = cumsum(Σ.^2)
   n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
   err = sqrt(1-energies[n]/energies[end])
   printstyled("Basis number obtained via POD is $n, projection error ≤ $err\n";
     color=:blue)
-
-  U[:,1:n]
+  n
 end
 
-function reduced_POD(
-  la::LazyArray{<:Fill{<:Function},DistMatrix{Float},1,Tuple{Base.OneTo{Int}}};
-  ϵ=1e-5)
+truncation(Σ::DistMatrix{Float},ϵ::Real) = truncation(Matrix(Σ)[:],ϵ)
 
-  reduced_POD(DistMatrix(la);ϵ)
+function correct_basis(S::Matrix{Float},V::Matrix{Float},Σ::Vector{Float})
+  U = S*V
+  for i = axes(U,2)
+    U[:,i] /= (Σ[i]+eps())
+  end
+  U
+end
+
+function correct_basis(S::DistMatrix{Float},V::DistMatrix{Float},Σ::DistMatrix{Float})
+  basis = correct_basis(Matrix(S),Matrix(V),Matrix(Σ)[:])
+  DistMatrix(basis)
 end
 
 function randomized_POD(S::AbstractMatrix;ϵ=1e-5,q=1)

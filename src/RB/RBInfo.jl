@@ -1,6 +1,6 @@
 abstract type RBInfo end
 
-struct RBInfoSteady <: RBInfo
+mutable struct RBInfoSteady <: RBInfo
   ptype::ProblemType
   ϵ::Float
   nsnap::Int

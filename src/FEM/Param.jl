@@ -31,8 +31,8 @@ realization(P::ParamSpace) = Param(generate_param(P))
 realization(P::ParamSpace,n) = Param.(generate_param(P,n))
 
 Base.zero(::Type{Param}) = 0.
-Base.iterate(p::Param,i = 1) = iterate(p.param,i)
-Base.getindex(p::Param,args...) = getindex(p.param,args...)
+Base.iterate(p::Param,i = 1) = iterate(p.μ,i)
+Base.getindex(p::Param,args...) = getindex(p.μ,args...)
 Base.Matrix(pvec::Vector{Param}) = Matrix{Float}(reduce(vcat,transpose.(getproperty.(pvec,:μ)))')
 Distributions.var(p::Param) = var(get_μ(p))
 Base.:(-)(p1::Param,p2::Param) = get_μ(p1) .- get_μ(p2)
@@ -47,12 +47,12 @@ end
 
 abstract type ProblemMeasures end
 
-mutable struct ProblemFixedMeasures <: ProblemMeasures
+struct ProblemFixedMeasures <: ProblemMeasures
   dΩ::Measure
   dΓn::Measure
 end
 
-mutable struct ProblemParamMeasures <: ProblemMeasures
+struct ProblemParamMeasures <: ProblemMeasures
   dΩ::Function
   dΓn::Function
 end

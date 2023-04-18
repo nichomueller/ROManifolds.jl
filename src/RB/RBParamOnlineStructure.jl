@@ -1,4 +1,4 @@
-mutable struct RBParamOnlineStructure{Top}
+struct RBParamOnlineStructure{Top}
   op::Top
   on_structure::Function
 end

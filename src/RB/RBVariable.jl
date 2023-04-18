@@ -3,29 +3,29 @@ abstract type RBLinVariable{Top} <: RBVariable{Top,nothing} end
 abstract type RBBilinVariable{Top,Ttr} <: RBVariable{Top,Ttr} end
 abstract type RBLiftVariable{Top} <: RBLinVariable{Top} end
 
-mutable struct RBSteadyLinVariable{Top} <: RBLinVariable{Top}
+struct RBSteadyLinVariable{Top} <: RBLinVariable{Top}
   feop::ParamSteadyLinOperator{Top}
   rbspace_row::RBSpaceSteady
 end
 
-mutable struct RBUnsteadyLinVariable{Top} <: RBLinVariable{Top}
+struct RBUnsteadyLinVariable{Top} <: RBLinVariable{Top}
   feop::ParamUnsteadyLinOperator{Top}
   rbspace_row::RBSpaceUnsteady
 end
 
-mutable struct RBSteadyBilinVariable{Top,Ttr} <: RBBilinVariable{Top,Ttr}
+struct RBSteadyBilinVariable{Top,Ttr} <: RBBilinVariable{Top,Ttr}
   feop::ParamSteadyBilinOperator{Top,Ttr}
   rbspace_row::RBSpaceSteady
   rbspace_col::RBSpaceSteady
 end
 
-mutable struct RBUnsteadyBilinVariable{Top,Ttr} <: RBBilinVariable{Top,Ttr}
+struct RBUnsteadyBilinVariable{Top,Ttr} <: RBBilinVariable{Top,Ttr}
   feop::ParamUnsteadyBilinOperator{Top,Ttr}
   rbspace_row::RBSpaceUnsteady
   rbspace_col::RBSpaceUnsteady
 end
 
-mutable struct RBSteadyLiftVariable{Top} <: RBLiftVariable{Top}
+struct RBSteadyLiftVariable{Top} <: RBLiftVariable{Top}
   feop::ParamSteadyLiftOperator{Top}
   rbspace_row::RBSpaceSteady
 
@@ -36,7 +36,7 @@ mutable struct RBSteadyLiftVariable{Top} <: RBLiftVariable{Top}
   end
 end
 
-mutable struct RBUnsteadyLiftVariable{Top} <: RBLiftVariable{Top}
+struct RBUnsteadyLiftVariable{Top} <: RBLiftVariable{Top}
   feop::ParamUnsteadyLiftOperator{Top}
   rbspace_row::RBSpaceUnsteady
 
@@ -142,9 +142,7 @@ function Gridap.FESpaces.get_cell_dof_ids(
   get_cell_dof_ids(rbop.feop,trian)
 end
 
-function assemble_fe_quantity(op::RBVariable,args...;kwargs...)
-  assemble_fe_quantity(op.feop,args...;kwargs...)
-end
+get_assembler(op::RBVariable) = get_assembler(op.feop)
 
 function Gridap.FESpaces.assemble_vector(op::RBLinVariable;kwargs...)
   assemble_vector(op.feop;kwargs...)

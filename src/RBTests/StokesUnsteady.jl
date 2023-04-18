@@ -61,8 +61,6 @@ function stokes_unsteady()
   reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1)
   V = TestFESpace(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
   U = ParamTransientTrialFESpace(V,[g0,g])
-  V = TestFESpace(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
-  U = ParamTransientTrialFESpace(V,[g0,g])
   Q = TestFESpace(model,reffe2;conformity=:C0)
   P = TrialFESpace(Q)
 
@@ -80,7 +78,9 @@ function stokes_unsteady()
   uh_offline = uh[1:info.nsnap]
   ph_offline = ph[1:info.nsnap]
 
-  rbspace_u,rbspace_p = rb(info,(uh_offline,ph_offline),opB,ph,μ;tt)
+  tt.offline_time.basis_time += @elapsed begin
+    rbspace_u,rbspace_p = rb(info,(uh_offline,ph_offline),opB,ph,μ)
+  end
   rbspace = rbspace_u,rbspace_p
 
   rbopA = RBVariable(opA,rbspace_u,rbspace_u)
@@ -90,12 +90,14 @@ function stokes_unsteady()
   rbopF = RBVariable(opF,rbspace_u)
   rbopH = RBVariable(opH,rbspace_u)
 
-  Arb = RBAffineDecomposition(info,tt,rbopA,μ,measures,:dΩ)
-  Brb = RBAffineDecomposition(info,tt,rbopB,μ,measures,:dΩ)
-  BTrb = RBAffineDecomposition(info,tt,rbopBT,μ,measures,:dΩ)
-  Mrb = RBAffineDecomposition(info,tt,rbopM,μ,measures,:dΩ)
-  Frb = RBAffineDecomposition(info,tt,rbopF,μ,measures,:dΩ)
-  Hrb = RBAffineDecomposition(info,tt,rbopH,μ,measures,:dΓn)
+  tt.offline_time.assembly_time = @elapsed begin
+    Arb = RBAffineDecomposition(info,rbopA,μ,measures,:dΩ)
+    Brb = RBAffineDecomposition(info,rbopB,μ,measures,:dΩ)
+    BTrb = RBAffineDecomposition(info,rbopBT,μ,measures,:dΩ)
+    Mrb = RBAffineDecomposition(info,rbopM,μ,measures,:dΩ)
+    Frb = RBAffineDecomposition(info,rbopF,μ,measures,:dΩ)
+    Hrb = RBAffineDecomposition(info,rbopH,μ,measures,:dΓn)
+  end
 
   ad = (Arb,Brb,BTrb,Mrb,Frb,Hrb)
   ad_eval = eval_affine_decomposition(ad)
