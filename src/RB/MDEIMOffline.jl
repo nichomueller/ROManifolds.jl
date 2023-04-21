@@ -45,11 +45,11 @@ function MDEIM(
   μ_mdeim = μ[1:info.mdeim_nsnap]
   meas = getproperty(measures,field)
 
-  rbspace,findnz_map = mdeim_basis(info,op,μ_mdeim,args...)
-  red_rbspace = project_mdeim_basis(op,rbspace,findnz_map)
+  rbspace,findnz_idx = mdeim_basis(info,op,μ_mdeim,args...)
+  red_rbspace = project_mdeim_basis(op,rbspace,findnz_idx)
   idx = mdeim_idx(rbspace)
   red_lu_factors = get_red_lu_factors(info,rbspace,idx)
-  idx = recast_in_full_dim(idx,findnz_map)
+  idx = recast_in_full_dim(idx,findnz_idx)
   red_meas = get_red_measure(op,idx,meas)
 
   MDEIM(red_rbspace,red_lu_factors,idx,red_meas)
@@ -107,9 +107,9 @@ end
 function rb_space_projection(
   op::RBBilinVariable,
   basis_space::Matrix{Float},
-  findnz_map::Vector{Int})
+  findnz_idx::Vector{Int})
 
-  sparse_basis_space = sparsevec(basis_space,findnz_map)
+  sparse_basis_space = sparsevec(basis_space,findnz_idx)
   rbspace_row = get_rbspace_row(op)
   brow = get_basis_space(rbspace_row)
   rbspace_col = get_rbspace_col(op)
@@ -203,11 +203,11 @@ function get_red_lu_factors(
   lu(bst_idx)
 end
 
-recast_in_full_dim(idx_tmp::Vector{Int},findnz_map::Vector{Int}) =
-  findnz_map[idx_tmp]
+recast_in_full_dim(idx_tmp::Vector{Int},findnz_idx::Vector{Int}) =
+  findnz_idx[idx_tmp]
 
-recast_in_full_dim(idx_tmp::NTuple{2,Vector{Int}},findnz_map::Vector{Int}) =
-  recast_in_full_dim(first(idx_tmp),findnz_map),last(idx_tmp)
+recast_in_full_dim(idx_tmp::NTuple{2,Vector{Int}},findnz_idx::Vector{Int}) =
+  recast_in_full_dim(first(idx_tmp),findnz_idx),last(idx_tmp)
 
 function get_red_measure(
   op::RBVariable,

@@ -6,10 +6,9 @@ using Random
 using SuiteSparse
 using SparseArrays
 using Arpack
-using MPI,MPIClusterManagers,PartitionedArrays,SharedArrays
-using Distributed,Elemental
+using Elemental
 using DelimitedFiles
-using Parameters
+using PartitionedArrays,SharedArrays
 using Test
 using PlotlyJS
 using ForwardDiff
@@ -27,7 +26,6 @@ using GridapP4est
 using Gridap.TensorValues
 using Gridap.ODEs.TransientFETools
 
-import Elemental:DistMatrix
 import Base.Threads.@threads
 import Gridap:solve!
 import Gridap:∇
@@ -59,6 +57,7 @@ import Gridap.ODEs.TransientFETools:jacobians!
 import LineSearches:BackTracking
 
 const Float = Float64
+const EMatrix = Elemental.DistMatrix
 
 include("Files.jl")
 include("Indexes.jl")

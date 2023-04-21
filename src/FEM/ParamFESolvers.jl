@@ -66,5 +66,6 @@ function Gridap.solve(
   solve(solver,param_op,μ)
 end
 
+get_Nt(sol::ParamFESolution) = 1
 get_Ns(sol::ParamFESolution) = get_Ns(sol.psol.op.feop)
 get_Ns(sol::Vector{<:ParamFESolution}) = get_Ns(first(sol))

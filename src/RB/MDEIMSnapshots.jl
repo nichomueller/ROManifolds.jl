@@ -4,17 +4,17 @@ function mdeim_basis(info::RBInfo,op::RBVariable,args...)
 end
 
 function mdeim_basis(::Val{false},info::RBInfoSteady,op::RBVariable,args...)
-  snaps,findnz_map = fe_snapshots(op,args...)
+  snaps,findnz_idx = fe_snapshots(op,args...)
   bs = reduced_POD(snaps;ϵ=info.ϵ)
-  RBSpaceSteady(get_id(op),Matrix(bs)),findnz_map
+  RBSpaceSteady(get_id(op),Matrix(bs)),findnz_idx
 end
 
 function mdeim_basis(::Val{false},info::RBInfoUnsteady,op::RBVariable,args...)
-  snaps,findnz_map = fe_snapshots(op,args...)
+  snaps,findnz_idx = fe_snapshots(op,args...)
   bs = reduced_POD(snaps;ϵ=info.ϵ)
   snaps2 = mode2_unfolding(bs'*snaps,info.mdeim_nsnap)
   bt = reduced_POD(snaps2;ϵ=info.ϵ)
-  RBSpaceUnsteady(get_id(op),Matrix(bs),Matrix(bt)),findnz_map
+  RBSpaceUnsteady(get_id(op),Matrix(bs),Matrix(bt)),findnz_idx
 end
 
 function fe_snapshots(op::RBVariable,μ::Vector{Param},args...)
@@ -46,68 +46,9 @@ function mdeim_basis(
   end
   bs = rb_space(info,Snapshots(id,vals))
 
-  #findnz_map = (op;μ,u)
+  #findnz_idx = (op;μ,u)
 
-  RBSpaceUnsteady(id,bs,param_bt),findnz_map
-end
-
-function setup_dvecs_assembler(
-  op::RBVariable{Nonaffine,Ttr},
-  μ::Vector{Param},
-  args...) where Ttr
-
-  assembler = get_assembler(op)
-  k -> assembler(op;μ=μ[k])
-end
-
-function setup_dvecs_assembler(
-  op::RBVariable{Nonlinear,Ttr},
-  μ::Vector{Param},
-  uh::Snapshots) where Ttr
-
-  assembler = get_assembler(op)
-  u_fun(k) = FEFunction(op,uh[k],μ[k])
-  k -> assembler(op;μ=μ[k],u=u_fun(k))
-end
-
-function setup_dvecs_assembler(
-  op::RBBilinVariable{Nonaffine,Ttr},
-  μ::Vector{Param},
-  fun::Function) where Ttr
-
-  assembler = get_assembler(op)
-  k -> assembler(op;μ=μ[k],u=fun(k),t=first(get_timesθ(op)))
-end
-
-function setup_dvecs_assembler(
-  op::RBBilinVariable{Nonlinear,Ttr},
-  μ::Vector{Param},
-  fun::Function) where Ttr
-
-  assembler = get_assembler(op)
-  k -> assembler(op;μ=first(μ),u=fun(k),t=first(get_timesθ(op)))
-end
-
-function assemble_dvecs(op::RBLinVariable,μ::Vector{Param},args...)
-  assembler = setup_dvecs_assembler(op,μ,args...)
-  fe_vecs = Matrix([assembler(k) for k = eachindex(μ)])
-  findnz_map = get_findnz_map(fe_vecs)
-  nz_vecs = nonzero_values(fe_vecs,findnz_map)
-  DistMatrix(nz_vecs),findnz_map
-end
-
-function assemble_dvecs(op::RBBilinVariable,μ::Vector{Param},args...)
-  assembler = setup_dvecs_assembler(op,μ,args...)
-  fe_mat = assembler(1)
-  findnz_map = get_findnz_map(fe_mat)
-  nz_mat = nonzero_values(fe_mat,findnz_map)
-  r,c = size(nz_mat)
-  nz_mats = hcat(nz_mat,zeros(r,c*(length(μ)-1)))
-  for k = 2:length(μ)
-    fe_mat = assembler(k)
-    nz_mats[:,c*(k-1)+1:c*k] = nonzero_values(fe_mat,findnz_map)
-  end
-  DistMatrix(nz_mats),findnz_map
+  RBSpaceUnsteady(id,bs,param_bt),findnz_idx
 end
 
 function evaluate_param_function(

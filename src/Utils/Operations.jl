@@ -1,12 +1,16 @@
-function Base.Matrix(v::Vector{T}) where T
-  Matrix{T}(reshape(v,:,1))
+function LinearAlgebra.Vector(mat::Matrix{T}) where T
+  Vector{T}(reshape(mat,:,))
 end
 
-function Base.Matrix(block::Vector{<:AbstractArray{T}}) where T
+function LinearAlgebra.Matrix(vec::Vector{T}) where T
+  Matrix{T}(reshape(vec,:,1))
+end
+
+function LinearAlgebra.Matrix(block::Vector{<:AbstractArray{T}}) where T
   Matrix{T}(reduce(hcat,block))
 end
 
-function Base.Matrix(vblock::Vector{<:Vector{Vector{T}}}) where T
+function LinearAlgebra.Matrix(vblock::Vector{<:Vector{Vector{T}}}) where T
   n = length(vblock)
   mat = Matrix(vblock[1])
   if n > 1
@@ -17,45 +21,14 @@ function Base.Matrix(vblock::Vector{<:Vector{Vector{T}}}) where T
   mat
 end
 
-Base.Matrix(dmat::DistMatrix{T}) where T = convert(Matrix{T},dmat)
+LinearAlgebra.Vector(dmat::DistMatrix{T}) where T = Vector{T}(Matrix(dmat))
+
+LinearAlgebra.Matrix(dmat::DistMatrix{T}) where T = convert(Matrix{T},dmat)
 
 Elemental.DistMatrix(mat::Matrix{T}) where T = convert(DistMatrix{T},mat)
 
-function Elemental.DistMatrix(vecs::Vector{Vector{T}}) where T
-  DistMatrix(Matrix(vecs))
-end
-
-#= function Elemental.DistMatrix(
-  la::LazyArray{<:Fill{<:Function},DistMatrix{T},1,Tuple{Base.OneTo{Int}}}) where T
-
-  vec_of_mat = pmap(idx->la[idx],eachindex(la))
-  hcat(vec_of_mat)
-end
-
-function Elemental.hcat(x::Vector{DistMatrix{T}}) where T
-  l = length(x)
-  if l == 0
-    throw(ArgumentError("cannot flatten empty vector"))
-  else
-    x1 = x[1]
-    m,n = size(x1,1),size(x1,2)
-    A = DistMatrix(T)
-    Elemental.zeros!(A,m,l*n)
-    for j = 1:l
-      xj = x[j]
-      for k = 1:Elemental.localWidth(xj)
-        for i = 1:Elemental.localHeight(xj)
-          xjik = Elemental.getLocal(xj,i,k)
-          Elemental.queueUpdate(A,Elemental.globalRow(xj,i),j,xjik)
-        end
-      end
-    end
-    Elemental.processQueues(A)
-    return A
-  end
-end =#
-
 const Block{T} = Vector{T} where T
+
 const BlockMatrix{T} = Block{Matrix{T}} where T
 
 function blocks(mat::Matrix{T},nrow::Int) where T
@@ -128,10 +101,10 @@ function expand(tup::Tuple)
   ntup
 end
 
-function SparseArrays.sparsevec(M::Matrix{T},findnz_map::Vector{Int}) where T
+function SparseArrays.sparsevec(M::Matrix{T},findnz_idx::Vector{Int}) where T
   sparse_vblocks = SparseVector{T}[]
   for j = axes(M,2)
-    push!(sparse_vblocks,sparsevec(findnz_map,M[:,j],maximum(findnz_map)))
+    push!(sparse_vblocks,sparsevec(findnz_idx,M[:,j],maximum(findnz_idx)))
   end
 
   sparse_vblocks
@@ -179,18 +152,6 @@ function SparseArrays.findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
   nz = findall(v -> abs.(v) .>= eps(), V)
 
   (I[nz], V[nz])
-end
-
-function nonzero_values(mat::SparseMatrixCSC,findnz_map::Vector{Int})
-  Matrix(mat[:][findnz_map])
-end
-
-function nonzero_values(arr::AbstractArray,findnz_map::Vector{Int})
-  Matrix(selectdim(arr,1,findnz_map))
-end
-
-function nonzero_values(vec::Vector{<:AbstractArray},findnz_map::Vector{Int})
-  Matrix(Broadcasting(v -> nonzero_values(v,findnz_map))(vec))
 end
 
 function LinearAlgebra.kron(

@@ -1,6 +1,6 @@
 root = pwd()
 
-using Distributed
+using MPI,MPIClusterManagers,Distributed
 @everywhere include("$root/src/FEM/FEM.jl")
 @everywhere include("$root/src/RB/RB.jl")
 @everywhere include("$root/src/RBTests/RBTests.jl")
@@ -18,7 +18,7 @@ function stokes_unsteady()
   bnd_info = Dict("dirichlet0" => ["noslip"],"dirichlet" => ["inlet"],"neumann" => ["outlet"])
   order = 2
 
-  fepath = fem_path(test_path,mesh)
+  fepath = fem_path(test_path)
   mshpath = mesh_path(test_path,mesh)
   model = model_info(mshpath,bnd_info,ptype)
   measures = ProblemMeasures(model,order)
@@ -33,7 +33,7 @@ function stokes_unsteady()
 
   function a(x,p::Param,t::Real)
     μ = get_μ(p)
-    1/sum(μ)
+    μ[1]*exp((cos(t)+sin(t))*x[1]/sum(μ))
   end
   a(p::Param,t::Real) = x->a(x,p,t)
   b(x,p::Param,t::Real) = 1.
@@ -68,7 +68,7 @@ function stokes_unsteady()
 
   solver = ThetaMethod(LUSolver(),dt,θ)
   nsnap = 100
-  uh,ph,μ = fe_snapshots(ptype,solver,feop,fepath,run_fem,nsnap,t0,tF)
+  uh,ph,μ = fe_snapshots(solver,feop,fepath,run_fem,nsnap,t0,tF;indef)
 
   info = RBInfoUnsteady(ptype,test_path;ϵ=1e-3,nsnap=80,mdeim_snap=10)
   tt = TimeTracker(OfflineTime(0.,0.),0.)

@@ -1,45 +1,28 @@
 get_Nt(S::AbstractMatrix,ns::Int) = Int(size(S,2)/ns)
 
-function mode2_unfolding(S::Matrix{Float},ns::Int)
-  mode2 = zeros(get_Nt(S,ns),size(S,1)*ns)
-  mode2_unfolding!(mode2,S,ns)
-end
-
 function mode2_unfolding(S::DistMatrix{Float},ns::Int)
   mode2 = mode2_unfolding(Matrix(S),ns)
   DistMatrix(mode2)
 end
 
-function mode2_unfolding!(mode2::AbstractMatrix,S::AbstractMatrix,ns::Int)
-  Ns,Nt = size(S,1),get_Nt(S,ns)
+function mode2_unfolding(S::Matrix{Float},ns::Int)
+  mode2 = Matrix{Float}(undef,get_Nt(S,ns),size(S,1)*ns)
   @inbounds for k = 1:ns
-    mode2[:,(k.-1)*Ns.+1:k*Ns] = S[:,(k.-1)*Nt.+1:k*Nt]'
+    copyto!(view(mode2,:,(k-1)*Ns+1:k*Ns),S[:,(k-1)*Nt+1:k*Nt]',ns)
   end
-  mode2
-end
-
-my_svd(s::Matrix{Float}) = svd(s)
-
-my_svd(s::SparseMatrixCSC{Float,Int}) = svds(s;nsv=size(s)[2]-1)[1]
-
-my_svd(s::DistMatrix{Float}) = Elemental.svd(s)
-
-my_svd(s::Vector{AbstractMatrix}) = my_svd(Matrix(s))
-
-function POD(S::NTuple{N,AbstractMatrix},args...;kwargs...) where N
-  Broadcasting(si -> POD(si,args...;kwargs...))(S)
+  return mode2
 end
 
 function POD(S::AbstractMatrix,X::SparseMatrixCSC;ϵ=1e-5)
   H = cholesky(X)
   L = sparse(H.L)
-  U,Σ,_ = my_svd(L'*S[H.p,:])
+  U,Σ,_ = svd(L'*S[H.p,:])
   n = truncation(Σ,ϵ)
   Matrix((L'\U[:,1:n])[invperm(H.p),:])
 end
 
 function POD(S::AbstractMatrix;ϵ=1e-5)
-  U,Σ,_ = my_svd(S)
+  U,Σ,_ = svd(S)
   n = truncation(Σ,ϵ)
   U[:,1:n]
 end
@@ -50,7 +33,7 @@ end
 
 function reduced_POD(::Val{true},S::AbstractMatrix;ϵ=1e-5)
   C = S'*S
-  _,_,V = my_svd(C)
+  _,_,V = svd(C)
   Σ = svdvals(S)
   n = truncation(Σ,ϵ)
   correct_basis(S,V[:,1:n],Σ)
@@ -58,7 +41,7 @@ end
 
 function reduced_POD(::Val{false},S::AbstractMatrix;ϵ=1e-5)
   C = S*S'
-  U,_ = my_svd(C)
+  U,_ = svd(C)
   Σ = svdvals(S)
   n = truncation(Σ,ϵ)
   U[:,1:n]
@@ -88,33 +71,6 @@ function correct_basis(S::DistMatrix{Float},V::DistMatrix{Float},Σ::DistMatrix{
   DistMatrix(basis)
 end
 
-function randomized_POD(S::AbstractMatrix;ϵ=1e-5,q=1)
-  randomized_POD(Val{size(S,1)>size(S,2)}(),S;ϵ,q=q)
-end
-
-function randomized_POD(::Val{true},S::AbstractMatrix;ϵ=1e-5,q=1)
-  Matrix(randomized_POD(Val{false}(),S';ϵ,q=q)')
-end
-
-function randomized_POD(::Val{false},S::AbstractMatrix;ϵ=1e-5,q=1)
-  Σ = svdvals(S)
-  r = count(x->x>min(size(S)...)*eps()*Σ[1],Σ)
-  G = rand(Normal(0.,1.),size(S,1),min(2*r,size(S,2)))
-  Y = G'*(S*S')^q*S
-  Q,R = qr(Y')
-  B = S*Matrix(Q)
-  QRb = qr(B)
-  QRr = qr(R',ColumnNorm())
-
-  energies = cumsum(Σ.^2)
-  n = findall(x->x ≥ (1-ϵ^2)*energies[end],energies)[1]
-  err = sqrt(1-energies[n]/energies[end])
-  printstyled("Basis number obtained via POD is $n, projection error ≤ $err\n";
-    color=:blue)
-
-  QRb.Q*QRr.P[:,1:n]
-end
-
 function projection(vnew::AbstractVector,v::AbstractVector;X=nothing)
   isnothing(X) ? projection(vnew,v,I(length(v))) : projection(vnew,v,X)
 end
@@ -139,9 +95,6 @@ function orth_projection(vnew::AbstractVector,basis::AbstractMatrix;X=nothing)
   sum([orth_projection(vnew,basis[:,i];X) for i=axes(basis,2)])
 end
 
-isbasis(basis,args...) =
-  all([isapprox(norm(basis[:,j],args...),1) for j=axes(basis,2)])
-
 function orth_complement(
   v::AbstractVector,
   basis::AbstractMatrix;
@@ -161,8 +114,4 @@ function gram_schmidt(mat::Matrix{Float},basis::Matrix{Float};kwargs...)
   end
 
   mat
-end
-
-function gram_schmidt(vec::Vector{Vector{T}},basis::Matrix{Float};kwargs...) where T
-  gram_schmidt(Matrix(vec),basis;kwargs...)
 end

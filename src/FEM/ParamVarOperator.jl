@@ -121,18 +121,6 @@ realization_trial(op::ParamSteadyOperator) = get_trial(op)(realization(op))
 
 realization_trial(op::ParamUnsteadyOperator) = get_trial(op)(realization(op),realization(get_time_info(op)))
 
-function unpack_for_assembly(op::ParamLinOperator)
-  get_param_fefunction(op),get_test(op)
-end
-
-function unpack_for_assembly(op::ParamBilinOperator)
-  get_param_fefunction(op),get_test(op),get_trial(op)
-end
-
-function unpack_for_assembly(op::ParamLiftOperator)
-  get_param_fefunction(op),get_test(op),get_dirichlet_function(op)
-end
-
 function Gridap.FESpaces.get_cell_dof_ids(
   op::ParamOperator,
   trian::Triangulation)
@@ -232,96 +220,6 @@ function ParamLiftOperator(op::ParamUnsteadyBilinOperator{Top,Ttr}) where {Top,T
     get_pspace(op),get_time_info(op),get_trial(op),get_test(op))
 end
 
-get_assembler(::ParamLinOperator) = assemble_vector
-
-get_assembler(::ParamBilinOperator) = assemble_matrix
-
-function Gridap.FESpaces.assemble_vector(
-  op::ParamLinOperator;
-  μ=realization(op),t=get_timesθ(op),u=nothing)
-
-  assemble_vector(unpack_for_assembly(op)...,μ,t,u)
-end
-
-function Gridap.FESpaces.assemble_vector(
-  fefun::Function,
-  test::FESpace,
-  μ::Param,t,args...)
-
-  if isnothing(t)
-    [assemble_vector(fefun(μ),test)]
-  else
-    [assemble_vector(fefun(μ,tθ),test) for tθ = t]
-  end
-end
-
-function Gridap.FESpaces.assemble_vector(
-  fefun::Function,
-  test::FESpace,
-  dir::Function,
-  μ::Param,t,u)
-
-  if isnothing(t)
-    if isnothing(u)
-      [assemble_vector(v->fefun(μ,dir(μ),v),test)]
-    else
-      [assemble_vector(v->fefun(u,dir(μ),v),test)]
-    end
-  else
-    if isnothing(u)
-      [assemble_vector(v->fefun(μ,tθ,dir(μ,tθ),v),test) for tθ = t]
-    elseif typeof(u) == Function
-      [assemble_vector(v->fefun(u(tθ),dir(μ,tθ),v),test) for tθ = t]
-    else typeof(u) == FEFunction
-      [assemble_vector(v->fefun(u,dir(μ,tθ),v),test) for tθ = t]
-    end
-  end
-end
-
-function Gridap.FESpaces.assemble_matrix(
-  op::ParamBilinOperator;
-  μ=realization(op),t=get_timesθ(op),u=nothing)
-
-  assemble_matrix(unpack_for_assembly(op)...,μ,t,u)
-end
-
-function Gridap.FESpaces.assemble_matrix(
-  fefun::Function,
-  test::FESpace,
-  trial::ParamTrialFESpace,
-  μ::Param,t,u)
-
-  if isnothing(u)
-    [assemble_matrix(fefun(μ),trial(μ),test)]
-  else
-    [assemble_matrix(fefun(u),trial(μ),test)]
-  end
-end
-
-function Gridap.FESpaces.assemble_matrix(
-  fefun::Function,
-  test::FESpace,
-  trial::ParamTransientTrialFESpace,
-  μ::Param,t,u)
-
-  if isnothing(u)
-    [assemble_matrix(fefun(μ,tθ),trial(μ,tθ),test) for tθ = t]
-  elseif typeof(u) == Function
-    [assemble_matrix(fefun(u(tθ)),trial(μ,tθ),test) for tθ = t]
-  else typeof(u) == FEFunction
-    [assemble_matrix(fefun(u),trial(μ,tθ),test) for tθ = t]
-  end
-end
-
-function assemble_first_dvec(
-  op::ParamLinOperator,
-  μ::Vector{Param},
-  u::Vector{Any};
-  t=get_timesθ(op))
-
-  assemble_vector(unpack_for_assembly(op)...,first(μ),t,first(u))
-end
-
 function assemble_affine_quantity(op::ParamOperator)
   assemble_affine_quantity(unpack_for_assembly(op)...,realization(op),first(get_timesθ(op)))
 end
@@ -355,35 +253,3 @@ function get_dirichlet_function(op::ParamOperator)
   trial = get_trial(op)
   get_dirichlet_function(Val(id ∈ (:M,:M_lift)),trial)
 end
-
-function get_findnz_map(vec::AbstractVector)
-  findall(x -> abs(x) ≥ eps(),vec)
-end
-
-function get_findnz_map(mat::AbstractMatrix)
-  sum_cols = sum(mat,dims=2)[:]
-  findall(x -> abs(x) ≥ eps(),sum_cols)
-end
-
-function get_findnz_map(mat::SparseMatrixCSC)
-  findnz_map, = findnz(first(mat)[:])
-  findnz_map
-end
-
-function get_findnz_map(vecs::Vector{<:AbstractArray})
-  get_findnz_map(Matrix(vecs))
-end
-
-function get_findnz_map(vecs::Vector{SparseMatrixCSC})
-  get_findnz_map(first(vecs))
-end
-
-function get_findnz_map(assembler::Function,args...)
-  fe_quantity = assembler(args...)
-  get_findnz_map(fe_quantity)
-end
-
-#= function get_inverse_findnz_map(q::AbstractArray)
-  findnz_map = get_findnz_map(q)
-  (i::Int) -> findall(x -> x == i,findnz_map)[1]
-end =#

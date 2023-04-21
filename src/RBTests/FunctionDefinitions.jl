@@ -206,7 +206,7 @@ function stokes_operators(
   hfe(h::Function) = v -> hfe(h,u,v)
   H = ParamFunctions(h,hfe)
 
-  opA = AffineParamOperator(A,PS,time_info,U,V;id=:A)
+  opA = NonaffineParamOperator(A,PS,time_info,U,V;id=:A)
   opB = AffineParamOperator(B,PS,time_info,U,Q;id=:B)
   opBT = AffineParamOperator(BT,PS,time_info,P,V;id=:BT)
   opM = AffineParamOperator(M,PS,time_info,U,V;id=:M)

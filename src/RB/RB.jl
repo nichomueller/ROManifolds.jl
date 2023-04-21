@@ -1,5 +1,4 @@
 include("RBInfo.jl")
-include("Snapshots.jl")
 include("RBSpace.jl")
 include("RBVariable.jl")
 include("MDEIMOffline.jl")
