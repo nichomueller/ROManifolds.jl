@@ -196,14 +196,14 @@ function stokes_operators(
   ffe(p::Param,t::Real,v) = ffe(p,t,dΩ,v)
   ffe(p::Param,t::Real) = v -> ffe(p,t,v)
   ffe(f::Function,v) = ∫(f⋅v)dΩ
-  ffe(f::Function) = v -> ffe(f,u,v)
+  ffe(f::Function) = v -> ffe(f,v)
   F = ParamFunctions(f,ffe)
 
   hfe(p::Param,t::Real,dΓn,v) = ∫(h(p,t)⋅v)dΓn
   hfe(p::Param,t::Real,v) = hfe(p,t,dΓn,v)
   hfe(p::Param,t::Real) = v -> hfe(p,t,v)
   hfe(h::Function,v) = ∫(h⋅v)dΓn
-  hfe(h::Function) = v -> hfe(h,u,v)
+  hfe(h::Function) = v -> hfe(h,v)
   H = ParamFunctions(h,hfe)
 
   opA = NonaffineParamOperator(A,PS,time_info,U,V;id=:A)
@@ -348,14 +348,14 @@ function navier_stokes_functions(
   ffe(p::Param,t::Real,v) = ffe(p,t,dΩ,v)
   ffe(p::Param,t::Real) = v -> ffe(p,t,v)
   ffe(f::Function,v) = ∫(f⋅v)dΩ
-  ffe(f::Function) = v -> ffe(f,u,v)
+  ffe(f::Function) = v -> ffe(f,v)
   F = ParamFunctions(f,ffe)
 
   hfe(p::Param,t::Real,dΓn,v) = ∫(h(p,t)⋅v)dΓn
   hfe(p::Param,t::Real,v) = hfe(p,t,dΓn,v)
   hfe(p::Param,t::Real) = v -> hfe(p,t,v)
   hfe(h::Function,v) = ∫(h⋅v)dΓn
-  hfe(h::Function) = v -> hfe(h,u,v)
+  hfe(h::Function) = v -> hfe(h,v)
   H = ParamFunctions(h,hfe)
 
   opA = AffineParamOperator(A,PS,time_info,U,V;id=:A)

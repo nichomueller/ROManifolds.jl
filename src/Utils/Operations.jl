@@ -21,7 +21,7 @@ function LinearAlgebra.Matrix(vblock::Vector{<:Vector{Vector{T}}}) where T
   mat
 end
 
-LinearAlgebra.Vector(dmat::EMatrix{T}) where T = Vector{T}(Matrix(dmat))
+LinearAlgebra.Vector(dmat::EMatrix{T}) where T = Vector(Matrix(dmat))
 
 LinearAlgebra.Matrix(dmat::EMatrix{T}) where T = convert(Matrix{T},dmat)
 
@@ -43,8 +43,8 @@ function blocks(mat::Matrix{T},nblocks=size(mat,2);dims=(size(mat,1),1)) where T
   idx1 = idx2 .- ncol_block .+ 1
 
   blockmat = Matrix{T}[]
-  for i in eachindex(idx1)
-    block_i = Matrix(reshape(mat[:,idx1[i]:idx2[i]],dims))
+  @inbounds for i in eachindex(idx1)
+    block_i = reshape(mat[:,idx1[i]:idx2[i]],dims)
     push!(blockmat,block_i)
   end
   blockmat
@@ -57,10 +57,6 @@ function blocks(mat::Array{T,3};dims=size(mat)[1:2]) where T
     push!(blockmat,block_i)
   end
   blockmat
-end
-
-function vblocks(vec::Vector{T}) where T
-  [vec]
 end
 
 function vblocks(mat::Matrix{T}) where T
@@ -149,9 +145,13 @@ function SparseArrays.findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
   (I[nz], V[nz])
 end
 
-Elemental.getindex(emat::EMatrix{Float},::Colon,k::Int) = emat[:,k:k]
+Base.getindex(emat::EMatrix{Float},::Colon,k::Int) = emat[:,k:k]
 
-Elemental.getindex(emat::EMatrix{Float},k::Int,::Colon) = emat[k:k,:]
+Base.getindex(emat::EMatrix{Float},k::Int,::Colon) = emat[k:k,:]
+
+Base.getindex(emat::EMatrix{Float},idx::UnitRange{Int},k::Int) = emat[idx,k:k]
+
+Base.getindex(emat::EMatrix{Float},k::Int,idx::UnitRange{Int}) = emat[k:k,idx]
 
 Gridap.VectorValue(D::Int,T::DataType) = VectorValue(NTuple(D,T))
 

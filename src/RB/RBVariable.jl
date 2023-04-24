@@ -174,9 +174,7 @@ get_timesθ(op::RBVariable) = get_timesθ(op.feop)
 
 get_phys_quad_points(op::RBVariable) = get_phys_quad_points(op.feop)
 
-get_findnz_idx(op::RBVariable;kwargs...) = get_findnz_idx(op.feop;kwargs...)
-
-get_inverse_findnz_idx(op::RBVariable;kwargs...) = get_inverse_findnz_idx(op.feop;kwargs...)
+DistributedAssembler(op::RBVariable,args...) = DistributedAssembler(op.feop,args...)
 
 function rb_space_projection(
   op::RBLinVariable,

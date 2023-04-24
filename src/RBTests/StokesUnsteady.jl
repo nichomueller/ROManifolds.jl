@@ -6,7 +6,7 @@ using MPI,MPIClusterManagers,Distributed
 @everywhere include("$root/src/RBTests/RBTests.jl")
 
 function stokes_unsteady()
-  run_fem = true
+  run_fem = false
 
   steady = false
   indef = true
@@ -67,10 +67,10 @@ function stokes_unsteady()
   feop,opA,opB,opBT,opM,opF,opH = stokes_operators(measures,PS,time_info,V,U,Q,P;a,b,m,f,h)
 
   solver = ThetaMethod(LUSolver(),dt,θ)
-  nsnap = 100
+  nsnap = 50
   uh,ph,μ = fe_snapshots(solver,feop,fepath,run_fem,nsnap,t0,tF;indef)
 
-  info = RBInfoUnsteady(ptype,test_path;ϵ=1e-3,nsnap=80,mdeim_snap=10)
+  info = RBInfoUnsteady(ptype,test_path;ϵ=1e-3,nsnap=40,mdeim_snap=10,load_offline=false)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
 
   printstyled("Offline phase, reduced basis method\n";color=:blue)
@@ -79,7 +79,7 @@ function stokes_unsteady()
   ph_offline = ph[1:info.nsnap]
 
   tt.offline_time.basis_time += @elapsed begin
-    rbspace_u,rbspace_p = rb(info,(uh_offline,ph_offline),opB,ph,μ)
+    rbspace_u,rbspace_p = rb(info,(uh_offline,ph_offline),opB)
   end
   rbspace = rbspace_u,rbspace_p
 
@@ -98,10 +98,15 @@ function stokes_unsteady()
     Frb = RBAffineDecomposition(info,rbopF,measures,:dΩ,μ)
     Hrb = RBAffineDecomposition(info,rbopH,measures,:dΓn,μ)
   end
-
   ad = (Arb,Brb,BTrb,Mrb,Frb,Hrb)
-  ad_eval = eval_affine_decomposition(ad)
-  param_on_structures = RBParamOnlineStructure(ad,ad_eval;st_mdeim=info.st_mdeim)
+
+  Aon = RBParamOnlineStructure(Arb;st_mdeim=info.st_mdeim)
+  Bon = RBAffineDecomposition(Brb;st_mdeim=info.st_mdeim)
+  BTon = RBAffineDecomposition(BTrb;st_mdeim=info.st_mdeim)
+  Mon = RBAffineDecomposition(Mon;st_mdeim=info.st_mdeim)
+  Fon = RBAffineDecomposition(Fon;st_mdeim=info.st_mdeim)
+  Hon = RBAffineDecomposition(Hon;st_mdeim=info.st_mdeim)
+  param_on_structures = (Aon,Bon,BTon,Mon,Fon,Hon)
 
   save(info,(rbspace,ad))
 

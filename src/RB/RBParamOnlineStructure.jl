@@ -10,16 +10,9 @@ function RBParamOnlineStructure(
   RBParamOnlineStructure{Top}(op,on_structure)
 end
 
-function RBParamOnlineStructure(
-  ad::Tuple,
-  ad_eval::Tuple;
-  kwargs...)
-
-  ad_ntupl = expand(ad)
-  ad_eval_ntupl = expand(ad_eval)
-
-  Broadcasting((ad_i,ad_eval_i)->
-    RBParamOnlineStructure(ad_i,ad_eval_i;kwargs...))(ad_ntupl,ad_eval_ntupl)
+function RBParamOnlineStructure(ad::RBAffineDecomposition;kwargs...)
+  ad_eval = eval_affine_decomposition(ad)
+  RBParamOnlineStructure(ad,ad_eval;kwargs...)
 end
 
 function RBParamOnlineStructure(
@@ -70,15 +63,8 @@ function rb_online_product(
   Matrix(reshape(bc,nr,:))
 end
 
-function rb_online_product(basis,coeff::NTuple{2,T};kwargs...) where T
-  Broadcasting(c->rb_online_product(basis,c;kwargs...))(coeff)
-end
-
-function rb_online_product(basis::NTuple{2,T},coeff;kwargs...) where T
-  Broadcasting(b->rb_online_product(b,coeff;kwargs...))(basis)
-end
-
 get_op(param_os::RBParamOnlineStructure) = param_os.op
+
 get_id(param_os::RBParamOnlineStructure) = get_id(get_op(param_os))
 
 function get_op(

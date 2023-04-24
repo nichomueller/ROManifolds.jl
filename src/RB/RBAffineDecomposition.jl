@@ -101,15 +101,8 @@ get_affine_decomposition(ad::RBAffineDecomposition) = ad.affine_decomposition
 
 get_id(ad::RBAffineDecomposition) = get_id(get_op(ad))
 
-function eval_affine_decomposition(ad::Tuple)
-  eval_affine_decomposition.(expand(ad))
-end
-
 function eval_affine_decomposition(ad::RBAffineDecomposition)
   op = get_op(ad)
-  id = get_id(op)
-  printstyled("Evaluating the RB offline quantity for $id \n";color=:blue)
-
   eval_affine_decomposition(op,ad)
 end
 
@@ -129,26 +122,20 @@ function eval_affine_decomposition(
 end
 
 function eval_affine_decomposition(
-  ::RBUnsteadyVariable,
+  op::RBUnsteadyVariable,
   ad::RBAffineDecomposition{Affine,Ttr,Matrix{Float}}) where Ttr
 
-  op = get_op(ad)
   ns_row = get_ns(get_rbspace_row(op))
-
-  ad = get_affine_decomposition(ad)
-  blocks(ad,ns_row)
+  blocks(get_affine_decomposition(ad),ns_row)
 end
 
 function eval_affine_decomposition(
-  ::RBUnsteadyVariable,
+  op::RBUnsteadyVariable,
   ad::RBAffineDecomposition)
 
-  op = get_op(ad)
   ns_row = get_ns(get_rbspace_row(op))
-
   mdeim = get_affine_decomposition(ad)
-  ad = get_basis_space(mdeim)
-  blocks(ad,ns_row)
+  blocks(get_basis_space(mdeim),ns_row)
 end
 
 function save(info::RBInfo,ad::RBAffineDecomposition)
@@ -212,7 +199,7 @@ function load(
   printstyled("Loading projected Affine variable $id \n";color=:blue)
   path_id = joinpath(info.offline_path,"$id")
 
-  ad = load(joinpath(path_id,"basis_space"))::Matrix{Float}
+  ad = load(joinpath(path_id,"basis_space"))
   RBAffineDecomposition(op,ad)
 end
 
@@ -238,7 +225,7 @@ function load(
   printstyled("Loading projected Affine variable $id \n";color=:blue)
   path_id = joinpath(info.offline_path,"$id")
 
-  ad = load(joinpath(path_id,"basis_space"))::Matrix{Float}
+  ad = load(joinpath(path_id,"basis_space"))
   RBAffineDecomposition(op,ad)
 end
 
@@ -271,7 +258,7 @@ function load(
   path_id = joinpath(info.offline_path,"$id")
   path_id_lift = joinpath(info.offline_path,"$(id)_lift")
 
-  ad = load(joinpath(path_id,"basis_space"))::Matrix{Float}
+  ad = load(joinpath(path_id,"basis_space"))
   op_lift = RBLiftVariable(op)
   ad_lift = load(path_id_lift,op,measures)
   RBAffineDecomposition(op,ad),RBAffineDecomposition(op_lift,ad_lift)

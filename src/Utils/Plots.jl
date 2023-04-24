@@ -10,8 +10,8 @@ struct PlotInfo{T}
 end
 
 function PlotInfo(
-  xval::AbstractArray{T},
-  yval::AbstractArray{T},
+  xval::AbstractMatrix{T},
+  yval::AbstractMatrix{T},
   title::String,
   path::String,
   label::Vector{String};

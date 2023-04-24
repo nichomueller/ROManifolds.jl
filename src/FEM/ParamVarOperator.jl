@@ -229,11 +229,11 @@ function assemble_affine_quantity(fefun::Function,test::FESpace,args...)
 end
 
 function assemble_affine_quantity(fefun::Function,test::FESpace,trial::ParamTrialFESpace,μ::Param,args...)
-  assemble_matrix(fefun(x->1),test,trial(μ))
+  assemble_matrix(fefun(x->1),trial(μ),test)
 end
 
 function assemble_affine_quantity(fefun::Function,test::FESpace,trial::ParamTransientTrialFESpace,μ::Param,t::Real)
-  assemble_matrix(fefun(x->1),test,trial(μ,t))
+  assemble_matrix(fefun(x->1),trial(μ,t),test)
 end
 
 function get_dirichlet_function(::Val,trial::ParamTrialFESpace)

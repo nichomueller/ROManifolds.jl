@@ -1,6 +1,6 @@
 struct DistributedAssembler
+  op::ParamOperator
   assembler::Function
-  allocated_snap::Matrix{Float}
   findnz_idx::Vector{Int}
 end
 
@@ -8,17 +8,16 @@ function DistributedAssembler(op::ParamOperator,args...)
   initial_assembler = setup_assembler(op,args...)
   findnz_idx = get_findnz_idx(initial_assembler(1))
   assembler = setup_assembler(op,args...;findnz_idx)
-  allocated_snap = assembler(1)
-  DistributedAssembler(assembler,allocated_snap,findnz_idx)
+  DistributedAssembler(op,assembler,findnz_idx)
 end
 
 get_assembler(::ParamOperator,args...) = assemble_vectors
 
 get_assembler(::ParamBilinOperator,::Nothing) = assemble_matrices
 
-get_assembler(da::DistributedAssembler) = da.assembler
+get_op(da::DistributedAssembler) = da.op
 
-get_allocated_snap(da::DistributedAssembler) = da.allocated_snap
+get_assembler(da::DistributedAssembler) = da.assembler
 
 get_findnz_idx(da::DistributedAssembler) = da.findnz_idx
 
@@ -64,14 +63,20 @@ function setup_assembler(
 end
 
 function Gridap.evaluate(da::DistributedAssembler,idx::UnitRange{Int})
+  op = get_op(da)
+  id = get_id(op)
+  nsnap = length(idx)
+  printstyled("MDEIM: generating $nsnap snapshots for $id \n";color=:blue)
+
   assembler = get_assembler(da)
-  Nz,Nt = size(get_allocated_snap(da))
-  snaps = Elemental.zeros(EMatrix{Float},Nz,Nt)
   findnz_idx = get_findnz_idx(da)
+  Nz,Nt = length(findnz_idx),get_Nt(op)
+  snaps = Elemental.zeros(EMatrix{Float},Nz,Nt)
   @sync @distributed for k = idx
     copyto!(snaps[:,(k-1)*Nt+1:k*Nt],assembler(k))
   end
-  s = Snapshots(id,snaps,length(idx))
+  s = Snapshots(id,snaps,nsnap)
+
   s,findnz_idx
 end
 
@@ -97,7 +102,7 @@ end
 
 function assemble_vectors(
   op::ParamLinOperator,
-  ::Nothing;
+  args...;
   μ=realization(op),t=get_timesθ(op),u=nothing)::EMatrix{Float}
 
   assemble_vectors(unpack_for_assembly(op)...,μ,t,u)
@@ -180,7 +185,7 @@ function assemble_matrices(
   args...;
   μ=realization(op),t=get_timesθ(op),u=nothing)::Vector{SparseMatrixCSC{Float,Int}}
 
-  assemble_vectors(unpack_for_assembly(op)...,μ,t,u)
+  assemble_matrices(unpack_for_assembly(op)...,μ,t,u)
 end
 
 function assemble_matrices(

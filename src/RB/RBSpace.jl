@@ -3,25 +3,25 @@ abstract type RBSpace end
 struct RBSpaceSteady <: RBSpace
   id::Symbol
   basis_space::EMatrix{Float}
+end
 
-  function RBSpaceSteady(snaps::Snapshots;ϵ=1e-5,style=ReducedPOD())
-    id = get_id(snaps)
-    basis_space = rb_space(snaps;ϵ,style)
-    new(id,basis_space)
-  end
+function RBSpaceSteady(snaps::Snapshots;ϵ=1e-5,style=ReducedPOD())
+  id = get_id(snaps)
+  basis_space = rb_space(snaps;ϵ,style)
+  RBSpaceSteady(id,basis_space)
 end
 
 struct RBSpaceUnsteady <: RBSpace
   id::Symbol
   basis_space::Matrix{Float}
   basis_time::Matrix{Float}
+end
 
-  function RBSpaceUnsteady(snaps::Snapshots;ϵ=1e-5,style=ReducedPOD())
-    id = get_id(snaps)
-    basis_space = rb_space(snaps;ϵ,style)
-    basis_time = rb_time(snaps,basis_space;ϵ,style)
-    new(id,basis_space,basis_time)
-  end
+function RBSpaceUnsteady(snaps::Snapshots;ϵ=1e-5,style=ReducedPOD())
+  id = get_id(snaps)
+  basis_space = rb_space(snaps;ϵ,style)
+  basis_time = rb_time(snaps,basis_space;ϵ,style)
+  RBSpaceUnsteady(id,basis_space,basis_time)
 end
 
 get_id(rb::RBSpace) = rb.id
@@ -42,18 +42,19 @@ function save(info::RBInfo,rb::RBSpace)
   id = get_id(rb)
   path_id = joinpath(info.offline_path,"$id")
   create_dir!(path_id)
-  if info.save_offline
-    save(path_id,rb)
-  end
+  save(path_id,rb)
 end
 
 function save(path::String,rb::RBSpaceSteady)
-  save(joinpath(path,"basis_space"),rb.basis_space)
+  bs = Matrix(get_basis_space(rb))
+  save(joinpath(path,"basis_space"),bs)
 end
 
 function save(path::String,rb::RBSpaceUnsteady)
-  save(joinpath(path,"basis_space"),rb.basis_space)
-  save(joinpath(path,"basis_time"),rb.basis_time)
+  bs = Matrix(get_basis_space(rb))
+  bt = Matrix(get_basis_time(rb))
+  save(joinpath(path,"basis_space"),bs)
+  save(joinpath(path,"basis_time"),bt)
 end
 
 function load(info::RBInfoSteady,id::Symbol)
@@ -67,6 +68,11 @@ function load(info::RBInfoUnsteady,id::Symbol)
   basis_space = load(EMatrix{Float},joinpath(path_id,"basis_space"))
   basis_time = load(EMatrix{Float},joinpath(path_id,"basis_time"))
   RBSpaceUnsteady(id,basis_space,basis_time)
+end
+
+function load(info::RBInfo,ids::NTuple{N,Symbol}) where N
+  load_id(id::Symbol) = load(info,id)
+  load_id.(ids)
 end
 
 function rb_space_projection(rbrow::RBSpace,mat::AbstractArray)

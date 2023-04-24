@@ -56,13 +56,21 @@ function MDEIM(
 end
 
 get_rbspace(mdeim::MDEIM) = mdeim.rbspace
+
 get_red_lu_factors(mdeim::MDEIM) = mdeim.red_lu_factors
-get_id(mdeim::MDEIM) = get_id(mdeim.rbspace)
-get_basis_space(mdeim::MDEIM) = get_basis_space(mdeim.rbspace)
-get_basis_time(mdeim::MDEIMUnsteady) = get_basis_time(mdeim.rbspace)
+
+get_id(mdeim::MDEIM) = get_id(get_rbspace(mdeim))
+
+get_basis_space(mdeim::MDEIM) = get_basis_space(get_rbspace(mdeim))
+
+get_basis_time(mdeim::MDEIMUnsteady) = get_basis_time(get_rbspace(mdeim))
+
 get_idx_space(mdeim::MDEIMSteady) = mdeim.idx
+
 get_idx_space(mdeim::MDEIMUnsteady) = first(mdeim.idx)
+
 get_idx_time(mdeim::MDEIMUnsteady) = last(mdeim.idx)
+
 get_red_measure(mdeim::MDEIM) = mdeim.red_measure
 
 function project_mdeim_basis(
@@ -96,7 +104,7 @@ end
 
 function rb_space_projection(
   op::RBLinVariable,
-  basis_space::Matrix{Float},
+  basis_space::EMatrix{Float},
   args...)
 
   rbspace_row = get_rbspace_row(op)
@@ -106,7 +114,7 @@ end
 
 function rb_space_projection(
   op::RBBilinVariable,
-  basis_space::Matrix{Float},
+  basis_space::EMatrix{Float},
   findnz_idx::Vector{Int})
 
   sparse_basis_space = sparsevec(basis_space,findnz_idx)
@@ -137,15 +145,15 @@ function mdeim_idx(rbspace::RBSpaceUnsteady)
   idx_space,idx_time
 end
 
-function mdeim_idx(M::Matrix{Float})
+function mdeim_idx(M::EMatrix{Float})
   n = size(M)[2]
-  idx = Int[]
-  append!(idx,Int(argmax(abs.(M[:,1]))))
+  idx = zeros(Int,size(M,2))
+  idx[1] = Int(argmax(abs.(M[:,1])))
 
   @inbounds for i = 2:n
     res = (M[:,i] - M[:,1:i-1] *
       (M[idx[1:i-1],1:i-1] \ M[idx[1:i-1],i]))
-    append!(idx,Int(argmax(abs.(res))))
+    idx[i] = Int(argmax(abs.(res)))
   end
 
   unique(idx)
@@ -183,15 +191,15 @@ function get_red_lu_factors(
 end
 
 function get_red_lu_factors(
-  basis::Matrix{Float},
+  basis::EMatrix{Float},
   idx::Vector{Int})
 
   basis_idx = basis[idx,:]
-  lu(basis_idx)
+  lu(Matrix(basis_idx)) #lu(basis_idx)
 end
 
 function get_red_lu_factors(
-  basis::NTuple{2,Matrix{Float}},
+  basis::NTuple{2,EMatrix{Float}},
   idx::NTuple{2,Vector{Int}})
 
   bs,bt = basis
@@ -200,7 +208,7 @@ function get_red_lu_factors(
   bt_idx = bt[idx_time,:]
   bst_idx = kron(bt_idx,bs_idx)
 
-  lu(bst_idx)
+  lu(Matrix(bst_idx)) #lu(bst_idx)
 end
 
 recast_in_full_dim(idx_tmp::Vector{Int},findnz_idx::Vector{Int}) =
@@ -301,10 +309,10 @@ function load(
 
   basis_space = load(EMatrix{Float},joinpath(path,"basis_space"))
   rbspace = RBSpace(id,basis_space)
-  idx_space = Int.(load(joinpath(path,"idx_space"))[:,1])
+  idx_space = load(Vector{Int},joinpath(path,"idx_space"))
 
   factors = load(joinpath(path,"LU"))
-  ipiv = Int.(load(joinpath(path,"p"))[:,1])
+  ipiv = load(Vector{Int},joinpath(path,"p"))
   red_lu_factors = LU(factors,ipiv,0)
 
   red_measure = get_red_measure(op,idx_space,meas)
@@ -323,12 +331,12 @@ function load(
   basis_time = load(EMatrix{Float},joinpath(path,"basis_time"))
   rbspace = RBSpace(id,basis_space,basis_time)
 
-  idx_space = Int.(load(joinpath(path,"idx_space"))[:,1])
-  idx_time = Int.(load(joinpath(path,"idx_time"))[:,1])
+  idx_space = load(Vector{Int},joinpath(path,"idx_space"))
+  idx_time = load(Vector{Int},joinpath(path,"idx_time"))
   idx = (idx_space,idx_time)
 
   factors = load(joinpath(path,"LU"))
-  ipiv = Int.(load(joinpath(path,"p"))[:,1])
+  ipiv = load(Vector{Int},joinpath(path,"p"))
   red_lu_factors = LU(factors,ipiv,0)
 
   red_measure = get_red_measure(op,idx_space,meas)

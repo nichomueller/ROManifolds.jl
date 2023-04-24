@@ -3,24 +3,28 @@ function mdeim_basis(info::RBInfo,op::RBVariable,args...)
   mdeim_basis(Val(state),info,op,args...)
 end
 
-function mdeim_basis(::Val{false},info::RBInfoSteady,op::RBVariable,args...)
-  snaps,findnz_idx = fe_snapshots(op,args...)
-  bs = reduced_POD(snaps;ϵ=info.ϵ)
-  RBSpaceSteady(get_id(op),Matrix(bs)),findnz_idx
+function mdeim_basis(
+  ::Val{false},
+  info::RBInfoSteady,
+  op::RBVariable,
+  μ::Vector{Param},
+  args...)
+
+  da = DistributedAssembler(op,μ,args...)
+  snaps,findnz_idx = da(μ)
+  RBSpaceSteady(snaps;ϵ=info.ϵ,style=ReducedPOD()),findnz_idx
 end
 
-function mdeim_basis(::Val{false},info::RBInfoUnsteady,op::RBVariable,args...)
-  snaps,findnz_idx = fe_snapshots(op,args...)
-  bs = reduced_POD(snaps;ϵ=info.ϵ)
-  snaps2 = mode2_unfolding(bs'*snaps,info.mdeim_nsnap)
-  bt = reduced_POD(snaps2;ϵ=info.ϵ)
-  RBSpaceUnsteady(get_id(op),Matrix(bs),Matrix(bt)),findnz_idx
-end
+function mdeim_basis(
+  ::Val{false},
+  info::RBInfoUnsteady,
+  op::RBVariable,
+  μ::Vector{Param},
+  args...)
 
-function fe_snapshots(op::RBVariable,μ::Vector{Param},args...)
-  id = get_id(op)
-  printstyled("MDEIM: generating snapshots for $id \n";color=:blue)
-  assemble_dvecs(op,μ,args...)
+  da = DistributedAssembler(op,μ,args...)
+  snaps,findnz_idx = da(μ)
+  RBSpaceUnsteady(snaps;ϵ=info.ϵ,style=ReducedPOD()),findnz_idx
 end
 
 function mdeim_basis(
@@ -101,9 +105,9 @@ function reduce_param_function(
   op::RBUnsteadyVariable,
   vals::Matrix{Float})
 
-  param_bs = reduced_POD(vals)
+  param_bs = POD(vals)
   vals2 = mode2_unfolding(param_bs'*vals,Int(size(vals,2)/get_Nt(op)))
-  param_bt = reduced_POD(vals2)
+  param_bt = POD(vals2)
   param_bs,param_bt
 end
 
@@ -116,10 +120,10 @@ function reduce_param_function(
   ns = Int(size(free_vals,2)/Nt)
   free_vals = all_vals[1:Ns,:]
 
-  bs_all = reduced_POD(all_vals;ϵ=info.ϵ)
+  bs_all = POD(all_vals;ϵ=info.ϵ)
   bs_free = bs_all[1:Ns,:]
   s2 = mode2_unfolding(bs_free'*free_vals,ns)
-  bt_free = reduced_POD(s2;ϵ=info.ϵ)
+  bt_free = POD(s2;ϵ=info.ϵ)
 
   bs_all,bt_free
 end

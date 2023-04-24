@@ -69,8 +69,8 @@ isindef(info::RBInfo) = isindef(info.ptype)
 
 ispdomain(info::RBInfo) = ispdomain(info.ptype)
 
-function save(info::RBInfo,args::Tuple)
+function save(info::RBInfo,args...)
   if info.save_offline
-    Broadcasting(arg->save(info,arg))(expand(args))
+    Broadcasting(arg->save(info,arg))(args...)
   end
 end

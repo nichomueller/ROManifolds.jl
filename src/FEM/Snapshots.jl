@@ -29,6 +29,8 @@ Base.getindex(s::Snapshots,idx::Int) = getindex(s,idx:idx)
 
 get_id(s::Snapshots) = s.id
 
+get_id(s::NTuple{N,Snapshots}) where N = get_id.(s)
+
 get_snap(s::Snapshots) = s.snap
 
 get_nsnap(s::Snapshots) = s.nsnap
@@ -37,7 +39,10 @@ get_nsnap(v::AbstractVector) = length(v)
 
 get_nsnap(m::AbstractMatrix) = size(m,2)
 
-save(path::String,s::Snapshots) = save(joinpath(path,"$(s.id)"),s.snap)
+function save(path::String,s::Snapshots)
+  smat = Matrix(get_snap(s))
+  save(joinpath(path,"$(get_id(s))"),smat)
+end
 
 function load(path::String,id::Symbol,nsnap::Int)
   s = load(EMatrix{Float},joinpath(path,"$(id)"))

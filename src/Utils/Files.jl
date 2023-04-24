@@ -30,7 +30,7 @@ save(path::String,s) = serialize(correct_path(path),s)
 
 load(path::String) = deserialize(correct_path(path))::Matrix{Float}
 
-load(::T,path::String) where T = deserialize(correct_path(path))::T
+load(::Type{T},path::String) where T = convert(T,load(path))::T
 
 myisfile(path::String) = isfile(correct_path(path))
 
