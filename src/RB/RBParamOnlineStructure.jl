@@ -1,13 +1,10 @@
-struct RBParamOnlineStructure{Top}
-  op::Top
-  on_structure::Function
+struct RBParamOnlineStructure
+  op::RBVariable
+  assembler::Function
 end
 
-function RBParamOnlineStructure(
-  op::Top,
-  on_structure::Function) where Top
-
-  RBParamOnlineStructure{Top}(op,on_structure)
+function RBParamOnlineStructure(op::RBVariable,assembler::Function)
+  RBParamOnlineStructure(op,assembler)
 end
 
 function RBParamOnlineStructure(ad::RBAffineDecomposition;kwargs...)
@@ -23,10 +20,8 @@ function RBParamOnlineStructure(
   op = get_op(ad)
   basis = get_affine_decomposition(ad)
   coeff = compute_coefficient(op,basis;kwargs...)
-  param_on_structure(μ::Param) =
-    rb_online_product(ad_eval,coeff(μ);nr=get_nrows(op))
-
-  RBParamOnlineStructure(op,param_on_structure)
+  param_assembler(μ::Param) = rb_online_product(ad_eval,coeff(μ);nr=get_nrows(op))
+  RBParamOnlineStructure(op,param_assembler)
 end
 
 function RBParamOnlineStructure(
@@ -37,10 +32,8 @@ function RBParamOnlineStructure(
   op = get_op(ad)
   basis = get_affine_decomposition(ad)
   coeff = compute_coefficient(op,basis;kwargs...)
-  param_on_structure(μ::Param,z) =
-    rb_online_product(ad_eval,coeff(μ,z);nr=get_nrows(op))
-
-  RBParamOnlineStructure(op,param_on_structure)
+  param_assembler(μ::Param,z) = rb_online_product(ad_eval,coeff(μ,z);nr=get_nrows(op))
+  RBParamOnlineStructure(op,param_assembler)
 end
 
 function rb_online_product(
@@ -50,17 +43,17 @@ function rb_online_product(
 
   @assert size(basis,2) == length(coeff) "Something is wrong"
   bc = sum([basis[:,k]*coeff[k] for k=eachindex(coeff)])
-  Matrix(reshape(bc,nr,:))
+  reshape(bc,nr,:)
 end
 
 function rb_online_product(
-  basis::BlockMatrix{Float},
-  coeff::BlockMatrix{Float};
+  basis::Vector{Matrix{Float}},
+  coeff::Vector{Matrix{Float}};
   nr=size(first(basis),1)*size(first(coeff),1))
 
   @assert length(basis) == length(coeff) "Something is wrong"
   bc = sum([kron(basis[k],coeff[k]) for k=eachindex(coeff)])
-  Matrix(reshape(bc,nr,:))
+  reshape(bc,nr,:)
 end
 
 get_op(param_os::RBParamOnlineStructure) = param_os.op
@@ -71,16 +64,8 @@ function get_op(
   param_os::RBParamOnlineStructure,
   sym::Symbol)
 
-  get_id(param_os) == sym ? param_os.op : return
-end
-
-function get_op(
-  param_os::NTuple{N,RBParamOnlineStructure},
-  sym::Symbol) where N
-
-  ids = get_id.(param_os)
-  idx = findall(x -> x == sym,ids)
-  !isempty(idx) ? get_op(param_os[first(idx)],sym) : return
+  @assert get_id(param_os) == sym "Wrong operator"
+  get_op(param_os)
 end
 
 function get_op(
@@ -91,13 +76,13 @@ function get_op(
   filter(!isnothing,all_param_os)
 end
 
-get_online_structure(param_os::RBParamOnlineStructure) = param_os.on_structure
+get_online_structure(param_os::RBParamOnlineStructure) = param_os.assembler
 
-function get_on_structure(param_os::RBParamOnlineStructure,args...)
+function get_assembler(param_os::RBParamOnlineStructure,args...)
   get_online_structure(param_os)(args...)
 end
 
-function get_on_structure(
+function get_assembler(
   param_os::RBParamOnlineStructure{<:RBUnsteadyBilinVariable},
   args...)
 
@@ -113,36 +98,18 @@ function get_on_structure(
   end
 end
 
-function get_on_structure(
+function get_assembler(
   param_os::RBParamOnlineStructure{<:RBLiftVariable},
   args...)
 
   -get_online_structure(param_os)(args...)
 end
 
-function eval_on_structure(
-  param_os::RBParamOnlineStructure,
-  sym::Symbol,
-  args...)
-
-  get_id(param_os) == sym ? get_on_structure(param_os,args...) : return
-end
-
-function eval_on_structure(
-  param_os::NTuple{N,RBParamOnlineStructure},
-  sym::Symbol,
-  args...) where N
-
-  ids = get_id.(param_os)
-  idx = findall(x -> x == sym,ids)
-  !isempty(idx) ? eval_on_structure(param_os[first(idx)],sym,args...) : return
-end
-
-function eval_on_structure(
+function eval_assembler(
   param_os::NTuple{N1,RBParamOnlineStructure},
   syms::NTuple{N2,Symbol},
   args...) where {N1,N2}
 
-  all_param_os = Broadcasting(sym -> eval_on_structure(param_os,sym,args...))(syms)
+  all_param_os = Broadcasting(sym -> eval_assembler(param_os,sym,args...))(syms)
   filter(!isnothing,all_param_os)
 end

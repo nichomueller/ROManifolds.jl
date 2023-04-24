@@ -22,10 +22,17 @@ function compute_coefficient(
 
   fun = get_param_function(op)
   timesθ = get_timesθ(op)
-  coeff(μ::Param,tθ::Real) = fun(nothing,μ,tθ)[1]
-  coeff(μ::Param) = Matrix(Broadcasting(tθ -> coeff(μ,tθ))(timesθ))
-  coeff_bt(μ::Param) = coeff_by_time_bases(op,coeff(μ))
+  ns,nt = 1,length(timesθ)
+  coeff = zeros(ns,nt)
 
+  function coeff!(μ::Param)
+    @inbounds for (n,tn) in enumerate(timesθ)
+      coeff[:,n] = fun(nothing,μ,tn)[1]
+    end
+    coeff
+  end
+
+  coeff_bt(μ::Param) = coeff_by_time_bases(op,coeff(μ))
   coeff_bt
 end
 
@@ -69,7 +76,7 @@ function compute_coefficient(
   ::Val{true})
 
   spacetime_vector(fun::Function,::Val{false}) = μ -> fun(μ)[:]
-  spacetime_vector(fun::Function,::Val{true}) = (μ,u) -> fun(μ,u)[:]
+  spacetime_vector(fun::Function,::Val{true}) = (μ,z) -> fun(μ,z)[:]
 
   nnl = isnonlinear(op)
 
@@ -104,9 +111,18 @@ function hyperred_structure(
   timesθ::Vector{<:Real})
 
   fun = get_param_fefunction(op)
-  V(μ::Param,tθ::Real) = assemble_vector(v->fun(μ,tθ,m,v),get_test(op))[idx_space]
-  V(μ::Param) = Matrix(Broadcasting(tθ -> V(μ,tθ))(timesθ))
-  V
+  test = get_test(op)
+  ns,nt = length(idx_space),length(timesθ)
+  V = zeros(ns,nt)
+
+  function V!(μ::Param)
+    @inbounds for (n,tn) in enumerate(timesθ)
+      V[:,n] = assemble_vector(v->fun(μ,tn,m,v),test(op))[idx_space]
+    end
+    V
+  end
+
+  V!
 end
 
 function hyperred_structure(
@@ -116,7 +132,7 @@ function hyperred_structure(
 
   fun = get_param_fefunction(op)
   M(μ::Param) = assemble_matrix((u,v)->fun(μ,m,u,v),get_trial(op)(μ),get_test(op))
-  μ -> Vector(M(μ)[:][idx_space])
+  μ -> get_findnz_vals(M(μ),idx_space)
 end
 
 function hyperred_structure(
@@ -126,10 +142,20 @@ function hyperred_structure(
   timesθ::Vector{<:Real}) where Ttr
 
   fun = get_param_fefunction(op)
-  M(μ::Param,tθ::Real) = assemble_matrix((u,v)->fun(μ,tθ,m,u,v),get_trial(op)(μ,tθ),get_test(op))
-  Midx(μ::Param,tθ::Real) = Vector(M(μ,tθ)[:][idx_space])
-  Midx(μ::Param) = Matrix(Broadcasting(tθ -> Midx(μ,tθ))(timesθ))
-  Midx
+  trial = get_trial(op)
+  test = get_test(op)
+  ns,nt = length(idx_space),length(timesθ)
+  M = zeros(ns,nt)
+
+  function M!(μ::Param)
+    @inbounds for (n,tn) in enumerate(timesθ)
+      Mtemp = assemble_matrix((u,v)->fun(μ,tn,m,u,v),trial(op)(μ,tn),test(op))
+      M[:,n] = get_findnz_vals(Mtemp,idx_space)
+    end
+    M
+  end
+
+  M!
 end
 
 function hyperred_structure(
@@ -151,11 +177,19 @@ function hyperred_structure(
   timesθ::Vector{<:Real})
 
   fun = get_param_fefunction(op)
+  test = get_test(op)
   dir(μ::Param,tθ::Real) = get_dirichlet_function(op)(μ,tθ)
-  lift(μ::Param,tθ::Real) = assemble_vector(v->fun(μ,tθ,m,dir(μ,tθ),v),get_test(op))[idx_space]
-  lift(μ::Param) = Matrix(Broadcasting(tθ -> lift(μ,tθ))(timesθ))
+  ns,nt = length(idx_space),length(timesθ)
+  lift = zeros(ns,nt)
 
-  lift
+  function lift!(μ::Param)
+    @inbounds for (n,tn) in enumerate(timesθ)
+      lift[:,n] = assemble_vector(v->fun(μ,tn,m,dir(μ,tn),v),test)[idx_space]
+    end
+    lift
+  end
+
+  lift!
 end
 
 function hyperred_structure(
@@ -168,7 +202,7 @@ function hyperred_structure(
   test = get_test(op)
 
   M(μ::Param,z) = assemble_matrix((u,v)->fun(m,z,u,v),trial(μ),test)
-  (μ::Param,z) -> Vector(M(μ,z)[:][idx_space])
+  (μ::Param,z) -> get_findnz_vals(M(μ,z),idx_space)
 end
 
 function hyperred_structure(
@@ -180,11 +214,18 @@ function hyperred_structure(
   fun = get_param_fefunction(op)
   trial = get_trial(op)
   test = get_test(op)
+  ns,nt = length(idx_space),length(timesθ)
+  M = zeros(ns,nt)
 
-  M(μ::Param,tθ::Real,z) = assemble_matrix((u,v)->fun(m,z(tθ),u,v),trial(μ,tθ),test)
-  Midx(μ::Param,tθ::Real,z) = Vector(M(μ,tθ,z)[:][idx_space])
-  Midx(μ::Param,z) = Matrix(Broadcasting(tθ -> Midx(μ,tθ,z))(timesθ))
-  Midx
+  function M!(μ::Param,z)
+    @inbounds for (n,tn) in enumerate(timesθ)
+      Mtemp = assemble_matrix((u,v)->fun(m,z(tn),u,v),trial(μ,tn),test)
+      M[:,n] = get_findnz_vals(Mtemp,idx_space)
+    end
+    M
+  end
+
+  M!
 end
 
 function hyperred_structure(
@@ -193,8 +234,9 @@ function hyperred_structure(
   idx_space::Vector{Int})
 
   fun = get_param_fefunction(op)
+  test = get_test(op)
   dir(μ::Param) = get_dirichlet_function(op)(μ)
-  lift(μ::Param) = assemble_vector(v->fun(m,z,dir(μ),v),get_test(op))[idx_space]
+  lift(μ::Param) = assemble_vector(v->fun(m,z,dir(μ),v),test)[idx_space]
 
   lift
 end
@@ -206,11 +248,19 @@ function hyperred_structure(
   timesθ::Vector{<:Real})
 
   fun = get_param_fefunction(op)
+  test = get_test(op)
   dir(μ::Param,tθ::Real) = get_dirichlet_function(op)(μ,tθ)
-  lift(μ::Param,tθ::Real,z) = assemble_vector(v->fun(m,z(tθ),dir(μ,tθ),v),get_test(op))[idx_space]
-  lift(μ::Param,z) = Matrix(Broadcasting(tθ -> lift(μ,tθ,z))(timesθ))
+  ns,nt = length(idx_space),length(timesθ)
+  lift = zeros(ns,nt)
 
-  lift
+  function lift!(μ::Param,z)
+    @inbounds for (n,tn) in enumerate(timesθ)
+      lift[:,n] = assemble_vector(v->fun(m,z(tn),dir(μ,tn),v),test)[idx_space]
+    end
+    lift
+  end
+
+  lift!
 end
 
 function solve_lu(A::Vector{Float},lu::LU)
@@ -252,15 +302,20 @@ end
 
 function interp_coeff_time(
   mdeim::MDEIMUnsteady,
-  coeff::AbstractVector)
+  coeff::Vector{Float})
 
   bs = get_basis_space(mdeim)
   bt = get_basis_time(mdeim)
   Qs = size(bs,2)
   Qt = size(bt,2)
-  sorted_idx(qs) = [(i-1)*Qs+qs for i=1:Qt]
-  bt_times_coeff(qs) = bt*coeff[sorted_idx(qs)]
-  Matrix(bt_times_coeff.(1:Qs))
+  sorted_idx(qs) = [(i-1)*Qs+qs for i = 1:Qt]
+
+  interp_coeff = zeros(Qt,Qs)
+  @inbounds for qs = 1:Qs
+    interp_coeff[:,qs] = bt*coeff[sorted_idx(qs)]
+  end
+
+  interp_coeff
 end
 
 function interp_coeff_time(

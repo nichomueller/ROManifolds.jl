@@ -211,12 +211,12 @@ function assemble_matrices(
   end
 end
 
-function get_findnz_vals(arr::Matrix{Float},findnz_idx::Vector{Int})
-  EMatrix(selectdim(arr,1,findnz_idx))
-end
+function get_findnz_vals(
+  ::EMatrix,
+  arr::AbstractMatrix{Float},
+  findnz_idx::Vector{Int})
 
-function get_findnz_vals(mat::SparseMatrixCSC{Float,Int},findnz_idx::Vector{Int})
-  EMatrix(mat[:][findnz_idx])
+  EMatrix(get_findnz_vals(arr,findnz_idx))
 end
 
 function get_findnz_vals(

@@ -151,10 +151,11 @@ function generate_fe_snapshots(
   fepath::String;
   save_snap=true) where T
 
+  ns = length(sol)
   time = @elapsed begin
     uh,μ = collect_solutions(sol)
   end
-  usnap = Snapshots(:u,uh)
+  usnap = Snapshots(:u,uh,ns)
   if save_snap
     save.((fepath,fepath),(usnap,μ))
     save(joinpath(fepath,"fe_time"),Dict("FE time"=>time))
@@ -168,12 +169,12 @@ function generate_fe_snapshots(
   fepath::String;
   save_snap=true) where T
 
-  Ns = get_Ns(sol)
+  Ns,ns = get_Ns(sol),length(sol)
   time = @elapsed begin
     xh,μ = collect_solutions(sol)
   end
   uh,ph = xh[1:Ns[1],:],xh[Ns[1]+1:Ns[1]+Ns[2],:]
-  usnap,psnap = Snapshots(:u,uh),Snapshots(:p,ph)
+  usnap,psnap = Snapshots(:u,uh,ns),Snapshots(:p,ph,ns)
   if save_snap
     save.((fepath,fepath,fepath),(usnap,psnap,μ))
     save(joinpath(fepath,"fe_time"),Dict("FE time"=>time))

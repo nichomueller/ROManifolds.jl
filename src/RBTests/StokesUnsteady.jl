@@ -13,7 +13,7 @@ function stokes_unsteady()
   pdomain = false
   ptype = ProblemType(steady,indef,pdomain)
 
-  mesh = "flow_3cyl2D.json"
+  mesh = "flow_3cyl2D_coarse.json"
   test_path = "$root/tests/stokes/unsteady/$mesh"
   bnd_info = Dict("dirichlet0" => ["noslip"],"dirichlet" => ["inlet"],"neumann" => ["outlet"])
   order = 2
@@ -100,17 +100,18 @@ function stokes_unsteady()
   end
   ad = (Arb,Brb,BTrb,Mrb,Frb,Hrb)
 
-  Aon = RBParamOnlineStructure(Arb;st_mdeim=info.st_mdeim)
-  Bon = RBAffineDecomposition(Brb;st_mdeim=info.st_mdeim)
-  BTon = RBAffineDecomposition(BTrb;st_mdeim=info.st_mdeim)
-  Mon = RBAffineDecomposition(Mon;st_mdeim=info.st_mdeim)
-  Fon = RBAffineDecomposition(Fon;st_mdeim=info.st_mdeim)
-  Hon = RBAffineDecomposition(Hon;st_mdeim=info.st_mdeim)
-  param_on_structures = (Aon,Bon,BTon,Mon,Fon,Hon)
-
   save(info,(rbspace,ad))
 
   printstyled("Online phase, reduced basis method\n";color=:red)
+
+  μon = μ[info.online_snaps]
+  Aon = RBParamOnlineStructure(Arb,μon;st_mdeim=info.st_mdeim)
+  Bon = RBParamOnlineStructure(Brb,μon;st_mdeim=info.st_mdeim)
+  BTon = RBParamOnlineStructure(BTrb,μon;st_mdeim=info.st_mdeim)
+  Mon = RBParamOnlineStructure(Mon,μon;st_mdeim=info.st_mdeim)
+  Fon = RBParamOnlineStructure(Fon,μon;st_mdeim=info.st_mdeim)
+  Hon = RBParamOnlineStructure(Hon,μon;st_mdeim=info.st_mdeim)
+  param_on_structures = (Aon,Bon,BTon,Mon,Fon,Hon)
 
   function online_loop(k::Int)
     printstyled("-------------------------------------------------------------\n")

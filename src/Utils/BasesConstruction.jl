@@ -1,9 +1,10 @@
 get_Nt(S::AbstractMatrix,ns::Int) = Int(size(S,2)/ns)
 
 function mode2_unfolding(S::AbstractMatrix{Float},ns::Int)
-  mode2 = Elemental.zeros(EMatrix{Float},get_Nt(S,ns),size(S,1)*ns)
+  Ns,Nt = size(S,1),get_Nt(S,ns)
+  mode2 = allocate_matrix(S,Nt,Ns*ns)
   @inbounds for k = 1:ns
-    copyto!(view(mode2,:,(k-1)*Ns+1:k*Ns),S[:,(k-1)*Nt+1:k*Nt]',ns)
+    copyto!(view(mode2,:,(k-1)*Ns+1:k*Ns),S[:,(k-1)*Nt+1:k*Nt]')
   end
   return mode2
 end
@@ -61,39 +62,42 @@ function truncation(Σ::AbstractArray,ϵ::Real)
   n
 end
 
-function projection(vnew::AbstractVector,v::AbstractVector;X=nothing)
-  isnothing(X) ? projection(vnew,v,I(length(v))) : projection(vnew,v,X)
+function projection(
+  vnew::AbstractArray{Float},
+  basis::AbstractMatrix{Float};
+  X=nothing)
+
+  proj(v) = isnothing(X) ? v*sum(vnew'*v) : v*sum(vnew'*X*v)
+  proj_mat = allocate_matrix(basis,length(vnew),1)
+  copyto!(proj_mat,sum([proj(basis[:,i]) for i = axes(basis,2)]))
+  proj_mat
 end
 
-function projection(vnew::AbstractArray,v::AbstractArray,X::AbstractMatrix)
-  v*(vnew'*X*v)
-end
+function orth_projection(
+  vnew::AbstractArray{Float},
+  basis::AbstractMatrix{Float};
+  X=nothing)
 
-function projection(vnew::AbstractArray,basis::AbstractMatrix;X=nothing)
-  sum([projection(vnew,basis[:,i];X) for i=axes(basis,2)])
-end
-
-function orth_projection(vnew::AbstractArray,v::AbstractArray;X=nothing)
-  isnothing(X) ? orth_projection(vnew,v,I(length(v))) : orth_projection(vnew,v,X)
-end
-
-function orth_projection(vnew::AbstractArray,v::AbstractArray,X::AbstractMatrix)
-  projection(vnew,v,X)/(v'*X*v)
-end
-
-function orth_projection(vnew::AbstractArray,basis::AbstractMatrix;X=nothing)
-  sum([orth_projection(vnew,basis[:,i];X) for i=axes(basis,2)])
+  proj(v) = isnothing(X) ? v*sum(vnew'*v)/sum(v'*v) : v*sum(vnew'*X*v)/sum(v'*X*v)
+  proj_mat = allocate_matrix(basis,length(vnew),1)
+  copyto!(proj_mat,sum([proj(basis[:,i]) for i = axes(basis,2)]))
+  proj_mat
 end
 
 function orth_complement(
-  v::AbstractArray,
-  basis::AbstractMatrix;
+  v::AbstractArray{Float},
+  basis::AbstractMatrix{Float};
   kwargs...)
 
-  v - orth_projection(v,basis;kwargs...)
+  compl = allocate_matrix(basis,length(v),1)
+  copyto!(compl,v - orth_projection(v,basis;kwargs...))
 end
 
-function gram_schmidt(mat::AbstractMatrix,basis::AbstractMatrix;kwargs...)
+function gram_schmidt(
+  mat::AbstractMatrix{Float},
+  basis::AbstractMatrix{Float};
+  kwargs...)
+
   for i = axes(mat,2)
     mat_i = mat[:,i]
     mat_i = orth_complement(mat_i,basis;kwargs...)

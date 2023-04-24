@@ -27,9 +27,15 @@ LinearAlgebra.Matrix(dmat::EMatrix{T}) where T = convert(Matrix{T},dmat)
 
 EMatrix(mat::Matrix{T}) where T = convert(EMatrix{T},mat)
 
-const Block{T} = Vector{T} where T
+function allocate_matrix(::Matrix{Float},sizes...)
+  Nr,Nc = sizes
+  zeros(Nr,Nc)
+end
 
-const BlockMatrix{T} = Block{Matrix{T}} where T
+function allocate_matrix(::EMatrix{Float},sizes...)
+  Nr,Nc = sizes
+  Elemental.zeros(EMatrix{Float},Nr,Nc)
+end
 
 function blocks(mat::Matrix{T},nrow::Int) where T
   blocks(mat,size(mat,2);dims=(nrow,:))
@@ -143,6 +149,14 @@ function SparseArrays.findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
   nz = findall(v -> abs.(v) .>= eps(), V)
 
   (I[nz], V[nz])
+end
+
+function get_findnz_vals(arr::Matrix{Float},findnz_idx::Vector{Int})
+  selectdim(arr,1,findnz_idx)
+end
+
+function get_findnz_vals(mat::SparseMatrixCSC{Float,Int},findnz_idx::Vector{Int})
+  mat[:][findnz_idx]
 end
 
 Base.getindex(emat::EMatrix{Float},::Colon,k::Int) = emat[:,k:k]

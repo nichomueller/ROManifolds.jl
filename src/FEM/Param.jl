@@ -37,7 +37,7 @@ realization(P::ParamSpace,n) = Vector{Param}([realization(P) for _ = 1:n])
 
 Base.getindex(p::Param,args...) = getindex(p.μ,args...)
 
-Base.Matrix(pvec::Vector{Param}) = Matrix{Float}(reduce(vcat,transpose.(getproperty.(pvec,:μ)))')
+LinearAlgebra.Matrix(pvec::Vector{Param}) = Matrix{Float}(reduce(vcat,transpose.(getproperty.(pvec,:μ)))')
 
 Distributions.var(p::Param) = var(get_μ(p))
 

@@ -80,7 +80,7 @@ end
 
 function rb_time(
   snap::Snapshots,
-  basis_space::EMatrix{Float};
+  basis_space::AbstractMatrix{Float};
   kwargs...)
 
   s1 = get_snap(snap)
@@ -91,7 +91,7 @@ end
 
 function add_space_supremizers(
   ::Val{false},
-  basis::NTuple{2,EMatrix{Float}},
+  basis::NTuple{2,AbstractMatrix{Float}},
   args...)
 
   first(basis)
@@ -99,7 +99,7 @@ end
 
 function add_space_supremizers(
   ::Val{true},
-  basis::NTuple{2,EMatrix{Float}},
+  basis::NTuple{2,AbstractMatrix{Float}},
   opB::ParamBilinOperator)
 
   basis_u, = basis
@@ -108,7 +108,7 @@ function add_space_supremizers(
 end
 
 function space_supremizers(
-  basis::NTuple{2,EMatrix{Float}},
+  basis::NTuple{2,AbstractMatrix{Float}},
   opB::ParamBilinOperator)
 
   printstyled("Computing primal supremizers\n";color=:blue)
@@ -120,7 +120,7 @@ end
 
 function assemble_constraint_matrix(
   opB::ParamBilinOperator{Affine,Ttr},
-  basis_p::EMatrix{Float}) where Ttr
+  basis_p::AbstractMatrix{Float}) where Ttr
 
   @assert opB.id == :B
   printstyled("Fetching supremizing operator Bᵀ\n";color=:blue)
@@ -131,7 +131,7 @@ end
 
 function assemble_constraint_matrix(
   ::ParamBilinOperator,
-  ::EMatrix{Float},
+  ::AbstractMatrix{Float},
   ::Snapshots)
 
   error("Implement this")
@@ -139,7 +139,7 @@ end
 
 function add_time_supremizers(
   ::Val{false},
-  basis::NTuple{2,EMatrix{Float}},
+  basis::NTuple{2,AbstractMatrix{Float}},
   args...)
 
   first(basis)
@@ -147,7 +147,7 @@ end
 
 function add_time_supremizers(
   ::Val{true},
-  basis::NTuple{2,EMatrix{Float}},
+  basis::NTuple{2,AbstractMatrix{Float}},
   ttol=1e-2)
 
   printstyled("Checking if supremizers in time need to be added\n";color=:blue)
@@ -155,7 +155,11 @@ function add_time_supremizers(
   basis_u,basis_p = basis
   basis_up = basis_u'*basis_p
 
-  function enrich(basis_u::EMatrix{Float},basis_up::EMatrix{Float},v::Vector)
+  function enrich(
+    basis_u::AbstractMatrix{Float},
+    basis_up::AbstractMatrix{Float},
+    v::AbstractArray{Float})
+
     vnew = orth_complement(v,basis_u)
     vnew /= norm(vnew)
     hcat(basis_u,vnew),vcat(basis_up,vnew'*basis_p)
