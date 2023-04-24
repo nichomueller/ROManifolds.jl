@@ -33,6 +33,8 @@ get_μ(p::Param) = p.μ
 
 realization(P::ParamSpace) = Param(generate_param(P))
 
+realization(P::ParamSpace,n) = Vector{Param}([realization(P) for _ = 1:n])
+
 Base.getindex(p::Param,args...) = getindex(p.μ,args...)
 
 Base.Matrix(pvec::Vector{Param}) = Matrix{Float}(reduce(vcat,transpose.(getproperty.(pvec,:μ)))')
@@ -41,18 +43,12 @@ Distributions.var(p::Param) = var(get_μ(p))
 
 Base.:(-)(p1::Param,p2::Param) = get_μ(p1) .- get_μ(p2)
 
-struct ParamVecs
-  pvec::Vector{Param}
-end
-
-realization(P::ParamSpace,n) = ParamVecs([realization(P) for _ = 1:n])
-
 save(path::String,pvec::Vector{Param}) = save(joinpath(path,"param"),Matrix(pvec))
 
-function load_param(::Type{ParamVecs},path::String)
+function load(::Type{Vector{Param}},path::String)
   param_mat = load(joinpath(path,"param"))
   param_block = vblocks(param_mat)
-  ParamVecs(Param.(param_block))
+  Vector{Param}(Param.(param_block))
 end
 
 abstract type ProblemMeasures end

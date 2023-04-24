@@ -20,11 +20,17 @@ function create_dir!(path::String)
   return
 end
 
-correct_path(path::String) = path*".csv"
+correct_path(path::String) = path*".txt"
 
-save(path::String,s) = writedlm(correct_path(path),s, ','; header=false)
+# save(path::String,s) = writedlm(correct_path(path),s, ','; header=false)
 
-load(path::String) = readdlm(correct_path(path), ',')
+# load(path::String) = readdlm(correct_path(path), ',')
+
+save(path::String,s) = serialize(correct_path(path),s)
+
+load(path::String) = deserialize(correct_path(path))::Matrix{Float}
+
+load(::T,path::String) where T = deserialize(correct_path(path))::T
 
 myisfile(path::String) = isfile(correct_path(path))
 

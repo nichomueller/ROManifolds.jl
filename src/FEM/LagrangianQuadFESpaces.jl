@@ -135,7 +135,7 @@ function get_phys_quad_points(test::SingleFieldFESpace)
   nquadp = ncells*nquad_cell
   dim = get_dimension(op)
   quadp = zeros(VectorValue{dim,Float},nquadp)
-  for (i,quadpi) = enumerate(lazy_quadp)
+  @inbounds for (i,quadpi) = enumerate(lazy_quadp)
     quadp[(i-1)*nquad_cell+1:i*nquad_cell] = quadpi
   end
 

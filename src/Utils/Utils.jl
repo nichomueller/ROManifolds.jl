@@ -8,7 +8,9 @@ using SparseArrays
 using Arpack
 using Elemental
 using DelimitedFiles
-using PartitionedArrays,SharedArrays
+using Serialization
+using PartitionedArrays
+using SharedArrays
 using Test
 using PlotlyJS
 using ForwardDiff
@@ -57,7 +59,7 @@ import Gridap.ODEs.TransientFETools:jacobians!
 import LineSearches:BackTracking
 
 const Float = Float64
-const EMatrix = Elemental.DistMatrix
+const EMatrix = Elemental.Matrix
 
 include("Files.jl")
 include("Indexes.jl")

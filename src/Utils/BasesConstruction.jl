@@ -1,19 +1,20 @@
 get_Nt(S::AbstractMatrix,ns::Int) = Int(size(S,2)/ns)
 
-function mode2_unfolding(S::DistMatrix{Float},ns::Int)
-  mode2 = mode2_unfolding(Matrix(S),ns)
-  DistMatrix(mode2)
-end
-
-function mode2_unfolding(S::Matrix{Float},ns::Int)
-  mode2 = Matrix{Float}(undef,get_Nt(S,ns),size(S,1)*ns)
+function mode2_unfolding(S::AbstractMatrix{Float},ns::Int)
+  mode2 = Elemental.zeros(EMatrix{Float},get_Nt(S,ns),size(S,1)*ns)
   @inbounds for k = 1:ns
     copyto!(view(mode2,:,(k-1)*Ns+1:k*Ns),S[:,(k-1)*Nt+1:k*Nt]',ns)
   end
   return mode2
 end
 
-function POD(S::AbstractMatrix,X::SparseMatrixCSC;ϵ=1e-5)
+abstract type PODStyle end
+struct DefaultPOD end
+struct ReducedPOD end
+
+POD(S::AbstractMatrix,args...;ϵ=1e-5,style=ReducedPOD()) = POD(style,S,args...;ϵ)
+
+function POD(::DefaultPOD,S::AbstractMatrix,X::SparseMatrixCSC;ϵ=1e-5)
   H = cholesky(X)
   L = sparse(H.L)
   U,Σ,_ = svd(L'*S[H.p,:])
@@ -21,13 +22,13 @@ function POD(S::AbstractMatrix,X::SparseMatrixCSC;ϵ=1e-5)
   Matrix((L'\U[:,1:n])[invperm(H.p),:])
 end
 
-function POD(S::AbstractMatrix;ϵ=1e-5)
+function POD(::DefaultPOD,S::AbstractMatrix;ϵ=1e-5)
   U,Σ,_ = svd(S)
   n = truncation(Σ,ϵ)
   U[:,1:n]
 end
 
-function reduced_POD(S::AbstractMatrix;ϵ=1e-5)
+function reduced_POD(::ReducedPOD,S::AbstractMatrix;ϵ=1e-5)
   reduced_POD(Val{size(S,1)>size(S,2)}(),S;ϵ)
 end
 
@@ -36,7 +37,11 @@ function reduced_POD(::Val{true},S::AbstractMatrix;ϵ=1e-5)
   _,_,V = svd(C)
   Σ = svdvals(S)
   n = truncation(Σ,ϵ)
-  correct_basis(S,V[:,1:n],Σ)
+  U = S*V[:,1:n]
+  for i = axes(U,2)
+    U[:,i] /= (Σ[i]+eps())
+  end
+  U
 end
 
 function reduced_POD(::Val{false},S::AbstractMatrix;ϵ=1e-5)
@@ -54,21 +59,6 @@ function truncation(Σ::Vector{Float},ϵ::Real)
   printstyled("Basis number obtained via POD is $n, projection error ≤ $err\n";
     color=:blue)
   n
-end
-
-truncation(Σ::DistMatrix{Float},ϵ::Real) = truncation(Matrix(Σ)[:],ϵ)
-
-function correct_basis(S::Matrix{Float},V::Matrix{Float},Σ::Vector{Float})
-  U = S*V
-  for i = axes(U,2)
-    U[:,i] /= (Σ[i]+eps())
-  end
-  U
-end
-
-function correct_basis(S::DistMatrix{Float},V::DistMatrix{Float},Σ::DistMatrix{Float})
-  basis = correct_basis(Matrix(S),Matrix(V),Matrix(Σ)[:])
-  DistMatrix(basis)
 end
 
 function projection(vnew::AbstractVector,v::AbstractVector;X=nothing)

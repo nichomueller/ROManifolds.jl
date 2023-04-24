@@ -178,27 +178,6 @@ get_findnz_idx(op::RBVariable;kwargs...) = get_findnz_idx(op.feop;kwargs...)
 
 get_inverse_findnz_idx(op::RBVariable;kwargs...) = get_inverse_findnz_idx(op.feop;kwargs...)
 
-function unfold_spacetime(
-  op::RBUnsteadyVariable,
-  vals::AbstractVector{T}) where T
-
-  Nt = get_Nt(op)
-  Ns = Int(size(vals,1)/Nt)
-
-  space_vals = Matrix{T}(reshape(vals,Ns,Nt))
-  time_vals = Matrix{T}(reshape(vals,Nt,Ns))
-  space_vals,time_vals
-end
-
-function unfold_spacetime(
-  op::RBUnsteadyVariable,
-  vals::AbstractMatrix{T}) where T
-
-  unfold_vec(k::Int) = unfold_spacetime(op,vals[:,k])
-  vals = Broadcasting(unfold_vec)(axes(vals,2))
-  Matrix(first.(vals)),Matrix(last.(vals))
-end
-
 function rb_space_projection(
   op::RBLinVariable,
   vec::AbstractArray)

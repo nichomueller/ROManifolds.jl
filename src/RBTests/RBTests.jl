@@ -1,5 +1,7 @@
+include("FunctionDefinitions.jl")
+
 function fem_path(tpath::String)
-  create_dir!(fepath)
+  create_dir!(tpath)
   fepath = joinpath(tpath,"fem")
   create_dir!(fepath)
   fepath
@@ -110,11 +112,11 @@ function fe_snapshots(
 end
 
 function load_fe_snapshots(::Val{false},fepath::String,nsnap::Int)
-  load_snap(fepath,:u,nsnap),load(ParamVecs,fepath)
+  load(fepath,:u,nsnap),load(Vector{Param},fepath)
 end
 
 function load_fe_snapshots(::Val{true},fepath::String,nsnap::Int)
-  load_snap(fepath,:u,nsnap),load_snap(fepath,:p,nsnap),load_param(ParamVecs,fepath)
+  load(fepath,:u,nsnap),load(fepath,:p,nsnap),load(Vector{Param},fepath)
 end
 
 function generate_fe_snapshots(
@@ -155,7 +157,7 @@ function generate_fe_snapshots(
   usnap = Snapshots(:u,uh)
   if save_snap
     save.((fepath,fepath),(usnap,μ))
-    save(fepath,Dict("FE time"=>time))
+    save(joinpath(fepath,"fe_time"),Dict("FE time"=>time))
   end
   usnap,μ
 end
@@ -174,7 +176,7 @@ function generate_fe_snapshots(
   usnap,psnap = Snapshots(:u,uh),Snapshots(:p,ph)
   if save_snap
     save.((fepath,fepath,fepath),(usnap,psnap,μ))
-    save(fepath,Dict("FE time"=>time))
+    save(joinpath(fepath,"fe_time"),Dict("FE time"=>time))
   end
   usnap,psnap,μ
 end
@@ -184,8 +186,9 @@ function collect_solutions(sol)
   Nt = get_Nt(first(sol))
   ns = length(sol)
 
-  x,μ = Matrix{Float}(undef,Ns,Nt*ns),Param[]
-  xtmp = Matrix{Float}(undef,Ns,Nt)
+  x = Elemental.zeros(EMatrix{Float},Ns,Nt*ns)
+  xtmp = Elemental.zeros(EMatrix{Float},Ns,Nt)
+  μ = Param[]
   @threads for k in eachindex(sol)
     printstyled("Collecting solution $k\n";color=:blue)
     copyto!(view(x,:,(k-1)*Nt+1:k*Nt),get_solution(xtmp,sol[k]))
@@ -195,15 +198,12 @@ function collect_solutions(sol)
   x,μ
 end
 
-function get_solution(x::SubArray{Float,2,Matrix{Float}},solk::ParamFESolution)
+function get_solution(x::EMatrix{Float},solk::ParamFESolution)
   x[:,1] = get_free_dof_values(solk.psol.uh)
   x
 end
 
-function get_solution(
-  x::SubArray{Float,2,Matrix{Float}},
-  solk::ParamTransientFESolution)
-
+function get_solution(x::EMatrix{Float},solk::ParamTransientFESolution)
   n = 1
   for (xn,tn) in solk
     printstyled("Time $tn\n";color=:blue)

@@ -148,7 +148,10 @@ function Gridap.FESpaces.solve(
   t0::Real,
   tF::Real)
 
-  Broadcasting(p -> ParamTransientFESolution(solver,op,p,u0,t0,tF))(μ)
+  # @distributed for p in μ
+  #   ParamTransientFESolution(solver,op,p,u0,t0,tF)
+  # end
+  [ParamTransientFESolution(solver,op,p,u0,t0,tF) for p = μ]
 end
 
 function Gridap.FESpaces.solve(

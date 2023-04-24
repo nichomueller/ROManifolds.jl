@@ -23,7 +23,7 @@ get_allocated_snap(da::DistributedAssembler) = da.allocated_snap
 get_findnz_idx(da::DistributedAssembler) = da.findnz_idx
 
 function setup_assembler(
-  op::RBVariable{Nonaffine,Ttr},
+  op::ParamOperator{Nonaffine,Ttr},
   μ::Vector{Param},
   args...;
   findnz_idx=nothing) where Ttr
@@ -33,7 +33,7 @@ function setup_assembler(
 end
 
 function setup_assembler(
-  op::RBVariable{Nonlinear,Ttr},
+  op::ParamOperator{Nonlinear,Ttr},
   μ::Vector{Param},
   uh::Snapshots;
   findnz_idx=nothing) where Ttr
@@ -44,7 +44,7 @@ function setup_assembler(
 end
 
 function setup_assembler(
-  op::RBBilinVariable{Nonaffine,Ttr},
+  op::ParamBilinOperator{Nonaffine,Ttr},
   μ::Vector{Param},
   fun::Function;
   findnz_idx=nothing) where Ttr
@@ -54,7 +54,7 @@ function setup_assembler(
 end
 
 function setup_assembler(
-  op::RBBilinVariable{Nonlinear,Ttr},
+  op::ParamBilinOperator{Nonlinear,Ttr},
   μ::Vector{Param},
   fun::Function;
   findnz_idx=nothing) where Ttr
@@ -63,17 +63,20 @@ function setup_assembler(
   k -> assembler(op,findnz_idx;μ=first(μ),u=fun(k),t=first(get_timesθ(op)))
 end
 
-function Gridap.evaluate(da::DistributedAssembler,k::Int)
+function Gridap.evaluate(da::DistributedAssembler,idx::UnitRange{Int})
   assembler = get_assembler(da)
-  snap = get_allocated_snap(da)
+  Nz,Nt = size(get_allocated_snap(da))
+  snaps = Elemental.zeros(EMatrix{Float},Nz,Nt)
   findnz_idx = get_findnz_idx(da)
-  copyto!(snap,assembler(k))
-  dist_snap = DistMatrix(dist_snap)
-  dist_snap,findnz_idx
+  @sync @distributed for k = idx
+    copyto!(snaps[:,(k-1)*Nt+1:k*Nt],assembler(k))
+  end
+  s = Snapshots(id,snaps,length(idx))
+  s,findnz_idx
 end
 
-function Gridap.evaluate(da::DistributedAssembler,k::UnitRange{Int})
-  println("TO DO...")
+function Gridap.evaluate(da::DistributedAssembler,μ::Vector{Param})
+  evaluate(da,eachindex(μ))
 end
 
 function unpack_for_assembly(op::ParamLinOperator)
@@ -95,7 +98,7 @@ end
 function assemble_vectors(
   op::ParamLinOperator,
   ::Nothing;
-  μ=realization(op),t=get_timesθ(op),u=nothing)::Matrix{Float}
+  μ=realization(op),t=get_timesθ(op),u=nothing)::EMatrix{Float}
 
   assemble_vectors(unpack_for_assembly(op)...,μ,t,u)
 end
@@ -103,7 +106,7 @@ end
 function assemble_vectors(
   op::ParamLinOperator,
   findnz_idx::Vector{Int};
-  μ=realization(op),t=get_timesθ(op),u=nothing)::Matrix{Float}
+  μ=realization(op),t=get_timesθ(op),u=nothing)::EMatrix{Float}
 
   vecs = assemble_vectors(unpack_for_assembly(op)...,μ,t,u)
   get_findnz_vals(vecs,findnz_idx)
@@ -115,11 +118,11 @@ function assemble_vectors(
   μ::Param,t,args...)
 
   if isnothing(t)
-    mat = Matrix(assemble_vector(fefun(μ),test))
+    mat = EMatrix(assemble_vector(fefun(μ),test))
   else
-    mat = Matrix{Float}(undef,get_Ns(test),length(t))
+    mat = EMatrix{Float}(undef,get_Ns(test),length(t))
     @inbounds for (n,tn) = enumerate(t)
-      copyto!(view(mat,:,n),assemble_vector(fefun(μ,tn),test))
+      copyto!(mat[:,n],assemble_vector(fefun(μ,tn),test))
     end
   end
 
@@ -135,14 +138,12 @@ function assemble_vectors(
   if isnothing(t)
 
     if isnothing(u)
-      mat = Matrix(assemble_vector(v->fefun(μ,dir(μ),v),test))
+      mat = EMatrix(assemble_vector(v->fefun(μ,dir(μ),v),test))
     else
-      mat = Matrix(assemble_vector(v->fefun(u,dir(μ),v),test))
+      mat = EMatrix(assemble_vector(v->fefun(u,dir(μ),v),test))
     end
 
   else
-
-    mat = Matrix{Float}(undef,get_Ns(test),length(t))
 
     function vec(tn::Real)
       if isnothing(u)
@@ -154,8 +155,9 @@ function assemble_vectors(
       end
     end
 
+    mat = EMatrix{Float}(undef,get_Ns(test),length(t))
     @inbounds for (n,tn) = enumerate(t)
-      copyto!(view(mat,:,n),vec(tn))
+      copyto!(mat[:,n],vec(tn))
     end
 
   end
@@ -205,11 +207,11 @@ function assemble_matrices(
 end
 
 function get_findnz_vals(arr::Matrix{Float},findnz_idx::Vector{Int})
-  Matrix(selectdim(arr,1,findnz_idx))
+  EMatrix(selectdim(arr,1,findnz_idx))
 end
 
 function get_findnz_vals(mat::SparseMatrixCSC{Float,Int},findnz_idx::Vector{Int})
-  Matrix(mat[:][findnz_idx])
+  EMatrix(mat[:][findnz_idx])
 end
 
 function get_findnz_vals(
@@ -217,14 +219,14 @@ function get_findnz_vals(
   findnz_idx::Vector{Int})
 
   nz,nvec = length(findnz_idx),length(vec)
-  mat = Matrix{Float}(undef,nz,nvec)
+  mat = EMatrix{Float}(undef,nz,nvec)
   @inbounds @simd for k = eachindex(vec)
-    copyto!(view(mat[:,k]),get_findnz_vals(vec[k],findnz_idx))
+    copyto!(mat[:,k],get_findnz_vals(vec[k],findnz_idx))
   end
   mat
 end
 
-function get_findnz_idx(mat::Matrix{Float})
+function get_findnz_idx(mat::EMatrix{Float})
   sum_cols = sum(mat,dims=2)[:]
   findall(x -> abs(x) ≥ eps(),sum_cols)
 end

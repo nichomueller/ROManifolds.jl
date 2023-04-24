@@ -6,7 +6,7 @@ using MPI,MPIClusterManagers,Distributed
 @everywhere include("$root/src/RBTests/RBTests.jl")
 
 function stokes_unsteady()
-  run_fem = false
+  run_fem = true
 
   steady = false
   indef = true
@@ -91,12 +91,12 @@ function stokes_unsteady()
   rbopH = RBVariable(opH,rbspace_u)
 
   tt.offline_time.assembly_time = @elapsed begin
-    Arb = RBAffineDecomposition(info,rbopA,μ,measures,:dΩ)
-    Brb = RBAffineDecomposition(info,rbopB,μ,measures,:dΩ)
-    BTrb = RBAffineDecomposition(info,rbopBT,μ,measures,:dΩ)
-    Mrb = RBAffineDecomposition(info,rbopM,μ,measures,:dΩ)
-    Frb = RBAffineDecomposition(info,rbopF,μ,measures,:dΩ)
-    Hrb = RBAffineDecomposition(info,rbopH,μ,measures,:dΓn)
+    Arb = RBAffineDecomposition(info,rbopA,measures,:dΩ,μ)
+    Brb = RBAffineDecomposition(info,rbopB,measures,:dΩ,μ)
+    BTrb = RBAffineDecomposition(info,rbopBT,measures,:dΩ,μ)
+    Mrb = RBAffineDecomposition(info,rbopM,measures,:dΩ,μ)
+    Frb = RBAffineDecomposition(info,rbopF,measures,:dΩ,μ)
+    Hrb = RBAffineDecomposition(info,rbopH,measures,:dΓn,μ)
   end
 
   ad = (Arb,Brb,BTrb,Mrb,Frb,Hrb)

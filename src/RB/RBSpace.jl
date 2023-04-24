@@ -2,83 +2,40 @@ abstract type RBSpace end
 
 struct RBSpaceSteady <: RBSpace
   id::Symbol
-  basis_space::Matrix{Float}
-end
+  basis_space::EMatrix{Float}
 
-function RBSpaceSteady(
-  id::NTuple{N,Symbol},
-  basis_space::NTuple{N,Matrix{Float}}) where N
-
-  RBSpaceSteady.(id,basis_space)
-end
-
-function RBSpaceSteady(
-  snaps::Snapshots;ϵ=1e-5)
-
-  id = get_id(snaps)
-  basis_space = POD(snaps;ϵ)
-  RBSpaceSteady(id,basis_space)
-end
-
-function RBSpaceSteady(
-  snaps::NTuple{N,Snapshots};ϵ=1e-5) where N
-  Broadcasting(s->RBSpaceSteady(s;ϵ))(snaps)
+  function RBSpaceSteady(snaps::Snapshots;ϵ=1e-5,style=ReducedPOD())
+    id = get_id(snaps)
+    basis_space = rb_space(snaps;ϵ,style)
+    new(id,basis_space)
+  end
 end
 
 struct RBSpaceUnsteady <: RBSpace
   id::Symbol
   basis_space::Matrix{Float}
   basis_time::Matrix{Float}
-end
 
-function RBSpaceUnsteady(
-  id::NTuple{N,Symbol},
-  basis_space::NTuple{N,Matrix{Float}},
-  basis_time::NTuple{N,Matrix{Float}}) where N
-
-  RBSpaceUnsteady.(id,basis_space,basis_time)
-end
-
-function RBSpaceUnsteady(
-  snaps::Snapshots;ϵ=1e-5)
-
-  id = get_id(snaps)
-  s,ns = get_snap(snaps),get_nsnap(snaps)
-  basis_space = POD(s;ϵ)
-  s2 = mode2_unfolding(basis_space'*s,ns)
-  basis_time = POD(s2;ϵ)
-  RBSpaceUnsteady(id,basis_space,basis_time)
-end
-
-function RBSpaceUnsteady(
-  snaps::NTuple{N,Snapshots};ϵ=1e-5) where N
-  Broadcasting(s->RBSpaceUnsteady(s;ϵ))(snaps)
-end
-
-function RBSpace(
-  id::Symbol,
-  basis_space::Matrix{Float})
-
-  RBSpaceSteady(id,basis_space)
-end
-
-function RBSpace(
-  id::Symbol,
-  basis_space::Matrix{Float},
-  basis_time::Matrix{Float})
-
-  RBSpaceUnsteady(id,basis_space,basis_time)
+  function RBSpaceUnsteady(snaps::Snapshots;ϵ=1e-5,style=ReducedPOD())
+    id = get_id(snaps)
+    basis_space = rb_space(snaps;ϵ,style)
+    basis_time = rb_time(snaps,basis_space;ϵ,style)
+    new(id,basis_space,basis_time)
+  end
 end
 
 get_id(rb::RBSpace) = rb.id
-get_id(rb::NTuple{N,RBSpace}) where N = get_id.(rb)
+
 get_basis_space(rb::RBSpace) = rb.basis_space
-get_basis_space(rb::NTuple{N,RBSpace}) where N = get_basis_space.(rb)
+
 get_basis_time(rb::RBSpaceUnsteady) = rb.basis_time
-get_basis_time(rb::NTuple{N,RBSpaceUnsteady}) where N = get_basis_time.(rb)
+
 get_Ns(rb::RBSpace) = size(rb.basis_space,1)
+
 get_ns(rb::RBSpace) = size(rb.basis_space,2)
+
 get_Nt(rb::RBSpaceUnsteady) = size(rb.basis_time,1)
+
 get_nt(rb::RBSpaceUnsteady) = size(rb.basis_time,2)
 
 function save(info::RBInfo,rb::RBSpace)
@@ -99,16 +56,16 @@ function save(path::String,rb::RBSpaceUnsteady)
   save(joinpath(path,"basis_time"),rb.basis_time)
 end
 
-function load_rb(info::RBInfoSteady,id::Symbol)
+function load(info::RBInfoSteady,id::Symbol)
   path_id = joinpath(info.offline_path,"$id")
-  basis_space = load(joinpath(path_id,"basis_space"))
+  basis_space = load(EMatrix{Float},joinpath(path_id,"basis_space"))
   RBSpaceSteady(id,basis_space)
 end
 
-function load_rb(info::RBInfoUnsteady,id::Symbol)
+function load(info::RBInfoUnsteady,id::Symbol)
   path_id = joinpath(info.offline_path,"$id")
-  basis_space = load(joinpath(path_id,"basis_space"))
-  basis_time = load(joinpath(path_id,"basis_time"))
+  basis_space = load(EMatrix{Float},joinpath(path_id,"basis_space"))
+  basis_time = load(EMatrix{Float},joinpath(path_id,"basis_time"))
   RBSpaceUnsteady(id,basis_space,basis_time)
 end
 
@@ -130,10 +87,15 @@ function rb_time_projection(rbrow::RBSpaceUnsteady,mat::AbstractArray)
 
   nrow = size(brow,2)
   Q = size(mat,2)
+  proj = Matrix{Float}(undef,nrow,Q)
 
-  btp_fun(it,q) = sum(brow[:,it].*mat[:,q])
-  btp_fun(q) = Matrix(Broadcasting(it -> btp_fun(it,q))(1:nrow))
-  btp_fun.(1:Q)
+  for q = 1:Q
+    for it = 1:nrow
+      proj[it,q] = sum(brow[:,it].*mat[:,q])
+    end
+  end
+
+  proj
 end
 
 function rb_time_projection(
@@ -150,12 +112,17 @@ function rb_time_projection(
   nrow = size(brow,2)
   ncol = size(bcol,2)
   Q = size(mat,2)
+  proj = [Matrix{Float}(undef,nrow,ncol) for _ = 1:Q]
 
-  time_proj_fun(it,jt,q) =
-    sum(brow[idx_forwards,it].*bcol[idx_backwards,jt].*mat[idx_forwards,q])
-  time_proj_fun(jt,q) = Broadcasting(it -> time_proj_fun(it,jt,q))(1:nrow)
-  time_proj_fun(q) = Broadcasting(jt -> time_proj_fun(jt,q))(1:ncol)
-  Matrix.(time_proj_fun.(1:Q))
+  for q = 1:Q
+    for jt = 1:ncol
+      for it = 1:nrow
+        proj[q][it,jt] = sum(brow[idx_forwards,it].*bcol[idx_backwards,jt].*mat[idx_forwards,q])
+      end
+    end
+  end
+
+  proj
 end
 
 function rb_spacetime_projection(rbrow::RBSpaceUnsteady,mat::AbstractMatrix)

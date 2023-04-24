@@ -6,14 +6,14 @@ end
 
 function Snapshots(
   id::Symbol,
-  snap::EMatrix{Float};
+  snap::EMatrix{Float},
   nsnap=get_nsnap(snap))
 
   Snapshots(id,snap,nsnap)
 end
 
-function Snapshots(id::Symbol,snap::EMatrix{Float};kwargs...)
-  Snapshots(id,Matrix(snap);kwargs...)
+function Snapshots(id::Symbol,snap::Matrix{Float},args...)
+  Snapshots(id,EMatrix(snap),args...)
 end
 
 function Base.getindex(s::Snapshots,idx::UnitRange{Int})
@@ -29,8 +29,6 @@ Base.getindex(s::Snapshots,idx::Int) = getindex(s,idx:idx)
 
 get_id(s::Snapshots) = s.id
 
-get_id(s::NTuple{N,Snapshots}) where N = get_id.(s)
-
 get_snap(s::Snapshots) = s.snap
 
 get_nsnap(s::Snapshots) = s.nsnap
@@ -41,8 +39,8 @@ get_nsnap(m::AbstractMatrix) = size(m,2)
 
 save(path::String,s::Snapshots) = save(joinpath(path,"$(s.id)"),s.snap)
 
-function load_snap(path::String,id::Symbol,nsnap::Int)
-  s = load(joinpath(path,"$(id)"))
+function load(path::String,id::Symbol,nsnap::Int)
+  s = load(EMatrix{Float},joinpath(path,"$(id)"))
   Snapshots(id,s,nsnap)
 end
 
@@ -56,11 +54,11 @@ function Gridap.FESpaces.FEFunction(fespace,u::Snapshots,args...)
   FEFunction(fespace,get_snap(u),args...)
 end
 
-function compute_in_timesθ(snaps::Snapshots,args...;kwargs...)
+function compute_in_timesθ(snaps::Snapshots,args...)
   id = get_id(snaps)*:θ
   snap = get_snap(snaps)
   nsnap = get_nsnap(snaps)
-  Snapshots(id,compute_in_timesθ(snap,args...;kwargs...),nsnap)
+  Snapshots(id,compute_in_timesθ(snap,args...),nsnap)
 end
 
 function Base.vcat(s1::Snapshots,s2::Snapshots)

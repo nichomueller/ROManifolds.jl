@@ -52,17 +52,10 @@ function time_idx(kst::Int,ns::Int)
   Int(floor((kst-1)/ns)+1)
 end
 
-function get_batches(mv::AbstractArray)
+function idx_batches(mv::AbstractArray)
   nthreads = Threads.nthreads()
   batch_size = floor(Int,length(mv)/nthreads)
-  batch_idx = [(i-1)*batch_size+1:i*batch_size for i=1:nthreads]
-  batches = Broadcasting(idx->getindex(mv,idx))(batch_idx)
-  if batch_size*nthreads == length(mv)
-    batches
-  else
-    last_batch = nthreads*batch_size+1:length(mv)
-    [batches...,mv[last_batch]]
-  end
+  [(i-1)*batch_size+1:i*batch_size for i=1:nthreads]
 end
 
 function Base.argmax(v::Vector,nval::Int)

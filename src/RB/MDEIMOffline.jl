@@ -37,9 +37,9 @@ end
 function MDEIM(
   info::RBInfo,
   op::RBVariable,
-  μ::Vector{Param},
   measures::ProblemMeasures,
-  field::Symbol=:dΩ,
+  field::Symbol,
+  μ::Vector{Param},
   args...)
 
   μ_mdeim = μ[1:info.mdeim_nsnap]
@@ -299,7 +299,7 @@ function load(
 
   id = Symbol(last(split(path,'/')))
 
-  basis_space = load(joinpath(path,"basis_space"))
+  basis_space = load(EMatrix{Float},joinpath(path,"basis_space"))
   rbspace = RBSpace(id,basis_space)
   idx_space = Int.(load(joinpath(path,"idx_space"))[:,1])
 
@@ -319,8 +319,8 @@ function load(
 
   id = Symbol(last(split(path,'/')))
 
-  basis_space = load(joinpath(path,"basis_space"))
-  basis_time = load(joinpath(path,"basis_time"))
+  basis_space = load(EMatrix{Float},joinpath(path,"basis_space"))
+  basis_time = load(EMatrix{Float},joinpath(path,"basis_time"))
   rbspace = RBSpace(id,basis_space,basis_time)
 
   idx_space = Int.(load(joinpath(path,"idx_space"))[:,1])

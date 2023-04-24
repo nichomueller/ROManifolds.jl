@@ -21,11 +21,11 @@ function LinearAlgebra.Matrix(vblock::Vector{<:Vector{Vector{T}}}) where T
   mat
 end
 
-LinearAlgebra.Vector(dmat::DistMatrix{T}) where T = Vector{T}(Matrix(dmat))
+LinearAlgebra.Vector(dmat::EMatrix{T}) where T = Vector{T}(Matrix(dmat))
 
-LinearAlgebra.Matrix(dmat::DistMatrix{T}) where T = convert(Matrix{T},dmat)
+LinearAlgebra.Matrix(dmat::EMatrix{T}) where T = convert(Matrix{T},dmat)
 
-Elemental.DistMatrix(mat::Matrix{T}) where T = convert(DistMatrix{T},mat)
+EMatrix(mat::Matrix{T}) where T = convert(EMatrix{T},mat)
 
 const Block{T} = Vector{T} where T
 
@@ -48,10 +48,6 @@ function blocks(mat::Matrix{T},nblocks=size(mat,2);dims=(size(mat,1),1)) where T
     push!(blockmat,block_i)
   end
   blockmat
-end
-
-function blocks(mat::NTuple{N,Matrix{T}},args...;kwargs...) where {N,T}
-  Broadcasting(m->blocks(m,args...;kwargs...))(mat)
 end
 
 function blocks(mat::Array{T,3};dims=size(mat)[1:2]) where T
@@ -80,25 +76,24 @@ check_dimensions(vb::AbstractVector) =
 
 check_dimensions(m::AbstractMatrix,nb::Int) = iszero(size(m)[2]%nb)
 
-function compute_rank(mat::AbstractMatrix;tol=1e-10)
-  Σ = svdvals(mat)
-  length(findall(x->abs(x)>tol,Σ))
-end
-
-istuple(tup::Any) = false
-
-istuple(tup::Tuple) = true
-
 function expand(tup::Tuple)
   ntup = ()
   for el = tup
-    if istuple(el)
+    if typeof(el) <: Tuple
       ntup = (ntup...,expand(el)...)
     else
       ntup = (ntup...,el)
     end
   end
   ntup
+end
+
+function Base.NTuple(N::Int,T::DataType)
+  NT = ()
+  for _ = 1:N
+    NT = (NT...,zero(T))
+  end
+  NT::NTuple{N,T}
 end
 
 function SparseArrays.sparsevec(M::Matrix{T},findnz_idx::Vector{Int}) where T
@@ -154,40 +149,9 @@ function SparseArrays.findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
   (I[nz], V[nz])
 end
 
-function LinearAlgebra.kron(
-  mat1::AbstractArray,
-  mat2::NTuple{N,AbstractArray}) where N
-  Broadcasting(m2->kron(mat1,m2))(mat2)
-end
+Elemental.getindex(emat::EMatrix{Float},::Colon,k::Int) = emat[:,k:k]
 
-function LinearAlgebra.kron(
-  mat1::NTuple{N,AbstractArray},
-  mat2::AbstractArray) where N
-  Broadcasting(m1->kron(m1,mat2))(mat1)
-end
-
-function LinearAlgebra.kron(
-  mat1::NTuple{N,AbstractArray},
-  mat2::NTuple{N,AbstractArray}) where N
-  kron.(mat1,mat2)
-end
-
-function LinearAlgebra.kron(
-  b1::BlockMatrix,
-  b2::BlockMatrix)
-
-  n1 = length(b1)
-  n2 = length(b2)
-  [kron(b1[i],b2[j]) for i=1:n1 for j=1:n2]
-end
-
-function Base.NTuple(N::Int,T::DataType)
-  NT = ()
-  for _ = 1:N
-    NT = (NT...,zero(T))
-  end
-  NT::NTuple{N,T}
-end
+Elemental.getindex(emat::EMatrix{Float},k::Int,::Colon) = emat[k:k,:]
 
 Gridap.VectorValue(D::Int,T::DataType) = VectorValue(NTuple(D,T))
 
@@ -221,13 +185,19 @@ function Gridap.evaluate(ntuple_fun::NTuple{N,Function},args...) where N
 end
 
 Base.:(*)(a::Symbol,b::Symbol) = Symbol(String(a)*String(b))
+
 Base.:(*)(a::Symbol,b::Symbol) = Symbol(String(a)*String(b))
+
 Base.:(-)(a::NTuple{N,T1},b::NTuple{N,T2}) where {N,T1,T2} = a.-b
+
 Base.:(*)(a::NTuple{N,T1},b::NTuple{N,T2}) where {N,T1,T2} = a.*b
+
 Base.adjoint(nt::NTuple{N,T}) where {N,T} = adjoint.(nt)
 
 Base.:(^)(vv::VectorValue,n::Int) = VectorValue([vv[k]^n for k=eachindex(vv)])
+
 Base.:(^)(vv::VectorValue,n::Float) = VectorValue([vv[k]^n for k=eachindex(vv)])
+
 Base.abs(vv::VectorValue) = VectorValue([abs(vv[k]) for k=eachindex(vv)])
 
 Gridap.get_triangulation(m::Measure) = m.quad.trian

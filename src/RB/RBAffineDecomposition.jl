@@ -158,10 +158,6 @@ function save(info::RBInfo,ad::RBAffineDecomposition)
   save(path_id,ad)
 end
 
-function save(info::RBInfo,ad::NTuple{2,RBAffineDecomposition})
-  Broadcasting(x->save(info,x))(ad)
-end
-
 function save(
   path::String,
   ad::RBAffineDecomposition{Affine,Ttr,Matrix{Float}}) where Ttr
@@ -178,17 +174,18 @@ end
 function load(
   info::RBInfo,
   op::RBVariable,
+  measures::ProblemMeasures,
+  field::Symbol,
   args...)
 
   id = get_id(op)
   path_id = joinpath(info.offline_path,"$id")
   if ispath(path_id)
-    _,meas,field = args
-    load(info,op,getproperty(meas,field))
+    load(info,op,getproperty(measures,field))
   else
     printstyled("Failed to load variable $(id): running offline assembler instead\n";
       color=:blue)
-    assemble_affine_decomposition(info,op,args...)
+    assemble_affine_decomposition(info,op,measures,field,args...)
   end
 
 end
@@ -196,13 +193,13 @@ end
 function load(
   info::RBInfo,
   op::RBLinVariable{Top},
-  meas::Measure) where Top
+  measures::Measure) where Top
 
   id = get_id(op)
   printstyled("Loading MDEIM structures for $Top variable $id \n";color=:blue)
   path_id = joinpath(info.offline_path,"$id")
 
-  ad = load(path_id,op,meas)
+  ad = load(path_id,op,measures)
   RBAffineDecomposition(op,ad)
 end
 
@@ -222,13 +219,13 @@ end
 function load(
   info::RBInfo,
   op::RBBilinVariable{Top,<:SingleFieldFESpace},
-  meas::Measure) where Top
+  measures::Measure) where Top
 
   id = get_id(op)
   printstyled("Loading MDEIM structures for $Top variable $id \n";color=:blue)
   path_id = joinpath(info.offline_path,"$id")
 
-  ad = load(path_id,op,meas)
+  ad = load(path_id,op,measures)
   RBAffineDecomposition(op,ad)
 end
 
@@ -249,7 +246,7 @@ end
 function load(
   info::RBInfo,
   op::RBBilinVariable{Top,Ttr},
-  meas::Measure) where {Top,Ttr}
+  measures::Measure) where {Top,Ttr}
 
   id = get_id(op)
   printstyled("Loading MDEIM structures for $Top variable $id and its lifting \n";
@@ -257,16 +254,16 @@ function load(
   path_id = joinpath(info.offline_path,"$id")
   path_id_lift = joinpath(info.offline_path,"$(id)_lift")
 
-  ad = load(path_id,op,meas)
+  ad = load(path_id,op,measures)
   op_lift = RBLiftVariable(op)
-  ad_lift = load(path_id_lift,op,meas)
+  ad_lift = load(path_id_lift,op,measures)
   RBAffineDecomposition(op,ad),RBAffineDecomposition(op_lift,ad_lift)
 end
 
 function load(
   info::RBInfo,
   op::RBBilinVariable{Affine,Ttr},
-  meas::Measure) where Ttr
+  measures::Measure) where Ttr
 
   id = get_id(op)
   printstyled("Loading projected Affine variable $id and MDEIM structures for its lifting\n";
@@ -276,6 +273,6 @@ function load(
 
   ad = load(joinpath(path_id,"basis_space"))::Matrix{Float}
   op_lift = RBLiftVariable(op)
-  ad_lift = load(path_id_lift,op,meas)
+  ad_lift = load(path_id_lift,op,measures)
   RBAffineDecomposition(op,ad),RBAffineDecomposition(op_lift,ad_lift)
 end
