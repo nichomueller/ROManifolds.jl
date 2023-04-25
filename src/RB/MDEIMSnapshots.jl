@@ -11,7 +11,7 @@ function mdeim_basis(
   args...)
 
   da = DistributedAssembler(op,μ,args...)
-  snaps,findnz_idx = da(μ)
+  snaps,findnz_idx = assemble(da,μ)
   RBSpaceSteady(snaps;ϵ=info.ϵ,style=ReducedPOD()),findnz_idx
 end
 
@@ -23,7 +23,7 @@ function mdeim_basis(
   args...)
 
   da = DistributedAssembler(op,μ,args...)
-  snaps,findnz_idx = da(μ)
+  snaps,findnz_idx = assemble(da,μ)
   RBSpaceUnsteady(snaps;ϵ=info.ϵ,style=ReducedPOD()),findnz_idx
 end
 

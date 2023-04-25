@@ -60,7 +60,7 @@ get_op(param_os::RBParamOnlineStructure) = param_os.op
 
 get_assembler(param_os::RBParamOnlineStructure) = param_os.assembler
 
-function Gridap.evaluate(
+function assemble(
   ::RBVariable,
   assembler::Function,
   args...)
@@ -68,7 +68,7 @@ function Gridap.evaluate(
   assembler(args...)
 end
 
-function Gridap.evaluate(
+function assemble(
   ::RBLiftVariable,
   assembler::Function,
   args...)
@@ -76,19 +76,19 @@ function Gridap.evaluate(
   -assembler(args...)
 end
 
-function Gridap.evaluate(param_os::RBParamOnlineStructure,args...)
+function assemble(param_os::RBParamOnlineStructure,args...)
   op = get_op(param_os)
   assembler = get_assembler(param_os)
-  evaluate(op,assembler,args...)
+  assemble(op,assembler,args...)
 end
 
-function Gridap.evaluate(param_os::RBParamOnlineStructure,args...)
+function assemble(param_os::RBParamOnlineStructure,args...)
   op = get_op(param_os)
   assembler = get_assembler(param_os)
-  evaluate(op,assembler,args...)
+  assemble(op,assembler,args...)
 end
 
-function Gridap.evaluate(
+function assemble(
   param_os::NTuple{N1,RBParamOnlineStructure},
   sym::Symbol,
   args...) where N1
@@ -97,14 +97,14 @@ function Gridap.evaluate(
   idx = findall(x -> x == sym,syms)[1]
   op = get_op(param_os[idx])
   assembler = get_assembler(param_os[idx])
-  evaluate(op,assembler,args...)
+  assemble(op,assembler,args...)
 end
 
-function Gridap.evaluate(
+function assemble(
   param_os::NTuple{N1,RBParamOnlineStructure},
   syms::NTuple{N2,Symbol},
   args...) where {N1,N2}
 
-  eval_structure(sym::Symbol) = evaluate(param_os,sym,args...)
-  eval_structure.(syms)
+  assemble(sym::Symbol) = assemble(param_os,sym,args...)
+  assemble.(syms)
 end

@@ -2,8 +2,8 @@ function steady_poisson_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
 
-  lhs = rbpos(:A,μ)
-  rhs = rbpos((:F,:H,:A_lift),μ)
+  lhs = assemble(rbpos,:A,μ)
+  rhs = assemble(rbpos,(:F,:H,:A_lift),μ)
   lhs,sum(rhs)
 end
 
@@ -11,8 +11,8 @@ function unsteady_poisson_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
 
-  lhs = rbpos((:A,:M),μ)
-  rhs = rbpos((:F,:H,:A_lift,:M_lift),μ)
+  lhs = assemble(rbpos,(:A,:M),μ)
+  rhs = assemble(rbpos,(:F,:H,:A_lift,:M_lift),μ)
   sum(lhs),sum(rhs)
 end
 
@@ -20,8 +20,8 @@ function steady_stokes_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
 
-  lhs = rbpos((:A,:B),μ)
-  rhs = rbpos((:F,:H,:A_lift,:B_lift),μ)
+  lhs = assemble(rbpos,(:A,:B),μ)
+  rhs = assemble(rbpos,(:F,:H,:A_lift,:B_lift),μ)
 
   np = size(lhs[2],1)
   rb_lhs = vcat(hcat(lhs[1],-lhs[2]'),hcat(lhs[2],zeros(np,np)))
@@ -33,8 +33,8 @@ function unsteady_stokes_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
 
-  lhs = rbpos((:A,:B,:BT,:M),μ)
-  rhs = rbpos((:F,:H,:A_lift,:B_lift,:M_lift),μ)
+  lhs = assemble(rbpos,(:A,:B,:BT,:M),μ)
+  rhs = assemble(rbpos,(:F,:H,:A_lift,:B_lift,:M_lift),μ)
 
   np = size(lhs[2],1)
   rb_lhs = vcat(hcat(lhs[1]+lhs[4],-lhs[3]),hcat(lhs[2],zeros(np,np)))
@@ -47,8 +47,8 @@ function steady_navier_stokes_rb_system(
   μ::Param) where N
 
   lin_rb_lhs,lin_rb_rhs = steady_stokes_rb_system(rbpos,μ)
-  nonlin_lhs(u) = rbpos((:C,:D),u)
-  nonlin_rhs(u) = rbpos(:C_lift,u)
+  nonlin_lhs(u) = assemble(rbpos,(:C,:D),u)
+  nonlin_rhs(u) = assemble(rbpos,:C_lift,u)
 
   opA,opB = findall(x -> x ∈ (:A,:B),get_op.(rbpos)) # get_op(rbpos,(:A,:B))
   rbu,rbp = get_rbspace_row(opA),get_rbspace_row(opB)
@@ -74,8 +74,8 @@ function unsteady_navier_stokes_rb_system(
   μ::Param) where N
 
   lin_rb_lhs,lin_rb_rhs = unsteady_stokes_rb_system(rbpos,μ)
-  nonlin_lhs(un) = rbpos((:C,:D),μ,un)
-  nonlin_rhs(un) = rbpos(:C_lift,μ,un)
+  nonlin_lhs(un) = assemble(rbpos,(:C,:D),μ,un)
+  nonlin_rhs(un) = assemble(rbpos,:C_lift,μ,un)
 
   opA,opB = findall(x -> x ∈ (:A,:B),get_op.(rbpos)) # get_op(rbpos,(:A,:B))
   rbu,rbp = get_rbspace_row(opA),get_rbspace_row(opB)
