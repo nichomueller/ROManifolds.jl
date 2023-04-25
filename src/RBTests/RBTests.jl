@@ -227,7 +227,7 @@ function get_dirichlet_values(
   μ::Vector{Param},
   tinfo::TimeInfo)
 
-  timesθ = get_timesθ(tinfo)
-  dir(μ) = Matrix([U(μ,t).dirichlet_values for t=timesθ])
+  times = get_times(tinfo)
+  dir(μ) = Matrix([U(μ,t).dirichlet_values for t=times])
   Snapshots(:g,dir.(μ))
 end

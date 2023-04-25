@@ -49,7 +49,7 @@ function setup_assembler(
   findnz_idx=nothing) where Ttr
 
   assembler = get_assembler(op,findnz_idx)
-  k -> assembler(op,findnz_idx;μ=μ[k],u=fun(k),t=first(get_timesθ(op)))
+  k -> assembler(op,findnz_idx;μ=μ[k],u=fun(k),t=first(get_times(op)))
 end
 
 function setup_assembler(
@@ -59,7 +59,7 @@ function setup_assembler(
   findnz_idx=nothing) where Ttr
 
   assembler = get_assembler(op,findnz_idx)
-  k -> assembler(op,findnz_idx;μ=first(μ),u=fun(k),t=first(get_timesθ(op)))
+  k -> assembler(op,findnz_idx;μ=first(μ),u=fun(k),t=first(get_times(op)))
 end
 
 function Gridap.evaluate(da::DistributedAssembler,idx::UnitRange{Int})
@@ -103,7 +103,7 @@ end
 function assemble_vectors(
   op::ParamLinOperator,
   args...;
-  μ=realization(op),t=get_timesθ(op),u=nothing)::EMatrix{Float}
+  μ=realization(op),t=get_times(op),u=nothing)::EMatrix{Float}
 
   assemble_vectors(unpack_for_assembly(op)...,μ,t,u)
 end
@@ -111,7 +111,7 @@ end
 function assemble_vectors(
   op::ParamLinOperator,
   findnz_idx::Vector{Int};
-  μ=realization(op),t=get_timesθ(op),u=nothing)::EMatrix{Float}
+  μ=realization(op),t=get_times(op),u=nothing)::EMatrix{Float}
 
   vecs = assemble_vectors(unpack_for_assembly(op)...,μ,t,u)
   get_findnz_vals(vecs,findnz_idx)
@@ -174,7 +174,7 @@ end
 function assemble_vectors(
   op::ParamBilinOperator,
   findnz_idx::Vector{Int};
-  μ=realization(op),t=get_timesθ(op),u=nothing)
+  μ=realization(op),t=get_times(op),u=nothing)
 
   mats = assemble_matrices(unpack_for_assembly(op)...,μ,t,u)
   get_findnz_vals(mats,findnz_idx)
@@ -183,7 +183,7 @@ end
 function assemble_matrices(
   op::ParamBilinOperator,
   args...;
-  μ=realization(op),t=get_timesθ(op),u=nothing)::Vector{SparseMatrixCSC{Float,Int}}
+  μ=realization(op),t=get_times(op),u=nothing)::Vector{SparseMatrixCSC{Float,Int}}
 
   assemble_matrices(unpack_for_assembly(op)...,μ,t,u)
 end
@@ -202,11 +202,11 @@ function assemble_matrices(
     end
   else
     if isnothing(u)
-      [assemble_matrix(fefun(μ,tθ),trial(μ,tθ),test) for tθ = t]
+      [assemble_matrix(fefun(μ,tn),trial(μ,tn),test) for tn = t]
     elseif typeof(u) == Function
-      [assemble_matrix(fefun(u(tθ)),trial(μ,tθ),test) for tθ = t]
+      [assemble_matrix(fefun(u(tn)),trial(μ,tn),test) for tn = t]
     else typeof(u) == FEFunction
-      [assemble_matrix(fefun(u),trial(μ,tθ),test) for tθ = t]
+      [assemble_matrix(fefun(u),trial(μ,tn),test) for tn = t]
     end
   end
 end

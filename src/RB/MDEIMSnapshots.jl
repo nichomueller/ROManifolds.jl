@@ -95,9 +95,9 @@ function get_evaluated_param_function(
   quadp::Vector{Point},
   μ::Vector{Param})
 
-  timesθ = get_timesθ(op)
+  times = get_times(op)
   eval_param(k,t) = Broadcasting(x->param_fun(x,μ[k],t))(quadp)
-  eval_param(k) = Matrix([eval_param(k,t) for t = timesθ])
+  eval_param(k) = Matrix([eval_param(k,t) for t = times])
   eval_param
 end
 

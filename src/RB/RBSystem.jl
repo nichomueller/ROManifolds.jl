@@ -2,8 +2,8 @@ function steady_poisson_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
 
-  lhs = eval_assembler(rbpos,:A,μ)
-  rhs = eval_assembler(rbpos,(:F,:H,:A_lift),μ)
+  lhs = rbpos(:A,μ)
+  rhs = rbpos((:F,:H,:A_lift),μ)
   lhs,sum(rhs)
 end
 
@@ -11,8 +11,8 @@ function unsteady_poisson_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
 
-  lhs = eval_assembler(rbpos,(:A,:M),μ)
-  rhs = eval_assembler(rbpos,(:F,:H,:A_lift,:M_lift),μ)
+  lhs = rbpos((:A,:M),μ)
+  rhs = rbpos((:F,:H,:A_lift,:M_lift),μ)
   sum(lhs),sum(rhs)
 end
 
@@ -20,8 +20,8 @@ function steady_stokes_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
 
-  lhs = eval_assembler(rbpos,(:A,:B),μ)
-  rhs = eval_assembler(rbpos,(:F,:H,:A_lift,:B_lift),μ)
+  lhs = rbpos((:A,:B),μ)
+  rhs = rbpos((:F,:H,:A_lift,:B_lift),μ)
 
   np = size(lhs[2],1)
   rb_lhs = vcat(hcat(lhs[1],-lhs[2]'),hcat(lhs[2],zeros(np,np)))
@@ -33,8 +33,8 @@ function unsteady_stokes_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
 
-  lhs = eval_assembler(rbpos,(:A,:B,:BT,:M),μ)
-  rhs = eval_assembler(rbpos,(:F,:H,:A_lift,:B_lift,:M_lift),μ)
+  lhs = rbpos((:A,:B,:BT,:M),μ)
+  rhs = rbpos((:F,:H,:A_lift,:B_lift,:M_lift),μ)
 
   np = size(lhs[2],1)
   rb_lhs = vcat(hcat(lhs[1]+lhs[4],-lhs[3]),hcat(lhs[2],zeros(np,np)))
@@ -47,10 +47,10 @@ function steady_navier_stokes_rb_system(
   μ::Param) where N
 
   lin_rb_lhs,lin_rb_rhs = steady_stokes_rb_system(rbpos,μ)
-  nonlin_lhs(u) = eval_assembler(rbpos,(:C,:D),u)
-  nonlin_rhs(u) = eval_assembler(rbpos,:C_lift,u)
+  nonlin_lhs(u) = rbpos((:C,:D),u)
+  nonlin_rhs(u) = rbpos(:C_lift,u)
 
-  opA,opB = get_op(rbpos,(:A,:B))
+  opA,opB = findall(x -> x ∈ (:A,:B),get_op.(rbpos)) # get_op(rbpos,(:A,:B))
   rbu,rbp = get_rbspace_row(opA),get_rbspace_row(opB)
   nu,np = get_ns(rbu),get_ns(rbp)
 
@@ -74,31 +74,31 @@ function unsteady_navier_stokes_rb_system(
   μ::Param) where N
 
   lin_rb_lhs,lin_rb_rhs = unsteady_stokes_rb_system(rbpos,μ)
-  nonlin_lhs(uθ) = eval_assembler(rbpos,(:C,:D),μ,uθ)
-  nonlin_rhs(uθ) = eval_assembler(rbpos,:C_lift,μ,uθ)
+  nonlin_lhs(un) = rbpos((:C,:D),μ,un)
+  nonlin_rhs(un) = rbpos(:C_lift,μ,un)
 
-  opA,opB = get_op(rbpos,(:A,:B))
+  opA,opB = findall(x -> x ∈ (:A,:B),get_op.(rbpos)) # get_op(rbpos,(:A,:B))
   rbu,rbp = get_rbspace_row(opA),get_rbspace_row(opB)
   nu,np = get_ns(rbu)*get_nt(rbu),get_ns(rbp)*get_nt(rbp)
 
   block12,block21,block22 = zeros(nu,np),zeros(np,nu),zeros(np,np)
 
-  function nonlin_rb_lhs1(uθ)::Matrix{Float}
-    Cuθ,_ = nonlin_lhs(uθ)
-    vcat(hcat(Cuθ,block12),hcat(block21,block22))
+  function nonlin_rb_lhs1(un)::Matrix{Float}
+    Cun,_ = nonlin_lhs(un)
+    vcat(hcat(Cun,block12),hcat(block21,block22))
   end
 
-  function nonlin_rb_lhs2(uθ)::Matrix{Float}
-    Cuθ,Duθ = nonlin_lhs(uθ)
-    vcat(hcat(Cuθ+Duθ,block12),hcat(block21,block22))
+  function nonlin_rb_lhs2(un)::Matrix{Float}
+    Cun,Dun = nonlin_lhs(un)
+    vcat(hcat(Cun+Dun,block12),hcat(block21,block22))
   end
 
-  nonlin_rb_rhs(uθ) = vcat(nonlin_rhs(uθ),zeros(np,1))::Matrix{Float}
+  nonlin_rb_rhs(un) = vcat(nonlin_rhs(un),zeros(np,1))::Matrix{Float}
 
-  jac_rb(uθ) = lin_rb_lhs + nonlin_rb_lhs2(uθ)
-  lhs_rb(uθ) = lin_rb_lhs + nonlin_rb_lhs1(uθ)
-  rhs_rb(uθ) = lin_rb_rhs + nonlin_rb_rhs(uθ)
-  res_rb(uθ,x_rb) = lhs_rb(uθ)*x_rb - rhs_rb(uθ)
+  jac_rb(un) = lin_rb_lhs + nonlin_rb_lhs2(un)
+  lhs_rb(un) = lin_rb_lhs + nonlin_rb_lhs1(un)
+  rhs_rb(un) = lin_rb_rhs + nonlin_rb_rhs(un)
+  res_rb(un,x_rb) = lhs_rb(un)*x_rb - rhs_rb(un)
 
   res_rb,jac_rb
 end
@@ -149,25 +149,25 @@ function solve_rb_system(
   time_info::TimeInfo;
   tol=1e-10,maxtol=1e10,maxit=20)
 
-  timesθ = get_timesθ(time_info)
+  times = get_times(time_info)
   θ = get_θ(time_info)
   Ns = get_Ns(rbspace[1])
   nstu = get_ns(rbspace[1])*get_nt(rbspace[1])
 
-  function get_uθ_fun(ufe::Matrix{Float})
-    uθfe = compute_in_timesθ(ufe,θ)
-    n(tθ) = findall(x -> x == tθ,timesθ)[1]
-    tθ -> FEFunction(Uk(tθ),uθfe[:,n(tθ)])
+  function get_un_fun(ufe::Matrix{Float})
+    unfe = compute_in_times(ufe,θ)
+    n(tn) = findall(x -> x == tn,times)[1]
+    tn -> FEFunction(Uk(tn),unfe[:,n(tn)])
   end
 
-  function get_uθ_fun(x_rb::Vector{Float})
+  function get_un_fun(x_rb::Vector{Float})
     ufe = reconstruct_fe_sol(rbspace[1],x_rb[1:nstu])
-    uθfe = compute_in_timesθ(ufe,θ)
-    n(tθ) = findall(x -> x == tθ,timesθ)[1]
-    tθ -> FEFunction(Uk(tθ),uθfe[:,n(tθ)])
+    unfe = compute_in_times(ufe,θ)
+    n(tn) = findall(x -> x == tn,times)[1]
+    tn -> FEFunction(Uk(tn),unfe[:,n(tn)])
   end
 
-  uθ_fun = get_uθ_fun(x0)
+  un_fun = get_un_fun(x0)
   u0_rb = rb_spacetime_projection(rbspace[1],x0[1:Ns,:])
   p0_rb = rb_spacetime_projection(rbspace[2],x0[Ns+1:end,:])
   x_rb = vcat(u0_rb,p0_rb)[:,1]
@@ -181,10 +181,10 @@ function solve_rb_system(
       return x_rb
     end
 
-    jx_rb,rx_rb = jac(uθ_fun),res(uθ_fun,x_rb)
+    jx_rb,rx_rb = jac(un_fun),res(un_fun,x_rb)
     err = jx_rb \ rx_rb
     x_rb -= err[:,1]
-    uθ_fun = get_uθ_fun(x_rb)
+    un_fun = get_un_fun(x_rb)
     iter += 1
 
     printstyled("Newton method: err = $(norm(err)), iter = $iter\n";color=:red)

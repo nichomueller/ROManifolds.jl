@@ -16,10 +16,10 @@ end
 get_dt(ti::TimeInfo) = ti.dt
 get_Nt(ti::TimeInfo) = Int((ti.tF-ti.t0)/ti.dt)
 get_θ(ti::TimeInfo) = ti.θ
-get_timesθ(ti::TimeInfo) = collect(ti.t0:ti.dt:ti.tF-ti.dt).+ti.dt*ti.θ
+get_times(ti::TimeInfo) = collect(ti.t0:ti.dt:ti.tF-ti.dt).+ti.dt*ti.θ
 realization(ti::TimeInfo) = rand(Uniform(ti.t0,ti.tF))
 
-function compute_in_timesθ(mat::Matrix{Float},θ::Real;mat0=zeros(size(mat,1)))
+function compute_in_times(mat::Matrix{Float},θ::Real;mat0=zeros(size(mat,1)))
   mat_prev = hcat(mat0,mat[:,1:end-1])
   θ*mat + (1-θ)*mat_prev
 end
@@ -107,9 +107,9 @@ get_Nt(op::ParamUnsteadyOperator) = get_Nt(get_time_info(op))
 
 get_θ(op::ParamUnsteadyOperator) = get_θ(get_time_info(op))
 
-get_timesθ(::ParamSteadyOperator) = fill(nothing,1)
+get_times(::ParamSteadyOperator) = fill(nothing,1)
 
-get_timesθ(op::ParamUnsteadyOperator) = get_timesθ(get_time_info(op))
+get_times(op::ParamUnsteadyOperator) = get_times(get_time_info(op))
 
 get_phys_quad_points(op::ParamOperator) = get_phys_quad_points(get_test(op))
 
@@ -221,7 +221,7 @@ function ParamLiftOperator(op::ParamUnsteadyBilinOperator{Top,Ttr}) where {Top,T
 end
 
 function assemble_affine_quantity(op::ParamOperator)
-  assemble_affine_quantity(unpack_for_assembly(op)...,realization(op),first(get_timesθ(op)))
+  assemble_affine_quantity(unpack_for_assembly(op)...,realization(op),first(get_times(op)))
 end
 
 function assemble_affine_quantity(fefun::Function,test::FESpace,args...)

@@ -102,13 +102,13 @@ function Gridap.writevtk(
   X,
   trian::Triangulation)
 
-  timesθ = get_timesθ(tinfo)
+  times = get_times(tinfo)
   id = get_id(s)
   plt_dir = joinpath(info.online_path,joinpath("plots"))
   create_dir!(plt_dir)
 
   path = joinpath(plt_dir,"$(id)h")
-  for (it,t) in enumerate(timesθ)
+  for (it,t) in enumerate(times)
     fefun = FEFunction(X(t),s.snap[:,it])
     writevtk(trian,path*"_$(it).vtu",cellfields=["$(id)h"=>fefun])
   end
@@ -121,11 +121,11 @@ function Gridap.writevtk(
   X,
   trian::Triangulation)
 
-  timesθ = get_timesθ(tinfo)
+  times = get_times(tinfo)
   plt_dir = joinpath(info.online_path,joinpath("plots","pwise_err_$(res.id)"))
   create_dir!(plt_dir)
 
-  for (it,t) in enumerate(timesθ)
+  for (it,t) in enumerate(times)
     fefun = FEFunction(X(t),res.et.pointwise_err[:,it])
     writevtk(trian,plt_dir*"_$(it).vtu",cellfields=["err"=>fefun])
   end

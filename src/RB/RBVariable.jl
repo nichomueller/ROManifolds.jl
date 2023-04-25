@@ -170,7 +170,7 @@ get_Nt(op::RBVariable) = get_Nt(op.feop)
 
 get_θ(op::RBVariable) = get_θ(op.feop)
 
-get_timesθ(op::RBVariable) = get_timesθ(op.feop)
+get_times(op::RBVariable) = get_times(op.feop)
 
 get_phys_quad_points(op::RBVariable) = get_phys_quad_points(op.feop)
 
@@ -251,9 +251,9 @@ function Gridap.FESpaces.FEFunction(
   u::AbstractMatrix,
   ::Param)
 
-  timesθ = get_timesθ(op)
-  n(tθ) = findall(x->x == tθ,timesθ)[1]
-  tθ -> FEFunction(get_test(op),u[:,n(tθ)])
+  times = get_times(op)
+  n(tn) = findall(x->x == tn,times)[1]
+  tn -> FEFunction(get_test(op),u[:,n(tn)])
 end
 
 function Gridap.FESpaces.FEFunction(
@@ -269,7 +269,7 @@ function Gridap.FESpaces.FEFunction(
   u::AbstractMatrix,
   μ::Param)
 
-  timesθ = get_timesθ(op)
-  n(tθ) = findall(x->x == tθ,timesθ)[1]
-  tθ -> FEFunction(get_trial(op)(μ,tθ),u[:,n(tθ)])
+  times = get_times(op)
+  n(tn) = findall(x->x == tn,times)[1]
+  tn -> FEFunction(get_trial(op)(μ,tn),u[:,n(tn)])
 end

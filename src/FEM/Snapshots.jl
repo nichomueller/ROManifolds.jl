@@ -59,11 +59,11 @@ function Gridap.FESpaces.FEFunction(fespace,u::Snapshots,args...)
   FEFunction(fespace,get_snap(u),args...)
 end
 
-function compute_in_timesθ(snaps::Snapshots,args...)
+function compute_in_times(snaps::Snapshots,args...)
   id = get_id(snaps)*:θ
   snap = get_snap(snaps)
   nsnap = get_nsnap(snaps)
-  Snapshots(id,compute_in_timesθ(snap,args...),nsnap)
+  Snapshots(id,compute_in_times(snap,args...),nsnap)
 end
 
 function Base.vcat(s1::Snapshots,s2::Snapshots)

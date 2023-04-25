@@ -88,7 +88,7 @@ function navier_stokes_unsteady()
         μ_offline = μ[1:info.nsnap]
         uh_offline = uh[1:info.nsnap]
         ph_offline = ph[1:info.nsnap]
-        uhθ_offline = compute_in_timesθ(uh_offline,θ)
+        uhθ_offline = compute_in_times(uh_offline,θ)
         ghθ_offline = get_dirichlet_values(U,μ_offline,time_info)
         ughθ_offline = vcat(uhθ_offline,ghθ_offline)
 
