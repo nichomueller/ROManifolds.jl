@@ -10,89 +10,15 @@ function RBAffineDecomposition(
   RBAffineDecomposition{Top,Ttr,Tad}(op,affine_decomposition)
 end
 
-function RBAffineDecomposition(info::RBInfo,args...)
-  info.load_offline ? load(info,args...) : assemble_affine_decomposition(info,args...)
-end
-
-function assemble_affine_decomposition(
-  ::RBInfo,
-  op::RBLinVariable{Affine},
+function RBAffineDecomposition(
+  info::RBInfo,
   args...)
 
-  id = get_id(op)
-  printstyled("Linear operator $id is Affine: computing Φᵀ$id \n";color=:blue)
-
-  ad = rb_space_projection(op)
-  RBAffineDecomposition(op,ad)
-end
-
-function assemble_affine_decomposition(
-  info::RBInfo,
-  op::RBLinVariable{Top},
-  args...) where Top
-
-  id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
-  printstyled("Linear operator $id is $Top:running the MDEIM offline phase on $mdeim_nsnap snapshots \n";
-    color=:blue)
-
-  ad = MDEIM(info,op,args...)
-  RBAffineDecomposition(op,ad)
-end
-
-function assemble_affine_decomposition(
-  ::RBInfo,
-  op::RBBilinVariable{Affine,<:SingleFieldFESpace},
-  args...)
-
-  id = get_id(op)
-  printstyled("Bilinear operator $id is Affine and has no lifting: computing Φᵀ$(id)Φ\n";
-    color=:blue)
-
-  ad = rb_space_projection(op)
-  RBAffineDecomposition(op,ad)
-end
-
-function assemble_affine_decomposition(
-  info::RBInfo,
-  op::RBBilinVariable{Top,<:SingleFieldFESpace},
-  args...) where Top
-
-  id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
-  printstyled("Bilinear operator $id is $Top and has no lifting: running the MDEIM offline phase on $mdeim_nsnap snapshots\n";
-    color=:blue)
-
-  ad = MDEIM(info,op,args...)
-  RBAffineDecomposition(op,ad)
-end
-
-function assemble_affine_decomposition(
-  info::RBInfo,
-  op::RBBilinVariable{Affine,Ttr},
-  args...) where Ttr
-
-  id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
-  printstyled("Bilinear operator $id is Affine but its lifting is non-affine: running the MDEIM offline phase on $mdeim_nsnap snapshots\n";
-    color=:blue)
-
-  ad = rb_space_projection(op)
-  op_lift = RBLiftVariable(op)
-  ad_lift = MDEIM(info,op_lift,args...)
-  RBAffineDecomposition(op,ad),RBAffineDecomposition(op_lift,ad_lift)
-end
-
-function assemble_affine_decomposition(
-  info::RBInfo,
-  op::RBBilinVariable{Top,Ttr},
-  args...) where {Top,Ttr}
-
-  id,mdeim_nsnap = get_id(op),info.mdeim_nsnap
-  printstyled("Bilinear operator $id and its lifting are $Top: running the MDEIM offline phase on $mdeim_nsnap snapshots\n";
-    color=:blue)
-
-  ad = MDEIM(info,op,args...)
-  op_lift = RBLiftVariable(op)
-  ad_lift = MDEIM(info,op_lift,args...)
-  RBAffineDecomposition(op,ad),RBAffineDecomposition(op_lift,ad_lift)
+  if info.load_offline
+    load(info,args...)
+  else
+    assemble_affine_decomposition(info,args...)
+  end
 end
 
 get_op(ad::RBAffineDecomposition) = ad.op
@@ -100,6 +26,31 @@ get_op(ad::RBAffineDecomposition) = ad.op
 get_affine_decomposition(ad::RBAffineDecomposition) = ad.affine_decomposition
 
 get_id(ad::RBAffineDecomposition) = get_id(get_op(ad))
+
+function assemble_affine_decomposition(
+  ::RBInfo,
+  op::RBVariable{Affine,Ttr},
+  args...) where Ttr
+
+  id = get_id(op)
+  printstyled("Operator $id is Affine: computing its RB Galerkin projection \n";color=:blue)
+
+  ad = rb_space_projection(op)
+  RBAffineDecomposition(op,ad)
+end
+
+function assemble_affine_decomposition(
+  info::RBInfo,
+  op::RBVariable{Top,Ttr},
+  args...) where {Top,Ttr}
+
+  id,nsnap = get_id(op),info.mdeim_nsnap
+  printstyled("Operator $id is $Top: running the MDEIM offline phase on $nsnap snapshots \n";
+    color=:blue)
+
+  ad = MDEIM(info,op,args...)
+  RBAffineDecomposition(op,ad)
+end
 
 function eval_affine_decomposition(ad::RBAffineDecomposition)
   op = get_op(ad)
@@ -161,39 +112,26 @@ end
 function load(
   info::RBInfo,
   op::RBVariable,
-  measures::ProblemMeasures,
-  field::Symbol,
   args...)
 
   id = get_id(op)
   path_id = joinpath(info.offline_path,"$id")
   if ispath(path_id)
-    load(info,op,getproperty(measures,field))
+    load(info,op,args...)
   else
     printstyled("Failed to load variable $(id): running offline assembler instead\n";
       color=:blue)
-    assemble_affine_decomposition(info,op,measures,field,args...)
+    assemble_affine_decomposition(info,op,args...)
   end
 
 end
 
 function load(
   info::RBInfo,
-  op::RBLinVariable{Top},
-  measures::Measure) where Top
-
-  id = get_id(op)
-  printstyled("Loading MDEIM structures for $Top variable $id \n";color=:blue)
-  path_id = joinpath(info.offline_path,"$id")
-
-  ad = load(path_id,op,measures)
-  RBAffineDecomposition(op,ad)
-end
-
-function load(
-  info::RBInfo,
-  op::RBLinVariable{Affine},
-  ::Measure)
+  op::RBVariable{Affine,Ttr},
+  ::ProblemMeasures,
+  ::Symbol,
+  args...) where Ttr
 
   id = get_id(op)
   printstyled("Loading projected Affine variable $id \n";color=:blue)
@@ -205,61 +143,14 @@ end
 
 function load(
   info::RBInfo,
-  op::RBBilinVariable{Top,<:SingleFieldFESpace},
-  measures::Measure) where Top
+  op::RBVariable{Top,Ttr},
+  measures::ProblemMeasures,
+  field::Symbol,
+  args...) where {Top,Ttr}
 
   id = get_id(op)
   printstyled("Loading MDEIM structures for $Top variable $id \n";color=:blue)
-  path_id = joinpath(info.offline_path,"$id")
 
-  ad = load(path_id,op,measures)
+  ad = load(info,op,getproperty(measures,field))
   RBAffineDecomposition(op,ad)
-end
-
-function load(
-  info::RBInfo,
-  op::RBBilinVariable{Affine,<:SingleFieldFESpace},
-  ::Measure)
-
-  id = get_id(op)
-  printstyled("Loading projected Affine variable $id \n";color=:blue)
-  path_id = joinpath(info.offline_path,"$id")
-
-  ad = load(joinpath(path_id,"basis_space"))
-  RBAffineDecomposition(op,ad)
-end
-
-
-function load(
-  info::RBInfo,
-  op::RBBilinVariable{Top,Ttr},
-  measures::Measure) where {Top,Ttr}
-
-  id = get_id(op)
-  printstyled("Loading MDEIM structures for $Top variable $id and its lifting \n";
-    color=:blue)
-  path_id = joinpath(info.offline_path,"$id")
-  path_id_lift = joinpath(info.offline_path,"$(id)_lift")
-
-  ad = load(path_id,op,measures)
-  op_lift = RBLiftVariable(op)
-  ad_lift = load(path_id_lift,op,measures)
-  RBAffineDecomposition(op,ad),RBAffineDecomposition(op_lift,ad_lift)
-end
-
-function load(
-  info::RBInfo,
-  op::RBBilinVariable{Affine,Ttr},
-  measures::Measure) where Ttr
-
-  id = get_id(op)
-  printstyled("Loading projected Affine variable $id and MDEIM structures for its lifting\n";
-    color=:blue)
-  path_id = joinpath(info.offline_path,"$id")
-  path_id_lift = joinpath(info.offline_path,"$(id)_lift")
-
-  ad = load(joinpath(path_id,"basis_space"))
-  op_lift = RBLiftVariable(op)
-  ad_lift = load(path_id_lift,op,measures)
-  RBAffineDecomposition(op,ad),RBAffineDecomposition(op_lift,ad_lift)
 end

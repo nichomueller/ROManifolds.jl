@@ -4,6 +4,7 @@ struct ParamFunctions
 end
 
 get_param_function(pf::ParamFunctions) = pf.fun
+
 get_param_fefunction(pf::ParamFunctions) = pf.fefun
 
 struct TimeInfo
@@ -14,9 +15,13 @@ struct TimeInfo
 end
 
 get_dt(ti::TimeInfo) = ti.dt
+
 get_Nt(ti::TimeInfo) = Int((ti.tF-ti.t0)/ti.dt)
+
 get_θ(ti::TimeInfo) = ti.θ
+
 get_times(ti::TimeInfo) = collect(ti.t0:ti.dt:ti.tF-ti.dt).+ti.dt*ti.θ
+
 realization(ti::TimeInfo) = rand(Uniform(ti.t0,ti.tF))
 
 function compute_in_times(mat::Matrix{Float},θ::Real;mat0=zeros(size(mat,1)))
@@ -120,6 +125,20 @@ realization(op::ParamOperator) = realization(get_pspace(op))
 realization_trial(op::ParamSteadyOperator) = get_trial(op)(realization(op))
 
 realization_trial(op::ParamUnsteadyOperator) = get_trial(op)(realization(op),realization(get_time_info(op)))
+
+function realization_param_fefunction(op::ParamSteadyOperator)
+  pfun = get_param_function(op)
+  eval_pfun = pfun(realization(op))
+  pfefun = get_param_fefunction(op)
+  pfefun(eval_pfun)
+end
+
+function realization_param_fefunction(op::ParamUnsteadyOperator)
+  pfun = get_param_function(op)
+  eval_pfun = pfun(realization(op),realization(get_time_info(op)))
+  pfefun = get_param_fefunction(op)
+  pfefun(eval_pfun)
+end
 
 function Gridap.FESpaces.get_cell_dof_ids(
   op::ParamOperator,
@@ -232,20 +251,17 @@ function unpack_for_assembly(op::ParamLiftOperator)
   get_param_fefunction(op),get_test(op),get_dirichlet_function(op)
 end
 
-function assemble_affine_quantity(op::ParamOperator)
-  assemble_affine_quantity(unpack_for_assembly(op)...,realization(op),first(get_times(op)))
+function assemble_affine_quantity(op::ParamLinOperator)
+  eval_param_fefun = realization_param_fefunction(op)
+  test = get_test(op)
+  assemble_vector(eval_param_fefun,test)
 end
 
-function assemble_affine_quantity(fefun::Function,test::FESpace,args...)
-  assemble_vector(fefun(x->1),test)
-end
-
-function assemble_affine_quantity(fefun::Function,trial::ParamTrialFESpace,test::FESpace,μ::Param,args...)
-  assemble_matrix(fefun(x->1),trial(μ),test)
-end
-
-function assemble_affine_quantity(fefun::Function,trial::ParamTransientTrialFESpace,test::FESpace,μ::Param,t::Real)
-  assemble_matrix(fefun(x->1),trial(μ,t),test)
+function assemble_affine_quantity(op::ParamBilinOperator)
+  eval_param_fefun = realization_param_fefunction(op)
+  eval_trial = realization_trial(op)
+  test = get_test(op)
+  assemble_matrix(eval_param_fefun,eval_trial,test)
 end
 
 function get_dirichlet_function(::Val,trial::ParamTrialFESpace)

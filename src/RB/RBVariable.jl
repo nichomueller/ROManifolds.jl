@@ -80,14 +80,14 @@ end
 function RBLiftVariable(op::RBSteadyBilinVariable)
   feop = ParamLiftOperator(op.feop)
   rbs = get_rbspace_row(op)
-  rbs_lift = RBSpace(get_id(rbs)*:_lift,get_basis_space(rbs))
+  rbs_lift = RBSpaceSteady(get_id(rbs)*:_lift,get_basis_space(rbs))
   RBSteadyLiftVariable(feop,rbs_lift)
 end
 
 function RBLiftVariable(op::RBUnsteadyBilinVariable)
   feop = ParamLiftOperator(op.feop)
   rbs = get_rbspace_row(op)
-  rbs_lift = RBSpace(get_id(rbs)*:_lift,get_basis_space(rbs),get_basis_time(rbs))
+  rbs_lift = RBSpaceUnsteady(get_id(rbs)*:_lift,get_basis_space(rbs),get_basis_time(rbs))
   RBUnsteadyLiftVariable(feop,rbs_lift)
 end
 

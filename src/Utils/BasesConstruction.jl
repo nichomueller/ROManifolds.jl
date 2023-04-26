@@ -20,7 +20,7 @@ function POD(::DefaultPOD,S::AbstractMatrix,X::SparseMatrixCSC;ϵ=1e-5)
   L = sparse(H.L)
   U,Σ,_ = svd(L'*S[H.p,:])
   n = truncation(Σ,ϵ)
-  Matrix((L'\U[:,1:n])[invperm(H.p),:])
+  (L'\U[:,1:n])[invperm(H.p),:]
 end
 
 function POD(::DefaultPOD,S::AbstractMatrix;ϵ=1e-5)

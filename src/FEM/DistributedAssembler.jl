@@ -138,11 +138,9 @@ function assembler_invariables(
   vecdata1 = data(1)
   v1 = Gridap.Algebra.nz_counter(get_vector_builder(a),(get_rows(a),))
   symbolic_loop_vector!(v1,a,vecdata1)
-  v2 = Gridap.Algebra.nz_allocation(v1)
-  numeric_loop_vector!(v2,a,vecdata1)
   findnz_idx = collect(eachindex(get_rows(a)))
 
-  v2,findnz_idx
+  v1,findnz_idx
 end
 
 function assembler_loop(
@@ -159,11 +157,11 @@ function assembler_loop(
   @sync @distributed for i = 1:nsnap
     vecdata_i = data(i)
     v2 = Gridap.Algebra.nz_allocation(v1)
-    numeric_loop_matrix!(v2,a,vecdata_i)
+    numeric_loop_vector!(v2,a,vecdata_i)
     copyto!(view(vecs,:,i),v2)
   end
 
-  vecs[:,findnz_idx],findnz_idx
+  vecs[findnz_idx,:],findnz_idx
 end
 
 function assemble_matrices(f::Function,U,V::FESpace,args...)

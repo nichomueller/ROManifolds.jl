@@ -2,26 +2,26 @@ abstract type RBSpace end
 
 struct RBSpaceSteady <: RBSpace
   id::Symbol
-  basis_space::EMatrix{Float}
+  basis_space::Matrix{Float}
 end
 
 function RBSpaceSteady(snaps::Snapshots;ϵ=1e-5,style=ReducedPOD())
   id = get_id(snaps)
   basis_space = rb_space(snaps;ϵ,style)
-  RBSpaceSteady(id,basis_space)
+  RBSpaceSteady(id,Matrix(basis_space))
 end
 
 struct RBSpaceUnsteady <: RBSpace
   id::Symbol
-  basis_space::EMatrix{Float}
-  basis_time::EMatrix{Float}
+  basis_space::Matrix{Float}
+  basis_time::Matrix{Float}
 end
 
 function RBSpaceUnsteady(snaps::Snapshots;ϵ=1e-5,style=ReducedPOD())
   id = get_id(snaps)
   basis_space = rb_space(snaps;ϵ,style)
   basis_time = rb_time(snaps,basis_space;ϵ,style)
-  RBSpaceUnsteady(id,basis_space,basis_time)
+  RBSpaceUnsteady(id,Matrix(basis_space),Matrix(basis_time))
 end
 
 get_id(rb::RBSpace) = rb.id
@@ -59,14 +59,14 @@ end
 
 function load(info::RBInfoSteady,id::Symbol)
   path_id = joinpath(info.offline_path,"$id")
-  basis_space = load(EMatrix{Float},joinpath(path_id,"basis_space"))
+  basis_space = load(joinpath(path_id,"basis_space"))
   RBSpaceSteady(id,basis_space)
 end
 
 function load(info::RBInfoUnsteady,id::Symbol)
   path_id = joinpath(info.offline_path,"$id")
-  basis_space = load(EMatrix{Float},joinpath(path_id,"basis_space"))
-  basis_time = load(EMatrix{Float},joinpath(path_id,"basis_time"))
+  basis_space = load(joinpath(path_id,"basis_space"))
+  basis_time = load(joinpath(path_id,"basis_time"))
   RBSpaceUnsteady(id,basis_space,basis_time)
 end
 
@@ -147,7 +147,7 @@ end
 function rb_spacetime_projection(
   rbrow::RBSpaceUnsteady,
   rbcol::RBSpaceUnsteady,
-  mat::Vector{Matrix{Float}};
+  mat::Vector{AbstractMatrix};
   idx_forwards=1:size(mat,1),
   idx_backwards=1:size(mat,1))
 

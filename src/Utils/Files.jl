@@ -22,11 +22,22 @@ end
 
 correct_path(path::String) = path*".txt"
 
-save(path::String,s) = serialize(correct_path(path),s)
+save(path::String,obj) = serialize(correct_path(path),obj)
 
 load(path::String) = deserialize(correct_path(path))::Matrix{Float}
 
-load(::Type{T},path::String) where T = convert(T,load(path))::T
+# load(::Type{T},path::String) where T = convert(T,load(path))::T
+
+function load(::Type{T},path::String)::T where T
+  obj = deserialize(correct_path(path))
+  if typeof(obj) == T
+    obj
+  else
+    convert(T,load(path))
+  end
+end
+
+load(path::String) = load(Matrix{Float},path)
 
 myisfile(path::String) = isfile(correct_path(path))
 
