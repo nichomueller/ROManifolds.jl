@@ -43,12 +43,13 @@ function rb_online_product(
 end
 
 function rb_online_product(
-  basis::Vector{Matrix{Float}},
-  coeff::Vector{Matrix{Float}};
+  basis::Array{Float,3},
+  coeff::Array{Float,3};
   nr=size(first(basis),1)*size(first(coeff),1))
 
-  @assert length(basis) == length(coeff) "Something is wrong"
-  bc = sum([kron(basis[k],coeff[k]) for k=eachindex(coeff)])
+  Qs = size(basis,3)
+  @assert size(coeff,3) == Qs "Something is wrong"
+  bc = sum([kron(basis[:,:,q],coeff[:,:,q]) for q = 1:Qs])
   reshape(bc,nr,:)
 end
 
@@ -79,9 +80,9 @@ function assemble(param_os::RBParamOnlineStructure,args...)::Matrix{Float}
 end
 
 function assemble(
-  param_os::NTuple{N1,RBParamOnlineStructure},
+  param_os::NTuple{N,RBParamOnlineStructure},
   sym::Symbol,
-  args...) where N1
+  args...) where N
 
   syms = get_id.(get_op.(param_os))
   idx = findall(x -> x == sym,syms)[1]

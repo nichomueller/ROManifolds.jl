@@ -96,10 +96,8 @@ function rb_time_projection(rbrow::RBSpaceUnsteady,mat::AbstractArray)
   Q = size(mat,2)
   proj = zeros(nrow,ncol,Q)
 
-  @inbounds for q = 1:Q
-    @inbounds for it = 1:nrow
-      proj[it,:,q] = sum(brow[:,it].*mat[:,q])
-    end
+  @inbounds for q = 1:Q, it = 1:nrow
+    proj[it,:,q] = sum(brow[:,it].*mat[:,q])
   end
 
   proj
@@ -121,12 +119,8 @@ function rb_time_projection(
   Q = size(mat,2)
   proj = zeros(nrow,ncol,Q)
 
-  @inbounds for q = 1:Q
-    @inbounds for jt = 1:ncol
-      @inbounds for it = 1:nrow
-        proj[it,jt,q] = sum(brow[idx_forwards,it].*bcol[idx_backwards,jt].*mat[idx_forwards,q])
-      end
-    end
+  @inbounds for q = 1:Q, jt = 1:ncol, it = 1:nrow
+    proj[it,jt,q]= sum(brow[idx_forwards,it].*bcol[idx_backwards,jt].*mat[idx_forwards,q])
   end
 
   proj
@@ -158,10 +152,9 @@ function rb_spacetime_projection(
     idx_forwards=idx_forwards,idx_backwards=idx_backwards)
 
   proj_spacetime = zeros(nsrow*ntrow,nscol*ntcol)
-  @inbounds for i = 1:nscol
-    @inbounds for j = 1:nsrow
-      proj_spacetime[1+(j-1)*ntrow:j*ntrow,1+(i-1)*ntcol:i*ntcol] = proj_space_time[i,j,:]
-    end
+  @inbounds for is = 1:nscol, js = 1:nsrow
+    proj_spacetime[1+(js-1)*ntrow:js*ntrow,1+(is-1)*ntcol:is*ntcol] =
+      proj_space_time[is,js,:]
   end
 
   proj_spacetime

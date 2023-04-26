@@ -11,29 +11,29 @@ function compute_coefficient(
   args...) where Ttr
 
   fun = get_param_function(op)
-  coeff(μ::Param) = [fun(nothing,μ)[1]]
-
-  coeff
+  (μ::Param) -> [fun(nothing,μ)[1]]
 end
 
 function compute_coefficient(
   op::RBUnsteadyVariable{Affine,Ttr},
-  args...;kwargs...) where Ttr
+  basis::AbstractMatrix;
+  kwargs...) where Ttr
 
   fun = get_param_function(op)
   times = get_times(op)
-  ns,nt = 1,length(times)
-  coeff = zeros(ns,nt)
+  Qs,Nt = 1,length(times)
+  coeff = zeros(Nt,Qs)
 
   function coeff!(μ::Param)
     @inbounds for (n,tn) in enumerate(times)
-      coeff[:,n] = fun(nothing,μ,tn)[1]
+      coeff[:,n] .= fun(nothing,μ,tn)[1]
     end
     coeff
   end
 
-  coeff_bt(μ::Param) = coeff_by_time_bases(op,coeff(μ))
-  coeff_bt
+  Qs = size(basis,2)
+  coeff_by_time_bases = get_coeff_by_time_bases(op,Qs)
+  (μ::Param) -> coeff_by_time_bases(coeff!(μ))
 end
 
 function setup_coefficient(
@@ -45,23 +45,24 @@ function setup_coefficient(
   idx_space = get_idx_space(mdeim)
   m = get_red_measure(mdeim)
   A = hyperred_structure(op,m,idx_space,args...)
-  red_lu,A
+  mdeim_solver = mdeim_online(red_lu)
+  mdeim_solver,A
 end
 
 function compute_coefficient(
   op::RBSteadyVariable,
   mdeim::MDEIMSteady)
 
-  red_lu,A = setup_coefficient(op,mdeim)
-  (μ::Param) -> mdeim_online(A(μ),red_lu)
+  mdeim_solver,A = setup_coefficient(op,mdeim)
+  (μ::Param) -> mdeim_solver(A(μ))
 end
 
 function compute_coefficient(
   op::RBSteadyVariable{Nonlinear,Ttr},
   mdeim::MDEIMSteady) where Ttr
 
-  red_lu,A = setup_coefficient(op,mdeim)
-  (μ::Param,z) -> mdeim_online(A(μ,z),red_lu)
+  mdeim_solver,A = setup_coefficient(op,mdeim)
+  (μ::Param,z) -> mdeim_solver(A(μ,z))
 end
 
 function compute_coefficient(
@@ -70,9 +71,11 @@ function compute_coefficient(
   ::Val{false})
 
   times = get_times(op)
-  red_lu,A = setup_coefficient(op,mdeim,times)
-  coeff(μ::Param) = mdeim_online(A(μ),red_lu)
-  (μ::Param) -> coeff_by_time_bases(op,coeff(μ))
+  mdeim_solver,A = setup_coefficient(op,mdeim,times)
+  coeff_by_time_bases = get_coeff_by_time_bases(op,mdeim)
+
+  coeff(μ::Param) = mdeim_solver(A(μ))
+  (μ::Param) -> coeff_by_time_bases(coeff(μ))
 end
 
 function compute_coefficient(
@@ -81,9 +84,11 @@ function compute_coefficient(
   ::Val{false}) where Ttr
 
   times = get_times(op)
-  red_lu,A = setup_coefficient(op,mdeim,times)
-  coeff(μ::Param,z) = mdeim_online(A(μ,z),red_lu)
-  (μ::Param,z) -> coeff_by_time_bases(op,coeff(μ,z))
+  mdeim_solver,A = setup_coefficient(op,mdeim,times)
+  coeff_by_time_bases = get_coeff_by_time_bases(op,mdeim)
+
+  coeff(μ::Param,z) = mdeim_solver(A(μ,z))
+  (μ::Param,z) -> coeff_by_time_bases(coeff(μ,z))
 end
 
 function compute_coefficient(
@@ -93,10 +98,12 @@ function compute_coefficient(
 
   idx_time = get_idx_time(mdeim)
   red_times = get_times(op)[idx_time]
-  red_lu,A = setup_coefficient(op,mdeim,red_times)
-  coeff(μ::Param) = mdeim_online(A(μ)[:],red_lu)
-  coeff_interp(μ::Param) = interp_coeff_time(mdeim,coeff(μ))
-  (μ::Param) -> coeff_by_time_bases(op,coeff_interp(μ))
+  mdeim_solver,A = setup_coefficient(op,mdeim,red_times)
+  coeff_by_time_bases = get_coeff_by_time_bases(op,mdeim)
+  interp_coeff = get_interp_coeff(mdeim)
+
+  coeff(μ::Param) = mdeim_solver(A(μ)[:])
+  (μ::Param) -> coeff_by_time_bases(interp_coeff(coeff(μ)))
 end
 
 function compute_coefficient(
@@ -106,10 +113,12 @@ function compute_coefficient(
 
   idx_time = get_idx_time(mdeim)
   red_times = get_times(op)[idx_time]
-  red_lu,A = setup_coefficient(op,mdeim,red_times)
-  coeff(μ::Param,z) = mdeim_online(A(μ,z)[:],red_lu)
-  coeff_interp(μ::Param,z) = interp_coeff_time(mdeim,coeff(μ,z))
-  (μ::Param,z) -> coeff_by_time_bases(op,coeff_interp(μ,z))
+  mdeim_solver,A = setup_coefficient(op,mdeim,red_times)
+  coeff_by_time_bases = get_coeff_by_time_bases(op,mdeim)
+  interp_coeff = get_interp_coeff(mdeim)
+
+  coeff(μ::Param,z) = mdeim_solver(A(μ,z)[:])
+  (μ::Param,z) -> coeff_by_time_bases(interp_coeff(coeff(μ,z)))
 end
 
 function hyperred_structure(
@@ -285,24 +294,26 @@ function hyperred_structure(
   lift!
 end
 
-function mdeim_online(A::Vector{Float},lu::LU)
-  P_A = lu.P*A
-  y = lu.L \ P_A
-  x = lu.U \ y
-  x
+function mdeim_online(lu::LU)
+
+  function sol!(A::Vector{Float})
+    P_A = lu.P*A
+    y = lu.L \ P_A
+    x = lu.U \ y
+    x
+  end
+
+  function sol!(A::Matrix{Float})
+    P_A = lu.P*A
+    y = lu.L \ P_A
+    x = lu.U \ y
+    Matrix(x')
+  end
+
+  sol!
 end
 
-function mdeim_online(A::Matrix{Float},lu::LU)
-  P_A = lu.P*A
-  y = lu.L \ P_A
-  x = lu.U \ y
-  Matrix(x')
-end
-
-function interp_coeff_time(
-  mdeim::MDEIMUnsteady,
-  coeff::Vector{Float})
-
+function get_interp_coeff(mdeim::MDEIMUnsteady)
   bs = get_basis_space(mdeim)
   bt = get_basis_time(mdeim)
   Qs = size(bs,2)
@@ -310,42 +321,75 @@ function interp_coeff_time(
   sorted_idx(qs) = [(i-1)*Qs+qs for i = 1:Qt]
 
   interp_coeff = zeros(Qt,Qs)
-  @inbounds for qs = 1:Qs
-    interp_coeff[:,qs] = bt*coeff[sorted_idx(qs)]
+  function interp_coeff!(coeff::AbstractMatrix)
+    @inbounds for qs = 1:Qs
+      interp_coeff[:,qs] = bt*coeff[sorted_idx(qs)]
+    end
   end
 
-  interp_coeff
+  interp_coeff!
 end
 
-function coeff_by_time_bases(
-  op::RBUnsteadyVariable,
-  coeff::AbstractMatrix)
+function get_coeff_by_time_bases(op::RBUnsteadyVariable,mdeim::MDEIMUnsteady)
+  Qs = size(get_basis_space(mdeim),2)
+  get_coeff_by_time_bases(op,Qs)
+end
 
+function get_coeff_by_time_bases(op::RBUnsteadyVariable,Qs::Int)
   rbrow = get_rbspace_row(op)
-  rb_time_projection(rbrow,coeff)
+  brow = get_basis_time(rbrow)
+  nrow = size(brow,2)
+  ncol = 1
+
+  proj = zeros(nrow,ncol,Qs)
+  function time_proj!(coeff::AbstractMatrix)
+    @assert size(coeff,2) == Qs "Dimension mismatch: $(size(coeff,2)) != $Qs"
+
+    @inbounds for q = 1:Qs, it = 1:nrow
+      proj[it,:,q] = sum(brow[:,it].*coeff[:,q])
+    end
+    proj
+  end
+
+  time_proj!
 end
 
-function coeff_by_time_bases(
-  op::RBUnsteadyBilinVariable,
-  coeff::AbstractMatrix)
-
+function get_coeff_by_time_bases(op::RBUnsteadyBilinVariable,Qs::Int)
   rbrow = get_rbspace_row(op)
   rbcol = get_rbspace_col(op)
-  time_proj(idx1,idx2) = rb_time_projection(rbrow,rbcol,coeff;
-    idx_forwards=idx1,idx_backwards=idx2)
+  brow = get_basis_time(rbrow)
+  bcol = get_basis_time(rbcol)
+  nrow = size(brow,2)
+  ncol = size(bcol,2)
 
   θ = get_θ(op)
   dt = get_dt(op)
   Nt = get_Nt(op)
-  idx = 1:Nt
-  idx_backwards,idx_forwards = 1:Nt-1,2:Nt
 
-  btbtc = time_proj(idx,idx)
-  btbtc_shift = time_proj(idx_forwards,idx_backwards)
+  btbt = zeros(Nt,nrow,ncol)
+  btbt_shift = zeros(Nt-1,nrow,ncol)
+  @inbounds for jt = 1:ncol, it = 1:nrow
+    row_idx = fast_idx((jt-1)*ncol+it,ncol)
+    col_idx = slow_idx((jt-1)*ncol+it,ncol)
+    btbt[:,row_idx,col_idx] .= sum(brow[:,it].*bcol[:,jt])
+    btbt_shift[:,row_idx,col_idx] .= sum(brow[2:Nt,it].*bcol[1:Nt-1,jt])
+  end
+
+  proj = zeros(nrow,ncol,Qs)
+  function time_proj!(bt_mult::AbstractArray,coeff::AbstractMatrix)
+    @assert size(coeff,2) == Qs "Dimension mismatch: $(size(coeff,2)) != $Qs"
+    @inbounds for q = 1:Qs, jt = 1:ncol, it = 1:nrow
+      proj[it,jt,q] = sum(bt_mult[:,it,jt].*coeff[:,q])
+    end
+    proj
+  end
+
+  btbtc(coeff::AbstractMatrix) = time_proj!(btbt,coeff)
+  btbtc_shift(coeff::AbstractMatrix) = time_proj!(btbt_shift,coeff[2:Nt,:])
 
   if get_id(op) == :M
-    btbtc/dt - btbtc_shift/dt
+    (coeff::AbstractMatrix) -> btbtc(coeff)/dt - btbtc_shift(coeff)/dt
   else
-    θ*btbtc + (1-θ)*btbtc_shift
+    (coeff::AbstractMatrix) -> θ*btbtc(coeff) + (1-θ)*btbtc_shift(coeff)
   end
 end
