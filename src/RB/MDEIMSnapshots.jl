@@ -1,4 +1,8 @@
 function mdeim_basis(info::RBInfo,op::RBVariable,args...)
+  id = get_id(op)
+  nsnap = info.mdeim_nsnap
+  printstyled("MDEIM: generating $nsnap snapshots for $id \n";color=:blue)
+
   state = info.fun_mdeim && typeof(op) == RBBilinVariable
   mdeim_basis(Val(state),info,op,args...)
 end
@@ -10,8 +14,7 @@ function mdeim_basis(
   μ::Vector{Param},
   args...)
 
-  da = DistributedAssembler(op,μ,args...)
-  snaps,findnz_idx = assemble(da,μ)
+  snaps,findnz_idx = assemble_fe_snaps(op,μ,args...)
   RBSpaceSteady(snaps;ϵ=info.ϵ,style=ReducedPOD()),findnz_idx
 end
 
@@ -22,8 +25,8 @@ function mdeim_basis(
   μ::Vector{Param},
   args...)
 
-  da = DistributedAssembler(op,μ,args...)
-  snaps,findnz_idx = assemble(da,μ)
+  times = get_times(op)
+  snaps,findnz_idx = assemble_fe_snaps(op,μ,times,args...)
   RBSpaceUnsteady(snaps;ϵ=info.ϵ,style=ReducedPOD()),findnz_idx
 end
 
@@ -106,7 +109,8 @@ function reduce_param_function(
   vals::Matrix{Float})
 
   param_bs = POD(vals)
-  vals2 = mode2_unfolding(param_bs'*vals,Int(size(vals,2)/get_Nt(op)))
+  ns = get_nsnap(vals,get_Nt(op))
+  vals2 = mode2_unfolding(param_bs'*vals,ns)
   param_bt = POD(vals2)
   param_bs,param_bt
 end
@@ -117,7 +121,7 @@ function reduce_param_function(
 
   Ns = get_Ns(get_rbspace_row(op))
   Nt = get_Nt(op)
-  ns = Int(size(free_vals,2)/Nt)
+  ns = get_nsnap(free_vals,Nt)
   free_vals = all_vals[1:Ns,:]
 
   bs_all = POD(all_vals;ϵ=info.ϵ)

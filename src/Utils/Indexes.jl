@@ -43,12 +43,12 @@ function spacetime_idx(
   (time_idx .- 1)*Ns .+ space_idx
 end
 
-function space_idx(kst::Int,ns::Int)
+function fast_idx(kst::Int,ns::Int)
   ks = mod(kst,ns)
   ks == 0 ? ns : ks
 end
 
-function time_idx(kst::Int,ns::Int)
+function slow_idx(kst::Int,ns::Int)
   Int(floor((kst-1)/ns)+1)
 end
 
@@ -61,4 +61,14 @@ end
 function Base.argmax(v::Vector,nval::Int)
   s = sort(v,rev=true)
   Int.(indexin(s,v))[1:nval]
+end
+
+function get_findnz_idx(mat::EMatrix{Float})
+  sum_cols = sum(mat,dims=2)[:]
+  findall(x -> abs(x) ≥ eps(),sum_cols)
+end
+
+function get_findnz_idx(mat::SparseMatrixCSC{Float,Int})
+  findnz_idx, = findnz(mat[:])
+  findnz_idx
 end

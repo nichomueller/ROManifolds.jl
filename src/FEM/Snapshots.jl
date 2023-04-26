@@ -7,7 +7,7 @@ end
 function Snapshots(
   id::Symbol,
   snap::EMatrix{Float},
-  nsnap=get_nsnap(snap))
+  nsnap=size(snap,2))
 
   Snapshots(id,snap,nsnap)
 end
@@ -35,9 +35,7 @@ get_snap(s::Snapshots) = s.snap
 
 get_nsnap(s::Snapshots) = s.nsnap
 
-get_nsnap(v::AbstractVector) = length(v)
-
-get_nsnap(m::AbstractMatrix) = size(m,2)
+get_nsnap(mat::AbstractMatrix,Nt::Int) = Int(size(mat,2)/Nt)
 
 function save(path::String,s::Snapshots)
   smat = Matrix(get_snap(s))

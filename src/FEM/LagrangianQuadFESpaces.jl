@@ -108,14 +108,14 @@ function LagrangianQuadFESpace(test::SingleFieldFESpace)
   LagrangianQuadFESpace(model,order)
 end
 
-function Gridap.FEFunction(
+function Gridap.FESpaces.FEFunction(
   quad_fespace::LagrangianQuadFESpace,
   vec::AbstractVector)
 
   FEFunction(quad_fespace.test,vec)
 end
 
-function Gridap.FEFunction(
+function Gridap.FESpaces.FEFunction(
   quad_fespace::LagrangianQuadFESpace,
   mat::AbstractMatrix)
 

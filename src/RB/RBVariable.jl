@@ -174,7 +174,7 @@ get_times(op::RBVariable) = get_times(op.feop)
 
 get_phys_quad_points(op::RBVariable) = get_phys_quad_points(op.feop)
 
-DistributedAssembler(op::RBVariable,args...) = DistributedAssembler(op.feop,args...)
+assemble_fe_snaps(op::RBVariable,args...) = assemble_fe_snaps(op.feop,args...)
 
 function rb_space_projection(
   op::RBLinVariable,

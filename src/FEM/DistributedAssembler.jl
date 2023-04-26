@@ -1,222 +1,190 @@
-struct DistributedAssembler
-  op::ParamOperator
-  assembler::Function
-  findnz_idx::Vector{Int}
-end
-
-function DistributedAssembler(op::ParamOperator,args...)
-  initial_assembler = setup_assembler(op,args...)
-  findnz_idx = get_findnz_idx(initial_assembler(1))
-  assembler = setup_assembler(op,args...;findnz_idx)
-  DistributedAssembler(op,assembler,findnz_idx)
-end
-
-get_op(da::DistributedAssembler) = da.op
-
-get_assembler(da::DistributedAssembler) = da.assembler
-
-get_findnz_idx(da::DistributedAssembler) = da.findnz_idx
-
-# function setup_assembler(
-#   op::ParamLinOperator{Nonaffine},
-#   μ::Vector{Param},
-#   args...)
-
-#   findnz_idx = get_findnz_idx(assemble_vectors(op,μ[1]))
-#   snaps = assemble_vectors(op,findnz_idx,μ)
-#   snaps,findnz_idx
-# end
-
-# function setup_assembler(
-#   op::ParamOperator{Nonlinear,Ttr},
-#   μ::Vector{Param},
-#   uh::Snapshots;
-#   findnz_idx=nothing) where Ttr
-
-#   assembler = get_assembler(op,findnz_idx)
-#   u_fun(k) = FEFunction(op,uh[k],μ[k])
-#   k -> assembler(op,findnz_idx;μ=μ[k],u=u_fun(k))
-# end
-
-# function setup_assembler(
-#   op::ParamBilinOperator{Nonaffine,Ttr},
-#   μ::Vector{Param},
-#   fun::Function;
-#   findnz_idx=nothing) where Ttr
-
-#   assembler = get_assembler(op,findnz_idx)
-#   k -> assembler(op,findnz_idx;μ=μ[k],u=fun(k),t=first(get_times(op)))
-# end
-
-# function setup_assembler(
-#   op::ParamBilinOperator{Nonlinear,Ttr},
-#   μ::Vector{Param},
-#   fun::Function;
-#   findnz_idx=nothing) where Ttr
-
-#   assembler = get_assembler(op,findnz_idx)
-#   k -> assembler(op,findnz_idx;μ=first(μ),u=fun(k),t=first(get_times(op)))
-# end
-
-function assemble(da::DistributedAssembler,idx::Base.OneTo{Int})
-  op = get_op(da)
+function assemble_fe_snaps(op::ParamOperator,args...)
   id = get_id(op)
-  nsnap = length(idx)
-  printstyled("MDEIM: generating $nsnap snapshots for $id \n";color=:blue)
-
-  assembler = get_assembler(da)
-  findnz_idx = get_findnz_idx(da)
-  Nz,Nt,ns = length(findnz_idx),get_Nt(op),length(idx)
-  snaps = Elemental.zeros(EMatrix{Float},Nz,Nt*ns)
-  @sync @distributed for k = idx
-    copyto!(view(snaps,:,(k-1)*Nt+1:k*Nt),assembler(k))
-  end
-  s = Snapshots(id,snaps,nsnap)
-
+  Nt = get_Nt(op)
+  assembler = get_assembler(op)
+  snap,findnz_idx = assembler(unpack_for_assembly(op)...,args...)
+  nsnap = get_nsnap(snap,Nt)
+  s = Snapshots(id,snap,nsnap)
   s,findnz_idx
 end
 
-function assemble(da::DistributedAssembler,μ::Vector{Param})
-  assemble(da,eachindex(μ))
+get_assembler(::ParamLinOperator) = assemble_vectors
+
+get_assembler(::ParamBilinOperator) = assemble_matrices
+
+abstract type AssemblerLoop end
+
+struct VectorAssemblerLoop <: AssemblerLoop
+  data::Function
+  nsnap::Int
 end
 
-function unpack_for_assembly(op::ParamLinOperator)
-  get_param_fefunction(op),get_test(op)
+struct MatrixAssemblerLoop <: AssemblerLoop
+  data::Function
+  nsnap::Int
 end
 
-function unpack_for_assembly(op::ParamBilinOperator)
-  get_param_fefunction(op),get_test(op),get_trial(op)
+get_data(al::AssemblerLoop) = al.data
+
+get_nsnap(al::AssemblerLoop) = al.nsnap
+
+function assemble_vectors(f::Function,V::FESpace,args...)
+  a,vecdata = assembler_setup(f,V,args...)
+  v1,findnz_idx = assembler_invariables(a,vecdata)
+  assembler_loop(a,vecdata,v1,findnz_idx)
 end
 
-function unpack_for_assembly(op::ParamLiftOperator)
-  get_param_fefunction(op),get_test(op),get_dirichlet_function(op)
-end
-
-# function assemble_vectors(op::ParamBilinOperator,::Nothing;kwargs...)
-#   error("Something is wrong")
-# end
-
-# function assemble_vectors(
-#   op::ParamLinOperator,
-#   args...;
-#   μ=realization(op),t=get_times(op),u=nothing)::EMatrix{Float}
-
-#   assemble_vectors(unpack_for_assembly(op)...,μ,t,u)
-# end
-
-# function assemble_vectors(
-#   op::ParamLinOperator,
-#   findnz_idx::Vector{Int};
-#   μ=realization(op),t=get_times(op),u=nothing)::EMatrix{Float}
-
-#   vecs = assemble_vectors(unpack_for_assembly(op)...,μ,t,u)
-#   get_findnz_vals(vecs,findnz_idx)
-# end
-
-# function assemble_vectors(
-#   fefun::Function,
-#   test::FESpace,
-#   μ::Param,t,args...)
-
-#   if isnothing(t)
-#     mat = EMatrix(assemble_vector(fefun(μ),test))
-#   else
-#     mat = EMatrix{Float}(undef,get_Ns(test),length(t))
-#     @inbounds for (n,tn) = enumerate(t)
-#       copyto!(view(mat,:,n),assemble_vector(fefun(μ,tn),test))
-#     end
-#   end
-
-#   mat
-# end
-
-# function assemble_vectors(
-#   fefun::Function,
-#   test::FESpace,
-#   dir::Function,
-#   μ::Param,t,u)
-
-#   if isnothing(t)
-
-#     if isnothing(u)
-#       mat = EMatrix(assemble_vector(v->fefun(μ,dir(μ),v),test))
-#     else
-#       mat = EMatrix(assemble_vector(v->fefun(u,dir(μ),v),test))
-#     end
-
-#   else
-
-#     function vec(tn::Real)
-#       if isnothing(u)
-#         assemble_vector(v->fefun(μ,tn,dir(μ,tn),v),test)
-#       elseif typeof(u) == Function
-#         assemble_vector(v->fefun(u(tn),dir(μ,tn),v),test)
-#       else typeof(u) == FEFunction
-#         assemble_vector(v->fefun(u,dir(μ,tn),v),test)
-#       end
-#     end
-
-#     mat = EMatrix{Float}(undef,get_Ns(test),length(t))
-#     @inbounds for (n,tn) = enumerate(t)
-#       copyto!(view(mat,:,n),vec(tn))
-#     end
-
-#   end
-
-#   mat
-
-# end
-
-# function assemble_vectors(
-#   op::ParamBilinOperator,
-#   findnz_idx::Vector{Int};
-#   μ=realization(op),t=get_times(op),u=nothing)
-
-#   mats = assemble_matrices(unpack_for_assembly(op)...,μ,t,u)
-#   get_findnz_vals(mats,findnz_idx)
-# end
-
-# function assemble_matrices(
-#   op::ParamBilinOperator,
-#   args...;
-#   μ=realization(op),t=get_times(op),u=nothing)::SparseMatrixCSC{Float,Int}
-
-#   assemble_matrices(unpack_for_assembly(op)...,μ,first(t),u)
-# end
-
-# function assemble_matrices(
-#   fefun::Function,
-#   test::FESpace,
-#   trial::Ttr,
-#   μ::Param,t::Real,u)::SparseMatrixCSC{Float,Int} where Ttr
-
-#   if isnothing(t)
-#     if isnothing(u)
-#       assemble_matrix(fefun(μ),trial(μ),test)
-#     else
-#       assemble_matrix(fefun(u),trial(μ),test)
-#     end
-#   else
-#     if isnothing(u)
-#       assemble_matrix(fefun(μ,t),trial(μ,t),test)
-#     elseif typeof(u) == Function
-#       assemble_matrix(fefun(u(t)),trial(μ,t),test)
-#     else typeof(u) == FEFunction
-#       assemble_matrix(fefun(u),trial(μ,t),test)
-#     end
-#   end
-# end
-
-function assemble_matrices(
+function assembler_setup(
   f::Function,
-  U::ParamTransientTrialFESpace,
   V::FESpace,
+  args...)
+
+  dv = get_fe_basis(V)
+  a = SparseMatrixAssembler(V,V)
+  vecdata = get_vecdata(f,V,dv,args...)
+  a,vecdata
+end
+
+function get_vecdata(
+  f::Function,
+  V::FESpace,
+  dv::Gridap.FESpaces.SingleFieldFEBasis,
+  μvec::Vector{Param})
+
+  vecdata(i) = collect_cell_vector(V,f(μvec[i],dv))
+  nsnap = length(μvec)
+  VectorAssemblerLoop(vecdata,nsnap)
+end
+
+function get_vecdata(
+  f::Function,
+  V::FESpace,
+  dv::Gridap.FESpaces.SingleFieldFEBasis,
+  dir::Function,
+  μvec::Vector{Param})
+
+  vecdata(i) = collect_cell_vector(V,f(μvec[i],dir(μvec[i]),dv))
+  nsnap = length(μvec)
+  VectorAssemblerLoop(vecdata,nsnap)
+end
+
+function get_vecdata(
+  f::Function,
+  V::FESpace,
+  dv::Gridap.FESpaces.SingleFieldFEBasis,
+  dir::Function,
+  μvec::Vector{Param},
+  uvec::Vector{<:FEFunction})
+
+  vecdata(i) = collect_cell_vector(V,f(uvec[i],dir(μvec[i]),dv))
+  nsnap = length(μvec)
+  VectorAssemblerLoop(vecdata,nsnap)
+end
+
+function get_vecdata(
+  f::Function,
+  V::FESpace,
+  dv::Gridap.FESpaces.SingleFieldFEBasis,
   μvec::Vector{Param},
   tvec::Vector{<:Real})
 
-  a,get_matdata = assembler_setup(f,U,V,μvec,tvec)
-  m1,findnz_idx = assembler_invariables(a,get_matdata,μvec,tvec)
-  assembler_loop(a,get_matdata,m1,findnz_idx,μvec,tvec)
+  Nt = length(tvec)
+  μ(i) = μvec[slow_idx(i,Nt)]
+  t(i) = tvec[fast_idx(i,Nt)]
+  vecdata(i) = collect_cell_vector(V,f(μ(i),t(i),dv))
+  nsnap = length(μvec)*Nt
+  VectorAssemblerLoop(vecdata,nsnap)
+end
+
+function get_vecdata(
+  f::Function,
+  V::FESpace,
+  dv::Gridap.FESpaces.SingleFieldFEBasis,
+  dir::Function,
+  μvec::Vector{Param},
+  tvec::Vector{<:Real})
+
+  Nt = length(tvec)
+  μ(i) = μvec[slow_idx(i,Nt)]
+  t(i) = tvec[fast_idx(i,Nt)]
+  vecdata(i) = collect_cell_vector(V,f(μ(i),t(i),dir(μ(i),t(i)),dv))
+  nsnap = length(μvec)*Nt
+  VectorAssemblerLoop(vecdata,nsnap)
+end
+
+function get_vecdata(
+  f::Function,
+  V::FESpace,
+  dv::Gridap.FESpaces.SingleFieldFEBasis,
+  dir::Function,
+  μvec::Vector{Param},
+  tvec::Vector{<:Real},
+  uvec::Vector{<:FEFunction})
+
+  Nt = length(tvec)
+  μ(i) = μvec[slow_idx(i,Nt)]
+  t(i) = tvec[fast_idx(i,Nt)]
+  u(i) = uvec[slow_idx(i,Nt)]
+  vecdata(i) = collect_cell_vector(V,f(u(i),dir(μ(i),t(i)),dv))
+  nsnap = length(μvec)*Nt
+  VectorAssemblerLoop(vecdata,nsnap)
+end
+
+function assembler_invariables(
+  a::SparseMatrixAssembler,
+  vecdata::VectorAssemblerLoop)
+
+  data = get_data(vecdata)
+  vecdata1 = data(1)
+  v1 = Gridap.Algebra.nz_counter(get_vector_builder(a),(get_rows(a),))
+  symbolic_loop_vector!(v1,a,vecdata1)
+  v2 = Gridap.Algebra.nz_allocation(v1)
+  numeric_loop_vector!(v2,a,vecdata1)
+  findnz_idx = collect(eachindex(get_rows(a)))
+
+  v2,findnz_idx
+end
+
+function assembler_loop(
+  a::SparseMatrixAssembler,
+  vecdata::VectorAssemblerLoop,
+  v1::Gridap.Algebra.ArrayCounter{Vector{Float},Tuple{Base.OneTo{Int}}},
+  findnz_idx::Vector{Int})
+
+  data = get_data(vecdata)
+  nsnap = get_nsnap(vecdata)
+  Nz = length(findnz_idx)
+
+  vecs = Elemental.zeros(EMatrix{Float},Nz,nsnap)
+  @sync @distributed for i = 1:nsnap
+    vecdata_i = data(i)
+    v2 = Gridap.Algebra.nz_allocation(v1)
+    numeric_loop_matrix!(v2,a,vecdata_i)
+    copyto!(view(vecs,:,i),v2)
+  end
+
+  vecs[:,findnz_idx],findnz_idx
+end
+
+function assemble_matrices(f::Function,U,V::FESpace,args...)
+  a,matdata = assembler_setup(f,U,V,args...)
+  m1,findnz_idx = assembler_invariables(a,matdata)
+  assembler_loop(a,matdata,m1,findnz_idx)
+end
+
+function assembler_setup(
+  f::Function,
+  U::ParamTrialFESpace,
+  V::FESpace,
+  μvec::Vector{Param},
+  args...)
+
+  U1 = U(first(μvec))
+  dv = get_fe_basis(V)
+  du = get_trial_fe_basis(U1)
+  a = SparseMatrixAssembler(U1,V)
+  matdata = get_matdata(f,U,V,du,dv,μvec,args...)
+  a,matdata
 end
 
 function assembler_setup(
@@ -224,27 +192,105 @@ function assembler_setup(
   U::ParamTransientTrialFESpace,
   V::FESpace,
   μvec::Vector{Param},
-  tvec::Vector{<:Real})
+  tvec::Vector{<:Real},
+  args...)
 
   U1 = U(first(μvec),first(tvec))
-  v = get_fe_basis(V)
-  u = get_trial_fe_basis(U1)
+  dv = get_fe_basis(V)
+  du = get_trial_fe_basis(U1)
   a = SparseMatrixAssembler(U1,V)
+  matdata = get_matdata(f,U,V,du,dv,μvec,tvec,args...)
+  a,matdata
+end
 
-  function get_matdata(μ::Param,t::Real)
-    collect_cell_matrix(U(μ,t),V,f(μ,t,u,v))
-  end
+function get_matdata(
+  f::Function,
+  U::ParamTrialFESpace,
+  V::FESpace,
+  du::Gridap.FESpaces.SingleFieldFEBasis,
+  dv::Gridap.FESpaces.SingleFieldFEBasis,
+  μvec::Vector{Param})
 
-  a,get_matdata
+  matdata(i) = collect_cell_matrix(U(μvec[i]),V,f(μvec[i],du,dv))
+  nsnap = length(μvec)
+  MatrixAssemblerLoop(matdata,nsnap)
+end
+
+function get_matdata(
+  f::Function,
+  U::ParamTrialFESpace,
+  V::FESpace,
+  du::Gridap.FESpaces.SingleFieldFEBasis,
+  dv::Gridap.FESpaces.SingleFieldFEBasis,
+  μvec::Vector{Param},
+  uvec::Vector{<:FEFunction})
+
+  matdata(i) = collect_cell_matrix(U(μvec[i]),V,f(uvec[i],du,dv))
+  nsnap = length(μvec)
+  MatrixAssemblerLoop(matdata,nsnap)
+end
+
+function get_matdata(
+  f::Function,
+  U::ParamTransientTrialFESpace,
+  V::FESpace,
+  du::Gridap.FESpaces.SingleFieldFEBasis,
+  dv::Gridap.FESpaces.SingleFieldFEBasis,
+  μvec::Vector{Param},
+  tvec::Vector{<:Real})
+
+  Nt = length(tvec)
+  μ(i) = μvec[slow_idx(i,Nt)]
+  t(i) = tvec[fast_idx(i,Nt)]
+  matdata(i) = collect_cell_matrix(U(μ(i),t(i)),V,f(μ(i),t(i),du,dv))
+  nsnap = length(μvec)*Nt
+  MatrixAssemblerLoop(matdata,nsnap)
+end
+
+function get_matdata(
+  f::Function,
+  U::ParamTransientTrialFESpace,
+  V::FESpace,
+  du::Gridap.FESpaces.SingleFieldFEBasis,
+  dv::Gridap.FESpaces.SingleFieldFEBasis,
+  μvec::Vector{Param},
+  tvec::Vector{<:Real},
+  uvec::Vector{<:FEFunction})
+
+  Nt = length(tvec)
+  μ(i) = μvec[slow_idx(i,Nt)]
+  t(i) = tvec[fast_idx(i,Nt)]
+  u(i) = uvec[slow_idx(i,Nt)]
+  matdata(i) = collect_cell_matrix(U(μ(i),t(i)),V,f(u(i),du,dv))
+  nsnap = length(μvec)*Nt
+  MatrixAssemblerLoop(matdata,nsnap)
+end
+
+function get_matdata(
+  f::Function,
+  U::ParamTransientTrialFESpace,
+  V::FESpace,
+  du::Gridap.FESpaces.SingleFieldFEBasis,
+  dv::Gridap.FESpaces.SingleFieldFEBasis,
+  μvec::Vector{Param},
+  tvec::Vector{<:Real},
+  uvec::Vector{<:Function})
+
+  Nt = length(tvec)
+  μ(i) = μvec[slow_idx(i,Nt)]
+  t(i) = tvec[fast_idx(i,Nt)]
+  u(i) = uvec[slow_idx(i,Nt)]
+  matdata(i) = collect_cell_matrix(U(μ(i),t(i)),V,f(u(i)(t(i)),du,dv))
+  nsnap = length(μvec)*Nt
+  MatrixAssemblerLoop(matdata,nsnap)
 end
 
 function assembler_invariables(
   a::SparseMatrixAssembler,
-  get_matdata::Function,
-  μvec::Vector{Param},
-  tvec::Vector{<:Real})
+  matdata::MatrixAssemblerLoop)
 
-  matdata1 = get_matdata(first(μvec),first(tvec))
+  data = get_data(matdata)
+  matdata1 = data(1)
   m1 = Gridap.Algebra.nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
   symbolic_loop_matrix!(m1,a,matdata1)
   m2 = Gridap.Algebra.nz_allocation(m1)
@@ -257,27 +303,28 @@ end
 
 function assembler_loop(
   a::SparseMatrixAssembler,
-  get_matdata::Function,
+  matdata::MatrixAssemblerLoop,
   m1::Gridap.Algebra.CounterCSC{Float,Int,Gridap.Algebra.Loop},
-  findnz_idx::Vector{Int},
-  μvec::Vector{Param},
-  tvec::Vector{<:Real})
+  findnz_idx::Vector{Int})
 
-  Nz,Nt,np = length(findnz_idx),length(tvec),length(μvec)
-  mat = Elemental.zeros(EMatrix{Float},Nz,Nt*np)
-  @distributed for k = eachindex(μvec)
-    for n = eachindex(tvec)
-      matdata_kn = get_matdata(μvec[k],tvec[n])
-      m2 = Gridap.Algebra.nz_allocation(m1)
-      numeric_loop_matrix!(m2,a,matdata_kn)
-      copyto!(view(mat,:,(k-1)*Nt+n),my_create_from_nz(m2))
-    end
+  data = get_data(matdata)
+  nsnap = get_nsnap(matdata)
+  Nz = length(findnz_idx)
+
+  mats = Elemental.zeros(EMatrix{Float},Nz,nsnap)
+  @sync @distributed for i = 1:nsnap
+    matdata_i = data(i)
+    m2 = Gridap.Algebra.nz_allocation(m1)
+    numeric_loop_matrix!(m2,a,matdata_i)
+    copyto!(view(mats,:,i),my_create_from_nz(m2))
   end
 
-  mat
+  mats,findnz_idx
 end
 
-function my_create_from_nz(a::Gridap.Algebra.InserterCSC{Tv,Ti}) where {Tv,Ti}
+function my_create_from_nz(
+  a::Gridap.Algebra.InserterCSC{Tv,Ti}) where {Tv,Ti}
+
   k = 1
   for j in 1:a.ncols
     pini = Int(a.colptr[j])

@@ -44,7 +44,7 @@ end
 function blocks(mat::Matrix{T},nblocks=size(mat,2);dims=(size(mat,1),1)) where T
   @assert check_dimensions(mat,nblocks) "Wrong dimensions"
 
-  ncol_block = Int(size(mat)[2]/nblocks)
+  ncol_block = Int(size(mat,2)/nblocks)
   idx2 = ncol_block:ncol_block:size(mat)[2]
   idx1 = idx2 .- ncol_block .+ 1
 
@@ -96,21 +96,6 @@ function Base.NTuple(N::Int,T::DataType)
     NT = (NT...,zero(T))
   end
   NT::NTuple{N,T}
-end
-
-function SparseArrays.sparsevec(M::Matrix{T},findnz_idx::Vector{Int}) where T
-  sparse_vblocks = SparseVector{T}[]
-  for j = axes(M,2)
-    push!(sparse_vblocks,sparsevec(findnz_idx,M[:,j],maximum(findnz_idx)))
-  end
-
-  sparse_vblocks
-end
-
-function sparsevec_to_sparsemat(svec::SparseVector,Nc::Int)
-  ij,v = findnz(svec)
-  i,j = from_vec_to_mat_idx(ij,Nc)
-  sparse(i,j,v,maximum(i),Nc)
 end
 
 function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}

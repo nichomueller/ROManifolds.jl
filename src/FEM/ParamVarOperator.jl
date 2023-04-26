@@ -220,6 +220,18 @@ function ParamLiftOperator(op::ParamUnsteadyBilinOperator{Top,Ttr}) where {Top,T
     get_pspace(op),get_time_info(op),get_trial(op),get_test(op))
 end
 
+function unpack_for_assembly(op::ParamLinOperator)
+  get_param_fefunction(op),get_test(op)
+end
+
+function unpack_for_assembly(op::ParamBilinOperator)
+  get_param_fefunction(op),get_trial(op),get_test(op)
+end
+
+function unpack_for_assembly(op::ParamLiftOperator)
+  get_param_fefunction(op),get_test(op),get_dirichlet_function(op)
+end
+
 function assemble_affine_quantity(op::ParamOperator)
   assemble_affine_quantity(unpack_for_assembly(op)...,realization(op),first(get_times(op)))
 end
@@ -228,11 +240,11 @@ function assemble_affine_quantity(fefun::Function,test::FESpace,args...)
   assemble_vector(fefun(x->1),test)
 end
 
-function assemble_affine_quantity(fefun::Function,test::FESpace,trial::ParamTrialFESpace,μ::Param,args...)
+function assemble_affine_quantity(fefun::Function,trial::ParamTrialFESpace,test::FESpace,μ::Param,args...)
   assemble_matrix(fefun(x->1),trial(μ),test)
 end
 
-function assemble_affine_quantity(fefun::Function,test::FESpace,trial::ParamTransientTrialFESpace,μ::Param,t::Real)
+function assemble_affine_quantity(fefun::Function,trial::ParamTransientTrialFESpace,test::FESpace,μ::Param,t::Real)
   assemble_matrix(fefun(x->1),trial(μ,t),test)
 end
 

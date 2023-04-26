@@ -117,18 +117,19 @@ function rb_space_projection(
   basis_space::EMatrix{Float},
   findnz_idx::Vector{Int})
 
-  sparse_basis_space = sparsevec(basis_space,findnz_idx)
   rbspace_row = get_rbspace_row(op)
   brow = get_basis_space(rbspace_row)
   rbspace_col = get_rbspace_col(op)
   bcol = get_basis_space(rbspace_col)
 
-  Qs = length(sparse_basis_space)
+  Qs = size(basis_space,2)
   Ns = get_Ns(rbspace_col)
+  isparse,jsparse = from_vec_to_mat_idx(findnz_idx,Ns)
   red_basis_space = zeros(get_ns(rbspace_row)*get_ns(rbspace_col),Qs)
   for q = 1:Qs
-    smat = sparsevec_to_sparsemat(sparse_basis_space[q],Ns)
-    red_basis_space[:,q] = (brow'*smat*bcol)[:]
+    vsparse = Vector(basis_space[:,q])
+    smat = sparse(isparse,jsparse,vsparse,Ns,Ns)
+    red_basis_space[:,q] = Vector(brow'*smat*bcol)
   end
 
   red_basis_space
@@ -145,7 +146,7 @@ function mdeim_idx(rbspace::RBSpaceUnsteady)
   idx_space,idx_time
 end
 
-function mdeim_idx(M::EMatrix{Float})
+function mdeim_idx(M::AbstractMatrix{Float})
   n = size(M)[2]
   idx = zeros(Int,size(M,2))
   idx[1] = Int(argmax(abs.(M[:,1])))
@@ -191,7 +192,7 @@ function get_red_lu_factors(
 end
 
 function get_red_lu_factors(
-  basis::EMatrix{Float},
+  basis::AbstractMatrix{Float},
   idx::Vector{Int})
 
   basis_idx = basis[idx,:]
@@ -199,7 +200,7 @@ function get_red_lu_factors(
 end
 
 function get_red_lu_factors(
-  basis::NTuple{2,EMatrix{Float}},
+  basis::NTuple{2,AbstractMatrix{Float}},
   idx::NTuple{2,Vector{Int}})
 
   bs,bt = basis

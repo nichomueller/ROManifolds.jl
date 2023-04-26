@@ -13,8 +13,8 @@ end
 
 struct RBSpaceUnsteady <: RBSpace
   id::Symbol
-  basis_space::Matrix{Float}
-  basis_time::Matrix{Float}
+  basis_space::EMatrix{Float}
+  basis_time::EMatrix{Float}
 end
 
 function RBSpaceUnsteady(snaps::Snapshots;ϵ=1e-5,style=ReducedPOD())
