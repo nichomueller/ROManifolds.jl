@@ -110,16 +110,16 @@ function stokes_unsteady()
 
   printstyled("Online phase, reduced basis method\n";color=:red)
 
-  μon = μ[info.online_snaps]
-  Aon = RBParamOnlineStructure(Arb,μon;st_mdeim=info.st_mdeim)
-  Bon = RBParamOnlineStructure(Brb,μon;st_mdeim=info.st_mdeim)
-  BTon = RBParamOnlineStructure(BTrb,μon;st_mdeim=info.st_mdeim)
-  Mon = RBParamOnlineStructure(Mon,μon;st_mdeim=info.st_mdeim)
-  Fon = RBParamOnlineStructure(Fon,μon;st_mdeim=info.st_mdeim)
-  Hon = RBParamOnlineStructure(Hon,μon;st_mdeim=info.st_mdeim)
-  Alifton = RBParamOnlineStructure(Aliftrb,μon;st_mdeim=info.st_mdeim)
-  Blifton = RBParamOnlineStructure(Bliftrb,μon;st_mdeim=info.st_mdeim)
-  Mlifton = RBParamOnlineStructure(Mlifton,μon;st_mdeim=info.st_mdeim)
+  # μon = μ[info.online_snaps]
+  Aon = RBParamOnlineStructure(Arb;st_mdeim=info.st_mdeim)
+  Bon = RBParamOnlineStructure(Brb;st_mdeim=info.st_mdeim)
+  BTon = RBParamOnlineStructure(BTrb;st_mdeim=info.st_mdeim)
+  Mon = RBParamOnlineStructure(Mon;st_mdeim=info.st_mdeim)
+  Fon = RBParamOnlineStructure(Fon;st_mdeim=info.st_mdeim)
+  Hon = RBParamOnlineStructure(Hon;st_mdeim=info.st_mdeim)
+  Alifton = RBParamOnlineStructure(Aliftrb;st_mdeim=info.st_mdeim)
+  Blifton = RBParamOnlineStructure(Bliftrb;st_mdeim=info.st_mdeim)
+  Mlifton = RBParamOnlineStructure(Mlifton;st_mdeim=info.st_mdeim)
   param_on_structures = (Aon,Bon,BTon,Mon,Fon,Hon,Alifton,Blifton,Mlifton)
 
   function online_loop(k::Int)
