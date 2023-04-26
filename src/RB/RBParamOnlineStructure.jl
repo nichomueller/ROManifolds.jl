@@ -3,10 +3,6 @@ struct RBParamOnlineStructure
   assembler::Function
 end
 
-function RBParamOnlineStructure(op::RBVariable,assembler::Function)
-  RBParamOnlineStructure(op,assembler)
-end
-
 function RBParamOnlineStructure(ad::RBAffineDecomposition;kwargs...)
   ad_eval = eval_affine_decomposition(ad)
   RBParamOnlineStructure(ad,ad_eval;kwargs...)
@@ -76,13 +72,7 @@ function assemble(
   -assembler(args...)
 end
 
-function assemble(param_os::RBParamOnlineStructure,args...)
-  op = get_op(param_os)
-  assembler = get_assembler(param_os)
-  assemble(op,assembler,args...)
-end
-
-function assemble(param_os::RBParamOnlineStructure,args...)
+function assemble(param_os::RBParamOnlineStructure,args...)::Matrix{Float}
   op = get_op(param_os)
   assembler = get_assembler(param_os)
   assemble(op,assembler,args...)

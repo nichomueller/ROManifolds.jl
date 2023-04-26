@@ -92,12 +92,13 @@ function rb_time_projection(rbrow::RBSpaceUnsteady,mat::AbstractArray)
   @assert size(brow,1) == size(mat,1) "Cannot project array"
 
   nrow = size(brow,2)
+  ncol = 1
   Q = size(mat,2)
-  proj = Matrix{Float}(undef,nrow,Q)
+  proj = zeros(nrow,ncol,Q)
 
-  for q = 1:Q
-    for it = 1:nrow
-      proj[it,q] = sum(brow[:,it].*mat[:,q])
+  @inbounds for q = 1:Q
+    @inbounds for it = 1:nrow
+      proj[it,:,q] = sum(brow[:,it].*mat[:,q])
     end
   end
 
@@ -118,12 +119,12 @@ function rb_time_projection(
   nrow = size(brow,2)
   ncol = size(bcol,2)
   Q = size(mat,2)
-  proj = [Matrix{Float}(undef,nrow,ncol) for _ = 1:Q]
+  proj = zeros(nrow,ncol,Q)
 
-  for q = 1:Q
-    for jt = 1:ncol
-      for it = 1:nrow
-        proj[q][it,jt] = sum(brow[idx_forwards,it].*bcol[idx_backwards,jt].*mat[idx_forwards,q])
+  @inbounds for q = 1:Q
+    @inbounds for jt = 1:ncol
+      @inbounds for it = 1:nrow
+        proj[it,jt,q] = sum(brow[idx_forwards,it].*bcol[idx_backwards,jt].*mat[idx_forwards,q])
       end
     end
   end
@@ -132,36 +133,34 @@ function rb_time_projection(
 end
 
 function rb_spacetime_projection(rbrow::RBSpaceUnsteady,mat::AbstractMatrix)
-  proj_space = [rb_space_projection(rbrow,mat[:,i]) for i=axes(mat,2)]
-  proj_spacetime_block = rb_time_projection(rbrow,Matrix(proj_space)')
-  ns,nt = get_ns(rbrow),get_nt(rbrow)
-
-  proj_spacetime = zeros(ns*nt)
-  for i = 1:ns
-    proj_spacetime[1+(i-1)*nt:i*nt] = proj_spacetime_block[i]
-  end
-
-  proj_spacetime
+  proj_space = rb_space_projection(rbrow,mat)
+  proj_space_time = rb_time_projection(rbrow,proj_space')
+  reshape(proj_space_time,:,1)
 end
 
 function rb_spacetime_projection(
   rbrow::RBSpaceUnsteady,
   rbcol::RBSpaceUnsteady,
-  mat::Vector{AbstractMatrix};
+  mat::Array{Float,3};
   idx_forwards=1:size(mat,1),
   idx_backwards=1:size(mat,1))
 
-  proj_space = [rb_space_projection(rbrow,rbcol,mat[i])[:] for i=eachindex(mat)]
-  proj_spacetime_block = rb_time_projection(rbrow,rbcol,Matrix(proj_space)';
-    idx_forwards=idx_forwards,idx_backwards=idx_backwards)
   nsrow,ntrow = get_ns(rbrow),get_nt(rbrow)
   nscol,ntcol = get_ns(rbcol),get_nt(rbcol)
+  Nt = size(mat,3)
+
+  proj_space = zeros(nsrow*nscol,Nt)
+  @inbounds for n = 1:Nt
+    proj_space[:,n] = Vector(rb_space_projection(rbrow,rbcol,mat[:,:,n]))
+  end
+
+  proj_space_time = rb_time_projection(rbrow,rbcol,proj_space';
+    idx_forwards=idx_forwards,idx_backwards=idx_backwards)
 
   proj_spacetime = zeros(nsrow*ntrow,nscol*ntcol)
-  for i = 1:nscol
-    for j = 1:nsrow
-      proj_spacetime[1+(j-1)*ntrow:j*ntrow,1+(i-1)*ntcol:i*ntcol] =
-        proj_spacetime_block[(i-1)*nsrow+j]
+  @inbounds for i = 1:nscol
+    @inbounds for j = 1:nsrow
+      proj_spacetime[1+(j-1)*ntrow:j*ntrow,1+(i-1)*ntcol:i*ntcol] = proj_space_time[i,j,:]
     end
   end
 

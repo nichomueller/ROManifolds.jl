@@ -78,6 +78,12 @@ check_dimensions(vb::AbstractVector) =
 
 check_dimensions(m::AbstractMatrix,nb::Int) = iszero(size(m)[2]%nb)
 
+function array3D(mat::AbstractMatrix,nrows::Int)
+  ncols = Int(size(mat,1)/nrows)
+  nblocks = size(mat,2)
+  reshape(mat,nrows,ncols,nblocks)
+end
+
 function expand(tup::Tuple)
   ntup = ()
   for el = tup

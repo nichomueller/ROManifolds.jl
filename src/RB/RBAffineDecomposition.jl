@@ -77,7 +77,7 @@ function eval_affine_decomposition(
   ad::RBAffineDecomposition{Affine,Ttr,Matrix{Float}}) where Ttr
 
   ns_row = get_ns(get_rbspace_row(op))
-  blocks(get_affine_decomposition(ad),ns_row)
+  array3D(get_affine_decomposition(ad),ns_row)
 end
 
 function eval_affine_decomposition(
@@ -86,7 +86,7 @@ function eval_affine_decomposition(
 
   ns_row = get_ns(get_rbspace_row(op))
   mdeim = get_affine_decomposition(ad)
-  blocks(get_basis_space(mdeim),ns_row)
+  array3D(get_basis_space(mdeim),ns_row)
 end
 
 function save(info::RBInfo,ad::RBAffineDecomposition)

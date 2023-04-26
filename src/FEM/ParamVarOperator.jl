@@ -8,10 +8,14 @@ get_param_function(pf::ParamFunctions) = pf.fun
 get_param_fefunction(pf::ParamFunctions) = pf.fefun
 
 struct TimeInfo
-  t0::Real
-  tF::Real
-  dt::Real
-  θ::Real
+  t0::Float
+  tF::Float
+  dt::Float
+  θ::Float
+
+  function TimeInfo(t0::Real,tF::Real,dt::Real,θ::Real)
+    new(Float(t0),Float(tF),Float(dt),Float(θ))
+  end
 end
 
 get_dt(ti::TimeInfo) = ti.dt
@@ -24,7 +28,11 @@ get_times(ti::TimeInfo) = collect(ti.t0:ti.dt:ti.tF-ti.dt).+ti.dt*ti.θ
 
 realization(ti::TimeInfo) = rand(Uniform(ti.t0,ti.tF))
 
-function compute_in_times(mat::Matrix{Float},θ::Real;mat0=zeros(size(mat,1)))
+function compute_in_times(
+  mat::Matrix{Float},
+  θ::Float;
+  mat0=zeros(size(mat,1)))
+
   mat_prev = hcat(mat0,mat[:,1:end-1])
   θ*mat + (1-θ)*mat_prev
 end

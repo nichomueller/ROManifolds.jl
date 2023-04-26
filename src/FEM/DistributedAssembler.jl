@@ -86,7 +86,7 @@ function get_vecdata(
   V::FESpace,
   dv::Gridap.FESpaces.SingleFieldFEBasis,
   μvec::Vector{Param},
-  tvec::Vector{<:Real})
+  tvec::Vector{Float})
 
   Nt = length(tvec)
   μ(i) = μvec[slow_idx(i,Nt)]
@@ -102,7 +102,7 @@ function get_vecdata(
   dv::Gridap.FESpaces.SingleFieldFEBasis,
   dir::Function,
   μvec::Vector{Param},
-  tvec::Vector{<:Real})
+  tvec::Vector{Float})
 
   Nt = length(tvec)
   μ(i) = μvec[slow_idx(i,Nt)]
@@ -118,7 +118,7 @@ function get_vecdata(
   dv::Gridap.FESpaces.SingleFieldFEBasis,
   dir::Function,
   μvec::Vector{Param},
-  tvec::Vector{<:Real},
+  tvec::Vector{Float},
   uvec::Vector{<:FEFunction})
 
   Nt = length(tvec)
@@ -190,7 +190,7 @@ function assembler_setup(
   U::ParamTransientTrialFESpace,
   V::FESpace,
   μvec::Vector{Param},
-  tvec::Vector{<:Real},
+  tvec::Vector{Float},
   args...)
 
   U1 = U(first(μvec),first(tvec))
@@ -235,7 +235,7 @@ function get_matdata(
   du::Gridap.FESpaces.SingleFieldFEBasis,
   dv::Gridap.FESpaces.SingleFieldFEBasis,
   μvec::Vector{Param},
-  tvec::Vector{<:Real})
+  tvec::Vector{Float})
 
   Nt = length(tvec)
   μ(i) = μvec[slow_idx(i,Nt)]
@@ -252,7 +252,7 @@ function get_matdata(
   du::Gridap.FESpaces.SingleFieldFEBasis,
   dv::Gridap.FESpaces.SingleFieldFEBasis,
   μvec::Vector{Param},
-  tvec::Vector{<:Real},
+  tvec::Vector{Float},
   uvec::Vector{<:FEFunction})
 
   Nt = length(tvec)
@@ -271,7 +271,7 @@ function get_matdata(
   du::Gridap.FESpaces.SingleFieldFEBasis,
   dv::Gridap.FESpaces.SingleFieldFEBasis,
   μvec::Vector{Param},
-  tvec::Vector{<:Real},
+  tvec::Vector{Float},
   uvec::Vector{<:Function})
 
   Nt = length(tvec)
@@ -341,26 +341,6 @@ function my_create_from_nz(
 
   my_nnz = findall(v -> abs.(v) .>= eps(), a.nzval)
   a.nzval[my_nnz]
-end
-
-function get_findnz_vals(
-  ::EMatrix,
-  arr::AbstractMatrix{Float},
-  findnz_idx::Vector{Int})
-
-  EMatrix(get_findnz_vals(arr,findnz_idx))
-end
-
-function get_findnz_vals(
-  vec::Vector{SparseMatrixCSC{Float,Int}},
-  findnz_idx::Vector{Int})
-
-  nz,nvec = length(findnz_idx),length(vec)
-  mat = Elemental.zeros(EMatrix{Float},nz,nvec)
-  @inbounds @simd for k = eachindex(vec)
-    copyto!(view(mat,:,k),get_findnz_vals(vec[k],findnz_idx))
-  end
-  mat
 end
 
 function get_findnz_idx(mat::EMatrix{Float})
