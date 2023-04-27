@@ -6,7 +6,7 @@ using MPI,MPIClusterManagers,Distributed
 @everywhere include("$root/src/RBTests/RBTests.jl")
 
 function stokes_unsteady()
-  run_fem = false
+  run_fem = true
 
   steady = false
   indef = true
@@ -33,7 +33,7 @@ function stokes_unsteady()
 
   function a(x,p::Param,t::Real)
     μ = get_μ(p)
-    μ[1]*exp((cos(t)+sin(t))*x[1]/sum(μ))
+    exp((cos(t)+sin(t))*x[1]/sum(μ))
   end
   a(p::Param,t::Real) = x->a(x,p,t)
   b(x,p::Param,t::Real) = 1.
@@ -48,7 +48,7 @@ function stokes_unsteady()
     μ = get_μ(p)
     W = 1.5
     T = 0.16
-    flow_rate = μ[4]*abs(1-cos(pi*t/T)+μ[2]*sin(μ[3]*pi*t/T))
+    flow_rate = abs(1-cos(pi*t/T)+μ[2]*sin(μ[3]*pi*t/T))
     parab_prof = VectorValue(abs.(x[2]*(x[2]-W))/(W/2)^2,0.)
     parab_prof*flow_rate
   end
@@ -129,8 +129,7 @@ function stokes_unsteady()
       lhs,rhs = unsteady_stokes_rb_system(param_on_structures,μ[k])
       rb_sol = solve_rb_system(lhs,rhs)
     end
-    uhk = get_snap(uh[k])
-    phk = get_snap(ph[k])
+    uhk,phk = get_snap(uh[k]),get_snap(ph[k])
     uhk_rb,phk_rb = reconstruct_fe_sol(rbspace,rb_sol)
     ErrorTracker(:u,uhk,uhk_rb),ErrorTracker(:p,phk,phk_rb)
   end

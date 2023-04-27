@@ -109,7 +109,7 @@ function Gridap.writevtk(
 
   path = joinpath(plt_dir,"$(id)h")
   for (it,t) in enumerate(times)
-    fefun = FEFunction(X(t),s.snap[:,it])
+    fefun = FEFunction(X(t),Vector(s.snap[:,it]))
     writevtk(trian,path*"_$(it).vtu",cellfields=["$(id)h"=>fefun])
   end
 end

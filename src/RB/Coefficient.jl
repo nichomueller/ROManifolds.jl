@@ -21,12 +21,12 @@ function compute_coefficient(
 
   fun = get_param_function(op)
   times = get_times(op)
-  Qs,Nt = 1,length(times)
+  Nt,Qs = length(times),1
   coeff = zeros(Nt,Qs)
 
   function coeff!(μ::Param)
     @inbounds for (n,tn) in enumerate(times)
-      coeff[:,n] .= fun(nothing,μ,tn)[1]
+      coeff[n,:] .= fun(nothing,μ,tn)[1]
     end
     coeff
   end
@@ -346,7 +346,7 @@ function get_coeff_by_time_bases(op::RBUnsteadyVariable,Qs::Int)
     @assert size(coeff,2) == Qs "Dimension mismatch: $(size(coeff,2)) != $Qs"
 
     @inbounds for q = 1:Qs, it = 1:nrow
-      proj[it,:,q] = sum(brow[:,it].*coeff[:,q])
+      proj[it,:,q] .= sum(brow[:,it].*coeff[:,q])
     end
     proj
   end
@@ -361,35 +361,25 @@ function get_coeff_by_time_bases(op::RBUnsteadyBilinVariable,Qs::Int)
   bcol = get_basis_time(rbcol)
   nrow = size(brow,2)
   ncol = size(bcol,2)
-
+  Nt = get_Nt(op)
   θ = get_θ(op)
   dt = get_dt(op)
-  Nt = get_Nt(op)
-
-  btbt = zeros(Nt,nrow,ncol)
-  btbt_shift = zeros(Nt-1,nrow,ncol)
-  @inbounds for jt = 1:ncol, it = 1:nrow
-    row_idx = fast_idx((jt-1)*ncol+it,ncol)
-    col_idx = slow_idx((jt-1)*ncol+it,ncol)
-    btbt[:,row_idx,col_idx] .= sum(brow[:,it].*bcol[:,jt])
-    btbt_shift[:,row_idx,col_idx] .= sum(brow[2:Nt,it].*bcol[1:Nt-1,jt])
-  end
 
   proj = zeros(nrow,ncol,Qs)
-  function time_proj!(bt_mult::AbstractArray,coeff::AbstractMatrix)
+  proj_shift = zeros(nrow,ncol,Qs)
+  function time_proj!(coeff::AbstractMatrix)
     @assert size(coeff,2) == Qs "Dimension mismatch: $(size(coeff,2)) != $Qs"
     @inbounds for q = 1:Qs, jt = 1:ncol, it = 1:nrow
-      proj[it,jt,q] = sum(bt_mult[:,it,jt].*coeff[:,q])
+      proj[it,jt,q] = sum(brow[:,it].*bcol[:,jt].*coeff[:,q])
+      proj_shift[it,jt,q] = sum(brow[2:Nt,it].*bcol[1:Nt-1,jt].*coeff[2:Nt,q])
     end
-    proj
+
+    if get_id(op) == :M
+      return proj/dt - proj_shift/dt
+    else
+      return θ*proj + (1-θ)*proj_shift
+    end
   end
 
-  btbtc(coeff::AbstractMatrix) = time_proj!(btbt,coeff)
-  btbtc_shift(coeff::AbstractMatrix) = time_proj!(btbt_shift,coeff[2:Nt,:])
-
-  if get_id(op) == :M
-    (coeff::AbstractMatrix) -> btbtc(coeff)/dt - btbtc_shift(coeff)/dt
-  else
-    (coeff::AbstractMatrix) -> θ*btbtc(coeff) + (1-θ)*btbtc_shift(coeff)
-  end
+  time_proj!
 end

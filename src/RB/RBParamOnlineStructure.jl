@@ -82,20 +82,11 @@ end
 function assemble(
   param_os::NTuple{N,RBParamOnlineStructure},
   sym::Symbol,
-  args...) where N
+  args...)::Matrix{Float} where N
 
   syms = get_id.(get_op.(param_os))
   idx = findall(x -> x == sym,syms)[1]
   op = get_op(param_os[idx])
   assembler = get_assembler(param_os[idx])
   assemble(op,assembler,args...)
-end
-
-function assemble(
-  param_os::NTuple{N1,RBParamOnlineStructure},
-  syms::NTuple{N2,Symbol},
-  args...) where {N1,N2}
-
-  assemble(sym::Symbol) = assemble(param_os,sym,args...)
-  assemble.(syms)
 end

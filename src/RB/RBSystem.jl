@@ -33,12 +33,17 @@ function unsteady_stokes_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
 
-  lhs = assemble(rbpos,(:A,:B,:BT,:M),μ)
-  rhs = assemble(rbpos,(:F,:H,:A_lift,:B_lift,:M_lift),μ)
+  mblock11 = assemble(rbpos,:A,μ)+assemble(rbpos,:M,μ)
+  mblock12 = -assemble(rbpos,:BT,μ)
+  mblock21 = assemble(rbpos,:B,μ)
+  mblock22 = zeros(size(mblock21,1),size(mblock12,2))
 
-  np = size(lhs[2],1)
-  rb_lhs = vcat(hcat(lhs[1]+lhs[4],-lhs[3]),hcat(lhs[2],zeros(np,np)))
-  rb_rhs = vcat(rhs[1]+rhs[2]+rhs[3]+rhs[5],rhs[4])
+  vblock1 = assemble(rbpos,:F,μ)+assemble(rbpos,:H,μ)+assemble(rbpos,:A_lift,μ)+
+    assemble(rbpos,:M_lift,μ)
+  vblock2 = assemble(rbpos,:B_lift,μ)
+
+  rb_lhs = vcat(hcat(mblock11,mblock12),hcat(mblock21,mblock22))
+  rb_rhs = vcat(vblock1,vblock2)
   rb_lhs,rb_rhs
 end
 
