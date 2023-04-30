@@ -4,34 +4,34 @@ abstract type MDEIM end
 
 struct MDEIMSteady <: MDEIM
   rbspace::RBSpaceSteady
-  red_lu_factors::LU
+  rb_lu::EMatrix{Float}
   idx::Vector{Int}
   red_measure::Measure
 end
 
 struct MDEIMUnsteady <: MDEIM
   rbspace::RBSpaceUnsteady
-  red_lu_factors::LU
+  rb_lu::EMatrix{Float}
   idx::NTuple{2,Vector{Int}}
   red_measure::Measure
 end
 
 function MDEIM(
   red_rbspace::RBSpaceSteady,
-  red_lu_factors::LU,
+  rb_lu::EMatrix{Float},
   idx::Vector{Int},
   red_measure::Measure)
 
-  MDEIMSteady(red_rbspace,red_lu_factors,idx,red_measure)
+  MDEIMSteady(red_rbspace,rb_lu,idx,red_measure)
 end
 
 function MDEIM(
   red_rbspace::RBSpaceUnsteady,
-  red_lu_factors::LU,
+  rb_lu::EMatrix{Float},
   idx::NTuple{2,Vector{Int}},
   red_measure::Measure)
 
-  MDEIMUnsteady(red_rbspace,red_lu_factors,idx,red_measure)
+  MDEIMUnsteady(red_rbspace,rb_lu,idx,red_measure)
 end
 
 function MDEIM(
@@ -48,16 +48,16 @@ function MDEIM(
   rbspace,findnz_idx = mdeim_basis(info,op,μ_mdeim,args...)
   red_rbspace = project_mdeim_basis(op,rbspace,findnz_idx)
   idx = mdeim_idx(rbspace)
-  red_lu_factors = get_red_lu_factors(info,rbspace,idx)
+  rb_lu = get_rb_lu(info,rbspace,idx)
   idx = recast_in_full_dim(idx,findnz_idx)
   red_meas = get_red_measure(op,idx,meas)
 
-  MDEIM(red_rbspace,red_lu_factors,idx,red_meas)
+  MDEIM(red_rbspace,rb_lu,idx,red_meas)
 end
 
 get_rbspace(mdeim::MDEIM) = mdeim.rbspace
 
-get_red_lu_factors(mdeim::MDEIM) = mdeim.red_lu_factors
+get_rb_lu(mdeim::MDEIM) = mdeim.rb_lu
 
 get_id(mdeim::MDEIM) = get_id(get_rbspace(mdeim))
 
@@ -160,38 +160,38 @@ function mdeim_idx(mat::AbstractMatrix{Float})
   unique(idx)
 end
 
-function get_red_lu_factors(
+function get_rb_lu(
   ::RBInfoSteady,
   rbspace::RBSpaceSteady,
   idx_space::Vector{Int})
 
   basis = get_basis_space(rbspace)
-  get_red_lu_factors(basis,idx_space)
+  get_rb_lu(basis,idx_space)
 end
 
-function get_red_lu_factors(info::RBInfoUnsteady,args...)
-  get_red_lu_factors(Val(info.st_mdeim),args...)
+function get_rb_lu(info::RBInfoUnsteady,args...)
+  get_rb_lu(Val(info.st_mdeim),args...)
 end
 
-function get_red_lu_factors(
+function get_rb_lu(
   ::Val{false},
   rbspace::RBSpaceUnsteady,
   idx_st::NTuple{2,Vector{Int}})
 
   basis = get_basis_space(rbspace)
-  get_red_lu_factors(basis,first(idx_st))
+  get_rb_lu(basis,first(idx_st))
 end
 
-function get_red_lu_factors(
+function get_rb_lu(
   ::Val{true},
   rbspace::RBSpaceUnsteady,
   idx_st::NTuple{2,Vector{Int}})
 
   basis = get_basis_space(rbspace),get_basis_time(rbspace)
-  get_red_lu_factors(basis,idx_st)
+  get_rb_lu(basis,idx_st)
 end
 
-function get_red_lu_factors(
+function get_rb_lu(
   basis::AbstractMatrix{Float},
   idx::Vector{Int})
 
@@ -199,7 +199,7 @@ function get_red_lu_factors(
   lu(basis_idx)
 end
 
-function get_red_lu_factors(
+function get_rb_lu(
   basis::NTuple{2,AbstractMatrix{Float}},
   idx::NTuple{2,Vector{Int}})
 
@@ -207,7 +207,7 @@ function get_red_lu_factors(
   idx_space,idx_time = idx
   bs_idx = bs[idx_space,:]
   bt_idx = bt[idx_time,:]
-  bst_idx = kron(bt_idx,bs_idx)
+  bst_idx = EMatrix(kron(bt_idx,bs_idx))
 
   lu(bst_idx)
 end
@@ -285,18 +285,14 @@ end
 
 function save(path::String,mdeim::MDEIMSteady)
   save(path,get_rbspace(mdeim))
-  red_lu = get_red_lu_factors(mdeim)
-  save(joinpath(path,"LU"),red_lu.factors)
-  save(joinpath(path,"p"),red_lu.ipiv)
+  save(joinpath(path,"rb_lu"),get_rb_lu(mdeim))
 end
 
 function save(path::String,mdeim::MDEIMUnsteady)
   save(path,get_rbspace(mdeim))
   save(joinpath(path,"idx_space"),get_idx_space(mdeim))
   save(joinpath(path,"idx_time"),get_idx_time(mdeim))
-  red_lu = get_red_lu_factors(mdeim)
-  save(joinpath(path,"LU"),red_lu.factors)
-  save(joinpath(path,"p"),red_lu.ipiv)
+  save(joinpath(path,"rb_lu"),get_rb_lu(mdeim))
 end
 
 function load(
@@ -309,12 +305,10 @@ function load(
 
   rbspace = load(info,id)
   idx_space = load(Vector{Int},joinpath(path_id,"idx_space"))
-  factors = load(joinpath(path_id,"LU"))
-  ipiv = load(Vector{Int},joinpath(path_id,"p"))
-  red_lu_factors = LU(factors,ipiv,0)
+  rb_lu = load(EMatrix{Float},joinpath(path_id,"rb_lu"))
   red_measure = get_red_measure(op,idx_space,meas)
 
-  MDEIM(rbspace,red_lu_factors,idx_space,red_measure)
+  MDEIM(rbspace,rb_lu,idx_space,red_measure)
 end
 
 function load(
@@ -329,10 +323,8 @@ function load(
   idx_space = load(Vector{Int},joinpath(path_id,"idx_space"))
   idx_time = load(Vector{Int},joinpath(path_id,"idx_time"))
   idx = (idx_space,idx_time)
-  factors = load(joinpath(path_id,"LU"))
-  ipiv = load(Vector{Int},joinpath(path_id,"p"))
-  red_lu_factors = LU(factors,ipiv,0)
+  rb_lu = load(EMatrix{Float},joinpath(path_id,"rb_lu"))
   red_measure = get_red_measure(op,idx_space,meas)
 
-  MDEIM(rbspace,red_lu_factors,idx,red_measure)
+  MDEIM(rbspace,rb_lu,idx,red_measure)
 end

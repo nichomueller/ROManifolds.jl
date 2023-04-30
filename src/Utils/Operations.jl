@@ -37,32 +37,10 @@ function allocate_matrix(::EMatrix{Float},sizes...)
   Elemental.zeros(EMatrix{Float},Nr,Nc)
 end
 
-function blocks(mat::Matrix{T},nrow::Int) where T
-  blocks(mat,size(mat,2);dims=(nrow,:))
-end
-
-function blocks(mat::Matrix{T},nblocks=size(mat,2);dims=(size(mat,1),1)) where T
-  @assert check_dimensions(mat,nblocks) "Wrong dimensions"
-
-  ncol_block = Int(size(mat,2)/nblocks)
-  idx2 = ncol_block:ncol_block:size(mat)[2]
-  idx1 = idx2 .- ncol_block .+ 1
-
-  blockmat = Matrix{T}[]
-  @inbounds for i in eachindex(idx1)
-    block_i = reshape(mat[:,idx1[i]:idx2[i]],dims)
-    push!(blockmat,block_i)
-  end
-  blockmat
-end
-
-function blocks(mat::Array{T,3};dims=size(mat)[1:2]) where T
-  blockmat = Matrix{T}[]
-  for nb = 1:size(mat,3)
-    block_i = Matrix(reshape(mat[:,:,nb],dims))
-    push!(blockmat,block_i)
-  end
-  blockmat
+function blocks(mat::AbstractMatrix{Float};dims=(size(mat,1),1))
+  @assert size(mat,1) == prod(dims)
+  nblocks = size(mat,2)
+  [reshape(mat[:,k],dims) for k = 1:nblocks]
 end
 
 function vblocks(mat::Matrix{T}) where T
@@ -72,11 +50,6 @@ function vblocks(mat::Matrix{T}) where T
   end
   blockvec
 end
-
-check_dimensions(vb::AbstractVector) =
-  all([size(vb[i])[1] == size(vb[1])[1] for i = 2:length(vb)])
-
-check_dimensions(m::AbstractMatrix,nb::Int) = iszero(size(m)[2]%nb)
 
 function array3D(mat::AbstractMatrix,nrows::Int)
   ncols = Int(size(mat,1)/nrows)

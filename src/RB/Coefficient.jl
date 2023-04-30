@@ -1,12 +1,4 @@
-function compute_coefficient(
-  op::RBUnsteadyVariable,
-  mdeim::MDEIMUnsteady;
-  st_mdeim=false)
-
-  compute_coefficient(op,mdeim,Val(st_mdeim))
-end
-
-function compute_coefficient(
+function get_coefficient(
   op::RBSteadyVariable{Affine,Ttr},
   args...) where Ttr
 
@@ -14,7 +6,7 @@ function compute_coefficient(
   (μ::Param) -> [fun(nothing,μ)[1]]
 end
 
-function compute_coefficient(
+function get_coefficient(
   op::RBUnsteadyVariable{Affine,Ttr},
   basis::AbstractMatrix;
   kwargs...) where Ttr
@@ -36,20 +28,15 @@ function compute_coefficient(
   (μ::Param) -> coeff_by_time_bases(coeff!(μ))
 end
 
-function setup_coefficient(
-  op::RBVariable,
-  mdeim::MDEIM,
-  args...)
+function get_coefficient(
+  op::RBUnsteadyVariable,
+  mdeim::MDEIMUnsteady;
+  st_mdeim=false)
 
-  red_lu = get_red_lu_factors(mdeim)
-  idx_space = get_idx_space(mdeim)
-  m = get_red_measure(mdeim)
-  A = hyperred_structure(op,m,idx_space,args...)
-  mdeim_solver = mdeim_online(red_lu)
-  mdeim_solver,A
+  get_coefficient(op,mdeim,Val(st_mdeim))
 end
 
-function compute_coefficient(
+function get_coefficient(
   op::RBSteadyVariable,
   mdeim::MDEIMSteady)
 
@@ -57,7 +44,7 @@ function compute_coefficient(
   (μ::Param) -> mdeim_solver(A(μ))
 end
 
-function compute_coefficient(
+function get_coefficient(
   op::RBSteadyVariable{Nonlinear,Ttr},
   mdeim::MDEIMSteady) where Ttr
 
@@ -65,7 +52,7 @@ function compute_coefficient(
   (μ::Param,z) -> mdeim_solver(A(μ,z))
 end
 
-function compute_coefficient(
+function get_coefficient(
   op::RBUnsteadyVariable,
   mdeim::MDEIMUnsteady,
   ::Val{false})
@@ -78,7 +65,7 @@ function compute_coefficient(
   (μ::Param) -> coeff_by_time_bases(coeff(μ))
 end
 
-function compute_coefficient(
+function get_coefficient(
   op::RBUnsteadyVariable{Nonlinear,Ttr},
   mdeim::MDEIMUnsteady,
   ::Val{false}) where Ttr
@@ -91,7 +78,7 @@ function compute_coefficient(
   (μ::Param,z) -> coeff_by_time_bases(coeff(μ,z))
 end
 
-function compute_coefficient(
+function get_coefficient(
   op::RBUnsteadyVariable,
   mdeim::MDEIMUnsteady,
   ::Val{true})
@@ -106,7 +93,7 @@ function compute_coefficient(
   (μ::Param) -> coeff_by_time_bases(interp_coeff(coeff(μ)))
 end
 
-function compute_coefficient(
+function get_coefficient(
   op::RBUnsteadyVariable{Nonlinear,Ttr},
   mdeim::MDEIMUnsteady,
   ::Val{true}) where Ttr
@@ -119,6 +106,19 @@ function compute_coefficient(
 
   coeff(μ::Param,z) = mdeim_solver(A(μ,z)[:])
   (μ::Param,z) -> coeff_by_time_bases(interp_coeff(coeff(μ,z)))
+end
+
+function setup_coefficient(
+  op::RBVariable,
+  mdeim::MDEIM,
+  args...)
+
+  red_lu = get_rb_lu(mdeim)
+  idx_space = get_idx_space(mdeim)
+  m = get_red_measure(mdeim)
+  A = hyperred_structure(op,m,idx_space,args...)
+  mdeim_solver = mdeim_online(red_lu)
+  mdeim_solver,A
 end
 
 function hyperred_structure(
@@ -141,11 +141,11 @@ function hyperred_structure(
   fun = get_param_fefunction(op)
   test = get_test(op)
   ns,nt = length(idx_space),length(times)
-  V = zeros(ns,nt)
+  V = allocate_matrix(EMatrix{Float},ns,nt)
 
   function V!(μ::Param)
     @inbounds for (n,tn) in enumerate(times)
-      V[:,n] = assemble_vector(v->fun(μ,tn,m,v),test)[idx_space]
+      copyto!(view(V,:,n),assemble_vector(v->fun(μ,tn,m,v),test)[idx_space])
     end
     V
   end
@@ -175,7 +175,7 @@ function hyperred_structure(
   trial = get_trial(op)
   test = get_test(op)
   ns,nt = length(idx_space),length(times)
-  M = zeros(ns,nt)
+  M = allocate_matrix(EMatrix{Float},ns,nt)
 
   function M!(μ::Param)
     @inbounds for (n,tn) in enumerate(times)
@@ -211,7 +211,7 @@ function hyperred_structure(
   test = get_test(op)
   dir(μ::Param,tn::Float) = get_dirichlet_function(op)(μ,tn)
   ns,nt = length(idx_space),length(times)
-  lift = zeros(ns,nt)
+  lift = allocate_matrix(EMatrix{Float},ns,nt)
 
   function lift!(μ::Param)
     @inbounds for (n,tn) in enumerate(times)
@@ -246,7 +246,7 @@ function hyperred_structure(
   trial = get_trial(op)
   test = get_test(op)
   ns,nt = length(idx_space),length(times)
-  M = zeros(ns,nt)
+  M = allocate_matrix(EMatrix{Float},ns,nt)
 
   function M!(μ::Param,z)
     @inbounds for (n,tn) in enumerate(times)
@@ -282,7 +282,7 @@ function hyperred_structure(
   test = get_test(op)
   dir(μ::Param,tn::Float) = get_dirichlet_function(op)(μ,tn)
   ns,nt = length(idx_space),length(times)
-  lift = zeros(ns,nt)
+  lift = allocate_matrix(EMatrix{Float},ns,nt)
 
   function lift!(μ::Param,z)
     @inbounds for (n,tn) in enumerate(times)
@@ -320,7 +320,7 @@ function get_interp_coeff(mdeim::MDEIMUnsteady)
   Qt = size(bt,2)
   sorted_idx(qs) = [(i-1)*Qs+qs for i = 1:Qt]
 
-  interp_coeff = zeros(Qt,Qs)
+  interp_coeff = allocate_matrix(EMatrix{Float},Qt,Qs)
   function interp_coeff!(coeff::AbstractMatrix)
     @inbounds for qs = 1:Qs
       interp_coeff[:,qs] = bt*coeff[sorted_idx(qs)]
@@ -372,6 +372,43 @@ function get_coeff_by_time_bases(op::RBUnsteadyBilinVariable,Qs::Int)
     @inbounds for q = 1:Qs, jt = 1:ncol, it = 1:nrow
       proj[it,jt,q] = sum(brow[:,it].*bcol[:,jt].*coeff[:,q])
       proj_shift[it,jt,q] = sum(brow[2:Nt,it].*bcol[1:Nt-1,jt].*coeff[2:Nt,q])
+    end
+
+    if get_id(op) == :M
+      return proj/dt - proj_shift/dt
+    else
+      return θ*proj + (1-θ)*proj_shift
+    end
+  end
+
+  time_proj!
+end
+
+function get_coeff_by_time_bases_try(op::RBUnsteadyBilinVariable,Qs::Int)
+  rbrow = get_rbspace_row(op)
+  rbcol = get_rbspace_col(op)
+  brow = get_basis_time(rbrow)
+  bcol = get_basis_time(rbcol)
+  nrow = size(brow,2)
+  ncol = size(bcol,2)
+  Nt = get_Nt(op)
+  θ = get_θ(op)
+  dt = get_dt(op)
+
+  btbt = zeros(Nt,nrow*ncol)
+  btbt_shift = zeros(Nt-1,nrow*ncol)
+  @inbounds for jt = 1:ncol, it = 1:nrow
+    btbt[:,(jt-1)*nrow+it] .= brow[:,it].*bcol[:,jt]
+    btbt_shift[:,(jt-1)*nrow+it] .= brow[2:Nt,it].*bcol[1:Nt-1,jt]
+  end
+
+  proj = zeros(nrow*ncol,Qs)
+  proj_shift = zeros(nrow*ncol,Qs)
+  function time_proj!(coeff::AbstractMatrix)
+    @assert size(coeff,2) == Qs "Dimension mismatch: $(size(coeff,2)) != $Qs"
+    @inbounds for q = 1:Qs, ijt = 1:ncol*nrow
+      proj[ijt,q] = sum(btbt[:,ijt].*coeff[:,q])
+      proj_shift[ijt,q] = sum(btbt_shift[:,ijt].*coeff[2:Nt,q])
     end
 
     if get_id(op) == :M

@@ -59,9 +59,9 @@ end
 
 function eval_affine_decomposition(
   ::RBSteadyVariable,
-  ad::RBAffineDecomposition{Affine,Ttr,Matrix{Float}}) where Ttr
+  ad::RBAffineDecomposition{Affine,Ttr,AbstractMatrix{Float}}) where Ttr
 
-  get_affine_decomposition(ad)
+  [get_affine_decomposition(ad)]
 end
 
 function eval_affine_decomposition(
@@ -69,15 +69,16 @@ function eval_affine_decomposition(
   ad::RBAffineDecomposition)
 
   mdeim = get_affine_decomposition(ad)
-  get_basis_space(mdeim)
+  [get_basis_space(mdeim)]
 end
 
 function eval_affine_decomposition(
   op::RBUnsteadyVariable,
-  ad::RBAffineDecomposition{Affine,Ttr,Matrix{Float}}) where Ttr
+  ad::RBAffineDecomposition{Affine,Ttr,AbstractMatrix{Float}}) where Ttr
 
   ns_row = get_ns(get_rbspace_row(op))
-  array3D(get_affine_decomposition(ad),ns_row)
+  ns_col = get_ns(get_rbspace_col(op))
+  blocks(get_affine_decomposition(ad);dims = (ns_row,ns_col))
 end
 
 function eval_affine_decomposition(
@@ -85,8 +86,9 @@ function eval_affine_decomposition(
   ad::RBAffineDecomposition)
 
   ns_row = get_ns(get_rbspace_row(op))
+  ns_col = get_ns(get_rbspace_col(op))
   mdeim = get_affine_decomposition(ad)
-  array3D(get_basis_space(mdeim),ns_row)
+  blocks(get_basis_space(mdeim);dims = (ns_row,ns_col))
 end
 
 function save(info::RBInfo,ad::RBAffineDecomposition)
@@ -98,7 +100,7 @@ end
 
 function save(
   path::String,
-  ad::RBAffineDecomposition{Affine,Ttr,Matrix{Float}}) where Ttr
+  ad::RBAffineDecomposition{Affine,Ttr,AbstractMatrix{Float}}) where Ttr
 
   ad = get_affine_decomposition(ad)
   save(joinpath(path,"basis_space"),ad)
@@ -137,7 +139,7 @@ function load(
   printstyled("Loading projected Affine variable $id \n";color=:blue)
   path_id = joinpath(info.offline_path,"$id")
 
-  ad = load(joinpath(path_id,"basis_space"))
+  ad = load(EMatrix{Float},joinpath(path_id,"basis_space"))
   RBAffineDecomposition(op,ad)
 end
 

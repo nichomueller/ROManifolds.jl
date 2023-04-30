@@ -4,53 +4,60 @@ struct RBParamOnlineStructure
 end
 
 function RBParamOnlineStructure(ad::RBAffineDecomposition;kwargs...)
+  op = get_op(ad)
   ad_eval = eval_affine_decomposition(ad)
-  RBParamOnlineStructure(ad,ad_eval;kwargs...)
+  basis = get_affine_decomposition(ad)
+  coeff = get_coefficient(op,basis;kwargs...)
+  assembler = get_assembler(op,ad_eval,get_nrows(op),get_ncols(op))
+
+  RBParamOnlineStructure(ad,coeff,assembler)
 end
 
 function RBParamOnlineStructure(
   ad::RBAffineDecomposition,
-  ad_eval::AbstractArray;
-  kwargs...)
+  coeff::Function,
+  assembler::Function)
 
-  op = get_op(ad)
-  basis = get_affine_decomposition(ad)
-  coeff = compute_coefficient(op,basis;kwargs...)
-  assembler(μ::Param) = rb_online_product(ad_eval,coeff(μ);nr=get_nrows(op))
-  RBParamOnlineStructure(op,assembler)
+  RBParamOnlineStructure(ad,μ::Param -> assembler(coeff(μ)))
 end
 
 function RBParamOnlineStructure(
-  ad::RBAffineDecomposition{Nonlinear,Ttr,<:MDEIM},
-  ad_eval::AbstractArray;
-  kwargs...) where Ttr
+  ad::RBAffineDecomposition,
+  coeff::Function,
+  assembler::Function)
 
-  op = get_op(ad)
-  basis = get_affine_decomposition(ad)
-  coeff = compute_coefficient(op,basis;kwargs...)
-  assembler(μ::Param,z) = rb_online_product(ad_eval,coeff(μ,z);nr=get_nrows(op))
-  RBParamOnlineStructure(op,assembler)
+  RBParamOnlineStructure(ad,(μ::Param,z) -> assembler(coeff(μ,z)))
 end
 
-function rb_online_product(
-  basis::Matrix{Float},
-  coeff::Vector{Float};
-  nr=size(basis,1))
+function get_assembler(
+  ::RBSteadyVariable,
+  basis::Vector{<:AbstractMatrix{Float}},
+  nr::Int,
+  nc::Int)
 
-  @assert size(basis,2) == length(coeff) "Something is wrong"
-  bc = sum([basis[:,k]*coeff[k] for k=eachindex(coeff)])
-  reshape(bc,nr,:)
+  Qs = length(basis)
+  online_mat = Elemental.zeros(EMatrix{Float},nr,nc)
+  function online_mat!(coeff::Vector{<:AbstractMatrix{Float}})
+    @assert length(coeff) == Qs "Something is wrong"
+    copyto!(online_mat,sum([basis[k]*coeff[k] for k = 1:Qs]))
+  end
+
+  online_mat!
 end
 
-function rb_online_product(
-  basis::Array{Float,3},
-  coeff::Array{Float,3};
-  nr=size(first(basis),1)*size(first(coeff),1))
+function get_assembler(
+  ::RBUnsteadyVariable,
+  basis::Vector{<:AbstractMatrix{Float}};
+  nr::Int)
 
   Qs = size(basis,3)
-  @assert size(coeff,3) == Qs "Something is wrong"
-  bc = sum([kron(basis[:,:,q],coeff[:,:,q]) for q = 1:Qs])
-  reshape(bc,nr,:)
+  online_mat = Elemental.zeros(EMatrix{Float},nr,nc)
+  function online_mat!(coeff::Vector{<:AbstractMatrix{Float}})
+    @assert length(coeff) == Qs "Something is wrong"
+    copyto!(online_mat,sum([kron(basis[k],coeff[k]) for k = 1:Qs]))
+  end
+
+  online_mat!
 end
 
 get_op(param_os::RBParamOnlineStructure) = param_os.op
