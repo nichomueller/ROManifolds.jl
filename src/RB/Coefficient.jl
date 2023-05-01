@@ -3,7 +3,23 @@ function get_coefficient(
   args...) where Ttr
 
   fun = get_param_function(op)
-  (μ::Param) -> [fun(nothing,μ)[1]]
+  (μ::Param) -> fun(nothing,μ)[1]
+end
+
+function get_coefficient(
+  op::RBSteadyVariable,
+  mdeim::MDEIMSteady)
+
+  mdeim_solver,A = setup_coefficient(op,mdeim)
+  (μ::Param) -> mdeim_solver(A(μ))
+end
+
+function get_coefficient(
+  op::RBSteadyVariable{Nonlinear,Ttr},
+  mdeim::MDEIMSteady) where Ttr
+
+  mdeim_solver,A = setup_coefficient(op,mdeim)
+  (μ::Param,z) -> mdeim_solver(A(μ,z))
 end
 
 function get_coefficient(
@@ -34,22 +50,6 @@ function get_coefficient(
   st_mdeim=false)
 
   get_coefficient(op,mdeim,Val(st_mdeim))
-end
-
-function get_coefficient(
-  op::RBSteadyVariable,
-  mdeim::MDEIMSteady)
-
-  mdeim_solver,A = setup_coefficient(op,mdeim)
-  (μ::Param) -> mdeim_solver(A(μ))
-end
-
-function get_coefficient(
-  op::RBSteadyVariable{Nonlinear,Ttr},
-  mdeim::MDEIMSteady) where Ttr
-
-  mdeim_solver,A = setup_coefficient(op,mdeim)
-  (μ::Param,z) -> mdeim_solver(A(μ,z))
 end
 
 function get_coefficient(
@@ -141,7 +141,7 @@ function hyperred_structure(
   fun = get_param_fefunction(op)
   test = get_test(op)
   ns,nt = length(idx_space),length(times)
-  V = allocate_matrix(EMatrix{Float},ns,nt)
+  V = Elemental.zeros(EMatrix{Float},ns,nt)
 
   function V!(μ::Param)
     @inbounds for (n,tn) in enumerate(times)
@@ -175,7 +175,7 @@ function hyperred_structure(
   trial = get_trial(op)
   test = get_test(op)
   ns,nt = length(idx_space),length(times)
-  M = allocate_matrix(EMatrix{Float},ns,nt)
+  M = Elemental.zeros(EMatrix{Float},ns,nt)
 
   function M!(μ::Param)
     @inbounds for (n,tn) in enumerate(times)
@@ -211,7 +211,7 @@ function hyperred_structure(
   test = get_test(op)
   dir(μ::Param,tn::Float) = get_dirichlet_function(op)(μ,tn)
   ns,nt = length(idx_space),length(times)
-  lift = allocate_matrix(EMatrix{Float},ns,nt)
+  lift = Elemental.zeros(EMatrix{Float},ns,nt)
 
   function lift!(μ::Param)
     @inbounds for (n,tn) in enumerate(times)
@@ -246,7 +246,7 @@ function hyperred_structure(
   trial = get_trial(op)
   test = get_test(op)
   ns,nt = length(idx_space),length(times)
-  M = allocate_matrix(EMatrix{Float},ns,nt)
+  M = Elemental.zeros(EMatrix{Float},ns,nt)
 
   function M!(μ::Param,z)
     @inbounds for (n,tn) in enumerate(times)
@@ -282,7 +282,7 @@ function hyperred_structure(
   test = get_test(op)
   dir(μ::Param,tn::Float) = get_dirichlet_function(op)(μ,tn)
   ns,nt = length(idx_space),length(times)
-  lift = allocate_matrix(EMatrix{Float},ns,nt)
+  lift = Elemental.zeros(EMatrix{Float},ns,nt)
 
   function lift!(μ::Param,z)
     @inbounds for (n,tn) in enumerate(times)
@@ -294,20 +294,15 @@ function hyperred_structure(
   lift!
 end
 
-function mdeim_online(lu::LU)
+function mdeim_online(lu_rb::AbstractMatrix)
+  U = UpperTriangular(lu_rb)
+  L = LowerTriangular(lu_rb)
+  L[diagind(L)[:]] .= 1
 
-  function sol!(A::Vector{Float})
-    P_A = lu.P*A
-    y = lu.L \ P_A
-    x = lu.U \ y
-    x
-  end
-
-  function sol!(A::Matrix{Float})
-    P_A = lu.P*A
-    y = lu.L \ P_A
-    x = lu.U \ y
-    Matrix(x')
+  function sol!(A::AbstractMatrix{Float})
+    y = L \ A
+    x = U \ y
+    x'
   end
 
   sol!
@@ -320,7 +315,7 @@ function get_interp_coeff(mdeim::MDEIMUnsteady)
   Qt = size(bt,2)
   sorted_idx(qs) = [(i-1)*Qs+qs for i = 1:Qt]
 
-  interp_coeff = allocate_matrix(EMatrix{Float},Qt,Qs)
+  interp_coeff = Elemental.zeros(EMatrix{Float},Qt,Qs)
   function interp_coeff!(coeff::AbstractMatrix)
     @inbounds for qs = 1:Qs
       interp_coeff[:,qs] = bt*coeff[sorted_idx(qs)]
@@ -339,14 +334,13 @@ function get_coeff_by_time_bases(op::RBUnsteadyVariable,Qs::Int)
   rbrow = get_rbspace_row(op)
   brow = get_basis_time(rbrow)
   nrow = size(brow,2)
-  ncol = 1
 
-  proj = zeros(nrow,ncol,Qs)
+  proj = zeros(nrow,Qs)
   function time_proj!(coeff::AbstractMatrix)
     @assert size(coeff,2) == Qs "Dimension mismatch: $(size(coeff,2)) != $Qs"
 
     @inbounds for q = 1:Qs, it = 1:nrow
-      proj[it,:,q] .= sum(brow[:,it].*coeff[:,q])
+      proj[it,q] .= sum(brow[:,it].*coeff[:,q])
     end
     proj
   end
@@ -365,13 +359,13 @@ function get_coeff_by_time_bases(op::RBUnsteadyBilinVariable,Qs::Int)
   θ = get_θ(op)
   dt = get_dt(op)
 
-  proj = zeros(nrow,ncol,Qs)
-  proj_shift = zeros(nrow,ncol,Qs)
+  proj = zeros(nrow*ncol,Qs)
+  proj_shift = zeros(nrow*ncol,Qs)
   function time_proj!(coeff::AbstractMatrix)
     @assert size(coeff,2) == Qs "Dimension mismatch: $(size(coeff,2)) != $Qs"
     @inbounds for q = 1:Qs, jt = 1:ncol, it = 1:nrow
-      proj[it,jt,q] = sum(brow[:,it].*bcol[:,jt].*coeff[:,q])
-      proj_shift[it,jt,q] = sum(brow[2:Nt,it].*bcol[1:Nt-1,jt].*coeff[2:Nt,q])
+      proj[(jt-1)*nrow+it,q] = sum(brow[:,it].*bcol[:,jt].*coeff[:,q])
+      proj_shift[(jt-1)*nrow+it,q] = sum(brow[2:Nt,it].*bcol[1:Nt-1,jt].*coeff[2:Nt,q])
     end
 
     if get_id(op) == :M

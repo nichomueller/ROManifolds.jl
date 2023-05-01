@@ -214,18 +214,20 @@ function nearest_parameter(μ::Vector{Param},μk::Param)
 end
 
 function reconstruct_fe_sol(rbspace::RBSpaceSteady,rb_sol::Array{Float})
+  id = get_id(rbspace)
   bs = get_basis_space(rbspace)
-  bs*rb_sol
+  Snapshots(id,bs*rb_sol,1)
 end
 
 function reconstruct_fe_sol(rbspace::RBSpaceUnsteady,rb_sol::Array{Float})
+  id = get_id(rbspace)
   bs = get_basis_space(rbspace)
   bt = get_basis_time(rbspace)
   ns = get_ns(rbspace)
   nt = get_nt(rbspace)
 
   rb_sol_resh = reshape(rb_sol,nt,ns)
-  bs*(bt*rb_sol_resh)'
+  Snapshots(id,bs*(bt*rb_sol_resh)',1)
 end
 
 function reconstruct_fe_sol(rbspace::NTuple{2,RBSpaceSteady},rb_sol::Array{Float})

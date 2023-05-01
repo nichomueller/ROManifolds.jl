@@ -52,43 +52,17 @@ function assemble_affine_decomposition(
   RBAffineDecomposition(op,ad)
 end
 
-function eval_affine_decomposition(ad::RBAffineDecomposition)
-  op = get_op(ad)
-  eval_affine_decomposition(op,ad)
-end
-
 function eval_affine_decomposition(
-  ::RBSteadyVariable,
   ad::RBAffineDecomposition{Affine,Ttr,AbstractMatrix{Float}}) where Ttr
 
-  [get_affine_decomposition(ad)]
+  get_affine_decomposition(ad)
 end
 
 function eval_affine_decomposition(
-  ::RBSteadyVariable,
   ad::RBAffineDecomposition)
 
   mdeim = get_affine_decomposition(ad)
-  [get_basis_space(mdeim)]
-end
-
-function eval_affine_decomposition(
-  op::RBUnsteadyVariable,
-  ad::RBAffineDecomposition{Affine,Ttr,AbstractMatrix{Float}}) where Ttr
-
-  ns_row = get_ns(get_rbspace_row(op))
-  ns_col = get_ns(get_rbspace_col(op))
-  blocks(get_affine_decomposition(ad);dims = (ns_row,ns_col))
-end
-
-function eval_affine_decomposition(
-  op::RBUnsteadyVariable,
-  ad::RBAffineDecomposition)
-
-  ns_row = get_ns(get_rbspace_row(op))
-  ns_col = get_ns(get_rbspace_col(op))
-  mdeim = get_affine_decomposition(ad)
-  blocks(get_basis_space(mdeim);dims = (ns_row,ns_col))
+  get_basis_space(mdeim)
 end
 
 function save(info::RBInfo,ad::RBAffineDecomposition)

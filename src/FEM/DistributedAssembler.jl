@@ -153,7 +153,7 @@ function assembler_loop(
   nsnap = get_nsnap(vecdata)
   Nz = length(findnz_idx)
 
-  vecs = allocate_matrix(EMatrix{Float},Nz,nsnap)
+  vecs = Elemental.zeros(EMatrix{Float},Nz,nsnap)
   @sync @distributed for i = 1:nsnap
     vecdata_i = data(i)
     v2 = Gridap.Algebra.nz_allocation(v1)
@@ -309,7 +309,7 @@ function assembler_loop(
   nsnap = get_nsnap(matdata)
   Nz = length(findnz_idx)
 
-  mats = allocate_matrix(EMatrix{Float},Nz,nsnap)
+  mats = Elemental.zeros(EMatrix{Float},Nz,nsnap)
   @sync @distributed for i = 1:nsnap
     matdata_i = data(i)
     m2 = Gridap.Algebra.nz_allocation(m1)

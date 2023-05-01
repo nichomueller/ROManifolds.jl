@@ -8,7 +8,7 @@ function RBParamOnlineStructure(ad::RBAffineDecomposition;kwargs...)
   ad_eval = eval_affine_decomposition(ad)
   basis = get_affine_decomposition(ad)
   coeff = get_coefficient(op,basis;kwargs...)
-  assembler = get_assembler(op,ad_eval,get_nrows(op),get_ncols(op))
+  assembler = get_assembler(op,ad_eval)
 
   RBParamOnlineStructure(ad,coeff,assembler)
 end
@@ -31,30 +31,39 @@ end
 
 function get_assembler(
   ::RBSteadyVariable,
-  basis::Vector{<:AbstractMatrix{Float}},
+  basis::AbstractMatrix{Float},
   nr::Int,
   nc::Int)
 
-  Qs = length(basis)
+  Qs = size(basis,2)
   online_mat = Elemental.zeros(EMatrix{Float},nr,nc)
-  function online_mat!(coeff::Vector{<:AbstractMatrix{Float}})
+  function online_mat!(coeff::AbstractMatrix{Float})
     @assert length(coeff) == Qs "Something is wrong"
-    copyto!(online_mat,sum([basis[k]*coeff[k] for k = 1:Qs]))
+    copyto!(online_mat,reshape(basis*coeff,nr,nc))
   end
 
   online_mat!
 end
 
 function get_assembler(
-  ::RBUnsteadyVariable,
-  basis::Vector{<:AbstractMatrix{Float}};
-  nr::Int)
+  op::RBUnsteadyVariable,
+  basis::AbstractMatrix{Float})
 
-  Qs = size(basis,3)
+  nsrow,nscol = get_ns(get_rbspace_row(op)),get_ns(get_rbspace_col(op))
+  ntrow,ntcol = get_nt(get_rbspace_row(op)),get_nt(get_rbspace_col(op))
+  nr,nc = nsrow*ntrow,nscol*ntcol
+  Qs = size(basis,2)
+
   online_mat = Elemental.zeros(EMatrix{Float},nr,nc)
-  function online_mat!(coeff::Vector{<:AbstractMatrix{Float}})
+  mat = zeros(nr,nc)
+  function online_mat!(coeff::AbstractMatrix{Float})
     @assert length(coeff) == Qs "Something is wrong"
-    copyto!(online_mat,sum([kron(basis[k],coeff[k]) for k = 1:Qs]))
+    @inbounds for q = 1:Qs
+      basis_q = reshape(basis[:,q],nsrow,nscol)
+      coeff_q = reshape(coeff[:,q],ntrow,ntcol)
+      mat += kron(basis_q,coeff_q)
+    end
+    copyto!(online_mat,mat)
   end
 
   online_mat!

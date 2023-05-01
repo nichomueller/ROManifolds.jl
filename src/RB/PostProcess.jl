@@ -13,15 +13,25 @@ struct ErrorTracker
   pointwise_err::Matrix{Float}
 end
 
-function ErrorTracker(id::Symbol,uh::Matrix{Float},uh_rb::Matrix{Float};X=nothing)
+function ErrorTracker(
+  uh::Snapshots,
+  uh_rb::Snapshots;
+  X=nothing)
+
+  id = get_id(uh)
   Y = isnothing(X) ? I(size(uh,1)) : X
-  relative_err,pointwise_err = compute_errors(uh,uh_rb,Y)
+  relative_err,pointwise_err = compute_errors(Matrix(uh),Matrix(uh_rb),Y)
   printstyled("Online relative error of variable $id is: $relative_err \n";
     color=:red)
+
   ErrorTracker(relative_err,pointwise_err)
 end
 
-function compute_errors(uh::Matrix{Float},uh_rb::Matrix{Float},X::AbstractMatrix)
+function compute_errors(
+  uh::AbstractMatrix,
+  uh_rb::AbstractMatrix,
+  X::AbstractMatrix)
+
   pointwise_err = abs.(uh-uh_rb)
   Nt = size(uh,2)
   absolute_err,uh_norm = zeros(Nt),zeros(Nt)
@@ -30,6 +40,7 @@ function compute_errors(uh::Matrix{Float},uh_rb::Matrix{Float},X::AbstractMatrix
     uh_norm[i] = sqrt(uh[:,i]'*X*uh[:,i])
   end
   relative_err = norm(absolute_err)/norm(uh_norm)
+
   relative_err,pointwise_err
 end
 

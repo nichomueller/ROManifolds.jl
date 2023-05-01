@@ -110,7 +110,6 @@ function stokes_unsteady()
 
   printstyled("Online phase, reduced basis method\n";color=:red)
 
-  # μon = μ[info.online_snaps]
   Aon = RBParamOnlineStructure(Arb;st_mdeim=info.st_mdeim)
   Bon = RBParamOnlineStructure(Brb;st_mdeim=info.st_mdeim)
   BTon = RBParamOnlineStructure(BTrb;st_mdeim=info.st_mdeim)
@@ -129,9 +128,9 @@ function stokes_unsteady()
       lhs,rhs = unsteady_stokes_rb_system(param_on_structures,μ[k])
       rb_sol = solve_rb_system(lhs,rhs)
     end
-    uhk,phk = get_snap(uh[k]),get_snap(ph[k])
+    uhk,phk = uh[k],ph[k]
     uhk_rb,phk_rb = reconstruct_fe_sol(rbspace,rb_sol)
-    ErrorTracker(:u,uhk,uhk_rb),ErrorTracker(:p,phk,phk_rb)
+    ErrorTracker(uhk,uhk_rb),ErrorTracker(phk,phk_rb)
   end
 
   ets = online_loop.(info.online_snaps)

@@ -127,7 +127,7 @@ function rb_space_projection(
   isparse,jsparse = from_vec_to_mat_idx(findnz_idx,Ns)
   red_basis_space = zeros(get_ns(rbspace_row)*get_ns(rbspace_col),Qs)
   for q = 1:Qs
-    vsparse = basis_space[:,q]
+    vsparse = Vector(basis_space[:,q])
     smat = sparse(isparse,jsparse,vsparse,Ns,Ns)
     red_basis_space[:,q] = Vector(brow'*smat*bcol)
   end
@@ -145,6 +145,8 @@ function mdeim_idx(rbspace::RBSpaceUnsteady)
   idx_time = mdeim_idx(get_basis_time(rbspace))
   idx_space,idx_time
 end
+
+mdeim_idx(mat::EMatrix{Float}) = mdeim_idx(Matrix(mat))
 
 function mdeim_idx(mat::AbstractMatrix{Float})
   n = size(mat)[2]
@@ -196,7 +198,7 @@ function get_rb_lu(
   idx::Vector{Int})
 
   basis_idx = basis[idx,:]
-  lu(basis_idx)
+  first(lu(basis_idx))
 end
 
 function get_rb_lu(
@@ -209,7 +211,7 @@ function get_rb_lu(
   bt_idx = bt[idx_time,:]
   bst_idx = EMatrix(kron(bt_idx,bs_idx))
 
-  lu(bst_idx)
+  first(lu(bst_idx))
 end
 
 recast_in_full_dim(idx_tmp::Vector{Int},findnz_idx::Vector{Int}) =
