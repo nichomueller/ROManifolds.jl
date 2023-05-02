@@ -81,6 +81,26 @@ function get_vecdata(
   VectorAssemblerLoop(vecdata,nsnap)
 end
 
+function arg_functions(
+  μvec::Vector{Param},
+  tvec::Vector{Float})
+
+  Nt = length(tvec)
+  μ(i) = μvec[slow_idx(i,Nt)]
+  t(i) = tvec[fast_idx(i,Nt)]
+  Nt,μ,t
+end
+
+function arg_functions(
+  μvec::Vector{Param},
+  tvec::Vector{Float},
+  uvec::Vector{T}) where {T<:Union{FEFunction,Function}}
+
+  Nt,μ,t = arg_functions(μvec,tvec)
+  u(i) = uvec[slow_idx(i,Nt)]
+  Nt,μ,t,u
+end
+
 function get_vecdata(
   f::Function,
   V::FESpace,
@@ -88,9 +108,7 @@ function get_vecdata(
   μvec::Vector{Param},
   tvec::Vector{Float})
 
-  Nt = length(tvec)
-  μ(i) = μvec[slow_idx(i,Nt)]
-  t(i) = tvec[fast_idx(i,Nt)]
+  Nt,μ,t = arg_functions(μvec,tvec)
   vecdata(i) = collect_cell_vector(V,f(μ(i),t(i),dv))
   nsnap = length(μvec)*Nt
   VectorAssemblerLoop(vecdata,nsnap)
@@ -104,9 +122,7 @@ function get_vecdata(
   μvec::Vector{Param},
   tvec::Vector{Float})
 
-  Nt = length(tvec)
-  μ(i) = μvec[slow_idx(i,Nt)]
-  t(i) = tvec[fast_idx(i,Nt)]
+  Nt,μ,t = arg_functions(μvec,tvec)
   vecdata(i) = collect_cell_vector(V,f(μ(i),t(i),dir(μ(i),t(i)),dv))
   nsnap = length(μvec)*Nt
   VectorAssemblerLoop(vecdata,nsnap)
@@ -121,10 +137,7 @@ function get_vecdata(
   tvec::Vector{Float},
   uvec::Vector{<:FEFunction})
 
-  Nt = length(tvec)
-  μ(i) = μvec[slow_idx(i,Nt)]
-  t(i) = tvec[fast_idx(i,Nt)]
-  u(i) = uvec[slow_idx(i,Nt)]
+  Nt,μ,t,u = arg_functions(μvec,tvec,uvec)
   vecdata(i) = collect_cell_vector(V,f(u(i),dir(μ(i),t(i)),dv))
   nsnap = length(μvec)*Nt
   VectorAssemblerLoop(vecdata,nsnap)
@@ -237,9 +250,7 @@ function get_matdata(
   μvec::Vector{Param},
   tvec::Vector{Float})
 
-  Nt = length(tvec)
-  μ(i) = μvec[slow_idx(i,Nt)]
-  t(i) = tvec[fast_idx(i,Nt)]
+  Nt,μ,t = arg_functions(μvec,tvec)
   matdata(i) = collect_cell_matrix(U(μ(i),t(i)),V,f(μ(i),t(i),du,dv))
   nsnap = length(μvec)*Nt
   MatrixAssemblerLoop(matdata,nsnap)
@@ -255,10 +266,7 @@ function get_matdata(
   tvec::Vector{Float},
   uvec::Vector{<:FEFunction})
 
-  Nt = length(tvec)
-  μ(i) = μvec[slow_idx(i,Nt)]
-  t(i) = tvec[fast_idx(i,Nt)]
-  u(i) = uvec[slow_idx(i,Nt)]
+  Nt,μ,t,u = arg_functions(μvec,tvec,uvec)
   matdata(i) = collect_cell_matrix(U(μ(i),t(i)),V,f(u(i),du,dv))
   nsnap = length(μvec)*Nt
   MatrixAssemblerLoop(matdata,nsnap)
@@ -274,10 +282,7 @@ function get_matdata(
   tvec::Vector{Float},
   uvec::Vector{<:Function})
 
-  Nt = length(tvec)
-  μ(i) = μvec[slow_idx(i,Nt)]
-  t(i) = tvec[fast_idx(i,Nt)]
-  u(i) = uvec[slow_idx(i,Nt)]
+  Nt,μ,t,u = arg_functions(μvec,tvec,uvec)
   matdata(i) = collect_cell_matrix(U(μ(i),t(i)),V,f(u(i)(t(i)),du,dv))
   nsnap = length(μvec)*Nt
   MatrixAssemblerLoop(matdata,nsnap)

@@ -4,16 +4,15 @@ function Gridap.ODEs.TransientFETools.solve_step!(
   op::ParamODEOperator,
   μ::Param,
   u0::AbstractVector,
-  u1::AbstractVector,
-  t1::Real,
+  t0::Real,
   cache)
 
   dt = solver.dt
-  t2 = t1+dt
+  t1 = t0+dt
 
   if isnothing(cache)
     ode_cache = allocate_cache(op)
-    v0,v1 = similar(u0),similar(u1)
+    v0,v1 = similar(u0),similar(u0)
     nl_cache = nothing
   else
     ode_cache,v0,v1,nl_cache = cache

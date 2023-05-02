@@ -2,26 +2,26 @@ abstract type RBSpace end
 
 struct RBSpaceSteady <: RBSpace
   id::Symbol
-  basis_space::EMatrix{Float}
+  basis_space::Matrix{Float}
 end
 
 function RBSpaceSteady(snaps::Snapshots;ϵ=1e-5,style=ReducedPOD())
   id = get_id(snaps)
   basis_space = rb_space(snaps;ϵ,style)
-  RBSpaceSteady(id,basis_space)
+  RBSpaceSteady(id,Matrix(basis_space))
 end
 
 struct RBSpaceUnsteady <: RBSpace
   id::Symbol
-  basis_space::EMatrix{Float}
-  basis_time::EMatrix{Float}
+  basis_space::Matrix{Float}
+  basis_time::Matrix{Float}
 end
 
 function RBSpaceUnsteady(snaps::Snapshots;ϵ=1e-5,style=ReducedPOD())
   id = get_id(snaps)
   basis_space = rb_space(snaps;ϵ,style)
   basis_time = rb_time(snaps,basis_space;ϵ,style)
-  RBSpaceUnsteady(id,basis_space,basis_time)
+  RBSpaceUnsteady(id,Matrix(basis_space),Matrix(basis_time))
 end
 
 get_id(rb::RBSpace) = rb.id
@@ -59,14 +59,14 @@ end
 
 function load(info::RBInfoSteady,id::Symbol)
   path_id = joinpath(info.offline_path,"$id")
-  basis_space = load(EMatrix{Float},joinpath(path_id,"basis_space"))
+  basis_space = load(joinpath(path_id,"basis_space"))
   RBSpaceSteady(id,basis_space)
 end
 
 function load(info::RBInfoUnsteady,id::Symbol)
   path_id = joinpath(info.offline_path,"$id")
-  basis_space = load(EMatrix{Float},joinpath(path_id,"basis_space"))
-  basis_time = load(EMatrix{Float},joinpath(path_id,"basis_time"))
+  basis_space = load(joinpath(path_id,"basis_space"))
+  basis_time = load(joinpath(path_id,"basis_time"))
   RBSpaceUnsteady(id,basis_space,basis_time)
 end
 
@@ -78,7 +78,7 @@ end
 function rb_space_projection(rbrow::RBSpace,mat::AbstractArray)
   brow = get_basis_space(rbrow)
   @assert size(brow,1) == size(mat,1) "Cannot project array"
-  brow'*mat
+  reshape(brow'*mat,:,1)
 end
 
 function rb_space_projection(rbrow::RBSpace,rbcol::RBSpace,mat::AbstractMatrix)
@@ -93,7 +93,7 @@ function rb_time_projection(rbrow::RBSpaceUnsteady,mat::AbstractArray)
 
   nrow = size(brow,2)
   Q = size(mat,2)
-  proj = Elemental.zeros(EMatrix{Float},nrow,Q)
+  proj = zeros(nrow,Q)
 
   @inbounds for q = 1:Q, it = 1:nrow
     proj[it,q] = sum(brow[:,it].*mat[:,q])
@@ -128,7 +128,7 @@ end
 function rb_spacetime_projection(rbrow::RBSpaceUnsteady,mat::AbstractMatrix)
   proj_space = rb_space_projection(rbrow,mat)
   proj_space_time = rb_time_projection(rbrow,proj_space')
-  reshape(proj_space_time,:,1)
+  reshape(proj_space_time,:)
 end
 
 function rb_spacetime_projection(
@@ -142,7 +142,7 @@ function rb_spacetime_projection(
   nscol,ntcol = get_ns(rbcol),get_nt(rbcol)
   Nt = length(mats)
 
-  proj_space = Elemental.zeros(EMatrix{Float},nsrow*nscol,Nt)
+  proj_space = zeros(nsrow*nscol,Nt)
   @inbounds for n = 1:Nt
     proj_space[:,n] = rb_space_projection(rbrow,rbcol,mats[n])
   end
@@ -150,7 +150,7 @@ function rb_spacetime_projection(
   proj_space_time = rb_time_projection(rbrow,rbcol,proj_space';
     idx_forwards,idx_backwards)
 
-  proj_spacetime = Elemental.zeros(EMatrix{Float},nsrow*ntrow,nscol*ntcol)
+  proj_spacetime = zeros(nsrow*ntrow,nscol*ntcol)
   @inbounds for is = 1:nscol, js = 1:nsrow
     proj_ij = proj_space_time[(jt-1)*nrow+it,:]
     copyto!(view(proj_spacetime,1+(js-1)*ntrow:js*ntrow,1+(is-1)*ntcol:is*ntcol),

@@ -52,26 +52,7 @@ function steady_navier_stokes_rb_system(
   μ::Param) where N
 
   lin_rb_lhs,lin_rb_rhs = steady_stokes_rb_system(rbpos,μ)
-  nonlin_lhs(u) = assemble(rbpos,(:C,:D),u)
-  nonlin_rhs(u) = assemble(rbpos,:C_lift,u)
-
-  opA,opB = findall(x -> x ∈ (:A,:B),get_op.(rbpos)) # get_op(rbpos,(:A,:B))
-  rbu,rbp = get_rbspace_row(opA),get_rbspace_row(opB)
-  nu,np = get_ns(rbu),get_ns(rbp)
-
-  block12,block21,block22 = zeros(nu,np),zeros(np,nu),zeros(np,np)
-  nonlin_rb_lhs1(u) = vcat(hcat(nonlin_lhs[1](u),block12),
-                           hcat(block21,block22))::Matrix{Float}
-  nonlin_rb_lhs2(u) = vcat(hcat(nonlin_lhs[1](u)+nonlin_lhs[2](u),block12),
-                           hcat(block21,block22))::Matrix{Float}
-  nonlin_rb_rhs(ud) = vcat(nonlin_rhs(ud),zeros(np,1))::Matrix{Float}
-
-  jac_rb(u) = lin_rb_lhs + nonlin_rb_lhs2(u)
-  lhs_rb(u) = lin_rb_lhs + nonlin_rb_lhs1(u)
-  rhs_rb(ud) = lin_rb_rhs + nonlin_rb_rhs(ud)
-  res_rb(u,ud,x_rb) = lhs_rb(u)*x_rb - rhs_rb(ud)
-
-  res_rb,jac_rb
+  navier_stokes_rb_system(rbpos,μ,lin_rb_lhs,lin_rb_rhs)
 end
 
 function unsteady_navier_stokes_rb_system(
@@ -79,32 +60,44 @@ function unsteady_navier_stokes_rb_system(
   μ::Param) where N
 
   lin_rb_lhs,lin_rb_rhs = unsteady_stokes_rb_system(rbpos,μ)
-  C(un) = assemble(rbpos,:C,μ,un)
-  D(un) = assemble(rbpos,:D,μ,un)
-  C_lift(un) = assemble(rbpos,:C_lift,μ,un)
+  navier_stokes_rb_system(rbpos,μ,lin_rb_lhs,lin_rb_rhs)
+end
 
-  opA,opB = findall(x -> x ∈ (:A,:B),get_op.(rbpos))
-  rbu,rbp = get_rbspace_row(opA),get_rbspace_row(opB)
-  nu,np = get_ns(rbu)*get_nt(rbu),get_ns(rbp)*get_nt(rbp)
+function navier_stokes_rb_system(
+  rbpos::NTuple{N,RBParamOnlineStructure},
+  μ::Param,
+  lin_rb_lhs::AbstractMatrix{Float},
+  lin_rb_rhs::AbstractMatrix{Float}) where N
 
-  block12,block21,block22 = zeros(nu,np),zeros(np,nu),zeros(np,np)
+  rb_jac,rb_lhs = zeros(size(lin_rb_lhs)),zeros(size(lin_rb_lhs))
+  rb_rhs = zeros(size(lin_rb_rhs))
 
-  function nonlin_rb_lhs(un)::Matrix{Float}
-    vcat(hcat(C(un),block12),hcat(block21,block22))
+  function rb_system!(
+    Cun::AbstractMatrix{Float},
+    Dun::AbstractMatrix{Float},
+    Cliftun::AbstractMatrix{Float})
+
+    rb_jac = lin_rb_lhs
+    rb_jac[1:nu,1:nu] += Cun + Dun
+
+    rb_lhs = lin_rb_lhs
+    rb_lhs[1:nu,1:nu] += Cun
+
+    rb_rhs = lin_rb_rhs
+    rb_rhs[1:nu] += Cliftun
+    #res_rb = lhs_rb*x_rb - rhs_rb
+
+    rb_jac,rb_lhs,rb_rhs
   end
 
-  function nonlin_rb_jac(un)::Matrix{Float}
-    vcat(hcat(C(un)+D(un),block12),hcat(block21,block22))
+  function rb_system!(un)
+    Cun = assemble(rbpos,:C,μ,un)
+    Dun = assemble(rbpos,:D,μ,un)
+    Cliftun = assemble(rbpos,:C_lift,μ,un)
+    rb_system!(Cun,Dun,Cliftun)
   end
 
-  nonlin_rb_rhs(un) = vcat(nonlin_rhs(un),zeros(np,1))::Matrix{Float}
-
-  jac_rb(un) = lin_rb_lhs + nonlin_rb_jac(un)
-  lhs_rb(un) = lin_rb_lhs + nonlin_rb_lhs(un)
-  rhs_rb(un) = lin_rb_rhs + nonlin_rb_rhs(un)
-  res_rb(un,x_rb) = lhs_rb(un)*x_rb - rhs_rb(un)
-
-  res_rb,jac_rb
+  rb_system!
 end
 
 function solve_rb_system(rb_lhs::Matrix{Float},rb_rhs::Matrix{Float})
@@ -112,84 +105,32 @@ function solve_rb_system(rb_lhs::Matrix{Float},rb_rhs::Matrix{Float})
 end
 
 function solve_rb_system(
-  res::Function,
-  jac::Function,
-  x0::Matrix{Float},
-  fespaces::NTuple{2,FESpace},
-  rbspace::NTuple{2,RBSpace};
-  tol=1e-10,maxtol=1e10,maxit=20)
+  rb_system::Function,
+  x0::AbstractVector{Float},
+  args...;
+  tol=1e-10,maxtol=1e10,maxit=20,kwargs...)
 
-  Uk,Vk = fespaces
-  bsu = get_basis_space(rbspace[1])
-  nsu = size(bsu,2)
-  x_rb = x0
+  #= function get_un_fun(ufe::Matrix{Float})
+    unfe = compute_in_times(ufe,θ)
+    n(tn) = findall(x -> x == tn,times)[1]
+    tn -> FEFunction(Uk(tn),unfe[:,n(tn)])
+  end =#
 
-  u(x_rb::AbstractArray) = FEFunction(Vk,bsu*x_rb[1:nsu])
-  ud(x_rb::AbstractArray) = FEFunction(Uk,bsu*x_rb[1:nsu])
-
+  x_rb = rb_initial_guess(x0,kwargs...)
   err = 1.
   iter = 0
   while norm(err) ≥ tol && iter < maxit
+
     if norm(err) ≥ maxtol
       printstyled("Newton iterations did not converge\n";color=:red)
       return x_rb
     end
-    jx_rb,rx_rb = jac(u(x_rb)),res(u(x_rb),ud(x_rb),x_rb)
-    err = jx_rb \ rx_rb
+
+    un_fun = get_un_fun(x_rb,args...)
+    rb_jac,rb_lhs,rb_rhs = rb_system(un_fun)
+    err = rb_jac \ Vector(rb_lhs*x_rb - rb_rhs)
     x_rb -= err
     iter += 1
-    printstyled("Newton method: err = $(norm(err)), iter = $iter\n";color=:red)
-  end
-
-  x_rb
-end
-
-function solve_rb_system(
-  res::Function,
-  jac::Function,
-  x0::Matrix{Float},
-  Uk::Function,
-  rbspace::NTuple{2,<:RBSpace},
-  time_info::TimeInfo;
-  tol=1e-10,maxtol=1e10,maxit=20)
-
-  times = get_times(time_info)
-  θ = get_θ(time_info)
-  Ns = get_Ns(rbspace[1])
-  nstu = get_ns(rbspace[1])*get_nt(rbspace[1])
-
-  function get_un_fun(ufe::Matrix{Float})
-    unfe = compute_in_times(ufe,θ)
-    n(tn) = findall(x -> x == tn,times)[1]
-    tn -> FEFunction(Uk(tn),unfe[:,n(tn)])
-  end
-
-  function get_un_fun(x_rb::Vector{Float})
-    ufe = reconstruct_fe_sol(rbspace[1],x_rb[1:nstu])
-    unfe = compute_in_times(ufe,θ)
-    n(tn) = findall(x -> x == tn,times)[1]
-    tn -> FEFunction(Uk(tn),unfe[:,n(tn)])
-  end
-
-  un_fun = get_un_fun(x0)
-  u0_rb = rb_spacetime_projection(rbspace[1],x0[1:Ns,:])
-  p0_rb = rb_spacetime_projection(rbspace[2],x0[Ns+1:end,:])
-  x_rb = vcat(u0_rb,p0_rb)[:,1]
-
-  err = 1.
-  iter = 0
-  while norm(err) ≥ tol && iter < maxit
-
-    if norm(err) ≥ maxtol
-      printstyled("Newton iterations did not converge\n";color=:red)
-      return x_rb
-    end
-
-    jx_rb,rx_rb = jac(un_fun),res(un_fun,x_rb)
-    err = jx_rb \ rx_rb
-    x_rb -= err[:,1]
-    un_fun = get_un_fun(x_rb)
-    iter += 1
 
     printstyled("Newton method: err = $(norm(err)), iter = $iter\n";color=:red)
   end
@@ -197,18 +138,61 @@ function solve_rb_system(
   x_rb
 end
 
-function initial_guess(
+function get_un_fun(
+  x_rb::Vector{Float},
+  rbspace::RBSpaceSteady,
+  U::ParamTrialFESpace,
+  μ::Param)
+
+  nstu = get_ns(rbspace)
+  ufe = reconstruct_fe_sol(rbspace,x_rb[1:nstu])
+  FEFunction(U,ufe,μ)
+end
+
+function get_un_fun(
+  x_rb::Vector{Float},
+  rbspace::RBSpaceUnsteady,
+  U::ParamTransientTrialFESpace,
+  μ::Param,
+  time_info::TimeInfo)
+
+  nstu = get_ns(rbspace)*get_nt(rbspace)
+  ufe = reconstruct_fe_sol(rbspace,x_rb[1:nstu])
+  unfe = compute_in_times(ufe,get_θ(time_info))
+  FEFunction(U,unfe,μ,get_times(time_info))
+end
+
+function rb_initial_guess(
+  rbspace::NTuple{2,RBSpace},
+  args...)
+
+  x0 = get_initial_guess(uh,ph,μ_offline,μk)
+  rb_initial_guess(x0,rbspace,args...)
+end
+
+function rb_initial_guess(
+  x0::AbstractArray,
+  rbspace::NTuple{2,RBSpace},
+  args...)
+
+  Nu = get_Ns(rbspace[1])
+  u0_rb = rb_spacetime_projection(rbspace[1],x0[1:Nu,:])
+  p0_rb = rb_spacetime_projection(rbspace[2],x0[Nu+1:end,:])
+  vcat(u0_rb,p0_rb)
+end
+
+function get_initial_guess(
   uh::Snapshots,
   ph::Snapshots,
-  μ::Vector{Param},
-  μk::Param)
+  μvec::Vector{Param},
+  μ::Param)
 
-  kmin = nearest_parameter(μ,μk)
+  kmin = nearest_parameter(μvec,μ)
   vcat(get_snap(uh[kmin]),get_snap(ph[kmin]))
 end
 
-function nearest_parameter(μ::Vector{Param},μk::Param)
-  vars = [var(μi-μk) for μi=μ]
+function nearest_parameter(μvec::Vector{Param},μ::Param)
+  vars = [var(μi-μ) for μi = μvec]
   argmin(vars)
 end
 

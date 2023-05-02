@@ -5,8 +5,10 @@ function rb(
   kwargs...)::NTuple{N,RBSpace} where N
 
   if info.load_offline
+    printstyled("Loading reduced bases\n";color=:red)
     load(info,get_id(snaps))
   else
+    printstyled("Assembling reduced bases\n";color=:red)
     assemble_rb(info,snaps,args...;kwargs...)
   end
 end
@@ -111,8 +113,7 @@ function space_supremizers(
   basis::NTuple{2,AbstractMatrix{Float}},
   opB::ParamBilinOperator)
 
-  printstyled("Computing primal supremizers\n";color=:blue)
-
+  printstyled("Computing supremizers in space\n";color=:blue)
   basis_u,basis_p = basis
   constraint_mat = assemble_constraint_matrix(opB,basis_p)
   gram_schmidt(constraint_mat,basis_u)
@@ -123,8 +124,6 @@ function assemble_constraint_matrix(
   basis_p::AbstractMatrix{Float}) where Ttr
 
   @assert opB.id == :B
-  printstyled("Fetching supremizing operator Bᵀ\n";color=:blue)
-
   B = assemble_affine_quantity(opB)
   B'*basis_p
 end
@@ -178,7 +177,6 @@ function add_time_supremizers(
   while ntp ≤ size(basis_up,2)
     proj = ntp == 1 ? zeros(size(basis_up[:,1])) : orth_projection(basis_up[:,ntp],basis_up[:,1:ntp-1])
     dist = norm(basis_up[:,1]-proj)
-    printstyled("Distance measure of basis vector number $ntp is: $dist\n";color=:blue)
     if dist ≤ ttol
       basis_u,basis_up = enrich(basis_u,basis_up,basis_p[:,ntp])
       count += 1

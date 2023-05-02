@@ -1,7 +1,3 @@
-function poisson_functions(ptype::ProblemType,measures::ProblemMeasures)
-  poisson_functions(issteady(ptype),measures)
-end
-
 function poisson_functions(::Val{true},measures::ProblemFixedMeasures)
 
   dΩ,dΓn = get_dΩ(measures),get_dΓn(measures)
@@ -220,10 +216,6 @@ function stokes_operators(
   feop = ParamTransientAffineFEOperator(lhs_t,lhs,rhs,PS,X,Y)
 
   feop,opA,opB,opBT,opM,opF,opH
-end
-
-function navier_stokes_functions(ptype::ProblemType,measures::ProblemMeasures)
-  navier_stokes_functions(issteady(ptype),measures)
 end
 
 function navier_stokes_functions(::Val{true},measures::ProblemFixedMeasures)

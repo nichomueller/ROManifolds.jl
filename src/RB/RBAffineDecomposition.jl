@@ -53,7 +53,7 @@ function assemble_affine_decomposition(
 end
 
 function eval_affine_decomposition(
-  ad::RBAffineDecomposition{Affine,Ttr,AbstractMatrix{Float}}) where Ttr
+  ad::RBAffineDecomposition{Affine,Ttr,Tad}) where {Ttr,Tad}
 
   get_affine_decomposition(ad)
 end
@@ -74,7 +74,7 @@ end
 
 function save(
   path::String,
-  ad::RBAffineDecomposition{Affine,Ttr,AbstractMatrix{Float}}) where Ttr
+  ad::RBAffineDecomposition{Affine,Ttr,Tad}) where {Ttr,Tad}
 
   ad = get_affine_decomposition(ad)
   save(joinpath(path,"basis_space"),ad)

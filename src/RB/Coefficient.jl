@@ -294,14 +294,12 @@ function hyperred_structure(
   lift!
 end
 
-function mdeim_online(lu_rb::AbstractMatrix)
-  U = UpperTriangular(lu_rb)
-  L = LowerTriangular(lu_rb)
-  L[diagind(L)[:]] .= 1
+function mdeim_online(lu_rb::LU)
 
   function sol!(A::AbstractMatrix{Float})
-    y = L \ A
-    x = U \ y
+    P_A = lu_rb.P*A
+    y = lu_rb.L \ P_A
+    x = lu_rb.U \ y
     x'
   end
 
@@ -340,7 +338,7 @@ function get_coeff_by_time_bases(op::RBUnsteadyVariable,Qs::Int)
     @assert size(coeff,2) == Qs "Dimension mismatch: $(size(coeff,2)) != $Qs"
 
     @inbounds for q = 1:Qs, it = 1:nrow
-      proj[it,q] .= sum(brow[:,it].*coeff[:,q])
+      proj[it,q] = sum(brow[:,it].*coeff[:,q])
     end
     proj
   end

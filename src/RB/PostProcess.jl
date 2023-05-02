@@ -19,8 +19,10 @@ function ErrorTracker(
   X=nothing)
 
   id = get_id(uh)
-  Y = isnothing(X) ? I(size(uh,1)) : X
-  relative_err,pointwise_err = compute_errors(get_snap(uh),get_snap(uh_rb),Y)
+  usnap = Matrix(get_snap(uh))
+  usnap_rb = Matrix(get_snap(uh_rb))
+  Y = isnothing(X) ? I(size(usnap,1)) : X
+  relative_err,pointwise_err = compute_errors(usnap,usnap_rb,Y)
   printstyled("Online relative error of variable $id is: $relative_err \n";
     color=:red)
 
@@ -70,9 +72,9 @@ err_dict(r::RBResults) = Dict("relative_err"=>r.et.relative_err,"pointwise_err"=
 
 function save(info::RBInfo,r::RBResults)
   if info.save_online
-    save(joinpath(path,"errors_$(r.id)"),err_dict(r))
+    save(joinpath(info.online_path,"errors_$(r.id)"),err_dict(r))
     if !info.load_offline
-      save(joinpath(path,"times"),time_dict(r))
+      save(joinpath(info.online_path,"times"),time_dict(r))
     end
   end
   return nothing

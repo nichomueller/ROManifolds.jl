@@ -63,10 +63,8 @@ function RBInfoUnsteady(
     adaptivity,postprocess)
 end
 
-issteady(info::RBInfo) = issteady(info.ptype)
-
 isindef(info::RBInfo) = isindef(info.ptype)
 
 ispdomain(info::RBInfo) = ispdomain(info.ptype)
 
-save(info::RBInfo,args::Tuple) = Broadcasting(arg->save(info,arg))(args...)
+save(info::RBInfo,args::Tuple) = Broadcasting(arg->save(info,arg))(expand(args))

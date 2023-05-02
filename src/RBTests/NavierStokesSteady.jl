@@ -115,7 +115,7 @@ function online_phase(
     tt.online_time += @elapsed begin
       res,jac = unsteady_navier_stokes_rb_system(param_on_structures,μ[k])
       Uk = get_trial(U)(μ[k])
-      x0 = initial_guess(uh,ph,μ_offline,μ[k])
+      x0 = get_initial_guess(uh,ph,μ_offline,μ[k])
       rb_sol = rb_solver(res,jac,x0,Uk)
     end
     uhk,phk = get_snap(uh[k]),get_snap(ph[k])

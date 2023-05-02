@@ -4,8 +4,6 @@ struct ProblemType
   pdomain::Bool
 end
 
-issteady(p::ProblemType) = Val(p.steady)
-
 isindef(p::ProblemType) = Val(p.indef)
 
 ispdomain(p::ProblemType) = Val(p.pdomain)

@@ -6,7 +6,7 @@ using MPI,MPIClusterManagers,Distributed
 @everywhere include("$root/src/RBTests/RBTests.jl")
 
 function stokes_unsteady()
-  run_fem = true
+  run_fem = false
 
   steady = false
   indef = true
@@ -32,8 +32,7 @@ function stokes_unsteady()
   time_info = TimeInfo(t0,tF,dt,θ)
 
   function a(x,p::Param,t::Real)
-    μ = get_μ(p)
-    exp((cos(t)+sin(t))*x[1]/sum(μ))
+    exp((cos(t)+sin(t))*x[1]/sum(p.μ))
   end
   a(p::Param,t::Real) = x->a(x,p,t)
   b(x,p::Param,t::Real) = 1.
@@ -45,10 +44,9 @@ function stokes_unsteady()
   h(x,p::Param,t::Real) = VectorValue(0.,0.)
   h(p::Param,t::Real) = x->h(x,p,t)
   function g(x,p::Param,t::Real)
-    μ = get_μ(p)
     W = 1.5
     T = 0.16
-    flow_rate = abs(1-cos(pi*t/T)+μ[2]*sin(μ[3]*pi*t/T))
+    flow_rate = abs(1-cos(pi*t/T)+p.μ[2]*sin(p.μ[3]*pi*t/T))
     parab_prof = VectorValue(abs.(x[2]*(x[2]-W))/(W/2)^2,0.)
     parab_prof*flow_rate
   end
@@ -121,14 +119,13 @@ function stokes_unsteady()
   Mlifton = RBParamOnlineStructure(Mliftrb;st_mdeim=info.st_mdeim)
   param_on_structures = (Aon,Bon,BTon,Mon,Fon,Hon,Alifton,Blifton,Mlifton)
 
-  μ_online = μ[info.online_snaps]
   err_u = ErrorTracker[]
   err_p = ErrorTracker[]
-  @distributed for (k,μk) in enumerate(μ_online)
+  function online_loop(k::Int)
     printstyled("-------------------------------------------------------------\n")
     printstyled("Evaluating RB system for μ = μ[$k]\n";color=:red)
     tt.online_time += @elapsed begin
-      lhs,rhs = unsteady_stokes_rb_system(param_on_structures,μk)
+      lhs,rhs = unsteady_stokes_rb_system(param_on_structures,μ[k])
       rb_sol = solve_rb_system(lhs,rhs)
     end
     uhk,phk = uh[k],ph[k]
@@ -136,6 +133,8 @@ function stokes_unsteady()
     push!(err_u,ErrorTracker(uhk,uhk_rb))
     push!(err_p,ErrorTracker(phk,phk_rb))
   end
+
+  pmap(online_loop,info.online_snaps)
 
   res_u,res_p = RBResults(:u,tt,err_u),RBResults(:p,tt,err_p)
   if info.save_online save(info,(res_u,res_p)) end

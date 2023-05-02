@@ -123,18 +123,25 @@ get_basis_time_col(rbop::RBVariable) = get_basis_time(get_rbspace_col(rbop))
 
 get_Nt(rbop::RBVariable) = get_Nt(rbop.rbspace_row)
 
-get_nrows(rbop::RBSteadyVariable) = get_ns(get_rbspace_row(rbop))
+get_ns_row(rbop::RBVariable) = get_ns(get_rbspace_row(rbop))
 
-get_nrows(rbop::RBUnsteadyVariable) =
-  get_ns(get_rbspace_row(rbop))*get_nt(get_rbspace_row(rbop))
+get_nt_row(rbop::RBUnsteadyVariable) = get_nt(get_rbspace_row(rbop))
 
-issteady(::RBSteadyVariable) = true
+get_ns_col(rbop::RBVariable) = 1
 
-issteady(::RBUnsteadyVariable) = false
+get_nt_col(rbop::RBUnsteadyVariable) = 1
 
-isnonlinear(::RBVariable) = false
+get_ns_col(rbop::RBBilinVariable) = get_ns(get_rbspace_col(rbop))
 
-isnonlinear(::RBVariable{Nonlinear,Ttr}) where Ttr = true
+get_nt_col(rbop::RBUnsteadyBilinVariable) = get_nt(get_rbspace_row(rbop))
+
+get_nrows(rbop::RBSteadyVariable) = get_ns_row(rbop)
+
+get_nrows(rbop::RBUnsteadyVariable) = get_ns_row(rbop)*get_nt_row(rbop)
+
+get_ncols(rbop::RBSteadyVariable) = get_ns_col(rbop)
+
+get_ncols(rbop::RBUnsteadyVariable) = get_ns_col(rbop)*get_nt_col(rbop)
 
 function Gridap.FESpaces.get_cell_dof_ids(
   rbop::RBVariable,
