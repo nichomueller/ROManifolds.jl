@@ -106,7 +106,7 @@ function stokes_unsteady()
   end
   ad = (Arb,Brb,BTrb,Mrb,Frb,Hrb,Aliftrb,Bliftrb,Mliftrb)
 
-  save(info,(rbspace,ad))
+  if info.save_offline save(info,(rbspace,ad)) end
 
   printstyled("Online phase, reduced basis method\n";color=:red)
 
@@ -121,24 +121,25 @@ function stokes_unsteady()
   Mlifton = RBParamOnlineStructure(Mliftrb;st_mdeim=info.st_mdeim)
   param_on_structures = (Aon,Bon,BTon,Mon,Fon,Hon,Alifton,Blifton,Mlifton)
 
-  function online_loop(k::Int)
+  μ_online = μ[info.online_snaps]
+  err_u = ErrorTracker[]
+  err_p = ErrorTracker[]
+  @distributed for (k,μk) in enumerate(μ_online)
     printstyled("-------------------------------------------------------------\n")
     printstyled("Evaluating RB system for μ = μ[$k]\n";color=:red)
     tt.online_time += @elapsed begin
-      lhs,rhs = unsteady_stokes_rb_system(param_on_structures,μ[k])
+      lhs,rhs = unsteady_stokes_rb_system(param_on_structures,μk)
       rb_sol = solve_rb_system(lhs,rhs)
     end
     uhk,phk = uh[k],ph[k]
     uhk_rb,phk_rb = reconstruct_fe_sol(rbspace,rb_sol)
-    ErrorTracker(uhk,uhk_rb),ErrorTracker(phk,phk_rb)
+    push!(err_u,ErrorTracker(uhk,uhk_rb))
+    push!(err_p,ErrorTracker(phk,phk_rb))
   end
 
-  ets = online_loop.(info.online_snaps)
-  ets_u,ets_p = first.(ets),last.(ets)
-  res_u,res_p = RBResults(:u,tt,ets_u),RBResults(:p,tt,ets_p)
-  save(info,res_u)
-  save(info,res_p)
-  printstyled("Average online wall time: $(tt.online_time/length(ets_u)) s\n";
+  res_u,res_p = RBResults(:u,tt,err_u),RBResults(:p,tt,err_p)
+  if info.save_online save(info,(res_u,res_p)) end
+  printstyled("Average online wall time: $(tt.online_time/length(err_u)) s\n";
     color=:red)
 
   if info.postprocess

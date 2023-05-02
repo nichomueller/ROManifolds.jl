@@ -113,7 +113,7 @@ function load(
   printstyled("Loading projected Affine variable $id \n";color=:blue)
   path_id = joinpath(info.offline_path,"$id")
 
-  ad = load(EMatrix{Float},joinpath(path_id,"basis_space"))
+  ad = load(joinpath(path_id,"basis_space"))
   RBAffineDecomposition(op,ad)
 end
 

@@ -79,29 +79,28 @@ function unsteady_navier_stokes_rb_system(
   μ::Param) where N
 
   lin_rb_lhs,lin_rb_rhs = unsteady_stokes_rb_system(rbpos,μ)
-  nonlin_lhs(un) = assemble(rbpos,(:C,:D),μ,un)
-  nonlin_rhs(un) = assemble(rbpos,:C_lift,μ,un)
+  C(un) = assemble(rbpos,:C,μ,un)
+  D(un) = assemble(rbpos,:D,μ,un)
+  C_lift(un) = assemble(rbpos,:C_lift,μ,un)
 
-  opA,opB = findall(x -> x ∈ (:A,:B),get_op.(rbpos)) # get_op(rbpos,(:A,:B))
+  opA,opB = findall(x -> x ∈ (:A,:B),get_op.(rbpos))
   rbu,rbp = get_rbspace_row(opA),get_rbspace_row(opB)
   nu,np = get_ns(rbu)*get_nt(rbu),get_ns(rbp)*get_nt(rbp)
 
   block12,block21,block22 = zeros(nu,np),zeros(np,nu),zeros(np,np)
 
-  function nonlin_rb_lhs1(un)::Matrix{Float}
-    Cun,_ = nonlin_lhs(un)
-    vcat(hcat(Cun,block12),hcat(block21,block22))
+  function nonlin_rb_lhs(un)::Matrix{Float}
+    vcat(hcat(C(un),block12),hcat(block21,block22))
   end
 
-  function nonlin_rb_lhs2(un)::Matrix{Float}
-    Cun,Dun = nonlin_lhs(un)
-    vcat(hcat(Cun+Dun,block12),hcat(block21,block22))
+  function nonlin_rb_jac(un)::Matrix{Float}
+    vcat(hcat(C(un)+D(un),block12),hcat(block21,block22))
   end
 
   nonlin_rb_rhs(un) = vcat(nonlin_rhs(un),zeros(np,1))::Matrix{Float}
 
-  jac_rb(un) = lin_rb_lhs + nonlin_rb_lhs2(un)
-  lhs_rb(un) = lin_rb_lhs + nonlin_rb_lhs1(un)
+  jac_rb(un) = lin_rb_lhs + nonlin_rb_jac(un)
+  lhs_rb(un) = lin_rb_lhs + nonlin_rb_lhs(un)
   rhs_rb(un) = lin_rb_rhs + nonlin_rb_rhs(un)
   res_rb(un,x_rb) = lhs_rb(un)*x_rb - rhs_rb(un)
 

@@ -36,7 +36,7 @@ function get_assembler(
   nc::Int)
 
   Qs = size(basis,2)
-  online_mat = Elemental.zeros(EMatrix{Float},nr,nc)
+  online_mat = zeros(nr,nc)
   function online_mat!(coeff::AbstractMatrix{Float})
     @assert length(coeff) == Qs "Something is wrong"
     copyto!(online_mat,reshape(basis*coeff,nr,nc))
@@ -54,7 +54,7 @@ function get_assembler(
   nr,nc = nsrow*ntrow,nscol*ntcol
   Qs = size(basis,2)
 
-  online_mat = Elemental.zeros(EMatrix{Float},nr,nc)
+  online_mat = zeros(nr,nc)
   mat = zeros(nr,nc)
   function online_mat!(coeff::AbstractMatrix{Float})
     @assert length(coeff) == Qs "Something is wrong"

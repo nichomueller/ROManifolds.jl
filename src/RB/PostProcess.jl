@@ -20,7 +20,7 @@ function ErrorTracker(
 
   id = get_id(uh)
   Y = isnothing(X) ? I(size(uh,1)) : X
-  relative_err,pointwise_err = compute_errors(Matrix(uh),Matrix(uh_rb),Y)
+  relative_err,pointwise_err = compute_errors(get_snap(uh),get_snap(uh_rb),Y)
   printstyled("Online relative error of variable $id is: $relative_err \n";
     color=:red)
 

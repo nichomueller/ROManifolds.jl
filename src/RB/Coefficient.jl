@@ -141,7 +141,7 @@ function hyperred_structure(
   fun = get_param_fefunction(op)
   test = get_test(op)
   ns,nt = length(idx_space),length(times)
-  V = Elemental.zeros(EMatrix{Float},ns,nt)
+  V = zeros(ns,nt)
 
   function V!(μ::Param)
     @inbounds for (n,tn) in enumerate(times)
@@ -175,7 +175,7 @@ function hyperred_structure(
   trial = get_trial(op)
   test = get_test(op)
   ns,nt = length(idx_space),length(times)
-  M = Elemental.zeros(EMatrix{Float},ns,nt)
+  M = zeros(ns,nt)
 
   function M!(μ::Param)
     @inbounds for (n,tn) in enumerate(times)
@@ -211,7 +211,7 @@ function hyperred_structure(
   test = get_test(op)
   dir(μ::Param,tn::Float) = get_dirichlet_function(op)(μ,tn)
   ns,nt = length(idx_space),length(times)
-  lift = Elemental.zeros(EMatrix{Float},ns,nt)
+  lift = zeros(ns,nt)
 
   function lift!(μ::Param)
     @inbounds for (n,tn) in enumerate(times)
@@ -246,7 +246,7 @@ function hyperred_structure(
   trial = get_trial(op)
   test = get_test(op)
   ns,nt = length(idx_space),length(times)
-  M = Elemental.zeros(EMatrix{Float},ns,nt)
+  M = zeros(ns,nt)
 
   function M!(μ::Param,z)
     @inbounds for (n,tn) in enumerate(times)
@@ -282,7 +282,7 @@ function hyperred_structure(
   test = get_test(op)
   dir(μ::Param,tn::Float) = get_dirichlet_function(op)(μ,tn)
   ns,nt = length(idx_space),length(times)
-  lift = Elemental.zeros(EMatrix{Float},ns,nt)
+  lift = zeros(ns,nt)
 
   function lift!(μ::Param,z)
     @inbounds for (n,tn) in enumerate(times)
@@ -315,7 +315,7 @@ function get_interp_coeff(mdeim::MDEIMUnsteady)
   Qt = size(bt,2)
   sorted_idx(qs) = [(i-1)*Qs+qs for i = 1:Qt]
 
-  interp_coeff = Elemental.zeros(EMatrix{Float},Qt,Qs)
+  interp_coeff = zeros(Qt,Qs)
   function interp_coeff!(coeff::AbstractMatrix)
     @inbounds for qs = 1:Qs
       interp_coeff[:,qs] = bt*coeff[sorted_idx(qs)]
