@@ -19,7 +19,7 @@ function navier_stokes_unsteady()
   order = 2
 
   t0,tF,dt,θ = 0.,0.15,0.0025,1
-  time_info = TimeInfo(t0,tF,dt,θ)
+  time_info = ThetaMethodInfo(t0,tF,dt,θ)
 
   ranges = [[1.,10.],[0.5,1.],[0.5,1.],[1.,2.]]
   sampling = UniformSampling()

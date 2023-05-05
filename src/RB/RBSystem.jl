@@ -11,9 +11,10 @@ function unsteady_poisson_rb_system(
   rbpos::NTuple{N,RBParamOnlineStructure},
   μ::Param) where N
 
-  lhs = assemble(rbpos,(:A,:M),μ)
-  rhs = assemble(rbpos,(:F,:H,:A_lift,:M_lift),μ)
-  sum(lhs),sum(rhs)
+  lhs = assemble(rbpos,:A,μ)+assemble(rbpos,:M,μ)
+  rhs = (assemble(rbpos,:F,μ)+assemble(rbpos,:H,μ)+
+    assemble(rbpos,:A_lift,μ)+assemble(rbpos,:M_lift,μ))
+  lhs,rhs
 end
 
 function steady_stokes_rb_system(
@@ -38,8 +39,8 @@ function unsteady_stokes_rb_system(
   mblock21 = assemble(rbpos,:B,μ)
   mblock22 = zeros(size(mblock21,1),size(mblock12,2))
 
-  vblock1 = assemble(rbpos,:F,μ)+assemble(rbpos,:H,μ)+assemble(rbpos,:A_lift,μ)+
-    assemble(rbpos,:M_lift,μ)
+  vblock1 = (assemble(rbpos,:F,μ)+assemble(rbpos,:H,μ)+assemble(rbpos,:A_lift,μ)+
+    assemble(rbpos,:M_lift,μ))
   vblock2 = assemble(rbpos,:B_lift,μ)
 
   rb_lhs = vcat(hcat(mblock11,mblock12),hcat(mblock21,mblock22))

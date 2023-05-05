@@ -29,7 +29,7 @@ function stokes_unsteady()
   PS = ParamSpace(ranges,sampling)
 
   t0,tF,dt,θ = 0.,0.15,0.0025,1
-  time_info = TimeInfo(t0,tF,dt,θ)
+  time_info = ThetaMethodInfo(t0,tF,dt,θ)
 
   function a(x,p::Param,t::Real)
     exp((cos(t)+sin(t))*x[1]/sum(p.μ))

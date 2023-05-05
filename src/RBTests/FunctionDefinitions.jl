@@ -42,62 +42,59 @@ function poisson_functions(::Val{true},measures::ProblemFixedMeasures)
   a,afe,f,ffe,h,hfe,g,lhs,rhs
 end
 
-function poisson_functions(::Val{false},measures::ProblemFixedMeasures)
-
-  function a(x,p::Param,t::Real)
-    μ = get_μ(p)
-    exp(x[1]/sum(μ))
-  end
-  a(p::Param,t::Real) = x->a(x,p,t)
-  a(p::Param) = t->a(p,t)
-  function m(x,p::Param,t::Real)
-    1.
-  end
-  m(p::Param,t::Real) = x->m(x,p,t)
-  m(p::Param) = t->m(p,t)
-  function f(x,p::Param,t::Real)
-    μ = get_μ(p)
-    1.
-  end
-  f(p::Param,t::Real) = x->f(x,p,t)
-  f(p::Param) = t->f(p,t)
-  function h(x,p::Param,t::Real)
-    μ = get_μ(p)
-    1.
-  end
-  h(p::Param,t::Real) = x->h(x,p,t)
-  h(p::Param) = t->h(p,t)
-  function g(x,p::Param,t::Real)
-    μ = get_μ(p)
-    exp(-x[1]/μ[2])*abs.(sin(μ[3]*t))*minimum(μ)
-  end
-  g(p::Param,t::Real) = x->g(x,p,t)
-  g(p::Param) = t->g(p,t)
-
-  afe(p::Param,t::Real,dΩ,u,v) = ∫(a(p,t)*∇(v)⋅∇(u))dΩ
-  mfe(p::Param,t::Real,dΩ,u,v) = ∫(m(p,t)*v⋅u)dΩ
-  ffe(p::Param,t::Real,dΩ,v) = ∫(f(p,t)*v)dΩ
-  hfe(p::Param,t::Real,dΓn,v) = ∫(h(p,t)*v)dΓn
+function poisson_operators(
+  measures::ProblemFixedMeasures,
+  PS::ParamSpace,
+  time_info::TimeInfo,
+  V::FESpace,
+  U::ParamTransientTrialFESpace;
+  a::Function = (x,p::Param,t::Real)->1,
+  m::Function = (x,p::Param,t::Real)->1,
+  f::Function = (x,p::Param,t::Real)->VectorValue(0,0),
+  h::Function = (x,p::Param,t::Real)->VectorValue(0,0))
 
   dΩ,dΓn = get_dΩ(measures),get_dΓn(measures)
+
+  afe(p::Param,t::Real,dΩ,u,v) = ∫(a(p,t)*∇(v)⊙∇(u))dΩ
   afe(p::Param,t::Real,u,v) = afe(p,t,dΩ,u,v)
   afe(p::Param,t::Real) = (u,v) -> afe(p,t,u,v)
+  afe(a::Function,u,v) = ∫(a*∇(v)⊙∇(u))dΩ
+  afe(a::Function) = (u,v) -> afe(a,u,v)
+  A = ParamFunctions(a,afe)
+
+  mfe(p::Param,t::Real,dΩ,u,v) = ∫(m(p,t)*v⋅u)dΩ
   mfe(p::Param,t::Real,u,v) = mfe(p,t,dΩ,u,v)
   mfe(p::Param,t::Real) = (u,v) -> mfe(p,t,u,v)
+  mfe(m::Function,u,v) = ∫(m*v⋅u)dΩ
+  mfe(m::Function) = (u,v) -> mfe(m,u,v)
+  M = ParamFunctions(m,mfe)
+
+  ffe(p::Param,t::Real,dΩ,v) = ∫(f(p,t)⋅v)dΩ
   ffe(p::Param,t::Real,v) = ffe(p,t,dΩ,v)
   ffe(p::Param,t::Real) = v -> ffe(p,t,v)
+  ffe(f::Function,v) = ∫(f⋅v)dΩ
+  ffe(f::Function) = v -> ffe(f,v)
+  F = ParamFunctions(f,ffe)
+
+  hfe(p::Param,t::Real,dΓn,v) = ∫(h(p,t)⋅v)dΓn
   hfe(p::Param,t::Real,v) = hfe(p,t,dΓn,v)
   hfe(p::Param,t::Real) = v -> hfe(p,t,v)
-  # FUNCTIONAL MDEIM REPRESENTATION
-  afe(a,u,v) = ∫(a*∇(v)⋅∇(u))dΩ
-  mfe(m,u,v) = ∫(m*v⋅u)dΩ
-  ffe(f,v) = ∫(f*v)dΩ
-  hfe(h,v) = ∫(h*v)dΓn
+  hfe(h::Function,v) = ∫(h⋅v)dΓn
+  hfe(h::Function) = v -> hfe(h,v)
+  H = ParamFunctions(h,hfe)
 
+  opA = NonaffineParamOperator(A,PS,time_info,U,V;id=:A)
+  opM = AffineParamOperator(M,PS,time_info,U,V;id=:M)
+  opF = AffineParamOperator(F,PS,time_info,V;id=:F)
+  opH = AffineParamOperator(H,PS,time_info,V;id=:H)
+
+  lhs_t(μ,t,u,v) = mfe(μ,t,u,v)
   lhs(p,t,u,v) = afe(p,t,u,v)
   rhs(p,t,v) = ffe(p,t,v) + hfe(p,t,v)
 
-  a,afe,m,mfe,f,ffe,h,hfe,g,lhs,rhs
+  feop = ParamTransientAffineFEOperator(lhs_t,lhs,rhs,PS,U,V)
+
+  feop,opA,opM,opF,opH
 end
 
 function stokes_operators(measures::ProblemFixedMeasures)

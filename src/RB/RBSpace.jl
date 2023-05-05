@@ -78,13 +78,13 @@ end
 function rb_space_projection(rbrow::RBSpace,mat::AbstractArray)
   brow = get_basis_space(rbrow)
   @assert size(brow,1) == size(mat,1) "Cannot project array"
-  reshape(brow'*mat,:,1)
+  Matrix(brow'*mat)
 end
 
 function rb_space_projection(rbrow::RBSpace,rbcol::RBSpace,mat::AbstractMatrix)
   brow,bcol = get_basis_space(rbrow),get_basis_space(rbcol)
   @assert size(brow,1) == size(mat,1) && size(bcol,1) == size(mat,2) "Cannot project matrix"
-  reshape(brow'*mat*bcol,:,1)
+  brow'*mat*bcol
 end
 
 function rb_time_projection(rbrow::RBSpaceUnsteady,mat::AbstractArray)
@@ -144,15 +144,15 @@ function rb_spacetime_projection(
 
   proj_space = zeros(nsrow*nscol,Nt)
   @inbounds for n = 1:Nt
-    proj_space[:,n] = rb_space_projection(rbrow,rbcol,mats[n])
+    proj_space[:,n] = rb_space_projection(rbrow,rbcol,mats[n])[:]
   end
 
   proj_space_time = rb_time_projection(rbrow,rbcol,proj_space';
     idx_forwards,idx_backwards)
 
   proj_spacetime = zeros(nsrow*ntrow,nscol*ntcol)
-  @inbounds for is = 1:nscol, js = 1:nsrow
-    proj_ij = proj_space_time[(jt-1)*nrow+it,:]
+  @inbounds for it = 1:ntcol, jt = 1:ntrow
+    proj_ij = proj_space_time[(jt-1)*ntrow+it,:]
     copyto!(view(proj_spacetime,1+(js-1)*ntrow:js*ntrow,1+(is-1)*ntcol:is*ntcol),
             proj_ij)
   end

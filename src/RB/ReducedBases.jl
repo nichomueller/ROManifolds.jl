@@ -5,33 +5,33 @@ function rb(
   kwargs...)::NTuple{N,RBSpace} where N
 
   if info.load_offline
-    printstyled("Loading reduced bases\n";color=:red)
+    printstyled("Loading reduced bases\n";color=:blue)
     load(info,get_id(snaps))
   else
-    printstyled("Assembling reduced bases\n";color=:red)
+    printstyled("Assembling reduced bases\n";color=:blue)
     assemble_rb(info,snaps,args...;kwargs...)
   end
 end
 
 function assemble_rb(
   info::RBInfoSteady,
-  snaps::Snapshots;
+  snaps::NTuple{1,Snapshots};
   kwargs...)
 
-  id = get_id(snaps)
-  basis_space = rb_space(snaps;ϵ=info.ϵ,kwargs...)
-  (RBSpaceSteady(id,basis_space),)
+  snaps_u, = snaps
+  basis_space = rb_space(snaps_u;ϵ=info.ϵ,kwargs...)
+  (RBSpaceSteady(get_id(snaps_u),basis_space),)
 end
 
 function assemble_rb(
   info::RBInfoUnsteady,
-  snaps::Snapshots;
+  snaps::NTuple{1,Snapshots};
   kwargs...)
 
-  id = get_id(snaps)
-  basis_space = rb_space(snaps;ϵ=info.ϵ,kwargs...)
-  basis_time = rb_time(snaps,basis_space;ϵ=info.ϵ,kwargs...)
-  (RBSpaceUnsteady(id,basis_space,basis_time),)
+  snaps_u, = snaps
+  basis_space = rb_space(snaps_u;ϵ=info.ϵ,kwargs...)
+  basis_time = rb_time(snaps_u,basis_space;ϵ=info.ϵ,kwargs...)
+  (RBSpaceUnsteady(get_id(snaps_u),basis_space,basis_time),)
 end
 
 function assemble_rb(

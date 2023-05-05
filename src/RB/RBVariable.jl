@@ -151,14 +151,6 @@ end
 
 get_assembler(op::RBVariable) = get_assembler(op.feop)
 
-function Gridap.FESpaces.assemble_vector(op::RBLinVariable;kwargs...)
-  assemble_vector(op.feop;kwargs...)
-end
-
-function Gridap.FESpaces.assemble_matrix(op::RBBilinVariable;kwargs...)
-  assemble_matrix(op.feop;kwargs...)
-end
-
 assemble_affine_quantity(op::RBVariable,args...) = assemble_affine_quantity(op.feop)
 
 get_dirichlet_function(op::RBVariable) = get_dirichlet_function(op.feop)
