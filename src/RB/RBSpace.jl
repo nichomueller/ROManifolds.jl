@@ -151,8 +151,8 @@ function rb_spacetime_projection(
     idx_forwards,idx_backwards)
 
   proj_spacetime = zeros(nsrow*ntrow,nscol*ntcol)
-  @inbounds for it = 1:ntcol, jt = 1:ntrow
-    proj_ij = proj_space_time[(jt-1)*ntrow+it,:]
+  @inbounds for is = 1:nscol, js = 1:nsrow
+    proj_ij = proj_space_time[:,(is-1)*nsrow+js]
     copyto!(view(proj_spacetime,1+(js-1)*ntrow:js*ntrow,1+(is-1)*ntcol:is*ntcol),
             proj_ij)
   end

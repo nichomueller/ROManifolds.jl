@@ -56,9 +56,9 @@ function get_assembler(
   Qs = size(basis,2)
 
   online_mat = zeros(nr,nc)
-  mat = zeros(nr,nc)
   function online_mat!(coeff::AbstractMatrix{Float})
     @assert size(coeff,2) == Qs "Something is wrong"
+    mat = zeros(nr,nc)
     @inbounds for q = 1:Qs
       basis_q = reshape(basis[:,q],nsrow,nscol)
       coeff_q = reshape(coeff[:,q],ntrow,ntcol)
