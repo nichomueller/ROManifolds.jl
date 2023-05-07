@@ -137,8 +137,7 @@ function interpolate_param_function(
   vals::Matrix{Float})
 
   test_quad = LagrangianQuadFESpace(get_test(op))
-  param_fun = FEFunction(test_quad,vals)
-  param_fun
+  FEFunction(test_quad,vals)
 end
 
 function interpolate_param_function(
@@ -149,6 +148,5 @@ function interpolate_param_function(
   vals_free,vals_dir = vals[1:Ns,:],vals[1+Ns:end,:]
 
   test = get_test(op)
-  param_fun(k::Int) = FEFunction(test,vals_free[:,k],vals_dir[:,k])
-  param_fun
+  (k::Int) -> FEFunction(test,vals_free[:,k],vals_dir[:,k])
 end

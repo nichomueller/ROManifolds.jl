@@ -1,11 +1,13 @@
-root = pwd()
-
 using MPI,MPIClusterManagers,Distributed
+manager = MPIWorkerManager()
+addprocs(manager)
+
+@everywhere root = pwd()
 @everywhere include("$root/src/FEM/FEM.jl")
 @everywhere include("$root/src/RB/RB.jl")
 @everywhere include("$root/src/RBTests/RBTests.jl")
 
-function stokes_unsteady()
+@mpi_do manager begin
   run_fem = false
 
   steady = false
@@ -46,7 +48,7 @@ function stokes_unsteady()
   function g(x,p::Param,t::Real)
     W = 1.5
     T = 0.16
-    flow_rate = abs(1-cos(pi*t/T)+p.μ[2]*sin(p.μ[3]*pi*t/T))
+    flow_rate = abs(1-cos(2*pi*t/T)+sin(2*pi*t/(p.μ[3]*T))/p.μ[2])
     parab_prof = VectorValue(abs.(x[2]*(x[2]-W))/(W/2)^2,0.)
     parab_prof*flow_rate
   end
@@ -65,10 +67,10 @@ function stokes_unsteady()
   feop,opA,opB,opBT,opM,opF,opH = stokes_operators(measures,PS,time_info,V,U,Q,P;a,b,m,f,h)
 
   solver = ThetaMethod(LUSolver(),dt,θ)
-  nsnap = 50
+  nsnap = 100
   uh,ph,μ = fe_snapshots(solver,feop,fepath,run_fem,nsnap,t0,tF;indef)
 
-  info = RBInfoUnsteady(ptype,test_path;ϵ=1e-3,nsnap=40,mdeim_snap=10,load_offline=false)
+  info = RBInfoUnsteady(ptype,test_path;ϵ=1e-3,nsnap=80,mdeim_snap=20,load_offline=false)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
 
   printstyled("Offline phase, reduced basis method\n";color=:blue)
@@ -151,5 +153,3 @@ function stokes_unsteady()
     writevtk(info,time_info,res_p,Q,trian)
   end
 end
-
-stokes_unsteady()

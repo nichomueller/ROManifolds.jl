@@ -1,4 +1,4 @@
-include("MDEIMSnapshots.jl")
+include("MDEIMBases.jl")
 
 abstract type MDEIM end
 
