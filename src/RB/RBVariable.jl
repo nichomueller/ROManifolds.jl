@@ -180,7 +180,7 @@ function rb_space_projection(
   vec::AbstractArray)
 
   rbrow = get_rbspace_row(op)
-  rb_space_projection(rbrow,vec)
+  reshape(rb_space_projection(rbrow,vec),:,1)
 end
 
 function rb_space_projection(
@@ -189,7 +189,7 @@ function rb_space_projection(
 
   rbrow = get_rbspace_row(op)
   rbcol = get_rbspace_col(op)
-  rb_space_projection(rbrow,rbcol,mat)
+  reshape(rb_space_projection(rbrow,rbcol,mat),:,1)
 end
 
 function rb_space_projection(op::RBVariable)

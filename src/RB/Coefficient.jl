@@ -39,7 +39,7 @@ function get_coefficient(
     coeff
   end
 
-  Qs = size(basis,2)
+  @assert Qs == size(basis,2) "Wrong dimensions"
   coeff_by_time_bases = get_coeff_by_time_bases(op,Qs)
   (μ::Param) -> coeff_by_time_bases(coeff!(μ))
 end
