@@ -132,9 +132,25 @@ get_dimension(op::ParamOperator) = get_dimension(get_test(op))
 
 realization(op::ParamOperator) = realization(get_pspace(op))
 
-realization_trial(op::ParamSteadyOperator) = get_trial(op)(realization(op))
+realization_trial(trial::TrialFESpace,args...) = trial
 
-realization_trial(op::ParamUnsteadyOperator) = get_trial(op)(realization(op),realization(get_time_info(op)))
+function realization_trial(
+  trial::ParamTrialFESpace,μ::Vector{Param},args...)
+  trial(first(μ))
+end
+
+function realization_trial(
+  trial::ParamTransientTrialFESpace,μ::Vector{Param},t::Vector{Float},args...)
+  trial(first(μ),first(t))
+end
+
+function realization_trial(op::ParamSteadyOperator)
+  get_trial(op)(realization(op))
+end
+
+function realization_trial(op::ParamUnsteadyOperator)
+  get_trial(op)(realization(op),realization(get_time_info(op)))
+end
 
 function realization_param_fefunction(op::ParamSteadyOperator)
   pfun = get_param_function(op)
@@ -249,16 +265,20 @@ function ParamLiftOperator(op::ParamUnsteadyBilinOperator{Top,Ttr}) where {Top,T
     get_pspace(op),get_time_info(op),get_trial(op),get_test(op))
 end
 
-function unpack_for_assembly(op::ParamLinOperator)
+function unpack_for_assembly(::Val,op::ParamLinOperator)
   get_param_fefunction(op),get_test(op)
 end
 
-function unpack_for_assembly(op::ParamBilinOperator)
+function unpack_for_assembly(::Val,op::ParamLiftOperator)
+  get_param_fefunction(op),get_test(op),get_dirichlet_function(op)
+end
+
+function unpack_for_assembly(::Val{false},op::ParamBilinOperator)
   get_param_fefunction(op),get_trial(op),get_test(op)
 end
 
-function unpack_for_assembly(op::ParamLiftOperator)
-  get_param_fefunction(op),get_test(op),get_dirichlet_function(op)
+function unpack_for_assembly(::Val{true},op::ParamBilinOperator)
+  get_param_fefunction(op),realization_trial(op),get_test(op)
 end
 
 function assemble_affine_quantity(op::ParamLinOperator)

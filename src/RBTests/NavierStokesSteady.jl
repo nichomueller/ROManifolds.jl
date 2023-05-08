@@ -51,7 +51,7 @@ function navier_stokes_steady()
   opF = AffineParamOperator(f,ffe,PS,V;id=:F)
   opH = AffineParamOperator(h,hfe,PS,V;id=:H)
 
-  info = RBInfoSteady(ptype,test_path;ϵ=1e-5,nsnap=80,mdeim_snap=30,load_offline=true)
+  info = RBInfoSteady(ptype,test_path;ϵ=1e-4,nsnap=80,mdeim_snap=30,load_offline=true)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
   fesol = (uh,ph,μ,U,V)
   rbspace,param_on_structures = offline_phase(info,fesol,(opA,opB,opC,opD,opF,opH),measures,tt)

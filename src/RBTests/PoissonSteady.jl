@@ -43,7 +43,7 @@ function poisson_steady()
   opF = AffineParamOperator(f,ffe,PS,V;id=:F)
   opH = NonaffineParamOperator(h,hfe,PS,V;id=:H)
 
-  info = RBInfoSteady(ptype,test_path;ϵ=1e-5,nsnap=80,mdeim_snap=20,load_offline=false)
+  info = RBInfoSteady(ptype,test_path;ϵ=1e-4,nsnap=80,mdeim_snap=20,load_offline=false)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
   rbspace,param_on_structures = offline_phase(info,(uh,μ),(opA,opF,opH),measures,tt)
   online_phase(info,(uh,μ),rbspace,param_on_structures,tt)

@@ -13,9 +13,9 @@ abstract type PODStyle end
 struct DefaultPOD end
 struct ReducedPOD end
 
-POD(S::AbstractMatrix,args...;ϵ=1e-5,style=ReducedPOD()) = POD(style,S,args...;ϵ)
+POD(S::AbstractMatrix,args...;ϵ=1e-4,style=ReducedPOD()) = POD(style,S,args...;ϵ)
 
-function POD(::DefaultPOD,S::AbstractMatrix,X::SparseMatrixCSC;ϵ=1e-5)
+function POD(::DefaultPOD,S::AbstractMatrix,X::SparseMatrixCSC;ϵ=1e-4)
   H = cholesky(X)
   L = sparse(H.L)
   U,Σ,_ = svd(L'*S[H.p,:])
@@ -23,17 +23,17 @@ function POD(::DefaultPOD,S::AbstractMatrix,X::SparseMatrixCSC;ϵ=1e-5)
   (L'\U[:,1:n])[invperm(H.p),:]
 end
 
-function POD(::DefaultPOD,S::AbstractMatrix;ϵ=1e-5)
+function POD(::DefaultPOD,S::AbstractMatrix;ϵ=1e-4)
   U,Σ,_ = svd(S)
   n = truncation(Σ,ϵ)
   U[:,1:n]
 end
 
-function POD(::ReducedPOD,S::AbstractMatrix;ϵ=1e-5)
+function POD(::ReducedPOD,S::AbstractMatrix;ϵ=1e-4)
   POD(Val{size(S,1)>size(S,2)}(),S;ϵ)
 end
 
-function POD(::Val{true},S::AbstractMatrix;ϵ=1e-5)
+function POD(::Val{true},S::AbstractMatrix;ϵ=1e-4)
   C = S'*S
   _,_,V = svd(C)
   Σ = svdvals(S)
@@ -45,7 +45,7 @@ function POD(::Val{true},S::AbstractMatrix;ϵ=1e-5)
   U
 end
 
-function POD(::Val{false},S::AbstractMatrix;ϵ=1e-5)
+function POD(::Val{false},S::AbstractMatrix;ϵ=1e-4)
   C = S*S'
   U,_ = svd(C)
   Σ = svdvals(S)

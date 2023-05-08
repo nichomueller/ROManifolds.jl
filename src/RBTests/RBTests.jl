@@ -190,7 +190,8 @@ function collect_solutions(sol)
   x = Elemental.zeros(EMatrix{Float},Ns,Nt*ns)
   xtmp = Elemental.zeros(EMatrix{Float},Ns,Nt)
   μ = Param[]
-  @sync @distributed for k in eachindex(sol)
+  # @sync @distributed
+  for k in eachindex(sol)
     printstyled("Collecting solution $k\n";color=:blue)
     copyto!(view(x,:,(k-1)*Nt+1:k*Nt),get_solution(xtmp,sol[k]))
     push!(μ,sol[k].psol.μ)

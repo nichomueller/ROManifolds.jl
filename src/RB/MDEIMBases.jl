@@ -3,7 +3,7 @@ function mdeim_basis(info::RBInfo,op::RBVariable,args...)
   nsnap = info.mdeim_nsnap
   printstyled("MDEIM: generating $nsnap snapshots for $id \n";color=:blue)
 
-  state = info.fun_mdeim && typeof(op) == RBBilinVariable
+  state = info.fun_mdeim && typeof(op) <: RBBilinVariable
   mdeim_basis(Val(state),info,op,args...)
 end
 
@@ -32,121 +32,64 @@ end
 
 function mdeim_basis(
   ::Val{true},
-  info::RBInfo,
-  op::RBUnsteadyBilinVariable{Top,<:ParamTransientTrialFESpace},
-  μ::Vector{Param},
-  u=nothing) where Top
-
-  id = get_id(op)
-  printstyled("MDEIM: generating snapshots on the quadrature points, $id \n";
-   color=:blue)
-
-  param_vals = evaluate_param_function(op,μ,u)
-  param_bs,param_bt = reduce_param_function(op,param_vals)
-  param_fun = interpolate_param_function(op,param_bs)
-
-  fe_quantity = get_assembler(op,μ,param_fun)
-  ns = size(param_bs,2)
-  vals = Vector{Float}[]
-  @threads for k = 1:ns
-    push!(vals,fe_quantity(k))
-  end
-  bs = rb_space(info,Snapshots(id,vals))
-
-  #findnz_idx = (op;μ,u)
-
-  RBSpaceUnsteady(id,bs,param_bt),findnz_idx
-end
-
-function evaluate_param_function(
+  info::RBInfoSteady,
   op::RBVariable,
   μ::Vector{Param},
   args...)
 
-  param_fun = get_param_function(op)
-  quadp = get_phys_quad_points(op)
-  eval_fun = get_evaluated_param_function(op,param_fun,quadp,μ)
+  param_snaps = assemble_functional_snaps(op,μ,args...)
+  param_basis = reduce_param_function(op,param_snaps)
+  param_fun = interpolate_param_function(op,param_basis)
+  snaps,findnz_idx = assemble_fe_snaps(op,μ,param_fun)
 
-  param_vals = Array{Float}[]
-  @threads for k = eachindex(μ)
-    push!(param_vals,eval_fun(k))
-  end
-
-  Matrix(param_vals)
+  RBSpaceSteady(snaps;ϵ=info.ϵ,style=ReducedPOD()),findnz_idx
 end
 
-function evaluate_param_function(
-  ::RBVariable{Nonlinear,Ttr},
-  ::Vector{Param},
-  vals::Snapshots) where Ttr
+function mdeim_basis(
+  ::Val{true},
+  info::RBInfo,
+  op::RBUnsteadyBilinVariable,
+  μ::Vector{Param},
+  args...)
 
-  get_snap(vals)
+  param_snaps = assemble_functional_snaps(op,μ,args...)
+  param_basis = get_param_basis(op,param_snaps)
+  param_fun = interpolate_param_basis(op,param_basis)
+  snaps,findnz_idx = assemble_fe_snaps(op,param_fun;fun_mdeim=true)
+  basis_time = get_basis_time(param_basis)
+  basis_space = POD(snaps;ϵ=info.ϵ,style=ReducedPOD())
+
+  RBSpaceUnsteady(get_id(op),basis_space,basis_time),findnz_idx
 end
 
-function get_evaluated_param_function(
-  ::RBSteadyVariable,
-  param_fun::Function,
-  quadp::Vector{Point},
-  μ::Vector{Param})
-
-  k -> Broadcasting(x->param_fun(x,μ[k]))(quadp)
+function get_param_basis(::RBSteadyVariable,snaps)
+  RBSpaceSteady(snaps;ϵ=info.ϵ,style=ReducedPOD())
 end
 
-function get_evaluated_param_function(
-  op::RBUnsteadyVariable,
-  param_fun::Function,
-  quadp::Vector{Point},
-  μ::Vector{Param})
-
-  times = get_times(op)
-  eval_param(k,t) = Broadcasting(x->param_fun(x,μ[k],t))(quadp)
-  eval_param(k) = Matrix([eval_param(k,t) for t = times])
-  eval_param
+function get_param_basis(::RBUnsteadyVariable,snaps)
+  RBSpaceUnsteady(snaps;ϵ=info.ϵ,style=ReducedPOD())
 end
 
-function reduce_param_function(
-  op::RBUnsteadyVariable,
-  vals::Matrix{Float})
+function interpolate_param_basis(
+  op::RBVariable,
+  rbspace::RBSpace)
 
-  param_bs = POD(vals)
-  ns = get_nsnap(vals,get_Nt(op))
-  vals2 = mode2_unfolding(param_bs'*vals,ns)
-  param_bt = POD(vals2)
-  param_bs,param_bt
+  ns = get_ns(rbspace)
+  basis_space = get_basis_space(rbspace)
+  quad_fespace = LagrangianQuadFESpace(get_test(op))
+  quad_test = quad_fespace.test
+
+  [FEFunction(quad_test,basis_space[:,k]) for k = 1:ns]
 end
 
-function reduce_param_function(
-  op::RBUnsteadyVariable{Nonlinear,Ttr},
-  all_vals::Matrix{Float}) where Ttr
+function interpolate_param_basis(
+  op::RBVariable{Nonlinear,Top},
+  rbspace::RBSpace) where Top
 
-  Ns = get_Ns(get_rbspace_row(op))
-  Nt = get_Nt(op)
-  ns = get_nsnap(free_vals,Nt)
-  free_vals = all_vals[1:Ns,:]
-
-  bs_all = POD(all_vals;ϵ=info.ϵ)
-  bs_free = bs_all[1:Ns,:]
-  s2 = mode2_unfolding(bs_free'*free_vals,ns)
-  bt_free = POD(s2;ϵ=info.ϵ)
-
-  bs_all,bt_free
-end
-
-function interpolate_param_function(
-  op::RBUnsteadyVariable,
-  vals::Matrix{Float})
-
-  test_quad = LagrangianQuadFESpace(get_test(op))
-  FEFunction(test_quad,vals)
-end
-
-function interpolate_param_function(
-  op::RBUnsteadyVariable{Nonlinear,Top},
-  vals::Matrix{Float}) where Top
-
-  Ns = get_Ns(get_rbspace_row(op))
-  vals_free,vals_dir = vals[1:Ns,:],vals[1+Ns:end,:]
-
+  Ns,ns = get_Ns(rbspace),get_ns(rbspace)
   test = get_test(op)
-  (k::Int) -> FEFunction(test,vals_free[:,k],vals_dir[:,k])
+  basis_space = get_basis_space(rbspace)
+  basis_free,basis_dir = basis_space[1:Ns,:],basis_space[1+Ns:end,:]
+
+  [FEFunction(test,basis_free[:,k],basis_dir[:,k]) for k = 1:ns]
 end

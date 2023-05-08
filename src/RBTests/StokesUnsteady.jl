@@ -70,7 +70,7 @@ addprocs(manager)
   nsnap = 100
   uh,ph,μ = fe_snapshots(solver,feop,fepath,run_fem,nsnap,t0,tF;indef)
 
-  info = RBInfoUnsteady(ptype,test_path;ϵ=1e-3,nsnap=80,mdeim_snap=20,load_offline=false)
+  info = RBInfoUnsteady(ptype,test_path;ϵ=1e-3,nsnap=80,mdeim_snap=20)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
 
   printstyled("Offline phase, reduced basis method\n";color=:blue)
@@ -124,8 +124,6 @@ addprocs(manager)
   err_u = ErrorTracker[]
   err_p = ErrorTracker[]
   function online_loop(k::Int)
-    printstyled("-------------------------------------------------------------\n")
-    printstyled("Evaluating RB system for μ = μ[$k]\n";color=:red)
     tt.online_time += @elapsed begin
       lhs,rhs = unsteady_stokes_rb_system(param_on_structures,μ[k])
       rb_sol = solve_rb_system(lhs,rhs)
@@ -139,7 +137,10 @@ addprocs(manager)
   pmap(online_loop,info.online_snaps)
 
   res_u,res_p = RBResults(:u,tt,err_u),RBResults(:p,tt,err_p)
+  rel_err_u,rel_err_u = res_u.et.relative_err,res_p.et.relative_err
   if info.save_online save(info,(res_u,res_p)) end
+  printstyled("Average online relative errors (err_u,err_p): $((rel_err_u,rel_err_u))\n";
+    color=:red)
   printstyled("Average online wall time: $(tt.online_time/length(err_u)) s\n";
     color=:red)
 

@@ -5,9 +5,22 @@ struct RBSpaceSteady <: RBSpace
   basis_space::Matrix{Float}
 end
 
-function RBSpaceSteady(snaps::Snapshots;ϵ=1e-5,style=ReducedPOD())
+function RBSpaceSteady(
+  snaps::Snapshots;
+  ϵ=1e-4,style=ReducedPOD())
+
   id = get_id(snaps)
   basis_space = rb_space(snaps;ϵ,style)
+  RBSpaceSteady(id,Matrix(basis_space))
+end
+
+function RBSpaceSteady(
+  snaps::NTuple{2,Snapshots};
+  ϵ=1e-4,style=ReducedPOD())
+
+  all_snaps = vcat(snaps...)
+  id = get_id(all_snaps)
+  basis_space = rb_space(all_snaps;ϵ,style)
   RBSpaceSteady(id,Matrix(basis_space))
 end
 
@@ -17,10 +30,22 @@ struct RBSpaceUnsteady <: RBSpace
   basis_time::Matrix{Float}
 end
 
-function RBSpaceUnsteady(snaps::Snapshots;ϵ=1e-5,style=ReducedPOD())
+function RBSpaceUnsteady(
+  snaps::Snapshots;
+  ϵ=1e-4,style=ReducedPOD())
+
   id = get_id(snaps)
-  basis_space = rb_space(snaps;ϵ,style)
-  basis_time = rb_time(snaps,basis_space;ϵ,style)
+  basis_space,basis_time = rb_space_time(snaps;ϵ,style)
+  RBSpaceUnsteady(id,Matrix(basis_space),Matrix(basis_time))
+end
+
+function RBSpaceUnsteady(
+  snaps::NTuple{2,Snapshots};
+  ϵ=1e-4,style=ReducedPOD())
+
+  all_snaps = vcat(snaps...)
+  id = get_id(all_snaps)
+  basis_space,basis_time = rb_space_time(all_snaps;ϵ,style)
   RBSpaceUnsteady(id,Matrix(basis_space),Matrix(basis_time))
 end
 

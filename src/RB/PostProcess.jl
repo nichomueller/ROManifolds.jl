@@ -18,13 +18,10 @@ function ErrorTracker(
   uh_rb::Snapshots;
   X=nothing)
 
-  id = get_id(uh)
   usnap = Matrix(get_snap(uh))
   usnap_rb = Matrix(get_snap(uh_rb))
   Y = isnothing(X) ? I(size(usnap,1)) : X
   relative_err,pointwise_err = compute_errors(usnap,usnap_rb,Y)
-  printstyled("Online relative error of variable $id is: $relative_err \n";
-    color=:red)
 
   ErrorTracker(relative_err,pointwise_err)
 end

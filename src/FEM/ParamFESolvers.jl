@@ -39,9 +39,7 @@ function Gridap.solve(
   op::ParamOp,
   μ::Vector{Param})
 
-  @distributed for p in μ
-    solve(solver,op,p)
-  end
+  [solve(solver,op,p) for p in μ]
 end
 
 function Gridap.solve(

@@ -29,8 +29,7 @@ function assemble_rb(
   kwargs...)
 
   snaps_u, = snaps
-  basis_space = rb_space(snaps_u;ϵ=info.ϵ,kwargs...)
-  basis_time = rb_time(snaps_u,basis_space;ϵ=info.ϵ,kwargs...)
+  basis_space,basis_time = rb_space_time(snaps_u;ϵ=info.ϵ,kwargs...)
   (RBSpaceUnsteady(get_id(snaps_u),basis_space,basis_time),)
 end
 
@@ -63,11 +62,9 @@ function assemble_rb(
   snaps_u,snaps_p = snaps
   opB,ttol... = args
 
-  bs_u = rb_space(snaps_u;ϵ=info.ϵ,kwargs...)
-  bs_p = rb_space(snaps_p;ϵ=info.ϵ,kwargs...)
+  bs_u,bt_u = rb_space_time(snaps_u;ϵ=info.ϵ,kwargs...)
+  bs_p,bt_p = rb_space_time(snaps_p;ϵ=info.ϵ,kwargs...)
   bs_u_supr = add_space_supremizers(def,(bs_u,bs_p),opB)
-  bt_u = rb_time(snaps_u,bs_u;ϵ=info.ϵ,kwargs...)
-  bt_p = rb_time(snaps_p,bs_p;ϵ=info.ϵ,kwargs...)
   bt_u_supr = add_time_supremizers(def,(bt_u,bt_p),ttol...)
 
   rbspace_u = RBSpaceUnsteady(get_id(snaps_u),bs_u_supr,bt_u_supr)
@@ -80,15 +77,15 @@ function rb_space(snap::Snapshots;kwargs...)
   POD(snap;kwargs...)
 end
 
-function rb_time(
-  snap::Snapshots,
-  basis_space::AbstractMatrix{Float};
-  kwargs...)
-
-  s1 = get_snap(snap)
+function rb_space_time(snap::Snapshots;kwargs...)
+  snap_space = get_snap(snap)
   ns = get_nsnap(snap)
-  s2 = mode2_unfolding(basis_space'*s1,ns)
-  POD(s2;kwargs...)
+  snap_time = mode2_unfolding(snap_space,ns)
+  basis_time = POD(snap_time;kwargs...)
+  red_snap_space = mode2_unfolding(basis_time'*snap_time,ns)
+  basis_space = POD(red_snap_space;kwargs...)
+
+  basis_space,basis_time
 end
 
 function add_space_supremizers(

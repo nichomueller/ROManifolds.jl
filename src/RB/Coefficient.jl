@@ -89,7 +89,7 @@ function get_coefficient(
   coeff_by_time_bases = get_coeff_by_time_bases(op,mdeim)
   interp_coeff = get_interp_coeff(mdeim)
 
-  coeff(μ::Param) = mdeim_solver(A(μ)[:])
+  coeff(μ::Param) = mdeim_solver(reshape(A(μ),:,1))
   (μ::Param) -> coeff_by_time_bases(interp_coeff(coeff(μ)))
 end
 
@@ -310,14 +310,15 @@ function get_interp_coeff(mdeim::MDEIMUnsteady)
   bs = get_basis_space(mdeim)
   bt = get_basis_time(mdeim)
   Qs = size(bs,2)
-  Qt = size(bt,2)
+  Nt,Qt = size(bt)
   sorted_idx(qs) = [(i-1)*Qs+qs for i = 1:Qt]
 
-  interp_coeff = zeros(Qt,Qs)
+  interp_coeff = zeros(Nt,Qs)
   function interp_coeff!(coeff::AbstractMatrix)
     @inbounds for qs = 1:Qs
       interp_coeff[:,qs] = bt*coeff[sorted_idx(qs)]
     end
+    interp_coeff
   end
 
   interp_coeff!
