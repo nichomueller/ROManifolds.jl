@@ -77,6 +77,16 @@ function rb_space(snap::Snapshots;kwargs...)
   POD(snap;kwargs...)
 end
 
+#= function rb_space_time(snap::Snapshots;kwargs...)
+  snap_space = get_snap(snap)
+  ns = get_nsnap(snap)
+  basis_space = POD(snap_space;kwargs...)
+  red_snap_time = mode2_unfolding(basis_space'*snap_space,ns)
+  basis_time = POD(red_snap_time;kwargs...)
+
+  basis_space,basis_time
+end =#
+
 function rb_space_time(snap::Snapshots;kwargs...)
   snap_space = get_snap(snap)
   ns = get_nsnap(snap)

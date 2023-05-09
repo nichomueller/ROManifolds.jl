@@ -352,7 +352,6 @@ function get_findnz_idx(mat::SparseMatrixCSC{Float,Int})
   findnz_idx
 end
 
-# FUNCTIONAL MDEIM
 function assemble_functional_snaps(
   op::ParamOperator,
   μvec::Vector{Param})

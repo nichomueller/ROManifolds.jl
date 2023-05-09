@@ -1,11 +1,13 @@
-root = pwd()
-
 using MPI,MPIClusterManagers,Distributed
+manager = MPIWorkerManager()
+addprocs(manager)
+
+@everywhere root = pwd()
 @everywhere include("$root/src/FEM/FEM.jl")
 @everywhere include("$root/src/RB/RB.jl")
 @everywhere include("$root/src/RBTests/RBTests.jl")
 
-function poisson_unsteady()
+@mpi_do manager begin
   run_fem = false
 
   steady = false
@@ -60,7 +62,7 @@ function poisson_unsteady()
   nsnap = 100
   uh,μ = fe_snapshots(solver,feop,fepath,run_fem,nsnap,t0,tF;indef)
 
-  info = RBInfoUnsteady(ptype,test_path;ϵ=1e-3,nsnap=80,mdeim_snap=20,load_offline=false)
+  info = RBInfoUnsteady(ptype,test_path;ϵ=1e-3,nsnap=80,mdeim_snap=20,load_offline=false,fun_mdeim=true)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
 
   printstyled("Offline phase, reduced basis method\n";color=:blue)
@@ -102,8 +104,6 @@ function poisson_unsteady()
 
   err = ErrorTracker[]
   function online_loop(k::Int)
-    printstyled("-------------------------------------------------------------\n")
-    printstyled("Evaluating RB system for μ = μ[$k]\n";color=:red)
     tt.online_time += @elapsed begin
       lhs,rhs = unsteady_poisson_rb_system(param_on_structures,μ[k])
       rb_sol = solve_rb_system(lhs,rhs)
@@ -114,23 +114,9 @@ function poisson_unsteady()
   end
 
   pmap(online_loop,info.online_snaps)
-
   res = RBResults(:u,tt,err)
-  if info.save_online save(info,res) end
-  printstyled("Average online wall time: $(tt.online_time/length(err)) s\n";
-    color=:red)
-
-  if info.postprocess
-    postprocess(info)
-    trian = get_triangulation(model)
-    k = first(info.online_snaps)
-    writevtk(info,time_info,uh[k],t->U(μ[k],t),trian)
-    writevtk(info,time_info,res,V,trian)
-  end
-
+  postprocess(info,(res,),(V,),model,time_info)
 end
-
-poisson_unsteady()
 
 #=
 run_fem = false

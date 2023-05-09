@@ -58,29 +58,29 @@ function poisson_operators(
   afe(p::Param,t::Real,dΩ,u,v) = ∫(a(p,t)*∇(v)⊙∇(u))dΩ
   afe(p::Param,t::Real,u,v) = afe(p,t,dΩ,u,v)
   afe(p::Param,t::Real) = (u,v) -> afe(p,t,u,v)
-  afe(a::Function,u,v) = ∫(a*∇(v)⊙∇(u))dΩ
-  afe(a::Function) = (u,v) -> afe(a,u,v)
+  afe(a,u,v) = ∫(a*∇(v)⊙∇(u))dΩ
+  afe(a) = (u,v) -> afe(a,u,v)
   A = ParamFunctions(a,afe)
 
   mfe(p::Param,t::Real,dΩ,u,v) = ∫(m(p,t)*v⋅u)dΩ
   mfe(p::Param,t::Real,u,v) = mfe(p,t,dΩ,u,v)
   mfe(p::Param,t::Real) = (u,v) -> mfe(p,t,u,v)
-  mfe(m::Function,u,v) = ∫(m*v⋅u)dΩ
-  mfe(m::Function) = (u,v) -> mfe(m,u,v)
+  mfe(m,u,v) = ∫(m*v⋅u)dΩ
+  mfe(m) = (u,v) -> mfe(m,u,v)
   M = ParamFunctions(m,mfe)
 
   ffe(p::Param,t::Real,dΩ,v) = ∫(f(p,t)⋅v)dΩ
   ffe(p::Param,t::Real,v) = ffe(p,t,dΩ,v)
   ffe(p::Param,t::Real) = v -> ffe(p,t,v)
-  ffe(f::Function,v) = ∫(f⋅v)dΩ
-  ffe(f::Function) = v -> ffe(f,v)
+  ffe(f,v) = ∫(f⋅v)dΩ
+  ffe(f) = v -> ffe(f,v)
   F = ParamFunctions(f,ffe)
 
   hfe(p::Param,t::Real,dΓn,v) = ∫(h(p,t)⋅v)dΓn
   hfe(p::Param,t::Real,v) = hfe(p,t,dΓn,v)
   hfe(p::Param,t::Real) = v -> hfe(p,t,v)
-  hfe(h::Function,v) = ∫(h⋅v)dΓn
-  hfe(h::Function) = v -> hfe(h,v)
+  hfe(h,v) = ∫(h⋅v)dΓn
+  hfe(h) = v -> hfe(h,v)
   H = ParamFunctions(h,hfe)
 
   opA = NonaffineParamOperator(A,PS,time_info,U,V;id=:A)

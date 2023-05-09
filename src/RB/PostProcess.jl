@@ -47,6 +47,7 @@ mutable struct RBResults
   id::Symbol
   tt::TimeTracker
   et::ErrorTracker
+  nruns::Int
 end
 
 function RBResults(id::Symbol,tt::TimeTracker,ets::Vector{ErrorTracker})
@@ -57,7 +58,7 @@ function RBResults(id::Symbol,tt::TimeTracker,ets::Vector{ErrorTracker})
   et = ErrorTracker(sum(relative_errs)/nruns,sum(pointwise_errs)/nruns)
   ttnew = TimeTracker(tt.offline_time,tt.online_time/nruns)
 
-  RBResults(id,ttnew,et)
+  RBResults(id,ttnew,et,nruns)
 end
 
 function time_dict(r::RBResults)
@@ -77,10 +78,71 @@ function save(info::RBInfo,r::RBResults)
   return nothing
 end
 
+function postprocess(
+  info::RBInfo,
+  res::NTuple{1,RBResults},
+  fespaces::NTuple{1,FESpace},
+  model::DiscreteModel,
+  args...)
+
+  res_u, = res
+  rel_err_u = res_u.et.relative_err
+  V, = fespaces
+
+  printstyled("-------------------------------------------------------------\n")
+  printstyled("Average online relative errors err_u: $rel_err_u\n";
+    color=:red)
+  printstyled("Average online wall time: $(tt.online_time/res_u.nruns) s\n";
+    color=:red)
+  printstyled("-------------------------------------------------------------\n")
+
+  if info.save_online save(info,res) end
+
+  if info.postprocess
+    offline_results_dict(info)
+    online_results_dict(info)
+    trian = get_triangulation(model)
+    writevtk(info,res_u,V,trian,args...)
+  end
+
+  return
+end
+
+function postprocess(
+  info::RBInfo,
+  res::NTuple{2,RBResults},
+  fespaces::NTuple{2,FESpace},
+  model::DiscreteModel,
+  args...)
+
+  res_u,res_p = res
+  rel_err_u,rel_err_p = res_u.et.relative_err,res_p.et.relative_err
+  V,Q = fespaces
+
+  printstyled("-------------------------------------------------------------\n")
+  printstyled("Average online relative errors (err_u,err_p): $((rel_err_u,rel_err_p))\n";
+    color=:red)
+  printstyled("Average online wall time: $(tt.online_time/res_u.nruns) s\n";
+    color=:red)
+  printstyled("-------------------------------------------------------------\n")
+
+  if info.save_online save(info,res) end
+
+  if info.postprocess
+    offline_results_dict(info)
+    online_results_dict(info)
+    trian = get_triangulation(model)
+    writevtk(info,res_u,V,trian,args...)
+    writevtk(info,res_p,Q,trian,args...)
+  end
+
+  return
+end
+
 function Gridap.writevtk(
   info::RBInfoSteady,
   s::Snapshots,
-  X::FESpace,
+  fespace::FESpace,
   trian::Triangulation)
 
   id = get_id(s)
@@ -88,29 +150,29 @@ function Gridap.writevtk(
   create_dir!(plt_dir)
 
   path = joinpath(plt_dir,"$(id)h")
-  fefun = FEFunction(X,s.snap[:,1])
+  fefun = FEFunction(fespace,s.snap[:,1])
   writevtk(trian,path,cellfields=["$(id)h"=>fefun])
 end
 
 function Gridap.writevtk(
   info::RBInfoSteady,
   res::RBResults,
-  X::FESpace,
+  fespace::FESpace,
   trian::Triangulation)
 
   plt_dir = joinpath(info.online_path,joinpath("plots","pwise_err_$(res.id)"))
   create_dir!(plt_dir)
 
-  fefun = FEFunction(X,res.et.pointwise_err[:,1])
+  fefun = FEFunction(fespace,res.et.pointwise_err[:,1])
   writevtk(trian,plt_dir,cellfields=["err"=>fefun])
 end
 
 function Gridap.writevtk(
   info::RBInfoUnsteady,
-  tinfo::TimeInfo,
   s::Snapshots,
-  X,
-  trian::Triangulation)
+  fespace::FESpace,
+  trian::Triangulation,
+  tinfo::TimeInfo)
 
   times = get_times(tinfo)
   id = get_id(s)
@@ -119,31 +181,26 @@ function Gridap.writevtk(
 
   path = joinpath(plt_dir,"$(id)h")
   for (it,t) in enumerate(times)
-    fefun = FEFunction(X(t),Vector(s.snap[:,it]))
+    fefun = FEFunction(fespace(t),Vector(s.snap[:,it]))
     writevtk(trian,path*"_$(it).vtu",cellfields=["$(id)h"=>fefun])
   end
 end
 
 function Gridap.writevtk(
   info::RBInfoUnsteady,
-  tinfo::TimeInfo,
   res::RBResults,
-  X,
-  trian::Triangulation)
+  fespace::FESpace,
+  trian::Triangulation,
+  tinfo::TimeInfo)
 
   times = get_times(tinfo)
   plt_dir = joinpath(info.online_path,joinpath("plots","pwise_err_$(res.id)"))
   create_dir!(plt_dir)
 
   for (it,t) in enumerate(times)
-    fefun = FEFunction(X(t),res.et.pointwise_err[:,it])
+    fefun = FEFunction(fespace(t),res.et.pointwise_err[:,it])
     writevtk(trian,plt_dir*"_$(it).vtu",cellfields=["err"=>fefun])
   end
-end
-
-function postprocess(info::RBInfo)
-  offline_results_dict(info)
-  online_results_dict(info)
 end
 
 function offline_results_dict(info::RBInfoUnsteady)

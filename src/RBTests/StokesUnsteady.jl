@@ -70,7 +70,7 @@ addprocs(manager)
   nsnap = 100
   uh,ph,μ = fe_snapshots(solver,feop,fepath,run_fem,nsnap,t0,tF;indef)
 
-  info = RBInfoUnsteady(ptype,test_path;ϵ=1e-3,nsnap=80,mdeim_snap=20)
+  info = RBInfoUnsteady(ptype,test_path;ϵ=1e-4,nsnap=80,mdeim_snap=20,load_offline=false,fun_mdeim=true)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
 
   printstyled("Offline phase, reduced basis method\n";color=:blue)
@@ -135,22 +135,6 @@ addprocs(manager)
   end
 
   pmap(online_loop,info.online_snaps)
-
-  res_u,res_p = RBResults(:u,tt,err_u),RBResults(:p,tt,err_p)
-  rel_err_u,rel_err_u = res_u.et.relative_err,res_p.et.relative_err
-  if info.save_online save(info,(res_u,res_p)) end
-  printstyled("Average online relative errors (err_u,err_p): $((rel_err_u,rel_err_u))\n";
-    color=:red)
-  printstyled("Average online wall time: $(tt.online_time/length(err_u)) s\n";
-    color=:red)
-
-  if info.postprocess
-    postprocess(info)
-    trian = get_triangulation(model)
-    k = first(info.online_snaps)
-    writevtk(info,time_info,uh[k],t->U(μ[k],t),trian)
-    writevtk(info,time_info,ph[k],t->P,trian)
-    writevtk(info,time_info,res_u,V,trian)
-    writevtk(info,time_info,res_p,Q,trian)
-  end
+  res = RBResults(:u,tt,err_u),RBResults(:p,tt,err_p)
+  postprocess(info,res,(V,Q),model,time_info)
 end
