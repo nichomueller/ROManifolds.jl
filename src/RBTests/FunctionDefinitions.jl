@@ -50,33 +50,33 @@ function poisson_operators(
   U::ParamTransientTrialFESpace;
   a::Function = (x,p::Param,t::Real)->1,
   m::Function = (x,p::Param,t::Real)->1,
-  f::Function = (x,p::Param,t::Real)->VectorValue(0,0),
-  h::Function = (x,p::Param,t::Real)->VectorValue(0,0))
+  f::Function = (x,p::Param,t::Real)->0,
+  h::Function = (x,p::Param,t::Real)->0)
 
   dΩ,dΓn = get_dΩ(measures),get_dΓn(measures)
 
-  afe(p::Param,t::Real,dΩ,u,v) = ∫(a(p,t)*∇(v)⊙∇(u))dΩ
+  afe(p::Param,t::Real,dΩ,u,v) = ∫(a(p,t)*∇(v)⋅∇(u))dΩ
   afe(p::Param,t::Real,u,v) = afe(p,t,dΩ,u,v)
   afe(p::Param,t::Real) = (u,v) -> afe(p,t,u,v)
-  afe(a,u,v) = ∫(a*∇(v)⊙∇(u))dΩ
+  afe(a,u,v) = ∫(a*∇(v)⋅∇(u))dΩ
   afe(a) = (u,v) -> afe(a,u,v)
   A = ParamFunctions(a,afe)
 
-  mfe(p::Param,t::Real,dΩ,u,v) = ∫(m(p,t)*v⋅u)dΩ
+  mfe(p::Param,t::Real,dΩ,u,v) = ∫(m(p,t)*v*u)dΩ
   mfe(p::Param,t::Real,u,v) = mfe(p,t,dΩ,u,v)
   mfe(p::Param,t::Real) = (u,v) -> mfe(p,t,u,v)
   mfe(m,u,v) = ∫(m*v⋅u)dΩ
   mfe(m) = (u,v) -> mfe(m,u,v)
   M = ParamFunctions(m,mfe)
 
-  ffe(p::Param,t::Real,dΩ,v) = ∫(f(p,t)⋅v)dΩ
+  ffe(p::Param,t::Real,dΩ,v) = ∫(f(p,t)*v)dΩ
   ffe(p::Param,t::Real,v) = ffe(p,t,dΩ,v)
   ffe(p::Param,t::Real) = v -> ffe(p,t,v)
   ffe(f,v) = ∫(f⋅v)dΩ
   ffe(f) = v -> ffe(f,v)
   F = ParamFunctions(f,ffe)
 
-  hfe(p::Param,t::Real,dΓn,v) = ∫(h(p,t)⋅v)dΓn
+  hfe(p::Param,t::Real,dΓn,v) = ∫(h(p,t)*v)dΓn
   hfe(p::Param,t::Real,v) = hfe(p,t,dΓn,v)
   hfe(p::Param,t::Real) = v -> hfe(p,t,v)
   hfe(h,v) = ∫(h⋅v)dΓn

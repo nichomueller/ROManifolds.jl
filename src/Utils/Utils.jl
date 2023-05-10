@@ -37,6 +37,7 @@ import Gridap.Algebra:AffineOperator
 import Gridap.Algebra:NonlinearOperator
 import Gridap.Algebra:LinearSolver
 import Gridap.Algebra:NonlinearSolver
+import Gridap.Polynomials:MonomialBasis
 import Gridap.ODEs.TransientFETools:ODESolver
 import Gridap.ODEs.TransientFETools:OperatorType
 import Gridap.ODEs.TransientFETools:Affine

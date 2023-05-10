@@ -38,7 +38,7 @@ function mdeim_basis(
   args...)
 
   param_snaps = assemble_functional_snaps(op,μ,args...)
-  param_basis = RBSpaceSteady(param_snaps;ϵ=info.ϵ^2,style=ReducedPOD())
+  param_basis = RBSpaceSteady(param_snaps;ϵ=info.ϵ,style=ReducedPOD())
   param_fun = interpolate_param_basis(op,param_basis)
   snaps,findnz_idx = assemble_fe_snaps(op,μ,param_fun)
 
@@ -53,7 +53,7 @@ function mdeim_basis(
   args...)
 
   param_snaps = assemble_functional_snaps(op,μ,args...)
-  param_basis = RBSpaceUnsteady(param_snaps;ϵ=info.ϵ^2,style=ReducedPOD())
+  param_basis = RBSpaceUnsteady(param_snaps;ϵ=info.ϵ,style=ReducedPOD())
   param_fun = interpolate_param_basis(op,param_basis)
   snaps,findnz_idx = assemble_fe_snaps(op,param_fun;fun_mdeim=true)
   basis_time = get_basis_time(param_basis)

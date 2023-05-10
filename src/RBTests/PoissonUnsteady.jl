@@ -33,7 +33,7 @@ addprocs(manager)
   time_info = ThetaMethodInfo(t0,tF,dt,θ)
 
   function a(x,p::Param,t::Real)
-    exp(x[1]/sum(p.μ))
+    exp((sin(t)+cos(t))*x[1]/sum(p.μ))
   end
   a(p::Param,t::Real) = x->a(x,p,t)
   a(p::Param) = t->a(p,t)
@@ -47,7 +47,7 @@ addprocs(manager)
   h(p::Param,t::Real) = x->h(x,p,t)
   h(p::Param) = t->h(p,t)
   function g(x,p::Param,t::Real)
-    exp(-x[1]/p.μ[2])*abs.(sin(p.μ[3]*t))*minimum(p.μ)
+    exp(-x[1]/p.μ[2])*abs(sin(p.μ[3]*t))*minimum(p.μ)
   end
   g(p::Param,t::Real) = x->g(x,p,t)
   g(p::Param) = t->g(p,t)
@@ -62,7 +62,7 @@ addprocs(manager)
   nsnap = 100
   uh,μ = fe_snapshots(solver,feop,fepath,run_fem,nsnap,t0,tF;indef)
 
-  info = RBInfoUnsteady(ptype,test_path;ϵ=1e-3,nsnap=80,mdeim_snap=20,load_offline=false,fun_mdeim=true)
+  info = RBInfoUnsteady(ptype,test_path;ϵ=1e-3,nsnap=80,mdeim_snap=20,load_offline=false)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
 
   printstyled("Offline phase, reduced basis method\n";color=:blue)
