@@ -139,7 +139,7 @@ function navier_stokes_unsteady()
     Blifton = RBParamOnlineStructure(Bliftrb;st_mdeim=info.st_mdeim)
     Clifton = RBParamOnlineStructure(Cliftrb;st_mdeim=info.st_mdeim)
     Mlifton = RBParamOnlineStructure(Mliftrb;st_mdeim=info.st_mdeim)
-    param_on_structures = (Aon,Bon,BTon,Con,Don,Mon,Fon,Hon,Alifton,Blifton,Clifton,Mlifton)
+    online_structures = (Aon,Bon,BTon,Con,Don,Mon,Fon,Hon,Alifton,Blifton,Clifton,Mlifton)
 
     μ_online = μ[info.online_snaps]
     err_u = ErrorTracker[]
@@ -148,7 +148,7 @@ function navier_stokes_unsteady()
       printstyled("-------------------------------------------------------------\n")
       printstyled("Evaluating RB system for μ = μ[$k]\n";color=:red)
       tt.online_time += @elapsed begin
-        rb_system = unsteady_navier_stokes_rb_system(param_on_structures,μk)
+        rb_system = unsteady_navier_stokes_rb_system(online_structures,μk)
         x0 = get_initial_guess(uh,ph,μ,μk)
         rb_sol = solve_rb_system(rb_system,x0,rbspace_u,U,μk,time_info;tol=info.ϵ)
       end

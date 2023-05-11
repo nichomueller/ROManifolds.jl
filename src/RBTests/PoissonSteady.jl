@@ -45,8 +45,8 @@ function poisson_steady()
 
   info = RBInfoSteady(ptype,test_path;ϵ=1e-4,nsnap=80,mdeim_snap=20,load_offline=false)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
-  rbspace,param_on_structures = offline_phase(info,(uh,μ),(opA,opF,opH),measures,tt)
-  online_phase(info,(uh,μ),rbspace,param_on_structures,tt)
+  rbspace,online_structures = offline_phase(info,(uh,μ),(opA,opF,opH),measures,tt)
+  online_phase(info,(uh,μ),rbspace,online_structures,tt)
 end
 
 function offline_phase(
@@ -74,16 +74,16 @@ function offline_phase(
 
   ad = (Arb,Frb,Hrb)
   ad_eval = eval_affine_decomposition(ad)
-  param_on_structures = RBParamOnlineStructure(ad,ad_eval)
+  online_structures = RBParamOnlineStructure(ad,ad_eval)
 
-  rbspace,param_on_structures
+  rbspace,online_structures
 end
 
 function online_phase(
   info::RBInfo,
   fesol,
   rbspace::RBSpace,
-  param_on_structures::Tuple,
+  online_structures::Tuple,
   tt::TimeTracker)
 
   printstyled("Online phase, reduced basis method\n";color=:red)
@@ -94,7 +94,7 @@ function online_phase(
     printstyled("-------------------------------------------------------------\n")
     printstyled("Evaluating RB system for μ = μ[$k]\n";color=:red)
     tt.online_time += @elapsed begin
-      lhs,rhs = steady_poisson_rb_system(param_on_structures,μ[k])
+      lhs,rhs = steady_poisson_rb_system(online_structures,μ[k])
       rb_sol = solve_rb_system(lhs,rhs)
     end
     uhk = get_snap(uh[k])

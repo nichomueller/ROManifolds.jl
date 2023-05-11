@@ -8,14 +8,14 @@ addprocs(manager)
 @everywhere include("$root/src/RBTests/RBTests.jl")
 
 @mpi_do manager begin
-  run_fem = false
+  run_fem = true
 
   steady = false
   indef = false
   pdomain = false
   ptype = ProblemType(steady,indef,pdomain)
 
-  mesh = "elasticity_3cyl2D.json"
+  mesh = "elasticity_3cyl.json"
   test_path = "$root/tests/poisson/unsteady/$mesh"
   bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
   order = 1
@@ -43,12 +43,10 @@ addprocs(manager)
   f(x,p::Param,t::Real) = 1.
   f(p::Param,t::Real) = x->f(x,p,t)
   f(p::Param) = t->f(p,t)
-  h(x,p::Param,t::Real) = 1.
+  h(x,p::Param,t::Real) = abs(cos(p.μ[3]*t))
   h(p::Param,t::Real) = x->h(x,p,t)
   h(p::Param) = t->h(p,t)
-  function g(x,p::Param,t::Real)
-    exp(-x[1]/p.μ[2])*abs(sin(p.μ[3]*t))*minimum(p.μ)
-  end
+  g(x,p::Param,t::Real) = p.μ[1]*exp(-x[1]/p.μ[2])*abs(sin(p.μ[3]*t))
   g(p::Param,t::Real) = x->g(x,p,t)
   g(p::Param) = t->g(p,t)
 
@@ -100,12 +98,12 @@ addprocs(manager)
   Hon = RBParamOnlineStructure(Hrb;st_mdeim=info.st_mdeim)
   Alifton = RBParamOnlineStructure(Aliftrb;st_mdeim=info.st_mdeim)
   Mlifton = RBParamOnlineStructure(Mliftrb;st_mdeim=info.st_mdeim)
-  param_on_structures = (Aon,Mon,Fon,Hon,Alifton,Mlifton)
+  online_structures = (Aon,Mon,Fon,Hon,Alifton,Mlifton)
 
   err = ErrorTracker[]
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
-      lhs,rhs = unsteady_poisson_rb_system(param_on_structures,μ[k])
+      lhs,rhs = unsteady_poisson_rb_system(online_structures,μ[k])
       rb_sol = solve_rb_system(lhs,rhs)
     end
     uhk = uh[k]
@@ -187,7 +185,7 @@ for fun_mdeim = (false)#(false,true)
 
       ad = (Arb,Mrb,Frb,Hrb)
       ad_eval = eval_affine_decomposition(ad)
-      param_on_structures = RBParamOnlineStructure(ad,ad_eval;st_mdeim=info.st_mdeim)
+      online_structures = RBParamOnlineStructure(ad,ad_eval;st_mdeim=info.st_mdeim)
 
       printstyled("Online phase; tol=$tol, st_mdeim=$st_mdeim, fun_mdeim=$fun_mdeim\n";color=:red)
 
@@ -196,7 +194,7 @@ for fun_mdeim = (false)#(false,true)
         printstyled("Evaluating RB system for μ = μ[$k]\n";color=:red)
         tt.online_time += @elapsed begin
           printstyled("Evaluating RB system for μ = μ[$k]\n";color=:red)
-          lhs,rhs = unsteady_poisson_rb_system(param_on_structures,μ[k])
+          lhs,rhs = unsteady_poisson_rb_system(online_structures,μ[k])
           rb_sol = solve_rb_system(lhs,rhs)
         end
         uhk = get_snap(uh[k])

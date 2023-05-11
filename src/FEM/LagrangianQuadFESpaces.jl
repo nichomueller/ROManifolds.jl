@@ -30,12 +30,6 @@ function _lagrangian_quad_ref_fe(
   p::Polytope{D},
   orders) where {T,D}
 
-  #= @assert isa(p,ExtrusionPolytope)
-  @assert is_n_cube(p)
-  degrees = broadcast(*,2,orders)
-  q = Quadrature(p,Gridap.ReferenceFEs.TensorProduct(),degrees) =#
-  @assert isa(p,ExtrusionPolytope)
-  @assert is_n_cube(p) || is_simplex(p)
   @assert all(orders .== first(orders))
 
   q = Quadrature(p,2*last(orders))

@@ -15,9 +15,12 @@ addprocs(manager)
   pdomain = false
   ptype = ProblemType(steady,indef,pdomain)
 
-  mesh = "flow_3cyl2D_coarse.json"
+  mesh = "flow_3cyl_02.json"
   test_path = "$root/tests/stokes/unsteady/$mesh"
-  bnd_info = Dict("dirichlet0" => ["noslip"],"dirichlet" => ["inlet"],"neumann" => ["outlet"])
+  bnd_info = Dict("dirichlet_noslip" => ["noslip"],
+                  "dirichlet_nopenetration" => ["nopenetration"],
+                  "dirichlet" => ["inlet"],
+                  "neumann" => ["outlet"])
   order = 2
 
   fepath = fem_path(test_path)
@@ -26,7 +29,7 @@ addprocs(manager)
   measures = ProblemMeasures(model,order)
   D = get_dimension(model)
 
-  ranges = fill([1.,10.],4)
+  ranges = fill([1.,10.],2)
   sampling = UniformSampling()
   PS = ParamSpace(ranges,sampling)
 
@@ -41,26 +44,28 @@ addprocs(manager)
   b(p::Param,t::Real) = x->b(x,p,t)
   m(x,p::Param,t::Real) = 1.
   m(p::Param,t::Real) = x->m(x,p,t)
-  f(x,p::Param,t::Real) = VectorValue(0.,0.)
+  f(x,p::Param,t::Real) = VectorValue(0.,0.,0.)
   f(p::Param,t::Real) = x->f(x,p,t)
-  h(x,p::Param,t::Real) = VectorValue(0.,0.)
+  h(x,p::Param,t::Real) = VectorValue(0.,0.,0.)
   h(p::Param,t::Real) = x->h(x,p,t)
   function g(x,p::Param,t::Real)
     W = 1.5
     T = 0.16
-    flow_rate = abs(1-cos(2*pi*t/T)+sin(2*pi*t/(p.μ[3]*T))/p.μ[2])
-    parab_prof = VectorValue(abs.(x[2]*(x[2]-W))/(W/2)^2,0.)
+    flow_rate = abs(1-cos(2*pi*t/T)+sin(2*pi*t/(p.μ[1]*T))/p.μ[2])
+    parab_prof = VectorValue(abs.(x[2]*(x[2]-W))/(W/2)^2,0.,0.)
     parab_prof*flow_rate
   end
   g(p::Param,t::Real) = x->g(x,p,t)
-  g0(x,p::Param,t::Real) = VectorValue(0.,0.)
+  g0(x,p::Param,t::Real) = VectorValue(0.,0.,0.)
   g0(p::Param,t::Real) = x->g0(x,p,t)
 
   reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{D,Float},order)
   reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{D,Float},order)
   reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1)
-  V = TestFESpace(model,reffe1;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
-  U = ParamTransientTrialFESpace(V,[g0,g])
+  V = TestFESpace(model,reffe1;conformity=:H1,
+    dirichlet_tags=["dirichlet_noslip","dirichlet_nopenetration","dirichlet"],
+    dirichlet_masks=[(true,true,true),(false,false,true),(true,true,true)])
+  U = ParamTransientTrialFESpace(V,[g0,g,g])
   Q = TestFESpace(model,reffe2;conformity=:C0)
   P = TrialFESpace(Q)
 
@@ -119,13 +124,13 @@ addprocs(manager)
   Alifton = RBParamOnlineStructure(Aliftrb;st_mdeim=info.st_mdeim)
   Blifton = RBParamOnlineStructure(Bliftrb;st_mdeim=info.st_mdeim)
   Mlifton = RBParamOnlineStructure(Mliftrb;st_mdeim=info.st_mdeim)
-  param_on_structures = (Aon,Bon,BTon,Mon,Fon,Hon,Alifton,Blifton,Mlifton)
+  online_structures = (Aon,Bon,BTon,Mon,Fon,Hon,Alifton,Blifton,Mlifton)
 
   err_u = ErrorTracker[]
   err_p = ErrorTracker[]
   function online_loop(k::Int)
     tt.online_time += @elapsed begin
-      lhs,rhs = unsteady_stokes_rb_system(param_on_structures,μ[k])
+      lhs,rhs = unsteady_stokes_rb_system(online_structures,μ[k])
       rb_sol = solve_rb_system(lhs,rhs)
     end
     uhk,phk = uh[k],ph[k]

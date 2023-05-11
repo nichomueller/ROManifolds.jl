@@ -69,6 +69,11 @@ function model_info(
   bnd_info::Dict,
   ::Val{false})
 
+  if !ispath(mshpath)
+    mshpath_msh_format = mshpath[1:findall(x->x=='.',mshpath)[end]-1]*".msh"
+    model_msh_format = GmshDiscreteModel(mshpath_msh_format)
+    to_json_file(model_msh_format,mshpath)
+  end
   model = DiscreteModelFromFile(mshpath)
   set_labels!(model,bnd_info)
   model

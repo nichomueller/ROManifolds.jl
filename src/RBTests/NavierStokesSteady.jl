@@ -54,8 +54,8 @@ function navier_stokes_steady()
   info = RBInfoSteady(ptype,test_path;ϵ=1e-4,nsnap=80,mdeim_snap=30,load_offline=true)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
   fesol = (uh,ph,μ,U,V)
-  rbspace,param_on_structures = offline_phase(info,fesol,(opA,opB,opC,opD,opF,opH),measures,tt)
-  online_phase(info,fesol,rbspace,param_on_structures,tt)
+  rbspace,online_structures = offline_phase(info,fesol,(opA,opB,opC,opD,opF,opH),measures,tt)
+  online_phase(info,fesol,rbspace,online_structures,tt)
 end
 
 function offline_phase(
@@ -91,16 +91,16 @@ function offline_phase(
 
   ad = (Arb,Brb,BTrb,Crb,Drb,Mrb,Frb,Hrb)
   ad_eval = eval_affine_decomposition(ad)
-  param_on_structures = RBParamOnlineStructure(ad,ad_eval;st_mdeim=info.st_mdeim)
+  online_structures = RBParamOnlineStructure(ad,ad_eval;st_mdeim=info.st_mdeim)
 
-  rbspace,param_on_structures
+  rbspace,online_structures
 end
 
 function online_phase(
   info::RBInfo,
   fesol,
   rbspace::NTuple{2,RBSpace},
-  param_on_structures::Tuple,
+  online_structures::Tuple,
   tt::TimeTracker)
 
   printstyled("Online phase, reduced basis method\n";color=:red)
@@ -113,7 +113,7 @@ function online_phase(
     printstyled("-------------------------------------------------------------\n")
     printstyled("Evaluating RB system for μ = μ[$k]\n";color=:red)
     tt.online_time += @elapsed begin
-      res,jac = unsteady_navier_stokes_rb_system(param_on_structures,μ[k])
+      res,jac = unsteady_navier_stokes_rb_system(online_structures,μ[k])
       Uk = get_trial(U)(μ[k])
       x0 = get_initial_guess(uh,ph,μ_offline,μ[k])
       rb_sol = rb_solver(res,jac,x0,Uk)

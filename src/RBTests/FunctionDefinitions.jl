@@ -86,7 +86,7 @@ function poisson_operators(
   opA = NonaffineParamOperator(A,PS,time_info,U,V;id=:A)
   opM = AffineParamOperator(M,PS,time_info,U,V;id=:M)
   opF = AffineParamOperator(F,PS,time_info,V;id=:F)
-  opH = AffineParamOperator(H,PS,time_info,V;id=:H)
+  opH = NonaffineParamOperator(H,PS,time_info,V;id=:H)
 
   lhs_t(μ,t,u,v) = mfe(μ,t,u,v)
   lhs(p,t,u,v) = afe(p,t,u,v)
@@ -150,8 +150,8 @@ function stokes_operators(
   a::Function = (x,p::Param,t::Real)->1,
   b::Function = (x,p::Param,t::Real)->1,
   m::Function = (x,p::Param,t::Real)->1,
-  f::Function = (x,p::Param,t::Real)->VectorValue(0,0),
-  h::Function = (x,p::Param,t::Real)->VectorValue(0,0))
+  f::Function = (x,p::Param,t::Real)->VectorValue(0,0,0),
+  h::Function = (x,p::Param,t::Real)->VectorValue(0,0,0))
 
   dΩ,dΓn = get_dΩ(measures),get_dΓn(measures)
   Y = ParamTransientMultiFieldFESpace([V,Q])
