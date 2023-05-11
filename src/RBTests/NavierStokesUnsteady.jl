@@ -91,7 +91,7 @@ function navier_stokes_unsteady()
 
     printstyled("Offline phase; tol=$tol, st_mdeim=$st_mdeim, fun_mdeim=$fun_mdeim\n";color=:blue)
 
-    rbspace_u,rbspace_p = rb(info,(uh_offline,ph_offline),opB,ph,μ;tt)
+    rbspace_u,rbspace_p = assemble_rbspace(info,(uh_offline,ph_offline),opB,ph,μ;tt)
     rbspace = rbspace_u,rbspace_p
 
     rbopA = RBVariable(opA,rbspace_u,rbspace_u)

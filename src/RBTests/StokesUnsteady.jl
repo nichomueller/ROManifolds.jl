@@ -84,7 +84,7 @@ addprocs(manager)
   ph_offline = ph[1:info.nsnap]
 
   tt.offline_time.basis_time += @elapsed begin
-    rbspace_u,rbspace_p = rb(info,(uh_offline,ph_offline),opB)
+    rbspace_u,rbspace_p = assemble_rbspace(info,(uh_offline,ph_offline),opB)
   end
   rbspace = rbspace_u,rbspace_p
 

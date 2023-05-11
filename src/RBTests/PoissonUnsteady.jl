@@ -15,7 +15,7 @@ addprocs(manager)
   pdomain = false
   ptype = ProblemType(steady,indef,pdomain)
 
-  mesh = "elasticity_3cyl.json"
+  mesh = "elasticity_3cyl2D.json"
   test_path = "$root/tests/poisson/unsteady/$mesh"
   bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
   order = 1
@@ -68,7 +68,7 @@ addprocs(manager)
   uh_offline = uh[1:info.nsnap]
 
   tt.offline_time.basis_time += @elapsed begin
-    rbspace, = rb(info,(uh_offline,))
+    rbspace, = assemble_rbspace(info,(uh_offline,))
   end
 
   rbopA = RBVariable(opA,rbspace,rbspace)
@@ -171,7 +171,7 @@ for fun_mdeim = (false)#(false,true)
 
       uh_offline = uh[1:info.nsnap]
       #X = H1_norm_matrix(opA,opM)
-      rbspace = rb(info,tt,uh_offline)#;X)
+      rbspace = assemble_rbspace(info,tt,uh_offline)#;X)
 
       rbopA = RBVariable(opA,rbspace,rbspace)
       rbopM = RBVariable(opM,rbspace,rbspace)

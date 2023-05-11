@@ -191,18 +191,21 @@ function collect_solutions(sol)
   Ns = sum(get_Ns(first(sol)))
   Nt = get_Nt(first(sol))
   ns = length(sol)
+  ntimes = ceil(Int,ns/nworkers())
 
-  x = Elemental.zeros(EMatrix{Float},Ns,Nt*ns)
   xtmp = Elemental.zeros(EMatrix{Float},Ns,Nt)
+  x = [xtmp for _ = 1:ntimes]
   μ = Param[]
-  # @sync @distributed
-  for k in eachindex(sol)
+
+  #for k in eachindex(sol)
+  function get_solution!(k::Int)
     printstyled("Collecting solution $k\n";color=:blue)
-    copyto!(view(x,:,(k-1)*Nt+1:k*Nt),get_solution(xtmp,sol[k]))
+    x[k] = get_solution(xtmp,sol[k])
     push!(μ,sol[k].psol.μ)
   end
 
-  x,μ
+  pmap(get_solution!,eachindex(sol))
+  hcat(x...),μ
 end
 
 function get_solution(x::EMatrix{Float},solk::ParamFESolution)
@@ -212,11 +215,11 @@ end
 
 function get_solution(x::EMatrix{Float},solk::ParamTransientFESolution)
   n = 1
-  for (xn,tn) in solk
-    printstyled("Time $tn\n";color=:blue)
+  for (xn,_) in solk
     x[:,n] = xn
     n += 1
   end
+  printstyled("Reached final time instant!\n";color=:blue)
   x
 end
 

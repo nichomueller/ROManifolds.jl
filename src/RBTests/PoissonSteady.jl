@@ -62,7 +62,7 @@ function offline_phase(
   uh_offline = uh[1:info.nsnap]
   opA,opF,opH = op
 
-  rbspace = rb(info,tt,uh_offline)
+  rbspace = assemble_rbspace(info,tt,uh_offline)
 
   rbopA = RBVariable(opA,rbspace,rbspace)
   rbopF = RBVariable(opF,rbspace)

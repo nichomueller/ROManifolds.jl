@@ -2,9 +2,7 @@ function mdeim_basis(info::RBInfo,op::RBVariable,args...)
   id = get_id(op)
   nsnap = info.mdeim_nsnap
   printstyled("MDEIM: generating $nsnap snapshots for $id \n";color=:blue)
-
-  state = info.fun_mdeim && typeof(op) <: RBBilinVariable
-  mdeim_basis(Val(state),info,op,args...)
+  mdeim_basis(Val(info.fun_mdeim),info,op,args...)
 end
 
 function mdeim_basis(
@@ -68,7 +66,8 @@ function interpolate_param_basis(
 
   ns = get_ns(rbspace)
   basis_space = get_basis_space(rbspace)
-  quad_fespace = LagrangianQuadFESpace(get_test(op))
+  test = get_test(op)
+  quad_fespace = LagrangianQuadFESpace(test)
   quad_test = quad_fespace.test
 
   [FEFunction(quad_test,basis_space[:,k]) for k = 1:ns]
