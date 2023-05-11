@@ -15,16 +15,24 @@ struct ReducedPOD end
 
 POD(S::AbstractMatrix,args...;ϵ=1e-4,style=ReducedPOD()) = POD(style,S,args...;ϵ)
 
+function my_svd(S::AbstractMatrix)
+  @mpi_do manager begin
+    S = fetch(@spawnat 1 S)
+    U,Σ,V = svd(S)
+  end
+  U,Σ,V = fetch(@spawnat :any U,Σ,V)
+end
+
 function POD(::DefaultPOD,S::AbstractMatrix,X::SparseMatrixCSC;ϵ=1e-4)
   H = cholesky(X)
   L = sparse(H.L)
-  U,Σ,_ = svd(L'*S[H.p,:])
+  U,Σ,_ = my_svd(L'*S[H.p,:])
   n = truncation(Σ,ϵ)
   (L'\U[:,1:n])[invperm(H.p),:]
 end
 
 function POD(::DefaultPOD,S::AbstractMatrix;ϵ=1e-4)
-  U,Σ,_ = svd(S)
+  U,Σ,_ = my_svd(S)
   n = truncation(Σ,ϵ)
   U[:,1:n]
 end
@@ -35,7 +43,7 @@ end
 
 function POD(::Val{true},S::AbstractMatrix;ϵ=1e-4)
   C = S'*S
-  _,_,V = svd(C)
+  _,_,V = my_svd(C)
   Σ = svdvals(S)
   n = truncation(Σ,ϵ)
   U = S*V[:,1:n]
@@ -47,7 +55,7 @@ end
 
 function POD(::Val{false},S::AbstractMatrix;ϵ=1e-4)
   C = S*S'
-  U,_ = svd(C)
+  U,_ = my_svd(C)
   Σ = svdvals(S)
   n = truncation(Σ,ϵ)
   U[:,1:n]

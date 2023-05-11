@@ -190,36 +190,30 @@ end
 function collect_solutions(sol)
   Ns = sum(get_Ns(first(sol)))
   Nt = get_Nt(first(sol))
-  ns = length(sol)
-  ntimes = ceil(Int,ns/nworkers())
+  xtmp = zeros(Ns,Nt)
 
-  xtmp = Elemental.zeros(EMatrix{Float},Ns,Nt)
-  x = [xtmp for _ = 1:ntimes]
-  μ = Param[]
-
-  #for k in eachindex(sol)
-  function get_solution!(k::Int)
-    printstyled("Collecting solution $k\n";color=:blue)
-    x[k] = get_solution(xtmp,sol[k])
-    push!(μ,sol[k].psol.μ)
+  function get_solution(k::Int)
+    printstyled("Computing snapshot $k ...\n";color=:blue)
+    x,μ = get_solution!(xtmp,sol[k]),sol[k].psol.μ
+    printstyled("Successfully computed snapshot $k ...\n";color=:blue)
+    x,μ
   end
 
-  pmap(get_solution!,eachindex(sol))
-  hcat(x...),μ
+  xμ = pmap(get_solution,eachindex(sol))
+  hcat(EMatrix.(first.(xμ))...),last.(xμ)
 end
 
-function get_solution(x::EMatrix{Float},solk::ParamFESolution)
+function get_solution!(x::Matrix{Float},solk::ParamFESolution)
   x[:,1] = get_free_dof_values(solk.psol.uh)
   x
 end
 
-function get_solution(x::EMatrix{Float},solk::ParamTransientFESolution)
+function get_solution!(x::Matrix{Float},solk::ParamTransientFESolution)
   n = 1
   for (xn,_) in solk
     x[:,n] = xn
     n += 1
   end
-  printstyled("Reached final time instant!\n";color=:blue)
   x
 end
 

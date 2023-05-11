@@ -177,16 +177,15 @@ function assembler_loop(
 
   data = get_fdata(vecdata)
   nsnap = get_nsnap(vecdata)
-  Nz = length(findnz_idx)
 
-  vecs = Elemental.zeros(EMatrix{Float},Nz,nsnap)
-  for i = 1:nsnap
+  function get_snapshot(i)
     vecdata_i = data(i)
     v2 = Gridap.Algebra.nz_allocation(v1)
     numeric_loop_vector!(v2,a,vecdata_i)
-    copyto!(view(vecs,:,i),v2)
+    v2
   end
 
+  vecs = hcat(EMatrix.(pmap(get_snapshot,1:nsnap))...)
   vecs[findnz_idx,:],findnz_idx
 end
 
@@ -306,16 +305,14 @@ function assembler_loop(
 
   data = get_fdata(matdata)
   nsnap = get_nsnap(matdata)
-  Nz = length(findnz_idx)
-
-  mats = Elemental.zeros(EMatrix{Float},Nz,nsnap)
-  for i = 1:nsnap
+  function get_snapshot(i)
     matdata_i = data(i)
     m2 = Gridap.Algebra.nz_allocation(m1)
     numeric_loop_matrix!(m2,a,matdata_i)
-    copyto!(view(mats,:,i),my_create_from_nz(m2))
+    m2
   end
 
+  mats = hcat(EMatrix.(pmap(get_snapshot,1:nsnap))...)
   mats,findnz_idx
 end
 
