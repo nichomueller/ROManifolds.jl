@@ -11,6 +11,9 @@ using DelimitedFiles
 using Serialization
 using PartitionedArrays
 using SharedArrays
+using MPI
+using MPIClusterManagers
+using Distributed
 using Test
 using PlotlyJS
 using ForwardDiff

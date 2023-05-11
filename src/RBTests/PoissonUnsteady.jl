@@ -57,7 +57,7 @@ addprocs(manager)
   feop,opA,opM,opF,opH = poisson_operators(measures,PS,time_info,V,U;a,m,f,h)
 
   solver = ThetaMethod(LUSolver(),dt,θ)
-  nsnap = 10
+  nsnap = 100
 end
 
 uh,μ = fe_snapshots(solver,feop,fepath,run_fem,nsnap,t0,tF;indef)
