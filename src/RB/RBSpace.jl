@@ -10,7 +10,7 @@ function RBSpaceSteady(
   ϵ=1e-4,style=ReducedPOD())
 
   id = get_id(snaps)
-  basis_space = rb_space(snaps;ϵ,style)
+  basis_space = assemble_spatial_rb(snaps;ϵ,style)
   RBSpaceSteady(id,Matrix(basis_space))
 end
 
@@ -20,7 +20,7 @@ function RBSpaceSteady(
 
   all_snaps = vcat(snaps...)
   id = get_id(all_snaps)
-  basis_space = rb_space(all_snaps;ϵ,style)
+  basis_space = assemble_spatial_rb(all_snaps;ϵ,style)
   RBSpaceSteady(id,Matrix(basis_space))
 end
 
@@ -35,7 +35,7 @@ function RBSpaceUnsteady(
   ϵ=1e-4,style=ReducedPOD())
 
   id = get_id(snaps)
-  basis_space,basis_time = rb_space_time(snaps;ϵ,style)
+  basis_space,basis_time = assemble_spatio_temporal_rb(snaps;ϵ,style)
   RBSpaceUnsteady(id,Matrix(basis_space),Matrix(basis_time))
 end
 
@@ -45,11 +45,11 @@ function RBSpaceUnsteady(
 
   all_snaps = vcat(snaps...)
   id = get_id(all_snaps)
-  basis_space,basis_time = rb_space_time(all_snaps;ϵ,style)
+  basis_space,basis_time = assemble_spatio_temporal_rb(all_snaps;ϵ,style)
   RBSpaceUnsteady(id,Matrix(basis_space),Matrix(basis_time))
 end
 
-function assemble_rbspace(
+function assemble_rb_space(
   info::RBInfo,
   snaps::NTuple{N,Snapshots},
   args...;
@@ -60,31 +60,31 @@ function assemble_rbspace(
     load(info,get_id(snaps))
   else
     printstyled("Assembling reduced bases\n";color=:blue)
-    assemble_rbspace(info,snaps,args...;kwargs...)
+    assemble_rb_space(info,snaps,args...;kwargs...)
   end
 end
 
-function assemble_rbspace(
+function assemble_rb_space(
   info::RBInfoSteady,
   snaps::NTuple{1,Snapshots};
   kwargs...)
 
   snaps_u, = snaps
-  basis_space = rb_space(snaps_u;ϵ=info.ϵ,kwargs...)
+  basis_space = assemble_spatial_rb(snaps_u;ϵ=info.ϵ,kwargs...)
   (RBSpaceSteady(get_id(snaps_u),basis_space),)
 end
 
-function assemble_rbspace(
+function assemble_rb_space(
   info::RBInfoUnsteady,
   snaps::NTuple{1,Snapshots};
   kwargs...)
 
   snaps_u, = snaps
-  basis_space,basis_time = rb_space_time(snaps_u;ϵ=info.ϵ,kwargs...)
+  basis_space,basis_time = assemble_spatio_temporal_rb(snaps_u;ϵ=info.ϵ,kwargs...)
   (RBSpaceUnsteady(get_id(snaps_u),basis_space,basis_time),)
 end
 
-function assemble_rbspace(
+function assemble_rb_space(
   info::RBInfoSteady,
   snaps::NTuple{2,Snapshots},
   args...;
@@ -93,9 +93,9 @@ function assemble_rbspace(
   def = isindef(info)
   snaps_u,snaps_p = snaps
 
-  bs_u = rb_space(snaps_u;ϵ=info.ϵ,kwargs...)
-  bs_p = rb_space(snaps_p;ϵ=info.ϵ,kwargs...)
-  bs_u_supr = add_assemble_space_supremizers(def,(bs_u,bs_p),args...)
+  bs_u = assemble_spatial_rb(snaps_u;ϵ=info.ϵ,kwargs...)
+  bs_p = assemble_spatial_rb(snaps_p;ϵ=info.ϵ,kwargs...)
+  bs_u_supr = add_space_supremizers(def,(bs_u,bs_p),args...)
 
   rbspace_u = RBSpaceSteady(get_id(snaps_u),bs_u_supr)
   rbspace_p = RBSpaceSteady(get_id(snaps_p),bs_p)
@@ -103,7 +103,7 @@ function assemble_rbspace(
   (rbspace_u,rbspace_p)
 end
 
-function assemble_rbspace(
+function assemble_rb_space(
   info::RBInfoUnsteady,
   snaps::NTuple{2,Snapshots},
   args...;
@@ -113,9 +113,9 @@ function assemble_rbspace(
   snaps_u,snaps_p = snaps
   opB,ttol... = args
 
-  bs_u,bt_u = rb_space_time(snaps_u;ϵ=info.ϵ,kwargs...)
-  bs_p,bt_p = rb_space_time(snaps_p;ϵ=info.ϵ,kwargs...)
-  bs_u_supr = add_assemble_space_supremizers(def,(bs_u,bs_p),opB)
+  bs_u,bt_u = assemble_spatio_temporal_rb(snaps_u;ϵ=info.ϵ,kwargs...)
+  bs_p,bt_p = assemble_spatio_temporal_rb(snaps_p;ϵ=info.ϵ,kwargs...)
+  bs_u_supr = add_space_supremizers(def,(bs_u,bs_p),opB)
   bt_u_supr = add_time_supremizers(def,(bt_u,bt_p),ttol...)
 
   rbspace_u = RBSpaceUnsteady(get_id(snaps_u),bs_u_supr,bt_u_supr)
@@ -124,11 +124,11 @@ function assemble_rbspace(
   (rbspace_u,rbspace_p)
 end
 
-function rb_space(snap::Snapshots;kwargs...)
+function assemble_spatial_rb(snap::Snapshots;kwargs...)
   POD(snap;kwargs...)
 end
 
-#= function rb_space_time(snap::Snapshots;kwargs...)
+#= function assemble_spatio_temporal_rb(snap::Snapshots;kwargs...)
   snap_space = get_snap(snap)
   ns = get_nsnap(snap)
   basis_space = POD(snap_space;kwargs...)
@@ -138,7 +138,7 @@ end
   basis_space,basis_time
 end =#
 
-function rb_space_time(snap::Snapshots;kwargs...)
+function assemble_spatio_temporal_rb(snap::Snapshots;kwargs...)
   snap_space = get_snap(snap)
   ns = get_nsnap(snap)
   snap_time = mode2_unfolding(snap_space,ns)
@@ -149,7 +149,7 @@ function rb_space_time(snap::Snapshots;kwargs...)
   basis_space,basis_time
 end
 
-function add_assemble_space_supremizers(
+function add_space_supremizers(
   ::Val{false},
   basis::NTuple{2,AbstractMatrix{Float}},
   args...)
@@ -157,7 +157,7 @@ function add_assemble_space_supremizers(
   first(basis)
 end
 
-function add_assemble_space_supremizers(
+function add_space_supremizers(
   ::Val{true},
   basis::NTuple{2,AbstractMatrix{Float}},
   opB::ParamBilinOperator)

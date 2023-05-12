@@ -75,7 +75,7 @@ addprocs(manager)
   nsnap = 100
   uh,ph,μ = fe_snapshots(solver,feop,fepath,run_fem,nsnap,t0,tF;indef)
 
-  info = RBInfoUnsteady(ptype,test_path;ϵ=1e-4,nsnap=80,mdeim_snap=20,load_offline=false,fun_mdeim=true)
+  info = RBInfoUnsteady(ptype,test_path;ϵ=1e-4,nsnap=80,mdeim_snap=20,fun_mdeim=true)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
 
   printstyled("Offline phase, reduced basis method\n";color=:blue)
@@ -84,9 +84,9 @@ addprocs(manager)
   ph_offline = ph[1:info.nsnap]
 
   tt.offline_time.basis_time += @elapsed begin
-    rbspace_u,rbspace_p = assemble_rbspace(info,(uh_offline,ph_offline),opB)
+    rbspace_u,rbspace_p = assemble_rb_space(info,(uh_offline,ph_offline),opB)
   end
-  rbspace = rbspace_u,rbspace_p
+  rb_space = rbspace_u,rbspace_p
 
   rbopA = RBVariable(opA,rbspace_u,rbspace_u)
   rbopB = RBVariable(opB,rbspace_p,rbspace_u)
@@ -111,7 +111,7 @@ addprocs(manager)
   end
   ad = (Arb,Brb,BTrb,Mrb,Frb,Hrb,Aliftrb,Bliftrb,Mliftrb)
 
-  if info.save_offline save(info,(rbspace,ad)) end
+  if info.save_offline save(info,(rb_space,ad)) end
 
   printstyled("Online phase, reduced basis method\n";color=:red)
 
@@ -134,7 +134,7 @@ addprocs(manager)
       rb_sol = solve_rb_system(lhs,rhs)
     end
     uhk,phk = uh[k],ph[k]
-    uhk_rb,phk_rb = reconstruct_fe_sol(rbspace,rb_sol)
+    uhk_rb,phk_rb = reconstruct_fe_sol(rb_space,rb_sol)
     push!(err_u,ErrorTracker(uhk,uhk_rb))
     push!(err_p,ErrorTracker(phk,phk_rb))
   end

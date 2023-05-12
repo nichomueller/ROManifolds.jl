@@ -94,6 +94,7 @@ function model_info(
   bnd_info::Dict,
   ptype::ProblemType)
 
+  printstyled("Loading discrete model\n";color=:blue)
   model_info(mshpath,bnd_info,ispdomain(ptype))
 end
 
@@ -157,13 +158,13 @@ function generate_fe_snapshots(
   save_snap=true) where T
 
   ns = length(sol)
-  time = @elapsed begin
+  fe_time = @elapsed begin
     uh,μ = collect_solutions(sol)
   end
   usnap = Snapshots(:u,uh,ns)
   if save_snap
     save.((fepath,fepath),(usnap,μ))
-    save(joinpath(fepath,"fe_time"),Dict("FE time"=>time))
+    save(joinpath(fepath,"fe_time"),fe_time)
   end
   usnap,μ
 end
@@ -175,14 +176,14 @@ function generate_fe_snapshots(
   save_snap=true) where T
 
   Ns,ns = get_Ns(sol),length(sol)
-  time = @elapsed begin
+  fe_time = @elapsed begin
     xh,μ = collect_solutions(sol)
   end
   uh,ph = xh[1:Ns[1],:],xh[Ns[1]+1:Ns[1]+Ns[2],:]
   usnap,psnap = Snapshots(:u,uh,ns),Snapshots(:p,ph,ns)
   if save_snap
     save.((fepath,fepath,fepath),(usnap,psnap,μ))
-    save(joinpath(fepath,"fe_time"),Dict("FE time"=>time))
+    save(joinpath(fepath,"fe_time"),fe_time)
   end
   usnap,psnap,μ
 end
@@ -233,4 +234,19 @@ function get_dirichlet_values(
   times = get_times(tinfo)
   dir(μ) = Matrix([U(μ,t).dirichlet_values for t=times])
   Snapshots(:g,dir.(μ))
+end
+
+function online_loop(fe_sol,rb_space,rb_system,k::Int)
+  online_time = @elapsed begin
+    lhs,rhs = rb_system(k)
+    rb_sol = solve_rb_system(lhs,rhs)
+  end
+  fe_sol_approx = reconstruct_fe_sol(rb_space,rb_sol)
+
+  RBResults(fe_sol(k),fe_sol_approx,online_time)
+end
+
+function online_loop(fe_sol,rb_space,rb_system,k::UnitRange{Int})
+  loop = (k::Int) -> online_loop(fe_sol,rb_space,rb_system,k)
+  RBResults(pmap(loop,k))
 end

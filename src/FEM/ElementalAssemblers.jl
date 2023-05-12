@@ -42,9 +42,9 @@ get_fdata(al::AssemblerLoop) = al.fdata
 get_nsnap(al::AssemblerLoop) = al.nsnap
 
 function assemble_vectors(f::Function,V::FESpace,args...)
-  a,vecdata = assembler_setup(f,V,args...)
-  v1,findnz_idx = assembler_invariables(a,vecdata)
-  assembler_loop(a,vecdata,v1,findnz_idx)
+  asmblr,vecdata = assembler_setup(f,V,args...)
+  v1,findnz_idx = assembler_invariables(asmblr,vecdata)
+  assembler_loop(asmblr,vecdata,v1,findnz_idx)
 end
 
 function assembler_setup(
@@ -53,9 +53,9 @@ function assembler_setup(
   args...)
 
   dv = get_fe_basis(V)
-  a = SparseMatrixAssembler(V,V)
+  asmblr = SparseMatrixAssembler(V,V)
   vecdata = get_vecdata(f,V,dv,args...)
-  a,vecdata
+  asmblr,vecdata
 end
 
 function get_vecdata(
@@ -157,14 +157,14 @@ function get_vecdata(
 end
 
 function assembler_invariables(
-  a::SparseMatrixAssembler,
+  asmblr::SparseMatrixAssembler,
   vecdata::VectorAssemblerLoop)
 
   data = get_fdata(vecdata)
   vecdata1 = data(1)
-  v1 = Gridap.Algebra.nz_counter(get_vector_builder(a),(get_rows(a),))
-  symbolic_loop_vector!(v1,a,vecdata1)
-  findnz_idx = collect(eachindex(get_rows(a)))
+  v1 = Gridap.Algebra.nz_counter(get_vector_builder(asmblr),(get_rows(asmblr),))
+  symbolic_loop_vector!(v1,asmblr,vecdata1)
+  findnz_idx = collect(eachindex(get_rows(asmblr)))
 
   v1,findnz_idx
 end
@@ -177,22 +177,23 @@ function assembler_loop(
 
   data = get_fdata(vecdata)
   nsnap = get_nsnap(vecdata)
+  Nz = length(findnz_idx)
 
-  function get_snapshot(i)
+  vecs = Elemental.zeros(EMatrix{Float},Nz,nsnap)
+  for i = 1:nsnap
     vecdata_i = data(i)
     v2 = Gridap.Algebra.nz_allocation(v1)
     numeric_loop_vector!(v2,a,vecdata_i)
-    v2
+    copyto!(view(vecs,:,i),v2)
   end
 
-  vecs = hcat(EMatrix.(pmap(get_snapshot,1:nsnap))...)
   vecs[findnz_idx,:],findnz_idx
 end
 
 function assemble_matrices(f::Function,U,V::FESpace,args...)
-  a,matdata = assembler_setup(f,U,V,args...)
-  m1,findnz_idx = assembler_invariables(a,matdata)
-  assembler_loop(a,matdata,m1,findnz_idx)
+  asmblr,matdata = assembler_setup(f,U,V,args...)
+  m1,findnz_idx = assembler_invariables(asmblr,matdata)
+  assembler_loop(asmblr,matdata,m1,findnz_idx)
 end
 
 function assembler_setup(
@@ -204,9 +205,9 @@ function assembler_setup(
   U1 = realization_trial(U,args...)
   dv = get_fe_basis(V)
   du = get_trial_fe_basis(U1)
-  a = SparseMatrixAssembler(U1,V)
+  asmblr = SparseMatrixAssembler(U1,V)
   matdata = get_matdata(f,U,V,du,dv,args...)
-  a,matdata
+  asmblr,matdata
 end
 
 function get_matdata(
@@ -282,15 +283,15 @@ function get_matdata(
 end
 
 function assembler_invariables(
-  a::SparseMatrixAssembler,
+  asmblr::SparseMatrixAssembler,
   matdata::MatrixAssemblerLoop)
 
   data = get_fdata(matdata)
   matdata1 = data(1)
-  m1 = Gridap.Algebra.nz_counter(get_matrix_builder(a),(get_rows(a),get_cols(a)))
-  symbolic_loop_matrix!(m1,a,matdata1)
+  m1 = Gridap.Algebra.nz_counter(get_matrix_builder(asmblr),(get_rows(asmblr),get_cols(asmblr)))
+  symbolic_loop_matrix!(m1,asmblr,matdata1)
   m2 = Gridap.Algebra.nz_allocation(m1)
-  numeric_loop_matrix!(m2,a,matdata1)
+  numeric_loop_matrix!(m2,asmblr,matdata1)
   m3 = Gridap.Algebra.create_from_nz(m2)
   findnz_idx = get_findnz_idx(m3)
 
@@ -305,38 +306,40 @@ function assembler_loop(
 
   data = get_fdata(matdata)
   nsnap = get_nsnap(matdata)
-  function get_snapshot(i)
+  Nz = length(findnz_idx)
+
+  mats = Elemental.zeros(EMatrix{Float},Nz,nsnap)
+  for i = 1:nsnap
     matdata_i = data(i)
     m2 = Gridap.Algebra.nz_allocation(m1)
     numeric_loop_matrix!(m2,a,matdata_i)
-    m2
+    copyto!(view(mats,:,i),my_create_from_nz(m2))
   end
 
-  mats = hcat(EMatrix.(pmap(get_snapshot,1:nsnap))...)
   mats,findnz_idx
 end
 
 function my_create_from_nz(
-  a::Gridap.Algebra.InserterCSC{Tv,Ti}) where {Tv,Ti}
+  asmblr::Gridap.Algebra.InserterCSC{Tv,Ti}) where {Tv,Ti}
 
   k = 1
-  for j in 1:a.ncols
-    pini = Int(a.colptr[j])
-    pend = pini + Int(a.colnnz[j]) - 1
+  for j in 1:asmblr.ncols
+    pini = Int(asmblr.colptr[j])
+    pend = pini + Int(asmblr.colnnz[j]) - 1
     for p in pini:pend
-      a.nzval[k] = a.nzval[p]
+      asmblr.nzval[k] = asmblr.nzval[p]
       k += 1
     end
   end
-  @inbounds for j in 1:a.ncols
-    a.colptr[j+1] = a.colnnz[j]
+  @inbounds for j in 1:asmblr.ncols
+    asmblr.colptr[j+1] = asmblr.colnnz[j]
   end
-  Gridap.FESpaces.length_to_ptrs!(a.colptr)
-  nnz = a.colptr[end]-1
-  resize!(a.nzval,nnz)
+  Gridap.FESpaces.length_to_ptrs!(asmblr.colptr)
+  nnz = asmblr.colptr[end]-1
+  resize!(asmblr.nzval,nnz)
 
-  my_nnz = findall(v -> abs.(v) .>= eps(), a.nzval)
-  a.nzval[my_nnz]
+  my_nnz = findall(v -> abs.(v) .>= eps(),asmblr.nzval)
+  asmblr.nzval[my_nnz]
 end
 
 function get_findnz_idx(mat::EMatrix{Float})

@@ -54,8 +54,8 @@ function navier_stokes_steady()
   info = RBInfoSteady(ptype,test_path;ϵ=1e-4,nsnap=80,mdeim_snap=30,load_offline=true)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
   fesol = (uh,ph,μ,U,V)
-  rbspace,online_structures = offline_phase(info,fesol,(opA,opB,opC,opD,opF,opH),measures,tt)
-  online_phase(info,fesol,rbspace,online_structures,tt)
+  rb_space,online_structures = offline_phase(info,fesol,(opA,opB,opC,opD,opF,opH),measures,tt)
+  online_phase(info,fesol,rb_space,online_structures,tt)
 end
 
 function offline_phase(
@@ -72,8 +72,8 @@ function offline_phase(
   ph_offline = ph[1:info.nsnap]
   opA,opB,opC,opD,opF,opH = op
 
-  rbspace_u,rbspace_p = assemble_rbspace(info,tt,(uh_offline,ph_offline),opB,ph,μ)
-  rbspace = rbspace_u,rbspace_p
+  rbspace_u,rbspace_p = assemble_rb_space(info,tt,(uh_offline,ph_offline),opB,ph,μ)
+  rb_space = rbspace_u,rbspace_p
 
   rbopA = RBVariable(opA,rbspace_u,rbspace_u)
   rbopB = RBVariable(opB,rbspace_p,rbspace_u)
@@ -93,13 +93,13 @@ function offline_phase(
   ad_eval = eval_affine_decomposition(ad)
   online_structures = RBParamOnlineStructure(ad,ad_eval;st_mdeim=info.st_mdeim)
 
-  rbspace,online_structures
+  rb_space,online_structures
 end
 
 function online_phase(
   info::RBInfo,
   fesol,
-  rbspace::NTuple{2,RBSpace},
+  rb_space::NTuple{2,RBSpace},
   online_structures::Tuple,
   tt::TimeTracker)
 
@@ -107,7 +107,7 @@ function online_phase(
 
   uh,ph,μ,U = fesol
   μ_offline = μ[1:info.nsnap]
-  rb_solver(res,jac,x0,Uk) = solve_rb_system(res,jac,x0,Uk,rbspace)
+  rb_solver(res,jac,x0,Uk) = solve_rb_system(res,jac,x0,Uk,rb_space)
 
   function online_loop(k::Int)
     printstyled("-------------------------------------------------------------\n")
@@ -119,7 +119,7 @@ function online_phase(
       rb_sol = rb_solver(res,jac,x0,Uk)
     end
     uhk,phk = get_snap(uh[k]),get_snap(ph[k])
-    uhk_rb,phk_rb = reconstruct_fe_sol(rbspace,rb_sol)
+    uhk_rb,phk_rb = reconstruct_fe_sol(rb_space,rb_sol)
     ErrorTracker(:u,uhk,uhk_rb),ErrorTracker(:p,phk,phk_rb)
   end
 

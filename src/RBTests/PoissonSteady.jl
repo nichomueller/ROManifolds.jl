@@ -43,10 +43,10 @@ function poisson_steady()
   opF = AffineParamOperator(f,ffe,PS,V;id=:F)
   opH = NonaffineParamOperator(h,hfe,PS,V;id=:H)
 
-  info = RBInfoSteady(ptype,test_path;ϵ=1e-4,nsnap=80,mdeim_snap=20,load_offline=false)
+  info = RBInfoSteady(ptype,test_path;ϵ=1e-4,nsnap=80,mdeim_snap=20)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
-  rbspace,online_structures = offline_phase(info,(uh,μ),(opA,opF,opH),measures,tt)
-  online_phase(info,(uh,μ),rbspace,online_structures,tt)
+  rb_space,online_structures = offline_phase(info,(uh,μ),(opA,opF,opH),measures,tt)
+  online_phase(info,(uh,μ),rb_space,online_structures,tt)
 end
 
 function offline_phase(
@@ -62,11 +62,11 @@ function offline_phase(
   uh_offline = uh[1:info.nsnap]
   opA,opF,opH = op
 
-  rbspace = assemble_rbspace(info,tt,uh_offline)
+  rb_space = assemble_rb_space(info,tt,uh_offline)
 
-  rbopA = RBVariable(opA,rbspace,rbspace)
-  rbopF = RBVariable(opF,rbspace)
-  rbopH = RBVariable(opH,rbspace)
+  rbopA = RBVariable(opA,rb_space,rb_space)
+  rbopF = RBVariable(opF,rb_space)
+  rbopH = RBVariable(opH,rb_space)
 
   Arb = RBAffineDecomposition(info,tt,rbopA,μ,meas,:dΩ)
   Frb = RBAffineDecomposition(info,tt,rbopF,μ,meas,:dΩ)
@@ -76,13 +76,13 @@ function offline_phase(
   ad_eval = eval_affine_decomposition(ad)
   online_structures = RBParamOnlineStructure(ad,ad_eval)
 
-  rbspace,online_structures
+  rb_space,online_structures
 end
 
 function online_phase(
   info::RBInfo,
   fesol,
-  rbspace::RBSpace,
+  rb_space::RBSpace,
   online_structures::Tuple,
   tt::TimeTracker)
 
@@ -98,7 +98,7 @@ function online_phase(
       rb_sol = solve_rb_system(lhs,rhs)
     end
     uhk = get_snap(uh[k])
-    uhk_rb = reconstruct_fe_sol(rbspace,rb_sol)
+    uhk_rb = reconstruct_fe_sol(rb_space,rb_sol)
     ErrorTracker(:u,uhk,uhk_rb)
   end
 

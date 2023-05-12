@@ -33,12 +33,14 @@ get_id(s::NTuple{N,Snapshots}) where N = get_id.(s)
 
 get_snap(s::Snapshots) = s.snap
 
+get_snap(::Type{T},s::Snapshots) where T = convert(T,s.snap)
+
 get_nsnap(s::Snapshots) = s.nsnap
 
 get_nsnap(mat::AbstractMatrix,Nt::Int) = Int(size(mat,2)/Nt)
 
 function save(path::String,s::Snapshots)
-  smat = Matrix(get_snap(s))
+  smat = get_snap(Matrix{Float},s)
   save(joinpath(path,"$(get_id(s))"),smat)
 end
 

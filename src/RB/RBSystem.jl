@@ -141,44 +141,44 @@ end
 
 function get_un_fun(
   x_rb::Vector{Float},
-  rbspace::RBSpaceSteady,
+  rb_space::RBSpaceSteady,
   U::ParamTrialFESpace,
   μ::Param)
 
-  nstu = get_ns(rbspace)
-  ufe = reconstruct_fe_sol(rbspace,x_rb[1:nstu])
+  nstu = get_ns(rb_space)
+  ufe = reconstruct_fe_sol(rb_space,x_rb[1:nstu])
   FEFunction(U,ufe,μ)
 end
 
 function get_un_fun(
   x_rb::Vector{Float},
-  rbspace::RBSpaceUnsteady,
+  rb_space::RBSpaceUnsteady,
   U::ParamTransientTrialFESpace,
   μ::Param,
   time_info::TimeInfo)
 
-  nstu = get_ns(rbspace)*get_nt(rbspace)
-  ufe = reconstruct_fe_sol(rbspace,x_rb[1:nstu])
+  nstu = get_ns(rb_space)*get_nt(rb_space)
+  ufe = reconstruct_fe_sol(rb_space,x_rb[1:nstu])
   unfe = compute_in_times(ufe,get_θ(time_info))
   FEFunction(U,unfe,μ,get_times(time_info))
 end
 
 function rb_initial_guess(
-  rbspace::NTuple{2,RBSpace},
+  rb_space::NTuple{2,RBSpace},
   args...)
 
   x0 = get_initial_guess(uh,ph,μ_offline,μk)
-  rb_initial_guess(x0,rbspace,args...)
+  rb_initial_guess(x0,rb_space,args...)
 end
 
 function rb_initial_guess(
   x0::AbstractArray,
-  rbspace::NTuple{2,RBSpace},
+  rb_space::NTuple{2,RBSpace},
   args...)
 
-  Nu = get_Ns(rbspace[1])
-  u0_rb = rb_spacetime_projection(rbspace[1],x0[1:Nu,:])
-  p0_rb = rb_spacetime_projection(rbspace[2],x0[Nu+1:end,:])
+  Nu = get_Ns(rb_space[1])
+  u0_rb = rb_spacetime_projection(rb_space[1],x0[1:Nu,:])
+  p0_rb = rb_spacetime_projection(rb_space[2],x0[Nu+1:end,:])
   vcat(u0_rb,p0_rb)
 end
 
@@ -197,33 +197,45 @@ function nearest_parameter(μvec::Vector{Param},μ::Param)
   argmin(vars)
 end
 
-function reconstruct_fe_sol(rbspace::RBSpaceSteady,rb_sol::Array{Float})
-  id = get_id(rbspace)
-  bs = get_basis_space(rbspace)
+function reconstruct_fe_sol(
+  rb_space::RBSpaceSteady,
+  rb_sol::Array{Float})
+
+  id = get_id(rb_space)
+  bs = get_basis_space(rb_space)
   Snapshots(id,bs*rb_sol,1)
 end
 
-function reconstruct_fe_sol(rbspace::RBSpaceUnsteady,rb_sol::Array{Float})
-  id = get_id(rbspace)
-  bs = get_basis_space(rbspace)
-  bt = get_basis_time(rbspace)
-  ns = get_ns(rbspace)
-  nt = get_nt(rbspace)
+function reconstruct_fe_sol(
+  rb_space::RBSpaceUnsteady,
+  rb_sol::Array{Float})
+
+  id = get_id(rb_space)
+  bs = get_basis_space(rb_space)
+  bt = get_basis_time(rb_space)
+  ns = get_ns(rb_space)
+  nt = get_nt(rb_space)
 
   rb_sol_resh = reshape(rb_sol,nt,ns)
   Snapshots(id,bs*(bt*rb_sol_resh)',1)
 end
 
-function reconstruct_fe_sol(rbspace::NTuple{2,RBSpaceSteady},rb_sol::Array{Float})
-  ns = get_ns.(rbspace)
+function reconstruct_fe_sol(
+  rb_space::NTuple{2,RBSpaceSteady},
+  rb_sol::Array{Float})
+
+  ns = get_ns.(rb_space)
   rb_sol_u,rb_sol_p = rb_sol[1:ns[1],:],rb_sol[1+ns[1]:end,:]
-  reconstruct_fe_sol.(rbspace,(rb_sol_u,rb_sol_p))
+  reconstruct_fe_sol.(rb_space,(rb_sol_u,rb_sol_p))
 end
 
-function reconstruct_fe_sol(rbspace::NTuple{2,RBSpaceUnsteady},rb_sol::Array{Float})
-  ns = get_ns.(rbspace)
-  nt = get_nt.(rbspace)
+function reconstruct_fe_sol(
+  rb_space::NTuple{2,RBSpaceUnsteady},
+  rb_sol::Array{Float})
+
+  ns = get_ns.(rb_space)
+  nt = get_nt.(rb_space)
   n = ns.*nt
   rb_sol_u,rb_sol_p = rb_sol[1:n[1],:],rb_sol[1+n[1]:end,:]
-  reconstruct_fe_sol.(rbspace,(rb_sol_u,rb_sol_p))
+  reconstruct_fe_sol.(rb_space,(rb_sol_u,rb_sol_p))
 end

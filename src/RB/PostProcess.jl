@@ -1,29 +1,71 @@
-mutable struct OfflineTime
+struct OfflineTime
   basis_time::Float
   assembly_time::Float
 end
 
-mutable struct TimeTracker
-  offline_time::OfflineTime
+function save(info::RBInfo,ot::OfflineTime)
+  ot_dict = Dict("basis_time"=>ot.basis_time,"assembly_time"=>ot.assembly_time)
+  save(joinpath(info.offline_path,"offline_time"),ot_dict)
+end
+
+struct RBResults
+  id::Symbol
+  relative_err::Float
+  pointwise_err::Matrix{Float}
   online_time::Float
 end
 
-struct ErrorTracker
-  relative_err::Float
-  pointwise_err::Matrix{Float}
+function RBResults(
+  sol::NTuple{N,Snapshots},
+  sol_approx::NTuple{N,Snapshots},
+  args...;
+  kwargs...)::NTuple{N,RBResults} where N
+
+  RBResults.(sol,sol_approx;kwargs...)
 end
 
-function ErrorTracker(
-  uh::Snapshots,
-  uh_rb::Snapshots;
+function RBResults(
+  sol::Snapshots,
+  sol_approx::Snapshots,
+  online_time::Float;
   X=nothing)
 
-  usnap = Matrix(get_snap(uh))
-  usnap_rb = Matrix(get_snap(uh_rb))
-  Y = isnothing(X) ? I(size(usnap,1)) : X
-  relative_err,pointwise_err = compute_errors(usnap,usnap_rb,Y)
+  id = get_id(sol)
+  sol_mat = get_snap(Matrix{Float},sol)
+  sol_approx_mat = get_snap(Matrix{Float},sol_approx)
+  Y = isnothing(X) ? I(size(sol_mat,1)) : X
+  relative_err,pointwise_err = compute_errors(sol_mat,sol_approx_mat,Y)
 
-  ErrorTracker(relative_err,pointwise_err)
+  RBResults(id,relative_err,pointwise_err,online_time)
+end
+
+function RBResults(res::Vector{RBResults})
+  nruns = length(res)
+
+  id = res.id
+  relative_errs = Broadcasting(r->getproperty(r,:relative_err))(res)
+  online_times = Broadcasting(r->getproperty(r,:online_times))(res)
+
+  relative_err = sum(relative_errs)/nruns
+  pointwise_err = res[1].pointwise_err
+  online_time = sum(online_times/nruns)
+
+  RBResults(id,relative_err,pointwise_err,online_time)
+end
+
+function save(info::RBInfo,res::NTuple{1,RBResults})
+  res_u, = res
+  res_dict = Dict("relative_err_$(get_id(res_u))" => res_u.relative_err,
+                  "online_time"=>res_u.online_time)
+  save(joinpath(info.online_path,"results"),res_dict)
+end
+
+function save(info::RBInfo,res::NTuple{2,RBResults})
+  res_u,res_p = res
+  res_dict = Dict("relative_err_$(get_id(res_u))" => res_u.relative_err,
+                  "relative_err_$(get_id(res_p))" => res_p.relative_err,
+                  "online_time"=>res_u.online_time)
+  save(joinpath(info.online_path,"results_$id"),res_dict)
 end
 
 function compute_errors(
@@ -43,41 +85,6 @@ function compute_errors(
   relative_err,pointwise_err
 end
 
-mutable struct RBResults
-  id::Symbol
-  tt::TimeTracker
-  et::ErrorTracker
-  nruns::Int
-end
-
-function RBResults(id::Symbol,tt::TimeTracker,ets::Vector{ErrorTracker})
-  nruns = length(ets)
-
-  relative_errs = Broadcasting(et->getproperty(et,:relative_err))(ets)
-  pointwise_errs = Broadcasting(et->getproperty(et,:pointwise_err))(ets)
-  et = ErrorTracker(sum(relative_errs)/nruns,sum(pointwise_errs)/nruns)
-  ttnew = TimeTracker(tt.offline_time,tt.online_time/nruns)
-
-  RBResults(id,ttnew,et,nruns)
-end
-
-function time_dict(r::RBResults)
-  bt,at = r.tt.offline_time.basis_time,r.tt.offline_time.assembly_time
-  Dict("offline_time"=>[bt,at],"online_time"=>r.tt.online_time)
-end
-
-err_dict(r::RBResults) = Dict("relative_err"=>r.et.relative_err,"pointwise_err"=>r.et.pointwise_err)
-
-function save(info::RBInfo,r::RBResults)
-  if info.save_online
-    save(joinpath(info.online_path,"errors_$(r.id)"),err_dict(r))
-    if !info.load_offline
-      save(joinpath(info.online_path,"times"),time_dict(r))
-    end
-  end
-  return nothing
-end
-
 function postprocess(
   info::RBInfo,
   res::NTuple{1,RBResults},
@@ -86,13 +93,12 @@ function postprocess(
   args...)
 
   res_u, = res
-  rel_err_u = res_u.et.relative_err
   V, = fespaces
 
   printstyled("-------------------------------------------------------------\n")
-  printstyled("Average online relative errors err_u: $rel_err_u\n";
+  printstyled("Average online relative errors err_u: $(res_u.relative_err)\n";
     color=:red)
-  printstyled("Average online wall time: $(tt.online_time/res_u.nruns) s\n";
+  printstyled("Average online wall time: $(res_u.online_time) s\n";
     color=:red)
   printstyled("-------------------------------------------------------------\n")
 
@@ -116,13 +122,13 @@ function postprocess(
   args...)
 
   res_u,res_p = res
-  rel_err_u,rel_err_p = res_u.et.relative_err,res_p.et.relative_err
+  rel_err_u,rel_err_p = res_u.relative_err,res_p.relative_err
   V,Q = fespaces
 
   printstyled("-------------------------------------------------------------\n")
   printstyled("Average online relative errors (err_u,err_p): $((rel_err_u,rel_err_p))\n";
     color=:red)
-  printstyled("Average online wall time: $(tt.online_time/res_u.nruns) s\n";
+  printstyled("Average online wall time: $(res_u.online_time) s\n";
     color=:red)
   printstyled("-------------------------------------------------------------\n")
 

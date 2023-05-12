@@ -48,10 +48,10 @@ function stokes_steady()
   opF = AffineParamOperator(f,ffe,PS,V;id=:F)
   opH = AffineParamOperator(h,hfe,PS,V;id=:H)
 
-  info = RBInfoSteady(ptype,test_path;ϵ=1e-4,nsnap=80,mdeim_snap=30,load_offline=false)
+  info = RBInfoSteady(ptype,test_path;ϵ=1e-4,nsnap=80,mdeim_snap=30)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
-  rbspace,online_structures = offline_phase(info,(uh,ph,μ),(opA,opB,opF,opH),measures,tt)
-  online_phase(info,(uh,ph,μ),rbspace,online_structures,tt)
+  rb_space,online_structures = offline_phase(info,(uh,ph,μ),(opA,opB,opF,opH),measures,tt)
+  online_phase(info,(uh,ph,μ),rb_space,online_structures,tt)
 end
 
 function offline_phase(
@@ -68,7 +68,7 @@ function offline_phase(
   ph_offline = ph[1:info.nsnap]
   opA,opB,opF,opH = op
 
-  rbspace_u,rbspace_p = assemble_rbspace(info,tt,(uh_offline,ph_offline),opB,ph,μ)
+  rbspace_u,rbspace_p = assemble_rb_space(info,tt,(uh_offline,ph_offline),opB,ph,μ)
 
   rbopA = RBVariable(opA,rbspace_u,rbspace_u)
   rbopB = RBVariable(opB,rbspace_p,rbspace_u)
@@ -84,13 +84,13 @@ function offline_phase(
   ad_eval = eval_affine_decomposition(ad)
   online_structures = RBParamOnlineStructure(ad,ad_eval)
 
-  rbspace,online_structures
+  rb_space,online_structures
 end
 
 function online_phase(
   info::RBInfo,
   fesol,
-  rbspace::NTuple{2,RBSpace},
+  rb_space::NTuple{2,RBSpace},
   online_structures::Tuple,
   tt::TimeTracker)
 
@@ -107,7 +107,7 @@ function online_phase(
     end
     uhk = get_snap(uh[k])
     phk = get_snap(ph[k])
-    uhk_rb,phk_rb = reconstruct_fe_sol(rbspace,rb_sol)
+    uhk_rb,phk_rb = reconstruct_fe_sol(rb_space,rb_sol)
     ErrorTracker(:u,uhk,uhk_rb),ErrorTracker(:p,phk,phk_rb)
   end
 

@@ -85,14 +85,14 @@ function navier_stokes_unsteady()
   for fun_mdeim = (true,false), st_mdeim = (true,false), tol = (1e-1,1e-2,1e-3,1e-4)
 
     global info = RBInfoUnsteady(ptype,test_path;ϵ=tol,nsnap=offline_nsnap,
-      online_snaps=95:100,mdeim_snap=15,load_offline=false,postprocess=true,
+      online_snaps=95:100,mdeim_snap=15,postprocess=true,
       fun_mdeim=fun_mdeim,st_mdeim=st_mdeim)
     tt = TimeTracker(OfflineTime(0.,0.),0.)
 
     printstyled("Offline phase; tol=$tol, st_mdeim=$st_mdeim, fun_mdeim=$fun_mdeim\n";color=:blue)
 
-    rbspace_u,rbspace_p = assemble_rbspace(info,(uh_offline,ph_offline),opB,ph,μ;tt)
-    rbspace = rbspace_u,rbspace_p
+    rbspace_u,rbspace_p = assemble_rb_space(info,(uh_offline,ph_offline),opB,ph,μ;tt)
+    rb_space = rbspace_u,rbspace_p
 
     rbopA = RBVariable(opA,rbspace_u,rbspace_u)
     rbopB = RBVariable(opB,rbspace_p,rbspace_u)
@@ -123,7 +123,7 @@ function navier_stokes_unsteady()
     end
     ad = (Arb,Brb,BTrb,Mrb,Frb,Hrb,Aliftrb,Bliftrb,Mliftrb)
 
-    if info.save_offline save(info,(rbspace,ad)) end
+    if info.save_offline save(info,(rb_space,ad)) end
 
     printstyled("Online phase; tol=$tol, st_mdeim=$st_mdeim\n";color=:red)
 
@@ -153,7 +153,7 @@ function navier_stokes_unsteady()
         rb_sol = solve_rb_system(rb_system,x0,rbspace_u,U,μk,time_info;tol=info.ϵ)
       end
       uhk,phk = uh[k],ph[k]
-      uhk_rb,phk_rb = reconstruct_fe_sol(rbspace,rb_sol)
+      uhk_rb,phk_rb = reconstruct_fe_sol(rb_space,rb_sol)
       push!(err_u,ErrorTracker(uhk,uhk_rb))
       push!(err_p,ErrorTracker(phk,phk_rb))
     end

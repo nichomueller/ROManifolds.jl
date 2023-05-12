@@ -61,7 +61,7 @@ function get_assembler(
     mat = @distributed (+) for q = 1:Qs
       basis_q = reshape(basis[:,q],nsrow,nscol)
       coeff_q = reshape(coeff[:,q],ntrow,ntcol)
-      mat += kron(basis_q,coeff_q)
+      kron(basis_q,coeff_q)
     end
     copyto!(online_mat,mat)
   end

@@ -21,7 +21,7 @@ function RBInfoSteady(
   ptype::ProblemType,
   tpath::String;
   ϵ=1e-4,nsnap=80,online_snaps=95:100,mdeim_snap=20,use_energy_norm=false,
-  load_offline=true,save_offline=true,save_online=true,
+  load_offline=false,save_offline=true,save_online=true,
   fun_mdeim=false,adaptivity=false,postprocess=false)
 
   offline_path,online_path = rom_off_on_paths(tpath,ϵ;fun_mdeim=fun_mdeim)
@@ -51,7 +51,7 @@ function RBInfoUnsteady(
   ptype::ProblemType,
   tpath::String;
   ϵ=1e-4,nsnap=80,online_snaps=95:100,mdeim_snap=20,
-  use_energy_norm=false,load_offline=true,
+  use_energy_norm=false,load_offline=false,
   save_offline=true,save_online=true,st_mdeim=false,fun_mdeim=false,
   adaptivity=false,postprocess=false)
 

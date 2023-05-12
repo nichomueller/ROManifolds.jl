@@ -7,8 +7,10 @@ addprocs(manager)
   include("$root/src/FEM/FEM.jl")
   include("$root/src/RB/RB.jl")
   include("$root/src/RBTests/RBTests.jl")
+end
 
-  run_fem = true
+@everywhere begin
+  run_fem = false
 
   steady = false
   indef = false
@@ -62,64 +64,60 @@ end
 
 uh,μ = fe_snapshots(solver,feop,fepath,run_fem,nsnap,t0,tF;indef)
 
-@everywhere begin
-  uh,μ = fetch(@spawnat 1 uh,μ)
+@mpi_do manager begin
+  uh = fetch(@spawnat 1 uh)
+  μ = fetch(@spawnat 1 μ)
+  fe_sol(k) = uh[k]
 
-  info = RBInfoUnsteady(ptype,test_path;ϵ=1e-3,nsnap=80,mdeim_snap=20,load_offline=false)
-  tt = TimeTracker(OfflineTime(0.,0.),0.)
+  info = RBInfoUnsteady(ptype,test_path;ϵ=1e-3,nsnap=80,mdeim_snap=20)
 
   printstyled("Offline phase, reduced basis method\n";color=:blue)
 
   uh_offline = uh[1:info.nsnap]
 
-  tt.offline_time.basis_time += @elapsed begin
-    rbspace, = assemble_rbspace(info,(uh_offline,))
+  basis_time = @elapsed begin
+    rb_space, = assemble_rb_space(info,(uh_offline,))
   end
 
-  rbopA = RBVariable(opA,rbspace,rbspace)
-  rbopM = RBVariable(opM,rbspace,rbspace)
-  rbopF = RBVariable(opF,rbspace)
-  rbopH = RBVariable(opH,rbspace)
+  rbopA = RBVariable(opA,rb_space,rb_space)
+  rbopM = RBVariable(opM,rb_space,rb_space)
+  rbopF = RBVariable(opF,rb_space)
+  rbopH = RBVariable(opH,rb_space)
   rbopAlift = RBLiftVariable(rbopA)
   rbopMlift = RBLiftVariable(rbopM)
-end
 
-tt.offline_time.assembly_time = @elapsed begin
-  Arb = RBAffineDecomposition(info,rbopA,measures,:dΩ,μ)
-  Mrb = RBAffineDecomposition(info,rbopM,measures,:dΩ,μ)
-  Frb = RBAffineDecomposition(info,rbopF,measures,:dΩ,μ)
-  Hrb = RBAffineDecomposition(info,rbopH,measures,:dΓn,μ)
-  Aliftrb = RBAffineDecomposition(info,rbopAlift,measures,:dΩ,μ)
-  Mliftrb = RBAffineDecomposition(info,rbopMlift,measures,:dΩ,μ)
-end
-ad = (Arb,Mrb,Frb,Hrb,Aliftrb,Mliftrb)
-
-if info.save_offline save(info,(rbspace,ad)) end
-
-printstyled("Online phase, reduced basis method\n";color=:red)
-
-Aon = RBParamOnlineStructure(Arb;st_mdeim=info.st_mdeim)
-Mon = RBParamOnlineStructure(Mrb;st_mdeim=info.st_mdeim)
-Fon = RBParamOnlineStructure(Frb;st_mdeim=info.st_mdeim)
-Hon = RBParamOnlineStructure(Hrb;st_mdeim=info.st_mdeim)
-Alifton = RBParamOnlineStructure(Aliftrb;st_mdeim=info.st_mdeim)
-Mlifton = RBParamOnlineStructure(Mliftrb;st_mdeim=info.st_mdeim)
-online_structures = (Aon,Mon,Fon,Hon,Alifton,Mlifton)
-
-err = ErrorTracker[]
-function online_loop(k::Int)
-  tt.online_time += @elapsed begin
-    lhs,rhs = unsteady_poisson_rb_system(online_structures,μ[k])
-    rb_sol = solve_rb_system(lhs,rhs)
+  assembly_time = @elapsed begin
+    Arb = RBAffineDecomposition(info,rbopA,measures,:dΩ,μ)
+    Mrb = RBAffineDecomposition(info,rbopM,measures,:dΩ,μ)
+    Frb = RBAffineDecomposition(info,rbopF,measures,:dΩ,μ)
+    Hrb = RBAffineDecomposition(info,rbopH,measures,:dΓn,μ)
+    Aliftrb = RBAffineDecomposition(info,rbopAlift,measures,:dΩ,μ)
+    Mliftrb = RBAffineDecomposition(info,rbopMlift,measures,:dΩ,μ)
   end
-  uhk = uh[k]
-  uhk_rb = reconstruct_fe_sol(rbspace,rb_sol)
-  push!(err,ErrorTracker(uhk,uhk_rb))
+  ad = (Arb,Mrb,Frb,Hrb,Aliftrb,Mliftrb)
+
+  offline_times = OfflineTime(basis_time,assembly_time)
+
+  if info.save_offline
+    save(info,(rb_space,ad,offline_times))
+  end
+
+  printstyled("Online phase, reduced basis method\n";color=:red)
+
+  Aon = RBParamOnlineStructure(Arb;st_mdeim=info.st_mdeim)
+  Mon = RBParamOnlineStructure(Mrb;st_mdeim=info.st_mdeim)
+  Fon = RBParamOnlineStructure(Frb;st_mdeim=info.st_mdeim)
+  Hon = RBParamOnlineStructure(Hrb;st_mdeim=info.st_mdeim)
+  Alifton = RBParamOnlineStructure(Aliftrb;st_mdeim=info.st_mdeim)
+  Mlifton = RBParamOnlineStructure(Mliftrb;st_mdeim=info.st_mdeim)
+  online_structures = (Aon,Mon,Fon,Hon,Alifton,Mlifton)
+
+  rb_system(k) = unsteady_poisson_rb_system(online_structures,μ[k])
+  res = online_loop(fe_sol,rb_space,rb_system,info.online_snaps)
+  postprocess(info,(res,),(V,),model,time_info)
 end
 
-pmap(online_loop,info.online_snaps)
-res = RBResults(:u,tt,err)
-postprocess(info,(res,),(V,),model,time_info)
+poisson_unsteady()
 
 #=
 run_fem = false
@@ -168,7 +166,7 @@ for fun_mdeim = (false)#(false,true)
     for tol = (1e-4)#(1e-2,1e-3,1e-4,1e-5)
 
       global info = RBInfoUnsteady(ptype,test_path;ϵ=tol,nsnap=80,online_snaps=95:100,
-        mdeim_snap=20,load_offline=false,save_offline=false,postprocess=true,
+        mdeim_snap=20,save_offline=false,postprocess=true,
         fun_mdeim=fun_mdeim,st_mdeim=st_mdeim,save_online=false)
       tt = TimeTracker(OfflineTime(0.,0.),0.)
 
@@ -176,12 +174,12 @@ for fun_mdeim = (false)#(false,true)
 
       uh_offline = uh[1:info.nsnap]
       #X = H1_norm_matrix(opA,opM)
-      rbspace = assemble_rbspace(info,tt,uh_offline)#;X)
+      rb_space = assemble_rb_space(info,tt,uh_offline)#;X)
 
-      rbopA = RBVariable(opA,rbspace,rbspace)
-      rbopM = RBVariable(opM,rbspace,rbspace)
-      rbopF = RBVariable(opF,rbspace)
-      rbopH = RBVariable(opH,rbspace)
+      rbopA = RBVariable(opA,rb_space,rb_space)
+      rbopM = RBVariable(opM,rb_space,rb_space)
+      rbopF = RBVariable(opF,rb_space)
+      rbopH = RBVariable(opH,rb_space)
 
       Arb = RBAffineDecomposition(info,tt,rbopA,μ,measures,:dΩ)
       Mrb = RBAffineDecomposition(info,tt,rbopM,μ,measures,:dΩ)
@@ -203,7 +201,7 @@ for fun_mdeim = (false)#(false,true)
           rb_sol = solve_rb_system(lhs,rhs)
         end
         uhk = get_snap(uh[k])
-        uhk_rb = reconstruct_fe_sol(rbspace,rb_sol)
+        uhk_rb = reconstruct_fe_sol(rb_space,rb_sol)
         ErrorTracker(:u,uhk,uhk_rb;X)
       end
 

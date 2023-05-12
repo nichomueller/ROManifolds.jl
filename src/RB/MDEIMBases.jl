@@ -62,10 +62,10 @@ end
 
 function interpolate_param_basis(
   op::RBVariable,
-  rbspace::RBSpace)
+  rb_space::RBSpace)
 
-  ns = get_ns(rbspace)
-  basis_space = get_basis_space(rbspace)
+  ns = get_ns(rb_space)
+  basis_space = get_basis_space(rb_space)
   test = get_test(op)
   quad_fespace = LagrangianQuadFESpace(test)
   quad_test = quad_fespace.test
@@ -75,11 +75,11 @@ end
 
 function interpolate_param_basis(
   op::RBVariable{Nonlinear,Top},
-  rbspace::RBSpace) where Top
+  rb_space::RBSpace) where Top
 
-  Ns,ns = get_Ns(rbspace),get_ns(rbspace)
+  Ns,ns = get_Ns(rb_space),get_ns(rb_space)
   test = get_test(op)
-  basis_space = get_basis_space(rbspace)
+  basis_space = get_basis_space(rb_space)
   basis_free,basis_dir = basis_space[1:Ns,:],basis_space[1+Ns:end,:]
 
   [FEFunction(test,basis_free[:,k],basis_dir[:,k]) for k = 1:ns]
