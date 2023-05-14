@@ -167,7 +167,7 @@ function rb_initial_guess(
   rb_space::NTuple{2,RBSpace},
   args...)
 
-  x0 = get_initial_guess(uh,ph,μ_offline,μk)
+  x0 = get_initial_guess(u,p,μ_offline,μk)
   rb_initial_guess(x0,rb_space,args...)
 end
 
@@ -183,13 +183,13 @@ function rb_initial_guess(
 end
 
 function get_initial_guess(
-  uh::Snapshots,
-  ph::Snapshots,
+  u::Snapshots,
+  p::Snapshots,
   μvec::Vector{Param},
   μ::Param)
 
   kmin = nearest_parameter(μvec,μ)
-  vcat(get_snap(uh[kmin]),get_snap(ph[kmin]))
+  vcat(get_snap(u[kmin]),get_snap(p[kmin]))
 end
 
 function nearest_parameter(μvec::Vector{Param},μ::Param)
@@ -203,7 +203,7 @@ function reconstruct_fe_sol(
 
   id = get_id(rb_space)
   bs = get_basis_space(rb_space)
-  Snapshots(id,bs*rb_sol,1)
+  Snapshots(id,bs*rb_sol,1,EMatrix{Float})
 end
 
 function reconstruct_fe_sol(
@@ -217,7 +217,7 @@ function reconstruct_fe_sol(
   nt = get_nt(rb_space)
 
   rb_sol_resh = reshape(rb_sol,nt,ns)
-  Snapshots(id,bs*(bt*rb_sol_resh)',1)
+  Snapshots(id,bs*(bt*rb_sol_resh)',1,EMatrix{Float})
 end
 
 function reconstruct_fe_sol(

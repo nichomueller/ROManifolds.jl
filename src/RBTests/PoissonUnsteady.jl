@@ -34,9 +34,7 @@ end
   t0,tF,dt,θ = 0.,0.3,0.005,1
   time_info = ThetaMethodInfo(t0,tF,dt,θ)
 
-  function a(x,p::Param,t::Real)
-    exp((sin(t)+cos(t))*x[1]/sum(p.μ))
-  end
+  a(x,p::Param,t::Real) = exp((sin(t)+cos(t))*x[1]/sum(p.μ))
   a(p::Param,t::Real) = x->a(x,p,t)
   a(p::Param) = t->a(p,t)
   m(x,p::Param,t::Real) = 1.
@@ -62,12 +60,18 @@ end
   nsnap = 100
 end
 
-uh,μ = fe_snapshots(solver,feop,fepath,run_fem,nsnap,t0,tF;indef)
+@everywhere workers() begin
+  u,μ = generate_fe_snapshots_on_workers(run_fem,fepath,nsnap,solver,feop,t0,tF;indef)
+end
+
+begin
+  uh,μh = collect_fe_snapshots(run_fem,fepath,nsnap;indef)
+  @passobj 1 workers() uh
+  @passobj 1 workers() μh
+end
 
 @mpi_do manager begin
-  uh = fetch(@spawnat 1 uh)
-  μ = fetch(@spawnat 1 μ)
-  fe_sol(k) = uh[k]
+  uh = convert_snapshot(EMatrix{Float},uh)
 
   info = RBInfoUnsteady(ptype,test_path;ϵ=1e-3,nsnap=80,mdeim_snap=20)
 
@@ -76,7 +80,7 @@ uh,μ = fe_snapshots(solver,feop,fepath,run_fem,nsnap,t0,tF;indef)
   uh_offline = uh[1:info.nsnap]
 
   basis_time = @elapsed begin
-    rb_space, = assemble_rb_space(info,(uh_offline,))
+    rb_space, = assemble_rb_space(info,(u_offline,))
   end
 
   rbopA = RBVariable(opA,rb_space,rb_space)
@@ -87,12 +91,12 @@ uh,μ = fe_snapshots(solver,feop,fepath,run_fem,nsnap,t0,tF;indef)
   rbopMlift = RBLiftVariable(rbopM)
 
   assembly_time = @elapsed begin
-    Arb = RBAffineDecomposition(info,rbopA,measures,:dΩ,μ)
-    Mrb = RBAffineDecomposition(info,rbopM,measures,:dΩ,μ)
-    Frb = RBAffineDecomposition(info,rbopF,measures,:dΩ,μ)
-    Hrb = RBAffineDecomposition(info,rbopH,measures,:dΓn,μ)
-    Aliftrb = RBAffineDecomposition(info,rbopAlift,measures,:dΩ,μ)
-    Mliftrb = RBAffineDecomposition(info,rbopMlift,measures,:dΩ,μ)
+    Arb = RBAffineDecomposition(info,rbopA,measures,:dΩ,μh)
+    Mrb = RBAffineDecomposition(info,rbopM,measures,:dΩ,μh)
+    Frb = RBAffineDecomposition(info,rbopF,measures,:dΩ,μh)
+    Hrb = RBAffineDecomposition(info,rbopH,measures,:dΓn,μh)
+    Aliftrb = RBAffineDecomposition(info,rbopAlift,measures,:dΩ,μh)
+    Mliftrb = RBAffineDecomposition(info,rbopMlift,measures,:dΩ,μh)
   end
   ad = (Arb,Mrb,Frb,Hrb,Aliftrb,Mliftrb)
 
@@ -112,8 +116,8 @@ uh,μ = fe_snapshots(solver,feop,fepath,run_fem,nsnap,t0,tF;indef)
   Mlifton = RBParamOnlineStructure(Mliftrb;st_mdeim=info.st_mdeim)
   online_structures = (Aon,Mon,Fon,Hon,Alifton,Mlifton)
 
-  rb_system(k) = unsteady_poisson_rb_system(online_structures,μ[k])
-  res = online_loop(fe_sol,rb_space,rb_system,info.online_snaps)
+  rb_system(k) = unsteady_poisson_rb_system(online_structures,μh[k])
+  res = online_loop(k->u[k],rb_space,rb_system,info.online_snaps)
   postprocess(info,(res,),(V,),model,time_info)
 end
 
@@ -154,7 +158,7 @@ run_fem = false
 
   solver = ThetaMethod(LUSolver(),dt,θ)
   nsnap = 100
-  uh,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
+  u,μ = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap,t0,tF)
 
   opA = NonaffineParamOperator(a,afe,PS,time_info,U,V;id=:A)
   opM = AffineParamOperator(m,mfe,PS,time_info,U,V;id=:M)
@@ -172,9 +176,9 @@ for fun_mdeim = (false)#(false,true)
 
       printstyled("Offline phase; tol=$tol, st_mdeim=$st_mdeim, fun_mdeim=$fun_mdeim\n";color=:blue)
 
-      uh_offline = uh[1:info.nsnap]
+      u_offline = u[1:info.nsnap]
       #X = H1_norm_matrix(opA,opM)
-      rb_space = assemble_rb_space(info,tt,uh_offline)#;X)
+      rb_space = assemble_rb_space(info,tt,u_offline)#;X)
 
       rbopA = RBVariable(opA,rb_space,rb_space)
       rbopM = RBVariable(opM,rb_space,rb_space)
@@ -200,7 +204,7 @@ for fun_mdeim = (false)#(false,true)
           lhs,rhs = unsteady_poisson_rb_system(online_structures,μ[k])
           rb_sol = solve_rb_system(lhs,rhs)
         end
-        uhk = get_snap(uh[k])
+        uhk = get_snap(u[k])
         uhk_rb = reconstruct_fe_sol(rb_space,rb_sol)
         ErrorTracker(:u,uhk,uhk_rb;X)
       end
@@ -214,7 +218,7 @@ for fun_mdeim = (false)#(false,true)
       if info.postprocess
         trian = get_triangulation(model)
         k = first(info.online_snaps)
-        writevtk(info,time_info,uh[k],t->U(μ[k],t),trian)
+        writevtk(info,time_info,u[k],t->U(μ[k],t),trian)
         writevtk(info,time_info,res,V,trian)
       end
     end

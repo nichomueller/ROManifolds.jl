@@ -1,19 +1,27 @@
 mutable struct Snapshots
   id::Symbol
-  snap::EMatrix{Float}
+  snap::AbstractMatrix{Float}
   nsnap::Int
 end
 
 function Snapshots(
   id::Symbol,
-  snap::EMatrix{Float},
-  nsnap=size(snap,2))
+  snap::AbstractMatrix{Float},
+  nsnap=size(snap,2),
+  convert_type=nothing)
 
-  Snapshots(id,snap,nsnap)
+  if isnothing(convert_type)
+    Snapshots(id,snap,nsnap)
+  else typeof(convert_type) == DataType
+    Snapshots(id,convert(convert_type,snap),nsnap)
+  end
 end
 
-function Snapshots(id::Symbol,snap::Matrix{Float},args...)
-  Snapshots(id,EMatrix(snap),args...)
+function convert_snapshot(::Type{T},s::Snapshots) where T
+  id = get_id(s)
+  snap = get_snap(s)
+  nsnap = get_nsnap(s)
+  Snapshots(id,convert(T,snap),nsnap)
 end
 
 function Base.getindex(s::Snapshots,idx::UnitRange{Int})
@@ -45,7 +53,7 @@ function save(path::String,s::Snapshots)
 end
 
 function load(path::String,id::Symbol,nsnap::Int)
-  s = load(EMatrix{Float},joinpath(path,"$(id)"))
+  s = load(Matrix{Float},joinpath(path,"$(id)"))
   Snapshots(id,s,nsnap)
 end
 
@@ -64,6 +72,10 @@ function compute_in_times(snaps::Snapshots,args...)
   snap = get_snap(snaps)
   nsnap = get_nsnap(snaps)
   Snapshots(id,compute_in_times(snap,args...),nsnap)
+end
+
+function collect_snap_from_workers(id::Symbol,nsnap::Int)
+  Snapshots(id,collect_from_workers(Matrix{Float},id),nsnap)
 end
 
 function Base.vcat(s1::Snapshots,s2::Snapshots)

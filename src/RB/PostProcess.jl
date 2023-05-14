@@ -69,16 +69,16 @@ function save(info::RBInfo,res::NTuple{2,RBResults})
 end
 
 function compute_errors(
-  uh::AbstractMatrix,
+  u::AbstractMatrix,
   uh_rb::AbstractMatrix,
   X::AbstractMatrix)
 
-  pointwise_err = abs.(uh-uh_rb)
-  Nt = size(uh,2)
+  pointwise_err = abs.(u-uh_rb)
+  Nt = size(u,2)
   absolute_err,uh_norm = zeros(Nt),zeros(Nt)
   for i = 1:Nt
-    absolute_err[i] = sqrt((uh[:,i]-uh_rb[:,i])'*X*(uh[:,i]-uh_rb[:,i]))
-    uh_norm[i] = sqrt(uh[:,i]'*X*uh[:,i])
+    absolute_err[i] = sqrt((u[:,i]-uh_rb[:,i])'*X*(u[:,i]-uh_rb[:,i]))
+    uh_norm[i] = sqrt(u[:,i]'*X*u[:,i])
   end
   relative_err = norm(absolute_err)/norm(uh_norm)
 

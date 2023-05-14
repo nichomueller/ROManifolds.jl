@@ -41,7 +41,7 @@ function stokes_steady()
 
   solver = LinearFESolver()
   nsnap = 100
-  uh,ph,μ, = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
+  u,p,μ, = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
 
   opA = NonaffineParamOperator(a,afe,PS,U,V;id=:A)
   opB = AffineParamOperator(b,bfe,PS,U,Q;id=:B)
@@ -50,8 +50,8 @@ function stokes_steady()
 
   info = RBInfoSteady(ptype,test_path;ϵ=1e-4,nsnap=80,mdeim_snap=30)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
-  rb_space,online_structures = offline_phase(info,(uh,ph,μ),(opA,opB,opF,opH),measures,tt)
-  online_phase(info,(uh,ph,μ),rb_space,online_structures,tt)
+  rb_space,online_structures = offline_phase(info,(u,p,μ),(opA,opB,opF,opH),measures,tt)
+  online_phase(info,(u,p,μ),rb_space,online_structures,tt)
 end
 
 function offline_phase(
@@ -63,12 +63,12 @@ function offline_phase(
 
   printstyled("Offline phase, reduced basis method\n";color=:blue)
 
-  uh,ph,μ = fesol
-  uh_offline = uh[1:info.nsnap]
-  ph_offline = ph[1:info.nsnap]
+  u,p,μ = fesol
+  u_offline = u[1:info.nsnap]
+  p_offline = p[1:info.nsnap]
   opA,opB,opF,opH = op
 
-  rbspace_u,rbspace_p = assemble_rb_space(info,tt,(uh_offline,ph_offline),opB,ph,μ)
+  rbspace_u,rbspace_p = assemble_rb_space(info,tt,(u_offline,p_offline),opB,p,μ)
 
   rbopA = RBVariable(opA,rbspace_u,rbspace_u)
   rbopB = RBVariable(opB,rbspace_p,rbspace_u)
@@ -96,7 +96,7 @@ function online_phase(
 
   printstyled("Online phase, reduced basis method\n";color=:red)
 
-  uh,ph,μ = fesol
+  u,p,μ = fesol
 
   function online_loop(k::Int)
     printstyled("-------------------------------------------------------------\n")
@@ -105,8 +105,8 @@ function online_phase(
       lhs,rhs = steady_stokes_rb_system(online_structures,μ[k])
       rb_sol = solve_rb_system(lhs,rhs)
     end
-    uhk = get_snap(uh[k])
-    phk = get_snap(ph[k])
+    uhk = get_snap(u[k])
+    phk = get_snap(p[k])
     uhk_rb,phk_rb = reconstruct_fe_sol(rb_space,rb_sol)
     ErrorTracker(:u,uhk,uhk_rb),ErrorTracker(:p,phk,phk_rb)
   end

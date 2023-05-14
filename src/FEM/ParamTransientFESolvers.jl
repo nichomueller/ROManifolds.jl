@@ -208,4 +208,4 @@ end
 
 get_Nt(sol::ParamTransientFESolution) = Int(sol.psol.tF/sol.psol.solver.dt)
 get_Ns(sol::ParamTransientFESolution) = get_Ns(sol.psol.op.feop)
-get_Ns(sol::Vector{<:ParamTransientFESolution}) = get_Ns(first(sol))
+get_np(sol::ParamTransientFESolution) = length(get_μ(sol.psol.μ))

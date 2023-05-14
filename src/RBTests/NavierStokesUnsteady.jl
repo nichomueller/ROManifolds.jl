@@ -72,13 +72,13 @@ function navier_stokes_unsteady()
   nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking())
   solver = ThetaMethod(nls,dt,θ)
   nsnap = 100
-  uh,ph,μ = fe_snapshots(ptype,solver,feop,fepath,run_fem,nsnap,t0,tF)
+  u,p,μ = fe_snapshots(ptype,solver,feop,fepath,run_fem,nsnap,t0,tF)
 
   offline_nsnap = 50
   μ_offline = μ[offline_nsnap]
-  uh_offline = uh[offline_nsnap]
-  ph_offline = ph[offline_nsnap]
-  uhθ_offline = compute_in_times(uh_offline,θ)
+  u_offline = u[offline_nsnap]
+  p_offline = p[offline_nsnap]
+  uhθ_offline = compute_in_times(u_offline,θ)
   ghθ_offline = get_dirichlet_values(U,μ_offline,time_info)
   ughθ_offline = vcat(uhθ_offline,ghθ_offline)
 
@@ -91,7 +91,7 @@ function navier_stokes_unsteady()
 
     printstyled("Offline phase; tol=$tol, st_mdeim=$st_mdeim, fun_mdeim=$fun_mdeim\n";color=:blue)
 
-    rbspace_u,rbspace_p = assemble_rb_space(info,(uh_offline,ph_offline),opB,ph,μ;tt)
+    rbspace_u,rbspace_p = assemble_rb_space(info,(u_offline,p_offline),opB,p,μ;tt)
     rb_space = rbspace_u,rbspace_p
 
     rbopA = RBVariable(opA,rbspace_u,rbspace_u)
@@ -149,10 +149,10 @@ function navier_stokes_unsteady()
       printstyled("Evaluating RB system for μ = μ[$k]\n";color=:red)
       tt.online_time += @elapsed begin
         rb_system = unsteady_navier_stokes_rb_system(online_structures,μk)
-        x0 = get_initial_guess(uh,ph,μ,μk)
+        x0 = get_initial_guess(u,p,μ,μk)
         rb_sol = solve_rb_system(rb_system,x0,rbspace_u,U,μk,time_info;tol=info.ϵ)
       end
-      uhk,phk = uh[k],ph[k]
+      uhk,phk = u[k],p[k]
       uhk_rb,phk_rb = reconstruct_fe_sol(rb_space,rb_sol)
       push!(err_u,ErrorTracker(uhk,uhk_rb))
       push!(err_p,ErrorTracker(phk,phk_rb))
@@ -166,8 +166,8 @@ function navier_stokes_unsteady()
     if info.postprocess
       trian = get_triangulation(model)
       k = first(info.online_snaps)
-      writevtk(info,time_info,uh[k],t->U(μ[k],t),trian)
-      writevtk(info,time_info,ph[k],t->P,trian)
+      writevtk(info,time_info,u[k],t->U(μ[k],t),trian)
+      writevtk(info,time_info,p[k],t->P,trian)
       writevtk(info,time_info,res_u,V,trian)
       writevtk(info,time_info,res_p,Q,trian)
     end

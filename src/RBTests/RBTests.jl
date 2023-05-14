@@ -98,132 +98,165 @@ function model_info(
   model_info(mshpath,bnd_info,ispdomain(ptype))
 end
 
-function fe_snapshots(
-  solver,
-  op,
-  fepath::String,
+function collect_fe_snapshots(
   run_fem::Bool,
-  nsnap::Int,
-  args...;
-  indef=true,kwargs...)
+  fepath::String,
+  nsnap::Int;
+  indef=true)
 
   isindef = Val{indef}()
   if run_fem
-    printstyled("Generating $nsnap full order snapshots\n";color=:blue)
-    generate_fe_snapshots(isindef,solver,op,fepath,nsnap,args...;kwargs...)
+    printstyled("Collecting $nsnap full order snapshots\n";color=:blue)
+    collect_fe_snapshots(isindef,nsnap)
   else
     printstyled("Loading $nsnap full order snapshots\n";color=:blue)
-    load_fe_snapshots(isindef,fepath,nsnap)
+    load(isindef,fepath,nsnap)
   end
 end
 
-function load_fe_snapshots(::Val{false},fepath::String,nsnap::Int)
+function collect_fe_snapshots(::Val{false},nsnap::Int)
+  u = collect_snap_from_workers(:u,nsnap)
+  μ = collect_param_from_workers()
+  save.((fepath,fepath),(u,μ))
+  u,μ
+end
+
+function collect_fe_snapshots(::Val{true},nsnap::Int)
+  u = collect_snap_from_workers(:u,nsnap)
+  p = collect_snap_from_workers(:p,nsnap)
+  μ = collect_param_from_workers(:μ)
+  save.((fepath,fepath,fepath),(u,p,μ))
+  u,p,μ
+end
+
+function load(::Val{false},fepath::String,nsnap::Int)
   load(fepath,:u,nsnap),load(Vector{Param},fepath)
 end
 
-function load_fe_snapshots(::Val{true},fepath::String,nsnap::Int)
+function load(::Val{true},fepath::String,nsnap::Int)
   load(fepath,:u,nsnap),load(fepath,:p,nsnap),load(Vector{Param},fepath)
 end
 
-function generate_fe_snapshots(
+function generate_fe_snapshots_on_workers(
+  run_fem::Bool,
+  fepath::String,
+  nsnap::Int,
+  solver,
+  op,
+  args...;
+  indef=true)
+
+  isindef = Val{indef}()
+
+  if run_fem
+    nsnap_per_worker = ceil(Int,nsnap/nworkers())
+    printstyled("Generating $nsnap_per_worker full order snapshots
+      on each available worker\n";color=:blue)
+    fe_time = @elapsed begin
+      fe_snaps = generate_fe_snapshots_on_workers(isindef,solver,op,nsnap_per_worker,args...)
+    end
+    save(joinpath(fepath,"fe_time"),fe_time)
+  else
+    fe_snaps = generate_empty_snapshots(isindef)
+  end
+
+  fe_snaps
+end
+
+function generate_empty_snapshots(::Val{false})
+  em = allocate_matrix(Matrix{Float},0,0)
+  em,em
+end
+
+function generate_empty_snapshots(::Val{true})
+  em = allocate_matrix(Matrix{Float},0,0)
+  em,em,em
+end
+
+function generate_fe_snapshots_on_workers(
   isindef::Val,
   solver::FESolver,
   op::ParamFEOperator,
-  fepath::String,
-  nsnap::Int;
-  kwargs...)
+  nsnap::Int)
 
   sol = solve(solver,op,nsnap)
-  generate_fe_snapshots(isindef,sol,fepath;kwargs...)
+  generate_fe_snapshots_on_workers(isindef,sol)
 end
 
-function generate_fe_snapshots(
+function generate_fe_snapshots_on_workers(
   isindef::Val,
   solver::ThetaMethod,
   op::ParamTransientFEOperator,
-  fepath::String,
   nsnap::Int,
   t0::Real,
-  tF::Real;
-  kwargs...)
+  tF::Real)
 
   sol = solve(solver,op,t0,tF,nsnap)
-  generate_fe_snapshots(isindef,sol,fepath;kwargs...)
+  generate_fe_snapshots_on_workers(isindef,sol)
 end
 
-function generate_fe_snapshots(
-  ::Val{false},
-  sol::Vector{T},
-  fepath::String;
-  save_snap=true) where T
-
-  ns = length(sol)
-  fe_time = @elapsed begin
-    uh,μ = collect_solutions(sol)
-  end
-  usnap = Snapshots(:u,uh,ns)
-  if save_snap
-    save.((fepath,fepath),(usnap,μ))
-    save(joinpath(fepath,"fe_time"),fe_time)
-  end
-  usnap,μ
+function generate_fe_snapshots_on_workers(::Val{false},sol::Vector{T}) where T
+  get_solutions(sol)
 end
 
-function generate_fe_snapshots(
-  ::Val{true},
-  sol::Vector{T},
-  fepath::String;
-  save_snap=true) where T
-
-  Ns,ns = get_Ns(sol),length(sol)
-  fe_time = @elapsed begin
-    xh,μ = collect_solutions(sol)
-  end
-  uh,ph = xh[1:Ns[1],:],xh[Ns[1]+1:Ns[1]+Ns[2],:]
-  usnap,psnap = Snapshots(:u,uh,ns),Snapshots(:p,ph,ns)
-  if save_snap
-    save.((fepath,fepath,fepath),(usnap,psnap,μ))
-    save(joinpath(fepath,"fe_time"),fe_time)
-  end
-  usnap,psnap,μ
+function generate_fe_snapshots_on_workers(::Val{true},sol::Vector{T}) where T
+  Ns = get_Ns(sol)
+  xh,μ = get_solutions(sol)
+  u,p = xh[1:Ns[1],:],xh[Ns[1]+1:Ns[1]+Ns[2],:]
+  u,p,μ
 end
 
-function collect_solutions(sol)
+function get_solutions(sol::Vector{T}) where T
   Ns = sum(get_Ns(first(sol)))
   Nt = get_Nt(first(sol))
-  xtmp = zeros(Ns,Nt)
+  np = get_np(first(sol))
+  xtmp = allocate_matrix(Matrix{Float},Ns,Nt)
+  μtmp = allocate_matrix(Matrix{Float},np,1)
 
   function get_solution(k::Int)
     printstyled("Computing snapshot $k ...\n";color=:blue)
-    x,μ = get_solution!(xtmp,sol[k]),sol[k].psol.μ
+    x,μ = get_solution!(xtmp,μtmp,sol[k])
     printstyled("Successfully computed snapshot $k ...\n";color=:blue)
     x,μ
   end
 
-  xμ = pmap(get_solution,eachindex(sol))
-  hcat(EMatrix.(first.(xμ))...),last.(xμ)
+  sols_and_params = pmap(get_solution,eachindex(sol))
+  sols = hcat(first.(sols_and_params)...)
+  params = hcat(last.(sols_and_params)...)
+  sols,params
 end
 
-function get_solution!(x::Matrix{Float},solk::ParamFESolution)
+function get_solution!(
+  x::Matrix{Float},
+  μ::Matrix{Float},
+  solk::ParamFESolution)
+
   x[:,1] = get_free_dof_values(solk.psol.uh)
-  x
+  μ[:,1] = get_μ(solk.psol.μ)
+  x,μ
 end
 
-function get_solution!(x::Matrix{Float},solk::ParamTransientFESolution)
+function get_solution!(
+  x::Matrix{Float},
+  μ::Matrix{Float},
+  solk::ParamTransientFESolution)
+
   n = 1
   for (xn,_) in solk
     x[:,n] = xn
     n += 1
   end
-  x
+  μ[:,1] = get_μ(solk.psol.μ)
+  x,μ
 end
 
 function get_dirichlet_values(
   U::ParamTrialFESpace,
   μ::Vector{Param})
 
+  nsnap = length(μ)
   dir(μ) = U(μ).dirichlet_values
-  Snapshots(:g,dir.(μ))
+  Snapshots(:g,dir.(μ),nsnap,EMatrix{Float})
 end
 
 function get_dirichlet_values(
@@ -231,9 +264,10 @@ function get_dirichlet_values(
   μ::Vector{Param},
   tinfo::TimeInfo)
 
+  nsnap = length(μ)
   times = get_times(tinfo)
   dir(μ) = Matrix([U(μ,t).dirichlet_values for t=times])
-  Snapshots(:g,dir.(μ))
+  Snapshots(:g,dir.(μ),nsnap,EMatrix{Float})
 end
 
 function online_loop(fe_sol,rb_space,rb_system,k::Int)

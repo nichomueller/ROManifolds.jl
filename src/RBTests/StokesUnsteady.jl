@@ -73,18 +73,18 @@ addprocs(manager)
 
   solver = ThetaMethod(LUSolver(),dt,θ)
   nsnap = 100
-  uh,ph,μ = fe_snapshots(solver,feop,fepath,run_fem,nsnap,t0,tF;indef)
+  u,p,μ = fe_snapshots(solver,feop,fepath,run_fem,nsnap,t0,tF;indef)
 
   info = RBInfoUnsteady(ptype,test_path;ϵ=1e-4,nsnap=80,mdeim_snap=20,fun_mdeim=true)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
 
   printstyled("Offline phase, reduced basis method\n";color=:blue)
 
-  uh_offline = uh[1:info.nsnap]
-  ph_offline = ph[1:info.nsnap]
+  u_offline = u[1:info.nsnap]
+  p_offline = p[1:info.nsnap]
 
   tt.offline_time.basis_time += @elapsed begin
-    rbspace_u,rbspace_p = assemble_rb_space(info,(uh_offline,ph_offline),opB)
+    rbspace_u,rbspace_p = assemble_rb_space(info,(u_offline,p_offline),opB)
   end
   rb_space = rbspace_u,rbspace_p
 
@@ -133,7 +133,7 @@ addprocs(manager)
       lhs,rhs = unsteady_stokes_rb_system(online_structures,μ[k])
       rb_sol = solve_rb_system(lhs,rhs)
     end
-    uhk,phk = uh[k],ph[k]
+    uhk,phk = u[k],p[k]
     uhk_rb,phk_rb = reconstruct_fe_sol(rb_space,rb_sol)
     push!(err_u,ErrorTracker(uhk,uhk_rb))
     push!(err_p,ErrorTracker(phk,phk_rb))

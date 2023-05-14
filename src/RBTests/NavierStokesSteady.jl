@@ -42,7 +42,7 @@ function navier_stokes_steady()
   nls = NLSolver(show_trace=true,method=:newton,linesearch=BackTracking())
   solver = FESolver(nls)
   nsnap = 100
-  uh,ph,μ, = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
+  u,p,μ, = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
 
   opA = NonaffineParamOperator(a,afe,PS,U,V;id=:A)
   opB = AffineParamOperator(b,bfe,PS,U,Q;id=:B)
@@ -53,7 +53,7 @@ function navier_stokes_steady()
 
   info = RBInfoSteady(ptype,test_path;ϵ=1e-4,nsnap=80,mdeim_snap=30,load_offline=true)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
-  fesol = (uh,ph,μ,U,V)
+  fesol = (u,p,μ,U,V)
   rb_space,online_structures = offline_phase(info,fesol,(opA,opB,opC,opD,opF,opH),measures,tt)
   online_phase(info,fesol,rb_space,online_structures,tt)
 end
@@ -67,12 +67,12 @@ function offline_phase(
 
   printstyled("Offline phase, reduced basis method\n";color=:blue)
 
-  uh,ph,μ, = fesol
-  uh_offline = uh[1:info.nsnap]
-  ph_offline = ph[1:info.nsnap]
+  u,p,μ, = fesol
+  u_offline = u[1:info.nsnap]
+  p_offline = p[1:info.nsnap]
   opA,opB,opC,opD,opF,opH = op
 
-  rbspace_u,rbspace_p = assemble_rb_space(info,tt,(uh_offline,ph_offline),opB,ph,μ)
+  rbspace_u,rbspace_p = assemble_rb_space(info,tt,(u_offline,p_offline),opB,p,μ)
   rb_space = rbspace_u,rbspace_p
 
   rbopA = RBVariable(opA,rbspace_u,rbspace_u)
@@ -105,7 +105,7 @@ function online_phase(
 
   printstyled("Online phase, reduced basis method\n";color=:red)
 
-  uh,ph,μ,U = fesol
+  u,p,μ,U = fesol
   μ_offline = μ[1:info.nsnap]
   rb_solver(res,jac,x0,Uk) = solve_rb_system(res,jac,x0,Uk,rb_space)
 
@@ -115,10 +115,10 @@ function online_phase(
     tt.online_time += @elapsed begin
       res,jac = unsteady_navier_stokes_rb_system(online_structures,μ[k])
       Uk = get_trial(U)(μ[k])
-      x0 = get_initial_guess(uh,ph,μ_offline,μ[k])
+      x0 = get_initial_guess(u,p,μ_offline,μ[k])
       rb_sol = rb_solver(res,jac,x0,Uk)
     end
-    uhk,phk = get_snap(uh[k]),get_snap(ph[k])
+    uhk,phk = get_snap(u[k]),get_snap(p[k])
     uhk_rb,phk_rb = reconstruct_fe_sol(rb_space,rb_sol)
     ErrorTracker(:u,uhk,uhk_rb),ErrorTracker(:p,phk,phk_rb)
   end

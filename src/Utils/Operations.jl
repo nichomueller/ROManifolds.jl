@@ -27,21 +27,17 @@ LinearAlgebra.Matrix(dmat::EMatrix{T}) where T = convert(Matrix{T},dmat)
 
 EMatrix(mat::Matrix{T}) where T = convert(EMatrix{T},mat)
 
-function allocate_matrix(::Matrix{Float},sizes...)
+function allocate_matrix(::Type{Matrix{Float}},sizes...)
   Nr,Nc = sizes
   zeros(Nr,Nc)
 end
 
-function allocate_matrix(::EMatrix{Float},sizes...)
+function allocate_matrix(::Type{EMatrix{Float}},sizes...)
   Nr,Nc = sizes
   Elemental.zeros(EMatrix{Float},Nr,Nc)
 end
 
-function blocks(mat::AbstractMatrix{Float};dims=(size(mat,1),1))
-  @assert size(mat,1) == prod(dims)
-  nblocks = size(mat,2)
-  [reshape(mat[:,k],dims) for k = 1:nblocks]
-end
+allocate_matrix(::T,sizes...) where T = allocate_matrix(T,sizes...)
 
 function vblocks(mat::Matrix{T}) where T
   blockvec = Vector{T}[]
@@ -51,11 +47,17 @@ function vblocks(mat::Matrix{T}) where T
   blockvec
 end
 
-function array3D(mat::AbstractMatrix,nrows::Int)
+#= function blocks(mat::AbstractMatrix{Float};dims=(size(mat,1),1))
+  @assert size(mat,1) == prod(dims)
+  nblocks = size(mat,2)
+  [reshape(mat[:,k],dims) for k = 1:nblocks]
+end =#
+
+#= function array3D(mat::AbstractMatrix,nrows::Int)
   ncols = Int(size(mat,1)/nrows)
   nblocks = size(mat,2)
   reshape(mat,nrows,ncols,nblocks)
-end
+end =#
 
 function expand(tup::Tuple)
   ntup = ()

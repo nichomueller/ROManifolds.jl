@@ -37,7 +37,7 @@ function poisson_steady()
 
   solver = LinearFESolver()
   nsnap = 1
-  uh,μ, = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
+  u,μ, = fe_snapshots(ptype,solver,op,fepath,run_fem,nsnap)
 
   opA = NonaffineParamOperator(a,afe,PS,U,V;id=:A)
   opF = AffineParamOperator(f,ffe,PS,V;id=:F)
@@ -45,8 +45,8 @@ function poisson_steady()
 
   info = RBInfoSteady(ptype,test_path;ϵ=1e-4,nsnap=80,mdeim_snap=20)
   tt = TimeTracker(OfflineTime(0.,0.),0.)
-  rb_space,online_structures = offline_phase(info,(uh,μ),(opA,opF,opH),measures,tt)
-  online_phase(info,(uh,μ),rb_space,online_structures,tt)
+  rb_space,online_structures = offline_phase(info,(u,μ),(opA,opF,opH),measures,tt)
+  online_phase(info,(u,μ),rb_space,online_structures,tt)
 end
 
 function offline_phase(
@@ -58,11 +58,11 @@ function offline_phase(
 
   printstyled("Offline phase, reduced basis method\n";color=:blue)
 
-  uh,μ = fesol
-  uh_offline = uh[1:info.nsnap]
+  u,μ = fesol
+  u_offline = u[1:info.nsnap]
   opA,opF,opH = op
 
-  rb_space = assemble_rb_space(info,tt,uh_offline)
+  rb_space = assemble_rb_space(info,tt,u_offline)
 
   rbopA = RBVariable(opA,rb_space,rb_space)
   rbopF = RBVariable(opF,rb_space)
@@ -88,7 +88,7 @@ function online_phase(
 
   printstyled("Online phase, reduced basis method\n";color=:red)
 
-  uh,μ = fesol
+  u,μ = fesol
 
   function online_loop(k::Int)
     printstyled("-------------------------------------------------------------\n")
@@ -97,7 +97,7 @@ function online_phase(
       lhs,rhs = steady_poisson_rb_system(online_structures,μ[k])
       rb_sol = solve_rb_system(lhs,rhs)
     end
-    uhk = get_snap(uh[k])
+    uhk = get_snap(u[k])
     uhk_rb = reconstruct_fe_sol(rb_space,rb_sol)
     ErrorTracker(:u,uhk,uhk_rb)
   end

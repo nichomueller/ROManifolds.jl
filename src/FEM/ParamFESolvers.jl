@@ -68,4 +68,4 @@ end
 
 get_Nt(sol::ParamFESolution) = 1
 get_Ns(sol::ParamFESolution) = get_Ns(sol.psol.op.feop)
-get_Ns(sol::Vector{<:ParamFESolution}) = get_Ns(first(sol))
+get_np(sol::ParamFESolution) = length(get_μ(sol.psol.μ))
