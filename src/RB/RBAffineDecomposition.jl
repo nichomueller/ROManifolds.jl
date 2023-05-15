@@ -23,28 +23,32 @@ function RBAffineDecomposition(
   if info.load_offline
     load(info,args...)
   else
-    reduce_affine_decomposition(info,args...)
+    assemble_affine_decomposition(info,args...)
   end
 end
 
-function reduce_affine_decomposition(
+function assemble_affine_decomposition(
   ::RBInfo,
   op::RBVariable{Affine,Ttr},
-  ad::AffineDecomposition,
   args...) where Ttr
 
-  mat = get_snap(get_aff_dec(ad))
-  adrb = rb_space_projection(op,mat)
+  id = get_id(op)
+  printstyled("Operator $id is Affine: computing its RB Galerkin projection \n";color=:blue)
+
+  adrb = rb_space_projection(op)
   RBAffineDecomposition(op,adrb)
 end
 
-function reduce_affine_decomposition(
+function assemble_affine_decomposition(
   info::RBInfo,
   op::RBVariable{Top,Ttr},
-  ad::AffineDecomposition,
   args...) where {Top,Ttr}
 
-  adrb = MDEIM(info,op,ad,args...)
+  id,nsnap = get_id(op),info.mdeim_nsnap
+  printstyled("Operator $id is $Top: running the MDEIM offline phase on $nsnap snapshots \n";
+    color=:blue)
+
+  adrb = MDEIM(info,op,args...)
   RBAffineDecomposition(op,adrb)
 end
 
@@ -84,17 +88,17 @@ end
 function load(
   info::RBInfo,
   op::RBVariable,
-  ad::AffineDecomposition,
-  args...)
+  μ::Vector{Param},
+  meas::Measure)
 
   id = get_id(op)
   path_id = joinpath(info.offline_path,"$id")
   if ispath(path_id)
-    load(info,op,args...)
+    load(info,op,meas)
   else
     printstyled("Failed to load variable $(id): running offline assembler instead\n";
       color=:blue)
-    reduce_affine_decomposition(info,op,ad,args...)
+    reduce_affine_decomposition(info,op,μ,meas)
   end
 
 end
@@ -102,8 +106,7 @@ end
 function load(
   info::RBInfo,
   op::RBVariable{Affine,Ttr},
-  ::ProblemMeasures,
-  ::Symbol) where Ttr
+  ::Measure) where Ttr
 
   id = get_id(op)
   printstyled("Loading projected Affine variable $id \n";color=:blue)
@@ -116,12 +119,12 @@ end
 function load(
   info::RBInfo,
   op::RBVariable{Top,Ttr},
-  measures::ProblemMeasures,
-  field::Symbol) where {Top,Ttr}
+  meas::Measure) where {Top,Ttr}
 
   id = get_id(op)
   printstyled("Loading MDEIM structures for $Top variable $id \n";color=:blue)
+  path_id = joinpath(info.offline_path,"$id")
 
-  adrb = load(info,op,getproperty(measures,field))
+  adrb = load(info,path_id,op,meas)
   RBAffineDecomposition(op,adrb)
 end

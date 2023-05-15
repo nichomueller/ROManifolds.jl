@@ -92,7 +92,7 @@ function assemble_rb_space(
   def = isindef(info)
 
   bs_u = assemble_spatial_rb(snaps_u;ϵ=info.ϵ,kwargs...)
-  bs_p = assemble_spatial_rb(snaps_p;ϵ=info.ϵ/10,kwargs...)
+  bs_p = assemble_spatial_rb(snaps_p;ϵ=info.ϵ,kwargs...)
   bs_u_supr = add_space_supremizers(def,(bs_u,bs_p),args...)
 
   rbspace_u = RBSpaceSteady(get_id(snaps_u),bs_u_supr)
@@ -112,7 +112,7 @@ function assemble_rb_space(
   opB,ttol... = args
 
   bs_u,bt_u = assemble_spatio_temporal_rb(snaps_u;ϵ=info.ϵ,kwargs...)
-  bs_p,bt_p = assemble_spatio_temporal_rb(snaps_p;ϵ=info.ϵ/10,kwargs...)
+  bs_p,bt_p = assemble_spatio_temporal_rb(snaps_p;ϵ=info.ϵ,kwargs...)
   bs_u_supr = add_space_supremizers(def,(bs_u,bs_p),opB)
   bt_u_supr = add_time_supremizers(def,(bt_u,bt_p),ttol...)
 
@@ -123,11 +123,15 @@ function assemble_rb_space(
 end
 
 function assemble_spatial_rb(snap::Snapshots;kwargs...)
-  el_snap = convert_snapshot(EMatrix{Float},snap)
-  POD(el_snap;kwargs...)
+  POD(snap;kwargs...)
 end
 
-#= function assemble_spatio_temporal_rb(snap::Snapshots;kwargs...)
+function assemble_spatio_temporal_rb(snap::Snapshots;kwargs...)
+  Nr,Nc = size(get_snap(snap))
+  assemble_spatio_temporal_rb(Val{Nr > Nc}(),snap;kwargs...)
+end
+
+function assemble_spatio_temporal_rb(::Val{false},snap::Snapshots;kwargs...)
   snap_space = get_snap(snap)
   ns = get_nsnap(snap)
   basis_space = POD(snap_space;kwargs...)
@@ -135,11 +139,10 @@ end
   basis_time = POD(red_snap_time;kwargs...)
 
   basis_space,basis_time
-end =#
+end
 
-function assemble_spatio_temporal_rb(snap::Snapshots;kwargs...)
-  el_snap = convert_snapshot(EMatrix{Float},snap)
-  snap_space = get_snap(el_snap)
+function assemble_spatio_temporal_rb(::Val{true},snap::Snapshots;kwargs...)
+  snap_space = get_snap(snap)
   ns = get_nsnap(snap)
   snap_time = mode2_unfolding(snap_space,ns)
   basis_time = POD(snap_time;kwargs...)

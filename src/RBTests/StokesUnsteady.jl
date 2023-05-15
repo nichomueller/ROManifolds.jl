@@ -86,7 +86,7 @@ end
 # and split among on all available remote workers thanks to a pmap.
 # Then, the snapshots are sent to the remote workers
 begin
-  u,p,μ = generate_fe_snapshots_on_workers(run_fem,fepath,nsnap,solver,feop,t0,tF;indef)
+  u,p,μ = generate_fe_snapshots(run_fem,fepath,nsnap,solver,feop,t0,tF;indef)
   @passobj 1 workers() u
   @passobj 1 workers() p
   @passobj 1 workers() μ

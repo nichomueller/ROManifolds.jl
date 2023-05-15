@@ -1,12 +1,9 @@
 struct ProblemType
   steady::Bool
   indef::Bool
-  pdomain::Bool
 end
 
-isindef(p::ProblemType) = Val(p.indef)
-
-ispdomain(p::ProblemType) = Val(p.pdomain)
+isindef(p::ProblemType) = Val{p.indef}()
 
 abstract type SamplingStyle end
 struct UniformSampling <: SamplingStyle end
@@ -77,20 +74,6 @@ function ProblemMeasures(model::DiscreteModel,order=1)
   ProblemFixedMeasures(dΩ,dΓn)
 end
 
-function ProblemMeasures(model::Function,order=1)
-  degree = get_degree(order)
-  Ω(μ) = Triangulation(model(μ))
-  dΩ(μ) = Measure(Ω(μ),degree)
-  Γn(μ) = BoundaryTriangulation(model(μ),tags=["neumann"])
-  dΓn(μ) = Measure(Γn(μ),degree)
-
-  ProblemFixedMeasures(dΩ,dΓn)
-end
-
 get_dΩ(meas::ProblemFixedMeasures) = meas.dΩ
 
 get_dΓn(meas::ProblemFixedMeasures) = meas.dΓn
-
-get_dΩ(meas::ProblemParamMeasures,p::Param) = meas.dΩ(p)
-
-get_dΓn(meas::ProblemParamMeasures,p::Param) = meas.dΓn(p)

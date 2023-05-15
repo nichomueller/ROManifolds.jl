@@ -37,16 +37,15 @@ end
 function MDEIM(
   info::RBInfo,
   op::RBVariable,
-  ad::AffineDecomposition,
-  measures::ProblemMeasures,
-  field::Symbol)
+  μ::Vector{Param},
+  meas::Measure,
+  args...)
 
-  meas = getproperty(measures,field)
-
-  rb_space,findnz_idx = mdeim_basis(info,ad,op)
-  red_rbspace = project_mdeim_basis(op,rb_space,findnz_idx)
-  idx = mdeim_idx(rb_space)
-  rb_lu = get_rb_lu(info,rb_space,idx)
+  μ_mdeim = μ[1:info.mdeim_nsnap]
+  rbspace,findnz_idx = mdeim_basis(info,op,μ_mdeim,args...)
+  red_rbspace = project_mdeim_basis(op,rbspace,findnz_idx)
+  idx = mdeim_idx(rbspace)
+  rb_lu = get_rb_lu(info,rbspace,idx)
   idx = recast_in_full_dim(idx,findnz_idx)
   red_meas = get_red_measure(op,idx,meas)
 
@@ -300,13 +299,11 @@ end
 
 function load(
   info::RBInfoSteady,
+  path_id::String,
   op::RBSteadyVariable,
   meas::Measure)
 
-  id = get_id(op)
-  path_id = joinpath(info.offline_path,"$id")
-
-  rb_space = load(info,id)
+  rb_space = load(info,get_id(op))
   idx_space = load(Vector{Int},joinpath(path_id,"idx_space"))
   factors = load(joinpath(path_id,"LU"))
   ipiv = load(Vector{Int},joinpath(path_id,"p"))
@@ -318,13 +315,11 @@ end
 
 function load(
   info::RBInfoUnsteady,
+  path_id::String,
   op::RBUnsteadyVariable,
   meas::Measure)
 
-  id = get_id(op)
-  path_id = joinpath(info.offline_path,"$id")
-
-  rb_space = load(info,id)
+  rb_space = load(info,get_id(op))
   idx_space = load(Vector{Int},joinpath(path_id,"idx_space"))
   idx_time = load(Vector{Int},joinpath(path_id,"idx_time"))
   idx = (idx_space,idx_time)

@@ -66,7 +66,6 @@ const EMatrix = Elemental.Matrix
 include("Files.jl")
 include("Indexes.jl")
 include("Operations.jl")
-include("Parallel.jl")
 include("BasesConstruction.jl")
 include("SystemSolvers.jl")
 include("Plots.jl")

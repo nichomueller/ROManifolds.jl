@@ -66,8 +66,7 @@ end
 
 function model_info(
   mshpath::String,
-  bnd_info::Dict,
-  ::Val{false})
+  bnd_info::Dict)
 
   if !ispath(mshpath)
     mshpath_msh_format = mshpath[1:findall(x->x=='.',mshpath)[end]-1]*".msh"
@@ -79,25 +78,7 @@ function model_info(
   model
 end
 
-function model_info(
-  ::String,
-  bnd_info::Dict,
-  ::Val{true})
-
-  function model(μ) end
-  set_labels!(model,bnd_info)
-  model
-end
-
-function model_info(
-  mshpath::String,
-  bnd_info::Dict,
-  ptype::ProblemType)
-
-  model_info(mshpath,bnd_info,ispdomain(ptype))
-end
-
-function generate_fe_snapshots_on_workers(
+function generate_fe_snapshots(
   run_fem::Bool,
   fepath::String,
   nsnap::Int,
@@ -112,7 +93,7 @@ function generate_fe_snapshots_on_workers(
   if run_fem
     printstyled("Generating $nsnap full order snapshots on each available worker\n";color=:blue)
     fe_time = @elapsed begin
-      sols_params = generate_fe_snapshots_on_workers(isindef,solver,op,nsnap,args...)
+      sols_params = generate_fe_snapshots(isindef,solver,op,nsnap,args...)
     end
     if save_snaps
       save(fepath,sols_params)
@@ -133,17 +114,17 @@ function load(::Val{true},fepath::String,nsnap::Int)
   load(fepath,:u,nsnap),load(fepath,:p,nsnap),load(Vector{Param},fepath)
 end
 
-function generate_fe_snapshots_on_workers(
+function generate_fe_snapshots(
   isindef::Val,
   solver::FESolver,
   op::ParamFEOperator,
   nsnap::Int)
 
   sol = solve(solver,op,nsnap)
-  generate_fe_snapshots_on_workers(isindef,sol)
+  generate_fe_snapshots(isindef,sol)
 end
 
-function generate_fe_snapshots_on_workers(
+function generate_fe_snapshots(
   isindef::Val,
   solver::ThetaMethod,
   op::ParamTransientFEOperator,
@@ -152,17 +133,17 @@ function generate_fe_snapshots_on_workers(
   tF::Real)
 
   sol = solve(solver,op,t0,tF,nsnap)
-  generate_fe_snapshots_on_workers(isindef,sol)
+  generate_fe_snapshots(isindef,sol)
 end
 
-function generate_fe_snapshots_on_workers(::Val{false},sol::Vector{T}) where T
+function generate_fe_snapshots(::Val{false},sol::Vector{T}) where T
   ns = length(sol)
   xh,μ = get_solutions(sol)
   usnap = Snapshots(:u,xh,ns)
   usnap,μ
 end
 
-function generate_fe_snapshots_on_workers(::Val{true},sol::Vector{T}) where T
+function generate_fe_snapshots(::Val{true},sol::Vector{T}) where T
   Ns,ns = get_Ns(sol),length(sol)
   xh,μ = get_solutions(sol)
   u,p = xh[1:Ns[1],:],xh[Ns[1]+1:Ns[1]+Ns[2],:]
@@ -242,8 +223,4 @@ function online_loop(fe_sol,rb_space,rb_system,k::Int)
   fe_sol_approx = reconstruct_fe_sol(rb_space,rb_sol)
 
   RBResults(fe_sol(k),fe_sol_approx,online_time)
-end
-
-function online_loop(loop,k::UnitRange{Int})
-  RBResults(pmap(loop,k))
 end

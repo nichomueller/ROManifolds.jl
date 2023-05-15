@@ -57,13 +57,14 @@ function get_assembler(
 
   online_mat = allocate_matrix(Matrix{Float},nr,nc)
   function online_mat!(coeff::AbstractMatrix{Float})
+    mat = allocate_matrix(Matrix{Float},nr,nc)
     @assert size(coeff,2) == Qs "Something is wrong"
-    mat = @distributed (+) for q = 1:Qs
+    for q = 1:Qs
       basis_q = reshape(basis[:,q],nsrow,nscol)
       coeff_q = reshape(coeff[:,q],ntrow,ntcol)
-      kron(basis_q,coeff_q)
+      mat += kron(basis_q,coeff_q)
     end
-    copyto!(online_mat,mat)
+    copyto!(online_mat,sum(mat))
   end
 
   online_mat!
