@@ -49,12 +49,6 @@ Distributions.var(p::Param) = var(get_μ(p))
 
 Base.:(-)(p1::Param,p2::Param) = get_μ(p1) .- get_μ(p2)
 
-#= function collect_param_from_workers()
-  param_mat = collect_from_workers(Matrix{Float},:μ)
-  param_block = vblocks(param_mat)
-  Vector{Param}(Param.(param_block))
-end =#
-
 save(path::String,pvec::Vector{Param}) = save(joinpath(path,"param"),Matrix(pvec))
 
 function load(::Type{Vector{Param}},path::String)

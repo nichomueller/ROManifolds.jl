@@ -69,9 +69,8 @@ end
 # and split among on all available remote workers thanks to a pmap.
 # Then, the snapshots are sent to the remote workers
 begin
-  u,μ = generate_fe_snapshots_on_workers(run_fem,fepath,nsnap,solver,feop,t0,tF;indef)
-  @passobj 1 workers() u
-  @passobj 1 workers() μ
+  sol_and_param = generate_fe_snapshots_on_workers(run_fem,fepath,nsnap,solver,feop,t0,tF;indef)
+  @passobj 1 workers() sol_and_param
 end
 
 # Generation of the reduced basis in parallel on the remote workers, leveraging
@@ -79,6 +78,7 @@ end
 @mpi_do manager begin
   printstyled("Offline phase, reduced basis method\n";color=:blue)
 
+  u,μ = sol_and_param
   u_off = u[1:info.nsnap]
 
   basis_time = @elapsed begin
@@ -91,40 +91,27 @@ end
   rbopH = RBVariable(opH,rb_space)
   rbopAlift = RBLiftVariable(rbopA)
   rbopMlift = RBLiftVariable(rbopM)
+  rbops = rbopA,rbopM,rbopF,rbopH,rbopAlift,rbopMlift
+
+  @passobj 2 1 rbops
 end
 
 # Remote generation of MDEIM snapshots with parallel map on all remote workers
 begin
-  rbopA = (@getfrom first(workers()) rbopA)::RBUnsteadyBilinVariable
-  rbopM = (@getfrom first(workers()) rbopM)::RBUnsteadyBilinVariable
-  rbopF = (@getfrom first(workers()) rbopF)::RBUnsteadyLinVariable
-  rbopH = (@getfrom first(workers()) rbopH)::RBUnsteadyLinVariable
-  rbopAlift = (@getfrom first(workers()) rbopAlift)::RBUnsteadyLiftVariable
-  rbopMlift = (@getfrom first(workers()) rbopAlift)::RBUnsteadyLiftVariable
-
   μ_off = μ[1:info.mdeim_nsnap]
 
   assembly_time = @elapsed begin
-    A = AffineDecomposition(info,rbopA,μ_off)
-    M = AffineDecomposition(info,rbopM,μ_off)
-    F = AffineDecomposition(info,rbopF,μ_off)
-    H = AffineDecomposition(info,rbopH,μ_off)
-    Alift = AffineDecomposition(info,rbopAlift,μ_off)
-    Mlift = AffineDecomposition(info,rbopMlift,μ_off)
+    ad = AffineDecomposition(info,μ_off,rbops)
   end
 
   @passobj 1 workers() assembly_time
-  @passobj 1 workers() A
-  @passobj 1 workers() M
-  @passobj 1 workers() F
-  @passobj 1 workers() H
-  @passobj 1 workers() Alift
-  @passobj 1 workers() Mlift
+  @passobj 1 workers() ad
 end
 
 # Generation of the reduced basis in parallel on the remote workers, leveraging
 # the Elemental package
 @mpi_do manager begin
+  A,M,F,H,Alift,Mlift = ad
   assembly_time += @elapsed begin
     Arb = RBAffineDecomposition(info,rbopA,A,measures,:dΩ)
     Mrb = RBAffineDecomposition(info,rbopM,M,measures,:dΩ)
@@ -150,12 +137,6 @@ begin
   u = (@getfrom first(workers()) u)::Snapshots
   μ = (@getfrom first(workers()) μ)::Vector{Param}
   rb_space = (@getfrom first(workers()) rb_space)::RBSpaceUnsteady
-  Arb = (@getfrom first(workers()) Arb)::RBAffineDecomposition
-  Mrb = (@getfrom first(workers()) Mrb)::RBAffineDecomposition
-  Frb = (@getfrom first(workers()) Frb)::RBAffineDecomposition
-  Hrb = (@getfrom first(workers()) Hrb)::RBAffineDecomposition
-  Aliftrb = (@getfrom first(workers()) Aliftrb)::RBAffineDecomposition
-  Mliftrb = (@getfrom first(workers()) Mliftrb)::RBAffineDecomposition
 
   st_mdeim = info.st_mdeim
   Aon = RBParamOnlineStructure(Arb;st_mdeim)

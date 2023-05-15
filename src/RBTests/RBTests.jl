@@ -97,37 +97,6 @@ function model_info(
   model_info(mshpath,bnd_info,ispdomain(ptype))
 end
 
-function collect_fe_snapshots(
-  run_fem::Bool,
-  fepath::String,
-  nsnap::Int;
-  indef=true)
-
-  isindef = Val{indef}()
-  if run_fem
-    printstyled("Collecting $nsnap full order snapshots\n";color=:blue)
-    collect_fe_snapshots(isindef,nsnap)
-  else
-    printstyled("Loading $nsnap full order snapshots\n";color=:blue)
-    load(isindef,fepath,nsnap)
-  end
-end
-
-function collect_fe_snapshots(::Val{false},nsnap::Int)
-  u = collect_snap_from_workers(:u,nsnap)
-  μ = collect_param_from_workers()
-  save.((fepath,fepath),(u,μ))
-  u,μ
-end
-
-function collect_fe_snapshots(::Val{true},nsnap::Int)
-  u = collect_snap_from_workers(:u,nsnap)
-  p = collect_snap_from_workers(:p,nsnap)
-  μ = collect_param_from_workers(:μ)
-  save.((fepath,fepath,fepath),(u,p,μ))
-  u,p,μ
-end
-
 function generate_fe_snapshots_on_workers(
   run_fem::Bool,
   fepath::String,

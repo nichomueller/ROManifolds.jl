@@ -52,10 +52,15 @@ function slow_idx(kst::Int,ns::Int)
   Int(floor((kst-1)/ns)+1)
 end
 
-function idx_batches(mv::AbstractArray)
+function idx_threads_batches(idx::AbstractArray)
   nthreads = Threads.nthreads()
-  batch_size = floor(Int,length(mv)/nthreads)
+  batch_size = floor(Int,length(idx)/nthreads)
   [(i-1)*batch_size+1:i*batch_size for i=1:nthreads]
+end
+
+function idx_procs_batches(idx::AbstractArray)
+  batch_size = floor(Int,length(idx)/nprocs())
+  [(i-1)*batch_size+1:i*batch_size for i=1:nprocs()]
 end
 
 function Base.argmax(v::Vector,nval::Int)

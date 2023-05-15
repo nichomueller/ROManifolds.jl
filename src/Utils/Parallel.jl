@@ -17,3 +17,14 @@ end
 function _from_worker(sym::Symbol,w::Int)
   return @fetchfrom w eval(sym)
 end
+
+macro assign_var_id(val)
+  Expr(:block,__source__,esc(:($(Symbol(val, myid())) = $val)))
+end
+
+function collect_from_other_workers(val)
+  @assign_var_id val
+  passobj(myid(),1,:val*Symbol(myid()))
+  passobj(1,myid(),[:val*Symbol(p) for p = workers()])
+  return nothing
+end
