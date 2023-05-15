@@ -29,9 +29,17 @@ end
 
 get_μ(p::Param) = p.μ
 
+function vector_of_params(param_block::Vector{Vector{Float}})
+  Vector{Param}(Param.(param_block))
+end
+
+function vector_of_params(param_mat::AbstractMatrix)
+  vector_of_params(vblocks(param_mat))
+end
+
 realization(P::ParamSpace) = Param(generate_param(P))
 
-realization(P::ParamSpace,n) = Vector{Param}([realization(P) for _ = 1:n])
+realization(P::ParamSpace,n) = [realization(P) for _ = 1:n]
 
 Base.getindex(p::Param,args...) = getindex(p.μ,args...)
 
@@ -41,18 +49,16 @@ Distributions.var(p::Param) = var(get_μ(p))
 
 Base.:(-)(p1::Param,p2::Param) = get_μ(p1) .- get_μ(p2)
 
-function collect_param_from_workers()
+#= function collect_param_from_workers()
   param_mat = collect_from_workers(Matrix{Float},:μ)
   param_block = vblocks(param_mat)
   Vector{Param}(Param.(param_block))
-end
+end =#
 
 save(path::String,pvec::Vector{Param}) = save(joinpath(path,"param"),Matrix(pvec))
 
 function load(::Type{Vector{Param}},path::String)
-  param_mat = load(joinpath(path,"param"))
-  param_block = vblocks(param_mat)
-  Vector{Param}(Param.(param_block))
+  vector_of_params(load(joinpath(path,"param")))
 end
 
 abstract type ProblemMeasures end

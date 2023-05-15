@@ -3,10 +3,10 @@ struct RBParamOnlineStructure
   assembler::Function
 end
 
-function RBParamOnlineStructure(ad::RBAffineDecomposition;kwargs...)
-  op = get_op(ad)
-  basis = get_affine_decomposition(ad)
-  ad_eval = eval_affine_decomposition(ad)
+function RBParamOnlineStructure(adrb::RBAffineDecomposition;kwargs...)
+  op = get_op(adrb)
+  basis = get_rb_aff_dec(adrb)
+  ad_eval = eval_affine_decomposition(adrb)
   coeff = get_coefficient(op,basis;kwargs...)
   assembler = get_assembler(op,ad_eval)
 
@@ -37,7 +37,7 @@ function get_assembler(
   nc = get_ncols(op)
   Qs = size(basis,2)
 
-  online_mat = zeros(nr,nc)
+  online_mat = allocate_matrix(Matrix{Float},nr,nc)
   function online_mat!(coeff::AbstractMatrix{Float})
     @assert size(coeff,2) == Qs "Something is wrong"
     copyto!(online_mat,reshape(basis*coeff',nr,nc))
@@ -55,7 +55,7 @@ function get_assembler(
   nr,nc = nsrow*ntrow,nscol*ntcol
   Qs = size(basis,2)
 
-  online_mat = zeros(nr,nc)
+  online_mat = allocate_matrix(Matrix{Float},nr,nc)
   function online_mat!(coeff::AbstractMatrix{Float})
     @assert size(coeff,2) == Qs "Something is wrong"
     mat = @distributed (+) for q = 1:Qs

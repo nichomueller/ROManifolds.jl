@@ -67,4 +67,4 @@ isindef(info::RBInfo) = isindef(info.ptype)
 
 ispdomain(info::RBInfo) = ispdomain(info.ptype)
 
-save(info::RBInfo,args::Tuple) = Broadcasting(arg->save(info,arg))(expand(args))
+save(info::RBInfo,objs::Tuple) = Broadcasting(obj->save(info,obj))(expand(objs))

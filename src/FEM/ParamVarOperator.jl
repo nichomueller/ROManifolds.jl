@@ -284,7 +284,8 @@ end
 function assemble_affine_quantity(op::ParamLinOperator)
   eval_param_fefun = realization_param_fefunction(op)
   test = get_test(op)
-  assemble_vector(eval_param_fefun,test)
+  av = assemble_vector(eval_param_fefun,test)
+  reshape(av,:,1)
 end
 
 function assemble_affine_quantity(op::ParamBilinOperator)

@@ -37,15 +37,13 @@ end
 function MDEIM(
   info::RBInfo,
   op::RBVariable,
+  ad::AffineDecomposition,
   measures::ProblemMeasures,
-  field::Symbol,
-  μ::Vector{Param},
-  args...)
+  field::Symbol)
 
-  μ_mdeim = μ[1:info.mdeim_nsnap]
   meas = getproperty(measures,field)
 
-  rb_space,findnz_idx = mdeim_basis(info,op,μ_mdeim,args...)
+  rb_space,findnz_idx = mdeim_basis(info,ad,op)
   red_rbspace = project_mdeim_basis(op,rb_space,findnz_idx)
   idx = mdeim_idx(rb_space)
   rb_lu = get_rb_lu(info,rb_space,idx)
@@ -125,7 +123,8 @@ function rb_space_projection(
   Qs = size(basis_space,2)
   Ns = get_Ns(rbspace_col)
   isparse,jsparse = from_vec_to_mat_idx(findnz_idx,Ns)
-  red_basis_space = zeros(get_ns(rbspace_row)*get_ns(rbspace_col),Qs)
+  red_basis_space = allocate_matrix(Matrix{Float},
+    get_ns(rbspace_row)*get_ns(rbspace_col),Qs)
   for q = 1:Qs
     vsparse = Vector(basis_space[:,q])
     smat = sparse(isparse,jsparse,vsparse,Ns,Ns)
@@ -148,7 +147,7 @@ end
 
 function mdeim_idx(mat::AbstractMatrix{Float})
   n = size(mat)[2]
-  idx = zeros(Int,size(mat,2))
+  idx = allocate_matrix(Matrix{Float},Int,size(mat,2))
   idx[1] = Int(argmax(abs.(mat[:,1])))
 
   @inbounds for i = 2:n

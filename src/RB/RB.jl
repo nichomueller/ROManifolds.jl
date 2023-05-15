@@ -1,6 +1,7 @@
 include("RBInfo.jl")
 include("RBSpace.jl")
 include("RBVariable.jl")
+include("AffineDecomposition.jl")
 include("MDEIMOffline.jl")
 include("PostProcess.jl")
 include("RBAffineDecomposition.jl")

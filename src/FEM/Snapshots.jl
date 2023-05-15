@@ -74,9 +74,9 @@ function compute_in_times(snaps::Snapshots,args...)
   Snapshots(id,compute_in_times(snap,args...),nsnap)
 end
 
-function collect_snap_from_workers(id::Symbol,nsnap::Int)
+#= function collect_snap_from_workers(id::Symbol,nsnap::Int)
   Snapshots(id,collect_from_workers(Matrix{Float},id),nsnap)
-end
+end =#
 
 function Base.vcat(s1::Snapshots,s2::Snapshots)
   @assert get_nsnap(s1) == get_nsnap(s2) "Cannot concatenate input snapshots"

@@ -1,25 +1,32 @@
-function assemble_fe_snaps(op::ParamOperator,args...;fun_mdeim=false)
-  assemble_fe_snaps(Val{fun_mdeim}(),op,args...)
-end
+function generate_mdeim_snapshots_on_workers(
+  val::Val{false},
+  op::ParamOperator,
+  μ::Vector{Param},
+  args...)
 
-function assemble_fe_snaps(val::Val{false},op::ParamOperator,args...)
   id = get_id(op)
-  Nt = get_Nt(op)
+  nsnap = length(μ)
+  printstyled("Generating $nsnap mdeim snapshots for variable $id on each available worker\n";color=:blue)
+
   assembler = get_assembler(op)
-  snap,findnz_idx = assembler(unpack_for_assembly(val,op)...,args...)
-  nsnap = get_nsnap(snap,Nt)
+  snap,findnz_idx = assembler(unpack_for_assembly(val,op)...,μ,args...)
   s = Snapshots(id,snap,nsnap)
+
   s,findnz_idx
 end
 
-function assemble_fe_snaps(val::Val{true},op::ParamOperator,args...)
+#= function generate_mdeim_snapshots_on_workers(
+  val::Val{true},
+  op::ParamOperator,
+  args...)
+
   id = get_id(op)
   assembler = get_assembler(op)
   snap,findnz_idx = assembler(unpack_for_assembly(val,op)...,args...)
   nsnap = size(snap,2)
   s = Snapshots(id,snap,nsnap)
   s,findnz_idx
-end
+end =#
 
 get_assembler(::ParamLinOperator) = assemble_vectors
 
@@ -177,16 +184,16 @@ function assembler_loop(
 
   data = get_fdata(vecdata)
   nsnap = get_nsnap(vecdata)
-  Nz = length(findnz_idx)
 
-  vecs = Elemental.zeros(EMatrix{Float},Nz,nsnap)
-  for i = 1:nsnap
+  function get_snapshot(i::Int)
     vecdata_i = data(i)
     v2 = Gridap.Algebra.nz_allocation(v1)
     numeric_loop_vector!(v2,a,vecdata_i)
-    copyto!(view(vecs,:,i),v2)
+    v2
   end
 
+  snaps = pmap(get_snapshot,1:nsnap)
+  vecs = hcat(snaps...)
   vecs[findnz_idx,:],findnz_idx
 end
 
@@ -306,16 +313,17 @@ function assembler_loop(
 
   data = get_fdata(matdata)
   nsnap = get_nsnap(matdata)
-  Nz = length(findnz_idx)
 
-  mats = Elemental.zeros(EMatrix{Float},Nz,nsnap)
-  for i = 1:nsnap
+  function get_snapshot(i::Int)
     matdata_i = data(i)
     m2 = Gridap.Algebra.nz_allocation(m1)
     numeric_loop_matrix!(m2,a,matdata_i)
-    copyto!(view(mats,:,i),my_create_from_nz(m2))
+    m3 = my_create_from_nz(m2)
+    m3
   end
 
+  snaps = pmap(get_snapshot,1:nsnap)
+  mats = hcat(snaps...)
   mats,findnz_idx
 end
 
@@ -352,34 +360,24 @@ function get_findnz_idx(mat::SparseMatrixCSC{Float,Int})
   findnz_idx
 end
 
-function assemble_functional_snaps(
+function generate_mdeim_snapshots_on_workers(
+  ::Val{true},
   op::ParamOperator,
-  μvec::Vector{Param})
+  μvec::Vector{Param},
+  args...)
 
   quadp = get_phys_quad_points(op)
   Nq = length(quadp)
-  matdata = evaluate_param_function(op,quadp,μvec)
-  data = get_fdata(matdata)
-  nsnap = get_nsnap(matdata)
+  paramdata = get_paramdata(op,quadp,μvec)
+  data = get_fdata(paramdata)
+  nsnap = get_nsnap(paramdata)
 
-  snaps = Elemental.zeros(EMatrix{Float},Nq,nsnap)
-  for i = 1:nsnap
-    copyto!(view(snaps,:,i),data(i))
-  end
+  snaps = pmap(data,1:nsnap)
 
-  Snapshots(get_id(op),snaps,length(μvec))
+  Snapshots(get_id(op),hcat(snaps...),length(μvec)),collect(1:Nq)
 end
 
-function assemble_functional_snaps(
-  ::ParamOperator{Nonlinear,Ttr},
-  ::Vector{Param},
-  snaps::Snapshots,
-  snaps_dir::Snapshots) where Ttr
-
-  snaps,snaps_dir
-end
-
-function evaluate_param_function(
+function get_paramdata(
   ::ParamSteadyOperator,
   quadp,
   μvec::Vector{Param})
@@ -391,12 +389,12 @@ function evaluate_param_function(
   MatrixAssemblerLoop(paramdata,nsnap)
 end
 
-function evaluate_param_function(
+function get_paramdata(
   op::ParamUnsteadyOperator,
   quadp,
-  μvec::Vector{Param})
+  μvec::Vector{Param},
+  tvec::Vector{Float})
 
-  tvec = get_times(op)
   Nt,μ,t = arg_functions(μvec,tvec)
   nsnap = length(μvec)*Nt
   param_fun = get_param_function(op)

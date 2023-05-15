@@ -24,9 +24,9 @@ correct_path(path::String) = path*".txt"
 
 save(path::String,obj) = serialize(correct_path(path),obj)
 
-load(path::String) = deserialize(correct_path(path))::Matrix{Float}
+save(path::String,objs::Tuple) = Broadcasting(obj->save(path,obj))(expand(objs))
 
-# load(::Type{T},path::String) where T = convert(T,load(path))::T
+load(path::String) = deserialize(correct_path(path))::Matrix{Float}
 
 function load(::Type{T},path::String)::T where T
   obj = deserialize(correct_path(path))

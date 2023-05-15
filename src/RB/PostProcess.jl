@@ -42,12 +42,12 @@ end
 function RBResults(res::Vector{RBResults})
   nruns = length(res)
 
-  id = res.id
+  id = first(res).id
   relative_errs = Broadcasting(r->getproperty(r,:relative_err))(res)
-  online_times = Broadcasting(r->getproperty(r,:online_times))(res)
+  online_times = Broadcasting(r->getproperty(r,:online_time))(res)
 
   relative_err = sum(relative_errs)/nruns
-  pointwise_err = res[1].pointwise_err
+  pointwise_err = first(res).pointwise_err
   online_time = sum(online_times/nruns)
 
   RBResults(id,relative_err,pointwise_err,online_time)
@@ -55,15 +55,15 @@ end
 
 function save(info::RBInfo,res::NTuple{1,RBResults})
   res_u, = res
-  res_dict = Dict("relative_err_$(get_id(res_u))" => res_u.relative_err,
+  res_dict = Dict("relative_err_$(res_u.id)" => res_u.relative_err,
                   "online_time"=>res_u.online_time)
   save(joinpath(info.online_path,"results"),res_dict)
 end
 
 function save(info::RBInfo,res::NTuple{2,RBResults})
   res_u,res_p = res
-  res_dict = Dict("relative_err_$(get_id(res_u))" => res_u.relative_err,
-                  "relative_err_$(get_id(res_p))" => res_p.relative_err,
+  res_dict = Dict("relative_err_$(res_u.id)" => res_u.relative_err,
+                  "relative_err_$(res_p.id)" => res_p.relative_err,
                   "online_time"=>res_u.online_time)
   save(joinpath(info.online_path,"results_$id"),res_dict)
 end

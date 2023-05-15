@@ -1,13 +1,18 @@
+# Init MPI
 using MPI,MPIClusterManagers,Distributed
 manager = MPIWorkerManager()
 addprocs(manager)
 
-@everywhere root = pwd()
-@everywhere include("$root/src/FEM/FEM.jl")
-@everywhere include("$root/src/RB/RB.jl")
-@everywhere include("$root/src/RBTests/RBTests.jl")
+# Loading packages on all processes
+@everywhere begin
+  root = pwd()
+  include("$root/src/FEM/FEM.jl")
+  include("$root/src/RB/RB.jl")
+  include("$root/src/RBTests/RBTests.jl")
+end
 
-@mpi_do manager begin
+# Setting up the problem on all processes
+@everywhere begin
   run_fem = false
 
   steady = false
@@ -73,18 +78,30 @@ addprocs(manager)
 
   solver = ThetaMethod(LUSolver(),dt,θ)
   nsnap = 100
-  u,p,μ = fe_snapshots(solver,feop,fepath,run_fem,nsnap,t0,tF;indef)
 
-  info = RBInfoUnsteady(ptype,test_path;ϵ=1e-4,nsnap=80,mdeim_snap=20,fun_mdeim=true)
-  tt = TimeTracker(OfflineTime(0.,0.),0.)
+  info = RBInfoUnsteady(ptype,test_path;ϵ=1e-4,nsnap=80,mdeim_snap=20)
+end
 
+# Remote generation of FEM snapshots; the task is launched on the local process,
+# and split among on all available remote workers thanks to a pmap.
+# Then, the snapshots are sent to the remote workers
+begin
+  u,p,μ = generate_fe_snapshots_on_workers(run_fem,fepath,nsnap,solver,feop,t0,tF;indef)
+  @passobj 1 workers() u
+  @passobj 1 workers() p
+  @passobj 1 workers() μ
+end
+
+# Generation of the reduced basis in parallel on the remote workers, leveraging
+# the Elemental package
+@mpi_do manager begin
   printstyled("Offline phase, reduced basis method\n";color=:blue)
 
-  u_offline = u[1:info.nsnap]
-  p_offline = p[1:info.nsnap]
+  u_off = u[1:info.nsnap]
+  p_off = p[1:info.nsnap]
 
-  tt.offline_time.basis_time += @elapsed begin
-    rbspace_u,rbspace_p = assemble_rb_space(info,(u_offline,p_offline),opB)
+  basis_time = @elapsed begin
+    rbspace_u,rbspace_p = assemble_rb_space(info,(u_off,p_off),opB)
   end
   rb_space = rbspace_u,rbspace_p
 
@@ -97,49 +114,99 @@ addprocs(manager)
   rbopAlift = RBLiftVariable(rbopA)
   rbopBlift = RBLiftVariable(rbopB)
   rbopMlift = RBLiftVariable(rbopM)
+end
 
-  tt.offline_time.assembly_time = @elapsed begin
-    Arb = RBAffineDecomposition(info,rbopA,measures,:dΩ,μ)
-    Brb = RBAffineDecomposition(info,rbopB,measures,:dΩ,μ)
-    BTrb = RBAffineDecomposition(info,rbopBT,measures,:dΩ,μ)
-    Mrb = RBAffineDecomposition(info,rbopM,measures,:dΩ,μ)
-    Frb = RBAffineDecomposition(info,rbopF,measures,:dΩ,μ)
-    Hrb = RBAffineDecomposition(info,rbopH,measures,:dΓn,μ)
-    Aliftrb = RBAffineDecomposition(info,rbopAlift,measures,:dΩ,μ)
-    Bliftrb = RBAffineDecomposition(info,rbopBlift,measures,:dΩ,μ)
-    Mliftrb = RBAffineDecomposition(info,rbopMlift,measures,:dΩ,μ)
+# Remote generation of MDEIM snapshots with parallel map on all remote workers
+begin
+  rbopA = (@getfrom first(workers()) rbopA)::RBUnsteadyBilinVariable
+  rbopB = (@getfrom first(workers()) rbopB)::RBUnsteadyBilinVariable
+  rbopBT = (@getfrom first(workers()) rbopBT)::RBUnsteadyBilinVariable
+  rbopM = (@getfrom first(workers()) rbopM)::RBUnsteadyBilinVariable
+  rbopF = (@getfrom first(workers()) rbopF)::RBUnsteadyLinVariable
+  rbopH = (@getfrom first(workers()) rbopH)::RBUnsteadyLinVariable
+  rbopAlift = (@getfrom first(workers()) rbopAlift)::RBUnsteadyLiftVariable
+  rbopBlift = (@getfrom first(workers()) rbopBlift)::RBUnsteadyLiftVariable
+  rbopMlift = (@getfrom first(workers()) rbopAlift)::RBUnsteadyLiftVariable
+
+  μ_off = μ[1:info.mdeim_nsnap]
+
+  assembly_time = @elapsed begin
+    A = AffineDecomposition(info,rbopA,μ_off)
+    B = AffineDecomposition(info,rbopB,μ_off)
+    BT = AffineDecomposition(info,rbopBT,μ_off)
+    M = AffineDecomposition(info,rbopM,μ_off)
+    F = AffineDecomposition(info,rbopF,μ_off)
+    H = AffineDecomposition(info,rbopH,μ_off)
+    Alift = AffineDecomposition(info,rbopAlift,μ_off)
+    Blift = AffineDecomposition(info,rbopBlift,μ_off)
+    Mlift = AffineDecomposition(info,rbopMlift,μ_off)
   end
-  ad = (Arb,Brb,BTrb,Mrb,Frb,Hrb,Aliftrb,Bliftrb,Mliftrb)
 
-  if info.save_offline save(info,(rb_space,ad)) end
+  @passobj 1 workers() assembly_time
+  @passobj 1 workers() A
+  @passobj 1 workers() B
+  @passobj 1 workers() BT
+  @passobj 1 workers() M
+  @passobj 1 workers() F
+  @passobj 1 workers() H
+  @passobj 1 workers() Alift
+  @passobj 1 workers() Blift
+  @passobj 1 workers() Mlift
+end
 
+@mpi_do manager begin
+  assembly_time = @elapsed begin
+    Arb = RBAffineDecomposition(info,rbopA,A,measures,:dΩ)
+    Brb = RBAffineDecomposition(info,rbopB,B,measures,:dΩ)
+    BTrb = RBAffineDecomposition(info,rbopBT,BT,measures,:dΩ)
+    Mrb = RBAffineDecomposition(info,rbopM,M,measures,:dΩ)
+    Frb = RBAffineDecomposition(info,rbopF,F,measures,:dΩ)
+    Hrb = RBAffineDecomposition(info,rbopH,H,measures,:dΓn)
+    Aliftrb = RBAffineDecomposition(info,rbopAlift,Alift,measures,:dΩ)
+    Bliftrb = RBAffineDecomposition(info,rbopBlift,Blift,measures,:dΩ)
+    Mliftrb = RBAffineDecomposition(info,rbopMlift,Mlift,measures,:dΩ)
+  end
+  adrb = (Arb,Brb,BTrb,Mrb,Frb,Hrb,Aliftrb,Bliftrb,Mliftrb)
+
+  offline_times = OfflineTime(basis_time,assembly_time)
+
+  if info.save_offline
+    save(info,(rb_space,adrb,offline_times))
+  end
+
+# The method's online phase can be carried out on the local process; a pmap is
+# used to loop over the online parameters
+begin
   printstyled("Online phase, reduced basis method\n";color=:red)
 
-  Aon = RBParamOnlineStructure(Arb;st_mdeim=info.st_mdeim)
-  Bon = RBParamOnlineStructure(Brb;st_mdeim=info.st_mdeim)
-  BTon = RBParamOnlineStructure(BTrb;st_mdeim=info.st_mdeim)
-  Mon = RBParamOnlineStructure(Mrb;st_mdeim=info.st_mdeim)
-  Fon = RBParamOnlineStructure(Frb;st_mdeim=info.st_mdeim)
-  Hon = RBParamOnlineStructure(Hrb;st_mdeim=info.st_mdeim)
-  Alifton = RBParamOnlineStructure(Aliftrb;st_mdeim=info.st_mdeim)
-  Blifton = RBParamOnlineStructure(Bliftrb;st_mdeim=info.st_mdeim)
-  Mlifton = RBParamOnlineStructure(Mliftrb;st_mdeim=info.st_mdeim)
+  u = (@getfrom first(workers()) u)::Snapshots
+  p = (@getfrom first(workers()) p)::Snapshots
+  μ = (@getfrom first(workers()) μ)::Vector{Param}
+  rb_space = (@getfrom first(workers()) rb_space)::NTuple{2,RBSpaceUnsteady}
+  Arb = (@getfrom first(workers()) Arb)::RBAffineDecomposition
+  Brb = (@getfrom first(workers()) Brb)::RBAffineDecomposition
+  BTrb = (@getfrom first(workers()) BTrb)::RBAffineDecomposition
+  Mrb = (@getfrom first(workers()) Mrb)::RBAffineDecomposition
+  Frb = (@getfrom first(workers()) Frb)::RBAffineDecomposition
+  Hrb = (@getfrom first(workers()) Hrb)::RBAffineDecomposition
+  Aliftrb = (@getfrom first(workers()) Aliftrb)::RBAffineDecomposition
+  Bliftrb = (@getfrom first(workers()) Bliftrb)::RBAffineDecomposition
+  Mliftrb = (@getfrom first(workers()) Mliftrb)::RBAffineDecomposition
+
+  st_mdeim = info.st_mdeim
+  Aon = RBParamOnlineStructure(Arb;st_mdeim)
+  Bon = RBParamOnlineStructure(Brb;st_mdeim)
+  BTon = RBParamOnlineStructure(BTrb;st_mdeim)
+  Mon = RBParamOnlineStructure(Mrb;st_mdeim)
+  Fon = RBParamOnlineStructure(Frb;st_mdeim)
+  Hon = RBParamOnlineStructure(Hrb;st_mdeim)
+  Alifton = RBParamOnlineStructure(Aliftrb;st_mdeim)
+  Mlifton = RBParamOnlineStructure(Mliftrb;st_mdeim)
   online_structures = (Aon,Bon,BTon,Mon,Fon,Hon,Alifton,Blifton,Mlifton)
 
-  err_u = ErrorTracker[]
-  err_p = ErrorTracker[]
-  function online_loop(k::Int)
-    tt.online_time += @elapsed begin
-      lhs,rhs = unsteady_stokes_rb_system(online_structures,μ[k])
-      rb_sol = solve_rb_system(lhs,rhs)
-    end
-    uhk,phk = u[k],p[k]
-    uhk_rb,phk_rb = reconstruct_fe_sol(rb_space,rb_sol)
-    push!(err_u,ErrorTracker(uhk,uhk_rb))
-    push!(err_p,ErrorTracker(phk,phk_rb))
-  end
-
-  pmap(online_loop,info.online_snaps)
-  res = RBResults(:u,tt,err_u),RBResults(:p,tt,err_p)
+  @passobj 1 workers() online_structures
+  @everywhere rb_system(k) = unsteady_stokes_rb_system(online_structures,μ[k])
+  @everywhere loop(k) = online_loop(k->(u[k],p[k]),rb_space,rb_system,k)
+  res = online_loop(loop,info.online_snaps)
   postprocess(info,res,(V,Q),model,time_info)
 end

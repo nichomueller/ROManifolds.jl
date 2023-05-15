@@ -171,6 +171,25 @@ get_θ(op::RBVariable) = get_θ(op.feop)
 
 get_times(op::RBVariable) = get_times(op.feop)
 
+function generate_mdeim_snapshots_on_workers(
+  op::RBSteadyVariable,
+  μ::Vector{Param},
+  args...;
+  fun_mdeim=false)
+
+  generate_mdeim_snapshots_on_workers(Val{fun_mdeim}(),op.feop,μ,args...)
+end
+
+function generate_mdeim_snapshots_on_workers(
+  op::RBUnsteadyVariable,
+  μ::Vector{Param},
+  args...;
+  fun_mdeim=false)
+
+  times = get_times(op)
+  generate_mdeim_snapshots_on_workers(Val{fun_mdeim}(),op.feop,μ,times,args...)
+end
+
 assemble_fe_snaps(op::RBVariable,args...;kwargs...) = assemble_fe_snaps(op.feop,args...;kwargs...)
 
 assemble_functional_snaps(op::RBVariable,args...) = assemble_functional_snaps(op.feop,args...)

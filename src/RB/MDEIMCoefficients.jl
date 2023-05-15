@@ -30,7 +30,7 @@ function get_coefficient(
   fun = get_param_function(op)
   times = get_times(op)
   Nt,Qs = length(times),1
-  coeff = zeros(Nt,Qs)
+  coeff = allocate_matrix(Matrix{Float},Nt,Qs)
 
   function coeff!(μ::Param)
     @inbounds for (n,tn) in enumerate(times)
@@ -141,7 +141,7 @@ function hyperred_structure(
   fun = get_param_fefunction(op)
   test = get_test(op)
   ns,nt = length(idx_space),length(times)
-  V = zeros(ns,nt)
+  V = allocate_matrix(Matrix{Float},ns,nt)
 
   function V!(μ::Param)
     @inbounds for (n,tn) in enumerate(times)
@@ -175,7 +175,7 @@ function hyperred_structure(
   trial = get_trial(op)
   test = get_test(op)
   ns,nt = length(idx_space),length(times)
-  M = zeros(ns,nt)
+  M = allocate_matrix(Matrix{Float},ns,nt)
 
   function M!(μ::Param)
     @inbounds for (n,tn) in enumerate(times)
@@ -211,7 +211,7 @@ function hyperred_structure(
   test = get_test(op)
   dir(μ::Param,tn::Float) = get_dirichlet_function(op)(μ,tn)
   ns,nt = length(idx_space),length(times)
-  lift = zeros(ns,nt)
+  lift = allocate_matrix(Matrix{Float},ns,nt)
 
   function lift!(μ::Param)
     @inbounds for (n,tn) in enumerate(times)
@@ -246,7 +246,7 @@ function hyperred_structure(
   trial = get_trial(op)
   test = get_test(op)
   ns,nt = length(idx_space),length(times)
-  M = zeros(ns,nt)
+  M = allocate_matrix(Matrix{Float},ns,nt)
 
   function M!(μ::Param,z)
     @inbounds for (n,tn) in enumerate(times)
@@ -282,7 +282,7 @@ function hyperred_structure(
   test = get_test(op)
   dir(μ::Param,tn::Float) = get_dirichlet_function(op)(μ,tn)
   ns,nt = length(idx_space),length(times)
-  lift = zeros(ns,nt)
+  lift = allocate_matrix(Matrix{Float},ns,nt)
 
   function lift!(μ::Param,z)
     @inbounds for (n,tn) in enumerate(times)
@@ -313,7 +313,7 @@ function get_interp_coeff(mdeim::MDEIMUnsteady)
   Nt,Qt = size(bt)
   sorted_idx(qs) = [(i-1)*Qs+qs for i = 1:Qt]
 
-  interp_coeff = zeros(Nt,Qs)
+  interp_coeff = allocate_matrix(Matrix{Float},Nt,Qs)
   function interp_coeff!(coeff::AbstractMatrix)
     @inbounds for qs = 1:Qs
       interp_coeff[:,qs] = bt*coeff[sorted_idx(qs)]
@@ -334,7 +334,7 @@ function get_coeff_by_time_bases(op::RBUnsteadyVariable,Qs::Int)
   brow = get_basis_time(rbrow)
   nrow = size(brow,2)
 
-  proj = zeros(nrow,Qs)
+  proj = allocate_matrix(Matrix{Float},nrow,Qs)
   function time_proj!(coeff::AbstractMatrix)
     @assert size(coeff,2) == Qs "Dimension mismatch: $(size(coeff,2)) != $Qs"
 
@@ -358,8 +358,8 @@ function get_coeff_by_time_bases(op::RBUnsteadyBilinVariable,Qs::Int)
   θ = get_θ(op)
   dt = get_dt(op)
 
-  proj = zeros(nrow*ncol,Qs)
-  proj_shift = zeros(nrow*ncol,Qs)
+  proj = allocate_matrix(Matrix{Float},nrow*ncol,Qs)
+  proj_shift = allocate_matrix(Matrix{Float},nrow*ncol,Qs)
   function time_proj!(coeff::AbstractMatrix)
     @assert size(coeff,2) == Qs "Dimension mismatch: $(size(coeff,2)) != $Qs"
     @inbounds for q = 1:Qs, jt = 1:ncol, it = 1:nrow
@@ -388,15 +388,15 @@ function get_coeff_by_time_bases_try(op::RBUnsteadyBilinVariable,Qs::Int)
   θ = get_θ(op)
   dt = get_dt(op)
 
-  btbt = zeros(Nt,nrow*ncol)
-  btbt_shift = zeros(Nt-1,nrow*ncol)
+  btbt = allocate_matrix(Matrix{Float},Nt,nrow*ncol)
+  btbt_shift = allocate_matrix(Matrix{Float},Nt-1,nrow*ncol)
   @inbounds for jt = 1:ncol, it = 1:nrow
     btbt[:,(jt-1)*nrow+it] .= brow[:,it].*bcol[:,jt]
     btbt_shift[:,(jt-1)*nrow+it] .= brow[2:Nt,it].*bcol[1:Nt-1,jt]
   end
 
-  proj = zeros(nrow*ncol,Qs)
-  proj_shift = zeros(nrow*ncol,Qs)
+  proj = allocate_matrix(Matrix{Float},nrow*ncol,Qs)
+  proj_shift = allocate_matrix(Matrix{Float},nrow*ncol,Qs)
   function time_proj!(coeff::AbstractMatrix)
     @assert size(coeff,2) == Qs "Dimension mismatch: $(size(coeff,2)) != $Qs"
     @inbounds for q = 1:Qs, ijt = 1:ncol*nrow
