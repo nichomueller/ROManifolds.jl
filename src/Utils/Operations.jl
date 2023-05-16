@@ -27,6 +27,8 @@ LinearAlgebra.Matrix(dmat::EMatrix{T}) where T = convert(Matrix{T},dmat)
 
 EMatrix(mat::Matrix{T}) where T = convert(EMatrix{T},mat)
 
+EMatrix(mats::Vector{Matrix{T}}) where T = EMatrix(hcat(mats...))
+
 function allocate_matrix(::Type{Matrix{Float}},sizes...)
   Nr,Nc = sizes
   zeros(Nr,Nc)

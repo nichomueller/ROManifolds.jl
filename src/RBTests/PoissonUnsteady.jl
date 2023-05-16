@@ -11,8 +11,7 @@ addprocs(manager)
   include("$root/src/RBTests/RBTests.jl")
 end
 
-# Setting up the problem on all processes
-@everywhere begin
+@everywhere function poisson_unsteady()
   run_fem = false
 
   steady = false
@@ -60,22 +59,16 @@ end
 
   solver = ThetaMethod(LUSolver(),dt,θ)
   nsnap = 100
-end
 
-# Remote generation of FEM snapshots; the task is launched on the local process,
-# and split among on all available remote workers thanks to a pmap.
-# Then, the snapshots are sent to the remote workers
-begin
+  # Remote generation of FEM snapshots; the task is launched on the local process,
+  # and split among on all available remote workers thanks to a pmap.
+  # Then, the snapshots are sent to the remote workers
   u,μ = generate_fe_snapshots(run_fem,fepath,nsnap,solver,feop,t0,tF;indef)
-  passobj(1,workers(),[:u,:μ])
-end
 
-@mpi_do manager begin
   info = RBInfoUnsteady(ptype,test_path;ϵ=1e-3,nsnap=80,mdeim_snap=20)
 
   printstyled("Offline phase, reduced basis method\n";color=:blue)
 
-  u = convert_snapshot(EMatrix{Float},u)
   u_offline = u[1:info.nsnap]
 
   basis_time = @elapsed begin
@@ -116,5 +109,7 @@ end
 
   rb_system = k -> unsteady_poisson_rb_system(online_structures,μ[k])
   res = online_loop(k -> uh[k],rb_space,rb_system,info.online_snaps)
-  postprocess(info,(all_res,),(V,),model,time_info)
+  postprocess(info,(res,),(V,),model,time_info)
 end
+
+poisson_unsteady()

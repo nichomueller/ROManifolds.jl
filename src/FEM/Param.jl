@@ -42,8 +42,6 @@ Base.getindex(p::Param,args...) = getindex(p.μ,args...)
 
 LinearAlgebra.Matrix(pvec::Vector{Param}) = Matrix{Float}(reduce(vcat,transpose.(getproperty.(pvec,:μ)))')
 
-Distributions.var(p::Param) = var(get_μ(p))
-
 Base.:(-)(p1::Param,p2::Param) = get_μ(p1) .- get_μ(p2)
 
 save(path::String,pvec::Vector{Param}) = save(joinpath(path,"param"),Matrix(pvec))

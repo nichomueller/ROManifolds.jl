@@ -182,24 +182,13 @@ function rb_initial_guess(
   vcat(u0_rb,p0_rb)
 end
 
-function get_initial_guess(
-  u::Snapshots,
-  p::Snapshots,
-  μvec::Vector{Param},
-  μ::Param)
-
-  kmin = nearest_parameter(μvec,μ)
-  vcat(get_snap(u[kmin]),get_snap(p[kmin]))
-end
-
-function nearest_parameter(μvec::Vector{Param},μ::Param)
-  vars = [var(μi-μ) for μi = μvec]
-  argmin(vars)
+function get_initial_guess(u::Snapshots,p::Snapshots,k::Int)
+  nearest_neighbor(vcat(u,p),k)
 end
 
 function reconstruct_fe_sol(
   rb_space::RBSpaceSteady,
-  rb_sol::Array{Float})
+  rb_sol::AbstractArray{Float})
 
   id = get_id(rb_space)
   bs = get_basis_space(rb_space)
@@ -208,7 +197,7 @@ end
 
 function reconstruct_fe_sol(
   rb_space::RBSpaceUnsteady,
-  rb_sol::Array{Float})
+  rb_sol::AbstractArray{Float})
 
   id = get_id(rb_space)
   bs = get_basis_space(rb_space)
@@ -222,7 +211,7 @@ end
 
 function reconstruct_fe_sol(
   rb_space::NTuple{2,RBSpaceSteady},
-  rb_sol::Array{Float})
+  rb_sol::AbstractArray{Float})
 
   ns = get_ns.(rb_space)
   rb_sol_u,rb_sol_p = rb_sol[1:ns[1],:],rb_sol[1+ns[1]:end,:]
@@ -231,7 +220,7 @@ end
 
 function reconstruct_fe_sol(
   rb_space::NTuple{2,RBSpaceUnsteady},
-  rb_sol::Array{Float})
+  rb_sol::AbstractArray{Float})
 
   ns = get_ns.(rb_space)
   nt = get_nt.(rb_space)

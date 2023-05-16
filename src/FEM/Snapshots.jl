@@ -17,12 +17,12 @@ function Snapshots(
   end
 end
 
-function convert_snapshot(::Type{T},s::Snapshots) where T
+#= function convert_snapshot(::Type{T},s::Snapshots) where T
   id = get_id(s)
   snap = get_snap(s)
   nsnap = get_nsnap(s)
   Snapshots(id,convert(T,snap),nsnap)
-end
+end =#
 
 function Base.getindex(s::Snapshots,idx::UnitRange{Int})
   nidx = length(idx)

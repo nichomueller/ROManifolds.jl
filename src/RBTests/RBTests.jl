@@ -155,43 +155,36 @@ function get_solutions(sol::Vector{T}) where T
   Ns = sum(get_Ns(first(sol)))
   Nt = get_Nt(first(sol))
   np = get_np(first(sol))
-  xtmp = allocate_matrix(Matrix{Float},Ns,Nt)
-  μtmp = allocate_matrix(Matrix{Float},np,1)
+  x = allocate_matrix(Matrix{Float},Ns,Nt)
+  μ = zeros(np)
 
-  function get_solution(k::Int)
-    printstyled("Computing snapshot $k\n";color=:blue)
-    x,μ = get_solution!(xtmp,μtmp,sol[k])
-    printstyled("Successfully computed snapshot $k\n";color=:blue)
-    x,μ
-  end
-
-  sols_and_params = pmap(get_solution,eachindex(sol))
-  sols = hcat(first.(sols_and_params)...)
-  params = vector_of_params(hcat(last.(sols_and_params)...))
-  sols,params
+  #sols_and_params = pmap(get_sol_and_param!,eachindex(sol))
+  sols_and_params = pmap(solk->get_solution!(x,μ,solk),sol)
+  sols,params = first.(sols_and_params),last.(sols_and_params)
+  EMatrix(sols),vector_of_params(params)
 end
 
 function get_solution!(
   x::Matrix{Float},
-  μ::Matrix{Float},
+  μ::Vector{Float},
   solk::ParamFESolution)
 
-  x[:,1] = get_free_dof_values(solk.psol.uh)
-  μ[:,1] = get_μ(solk.psol.μ)
+  copyto!(view(x,:,1),get_free_dof_values(solk.psol.uh))
+  copyto!(μ,get_μ(solk.psol.μ))
   x,μ
 end
 
 function get_solution!(
   x::Matrix{Float},
-  μ::Matrix{Float},
+  μ::Vector{Float},
   solk::ParamTransientFESolution)
 
   n = 1
   for (xn,_) in solk
-    x[:,n] = xn
+    copyto!(view(x,:,n),xn)
     n += 1
   end
-  μ[:,1] = get_μ(solk.psol.μ)
+  copyto!(μ,get_μ(solk.psol.μ))
   x,μ
 end
 
