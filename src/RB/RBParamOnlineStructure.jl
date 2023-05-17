@@ -63,7 +63,7 @@ function get_assembler(
       coeff_q = reshape(coeff[:,q],ntrow,ntcol)
       kron(basis_q,coeff_q)
     end
-    copyto!(online_mat,sum(mat))
+    copyto!(online_mat,mat)
   end
 
   online_mat!

@@ -3,7 +3,8 @@ function mdeim_basis(info::RBInfo,op::RBVariable,args...)
   nsnap = info.mdeim_nsnap
   printstyled("MDEIM: generating $nsnap snapshots for $id \n";color=:blue)
 
-  mdeim_basis(Val(info.fun_mdeim),info,op,args...)
+  state = info.fun_mdeim && !(typeof(op) <: RBLiftVariable)
+  mdeim_basis(Val{state}(),info,op,args...)
 end
 
 function mdeim_basis(
@@ -47,7 +48,7 @@ end
 function mdeim_basis(
   ::Val{true},
   info::RBInfo,
-  op::RBUnsteadyBilinVariable,
+  op::RBUnsteadyVariable,
   μ::Vector{Param},
   args...)
 

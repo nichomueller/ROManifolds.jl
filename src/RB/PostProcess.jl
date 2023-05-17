@@ -105,8 +105,8 @@ function postprocess(
   if info.save_online save(info,res) end
 
   if info.postprocess
-    offline_results_dict(info)
-    online_results_dict(info)
+    # offline_results_dict(info)
+    # online_results_dict(info)
     trian = get_triangulation(model)
     writevtk(info,res_u,V,trian,args...)
   end
@@ -135,8 +135,8 @@ function postprocess(
   if info.save_online save(info,res) end
 
   if info.postprocess
-    offline_results_dict(info)
-    online_results_dict(info)
+    # offline_results_dict(info)
+    # online_results_dict(info)
     trian = get_triangulation(model)
     writevtk(info,res_u,V,trian,args...)
     writevtk(info,res_p,Q,trian,args...)
@@ -282,4 +282,14 @@ end
 function L2_norm_matrix(opM::ParamBilinOperator)
   @assert get_id(opM) == :M "wrong operator"
   assemble_affine_quantity(opM)
+end
+
+function gather_online_results()
+  d = []
+  for fun_mdeim=(true,false), st_mdeim=(false,true), ϵ=(1e-1,1e-2,1e-3,1e-4)
+    info = RBInfoUnsteady(ptype,test_path;ϵ,nsnap=80,mdeim_snap=20,st_mdeim,fun_mdeim)
+    tpath = info.online_path
+    d = [d...,Dict("res_$(fun_mdeim)_$(st_mdeim)_$(ϵ)" => deserialize(joinpath(tpath,"results.txt")))]
+  end
+  d
 end

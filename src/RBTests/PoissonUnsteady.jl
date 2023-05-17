@@ -18,7 +18,7 @@ end
   indef = false
   ptype = ProblemType(steady,indef)
 
-  mesh = "elasticity_3cyl2D.json"
+  mesh = "elasticity_3cyl.json"
   test_path = "$root/tests/poisson/unsteady/$mesh"
   bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
   order = 1
@@ -63,53 +63,55 @@ end
   # Remote generation of FEM snapshots; the task is launched on the local process,
   # and split among on all available remote workers thanks to a pmap.
   # Then, the snapshots are sent to the remote workers
-  u,μ = generate_fe_snapshots(run_fem,fepath,nsnap,solver,feop,t0,tF;indef)
+  u,μ = generate_fe_snapshots(Val{indef}(),run_fem,fepath,nsnap,solver,feop,t0,tF)
 
-  info = RBInfoUnsteady(ptype,test_path;ϵ=1e-3,nsnap=80,mdeim_snap=20)
+  for fun_mdeim=(false), st_mdeim=(true,false), ϵ=(1e-4,)#(1e-1,1e-2,1e-3,1e-4)
+    info = RBInfoUnsteady(ptype,test_path;ϵ,nsnap=80,mdeim_snap=20,st_mdeim,fun_mdeim)
 
-  printstyled("Offline phase, reduced basis method\n";color=:blue)
+    printstyled("Offline phase, reduced basis method\n";color=:blue)
 
-  u_offline = u[1:info.nsnap]
+    u_offline = u[1:info.nsnap]
 
-  basis_time = @elapsed begin
-    rb_space, = assemble_rb_space(info,(u_offline,))
+    basis_time = @elapsed begin
+      rb_space, = assemble_rb_space(info,(u_offline,))
+    end
+
+    rbopA = RBVariable(opA,rb_space,rb_space)
+    rbopM = RBVariable(opM,rb_space,rb_space)
+    rbopF = RBVariable(opF,rb_space)
+    rbopH = RBVariable(opH,rb_space)
+    rbopAlift = RBLiftVariable(rbopA)
+    rbopMlift = RBLiftVariable(rbopM)
+
+    assembly_time = @elapsed begin
+      Arb = RBAffineDecomposition(info,rbopA,μ,get_dΩ(measures))
+      Mrb = RBAffineDecomposition(info,rbopM,μ,get_dΩ(measures))
+      Frb = RBAffineDecomposition(info,rbopF,μ,get_dΩ(measures))
+      Hrb = RBAffineDecomposition(info,rbopH,μ,get_dΓn(measures))
+      Aliftrb = RBAffineDecomposition(info,rbopAlift,μ,get_dΩ(measures))
+      Mliftrb = RBAffineDecomposition(info,rbopMlift,μ,get_dΩ(measures))
+    end
+    adrb = (Arb,Mrb,Frb,Hrb,Aliftrb,Mliftrb)
+
+    offline_times = OfflineTime(basis_time,assembly_time)
+
+    if info.save_offline save(info,(rb_space,adrb,offline_times)) end
+
+    printstyled("Online phase, reduced basis method\n";color=:red)
+
+    Aon = RBParamOnlineStructure(Arb;st_mdeim)
+    Mon = RBParamOnlineStructure(Mrb;st_mdeim)
+    Fon = RBParamOnlineStructure(Frb;st_mdeim)
+    Hon = RBParamOnlineStructure(Hrb;st_mdeim)
+    Alifton = RBParamOnlineStructure(Aliftrb;st_mdeim)
+    Mlifton = RBParamOnlineStructure(Mliftrb;st_mdeim)
+    online_structures = (Aon,Mon,Fon,Hon,Alifton,Mlifton)
+
+    rb_system = k -> unsteady_poisson_rb_system(online_structures,μ[k])
+    online_loop_k = k -> online_loop(u[k],rb_space,rb_system,k)
+    res = online_loop(online_loop_k,info.online_snaps)
+    postprocess(info,(res,),(V,),model,time_info)
   end
-
-  rbopA = RBVariable(opA,rb_space,rb_space)
-  rbopM = RBVariable(opM,rb_space,rb_space)
-  rbopF = RBVariable(opF,rb_space)
-  rbopH = RBVariable(opH,rb_space)
-  rbopAlift = RBLiftVariable(rbopA)
-  rbopMlift = RBLiftVariable(rbopM)
-
-  assembly_time = @elapsed begin
-    Arb = RBAffineDecomposition(info,rbopA,μ,get_dΩ(measures))
-    Mrb = RBAffineDecomposition(info,rbopM,μ,get_dΩ(measures))
-    Frb = RBAffineDecomposition(info,rbopF,μ,get_dΩ(measures))
-    Hrb = RBAffineDecomposition(info,rbopH,μ,get_dΓn(measures))
-    Aliftrb = RBAffineDecomposition(info,rbopAlift,μ,get_dΩ(measures))
-    Mliftrb = RBAffineDecomposition(info,rbopMlift,μ,get_dΩ(measures))
-  end
-  adrb = (Arb,Mrb,Frb,Hrb,Aliftrb,Mliftrb)
-
-  offline_times = OfflineTime(basis_time,assembly_time)
-
-  if info.save_offline save(info,(rb_space,adrb,offline_times)) end
-
-  printstyled("Online phase, reduced basis method\n";color=:red)
-
-  st_mdeim = info.st_mdeim
-  Aon = RBParamOnlineStructure(Arb;st_mdeim)
-  Mon = RBParamOnlineStructure(Mrb;st_mdeim)
-  Fon = RBParamOnlineStructure(Frb;st_mdeim)
-  Hon = RBParamOnlineStructure(Hrb;st_mdeim)
-  Alifton = RBParamOnlineStructure(Aliftrb;st_mdeim)
-  Mlifton = RBParamOnlineStructure(Mliftrb;st_mdeim)
-  online_structures = (Aon,Mon,Fon,Hon,Alifton,Mlifton)
-
-  rb_system = k -> unsteady_poisson_rb_system(online_structures,μ[k])
-  res = online_loop(k -> uh[k],rb_space,rb_system,info.online_snaps)
-  postprocess(info,(res,),(V,),model,time_info)
 end
 
 poisson_unsteady()

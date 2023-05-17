@@ -102,9 +102,15 @@ end
 function rb_space_projection(
   op::RBLinVariable,
   basis_space::AbstractMatrix{Float},
-  args...)
+  findnz_idx::Vector{Int})
 
   rbspace_row = get_rbspace_row(op)
+  # Ns = get_Ns(rbspace_row)
+  # full_basis_space = zeros(Ns,size(basis_space,2))
+  # full_basis_space[findnz_idx,:] = basis_space
+
+  # brow = get_basis_space(rbspace_row)
+  # brow'*full_basis_space
   brow = get_basis_space(rbspace_row)
   brow'*basis_space
 end
@@ -211,7 +217,7 @@ function get_rb_lu(
 end
 
 recast_in_full_dim(idx_tmp::Vector{Int},findnz_idx::Vector{Int}) =
-  findnz_idx[idx_tmp]
+  idx_tmp# findnz_idx[idx_tmp]
 
 recast_in_full_dim(idx_tmp::NTuple{2,Vector{Int}},findnz_idx::Vector{Int}) =
   recast_in_full_dim(first(idx_tmp),findnz_idx),last(idx_tmp)
@@ -273,9 +279,7 @@ function find_mesh_elements(::Val{false},idx::Vector{Int},connectivity)
   unique(reduce(vcat,el))
 end
 
-recast_in_mat_form(::RBLinVariable,idx_tmp::Vector{Int}) = idx_tmp
-
-function recast_in_mat_form(op::RBBilinVariable,idx_tmp::Vector{Int})
+function recast_in_mat_form(op::RBVariable,idx_tmp::Vector{Int})
   Ns = get_Ns(get_rbspace_row(op))
   idx_space,_ = from_vec_to_mat_idx(idx_tmp,Ns)
   idx_space

@@ -180,7 +180,7 @@ function hyperred_structure(
   function M!(μ::Param)
     @inbounds for (n,tn) in enumerate(times)
       Mtemp = assemble_matrix((u,v)->fun(μ,tn,m,u,v),trial(μ,tn),test)
-      M[:,n] = get_findnz_vals(Mtemp,idx_space)
+      copyto!(view(M,:,n),get_findnz_vals(Mtemp,idx_space))
     end
     M
   end
@@ -215,7 +215,7 @@ function hyperred_structure(
 
   function lift!(μ::Param)
     @inbounds for (n,tn) in enumerate(times)
-      lift[:,n] = assemble_vector(v->fun(μ,tn,m,dir(μ,tn),v),test)[idx_space]
+      copyto!(view(lift,:,n),assemble_vector(v->fun(μ,tn,m,dir(μ,tn),v),test)[idx_space])
     end
     lift
   end
@@ -251,7 +251,7 @@ function hyperred_structure(
   function M!(μ::Param,z)
     @inbounds for (n,tn) in enumerate(times)
       Mtemp = assemble_matrix((u,v)->fun(m,z(tn),u,v),trial(μ,tn),test)
-      M[:,n] = get_findnz_vals(Mtemp,idx_space)
+      copyto!(view(M,:,n),get_findnz_vals(Mtemp,idx_space))
     end
     M
   end
@@ -286,7 +286,7 @@ function hyperred_structure(
 
   function lift!(μ::Param,z)
     @inbounds for (n,tn) in enumerate(times)
-      lift[:,n] = assemble_vector(v->fun(m,z(tn),dir(μ,tn),v),test)[idx_space]
+      copyto!(view(lift,:,n),assemble_vector(v->fun(m,z(tn),dir(μ,tn),v),test)[idx_space])
     end
     lift
   end

@@ -68,7 +68,7 @@ function Base.argmax(v::Vector,nval::Int)
   Int.(indexin(s,v))[1:nval]
 end
 
-function get_findnz_idx(mat::EMatrix{Float})
+function get_findnz_idx(mat::AbstractMatrix{Float})
   sum_cols = sum(mat,dims=2)[:]
   findall(x -> abs(x) ≥ eps(),sum_cols)
 end

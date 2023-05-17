@@ -79,25 +79,24 @@ function model_info(
 end
 
 function generate_fe_snapshots(
+  isindef::Val,
   run_fem::Bool,
   fepath::String,
   nsnap::Int,
   solver,
   op,
   args...;
-  indef=true,
   save_snaps=true)
-
-  isindef = Val{indef}()
 
   if run_fem
     printstyled("Generating $nsnap full order snapshots on each available worker\n";color=:blue)
     fe_time = @elapsed begin
       sols_params = generate_fe_snapshots(isindef,solver,op,nsnap,args...)
     end
+    printstyled("fe_time = $fe_time\n";color=:blue)
     if save_snaps
       save(fepath,sols_params)
-      save(joinpath(fepath,"fe_time"),fe_time)
+      save(joinpath(fepath,"fe_time"),fe_time/ceil(nsnap/nworkers()))
     end
   else
     sols_params = load(isindef,fepath,nsnap)
@@ -106,11 +105,19 @@ function generate_fe_snapshots(
   sols_params
 end
 
-function load(::Val{false},fepath::String,nsnap::Int)
+function load(
+  ::Val{false},
+  fepath::String,
+  nsnap::Int)
+
   load(fepath,:u,nsnap),load(Vector{Param},fepath)
 end
 
-function load(::Val{true},fepath::String,nsnap::Int)
+function load(
+  ::Val{true},
+  fepath::String,
+  nsnap::Int)
+
   load(fepath,:u,nsnap),load(fepath,:p,nsnap),load(Vector{Param},fepath)
 end
 
@@ -136,14 +143,20 @@ function generate_fe_snapshots(
   generate_fe_snapshots(isindef,sol)
 end
 
-function generate_fe_snapshots(::Val{false},sol::Vector{T}) where T
+function generate_fe_snapshots(
+  ::Val{false},
+  sol)
+
   ns = length(sol)
   xh,μ = get_solutions(sol)
   usnap = Snapshots(:u,xh,ns)
   usnap,μ
 end
 
-function generate_fe_snapshots(::Val{true},sol::Vector{T}) where T
+function generate_fe_snapshots(
+  ::Val{true},
+  sol)
+
   Ns,ns = get_Ns(sol),length(sol)
   xh,μ = get_solutions(sol)
   u,p = xh[1:Ns[1],:],xh[Ns[1]+1:Ns[1]+Ns[2],:]
@@ -151,15 +164,15 @@ function generate_fe_snapshots(::Val{true},sol::Vector{T}) where T
   usnap,psnap,μ
 end
 
-function get_solutions(sol::Vector{T}) where T
+function get_solutions(sol)
   Ns = sum(get_Ns(first(sol)))
   Nt = get_Nt(first(sol))
   np = get_np(first(sol))
   x = allocate_matrix(Matrix{Float},Ns,Nt)
   μ = zeros(np)
 
-  #sols_and_params = pmap(get_sol_and_param!,eachindex(sol))
-  sols_and_params = pmap(solk->get_solution!(x,μ,solk),sol)
+  idx = eachindex(sol)
+  sols_and_params = pmap(k->get_solution!(x,μ,sol,k),idx)
   sols,params = first.(sols_and_params),last.(sols_and_params)
   EMatrix(sols),vector_of_params(params)
 end
@@ -167,24 +180,38 @@ end
 function get_solution!(
   x::Matrix{Float},
   μ::Vector{Float},
-  solk::ParamFESolution)
+  sol::Vector{ParamFESolution},
+  k::Int)
 
+  printstyled("Computing snapshot $k\n";color=:blue)
+
+  solk = sol[k]
   copyto!(view(x,:,1),get_free_dof_values(solk.psol.uh))
   copyto!(μ,get_μ(solk.psol.μ))
+
+  printstyled("Successfully computed snapshot $k\n";color=:blue)
+
   x,μ
 end
 
 function get_solution!(
   x::Matrix{Float},
   μ::Vector{Float},
-  solk::ParamTransientFESolution)
+  sol::Vector{ParamTransientFESolution},
+  k::Int)
 
+  printstyled("Computing snapshot $k\n";color=:blue)
+
+  solk = sol[k]
   n = 1
   for (xn,_) in solk
     copyto!(view(x,:,n),xn)
     n += 1
   end
   copyto!(μ,get_μ(solk.psol.μ))
+
+  printstyled("Successfully computed snapshot $k\n";color=:blue)
+
   x,μ
 end
 
@@ -215,5 +242,9 @@ function online_loop(fe_sol,rb_space,rb_system,k::Int)
   end
   fe_sol_approx = reconstruct_fe_sol(rb_space,rb_sol)
 
-  RBResults(fe_sol(k),fe_sol_approx,online_time)
+  RBResults(fe_sol,fe_sol_approx,online_time)
+end
+
+function online_loop(loop,k::UnitRange{Int})
+  RBResults(pmap(loop,k))
 end

@@ -41,6 +41,26 @@ get_fdata(al::AssemblerLoop) = al.fdata
 
 get_nsnap(al::AssemblerLoop) = al.nsnap
 
+function arg_functions(
+  μvec::Vector{Param},
+  tvec::Vector{Float})
+
+  Nt = length(tvec)
+  μ(i) = μvec[slow_idx(i,Nt)]
+  t(i) = tvec[fast_idx(i,Nt)]
+  Nt,μ,t
+end
+
+function arg_functions(
+  μvec::Vector{Param},
+  tvec::Vector{Float},
+  uvec::Vector{T}) where {T<:Union{FEFunction,Function}}
+
+  Nt,μ,t = arg_functions(μvec,tvec)
+  u(i) = uvec[slow_idx(i,Nt)]
+  Nt,μ,t,u
+end
+
 function assemble_vectors(f::Function,V::FESpace,args...)
   a,vecdata = assembler_setup(f,V,args...)
   v1,findnz_idx = assembler_invariables(a,vecdata)
@@ -94,24 +114,16 @@ function get_vecdata(
   VectorAssemblerLoop(vecdata,nsnap)
 end
 
-function arg_functions(
-  μvec::Vector{Param},
-  tvec::Vector{Float})
+# FUNCTIONAL MDEIM
+function get_vecdata(
+  f::Function,
+  V::FESpace,
+  dv::Gridap.FESpaces.SingleFieldFEBasis,
+  fvec::Vector{<:FEFunction})
 
-  Nt = length(tvec)
-  μ(i) = μvec[slow_idx(i,Nt)]
-  t(i) = tvec[fast_idx(i,Nt)]
-  Nt,μ,t
-end
-
-function arg_functions(
-  μvec::Vector{Param},
-  tvec::Vector{Float},
-  uvec::Vector{T}) where {T<:Union{FEFunction,Function}}
-
-  Nt,μ,t = arg_functions(μvec,tvec)
-  u(i) = uvec[slow_idx(i,Nt)]
-  Nt,μ,t,u
+  vecdata(i) = collect_cell_vector(V,f(fvec[i],dv))
+  nsnap = length(fvec)
+  VectorAssemblerLoop(vecdata,nsnap)
 end
 
 function get_vecdata(
@@ -164,7 +176,7 @@ function assembler_invariables(
   vecdata1 = data(1)
   v1 = Gridap.Algebra.nz_counter(get_vector_builder(a),(get_rows(a),))
   symbolic_loop_vector!(v1,a,vecdata1)
-  # findnz_idx = collect(eachindex(get_rows(a)))
+  findnz_idx = collect(eachindex(get_rows(a)))
 
   v1,findnz_idx
 end
@@ -173,7 +185,7 @@ function assembler_loop(
   a::SparseMatrixAssembler,
   vecdata::VectorAssemblerLoop,
   v1::Gridap.Algebra.ArrayCounter{Vector{Float},Tuple{Base.OneTo{Int}}},
-  findnz_idx::Vector{Int})
+  ::Vector{Int})
 
   data = get_fdata(vecdata)
   nsnap = get_nsnap(vecdata)
@@ -182,12 +194,14 @@ function assembler_loop(
     vecdata_i = data(i)
     v2 = Gridap.Algebra.nz_allocation(v1)
     numeric_loop_vector!(v2,a,vecdata_i)
-    v2[findnz_idx]
+    v2
   end
 
-  snaps = pmap(get_snapshot,1:nsnap)
-  save(joinpath(pwd(),"dio"),hcat(snaps...))
-  EMatrix(hcat(snaps...)),findnz_idx
+  snaps = hcat(pmap(get_snapshot,1:nsnap)...)
+  # snaps = hcat(get_snapshot.(1:nsnap)...)
+  findnz_idx = get_findnz_idx(snaps)
+  # EMatrix(snaps)[findnz_idx,:],findnz_idx
+  EMatrix(snaps),findnz_idx
 end
 
 function assemble_matrices(f::Function,U,V::FESpace,args...)
@@ -315,8 +329,9 @@ function assembler_loop(
     m3
   end
 
-  snaps = pmap(get_snapshot,1:nsnap)
-  EMatrix(hcat(snaps...)),findnz_idx
+  snaps = hcat(pmap(get_snapshot,1:nsnap)...)
+  # snaps = hcat(get_snapshot.(1:nsnap)...)
+  EMatrix(snaps),findnz_idx
 end
 
 function my_create_from_nz(
@@ -361,6 +376,7 @@ function assemble_functional_snaps(
   nsnap = get_nsnap(matdata)
 
   snaps = pmap(data,1:nsnap)
+  # snaps = data.(1:nsnap)
   Snapshots(get_id(op),EMatrix(hcat(snaps...)),length(μvec))
 end
 
