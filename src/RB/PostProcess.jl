@@ -9,9 +9,9 @@ function save(info::RBInfo,ot::OfflineTime)
 end
 
 struct RBResults
-  id::Symbol
+  sol::Snapshots
+  sol_approx::Snapshots
   relative_err::Float
-  pointwise_err::Matrix{Float}
   online_time::Float
 end
 
@@ -30,70 +30,70 @@ function RBResults(
   online_time::Float;
   X=nothing)
 
-  id = get_id(sol)
-  sol_mat = get_snap(Matrix{Float},sol)
-  sol_approx_mat = get_snap(Matrix{Float},sol_approx)
+  sol_mat = get_snap(sol)
+  sol_approx_mat = get_snap(sol_approx)
   Y = isnothing(X) ? I(size(sol_mat,1)) : X
-  relative_err,pointwise_err = compute_errors(sol_mat,sol_approx_mat,Y)
-
-  RBResults(id,relative_err,pointwise_err,online_time)
+  relative_err = compute_rel_error(sol_mat,sol_approx_mat,Y)
+  RBResults(sol,sol_approx,relative_err,online_time)
 end
 
 function RBResults(res::Vector{RBResults})
   nruns = length(res)
 
-  id = first(res).id
+  sols = first(res).sol
+  sols_approx = first(res).sol_approx
   relative_errs = Broadcasting(r->getproperty(r,:relative_err))(res)
   online_times = Broadcasting(r->getproperty(r,:online_time))(res)
 
   relative_err = sum(relative_errs)/nruns
-  pointwise_err = first(res).pointwise_err
   online_time = sum(online_times/nruns)
 
-  RBResults(id,relative_err,pointwise_err,online_time)
+  RBResults(sols,sols_approx,relative_err,online_time)
+end
+
+function RBResults(res::Vector{NTuple{2,RBResults}})
+  RBResults(first.(res)),RBResults(last.(res))
 end
 
 function save(info::RBInfo,res::NTuple{1,RBResults})
   res_u, = res
-  res_dict = Dict("relative_err_$(res_u.id)" => res_u.relative_err,
+  res_dict = Dict("relative_err_$(res_u.sol.id)" => res_u.relative_err,
                   "online_time"=>res_u.online_time)
   save(joinpath(info.online_path,"results"),res_dict)
 end
 
 function save(info::RBInfo,res::NTuple{2,RBResults})
   res_u,res_p = res
-  res_dict = Dict("relative_err_$(res_u.id)" => res_u.relative_err,
-                  "relative_err_$(res_p.id)" => res_p.relative_err,
+  res_dict = Dict("relative_err_$(res_u.sol.id)" => res_u.relative_err,
+                  "relative_err_$(res_p.sol.id)" => res_p.relative_err,
                   "online_time"=>res_u.online_time)
-  save(joinpath(info.online_path,"results_$id"),res_dict)
+  save(joinpath(info.online_path,"results"),res_dict)
 end
 
-function compute_errors(
+function compute_rel_error(
   u::AbstractMatrix,
   uh_rb::AbstractMatrix,
   X::AbstractMatrix)
 
-  pointwise_err = abs.(u-uh_rb)
   Nt = size(u,2)
   absolute_err,uh_norm = zeros(Nt),zeros(Nt)
   for i = 1:Nt
     absolute_err[i] = sqrt((u[:,i]-uh_rb[:,i])'*X*(u[:,i]-uh_rb[:,i]))
     uh_norm[i] = sqrt(u[:,i]'*X*u[:,i])
   end
-  relative_err = norm(absolute_err)/norm(uh_norm)
 
-  relative_err,pointwise_err
+  norm(absolute_err)/norm(uh_norm)
 end
 
 function postprocess(
   info::RBInfo,
   res::NTuple{1,RBResults},
-  fespaces::NTuple{1,FESpace},
+  fespaces::NTuple{1,Tuple},
   model::DiscreteModel,
   args...)
 
   res_u, = res
-  V, = fespaces
+  fespaces_u, = fespaces
 
   printstyled("-------------------------------------------------------------\n")
   printstyled("Average online relative errors err_u: $(res_u.relative_err)\n";
@@ -105,10 +105,8 @@ function postprocess(
   if info.save_online save(info,res) end
 
   if info.postprocess
-    # offline_results_dict(info)
-    # online_results_dict(info)
     trian = get_triangulation(model)
-    writevtk(info,res_u,V,trian,args...)
+    writevtk(info,res_u,fespaces_u,trian,args...)
   end
 
   return
@@ -117,13 +115,13 @@ end
 function postprocess(
   info::RBInfo,
   res::NTuple{2,RBResults},
-  fespaces::NTuple{2,FESpace},
+  fespaces::NTuple{2,Tuple},
   model::DiscreteModel,
   args...)
 
   res_u,res_p = res
   rel_err_u,rel_err_p = res_u.relative_err,res_p.relative_err
-  V,Q = fespaces
+  fespaces_u,fespaces_p = fespaces
 
   printstyled("-------------------------------------------------------------\n")
   printstyled("Average online relative errors (err_u,err_p): $((rel_err_u,rel_err_p))\n";
@@ -135,11 +133,9 @@ function postprocess(
   if info.save_online save(info,res) end
 
   if info.postprocess
-    # offline_results_dict(info)
-    # online_results_dict(info)
     trian = get_triangulation(model)
-    writevtk(info,res_u,V,trian,args...)
-    writevtk(info,res_p,Q,trian,args...)
+    writevtk(info,res_u,fespaces_u,trian,args...)
+    writevtk(info,res_p,fespaces_p,trian,args...)
   end
 
   return
@@ -148,7 +144,7 @@ end
 function Gridap.writevtk(
   info::RBInfoSteady,
   s::Snapshots,
-  fespace::FESpace,
+  fespace,
   trian::Triangulation)
 
   id = get_id(s)
@@ -157,26 +153,32 @@ function Gridap.writevtk(
 
   path = joinpath(plt_dir,"$(id)h")
   fefun = FEFunction(fespace,s.snap[:,1])
-  writevtk(trian,path,cellfields=["$(id)h"=>fefun])
+  writevtk(trian,path,cellfields=["$(id)"=>fefun])
 end
 
 function Gridap.writevtk(
   info::RBInfoSteady,
   res::RBResults,
-  fespace::FESpace,
+  fespaces::Tuple,
   trian::Triangulation)
 
-  plt_dir = joinpath(info.online_path,joinpath("plots","pwise_err_$(res.id)"))
-  create_dir!(plt_dir)
+  trial,test = fespaces
+  sol,sol_approx = res.sol,res.sol_approx
+  id = get_id(sol_approx)
 
-  fefun = FEFunction(fespace,res.et.pointwise_err[:,1])
+  writevtk(info,sol,trial,trian)
+  writevtk(info,sol_approx,trial,trian)
+
+  plt_dir = joinpath(info.online_path,joinpath("plots","err_$(id)"))
+  create_dir!(plt_dir)
+  fefun = FEFunction(test,res.pointwise_err[:,1])
   writevtk(trian,plt_dir,cellfields=["err"=>fefun])
 end
 
 function Gridap.writevtk(
   info::RBInfoUnsteady,
   s::Snapshots,
-  fespace::FESpace,
+  fespace::Function,
   trian::Triangulation,
   tinfo::TimeInfo)
 
@@ -185,27 +187,33 @@ function Gridap.writevtk(
   plt_dir = joinpath(info.online_path,joinpath("plots"))
   create_dir!(plt_dir)
 
-  path = joinpath(plt_dir,"$(id)h")
   for (it,t) in enumerate(times)
     fefun = FEFunction(fespace(t),Vector(s.snap[:,it]))
-    writevtk(trian,path*"_$(it).vtu",cellfields=["$(id)h"=>fefun])
+    writevtk(trian,joinpath(plt_dir,"$(id)_$(it).vtu"),cellfields=["$(id)"=>fefun])
   end
 end
 
 function Gridap.writevtk(
   info::RBInfoUnsteady,
   res::RBResults,
-  fespace::FESpace,
+  fespaces::Tuple,
   trian::Triangulation,
   tinfo::TimeInfo)
 
+  trial,test = fespaces
   times = get_times(tinfo)
-  plt_dir = joinpath(info.online_path,joinpath("plots","pwise_err_$(res.id)"))
-  create_dir!(plt_dir)
+  sol,sol_approx = res.sol,res.sol_approx
+  writevtk(info,sol,trial,trian,tinfo)
+  writevtk(info,sol_approx,trial,trian,tinfo)
 
-  for (it,t) in enumerate(times)
-    fefun = FEFunction(fespace(t),res.et.pointwise_err[:,it])
-    writevtk(trian,plt_dir*"_$(it).vtu",cellfields=["err"=>fefun])
+  pointwise_err = abs.(get_snap(sol)-get_snap(sol_approx))
+  id = get_id(sol_approx)
+
+  plt_dir = joinpath(info.online_path,"plots")
+  create_dir!(plt_dir)
+  for it in eachindex(times)
+    fefun = FEFunction(test,pointwise_err[:,it])
+    writevtk(trian,joinpath(plt_dir,"err_$(id)_$(it).vtu"),cellfields=["err"=>fefun])
   end
 end
 
@@ -284,12 +292,12 @@ function L2_norm_matrix(opM::ParamBilinOperator)
   assemble_affine_quantity(opM)
 end
 
-function gather_online_results()
+function gather_online_results(ptype,test_path)
   d = []
-  for fun_mdeim=(true,false), st_mdeim=(false,true), ϵ=(1e-1,1e-2,1e-3,1e-4)
+  for fun_mdeim=(true,), st_mdeim=(false,true), ϵ=(1e-1,1e-2,1e-3,1e-4)
     info = RBInfoUnsteady(ptype,test_path;ϵ,nsnap=80,mdeim_snap=20,st_mdeim,fun_mdeim)
     tpath = info.online_path
-    d = [d...,Dict("res_$(fun_mdeim)_$(st_mdeim)_$(ϵ)" => deserialize(joinpath(tpath,"results.txt")))]
+    d = [d...,Dict("res_$(fun_mdeim)_$(st_mdeim)_$(ϵ)" => deserialize(joinpath(tpath,"results_u.txt")))]
   end
   d
 end

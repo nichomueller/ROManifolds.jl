@@ -12,14 +12,13 @@ addprocs(manager)
 end
 
 function stokes_unsteady()
-  run_fem = true
+  run_fem = false
 
   steady = false
   indef = true
-  pdomain = false
-  ptype = ProblemType(steady,indef,pdomain)
+  ptype = ProblemType(steady,indef)
 
-  mesh = "flow_3cyl.json"
+  mesh = "flow_3cyl_02.json"
   test_path = "$root/tests/stokes/unsteady/$mesh"
   bnd_info = Dict("dirichlet_noslip" => ["noslip"],
                   "dirichlet_nopenetration" => ["nopenetration"],
@@ -29,7 +28,7 @@ function stokes_unsteady()
 
   fepath = fem_path(test_path)
   mshpath = mesh_path(test_path,mesh)
-  model = model_info(mshpath,bnd_info,ptype)
+  model = model_info(mshpath,bnd_info)
   measures = ProblemMeasures(model,order)
   D = get_dimension(model)
 
@@ -41,7 +40,7 @@ function stokes_unsteady()
   time_info = ThetaMethodInfo(t0,tF,dt,θ)
 
   function a(x,p::Param,t::Real)
-    exp((cos(t)+sin(t))*x[1]/sum(p.μ))
+    exp(-abs(sin(t))*x[1]/sum(p.μ))
   end
   a(p::Param,t::Real) = x->a(x,p,t)
   b(x,p::Param,t::Real) = 1.
@@ -55,7 +54,7 @@ function stokes_unsteady()
   function g(x,p::Param,t::Real)
     W = 1.5
     T = 0.16
-    flow_rate = abs(1-cos(2*pi*t/T)+sin(2*pi*t/(p.μ[1]*T))/p.μ[2])
+    flow_rate = abs(1-cos(2*pi*t/T)+sin(2*pi*t/(p.μ[1]*T))/p.μ[2])/2
     parab_prof = VectorValue(abs.(x[2]*(x[2]-W))/(W/2)^2,0.,0.)
     parab_prof*flow_rate
   end
@@ -64,13 +63,12 @@ function stokes_unsteady()
   g0(p::Param,t::Real) = x->g0(x,p,t)
 
   reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{D,Float},order)
-  reffe1 = Gridap.ReferenceFE(lagrangian,VectorValue{D,Float},order)
   reffe2 = Gridap.ReferenceFE(lagrangian,Float,order-1)
   V = TestFESpace(model,reffe1;conformity=:H1,
     dirichlet_tags=["dirichlet_noslip","dirichlet_nopenetration","dirichlet"],
     dirichlet_masks=[(true,true,true),(false,false,true),(true,true,true)])
   U = ParamTransientTrialFESpace(V,[g0,g,g])
-  Q = TestFESpace(model,reffe2;conformity=:L2)
+  Q = TestFESpace(model,reffe2;conformity=:C0)
   P = TrialFESpace(Q)
 
   feop,opA,opB,opBT,opM,opF,opH = stokes_operators(measures,PS,time_info,V,U,Q,P;a,b,m,f,h)
@@ -84,8 +82,8 @@ function stokes_unsteady()
 
   u,p,μ = generate_fe_snapshots(Val{indef}(),run_fem,fepath,nsnap,solver,feop,t0,tF)
 
-  for fun_mdeim=(false,true), st_mdeim=(false,true), ϵ=(1e-1,1e-2,1e-3,1e-4)
-    info = RBInfoUnsteady(ptype,test_path;ϵ,nsnap=80,mdeim_snap=20,
+  for fun_mdeim=(true,), st_mdeim=(true,), ϵ=(1e-1,1e-2,1e-3,1e-4)
+    info = RBInfoUnsteady(ptype,test_path;ϵ,nsnap=50,mdeim_snap=30,
       st_mdeim,fun_mdeim,postprocess=true)
 
     printstyled("Offline phase, reduced basis method\n";color=:blue)
@@ -109,15 +107,15 @@ function stokes_unsteady()
     rbopMlift = RBLiftVariable(rbopM)
 
     assembly_time = @elapsed begin
-      Arb = RBAffineDecomposition(info,rbopA,get_dΩ(measures))
-      Brb = RBAffineDecomposition(info,rbopB,get_dΩ(measures))
-      BTrb = RBAffineDecomposition(info,rbopBT,get_dΩ(measures))
-      Mrb = RBAffineDecomposition(info,rbopM,get_dΩ(measures))
-      Frb = RBAffineDecomposition(info,rbopF,get_dΩ(measures))
-      Hrb = RBAffineDecomposition(info,rbopH,measures,get_dΓn(measures))
-      Aliftrb = RBAffineDecomposition(info,rbopAlift,get_dΩ(measures))
-      Bliftrb = RBAffineDecomposition(info,rbopBlift,get_dΩ(measures))
-      Mliftrb = RBAffineDecomposition(info,rbopMlift,get_dΩ(measures))
+      Arb = RBAffineDecomposition(info,rbopA,μ,get_dΩ(measures))
+      Brb = RBAffineDecomposition(info,rbopB,μ,get_dΩ(measures))
+      BTrb = RBAffineDecomposition(info,rbopBT,μ,get_dΩ(measures))
+      Mrb = RBAffineDecomposition(info,rbopM,μ,get_dΩ(measures))
+      Frb = RBAffineDecomposition(info,rbopF,μ,get_dΩ(measures))
+      Hrb = RBAffineDecomposition(info,rbopH,μ,get_dΓn(measures))
+      Aliftrb = RBAffineDecomposition(info,rbopAlift,μ,get_dΩ(measures))
+      Bliftrb = RBAffineDecomposition(info,rbopBlift,μ,get_dΩ(measures))
+      Mliftrb = RBAffineDecomposition(info,rbopMlift,μ,get_dΩ(measures))
     end
     adrb = (Arb,Brb,BTrb,Mrb,Frb,Hrb,Aliftrb,Bliftrb,Mliftrb)
 
@@ -129,7 +127,6 @@ function stokes_unsteady()
 
     printstyled("Online phase, reduced basis method\n";color=:red)
 
-    st_mdeim = info.st_mdeim
     Aon = RBParamOnlineStructure(Arb;st_mdeim)
     Bon = RBParamOnlineStructure(Brb;st_mdeim)
     BTon = RBParamOnlineStructure(BTrb;st_mdeim)
@@ -137,12 +134,19 @@ function stokes_unsteady()
     Fon = RBParamOnlineStructure(Frb;st_mdeim)
     Hon = RBParamOnlineStructure(Hrb;st_mdeim)
     Alifton = RBParamOnlineStructure(Aliftrb;st_mdeim)
+    Blifton = RBParamOnlineStructure(Bliftrb;st_mdeim)
     Mlifton = RBParamOnlineStructure(Mliftrb;st_mdeim)
     online_structures = (Aon,Bon,BTon,Mon,Fon,Hon,Alifton,Blifton,Mlifton)
 
+    u_on = convert_snapshot(Matrix{Float},u)
+    p_on = convert_snapshot(Matrix{Float},p)
     rb_system = k -> unsteady_stokes_rb_system(online_structures,μ[k])
-    online_loop_k = k -> online_loop((u[k],p[k]),rb_space,rb_system,k)
+    online_loop_k = k -> online_loop((u_on[k],p_on[k]),rb_space,rb_system,k)
     res = online_loop(online_loop_k,info.online_snaps)
-    postprocess(info,res,(V,Q),model,time_info)
+    postprocess(info,res,
+      (t->U(μ[info.online_snaps[1]],t),t->P(μ[info.online_snaps[1]],t)),
+      model,time_info)
   end
 end
+
+stokes_unsteady()

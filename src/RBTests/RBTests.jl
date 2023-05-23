@@ -90,13 +90,14 @@ function generate_fe_snapshots(
 
   if run_fem
     printstyled("Generating $nsnap full order snapshots on each available worker\n";color=:blue)
-    fe_time = @elapsed begin
+    total_fe_time = @elapsed begin
       sols_params = generate_fe_snapshots(isindef,solver,op,nsnap,args...)
     end
-    printstyled("fe_time = $fe_time\n";color=:blue)
+    time_per_snap = total_fe_time/ceil(nsnap/nworkers())
+    printstyled("fe_time = $time_per_snap\n";color=:blue)
     if save_snaps
       save(fepath,sols_params)
-      save(joinpath(fepath,"fe_time"),fe_time/ceil(nsnap/nworkers()))
+      save(joinpath(fepath,"fe_time"),time_per_snap)
     end
   else
     sols_params = load(isindef,fepath,nsnap)
@@ -157,7 +158,7 @@ function generate_fe_snapshots(
   ::Val{true},
   sol)
 
-  Ns,ns = get_Ns(sol),length(sol)
+  Ns,ns = get_Ns(first(sol)),length(sol)
   xh,μ = get_solutions(sol)
   u,p = xh[1:Ns[1],:],xh[Ns[1]+1:Ns[1]+Ns[2],:]
   usnap,psnap = Snapshots(:u,u,ns),Snapshots(:p,p,ns)

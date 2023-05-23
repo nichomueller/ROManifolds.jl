@@ -192,7 +192,7 @@ function reconstruct_fe_sol(
 
   id = get_id(rb_space)
   bs = get_basis_space(rb_space)
-  Snapshots(id,bs*rb_sol,1,EMatrix{Float})
+  Snapshots(id*:_approx,bs*rb_sol,1)
 end
 
 function reconstruct_fe_sol(
@@ -206,7 +206,7 @@ function reconstruct_fe_sol(
   nt = get_nt(rb_space)
 
   rb_sol_resh = reshape(rb_sol,nt,ns)
-  Snapshots(id,bs*(bt*rb_sol_resh)',1,EMatrix{Float})
+  Snapshots(id*:_approx,bs*(bt*rb_sol_resh)',1)
 end
 
 function reconstruct_fe_sol(

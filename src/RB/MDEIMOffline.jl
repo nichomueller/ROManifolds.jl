@@ -105,14 +105,12 @@ function rb_space_projection(
   findnz_idx::Vector{Int})
 
   rbspace_row = get_rbspace_row(op)
-  # Ns = get_Ns(rbspace_row)
-  # full_basis_space = zeros(Ns,size(basis_space,2))
-  # full_basis_space[findnz_idx,:] = basis_space
+  Ns = get_Ns(rbspace_row)
+  full_basis_space = zeros(Ns,size(basis_space,2))
+  full_basis_space[findnz_idx,:] = basis_space
 
-  # brow = get_basis_space(rbspace_row)
-  # brow'*full_basis_space
   brow = get_basis_space(rbspace_row)
-  brow'*basis_space
+  brow'*full_basis_space
 end
 
 function rb_space_projection(
@@ -217,7 +215,7 @@ function get_rb_lu(
 end
 
 recast_in_full_dim(idx_tmp::Vector{Int},findnz_idx::Vector{Int}) =
-  idx_tmp# findnz_idx[idx_tmp]
+  findnz_idx[idx_tmp]
 
 recast_in_full_dim(idx_tmp::NTuple{2,Vector{Int}},findnz_idx::Vector{Int}) =
   recast_in_full_dim(first(idx_tmp),findnz_idx),last(idx_tmp)

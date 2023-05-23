@@ -198,10 +198,17 @@ function assembler_loop(
   end
 
   snaps = hcat(pmap(get_snapshot,1:nsnap)...)
-  # snaps = hcat(get_snapshot.(1:nsnap)...)
   findnz_idx = get_findnz_idx(snaps)
-  # EMatrix(snaps)[findnz_idx,:],findnz_idx
-  EMatrix(snaps),findnz_idx
+  EMatrix(snaps)[findnz_idx,:],findnz_idx
+  # vecs = allocate_matrix(EMatrix{Float},length(findnz_idx),nsnap)
+  # @inbounds for i = 1:nsnap
+  #   vecdata_i = data(i)
+  #   v2 = Gridap.Algebra.nz_allocation(v1)
+  #   numeric_loop_vector!(v2,a,vecdata_i)
+  #   copyto!(view(vecs,:,i),v2)
+  # end
+  # findnz_idx = get_findnz_idx(vecs)
+  # vecs[findnz_idx,:],findnz_idx
 end
 
 function assemble_matrices(f::Function,U,V::FESpace,args...)
@@ -330,8 +337,15 @@ function assembler_loop(
   end
 
   snaps = hcat(pmap(get_snapshot,1:nsnap)...)
-  # snaps = hcat(get_snapshot.(1:nsnap)...)
   EMatrix(snaps),findnz_idx
+  # mats = allocate_matrix(EMatrix{Float},length(findnz_idx),nsnap)
+  # @inbounds for i = 1:nsnap
+  #   matdata_i = data(i)
+  #   m2 = Gridap.Algebra.nz_allocation(m1)
+  #   numeric_loop_matrix!(m2,a,matdata_i)
+  #   copyto!(view(mats,:,i),my_create_from_nz(m2))
+  # end
+  # mats,findnz_idx
 end
 
 function my_create_from_nz(
@@ -376,8 +390,12 @@ function assemble_functional_snaps(
   nsnap = get_nsnap(matdata)
 
   snaps = pmap(data,1:nsnap)
-  # snaps = data.(1:nsnap)
   Snapshots(get_id(op),EMatrix(hcat(snaps...)),length(μvec))
+  # snaps = allocate_matrix(EMatrix{Float},length(quadp),nsnap)
+  # for i = 1:nsnap
+  #   copyto!(view(snaps,:,i),data(i))
+  # end
+  # Snapshots(get_id(op),snaps,length(μvec))
 end
 
 function assemble_functional_snaps(

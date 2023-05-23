@@ -65,8 +65,9 @@ end
   # Then, the snapshots are sent to the remote workers
   u,μ = generate_fe_snapshots(Val{indef}(),run_fem,fepath,nsnap,solver,feop,t0,tF)
 
-  for fun_mdeim=(false), st_mdeim=(true,false), ϵ=(1e-4,)#(1e-1,1e-2,1e-3,1e-4)
-    info = RBInfoUnsteady(ptype,test_path;ϵ,nsnap=80,mdeim_snap=20,st_mdeim,fun_mdeim)
+  for fun_mdeim=(true,false), st_mdeim=(true,false), ϵ=(1e-4,)#ϵ=(1e-1,1e-2,1e-3,1e-4)
+    info = RBInfoUnsteady(ptype,test_path;ϵ,nsnap=80,mdeim_snap=30,
+      st_mdeim,fun_mdeim,postprocess=true,load_offline=true)
 
     printstyled("Offline phase, reduced basis method\n";color=:blue)
 
@@ -107,10 +108,12 @@ end
     Mlifton = RBParamOnlineStructure(Mliftrb;st_mdeim)
     online_structures = (Aon,Mon,Fon,Hon,Alifton,Mlifton)
 
+    u_on = convert_snapshot(Matrix{Float},u)
+    μ_on = μ[info.online_snaps]
     rb_system = k -> unsteady_poisson_rb_system(online_structures,μ[k])
-    online_loop_k = k -> online_loop(u[k],rb_space,rb_system,k)
+    online_loop_k = k -> online_loop(u_on[k],rb_space,rb_system,k)
     res = online_loop(online_loop_k,info.online_snaps)
-    postprocess(info,(res,),(V,),model,time_info)
+    postprocess(info,(res,),((t->U(μ_on[1],t),V),),model,time_info)
   end
 end
 

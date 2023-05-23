@@ -17,12 +17,12 @@ function Snapshots(
   end
 end
 
-#= function convert_snapshot(::Type{T},s::Snapshots) where T
+function convert_snapshot(::Type{T},s::Snapshots) where T
   id = get_id(s)
   snap = get_snap(s)
   nsnap = get_nsnap(s)
   Snapshots(id,convert(T,snap),nsnap)
-end =#
+end
 
 function Base.getindex(s::Snapshots,idx::UnitRange{Int})
   nidx = length(idx)
@@ -54,7 +54,7 @@ end
 
 function load(path::String,id::Symbol,nsnap::Int)
   s = load(Matrix{Float},joinpath(path,"$(id)"))
-  Snapshots(id,s,nsnap)
+  Snapshots(id,s,nsnap,EMatrix{Float})
 end
 
 get_Nt(s::Snapshots) = get_Nt(get_snap(s),get_nsnap(s))
