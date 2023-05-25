@@ -21,7 +21,7 @@ function RBResults(
   args...;
   kwargs...)::NTuple{N,RBResults} where N
 
-  RBResults.(sol,sol_approx;kwargs...)
+  RBResults.(sol,sol_approx,args...;kwargs...)
 end
 
 function RBResults(
@@ -178,7 +178,7 @@ end
 function Gridap.writevtk(
   info::RBInfoUnsteady,
   s::Snapshots,
-  fespace::Function,
+  fespace,
   trian::Triangulation,
   tinfo::TimeInfo)
 
@@ -297,7 +297,7 @@ function gather_online_results(ptype,test_path)
   for fun_mdeim=(true,), st_mdeim=(false,true), ϵ=(1e-1,1e-2,1e-3,1e-4)
     info = RBInfoUnsteady(ptype,test_path;ϵ,nsnap=80,mdeim_snap=20,st_mdeim,fun_mdeim)
     tpath = info.online_path
-    d = [d...,Dict("res_$(fun_mdeim)_$(st_mdeim)_$(ϵ)" => deserialize(joinpath(tpath,"results_u.txt")))]
+    d = [d...,Dict("res_$(fun_mdeim)_$(st_mdeim)_$(ϵ)" => deserialize(joinpath(tpath,"results.txt")))]
   end
   d
 end

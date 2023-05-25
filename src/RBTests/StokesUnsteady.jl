@@ -18,7 +18,7 @@ function stokes_unsteady()
   indef = true
   ptype = ProblemType(steady,indef)
 
-  mesh = "flow_3cyl_02.json"
+  mesh = "flow_3cyl_015.json"
   test_path = "$root/tests/stokes/unsteady/$mesh"
   bnd_info = Dict("dirichlet_noslip" => ["noslip"],
                   "dirichlet_nopenetration" => ["nopenetration"],
@@ -32,7 +32,7 @@ function stokes_unsteady()
   measures = ProblemMeasures(model,order)
   D = get_dimension(model)
 
-  ranges = fill([1.,10.],2)
+  ranges = fill([1.,10.],3)
   sampling = UniformSampling()
   PS = ParamSpace(ranges,sampling)
 
@@ -40,7 +40,7 @@ function stokes_unsteady()
   time_info = ThetaMethodInfo(t0,tF,dt,θ)
 
   function a(x,p::Param,t::Real)
-    exp(-abs(sin(t))*x[1]/sum(p.μ))
+    exp((sin(t)+cos(t))*x[1]/sum(p.μ))
   end
   a(p::Param,t::Real) = x->a(x,p,t)
   b(x,p::Param,t::Real) = 1.
@@ -53,9 +53,8 @@ function stokes_unsteady()
   h(p::Param,t::Real) = x->h(x,p,t)
   function g(x,p::Param,t::Real)
     W = 1.5
-    T = 0.16
-    flow_rate = abs(1-cos(2*pi*t/T)+sin(2*pi*t/(p.μ[1]*T))/p.μ[2])/2
-    parab_prof = VectorValue(abs.(x[2]*(x[2]-W))/(W/2)^2,0.,0.)
+    flow_rate = abs(1-cos(pi*t/(2*tF))+sin(pi*t/(2*p.μ[1]*tF))/p.μ[2])
+    parab_prof = p.μ[3]*VectorValue(abs.(x[2]*(x[2]-W)),0.,0.)
     parab_prof*flow_rate
   end
   g(p::Param,t::Real) = x->g(x,p,t)
@@ -82,7 +81,7 @@ function stokes_unsteady()
 
   u,p,μ = generate_fe_snapshots(Val{indef}(),run_fem,fepath,nsnap,solver,feop,t0,tF)
 
-  for fun_mdeim=(true,), st_mdeim=(true,), ϵ=(1e-1,1e-2,1e-3,1e-4)
+  for fun_mdeim=(true,), st_mdeim=(false,), ϵ=(1e-1,1e-2,1e-3,1e-4)
     info = RBInfoUnsteady(ptype,test_path;ϵ,nsnap=50,mdeim_snap=30,
       st_mdeim,fun_mdeim,postprocess=true)
 
@@ -140,12 +139,12 @@ function stokes_unsteady()
 
     u_on = convert_snapshot(Matrix{Float},u)
     p_on = convert_snapshot(Matrix{Float},p)
+    μ_on = μ[info.online_snaps]
     rb_system = k -> unsteady_stokes_rb_system(online_structures,μ[k])
     online_loop_k = k -> online_loop((u_on[k],p_on[k]),rb_space,rb_system,k)
     res = online_loop(online_loop_k,info.online_snaps)
     postprocess(info,res,
-      (t->U(μ[info.online_snaps[1]],t),t->P(μ[info.online_snaps[1]],t)),
-      model,time_info)
+    ((t->U(μ_on[1],t),V),(P,Q)),model,time_info)
   end
 end
 

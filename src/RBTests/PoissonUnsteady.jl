@@ -18,7 +18,7 @@ end
   indef = false
   ptype = ProblemType(steady,indef)
 
-  mesh = "elasticity_3cyl.json"
+  mesh = "elasticity_3cyl2D.json"
   test_path = "$root/tests/poisson/unsteady/$mesh"
   bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
   order = 1
@@ -44,10 +44,10 @@ end
   f(x,p::Param,t::Real) = 1.
   f(p::Param,t::Real) = x->f(x,p,t)
   f(p::Param) = t->f(p,t)
-  h(x,p::Param,t::Real) = abs(cos(p.μ[3]*t))
+  h(x,p::Param,t::Real) = abs(cos(pi*t/(p.μ[3]*tF)))
   h(p::Param,t::Real) = x->h(x,p,t)
   h(p::Param) = t->h(p,t)
-  g(x,p::Param,t::Real) = p.μ[1]*exp(-x[1]/p.μ[2])*abs(sin(p.μ[3]*t))
+  g(x,p::Param,t::Real) = p.μ[1]*exp(-x[1]/p.μ[2])*abs(sin(pi*t/(p.μ[3]*tF)))
   g(p::Param,t::Real) = x->g(x,p,t)
   g(p::Param) = t->g(p,t)
 
@@ -65,7 +65,7 @@ end
   # Then, the snapshots are sent to the remote workers
   u,μ = generate_fe_snapshots(Val{indef}(),run_fem,fepath,nsnap,solver,feop,t0,tF)
 
-  for fun_mdeim=(true,false), st_mdeim=(true,false), ϵ=(1e-4,)#ϵ=(1e-1,1e-2,1e-3,1e-4)
+  for fun_mdeim=(true,false), st_mdeim=(true,false), ϵ=(1e-1,1e-2,1e-3,1e-4)
     info = RBInfoUnsteady(ptype,test_path;ϵ,nsnap=80,mdeim_snap=30,
       st_mdeim,fun_mdeim,postprocess=true,load_offline=true)
 

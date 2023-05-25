@@ -106,6 +106,33 @@ get_param_functions(op::ParamOperator) = op.pfun
 
 get_param_function(op::ParamOperator) = get_param_function(op.pfun)
 
+# REMOVE WHEN POSSIBLE!!
+function get_param_function(op::ParamLiftOperator)
+  id = get_id(op)
+  dirf = get_trial(op).dirichlet_μt
+  pfun = get_param_function(op.pfun)
+  if id == :A
+    (x,μ,t) -> pfun(x,μ,t)*∇(dirf(μ,t))(x)
+  elseif id == :B
+    (x,μ,t) -> pfun(x,μ,t)*(∇⋅(dirf(μ,t)))(x)
+  else id == :M
+    (x,μ,t) -> pfun(x,μ,t)*dirf(μ,t)(x)
+  end
+end
+
+# REMOVE WHEN POSSIBLE!!
+function get_param_fefunction_temp(op::ParamLiftOperator)
+  id = get_id(op)
+  dΩ = measures.dΩ
+  if id == :A
+    (f,v) -> ∫(∇(v)⊙f)dΩ
+  elseif id == :B
+    (f,v) -> ∫(v*f)dΩ
+  else id == :M
+    (f,v) -> ∫(v⋅f)dΩ
+  end
+end
+
 get_param_fefunction(op::ParamOperator) = get_param_fefunction(op.pfun)
 
 Gridap.ODEs.TransientFETools.get_test(op::ParamOperator) = op.test
@@ -127,6 +154,11 @@ get_times(::ParamSteadyOperator) = fill(nothing,1)
 get_times(op::ParamUnsteadyOperator) = get_times(get_time_info(op))
 
 get_phys_quad_points(op::ParamOperator) = get_phys_quad_points(get_test(op))
+
+function get_phys_quad_points(op::ParamLiftOperator)
+  test = get_test(op)
+  get_phys_quad_points(test;cells=test.dirichlet_cells)
+end
 
 get_dimension(op::ParamOperator) = get_dimension(get_test(op))
 
@@ -269,16 +301,20 @@ function unpack_for_assembly(::Val,op::ParamLinOperator)
   get_param_fefunction(op),get_test(op)
 end
 
-function unpack_for_assembly(::Val,op::ParamLiftOperator)
-  get_param_fefunction(op),get_test(op),get_dirichlet_function(op)
-end
-
 function unpack_for_assembly(::Val{false},op::ParamBilinOperator)
   get_param_fefunction(op),get_trial(op),get_test(op)
 end
 
 function unpack_for_assembly(::Val{true},op::ParamBilinOperator)
   get_param_fefunction(op),realization_trial(op),get_test(op)
+end
+
+function unpack_for_assembly(::Val{false},op::ParamLiftOperator)
+  get_param_fefunction(op),get_test(op),get_dirichlet_function(op)
+end
+
+function unpack_for_assembly(::Val{true},op::ParamLiftOperator)
+  get_param_fefunction_temp(op),get_test(op)
 end
 
 function assemble_affine_quantity(op::ParamLinOperator)

@@ -133,8 +133,9 @@ function Gridap.FESpaces.get_order(test::SingleFieldFESpace)
   first(basis.cell_basis.values[1].fields.orders)
 end
 
-function get_cell_quadrature(test::SingleFieldFESpace)
-  CellQuadrature(get_triangulation(test),get_degree(test))
+function Gridap.CellData.get_cell_points(test::SingleFieldFESpace)
+  cell_quad = CellQuadrature(get_triangulation(test),get_degree(test))
+  Gridap.CellData.get_data(get_cell_points(cell_quad))
 end
 
 struct LagrangianQuadFESpace
@@ -153,18 +154,20 @@ function LagrangianQuadFESpace(test::SingleFieldFESpace)
   LagrangianQuadFESpace(model,order)
 end
 
-function get_phys_quad_points(test::SingleFieldFESpace)
-  trian = get_triangulation(test)
-  phys_map = get_cell_map(trian)
-  cell_quad = get_cell_quadrature(test)
-  cell_points = Gridap.CellData.get_data(get_cell_points(cell_quad))
-  lazy_quadp = map(evaluate,phys_map,cell_points)
+function get_phys_quad_points(
+  test::SingleFieldFESpace;
+  cells=eachindex(V.cell_dofs_ids))
 
+  trian = get_triangulation(test)
+  phys_map = get_cell_map(view(trian,cells))
+  cell_points = get_cell_points(test)
+
+  lazy_quadp = map(evaluate,phys_map,cell_points)
   ncells = length(lazy_quadp)
   nquad_cell = length(first(lazy_quadp))
-  nquadp = ncells*nquad_cell
+
   dim = get_dimension(test)
-  quadp = zeros(VectorValue{dim,Float},nquadp)
+  quadp = zeros(VectorValue{dim,Float},ncells*nquad_cell)
   @inbounds for (i,quadpi) = enumerate(lazy_quadp)
     quadp[(i-1)*nquad_cell+1:i*nquad_cell] = quadpi
   end
