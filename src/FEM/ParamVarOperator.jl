@@ -109,27 +109,38 @@ get_param_function(op::ParamOperator) = get_param_function(op.pfun)
 # REMOVE WHEN POSSIBLE!!
 function get_param_function(op::ParamLiftOperator)
   id = get_id(op)
-  dirf = get_trial(op).dirichlet_μt
+  dir = get_dirichlet_function(op)
   pfun = get_param_function(op.pfun)
   if id == :A
-    (x,μ,t) -> pfun(x,μ,t)*∇(dirf(μ,t))(x)
+    (x,μ,t) -> pfun(x,μ,t)*∇(dir(μ,t))(x)
   elseif id == :B
-    (x,μ,t) -> pfun(x,μ,t)*(∇⋅(dirf(μ,t)))(x)
+    (x,μ,t) -> pfun(x,μ,t)*(∇⋅(dir(μ,t)))(x)
   else id == :M
-    (x,μ,t) -> pfun(x,μ,t)*dirf(μ,t)(x)
+    (x,μ,t) -> pfun(x,μ,t)*dir(μ,t)(x)
   end
 end
 
 # REMOVE WHEN POSSIBLE!!
+# STOKES
+# function get_param_fefunction_temp(op::ParamLiftOperator)
+#   id = get_id(op)
+#   dΩ = measures.dΩ
+#   if id == :A
+#     (f,v) -> ∫(∇(v)⊙f)dΩ
+#   elseif id == :B
+#     (f,v) -> ∫(v*f)dΩ
+#   else id == :M
+#     (f,v) -> ∫(v⋅f)dΩ
+#   end
+# end
+# POISSON
 function get_param_fefunction_temp(op::ParamLiftOperator)
   id = get_id(op)
   dΩ = measures.dΩ
   if id == :A
-    (f,v) -> ∫(∇(v)⊙f)dΩ
-  elseif id == :B
-    (f,v) -> ∫(v*f)dΩ
+    (f,v) -> ∫(∇(v)⋅f)dΩ
   else id == :M
-    (f,v) -> ∫(v⋅f)dΩ
+    (f,v) -> ∫(v*f)dΩ
   end
 end
 
