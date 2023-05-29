@@ -81,9 +81,9 @@ function stokes_unsteady()
 
   u,p,μ = generate_fe_snapshots(Val{indef}(),run_fem,fepath,nsnap,solver,feop,t0,tF)
 
-  for fun_mdeim=(true,), st_mdeim=(false,), ϵ=(1e-1,1e-2,1e-3,1e-4)
-    info = RBInfoUnsteady(ptype,test_path;ϵ,nsnap=50,mdeim_snap=30,
-      st_mdeim,fun_mdeim,postprocess=true)
+  for fun_mdeim=(true,), st_mdeim=(true,), ϵ=(1e-1,1e-2,1e-3,1e-4)
+    info = RBInfoUnsteady(ptype,test_path;ϵ,nsnap=50,mdeim_snap=20,
+      st_mdeim,fun_mdeim,postprocess=true,load_offline=true,online_snaps=95:100)
 
     printstyled("Offline phase, reduced basis method\n";color=:blue)
 
@@ -104,6 +104,9 @@ function stokes_unsteady()
     rbopAlift = RBLiftVariable(rbopA)
     rbopBlift = RBLiftVariable(rbopB)
     rbopMlift = RBLiftVariable(rbopM)
+
+    info = RBInfoUnsteady(ptype,test_path;ϵ,nsnap=50,mdeim_snap=20,
+      st_mdeim,fun_mdeim,postprocess=true,online_snaps=95:100)
 
     assembly_time = @elapsed begin
       Arb = RBAffineDecomposition(info,rbopA,μ,get_dΩ(measures))

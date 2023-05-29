@@ -46,7 +46,7 @@ function RBResults(res::Vector{RBResults})
   online_times = Broadcasting(r->getproperty(r,:online_time))(res)
 
   relative_err = sum(relative_errs)/nruns
-  online_time = sum(online_times/nruns)
+  online_time = sum(online_times)/nruns
 
   RBResults(sols,sols_approx,relative_err,online_time)
 end
@@ -294,7 +294,7 @@ end
 
 function gather_online_results(ptype,test_path)
   d = []
-  for fun_mdeim=(true,), st_mdeim=(false,true), ϵ=(1e-1,1e-2,1e-3,1e-4)
+  for fun_mdeim=(true,), st_mdeim=(false,true), ϵ=(1e-2,1e-3,1e-4)
     info = RBInfoUnsteady(ptype,test_path;ϵ,nsnap=80,mdeim_snap=20,st_mdeim,fun_mdeim)
     tpath = info.online_path
     d = [d...,Dict("res_$(fun_mdeim)_$(st_mdeim)_$(ϵ)" => deserialize(joinpath(tpath,"results.txt")))]

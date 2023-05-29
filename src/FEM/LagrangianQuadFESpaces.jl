@@ -156,7 +156,7 @@ end
 
 function get_phys_quad_points(
   test::SingleFieldFESpace;
-  cells=eachindex(V.cell_dofs_ids))
+  cells=eachindex(test.cell_dofs_ids))
 
   trian = get_triangulation(test)
   phys_map = get_cell_map(view(trian,cells))

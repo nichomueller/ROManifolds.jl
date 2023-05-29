@@ -98,7 +98,7 @@ function load(
   else
     printstyled("Failed to load variable $(id): running offline assembler instead\n";
       color=:blue)
-    reduce_affine_decomposition(info,op,μ,meas)
+    assemble_affine_decomposition(info,op,μ,meas)
   end
 
 end

@@ -247,5 +247,5 @@ function online_loop(fe_sol,rb_space,rb_system,k::Int)
 end
 
 function online_loop(loop,k::UnitRange{Int})
-  RBResults(pmap(loop,k))
+  RBResults(loop.(k))#pmap(loop,k))#
 end

@@ -112,7 +112,7 @@ function assemble_rb_space(
   opB,ttol... = args
 
   bs_u,bt_u = assemble_spatio_temporal_rb(snaps_u;ϵ=info.ϵ,kwargs...)
-  bs_p,bt_p = assemble_spatio_temporal_rb(snaps_p;ϵ=info.ϵ/100,kwargs...)
+  bs_p,bt_p = assemble_spatio_temporal_rb(snaps_p;ϵ=info.ϵ,kwargs...)
   bs_u_supr = add_space_supremizers(def,(bs_u,bs_p),opB)
   bt_u_supr = add_time_supremizers(def,(bt_u,bt_p),ttol...)
 

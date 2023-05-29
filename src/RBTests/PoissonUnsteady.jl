@@ -18,7 +18,7 @@ end
   indef = false
   ptype = ProblemType(steady,indef)
 
-  mesh = "elasticity_3cyl2D.json"
+  mesh = "elasticity_3cyl.json"
   test_path = "$root/tests/poisson/unsteady/$mesh"
   bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
   order = 1

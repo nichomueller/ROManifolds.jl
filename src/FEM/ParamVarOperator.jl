@@ -108,6 +108,7 @@ get_param_function(op::ParamOperator) = get_param_function(op.pfun)
 
 # REMOVE WHEN POSSIBLE!!
 function get_param_function(op::ParamLiftOperator)
+  # dir = get_trial(op).dirichlet_μt
   id = get_id(op)
   dir = get_dirichlet_function(op)
   pfun = get_param_function(op.pfun)
@@ -126,9 +127,9 @@ end
 #   id = get_id(op)
 #   dΩ = measures.dΩ
 #   if id == :A
-#     (f,v) -> ∫(∇(v)⊙f)dΩ
+#     (f,v) -> ∫(∇(v)⊙∇(f))dΩ
 #   elseif id == :B
-#     (f,v) -> ∫(v*f)dΩ
+#     (f,v) -> ∫(v*(∇⋅(f)))dΩ
 #   else id == :M
 #     (f,v) -> ∫(v⋅f)dΩ
 #   end
@@ -138,7 +139,7 @@ function get_param_fefunction_temp(op::ParamLiftOperator)
   id = get_id(op)
   dΩ = measures.dΩ
   if id == :A
-    (f,v) -> ∫(∇(v)⋅f)dΩ
+    (f,v) -> ∫(∇(v)⋅∇(f))dΩ
   else id == :M
     (f,v) -> ∫(v*f)dΩ
   end
