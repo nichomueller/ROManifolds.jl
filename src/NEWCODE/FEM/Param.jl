@@ -1,10 +1,3 @@
-struct ProblemType
-  steady::Bool
-  indef::Bool
-end
-
-isindef(p::ProblemType) = Val{p.indef}()
-
 abstract type SamplingStyle end
 struct UniformSampling <: SamplingStyle end
 struct NormalSampling <: SamplingStyle end
