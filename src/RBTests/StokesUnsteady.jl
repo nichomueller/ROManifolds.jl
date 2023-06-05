@@ -28,7 +28,7 @@ function stokes_unsteady()
 
   fepath = fem_path(test_path)
   mshpath = mesh_path(test_path,mesh)
-  model = model_info(mshpath,bnd_info)
+  model = get_discrete_model(mshpath,bnd_info)
   measures = ProblemMeasures(model,order)
   D = get_dimension(model)
 

@@ -25,7 +25,7 @@ end
 
   fepath = fem_path(test_path)
   mshpath = mesh_path(test_path,mesh)
-  model = model_info(mshpath,bnd_info)
+  model = get_discrete_model(mshpath,bnd_info)
   measures = ProblemMeasures(model,order)
 
   ranges = fill([1.,10.],3)

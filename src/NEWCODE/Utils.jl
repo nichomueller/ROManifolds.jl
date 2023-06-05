@@ -5,15 +5,9 @@ using Distributions
 using Random
 using SuiteSparse
 using SparseArrays
-using Arpack
 using Elemental
 using DelimitedFiles
 using Serialization
-using ParallelDataTransfer
-using PartitionedArrays
-using SharedArrays
-using Test
-using PlotlyJS
 using ForwardDiff
 using Gridap
 using Gridap.FESpaces
@@ -24,7 +18,8 @@ using Gridap.Fields
 using Gridap.CellData
 using Gridap.Io
 using GridapGmsh
-using GridapDistributed,GridapPETSc
+using GridapDistributed
+using GridapPETSc
 using GridapP4est
 using Gridap.TensorValues
 using Gridap.ODEs.TransientFETools

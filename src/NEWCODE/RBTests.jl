@@ -1,5 +1,3 @@
-include("FunctionDefinitions.jl")
-
 function fem_path(tpath::String)
   create_dir!(tpath)
   fepath = joinpath(tpath,"fem")
@@ -215,36 +213,36 @@ function get_solution!(
   x,μ
 end
 
-function get_dirichlet_values(
-  U::ParamTrialFESpace,
-  μ::Vector{Param})
+# function get_dirichlet_values(
+#   U::ParamTrialFESpace,
+#   μ::Vector{Param})
 
-  nsnap = length(μ)
-  dir(μ) = U(μ).dirichlet_values
-  Snapshots(:g,dir.(μ),nsnap,EMatrix{Float})
-end
+#   nsnap = length(μ)
+#   dir(μ) = U(μ).dirichlet_values
+#   Snapshots(:g,dir.(μ),nsnap,EMatrix{Float})
+# end
 
-function get_dirichlet_values(
-  U::ParamTransientTrialFESpace,
-  μ::Vector{Param},
-  tinfo::TimeInfo)
+# function get_dirichlet_values(
+#   U::ParamTransientTrialFESpace,
+#   μ::Vector{Param},
+#   tinfo::TimeInfo)
 
-  nsnap = length(μ)
-  times = get_times(tinfo)
-  dir(μ) = Matrix([U(μ,t).dirichlet_values for t=times])
-  Snapshots(:g,dir.(μ),nsnap,EMatrix{Float})
-end
+#   nsnap = length(μ)
+#   times = get_times(tinfo)
+#   dir(μ) = Matrix([U(μ,t).dirichlet_values for t=times])
+#   Snapshots(:g,dir.(μ),nsnap,EMatrix{Float})
+# end
 
-function online_loop(fe_sol,rb_space,rb_system,k::Int)
-  online_time = @elapsed begin
-    lhs,rhs = rb_system(k)
-    rb_sol = solve_rb_system(lhs,rhs)
-  end
-  fe_sol_approx = reconstruct_fe_sol(rb_space,rb_sol)
+# function online_loop(fe_sol,rb_space,rb_system,k::Int)
+#   online_time = @elapsed begin
+#     lhs,rhs = rb_system(k)
+#     rb_sol = solve_rb_system(lhs,rhs)
+#   end
+#   fe_sol_approx = reconstruct_fe_sol(rb_space,rb_sol)
 
-  RBResults(fe_sol,fe_sol_approx,online_time)
-end
+#   RBResults(fe_sol,fe_sol_approx,online_time)
+# end
 
-function online_loop(loop,k::UnitRange{Int})
-  RBResults(loop.(k))#pmap(loop,k))#
-end
+# function online_loop(loop,k::UnitRange{Int})
+#   pmap(loop,k)
+# end

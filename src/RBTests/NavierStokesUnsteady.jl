@@ -27,7 +27,7 @@ function navier_stokes_unsteady()
 
   fepath = fem_path(test_path,mesh)
   mshpath = mesh_path(test_path,mesh)
-  model = model_info(mshpath,bnd_info,ptype)
+  model = get_discrete_model(mshpath,bnd_info,ptype)
   measures = ProblemMeasures(model,order)
 
   function a(x,p::Param,t::Real)
