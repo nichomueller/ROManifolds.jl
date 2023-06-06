@@ -38,7 +38,7 @@ end
 function Gridap.solve(
   solver::FESolver,
   op::ParamOp,
-  params::Table{Float,Vector{Param},Vector{Int32}})
+  params::Table{Float,Param,Vector{Int32}})
 
   [solve(solver,op,μk,k) for (μk,k) in enumerate(params)]
 end

@@ -4,11 +4,11 @@ manager = MPIWorkerManager()
 addprocs(manager)
 
 root = pwd()
-include("$root/src/FEM/FEM.jl")
-include("$root/src/RB/RB.jl")
-include("$root/src/RBTests/RBTests.jl")
+include("$root/src/NEWCODE/FEM/FEM.jl")
+include("$root/src/NEWCODE/ROM/ROM.jl")
+include("$root/src/NEWCODE/RBTests.jl")
 
-mesh = "elasticity_3cyl.json"
+mesh = "elasticity_3cyl2D.json"
 test_path = "$root/tests/poisson/unsteady/$mesh"
 bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
 order = 1
@@ -48,7 +48,7 @@ rhs(p,t,v) = ∫(f(p,t)*v)dΩ + ∫(h(p,t)*v)dΓn
 reffe = Gridap.ReferenceFE(lagrangian,Float,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = ParamTransientTrialFESpace(test,g)
-feop = ParamTransientAffineFEOperator(lhs_t,lhs,rhs,pspace,test,trial)
+feop = ParamTransientAffineFEOperator(lhs_t,lhs,rhs,pspace,trial,test)
 fesolver = TimeMarchingScheme(LUSolver(),time_info)
 
 load_offline = false
@@ -56,7 +56,7 @@ load_offline = false
 energy_norm = false
 pod_style = ReducedPOD()
 
-rbspace = reduce_fe_space(feop;load_offline,fesolver,n_snaps=80,ϵ,energy_norm,pod_style)
+rbspace = reduce_fe_space(feop,fesolver;load_offline,n_snaps=80,ϵ,energy_norm,pod_style)
 rbop = reduce_fe_operator(feop,rbspace;load_offline,n_snaps=20,ϵ)
 rbsolver = Backslash()
 

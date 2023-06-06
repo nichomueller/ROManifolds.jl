@@ -145,7 +145,7 @@ end
 function Gridap.FESpaces.solve(
   solver::ODESolver,
   op::ParamTransientFEOperator,
-  params::Table{Float,Vector{Param},Vector{Int32}},
+  params::Table{Float,Param,Vector{Int32}},
   u0)
 
   t0,tF = solver.t0,solver.tF

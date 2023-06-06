@@ -38,43 +38,12 @@ function evaluate!(Uμt::T,U::ParamTransientTrialFESpace,μ::Param,t::Real) wher
 end
 
 """
-Parameter evaluation without allocating Dirichlet vals (returns a TransientTrialFESpace)
-"""
-function evaluate!(Uμt::T,U::ParamTransientTrialFESpace,μ::Param) where T
-  if isa(U.dirichlet_μt,Vector)
-    objects_at_μt = map(o->o(μ,t), U.dirichlet_μt)
-  else
-    objects_at_μt = U.dirichlet_μt(μ,t)
-  end
-  TrialFESpace!(Uμt,objects_at_μt)
-  Uμt
-end
-
-"""
 Parameter, time evaluation allocating Dirichlet vals
 """
 function Gridap.evaluate(U::ParamTransientTrialFESpace,μ::Param,t::Real)
   Uμt = allocate_trial_space(U)
   evaluate!(Uμt,U,μ,t)
   Uμt
-end
-
-"""
-Time evaluation allocating Dirichlet vals
-"""
-function Gridap.evaluate(U::ParamTransientTrialFESpace,t::Real)
-  Ut = allocate_trial_space(U)
-  evaluate!(Uμ,U,t)
-  Ut
-end
-
-"""
-Parameter evaluation allocating Dirichlet vals
-"""
-function Gridap.evaluate(U::ParamTransientTrialFESpace,μ::Param)
-  Uμ = allocate_trial_space(U)
-  evaluate!(Uμ,U,μ)
-  Uμ
 end
 
 """
@@ -88,8 +57,6 @@ Functor-like evaluation. It allocates Dirichlet vals in general.
 """
 (U::SingleFieldFESpace)(::Param,::Real) = U
 (U::ParamTransientTrialFESpace)(μ::Param,t::Real) = Gridap.evaluate(U,μ,t)
-(U::ParamTransientTrialFESpace)(μ::Param) = t -> Gridap.evaluate(U,μ,t)
-(U::ParamTransientTrialFESpace)(t::Real) = μ -> Gridap.evaluate(U,μ,t)
 (U::ParamTransientTrialFESpace)(::Nothing,::Nothing) = Gridap.evaluate(U,nothing,nothing)
 
 """
@@ -111,10 +78,6 @@ function evaluate!(::FESpace,U::FESpace,::Param,::Real)
 end
 
 function Gridap.evaluate(U::FESpace,::Param,::Real)
-  U
-end
-
-function Gridap.evaluate(U::FESpace,::Param,::Nothing)
   U
 end
 
@@ -153,23 +116,12 @@ function Gridap.evaluate(U::ParamTransientMultiFieldTrialFESpace,μ::Param,t::Re
   Uμt
 end
 
-function Gridap.evaluate(U::ParamTransientMultiFieldTrialFESpace,t::Real)
-  Uμt = allocate_trial_space(U)
-  μ -> evaluate!(Uμt,U,μ,t)
-end
-
-function Gridap.evaluate(U::ParamTransientMultiFieldTrialFESpace,μ::Param)
-  Uμt = allocate_trial_space(U)
-  t -> evaluate!(Uμt,U,μ,t)
-end
-
 function Gridap.evaluate(U::ParamTransientMultiFieldTrialFESpace,::Nothing,::Nothing)
   MultiFieldFESpace([Gridap.evaluate(fesp,nothing,nothing) for fesp in U.spaces])
 end
 
 (U::TransientMultiFieldTrialFESpace)(::Param,::Real) = U
 (U::ParamTransientMultiFieldTrialFESpace)(μ,t) = Gridap.evaluate(U,μ,t)
-(U::ParamTransientMultiFieldTrialFESpace)(μ) = Gridap.evaluate(U,μ)
 
 function Gridap.ODEs.TransientFETools.∂t(U::ParamTransientMultiFieldTrialFESpace)
   spaces = ∂t.(U.spaces)

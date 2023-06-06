@@ -14,7 +14,7 @@ function generate_param(d::Vector{<:Number},::UniformSampling)
   rand(Uniform(first(d),last(d)))
 end
 
-function generate_param(d::Vector{<:Number},::UniformSampling)
+function generate_param(d::Vector{<:Number},::NormalSampling)
   rand(Normal(first(d),last(d)))
 end
 
@@ -22,16 +22,15 @@ function generate_param(pspace::ParamSpace)
   [generate_param(d,pspace.sampling_style) for d = pspace.domain]
 end
 
-struct Param
+struct Param <: AbstractVector{Float}
   p::Vector{Float}
-  function Param(p::Vector{Number})
-    new(Float.(p))
-  end
 end
 
 get_param(μ::Param) = μ.p
 
 Base.getindex(μ::Param,args...) = getindex(μ.p,args...)
+
+Base.size(μ::Param,args...) = size(μ.p)
 
 realization(pspace::ParamSpace) = Param(generate_param(pspace))
 

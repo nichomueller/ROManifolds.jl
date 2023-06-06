@@ -1,6 +1,7 @@
 struct Snapshots
   snaps::AbstractMatrix{Float}
-  params::Table{Float,Vector{Param},Vector{Int32}}
+  params::Table{Float,Param,Vector{Int32}}
+  nonzero_idx::Vector{Int32}
 end
 
 get_snaps(s::Snapshots) = s.snaps
@@ -11,11 +12,11 @@ Base.length(s::Snapshots) = length(get_params(s))
 
 function generate_fe_snapshots(feop,solver,nsnap)
   sols = solve(solver,feop,nsnap)
-  cache = array_cache(solver,feop,nsnap)
+  cache,nonzero_idx = snapshot_cache(solver,feop,nsnap)
   snaps = pmap(sol->get_solution!(cache,sol),sols)
   mat_snaps = EMatrix(first.(snaps))
   param_snaps = Table(last.(snaps))
-  Snapshots(mat_snaps,param_snaps)
+  Snapshots(mat_snaps,param_snaps,nonzero_idx)
 end
 
 function get_solution!(cache,sol::ParamFESolution)
