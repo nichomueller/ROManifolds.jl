@@ -24,39 +24,39 @@ dΓn = Measure(Γn,degree)
 
 ranges = fill([1.,10.],3)
 sampling = UniformSampling()
-PS = ParamSpace(ranges,sampling)
+pspace = ParamSpace(ranges,sampling)
 
 t0,tF,dt,θ = 0.,0.3,0.005,1
 time_info = ThetaMethodInfo(t0,tF,dt,θ)
 
-a(x,p::Param,t::Real) = exp((sin(t)+cos(t))*x[1]/sum(p.μ))
-a(p::Param,t::Real) = x->a(x,p,t)
+a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
+a(μ,t) = x->a(x,μ,t)
 
-f(x,p::Param,t::Real) = 1.
-f(p::Param,t::Real) = x->f(x,p,t)
+f(x,μ,t) = 1.
+f(μ,t) = x->f(x,μ,t)
 
-h(x,p::Param,t::Real) = abs(cos(p.μ[3]*t))
-h(p::Param,t::Real) = x->h(x,p,t)
+h(x,μ,t) = abs(cos(μ[3]*t))
+h(μ,t) = x->h(x,μ,t)
 
-g(x,p::Param,t::Real) = p.μ[1]*exp(-x[1]/p.μ[2])*abs(sin(p.μ[3]*t))
-g(p::Param,t::Real) = x->g(x,p,t)
+g(x,μ,t) = μ[1]*exp(-x[1]/μ[2])*abs(sin(μ[3]*t))
+g(μ,t) = x->g(x,μ,t)
 
-lhs_t(u,v) = ∫(v*u)dΩ
-lhs(p,t,u,v) = ∫(a(p,t)*∇(v)⋅∇(u))dΩ
-rhs(p,t,v) = ∫(f(p,t)*v)dΩ + ∫(h(p,t)*v)dΓn
+lhs_t(μ,t,u,v) = ∫(v*u)dΩ
+lhs(μ,t,u,v) = ∫(a(μ,t)*∇(v)⋅∇(u))dΩ
+rhs(μ,t,v) = ∫(f(μ,t)*v)dΩ + ∫(h(μ,t)*v)dΓn
 
 reffe = Gridap.ReferenceFE(lagrangian,Float,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = ParamTransientTrialFESpace(test,g)
 feop = ParamTransientAffineFEOperator(lhs_t,lhs,rhs,pspace,trial,test)
-fesolver = TimeMarchingScheme(LUSolver(),time_info)
+fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 load_offline = false
 ϵ = 1e-3
 energy_norm = false
 pod_style = ReducedPOD()
 
-rbspace = reduce_fe_space(feop,fesolver;load_offline,n_snaps=80,ϵ,energy_norm,pod_style)
+rbspace = reduce_fe_space(feop,fesolver,t0,tF;load_offline,n_snaps=80,ϵ,energy_norm,pod_style)
 rbop = reduce_fe_operator(feop,rbspace;load_offline,n_snaps=20,ϵ)
 rbsolver = Backslash()
 

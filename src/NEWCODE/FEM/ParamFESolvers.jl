@@ -4,7 +4,7 @@ mutable struct GenericParamSolution{C} <: ParamSolution
   solver::FESolver
   op::ParamOp{C}
   uh::FEFunction
-  μ::Param
+  μ::AbstractVector
   k::Int
 end
 
@@ -38,7 +38,7 @@ end
 function Gridap.solve(
   solver::FESolver,
   op::ParamOp,
-  params::Table{Float,Param,Vector{Int32}})
+  params::Table{Float,Vector{Float},Vector{Int32}})
 
   [solve(solver,op,μk,k) for (μk,k) in enumerate(params)]
 end
@@ -46,7 +46,7 @@ end
 function Gridap.solve(
   solver::FESolver,
   op::ParamOp{C},
-  μk::Param,
+  μk::AbstractVector,
   k::Int) where C
 
   trial = get_trial(op.feop)

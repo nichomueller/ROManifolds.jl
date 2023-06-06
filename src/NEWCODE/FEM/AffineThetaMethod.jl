@@ -2,7 +2,7 @@ function Gridap.ODEs.TransientFETools.solve_step!(
   uf::AbstractVector,
   solver::ThetaMethod,
   op::AffineParamODEOperator,
-  μ::Param,
+  μ::AbstractVector,
   u0::AbstractVector,
   t0::Real,
   cache)
@@ -46,9 +46,9 @@ given time step, i.e., M(t)(u_n+θ-u_n)/dt + K(t)u_n+θ + b(t)
 """
 function ParamThetaMethodAffineOperator(
   odeop::AffineParamODEOperator,
-  μ::Param,
-  tθ::Float64,
-  dtθ::Float64,
+  μ::AbstractVector,
+  tθ::Real,
+  dtθ::Real,
   u0::AbstractVector,
   ode_cache,
   vθ::AbstractVector)

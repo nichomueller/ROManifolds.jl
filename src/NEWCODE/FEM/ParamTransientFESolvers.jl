@@ -3,7 +3,7 @@ abstract type ParamODESolution <: GridapType end
 struct GenericParamODESolution{T} <: ParamODESolution
   solver::ODESolver
   op::ParamODEOperator
-  μ::Param
+  μ::AbstractVector
   u0::T
   t0::Real
   tF::Real
@@ -14,7 +14,7 @@ function Gridap.ODEs.TransientFETools.solve_step!(
   uF::Union{AbstractVector,Tuple{Vararg{AbstractVector}}},
   solver::ODESolver,
   op::ParamODEOperator,
-  μ::Param,
+  μ::AbstractVector,
   u0::Union{AbstractVector,Tuple{Vararg{AbstractVector}}},
   t0::Real) # -> (uF,tF,cache)
 
@@ -24,7 +24,7 @@ end
 function Gridap.FESpaces.solve(
   solver::ODESolver,
   op::ParamODEOperator,
-  μ::Param,
+  μ::AbstractVector,
   u0::T,
   t0::Real,
   tF::Real,
@@ -129,14 +129,15 @@ end
 function ParamTransientFESolution(
   solver::ODESolver,
   op::ParamTransientFEOperator,
-  μ::Param,
+  μ::AbstractVector,
   uh0,
   t0::Real,
-  tF::Real)
+  tF::Real,
+  k::Int)
 
   ode_op = get_algebraic_operator(op)
   u0 = get_free_dof_values(uh0)
-  ode_sol = solve(solver,ode_op,μ,u0,t0,tF)
+  ode_sol = solve(solver,ode_op,μ,u0,t0,tF,k)
   trial = get_trial(op)
 
   ParamTransientFESolution(ode_sol,trial)
@@ -145,22 +146,24 @@ end
 function Gridap.FESpaces.solve(
   solver::ODESolver,
   op::ParamTransientFEOperator,
-  params::Table{Float,Param,Vector{Int32}},
-  u0)
+  params::Table{Float,Vector{Float},Vector{Int32}},
+  u0,
+  t0::Real,
+  tF::Real)
 
-  t0,tF = solver.t0,solver.tF
-  [ParamTransientFESolution(solver,op,μk,u0,t0,tF,k) for (μk,k) in enumerate(params)]
+  [ParamTransientFESolution(solver,op,μk,u0,t0,tF,k) for (k,μk) in enumerate(params)]
 end
 
 function Gridap.FESpaces.solve(
   solver::ODESolver,
   op::ParamTransientFEOperator,
-  n=100)
+  n_snap::Int,
+  args...)
 
-  params = realization(op,n)
+  params = realization(op,n_snap)
   trial = get_trial(op)
   u0 = zero(trial(nothing,nothing))
-  solve(solver,op,params,u0)
+  solve(solver,op,params,u0,args...)
 end
 
 function Base.iterate(sol::ParamTransientFESolution)

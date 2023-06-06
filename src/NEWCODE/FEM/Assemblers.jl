@@ -1,12 +1,3 @@
-function generate_fe_snapshots(feop,solver,nsnap)
-  sols = solve(solver,feop,nsnap)
-  cache,nonzero_idx = snapshot_cache(solver,feop,nsnap)
-  snaps = pmap(sol->get_solution!(cache,sol),sols)
-  mat_snaps = EMatrix(first.(snaps))
-  param_snaps = Table(last.(snaps))
-  Snapshots(mat_snaps,param_snaps,nonzero_idx)
-end
-
 function assemble_vector(a::Assembler,vecdata)
   vecs = Float[]
   for data in vecdata

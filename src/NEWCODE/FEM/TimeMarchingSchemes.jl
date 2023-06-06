@@ -20,7 +20,3 @@ get_θ(ti::ThetaMethodInfo) = ti.θ
 get_times(ti::ThetaMethodInfo) = collect(ti.t0:ti.dt:ti.tF-ti.dt).+ti.dt*ti.θ
 
 realization(ti::TimeInfo) = rand(Uniform(ti.t0,ti.tF))
-
-function TimeMarchingScheme(nls::NonlinearSolver,ti::ThetaMethodInfo)
-  ThetaMethod(nls,get_dt(ti),get_θ(ti))
-end

@@ -20,7 +20,7 @@ end
 
 function reduce_fe_operator(
   feop::ParamFEOperator,
-  rbspace::RBBasis;
+  rbspace::RBSpace;
   kwargs...)
 
   μ = realization(feop.pspace)
@@ -31,7 +31,7 @@ end
 
 function reduce_fe_operator(
   feop::ParamTransientFEOperator,
-  rbspace::RBBasis;
+  rbspace::RBSpace;
   kwargs...)
 
   μ = realization(feop.pspace)
@@ -43,7 +43,7 @@ end
 
 function reduce_fe_operator(
   feop,
-  rbspace::RBBasis,
+  rbspace::RBSpace,
   input,
   du::FEBasis,
   dv::FEBasis;
@@ -62,7 +62,7 @@ function reduce_fe_term(
   ::Val{true},
   solver,
   feop,
-  rbspace::RBBasis;
+  rbspace::RBSpace;
   kwargs...)
 
   affine_vec = assemble_vector(feop)
@@ -75,7 +75,7 @@ function reduce_fe_term(
   ::Val{false},
   solver,
   feop,
-  rbspace::RBBasis;
+  rbspace::RBSpace;
   n_snaps=20,kwargs...)
 
   snaps = generate_fe_snapshots(feop,solver,n_snaps)

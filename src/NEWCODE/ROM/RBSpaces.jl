@@ -19,8 +19,8 @@ function reduce_fe_space(::Val{true},feop,args...;kwargs...)
   load()
 end
 
-function reduce_fe_space(::Val{false},feop,fe_solver;n_snaps=50,kwargs...)
-  snaps = generate_fe_snapshots(feop,fe_solver,n_snaps)
+function reduce_fe_space(::Val{false},feop,args...;n_snaps=50,kwargs...)
+  snaps = generate_fe_snapshots(feop,n_snaps,args...)
   Ns = get_Ns(feop)
   assemble_rb_space(snaps,Ns;kwargs...)
 end

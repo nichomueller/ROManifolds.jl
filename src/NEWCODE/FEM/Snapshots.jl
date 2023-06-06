@@ -1,6 +1,6 @@
 struct Snapshots
   snaps::AbstractMatrix{Float}
-  params::Table{Float,Param,Vector{Int32}}
+  params::Table{Float,Vector{Float},Vector{Int32}}
   nonzero_idx::Vector{Int32}
 end
 
@@ -10,13 +10,23 @@ get_params(s::Snapshots) = s.params
 
 Base.length(s::Snapshots) = length(get_params(s))
 
-function generate_fe_snapshots(feop,solver,nsnap)
-  sols = solve(solver,feop,nsnap)
-  cache,nonzero_idx = snapshot_cache(solver,feop,nsnap)
+function generate_fe_snapshots(feop,nsnap,solver,args...)
+  sols = solve(solver,feop,nsnap,args...)
+  cache,nonzero_idx = snapshot_cache(feop,first(sols))
   snaps = pmap(sol->get_solution!(cache,sol),sols)
   mat_snaps = EMatrix(first.(snaps))
   param_snaps = Table(last.(snaps))
   Snapshots(mat_snaps,param_snaps,nonzero_idx)
+end
+
+function snapshot_cache(
+  feop::ParamTransientFEOperator,
+  sol::ParamTransientFESolution)
+
+  sol_cache = zeros(get_Ns(sol),get_Nt(sol))
+  param_cache = realization(feop)
+  nonzero_idx = collect(1:get_Ns(sol))
+  (sol_cache,param_cache),nonzero_idx
 end
 
 function get_solution!(cache,sol::ParamFESolution)
@@ -25,7 +35,7 @@ function get_solution!(cache,sol::ParamFESolution)
   k = sol.psol.k
   printstyled("Computing snapshot $k\n";color=:blue)
   copyto!(sol_cache,get_free_dof_values(sol.psol.uh))
-  copyto!(param_cache,get_param(sol.psol.μ))
+  copyto!(param_cache,sol.psol.μ)
   printstyled("Successfully computed snapshot $k\n";color=:blue)
 
   sol_cache,param_cache
@@ -41,7 +51,7 @@ function get_solution!(cache,sol::ParamTransientFESolution)
     setindex!(sol_cache,xn,:,n)
     n += 1
   end
-  copyto!(param_cache,get_param(sol.psol.μ))
+  copyto!(param_cache,sol.psol.μ)
   printstyled("Successfully computed snapshot $k\n";color=:blue)
 
   sol_cache,param_cache

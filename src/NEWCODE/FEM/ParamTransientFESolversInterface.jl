@@ -42,7 +42,7 @@ end
 function Gridap.ODEs.TransientFETools.update_cache!(
   ode_cache,
   op::ParamODEOpFromFEOp,
-  μ::Param,
+  μ::AbstractVector,
   t::Real)
 
   _Us,Uts,fecache = ode_cache
@@ -80,7 +80,7 @@ It provides A(t,uh,∂tuh,...,∂t^Nuh) for a given (t,uh,∂tuh,...,∂t^Nuh)
 function Gridap.ODEs.TransientFETools.residual!(
   b::AbstractVector,
   op::ParamODEOpFromFEOp,
-  μ::Param,
+  μ::AbstractVector,
   t::Real,
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
@@ -104,7 +104,7 @@ Note that for i=0, γ_i=1.0.
 function Gridap.ODEs.TransientFETools.jacobian!(
   A::AbstractMatrix,
   op::ParamODEOpFromFEOp,
-  μ::Param,
+  μ::AbstractVector,
   t::Real,
   xhF::Tuple{Vararg{AbstractVector}},
   i::Integer,
@@ -125,7 +125,7 @@ Add the contribution of all jacobians ,i.e., ∑ᵢ γ_i*[∂A/∂(∂t^iuh)](t,
 function Gridap.ODEs.TransientFETools.jacobians!(
   J::AbstractMatrix,
   op::ParamODEOpFromFEOp,
-  μ::Param,
+  μ::AbstractVector,
   t::Real,
   xhF::Tuple{Vararg{AbstractVector}},
   γ::Tuple{Vararg{Real}},
