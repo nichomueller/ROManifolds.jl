@@ -4,6 +4,7 @@ struct θMethod <: ODESolver
   tF::Real
   dt::Real
   θ::Real
+  uh0::Function
 end
 
 get_time_ndofs(ti::ODESolver) = Int((ti.tF-ti.t0)/ti.dt)

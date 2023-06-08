@@ -26,7 +26,7 @@ function Gridap.FESpaces.solve(
   op::ParamODEOperator,
   μ::AbstractVector,
   u0::T,
-  k::Int) where {T}
+  k::Int) where T
 
   t0,tF = solver.t0,solver.tF
   GenericParamODESolution{T}(solver,op,μ,u0,t0,tF,k)
@@ -47,10 +47,10 @@ end
 function Gridap.FESpaces.solve(
   solver::ODESolver,
   op::ParamTransientFEOperator,
-  params::Table,
-  u0)
+  params::Table)
 
-  [solve(solver,op,μk,u0,k) for (k,μk) in enumerate(params)]
+  uh0 = solver.uh0
+  [solve(solver,op,μk,uh0(μk),k) for (k,μk) in enumerate(params)]
 end
 
 function Gridap.FESpaces.solve(
@@ -59,13 +59,11 @@ function Gridap.FESpaces.solve(
   n_snap::Int)
 
   params = realization(op,n_snap)
-  trial = get_trial(op)
-  u0 = zero(trial(nothing,nothing))
-  solve(solver,op,params,u0)
+  solve(solver,op,params)
 end
 
 function Base.iterate(
-  sol::GenericParamODESolution{T}) where {T<:AbstractVector}
+  sol::GenericParamODESolution{<:AbstractVector})
 
   uF = copy(sol.u0)
   u0 = copy(sol.u0)
@@ -78,12 +76,16 @@ function Base.iterate(
   u0 .= uF
   state = (uF,u0,tF,cache)
 
-  return uF,state
+  # Multi field
+  Uh = _allocate_trial_space(sol)
+  uh = _split_solutions(Uh,uF)
+
+  return uh,state
 end
 
 function Base.iterate(
-  sol::GenericParamODESolution{T},
-  state) where {T<:AbstractVector}
+  sol::GenericParamODESolution{<:AbstractVector},
+  state)
 
   uF,u0,t0,cache = state
 
@@ -98,60 +100,23 @@ function Base.iterate(
   u0 .= uF
   state = (uF,u0,tF,cache)
 
-  return uF,state
-end
-
-function Base.iterate(
-  sol::GenericParamODESolution{T}) where {T<:Tuple{Vararg{AbstractVector}}}
-
-  uF = ()
-  u0 = ()
-  for i in eachindex(sol.u0)
-    uF = (uF...,copy(sol.u0[i]))
-    u0 = (u0...,copy(sol.u0[i]))
-  end
-  t0 = sol.t0
-
-  # Solve step
-  uF,tF,cache = solve_step!(uF,sol.solver,sol.op,sol.μ,u0,t0)
-
-  # Update
-  for i in eachindex(uF)
-    u0[i] .= uF[i]
-  end
-  state = (uF,u0,tF,cache)
-
-  Uh = allocate_trial_space(sol.op.trial)
-  uh = map(1:length(Uh.spaces)) do i
-    Gridap.CellField.restrict_to_field(Uh,uF,i)
-  end
+  # Multi field
+  Uh = _allocate_trial_space(sol)
+  uh = _split_solutions(Uh,uF)
 
   return uh,state
 end
 
-function Base.iterate(
-  sol::GenericParamODESolution{T},
-  state) where {T<:Tuple{Vararg{AbstractVector}}}
+function _allocate_trial_space(sol::ParamODESolution)
+  allocate_trial_space(first(sol.op.feop.trials))
+end
 
-  uF,u0,t0,cache = state
+function _split_solutions(::TrialFESpace,u::AbstractVector)
+  u
+end
 
-  if t0 >= sol.tF - 100*eps()
-    return nothing
+function _split_solutions(Uh::MultiFieldFESpace,u::AbstractVector)
+  map(1:length(Uh.spaces)) do i
+    restrict_to_field(Uh,u,i)
   end
-
-  # Solve step
-  uF,tF,cache = solve_step!(uF,sol.solver,sol.op,sol.μ,u0,t0,cache)
-
-  # Update
-  for i in eachindex(uF)
-    u0[i] .= uF[i]
-  end
-  state = (uF,u0,tF,cache)
-
-  Uh = allocate_trial_space(sol.op.trial)
-  uh = map(1:length(Uh.spaces)) do i
-    Gridap.CellField.restrict_to_field(Uh,uF,i)
-  end
-
-  return uh,state
 end

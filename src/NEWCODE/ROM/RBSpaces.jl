@@ -6,7 +6,7 @@ function reduce_fe_space(
 
   n_snaps = info.nsnaps
   s = generate_snapshots(feop,fe_solver,n_snaps)
-  save(info,:fe_snaps,s)
+  save(info,s)
   RBSpace(s;kwargs...)
 end
 
@@ -18,7 +18,7 @@ function reduce_fe_space(
 
   n_snaps = info.nsnaps
   s = generate_snapshots(feop,fe_solver,n_snaps)
-  save(info,:fe_snaps,s)
+  save(info,s)
   TransientRBSpace(s;kwargs...)
 end
 
@@ -34,12 +34,12 @@ struct MultiFieldRBSpace{T} <: RBSpace{T}
 end
 
 function RBSpace(s::SingleFieldSnapshots{T};kwargs...) where T
-  basis_space = compress(s;kwargs...)
+  basis_space = tpod(s;kwargs...)
   SingleFieldRBSpace{T}(basis_space)
 end
 
 function RBSpace(s::MultiFieldSnapshots{T};kwargs...) where T
-  bases_space = compress(s;kwargs...)
+  bases_space = multi_tpod(s;kwargs...)
   MultiFieldRBSpace{T}(bases_space)
 end
 
@@ -54,30 +54,16 @@ struct TransientMultiFieldRBSpace{T} <: TransientRBSpace{T}
 end
 
 function TransientRBSpace(s::SingleFieldSnapshots{T};kwargs...) where T
-  basis_space,basis_time = compress(s;kwargs...)
+  basis_space,basis_time = transient_tpod(s;kwargs...)
   TransientSingleFieldRBSpace{T}(basis_space,basis_time)
 end
 
 function TransientRBSpace(s::MultiFieldSnapshots{T};kwargs...) where T
-  bases_space,bases_time = compress(s;kwargs...)
+  bases_space,bases_time = multi_transient_tpod(s;kwargs...)
   TransientMultiFieldRBSpace{T}(bases_space,bases_time)
 end
 
-function compress(s::MultiFieldSnapshots;compute_supremizers=true,kwargs...)
-  bases_space = map(snap -> tpod(snap;kwargs...),s.snaps)
-  add_supremizers!(Val{compute_supremizers}(),bases_space)
-  bases_space
-end
-
-function compress(s::MultiFieldSnapshots;compute_supremizers=true,kwargs...)
-  bases = map(snap -> transient_tpod(snap;kwargs...),s.snaps)
-  bases_space,bases_time = first.(bases),last.(bases)
-  add_space_supremizers!(Val{compute_supremizers}(),bases_space)
-  add_time_supremizers!(Val{compute_supremizers}(),bases_time)
-  bases_space,bases_time
-end
-
-add_space_supremizers!(::Val{false},args...) = nothing
+add_space_supremizers!(args...;kwargs...) = @notimplemented
 
 # function add_space_supremizers(
 #   ::Val{true},
@@ -116,13 +102,7 @@ add_space_supremizers!(::Val{false},args...) = nothing
 #   error("Implement this")
 # end
 
-add_time_supremizers!(::Val{false},args...) = nothing
-
-function add_time_supremizers!(
-  ::Val{true},
-  time_bases::Vector{<:NnzMatrix};
-  kwargs...)
-
+function add_time_supremizers!(time_bases::Vector{<:NnzMatrix};kwargs...)
   tbu,tbp = time_bases
   time_basis_u,time_basis_p = add_time_supremizers([tbu.array,tbp.array];kwargs...)
   tbu.array = time_basis_u
@@ -174,14 +154,14 @@ function add_time_supremizers(time_bases::Vector{<:AbstractMatrix};ttol=1e-2)
 end
 
 
-function save(info::RBInfo,ref::Symbol,rb::RBSpace)
+function save(info::RBInfo,rb::RBSpace)
   if info.save_offline
-    path = joinpath(info.offline_path,ref)
+    path = joinpath(info.offline_path,"basis")
     save(path,rb)
   end
 end
 
-function load(T::Type{RBSpace},info::RBInfo,ref::Symbol)
-  path = joinpath(info.offline_path,ref)
+function load(T::Type{RBSpace},info::RBInfo)
+  path = joinpath(info.offline_path,"basis")
   load(T,path)
 end

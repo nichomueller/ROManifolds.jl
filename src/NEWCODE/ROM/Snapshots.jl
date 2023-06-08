@@ -1,8 +1,8 @@
-function generate_snapshots(feop,solver,nsnap)
-  sols = solve(solver,feop,nsnap)
+function generate_snapshots(feop,solver,nsnaps)
+  sols = solve(solver,feop,nsnaps)
   cache = snapshots_cache(feop,solver)
-  snaps = pmap(sol->collect_snapshot!(cache,sol),sols)
-  hcat!(first.(snaps))
+  snaps = map(sol->collect_snapshot!(cache,sol),sols) #pmap
+  mat_snaps = compress(first.(snaps))
   param_snaps = Table(last.(snaps))
   Snapshots(mat_snaps,param_snaps)
 end
@@ -19,11 +19,9 @@ mutable struct MultiFieldSnapshots{T} <: Snapshots{T}
   params::Table
 end
 
-Base.size(s::Snapshots) = size(s.snaps)
-
-Base.size(s::MultiFieldSnapshots) = size.(s.snaps)
-
 Base.length(s::Snapshots) = length(s.params)
+
+Base.size(s::Snapshots,idx...) = size(s.snaps,idx...)
 
 nfields(s::MultiFieldSnapshots) = length(s.snaps)
 
@@ -31,14 +29,16 @@ get_snaps(s::Snapshots) = s.snaps
 
 get_params(s::Snapshots) = s.params
 
-is_transient(s::Snapshots) = all(tndofs -> tndofs > 1,_complementary_dimension(s))
+complementary_dimension(s::SingleFieldSnapshots) = Int(size(s.snaps,2)/length(s))
 
-function Snapshots(snaps::AbstractMatrix{Float},params::Table)
-  SingleFieldSnapshots(snaps,params)
+is_transient(s::Snapshots) = all(tndofs -> tndofs > 1,complementary_dimension(s))
+
+function Snapshots(snaps::NnzMatrix{T},params::Table) where T
+  SingleFieldSnapshots{T}(snaps,params)
 end
 
-function Snapshots(snaps::Vector{<:AbstractMatrix{Float}},params::Table)
-  MultiFieldSnapshots(snaps,params)
+function Snapshots(snaps::Vector{NnzMatrix{T}},params::Table) where T
+  MultiFieldSnapshots{T}(snaps,params)
 end
 
 function get_single_field(s::MultiFieldSnapshots,fieldid::Int)
@@ -68,15 +68,23 @@ function solution_cache(test::FESpace,solver::ODESolver)
   NnzMatrix(cache)
 end
 
-function solution_cache(test::MultiFieldFESpace,solver::GridapType)
-  map(t->solution_cache(t,solver),test.spaces)
+for T in (:FESolver,:ODESolver)
+  @eval begin
+    function solution_cache(test::MultiFieldFESpace,solver::$T)
+      map(t->solution_cache(t,solver),test.spaces)
+    end
+  end
 end
 
 function collect_snapshot!(cache,sol::ParamSolution)
   sol_cache,param_cache = cache
 
   printstyled("Computing snapshot $(sol.k)\n";color=:blue)
-  copyto!(sol_cache,sol.uh)
+  if isa(sol_cache,NnzMatrix)
+    copyto!(sol_cache,sol.uh)
+  else
+    map((cache,sol) -> copyto!(cache,sol),sol_cache,sol.uh)
+  end
   copyto!(param_cache,sol.μ)
   printstyled("Successfully computed snapshot $(sol.k)\n";color=:blue)
 
@@ -88,9 +96,16 @@ function collect_snapshot!(cache,sol::ParamODESolution)
 
   printstyled("Computing snapshot $(sol.k)\n";color=:blue)
   n = 1
-  for (xn,_) in sol
-    setindex!(sol_cache,xn,:,n)
-    n += 1
+  if isa(sol_cache,NnzMatrix)
+    for soln in sol
+      setindex!(sol_cache,soln,:,n)
+      n += 1
+    end
+  else
+    for soln in sol
+      map((cache,sol) -> setindex!(cache,sol,:,n),sol_cache,soln)
+      n += 1
+    end
   end
   copyto!(param_cache,sol.μ)
   printstyled("Successfully computed snapshot $(sol.k)\n";color=:blue)
@@ -98,66 +113,69 @@ function collect_snapshot!(cache,sol::ParamODESolution)
   sol_cache,param_cache
 end
 
-_complementary_dimension(s::SingleFieldSnapshots) = Int(size(s,2)/length(s))
-
-function _complementary_dimension(s::MultiFieldSnapshots)
-  single_fields = collect_single_fields(s)
-  _complementary_dimension.(single_fields)
-end
-
-function change_mode!(s::SingleFieldSnapshots)
-  mode1_ndofs = size(s,1)
-  mode2_ndofs = _complementary_dimension(s)
-  nparams = length(s)
-  change_mode!(s.snaps,mode1_ndofs,mode2_ndofs,nparams)
-end
-
-function change_mode!(s::MultiFieldSnapshots)
-  mode1_ndofs = size(s,1)
-  mode2_ndofs = _complementary_dimension(s)
-  nparams = length(s)
-  map((snap,m1ndfs,m2ndfs) -> change_mode!(snap,m1ndfs,m2ndfs,nparams),
-    s.snaps,mode1_ndofs,mode2_ndofs)
-end
-
 function tpod(s::SingleFieldSnapshots;kwargs...)
-  tpod(s.snaps;kwargs...)
+  basis_space = copy(s.snaps)
+  tpod!(basis_space;kwargs...)
+  basis_space
 end
 
-function transient_tpod(::Val{false},s::SingleFieldSnapshots;kwargs...)
-  s1 = copy(s)
-  basis_space = tpod(s1;kwargs...)
-  s2 = basis_space'*s
-  change_mode!(s2)
-  basis_time = tpod(s2;kwargs...)
-
-  basis_space,basis_time
+function multi_tpod(s::MultiFieldSnapshots;compute_supremizers=true,kwargs...)
+  snaps = collect_single_fields(s)
+  bases_space = map(snap -> tpod(snap;kwargs...),snaps)
+  if compute_supremizers
+    add_space_supremizers!(bases_space)
+  end
+  bases_space
 end
 
 function transient_tpod(s::SingleFieldSnapshots;kwargs...)
   compress_rows = _compress_rows(s.snaps)
-  transient_tpod(compress_rows,s;kwargs...)
+  transient_tpod(Val{compress_rows}(),s;kwargs...)
 end
 
-function transient_tpod(::Val{true},s::SingleFieldSnapshots;kwargs...)
-  s1 = copy(s)
-  change_mode!(s1)
-  basis_time = tpod(s1;kwargs...)
-  s2 = basis_time'*s
-  change_mode!(s2)
-  basis_space = tpod(s2;kwargs...)
+function transient_tpod(::Val{false},s::SingleFieldSnapshots;kwargs...)
+  nparams = length(s)
+  basis_space = copy(s.snaps)
+  tpod!(basis_space;kwargs...)
+  basis_time = basis_space'*s.snaps
+  change_mode!(basis_time,nparams)
+  tpod!(basis_time;kwargs...)
 
   basis_space,basis_time
 end
 
-function save(info::RBInfo,ref::Symbol,snaps::Snapshots)
+function transient_tpod(::Val{true},s::SingleFieldSnapshots;kwargs...)
+  nparams = length(s)
+  basis_time = copy(s.snaps)
+  change_mode!(basis_time,nparams)
+  bt = copy(basis_time)
+  tpod!(basis_time)
+  basis_space = basis_time'*bt
+  change_mode!(basis_space,nparams)
+  tpod!(basis_space)
+
+  basis_space,basis_time
+end
+
+function multi_transient_tpod(s::MultiFieldSnapshots;compute_supremizers=true,kwargs...)
+  snaps = collect_single_fields(s)
+  bases = map(snap -> transient_tpod(snap;kwargs...),snaps)
+  bases_space,bases_time = first.(bases),last.(bases)
+  if compute_supremizers
+    add_space_supremizers!(bases_space)
+    add_time_supremizers!(bases_time)
+  end
+  bases_space,bases_time
+end
+
+function save(info::RBInfo,snaps::Snapshots)
   if info.save_offline
-    path = joinpath(info.fe_path,ref)
+    path = joinpath(info.fe_path,"fe_snaps")
     save(path,snaps)
   end
 end
 
-function load(T::Type{Snapshots},info::RBInfo,ref::Symbol)
-  path = joinpath(info.fe_path,ref)
+function load(T::Type{Snapshots},info::RBInfo)
+  path = joinpath(info.fe_path,"fe_snaps")
   load(T,path)
 end

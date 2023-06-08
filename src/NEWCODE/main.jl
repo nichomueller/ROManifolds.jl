@@ -37,6 +37,9 @@ h(μ,t) = x->h(x,μ,t)
 g(x,μ,t) = μ[1]*exp(-x[1]/μ[2])*abs(sin(μ[3]*t))
 g(μ,t) = x->g(x,μ,t)
 
+u0(x,μ) = 0
+u0(μ) = x->u0(x,μ)
+
 lhs_t(μ,t,u,v) = ∫(v*u)dΩ
 lhs(μ,t,u,v) = ∫(a(μ,t)*∇(v)⋅∇(u))dΩ
 rhs(μ,t,v) = ∫(f(μ,t)*v)dΩ + ∫(h(μ,t)*v)dΓn
@@ -45,22 +48,26 @@ reffe = Gridap.ReferenceFE(lagrangian,Float,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = ParamTransientTrialFESpace(test,g)
 feop = ParamTransientAffineFEOperator(lhs_t,lhs,rhs,pspace,trial,test)
-t0,tF,dt,θ = 0.,0.3,0.005,1
-fesolver = θMethod(LUSolver(),t0,tF,dt,θ)
+t0,tF,dt,θ = 0.,0.05,0.005,1
+uh0(μ) = interpolate_everywhere(u0(μ),trial(μ,t0))
+fesolver = θMethod(LUSolver(),t0,tF,dt,θ,uh0)
 
 ϵ = 1e-4
+save_offline = false
 load_offline = false
 energy_norm = false
 nsnaps = 10
 nsnaps_mdeim = 10
-info = RBInfo(test_path;ϵ,load_offline,energy_norm,nsnaps,nsnaps_mdeim)
+info = RBInfo(test_path;ϵ,load_offline,save_offline,energy_norm,nsnaps,nsnaps_mdeim)
 
-if load_offline
-  rbop = load(RBOperator,info)
-else
-  rbspace = reduce_fe_space(info,feop,fesolver)
-  rbop = reduce_fe_operator(info,feop,fesolver,rbspace)
-end
+rbspace = reduce_fe_space(info,feop,fesolver)
 
-rbsolver = Backslash()
-u_rb = solve(rbsolver,rbop;n_solutions=10,post_process=true,energy_norm)
+# if load_offline
+#   rbop = load(RBOperator,info)
+# else
+#   rbspace = reduce_fe_space(info,feop,fesolver)
+#   rbop = reduce_fe_operator(info,feop,fesolver,rbspace)
+# end
+
+# rbsolver = Backslash()
+# u_rb = solve(info,rbsolver,rbop;n_solutions=10,post_process=true,energy_norm)
