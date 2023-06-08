@@ -1,53 +1,49 @@
-function LinearAlgebra.Vector(mat::Matrix{T}) where T
-  Vector{T}(reshape(mat,:,))
+function projection(
+  vnew::AbstractArray{Float},
+  basis::AbstractMatrix{Float};
+  X=nothing)
+
+  proj(v) = isnothing(X) ? v*sum(vnew'*v) : v*sum(vnew'*X*v)
+  proj_mat = reshape(similar(basis),:,1)
+  copyto!(proj_mat,sum([proj(basis[:,i]) for i = axes(basis,2)]))
+  proj_mat
 end
 
-function LinearAlgebra.Matrix(vec::Vector{T}) where T
-  Matrix{T}(reshape(vec,:,1))
+function orth_projection(
+  vnew::AbstractArray{Float},
+  basis::AbstractMatrix{Float};
+  X=nothing)
+
+  proj(v) = isnothing(X) ? v*sum(vnew'*v)/sum(v'*v) : v*sum(vnew'*X*v)/sum(v'*X*v)
+  proj_mat = reshape(similar(basis),:,1)
+  copyto!(proj_mat,sum([proj(basis[:,i]) for i = axes(basis,2)]))
+  proj_mat
 end
 
-function LinearAlgebra.Matrix(block::Vector{<:AbstractArray{T}}) where T
-  Matrix{T}(reduce(hcat,block))
+function orth_complement(
+  v::AbstractArray{Float},
+  basis::AbstractMatrix{Float};
+  kwargs...)
+
+  compl = reshape(similar(basis),:,1)
+  copyto!(compl,v - orth_projection(v,basis;kwargs...))
 end
 
-function LinearAlgebra.Matrix(vblock::Vector{<:Vector{Vector{T}}}) where T
-  n = length(vblock)
-  mat = Matrix(vblock[1])
-  if n > 1
-    for i = 2:n
-      mat = hcat(mat,Matrix(vblock[i]))
+function gram_schmidt(
+  mat::AbstractMatrix{Float},
+  basis::AbstractMatrix{Float};
+  kwargs...)
+
+  for i = axes(mat,2)
+    mat_i = mat[:,i]
+    mat_i = orth_complement(mat_i,basis;kwargs...)
+    if i > 1
+      mat_i = orth_complement(mat_i,mat[:,1:i-1];kwargs...)
     end
+    mat[:,i] = mat_i/norm(mat_i)
   end
+
   mat
-end
-
-LinearAlgebra.Vector(dmat::EMatrix{T}) where T = Vector(Matrix(dmat))
-
-LinearAlgebra.Matrix(dmat::EMatrix{T}) where T = convert(Matrix{T},dmat)
-
-EMatrix(mat::Matrix{T}) where T = convert(EMatrix{T},mat)
-
-EMatrix(mats::Vector{Matrix{T}}) where T = EMatrix(hcat(mats...))
-
-function allocate_matrix(::Type{Matrix{Float}},sizes...)
-  Nr,Nc = sizes
-  zeros(Nr,Nc)
-end
-
-function allocate_matrix(::Type{EMatrix{Float}},sizes...)
-  Nr,Nc = sizes
-  Elemental.zeros(EMatrix{Float},Nr,Nc)
-end
-
-complementary_dimension(mat::AbstractMatrix,ns::Int) = Int(size(mat,2)/ns)
-
-function mode2_unfolding(mat::AbstractMatrix{Float},ns::Int)
-  Ns,Nt = size(mat,1),complementary_dimension(mat,ns)
-  mode2 = allocate_matrix(mat,Nt,Ns*ns)
-  @inbounds for k = 1:ns
-    setindex!(mode2,mat[:,(k-1)*Nt+1:k*Nt]',:,(k-1)*Ns+1:k*Ns)
-  end
-  return mode2
 end
 
 function expand(tup::Tuple)
@@ -60,14 +56,6 @@ function expand(tup::Tuple)
     end
   end
   ntup
-end
-
-function Base.NTuple(N::Int,T::DataType)
-  NT = ()
-  for _ = 1:N
-    NT = (NT...,zero(T))
-  end
-  NT::NTuple{N,T}
 end
 
 function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
@@ -84,7 +72,7 @@ function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
       count += 1
   end
 
-  nz = findall(x -> x .!= 0., V)
+  nz = findall(x -> x .>= eps(), V)
 
   (I[nz], J[nz], V[nz])
 end
@@ -108,14 +96,6 @@ function SparseArrays.findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
   (I[nz], V[nz])
 end
 
-function get_findnz_vals(mat::Matrix{Float},findnz_idx::Vector{Int})
-  selectdim(mat,1,findnz_idx)
-end
-
-function get_findnz_vals(mat::SparseMatrixCSC{Float,Int},findnz_idx::Vector{Int})
-  mat[:][findnz_idx]
-end
-
 Base.getindex(emat::EMatrix{Float},::Colon,k::Int) = emat[:,k:k]
 
 Base.getindex(emat::EMatrix{Float},k::Int,::Colon) = emat[k:k,:]
@@ -123,17 +103,5 @@ Base.getindex(emat::EMatrix{Float},k::Int,::Colon) = emat[k:k,:]
 Base.getindex(emat::EMatrix{Float},idx::UnitRange{Int},k::Int) = emat[idx,k:k]
 
 Base.getindex(emat::EMatrix{Float},k::Int,idx::UnitRange{Int}) = emat[k:k,idx]
-
-# Base.:(-)(a::NTuple{N,T1},b::NTuple{N,T2}) where {N,T1,T2} = a.-b
-
-# Base.:(*)(a::NTuple{N,T1},b::NTuple{N,T2}) where {N,T1,T2} = a.*b
-
-# Base.adjoint(nt::NTuple{N,T}) where {N,T} = adjoint.(nt)
-
-# Base.:(^)(vv::VectorValue,n::Int) = VectorValue([vv[k]^n for k=eachindex(vv)])
-
-# Base.:(^)(vv::VectorValue,n::Float) = VectorValue([vv[k]^n for k=eachindex(vv)])
-
-# Base.abs(vv::VectorValue) = VectorValue([abs(vv[k]) for k=eachindex(vv)])
 
 Gridap.get_triangulation(m::Measure) = m.quad.trian

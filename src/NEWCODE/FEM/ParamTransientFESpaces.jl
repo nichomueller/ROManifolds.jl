@@ -29,7 +29,7 @@ Parameter, time evaluation without allocating Dirichlet vals (returns a TrialFES
 """
 function evaluate!(Uμt::T,U::ParamTransientTrialFESpace,μ::AbstractVector,t::Real) where T
   if isa(U.dirichlet_μt,Vector)
-    objects_at_μt = map(o->o(μ,t), U.dirichlet_μt)
+    objects_at_μt = map(o->o(μ,t),U.dirichlet_μt)
   else
     objects_at_μt = U.dirichlet_μt(μ,t)
   end
@@ -47,6 +47,19 @@ function Gridap.evaluate(U::ParamTransientTrialFESpace,μ::AbstractVector,t::Rea
 end
 
 """
+Parameter evaluation allocating Dirichlet vals
+"""
+function Gridap.evaluate(U::ParamTransientTrialFESpace,μ::AbstractVector)
+  Uμt = evaluate(U,μ,0.)
+  if isa(U.dirichlet_μt,Vector)
+    objects_at_t = t -> map(o->o(μ,t),U.dirichlet_μt)
+  else
+    objects_at_t = t -> U.dirichlet_μt(μ,t)
+  end
+  TransientTrialFESpace(Uμt,objects_at_t)
+end
+
+"""
 We can evaluate at `nothing` when we do not care about the Dirichlet vals
 """
 Gridap.evaluate(U::ParamTransientTrialFESpace,::Nothing,::Nothing) = U.Ud0
@@ -57,7 +70,9 @@ Functor-like evaluation. It allocates Dirichlet vals in general.
 """
 (U::SingleFieldFESpace)(::AbstractVector,::Real) = U
 (U::ParamTransientTrialFESpace)(μ::AbstractVector,t::Real) = Gridap.evaluate(U,μ,t)
+(U::ParamTransientTrialFESpace)(μ::AbstractVector) = Gridap.evaluate(U,μ)
 (U::ParamTransientTrialFESpace)(::Nothing,::Nothing) = Gridap.evaluate(U,nothing,nothing)
+(U::ParamTransientTrialFESpace)(::Nothing) = Gridap.evaluate(U,nothing)
 
 """
 Time derivative of the Dirichlet functions
@@ -135,24 +150,25 @@ end
 function ParamTransientMultiFieldFESpace(spaces::Vector{<:SingleFieldFESpace})
   MultiFieldFESpace(spaces)
 end
-function Gridap.FESpaces.FEFunction(
-  trial::ParamTransientTrialFESpace,
-  u::AbstractVector,
-  μ::AbstractVector,
-  t::Real)
 
-  FEFunction(trial(μ,t),u)
-end
+# function Gridap.FESpaces.FEFunction(
+#   trial::ParamTransientTrialFESpace,
+#   u::AbstractVector,
+#   μ::AbstractVector,
+#   t::Real)
 
-function Gridap.FESpaces.FEFunction(
-  trial::ParamTransientTrialFESpace,
-  u::AbstractMatrix,
-  μ::AbstractVector,
-  times::Vector{<:Real})
+#   FEFunction(trial(μ,t),u)
+# end
 
-  Nt = length(times)
-  @assert size(u,2) == Nt "Wrong dimensions"
+# function Gridap.FESpaces.FEFunction(
+#   trial::ParamTransientTrialFESpace,
+#   u::AbstractMatrix,
+#   μ::AbstractVector,
+#   times::Vector{<:Real})
 
-  n(tθ) = findall(x -> x == tθ,timesθ)[1]
-  tθ -> FEFunction(trial,uk[:,n(tθ)],μ,tθ)
-end
+#   Nt = length(times)
+#   @assert size(u,2) == Nt "Wrong dimensions"
+
+#   n(tθ) = findall(x -> x == tθ,timesθ)[1]
+#   tθ -> FEFunction(trial,uk[:,n(tθ)],μ,tθ)
+# end

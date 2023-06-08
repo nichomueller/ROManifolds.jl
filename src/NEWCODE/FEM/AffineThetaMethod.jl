@@ -1,6 +1,6 @@
 function Gridap.ODEs.TransientFETools.solve_step!(
   uf::AbstractVector,
-  solver::ThetaMethod,
+  solver::θMethod,
   op::AffineParamODEOperator,
   μ::AbstractVector,
   u0::AbstractVector,

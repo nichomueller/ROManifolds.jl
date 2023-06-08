@@ -32,8 +32,8 @@ function newton(res::Function,jac::Function,X::FESpace,t::Real,x0;tol=1e-10,maxi
 end
 
 function solve_cholesky(
-  A::SparseMatrixCSC{Float, Int},
-  B::SparseMatrixCSC{Float, Int})
+  A::SparseMatrixCSC{Float,Int},
+  B::SparseMatrixCSC{Float,Int})
 
   H = cholesky(A)
   L = sparse(H.L)
@@ -45,7 +45,7 @@ function solve_cholesky(
 end
 
 function solve_cholesky(
-  A::SparseMatrixCSC{Float, Int},
+  A::SparseMatrixCSC{Float,Int},
   B::Matrix{T}) where T
 
   H = cholesky(A)
@@ -58,7 +58,7 @@ function solve_cholesky(
 end
 
 function solve_cholesky(
-  A::SparseMatrixCSC{Float, Int},
+  A::SparseMatrixCSC{Float,Int},
   B::Vector{T}) where T
 
   H = cholesky(A)

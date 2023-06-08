@@ -25,6 +25,7 @@ using Gridap.TensorValues
 using Gridap.ODEs.TransientFETools
 
 import Base.Threads.@threads
+import Gridap.Helpers.@check
 import Gridap:solve!
 import Gridap:∇
 import Gridap.Arrays:Table
@@ -62,5 +63,4 @@ const EMatrix = Elemental.Matrix
 include("Files.jl")
 include("Indexes.jl")
 include("Operations.jl")
-include("BasesConstruction.jl")
 include("SystemSolvers.jl")

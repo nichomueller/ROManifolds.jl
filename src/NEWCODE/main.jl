@@ -14,7 +14,6 @@ bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
 order = 1
 degree = 2
 
-fepath = fem_path(test_path)
 mshpath = mesh_path(test_path,mesh)
 model = get_discrete_model(mshpath,bnd_info)
 Ω = Triangulation(model)
@@ -25,9 +24,6 @@ dΓn = Measure(Γn,degree)
 ranges = fill([1.,10.],3)
 sampling = UniformSampling()
 pspace = ParamSpace(ranges,sampling)
-
-t0,tF,dt,θ = 0.,0.3,0.005,1
-time_info = ThetaMethodInfo(t0,tF,dt,θ)
 
 a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
 a(μ,t) = x->a(x,μ,t)
@@ -49,15 +45,22 @@ reffe = Gridap.ReferenceFE(lagrangian,Float,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = ParamTransientTrialFESpace(test,g)
 feop = ParamTransientAffineFEOperator(lhs_t,lhs,rhs,pspace,trial,test)
-fesolver = ThetaMethod(LUSolver(),dt,θ)
+t0,tF,dt,θ = 0.,0.3,0.005,1
+fesolver = θMethod(LUSolver(),t0,tF,dt,θ)
 
+ϵ = 1e-4
 load_offline = false
-ϵ = 1e-3
 energy_norm = false
-pod_style = ReducedPOD()
+nsnaps = 10
+nsnaps_mdeim = 10
+info = RBInfo(test_path;ϵ,load_offline,energy_norm,nsnaps,nsnaps_mdeim)
 
-rbspace = reduce_fe_space(feop,fesolver,t0,tF;load_offline,n_snaps=80,ϵ,energy_norm,pod_style)
-rbop = reduce_fe_operator(feop,rbspace;load_offline,n_snaps=20,ϵ)
+if load_offline
+  rbop = load(RBOperator,info)
+else
+  rbspace = reduce_fe_space(info,feop,fesolver)
+  rbop = reduce_fe_operator(info,feop,fesolver,rbspace)
+end
+
 rbsolver = Backslash()
-
 u_rb = solve(rbsolver,rbop;n_solutions=10,post_process=true,energy_norm)

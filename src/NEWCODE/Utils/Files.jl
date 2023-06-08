@@ -22,19 +22,13 @@ end
 
 correct_path(path::String) = path*".txt"
 
-save(path::String,obj) = serialize(correct_path(path),obj)
-
-save(path::String,objs::Tuple) = Broadcasting(obj->save(path,obj))(expand(objs))
+function save(path::String,obj)
+  serialize(correct_path(path),obj)
+  return nothing
+end
 
 function load(::Type{T},path::String)::T where T
   obj = deserialize(correct_path(path))
-  if typeof(obj) == T
-    obj
-  else
-    convert(T,load(path))
-  end
+  @assert typeof(obj) <: T
+  return obj
 end
-
-load(path::String) = load(Matrix{Float},path)
-
-myisfile(path::String) = isfile(correct_path(path))

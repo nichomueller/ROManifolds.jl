@@ -99,7 +99,3 @@ end
 
 get_pspace(op::ParamFEOperatorFromWeakForm) = op.pspace
 realization(op::ParamFEOperator,args...) = realization(op.pspace,args...)
-get_Ns(space::FESpace) = space.nfree
-get_Ns(space::ZeroMeanFESpace) = space.space.space.nfree-1
-get_Ns(space::MultiFieldFESpace) = get_Ns.(space)
-get_Ns(op::ParamFEOperator) = get_Ns(op.test)

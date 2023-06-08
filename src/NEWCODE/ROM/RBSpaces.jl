@@ -1,117 +1,83 @@
-abstract type RBSpace end
+function reduce_fe_space(
+  info::RBInfo,
+  feop::ParamFEOperator,
+  fe_solver::FESolver;
+  kwargs...)
 
-struct SingleFieldRBSpace <: RBSpace
-  basis_space::AbstractArray
-
-  function SingleFieldRBBasis(snaps::Snapshots;kwargs...)
-    basis_space = POD(snaps;kwargs...)
-    new(basis_space)
-  end
+  n_snaps = info.nsnaps
+  s = generate_snapshots(feop,fe_solver,n_snaps)
+  save(info,:fe_snaps,s)
+  RBSpace(s;kwargs...)
 end
 
-get_basis_space(rbb::SingleFieldRBSpace) = rbb.basis_space
+function reduce_fe_space(
+  info::RBInfo,
+  feop::ParamTransientFEOperator,
+  fe_solver::ODESolver;
+  kwargs...)
 
-function reduce_fe_space(feop,args...;load_offline=true,kwargs...)
-  reduce_fe_space(Val{load_offline}(),feop,args...;kwargs...)
+  n_snaps = info.nsnaps
+  s = generate_snapshots(feop,fe_solver,n_snaps)
+  save(info,:fe_snaps,s)
+  TransientRBSpace(s;kwargs...)
 end
 
-function reduce_fe_space(::Val{true},feop,args...;kwargs...)
-  load()
+abstract type RBSpace{T} end
+abstract type TransientRBSpace{T} <: RBSpace{T} end
+
+struct SingleFieldRBSpace{T} <: RBSpace{T}
+  basis_space::NnzMatrix{T}
 end
 
-function reduce_fe_space(::Val{false},feop,args...;n_snaps=50,kwargs...)
-  snaps = generate_fe_snapshots(feop,n_snaps,args...)
-  Ns = get_Ns(feop)
-  assemble_rb_space(snaps,Ns;kwargs...)
+struct MultiFieldRBSpace{T} <: RBSpace{T}
+  basis_space::Vector{NnzMatrix{T}}
 end
 
-function assemble_rb_space(snaps::Snapshots,::Int;kwargs...)
-  SingleFieldRBSpace(snaps;kwargs...)
+function RBSpace(s::SingleFieldSnapshots{T};kwargs...) where T
+  basis_space = compress(s;kwargs...)
+  SingleFieldRBSpace{T}(basis_space)
 end
 
-struct TransientSingleFieldRBSpace <: RBSpace
-  basis_space::AbstractArray
-  basis_time::AbstractArray
-
-  function TransientSingleFieldRBSpace(snaps::Snapshots;kwargs...)
-    basis_space,basis_time = assemble_spatio_temporal_rb(snaps;kwargs...)
-    new(basis_space,basis_time)
-  end
+function RBSpace(s::MultiFieldSnapshots{T};kwargs...) where T
+  bases_space = compress(s;kwargs...)
+  MultiFieldRBSpace{T}(bases_space)
 end
 
-function assemble_spatio_temporal_rb(snaps::Snapshots;kwargs...)
-  nrows,ncols = size(get_snap(snaps))
-  assemble_spatio_temporal_rb(Val{nrows > ncols}(),snap;kwargs...)
+struct TransientSingleFieldRBSpace{T} <: TransientRBSpace{T}
+  basis_space::NnzMatrix{T}
+  basis_time::NnzMatrix{T}
 end
 
-function assemble_spatio_temporal_rb(::Val{false},snaps::Snapshots;kwargs...)
-  snaps_space = get_snap(snaps)
-  nsnaps = length(snaps)
-  basis_space = POD(snaps_space;kwargs...)
-  rb_snaps_time = mode2_unfolding(basis_space'*snaps_space,nsnaps)
-  basis_time = POD(rb_snaps_time;kwargs...)
-
-  basis_space,basis_time
+struct TransientMultiFieldRBSpace{T} <: TransientRBSpace{T}
+  basis_space::Vector{NnzMatrix{T}}
+  basis_time::Vector{NnzMatrix{T}}
 end
 
-function assemble_spatio_temporal_rb(::Val{true},snaps::Snapshots;kwargs...)
-  snaps_space = get_snap(snaps)
-  nsnaps = length(snaps)
-  snaps_time = mode2_unfolding(snaps_space,nsnaps)
-  basis_time = POD(snaps_time;kwargs...)
-  red_snaps_space = mode2_unfolding(basis_time'*snaps_time,nsnaps)
-  basis_space = POD(red_snaps_space;kwargs...)
-
-  basis_space,basis_time
+function TransientRBSpace(s::SingleFieldSnapshots{T};kwargs...) where T
+  basis_space,basis_time = compress(s;kwargs...)
+  TransientSingleFieldRBSpace{T}(basis_space,basis_time)
 end
 
-# function assemble_rb_space(
-#   info::RBInfoSteady,
-#   snaps_u::Snapshots,
-#   snaps_p::Snapshots,
-#   args...;
-#   kwargs...)
+function TransientRBSpace(s::MultiFieldSnapshots{T};kwargs...) where T
+  bases_space,bases_time = compress(s;kwargs...)
+  TransientMultiFieldRBSpace{T}(bases_space,bases_time)
+end
 
-#   def = isindef(info)
+function compress(s::MultiFieldSnapshots;compute_supremizers=true,kwargs...)
+  bases_space = map(snap -> tpod(snap;kwargs...),s.snaps)
+  add_supremizers!(Val{compute_supremizers}(),bases_space)
+  bases_space
+end
 
-#   bs_u = assemble_spatial_rb(snaps_u;ϵ=info.ϵ,kwargs...)
-#   bs_p = assemble_spatial_rb(snaps_p;ϵ=info.ϵ,kwargs...)
-#   bs_u_supr = add_space_supremizers(def,(bs_u,bs_p),args...)
+function compress(s::MultiFieldSnapshots;compute_supremizers=true,kwargs...)
+  bases = map(snap -> transient_tpod(snap;kwargs...),s.snaps)
+  bases_space,bases_time = first.(bases),last.(bases)
+  add_space_supremizers!(Val{compute_supremizers}(),bases_space)
+  add_time_supremizers!(Val{compute_supremizers}(),bases_time)
+  bases_space,bases_time
+end
 
-#   rbspace_u = RBSpaceSteady(get_id(snaps_u),bs_u_supr)
-#   rbspace_p = RBSpaceSteady(get_id(snaps_p),bs_p)
-
-#   (rbspace_u,rbspace_p)
-# end
-
-# function assemble_rb_space(
-#   info::RBInfoUnsteady,
-#   snaps_u::Snapshots,
-#   snaps_p::Snapshots,
-#   args...;
-#   kwargs...)
-
-#   def = isindef(info)
-#   opB,ttol... = args
-
-#   bs_u,bt_u = assemble_spatio_temporal_rb(snaps_u;ϵ=info.ϵ,kwargs...)
-#   bs_p,bt_p = assemble_spatio_temporal_rb(snaps_p;ϵ=info.ϵ,kwargs...)
-#   bs_u_supr = add_space_supremizers(def,(bs_u,bs_p),opB)
-#   bt_u_supr = add_time_supremizers(def,(bt_u,bt_p),ttol...)
-
-#   rbspace_u = RBSpaceUnsteady(get_id(snaps_u),bs_u_supr,bt_u_supr)
-#   rbspace_p = RBSpaceUnsteady(get_id(snaps_p),bs_p,bt_p)
-
-#   (rbspace_u,rbspace_p)
-# end
-
-# function add_space_supremizers(
-#   ::Val{false},
-#   basis::NTuple{2,AbstractMatrix{Float}},
-#   args...)
-
-#   first(basis)
-# end
+add_space_supremizers!(::Val{false},args...) = nothing
 
 # function add_space_supremizers(
 #   ::Val{true},
@@ -150,57 +116,72 @@ end
 #   error("Implement this")
 # end
 
-# function add_time_supremizers(
-#   ::Val{false},
-#   basis::NTuple{2,AbstractMatrix{Float}},
-#   args...)
+add_time_supremizers!(::Val{false},args...) = nothing
 
-#   first(basis)
-# end
+function add_time_supremizers!(
+  ::Val{true},
+  time_bases::Vector{<:NnzMatrix};
+  kwargs...)
 
-# function add_time_supremizers(
-#   ::Val{true},
-#   basis::NTuple{2,AbstractMatrix{Float}},
-#   ttol=1e-2)
+  tbu,tbp = time_bases
+  time_basis_u,time_basis_p = add_time_supremizers([tbu.array,tbp.array];kwargs...)
+  tbu.array = time_basis_u
+  tbp.array = time_basis_p
+  return
+end
 
-#   printstyled("Checking if supremizers in time need to be added\n";color=:blue)
+function add_time_supremizers(time_bases::Vector{<:AbstractMatrix};ttol=1e-2)
+  printstyled("Checking if supremizers in time need to be added\n";color=:blue)
 
-#   basis_u,basis_p = basis
-#   basis_up = basis_u'*basis_p
+  basis_u,basis_p = time_bases
+  basis_up = basis_u'*basis_p
 
-#   function enrich(
-#     basis_u::AbstractMatrix{Float},
-#     basis_up::AbstractMatrix{Float},
-#     v::AbstractArray{Float})
+  function enrich(
+    basis_u::AbstractMatrix{Float},
+    basis_up::AbstractMatrix{Float},
+    v::AbstractArray{Float})
 
-#     vnew = orth_complement(v,basis_u)
-#     vnew /= norm(vnew)
-#     hcat(basis_u,vnew),vcat(basis_up,vnew'*basis_p)
-#   end
+    vnew = orth_complement(v,basis_u)
+    vnew /= norm(vnew)
+    hcat(basis_u,vnew),vcat(basis_up,vnew'*basis_p)
+  end
 
-#   count = 0
-#   ntp_minus_ntu = size(basis_p,2) - size(basis_u,2)
-#   if ntp_minus_ntu > 0
-#     for ntp = 1:ntp_minus_ntu
-#       basis_u,basis_up = enrich(basis_u,basis_up,basis_p[:,ntp])
-#       count += 1
-#     end
-#   end
+  count = 0
+  ntp_minus_ntu = size(basis_p,2) - size(basis_u,2)
+  if ntp_minus_ntu > 0
+    for ntp = 1:ntp_minus_ntu
+      basis_u,basis_up = enrich(basis_u,basis_up,basis_p[:,ntp])
+      count += 1
+    end
+  end
 
-#   ntp = 1
-#   while ntp ≤ size(basis_up,2)
-#     proj = ntp == 1 ? zeros(size(basis_up[:,1])) : orth_projection(basis_up[:,ntp],basis_up[:,1:ntp-1])
-#     dist = norm(basis_up[:,1]-proj)
-#     if dist ≤ ttol
-#       basis_u,basis_up = enrich(basis_u,basis_up,basis_p[:,ntp])
-#       count += 1
-#       ntp = 0
-#     else
-#       basis_up[:,ntp] -= proj
-#     end
-#     ntp += 1
-#   end
+  ntp = 1
+  while ntp ≤ size(basis_up,2)
+    proj = ntp == 1 ? zeros(size(basis_up[:,1])) : orth_projection(basis_up[:,ntp],basis_up[:,1:ntp-1])
+    dist = norm(basis_up[:,1]-proj)
+    if dist ≤ ttol
+      basis_u,basis_up = enrich(basis_u,basis_up,basis_p[:,ntp])
+      count += 1
+      ntp = 0
+    else
+      basis_up[:,ntp] -= proj
+    end
+    ntp += 1
+  end
 
-#   printstyled("Added $count time supremizers\n";color=:blue)
-#   basis_u
-# end
+  printstyled("Added $count time supremizers\n";color=:blue)
+  basis_u
+end
+
+
+function save(info::RBInfo,ref::Symbol,rb::RBSpace)
+  if info.save_offline
+    path = joinpath(info.offline_path,ref)
+    save(path,rb)
+  end
+end
+
+function load(T::Type{RBSpace},info::RBInfo,ref::Symbol)
+  path = joinpath(info.offline_path,ref)
+  load(T,path)
+end

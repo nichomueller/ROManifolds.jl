@@ -78,7 +78,7 @@ function reduce_fe_term(
   rbspace::RBSpace;
   n_snaps=20,kwargs...)
 
-  snaps = generate_fe_snapshots(feop,solver,n_snaps)
+  snaps = generate_snapshots(feop,solver,n_snaps)
   affine_vecs = reduce(snaps;kwargs...)
   rb_integration_temp = get_integration_domain(affine_vecs)
   rb_interpolation = get_mdeim_interpolation(affine_vecs,rb_integration_temp)
