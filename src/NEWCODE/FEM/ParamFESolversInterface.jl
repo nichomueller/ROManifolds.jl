@@ -99,3 +99,32 @@ function Gridap.ODEs.TransientFETools.allocate_jacobian(
   u = EvaluationFunction(trial(op.μ),x)
   allocate_jacobian(feop,u)
 end
+
+# MDEIM snapshots generation interface
+
+function _vecdata_residual(
+  op::ParamFEOperator,
+  sols::AbstractMatrix,
+  params::Table)
+
+  trial = get_trial(op)
+  test = get_test(op)
+  dv = get_fe_basis(test)
+  sol_μ = _as_function(sols,params)
+  u(μ) = EvaluationFunction(trial(μ),sol_μ(μ))
+  μ -> collect_cell_vector(test,op.res(μ,u(μ),dv))
+end
+
+function Gridap.ODEs.TransientFETools._matdata_jacobian(
+  op::ParamFEOperator,
+  sols::AbstractMatrix,
+  params::Table)
+
+  trial = get_trial(op)
+  test = get_test(op)
+  dv = get_fe_basis(test)
+  du = get_trial_fe_basis(trial(nothing))
+  sol_μ = _as_function(sols,params)
+  u(μ) = EvaluationFunction(trial(μ),sol_μ(μ))
+  μ -> collect_cell_matrix(trial(μ),test,op.jac(μ,u(μ),dv,du))
+end

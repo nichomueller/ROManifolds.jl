@@ -1,7 +1,7 @@
 function generate_snapshots(feop,solver,nsnaps)
   sols = solve(solver,feop,nsnaps)
   cache = snapshots_cache(feop,solver)
-  snaps = map(sol->collect_snapshot!(cache,sol),sols) #pmap
+  snaps = pmap(sol->collect_snapshot!(cache,sol),sols)
   mat_snaps = compress(first.(snaps))
   param_snaps = Table(last.(snaps))
   Snapshots(mat_snaps,param_snaps)
@@ -52,64 +52,6 @@ end
 function snapshots_cache(feop,args...)
   param_cache = realization(feop)
   sol_cache = solution_cache(feop.test,args...)
-  sol_cache,param_cache
-end
-
-function solution_cache(test::FESpace,::FESolver)
-  space_ndofs = test.nfree
-  cache = fill(1.,space_ndofs,1)
-  NnzMatrix(cache)
-end
-
-function solution_cache(test::FESpace,solver::ODESolver)
-  space_ndofs = test.nfree
-  time_ndofs = get_time_ndofs(solver)
-  cache = fill(1.,space_ndofs,time_ndofs)
-  NnzMatrix(cache)
-end
-
-for T in (:FESolver,:ODESolver)
-  @eval begin
-    function solution_cache(test::MultiFieldFESpace,solver::$T)
-      map(t->solution_cache(t,solver),test.spaces)
-    end
-  end
-end
-
-function collect_snapshot!(cache,sol::ParamSolution)
-  sol_cache,param_cache = cache
-
-  printstyled("Computing snapshot $(sol.k)\n";color=:blue)
-  if isa(sol_cache,NnzMatrix)
-    copyto!(sol_cache,sol.uh)
-  else
-    map((cache,sol) -> copyto!(cache,sol),sol_cache,sol.uh)
-  end
-  copyto!(param_cache,sol.μ)
-  printstyled("Successfully computed snapshot $(sol.k)\n";color=:blue)
-
-  sol_cache,param_cache
-end
-
-function collect_snapshot!(cache,sol::ParamODESolution)
-  sol_cache,param_cache = cache
-
-  printstyled("Computing snapshot $(sol.k)\n";color=:blue)
-  n = 1
-  if isa(sol_cache,NnzMatrix)
-    for soln in sol
-      setindex!(sol_cache,soln,:,n)
-      n += 1
-    end
-  else
-    for soln in sol
-      map((cache,sol) -> setindex!(cache,sol,:,n),sol_cache,soln)
-      n += 1
-    end
-  end
-  copyto!(param_cache,sol.μ)
-  printstyled("Successfully computed snapshot $(sol.k)\n";color=:blue)
-
   sol_cache,param_cache
 end
 

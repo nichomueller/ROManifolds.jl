@@ -115,8 +115,41 @@ function _split_solutions(::TrialFESpace,u::AbstractVector)
   u
 end
 
-function _split_solutions(Uh::MultiFieldFESpace,u::AbstractVector)
-  map(1:length(Uh.spaces)) do i
-    restrict_to_field(Uh,u,i)
+function _split_solutions(trial::MultiFieldFESpace,u::AbstractVector)
+  map(1:length(trial.spaces)) do i
+    restrict_to_field(trial,u,i)
   end
+end
+
+function solution_cache(test::FESpace,solver::ODESolver)
+  space_ndofs = test.nfree
+  time_ndofs = get_time_ndofs(solver)
+  cache = fill(1.,space_ndofs,time_ndofs)
+  NnzMatrix(cache)
+end
+
+function solution_cache(test::MultiFieldFESpace,solver::ODESolver)
+  map(t->solution_cache(t,solver),test.spaces)
+end
+
+function collect_snapshot!(cache,sol::ParamODESolution)
+  sol_cache,param_cache = cache
+
+  printstyled("Computing snapshot $(sol.k)\n";color=:blue)
+  n = 1
+  if isa(sol_cache,NnzMatrix)
+    for soln in sol
+      setindex!(sol_cache,soln,:,n)
+      n += 1
+    end
+  else
+    for soln in sol
+      map((cache,sol) -> setindex!(cache,sol,:,n),sol_cache,soln)
+      n += 1
+    end
+  end
+  copyto!(param_cache,sol.μ)
+  printstyled("Successfully computed snapshot $(sol.k)\n";color=:blue)
+
+  sol_cache,param_cache
 end

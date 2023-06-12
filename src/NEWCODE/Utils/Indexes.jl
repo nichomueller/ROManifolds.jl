@@ -68,12 +68,22 @@ function Base.argmax(v::Vector,nval::Int)
   Int.(indexin(s,v))[1:nval]
 end
 
-# function get_nonzero_idx(mat::AbstractMatrix{Float})
-#   sum_cols = sum(mat,dims=2)[:]
-#   findall(x -> abs(x) ≥ eps(),sum_cols)
-# end
+function _as_function(values::AbstractMatrix,input)
+  n = y -> first(findall(x -> x == y,input))
+  if size(values,2) == length(input) # time function
+    y -> values[:,n(y)]
+  else size(values,2) % length(input) == 0 # param function
+    compl_dim = Int(size(values,2)/length(input))
+    y -> values[:,(n(y)-1)*compl_dim+1:n(y)*compl_dim]
+  end
+end
 
-# function get_nonzero_idx(mat::SparseMatrixCSC{Float,Int})
-#   findnz_idx, = findnz(mat[:])
-#   findnz_idx
-# end
+function param_function(
+  values::Vector{T},
+  params::Table) where {T<:AbstractMatrix}
+
+  @assert length(values) == length(params)
+
+  n(μ) = first(findall(x -> x == μ,params))
+  t -> values[n(t)]
+end

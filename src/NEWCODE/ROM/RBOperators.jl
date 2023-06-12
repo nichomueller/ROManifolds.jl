@@ -107,3 +107,18 @@ get_bilinear_solver(::Val{true}) = assemble_matrix
 get_linear_solver(::Val{false}) = LinearSnapshots()
 
 get_bilinear_solver(::Val{false}) = BilinearSnapshots()
+
+function collect_snapshot!(cache,data::Tuple{Vararg{Any}},filters)
+  sol_cache,param_cache = cache
+
+  printstyled("Computing snapshot $(sol.k)\n";color=:blue)
+  if isa(sol_cache,NnzMatrix)
+    copyto!(sol_cache,sol.uh)
+  else
+    map((cache,sol) -> copyto!(cache,sol),sol_cache,sol.uh)
+  end
+  copyto!(param_cache,sol.μ)
+  printstyled("Successfully computed snapshot $(sol.k)\n";color=:blue)
+
+  sol_cache,param_cache
+end

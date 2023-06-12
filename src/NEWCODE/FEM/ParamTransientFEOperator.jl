@@ -92,6 +92,8 @@ Gridap.ODEs.TransientFETools.get_assembler(op::ParamTransientFEOperatorFromWeakF
 Gridap.ODEs.TransientFETools.get_test(op::ParamTransientFEOperatorFromWeakForm) = op.test
 Gridap.FESpaces.get_trial(op::ParamTransientFEOperatorFromWeakForm) = op.trials[1]
 Gridap.ODEs.TransientFETools.get_order(op::ParamTransientFEOperatorFromWeakForm) = op.order
+get_pspace(op::ParamTransientFEOperatorFromWeakForm) = op.pspace
+realization(op::ParamTransientFEOperator,args...) = realization(op.pspace,args...)
 
 function Gridap.ODEs.TransientFETools.allocate_residual(
   op::ParamTransientFEOperatorFromWeakForm,
@@ -195,5 +197,17 @@ function Gridap.ODEs.TransientFETools.fill_jacobians(
   return _matdata
 end
 
-get_pspace(op::ParamTransientFEOperatorFromWeakForm) = op.pspace
-realization(op::ParamTransientFEOperator,args...) = realization(op.pspace,args...)
+function Gridap.ODEs.TransientFETools._matdata_jacobian(
+  op::TransientFEOperatorFromWeakForm,
+  μ::AbstractVector,
+  t::Real,
+  uh::T,
+  i::Integer,
+  γᵢ::Real) where T
+
+  Uh = evaluate(get_trial(op),nothing,nothing)
+  V = get_test(op)
+  du = get_trial_fe_basis(Uh)
+  v = get_fe_basis(V)
+  collect_cell_matrix(Uh,V,γᵢ*op.jacs[i](μ,t,uh,du,v))
+end

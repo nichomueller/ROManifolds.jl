@@ -58,34 +58,78 @@ function ParamThetaMethodAffineOperator(
   AffineOperator(A,b)
 end
 
-function _matrix_and_vector!(A,b,odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
+function _matrix_and_vector!(
+  A::AbstractMatrix,
+  b::AbstractVector,
+  odeop::AffineParamODEOperator,
+  μ::AbstractArray,
+  tθ::Real,
+  dtθ::Real,
+  u0,
+  ode_cache,
+  vθ)
+
   _matrix!(A,odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
   _vector!(b,odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
 end
 
-function _matrix!(A,odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
+function _matrix!(
+  A::AbstractMatrix,
+  odeop::AffineParamODEOperator,
+  μ::AbstractArray,
+  tθ::Real,
+  dtθ::Real,
+  u0,
+  ode_cache,
+  vθ)
+
   z = zero(eltype(A))
   LinearAlgebra.fillstored!(A,z)
   jacobians!(A,odeop,μ,tθ,(vθ,vθ),(1.0,1/dtθ),ode_cache)
 end
 
-function _mass_matrix!(A,odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
+function _mass_matrix!(
+  A::AbstractMatrix,
+  odeop::AffineParamODEOperator,
+  μ::AbstractArray,
+  tθ::Real,
+  dtθ::Real,
+  u0,
+  ode_cache,
+  vθ)
+
   z = zero(eltype(A))
   LinearAlgebra.fillstored!(A,z)
   jacobian!(A,odeop,μ,tθ,(vθ,vθ),2,(1/dtθ),ode_cache)
 end
 
-function _vector!(b,odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
+function _vector!(
+  b::AbstractVector,
+  odeop::AffineParamODEOperator,
+  μ::AbstractArray,
+  tθ::Real,
+  ::Real,
+  u0,
+  ode_cache,
+  vθ)
+
   residual!(b,odeop,μ,tθ,(u0,vθ),ode_cache)
   b .*= -1.0
 end
 
-function _allocate_matrix(odeop,u0,ode_cache)
-  A = allocate_jacobian(odeop,u0,ode_cache)
-  A
+function _allocate_matrix(
+  odeop::AffineParamODEOperator,
+  u0,
+  ode_cache)
+
+  allocate_jacobian(odeop,u0,ode_cache)
 end
 
-function _allocate_matrix_and_vector(odeop,u0,ode_cache)
+function _allocate_matrix_and_vector(
+  odeop::AffineParamODEOperator,
+  u0,
+  ode_cache)
+
   b = allocate_residual(odeop,u0,ode_cache)
   A = allocate_jacobian(odeop,u0,ode_cache)
   A,b
