@@ -114,7 +114,8 @@ function _vecdata_residual(
   solver::θMethod,
   op::ParamTransientFEOperator,
   sols::AbstractMatrix,
-  params::Table)
+  params::Table,
+  args...)
 
   trial = get_trial(op)
   test = get_test(op)
@@ -122,18 +123,14 @@ function _vecdata_residual(
   sol_μ = _as_function(sols,params)
   u(μ,t) = get_evaluation_function(solver,trial(μ),sol_μ(μ))(t)                 # add initial condition if needed
   (μ,t) -> collect_cell_vector(test,op.res(μ,t,(u(μ,t),uθ(μ,t)),dv))
-  # vecdatum(μ,t) = collect_cell_vector(test,op.res(μ,t,(u(μ,t),uθ(μ,t)),dv))
-  # vecdata = pmap(μ -> map(t -> vecdatum(μ,t),times),params,uh)
-
-  # b = allocate_residual(op,first(first(sols)),nothing,filter)
-  # pmap(d -> assemble_vector!(b,op.assem,d,filter),vecdata...)
 end
 
 function Gridap.ODEs.TransientFETools._matdata_jacobian(
   solver::θMethod,
   op::ParamTransientFEOperator,
   sols::AbstractMatrix,
-  params::Table)
+  params::Table,
+  filter)
 
   trial = get_trial(op)
   test = get_test(op)
@@ -141,14 +138,18 @@ function Gridap.ODEs.TransientFETools._matdata_jacobian(
   du = get_trial_fe_basis(trial(nothing,nothing))
   sol_μ = _as_function(sols,params)
   u(μ,t) = get_evaluation_function(solver,trial(μ),sol_μ(μ))(t)                 # add initial condition if needed
-  (μ,t) -> collect_cell_matrix(trial(μ,t),test,op.jac(μ,t,u(μ,t),dv,du))
-  # matdatum(μ,t) = collect_cell_matrix(trial(μ,t),test,op.jac(μ,t,u(μ,t),dv,du))
-  # matdata = pmap(μ -> map(t -> matdatum(μ,t),times),params,uh)
 
-  # A = allocate_jacobian(op,first(first(sols)),nothing,filter)
-  # pmap(d -> assemble_jacobian!(A,op.assem,d,filter),matdata...)
+  γ = (1.0,1/op.dtθ)[filter]
+  function matdata(μ,t)
+    _matdata = ()
+    for (i,γᵢ) in enumerate(γ)
+      if (γᵢ > 0.0)
+        _matdata = (_matdata...,
+          collect_cell_matrix(trial(μ,t),test,γᵢ*op.jacs[i](μ,t,u(μ,t),dv,du)))
+      end
+    end
+    _matdata
+  end
+
+  matdata
 end
-
-# _matdata_jacobians = fill_jacobians(op,μ,t,uh,γ)
-# matdata = _vcat_matdata(_matdata_jacobians)
-# assemble_matrix_add!(A,op.assem,matdata)

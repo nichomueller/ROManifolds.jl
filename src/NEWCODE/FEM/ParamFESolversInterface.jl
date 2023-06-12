@@ -105,7 +105,8 @@ end
 function _vecdata_residual(
   op::ParamFEOperator,
   sols::AbstractMatrix,
-  params::Table)
+  params::Table,
+  args...)
 
   trial = get_trial(op)
   test = get_test(op)
@@ -118,7 +119,8 @@ end
 function Gridap.ODEs.TransientFETools._matdata_jacobian(
   op::ParamFEOperator,
   sols::AbstractMatrix,
-  params::Table)
+  params::Table,
+  args...)
 
   trial = get_trial(op)
   test = get_test(op)
