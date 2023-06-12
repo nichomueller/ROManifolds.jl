@@ -10,6 +10,7 @@ using Elemental
 using DelimitedFiles
 using Serialization
 using ForwardDiff
+using BlockArrays
 using Gridap
 using Gridap.FESpaces
 using Gridap.ReferenceFEs
@@ -38,6 +39,10 @@ import Gridap.Algebra:AffineOperator
 import Gridap.Algebra:NonlinearOperator
 import Gridap.Algebra:LinearSolver
 import Gridap.Algebra:NonlinearSolver
+import Gridap.Algebra:create_from_nz
+import Gridap.Algebra:nz_allocation
+import Gridap.Algebra:nz_counter
+import Gridap.FESpaces:_pair_contribution_when_possible
 import Gridap.Polynomials:MonomialBasis
 import Gridap.ODEs.TransientFETools:ODESolver
 import Gridap.ODEs.TransientFETools:OperatorType
@@ -58,6 +63,8 @@ import Gridap.ODEs.TransientFETools:update_cache!
 import Gridap.ODEs.TransientFETools:residual!
 import Gridap.ODEs.TransientFETools:jacobian!
 import Gridap.ODEs.TransientFETools:jacobians!
+import Gridap.ODEs.TransientFETools._vcat_matdata
+import Gridap.ODEs.TransientFETools._matdata_jacobian
 import LineSearches:BackTracking
 
 const Float = Float64

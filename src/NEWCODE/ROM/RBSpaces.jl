@@ -23,7 +23,7 @@ function reduce_fe_space(
 end
 
 abstract type RBSpace{T} end
-abstract type TransientRBSpace{T} <: RBSpace{T} end
+abstract type TransientRBSpace{T} end
 
 struct SingleFieldRBSpace{T} <: RBSpace{T}
   basis_space::NnzMatrix{T}

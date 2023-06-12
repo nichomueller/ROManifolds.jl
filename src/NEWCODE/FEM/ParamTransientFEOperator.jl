@@ -195,38 +195,5 @@ function Gridap.ODEs.TransientFETools.fill_jacobians(
   return _matdata
 end
 
-function _vcat_matdata(_matdata)
-
-  term_to_cellmat_j = ()
-  term_to_cellidsrows_j = ()
-  term_to_cellidscols_j = ()
-  for j in eachindex(_matdata)
-    term_to_cellmat_j = (term_to_cellmat_j...,_matdata[j][1])
-    term_to_cellidsrows_j = (term_to_cellidsrows_j...,_matdata[j][2])
-    term_to_cellidscols_j = (term_to_cellidscols_j...,_matdata[j][3])
-  end
-
-  term_to_cellmat = vcat(term_to_cellmat_j...)
-  term_to_cellidsrows = vcat(term_to_cellidsrows_j...)
-  term_to_cellidscols = vcat(term_to_cellidscols_j...)
-
-  (term_to_cellmat,term_to_cellidsrows, term_to_cellidscols)
-end
-
-function _matdata_jacobian(
-  op::ParamTransientFEOperatorFromWeakForm,
-  μ::AbstractVector,
-  t::Real,
-  uh::T,
-  i::Integer,
-  γᵢ::Real) where T
-
-  Uh = Gridap.evaluate(get_trial(op),μ,t)
-  V = get_test(op)
-  du = get_trial_fe_basis(Uh)
-  v = get_fe_basis(V)
-  collect_cell_matrix(Uh,V,γᵢ*op.jacs[i](μ,t,uh,du,v))
-end
-
 get_pspace(op::ParamTransientFEOperatorFromWeakForm) = op.pspace
 realization(op::ParamTransientFEOperator,args...) = realization(op.pspace,args...)
