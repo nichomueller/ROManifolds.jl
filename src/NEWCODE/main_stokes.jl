@@ -62,11 +62,11 @@ fesolver = θMethod(LUSolver(),t0,tF,dt,θ,xh0)
 save_offline = false
 load_offline = false
 energy_norm = false
-nsnaps = 10
-nsnaps_mdeim = 10
+nsnaps = 2
+nsnaps_mdeim = 2
 info = RBInfo(test_path;ϵ,load_offline,save_offline,energy_norm,nsnaps,nsnaps_mdeim)
 
-rbspace = reduce_fe_space(info,feop,fesolver)
+rbspace = reduce_fe_space(info,feop,fesolver;compute_supremizers=true)
 rbop = reduce_fe_operator(info,feop,fesolver,rbspace)
 rbsolver = Backslash()
 

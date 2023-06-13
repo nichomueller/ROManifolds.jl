@@ -24,23 +24,14 @@ Base.eachindex(nzm::NnzMatrix) = eachindex(nzm.array)
 
 Base.setindex!(nzm::NnzMatrix,val,idx...) = setindex!(nzm.array,val,idx...)
 
-# function Base.setindex!(nzm::Vector{NnzMatrix{T}},val,idx...) where T
-#   map((m,v) -> setindex!(m,v,idx...),nzm.array,val)
-# end
-
 function Base.copy(nzm::NnzMatrix{T}) where T
   NnzMatrix{T}(copy(nzm.array),copy(nzm.nonzero_idx),copy(nzm.nrows))
 end
 
 Base.copyto!(nzm::NnzMatrix,val::AbstractMatrix) = copyto!(nzm.array,val)
 
-# function Base.copyto!(nzm::Vector{NnzMatrix{T}},val) where T
-#   @assert length(nzm) == length(val)
-#   copyto!.(nzm,val)
-# end
-
 function Base.show(io::IO,nmz::NnzMatrix{T}) where T
-  print(io,"NnzMatrix{$T} storing $(length(nmz.nonzero_idx)) nonzero entries")
+  print(io,"NnzMatrix{$T} with $(length(nmz.nonzero_idx)) nonzero row entries")
 end
 
 function Base.:(*)(nzm1::NnzMatrix{T},nzm2::NnzMatrix{T}) where T
@@ -121,6 +112,9 @@ function change_mode!(nzm::NnzMatrix,nparams::Int)
   end
 
   nzm.array = mode2
+  nzm.nonzero_idx = collect(1:mode2_ndofs)
+  nzm.nrows = mode2_ndofs
+  return
 end
 
 _compress_rows(nzm::NnzMatrix) = size(nzm.array,1) > size(nzm.array,2)

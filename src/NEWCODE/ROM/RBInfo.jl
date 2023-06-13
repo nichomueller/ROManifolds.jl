@@ -25,3 +25,15 @@ end
 function save(info::RBInfo,ref::Symbol,objs::Tuple)
   map(obj->save(info,ref,obj))(expand(objs))
 end
+
+function save(info::RBInfo,snaps::Snapshots)
+  if info.save_offline
+    path = joinpath(info.fe_path,"fe_snaps")
+    save(path,snaps)
+  end
+end
+
+function load(T::Type{Snapshots},info::RBInfo)
+  path = joinpath(info.fe_path,"fe_snaps")
+  load(T,path)
+end

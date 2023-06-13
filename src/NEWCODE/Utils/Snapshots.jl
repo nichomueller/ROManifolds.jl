@@ -87,15 +87,3 @@ function transient_tpod(::Val{true},s::SingleFieldSnapshots;kwargs...)
 
   basis_space,basis_time
 end
-
-function save(info::RBInfo,snaps::Snapshots)
-  if info.save_offline
-    path = joinpath(info.fe_path,"fe_snaps")
-    save(path,snaps)
-  end
-end
-
-function load(T::Type{Snapshots},info::RBInfo)
-  path = joinpath(info.fe_path,"fe_snaps")
-  load(T,path)
-end

@@ -1,5 +1,3 @@
 include("RBInfo.jl")
-include("NnzMatrix.jl")
-include("Snapshots.jl")
 include("RBSpaces.jl")
 include("RBOperators.jl")

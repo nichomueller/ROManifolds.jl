@@ -174,7 +174,6 @@ function add_time_supremizers(bases_time::Vector{<:AbstractMatrix};ttol=1e-2)
   basis_u
 end
 
-
 function save(info::RBInfo,rb::RBSpace)
   if info.save_offline
     path = joinpath(info.offline_path,"basis")

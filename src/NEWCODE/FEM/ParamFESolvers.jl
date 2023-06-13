@@ -44,7 +44,7 @@ function Gridap.solve(
 
   trial = get_trial(op.feop)
   uh = zero(trial(μk))
-  solk = solve!(op,solver,uh,μk)
+  solk = solve!(solver,op,uh,μk)
   GenericParamSolution(solk,μk,k)
 end
 
@@ -53,7 +53,7 @@ function Gridap.solve(
   op::ParamOp,
   params::Table)
 
-  [solve(op,solver,μk,k) for (μk,k) in enumerate(params)]
+  [solve(solver,op,μk,k) for (μk,k) in enumerate(params)]
 end
 
 function Gridap.solve(
@@ -64,4 +64,19 @@ function Gridap.solve(
   μ = realization(op,n_snaps)
   param_op = get_algebraic_operator(op)
   solve(solver,param_op,μ)
+end
+
+function collect_snapshot!(cache,sol::ParamSolution)
+  sol_cache,param_cache = cache
+
+  printstyled("Computing snapshot $(sol.k)\n";color=:blue)
+  if isa(sol_cache,NnzMatrix)
+    copyto!(sol_cache,sol.uh)
+  else
+    map((cache,sol) -> copyto!(cache,sol),sol_cache,sol.uh)
+  end
+  copyto!(param_cache,sol.μ)
+  printstyled("Successfully computed snapshot $(sol.k)\n";color=:blue)
+
+  sol_cache,param_cache
 end

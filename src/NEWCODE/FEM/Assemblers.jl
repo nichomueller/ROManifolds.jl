@@ -147,7 +147,6 @@ function assemble_residual(
   A,aff
 end
 
-
 function assemble_residual(
   op::ParamTransientFEOperator,
   solver::θMethod,
