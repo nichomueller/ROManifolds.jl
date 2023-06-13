@@ -44,7 +44,7 @@ function Gridap.solve(
 
   trial = get_trial(op.feop)
   uh = zero(trial(μk))
-  solk = solve!(solver,op,uh,μk)
+  solk = solve!(op,solver,uh,μk)
   GenericParamSolution(solk,μk,k)
 end
 
@@ -53,7 +53,7 @@ function Gridap.solve(
   op::ParamOp,
   params::Table)
 
-  [solve(solver,op,μk,k) for (μk,k) in enumerate(params)]
+  [solve(op,solver,μk,k) for (μk,k) in enumerate(params)]
 end
 
 function Gridap.solve(

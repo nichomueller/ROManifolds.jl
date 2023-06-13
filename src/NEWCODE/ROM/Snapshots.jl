@@ -25,9 +25,7 @@ Base.size(s::Snapshots,idx...) = size(s.snaps,idx...)
 
 nfields(s::MultiFieldSnapshots) = length(s.snaps)
 
-get_snaps(s::Snapshots) = s.snaps
-
-get_params(s::Snapshots) = s.params
+Gridap.CellData.get_data(s::Snapshots) = s.snaps,s.params
 
 complementary_dimension(s::SingleFieldSnapshots) = Int(size(s.snaps,2)/length(s))
 
@@ -61,15 +59,6 @@ function tpod(s::SingleFieldSnapshots;kwargs...)
   basis_space
 end
 
-function multi_tpod(s::MultiFieldSnapshots;compute_supremizers=true,kwargs...)
-  snaps = collect_single_fields(s)
-  bases_space = map(snap -> tpod(snap;kwargs...),snaps)
-  if compute_supremizers
-    add_space_supremizers!(bases_space)
-  end
-  bases_space
-end
-
 function transient_tpod(s::SingleFieldSnapshots;kwargs...)
   compress_rows = _compress_rows(s.snaps)
   transient_tpod(Val{compress_rows}(),s;kwargs...)
@@ -97,17 +86,6 @@ function transient_tpod(::Val{true},s::SingleFieldSnapshots;kwargs...)
   tpod!(basis_space)
 
   basis_space,basis_time
-end
-
-function multi_transient_tpod(s::MultiFieldSnapshots;compute_supremizers=true,kwargs...)
-  snaps = collect_single_fields(s)
-  bases = map(snap -> transient_tpod(snap;kwargs...),snaps)
-  bases_space,bases_time = first.(bases),last.(bases)
-  if compute_supremizers
-    add_space_supremizers!(bases_space)
-    add_time_supremizers!(bases_time)
-  end
-  bases_space,bases_time
 end
 
 function save(info::RBInfo,snaps::Snapshots)

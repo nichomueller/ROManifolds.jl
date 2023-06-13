@@ -111,8 +111,8 @@ function _evaluation_function(
 end
 
 function _vecdata_residual(
-  solver::θMethod,
   op::ParamTransientFEOperator,
+  solver::θMethod,
   sols::AbstractMatrix,
   params::Table)
 
@@ -125,8 +125,8 @@ function _vecdata_residual(
 end
 
 function Gridap.ODEs.TransientFETools._matdata_jacobian(
-  solver::θMethod,
   op::ParamTransientFEOperator,
+  solver::θMethod,
   sols::AbstractMatrix,
   params::Table)
 
@@ -150,8 +150,4 @@ function Gridap.ODEs.TransientFETools._matdata_jacobian(
   end
 
   matdata
-end
-
-function isaffine(matdata,params::Table,times::AbstractVector,filter)
-
 end
