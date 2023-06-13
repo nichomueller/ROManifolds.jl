@@ -48,7 +48,10 @@ test = ParamTransientMultiFieldFESpace([test_u,test_p])
 trial = ParamTransientMultiFieldFESpace([trial_u,trial_p])
 feop = ParamTransientAffineFEOperator(lhs_t,lhs,rhs,pspace,trial,test)
 t0,tF,dt,θ = 0.,0.3,0.005,1
-fesolver = θMethod(LUSolver(),t0,tF,dt,θ)
+Uh0 = interpolate_everywhere(u0,trial_u(t0))
+Ph0 = interpolate_everywhere(p0,trial_p(t0))
+Xh0 = interpolate_everywhere([Uh0,Ph0],trial(t0))
+fesolver = θMethod(LUSolver(),t0,tF,dt,θ,Xh0)
 
 ϵ = 1e-4
 load_offline = false

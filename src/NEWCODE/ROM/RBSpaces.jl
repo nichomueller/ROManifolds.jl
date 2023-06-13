@@ -63,7 +63,24 @@ function TransientRBSpace(s::MultiFieldSnapshots{T};kwargs...) where T
   TransientMultiFieldRBSpace{T}(bases_space,bases_time)
 end
 
-add_space_supremizers!(args...;kwargs...) = @notimplemented
+function add_space_supremizers!(space_bases::Vector{<:NnzMatrix};kwargs...)
+  sbu,sbdual... = space_bases
+  for sb in sbdual
+    sbu_i,sbd_i = add_space_supremizers([sbu.array,sb.array];kwargs...)
+    sbu.array = sbu_i
+    sb.array = sbd_i
+  end
+  return
+end
+
+function assemble_constraint_matrix(
+  feop::ParamTransientFEOperator,
+  i::Int)
+
+  trial_dual_field = trial[i]
+  test_field = test[1]
+  cmat = assemble_matrix(op.jac,op.trial,op.test)
+end
 
 # function add_space_supremizers(
 #   ::Val{true},
@@ -103,10 +120,12 @@ add_space_supremizers!(args...;kwargs...) = @notimplemented
 # end
 
 function add_time_supremizers!(time_bases::Vector{<:NnzMatrix};kwargs...)
-  tbu,tbp = time_bases
-  time_basis_u,time_basis_p = add_time_supremizers([tbu.array,tbp.array];kwargs...)
-  tbu.array = time_basis_u
-  tbp.array = time_basis_p
+  tbu,tbdual... = time_bases
+  for tb in tbdual
+    tbu_i,tbd_i = add_time_supremizers([tbu.array,tb.array];kwargs...)
+    tbu.array = tbu_i
+    tb.array = tbd_i
+  end
   return
 end
 
