@@ -72,9 +72,11 @@ function _as_function(values::AbstractMatrix,input)
   n = y -> first(findall(x -> x == y,input))
   if size(values,2) == length(input) # time function
     y -> values[:,n(y)]
-  else size(values,2) % length(input) == 0 # param function
+  elseif size(values,2) % length(input) == 0 # param function
     compl_dim = Int(size(values,2)/length(input))
     y -> values[:,(n(y)-1)*compl_dim+1:n(y)*compl_dim]
+  else
+    @unreachable
   end
 end
 

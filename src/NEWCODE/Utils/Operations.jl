@@ -105,3 +105,15 @@ Base.getindex(emat::EMatrix{Float},idx::UnitRange{Int},k::Int) = emat[idx,k:k]
 Base.getindex(emat::EMatrix{Float},k::Int,idx::UnitRange{Int}) = emat[k:k,idx]
 
 Gridap.get_triangulation(m::Measure) = m.quad.trian
+
+# Remove when possible
+function Gridap.Geometry.is_change_possible(strian::Triangulation,ttrian::Triangulation)
+  if strian === ttrian
+    return true
+  end
+  #@check get_background_model(strian) === get_background_model(ttrian)
+  D = num_cell_dims(strian)
+  sglue = get_glue(strian,Val(D))
+  tglue = get_glue(ttrian,Val(D))
+  is_change_possible(sglue,tglue)
+end

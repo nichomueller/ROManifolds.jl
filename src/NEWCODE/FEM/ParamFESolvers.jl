@@ -66,6 +66,16 @@ function Gridap.solve(
   solve(solver,param_op,μ)
 end
 
+function solution_cache(test::FESpace,::FESolver)
+  space_ndofs = test.nfree
+  cache = fill(1.,space_ndofs,1)
+  NnzMatrix(cache)
+end
+
+function solution_cache(test::MultiFieldFESpace,args...)
+  map(t->solution_cache(t,args...),test.spaces)
+end
+
 function collect_snapshot!(cache,sol::ParamSolution)
   sol_cache,param_cache = cache
 

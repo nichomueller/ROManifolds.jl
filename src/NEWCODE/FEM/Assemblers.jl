@@ -1,67 +1,29 @@
-function Gridap.FESpaces.allocate_vector(
-  a::SparseMatrixAssembler,
-  vecdata,
-  filter)
-
-  r,d = _filter_vecdata(a,vecdata,filter)
-  vec = allocate_vector(a,d)
-  vec[r]
-end
+# Generic assembler interface
 
 function Gridap.FESpaces.assemble_vector(
   a::SparseMatrixAssembler,
   vecdata,
-  filter)
+  filter::Tuple{Vararg{Int}})
 
   r,d = _filter_vecdata(a,vecdata,filter)
   vec = assemble_vector(a,d)
   vec[r]
 end
 
-function Gridap.FESpaces.assemble_vector_add!(
-  vec::AbstractVector,
-  a::SparseMatrixAssembler,
-  vecdata,
-  filter)
-
-  _,d = _filter_vecdata(a,vecdata,filter)
-  assemble_vector_add!(vec,a,d)
-end
-
-function Gridap.FESpaces.allocate_matrix(
-  a::SparseMatrixAssembler,
-  matdata,
-  filter)
-
-  r,c,d = _filter_matdata(a,matdata,filter)
-  mat = allocate_matrix(a,d)
-  mat[r,c]
-end
-
 function Gridap.FESpaces.assemble_matrix(
   a::SparseMatrixAssembler,
   matdata,
-  filter)
+  filter::Tuple{Vararg{Int}})
 
   r,c,d = _filter_matdata(a,matdata,filter)
   mat = assemble_matrix(a,d)
   mat[r,c]
 end
 
-function Gridap.FESpaces.assemble_matrix_add!(
-  mat::AbstractVector,
-  a::SparseMatrixAssembler,
-  matdata,
-  filter)
-
-  _,_,d = _filter_matdata(a,matdata,filter)
-  assemble_matrix_add!(mat,a,d)
-end
-
 function _filter_vecdata(
   a::SparseMatrixAssembler,
   vecdata::Tuple{Vararg{Any}},
-  filter)
+  filter::Tuple{Vararg{Int}})
 
   vals,rowids, = vecdata
   r_filter, = filter
@@ -73,7 +35,7 @@ end
 function _filter_matdata(
   a::SparseMatrixAssembler,
   matdata::Tuple{Vararg{Any}},
-  filter)
+  filter::Tuple{Vararg{Int}})
 
   vals,rowids,colids = matdata
   r_filter,c_filter = filter
@@ -83,9 +45,8 @@ function _filter_matdata(
   r,c,d
 end
 
-function _idx_in_block(ndofs::Vector{Int},filter::Int)
-  @assert filter == 1
-  first(ndofs):last(ndofs)
+function _idx_in_block(ndofs::Base.OneTo{Int},args...)
+  ndofs
 end
 
 function _idx_in_block(ndofs::BlockedUnitRange,filter::Int)
@@ -95,21 +56,21 @@ end
 
 _filter_data(data,args...) = data
 
-function _filter_data(data::Vector{Any},filter)
-  [_filter_data(d,filter) for d = data]
+function _filter_data(data::Vector{Any},filter::Tuple{Vararg{Int}}) # loop over domain contributions
+  map(d->_filter_data(d,filter),data)
 end
 
-function _filter_data(data::LazyArray,filter)
+function _filter_data(data::LazyArray,filter::Tuple{Vararg{Int}}) # loop over cells
   lazy_map(d->_filter_data(d,filter),data)
 end
 
-function _filter_data(data::ArrayBlock,filter)
+function _filter_data(data::ArrayBlock,filter::Tuple{Vararg{Int}})
   data[filter...]
 end
 
 function _filter_data(
   data::Tuple{MatrixBlock{Matrix{Float}},VectorBlock{Vector{Float}}},
-  filter::NTuple{2,Int})
+  filter::Tuple{Vararg{Int}})
 
   mdata,vdata = data
   r_filter,c_filter = filter
@@ -118,14 +79,72 @@ end
 
 # MDEIM snapshots generation interface
 
-function _affine_residual(a::SparseMatrixAssembler,vecdata,filter)
-  b = allocate_vector(a,vecdata,filter)
-  assemble_vector_add!(b,a,vecdata,filter)
+function Gridap.FESpaces.allocate_vector(
+  a::SparseMatrixAssembler,
+  vecdata,
+  filter::Tuple{Vararg{Int}})
+
+  r,d = _filter_vecdata(a,vecdata,filter)
+  vec = allocate_vector(a,d)
+  vec[r]
 end
 
-function _nonaffine_residual(a::SparseMatrixAssembler,vecdata,filter)
-  b = allocate_vector(a,first(vecdata),filter)
-  pmap(d -> assemble_vector_add!(b,a,d,filter),vecdata...)
+function Gridap.FESpaces.assemble_vector_add!(
+  vec::AbstractVector,
+  a::SparseMatrixAssembler,
+  vecdata::Tuple{Vararg{Tuple}},
+  filter::Tuple{Vararg{Int}})
+
+  _,d = _filter_vecdata(a,vecdata,filter)
+  vecs = [Vector{eltype(vec)}(undef,length(vec)) for _ = 1:length(vecdata)]
+  for dat in d
+    assemble_vector_add!(vec,a,dat)
+    vecs[d] = vec
+  end
+end
+
+function Gridap.FESpaces.assemble_vector_add!(
+  vec::AbstractVector,
+  a::SparseMatrixAssembler,
+  vecdata,
+  filter::Tuple{Vararg{Int}})
+
+  _,d = _filter_vecdata(a,vecdata,filter)
+  assemble_vector_add!(vec,a,d)
+end
+
+function Gridap.FESpaces.allocate_matrix(
+  a::SparseMatrixAssembler,
+  matdata,
+  filter::Tuple{Vararg{Int}})
+
+  r,c,d = _filter_matdata(a,matdata,filter)
+  mat = allocate_matrix(a,d)
+  mat[r,c]
+end
+
+function Gridap.FESpaces.assemble_matrix_add!(
+  mat::AbstractMatrix,
+  a::SparseMatrixAssembler,
+  matdata::Tuple{Vararg{Tuple}},
+  filter::Tuple{Vararg{Int}})
+
+  _,d = _filter_vecdata(a,matdata,filter)
+  mats = [Matrix{eltype(mat)}(undef,size(mat)...) for _ = 1:length(matdata)]
+  for dat in d
+    assemble_matrix_add!(mat,a,dat)
+    mats[d] = mat
+  end
+end
+
+function Gridap.FESpaces.assemble_matrix_add!(
+  mat::AbstractMatrix,
+  a::SparseMatrixAssembler,
+  matdata,
+  filter::Tuple{Vararg{Int}})
+
+  _,_,d = _filter_matdata(a,matdata,filter)
+  assemble_matrix_add!(mat,a,d)
 end
 
 function assemble_residual(
@@ -133,18 +152,21 @@ function assemble_residual(
   ::FESolver,
   sols::AbstractMatrix,
   params::Table,
-  filter)
+  filter::Tuple{Vararg{Int}})
 
-  vecdatum = _vecdata_residual(op,sols,params)
+  vecdatum = _vecdata_jacobian(op,sols,params)
   aff = Affinity(vecdatum,params)
+  b = allocate_vector(op.assem,vecdatum(first(params)),filter)
   if isa(aff,ParamAffinity)
     vecdata = vecdatum(first(params))
-    A = _affine_residual(op.assem,vecdata,filter)
-  else
+    assemble_vector_add!(b,op.assem,vecdata,filter)
+  elseif isa(aff,NonAffinity)
     vecdata = pmap(μ -> vecdatum(μ),params)
-    A = _nonaffine_residual(op.assem,vecdata,filter)
+    pmap(d -> assemble_vector_add!(b,op.assem,d,filter),vecdata)
+  else
+    @unreachable
   end
-  A,aff
+  b
 end
 
 function assemble_residual(
@@ -152,35 +174,28 @@ function assemble_residual(
   solver::θMethod,
   sols::AbstractMatrix,
   params::Table,
-  filter)
+  filter::Tuple{Vararg{Int}})
 
   times = get_times(solver)
-  vecdatum = _vecdata_residual(op,solver,sols,params)
-  aff = isaffine(vecdatum,params,times)
+  vecdatum = _vecdata_jacobian(op,solver,sols,params)
+  aff = Affinity(vecdatum,params,times)
+  b = allocate_vector(op.assem,vecdatum(first(params),first(times)),filter)
   if isa(aff,ParamTimeAffinity)
     vecdata = vecdatum(first(params),first(times))
-    b = _affine_residual(op.assem,vecdata,filter)
+    assemble_vector_add!(b,op.assem,vecdata,filter)
   elseif isa(aff,ParamAffinity)
     vecdata = pmap(t -> vecdatum(first(params),t),times)
-    b = _nonaffine_residual(op.assem,vecdata,filter)
+    pmap(d -> assemble_vector_add!(b,op.assem,d,filter),vecdata)
   elseif isa(aff,TimeAffinity)
     vecdata = pmap(μ -> vecdatum(μ,first(times)),params)
-    b = _nonaffine_residual(op.assem,vecdata,filter)
-  else
+    pmap(d -> assemble_vector_add!(b,op.assem,d,filter),vecdata)
+  elseif isa(aff,NonAffinity)
     vecdata = pmap(μ -> map(t -> vecdatum(μ,t),times),params)
-    b = _nonaffine_residual(op.assem,vecdata,filter)
+    pmap(d -> assemble_vector_add!(b,op.assem,d,filter),vecdata...)
+  else
+    @unreachable
   end
-  b,aff
-end
-
-function _affine_jacobian(a::SparseMatrixAssembler,matdata,filter)
-  A = allocate_matrix(a,matdata,filter)
-  assemble_matrix_add!(A,a,matdata,filter)
-end
-
-function _nonaffine_jacobian(a::SparseMatrixAssembler,matdata,filter)
-  A = allocate_matrix(a,first(matdata),filter)
-  pmap(d -> assemble_matrix_add!(A,a,d,filter),matdata...)
+  b
 end
 
 function assemble_jacobian(
@@ -188,18 +203,21 @@ function assemble_jacobian(
   ::FESolver,
   sols::AbstractMatrix,
   params::Table,
-  filter)
+  filter::Tuple{Vararg{Int}})
 
   matdatum = _matdata_jacobian(op,sols,params)
   aff = Affinity(matdatum,params)
+  A = allocate_matrix(op.assem,matdatum(first(params)),filter)
   if isa(aff,ParamAffinity)
     matdata = matdatum(first(params))
-    A = _affine_jacobian(op.assem,matdata,filter)
-  else
+    assemble_matrix_add!(A,op.assem,matdata,filter)
+  elseif isa(aff,NonAffinity)
     matdata = pmap(μ -> matdatum(μ),params)
-    A = _nonaffine_jacobian(op.assem,matdata,filter)
+    pmap(d -> assemble_matrix_add!(A,op.assem,d,filter),matdata)
+  else
+    @unreachable
   end
-  A,aff
+  A
 end
 
 function assemble_jacobian(
@@ -207,25 +225,28 @@ function assemble_jacobian(
   solver::θMethod,
   sols::AbstractMatrix,
   params::Table,
-  filter)
+  filter::Tuple{Vararg{Int}})
 
   times = get_times(solver)
   matdatum = _matdata_jacobian(op,solver,sols,params)
-  aff = isaffine(matdatum,params,times)
+  aff = Affinity(matdatum,params,times)
+  A = allocate_matrix(op.assem,matdatum(first(params),first(times)),filter)
   if isa(aff,ParamTimeAffinity)
     matdata = matdatum(first(params),first(times))
-    A = _affine_jacobian(op.assem,matdata,filter)
+    assemble_matrix_add!(A,op.assem,matdata,filter)
   elseif isa(aff,ParamAffinity)
     matdata = pmap(t -> matdatum(first(params),t),times)
-    A = _nonaffine_jacobian(op.assem,matdata,filter)
+    pmap(d -> assemble_matrix_add!(A,op.assem,d,filter),matdata)
   elseif isa(aff,TimeAffinity)
     matdata = pmap(μ -> matdatum(μ,first(times)),params)
-    A = _nonaffine_jacobian(op.assem,matdata,filter)
-  else
+    pmap(d -> assemble_matrix_add!(A,op.assem,d,filter),matdata)
+  elseif isa(aff,NonAffinity)
     matdata = pmap(μ -> map(t -> matdatum(μ,t),times),params)
-    A = _nonaffine_jacobian(op.assem,matdata,filter)
+    pmap(d -> assemble_matrix_add!(A,op.assem,d,filter),matdata...)
+  else
+    @unreachable
   end
-  A,aff
+  A
 end
 
 # for T in (:ParamMultiFieldTrialFESpace,:ParamTransientMultiFieldTrialFESpace)

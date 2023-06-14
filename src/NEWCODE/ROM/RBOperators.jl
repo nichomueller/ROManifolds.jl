@@ -88,18 +88,6 @@ function reduce_fe_term(
   AffineDecomposition(basis,rb_interpolation,rb_integration)
 end
 
-function isaffine(terms::Tuple{Vararg{Function}},args...)
-  map(term->isaffine(term,args...),terms)
-end
-
-function isaffine(term::Function,args...)
-  try term(args...)
-    typeof(term(args...)) <: DomainContribution ? Val{false}() : Val{true}()
-  catch
-    Val{true}()
-  end
-end
-
 get_linear_solver(::Val{true}) = assemble_vector
 
 get_bilinear_solver(::Val{true}) = assemble_matrix
