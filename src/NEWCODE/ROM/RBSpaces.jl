@@ -39,6 +39,24 @@ get_basis_space(rb::SingleFieldRBSpace) = rb.basis_space.array
 
 get_basis_time(rb::TransientSingleFieldRBSpace) = rb.basis_time.array
 
+function get_single_field(
+  rb::MultiFieldRBSpace{T},
+  fieldid::Int) where T
+
+  SingleFieldRBSpace{T}(rb.basis_space[fieldid])
+end
+
+function get_single_field(
+  rb::TransientMultiFieldRBSpace{T},
+  fieldid::Int) where T
+
+  TransientSingleFieldRBSpace{T}(rb.basis_space[fieldid],rb.basis_time[fieldid])
+end
+
+Base.getindex(rb::MultiFieldRBSpace,i::Int) = get_single_field(rb,i)
+
+Base.getindex(rb::TransientMultiFieldRBSpace,i::Int) = get_single_field(rb,i)
+
 function compress(
   s::SingleFieldSnapshots{T},
   info::RBInfo,

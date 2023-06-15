@@ -62,7 +62,7 @@ function compress(entire_array::AbstractMatrix)
 end
 
 function compress(entire_array::SparseMatrixCSC{Float,Int})
-  findnz(reshape(entire_array,:))
+  findnz(entire_array[:])
 end
 
 function compress(nzm::Vector{NnzMatrix{T}};as_emat=true) where T

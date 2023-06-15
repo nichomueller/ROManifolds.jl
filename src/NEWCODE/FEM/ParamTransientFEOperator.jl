@@ -42,11 +42,11 @@ struct ParamTransientFEOperatorFromWeakForm{C<:OperatorType} <: ParamTransientFE
   order::Integer
 end
 
-function ParamTransientAffineFEOperator(m::Function,a::Function,b::Function,
+function ParamTransientAffineFEOperator(res::Function,jac::Function,jac_t::Function,
   pspace,trial,test)
-  res(μ,t,u,v) = m(μ,t,∂t(u),v) + a(μ,t,u,v) - b(μ,t,v)
-  jac(μ,t,u,du,v) = a(μ,t,du,v)
-  jac_t(μ,t,u,dut,v) = m(μ,t,dut,v)
+  # res(μ,t,u,v) = m(μ,t,∂t(u),v) + a(μ,t,u,v) - b(μ,t,v)
+  # jac(μ,t,u,du,v) = a(μ,t,du,v)
+  # jac_t(μ,t,u,dut,v) = m(μ,t,dut,v)
   assem = SparseMatrixAssembler(trial,test)
   ParamTransientFEOperatorFromWeakForm{Affine}(
     res,(jac,jac_t),assem,pspace,(trial,∂t(trial)),test,1)

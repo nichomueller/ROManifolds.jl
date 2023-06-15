@@ -23,13 +23,13 @@ Base.length(s::Snapshots) = length(s.params)
 
 Base.size(s::Snapshots,idx...) = size(s.snaps,idx...)
 
-nfields(s::MultiFieldSnapshots) = length(s.snaps)
+get_nfields(s::MultiFieldSnapshots) = length(s.snaps)
 
-Gridap.CellData.get_data(s::Snapshots) = s.snaps,s.params
+Gridap.CellData.get_data(s::Snapshots) = recast(s.snaps),s.params
 
-complementary_dimension(s::SingleFieldSnapshots) = Int(size(s.snaps,2)/length(s))
+# complementary_dimension(s::SingleFieldSnapshots) = Int(size(s.snaps,2)/length(s))
 
-istransient(s::Snapshots) = all(tndofs -> tndofs > 1,complementary_dimension(s))
+# istransient(s::Snapshots) = all(tndofs -> tndofs > 1,complementary_dimension(s))
 
 function Snapshots(snaps::NnzMatrix{T},params::Table) where T
   SingleFieldSnapshots{T}(snaps,params)
@@ -44,8 +44,10 @@ function get_single_field(s::MultiFieldSnapshots,fieldid::Int)
 end
 
 function collect_single_fields(s::MultiFieldSnapshots)
-  map(fieldid -> get_single_field(s,fieldid),1:nfields(s))
+  map(fieldid -> get_single_field(s,fieldid),1:get_nfields(s))
 end
+
+Base.getindex(s::MultiFieldSnapshots,i::Int) = get_single_field(s,i)
 
 function snapshots_cache(feop,args...)
   param_cache = realization(feop)

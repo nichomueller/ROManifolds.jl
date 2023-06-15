@@ -84,7 +84,7 @@ function Gridap.FESpaces.allocate_vector(
   filter::Tuple{Vararg{Int}},
   args...)
 
-  d = vecdata(first.(args)...)
+  d = vecdata(rand.(args)...)
   allocate_vector(a,d,filter)
 end
 
@@ -114,7 +114,7 @@ function Gridap.FESpaces.allocate_matrix(
   filter::Tuple{Vararg{Int}},
   args...)
 
-  d = matdata(first.(args)...)
+  d = matdata(rand.(args)...)
   allocate_matrix(a,d,filter)
 end
 
@@ -138,36 +138,6 @@ function Gridap.FESpaces.assemble_matrix_add!(
   assemble_matrix_add!(mat,a,d)
 end
 
-function collect_trian(f::Function,args...)
-  domcontrib = f(first.(args)...)
-  collect_trian(domcontrib)
-end
-
-function compressed_assemble_matrix_add!(mat,a::SparseMatrixAssembler,matdata)
-  numeric_loop_matrix!(mat,a,matdata)
-  compressed_create_from_nz(mat)
-end
-
-function compressed_create_from_nz(a::InserterCSC{Tv,Ti}) where {Tv,Ti}
-  k = 1
-  for j in 1:a.ncols
-    pini = Int(a.colptr[j])
-    pend = pini + Int(a.colnnz[j]) - 1
-    for p in pini:pend
-      a.nzval[k] = a.nzval[p]
-      k += 1
-    end
-  end
-  @inbounds for j in 1:a.ncols
-    a.colptr[j+1] = a.colnnz[j]
-  end
-  length_to_ptrs!(a.colptr)
-  nnz = a.colptr[end]-1
-  resize!(a.nzval,nnz)
-
-  a.nzval
-end
-
 function assemble_residual(
   op::ParamFEOperator,
   ::FESolver,
@@ -177,17 +147,17 @@ function assemble_residual(
 
   vecdatum = _vecdata_jacobian(op,sols,params)
   aff = Affinity(vecdatum,params)
-  b = allocate_vector(op.assem,vecdatum(first(params)),filter)
+  r = allocate_vector(op.assem,vecdatum(first(params)),filter)
   if isa(aff,ParamAffinity)
     vecdata = vecdatum(first(params))
-    assemble_vector_add!(b,op.assem,vecdata,filter)
+    assemble_vector_add!(r,op.assem,vecdata,filter)
   elseif isa(aff,NonAffinity)
     vecdata = pmap(μ -> vecdatum(μ),params)
-    pmap(d -> assemble_vector_add!(b,op.assem,d,filter),vecdata)
+    pmap(d -> assemble_vector_add!(r,op.assem,d,filter),vecdata)
   else
     @unreachable
   end
-  b
+  r
 end
 
 function assemble_residual(
@@ -200,23 +170,23 @@ function assemble_residual(
   times = get_times(solver)
   vecdatum = _vecdata_jacobian(op,solver,sols,params)
   aff = Affinity(vecdatum,params,times)
-  b = allocate_vector(op.assem,vecdatum(first(params),first(times)),filter)
+  r = allocate_vector(op.assem,vecdatum(first(params),first(times)),filter)
   if isa(aff,ParamTimeAffinity)
     vecdata = vecdatum(first(params),first(times))
-    assemble_vector_add!(b,op.assem,vecdata,filter)
+    assemble_vector_add!(r,op.assem,vecdata,filter)
   elseif isa(aff,ParamAffinity)
     vecdata = pmap(t -> vecdatum(first(params),t),times)
-    pmap(d -> assemble_vector_add!(b,op.assem,d,filter),vecdata)
+    pmap(d -> assemble_vector_add!(r,op.assem,d,filter),vecdata)
   elseif isa(aff,TimeAffinity)
     vecdata = pmap(μ -> vecdatum(μ,first(times)),params)
-    pmap(d -> assemble_vector_add!(b,op.assem,d,filter),vecdata)
+    pmap(d -> assemble_vector_add!(r,op.assem,d,filter),vecdata)
   elseif isa(aff,NonAffinity)
     vecdata = pmap(μ -> map(t -> vecdatum(μ,t),times),params)
-    pmap(d -> assemble_vector_add!(b,op.assem,d,filter),vecdata...)
+    pmap(d -> assemble_vector_add!(r,op.assem,d,filter),vecdata...)
   else
     @unreachable
   end
-  b
+  r
 end
 
 function assemble_jacobian(
@@ -228,41 +198,43 @@ function assemble_jacobian(
 
   matdatum = _matdata_jacobian(op,sols,params)
   aff = Affinity(matdatum,params)
-  A = allocate_matrix(op.assem,matdatum(first(params)),filter)
+  J = allocate_matrix(op.assem,matdatum(first(params)),filter)
   if isa(aff,ParamAffinity)
     matdata = matdatum(first(params))
-    assemble_matrix_add!(A,op.assem,matdata,filter)
+    assemble_matrix_add!(J,op.assem,matdata,filter)
   elseif isa(aff,NonAffinity)
     matdata = pmap(μ -> matdatum(μ),params)
-    pmap(d -> assemble_matrix_add!(A,op.assem,d,filter),matdata)
+    pmap(d -> assemble_matrix_add!(J,op.assem,d,filter),matdata)
   else
     @unreachable
   end
-  A
+  J
 end
 
 function assemble_jacobian(
   op::ParamTransientFEOperator,
   solver::θMethod,
-  matdatum::Function,
-  params::Table,
+  s::SingleFieldSnapshots,
+  trian::Triangulation,
   filter::Tuple{Vararg{Int}})
 
   times = get_times(solver)
+  sols,params = get_data(s)
+  matdatum = _matdata_jacobian(feop,solver,sols,params,trian)
   aff = Affinity(matdatum,params,times)
-  A = allocate_matrix(op.assem,matdatum,filter,params,times)
+  J = allocate_matrix(op.assem,matdatum,filter,params,times)
   if isa(aff,ParamTimeAffinity)
     matdata = matdatum(first(params),first(times))
-    assemble_matrix_add!(A,op.assem,matdata,filter)
+    assemble_matrix_add!(J,op.assem,matdata,filter)
   elseif isa(aff,ParamAffinity)
     matdata = pmap(t -> matdatum(first(params),t),times)
-    pmap(d -> assemble_matrix_add!(A,op.assem,d,filter),matdata)
+    pmap(d -> assemble_matrix_add!(J,op.assem,d,filter),matdata)
   elseif isa(aff,TimeAffinity)
     matdata = pmap(μ -> matdatum(μ,first(times)),params)
-    pmap(d -> assemble_matrix_add!(A,op.assem,d,filter),matdata)
+    pmap(d -> assemble_matrix_add!(J,op.assem,d,filter),matdata)
   elseif isa(aff,NonAffinity)
     matdata = pmap(μ -> map(t -> matdatum(μ,t),times),params)
-    pmap(dp -> map(dt -> assemble_matrix_add!(A,op.assem,dt,filter),dp),matdata)
+    pmap(dp -> map(dt -> assemble_matrix_add!(J,op.assem,dt,filter),dp),matdata)
   else
     @unreachable
   end

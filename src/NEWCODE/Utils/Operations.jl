@@ -85,15 +85,55 @@ function Gridap.FESpaces.allocate_matrix(::Matrix{T},sizes...) where T
   zeros(T,sizes...)
 end
 
-function Base.getindex(emat::EMatrix{Float},idx::Union{UnitRange{Int},Colon},k::Int)
-  emat[idx,k:k]
+function Base.getindex(
+  emat::EMatrix{T},
+  idx::Union{UnitRange{Int},Colon},
+  k::Int) where T
+
+  reshape(convert(Matrix{T},emat[idx,k:k]),:)
 end
 
-function Base.getindex(emat::EMatrix{Float},k::Int,idx::Union{UnitRange{Int},Colon})
-  emat[k:k,idx]
+function Base.getindex(
+  emat::EMatrix{T},
+  k::Int,
+  idx::Union{UnitRange{Int},Colon}) where T
+
+  reshape(convert(Matrix{T},emat[k:k,idx]),:)
 end
 
 Gridap.FESpaces.get_cell_dof_ids(trian::Triangulation) = trian.grid.cell_node_ids
+
+function _collect_trian_res(res::Function,op::ParamFEOperator,test::FESpace)
+  μ = realization(op)
+  uh = zero(test)
+  v = get_fe_basis(test)
+  domcontrib = res(μ,uh,v)
+  collect_trian(domcontrib)
+end
+
+function _collect_trian_res(res::Function,op::ParamTransientFEOperator,test::FESpace)
+  μ,t = realization(op),0.
+  uh = zero(test)
+  v = get_fe_basis(test)
+  domcontrib = res(μ,t,uh,v)
+  collect_trian(domcontrib)
+end
+
+function _collect_trian_jac(jac::Function,op::ParamFEOperator,test::FESpace)
+  μ = realization(op)
+  uh = zero(test)
+  v = get_fe_basis(test)
+  domcontrib = jac(μ,uh,v,v)
+  collect_trian(domcontrib)
+end
+
+function _collect_trian_jac(jac::Function,op::ParamTransientFEOperator,test::FESpace)
+  μ,t = realization(op),0.
+  uh = zero(test)
+  v = get_fe_basis(test)
+  domcontrib = jac(μ,t,uh,v,v)
+  collect_trian(domcontrib)
+end
 
 function collect_trian(a::DomainContribution)
   t = Triangulation[]

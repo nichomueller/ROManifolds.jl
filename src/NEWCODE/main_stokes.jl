@@ -39,9 +39,14 @@ u0(μ) = x->u0(x,μ)
 p0(x,μ) = 0
 p0(μ) = x->p0(x,μ)
 
-lhs_t(μ,t,(u,p),(v,q)) = ∫(v⋅u)dΩ
-lhs(μ,t,(u,p),(v,q)) = ∫(a(μ,t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ - ∫(q*(∇⋅(u)))dΩ
-rhs(μ,t,(v,q)) = ∫(g0(μ,t)⋅v)dΩ
+res(μ,t,(u,p),(v,q),dΩ,dΓn) = ∫((v,q)⋅∂t((u,p)))dΩ + ∫(a(μ,t)*∇(v)⊙∇(u))dΩ
+  - ∫(p*(∇⋅(v)))dΩ - ∫(q*(∇⋅(u)))dΩ - ∫(g0(μ,t)⋅v)dΩ
+jac(μ,t,(u,p),(du,dp),(v,q),dΩ) = ∫(a(μ,t)*∇(v)⊙∇(du))dΩ - ∫(dp*(∇⋅(v)))dΩ - ∫(q*(∇⋅(du)))dΩ
+jac_t(μ,t,(u,p),(dut,dpt),(v,q),dΩ) = ∫(v⋅dut)dΩ
+
+res(μ,t,u,v) = res(μ,t,u,v,dΩ,dΓn)
+jac(μ,t,u,du,v) = jac(μ,t,u,du,v,dΩ)
+jac_t(μ,t,u,dut,v) = jac_t(μ,t,u,dut,v,dΩ)
 
 reffe_u = Gridap.ReferenceFE(lagrangian,VectorValue{2,Float},order)
 reffe_p = Gridap.ReferenceFE(lagrangian,Float,order-1)
@@ -51,7 +56,7 @@ test_p = TestFESpace(model,reffe_p;conformity=:C0)
 trial_p = TrialFESpace(test_p)
 test = ParamTransientMultiFieldFESpace([test_u,test_p])
 trial = ParamTransientMultiFieldFESpace([trial_u,trial_p])
-feop = ParamTransientAffineFEOperator(lhs_t,lhs,rhs,pspace,trial,test)
+feop = ParamTransientAffineFEOperator(res,jac,jac_t,pspace,trial,test)
 t0,tF,dt,θ = 0.,0.3,0.005,1
 uh0(μ) = interpolate_everywhere(u0(μ),trial_u(μ,t0))
 ph0(μ) = interpolate_everywhere(p0(μ),trial_p(μ,t0))

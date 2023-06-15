@@ -23,9 +23,9 @@ struct ParamFEOperatorFromWeakForm{C<:OperatorType} <: ParamFEOperator{C}
   test::FESpace
 end
 
-function ParamAffineFEOperator(a::Function,b::Function,pspace,trial,test)
-  res(μ,u,v) = a(μ,u,v) - b(μ,v)
-  jac(μ,u,du,v) = a(μ,du,v)
+function ParamAffineFEOperator(res::Function,jac::Function,pspace,trial,test)
+  # res(μ,u,v) = a(μ,u,v) - b(μ,v)
+  # jac(μ,u,du,v) = a(μ,du,v)
   assem = SparseMatrixAssembler(trial,test)
   ParamFEOperatorFromWeakForm{Affine}(res,jac,assem,pspace,trial,test)
 end

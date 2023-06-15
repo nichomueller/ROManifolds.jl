@@ -41,14 +41,18 @@ addprocs(manager)
   u0(x,μ) = 0
   u0(μ) = x->u0(x,μ)
 
-  lhs_t(μ,t,u,v) = ∫(v*u)dΩ
-  lhs(μ,t,u,v) = ∫(a(μ,t)*∇(v)⋅∇(u))dΩ
-  rhs(μ,t,v) = ∫(f(μ,t)*v)dΩ + ∫(h(μ,t)*v)dΓn
+  res(μ,t,u,v,dΩ,dΓn) = ∫(v*∂t(u))dΩ + ∫(a(μ,t)*∇(v)⋅∇(u))dΩ - ∫(f(μ,t)*v)dΩ - ∫(h(μ,t)*v)dΓn
+  jac(μ,t,u,du,v,dΩ) = ∫(a(μ,t)*∇(v)⋅∇(du))dΩ
+  jac_t(μ,t,u,dut,v,dΩ) = ∫(v*dut)dΩ
+
+  res(μ,t,u,v) = res(μ,t,u,v,dΩ,dΓn)
+  jac(μ,t,u,du,v) = jac(μ,t,u,du,v,dΩ)
+  jac_t(μ,t,u,dut,v) = jac_t(μ,t,u,dut,v,dΩ)
 
   reffe = Gridap.ReferenceFE(lagrangian,Float,order)
   test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
   trial = ParamTransientTrialFESpace(test,g)
-  feop = ParamTransientAffineFEOperator(lhs_t,lhs,rhs,pspace,trial,test)
+  feop = ParamTransientAffineFEOperator(res,jac,jac_t,pspace,trial,test)
   t0,tF,dt,θ = 0.,0.05,0.005,1
   uh0(μ) = interpolate_everywhere(u0(μ),trial(μ,t0))
   fesolver = θMethod(LUSolver(),t0,tF,dt,θ,uh0)
@@ -64,18 +68,33 @@ end
 
 rbspace = reduce_fe_space(info,feop,fesolver)
 
+solver = fesolver
+sols = solve(solver,feop,nsnaps)
+cache = snapshots_cache(feop,solver)
+snaps = pmap(sol->collect_snapshot!(cache,sol),sols)
+mat_snaps = compress(first.(snaps))
+param_snaps = Table(last.(snaps))
+s = Snapshots(mat_snaps,param_snaps)
 times = get_times(solver)
 sols,param = get_data(s)
 sols = convert(Matrix{Float},sols.array)
-matdatum = _matdata_jacobian(feop,solver,sols,param)
-aff = Affinity(matdatum,param,times)
-matdata = map(μ -> map(t -> matdatum(μ,t),times),param)
-A = _nonaffine_jacobian(op.assem,matdata,filter)
-
-vecdatum = _vecdata_residual(op,solver,sols,param)
-aff = Affinity(vecdatum,param,times)
-vecdata = map(μ -> map(t -> vecdatum(μ,t),times),param)
-b = _nonaffine_residual(op.assem,vecdata,filter)
+trians = _collect_trian(feop.jacs[1],feop,feop.test)
+red_jac = TransientRBAffineDecomposition[]
+matdatum = _matdata_jacobian(feop,solver,sols,param,trians[1])
+jacs = assemble_jacobian(feop,solver,s,trians[1],(1,1))
+times = get_times(solver)
+rbspace_component = tpod(component)
+interp_idx_space,interp_idx_time = get_interpolation_idx(rbspace_component)
+integr_domain = TransientRBIntegrationDomain(
+  component,trian,times,interp_idx_space,interp_idx_time;st_mdeim)
+bs = get_basis_space(rbspace_component)
+bt = get_basis_time(rbspace_component)
+interp_bs = bs[interp_idx_space,:]
+interp_bt = bt[interp_idx_time,:]
+interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
+lu_interp_bst = lu(interp_bst)
+proj_bs,proj_bt... = compress(solver,rbspace_component,args...)
+TransientRBAffineDecomposition(proj_bs,proj_bt,lu_interp_bst,integr_domain)
 
 # if load_offline
 #   rbop = load(RBOperator,info)

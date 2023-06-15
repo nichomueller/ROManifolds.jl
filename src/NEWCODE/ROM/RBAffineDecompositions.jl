@@ -5,9 +5,9 @@ struct RBIntegrationDomain
   function RBIntegrationDomain(
     component::SingleFieldSnapshots,
     trian::Triangulation,
-    interp_idx::Vector{Int};
-    degree=2)
+    interp_idx::Vector{Int})
 
+    degree = Gridap.FESpaces.get_order(first(trian.grid.reffes))
     nonzero_idx = get_nonzero_idx(component)
     nrows = get_nrows(component)
     entire_interp_idx = nonzero_idx[interp_idx]
@@ -30,8 +30,9 @@ struct TransientRBIntegrationDomain
     times::Vector{Float},
     interp_idx_space::Vector{Int},
     interp_idx_time::Vector{Int};
-    degree=2,st_mdeim=true)
+    st_mdeim=true)
 
+    degree = Gridap.FESpaces.get_order(first(trian.grid.reffes))
     nonzero_idx = get_nonzero_idx(component)
     nrows = get_nrows(component)
     entire_interp_idx_space = nonzero_idx[interp_idx_space]
@@ -39,7 +40,7 @@ struct TransientRBIntegrationDomain
     red_integr_cells = find_cells(entire_interp_rows_space,trian)
     red_trian = view(trian,red_integr_cells)
     red_meas = Measure(red_trian,degree)
-    red_times = get_red_times(Val{st_mdeim}(),times,interp_idx_time)
+    red_times = st_mdeim ? times[interp_idx_time] : times
     new(red_meas,red_times,entire_interp_idx_space)
   end
 end
@@ -57,46 +58,69 @@ struct TransientRBAffineDecomposition
   integration_domain::TransientRBIntegrationDomain
 end
 
-function compress_jacobian(
-  feop::ParamTransientFEOperator,
-  solver::θMethod,
-  rbspace::TransientSingleFieldRBSpace,
-  s::TransientSingleFieldRBSpace;
-  kwargs...)
+for (Top,Tsol,Tsps,Tspm) in zip(
+  (:ParamFEOperator,:ParamTransientFEOperator),
+  (:FESolver,:ODESolver),
+  (:SingleFieldRBSpace,:TransientSingleFieldRBSpace),
+  (:MultiFieldRBSpace,:TransientMultiFieldRBSpace))
 
+  @eval begin
+    function compress_jacobian(
+      feop::$Top,
+      solver::$Tsol,
+      rbspace::$Tspm,
+      s::MultiFieldSnapshots,
+      kwargs...)
+
+      nfields = get_nfields(s)
+      lazy_map(1:nfields) do row
+        lazy_map(1:nfields) do col
+          compress_jacobian(feop,solver,(rbspace[row],rbspace[col]),s[col],(row,col);kwargs...)
+        end
+      end
+    end
+
+    function compress_jacobian(
+      feop::$Top,
+      solver::$Tsol,
+      rbspace::$Tsps,
+      s::SingleFieldSnapshots,
+      filter=(1,1);
+      kwargs...)
+
+      compress_jacobian(feop,solver,(rbspace,rbspace),s,filter;kwargs...)
+    end
+  end
 
 end
 
 function compress_jacobian(
   feop::ParamTransientFEOperator,
-  solver::θMethod,
-  rbspace::TransientSingleFieldRBSpace,
-  sols::AbstractMatrix,
-  params::Table,
+  solver::ODESolver,
+  rbspace::NTuple{2,TransientSingleFieldRBSpace},
+  s::SingleFieldSnapshots,
   filter::Tuple{Vararg{Int}};
   kwargs...)
 
-  trians = collect_trian(feop.jac,sols,params)
+  trians = _collect_trian_jac(feop.jacs[1],feop,feop.test)
   red_jac = TransientRBAffineDecomposition[]
   for trian in trians
-    matdatum = _matdata_jacobian(feop,solver,sols,params,trian)
-    jacs = assemble_jacobian(feop,solver,matdatum,params,trian,filter)
-    push!(red_jac,compress_component(jacs,rbspace,trian;kwargs...))
+    j = assemble_jacobian(feop,solver,s,trian,filter)
+    push!(red_jac,compress_component(j,solver,trian,rbspace...;kwargs...))
   end
   red_jac
 end
 
 function compress_component(
-  solver::FESolver,
   component::SingleFieldSnapshots,
+  solver::FESolver,
   trian::Triangulation,
   args...;
-  degree=2,
   kwargs...)
 
   rbspace_component = tpod(component;kwargs...)
   interp_idx = get_interpolation_idx(rbspace_component)
-  integr_domain = RBIntegrationDomain(component,trian,interp_idx;degree)
+  integr_domain = RBIntegrationDomain(component,trian,interp_idx)
 
   bs = get_basis_space(rbspace_component)
   interp_bs = bs[interp_idx,:]
@@ -113,7 +137,6 @@ function compress_component(
   trian::Triangulation,
   args...;
   st_mdeim=true,
-  degree=2,
   kwargs...)
 
   times = get_times(solver)
@@ -121,7 +144,7 @@ function compress_component(
   rbspace_component = tpod(component;kwargs...)
   interp_idx_space,interp_idx_time = get_interpolation_idx(rbspace_component)
   integr_domain = TransientRBIntegrationDomain(
-    component,trian,times,interp_idx_space,interp_idx_time;st_mdeim,degree)
+    component,trian,times,interp_idx_space,interp_idx_time;st_mdeim)
 
   bs = get_basis_space(rbspace_component)
   bt = get_basis_time(rbspace_component)
