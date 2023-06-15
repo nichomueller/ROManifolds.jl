@@ -29,7 +29,7 @@ Gridap.CellData.get_data(s::Snapshots) = s.snaps,s.params
 
 complementary_dimension(s::SingleFieldSnapshots) = Int(size(s.snaps,2)/length(s))
 
-is_transient(s::Snapshots) = all(tndofs -> tndofs > 1,complementary_dimension(s))
+istransient(s::Snapshots) = all(tndofs -> tndofs > 1,complementary_dimension(s))
 
 function Snapshots(snaps::NnzMatrix{T},params::Table) where T
   SingleFieldSnapshots{T}(snaps,params)

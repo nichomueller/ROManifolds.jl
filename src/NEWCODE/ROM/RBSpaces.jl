@@ -35,6 +35,10 @@ struct TransientMultiFieldRBSpace{T} <: TransientRBSpace{T}
   basis_time::Vector{NnzMatrix{T}}
 end
 
+get_basis_space(rb::SingleFieldRBSpace) = rb.basis_space.array
+
+get_basis_time(rb::TransientSingleFieldRBSpace) = rb.basis_time.array
+
 function compress(
   s::SingleFieldSnapshots{T},
   info::RBInfo,
@@ -51,7 +55,7 @@ function compress(
   info::RBInfo,
   feop::ParamFEOperator,
   fe_solver::FESolver;
-  compute_supremizers=true) where T
+  compute_supremizers=false) where T
 
   snaps = collect_single_fields(s)
   bases_space = map(snap -> tpod(snap;ϵ=info.ϵ),snaps)
@@ -77,7 +81,7 @@ function compress(
   info::RBInfo,
   feop::ParamTransientFEOperator,
   fe_solver::ODESolver;
-  compute_supremizers=true,
+  compute_supremizers=false,
   kwargs...) where T
 
   snaps = collect_single_fields(s)

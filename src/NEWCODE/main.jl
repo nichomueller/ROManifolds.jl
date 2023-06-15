@@ -8,59 +8,59 @@ addprocs(manager)
   include("$root/src/NEWCODE/FEM/FEM.jl")
   include("$root/src/NEWCODE/ROM/ROM.jl")
   include("$root/src/NEWCODE/RBTests.jl")
+
+  mesh = "elasticity_3cyl2D.json"
+  test_path = "$root/tests/poisson/unsteady/$mesh"
+  bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
+  order = 1
+  degree = 2
+
+  mshpath = mesh_path(test_path,mesh)
+  model = get_discrete_model(mshpath,bnd_info)
+  Ω = Triangulation(model)
+  dΩ = Measure(Ω,degree)
+  Γn = BoundaryTriangulation(model,tags=["neumann"])
+  dΓn = Measure(Γn,degree)
+
+  ranges = fill([1.,10.],3)
+  sampling = UniformSampling()
+  pspace = ParamSpace(ranges,sampling)
+
+  a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
+  a(μ,t) = x->a(x,μ,t)
+
+  f(x,μ,t) = 1.
+  f(μ,t) = x->f(x,μ,t)
+
+  h(x,μ,t) = abs(cos(μ[3]*t))
+  h(μ,t) = x->h(x,μ,t)
+
+  g(x,μ,t) = μ[1]*exp(-x[1]/μ[2])*abs(sin(μ[3]*t))
+  g(μ,t) = x->g(x,μ,t)
+
+  u0(x,μ) = 0
+  u0(μ) = x->u0(x,μ)
+
+  lhs_t(μ,t,u,v) = ∫(v*u)dΩ
+  lhs(μ,t,u,v) = ∫(a(μ,t)*∇(v)⋅∇(u))dΩ
+  rhs(μ,t,v) = ∫(f(μ,t)*v)dΩ + ∫(h(μ,t)*v)dΓn
+
+  reffe = Gridap.ReferenceFE(lagrangian,Float,order)
+  test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
+  trial = ParamTransientTrialFESpace(test,g)
+  feop = ParamTransientAffineFEOperator(lhs_t,lhs,rhs,pspace,trial,test)
+  t0,tF,dt,θ = 0.,0.05,0.005,1
+  uh0(μ) = interpolate_everywhere(u0(μ),trial(μ,t0))
+  fesolver = θMethod(LUSolver(),t0,tF,dt,θ,uh0)
+
+  ϵ = 1e-4
+  save_offline = false
+  load_offline = false
+  energy_norm = false
+  nsnaps = 10
+  nsnaps_mdeim = 10
+  info = RBInfo(test_path;ϵ,load_offline,save_offline,energy_norm,nsnaps,nsnaps_mdeim)
 end
-
-mesh = "elasticity_3cyl2D.json"
-test_path = "$root/tests/poisson/unsteady/$mesh"
-bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
-order = 1
-degree = 2
-
-mshpath = mesh_path(test_path,mesh)
-model = get_discrete_model(mshpath,bnd_info)
-Ω = Triangulation(model)
-dΩ = Measure(Ω,degree)
-Γn = BoundaryTriangulation(model,tags=["neumann"])
-dΓn = Measure(Γn,degree)
-
-ranges = fill([1.,10.],3)
-sampling = UniformSampling()
-pspace = ParamSpace(ranges,sampling)
-
-a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
-a(μ,t) = x->a(x,μ,t)
-
-f(x,μ,t) = 1.
-f(μ,t) = x->f(x,μ,t)
-
-h(x,μ,t) = abs(cos(μ[3]*t))
-h(μ,t) = x->h(x,μ,t)
-
-g(x,μ,t) = μ[1]*exp(-x[1]/μ[2])*abs(sin(μ[3]*t))
-g(μ,t) = x->g(x,μ,t)
-
-u0(x,μ) = 0
-u0(μ) = x->u0(x,μ)
-
-lhs_t(μ,t,u,v) = ∫(v*u)dΩ
-lhs(μ,t,u,v) = ∫(a(μ,t)*∇(v)⋅∇(u))dΩ
-rhs(μ,t,v) = ∫(f(μ,t)*v)dΩ + ∫(h(μ,t)*v)dΓn
-
-reffe = Gridap.ReferenceFE(lagrangian,Float,order)
-test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-trial = ParamTransientTrialFESpace(test,g)
-feop = ParamTransientAffineFEOperator(lhs_t,lhs,rhs,pspace,trial,test)
-t0,tF,dt,θ = 0.,0.05,0.005,1
-uh0(μ) = interpolate_everywhere(u0(μ),trial(μ,t0))
-fesolver = θMethod(LUSolver(),t0,tF,dt,θ,uh0)
-
-ϵ = 1e-4
-save_offline = false
-load_offline = false
-energy_norm = false
-nsnaps = 10
-nsnaps_mdeim = 10
-info = RBInfo(test_path;ϵ,load_offline,save_offline,energy_norm,nsnaps,nsnaps_mdeim)
 
 rbspace = reduce_fe_space(info,feop,fesolver)
 

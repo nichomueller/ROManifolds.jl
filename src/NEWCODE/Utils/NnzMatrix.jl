@@ -95,10 +95,10 @@ function recast(nzm::NnzMatrix{<:AbstractMatrix})
   entire_array
 end
 
-function recast(nzm::NnzMatrix{<:SparseMatrixCSC})
+function recast(nzm::NnzMatrix{<:SparseMatrixCSC},col=1)
   sparse_rows,sparse_cols = from_vec_to_mat_idx(nzm.nonzero_idx,nzm.nrows)
   ncols = maximum(sparse_cols)
-  sparse(sparse_rows,sparse_cols,nzm.array,nzm.nrows,ncols)
+  sparse(sparse_rows,sparse_cols,nzm.array[:,col],nzm.nrows,ncols)
 end
 
 function change_mode!(nzm::NnzMatrix,nparams::Int)

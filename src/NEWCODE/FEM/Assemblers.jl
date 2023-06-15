@@ -78,6 +78,15 @@ function _filter_data(
 end
 
 # MDEIM snapshots generation interface
+function Gridap.FESpaces.allocate_vector(
+  a::SparseMatrixAssembler,
+  vecdata::Function,
+  filter::Tuple{Vararg{Int}},
+  args...)
+
+  d = vecdata(first.(args)...)
+  allocate_vector(a,d,filter)
+end
 
 function Gridap.FESpaces.allocate_vector(
   a::SparseMatrixAssembler,
@@ -92,25 +101,21 @@ end
 function Gridap.FESpaces.assemble_vector_add!(
   vec::AbstractVector,
   a::SparseMatrixAssembler,
-  vecdata::Tuple{Vararg{Tuple}},
-  filter::Tuple{Vararg{Int}})
-
-  _,d = _filter_vecdata(a,vecdata,filter)
-  vecs = [Vector{eltype(vec)}(undef,length(vec)) for _ = 1:length(vecdata)]
-  for dat in d
-    assemble_vector_add!(vec,a,dat)
-    vecs[d] = vec
-  end
-end
-
-function Gridap.FESpaces.assemble_vector_add!(
-  vec::AbstractVector,
-  a::SparseMatrixAssembler,
   vecdata,
   filter::Tuple{Vararg{Int}})
 
   _,d = _filter_vecdata(a,vecdata,filter)
   assemble_vector_add!(vec,a,d)
+end
+
+function Gridap.FESpaces.allocate_matrix(
+  a::SparseMatrixAssembler,
+  matdata::Function,
+  filter::Tuple{Vararg{Int}},
+  args...)
+
+  d = matdata(first.(args)...)
+  allocate_matrix(a,d,filter)
 end
 
 function Gridap.FESpaces.allocate_matrix(
@@ -126,25 +131,41 @@ end
 function Gridap.FESpaces.assemble_matrix_add!(
   mat::AbstractMatrix,
   a::SparseMatrixAssembler,
-  matdata::Tuple{Vararg{Tuple}},
-  filter::Tuple{Vararg{Int}})
-
-  _,d = _filter_vecdata(a,matdata,filter)
-  mats = [Matrix{eltype(mat)}(undef,size(mat)...) for _ = 1:length(matdata)]
-  for dat in d
-    assemble_matrix_add!(mat,a,dat)
-    mats[d] = mat
-  end
-end
-
-function Gridap.FESpaces.assemble_matrix_add!(
-  mat::AbstractMatrix,
-  a::SparseMatrixAssembler,
   matdata,
   filter::Tuple{Vararg{Int}})
 
   _,_,d = _filter_matdata(a,matdata,filter)
   assemble_matrix_add!(mat,a,d)
+end
+
+function collect_trian(f::Function,args...)
+  domcontrib = f(first.(args)...)
+  collect_trian(domcontrib)
+end
+
+function compressed_assemble_matrix_add!(mat,a::SparseMatrixAssembler,matdata)
+  numeric_loop_matrix!(mat,a,matdata)
+  compressed_create_from_nz(mat)
+end
+
+function compressed_create_from_nz(a::InserterCSC{Tv,Ti}) where {Tv,Ti}
+  k = 1
+  for j in 1:a.ncols
+    pini = Int(a.colptr[j])
+    pend = pini + Int(a.colnnz[j]) - 1
+    for p in pini:pend
+      a.nzval[k] = a.nzval[p]
+      k += 1
+    end
+  end
+  @inbounds for j in 1:a.ncols
+    a.colptr[j+1] = a.colnnz[j]
+  end
+  length_to_ptrs!(a.colptr)
+  nnz = a.colptr[end]-1
+  resize!(a.nzval,nnz)
+
+  a.nzval
 end
 
 function assemble_residual(
@@ -223,14 +244,13 @@ end
 function assemble_jacobian(
   op::ParamTransientFEOperator,
   solver::θMethod,
-  sols::AbstractMatrix,
+  matdatum::Function,
   params::Table,
   filter::Tuple{Vararg{Int}})
 
   times = get_times(solver)
-  matdatum = _matdata_jacobian(op,solver,sols,params)
   aff = Affinity(matdatum,params,times)
-  A = allocate_matrix(op.assem,matdatum(first(params),first(times)),filter)
+  A = allocate_matrix(op.assem,matdatum,filter,params,times)
   if isa(aff,ParamTimeAffinity)
     matdata = matdatum(first(params),first(times))
     assemble_matrix_add!(A,op.assem,matdata,filter)
@@ -242,33 +262,8 @@ function assemble_jacobian(
     pmap(d -> assemble_matrix_add!(A,op.assem,d,filter),matdata)
   elseif isa(aff,NonAffinity)
     matdata = pmap(μ -> map(t -> matdatum(μ,t),times),params)
-    pmap(d -> assemble_matrix_add!(A,op.assem,d,filter),matdata...)
+    pmap(dp -> map(dt -> assemble_matrix_add!(A,op.assem,dt,filter),dp),matdata)
   else
     @unreachable
   end
-  A
 end
-
-# for T in (:ParamMultiFieldTrialFESpace,:ParamTransientMultiFieldTrialFESpace)
-
-#   @eval begin
-#     function get_snapshots(
-#       trial::T,
-#       test::FESpace,
-#       biform::Function,
-#       liform::Function,
-#       args...)
-
-#       am = SparseMatrixAssembler(trial,test)
-#       av = SparseMatrixAssembler(test,test)
-#       matvecdata,matdata,vecdata =
-#         collect_cell_matrix_and_vector(trial,test,biform,liform,args...)
-#       nfields = test.nfields
-#       for r_filter = 1:nfields, c_filter = 1:nfields
-#         vecs = allocate_vector()
-#       end
-#     end
-
-#   end
-
-# end

@@ -60,58 +60,105 @@ end
 
 function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
   numnz = nnz(S)
-  I = Vector{Ti}(undef, numnz)
-  J = Vector{Ti}(undef, numnz)
-  V = Vector{Tv}(undef, numnz)
+  I = Vector{Ti}(undef,numnz)
+  J = Vector{Ti}(undef,numnz)
+  V = Vector{Tv}(undef,numnz)
 
   count = 1
-  @inbounds for col = 1 : size(S, 2), k = SparseArrays.getcolptr(S)[col] : (SparseArrays.getcolptr(S)[col+1]-1)
+  @inbounds for col = 1:size(S,2), k = SparseArrays.getcolptr(S)[col] : (SparseArrays.getcolptr(S)[col+1]-1)
       I[count] = rowvals(S)[k]
       J[count] = col
       V[count] = nonzeros(S)[k]
       count += 1
   end
 
-  nz = findall(x -> x .>= eps(), V)
+  nz = findall(x -> x .>= eps(),V)
 
-  (I[nz], J[nz], V[nz])
+  (I[nz],J[nz],V[nz])
 end
 
-function SparseArrays.findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
-  numnz = nnz(x)
+function Gridap.FESpaces.allocate_matrix(::EMatrix{T},sizes...) where T
+  Elemental.zeros(EMatrix{T},sizes...)
+end
 
-  I = Vector{Ti}(undef, numnz)
-  V = Vector{Tv}(undef, numnz)
+function Gridap.FESpaces.allocate_matrix(::Matrix{T},sizes...) where T
+  zeros(T,sizes...)
+end
 
-  nzind = SparseArrays.nonzeroinds(x)
-  nzval = nonzeros(x)
+function Base.getindex(emat::EMatrix{Float},idx::Union{UnitRange{Int},Colon},k::Int)
+  emat[idx,k:k]
+end
 
-  @inbounds for i = 1 : numnz
-      I[i] = nzind[i]
-      V[i] = nzval[i]
+function Base.getindex(emat::EMatrix{Float},k::Int,idx::Union{UnitRange{Int},Colon})
+  emat[k:k,idx]
+end
+
+Gridap.FESpaces.get_cell_dof_ids(trian::Triangulation) = trian.grid.cell_node_ids
+
+function collect_trian(a::DomainContribution)
+  t = Triangulation[]
+  for strian in get_domains(a)
+    push!(t,strian)
   end
-
-  nz = findall(v -> abs.(v) .>= eps(), V)
-
-  (I[nz], V[nz])
+  t
 end
 
-Base.getindex(emat::EMatrix{Float},::Colon,k::Int) = emat[:,k:k]
+function Gridap.FESpaces.collect_cell_matrix(
+  trial::FESpace,
+  test::FESpace,
+  a::DomainContribution,
+  trian::Triangulation)
 
-Base.getindex(emat::EMatrix{Float},k::Int,::Colon) = emat[k:k,:]
+  w = []
+  r = []
+  c = []
+  for strian in get_domains(a)
+    if strian == trian
+      scell_mat = get_contribution(a,strian)
+      cell_mat, trian = move_contributions(scell_mat,strian)
+      @assert ndims(eltype(cell_mat)) == 2
+      cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
+      cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
+      rows = get_cell_dof_ids(test,trian)
+      cols = get_cell_dof_ids(trial,trian)
+      push!(w,cell_mat_rc)
+      push!(r,rows)
+      push!(c,cols)
+    end
+  end
+  (w,r,c)
+end
 
-Base.getindex(emat::EMatrix{Float},idx::UnitRange{Int},k::Int) = emat[idx,k:k]
+function Gridap.FESpaces.collect_cell_vector(
+  test::FESpace,
+  a::DomainContribution,
+  trian::Triangulation)
 
-Base.getindex(emat::EMatrix{Float},k::Int,idx::UnitRange{Int}) = emat[k:k,idx]
-
-Gridap.get_triangulation(m::Measure) = m.quad.trian
+  w = []
+  r = []
+  for strian in get_domains(a)
+    if strian == trian
+    scell_vec = get_contribution(a,strian)
+    cell_vec, trian = move_contributions(scell_vec,strian)
+    @assert ndims(eltype(cell_vec)) == 1
+    cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
+    rows = get_cell_dof_ids(test,trian)
+    push!(w,cell_vec_r)
+    push!(r,rows)
+    end
+  end
+  (w,r)
+end
 
 # Remove when possible
-function Gridap.Geometry.is_change_possible(strian::Triangulation,ttrian::Triangulation)
+function Gridap.Geometry.is_change_possible(
+  strian::Triangulation,
+  ttrian::Triangulation)
+
   if strian === ttrian
     return true
   end
-  #@check get_background_model(strian) === get_background_model(ttrian)
+
   D = num_cell_dims(strian)
   sglue = get_glue(strian,Val(D))
   tglue = get_glue(ttrian,Val(D))

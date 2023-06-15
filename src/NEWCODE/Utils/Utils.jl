@@ -40,10 +40,12 @@ import Gridap.Algebra:AffineOperator
 import Gridap.Algebra:NonlinearOperator
 import Gridap.Algebra:LinearSolver
 import Gridap.Algebra:NonlinearSolver
+import Gridap.Algebra:InserterCSC
 import Gridap.Algebra:create_from_nz
 import Gridap.Algebra:nz_allocation
 import Gridap.Algebra:nz_counter
 import Gridap.FESpaces:_pair_contribution_when_possible
+import Gridap.FESpaces.length_to_ptrs!
 import Gridap.Polynomials:MonomialBasis
 import Gridap.ODEs.TransientFETools:ODESolver
 import Gridap.ODEs.TransientFETools:OperatorType
