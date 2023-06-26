@@ -87,18 +87,18 @@ end
 
 function Base.getindex(
   emat::EMatrix{T},
-  idx::Union{UnitRange{Int},Colon},
-  k::Int) where T
+  k1::Int,
+  idx::Union{UnitRange{Int},Vector{Int},Colon}) where T
 
-  reshape(convert(Matrix{T},emat[idx,k:k]),:)
+  reshape(convert(Matrix{T},emat[k1:k1,idx]),:)
 end
 
 function Base.getindex(
   emat::EMatrix{T},
-  k::Int,
-  idx::Union{UnitRange{Int},Colon}) where T
+  idx::Union{UnitRange{Int},Vector{Int},Colon},
+  k2::Int) where T
 
-  reshape(convert(Matrix{T},emat[k:k,idx]),:)
+  reshape(convert(Matrix{T},emat[idx,k2:k2]),:)
 end
 
 Gridap.FESpaces.get_cell_dof_ids(trian::Triangulation) = trian.grid.cell_node_ids

@@ -38,12 +38,13 @@ end
 function assemble_compressed_jacobian(
   op::ParamTransientFEOperator,
   solver::θMethod,
-  s::SingleFieldSnapshots,
   trian::Triangulation,
+  s::SingleFieldSnapshots,
+  params::Table,
   filter::Tuple{Vararg{Int}})
 
   times = get_times(solver)
-  sols,params = get_data(s)
+  sols = get_data(s)
   matdatum = _matdata_jacobian(feop,solver,sols,params,trian)
   aff = Affinity(matdatum,params,times)
   J,Jnnz = allocate_compressed_matrix(op.assem,matdatum,filter,params,times)
@@ -65,7 +66,7 @@ function assemble_compressed_jacobian(
   else
     @unreachable
   end
-  Snapshots(compress(Jnnz),params)
+  Snapshots(compress(Jnnz),length(params))
 end
 
 # function assemble_compressed_jacobian(

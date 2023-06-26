@@ -61,9 +61,9 @@ function Gridap.solve(
   op::ParamFEOperator,
   n_snaps::Int)
 
-  μ = realization(op,n_snaps)
+  params = realization(op,n_snaps)
   param_op = get_algebraic_operator(op)
-  solve(solver,param_op,μ)
+  solve(solver,param_op,params),params
 end
 
 function solution_cache(test::FESpace,::FESolver)
@@ -77,16 +77,13 @@ function solution_cache(test::MultiFieldFESpace,args...)
 end
 
 function collect_snapshot!(cache,sol::ParamSolution)
-  sol_cache,param_cache = cache
-
   printstyled("Computing snapshot $(sol.k)\n";color=:blue)
-  if isa(sol_cache,NnzArray)
-    copyto!(sol_cache,sol.uh)
+  if isa(cache,NnzArray)
+    copyto!(cache,sol.uh)
   else
-    map((cache,sol) -> copyto!(cache,sol),sol_cache,sol.uh)
+    map((c,sol) -> copyto!(c,sol),cache,sol.uh)
   end
-  copyto!(param_cache,sol.μ)
   printstyled("Successfully computed snapshot $(sol.k)\n";color=:blue)
 
-  sol_cache,param_cache
+  cache
 end

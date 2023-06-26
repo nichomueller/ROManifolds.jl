@@ -69,25 +69,22 @@ end
 rbspace = reduce_fe_space(info,feop,fesolver)
 
 solver = fesolver
-sols = solve(solver,feop,nsnaps)
-cache = snapshots_cache(feop,solver)
+sols,params = solve(fesolver,feop,nsnaps)
+cache = solution_cache(feop.test,fesolver)
 snaps = pmap(sol->collect_snapshot!(cache,sol),sols)
-mat_snaps = compress(first.(snaps))
-param_snaps = Table(last.(snaps))
-s = Snapshots(mat_snaps,param_snaps)
+s = Snapshots(compress(snaps),nsnaps)
+param = Table(params)
+
 times = get_times(solver)
-sols,param = get_data(s)
+sols = get_data(s)
 trians = _collect_trian_jac(feop)
-red_jac = TransientRBAffineDecomposition[]
 matdatum = _matdata_jacobian(feop,solver,sols,param,trians[1])
-jacs = assemble_compressed_jacobian(feop,solver,s,trians[1],(1,1))
+jacs = assemble_compressed_jacobian(feop,solver,trians[1],s,param,(1,1))
 times = get_times(solver)
-rbspace_component = tpod(jacs)
-interp_idx_space,interp_idx_time = get_interpolation_idx(rbspace_component)
+bs,bt = transient_tpod(jacs)
+interp_idx_space,interp_idx_time = get_interpolation_idx(bs,bt)
 integr_domain = TransientRBIntegrationDomain(
   jacs,trian,times,interp_idx_space,interp_idx_time;st_mdeim)
-bs = get_basis_space(rbspace_component)
-bt = get_basis_time(rbspace_component)
 interp_bs = bs[interp_idx_space,:]
 interp_bt = bt[interp_idx_time,:]
 interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)

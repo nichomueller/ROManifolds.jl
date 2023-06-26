@@ -3,13 +3,25 @@ for (Top,Tsol) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:O
     function reduce_fe_space(
       info::RBInfo,
       feop::$Top,
-      fe_solver::$Tsol;
+      fesolver::$Tsol;
       kwargs...)
 
-      n_snaps = info.nsnaps
-      s = generate_snapshots(feop,fe_solver,n_snaps)
-      save(info,s)
-      compress(s,info,feop,fe_solver;kwargs...)
+      nsnaps = info.nsnaps
+      snaps,params = generate_snapshots(feop,fesolver,nsnaps)
+      save(info,(snaps,params))
+      compress(snaps,info,feop,fesolver;kwargs...)
+    end
+
+    function generate_snapshots(
+      feop::$Top,
+      fesolver::$Tsol,
+      nsnaps::Int)
+
+      sols,params = solve(fesolver,feop,nsnaps)
+      cache = solution_cache(feop.test,fesolver)
+      snaps = pmap(sol->collect_snapshot!(cache,sol),sols)
+      nnz_snaps = compress(snaps)
+      Snapshots(nnz_snaps),params
     end
   end
 end
@@ -53,9 +65,13 @@ function get_single_field(
   TransientSingleFieldRBSpace{T}(rb.basis_space[fieldid],rb.basis_time[fieldid])
 end
 
-Base.getindex(rb::MultiFieldRBSpace,i::Int) = get_single_field(rb,i)
+for Trb in (:MultiFieldRBSpace,:TransientMultiFieldRBSpace)
 
-Base.getindex(rb::TransientMultiFieldRBSpace,i::Int) = get_single_field(rb,i)
+  @eval begin
+    Base.getindex(rb::$Trb,i::Int) = get_single_field(rb,i)
+  end
+
+end
 
 function compress(
   s::SingleFieldSnapshots{T},

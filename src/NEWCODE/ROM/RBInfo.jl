@@ -22,18 +22,32 @@ function RBInfo(test_path::String;ϵ=1e-4,nsnaps=80,nsnaps_mdeim=20,
     energy_norm,load_offline,save_offline,save_online,postprocess)
 end
 
-function save(info::RBInfo,ref::Symbol,objs::Tuple)
-  map(obj->save(info,ref,obj))(expand(objs))
+function save(info::RBInfo,objs::Tuple)
+  map(obj->save(info,obj))(expand(objs))
 end
 
 function save(info::RBInfo,snaps::Snapshots)
   if info.save_offline
     path = joinpath(info.fe_path,"fe_snaps")
+    convert!(Matrix{Float},snaps)
     save(path,snaps)
+  end
+end
+
+function save(info::RBInfo,params::Table)
+  if info.save_offline
+    path = joinpath(info.fe_path,"params")
+    save(path,params)
   end
 end
 
 function load(T::Type{Snapshots},info::RBInfo)
   path = joinpath(info.fe_path,"fe_snaps")
-  load(T,path)
+  s = load(T,path)
+  convert!(EMatrix{Float},s)
+end
+
+function load(T::Type{Table},info::RBInfo)
+  path = joinpath(info.fe_path,"params")
+  load(T,path)[idx]
 end

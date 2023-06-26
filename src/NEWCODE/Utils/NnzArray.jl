@@ -10,49 +10,49 @@ function NnzArray(entire_array::T) where {T<:AbstractMatrix}
   NnzArray{T}(array,nonzero_idx,nrows)
 end
 
-Base.size(nzm::NnzArray,idx...) = size(nzm.array,idx...)
+Base.size(nza::NnzArray,idx...) = size(nza.array,idx...)
 
-full_size(nzm::NnzArray) = (nzm.nrows,size(nzm,2))
+full_size(nza::NnzArray) = (nza.nrows,size(nza,2))
 
 Base.eltype(::Type{<:NnzArray{T}}) where T = T
 
 Base.eltype(::NnzArray{T}) where T = T
 
-Base.getindex(nzm::NnzArray,idx...) = nzm.array[idx...]
+Base.getindex(nza::NnzArray,idx...) = nza.array[idx...]
 
-Base.eachindex(nzm::NnzArray) = eachindex(nzm.array)
+Base.eachindex(nza::NnzArray) = eachindex(nza.array)
 
-Base.setindex!(nzm::NnzArray,val,idx...) = setindex!(nzm.array,val,idx...)
+Base.setindex!(nza::NnzArray,val,idx...) = setindex!(nza.array,val,idx...)
 
-function Base.copy(nzm::NnzArray{T}) where T
-  NnzArray{T}(copy(nzm.array),copy(nzm.nonzero_idx),copy(nzm.nrows))
+function Base.copy(nza::NnzArray{T}) where T
+  NnzArray{T}(copy(nza.array),copy(nza.nonzero_idx),copy(nza.nrows))
 end
 
-Base.copyto!(nzm::NnzArray,val::AbstractArray) = copyto!(nzm.array,val)
+Base.copyto!(nza::NnzArray,val::AbstractArray) = copyto!(nza.array,val)
 
 function Base.show(io::IO,nmz::NnzArray{T}) where T
   print(io,"NnzArray{$T} with $(length(nmz.nonzero_idx)) nonzero row entries")
 end
 
-function Base.:(*)(nzm1::NnzArray{T},nzm2::NnzArray{T}) where T
+function Base.:(*)(nza1::NnzArray{T},nza2::NnzArray{T}) where T
   msg = """\n
-  Cannot multiply the given NnzMatrices, the nonzero indices and/or the full
+  Cannot multiply the given Nnzaatrices, the nonzero indices and/or the full
   order number of rows do not match one another.
   """
-  @assert nzm1.nonzero_idx == nzm2.nonzero_idx msg
-  @assert nzm1.nrows == nzm2.nrows msg
-  array = nzm1.array*nzm2.array
-  NnzArray{T}(array,copy(nzm1.nonzero_idx),copy(nzm1.nrows))
+  @assert nza1.nonzero_idx == nza2.nonzero_idx msg
+  @assert nza1.nrows == nza2.nrows msg
+  array = nza1.array*nza2.array
+  NnzArray{T}(array,copy(nza1.nonzero_idx),copy(nza1.nrows))
 end
 
-function Base.adjoint(nzm::NnzArray{T}) where T
-  array = nzm.array'
-  NnzArray{T}(array,copy(nzm.nonzero_idx),copy(nzm.nrows))
+function Base.adjoint(nza::NnzArray{T}) where T
+  array = nza.array'
+  NnzArray{T}(array,copy(nza.nonzero_idx),copy(nza.nrows))
 end
 
-function convert!(::Type{T},nzm::NnzArray) where T
-  nzm.array = convert(T,nzm.array)
-  nzm
+function convert!(::Type{T},nza::NnzArray) where T
+  nza.array = convert(T,nza.array)
+  nza
 end
 
 function compress(entire_array::AbstractMatrix)
@@ -65,17 +65,17 @@ function compress(entire_array::SparseMatrixCSC{Float,Int})
   findnz(entire_array[:])
 end
 
-function compress(nzm::Vector{NnzArray{T}};as_emat=true) where T
+function compress(nza::Vector{NnzArray{T}};as_emat=true) where T
   msg = """\n
-  Cannot compress the given NnzMatrices, the nonzero indices and/or the full
+  Cannot compress the given Nnzaatrices, the nonzero indices and/or the full
   order number of rows do not match one another.
   """
 
-  test_nnz_idx,test_nrows = nzm[1].nonzero_idx,nzm[1].nrows
-  @assert all([m.nonzero_idx == test_nnz_idx for m in nzm]) msg
-  @assert all([m.nrows == test_nrows for m in nzm]) msg
+  test_nnz_idx,test_nrows = nza[1].nonzero_idx,nza[1].nrows
+  @assert all([m.nonzero_idx == test_nnz_idx for m in nza]) msg
+  @assert all([m.nrows == test_nrows for m in nza]) msg
 
-  array = hcat([m.array for m in nzm]...)
+  array = hcat([m.array for m in nza]...)
 
   if as_emat
     array = convert(EMatrix{Float},array)
@@ -84,44 +84,44 @@ function compress(nzm::Vector{NnzArray{T}};as_emat=true) where T
   NnzArray{T}(array,test_nnz_idx,test_nrows)
 end
 
-function compress(nzm::Vector{Vector{NnzArray{T}}};kwargs...) where T
-  sorted_nzm(i) = map(m->getindex(m,i),nzm)
-  map(i -> compress(sorted_nzm(i);kwargs...),eachindex(nzm))
+function compress(nza::Vector{Vector{NnzArray{T}}};kwargs...) where T
+  sorted_nza(i) = map(m->getindex(m,i),nza)
+  map(i -> compress(sorted_nza(i);kwargs...),eachindex(nza))
 end
 
-function recast(nzm::NnzArray{<:AbstractMatrix})
-  entire_array = zeros(full_size(nzm)...)
-  entire_array[nzm.nonzero_idx,:] = nzm.array
+function recast(nza::NnzArray{<:AbstractMatrix})
+  entire_array = zeros(full_size(nza)...)
+  entire_array[nza.nonzero_idx,:] = nza.array
   entire_array
 end
 
-function recast(nzm::NnzArray{<:SparseMatrixCSC},col=1)
-  sparse_rows,sparse_cols = from_vec_to_mat_idx(nzm.nonzero_idx,nzm.nrows)
+function recast(nza::NnzArray{<:SparseMatrixCSC},col=1)
+  sparse_rows,sparse_cols = from_vec_to_mat_idx(nza.nonzero_idx,nza.nrows)
   ncols = maximum(sparse_cols)
-  sparse(sparse_rows,sparse_cols,nzm.array[:,col],nzm.nrows,ncols)
+  sparse(sparse_rows,sparse_cols,nza.array[:,col],nza.nrows,ncols)
 end
 
-function change_mode!(nzm::NnzArray,nparams::Int)
-  mode1_ndofs = size(nzm,1)
-  mode2_ndofs = Int(size(nzm,2)/nparams)
+function change_mode!(nza::NnzArray,nparams::Int)
+  mode1_ndofs = size(nza,1)
+  mode2_ndofs = Int(size(nza,2)/nparams)
 
-  mode2 = reshape(similar(nzm.array),mode2_ndofs,mode1_ndofs*nparams)
-  _mode2(k::Int) = nzm.array[:,(k-1)*mode2_ndofs+1:k*mode2_ndofs]'
+  mode2 = reshape(similar(nza.array),mode2_ndofs,mode1_ndofs*nparams)
+  _mode2(k::Int) = nza.array[:,(k-1)*mode2_ndofs+1:k*mode2_ndofs]'
   @inbounds for k = 1:nparams
     setindex!(mode2,_mode2(k),:,(k-1)*mode1_ndofs+1:k*mode1_ndofs)
   end
 
-  nzm.array = mode2
-  nzm.nonzero_idx = collect(1:mode2_ndofs)
-  nzm.nrows = mode2_ndofs
+  nza.array = mode2
+  nza.nonzero_idx = collect(1:mode2_ndofs)
+  nza.nrows = mode2_ndofs
   return
 end
 
-_compress_rows(nzm::NnzArray) = size(nzm.array,1) > size(nzm.array,2)
+_compress_rows(nza::NnzArray) = size(nza.array,1) > size(nza.array,2)
 
-function tpod!(nzm::NnzArray;kwargs...)
-  compress_rows = _compress_rows(nzm)
-  nzm.array = tpod(Val{compress_rows}(),nzm.array;kwargs...)
+function tpod!(nza::NnzArray;kwargs...)
+  compress_rows = _compress_rows(nza)
+  nza.array = tpod(Val{compress_rows}(),nza.array;kwargs...)
 end
 
 function tpod(::Val{true},array::AbstractMatrix;ϵ=1e-4)

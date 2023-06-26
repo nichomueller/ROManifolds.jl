@@ -59,7 +59,7 @@ function Gridap.FESpaces.solve(
   n_snap::Int)
 
   params = realization(op,n_snap)
-  solve(solver,op,params)
+  solve(solver,op,params),params
 end
 
 function Base.iterate(
@@ -133,23 +133,20 @@ function solution_cache(test::MultiFieldFESpace,solver::ODESolver)
 end
 
 function collect_snapshot!(cache,sol::ParamODESolution)
-  sol_cache,param_cache = cache
-
   printstyled("Computing snapshot $(sol.k)\n";color=:blue)
   n = 1
-  if isa(sol_cache,NnzArray)
+  if isa(cache,NnzArray)
     for soln in sol
-      setindex!(sol_cache,soln,:,n)
+      setindex!(cache,soln,:,n)
       n += 1
     end
   else
     for soln in sol
-      map((cache,sol) -> setindex!(cache,sol,:,n),sol_cache,soln)
+      map((cache,sol) -> setindex!(cache,sol,:,n),cache,soln)
       n += 1
     end
   end
-  copyto!(param_cache,sol.μ)
   printstyled("Successfully computed snapshot $(sol.k)\n";color=:blue)
 
-  sol_cache,param_cache
+  cache
 end
