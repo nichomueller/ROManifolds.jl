@@ -103,38 +103,6 @@ end
 
 Gridap.FESpaces.get_cell_dof_ids(trian::Triangulation) = trian.grid.cell_node_ids
 
-function _collect_trian_res(res::Function,op::ParamFEOperator,test::FESpace)
-  μ = realization(op)
-  uh = zero(test)
-  v = get_fe_basis(test)
-  domcontrib = res(μ,uh,v)
-  collect_trian(domcontrib)
-end
-
-function _collect_trian_res(res::Function,op::ParamTransientFEOperator,test::FESpace)
-  μ,t = realization(op),0.
-  uh = zero(test)
-  v = get_fe_basis(test)
-  domcontrib = res(μ,t,uh,v)
-  collect_trian(domcontrib)
-end
-
-function _collect_trian_jac(jac::Function,op::ParamFEOperator,test::FESpace)
-  μ = realization(op)
-  uh = zero(test)
-  v = get_fe_basis(test)
-  domcontrib = jac(μ,uh,v,v)
-  collect_trian(domcontrib)
-end
-
-function _collect_trian_jac(jac::Function,op::ParamTransientFEOperator,test::FESpace)
-  μ,t = realization(op),0.
-  uh = zero(test)
-  v = get_fe_basis(test)
-  domcontrib = jac(μ,t,uh,v,v)
-  collect_trian(domcontrib)
-end
-
 function collect_trian(a::DomainContribution)
   t = Triangulation[]
   for strian in get_domains(a)

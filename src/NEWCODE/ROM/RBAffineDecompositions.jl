@@ -106,7 +106,8 @@ function compress_jacobian(
   red_jac = TransientRBAffineDecomposition[]
   for trian in trians
     j = assemble_jacobian(feop,solver,s,trian,filter)
-    push!(red_jac,compress_component(j,solver,trian,rbspace...;kwargs...))
+    jrb = compress_component(j,solver,trian,rbspace...;kwargs...)
+    push!(red_jac,jrb)
   end
   red_jac
 end

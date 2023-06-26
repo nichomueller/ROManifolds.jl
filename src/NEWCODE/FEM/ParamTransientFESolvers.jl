@@ -125,7 +125,7 @@ function solution_cache(test::FESpace,solver::ODESolver)
   space_ndofs = test.nfree
   time_ndofs = get_time_ndofs(solver)
   cache = fill(1.,space_ndofs,time_ndofs)
-  NnzMatrix(cache)
+  NnzArray(cache)
 end
 
 function solution_cache(test::MultiFieldFESpace,solver::ODESolver)
@@ -137,7 +137,7 @@ function collect_snapshot!(cache,sol::ParamODESolution)
 
   printstyled("Computing snapshot $(sol.k)\n";color=:blue)
   n = 1
-  if isa(sol_cache,NnzMatrix)
+  if isa(sol_cache,NnzArray)
     for soln in sol
       setindex!(sol_cache,soln,:,n)
       n += 1

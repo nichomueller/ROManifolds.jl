@@ -97,5 +97,21 @@ function Gridap.ODEs.TransientFETools.jacobian!(
   A
 end
 
+function _collect_trian_res(res::Function,op::ParamFEOperator,test::FESpace)
+  μ = realization(op)
+  uh = zero(test)
+  v = get_fe_basis(test)
+  domcontrib = res(μ,uh,v)
+  collect_trian(domcontrib)
+end
+
+function _collect_trian_jac(jac::Function,op::ParamFEOperator,test::FESpace)
+  μ = realization(op)
+  uh = zero(test)
+  v = get_fe_basis(test)
+  domcontrib = jac(μ,uh,v,v)
+  collect_trian(domcontrib)
+end
+
 get_pspace(op::ParamFEOperatorFromWeakForm) = op.pspace
 realization(op::ParamFEOperator,args...) = realization(op.pspace,args...)

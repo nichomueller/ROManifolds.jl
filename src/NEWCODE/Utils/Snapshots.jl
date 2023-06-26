@@ -10,12 +10,12 @@ end
 abstract type Snapshots{T} end
 
 mutable struct SingleFieldSnapshots{T} <: Snapshots{T}
-  snaps::NnzMatrix{T}
+  snaps::NnzArray{T}
   params::Table
 end
 
 mutable struct MultiFieldSnapshots{T} <: Snapshots{T}
-  snaps::Vector{NnzMatrix{T}}
+  snaps::Vector{NnzArray{T}}
   params::Table
 end
 
@@ -31,11 +31,11 @@ Gridap.CellData.get_data(s::Snapshots) = recast(s.snaps),s.params
 
 # istransient(s::Snapshots) = all(tndofs -> tndofs > 1,complementary_dimension(s))
 
-function Snapshots(snaps::NnzMatrix{T},params::Table) where T
+function Snapshots(snaps::NnzArray{T},params::Table) where T
   SingleFieldSnapshots{T}(snaps,params)
 end
 
-function Snapshots(snaps::Vector{NnzMatrix{T}},params::Table) where T
+function Snapshots(snaps::Vector{NnzArray{T}},params::Table) where T
   MultiFieldSnapshots{T}(snaps,params)
 end
 

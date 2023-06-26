@@ -18,21 +18,21 @@ abstract type RBSpace{T} end
 abstract type TransientRBSpace{T} end
 
 struct SingleFieldRBSpace{T} <: RBSpace{T}
-  basis_space::NnzMatrix{T}
+  basis_space::NnzArray{T}
 end
 
 struct MultiFieldRBSpace{T} <: RBSpace{T}
-  basis_space::Vector{NnzMatrix{T}}
+  basis_space::Vector{NnzArray{T}}
 end
 
 struct TransientSingleFieldRBSpace{T} <: TransientRBSpace{T}
-  basis_space::NnzMatrix{T}
-  basis_time::NnzMatrix{T}
+  basis_space::NnzArray{T}
+  basis_time::NnzArray{T}
 end
 
 struct TransientMultiFieldRBSpace{T} <: TransientRBSpace{T}
-  basis_space::Vector{NnzMatrix{T}}
-  basis_time::Vector{NnzMatrix{T}}
+  basis_space::Vector{NnzArray{T}}
+  basis_time::Vector{NnzArray{T}}
 end
 
 get_basis_space(rb::SingleFieldRBSpace) = rb.basis_space.array
@@ -115,7 +115,7 @@ end
 for (Top,Tsol) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:ODESolver))
   @eval begin
     function add_space_supremizers!(
-      bases_space::Vector{<:NnzMatrix},
+      bases_space::Vector{<:NnzArray},
       feop::$Top,
       solver::$Tsol,
       snaps::MultiFieldSnapshots;
@@ -145,7 +145,7 @@ for (Top,Tsol) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:O
   end
 end
 
-function add_time_supremizers!(bases_time::Vector{<:NnzMatrix};kwargs...)
+function add_time_supremizers!(bases_time::Vector{<:NnzArray};kwargs...)
   tbu,tbdual... = bases_time
   for (i,tb) in enumerate(tbdual)
     printstyled("Computing supremizers in time for dual field $i\n";color=:blue)

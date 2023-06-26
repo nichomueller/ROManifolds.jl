@@ -69,7 +69,7 @@ end
 function solution_cache(test::FESpace,::FESolver)
   space_ndofs = test.nfree
   cache = fill(1.,space_ndofs,1)
-  NnzMatrix(cache)
+  NnzArray(cache)
 end
 
 function solution_cache(test::MultiFieldFESpace,args...)
@@ -80,7 +80,7 @@ function collect_snapshot!(cache,sol::ParamSolution)
   sol_cache,param_cache = cache
 
   printstyled("Computing snapshot $(sol.k)\n";color=:blue)
-  if isa(sol_cache,NnzMatrix)
+  if isa(sol_cache,NnzArray)
     copyto!(sol_cache,sol.uh)
   else
     map((cache,sol) -> copyto!(cache,sol),sol_cache,sol.uh)

@@ -143,7 +143,7 @@ function Gridap.ODEs.TransientFETools._matdata_jacobian(
   function matdata(μ,t)
     _matdata = ()
     for (i,γᵢ) in enumerate(γ)
-      if (γᵢ > 0.0)
+      if γᵢ > 0.0
         _matdata = (_matdata...,
           collect_cell_matrix(
           trial(μ,t),

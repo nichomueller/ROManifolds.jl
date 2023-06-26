@@ -73,9 +73,66 @@ for Tad in (:RBAffineDecomposition,:TransientRBAffineDecomposition)
       jac_rb!
     end
 
-    function get_residual_coefficient(res_ad::$Tad;st_mdeim=true)
-
-    end
   end
 
+end
+
+function get_residual_coefficient(
+  res_ad::TransientRBAffineDecomposition;
+  st_mdeim=true)
+
+end
+
+function solve_mdeim(mdeim_interp::LU,a::AbstractArray)
+  Pa = mdeim_interp.P*a
+  y = mdeim_interp.L \ Pa
+  x = mdeim_interp.U \ y
+  x'
+end
+
+function recast_coefficient(
+  solver::ODESolver,
+  basis_time::Tuple{Vararg{AbstractMatrix}},
+  coeff::AbstractMatrix)
+
+  time_ndofs = get_time_ndofs(solver)
+  bt,btbt,btbt_shift = basis_time
+  Qs = size(coeff,2)
+  Qt = size(basis_time,2)
+  sorted_idx(qs) = [(i-1)*Qs+qs for i = 1:Qt]
+
+  rcoeff = allocate_matrix(coeff,time_ndofs,size(coeff,2))
+  @inbounds for q = 1:Qs
+    rcoeff[:,q] = bt*coeff[sorted_idx(qs)]
+  end
+
+  rcoeff
+end
+
+function project_residual_coefficient(
+  ::ODESolver,
+  basis_time::Tuple{Vararg{AbstractMatrix}},
+  coeff::AbstractMatrix)
+
+  bt,btbt,btbt_shift = basis_time
+  proj = Matrix{Float}[]
+  @inbounds for q = axes(coeff,2), ijt = axes(bt,2)
+    push!(proj,sum(bt[:,ijt].*coeff[:,q]))
+  end
+  proj
+end
+
+function project_jacobian_coefficient(
+  ::θMethod,
+  basis_time::NTuple{3,AbstractMatrix},
+  coeff::AbstractMatrix)
+
+  bt,btbt,btbt_shift = basis_time
+  proj = Matrix{Float}[]
+  proj_shift = Matrix{Float}[]
+  @inbounds for q = axes(coeff,2), ijt = axes(btbt,2)
+    push!(proj,sum(btbt[:,ijt].*coeff[:,q]))
+    push!(proj_shift,sum(btbt_shift[:,ijt].*coeff[2:Nt,q]))
+  end
+  proj + proj_shift
 end
