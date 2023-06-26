@@ -77,15 +77,15 @@ param_snaps = Table(last.(snaps))
 s = Snapshots(mat_snaps,param_snaps)
 times = get_times(solver)
 sols,param = get_data(s)
-trians = _collect_trian_jac(feop.jacs[1],feop,feop.test)
+trians = _collect_trian_jac(feop)
 red_jac = TransientRBAffineDecomposition[]
 matdatum = _matdata_jacobian(feop,solver,sols,param,trians[1])
 jacs = assemble_compressed_jacobian(feop,solver,s,trians[1],(1,1))
 times = get_times(solver)
-rbspace_component = tpod(component)
+rbspace_component = tpod(jacs)
 interp_idx_space,interp_idx_time = get_interpolation_idx(rbspace_component)
 integr_domain = TransientRBIntegrationDomain(
-  component,trian,times,interp_idx_space,interp_idx_time;st_mdeim)
+  jacs,trian,times,interp_idx_space,interp_idx_time;st_mdeim)
 bs = get_basis_space(rbspace_component)
 bt = get_basis_time(rbspace_component)
 interp_bs = bs[interp_idx_space,:]

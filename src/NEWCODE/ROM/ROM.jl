@@ -1,4 +1,5 @@
 include("RBInfo.jl")
 include("RBSpaces.jl")
 include("RBAffineDecompositions.jl")
+include("RBAlgebraicContributions.jl")
 include("RBOperators.jl")

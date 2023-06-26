@@ -65,7 +65,7 @@ function assemble_compressed_jacobian(
   else
     @unreachable
   end
-  compress(Jnnz)
+  Snapshots(compress(Jnnz),params)
 end
 
 # function assemble_compressed_jacobian(

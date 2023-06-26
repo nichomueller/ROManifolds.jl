@@ -45,13 +45,15 @@ struct TransientRBIntegrationDomain
   end
 end
 
-struct RBAffineDecomposition
+abstract type RBAffineDecompositions end
+
+struct RBAffineDecomposition <: RBAffineDecompositions
   basis_space::AbstractMatrix
   mdeim_interpolation::LU
   integration_domain::RBIntegrationDomain
 end
 
-struct TransientRBAffineDecomposition
+struct TransientRBAffineDecomposition <: RBAffineDecompositions
   basis_space::AbstractMatrix
   basis_time::Tuple{Vararg{AbstractMatrix}}
   mdeim_interpolation::LU
@@ -68,14 +70,31 @@ for (Top,Tsol,Tsps,Tspm) in zip(
     function compress_jacobian(
       feop::$Top,
       solver::$Tsol,
+      args...;
+      kwargs...)
+
+      trians = _collect_trian_jac(feop)
+      cjac = RBAlgebraicContribution()
+      for trian in trians
+        ad_jac = compress_component(j,solver,trian,args...;kwargs...)
+        add_contribution!(cjac,trian,ad_jac)
+      end
+      cjac
+    end
+
+    function compress_jacobian(
+      feop::$Top,
+      solver::$Tsol,
+      trian::Triangulation,
       rbspace::$Tspm,
-      s::MultiFieldSnapshots,
+      s::MultiFieldSnapshots;
       kwargs...)
 
       nfields = get_nfields(s)
       lazy_map(1:nfields) do row
         lazy_map(1:nfields) do col
-          compress_jacobian(feop,solver,(rbspace[row],rbspace[col]),s[col],(row,col);kwargs...)
+          compress_jacobian(feop,solver,trian,
+            (rbspace[row],rbspace[col]),s[col],(row,col);kwargs...)
         end
       end
     end
@@ -83,12 +102,14 @@ for (Top,Tsol,Tsps,Tspm) in zip(
     function compress_jacobian(
       feop::$Top,
       solver::$Tsol,
+      trian::Triangulation,
       rbspace::$Tsps,
       s::SingleFieldSnapshots,
       filter=(1,1);
       kwargs...)
 
-      compress_jacobian(feop,solver,(rbspace,rbspace),s,filter;kwargs...)
+      compress_jacobian(feop,solver,trian,
+        (rbspace,rbspace),s,filter;kwargs...)
     end
   end
 
@@ -97,19 +118,14 @@ end
 function compress_jacobian(
   feop::ParamTransientFEOperator,
   solver::ODESolver,
+  trian::Triangulation,
   rbspace::NTuple{2,TransientSingleFieldRBSpace},
   s::SingleFieldSnapshots,
   filter::Tuple{Vararg{Int}};
   kwargs...)
 
-  trians = _collect_trian_jac(feop.jacs[1],feop,feop.test)
-  red_jac = TransientRBAffineDecomposition[]
-  for trian in trians
-    j = assemble_jacobian(feop,solver,s,trian,filter)
-    jrb = compress_component(j,solver,trian,rbspace...;kwargs...)
-    push!(red_jac,jrb)
-  end
-  red_jac
+  j = assemble_jacobian(feop,solver,s,trian,filter)
+  compress_component(j,solver,trian,rbspace...;kwargs...)
 end
 
 function compress_component(

@@ -212,18 +212,22 @@ function Gridap.ODEs.TransientFETools._matdata_jacobian(
   collect_cell_matrix(Uh,V,γᵢ*op.jacs[i](μ,t,uh,du,v))
 end
 
-function _collect_trian_res(res::Function,op::ParamTransientFEOperator,test::FESpace)
+function _collect_trian_res(op::ParamTransientFEOperator)
   μ,t = realization(op),0.
-  uh = zero(test)
-  v = get_fe_basis(test)
-  domcontrib = res(μ,t,uh,v)
+  uh = zero(op.test)
+  v = get_fe_basis(op.test)
+  domcontrib = op.res(μ,t,uh,v)
   collect_trian(domcontrib)
 end
 
-function _collect_trian_jac(jac::Function,op::ParamTransientFEOperator,test::FESpace)
+function _collect_trian_jac(op::ParamTransientFEOperator)
   μ,t = realization(op),0.
-  uh = zero(test)
-  v = get_fe_basis(test)
-  domcontrib = jac(μ,t,uh,v,v)
-  collect_trian(domcontrib)
+  uh = zero(op.test)
+  v = get_fe_basis(op.test)
+  trians = ()
+  for j in op.jacs
+    domcontrib = j(μ,t,uh,v,v)
+    trians = (trians...,collect_trian(domcontrib)...)
+  end
+  unique(trians)
 end

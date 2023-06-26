@@ -104,23 +104,29 @@ end
 
 function _vecdata_residual(
   op::ParamFEOperator,
-  sols::AbstractMatrix,
-  params::Table,
-  trian::Triangulation)
+  sols::AbstractArray,
+  params::AbstractArray,
+  trian::Triangulation;
+  m=nothing)
 
   trial = get_trial(op)
   test = get_test(op)
   dv = get_fe_basis(test)
   sol_μ = _as_function(sols,params)
   u(μ) = EvaluationFunction(trial(μ),sol_μ(μ))
-  μ -> collect_cell_vector(test,op.res(μ,u(μ),dv),trian)
+  if isnothing(m)
+    μ -> collect_cell_vector(test,op.res(μ,u(μ),dv),trian)
+  else
+    μ -> collect_cell_vector(test,op.res(μ,u(μ),dv,m...),trian)
+  end
 end
 
 function Gridap.ODEs.TransientFETools._matdata_jacobian(
   op::ParamFEOperator,
-  sols::AbstractMatrix,
-  params::Table,
-  trian::Triangulation)
+  sols::AbstractArray,
+  params::AbstractArray,
+  trian::Triangulation;
+  m=nothing)
 
   trial = get_trial(op)
   test = get_test(op)
@@ -128,5 +134,9 @@ function Gridap.ODEs.TransientFETools._matdata_jacobian(
   du = get_trial_fe_basis(trial(nothing))
   sol_μ = _as_function(sols,params)
   u(μ) = EvaluationFunction(trial(μ),sol_μ(μ))
-  μ -> collect_cell_matrix(trial(μ),test,op.jac(μ,u(μ),dv,du),trian)
+  if isnothing(m)
+    μ -> collect_cell_matrix(trial(μ),test,op.jac(μ,u(μ),dv,du),trian)
+  else
+    μ -> collect_cell_matrix(trial(μ),test,op.jac(μ,u(μ),dv,du,m...),trian)
+  end
 end

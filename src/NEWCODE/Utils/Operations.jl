@@ -104,9 +104,9 @@ end
 Gridap.FESpaces.get_cell_dof_ids(trian::Triangulation) = trian.grid.cell_node_ids
 
 function collect_trian(a::DomainContribution)
-  t = Triangulation[]
+  t = ()
   for strian in get_domains(a)
-    push!(t,strian)
+    t = (t...,strian)
   end
   t
 end

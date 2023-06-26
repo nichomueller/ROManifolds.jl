@@ -97,19 +97,19 @@ function Gridap.ODEs.TransientFETools.jacobian!(
   A
 end
 
-function _collect_trian_res(res::Function,op::ParamFEOperator,test::FESpace)
+function _collect_trian_res(op::ParamFEOperator)
   μ = realization(op)
-  uh = zero(test)
-  v = get_fe_basis(test)
-  domcontrib = res(μ,uh,v)
+  uh = zero(op.test)
+  v = get_fe_basis(op.test)
+  domcontrib = op.res(μ,uh,v)
   collect_trian(domcontrib)
 end
 
-function _collect_trian_jac(jac::Function,op::ParamFEOperator,test::FESpace)
+function _collect_trian_jac(op::ParamFEOperator)
   μ = realization(op)
-  uh = zero(test)
-  v = get_fe_basis(test)
-  domcontrib = jac(μ,uh,v,v)
+  uh = zero(op.test)
+  v = get_fe_basis(op.test)
+  domcontrib = op.jac(μ,uh,v,v)
   collect_trian(domcontrib)
 end
 
