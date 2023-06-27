@@ -1,21 +1,9 @@
 for (Top,Tsol) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:ODESolver))
   @eval begin
-    function reduce_fe_space(
-      info::RBInfo,
-      feop::$Top,
-      fesolver::$Tsol;
-      kwargs...)
-
-      nsnaps = info.nsnaps
-      snaps,params = generate_snapshots(feop,fesolver,nsnaps)
-      save(info,(snaps,params))
-      compress(snaps,info,feop,fesolver;kwargs...)
-    end
-
     function generate_snapshots(
       feop::$Top,
-      fesolver::$Tsol,
-      nsnaps::Int)
+      fesolver::$Tsol;
+      nsnaps=50)
 
       sols,params = solve(fesolver,feop,nsnaps)
       cache = solution_cache(feop.test,fesolver)

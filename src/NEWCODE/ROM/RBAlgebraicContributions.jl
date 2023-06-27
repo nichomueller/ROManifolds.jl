@@ -30,14 +30,12 @@ function Gridap.CellData.add_contribution!(
   op=+)
 
   if haskey(a.dict,trian)
-    @notimplemented
-    # a.dict[trian] = lazy_map(Broadcasting(op),a.dict[trian],b)
+    a.dict[trian] = op(a.dict[trian],b)
   else
     if op == +
-     a.dict[trian] = b
+      a.dict[trian] = b
     else
-      @notimplemented
-    #  a.dict[trian] = lazy_map(Broadcasting(op),b)
+      a.dict[trian] = op(b)
     end
   end
   a
@@ -48,7 +46,7 @@ function get_measures(a::RBAlgebraicContribution)
   for (_,rbad) in a.dict
     push!(measures,rbad.integration_domain.meas)
   end
-  measures
+  unique(measures)
 end
 
 function Gridap.FESpaces.assemble_vector(
@@ -59,10 +57,10 @@ function Gridap.FESpaces.assemble_vector(
 
   m = get_measures(c)
   vec = allocate_vector(c)
-  for (trian,rbad) in c.dict
+  for (trian,rbres) in c.dict
     vecdatum = _vecdata_residual(feop,solver,sol,μ,trian;m)
-    idx_space = rbad.integration_domain.idx_space
-    times = rbad.integration_domain.times
+    idx_space = rbres.integration_domain.idx_space
+    times = rbres.integration_domain.times
     @inbounds for (n,tn) in enumerate(times)
       vn = assemble_vector(vecdatum(μ,tn),feop.test)
       copyto!(view(vec,:,n),vn[idx_space])
@@ -78,15 +76,17 @@ function Gridap.FESpaces.assemble_matrix(
   μ::AbstractArray)
 
   m = get_measures(c)
-  mat = allocate_matrix(c)
-  for (trian,rbad) in c.dict
+  mats = Matrix{Float}[]
+  for (trian,rbjac) in c.dict
     matdatum = _matdata_jacobian(feop,solver,sol,μ,trian;m)
-    idx_space = rbad.integration_domain.idx_space
-    times = rbad.integration_domain.times
+    idx_space = rbjac.integration_domain.idx_space
+    times = rbjac.integration_domain.times
+    mat = zeros(length(idx_space),length(times))
     @inbounds for (n,tn) in enumerate(times)
       mn = assemble_matrix(matdatum(μ,tn),feop.trial(μ,tn),feop.test)
       copyto!(view(mat,:,n),reshape(mn,:,1)[idx_space])
     end
+    push!(mats,mat)
   end
-  mat
+  mats
 end

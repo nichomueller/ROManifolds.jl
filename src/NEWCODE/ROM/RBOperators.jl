@@ -1,33 +1,29 @@
-function reduce_fe_operator(info,feop,solver,rbspace,s)
+function reduce_fe_operator(
+  info::RBInfo,
+  feop::ParamTransientFEOperator{Top},
+  fesolver::ODESolver) where Top
+
   ϵ = info.ϵ
   # fun_mdeim = info.fun_mdeim
-  rb_res = compress_residual(feop,solver,rbspace,s;ϵ)
-  rb_jac = compress_jacobian(feop,solver,rbspace,s;ϵ)
-  RBOperator(rb_jac,rb_res;st_mdeim)
+  nsnaps = info.nsnaps
+  snaps,params = generate_snapshots(feop,fesolver;nsnaps)
+  rbspace = compress(snaps,info,feop,fesolver;ϵ)
+  save(info,(snaps,params,rbspace))
+
+  nsnaps = info.nsnaps_mdeim
+  #compress_residual_and_jacobian(...)
+  rb_res = compress_residual(feop,fesolver,rbspace,snaps,params;ϵ,nsnaps)
+  rb_jac = compress_jacobian(feop,fesolver,rbspace,snaps,params;ϵ,nsnaps)
+  rbop = RBOperator{Top}(rb_jac,rb_res,rbspace;st_mdeim)
+  save(info,rbop)
+
+  return rbop
 end
 
-function reduce_fe_operator(info,feop,solver,rbspace,s)
-  ϵ = info.ϵ
-  st_mdeim = info.st_mdeim
-  # fun_mdeim = info.fun_mdeim
-  res_ad = compress_residual(feop,solver,rbspace,s;ϵ,st_mdeim)
-  jac_ad = compress_jacobian(feop,solver,rbspace,s;ϵ,st_mdeim)
-  RBOperator(res_ad,jac_ad;st_mdeim)
-end
-
-struct RBOperator
+struct RBOperator{Top<:OperatorType}
   res::Function
   jac::Function
-
-  function RBOperator(res_ad,jac_ad;kwargs...)
-    res = collect_residual_contributions(res_ad;kwargs...)
-    jac = collect_jacobian_contributions(jac_ad;kwargs...)
-    new(res,jac)
-  end
-end
-
-function collect_residual_contributions(res_ad::LazyArray;kwargs...)
-  map(collect_residual_contributions,res_ad)
+  rbspace::Any
 end
 
 for Tad in (:RBAffineDecomposition,:TransientRBAffineDecomposition)

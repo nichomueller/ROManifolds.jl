@@ -68,20 +68,16 @@ for (Top,Tsol,Tsps,Tspm) in zip(
 
   @eval begin
     function compress_residual(
-      info::RBInfo,
       feop::$Top,
       solver::$Tsol,
       args...;
       kwargs...)
 
-      snaps = load(Snapshots,info)
-      params = load(Table,info)
       trians = _collect_trian_res(feop)
       cres = RBAlgebraicContribution()
       for trian in trians
-        ad_res = compress_residual(feop,solver,trian,snaps,params,args...;
-          nsnaps=info.nsnaps_mdeim,kwargs...)
-        add_contribution!(cjac,trian,ad_res)
+        ad_res = compress_residual(feop,solver,trian,args...;kwargs...)
+        add_contribution!(cres,trian,ad_res)
       end
       cres
     end
@@ -90,15 +86,17 @@ for (Top,Tsol,Tsps,Tspm) in zip(
       feop::$Top,
       solver::$Tsol,
       trian::Triangulation,
+      rbspace::$Tspm,
       s::MultiFieldSnapshots,
-      params::Table,
-      rbspace::$Tspm;
+      params::Table;
+      nsnaps=20,
       kwargs...)
 
       nfields = get_nfields(s)
+      sres,pres = s[1:nsnaps],p[1:nsnaps]
       lazy_map(1:nfields) do row
         compress_residual(feop,solver,trian,
-          rbspace[row],s[row],params,(row,1);kwargs...)
+          rbspace[row],sres[row],pres,(row,1);kwargs...)
       end
     end
 
@@ -106,9 +104,9 @@ for (Top,Tsol,Tsps,Tspm) in zip(
       feop::$Top,
       solver::$Tsol,
       trian::Triangulation,
+      rbspace::$Tsps,
       s::SingleFieldSnapshots,
       params::Table,
-      rbspace::$Tsps,
       filter=(1,1);
       kwargs...)
 
@@ -137,13 +135,10 @@ for (Top,Tsol,Tsps,Tspm) in zip(
       args...;
       kwargs...)
 
-      snaps = load(Snapshots,info)
-      params = load(Table,info)
       trians = _collect_trian_jac(feop)
       cjac = RBAlgebraicContribution()
       for trian in trians
-        ad_jac = compress_jacobian(feop,solver,trian,snaps,params,args...;
-          nsnaps=info.nsnaps_mdeim,kwargs...)
+        ad_jac = compress_jacobian(feop,solver,trian,args...;kwargs...)
         add_contribution!(cjac,trian,ad_jac)
       end
       cjac
@@ -153,16 +148,18 @@ for (Top,Tsol,Tsps,Tspm) in zip(
       feop::$Top,
       solver::$Tsol,
       trian::Triangulation,
+      rbspace::$Tspm,
       s::MultiFieldSnapshots,
-      params::Table,
-      rbspace::$Tspm;
+      params::Table;
+      nsnaps=20,
       kwargs...)
 
       nfields = get_nfields(s)
+      sjac,pjac = s[1:nsnaps],p[1:nsnaps]
       lazy_map(1:nfields) do row
         lazy_map(1:nfields) do col
           compress_jacobian(feop,solver,trian,
-            (rbspace[row],rbspace[col]),s[col],params,(row,col);kwargs...)
+            (rbspace[row],rbspace[col]),sjac[col],pjac,(row,col);kwargs...)
         end
       end
     end
@@ -171,9 +168,9 @@ for (Top,Tsol,Tsps,Tspm) in zip(
       feop::$Top,
       solver::$Tsol,
       trian::Triangulation,
+      rbspace::$Tsps,
       s::SingleFieldSnapshots,
       params::Table,
-      rbspace::$Tsps,
       filter=(1,1);
       kwargs...)
 

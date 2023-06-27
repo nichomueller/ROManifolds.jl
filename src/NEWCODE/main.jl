@@ -58,15 +58,13 @@ addprocs(manager)
   fesolver = θMethod(LUSolver(),t0,tF,dt,θ,uh0)
 
   ϵ = 1e-4
-  save_offline = false
-  load_offline = false
+  save_offline = true
+  load_offline = true
   energy_norm = false
   nsnaps = 10
   nsnaps_mdeim = 10
   info = RBInfo(test_path;ϵ,load_offline,save_offline,energy_norm,nsnaps,nsnaps_mdeim)
 end
-
-rbspace = reduce_fe_space(info,feop,fesolver)
 
 solver = fesolver
 sols,params = solve(fesolver,feop,nsnaps)

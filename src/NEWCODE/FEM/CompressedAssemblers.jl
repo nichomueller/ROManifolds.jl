@@ -81,7 +81,7 @@ function assemble_compressed_residual(
   r = allocate_compressed_vector(op.assem,vecdatum,filter,params,times)
   rtemp = if isa(aff,ParamTimeAffinity)
     vecdata = vecdatum(first(params),first(times))
-    assemble_compressed_vector_add!(r,op.assem,vecdata,filter)
+    reshape(assemble_compressed_vector_add!(r,op.assem,vecdata,filter),:,1)
   elseif isa(aff,ParamAffinity)
     vecdata = map(t -> vecdatum(first(params),t),times)
     map(d -> assemble_compressed_vector_add!(r,op.assem,d,filter),vecdata)
@@ -98,8 +98,7 @@ function assemble_compressed_residual(
     @unreachable
   end
   rnnz = NnzArray(rtemp)
-  nsnaps = length(params)
-  Snapshots(rnnz,nsnaps)
+  Snapshots(rnnz)
 end
 
 function assemble_compressed_jacobian(

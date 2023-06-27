@@ -216,8 +216,13 @@ function _collect_trian_res(op::ParamTransientFEOperator)
   μ,t = realization(op),0.
   uh = zero(op.test)
   v = get_fe_basis(op.test)
-  domcontrib = op.res(μ,t,uh,v)
-  collect_trian(domcontrib)
+  dxh = ()
+  for _ in 1:get_order(op)
+    dxh = (dxh...,uh)
+  end
+  xh = TransientCellField(uh,dxh)
+  veccontrib = op.res(μ,t,xh,v)
+  collect_trian(veccontrib)
 end
 
 function _collect_trian_jac(op::ParamTransientFEOperator)
@@ -226,8 +231,8 @@ function _collect_trian_jac(op::ParamTransientFEOperator)
   v = get_fe_basis(op.test)
   trians = ()
   for j in op.jacs
-    domcontrib = j(μ,t,uh,v,v)
-    trians = (trians...,collect_trian(domcontrib)...)
+    matcontrib = j(μ,t,uh,v,v)
+    trians = (trians...,collect_trian(matcontrib)...)
   end
-  unique(trians)
+  trians
 end

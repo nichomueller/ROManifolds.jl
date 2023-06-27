@@ -101,16 +101,16 @@ function _collect_trian_res(op::ParamFEOperator)
   μ = realization(op)
   uh = zero(op.test)
   v = get_fe_basis(op.test)
-  domcontrib = op.res(μ,uh,v)
-  collect_trian(domcontrib)
+  veccontrib = op.res(μ,uh,v)
+  collect_trian(veccontrib)
 end
 
 function _collect_trian_jac(op::ParamFEOperator)
   μ = realization(op)
   uh = zero(op.test)
   v = get_fe_basis(op.test)
-  domcontrib = op.jac(μ,uh,v,v)
-  collect_trian(domcontrib)
+  matcontrib = op.jac(μ,uh,v,v)
+  collect_trian(matcontrib)
 end
 
 get_pspace(op::ParamFEOperatorFromWeakForm) = op.pspace

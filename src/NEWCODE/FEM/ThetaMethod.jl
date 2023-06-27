@@ -122,7 +122,7 @@ function _vecdata_residual(
   test = get_test(op)
   dv = get_fe_basis(test)
   sol_μ = _as_function(sols,params)
-  u(μ,t) = _evaluation_function(solver,trial(μ),sol_μ(μ))(t)                    # add initial condition if needed
+  u(μ,t) = _evaluation_function(solver,trial(μ),sol_μ(μ),get_free_dof_values(solver.uh0(μ)))(t)
   if isnothing(m)
     (μ,t) -> collect_cell_vector(test,op.res(μ,t,u(μ,t),dv),trian)
   else
@@ -143,7 +143,7 @@ function Gridap.ODEs.TransientFETools._matdata_jacobian(
   dv = get_fe_basis(test)
   du = get_trial_fe_basis(trial(nothing,nothing))
   sol_μ = _as_function(sols,params)
-  u(μ,t) = _evaluation_function(solver,trial(μ),sol_μ(μ))(t)                    # add initial condition if needed
+  u(μ,t) = _evaluation_function(solver,trial(μ),sol_μ(μ),get_free_dof_values(solver.uh0(μ)))(t)
 
   γ = (1.0,1/(solver.dt*solver.θ))
   function matdata(μ,t)

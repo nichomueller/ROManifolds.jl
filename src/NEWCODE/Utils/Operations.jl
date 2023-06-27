@@ -108,7 +108,7 @@ function collect_trian(a::DomainContribution)
   for strian in get_domains(a)
     t = (t...,strian)
   end
-  t
+  unique(t)
 end
 
 function Gridap.FESpaces.collect_cell_matrix(
