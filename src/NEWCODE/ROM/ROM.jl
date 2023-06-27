@@ -1,3 +1,4 @@
+include("Snapshots.jl")
 include("RBInfo.jl")
 include("RBSpaces.jl")
 include("RBAffineDecompositions.jl")

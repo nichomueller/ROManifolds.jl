@@ -7,8 +7,8 @@ mutable struct GenericParamSolution <: ParamSolution
 end
 
 function Gridap.solve!(
-  solver::FESolver,
   op::ParamOp,
+  solver::FESolver,
   uh::FEFunction,
   μ::AbstractVector)
 
@@ -20,8 +20,8 @@ function Gridap.solve!(
 end
 
 function Gridap.solve!(
-  solver::FESolver,
   op::ParamOp{Affine},
+  solver::FESolver,
   uh::FEFunction,
   μ::AbstractVector)
 
@@ -37,33 +37,24 @@ function Gridap.solve!(
 end
 
 function Gridap.solve(
-  solver::FESolver,
   op::ParamOp,
+  solver::FESolver,
   μk::AbstractVector,
   k::Int)
 
   trial = get_trial(op.feop)
   uh = zero(trial(μk))
-  solk = solve!(solver,op,uh,μk)
+  solk = solve!(op,solver,uh,μk)
   GenericParamSolution(solk,μk,k)
 end
 
 function Gridap.solve(
+  op::ParamFEOperator,
   solver::FESolver,
-  op::ParamOp,
   params::Table)
 
-  [solve(solver,op,μk,k) for (μk,k) in enumerate(params)]
-end
-
-function Gridap.solve(
-  solver::FESolver,
-  op::ParamFEOperator,
-  n_snaps::Int)
-
-  params = realization(op,n_snaps)
   param_op = get_algebraic_operator(op)
-  solve(solver,param_op,params),params
+  [solve(param_op,solver,μk,k) for (μk,k) in enumerate(params)]
 end
 
 function solution_cache(test::FESpace,::FESolver)
@@ -76,7 +67,7 @@ function solution_cache(test::MultiFieldFESpace,args...)
   map(t->solution_cache(t,args...),test.spaces)
 end
 
-function collect_snapshot!(cache,sol::ParamSolution)
+function collect_solution!(cache,sol::ParamSolution)
   printstyled("Computing snapshot $(sol.k)\n";color=:blue)
   if isa(cache,NnzArray)
     copyto!(cache,sol.uh)

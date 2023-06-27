@@ -1,21 +1,76 @@
+function _filter_vecdata(
+  a::SparseMatrixAssembler,
+  vecdata::Tuple{Vararg{Any}},
+  filter::Tuple{Vararg{Int}})
+
+  vals,rowids, = vecdata
+  r_filter, = filter
+  r = _idx_in_block(get_rows(a),r_filter)
+  d = _filter_data(vals,filter),_filter_data(rowids,r_filter)
+  r,d
+end
+
+function _filter_matdata(
+  a::SparseMatrixAssembler,
+  matdata::Tuple{Vararg{Any}},
+  filter::Tuple{Vararg{Int}})
+
+  vals,rowids,colids = matdata
+  r_filter,c_filter = filter
+  r = _idx_in_block(get_rows(a),r_filter)
+  c = _idx_in_block(get_cols(a),c_filter)
+  d = _filter_data(vals,filter),_filter_data(rowids,r_filter),_filter_data(colids,c_filter)
+  r,c,d
+end
+
+function _idx_in_block(ndofs::Base.OneTo{Int},args...)
+  ndofs
+end
+
+function _idx_in_block(ndofs::BlockedUnitRange,filter::Int)
+  nd = [0,ndofs.lasts...]
+  [idx1+1:idx2 for (idx1,idx2) in zip(nd[1:end-1],nd[2:end])][filter]
+end
+
+_filter_data(data,args...) = data
+
+function _filter_data(data::Vector{Any},filter::Tuple{Vararg{Int}}) # loop over domain contributions
+  map(d->_filter_data(d,filter),data)
+end
+
+function _filter_data(data::LazyArray,filter::Tuple{Vararg{Int}}) # loop over cells
+  lazy_map(d->_filter_data(d,filter),data)
+end
+
+function _filter_data(data::ArrayBlock,filter::Tuple{Vararg{Int}})
+  data[filter...]
+end
+
+function _filter_data(
+  data::Tuple{MatrixBlock{Matrix{Float}},VectorBlock{Vector{Float}}},
+  filter::Tuple{Vararg{Int}})
+
+  mdata,vdata = data
+  r_filter,c_filter = filter
+  mdata[r_filter,c_filter],vdata[r_filter]
+end
+
 # Compressed MDEIM snapshots generation interface
 function allocate_compressed_vector(
   a::SparseMatrixAssembler,
-  vecdata::Function,
-  filter::Tuple{Vararg{Int}},
-  args...)
+  vecdata::LazyArray,
+  filter::Tuple{Vararg{Int}})
 
-  d = vecdata(rand.(args)...)
+  d = rand(vecdata)
   allocate_compressed_vector(a,d,filter)
 end
 
 function allocate_compressed_matrix(
   a::SparseMatrixAssembler,
-  matdata::Function,
-  filter::Tuple{Vararg{Int}},
-  args...)
+  matdata::LazyArray,
+  filter::Tuple{Vararg{Int}})
 
-  d = matdata(rand.(args)...)
+  d = rand(matdata)
   allocate_compressed_matrix(a,d,filter)
 end
 
@@ -43,11 +98,9 @@ end
 function assemble_compressed_vector_add!(
   vec::AbstractVector,
   a::SparseMatrixAssembler,
-  vecdata,
-  filter::Tuple{Vararg{Int}})
+  vecdata)
 
-  _,d = _filter_vecdata(a,vecdata,filter)
-  numeric_loop_vector!(vec,a,d)
+  numeric_loop_vector!(vec,a,vecdata)
   vec
 end
 
@@ -55,115 +108,28 @@ function assemble_compressed_matrix_add!(
   mat::AbstractMatrix,
   mat_nnz::NnzArray{<:SparseMatrixCSC},
   a::SparseMatrixAssembler,
-  matdata,
-  filter::Tuple{Vararg{Int}})
+  matdata)
 
-  _,_,d = _filter_matdata(a,matdata,filter)
-  numeric_loop_matrix!(mat,a,d)
+  numeric_loop_matrix!(mat,a,matdata)
   nnz_i,nnz_v = compress(mat)
   mat_nnz.array = nnz_v
   mat_nnz.nonzero_idx = nnz_i
   mat_nnz
 end
 
-function assemble_compressed_residual(
+function collect_residuals!(
+  cache,
   op::ParamTransientFEOperator,
-  solver::θMethod,
-  trian::Triangulation,
-  s::SingleFieldSnapshots,
-  params::Table,
-  filter::Tuple{Vararg{Int}})
+  matdata)
 
-  times = get_times(solver)
-  sols = get_data(s)
-  vecdatum = _vecdata_residual(feop,solver,sols,params,trian)
-  aff = Affinity(vecdatum,params,times)
-  r = allocate_compressed_vector(op.assem,vecdatum,filter,params,times)
-  rtemp = if isa(aff,ParamTimeAffinity)
-    vecdata = vecdatum(first(params),first(times))
-    reshape(assemble_compressed_vector_add!(r,op.assem,vecdata,filter),:,1)
-  elseif isa(aff,ParamAffinity)
-    vecdata = map(t -> vecdatum(first(params),t),times)
-    map(d -> assemble_compressed_vector_add!(r,op.assem,d,filter),vecdata)
-  elseif isa(aff,TimeAffinity)
-    vecdata = map(μ -> vecdatum(μ,first(times)),params)
-    map(d -> assemble_compressed_vector_add!(r,op.assem,d,filter),vecdata)
-  elseif isa(aff,NonAffinity)
-    map(params) do μ
-      vecdata = map(t -> vecdatum(μ,t),times)
-      hcat(map(d -> assemble_compressed_vector_add!(
-        r,op.assem,d,filter),vecdata)...)
-    end
-  else
-    @unreachable
-  end
-  rnnz = NnzArray(rtemp)
-  Snapshots(rnnz)
+  assemble_compressed_vector_add!(cache,op.assem,matdata)
 end
 
-function assemble_compressed_jacobian(
+function collect_jacobians!(
+  cache,
   op::ParamTransientFEOperator,
-  solver::θMethod,
-  trian::Triangulation,
-  s::SingleFieldSnapshots,
-  params::Table,
-  filter::Tuple{Vararg{Int}})
+  matdata)
 
-  times = get_times(solver)
-  sols = get_data(s)
-  matdatum = _matdata_jacobian(feop,solver,sols,params,trian)
-  aff = Affinity(matdatum,params,times)
-  J,Jnnz = allocate_compressed_matrix(op.assem,matdatum,filter,params,times)
-  Jnnz = if isa(aff,ParamTimeAffinity)
-    matdata = matdatum(first(params),first(times))
-    assemble_compressed_matrix_add!(J,Jnnz,op.assem,matdata,filter)
-  elseif isa(aff,ParamAffinity)
-    matdata = map(t -> matdatum(first(params),t),times)
-    map(d -> assemble_compressed_matrix_add!(J,Jnnz,op.assem,d,filter),matdata)
-  elseif isa(aff,TimeAffinity)
-    matdata = map(μ -> matdatum(μ,first(times)),params)
-    map(d -> assemble_compressed_matrix_add!(J,Jnnz,op.assem,d,filter),matdata)
-  elseif isa(aff,NonAffinity)
-    map(params) do μ
-      matdata = map(t -> matdatum(μ,t),times)
-      compress(map(d -> assemble_compressed_matrix_add!(
-        J,Jnnz,op.assem,d,filter),matdata);type=Matrix{Float})
-    end
-  else
-    @unreachable
-  end
-  Snapshots(Jnnz)
+  j,jnnz = cache
+  assemble_compressed_matrix_add!(j,jnnz,op.assem,matdata)
 end
-
-# function assemble_compressed_jacobian(
-#   op::ParamTransientFEOperator,
-#   solver::θMethod,
-#   s::SingleFieldSnapshots,
-#   trian::Triangulation,
-#   filter::Tuple{Vararg{Int}})
-
-#   times = get_times(solver)
-#   sols,params = get_data(s)
-#   matdatum = _matdata_jacobian(feop,solver,sols,params,trian)
-#   aff = Affinity(matdatum,params,times)
-#   J,Jnnz = allocate_compressed_matrix(op.assem,matdatum,filter,params,times)
-#   Jnnz = if isa(aff,ParamTimeAffinity)
-#     matdata = matdatum(first(params),first(times))
-#     assemble_compressed_matrix_add!(J,Jnnz,op.assem,matdata,filter)
-#   elseif isa(aff,ParamAffinity)
-#     matdata = pmap(t -> matdatum(first(params),t),times)
-#     pmap(d -> assemble_compressed_matrix_add!(J,Jnnz,op.assem,d,filter),matdata)
-#   elseif isa(aff,TimeAffinity)
-#     matdata = pmap(μ -> matdatum(μ,first(times)),params)
-#     pmap(d -> assemble_compressed_matrix_add!(J,Jnnz,op.assem,d,filter),matdata)
-#   elseif isa(aff,NonAffinity)
-#     map(params) do μ
-#       matdata = map(t -> matdatum(μ,t),times)
-#       compress(map(d -> assemble_compressed_matrix_add!(
-#         J,Jnnz,op.assem,d,filter),matdata);as_emat=false)
-#     end
-#   else
-#     @unreachable
-#   end
-#   compress(Jnnz)
-# end

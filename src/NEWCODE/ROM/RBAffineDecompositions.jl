@@ -124,7 +124,7 @@ for (Top,Tsol,Tsps,Tspm) in zip(
       filter::Tuple{Vararg{Int}};
       kwargs...)
 
-      r = assemble_compressed_residual(feop,solver,trian,s,params,filter)
+      r = generate_residuals(feop,solver,trian,s,params,filter)
       compress_component(r,solver,trian,rbspace;kwargs...)
     end
 
@@ -188,7 +188,9 @@ for (Top,Tsol,Tsps,Tspm) in zip(
       filter::Tuple{Vararg{Int}};
       kwargs...)
 
-      j = assemble_compressed_jacobian(feop,solver,trian,s,params,filter)
+      sols = get_data(s)
+      matdata = _matdata_jacobian(feop,solver,trian,sols,params,filter)
+      j = generate_jacobians(feop,matdata)
       compress_component(j,solver,trian,rbspace...;kwargs...)
     end
   end

@@ -69,7 +69,7 @@ end
 solver = fesolver
 sols,params = solve(fesolver,feop,nsnaps)
 cache = solution_cache(feop.test,fesolver)
-snaps = pmap(sol->collect_snapshot!(cache,sol),sols)
+snaps = pmap(sol->collect_solution!(cache,sol),sols)
 s = Snapshots(snaps)
 param = Table(params)
 
@@ -91,7 +91,7 @@ end
 # sols = get_data(s)
 # trians = _collect_trian_jac(feop)
 # matdatum = _matdata_jacobian(feop,solver,sols,param,trians[1])
-# jacs = assemble_compressed_jacobian(feop,solver,trians[1],s,param,(1,1))
+# jacs = generate_jacobians(feop,solver,trians[1],s,param,(1,1))
 # compress_component(jacs,solver,trians[1],rbspace,rbspace;st_mdeim=true)
 
 # bs,bt = transient_tpod(jacs)

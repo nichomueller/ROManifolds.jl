@@ -5,11 +5,11 @@ struct ParamTimeAffinity <: Affinity end
 struct NonAffinity <: Affinity end
 
 _affinity(args...) = NonAffinity()
-_affinity(aff::ParamAffinity,args...) = aff
-_affinity(::NonAffinity,aff::TimeAffinity) = aff
+_affinity(::ParamAffinity,args...) = ParamAffinity()
+_affinity(::NonAffinity,::TimeAffinity) = TimeAffinity()
 _affinity(::ParamAffinity,::TimeAffinity) = ParamTimeAffinity()
 
-function Affinity(data,params::Table;n_tests=10)
+function get_affinity(data,params::Table;n_tests=10)
   d(μ) = first(first(data(μ)))
   global idx
   for (i,ci) in enumerate(d(rand(params)))
@@ -34,7 +34,7 @@ function Affinity(data,params::Table;n_tests=10)
   _affinity(p_aff)
 end
 
-function Affinity(data,params::Table,times::AbstractVector;n_tests=10)
+function get_affinity(data,params::Table,times::AbstractVector;n_tests=10)
   d(μ,t) = first(first(data(μ,t)))
   global idx
   for (i,ci) in enumerate(d(rand(params),rand(times)))

@@ -1,18 +1,3 @@
-for (Top,Tsol) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:ODESolver))
-  @eval begin
-    function generate_snapshots(
-      feop::$Top,
-      fesolver::$Tsol;
-      nsnaps=50)
-
-      sols,params = solve(fesolver,feop,nsnaps)
-      cache = solution_cache(feop.test,fesolver)
-      snaps = pmap(sol->collect_snapshot!(cache,sol),sols)
-      Snapshots(snaps),params
-    end
-  end
-end
-
 abstract type RBSpace{T} end
 abstract type TransientRBSpace{T} end
 

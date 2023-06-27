@@ -146,7 +146,7 @@ function assemble_residual(
   filter::Tuple{Vararg{Int}})
 
   vecdatum = _vecdata_jacobian(op,sols,params)
-  aff = Affinity(vecdatum,params)
+  aff = get_affinity(vecdatum,params)
   r = allocate_vector(op.assem,vecdatum(first(params)),filter)
   if isa(aff,ParamAffinity)
     vecdata = vecdatum(first(params))
@@ -169,7 +169,7 @@ function assemble_residual(
 
   times = get_times(solver)
   vecdatum = _vecdata_jacobian(op,solver,sols,params)
-  aff = Affinity(vecdatum,params,times)
+  aff = get_affinity(vecdatum,params,times)
   r = allocate_vector(op.assem,vecdatum(first(params),first(times)),filter)
   if isa(aff,ParamTimeAffinity)
     vecdata = vecdatum(first(params),first(times))
@@ -197,7 +197,7 @@ function assemble_jacobian(
   filter::Tuple{Vararg{Int}})
 
   matdatum = _matdata_jacobian(op,sols,params)
-  aff = Affinity(matdatum,params)
+  aff = get_affinity(matdatum,params)
   J = allocate_matrix(op.assem,matdatum(first(params)),filter)
   if isa(aff,ParamAffinity)
     matdata = matdatum(first(params))
@@ -221,7 +221,7 @@ function assemble_jacobian(
   times = get_times(solver)
   sols,params = get_data(s)
   matdatum = _matdata_jacobian(feop,solver,sols,params,trian)
-  aff = Affinity(matdatum,params,times)
+  aff = get_affinity(matdatum,params,times)
   J = allocate_matrix(op.assem,matdatum,filter,params,times)
   if isa(aff,ParamTimeAffinity)
     matdata = matdatum(first(params),first(times))

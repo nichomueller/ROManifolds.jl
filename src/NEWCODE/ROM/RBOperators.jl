@@ -6,7 +6,8 @@ function reduce_fe_operator(
   ϵ = info.ϵ
   # fun_mdeim = info.fun_mdeim
   nsnaps = info.nsnaps
-  snaps,params = generate_snapshots(feop,fesolver;nsnaps)
+  params = realization(op,nsnaps)
+  snaps = generate_solutions(feop,fesolver,params)
   rbspace = compress(snaps,info,feop,fesolver;ϵ)
   save(info,(snaps,params,rbspace))
 

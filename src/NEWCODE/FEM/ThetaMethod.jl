@@ -1,7 +1,7 @@
 function Gridap.ODEs.TransientFETools.solve_step!(
   uf::AbstractVector,
-  solver::θMethod,
   op::ParamODEOperator,
+  solver::θMethod,
   μ::AbstractVector,
   u0::AbstractVector,
   t0::Real,
@@ -113,62 +113,62 @@ end
 function _vecdata_residual(
   op::ParamTransientFEOperator,
   solver::θMethod,
+  trian::Triangulation,
   sols::AbstractArray,
   params::AbstractArray,
-  trian::Triangulation;
-  m=nothing)
+  filter::Tuple{Vararg{Int}})
 
-  trial = get_trial(op)
-  test = get_test(op)
-  dv = get_fe_basis(test)
+  dv = get_fe_basis(op.test)
+  times = get_times(solver)
   sol_μ = _as_function(sols,params)
-  u(μ,t) = _evaluation_function(solver,trial(μ),sol_μ(μ),get_free_dof_values(solver.uh0(μ)))(t)
-  if isnothing(m)
-    (μ,t) -> collect_cell_vector(test,op.res(μ,t,u(μ,t),dv),trian)
-  else
-    (μ,t) -> collect_cell_vector(test,op.res(μ,t,u(μ,t),dv,m...),trian)
+
+  function vecdata(μ,t)
+    u0 = get_free_dof_values(solver.uh0(μ))
+    u = _evaluation_function(solver,op.trial(μ),sol_μ(μ),u0)(t)
+    collect_cell_vector(op.test,op.res(μ,t,u(μ,t),dv),trian)
+  end
+
+  lazy_map(params) do μ
+    map(times) do t
+      _filter_vecdata(op.assem,vecdata(μ,t),filter)
+    end
   end
 end
 
 function Gridap.ODEs.TransientFETools._matdata_jacobian(
   op::ParamTransientFEOperator,
   solver::θMethod,
+  trian::Triangulation,
   sols::AbstractArray,
   params::AbstractArray,
-  trian::Triangulation;
-  m=nothing)
+  filter::Tuple{Vararg{Int}})
 
-  trial = get_trial(op)
-  test = get_test(op)
-  dv = get_fe_basis(test)
-  du = get_trial_fe_basis(trial(nothing,nothing))
+  dv = get_fe_basis(op.test)
+  du = get_trial_fe_basis(op.trial(nothing,nothing))
+  times = get_times(solver)
   sol_μ = _as_function(sols,params)
-  u(μ,t) = _evaluation_function(solver,trial(μ),sol_μ(μ),get_free_dof_values(solver.uh0(μ)))(t)
 
   γ = (1.0,1/(solver.dt*solver.θ))
   function matdata(μ,t)
+    u0 = get_free_dof_values(solver.uh0(μ))
+    u = _evaluation_function(solver,op.trial(μ),sol_μ(μ),u0)(t)
     _matdata = ()
     for (i,γᵢ) in enumerate(γ)
       if γᵢ > 0.0
-        if isnothing(m)
-          _matdata = (_matdata...,
-            collect_cell_matrix(
-            trial(μ,t),
-            test,
-            γᵢ*op.jacs[i](μ,t,u(μ,t),dv,du),
-            trian))
-        else
-          _matdata = (_matdata...,
-            collect_cell_matrix(
-            trial(μ,t),
-            test,
-            γᵢ*op.jacs[i](μ,t,u(μ,t),dv,du,m...),
-            trian))
-        end
+        _matdata = (_matdata...,
+          collect_cell_matrix(
+          op.trial(μ,t),
+          op.test,
+          γᵢ*op.jacs[i](μ,t,u(μ,t),dv,du),
+          trian))
       end
     end
     _vcat_matdata(_matdata)
   end
 
-  matdata
+  lazy_map(params) do μ
+    map(times) do t
+      _filter_matdata(op.assem,matdata(μ,t),filter)
+    end
+  end
 end
