@@ -10,9 +10,12 @@ function NnzArray(entire_array::T) where {T<:AbstractMatrix}
   NnzArray{T}(array,nonzero_idx,nrows)
 end
 
-Base.size(nza::NnzArray,idx...) = size(nza.array,idx...)
+function NnzArray(arrays::Vector{T}) where {T<:AbstractArray}
+  entire_array = hcat(arrays...)
+  NnzArray(entire_array)
+end
 
-full_size(nza::NnzArray) = (nza.nrows,size(nza,2))
+Base.size(nza::NnzArray,idx...) = size(nza.array,idx...)
 
 Base.eltype(::Type{<:NnzArray{T}}) where T = T
 
@@ -31,7 +34,10 @@ end
 Base.copyto!(nza::NnzArray,val::AbstractArray) = copyto!(nza.array,val)
 
 function Base.show(io::IO,nmz::NnzArray{T}) where T
-  print(io,"NnzArray{$T} with $(length(nmz.nonzero_idx)) nonzero row entries")
+  msg = """NnzArray{$T} computed from a matrix with $(length(nmz.nonzero_idx))
+  nonzero row entries
+  """
+  print(io,msg)
 end
 
 function Base.:(*)(nza1::NnzArray{T},nza2::NnzArray{T}) where T
@@ -50,6 +56,10 @@ function Base.adjoint(nza::NnzArray{T}) where T
   NnzArray{T}(array,copy(nza.nonzero_idx),copy(nza.nrows))
 end
 
+function Gridap.FESpaces.allocate_matrix(nza::NnzArray{T},sizes...) where T
+  allocate_matrix(nza.array,sizes...)
+end
+
 function convert!(::Type{T},nza::NnzArray) where T
   nza.array = convert(T,nza.array)
   nza
@@ -65,9 +75,9 @@ function compress(entire_array::SparseMatrixCSC{Float,Int})
   findnz(entire_array[:])
 end
 
-function compress(nza::Vector{NnzArray{T}};as_emat=true) where T
+function compress(nza::Vector{NnzArray{T}};type=EMatrix{Float}) where T
   msg = """\n
-  Cannot compress the given Nnzaatrices, the nonzero indices and/or the full
+  Cannot compress the given NnzArrays, the nonzero indices and/or the full
   order number of rows do not match one another.
   """
 
@@ -76,12 +86,8 @@ function compress(nza::Vector{NnzArray{T}};as_emat=true) where T
   @assert all([m.nrows == test_nrows for m in nza]) msg
 
   array = hcat([m.array for m in nza]...)
-
-  if as_emat
-    array = convert(EMatrix{Float},array)
-  end
-
-  NnzArray{T}(array,test_nnz_idx,test_nrows)
+  conv_array = convert(type,array)
+  NnzArray{T}(conv_array,test_nnz_idx,test_nrows)
 end
 
 function compress(nza::Vector{Vector{NnzArray{T}}};kwargs...) where T
@@ -90,7 +96,7 @@ function compress(nza::Vector{Vector{NnzArray{T}}};kwargs...) where T
 end
 
 function recast(nza::NnzArray{<:AbstractMatrix})
-  entire_array = zeros(full_size(nza)...)
+  entire_array = zeros(nza.nrows,size(nza,2))
   entire_array[nza.nonzero_idx,:] = nza.array
   entire_array
 end
@@ -112,8 +118,6 @@ function change_mode!(nza::NnzArray,nparams::Int)
   end
 
   nza.array = mode2
-  nza.nonzero_idx = collect(1:mode2_ndofs)
-  nza.nrows = mode2_ndofs
   return
 end
 

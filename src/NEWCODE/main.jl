@@ -72,25 +72,40 @@ solver = fesolver
 sols,params = solve(fesolver,feop,nsnaps)
 cache = solution_cache(feop.test,fesolver)
 snaps = pmap(sol->collect_snapshot!(cache,sol),sols)
-s = Snapshots(compress(snaps),nsnaps)
+s = Snapshots(snaps)
 param = Table(params)
 
-times = get_times(solver)
-sols = get_data(s)
 trians = _collect_trian_jac(feop)
-matdatum = _matdata_jacobian(feop,solver,sols,param,trians[1])
-jacs = assemble_compressed_jacobian(feop,solver,trians[1],s,param,(1,1))
-times = get_times(solver)
-bs,bt = transient_tpod(jacs)
-interp_idx_space,interp_idx_time = get_interpolation_idx(bs,bt)
-integr_domain = TransientRBIntegrationDomain(
-  jacs,trian,times,interp_idx_space,interp_idx_time;st_mdeim)
-interp_bs = bs[interp_idx_space,:]
-interp_bt = bt[interp_idx_time,:]
-interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
-lu_interp_bst = lu(interp_bst)
-proj_bs,proj_bt... = compress(solver,rbspace_component,args...)
-TransientRBAffineDecomposition(proj_bs,proj_bt,lu_interp_bst,integr_domain)
+cjac = RBAlgebraicContribution()
+for trian in trians
+  ad_jac = compress_jacobian(feop,solver,trian,s,params,rbspace;
+    nsnaps=info.nsnaps_mdeim)
+  add_contribution!(cjac,trian,ad_jac)
+end
+cres = RBAlgebraicContribution()
+for trian in trians
+  ad_res = compress_residual(feop,solver,trian,s,params,rbspace;
+    nsnaps=info.nsnaps_mdeim)
+  add_contribution!(cres,trian,ad_res)
+end
+
+# times = get_times(solver)
+# sols = get_data(s)
+# trians = _collect_trian_jac(feop)
+# matdatum = _matdata_jacobian(feop,solver,sols,param,trians[1])
+# jacs = assemble_compressed_jacobian(feop,solver,trians[1],s,param,(1,1))
+# compress_component(jacs,solver,trians[1],rbspace,rbspace;st_mdeim=true)
+
+# bs,bt = transient_tpod(jacs)
+# interp_idx_space,interp_idx_time = get_interpolation_idx(bs,bt)
+# integr_domain = TransientRBIntegrationDomain(
+#   jacs,trians[1],times,interp_idx_space,interp_idx_time)
+# interp_bs = bs[interp_idx_space,:]
+# interp_bt = bt[interp_idx_time,:]
+# interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
+# lu_interp_bst = lu(interp_bst)
+# proj_bs,proj_bt = compress(solver,bs,bt,rbspace,rbspace)
+# TransientRBAffineDecomposition(proj_bs,proj_bt,lu_interp_bst,integr_domain)
 
 # if load_offline
 #   rbop = load(RBOperator,info)

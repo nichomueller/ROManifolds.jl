@@ -80,12 +80,12 @@ function _as_function(values::AbstractMatrix,input)
   end
 end
 
-function param_function(
-  values::Vector{T},
-  params::Table) where {T<:AbstractMatrix}
+# function param_function(
+#   values::Vector{T},
+#   params::Table) where {T<:AbstractMatrix}
 
-  @assert length(values) == length(params)
+#   @assert length(values) == length(params)
 
-  n(μ) = first(findall(x -> x == μ,params))
-  t -> values[n(t)]
-end
+#   n(μ) = first(findall(x -> x == μ,params))
+#   t -> values[n(t)]
+# end

@@ -1,4 +1,14 @@
 # Compressed MDEIM snapshots generation interface
+function allocate_compressed_vector(
+  a::SparseMatrixAssembler,
+  vecdata::Function,
+  filter::Tuple{Vararg{Int}},
+  args...)
+
+  d = vecdata(rand.(args)...)
+  allocate_compressed_vector(a,d,filter)
+end
+
 function allocate_compressed_matrix(
   a::SparseMatrixAssembler,
   matdata::Function,
@@ -7,6 +17,16 @@ function allocate_compressed_matrix(
 
   d = matdata(rand.(args)...)
   allocate_compressed_matrix(a,d,filter)
+end
+
+function allocate_compressed_vector(
+  a::SparseMatrixAssembler,
+  vecdata,
+  filter::Tuple{Vararg{Int}})
+
+  r,d = _filter_vecdata(a,vecdata,filter)
+  vec = allocate_vector(a,d)
+  vec[r]
 end
 
 function allocate_compressed_matrix(
@@ -18,6 +38,17 @@ function allocate_compressed_matrix(
   mat = allocate_matrix(a,d)
   mat_rc = mat[r,c]
   mat_rc,NnzArray(mat_rc)
+end
+
+function assemble_compressed_vector_add!(
+  vec::AbstractVector,
+  a::SparseMatrixAssembler,
+  vecdata,
+  filter::Tuple{Vararg{Int}})
+
+  _,d = _filter_vecdata(a,vecdata,filter)
+  numeric_loop_vector!(vec,a,d)
+  vec
 end
 
 function assemble_compressed_matrix_add!(
@@ -33,6 +64,42 @@ function assemble_compressed_matrix_add!(
   mat_nnz.array = nnz_v
   mat_nnz.nonzero_idx = nnz_i
   mat_nnz
+end
+
+function assemble_compressed_residual(
+  op::ParamTransientFEOperator,
+  solver::θMethod,
+  trian::Triangulation,
+  s::SingleFieldSnapshots,
+  params::Table,
+  filter::Tuple{Vararg{Int}})
+
+  times = get_times(solver)
+  sols = get_data(s)
+  vecdatum = _vecdata_residual(feop,solver,sols,params,trian)
+  aff = Affinity(vecdatum,params,times)
+  r = allocate_compressed_vector(op.assem,vecdatum,filter,params,times)
+  rtemp = if isa(aff,ParamTimeAffinity)
+    vecdata = vecdatum(first(params),first(times))
+    assemble_compressed_vector_add!(r,op.assem,vecdata,filter)
+  elseif isa(aff,ParamAffinity)
+    vecdata = map(t -> vecdatum(first(params),t),times)
+    map(d -> assemble_compressed_vector_add!(r,op.assem,d,filter),vecdata)
+  elseif isa(aff,TimeAffinity)
+    vecdata = map(μ -> vecdatum(μ,first(times)),params)
+    map(d -> assemble_compressed_vector_add!(r,op.assem,d,filter),vecdata)
+  elseif isa(aff,NonAffinity)
+    map(params) do μ
+      vecdata = map(t -> vecdatum(μ,t),times)
+      hcat(map(d -> assemble_compressed_vector_add!(
+        r,op.assem,d,filter),vecdata)...)
+    end
+  else
+    @unreachable
+  end
+  rnnz = NnzArray(rtemp)
+  nsnaps = length(params)
+  Snapshots(rnnz,nsnaps)
 end
 
 function assemble_compressed_jacobian(
@@ -61,12 +128,12 @@ function assemble_compressed_jacobian(
     map(params) do μ
       matdata = map(t -> matdatum(μ,t),times)
       compress(map(d -> assemble_compressed_matrix_add!(
-        J,Jnnz,op.assem,d,filter),matdata);as_emat=false)
+        J,Jnnz,op.assem,d,filter),matdata);type=Matrix{Float})
     end
   else
     @unreachable
   end
-  Snapshots(compress(Jnnz),length(params))
+  Snapshots(Jnnz)
 end
 
 # function assemble_compressed_jacobian(

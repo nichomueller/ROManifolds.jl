@@ -23,7 +23,11 @@ function RBInfo(test_path::String;ϵ=1e-4,nsnaps=80,nsnaps_mdeim=20,
 end
 
 function save(info::RBInfo,objs::Tuple)
-  map(obj->save(info,obj))(expand(objs))
+  map(obj->save(info,obj),expand(objs))
+end
+
+function load(types::Tuple,info::RBInfo)
+  map(type->load(type,info),expand(types))
 end
 
 function save(info::RBInfo,snaps::Snapshots)

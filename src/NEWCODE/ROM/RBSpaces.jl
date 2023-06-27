@@ -20,8 +20,7 @@ for (Top,Tsol) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:O
       sols,params = solve(fesolver,feop,nsnaps)
       cache = solution_cache(feop.test,fesolver)
       snaps = pmap(sol->collect_snapshot!(cache,sol),sols)
-      nnz_snaps = compress(snaps)
-      Snapshots(nnz_snaps),params
+      Snapshots(snaps),params
     end
   end
 end
@@ -47,9 +46,11 @@ struct TransientMultiFieldRBSpace{T} <: TransientRBSpace{T}
   basis_time::Vector{NnzArray{T}}
 end
 
-get_basis_space(rb::SingleFieldRBSpace) = rb.basis_space.array
+get_basis_space(rb::SingleFieldRBSpace) = rb.basis_space
 
-get_basis_time(rb::TransientSingleFieldRBSpace) = rb.basis_time.array
+get_basis_space(rb::TransientSingleFieldRBSpace) = rb.basis_space
+
+get_basis_time(rb::TransientSingleFieldRBSpace) = rb.basis_time
 
 function get_single_field(
   rb::MultiFieldRBSpace{T},

@@ -24,7 +24,7 @@ end
 Base.getindex(a::RBAlgebraicContribution,trian::Triangulation) = get_contribution(a,trian)
 
 function Gridap.CellData.add_contribution!(
-  a::DomainContribution,
+  a::RBAlgebraicContribution,
   trian::Triangulation,
   b::RBAffineDecompositions,
   op=+)

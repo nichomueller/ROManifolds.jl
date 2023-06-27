@@ -47,15 +47,15 @@ function gram_schmidt(
 end
 
 function expand(tup::Tuple)
-  ntup = ()
+  t = ()
   for el = tup
     if typeof(el) <: Tuple
-      ntup = (ntup...,expand(el)...)
+      t = (t...,expand(el)...)
     else
-      ntup = (ntup...,el)
+      t = (t...,el)
     end
   end
-  ntup
+  t
 end
 
 function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}

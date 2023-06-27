@@ -18,12 +18,20 @@ get_nfields(s::MultiFieldSnapshots) = length(s.snaps)
 
 Gridap.CellData.get_data(s::Snapshots) = recast(s.snaps)
 
-function Snapshots(snaps::NnzArray{T},nsnaps::Int) where T
-  SingleFieldSnapshots{T}(snaps,nsnaps)
+function Snapshots(csnaps::NnzArray{T},nsnaps=size(snaps,2);kwargs...) where T
+  SingleFieldSnapshots{T}(csnaps,nsnaps)
 end
 
-function Snapshots(snaps::Vector{NnzArray{T}},nsnaps::Int) where T
-  MultiFieldSnapshots{T}(snaps,nsnaps)
+function Snapshots(snaps::Vector{NnzArray{T}};kwargs...) where T
+  csnaps = compress(snaps;kwargs...)
+  nsnaps = length(snaps)
+  SingleFieldSnapshots{T}(csnaps,nsnaps)
+end
+
+function Snapshots(snaps::Vector{Vector{NnzArray{T}}};kwargs...) where T
+  csnaps = compress(snaps;kwargs...)
+  nsnaps = length(snaps)
+  MultiFieldSnapshots{T}(csnaps,nsnaps)
 end
 
 function get_single_field(s::MultiFieldSnapshots,fieldid::Int)
@@ -48,15 +56,16 @@ function convert!(::Type{T},s::MultiFieldSnapshots) where T
   sf
 end
 
-function tpod(s::SingleFieldSnapshots;kwargs...)
+function tpod(s::SingleFieldSnapshots;type=Matrix{Float},kwargs...)
   basis_space = copy(s.snaps)
   tpod!(basis_space;kwargs...)
-  basis_space
+  convert!(type,basis_space)
 end
 
-function transient_tpod(s::SingleFieldSnapshots;kwargs...)
+function transient_tpod(s::SingleFieldSnapshots;type=Matrix{Float},kwargs...)
   compress_rows = _compress_rows(s.snaps)
-  transient_tpod(Val{compress_rows}(),s;kwargs...)
+  basis_space,basis_time = transient_tpod(Val{compress_rows}(),s;kwargs...)
+  convert!(type,basis_space),convert!(type,basis_time)
 end
 
 function transient_tpod(::Val{false},s::SingleFieldSnapshots;kwargs...)
