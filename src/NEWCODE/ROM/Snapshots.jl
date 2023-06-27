@@ -58,17 +58,16 @@ function convert!(::Type{T},s::MultiFieldSnapshots) where T
   sf
 end
 
-for (Top,Tsol) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:ODESolver))
+for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:ODESolver))
   @eval begin
     function generate_solutions(
       feop::$Top,
-      fesolver::$Tsol,
-      soldata)
+      fesolver::$Tslv,
+      params::Table)
 
-      aff = get_affinity(soldata)
-      cache = solution_cache(feop.test,fesolver,aff)
-      sols = pmap(d->collect_solution!(cache,d),soldata)
-      Snapshots(sols,aff)
+      cache = solution_cache(feop.test,fesolver)
+      sols = pmap(p->collect_solution!(cache,feop,fesolver,p),params)
+      Snapshots(sols,NonAffinity())
     end
 
     function generate_residuals(

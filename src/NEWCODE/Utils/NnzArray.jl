@@ -34,10 +34,8 @@ end
 Base.copyto!(nza::NnzArray,val::AbstractArray) = copyto!(nza.array,val)
 
 function Base.show(io::IO,nmz::NnzArray{T}) where T
-  msg = """NnzArray{$T} computed from a matrix with $(length(nmz.nonzero_idx))
-  nonzero row entries
-  """
-  print(io,msg)
+  l = length(nmz.nonzero_idx)
+  print(io,"NnzArray{$T} computed from a matrix with $l nonzero row entries")
 end
 
 function Base.:(*)(nza1::NnzArray{T},nza2::NnzArray{T}) where T

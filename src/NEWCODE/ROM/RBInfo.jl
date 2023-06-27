@@ -45,14 +45,6 @@ function save(info::RBInfo,params::Table)
   end
 end
 
-# REMOVE IN THE FUTURE
-function save(info::RBInfo,rbspace::Union{RBSpace,TransientRBSpace})
-  if info.save_offline
-    path = joinpath(info.offline_path,"rbspace")
-    save(path,rbspace)
-  end
-end
-
 function load(T::Type{Snapshots},info::RBInfo)
   path = joinpath(info.fe_path,"fesnaps")
   s = load(T,path)
@@ -61,11 +53,5 @@ end
 
 function load(T::Type{Table},info::RBInfo)
   path = joinpath(info.fe_path,"params")
-  load(T,path)
-end
-
-# REMOVE IN THE FUTURE
-function load(T::Union{Type{RBSpace},Type{TransientRBSpace}},info::RBInfo)
-  path = joinpath(info.offline_path,"rbspace")
   load(T,path)
 end

@@ -7,7 +7,6 @@ struct GenericParamODESolution{T} <: ParamODESolution
   u0::T
   t0::Real
   tF::Real
-  k::Int
 end
 
 function Gridap.ODEs.TransientFETools.solve_step!(
@@ -25,32 +24,21 @@ function Gridap.FESpaces.solve(
   op::ParamODEOperator,
   solver::ODESolver,
   μ::AbstractVector,
-  u0::T,
-  k::Int) where T
+  u0::T) where T
 
   t0,tF = solver.t0,solver.tF
-  GenericParamODESolution{T}(op,solver,μ,u0,t0,tF,k)
+  GenericParamODESolution{T}(op,solver,μ,u0,t0,tF)
 end
 
 function Gridap.FESpaces.solve(
   op::ParamTransientFEOperator,
   solver::ODESolver,
   μ::AbstractVector,
-  uh0,
-  k::Int)
+  uh0)
 
   ode_op = get_algebraic_operator(op)
   u0 = get_free_dof_values(uh0)
-  solve(solver,ode_op,μ,u0,k)
-end
-
-function Gridap.FESpaces.solve(
-  op::ParamTransientFEOperator,
-  solver::ODESolver,
-  params::Table)
-
-  uh0 = solver.uh0
-  [solve(op,solver,μk,uh0(μk),k) for (k,μk) in enumerate(params)]
+  solve(ode_op,solver,μ,u0)
 end
 
 function Base.iterate(
@@ -123,8 +111,13 @@ function solution_cache(test::MultiFieldFESpace,solver::ODESolver)
   map(t->solution_cache(t,solver),test.spaces)
 end
 
-function collect_solution!(cache,sol::ParamODESolution)
-  printstyled("Computing snapshot $(sol.k)\n";color=:blue)
+function collect_solution!(
+  cache,
+  op::ParamTransientFEOperator,
+  solver::ODESolver,
+  μ::AbstractVector)
+
+  sol = solve(op,solver,μ,uh0(μ))
   n = 1
   if isa(cache,NnzArray)
     for soln in sol
@@ -137,7 +130,5 @@ function collect_solution!(cache,sol::ParamODESolution)
       n += 1
     end
   end
-  printstyled("Successfully computed snapshot $(sol.k)\n";color=:blue)
-
   cache
 end

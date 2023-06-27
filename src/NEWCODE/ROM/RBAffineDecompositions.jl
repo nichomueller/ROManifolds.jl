@@ -60,7 +60,7 @@ struct TransientRBAffineDecomposition <: RBAffineDecompositions
   integration_domain::TransientRBIntegrationDomain
 end
 
-for (Top,Tsol,Tsps,Tspm) in zip(
+for (Top,Tslv,Tsps,Tspm) in zip(
   (:ParamFEOperator,:ParamTransientFEOperator),
   (:FESolver,:ODESolver),
   (:SingleFieldRBSpace,:TransientSingleFieldRBSpace),
@@ -69,7 +69,7 @@ for (Top,Tsol,Tsps,Tspm) in zip(
   @eval begin
     function compress_residual(
       feop::$Top,
-      solver::$Tsol,
+      solver::$Tslv,
       args...;
       kwargs...)
 
@@ -84,7 +84,7 @@ for (Top,Tsol,Tsps,Tspm) in zip(
 
     function compress_residual(
       feop::$Top,
-      solver::$Tsol,
+      solver::$Tslv,
       trian::Triangulation,
       rbspace::$Tspm,
       s::MultiFieldSnapshots,
@@ -102,7 +102,7 @@ for (Top,Tsol,Tsps,Tspm) in zip(
 
     function compress_residual(
       feop::$Top,
-      solver::$Tsol,
+      solver::$Tslv,
       trian::Triangulation,
       rbspace::$Tsps,
       s::SingleFieldSnapshots,
@@ -116,7 +116,7 @@ for (Top,Tsol,Tsps,Tspm) in zip(
 
     function compress_residual(
       feop::$Top,
-      solver::$Tsol,
+      solver::$Tslv,
       trian::Triangulation,
       rbspace::$Tsps,
       s::SingleFieldSnapshots,
@@ -124,14 +124,16 @@ for (Top,Tsol,Tsps,Tspm) in zip(
       filter::Tuple{Vararg{Int}};
       kwargs...)
 
-      r = generate_residuals(feop,solver,trian,s,params,filter)
+      sols = get_data(s)
+      vecdata = _vecdata_residual(feop,solver,trian,sols,params,filter)
+      r = generate_residuals(feop,vecdata)
       compress_component(r,solver,trian,rbspace;kwargs...)
     end
 
     function compress_jacobian(
       info::RBInfo,
       feop::$Top,
-      solver::$Tsol,
+      solver::$Tslv,
       args...;
       kwargs...)
 
@@ -146,7 +148,7 @@ for (Top,Tsol,Tsps,Tspm) in zip(
 
     function compress_jacobian(
       feop::$Top,
-      solver::$Tsol,
+      solver::$Tslv,
       trian::Triangulation,
       rbspace::$Tspm,
       s::MultiFieldSnapshots,
@@ -166,7 +168,7 @@ for (Top,Tsol,Tsps,Tspm) in zip(
 
     function compress_jacobian(
       feop::$Top,
-      solver::$Tsol,
+      solver::$Tslv,
       trian::Triangulation,
       rbspace::$Tsps,
       s::SingleFieldSnapshots,
@@ -180,7 +182,7 @@ for (Top,Tsol,Tsps,Tspm) in zip(
 
     function compress_jacobian(
       feop::$Top,
-      solver::$Tsol,
+      solver::$Tslv,
       trian::Triangulation,
       rbspace::NTuple{2,$Tsps},
       s::SingleFieldSnapshots,

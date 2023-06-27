@@ -6,15 +6,14 @@ function reduce_fe_operator(
   ϵ = info.ϵ
   # fun_mdeim = info.fun_mdeim
   nsnaps = info.nsnaps
-  params = realization(op,nsnaps)
-  snaps = generate_solutions(feop,fesolver,params)
-  rbspace = compress(snaps,info,feop,fesolver;ϵ)
-  save(info,(snaps,params,rbspace))
+  params = realization(feop,nsnaps)
+  sols = generate_solutions(feop,fesolver,params)
+  rbspace = compress_solution(sols,feop,fesolver;ϵ)
 
   nsnaps = info.nsnaps_mdeim
   #compress_residual_and_jacobian(...)
-  rb_res = compress_residual(feop,fesolver,rbspace,snaps,params;ϵ,nsnaps)
-  rb_jac = compress_jacobian(feop,fesolver,rbspace,snaps,params;ϵ,nsnaps)
+  rb_res = compress_residual(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
+  rb_jac = compress_jacobian(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
   rbop = RBOperator{Top}(rb_jac,rb_res,rbspace;st_mdeim)
   save(info,rbop)
 
