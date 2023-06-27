@@ -17,10 +17,6 @@ end
 
 Base.size(nza::NnzArray,idx...) = size(nza.array,idx...)
 
-Base.eltype(::Type{<:NnzArray{T}}) where T = T
-
-Base.eltype(::NnzArray{T}) where T = T
-
 Base.getindex(nza::NnzArray,idx...) = nza.array[idx...]
 
 Base.eachindex(nza::NnzArray) = eachindex(nza.array)
@@ -54,7 +50,7 @@ function Base.adjoint(nza::NnzArray{T}) where T
   NnzArray{T}(array,copy(nza.nonzero_idx),copy(nza.nrows))
 end
 
-function Gridap.FESpaces.allocate_matrix(nza::NnzArray{T},sizes...) where T
+function Gridap.FESpaces.allocate_matrix(nza::NnzArray,sizes...)
   allocate_matrix(nza.array,sizes...)
 end
 

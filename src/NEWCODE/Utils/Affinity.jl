@@ -9,7 +9,7 @@ _affinity(::ParamAffinity,args...) = ParamAffinity()
 _affinity(::NonAffinity,::TimeAffinity) = TimeAffinity()
 _affinity(::ParamAffinity,::TimeAffinity) = ParamTimeAffinity()
 
-function get_affinity(data,params::Table;n_tests=10)
+function get_affinity(::FESolver,params::Table,data;n_tests=10)
   d(μ) = first(first(data(μ)))
   global idx
   for (i,ci) in enumerate(d(rand(params)))
@@ -34,7 +34,7 @@ function get_affinity(data,params::Table;n_tests=10)
   _affinity(p_aff)
 end
 
-function get_affinity(data,params::Table,times::AbstractVector;n_tests=10)
+function get_affinity(solver::ODESolver,params::Table,data;;n_tests=10)
   d(μ,t) = first(first(data(μ,t)))
   global idx
   for (i,ci) in enumerate(d(rand(params),rand(times)))
@@ -45,6 +45,7 @@ function get_affinity(data,params::Table,times::AbstractVector;n_tests=10)
   end
   didx(μ,t) = max.(d(μ,t)[idx],eps())
 
+  times = get_times(solver)
   param_base = rand(params)
   time_base = rand(times)
   datum_idx_base = didx(param_base,time_base)

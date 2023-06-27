@@ -56,40 +56,51 @@ function _filter_data(
 end
 
 # Compressed MDEIM snapshots generation interface
-function allocate_compressed_vector(
+function residuals_cache(
   a::SparseMatrixAssembler,
-  vecdata::LazyArray,
-  filter::Tuple{Vararg{Int}})
+  ::FESolver,
+  params::Table,
+  vecdata::Function)
 
-  d = rand(vecdata)
-  allocate_compressed_vector(a,d,filter)
-end
-
-function allocate_compressed_matrix(
-  a::SparseMatrixAssembler,
-  matdata::LazyArray,
-  filter::Tuple{Vararg{Int}})
-
-  d = rand(matdata)
-  allocate_compressed_matrix(a,d,filter)
-end
-
-function allocate_compressed_vector(
-  a::SparseMatrixAssembler,
-  vecdata,
-  filter::Tuple{Vararg{Int}})
-
-  r,d = _filter_vecdata(a,vecdata,filter)
+  r,d = vecdata(rand(params))
   vec = allocate_vector(a,d)
-  vec[r]
+  vec_r = vec[r]
+  vec_r
 end
 
-function allocate_compressed_matrix(
+function residuals_cache(
   a::SparseMatrixAssembler,
-  matdata,
-  filter::Tuple{Vararg{Int}})
+  solver::ODESolver,
+  params::Table,
+  vecdata::Function)
 
-  r,c,d = _filter_matdata(a,matdata,filter)
+  times = get_times(solver)
+  r,d = vecdata(rand(params),rand(times))
+  vec = allocate_vector(a,d)
+  vec_r = vec[r]
+  vec_r
+end
+
+function jacobians_cache(
+  a::SparseMatrixAssembler,
+  ::FESolver,
+  params::Table,
+  matdata::Function)
+
+  r,c,d = matdata(rand(params))
+  mat = allocate_matrix(a,d)
+  mat_rc = mat[r,c]
+  mat_rc,NnzArray(mat_rc)
+end
+
+function jacobians_cache(
+  a::SparseMatrixAssembler,
+  solver::ODESolver,
+  params::Table,
+  matdata::Function)
+
+  times = get_times(solver)
+  r,c,d = matdata(rand(params),rand(times))
   mat = allocate_matrix(a,d)
   mat_rc = mat[r,c]
   mat_rc,NnzArray(mat_rc)

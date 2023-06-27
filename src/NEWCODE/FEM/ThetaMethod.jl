@@ -119,7 +119,6 @@ function _vecdata_residual(
   filter::Tuple{Vararg{Int}})
 
   dv = get_fe_basis(op.test)
-  times = get_times(solver)
   sol_μ = _as_function(sols,params)
 
   function vecdata(μ,t)
@@ -128,11 +127,7 @@ function _vecdata_residual(
     collect_cell_vector(op.test,op.res(μ,t,u(μ,t),dv),trian)
   end
 
-  lazy_map(params) do μ
-    map(times) do t
-      _filter_vecdata(op.assem,vecdata(μ,t),filter)
-    end
-  end
+  (μ,t) -> _filter_vecdata(op.assem,vecdata(μ,t),filter)
 end
 
 function Gridap.ODEs.TransientFETools._matdata_jacobian(
@@ -145,7 +140,6 @@ function Gridap.ODEs.TransientFETools._matdata_jacobian(
 
   dv = get_fe_basis(op.test)
   du = get_trial_fe_basis(op.trial(nothing,nothing))
-  times = get_times(solver)
   sol_μ = _as_function(sols,params)
 
   γ = (1.0,1/(solver.dt*solver.θ))
@@ -166,9 +160,5 @@ function Gridap.ODEs.TransientFETools._matdata_jacobian(
     _vcat_matdata(_matdata)
   end
 
-  lazy_map(params) do μ
-    map(times) do t
-      _filter_matdata(op.assem,matdata(μ,t),filter)
-    end
-  end
+  (μ,t) -> _filter_matdata(op.assem,matdata(μ,t),filter)
 end

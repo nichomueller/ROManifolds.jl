@@ -72,20 +72,24 @@ for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:O
 
     function generate_residuals(
       feop::$Top,
+      fesolver::$Tslv,
+      params::Table,
       vecdata)
 
-      aff = get_affinity(vecdata)
-      cache = residuals_cache(feop.assem,vecdata,aff)
+      aff = get_affinity(fesolver,params,vecdata)
+      cache = residuals_cache(feop.assem,fesolver,params,vecdata)
       ress = pmap(d -> collect_residuals!(cache,feop,d),vecdata)
       Snapshots(ress,aff)
     end
 
     function generate_jacobians(
       feop::$Top,
+      fesolver::$Tslv,
+      params::Table,
       matdata)
 
-      aff = get_affinity(matdata)
-      cache = jacobian_cache(feop.assem,matdata,aff)
+      aff = get_affinity(fesolver,params,matdata)
+      cache = jacobian_cache(feop.assem,fesolver,params,vecdata)
       jacs = pmap(d -> collect_jacobians!(cache,feop,d),matdata)
       Snapshots(jacs,aff)
     end

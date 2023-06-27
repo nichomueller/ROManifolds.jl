@@ -119,9 +119,7 @@ function _vecdata_residual(
     collect_cell_vector(test,op.res(μ,u(μ),dv),trian)
   end
 
-  lazy_map(params) do μ
-    _filter_vecdata(op.assem,vecdata(μ),filter)
-  end
+  μ -> _filter_vecdata(op.assem,vecdata(μ),filter)
 end
 
 function Gridap.ODEs.TransientFETools._matdata_jacobian(
@@ -142,7 +140,5 @@ function Gridap.ODEs.TransientFETools._matdata_jacobian(
     collect_cell_matrix(trial(μ),test,op.jac(μ,u(μ),dv,du),trian)
   end
 
-  lazy_map(params) do μ
-    _filter_matdata(op.assem,matdata(μ),filter)
-  end
+  μ -> _filter_matdata(op.assem,matdata(μ),filter)
 end
