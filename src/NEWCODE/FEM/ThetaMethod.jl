@@ -85,12 +85,6 @@ function Gridap.ODEs.ODETools.allocate_jacobian(
   allocate_jacobian(op.odeop,x,op.ode_cache)
 end
 
-function zero_initial_guess(op::ParamThetaMethodNonlinearOperator)
-  x0 = similar(op.u0)
-  fill!(x0,zero(eltype(x0)))
-  x0
-end
-
 # MDEIM snapshots generation interface
 
 function _evaluation_function(
@@ -118,13 +112,14 @@ function _vecdata_residual(
   params::AbstractArray,
   filter::Tuple{Vararg{Int}})
 
+  trial = get_trial(op)
   dv = get_fe_basis(op.test)
   sol_μ = _as_function(sols,params)
 
   function vecdata(μ,t)
     u0 = get_free_dof_values(solver.uh0(μ))
-    u = _evaluation_function(solver,op.trial(μ),sol_μ(μ),u0)(t)
-    collect_cell_vector(op.test,op.res(μ,t,u(μ,t),dv),trian)
+    u = _evaluation_function(solver,trial(μ),sol_μ(μ),u0)
+    collect_cell_vector(op.test,op.res(μ,t,u(t),dv),trian)
   end
 
   (μ,t) -> _filter_vecdata(op.assem,vecdata(μ,t),filter)
@@ -138,6 +133,7 @@ function Gridap.ODEs.TransientFETools._matdata_jacobian(
   params::AbstractArray,
   filter::Tuple{Vararg{Int}})
 
+  trial = get_trial(op)
   dv = get_fe_basis(op.test)
   du = get_trial_fe_basis(op.trial(nothing,nothing))
   sol_μ = _as_function(sols,params)
@@ -145,15 +141,15 @@ function Gridap.ODEs.TransientFETools._matdata_jacobian(
   γ = (1.0,1/(solver.dt*solver.θ))
   function matdata(μ,t)
     u0 = get_free_dof_values(solver.uh0(μ))
-    u = _evaluation_function(solver,op.trial(μ),sol_μ(μ),u0)(t)
+    u = _evaluation_function(solver,trial(μ),sol_μ(μ),u0)
     _matdata = ()
     for (i,γᵢ) in enumerate(γ)
       if γᵢ > 0.0
         _matdata = (_matdata...,
           collect_cell_matrix(
-          op.trial(μ,t),
+          trial(μ,t),
           op.test,
-          γᵢ*op.jacs[i](μ,t,u(μ,t),dv,du),
+          γᵢ*op.jacs[i](μ,t,u(t),dv,du),
           trian))
       end
     end

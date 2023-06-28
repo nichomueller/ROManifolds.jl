@@ -1,152 +1,165 @@
-mutable struct NnzArray{T}
-  array::AbstractArray
+abstract type AbstractNnzArray end
+abstract type AbstractNnzVector <: AbstractNnzArray end
+abstract type AbstractNnzMatrix <: AbstractNnzArray end
+
+mutable struct NnzVector <: AbstractNnzVector
+  nonzero_val::AbstractVector
   nonzero_idx::Vector{Int}
   nrows::Int
 end
 
-function NnzArray(entire_array::T) where {T<:AbstractMatrix}
-  nonzero_idx,array = compress(entire_array)
-  nrows = size(entire_array,1)
-  NnzArray{T}(array,nonzero_idx,nrows)
+function compress(spmat::SparseMatrixCSC)
+  nonzero_idx,nonzero_val = compress(spmat)
+  nrows = size(spmat,1)
+  NnzVector(nonzero_val,nonzero_idx,nrows)
 end
 
-function NnzArray(arrays::Vector{T}) where {T<:AbstractArray}
-  entire_array = hcat(arrays...)
-  NnzArray(entire_array)
+mutable struct NnzMatrix <: AbstractNnzMatrix
+  nonzero_val::AbstractMatrix
+  nonzero_idx::Vector{Int}
+  nrows::Int
 end
 
-Base.size(nza::NnzArray,idx...) = size(nza.array,idx...)
+for T in (:NnzVector,:NnzMatrix)
+  @eval begin
+    function Base.hcat(nzv_vec::Vector{$T}...)
+      msg = """\n
+      Cannot hcat the given NnzVectors: the nonzero indices and/or the full
+      order number of rows do not match one another.
+      """
 
-Base.getindex(nza::NnzArray,idx...) = nza.array[idx...]
+      test_nnz_idx = nzv_vec[1].nonzero_idx
+      test_nrows = nzv_vec[1].nrows
+      @assert all([nzv.nonzero_idx == test_nnz_idx for nzv in nzv_vec]) msg
+      @assert all([nzv.nrows == test_nrows for nzv in nzv_vec]) msg
 
-Base.eachindex(nza::NnzArray) = eachindex(nza.array)
+      nzm = hcat([nzv.nonzero_val for nzv in nzv_vec]...)
 
-Base.setindex!(nza::NnzArray,val,idx...) = setindex!(nza.array,val,idx...)
-
-function Base.copy(nza::NnzArray{T}) where T
-  NnzArray{T}(copy(nza.array),copy(nza.nonzero_idx),copy(nza.nrows))
+      NnzMatrix(nzm,test_nnz_idx,test_nrows)
+    end
+  end
 end
 
-Base.copyto!(nza::NnzArray,val::AbstractArray) = copyto!(nza.array,val)
+for T in (:NnzVector,:NnzMatrix)
+  @eval begin
+    Base.size(nz::$T,idx...) = size(nz.nonzero_val,idx...)
 
-function Base.show(io::IO,nmz::NnzArray{T}) where T
-  l = length(nmz.nonzero_idx)
-  print(io,"NnzArray{$T} computed from a matrix with $l nonzero row entries")
+    Base.getindex(nz::$T,idx...) = nz.nonzero_val[idx...]
+
+    Base.eachindex(nz::$T) = eachindex(nz.nonzero_val)
+
+    Base.setindex!(nz::$T,val,idx...) = setindex!(nz.nonzero_val,val,idx...)
+
+    function Base.show(io::IO,nz::$T)
+      print(io,"$T storing $(length(nz.nonzero_idx)) nonzero values")
+    end
+
+    function Base.reshape(nz::$T,size...)
+      rnz = reshape(nz.nonzero_val,size...)
+      if isa(rnz,AbstractVector)
+        NnzVector(rnz,nz.nonzero_idx,nz.nrows)
+      elseif isa(rnz,AbstractMatrix)
+        NnzMatrix(rnz,nz.nonzero_idx,nz.nrows)
+      else
+        @unreachable
+      end
+    end
+  end
 end
 
-function Base.:(*)(nza1::NnzArray{T},nza2::NnzArray{T}) where T
-  msg = """\n
-  Cannot multiply the given Nnzaatrices, the nonzero indices and/or the full
-  order number of rows do not match one another.
-  """
-  @assert nza1.nonzero_idx == nza2.nonzero_idx msg
-  @assert nza1.nrows == nza2.nrows msg
-  array = nza1.array*nza2.array
-  NnzArray{T}(array,copy(nza1.nonzero_idx),copy(nza1.nrows))
+function Base.copy(nzv::NnzVector)
+  NnzVector(copy(nzv.nonzero_val),copy(nzv.nonzero_idx),copy(nzv.nrows))
 end
 
-function Base.adjoint(nza::NnzArray{T}) where T
-  array = nza.array'
-  NnzArray{T}(array,copy(nza.nonzero_idx),copy(nza.nrows))
+Base.copyto!(nzv::NnzVector,val::AbstractVector) = copyto!(nzv.nonzero_val,val)
+
+Base.convert(::Type{Any},nzv::NnzVector) = nzv
+
+function Base.convert(::Type{T},nzv::NnzVector) where T
+  nzv_copy = copy(nzv)
+  nzv_copy.nonzero_val = convert(T,nzv_copy.nonzero_val)
+  nzv_copy
 end
 
-function Gridap.FESpaces.allocate_matrix(nza::NnzArray,sizes...)
-  allocate_matrix(nza.array,sizes...)
-end
-
-function convert!(::Type{T},nza::NnzArray) where T
-  nza.array = convert(T,nza.array)
-  nza
-end
-
-function compress(entire_array::AbstractMatrix)
-  sum_cols = reshape(sum(entire_array,dims=2),:)
-  nonzero_idx = findall(x -> abs(x) ≥ eps(),sum_cols)
-  nonzero_idx,entire_array[nonzero_idx,:]
-end
-
-function compress(entire_array::SparseMatrixCSC{Float,Int})
-  findnz(entire_array[:])
-end
-
-function compress(nza::Vector{NnzArray{T}};type=EMatrix{Float}) where T
-  msg = """\n
-  Cannot compress the given NnzArrays, the nonzero indices and/or the full
-  order number of rows do not match one another.
-  """
-
-  test_nnz_idx,test_nrows = nza[1].nonzero_idx,nza[1].nrows
-  @assert all([m.nonzero_idx == test_nnz_idx for m in nza]) msg
-  @assert all([m.nrows == test_nrows for m in nza]) msg
-
-  array = hcat([m.array for m in nza]...)
-  conv_array = convert(type,array)
-  NnzArray{T}(conv_array,test_nnz_idx,test_nrows)
-end
-
-function compress(nza::Vector{Vector{NnzArray{T}}};kwargs...) where T
-  sorted_nza(i) = map(m->getindex(m,i),nza)
-  map(i -> compress(sorted_nza(i);kwargs...),eachindex(nza))
-end
-
-function recast(nza::NnzArray{<:AbstractMatrix})
-  entire_array = zeros(nza.nrows,size(nza,2))
-  entire_array[nza.nonzero_idx,:] = nza.array
-  entire_array
-end
-
-function recast(nza::NnzArray{<:SparseMatrixCSC},col=1)
-  sparse_rows,sparse_cols = from_vec_to_mat_idx(nza.nonzero_idx,nza.nrows)
+function recast(nzv::NnzVector)
+  sparse_rows,sparse_cols = from_vec_to_mat_idx(nzv.nonzero_idx,nzv.nrows)
   ncols = maximum(sparse_cols)
-  sparse(sparse_rows,sparse_cols,nza.array[:,col],nza.nrows,ncols)
+  sparse(sparse_rows,sparse_cols,nzv.nonzero_val,nzv.nrows,ncols)
 end
 
-function change_mode!(nza::NnzArray,nparams::Int)
-  mode1_ndofs = size(nza,1)
-  mode2_ndofs = Int(size(nza,2)/nparams)
+function Base.copy(nzm::NnzMatrix)
+  NnzMatrix(copy(nzm.nonzero_val),copy(nzm.nonzero_idx),copy(nzm.nrows))
+end
 
-  mode2 = reshape(similar(nza.array),mode2_ndofs,mode1_ndofs*nparams)
-  _mode2(k::Int) = nza.array[:,(k-1)*mode2_ndofs+1:k*mode2_ndofs]'
+Base.copyto!(nzm::NnzMatrix,val::AbstractMatrix) = copyto!(nzm.nonzero_val,val)
+
+Base.convert(::Type{Any},nzm::NnzMatrix) = nzm
+
+function Base.convert(::Type{T},nzm::NnzMatrix) where T
+  nzm_copy = copy(nzm)
+  nzm_copy.nonzero_val = convert(T,nmv_copy.nonzero_val)
+  nzm_copy
+end
+
+function Base.:(*)(nzm1::NnzMatrix,nzm2::NnzMatrix)
+  msg = """\n
+  Cannot multiply the given NnzMatrix, the nonzero indices and/or the full
+  order number of rows do not match one another.
+  """
+  @assert nzm1.nonzero_idx == nzm2.nonzero_idx msg
+  @assert nzm1.nrows == nzm2.nrows msg
+  mat = nzm1.nonzero_val*nzm2.nonzero_val
+  NnzMatrix(mat,copy(nzm1.nonzero_idx),copy(nzm1.nrows))
+end
+
+function Base.adjoint(nzm::NnzMatrix)
+  mat = nzm.nonzero_val'
+  NnzMatrix(mat,copy(nzm.nonzero_idx),copy(nzm.nrows))
+end
+
+function Gridap.FESpaces.allocate_matrix(nzm::NnzMatrix,sizes...)
+  allocate_matrix(nzm.nonzero_val,sizes...)
+end
+
+function recast(nzm::NnzMatrix)
+  nvec = size(nzm.nonzero_val,2)
+  spm_vec = Vector{SparseMatrixCSC{Float64,Int}}(undef,nvec)
+  for (ncol,col) in enumerate(eachcol(nzm.nonzero_val))
+    sparse_rows,sparse_cols = from_vec_to_mat_idx(nzm.nonzero_idx,nzm.nrows)
+    ncols = maximum(sparse_cols)
+    spm = sparse(sparse_rows,sparse_cols,col,nzm.nrows,ncols)
+    setindex!(spm_vec,spm,ncol)
+  end
+  spm_vec
+end
+
+function change_mode!(nzm::NnzMatrix,nparams::Int)
+  mode1_ndofs = size(nzm,1)
+  mode2_ndofs = Int(size(nzm,2)/nparams)
+
+  mode2 = reshape(similar(nzm.nonzero_val),mode2_ndofs,mode1_ndofs*nparams)
+  _mode2(k::Int) = nzm.nonzero_val[:,(k-1)*mode2_ndofs+1:k*mode2_ndofs]'
   @inbounds for k = 1:nparams
     setindex!(mode2,_mode2(k),:,(k-1)*mode1_ndofs+1:k*mode1_ndofs)
   end
 
-  nza.array = mode2
+  nzm.nonzero_val = mode2
   return
 end
 
-_compress_rows(nza::NnzArray) = size(nza.array,1) > size(nza.array,2)
-
-function tpod!(nza::NnzArray;kwargs...)
-  compress_rows = _compress_rows(nza)
-  nza.array = tpod(Val{compress_rows}(),nza.array;kwargs...)
+function change_mode(nzm::NnzMatrix,nparams::Int)
+  nzm_copy = copy(nzm)
+  change_mode!(nzm_copy,nparams)
+  nzm_copy
 end
 
-function tpod(::Val{true},array::AbstractMatrix;ϵ=1e-4)
-  compressed_array = array'*array
-  _,Σ2,V = svd(compressed_array)
-  Σ = sqrt.(Σ2)
-  n = truncation(Σ,ϵ)
-  U = array*V[:,1:n]
-  for i = axes(U,2)
-    U[:,i] /= (Σ[i]+eps())
-  end
-  U
+function tpod!(nzm::NnzMatrix;kwargs...)
+  nzm.nonzero_val = tpod(nzm.nonzero_val;kwargs...)
+  return
 end
 
-function tpod(::Val{false},array::AbstractMatrix;ϵ=1e-4)
-  compressed_array = array*array'
-  U,Σ2,_ = svd(compressed_array)
-  Σ = sqrt.(Σ2)
-  n = truncation(Σ,ϵ)
-  U[:,1:n]
-end
-
-function truncation(Σ::AbstractArray,ϵ::Real)
-  energies = cumsum(Σ.^2;dims=1)
-  rb_ndofs = first(findall(x->x ≥ (1-ϵ^2)*energies[end],energies))[1]
-  err = sqrt(1-energies[rb_ndofs]/energies[end])
-  printstyled("POD truncated at ϵ = $ϵ: number basis vectors = $rb_ndofs; projection error ≤ $err\n";
-    color=:blue)
-  rb_ndofs
+function tpod(nzm::NnzMatrix;kwargs...)
+  nzm_copy = copy(nzm)
+  tpod!(nzm_copy;kwargs...)
+  nzm_copy
 end

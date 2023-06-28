@@ -66,26 +66,41 @@ addprocs(manager)
   info = RBInfo(test_path;ϵ,load_offline,save_offline,energy_norm,nsnaps,nsnaps_mdeim)
 end
 
-solver = fesolver
-sols,params = solve(fesolver,feop,nsnaps)
-cache = solution_cache(feop.test,fesolver)
-snaps = pmap(sol->collect_solution!(cache,sol),sols)
-s = Snapshots(snaps)
-param = Table(params)
+ϵ = info.ϵ
+nsnaps = info.nsnaps
+params = realization(feop,nsnaps)
+sols = generate_solutions(feop,fesolver,params)
+rbspace = compress_solution(sols,feop,fesolver;ϵ)
 
-trians = _collect_trian_jac(feop)
-cjac = RBAlgebraicContribution()
-for trian in trians
-  ad_jac = compress_jacobian(feop,solver,trian,s,params,rbspace;
-    nsnaps=info.nsnaps_mdeim)
-  add_contribution!(cjac,trian,ad_jac)
-end
-cres = RBAlgebraicContribution()
-for trian in trians
-  ad_res = compress_residual(feop,solver,trian,s,params,rbspace;
-    nsnaps=info.nsnaps_mdeim)
-  add_contribution!(cres,trian,ad_res)
-end
+nsnaps = info.nsnaps_mdeim
+trians = _collect_trian_res(feop)
+trian = first(trians)
+vecdata = _vecdata_residual(feop,fesolver,trian,get_data(sols),params,(1,1))
+aff = get_affinity(fesolver,params,vecdata)
+data = get_data(aff,fesolver,params,vecdata)
+cache = residuals_cache(feop.assem,data)
+ress = pmap(d -> collect_residuals!(cache,feop,d),data)
+dummy
+# solver = fesolver
+# sols,params = solve(fesolver,feop,nsnaps)
+# cache = solution_cache(feop.test,fesolver)
+# snaps = pmap(sol->collect_solution!(cache,sol),sols)
+# s = Snapshots(snaps)
+# param = Table(params)
+
+# trians = _collect_trian_jac(feop)
+# cjac = RBAlgebraicContribution()
+# for trian in trians
+#   ad_jac = compress_jacobian(feop,solver,trian,s,params,rbspace;
+#     nsnaps=info.nsnaps_mdeim)
+#   add_contribution!(cjac,trian,ad_jac)
+# end
+# cres = RBAlgebraicContribution()
+# for trian in trians
+#   ad_res = compress_residual(feop,solver,trian,s,params,rbspace;
+#     nsnaps=info.nsnaps_mdeim)
+#   add_contribution!(cres,trian,ad_res)
+# end
 
 # times = get_times(solver)
 # sols = get_data(s)

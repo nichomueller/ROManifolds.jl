@@ -79,13 +79,3 @@ function _as_function(values::AbstractMatrix,input)
     @unreachable
   end
 end
-
-# function param_function(
-#   values::Vector{T},
-#   params::Table) where {T<:AbstractMatrix}
-
-#   @assert length(values) == length(params)
-
-#   n(μ) = first(findall(x -> x == μ,params))
-#   t -> values[n(t)]
-# end

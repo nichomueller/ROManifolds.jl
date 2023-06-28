@@ -76,6 +76,7 @@ const EMatrix = Elemental.Matrix
 include("Files.jl")
 include("Indexes.jl")
 include("Operations.jl")
+include("BasesConstruction.jl")
 include("SystemSolvers.jl")
 include("NnzArray.jl")
 include("Affinity.jl")

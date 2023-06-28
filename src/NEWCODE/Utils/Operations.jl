@@ -1,50 +1,4 @@
-function projection(
-  vnew::AbstractArray{Float},
-  basis::AbstractMatrix{Float};
-  X=nothing)
-
-  proj(v) = isnothing(X) ? v*sum(vnew'*v) : v*sum(vnew'*X*v)
-  proj_mat = reshape(similar(basis),:,1)
-  copyto!(proj_mat,sum([proj(basis[:,i]) for i = axes(basis,2)]))
-  proj_mat
-end
-
-function orth_projection(
-  vnew::AbstractArray{Float},
-  basis::AbstractMatrix{Float};
-  X=nothing)
-
-  proj(v) = isnothing(X) ? v*sum(vnew'*v)/sum(v'*v) : v*sum(vnew'*X*v)/sum(v'*X*v)
-  proj_mat = reshape(similar(basis),:,1)
-  copyto!(proj_mat,sum([proj(basis[:,i]) for i = axes(basis,2)]))
-  proj_mat
-end
-
-function orth_complement(
-  v::AbstractArray{Float},
-  basis::AbstractMatrix{Float};
-  kwargs...)
-
-  compl = reshape(similar(basis),:,1)
-  copyto!(compl,v - orth_projection(v,basis;kwargs...))
-end
-
-function gram_schmidt(
-  mat::AbstractMatrix{Float},
-  basis::AbstractMatrix{Float};
-  kwargs...)
-
-  for i = axes(mat,2)
-    mat_i = mat[:,i]
-    mat_i = orth_complement(mat_i,basis;kwargs...)
-    if i > 1
-      mat_i = orth_complement(mat_i,mat[:,1:i-1];kwargs...)
-    end
-    mat[:,i] = mat_i/norm(mat_i)
-  end
-
-  mat
-end
+recast(obj) = obj
 
 function expand(tup::Tuple)
   t = ()
@@ -75,6 +29,16 @@ function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
   nz = findall(x -> x .>= eps(),V)
 
   (I[nz],J[nz],V[nz])
+end
+
+function compress(entire_array::AbstractMatrix)
+  sum_cols = reshape(sum(entire_array,dims=2),:)
+  nonzero_idx = findall(x -> abs(x) ≥ eps(),sum_cols)
+  nonzero_idx,entire_array[nonzero_idx,:]
+end
+
+function compress(entire_array::SparseMatrixCSC{Float,Int})
+  findnz(entire_array[:])
 end
 
 function Gridap.FESpaces.allocate_matrix(::EMatrix{T},sizes...) where T

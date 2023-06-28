@@ -69,14 +69,14 @@ for (Top,Tslv,Tsps,Tspm) in zip(
   @eval begin
     function compress_residual(
       feop::$Top,
-      solver::$Tslv,
+      fesolver::$Tslv,
       args...;
       kwargs...)
 
       trians = _collect_trian_res(feop)
       cres = RBAlgebraicContribution()
       for trian in trians
-        ad_res = compress_residual(feop,solver,trian,args...;kwargs...)
+        ad_res = compress_residual(feop,fesolver,trian,args...;kwargs...)
         add_contribution!(cres,trian,ad_res)
       end
       cres
@@ -84,63 +84,48 @@ for (Top,Tslv,Tsps,Tspm) in zip(
 
     function compress_residual(
       feop::$Top,
-      solver::$Tslv,
+      fesolver::$Tslv,
       trian::Triangulation,
       rbspace::$Tspm,
       s::MultiFieldSnapshots,
       params::Table;
-      nsnaps=20,
       kwargs...)
 
       nfields = get_nfields(s)
-      sres,pres = s[1:nsnaps],p[1:nsnaps]
       lazy_map(1:nfields) do row
-        compress_residual(feop,solver,trian,
-          rbspace[row],sres[row],pres,(row,1);kwargs...)
+        compress_residual(feop,fesolver,trian,
+          rbspace[row],s[row],params,(row,1);kwargs...)
       end
     end
 
     function compress_residual(
       feop::$Top,
-      solver::$Tslv,
+      fesolver::$Tslv,
       trian::Triangulation,
       rbspace::$Tsps,
       s::SingleFieldSnapshots,
       params::Table,
       filter=(1,1);
+      nsnaps=20,
       kwargs...)
 
-      compress_residual(feop,solver,trian,
-        rbspace,s,params,filter;kwargs...)
-    end
-
-    function compress_residual(
-      feop::$Top,
-      solver::$Tslv,
-      trian::Triangulation,
-      rbspace::$Tsps,
-      s::SingleFieldSnapshots,
-      params::Table,
-      filter::Tuple{Vararg{Int}};
-      kwargs...)
-
-      sols = get_data(s)
-      vecdata = _vecdata_residual(feop,solver,trian,sols,params,filter)
-      r = generate_residuals(feop,vecdata)
-      compress_component(r,solver,trian,rbspace;kwargs...)
+      sres = get_data(s[1:nsnaps])
+      pres = params[1:nsnaps]
+      vecdata = _vecdata_residual(feop,fesolver,trian,sres,pres,filter)
+      r = generate_residuals(feop,fesolver,pres,vecdata)
+      compress_component(r,fesolver,trian,rbspace;kwargs...)
     end
 
     function compress_jacobian(
-      info::RBInfo,
       feop::$Top,
-      solver::$Tslv,
+      fesolver::$Tslv,
       args...;
       kwargs...)
 
       trians = _collect_trian_jac(feop)
       cjac = RBAlgebraicContribution()
       for trian in trians
-        ad_jac = compress_jacobian(feop,solver,trian,args...;kwargs...)
+        ad_jac = compress_jacobian(feop,fesolver,trian,args...;kwargs...)
         add_contribution!(cjac,trian,ad_jac)
       end
       cjac
@@ -148,52 +133,38 @@ for (Top,Tslv,Tsps,Tspm) in zip(
 
     function compress_jacobian(
       feop::$Top,
-      solver::$Tslv,
+      fesolver::$Tslv,
       trian::Triangulation,
       rbspace::$Tspm,
       s::MultiFieldSnapshots,
       params::Table;
-      nsnaps=20,
       kwargs...)
 
       nfields = get_nfields(s)
-      sjac,pjac = s[1:nsnaps],p[1:nsnaps]
       lazy_map(1:nfields) do row
         lazy_map(1:nfields) do col
-          compress_jacobian(feop,solver,trian,
-            (rbspace[row],rbspace[col]),sjac[col],pjac,(row,col);kwargs...)
+          compress_jacobian(feop,fesolver,trian,
+            (rbspace[row],rbspace[col]),s[col],params,(row,col);kwargs...)
         end
       end
     end
 
     function compress_jacobian(
       feop::$Top,
-      solver::$Tslv,
-      trian::Triangulation,
-      rbspace::$Tsps,
-      s::SingleFieldSnapshots,
-      params::Table,
-      filter=(1,1);
-      kwargs...)
-
-      compress_jacobian(feop,solver,trian,
-        (rbspace,rbspace),s,params,filter;kwargs...)
-    end
-
-    function compress_jacobian(
-      feop::$Top,
-      solver::$Tslv,
+      fesolver::$Tslv,
       trian::Triangulation,
       rbspace::NTuple{2,$Tsps},
       s::SingleFieldSnapshots,
       params::Table,
-      filter::Tuple{Vararg{Int}};
+      filter=(1,1);
+      nsnaps=20,
       kwargs...)
 
-      sols = get_data(s)
-      matdata = _matdata_jacobian(feop,solver,trian,sols,params,filter)
-      j = generate_jacobians(feop,matdata)
-      compress_component(j,solver,trian,rbspace...;kwargs...)
+      sjac = get_data(s[1:nsnaps])
+      pjac = params[1:nsnaps]
+      matdata = _matdata_jacobian(feop,fesolver,trian,sjac,pjac,filter)
+      j = generate_jacobians(feop,fesolver,pjac,matdata)
+      compress_component(j,fesolver,trian,rbspace...;kwargs...)
     end
   end
 
@@ -201,7 +172,7 @@ end
 
 function compress_component(
   component::SingleFieldSnapshots,
-  solver::FESolver,
+  fesolver::FESolver,
   trian::Triangulation,
   args...;
   kwargs...)
@@ -213,22 +184,22 @@ function compress_component(
   interp_bs = bs[interp_idx,:]
   lu_interp_bs = lu(interp_bs)
 
-  proj_bs = compress(solver,bs,args...)
+  proj_bs = compress(fesolver,bs,args...)
 
   RBAffineDecomposition(proj_bs,lu_interp_bs,integr_domain)
 end
 
 function compress_component(
   component::SingleFieldSnapshots,
-  solver::ODESolver,
+  fesolver::ODESolver,
   trian::Triangulation,
   args...;
   st_mdeim=true,
   kwargs...)
 
-  times = get_times(solver)
+  times = get_times(fesolver)
 
-  bs,bt = transient_tpod(component;kwargs...)
+  bs,bt = transient_tpod(component,fesolver;kwargs...)
   interp_idx_space,interp_idx_time = get_interpolation_idx(bs,bt)
   integr_domain = TransientRBIntegrationDomain(
     component,trian,times,interp_idx_space,interp_idx_time;st_mdeim)
@@ -238,28 +209,31 @@ function compress_component(
   interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
   lu_interp_bst = lu(interp_bst)
 
-  proj_bs,proj_bt = compress(solver,bs,bt,args...)
+  proj_bs,proj_bt = compress(fesolver,bs,bt,args...)
 
   TransientRBAffineDecomposition(proj_bs,proj_bt,lu_interp_bst,integr_domain)
 end
 
-function get_interpolation_idx(basis_space::NnzArray)
-  idx_space = get_interpolation_idx(basis_space.array)
-  idx_space
+for T in (:AbstractMatrix,:NnzMatrix)
+  @eval begin
+    function get_interpolation_idx(basis_space::$T,basis_time::$T)
+      idx_space = get_interpolation_idx(basis_space)
+      idx_time = get_interpolation_idx(basis_time)
+      idx_space,idx_time
+    end
+  end
 end
 
-function get_interpolation_idx(basis_space::NnzArray,basis_time::NnzArray)
-  idx_space = get_interpolation_idx(basis_space.array)
-  idx_time = get_interpolation_idx(basis_time.array)
-  idx_space,idx_time
+function get_interpolation_idx(basis::NnzMatrix)
+  get_interpolation_idx(basis.nonzero_val)
 end
 
-function get_interpolation_idx(mat::AbstractMatrix)
-  n = size(mat,2)
-  idx = zeros(Int,size(mat,2))
-  idx[1] = argmax(abs.(mat[:,1]))
+function get_interpolation_idx(basis::AbstractMatrix)
+  n = size(basis,2)
+  idx = zeros(Int,size(basis,2))
+  idx[1] = argmax(abs.(basis[:,1]))
   @inbounds for i = 2:n
-    res = mat[:,i] - mat[:,1:i-1]*(mat[idx[1:i-1],1:i-1] \ mat[idx[1:i-1],i])
+    res = basis[:,i] - basis[:,1:i-1]*(basis[idx[1:i-1],1:i-1] \ basis[idx[1:i-1],i])
     idx[i] = argmax(abs.(res))
   end
   unique(idx)
@@ -267,26 +241,26 @@ end
 
 function compress(
   ::FESolver,
-  bs_component::NnzArray,
+  bs_component::NnzMatrix,
   args...)
 
   compress_space(bs_component,args...)
 end
 
 function compress(
-  solver::ODESolver,
-  bs_component::NnzArray,
-  bt_component::NnzArray,
+  fesolver::ODESolver,
+  bs_component::NnzMatrix,
+  bt_component::NnzMatrix,
   args...)
 
-  compress_space(bs_component,args...),compress_time(solver,bt_component,args...)
+  compress_space(bs_component,args...),compress_time(fesolver,bt_component,args...)
 end
 
 for Top in (:SingleFieldRBSpace,:TransientSingleFieldRBSpace)
 
   @eval begin
     function compress_space(
-      bs_component::NnzArray,
+      bs_component::NnzVector,
       rbspace_row::$Top{<:AbstractMatrix})
 
       bs_row = get_basis_space(rbspace_row)
@@ -296,7 +270,7 @@ for Top in (:SingleFieldRBSpace,:TransientSingleFieldRBSpace)
     end
 
     function compress_space(
-      bs_component::NnzArray,
+      bs_component::NnzVector,
       rbspace_row::$Top{<:AbstractMatrix},
       rbspace_col::$Top{<:AbstractMatrix})
 
@@ -304,7 +278,7 @@ for Top in (:SingleFieldRBSpace,:TransientSingleFieldRBSpace)
       bs_col = get_basis_space(rbspace_col)
       entire_bs_row = recast(bs_row)
       entire_bs_col = recast(bs_col)
-      nbasis = size(bs_component.array,2)
+      nbasis = size(bs_component.nonzero_val,2)
       [entire_bs_row'*recast(bs_component,n)*entire_bs_col for n in 1:nbasis]
     end
   end
@@ -312,16 +286,16 @@ end
 
 function compress_time(
   ::θMethod,
-  bt_component::NnzArray,
+  bt_component::NnzVector,
   rbspace_row::TransientSingleFieldRBSpace{<:AbstractMatrix})
 
   bt = get_basis_time(rbspace_row)
-  bt_component.array,bt.array
+  bt_component.nonzero_val,bt.nonzero_val
 end
 
 function compress_time(
   ::θMethod,
-  bt_component::NnzArray,
+  bt_component::NnzVector,
   rbspace_row::TransientSingleFieldRBSpace{<:AbstractMatrix},
   rbspace_col::TransientSingleFieldRBSpace{<:AbstractMatrix})
 
@@ -337,7 +311,7 @@ function compress_time(
     btbt_shift[:,(jt-1)*nt_row+it] .= bt_row[2:time_ndofs,it].*bt_col[1:time_ndofs-1,jt]
   end
 
-  bt_component.array,btbt,btbt_shift
+  bt_component.nonzero_val,btbt,btbt_shift
 end
 
 function find_cells(idx::Vector{Int},trian::Triangulation)

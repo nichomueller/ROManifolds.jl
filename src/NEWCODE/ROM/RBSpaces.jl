@@ -2,21 +2,21 @@ abstract type RBSpace{T} end
 abstract type TransientRBSpace{T} end
 
 struct SingleFieldRBSpace{T} <: RBSpace{T}
-  basis_space::NnzArray{T}
+  basis_space::T
 end
 
 struct MultiFieldRBSpace{T} <: RBSpace{T}
-  basis_space::Vector{NnzArray{T}}
+  basis_space::Vector{T}
 end
 
 struct TransientSingleFieldRBSpace{T} <: TransientRBSpace{T}
-  basis_space::NnzArray{T}
-  basis_time::NnzArray{T}
+  basis_space::T
+  basis_time::T
 end
 
 struct TransientMultiFieldRBSpace{T} <: TransientRBSpace{T}
-  basis_space::Vector{NnzArray{T}}
-  basis_time::Vector{NnzArray{T}}
+  basis_space::Vector{T}
+  basis_time::Vector{T}
 end
 
 get_basis_space(rb::SingleFieldRBSpace) = rb.basis_space
@@ -44,53 +44,53 @@ function get_single_field(
 end
 
 function compress_solution(
-  s::SingleFieldSnapshots{T},
+  s::SingleFieldSnapshots{T,A},
   ::ParamFEOperator,
   ::FESolver;
-  kwargs...) where T
+  kwargs...) where {T,A}
 
   basis_space = tpod(s;kwargs...)
   SingleFieldRBSpace{T}(basis_space)
 end
 
 function compress_solution(
-  s::MultiFieldSnapshots{T},
+  s::MultiFieldSnapshots{T,A},
   feop::ParamFEOperator,
-  fe_solver::FESolver;
+  fesolver::FESolver;
   compute_supremizers=false,
-  kwargs...) where T
+  kwargs...) where {T,A}
 
   snaps = collect_single_fields(s)
   bases_space = map(snap -> tpod(snap;kwargs...),snaps)
   if compute_supremizers
-    add_space_supremizers!(bases_space,feop,fe_solver,s)
+    add_space_supremizers!(bases_space,feop,fesolver,s)
   end
   MultiFieldRBSpace{T}(bases_space)
 end
 
 function compress_solution(
-  s::SingleFieldSnapshots{T},
+  s::SingleFieldSnapshots{T,A},
   ::ParamTransientFEOperator,
-  ::ODESolver;
-  kwargs...) where T
+  solver::ODESolver;
+  kwargs...) where {T,A}
 
-  basis_space,basis_time = transient_tpod(s;kwargs...)
+  basis_space,basis_time = transient_tpod(s,solver;kwargs...)
   TransientSingleFieldRBSpace{T}(basis_space,basis_time)
 end
 
 function compress_solution(
-  s::MultiFieldSnapshots{T},
+  s::MultiFieldSnapshots{T,A},
   feop::ParamTransientFEOperator,
-  fe_solver::ODESolver;
+  fesolver::ODESolver;
   compute_supremizers=false,
   ttol=1e-2,
-  kwargs...) where T
+  kwargs...) where {T,A}
 
   snaps = collect_single_fields(s)
-  bases = map(snap -> transient_tpod(snap;kwargs...),snaps)
+  bases = map(snap -> transient_tpod(snap,fesolver;kwargs...),snaps)
   bases_space,bases_time = first.(bases),last.(bases)
   if compute_supremizers
-    add_space_supremizers!(bases_space,feop,fe_solver,s)
+    add_space_supremizers!(bases_space,feop,fesolver,s)
     add_time_supremizers!(bases_time;ttol)
   end
   TransientMultiFieldRBSpace{T}(bases_space,bases_time)
@@ -99,7 +99,7 @@ end
 for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:ODESolver))
   @eval begin
     function add_space_supremizers!(
-      bases_space::Vector{<:NnzArray},
+      bases_space::Vector{<:AbstractMatrix},
       feop::$Top,
       solver::$Tslv,
       snaps::MultiFieldSnapshots;
@@ -110,8 +110,8 @@ for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:O
         printstyled("Computing supremizers in space for dual field $i\n";color=:blue)
         cmat_i = assemble_constraint_matrix(feop,solver,snaps,i)
         supr_i = cmat_i*sb.bases_space[i]
-        sbu_i = gram_schmidt(supr_i,sbu.array)
-        sbu.array = hcat(sbu.array,sbu_i)
+        sbu_i = gram_schmidt(supr_i,sbu.nonzero_val)
+        sbu.nonzero_val = hcat(sbu.nonzero_val,sbu_i)
       end
       return
     end
@@ -129,12 +129,12 @@ for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:O
   end
 end
 
-function add_time_supremizers!(bases_time::Vector{<:NnzArray};kwargs...)
+function add_time_supremizers!(bases_time::Vector{<:AbstractMatrix};kwargs...)
   tbu,tbdual... = bases_time
   for (i,tb) in enumerate(tbdual)
     printstyled("Computing supremizers in time for dual field $i\n";color=:blue)
-    tbu_i = add_time_supremizers([tbu.array,tb.array];kwargs...)
-    tbu.array = tbu_i
+    tbu_i = add_time_supremizers([tbu.nonzero_val,tb.nonzero_val];kwargs...)
+    tbu.nonzero_val = tbu_i
   end
   return
 end

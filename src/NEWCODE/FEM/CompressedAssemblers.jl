@@ -56,54 +56,42 @@ function _filter_data(
 end
 
 # Compressed MDEIM snapshots generation interface
-function residuals_cache(
-  a::SparseMatrixAssembler,
-  ::FESolver,
-  params::Table,
-  vecdata::Function)
+# function residuals_cache(
+#   a::SparseMatrixAssembler,
+#   ::FESolver,
+#   params::Table,
+#   vecdata::Function)
 
-  r,d = vecdata(rand(params))
+#   r,d = vecdata(rand(params))
+#   vec = allocate_vector(a,d)
+#   vec_r = vec[r]
+#   vec_r
+# end
+
+# function jacobians_cache(
+#   a::SparseMatrixAssembler,
+#   ::FESolver,
+#   params::Table,
+#   matdata::Function)
+
+#   r,c,d = matdata(rand(params))
+#   mat = allocate_matrix(a,d)
+#   mat_rc = mat[r,c]
+#   mat_rc,compress(mat_rc)
+# end
+
+function residuals_cache(a::SparseMatrixAssembler,vecdata)
+  r,d = first(vecdata)
   vec = allocate_vector(a,d)
   vec_r = vec[r]
   vec_r
 end
 
-function residuals_cache(
-  a::SparseMatrixAssembler,
-  solver::ODESolver,
-  params::Table,
-  vecdata::Function)
-
-  times = get_times(solver)
-  r,d = vecdata(rand(params),rand(times))
-  vec = allocate_vector(a,d)
-  vec_r = vec[r]
-  vec_r
-end
-
-function jacobians_cache(
-  a::SparseMatrixAssembler,
-  ::FESolver,
-  params::Table,
-  matdata::Function)
-
-  r,c,d = matdata(rand(params))
+function jacobians_cache(a::SparseMatrixAssembler,matdata)
+  r,c,d = first(matdata)
   mat = allocate_matrix(a,d)
   mat_rc = mat[r,c]
-  mat_rc,NnzArray(mat_rc)
-end
-
-function jacobians_cache(
-  a::SparseMatrixAssembler,
-  solver::ODESolver,
-  params::Table,
-  matdata::Function)
-
-  times = get_times(solver)
-  r,c,d = matdata(rand(params),rand(times))
-  mat = allocate_matrix(a,d)
-  mat_rc = mat[r,c]
-  mat_rc,NnzArray(mat_rc)
+  mat_rc,compress(mat_rc)
 end
 
 function assemble_compressed_vector_add!(
@@ -116,31 +104,25 @@ function assemble_compressed_vector_add!(
 end
 
 function assemble_compressed_matrix_add!(
-  mat::AbstractMatrix,
-  mat_nnz::NnzArray{<:SparseMatrixCSC},
+  mat::SparseMatrixCSC,
+  mat_nnz::NnzVector,
   a::SparseMatrixAssembler,
   matdata)
 
   numeric_loop_matrix!(mat,a,matdata)
   nnz_i,nnz_v = compress(mat)
-  mat_nnz.array = nnz_v
+  mat_nnz.nonzero_val = nnz_v
   mat_nnz.nonzero_idx = nnz_i
   mat_nnz
 end
 
-function collect_residuals!(
-  cache,
-  op::ParamTransientFEOperator,
-  matdata)
-
-  assemble_compressed_vector_add!(cache,op.assem,matdata)
+function collect_residuals!(cache,op::ParamTransientFEOperator,d)
+  vecdata = last(d)
+  assemble_compressed_vector_add!(cache,op.assem,vecdata)
 end
 
-function collect_jacobians!(
-  cache,
-  op::ParamTransientFEOperator,
-  matdata)
-
+function collect_jacobians!(cache,op::ParamTransientFEOperator,d)
   j,jnnz = cache
+  matdata = last(d)
   assemble_compressed_matrix_add!(j,jnnz,op.assem,matdata)
 end
