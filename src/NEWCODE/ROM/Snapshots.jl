@@ -67,10 +67,10 @@ function Base.copy(s::MultiFieldSnapshots{T,A}) where {T,A}
 end
 
 function Base.getindex(s::SingleFieldSnapshots,idx...)
-  nsnaps = length(idx...)
   s_copy = copy(s)
-  s_copy.snaps = s_copy.snaps[:,idx...]
-  s_copy.nsnaps = nsnaps
+  ridx = (first(idx...)-1)*s_copy.nsnaps+1:last(idx...)*s_copy.nsnaps
+  s_copy.snaps = s_copy.snaps[:,ridx]
+  s_copy.nsnaps = length(idx...)
   s_copy
 end
 

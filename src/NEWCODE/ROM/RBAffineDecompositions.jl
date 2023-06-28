@@ -67,7 +67,7 @@ for (Top,Tslv,Tsps,Tspm) in zip(
   (:MultiFieldRBSpace,:TransientMultiFieldRBSpace))
 
   @eval begin
-    function compress_residual(
+    function compress_residuals(
       feop::$Top,
       fesolver::$Tslv,
       args...;
@@ -76,13 +76,13 @@ for (Top,Tslv,Tsps,Tspm) in zip(
       trians = _collect_trian_res(feop)
       cres = RBAlgebraicContribution()
       for trian in trians
-        ad_res = compress_residual(feop,fesolver,trian,args...;kwargs...)
+        ad_res = compress_residuals(feop,fesolver,trian,args...;kwargs...)
         add_contribution!(cres,trian,ad_res)
       end
       cres
     end
 
-    function compress_residual(
+    function compress_residuals(
       feop::$Top,
       fesolver::$Tslv,
       trian::Triangulation,
@@ -93,12 +93,12 @@ for (Top,Tslv,Tsps,Tspm) in zip(
 
       nfields = get_nfields(s)
       lazy_map(1:nfields) do row
-        compress_residual(feop,fesolver,trian,
+        compress_residuals(feop,fesolver,trian,
           rbspace[row],s[row],params,(row,1);kwargs...)
       end
     end
 
-    function compress_residual(
+    function compress_residuals(
       feop::$Top,
       fesolver::$Tslv,
       trian::Triangulation,
@@ -116,7 +116,7 @@ for (Top,Tslv,Tsps,Tspm) in zip(
       compress_component(r,fesolver,trian,rbspace;kwargs...)
     end
 
-    function compress_jacobian(
+    function compress_jacobians(
       feop::$Top,
       fesolver::$Tslv,
       args...;
@@ -125,13 +125,13 @@ for (Top,Tslv,Tsps,Tspm) in zip(
       trians = _collect_trian_jac(feop)
       cjac = RBAlgebraicContribution()
       for trian in trians
-        ad_jac = compress_jacobian(feop,fesolver,trian,args...;kwargs...)
+        ad_jac = compress_jacobians(feop,fesolver,trian,args...;kwargs...)
         add_contribution!(cjac,trian,ad_jac)
       end
       cjac
     end
 
-    function compress_jacobian(
+    function compress_jacobians(
       feop::$Top,
       fesolver::$Tslv,
       trian::Triangulation,
@@ -143,13 +143,13 @@ for (Top,Tslv,Tsps,Tspm) in zip(
       nfields = get_nfields(s)
       lazy_map(1:nfields) do row
         lazy_map(1:nfields) do col
-          compress_jacobian(feop,fesolver,trian,
+          compress_jacobians(feop,fesolver,trian,
             (rbspace[row],rbspace[col]),s[col],params,(row,col);kwargs...)
         end
       end
     end
 
-    function compress_jacobian(
+    function compress_jacobians(
       feop::$Top,
       fesolver::$Tslv,
       trian::Triangulation,
@@ -256,12 +256,12 @@ function compress(
   compress_space(bs_component,args...),compress_time(fesolver,bt_component,args...)
 end
 
-for Top in (:SingleFieldRBSpace,:TransientSingleFieldRBSpace)
+for Trb in (:SingleFieldRBSpace,:TransientSingleFieldRBSpace)
 
   @eval begin
     function compress_space(
       bs_component::NnzVector,
-      rbspace_row::$Top{<:AbstractMatrix})
+      rbspace_row::$Trb{<:AbstractMatrix})
 
       bs_row = get_basis_space(rbspace_row)
       entire_bs_row = recast(bs_row)
@@ -271,8 +271,8 @@ for Top in (:SingleFieldRBSpace,:TransientSingleFieldRBSpace)
 
     function compress_space(
       bs_component::NnzVector,
-      rbspace_row::$Top{<:AbstractMatrix},
-      rbspace_col::$Top{<:AbstractMatrix})
+      rbspace_row::$Trb{<:AbstractMatrix},
+      rbspace_col::$Trb{<:AbstractMatrix})
 
       bs_row = get_basis_space(rbspace_row)
       bs_col = get_basis_space(rbspace_col)

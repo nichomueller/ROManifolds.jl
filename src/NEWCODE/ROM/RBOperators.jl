@@ -8,12 +8,12 @@ function reduce_fe_operator(
   nsnaps = info.nsnaps
   params = realization(feop,nsnaps)
   sols = generate_solutions(feop,fesolver,params)
-  rbspace = compress_solution(sols,feop,fesolver;ϵ)
+  rbspace = compress_solutions(sols,feop,fesolver;ϵ)
 
   nsnaps = info.nsnaps_mdeim
   #compress_residual_and_jacobian(...)
-  rb_res = compress_residual(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
-  rb_jac = compress_jacobian(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
+  rb_res = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
+  rb_jac = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
   rbop = RBOperator{Top}(rb_jac,rb_res,rbspace;st_mdeim)
   save(info,rbop)
 

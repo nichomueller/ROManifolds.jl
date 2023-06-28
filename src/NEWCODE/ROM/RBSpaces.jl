@@ -43,7 +43,7 @@ function get_single_field(
   TransientSingleFieldRBSpace{T}(rb.basis_space[fieldid],rb.basis_time[fieldid])
 end
 
-function compress_solution(
+function compress_solutions(
   s::SingleFieldSnapshots{T,A},
   ::ParamFEOperator,
   ::FESolver;
@@ -53,7 +53,7 @@ function compress_solution(
   SingleFieldRBSpace{T}(basis_space)
 end
 
-function compress_solution(
+function compress_solutions(
   s::MultiFieldSnapshots{T,A},
   feop::ParamFEOperator,
   fesolver::FESolver;
@@ -68,7 +68,7 @@ function compress_solution(
   MultiFieldRBSpace{T}(bases_space)
 end
 
-function compress_solution(
+function compress_solutions(
   s::SingleFieldSnapshots{T,A},
   ::ParamTransientFEOperator,
   solver::ODESolver;
@@ -78,7 +78,7 @@ function compress_solution(
   TransientSingleFieldRBSpace{T}(basis_space,basis_time)
 end
 
-function compress_solution(
+function compress_solutions(
   s::MultiFieldSnapshots{T,A},
   feop::ParamTransientFEOperator,
   fesolver::ODESolver;

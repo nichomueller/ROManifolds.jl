@@ -70,11 +70,14 @@ end
 nsnaps = info.nsnaps
 params = realization(feop,nsnaps)
 sols = generate_solutions(feop,fesolver,params)
-rbspace = compress_solution(sols,feop,fesolver;ϵ)
+rbspace = compress_solutions(sols,feop,fesolver;ϵ)
+nsnaps = info.nsnaps_mdeim
+rb_res = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
+rb_jac = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
 
 nsnaps = info.nsnaps_mdeim
 trians = _collect_trian_res(feop)
-trian = first(trians)
+trian = last(trians)
 vecdata = _vecdata_residual(feop,fesolver,trian,get_data(sols),params,(1,1))
 aff = get_affinity(fesolver,params,vecdata)
 data = get_data(aff,fesolver,params,vecdata)
@@ -91,13 +94,13 @@ dummy
 # trians = _collect_trian_jac(feop)
 # cjac = RBAlgebraicContribution()
 # for trian in trians
-#   ad_jac = compress_jacobian(feop,solver,trian,s,params,rbspace;
+#   ad_jac = compress_jacobians(feop,solver,trian,s,params,rbspace;
 #     nsnaps=info.nsnaps_mdeim)
 #   add_contribution!(cjac,trian,ad_jac)
 # end
 # cres = RBAlgebraicContribution()
 # for trian in trians
-#   ad_res = compress_residual(feop,solver,trian,s,params,rbspace;
+#   ad_res = compress_residuals(feop,solver,trian,s,params,rbspace;
 #     nsnaps=info.nsnaps_mdeim)
 #   add_contribution!(cres,trian,ad_res)
 # end
