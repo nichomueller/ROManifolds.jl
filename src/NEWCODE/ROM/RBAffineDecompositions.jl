@@ -214,17 +214,13 @@ function compress_component(
   TransientRBAffineDecomposition(proj_bs,proj_bt,lu_interp_bst,integr_domain)
 end
 
-for T in (:AbstractMatrix,:NnzMatrix)
-  @eval begin
-    function get_interpolation_idx(basis_space::$T,basis_time::$T)
-      idx_space = get_interpolation_idx(basis_space)
-      idx_time = get_interpolation_idx(basis_time)
-      idx_space,idx_time
-    end
-  end
+function get_interpolation_idx(basis_space::NnzArray,basis_time::NnzArray)
+  idx_space = get_interpolation_idx(basis_space)
+  idx_time = get_interpolation_idx(basis_time)
+  idx_space,idx_time
 end
 
-function get_interpolation_idx(basis::NnzMatrix)
+function get_interpolation_idx(basis::NnzArray)
   get_interpolation_idx(basis.nonzero_val)
 end
 
@@ -241,7 +237,7 @@ end
 
 function compress(
   ::FESolver,
-  bs_component::NnzMatrix,
+  bs_component::NnzArray,
   args...)
 
   compress_space(bs_component,args...)
@@ -249,8 +245,8 @@ end
 
 function compress(
   fesolver::ODESolver,
-  bs_component::NnzMatrix,
-  bt_component::NnzMatrix,
+  bs_component::NnzArray,
+  bt_component::NnzArray,
   args...)
 
   compress_space(bs_component,args...),compress_time(fesolver,bt_component,args...)
@@ -260,7 +256,7 @@ for Trb in (:SingleFieldRBSpace,:TransientSingleFieldRBSpace)
 
   @eval begin
     function compress_space(
-      bs_component::NnzVector,
+      bs_component::NnzArray,
       rbspace_row::$Trb{<:AbstractMatrix})
 
       bs_row = get_basis_space(rbspace_row)
@@ -270,7 +266,7 @@ for Trb in (:SingleFieldRBSpace,:TransientSingleFieldRBSpace)
     end
 
     function compress_space(
-      bs_component::NnzVector,
+      bs_component::NnzArray,
       rbspace_row::$Trb{<:AbstractMatrix},
       rbspace_col::$Trb{<:AbstractMatrix})
 
@@ -286,7 +282,7 @@ end
 
 function compress_time(
   ::θMethod,
-  bt_component::NnzVector,
+  bt_component::NnzArray,
   rbspace_row::TransientSingleFieldRBSpace{<:AbstractMatrix})
 
   bt = get_basis_time(rbspace_row)
@@ -295,7 +291,7 @@ end
 
 function compress_time(
   ::θMethod,
-  bt_component::NnzVector,
+  bt_component::NnzArray,
   rbspace_row::TransientSingleFieldRBSpace{<:AbstractMatrix},
   rbspace_col::TransientSingleFieldRBSpace{<:AbstractMatrix})
 

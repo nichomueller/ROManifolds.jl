@@ -1,5 +1,3 @@
-recast(obj) = obj
-
 function expand(tup::Tuple)
   t = ()
   for el = tup
@@ -31,13 +29,13 @@ function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
   (I[nz],J[nz],V[nz])
 end
 
-function compress(entire_array::AbstractMatrix)
+function compress_array(entire_array::AbstractMatrix)
   sum_cols = reshape(sum(entire_array,dims=2),:)
   nonzero_idx = findall(x -> abs(x) ≥ eps(),sum_cols)
   nonzero_idx,entire_array[nonzero_idx,:]
 end
 
-function compress(entire_array::SparseMatrixCSC{Float,Int})
+function compress_array(entire_array::SparseMatrixCSC{Float,Int})
   findnz(entire_array[:])
 end
 

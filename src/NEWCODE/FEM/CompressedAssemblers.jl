@@ -105,7 +105,7 @@ end
 
 function assemble_compressed_matrix_add!(
   mat::SparseMatrixCSC,
-  mat_nnz::NnzVector,
+  mat_nnz::NnzArray,
   a::SparseMatrixAssembler,
   matdata)
 

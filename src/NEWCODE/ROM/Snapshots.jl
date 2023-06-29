@@ -1,57 +1,47 @@
 abstract type Snapshots{T,A} end
 
 mutable struct SingleFieldSnapshots{T,A} <: Snapshots{T,A}
-  snaps::T
+  snaps::NnzArray{T}
   nsnaps::Int
 end
 
 mutable struct MultiFieldSnapshots{T,A} <: Snapshots{T,A}
-  snaps::Vector{T}
+  snaps::Vector{NnzArray{T}}
   nsnaps::Int
 end
 
-for (T,Tnnz) in zip((:AbstractVector,:AbstractMatrix),
-                    (:AbstractNnzVector,:AbstractNnzMatrix))
-  @eval begin
-    function Snapshots(s::$T,::A;type=EMatrix{Float}) where A
-      snaps = isa(s,AbstractMatrix) ? s : reshape(s,:,1)
-      csnaps = convert(type,snaps)
-      nsnaps = size(snaps,2)
-      SingleFieldSnapshots{AbstractMatrix,A}(csnaps,nsnaps)
-    end
+function Snapshots(
+  snaps::NnzArray{T},
+  ::A;
+  type=EMatrix{Float}) where {T,A}
 
-    function Snapshots(s::$Tnnz,::A;type=EMatrix{Float}) where A
-      snaps = isa(s,NnzMatrix) ? s : reshape(s,:,1)
-      csnaps = convert(type,snaps)
-      nsnaps = size(snaps,2)
-      SingleFieldSnapshots{AbstractNnzMatrix,A}(csnaps,nsnaps)
-    end
-
-    function Snapshots(s::Vector{<:$T},::A;type=EMatrix{Float}) where A
-      snaps = hcat(s...)
-      csnaps = convert(type,snaps)
-      nsnaps = length(s)
-      SingleFieldSnapshots{AbstractMatrix,A}(csnaps,nsnaps)
-    end
-
-    function Snapshots(s::Vector{<:$Tnnz},::A;type=EMatrix{Float}) where A
-      snaps = s
-      csnaps = convert(type,snaps)
-      nsnaps = length(s)
-      SingleFieldSnapshots{AbstractNnzMatrix,A}(csnaps,nsnaps)
-    end
-  end
+  csnaps = snaps
+  convert!(type,csnaps)
+  nsnaps = size(snaps,2)
+  SingleFieldSnapshots{T,A}(csnaps,nsnaps)
 end
 
 function Snapshots(
-  s::Vector{Vector{AbstractMatrix}},
+  snaps::Vector{NnzArray{T}},
   ::A;
-  type=EMatrix{Float}) where A
+  type=EMatrix{Float}) where {T,A}
+
+  csnaps = hcat(snaps)
+  convert!(type,csnaps)
+  nsnaps = length(snaps)
+  SingleFieldSnapshots{T,A}(csnaps,nsnaps)
+end
+
+function Snapshots(
+  snaps::Vector{Vector{NnzArray{T}}},
+  ::A;
+  type=EMatrix{Float}) where {T,A}
 
   nfields = length(first(s))
-  csnaps = map(n -> convert(type,hcat(map(sn -> getindex(sn,n),s)...)),1:nfields)
+  csnaps = map(n->hcat(map(sn -> getindex(sn,n),snaps)...),1:nfields)
+  convert!(type,csnaps)
   nsnaps = length(snaps)
-  MultiFieldSnapshots{AbstractMatrix,A}(csnaps,nsnaps)
+  MultiFieldSnapshots{T,A}(csnaps,nsnaps)
 end
 
 Base.length(s::Snapshots) = s.nsnaps
@@ -74,46 +64,36 @@ function Base.getindex(s::SingleFieldSnapshots,idx...)
   s_copy
 end
 
-Gridap.CellData.get_data(s::SingleFieldSnapshots) = s.snaps
+Base.getindex(s::MultiFieldSnapshots,i::Int) = get_single_field(s,i)
 
-for T in (:AbstractMatrix,:AbstractNnzMatrix)
-  @eval begin
-    function Gridap.CellData.get_data(s::SingleFieldSnapshots{<:$T,A}) where A
-      recast(s.snaps)
-    end
-  end
+function Gridap.CellData.get_data(s::SingleFieldSnapshots)
+  recast(s.snaps)
+end
+
+function Gridap.FESpaces.allocate_matrix(s::SingleFieldSnapshots,sizes...)
+  allocate_matrix(s.snaps,sizes...)
 end
 
 get_nfields(s::MultiFieldSnapshots) = length(s.snaps)
 
-function get_single_field(s::MultiFieldSnapshots,fieldid::Int)
-  Snapshots(s.snaps[fieldid],s.nsnaps)
+function get_single_field(s::MultiFieldSnapshots{T,A},fieldid::Int) where {T,A}
+  SingleFieldSnapshots{T,A}(s.snaps[fieldid],s.nsnaps)
 end
 
 function collect_single_fields(s::MultiFieldSnapshots)
   map(fieldid -> get_single_field(s,fieldid),1:get_nfields(s))
 end
 
-Base.getindex(s::MultiFieldSnapshots,i::Int) = get_single_field(s,i)
-
-Base.convert(::Type{Any},s::SingleFieldSnapshots) = s
-
-Base.convert(::Type{Any},s::MultiFieldSnapshots) = s
-
-function Base.convert(::Type{T},s::SingleFieldSnapshots) where T
-  s_copy = copy(s)
-  s_copy.snaps = convert(T,s_copy.nonzero_val)
-  s_copy
+function convert!(::Type{T},s::SingleFieldSnapshots) where T
+  convert!(T,s.snaps)
+  return
 end
 
-function Base.convert(::Type{T},s::MultiFieldSnapshots) where T
-  s_copy = copy(s)
-  s_copy.snaps = [convert(T,sf) for sf in s_copy.snaps]
-  s_copy
-end
-
-function Gridap.FESpaces.allocate_matrix(s::SingleFieldSnapshots,sizes...)
-  allocate_matrix(s.snaps,sizes...)
+function convert!(::Type{T},s::MultiFieldSnapshots) where T
+  for sf in s.snaps
+    convert!(T,sf)
+  end
+  return
 end
 
 for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:ODESolver))
@@ -191,7 +171,7 @@ function transient_tpod(::Val{true},s::SingleFieldSnapshots;kwargs...)
   basis_space,basis_time
 end
 
-for (T,A) in zip((:AbstractMatrix,:AbstractNnzMatrix),
+for (T,A) in zip((:AbstractMatrix,:SparseMatrixCSC),
                  (:TimeAffinity,:ParamTimeAffinity))
   @eval begin
     function transient_tpod(

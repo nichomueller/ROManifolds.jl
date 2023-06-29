@@ -104,7 +104,8 @@ function solution_cache(test::FESpace,solver::ODESolver)
   space_ndofs = test.nfree
   time_ndofs = get_time_ndofs(solver)
   cache = fill(1.,space_ndofs,time_ndofs)
-  cache
+  nnz_cache = compress(cache)
+  nnz_cache
 end
 
 function solution_cache(test::MultiFieldFESpace,solver::ODESolver)
@@ -119,12 +120,12 @@ function collect_solution!(
 
   sol = solve(op,solver,μ,uh0(μ))
   n = 1
-  if isa(cache,AbstractMatrix)
+  if isa(cache,NnzArray)
     for soln in sol
       setindex!(cache,soln,:,n)
       n += 1
     end
-  elseif isa(cache,Vector{AbstractMatrix})
+  elseif isa(cache,Vector{<:NnzArray})
     for soln in sol
       map((cache,sol) -> setindex!(cache,sol,:,n),cache,soln)
       n += 1

@@ -49,7 +49,8 @@ end
 function solution_cache(test::FESpace,::FESolver)
   space_ndofs = test.nfree
   cache = fill(1.,space_ndofs,1)
-  cache
+  nnz_cache = compress(cache)
+  nnz_cache
 end
 
 function solution_cache(test::MultiFieldFESpace,args...)
@@ -63,9 +64,9 @@ function collect_solution!(
   μ::AbstractVector)
 
   sol = solve(op,solver,μ)
-  if isa(cache,AbstractMatrix)
+  if isa(cache,NnzArray)
     copyto!(cache,sol.uh)
-  elseif isa(cache,Vector{AbstractMatrix})
+  elseif isa(cache,Vector{<:NnzArray})
     map((c,sol) -> copyto!(c,sol),cache,sol.uh)
   else
     @unreachable
