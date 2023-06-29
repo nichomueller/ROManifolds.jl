@@ -2,28 +2,36 @@ abstract type RBSpace{T} end
 abstract type TransientRBSpace{T} end
 
 struct SingleFieldRBSpace{T} <: RBSpace{T}
-  basis_space::T
+  basis_space::NnzArray{T}
 end
 
 struct MultiFieldRBSpace{T} <: RBSpace{T}
-  basis_space::Vector{T}
+  basis_space::Vector{NnzArray{T}}
 end
 
 struct TransientSingleFieldRBSpace{T} <: TransientRBSpace{T}
-  basis_space::T
-  basis_time::T
+  basis_space::NnzArray{T}
+  basis_time::NnzArray{T}
 end
 
 struct TransientMultiFieldRBSpace{T} <: TransientRBSpace{T}
-  basis_space::Vector{T}
-  basis_time::Vector{T}
+  basis_space::Vector{NnzArray{T}}
+  basis_time::Vector{NnzArray{T}}
 end
 
 get_basis_space(rb::SingleFieldRBSpace) = rb.basis_space
 
 get_basis_space(rb::TransientSingleFieldRBSpace) = rb.basis_space
 
+get_rb_space_ndofs(rb::SingleFieldRBSpace) = size(get_data(rb.basis_space),2)
+
 get_basis_time(rb::TransientSingleFieldRBSpace) = rb.basis_time
+
+get_rb_time_ndofs(rb::TransientSingleFieldRBSpace) = size(get_data(rb.basis_time),2)
+
+get_rb_ndofs(rb::SingleFieldRBSpace) = get_rb_space_ndofs(rb)
+
+get_rb_ndofs(rb::TransientSingleFieldRBSpace) = get_rb_space_ndofs(rb)*get_rb_time_ndofs(rb)
 
 Base.getindex(rb::MultiFieldRBSpace,i::Int) = get_single_field(rb,i)
 
@@ -180,27 +188,29 @@ function add_time_supremizers(bases_time::Vector{<:AbstractMatrix};ttol=1e-2)
   basis_u
 end
 
-function save(info::RBInfo,rb::RBSpace)
-  if info.save_offline
-    path = joinpath(info.offline_path,"basis")
-    save(path,rb)
+for Trb in (:RBSpace,:TransientRBSpace)
+  @eval begin
+    function allocate_rb_residual(rb::$Trb)
+      rb_ndofs = get_rb_ndofs(rb)
+      zeros(rb_ndofs)
+    end
+
+    function allocate_rb_jacobian(rb::$Trb)
+      rb_ndofs = get_rb_ndofs(rb)
+      zeros(rb_ndofs,rb_ndofs)
+    end
+
+    # REMOVE IN THE FUTURE
+    function save(info::RBInfo,rb::$Trb)
+      if info.save_offline
+        path = joinpath(info.offline_path,"basis")
+        save(path,rb)
+      end
+    end
+
+    function load(T::$Trb,info::RBInfo)
+      path = joinpath(info.offline_path,"basis")
+      load(T,path)
+    end
   end
-end
-
-function load(T::Type{RBSpace},info::RBInfo)
-  path = joinpath(info.offline_path,"basis")
-  load(T,path)
-end
-
-# REMOVE IN THE FUTURE
-function save(info::RBInfo,rbspace::Union{RBSpace,TransientRBSpace})
-  if info.save_offline
-    path = joinpath(info.offline_path,"basis")
-    save(path,rbspace)
-  end
-end
-
-function load(T::Union{Type{RBSpace},Type{TransientRBSpace}},info::RBInfo)
-  path = joinpath(info.offline_path,"basis")
-  load(T,path)
 end

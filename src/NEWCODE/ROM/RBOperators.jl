@@ -12,8 +12,10 @@ function reduce_fe_operator(
 
   nsnaps = info.nsnaps_mdeim
   #compress_residual_and_jacobian(...)
-  rb_res = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
-  rb_jac = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
+  rb_res_c = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
+  rb_jac_c = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
+  rb_res = collect_residual_contributions(rb_res_c;st_mdeim)
+  rb_jac = collect_residual_contributions(rb_jac_c;st_mdeim)
   rbop = RBOperator{Top}(rb_jac,rb_res,rbspace;st_mdeim)
   save(info,rbop)
 
@@ -29,7 +31,10 @@ end
 for Tad in (:RBAffineDecomposition,:TransientRBAffineDecomposition)
 
   @eval begin
-    function collect_residual_contributions(res_ad::Vector{$Tad};kwargs...)
+    function collect_residual_contributions(
+      res_ad::RBAlgebraicContribution;
+      kwargs...)
+
       (u,μ) -> sum([collect_residual_contributions(r;kwargs...)(u,μ)
         for r in res_ad])
     end
@@ -37,8 +42,7 @@ for Tad in (:RBAffineDecomposition,:TransientRBAffineDecomposition)
     function collect_residual_contributions(res_ad::$Tad;kwargs...)
       res_basis = get_basis(res_ad)
       nrows = get_nrows(res_ad)
-      ncols = get_ncols(res_ad)
-      res_rb = zeros(nrows,ncols)
+      res_rb = zeros(nrows,1)
       function res_rb!(u,μ)
         coeff = get_residual_coefficient(res_ad;kwargs...)(u,μ)
         r = @distributed (+) for (b,c) in zip(res_basis,coeff)

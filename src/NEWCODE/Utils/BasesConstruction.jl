@@ -1,12 +1,8 @@
 _compress_rows(mat::AbstractMatrix) = size(mat,1) > size(mat,2)
 
 function tpod(mat::AbstractMatrix;ϵ=1e-4)
-  nonzero_idx,nonzero_val = compress(mat)
-  by_row = _compress_rows(nonzero_val)
-  nonzero_basis = tpod(Val{by_row}(),nonzero_val;ϵ)
-  basis = zeros(size(mat,1),size(nonzero_basis,2))
-  basis[nonzero_idx,:] = nonzero_basis
-  basis
+  by_row = _compress_rows(mat)
+  tpod(Val{by_row}(),mat;ϵ)
 end
 
 function tpod(::Val{true},mat::AbstractMatrix;ϵ=1e-4)

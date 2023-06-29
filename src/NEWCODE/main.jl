@@ -75,15 +75,8 @@ nsnaps = info.nsnaps_mdeim
 rb_res = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
 rb_jac = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
 
-nsnaps = info.nsnaps_mdeim
-trians = _collect_trian_res(feop)
-trian = last(trians)
-vecdata = _vecdata_residual(feop,fesolver,trian,get_data(sols),params,(1,1))
-aff = get_affinity(fesolver,params,vecdata)
-data = get_data(aff,fesolver,params,vecdata)
-cache = residuals_cache(feop.assem,data)
-ress = pmap(d -> collect_residuals!(cache,feop,d),data)
-dummy
+
+
 # solver = fesolver
 # sols,params = solve(fesolver,feop,nsnaps)
 # cache = solution_cache(feop.test,fesolver)

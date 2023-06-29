@@ -13,7 +13,7 @@ function Gridap.CellData.get_contribution(
   trian::Triangulation)
 
   if haskey(a.dict,trian)
-     return a.dict[trian]
+    return a.dict[trian]
   else
     @unreachable """\n
     There is not contribution associated with the given mesh in this RBAlgebraicContribution object.
@@ -49,16 +49,29 @@ function get_measures(a::RBAlgebraicContribution)
   unique(measures)
 end
 
-function Gridap.FESpaces.assemble_vector(
-  feop::ParamTransientFEOperator,
+function assemble_rb_residual(
   c::RBAlgebraicContribution,
   sol::AbstractArray,
   μ::AbstractArray)
 
   m = get_measures(c)
+  res = []
+  for trian in get_domains(c)
+    res_ad = get_contribution(c,trian)
+    res_basis = get_basis(res_ad)
+  end
+end
+
+function Gridap.FESpaces.assemble_vector(
+  feop::ParamTransientFEOperator,
+  c::RBAlgebraicContribution,
+  sols::AbstractArray,
+  μ::AbstractArray)
+
+  m = get_measures(c)
   vec = allocate_vector(c)
   for (trian,rbres) in c.dict
-    vecdatum = _vecdata_residual(feop,solver,sol,μ,trian;m)
+    vecdatum = _vecdata_residual(feop,solver,sols,μ,trian;m)
     idx_space = rbres.integration_domain.idx_space
     times = rbres.integration_domain.times
     @inbounds for (n,tn) in enumerate(times)
@@ -72,13 +85,13 @@ end
 function Gridap.FESpaces.assemble_matrix(
   feop::ParamTransientFEOperator,
   c::RBAlgebraicContribution,
-  sol::AbstractArray,
+  sols::AbstractArray,
   μ::AbstractArray)
 
   m = get_measures(c)
   mats = Matrix{Float}[]
   for (trian,rbjac) in c.dict
-    matdatum = _matdata_jacobian(feop,solver,sol,μ,trian;m)
+    matdatum = _matdata_jacobian(feop,solver,sols,μ,trian;m)
     idx_space = rbjac.integration_domain.idx_space
     times = rbjac.integration_domain.times
     mat = zeros(length(idx_space),length(times))

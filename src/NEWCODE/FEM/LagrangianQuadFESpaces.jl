@@ -111,10 +111,6 @@ function _add_quad_terms!(terms,term,extrusion,orders,dim)
   end
 end
 
-get_degree(order::Int,c=2) = c*order
-
-get_degree(test::SingleFieldFESpace,c=2) = get_degree(Gridap.FESpaces.get_order(test),c)
-
 function Gridap.get_background_model(test::SingleFieldFESpace)
   get_background_model(get_triangulation(test))
 end
@@ -126,11 +122,6 @@ end
 function get_dimension(test::SingleFieldFESpace)
   model = get_background_model(test)
   get_dimension(model)
-end
-
-function Gridap.FESpaces.get_order(test::SingleFieldFESpace)
-  basis = get_fe_basis(test)
-  first(basis.cell_basis.values[1].fields.orders)
 end
 
 function Gridap.CellData.get_cell_points(test::SingleFieldFESpace)

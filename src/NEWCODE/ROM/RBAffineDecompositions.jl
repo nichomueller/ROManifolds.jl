@@ -5,14 +5,16 @@ struct RBIntegrationDomain
   function RBIntegrationDomain(
     component::SingleFieldSnapshots,
     trian::Triangulation,
-    interp_idx::Vector{Int})
+    interp_idx::Vector{Int},
+    cell_dof_ids,
+    order=1)
 
-    degree = Gridap.FESpaces.get_order(first(trian.grid.reffes))
+    degree = 2*order
     nonzero_idx = component.snaps.nonzero_idx
     nrows = component.snaps.nrows
     entire_interp_idx = nonzero_idx[interp_idx]
     entire_interp_rows,_ = from_vec_to_mat_idx(entire_interp_idx,nrows)
-    red_integr_cells = find_cells(entire_interp_rows,trian)
+    red_integr_cells = find_cells(entire_interp_rows,cell_dof_ids)
     red_trian = view(trian,red_integr_cells)
     red_meas = Measure(red_trian,degree)
     new(red_meas,entire_interp_idx_space)
@@ -29,15 +31,17 @@ struct TransientRBIntegrationDomain
     trian::Triangulation,
     times::Vector{Float},
     interp_idx_space::Vector{Int},
-    interp_idx_time::Vector{Int};
+    interp_idx_time::Vector{Int},
+    cell_dof_ids,
+    order=1;
     st_mdeim=true)
 
-    degree = Gridap.FESpaces.get_order(first(trian.grid.reffes))
+    degree = 2*order
     nonzero_idx = component.snaps.nonzero_idx
     nrows = component.snaps.nrows
     entire_interp_idx_space = nonzero_idx[interp_idx_space]
     entire_interp_rows_space,_ = from_vec_to_mat_idx(entire_interp_idx_space,nrows)
-    red_integr_cells = find_cells(entire_interp_rows_space,trian)
+    red_integr_cells = find_cells(entire_interp_rows_space,cell_dof_ids)
     red_trian = view(trian,red_integr_cells)
     red_meas = Measure(red_trian,degree)
     red_times = st_mdeim ? times[interp_idx_time] : times
@@ -113,7 +117,7 @@ for (Top,Tslv,Tsps,Tspm) in zip(
       pres = params[1:nsnaps]
       vecdata = _vecdata_residual(feop,fesolver,trian,sres,pres,filter)
       r = generate_residuals(feop,fesolver,pres,vecdata)
-      compress_component(r,fesolver,trian,rbspace;kwargs...)
+      compress_component(r,feop,fesolver,trian,rbspace;kwargs...)
     end
 
     function compress_jacobians(
@@ -153,10 +157,23 @@ for (Top,Tslv,Tsps,Tspm) in zip(
       feop::$Top,
       fesolver::$Tslv,
       trian::Triangulation,
+      rbspace::$Tsps,
+      s::SingleFieldSnapshots,
+      params::Table;
+      kwargs...)
+
+      compress_jacobians(feop,fesolver,trian,
+        (rbspace,rbspace),s,params,(1,1);kwargs...)
+    end
+
+    function compress_jacobians(
+      feop::$Top,
+      fesolver::$Tslv,
+      trian::Triangulation,
       rbspace::NTuple{2,$Tsps},
       s::SingleFieldSnapshots,
       params::Table,
-      filter=(1,1);
+      filter::Tuple{Vararg{Int}};
       nsnaps=20,
       kwargs...)
 
@@ -164,7 +181,7 @@ for (Top,Tslv,Tsps,Tspm) in zip(
       pjac = params[1:nsnaps]
       matdata = _matdata_jacobian(feop,fesolver,trian,sjac,pjac,filter)
       j = generate_jacobians(feop,fesolver,pjac,matdata)
-      compress_component(j,fesolver,trian,rbspace...;kwargs...)
+      compress_component(j,feop,fesolver,trian,rbspace...;kwargs...)
     end
   end
 
@@ -172,16 +189,20 @@ end
 
 function compress_component(
   component::SingleFieldSnapshots,
+  feop::ParamFEOperator,
   fesolver::FESolver,
   trian::Triangulation,
   args...;
   kwargs...)
 
+  cell_dof_ids = get_cell_dof_ids(feop.test,trian)
+  order = Gridap.FESpaces.get_order(feop.test)
+
   bs = tpod(component;kwargs...)
   interp_idx = get_interpolation_idx(bs)
-  integr_domain = RBIntegrationDomain(component,trian,interp_idx)
+  integr_domain = RBIntegrationDomain(component,trian,interp_idx,cell_dof_ids,order)
 
-  interp_bs = bs[interp_idx,:]
+  interp_bs = bs.nonzero_val[interp_idx,:]
   lu_interp_bs = lu(interp_bs)
 
   proj_bs = compress(fesolver,bs,args...)
@@ -191,21 +212,24 @@ end
 
 function compress_component(
   component::SingleFieldSnapshots,
+  feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   trian::Triangulation,
   args...;
   st_mdeim=true,
   kwargs...)
 
+  cell_dof_ids = get_cell_dof_ids(feop.test,trian)
+  order = Gridap.FESpaces.get_order(feop.test)
   times = get_times(fesolver)
 
-  bs,bt = transient_tpod(component,fesolver;kwargs...)
+  bs,bt = transient_tpod(component,fesolver;ϵ)
   interp_idx_space,interp_idx_time = get_interpolation_idx(bs,bt)
   integr_domain = TransientRBIntegrationDomain(
-    component,trian,times,interp_idx_space,interp_idx_time;st_mdeim)
+    component,trian,times,interp_idx_space,interp_idx_time,cell_dof_ids,order;st_mdeim)
 
-  interp_bs = bs[interp_idx_space,:]
-  interp_bt = bt[interp_idx_time,:]
+  interp_bs = bs.nonzero_val[interp_idx_space,:]
+  interp_bt = bt.nonzero_val[interp_idx_time,:]
   interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
   lu_interp_bst = lu(interp_bst)
 
@@ -295,9 +319,9 @@ function compress_time(
   rbspace_row::TransientSingleFieldRBSpace{<:AbstractMatrix},
   rbspace_col::TransientSingleFieldRBSpace{<:AbstractMatrix})
 
-  bt_row = get_basis_time(rbspace_row)
-  bt_col = get_basis_time(rbspace_col)
-  time_ndofs = size(bt_component,1)
+  bt_row = get_basis_time(rbspace_row).nonzero_val
+  bt_col = get_basis_time(rbspace_col).nonzero_val
+  time_ndofs = size(bt_row,1)
   nt_row,nt_col = size(bt_row,2),size(bt_col,2)
 
   btbt = allocate_matrix(bt_component,time_ndofs,nt_row*nt_col)
@@ -310,8 +334,7 @@ function compress_time(
   bt_component.nonzero_val,btbt,btbt_shift
 end
 
-function find_cells(idx::Vector{Int},trian::Triangulation)
-  cell_dof_ids = get_cell_dof_ids(trian)
+function find_cells(idx::Vector{Int},cell_dof_ids)
   find_cells(Val{length(idx)>length(cell_dof_ids)}(),idx,cell_dof_ids)
 end
 

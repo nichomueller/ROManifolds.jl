@@ -150,25 +150,3 @@ end
 function ParamTransientMultiFieldFESpace(spaces::Vector{<:SingleFieldFESpace})
   MultiFieldFESpace(spaces)
 end
-
-# function Gridap.FESpaces.FEFunction(
-#   trial::ParamTransientTrialFESpace,
-#   u::AbstractVector,
-#   μ::AbstractVector,
-#   t::Real)
-
-#   FEFunction(trial(μ,t),u)
-# end
-
-# function Gridap.FESpaces.FEFunction(
-#   trial::ParamTransientTrialFESpace,
-#   u::AbstractMatrix,
-#   μ::AbstractVector,
-#   times::Vector{<:Real})
-
-#   Nt = length(times)
-#   @assert size(u,2) == Nt "Wrong dimensions"
-
-#   n(tθ) = findall(x -> x == tθ,timesθ)[1]
-#   tθ -> FEFunction(trial,uk[:,n(tθ)],μ,tθ)
-# end

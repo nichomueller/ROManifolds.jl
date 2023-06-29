@@ -10,37 +10,50 @@ mutable struct MultiFieldSnapshots{T,A} <: Snapshots{T,A}
   nsnaps::Int
 end
 
+_get_nsnaps(snaps) = size(snaps,2)
+_get_nsnaps(snaps::AbstractVector) = length(snaps)
+
 function Snapshots(
   snaps::NnzArray{T},
-  ::A;
+  ::A,
+  nsnaps=size(snaps,2);
   type=EMatrix{Float}) where {T,A}
 
   csnaps = snaps
   convert!(type,csnaps)
-  nsnaps = size(snaps,2)
   SingleFieldSnapshots{T,A}(csnaps,nsnaps)
 end
 
 function Snapshots(
   snaps::Vector{NnzArray{T}},
-  ::A;
+  ::A,
+  nsnaps=length(snaps);
   type=EMatrix{Float}) where {T,A}
 
   csnaps = hcat(snaps)
   convert!(type,csnaps)
-  nsnaps = length(snaps)
   SingleFieldSnapshots{T,A}(csnaps,nsnaps)
 end
 
 function Snapshots(
-  snaps::Vector{Vector{NnzArray{T}}},
-  ::A;
-  type=EMatrix{Float}) where {T,A}
+  snaps::Union{AbstractMatrix,Vector{T}},
+  aff::Affinity,
+  args...;
+  kwargs...) where {T<:AbstractArray}
 
-  nfields = length(first(s))
-  csnaps = map(n->hcat(map(sn -> getindex(sn,n),snaps)...),1:nfields)
-  convert!(type,csnaps)
-  nsnaps = length(snaps)
+  csnaps = compress(snaps)
+  nsnaps = _get_nsnaps(snaps)
+  Snapshots(csnaps,aff,nsnaps;kwargs...)
+end
+
+function Snapshots(
+  snaps::Vector{Vector{T}},
+  ::A;
+  type=EMatrix{Float}) where {T<:AbstractArray,A}
+
+  csnaps = compress(snaps)
+  map(s->convert!(type,s),csnaps)
+  nsnaps = _get_nsnaps(snaps)
   MultiFieldSnapshots{T,A}(csnaps,nsnaps)
 end
 
@@ -129,7 +142,7 @@ for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:O
 
       aff = get_affinity(fesolver,params,matdata)
       data = get_data(aff,fesolver,params,matdata)
-      cache = jacobian_cache(feop.assem,data)
+      cache = jacobians_cache(feop.assem,data)
       jacs = pmap(d -> collect_jacobians!(cache,feop,d),data)
       Snapshots(jacs,aff)
     end
@@ -138,7 +151,8 @@ end
 
 function tpod(s::SingleFieldSnapshots;type=Matrix{Float},kwargs...)
   basis_space = tpod(basis_space;kwargs...)
-  convert(type,basis_space)
+  convert!(type,basis_space)
+  basis_space
 end
 
 function transient_tpod(
@@ -147,9 +161,11 @@ function transient_tpod(
   type=Matrix{Float},
   kwargs...)
 
-  compress_rows = _compress_rows(s.snaps)
-  basis_space,basis_time = transient_tpod(Val{compress_rows}(),s;kwargs...)
-  convert(type,basis_space),convert(type,basis_time)
+  by_row = _compress_rows(s.snaps)
+  basis_space,basis_time = transient_tpod(Val{by_row}(),s;kwargs...)
+  convert!(type,basis_space)
+  convert!(type,basis_time)
+  basis_space,basis_time
 end
 
 function transient_tpod(::Val{false},s::SingleFieldSnapshots;kwargs...)
@@ -183,7 +199,9 @@ for (T,A) in zip((:AbstractMatrix,:SparseMatrixCSC),
       basis_space = tpod(s.snaps;kwargs...)
       time_ndofs = get_time_ndofs(solver)
       basis_time = allocate_matrix(s,time_ndofs,1)
-      convert(type,basis_space),convert(type,basis_time)
+      convert!(type,basis_space)
+      convert!(type,basis_time)
+      basis_space,basis_time
     end
   end
 end

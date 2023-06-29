@@ -63,16 +63,6 @@ function Base.getindex(
   reshape(convert(Matrix{T},emat[idx,k2:k2]),:)
 end
 
-Gridap.FESpaces.get_cell_dof_ids(trian::Triangulation) = trian.grid.cell_node_ids
-
-function collect_trian(a::DomainContribution)
-  t = ()
-  for strian in get_domains(a)
-    t = (t...,strian)
-  end
-  unique(t)
-end
-
 function Gridap.FESpaces.collect_cell_matrix(
   trial::FESpace,
   test::FESpace,
@@ -118,6 +108,19 @@ function Gridap.FESpaces.collect_cell_vector(
     end
   end
   (w,r)
+end
+
+function collect_trian(a::DomainContribution)
+  t = ()
+  for strian in get_domains(a)
+    t = (t...,strian)
+  end
+  unique(t)
+end
+
+function Gridap.FESpaces.get_order(test::SingleFieldFESpace)
+  basis = get_fe_basis(test)
+  first(Gridap.FESpaces.get_order(first(basis.cell_basis.values).fields))
 end
 
 # Remove when possible

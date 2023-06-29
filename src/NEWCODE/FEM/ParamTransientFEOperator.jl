@@ -205,7 +205,7 @@ function Gridap.ODEs.TransientFETools._matdata_jacobian(
   i::Integer,
   γᵢ::Real) where T
 
-  Uh = evaluate(get_trial(op),nothing,nothing)
+  Uh = get_trial(op)(nothing,nothing)
   V = get_test(op)
   du = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
@@ -234,5 +234,5 @@ function _collect_trian_jac(op::ParamTransientFEOperator)
     matcontrib = j(μ,t,uh,v,v)
     trians = (trians...,collect_trian(matcontrib)...)
   end
-  trians
+  unique(trians)
 end

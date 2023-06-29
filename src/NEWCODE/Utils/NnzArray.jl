@@ -15,6 +15,12 @@ function compress(entire_arrays::Vector{T}) where {T<:AbstractArray}
   compress(entire_array)
 end
 
+function compress(entire_arrays::Vector{Vector{T}}) where {T<:AbstractArray}
+  nfields = length(first(entire_arrays))
+  entire_array = map(n->hcat(map(sn -> getindex(sn,n),snaps)...),1:nfields)
+  map(compress,entire_array)
+end
+
 function Base.hcat(nza_vec::Vector{NnzArray{T}}) where T
   msg = """\n
   Cannot hcat the given NnzArrays: the nonzero indices and/or the full
@@ -31,14 +37,6 @@ function Base.hcat(nza_vec::Vector{NnzArray{T}}) where T
   NnzArray{T}(nza,test_nnz_idx,test_nrows)
 end
 
-Base.size(nza::NnzArray,idx...) = size(nza.nonzero_val,idx...)
-
-Base.getindex(nza::NnzArray,idx...) = nza.nonzero_val[idx...]
-
-Base.eachindex(nza::NnzArray) = eachindex(nza.nonzero_val)
-
-Base.setindex!(nza::NnzArray,val,idx...) = setindex!(nza.nonzero_val,val,idx...)
-
 function Base.show(io::IO,nza::NnzArray)
   print(io,"NnzArray storing $(length(nza.nonzero_idx)) nonzero values")
 end
@@ -49,6 +47,18 @@ end
 
 Base.copyto!(nza::NnzArray,val::AbstractArray) = copyto!(nza.nonzero_val,val)
 
+Base.size(nza::NnzArray,idx...) = size(nza.nonzero_val,idx...)
+
+function Base.getindex(nza::NnzArray,idx...)
+  nza_copy = copy(nza)
+  nza_copy.nonzero_val = nza_copy.nonzero_val[idx...]
+  nza_copy
+end
+
+Base.eachindex(nza::NnzArray) = eachindex(nza.nonzero_val)
+
+Base.setindex!(nza::NnzArray,val,idx...) = setindex!(nza.nonzero_val,val,idx...)
+
 function Base.:(*)(nza1::NnzArray{T},nza2::NnzArray{T}) where T
   msg = """\n
   Cannot multiply the given NnzArray, the nonzero indices and/or the full
@@ -58,6 +68,12 @@ function Base.:(*)(nza1::NnzArray{T},nza2::NnzArray{T}) where T
   @assert nza1.nrows == nza2.nrows msg
   mat = nza1.nonzero_val*nza2.nonzero_val
   NnzArray{T}(mat,copy(nza1.nonzero_idx),copy(nza1.nrows))
+end
+
+function Base.adjoint(nza::NnzArray)
+  nza_copy = copy(nza)
+  adjoint!(nza_copy)
+  nza_copy
 end
 
 function Gridap.FESpaces.allocate_matrix(nza::NnzArray,sizes...)
@@ -119,6 +135,8 @@ function change_mode(nza::NnzArray,nparams::Int)
   change_mode!(nzm_copy,nparams)
   nzm_copy
 end
+
+_compress_rows(nza::NnzArray) = _compress_rows(nza.nonzero_val)
 
 function tpod!(nza::NnzArray;kwargs...)
   nza.nonzero_val = tpod(nza.nonzero_val;kwargs...)

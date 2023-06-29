@@ -110,7 +110,7 @@ function assemble_compressed_matrix_add!(
   matdata)
 
   numeric_loop_matrix!(mat,a,matdata)
-  nnz_i,nnz_v = compress(mat)
+  nnz_i,nnz_v = compress_array(mat)
   mat_nnz.nonzero_val = nnz_v
   mat_nnz.nonzero_idx = nnz_i
   mat_nnz

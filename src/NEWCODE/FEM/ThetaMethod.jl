@@ -135,7 +135,7 @@ function Gridap.ODEs.TransientFETools._matdata_jacobian(
 
   trial = get_trial(op)
   dv = get_fe_basis(op.test)
-  du = get_trial_fe_basis(op.trial(nothing,nothing))
+  du = get_trial_fe_basis(get_trial(op)(nothing,nothing))
   sol_μ = _as_function(sols,params)
 
   γ = (1.0,1/(solver.dt*solver.θ))
