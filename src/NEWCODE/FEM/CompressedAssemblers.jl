@@ -23,24 +23,24 @@ function _filter_matdata(
   r,c,d
 end
 
-function _idx_in_block(ndofs::Base.OneTo{Int},args...)
-  ndofs
-end
+# function _idx_in_block(ndofs::Base.OneTo{Int},args...)
+#   ndofs
+# end
 
-function _idx_in_block(ndofs::BlockedUnitRange,filter::Int)
-  nd = [0,ndofs.lasts...]
-  [idx1+1:idx2 for (idx1,idx2) in zip(nd[1:end-1],nd[2:end])][filter]
+# function _idx_in_block(ndofs::BlockedUnitRange,filter::Int)
+#   nd = [0,ndofs.lasts...]
+#   [idx1+1:idx2 for (idx1,idx2) in zip(nd[1:end-1],nd[2:end])][filter]
+# end
+
+function _filter_data(data::Vector{Any},filter::Tuple{Vararg{Int}})
+  map(data) do dout # loop over domain contributions
+    lazy_map(dout) do din # loop over cells
+      _filter_data(din,filter)
+    end
+  end
 end
 
 _filter_data(data,args...) = data
-
-function _filter_data(data::Vector{Any},filter::Tuple{Vararg{Int}}) # loop over domain contributions
-  map(d->_filter_data(d,filter),data)
-end
-
-function _filter_data(data::LazyArray,filter::Tuple{Vararg{Int}}) # loop over cells
-  lazy_map(d->_filter_data(d,filter),data)
-end
 
 function _filter_data(data::ArrayBlock,filter::Tuple{Vararg{Int}})
   data[filter...]
@@ -54,31 +54,6 @@ function _filter_data(
   r_filter,c_filter = filter
   mdata[r_filter,c_filter],vdata[r_filter]
 end
-
-# Compressed MDEIM snapshots generation interface
-# function residuals_cache(
-#   a::SparseMatrixAssembler,
-#   ::FESolver,
-#   params::Table,
-#   vecdata::Function)
-
-#   r,d = vecdata(rand(params))
-#   vec = allocate_vector(a,d)
-#   vec_r = vec[r]
-#   vec_r
-# end
-
-# function jacobians_cache(
-#   a::SparseMatrixAssembler,
-#   ::FESolver,
-#   params::Table,
-#   matdata::Function)
-
-#   r,c,d = matdata(rand(params))
-#   mat = allocate_matrix(a,d)
-#   mat_rc = mat[r,c]
-#   mat_rc,compress(mat_rc)
-# end
 
 function residuals_cache(a::SparseMatrixAssembler,vecdata)
   r,d = first(vecdata)

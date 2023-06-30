@@ -107,10 +107,11 @@ end
 function _vecdata_residual(
   op::ParamTransientFEOperator,
   solver::θMethod,
-  trian::Triangulation,
   sols::AbstractArray,
   params::AbstractArray,
-  filter::Tuple{Vararg{Int}})
+  filter::Tuple{Vararg{Int}},
+  args...;
+  kwargs...)
 
   trial = get_trial(op)
   dv = get_fe_basis(op.test)
@@ -128,10 +129,11 @@ end
 function Gridap.ODEs.TransientFETools._matdata_jacobian(
   op::ParamTransientFEOperator,
   solver::θMethod,
-  trian::Triangulation,
   sols::AbstractArray,
   params::AbstractArray,
-  filter::Tuple{Vararg{Int}})
+  filter::Tuple{Vararg{Int}},
+  args...;
+  kwargs...)
 
   trial = get_trial(op)
   dv = get_fe_basis(op.test)
@@ -150,7 +152,7 @@ function Gridap.ODEs.TransientFETools._matdata_jacobian(
           trial(μ,t),
           op.test,
           γᵢ*op.jacs[i](μ,t,u(t),dv,du),
-          trian))
+          args...))
       end
     end
     _vcat_matdata(_matdata)

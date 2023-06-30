@@ -117,7 +117,7 @@ function collect_solution!(
   solver::ODESolver,
   μ::AbstractVector)
 
-  sol = solve(op,solver,μ,uh0(μ))
+  sol = solve(op,solver,μ,solver.uh0(μ))
   n = 1
   if isa(cache,AbstractMatrix)
     for soln in sol

@@ -52,9 +52,10 @@ function get_single_field(
 end
 
 function compress_solutions(
-  s::SingleFieldSnapshots{T,A},
   ::ParamFEOperator,
-  ::FESolver;
+  ::FESolver,
+  s::SingleFieldSnapshots{T,A},
+  args...;
   kwargs...) where {T,A}
 
   basis_space = tpod(s;kwargs...)
@@ -62,34 +63,37 @@ function compress_solutions(
 end
 
 function compress_solutions(
-  s::MultiFieldSnapshots{T,A},
   feop::ParamFEOperator,
-  fesolver::FESolver;
+  fesolver::FESolver,
+  s::MultiFieldSnapshots{T,A},
+  args...;
   compute_supremizers=false,
   kwargs...) where {T,A}
 
   snaps = collect_single_fields(s)
   bases_space = map(snap -> tpod(snap;kwargs...),snaps)
   if compute_supremizers
-    add_space_supremizers!(bases_space,feop,fesolver,s)
+    add_space_supremizers!(bases_space,feop,fesolver,s,args...)
   end
   MultiFieldRBSpace{T}(bases_space)
 end
 
 function compress_solutions(
-  s::SingleFieldSnapshots{T,A},
   ::ParamTransientFEOperator,
-  solver::ODESolver;
+  fesolver::ODESolver,
+  s::SingleFieldSnapshots{T,A},
+  args...;
   kwargs...) where {T,A}
 
-  basis_space,basis_time = transient_tpod(s,solver;kwargs...)
+  basis_space,basis_time = transient_tpod(s,fesolver;kwargs...)
   TransientSingleFieldRBSpace{T}(basis_space,basis_time)
 end
 
 function compress_solutions(
-  s::MultiFieldSnapshots{T,A},
   feop::ParamTransientFEOperator,
-  fesolver::ODESolver;
+  fesolver::ODESolver,
+  s::MultiFieldSnapshots{T,A},
+  args...;
   compute_supremizers=false,
   ttol=1e-2,
   kwargs...) where {T,A}
@@ -98,7 +102,7 @@ function compress_solutions(
   bases = map(snap -> transient_tpod(snap,fesolver;kwargs...),snaps)
   bases_space,bases_time = first.(bases),last.(bases)
   if compute_supremizers
-    add_space_supremizers!(bases_space,feop,fesolver,s)
+    add_space_supremizers!(bases_space,feop,fesolver,s,args...)
     add_time_supremizers!(bases_time;ttol)
   end
   TransientMultiFieldRBSpace{T}(bases_space,bases_time)
@@ -107,38 +111,46 @@ end
 for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:ODESolver))
   @eval begin
     function add_space_supremizers!(
-      bases_space::Vector{<:AbstractMatrix},
+      bases_space::Vector{NnzArray{T}},
       feop::$Top,
-      solver::$Tslv,
-      snaps::MultiFieldSnapshots;
-      kwargs...)
+      fesolver::$Tslv,
+      snaps::MultiFieldSnapshots,
+      params::Table;
+      kwargs...) where T
 
-      sbu,sbdual... = bases_space
-      for (i,sb) in enumerate(sbdual)
+      bsprimal,bsdual... = map(recast,bases_space)
+      for (i,bs) in enumerate(bsdual)
         printstyled("Computing supremizers in space for dual field $i\n";color=:blue)
-        cmat_i = assemble_constraint_matrix(feop,solver,snaps,i)
-        supr_i = cmat_i*sb.bases_space[i]
-        sbu_i = gram_schmidt(supr_i,sbu.nonzero_val)
-        sbu.nonzero_val = hcat(sbu.nonzero_val,sbu_i)
+        cmat_i = assemble_constraint_matrix(feop,fesolver,snaps,params,i)
+        supr_i = cmat_i*bs.bases_space[i]
+        bsu_i = gram_schmidt(supr_i,primal.nonzero_val)
+        primal.nonzero_val = hcat(primal.nonzero_val,bsu_i)
       end
       return
     end
 
     function assemble_constraint_matrix(
       feop::$Top,
-      solver::$Tslv,
-      snaps::MultiFieldSnapshots,
+      fesolver::$Tslv,
+      s::MultiFieldSnapshots,
+      params::Table,
       i::Int)
 
-      sols,params = get_data(snaps)
       filter = (1,i)
-      assemble_matrix(feop,solver,sols,params,filter)
+      si = get_data(s[i])
+
+      matdata = _matdata_jacobian(feop,fesolver,si,params,filter)
+      aff = get_affinity(fesolver,params,matdata)
+      assemble_matrix(feop,fesolver,sols,params,filter)
     end
   end
 end
 
-function add_time_supremizers!(bases_time::Vector{<:AbstractMatrix};kwargs...)
-  tbu,tbdual... = bases_time
+function add_time_supremizers!(
+  bases_time::Vector{NnzArray{T}};
+  kwargs...) where T
+
+  tbu,tbdual... = map(get_nonzero_val,bases_time)
   for (i,tb) in enumerate(tbdual)
     printstyled("Computing supremizers in time for dual field $i\n";color=:blue)
     tbu_i = add_time_supremizers([tbu.nonzero_val,tb.nonzero_val];kwargs...)

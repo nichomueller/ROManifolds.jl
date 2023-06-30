@@ -35,26 +35,31 @@ function Snapshots(
   SingleFieldSnapshots{T,A}(csnaps,nsnaps)
 end
 
-function Snapshots(
-  snaps::Union{AbstractMatrix,Vector{T}},
-  aff::Affinity,
-  args...;
-  kwargs...) where {T<:AbstractArray}
+for (T,elT) in zip((:Matrix,:Vector),(:Float64,:Float32))
+  @eval begin
+    function Snapshots(
+      snaps::Union{$T{$elT},Vector{$T{$elT}}},
+      aff::Affinity,
+      args...;
+      kwargs...)
 
-  csnaps = compress(snaps)
-  nsnaps = _get_nsnaps(snaps)
-  Snapshots(csnaps,aff,nsnaps;kwargs...)
-end
+      csnaps = compress(snaps)
+      nsnaps = _get_nsnaps(snaps)
+      Snapshots(csnaps,aff,nsnaps;kwargs...)
+    end
 
-function Snapshots(
-  snaps::Vector{Vector{T}},
-  ::A;
-  type=EMatrix{Float}) where {T<:AbstractArray,A}
+    function Snapshots(
+      snaps::Vector{Vector{$T{$elT}}},
+      ::A,
+      args...;
+      type=EMatrix{Float}) where A
 
-  csnaps = compress(snaps)
-  map(s->convert!(type,s),csnaps)
-  nsnaps = _get_nsnaps(snaps)
-  MultiFieldSnapshots{T,A}(csnaps,nsnaps)
+      csnaps = compress(snaps)
+      map(s->convert!(type,s),csnaps)
+      nsnaps = _get_nsnaps(snaps)
+      MultiFieldSnapshots{$T{$elT},A}(csnaps,nsnaps)
+    end
+  end
 end
 
 Base.length(s::Snapshots) = s.nsnaps

@@ -8,7 +8,7 @@ function reduce_fe_operator(
   nsnaps = info.nsnaps
   params = realization(feop,nsnaps)
   sols = generate_solutions(feop,fesolver,params)
-  rbspace = compress_solutions(sols,feop,fesolver;ϵ)
+  rbspace = compress_solutions(feop,fesolver,sols,params;ϵ)
 
   nsnaps = info.nsnaps_mdeim
   #compress_residual_and_jacobian(...)

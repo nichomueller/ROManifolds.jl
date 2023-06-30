@@ -70,7 +70,7 @@ end
 nsnaps = info.nsnaps
 params = realization(feop,nsnaps)
 sols = generate_solutions(feop,fesolver,params)
-rbspace = compress_solutions(sols,feop,fesolver;ϵ)
+rbspace = compress_solutions(feop,fesolver,sols;ϵ)
 nsnaps = info.nsnaps_mdeim
 rb_res = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
 rb_jac = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)

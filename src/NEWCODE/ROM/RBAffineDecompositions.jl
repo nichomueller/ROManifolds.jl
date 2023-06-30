@@ -115,7 +115,7 @@ for (Top,Tslv,Tsps,Tspm) in zip(
 
       sres = get_data(s[1:nsnaps])
       pres = params[1:nsnaps]
-      vecdata = _vecdata_residual(feop,fesolver,trian,sres,pres,filter)
+      vecdata = _vecdata_residual(feop,fesolver,sres,pres,filter,trian)
       r = generate_residuals(feop,fesolver,pres,vecdata)
       compress_component(r,feop,fesolver,trian,rbspace;kwargs...)
     end
@@ -179,7 +179,7 @@ for (Top,Tslv,Tsps,Tspm) in zip(
 
       sjac = get_data(s[1:nsnaps])
       pjac = params[1:nsnaps]
-      matdata = _matdata_jacobian(feop,fesolver,trian,sjac,pjac,filter)
+      matdata = _matdata_jacobian(feop,fesolver,sjac,pjac,filter,trian)
       j = generate_jacobians(feop,fesolver,pjac,matdata)
       compress_component(j,feop,fesolver,trian,rbspace...;kwargs...)
     end

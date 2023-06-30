@@ -17,7 +17,7 @@ end
 
 function compress(entire_arrays::Vector{Vector{T}}) where {T<:AbstractArray}
   nfields = length(first(entire_arrays))
-  entire_array = map(n->hcat(map(sn -> getindex(sn,n),snaps)...),1:nfields)
+  entire_array = map(n->hcat(map(sn -> getindex(sn,n),entire_arrays)...),1:nfields)
   map(compress,entire_array)
 end
 
@@ -94,6 +94,8 @@ function reshape!(nza::NnzArray{T},size...) where T
   nza.nonzero_val = reshape(nza.nonzero_val,size...)
   return
 end
+
+get_nonzero_val(nza::NnzArray) = nza.nonzero_val
 
 function recast(nza::NnzArray{<:AbstractMatrix})
   entire_array = zeros(nza.nrows,size(nza,2))
