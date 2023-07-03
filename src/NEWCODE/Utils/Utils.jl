@@ -46,6 +46,7 @@ import Gridap.Algebra:nz_allocation
 import Gridap.Algebra:nz_counter
 import Gridap.FESpaces:_pair_contribution_when_possible
 import Gridap.FESpaces.length_to_ptrs!
+import Gridap.MultiField:MultiFieldFEBasisComponent
 import Gridap.Polynomials:MonomialBasis
 import Gridap.ODEs.TransientFETools:ODESolver
 import Gridap.ODEs.TransientFETools:OperatorType

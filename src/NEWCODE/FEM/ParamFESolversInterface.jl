@@ -102,6 +102,32 @@ end
 
 # MDEIM snapshots generation interface
 
+_get_fe_basis(test,args...) = get_fe_basis(test)
+
+_get_trial_fe_basis(trial,args...) = get_trial_fe_basis(trial)
+
+function _get_fe_basis(
+  test::MultiFieldFESpace,
+  filter::Tuple{Vararg{Int}})
+
+  row, = filter
+  nfields = length(test.spaces)
+  dv_row = Vector{Nothing}(undef,nfields)
+  dv_row[row] = get_fe_basis(test[row])
+  dv_row
+end
+
+function _get_trial_fe_basis(
+  trial::MultiFieldFESpace,
+  filter::Tuple{Vararg{Int}})
+
+  row,col = filter
+  nfields = length(du)
+  du_col = Vector{Nothing}(undef,nfields)
+  du_col[col] = get_trial_fe_basis(trial[col])
+  du_col
+end
+
 function _vecdata_residual(
   op::ParamFEOperator,
   ::FESolver,
@@ -111,13 +137,14 @@ function _vecdata_residual(
   args...;
   kwargs...)
 
+  row,_ = filter
   trial = get_trial(op)
-  test = get_test(op)
-  dv = get_fe_basis(test)
+  dv_row = _get_fe_basis(op.test,row)
   sol_μ = _as_function(sols,params)
-  u(μ) = EvaluationFunction(trial(μ),sol_μ(μ))
+
   function vecdata(μ)
-    collect_cell_vector(test,op.res(μ,u(μ),dv),args...)
+    u = EvaluationFunction(trial(μ),sol_μ(μ))
+    collect_cell_vector(test,op.res(μ,u,dv_row),args...)
   end
 
   μ -> _filter_vecdata(op.assem,vecdata(μ),filter)
@@ -132,14 +159,17 @@ function Gridap.ODEs.TransientFETools._matdata_jacobian(
   args...;
   kwargs...)
 
-  trial = get_trial(op)
-  test = get_test(op)
-  dv = get_fe_basis(test)
-  du = get_trial_fe_basis(trial(nothing))
-  sol_μ = _as_function(sols,params)
-  u(μ) = EvaluationFunction(trial(μ),sol_μ(μ))
+  row,col = filter
+  dv_row = _get_fe_basis(op.test,row)
+  du_col = _get_trial_fe_basis(get_trial(op)(nothing,nothing),col)
+  test_row = get_test(op)[row]
+  trial_col = get_trial(op)[col]
+  sols_col = sols[col]
+  sol_col_μ = _as_function(sols_col,params)
+
   function matdata(μ)
-    collect_cell_matrix(trial(μ),test,op.jac(μ,u(μ),dv,du),args...)
+    u_col = EvaluationFunction(trial_col(μ),sol_col_μ(μ))
+    collect_cell_matrix(trial_col(μ),test_row,op.jac(μ,u_col(μ),dv_row,du_col),args...)
   end
 
   μ -> _filter_matdata(op.assem,matdata(μ),filter)

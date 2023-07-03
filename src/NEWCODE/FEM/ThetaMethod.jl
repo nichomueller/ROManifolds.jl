@@ -113,14 +113,15 @@ function _vecdata_residual(
   args...;
   kwargs...)
 
+  row,_ = filter
   trial = get_trial(op)
-  dv = get_fe_basis(op.test)
+  dv_row = _get_fe_basis(op.test,row)
   sol_μ = _as_function(sols,params)
 
   function vecdata(μ,t)
     u0 = get_free_dof_values(solver.uh0(μ))
     u = _evaluation_function(solver,trial(μ),sol_μ(μ),u0)
-    collect_cell_vector(op.test,op.res(μ,t,u(t),dv),trian)
+    collect_cell_vector(op.test,op.res(μ,t,u(t),dv_row),trian)
   end
 
   (μ,t) -> _filter_vecdata(op.assem,vecdata(μ,t),filter)
@@ -135,23 +136,26 @@ function Gridap.ODEs.TransientFETools._matdata_jacobian(
   args...;
   kwargs...)
 
-  trial = get_trial(op)
-  dv = get_fe_basis(op.test)
-  du = get_trial_fe_basis(get_trial(op)(nothing,nothing))
-  sol_μ = _as_function(sols,params)
+  row,col = filter
+  dv_row = _get_fe_basis(op.test,row)
+  du_col = _get_trial_fe_basis(get_trial(op)(nothing,nothing),col)
+  test_row = get_test(op)[row]
+  trial_col = get_trial(op)[col]
+  sols_col = sols[col]
+  sol_col_μ = _as_function(sols_col,params)
 
   γ = (1.0,1/(solver.dt*solver.θ))
   function matdata(μ,t)
-    u0 = get_free_dof_values(solver.uh0(μ))
-    u = _evaluation_function(solver,trial(μ),sol_μ(μ),u0)
+    u0_col = get_free_dof_values(solver.uh0(μ)[col])
+    u_col = _evaluation_function(solver,trial_col(μ),sol_col_μ(μ),u0_col)
     _matdata = ()
     for (i,γᵢ) in enumerate(γ)
       if γᵢ > 0.0
         _matdata = (_matdata...,
           collect_cell_matrix(
-          trial(μ,t),
-          op.test,
-          γᵢ*op.jacs[i](μ,t,u(t),dv,du),
+          trial_col(μ,t),
+          test_row,
+          γᵢ*op.jacs[i](μ,t,u_col(t),dv_row,du_col),
           args...))
       end
     end

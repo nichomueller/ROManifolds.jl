@@ -36,9 +36,9 @@ function ParamFEOperator(res::Function,jac::Function,pspace,trial,test)
 end
 
 function Gridap.ODEs.TransientFETools.SparseMatrixAssembler(
-  trial::Union{ParamTrialFESpace,ParamMultiFieldTrialFESpace},
+  trial::Union{ParamTrialFESpace,ParamMultiFieldFESpace},
   test::FESpace)
-  SparseMatrixAssembler(Gridap.evaluate(trial,nothing),test)
+  SparseMatrixAssembler(trial(nothing),test)
 end
 
 Gridap.ODEs.TransientFETools.get_assembler(op::ParamFEOperatorFromWeakForm) = op.assem

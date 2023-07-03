@@ -83,7 +83,7 @@ function ParamTransientFEOperator(res::Function,pspace,trial,test;order::Integer
 end
 
 function Gridap.ODEs.TransientFETools.SparseMatrixAssembler(
-  trial::Union{ParamTransientTrialFESpace,ParamTransientMultiFieldTrialFESpace},
+  trial::Union{ParamTransientTrialFESpace,ParamTransientMultiFieldFESpace},
   test::FESpace)
   SparseMatrixAssembler(Gridap.evaluate(trial,nothing,nothing),test)
 end

@@ -20,7 +20,7 @@ end
 """
 Parameter evaluation without allocating Dirichlet vals
 """
-function evaluate!(Uμ::T,U::ParamTrialFESpace,μ::AbstractVector) where T
+function Gridap.evaluate!(Uμ::T,U::ParamTrialFESpace,μ::AbstractVector) where T
   if isa(U.dirichlet_μ,Vector)
     objects_at_μ = map(o->o(μ), U.dirichlet_μ)
   else
@@ -58,7 +58,7 @@ Functor-like evaluation. It allocates Dirichlet vals in general.
 
 # Define the ParamTrialFESpace interface for affine spaces
 
-function evaluate!(::FESpace,U::FESpace,::AbstractVector)
+function Gridap.evaluate!(::FESpace,U::FESpace,::AbstractVector)
   U
 end
 
@@ -68,41 +68,52 @@ end
 
 # Define the interface for MultiField
 
-struct ParamMultiFieldTrialFESpace
+struct ParamMultiFieldFESpace
   spaces::Vector
 end
-Base.iterate(m::ParamMultiFieldTrialFESpace) = iterate(m.spaces)
-Base.iterate(m::ParamMultiFieldTrialFESpace,state) = iterate(m.spaces,state)
-Base.getindex(m::ParamMultiFieldTrialFESpace,field_id::Integer) = m.spaces[field_id]
-Base.length(m::ParamMultiFieldTrialFESpace) = length(m.spaces)
+Base.iterate(m::ParamMultiFieldFESpace) = iterate(m.spaces)
+Base.iterate(m::ParamMultiFieldFESpace,state) = iterate(m.spaces,state)
+Base.getindex(m::ParamMultiFieldFESpace,field_id::Integer) = m.spaces[field_id]
+Base.length(m::ParamMultiFieldFESpace) = length(m.spaces)
 
 function ParamMultiFieldFESpace(spaces::Vector)
-  ParamMultiFieldTrialFESpace(spaces)
+  ParamMultiFieldFESpace(spaces)
 end
 
 function ParamMultiFieldFESpace(spaces::Vector{<:SingleFieldFESpace})
   MultiFieldFESpace(spaces)
 end
 
-function evaluate!(Uμ::T,U::ParamMultiFieldTrialFESpace,μ::AbstractVector) where T
+function Gridap.evaluate!(Uμ::T,U::ParamMultiFieldFESpace,μ::AbstractVector) where T
   spaces_at_μ = [evaluate!(Uμi,Ui,μ) for (Uμi,Ui) in zip(Uμ,U)]
   MultiFieldFESpace(spaces_at_μ)
 end
 
-function Gridap.ODEs.TransientFETools.allocate_trial_space(U::ParamMultiFieldTrialFESpace)
+function Gridap.ODEs.TransientFETools.allocate_trial_space(U::ParamMultiFieldFESpace)
   spaces = allocate_trial_space.(U.spaces)
   MultiFieldFESpace(spaces)
 end
 
-function Gridap.evaluate(U::ParamMultiFieldTrialFESpace,μ::AbstractVector)
+function Gridap.evaluate(U::ParamMultiFieldFESpace,μ::AbstractVector)
   Uμ = allocate_trial_space(U)
   evaluate!(Uμ,U,μ)
   Uμ
 end
 
-function Gridap.evaluate(U::ParamMultiFieldTrialFESpace,::Nothing)
+function Gridap.evaluate(U::ParamMultiFieldFESpace,::Nothing)
   MultiFieldFESpace([Gridap.evaluate(fesp,nothing) for fesp in U.spaces])
 end
 
 (U::MultiFieldFESpace)(::AbstractVector) = U
-(U::ParamMultiFieldTrialFESpace)(μ) = Gridap.evaluate(U,μ)
+(U::ParamMultiFieldFESpace)(μ) = Gridap.evaluate(U,μ)
+
+
+Gridap.FESpaces.get_fe_basis(U,args...) = get_fe_basis(U)
+Gridap.FESpaces.get_trial_fe_basis(U,args...) = get_trial_fe_basis(U)
+
+for Tsp in (:MultiFieldFESpace,:ParamMultiFieldFESpace)
+  @eval begin
+    Gridap.FESpaces.get_fe_basis(U::$Tsp,i::Int) = get_fe_basis(U[i])
+    Gridap.FESpaces.get_trial_fe_basis(U::$Tsp,i::Int) = get_trial_fe_basis(U[i])
+  end
+end

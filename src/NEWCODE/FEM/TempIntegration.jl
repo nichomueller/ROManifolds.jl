@@ -1,121 +1,79 @@
-obj = ∫(∇(dv[1])⊙∇(du[1])).object
-quad = dΩ.quad
-f = CellField(obj,quad.trian,quad.data_domain_style)
-trian_f = get_triangulation(f)
-trian_x = get_triangulation(quad)
-b = change_domain(f,quad.trian,quad.data_domain_style)
-x = get_cell_points(quad)
-bx = b(x)
-cell_map = get_cell_map(quad.trian)
-cell_Jt = lazy_map(∇,cell_map)
-cell_Jtx = lazy_map(evaluate,cell_Jt,quad.cell_point)
-k = IntegrationMap()
+# function Gridap.Fields.evaluate!(
+#   cache,
+#   f::Gridap.Fields.BroadcastingFieldOpMap,
+#   a::AbstractArray{T,N},
+#   b::AbstractArray{S,N}) where {T,S,N}
 
-function Gridap.return_value(
-  k::IntegrationMap,
-  fx::ArrayBlock{A,N} where A,
-  i::Int,
-  args...) where N
-
-  if fx.touched[i]
-    return_value(k,fx.array[i],args...)
-  else
-    fxi = testitem(fx)
-    return_value(k,fxi,args...)
-  end
-end
-
-# _check_blocks(args...) = true
-
-# function _check_blocks(
-#   array_a::ArrayBlock{Aa,N},
-#   array_b::ArrayBlock{Ab,N}) where {Aa,Ab,N}
-
-#   array_a.touched == array_b.touched
-# end
-
-# function (+)(a::DomainContribution,b::DomainContribution)
-#   array_a = first(values(a.dict))
-#   array_b = first(values(b.dict))
-#   c = copy(a)
-#   if _check_blocks(array_a,array_b)
-#     for (trian,array) in b.dict
-#       add_contribution!(c,trian,array)
-#     end
+#   setsize!(cache,size(a))
+#   r = cache.array
+#   for i in eachindex(a)
+#     r[i] = f.op(a[i],b[i])
 #   end
-#   c
+#   r
 # end
 
-function my_integrate(f,b::Gridap.CellData.GenericMeasure)
-  c = my_integrate(f,b.quad)
-  cont = DomainContribution()
-  add_contribution!(cont,b.quad.trian,c)
-  cont
-end
+# function Gridap.Arrays.return_cache(::Operation,::Nothing...)
+#   nothing
+# end
 
-function my_integrate(f::CellField,quad::CellQuadrature)
-  trian_f = get_triangulation(f)
-  trian_x = get_triangulation(quad)
+# function Gridap.return_value(::Broadcasting{typeof(∇)},::Nothing...)
+#   nothing
+# end
 
-  msg = """\n
-    Your are trying to integrate a CellField using a CellQuadrature defined on incompatible
-    triangulations. Verify that either the two objects are defined in the same triangulation
-    or that the triangulaiton of the CellField is the background triangulation of the CellQuadrature.
-    """
-  @check is_change_possible(trian_f,trian_x) msg
+# function Gridap.Arrays.evaluate!(cache,::Operation,::Tuple{Vararg{Union{Nothing,CellField}}})
+#   nothing
+# end
 
-  b = my_change_domain(f,quad.trian,quad.data_domain_style)
-  x = get_cell_points(quad)
-  bx = b(x)
-  if quad.data_domain_style == PhysicalDomain() &&
-            quad.integration_domain_style == PhysicalDomain()
-    lazy_map(IntegrationMap(),bx,quad.cell_weight)
-  elseif quad.data_domain_style == ReferenceDomain() &&
-            quad.integration_domain_style == PhysicalDomain()
-    cell_map = get_cell_map(quad.trian)
-    cell_Jt = lazy_map(∇,cell_map)
-    cell_Jtx = lazy_map(evaluate,cell_Jt,quad.cell_point)
-    lazy_map(IntegrationMap(),bx,quad.cell_weight,cell_Jtx)
-  elseif quad.data_domain_style == ReferenceDomain() &&
-            quad.integration_domain_style == ReferenceDomain()
-    cell_map = Fill(GenericField(identity),length(bx))
-    cell_Jt = lazy_map(∇,cell_map)
-    cell_Jtx = lazy_map(evaluate,cell_Jt,quad.cell_point)
-    lazy_map(IntegrationMap(),bx,quad.cell_weight,cell_Jtx)
-  else
-    @notimplemented
+import Gridap.TensorValues: inner, outer, double_contraction, symmetric_part
+import LinearAlgebra: det, tr, cross, dot, ⋅, rmul!
+import Base: inv, abs, abs2, *, +, -, /, adjoint, transpose, real, imag, conj
+
+for op in (:inner,:outer,:double_contraction,:+,:-,:*,:cross,:dot,:/)
+  @eval begin
+    ($op)(::Nothing,::Nothing) = nothing
+    ($op)(::CellField,::Nothing) = nothing
+    ($op)(::Nothing,::CellField) = nothing
   end
 end
 
-my_change_domain(args...;kwargs...) = change_domain(args...;kwargs...)
+Gridap.CellData.integrate(::Nothing,::Gridap.CellData.GenericMeasure) = nothing
 
-function my_change_domain(f::Gridap.CellData.OperationCellField,target_trian::Triangulation,target_domain::DomainStyle)
-  args = map(i->my_change_domain(i,target_trian,target_domain),f.args)
-  Gridap.CellData.OperationCellField(f.op,args...)
+Base.broadcasted(f,a::Nothing,b::Nothing) = Operation((i,j)->f.(i,j))(a,b)
+Base.broadcasted(f,a::Nothing,b::CellField) = Operation((i,j)->f.(i,j))(a,b)
+Base.broadcasted(f,a::CellField,b::Nothing) = Operation((i,j)->f.(i,j))(a,b)
+
+(+)(::Nothing,b::DomainContribution) = b
+(+)(a::DomainContribution,::Nothing) = a
+function (-)(::Nothing,b::DomainContribution)
+  for (trian,array) in b.dict
+    b.dict[trian] = -array
+  end
+  b
 end
-
-function my_change_domain(
-  a::Gridap.MultiField.MultiFieldFEBasisComponent,
-  ttrian::Triangulation,
-  tdomain::DomainStyle)
-
-  change_domain(a.single_field,ttrian,tdomain)
-end
-
-fs(du,v) = my_integrate(∫(∇(v)⊙∇(du)).object,dΩ)
-fm((du,dp),(v,q)) = my_integrate(∫(∇(v)⊙∇(du)).object,dΩ)
+(-)(a::DomainContribution,::Nothing) = a
+Gridap.Fields.gradient(::Nothing) = nothing
+LinearAlgebra.dot(::typeof(∇),::Nothing) = nothing
 
 t = 1.
-dvu = get_fe_basis(test_u)
-duu = get_trial_fe_basis(trial_u(t))
-dv = get_fe_basis(test)
-du = get_trial_fe_basis(trial(t))
+dvq = get_fe_basis(test)
+dup = get_trial_fe_basis(trial(t))
+dv = get_fe_basis(test_u)
+du = get_trial_fe_basis(trial_u(t))
+dq = get_fe_basis(test_p)
+dp = get_trial_fe_basis(trial_p(t))
+fm((u,p),(v,q)) = ∫(∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ - ∫(q*(∇⋅(u)))dΩ
 
-dcfs = fs(duu,dvu)
-dcfm = fm(du,dv)
-trian = get_triangulation(test)
+fm11 = ∫(∇(dv)⊙∇(du))dΩ
+fm12 = ∫(dp*(∇⋅(dv)))dΩ
+∫(dq*dp)dΩ
 
-Jfs = assemble_matrix(dcfs,trial_u(t),test_u)
-Jfm = assemble_matrix(dcfm,trial_u(t),test_u)
+dcfm = fm(dup,dvq)
+J = assemble_matrix(dcfm,trial(t),test)
+J11 = assemble_matrix(fm((du,nothing),(dv,nothing)),trial_u(t),test_u)
+J12 = assemble_matrix(fm((nothing,dp),(dv,nothing)),trial_p,test_u)
+J21 = assemble_matrix(fm((du,nothing),(nothing,dq)),trial_u(t),test_p)
+J22 = assemble_matrix(fm((nothing,dp),(nothing,dq)),trial_p,test_p)
 
-dcfm.dict[trian]
+isapprox(J11,J[1:500,1:500])
+isapprox(J12,J[1:500,501:end])
+isapprox(J21,J[501:end,1:500])
