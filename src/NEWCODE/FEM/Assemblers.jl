@@ -3,7 +3,7 @@
 function Gridap.FESpaces.assemble_vector(
   a::SparseMatrixAssembler,
   vecdata,
-  filter::Tuple{Vararg{Int}})
+  filter::Tuple{Vararg{Any}})
 
   r,d = _filter_vecdata(a,vecdata,filter)
   vec = assemble_vector(a,d)
@@ -13,7 +13,7 @@ end
 function Gridap.FESpaces.assemble_matrix(
   a::SparseMatrixAssembler,
   matdata,
-  filter::Tuple{Vararg{Int}})
+  filter::Tuple{Vararg{Any}})
 
   r,c,d = _filter_matdata(a,matdata,filter)
   mat = assemble_matrix(a,d)
@@ -23,7 +23,7 @@ end
 function _filter_vecdata(
   a::SparseMatrixAssembler,
   vecdata::Tuple{Vararg{Any}},
-  filter::Tuple{Vararg{Int}})
+  filter::Tuple{Vararg{Any}})
 
   vals,rowids, = vecdata
   r_filter, = filter
@@ -35,7 +35,7 @@ end
 function _filter_matdata(
   a::SparseMatrixAssembler,
   matdata::Tuple{Vararg{Any}},
-  filter::Tuple{Vararg{Int}})
+  filter::Tuple{Vararg{Any}})
 
   vals,rowids,colids = matdata
   r_filter,c_filter = filter
@@ -56,21 +56,21 @@ end
 
 _filter_data(data,args...) = data
 
-function _filter_data(data::Vector{Any},filter::Tuple{Vararg{Int}}) # loop over domain contributions
+function _filter_data(data::Vector{Any},filter::Tuple{Vararg{Any}}) # loop over domain contributions
   map(d->_filter_data(d,filter),data)
 end
 
-function _filter_data(data::LazyArray,filter::Tuple{Vararg{Int}}) # loop over cells
+function _filter_data(data::LazyArray,filter::Tuple{Vararg{Any}}) # loop over cells
   lazy_map(d->_filter_data(d,filter),data)
 end
 
-function _filter_data(data::ArrayBlock,filter::Tuple{Vararg{Int}})
+function _filter_data(data::ArrayBlock,filter::Tuple{Vararg{Any}})
   data[filter...]
 end
 
 function _filter_data(
   data::Tuple{MatrixBlock{Matrix{Float}},VectorBlock{Vector{Float}}},
-  filter::Tuple{Vararg{Int}})
+  filter::Tuple{Vararg{Any}})
 
   mdata,vdata = data
   r_filter,c_filter = filter
@@ -81,7 +81,7 @@ end
 function Gridap.FESpaces.allocate_vector(
   a::SparseMatrixAssembler,
   vecdata::Function,
-  filter::Tuple{Vararg{Int}},
+  filter::Tuple{Vararg{Any}},
   args...)
 
   d = vecdata(rand.(args)...)
@@ -91,7 +91,7 @@ end
 function Gridap.FESpaces.allocate_vector(
   a::SparseMatrixAssembler,
   vecdata,
-  filter::Tuple{Vararg{Int}})
+  filter::Tuple{Vararg{Any}})
 
   r,d = _filter_vecdata(a,vecdata,filter)
   vec = allocate_vector(a,d)
@@ -102,7 +102,7 @@ function Gridap.FESpaces.assemble_vector_add!(
   vec::AbstractVector,
   a::SparseMatrixAssembler,
   vecdata,
-  filter::Tuple{Vararg{Int}})
+  filter::Tuple{Vararg{Any}})
 
   _,d = _filter_vecdata(a,vecdata,filter)
   assemble_vector_add!(vec,a,d)
@@ -111,7 +111,7 @@ end
 function Gridap.FESpaces.allocate_matrix(
   a::SparseMatrixAssembler,
   matdata::Function,
-  filter::Tuple{Vararg{Int}},
+  filter::Tuple{Vararg{Any}},
   args...)
 
   d = matdata(rand.(args)...)
@@ -121,7 +121,7 @@ end
 function Gridap.FESpaces.allocate_matrix(
   a::SparseMatrixAssembler,
   matdata,
-  filter::Tuple{Vararg{Int}})
+  filter::Tuple{Vararg{Any}})
 
   r,c,d = _filter_matdata(a,matdata,filter)
   mat = allocate_matrix(a,d)
@@ -132,7 +132,7 @@ function Gridap.FESpaces.assemble_matrix_add!(
   mat::AbstractMatrix,
   a::SparseMatrixAssembler,
   matdata,
-  filter::Tuple{Vararg{Int}})
+  filter::Tuple{Vararg{Any}})
 
   _,_,d = _filter_matdata(a,matdata,filter)
   assemble_matrix_add!(mat,a,d)
@@ -143,7 +143,7 @@ function assemble_residual(
   ::FESolver,
   sols::AbstractMatrix,
   params::Table,
-  filter::Tuple{Vararg{Int}})
+  filter::Tuple{Vararg{Any}})
 
   vecdatum = _vecdata_jacobian(op,sols,params)
   aff = get_affinity(vecdatum,params)
@@ -165,7 +165,7 @@ function assemble_residual(
   solver::θMethod,
   sols::AbstractMatrix,
   params::Table,
-  filter::Tuple{Vararg{Int}})
+  filter::Tuple{Vararg{Any}})
 
   times = get_times(solver)
   vecdatum = _vecdata_jacobian(op,solver,sols,params)
@@ -194,7 +194,7 @@ function assemble_jacobian(
   ::FESolver,
   sols::AbstractMatrix,
   params::Table,
-  filter::Tuple{Vararg{Int}})
+  filter::Tuple{Vararg{Any}})
 
   matdatum = _matdata_jacobian(op,sols,params)
   aff = get_affinity(matdatum,params)
@@ -216,7 +216,7 @@ function assemble_jacobian(
   solver::θMethod,
   s::SingleFieldSnapshots,
   trian::Triangulation,
-  filter::Tuple{Vararg{Int}})
+  filter::Tuple{Vararg{Any}})
 
   times = get_times(solver)
   sols,params = get_data(s)

@@ -9,7 +9,7 @@ struct GenericParamODESolution{T} <: ParamODESolution
   tF::Real
 end
 
-function Gridap.ODEs.TransientFETools.solve_step!(
+function solve_step!(
   uF::Union{AbstractVector,Tuple{Vararg{AbstractVector}}},
   op::ParamODEOperator,
   solver::ODESolver,
@@ -20,7 +20,7 @@ function Gridap.ODEs.TransientFETools.solve_step!(
   solve_step!(uF,op,solver,μ,u0,t0,nothing)
 end
 
-function Gridap.FESpaces.solve(
+function solve(
   op::ParamODEOperator,
   solver::ODESolver,
   μ::AbstractVector,
@@ -30,7 +30,7 @@ function Gridap.FESpaces.solve(
   GenericParamODESolution{T}(op,solver,μ,u0,t0,tF)
 end
 
-function Gridap.FESpaces.solve(
+function solve(
   op::ParamTransientFEOperator,
   solver::ODESolver,
   μ::AbstractVector,

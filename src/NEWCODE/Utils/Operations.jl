@@ -75,7 +75,7 @@ function Gridap.FESpaces.collect_cell_matrix(
   for strian in get_domains(a)
     if strian == trian
       scell_mat = get_contribution(a,strian)
-      cell_mat, trian = move_contributions(scell_mat,strian)
+      cell_mat,trian = move_contributions(scell_mat,strian)
       @assert ndims(eltype(cell_mat)) == 2
       cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
       cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
@@ -99,7 +99,7 @@ function Gridap.FESpaces.collect_cell_vector(
   for strian in get_domains(a)
     if strian == trian
     scell_vec = get_contribution(a,strian)
-    cell_vec, trian = move_contributions(scell_vec,strian)
+    cell_vec,trian = move_contributions(scell_vec,strian)
     @assert ndims(eltype(cell_vec)) == 1
     cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
     rows = get_cell_dof_ids(test,trian)

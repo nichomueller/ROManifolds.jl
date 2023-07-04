@@ -1,7 +1,9 @@
 # driver for unsteady poisson
 using MPI,MPIClusterManagers,Distributed
 manager = MPIWorkerManager()
-addprocs(manager)
+addprocs(4)
+
+@everywhere using Pkg; Pkg.activate(".")
 
 @everywhere begin
   root = pwd()

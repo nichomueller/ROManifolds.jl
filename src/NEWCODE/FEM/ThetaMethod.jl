@@ -1,4 +1,4 @@
-function Gridap.ODEs.TransientFETools.solve_step!(
+function solve_step!(
   uf::AbstractVector,
   op::ParamODEOperator,
   solver::θMethod,
@@ -49,7 +49,7 @@ struct ParamThetaMethodNonlinearOperator <: NonlinearOperator
   vθ::AbstractVector
 end
 
-function Gridap.ODEs.TransientFETools.residual!(
+function residual!(
   b::AbstractVector,
   op::ParamThetaMethodNonlinearOperator,
   x::AbstractVector)
@@ -59,7 +59,7 @@ function Gridap.ODEs.TransientFETools.residual!(
   residual!(b,op.odeop,op.μ,op.tθ,(uθ,vθ),op.ode_cache)
 end
 
-function Gridap.ODEs.TransientFETools.jacobian!(
+function jacobian!(
   A::AbstractMatrix,
   op::ParamThetaMethodNonlinearOperator,
   x::AbstractVector)
@@ -71,14 +71,14 @@ function Gridap.ODEs.TransientFETools.jacobian!(
   jacobians!(A,op.odeop,op.μ,op.tθ,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)
 end
 
-function Gridap.ODEs.ODETools.allocate_residual(
+function allocate_residual(
   op::ParamThetaMethodNonlinearOperator,
   x::AbstractVector)
 
   allocate_residual(op.odeop,x,op.ode_cache)
 end
 
-function Gridap.ODEs.ODETools.allocate_jacobian(
+function allocate_jacobian(
   op::ParamThetaMethodNonlinearOperator,
   x::AbstractVector)
 
@@ -109,22 +109,25 @@ function _vecdata_residual(
   solver::θMethod,
   sols::AbstractArray,
   params::AbstractArray,
-  filter::Tuple{Vararg{Int}},
+  filter::Tuple{Vararg{Any}},
   args...;
   kwargs...)
 
   row,_ = filter
+  test_row = get_test(op)[row]
   trial = get_trial(op)
   dv_row = _get_fe_basis(op.test,row)
   sol_μ = _as_function(sols,params)
+  assem_row = SparseMatrixAssembler(test_row,test_row)
+  op.assem = assem_row
 
   function vecdata(μ,t)
     u0 = get_free_dof_values(solver.uh0(μ))
     u = _evaluation_function(solver,trial(μ),sol_μ(μ),u0)
-    collect_cell_vector(op.test,op.res(μ,t,u(t),dv_row),trian)
+    collect_cell_vector(test_row,op.res(μ,t,u(t),dv_row),trian)
   end
 
-  (μ,t) -> _filter_vecdata(op.assem,vecdata(μ,t),filter)
+  (μ,t) -> _filter_vecdata(vecdata(μ,t),filter)
 end
 
 function Gridap.ODEs.TransientFETools._matdata_jacobian(
@@ -132,17 +135,19 @@ function Gridap.ODEs.TransientFETools._matdata_jacobian(
   solver::θMethod,
   sols::AbstractArray,
   params::AbstractArray,
-  filter::Tuple{Vararg{Int}},
+  filter::Tuple{Vararg{Any}},
   args...;
   kwargs...)
 
   row,col = filter
-  dv_row = _get_fe_basis(op.test,row)
-  du_col = _get_trial_fe_basis(get_trial(op)(nothing,nothing),col)
   test_row = get_test(op)[row]
   trial_col = get_trial(op)[col]
+  dv_row = _get_fe_basis(op.test,row)
+  du_col = _get_trial_fe_basis(op.trial(nothing,nothing),col)
   sols_col = sols[col]
   sol_col_μ = _as_function(sols_col,params)
+  assem_row_col = SparseMatrixAssembler(trial_col(nothing,nothing)[col],test_row)
+  op.assem = assem_row_col
 
   γ = (1.0,1/(solver.dt*solver.θ))
   function matdata(μ,t)
@@ -162,5 +167,5 @@ function Gridap.ODEs.TransientFETools._matdata_jacobian(
     _vcat_matdata(_matdata)
   end
 
-  (μ,t) -> _filter_matdata(op.assem,matdata(μ,t),filter)
+  (μ,t) -> _filter_matdata(matdata(μ,t),filter)
 end

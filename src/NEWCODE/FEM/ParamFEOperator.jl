@@ -5,7 +5,7 @@ abstract type ParamFEOperator{C<:OperatorType} <: GridapType end
 """
 Returns a `ParamOp` wrapper of the `ParamFEOperator`
 """
-function Gridap.ODEs.TransientFETools.get_algebraic_operator(feop::ParamFEOperator{C}) where C
+function get_algebraic_operator(feop::ParamFEOperator{C}) where C
   ParamOpFromFEOp{C}(feop)
 end
 
@@ -14,7 +14,7 @@ end
 """
 Parametric FE operator that is defined by a parametric weak form
 """
-struct ParamFEOperatorFromWeakForm{C<:OperatorType} <: ParamFEOperator{C}
+mutable struct ParamFEOperatorFromWeakForm{C<:OperatorType} <: ParamFEOperator{C}
   res::Function
   jac::Function
   assem::Assembler
@@ -35,17 +35,18 @@ function ParamFEOperator(res::Function,jac::Function,pspace,trial,test)
   ParamFEOperatorFromWeakForm{Nonlinear}(res,jac,assem,pspace,trial,test)
 end
 
-function Gridap.ODEs.TransientFETools.SparseMatrixAssembler(
-  trial::Union{ParamTrialFESpace,ParamMultiFieldFESpace},
+function Gridap.FESpaces.SparseMatrixAssembler(
+  trial::Union{ParamTrialFESpace,ParamMultiFieldTrialFESpace},
   test::FESpace)
   SparseMatrixAssembler(trial(nothing),test)
 end
 
-Gridap.ODEs.TransientFETools.get_assembler(op::ParamFEOperatorFromWeakForm) = op.assem
-Gridap.ODEs.TransientFETools.get_test(op::ParamFEOperatorFromWeakForm) = op.test
-Gridap.FESpaces.get_trial(op::ParamFEOperatorFromWeakForm) = op.trial
+get_test(op::ParamFEOperatorFromWeakForm) = op.test
+get_trial(op::ParamFEOperatorFromWeakForm) = op.trial
+get_pspace(op::ParamFEOperatorFromWeakForm) = op.pspace
+realization(op::ParamFEOperator,args...) = realization(op.pspace,args...)
 
-function Gridap.ODEs.TransientFETools.allocate_residual(
+function allocate_residual(
   op::ParamFEOperatorFromWeakForm,
   uh::CellField)
 
@@ -55,12 +56,12 @@ function Gridap.ODEs.TransientFETools.allocate_residual(
   allocate_vector(op.assem,vecdata)
 end
 
-function Gridap.ODEs.TransientFETools.allocate_jacobian(
+function allocate_jacobian(
   op::ParamFEOperatorFromWeakForm,
   uh::CellField)
 
   Uμ = get_trial(op)
-  U = Gridap.evaluate(Uμ,nothing)
+  U = Uμ(nothing)
   V = get_test(op)
   du = get_trial_fe_basis(U)
   v = get_fe_basis(V)
@@ -68,7 +69,7 @@ function Gridap.ODEs.TransientFETools.allocate_jacobian(
   allocate_matrix(op.assem,matdata)
 end
 
-function Gridap.ODEs.TransientFETools.residual!(
+function residual!(
   b::AbstractVector,
   op::ParamFEOperatorFromWeakForm,
   μ::AbstractVector,
@@ -81,14 +82,14 @@ function Gridap.ODEs.TransientFETools.residual!(
   b
 end
 
-function Gridap.ODEs.TransientFETools.jacobian!(
+function jacobian!(
   A::AbstractMatrix,
   op::ParamFEOperatorFromWeakForm,
   μ::AbstractVector,
   uh::CellField)
 
   Uμ = get_trial(op)
-  U = Gridap.evaluate(Uμ,μ)
+  U = Uμ(μ)
   V = get_test(op)
   du = get_trial_fe_basis(U)
   v = get_fe_basis(V)
@@ -113,5 +114,21 @@ function _collect_trian_jac(op::ParamFEOperator)
   collect_trian(matcontrib)
 end
 
-get_pspace(op::ParamFEOperatorFromWeakForm) = op.pspace
-realization(op::ParamFEOperator,args...) = realization(op.pspace,args...)
+function get_single_field(
+  op::ParamFEOperator{C},
+  filter::Tuple{Vararg{Any}}) where C
+
+  r_filter,c_filter = filter
+  trial = op.trial
+  test = op.test
+  c_trial = trial[c_filter]
+  r_test = test[r_filter]
+  rc_assem = SparseMatrixAssembler(c_trial,r_test)
+  ParamFEOperatorFromWeakForm{C}(
+    op.res,
+    op.jac,
+    rc_assem,
+    op.pspace,
+    c_trial,
+    r_test)
+end

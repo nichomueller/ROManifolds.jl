@@ -109,7 +109,7 @@ for (Top,Tslv,Tsps,Tspm) in zip(
       rbspace::$Tsps,
       s::SingleFieldSnapshots,
       params::Table,
-      filter=(1,1);
+      filter=(1,1),
       nsnaps=20,
       kwargs...)
 
@@ -163,7 +163,7 @@ for (Top,Tslv,Tsps,Tspm) in zip(
       kwargs...)
 
       compress_jacobians(feop,fesolver,trian,
-        (rbspace,rbspace),s,params,(1,1);kwargs...)
+        (rbspace,rbspace),s,params;kwargs...)
     end
 
     function compress_jacobians(
@@ -173,7 +173,7 @@ for (Top,Tslv,Tsps,Tspm) in zip(
       rbspace::NTuple{2,$Tsps},
       s::SingleFieldSnapshots,
       params::Table,
-      filter::Tuple{Vararg{Int}};
+      filter=(1,1),
       nsnaps=20,
       kwargs...)
 

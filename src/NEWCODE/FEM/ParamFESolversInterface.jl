@@ -10,11 +10,11 @@ struct ParamOpFromFEOp{C} <: ParamOp{C}
   feop::ParamFEOperator{C}
 end
 
-function Gridap.ODEs.TransientFETools.allocate_residual(op::ParamOpFromFEOp,uh)
+function allocate_residual(op::ParamOpFromFEOp,uh)
   allocate_residual(op.feop,uh)
 end
 
-function Gridap.ODEs.TransientFETools.allocate_jacobian(op::ParamOpFromFEOp,uh)
+function allocate_jacobian(op::ParamOpFromFEOp,uh)
   allocate_jacobian(op.feop,uh)
 end
 
@@ -56,7 +56,7 @@ struct ParamNonlinearOperator{T} <: NonlinearOperator
   cache
 end
 
-function Gridap.ODEs.TransientFETools.residual!(
+function residual!(
   b::AbstractVector,
   op::ParamNonlinearOperator,
   x::AbstractVector)
@@ -67,7 +67,7 @@ function Gridap.ODEs.TransientFETools.residual!(
   residual!(b,feop,op.μ,u)
 end
 
-function Gridap.ODEs.TransientFETools.jacobian!(
+function jacobian!(
   A::AbstractMatrix,
   op::ParamNonlinearOperator,
   x::AbstractVector)
@@ -80,7 +80,7 @@ function Gridap.ODEs.TransientFETools.jacobian!(
   jacobian!(A,feop,op.μ,u)
 end
 
-function Gridap.ODEs.TransientFETools.allocate_residual(
+function allocate_residual(
   op::ParamNonlinearOperator,
   x::AbstractVector)
 
@@ -90,7 +90,7 @@ function Gridap.ODEs.TransientFETools.allocate_residual(
   allocate_residual(feop,u)
 end
 
-function Gridap.ODEs.TransientFETools.allocate_jacobian(
+function allocate_jacobian(
   op::ParamNonlinearOperator,
   x::AbstractVector)
 
@@ -108,7 +108,7 @@ _get_trial_fe_basis(trial,args...) = get_trial_fe_basis(trial)
 
 function _get_fe_basis(
   test::MultiFieldFESpace,
-  filter::Tuple{Vararg{Int}})
+  filter::Tuple{Vararg{Any}})
 
   row, = filter
   nfields = length(test.spaces)
@@ -119,7 +119,7 @@ end
 
 function _get_trial_fe_basis(
   trial::MultiFieldFESpace,
-  filter::Tuple{Vararg{Int}})
+  filter::Tuple{Vararg{Any}})
 
   row,col = filter
   nfields = length(du)
@@ -133,21 +133,24 @@ function _vecdata_residual(
   ::FESolver,
   sols::AbstractArray,
   params::AbstractArray,
-  filter::Tuple{Vararg{Int}},
+  filter::Tuple{Vararg{Any}},
   args...;
   kwargs...)
 
   row,_ = filter
+  test_row = get_test(op)[row]
   trial = get_trial(op)
   dv_row = _get_fe_basis(op.test,row)
   sol_μ = _as_function(sols,params)
+  assem_row = SparseMatrixAssembler(test_row,test_row)
+  op.assem = assem_row
 
   function vecdata(μ)
     u = EvaluationFunction(trial(μ),sol_μ(μ))
-    collect_cell_vector(test,op.res(μ,u,dv_row),args...)
+    collect_cell_vector(test_row,op.res(μ,u,dv_row),args...)
   end
 
-  μ -> _filter_vecdata(op.assem,vecdata(μ),filter)
+  μ -> _filter_vecdata(vecdata(μ),filter)
 end
 
 function Gridap.ODEs.TransientFETools._matdata_jacobian(
@@ -155,22 +158,24 @@ function Gridap.ODEs.TransientFETools._matdata_jacobian(
   ::FESolver,
   sols::AbstractArray,
   params::AbstractArray,
-  filter::Tuple{Vararg{Int}},
+  filter::Tuple{Vararg{Any}},
   args...;
   kwargs...)
 
   row,col = filter
-  dv_row = _get_fe_basis(op.test,row)
-  du_col = _get_trial_fe_basis(get_trial(op)(nothing,nothing),col)
   test_row = get_test(op)[row]
   trial_col = get_trial(op)[col]
+  dv_row = _get_fe_basis(op.test,row)
+  du_col = _get_trial_fe_basis(op.trial(nothing),col)
   sols_col = sols[col]
   sol_col_μ = _as_function(sols_col,params)
+  assem_row_col = SparseMatrixAssembler(trial_col(nothing)[col],test_row)
+  op.assem = assem_row_col
 
   function matdata(μ)
     u_col = EvaluationFunction(trial_col(μ),sol_col_μ(μ))
     collect_cell_matrix(trial_col(μ),test_row,op.jac(μ,u_col(μ),dv_row,du_col),args...)
   end
 
-  μ -> _filter_matdata(op.assem,matdata(μ),filter)
+  μ -> _filter_matdata(matdata(μ),filter)
 end

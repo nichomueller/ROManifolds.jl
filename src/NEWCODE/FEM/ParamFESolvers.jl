@@ -5,7 +5,7 @@ mutable struct GenericParamSolution <: ParamSolution
   μ::AbstractVector
 end
 
-function Gridap.solve!(
+function solve!(
   op::ParamOp,
   solver::FESolver,
   uh::FEFunction,
@@ -18,7 +18,7 @@ function Gridap.solve!(
   sol
 end
 
-function Gridap.solve!(
+function solve!(
   op::ParamOp{Affine},
   solver::FESolver,
   uh::FEFunction,
@@ -35,7 +35,7 @@ function Gridap.solve!(
   sol
 end
 
-function Gridap.solve(
+function solve(
   op::ParamOp,
   solver::FESolver,
   μ::AbstractVector)

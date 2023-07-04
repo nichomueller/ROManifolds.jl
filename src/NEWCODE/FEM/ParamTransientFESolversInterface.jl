@@ -13,10 +13,9 @@ struct ParamODEOpFromFEOp{C} <: ParamODEOperator{C}
   feop::ParamTransientFEOperator{C}
 end
 
-Gridap.ODEs.TransientFETools.get_order(op::ParamODEOpFromFEOp) =
-  get_order(op.feop)
+get_order(op::ParamODEOpFromFEOp) = get_order(op.feop)
 
-function Gridap.ODEs.TransientFETools.allocate_cache(op::ParamODEOpFromFEOp)
+function allocate_cache(op::ParamODEOpFromFEOp)
   Ut = get_trial(op.feop)
   U = allocate_trial_space(Ut)
   Uts = (Ut,)
@@ -30,7 +29,7 @@ function Gridap.ODEs.TransientFETools.allocate_cache(op::ParamODEOpFromFEOp)
   ode_cache
 end
 
-function Gridap.ODEs.TransientFETools.allocate_cache(
+function allocate_cache(
   op::ParamODEOpFromFEOp,
   v::AbstractVector,
   a::AbstractVector)
@@ -39,7 +38,7 @@ function Gridap.ODEs.TransientFETools.allocate_cache(
   (v,a,ode_cache)
 end
 
-function Gridap.ODEs.TransientFETools.update_cache!(
+function update_cache!(
   ode_cache,
   op::ParamODEOpFromFEOp,
   μ::AbstractVector,
@@ -54,7 +53,7 @@ function Gridap.ODEs.TransientFETools.update_cache!(
   (Us,Uts,fecache)
 end
 
-function Gridap.ODEs.TransientFETools.allocate_residual(
+function allocate_residual(
   op::ParamODEOpFromFEOp,
   uhF::AbstractVector,
   ode_cache)
@@ -64,7 +63,7 @@ function Gridap.ODEs.TransientFETools.allocate_residual(
   allocate_residual(op.feop,uh,fecache)
 end
 
-function Gridap.ODEs.TransientFETools.allocate_jacobian(
+function allocate_jacobian(
   op::ParamODEOpFromFEOp,
   uhF::AbstractVector,
   ode_cache)
@@ -77,7 +76,7 @@ end
 """
 It provides A(t,uh,∂tuh,...,∂t^Nuh) for a given (t,uh,∂tuh,...,∂t^Nuh)
 """
-function Gridap.ODEs.TransientFETools.residual!(
+function residual!(
   b::AbstractVector,
   op::ParamODEOpFromFEOp,
   μ::AbstractVector,
@@ -101,7 +100,7 @@ provided by the `ODESolver`, e.g., 1/Δt for Backward Euler; It represents
 ∂(δt^i(uh))/∂(uh), in which δt^i(⋅) is the approximation of ∂t^i(⋅) in the solver.
 Note that for i=0, γ_i=1.0.
 """
-function Gridap.ODEs.TransientFETools.jacobian!(
+function jacobian!(
   A::AbstractMatrix,
   op::ParamODEOpFromFEOp,
   μ::AbstractVector,
@@ -122,7 +121,7 @@ end
 """
 Add the contribution of all jacobians ,i.e., ∑ᵢ γ_i*[∂A/∂(∂t^iuh)](t,uh,∂tuh,...,∂t^Nuh,vh)
 """
-function Gridap.ODEs.TransientFETools.jacobians!(
+function jacobians!(
   J::AbstractMatrix,
   op::ParamODEOpFromFEOp,
   μ::AbstractVector,
