@@ -133,8 +133,13 @@ function evaluate(U::ParamTransientMultiFieldTrialFESpace,::Nothing,::Nothing)
   MultiFieldFESpace([fesp(nothing,nothing) for fesp in U.spaces])
 end
 
+function evaluate(U::ParamTransientMultiFieldTrialFESpace,μ::AbstractVector)
+  TransientMultiFieldTrialFESpace([fesp(μ) for fesp in U.spaces])
+end
+
 (U::TransientMultiFieldTrialFESpace)(::AbstractVector,::Real) = U
 (U::ParamTransientMultiFieldTrialFESpace)(μ,t) = evaluate(U,μ,t)
+(U::ParamTransientMultiFieldTrialFESpace)(μ) = evaluate(U,μ)
 
 function ∂t(U::ParamTransientMultiFieldTrialFESpace)
   spaces = ∂t.(U.spaces)
@@ -149,16 +154,20 @@ function ParamTransientMultiFieldFESpace(spaces::Vector{<:SingleFieldFESpace})
   MultiFieldFESpace(spaces)
 end
 
-function Gridap.FESpaces.get_fe_basis(
+function get_fe_basis(
   U::ParamTransientMultiFieldTrialFESpace,
   i::Int)
 
   get_fe_basis(U[i])
 end
 
-function Gridap.FESpaces.get_trial_fe_basis(
+function get_trial_fe_basis(
   U::ParamTransientMultiFieldTrialFESpace,
   i::Int)
 
   get_trial_fe_basis(U[i])
+end
+
+function _split_solutions(trial::TransientMultiFieldTrialFESpace,u::AbstractVector)
+  _split_solutions(trial(nothing),u)
 end

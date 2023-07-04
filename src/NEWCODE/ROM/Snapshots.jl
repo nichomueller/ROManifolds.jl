@@ -82,13 +82,23 @@ function Base.getindex(s::SingleFieldSnapshots,idx...)
   s_copy
 end
 
-Base.getindex(s::MultiFieldSnapshots,i::Int) = get_single_field(s,i)
+function Base.getindex(s::MultiFieldSnapshots,idx...)
+  s_copy = copy(s)
+  ridx = (first(idx...)-1)*s_copy.nsnaps+1:last(idx...)*s_copy.nsnaps
+  s_copy.snaps = map(x->getindex(x,:,ridx),s_copy.snaps)
+  s_copy.nsnaps = length(idx...)
+  s_copy
+end
 
-function Gridap.CellData.get_data(s::SingleFieldSnapshots)
+function get_datum(s::SingleFieldSnapshots)
   recast(s.snaps)
 end
 
-function Gridap.FESpaces.allocate_matrix(s::SingleFieldSnapshots,sizes...)
+function get_datum(s::MultiFieldSnapshots)
+  map(recast,s.snaps)
+end
+
+function allocate_matrix(s::SingleFieldSnapshots,sizes...)
   allocate_matrix(s.snaps,sizes...)
 end
 
@@ -133,7 +143,7 @@ for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:O
       vecdata)
 
       aff = get_affinity(fesolver,params,vecdata)
-      data = get_data(aff,fesolver,params,vecdata)
+      data = get_datum(aff,fesolver,params,vecdata)
       cache = residuals_cache(feop.assem,data)
       ress = pmap(d -> collect_residuals!(cache,feop,d),data)
       Snapshots(ress,aff)
@@ -146,7 +156,7 @@ for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:O
       matdata)
 
       aff = get_affinity(fesolver,params,matdata)
-      data = get_data(aff,fesolver,params,matdata)
+      data = get_datum(aff,fesolver,params,matdata)
       cache = jacobians_cache(feop.assem,data)
       jacs = pmap(d -> collect_jacobians!(cache,feop,d),data)
       Snapshots(jacs,aff)

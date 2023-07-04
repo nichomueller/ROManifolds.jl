@@ -79,3 +79,8 @@ function _as_function(values::AbstractMatrix,input)
     @unreachable
   end
 end
+
+function _as_function(values_block::Vector{<:AbstractArray},args...)
+  values = vcat(values_block...)
+  _as_function(values,args...)
+end

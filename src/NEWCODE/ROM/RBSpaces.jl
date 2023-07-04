@@ -23,19 +23,23 @@ get_basis_space(rb::SingleFieldRBSpace) = rb.basis_space
 
 get_basis_space(rb::TransientSingleFieldRBSpace) = rb.basis_space
 
-get_rb_space_ndofs(rb::SingleFieldRBSpace) = size(get_data(rb.basis_space),2)
+get_rb_space_ndofs(rb::SingleFieldRBSpace) = size(get_datum(rb.basis_space),2)
 
 get_basis_time(rb::TransientSingleFieldRBSpace) = rb.basis_time
 
-get_rb_time_ndofs(rb::TransientSingleFieldRBSpace) = size(get_data(rb.basis_time),2)
+get_rb_time_ndofs(rb::TransientSingleFieldRBSpace) = size(get_datum(rb.basis_time),2)
 
 get_rb_ndofs(rb::SingleFieldRBSpace) = get_rb_space_ndofs(rb)
 
 get_rb_ndofs(rb::TransientSingleFieldRBSpace) = get_rb_space_ndofs(rb)*get_rb_time_ndofs(rb)
 
-Base.getindex(rb::MultiFieldRBSpace,i::Int) = get_single_field(rb,i)
+for Tsp in (:MultiFieldRBSpace,:TransientMultiFieldRBSpace)
+  @eval begin
+    Base.getindex(rb::$Tsp,i::Int) = get_single_field(rb,i)
 
-Base.getindex(rb::TransientMultiFieldRBSpace,i::Int) = get_single_field(rb,i)
+    get_nfields(rb::$Tsp) = length(rb.basis_space)
+  end
+end
 
 function get_single_field(
   rb::MultiFieldRBSpace{T},
@@ -122,7 +126,7 @@ for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:O
       for (i,bs) in enumerate(bsdual)
         printstyled("Computing supremizers in space for dual field $i\n";color=:blue)
         cmat_i = assemble_constraint_matrix(feop,fesolver,snaps,params,i)
-        supr_i = cmat_i*bs.bases_space[i]
+        supr_i = cmat_i*bs.bases_space[i+1]
         bsu_i = gram_schmidt(supr_i,primal.nonzero_val)
         primal.nonzero_val = hcat(primal.nonzero_val,bsu_i)
       end
@@ -137,11 +141,13 @@ for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:O
       i::Int)
 
       filter = (1,i)
-      si = get_data(s[i])
+      snaps = get_datum(s)
 
-      matdata = _matdata_jacobian(feop,fesolver,si,params,filter)
+      matdata = _matdata_jacobian(feop,fesolver,snaps,params,filter)
       aff = get_affinity(fesolver,params,matdata)
-      assemble_matrix(feop,fesolver,sols,params,filter)
+      @check isa(aff,ParamAffinity) || isa(aff,ParamTimeAffinity)
+      data = get_datum(aff,fesolver,params,matdata)
+      assemble_matrix(feop.assem,data)
     end
   end
 end

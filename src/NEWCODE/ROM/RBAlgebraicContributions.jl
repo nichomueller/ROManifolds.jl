@@ -4,11 +4,11 @@ end
 
 RBAlgebraicContribution() = RBAlgebraicContribution(IdDict{Triangulation,RBAffineDecompositions}())
 
-Gridap.CellData.num_domains(a::RBAlgebraicContribution) = length(a.dict)
+num_domains(a::RBAlgebraicContribution) = length(a.dict)
 
-Gridap.CellData.get_domains(a::RBAlgebraicContribution) = keys(a.dict)
+get_domains(a::RBAlgebraicContribution) = keys(a.dict)
 
-function Gridap.CellData.get_contribution(
+function get_contribution(
   a::RBAlgebraicContribution,
   trian::Triangulation)
 
@@ -23,7 +23,7 @@ end
 
 Base.getindex(a::RBAlgebraicContribution,trian::Triangulation) = get_contribution(a,trian)
 
-function Gridap.CellData.add_contribution!(
+function add_contribution!(
   a::RBAlgebraicContribution,
   trian::Triangulation,
   b::RBAffineDecompositions,
@@ -62,7 +62,7 @@ function assemble_rb_residual(
   end
 end
 
-function Gridap.FESpaces.assemble_vector(
+function assemble_vector(
   feop::ParamTransientFEOperator,
   c::RBAlgebraicContribution,
   sols::AbstractArray,
@@ -82,7 +82,7 @@ function Gridap.FESpaces.assemble_vector(
   vec
 end
 
-function Gridap.FESpaces.assemble_matrix(
+function assemble_matrix(
   feop::ParamTransientFEOperator,
   c::RBAlgebraicContribution,
   sols::AbstractArray,

@@ -124,9 +124,9 @@ function get_dimension(test::SingleFieldFESpace)
   get_dimension(model)
 end
 
-function Gridap.CellData.get_cell_points(test::SingleFieldFESpace)
+function get_cell_points(test::SingleFieldFESpace)
   cell_quad = CellQuadrature(get_triangulation(test),get_degree(test))
-  Gridap.CellData.get_data(get_cell_points(cell_quad))
+  get_data(get_cell_points(cell_quad))
 end
 
 struct LagrangianQuadFESpace

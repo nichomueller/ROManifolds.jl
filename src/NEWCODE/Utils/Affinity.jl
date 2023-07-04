@@ -76,7 +76,7 @@ function get_affinity(solver::ODESolver,params::Table,data::Function;ntests=10)
   _affinity(p_aff,t_aff)
 end
 
-function Gridap.CellData.get_data(
+function get_datum(
   ::ParamAffinity,
   ::FESolver,
   params::Table,
@@ -86,7 +86,7 @@ function Gridap.CellData.get_data(
   [data(μ)]
 end
 
-function Gridap.CellData.get_data(
+function get_datum(
   ::NonAffinity,
   ::FESolver,
   params::Table,
@@ -95,7 +95,7 @@ function Gridap.CellData.get_data(
   pmap(μ->data(μ),params)
 end
 
-function Gridap.CellData.get_data(
+function get_datum(
   ::ParamTimeAffinity,
   solver::ODESolver,
   params::Table,
@@ -107,7 +107,7 @@ function Gridap.CellData.get_data(
   [data(μ,t)]
 end
 
-function Gridap.CellData.get_data(
+function get_datum(
   ::ParamAffinity,
   solver::ODESolver,
   params::Table,
@@ -118,7 +118,7 @@ function Gridap.CellData.get_data(
   pmap(t->data(μ,t),times)
 end
 
-function Gridap.CellData.get_data(
+function get_datum(
   ::TimeAffinity,
   solver::ODESolver,
   params::Table,
@@ -129,7 +129,7 @@ function Gridap.CellData.get_data(
   pmap(μ->data(μ,t),params)
 end
 
-function Gridap.CellData.get_data(
+function get_datum(
   ::NonAffinity,
   solver::ODESolver,
   params::Table,

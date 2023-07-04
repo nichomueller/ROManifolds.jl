@@ -108,23 +108,23 @@ _get_trial_fe_basis(trial,args...) = get_trial_fe_basis(trial)
 
 function _get_fe_basis(
   test::MultiFieldFESpace,
-  filter::Tuple{Vararg{Any}})
+  row::Int)
 
-  row, = filter
-  nfields = length(test.spaces)
-  dv_row = Vector{Nothing}(undef,nfields)
-  dv_row[row] = get_fe_basis(test[row])
+  dv_row = Any[]
+  for nf = eachindex(test.spaces)
+    nf == row ? push!(dv_row,get_fe_basis(test[row])) : push!(dv_row,nothing)
+  end
   dv_row
 end
 
 function _get_trial_fe_basis(
   trial::MultiFieldFESpace,
-  filter::Tuple{Vararg{Any}})
+  col::Int)
 
-  row,col = filter
-  nfields = length(du)
-  du_col = Vector{Nothing}(undef,nfields)
-  du_col[col] = get_trial_fe_basis(trial[col])
+  du_col = Any[]
+  for nf = eachindex(trial.spaces)
+    nf == col ? push!(du_col,get_fe_basis(trial[col])) : push!(du_col,nothing)
+  end
   du_col
 end
 
@@ -153,7 +153,7 @@ function _vecdata_residual(
   μ -> _filter_vecdata(vecdata(μ),filter)
 end
 
-function Gridap.ODEs.TransientFETools._matdata_jacobian(
+function _matdata_jacobian(
   op::ParamFEOperator,
   ::FESolver,
   sols::AbstractArray,
@@ -167,7 +167,7 @@ function Gridap.ODEs.TransientFETools._matdata_jacobian(
   trial_col = get_trial(op)[col]
   dv_row = _get_fe_basis(op.test,row)
   du_col = _get_trial_fe_basis(op.trial(nothing),col)
-  sols_col = sols[col]
+  sols_col = isa(sols,AbstractMatrix) ? sols : sols[col]
   sol_col_μ = _as_function(sols_col,params)
   assem_row_col = SparseMatrixAssembler(trial_col(nothing)[col],test_row)
   op.assem = assem_row_col

@@ -39,11 +39,11 @@ function compress_array(entire_array::SparseMatrixCSC{Float,Int})
   findnz(entire_array[:])
 end
 
-function Gridap.FESpaces.allocate_matrix(::EMatrix{T},sizes...) where T
+function allocate_matrix(::EMatrix{T},sizes...) where T
   Elemental.zeros(EMatrix{T},sizes...)
 end
 
-function Gridap.FESpaces.allocate_matrix(::Matrix{T},sizes...) where T
+function allocate_matrix(::Matrix{T},sizes...) where T
   zeros(T,sizes...)
 end
 

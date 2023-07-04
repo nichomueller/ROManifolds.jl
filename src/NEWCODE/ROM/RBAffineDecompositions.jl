@@ -95,10 +95,10 @@ for (Top,Tslv,Tsps,Tspm) in zip(
       params::Table;
       kwargs...)
 
-      nfields = get_nfields(s)
+      nfields = get_nfields(rbspace)
       lazy_map(1:nfields) do row
         compress_residuals(feop,fesolver,trian,
-          rbspace[row],s[row],params,(row,1);kwargs...)
+          rbspace[row],s,params,(row,1);kwargs...)
       end
     end
 
@@ -107,13 +107,13 @@ for (Top,Tslv,Tsps,Tspm) in zip(
       fesolver::$Tslv,
       trian::Triangulation,
       rbspace::$Tsps,
-      s::SingleFieldSnapshots,
+      s::Snapshots,
       params::Table,
-      filter=(1,1),
+      filter=(1,1);
       nsnaps=20,
       kwargs...)
 
-      sres = get_data(s[1:nsnaps])
+      sres = get_datum(s[1:nsnaps])
       pres = params[1:nsnaps]
       vecdata = _vecdata_residual(feop,fesolver,sres,pres,filter,trian)
       r = generate_residuals(feop,fesolver,pres,vecdata)
@@ -148,7 +148,7 @@ for (Top,Tslv,Tsps,Tspm) in zip(
       lazy_map(1:nfields) do row
         lazy_map(1:nfields) do col
           compress_jacobians(feop,fesolver,trian,
-            (rbspace[row],rbspace[col]),s[col],params,(row,col);kwargs...)
+            (rbspace[row],rbspace[col]),s,params,(row,col);kwargs...)
         end
       end
     end
@@ -171,13 +171,13 @@ for (Top,Tslv,Tsps,Tspm) in zip(
       fesolver::$Tslv,
       trian::Triangulation,
       rbspace::NTuple{2,$Tsps},
-      s::SingleFieldSnapshots,
+      s::Snapshots,
       params::Table,
       filter=(1,1),
       nsnaps=20,
       kwargs...)
 
-      sjac = get_data(s[1:nsnaps])
+      sjac = get_datum(s[1:nsnaps])
       pjac = params[1:nsnaps]
       matdata = _matdata_jacobian(feop,fesolver,sjac,pjac,filter,trian)
       j = generate_jacobians(feop,fesolver,pjac,matdata)

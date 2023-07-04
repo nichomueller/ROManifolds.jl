@@ -76,7 +76,7 @@ function Base.adjoint(nza::NnzArray)
   nza_copy
 end
 
-function Gridap.FESpaces.allocate_matrix(nza::NnzArray,sizes...)
+function allocate_matrix(nza::NnzArray,sizes...)
   allocate_matrix(nza.nonzero_val,sizes...)
 end
 

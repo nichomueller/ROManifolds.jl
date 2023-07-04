@@ -90,16 +90,6 @@ function _allocate_trial_space(sol::ParamODESolution)
   allocate_trial_space(first(sol.op.feop.trials))
 end
 
-function _split_solutions(::TrialFESpace,u::AbstractVector)
-  u
-end
-
-function _split_solutions(trial::MultiFieldFESpace,u::AbstractVector)
-  map(1:length(trial.spaces)) do i
-    restrict_to_field(trial,u,i)
-  end
-end
-
 function solution_cache(test::FESpace,solver::ODESolver)
   space_ndofs = test.nfree
   time_ndofs = get_time_ndofs(solver)

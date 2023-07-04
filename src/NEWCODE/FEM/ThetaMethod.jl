@@ -89,9 +89,9 @@ end
 
 function _evaluation_function(
   solver::θMethod,
-  trial::TransientTrialFESpace,
+  trial::Tsp,
   xh::AbstractMatrix,
-  x0=zeros(size(xh,1)))
+  x0::AbstractVector) where Tsp
 
   times = get_times(solver)
   xhθ = solver.θ*xh + (1-solver.θ)*hcat(x0,xh[:,1:end-1])
@@ -102,6 +102,19 @@ function _evaluation_function(
   x_t(t) = EvaluationFunction(trial(t),xh_t(t))
   xθ_t(t) = EvaluationFunction(dtrial(t),xhθ_t(t))
   t -> TransientCellField(x_t(t),(xθ_t(t),))
+end
+
+_evaluation_function(u,args...) = u
+
+function _evaluation_function(
+  u::Gridap.ODEs.TransientFETools.TransientMultiFieldCellField,
+  col::Int)
+
+  u_col = Any[]
+  for nf = eachindex(u.transient_single_fields)
+    nf == col ? push!(u_col,u[col]) : push!(u_col,nothing)
+  end
+  u_col
 end
 
 function _vecdata_residual(
@@ -130,7 +143,7 @@ function _vecdata_residual(
   (μ,t) -> _filter_vecdata(vecdata(μ,t),filter)
 end
 
-function Gridap.ODEs.TransientFETools._matdata_jacobian(
+function _matdata_jacobian(
   op::ParamTransientFEOperator,
   solver::θMethod,
   sols::AbstractArray,
@@ -143,16 +156,16 @@ function Gridap.ODEs.TransientFETools._matdata_jacobian(
   test_row = get_test(op)[row]
   trial_col = get_trial(op)[col]
   dv_row = _get_fe_basis(op.test,row)
-  du_col = _get_trial_fe_basis(op.trial(nothing,nothing),col)
-  sols_col = sols[col]
-  sol_col_μ = _as_function(sols_col,params)
+  du_col = _get_trial_fe_basis(get_trial(op)(nothing,nothing),col)
+  sols_μ = _as_function(sols,params)
   assem_row_col = SparseMatrixAssembler(trial_col(nothing,nothing)[col],test_row)
   op.assem = assem_row_col
 
   γ = (1.0,1/(solver.dt*solver.θ))
   function matdata(μ,t)
-    u0_col = get_free_dof_values(solver.uh0(μ)[col])
-    u_col = _evaluation_function(solver,trial_col(μ),sol_col_μ(μ),u0_col)
+    u0 = get_free_dof_values(solver.uh0(μ))
+    u = _evaluation_function(solver,get_trial(op)(μ),sols_μ(μ),u0)
+    u_col(t) = _evaluation_function(u(t),col)
     _matdata = ()
     for (i,γᵢ) in enumerate(γ)
       if γᵢ > 0.0

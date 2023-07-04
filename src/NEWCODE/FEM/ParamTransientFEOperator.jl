@@ -196,7 +196,7 @@ function fill_jacobians(
   return _matdata
 end
 
-function Gridap.ODEs.TransientFETools._matdata_jacobian(
+function _matdata_jacobian(
   op::ParamTransientFEOperatorFromWeakForm,
   μ::AbstractVector,
   t::Real,
