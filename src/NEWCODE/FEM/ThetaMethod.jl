@@ -122,7 +122,7 @@ function _vecdata_residual(
   solver::θMethod,
   sols::AbstractArray,
   params::AbstractArray,
-  filter::Tuple{Vararg{Any}},
+  filter::Tuple{Vararg{Int}},
   args...;
   kwargs...)
 
@@ -137,10 +137,10 @@ function _vecdata_residual(
   function vecdata(μ,t)
     u0 = get_free_dof_values(solver.uh0(μ))
     u = _evaluation_function(solver,trial(μ),sol_μ(μ),u0)
-    collect_cell_vector(test_row,op.res(μ,t,u(t),dv_row),trian)
+    collect_cell_vector(test_row,op.res(μ,t,u(t),dv_row),args...)
   end
 
-  (μ,t) -> _filter_vecdata(vecdata(μ,t),filter)
+  vecdata
 end
 
 function _matdata_jacobian(
@@ -148,7 +148,7 @@ function _matdata_jacobian(
   solver::θMethod,
   sols::AbstractArray,
   params::AbstractArray,
-  filter::Tuple{Vararg{Any}},
+  filter::Tuple{Vararg{Int}},
   args...;
   kwargs...)
 
@@ -180,5 +180,5 @@ function _matdata_jacobian(
     _vcat_matdata(_matdata)
   end
 
-  (μ,t) -> _filter_matdata(matdata(μ,t),filter)
+  matdata
 end

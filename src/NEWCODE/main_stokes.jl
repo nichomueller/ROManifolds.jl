@@ -81,55 +81,24 @@ nsnaps = info.nsnaps
 params = realization(feop,nsnaps)
 cache = solution_cache(feop.test,fesolver)
 sols = generate_solutions(feop,fesolver,params)
+rbspace = compress_solutions(feop,fesolver,sols,params;ϵ,compute_supremizers)
+rb_res_c = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
+rb_jac_c = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
 
-s = collect_single_fields(sols)
-bases = map(snap -> transient_tpod(snap,fesolver;ϵ),s)
-bases_space,bases_time = first.(bases),last.(bases)
-bsprimal,bsdual = map(recast,bases_space)
-filter = (1,2)
-snaps = get_datum(sols)
-op,solver = feop,fesolver
-row,col = filter
-test_row = get_test(op)[row]
-trial_col = get_trial(op)[col]
-dv_row = _get_fe_basis(op.test,row)
-du_col = _get_trial_fe_basis(get_trial(op)(nothing,nothing),col)
-sols_μ = _as_function(snaps,params)
-assem_row_col = SparseMatrixAssembler(trial_col(nothing,nothing)[col],test_row)
-op.assem = assem_row_col
+trians = _collect_trian_jac(feop)
+trian = trians[1]
+filter = (2,2)
+sres = get_datum(sols[1:nsnaps])
+pres = params[1:nsnaps]
+cell_dof_ids = get_cell_dof_ids(feop.test[filter[1]],trian)
+order = 2
+matdata = _matdata_jacobian(feop,fesolver,sres,pres,filter,trian)
+j = generate_jacobians(feop,fesolver,pres,matdata)
+jrb = compress_component(j,fesolver,trian,cell_dof_ids,order,rbspace[2],rbspace[1])
 
-γ = (1.0,1/(solver.dt*solver.θ))
-μ,t = params[1],dt
-uu0 = get_free_dof_values(solver.uh0(μ))
-u = _evaluation_function(solver,get_trial(op)(μ),sols_μ(μ),uu0)
-u_col = _evaluation_function(u(t),col)
-
-# xh_block = sols_μ(μ)
-# xh = vcat(xh_block...)
-# times = get_times(solver)
-# xhθ = solver.θ*xh + (1-solver.θ)*hcat(uu0,xh[:,1:end-1])
-# xh_t = _as_function(xh,times)
-# xhθ_t = _as_function(xhθ,times)
-
-# dtrial = ∂t(get_trial(op)(μ)(t))
-# x_t = EvaluationFunction(get_trial(op)(μ)(t),xh_t(t))
-# xθ_t = EvaluationFunction(dtrial(t),xhθ_t(t))
-# TransientCellField(x_t,(xθ_t,))
-
-
-_matdata = ()
-for (i,γᵢ) in enumerate(γ)
-  if γᵢ > 0.0
-    _matdata = (_matdata...,
-      collect_cell_matrix(
-      trial_col(μ,t),
-      test_row,
-      γᵢ*op.jacs[i](μ,t,u_col,dv_row,du_col)))
-  end
-end
-_vcat_matdata(_matdata)
-
-# rbspace = compress_solutions(feop,fesolver,sols,params;ϵ,compute_supremizers)
+data = matdata(μ,t)
+mat = allocate_matrix(feop.assem,data)
+mat_nnz = compress(mat)
 # nsnaps = info.nsnaps_mdeim
 # rb_res = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
 # rb_jac = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)

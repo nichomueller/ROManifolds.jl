@@ -53,7 +53,7 @@ function projection(
   X=nothing)
 
   proj(v) = isnothing(X) ? v*sum(vnew'*v) : v*sum(vnew'*X*v)
-  proj_mat = reshape(similar(basis),:,1)
+  proj_mat = reshape(similar(vnew),:,1)
   copyto!(proj_mat,sum([proj(basis[:,i]) for i = axes(basis,2)]))
   proj_mat
 end
@@ -64,7 +64,7 @@ function orth_projection(
   X=nothing)
 
   proj(v) = isnothing(X) ? v*sum(vnew'*v)/sum(v'*v) : v*sum(vnew'*X*v)/sum(v'*X*v)
-  proj_mat = reshape(similar(basis),:,1)
+  proj_mat = reshape(similar(vnew),:,1)
   copyto!(proj_mat,sum([proj(basis[:,i]) for i = axes(basis,2)]))
   proj_mat
 end
@@ -74,7 +74,7 @@ function orth_complement(
   basis::AbstractMatrix{Float};
   kwargs...)
 
-  compl = reshape(similar(basis),:,1)
+  compl = reshape(similar(v),:,1)
   copyto!(compl,v - orth_projection(v,basis;kwargs...))
 end
 

@@ -123,7 +123,7 @@ function _get_trial_fe_basis(
 
   du_col = Any[]
   for nf = eachindex(trial.spaces)
-    nf == col ? push!(du_col,get_fe_basis(trial[col])) : push!(du_col,nothing)
+    nf == col ? push!(du_col,get_trial_fe_basis(trial[col])) : push!(du_col,nothing)
   end
   du_col
 end
@@ -133,7 +133,7 @@ function _vecdata_residual(
   ::FESolver,
   sols::AbstractArray,
   params::AbstractArray,
-  filter::Tuple{Vararg{Any}},
+  filter::Tuple{Vararg{Int}},
   args...;
   kwargs...)
 
@@ -150,7 +150,7 @@ function _vecdata_residual(
     collect_cell_vector(test_row,op.res(μ,u,dv_row),args...)
   end
 
-  μ -> _filter_vecdata(vecdata(μ),filter)
+  vecdata
 end
 
 function _matdata_jacobian(
@@ -158,7 +158,7 @@ function _matdata_jacobian(
   ::FESolver,
   sols::AbstractArray,
   params::AbstractArray,
-  filter::Tuple{Vararg{Any}},
+  filter::Tuple{Vararg{Int}},
   args...;
   kwargs...)
 
@@ -177,5 +177,5 @@ function _matdata_jacobian(
     collect_cell_matrix(trial_col(μ),test_row,op.jac(μ,u_col(μ),dv_row,du_col),args...)
   end
 
-  μ -> _filter_matdata(matdata(μ),filter)
+  matdata
 end

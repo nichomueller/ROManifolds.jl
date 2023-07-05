@@ -37,9 +37,9 @@ import Gridap.Algebra:InserterCSC
 import Gridap.Algebra:solve
 import Gridap.Algebra:solve!
 import Gridap.Algebra:residual!
-import Gridap.Algebra:allocate_jacobian!
+import Gridap.Algebra:jacobian!
+import Gridap.Algebra:allocate_jacobian
 import Gridap.Algebra:allocate_residual
-import Gridap.Algebra:jacobian
 import Gridap.Algebra:allocate_vector
 import Gridap.Algebra:allocate_matrix
 import Gridap.FESpaces:_pair_contribution_when_possible
@@ -59,15 +59,10 @@ import Gridap.ODEs.TransientFETools:Nonlinear
 import Gridap.ODEs.TransientFETools:solve_step!
 import Gridap.ODEs.TransientFETools:allocate_trial_space
 import Gridap.ODEs.TransientFETools:allocate_cache
-import Gridap.ODEs.TransientFETools:allocate_jacobian
-import Gridap.ODEs.TransientFETools:allocate_residual
 import Gridap.ODEs.TransientFETools:fill_initial_jacobians
 import Gridap.ODEs.TransientFETools:fill_jacobians
 import Gridap.ODEs.TransientFETools:update_cache!
-import Gridap.ODEs.TransientFETools:residual!
-import Gridap.ODEs.TransientFETools:jacobian!
 import Gridap.ODEs.TransientFETools:jacobians!
-import Gridap.ODEs.TransientFETools._vcat_matdata
 import Gridap.ODEs.TransientFETools._matdata_jacobian
 import Gridap.ODEs.TransientFETools:∂t
 import Gridap.ODEs.TransientFETools:∂tt

@@ -12,6 +12,8 @@ end
 
 _get_nsnaps(snaps) = size(snaps,2)
 _get_nsnaps(snaps::AbstractVector) = length(snaps)
+get_time_ndofs(s::SingleFieldSnapshots) = Int(size(s,2)/s.nsnaps)
+get_time_ndofs(s::MultiFieldSnapshots) = Int(size(s.snaps[1],2)/s.nsnaps)
 
 function Snapshots(
   snaps::NnzArray{T},
@@ -35,7 +37,7 @@ function Snapshots(
   SingleFieldSnapshots{T,A}(csnaps,nsnaps)
 end
 
-for (T,elT) in zip((:Matrix,:Vector),(:Float64,:Float32))
+for T in (:Matrix,:Vector), elT in (:Float64,:Float32)
   @eval begin
     function Snapshots(
       snaps::Union{$T{$elT},Vector{$T{$elT}}},
@@ -76,7 +78,8 @@ end
 
 function Base.getindex(s::SingleFieldSnapshots,idx...)
   s_copy = copy(s)
-  ridx = (first(idx...)-1)*s_copy.nsnaps+1:last(idx...)*s_copy.nsnaps
+  time_ndofs = get_time_ndofs(s)
+  ridx = (first(idx...)-1)*time_ndofs+1:last(idx...)*time_ndofs
   s_copy.snaps = s_copy.snaps[:,ridx]
   s_copy.nsnaps = length(idx...)
   s_copy
@@ -84,7 +87,8 @@ end
 
 function Base.getindex(s::MultiFieldSnapshots,idx...)
   s_copy = copy(s)
-  ridx = (first(idx...)-1)*s_copy.nsnaps+1:last(idx...)*s_copy.nsnaps
+  time_ndofs = get_time_ndofs(s)
+  ridx = (first(idx...)-1)*time_ndofs+1:last(idx...)*time_ndofs
   s_copy.snaps = map(x->getindex(x,:,ridx),s_copy.snaps)
   s_copy.nsnaps = length(idx...)
   s_copy
@@ -145,7 +149,7 @@ for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:O
       aff = get_affinity(fesolver,params,vecdata)
       data = get_datum(aff,fesolver,params,vecdata)
       cache = residuals_cache(feop.assem,data)
-      ress = pmap(d -> collect_residuals!(cache,feop,d),data)
+      ress = pmap(d -> collect_residuals!(cache,feop.assem,d),data)
       Snapshots(ress,aff)
     end
 
@@ -158,7 +162,7 @@ for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:O
       aff = get_affinity(fesolver,params,matdata)
       data = get_datum(aff,fesolver,params,matdata)
       cache = jacobians_cache(feop.assem,data)
-      jacs = pmap(d -> collect_jacobians!(cache,feop,d),data)
+      jacs = pmap(d -> collect_jacobians!(cache,feop.assem,d),data)
       Snapshots(jacs,aff)
     end
   end
@@ -213,7 +217,7 @@ for (T,A) in zip((:AbstractMatrix,:SparseMatrixCSC),
 
       basis_space = tpod(s.snaps;kwargs...)
       time_ndofs = get_time_ndofs(solver)
-      basis_time = allocate_matrix(s,time_ndofs,1)
+      basis_time = compress(ones(time_ndofs,1))
       convert!(type,basis_space)
       convert!(type,basis_time)
       basis_space,basis_time

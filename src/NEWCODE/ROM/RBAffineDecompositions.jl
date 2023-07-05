@@ -64,6 +64,8 @@ struct TransientRBAffineDecomposition <: RBAffineDecompositions
   integration_domain::TransientRBIntegrationDomain
 end
 
+struct ZeroRBAffineDecomposition <: RBAffineDecompositions end
+
 for (Top,Tslv,Tsps,Tspm) in zip(
   (:ParamFEOperator,:ParamTransientFEOperator),
   (:FESolver,:ODESolver),
@@ -78,7 +80,7 @@ for (Top,Tslv,Tsps,Tspm) in zip(
       kwargs...)
 
       trians = _collect_trian_res(feop)
-      cres = RBAlgebraicContribution()
+      cres = RBResidualContribution()
       for trian in trians
         ad_res = compress_residuals(feop,fesolver,trian,args...;kwargs...)
         add_contribution!(cres,trian,ad_res)
@@ -90,16 +92,18 @@ for (Top,Tslv,Tsps,Tspm) in zip(
       feop::$Top,
       fesolver::$Tslv,
       trian::Triangulation,
-      rbspace::$Tspm,
-      s::MultiFieldSnapshots,
+      rbspace::Union{$Tsps,$Tspm},
+      s::Snapshots,
       params::Table;
       kwargs...)
 
       nfields = get_nfields(rbspace)
-      lazy_map(1:nfields) do row
-        compress_residuals(feop,fesolver,trian,
+      ad_res = Vector{RBAffineDecompositions}(undef,nfields)
+      for row = 1:nfields
+        ad_res[row] = compress_residuals(feop,fesolver,trian,
           rbspace[row],s,params,(row,1);kwargs...)
       end
+      ad_res
     end
 
     function compress_residuals(
@@ -109,15 +113,18 @@ for (Top,Tslv,Tsps,Tspm) in zip(
       rbspace::$Tsps,
       s::Snapshots,
       params::Table,
-      filter=(1,1);
+      filter::Tuple{Vararg{Int}};
       nsnaps=20,
       kwargs...)
 
       sres = get_datum(s[1:nsnaps])
       pres = params[1:nsnaps]
+      cell_dof_ids = get_cell_dof_ids(feop.test[filter[1]],trian)
+      order = get_order(feop.test[filter[1]])
+
       vecdata = _vecdata_residual(feop,fesolver,sres,pres,filter,trian)
       r = generate_residuals(feop,fesolver,pres,vecdata)
-      compress_component(r,feop,fesolver,trian,rbspace;kwargs...)
+      compress_component(r,fesolver,trian,cell_dof_ids,order,rbspace;kwargs...)
     end
 
     function compress_jacobians(
@@ -127,7 +134,7 @@ for (Top,Tslv,Tsps,Tspm) in zip(
       kwargs...)
 
       trians = _collect_trian_jac(feop)
-      cjac = RBAlgebraicContribution()
+      cjac = RBJacobianContribution()
       for trian in trians
         ad_jac = compress_jacobians(feop,fesolver,trian,args...;kwargs...)
         add_contribution!(cjac,trian,ad_jac)
@@ -139,31 +146,18 @@ for (Top,Tslv,Tsps,Tspm) in zip(
       feop::$Top,
       fesolver::$Tslv,
       trian::Triangulation,
-      rbspace::$Tspm,
-      s::MultiFieldSnapshots,
+      rbspace::Union{$Tsps,$Tspm},
+      s::Snapshots,
       params::Table;
       kwargs...)
 
-      nfields = get_nfields(s)
-      lazy_map(1:nfields) do row
-        lazy_map(1:nfields) do col
-          compress_jacobians(feop,fesolver,trian,
-            (rbspace[row],rbspace[col]),s,params,(row,col);kwargs...)
-        end
+      nfields = get_nfields(rbspace)
+      ad_jac = Matrix{RBAffineDecompositions}(undef,nfields,nfields)
+      for row = 1:nfields, col = 1:nfields
+        ad_jac[row,col] = compress_jacobians(feop,fesolver,trian,
+          (rbspace[row],rbspace[col]),s,params,(row,col);kwargs...)
       end
-    end
-
-    function compress_jacobians(
-      feop::$Top,
-      fesolver::$Tslv,
-      trian::Triangulation,
-      rbspace::$Tsps,
-      s::SingleFieldSnapshots,
-      params::Table;
-      kwargs...)
-
-      compress_jacobians(feop,fesolver,trian,
-        (rbspace,rbspace),s,params;kwargs...)
+      ad_jac
     end
 
     function compress_jacobians(
@@ -173,30 +167,31 @@ for (Top,Tslv,Tsps,Tspm) in zip(
       rbspace::NTuple{2,$Tsps},
       s::Snapshots,
       params::Table,
-      filter=(1,1),
+      filter=(1,1);
       nsnaps=20,
       kwargs...)
 
       sjac = get_datum(s[1:nsnaps])
       pjac = params[1:nsnaps]
+      cell_dof_ids = get_cell_dof_ids(feop.test[filter[1]],trian)
+      order = get_order(feop.test[filter[1]])
+
       matdata = _matdata_jacobian(feop,fesolver,sjac,pjac,filter,trian)
       j = generate_jacobians(feop,fesolver,pjac,matdata)
-      compress_component(j,feop,fesolver,trian,rbspace...;kwargs...)
+      compress_component(j,fesolver,trian,cell_dof_ids,order,rbspace...;kwargs...)
     end
   end
 
 end
 
 function compress_component(
-  component::SingleFieldSnapshots,
-  feop::ParamFEOperator,
+  component::SingleFieldSnapshots{T,A} where T,
   fesolver::FESolver,
   trian::Triangulation,
+  cell_dof_ids::Table,
+  order::Int,
   args...;
-  kwargs...)
-
-  cell_dof_ids = get_cell_dof_ids(feop.test,trian)
-  order = Gridap.FESpaces.get_order(feop.test)
+  kwargs...) where {A<:Union{ParamAffinity,NonAffinity}}
 
   bs = tpod(component;kwargs...)
   interp_idx = get_interpolation_idx(bs)
@@ -211,16 +206,15 @@ function compress_component(
 end
 
 function compress_component(
-  component::SingleFieldSnapshots,
-  feop::ParamTransientFEOperator,
+  component::SingleFieldSnapshots{T,A} where T,
   fesolver::ODESolver,
   trian::Triangulation,
+  cell_dof_ids::Table,
+  order::Int,
   args...;
   st_mdeim=true,
-  kwargs...)
+  kwargs...) where {A<:Union{ParamAffinity,TimeAffinity,ParamTimeAffinity,NonAffinity}}
 
-  cell_dof_ids = get_cell_dof_ids(feop.test,trian)
-  order = Gridap.FESpaces.get_order(feop.test)
   times = get_times(fesolver)
 
   bs,bt = transient_tpod(component,fesolver;ϵ)
@@ -238,6 +232,14 @@ function compress_component(
   TransientRBAffineDecomposition(proj_bs,proj_bt,lu_interp_bst,integr_domain)
 end
 
+function compress_component(
+  ::SingleFieldSnapshots{T,ZeroAffinity},
+  args...;
+  kwargs...) where T
+
+  ZeroRBAffineDecomposition()
+end
+
 function get_interpolation_idx(basis_space::NnzArray,basis_time::NnzArray)
   idx_space = get_interpolation_idx(basis_space)
   idx_time = get_interpolation_idx(basis_time)
@@ -250,11 +252,14 @@ end
 
 function get_interpolation_idx(basis::AbstractMatrix)
   n = size(basis,2)
-  idx = zeros(Int,size(basis,2))
+  idx = zeros(Int,n)
   idx[1] = argmax(abs.(basis[:,1]))
-  @inbounds for i = 2:n
-    res = basis[:,i] - basis[:,1:i-1]*(basis[idx[1:i-1],1:i-1] \ basis[idx[1:i-1],i])
-    idx[i] = argmax(abs.(res))
+  if n > 1
+    @inbounds for i = 2:n
+      proj = basis[:,1:i-1]*(basis[idx[1:i-1],1:i-1] \ basis[idx[1:i-1],i])
+      res = basis[:,i] - proj
+      idx[i] = argmax(abs.(res))
+    end
   end
   unique(idx)
 end

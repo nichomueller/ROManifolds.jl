@@ -34,3 +34,11 @@ function (-)(::Nothing,b::DomainContribution)
 end
 
 (-)(a::DomainContribution,::Nothing) = a
+
+function Gridap.FESpaces.collect_cell_vector(::FESpace,::Nothing,args...)
+  nothing
+end
+
+function Gridap.FESpaces.collect_cell_matrix(::FESpace,::FESpace,::Nothing,args...)
+  nothing
+end

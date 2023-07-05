@@ -1,4 +1,5 @@
 abstract type Affinity end
+struct ZeroAffinity <: Affinity end
 struct ParamAffinity <: Affinity end
 struct TimeAffinity <: Affinity end
 struct ParamTimeAffinity <: Affinity end
@@ -10,7 +11,11 @@ _affinity(::NonAffinity,::TimeAffinity) = TimeAffinity()
 _affinity(::ParamAffinity,::TimeAffinity) = ParamTimeAffinity()
 
 function get_affinity(::FESolver,params::Table,data::Function;ntests=10)
-  d(μ) = first(first(last(data(μ))))
+  if isempty(data(rand(params),rand(times)))
+    return ZeroAffinity()
+  end
+
+  d(μ) = first(first(data(μ)))
   global idx
   for (i,ci) in enumerate(d(rand(params)))
     if !isapprox(sum(abs.(ci)),0.)
@@ -36,7 +41,12 @@ end
 
 function get_affinity(solver::ODESolver,params::Table,data::Function;ntests=10)
   times = get_times(solver)
-  d(μ,t) = first(first(last(data(μ,t))))
+
+  if all(isempty,data(rand(params),rand(times)))
+    return ZeroAffinity()
+  end
+
+  d(μ,t) = first(first(data(μ,t)))
   global idx
   for (i,ci) in enumerate(d(rand(params),rand(times)))
     if !isapprox(sum(abs.(ci)),0.)
@@ -77,7 +87,7 @@ function get_affinity(solver::ODESolver,params::Table,data::Function;ntests=10)
 end
 
 function get_datum(
-  ::ParamAffinity,
+  ::Union{ZeroAffinity,ParamAffinity},
   ::FESolver,
   params::Table,
   data::Function)
@@ -96,7 +106,7 @@ function get_datum(
 end
 
 function get_datum(
-  ::ParamTimeAffinity,
+  ::Union{ZeroAffinity,ParamTimeAffinity},
   solver::ODESolver,
   params::Table,
   data::Function)

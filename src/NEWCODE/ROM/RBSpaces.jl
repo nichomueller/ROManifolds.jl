@@ -33,11 +33,16 @@ get_rb_ndofs(rb::SingleFieldRBSpace) = get_rb_space_ndofs(rb)
 
 get_rb_ndofs(rb::TransientSingleFieldRBSpace) = get_rb_space_ndofs(rb)*get_rb_time_ndofs(rb)
 
-for Tsp in (:MultiFieldRBSpace,:TransientMultiFieldRBSpace)
+for (Tsps,Tspm) in zip((:SingleFieldRBSpace,:TransientSingleFieldRBSpace),
+                       (:MultiFieldRBSpace,:TransientMultiFieldRBSpace))
   @eval begin
-    Base.getindex(rb::$Tsp,i::Int) = get_single_field(rb,i)
+    Base.getindex(rb::$Tsps,args...) = rb
 
-    get_nfields(rb::$Tsp) = length(rb.basis_space)
+    Base.getindex(rb::$Tspm,i::Int) = get_single_field(rb,i)
+
+    get_nfields(::$Tsps) = 1
+
+    get_nfields(rb::$Tspm) = length(rb.basis_space)
   end
 end
 
@@ -123,20 +128,20 @@ for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:O
       kwargs...) where T
 
       bsprimal,bsdual... = map(recast,bases_space)
-      for (i,bs) in enumerate(bsdual)
+      for (i,bsd) in enumerate(bsdual)
         printstyled("Computing supremizers in space for dual field $i\n";color=:blue)
-        cmat_i = assemble_constraint_matrix(feop,fesolver,snaps,params,i)
-        supr_i = cmat_i*bs.bases_space[i+1]
-        bsu_i = gram_schmidt(supr_i,primal.nonzero_val)
-        primal.nonzero_val = hcat(primal.nonzero_val,bsu_i)
+        supr_i = space_supremizers(feop,fesolver,snaps,bsd,params,i+1)
+        bsu_i = gram_schmidt(supr_i,bsprimal)
+        bases_space[1].nonzero_val = hcat(bases_space[1].nonzero_val,bsu_i)
       end
       return
     end
 
-    function assemble_constraint_matrix(
+    function space_supremizers(
       feop::$Top,
       fesolver::$Tslv,
       s::MultiFieldSnapshots,
+      bs::AbstractMatrix,
       params::Table,
       i::Int)
 
@@ -145,9 +150,16 @@ for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:O
 
       matdata = _matdata_jacobian(feop,fesolver,snaps,params,filter)
       aff = get_affinity(fesolver,params,matdata)
-      @check isa(aff,ParamAffinity) || isa(aff,ParamTimeAffinity)
       data = get_datum(aff,fesolver,params,matdata)
-      assemble_matrix(feop.assem,data)
+      constraint_mat = map(d->assemble_matrix(feop.assem,d),data)
+
+      if isa(aff,ParamAffinity) || isa(aff,ParamTimeAffinity)
+        supr = first(constraint_mat)*bs
+      else
+        supr = map(*,constraint_mat,snaps[i])
+      end
+
+      supr
     end
   end
 end
@@ -159,8 +171,8 @@ function add_time_supremizers!(
   tbu,tbdual... = map(get_nonzero_val,bases_time)
   for (i,tb) in enumerate(tbdual)
     printstyled("Computing supremizers in time for dual field $i\n";color=:blue)
-    tbu_i = add_time_supremizers([tbu.nonzero_val,tb.nonzero_val];kwargs...)
-    tbu.nonzero_val = tbu_i
+    tbu_i = add_time_supremizers([tbu,tb];kwargs...)
+    bases_time[1].nonzero_val = hcat(bases_time[1].nonzero_val,tbu_i)
   end
   return
 end

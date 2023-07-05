@@ -196,6 +196,25 @@ function fill_jacobians(
   return _matdata
 end
 
+function _vcat_matdata(_matdata)
+  term_to_cellmat_j = ()
+  term_to_cellidsrows_j = ()
+  term_to_cellidscols_j = ()
+  for j in 1:length(_matdata)
+    if !isnothing(_matdata[j])
+      term_to_cellmat_j = (term_to_cellmat_j...,_matdata[j][1])
+      term_to_cellidsrows_j = (term_to_cellidsrows_j...,_matdata[j][2])
+      term_to_cellidscols_j = (term_to_cellidscols_j...,_matdata[j][3])
+    end
+  end
+
+  term_to_cellmat = vcat(term_to_cellmat_j...)
+  term_to_cellidsrows = vcat(term_to_cellidsrows_j...)
+  term_to_cellidscols = vcat(term_to_cellidscols_j...)
+
+  (term_to_cellmat,term_to_cellidsrows, term_to_cellidscols)
+end
+
 function _matdata_jacobian(
   op::ParamTransientFEOperatorFromWeakForm,
   μ::AbstractVector,
@@ -238,7 +257,7 @@ end
 
 function get_single_field(
   op::ParamTransientFEOperator{C},
-  filter::Tuple{Vararg{Any}}) where C
+  filter::Tuple{Vararg{Int}}) where C
 
   r_filter,c_filter = filter
   trial = op.trial

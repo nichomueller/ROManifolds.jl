@@ -1,14 +1,20 @@
-struct RBAlgebraicContribution
-  dict::IdDict{Triangulation,RBAffineDecompositions}
+struct RBAlgebraicContribution{N}
+  dict::IdDict{Triangulation,Array{RBAffineDecompositions,N}}
 end
 
-RBAlgebraicContribution() = RBAlgebraicContribution(IdDict{Triangulation,RBAffineDecompositions}())
+function RBResidualContribution()
+  RBAlgebraicContribution{1}(IdDict{Triangulation,Vector{RBAffineDecompositions}}())
+end
 
-num_domains(a::RBAlgebraicContribution) = length(a.dict)
+function RBJacobianContribution()
+  RBAlgebraicContribution{2}(IdDict{Triangulation,Matrix{RBAffineDecompositions}}())
+end
 
-get_domains(a::RBAlgebraicContribution) = keys(a.dict)
+Gridap.CellData.num_domains(a::RBAlgebraicContribution) = length(a.dict)
 
-function get_contribution(
+Gridap.CellData.get_domains(a::RBAlgebraicContribution) = keys(a.dict)
+
+function Gridap.CellData.get_contribution(
   a::RBAlgebraicContribution,
   trian::Triangulation)
 
@@ -23,21 +29,13 @@ end
 
 Base.getindex(a::RBAlgebraicContribution,trian::Triangulation) = get_contribution(a,trian)
 
-function add_contribution!(
-  a::RBAlgebraicContribution,
+function Gridap.CellData.add_contribution!(
+  a::RBAlgebraicContribution{N},
   trian::Triangulation,
-  b::RBAffineDecompositions,
-  op=+)
+  b::Array{<:RBAffineDecompositions,N}) where N
 
-  if haskey(a.dict,trian)
-    a.dict[trian] = op(a.dict[trian],b)
-  else
-    if op == +
-      a.dict[trian] = b
-    else
-      a.dict[trian] = op(b)
-    end
-  end
+  @check !haskey(a.dict,trian)
+  a.dict[trian] = b
   a
 end
 

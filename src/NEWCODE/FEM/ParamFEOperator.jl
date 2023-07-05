@@ -116,7 +116,7 @@ end
 
 function get_single_field(
   op::ParamFEOperator{C},
-  filter::Tuple{Vararg{Any}}) where C
+  filter::Tuple{Vararg{Int}}) where C
 
   r_filter,c_filter = filter
   trial = op.trial
