@@ -52,13 +52,13 @@ end
 abstract type RBAffineDecompositions end
 
 struct RBAffineDecomposition <: RBAffineDecompositions
-  basis_space::Vector{<:AbstractArray}
+  basis_space::AbstractMatrix
   mdeim_interpolation::LU
   integration_domain::RBIntegrationDomain
 end
 
 struct TransientRBAffineDecomposition <: RBAffineDecompositions
-  basis_space::Vector{<:AbstractArray}
+  basis_space::AbstractMatrix
   basis_time::Tuple{Vararg{AbstractMatrix}}
   mdeim_interpolation::LU
   integration_domain::TransientRBIntegrationDomain
@@ -291,7 +291,10 @@ for Trb in (:SingleFieldRBSpace,:TransientSingleFieldRBSpace)
       bs_row = get_basis_space(rbspace_row)
       entire_bs_row = recast(bs_row)
       entire_bs_component = recast(bs_component)
-      [entire_bs_row'*col for col in eachcol(entire_bs_component)]
+      crb = eachcol(entire_bs_component) do col
+        entire_bs_row'*col
+      end
+      hcat(crb...)
     end
 
     function compress_space(
@@ -303,8 +306,12 @@ for Trb in (:SingleFieldRBSpace,:TransientSingleFieldRBSpace)
       bs_col = get_basis_space(rbspace_col)
       entire_bs_row = recast(bs_row)
       entire_bs_col = recast(bs_col)
-      nbasis = size(bs_component.nonzero_val,2)
-      [entire_bs_row'*recast(bs_component,n)*entire_bs_col for n in 1:nbasis]
+      nbasis = size(bs_component,2)
+      crb = map(1:nbasis) do n
+        crb_n = entire_bs_row'*recast(bs_component,n)*entire_bs_col
+        reshape(crb_n,:)
+      end
+      hcat(crb...)
     end
   end
 end

@@ -134,8 +134,8 @@ function _vecdata_residual(
   sols::AbstractArray,
   params::AbstractArray,
   filter::Tuple{Vararg{Int}},
-  args...;
-  kwargs...)
+  trian::Triangulation,
+  args...)
 
   row,_ = filter
   test_row = get_test(op)[row]
@@ -147,7 +147,7 @@ function _vecdata_residual(
 
   function vecdata(μ)
     u = EvaluationFunction(trial(μ),sol_μ(μ))
-    collect_cell_vector(test_row,op.res(μ,u,dv_row),args...)
+    collect_cell_vector(test_row,op.res(μ,u,dv_row,args...),trian)
   end
 
   vecdata
@@ -159,8 +159,8 @@ function _matdata_jacobian(
   sols::AbstractArray,
   params::AbstractArray,
   filter::Tuple{Vararg{Int}},
-  args...;
-  kwargs...)
+  trian::Triangulation,
+  args...)
 
   row,col = filter
   test_row = get_test(op)[row]
@@ -174,7 +174,7 @@ function _matdata_jacobian(
 
   function matdata(μ)
     u_col = EvaluationFunction(trial_col(μ),sol_col_μ(μ))
-    collect_cell_matrix(trial_col(μ),test_row,op.jac(μ,u_col(μ),dv_row,du_col),args...)
+    collect_cell_matrix(trial_col(μ),test_row,op.jac(μ,u_col(μ),dv_row,du_col,args...),trian)
   end
 
   matdata
