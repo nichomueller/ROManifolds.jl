@@ -1,7 +1,7 @@
 function expand(tup::Tuple)
   t = ()
   for el = tup
-    if typeof(el) <: Tuple
+    if isa(el,Tuple)
       t = (t...,expand(el)...)
     else
       t = (t...,el)
@@ -98,13 +98,13 @@ function Gridap.FESpaces.collect_cell_vector(
   r = []
   for strian in get_domains(a)
     if strian == trian
-    scell_vec = get_contribution(a,strian)
-    cell_vec,trian = move_contributions(scell_vec,strian)
-    @assert ndims(eltype(cell_vec)) == 1
-    cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
-    rows = get_cell_dof_ids(test,trian)
-    push!(w,cell_vec_r)
-    push!(r,rows)
+      scell_vec = get_contribution(a,strian)
+      cell_vec,trian = move_contributions(scell_vec,strian)
+      @assert ndims(eltype(cell_vec)) == 1
+      cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
+      rows = get_cell_dof_ids(test,trian)
+      push!(w,cell_vec_r)
+      push!(r,rows)
     end
   end
   (w,r)
@@ -112,11 +112,49 @@ end
 
 function collect_trian(a::DomainContribution)
   t = ()
-  for strian in get_domains(a)
-    t = (t...,strian)
+  for trian in get_domains(a)
+    t = (t...,trian)
   end
   unique(t)
 end
+
+function Base.:(==)(g1::UnstructuredGrid,g2::UnstructuredGrid)
+  (g1.node_coordinates == g2.node_coordinates &&
+  g1.cell_node_ids == g2.cell_node_ids &&
+  g1.reffes == g2.reffes &&
+  g1.cell_types == g2.cell_types &&
+  g1.orientation_style == g2.orientation_style &&
+  g1.facet_normal == g2.facet_normal)
+end
+
+function Base.:(==)(t1::Triangulation,t2::Triangulation)
+  t1.model == t2.model && t1.grid == t2.grid
+end
+
+function is_parent(
+  tparent::Triangulation,
+  tchild::BodyFittedTriangulation{Dt,Dp,A,<:GridView,C}) where {Dt,Dp,A,C}
+
+  tparent.model == tchild.model && tparent.grid == tchild.grid.parent
+end
+
+function modify_measures!(measures::Vector{Measure},m::Measure)
+  for (nmeas,meas) in enumerate(measures)
+    if is_parent(get_triangulation(meas),get_triangulation(m))
+      measures[nmeas] = m
+      return
+    end
+  end
+  @unreachable "Unrecognizable measure"
+end
+
+function modify_measures(measures::Vector{Measure},m::Measure)
+  new_measures = copy(measures)
+  modify_measures!(new_measures,m)
+  new_measures
+end
+
+Gridap.CellData.get_triangulation(m::Measure) = m.quad.trian
 
 function Gridap.FESpaces.get_order(test::SingleFieldFESpace)
   basis = get_fe_basis(test)

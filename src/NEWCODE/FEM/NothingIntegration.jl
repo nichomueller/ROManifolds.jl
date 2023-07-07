@@ -22,6 +22,8 @@ Gridap.CellData.integrate(::Nothing,::GenericMeasure) = nothing
 
 Gridap.CellData.integrate(::Nothing,::CellQuadrature) = nothing
 
+Gridap.CellData.integrate(::Any,::Nothing) = nothing
+
 (+)(::Nothing,b::DomainContribution) = b
 
 (+)(a::DomainContribution,::Nothing) = a

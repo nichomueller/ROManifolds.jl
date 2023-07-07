@@ -68,19 +68,30 @@ function Base.argmax(v::Vector,nval::Int)
   Int.(indexin(s,v))[1:nval]
 end
 
-function _as_function(values::AbstractMatrix,input)
+function _as_time_function(values::AbstractMatrix,input::AbstractVector)
   n = y -> first(findall(x -> x == y,input))
-  if size(values,2) == length(input) # time function
-    y -> values[:,n(y)]
-  elseif size(values,2) % length(input) == 0 # param function
-    compl_dim = Int(size(values,2)/length(input))
-    y -> values[:,(n(y)-1)*compl_dim+1:n(y)*compl_dim]
-  else
-    @unreachable
-  end
+  @check size(values,2) == length(input)
+  y -> values[:,n(y)]
 end
 
-function _as_function(values_block::Vector{<:AbstractArray},args...)
-  values = vcat(values_block...)
-  _as_function(values,args...)
+function _as_param_function(values::AbstractMatrix,input::AbstractVector)
+  n = y -> first(findall(x -> x == y,[input]))
+  ncol = size(values,2)
+  y -> values[:,(n(y)-1)*ncol+1:n(y)*ncol]
+end
+
+function _as_param_function(values::AbstractMatrix,input::Table)
+  n = y -> first(findall(x -> x == y,input))
+  @check size(values,2) % length(input) == 0
+  compl_dim = Int(size(values,2)/length(input))
+  y -> values[:,(n(y)-1)*compl_dim+1:n(y)*compl_dim]
+end
+
+for fun in (:_as_time_function,:_as_param_function)
+  @eval begin
+    function $fun(values_block::Vector{<:AbstractArray},args...)
+      values = vcat(values_block...)
+      $fun(values,args...)
+    end
+  end
 end

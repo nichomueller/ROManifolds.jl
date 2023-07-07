@@ -34,6 +34,7 @@ import Gridap.Helpers.@unreachable
 import Gridap.Arrays:evaluate
 import Gridap.Arrays:evaluate!
 import Gridap.Algebra:InserterCSC
+import Gridap.Algebra:LUNumericalSetup
 import Gridap.Algebra:solve
 import Gridap.Algebra:solve!
 import Gridap.Algebra:residual!
@@ -47,6 +48,7 @@ import Gridap.FESpaces:assemble_vector
 import Gridap.FESpaces:assemble_matrix
 import Gridap.FESpaces:get_fe_basis
 import Gridap.FESpaces:get_trial_fe_basis
+import Gridap.Geometry:GridView
 import Gridap.MultiField:MultiFieldFEBasisComponent
 import Gridap.Polynomials:MonomialBasis
 import Gridap.Polynomials:get_order
@@ -77,4 +79,5 @@ include("Operations.jl")
 include("BasesConstruction.jl")
 include("SystemSolvers.jl")
 include("NnzArray.jl")
+include("ParamArray.jl")
 include("Affinity.jl")

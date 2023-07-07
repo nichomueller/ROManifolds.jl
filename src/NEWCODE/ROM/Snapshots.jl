@@ -10,15 +10,14 @@ mutable struct MultiFieldSnapshots{T,A} <: Snapshots{T,A}
   nsnaps::Int
 end
 
-_get_nsnaps(snaps) = size(snaps,2)
-_get_nsnaps(snaps::AbstractVector) = length(snaps)
 get_time_ndofs(s::SingleFieldSnapshots) = Int(size(s,2)/s.nsnaps)
+
 get_time_ndofs(s::MultiFieldSnapshots) = Int(size(s.snaps[1],2)/s.nsnaps)
 
 function Snapshots(
-  snaps::NnzArray{T},
   ::A,
-  nsnaps=size(snaps,2);
+  snaps::NnzArray{T},
+  nsnaps::Int;
   type=EMatrix{Float}) where {T,A}
 
   csnaps = snaps
@@ -27,9 +26,9 @@ function Snapshots(
 end
 
 function Snapshots(
-  snaps::Vector{NnzArray{T}},
   ::A,
-  nsnaps=length(snaps);
+  snaps::Vector{NnzArray{T}},
+  nsnaps::Int;
   type=EMatrix{Float}) where {T,A}
 
   csnaps = hcat(snaps)
@@ -37,29 +36,27 @@ function Snapshots(
   SingleFieldSnapshots{T,A}(csnaps,nsnaps)
 end
 
-for T in (:Matrix,:Vector), elT in (:Float64,:Float32)
+for Tarr in (:Matrix,:Vector)
   @eval begin
     function Snapshots(
-      snaps::Union{$T{$elT},Vector{$T{$elT}}},
-      aff::Affinity,
-      args...;
-      kwargs...)
+      aff::A,
+      snaps::Union{$Tarr{T},Vector{$Tarr{T}}},
+      nsnaps::Int;
+      kwargs...) where {T,A}
 
       csnaps = compress(snaps)
-      nsnaps = _get_nsnaps(snaps)
-      Snapshots(csnaps,aff,nsnaps;kwargs...)
+      Snapshots(aff,csnaps,nsnaps;kwargs...)
     end
 
     function Snapshots(
-      snaps::Vector{Vector{$T{$elT}}},
       ::A,
-      args...;
-      type=EMatrix{Float}) where A
+      snaps::Vector{Vector{$Tarr{T}}},
+      nsnaps::Int;
+      type=EMatrix{Float}) where {T,A}
 
       csnaps = compress(snaps)
       map(s->convert!(type,s),csnaps)
-      nsnaps = _get_nsnaps(snaps)
-      MultiFieldSnapshots{$T{$elT},A}(csnaps,nsnaps)
+      MultiFieldSnapshots{$Tarr{T},A}(csnaps,nsnaps)
     end
   end
 end
@@ -135,9 +132,11 @@ for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:O
       fesolver::$Tslv,
       params::Table)
 
+      aff = NonAffinity()
       cache = solution_cache(feop.test,fesolver)
       sols = pmap(p->collect_solution!(cache,feop,fesolver,p),params)
-      Snapshots(sols,NonAffinity())
+      nsols = _get_nsnaps(aff,params)
+      Snapshots(aff,sols,nsols)
     end
 
     function generate_residuals(
@@ -150,7 +149,8 @@ for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:O
       data = get_datum(aff,fesolver,params,vecdata)
       cache = residuals_cache(feop.assem,data)
       ress = pmap(d -> collect_residuals!(cache,feop.assem,d),data)
-      Snapshots(ress,aff)
+      nress = _get_nsnaps(aff,params)
+      Snapshots(aff,ress,nress)
     end
 
     function generate_jacobians(
@@ -163,7 +163,8 @@ for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:O
       data = get_datum(aff,fesolver,params,matdata)
       cache = jacobians_cache(feop.assem,data)
       jacs = pmap(d -> collect_jacobians!(cache,feop.assem,d),data)
-      Snapshots(jacs,aff)
+      njacs = _get_nsnaps(aff,params)
+      Snapshots(aff,jacs,njacs)
     end
   end
 end

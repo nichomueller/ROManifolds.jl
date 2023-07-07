@@ -1,7 +1,7 @@
 struct RBInfo
   ϵ::Float
-  nsnaps::Int
-  nsnaps_mdeim::Int
+  nsnaps_state::Int
+  nsnaps_system::Int
   fe_path::String
   offline_path::String
   online_path::String
@@ -12,13 +12,13 @@ struct RBInfo
   postprocess::Bool
 end
 
-function RBInfo(test_path::String;ϵ=1e-4,nsnaps=80,nsnaps_mdeim=20,
+function RBInfo(test_path::String;ϵ=1e-4,nsnaps_state=80,nsnaps_system=20,
   energy_norm=false,st_mdeim=false,fun_mdeim=false,
   load_offline=false,save_offline=true,save_online=true,postprocess=false)
 
   fe_path = fem_path(test_path)
   offline_path,online_path = rom_off_on_paths(test_path,ϵ;st_mdeim,fun_mdeim)
-  RBInfo(ϵ,nsnaps,nsnaps_mdeim,fe_path,offline_path,online_path,
+  RBInfo(ϵ,nsnaps_state,nsnaps_system,fe_path,offline_path,online_path,
     energy_norm,load_offline,save_offline,save_online,postprocess)
 end
 

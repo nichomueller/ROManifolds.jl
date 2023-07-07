@@ -151,3 +151,7 @@ function get_datum(
   end
   vcat(d...)
 end
+
+_get_nsnaps(args...) = 1
+
+_get_nsnaps(::Union{TimeAffinity,NonAffinity},params::Table) = length(params)

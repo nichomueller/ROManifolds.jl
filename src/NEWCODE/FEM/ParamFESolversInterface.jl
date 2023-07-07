@@ -134,14 +134,14 @@ function _vecdata_residual(
   sols::AbstractArray,
   params::AbstractArray,
   filter::Tuple{Vararg{Int}},
-  trian::Triangulation,
-  args...)
+  args...;
+  trian::Triangulation=get_triangulation(op.test))
 
   row,_ = filter
   test_row = get_test(op)[row]
   trial = get_trial(op)
   dv_row = _get_fe_basis(op.test,row)
-  sol_μ = _as_function(sols,params)
+  sol_μ = _as_param_function(sols,params)
   assem_row = SparseMatrixAssembler(test_row,test_row)
   op.assem = assem_row
 
@@ -159,8 +159,8 @@ function _matdata_jacobian(
   sols::AbstractArray,
   params::AbstractArray,
   filter::Tuple{Vararg{Int}},
-  trian::Triangulation,
-  args...)
+  args...;
+  trian::Triangulation=get_triangulation(op.test))
 
   row,col = filter
   test_row = get_test(op)[row]
@@ -168,7 +168,7 @@ function _matdata_jacobian(
   dv_row = _get_fe_basis(op.test,row)
   du_col = _get_trial_fe_basis(op.trial(nothing),col)
   sols_col = isa(sols,AbstractMatrix) ? sols : sols[col]
-  sol_col_μ = _as_function(sols_col,params)
+  sol_col_μ = _as_param_function(sols_col,params)
   assem_row_col = SparseMatrixAssembler(trial_col(nothing)[col],test_row)
   op.assem = assem_row_col
 

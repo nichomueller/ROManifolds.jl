@@ -46,6 +46,10 @@ for (Tsps,Tspm) in zip((:SingleFieldRBSpace,:TransientSingleFieldRBSpace),
   end
 end
 
+function allocate_matrix(rb::SingleFieldRBSpace,sizes...)
+  allocate_matrix(rb.basis_space,sizes...)
+end
+
 function get_single_field(
   rb::MultiFieldRBSpace{T},
   fieldid::Int) where T

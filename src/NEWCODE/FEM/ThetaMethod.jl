@@ -95,8 +95,8 @@ function _evaluation_function(
 
   times = get_times(solver)
   xhθ = solver.θ*xh + (1-solver.θ)*hcat(x0,xh[:,1:end-1])
-  xh_t = _as_function(xh,times)
-  xhθ_t = _as_function(xhθ,times)
+  xh_t = _as_time_function(xh,times)
+  xhθ_t = _as_time_function(xhθ,times)
 
   dtrial(t) = ∂t(trial(t))
   x_t(t) = EvaluationFunction(trial(t),xh_t(t))
@@ -123,14 +123,14 @@ function _vecdata_residual(
   sols::AbstractArray,
   params::AbstractArray,
   filter::Tuple{Vararg{Int}},
-  trian::Triangulation,
-  args...)
+  args...;
+  trian::Triangulation=get_triangulation(op.test))
 
   row,_ = filter
   test_row = get_test(op)[row]
   trial = get_trial(op)
   dv_row = _get_fe_basis(op.test,row)
-  sol_μ = _as_function(sols,params)
+  sol_μ = _as_param_function(sols,params)
   assem_row = SparseMatrixAssembler(test_row,test_row)
   op.assem = assem_row
 
@@ -149,15 +149,15 @@ function _matdata_jacobian(
   sols::AbstractArray,
   params::AbstractArray,
   filter::Tuple{Vararg{Int}},
-  trian::Triangulation,
-  args...)
+  args...;
+  trian::Triangulation=get_triangulation(op.test))
 
   row,col = filter
   test_row = get_test(op)[row]
   trial_col = get_trial(op)[col]
   dv_row = _get_fe_basis(op.test,row)
   du_col = _get_trial_fe_basis(get_trial(op)(nothing,nothing),col)
-  sols_μ = _as_function(sols,params)
+  sols_μ = _as_param_function(sols,params)
   assem_row_col = SparseMatrixAssembler(trial_col(nothing,nothing)[col],test_row)
   op.assem = assem_row_col
 

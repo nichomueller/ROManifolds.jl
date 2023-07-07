@@ -14,6 +14,12 @@ Gridap.CellData.num_domains(a::RBAlgebraicContribution) = length(a.dict)
 
 Gridap.CellData.get_domains(a::RBAlgebraicContribution) = keys(a.dict)
 
+function get_nfields(a::RBAlgebraicContribution)
+  for (_,ad) in a.dict
+    return size(ad,1)
+  end
+end
+
 function Gridap.CellData.get_contribution(
   a::RBAlgebraicContribution,
   trian::Triangulation)
@@ -39,10 +45,10 @@ function Gridap.CellData.add_contribution!(
   a
 end
 
-function get_measures(a::RBAlgebraicContribution)
-  measures = Measures[]
-  for (_,rbad) in a.dict
-    push!(measures,rbad.integration_domain.meas)
+function get_measures(a::RBAlgebraicContribution,degree=2)
+  meas = Measure[]
+  for trian in get_domains(a)
+    push!(meas,Measure(trian,degree))
   end
-  unique(measures)
+  meas
 end

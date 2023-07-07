@@ -61,17 +61,17 @@ addprocs(manager)
   save_offline = true
   load_offline = true
   energy_norm = false
-  nsnaps = 10
-  nsnaps_mdeim = 10
-  info = RBInfo(test_path;ϵ,load_offline,save_offline,energy_norm,nsnaps,nsnaps_mdeim)
+  nsnaps_state = 10
+  nsnaps_system = 10
+  info = RBInfo(test_path;ϵ,load_offline,save_offline,energy_norm,nsnaps_state,nsnaps_system)
 end
 
 ϵ = info.ϵ
-nsnaps = info.nsnaps
+nsnaps = info.nsnaps_state
 params = realization(feop,nsnaps)
 sols = generate_solutions(feop,fesolver,params)
 rbspace = compress_solutions(feop,fesolver,sols;ϵ)
-nsnaps = info.nsnaps_mdeim
+nsnaps = info.nsnaps_system
 rb_res = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
 rb_jac = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
 
