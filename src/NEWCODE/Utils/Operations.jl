@@ -127,9 +127,13 @@ function Base.:(==)(g1::UnstructuredGrid,g2::UnstructuredGrid)
   g1.facet_normal == g2.facet_normal)
 end
 
-function Base.:(==)(t1::Triangulation,t2::Triangulation)
-  t1.model == t2.model && t1.grid == t2.grid
-end
+# function Base.:(==)(t1::BoundaryTriangulation,t2::BoundaryTriangulation)
+#   t1.trian == t2.trian && t1.glue == t2.glue
+# end
+
+# function Base.:(==)(t1::Triangulation,t2::Triangulation)
+#   t1.model == t2.model && t1.grid == t2.grid
+# end
 
 function is_parent(
   tparent::Triangulation,

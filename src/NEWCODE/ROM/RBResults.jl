@@ -19,27 +19,51 @@ abstract type RBSolver end
 struct Backslash <:RBSolver end
 struct NewtonIterations <:RBSolver end
 
-function test_fe_operator(
-  info::RBInfo,
-  feop::Top,
-  rbop::RBOperator,
-  rbsolver::RBSolver;
-  nsnaps_test=10,
-  postprocess=true,
-  kwargs...) where Top
+for (Top,Tslv) in zip(
+  (:ParamFEOperator,:ParamTransientFEOperator),
+  (:FESolver,:ODESolver))
 
-  sols,params = load((Snapshots,Table),info)
-  sols_test = sols[end-nsnaps_test+1:end]
-  params_test = params[end-nsnaps_test+1:end]
-  res = Vector{RBResults}(undef,nsnaps_test)
-  for (u,μ) in zip(sols_test,params_test)
-    ic = initial_condition(sols,params,μ)
-    urb,wall_time = solve(rbsolver,rbop,μ,ic)
-    push!(res,RBResults(u,urb,wall_time;kwargs...))
-  end
-  if postprocess
-    save(info,errs)
-    writevtk(info,feop,errs)
+  @eval begin
+    function test_rb_operator(
+      info::RBInfo,
+      feop::$Top,
+      rbop::RBOperator,
+      fesolver::$Tslv,
+      rbsolver::RBSolver;
+      nsnaps_test=10,
+      postprocess=true,
+      kwargs...)
+
+      sols,params = load_test(info,feop,fesolver)
+      sols_test = sols[end-nsnaps_test+1:end]
+      params_test = params[end-nsnaps_test+1:end]
+      res = Vector{RBResults}(undef,nsnaps_test)
+      for (u,μ) in zip(sols_test,params_test)
+        ic = initial_condition(sols,params,μ)
+        urb,wall_time = solve(rbsolver,rbop,μ,ic)
+        push!(res,RBResults(u,urb,wall_time;kwargs...))
+      end
+      if postprocess
+        save(info,errs)
+        writevtk(info,feop,errs)
+      end
+    end
+
+    function load_test(
+      info::RBInfo,
+      feop::$Top,
+      fesolver::$Tslv)
+
+      try
+        sols,params = load_test((Snapshots,Table),info)
+      catch
+        nsnaps = info.nsnaps_state
+        params = realization(feop,nsnaps)
+        sols = generate_solutions(feop,fesolver,params)
+        save_test(info,(sols,params))
+      end
+      sols,params
+    end
   end
 end
 

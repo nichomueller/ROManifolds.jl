@@ -4,36 +4,36 @@ struct RBOperator{Top<:OperatorType}
   rbspace::Any
 end
 
-function reduce_fe_operator(
-  info::RBInfo,
-  feop::ParamTransientFEOperator{Top},
-  fesolver::ODESolver) where Top
-
-  ϵ = info.ϵ
-  # fun_mdeim = info.fun_mdeim
-  nsnaps = info.nsnaps_state
-  params = realization(feop,nsnaps)
-  sols = generate_solutions(feop,fesolver,params)
-  rbspace = compress_solutions(feop,fesolver,sols,params;ϵ)
-
-  nsnaps = info.nsnaps_system
-  #compress_residual_and_jacobian(...)
-  rb_res_c = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
-  rb_jac_c = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
-  rb_res = collect_residual_contributions(feop,fesolver,rb_res_c;st_mdeim)
-  rb_jac = collect_jacobian_contributions(feop,fesolver,rb_jac_c;st_mdeim)
-  rbop = RBOperator{Top}(rb_jac,rb_res,rbspace;st_mdeim)
-  save(info,rbop)
-
-  return rbop
-end
-
 for (Top,Tslv,Tad) in zip(
   (:ParamFEOperator,:ParamTransientFEOperator),
   (:FESolver,:ODESolver),
   (:RBAffineDecomposition,:TransientRBAffineDecomposition))
 
   @eval begin
+    function reduce_fe_operator(
+      info::RBInfo,
+      feop::$Top{T},
+      fesolver::$Tslv) where T
+
+      ϵ = info.ϵ
+      # fun_mdeim = info.fun_mdeim
+      nsnaps = info.nsnaps_state
+      params = realization(feop,nsnaps)
+      sols = generate_solutions(feop,fesolver,params)
+      rbspace = compress_solutions(feop,fesolver,sols,params;ϵ)
+
+      nsnaps = info.nsnaps_system
+      #compress_residual_and_jacobian(...)
+      rb_res_c = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
+      rb_jac_c = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
+      rb_res = collect_residual_contributions(feop,fesolver,rb_res_c;st_mdeim)
+      rb_jac = collect_jacobian_contributions(feop,fesolver,rb_jac_c;st_mdeim)
+      rbop = RBOperator{T}(rb_jac,rb_res,rbspace;st_mdeim)
+      save(info,rbop)
+
+      return rbop
+    end
+
     function collect_residual_contributions(
       feop::$Top,
       fesolver::$Tslv,

@@ -40,24 +40,6 @@ function solve_step!(
   return (uf,tf,cache)
 end
 
-"""
-Affine operator that represents the θ-method affine operator at a
-given time step, i.e., M(t)(u_n+θ-u_n)/dt + K(t)u_n+θ + b(t)
-"""
-function ParamThetaMethodAffineOperator(
-  odeop::AffineParamODEOperator,
-  μ::AbstractVector,
-  tθ::Real,
-  dtθ::Real,
-  u0::AbstractVector,
-  ode_cache,
-  vθ::AbstractVector)
-
-  A,b = _allocate_matrix_and_vector(odeop,u0,ode_cache)
-  _matrix_and_vector!(A,b,odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
-  AffineOperator(A,b)
-end
-
 function _matrix_and_vector!(
   A::AbstractMatrix,
   b::AbstractVector,

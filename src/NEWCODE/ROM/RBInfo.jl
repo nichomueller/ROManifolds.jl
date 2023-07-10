@@ -55,3 +55,14 @@ function load(T::Type{Table},info::RBInfo)
   path = joinpath(info.fe_path,"params")
   load(T,path)
 end
+
+function load_test(T::Type{Snapshots},info::RBInfo)
+  path = joinpath(info.fe_path,"fesnaps_test")
+  s = load(T,path)
+  convert!(EMatrix{Float},s)
+end
+
+function load_test(T::Type{Table},info::RBInfo)
+  path = joinpath(info.fe_path,"params_test")
+  load(T,path)
+end

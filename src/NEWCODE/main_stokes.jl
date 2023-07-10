@@ -66,9 +66,9 @@ addprocs(4)
 
   ϵ = 1e-4
   compute_supremizers = true
-  nsnaps_state = 2
-  nsnaps_system = 2
-  save_offline = false
+  nsnaps_state = 50
+  nsnaps_system = 20
+  save_offline = true
   load_offline = false
   energy_norm = false
   st_mdeim = true
@@ -85,6 +85,7 @@ rb_res_c = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
 rb_jac_c = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
 rb_res = collect_residual_contributions(feop,fesolver,rb_res_c;st_mdeim)
 rb_jac = collect_jacobian_contributions(feop,fesolver,rb_jac_c;st_mdeim)
+test_rb_operator(info,feop,rbop,fesolver,rbsolver)
 
 global r
 for (m,ad) in rb_res_c.dict

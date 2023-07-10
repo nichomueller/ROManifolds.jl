@@ -1,18 +1,32 @@
 abstract type Snapshots{T,A} end
+abstract type AbstractSingleFieldSnapshots{T,A} <: Snapshots{T,A} end
+abstract type AbstractMultiFieldSnapshots{T,A} <: Snapshots{T,A} end
 
-mutable struct SingleFieldSnapshots{T,A} <: Snapshots{T,A}
+struct SingleFieldSnapshots{T,A} <: AbstractSingleFieldSnapshots{T,A}
   snaps::NnzArray{T}
   nsnaps::Int
 end
 
-mutable struct MultiFieldSnapshots{T,A} <: Snapshots{T,A}
+struct TransientSingleFieldSnapshots{T,A} <: AbstractSingleFieldSnapshots{T,A}
+  snaps::NnzArray{T}
+  nsnaps::Int
+end
+
+struct MultiFieldSnapshots{T,A} <: AbstractMultiFieldSnapshots{T,A}
   snaps::Vector{NnzArray{T}}
   nsnaps::Int
 end
 
-get_time_ndofs(s::SingleFieldSnapshots) = Int(size(s,2)/s.nsnaps)
+struct TransientMultiFieldSnapshots{T,A} <: AbstractMultiFieldSnapshots{T,A}
+  snaps::Vector{NnzArray{T}}
+  nsnaps::Int
+end
 
-get_time_ndofs(s::MultiFieldSnapshots) = Int(size(s.snaps[1],2)/s.nsnaps)
+get_time_ndofs(::Snapshots) = @abstractmethod
+
+get_time_ndofs(s::TransientSingleFieldSnapshots) = Int(size(s,2)/s.nsnaps)
+
+get_time_ndofs(s::TransientMultiFieldSnapshots) = Int(size(s.snaps[1],2)/s.nsnaps)
 
 function Snapshots(
   ::A,
@@ -123,50 +137,6 @@ function convert!(::Type{T},s::MultiFieldSnapshots) where T
     convert!(T,sf)
   end
   return
-end
-
-for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:ODESolver))
-  @eval begin
-    function generate_solutions(
-      feop::$Top,
-      fesolver::$Tslv,
-      params::Table)
-
-      aff = NonAffinity()
-      cache = solution_cache(feop.test,fesolver)
-      sols = pmap(p->collect_solution!(cache,feop,fesolver,p),params)
-      nsols = _get_nsnaps(aff,params)
-      Snapshots(aff,sols,nsols)
-    end
-
-    function generate_residuals(
-      feop::$Top,
-      fesolver::$Tslv,
-      params::Table,
-      vecdata)
-
-      aff = get_affinity(fesolver,params,vecdata)
-      data = get_datum(aff,fesolver,params,vecdata)
-      cache = residuals_cache(feop.assem,data)
-      ress = pmap(d -> collect_residuals!(cache,feop.assem,d),data)
-      nress = _get_nsnaps(aff,params)
-      Snapshots(aff,ress,nress)
-    end
-
-    function generate_jacobians(
-      feop::$Top,
-      fesolver::$Tslv,
-      params::Table,
-      matdata)
-
-      aff = get_affinity(fesolver,params,matdata)
-      data = get_datum(aff,fesolver,params,matdata)
-      cache = jacobians_cache(feop.assem,data)
-      jacs = pmap(d -> collect_jacobians!(cache,feop.assem,d),data)
-      njacs = _get_nsnaps(aff,params)
-      Snapshots(aff,jacs,njacs)
-    end
-  end
 end
 
 function tpod(s::SingleFieldSnapshots;type=Matrix{Float},kwargs...)

@@ -80,47 +80,9 @@ function Base.iterate(
   state = (uF,u0,tF,cache)
 
   # Multi field
-  Uh = _allocate_trial_space(sol)
+  Xh, = cache
+  Uh = first(Xh)
   uh = _split_solutions(Uh,uF)
 
   return uh,state
-end
-
-function _allocate_trial_space(sol::ParamODESolution)
-  allocate_trial_space(first(sol.op.feop.trials))
-end
-
-function solution_cache(test::FESpace,solver::ODESolver)
-  space_ndofs = test.nfree
-  time_ndofs = get_time_ndofs(solver)
-  cache = fill(0.,space_ndofs,time_ndofs)
-  cache
-end
-
-function solution_cache(test::MultiFieldFESpace,solver::ODESolver)
-  map(t->solution_cache(t,solver),test.spaces)
-end
-
-function collect_solution!(
-  cache,
-  op::ParamTransientFEOperator,
-  solver::ODESolver,
-  μ::AbstractVector)
-
-  sol = solve(op,solver,μ,solver.uh0(μ))
-  n = 1
-  if isa(cache,AbstractMatrix)
-    for soln in sol
-      setindex!(cache,soln,:,n)
-      n += 1
-    end
-  elseif isa(cache,Vector{<:AbstractMatrix})
-    for soln in sol
-      map((cache,sol) -> setindex!(cache,sol,:,n),cache,soln)
-      n += 1
-    end
-  else
-    @unreachable
-  end
-  cache
 end

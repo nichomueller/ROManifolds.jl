@@ -93,20 +93,30 @@ function _evaluation_function(
   xh::AbstractMatrix,
   x0::AbstractVector) where Tsp
 
-  times = get_times(solver)
-  xhθ = solver.θ*xh + (1-solver.θ)*hcat(x0,xh[:,1:end-1])
-  xh_t = _as_time_function(xh,times)
-  xhθ_t = _as_time_function(xhθ,times)
+  u0 = get_free_dof_values(solver.uh0(μ))
+  sol_μ = _as_param_function(sols,params)
 
-  dtrial(t) = ∂t(trial(t))
-  x_t(t) = EvaluationFunction(trial(t),xh_t(t))
-  xθ_t(t) = EvaluationFunction(dtrial(t),xhθ_t(t))
-  t -> TransientCellField(x_t(t),(xθ_t(t),))
+  times = get_times(solver)
+  xh_prev = hcat(x0,xh[:,1:end-1])
+  xhθ = solver.θ*xh + (1-solver.θ)*xh_prev
+  yhθ = similar(xhθ)
+  _xhθ_t = _as_time_function(xhθ,times)
+  _dxhθ_t = _as_time_function(yhθ,times)
+
+  function _fun_t(μ,t)
+    trial0 = HomogeneousTrialFESpace(trial(μ,t))
+    dtrial = ∂t(trial)(μ,t)
+    evaluate!(trial0,dtrial,μ,t)
+    xhθ_t = EvaluationFunction(trial0,_xhθ_t(t))
+    dxhθ_t = EvaluationFunction(dtrial,_dxhθ_t(t))
+    return TransientCellField(xhθ_t,(dxhθ_t,))
+  end
+  _fun_t
 end
 
-_evaluation_function(u,args...) = u
+_filter_evaluation_function(u,args...) = u
 
-function _evaluation_function(
+function _filter_evaluation_function(
   u::Gridap.ODEs.TransientFETools.TransientMultiFieldCellField,
   col::Int)
 
@@ -130,17 +140,10 @@ function _vecdata_residual(
   test_row = get_test(op)[row]
   trial = get_trial(op)
   dv_row = _get_fe_basis(op.test,row)
-  sol_μ = _as_param_function(sols,params)
+  u = _evaluation_function(solver,trial,sols,params)
   assem_row = SparseMatrixAssembler(test_row,test_row)
   op.assem = assem_row
-
-  function vecdata(μ,t)
-    u0 = get_free_dof_values(solver.uh0(μ))
-    u = _evaluation_function(solver,trial(μ),sol_μ(μ),u0)
-    collect_cell_vector(test_row,op.res(μ,t,u(t),dv_row,args...),trian)
-  end
-
-  vecdata
+  (μ,t) -> collect_cell_vector(test_row,op.res(μ,t,u(μ,t),dv_row,args...),trian)
 end
 
 function _matdata_jacobian(
@@ -157,15 +160,13 @@ function _matdata_jacobian(
   trial_col = get_trial(op)[col]
   dv_row = _get_fe_basis(op.test,row)
   du_col = _get_trial_fe_basis(get_trial(op)(nothing,nothing),col)
-  sols_μ = _as_param_function(sols,params)
+  u = _evaluation_function(solver,trial,sols,params)
   assem_row_col = SparseMatrixAssembler(trial_col(nothing,nothing)[col],test_row)
   op.assem = assem_row_col
 
   γ = (1.0,1/(solver.dt*solver.θ))
   function matdata(μ,t)
-    u0 = get_free_dof_values(solver.uh0(μ))
-    u = _evaluation_function(solver,get_trial(op)(μ),sols_μ(μ),u0)
-    u_col(t) = _evaluation_function(u(t),col)
+    u_col(μ,t) = _filter_evaluation_function(u(μ,t),col)
     _matdata = ()
     for (i,γᵢ) in enumerate(γ)
       if γᵢ > 0.0
@@ -173,7 +174,7 @@ function _matdata_jacobian(
           collect_cell_matrix(
           trial_col(μ,t),
           test_row,
-          γᵢ*op.jacs[i](μ,t,u_col(t),dv_row,du_col,args...),
+          γᵢ*op.jacs[i](μ,t,u_col(μ,t),dv_row,du_col,args...),
           trian))
       end
     end

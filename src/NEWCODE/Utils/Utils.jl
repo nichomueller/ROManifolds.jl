@@ -28,6 +28,7 @@ using Gridap.TensorValues
 using Gridap.ODEs.TransientFETools
 
 import Base.Threads.@threads
+import Gridap.Helpers.@abstractmethod
 import Gridap.Helpers.@check
 import Gridap.Helpers.@notimplemented
 import Gridap.Helpers.@unreachable

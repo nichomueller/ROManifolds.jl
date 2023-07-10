@@ -1,7 +1,9 @@
 # driver for unsteady poisson
 using MPI,MPIClusterManagers,Distributed
 manager = MPIWorkerManager()
-addprocs(manager)
+addprocs(4)
+
+@everywhere using Pkg; Pkg.activate(".")
 
 @everywhere begin
   root = pwd()
@@ -41,7 +43,7 @@ addprocs(manager)
   u0(x,μ) = 0
   u0(μ) = x->u0(x,μ)
 
-  res(μ,t,u,v,dΩ,dΓn) = ∫(v*∂t(u))dΩ + ∫(a(μ,t)*∇(v)⋅∇(u))dΩ - ∫(f(μ,t)*v)dΩ - ∫(h(μ,t)*v)dΓn
+  res(μ,t,u,v,dΩ,dΓn) = ∫(v*∂t(u))dΩ + ∫(a(μ,t)*∇(v)⋅∇(u))dΩ - ∫(f(μ,t)*v)dΩ #- ∫(h(μ,t)*v)dΓn
   jac(μ,t,u,du,v,dΩ) = ∫(a(μ,t)*∇(v)⋅∇(du))dΩ
   jac_t(μ,t,u,dut,v,dΩ) = ∫(v*dut)dΩ
 

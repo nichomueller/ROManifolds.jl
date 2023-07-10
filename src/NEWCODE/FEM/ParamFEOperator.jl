@@ -1,16 +1,5 @@
 abstract type ParamFEOperator{C<:OperatorType} <: GridapType end
 
-# Default API
-
-"""
-Returns a `ParamOp` wrapper of the `ParamFEOperator`
-"""
-function get_algebraic_operator(feop::ParamFEOperator{C}) where C
-  ParamOpFromFEOp{C}(feop)
-end
-
-# Specializations
-
 """
 Parametric FE operator that is defined by a parametric weak form
 """

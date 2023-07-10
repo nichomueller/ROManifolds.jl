@@ -6,10 +6,10 @@ mutable struct GenericParamSolution <: ParamSolution
 end
 
 function solve!(
-  op::ParamOp,
+  op::ParamOperator,
   solver::FESolver,
-  uh::FEFunction,
-  μ::AbstractVector)
+  uh::T,
+  μ::AbstractVector) where T
 
   cache = nothing
   nlop = ParamNonlinearOperator(op,uh,μ,cache)
@@ -19,10 +19,10 @@ function solve!(
 end
 
 function solve!(
-  op::ParamOp{Affine},
+  op::ParamOperator{Affine},
   solver::FESolver,
-  uh::FEFunction,
-  μ::AbstractVector)
+  uh::T,
+  μ::AbstractVector) where T
 
   A,b = _allocate_matrix_and_vector(op,uh)
   A = _matrix!(A,op,uh,μ)
@@ -36,7 +36,7 @@ function solve!(
 end
 
 function solve(
-  op::ParamOp,
+  op::ParamOperator,
   solver::FESolver,
   μ::AbstractVector)
 
@@ -44,31 +44,4 @@ function solve(
   uh = zero(trial(μ))
   solk = solve!(op,solver,uh,μ)
   GenericParamSolution(solk,μ)
-end
-
-function solution_cache(test::FESpace,::FESolver)
-  space_ndofs = test.nfree
-  cache = fill(0.,space_ndofs,1)
-  cache
-end
-
-function solution_cache(test::MultiFieldFESpace,args...)
-  map(t->solution_cache(t,args...),test.spaces)
-end
-
-function collect_solution!(
-  cache,
-  op::ParamFEOperator,
-  solver::FESolver,
-  μ::AbstractVector)
-
-  sol = solve(op,solver,μ)
-  if isa(cache,AbstractMatrix)
-    copyto!(cache,sol.uh)
-  elseif isa(cache,Vector{<:AbstractMatrix})
-    map((c,sol) -> copyto!(c,sol),cache,sol.uh)
-  else
-    @unreachable
-  end
-  cache
 end
