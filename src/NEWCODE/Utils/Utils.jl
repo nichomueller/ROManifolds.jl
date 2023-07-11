@@ -50,6 +50,7 @@ import Gridap.FESpaces:assemble_matrix
 import Gridap.FESpaces:get_fe_basis
 import Gridap.FESpaces:get_trial_fe_basis
 import Gridap.Geometry:GridView
+import Gridap.MultiField:MultiFieldCellField
 import Gridap.MultiField:MultiFieldFEBasisComponent
 import Gridap.Polynomials:MonomialBasis
 import Gridap.Polynomials:get_order
@@ -57,6 +58,7 @@ import Gridap.ODEs.TransientFETools:ODESolver
 import Gridap.ODEs.TransientFETools:ODEOperator
 import Gridap.ODEs.TransientFETools:OperatorType
 import Gridap.ODEs.TransientFETools:TransientCellField
+import Gridap.ODEs.TransientFETools.TransientMultiFieldCellField
 import Gridap.ODEs.TransientFETools:Affine
 import Gridap.ODEs.TransientFETools:Nonlinear
 import Gridap.ODEs.TransientFETools:solve_step!
@@ -81,4 +83,3 @@ include("BasesConstruction.jl")
 include("SystemSolvers.jl")
 include("NnzArray.jl")
 include("ParamArray.jl")
-include("Affinity.jl")

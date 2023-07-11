@@ -1,6 +1,6 @@
 function solve_step!(
   uf::AbstractVector,
-  op::ParamODEOperator,
+  op::ParamTransientFEOperator,
   solver::θMethod,
   μ::AbstractVector,
   u0::AbstractVector,
@@ -40,7 +40,7 @@ Nonlinear operator that represents the θ-method nonlinear operator at a
 given time step, i.e., A(t,u_n+θ,(u_n+θ-u_n)/dt)
 """
 struct ParamThetaMethodNonlinearOperator <: NonlinearOperator
-  odeop::ParamODEOperator
+  odeop::ParamTransientFEOperator
   μ::AbstractVector
   tθ::Float64
   dtθ::Float64
@@ -85,38 +85,9 @@ function allocate_jacobian(
   allocate_jacobian(op.odeop,x,op.ode_cache)
 end
 
-# # MDEIM snapshots generation interface
+filter_evaluation_function(u,args...) = u
 
-# function _evaluation_function(
-#   solver::θMethod,
-#   trial::Tsp,
-#   xh::AbstractMatrix,
-#   x0::AbstractVector) where Tsp
-
-#   u0 = get_free_dof_values(solver.uh0(μ))
-#   sol_μ = _as_param_function(sols,params)
-
-#   times = get_times(solver)
-#   xh_prev = hcat(x0,xh[:,1:end-1])
-#   xhθ = solver.θ*xh + (1-solver.θ)*xh_prev
-#   yhθ = similar(xhθ)
-#   _xhθ_t = _as_time_function(xhθ,times)
-#   _dxhθ_t = _as_time_function(yhθ,times)
-
-#   function _fun_t(μ,t)
-#     trial0 = HomogeneousTrialFESpace(trial(μ,t))
-#     dtrial = ∂t(trial)(μ,t)
-#     evaluate!(trial0,dtrial,μ,t)
-#     xhθ_t = EvaluationFunction(trial0,_xhθ_t(t))
-#     dxhθ_t = EvaluationFunction(dtrial,_dxhθ_t(t))
-#     return TransientCellField(xhθ_t,(dxhθ_t,))
-#   end
-#   _fun_t
-# end
-
-_filter_evaluation_function(u,args...) = u
-
-function _filter_evaluation_function(
+function filter_evaluation_function(
   u::Gridap.ODEs.TransientFETools.TransientMultiFieldCellField,
   col::Int)
 
@@ -166,7 +137,7 @@ end
 
 #   γ = (1.0,1/(solver.dt*solver.θ))
 #   function matdata(μ,t)
-#     u_col(μ,t) = _filter_evaluation_function(u(μ,t),col)
+#     u_col(μ,t) = filter_evaluation_function(u(μ,t),col)
 #     _matdata = ()
 #     for (i,γᵢ) in enumerate(γ)
 #       if γᵢ > 0.0

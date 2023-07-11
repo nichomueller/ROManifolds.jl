@@ -94,9 +94,10 @@ function affinity_jacobian(
   dv_row = _get_fe_basis(op.test,row)
   du_col = _get_trial_fe_basis(get_trial(op)(nothing),col)
   u = allocate_evaluation_function(op)
+  ucol = filter_evaluation_function(u,col)
 
   μ = first(params)
-  d = collect_cell_contribution(trial_col,test_row,op.jac(μ,u,du_col,dv_row),trian)
+  d = collect_cell_contribution(trial_col,test_row,op.jac(μ,ucol,du_col,dv_row),trian)
   if all(isempty,d)
     return ZeroAffinity()
   end
@@ -105,7 +106,7 @@ function affinity_jacobian(
   d0 = max.(abs.(d[cell]),eps())
 
   for μ in rand(params,ntests)
-    d = collect_cell_contribution(trial_col,test_row,op.jac(μ,u,du_col,dv_row),trian)
+    d = collect_cell_contribution(trial_col,test_row,op.jac(μ,ucol,du_col,dv_row),trian)
     ratio = d[cell] ./ d0[cell]
     if !all(ratio .== ratio[1])
       return NonAffinity()
@@ -115,7 +116,7 @@ function affinity_jacobian(
   return ParamAffinity()
 end
 
-function affinity_residual(
+function affinity_jacobian(
   op::ParamTransientFEOperator,
   solver::ODESolver,
   params::Table;
@@ -130,9 +131,10 @@ function affinity_residual(
   dv_row = _get_fe_basis(op.test,row)
   du_col = _get_trial_fe_basis(get_trial(op)(nothing,nothing),col)
   u = allocate_evaluation_function(op)
+  ucol = filter_evaluation_function(u,col)
 
   μ,t = first(params),first(times)
-  d = collect_cell_contribution(trial_col,test_row,op.jac(μ,t,u,du_col,dv_row),trian)
+  d = collect_cell_contribution(trial_col,test_row,op.jac(μ,t,ucol,du_col,dv_row),trian)
   if all(isempty,d)
     return ZeroAffinity()
   end
@@ -141,7 +143,7 @@ function affinity_residual(
   d0 = max.(abs.(d[cell]),eps())
 
   for μ in rand(params,ntests)
-    d = collect_cell_contribution(trial_col,test_row,op.jac(μ,t,u,du_col,dv_row),trian)
+    d = collect_cell_contribution(trial_col,test_row,op.jac(μ,t,ucol,du_col,dv_row),trian)
     ratio = d[cell] ./ d0[cell]
     if !all(ratio .== ratio[1])
       return NonAffinity()
@@ -149,7 +151,7 @@ function affinity_residual(
   end
 
   for t in rand(params,ntests)
-    d = collect_cell_contribution(trial_col,test_row,op.jac(μ,t,u,du_col,dv_row),trian)
+    d = collect_cell_contribution(trial_col,test_row,op.jac(μ,t,ucol,du_col,dv_row),trian)
     ratio = d[cell] ./ d0[cell]
     if !all(ratio .== ratio[1])
       return ParamAffinity()

@@ -6,7 +6,7 @@ abstract type ParamTransientFEOperator{C<:OperatorType} <: GridapType end
 """
 Transient FE operator that is defined by a transient Weak form
 """
-mutable struct ParamTransientFEOperatorFromWeakForm{C<:OperatorType} <: ParamTransientFEOperator{C}
+struct ParamTransientFEOperatorFromWeakForm{C<:OperatorType} <: ParamTransientFEOperator{C}
   res::Function
   jacs::Tuple{Vararg{Function}}
   assem::Assembler
@@ -81,7 +81,7 @@ function allocate_cache(op::ParamTransientFEOperator)
     Uts = (Uts...,∂t(Uts[i]))
     Us = (Us...,allocate_trial_space(Uts[i+1]))
   end
-  fecache = allocate_cache(op)
+  fecache = nothing
   ode_cache = (Us,Uts,fecache)
   ode_cache
 end
@@ -97,13 +97,13 @@ function update_cache!(
   for i in 1:get_order(op)+1
     Us = (Us...,evaluate!(_Us[i],Uts[i],μ,t))
   end
-  fecache = update_cache!(fecache,op,μ,t)
+  fecache = nothing
   (Us,Uts,fecache)
 end
 
 function allocate_evaluation_function(op::ParamTransientFEOperator)
-  μ,t = realization(op),0.
-  uh = get_trial_fe_basis(op)(μ,t)
+  U = get_trial(op)
+  uh = get_trial_fe_basis(U(nothing,nothing))
   dxh = ()
   for _ in 1:get_order(op)
     dxh = (dxh...,uh)
@@ -122,6 +122,20 @@ function evaluation_function(
     dxh = (dxh...,EvaluationFunction(Xh[i],xhF[i]))
   end
   TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
+end
+
+filter_evaluation_function(u,args...) = u
+
+for T in (:MultiFieldCellField,:TransientMultiFieldCellField)
+  @eval begin
+    function filter_evaluation_function(u::$T,col::Int)
+      u_col = Any[]
+      for nf = eachindex(u.transient_single_fields)
+        nf == col ? push!(u_col,u[col]) : push!(u_col,nothing)
+      end
+      u_col
+    end
+  end
 end
 
 function allocate_residual(op::ParamTransientFEOperatorFromWeakForm,args...)
@@ -207,25 +221,6 @@ function fill_jacobians(
     end
   end
   return _matdata
-end
-
-function _vcat_matdata(_matdata)
-  term_to_cellmat_j = ()
-  term_to_cellidsrows_j = ()
-  term_to_cellidscols_j = ()
-  for j in 1:length(_matdata)
-    if !isnothing(_matdata[j])
-      term_to_cellmat_j = (term_to_cellmat_j...,_matdata[j][1])
-      term_to_cellidsrows_j = (term_to_cellidsrows_j...,_matdata[j][2])
-      term_to_cellidscols_j = (term_to_cellidscols_j...,_matdata[j][3])
-    end
-  end
-
-  term_to_cellmat = vcat(term_to_cellmat_j...)
-  term_to_cellidsrows = vcat(term_to_cellidsrows_j...)
-  term_to_cellidscols = vcat(term_to_cellidscols_j...)
-
-  (term_to_cellmat,term_to_cellidsrows,term_to_cellidscols)
 end
 
 function _matdata_jacobian(

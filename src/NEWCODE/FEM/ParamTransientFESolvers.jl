@@ -1,17 +1,17 @@
 abstract type ParamODESolution <: GridapType end
 
-struct GenericParamODESolution{T} <: ParamODESolution
-  op::ParamODEOperator
+struct GenericParamODESolution <: ParamODESolution
+  op::ParamTransientFEOperator
   solver::ODESolver
   μ::AbstractVector
-  u0::T
+  u0::AbstractVector
   t0::Real
   tF::Real
 end
 
 function solve_step!(
   uF::Union{AbstractVector,Tuple{Vararg{AbstractVector}}},
-  op::ParamODEOperator,
+  op::ParamTransientFEOperator,
   solver::ODESolver,
   μ::AbstractVector,
   u0::Union{AbstractVector,Tuple{Vararg{AbstractVector}}},
@@ -28,11 +28,11 @@ function solve(
 
   u0 = get_free_dof_values(uh0)
   t0,tF = solver.t0,solver.tF
-  GenericParamODESolution{T}(op,solver,μ,u0,t0,tF)
+  GenericParamODESolution(op,solver,μ,u0,t0,tF)
 end
 
 function Base.iterate(
-  sol::GenericParamODESolution{<:AbstractVector})
+  sol::GenericParamODESolution)
 
   uF = copy(sol.u0)
   u0 = copy(sol.u0)
@@ -53,7 +53,7 @@ function Base.iterate(
 end
 
 function Base.iterate(
-  sol::GenericParamODESolution{<:AbstractVector},
+  sol::GenericParamODESolution,
   state)
 
   uF,u0,t0,cache = state

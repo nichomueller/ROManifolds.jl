@@ -16,39 +16,39 @@ for (Top,Tslv) in zip(
       nsol = _get_nsnaps(aff,params)
       printstyled("Generating $nsol solution snapshots\n";color=:blue)
 
-      s = allocate_solution(op.test,fesolver)
-      solutions!(s,op,solver,μ)
+      s = allocate_solution(op.test,solver)
+      solutions!(s,op,solver,params)
       s
     end
 
     function collect_residuals(
       op::$Top,
       solver::$Tslv,
-      sols::AbstractArray,
-      params::Table;
-      kwargs...)
+      sols::Tsnp,
+      params::Table,
+      args...) where Tsnp
 
       cache = allocate_cache(op)
-      aff = affinity_residual(op,solver,params;kwargs...)
+      aff = affinity_residual(op,solver,params,args...)
       nres = _get_nsnaps(aff,params)
 
       printstyled("Generating $nres residual snapshots, affinity: $aff\n";color=:blue)
 
       r = allocate_residual(op,cache)
       rcache = r,cache
-      residuals!(aff,op,solver,sols,params,rcache)
+      residuals!(aff,op,solver,sols,params,rcache,args...)
       Snapshots(aff,r,nres)
     end
 
     function collect_jacobians(
       op::$Top,
       solver::$Tslv,
-      sols::AbstractArray,
-      params::Table;
-      kwargs...)
+      sols::Tsnp,
+      params::Table,
+      args...) where Tsnp
 
       cache = allocate_cache(op)
-      aff = affinity_jacobian(op,solver,params;kwargs...)
+      aff = affinity_jacobian(op,solver,params,args...)
       njac = _get_nsnaps(aff,params)
 
       printstyled("Generating $njac jacobian snapshots, affinity: $aff\n";color=:blue)
@@ -56,7 +56,7 @@ for (Top,Tslv) in zip(
       j = allocate_jacobian(op,cache)
       jnnz = compress(j)
       jcache = (j,jnnz),cache
-      jacobians!(aff,op,solver,sols,params,jcache)
+      jacobians!(aff,op,solver,sols,params,jcache,args...)
       Snapshots(aff,j,njac)
     end
   end
@@ -79,7 +79,26 @@ function allocate_solution(test::MultiFieldFESpace,args...)
   map(t->solution_cache(t,args...),test.spaces)
 end
 
-function solutions!(
+for (Top,Tslv) in zip(
+  (:ParamFEOperator,:ParamTransientFEOperator),
+  (:FESolver,:ODESolver))
+
+  @eval begin
+    function solutions!(
+      cache,
+      op::$Top,
+      solver::$Tslv,
+      params::Table)
+
+      pmap(params) do μ
+        solution!(cache,op,solver,μ)
+      end
+      cache
+    end
+  end
+end
+
+function solution!(
   cache,
   op::ParamFEOperator,
   solver::FESolver,
@@ -96,7 +115,7 @@ function solutions!(
   cache
 end
 
-function solutions!(
+function solution!(
   cache,
   op::ParamTransientFEOperator,
   solver::ODESolver,
@@ -120,39 +139,21 @@ function solutions!(
   cache
 end
 
-for (Top,Tslv) in zip(
-  (:ParamFEOperator,:ParamTransientFEOperator),
-  (:FESolver,:ODESolver))
-
-  @eval begin
-    function solutions!(
-      cache,
-      op::$Top,
-      solver::$Tslv,
-      params::Table)
-
-      pmap(params) do μ
-        solution!(cache,op,solver,μ)
-      end
-      cache
-    end
-  end
-end
-
 for (fun,cfun) in zip((:residuals!,:jacobians!),(:residual!,:nz_jacobian!))
   @eval begin
     function $fun(
       ::Union{ZeroAffinity,ParamAffinity},
       op::ParamFEOperator,
       ::FESolver,
-      sols::AbstractArray,
+      sols::Tsnp,
       params::Table,
-      cache)
+      cache,
+      args...) where Tsnp
 
       μ = first(params)
-      xh = get_sol(sols,nμ)
+      xh = get_datum(sols[1])
       a,c = cache
-      $cfun(a,op,μ,t,xh,c)
+      $cfun(a,op,solver,xh,μ,c,args...)
       a
     end
 
@@ -160,15 +161,16 @@ for (fun,cfun) in zip((:residuals!,:jacobians!),(:residual!,:nz_jacobian!))
       ::NonAffinity,
       op::ParamFEOperator,
       ::FESolver,
-      sols::AbstractArray,
+      sols::Tsnp,
       params::Table,
-      cache)
+      cache,
+      args...) where Tsnp
 
       a,c = cache
       pmap(enumerate(params)) do (nμ,μ)
-        xh = get_sol(sols,nμ)
+        xh = get_datum(sols[nμ])
         update_cache!(c,op,μ)
-        $cfun(a,op,μ,t,xh,c)
+        $cfun(a,op,solver,xh,μ,c,args...)
       end
       a
     end
@@ -177,15 +179,16 @@ for (fun,cfun) in zip((:residuals!,:jacobians!),(:residual!,:nz_jacobian!))
       ::Union{ZeroAffinity,ParamTimeAffinity},
       op::ParamTransientFEOperator,
       solver::ODESolver,
-      sols::AbstractArray,
+      sols::Tsnp,
       params::Table,
-      cache)
+      cache,
+      args...) where Tsnp
 
       μ = first(params)
       t = first(get_times(solver))
-      xh = get_sol(sols,nμ)
+      xh = get_datum(sols[1,1])
       a,c = cache
-      $cfun(a,op,μ,t,xh,c)
+      $cfun(a,op,solver,xh,μ,t,c,args...)
       a
     end
 
@@ -193,17 +196,18 @@ for (fun,cfun) in zip((:residuals!,:jacobians!),(:residual!,:nz_jacobian!))
       ::ParamAffinity,
       op::ParamTransientFEOperator,
       solver::ODESolver,
-      sols::AbstractArray,
+      sols::Tsnp,
       params::Table,
-      cache)
+      cache,
+      args...) where Tsnp
 
       times = get_times(solver)
       μ = first(params)
       a,c = cache
       pmap(enumerate(times)) do (nt,t)
-        xh = get_sol(sols,nμ,nt)
+        xh = get_datum(sols[1,nt])
         update_cache!(cache,op,μ,t)
-        $cfun(a,op,μ,t,xh,cache)
+        $cfun(a,op,solver,xh,μ,t,cache,args...)
       end
       a
     end
@@ -212,16 +216,17 @@ for (fun,cfun) in zip((:residuals!,:jacobians!),(:residual!,:nz_jacobian!))
       ::TimeAffinity,
       op::ParamTransientFEOperator,
       solver::ODESolver,
-      sols::AbstractArray,
+      sols::Tsnp,
       params::Table,
-      cache)
+      cache,
+      args...) where Tsnp
 
       t = first(get_times(solver))
       a,c = cache
       pmap(enumerate(params)) do (nμ,μ)
-        xh = get_sol(sols,nμ,nt)
+        xh = get_datum(sols[nμ,1])
         update_cache!(cache,op,μ,t)
-        $cfun(a,op,μ,t,xh,cache)
+        $cfun(a,op,solver,xh,μ,t,cache,args...)
       end
       a
     end
@@ -230,17 +235,18 @@ for (fun,cfun) in zip((:residuals!,:jacobians!),(:residual!,:nz_jacobian!))
       ::NonAffinity,
       op::ParamTransientFEOperator,
       solver::ODESolver,
-      sols::AbstractArray,
+      sols::Tsnp,
       params::Table,
-      cache)
+      cache,
+      args...) where Tsnp
 
       times = get_times(solver)
       a,c = cache
       pmap(enumerate(params)) do (nμ,μ)
         pmap(enumerate(times)) do (nt,t)
-          xh = get_sol(sols,nμ,nt)
+          xh = get_datum(sols[nμ,nt])
           update_cache!(cache,op,μ,t)
-          $cfun(a,op,μ,t,xh,cache)
+          $cfun(a,op,solver,xh,μ,t,cache,args...)
         end
       end
       a
@@ -248,9 +254,111 @@ for (fun,cfun) in zip((:residuals!,:jacobians!),(:residual!,:nz_jacobian!))
   end
 end
 
+function residual!(
+  r::AbstractVector,
+  op::ParamFEOperator,
+  ::FESolver,
+  xh::AbstractArray,
+  μ::AbstractArray,
+  cache,
+  trian::Triangulation,
+  filter::Tuple{Vararg{Int}},
+  args...)
+
+  row,_ = filter
+  test_row = op.test[row]
+  dv_row = _get_fe_basis(op.test,row)
+  u = evaluation_function(op,xh,cache)
+  assem_row = SparseMatrixAssembler(test_row,test_row)
+  vecdata = collect_cell_vector(test_row,op.res(μ,u,dv_row,args...),trian)
+  assemble_vector_add!(r,assem_row,vecdata)
+end
+
+function residual!(
+  r::AbstractVector,
+  op::ParamTransientFEOperator,
+  ::θMethod,
+  xh::AbstractArray,
+  μ::AbstractArray,
+  t::Float,
+  cache,
+  trian::Triangulation,
+  filter::Tuple{Vararg{Int}},
+  args...)
+
+  row,_ = filter
+  test_row = op.test[row]
+  dv_row = _get_fe_basis(op.test,row)
+  u = evaluation_function(op,xh,cache)
+  assem_row = SparseMatrixAssembler(test_row,test_row)
+  vecdata = collect_cell_vector(test_row,op.res(μ,t,u,dv_row,args...),trian)
+  assemble_vector_add!(r,assem_row,vecdata)
+end
+
 function nz_jacobian!(j::Tuple{SparseMatrixCSC,NnzArray},args...)
   js,jnz = j
   jacobian!(js,args...)
   jnz.nonzero_val = compress(js)
   jnz
+end
+
+function jacobian!(
+  j::AbstractMatrix,
+  op::ParamFEOperator,
+  ::FESolver,
+  xh::AbstractArray,
+  μ::AbstractArray,
+  cache,
+  trian::Triangulation,
+  filter::Tuple{Vararg{Int}},
+  args...)
+
+  row,col = filter
+  test_row = op.test[row]
+  trial,_ = cache
+  trial_col = trial[col]
+  dv_row = _get_fe_basis(op.test,row)
+  du_col = _get_trial_fe_basis(trial,col)
+  u = evaluation_function(op,xh,cache)
+  u_col = filter_evaluation_function(u,col)
+  assem_row_col = SparseMatrixAssembler(trial_col,test_row)
+  matdata = collect_cell_matrix(trial_col,test_row,
+    op.jacs(μ,u_col,du_col,dv_row,args...),trian)
+
+  assemble_matrix_add!(j,assem_row_col,matdata)
+end
+
+function jacobian!(
+  j::AbstractMatrix,
+  op::ParamTransientFEOperator,
+  solver::θMethod,
+  xh::AbstractArray,
+  μ::AbstractArray,
+  t::Float,
+  cache,
+  trian::Triangulation,
+  filter::Tuple{Vararg{Int}},
+  args...)
+
+  row,col = filter
+  test_row = op.test[row]
+  trial,_ = cache
+  trial_col = trial[col]
+  dv_row = _get_fe_basis(op.test,row)
+  du_col = _get_trial_fe_basis(trial,col)
+  u = evaluation_function(op,xh,cache)
+  u_col = filter_evaluation_function(u,col)
+  assem_row_col = SparseMatrixAssembler(trial_col,test_row)
+
+  γ = (1.0,1/(solver.dt*solver.θ))
+  _matdata = ()
+  for (i,γᵢ) in enumerate(γ)
+    if γᵢ > 0.0
+      _matdata = (_matdata...,collect_cell_matrix(trial_col,test_row,
+        γᵢ*op.jacs[i](μ,t,u_col,du_col,dv_row,args...),trian))
+    end
+  end
+  matdata = _vcat_matdata(_matdata)
+
+  assemble_matrix_add!(j,assem_row_col,matdata)
 end

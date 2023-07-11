@@ -135,7 +135,7 @@ function Base.getindex(s::MultiFieldSnapshots,idx)
   s_copy
 end
 
-function Base.getindex(s::TransientSingleFieldSnapshots,idx1,idx2)
+function Base.getindex(s::TransientSingleFieldSnapshots,idx1,idx2=:)
   s_copy = copy(s)
   time_ndofs = get_time_ndofs(s)
   _idx = ((first(idx1)-1)*time_ndofs+1:last(idx1)*time_ndofs)[idx2]
@@ -144,7 +144,7 @@ function Base.getindex(s::TransientSingleFieldSnapshots,idx1,idx2)
   s_copy
 end
 
-function Base.getindex(s::TransientMultiFieldSnapshots,idx1,idx2)
+function Base.getindex(s::TransientMultiFieldSnapshots,idx1,idx2=:)
   s_copy = copy(s)
   time_ndofs = get_time_ndofs(s)
   _idx = ((first(idx1)-1)*time_ndofs+1:last(idx1)*time_ndofs)[idx2]

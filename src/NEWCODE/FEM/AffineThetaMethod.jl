@@ -1,6 +1,6 @@
 function solve_step!(
   uf::AbstractVector,
-  op::AffineParamODEOperator,
+  op::ParamTransientFEOperator,
   solver::θMethod,
   μ::AbstractVector,
   u0::AbstractVector,
@@ -43,7 +43,7 @@ end
 function _matrix_and_vector!(
   A::AbstractMatrix,
   b::AbstractVector,
-  odeop::AffineParamODEOperator,
+  op::ParamTransientFEOperator{Affine},
   μ::AbstractArray,
   tθ::Real,
   dtθ::Real,
@@ -51,13 +51,13 @@ function _matrix_and_vector!(
   ode_cache,
   vθ)
 
-  _matrix!(A,odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
-  _vector!(b,odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
+  _matrix!(A,op,μ,tθ,dtθ,u0,ode_cache,vθ)
+  _vector!(b,op,μ,tθ,dtθ,u0,ode_cache,vθ)
 end
 
 function _matrix!(
   A::AbstractMatrix,
-  odeop::AffineParamODEOperator,
+  op::ParamTransientFEOperator{Affine},
   μ::AbstractArray,
   tθ::Real,
   dtθ::Real,
@@ -67,12 +67,12 @@ function _matrix!(
 
   z = zero(eltype(A))
   LinearAlgebra.fillstored!(A,z)
-  jacobians!(A,odeop,μ,tθ,(vθ,vθ),(1.0,1/dtθ),ode_cache)
+  jacobians!(A,op,μ,tθ,(vθ,vθ),(1.0,1/dtθ),ode_cache)
 end
 
 function _mass_matrix!(
   A::AbstractMatrix,
-  odeop::AffineParamODEOperator,
+  op::ParamTransientFEOperator{Affine},
   μ::AbstractArray,
   tθ::Real,
   dtθ::Real,
@@ -82,12 +82,12 @@ function _mass_matrix!(
 
   z = zero(eltype(A))
   LinearAlgebra.fillstored!(A,z)
-  jacobian!(A,odeop,μ,tθ,(vθ,vθ),2,(1/dtθ),ode_cache)
+  jacobian!(A,op,μ,tθ,(vθ,vθ),2,(1/dtθ),ode_cache)
 end
 
 function _vector!(
   b::AbstractVector,
-  odeop::AffineParamODEOperator,
+  op::ParamTransientFEOperator{Affine},
   μ::AbstractArray,
   tθ::Real,
   ::Real,
@@ -95,24 +95,24 @@ function _vector!(
   ode_cache,
   vθ)
 
-  residual!(b,odeop,μ,tθ,(u0,vθ),ode_cache)
+  residual!(b,op,μ,tθ,(u0,vθ),ode_cache)
   b .*= -1.0
 end
 
 function _allocate_matrix(
-  odeop::AffineParamODEOperator,
+  op::ParamTransientFEOperator{Affine},
   u0,
   ode_cache)
 
-  allocate_jacobian(odeop,u0,ode_cache)
+  allocate_jacobian(op,u0,ode_cache)
 end
 
 function _allocate_matrix_and_vector(
-  odeop::AffineParamODEOperator,
+  op::ParamTransientFEOperator{Affine},
   u0,
   ode_cache)
 
-  b = allocate_residual(odeop,u0,ode_cache)
-  A = allocate_jacobian(odeop,u0,ode_cache)
+  b = allocate_residual(op,u0,ode_cache)
+  A = allocate_jacobian(op,u0,ode_cache)
   A,b
 end

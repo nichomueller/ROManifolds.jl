@@ -119,12 +119,13 @@ for (Top,Tslv,Tsnp,Tsps,Tspm) in zip(
       nsnaps=20,
       kwargs...)
 
-      sres = get_datum(s[1:nsnaps])
+      row, = filter
+      sres = s[1:nsnaps]
       pres = params[1:nsnaps]
-      cell_dof_ids = get_cell_dof_ids(feop.test[filter[1]],trian)
-      order = get_order(feop.test[filter[1]])
+      cell_dof_ids = get_cell_dof_ids(feop.test[row],trian)
+      order = get_order(feop.test[row])
 
-      r = collect_residuals(feop,fesolver,sres,pres;trian,filter)
+      r = collect_residuals(feop,fesolver,sres,pres,trian,filter)
       compress_component(r,fesolver,trian,cell_dof_ids,order,rbspace;kwargs...)
     end
 
@@ -171,13 +172,13 @@ for (Top,Tslv,Tsnp,Tsps,Tspm) in zip(
       nsnaps=20,
       kwargs...)
 
-      sjac = get_datum(s[1:nsnaps])
+      row, = filter
+      sjac = s[1:nsnaps]
       pjac = params[1:nsnaps]
-      cell_dof_ids = get_cell_dof_ids(feop.test[filter[1]],trian)
-      order = get_order(feop.test[filter[1]])
+      cell_dof_ids = get_cell_dof_ids(feop.test[row],trian)
+      order = get_order(feop.test[row])
 
-      matdata = _matdata_jacobian(feop,fesolver,sjac,pjac,filter;trian)
-      j = generate_jacobians(feop,fesolver,pjac,matdata)
+      j = collect_jacobians(feop,fesolver,sjac,pjac,trian,filter)
       compress_component(j,fesolver,trian,cell_dof_ids,order,rbspace...;kwargs...)
     end
   end

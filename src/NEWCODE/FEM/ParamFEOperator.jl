@@ -3,7 +3,7 @@ abstract type ParamFEOperator{C<:OperatorType} <: GridapType end
 """
 Parametric FE operator that is defined by a parametric weak form
 """
-mutable struct ParamFEOperatorFromWeakForm{C<:OperatorType} <: ParamFEOperator{C}
+struct ParamFEOperatorFromWeakForm{C<:OperatorType} <: ParamFEOperator{C}
   res::Function
   jac::Function
   assem::Assembler
@@ -195,55 +195,3 @@ function get_single_field(
     c_trial,
     r_test)
 end
-
-# function _vecdata_residual(
-#   op::ParamFEOperator,
-#   ::FESolver,
-#   sols::AbstractArray,
-#   params::AbstractArray,
-#   filter::Tuple{Vararg{Int}},
-#   args...;
-#   trian::Triangulation=get_triangulation(op.test))
-
-#   row,_ = filter
-#   test_row = get_test(op)[row]
-#   trial = get_trial(op)
-#   dv_row = _get_fe_basis(op.test,row)
-#   sol_μ = _as_param_function(sols,params)
-#   assem_row = SparseMatrixAssembler(test_row,test_row)
-#   op.assem = assem_row
-
-#   function vecdata(μ)
-#     u = EvaluationFunction(trial(μ),sol_μ(μ))
-#     collect_cell_vector(test_row,op.res(μ,u,dv_row,args...),trian)
-#   end
-
-#   vecdata
-# end
-
-# function _matdata_jacobian(
-#   op::ParamFEOperator,
-#   ::FESolver,
-#   sols::AbstractArray,
-#   params::AbstractArray,
-#   filter::Tuple{Vararg{Int}},
-#   args...;
-#   trian::Triangulation=get_triangulation(op.test))
-
-#   row,col = filter
-#   test_row = get_test(op)[row]
-#   trial_col = get_trial(op)[col]
-#   dv_row = _get_fe_basis(op.test,row)
-#   du_col = _get_trial_fe_basis(op.trial(nothing),col)
-#   sols_col = isa(sols,AbstractMatrix) ? sols : sols[col]
-#   sol_col_μ = _as_param_function(sols_col,params)
-#   assem_row_col = SparseMatrixAssembler(trial_col(nothing)[col],test_row)
-#   op.assem = assem_row_col
-
-#   function matdata(μ)
-#     u_col = EvaluationFunction(trial_col(μ),sol_col_μ(μ))
-#     collect_cell_matrix(trial_col(μ),test_row,op.jac(μ,u_col(μ),dv_row,du_col,args...),trian)
-#   end
-
-#   matdata
-# end

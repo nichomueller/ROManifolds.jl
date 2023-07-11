@@ -6,7 +6,7 @@ mutable struct GenericParamSolution <: ParamSolution
 end
 
 function solve!(
-  op::ParamOperator,
+  op::ParamFEOperator,
   solver::FESolver,
   xh::AbstractVector,
   μ::AbstractVector)
@@ -23,7 +23,7 @@ function solve!(
 end
 
 function solve!(
-  op::ParamOperator{Affine},
+  op::ParamFEOperator{Affine},
   solver::FESolver,
   xh::AbstractVector,
   μ::AbstractVector)
@@ -39,7 +39,7 @@ function solve!(
 end
 
 function solve(
-  op::ParamOperator,
+  op::ParamFEOperator,
   solver::FESolver,
   μ::AbstractVector)
 
