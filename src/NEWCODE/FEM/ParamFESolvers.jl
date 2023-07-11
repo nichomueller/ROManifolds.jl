@@ -8,31 +8,34 @@ end
 function solve!(
   op::ParamOperator,
   solver::FESolver,
-  uh::T,
-  μ::AbstractVector) where T
+  xh::AbstractVector,
+  μ::AbstractVector)
 
-  cache = nothing
-  nlop = ParamNonlinearOperator(op,uh,μ,cache)
-  sol = get_free_dof_values(uh)
-  solve!(sol,solver.nls,nlop,cache)
-  sol
+  A,b = _allocate_matrix_and_vector(op,xh)
+  residual!(b,op,xh,μ)
+  jacobian!(A,op,xh,μ)
+  dx = similar(b)
+  ss = symbolic_setup(solver,A)
+  ns = numerical_setup(ss,A)
+  nls = NonlinearFESolver(solver)
+  Gridap.Algebra._solve_nr!(xh,A,b,dx,ns,nls,op)
+  xh
 end
 
 function solve!(
   op::ParamOperator{Affine},
   solver::FESolver,
-  uh::T,
-  μ::AbstractVector) where T
+  xh::AbstractVector,
+  μ::AbstractVector)
 
-  A,b = _allocate_matrix_and_vector(op,uh)
-  A = _matrix!(A,op,uh,μ)
-  b = _vector!(b,op,uh,μ)
+  A,b = _allocate_matrix_and_vector(op,xh)
+  A = _matrix!(A,op,xh,μ)
+  b = _vector!(b,op,xh,μ)
   afop = AffineOperator(A,b)
   cache = nothing
   newmatrix = true
-  sol = get_free_dof_values(uh)
-  solve!(sol,solver.ls,afop,cache,newmatrix)
-  sol
+  solve!(xh,solver.ls,afop,cache,newmatrix)
+  xh
 end
 
 function solve(
@@ -40,8 +43,7 @@ function solve(
   solver::FESolver,
   μ::AbstractVector)
 
-  trial = get_trial(op.feop)
-  uh = zero(trial(μ))
-  solk = solve!(op,solver,uh,μ)
+  xh = zero(op.test.nfree)
+  solk = solve!(op,solver,xh,μ)
   GenericParamSolution(solk,μ)
 end

@@ -59,7 +59,7 @@ for (Top,Tslv) in zip(
       catch
         nsnaps = info.nsnaps_state
         params = realization(feop,nsnaps)
-        sols = generate_solutions(feop,fesolver,params)
+        sols = collect_solutions(feop,fesolver,params)
         save_test(info,(sols,params))
       end
       sols,params
@@ -128,14 +128,24 @@ function compute_relative_error(
   sol_approx::SingleFieldSnapshots;
   norm_matrix=nothing)
 
-  time_ndofs = size(sol,2)
+  absolute_err = norm(sol-sol_approx,norm_matrix)
+  snap_norm = norm(sol,norm_matrix)
+  absolute_err/snap_norm
+end
+
+function compute_relative_error(
+  sol::TransientSingleFieldSnapshots,
+  sol_approx::TransientSingleFieldSnapshots;
+  norm_matrix=nothing)
+
+  time_ndofs = get_time_ndofs(sol)
   absolute_err,snap_norm = zeros(time_ndofs),zeros(time_ndofs)
   for i = 1:Nt
     absolute_err[i] = norm(sol[:,i]-sol_approx[:,i],norm_matrix)
     snap_norm[i] = norm(sol[:,i],norm_matrix)
   end
 
-  norm(absolute_err)/norm(uh_norm)
+  norm(absolute_err)/norm(snap_norm)
 end
 
 function compute_relative_error(

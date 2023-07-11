@@ -5,149 +5,166 @@ struct TimeAffinity <: Affinity end
 struct ParamTimeAffinity <: Affinity end
 struct NonAffinity <: Affinity end
 
-_affinity(args...) = NonAffinity()
-_affinity(::ParamAffinity,args...) = ParamAffinity()
-_affinity(::NonAffinity,::TimeAffinity) = TimeAffinity()
-_affinity(::ParamAffinity,::TimeAffinity) = ParamTimeAffinity()
+function affinity_residual(
+  op::ParamFEOperator,
+  ::FESolver,
+  params::Table;
+  filter=(1,1),
+  ntests=10,
+  trian=get_triangulation(feop.test))
 
-function get_affinity(::FESolver,params::Table,data::Function;ntests=10)
-  if isempty(data(rand(params),rand(times)))
+  row, = filter
+  test_row = get_test(op)[row]
+  dv_row = _get_fe_basis(op.test,row)
+  u = allocate_evaluation_function(op)
+
+  μ = first(params)
+  d = collect_cell_contribution(test_row,op.res(μ,u,dv_row),trian)
+  if all(isempty,d)
     return ZeroAffinity()
   end
 
-  d(μ) = first(first(data(μ)))
-  global idx
-  for (i,ci) in enumerate(d(rand(params)))
-    if !isapprox(sum(abs.(ci)),0.)
-      idx = i
-      break
-    end
-  end
-  didx(μ) = max.(abs.(d(μ)[idx]),eps())
+  cell = find_nonzero_cell_contribution(d)
+  d0 = max.(abs.(d[cell]),eps())
 
-  params_test = rand(params,ntests)
-
-  p_aff = ParamAffinity()
-  for μ = params_test
-    ratio = d(μ) ./ didx(μ)
+  for μ in rand(params,ntests)
+    d = collect_cell_contribution(test_row,op.res(μ,u,dv_row),trian)
+    ratio = d[cell] ./ d0[cell]
     if !all(ratio .== ratio[1])
-      p_aff = NonAffinity()
-      break
+      return NonAffinity()
     end
   end
 
-  _affinity(p_aff)
+  return ParamAffinity()
 end
 
-function get_affinity(solver::ODESolver,params::Table,data::Function;ntests=10)
-  times = get_times(solver)
+function affinity_residual(
+  op::ParamTransientFEOperator,
+  solver::ODESolver,
+  params::Table;
+  filter=(1,1),
+  ntests=10,
+  trian=get_triangulation(feop.test))
 
-  if all(isempty,data(rand(params),rand(times)))
+  row, = filter
+  times = get_times(solver)
+  test_row = get_test(op)[row]
+  dv_row = _get_fe_basis(op.test,row)
+  u = allocate_evaluation_function(op)
+
+  μ,t = first(params),first(times)
+  d = collect_cell_contribution(test_row,op.res(μ,t,u,dv_row),trian)
+  if all(isempty,d)
     return ZeroAffinity()
   end
 
-  d(μ,t) = first(first(data(μ,t)))
+  cell = find_nonzero_cell_contribution(d)
+  d0 = max.(abs.(d[cell]),eps())
+
+  for μ in rand(params,ntests)
+    d = collect_cell_contribution(test_row,op.res(μ,t,u,dv_row),trian)
+    ratio = d[cell] ./ d0[cell]
+    if !all(ratio .== ratio[1])
+      return NonAffinity()
+    end
+  end
+
+  for t in rand(params,ntests)
+    d = collect_cell_contribution(test_row,op.res(μ,t,u,dv_row),trian)
+    ratio = d[cell] ./ d0[cell]
+    if !all(ratio .== ratio[1])
+      return ParamAffinity()
+    end
+  end
+
+  return ParamTimeAffinity()
+end
+
+function affinity_jacobian(
+  op::ParamFEOperator,
+  ::FESolver,
+  params::Table;
+  filter=(1,1),
+  ntests=10,
+  trian=get_triangulation(feop.test))
+
+  row, = filter
+  test_row = get_test(op)[row]
+  trial_col = get_trial(op)[col]
+  dv_row = _get_fe_basis(op.test,row)
+  du_col = _get_trial_fe_basis(get_trial(op)(nothing),col)
+  u = allocate_evaluation_function(op)
+
+  μ = first(params)
+  d = collect_cell_contribution(trial_col,test_row,op.jac(μ,u,du_col,dv_row),trian)
+  if all(isempty,d)
+    return ZeroAffinity()
+  end
+
+  cell = find_nonzero_cell_contribution(d)
+  d0 = max.(abs.(d[cell]),eps())
+
+  for μ in rand(params,ntests)
+    d = collect_cell_contribution(trial_col,test_row,op.jac(μ,u,du_col,dv_row),trian)
+    ratio = d[cell] ./ d0[cell]
+    if !all(ratio .== ratio[1])
+      return NonAffinity()
+    end
+  end
+
+  return ParamAffinity()
+end
+
+function affinity_residual(
+  op::ParamTransientFEOperator,
+  solver::ODESolver,
+  params::Table;
+  filter=(1,1),
+  ntests=10,
+  trian=get_triangulation(feop.test))
+
+  row, = filter
+  times = get_times(solver)
+  test_row = get_test(op)[row]
+  trial_col = get_trial(op)[col]
+  dv_row = _get_fe_basis(op.test,row)
+  du_col = _get_trial_fe_basis(get_trial(op)(nothing,nothing),col)
+  u = allocate_evaluation_function(op)
+
+  μ,t = first(params),first(times)
+  d = collect_cell_contribution(trial_col,test_row,op.jac(μ,t,u,du_col,dv_row),trian)
+  if all(isempty,d)
+    return ZeroAffinity()
+  end
+
+  cell = find_nonzero_cell_contribution(d)
+  d0 = max.(abs.(d[cell]),eps())
+
+  for μ in rand(params,ntests)
+    d = collect_cell_contribution(trial_col,test_row,op.jac(μ,t,u,du_col,dv_row),trian)
+    ratio = d[cell] ./ d0[cell]
+    if !all(ratio .== ratio[1])
+      return NonAffinity()
+    end
+  end
+
+  for t in rand(params,ntests)
+    d = collect_cell_contribution(trial_col,test_row,op.jac(μ,t,u,du_col,dv_row),trian)
+    ratio = d[cell] ./ d0[cell]
+    if !all(ratio .== ratio[1])
+      return ParamAffinity()
+    end
+  end
+
+  return ParamTimeAffinity()
+end
+
+function find_nonzero_cell_contribution(data)
   global idx
-  for (i,ci) in enumerate(d(rand(params),rand(times)))
-    if !isapprox(sum(abs.(ci)),0.)
-      idx = i
-      break
+  for (i,celli) in data
+    if !iszero(sum(abs.(celli)))
+      return i
     end
   end
-  didx(μ,t) = max.(abs.(d(μ,t)[idx]),eps())
-
-  param_base = rand(params)
-  time_base = rand(times)
-  datum_idx_base = didx(param_base,time_base)
-
-  params_test = rand(params,ntests)
-  times_test = rand(times,ntests)
-
-  p_aff = ParamAffinity()
-  for μ = params_test
-    t = first(times_test)
-    ratio = didx(μ,t) ./ datum_idx_base
-    if !all(ratio .== ratio[1])
-      p_aff = NonAffinity()
-      break
-    end
-  end
-
-  t_aff = TimeAffinity()
-  for t = times_test
-    μ = first(params_test)
-    ratio = didx(μ,t) ./ datum_idx_base
-    if !all(ratio .== ratio[1])
-      t_aff = NonAffinity()
-      break
-    end
-  end
-
-  _affinity(p_aff,t_aff)
-end
-
-function get_datum(
-  ::Union{ZeroAffinity,ParamAffinity},
-  ::FESolver,
-  params::Table,
-  data::Function)
-
-  μ = rand(params)
-  [data(μ)]
-end
-
-function get_datum(
-  ::NonAffinity,
-  ::FESolver,
-  params::Table,
-  data::Function)
-
-  pmap(μ->data(μ),params)
-end
-
-function get_datum(
-  ::Union{ZeroAffinity,ParamTimeAffinity},
-  solver::ODESolver,
-  params::Table,
-  data::Function)
-
-  times = get_times(solver)
-  μ = rand(params)
-  t = rand(times)
-  [data(μ,t)]
-end
-
-function get_datum(
-  ::ParamAffinity,
-  solver::ODESolver,
-  params::Table,
-  data::Function)
-
-  times = get_times(solver)
-  μ = rand(params)
-  pmap(t->data(μ,t),times)
-end
-
-function get_datum(
-  ::TimeAffinity,
-  solver::ODESolver,
-  params::Table,
-  data::Function)
-
-  times = get_times(solver)
-  t = rand(times)
-  pmap(μ->data(μ,t),params)
-end
-
-function get_datum(
-  ::NonAffinity,
-  solver::ODESolver,
-  params::Table,
-  data::Function)
-
-  times = get_times(solver)
-  d = map(params) do μ
-    vcat(map(t->data(μ,t),times)...)
-  end
-  vcat(d...)
+  @unreachable
 end

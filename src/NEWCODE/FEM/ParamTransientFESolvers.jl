@@ -21,24 +21,14 @@ function solve_step!(
 end
 
 function solve(
-  op::ParamODEOperator,
-  solver::ODESolver,
-  μ::AbstractVector,
-  u0::T) where T
-
-  t0,tF = solver.t0,solver.tF
-  GenericParamODESolution{T}(op,solver,μ,u0,t0,tF)
-end
-
-function solve(
   op::ParamTransientFEOperator,
   solver::ODESolver,
   μ::AbstractVector,
   uh0)
 
-  ode_op = get_algebraic_operator(op)
   u0 = get_free_dof_values(uh0)
-  solve(ode_op,solver,μ,u0)
+  t0,tF = solver.t0,solver.tF
+  GenericParamODESolution{T}(op,solver,μ,u0,t0,tF)
 end
 
 function Base.iterate(

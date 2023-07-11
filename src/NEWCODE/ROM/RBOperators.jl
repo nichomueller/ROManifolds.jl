@@ -19,7 +19,7 @@ for (Top,Tslv,Tad) in zip(
       # fun_mdeim = info.fun_mdeim
       nsnaps = info.nsnaps_state
       params = realization(feop,nsnaps)
-      sols = generate_solutions(feop,fesolver,params)
+      sols = collect_solutions(feop,fesolver,params)
       rbspace = compress_solutions(feop,fesolver,sols,params;ϵ)
 
       nsnaps = info.nsnaps_system
@@ -41,7 +41,7 @@ for (Top,Tslv,Tad) in zip(
       kwargs...)
 
       measures = get_measures(a)
-      nfields = get_nfields(a)
+      nfields = num_fields(a)
       r = Vector{ParamArray}(undef,nfields)
 
       for (m,ad) in a.dict
@@ -96,7 +96,7 @@ for (Top,Tslv,Tad) in zip(
       kwargs...)
 
       measures = get_measures(a)
-      nfields = get_nfields(a)
+      nfields = num_fields(a)
       j = Matrix{ParamArray}(undef,nfields,nfields)
 
       for (_,ad) in a.dict

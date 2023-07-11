@@ -40,9 +40,9 @@ for (Tsps,Tspm) in zip((:SingleFieldRBSpace,:TransientSingleFieldRBSpace),
 
     Base.getindex(rb::$Tspm,i::Int) = get_single_field(rb,i)
 
-    get_nfields(::$Tsps) = 1
+    Base.length(rb::$Tsps) = 1
 
-    get_nfields(rb::$Tspm) = length(rb.basis_space)
+    Base.length(rb::$Tspm) = length(rb.basis_space)
   end
 end
 
@@ -78,13 +78,12 @@ end
 function compress_solutions(
   feop::ParamFEOperator,
   fesolver::FESolver,
-  s::MultiFieldSnapshots{T,A},
+  s::MultiFieldSnapshots{T,N,A},
   args...;
   compute_supremizers=false,
-  kwargs...) where {T,A}
+  kwargs...) where {T,N,A}
 
-  snaps = collect_single_fields(s)
-  bases_space = map(snap -> tpod(snap;kwargs...),snaps)
+  bases_space = map(snap -> tpod(snap;kwargs...),s)
   if compute_supremizers
     add_space_supremizers!(bases_space,feop,fesolver,s,args...)
   end
@@ -94,25 +93,24 @@ end
 function compress_solutions(
   ::ParamTransientFEOperator,
   fesolver::ODESolver,
-  s::SingleFieldSnapshots{T,A},
+  s::TransientSingleFieldSnapshots{T,A},
   args...;
   kwargs...) where {T,A}
 
-  basis_space,basis_time = transient_tpod(s,fesolver;kwargs...)
+  basis_space,basis_time = tpod(s,fesolver;kwargs...)
   TransientSingleFieldRBSpace{T}(basis_space,basis_time)
 end
 
 function compress_solutions(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
-  s::MultiFieldSnapshots{T,A},
+  s::TransientMultiFieldSnapshots{T,N,A},
   args...;
   compute_supremizers=false,
   ttol=1e-2,
-  kwargs...) where {T,A}
+  kwargs...) where {T,N,A}
 
-  snaps = collect_single_fields(s)
-  bases = map(snap -> transient_tpod(snap,fesolver;kwargs...),snaps)
+  bases = map(snap -> tpod(snap,fesolver;kwargs...),s)
   bases_space,bases_time = first.(bases),last.(bases)
   if compute_supremizers
     add_space_supremizers!(bases_space,feop,fesolver,s,args...)
@@ -121,13 +119,17 @@ function compress_solutions(
   TransientMultiFieldRBSpace{T}(bases_space,bases_time)
 end
 
-for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:ODESolver))
+for (Top,Tslv,Tsnp) in zip(
+  (:ParamFEOperator,:ParamTransientFEOperator),
+  (:FESolver,:ODESolver),
+  (:MultiFieldSnapshots,:TransientMultiFieldSnapshots))
+
   @eval begin
     function add_space_supremizers!(
       bases_space::Vector{NnzArray{T}},
       feop::$Top,
       fesolver::$Tslv,
-      snaps::MultiFieldSnapshots,
+      snaps::$Tsnp,
       params::Table;
       kwargs...) where T
 
@@ -144,7 +146,7 @@ for (Top,Tslv) in zip((:ParamFEOperator,:ParamTransientFEOperator),(:FESolver,:O
     function space_supremizers(
       feop::$Top,
       fesolver::$Tslv,
-      s::MultiFieldSnapshots,
+      s::$Tsnp,
       bs::AbstractMatrix,
       params::Table,
       i::Int)

@@ -71,7 +71,7 @@ end
 ϵ = info.ϵ
 nsnaps = info.nsnaps_state
 params = realization(feop,nsnaps)
-sols = generate_solutions(feop,fesolver,params)
+sols = collect_solutions(feop,fesolver,params)
 rbspace = compress_solutions(feop,fesolver,sols;ϵ)
 nsnaps = info.nsnaps_system
 rb_res = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
@@ -107,7 +107,7 @@ rb_jac = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
 # jacs = generate_jacobians(feop,solver,trians[1],s,param,(1,1))
 # compress_component(jacs,solver,trians[1],rbspace,rbspace;st_mdeim=true)
 
-# bs,bt = transient_tpod(jacs)
+# bs,bt = tpod(jacs)
 # interp_idx_space,interp_idx_time = get_interpolation_idx(bs,bt)
 # integr_domain = TransientRBIntegrationDomain(
 #   jacs,trians[1],times,interp_idx_space,interp_idx_time)

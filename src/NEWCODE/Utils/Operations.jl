@@ -63,6 +63,27 @@ function Base.getindex(
   reshape(convert(Matrix{T},emat[idx,k2:k2]),:)
 end
 
+function Gridap.FESpaces.collect_cell_vector(
+  test::FESpace,
+  a::DomainContribution,
+  trian::Triangulation)
+
+  w = []
+  r = []
+  for strian in get_domains(a)
+    if strian == trian
+      scell_vec = get_contribution(a,strian)
+      cell_vec,trian = move_contributions(scell_vec,strian)
+      @assert ndims(eltype(cell_vec)) == 1
+      cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
+      rows = get_cell_dof_ids(test,trian)
+      push!(w,cell_vec_r)
+      push!(r,rows)
+    end
+  end
+  (w,r)
+end
+
 function Gridap.FESpaces.collect_cell_matrix(
   trial::FESpace,
   test::FESpace,
@@ -89,25 +110,42 @@ function Gridap.FESpaces.collect_cell_matrix(
   (w,r,c)
 end
 
-function Gridap.FESpaces.collect_cell_vector(
+function collect_cell_contribution(
   test::FESpace,
   a::DomainContribution,
   trian::Triangulation)
 
   w = []
-  r = []
   for strian in get_domains(a)
     if strian == trian
-      scell_vec = get_contribution(a,strian)
-      cell_vec,trian = move_contributions(scell_vec,strian)
-      @assert ndims(eltype(cell_vec)) == 1
-      cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
-      rows = get_cell_dof_ids(test,trian)
-      push!(w,cell_vec_r)
-      push!(r,rows)
+      scell = get_contribution(a,strian)
+      cell,trian = move_contributions(scell,strian)
+      @assert ndims(eltype(cell_mat)) == 1
+      cell_r = attach_constraints_rows(test,cell,trian)
+      push!(w,cell_r)
     end
   end
-  (w,r)
+  w
+end
+
+function collect_cell_contribution(
+  trial::FESpace,
+  test::FESpace,
+  a::DomainContribution,
+  trian::Triangulation)
+
+  w = []
+  for strian in get_domains(a)
+    if strian == trian
+      scell = get_contribution(a,strian)
+      cell,trian = move_contributions(scell,strian)
+      @assert ndims(eltype(cell_mat)) == 2
+      cell_c = attach_constraints_cols(trial,cell,trian)
+      cell_rc = attach_constraints_rows(test,cell_c,trian)
+      push!(w,cell_rc)
+    end
+  end
+  w
 end
 
 function collect_trian(a::DomainContribution)
@@ -126,14 +164,6 @@ function Base.:(==)(g1::UnstructuredGrid,g2::UnstructuredGrid)
   g1.orientation_style == g2.orientation_style &&
   g1.facet_normal == g2.facet_normal)
 end
-
-# function Base.:(==)(t1::BoundaryTriangulation,t2::BoundaryTriangulation)
-#   t1.trian == t2.trian && t1.glue == t2.glue
-# end
-
-# function Base.:(==)(t1::Triangulation,t2::Triangulation)
-#   t1.model == t2.model && t1.grid == t2.grid
-# end
 
 function is_parent(
   tparent::Triangulation,

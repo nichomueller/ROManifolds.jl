@@ -14,7 +14,7 @@ Gridap.CellData.num_domains(a::RBAlgebraicContribution) = length(a.dict)
 
 Gridap.CellData.get_domains(a::RBAlgebraicContribution) = keys(a.dict)
 
-function get_nfields(a::RBAlgebraicContribution)
+function num_fields(a::RBAlgebraicContribution)
   for (_,ad) in a.dict
     return size(ad,1)
   end

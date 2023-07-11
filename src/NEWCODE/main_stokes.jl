@@ -78,8 +78,7 @@ end
 ϵ = info.ϵ
 nsnaps = info.nsnaps_state
 params = realization(feop,nsnaps)
-cache = solution_cache(feop.test,fesolver)
-sols = generate_solutions(feop,fesolver,params)
+sols = collect_solutions(feop,fesolver,params)
 rbspace = compress_solutions(feop,fesolver,sols,params;ϵ,compute_supremizers)
 rb_res_c = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
 rb_jac_c = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
@@ -173,7 +172,7 @@ cache = jacobians_cache(feop.assem,data)
 jacs = pmap(d -> collect_jacobians!(cache,feop.assem,d),data)
 njacs = _get_nsnaps(aff,params)
 j = generate_jacobians(feop,fesolver,pjac,matdata)
-bs,bt = transient_tpod(j,fesolver;ϵ)
+bs,bt = tpod(j,fesolver;ϵ)
 interp_idx_space,interp_idx_time = get_interpolation_idx(bs,bt)
 
 # nsnaps = info.nsnaps_mdeim
