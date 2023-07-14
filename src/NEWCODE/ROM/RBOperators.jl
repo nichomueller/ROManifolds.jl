@@ -237,13 +237,13 @@ function assemble_residual(
   trian = get_triangulation(meas)
   new_meas = modify_measures(measures,meas)
   times = res_ad.integration_domain.times
-  t0 = first(times)
 
-  vecdata = _vecdata_residual(feop,fesolver,u,μ,filter,new_meas...;trian)
-  r0 = allocate_vector(feop.assem,vecdata(μ,t0))
-  r = map(times) do t
-    numeric_loop_vector!(r0,feop.assem,vecdata(μ,t))
-    r0[idx]
+  rcache = allocate_residual(op)
+  res_iter = init_res_iterator(feop,fesolver,trian,filter,new_meas...)
+  r = map(enumerate(times)) do (nt,t)
+    _update_x!(fesolver,uθ,u,nt)
+    evaluate!(rcache,res_iter,feop,(u,uθ),μ,t)[idx]
+    rcache[idx]
   end
 
   hcat(r...)
@@ -284,13 +284,13 @@ function assemble_jacobian(
   trian = get_triangulation(meas)
   new_meas = modify_measures(measures,meas)
   times = jac_ad.integration_domain.times
-  t0 = first(times)
 
-  matdata = _matdata_jacobian(feop,fesolver,u,μ,filter,new_meas...;trian)
-  j0 = allocate_matrix(feop.assem,matdata(μ,t0))
-  j = map(times) do t
-    numeric_loop_matrix!(j0,feop.assem,matdata(μ,t))
-    Vector(reshape(j0,:)[idx])
+  jcache = allocate_jacobian(op)
+  jac_iter = init_jac_iterator(feop,fesolver,trian,filter,new_meas...)
+  j = map(enumerate(times)) do (nt,t)
+    _update_x!(fesolver,uθ,u,nt)
+    evaluate!(jcache,jac_iter,feop,(u,uθ),μ,t)
+    reshape(jcache,:)[idx]
   end
 
   hcat(j...)

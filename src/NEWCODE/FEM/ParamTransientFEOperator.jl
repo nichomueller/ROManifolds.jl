@@ -102,13 +102,13 @@ function update_cache!(
 end
 
 function allocate_evaluation_function(op::ParamTransientFEOperator)
-  U = get_trial(op)
-  uh = get_trial_fe_basis(U(nothing,nothing))
+  test = op.test
+  xh = EvaluationFunction(test,fill(0.,test.nfree))
   dxh = ()
   for _ in 1:get_order(op)
-    dxh = (dxh...,uh)
+    dxh = (dxh...,xh)
   end
-  TransientCellField(uh,dxh)
+  TransientCellField(xh,dxh)
 end
 
 function evaluation_function(
@@ -140,7 +140,8 @@ end
 
 function allocate_residual(op::ParamTransientFEOperatorFromWeakForm,args...)
   xh = allocate_evaluation_function(op)
-  vecdata = collect_cell_vector(V,op.res(realization(op),0.0,xh,v))
+  v = get_fe_basis(op.test)
+  vecdata = collect_cell_vector(op.test,op.res(realization(op),0.0,xh,v))
   allocate_vector(op.assem,vecdata)
 end
 

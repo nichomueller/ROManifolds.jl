@@ -120,12 +120,12 @@ function collect_cell_contribution(
     if strian == trian
       scell = get_contribution(a,strian)
       cell,trian = move_contributions(scell,strian)
-      @assert ndims(eltype(cell_mat)) == 1
+      @assert ndims(eltype(cell)) == 1
       cell_r = attach_constraints_rows(test,cell,trian)
       push!(w,cell_r)
     end
   end
-  w
+  first(w)
 end
 
 function collect_cell_contribution(
@@ -139,13 +139,13 @@ function collect_cell_contribution(
     if strian == trian
       scell = get_contribution(a,strian)
       cell,trian = move_contributions(scell,strian)
-      @assert ndims(eltype(cell_mat)) == 2
+      @assert ndims(eltype(cell)) == 2
       cell_c = attach_constraints_cols(trial,cell,trian)
       cell_rc = attach_constraints_rows(test,cell_c,trian)
       push!(w,cell_rc)
     end
   end
-  w
+  first(w)
 end
 
 function collect_trian(a::DomainContribution)

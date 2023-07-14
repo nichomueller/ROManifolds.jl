@@ -46,7 +46,8 @@ function Base.iterate(
   state = (uF,u0,tF,cache)
 
   # Multi field
-  Uh = _allocate_trial_space(sol)
+  ode_cache, = cache
+  Uh, = first(ode_cache)
   uh = _split_solutions(Uh,uF)
 
   return uh,state
@@ -70,8 +71,8 @@ function Base.iterate(
   state = (uF,u0,tF,cache)
 
   # Multi field
-  Xh, = cache
-  Uh = first(Xh)
+  ode_cache, = cache
+  Uh, = first(ode_cache)
   uh = _split_solutions(Uh,uF)
 
   return uh,state

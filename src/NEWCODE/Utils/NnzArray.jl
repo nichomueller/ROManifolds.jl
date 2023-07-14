@@ -21,7 +21,7 @@ function compress(entire_arrays::Vector{Vector{T}}) where {T<:AbstractArray}
   map(compress,entire_array)
 end
 
-function Base.hcat(nza_vec::Vector{NnzArray{T}}) where T
+function Base.hcat(nza_vec::NnzArray{T}...) where T
   msg = """\n
   Cannot hcat the given NnzArrays: the nonzero indices and/or the full
   order number of rows do not match one another.

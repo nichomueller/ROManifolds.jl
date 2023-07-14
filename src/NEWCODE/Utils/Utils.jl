@@ -69,6 +69,7 @@ import Gridap.ODEs.TransientFETools:fill_jacobians
 import Gridap.ODEs.TransientFETools:update_cache!
 import Gridap.ODEs.TransientFETools:jacobians!
 import Gridap.ODEs.TransientFETools._matdata_jacobian
+import Gridap.ODEs.TransientFETools._vcat_matdata
 import Gridap.ODEs.TransientFETools:∂t
 import Gridap.ODEs.TransientFETools:∂tt
 import LineSearches:BackTracking

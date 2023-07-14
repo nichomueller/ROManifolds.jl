@@ -1,6 +1,6 @@
 function solve_step!(
   uf::AbstractVector,
-  op::ParamTransientFEOperator,
+  op::ParamTransientFEOperator{Affine},
   solver::θMethod,
   μ::AbstractVector,
   u0::AbstractVector,

@@ -50,6 +50,20 @@ function update_cache!(cache,::ParamFEOperator,μ::AbstractVector)
   U,Us
 end
 
+function allocate_evaluation_function(op::ParamFEOperator)
+  test = op.test
+  EvaluationFunction(test,fill(0.,test.nfree))
+end
+
+function evaluation_function(
+  ::ParamFEOperator,
+  xh::AbstractVector,
+  cache)
+
+  trial, = cache
+  EvaluationFunction(trial,xh)
+end
+
 function _allocate_matrix_and_vector(op::ParamFEOperator,xh::AbstractVector)
   b = allocate_residual(op,xh)
   A = allocate_jacobian(op,xh)
@@ -77,28 +91,19 @@ function _vector!(
   b .*= -1.0
 end
 
-function allocate_residual(
-  op::ParamFEOperatorFromWeakForm,
-  xh::AbstractVector)
-
-  test = get_test(op)
-  v = get_fe_basis(test)
-  trial = get_trial(op)(nothing)
-  x = EvaluationFunction(trial,xh)
-  vecdata = collect_cell_vector(test,op.res(realization(op),x,v))
+function allocate_residual(op::ParamFEOperatorFromWeakForm,args...)
+  xh = allocate_evaluation_function(op)
+  v = get_fe_basis(op.test)
+  vecdata = collect_cell_vector(op.test,op.res(realization(op),xh,v))
   allocate_vector(op.assem,vecdata)
 end
 
-function allocate_jacobian(
-  op::ParamFEOperatorFromWeakForm,
-  xh::AbstractVector)
-
-  test = get_test(op)
-  v = get_fe_basis(test)
-  trial = get_trial(op)(nothing)
-  x = EvaluationFunction(trial,xh)
-  du = get_trial_fe_basis(trial)
-  matdata = collect_cell_matrix(trial,test,op.jac(realization(op),x,du,v))
+function allocate_jacobian(op::ParamFEOperatorFromWeakForm,args...)
+  xh = allocate_evaluation_function(op)
+  v = get_fe_basis(op.test)
+  trial = op.trial(nothing)
+  u = get_trial_fe_basis(op.test)
+  matdata = collect_cell_matrix(trial,op.test,op.jac(realization(op),xh,u,v))
   allocate_matrix(op.assem,matdata)
 end
 

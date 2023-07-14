@@ -8,10 +8,10 @@ struct NonAffinity <: Affinity end
 function affinity_residual(
   op::ParamFEOperator,
   ::FESolver,
-  params::Table;
-  filter=(1,1),
-  ntests=10,
-  trian=get_triangulation(feop.test))
+  params::Table,
+  trian::Triangulation,
+  filter::Tuple{Vararg{Int}};
+  ntests=10)
 
   row, = filter
   test_row = get_test(op)[row]
@@ -41,10 +41,10 @@ end
 function affinity_residual(
   op::ParamTransientFEOperator,
   solver::ODESolver,
-  params::Table;
-  filter=(1,1),
-  ntests=10,
-  trian=get_triangulation(feop.test))
+  params::Table,
+  trian::Triangulation,
+  filter::Tuple{Vararg{Int}};
+  ntests=10)
 
   row, = filter
   times = get_times(solver)
@@ -83,12 +83,12 @@ end
 function affinity_jacobian(
   op::ParamFEOperator,
   ::FESolver,
-  params::Table;
-  filter=(1,1),
-  ntests=10,
-  trian=get_triangulation(feop.test))
+  params::Table,
+  trian::Triangulation,
+  filter::Tuple{Vararg{Int}};
+  ntests=10)
 
-  row, = filter
+  row,col = filter
   test_row = get_test(op)[row]
   trial_col = get_trial(op)[col]
   dv_row = _get_fe_basis(op.test,row)
@@ -97,7 +97,7 @@ function affinity_jacobian(
   ucol = filter_evaluation_function(u,col)
 
   μ = first(params)
-  d = collect_cell_contribution(trial_col,test_row,op.jac(μ,ucol,du_col,dv_row),trian)
+  d = collect_cell_contribution(trial_col(μ),test_row,op.jac(μ,ucol,du_col,dv_row),trian)
   if all(isempty,d)
     return ZeroAffinity()
   end
@@ -106,7 +106,7 @@ function affinity_jacobian(
   d0 = max.(abs.(d[cell]),eps())
 
   for μ in rand(params,ntests)
-    d = collect_cell_contribution(trial_col,test_row,op.jac(μ,ucol,du_col,dv_row),trian)
+    d = collect_cell_contribution(trial_col(μ),test_row,op.jac(μ,ucol,du_col,dv_row),trian)
     ratio = d[cell] ./ d0[cell]
     if !all(ratio .== ratio[1])
       return NonAffinity()
@@ -119,12 +119,12 @@ end
 function affinity_jacobian(
   op::ParamTransientFEOperator,
   solver::ODESolver,
-  params::Table;
-  filter=(1,1),
-  ntests=10,
-  trian=get_triangulation(feop.test))
+  params::Table,
+  trian::Triangulation,
+  filter::Tuple{Vararg{Int}};
+  ntests=10)
 
-  row, = filter
+  row,col = filter
   times = get_times(solver)
   test_row = get_test(op)[row]
   trial_col = get_trial(op)[col]
@@ -134,7 +134,7 @@ function affinity_jacobian(
   ucol = filter_evaluation_function(u,col)
 
   μ,t = first(params),first(times)
-  d = collect_cell_contribution(trial_col,test_row,op.jac(μ,t,ucol,du_col,dv_row),trian)
+  d = collect_cell_contribution(trial_col(μ,t),test_row,op.jacs[1](μ,t,ucol,du_col,dv_row),trian)
   if all(isempty,d)
     return ZeroAffinity()
   end
@@ -143,7 +143,7 @@ function affinity_jacobian(
   d0 = max.(abs.(d[cell]),eps())
 
   for μ in rand(params,ntests)
-    d = collect_cell_contribution(trial_col,test_row,op.jac(μ,t,ucol,du_col,dv_row),trian)
+    d = collect_cell_contribution(trial_col(μ,t),test_row,op.jacs[1](μ,t,ucol,du_col,dv_row),trian)
     ratio = d[cell] ./ d0[cell]
     if !all(ratio .== ratio[1])
       return NonAffinity()
@@ -151,7 +151,7 @@ function affinity_jacobian(
   end
 
   for t in rand(params,ntests)
-    d = collect_cell_contribution(trial_col,test_row,op.jac(μ,t,ucol,du_col,dv_row),trian)
+    d = collect_cell_contribution(trial_col(μ,t),test_row,op.jac(μ,t,ucol,du_col,dv_row),trian)
     ratio = d[cell] ./ d0[cell]
     if !all(ratio .== ratio[1])
       return ParamAffinity()
@@ -163,7 +163,7 @@ end
 
 function find_nonzero_cell_contribution(data)
   global idx
-  for (i,celli) in data
+  for (i,celli) in enumerate(data)
     if !iszero(sum(abs.(celli)))
       return i
     end

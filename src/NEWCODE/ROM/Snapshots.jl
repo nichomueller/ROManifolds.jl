@@ -38,7 +38,7 @@ function Snapshots(
   nsnaps::Int;
   type=EMatrix{Float}) where {T,A}
 
-  csnaps = hcat(snaps)
+  csnaps = hcat(snaps...)
   convert!(type,csnaps)
   SingleFieldSnapshots{T,A}(csnaps,nsnaps)
 end
@@ -60,12 +60,12 @@ function TransientSnapshots(
   nsnaps::Int;
   type=EMatrix{Float}) where {T,A}
 
-  csnaps = hcat(snaps)
+  csnaps = hcat(snaps...)
   convert!(type,csnaps)
   TransientSingleFieldSnapshots{T,A}(csnaps,nsnaps)
 end
 
-for (fun,Tarr) in zip((:Snapshots,:TransientSnapshots),(:Matrix,:Vector))
+for fun in (:Snapshots,:TransientSnapshots), Tarr in (:Matrix,:Vector)
   @eval begin
     function $fun(
       aff::A,
@@ -98,59 +98,51 @@ for (fun,Tarr) in zip((:Snapshots,:TransientSnapshots),(:Matrix,:Vector))
       N = length(snaps)
       csnaps = compress(snaps)
       map(s->convert!(type,s),csnaps)
-      TransientMultiSnapshots{$Tarr{T},N,A}(csnaps,nsnaps)
+      TransientMultiFieldSnapshots{$Tarr{T},N,A}(csnaps,nsnaps)
     end
   end
 end
 
-function Base.copy(s::SingleFieldSnapshots{T,A}) where {T,A}
-  SingleFieldSnapshots{T,A}(copy(s.snaps),copy(s.nsnaps))
+function Base.getindex(
+  s::SingleFieldSnapshots{T,A},
+  idx) where {T,A}
+
+  snaps = s.snaps[:,idx]
+  nsnaps = length(idx)
+  SingleFieldSnapshots{T,A}(snaps,nsnaps)
 end
 
-function Base.copy(s::MultiFieldSnapshots{T,N,A}) where {T,N,A}
-  MultiFieldSnapshots{T,N,A}(copy(s.snaps),copy(s.nsnaps))
+function Base.getindex(
+  s::MultiFieldSnapshots{T,N,A},
+  idx) where {T,N,A}
+
+  snaps = map(x->getindex(x,:,idx),s.snaps)
+  nsnaps = length(idx)
+  MultiFieldSnapshots{T,N,A}(snaps,nsnaps)
 end
 
-function Base.copy(s::TransientSingleFieldSnapshots{T,A}) where {T,A}
-  TransientSingleFieldSnapshots{T,A}(copy(s.snaps),copy(s.nsnaps))
-end
+function Base.getindex(
+  s::TransientSingleFieldSnapshots{T,A},
+  idx1,
+  idx2=:) where {T,A}
 
-function Base.copy(s::TransientMultiFieldSnapshots{T,N,A}) where {T,N,A}
-  TransientMultiFieldSnapshots{T,N,A}(copy(s.snaps),copy(s.nsnaps))
-end
-
-function Base.getindex(s::SingleFieldSnapshots,idx)
-  s_copy = copy(s)
-  _idx = first(idx):last(idx)
-  s_copy.snaps = s_copy.snaps[:,_idx]
-  s_copy.nsnaps = length(idx)
-  s_copy
-end
-
-function Base.getindex(s::MultiFieldSnapshots,idx)
-  s_copy = copy(s)
-  _idx = first(idx):last(idx)
-  s_copy.snaps = map(x->getindex(x,:,_idx),s_copy.snaps)
-  s_copy.nsnaps = length(idx)
-  s_copy
-end
-
-function Base.getindex(s::TransientSingleFieldSnapshots,idx1,idx2=:)
-  s_copy = copy(s)
   time_ndofs = get_time_ndofs(s)
   _idx = ((first(idx1)-1)*time_ndofs+1:last(idx1)*time_ndofs)[idx2]
-  s_copy.snaps = s_copy.snaps[:,_idx]
-  s_copy.nsnaps = length(idx...)
-  s_copy
+  snaps = s.snaps[:,_idx]
+  nsnaps = length(idx1)
+  TransientSingleFieldSnapshots{T,A}(snaps,nsnaps)
 end
 
-function Base.getindex(s::TransientMultiFieldSnapshots,idx1,idx2=:)
-  s_copy = copy(s)
+function Base.getindex(
+  s::TransientMultiFieldSnapshots{T,N,A},
+  idx1,
+  idx2=:) where {T,N,A}
+
   time_ndofs = get_time_ndofs(s)
   _idx = ((first(idx1)-1)*time_ndofs+1:last(idx1)*time_ndofs)[idx2]
-  s_copy.snaps = map(x->getindex(x,:,_idx),s_copy.snaps)
-  s_copy.nsnaps = length(idx...)
-  s_copy
+  snaps = map(x->getindex(x,:,_idx),s.snaps)
+  nsnaps = length(idx1)
+  TransientMultiFieldSnapshots{T,N,A}(snaps,nsnaps)
 end
 
 for Tsnp in (:MultiFieldSnapshots,:TransientMultiFieldSnapshots)
@@ -167,17 +159,17 @@ end
 
 get_time_ndofs(::Snapshots) = @abstractmethod
 
-get_time_ndofs(s::TransientSingleFieldSnapshots) = Int(size(s,2)/s.nsnaps)
+get_time_ndofs(s::TransientSingleFieldSnapshots) = Int(size(s.snaps,2)/s.nsnaps)
 
 get_time_ndofs(s::TransientMultiFieldSnapshots) = Int(size(s.snaps[1],2)/s.nsnaps)
 
 get_datum(s::SingleFieldSnapshots) = recast(s.snaps)
 
-get_datum(s::MultiFieldSnapshots) = map(recast,s.snaps)
+get_datum(s::MultiFieldSnapshots) = vcat(map(recast,s.snaps))
 
 get_datum(s::TransientSingleFieldSnapshots) = recast(s.snaps)
 
-get_datum(s::TransientMultiFieldSnapshots) = map(recast,s.snaps)
+get_datum(s::TransientMultiFieldSnapshots) = vcat(map(recast,s.snaps))
 
 function allocate_matrix(s::SingleFieldSnapshots,sizes...)
   allocate_matrix(s.snaps,sizes...)

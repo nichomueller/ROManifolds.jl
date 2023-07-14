@@ -54,7 +54,7 @@ addprocs(4)
   reffe = Gridap.ReferenceFE(lagrangian,Float,order)
   test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
   trial = ParamTransientTrialFESpace(test,g)
-  feop = ParamTransientAffineFEOperator(res,jac,jac_t,pspace,trial,test)
+  feop = ParamTransientFEOperator(res,jac,jac_t,pspace,trial,test)
   t0,tF,dt,θ = 0.,0.05,0.005,1
   uh0(μ) = interpolate_everywhere(u0(μ),trial(μ,t0))
   fesolver = θMethod(LUSolver(),t0,tF,dt,θ,uh0)
@@ -77,6 +77,44 @@ nsnaps = info.nsnaps_system
 rb_res = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
 rb_jac = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
 
+cache = allocate_cache(feop)
+j = allocate_jacobian(feop,cache)
+jnnz = compress(j)
+jcache = (j,jnnz),cache
+trian = get_triangulation(test)
+jacss = jacobians(NonAffinity(),feop,fesolver,sols,params,jcache,trian,(1,1))
+q = 1
+row = 1
+trian = get_triangulation(test)
+sres = sols[1:nsnaps]
+pres = params[1:nsnaps]
+cell_dof_ids = get_cell_dof_ids(feop.test[row],trian)
+order = get_order(feop.test[row])
+
+# r = collect_residuals(feop,fesolver,sres,pres,trian,(1,1))
+op,solver = feop,fesolver
+cache = allocate_cache(op)
+times = get_times(solver)
+tdofs = length(times)
+r = allocate_residual(op,cache)
+res_iter = init_res_iterator(op,solver,trian,(1,1))
+tdofs = length(times)
+sols_μt = get_datum(sols)
+xh = get_free_dof_values(zero(op.test))
+xhθ = copy(xh)
+
+ye = pmap(enumerate(params)) do (nμ,μ)
+  rcache = copy(r)
+  sols_μ = hcat(xh,sols_μt[:,(nμ-1)*tdofs+1:nμ*tdofs])
+  map(enumerate(times)) do (nt,t)
+    _update_x!(solver,xhθ,sols_μ,nt)
+    evaluate!(rcache,res_iter,op,(xh,xhθ),μ,t)
+    rcache
+  end
+end
+
+
+hye = pmap(hcat,ye...)
 
 
 # solver = fesolver

@@ -78,13 +78,16 @@ for (Top,Tslv,Tsnp,Tsps,Tspm) in zip(
   @eval begin
     function compress_residuals(
       feop::$Top,
-      args...;
+      fesolver::$Tslv,
+      rbspace::Union{$Tsps,$Tspm},
+      s::$Tsnp,
+      params::Table;
       kwargs...)
 
       trians = _collect_trian_res(feop)
       cres = RBResidualContribution()
       for trian in trians
-        ad = compress_residuals(feop,args...;trian,kwargs...)
+        ad = compress_residuals(feop,fesolver,rbspace,s,params,trian;kwargs...)
         add_contribution!(cres,trian,ad)
       end
       cres
@@ -95,7 +98,8 @@ for (Top,Tslv,Tsnp,Tsps,Tspm) in zip(
       fesolver::$Tslv,
       rbspace::Union{$Tsps,$Tspm},
       s::$Tsnp,
-      params::Table;
+      params::Table,
+      trian::Triangulation;
       kwargs...)
 
       nfields = length(rbspace)
@@ -103,7 +107,7 @@ for (Top,Tslv,Tsnp,Tsps,Tspm) in zip(
       for row = 1:nfields
         filter = (row,1)
         ad_res[row] = compress_residuals(feop,fesolver,
-          rbspace[row],s,params;filter,kwargs...)
+          rbspace[row],s,params,trian,filter;kwargs...)
       end
       ad_res
     end
@@ -113,9 +117,9 @@ for (Top,Tslv,Tsnp,Tsps,Tspm) in zip(
       fesolver::$Tslv,
       rbspace::$Tsps,
       s::$Tsnp,
-      params::Table;
-      trian=get_triangulation(feop.test),
-      filter=(1,1),
+      params::Table,
+      trian::Triangulation,
+      filter::Tuple{Vararg{Int}};
       nsnaps=20,
       kwargs...)
 
@@ -131,13 +135,16 @@ for (Top,Tslv,Tsnp,Tsps,Tspm) in zip(
 
     function compress_jacobians(
       feop::$Top,
-      args...;
+      fesolver::$Tslv,
+      rbspace::Union{$Tsps,$Tspm},
+      s::$Tsnp,
+      params::Table;
       kwargs...)
 
       trians = _collect_trian_jac(feop)
       cjac = RBJacobianContribution()
       for trian in trians
-        ad = compress_jacobians(feop,args...;trian,kwargs...)
+        ad = compress_jacobians(feop,fesolver,rbspace,s,params,trian;kwargs...)
         add_contribution!(cjac,trian,ad)
       end
       cjac
@@ -148,7 +155,8 @@ for (Top,Tslv,Tsnp,Tsps,Tspm) in zip(
       fesolver::$Tslv,
       rbspace::Union{$Tsps,$Tspm},
       s::$Tsnp,
-      params::Table;
+      params::Table,
+      trian::Triangulation;
       kwargs...)
 
       nfields = length(rbspace)
@@ -156,7 +164,7 @@ for (Top,Tslv,Tsnp,Tsps,Tspm) in zip(
       for row = 1:nfields, col = 1:nfields
         filter = (row,col)
         ad_jac[row,col] = compress_jacobians(feop,fesolver,
-          (rbspace[row],rbspace[col]),s,params;filter,kwargs...)
+          (rbspace[row],rbspace[col]),s,params,trian,filter;kwargs...)
       end
       ad_jac
     end
@@ -166,9 +174,9 @@ for (Top,Tslv,Tsnp,Tsps,Tspm) in zip(
       fesolver::$Tslv,
       rbspace::NTuple{2,$Tsps},
       s::$Tsnp,
-      params::Table;
-      trian=get_triangulation(feop.test),
-      filter=(1,1),
+      params::Table,
+      trian::Triangulation,
+      filter::Tuple{Vararg{Int}};
       nsnaps=20,
       kwargs...)
 
