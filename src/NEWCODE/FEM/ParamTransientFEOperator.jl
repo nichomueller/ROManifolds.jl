@@ -138,11 +138,14 @@ for T in (:MultiFieldCellField,:TransientMultiFieldCellField)
   end
 end
 
-function allocate_residual(op::ParamTransientFEOperatorFromWeakForm,args...)
+function allocate_residual(
+  op::ParamTransientFEOperatorFromWeakForm;
+  assem::SparseMatrixAssembler=op.assem)
+
   xh = allocate_evaluation_function(op)
   v = get_fe_basis(op.test)
   vecdata = collect_cell_vector(op.test,op.res(realization(op),0.0,xh,v))
-  allocate_vector(op.assem,vecdata)
+  allocate_vector(assem,vecdata)
 end
 
 function residual!(
@@ -161,10 +164,13 @@ function residual!(
   b
 end
 
-function allocate_jacobian(op::ParamTransientFEOperatorFromWeakForm,args...)
+function allocate_jacobian(
+  op::ParamTransientFEOperatorFromWeakForm;
+  assem::SparseMatrixAssembler=op.assem)
+
   _matdata_jacobians = fill_initial_jacobians(op)
   matdata = _vcat_matdata(_matdata_jacobians)
-  allocate_matrix(op.assem,matdata)
+  allocate_matrix(assem,matdata)
 end
 
 function jacobian!(

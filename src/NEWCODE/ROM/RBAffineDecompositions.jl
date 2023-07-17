@@ -359,17 +359,15 @@ function compress_time(
   bt_row = get_basis_time(rbspace_row).nonzero_val
   bt_col = get_basis_time(rbspace_col).nonzero_val
   time_ndofs = size(bt_row,1)
-  nt_row,nt_col = size(bt_row,2),size(bt_col,2)
+  nt_row = size(bt_row,2)
+  nt_col = size(bt_col,2)
 
   btbt = zeros(time_ndofs,nt_row,nt_col)
-  btbt_shift = copy(btbt)
   @inbounds for jt = 1:nt_col, it = 1:nt_row
     btbt[:,it,jt] .= bt_row[:,it].*bt_col[:,jt]
-    btbt_shift[2:time_ndofs,it,jt] .= (bt_row[2:time_ndofs,it].*
-      bt_col[1:time_ndofs-1,jt])
   end
 
-  bt_component.nonzero_val,btbt+btbt_shift
+  bt_component.nonzero_val,btbt
 end
 
 function zero_compress(

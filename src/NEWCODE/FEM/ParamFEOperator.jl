@@ -91,20 +91,26 @@ function _vector!(
   b .*= -1.0
 end
 
-function allocate_residual(op::ParamFEOperatorFromWeakForm,args...)
+function allocate_residual(
+  op::ParamFEOperatorFromWeakForm;
+  assem::SparseMatrixAssembler=op.assem)
+
   xh = allocate_evaluation_function(op)
   v = get_fe_basis(op.test)
   vecdata = collect_cell_vector(op.test,op.res(realization(op),xh,v))
-  allocate_vector(op.assem,vecdata)
+  allocate_vector(assem,vecdata)
 end
 
-function allocate_jacobian(op::ParamFEOperatorFromWeakForm,args...)
+function allocate_jacobian(
+  op::ParamFEOperatorFromWeakForm;
+  assem::SparseMatrixAssembler=op.assem)
+
   xh = allocate_evaluation_function(op)
   v = get_fe_basis(op.test)
   trial = op.trial(nothing)
   u = get_trial_fe_basis(op.test)
   matdata = collect_cell_matrix(trial,op.test,op.jac(realization(op),xh,u,v))
-  allocate_matrix(op.assem,matdata)
+  allocate_matrix(assem,matdata)
 end
 
 function residual!(

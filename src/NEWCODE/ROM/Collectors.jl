@@ -34,9 +34,8 @@ for (Tsnp,Top,Tslv) in zip(
 
       printstyled("Generating $nres residual snapshots, affinity: $aff\n";color=:blue)
 
-      rcache = allocate_residual(op)
       res_iter = init_vec_iterator(op,solver,args...)
-      res = residuals(aff,rcache,op,solver,res_iter,sols,params)
+      res = residuals(aff,op,solver,res_iter,sols,params)
       $Tsnp(aff,res,nres)
     end
 
@@ -52,11 +51,8 @@ for (Tsnp,Top,Tslv) in zip(
 
       printstyled("Generating $njac jacobian snapshots, affinity: $aff\n";color=:blue)
 
-      j = allocate_jacobian(op)
-      jnnz = compress(j)
-      jcache = (j,jnnz)
       jac_iter = init_mat_iterator(op,solver,args...)
-      jac = jacobians(aff,jcache,op,solver,jac_iter,sols,params)
+      jac = jacobians(aff,op,solver,jac_iter,sols,params)
       $Tsnp(aff,jac,njac)
     end
   end
@@ -182,10 +178,9 @@ function init_vec_iterator(
   test_row = get_test(op)[row]
   dv_row = _get_fe_basis(op.test,row)
   assem_row = SparseMatrixAssembler(test_row,test_row)
+  r = allocate_residual(op;assem=assem_row)
 
-  r = allocate_residual(op,cache)
   function f(
-    r::AbstractVector,
     xh::AbstractVector,
     μ::AbstractVector,
     cache)
@@ -213,9 +208,9 @@ function init_vec_iterator(
   test_row = get_test(op)[row]
   dv_row = _get_fe_basis(op.test,row)
   assem_row = SparseMatrixAssembler(test_row,test_row)
+  r = allocate_residual(op;assem=assem_row)
 
   function f(
-    r::AbstractVector,
     xh::Tuple{Vararg{AbstractVector}},
     μ::AbstractVector,
     t::Real,
@@ -249,16 +244,24 @@ function init_mat_iterator(
   dv_row = _get_fe_basis(op.test,row)
   du_col = _get_trial_fe_basis(_trial,col)
   assem_row_col = SparseMatrixAssembler(_trial_col,test_row)
+  j = allocate_jacobian(op;assem=assem_row_col)
+  jnnz = compress(j)
 
   function f(
-    j::SparseMatrixCSC,
     xh::AbstractVector,
     μ::AbstractVector,
     cache)
 
+    trial, = cache[1]
+    trial_col = trial[col]
     u = evaluation_function(op,xh,cache)
-    vecdata = collect_cell_vector(test_row,op.jac(μ,u,du_col,dv_row,args...),trian)
-    assemble_matrix_add!(j,assem_row_col,vecdata)
+    matdata = collect_cell_matrix(trial_col,test_row,
+      op.jac(μ,u,du_col,dv_row,args...),trian)
+    jnew = assemble_matrix_add!(j,assem_row_col,matdata)
+    nnz_i,nnz_j = compress_array(jnew)
+    jnnz.nonzero_val = nnz_j
+    jnnz.nonzero_idx = nnz_i
+    jnnz
   end
 
   xh = get_free_dof_values(zero(op.test))
@@ -282,10 +285,11 @@ function init_mat_iterator(
   dv_row = _get_fe_basis(op.test,row)
   du_col = _get_trial_fe_basis(_trial,col)
   assem_row_col = SparseMatrixAssembler(_trial_col,test_row)
+  j = allocate_jacobian(op;assem=assem_row_col)
+  jnnz = compress(j)
   γ = (1.0,1/(solver.dt*solver.θ))
 
   function f(
-    j::SparseMatrixCSC,
     xh::Tuple{Vararg{AbstractVector}},
     μ::AbstractVector,
     t::Float,
@@ -303,7 +307,11 @@ function init_mat_iterator(
       end
     end
     matdata = _vcat_matdata(_matdata)
-    assemble_matrix_add!(j,assem_row_col,matdata)
+    jnew = assemble_matrix_add!(j,assem_row_col,matdata)
+    nnz_i,nnz_j = compress_array(jnew)
+    jnnz.nonzero_val = nnz_j
+    jnnz.nonzero_idx = nnz_i
+    jnnz
   end
 
   μ = realization(op)
@@ -352,49 +360,18 @@ function update!(
   return
 end
 
-function evaluate!(
-  rcache::AbstractVector,
-  itc::IterativeVecCollector)
-
-  itc.f(rcache,itc.xh,itc.μ,itc.cache)
+function evaluate!(itc::IterativeCollector)
+  itc.f(itc.xh,itc.μ,itc.cache)
 end
 
-function evaluate!(
-  jcache::Tuple{SparseMatrixCSC,NnzArray},
-  itc::IterativeMatCollector)
-
-  jmat,jnnz = jcache
-  jmat_new = itc.f(jmat,itc.xh,itc.μ,itc.cache)
-  nnz_i,nnz_j = compress_array(jmat_new)
-  jnnz.nonzero_val = nnz_j
-  jnnz.nonzero_idx = nnz_i
-  jnnz
-end
-
-function evaluate!(
-  rcache::AbstractVector,
-  itc::TransientIterativeVecCollector)
-
+function evaluate!(itc::TransientIterativeCollector)
   itc.f(rcache,itc.xh,itc.μ,itc.t,itc.cache)
-end
-
-function evaluate!(
-  jcache::Tuple{SparseMatrixCSC,NnzArray},
-  itc::TransientIterativeMatCollector)
-
-  jmat,jnnz = jcache
-  jmat_new = itc.f(jmat,itc.xh,itc.μ,itc.t,itc.cache)
-  nnz_i,nnz_j = compress_array(jmat_new)
-  jnnz.nonzero_val = nnz_j
-  jnnz.nonzero_idx = nnz_i
-  jnnz
 end
 
 for (fun) in (:residuals,:jacobians)
   @eval begin
     function $fun(
       ::Union{ZeroAffinity,ParamAffinity},
-      cache::Any,
       op::ParamFEOperator,
       ::FESolver,
       itc::IterativeCollector,
@@ -404,12 +381,11 @@ for (fun) in (:residuals,:jacobians)
       μ = first(params)
       xh = get_datum(sols[1])
       update!(itc,op,solver,μ,t,xh)
-      evaluate!(cache,itc)
+      evaluate!(itc)
     end
 
     function $fun(
       ::NonAffinity,
-      cache::Any,
       op::ParamFEOperator,
       ::FESolver,
       itc::IterativeCollector,
@@ -420,13 +396,12 @@ for (fun) in (:residuals,:jacobians)
       pmap(enumerate(params)) do (nμ,μ)
         xh = sols_μ[:,nμ]
         update!(itc,op,solver,μ,xh)
-        evaluate!(cache,itc)
+        evaluate!(itc)
       end
     end
 
     function $fun(
       ::Union{ZeroAffinity,ParamTimeAffinity},
-      cache::Any,
       op::ParamTransientFEOperator,
       solver::θMethod,
       itc::TransientIterativeCollector,
@@ -438,12 +413,11 @@ for (fun) in (:residuals,:jacobians)
       x = itc.xh[1]
       xh0 = get_datum(sols[1])[:,1]
       update!(itc,op,solver,μ,t,(x,xh0))
-      evaluate!(cache,itc)
+      evaluate!(itc)
     end
 
     function $fun(
       ::ParamAffinity,
-      cache::Any,
       op::ParamTransientFEOperator,
       solver::θMethod,
       itc::TransientIterativeCollector,
@@ -457,13 +431,12 @@ for (fun) in (:residuals,:jacobians)
         x = itc.xh[1]
         xh0 = sols_t[:,nt]
         update!(itc,op,solver,μ,t,(x,xh0))
-        evaluate!(cache,itc)
+        evaluate!(itc)
       end
     end
 
     function $fun(
       ::TimeAffinity,
-      cache::Any,
       op::ParamTransientFEOperator,
       solver::θMethod,
       itc::TransientIterativeCollector,
@@ -476,13 +449,12 @@ for (fun) in (:residuals,:jacobians)
         x = itc.xh[1]
         xh0 = sols_μ[:,nμ]
         update!(itc,op,solver,μ,t,(x,xh0))
-        evaluate!(cache,itc)
+        evaluate!(itc)
       end
     end
 
     function $fun(
       ::NonAffinity,
-      cache::Any,
       op::ParamTransientFEOperator,
       solver::θMethod,
       itc::TransientIterativeCollector,
@@ -499,7 +471,7 @@ for (fun) in (:residuals,:jacobians)
       pmap(enumerate(params)) do (nμ,μ)
         update!(itc,op,solver,μ,t)
         qt = map(enumerate(times)) do (nt,t)
-          q = evaluate!(cache,itc)
+          q = evaluate!(itc)
           copyto!(xhθ,itc.xh[1])
           copyto!(xh0,sols_μt[:,(nμ-1)*tdofs+nt])
           update!(itc,op,solver,μ,t,(xhθ,xh0))
