@@ -194,13 +194,13 @@ for (Top,Tslv,Tsnp,Tsps,Tspm) in zip(
 end
 
 function compress_component(
-  component::SingleFieldSnapshots{T,A} where T,
+  component::SingleFieldSnapshots,
   fesolver::FESolver,
   trian::Triangulation,
   cell_dof_ids::Table,
   order::Int,
   args...;
-  kwargs...) where {A<:Union{ParamAffinity,NonAffinity}}
+  kwargs...)
 
   bs = tpod(component;kwargs...)
   interp_idx = get_interpolation_idx(bs)
@@ -215,14 +215,14 @@ function compress_component(
 end
 
 function compress_component(
-  component::TransientSingleFieldSnapshots{T,A} where T,
+  component::TransientSingleFieldSnapshots,
   fesolver::ODESolver,
   trian::Triangulation,
   cell_dof_ids::Table,
   order::Int,
   args...;
   st_mdeim=true,
-  kwargs...) where {A<:Union{ParamAffinity,TimeAffinity,ParamTimeAffinity,NonAffinity}}
+  kwargs...)
 
   times = get_times(fesolver)
 

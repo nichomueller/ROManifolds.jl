@@ -435,7 +435,6 @@ for (fun) in (:residuals,:jacobians)
 
       μ = first(params)
       t = first(get_times(solver))
-      θdt = solver.θ*solver.dt
       x = itc.xh[1]
       xh0 = get_datum(sols[1])[:,1]
       update!(itc,op,solver,μ,t,(x,xh0))
@@ -452,7 +451,6 @@ for (fun) in (:residuals,:jacobians)
       params::Table)
 
       times = get_times(solver)
-      θdt = solver.θ*solver.dt
       μ = first(params)
       sols_t = get_datum(sols[1])
       pmap(enumerate(times)) do (nt,t)
@@ -473,7 +471,6 @@ for (fun) in (:residuals,:jacobians)
       params::Table)
 
       t = first(get_times(solver))
-      θdt = solver.θ*solver.dt
       sols_μ = get_datum(sols[:,1])
       pmap(enumerate(params)) do (nμ,μ)
         x = itc.xh[1]
@@ -513,26 +510,3 @@ for (fun) in (:residuals,:jacobians)
     end
   end
 end
-
-# function _set_xh!(
-#   solver::θMethod,
-#   itc::TransientIterativeCollector,
-#   nt::Int,
-#   μ::AbstractVector,
-#   xh::Tuple{Vararg{AbstractVector}}=itc.xh)
-
-#   xhθ = copy(xh[1])
-#   xh0 = copy(xh[2])
-
-#   if nt == 1
-#     copyto!(xhθ,get_free_dof_values(solver.uh0(μ)))
-#     copyto!(xh0,0. * xh0)
-#   else
-#     dtθ = solver.dt*solver.θ
-#     copyto!(xhθ,xh[1])
-#     copyto!(xh0,(xh[1]-xh[2])/dtθ)
-#   end
-
-#   itc.xh = (xhθ,xh0)
-#   return
-# end
