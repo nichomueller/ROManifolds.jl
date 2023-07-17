@@ -35,7 +35,7 @@ for (Tsnp,Top,Tslv) in zip(
       printstyled("Generating $nres residual snapshots, affinity: $aff\n";color=:blue)
 
       rcache = allocate_residual(op)
-      res_iter = init_res_iterator(op,solver,args...)
+      res_iter = init_vec_iterator(op,solver,args...)
       res = residuals(aff,rcache,op,solver,res_iter,sols,params)
       $Tsnp(aff,res,nres)
     end
@@ -55,7 +55,7 @@ for (Tsnp,Top,Tslv) in zip(
       j = allocate_jacobian(op)
       jnnz = compress(j)
       jcache = (j,jnnz)
-      jac_iter = init_jac_iterator(op,solver,args...)
+      jac_iter = init_mat_iterator(op,solver,args...)
       jac = jacobians(aff,jcache,op,solver,jac_iter,sols,params)
       $Tsnp(aff,jac,njac)
     end
@@ -171,7 +171,7 @@ mutable struct TransientIterativeMatCollector <: TransientIterativeCollector
   cache
 end
 
-function init_res_iterator(
+function init_vec_iterator(
   op::ParamFEOperator,
   ::FESolver,
   trian::Triangulation,
@@ -202,7 +202,7 @@ function init_res_iterator(
   IterativeVecCollector(f,xh,μ,cache)
 end
 
-function init_res_iterator(
+function init_vec_iterator(
   op::ParamTransientFEOperator,
   ::θMethod,
   trian::Triangulation,
@@ -226,16 +226,16 @@ function init_res_iterator(
     assemble_vector_add!(r,assem_row,vecdata)
   end
 
-  xh0 = get_free_dof_values(zero(op.test))
-  xh = (xh0,xh0)
   μ = realization(op)
   t = 0.
+  xhθ = get_free_dof_values(zero(op.test))
+  xh0 = 0. * xhθ
   cache = allocate_cache(op)
 
-  TransientIterativeVecCollector(f,xh,μ,t,cache)
+  TransientIterativeVecCollector(f,(xhθ,xh0),μ,t,cache)
 end
 
-function init_jac_iterator(
+function init_mat_iterator(
   op::ParamFEOperator,
   ::FESolver,
   trian::Triangulation,
@@ -268,7 +268,7 @@ function init_jac_iterator(
   IterativeVecCollector(f,xh,μ,cache)
 end
 
-function init_jac_iterator(
+function init_mat_iterator(
   op::ParamTransientFEOperator,
   solver::θMethod,
   trian::Triangulation,
@@ -306,65 +306,65 @@ function init_jac_iterator(
     assemble_matrix_add!(j,assem_row_col,matdata)
   end
 
-  xh0 = get_free_dof_values(zero(op.test))
-  xh = (xh0,xh0)
   μ = realization(op)
   t = 0.
+  xhθ = get_free_dof_values(zero(op.test))
+  xh0 = 0. * xhθ
   cache = allocate_cache(op)
-  TransientIterativeMatCollector(f,xh,μ,t,cache)
+  TransientIterativeMatCollector(f,(xhθ,xh0),μ,t,cache)
 end
 
 function update!(
-  it::IterativeCollector,
+  itc::IterativeCollector,
   op::ParamFEOperator,
-  xh::AbstractVector,
-  μ::AbstractVector)
+  ::FESolver,
+  μ::AbstractVector,
+  xh=itc.xh)
 
-  it.xh = xh
-  it.μ = μ
-  cache = it.cache
+  itc.μ = μ
+  itc.xh = xh
+  cache = itc.cache
   update_cache!(cache,op,μ)
-  it.cache = cache
+  itc.cache = cache
   return
 end
 
 function update!(
-  it::TransientIterativeCollector,
+  itc::TransientIterativeCollector,
   op::ParamTransientFEOperator,
-  xh::Tuple{Vararg{AbstractVector}},
+  solver::θMethod,
   μ::AbstractVector,
-  t::Real)
+  t::Real,
+  xh=(get_free_dof_values(solver.uh0(μ)),
+      0. * get_free_dof_values(solver.uh0(μ))))
 
-  it.xh = xh
-  it.μ = μ
-  it.t = t
-  cache = it.cache
+  itc.μ = μ
+  itc.t = t
+  xhθ = copy(xh[1])
+  xh0 = copy(xh[2])
+  dtθ = solver.dt*solver.θ
+  copyto!(xhθ,xh[1])
+  copyto!(xh0,(xh[1]-xh[2])/dtθ)
+  itc.xh = (xhθ,xh0)
+  cache = itc.cache
   update_cache!(cache,op,μ,t)
-  it.cache = cache
+  itc.cache = cache
   return
 end
 
 function evaluate!(
   rcache::AbstractVector,
-  it::IterativeVecCollector,
-  op::ParamFEOperator,
-  xh::AbstractVector,
-  μ::AbstractVector)
+  itc::IterativeVecCollector)
 
-  update!(it,op,xh,μ)
-  it.f(rcache,it.xh,it.μ,it.cache)
+  itc.f(rcache,itc.xh,itc.μ,itc.cache)
 end
 
 function evaluate!(
   jcache::Tuple{SparseMatrixCSC,NnzArray},
-  it::IterativeMatCollector,
-  op::ParamFEOperator,
-  xh::AbstractVector,
-  μ::AbstractVector)
+  itc::IterativeMatCollector)
 
   jmat,jnnz = jcache
-  update!(it,op,xh,μ)
-  jmat_new = it.f(jmat,it.xh,it.μ,it.cache)
+  jmat_new = itc.f(jmat,itc.xh,itc.μ,itc.cache)
   nnz_i,nnz_j = compress_array(jmat_new)
   jnnz.nonzero_val = nnz_j
   jnnz.nonzero_idx = nnz_i
@@ -373,27 +373,17 @@ end
 
 function evaluate!(
   rcache::AbstractVector,
-  it::TransientIterativeVecCollector,
-  op::ParamTransientFEOperator,
-  xh::Tuple{Vararg{AbstractVector}},
-  μ::AbstractVector,
-  t::Real)
+  itc::TransientIterativeVecCollector)
 
-  update!(it,op,xh,μ,t)
-  it.f(rcache,it.xh,it.μ,it.t,it.cache)
+  itc.f(rcache,itc.xh,itc.μ,itc.t,itc.cache)
 end
 
 function evaluate!(
   jcache::Tuple{SparseMatrixCSC,NnzArray},
-  it::TransientIterativeMatCollector,
-  op::ParamTransientFEOperator,
-  xh::Tuple{Vararg{AbstractVector}},
-  μ::AbstractVector,
-  t::Real)
+  itc::TransientIterativeMatCollector)
 
   jmat,jnnz = jcache
-  update!(it,op,xh,μ,t)
-  jmat_new = it.f(jmat,it.xh,it.μ,it.t,it.cache)
+  jmat_new = itc.f(jmat,itc.xh,itc.μ,itc.t,itc.cache)
   nnz_i,nnz_j = compress_array(jmat_new)
   jnnz.nonzero_val = nnz_j
   jnnz.nonzero_idx = nnz_i
@@ -407,13 +397,14 @@ for (fun) in (:residuals,:jacobians)
       cache::Any,
       op::ParamFEOperator,
       ::FESolver,
-      it::IterativeCollector,
+      itc::IterativeCollector,
       sols::Snapshots,
       params::Table)
 
       μ = first(params)
       xh = get_datum(sols[1])
-      evaluate!(cache,it,op,xh,μ)
+      update!(itc,op,solver,μ,t,xh)
+      evaluate!(cache,itc)
     end
 
     function $fun(
@@ -421,14 +412,15 @@ for (fun) in (:residuals,:jacobians)
       cache::Any,
       op::ParamFEOperator,
       ::FESolver,
-      it::IterativeCollector,
+      itc::IterativeCollector,
       sols::Snapshots,
       params::Table)
 
       sols_μ = get_datum(sols)
       pmap(enumerate(params)) do (nμ,μ)
         xh = sols_μ[:,nμ]
-        evaluate!(cache,it,op,xh,μ)
+        update!(itc,op,solver,μ,xh)
+        evaluate!(cache,itc)
       end
     end
 
@@ -436,32 +428,38 @@ for (fun) in (:residuals,:jacobians)
       ::Union{ZeroAffinity,ParamTimeAffinity},
       cache::Any,
       op::ParamTransientFEOperator,
-      solver::ODESolver,
-      it::TransientIterativeCollector,
+      solver::θMethod,
+      itc::TransientIterativeCollector,
       sols::TransientSnapshots,
       params::Table)
 
       μ = first(params)
       t = first(get_times(solver))
-      xh = get_datum(sols[1])[:,1]
-      evaluate!(cache,it,op,xh,μ,t)
+      θdt = solver.θ*solver.dt
+      x = itc.xh[1]
+      xh0 = get_datum(sols[1])[:,1]
+      update!(itc,op,solver,μ,t,(x,xh0))
+      evaluate!(cache,itc)
     end
 
     function $fun(
       ::ParamAffinity,
       cache::Any,
       op::ParamTransientFEOperator,
-      solver::ODESolver,
-      it::TransientIterativeCollector,
+      solver::θMethod,
+      itc::TransientIterativeCollector,
       sols::TransientSnapshots,
       params::Table)
 
       times = get_times(solver)
+      θdt = solver.θ*solver.dt
       μ = first(params)
       sols_t = get_datum(sols[1])
       pmap(enumerate(times)) do (nt,t)
-        xh = sols_t[:,nt]
-        evaluate!(cache,it,op,xh,μ,t)
+        x = itc.xh[1]
+        xh0 = sols_t[:,nt]
+        update!(itc,op,solver,μ,t,(x,xh0))
+        evaluate!(cache,itc)
       end
     end
 
@@ -469,16 +467,19 @@ for (fun) in (:residuals,:jacobians)
       ::TimeAffinity,
       cache::Any,
       op::ParamTransientFEOperator,
-      solver::ODESolver,
-      it::TransientIterativeCollector,
+      solver::θMethod,
+      itc::TransientIterativeCollector,
       sols::TransientSnapshots,
       params::Table)
 
       t = first(get_times(solver))
-      sols_t = get_datum(sols[:,1])
+      θdt = solver.θ*solver.dt
+      sols_μ = get_datum(sols[:,1])
       pmap(enumerate(params)) do (nμ,μ)
-        xh = sols_t[:,nμ]
-        evaluate!(cache,it,op,xh,μ,t)
+        x = itc.xh[1]
+        xh0 = sols_μ[:,nμ]
+        update!(itc,op,solver,μ,t,(x,xh0))
+        evaluate!(cache,itc)
       end
     end
 
@@ -486,23 +487,26 @@ for (fun) in (:residuals,:jacobians)
       ::NonAffinity,
       cache::Any,
       op::ParamTransientFEOperator,
-      solver::ODESolver,
-      it::TransientIterativeCollector,
+      solver::θMethod,
+      itc::TransientIterativeCollector,
       sols::TransientSnapshots,
       params::Table)
 
       times = get_times(solver)
       tdofs = length(times)
       sols_μt = get_datum(sols)
-      # xh0 = get_free_dof_values(zero(op.test))
-      # xhθ = copy(xh0)
+
+      xhθ = copy(itc.xh[1])
+      xh0 = copy(itc.xh[2])
 
       pmap(enumerate(params)) do (nμ,μ)
-        # sols_μ = hcat(xh0,sols_μt[:,(nμ-1)*tdofs+1:nμ*tdofs])
+        update!(itc,op,solver,μ,t)
         qt = map(enumerate(times)) do (nt,t)
-          # _update_x!(solver,xhθ,sols_μ,nt)
-          xh0 = sols_μt[:,(nμ-1)*tdofs+nt]
-          evaluate!(cache,it,op,xh0,μ,t)
+          q = evaluate!(cache,itc)
+          copyto!(xhθ,itc.xh[1])
+          copyto!(xh0,sols_μt[:,(nμ-1)*tdofs+nt])
+          update!(itc,op,solver,μ,t,(xhθ,xh0))
+          q
         end
         hcat(qt...)
       end
@@ -510,16 +514,25 @@ for (fun) in (:residuals,:jacobians)
   end
 end
 
-function _update_x!(
-  solver::θMethod,
-  xhθ::AbstractVector,
-  sols_μ::AbstractMatrix,
-  nt::Int)
+# function _set_xh!(
+#   solver::θMethod,
+#   itc::TransientIterativeCollector,
+#   nt::Int,
+#   μ::AbstractVector,
+#   xh::Tuple{Vararg{AbstractVector}}=itc.xh)
 
-  x = sols_μ[:,nt+1]
-  xprev = sols_μ[:,nt]
-  θ = solver.θ
-  dtθ = solver.dt*solver.θ
-  copyto!(xhθ,(θ*x + (1-θ)*xprev)/dtθ)
-  xhθ
-end
+#   xhθ = copy(xh[1])
+#   xh0 = copy(xh[2])
+
+#   if nt == 1
+#     copyto!(xhθ,get_free_dof_values(solver.uh0(μ)))
+#     copyto!(xh0,0. * xh0)
+#   else
+#     dtθ = solver.dt*solver.θ
+#     copyto!(xhθ,xh[1])
+#     copyto!(xh0,(xh[1]-xh[2])/dtθ)
+#   end
+
+#   itc.xh = (xhθ,xh0)
+#   return
+# end

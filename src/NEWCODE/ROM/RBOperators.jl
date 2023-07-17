@@ -47,7 +47,7 @@ for (Top,Tslv,Tad) in zip(
       for (m,ad) in a.dict
         for row = 1:nfields
           ad_r = ad[row]
-            rr = residual_contribution(
+          rr = residual_contribution(
             feop,
             fesolver,
             ad_r,
@@ -68,9 +68,9 @@ for (Top,Tslv,Tad) in zip(
       args...;
       kwargs...)
 
-      function _r_contribution(u,μ)
-        input = u,μ
-        coeff = residual_coefficient(feop,fesolver,res_ad,input,args...;kwargs...)
+      function _r_contribution(input...)
+        new_args = (args...,input...)
+        coeff = residual_coefficient(feop,fesolver,res_ad,new_args...;kwargs...)
         rb_contribution(res_ad,coeff)
       end
       ParamArray(_r_contribution)
@@ -83,7 +83,7 @@ for (Top,Tslv,Tad) in zip(
       args...;
       kwargs...)
 
-      function _r_contribution(u,μ)
+      function _r_contribution(input...)
         res_ad.proj
       end
       ParamArray(_r_contribution)
@@ -123,8 +123,7 @@ for (Top,Tslv,Tad) in zip(
       args...;
       kwargs...)
 
-      function _j_contribution(u,μ)
-        input = u,μ
+      function _j_contribution(input)
         coeff = jacobian_coefficient(feop,fesolver,jac_ad,input,args...;kwargs...)
         rb_contribution(jac_ad,coeff)
       end
@@ -138,7 +137,7 @@ for (Top,Tslv,Tad) in zip(
       args...;
       kwargs...)
 
-      function _j_contribution(u,μ)
+      function _j_contribution(input)
         jac_ad.proj
       end
       ParamArray(_j_contribution)
@@ -158,7 +157,7 @@ function residual_coefficient(
   feop::ParamFEOperator,
   fesolver::FESolver,
   res_ad::RBAffineDecomposition,
-  input::Tuple{Vararg{AbstractArray}},
+  input,
   args...)
 
   red_integr_res = assemble_residual(feop,fesolver,res_ad,input,args...)
@@ -169,11 +168,10 @@ function residual_coefficient(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   res_ad::TransientRBAffineDecomposition,
-  input::Tuple{Vararg{AbstractArray}},
   args...;
   kwargs...)
 
-  red_integr_res = assemble_residual(feop,fesolver,res_ad,input,args...)
+  red_integr_res = assemble_residual(feop,fesolver,res_ad,args...)
   coeff = solve(res_ad,red_integr_res;kwargs...)
   project_residual_coefficient(fesolver,res_ad.basis_time,coeff)
 end
@@ -182,7 +180,7 @@ function residual_jacobian(
   feop::ParamFEOperator,
   fesolver::FESolver,
   jac_ad::RBAffineDecomposition,
-  input::Tuple{Vararg{AbstractArray}},
+  input,
   args...)
 
   jac_integr_res = assemble_jacobian(feop,fesolver,jac_ad,input,args...)
@@ -193,7 +191,7 @@ function jacobian_coefficient(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   jac_ad::TransientRBAffineDecomposition,
-  input::Tuple{Vararg{AbstractArray}},
+  input,
   args...;
   kwargs...)
 
@@ -206,11 +204,10 @@ function assemble_residual(
   feop::ParamFEOperator,
   fesolver::FESolver,
   res_ad::RBAffineDecomposition,
-  input::Tuple{Vararg{AbstractArray}},
   filter::Tuple{Vararg{Int}},
-  measures::Vector{Measure})
+  measures::Vector{Measure},
+  input...)
 
-  u,μ = input
   idx = res_ad.integration_domain.idx
   meas = res_ad.integration_domain.meas
   trian = get_triangulation(meas)
@@ -225,13 +222,13 @@ end
 
 function assemble_residual(
   feop::ParamTransientFEOperator,
-  fesolver::ODESolver,
+  fesolver::θMethod,
   res_ad::TransientRBAffineDecomposition,
-  input::Tuple{Vararg{AbstractArray}},
   filter::Tuple{Vararg{Int}},
-  measures::Vector{Measure})
+  measures::Vector{Measure},
+  input...)
 
-  u,μ = input
+  μ,xh = input
   idx = res_ad.integration_domain.idx
   meas = res_ad.integration_domain.meas
   trian = get_triangulation(meas)
@@ -239,10 +236,15 @@ function assemble_residual(
   times = res_ad.integration_domain.times
 
   rcache = allocate_residual(feop)
-  res_iter = init_res_iterator(feop,fesolver,trian,filter,new_meas...)
-  r = map(enumerate(times)) do (nt,t)
-    _update_x!(fesolver,uθ,u,nt)
-    evaluate!(rcache,res_iter,feop,(u,uθ),μ,t)[idx]
+  res_iter = init_vec_iterator(feop,fesolver,trian,filter,new_meas...)
+  xhθ = copy(itc.xh[1])
+  xh0 = copy(itc.xh[2])
+  r = map(times) do t
+    q = evaluate!(rcache,res_iter)[idx]
+    copyto!(xhθ,itc.xh[1])
+    copyto!(xh0,xh[:,nt])
+    update!(res_iter,feop,fesolver,μ,t,(xhθ,xh0))
+    q
   end
 
   hcat(r...)
@@ -252,7 +254,7 @@ function assemble_jacobian(
   feop::ParamFEOperator,
   fesolver::FESolver,
   jac_ad::RBAffineDecomposition,
-  input::Tuple{Vararg{AbstractArray}},
+  input,
   filter::Tuple{Vararg{Int}},
   measures::Vector{Measure})
 
@@ -271,13 +273,13 @@ end
 
 function assemble_jacobian(
   feop::ParamTransientFEOperator,
-  fesolver::ODESolver,
+  fesolver::θMethod,
   jac_ad::TransientRBAffineDecomposition,
-  input::Tuple{Vararg{AbstractArray}},
+  input,
   filter::Tuple{Vararg{Int}},
   measures::Vector{Measure})
 
-  u,μ = input
+  μ,xh... = input
   idx = jac_ad.integration_domain.idx
   meas = jac_ad.integration_domain.meas
   trian = get_triangulation(meas)
@@ -285,11 +287,10 @@ function assemble_jacobian(
   times = jac_ad.integration_domain.times
 
   jcache = allocate_jacobian(op)
-  jac_iter = init_jac_iterator(feop,fesolver,trian,filter,new_meas...)
+  jac_iter = init_mat_iterator(feop,fesolver,trian,filter,new_meas...)
   j = map(enumerate(times)) do (nt,t)
-    _update_x!(fesolver,uθ,u,nt)
-    evaluate!(jcache,jac_iter,feop,(u,uθ),μ,t)
-    reshape(jcache,:)[idx]
+    _set_xh!(fesolver,jac_iter,μ,nt,xh)
+    reshape(evaluate!(jcache,jac_iter,feop,μ,t),:)[idx]
   end
 
   hcat(j...)

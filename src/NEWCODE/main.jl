@@ -106,7 +106,7 @@ begin
   times = get_times(solver)
   tdofs = length(times)
   r = allocate_residual(op,cache)
-  res_iter = init_res_iterator(op,solver,trian,(1,1))
+  res_iter = init_vec_iterator(op,solver,trian,(1,1))
   tdofs = length(times)
   sols_μt = get_datum(sols)
   xh = get_free_dof_values(zero(op.test))
