@@ -74,8 +74,10 @@ params = realization(feop,nsnaps)
 sols = collect_solutions(feop,fesolver,params)
 rbspace = compress_solutions(feop,fesolver,sols;ϵ)
 nsnaps = info.nsnaps_system
-rb_res = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
-rb_jac = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
+rb_res_c = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
+rb_jac_c = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
+rb_res = collect_residual_contributions(feop,fesolver,rb_res_c)
+rb_jac = collect_jacobian_contributions(feop,fesolver,rb_jac_c)
 
 cache = allocate_cache(feop)
 j = allocate_jacobian(feop,cache)
@@ -92,29 +94,34 @@ cell_dof_ids = get_cell_dof_ids(feop.test[row],trian)
 order = get_order(feop.test[row])
 
 # r = collect_residuals(feop,fesolver,sres,pres,trian,(1,1))
-op,solver = feop,fesolver
-cache = allocate_cache(op)
-times = get_times(solver)
-tdofs = length(times)
-r = allocate_residual(op,cache)
-res_iter = init_res_iterator(op,solver,trian,(1,1))
-tdofs = length(times)
-sols_μt = get_datum(sols)
-xh = get_free_dof_values(zero(op.test))
-xhθ = copy(xh)
+@everywhere begin
+  root = pwd()
+  include("$root/src/NEWCODE/FEM/FEM.jl")
+  include("$root/src/NEWCODE/ROM/ROM.jl")
+  include("$root/src/NEWCODE/RBTests.jl")
+end
+begin
+  op,solver = feop,fesolver
+  cache = allocate_cache(op)
+  times = get_times(solver)
+  tdofs = length(times)
+  r = allocate_residual(op,cache)
+  res_iter = init_res_iterator(op,solver,trian,(1,1))
+  tdofs = length(times)
+  sols_μt = get_datum(sols)
+  xh = get_free_dof_values(zero(op.test))
+  xhθ = copy(xh)
 
-ye = pmap(enumerate(params)) do (nμ,μ)
-  rcache = copy(r)
-  sols_μ = hcat(xh,sols_μt[:,(nμ-1)*tdofs+1:nμ*tdofs])
-  map(enumerate(times)) do (nt,t)
-    _update_x!(solver,xhθ,sols_μ,nt)
-    evaluate!(rcache,res_iter,op,(xh,xhθ),μ,t)
-    rcache
+  ye = pmap(enumerate(params)) do (nμ,μ)
+    sols_μ = hcat(xh,sols_μt[:,(nμ-1)*tdofs+1:nμ*tdofs])
+    map(enumerate(times)) do (nt,t)
+      _update_x!(solver,xhθ,sols_μ,nt)
+      evaluate!(r,res_iter,op,(xh,xhθ),μ,t)
+    end
   end
 end
 
-
-hye = pmap(hcat,ye...)
+hye = map(hcat,ye...)
 
 
 # solver = fesolver

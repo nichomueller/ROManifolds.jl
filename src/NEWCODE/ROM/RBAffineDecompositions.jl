@@ -71,7 +71,7 @@ end
 for (Top,Tslv,Tsnp,Tsps,Tspm) in zip(
   (:ParamFEOperator,:ParamTransientFEOperator),
   (:FESolver,:ODESolver),
-  (:SingleFieldSnapshots,:TransientSingleFieldSnapshots),
+  (:Snapshots,:TransientSnapshots),
   (:SingleFieldRBSpace,:TransientSingleFieldRBSpace),
   (:MultiFieldRBSpace,:TransientMultiFieldRBSpace))
 

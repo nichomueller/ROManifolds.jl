@@ -238,12 +238,11 @@ function assemble_residual(
   new_meas = modify_measures(measures,meas)
   times = res_ad.integration_domain.times
 
-  rcache = allocate_residual(op)
+  rcache = allocate_residual(feop)
   res_iter = init_res_iterator(feop,fesolver,trian,filter,new_meas...)
   r = map(enumerate(times)) do (nt,t)
     _update_x!(fesolver,uθ,u,nt)
     evaluate!(rcache,res_iter,feop,(u,uθ),μ,t)[idx]
-    rcache[idx]
   end
 
   hcat(r...)

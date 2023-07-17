@@ -193,7 +193,6 @@ function init_res_iterator(
     u = evaluation_function(op,xh,cache)
     vecdata = collect_cell_vector(test_row,op.res(μ,u,dv_row,args...),trian)
     assemble_vector_add!(r,assem_row,vecdata)
-    r
   end
 
   xh = get_free_dof_values(zero(op.test))
@@ -225,7 +224,6 @@ function init_res_iterator(
     u = evaluation_function(op,xh,cache)
     vecdata = collect_cell_vector(test_row,op.res(μ,t,u,dv_row,args...),trian)
     assemble_vector_add!(r,assem_row,vecdata)
-    r
   end
 
   xh0 = get_free_dof_values(zero(op.test))
@@ -261,7 +259,6 @@ function init_jac_iterator(
     u = evaluation_function(op,xh,cache)
     vecdata = collect_cell_vector(test_row,op.jac(μ,u,du_col,dv_row,args...),trian)
     assemble_matrix_add!(j,assem_row_col,vecdata)
-    j
   end
 
   xh = get_free_dof_values(zero(op.test))
@@ -307,7 +304,6 @@ function init_jac_iterator(
     end
     matdata = _vcat_matdata(_matdata)
     assemble_matrix_add!(j,assem_row_col,matdata)
-    j
   end
 
   xh0 = get_free_dof_values(zero(op.test))
@@ -341,6 +337,7 @@ function update!(
 
   it.xh = xh
   it.μ = μ
+  it.t = t
   cache = it.cache
   update_cache!(cache,op,μ,t)
   it.cache = cache
@@ -356,7 +353,6 @@ function evaluate!(
 
   update!(it,op,xh,μ)
   it.f(rcache,it.xh,it.μ,it.cache)
-  rcache
 end
 
 function evaluate!(
@@ -368,8 +364,8 @@ function evaluate!(
 
   jmat,jnnz = jcache
   update!(it,op,xh,μ)
-  it.f(jmat,it.xh,it.μ,it.cache)
-  nnz_i,nnz_j = compress_array(jmat)
+  jmat_new = it.f(jmat,it.xh,it.μ,it.cache)
+  nnz_i,nnz_j = compress_array(jmat_new)
   jnnz.nonzero_val = nnz_j
   jnnz.nonzero_idx = nnz_i
   jnnz
@@ -385,7 +381,6 @@ function evaluate!(
 
   update!(it,op,xh,μ,t)
   it.f(rcache,it.xh,it.μ,it.t,it.cache)
-  rcache
 end
 
 function evaluate!(
@@ -398,8 +393,8 @@ function evaluate!(
 
   jmat,jnnz = jcache
   update!(it,op,xh,μ,t)
-  it.f(jmat,it.xh,it.μ,it.t,it.cache)
-  nnz_i,nnz_j = compress_array(jmat)
+  jmat_new = it.f(jmat,it.xh,it.μ,it.t,it.cache)
+  nnz_i,nnz_j = compress_array(jmat_new)
   jnnz.nonzero_val = nnz_j
   jnnz.nonzero_idx = nnz_i
   jnnz
@@ -494,22 +489,23 @@ for (fun) in (:residuals,:jacobians)
       solver::ODESolver,
       it::TransientIterativeCollector,
       sols::TransientSnapshots,
-      params::Table,)
+      params::Table)
 
       times = get_times(solver)
       tdofs = length(times)
       sols_μt = get_datum(sols)
-      xh = get_free_dof_values(zero(op.test))
-      xhθ = copy(xh)
+      # xh0 = get_free_dof_values(zero(op.test))
+      # xhθ = copy(xh0)
 
-      q = pmap(enumerate(params)) do (nμ,μ)
-        sols_μ = hcat(xh,sols_μt[:,(nμ-1)*tdofs+1:nμ*tdofs])
-        map(enumerate(times)) do (nt,t)
-          _update_x!(solver,xhθ,sols_μ,nt)
-          evaluate!(cache,it,op,(xh,xhθ),μ,t)
+      pmap(enumerate(params)) do (nμ,μ)
+        # sols_μ = hcat(xh0,sols_μt[:,(nμ-1)*tdofs+1:nμ*tdofs])
+        qt = map(enumerate(times)) do (nt,t)
+          # _update_x!(solver,xhθ,sols_μ,nt)
+          xh0 = sols_μt[:,(nμ-1)*tdofs+nt]
+          evaluate!(cache,it,op,xh0,μ,t)
         end
+        hcat(qt...)
       end
-      pmap(x->map(hcat,x),q)
     end
   end
 end
@@ -523,7 +519,7 @@ function _update_x!(
   x = sols_μ[:,nt+1]
   xprev = sols_μ[:,nt]
   θ = solver.θ
-  dtθ = solver.dt*θ
+  dtθ = solver.dt*solver.θ
   copyto!(xhθ,(θ*x + (1-θ)*xprev)/dtθ)
   xhθ
 end

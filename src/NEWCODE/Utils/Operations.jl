@@ -156,6 +156,12 @@ function collect_trian(a::DomainContribution)
   unique(t)
 end
 
+function Base.:(==)(l1::FaceLabeling,l2::FaceLabeling)
+  (l1.d_to_dface_to_entity == l2.d_to_dface_to_entity &&
+  l1.tag_to_entities == l2.tag_to_entities &&
+  l1.tag_to_name == l2.tag_to_name)
+end
+
 function Base.:(==)(g1::UnstructuredGrid,g2::UnstructuredGrid)
   (g1.node_coordinates == g2.node_coordinates &&
   g1.cell_node_ids == g2.cell_node_ids &&
@@ -163,6 +169,45 @@ function Base.:(==)(g1::UnstructuredGrid,g2::UnstructuredGrid)
   g1.cell_types == g2.cell_types &&
   g1.orientation_style == g2.orientation_style &&
   g1.facet_normal == g2.facet_normal)
+end
+
+function Base.:(==)(
+  gt1::UnstructuredGridTopology,
+  gt2::UnstructuredGridTopology)
+
+  function _check_face_map(gt1,gt2)
+    fm1 = gt1.n_m_to_nface_to_mfaces
+    fm2 = gt2.n_m_to_nface_to_mfaces
+    if length(fm1) != length(fm2) return false end
+    for i in length(fm1)
+      if isdefined(fm1,i)
+        if !isdefined(fm2,i) return false end
+        fm1[i] == fm2[2]
+      else
+        if isdefined(fm2,i) return false end
+      end
+    end
+    return true
+  end
+
+  (gt1.vertex_coordinates == gt2.vertex_coordinates &&
+  _check_face_map(gt1,gt2) &&
+  gt1.cell_type == gt2.cell_type &&
+  gt1.polytopes == gt2.polytopes &&
+  typeof(gt1.orientation_style) == typeof(gt2.orientation_style))
+end
+
+function Base.:(==)(
+  m1::DiscreteModel{Dc,Dp},
+  m2::DiscreteModel{Dc,Dp}) where {Dc,Dp}
+  m1.grid == m2.grid && m1.grid_topology == m2.grid_topology && m1.face_labeling == m2.face_labeling
+end
+
+function Base.:(==)(
+  t1::BodyFittedTriangulation{Dt,Dp,A,C},
+  t2::BodyFittedTriangulation{Dt,Dp,A,C}) where {Dt,Dp,A,C}
+
+  t1.model == t2.model && t1.grid == t2.grid
 end
 
 function is_parent(
@@ -200,9 +245,15 @@ function Gridap.Geometry.is_change_possible(
   strian::Triangulation,
   ttrian::Triangulation)
 
+  msg = """\n
+  Triangulations do not point to the same background discrete model!
+  """
+
   if strian === ttrian
     return true
   end
+
+  @check get_background_model(strian) == get_background_model(ttrian) msg
 
   D = num_cell_dims(strian)
   sglue = get_glue(strian,Val(D))
