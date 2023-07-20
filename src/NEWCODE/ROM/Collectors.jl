@@ -55,6 +55,23 @@ for (Tsnp,Top,Tslv) in zip(
       jac = jacobians(aff,op,solver,jac_iter,sols,params)
       $Tsnp(aff,jac,njac)
     end
+
+    function collect_djacobians(
+      op::$Top,
+      solver::$Tslv,
+      sols::$Tsnp,
+      params::Table,
+      args...)
+
+      aff = affinity_jacobian(op,solver,params,args...)
+      ndjac = _get_nsnaps(aff,params)
+
+      printstyled("Generating $njac djacobian/dt snapshots, affinity: $aff\n";color=:blue)
+
+      djac_iter = init_dmat_iterator(op,solver,args...)
+      djac = jacobians(aff,op,solver,djac_iter,sols,params)
+      $Tsnp(aff,djac,ndjac)
+    end
   end
 end
 
@@ -322,6 +339,51 @@ function init_mat_iterator(
   TransientIterativeMatCollector(f,(xhθ,xh0),μ,t,cache)
 end
 
+function init_dmat_iterator(
+  op::ParamTransientFEOperator,
+  solver::θMethod,
+  trian::Triangulation,
+  filter::Tuple{Vararg{Int}},
+  args...)
+
+  row,col = filter
+  test_row = op.test[row]
+  _trial = get_trial(op)(nothing,nothing)
+  _trial_col = _trial[col]
+  dv_row = _get_fe_basis(op.test,row)
+  du_col = _get_trial_fe_basis(_trial,col)
+  assem_row_col = SparseMatrixAssembler(_trial_col,test_row)
+  j = allocate_jacobian(op;assem=assem_row_col)
+  jnnz = compress(j)
+  γ = (1.0,1/(solver.dt*solver.θ))
+
+  function f(
+    xh::Tuple{Vararg{AbstractVector}},
+    μ::AbstractVector,
+    t::Float,
+    cache)
+
+    trial, = cache[1]
+    trial_col = trial[col]
+    u = evaluation_function(op,xh,cache)
+    u_col = filter_evaluation_function(u,col)
+    matdata = collect_cell_matrix(trial_col,test_row,
+      γ[end]*op.jacs[end](μ,t,u_col,du_col,dv_row,args...),trian)
+    jnew = assemble_matrix_add!(j,assem_row_col,matdata)
+    nnz_i,nnz_j = compress_array(jnew)
+    jnnz.nonzero_val = nnz_j
+    jnnz.nonzero_idx = nnz_i
+    jnnz
+  end
+
+  μ = realization(op)
+  t = 0.
+  xhθ = get_free_dof_values(zero(op.test))
+  xh0 = 0. * xhθ
+  cache = allocate_cache(op)
+  TransientIterativeMatCollector(f,(xhθ,xh0),μ,t,cache)
+end
+
 function update!(
   itc::IterativeCollector,
   op::ParamFEOperator,
@@ -368,38 +430,68 @@ function evaluate!(itc::TransientIterativeCollector)
   itc.f(rcache,itc.xh,itc.μ,itc.t,itc.cache)
 end
 
-for (fun) in (:residuals,:jacobians)
+function residuals(
+  ::Union{ZeroAffinity,ParamAffinity},
+  op::ParamFEOperator,
+  ::FESolver,
+  itc::IterativeCollector,
+  sols::Snapshots,
+  params::Table)
+
+  μ = first(params)
+  xh = get_datum(sols[1])
+  update!(itc,op,solver,μ,xh)
+  evaluate!(itc)
+end
+
+function residuals(
+  ::NonAffinity,
+  op::ParamFEOperator,
+  ::FESolver,
+  itc::IterativeCollector,
+  sols::Snapshots,
+  params::Table)
+
+  sols_μ = get_datum(sols)
+  pmap(enumerate(params)) do (nμ,μ)
+    xh = sols_μ[:,nμ]
+    update!(itc,op,solver,μ,xh)
+    evaluate!(itc)
+  end
+end
+
+function jacobians(
+  ::Union{ZeroAffinity,ParamAffinity},
+  op::ParamFEOperator,
+  ::FESolver,
+  itc::IterativeCollector,
+  sols::Snapshots,
+  params::Table)
+
+  μ = first(params)
+  xh = get_datum(sols[1])
+  update!(itc,op,solver,μ,xh)
+  evaluate!(itc)
+end
+
+function jacobians(
+  ::NonAffinity,
+  op::ParamFEOperator,
+  ::FESolver,
+  itc::IterativeCollector,
+  sols::Snapshots,
+  params::Table)
+
+  sols_μ = get_datum(sols)
+  pmap(enumerate(params)) do (nμ,μ)
+    xh = sols_μ[:,nμ]
+    update!(itc,op,solver,μ,xh)
+    evaluate!(itc)
+  end
+end
+
+for fun in (:jacobians,:djacobians)
   @eval begin
-    function $fun(
-      ::Union{ZeroAffinity,ParamAffinity},
-      op::ParamFEOperator,
-      ::FESolver,
-      itc::IterativeCollector,
-      sols::Snapshots,
-      params::Table)
-
-      μ = first(params)
-      xh = get_datum(sols[1])
-      update!(itc,op,solver,μ,t,xh)
-      evaluate!(itc)
-    end
-
-    function $fun(
-      ::NonAffinity,
-      op::ParamFEOperator,
-      ::FESolver,
-      itc::IterativeCollector,
-      sols::Snapshots,
-      params::Table)
-
-      sols_μ = get_datum(sols)
-      pmap(enumerate(params)) do (nμ,μ)
-        xh = sols_μ[:,nμ]
-        update!(itc,op,solver,μ,xh)
-        evaluate!(itc)
-      end
-    end
-
     function $fun(
       ::Union{ZeroAffinity,ParamTimeAffinity},
       op::ParamTransientFEOperator,

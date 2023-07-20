@@ -193,6 +193,89 @@ for (Top,Tslv,Tsnp,Tsps,Tspm) in zip(
 
 end
 
+function compress_djacobians(
+  feop::ParamTransientFEOperator,
+  fesolver::ODESolver,
+  rbspace::Union{TransientSingleFieldRBSpace,TransientMultiFieldRBSpace},
+  s::TransientSnapshots,
+  params::Table;
+  kwargs...)
+
+  trians = _collect_trian_jac(feop)
+  cjac = RBJacobianContribution()
+  for trian in trians
+    ad = compress_djacobians(feop,fesolver,rbspace,s,params,trian;kwargs...)
+    add_contribution!(cjac,trian,ad)
+  end
+  cjac
+end
+
+function compress_djacobians(
+  feop::ParamTransientFEOperator,
+  fesolver::ODESolver,
+  rbspace::Union{TransientSingleFieldRBSpace,TransientMultiFieldRBSpace},
+  s::TransientSnapshots,
+  params::Table,
+  trian::Triangulation;
+  kwargs...)
+
+  nfields = length(rbspace)
+  ad_jac = Matrix{RBAffineDecompositions}(undef,nfields,nfields)
+  for row = 1:nfields, col = 1:nfields
+    filter = (row,col)
+    ad_jac[row,col] = compress_djacobians(feop,fesolver,
+      (rbspace[row],rbspace[col]),s,params,trian,filter;kwargs...)
+  end
+  ad_jac
+end
+
+function compress_djacobians(
+  feop::ParamTransientFEOperator,
+  fesolver::ODESolver,
+  rbspace::NTuple{2,TransientSingleFieldRBSpace},
+  s::TransientSnapshots,
+  params::Table,
+  trian::Triangulation,
+  filter::Tuple{Vararg{Int}};
+  nsnaps=20,
+  kwargs...)
+
+  row, = filter
+  sjac = s[1:nsnaps]
+  pjac = params[1:nsnaps]
+  cell_dof_ids = get_cell_dof_ids(feop.test[row],trian)
+  order = get_order(feop.test[row])
+
+  j = collect_djacobians(feop,fesolver,sjac,pjac,trian,filter)
+  compress_shifted_component(j,fesolver,trian,cell_dof_ids,order,rbspace...;kwargs...)
+end
+
+function compress_component(
+  ::SingleFieldSnapshots{T,ZeroAffinity},
+  ::FESolver,
+  ::Triangulation,
+  ::Table,
+  ::Int,
+  args...;
+  kwargs...) where T
+
+  proj = zero_compress(args...)
+  ZeroRBAffineDecomposition(proj)
+end
+
+function compress_component(
+  ::TransientSingleFieldSnapshots{T,ZeroAffinity},
+  ::ODESolver,
+  ::Triangulation,
+  ::Table,
+  ::Int,
+  args...;
+  kwargs...) where T
+
+  proj = zero_compress(args...)
+  ZeroRBAffineDecomposition(proj)
+end
+
 function compress_component(
   component::SingleFieldSnapshots,
   fesolver::FESolver,
@@ -241,30 +324,31 @@ function compress_component(
   TransientRBAffineDecomposition(proj_bs,proj_bt,lu_interp_bst,integr_domain)
 end
 
-function compress_component(
-  ::SingleFieldSnapshots{T,ZeroAffinity},
-  ::FESolver,
-  ::Triangulation,
-  ::Table,
-  ::Int,
+function compress_shifted_component(
+  component::TransientSingleFieldSnapshots,
+  fesolver::ODESolver,
+  trian::Triangulation,
+  cell_dof_ids::Table,
+  order::Int,
   args...;
-  kwargs...) where T
+  st_mdeim=true,
+  kwargs...)
 
-  proj = zero_compress(args...)
-  ZeroRBAffineDecomposition(proj)
-end
+  times = get_times(fesolver)
 
-function compress_component(
-  ::TransientSingleFieldSnapshots{T,ZeroAffinity},
-  ::ODESolver,
-  ::Triangulation,
-  ::Table,
-  ::Int,
-  args...;
-  kwargs...) where T
+  bs,bt = tpod(component,fesolver;ϵ)
+  interp_idx_space,interp_idx_time = get_interpolation_idx(bs,bt)
+  integr_domain = TransientRBIntegrationDomain(
+    component,trian,times,interp_idx_space,interp_idx_time,cell_dof_ids,order;st_mdeim)
 
-  proj = zero_compress(args...)
-  ZeroRBAffineDecomposition(proj)
+  interp_bs = bs.nonzero_val[interp_idx_space,:]
+  interp_bt = bt.nonzero_val[interp_idx_time,:]
+  interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
+  lu_interp_bst = lu(interp_bst)
+
+  proj_bs,proj_bt = compress_shifted(fesolver,bs,bt,args...)
+
+  TransientRBAffineDecomposition(proj_bs,proj_bt,lu_interp_bst,integr_domain)
 end
 
 function get_interpolation_idx(basis_space::NnzArray,basis_time::NnzArray)
@@ -306,6 +390,15 @@ function compress(
   args...)
 
   compress_space(bs_component,args...),compress_time(fesolver,bt_component,args...)
+end
+
+function compress_shifted(
+  fesolver::ODESolver,
+  bs_component::NnzArray,
+  bt_component::NnzArray,
+  args...)
+
+  compress_space(bs_component,args...),compress_time_shifted(fesolver,bt_component,args...)
 end
 
 for Trb in (:SingleFieldRBSpace,:TransientSingleFieldRBSpace)
@@ -365,6 +458,26 @@ function compress_time(
   btbt = zeros(time_ndofs,nt_row,nt_col)
   @inbounds for jt = 1:nt_col, it = 1:nt_row
     btbt[:,it,jt] .= bt_row[:,it].*bt_col[:,jt]
+  end
+
+  bt_component.nonzero_val,btbt
+end
+
+function compress_time_shifted(
+  ::θMethod,
+  bt_component::NnzArray,
+  rbspace_row::TransientSingleFieldRBSpace{<:AbstractMatrix},
+  rbspace_col::TransientSingleFieldRBSpace{<:AbstractMatrix})
+
+  bt_row = get_basis_time(rbspace_row).nonzero_val
+  bt_col = get_basis_time(rbspace_col).nonzero_val
+  time_ndofs = size(bt_row,1)
+  nt_row = size(bt_row,2)
+  nt_col = size(bt_col,2)
+
+  btbt = zeros(time_ndofs,nt_row,nt_col)
+  @inbounds for jt = 1:nt_col, it = 1:nt_row
+    btbt[2:end,it,jt] .= bt_row[2:end,it].*bt_col[1:end-1,jt]
   end
 
   bt_component.nonzero_val,btbt
