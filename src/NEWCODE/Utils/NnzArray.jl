@@ -4,7 +4,7 @@ mutable struct NnzArray{T}
   nrows::Int
 end
 
-function compress(entire_array::T) where {T<:AbstractMatrix}
+function compress(entire_array::T) where {T<:AbstractArray}
   nonzero_idx,nonzero_val = compress_array(entire_array)
   nrows = size(entire_array,1)
   NnzArray{T}(nonzero_val,nonzero_idx,nrows)

@@ -29,6 +29,11 @@ function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
   (I[nz],J[nz],V[nz])
 end
 
+function compress_array(entire_array::AbstractVector)
+  nonzero_idx = findall(x -> abs(x) ≥ eps(),entire_array)
+  nonzero_idx,entire_array[nonzero_idx]
+end
+
 function compress_array(entire_array::AbstractMatrix)
   sum_cols = reshape(sum(entire_array,dims=2),:)
   nonzero_idx = findall(x -> abs(x) ≥ eps(),sum_cols)
@@ -156,65 +161,43 @@ function collect_trian(a::DomainContribution)
   unique(t)
 end
 
-function Base.:(==)(l1::FaceLabeling,l2::FaceLabeling)
-  (l1.d_to_dface_to_entity == l2.d_to_dface_to_entity &&
-  l1.tag_to_entities == l2.tag_to_entities &&
-  l1.tag_to_name == l2.tag_to_name)
+function expand(tup::Tuple)
+  t = ()
+  for el = tup
+    if isa(el,Tuple)
+      t = (t...,expand(el)...)
+    else
+      t = (t...,el)
+    end
+  end
+  t
 end
 
-function Base.:(==)(g1::UnstructuredGrid,g2::UnstructuredGrid)
-  (g1.node_coordinates == g2.node_coordinates &&
-  g1.cell_node_ids == g2.cell_node_ids &&
-  g1.reffes == g2.reffes &&
-  g1.cell_types == g2.cell_types &&
-  g1.orientation_style == g2.orientation_style &&
-  g1.facet_normal == g2.facet_normal)
-end
-
-function Base.:(==)(
-  gt1::UnstructuredGridTopology,
-  gt2::UnstructuredGridTopology)
-
-  function _check_face_map(gt1,gt2)
-    fm1 = gt1.n_m_to_nface_to_mfaces
-    fm2 = gt2.n_m_to_nface_to_mfaces
-    if length(fm1) != length(fm2) return false end
-    for i in length(fm1)
-      if isdefined(fm1,i)
-        if !isdefined(fm2,i) return false end
-        fm1[i] == fm2[2]
-      else
-        if isdefined(fm2,i) return false end
+function Base.:(==)(a::T,b::T) where {T<:GridapType}
+  for field in propertynames(a)
+    a_field = getproperty(a,field)
+    b_field = getproperty(b,field)
+    if isa(a_field,GridapType)
+      (==)(a_field,b_field)
+    else
+      if isdefined(a_field,1) && !(==)(a_field,b_field)
+        return false
       end
     end
-    return true
   end
-
-  (gt1.vertex_coordinates == gt2.vertex_coordinates &&
-  _check_face_map(gt1,gt2) &&
-  gt1.cell_type == gt2.cell_type &&
-  gt1.polytopes == gt2.polytopes &&
-  typeof(gt1.orientation_style) == typeof(gt2.orientation_style))
+  return true
 end
 
-function Base.:(==)(
-  m1::DiscreteModel{Dc,Dp},
-  m2::DiscreteModel{Dc,Dp}) where {Dc,Dp}
-  m1.grid == m2.grid && m1.grid_topology == m2.grid_topology && m1.face_labeling == m2.face_labeling
-end
-
-function Base.:(==)(
-  t1::BodyFittedTriangulation{Dt,Dp,A,C},
-  t2::BodyFittedTriangulation{Dt,Dp,A,C}) where {Dt,Dp,A,C}
-
-  t1.model == t2.model && t1.grid == t2.grid
-end
-
-function is_parent(
-  tparent::Triangulation,
-  tchild::BodyFittedTriangulation{Dt,Dp,A,<:GridView,C}) where {Dt,Dp,A,C}
-
-  tparent.model == tchild.model && tparent.grid == tchild.grid.parent
+function is_parent(tparent::Triangulation,tchild::Triangulation)
+  try
+    try
+      tparent.model == tchild.model && tparent.grid == tchild.grid.parent
+    catch
+      tparent == tchild.parent
+    end
+  catch
+    false
+  end
 end
 
 function modify_measures!(measures::Vector{Measure},m::Measure)

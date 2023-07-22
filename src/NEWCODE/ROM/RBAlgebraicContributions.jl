@@ -1,13 +1,17 @@
 struct RBAlgebraicContribution{N}
   dict::IdDict{Triangulation,Array{RBAffineDecompositions,N}}
+  function RBAlgebraicContribution(::Val{N}) where N
+    dict = IdDict{Triangulation,Array{RBAffineDecompositions,N}}()
+    new{N}(dict)
+  end
 end
 
 function RBResidualContribution()
-  RBAlgebraicContribution{1}(IdDict{Triangulation,Vector{RBAffineDecompositions}}())
+  RBAlgebraicContribution(Val(1))
 end
 
 function RBJacobianContribution()
-  RBAlgebraicContribution{2}(IdDict{Triangulation,Matrix{RBAffineDecompositions}}())
+  RBAlgebraicContribution(Val(2))
 end
 
 Gridap.CellData.num_domains(a::RBAlgebraicContribution) = length(a.dict)

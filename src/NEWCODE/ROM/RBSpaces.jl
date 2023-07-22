@@ -19,19 +19,25 @@ struct TransientMultiFieldRBSpace{T} <: TransientRBSpace{T}
   basis_time::Vector{NnzArray{T}}
 end
 
-get_basis_space(rb::SingleFieldRBSpace) = rb.basis_space
+get_basis_space(rb::SingleFieldRBSpace) = recast(rb.basis_space)
 
-get_basis_space(rb::TransientSingleFieldRBSpace) = rb.basis_space
+get_basis_space(rb::MultiFieldRBSpace) = vcat(map(recast,rb.basis_space)...)
 
-get_rb_space_ndofs(rb::SingleFieldRBSpace) = size(get_datum(rb.basis_space),2)
+get_basis_space(rb::TransientSingleFieldRBSpace) = recast(rb.basis_space)
 
-get_basis_time(rb::TransientSingleFieldRBSpace) = rb.basis_time
+get_basis_space(rb::TransientMultiFieldRBSpace) = vcat(map(recast,rb.basis_space)...)
 
-get_rb_time_ndofs(rb::TransientSingleFieldRBSpace) = size(get_datum(rb.basis_time),2)
+get_rb_space_ndofs(rb) = size(get_basis_space(rb),2)
 
-get_rb_ndofs(rb::SingleFieldRBSpace) = get_rb_space_ndofs(rb)
+get_basis_time(rb::TransientSingleFieldRBSpace) = rb.basis_time.nonzero_val
 
-get_rb_ndofs(rb::TransientSingleFieldRBSpace) = get_rb_space_ndofs(rb)*get_rb_time_ndofs(rb)
+get_basis_time(rb::TransientMultiFieldRBSpace) = vcat(map(recast,rb.basis_time)...)
+
+get_rb_time_ndofs(rb::TransientRBSpace) = size(get_basis_time(rb),2)
+
+get_rb_ndofs(rb::RBSpace) = get_rb_space_ndofs(rb)
+
+get_rb_ndofs(rb::TransientRBSpace) = get_rb_space_ndofs(rb)*get_rb_time_ndofs(rb)
 
 for (Tsps,Tspm) in zip((:SingleFieldRBSpace,:TransientSingleFieldRBSpace),
                        (:MultiFieldRBSpace,:TransientMultiFieldRBSpace))

@@ -102,8 +102,9 @@ function update_cache!(
 end
 
 function allocate_evaluation_function(op::ParamTransientFEOperator)
-  test = op.test
-  xh = EvaluationFunction(test,fill(0.,test.nfree))
+  μ,t = realization(op),1.
+  trial = get_trial(op)(μ,t)
+  xh = EvaluationFunction(trial,fill(0.,test.nfree))
   dxh = ()
   for _ in 1:get_order(op)
     dxh = (dxh...,xh)
@@ -139,7 +140,8 @@ for T in (:MultiFieldCellField,:TransientMultiFieldCellField)
 end
 
 function allocate_residual(
-  op::ParamTransientFEOperatorFromWeakForm;
+  op::ParamTransientFEOperatorFromWeakForm,
+  args...;
   assem::SparseMatrixAssembler=op.assem)
 
   xh = allocate_evaluation_function(op)
@@ -165,7 +167,8 @@ function residual!(
 end
 
 function allocate_jacobian(
-  op::ParamTransientFEOperatorFromWeakForm;
+  op::ParamTransientFEOperatorFromWeakForm,
+  args...;
   assem::SparseMatrixAssembler=op.assem)
 
   _matdata_jacobians = fill_initial_jacobians(op)
@@ -268,23 +271,4 @@ function _collect_trian_jac(op::ParamTransientFEOperator)
     trians = (trians...,collect_trian(matcontrib)...)
   end
   unique(trians)
-end
-
-function get_single_field(
-  op::ParamTransientFEOperator{C},
-  filter::Tuple{Vararg{Int}}) where C
-
-  r_filter,c_filter = filter
-  trial = op.trial
-  test = op.test
-  c_trial = trial[c_filter]
-  r_test = test[r_filter]
-  rc_assem = SparseMatrixAssembler(c_trial,r_test)
-  ParamTransientFEOperatorFromWeakForm{C}(
-    op.res,
-    op.jac,
-    rc_assem,
-    op.pspace,
-    c_trial,
-    r_test)
 end

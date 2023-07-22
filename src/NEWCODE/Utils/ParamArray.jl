@@ -12,7 +12,7 @@ function evaluate(pa::ParamArray,args...)
 end
 
 function evaluate(pa::Vector{ParamArray},args...)
-  blocks = pmap(axes(pa,1)) do row
+  blocks = map(axes(pa,1)) do row
     evaluate(pa[row],args...)
   end
   pa_vec = vcat(blocks...)

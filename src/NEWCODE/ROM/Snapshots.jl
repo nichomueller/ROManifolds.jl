@@ -1,5 +1,6 @@
-abstract type Snapshots{T,N,A} end
-abstract type TransientSnapshots{T,N,A} end
+abstract type GenericSnapshots end
+abstract type Snapshots{T,N,A} <: GenericSnapshots end
+abstract type TransientSnapshots{T,N,A} <: GenericSnapshots end
 
 struct SingleFieldSnapshots{T,A} <: Snapshots{T,1,A}
   snaps::NnzArray{T}
@@ -143,6 +144,24 @@ function Base.getindex(
   snaps = map(x->getindex(x,:,_idx),s.snaps)
   nsnaps = length(idx1)
   TransientMultiFieldSnapshots{T,N,A}(snaps,nsnaps)
+end
+
+for Tsnp in (:SingleFieldSnapshots,:TransientSingleFieldSnapshots)
+  @eval begin
+    function Base.iterate(s::$Tsnp)
+      i = 1
+      snap_i = get_datum(s[i])
+      return snap_i,i+1
+    end
+    function Base.iterate(s::$Tsnp,idx::Int)
+      if idx > s.nsnaps
+        return
+      end
+      i = idx
+      snap_i = get_datum(s[i])
+      return snap_i,i+1
+    end
+  end
 end
 
 for Tsnp in (:MultiFieldSnapshots,:TransientMultiFieldSnapshots)

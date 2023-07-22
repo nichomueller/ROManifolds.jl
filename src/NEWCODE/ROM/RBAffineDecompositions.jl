@@ -6,7 +6,7 @@ struct RBIntegrationDomain
     component::SingleFieldSnapshots,
     trian::Triangulation,
     interp_idx::Vector{Int},
-    cell_dof_ids::Table,
+    cell_dof_ids,
     order=1)
 
     degree = 2*order
@@ -17,7 +17,7 @@ struct RBIntegrationDomain
     red_integr_cells = find_cells(entire_interp_rows,cell_dof_ids)
     red_trian = view(trian,red_integr_cells)
     red_meas = Measure(red_trian,degree)
-    new(red_meas,entire_interp_idx_space)
+    new(red_meas,interp_idx_space)
   end
 end
 
@@ -32,7 +32,7 @@ struct TransientRBIntegrationDomain
     times::Vector{Float},
     interp_idx_space::Vector{Int},
     interp_idx_time::Vector{Int},
-    cell_dof_ids::Table,
+    cell_dof_ids,
     order=1;
     st_mdeim=true)
 
@@ -45,7 +45,7 @@ struct TransientRBIntegrationDomain
     red_trian = view(trian,red_integr_cells)
     red_meas = Measure(red_trian,degree)
     red_times = st_mdeim ? times[interp_idx_time] : times
-    new(red_meas,red_times,entire_interp_idx_space)
+    new(red_meas,red_times,interp_idx_space)
   end
 end
 
@@ -247,7 +247,7 @@ function compress_djacobians(
   order = get_order(feop.test[row])
 
   j = collect_djacobians(feop,fesolver,sjac,pjac,trian,filter)
-  compress_shifted_component(j,fesolver,trian,cell_dof_ids,order,rbspace...;kwargs...)
+  compress_component(j,fesolver,trian,cell_dof_ids,order,rbspace...;shift=-,kwargs...)
 end
 
 function compress_component(
@@ -280,7 +280,7 @@ function compress_component(
   component::SingleFieldSnapshots,
   fesolver::FESolver,
   trian::Triangulation,
-  cell_dof_ids::Table,
+  cell_dof_ids,
   order::Int,
   args...;
   kwargs...)
@@ -301,7 +301,7 @@ function compress_component(
   component::TransientSingleFieldSnapshots,
   fesolver::ODESolver,
   trian::Triangulation,
-  cell_dof_ids::Table,
+  cell_dof_ids,
   order::Int,
   args...;
   st_mdeim=true,
@@ -320,33 +320,6 @@ function compress_component(
   lu_interp_bst = lu(interp_bst)
 
   proj_bs,proj_bt = compress(fesolver,bs,bt,args...)
-
-  TransientRBAffineDecomposition(proj_bs,proj_bt,lu_interp_bst,integr_domain)
-end
-
-function compress_shifted_component(
-  component::TransientSingleFieldSnapshots,
-  fesolver::ODESolver,
-  trian::Triangulation,
-  cell_dof_ids::Table,
-  order::Int,
-  args...;
-  st_mdeim=true,
-  kwargs...)
-
-  times = get_times(fesolver)
-
-  bs,bt = tpod(component,fesolver;ϵ)
-  interp_idx_space,interp_idx_time = get_interpolation_idx(bs,bt)
-  integr_domain = TransientRBIntegrationDomain(
-    component,trian,times,interp_idx_space,interp_idx_time,cell_dof_ids,order;st_mdeim)
-
-  interp_bs = bs.nonzero_val[interp_idx_space,:]
-  interp_bt = bt.nonzero_val[interp_idx_time,:]
-  interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
-  lu_interp_bst = lu(interp_bst)
-
-  proj_bs,proj_bt = compress_shifted(fesolver,bs,bt,args...)
 
   TransientRBAffineDecomposition(proj_bs,proj_bt,lu_interp_bst,integr_domain)
 end
@@ -387,18 +360,10 @@ function compress(
   fesolver::ODESolver,
   bs_component::NnzArray,
   bt_component::NnzArray,
-  args...)
+  args...;
+  kwargs...)
 
-  compress_space(bs_component,args...),compress_time(fesolver,bt_component,args...)
-end
-
-function compress_shifted(
-  fesolver::ODESolver,
-  bs_component::NnzArray,
-  bt_component::NnzArray,
-  args...)
-
-  compress_space(bs_component,args...),compress_time_shifted(fesolver,bt_component,args...)
+  compress_space(bs_component,args...),compress_time(fesolver,bt_component,args...;kwargs...)
 end
 
 for Trb in (:SingleFieldRBSpace,:TransientSingleFieldRBSpace)
@@ -408,8 +373,7 @@ for Trb in (:SingleFieldRBSpace,:TransientSingleFieldRBSpace)
       bs_component::NnzArray,
       rbspace_row::$Trb{<:AbstractMatrix})
 
-      bs_row = get_basis_space(rbspace_row)
-      entire_bs_row = recast(bs_row)
+      entire_bs_row = get_basis_space(rbspace_row)
       entire_bs_component = recast(bs_component)
       map(eachcol(entire_bs_component)) do col
         cmat = reshape(col,:,1)
@@ -422,10 +386,8 @@ for Trb in (:SingleFieldRBSpace,:TransientSingleFieldRBSpace)
       rbspace_row::$Trb{<:AbstractMatrix},
       rbspace_col::$Trb{<:AbstractMatrix})
 
-      bs_row = get_basis_space(rbspace_row)
-      bs_col = get_basis_space(rbspace_col)
-      entire_bs_row = recast(bs_row)
-      entire_bs_col = recast(bs_col)
+      entire_bs_row = get_basis_space(rbspace_row)
+      entire_bs_col = get_basis_space(rbspace_col)
       nbasis = size(bs_component,2)
       map(1:nbasis) do n
         entire_bs_row'*recast(bs_component,n)*entire_bs_col
@@ -437,80 +399,47 @@ end
 function compress_time(
   ::θMethod,
   bt_component::NnzArray,
-  rbspace_row::TransientSingleFieldRBSpace{<:AbstractMatrix})
+  rbspace_row::TransientSingleFieldRBSpace{<:AbstractMatrix};
+  kwargs...)
 
   bt = get_basis_time(rbspace_row)
-  bt_component.nonzero_val,bt.nonzero_val
+  bt_component.nonzero_val,bt
 end
 
 function compress_time(
-  ::θMethod,
+  fesolver::θMethod,
   bt_component::NnzArray,
   rbspace_row::TransientSingleFieldRBSpace{<:AbstractMatrix},
-  rbspace_col::TransientSingleFieldRBSpace{<:AbstractMatrix})
+  rbspace_col::TransientSingleFieldRBSpace{<:AbstractMatrix};
+  shift=+)
 
-  bt_row = get_basis_time(rbspace_row).nonzero_val
-  bt_col = get_basis_time(rbspace_col).nonzero_val
-  time_ndofs = size(bt_row,1)
-  nt_row = size(bt_row,2)
-  nt_col = size(bt_col,2)
-
-  btbt = zeros(time_ndofs,nt_row,nt_col)
-  @inbounds for jt = 1:nt_col, it = 1:nt_row
-    btbt[:,it,jt] .= bt_row[:,it].*bt_col[:,jt]
-  end
-
-  bt_component.nonzero_val,btbt
-end
-
-function compress_time_shifted(
-  ::θMethod,
-  bt_component::NnzArray,
-  rbspace_row::TransientSingleFieldRBSpace{<:AbstractMatrix},
-  rbspace_col::TransientSingleFieldRBSpace{<:AbstractMatrix})
-
-  bt_row = get_basis_time(rbspace_row).nonzero_val
-  bt_col = get_basis_time(rbspace_col).nonzero_val
-  time_ndofs = size(bt_row,1)
-  nt_row = size(bt_row,2)
-  nt_col = size(bt_col,2)
-
-  btbt = zeros(time_ndofs,nt_row,nt_col)
-  @inbounds for jt = 1:nt_col, it = 1:nt_row
-    btbt[2:end,it,jt] .= bt_row[2:end,it].*bt_col[1:end-1,jt]
-  end
-
-  bt_component.nonzero_val,btbt
-end
-
-function zero_compress(
-  rbspace_row::SingleFieldRBSpace{<:AbstractMatrix})
-
-  bs_row = get_basis_space(rbspace_row)
-  nbasis_row = size(bs_row,2)
-  allocate_matrix(bs_row,nbasis_row,1)
-end
-
-function zero_compress(
-  rbspace_row::TransientSingleFieldRBSpace{<:AbstractMatrix})
-
-  bs_row = get_basis_space(rbspace_row)
+  θ = fesolver.θ
   bt_row = get_basis_time(rbspace_row)
-  nbasis_row = size(bs_row,2)*size(bt_row,2)
-  allocate_matrix(bs_row,nbasis_row,1)
-end
-
-function zero_compress(
-  rbspace_row::TransientSingleFieldRBSpace{<:AbstractMatrix},
-  rbspace_col::TransientSingleFieldRBSpace{<:AbstractMatrix})
-
-  bs_row = get_basis_space(rbspace_row)
-  bt_row = get_basis_time(rbspace_row)
-  bs_col = get_basis_space(rbspace_col)
   bt_col = get_basis_time(rbspace_col)
-  nbasis_row = size(bs_row,2)*size(bt_row,2)
-  nbasis_col = size(bs_col,2)*size(bt_col,2)
-  allocate_matrix(bs_row,nbasis_row,nbasis_col)
+  time_ndofs = size(bt_row,1)
+  nt_row = size(bt_row,2)
+  nt_col = size(bt_col,2)
+
+  bt_proj = zeros(time_ndofs,nt_row,nt_col)
+  bt_proj_shift = copy(bt_proj)
+  @inbounds for jt = 1:nt_col, it = 1:nt_row
+    bt_proj[:,it,jt] .= bt_row[:,it].*bt_col[:,jt]
+    bt_proj_shift[2:end,it,jt] .= bt_row[2:end,it].*bt_col[1:end-1,jt]
+  end
+
+  combine_bt_proj = shift(θ*bt_proj,(1-θ)*bt_proj_shift)
+  bt_component.nonzero_val,combine_bt_proj
+end
+
+function zero_compress(rbspace_row)
+  rbdofs_row = get_rb_ndofs(rbspace_row)
+  fill(0.,rbdofs_row,1)
+end
+
+function zero_compress(rbspace_row,rbspace_col)
+  rbdofs_row = get_rb_ndofs(rbspace_row)
+  rbdofs_col = get_rb_ndofs(rbspace_col)
+  fill(0.,rbdofs_row,rbdofs_col)
 end
 
 function find_cells(idx::Vector{Int},cell_dof_ids)

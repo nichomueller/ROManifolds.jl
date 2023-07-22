@@ -51,8 +51,9 @@ function update_cache!(cache,::ParamFEOperator,μ::AbstractVector)
 end
 
 function allocate_evaluation_function(op::ParamFEOperator)
-  test = op.test
-  EvaluationFunction(test,fill(0.,test.nfree))
+  μ = realization(op)
+  trial = get_trial(op)(μ)
+  EvaluationFunction(trial,fill(0.,test.nfree))
 end
 
 function evaluation_function(
@@ -92,7 +93,8 @@ function _vector!(
 end
 
 function allocate_residual(
-  op::ParamFEOperatorFromWeakForm;
+  op::ParamFEOperatorFromWeakForm,
+  args...;
   assem::SparseMatrixAssembler=op.assem)
 
   xh = allocate_evaluation_function(op)
@@ -102,7 +104,8 @@ function allocate_residual(
 end
 
 function allocate_jacobian(
-  op::ParamFEOperatorFromWeakForm;
+  op::ParamFEOperatorFromWeakForm,
+  args...;
   assem::SparseMatrixAssembler=op.assem)
 
   xh = allocate_evaluation_function(op)
@@ -186,23 +189,4 @@ function _collect_trian_jac(op::ParamFEOperator)
   v = get_fe_basis(op.test)
   matcontrib = op.jac(μ,uh,v,v)
   collect_trian(matcontrib)
-end
-
-function get_single_field(
-  op::ParamFEOperator{C},
-  filter::Tuple{Vararg{Int}}) where C
-
-  r_filter,c_filter = filter
-  trial = op.trial
-  test = op.test
-  c_trial = trial[c_filter]
-  r_test = test[r_filter]
-  rc_assem = SparseMatrixAssembler(c_trial,r_test)
-  ParamFEOperatorFromWeakForm{C}(
-    op.res,
-    op.jac,
-    rc_assem,
-    op.pspace,
-    c_trial,
-    r_test)
 end

@@ -22,15 +22,19 @@ function RBInfo(test_path::String;ϵ=1e-4,nsnaps_state=80,nsnaps_system=20,
     energy_norm,load_offline,save_offline,save_online,postprocess)
 end
 
-function save(info::RBInfo,objs::Tuple)
-  map(obj->save(info,obj),expand(objs))
+for (fsave,fload) in zip((:save,:save_test),(:load,:load_test))
+  @eval begin
+    function $fsave(info::RBInfo,objs::Tuple)
+      map(obj->$fsave(info,obj),expand(objs))
+    end
+
+    function $fload(types::Tuple,info::RBInfo)
+      map(type->$fload(type,info),expand(types))
+    end
+  end
 end
 
-function load(types::Tuple,info::RBInfo)
-  map(type->load(type,info),expand(types))
-end
-
-function save(info::RBInfo,snaps::Snapshots)
+function save(info::RBInfo,snaps::GenericSnapshots)
   if info.save_offline
     path = joinpath(info.fe_path,"fesnaps")
     convert!(Matrix{Float},snaps)
@@ -45,7 +49,7 @@ function save(info::RBInfo,params::Table)
   end
 end
 
-function load(T::Type{Snapshots},info::RBInfo)
+function load(T::Type{GenericSnapshots},info::RBInfo)
   path = joinpath(info.fe_path,"fesnaps")
   s = load(T,path)
   convert!(EMatrix{Float},s)
@@ -56,10 +60,23 @@ function load(T::Type{Table},info::RBInfo)
   load(T,path)
 end
 
-function load_test(T::Type{Snapshots},info::RBInfo)
+function save_test(info::RBInfo,snaps::GenericSnapshots)
+  if info.save_offline
+    path = joinpath(info.fe_path,"fesnaps_test")
+    save(path,snaps)
+  end
+end
+
+function save_test(info::RBInfo,params::Table)
+  if info.save_offline
+    path = joinpath(info.fe_path,"params_test")
+    save(path,params)
+  end
+end
+
+function load_test(T::Type{GenericSnapshots},info::RBInfo)
   path = joinpath(info.fe_path,"fesnaps_test")
-  s = load(T,path)
-  convert!(EMatrix{Float},s)
+  load(T,path)
 end
 
 function load_test(T::Type{Table},info::RBInfo)
