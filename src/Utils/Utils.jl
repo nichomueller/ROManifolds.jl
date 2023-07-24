@@ -5,15 +5,15 @@ using Distributions
 using Random
 using SuiteSparse
 using SparseArrays
-using Arpack
+# using Arpack
 using Elemental
 using DelimitedFiles
 using Serialization
-using ParallelDataTransfer
-using PartitionedArrays
+# using ParallelDataTransfer
+# using PartitionedArrays
 using SharedArrays
 using Test
-using PlotlyJS
+# using PlotlyJS
 using ForwardDiff
 using Gridap
 using Gridap.FESpaces
@@ -69,4 +69,4 @@ include("Indexes.jl")
 include("Operations.jl")
 include("BasesConstruction.jl")
 include("SystemSolvers.jl")
-include("Plots.jl")
+# include("Plots.jl")

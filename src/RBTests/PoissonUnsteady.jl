@@ -1,7 +1,7 @@
 # Init MPI
 using MPI,MPIClusterManagers,Distributed
 manager = MPIWorkerManager()
-addprocs(manager)
+addprocs(4)
 
 # Loading packages on all processes
 @everywhere begin
@@ -18,7 +18,7 @@ end
   indef = false
   ptype = ProblemType(steady,indef)
 
-  mesh = "elasticity_3cyl.json"
+  mesh = "elasticity_3cyl2D.json"
   test_path = "$root/tests/poisson/unsteady/$mesh"
   bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
   order = 1
@@ -44,10 +44,10 @@ end
   f(x,p::Param,t::Real) = 1.
   f(p::Param,t::Real) = x->f(x,p,t)
   f(p::Param) = t->f(p,t)
-  h(x,p::Param,t::Real) = abs(cos(pi*t/(p.μ[3]*tF)))
+  h(x,p::Param,t::Real) = abs(cos(t*p.μ[3]))
   h(p::Param,t::Real) = x->h(x,p,t)
   h(p::Param) = t->h(p,t)
-  g(x,p::Param,t::Real) = p.μ[1]*exp(-x[1]/p.μ[2])*abs(sin(pi*t/(p.μ[3]*tF)))
+  g(x,p::Param,t::Real) = p.μ[1]*exp(-x[1]/p.μ[2])*abs(sin(p.μ[3]*t))
   g(p::Param,t::Real) = x->g(x,p,t)
   g(p::Param) = t->g(p,t)
 

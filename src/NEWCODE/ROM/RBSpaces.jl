@@ -241,18 +241,5 @@ for Trb in (:RBSpace,:TransientRBSpace)
       rb_ndofs = get_rb_ndofs(rb)
       zeros(rb_ndofs,rb_ndofs)
     end
-
-    # REMOVE IN THE FUTURE
-    function save(info::RBInfo,rb::$Trb)
-      if info.save_offline
-        path = joinpath(info.offline_path,"basis")
-        save(path,rb)
-      end
-    end
-
-    function load(T::$Trb,info::RBInfo)
-      path = joinpath(info.offline_path,"basis")
-      load(T,path)
-    end
   end
 end

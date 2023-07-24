@@ -39,7 +39,8 @@ end
 function reduce_fe_operator(
   info::RBInfo,
   feop::ParamTransientFEOperator{Top},
-  fesolver::ODESolver) where Top
+  fesolver::ODESolver;
+  st_mdeim=true) where Top
 
   ϵ = info.ϵ
   # fun_mdeim = info.fun_mdeim
@@ -47,11 +48,12 @@ function reduce_fe_operator(
   params = realization(feop,nsnaps)
   sols = collect_solutions(feop,fesolver,params)
   rbspace = compress_solutions(feop,fesolver,sols,params;ϵ)
+  save(info,(sols,params))
 
   nsnaps = info.nsnaps_system
-  rb_res_c = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
-  rb_jac_c = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
-  rb_djac_c = compress_djacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
+  rb_res_c = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps,st_mdeim)
+  rb_jac_c = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps,st_mdeim)
+  rb_djac_c = compress_djacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps,st_mdeim)
   rb_res = collect_residual_contributions(feop,fesolver,rb_res_c;st_mdeim)
   rb_jac = collect_jacobian_contributions(feop,fesolver,rb_jac_c;st_mdeim)
   rb_djac = collect_jacobian_contributions(feop,fesolver,rb_djac_c;i=2,st_mdeim)
@@ -400,9 +402,8 @@ function solve(ad::RBAffineDecompositions,b::AbstractArray;st_mdeim=true)
 end
 
 function solve(mdeim_interp::LU,b::AbstractArray)
-  ns = LUNumericalSetup(lu(mdeim_interp))
   x = similar(b)
-  solve!(x,ns,b)
+  copyto!(x,mdeim_interp.factors\b)
   x'
 end
 
@@ -469,11 +470,11 @@ function recast(rbop::TransientRBOperator,xrb::AbstractArray)
 end
 
 function save(info::RBInfo,op::GenericRBOperator)
-  path = joinpath(info.online_path,"rboperator")
+  path = joinpath(info.rb_path,"rboperator")
   save(path,op)
 end
 
 function load(T::Type{GenericRBOperator},info::RBInfo)
-  path = joinpath(info.online_path,"rboperator")
+  path = joinpath(info.rb_path,"rboperator")
   load(T,path)
 end

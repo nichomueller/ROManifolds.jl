@@ -290,11 +290,11 @@ function compress_component(
   integr_domain = RBIntegrationDomain(component,trian,interp_idx,cell_dof_ids,order)
 
   interp_bs = bs.nonzero_val[interp_idx,:]
-  lu_interp_bs = lu(interp_bs)
+  lu_interp = lu(interp_bs)
 
   proj_bs = compress(fesolver,bs,args...)
 
-  RBAffineDecomposition(proj_bs,lu_interp_bs,integr_domain)
+  RBAffineDecomposition(proj_bs,lu_interp,integr_domain)
 end
 
 function compress_component(
@@ -315,13 +315,17 @@ function compress_component(
     component,trian,times,interp_idx_space,interp_idx_time,cell_dof_ids,order;st_mdeim)
 
   interp_bs = bs.nonzero_val[interp_idx_space,:]
-  interp_bt = bt.nonzero_val[interp_idx_time,:]
-  interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
-  lu_interp_bst = lu(interp_bst)
+  lu_interp = if st_mdeim
+    interp_bt = bt.nonzero_val[interp_idx_time,:]
+    interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
+    lu(interp_bst)
+  else
+    lu(interp_bs)
+  end
 
   proj_bs,proj_bt = compress(fesolver,bs,bt,args...)
 
-  TransientRBAffineDecomposition(proj_bs,proj_bt,lu_interp_bst,integr_domain)
+  TransientRBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)
 end
 
 function get_interpolation_idx(basis_space::NnzArray,basis_time::NnzArray)

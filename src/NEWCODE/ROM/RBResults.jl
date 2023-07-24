@@ -238,11 +238,11 @@ LinearAlgebra.norm(v::AbstractVector,::Nothing) = norm(v)
 LinearAlgebra.norm(v::AbstractVector,X::AbstractMatrix) = v'*X*v
 
 function save(info::RBInfo,rbres::RBResults)
-  path = joinpath(info.online_path,"rbresults")
+  path = joinpath(info.rb_path,"rbresults")
   save(path,rbres)
 end
 
 function load(T::Type{RBResults},info::RBInfo)
-  path = joinpath(info.online_path,"rbresults")
+  path = joinpath(info.rb_path,"rbresults")
   load(T,path)
 end

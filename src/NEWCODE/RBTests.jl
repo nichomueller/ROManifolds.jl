@@ -11,19 +11,7 @@ function rom_path(tpath::String,ϵ::Float)
   rbpath
 end
 
-function rom_offline_path(tpath::String,ϵ::Float)
-  rb_off_path = joinpath(rom_path(tpath,ϵ),"offline")
-  create_dir!(rb_off_path)
-  rb_off_path
-end
-
-function rom_online_path(tpath::String,ϵ::Float)
-  rb_on_path = joinpath(rom_path(tpath,ϵ),"online")
-  create_dir!(rb_on_path)
-  rb_on_path
-end
-
-function rom_off_on_paths(
+function rom_path(
   tpath::String,ϵ::Float;
   st_mdeim=false,fun_mdeim=false)
 
@@ -37,12 +25,11 @@ function rom_off_on_paths(
     st*fun
   end
 
-  rompath = joinpath(tpath,"rom")
-  keytpath = joinpath(rompath,keyword)
-
-  offpath = rom_offline_path(keytpath,ϵ)
-  onpath = rom_online_path(keytpath,ϵ)
-  offpath,onpath
+  outermost_path = joinpath(tpath,"rom")
+  outer_path = joinpath(outermost_path,keyword)
+  rom_path = joinpath(outer_path,"$ϵ")
+  create_dir!(rom_path)
+  rom_path
 end
 
 function mesh_path(tpath::String,mesh::String)
