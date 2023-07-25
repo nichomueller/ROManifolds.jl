@@ -20,7 +20,7 @@ function solve_step!(
   solve_step!(uF,op,solver,μ,u0,t0,nothing)
 end
 
-function Gridap.Algebra.solve(
+function solve(
   op::ParamTransientFEOperator,
   solver::ODESolver,
   μ::AbstractVector,

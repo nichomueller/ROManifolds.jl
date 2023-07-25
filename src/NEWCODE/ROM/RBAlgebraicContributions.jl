@@ -49,10 +49,11 @@ function Gridap.CellData.add_contribution!(
   a
 end
 
-function get_measures(a::RBAlgebraicContribution,degree=2)
-  meas = Measure[]
-  for trian in get_domains(a)
-    push!(meas,Measure(trian,degree))
+function get_measures(a::RBAlgebraicContribution,degree::Int)
+  numd = num_domains(a)
+  meas = Vector{Measure}(undef,numd)
+  for (itrian,trian) in enumerate(get_domains(a))
+    meas[itrian] = Measure(trian,degree)
   end
   meas
 end

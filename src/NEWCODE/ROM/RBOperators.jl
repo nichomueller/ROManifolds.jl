@@ -76,7 +76,8 @@ for (Top,Tslv,Tad) in zip(
       a::RBAlgebraicContribution;
       kwargs...)
 
-      measures = get_measures(a)
+      order = get_order(feop.test)
+      measures = get_measures(a,2*order)
       nfields = num_fields(a)
       r = Vector{ParamArray}(undef,nfields)
 
@@ -131,7 +132,8 @@ for (Top,Tslv,Tad) in zip(
       a::RBAlgebraicContribution;
       kwargs...)
 
-      measures = get_measures(a)
+      order = get_order(feop.test)
+      measures = get_measures(a,2*order)
       nfields = num_fields(a)
       j = Matrix{ParamArray}(undef,nfields,nfields)
 
@@ -392,7 +394,7 @@ function assemble_jacobian(
   hcat(j...)
 end
 
-function Gridap.Algebra.solve(ad::RBAffineDecompositions,b::AbstractArray;st_mdeim=true)
+function solve(ad::RBAffineDecompositions,b::AbstractArray;st_mdeim=true)
   if st_mdeim
     coeff = solve(ad.mdeim_interpolation,reshape(b,:))
     recast_coefficient(ad.basis_time,coeff)
@@ -401,7 +403,7 @@ function Gridap.Algebra.solve(ad::RBAffineDecompositions,b::AbstractArray;st_mde
   end
 end
 
-function Gridap.Algebra.solve(mdeim_interp::LU,b::AbstractArray)
+function solve(mdeim_interp::LU,b::AbstractArray)
   x = similar(b)
   copyto!(x,mdeim_interp.P*b)
   copyto!(x,mdeim_interp.L\x)

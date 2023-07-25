@@ -173,7 +173,11 @@ function expand(tup::Tuple)
   t
 end
 
-function Base.:(==)(a::T,b::T) where {T<:GridapType}
+function Base.:(==)(
+  a::T,
+  b::T
+  ) where {T<:Union{Triangulation,Grid}}
+
   for field in propertynames(a)
     a_field = getproperty(a,field)
     b_field = getproperty(b,field)
@@ -221,6 +225,11 @@ Gridap.CellData.get_triangulation(m::Measure) = m.quad.trian
 function Gridap.FESpaces.get_order(test::SingleFieldFESpace)
   basis = get_fe_basis(test)
   first(Gridap.FESpaces.get_order(first(basis.cell_basis.values).fields))
+end
+
+function Gridap.FESpaces.get_order(test::MultiFieldFESpace)
+  orders = map(get_order,test)
+  maximum(orders)
 end
 
 # Remove when possible

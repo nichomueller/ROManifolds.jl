@@ -196,7 +196,7 @@ function init_vec_iterator(
   test_row = get_test(op)[row]
   dv_row = _get_fe_basis(op.test,row)
   assem_row = SparseMatrixAssembler(test_row,test_row)
-  r = allocate_residual(op;assem=assem_row)
+  b = allocate_residual(op;assem=assem_row)
 
   function f(
     xh::AbstractVector,
@@ -205,8 +205,9 @@ function init_vec_iterator(
 
     u = evaluation_function(op,xh,cache)
     vecdata = collect_cell_vector(test_row,op.res(μ,u,dv_row,args...),trian)
-    rnew = copy(r)
-    assemble_vector_add!(rnew,assem_row,vecdata)
+    r = copy(b)
+    assemble_vector_add!(r,assem_row,vecdata)
+    r .*= -1.0
   end
 
   xh = zeros(op.test.nfree)
@@ -227,7 +228,7 @@ function init_vec_iterator(
   test_row = get_test(op)[row]
   dv_row = _get_fe_basis(op.test,row)
   assem_row = SparseMatrixAssembler(test_row,test_row)
-  r = allocate_residual(op;assem=assem_row)
+  b = allocate_residual(op;assem=assem_row)
 
   function f(
     xh::Tuple{Vararg{AbstractVector}},
@@ -237,8 +238,9 @@ function init_vec_iterator(
 
     u = evaluation_function(op,xh,cache)
     vecdata = collect_cell_vector(test_row,op.res(μ,t,u,dv_row,args...),trian)
-    rnew = copy(r)
-    assemble_vector_add!(rnew,assem_row,vecdata)
+    r = copy(b)
+    assemble_vector_add!(r,assem_row,vecdata)
+    r .*= -1.0
   end
 
   μ = realization(op)
@@ -264,8 +266,8 @@ function init_mat_iterator(
   dv_row = _get_fe_basis(op.test,row)
   du_col = _get_trial_fe_basis(_trial,col)
   assem_row_col = SparseMatrixAssembler(_trial_col,test_row)
-  j = allocate_jacobian(op;assem=assem_row_col)
-  jnnz = compress(j)
+  A = allocate_jacobian(op;assem=assem_row_col)
+  Annz = compress(A)
 
   function f(
     xh::AbstractVector,
@@ -277,13 +279,13 @@ function init_mat_iterator(
     u = evaluation_function(op,xh,cache)
     matdata = collect_cell_matrix(trial_col,test_row,
       op.jac(μ,u,du_col,dv_row,args...),trian)
-    jnew = copy(j)
-    jnew = assemble_matrix_add!(jnew,assem_row_col,matdata)
-    nnz_i,nnz_j = compress_array(jnew)
-    jnnznew = copy(jnnz)
-    jnnznew.nonzero_val = nnz_j
-    jnnznew.nonzero_idx = nnz_i
-    jnnznew
+    J = copy(A)
+    J = assemble_matrix_add!(J,assem_row_col,matdata)
+    nnz_i,nnz_j = compress_array(J)
+    jnnz = copy(Annz)
+    jnnz.nonzero_val = nnz_j
+    jnnz.nonzero_idx = nnz_i
+    jnnz
   end
 
   xh = zeros(op.test.nfree)
@@ -308,8 +310,8 @@ function init_mat_iterator(
   dv_row = _get_fe_basis(op.test,row)
   du_col = _get_trial_fe_basis(_trial,col)
   assem_row_col = SparseMatrixAssembler(_trial_col,test_row)
-  j = allocate_jacobian(op;assem=assem_row_col)
-  jnnz = compress(j)
+  A = allocate_jacobian(op;assem=assem_row_col)
+  Annz = compress(A)
   γ = (1.0,1/(solver.dt*solver.θ))
 
   function f(
@@ -324,13 +326,13 @@ function init_mat_iterator(
     u_col = filter_evaluation_function(u,col)
     matdata = collect_cell_matrix(trial_col,test_row,
       γ[i]*op.jacs[i](μ,t,u_col,du_col,dv_row,args...),trian)
-    jnew = copy(j)
-    jnew = assemble_matrix_add!(jnew,assem_row_col,matdata)
-    nnz_i,nnz_j = compress_array(jnew)
-    jnnznew = copy(jnnz)
-    jnnznew.nonzero_val = nnz_j
-    jnnznew.nonzero_idx = nnz_i
-    jnnznew
+      J = copy(A)
+      J = assemble_matrix_add!(J,assem_row_col,matdata)
+      nnz_i,nnz_j = compress_array(J)
+      jnnz = copy(Annz)
+      jnnz.nonzero_val = nnz_j
+      jnnz.nonzero_idx = nnz_i
+      jnnz
   end
 
   μ = realization(op)

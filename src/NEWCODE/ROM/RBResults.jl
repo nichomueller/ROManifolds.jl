@@ -2,23 +2,33 @@ struct RBResults
   sol::AbstractArray
   sol_approx::AbstractArray
   relative_err::Float
-  online_time::Float
+  wall_time::Float
+end
 
-  function RBResults(
-    sol::AbstractArray,
-    sol_approx::AbstractArray,
-    online_time::Float;
-    kwargs...)
+function RBResults(
+  sol::AbstractArray,
+  sol_approx::AbstractArray,
+  wall_time::Float;
+  kwargs...)
 
-    relative_err = compute_relative_error(sol,sol_approx;kwargs...)
+  relative_err = compute_relative_error(sol,sol_approx;kwargs...)
 
-    printstyled("-------------------------------------------------------------\n")
-    printstyled("Average online relative errors err_u: $relative_err\n";color=:red)
-    printstyled("Average online wall time: $online_time s\n";color=:red)
-    printstyled("-------------------------------------------------------------\n")
+  printstyled("-------------------------------------------------------------\n")
+  printstyled("Average online relative errors err_u: $relative_err\n";color=:red)
+  printstyled("Average online wall time: $wall_time s\n";color=:red)
+  printstyled("-------------------------------------------------------------\n")
 
-    new(sol,sol_approx,relative_err,online_time)
-  end
+  RBResults(sol,sol_approx,relative_err,wall_time)
+end
+
+function Base.unique(rb_res::Vector{RBResults})
+  ntests = length(rb_res)
+  rb_res1 = first(rb_res)
+  sol = rb_res1.sol
+  sol_approx = rb_res1.sol_approx
+  relative_err = sum([r.relative_err for r in rb_res]) / ntests
+  wall_time = sum([r.wall_time for r in rb_res]) / ntests
+  RBResults(sol,sol_approx,relative_err,wall_time)
 end
 
 abstract type RBSolver end
@@ -37,19 +47,21 @@ for (Tfeop,Tslv,Trbop) in zip(
       rbop::$Trbop{Affine},
       fesolver::$Tslv,
       rbsolver::RBSolver;
-      nsnaps_test=10,
+      ntests=10,
       postprocess=true,
       kwargs...)
 
-      sols,params = load_test(info,feop,fesolver,nsnaps_test)
-      rb_res = Vector{RBResults}(undef,nsnaps_test)
+      sols,params = load_test(info,feop,fesolver,ntests)
+      rb_res = RBResults[]
       for (u,μ) in zip(sols,params)
         urb,wall_time = solve(rbsolver,rbop,μ)
         push!(rb_res,RBResults(u,urb,wall_time;kwargs...))
       end
       if postprocess
-        save(info,rb_res)
-        writevtk(info,feop,rb_res)
+        μ = params[1]
+        r = unique(rb_res)
+        save(info,r)
+        writevtk(info,feop,fesolver,r,μ)
       end
     end
 
@@ -59,20 +71,22 @@ for (Tfeop,Tslv,Trbop) in zip(
       rbop::$Trbop,
       fesolver::$Tslv,
       rbsolver::RBSolver;
-      nsnaps_test=10,
+      ntests=10,
       postprocess=true,
       kwargs...)
 
-      sols,params = load_test(info,feop,fesolver,nsnaps_test)
-      rb_res = Vector{RBResults}(undef,nsnaps_test)
+      sols,params = load_test(info,feop,fesolver,ntests)
+      rb_res = RBResults[]
       for (u,μ) in zip(sols,params)
         ic = initial_condition(sols,params,μ)
         urb,wall_time = solve(rbsolver,rbop,μ,ic)
         push!(rb_res,RBResults(u,urb,wall_time;kwargs...))
       end
       if postprocess
-        save(info,rb_res)
-        #writevtk(info,feop,rb_res)
+        μ = params[1]
+        r = unique(rb_res)
+        save(info,r)
+        writevtk(info,feop,fesolver,r,μ)
       end
     end
 
@@ -80,14 +94,14 @@ for (Tfeop,Tslv,Trbop) in zip(
       info::RBInfo,
       feop::$Tfeop,
       fesolver::$Tslv,
-      nsnaps_test::Int)
+      ntests::Int)
 
       try
         sols,params = load_test((GenericSnapshots,Table),info)
-        n = min(nsnaps_test,length(params))
+        n = min(ntests,length(params))
         return sols[1:n],params[1:n]
       catch
-        params = realization(feop,nsnaps_test)
+        params = realization(feop,ntests)
         sols = collect_solutions(feop,fesolver,params;type=Matrix{Float})
         save_test(info,(sols,params))
         return sols,params
@@ -96,21 +110,21 @@ for (Tfeop,Tslv,Trbop) in zip(
   end
 end
 
-function Gridap.Algebra.solve(
+function solve(
   ::Backslash,
   rbop::RBOperator{Affine},
   μ::AbstractArray,
   args...)
 
-  online_time = @elapsed begin
+  wall_time = @elapsed begin
     res = rbop.res(μ)
     jac = rbop.jac(μ)
     urb = recast(rbop,jac \ res)
   end
-  urb,online_time
+  urb,wall_time
 end
 
-function Gridap.Algebra.solve(
+function solve(
   ::NewtonIterations,
   rbop::RBOperator{Affine},
   μ::AbstractArray,
@@ -122,7 +136,7 @@ function Gridap.Algebra.solve(
   err = 1.
   iter = 0
 
-  online_time = @elapsed begin
+  wall_time = @elapsed begin
     while norm(err) ≥ tol && iter < maxit
       if norm(err) ≥ maxtol
         printstyled("Newton iterations did not converge\n";color=:red)
@@ -139,25 +153,25 @@ function Gridap.Algebra.solve(
     end
   end
 
-  urb,online_time
+  urb,wall_time
 end
 
-function Gridap.Algebra.solve(
+function solve(
   ::Backslash,
   rbop::TransientRBOperator{Affine},
   μ::AbstractArray,
   args...)
 
-  online_time = @elapsed begin
+  wall_time = @elapsed begin
     res = rbop.res(μ)
     jac = rbop.jac(μ)
     djac = rbop.djac(μ)
     urb = recast(rbop,(jac+djac) \ res)
   end
-  urb,online_time
+  urb,wall_time
 end
 
-function Gridap.Algebra.solve(
+function solve(
   ::NewtonIterations,
   rbop::TransientRBOperator{Affine},
   μ::AbstractArray,
@@ -169,7 +183,7 @@ function Gridap.Algebra.solve(
   err = 1.
   iter = 0
 
-  online_time = @elapsed begin
+  wall_time = @elapsed begin
     while norm(err) ≥ tol && iter < maxit
       if norm(err) ≥ maxtol
         printstyled("Newton iterations did not converge\n";color=:red)
@@ -187,7 +201,7 @@ function Gridap.Algebra.solve(
     end
   end
 
-  urb,online_time
+  urb,wall_time
 end
 
 function initial_condition(
@@ -237,9 +251,62 @@ LinearAlgebra.norm(v::AbstractVector,::Nothing) = norm(v)
 
 LinearAlgebra.norm(v::AbstractVector,X::AbstractMatrix) = v'*X*v
 
-function save(info::RBInfo,rbres::RBResults)
+function Gridap.Visualization.writevtk(
+  info::RBInfo,
+  feop::ParamFEOperator,
+  ::FESolver,
+  rb_res::RBResults,
+  μ::AbstractArray)
+
+  test = get_test(feop)
+  trial = get_trial(feop)
+  trian = get_triangulation(test)
+
+  sol = rb_res.sol
+  sol_approx = rb_res.sol_approx
+  pointwise_err = abs.(sol-sol_approx)
+
+  plt_dir = joinpath(info.rb_path,"plots")
+  create_dir!(plt_dir)
+  fsol = FEFunction(trial(μ),sol[:])
+  fsol_approx = FEFunction(trial(μ),sol_approx[:])
+  ferr = FEFunction(trial(μ),pointwise_err[:])
+  writevtk(trian,joinpath(plt_dir,"sol.vtu"),cellfields=["err"=>fsol])
+  writevtk(trian,joinpath(plt_dir,"sol_approx.vtu"),cellfields=["err"=>fsol_approx])
+  writevtk(trian,joinpath(plt_dir,"err.vtu"),cellfields=["err"=>ferr])
+end
+
+function Gridap.Visualization.writevtk(
+  info::RBInfo,
+  feop::ParamTransientFEOperator,
+  fesolver::ODESolver,
+  rb_res::RBResults,
+  μ::AbstractArray)
+
+  test = get_test(feop)
+  trial = get_trial(feop)
+  trian = get_triangulation(test)
+  times = get_times(fesolver)
+
+  sol = rb_res.sol
+  sol_approx = rb_res.sol_approx
+  pointwise_err = abs.(sol-sol_approx)
+
+  plt_dir = joinpath(info.rb_path,"plots")
+  create_dir!(plt_dir)
+  for (it,t) in enumerate(times)
+    fsol = FEFunction(trial(μ,t),sol[:,it])
+    fsol_approx = FEFunction(trial(μ,t),sol_approx[:,it])
+    ferr = FEFunction(trial(μ,t),pointwise_err[:,it])
+    writevtk(trian,joinpath(plt_dir,"sol_$(it).vtu"),cellfields=["err"=>fsol])
+    writevtk(trian,joinpath(plt_dir,"sol_approx_$(it).vtu"),cellfields=["err"=>fsol_approx])
+    writevtk(trian,joinpath(plt_dir,"err_$(it).vtu"),cellfields=["err"=>ferr])
+  end
+end
+
+function save(info::RBInfo,rb_res::RBResults)
   path = joinpath(info.rb_path,"rbresults")
-  save(path,rbres)
+  save(path,rb_res)
 end
 
 function load(T::Type{RBResults},info::RBInfo)
