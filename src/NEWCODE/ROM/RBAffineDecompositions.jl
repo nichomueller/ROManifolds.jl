@@ -247,7 +247,8 @@ function compress_djacobians(
   order = get_order(feop.test[row])
 
   j = collect_djacobians(feop,fesolver,sjac,pjac,trian,filter)
-  compress_component(j,fesolver,trian,cell_dof_ids,order,rbspace...;shift=-,kwargs...)
+  combine_projections = (x,y) -> x-y
+  compress_component(j,fesolver,trian,cell_dof_ids,order,rbspace...;combine_projections,kwargs...)
 end
 
 function compress_component(
@@ -305,6 +306,7 @@ function compress_component(
   order::Int,
   args...;
   st_mdeim=true,
+  ϵ=1e-4,
   kwargs...)
 
   times = get_times(fesolver)
@@ -323,7 +325,7 @@ function compress_component(
     lu(interp_bs)
   end
 
-  proj_bs,proj_bt = compress(fesolver,bs,bt,args...)
+  proj_bs,proj_bt = compress(fesolver,bs,bt,args...;kwargs...)
 
   TransientRBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)
 end
@@ -364,8 +366,7 @@ function compress(
   fesolver::ODESolver,
   bs_component::NnzArray,
   bt_component::NnzArray,
-  args...;
-  kwargs...)
+  args...;kwargs...)
 
   compress_space(bs_component,args...),compress_time(fesolver,bt_component,args...;kwargs...)
 end
@@ -403,8 +404,8 @@ end
 function compress_time(
   ::θMethod,
   bt_component::NnzArray,
-  rbspace_row::TransientSingleFieldRBSpace{<:AbstractMatrix};
-  kwargs...)
+  rbspace_row::TransientSingleFieldRBSpace{<:AbstractMatrix},
+  args...)
 
   bt = get_basis_time(rbspace_row)
   bt_component.nonzero_val,bt
@@ -415,9 +416,8 @@ function compress_time(
   bt_component::NnzArray,
   rbspace_row::TransientSingleFieldRBSpace{<:AbstractMatrix},
   rbspace_col::TransientSingleFieldRBSpace{<:AbstractMatrix};
-  shift=+)
+  combine_projections::Function=(x,y)->fesolver.θ*x+(1-fesolver.θ)*y)
 
-  θ = fesolver.θ
   bt_row = get_basis_time(rbspace_row)
   bt_col = get_basis_time(rbspace_col)
   time_ndofs = size(bt_row,1)
@@ -431,7 +431,7 @@ function compress_time(
     bt_proj_shift[2:end,it,jt] .= bt_row[2:end,it].*bt_col[1:end-1,jt]
   end
 
-  combine_bt_proj = shift(θ*bt_proj,(1-θ)*bt_proj_shift)
+  combine_bt_proj = combine_projections(bt_proj,bt_proj_shift)
   bt_component.nonzero_val,combine_bt_proj
 end
 

@@ -34,10 +34,10 @@ addprocs(4)
   f(x,μ,t) = 1.
   f(μ,t) = x->f(x,μ,t)
 
-  h(x,μ,t) = abs(cos(μ[3]*t))
+  h(x,μ,t) = abs(cos(t/μ[3]))
   h(μ,t) = x->h(x,μ,t)
 
-  g(x,μ,t) = μ[1]*exp(-x[1]/μ[2])*abs(sin(μ[3]*t))
+  g(x,μ,t) = μ[1]*exp(-x[1]/μ[2])*abs(sin(t/μ[3]))
   g(μ,t) = x->g(x,μ,t)
 
   u0(x,μ) = 0

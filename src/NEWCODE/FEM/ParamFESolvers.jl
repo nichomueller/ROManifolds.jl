@@ -38,7 +38,7 @@ function solve!(
   xh
 end
 
-function solve(
+function Gridap.Algebra.solve(
   op::ParamFEOperator,
   solver::FESolver,
   μ::AbstractVector)

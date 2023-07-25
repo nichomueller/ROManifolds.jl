@@ -104,7 +104,7 @@ end
 function allocate_evaluation_function(op::ParamTransientFEOperator)
   μ,t = realization(op),1.
   trial = get_trial(op)(μ,t)
-  xh = EvaluationFunction(trial,fill(0.,test.nfree))
+  xh = EvaluationFunction(trial,fill(0.,op.test.nfree))
   dxh = ()
   for _ in 1:get_order(op)
     dxh = (dxh...,xh)

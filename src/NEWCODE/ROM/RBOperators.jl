@@ -381,7 +381,7 @@ function assemble_jacobian(
   prev_u = hcat(ich,u[:,1:end-1])
   uθ = θ*u[:,2:end] + (1-θ)*prev_u
 
-  jac_iter = init_vec_iterator(feop,fesolver,trian,filter,new_meas...;i)
+  jac_iter = init_mat_iterator(feop,fesolver,trian,filter,new_meas...;i)
   j = map(times) do t
     uθt = uθ[:,nt]
     update!(jac_iter,feop,fesolver,μ,t,uθt)
@@ -392,7 +392,7 @@ function assemble_jacobian(
   hcat(j...)
 end
 
-function solve(ad::RBAffineDecompositions,b::AbstractArray;st_mdeim=true)
+function Gridap.Algebra.solve(ad::RBAffineDecompositions,b::AbstractArray;st_mdeim=true)
   if st_mdeim
     coeff = solve(ad.mdeim_interpolation,reshape(b,:))
     recast_coefficient(ad.basis_time,coeff)
@@ -401,9 +401,11 @@ function solve(ad::RBAffineDecompositions,b::AbstractArray;st_mdeim=true)
   end
 end
 
-function solve(mdeim_interp::LU,b::AbstractArray)
+function Gridap.Algebra.solve(mdeim_interp::LU,b::AbstractArray)
   x = similar(b)
-  copyto!(x,mdeim_interp.factors\b)
+  copyto!(x,mdeim_interp.P*b)
+  copyto!(x,mdeim_interp.L\x)
+  copyto!(x,mdeim_interp.U\x)
   x'
 end
 

@@ -96,7 +96,7 @@ for (Tfeop,Tslv,Trbop) in zip(
   end
 end
 
-function solve(
+function Gridap.Algebra.solve(
   ::Backslash,
   rbop::RBOperator{Affine},
   μ::AbstractArray,
@@ -110,7 +110,7 @@ function solve(
   urb,online_time
 end
 
-function solve(
+function Gridap.Algebra.solve(
   ::NewtonIterations,
   rbop::RBOperator{Affine},
   μ::AbstractArray,
@@ -142,7 +142,7 @@ function solve(
   urb,online_time
 end
 
-function solve(
+function Gridap.Algebra.solve(
   ::Backslash,
   rbop::TransientRBOperator{Affine},
   μ::AbstractArray,
@@ -157,7 +157,7 @@ function solve(
   urb,online_time
 end
 
-function solve(
+function Gridap.Algebra.solve(
   ::NewtonIterations,
   rbop::TransientRBOperator{Affine},
   μ::AbstractArray,
