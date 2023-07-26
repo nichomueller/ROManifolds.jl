@@ -97,6 +97,7 @@ for (Tfeop,Tslv,Trbop) in zip(
       ntests::Int)
 
       try
+        @check info.load_structures
         sols,params = load_test((GenericSnapshots,Table),info)
         n = min(ntests,length(params))
         return sols[1:n],params[1:n]

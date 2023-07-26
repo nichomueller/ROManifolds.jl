@@ -21,6 +21,15 @@ function compress(entire_arrays::Vector{Vector{T}}) where {T<:AbstractArray}
   map(compress,entire_array)
 end
 
+function compress!(nza::NnzArray,entire_array)
+  nonzero_idx,nonzero_val = compress_array(entire_array)
+  nrows = size(entire_array,1)
+  nza.nonzero_val = nonzero_val
+  @check nza.nonzero_idx == nonzero_idx
+  @check nza.nrows == nrows
+  return
+end
+
 function Base.hcat(nza_vec::NnzArray{T}...) where T
   msg = """\n
   Cannot hcat the given NnzArrays: the nonzero indices and/or the full
@@ -44,8 +53,6 @@ end
 function Base.copy(nza::NnzArray{T}) where T
   NnzArray{T}(copy(nza.nonzero_val),copy(nza.nonzero_idx),copy(nza.nrows))
 end
-
-Base.copyto!(nza::NnzArray,val::AbstractArray) = copyto!(nza.nonzero_val,val)
 
 Base.size(nza::NnzArray,idx...) = size(nza.nonzero_val,idx...)
 

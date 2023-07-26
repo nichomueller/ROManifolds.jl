@@ -52,46 +52,18 @@ function slow_idx(kst::Int,ns::Int)
   Int(floor((kst-1)/ns)+1)
 end
 
-function idx_threads_batches(idx::AbstractArray)
-  nthreads = Threads.nthreads()
-  batch_size = floor(Int,length(idx)/nthreads)
-  [(i-1)*batch_size+1:i*batch_size for i=1:nthreads]
+function idx_batches(v::AbstractArray)
+  nbatches = Threads.nthreads()
+  [round(Int,i) for i in range(0,length(v),nbatches+1)]
 end
 
-function idx_procs_batches(idx::AbstractArray)
-  batch_size = floor(Int,length(idx)/nprocs())
-  [(i-1)*batch_size+1:i*batch_size for i=1:nprocs()]
+function idx_batches_for_id(v::AbstractArray)
+  id = Threads.threadid()
+  idx = idx_batches(v)
+  idx[id]+1:idx[id+1]
 end
 
 function Base.argmax(v::Vector,nval::Int)
   s = sort(v,rev=true)
   Int.(indexin(s,v))[1:nval]
 end
-
-# function _as_time_function(values::AbstractMatrix,input::AbstractVector)
-#   n = y -> first(findall(x -> x == y,input))
-#   @check size(values,2) == length(input)
-#   y -> values[:,n(y)]
-# end
-
-# function _as_param_function(values::AbstractMatrix,input::AbstractVector)
-#   n = y -> first(findall(x -> x == y,[input]))
-#   ncol = size(values,2)
-#   y -> values[:,(n(y)-1)*ncol+1:n(y)*ncol]
-# end
-
-# function _as_param_function(values::AbstractMatrix,input::Table)
-#   n = y -> first(findall(x -> x == y,input))
-#   @check size(values,2) % length(input) == 0
-#   compl_dim = Int(size(values,2)/length(input))
-#   y -> values[:,(n(y)-1)*compl_dim+1:n(y)*compl_dim]
-# end
-
-# for fun in (:_as_time_function,:_as_param_function)
-#   @eval begin
-#     function $fun(values_block::Vector{<:AbstractArray},args...)
-#       values = vcat(values_block...)
-#       $fun(values,args...)
-#     end
-#   end
-# end

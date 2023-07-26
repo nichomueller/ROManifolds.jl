@@ -203,9 +203,10 @@ function init_vec_iterator(
     μ::AbstractVector,
     cache)
 
+    r = copy(b)
+
     u = evaluation_function(op,xh,cache)
     vecdata = collect_cell_vector(test_row,op.res(μ,u,dv_row,args...),trian)
-    r = copy(b)
     assemble_vector_add!(r,assem_row,vecdata)
     r .*= -1.0
   end
@@ -236,9 +237,10 @@ function init_vec_iterator(
     t::Real,
     cache)
 
+    r = copy(b)
+
     u = evaluation_function(op,xh,cache)
     vecdata = collect_cell_vector(test_row,op.res(μ,t,u,dv_row,args...),trian)
-    r = copy(b)
     assemble_vector_add!(r,assem_row,vecdata)
     r .*= -1.0
   end
@@ -267,24 +269,23 @@ function init_mat_iterator(
   du_col = _get_trial_fe_basis(_trial,col)
   assem_row_col = SparseMatrixAssembler(_trial_col,test_row)
   A = allocate_jacobian(op;assem=assem_row_col)
-  Annz = compress(A)
+  annz = compress(A)
 
   function f(
     xh::AbstractVector,
     μ::AbstractVector,
     cache)
 
+    J = copy(A)
+    jnnz = copy(annz)
+
     trial, = cache[1]
     trial_col = trial[col]
     u = evaluation_function(op,xh,cache)
     matdata = collect_cell_matrix(trial_col,test_row,
       op.jac(μ,u,du_col,dv_row,args...),trian)
-    J = copy(A)
     J = assemble_matrix_add!(J,assem_row_col,matdata)
-    nnz_i,nnz_j = compress_array(J)
-    jnnz = copy(Annz)
-    jnnz.nonzero_val = nnz_j
-    jnnz.nonzero_idx = nnz_i
+    compress!(jnnz,J)
     jnnz
   end
 
@@ -311,7 +312,7 @@ function init_mat_iterator(
   du_col = _get_trial_fe_basis(_trial,col)
   assem_row_col = SparseMatrixAssembler(_trial_col,test_row)
   A = allocate_jacobian(op;assem=assem_row_col)
-  Annz = compress(A)
+  annz = compress(A)
   γ = (1.0,1/(solver.dt*solver.θ))
 
   function f(
@@ -320,19 +321,18 @@ function init_mat_iterator(
     t::Float,
     cache)
 
+    J = copy(A)
+    jnnz = copy(annz)
+
     trial, = cache[1]
     trial_col = trial[col]
     u = evaluation_function(op,xh,cache)
     u_col = filter_evaluation_function(u,col)
     matdata = collect_cell_matrix(trial_col,test_row,
       γ[i]*op.jacs[i](μ,t,u_col,du_col,dv_row,args...),trian)
-      J = copy(A)
-      J = assemble_matrix_add!(J,assem_row_col,matdata)
-      nnz_i,nnz_j = compress_array(J)
-      jnnz = copy(Annz)
-      jnnz.nonzero_val = nnz_j
-      jnnz.nonzero_idx = nnz_i
-      jnnz
+    J = assemble_matrix_add!(J,assem_row_col,matdata)
+    compress!(jnnz,J)
+    jnnz
   end
 
   μ = realization(op)
@@ -376,11 +376,19 @@ function update!(
   return
 end
 
-function evaluate!(itc::IterativeCollector)
+function evaluate!(itc::IterativeVecCollector)::Vector{Float}
   itc.f(itc.xh,itc.μ,itc.cache)
 end
 
-function evaluate!(itc::TransientIterativeCollector)
+function evaluate!(itc::IterativeMatCollector)::NnzArray{SparseMatrixCSC}
+  itc.f(itc.xh,itc.μ,itc.cache)
+end
+
+function evaluate!(itc::TransientIterativeVecCollector)::Vector{Float}
+  itc.f(itc.xh,itc.μ,itc.t,itc.cache)
+end
+
+function evaluate!(itc::TransientIterativeMatCollector)::NnzArray{SparseMatrixCSC}
   itc.f(itc.xh,itc.μ,itc.t,itc.cache)
 end
 

@@ -24,7 +24,7 @@ addprocs(4)
   Γn = BoundaryTriangulation(model,tags=["neumann"])
   dΓn = Measure(Γn,degree)
 
-  ranges = fill([1.,10.],3)
+  ranges = fill([1.,2.],3)
   sampling = UniformSampling()
   pspace = ParamSpace(ranges,sampling)
 
@@ -60,17 +60,18 @@ addprocs(4)
   fesolver = θMethod(LUSolver(),t0,tF,dt,θ,uh0)
 
   ϵ = 1e-4
-  save_offline = true
-  load_offline = true
+  save_structures = true
+  load_structures = true
   energy_norm = false
   nsnaps_state = 80
   nsnaps_system = 30
   st_mdeim = false
-  info = RBInfo(test_path;ϵ,load_offline,save_offline,energy_norm,nsnaps_state,nsnaps_system,st_mdeim)
+  info = RBInfo(test_path;ϵ,load_structures,save_structures,energy_norm,
+                nsnaps_state,nsnaps_system,st_mdeim)
   rbsolver = Backslash()
 end
 
-rbop = if load_offline
+rbop = if load_structures
   load(GenericRBOperator,info)
 else
   reduce_fe_operator(info,feop,fesolver)

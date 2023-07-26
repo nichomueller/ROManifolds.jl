@@ -1,8 +1,8 @@
 abstract type GenericRBOperator{Top<:OperatorType} end
 
 struct RBOperator{Top} <: GenericRBOperator{Top}
-  res::Vector{ParamArray}
-  jac::Matrix{ParamArray}
+  res::Vector{ParamStructure}
+  jac::Matrix{ParamStructure}
   rbspace::RBSpace
 end
 
@@ -30,9 +30,9 @@ function reduce_fe_operator(
 end
 
 struct TransientRBOperator{Top} <: GenericRBOperator{Top}
-  res::Vector{ParamArray}
-  jac::Matrix{ParamArray}
-  djac::Matrix{ParamArray}
+  res::Vector{ParamStructure}
+  jac::Matrix{ParamStructure}
+  djac::Matrix{ParamStructure}
   rbspace::TransientRBSpace
 end
 
@@ -79,7 +79,7 @@ for (Top,Tslv,Tad) in zip(
       order = get_order(feop.test)
       measures = get_measures(a,2*order)
       nfields = num_fields(a)
-      r = Vector{ParamArray}(undef,nfields)
+      r = Vector{ParamStructure}(undef,nfields)
 
       for (m,ad) in a.dict
         for row = 1:nfields
@@ -110,7 +110,7 @@ for (Top,Tslv,Tad) in zip(
         coeff = residual_coefficient(feop,fesolver,res_ad,new_args...;kwargs...)
         rb_contribution(res_ad,coeff)
       end
-      ParamArray(_r_contribution)
+      ParamStructure(_r_contribution)
     end
 
     function residual_contribution(
@@ -123,7 +123,7 @@ for (Top,Tslv,Tad) in zip(
       function _r_contribution(input...)
         res_ad.proj
       end
-      ParamArray(_r_contribution)
+      ParamStructure(_r_contribution)
     end
 
     function collect_jacobian_contributions(
@@ -135,7 +135,7 @@ for (Top,Tslv,Tad) in zip(
       order = get_order(feop.test)
       measures = get_measures(a,2*order)
       nfields = num_fields(a)
-      j = Matrix{ParamArray}(undef,nfields,nfields)
+      j = Matrix{ParamStructure}(undef,nfields,nfields)
 
       for (_,ad) in a.dict
         for row = 1:nfields, col = 1:nfields
@@ -166,7 +166,7 @@ for (Top,Tslv,Tad) in zip(
         coeff = jacobian_coefficient(feop,fesolver,jac_ad,new_args...;kwargs...)
         rb_contribution(jac_ad,coeff)
       end
-      ParamArray(_j_contribution)
+      ParamStructure(_j_contribution)
     end
 
     function jacobian_contribution(
@@ -179,14 +179,14 @@ for (Top,Tslv,Tad) in zip(
       function _j_contribution(input...)
         jac_ad.proj
       end
-      ParamArray(_j_contribution)
+      ParamStructure(_j_contribution)
     end
 
     function rb_contribution(
       ad::$Tad,
       coeff::Vector{<:AbstractMatrix})
 
-      contribs = map(LinearAlgebra.kron,ad.basis_space,coeff)
+      contribs = pmap(LinearAlgebra.kron,ad.basis_space,coeff)
       sum(contribs)
     end
   end

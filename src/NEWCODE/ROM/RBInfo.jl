@@ -5,20 +5,19 @@ struct RBInfo
   fe_path::String
   rb_path::String
   energy_norm::Bool
-  load_offline::Bool
-  save_offline::Bool
-  save_online::Bool
+  load_structures::Bool
+  save_structures::Bool
   postprocess::Bool
 end
 
 function RBInfo(test_path::String;ϵ=1e-4,nsnaps_state=80,nsnaps_system=20,
   energy_norm=false,st_mdeim=false,fun_mdeim=false,
-  load_offline=false,save_offline=true,save_online=true,postprocess=false)
+  load_structures=false,save_structures=true,postprocess=false)
 
   fe_path = fem_path(test_path)
   rb_path = rom_path(test_path,ϵ;st_mdeim,fun_mdeim)
   RBInfo(ϵ,nsnaps_state,nsnaps_system,fe_path,rb_path,
-    energy_norm,load_offline,save_offline,save_online,postprocess)
+    energy_norm,load_structures,save_structures,postprocess)
 end
 
 for (fsave,fload) in zip((:save,:save_test),(:load,:load_test))
@@ -34,7 +33,7 @@ for (fsave,fload) in zip((:save,:save_test),(:load,:load_test))
 end
 
 function save(info::RBInfo,snaps::GenericSnapshots)
-  if info.save_offline
+  if info.save_structures
     path = joinpath(info.fe_path,"fesnaps")
     convert!(Matrix{Float},snaps)
     save(path,snaps)
@@ -42,7 +41,7 @@ function save(info::RBInfo,snaps::GenericSnapshots)
 end
 
 function save(info::RBInfo,params::Table)
-  if info.save_offline
+  if info.save_structures
     path = joinpath(info.fe_path,"params")
     save(path,params)
   end
@@ -61,14 +60,14 @@ function load(T::Type{Table},info::RBInfo)
 end
 
 function save_test(info::RBInfo,snaps::GenericSnapshots)
-  if info.save_offline
+  if info.save_structures
     path = joinpath(info.fe_path,"fesnaps_test")
     save(path,snaps)
   end
 end
 
 function save_test(info::RBInfo,params::Table)
-  if info.save_offline
+  if info.save_structures
     path = joinpath(info.fe_path,"params_test")
     save(path,params)
   end
