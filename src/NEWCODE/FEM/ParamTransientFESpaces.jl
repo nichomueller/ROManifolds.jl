@@ -90,11 +90,11 @@ function Gridap.Arrays.evaluate!(::FESpace,U::FESpace,::AbstractVector,::Real)
   U
 end
 
-function evaluate(U::FESpace,::AbstractVector,::Real)
+function Gridap.Arrays.evaluate(U::FESpace,::AbstractVector,::Real)
   U
 end
 
-function evaluate(U::FESpace,::Nothing,::Nothing)
+function Gridap.Arrays.evaluate(U::FESpace,::Nothing,::Nothing)
   U
 end
 
@@ -154,20 +154,20 @@ function ParamTransientMultiFieldFESpace(spaces::Vector{<:SingleFieldFESpace})
   MultiFieldFESpace(spaces)
 end
 
-function get_fe_basis(
-  U::ParamTransientMultiFieldTrialFESpace,
-  i::Int)
+# function get_fe_basis(
+#   U::ParamTransientMultiFieldTrialFESpace,
+#   i::Int)
 
-  get_fe_basis(U[i])
-end
+#   get_fe_basis(U[i])
+# end
 
-function get_trial_fe_basis(
-  U::ParamTransientMultiFieldTrialFESpace,
-  i::Int)
+# function get_trial_fe_basis(
+#   U::ParamTransientMultiFieldTrialFESpace,
+#   i::Int)
 
-  get_trial_fe_basis(U[i])
-end
+#   get_trial_fe_basis(U[i])
+# end
 
-function _split_solutions(trial::TransientMultiFieldTrialFESpace,u::AbstractVector)
-  _split_solutions(trial(nothing),u)
-end
+# function _split_solutions(trial::TransientMultiFieldTrialFESpace,u::AbstractVector)
+#   _split_solutions(trial(nothing),u)
+# end

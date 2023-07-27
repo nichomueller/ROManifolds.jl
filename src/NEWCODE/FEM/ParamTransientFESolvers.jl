@@ -77,13 +77,3 @@ function Base.iterate(
 
   return uh,state
 end
-
-function return_cache(sol::GenericParamODESolution)
-  time_ndofs = get_time_ndofs(sol.solver)
-  u0 = sol.solver
-  fill(u0,time_ndofs)
-end
-
-function evaluate!(cache,sol::GenericParamODESolution)
-
-end
