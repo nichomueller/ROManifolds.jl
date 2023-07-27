@@ -1,13 +1,4 @@
-abstract type RBSpace{T} end
 abstract type TransientRBSpace{T} end
-
-struct SingleFieldRBSpace{T} <: RBSpace{T}
-  basis_space::NnzArray{T}
-end
-
-struct MultiFieldRBSpace{T} <: RBSpace{T}
-  basis_space::Vector{NnzArray{T}}
-end
 
 struct TransientSingleFieldRBSpace{T} <: TransientRBSpace{T}
   basis_space::NnzArray{T}
@@ -19,15 +10,11 @@ struct TransientMultiFieldRBSpace{T} <: TransientRBSpace{T}
   basis_time::Vector{NnzArray{T}}
 end
 
-get_basis_space(rb::SingleFieldRBSpace) = recast(rb.basis_space)
-
-get_basis_space(rb::MultiFieldRBSpace) = vcat(map(recast,rb.basis_space)...)
-
 get_basis_space(rb::TransientSingleFieldRBSpace) = recast(rb.basis_space)
 
 get_basis_space(rb::TransientMultiFieldRBSpace) = vcat(map(recast,rb.basis_space)...)
 
-get_rb_space_ndofs(rb) = size(get_basis_space(rb),2)
+get_rb_space_ndofs(rb::TransientRBSpace) = size(get_basis_space(rb),2)
 
 get_basis_time(rb::TransientSingleFieldRBSpace) = rb.basis_time.nonzero_val
 
@@ -35,65 +22,21 @@ get_basis_time(rb::TransientMultiFieldRBSpace) = vcat(map(recast,rb.basis_time).
 
 get_rb_time_ndofs(rb::TransientRBSpace) = size(get_basis_time(rb),2)
 
-get_rb_ndofs(rb::RBSpace) = get_rb_space_ndofs(rb)
-
 get_rb_ndofs(rb::TransientRBSpace) = get_rb_space_ndofs(rb)*get_rb_time_ndofs(rb)
 
-for (Tsps,Tspm) in zip((:SingleFieldRBSpace,:TransientSingleFieldRBSpace),
-                       (:MultiFieldRBSpace,:TransientMultiFieldRBSpace))
-  @eval begin
-    Base.getindex(rb::$Tsps,args...) = rb
+Base.getindex(rb::TransientSingleFieldRBSpace,args...) = rb
 
-    Base.getindex(rb::$Tspm,i::Int) = get_single_field(rb,i)
+Base.getindex(rb::TransientMultiFieldRBSpace,i::Int) = get_single_field(rb,i)
 
-    Base.length(rb::$Tsps) = 1
+Base.length(rb::TransientSingleFieldRBSpace) = 1
 
-    Base.length(rb::$Tspm) = length(rb.basis_space)
-  end
-end
-
-function allocate_matrix(rb::SingleFieldRBSpace,sizes...)
-  allocate_matrix(rb.basis_space,sizes...)
-end
-
-function get_single_field(
-  rb::MultiFieldRBSpace{T},
-  fieldid::Int) where T
-
-  SingleFieldRBSpace{T}(rb.basis_space[fieldid])
-end
+Base.length(rb::TransientMultiFieldRBSpace) = length(rb.basis_space)
 
 function get_single_field(
   rb::TransientMultiFieldRBSpace{T},
   fieldid::Int) where T
 
   TransientSingleFieldRBSpace{T}(rb.basis_space[fieldid],rb.basis_time[fieldid])
-end
-
-function compress_solutions(
-  ::ParamFEOperator,
-  ::FESolver,
-  s::SingleFieldSnapshots{T,A},
-  args...;
-  kwargs...) where {T,A}
-
-  basis_space = tpod(s;kwargs...)
-  SingleFieldRBSpace{T}(basis_space)
-end
-
-function compress_solutions(
-  feop::ParamFEOperator,
-  fesolver::FESolver,
-  s::MultiFieldSnapshots{T,N,A},
-  args...;
-  compute_supremizers=false,
-  kwargs...) where {T,N,A}
-
-  bases_space = map(snap -> tpod(snap;kwargs...),s)
-  if compute_supremizers
-    add_space_supremizers!(bases_space,feop,fesolver,s,args...)
-  end
-  MultiFieldRBSpace{T}(bases_space)
 end
 
 function compress_solutions(
@@ -125,55 +68,47 @@ function compress_solutions(
   TransientMultiFieldRBSpace{T}(bases_space,bases_time)
 end
 
-for (Top,Tslv,Tsnp) in zip(
-  (:ParamFEOperator,:ParamTransientFEOperator),
-  (:FESolver,:ODESolver),
-  (:MultiFieldSnapshots,:TransientMultiFieldSnapshots))
+function add_space_supremizers!(
+  bases_space::Vector{NnzArray{T}},
+  feop::ParamTransientFEOperator,
+  fesolver::ODESolver,
+  snaps::TransientMultiFieldSnapshots,
+  params::Table;
+  kwargs...) where T
 
-  @eval begin
-    function add_space_supremizers!(
-      bases_space::Vector{NnzArray{T}},
-      feop::$Top,
-      fesolver::$Tslv,
-      snaps::$Tsnp,
-      params::Table;
-      kwargs...) where T
-
-      bsprimal,bsdual... = map(recast,bases_space)
-      for (i,bsd) in enumerate(bsdual)
-        printstyled("Computing supremizers in space for dual field $i\n";color=:blue)
-        supr_i = space_supremizers(feop,fesolver,snaps,bsd,params,i+1)
-        bsu_i = gram_schmidt(supr_i,bsprimal)
-        bases_space[1].nonzero_val = hcat(bases_space[1].nonzero_val,bsu_i)
-      end
-      return
-    end
-
-    function space_supremizers(
-      feop::$Top,
-      fesolver::$Tslv,
-      s::$Tsnp,
-      bs::AbstractMatrix,
-      params::Table,
-      i::Int)
-
-      filter = (1,i)
-      snaps = get_datum(s)
-
-      matdata = _matdata_jacobian(feop,fesolver,snaps,params,filter)
-      aff = affinity_jacobian(fesolver,params,matdata)
-      data = get_datum(aff,fesolver,params,matdata)
-      constraint_mat = map(d->assemble_matrix(feop.assem,d),data)
-
-      if isa(aff,ParamAffinity) || isa(aff,ParamTimeAffinity)
-        supr = first(constraint_mat)*bs
-      else
-        supr = map(*,constraint_mat,snaps[i])
-      end
-
-      supr
-    end
+  bsprimal,bsdual... = map(recast,bases_space)
+  for (i,bsd) in enumerate(bsdual)
+    printstyled("Computing supremizers in space for dual field $i\n";color=:blue)
+    supr_i = space_supremizers(feop,fesolver,snaps,bsd,params,i+1)
+    bsu_i = gram_schmidt(supr_i,bsprimal)
+    bases_space[1].nonzero_val = hcat(bases_space[1].nonzero_val,bsu_i)
   end
+  return
+end
+
+function space_supremizers(
+  feop::ParamTransientFEOperator,
+  fesolver::ODESolver,
+  s::TransientMultiFieldSnapshots,
+  bs::AbstractMatrix,
+  params::Table,
+  i::Int)
+
+  filter = (1,i)
+  snaps = get_datum(s)
+
+  matdata = _matdata_jacobian(feop,fesolver,snaps,params,filter)
+  aff = affinity_jacobian(fesolver,params,matdata)
+  data = get_datum(aff,fesolver,params,matdata)
+  constraint_mat = map(d->assemble_matrix(feop.assem,d),data)
+
+  if isa(aff,ParamAffinity) || isa(aff,ParamTimeAffinity)
+    supr = first(constraint_mat)*bs
+  else
+    supr = map(*,constraint_mat,snaps[i])
+  end
+
+  supr
 end
 
 function add_time_supremizers!(
@@ -230,16 +165,12 @@ function add_time_supremizers(bases_time::Vector{<:AbstractMatrix};ttol=1e-2)
   basis_u
 end
 
-for Trb in (:RBSpace,:TransientRBSpace)
-  @eval begin
-    function allocate_rb_residual(rb::$Trb)
-      rb_ndofs = get_rb_ndofs(rb)
-      zeros(rb_ndofs)
-    end
+function allocate_rb_residual(rb::TransientRBSpace)
+  rb_ndofs = get_rb_ndofs(rb)
+  zeros(rb_ndofs)
+end
 
-    function allocate_rb_jacobian(rb::$Trb)
-      rb_ndofs = get_rb_ndofs(rb)
-      zeros(rb_ndofs,rb_ndofs)
-    end
-  end
+function allocate_rb_jacobian(rb::TransientRBSpace)
+  rb_ndofs = get_rb_ndofs(rb)
+  zeros(rb_ndofs,rb_ndofs)
 end

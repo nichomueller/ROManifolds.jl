@@ -32,7 +32,7 @@ for (fsave,fload) in zip((:save,:save_test),(:load,:load_test))
   end
 end
 
-function save(info::RBInfo,snaps::GenericSnapshots)
+function save(info::RBInfo,snaps::GenericTransientSnapshots)
   if info.save_structures
     path = joinpath(info.fe_path,"fesnaps")
     convert!(Matrix{Float},snaps)
@@ -47,7 +47,7 @@ function save(info::RBInfo,params::Table)
   end
 end
 
-function load(T::Type{GenericSnapshots},info::RBInfo)
+function load(T::Type{GenericTransientSnapshots},info::RBInfo)
   path = joinpath(info.fe_path,"fesnaps")
   s = load(T,path)
   convert!(EMatrix{Float},s)
@@ -59,7 +59,7 @@ function load(T::Type{Table},info::RBInfo)
   load(T,path)
 end
 
-function save_test(info::RBInfo,snaps::GenericSnapshots)
+function save_test(info::RBInfo,snaps::GenericTransientSnapshots)
   if info.save_structures
     path = joinpath(info.fe_path,"fesnaps_test")
     save(path,snaps)
@@ -73,7 +73,7 @@ function save_test(info::RBInfo,params::Table)
   end
 end
 
-function load_test(T::Type{GenericSnapshots},info::RBInfo)
+function load_test(T::Type{GenericTransientSnapshots},info::RBInfo)
   path = joinpath(info.fe_path,"fesnaps_test")
   load(T,path)
 end

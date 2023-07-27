@@ -1,35 +1,4 @@
-abstract type GenericRBOperator{Top<:OperatorType} end
-
-struct RBOperator{Top} <: GenericRBOperator{Top}
-  res::Vector{ParamStructure}
-  jac::Matrix{ParamStructure}
-  rbspace::RBSpace
-end
-
-function reduce_fe_operator(
-  info::RBInfo,
-  feop::ParamFEOperator{Top},
-  fesolver::FESolver) where Top
-
-  ϵ = info.ϵ
-  # fun_mdeim = info.fun_mdeim
-  nsnaps = info.nsnaps_state
-  params = realization(feop,nsnaps)
-  sols = collect_solutions(feop,fesolver,params)
-  rbspace = compress_solutions(feop,fesolver,sols,params;ϵ)
-
-  nsnaps = info.nsnaps_system
-  rb_res_c = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
-  rb_jac_c = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps)
-  rb_res = collect_residual_contributions(feop,fesolver,rb_res_c;st_mdeim)
-  rb_jac = collect_jacobian_contributions(feop,fesolver,rb_jac_c;st_mdeim)
-  rbop = RBOperator{Top}(rb_res,rb_jac,rbspace)
-  save(info,rbop)
-
-  return rbop
-end
-
-struct TransientRBOperator{Top} <: GenericRBOperator{Top}
+struct TransientRBOperator{Top}
   res::Vector{ParamStructure}
   jac::Matrix{ParamStructure}
   djac::Matrix{ParamStructure}
@@ -63,143 +32,124 @@ function reduce_fe_operator(
   return rbop
 end
 
-for (Top,Tslv,Tad) in zip(
-  (:ParamFEOperator,:ParamTransientFEOperator),
-  (:FESolver,:ODESolver),
-  (:RBAffineDecomposition,:TransientRBAffineDecomposition))
+function collect_residual_contributions(
+  feop::ParamTransientFEOperator,
+  fesolver::ODESolver,
+  a::RBAlgebraicContribution;
+  kwargs...)
 
-  @eval begin
+  order = get_order(feop.test)
+  measures = get_measures(a,2*order)
+  nfields = num_fields(a)
+  r = Vector{ParamStructure}(undef,nfields)
 
-    function collect_residual_contributions(
-      feop::$Top,
-      fesolver::$Tslv,
-      a::RBAlgebraicContribution;
-      kwargs...)
-
-      order = get_order(feop.test)
-      measures = get_measures(a,2*order)
-      nfields = num_fields(a)
-      r = Vector{ParamStructure}(undef,nfields)
-
-      for (m,ad) in a.dict
-        for row = 1:nfields
-          ad_r = ad[row]
-          rr = residual_contribution(
-            feop,
-            fesolver,
-            ad_r,
-            measures,
-            (row,1);
-            kwargs...)
-          add_contribution!(r,rr,row)
-        end
-      end
-
-      r
-    end
-
-    function residual_contribution(
-      feop::$Top,
-      fesolver::$Tslv,
-      res_ad::$Tad,
-      args...;
-      kwargs...)
-
-      function _r_contribution(input...)
-        new_args = (args...,input...)
-        coeff = residual_coefficient(feop,fesolver,res_ad,new_args...;kwargs...)
-        rb_contribution(res_ad,coeff)
-      end
-      ParamStructure(_r_contribution)
-    end
-
-    function residual_contribution(
-      ::$Top,
-      ::$Tslv,
-      res_ad::ZeroRBAffineDecomposition,
-      args...;
-      kwargs...)
-
-      function _r_contribution(input...)
-        res_ad.proj
-      end
-      ParamStructure(_r_contribution)
-    end
-
-    function collect_jacobian_contributions(
-      feop::$Top,
-      fesolver::$Tslv,
-      a::RBAlgebraicContribution;
-      kwargs...)
-
-      order = get_order(feop.test)
-      measures = get_measures(a,2*order)
-      nfields = num_fields(a)
-      j = Matrix{ParamStructure}(undef,nfields,nfields)
-
-      for (_,ad) in a.dict
-        for row = 1:nfields, col = 1:nfields
-          ad_rc = ad[row,col]
-          jrc = jacobian_contribution(
-            feop,
-            fesolver,
-            ad_rc,
-            measures,
-            (row,col);
-            kwargs...)
-          add_contribution!(j,jrc,row,col)
-        end
-      end
-
-      j
-    end
-
-    function jacobian_contribution(
-      feop::$Top,
-      fesolver::$Tslv,
-      jac_ad::$Tad,
-      args...;
-      kwargs...)
-
-      function _j_contribution(input...)
-        new_args = (args...,input...)
-        coeff = jacobian_coefficient(feop,fesolver,jac_ad,new_args...;kwargs...)
-        rb_contribution(jac_ad,coeff)
-      end
-      ParamStructure(_j_contribution)
-    end
-
-    function jacobian_contribution(
-      ::$Top,
-      ::$Tslv,
-      jac_ad::ZeroRBAffineDecomposition,
-      args...;
-      kwargs...)
-
-      function _j_contribution(input...)
-        jac_ad.proj
-      end
-      ParamStructure(_j_contribution)
-    end
-
-    function rb_contribution(
-      ad::$Tad,
-      coeff::Vector{<:AbstractMatrix})
-
-      contribs = pmap(LinearAlgebra.kron,ad.basis_space,coeff)
-      sum(contribs)
+  for (m,ad) in a.dict
+    for row = 1:nfields
+      ad_r = ad[row]
+      rr = residual_contribution(
+        feop,
+        fesolver,
+        ad_r,
+        measures,
+        (row,1);
+        kwargs...)
+      add_contribution!(r,rr,row)
     end
   end
+
+  r
 end
 
-function residual_coefficient(
-  feop::ParamFEOperator,
-  fesolver::FESolver,
-  res_ad::RBAffineDecomposition,
-  args...)
+function residual_contribution(
+  feop::ParamTransientFEOperator,
+  fesolver::ODESolver,
+  res_ad::TransientRBAffineDecomposition,
+  args...;
+  kwargs...)
 
-  red_integr_res = assemble_residual(feop,fesolver,res_ad,args...)
-  solve(res_ad,red_integr_res)
+  function _r_contribution(input...)
+    new_args = (args...,input...)
+    coeff = residual_coefficient(feop,fesolver,res_ad,new_args...;kwargs...)
+    rb_contribution(res_ad,coeff)
+  end
+  ParamStructure(_r_contribution)
+end
+
+function residual_contribution(
+  ::ParamTransientFEOperator,
+  ::ODESolver,
+  res_ad::ZeroRBAffineDecomposition,
+  args...;
+  kwargs...)
+
+  function _r_contribution(input...)
+    res_ad.proj
+  end
+  ParamStructure(_r_contribution)
+end
+
+function collect_jacobian_contributions(
+  feop::ParamTransientFEOperator,
+  fesolver::ODESolver,
+  a::RBAlgebraicContribution;
+  kwargs...)
+
+  order = get_order(feop.test)
+  measures = get_measures(a,2*order)
+  nfields = num_fields(a)
+  j = Matrix{ParamStructure}(undef,nfields,nfields)
+
+  for (_,ad) in a.dict
+    for row = 1:nfields, col = 1:nfields
+      ad_rc = ad[row,col]
+      jrc = jacobian_contribution(
+        feop,
+        fesolver,
+        ad_rc,
+        measures,
+        (row,col);
+        kwargs...)
+      add_contribution!(j,jrc,row,col)
+    end
+  end
+
+  j
+end
+
+function jacobian_contribution(
+  feop::ParamTransientFEOperator,
+  fesolver::ODESolver,
+  jac_ad::TransientRBAffineDecomposition,
+  args...;
+  kwargs...)
+
+  function _j_contribution(input...)
+    new_args = (args...,input...)
+    coeff = jacobian_coefficient(feop,fesolver,jac_ad,new_args...;kwargs...)
+    rb_contribution(jac_ad,coeff)
+  end
+  ParamStructure(_j_contribution)
+end
+
+function jacobian_contribution(
+  ::ParamTransientFEOperator,
+  ::ODESolver,
+  jac_ad::ZeroRBAffineDecomposition,
+  args...;
+  kwargs...)
+
+  function _j_contribution(input...)
+    jac_ad.proj
+  end
+  ParamStructure(_j_contribution)
+end
+
+function rb_contribution(
+  ad::TransientRBAffineDecomposition,
+  coeff::Vector{<:AbstractMatrix})
+
+  contribs = pmap(LinearAlgebra.kron,ad.basis_space,coeff)
+  sum(contribs)
 end
 
 function residual_coefficient(
@@ -215,16 +165,6 @@ function residual_coefficient(
 end
 
 function jacobian_coefficient(
-  feop::ParamFEOperator,
-  fesolver::FESolver,
-  jac_ad::RBAffineDecomposition,
-  args...)
-
-  jac_integr_res = assemble_jacobian(feop,fesolver,jac_ad,args...)
-  solve(jac_ad,jac_integr_res)
-end
-
-function jacobian_coefficient(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   jac_ad::TransientRBAffineDecomposition,
@@ -235,27 +175,6 @@ function jacobian_coefficient(
   coeff = solve(jac_ad,red_integr_jac;kwargs...)
   project_jacobian_coefficient(fesolver,jac_ad.basis_time,coeff)
 end
-
-# function assemble_residual(
-#   feop::ParamFEOperator,
-#   fesolver::FESolver,
-#   res_ad::RBAffineDecomposition,
-#   measures::Vector{Measure},
-#   filter::Tuple{Vararg{Int}},
-#   input...)
-
-#   μ, = input
-#   idx = res_ad.integration_domain.idx
-#   meas = res_ad.integration_domain.meas
-#   trian = get_triangulation(meas)
-#   new_meas = modify_measures(measures,meas)
-
-#   vecdata = _vecdata_residual(feop,fesolver,u,μ,filter,new_meas...;trian)
-#   r = allocate_vector(feop.assem,vecdata)
-#   numeric_loop_vector!(v,feop.assem,vecdata[idx])
-
-#   r
-# end
 
 function assemble_residual(
   feop::ParamTransientFEOperator{Affine},
@@ -313,27 +232,6 @@ function assemble_residual(
 
   hcat(r...)
 end
-
-# function assemble_jacobian(
-#   feop::ParamFEOperator,
-#   fesolver::FESolver,
-#   jac_ad::RBAffineDecomposition,
-#   input,
-#   filter::Tuple{Vararg{Int}},
-#   measures::Vector{Measure})
-
-#   u,μ = input
-#   idx = jac_ad.integration_domain.idx
-#   meas = jac_ad.integration_domain.meas
-#   trian = get_triangulation(meas)
-#   new_meas = modify_measures(measures,meas)
-
-#   matdata = _matdata_jacobian(feop,fesolver,u,μ,filter,new_meas...;trian)
-#   j = allocate_jacobian(feop.assem,matdata)
-#   numeric_loop_matrix!(j,feop.assem,matdata)
-
-#   Vector(reshape(j,:)[idx])
-# end
 
 function assemble_jacobian(
   feop::ParamTransientFEOperator{Affine},
@@ -459,11 +357,6 @@ function project_jacobian_coefficient(
   proj
 end
 
-function recast(rbop::RBOperator,xrb::AbstractArray)
-  bs = get_basis_space(rbop.rbspace)
-  bs*xrb
-end
-
 function recast(rbop::TransientRBOperator,xrb::AbstractArray)
   bs = get_basis_space(rbop.rbspace)
   bt = get_basis_time(rbop.rbspace)
@@ -473,12 +366,12 @@ function recast(rbop::TransientRBOperator,xrb::AbstractArray)
   bs*(bt*xrb_mat)'
 end
 
-function save(info::RBInfo,op::GenericRBOperator)
+function save(info::RBInfo,op::TransientRBOperator)
   path = joinpath(info.rb_path,"rboperator")
   save(path,op)
 end
 
-function load(T::Type{GenericRBOperator},info::RBInfo)
+function load(T::Type{TransientRBOperator},info::RBInfo)
   path = joinpath(info.rb_path,"rboperator")
   load(T,path)
 end

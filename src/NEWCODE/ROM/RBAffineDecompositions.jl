@@ -1,26 +1,3 @@
-struct RBIntegrationDomain
-  meas::Measure
-  idx::Vector{Int}
-
-  function RBIntegrationDomain(
-    component::SingleFieldSnapshots,
-    trian::Triangulation,
-    interp_idx::Vector{Int},
-    cell_dof_ids,
-    order=1)
-
-    degree = 2*order
-    nonzero_idx = component.snaps.nonzero_idx
-    nrows = component.snaps.nrows
-    entire_interp_idx = nonzero_idx[interp_idx]
-    entire_interp_rows,_ = from_vec_to_mat_idx(entire_interp_idx,nrows)
-    red_integr_cells = find_cells(entire_interp_rows,cell_dof_ids)
-    red_trian = view(trian,red_integr_cells)
-    red_meas = Measure(red_trian,degree)
-    new(red_meas,interp_idx_space)
-  end
-end
-
 struct TransientRBIntegrationDomain
   meas::Measure
   times::Vector{Float}
@@ -68,129 +45,118 @@ struct ZeroRBAffineDecomposition <: RBAffineDecompositions
   proj::AbstractMatrix
 end
 
-for (Top,Tslv,Tsnp,Tsps,Tspm) in zip(
-  (:ParamFEOperator,:ParamTransientFEOperator),
-  (:FESolver,:ODESolver),
-  (:Snapshots,:TransientSnapshots),
-  (:SingleFieldRBSpace,:TransientSingleFieldRBSpace),
-  (:MultiFieldRBSpace,:TransientMultiFieldRBSpace))
+function compress_residuals(
+  feop::ParamTransientFEOperator,
+  fesolver::ODESolver,
+  rbspace::Union{$Tsps,$Tspm},
+  s::TransientSnapshots,
+  params::Table;
+  kwargs...)
 
-  @eval begin
-    function compress_residuals(
-      feop::$Top,
-      fesolver::$Tslv,
-      rbspace::Union{$Tsps,$Tspm},
-      s::$Tsnp,
-      params::Table;
-      kwargs...)
-
-      trians = _collect_trian_res(feop)
-      cres = RBResidualContribution()
-      for trian in trians
-        ad = compress_residuals(feop,fesolver,rbspace,s,params,trian;kwargs...)
-        add_contribution!(cres,trian,ad)
-      end
-      cres
-    end
-
-    function compress_residuals(
-      feop::$Top,
-      fesolver::$Tslv,
-      rbspace::Union{$Tsps,$Tspm},
-      s::$Tsnp,
-      params::Table,
-      trian::Triangulation;
-      kwargs...)
-
-      nfields = length(rbspace)
-      ad_res = Vector{RBAffineDecompositions}(undef,nfields)
-      for row = 1:nfields
-        filter = (row,1)
-        ad_res[row] = compress_residuals(feop,fesolver,
-          rbspace[row],s,params,trian,filter;kwargs...)
-      end
-      ad_res
-    end
-
-    function compress_residuals(
-      feop::$Top,
-      fesolver::$Tslv,
-      rbspace::$Tsps,
-      s::$Tsnp,
-      params::Table,
-      trian::Triangulation,
-      filter::Tuple{Vararg{Int}};
-      nsnaps=20,
-      kwargs...)
-
-      row, = filter
-      sres = s[1:nsnaps]
-      pres = params[1:nsnaps]
-      cell_dof_ids = get_cell_dof_ids(feop.test[row],trian)
-      order = get_order(feop.test[row])
-
-      r = collect_residuals(feop,fesolver,sres,pres,trian,filter)
-      compress_component(r,fesolver,trian,cell_dof_ids,order,rbspace;kwargs...)
-    end
-
-    function compress_jacobians(
-      feop::$Top,
-      fesolver::$Tslv,
-      rbspace::Union{$Tsps,$Tspm},
-      s::$Tsnp,
-      params::Table;
-      kwargs...)
-
-      trians = _collect_trian_jac(feop)
-      cjac = RBJacobianContribution()
-      for trian in trians
-        ad = compress_jacobians(feop,fesolver,rbspace,s,params,trian;kwargs...)
-        add_contribution!(cjac,trian,ad)
-      end
-      cjac
-    end
-
-    function compress_jacobians(
-      feop::$Top,
-      fesolver::$Tslv,
-      rbspace::Union{$Tsps,$Tspm},
-      s::$Tsnp,
-      params::Table,
-      trian::Triangulation;
-      kwargs...)
-
-      nfields = length(rbspace)
-      ad_jac = Matrix{RBAffineDecompositions}(undef,nfields,nfields)
-      for row = 1:nfields, col = 1:nfields
-        filter = (row,col)
-        ad_jac[row,col] = compress_jacobians(feop,fesolver,
-          (rbspace[row],rbspace[col]),s,params,trian,filter;kwargs...)
-      end
-      ad_jac
-    end
-
-    function compress_jacobians(
-      feop::$Top,
-      fesolver::$Tslv,
-      rbspace::NTuple{2,$Tsps},
-      s::$Tsnp,
-      params::Table,
-      trian::Triangulation,
-      filter::Tuple{Vararg{Int}};
-      nsnaps=20,
-      kwargs...)
-
-      row, = filter
-      sjac = s[1:nsnaps]
-      pjac = params[1:nsnaps]
-      cell_dof_ids = get_cell_dof_ids(feop.test[row],trian)
-      order = get_order(feop.test[row])
-
-      j = collect_jacobians(feop,fesolver,sjac,pjac,trian,filter)
-      compress_component(j,fesolver,trian,cell_dof_ids,order,rbspace...;kwargs...)
-    end
+  trians = _collect_trian_res(feop)
+  cres = RBResidualContribution()
+  for trian in trians
+    ad = compress_residuals(feop,fesolver,rbspace,s,params,trian;kwargs...)
+    add_contribution!(cres,trian,ad)
   end
+  cres
+end
 
+function compress_residuals(
+  feop::ParamTransientFEOperator,
+  fesolver::ODESolver,
+  rbspace::Union{$Tsps,$Tspm},
+  s::TransientSnapshots,
+  params::Table,
+  trian::Triangulation;
+  kwargs...)
+
+  nfields = length(rbspace)
+  ad_res = Vector{RBAffineDecompositions}(undef,nfields)
+  for row = 1:nfields
+    filter = (row,1)
+    ad_res[row] = compress_residuals(feop,fesolver,
+      rbspace[row],s,params,trian,filter;kwargs...)
+  end
+  ad_res
+end
+
+function compress_residuals(
+  feop::ParamTransientFEOperator,
+  fesolver::ODESolver,
+  rbspace::$Tsps,
+  s::TransientSnapshots,
+  params::Table,
+  trian::Triangulation,
+  filter::Tuple{Vararg{Int}};
+  nsnaps=20,
+  kwargs...)
+
+  row, = filter
+  sres = s[1:nsnaps]
+  pres = params[1:nsnaps]
+  cell_dof_ids = get_cell_dof_ids(feop.test[row],trian)
+  order = get_order(feop.test[row])
+
+  r = collect_residuals(feop,fesolver,sres,pres,trian,filter)
+  compress_component(r,fesolver,trian,cell_dof_ids,order,rbspace;kwargs...)
+end
+
+function compress_jacobians(
+  feop::ParamTransientFEOperator,
+  fesolver::ODESolver,
+  rbspace::Union{$Tsps,$Tspm},
+  s::TransientSnapshots,
+  params::Table;
+  kwargs...)
+
+  trians = _collect_trian_jac(feop)
+  cjac = RBJacobianContribution()
+  for trian in trians
+    ad = compress_jacobians(feop,fesolver,rbspace,s,params,trian;kwargs...)
+    add_contribution!(cjac,trian,ad)
+  end
+  cjac
+end
+
+function compress_jacobians(
+  feop::ParamTransientFEOperator,
+  fesolver::ODESolver,
+  rbspace::Union{$Tsps,$Tspm},
+  s::TransientSnapshots,
+  params::Table,
+  trian::Triangulation;
+  kwargs...)
+
+  nfields = length(rbspace)
+  ad_jac = Matrix{RBAffineDecompositions}(undef,nfields,nfields)
+  for row = 1:nfields, col = 1:nfields
+    filter = (row,col)
+    ad_jac[row,col] = compress_jacobians(feop,fesolver,
+      (rbspace[row],rbspace[col]),s,params,trian,filter;kwargs...)
+  end
+  ad_jac
+end
+
+function compress_jacobians(
+  feop::ParamTransientFEOperator,
+  fesolver::ODESolver,
+  rbspace::NTuple{2,$Tsps},
+  s::TransientSnapshots,
+  params::Table,
+  trian::Triangulation,
+  filter::Tuple{Vararg{Int}};
+  nsnaps=20,
+  kwargs...)
+
+  row, = filter
+  sjac = s[1:nsnaps]
+  pjac = params[1:nsnaps]
+  cell_dof_ids = get_cell_dof_ids(feop.test[row],trian)
+  order = get_order(feop.test[row])
+
+  j = collect_jacobians(feop,fesolver,sjac,pjac,trian,filter)
+  compress_component(j,fesolver,trian,cell_dof_ids,order,rbspace...;kwargs...)
 end
 
 function compress_djacobians(
@@ -252,19 +218,6 @@ function compress_djacobians(
 end
 
 function compress_component(
-  ::SingleFieldSnapshots{T,ZeroAffinity},
-  ::FESolver,
-  ::Triangulation,
-  ::Table,
-  ::Int,
-  args...;
-  kwargs...) where T
-
-  proj = zero_compress(args...)
-  ZeroRBAffineDecomposition(proj)
-end
-
-function compress_component(
   ::TransientSingleFieldSnapshots{T,ZeroAffinity},
   ::ODESolver,
   ::Triangulation,
@@ -275,27 +228,6 @@ function compress_component(
 
   proj = zero_compress(args...)
   ZeroRBAffineDecomposition(proj)
-end
-
-function compress_component(
-  component::SingleFieldSnapshots,
-  fesolver::FESolver,
-  trian::Triangulation,
-  cell_dof_ids,
-  order::Int,
-  args...;
-  kwargs...)
-
-  bs = tpod(component;kwargs...)
-  interp_idx = get_interpolation_idx(bs)
-  integr_domain = RBIntegrationDomain(component,trian,interp_idx,cell_dof_ids,order)
-
-  interp_bs = bs.nonzero_val[interp_idx,:]
-  lu_interp = lu(interp_bs)
-
-  proj_bs = compress(fesolver,bs,args...)
-
-  RBAffineDecomposition(proj_bs,lu_interp,integr_domain)
 end
 
 function compress_component(
@@ -355,14 +287,6 @@ function get_interpolation_idx(basis::AbstractMatrix)
 end
 
 function compress(
-  ::FESolver,
-  bs_component::NnzArray,
-  args...)
-
-  compress_space(bs_component,args...)
-end
-
-function compress(
   fesolver::ODESolver,
   bs_component::NnzArray,
   bt_component::NnzArray,
@@ -371,33 +295,28 @@ function compress(
   compress_space(bs_component,args...),compress_time(fesolver,bt_component,args...;kwargs...)
 end
 
-for Trb in (:SingleFieldRBSpace,:TransientSingleFieldRBSpace)
+function compress_space(
+  bs_component::NnzArray,
+  rbspace_row::TransientSingleFieldRBSpace{<:AbstractMatrix})
 
-  @eval begin
-    function compress_space(
-      bs_component::NnzArray,
-      rbspace_row::$Trb{<:AbstractMatrix})
+  entire_bs_row = get_basis_space(rbspace_row)
+  entire_bs_component = recast(bs_component)
+  map(eachcol(entire_bs_component)) do col
+    cmat = reshape(col,:,1)
+    entire_bs_row'*cmat
+  end
+end
 
-      entire_bs_row = get_basis_space(rbspace_row)
-      entire_bs_component = recast(bs_component)
-      map(eachcol(entire_bs_component)) do col
-        cmat = reshape(col,:,1)
-        entire_bs_row'*cmat
-      end
-    end
+function compress_space(
+  bs_component::NnzArray,
+  rbspace_row::TransientSingleFieldRBSpace{<:AbstractMatrix},
+  rbspace_col::TransientSingleFieldRBSpace{<:AbstractMatrix})
 
-    function compress_space(
-      bs_component::NnzArray,
-      rbspace_row::$Trb{<:AbstractMatrix},
-      rbspace_col::$Trb{<:AbstractMatrix})
-
-      entire_bs_row = get_basis_space(rbspace_row)
-      entire_bs_col = get_basis_space(rbspace_col)
-      nbasis = size(bs_component,2)
-      map(1:nbasis) do n
-        entire_bs_row'*recast(bs_component,n)*entire_bs_col
-      end
-    end
+  entire_bs_row = get_basis_space(rbspace_row)
+  entire_bs_col = get_basis_space(rbspace_col)
+  nbasis = size(bs_component,2)
+  map(1:nbasis) do n
+    entire_bs_row'*recast(bs_component,n)*entire_bs_col
   end
 end
 

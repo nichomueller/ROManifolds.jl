@@ -72,7 +72,7 @@ addprocs(4)
 end
 
 rbop = if load_structures
-  load(GenericRBOperator,info)
+  load(TransientRBOperator,info)
 else
   reduce_fe_operator(info,feop,fesolver)
 end

@@ -127,16 +127,12 @@ end
 
 filter_evaluation_function(u,args...) = u
 
-for T in (:MultiFieldCellField,:TransientMultiFieldCellField)
-  @eval begin
-    function filter_evaluation_function(u::$T,col::Int)
-      u_col = Any[]
-      for nf = eachindex(u.transient_single_fields)
-        nf == col ? push!(u_col,u[col]) : push!(u_col,nothing)
-      end
-      u_col
-    end
+function filter_evaluation_function(u::TransientMultiFieldCellField,col::Int)
+  u_col = Any[]
+  for nf = eachindex(u.transient_single_fields)
+    nf == col ? push!(u_col,u[col]) : push!(u_col,nothing)
   end
+  u_col
 end
 
 function allocate_residual(
