@@ -14,13 +14,13 @@ function collect_solutions(
 
   s = allocate_solution(op.test,solver)
   sol = solutions(s,op,solver,params)
-  TransientSnapshots(aff,sol,nsol;kwargs...)
+  Snapshots(aff,sol,nsol;kwargs...)
 end
 
 function collect_residuals(
   op::ParamTransientFEOperator,
   solver::ODESolver,
-  sols::TransientSnapshots,
+  sols::Snapshots,
   params::Table,
   args...)
 
@@ -31,13 +31,13 @@ function collect_residuals(
 
   res_iter = init_vec_iterator(op,solver,args...)
   res = residuals(aff,op,solver,res_iter,sols,params)
-  TransientSnapshots(aff,res,nres)
+  Snapshots(aff,res,nres)
 end
 
 function collect_jacobians(
   op::ParamTransientFEOperator,
   solver::ODESolver,
-  sols::TransientSnapshots,
+  sols::Snapshots,
   params::Table,
   args...)
 
@@ -48,13 +48,13 @@ function collect_jacobians(
 
   jac_iter = init_mat_iterator(op,solver,args...)
   jac = jacobians(aff,op,solver,jac_iter,sols,params)
-  TransientSnapshots(aff,jac,njac)
+  Snapshots(aff,jac,njac)
 end
 
 function collect_djacobians(
   op::ParamTransientFEOperator,
   solver::ODESolver,
-  sols::TransientSnapshots,
+  sols::Snapshots,
   params::Table,
   args...)
 
@@ -65,7 +65,7 @@ function collect_djacobians(
 
   djac_iter = init_mat_iterator(op,solver,args...;i=2)
   djac = djacobians(aff,op,solver,djac_iter,sols,params)
-  TransientSnapshots(aff,djac,ndjac)
+  Snapshots(aff,djac,ndjac)
 end
 
 function allocate_solution(test::SingleFieldFESpace,solver::ODESolver)
@@ -271,7 +271,7 @@ for fun in (:residuals,:jacobians,:djacobians)
       op::ParamTransientFEOperator,
       solver::θMethod,
       itc::TransientIterativeCollector,
-      ::TransientSnapshots,
+      ::Snapshots,
       params::Table)
 
       μ = first(params)
@@ -285,7 +285,7 @@ for fun in (:residuals,:jacobians,:djacobians)
       op::ParamTransientFEOperator,
       solver::θMethod,
       itc::TransientIterativeCollector,
-      ::TransientSnapshots,
+      ::Snapshots,
       params::Table)
 
       times = get_times(solver)
@@ -301,7 +301,7 @@ for fun in (:residuals,:jacobians,:djacobians)
       op::ParamTransientFEOperator,
       solver::θMethod,
       itc::TransientIterativeCollector,
-      ::TransientSnapshots,
+      ::Snapshots,
       params::Table)
 
       t = first(get_times(solver))
@@ -316,7 +316,7 @@ for fun in (:residuals,:jacobians,:djacobians)
       op::ParamTransientFEOperator{Affine},
       solver::θMethod,
       itc::TransientIterativeCollector,
-      ::TransientSnapshots,
+      ::Snapshots,
       params::Table)
 
       times = get_times(solver)
@@ -335,7 +335,7 @@ for fun in (:residuals,:jacobians,:djacobians)
       op::ParamTransientFEOperator,
       solver::θMethod,
       itc::TransientIterativeCollector,
-      s::TransientSnapshots,
+      s::Snapshots,
       params::Table)
 
       times = get_times(solver)

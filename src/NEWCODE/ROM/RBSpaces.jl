@@ -42,7 +42,7 @@ end
 function compress_solutions(
   ::ParamTransientFEOperator,
   fesolver::ODESolver,
-  s::TransientSingleFieldSnapshots{T,A},
+  s::SingleFieldSnapshots{T,A},
   args...;
   kwargs...) where {T,A}
 
@@ -53,7 +53,7 @@ end
 function compress_solutions(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
-  s::TransientMultiFieldSnapshots{T,N,A},
+  s::MultiFieldSnapshots{T,N,A},
   args...;
   compute_supremizers=true,
   ttol=1e-2,
@@ -72,7 +72,7 @@ function add_space_supremizers!(
   bases_space::Vector{NnzArray{T}},
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
-  snaps::TransientMultiFieldSnapshots,
+  snaps::MultiFieldSnapshots,
   params::Table;
   kwargs...) where T
 
@@ -89,7 +89,7 @@ end
 function space_supremizers(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
-  s::TransientMultiFieldSnapshots,
+  s::MultiFieldSnapshots,
   bs::AbstractMatrix,
   params::Table,
   i::Int)

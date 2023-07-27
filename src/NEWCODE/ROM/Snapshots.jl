@@ -1,17 +1,16 @@
-abstract type GenericTransientSnapshots end
-abstract type TransientSnapshots{T,N,A} <: GenericTransientSnapshots end
+abstract type Snapshots{T,N,A} end
 
-struct TransientSingleFieldSnapshots{T,A} <: TransientSnapshots{T,1,A}
+struct SingleFieldSnapshots{T,A} <: Snapshots{T,1,A}
   snaps::NnzArray{T}
   nsnaps::Int
 end
 
-struct TransientMultiFieldSnapshots{T,N,A} <: TransientSnapshots{T,N,A}
+struct MultiFieldSnapshots{T,N,A} <: Snapshots{T,N,A}
   snaps::Vector{NnzArray{T}}
   nsnaps::Int
 end
 
-function TransientSnapshots(
+function Snapshots(
   ::A,
   snaps::NnzArray{T},
   nsnaps::Int;
@@ -19,10 +18,10 @@ function TransientSnapshots(
 
   csnaps = snaps
   convert!(type,csnaps)
-  TransientSingleFieldSnapshots{T,A}(csnaps,nsnaps)
+  SingleFieldSnapshots{T,A}(csnaps,nsnaps)
 end
 
-function TransientSnapshots(
+function Snapshots(
   ::A,
   snaps::Vector{NnzArray{T}},
   nsnaps::Int;
@@ -30,12 +29,12 @@ function TransientSnapshots(
 
   csnaps = hcat(snaps...)
   convert!(type,csnaps)
-  TransientSingleFieldSnapshots{T,A}(csnaps,nsnaps)
+  SingleFieldSnapshots{T,A}(csnaps,nsnaps)
 end
 
 for Tarr in (:Matrix,:Vector)
   @eval begin
-    function TransientSnapshots(
+    function Snapshots(
       aff::A,
       snaps::Union{$Tarr{T},Vector{$Tarr{T}}},
       nsnaps::Int;
@@ -45,7 +44,7 @@ for Tarr in (:Matrix,:Vector)
       $fun(aff,csnaps,nsnaps;kwargs...)
     end
 
-    function TransientSnapshots(
+    function Snapshots(
       ::A,
       snaps::Vector{Vector{$Tarr{T}}},
       nsnaps::Int;
@@ -54,13 +53,13 @@ for Tarr in (:Matrix,:Vector)
       N = length(snaps)
       csnaps = compress(snaps)
       map(s->convert!(type,s),csnaps)
-      TransientMultiFieldSnapshots{$Tarr{T},N,A}(csnaps,nsnaps)
+      MultiFieldSnapshots{$Tarr{T},N,A}(csnaps,nsnaps)
     end
   end
 end
 
 function Base.getindex(
-  s::TransientSingleFieldSnapshots{T,A},
+  s::SingleFieldSnapshots{T,A},
   idx1,
   idx2=:) where {T,A}
 
@@ -68,11 +67,11 @@ function Base.getindex(
   _idx = ((first(idx1)-1)*time_ndofs+1:last(idx1)*time_ndofs)[idx2]
   snaps = s.snaps[:,_idx]
   nsnaps = length(idx1)
-  TransientSingleFieldSnapshots{T,A}(snaps,nsnaps)
+  SingleFieldSnapshots{T,A}(snaps,nsnaps)
 end
 
 function Base.getindex(
-  s::TransientMultiFieldSnapshots{T,N,A},
+  s::MultiFieldSnapshots{T,N,A},
   idx1,
   idx2=:) where {T,N,A}
 
@@ -80,15 +79,15 @@ function Base.getindex(
   _idx = ((first(idx1)-1)*time_ndofs+1:last(idx1)*time_ndofs)[idx2]
   snaps = map(x->getindex(x,:,_idx),s.snaps)
   nsnaps = length(idx1)
-  TransientMultiFieldSnapshots{T,N,A}(snaps,nsnaps)
+  MultiFieldSnapshots{T,N,A}(snaps,nsnaps)
 end
 
-function Base.iterate(s::TransientSingleFieldSnapshots)
+function Base.iterate(s::SingleFieldSnapshots)
   i = 1
   snap_i = get_datum(s[i])
   return snap_i,i+1
 end
-function Base.iterate(s::TransientSingleFieldSnapshots,idx::Int)
+function Base.iterate(s::SingleFieldSnapshots,idx::Int)
   if idx > s.nsnaps
     return
   end
@@ -97,34 +96,34 @@ function Base.iterate(s::TransientSingleFieldSnapshots,idx::Int)
   return snap_i,i+1
 end
 
-function Base.iterate(s::TransientMultiFieldSnapshots{T,A}) where {T,A}
+function Base.iterate(s::MultiFieldSnapshots{T,A}) where {T,A}
   fieldid = 1
-  snapid = TransientSingleFieldSnapshots{T,A}(s.snaps[fieldid],s.nsnaps)
+  snapid = SingleFieldSnapshots{T,A}(s.snaps[fieldid],s.nsnaps)
   return snapid,fieldid+1
 end
 
-function Base.iterate(s::TransientMultiFieldSnapshots{T,A},fieldid::Int) where {T,A}
+function Base.iterate(s::MultiFieldSnapshots{T,A},fieldid::Int) where {T,A}
   if fieldid > length(s.snaps)
     return
   end
-  snapid = TransientSingleFieldSnapshots{T,A}(s.snaps[fieldid],s.nsnaps)
+  snapid = SingleFieldSnapshots{T,A}(s.snaps[fieldid],s.nsnaps)
   return snapid,fieldid+1
 end
 
-get_time_ndofs(s::TransientSingleFieldSnapshots) = Int(size(s.snaps,2)/s.nsnaps)
+get_time_ndofs(s::SingleFieldSnapshots) = Int(size(s.snaps,2)/s.nsnaps)
 
-get_time_ndofs(s::TransientMultiFieldSnapshots) = Int(size(s.snaps[1],2)/s.nsnaps)
+get_time_ndofs(s::MultiFieldSnapshots) = Int(size(s.snaps[1],2)/s.nsnaps)
 
-get_datum(s::TransientSingleFieldSnapshots) = recast(s.snaps)
+get_datum(s::SingleFieldSnapshots) = recast(s.snaps)
 
-get_datum(s::TransientMultiFieldSnapshots) = vcat(map(recast,s.snaps))
+get_datum(s::MultiFieldSnapshots) = vcat(map(recast,s.snaps))
 
-function convert!(::Type{T},s::TransientSingleFieldSnapshots) where T
+function convert!(::Type{T},s::SingleFieldSnapshots) where T
   convert!(T,s.snaps)
   return
 end
 
-function convert!(::Type{T},s::TransientMultiFieldSnapshots) where T
+function convert!(::Type{T},s::MultiFieldSnapshots) where T
   for sf in s.snaps
     convert!(T,sf)
   end
@@ -132,7 +131,7 @@ function convert!(::Type{T},s::TransientMultiFieldSnapshots) where T
 end
 
 function tpod(
-  s::TransientSingleFieldSnapshots,
+  s::SingleFieldSnapshots,
   args...;
   type=Matrix{Float},
   kwargs...)
@@ -144,7 +143,7 @@ function tpod(
   basis_space,basis_time
 end
 
-function tpod(::Val{false},s::TransientSingleFieldSnapshots;kwargs...)
+function tpod(::Val{false},s::SingleFieldSnapshots;kwargs...)
   basis_space = tpod(s.snaps;kwargs...)
   compressed_time_snaps = change_mode(basis_space'*s.snaps,s.nsnaps)
   basis_time = tpod(compressed_time_snaps;kwargs...)
@@ -152,7 +151,7 @@ function tpod(::Val{false},s::TransientSingleFieldSnapshots;kwargs...)
   basis_space,basis_time
 end
 
-function tpod(::Val{true},s::TransientSingleFieldSnapshots;kwargs...)
+function tpod(::Val{true},s::SingleFieldSnapshots;kwargs...)
   time_snaps = change_mode(s.snaps,s.nsnaps)
   basis_time = tpod(time_snaps)
   compressed_space_snaps = change_mode(basis_time'*time_snaps,s.nsnaps)
@@ -164,7 +163,7 @@ end
 for A in (:TimeAffinity,:ParamTimeAffinity)
   @eval begin
     function tpod(
-      s::TransientSingleFieldSnapshots{T,$A},
+      s::SingleFieldSnapshots{T,$A},
       solver::ODESolver;
       type=Matrix{Float},
       kwargs...) where T

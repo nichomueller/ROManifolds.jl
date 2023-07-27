@@ -4,7 +4,7 @@ struct TransientRBIntegrationDomain
   idx::Vector{Int}
 
   function TransientRBIntegrationDomain(
-    component::TransientSingleFieldSnapshots,
+    component::SingleFieldSnapshots,
     trian::Triangulation,
     times::Vector{Float},
     interp_idx_space::Vector{Int},
@@ -49,7 +49,7 @@ function compress_residuals(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   rbspace::Union{$Tsps,$Tspm},
-  s::TransientSnapshots,
+  s::Snapshots,
   params::Table;
   kwargs...)
 
@@ -66,7 +66,7 @@ function compress_residuals(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   rbspace::Union{$Tsps,$Tspm},
-  s::TransientSnapshots,
+  s::Snapshots,
   params::Table,
   trian::Triangulation;
   kwargs...)
@@ -85,7 +85,7 @@ function compress_residuals(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   rbspace::$Tsps,
-  s::TransientSnapshots,
+  s::Snapshots,
   params::Table,
   trian::Triangulation,
   filter::Tuple{Vararg{Int}};
@@ -106,7 +106,7 @@ function compress_jacobians(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   rbspace::Union{$Tsps,$Tspm},
-  s::TransientSnapshots,
+  s::Snapshots,
   params::Table;
   kwargs...)
 
@@ -123,7 +123,7 @@ function compress_jacobians(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   rbspace::Union{$Tsps,$Tspm},
-  s::TransientSnapshots,
+  s::Snapshots,
   params::Table,
   trian::Triangulation;
   kwargs...)
@@ -142,7 +142,7 @@ function compress_jacobians(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   rbspace::NTuple{2,$Tsps},
-  s::TransientSnapshots,
+  s::Snapshots,
   params::Table,
   trian::Triangulation,
   filter::Tuple{Vararg{Int}};
@@ -163,7 +163,7 @@ function compress_djacobians(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   rbspace::Union{TransientSingleFieldRBSpace,TransientMultiFieldRBSpace},
-  s::TransientSnapshots,
+  s::Snapshots,
   params::Table;
   kwargs...)
 
@@ -180,7 +180,7 @@ function compress_djacobians(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   rbspace::Union{TransientSingleFieldRBSpace,TransientMultiFieldRBSpace},
-  s::TransientSnapshots,
+  s::Snapshots,
   params::Table,
   trian::Triangulation;
   kwargs...)
@@ -199,7 +199,7 @@ function compress_djacobians(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   rbspace::NTuple{2,TransientSingleFieldRBSpace},
-  s::TransientSnapshots,
+  s::Snapshots,
   params::Table,
   trian::Triangulation,
   filter::Tuple{Vararg{Int}};
@@ -218,7 +218,7 @@ function compress_djacobians(
 end
 
 function compress_component(
-  ::TransientSingleFieldSnapshots{T,ZeroAffinity},
+  ::SingleFieldSnapshots{T,ZeroAffinity},
   ::ODESolver,
   ::Triangulation,
   ::Table,
@@ -231,7 +231,7 @@ function compress_component(
 end
 
 function compress_component(
-  component::TransientSingleFieldSnapshots,
+  component::SingleFieldSnapshots,
   fesolver::ODESolver,
   trian::Triangulation,
   cell_dof_ids,

@@ -92,7 +92,7 @@ function load_test(
 
   try
     @check info.load_structures
-    sols,params = load_test((GenericTransientSnapshots,Table),info)
+    sols,params = load_test((Snapshots,Table),info)
     n = min(ntests,length(params))
     return sols[1:n],params[1:n]
   catch
