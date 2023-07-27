@@ -292,7 +292,7 @@ function assemble_jacobian(
   hcat(j...)
 end
 
-function solve(ad::RBAffineDecompositions,b::AbstractArray;st_mdeim=true)
+function solve(ad::RBAffineDecomposition,b::AbstractArray;st_mdeim=true)
   if st_mdeim
     coeff = solve(ad.mdeim_interpolation,reshape(b,:))
     recast_coefficient(ad.basis_time,coeff)

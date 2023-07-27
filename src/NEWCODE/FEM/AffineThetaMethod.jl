@@ -1,7 +1,7 @@
 function solve_step!(
   uf::AbstractVector,
-  op::ParamTransientFEOperator{Affine},
   solver::θMethod,
+  op::AffineParamODEOperator,
   μ::AbstractVector,
   u0::AbstractVector,
   t0::Real,
@@ -43,7 +43,7 @@ end
 function _matrix_and_vector!(
   A::AbstractMatrix,
   b::AbstractVector,
-  op::ParamTransientFEOperator{Affine},
+  op::AffineParamODEOperator,
   μ::AbstractArray,
   tθ::Real,
   dtθ::Real,
@@ -57,7 +57,7 @@ end
 
 function _matrix!(
   A::AbstractMatrix,
-  op::ParamTransientFEOperator{Affine},
+  op::AffineParamODEOperator,
   μ::AbstractArray,
   tθ::Real,
   dtθ::Real,
@@ -72,7 +72,7 @@ end
 
 function _mass_matrix!(
   A::AbstractMatrix,
-  op::ParamTransientFEOperator{Affine},
+  op::AffineParamODEOperator,
   μ::AbstractArray,
   tθ::Real,
   dtθ::Real,
@@ -87,7 +87,7 @@ end
 
 function _vector!(
   b::AbstractVector,
-  op::ParamTransientFEOperator{Affine},
+  op::AffineParamODEOperator,
   μ::AbstractArray,
   tθ::Real,
   ::Real,
@@ -100,7 +100,7 @@ function _vector!(
 end
 
 function _allocate_matrix(
-  op::ParamTransientFEOperator{Affine},
+  op::AffineParamODEOperator,
   u0,
   ode_cache)
 
@@ -108,7 +108,7 @@ function _allocate_matrix(
 end
 
 function _allocate_matrix_and_vector(
-  op::ParamTransientFEOperator{Affine},
+  op::AffineParamODEOperator,
   u0,
   ode_cache)
 

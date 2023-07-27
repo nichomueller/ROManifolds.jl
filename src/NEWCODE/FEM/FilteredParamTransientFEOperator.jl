@@ -1,78 +1,14 @@
-"""
-A parametric version of the `Gridap` `TransientFEOperator`
-"""
-abstract type ParamTransientFEOperator{C<:OperatorType} <: GridapType end
-
-"""
-Transient FE operator that is defined by a transient Weak form
-"""
-struct ParamTransientFEOperatorFromWeakForm{C<:OperatorType} <: ParamTransientFEOperator{C}
+struct FilteredParamTransientFEOperator{C<:OperatorType} <: ParamTransientFEOperator{C}
   res::Function
-  jacs::Tuple{Vararg{Function}}
+  jac::Function
   assem::Assembler
-  pspace::ParamSpace
-  trials::Tuple{Vararg{Any}}
+  trial::Any
   test::FESpace
-  order::Integer
+  trial_basis::Any
+  test_basis::Any
 end
 
-function ParamTransientAffineFEOperator(res::Function,jac::Function,jac_t::Function,
-  pspace,trial,test)
-  # res(μ,t,u,v) = m(μ,t,∂t(u),v) + a(μ,t,u,v) - b(μ,t,v)
-  # jac(μ,t,u,du,v) = a(μ,t,du,v)
-  # jac_t(μ,t,u,dut,v) = m(μ,t,dut,v)
-  assem = SparseMatrixAssembler(trial,test)
-  ParamTransientFEOperatorFromWeakForm{Affine}(
-    res,(jac,jac_t),assem,pspace,(trial,∂t(trial)),test,1)
-end
-
-function ParamTransientFEOperator(res::Function,jac::Function,jac_t::Function,
-  pspace,trial,test)
-  assem = SparseMatrixAssembler(trial,test)
-  ParamTransientFEOperatorFromWeakForm{Nonlinear}(
-    res,(jac,jac_t),assem,pspace,(trial,∂t(trial)),test,1)
-end
-
-function ParamTransientFEOperator(res::Function,pspace,trial,test;order::Integer=1)
-  function jac_0(μ,t,x,dx0,dv)
-    function res_0(y)
-      x0 = TransientCellField(y,x.derivatives)
-      res(μ,t,x0,dv)
-    end
-    jacobian(res_0,x.cellfield)
-  end
-  jacs = (jac_0,)
-  for i in 1:order
-    function jac_i(μ,t,x,dxi,dv)
-      function res_i(y)
-        derivatives = (x.derivatives[1:i-1]...,y,x.derivatives[i+1:end]...)
-        xi = TransientCellField(x.cellfield,derivatives)
-        res(μ,t,xi,dv)
-      end
-      jacobian(res_i,x.derivatives[i])
-    end
-    jacs = (jacs...,jac_i)
-  end
-  ParamTransientFEOperator(res,jacs...,pspace,trial,test)
-end
-
-function Gridap.FESpaces.SparseMatrixAssembler(
-  trial::Union{ParamTransientTrialFESpace,ParamTransientMultiFieldTrialFESpace},
-  test::FESpace)
-  SparseMatrixAssembler(trial(nothing,nothing),test)
-end
-
-get_test(op::ParamTransientFEOperatorFromWeakForm) = op.test
-
-get_trial(op::ParamTransientFEOperatorFromWeakForm) = op.trials[1]
-
-get_order(op::ParamTransientFEOperatorFromWeakForm) = op.order
-
-get_pspace(op::ParamTransientFEOperatorFromWeakForm) = op.pspace
-
-realization(op::ParamTransientFEOperator,args...) = realization(op.pspace,args...)
-
-function allocate_cache(op::ParamTransientFEOperator)
+function allocate_cache(op::FilteredParamTransientFEOperator)
   Ut = get_trial(op)
   U = allocate_trial_space(Ut)
   Uts = (Ut,)
@@ -88,7 +24,7 @@ end
 
 function update_cache!(
   ode_cache,
-  op::ParamTransientFEOperator,
+  op::FilteredParamTransientFEOperator,
   μ::AbstractVector,
   t::Real)
 
@@ -101,7 +37,7 @@ function update_cache!(
   (Us,Uts,fecache)
 end
 
-function allocate_evaluation_function(op::ParamTransientFEOperator)
+function allocate_evaluation_function(op::FilteredParamTransientFEOperator)
   μ,t = realization(op),1.
   trial = get_trial(op)(μ,t)
   xh = EvaluationFunction(trial,fill(0.,num_free_dofs(op.test)))
@@ -113,7 +49,7 @@ function allocate_evaluation_function(op::ParamTransientFEOperator)
 end
 
 function evaluation_function(
-  op::ParamTransientFEOperator,
+  op::FilteredParamTransientFEOperator,
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
 
@@ -244,7 +180,7 @@ function _matdata_jacobian(
   collect_cell_matrix(Uh,V,γᵢ*op.jacs[i](μ,t,uh,du,v))
 end
 
-function _collect_trian_res(op::ParamTransientFEOperator)
+function _collect_trian_res(op::FilteredParamTransientFEOperator)
   μ,t = realization(op),0.
   uh = zero(op.test)
   v = get_fe_basis(op.test)
@@ -257,7 +193,7 @@ function _collect_trian_res(op::ParamTransientFEOperator)
   collect_trian(veccontrib)
 end
 
-function _collect_trian_jac(op::ParamTransientFEOperator)
+function _collect_trian_jac(op::FilteredParamTransientFEOperator)
   μ,t = realization(op),0.
   uh = zero(op.test)
   v = get_fe_basis(op.test)
@@ -267,4 +203,16 @@ function _collect_trian_jac(op::ParamTransientFEOperator)
     trians = (trians...,collect_trian(matcontrib)...)
   end
   unique(trians)
+end
+filter_evaluation_function(u,args...) = u
+
+function filter_evaluation_function(
+  u::Gridap.ODEs.TransientFETools.TransientMultiFieldCellField,
+  col::Int)
+
+  u_col = Any[]
+  for nf = eachindex(u.transient_single_fields)
+    nf == col ? push!(u_col,u[col]) : push!(u_col,nothing)
+  end
+  u_col
 end

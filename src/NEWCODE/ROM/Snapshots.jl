@@ -41,7 +41,7 @@ for Tarr in (:Matrix,:Vector)
       kwargs...) where {T,A}
 
       csnaps = compress(snaps)
-      $fun(aff,csnaps,nsnaps;kwargs...)
+      Snapshots(aff,csnaps,nsnaps;kwargs...)
     end
 
     function Snapshots(

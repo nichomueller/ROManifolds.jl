@@ -1,7 +1,7 @@
 struct RBAlgebraicContribution{N}
-  dict::IdDict{Triangulation,Array{RBAffineDecompositions,N}}
+  dict::IdDict{Triangulation,Array{RBAffineDecomposition,N}}
   function RBAlgebraicContribution(::Val{N}) where N
-    dict = IdDict{Triangulation,Array{RBAffineDecompositions,N}}()
+    dict = IdDict{Triangulation,Array{RBAffineDecomposition,N}}()
     new{N}(dict)
   end
 end
@@ -42,7 +42,7 @@ Base.getindex(a::RBAlgebraicContribution,trian::Triangulation) = get_contributio
 function Gridap.CellData.add_contribution!(
   a::RBAlgebraicContribution{N},
   trian::Triangulation,
-  b::Array{<:RBAffineDecompositions,N}) where N
+  b::Array{<:RBAffineDecomposition,N}) where N
 
   @check !haskey(a.dict,trian)
   a.dict[trian] = b

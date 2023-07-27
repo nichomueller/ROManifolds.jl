@@ -71,10 +71,23 @@ addprocs(4)
   rbsolver = Backslash()
 end
 
-rbop = if load_structures
-  load(TransientRBOperator,info)
-else
-  reduce_fe_operator(info,feop,fesolver)
+params = realization(feop,10)
+# solve(fesolver,feop,params)
+k = CollectSolutionMap(fesolver,feop)
+fi = map(testitem,params)
+T = return_type(k,fi...)
+
+@everywhere begin
+  root = pwd()
+  include("$root/src/NEWCODE/FEM/FEM.jl")
+  include("$root/src/NEWCODE/ROM/ROM.jl")
+  include("$root/src/NEWCODE/RBTests.jl")
 end
 
-test_rb_operator(info,feop,rbop,fesolver,rbsolver)
+# rbop = if load_structures
+#   load(TransientRBOperator,info)
+# else
+#   reduce_fe_operator(info,feop,fesolver)
+# end
+
+# test_rb_operator(info,feop,rbop,fesolver,rbsolver)

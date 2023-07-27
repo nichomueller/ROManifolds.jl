@@ -1,7 +1,7 @@
 function solve_step!(
   uf::AbstractVector,
-  op::ParamTransientFEOperator,
   solver::θMethod,
+  op::ParamODEOperator,
   μ::AbstractVector,
   u0::AbstractVector,
   t0::Real,
@@ -40,7 +40,7 @@ Nonlinear operator that represents the θ-method nonlinear operator at a
 given time step, i.e., A(t,u_n+θ,(u_n+θ-u_n)/dt)
 """
 struct ParamThetaMethodNonlinearOperator <: NonlinearOperator
-  odeop::ParamTransientFEOperator
+  odeop::ParamODEOperator
   μ::AbstractVector
   tθ::Float64
   dtθ::Float64
@@ -83,17 +83,4 @@ function allocate_jacobian(
   x::AbstractVector)
 
   allocate_jacobian(op.odeop,x,op.ode_cache)
-end
-
-filter_evaluation_function(u,args...) = u
-
-function filter_evaluation_function(
-  u::Gridap.ODEs.TransientFETools.TransientMultiFieldCellField,
-  col::Int)
-
-  u_col = Any[]
-  for nf = eachindex(u.transient_single_fields)
-    nf == col ? push!(u_col,u[col]) : push!(u_col,nothing)
-  end
-  u_col
 end
