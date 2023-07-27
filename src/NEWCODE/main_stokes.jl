@@ -58,7 +58,7 @@ addprocs(4)
   test = ParamTransientMultiFieldFESpace([test_u,test_p])
   trial = ParamTransientMultiFieldFESpace([trial_u,trial_p])
   feop = ParamTransientAffineFEOperator(res,jac,jac_t,pspace,trial,test)
-  t0,tF,dt,θ = 0.,0.3,0.005,1
+  t0,tF,dt,θ = 0.,0.05,0.005,1
   uh0(μ) = interpolate_everywhere(u0(μ),trial_u(μ,t0))
   ph0(μ) = interpolate_everywhere(p0(μ),trial_p(μ,t0))
   xh0(μ) = interpolate_everywhere([uh0(μ),ph0(μ)],trial(μ,t0))
@@ -68,11 +68,19 @@ addprocs(4)
   compute_supremizers = true
   nsnaps_state = 50
   nsnaps_system = 20
-  save = true
-  load = false
+  save_structures = true
+  load_structures = true
   energy_norm = false
   st_mdeim = true
-  info = RBInfo(test_path;ϵ,load,save,energy_norm,nsnaps_state,nsnaps_system,st_mdeim)
+  info = RBInfo(test_path;ϵ,save_structures,load_structures,energy_norm,
+                nsnaps_state,nsnaps_system,st_mdeim)
+end
+
+@everywhere begin
+  root = pwd()
+  include("$root/src/NEWCODE/FEM/FEM.jl")
+  include("$root/src/NEWCODE/ROM/ROM.jl")
+  include("$root/src/NEWCODE/RBTests.jl")
 end
 
 nsnaps = info.nsnaps_state

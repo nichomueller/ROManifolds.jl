@@ -112,7 +112,7 @@ function compress_solutions(
   fesolver::ODESolver,
   s::TransientMultiFieldSnapshots{T,N,A},
   args...;
-  compute_supremizers=false,
+  compute_supremizers=true,
   ttol=1e-2,
   kwargs...) where {T,N,A}
 
@@ -161,7 +161,7 @@ for (Top,Tslv,Tsnp) in zip(
       snaps = get_datum(s)
 
       matdata = _matdata_jacobian(feop,fesolver,snaps,params,filter)
-      aff = get_affinity(fesolver,params,matdata)
+      aff = affinity_jacobian(fesolver,params,matdata)
       data = get_datum(aff,fesolver,params,matdata)
       constraint_mat = map(d->assemble_matrix(feop.assem,d),data)
 

@@ -76,21 +76,21 @@ for (Tsnp,Top,Tslv) in zip(
   end
 end
 
-function allocate_solution(test::FESpace,::FESolver)
-  space_ndofs = test.nfree
+function allocate_solution(test::SingleFieldFESpace,::FESolver)
+  space_ndofs = num_free_dofs(test)
   cache = fill(0.,space_ndofs,1)
   cache
 end
 
-function allocate_solution(test::FESpace,solver::ODESolver)
-  space_ndofs = test.nfree
+function allocate_solution(test::SingleFieldFESpace,solver::ODESolver)
+  space_ndofs = num_free_dofs(test)
   time_ndofs = get_time_ndofs(solver)
   cache = fill(0.,space_ndofs,time_ndofs)
   cache
 end
 
 function allocate_solution(test::MultiFieldFESpace,args...)
-  map(t->solution_cache(t,args...),test.spaces)
+  map(t->allocate_solution(t,args...),test.spaces)
 end
 
 for (Top,Tslv) in zip(
@@ -211,7 +211,7 @@ function init_vec_iterator(
     r .*= -1.0
   end
 
-  xh = zeros(op.test.nfree)
+  xh = zeros(num_free_dofs(op.test))
   μ = realization(op)
   cache = allocate_cache(op)
 
@@ -247,7 +247,7 @@ function init_vec_iterator(
 
   μ = realization(op)
   t = 0.
-  xhθ = zeros(op.test.nfree)
+  xhθ = zeros(num_free_dofs(op.test))
   xh0 = copy(xhθ)
   cache = allocate_cache(op)
 
@@ -289,7 +289,7 @@ function init_mat_iterator(
     jnnz
   end
 
-  xh = zeros(op.test.nfree)
+  xh = zeros(num_free_dofs(op.test))
   μ = realization(op)
   cache = allocate_cache(op)
 
@@ -337,7 +337,7 @@ function init_mat_iterator(
 
   μ = realization(op)
   t = 0.
-  xhθ = zeros(op.test.nfree)
+  xhθ = zeros(num_free_dofs(op.test))
   xh0 = copy(xhθ)
   cache = allocate_cache(op)
   TransientIterativeMatCollector(f,(xhθ,xh0),μ,t,cache)

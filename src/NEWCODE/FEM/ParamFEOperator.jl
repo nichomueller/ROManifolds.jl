@@ -53,7 +53,7 @@ end
 function allocate_evaluation_function(op::ParamFEOperator)
   μ = realization(op)
   trial = get_trial(op)(μ)
-  EvaluationFunction(trial,fill(0.,test.nfree))
+  EvaluationFunction(trial,fill(0.,num_free_dofs(op.test)))
 end
 
 function evaluation_function(

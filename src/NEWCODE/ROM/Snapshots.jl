@@ -164,14 +164,23 @@ for Tsnp in (:SingleFieldSnapshots,:TransientSingleFieldSnapshots)
   end
 end
 
-for Tsnp in (:MultiFieldSnapshots,:TransientMultiFieldSnapshots)
+for (Tsf,Tmf) in zip(
+  (:SingleFieldSnapshots,:TransientSingleFieldSnapshots),
+  (:MultiFieldSnapshots,:TransientMultiFieldSnapshots))
+
   @eval begin
-    function Base.length(s::$Tsnp)
-      length(s.snaps)
+    function Base.iterate(s::$Tmf{T,A}) where {T,A}
+      fieldid = 1
+      snapid = $Tsf{T,A}(s.snaps[fieldid],s.nsnaps)
+      return snapid,fieldid+1
     end
 
-    function Base.iterate(s::$Tsnp,idx::Int)
-      iterate(s.snaps,idx)
+    function Base.iterate(s::$Tmf{T,A},fieldid::Int) where {T,A}
+      if fieldid > length(s.snaps)
+        return
+      end
+      snapid = $Tsf{T,A}(s.snaps[fieldid],s.nsnaps)
+      return snapid,fieldid+1
     end
   end
 end
