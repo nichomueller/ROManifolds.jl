@@ -118,11 +118,6 @@ function evaluate!(Uμt::T,U::ParamTransientMultiFieldTrialFESpace,μ::AbstractV
   MultiFieldFESpace(spaces_at_μt)
 end
 
-function allocate_trial_space(U::ParamTransientMultiFieldTrialFESpace)
-  spaces = allocate_trial_space.(U.spaces)
-  MultiFieldFESpace(spaces)
-end
-
 function evaluate(U::ParamTransientMultiFieldTrialFESpace,μ::AbstractVector,t::Real)
   Uμt = allocate_trial_space(U)
   evaluate!(Uμt,U,μ,t)

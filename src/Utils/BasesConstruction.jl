@@ -1,7 +1,5 @@
-_compress_rows(mat::AbstractMatrix) = size(mat,1) > size(mat,2)
-
 function tpod(mat::AbstractMatrix;ϵ=1e-4)
-  by_row = _compress_rows(mat)
+  by_row = size(mat,1) > size(mat,2)
   tpod(Val{by_row}(),mat;ϵ)
 end
 

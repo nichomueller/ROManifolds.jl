@@ -83,10 +83,6 @@ function Base.adjoint(nza::NnzArray)
   nza_copy
 end
 
-function allocate_matrix(nza::NnzArray,sizes...)
-  allocate_matrix(nza.nonzero_val,sizes...)
-end
-
 function adjoint!(nza::NnzArray)
   nza.nonzero_val = nza.nonzero_val'
   return
@@ -116,15 +112,6 @@ function recast(nza::NnzArray{<:SparseMatrixCSC},col=1)
   sparse(sparse_rows,sparse_cols,nza.nonzero_val[:,col],nza.nrows,ncols)
 end
 
-function recast(nza::NnzArray{<:SparseMatrixCSC})
-  nvec = size(nza.nonzero_val,2)
-  entire_array = Vector{SparseMatrixCSC{Float64,Int}}(undef,nvec)
-  for col in axes(nza.nonzero_val,2)
-    setindex!(entire_array,recast(nza,col),col)
-  end
-  entire_array
-end
-
 function change_mode!(nza::NnzArray,nparams::Int)
   mode1_ndofs = size(nza,1)
   mode2_ndofs = Int(size(nza,2)/nparams)
@@ -144,8 +131,6 @@ function change_mode(nza::NnzArray,nparams::Int)
   change_mode!(nzm_copy,nparams)
   nzm_copy
 end
-
-_compress_rows(nza::NnzArray) = _compress_rows(nza.nonzero_val)
 
 function tpod!(nza::NnzArray;kwargs...)
   nza.nonzero_val = tpod(nza.nonzero_val;kwargs...)

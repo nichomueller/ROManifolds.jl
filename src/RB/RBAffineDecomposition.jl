@@ -47,7 +47,7 @@ function compress_residuals(
   params::Table;
   kwargs...)
 
-  trians = _collect_trian_res(feop)
+  trians = collect_trian_res(feop)
   cres = RBResidualContribution()
   for trian in trians
     ad = compress_residuals(feop,fesolver,rbspace,s,params,trian;kwargs...)
@@ -104,7 +104,7 @@ function compress_jacobians(
   params::Table;
   kwargs...)
 
-  trians = _collect_trian_jac(feop)
+  trians = collect_trian_jac(feop)
   cjac = RBJacobianContribution()
   for trian in trians
     ad = compress_jacobians(feop,fesolver,rbspace,s,params,trian;kwargs...)
@@ -161,7 +161,7 @@ function compress_djacobians(
   params::Table;
   kwargs...)
 
-  trians = _collect_trian_jac(feop)
+  trians = collect_trian_jac(feop)
   cjac = RBJacobianContribution()
   for trian in trians
     ad = compress_djacobians(feop,fesolver,rbspace,s,params,trian;kwargs...)

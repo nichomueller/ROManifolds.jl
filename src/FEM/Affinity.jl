@@ -5,6 +5,49 @@ struct TimeAffinity <: Affinity end
 struct ParamTimeAffinity <: Affinity end
 struct NonAffinity <: Affinity end
 
+function affinity_residual(
+  op::ParamTransientFEOperator,
+  solver::ODESolver,
+  params::Table,
+  trian::Triangulation,
+  filter::Tuple{Vararg{Int}};
+  ntests::Int=10)
+
+  row, = filter
+  times = get_times(solver)
+  test_row = get_test(op)[row]
+  dv_row = _get_fe_basis(op.test,row)
+  u = allocate_evaluation_function(op)
+
+  μ,t = rand(params),rand(times)
+  d = collect_cell_contribution(test_row,op.res(μ,t,u,dv_row),trian)
+  if all(isempty,d)
+    return ZeroAffinity()
+  end
+
+  dir_cells = op.test.dirichlet_cells
+  cell = find_nonzero_cell_contribution(d,dir_cells)
+  d0 = max.(abs.(d[cell]),eps())
+
+  for μ in rand(params,ntests)
+    d = collect_cell_contribution(test_row,op.res(μ,t,u,dv_row),trian)
+    ratio = d[cell] ./ d0
+    if !all(ratio .== ratio[1])
+      return NonAffinity()
+    end
+  end
+
+  for t in rand(times,ntests)
+    d = collect_cell_contribution(test_row,op.res(μ,t,u,dv_row),trian)
+    ratio = d[cell] ./ d0
+    if !all(ratio .== ratio[1])
+      return ParamAffinity()
+    end
+  end
+
+  return ParamTimeAffinity()
+end
+
 function affinity_jacobian(
   op::ParamTransientFEOperator,
   solver::ODESolver,

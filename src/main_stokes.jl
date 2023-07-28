@@ -7,9 +7,8 @@ addprocs(4)
 
 @everywhere begin
   root = pwd()
-  include("$root/src/NEWCODE/FEM/FEM.jl")
-  include("$root/src/NEWCODE/ROM/ROM.jl")
-  include("$root/src/NEWCODE/RBTests.jl")
+  include("$root/src/FEM/FEM.jl")
+  include("$root/src/RB/RB.jl")
 
   mesh = "model_circle_2D_coarse.json"
   test_path = "$root/tests/stokes/unsteady/$mesh"

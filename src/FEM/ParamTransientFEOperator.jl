@@ -203,28 +203,3 @@ function _matdata_jacobian(
   v = get_fe_basis(V)
   collect_cell_matrix(Uh,V,γᵢ*op.jacs[i](μ,t,uh,du,v))
 end
-
-function _collect_trian_res(op::ParamTransientFEOperator)
-  μ,t = realization(op),0.
-  uh = zero(op.test)
-  v = get_fe_basis(op.test)
-  dxh = ()
-  for _ in 1:get_order(op)
-    dxh = (dxh...,uh)
-  end
-  xh = TransientCellField(uh,dxh)
-  veccontrib = op.res(μ,t,xh,v)
-  collect_trian(veccontrib)
-end
-
-function _collect_trian_jac(op::ParamTransientFEOperator)
-  μ,t = realization(op),0.
-  uh = zero(op.test)
-  v = get_fe_basis(op.test)
-  trians = ()
-  for j in op.jacs
-    matcontrib = j(μ,t,uh,v,v)
-    trians = (trians...,collect_trian(matcontrib)...)
-  end
-  unique(trians)
-end

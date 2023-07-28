@@ -3,13 +3,9 @@ using MPI,MPIClusterManagers,Distributed
 manager = MPIWorkerManager()
 addprocs(4)
 
-@everywhere using Pkg; Pkg.activate(".")
-
 @everywhere begin
+  using Mabla
   root = pwd()
-  include("$root/src/NEWCODE/FEM/FEM.jl")
-  include("$root/src/NEWCODE/ROM/ROM.jl")
-  include("$root/src/NEWCODE/RBTests.jl")
 
   mesh = "elasticity_3cyl2D.json"
   test_path = "$root/tests/poisson/unsteady/$mesh"
@@ -17,8 +13,7 @@ addprocs(4)
   order = 1
   degree = 2
 
-  mshpath = mesh_path(test_path,mesh)
-  model = get_discrete_model(mshpath,bnd_info)
+  model = get_discrete_model(test_path,mesh,bnd_info)
   Ω = Triangulation(model)
   dΩ = Measure(Ω,degree)
   Γn = BoundaryTriangulation(model,tags=["neumann"])
@@ -51,7 +46,7 @@ addprocs(4)
   jac(μ,t,u,du,v) = jac(μ,t,u,du,v,dΩ)
   jac_t(μ,t,u,dut,v) = jac_t(μ,t,u,dut,v,dΩ)
 
-  reffe = Gridap.ReferenceFE(lagrangian,Float,order)
+  reffe = ReferenceFE(lagrangian,Float,order)
   test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
   trial = ParamTransientTrialFESpace(test,g)
   feop = ParamTransientAffineFEOperator(res,jac,jac_t,pspace,trial,test)
@@ -79,9 +74,8 @@ T = return_type(k,fi...)
 
 @everywhere begin
   root = pwd()
-  include("$root/src/NEWCODE/FEM/FEM.jl")
-  include("$root/src/NEWCODE/ROM/ROM.jl")
-  include("$root/src/NEWCODE/RBTests.jl")
+  include("$root/src/FEM/FEM.jl")
+  include("$root/src/ROM/ROM.jl")
 end
 
 # rbop = if load_structures

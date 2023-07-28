@@ -1,8 +1,0 @@
-include("Snapshots.jl")
-include("Collectors.jl")
-include("RBInfo.jl")
-include("RBSpaces.jl")
-include("RBAffineDecomposition.jl")
-include("RBAlgebraicContributions.jl")
-include("RBOperators.jl")
-include("RBResults.jl")

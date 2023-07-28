@@ -1,15 +1,9 @@
-using DataFrames
-using FillArrays
+module FEM
+using Mabla.Utils
+
 using LinearAlgebra
 using Distributions
-using Random
-using SuiteSparse
-using SparseArrays
-using Elemental
-using DelimitedFiles
-using Serialization
 using ForwardDiff
-using BlockArrays
 using Gridap
 using Gridap.Algebra
 using Gridap.FESpaces
@@ -27,10 +21,7 @@ using GridapP4est
 using Gridap.TensorValues
 using Gridap.ODEs.TransientFETools
 
-import Base.Threads.@threads
-import Gridap.Helpers.@abstractmethod
 import Gridap.Helpers.@check
-import Gridap.Helpers.@notimplemented
 import Gridap.Helpers.@unreachable
 import Gridap.Arrays:evaluate
 import Gridap.Arrays:evaluate!
@@ -47,6 +38,8 @@ import Gridap.Algebra:allocate_matrix
 import Gridap.FESpaces:_pair_contribution_when_possible
 import Gridap.FESpaces:assemble_vector
 import Gridap.FESpaces:assemble_matrix
+import Gridap.FESpaces:collect_cell_vector
+import Gridap.FESpaces:collect_cell_matrix
 import Gridap.FESpaces:get_fe_basis
 import Gridap.FESpaces:get_trial_fe_basis
 import Gridap.Geometry:GridView
@@ -72,15 +65,63 @@ import Gridap.ODEs.TransientFETools._matdata_jacobian
 import Gridap.ODEs.TransientFETools._vcat_matdata
 import Gridap.ODEs.TransientFETools:∂t
 import Gridap.ODEs.TransientFETools:∂tt
-import LineSearches:BackTracking
 
-const Float = Float64
-const EMatrix = Elemental.Matrix
+# FEOperations
+export collect_cell_contribution
+export collect_trian
+export is_parent
+export modify_measures
+export is_change_possible
+export get_discrete_model
+# ParamSpace
+export SamplingStyle
+export UniformSampling
+export realization
+# DiffOperators
+export time_derivative
+# ParamTransientFESpaces
+export ParamTransientTrialFESpace
+# ParamTransientFEOperator
+export ParamTransientFEOperator
+# FilteredParamTransientFEOperator
+export FilteredParamTransientFEOperator
+export allocate_evaluation_function
+export evaluation_function
+export filter_evaluation_function
+export collect_trian_res
+export collect_trian_jac
+# TimeMarchingSchemes
+export θMethod
+export get_time_ndofs
+export get_times
+# FECollectors
+export CollectSolutionMap
+# Affinity
+export Affinity
+export ZeroAffinity
+export ParamAffinity
+export TimeAffinity
+export ParamTimeAffinity
+export NonAffinity
+export affinity_residual
+export affinity_jacobian
+# LagrangianQuadFESpaces
+export LagrangianQuadRefFE
+export get_phys_quad_points
 
-include("Files.jl")
-include("Indexes.jl")
-include("Operations.jl")
-include("BasesConstruction.jl")
-include("SystemSolvers.jl")
-include("NnzArray.jl")
-include("ParamStructure.jl")
+include("FEOperations.jl")
+include("ParamSpace.jl")
+include("DiffOperators.jl")
+include("ParamTransientFESpaces.jl")
+include("ParamTransientFEOperator.jl")
+include("ParamTransientFESolversInterface.jl")
+include("ParamTransientFESolvers.jl")
+include("FilteredParamTransientFEOperator.jl")
+include("FECollectors.jl")
+include("TimeMarchingSchemes.jl")
+include("NothingIntegration.jl")
+include("AffineThetaMethod.jl")
+include("ThetaMethod.jl")
+include("Affinity.jl")
+include("LagrangianQuadFESpaces.jl")
+end # module

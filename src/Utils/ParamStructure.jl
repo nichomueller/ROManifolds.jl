@@ -7,11 +7,11 @@ function Base.:+(pa1::ParamStructure,pa2::ParamStructure)
   ParamStructure(f12)
 end
 
-function evaluate(pa::ParamStructure,args...)::AbstractMatrix
+function evaluate(pa::ParamStructure,args...)
   pa.f(args...)
 end
 
-function evaluate(pa::Vector{ParamStructure},args...)::AbstractMatrix
+function evaluate(pa::Vector{ParamStructure},args...)
   blocks = map(axes(pa,1)) do row
     evaluate(pa[row],args...)
   end
@@ -19,7 +19,7 @@ function evaluate(pa::Vector{ParamStructure},args...)::AbstractMatrix
   pa_vec
 end
 
-function evaluate(pa::Matrix{ParamStructure},args...)::AbstractMatrix
+function evaluate(pa::Matrix{ParamStructure},args...)
   cblocks = pmap(axes(pa,2)) do col
     rblocks = map(axes(pa,1)) do row
       evaluate(pa[row,col],args...)
@@ -34,7 +34,7 @@ end
 (pa::Vector{ParamStructure})(args...) = evaluate(pa,args...)
 (pa::Matrix{ParamStructure})(args...) = evaluate(pa,args...)
 
-function Gridap.CellData.add_contribution!(
+function sum_contributions!(
   pa1::Array{ParamStructure,N},
   pa2::ParamStructure,
   idx::Int...) where N

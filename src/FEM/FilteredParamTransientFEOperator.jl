@@ -149,38 +149,7 @@ function fill_initial_jacobians(op::ParamTransientFEOperatorFromWeakForm,args...
   return _matdata
 end
 
-function fill_jacobians(
-  op::ParamTransientFEOperatorFromWeakForm,
-  μ::AbstractVector,
-  t::Real,
-  uh::T,
-  γ::Tuple{Vararg{Real}}) where T
-
-  _matdata = ()
-  for i in 1:get_order(op)+1
-    if (γ[i] > 0.0)
-      _matdata = (_matdata...,_matdata_jacobian(op,μ,t,uh,i,γ[i]))
-    end
-  end
-  return _matdata
-end
-
-function _matdata_jacobian(
-  op::ParamTransientFEOperatorFromWeakForm,
-  μ::AbstractVector,
-  t::Real,
-  uh::T,
-  i::Integer,
-  γᵢ::Real) where T
-
-  Uh = get_trial(op)(nothing,nothing)
-  V = get_test(op)
-  du = get_trial_fe_basis(Uh)
-  v = get_fe_basis(V)
-  collect_cell_matrix(Uh,V,γᵢ*op.jacs[i](μ,t,uh,du,v))
-end
-
-function _collect_trian_res(op::FilteredParamTransientFEOperator)
+function collect_trian_res(op::FilteredParamTransientFEOperator)
   μ,t = realization(op),0.
   uh = zero(op.test)
   v = get_fe_basis(op.test)
@@ -193,7 +162,7 @@ function _collect_trian_res(op::FilteredParamTransientFEOperator)
   collect_trian(veccontrib)
 end
 
-function _collect_trian_jac(op::FilteredParamTransientFEOperator)
+function collect_trian_jac(op::FilteredParamTransientFEOperator)
   μ,t = realization(op),0.
   uh = zero(op.test)
   v = get_fe_basis(op.test)
@@ -203,16 +172,4 @@ function _collect_trian_jac(op::FilteredParamTransientFEOperator)
     trians = (trians...,collect_trian(matcontrib)...)
   end
   unique(trians)
-end
-filter_evaluation_function(u,args...) = u
-
-function filter_evaluation_function(
-  u::Gridap.ODEs.TransientFETools.TransientMultiFieldCellField,
-  col::Int)
-
-  u_col = Any[]
-  for nf = eachindex(u.transient_single_fields)
-    nf == col ? push!(u_col,u[col]) : push!(u_col,nothing)
-  end
-  u_col
 end

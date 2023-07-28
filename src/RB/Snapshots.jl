@@ -136,7 +136,7 @@ function tpod(
   type=Matrix{Float},
   kwargs...)
 
-  by_row = _compress_rows(s.snaps)
+  by_row = size(s.snaps.nonzero_val,1) > size(s.snaps.nonzero_val,2)
   basis_space,basis_time = tpod(Val{by_row}(),s;kwargs...)
   convert!(type,basis_space)
   convert!(type,basis_time)

@@ -37,7 +37,7 @@ struct NewtonIterations <:RBSolver end
 
 function test_rb_operator(
   info::RBInfo,
-  feop::ODEOperator{Affine},
+  feop::TransientFEOperator{Affine},
   rbop::TransientRBOperator{Affine},
   fesolver::ODESolver,
   rbsolver::RBSolver;
@@ -61,7 +61,7 @@ end
 
 function test_rb_operator(
   info::RBInfo,
-  feop::ODEOperator,
+  feop::TransientFEOperator,
   rbop::TransientRBOperator,
   fesolver::ODESolver,
   rbsolver::RBSolver;
@@ -86,7 +86,7 @@ end
 
 function load_test(
   info::RBInfo,
-  feop::ODEOperator,
+  feop::TransientFEOperator,
   fesolver::ODESolver,
   ntests::Int)
 

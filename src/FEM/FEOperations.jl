@@ -1,74 +1,4 @@
-function expand(tup::Tuple)
-  t = ()
-  for el = tup
-    if isa(el,Tuple)
-      t = (t...,expand(el)...)
-    else
-      t = (t...,el)
-    end
-  end
-  t
-end
-
-function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
-  numnz = nnz(S)
-  I = Vector{Ti}(undef,numnz)
-  J = Vector{Ti}(undef,numnz)
-  V = Vector{Tv}(undef,numnz)
-
-  count = 1
-  @inbounds for col = 1:size(S,2), k = SparseArrays.getcolptr(S)[col] : (SparseArrays.getcolptr(S)[col+1]-1)
-      I[count] = rowvals(S)[k]
-      J[count] = col
-      V[count] = nonzeros(S)[k]
-      count += 1
-  end
-
-  nz = findall(x -> x .>= eps(),V)
-
-  (I[nz],J[nz],V[nz])
-end
-
-function compress_array(entire_array::AbstractVector)
-  nonzero_idx = findall(x -> abs(x) ≥ eps(),entire_array)
-  nonzero_idx,entire_array[nonzero_idx]
-end
-
-function compress_array(entire_array::AbstractMatrix)
-  sum_cols = reshape(sum(entire_array,dims=2),:)
-  nonzero_idx = findall(x -> abs(x) ≥ eps(),sum_cols)
-  nonzero_idx,entire_array[nonzero_idx,:]
-end
-
-function compress_array(entire_array::SparseMatrixCSC{Float,Int})
-  findnz(entire_array[:])
-end
-
-function allocate_matrix(::EMatrix{T},sizes...) where T
-  Elemental.zeros(EMatrix{T},sizes...)
-end
-
-function allocate_matrix(::Matrix{T},sizes...) where T
-  zeros(T,sizes...)
-end
-
-function Base.getindex(
-  emat::EMatrix{T},
-  k1::Int,
-  idx::Union{UnitRange{Int},Vector{Int},Colon}) where T
-
-  reshape(convert(Matrix{T},emat[k1:k1,idx]),:)
-end
-
-function Base.getindex(
-  emat::EMatrix{T},
-  idx::Union{UnitRange{Int},Vector{Int},Colon},
-  k2::Int) where T
-
-  reshape(convert(Matrix{T},emat[idx,k2:k2]),:)
-end
-
-function Gridap.FESpaces.collect_cell_vector(
+function collect_cell_vector(
   test::FESpace,
   a::DomainContribution,
   trian::Triangulation)
@@ -89,7 +19,7 @@ function Gridap.FESpaces.collect_cell_vector(
   (w,r)
 end
 
-function Gridap.FESpaces.collect_cell_matrix(
+function collect_cell_matrix(
   trial::FESpace,
   test::FESpace,
   a::DomainContribution,
@@ -161,18 +91,6 @@ function collect_trian(a::DomainContribution)
   unique(t)
 end
 
-function expand(tup::Tuple)
-  t = ()
-  for el = tup
-    if isa(el,Tuple)
-      t = (t...,expand(el)...)
-    else
-      t = (t...,el)
-    end
-  end
-  t
-end
-
 function Base.:(==)(
   a::T,
   b::T
@@ -233,7 +151,7 @@ function Gridap.FESpaces.get_order(test::MultiFieldFESpace)
 end
 
 # Remove when possible
-function Gridap.Geometry.is_change_possible(
+function is_change_possible(
   strian::Triangulation,
   ttrian::Triangulation)
 
@@ -251,4 +169,31 @@ function Gridap.Geometry.is_change_possible(
   sglue = get_glue(strian,Val(D))
   tglue = get_glue(ttrian,Val(D))
   is_change_possible(sglue,tglue)
+end
+
+function get_discrete_model(
+  tpath::String,
+  mesh::String,
+  bnd_info::Dict)
+
+  mshpath = joinpath(get_parent_dir(tpath;nparent=3),"meshes/$mesh")
+  if !ispath(mshpath)
+    mshpath_msh_format = mshpath[1:findall(x->x=='.',mshpath)[end]-1]*".msh"
+    model_msh_format = GmshDiscreteModel(mshpath_msh_format)
+    to_json_file(model_msh_format,mshpath)
+  end
+  model = DiscreteModelFromFile(mshpath)
+  set_labels!(model,bnd_info)
+  model
+end
+
+function set_labels!(model,bnd_info)
+  tags = collect(keys(bnd_info))
+  bnds = collect(values(bnd_info))
+  labels = get_face_labeling(model)
+  for i = eachindex(tags)
+    if tags[i] ∉ labels.tag_to_name
+      add_tag_from_tags!(labels,tags[i],bnds[i])
+    end
+  end
 end

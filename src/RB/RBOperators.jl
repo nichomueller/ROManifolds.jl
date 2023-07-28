@@ -53,7 +53,7 @@ function collect_residual_contributions(
         measures,
         (row,1);
         kwargs...)
-      add_contribution!(r,rr,row)
+      sum_contributions!(r,rr,row)
     end
   end
 
@@ -109,7 +109,7 @@ function collect_jacobian_contributions(
         measures,
         (row,col);
         kwargs...)
-      add_contribution!(j,jrc,row,col)
+      sum_contributions!(j,jrc,row,col)
     end
   end
 
