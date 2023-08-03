@@ -40,7 +40,7 @@ end
 """
 Parameter, time evaluation allocating Dirichlet vals
 """
-function evaluate(U::ParamTransientTrialFESpace,μ::AbstractVector,t::Real)
+function Gridap.Arrays.evaluate(U::ParamTransientTrialFESpace,μ::AbstractVector,t::Real)
   Uμt = allocate_trial_space(U)
   evaluate!(Uμt,U,μ,t)
   Uμt
@@ -49,7 +49,7 @@ end
 """
 Parameter evaluation allocating Dirichlet vals
 """
-function evaluate(U::ParamTransientTrialFESpace,μ::AbstractVector)
+function Gridap.Arrays.evaluate(U::ParamTransientTrialFESpace,μ::AbstractVector)
   Uμt = evaluate(U,μ,0.)
   if isa(U.dirichlet_μt,Vector)
     objects_at_t = t -> map(o->o(μ,t),U.dirichlet_μt)
@@ -62,8 +62,8 @@ end
 """
 We can evaluate at `nothing` when we do not care about the Dirichlet vals
 """
-evaluate(U::ParamTransientTrialFESpace,::Nothing,::Nothing) = U.Ud0
-evaluate(U::ParamTransientTrialFESpace,::Nothing) = U.Ud0
+Gridap.Arrays.evaluate(U::ParamTransientTrialFESpace,::Nothing,::Nothing) = U.Ud0
+Gridap.Arrays.evaluate(U::ParamTransientTrialFESpace,::Nothing) = U.Ud0
 
 """
 Functor-like evaluation. It allocates Dirichlet vals in general.
@@ -75,14 +75,14 @@ Functor-like evaluation. It allocates Dirichlet vals in general.
 """
 Time derivative of the Dirichlet functions
 """
-∂t(U::ParamTransientTrialFESpace) =
-  ParamTransientTrialFESpace(U.space,∂t.(U.dirichlet_μt))
+∂ₚt(U::ParamTransientTrialFESpace) =
+  ParamTransientTrialFESpace(U.space,∂ₚt.(U.dirichlet_μt))
 
 """
 Time 2nd derivative of the Dirichlet functions
 """
-∂tt(U::ParamTransientTrialFESpace) =
-  ParamTransientTrialFESpace(U.space,∂tt.(U.dirichlet_μt))
+∂ₚtt(U::ParamTransientTrialFESpace) =
+  ParamTransientTrialFESpace(U.space,∂ₚtt.(U.dirichlet_μt))
 
 # Define the ParamTrialFESpace interface for affine spaces
 
@@ -118,17 +118,17 @@ function evaluate!(Uμt::T,U::ParamTransientMultiFieldTrialFESpace,μ::AbstractV
   MultiFieldFESpace(spaces_at_μt)
 end
 
-function evaluate(U::ParamTransientMultiFieldTrialFESpace,μ::AbstractVector,t::Real)
+function Gridap.Arrays.evaluate(U::ParamTransientMultiFieldTrialFESpace,μ::AbstractVector,t::Real)
   Uμt = allocate_trial_space(U)
   evaluate!(Uμt,U,μ,t)
   Uμt
 end
 
-function evaluate(U::ParamTransientMultiFieldTrialFESpace,::Nothing,::Nothing)
+function Gridap.Arrays.evaluate(U::ParamTransientMultiFieldTrialFESpace,::Nothing,::Nothing)
   MultiFieldFESpace([fesp(nothing,nothing) for fesp in U.spaces])
 end
 
-function evaluate(U::ParamTransientMultiFieldTrialFESpace,μ::AbstractVector)
+function Gridap.Arrays.evaluate(U::ParamTransientMultiFieldTrialFESpace,μ::AbstractVector)
   TransientMultiFieldTrialFESpace([fesp(μ) for fesp in U.spaces])
 end
 
@@ -136,8 +136,8 @@ end
 (U::ParamTransientMultiFieldTrialFESpace)(μ,t) = evaluate(U,μ,t)
 (U::ParamTransientMultiFieldTrialFESpace)(μ) = evaluate(U,μ)
 
-function ∂t(U::ParamTransientMultiFieldTrialFESpace)
-  spaces = ∂t.(U.spaces)
+function ∂ₚt(U::ParamTransientMultiFieldTrialFESpace)
+  spaces = ∂ₚt.(U.spaces)
   ParamTransientMultiFieldFESpace(spaces)
 end
 

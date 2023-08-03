@@ -14,7 +14,7 @@ function allocate_cache(op::ParamODEOpFromFEOp)
   Uts = (Ut,)
   Us = (U,)
   for i in 1:get_order(op)
-    Uts = (Uts...,∂t(Uts[i]))
+    Uts = (Uts...,∂ₚt(Uts[i]))
     Us = (Us...,allocate_trial_space(Uts[i+1]))
   end
   fecache = allocate_cache(op.feop)

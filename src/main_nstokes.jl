@@ -20,7 +20,7 @@ u0(μ) = x->u0(x,μ)
 p0(x,μ) = 0
 p0(μ) = x->p0(x,μ)
 
-lhs(μ,t,(u,p),(du,dp),(dv,dq),dΩ) = (∫(dv⋅∂t(du))dΩ + ∫(a(μ,t)*∇(dv)⊙∇(du))dΩ +
+lhs(μ,t,(u,p),(du,dp),(dv,dq),dΩ) = (∫(dv⋅∂ₚt(du))dΩ + ∫(a(μ,t)*∇(dv)⊙∇(du))dΩ +
   ∫(dv⊙(dconv∘(du,∇(du),u,∇(u))))dΩ - ∫(dp*(∇⋅(dv)))dΩ - ∫(dq*(∇⋅(du)))dΩ)
 rhs(μ,t,(dv,dq),dΩ) = ∫(f(μ,t)*dv)dΩ + ∫(h(μ,t)*dv)dΓn
 djac_dt(μ,t,(u,p),(dut,dpt),(dv,dq),dΩ) = ∫(dv⋅dut)dΩ

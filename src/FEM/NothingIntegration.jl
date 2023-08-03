@@ -37,10 +37,10 @@ end
 
 (-)(a::DomainContribution,::Nothing) = a
 
-function collect_cell_vector(::FESpace,::Nothing,args...)
+function Gridap.FESpaces.collect_cell_vector(::FESpace,::Nothing,args...)
   nothing
 end
 
-function collect_cell_matrix(::FESpace,::FESpace,::Nothing,args...)
+function Gridap.FESpaces.collect_cell_matrix(::FESpace,::FESpace,::Nothing,args...)
   nothing
 end

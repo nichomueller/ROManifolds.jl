@@ -153,7 +153,7 @@ function ParamTransientFESolution(
   for xhi in xh0
     x0 = (x0...,get_free_dof_values(xhi))
   end
-  ode_sol = solve(solver,ode_op,μ,u0,t0,tF)
+  ode_sol = solve(solver,ode_op,μ,x0,t0,tF)
   trial = get_trial(op)
 
   ParamTransientFESolution(ode_sol,trial)

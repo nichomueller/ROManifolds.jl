@@ -39,7 +39,7 @@ addprocs(4)
   p0(x,μ) = 0
   p0(μ) = x->p0(x,μ)
 
-  res(μ,t,(u,p),(v,q),dΩ) = (∫(v⋅∂t(u))dΩ + ∫(a(μ,t)*∇(v)⊙∇(u))dΩ
+  res(μ,t,(u,p),(v,q),dΩ) = (∫(v⋅∂ₚt(u))dΩ + ∫(a(μ,t)*∇(v)⊙∇(u))dΩ
     - ∫(p*(∇⋅(v)))dΩ - ∫(q*(∇⋅(u)))dΩ)
   jac(μ,t,(u,p),(du,dp),(v,q),dΩ) = ∫(a(μ,t)*∇(v)⊙∇(du))dΩ - ∫(dp*(∇⋅(v)))dΩ - ∫(q*(∇⋅(du)))dΩ
   jac_t(μ,t,(u,p),(dut,dpt),(v,q),dΩ) = ∫(v⋅dut)dΩ

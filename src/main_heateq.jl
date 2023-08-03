@@ -4,8 +4,10 @@ manager = MPIWorkerManager()
 addprocs(4)
 
 @everywhere begin
-  using Mabla
   root = pwd()
+  include("$root/src/Utils/Utils.jl")
+  include("$root/src/FEM/FEM.jl")
+  include("$root/src/RB/RB.jl")
 
   mesh = "elasticity_3cyl2D.json"
   test_path = "$root/tests/poisson/unsteady/$mesh"
@@ -38,7 +40,7 @@ addprocs(4)
   u0(x,μ) = 0
   u0(μ) = x->u0(x,μ)
 
-  res(μ,t,u,v,dΩ,dΓn) = ∫(v*∂t(u))dΩ + ∫(a(μ,t)*∇(v)⋅∇(u))dΩ - ∫(f(μ,t)*v)dΩ - ∫(h(μ,t)*v)dΓn
+  res(μ,t,u,v,dΩ,dΓn) = ∫(v*∂ₚt(u))dΩ + ∫(a(μ,t)*∇(v)⋅∇(u))dΩ - ∫(f(μ,t)*v)dΩ - ∫(h(μ,t)*v)dΓn
   jac(μ,t,u,du,v,dΩ) = ∫(a(μ,t)*∇(v)⋅∇(du))dΩ
   jac_t(μ,t,u,dut,v,dΩ) = ∫(v*dut)dΩ
 
@@ -74,8 +76,10 @@ T = return_type(k,fi...)
 
 @everywhere begin
   root = pwd()
+  using Pkg; Pkg.activate(".")
+  include("$root/src/Utils/Utils.jl")
   include("$root/src/FEM/FEM.jl")
-  include("$root/src/ROM/ROM.jl")
+  include("$root/src/RB/RB.jl")
 end
 
 # rbop = if load_structures

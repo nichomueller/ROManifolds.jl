@@ -1,6 +1,3 @@
-module FEM
-using Mabla.Utils
-
 using LinearAlgebra
 using Distributions
 using ForwardDiff
@@ -14,12 +11,14 @@ using Gridap.Fields
 using Gridap.CellData
 using Gridap.MultiField
 using Gridap.Io
-using GridapGmsh
+# using GridapGmsh
 using GridapDistributed
-using GridapPETSc
-using GridapP4est
-using Gridap.TensorValues
+# using GridapPETSc
+# using GridapP4est
+# using Gridap.TensorValues
 using Gridap.ODEs.TransientFETools
+
+const Float = Float64
 
 import Gridap.Helpers.@check
 import Gridap.Helpers.@unreachable
@@ -63,54 +62,12 @@ import Gridap.ODEs.TransientFETools:update_cache!
 import Gridap.ODEs.TransientFETools:jacobians!
 import Gridap.ODEs.TransientFETools._matdata_jacobian
 import Gridap.ODEs.TransientFETools._vcat_matdata
-import Gridap.ODEs.TransientFETools:∂t
-import Gridap.ODEs.TransientFETools:∂tt
-
-# FEOperations
-export collect_cell_contribution
-export collect_trian
-export is_parent
-export modify_measures
-export is_change_possible
-export get_discrete_model
-# ParamSpace
-export SamplingStyle
-export UniformSampling
-export realization
-# DiffOperators
-export time_derivative
-# ParamTransientFESpaces
-export ParamTransientTrialFESpace
-# ParamTransientFEOperator
-export ParamTransientFEOperator
-# FilteredParamTransientFEOperator
-export FilteredParamTransientFEOperator
-export allocate_evaluation_function
-export evaluation_function
-export filter_evaluation_function
-export collect_trian_res
-export collect_trian_jac
-# TimeMarchingSchemes
-export θMethod
-export get_time_ndofs
-export get_times
-# FECollectors
-export CollectSolutionMap
-# Affinity
-export Affinity
-export ZeroAffinity
-export ParamAffinity
-export TimeAffinity
-export ParamTimeAffinity
-export NonAffinity
-export affinity_residual
-export affinity_jacobian
-# LagrangianQuadFESpaces
-export LagrangianQuadRefFE
-export get_phys_quad_points
+# import Gridap.ODEs.TransientFETools:∂t
+# import Gridap.ODEs.TransientFETools:∂tt
 
 include("FEOperations.jl")
 include("ParamSpace.jl")
+include("ParamStructure.jl")
 include("DiffOperators.jl")
 include("ParamTransientFESpaces.jl")
 include("ParamTransientFEOperator.jl")
@@ -124,4 +81,3 @@ include("AffineThetaMethod.jl")
 include("ThetaMethod.jl")
 include("Affinity.jl")
 include("LagrangianQuadFESpaces.jl")
-end # module

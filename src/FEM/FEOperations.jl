@@ -1,4 +1,4 @@
-function collect_cell_vector(
+function Gridap.FESpaces.collect_cell_vector(
   test::FESpace,
   a::DomainContribution,
   trian::Triangulation)
@@ -19,7 +19,7 @@ function collect_cell_vector(
   (w,r)
 end
 
-function collect_cell_matrix(
+function Gridap.FESpaces.collect_cell_matrix(
   trial::FESpace,
   test::FESpace,
   a::DomainContribution,

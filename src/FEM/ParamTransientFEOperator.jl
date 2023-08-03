@@ -40,14 +40,14 @@ function ParamTransientAffineFEOperator(res::Function,jac::Function,jac_t::Funct
   pspace,trial,test)
   assem = SparseMatrixAssembler(trial,test)
   ParamTransientFEOperatorFromWeakForm{Affine}(
-    res,(jac,jac_t),assem,pspace,(trial,∂t(trial)),test,1)
+    res,(jac,jac_t),assem,pspace,(trial,∂ₚt(trial)),test,1)
 end
 
 function ParamTransientFEOperator(res::Function,jac::Function,jac_t::Function,
   pspace,trial,test)
   assem = SparseMatrixAssembler(trial,test)
   ParamTransientFEOperatorFromWeakForm{Nonlinear}(
-    res,(jac,jac_t),assem,pspace,(trial,∂t(trial)),test,1)
+    res,(jac,jac_t),assem,pspace,(trial,∂ₚt(trial)),test,1)
 end
 
 function ParamTransientFEOperator(res::Function,pspace,trial,test;order::Integer=1)
@@ -160,7 +160,10 @@ function jacobians!(
   A
 end
 
-function fill_initial_jacobians(op::ParamTransientFEOperatorFromWeakForm,uh)
+function fill_initial_jacobians(
+  op::ParamTransientFEOperatorFromWeakForm,
+  uh::T) where T
+
   dxh = ()
   for i in 1:get_order(op)
     dxh = (dxh...,uh)
