@@ -14,7 +14,7 @@ function Snapshots(
   ::A,
   snaps::NnzArray{T},
   nsnaps::Int;
-  type=EMatrix{Float}) where {T,A}
+  type=Matrix{Float}) where {T,A}
 
   csnaps = snaps
   convert!(type,csnaps)
@@ -25,7 +25,7 @@ function Snapshots(
   ::A,
   snaps::Vector{NnzArray{T}},
   nsnaps::Int;
-  type=EMatrix{Float}) where {T,A}
+  type=Matrix{Float}) where {T,A}
 
   csnaps = hcat(snaps...)
   convert!(type,csnaps)
@@ -48,7 +48,7 @@ for Tarr in (:Matrix,:Vector)
       ::A,
       snaps::Vector{Vector{$Tarr{T}}},
       nsnaps::Int;
-      type=EMatrix{Float}) where {T,A}
+      type=Matrix{Float}) where {T,A}
 
       N = length(snaps)
       csnaps = compress(snaps)
@@ -87,6 +87,7 @@ function Base.iterate(s::SingleFieldSnapshots)
   snap_i = get_datum(s[i])
   return snap_i,i+1
 end
+
 function Base.iterate(s::SingleFieldSnapshots,idx::Int)
   if idx > s.nsnaps
     return

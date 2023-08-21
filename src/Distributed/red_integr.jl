@@ -129,7 +129,8 @@ function collect_snapshots(
     assemble_vector_add!(r,op.assem,vecdata)
   end
 
-  lazy_map(_vector,[μt...])
+  # lazy_map(_vector,[μt...])
+  map(_vector,[μt...])
 end
 
 function collect_snapshots(

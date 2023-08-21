@@ -43,19 +43,3 @@ end
 function compress_array(entire_array::SparseMatrixCSC{Float,Int})
   findnz(entire_array[:])
 end
-
-function Base.getindex(
-  emat::EMatrix{T},
-  k1::Int,
-  idx::Union{UnitRange{Int},Vector{Int},Colon}) where T
-
-  reshape(convert(Matrix{T},emat[k1:k1,idx]),:)
-end
-
-function Base.getindex(
-  emat::EMatrix{T},
-  idx::Union{UnitRange{Int},Vector{Int},Colon},
-  k2::Int) where T
-
-  reshape(convert(Matrix{T},emat[idx,k2:k2]),:)
-end

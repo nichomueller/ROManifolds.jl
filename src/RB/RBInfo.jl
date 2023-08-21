@@ -78,7 +78,6 @@ end
 function load(T::Type{Snapshots},info::RBInfo)
   path = joinpath(info.fe_path,"fesnaps")
   s = load(T,path)
-  convert!(EMatrix{Float},s)
   s
 end
 
