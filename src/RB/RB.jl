@@ -11,6 +11,7 @@ using Gridap.Fields
 using Gridap.CellData
 using Gridap.MultiField
 
+import LazyArrays:ApplyArray
 import Gridap.Helpers.@check
 import Gridap.Helpers.@unreachable
 import Gridap.Arrays:Table
@@ -21,8 +22,8 @@ import Gridap.Algebra:solve
 import Gridap.ODEs.TransientFETools:Affine
 import Gridap.ODEs.TransientFETools:ODESolver
 
-include("Snapshots.jl")
 include("RBInfo.jl")
+include("Snapshots.jl")
 # include("RBSpaces.jl")
 # include("RBAffineDecomposition.jl")
 # include("RBAlgebraicContributions.jl")

@@ -1,26 +1,33 @@
-struct Snapshots{A,T,N}
+struct Snapshots{C,T,N}
+  collector::C
   snaps::LazyArray{T,N}
   params::Table
-  function Snapshots(::A,snaps::LazyArray{T,N},params::Table) where {A,T,N}
-    new{A,T,N}(snaps,params)
+  function Snapshots(collector::C,snaps::LazyArray{T,N},params::Table) where {C,T,N}
+    new{C,T,N}(collector,snaps,params)
   end
 end
 
-get_snaps(snap::Snapshots,idx=:) = snap.snaps[idx]
+get_snaps(snap::Snapshots) = snap.snaps
 
 get_params(snap::Snapshots,idx=:) = snap.params[idx]
 
 get_nsnaps(snap::Snapshots) = length(snap.params)
 
-get_time_ndofs(snap::Snapshots) = Int(size(get_snaps(snap),2)/get_nsnaps(snap))
-
-function tpod(snap::Snapshots;kwargs...)
-  mode = Val(size(s.snaps,1) > size(s.snaps,2))
-  tpod(mode,snap;kwargs...)
+function lazy_collect(snap::Snapshots)
+  snaps_dofs = get_snaps(snap)
+  ApplyArray(hcat,snaps_dofs...)
 end
 
-function tpod(::Val{false},snap::Snapshots;kwargs...)
-  snaps,nsnaps = get_snaps(snap),get_nsnaps(snap)
+function lazy_collect(snap::Snapshots{CollectSolutionsMap,T,N} where {T,N})
+  snaps = get_snaps(snap)
+  f = Broadcasting(get_free_dof_values)
+  snaps_dofs = lazy_map(f,snaps)
+  ApplyArray(hcat,snaps_dofs...)
+end
+
+function tpod(snap::Snapshots;kwargs...)
+  snaps = lazy_collect(snap)
+  nsnaps = get_nsnaps(snap)
 
   basis_space = tpod(snaps;kwargs...)
   compressed_time_snaps = change_mode(basis_space'*snaps,nsnaps)
@@ -29,16 +36,32 @@ function tpod(::Val{false},snap::Snapshots;kwargs...)
   basis_space,basis_time
 end
 
-function tpod(::Val{true},snap::Snapshots;kwargs...)
-  snaps,nsnaps = get_snaps(snap),get_nsnaps(snap)
+# function tpod(snap::Snapshots;kwargs...)
+#   snaps = lazy_collect(snap)
+#   mode = Val(size(snaps,1) < size(snaps,2))
+#   tpod(mode,snap;kwargs...)
+# end
 
-  time_snaps = change_mode(snaps,nsnaps)
-  basis_time = tpod(time_snaps)
-  compressed_space_snaps = change_mode(basis_time'*time_snaps,nsnaps)
-  basis_space = tpod(compressed_space_snaps;kwargs...)
+# function tpod(::Val{true},snap::Matrix{T};kwargs...) where T
+#   snaps,nsnaps = get_snaps(snap),get_nsnaps(snap)
 
-  basis_space,basis_time
-end
+#   basis_space = tpod(snaps;kwargs...)
+#   compressed_time_snaps = change_mode(basis_space'*snaps,nsnaps)
+#   basis_time = tpod(compressed_time_snaps;kwargs...)
+
+#   basis_space,basis_time
+# end
+
+# function tpod(::Val{false},snap::Matrix{T};kwargs...) where T
+#   snaps,nsnaps = get_snaps(snap),get_nsnaps(snap)
+
+#   time_snaps = change_mode(snaps,nsnaps)
+#   basis_time = tpod(time_snaps)
+#   compressed_space_snaps = change_mode(basis_time'*time_snaps,nsnaps)
+#   basis_space = tpod(compressed_space_snaps;kwargs...)
+
+#   basis_space,basis_time
+# end
 
 for A in (:TimeAffinity,:ParamTimeAffinity)
   @eval begin
@@ -52,31 +75,6 @@ for A in (:TimeAffinity,:ParamTimeAffinity)
   end
 end
 
-struct ParamPair{T,N}
-  snap::AbstractArray{T,N}
-  param::Table
-end
-
-get_snap(pp::ParamPair) = pp.snap
-
-get_param(pp::ParamPair) = pp.param
-
-function Base.getindex(snap::Snapshots{T,N,A} where A,idx::Int) where {T,N}
-  return ParamPair{T,N}(get_snaps(snap,idx),get_params(snap,idx))
-end
-
-function Base.iterate(snap::Snapshots)
-  state = 1
-  return snap[state],state+1
-end
-
-function Base.iterate(snap::Snapshots,state::Int)
-  if state > get_nsnaps(snap)
-    return nothing
-  end
-  return snap[state],state+1
-end
-
 function collect_solutions(
   info::RBInfo,
   feop::ParamTransientFEOperator,
@@ -86,41 +84,135 @@ function collect_solutions(
   params = realization(feop,nsols)
   printstyled("Generating $nsols solution snapshots\n";color=:blue)
 
-  collect = CollectSolutionsMap(fesolver,feop)
-  sols = lazy_map(collect,params)
-  Snapshots(NonAffinity(),sols,params)
+  collector = CollectSolutionsMap(fesolver,feop)
+  sols = lazy_map(collector,params)
+  Snapshots(collector,sols,params)
 end
 
 function collect_residuals(
   info::RBInfo,
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
-  sols::Snapshots,
+  snaps::Snapshots,
+  trian::Triangulation,
   args...)
 
   nres = info.nsnaps_system
-  params = get_params(sols)
-  aff = affinity_residual(feop,fesolver,sols,args...)
-  printstyled("Generating $nres residual snapshots, affinity: $aff\n";color=:blue)
+  sols = get_snaps(snaps)
+  cache = array_cache(sols)
 
-  collect = CollectResidualsMap(fesolver,feop)
-  ress = lazy_map(collect,sols)
-  Snapshots(aff,ress,params)
+  function run_collection(collector::CollectResidualsMap)
+    params = get_params(sols,1:nres)
+    printstyled("Generating $nres residuals snapshots\n";color=:blue)
+    ress = lazy_map(eachindex(params)) do i
+      sol_i = getindex!(cache,sols,i)
+      param_i = getindex(params,i)
+      collector.f(sol_i,param_i)
+    end
+    return ress,params
+  end
+
+  function run_collection(collector::CollectResidualsMap{Union{TimeAffinity,NonAffinity}})
+    params = get_params(sols,1)
+    printstyled("Generating 1 residual snapshot\n";color=:blue)
+    ress = lazy_map(eachindex(params)) do i
+      sol_i = getindex!(cache,sols,i)
+      param_i = getindex(params,i)
+      collector.f(sol_i,param_i)
+    end
+    return ress,params
+  end
+
+  collector = CollectResidualsMap(fesolver,feop,trian)
+  ress,params = lazy_map(collector,sols)
+  Snapshots(collector,ress,params)
 end
 
 function collect_jacobians(
   info::RBInfo,
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
-  sols::Snapshots,
-  args...)
+  snaps::Snapshots,
+  trian::Triangulation,
+  args...;
+  i=1)
 
   njac = info.nsnaps_system
-  params = get_params(sols)
-  aff = affinity_jacobian(feop,fesolver,sols,args...)
-  printstyled("Generating $njac jacobians snapshots, affinity: $aff\n";color=:blue)
+  sols = get_snaps(snaps)
+  cache = array_cache(sols)
 
-  collect = CollectJacobiansMap(fesolver,feop)
-  jacs = lazy_map(collect,sols)
-  Snapshots(aff,jacs,params)
+  function run_collection(collector::CollectJacobiansMap)
+    params = get_params(sols,1:njac)
+    printstyled("Generating $njac jacobians snapshots\n";color=:blue)
+    jacs = lazy_map(eachindex(params)) do i
+      sol_i = getindex!(cache,sols,i)
+      param_i = getindex(params,i)
+      collector.f(sol_i,param_i)
+    end
+    return jacs,params
+  end
+
+  function run_collection(collector::CollectJacobiansMap{Union{TimeAffinity,NonAffinity}})
+    params = get_params(sols,1)
+    printstyled("Generating 1 jacobian snapshot\n";color=:blue)
+    jacs = lazy_map(eachindex(params)) do i
+      sol_i = getindex!(cache,sols,i)
+      param_i = getindex(params,i)
+      collector.f(sol_i,param_i)
+    end
+    return jacs,params
+  end
+
+  collector = CollectJacobiansMap(fesolver,feop,trian;i)
+  jacs,params = run_collection(collector)
+  Snapshots(collector,jacs,params)
+end
+
+function Arrays.lazy_map(
+  k::CollectResidualsMap,
+  sols::Snapshots)
+
+  cache = array_cache(sols)
+
+  lazy_map(k,first(sols))
+end
+
+function Arrays.lazy_map(
+  k::CollectResidualsMap{Union{TimeAffinity,NonAffinity}},
+  sols::Snapshots)
+
+  lazy_map(k,first(sols))
+end
+
+function Arrays.lazy_map(
+  k::CollectJacobiansMap{Union{TimeAffinity,NonAffinity}},
+  sols::Snapshots)
+
+  lazy_map(k,first(sols))
+end
+
+function save(info::RBInfo,snaps::Snapshots)
+  if info.save_structures
+    path = joinpath(info.fe_path,"fesnaps")
+    convert!(Matrix{Float},snaps)
+    save(path,snaps)
+  end
+end
+
+function save(info::RBInfo,params::Table)
+  if info.save_structures
+    path = joinpath(info.fe_path,"params")
+    save(path,params)
+  end
+end
+
+function load(T::Type{Snapshots},info::RBInfo)
+  path = joinpath(info.fe_path,"fesnaps")
+  s = load(T,path)
+  s
+end
+
+function load(T::Type{Table},info::RBInfo)
+  path = joinpath(info.fe_path,"params")
+  load(T,path)
 end

@@ -218,6 +218,30 @@ function Gridap.Visualization.writevtk(
   end
 end
 
+function save_test(info::RBInfo,snaps::Snapshots)
+  if info.save_structures
+    path = joinpath(info.fe_path,"fesnaps_test")
+    save(path,snaps)
+  end
+end
+
+function save_test(info::RBInfo,params::Table)
+  if info.save_structures
+    path = joinpath(info.fe_path,"params_test")
+    save(path,params)
+  end
+end
+
+function load_test(T::Type{Snapshots},info::RBInfo)
+  path = joinpath(info.fe_path,"fesnaps_test")
+  load(T,path)
+end
+
+function load_test(T::Type{Table},info::RBInfo)
+  path = joinpath(info.fe_path,"params_test")
+  load(T,path)
+end
+
 function save(info::RBInfo,rb_res::RBResults)
   path = joinpath(info.rb_path,"rbresults")
   save(path,rb_res)

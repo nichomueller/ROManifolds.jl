@@ -8,19 +8,17 @@ struct NonAffinity <: Affinity end
 function affinity_residual(
   op::ParamTransientFEOperator,
   solver::ODESolver,
-  params::Table,
-  trian::Triangulation,
-  filter::Tuple{Vararg{Int}};
+  trian::Triangulation;
   ntests::Int=10)
 
-  row, = filter
-  times = get_times(solver)
-  test_row = get_test(op)[row]
-  dv_row = _get_fe_basis(op.test,row)
+  dv = get_fe_basis(op.test)
   u = allocate_evaluation_function(op)
 
-  μ,t = rand(params),rand(times)
-  d = collect_cell_contribution(test_row,op.res(μ,t,u,dv_row),trian)
+  test_params = realization(op,ntests)
+  test_times = rand(get_times(solver),ntests)
+
+  μ,t = rand(test_params),rand(test_times)
+  d = collect_cell_contribution(op.test,op.res(μ,t,u,dv),trian)
   if all(isempty,d)
     return ZeroAffinity()
   end
@@ -29,16 +27,16 @@ function affinity_residual(
   cell = find_nonzero_cell_contribution(d,dir_cells)
   d0 = max.(abs.(d[cell]),eps())
 
-  for μ in rand(params,ntests)
-    d = collect_cell_contribution(test_row,op.res(μ,t,u,dv_row),trian)
+  for μ in test_params
+    d = collect_cell_contribution(op.test,op.res(μ,t,u,dv),trian)
     ratio = d[cell] ./ d0
     if !all(ratio .== ratio[1])
       return NonAffinity()
     end
   end
 
-  for t in rand(times,ntests)
-    d = collect_cell_contribution(test_row,op.res(μ,t,u,dv_row),trian)
+  for t in test_times
+    d = collect_cell_contribution(op.test,op.res(μ,t,u,dv),trian)
     ratio = d[cell] ./ d0
     if !all(ratio .== ratio[1])
       return ParamAffinity()
@@ -51,22 +49,19 @@ end
 function affinity_jacobian(
   op::ParamTransientFEOperator,
   solver::ODESolver,
-  params::Table,
-  trian::Triangulation,
-  filter::Tuple{Vararg{Int}};
+  trian::Triangulation;
   ntests::Int=10,i::Int=1)
 
-  row,col = filter
-  times = get_times(solver)
-  test_row = get_test(op)[row]
-  trial_col = get_trial(op)[col]
-  dv_row = _get_fe_basis(op.test,row)
-  du_col = _get_trial_fe_basis(get_trial(op)(nothing,nothing),col)
+  trial_hom = allocate_trial_space(op.trial)
+  du = get_trial_fe_basis(trial_hom)
+  dv = get_fe_basis(op.test)
   u = allocate_evaluation_function(op)
-  ucol = filter_evaluation_function(u,col)
 
-  μ,t = first(params),first(times)
-  d = collect_cell_contribution(trial_col(μ,t),test_row,op.jacs[i](μ,t,ucol,du_col,dv_row),trian)
+  test_params = realization(op,ntests)
+  test_times = rand(get_times(solver),ntests)
+
+  μ,t = rand(test_params),rand(test_times)
+  d = collect_cell_contribution(op.trial(μ,t),op.test,op.jacs[i](μ,t,u,du,dv),trian)
   if all(isempty,d)
     return ZeroAffinity()
   end
@@ -75,16 +70,16 @@ function affinity_jacobian(
   cell = find_nonzero_cell_contribution(d,dir_cells)
   d0 = max.(abs.(d[cell]),eps())
 
-  for μ in rand(params,ntests)
-    d = collect_cell_contribution(trial_col(μ,t),test_row,op.jacs[i](μ,t,ucol,du_col,dv_row),trian)
+  for μ in test_params
+    d = collect_cell_contribution(op.trial(μ,t),op.test,op.jacs[i](μ,t,u,du,dv),trian)
     ratio = d[cell] ./ d0
     if !all(ratio .== ratio[1])
       return NonAffinity()
     end
   end
 
-  for t in rand(times,ntests)
-    d = collect_cell_contribution(trial_col(μ,t),test_row,op.jacs[i](μ,t,ucol,du_col,dv_row),trian)
+  for t in test_times
+    d = collect_cell_contribution(op.trial(μ,t),op.test,op.jacs[i](μ,t,u,du,dv),trian)
     ratio = d[cell] ./ d0
     if !all(ratio .== ratio[1])
       return ParamAffinity()
@@ -92,6 +87,18 @@ function affinity_jacobian(
   end
 
   return ParamTimeAffinity()
+end
+
+function allocate_evaluation_function(op::ParamTransientFEOperator)
+  μ,t = realization(op),1.
+  trial = get_trial(op)(μ,t)
+  x = fill(0.,num_free_dofs(op.test))
+  xh = EvaluationFunction(trial,x)
+  dxh = ()
+  for _ in 1:get_order(op)
+    dxh = (dxh...,xh)
+  end
+  TransientCellField(xh,dxh)
 end
 
 function find_nonzero_cell_contribution(data,dir_cells)

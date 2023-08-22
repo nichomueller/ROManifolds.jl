@@ -1,7 +1,7 @@
-struct CollectSolutionMap <: Map
+struct CollectSolutionsMap <: Map
   f::Function
 
-  function CollectSolutionMap(
+  function CollectSolutionsMap(
     solver::ODESolver,
     op::ParamTransientFEOperator)
 
@@ -12,7 +12,7 @@ struct CollectSolutionMap <: Map
   end
 end
 
-function Arrays.evaluate!(cache,k::CollectSolutionMap,μ::AbstractArray)
+function Arrays.evaluate!(cache,k::CollectSolutionsMap,μ::AbstractArray)
   sol_μ = k.f(μ)
   l = length(sol_μ)
   T = return_type(sol_μ)
@@ -30,14 +30,14 @@ struct CollectResidualsMap{A} <: Map
   function CollectResidualsMap(
     solver::θMethod,
     op::ParamTransientFEOperator,
-    aff::A,
-    trian::Triangulation) where A
+    trian::Triangulation)
 
     dv = get_fe_basis(op.test)
     v0 = zero(op.test)
     pop = get_algebraic_operator(op)
     cache = allocate_cache(pop)
-    times = get_times(aff,solver)
+    A = affinity_residual(op,solver,trian)
+    times = get_times(A,solver)
 
     function f(sol::AbstractArray,μ::AbstractArray)
       x0 = setup_initial_condition(pop,solver,μ)
@@ -56,18 +56,22 @@ struct CollectResidualsMap{A} <: Map
       end
     end
 
-    new{A}(res_μ)
+    new{A}(f)
   end
 end
 
-function Arrays.evaluate!(cache,k::CollectResidualsMap,pp::ParamPair)
-  sol,μ = get_snap(pp),get_param(pp)
+function Arrays.evaluate!(
+  cache,
+  k::CollectResidualsMap,
+  sol::AbstractArray,
+  μ::AbstractArray)
+
   res_μ = k.f(sol,μ)
   res_μ_nnz = compress(res_μ)
   res_μ_nnz
 end
 
-struct CollectJacobiansMap <: Map
+struct CollectJacobiansMap{A} <: Map
   f::Function
 
   function CollectJacobiansMap(
@@ -82,7 +86,8 @@ struct CollectJacobiansMap <: Map
     du = get_trial_fe_basis(trial_hom)
     pop = get_algebraic_operator(op)
     cache = allocate_cache(pop)
-    times = get_times(aff,solver)
+    A = affinity_jacobian(op,solver,trian)
+    times = get_times(A,solver)
     γ = (1.0,1/(solver.dt*solver.θ))
 
     function f(sol::AbstractArray,μ::AbstractArray)
@@ -105,12 +110,16 @@ struct CollectJacobiansMap <: Map
       end
     end
 
-    new(f)
+    new{A}(f)
   end
 end
 
-function Arrays.evaluate!(cache,k::CollectJacobiansMap,pp::ParamPair)
-  sol,μ = get_snap(pp),get_param(pp)
+function Arrays.evaluate!(
+  cache,
+  k::CollectJacobiansMap,
+  sol::AbstractArray,
+  μ::AbstractArray)
+
   jac_μ_nnz = k.f(sol,μ)
   jac_μ_nnz
 end

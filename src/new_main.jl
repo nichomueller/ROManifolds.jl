@@ -63,45 +63,10 @@ begin
   rbsolver = Backslash()
 end
 
-params = realization(feop,10)
-sols = solve(fesolver,feop,params)
-solsμ1 = sols[1]
-solsμ1_resc = 3*solsμ1[2:end] - 2*solsμ1[1:end-1]
+sols = collect_solutions(info,feop,fesolver)
+collector = CollectResidualsMap(fesolver,feop,trian)
+ress,params = lazy_map(collector,sols)
 
 # COMPUTATIONALLY QUITE EXPENSIVE...
 # using LazyArrays
 # A = ApplyArray(hcat,sols...)
-
-function _lazy_array_into_tuple(a)
-  t = ()
-  for ela = a
-    t = (t...,ela)
-  end
-  t
-end
-
-tsols = _lazy_array_into_tuple(sols)
-
-function _lazy_hcat(a)
-  function first_and_tail(a)
-    x = take(first(a))
-    y = Base.tail(a)
-    x,y
-  end
-  function take(a::Vector{<:FEFunction})
-    x = map(get_free_dof_values,a)
-    hcat(x...)
-  end
-  function take(a::Tuple{Vector{<:FEFunction}})
-    a1 = first(a)
-    take(a1)
-  end
-  function take(a)
-    x,y = first_and_tail(a)
-    hcat(x,_lazy_hcat(y))
-  end
-  take(a)
-end
-
-csols = _lazy_hcat(tsols)
-svd(csols)
