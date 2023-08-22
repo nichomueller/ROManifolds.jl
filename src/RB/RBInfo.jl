@@ -14,20 +14,20 @@ function RBInfo(test_path::String;ϵ=1e-4,nsnaps_state=80,nsnaps_system=20,
   energy_norm=false,st_mdeim=false,fun_mdeim=false,
   load_structures=false,save_structures=true,postprocess=false)
 
-  fe_path = fem_path(test_path)
-  rb_path = rb_path(test_path,ϵ;st_mdeim,fun_mdeim)
+  fe_path = get_fe_path(test_path)
+  rb_path = get_rb_path(test_path,ϵ;st_mdeim,fun_mdeim)
   RBInfo(ϵ,nsnaps_state,nsnaps_system,fe_path,rb_path,
     energy_norm,load_structures,save_structures,postprocess)
 end
 
-function fem_path(tpath::String)
+function get_fe_path(tpath::String)
   create_dir!(tpath)
   fepath = joinpath(tpath,"fem")
   create_dir!(fepath)
   fepath
 end
 
-function rb_path(
+function get_rb_path(
   tpath::String,ϵ::Float;
   st_mdeim=false,fun_mdeim=false)
 

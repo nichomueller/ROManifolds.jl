@@ -103,3 +103,6 @@ function find_nonzero_cell_contribution(data,dir_cells)
   end
   @unreachable
 end
+
+get_times(::Affinity,solver) = solver.t0
+get_times(::Union{TimeAffinity,ParamTimeAffinity},solver) = get_times(solver)

@@ -153,15 +153,6 @@ function ParamTransientFESolution(
   ParamTransientFESolution(ode_sol,trial)
 end
 
-function solve(
-  solver::ODESolver,
-  op::ParamTransientFEOperator,
-  params::Table)
-
-  collect = CollectSolutionMap(solver,op)
-  lazy_map(collect,params)
-end
-
 function Base.iterate(sol::ParamTransientFESolution)
 
   psolnext = iterate(sol.psol)

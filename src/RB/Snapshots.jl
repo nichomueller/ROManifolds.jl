@@ -1,161 +1,40 @@
-abstract type Snapshots{T,N,A} end
-
-struct SingleFieldSnapshots{T,A} <: Snapshots{T,1,A}
-  snaps::NnzArray{T}
-  nsnaps::Int
-end
-
-struct MultiFieldSnapshots{T,N,A} <: Snapshots{T,N,A}
-  snaps::Vector{NnzArray{T}}
-  nsnaps::Int
-end
-
-function Snapshots(
-  ::A,
-  snaps::NnzArray{T},
-  nsnaps::Int;
-  type=Matrix{Float}) where {T,A}
-
-  csnaps = snaps
-  convert!(type,csnaps)
-  SingleFieldSnapshots{T,A}(csnaps,nsnaps)
-end
-
-function Snapshots(
-  ::A,
-  snaps::Vector{NnzArray{T}},
-  nsnaps::Int;
-  type=Matrix{Float}) where {T,A}
-
-  csnaps = hcat(snaps...)
-  convert!(type,csnaps)
-  SingleFieldSnapshots{T,A}(csnaps,nsnaps)
-end
-
-for Tarr in (:Matrix,:Vector)
-  @eval begin
-    function Snapshots(
-      aff::A,
-      snaps::Union{$Tarr{T},Vector{$Tarr{T}}},
-      nsnaps::Int;
-      kwargs...) where {T,A}
-
-      csnaps = compress(snaps)
-      Snapshots(aff,csnaps,nsnaps;kwargs...)
-    end
-
-    function Snapshots(
-      ::A,
-      snaps::Vector{Vector{$Tarr{T}}},
-      nsnaps::Int;
-      type=Matrix{Float}) where {T,A}
-
-      N = length(snaps)
-      csnaps = compress(snaps)
-      map(s->convert!(type,s),csnaps)
-      MultiFieldSnapshots{$Tarr{T},N,A}(csnaps,nsnaps)
-    end
+struct Snapshots{A,T,N}
+  snaps::LazyArray{T,N}
+  params::Table
+  function Snapshots(::A,snaps::LazyArray{T,N},params::Table) where {A,T,N}
+    new{A,T,N}(snaps,params)
   end
 end
 
-function Base.getindex(
-  s::SingleFieldSnapshots{T,A},
-  idx1,
-  idx2=:) where {T,A}
+get_snaps(snap::Snapshots,idx=:) = snap.snaps[idx]
 
-  time_ndofs = get_time_ndofs(s)
-  _idx = ((first(idx1)-1)*time_ndofs+1:last(idx1)*time_ndofs)[idx2]
-  snaps = s.snaps[:,_idx]
-  nsnaps = length(idx1)
-  SingleFieldSnapshots{T,A}(snaps,nsnaps)
+get_params(snap::Snapshots,idx=:) = snap.params[idx]
+
+get_nsnaps(snap::Snapshots) = length(snap.params)
+
+get_time_ndofs(snap::Snapshots) = Int(size(get_snaps(snap),2)/get_nsnaps(snap))
+
+function tpod(snap::Snapshots;kwargs...)
+  mode = Val(size(s.snaps,1) > size(s.snaps,2))
+  tpod(mode,snap;kwargs...)
 end
 
-function Base.getindex(
-  s::MultiFieldSnapshots{T,N,A},
-  idx1,
-  idx2=:) where {T,N,A}
+function tpod(::Val{false},snap::Snapshots;kwargs...)
+  snaps,nsnaps = get_snaps(snap),get_nsnaps(snap)
 
-  time_ndofs = get_time_ndofs(s)
-  _idx = ((first(idx1)-1)*time_ndofs+1:last(idx1)*time_ndofs)[idx2]
-  snaps = map(x->getindex(x,:,_idx),s.snaps)
-  nsnaps = length(idx1)
-  MultiFieldSnapshots{T,N,A}(snaps,nsnaps)
-end
-
-function Base.iterate(s::SingleFieldSnapshots)
-  i = 1
-  snap_i = get_datum(s[i])
-  return snap_i,i+1
-end
-
-function Base.iterate(s::SingleFieldSnapshots,idx::Int)
-  if idx > s.nsnaps
-    return
-  end
-  i = idx
-  snap_i = get_datum(s[i])
-  return snap_i,i+1
-end
-
-function Base.iterate(s::MultiFieldSnapshots{T,A}) where {T,A}
-  fieldid = 1
-  snapid = SingleFieldSnapshots{T,A}(s.snaps[fieldid],s.nsnaps)
-  return snapid,fieldid+1
-end
-
-function Base.iterate(s::MultiFieldSnapshots{T,A},fieldid::Int) where {T,A}
-  if fieldid > length(s.snaps)
-    return
-  end
-  snapid = SingleFieldSnapshots{T,A}(s.snaps[fieldid],s.nsnaps)
-  return snapid,fieldid+1
-end
-
-get_time_ndofs(s::SingleFieldSnapshots) = Int(size(s.snaps,2)/s.nsnaps)
-
-get_time_ndofs(s::MultiFieldSnapshots) = Int(size(s.snaps[1],2)/s.nsnaps)
-
-get_datum(s::SingleFieldSnapshots) = recast(s.snaps)
-
-get_datum(s::MultiFieldSnapshots) = vcat(map(recast,s.snaps))
-
-function convert!(::Type{T},s::SingleFieldSnapshots) where T
-  convert!(T,s.snaps)
-  return
-end
-
-function convert!(::Type{T},s::MultiFieldSnapshots) where T
-  for sf in s.snaps
-    convert!(T,sf)
-  end
-  return
-end
-
-function tpod(
-  s::SingleFieldSnapshots,
-  args...;
-  type=Matrix{Float},
-  kwargs...)
-
-  by_row = size(s.snaps.nonzero_val,1) > size(s.snaps.nonzero_val,2)
-  basis_space,basis_time = tpod(Val{by_row}(),s;kwargs...)
-  convert!(type,basis_space)
-  convert!(type,basis_time)
-  basis_space,basis_time
-end
-
-function tpod(::Val{false},s::SingleFieldSnapshots;kwargs...)
-  basis_space = tpod(s.snaps;kwargs...)
-  compressed_time_snaps = change_mode(basis_space'*s.snaps,s.nsnaps)
+  basis_space = tpod(snaps;kwargs...)
+  compressed_time_snaps = change_mode(basis_space'*snaps,nsnaps)
   basis_time = tpod(compressed_time_snaps;kwargs...)
 
   basis_space,basis_time
 end
 
-function tpod(::Val{true},s::SingleFieldSnapshots;kwargs...)
-  time_snaps = change_mode(s.snaps,s.nsnaps)
+function tpod(::Val{true},snap::Snapshots;kwargs...)
+  snaps,nsnaps = get_snaps(snap),get_nsnaps(snap)
+
+  time_snaps = change_mode(snaps,nsnaps)
   basis_time = tpod(time_snaps)
-  compressed_space_snaps = change_mode(basis_time'*time_snaps,s.nsnaps)
+  compressed_space_snaps = change_mode(basis_time'*time_snaps,nsnaps)
   basis_space = tpod(compressed_space_snaps;kwargs...)
 
   basis_space,basis_time
@@ -163,18 +42,85 @@ end
 
 for A in (:TimeAffinity,:ParamTimeAffinity)
   @eval begin
-    function tpod(
-      s::SingleFieldSnapshots{T,$A},
-      solver::ODESolver;
-      type=Matrix{Float},
-      kwargs...) where T
+    function tpod(snaps::Snapshots{T,N,$A} where N;kwargs...) where T
+      snaps,time_ndofs = get_snaps(snap),get_time_ndofs(snap)
 
-      basis_space = tpod(s.snaps;kwargs...)
-      time_ndofs = get_time_ndofs(solver)
-      basis_time = compress(ones(time_ndofs,1))
-      convert!(type,basis_space)
-      convert!(type,basis_time)
+      basis_space = tpod(snaps;kwargs...)
+      basis_time = ones(T,time_ndofs,1)
       basis_space,basis_time
     end
   end
+end
+
+struct ParamPair{T,N}
+  snap::AbstractArray{T,N}
+  param::Table
+end
+
+get_snap(pp::ParamPair) = pp.snap
+
+get_param(pp::ParamPair) = pp.param
+
+function Base.getindex(snap::Snapshots{T,N,A} where A,idx::Int) where {T,N}
+  return ParamPair{T,N}(get_snaps(snap,idx),get_params(snap,idx))
+end
+
+function Base.iterate(snap::Snapshots)
+  state = 1
+  return snap[state],state+1
+end
+
+function Base.iterate(snap::Snapshots,state::Int)
+  if state > get_nsnaps(snap)
+    return nothing
+  end
+  return snap[state],state+1
+end
+
+function collect_solutions(
+  info::RBInfo,
+  feop::ParamTransientFEOperator,
+  fesolver::ODESolver)
+
+  nsols = info.nsnaps_state
+  params = realization(feop,nsols)
+  printstyled("Generating $nsols solution snapshots\n";color=:blue)
+
+  collect = CollectSolutionsMap(fesolver,feop)
+  sols = lazy_map(collect,params)
+  Snapshots(NonAffinity(),sols,params)
+end
+
+function collect_residuals(
+  info::RBInfo,
+  feop::ParamTransientFEOperator,
+  fesolver::ODESolver,
+  sols::Snapshots,
+  args...)
+
+  nres = info.nsnaps_system
+  params = get_params(sols)
+  aff = affinity_residual(feop,fesolver,sols,args...)
+  printstyled("Generating $nres residual snapshots, affinity: $aff\n";color=:blue)
+
+  collect = CollectResidualsMap(fesolver,feop)
+  ress = lazy_map(collect,sols)
+  Snapshots(aff,ress,params)
+end
+
+function collect_jacobians(
+  info::RBInfo,
+  feop::ParamTransientFEOperator,
+  fesolver::ODESolver,
+  sols::Snapshots,
+  args...)
+
+  njac = info.nsnaps_system
+  params = get_params(sols)
+  aff = affinity_jacobian(feop,fesolver,sols,args...)
+  printstyled("Generating $njac jacobians snapshots, affinity: $aff\n";color=:blue)
+
+  collect = CollectJacobiansMap(fesolver,feop)
+  jacs = lazy_map(collect,sols)
+  Snapshots(aff,jacs,params)
 end
