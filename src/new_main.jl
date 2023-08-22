@@ -63,10 +63,36 @@ begin
   rbsolver = Backslash()
 end
 
+#OK
 sols = collect_solutions(info,feop,fesolver)
+#TRY
+collector = CollectResidualsMap(fesolver,feop,trian)
+nres = info.nsnaps_system
+sols = get_snaps(snaps)
+cache = array_cache(sols)
+
+function run_collection(collector::CollectResidualsMap)
+  params = get_params(snaps,1:nres)
+  printstyled("Generating $nres residuals snapshots\n";color=:blue)
+  ress = lazy_map(eachindex(params)) do i
+    sol_i = getindex!(cache,sols,i)
+    param_i = getindex(params,i)
+    collector.f(sol_i,param_i)
+  end
+  return ress,params
+end
+
+function run_collection(collector::CollectResidualsMap{Union{TimeAffinity,NonAffinity}})
+  params = get_params(snaps,1)
+  printstyled("Generating 1 residual snapshot\n";color=:blue)
+  ress = lazy_map(eachindex(params)) do i
+    sol_i = getindex!(cache,sols,i)
+    param_i = getindex(params,i)
+    collector.f(sol_i,param_i)
+  end
+  return ress,params
+end
+
 collector = CollectResidualsMap(fesolver,feop,trian)
 ress,params = lazy_map(collector,sols)
-
-# COMPUTATIONALLY QUITE EXPENSIVE...
-# using LazyArrays
-# A = ApplyArray(hcat,sols...)
+Snapshots(collector,ress,params)
