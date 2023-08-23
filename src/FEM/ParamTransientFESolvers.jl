@@ -113,12 +113,7 @@ function Base.iterate(
   return (uF[1],tF),state
 end
 
-struct ParamTransientFESolution
-  psol::ParamODESolution
-  trial
-end
-
-function ParamTransientFESolution(
+function Algebra.solve(
   solver::ODESolver,
   op::ParamTransientFEOperator,
   μ::AbstractVector,
@@ -128,13 +123,10 @@ function ParamTransientFESolution(
 
   ode_op = get_algebraic_operator(op)
   u0 = get_free_dof_values(uh0)
-  ode_sol = solve(solver,ode_op,μ,u0,t0,tF)
-  trial = get_trial(op)
-
-  ParamTransientFESolution(ode_sol,trial)
+  solve(solver,ode_op,μ,u0,t0,tF)
 end
 
-function ParamTransientFESolution(
+function Algebra.solve(
   solver::ODESolver,
   op::ParamTransientFEOperator,
   μ::AbstractVector,
@@ -147,57 +139,5 @@ function ParamTransientFESolution(
   for xhi in xh0
     x0 = (x0...,get_free_dof_values(xhi))
   end
-  ode_sol = solve(solver,ode_op,μ,x0,t0,tF)
-  trial = get_trial(op)
-
-  ParamTransientFESolution(ode_sol,trial)
-end
-
-function Base.iterate(sol::ParamTransientFESolution)
-
-  psolnext = iterate(sol.psol)
-
-  if isnothing(psolnext)
-    return nothing
-  end
-
-  (uF,tF),psolstate = psolnext
-
-  Uh = allocate_trial_space(sol.trial)
-  Uh = evaluate!(Uh,sol.trial,sol.psol.μ,tF)
-  uh = FEFunction(Uh,uF)
-
-  state = (Uh,psolstate)
-
-  return (uh,tF),state
-end
-
-function Base.iterate(sol::ParamTransientFESolution,state)
-
-  Uh,psolstate = state
-
-  psolnext = iterate(sol.psol,psolstate)
-
-  if isnothing(psolnext)
-    return nothing
-  end
-
-  (uF,tF),psolstate = psolnext
-
-  Uh = evaluate!(Uh,sol.trial,sol.psol.μ,tF)
-  uh = FEFunction(Uh,uF)
-
-  state = (Uh,psolstate)
-
-  return (uh,tF),state
-end
-
-function Arrays.return_value(sol::ParamTransientFESolution)
-  sol_μ1 = iterate(sol)
-  (uh1,_),_ = sol_μ1
-  uh1
-end
-
-function Base.length(sol::ParamTransientFESolution)
-  get_time_ndofs(sol.psol.solver)
+  solve(solver,ode_op,μ,x0,t0,tF)
 end

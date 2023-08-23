@@ -74,7 +74,6 @@ nres = get_nres(collector)
 snaps = sols
 sols = get_snaps(snaps)
 sols = view(get_snaps(snaps),1:nres)
-params = get_params(snaps,1:nres)
 printstyled("Generating $nres residuals snapshots\n";color=:blue)
 ress = lazy_map(collector.f,sols,params)
 

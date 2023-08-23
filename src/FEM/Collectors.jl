@@ -1,4 +1,6 @@
-struct CollectSolutionsMap <: Map
+abstract type CollectorMap{A} <: Map end
+
+struct CollectSolutionsMap <: CollectorMap{NonAffinity}
   f::Function
 
   function CollectSolutionsMap(
@@ -7,7 +9,7 @@ struct CollectSolutionsMap <: Map
 
     t0,tF = solver.t0,solver.tF
     uh0 = solver.uh0
-    f = μ::AbstractArray -> ParamTransientFESolution(solver,op,μ,uh0(μ),t0,tF)
+    f = μ::AbstractArray -> solve(solver,op,μ,uh0(μ),t0,tF)
     new(f)
   end
 end
@@ -24,7 +26,7 @@ function Arrays.evaluate!(cache,k::CollectSolutionsMap,μ::AbstractArray)
   vT
 end
 
-struct CollectResidualsMap{A} <: Map
+struct CollectResidualsMap{A} <: CollectorMap{A}
   f::Function
 
   function CollectResidualsMap(
@@ -40,7 +42,7 @@ struct CollectResidualsMap{A} <: Map
     times = get_times(A,solver)
 
     function f(sol::AbstractArray,μ::AbstractArray)
-      x0 = setup_initial_condition(pop,solver,μ)
+      x0 = setup_initial_condition(solver,μ)
 
       map(enumerate(times)) do (it,t)
         update_cache!(cache,pop,μ,t)
@@ -71,7 +73,7 @@ function Arrays.evaluate!(
   res_μ_nnz
 end
 
-struct CollectJacobiansMap{A} <: Map
+struct CollectJacobiansMap{A} <: CollectorMap{A}
   f::Function
 
   function CollectJacobiansMap(
@@ -91,7 +93,7 @@ struct CollectJacobiansMap{A} <: Map
     γ = (1.0,1/(solver.dt*solver.θ))
 
     function f(sol::AbstractArray,μ::AbstractArray)
-      x0 = setup_initial_condition(pop,solver,μ)
+      x0 = setup_initial_condition(solver,μ)
 
       map(enumerate(times)) do (it,t)
         update_cache!(cache,pop,μ,t)
@@ -125,19 +127,10 @@ function Arrays.evaluate!(
 end
 
 function setup_initial_condition(
-  op::ParamTransientFEOperator,
   solver::ODESolver,
-  μ::AbstractArray=realization(op))
+  μ::AbstractArray)
 
-  solver.uh0(μ)
-end
-
-function setup_initial_condition(
-  pop::ParamODEOpFromFEOp,
-  solver::ODESolver,
-  μ::AbstractArray=realization(pop.feop))
-
-  uh0 = setup_initial_condition(pop.feop,solver,μ)
+  uh0 = solver.uh0(μ)
   get_free_dof_values(uh0)
 end
 
