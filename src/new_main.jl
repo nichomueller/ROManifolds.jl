@@ -66,33 +66,17 @@ end
 #OK
 sols = collect_solutions(info,feop,fesolver)
 #TRY
+trian = Ω
 collector = CollectResidualsMap(fesolver,feop,trian)
-nres = info.nsnaps_system
+get_nres(::CollectResidualsMap) = info.nsnaps_system
+get_nres(::CollectResidualsMap{Union{TimeAffinity,NonAffinity}}) = info.nsnaps_system
+nres = get_nres(collector)
+snaps = sols
 sols = get_snaps(snaps)
-cache = array_cache(sols)
+sols = view(get_snaps(snaps),1:nres)
+params = get_params(snaps,1:nres)
+printstyled("Generating $nres residuals snapshots\n";color=:blue)
+ress = lazy_map(collector.f,sols,params)
 
-function run_collection(collector::CollectResidualsMap)
-  params = get_params(snaps,1:nres)
-  printstyled("Generating $nres residuals snapshots\n";color=:blue)
-  ress = lazy_map(eachindex(params)) do i
-    sol_i = getindex!(cache,sols,i)
-    param_i = getindex(params,i)
-    collector.f(sol_i,param_i)
-  end
-  return ress,params
-end
-
-function run_collection(collector::CollectResidualsMap{Union{TimeAffinity,NonAffinity}})
-  params = get_params(snaps,1)
-  printstyled("Generating 1 residual snapshot\n";color=:blue)
-  ress = lazy_map(eachindex(params)) do i
-    sol_i = getindex!(cache,sols,i)
-    param_i = getindex(params,i)
-    collector.f(sol_i,param_i)
-  end
-  return ress,params
-end
-
-collector = CollectResidualsMap(fesolver,feop,trian)
-ress,params = lazy_map(collector,sols)
+ress,params = lazy_map(collector,sols,snaps.params)
 Snapshots(collector,ress,params)
