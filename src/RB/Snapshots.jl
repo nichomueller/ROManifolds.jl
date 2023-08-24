@@ -1,14 +1,16 @@
 struct Snapshots{A}
   snaps::LazyArray
   nsnaps::Int
-  function Snapshots(collector::CollectorMap{A},snaps::LazyArray,nsnaps::Int) where A
-    new{A}(collector,snaps,nsnaps)
+  function Snapshots(::CollectorMap{A},snaps::LazyArray,nsnaps::Int) where A
+    new{A}(snaps,nsnaps)
   end
 end
 
 function lazy_collect(snap::Snapshots)
-  snaps_dofs = get_snaps(snap)
-  ApplyArray(hcat,snaps_dofs...)
+  param_time_snaps = get_snaps(snap)
+  param_snaps = lazy_map(x -> reduce(hcat,x),param_time_snaps)
+  snaps = ApplyArray(hcat,param_snaps...)
+  snaps
 end
 
 Base.size(snap::Snapshots,idx...) = size(lazy_collect(snap))
@@ -23,9 +25,16 @@ function tpod(snap::Snapshots;kwargs...)
   snaps = lazy_collect(snap)
   nsnaps = get_nsnaps(snap)
 
-  basis_space = tpod(snaps;kwargs...)
-  compressed_time_snaps = change_mode(basis_space'*snaps,nsnaps)
-  basis_time = tpod(compressed_time_snaps;kwargs...)
+  if size(snaps,1) < size(snaps,2)
+    basis_space = tpod(snaps;kwargs...)
+    compressed_time_snaps = change_mode(basis_space'*snaps,nsnaps)
+    basis_time = tpod(compressed_time_snaps;kwargs...)
+  else
+    time_snaps = change_mode(snaps,nsnaps)
+    basis_time = tpod(time_snaps;kwargs...)
+    compressed_space_snaps = change_mode(basis_time'*time_snaps,nsnaps)
+    basis_space = tpod(compressed_space_snaps;kwargs...)
+  end
 
   basis_space,basis_time
 end
@@ -34,7 +43,8 @@ for A in (:TimeAffinity,:ParamTimeAffinity)
   @eval begin
     function tpod(snap::Snapshots{$A};kwargs...)
       snaps = lazy_collect(snap)
-      time_ndofs = get_time_ndofs(snap)
+      nsnaps = get_nsnaps(snap)
+      time_ndofs = Int(size(snaps,2)/nsnaps)
       T = eltype(snaps)
 
       basis_space = tpod(snaps;kwargs...)
@@ -47,15 +57,15 @@ end
 function collect_solutions(
   info::RBInfo,
   feop::ParamTransientFEOperator,
-  fesolver::ODESolver)
+  fesolver::ODESolver,
+  params::Table)
 
   nsols = info.nsnaps_state
-  params = realization(feop,nsols)
   printstyled("Generating $nsols solution snapshots\n";color=:blue)
 
   collector = CollectSolutionsMap(fesolver,feop)
   sols = lazy_map(collector,params)
-  Snapshots(collector,sols,params)
+  Snapshots(collector,sols,nsols)
 end
 
 function collect_residuals(
@@ -63,10 +73,10 @@ function collect_residuals(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   snaps::Snapshots,
+  params::Table,
   trian::Triangulation,
   args...)
 
-  sols = get_snaps(snaps)
   collector = CollectResidualsMap(fesolver,feop,trian)
 
   get_nress(::CollectResidualsMap) = info.nsnaps_system
@@ -75,7 +85,8 @@ function collect_residuals(
 
   printstyled("Generating $nress residuals snapshots\n";color=:blue)
   sols = view(get_snaps(snaps),1:nress)
-  ress = lazy_map(collector.f,sols,params)
+  params = view(params,1:nress)
+  ress = lazy_map(collector,sols,params)
 
   Snapshots(collector,ress,nress)
 end
@@ -85,12 +96,12 @@ function collect_jacobians(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   snaps::Snapshots,
+  params::Table,
   trian::Triangulation,
   args...;
   i=1)
 
-  sols = get_snaps(snaps)
-  collector = CollectJacobiansMap(fesolver,feop,trian)
+  collector = CollectJacobiansMap(fesolver,feop,trian;i)
 
   get_njacs(::CollectJacobiansMap) = info.nsnaps_system
   get_njacs(::CollectJacobiansMap{Union{TimeAffinity,NonAffinity}}) = 1
@@ -98,16 +109,17 @@ function collect_jacobians(
 
   printstyled("Generating $njacs jacobians snapshots\n";color=:blue)
   sols = view(get_snaps(snaps),1:njacs)
-  jacs = lazy_map(collector.f,sols,params;i)
+  params = view(params,1:njacs)
+  jacs = lazy_map(collector,sols,params)
 
   Snapshots(collector,jacs,njacs)
 end
 
-function save(info::RBInfo,snaps::Snapshots)
+function save(info::RBInfo,snap::Snapshots)
   if info.save_structures
     path = joinpath(info.fe_path,"fesnaps")
-    convert!(Matrix{Float},snaps)
-    save(path,snaps)
+    convert!(Matrix{Float},snap)
+    save(path,snap)
   end
 end
 
@@ -120,8 +132,8 @@ end
 
 function load(T::Type{Snapshots},info::RBInfo)
   path = joinpath(info.fe_path,"fesnaps")
-  s = load(T,path)
-  s
+  snap = load(T,path)
+  snap
 end
 
 function load(T::Type{Table},info::RBInfo)

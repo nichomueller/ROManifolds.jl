@@ -52,7 +52,8 @@ function affinity_jacobian(
   trian::Triangulation;
   ntests::Int=10,i::Int=1)
 
-  trial_hom = allocate_trial_space(op.trial)
+  trial = get_trial(op)
+  trial_hom = allocate_trial_space(trial)
   du = get_trial_fe_basis(trial_hom)
   dv = get_fe_basis(op.test)
   u = allocate_evaluation_function(op)
@@ -61,7 +62,7 @@ function affinity_jacobian(
   test_times = rand(get_times(solver),ntests)
 
   μ,t = rand(test_params),rand(test_times)
-  d = collect_cell_contribution(op.trial(μ,t),op.test,op.jacs[i](μ,t,u,du,dv),trian)
+  d = collect_cell_contribution(trial(μ,t),op.test,op.jacs[i](μ,t,u,du,dv),trian)
   if all(isempty,d)
     return ZeroAffinity()
   end
@@ -71,7 +72,7 @@ function affinity_jacobian(
   d0 = max.(abs.(d[cell]),eps())
 
   for μ in test_params
-    d = collect_cell_contribution(op.trial(μ,t),op.test,op.jacs[i](μ,t,u,du,dv),trian)
+    d = collect_cell_contribution(trial(μ,t),op.test,op.jacs[i](μ,t,u,du,dv),trian)
     ratio = d[cell] ./ d0
     if !all(ratio .== ratio[1])
       return NonAffinity()
@@ -79,7 +80,7 @@ function affinity_jacobian(
   end
 
   for t in test_times
-    d = collect_cell_contribution(op.trial(μ,t),op.test,op.jacs[i](μ,t,u,du,dv),trian)
+    d = collect_cell_contribution(trial(μ,t),op.test,op.jacs[i](μ,t,u,du,dv),trian)
     ratio = d[cell] ./ d0
     if !all(ratio .== ratio[1])
       return ParamAffinity()
@@ -111,5 +112,5 @@ function find_nonzero_cell_contribution(data,dir_cells)
   @unreachable
 end
 
-get_times(::Affinity,solver) = solver.t0
-get_times(::Union{TimeAffinity,ParamTimeAffinity},solver) = get_times(solver)
+get_times(::Affinity,solver) = get_times(solver)
+get_times(::Union{TimeAffinity,ParamTimeAffinity},solver) = [solver.t0]

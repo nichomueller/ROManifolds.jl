@@ -1,6 +1,4 @@
-abstract type ParamODESolution <: GridapType end
-
-struct GenericParamODESolution{T} <: ParamODESolution
+struct ParamODESolution{T} <: GridapType
   solver::ODESolver
   op::ParamODEOperator
   μ::AbstractVector
@@ -28,11 +26,11 @@ function solve(
   t0::Real,
   tF::Real) where {T}
 
-  GenericParamODESolution{T}(solver,op,μ,u0,t0,tF)
+  ParamODESolution{T}(solver,op,μ,u0,t0,tF)
 end
 
 function Base.iterate(
-  sol::GenericParamODESolution{T}) where {T<:AbstractVector}
+  sol::ParamODESolution{T}) where {T<:AbstractVector}
 
   uF = copy(sol.u0)
   u0 = copy(sol.u0)
@@ -44,12 +42,13 @@ function Base.iterate(
   # Update
   u0 .= uF
   state = (uF,u0,tF,cache)
+  uF = postprocess(sol,uF)
 
   return (uF,tF),state
 end
 
 function Base.iterate(
-  sol::GenericParamODESolution{T},
+  sol::ParamODESolution{T},
   state) where {T<:AbstractVector}
 
   uF,u0,t0,cache = state
@@ -64,12 +63,13 @@ function Base.iterate(
   # Update
   u0 .= uF
   state = (uF,u0,tF,cache)
+  uF = postprocess(sol,uF)
 
   return (uF,tF),state
 end
 
 function Base.iterate(
-  sol::GenericParamODESolution{T}) where {T<:Tuple{Vararg{AbstractVector}}}
+  sol::ParamODESolution{T}) where {T<:Tuple{Vararg{AbstractVector}}}
 
   uF = ()
   u0 = ()
@@ -87,12 +87,13 @@ function Base.iterate(
     u0[i] .= uF[i]
   end
   state = (uF,u0,tF,cache)
+  uF1 = postprocess(sol,uF[1])
 
-  return (uF[1],tF),state
+  return (uF1,tF),state
 end
 
 function Base.iterate(
-  sol::GenericParamODESolution{T},
+  sol::ParamODESolution{T},
   state) where {T<:Tuple{Vararg{AbstractVector}}}
 
   uF,u0,t0,cache = state
@@ -109,8 +110,9 @@ function Base.iterate(
     u0[i] .= uF[i]
   end
   state = (uF,u0,tF,cache)
+  uF1 = postprocess(sol,uF[1])
 
-  return (uF[1],tF),state
+  return (uF1,tF),state
 end
 
 function Algebra.solve(

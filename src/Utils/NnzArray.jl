@@ -14,6 +14,8 @@ end
 
 get_nonzero_val(nza::NnzArray) = nza.nonzero_val
 
+Base.getindex(nza::NnzArray,idx...) = getindex(nza.nonzero_val,idx...)
+
 function compress(entire_array::OT) where {OT<:AbstractArray}
   nonzero_idx,nonzero_val = compress_array(entire_array)
   nrows = size(entire_array,1)

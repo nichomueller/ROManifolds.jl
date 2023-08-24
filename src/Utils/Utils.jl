@@ -2,6 +2,8 @@ using LinearAlgebra
 using SparseArrays
 using Serialization
 
+import BlockArrays:BlockVector
+import BlockArrays:mortar
 import Gridap.Helpers.@check
 
 const Float = Float64

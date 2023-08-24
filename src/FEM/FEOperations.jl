@@ -1,4 +1,4 @@
-function Gridap.FESpaces.collect_cell_vector(
+function FESpaces.collect_cell_vector(
   test::FESpace,
   a::DomainContribution,
   trian::Triangulation)
@@ -19,7 +19,7 @@ function Gridap.FESpaces.collect_cell_vector(
   (w,r)
 end
 
-function Gridap.FESpaces.collect_cell_matrix(
+function FESpaces.collect_cell_matrix(
   trial::FESpace,
   test::FESpace,
   a::DomainContribution,
@@ -140,15 +140,17 @@ end
 
 Gridap.CellData.get_triangulation(m::Measure) = m.quad.trian
 
-function Gridap.FESpaces.get_order(test::SingleFieldFESpace)
+function FESpaces.get_order(test::SingleFieldFESpace)
   basis = get_fe_basis(test)
-  first(Gridap.FESpaces.get_order(first(basis.cell_basis.values).fields))
+  first(FESpaces.get_order(first(basis.cell_basis.values).fields))
 end
 
-function Gridap.FESpaces.get_order(test::MultiFieldFESpace)
+function FESpaces.get_order(test::MultiFieldFESpace)
   orders = map(get_order,test)
   maximum(orders)
 end
+
+Base.zeros(fe::FESpace) = get_free_dof_values(zero(fe))
 
 # Remove when possible
 function is_change_possible(

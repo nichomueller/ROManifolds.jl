@@ -35,7 +35,7 @@ struct CollectResidualsMap{A} <: CollectorMap{A}
     trian::Triangulation)
 
     dv = get_fe_basis(op.test)
-    v0 = zero(op.test)
+    v0 = zeros(op.test)
     pop = get_algebraic_operator(op)
     cache = allocate_cache(pop)
     A = affinity_residual(op,solver,trian)

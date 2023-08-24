@@ -1,76 +1,37 @@
-abstract type TransientRBSpace{T} end
+abstract type EnrichmentStyle end
+struct NoEnrichment <: EnrichmentStyle end
+struct SupremizingEnrichment <: EnrichmentStyle end
 
-struct TransientSingleFieldRBSpace{T} <: TransientRBSpace{T}
-  basis_space::NnzArray{T}
-  basis_time::NnzArray{T}
-end
+struct RBSpace
+  basis_space::AbstractArray
+  basis_time::AbstractArray
 
-struct TransientMultiFieldRBSpace{T} <: TransientRBSpace{T}
-  basis_space::Vector{NnzArray{T}}
-  basis_time::Vector{NnzArray{T}}
-end
-
-get_basis_space(rb::TransientSingleFieldRBSpace) = recast(rb.basis_space)
-
-get_basis_space(rb::TransientMultiFieldRBSpace) = vcat(map(recast,rb.basis_space)...)
-
-get_rb_space_ndofs(rb::TransientRBSpace) = size(get_basis_space(rb),2)
-
-get_basis_time(rb::TransientSingleFieldRBSpace) = rb.basis_time.nonzero_val
-
-get_basis_time(rb::TransientMultiFieldRBSpace) = vcat(map(recast,rb.basis_time)...)
-
-get_rb_time_ndofs(rb::TransientRBSpace) = size(get_basis_time(rb),2)
-
-get_rb_ndofs(rb::TransientRBSpace) = get_rb_space_ndofs(rb)*get_rb_time_ndofs(rb)
-
-Base.getindex(rb::TransientSingleFieldRBSpace,args...) = rb
-
-Base.getindex(rb::TransientMultiFieldRBSpace,i::Int) = get_single_field(rb,i)
-
-Base.length(rb::TransientSingleFieldRBSpace) = 1
-
-Base.length(rb::TransientMultiFieldRBSpace) = length(rb.basis_space)
-
-function get_single_field(
-  rb::TransientMultiFieldRBSpace{T},
-  fieldid::Int) where T
-
-  TransientSingleFieldRBSpace{T}(rb.basis_space[fieldid],rb.basis_time[fieldid])
-end
-
-function compress_solutions(
-  ::ParamTransientFEOperator,
-  fesolver::ODESolver,
-  s::SingleFieldSnapshots{T,A},
-  args...;
-  kwargs...) where {T,A}
-
-  basis_space,basis_time = tpod(s,fesolver;kwargs...)
-  TransientSingleFieldRBSpace{T}(basis_space,basis_time)
-end
-
-function compress_solutions(
-  feop::ParamTransientFEOperator,
-  fesolver::ODESolver,
-  s::MultiFieldSnapshots{T,N,A},
-  args...;
-  compute_supremizers=true,
-  ttol=1e-2,
-  kwargs...) where {T,N,A}
-
-  bases = map(snap -> tpod(snap,fesolver;kwargs...),s)
-  bases_space,bases_time = first.(bases),last.(bases)
-  if compute_supremizers
-    add_space_supremizers!(bases_space,feop,fesolver,s,args...)
-    add_time_supremizers!(bases_time;ttol)
+  function RBSpace(::NoEnrichment,snaps::Snapshots,args...;kwargs...)
+    basis_space,basis_time = tpod(snaps;kwargs...)
+    new(basis_space,basis_time)
   end
-  TransientMultiFieldRBSpace{T}(bases_space,bases_time)
+
+  function RBSpace(::SupremizingEnrichment,snaps::Snapshots,args...;ttol=1e-2,kwargs...)
+    basis_space,basis_time = tpod(snaps;kwargs...)
+    if compute_supremizers
+      add_space_supremizers!(bases_space,snaps,args...)
+      add_time_supremizers!(bases_time,ttol)
+    end
+    new(bases_space,bases_time)
+  end
 end
+
+get_basis_space(rb::RBSpace) = rb.basis_space
+
+get_basis_time(rb::RBSpace) = rb.basis_time
+
+function compress_snapshots end
+
+compress_snapshots(args...;enrich=NoEnrichment(),kwargs...) = RBSpace(enrich,args...;kwargs...)
 
 function add_space_supremizers!(
   bases_space::Vector{NnzArray{T}},
-  feop::ParamTransientFEOperator,
+  feop::ParamFEOperator,
   fesolver::ODESolver,
   snaps::MultiFieldSnapshots,
   params::Table;
@@ -87,7 +48,7 @@ function add_space_supremizers!(
 end
 
 function space_supremizers(
-  feop::ParamTransientFEOperator,
+  feop::ParamFEOperator,
   fesolver::ODESolver,
   s::MultiFieldSnapshots,
   bs::AbstractMatrix,
@@ -111,20 +72,17 @@ function space_supremizers(
   supr
 end
 
-function add_time_supremizers!(
-  bases_time::Vector{NnzArray{T}};
-  kwargs...) where T
-
+function add_time_supremizers!(bases_time::Vector{NnzArray{T}},ttol::Real) where T
   tbu,tbdual... = map(get_nonzero_val,bases_time)
   for (i,tb) in enumerate(tbdual)
     printstyled("Computing supremizers in time for dual field $i\n";color=:blue)
-    tbu_i = add_time_supremizers([tbu,tb];kwargs...)
+    tbu_i = add_time_supremizers([tbu,tb],ttol)
     bases_time[1].nonzero_val = hcat(bases_time[1].nonzero_val,tbu_i)
   end
   return
 end
 
-function add_time_supremizers(bases_time::Vector{<:AbstractMatrix};ttol=1e-2)
+function add_time_supremizers(bases_time::Vector{<:AbstractMatrix},ttol::Real)
   basis_u,basis_p = bases_time
   basis_up = basis_u'*basis_p
 
@@ -163,14 +121,4 @@ function add_time_supremizers(bases_time::Vector{<:AbstractMatrix};ttol=1e-2)
 
   printstyled("Added $count time supremizers\n";color=:blue)
   basis_u
-end
-
-function allocate_rb_residual(rb::TransientRBSpace)
-  rb_ndofs = get_rb_ndofs(rb)
-  zeros(rb_ndofs)
-end
-
-function allocate_rb_jacobian(rb::TransientRBSpace)
-  rb_ndofs = get_rb_ndofs(rb)
-  zeros(rb_ndofs,rb_ndofs)
 end

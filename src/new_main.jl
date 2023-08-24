@@ -64,18 +64,13 @@ begin
 end
 
 #OK
-sols = collect_solutions(info,feop,fesolver)
+nsols = info.nsnaps_state
+params = realization(feop,nsols)
+sols = collect_solutions(info,feop,fesolver,params)
+snaps = sols
 #TRY
 trian = Ω
-collector = CollectResidualsMap(fesolver,feop,trian)
-get_nres(::CollectResidualsMap) = info.nsnaps_system
-get_nres(::CollectResidualsMap{Union{TimeAffinity,NonAffinity}}) = info.nsnaps_system
-nres = get_nres(collector)
-snaps = sols
-sols = get_snaps(snaps)
-sols = view(get_snaps(snaps),1:nres)
-printstyled("Generating $nres residuals snapshots\n";color=:blue)
-ress = lazy_map(collector.f,sols,params)
+ress = collect_residuals(info,feop,fesolver,snaps,params,trian);
+jacs = collect_jacobians(info,feop,fesolver,snaps,params,trian);
 
-ress,params = lazy_map(collector,sols,snaps.params)
-Snapshots(collector,ress,params)
+boh = lazy_map(hcat,sols.snaps)

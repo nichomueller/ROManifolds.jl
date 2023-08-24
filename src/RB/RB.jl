@@ -12,6 +12,7 @@ using Gridap.CellData
 using Gridap.MultiField
 
 import LazyArrays:ApplyArray
+import BlockArrays:BlockVector
 import Gridap.Helpers.@check
 import Gridap.Helpers.@unreachable
 import Gridap.Arrays:Table

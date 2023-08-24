@@ -6,6 +6,10 @@ struct ParamODEOpFromFEOp{C} <: ParamODEOperator{C}
   feop::ParamTransientFEOperator{C}
 end
 
+function Base.length(sol::ParamODESolution)
+  get_time_ndofs(sol.solver)
+end
+
 get_order(op::ParamODEOpFromFEOp) = get_order(op.feop)
 
 function allocate_cache(op::ParamODEOpFromFEOp)
@@ -115,4 +119,22 @@ function jacobians!(
   end
   xh=TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
   jacobians!(J,op.feop,μ,t,xh,γ,ode_cache)
+end
+
+function Arrays.return_value(sol::ParamODESolution)
+  sol1 = iterate(sol)
+  (uh1,_),_ = sol1
+  uh1
+end
+
+function postprocess(sol::ParamODESolution,uF::AbstractArray)
+  Uh = allocate_trial_space(get_trial(sol.op.feop))
+  if isa(Uh,MultiFieldFESpace)
+    blocks = map(1:length(Uh.spaces)) do i
+      MultiField.restrict_to_field(Uh,uF,i)
+    end
+    return mortar(blocks)
+  else
+    return uF
+  end
 end

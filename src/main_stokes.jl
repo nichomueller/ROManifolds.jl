@@ -1,12 +1,6 @@
-# driver for unsteady poisson
-using MPI,MPIClusterManagers,Distributed
-manager = MPIWorkerManager()
-addprocs(4)
-
-@everywhere using Pkg; Pkg.activate(".")
-
-@everywhere begin
+begin
   root = pwd()
+  include("$root/src/Utils/Utils.jl")
   include("$root/src/FEM/FEM.jl")
   include("$root/src/RB/RB.jl")
 
@@ -16,9 +10,7 @@ addprocs(4)
   order = 2
   degree = 4
 
-  fepath = fem_path(test_path)
-  mshpath = mesh_path(test_path,mesh)
-  model = get_discrete_model(mshpath,bnd_info)
+  model = get_discrete_model(test_path,mesh,bnd_info)
   Ω = Triangulation(model)
   dΩ = Measure(Ω,degree)
 
@@ -75,18 +67,9 @@ addprocs(4)
                 nsnaps_state,nsnaps_system,st_mdeim)
 end
 
-@everywhere begin
-  root = pwd()
-  include("$root/src/NEWCODE/FEM/FEM.jl")
-  include("$root/src/NEWCODE/ROM/ROM.jl")
-  include("$root/src/NEWCODE/RBTests.jl")
-end
-
-nsnaps = info.nsnaps_state
-params = realization(feop,nsnaps)
-sols = collect_solutions(feop,fesolver,params)
-rbspace = compress_solutions(feop,fesolver,sols,params;ϵ)
-save(info,(sols,params))
+nsols = info.nsnaps_state
+params = realization(feop,nsols)
+sols = collect_solutions(info,feop,fesolver,params)
 
 nsnaps = info.nsnaps_system
 rb_res_c = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps,st_mdeim)
