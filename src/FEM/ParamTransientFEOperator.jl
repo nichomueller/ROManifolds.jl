@@ -89,6 +89,27 @@ get_pspace(op::ParamTransientFEOperatorFromWeakForm) = op.pspace
 
 realization(op::ParamTransientFEOperator,args...) = realization(op.pspace,args...)
 
+for (A,OP) in zip((:Affine,:Nonlinear),(:ParamTransientAffineFEOperator,:ParamTransientFEOperator))
+  @eval begin
+    function filter_operator(
+      op::ParamTransientFEOperatorFromWeakForm{$A},
+      filter::NTuple{2,Int})
+
+      if isa(get_test(op),MultiFieldFESpace)
+        row,col = filter
+        res = op.res
+        jac,jac_t = op.jacs
+        pspace = op.pspace
+        trials_col = map(x->getindex(x,col),op.trials)
+        test_row = getindex(op.test,row)
+        return $OP(res,jac,jac_t,pspace,trials_col,test_row)
+      else
+        return op
+      end
+    end
+  end
+end
+
 function allocate_residual(
   op::ParamTransientFEOperatorFromWeakForm,
   uh::T,

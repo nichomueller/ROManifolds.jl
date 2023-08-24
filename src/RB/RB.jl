@@ -12,7 +12,7 @@ using Gridap.CellData
 using Gridap.MultiField
 
 import LazyArrays:ApplyArray
-import BlockArrays:BlockVector
+import BlockArrays:BlockVector,BlockMatrix,BlockArray,mortar
 import Gridap.Helpers.@check
 import Gridap.Helpers.@unreachable
 import Gridap.Arrays:Table
@@ -25,7 +25,7 @@ import Gridap.ODEs.TransientFETools:ODESolver
 
 include("RBInfo.jl")
 include("Snapshots.jl")
-# include("RBSpaces.jl")
+include("RBSpaces.jl")
 # include("RBAffineDecomposition.jl")
 # include("RBAlgebraicContributions.jl")
 # include("RBOperators.jl")

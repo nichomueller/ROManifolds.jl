@@ -32,7 +32,8 @@ struct CollectResidualsMap{A} <: CollectorMap{A}
   function CollectResidualsMap(
     solver::θMethod,
     op::ParamTransientFEOperator,
-    trian::Triangulation)
+    trian::Triangulation=get_triangulation(get_test(op)),
+    meas::Measure=Measure(trian,2))
 
     dv = get_fe_basis(op.test)
     v0 = zeros(op.test)
@@ -51,7 +52,7 @@ struct CollectResidualsMap{A} <: CollectorMap{A}
         xh = evaluation_function(op,(x,v0),cache)
         x0 .= sol[it]
 
-        vecdata = collect_cell_vector(op.test,op.res(μ,t,xh,dv),trian)
+        vecdata = collect_cell_vector(op.test,op.res(μ,t,xh,dv),trian,meas)
         r = allocate_residual(pop,x0,cache)
         assemble_vector_add!(r,op.assem,vecdata)
         r .*= -1.0
@@ -79,7 +80,8 @@ struct CollectJacobiansMap{A} <: CollectorMap{A}
   function CollectJacobiansMap(
     solver::θMethod,
     op::ParamTransientFEOperator,
-    trian::Triangulation;
+    trian::Triangulation=get_triangulation(get_test(op)),
+    meas::Measure=Measure(trian,2);
     i::Int=1)
 
     trial = get_trial(op)
@@ -104,7 +106,7 @@ struct CollectJacobiansMap{A} <: CollectorMap{A}
         xh = evaluation_function(op,(x,vθ),cache)
         x0 .= sol[it]
 
-        matdata = collect_cell_matrix(trial,op.test,γ[i]*op.jacs[i](μ,t,xh,du,dv),trian)
+        matdata = collect_cell_matrix(trial,op.test,γ[i]*op.jacs[i](μ,t,xh,du,dv),trian,meas)
 
         J = allocate_jacobian(pop,x0,cache)
         assemble_matrix_add!(J,op.assem,matdata)

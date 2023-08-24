@@ -13,76 +13,65 @@ struct RBSpace
 
   function RBSpace(::SupremizingEnrichment,snaps::Snapshots,args...;ttol=1e-2,kwargs...)
     basis_space,basis_time = tpod(snaps;kwargs...)
+    @assert isa(basis_space,BlockArray)
+    @assert isa(basis_time,BlockArray)
     if compute_supremizers
-      add_space_supremizers!(bases_space,snaps,args...)
-      add_time_supremizers!(bases_time,ttol)
+      add_space_supremizers!(basis_space,snaps,args...)
+      add_time_supremizers!(basis_time;ttol)
     end
-    new(bases_space,bases_time)
+    new(basis_space,basis_time)
   end
+end
+
+function compress_snapshots(args...;enrich=NoEnrichment(),kwargs...)
+  RBSpace(enrich,args...;kwargs...)
 end
 
 get_basis_space(rb::RBSpace) = rb.basis_space
 
 get_basis_time(rb::RBSpace) = rb.basis_time
 
-function compress_snapshots end
-
-compress_snapshots(args...;enrich=NoEnrichment(),kwargs...) = RBSpace(enrich,args...;kwargs...)
-
-function add_space_supremizers!(
-  bases_space::Vector{NnzArray{T}},
-  feop::ParamFEOperator,
-  fesolver::ODESolver,
-  snaps::MultiFieldSnapshots,
-  params::Table;
-  kwargs...) where T
-
-  bsprimal,bsdual... = map(recast,bases_space)
-  for (i,bsd) in enumerate(bsdual)
+function add_space_supremizers!(bases_space::BlockMatrix,args...;kwargs...)
+  bsprimal,bsdual... = bases_space.blocks
+  for (i,bsd_i) in enumerate(bsdual)
     printstyled("Computing supremizers in space for dual field $i\n";color=:blue)
-    supr_i = space_supremizers(feop,fesolver,snaps,bsd,params,i+1)
-    bsu_i = gram_schmidt(supr_i,bsprimal)
-    bases_space[1].nonzero_val = hcat(bases_space[1].nonzero_val,bsu_i)
+    filter = (1,i+1)
+    supr_i = space_supremizers(bsd_i,filter,args...)
+    orth_supr_i = gram_schmidt(supr_i,bsprimal)
+    append!(bsprimal,orth_supr_i) # THIS IS WRONG
   end
-  return
+  return bsprimal,bsdual
 end
 
 function space_supremizers(
+  bs::AbstractMatrix,
+  filter::Tuple{Vararg{Int}},
+  snaps::MultiFieldSnapshots,
   feop::ParamFEOperator,
   fesolver::ODESolver,
-  s::MultiFieldSnapshots,
-  bs::AbstractMatrix,
-  params::Table,
-  i::Int)
+  params::Table)
 
-  filter = (1,i)
-  snaps = get_datum(s)
-
-  matdata = _matdata_jacobian(feop,fesolver,snaps,params,filter)
-  aff = affinity_jacobian(fesolver,params,matdata)
-  data = get_datum(aff,fesolver,params,matdata)
-  constraint_mat = map(d->assemble_matrix(feop.assem,d),data)
-
-  if isa(aff,ParamAffinity) || isa(aff,ParamTimeAffinity)
-    supr = first(constraint_mat)*bs
+  filt_op = filter_operator(feop,filter)
+  collector = CollectJacobiansMap(fesolver,filt_op)
+  constraint_mat = lazy_map(collector,snaps,params)
+  if length(constraint_mat) == 1
+    return constraint_mat*bs # THIS IS WRONG
   else
-    supr = map(*,constraint_mat,snaps[i])
+    return map(*,constraint_mat,snaps) # THIS IS WRONG
   end
-
-  supr
 end
 
-function add_time_supremizers!(bases_time::Vector{NnzArray{T}},ttol::Real) where T
-  tbu,tbdual... = map(get_nonzero_val,bases_time)
-  for (i,tb) in enumerate(tbdual)
+function add_time_supremizers!(bases_time::BlockMatrix;ttol::Real)
+  btprimal,btdual... = bases_time.blocks
+  for (i,btd_i) in enumerate(tbdual)
     printstyled("Computing supremizers in time for dual field $i\n";color=:blue)
-    tbu_i = add_time_supremizers([tbu,tb],ttol)
-    bases_time[1].nonzero_val = hcat(bases_time[1].nonzero_val,tbu_i)
+    supr_i = add_time_supremizers(btprimal,btd_i;ttol)
+    append!(btprimal,supr_i)
   end
-  return
+  return btprimal,btdual
 end
 
-function add_time_supremizers(bases_time::Vector{<:AbstractMatrix},ttol::Real)
+function add_time_supremizers(bases_time::AbstractMatrix...;ttol=1e-2)
   basis_u,basis_p = bases_time
   basis_up = basis_u'*basis_p
 
@@ -121,4 +110,21 @@ function add_time_supremizers(bases_time::Vector{<:AbstractMatrix},ttol::Real)
 
   printstyled("Added $count time supremizers\n";color=:blue)
   basis_u
+end
+
+function filter_rbspace(
+  op::RBSpace,
+  filter::NTuple{2,Int})
+
+  if isa(get_test(op),MultiFieldFESpace)
+    row,col = filter
+    res = op.res
+    jac,jac_t = op.jacs
+    pspace = op.pspace
+    trials_col = map(x->getindex(x,col),op.trials)
+    test_row = getindex(op.test,row)
+    return $OP(res,jac,jac_t,pspace,trials_col,test_row)
+  else
+    return op
+  end
 end

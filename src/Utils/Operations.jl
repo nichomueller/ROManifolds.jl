@@ -43,9 +43,3 @@ end
 function compress_array(entire_array::SparseMatrixCSC{Float,Int})
   findnz(entire_array[:])
 end
-
-function Base.hcat(a::BlockVector,b::BlockVector)
-  c = map(hcat,a.blocks,b.blocks)
-  d = reshape(c,:,length(c))
-  mortar(d)
-end

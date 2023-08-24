@@ -1,10 +1,14 @@
-struct Snapshots{A}
+struct Snapshots{T,A}
   snaps::LazyArray
   nsnaps::Int
   function Snapshots(::CollectorMap{A},snaps::LazyArray,nsnaps::Int) where A
-    new{A}(snaps,nsnaps)
+    T = eltype(eltype(snaps))
+    new{T,A}(snaps,nsnaps)
   end
 end
+
+const SingleFieldSnapshots{A} = Snapshots{<:Vector,A}
+const MultiFieldSnapshots{A} = Snapshots{<:BlockVector,A}
 
 function lazy_collect(snap::Snapshots)
   param_time_snaps = get_snaps(snap)
@@ -74,10 +78,9 @@ function collect_residuals(
   fesolver::ODESolver,
   snaps::Snapshots,
   params::Table,
-  trian::Triangulation,
   args...)
 
-  collector = CollectResidualsMap(fesolver,feop,trian)
+  collector = CollectResidualsMap(fesolver,feop,args...)
 
   get_nress(::CollectResidualsMap) = info.nsnaps_system
   get_nress(::CollectResidualsMap{Union{TimeAffinity,NonAffinity}}) = 1
@@ -97,11 +100,10 @@ function collect_jacobians(
   fesolver::ODESolver,
   snaps::Snapshots,
   params::Table,
-  trian::Triangulation,
   args...;
   i=1)
 
-  collector = CollectJacobiansMap(fesolver,feop,trian;i)
+  collector = CollectJacobiansMap(fesolver,feop,args...;i)
 
   get_njacs(::CollectJacobiansMap) = info.nsnaps_system
   get_njacs(::CollectJacobiansMap{Union{TimeAffinity,NonAffinity}}) = 1

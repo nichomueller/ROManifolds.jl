@@ -1,10 +1,10 @@
-struct TransientRBIntegrationDomain
+struct RBIntegrationDomain
   meas::Measure
   times::Vector{Float}
   idx::Vector{Int}
 
-  function TransientRBIntegrationDomain(
-    component::SingleFieldSnapshots,
+  function RBIntegrationDomain(
+    component::Snapshots,
     trian::Triangulation,
     times::Vector{Float},
     interp_idx_space::Vector{Int},
@@ -28,11 +28,11 @@ end
 
 abstract type RBAffineDecomposition end
 
-struct TransientRBAffineDecomposition <: RBAffineDecomposition
+struct GenericRBAffineDecomposition <: RBAffineDecomposition
   basis_space::Vector{<:AbstractMatrix}
   basis_time::Tuple{Vararg{AbstractArray}}
   mdeim_interpolation::LU
-  integration_domain::TransientRBIntegrationDomain
+  integration_domain::RBIntegrationDomain
 end
 
 struct ZeroRBAffineDecomposition <: RBAffineDecomposition
@@ -42,13 +42,13 @@ end
 function compress_residuals(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
-  rbspace::TransientRBSpace,
+  rbspace::RBSpace,
   s::Snapshots,
   params::Table;
   kwargs...)
 
   trians = collect_trian_res(feop)
-  cres = RBResidualContribution()
+  cres = RBAlgebraicContribution()
   for trian in trians
     ad = compress_residuals(feop,fesolver,rbspace,s,params,trian;kwargs...)
     add_contribution!(cres,trian,ad)
@@ -59,13 +59,14 @@ end
 function compress_residuals(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
-  rbspace::TransientRBSpace,
+  rbspace::RBSpace,
   s::Snapshots,
   params::Table,
   trian::Triangulation;
   kwargs...)
 
   nfields = length(rbspace)
+  idx =
   ad_res = Vector{RBAffineDecomposition}(undef,nfields)
   for row = 1:nfields
     filter = (row,1)
@@ -78,7 +79,7 @@ end
 function compress_residuals(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
-  rbspace::TransientSingleFieldRBSpace,
+  rbspace::RBSpace,
   s::Snapshots,
   params::Table,
   trian::Triangulation,
@@ -99,13 +100,13 @@ end
 function compress_jacobians(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
-  rbspace::TransientRBSpace,
+  rbspace::RBSpace,
   s::Snapshots,
   params::Table;
   kwargs...)
 
   trians = collect_trian_jac(feop)
-  cjac = RBJacobianContribution()
+  cjac = RBAlgebraicContribution()
   for trian in trians
     ad = compress_jacobians(feop,fesolver,rbspace,s,params,trian;kwargs...)
     add_contribution!(cjac,trian,ad)
@@ -116,7 +117,7 @@ end
 function compress_jacobians(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
-  rbspace::TransientRBSpace,
+  rbspace::RBSpace,
   s::Snapshots,
   params::Table,
   trian::Triangulation;
@@ -135,7 +136,7 @@ end
 function compress_jacobians(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
-  rbspace::NTuple{2,TransientSingleFieldRBSpace},
+  rbspace::NTuple{2,RBSpace},
   s::Snapshots,
   params::Table,
   trian::Triangulation,
@@ -156,7 +157,7 @@ end
 function compress_djacobians(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
-  rbspace::Union{TransientSingleFieldRBSpace,TransientMultiFieldRBSpace},
+  rbspace::RBSpace,
   s::Snapshots,
   params::Table;
   kwargs...)
@@ -173,7 +174,7 @@ end
 function compress_djacobians(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
-  rbspace::Union{TransientSingleFieldRBSpace,TransientMultiFieldRBSpace},
+  rbspace::RBSpace,
   s::Snapshots,
   params::Table,
   trian::Triangulation;
@@ -192,7 +193,7 @@ end
 function compress_djacobians(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
-  rbspace::NTuple{2,TransientSingleFieldRBSpace},
+  rbspace::NTuple{2,RBSpace},
   s::Snapshots,
   params::Table,
   trian::Triangulation,
@@ -212,7 +213,7 @@ function compress_djacobians(
 end
 
 function compress_component(
-  ::SingleFieldSnapshots{T,ZeroAffinity},
+  ::Snapshots{T,ZeroAffinity},
   ::ODESolver,
   ::Triangulation,
   ::Table,
@@ -225,7 +226,7 @@ function compress_component(
 end
 
 function compress_component(
-  component::SingleFieldSnapshots,
+  component::Snapshots,
   fesolver::ODESolver,
   trian::Triangulation,
   cell_dof_ids,
@@ -239,8 +240,8 @@ function compress_component(
 
   bs,bt = tpod(component,fesolver;ϵ)
   interp_idx_space,interp_idx_time = get_interpolation_idx(bs,bt)
-  integr_domain = TransientRBIntegrationDomain(
-    component,trian,times,interp_idx_space,interp_idx_time,cell_dof_ids,order;st_mdeim)
+  integr_domain = RBIntegrationDomain(component,trian,times,interp_idx_space,
+    interp_idx_time,cell_dof_ids,order;st_mdeim)
 
   interp_bs = bs.nonzero_val[interp_idx_space,:]
   lu_interp = if st_mdeim
@@ -253,7 +254,7 @@ function compress_component(
 
   proj_bs,proj_bt = compress(fesolver,bs,bt,args...;kwargs...)
 
-  TransientRBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)
+  GenericRBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)
 end
 
 function get_interpolation_idx(basis_space::NnzArray,basis_time::NnzArray)
@@ -291,7 +292,7 @@ end
 
 function compress_space(
   bs_component::NnzArray,
-  rbspace_row::TransientSingleFieldRBSpace{<:AbstractMatrix})
+  rbspace_row::RBSpace{<:AbstractMatrix})
 
   entire_bs_row = get_basis_space(rbspace_row)
   entire_bs_component = recast(bs_component)
@@ -303,8 +304,8 @@ end
 
 function compress_space(
   bs_component::NnzArray,
-  rbspace_row::TransientSingleFieldRBSpace{<:AbstractMatrix},
-  rbspace_col::TransientSingleFieldRBSpace{<:AbstractMatrix})
+  rbspace_row::RBSpace{<:AbstractMatrix},
+  rbspace_col::RBSpace{<:AbstractMatrix})
 
   entire_bs_row = get_basis_space(rbspace_row)
   entire_bs_col = get_basis_space(rbspace_col)
@@ -317,7 +318,7 @@ end
 function compress_time(
   ::θMethod,
   bt_component::NnzArray,
-  rbspace_row::TransientSingleFieldRBSpace{<:AbstractMatrix},
+  rbspace_row::RBSpace{<:AbstractMatrix},
   args...)
 
   bt = get_basis_time(rbspace_row)
@@ -327,8 +328,8 @@ end
 function compress_time(
   fesolver::θMethod,
   bt_component::NnzArray,
-  rbspace_row::TransientSingleFieldRBSpace{<:AbstractMatrix},
-  rbspace_col::TransientSingleFieldRBSpace{<:AbstractMatrix};
+  rbspace_row::RBSpace{<:AbstractMatrix},
+  rbspace_col::RBSpace{<:AbstractMatrix};
   combine_projections::Function=(x,y)->fesolver.θ*x+(1-fesolver.θ)*y)
 
   bt_row = get_basis_time(rbspace_row)
