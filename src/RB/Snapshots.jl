@@ -2,44 +2,54 @@ struct Snapshots{T,A}
   snaps::LazyArray
   nsnaps::Int
   function Snapshots(::CollectorMap{A},snaps::LazyArray,nsnaps::Int) where A
-    T = eltype(eltype(snaps))
+    T = eltype(snaps)
     new{T,A}(snaps,nsnaps)
   end
 end
 
-const SingleFieldSnapshots{A} = Snapshots{<:Vector,A}
-const MultiFieldSnapshots{A} = Snapshots{<:BlockVector,A}
+const SingleFieldSnapshots{A} = Snapshots{<:AbstractArray,A}
+const MultiFieldSnapshots{A} = Snapshots{<:BlockArray,A}
 
 function Base.collect(snap::Snapshots)
-  param_time_snaps = get_snaps(snap)
-  param_snaps = lazy_map(x -> reduce(hcat,x),param_time_snaps)
-  snaps = collect(param_snaps)
-  snaps
+  lazy_snaps = get_snaps(snap)
+  collect(lazy_snaps)
 end
 
-Base.size(snap::Snapshots,idx...) = size(collect(snap))
+# DO NOT RECOMMEND USING
+function Base.size(snap::Snapshots)
+  len = snap.nsnaps
+  s1 = first(snap.snaps)
+  size(s1,1),size(s1,2)*len
+end
 
 get_snaps(snap::Snapshots) = snap.snaps
 
 get_nsnaps(snap::Snapshots) = snap.nsnaps
 
-get_time_ndofs(snap::Snapshots) = Int(size(snap.snaps,2)/snap.nsnaps)
+get_time_ndofs(snap::Snapshots) = size(first(snap.snaps),2)
 
 function tpod(snap::Snapshots;kwargs...)
+  s = size(snap)
+  tpod(Val(s[1] < s[2]),snap;kwargs...)
+end
+
+function tpod(::Val{true},snap::Snapshots;kwargs...)
   snaps = collect(snap)
   nsnaps = get_nsnaps(snap)
 
-  if size(snaps,1) < size(snaps,2)
-    basis_space = tpod(snaps;kwargs...)
-    compressed_time_snaps = change_mode(basis_space'*snaps,nsnaps)
-    basis_time = tpod(compressed_time_snaps;kwargs...)
-  else
-    time_snaps = change_mode(snaps,nsnaps)
-    basis_time = tpod(time_snaps;kwargs...)
-    compressed_space_snaps = change_mode(basis_time'*time_snaps,nsnaps)
-    basis_space = tpod(compressed_space_snaps;kwargs...)
-  end
+  basis_space = tpod(snaps;kwargs...)
+  compressed_time_snaps = change_mode(basis_space'*snaps,nsnaps)
+  basis_time = tpod(compressed_time_snaps;kwargs...)
+  basis_space,basis_time
+end
 
+function tpod(::Val{false},snap::Snapshots;kwargs...)
+  snaps_t = collect(lazy_map(transpose,get_snaps(snap)))
+  nsnaps = get_nsnaps(snap)
+
+  basis_time = tpod(snaps_t;kwargs...)
+  compressed_space_snaps = change_mode(basis_time'*snaps_t,nsnaps)
+  basis_space = tpod(compressed_space_snaps;kwargs...)
   basis_space,basis_time
 end
 

@@ -70,5 +70,6 @@ snap = collect_solutions(feop,fesolver,p;nsnaps)
 rbspace = compress_snapshots(snap)
 #TRY
 trian = Ω
-ress = collect_residuals(info,feop,fesolver,snap,p,trian);
+ress = collect_residuals(info,feop,fesolver,snap,p,trian)
+rb_res = compress_residuals(feop,fesolver,rbspace,snaps,params;ϵ,nsnaps,st_mdeim)
 jacs = collect_jacobians(info,feop,fesolver,snap,p,trian);

@@ -5,15 +5,17 @@ struct SingleFieldRBSpace{T} <: RBSpace{T}
   basis_time::Matrix{T}
 
   function SingleFieldRBSpace(
-    basis_space::Matrix{T},
-    basis_time::Matrix{T}) where T
+    basis_space_nnz::NnzArray{T,N,OT},
+    basis_time_nnz::NnzArray{T,N,OT}) where {T,N,OT}
 
+    basis_space = recast(basis_space_nnz)
+    basis_time = recast(basis_time_nnz)
     new{T}(basis_space,basis_time)
   end
 end
 
 function compress_snapshots(snaps::SingleFieldSnapshots,args...;kwargs...)
-  basis_space,basis_time = tpod(snaps;kwargs...)
+  basis_space_nnz,basis_time_nnz = tpod(snaps;kwargs...)
   SingleFieldRBSpace(basis_space,basis_time)
 end
 
@@ -22,9 +24,11 @@ struct MultiFieldRBSpace{T} <: RBSpace{T}
   basis_time::BlockMatrix{T}
 
   function MultiFieldRBSpace(
-    basis_space::BlockMatrix{T},
-    basis_time::BlockMatrix{T}) where T
+    basis_space_nnz::BlockNnzArray{T,N,OT},
+    basis_time_nnz::BlockNnzArray{T,N,OT}) where {T,N,OT}
 
+    basis_space = recast(basis_space_nnz)
+    basis_time = recast(basis_time_nnz)
     new{T}(basis_space,basis_time)
   end
 end

@@ -1,6 +1,5 @@
 function tpod(mat::AbstractMatrix;ϵ=1e-4)
-  by_row = size(mat,1) > size(mat,2)
-  tpod(Val{by_row}(),mat;ϵ)
+  tpod(Val(size(mat,1) > size(mat,2)),mat;ϵ)
 end
 
 function tpod(::Val{true},mat::AbstractMatrix;ϵ=1e-4)
@@ -32,11 +31,11 @@ function truncation(Σ::AbstractArray,ϵ::Real)
   rb_ndofs
 end
 
-function change_mode(mat::AbstractMatrix,nparams::Int)
+function change_mode(mat::AbstractMatrix{T},nparams::Int) where T
   mode1_ndofs = size(mat,1)
   mode2_ndofs = Int(size(mat,2)/nparams)
+  mode2 = zeros(T,mode2_ndofs,mode1_ndofs*nparams)
 
-  mode2 = reshape(mat,mode2_ndofs,mode1_ndofs*nparams)
   _mode2(k::Int) = mat[:,(k-1)*mode2_ndofs+1:k*mode2_ndofs]'
   @inbounds for k = 1:nparams
     setindex!(mode2,_mode2(k),:,(k-1)*mode1_ndofs+1:k*mode1_ndofs)

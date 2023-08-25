@@ -126,7 +126,7 @@ function Arrays.evaluate!(
   μ::AbstractArray)
 
   jac_μ_nnz = k.f(sol,μ)
-  jac_μ_nnz
+  reduce(hcat,jac_μ_nnz)
 end
 
 function setup_initial_condition(
