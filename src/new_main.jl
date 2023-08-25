@@ -64,13 +64,11 @@ begin
 end
 
 #OK
-nsols = info.nsnaps_state
-params = realization(feop,nsols)
-sols = collect_solutions(info,feop,fesolver,params)
-snaps = sols
+nsnaps = info.nsnaps_state
+p = realization(feop,nsnaps)
+snap = collect_solutions(feop,fesolver,p;nsnaps)
+rbspace = compress_snapshots(snap)
 #TRY
 trian = Ω
-ress = collect_residuals(info,feop,fesolver,snaps,params,trian);
-jacs = collect_jacobians(info,feop,fesolver,snaps,params,trian);
-
-boh = lazy_map(hcat,sols.snaps)
+ress = collect_residuals(info,feop,fesolver,snap,p,trian);
+jacs = collect_jacobians(info,feop,fesolver,snap,p,trian);

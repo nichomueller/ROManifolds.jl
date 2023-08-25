@@ -10,14 +10,14 @@ end
 const SingleFieldSnapshots{A} = Snapshots{<:Vector,A}
 const MultiFieldSnapshots{A} = Snapshots{<:BlockVector,A}
 
-function lazy_collect(snap::Snapshots)
+function Base.collect(snap::Snapshots)
   param_time_snaps = get_snaps(snap)
   param_snaps = lazy_map(x -> reduce(hcat,x),param_time_snaps)
-  snaps = ApplyArray(hcat,param_snaps...)
+  snaps = collect(param_snaps)
   snaps
 end
 
-Base.size(snap::Snapshots,idx...) = size(lazy_collect(snap))
+Base.size(snap::Snapshots,idx...) = size(collect(snap))
 
 get_snaps(snap::Snapshots) = snap.snaps
 
@@ -26,7 +26,7 @@ get_nsnaps(snap::Snapshots) = snap.nsnaps
 get_time_ndofs(snap::Snapshots) = Int(size(snap.snaps,2)/snap.nsnaps)
 
 function tpod(snap::Snapshots;kwargs...)
-  snaps = lazy_collect(snap)
+  snaps = collect(snap)
   nsnaps = get_nsnaps(snap)
 
   if size(snaps,1) < size(snaps,2)
@@ -46,7 +46,7 @@ end
 for A in (:TimeAffinity,:ParamTimeAffinity)
   @eval begin
     function tpod(snap::Snapshots{$A};kwargs...)
-      snaps = lazy_collect(snap)
+      snaps = collect(snap)
       nsnaps = get_nsnaps(snap)
       time_ndofs = Int(size(snaps,2)/nsnaps)
       T = eltype(snaps)
@@ -59,12 +59,12 @@ for A in (:TimeAffinity,:ParamTimeAffinity)
 end
 
 function collect_solutions(
-  info::RBInfo,
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
-  params::Table)
+  params::Table;
+  nsnaps=50)
 
-  nsols = info.nsnaps_state
+  nsols = nsnaps
   printstyled("Generating $nsols solution snapshots\n";color=:blue)
 
   collector = CollectSolutionsMap(fesolver,feop)
@@ -73,16 +73,16 @@ function collect_solutions(
 end
 
 function collect_residuals(
-  info::RBInfo,
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   snaps::Snapshots,
   params::Table,
-  args...)
+  args...;
+  nsnaps=50)
 
   collector = CollectResidualsMap(fesolver,feop,args...)
 
-  get_nress(::CollectResidualsMap) = info.nsnaps_system
+  get_nress(::CollectResidualsMap) = nsnaps
   get_nress(::CollectResidualsMap{Union{TimeAffinity,NonAffinity}}) = 1
   nress = get_nress(collector)
 
@@ -95,17 +95,16 @@ function collect_residuals(
 end
 
 function collect_jacobians(
-  info::RBInfo,
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   snaps::Snapshots,
   params::Table,
   args...;
-  i=1)
+  i=1,nsnaps=50)
 
   collector = CollectJacobiansMap(fesolver,feop,args...;i)
 
-  get_njacs(::CollectJacobiansMap) = info.nsnaps_system
+  get_njacs(::CollectJacobiansMap) = nsnaps
   get_njacs(::CollectJacobiansMap{Union{TimeAffinity,NonAffinity}}) = 1
   njacs = get_njacs(collector)
 

@@ -1,30 +1,41 @@
-abstract type EnrichmentStyle end
-struct NoEnrichment <: EnrichmentStyle end
-struct SupremizingEnrichment <: EnrichmentStyle end
+abstract type RBSpace{T} end
 
-struct RBSpace
-  basis_space::AbstractArray
-  basis_time::AbstractArray
+struct SingleFieldRBSpace{T} <: RBSpace{T}
+  basis_space::Matrix{T}
+  basis_time::Matrix{T}
 
-  function RBSpace(::NoEnrichment,snaps::Snapshots,args...;kwargs...)
-    basis_space,basis_time = tpod(snaps;kwargs...)
-    new(basis_space,basis_time)
-  end
+  function SingleFieldRBSpace(
+    basis_space::Matrix{T},
+    basis_time::Matrix{T}) where T
 
-  function RBSpace(::SupremizingEnrichment,snaps::Snapshots,args...;ttol=1e-2,kwargs...)
-    basis_space,basis_time = tpod(snaps;kwargs...)
-    @assert isa(basis_space,BlockArray)
-    @assert isa(basis_time,BlockArray)
-    if compute_supremizers
-      add_space_supremizers!(basis_space,snaps,args...)
-      add_time_supremizers!(basis_time;ttol)
-    end
-    new(basis_space,basis_time)
+    new{T}(basis_space,basis_time)
   end
 end
 
-function compress_snapshots(args...;enrich=NoEnrichment(),kwargs...)
-  RBSpace(enrich,args...;kwargs...)
+function compress_snapshots(snaps::SingleFieldSnapshots,args...;kwargs...)
+  basis_space,basis_time = tpod(snaps;kwargs...)
+  SingleFieldRBSpace(basis_space,basis_time)
+end
+
+struct MultiFieldRBSpace{T} <: RBSpace{T}
+  basis_space::BlockMatrix{T}
+  basis_time::BlockMatrix{T}
+
+  function MultiFieldRBSpace(
+    basis_space::BlockMatrix{T},
+    basis_time::BlockMatrix{T}) where T
+
+    new{T}(basis_space,basis_time)
+  end
+end
+
+function compress_snapshots(snaps::MultiFieldSnapshots;compute_supremizers=false,kwargs...)
+  basis_space,basis_time = tpod(snaps;kwargs...)
+  if compute_supremizers
+    add_space_supremizers!(basis_space,snaps,args...)
+    add_time_supremizers!(basis_time;ttol)
+  end
+  MultiFieldRBSpace(basis_space,basis_time)
 end
 
 get_basis_space(rb::RBSpace) = rb.basis_space
@@ -47,7 +58,7 @@ function space_supremizers(
   bs::AbstractMatrix,
   filter::Tuple{Vararg{Int}},
   snaps::MultiFieldSnapshots,
-  feop::ParamFEOperator,
+  feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   params::Table)
 
@@ -112,19 +123,12 @@ function add_time_supremizers(bases_time::AbstractMatrix...;ttol=1e-2)
   basis_u
 end
 
-function filter_rbspace(
-  op::RBSpace,
-  filter::NTuple{2,Int})
-
-  if isa(get_test(op),MultiFieldFESpace)
-    row,col = filter
-    res = op.res
-    jac,jac_t = op.jacs
-    pspace = op.pspace
-    trials_col = map(x->getindex(x,col),op.trials)
-    test_row = getindex(op.test,row)
-    return $OP(res,jac,jac_t,pspace,trials_col,test_row)
+function filter_rbspace(rbspace::RBSpace,filter::Int)
+  if isa(rbspace,MultiFieldRBSpace)
+    _bs,_bt = get_basis_space(rbspace),get_basis_time(rbspace)
+    basis_space,basis_time = _bs.blocks[filter],_bt.blocks[filter]
+    return SingleFieldRBSpace(basis_space,basis_time)
   else
-    return op
+    return rbspace
   end
 end

@@ -11,7 +11,6 @@ using Gridap.Fields
 using Gridap.CellData
 using Gridap.MultiField
 
-import LazyArrays:ApplyArray
 import BlockArrays:BlockVector,BlockMatrix,BlockArray,mortar
 import Gridap.Helpers.@check
 import Gridap.Helpers.@unreachable

@@ -43,3 +43,24 @@ end
 function compress_array(entire_array::SparseMatrixCSC{Float,Int})
   findnz(entire_array[:])
 end
+
+struct LazyArrayWrap{L}
+  a::LazyArray
+  function LazyArrayWrap(a::LazyArray)
+    L = length(first(a.args))
+    new{L}(a)
+  end
+end
+
+Base.length(::LazyArrayWrap{L}) where L = L
+Base.getindex(w::LazyArrayWrap,idx...) = getindex(w.a,idx...)
+
+@generated function Base.hcat(w::LazyArrayWrap{D}) where D
+  str = join(["w[$i], " for i in 1:D])
+  Meta.parse("hcat($str)")
+end
+
+function Base.collect(a::LazyArray)
+  w_a = LazyArrayWrap(a)
+  hcat(w_a)
+end

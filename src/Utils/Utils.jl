@@ -5,6 +5,7 @@ using Serialization
 import BlockArrays:BlockVector
 import BlockArrays:mortar
 import Gridap.Helpers.@check
+import Gridap.Arrays.LazyArray
 
 const Float = Float64
 

@@ -18,12 +18,13 @@ function Arrays.evaluate!(cache,k::CollectSolutionsMap,μ::AbstractArray)
   sol_μ = k.f(μ)
   l = length(sol_μ)
   T = return_type(sol_μ)
-  vT = Vector{T}(undef,l)
+  v = Vector{T}(undef,l)
   for (n,sol_μn) in enumerate(sol_μ)
     uhn,_ = sol_μn
-    vT[n] = uhn
+    v[n] = uhn
   end
-  vT
+  sol_μ_nnz = compress(v)
+  sol_μ_nnz
 end
 
 struct CollectResidualsMap{A} <: CollectorMap{A}

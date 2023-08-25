@@ -110,6 +110,31 @@ for (A,OP) in zip((:Affine,:Nonlinear),(:ParamTransientAffineFEOperator,:ParamTr
   end
 end
 
+function collect_trian_res(op::ParamTransientFEOperator)
+  μ,t = realization(op),0.
+  uh = zero(op.test)
+  v = get_fe_basis(op.test)
+  dxh = ()
+  for _ in 1:get_order(op)
+    dxh = (dxh...,uh)
+  end
+  xh = TransientCellField(uh,dxh)
+  veccontrib = op.res(μ,t,xh,v)
+  collect_trian(veccontrib)
+end
+
+function collect_trian_jac(op::ParamTransientFEOperator)
+  μ,t = realization(op),0.
+  uh = zero(op.test)
+  v = get_fe_basis(op.test)
+  trians = ()
+  for j in op.jacs
+    matcontrib = j(μ,t,uh,v,v)
+    trians = (trians...,collect_trian(matcontrib)...)
+  end
+  unique(trians)
+end
+
 function allocate_residual(
   op::ParamTransientFEOperatorFromWeakForm,
   uh::T,

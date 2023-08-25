@@ -45,33 +45,21 @@ function recast(nza::NnzArray{T,N,<:SparseMatrixCSC} where {T,N},col=1)
   sparse(sparse_rows,sparse_cols,nza.nonzero_val[:,col],nza.nrows,ncols)
 end
 
-# function change_mode!(nza::NnzArray,nparams::Int)
-#   mode1_ndofs = size(nza,1)
-#   mode2_ndofs = Int(size(nza,2)/nparams)
+function change_mode!(nza::NnzArray,nparams::Int)
+  mode1_ndofs = size(nza,1)
+  mode2_ndofs = Int(size(nza,2)/nparams)
 
-#   mode2 = reshape(similar(nza.nonzero_val),mode2_ndofs,mode1_ndofs*nparams)
-#   _mode2(k::Int) = nza.nonzero_val[:,(k-1)*mode2_ndofs+1:k*mode2_ndofs]'
-#   @inbounds for k = 1:nparams
-#     setindex!(mode2,_mode2(k),:,(k-1)*mode1_ndofs+1:k*mode1_ndofs)
-#   end
+  mode2 = reshape(similar(nza.nonzero_val),mode2_ndofs,mode1_ndofs*nparams)
+  _mode2(k::Int) = nza.nonzero_val[:,(k-1)*mode2_ndofs+1:k*mode2_ndofs]'
+  @inbounds for k = 1:nparams
+    setindex!(mode2,_mode2(k),:,(k-1)*mode1_ndofs+1:k*mode1_ndofs)
+  end
 
-#   nza.nonzero_val = mode2
-#   return
-# end
+  nza.nonzero_val = mode2
+  return
+end
 
-# function change_mode(nza::NnzArray,nparams::Int)
-#   nzm_copy = copy(nza)
-#   change_mode!(nzm_copy,nparams)
-#   nzm_copy
-# end
-
-# function tpod!(nza::NnzArray;kwargs...)
-#   nza.nonzero_val = tpod(nza.nonzero_val;kwargs...)
-#   return
-# end
-
-# function tpod(nza::NnzArray;kwargs...)
-#   nzm_copy = copy(nza)
-#   tpod!(nzm_copy;kwargs...)
-#   nzm_copy
-# end
+function tpod(nza::NnzArray{T,N,OT};kwargs...) where {T,N,OT}
+  nonzero_val = tpod(nza.nonzero_val;kwargs...)
+  return NnzArray{OT}(nonzero_val,nza.nonzero_idx,nza.nrows)
+end

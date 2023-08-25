@@ -67,7 +67,6 @@ import Gridap.ODEs.TransientFETools._vcat_matdata
 
 include("FEOperations.jl")
 include("ParamSpace.jl")
-include("ParamStructure.jl")
 include("DiffOperators.jl")
 include("ParamTransientFESpaces.jl")
 include("ParamTransientFEOperator.jl")

@@ -7,6 +7,10 @@ struct ParamODESolution{T} <: GridapType
   tF::Real
 end
 
+function Base.length(sol::ParamODESolution)
+  get_time_ndofs(sol.solver)
+end
+
 function solve_step!(
   uF::Union{AbstractVector,Tuple{Vararg{AbstractVector}}},
   solver::ODESolver,
@@ -142,4 +146,22 @@ function Algebra.solve(
     x0 = (x0...,get_free_dof_values(xhi))
   end
   solve(solver,ode_op,μ,x0,t0,tF)
+end
+
+function Arrays.return_value(sol::ParamODESolution)
+  sol1 = iterate(sol)
+  (uh1,_),_ = sol1
+  uh1
+end
+
+function postprocess(sol::ParamODESolution,uF::AbstractArray)
+  Uh = allocate_trial_space(get_trial(sol.op.feop))
+  if isa(Uh,MultiFieldFESpace)
+    blocks = map(1:length(Uh.spaces)) do i
+      MultiField.restrict_to_field(Uh,uF,i)
+    end
+    return mortar(blocks)
+  else
+    return uF
+  end
 end

@@ -52,6 +52,10 @@ function slow_idx(kst::Int,ns::Int)
   Int(floor((kst-1)/ns)+1)
 end
 
+function index_pairs(a,b)
+  collect(Iterators.product(a,b))
+end
+
 function idx_batches(v::AbstractArray)
   nbatches = Threads.nthreads()
   [round(Int,i) for i in range(0,length(v),nbatches+1)]
