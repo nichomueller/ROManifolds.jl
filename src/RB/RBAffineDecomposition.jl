@@ -28,7 +28,7 @@ struct RBIntegrationDomain
   end
 end
 
-struct RBAffineDecomposition <: RBAffineDecomposition
+struct RBAffineDecomposition
   basis_space::Vector{<:AbstractMatrix}
   basis_time::Tuple{Vararg{AbstractArray}}
   mdeim_interpolation::LU
@@ -116,10 +116,12 @@ function compress_jacobians(
   i=1,nsnaps=20,kwargs...)
 
   times = get_times(fesolver)
-  combine_projections = if i == 1
-    (x,y) -> fesolver.θ*x+(1-fesolver.θ)*y
-  else
-    (x,y) -> x-y
+  function combine_projections(x,y)
+    if i == 1
+      fesolver.θ*x+(1-fesolver.θ)*y
+    else
+      x-y
+    end
   end
 
   jacs = collect_jacobians(feop,fesolver,snaps,params,trian;nsnaps,i)
@@ -138,15 +140,18 @@ function compress_jacobians(
 
   nfields = get_nfields(rbspace)
   all_idx = index_pairs(1:nfields,1:nfields)
+  times = get_times(fesolver)
+  function combine_projections(x,y)
+    if i == 1
+      fesolver.θ*x+(1-fesolver.θ)*y
+    else
+      x-y
+    end
+  end
+
   ad_jac = lazy_map(all_idx) do filter
     filt_op = filter_operator(feop,filter)
     filt_rbspace = filter_rbspace(rbspace,filter[1]),filter_rbspace(rbspace,filter[2])
-    times = get_times(fesolver)
-    combine_projections = if i == 1
-      (x,y) -> fesolver.θ*x+(1-fesolver.θ)*y
-    else
-      (x,y) -> x-y
-    end
 
     jacs = collect_jacobians(filt_op,fesolver,snaps,params,trian;nsnaps,i)
     compress_jacobians(jacs,filt_op,trian,times,filt_rbspace...;combine_projections,kwargs...)

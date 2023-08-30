@@ -153,7 +153,7 @@ end
 Base.zeros(fe::FESpace) = get_free_dof_values(zero(fe))
 
 # Remove when possible
-function is_change_possible(
+function CellData.is_change_possible(
   strian::Triangulation,
   ttrian::Triangulation)
 

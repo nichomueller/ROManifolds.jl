@@ -1,9 +1,8 @@
 using LinearAlgebra
 using SparseArrays
 using Serialization
+using BlockArrays
 
-import BlockArrays:BlockVector
-import BlockArrays:mortar
 import Gridap.Helpers.@check
 import Gridap.Arrays.LazyArray
 

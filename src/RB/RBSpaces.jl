@@ -9,7 +9,7 @@ struct SingleFieldRBSpace{T} <: RBSpace{T}
     basis_time_nnz::NnzArray{T,N,OT}) where {T,N,OT}
 
     basis_space = recast(basis_space_nnz)
-    basis_time = recast(basis_time_nnz)
+    basis_time = get_nonzero_val(basis_time_nnz)
     new{T}(basis_space,basis_time)
   end
 end
@@ -28,7 +28,7 @@ struct MultiFieldRBSpace{T} <: RBSpace{T}
     basis_time_nnz::BlockNnzArray{T,N,OT}) where {T,N,OT}
 
     basis_space = recast(basis_space_nnz)
-    basis_time = recast(basis_time_nnz)
+    basis_time = get_nonzero_val(basis_time_nnz)
     new{T}(basis_space,basis_time)
   end
 end

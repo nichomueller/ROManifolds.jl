@@ -38,7 +38,8 @@ function tpod(::Val{true},snap::Snapshots;kwargs...)
   nsnaps = get_nsnaps(snap)
 
   basis_space = tpod(snaps;kwargs...)
-  compressed_time_snaps = change_mode(basis_space'*snaps,nsnaps)
+  compressed_space_snaps = prod(basis_space,snaps)
+  compressed_time_snaps = change_mode(compressed_space_snaps,nsnaps)
   basis_time = tpod(compressed_time_snaps;kwargs...)
   basis_space,basis_time
 end
@@ -48,7 +49,8 @@ function tpod(::Val{false},snap::Snapshots;kwargs...)
   nsnaps = get_nsnaps(snap)
 
   basis_time = tpod(snaps_t;kwargs...)
-  compressed_space_snaps = change_mode(basis_time'*snaps_t,nsnaps)
+  compressed_time_snaps = prod(basis_time,snaps_t)
+  compressed_space_snaps = change_mode(compressed_time_snaps,nsnaps)
   basis_space = tpod(compressed_space_snaps;kwargs...)
   basis_space,basis_time
 end

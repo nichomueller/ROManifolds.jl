@@ -48,6 +48,20 @@ function Base.hcat(nza::NnzArray{T,N,OT}...) where {T,N,OT}
   NnzArray{OT}(reduce(hcat,nonzero_vals),first(nonzero_idxs),first(nrowss))
 end
 
+function Base.prod(nza1::NnzArray{T,N,OT},nza2::NnzArray{T,N,OT}) where {T,N,OT}
+  msg = """\n
+  Cannot hcat the given NnzArrays: the nonzero indices and/or the full
+  order number of rows do not match one another.
+  """
+  @assert nza1.nonzero_idx == nza2.nonzero_idx msg
+  @assert nza1.nrows == nza2.nrows msg
+
+  nonzero_vals_1 = nza1.nonzero_val
+  nonzero_vals_2 = nza2.nonzero_val
+  nonzero_vals = nonzero_vals_1' * nonzero_vals_2
+  NnzArray{OT}(nonzero_vals,nza1.nonzero_idx,nza1.nrows)
+end
+
 function recast(nza::NnzArray{T,N,<:AbstractMatrix}) where {T,N}
   entire_array = zeros(T,nza.nrows,size(nza,2))
   entire_array[nza.nonzero_idx,:] = nza.nonzero_val
