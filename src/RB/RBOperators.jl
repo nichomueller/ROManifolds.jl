@@ -16,6 +16,7 @@ function reduce_fe_operator(
   params = realization(feop,nsnaps)
   sols = collect_solutions(feop,fesolver,params)
   rbspace = compress_solutions(feop,fesolver,sols,params;ϵ)
+  save(info,(sols,params))
 
   nsnaps = info.nsnaps_system
   rb_jac = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps,st_mdeim)
@@ -158,7 +159,7 @@ function mdeim_solve(mdeim_interp::LU,b::AbstractArray)
 end
 
 function recast_coefficient(
-  basis_time::Tuple{Vararg{AbstractArray}},
+  basis_time::Vector{<:Array{T}},
   coeff::AbstractMatrix)
 
   bt,_ = basis_time
@@ -175,7 +176,7 @@ end
 
 function project_residual_coefficient(
   ::ODESolver,
-  basis_time::Tuple{Vararg{AbstractArray}},
+  basis_time::Vector{<:Array{T}},
   coeff::AbstractMatrix)
 
   _,bt_proj = basis_time
@@ -190,7 +191,7 @@ end
 
 function project_jacobian_coefficient(
   ::θMethod,
-  basis_time::Tuple{Vararg{AbstractArray}},
+  basis_time::Vector{<:Array{T}},
   coeff::AbstractMatrix)
 
   _,bt_proj = basis_time

@@ -1,8 +1,8 @@
 struct RBAlgebraicContribution
-  dict::IdDict{Triangulation,AbstractArray}
+  dict::IdDict{Triangulation,Any}
 end
 
-RBAlgebraicContribution() = RBAlgebraicContribution(IdDict{Triangulation,AbstractArray}())
+RBAlgebraicContribution() = RBAlgebraicContribution(IdDict{Triangulation,Any}())
 
 Gridap.CellData.num_domains(a::RBAlgebraicContribution) = length(a.dict)
 
@@ -26,7 +26,7 @@ Base.getindex(a::RBAlgebraicContribution,trian::Triangulation) = get_contributio
 function Gridap.CellData.add_contribution!(
   a::RBAlgebraicContribution,
   trian::Triangulation,
-  b::AbstractArray)
+  b)
 
   @check !haskey(a.dict,trian)
   a.dict[trian] = b

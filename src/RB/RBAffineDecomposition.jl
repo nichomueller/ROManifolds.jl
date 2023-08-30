@@ -28,9 +28,9 @@ struct RBIntegrationDomain
   end
 end
 
-struct RBAffineDecomposition
-  basis_space::Vector{<:AbstractMatrix}
-  basis_time::Tuple{Vararg{AbstractArray}}
+struct RBAffineDecomposition{T}
+  basis_space::Vector{Matrix{T}}
+  basis_time::Vector{<:Array{T}}
   mdeim_interpolation::LU
   integration_domain::RBIntegrationDomain
 end
@@ -220,7 +220,7 @@ function compress_space(
 
   entire_bs_row = get_basis_space(rbspace_row)
   entire_bs = recast(basis_space)
-  lazy_map(eachcol(entire_bs)) do col
+  map(eachcol(entire_bs)) do col
     cmat = reshape(col,:,1)
     entire_bs_row'*cmat
   end
@@ -233,7 +233,7 @@ function compress_space(
 
   entire_bs_row = get_basis_space(rbspace_row)
   entire_bs_col = get_basis_space(rbspace_col)
-  lazy_map(axes(basis_space,2)) do n
+  map(axes(basis_space,2)) do n
     entire_bs_row'*recast(basis_space,n)*entire_bs_col
   end
 end
@@ -244,7 +244,7 @@ function compress_time(
   args...)
 
   bt = get_basis_time(rbspace_row)
-  basis_time.nonzero_val,bt
+  [basis_time.nonzero_val,bt]
 end
 
 function compress_time(
@@ -267,7 +267,7 @@ function compress_time(
   end
 
   combine_bt_proj = combine_projections(bt_proj,bt_proj_shift)
-  basis_time.nonzero_val,combine_bt_proj
+  [basis_time.nonzero_val,combine_bt_proj]
 end
 
 function find_cells(idx::Vector{Int},cell_dof_ids)

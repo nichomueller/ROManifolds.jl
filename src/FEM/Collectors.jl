@@ -183,12 +183,12 @@ function compress_function(
   quad_points = lazy_map(evaluate,phys_map,cell_points)
   cell_fields = lazy_map(pt -> CellField(x->f(x,pt...),trian,PhysicalDomain()),p_t)
 
-  fevals = map(cell_fields) do field
+  fevals = lazy_map(cell_fields) do field
     feval_x = map(evaluate,get_data(field),quad_points)
     reduce(vcat,feval_x)
   end
 
-  fcat = reduce(hcat,fevals)
+  fcat = collect(fevals)
   fpod = tpod(fcat;kwargs...)
   fblocks = eachcol(reshape(fpod,:,length(cell_points)))
   GenericCellField(fblocks,trian,PhysicalDomain())
