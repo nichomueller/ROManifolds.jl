@@ -11,15 +11,12 @@ using Gridap.Fields
 using Gridap.CellData
 using Gridap.MultiField
 using Gridap.Io
-# using GridapGmsh
 using GridapDistributed
-# using GridapPETSc
-# using GridapP4est
-# using Gridap.TensorValues
 using Gridap.ODEs.TransientFETools
 
 const Float = Float64
 
+import Statistics.mean
 import Gridap.Helpers.@check
 import Gridap.Helpers.@unreachable
 import Gridap.Arrays:evaluate
@@ -62,8 +59,6 @@ import Gridap.ODEs.TransientFETools:update_cache!
 import Gridap.ODEs.TransientFETools:jacobians!
 import Gridap.ODEs.TransientFETools._matdata_jacobian
 import Gridap.ODEs.TransientFETools._vcat_matdata
-# import Gridap.ODEs.TransientFETools:∂t
-# import Gridap.ODEs.TransientFETools:∂tt
 
 include("FEOperations.jl")
 include("ParamSpace.jl")
@@ -78,4 +73,3 @@ include("AffineThetaMethod.jl")
 include("ThetaMethod.jl")
 include("Affinity.jl")
 include("Collectors.jl")
-include("LagrangianQuadFESpaces.jl")

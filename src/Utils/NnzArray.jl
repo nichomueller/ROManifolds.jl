@@ -48,8 +48,8 @@ function Base.hcat(nza::NnzArray{T,N,OT}...) where {T,N,OT}
   NnzArray{OT}(reduce(hcat,nonzero_vals),first(nonzero_idxs),first(nrowss))
 end
 
-function recast(nza::NnzArray{T,N,<:AbstractMatrix} where {T,N})
-  entire_array = zeros(nza.nrows,size(nza,2))
+function recast(nza::NnzArray{T,N,<:AbstractMatrix}) where {T,N}
+  entire_array = zeros(T,nza.nrows,size(nza,2))
   entire_array[nza.nonzero_idx,:] = nza.nonzero_val
   entire_array
 end

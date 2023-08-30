@@ -149,3 +149,28 @@ function evaluation_function(
   end
   TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
 end
+
+function compress_function(
+  f::Function,
+  solver::θMethod,
+  trian::Triangulation,
+  params::Table;
+  kwargs...)
+
+  times = get_times(solver)
+  p_t = Iterators.product(times,params)
+
+  phys_map = get_cell_map(trian)
+  cell_points = get_cell_points(trian)
+  quad_points = lazy_map(evaluate,phys_map,get_data(cell_points))
+  cell_fields = lazy_map(pt -> CellField(x->f(x,pt...),trian,PhysicalDomain()),p_t)
+
+  fevals = map(cell_fields) do field
+    feval_x = map(evaluate,get_data(field),quad_points)
+    reduce(vcat,feval_x)
+  end
+
+  fpod = tpod(fevals;kwargs...)
+  fblocks = eachcol(reshape(fpod,:,length(cell_points)))
+  GenericCellField(fblocks,trian,PhysicalDomain())
+end

@@ -73,3 +73,6 @@ trian = Ω
 ress = collect_residuals(info,feop,fesolver,snap,p,trian)
 rb_res = compress_residuals(feop,fesolver,rbspace,snaps,params;ϵ,nsnaps,st_mdeim)
 jacs = collect_jacobians(info,feop,fesolver,snap,p,trian);
+
+
+compress_function(f,fesolver,Ω,p)

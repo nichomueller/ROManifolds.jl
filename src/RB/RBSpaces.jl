@@ -15,7 +15,7 @@ struct SingleFieldRBSpace{T} <: RBSpace{T}
 end
 
 function compress_snapshots(snaps::SingleFieldSnapshots,args...;kwargs...)
-  basis_space_nnz,basis_time_nnz = tpod(snaps;kwargs...)
+  basis_space,basis_time = tpod(snaps;kwargs...)
   SingleFieldRBSpace(basis_space,basis_time)
 end
 
