@@ -131,7 +131,6 @@ end
 function save(info::RBInfo,snap::Snapshots)
   if info.save_structures
     path = joinpath(info.fe_path,"fesnaps")
-    convert!(Matrix{Float},snap)
     save(path,snap)
   end
 end

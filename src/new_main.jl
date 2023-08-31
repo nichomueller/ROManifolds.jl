@@ -64,16 +64,17 @@ begin
 end
 
 #OK
-nsnaps = info.nsnaps_state
+nsnaps = 30
 p = realization(feop,nsnaps)
 snap = collect_solutions(feop,fesolver,p;nsnaps)
 rbspace = compress_snapshots(snap)
-ress = collect_residuals(feop,fesolver,snap,p,trian;nsnaps=30)
-rb_res = compress_residuals(feop,fesolver,rbspace,snaps,params;ϵ,nsnaps,st_mdeim)
+save(info,(snap,p))
+ss,pp = load(Snapshots,info),load(Table,info)
 
 #TRY
 trian = Ω
-
+ress = collect_residuals(feop,fesolver,snap,p,trian;nsnaps=30)
+rb_res = compress_residuals(feop,fesolver,rbspace,snaps,params;ϵ,nsnaps,st_mdeim)
 jacs = collect_jacobians(info,feop,fesolver,snap,p,trian);
 
 

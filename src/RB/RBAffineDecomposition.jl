@@ -35,7 +35,7 @@ struct RBAffineDecomposition{T}
   integration_domain::RBIntegrationDomain
 end
 
-function compress_residuals(
+function collect_compress_residuals(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   rbspace::RBSpace,
@@ -46,13 +46,13 @@ function compress_residuals(
   trians = collect_trian_res(feop)
   cres = RBAlgebraicContribution()
   for trian in trians
-    ad = compress_residuals(feop,fesolver,rbspace,snaps,params,trian;kwargs...)
+    ad = collect_compress_residuals(feop,fesolver,rbspace,snaps,params,trian;kwargs...)
     add_contribution!(cres,trian,ad)
   end
   return cres
 end
 
-function compress_residuals(
+function collect_compress_residuals(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   rbspace::SingleFieldRBSpace,
@@ -63,11 +63,11 @@ function compress_residuals(
 
   times = get_times(fesolver)
   ress = collect_residuals(feop,fesolver,snaps,params,trian;nsnaps)
-  ad_res = compress_residuals(ress,feop,trian,times,rbspace;kwargs...)
+  ad_res = compress_component(ress,feop,trian,times,rbspace;kwargs...)
   return ad_res
 end
 
-function compress_residuals(
+function collect_compress_residuals(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   rbspace::MultiFieldRBSpace,
@@ -84,12 +84,12 @@ function compress_residuals(
     times = get_times(fesolver)
 
     ress = collect_residuals(filt_op,fesolver,snaps,params,trian;nsnaps)
-    compress_residuals(ress,filt_op,trian,times,filt_rbspace;kwargs...)
+    compress_component(ress,filt_op,trian,times,filt_rbspace;kwargs...)
   end
   return ad_res
 end
 
-function compress_jacobians(
+function collect_compress_jacobians(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   rbspace::RBSpace,
@@ -100,13 +100,13 @@ function compress_jacobians(
   trians = collect_trian_jac(feop)
   cres = RBAlgebraicContribution()
   for trian in trians
-    ad = compress_jacobians(feop,fesolver,rbspace,snaps,params,trian;kwargs...)
+    ad = collect_compress_jacobians(feop,fesolver,rbspace,snaps,params,trian;kwargs...)
     add_contribution!(cres,trian,ad)
   end
   return cres
 end
 
-function compress_jacobians(
+function collect_compress_jacobians(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   rbspace::SingleFieldRBSpace,
@@ -125,11 +125,11 @@ function compress_jacobians(
   end
 
   jacs = collect_jacobians(feop,fesolver,snaps,params,trian;nsnaps,i)
-  ad_jac = compress_jacobians(jacs,feop,trian,times,rbspace,rbspace;combine_projections,kwargs...)
+  ad_jac = compress_component(jacs,feop,trian,times,rbspace,rbspace;combine_projections,kwargs...)
   return ad_jac
 end
 
-function compress_jacobians(
+function collect_compress_jacobians(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   rbspace::MultiFieldRBSpace,
@@ -154,7 +154,7 @@ function compress_jacobians(
     filt_rbspace = filter_rbspace(rbspace,filter[1]),filter_rbspace(rbspace,filter[2])
 
     jacs = collect_jacobians(filt_op,fesolver,snaps,params,trian;nsnaps,i)
-    compress_jacobians(jacs,filt_op,trian,times,filt_rbspace...;combine_projections,kwargs...)
+    compress_component(jacs,filt_op,trian,times,filt_rbspace...;combine_projections,kwargs...)
   end
   return ad_jac
 end

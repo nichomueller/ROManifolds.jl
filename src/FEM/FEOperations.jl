@@ -199,3 +199,41 @@ function set_labels!(model,bnd_info)
     end
   end
 end
+
+for f in (:get_l2_norm_matrix,:get_h1_norm_matrix)
+  @eval begin
+    function $f(op::ParamTransientFEOperator)
+      test = op.test
+      trial = get_trial(op)
+      trial_hom = allocate_trial_space(trial)
+      $f(test,trial_hom)
+    end
+
+    function $f(
+      trial::TransientMultiFieldTrialFESpace,
+      test::MultiFieldFESpace)
+
+      map($f,trial.spaces,test.spaces)
+    end
+  end
+end
+
+function get_l2_norm_matrix(
+  trial::ParamTransientTrialFESpace,
+  test::FESpace)
+
+  trian = get_triangulation(test)
+  dΩ = Measure(trian,4)
+  l2_form(u,v) = ∫(v⋅u)dΩ
+  assemble_matrix(l2_form,trial,test)
+end
+
+function get_h1_norm_matrix(
+  trial::ParamTransientTrialFESpace,
+  test::FESpace)
+
+  trian = get_triangulation(test)
+  dΩ = Measure(trian,4)
+  h1_form(u,v) = ∫(∇(v)⊙∇(u))dΩ + ∫(v⋅u)dΩ
+  assemble_matrix(h1_form,trial,test)
+end

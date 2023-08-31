@@ -15,12 +15,12 @@ function reduce_fe_operator(
   nsnaps = info.nsnaps_state
   params = realization(feop,nsnaps)
   sols = collect_solutions(feop,fesolver,params)
-  rbspace = compress_solutions(feop,fesolver,sols,params;ϵ)
+  rbspace = compress_solutions(sols,feop,fesolver,params;ϵ)
   save(info,(sols,params))
 
   nsnaps = info.nsnaps_system
-  rb_jac = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps,st_mdeim)
-  rb_jac = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps,st_mdeim)
+  rb_jac = collect_compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps,st_mdeim)
+  rb_jac = collect_compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps,st_mdeim)
 
   rb_res = compress_residuals(feop,fesolver,rbspace,snaps,params;ϵ,nsnaps,st_mdeim)
   rbop = TransientRBOperator{Top}(rb_res,rb_jac,rbspace)
@@ -171,7 +171,7 @@ function recast_coefficient(
     bt*coeff[sorted_idx]
   end
 
-  hcat(rcoeff...)
+  reduce(hcat,rcoeff)
 end
 
 function project_residual_coefficient(
@@ -195,13 +195,13 @@ function project_jacobian_coefficient(
   coeff::AbstractMatrix)
 
   _,bt_proj = basis_time
-  proj = map(eachcol(coeff)) do c
+  proj = lazy_map(eachcol(coeff)) do c
     pcr = map(axes(bt_proj,3)) do col
       map(axes(bt_proj,2)) do row
         sum(bt_proj[:,row,col].*c)
       end
     end
-    hcat(pcr...)
+    reduce(hcat,pcr)
   end
   proj
 end
