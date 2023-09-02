@@ -19,7 +19,7 @@ function Arrays.evaluate!(cache,k::CollectSolutionsMap,μ::AbstractArray)
   l = length(sol_μ)
   T = return_type(sol_μ)
   v = Vector{T}(undef,l)
-  for (n,sol_μn) in enumerate(sol_μ)
+  @fastmath @inbounds for (n,sol_μn) in enumerate(sol_μ)
     uhn,_ = sol_μn
     v[n] = uhn
   end
@@ -39,39 +39,38 @@ struct CollectResidualsMap{A} <: CollectorMap{A}
     dv = get_fe_basis(op.test)
     v0 = zeros(op.test)
     pop = get_algebraic_operator(op)
-    cache = allocate_cache(pop)
     A = affinity_residual(op,solver,trian)
     times = get_times(A,solver)
 
     function f(μ::AbstractArray)
-      x0 = setup_initial_condition(solver,μ)
       xh = allocate_evaluation_function(op)
-
-      map(times) do t
-        update_cache!(cache,pop,μ,t)
-
+      v,rcache,odecache, = allocate_residual_cache(pop,times)
+      @fastmath @inbounds for (n,t) in enumerate(times)
+        r = copy(rcache)
+        update_cache!(odecache,pop,μ,t)
         vecdata = collect_cell_vector(op.test,op.res(μ,t,xh,dv,args...),trian)
-        r = allocate_residual(pop,x0,cache)
         assemble_vector_add!(r,op.assem,vecdata)
-        r .*= -1.0
+        @. r *= -1.0
+        v[n] = r
       end
+      v
     end
 
     function f(sol::AbstractArray,μ::AbstractArray)
       x0 = setup_initial_condition(solver,μ)
-
-      map(enumerate(times)) do (it,t)
-        update_cache!(cache,pop,μ,t)
-
-        x = sol[:,it]*solver.θ + x0*(1-solver.θ)
-        xh = evaluation_function(op,(x,v0),cache)
-        x0 .= sol[:,it]
-
+      v,rcache,odecache,x = allocate_residual_cache(pop,times)
+      @fastmath @inbounds for (n,t) in enumerate(times)
+        r = copy(rcache)
+        update_cache!(odecache,pop,μ,t)
+        @. x = sol[:,n]*solver.θ + x0*(1-solver.θ)
+        xh = evaluation_function(op,(x,v0),odecache)
+        @. x0 = sol[:,n]
         vecdata = collect_cell_vector(op.test,op.res(μ,t,xh,dv,args...),trian)
-        r = allocate_residual(pop,x0,cache)
         assemble_vector_add!(r,op.assem,vecdata)
-        r .*= -1.0
+        @. r *= -1.0
+        v[n] = r
       end
+      v
     end
 
     new{A}(f)
@@ -99,43 +98,40 @@ struct CollectJacobiansMap{A} <: CollectorMap{A}
     dv = get_fe_basis(op.test)
     du = get_trial_fe_basis(trial_hom)
     pop = get_algebraic_operator(op)
-    cache = allocate_cache(pop)
     A = affinity_jacobian(op,solver,trian)
     times = get_times(A,solver)
     γ = (1.0,1/(solver.dt*solver.θ))
 
     function f(μ::AbstractArray)
-      x0 = setup_initial_condition(solver,μ)
       xh = allocate_evaluation_function(op)
-
-      map(times) do t
-        update_cache!(cache,pop,μ,t)
-        trial, = cache[1]
-
+      v,Jcache,odecache, = allocate_jacobian_cache(pop,times)
+      @fastmath @inbounds for (n,t) in enumerate(times)
+        J = copy(Jcache)
+        update_cache!(odecache,pop,μ,t)
+        trial, = odecache[1]
         matdata = collect_cell_matrix(trial,op.test,γ[i]*op.jacs[i](μ,t,xh,du,dv,args...),trian)
-        J = allocate_jacobian(pop,x0,cache)
         assemble_matrix_add!(J,op.assem,matdata)
-        compress(J)
+        v[n] = compress(J)
       end
+      v
     end
 
     function f(sol::AbstractArray,μ::AbstractArray)
       x0 = setup_initial_condition(solver,μ)
-
-      map(enumerate(times)) do (it,t)
-        update_cache!(cache,pop,μ,t)
-        trial, = cache[1]
-
-        x = sol[it]*solver.θ + x0*(1-solver.θ)
-        vθ = (x-x0)/(solver.θ*solver.dt)
-        xh = evaluation_function(op,(x,vθ),cache)
-        x0 .= sol[it]
-
+      v,Jcache,odecache,x,vθ = allocate_jacobian_cache(pop,times)
+      @fastmath @inbounds for (n,t) in enumerate(times)
+        J = copy(Jcache)
+        update_cache!(odecache,pop,μ,t)
+        trial, = odecache[1]
+        @. x = sol[:,n]*solver.θ + x0*(1-solver.θ)
+        @. vθ = (x-x0)/(solver.θ*solver.dt)
+        xh = evaluation_function(op,(x,vθ),odecache)
+        @. x0 = sol[:,n]
         matdata = collect_cell_matrix(trial,op.test,γ[i]*op.jacs[i](μ,t,xh,du,dv,args...),trian)
-        J = allocate_jacobian(pop,x0,cache)
         assemble_matrix_add!(J,op.assem,matdata)
-        compress(J)
+        v[n] = compress(J)
       end
+      v
     end
 
     new{A}(f)
@@ -144,7 +140,7 @@ end
 
 function Arrays.evaluate!(cache,k::CollectJacobiansMap,args...)
   jac_μ_nnz = k.f(args...)
-  reduce(hcat,jac_μ_nnz)
+  hcat(jac_μ_nnz...)
 end
 
 function setup_initial_condition(
@@ -166,6 +162,36 @@ function evaluation_function(
     dxh = (dxh...,EvaluationFunction(Xh[i],xhF[i]))
   end
   TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
+end
+
+function allocate_residual_cache(
+  pop::ParamODEOperator,
+  times::Vector{<:Real})
+
+  x = zeros(pop.feop.test)
+  odecache = allocate_cache(pop)
+  rcache = allocate_residual(pop,x,odecache)
+  T = typeof(rcache)
+  l = length(times)
+  v = Vector{T}(undef,l)
+
+  return v,rcache,odecache,x
+end
+
+function allocate_jacobian_cache(
+  pop::ParamODEOperator,
+  times::Vector{<:Real})
+
+  x = zeros(pop.feop.test)
+  vθ = copy(x)
+  odecache = allocate_cache(pop)
+  Jcache = allocate_jacobian(pop,x,odecache)
+  J_nnz = compress(Jcache)
+  T = typeof(J_nnz)
+  l = length(times)
+  v = Vector{T}(undef,l)
+
+  return v,Jcache,odecache,x,vθ
 end
 
 function compress_function(

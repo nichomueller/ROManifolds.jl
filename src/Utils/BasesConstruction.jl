@@ -1,8 +1,8 @@
-function tpod(mat::AbstractMatrix;ϵ=1e-4)
-  tpod(Val(size(mat,1) > size(mat,2)),mat;ϵ)
+function tpod(mat::AbstractMatrix,args...;ϵ=1e-4)
+  tpod(Val(size(mat,1) > size(mat,2)),mat,args...;ϵ)
 end
 
-function tpod(::Val{true},mat::AbstractMatrix;ϵ=1e-4)
+function tpod(::Val{true},mat::AbstractMatrix,args...;ϵ=1e-4)
   compressed_mat = mat'*mat
   _,Σ2,V = svd(compressed_mat)
   Σ = sqrt.(Σ2)
@@ -14,12 +14,40 @@ function tpod(::Val{true},mat::AbstractMatrix;ϵ=1e-4)
   U
 end
 
-function tpod(::Val{false},mat::AbstractMatrix;ϵ=1e-4)
+function tpod(::Val{false},mat::AbstractMatrix,args...;ϵ=1e-4)
   compressed_mat = mat*mat'
   U,Σ2,_ = svd(compressed_mat)
   Σ = sqrt.(Σ2)
   n = truncation(Σ,ϵ)
   U[:,1:n]
+end
+
+function tpod(::Val{true},mat::AbstractMatrix,X::AbstractMatrix;ϵ=1e-4)
+  H = cholesky(X)
+  L = sparse(H.L)
+  Xmat = L'*mat[H.p,:]
+
+  compressed_mat = Xmat'*Xmat
+  _,Σ2,V = svd(compressed_mat)
+  Σ = sqrt.(Σ2)
+  n = truncation(Σ,ϵ)
+  U = Xmat*V[:,1:n]
+  for i = axes(U,2)
+    U[:,i] /= (Σ[i]+eps())
+  end
+  (L'\U[:,1:n])[invperm(H.p),:]
+end
+
+function tpod(::Val{false},mat::AbstractMatrix,X::AbstractMatrix;ϵ=1e-4)
+  H = cholesky(X)
+  L = sparse(H.L)
+  Xmat = L'*mat[H.p,:]
+
+  compressed_mat = Xmat*Xmat'
+  U,Σ2,_ = svd(compressed_mat)
+  Σ = sqrt.(Σ2)
+  n = truncation(Σ,ϵ)
+  (L'\U[:,1:n])[invperm(H.p),:]
 end
 
 function truncation(Σ::AbstractArray,ϵ::Real)

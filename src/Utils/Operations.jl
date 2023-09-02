@@ -61,6 +61,8 @@ Base.getindex(w::LazyArrayWrap,idx...) = getindex(w.a,idx...)
 end
 
 function Base.collect(a::LazyArray)
+  printstyled("Concatenating lazy arrays into a unique matrix; this might take some time\n";
+    color=:blue)
   w_a = LazyArrayWrap(a)
   hcat(w_a)
 end

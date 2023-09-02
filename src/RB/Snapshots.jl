@@ -7,19 +7,22 @@ struct Snapshots{T,A}
   end
 end
 
-const SingleFieldSnapshots{A} = Snapshots{<:AbstractArray,A}
-const MultiFieldSnapshots{A} = Snapshots{<:BlockArray,A}
+const SingleFieldSnapshots{T,A} = Snapshots{<:AbstractArray{T},A}
+const MultiFieldSnapshots{T,A} = Snapshots{<:BlockArray{T},A}
 
 function Base.collect(snap::Snapshots)
   lazy_snaps = get_snaps(snap)
   collect(lazy_snaps)
 end
 
-# DO NOT RECOMMEND USING
 function Base.size(snap::Snapshots)
   len = snap.nsnaps
   s1 = first(snap.snaps)
   size(s1,1),size(s1,2)*len
+end
+
+function Base.show(io::IO,snap::Snapshots{T,A}) where {T,A}
+  print(io,"Structure storing $(snap.nsnaps) $A snapshots of eltype $T")
 end
 
 get_snaps(snap::Snapshots) = snap.snaps
@@ -28,42 +31,42 @@ get_nsnaps(snap::Snapshots) = snap.nsnaps
 
 get_time_ndofs(snap::Snapshots) = size(first(snap.snaps),2)
 
-function tpod(snap::Snapshots;kwargs...)
+function tpod(snap::Snapshots,args...;kwargs...)
   s = size(snap)
-  tpod(Val(s[1] < s[2]),snap;kwargs...)
+  tpod(Val(s[1] < s[2]),snap,args...;kwargs...)
 end
 
-function tpod(::Val{true},snap::Snapshots;kwargs...)
+function tpod(::Val{true},snap::Snapshots,args...;kwargs...)
   snaps = collect(snap)
   nsnaps = get_nsnaps(snap)
 
-  basis_space = tpod(snaps;kwargs...)
+  basis_space = tpod(snaps,args...;kwargs...)
   compressed_space_snaps = prod(basis_space,snaps)
   compressed_time_snaps = change_mode(compressed_space_snaps,nsnaps)
   basis_time = tpod(compressed_time_snaps;kwargs...)
   basis_space,basis_time
 end
 
-function tpod(::Val{false},snap::Snapshots;kwargs...)
+function tpod(::Val{false},snap::Snapshots,args...;kwargs...)
   snaps_t = collect(lazy_map(transpose,get_snaps(snap)))
   nsnaps = get_nsnaps(snap)
 
   basis_time = tpod(snaps_t;kwargs...)
   compressed_time_snaps = prod(basis_time,snaps_t)
   compressed_space_snaps = change_mode(compressed_time_snaps,nsnaps)
-  basis_space = tpod(compressed_space_snaps;kwargs...)
+  basis_space = tpod(compressed_space_snaps,args...;kwargs...)
   basis_space,basis_time
 end
 
 for A in (:TimeAffinity,:ParamTimeAffinity)
   @eval begin
-    function tpod(snap::Snapshots{$A};kwargs...)
+    function tpod(snap::Snapshots{$A},args...;kwargs...)
       snaps = collect(snap)
       nsnaps = get_nsnaps(snap)
       time_ndofs = Int(size(snaps,2)/nsnaps)
       T = eltype(snaps)
 
-      basis_space = tpod(snaps;kwargs...)
+      basis_space = tpod(snaps,args...;kwargs...)
       basis_time = ones(T,time_ndofs,1)
       basis_space,basis_time
     end

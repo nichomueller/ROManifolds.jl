@@ -17,6 +17,7 @@ using Gridap.ODEs.TransientFETools
 const Float = Float64
 
 import Statistics.mean
+import GridapGmsh:GmshDiscreteModel
 import Gridap.Helpers.@check
 import Gridap.Helpers.@unreachable
 import Gridap.Arrays:evaluate
@@ -60,7 +61,6 @@ import Gridap.ODEs.TransientFETools:jacobians!
 import Gridap.ODEs.TransientFETools._matdata_jacobian
 import Gridap.ODEs.TransientFETools._vcat_matdata
 
-include("FEOperations.jl")
 include("ParamSpace.jl")
 include("DiffOperators.jl")
 include("ParamTransientFESpaces.jl")
@@ -73,3 +73,4 @@ include("AffineThetaMethod.jl")
 include("ThetaMethod.jl")
 include("Affinity.jl")
 include("Collectors.jl")
+include("FEOperations.jl")

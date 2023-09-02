@@ -4,9 +4,9 @@ begin
   include("$root/src/FEM/FEM.jl")
   include("$root/src/RB/RB.jl")
 
-  mesh = "elasticity_3cyl2D.json"
+  mesh = "cube2x2.json"
   test_path = "$root/tests/poisson/unsteady/$mesh"
-  bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
+  bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
   order = 1
   degree = 2
 
@@ -54,7 +54,7 @@ begin
   ϵ = 1e-4
   save_structures = true
   load_structures = true
-  energy_norm = false
+  energy_norm = l2Norm()
   nsnaps_state = 80
   nsnaps_system = 30
   st_mdeim = false
@@ -65,17 +65,17 @@ end
 
 #OK
 nsnaps = 30
-p = realization(feop,nsnaps)
-snap = collect_solutions(feop,fesolver,p;nsnaps)
-rbspace = compress_snapshots(snap)
-save(info,(snap,p))
-ss,pp = load(Snapshots,info),load(Table,info)
+# p = realization(feop,nsnaps)
+# snap = collect_solutions(feop,fesolver,p;nsnaps)
+# save(info,(snap,p))
+snap,p = load(Snapshots,info),load(Table,info)
+rbspace = compress_snapshots(info,snap,feop,fesolver,p)
 
 #TRY
-trian = Ω
-ress = collect_residuals(feop,fesolver,snap,p,trian;nsnaps=30)
-rb_res = compress_residuals(feop,fesolver,rbspace,snaps,params;ϵ,nsnaps,st_mdeim)
-jacs = collect_jacobians(info,feop,fesolver,snap,p,trian);
+rb_res = collect_compress_residual(info,feop,fesolver,rbspace,snap,p)
+online_res = collect_residual_contributions(info,feop,fesolver,rb_res)
 
+rb_jacs = collect_compress_jacobians(info,feop,fesolver,rbspace,snap,p)
+online_jac = collect_jacobians_contributions(info,feop,fesolver,rb_jac)
 
 compress_function(f,fesolver,Ω,p)

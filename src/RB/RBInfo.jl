@@ -4,20 +4,22 @@ struct RBInfo
   nsnaps_system::Int
   fe_path::String
   rb_path::String
-  energy_norm::Bool
+  energy_norm::NormStyle
+  st_mdeim::Bool
+  fun_mdeim::Bool
   load_structures::Bool
   save_structures::Bool
   postprocess::Bool
 end
 
 function RBInfo(test_path::String;ϵ=1e-4,nsnaps_state=80,nsnaps_system=20,
-  energy_norm=false,st_mdeim=false,fun_mdeim=false,
+  energy_norm=l2Norm(),st_mdeim=false,fun_mdeim=false,
   load_structures=false,save_structures=true,postprocess=false)
 
   fe_path = get_fe_path(test_path)
   rb_path = get_rb_path(test_path,ϵ;st_mdeim,fun_mdeim)
-  RBInfo(ϵ,nsnaps_state,nsnaps_system,fe_path,rb_path,
-    energy_norm,load_structures,save_structures,postprocess)
+  RBInfo(ϵ,nsnaps_state,nsnaps_system,fe_path,rb_path,energy_norm,
+    st_mdeim,fun_mdeim,load_structures,save_structures,postprocess)
 end
 
 function get_fe_path(tpath::String)

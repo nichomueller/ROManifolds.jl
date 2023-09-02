@@ -1,4 +1,5 @@
 struct RBResults
+  μ::AbstractArray
   sol::AbstractArray
   sol_approx::AbstractArray
   relative_err::Float
@@ -6,6 +7,7 @@ struct RBResults
 end
 
 function RBResults(
+  μ::AbstractArray,
   sol::AbstractArray,
   sol_approx::AbstractArray,
   wall_time::Float;
@@ -18,17 +20,18 @@ function RBResults(
   printstyled("Average online wall time: $wall_time s\n";color=:red)
   printstyled("-------------------------------------------------------------\n")
 
-  RBResults(sol,sol_approx,relative_err,wall_time)
+  RBResults(μ,sol,sol_approx,relative_err,wall_time)
 end
 
-function Base.unique(rb_res::Vector{RBResults})
-  ntests = length(rb_res)
-  rb_res1 = first(rb_res)
-  sol = rb_res1.sol
-  sol_approx = rb_res1.sol_approx
-  relative_err = sum([r.relative_err for r in rb_res]) / ntests
-  wall_time = sum([r.wall_time for r in rb_res]) / ntests
-  RBResults(sol,sol_approx,relative_err,wall_time)
+function Base.unique(results::Vector{RBResults})
+  ntests = length(results)
+  results1 = first(results)
+  μ = results1.μ
+  sol = results1.sol
+  sol_approx = results1.sol_approx
+  relative_err = sum([r.relative_err for r in results]) / ntests
+  wall_time = sum([r.wall_time for r in results]) / ntests
+  RBResults(μ,sol,sol_approx,relative_err,wall_time)
 end
 
 abstract type RBSolver end
@@ -42,21 +45,17 @@ function test_rb_operator(
   fesolver::ODESolver,
   rbsolver::RBSolver;
   ntests=10,
-  postprocess=true,
-  kwargs...)
+  postprocess=true)
 
   sols,params = load_test(info,feop,fesolver,ntests)
-  rb_res = RBResults[]
-  for (u,μ) in zip(sols,params)
-    urb,wall_time = solve(rbsolver,rbop,μ)
-    push!(rb_res,RBResults(u,urb,wall_time;kwargs...))
-  end
+  norm_matrix = get_norm_matrix(info.energy_norm,feop)
+  results = lazy_map((u,μ)->do_test(rbsolver,rbop,u,μ;norm_matrix),sols,params)
+
   if postprocess
-    μ = params[1]
-    r = unique(rb_res)
-    save(info,r)
-    writevtk(info,feop,fesolver,r,μ)
+    post_process(info,feop,fesolver,results)
   end
+
+  return
 end
 
 function test_rb_operator(
@@ -66,19 +65,20 @@ function test_rb_operator(
   fesolver::ODESolver,
   rbsolver::RBSolver;
   ntests=10,
-  postprocess=true,
-  kwargs...)
+  postprocess=true)
 
   sols,params = load_test(info,feop,fesolver,ntests)
-  rb_res = RBResults[]
+  norm_matrix = get_norm_matrix(info.energy_norm,feop)
+
+  results = RBResults[]
   for (u,μ) in zip(sols,params)
     ic = initial_condition(sols,params,μ)
     urb,wall_time = solve(rbsolver,rbop,μ,ic)
-    push!(rb_res,RBResults(u,urb,wall_time;kwargs...))
+    push!(results,RBResults(u,urb,wall_time;norm_matrix))
   end
   if postprocess
     μ = params[1]
-    r = unique(rb_res)
+    r = unique(results)
     save(info,r)
     writevtk(info,feop,fesolver,r,μ)
   end
@@ -96,29 +96,30 @@ function load_test(
     n = min(ntests,length(params))
     return sols[1:n],params[1:n]
   catch
-    params = realization(feop,ntests)
-    sols = collect_solutions(feop,fesolver,params;type=Matrix{Float})
+    params = realization(feop,nsnaps)
+    sols = collect_solutions(feop,fesolver,params)
     save_test(info,(sols,params))
     return sols,params
   end
 end
 
-function solve(
+function do_test(
   ::Backslash,
   rbop::TransientRBOperator{Affine},
   μ::AbstractArray,
-  args...)
+  urb::AbstractArray;
+  kwargs...)
 
   wall_time = @elapsed begin
-    res = rbop.res(μ)
-    jac = rbop.jac(μ)
-    djac = rbop.djac(μ)
-    urb = recast(rbop,(jac+djac) \ res)
+    rhs = rbop.rhs(μ)
+    lhs = rbop.lhs(μ)
+    urb = recast(rbop,lhs \ rhs)
   end
-  urb,wall_time
+
+  return RBResults(μ,u,urb,wall_time;kwargs...)
 end
 
-function solve(
+function do_test(
   ::NewtonIterations,
   rbop::TransientRBOperator{Affine},
   μ::AbstractArray,
@@ -136,10 +137,9 @@ function solve(
         printstyled("Newton iterations did not converge\n";color=:red)
         return urb
       end
-      res = rbop.res(μ,urb)
-      jac = rbop.jac(μ,urb)
-      djac = rbop.djac(μ)
-      rberr = (jac+djac) \ res
+      rhs = rbop.rhs(μ)
+      lhs = rbop.lhs(μ)
+      rberr = lhs \ rhs
       err = recast(rbop,rberr)
       urb -= err
       l2_err = norm(err)/length(err)
@@ -190,20 +190,32 @@ LinearAlgebra.norm(v::AbstractVector,::Nothing) = norm(v)
 
 LinearAlgebra.norm(v::AbstractVector,X::AbstractMatrix) = v'*X*v
 
+function post_process(
+  info::RBInfo,
+  feop::ParamTransientFEOperator,
+  fesolver::ODESolver,
+  results:: Vector{RBResults})
+
+  result = unique(results)
+  save(info,result)
+  writevtk(info,feop,fesolver,result)
+  return
+end
+
 function Gridap.Visualization.writevtk(
   info::RBInfo,
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
-  rb_res::RBResults,
-  μ::AbstractArray)
+  result::RBResults)
 
+  μ = result.μ
   test = get_test(feop)
   trial = get_trial(feop)
   trian = get_triangulation(test)
   times = get_times(fesolver)
 
-  sol = rb_res.sol
-  sol_approx = rb_res.sol_approx
+  sol = result.sol
+  sol_approx = result.sol_approx
   pointwise_err = abs.(sol-sol_approx)
 
   plt_dir = joinpath(info.rb_path,"plots")
@@ -242,9 +254,9 @@ function load_test(T::Type{Table},info::RBInfo)
   load(T,path)
 end
 
-function save(info::RBInfo,rb_res::RBResults)
+function save(info::RBInfo,result::RBResults)
   path = joinpath(info.rb_path,"rbresults")
-  save(path,rb_res)
+  save(path,result)
 end
 
 function load(T::Type{RBResults},info::RBInfo)
