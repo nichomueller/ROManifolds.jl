@@ -18,11 +18,11 @@ using Gridap.MultiField
 
 import Gridap.Helpers.@check
 import Gridap.Helpers.@unreachable
-import Gridap.Arrays:Table
-import Gridap.Arrays:evaluate!
-import Gridap.Algebra:allocate_jacobian
-import Gridap.Algebra:allocate_residual
-import Gridap.Algebra:solve
+import Arrays:Table
+import Arrays:evaluate!
+import Algebra:allocate_jacobian
+import Algebra:allocate_residual
+import Algebra:solve
 import Gridap.ODEs.TransientFETools:Affine
 import Gridap.ODEs.TransientFETools:ODESolver
 
