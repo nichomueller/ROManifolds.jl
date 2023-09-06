@@ -3,6 +3,16 @@ struct NnzArray{T,N,OT} <: AbstractArray{T,N}
   nonzero_idx::Vector{Int}
   nrows::Int
 
+  function NnzArray(
+    nonzero_val::OT,
+    nonzero_idx::Vector{Int},
+    nrows::Int) where OT
+
+    T = eltype(nonzero_val)
+    N = dims(nonzero_val)
+    new{T,N,OT}(nonzero_val,nonzero_idx,nrows)
+  end
+
   function NnzArray{OT}(
     nonzero_val::AbstractArray{T,N},
     nonzero_idx::Vector{Int},
