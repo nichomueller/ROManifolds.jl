@@ -5,10 +5,23 @@ end
 
 const ∫ₚ = PIntegrand
 
+function Arrays.evaluate(
+  int::PIntegrand,
+  sols::AbstractArray,
+  params::Table,
+  times::Vector{<:Real})
+
+  inputs = Iterators.product(params,times) |> collect
+  inputs_vec = hcat(sols,reshape(inputs,:))
+  fields = map(i->int.object(i...),inputs_vec)
+  meas = int.meas
+  integrate(fields,meas)
+end
+
 function Arrays.evaluate(int::PIntegrand,params::Table,times::Vector{<:Real})
   inputs = Iterators.product(params,times) |> collect
-  inputs_vec = view(inputs,:)
-  fields = lazy_map(i->int.object(i...),inputs_vec)
+  inputs_vec = reshape(inputs,:)
+  fields = map(i->int.object(i...),inputs_vec)
   meas = int.meas
   integrate(fields,meas)
 end

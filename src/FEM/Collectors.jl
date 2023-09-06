@@ -27,6 +27,80 @@ function Arrays.evaluate!(cache,k::CollectSolutionsMap,μ::AbstractArray)
   sol_μ_nnz
 end
 
+function collect_inputs(
+  ::ParamTimeAffinity,
+  feop::ParamTransientFEOperator,
+  solver::ODESolver,
+  sols::AbstractArray,
+  params::Table)
+
+  pop = get_algebraic_operator(op)
+  odecache = allocate_cache(pop)
+  times = get_times(solver)
+  trials,x = _allocate_xtrial(sols,params,times)
+
+  count = 0
+  countμ = 0
+  @inbounds for μ = params
+    countμ += 1
+    countt = 0
+    @inbounds for t = times
+      count += 1
+      countt += 1
+      if t == first(times)
+        x0 = setup_initial_condition(solver,μ)
+        x1 = sols[countμ][1]
+      else
+        x0 = sols[countμ][countt-1]
+        x1 = sols[countμ][countt]
+      end
+      x[count] = x0*solver.θ + x1*(1-solver.θ)
+      update_cache!(odecache,μ,t)
+      trials[count] = odecache
+    end
+  end
+  trials,_reorder_xtp(x,params,times)
+end
+
+function collect_inputs(
+  ::ParamAffinity,
+  solver::θMethod,
+  sols::AbstractArray,
+  params::Table)
+
+  times = get_times(solver)
+  μ = testitem(params)
+  x0 = setup_initial_condition(solver,μ)
+  x = testitem(sols)
+  x1 = pushfirst!(x[2:end],x0)
+  x1θ = x1*solver.θ + x1*(1-solver.θ)
+  _reorder_xtp(x1θ,μ,times)
+end
+
+function collect_inputs(
+  ::ParamTimeAffinity,
+  solver::ODESolver,
+  sols::AbstractArray,
+  params::Table)
+
+  return map(testitem,(sols,params,get_times(solver)))
+end
+
+function _allocate_xtrial(x,p,t)
+  npt = length(p)*length(t)
+  T = eltype(eltype(x))
+  x = Vector{T}(undef,npt)
+  Tode = typeof(odecache)
+  trials = Vector{Tode}(undef,npt)
+  trials,x
+end
+
+function _reorder_xtp(x,p,t)
+  pt = Iterators.product(p,t) |> collect
+  xpt = map((a,b)->(a,b...),x,pt)
+  return xpt
+end
+
 struct CollectResidualsMap{A} <: CollectorMap{A}
   f::Function
 
