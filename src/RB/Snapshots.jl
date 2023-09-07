@@ -1,7 +1,7 @@
 struct Snapshots{T,A}
-  snaps::LazyArray
+  snaps::AbstractArray
   nsnaps::Int
-  function Snapshots(::CollectorMap{A},snaps::LazyArray,nsnaps::Int) where A
+  function Snapshots(::A,snaps::AbstractArray,nsnaps::Int) where A
     T = eltype(snaps)
     new{T,A}(snaps,nsnaps)
   end
@@ -79,34 +79,35 @@ function collect_solutions(
   params::Table;
   nsnaps=50)
 
+  aff = NonAffinity()
   nsols = nsnaps
   printstyled("Generating $nsols solution snapshots\n";color=:blue)
 
-  collector = CollectSolutionsMap(fesolver,feop)
-  sols = lazy_map(collector,params)
-  Snapshots(collector,sols,nsols)
+  sols = collect_solutions(fesolver,feop,params)
+  Snapshots(aff,sols,nsols)
 end
+
+get_nsnaps(::Affinity,nsnaps) = nsnaps
+get_nsnaps(::Union{TimeAffinity,NonAffinity},nsnaps) = 1
 
 function collect_residuals(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   snaps::Snapshots,
   params::Table,
+  trian::Triangulation,
   args...;
   nsnaps=50)
 
-  collector = CollectResidualsMap(fesolver,feop,args...)
-
-  get_nress(::CollectResidualsMap) = nsnaps
-  get_nress(::CollectResidualsMap{Union{TimeAffinity,NonAffinity}}) = 1
-  nress = get_nress(collector)
+  aff = affinity_residual(feop,fesolver,trian)
+  nress = get_nsnaps(aff,nsnaps)
 
   printstyled("Generating $nress residuals snapshots\n";color=:blue)
   sols = view(get_snaps(snaps),1:nress)
   params = view(params,1:nress)
-  ress = lazy_map(collector,sols,params)
+  ress = collect_residuals(feop,fesolver,sols,params,trian,args...)
 
-  Snapshots(collector,ress,nress)
+  Snapshots(aff,ress,nress)
 end
 
 function collect_jacobians(
@@ -114,19 +115,17 @@ function collect_jacobians(
   fesolver::ODESolver,
   snaps::Snapshots,
   params::Table,
+  trian::Triangulation,
   args...;
   i=1,nsnaps=50)
 
-  collector = CollectJacobiansMap(fesolver,feop,args...;i)
-
-  get_njacs(::CollectJacobiansMap) = nsnaps
-  get_njacs(::CollectJacobiansMap{Union{TimeAffinity,NonAffinity}}) = 1
-  njacs = get_njacs(collector)
+  aff = affinity_jacobian(feop,fesolver,trian)
+  njacs = get_nsnaps(aff,nsnaps)
 
   printstyled("Generating $njacs jacobians snapshots\n";color=:blue)
   sols = view(get_snaps(snaps),1:njacs)
   params = view(params,1:njacs)
-  jacs = lazy_map(collector,sols,params)
+  jacs = collect_jacobians(feop,fesolver,sols,params,trian,args...;i)
 
   Snapshots(collector,jacs,njacs)
 end
