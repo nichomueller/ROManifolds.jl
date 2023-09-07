@@ -65,8 +65,8 @@ end
 
 #OK
 nsnaps = 30
-# p = realization(feop,nsnaps)
-# snap = collect_solutions(feop,fesolver,p;nsnaps)
+p = realization(feop,nsnaps)
+snap = collect_solutions(feop,fesolver,p;nsnaps)
 # save(info,(snap,p))
 snap,p = load(Snapshots,info),load(Table,info)
 rbspace = compress_snapshots(info,snap,feop,fesolver,p)

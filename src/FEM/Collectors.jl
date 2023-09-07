@@ -3,15 +3,10 @@ function collect_solutions(
   op::ParamTransientFEOperator,
   params::Table)
 
-  t0,tF = solver.t0,solver.tF
-  uh0 = solver.uh0
-  cache = get_solution_cache(solver,op)
-  sols = Vector{typeof(cache)}(undef,length(params))
-  @inbounds for k = eachindex(params)
-    μ = params[k]
-    sols[k] = solve(solver,op,μ,uh0(μ),t0,tF)
-  end
-  sols
+  K = length(params)
+  uh0 = map(solver.uh0,params)
+  sols = lazy_map(solve,fill(solver,K),fill(op,K),params,uh0)
+  return sols
 end
 
 function get_iterative_quantities(
@@ -20,7 +15,7 @@ function get_iterative_quantities(
   solver::ODESolver,
   sols::AbstractArray,
   params::Table;
-  itermediate_step=false)
+  intermediate_step=false)
 
   pop = get_algebraic_operator(op)
   odecache = allocate_cache(pop)
@@ -44,7 +39,7 @@ function get_iterative_quantities(
       else
         @. x0 = sols[countμ][countt-1]
       end
-      if itermediate_step
+      if intermediate_step
         @. vθ = (x1-x0)/(solver.θ*solver.dt)
       end
       @. x1 = sols[countμ][countt]
@@ -99,7 +94,7 @@ function collect_jacobians(
   dv = get_fe_basis(op.test)
   du = get_trial_fe_basis(trial_hom)
   aff = affinity_jacobian(op,solver,trian)
-  trials,inputs = get_iterative_quantities(aff,feop,solver,sols,params)
+  trials,inputs = get_iterative_quantities(aff,feop,solver,sols,params;intermediate_step=true)
   nin = length(inputs)
   γᵢ = (1.0,1/(solver.dt*solver.θ))[i]
 

@@ -36,8 +36,7 @@ function solve_step!(
 
   cache = (ode_cache,vθ,A,b,l_cache)
 
-  tf = t0+dt
-  return (uf,tf,cache)
+  return (uf,cache)
 end
 
 function _matrix_and_vector!(
