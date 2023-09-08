@@ -5,7 +5,7 @@ function collect_solutions(
 
   K = length(params)
   uh0 = map(solver.uh0,params)
-  sols = lazy_map(solve,fill(solver,K),fill(op,K),params,uh0)
+  sols = lazy_map(PTMap(solve),fill(solver,K),fill(op,K),params,uh0)
   return sols
 end
 
