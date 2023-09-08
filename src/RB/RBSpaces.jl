@@ -5,8 +5,8 @@ struct SingleFieldRBSpace{T} <: RBSpace{T}
   basis_time::Matrix{T}
 
   function SingleFieldRBSpace(
-    basis_space_nnz::NnzArray{T,N,OT},
-    basis_time_nnz::NnzArray{T,N,OT}) where {T,N,OT}
+    basis_space_nnz::NnzArray{T},
+    basis_time_nnz::NnzArray{T}) where T
 
     basis_space = recast(basis_space_nnz)
     basis_time = get_nonzero_val(basis_time_nnz)
@@ -24,7 +24,7 @@ function compress_snapshots(
   energy_norm = info.energy_norm
   norm_matrix = get_norm_matrix(energy_norm,feop)
 
-  basis_space,basis_time = tpod(snaps,norm_matrix;ϵ)
+  basis_space,basis_time = compress_snapshots(snaps,norm_matrix;ϵ)
   SingleFieldRBSpace(basis_space,basis_time)
 end
 
@@ -53,7 +53,7 @@ function compress_snapshots(
   energy_norm = info.energy_norm
   norm_matrix = get_norm_matrix(energy_norm,feop)
 
-  basis_space,basis_time = tpod(snaps,norm_matrix;ϵ)
+  basis_space,basis_time = compress_snapshots(snaps,norm_matrix;ϵ)
   if compute_supremizers
     add_space_supremizers!(basis_space,snaps,feop,args...;X=norm_matrix)
     add_time_supremizers!(basis_time;kwargs...)

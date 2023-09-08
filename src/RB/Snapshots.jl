@@ -1,34 +1,36 @@
 struct Snapshots{T,A}
-  snaps::LazyArray
-  function Snapshots(::A,snaps::LazyArray) where A
-    T = eltype(snaps)
-    new{T,A}(snaps)
+  snaps::AbstractVector{<:NnzArray{T,2}}
+  function Snapshots(::A,snaps::AbstractVector{<:AbstractArray{T}}) where {A,T}
+    snnz = map(compress,snaps)
+    new{T,A}(snnz)
   end
 end
 
-const SingleFieldSnapshots{T,A} = Snapshots{<:AbstractArray{T},A}
-const MultiFieldSnapshots{T,A} = Snapshots{<:BlockArray{T},A}
+const SingleFieldSnapshots{T,A} = Snapshots{T,A} where {T<:AbstractArray}
+const MultiFieldSnapshots{T,A} = Snapshots{T,A} where {T<:BlockArray}
 
 Base.length(snap::Snapshots) = length(snap.snaps)
 
 function Base.size(snap::Snapshots)
-  lazy_snaps = get_snaps(snap)
+  snaps = get_snaps(snap)
   nsnaps = length(snap)
-  cache = array_cache(lazy_snaps)
-  s1 = getindex!(cache,lazy_snaps,1)
+  s1 = first(snaps)
   size(s1,1),size(s1,2)*nsnaps
 end
 
-function Base.collect(snap::Snapshots)
-  lazy_snaps = get_snaps(snap)
-  nsnaps = length(snap)
-  cache = array_cache(lazy_snaps)
-  T = eltype(lazy_snaps)
-  snaps = Vector{T}(undef,nsnaps)
-  for i = 1:nsnaps
-    snaps[i] = getindex!(cache,lazy_snaps,i)
-  end
-  return snaps
+Base.getindex(snap::Snapshots,idx) = getindex(snap.snaps,idx)
+
+Base.collect(snap::Snapshots;transpose=false) = _collect_snaps(Val(transpose),snap)
+
+function _collect_snaps(::Val{false},snap::Snapshots{T}) where T
+  snaps = get_snaps(snap)
+  return hcat(snaps...)
+end
+
+function _collect_snaps(::Val{true},snap::Snapshots{T}) where T
+  snaps = get_snaps(snap)
+  snaps_t = map(transpose,snaps)
+  return hcat(snaps_t...)
 end
 
 function Base.show(io::IO,snap::Snapshots{T,A}) where {T,A}
@@ -38,56 +40,34 @@ end
 
 get_snaps(snap::Snapshots) = snap.snaps
 
-function tpod(snap::Snapshots,args...;kwargs...)
+function compress_snapshots(snap::Snapshots,args...;kwargs...)
   s = size(snap)
-  tpod(Val(s[1] < s[2]),snap,args...;kwargs...)
-end
-
-function tpod(::Val{true},snap::Snapshots,args...;kwargs...)
-  snaps = collect(snap)
+  if s[1] < s[2]
+    snaps = collect(snap)
+  else
+    snaps = collect(snap;transpose=true)
+  end
   nsnaps = get_nsnaps(snap)
-
-  basis_space = tpod(snaps,args...;kwargs...)
-  compressed_space_snaps = prod(basis_space,snaps)
-  compressed_time_snaps = change_mode(compressed_space_snaps,nsnaps)
-  basis_time = tpod(compressed_time_snaps;kwargs...)
-  basis_space,basis_time
-end
-
-# function Arrays.return_cache(::typeof(transpose),a::AbstractArray)
-#   CachedArray(a)
-# end
-
-# function Arrays.evaluate!(cache,::typeof(transpose),a::AbstractArray)
-#   s = size(a)
-#   st = filter(!isempty,(s[1:end-2],s[end],s[end-1]))
-#   setsize!(cache,st)
-#   b = cache.array
-#   b = transpose(a)
-#   b
-# end
-
-function tpod(::Val{false},snap::Snapshots,args...;kwargs...)
-  snaps_t = collect(lazy_map(transpose,get_snaps(snap)))
-  nsnaps = get_nsnaps(snap)
-
-  basis_time = tpod(snaps_t;kwargs...)
-  compressed_time_snaps = prod(basis_time,snaps_t)
-  compressed_space_snaps = change_mode(compressed_time_snaps,nsnaps)
-  basis_space = tpod(compressed_space_snaps,args...;kwargs...)
-  basis_space,basis_time
+  b1 = tpod(snaps,args...;kwargs...)
+  compressed_b1 = b1'*snaps
+  compressed_snaps_t = change_mode(compressed_b1,nsnaps)
+  b2 = tpod(compressed_snaps_t;kwargs...)
+  if s[1] < s[2]
+    return b1,b2
+  else
+    return b2,b1
+  end
 end
 
 for A in (:TimeAffinity,:ParamTimeAffinity)
   @eval begin
-    function tpod(snap::Snapshots{T,$A},args...;kwargs...) where T
+    function compress_snapshots(snap::Snapshots{T,$A},args...;kwargs...) where T
       snaps = collect(snap)
       nsnaps = get_nsnaps(snap)
-      time_ndofs = Int(size(snaps,2)/nsnaps)
-      S = eltype(T)
+      time_ndofs = Int(size(snaps)[2]/nsnaps)
 
       basis_space = tpod(snaps,args...;kwargs...)
-      basis_time = ones(S,time_ndofs,1)
+      basis_time = ones(T,time_ndofs,1)
       basis_space,basis_time
     end
   end
@@ -103,7 +83,7 @@ function collect_solutions(
   nsols = nsnaps
   printstyled("Generating $nsols solution snapshots\n";color=:blue)
 
-  sols = collect_solutions(fesolver,feop,params)
+  sols = solve(fesolver,feop,params)
   Snapshots(aff,sols)
 end
 

@@ -9,7 +9,7 @@ function solve(
   sol = Vector{T}(undef,length(get_times(solver)))
   sols = Vector{typeof(sol)}(undef,length(params))
   for (k,μ) in enumerate(params)
-    sols[k] = solve!(sol,solver,ode_op,μ,solver.uh0(μ),cache)
+    sols[k] = solve!(sol,solver,ode_op,μ,cache)
   end
 end
 
@@ -18,17 +18,18 @@ function solve!(
   solver::ODESolver,
   ode_op::ParamODEOperator,
   μ::AbstractArray,
-  u0,
   cache)
 
   ode_cache,vec_cache = cache
   times = get_times(solver)
+  u0 = copy(vec_cache)
   uF = similar(vec_cache)
   @inbounds for (n,tF) = enumerate(times)
     uF,ode_cache = solve_step!(uF,solver,ode_op,μ,u0,tF,ode_cache)
     u0 = sol_update(u0,uF)
     sol[n] = postprocess(ode_op,uF)
   end
+  sol
 end
 
 function sol_update(u0,uF)
@@ -47,7 +48,7 @@ function get_solution_cache(solver::ODESolver,op::ParamTransientFEOperator)
   ode_cache = nothing
   μ = realization(op)
   xh0 = solver.uh0(μ)
-  if isa(ic,Tuple)
+  if isa(xh0,Tuple)
     vec_cache = ()
     for xhi in xh0
       vec_i = get_free_dof_values(xhi)
