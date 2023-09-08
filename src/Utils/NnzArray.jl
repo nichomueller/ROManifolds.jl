@@ -3,6 +3,16 @@ struct NnzArray{T,N,OT} <: AbstractArray{T,N}
   nonzero_idx::Vector{Int}
   nrows::Int
 
+  function NnzArray(
+    nonzero_val::OT,
+    nonzero_idx::Vector{Int},
+    nrows::Int) where OT
+
+    T = eltype(nonzero_val)
+    N = dims(nonzero_val)
+    new{T,N,OT}(nonzero_val,nonzero_idx,nrows)
+  end
+
   function NnzArray{OT}(
     nonzero_val::AbstractArray{T,N},
     nonzero_idx::Vector{Int},
@@ -79,6 +89,14 @@ function recast(nza::NnzArray{T,N,<:SparseMatrixCSC} where {T,N},col=1)
   sparse(sparse_rows,sparse_cols,nza.nonzero_val[:,col],nza.nrows,ncols)
 end
 
+function recast_index(nza::NnzArray,idx::Vector{Int})
+  nonzero_idx = nza.nonzero_idx
+  nrows = nza.nrows
+  entire_idx = nonzero_idx[idx]
+  entire_idx_rows,_ = from_vec_to_mat_idx(entire_idx,nrows)
+  return entire_idx_rows
+end
+
 function change_mode(nza::NnzArray{T,N,OT},nparams::Int) where {T,N,OT}
   mode1_ndofs = size(nza,1)
   mode2_ndofs = Int(size(nza,2)/nparams)
@@ -92,7 +110,7 @@ function change_mode(nza::NnzArray{T,N,OT},nparams::Int) where {T,N,OT}
   return NnzArray{OT}(mode2,nza.nonzero_idx,nza.nrows)
 end
 
-function tpod(nza::NnzArray{T,N,OT};kwargs...) where {T,N,OT}
-  nonzero_val = tpod(nza.nonzero_val;kwargs...)
+function tpod(nza::NnzArray{T,N,OT},args...;kwargs...) where {T,N,OT}
+  nonzero_val = tpod(nza.nonzero_val,args...;kwargs...)
   return NnzArray{OT}(nonzero_val,nza.nonzero_idx,nza.nrows)
 end

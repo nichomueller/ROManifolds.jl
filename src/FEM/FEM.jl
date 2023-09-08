@@ -16,9 +16,12 @@ using Gridap.ODEs.TransientFETools
 
 const Float = Float64
 
+import FillArrays:Fill,fill
 import Statistics.mean
+import GridapGmsh:GmshDiscreteModel
 import Gridap.Helpers.@check
 import Gridap.Helpers.@unreachable
+import Gridap.Helpers.@notimplemented
 import Gridap.Arrays:evaluate
 import Gridap.Arrays:evaluate!
 import Gridap.Algebra:InserterCSC
@@ -31,6 +34,8 @@ import Gridap.Algebra:allocate_jacobian
 import Gridap.Algebra:allocate_residual
 import Gridap.Algebra:allocate_vector
 import Gridap.Algebra:allocate_matrix
+import Gridap.CellData:ConstrainRowsMap
+import Gridap.CellData:ConstrainColsMap
 import Gridap.FESpaces:_pair_contribution_when_possible
 import Gridap.FESpaces:assemble_vector
 import Gridap.FESpaces:assemble_matrix
@@ -60,7 +65,6 @@ import Gridap.ODEs.TransientFETools:jacobians!
 import Gridap.ODEs.TransientFETools._matdata_jacobian
 import Gridap.ODEs.TransientFETools._vcat_matdata
 
-include("FEOperations.jl")
 include("ParamSpace.jl")
 include("DiffOperators.jl")
 include("ParamTransientFESpaces.jl")
@@ -73,3 +77,4 @@ include("AffineThetaMethod.jl")
 include("ThetaMethod.jl")
 include("Affinity.jl")
 include("Collectors.jl")
+include("FEOperations.jl")

@@ -14,8 +14,17 @@ struct SingleFieldRBSpace{T} <: RBSpace{T}
   end
 end
 
-function compress_snapshots(snaps::SingleFieldSnapshots,args...;kwargs...)
-  basis_space,basis_time = tpod(snaps;kwargs...)
+function compress_snapshots(
+  info::RBInfo,
+  snaps::SingleFieldSnapshots,
+  feop::ParamTransientFEOperator,
+  args...)
+
+  ϵ = info.ϵ
+  energy_norm = info.energy_norm
+  norm_matrix = get_norm_matrix(energy_norm,feop)
+
+  basis_space,basis_time = tpod(snaps,norm_matrix;ϵ)
   SingleFieldRBSpace(basis_space,basis_time)
 end
 
@@ -33,11 +42,21 @@ struct MultiFieldRBSpace{T} <: RBSpace{T}
   end
 end
 
-function compress_snapshots(snaps::MultiFieldSnapshots;compute_supremizers=false,kwargs...)
-  basis_space,basis_time = tpod(snaps;kwargs...)
+function compress_snapshots(
+  info::RBInfo,
+  snaps::MultiFieldSnapshots,
+  feop::ParamTransientFEOperator;
+  compute_supremizers=false,
+  kwargs...)
+
+  ϵ = info.ϵ
+  energy_norm = info.energy_norm
+  norm_matrix = get_norm_matrix(energy_norm,feop)
+
+  basis_space,basis_time = tpod(snaps,norm_matrix;ϵ)
   if compute_supremizers
-    add_space_supremizers!(basis_space,snaps,args...)
-    add_time_supremizers!(basis_time;ttol)
+    add_space_supremizers!(basis_space,snaps,feop,args...;X=norm_matrix)
+    add_time_supremizers!(basis_time;kwargs...)
   end
   MultiFieldRBSpace(basis_space,basis_time)
 end

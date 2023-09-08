@@ -3,8 +3,6 @@ function FESpaces.collect_cell_vector(
   a::DomainContribution,
   trian::Triangulation)
 
-  w = []
-  r = []
   for strian in get_domains(a)
     if strian == trian
       scell_vec = get_contribution(a,strian)
@@ -12,11 +10,10 @@ function FESpaces.collect_cell_vector(
       @assert ndims(eltype(cell_vec)) == 1
       cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
       rows = get_cell_dof_ids(test,trian)
-      push!(w,cell_vec_r)
-      push!(r,rows)
+      return cell_vec_r,rows
     end
   end
-  (w,r)
+  @unreachable "Could not find the matching triangulation for the DomainContribution"
 end
 
 function FESpaces.collect_cell_matrix(
@@ -25,9 +22,6 @@ function FESpaces.collect_cell_matrix(
   a::DomainContribution,
   trian::Triangulation)
 
-  w = []
-  r = []
-  c = []
   for strian in get_domains(a)
     if strian == trian
       scell_mat = get_contribution(a,strian)
@@ -37,12 +31,10 @@ function FESpaces.collect_cell_matrix(
       cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
       rows = get_cell_dof_ids(test,trian)
       cols = get_cell_dof_ids(trial,trian)
-      push!(w,cell_mat_rc)
-      push!(r,rows)
-      push!(c,cols)
+      return cell_mat_rc,rows,cols
     end
   end
-  (w,r,c)
+  @unreachable "Could not find the matching triangulation for the DomainContribution"
 end
 
 function collect_cell_contribution(
@@ -50,17 +42,16 @@ function collect_cell_contribution(
   a::DomainContribution,
   trian::Triangulation)
 
-  w = []
   for strian in get_domains(a)
-    if strian == trian
+    if strian == trian || is_parent(strian,trian)
       scell = get_contribution(a,strian)
       cell,trian = move_contributions(scell,strian)
       @assert ndims(eltype(cell)) == 1
       cell_r = attach_constraints_rows(test,cell,trian)
-      push!(w,cell_r)
+      return cell_r
     end
   end
-  first(w)
+  @unreachable "Could not find the matching triangulation for the DomainContribution"
 end
 
 function collect_cell_contribution(
@@ -69,18 +60,17 @@ function collect_cell_contribution(
   a::DomainContribution,
   trian::Triangulation)
 
-  w = []
   for strian in get_domains(a)
-    if strian == trian
+    if strian == trian || is_parent(strian,trian)
       scell = get_contribution(a,strian)
       cell,trian = move_contributions(scell,strian)
       @assert ndims(eltype(cell)) == 2
       cell_c = attach_constraints_cols(trial,cell,trian)
       cell_rc = attach_constraints_rows(test,cell_c,trian)
-      push!(w,cell_rc)
+      return cell_rc
     end
   end
-  first(w)
+  @unreachable "Could not find the matching triangulation for the DomainContribution"
 end
 
 function collect_trian(a::DomainContribution)
@@ -94,7 +84,7 @@ end
 function Base.:(==)(
   a::T,
   b::T
-  ) where {T<:Union{Triangulation,Grid}}
+  ) where {T<:Union{Grid,Field}}
 
   for field in propertynames(a)
     a_field = getproperty(a,field)
@@ -198,4 +188,55 @@ function set_labels!(model,bnd_info)
       add_tag_from_tags!(labels,tags[i],bnds[i])
     end
   end
+end
+
+abstract type NormStyle end
+struct l2Norm <: NormStyle end
+struct L2Norm <: NormStyle end
+struct H1Norm <: NormStyle end
+
+get_norm_matrix(::l2Norm,args...) = nothing
+
+get_norm_matrix(::L2Norm,args...) = get_L2_norm_matrix(args...)
+
+get_norm_matrix(::H1Norm,args...) = get_H1_norm_matrix(args...)
+
+for f in (:get_L2_norm_matrix,:get_H1_norm_matrix)
+  @eval begin
+    function $f(op::ParamTransientFEOperator)
+      test = op.test
+      trial = get_trial(op)
+      trial_hom = allocate_trial_space(trial)
+      $f(test,trial_hom)
+    end
+
+    function $f(
+      trial::TransientMultiFieldTrialFESpace,
+      test::MultiFieldFESpace)
+
+      map($f,trial.spaces,test.spaces)
+    end
+  end
+end
+
+function get_L2_norm_matrix(
+  trial::ParamTransientTrialFESpace,
+  test::FESpace)
+
+  trian = get_triangulation(test)
+  order = get_order(test)
+  dΩ = Measure(trian,2*order)
+  L2_form(u,v) = ∫(v⋅u)dΩ
+  assemble_matrix(L2_form,trial,test)
+end
+
+function get_H1_norm_matrix(
+  trial::ParamTransientTrialFESpace,
+  test::FESpace)
+
+  trian = get_triangulation(test)
+  order = get_order(test)
+  dΩ = Measure(trian,2*order)
+  H1_form(u,v) = ∫(∇(v)⊙∇(u))dΩ + ∫(v⋅u)dΩ
+  assemble_matrix(H1_form,trial,test)
 end

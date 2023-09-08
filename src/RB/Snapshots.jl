@@ -1,70 +1,93 @@
 struct Snapshots{T,A}
   snaps::LazyArray
-  nsnaps::Int
-  function Snapshots(::CollectorMap{A},snaps::LazyArray,nsnaps::Int) where A
+  function Snapshots(::A,snaps::LazyArray) where A
     T = eltype(snaps)
-    new{T,A}(snaps,nsnaps)
+    new{T,A}(snaps)
   end
 end
 
-const SingleFieldSnapshots{A} = Snapshots{<:AbstractArray,A}
-const MultiFieldSnapshots{A} = Snapshots{<:BlockArray,A}
+const SingleFieldSnapshots{T,A} = Snapshots{<:AbstractArray{T},A}
+const MultiFieldSnapshots{T,A} = Snapshots{<:BlockArray{T},A}
+
+Base.length(snap::Snapshots) = length(snap.snaps)
+
+function Base.size(snap::Snapshots)
+  lazy_snaps = get_snaps(snap)
+  nsnaps = length(snap)
+  cache = array_cache(lazy_snaps)
+  s1 = getindex!(cache,lazy_snaps,1)
+  size(s1,1),size(s1,2)*nsnaps
+end
 
 function Base.collect(snap::Snapshots)
   lazy_snaps = get_snaps(snap)
-  collect(lazy_snaps)
+  nsnaps = length(snap)
+  cache = array_cache(lazy_snaps)
+  T = eltype(lazy_snaps)
+  snaps = Vector{T}(undef,nsnaps)
+  for i = 1:nsnaps
+    snaps[i] = getindex!(cache,lazy_snaps,i)
+  end
+  return snaps
 end
 
-# DO NOT RECOMMEND USING
-function Base.size(snap::Snapshots)
-  len = snap.nsnaps
-  s1 = first(snap.snaps)
-  size(s1,1),size(s1,2)*len
+function Base.show(io::IO,snap::Snapshots{T,A}) where {T,A}
+  nsnaps = length(snap)
+  print(io,"Structure storing $nsnaps $A snapshots of eltype $T")
 end
 
 get_snaps(snap::Snapshots) = snap.snaps
 
-get_nsnaps(snap::Snapshots) = snap.nsnaps
-
-get_time_ndofs(snap::Snapshots) = size(first(snap.snaps),2)
-
-function tpod(snap::Snapshots;kwargs...)
+function tpod(snap::Snapshots,args...;kwargs...)
   s = size(snap)
-  tpod(Val(s[1] < s[2]),snap;kwargs...)
+  tpod(Val(s[1] < s[2]),snap,args...;kwargs...)
 end
 
-function tpod(::Val{true},snap::Snapshots;kwargs...)
+function tpod(::Val{true},snap::Snapshots,args...;kwargs...)
   snaps = collect(snap)
   nsnaps = get_nsnaps(snap)
 
-  basis_space = tpod(snaps;kwargs...)
+  basis_space = tpod(snaps,args...;kwargs...)
   compressed_space_snaps = prod(basis_space,snaps)
   compressed_time_snaps = change_mode(compressed_space_snaps,nsnaps)
   basis_time = tpod(compressed_time_snaps;kwargs...)
   basis_space,basis_time
 end
 
-function tpod(::Val{false},snap::Snapshots;kwargs...)
+function Arrays.return_cache(::typeof(transpose),a::AbstractArray)
+  CachedArray(a)
+end
+
+function Arrays.evaluate!(cache,::typeof(transpose),a::AbstractArray)
+  s = size(a)
+  st = filter(!isempty,(s[1:end-2],s[end],s[end-1]))
+  setsize!(cache,st)
+  b = cache.array
+  b = transpose(a)
+  b
+end
+
+function tpod(::Val{false},snap::Snapshots,args...;kwargs...)
   snaps_t = collect(lazy_map(transpose,get_snaps(snap)))
   nsnaps = get_nsnaps(snap)
 
   basis_time = tpod(snaps_t;kwargs...)
   compressed_time_snaps = prod(basis_time,snaps_t)
   compressed_space_snaps = change_mode(compressed_time_snaps,nsnaps)
-  basis_space = tpod(compressed_space_snaps;kwargs...)
+  basis_space = tpod(compressed_space_snaps,args...;kwargs...)
   basis_space,basis_time
 end
 
 for A in (:TimeAffinity,:ParamTimeAffinity)
   @eval begin
-    function tpod(snap::Snapshots{$A};kwargs...)
+    function tpod(snap::Snapshots{T,$A},args...;kwargs...) where T
       snaps = collect(snap)
       nsnaps = get_nsnaps(snap)
       time_ndofs = Int(size(snaps,2)/nsnaps)
-      T = eltype(snaps)
+      S = eltype(T)
 
-      basis_space = tpod(snaps;kwargs...)
-      basis_time = ones(T,time_ndofs,1)
+      basis_space = tpod(snaps,args...;kwargs...)
+      basis_time = ones(S,time_ndofs,1)
       basis_space,basis_time
     end
   end
@@ -76,12 +99,12 @@ function collect_solutions(
   params::Table;
   nsnaps=length(params))
 
+  aff = NonAffinity()
   nsols = nsnaps
   printstyled("Generating $nsols solution snapshots\n";color=:blue)
 
-  collector = CollectSolutionsMap(fesolver,feop)
-  sols = lazy_map(collector,params)
-  Snapshots(collector,sols,nsols)
+  sols = collect_solutions(fesolver,feop,params)
+  Snapshots(aff,sols)
 end
 
 function collect_residuals(
@@ -89,21 +112,15 @@ function collect_residuals(
   fesolver::ODESolver,
   snaps::Snapshots,
   params::Table,
+  trian::Triangulation,
   args...;
-  nsnaps=length(params))
+  kwargs...)
 
-  collector = CollectResidualsMap(fesolver,feop,args...)
+  printstyled("Generating residuals snapshots\n";color=:blue)
+  sols = get_snaps(snaps)
+  aff,ress = collect_residuals(feop,fesolver,sols,params,trian,args...;kwargs...)
 
-  get_nress(::CollectResidualsMap) = nsnaps
-  get_nress(::CollectResidualsMap{Union{TimeAffinity,NonAffinity}}) = 1
-  nress = get_nress(collector)
-
-  printstyled("Generating $nress residuals snapshots\n";color=:blue)
-  sols = view(get_snaps(snaps),1:nress)
-  params = view(params,1:nress)
-  ress = lazy_map(collector,sols,params)
-
-  Snapshots(collector,ress,nress)
+  Snapshots(aff,ress)
 end
 
 function collect_jacobians(
@@ -111,27 +128,20 @@ function collect_jacobians(
   fesolver::ODESolver,
   snaps::Snapshots,
   params::Table,
+  trian::Triangulation,
   args...;
-  i=1,nsnaps=length(params))
+  kwargs...)
 
-  collector = CollectJacobiansMap(fesolver,feop,args...;i)
+  printstyled("Generating jacobians snapshots\n";color=:blue)
+  sols = get_snaps(snaps)
+  aff,jacs = collect_jacobians(feop,fesolver,sols,params,trian,args...;kwargs...)
 
-  get_njacs(::CollectJacobiansMap) = nsnaps
-  get_njacs(::CollectJacobiansMap{Union{TimeAffinity,NonAffinity}}) = 1
-  njacs = get_njacs(collector)
-
-  printstyled("Generating $njacs jacobians snapshots\n";color=:blue)
-  sols = view(get_snaps(snaps),1:njacs)
-  params = view(params,1:njacs)
-  jacs = lazy_map(collector,sols,params)
-
-  Snapshots(collector,jacs,njacs)
+  Snapshots(aff,jacs)
 end
 
 function save(info::RBInfo,snap::Snapshots)
   if info.save_structures
     path = joinpath(info.fe_path,"fesnaps")
-    convert!(Matrix{Float},snap)
     save(path,snap)
   end
 end

@@ -112,5 +112,7 @@ function find_nonzero_cell_contribution(data,dir_cells)
   @unreachable
 end
 
+get_params(::Affinity,params) = params
+get_params(::Union{TimeAffinity,ParamTimeAffinity},params) = Table([first(params)])
 get_times(::Affinity,solver) = get_times(solver)
 get_times(::Union{TimeAffinity,ParamTimeAffinity},solver) = [solver.t0]

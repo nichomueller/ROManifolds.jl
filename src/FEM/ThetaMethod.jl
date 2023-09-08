@@ -31,8 +31,7 @@ function solve_step!(
 
   cache = (ode_cache,vθ,nl_cache)
 
-  tf = t0+dt
-  return (uf,tf,cache)
+  return (uf,cache)
 end
 
 """

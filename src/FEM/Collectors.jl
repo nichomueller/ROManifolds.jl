@@ -1,150 +1,110 @@
-abstract type CollectorMap{A} <: Map end
+function collect_solutions(
+  solver::ODESolver,
+  op::ParamTransientFEOperator,
+  params::Table)
 
-struct CollectSolutionsMap <: CollectorMap{NonAffinity}
-  f::Function
-
-  function CollectSolutionsMap(
-    solver::ODESolver,
-    op::ParamTransientFEOperator)
-
-    t0,tF = solver.t0,solver.tF
-    uh0 = solver.uh0
-    f = μ::AbstractArray -> solve(solver,op,μ,uh0(μ),t0,tF)
-    new(f)
-  end
+  K = length(params)
+  uh0 = map(solver.uh0,params)
+  sols = lazy_map(PTMap(solve),fill(solver,K),fill(op,K),params,uh0)
+  return sols
 end
 
-function Arrays.evaluate!(cache,k::CollectSolutionsMap,μ::AbstractArray)
-  sol_μ = k.f(μ)
-  l = length(sol_μ)
-  T = return_type(sol_μ)
-  v = Vector{T}(undef,l)
-  for (n,sol_μn) in enumerate(sol_μ)
-    uhn,_ = sol_μn
-    v[n] = uhn
-  end
-  sol_μ_nnz = compress(v)
-  sol_μ_nnz
-end
+function get_iterative_quantities(
+  aff::Affinity,
+  op::ParamTransientFEOperator,
+  solver::ODESolver,
+  sols::AbstractArray,
+  params::Table;
+  intermediate_step=false)
 
-struct CollectResidualsMap{A} <: CollectorMap{A}
-  f::Function
+  pop = get_algebraic_operator(op)
+  odecache = allocate_cache(pop)
+  _params = get_params(aff,params)
+  _times = get_times(aff,solver)
+  xh = Vector{TransientCellField}(length(_params)*length(_times))
+  trials = Vector{TrialFESpace}(length(_params)*length(_times))
+  x = zeros(op.test)
+  x0,x1,vθ = copy(x),copy(x),copy(x)
 
-  function CollectResidualsMap(
-    solver::θMethod,
-    op::ParamTransientFEOperator,
-    trian::Triangulation=get_triangulation(get_test(op)),
-    args...)
-
-    dv = get_fe_basis(op.test)
-    v0 = zeros(op.test)
-    pop = get_algebraic_operator(op)
-    cache = allocate_cache(pop)
-    A = affinity_residual(op,solver,trian)
-    times = get_times(A,solver)
-
-    function f(μ::AbstractArray)
-      x0 = setup_initial_condition(solver,μ)
-      xh = allocate_evaluation_function(op)
-
-      map(times) do t
-        update_cache!(cache,pop,μ,t)
-
-        vecdata = collect_cell_vector(op.test,op.res(μ,t,xh,dv,args...),trian)
-        r = allocate_residual(pop,x0,cache)
-        assemble_vector_add!(r,op.assem,vecdata)
-        r .*= -1.0
+  count = 0
+  countμ = 0
+  @inbounds for μ = _params
+    countμ += 1
+    countt = 0
+    @inbounds for t = _times
+      count += 1
+      countt += 1
+      if t == first(_times)
+        x0 = setup_initial_condition(solver,μ)
+      else
+        @. x0 = sols[countμ][countt-1]
       end
-    end
-
-    function f(sol::AbstractArray,μ::AbstractArray)
-      x0 = setup_initial_condition(solver,μ)
-
-      map(enumerate(times)) do (it,t)
-        update_cache!(cache,pop,μ,t)
-
-        x = sol[:,it]*solver.θ + x0*(1-solver.θ)
-        xh = evaluation_function(op,(x,v0),cache)
-        x0 .= sol[:,it]
-
-        vecdata = collect_cell_vector(op.test,op.res(μ,t,xh,dv,args...),trian)
-        r = allocate_residual(pop,x0,cache)
-        assemble_vector_add!(r,op.assem,vecdata)
-        r .*= -1.0
+      if intermediate_step
+        @. vθ = (x1-x0)/(solver.θ*solver.dt)
       end
+      @. x1 = sols[countμ][countt]
+      @. x = x0*solver.θ + x1*(1-solver.θ)
+      xh[count] = evaluation_function(op,(x,vθ),odecache)
+      update_cache!(odecache,pop,μ,t)
+      trials[count] = first(odecache)
     end
-
-    new{A}(f)
   end
+  inputs = _reorder_xtp(x,_params,_times)
+  return trials,inputs
 end
 
-function Arrays.evaluate!(cache,k::CollectResidualsMap,args...)
-  res_μ = k.f(args...)
-  res_μ_nnz = compress(res_μ)
-  res_μ_nnz
+function _reorder_iterative_quantities(trials,x,p,t)
+  _create_tuple(a,b) = map((ai,bi)->(ai,bi),a,b)
+  pt = reshape(Iterators.product(p,t) |> collect,:)
+  _create_tuple(_create_tuple(trials,x)...,pt...)
 end
 
-struct CollectJacobiansMap{A} <: CollectorMap{A}
-  f::Function
+function collect_residuals(
+  solver::θMethod,
+  op::ParamTransientFEOperator,
+  sols::AbstractArray,
+  params::Table,
+  trian::Triangulation,
+  args...)
 
-  function CollectJacobiansMap(
-    solver::θMethod,
-    op::ParamTransientFEOperator,
-    trian::Triangulation=get_triangulation(get_test(op)),
-    args...;
-    i::Int=1)
+  dv = get_fe_basis(op.test)
+  aff = affinity_residual(feop,fesolver,trian)
+  _,inputs = get_iterative_quantities(aff,feop,solver,sols,params)
+  nin = length(inputs)
+  dcs = evaluate(op.res(dv,args...),inputs)
+  vecdata = collect_cell_vector(op.test,dcs,trian)
+  b = allocate_residual(op)
+  bs = fill(b,nin)
+  assemble_vector_add!(bs,op.assem,vecdata)
 
-    trial = get_trial(op)
-    trial_hom = allocate_trial_space(trial)
-    dv = get_fe_basis(op.test)
-    du = get_trial_fe_basis(trial_hom)
-    pop = get_algebraic_operator(op)
-    cache = allocate_cache(pop)
-    A = affinity_jacobian(op,solver,trian)
-    times = get_times(A,solver)
-    γ = (1.0,1/(solver.dt*solver.θ))
-
-    function f(μ::AbstractArray)
-      x0 = setup_initial_condition(solver,μ)
-      xh = allocate_evaluation_function(op)
-
-      map(times) do t
-        update_cache!(cache,pop,μ,t)
-        trial, = cache[1]
-
-        matdata = collect_cell_matrix(trial,op.test,γ[i]*op.jacs[i](μ,t,xh,du,dv,args...),trian)
-        J = allocate_jacobian(pop,x0,cache)
-        assemble_matrix_add!(J,op.assem,matdata)
-        compress(J)
-      end
-    end
-
-    function f(sol::AbstractArray,μ::AbstractArray)
-      x0 = setup_initial_condition(solver,μ)
-
-      map(enumerate(times)) do (it,t)
-        update_cache!(cache,pop,μ,t)
-        trial, = cache[1]
-
-        x = sol[it]*solver.θ + x0*(1-solver.θ)
-        vθ = (x-x0)/(solver.θ*solver.dt)
-        xh = evaluation_function(op,(x,vθ),cache)
-        x0 .= sol[it]
-
-        matdata = collect_cell_matrix(trial,op.test,γ[i]*op.jacs[i](μ,t,xh,du,dv,args...),trian)
-        J = allocate_jacobian(pop,x0,cache)
-        assemble_matrix_add!(J,op.assem,matdata)
-        compress(J)
-      end
-    end
-
-    new{A}(f)
-  end
+  return aff,bs
 end
 
-function Arrays.evaluate!(cache,k::CollectJacobiansMap,args...)
-  jac_μ_nnz = k.f(args...)
-  reduce(hcat,jac_μ_nnz)
+function collect_jacobians(
+  solver::θMethod,
+  op::ParamTransientFEOperator,
+  sols::AbstractArray,
+  params::Table,
+  trian::Triangulation,
+  args...;
+  i=1)
+
+  trial = get_trial(op)
+  trial_hom = allocate_trial_space(trial)
+  dv = get_fe_basis(op.test)
+  du = get_trial_fe_basis(trial_hom)
+  aff = affinity_jacobian(op,solver,trian)
+  trials,inputs = get_iterative_quantities(aff,feop,solver,sols,params;intermediate_step=true)
+  nin = length(inputs)
+  γᵢ = (1.0,1/(solver.dt*solver.θ))[i]
+
+  dcs = evaluate(op.jacs[i](du,dv,args...),inputs)
+  matdata = collect_cell_matrix(trials,op.test,dcs,trian)
+  b = allocate_nnz_vector(op)
+  bs = fill(b,nin)
+  assemble_matrix_add!(bs,op.assem,matdata)
+
+  return aff,bs*γᵢ
 end
 
 function setup_initial_condition(

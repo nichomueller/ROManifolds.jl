@@ -73,7 +73,7 @@ function ParamTransientFEOperator(res::Function,pspace,trial,test;order::Integer
   ParamTransientFEOperator(res,jacs...,pspace,trial,test)
 end
 
-function Gridap.FESpaces.SparseMatrixAssembler(
+function FESpaces.SparseMatrixAssembler(
   trial::Union{ParamTransientTrialFESpace,ParamTransientMultiFieldTrialFESpace},
   test::FESpace)
   SparseMatrixAssembler(trial(nothing,nothing),test)
@@ -89,10 +89,10 @@ get_pspace(op::ParamTransientFEOperatorFromWeakForm) = op.pspace
 
 realization(op::ParamTransientFEOperator,args...) = realization(op.pspace,args...)
 
-for (A,OP) in zip((:Affine,:Nonlinear),(:ParamTransientAffineFEOperator,:ParamTransientFEOperator))
+for OP in (:ParamTransientAffineFEOperator,:ParamTransientFEOperator)
   @eval begin
     function filter_operator(
-      op::ParamTransientFEOperatorFromWeakForm{$A},
+      op::ParamTransientFEOperatorFromWeakForm,
       filter::NTuple{2,Int})
 
       if isa(get_test(op),MultiFieldFESpace)
@@ -123,16 +123,12 @@ function collect_trian_res(op::ParamTransientFEOperator)
   collect_trian(veccontrib)
 end
 
-function collect_trian_jac(op::ParamTransientFEOperator)
+function collect_trian_jac(op::ParamTransientFEOperator,i::Int=1)
   μ,t = realization(op),0.
   uh = zero(op.test)
   v = get_fe_basis(op.test)
-  trians = ()
-  for j in op.jacs
-    matcontrib = j(μ,t,uh,v,v)
-    trians = (trians...,collect_trian(matcontrib)...)
-  end
-  unique(trians)
+  matcontrib = op.jacs[i](μ,t,uh,v,v)
+  collect_trian(matcontrib)
 end
 
 function allocate_residual(

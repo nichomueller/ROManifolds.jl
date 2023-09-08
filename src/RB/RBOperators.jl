@@ -1,47 +1,48 @@
 struct TransientRBOperator{Top}
-  res::Function
-  jac::Function
-  rbspace::TransientRBSpace
+  rhs::Function
+  lhs::Function
+  rbspace::RBSpace
 end
 
 function reduce_fe_operator(
   info::RBInfo,
   feop::ParamTransientFEOperator{Top},
-  fesolver::ODESolver;
-  st_mdeim=true) where Top
+  fesolver::ODESolver) where Top
 
-  ϵ = info.ϵ
-  # fun_mdeim = info.fun_mdeim
   nsnaps = info.nsnaps_state
   params = realization(feop,nsnaps)
   sols = collect_solutions(feop,fesolver,params)
-  rbspace = compress_solutions(sols,feop,fesolver,params;ϵ)
+  rbspace = compress_snapshots(info,sols,feop,fesolver,params)
   save(info,(sols,params))
 
   nsnaps = info.nsnaps_system
-  rb_res = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps,st_mdeim)
-  rb_jac = compress_jacobians(feop,fesolver,rbspace,sols,params;ϵ,nsnaps,st_mdeim)
-  rbop = TransientRBOperator{Top}(rb_res,rb_jac,rbspace)
+  rb_res = collect_compress_residual(info,feop,fesolver,rbspace,sols,params)
+  rb_jac = collect_compress_jacobians(info,feop,fesolver,rbspace,sols,params)
+
+  online_res = collect_residual_contributions(info,feop,fesolver,rb_res)
+  online_jac = collect_jacobians_contributions(info,feop,fesolver,rb_jac)
+  rbop = TransientRBOperator{Top}(online_res,online_jac,rbspace)
   save(info,rbop)
 
   return rbop
 end
 
 function collect_residual_contributions(
+  info::RBInfo,
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
-  rbspace::SingleFieldRBSpace,
-  rb_res::RBAlgebraicContribution;
-  kwargs...)
+  rb_res::RBAlgebraicContribution)
 
   order = get_order(feop.test)
   measures = get_measures(rb_res,2*order)
+  st_mdeim = info.st_mdeim
 
   function online_residual(online_input...)
-    rb_res_contribs = map(get_domains(rb_res)) do trian
+    rb_res_contribs = []
+    for trian in get_domains(rb_res)
       rb_res_trian = rb_res[trian]
-      coeff = residual_coefficient(feop,fesolver,rb_res_trian,measures,online_input...;kwargs...)
-      rb_contribution(rb_res_trian,coeff)
+      coeff = residual_coefficient(feop,fesolver,rb_res_trian,measures,online_input...;st_mdeim)
+      push!(rb_res_contribs,rb_contribution(rb_res_trian,coeff))
     end
     sum(rb_res_contribs)
   end
@@ -49,34 +50,30 @@ function collect_residual_contributions(
   online_residual
 end
 
-function collect_residual_contributions(
+function collect_jacobian_contributions(
+  info::RBInfo,
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
-  rbspace::MultiFieldRBSpace,
-  rb_res::RBAlgebraicContribution;
-  kwargs...)
+  rb_jacs::Vector{RBAlgebraicContribution})
 
   order = get_order(feop.test)
-  measures = get_measures(rb_res,2*order)
-  nfields = get_nfields(rbspace)
+  st_mdeim = info.st_mdeim
 
-  function online_residual(online_input...)
-    rb_res_contribs = map(get_domains(rb_res)) do trian
-      rb_res_trian = rb_res[trian]
-      all_idx = index_pairs(1:nfields,1)
-
-      rb_res_trian_contribs = map(all_idx) do filter
-        filt_op = filter_operator(feop,filter)
-        coeff = residual_coefficient(filt_op,fesolver,rb_res_trian,measures,online_input...;kwargs...)
-        rb_contribution(rb_res_trian,coeff)
+  function online_jacobian(online_input...)
+    rb_jacs_contribs = map(enumerate(rb_jacs)) do (i,rb_jac)
+      measures = get_measures(rb_jac,2*order)
+      rb_jac_contribs = []
+      for trian in get_domains(rb_jac)
+        rb_jac_trian = rb_jac[trian]
+        coeff = jacobian_coefficient(feop,fesolver,rb_jac_trian,measures,online_input...;st_mdeim,i)
+        push!(rb_jac_contribs,rb_contribution(rb_jac_trian,coeff))
       end
-      mortar(rb_res_trian_contribs)
+      sum(rb_jac_contribs)
     end
-
-    sum(rb_res_contribs)
+    sum(rb_jacs_contribs)
   end
 
-  online_residual
+  online_jacobian
 end
 
 function residual_coefficient(
@@ -88,7 +85,18 @@ function residual_coefficient(
 
   red_integr_res = assemble_residual(feop,fesolver,res_ad,args...)
   coeff = mdeim_solve(res_ad,red_integr_res;kwargs...)
-  project_residual_coefficient(fesolver,res_ad.basis_time,coeff)
+  project_residual_coefficient(res_ad.basis_time,coeff)
+end
+
+function residual_coefficient(
+  feop::ParamTransientFEOperator,
+  fesolver::ODESolver,
+  res_ad::AbstractArray,
+  args...;
+  kwargs...)
+
+  pcoeff = map(x->residual_coefficient(feop,fesolver,x,args...;kwargs...),res_ad)
+  return mortar(pcoeff)
 end
 
 function jacobian_coefficient(
@@ -100,7 +108,7 @@ function jacobian_coefficient(
 
   red_integr_jac = assemble_jacobian(feop,fesolver,jac_ad,args...;i)
   coeff = mdeim_solve(jac_ad,red_integr_jac;kwargs...)
-  project_jacobian_coefficient(fesolver,jac_ad.basis_time,coeff)
+  project_jacobian_coefficient(jac_ad.basis_time,coeff)
 end
 
 function assemble_residual(
@@ -126,20 +134,21 @@ function assemble_jacobian(
   fesolver::θMethod,
   jac_ad::RBAffineDecomposition,
   measures::Vector{Measure},
-  input...)
+  input...;
+  i::Int=1)
 
   idx = jac_ad.integration_domain.idx
   meas = jac_ad.integration_domain.meas
   trian = get_triangulation(meas)
   new_meas = modify_measures(measures,meas)
 
-  collector = CollectJacobiansMap(fesolver,feop,trian,new_meas...)
+  collector = CollectJacobiansMap(fesolver,feop,trian,new_meas...;i)
   jac = collector.f(input...)
-  jac_cat = reduce(hcat,jac)
+  jac_cat = hcat(jac...)
   jac_cat.nonzero_val[idx]
 end
 
-function mdeim_solve(ad::RBAffineDecomposition,b::AbstractArray;st_mdeim=true)
+function mdeim_solve(ad::RBAffineDecomposition,b::AbstractArray;st_mdeim=false)
   if st_mdeim
     coeff = mdeim_solve(ad.mdeim_interpolation,reshape(b,:))
     recast_coefficient(ad.basis_time,coeff)
@@ -158,54 +167,63 @@ end
 
 function recast_coefficient(
   basis_time::Vector{<:Array{T}},
-  coeff::AbstractMatrix)
+  coeff::AbstractMatrix) where T
 
   bt,_ = basis_time
-  Qt = size(bt,2)
+  Nt,Qt = size(bt)
   Qs = Int(length(coeff)/Qt)
+  rcoeff = zeros(T,Nt,Qs)
 
-  rcoeff = map(1:Qs) do qs
+  @fastmath @inbounds for qs in 1:Qs
     sorted_idx = [(i-1)*Qs+qs for i = 1:Qt]
-    bt*coeff[sorted_idx]
+    copyto!(view(rcoeff,:,qs),bt*coeff[sorted_idx])
   end
 
-  reduce(hcat,rcoeff)
+  rcoeff
 end
 
 function project_residual_coefficient(
-  ::ODESolver,
   basis_time::Vector{<:Array{T}},
-  coeff::AbstractMatrix)
+  coeff::AbstractMatrix) where T
 
   _,bt_proj = basis_time
-  proj = lazy_map(eachcol(coeff)) do c
-    pc = map(eachcol(bt_proj)) do b
-      sum(b.*c)
+  nt_row = size(bt_proj,2)
+  Qs = size(coeff,2)
+  pcoeff = zeros(T,nt_row,1)
+  pcoeff_v = Vector{typeof(pcoeff)}(undef,Qs)
+
+  @fastmath @inbounds for (ic,c) in enumerate(eachcol(coeff))
+    @fastmath @inbounds for (row,b) in enumerate(eachcol(bt_proj))
+      pcoeff[row] = sum(b.*c)
     end
-    reshape(pc,:,1)
+    pcoeff_v[ic] = pcoeff
   end
-  proj
+
+  pcoeff_v
 end
 
 function project_jacobian_coefficient(
-  ::θMethod,
   basis_time::Vector{<:Array{T}},
-  coeff::AbstractMatrix)
+  coeff::AbstractMatrix) where T
 
   _,bt_proj = basis_time
-  proj = lazy_map(eachcol(coeff)) do c
-    pcr = map(axes(bt_proj,3)) do col
-      map(axes(bt_proj,2)) do row
-        sum(bt_proj[:,row,col].*c)
-      end
+  nt_row,nt_col = size(bt_proj)[2:3]
+  Qs = size(coeff,2)
+  pcoeff = zeros(T,nt_row,nt_col)
+  pcoeff_v = Vector{typeof(pcoeff)}(undef,Qs)
+
+  @fastmath @inbounds for (ic,c) in enumerate(eachcol(coeff))
+    @fastmath @inbounds for col in axes(bt_proj,3), row in axes(bt_proj,2)
+      pcoeff[row,col] = sum(bt_proj[:,row,col].*c)
     end
-    reduce(hcat,pcr)
+    pcoeff_v[ic] = pcoeff
   end
-  proj
+
+  pcoeff_v
 end
 
 function rb_contribution(ad::RBAffineDecomposition,coeff::Vector{<:AbstractMatrix})
-  contribs = lazy_map(LinearAlgebra.kron,ad.basis_space,coeff)
+  contribs = map(LinearAlgebra.kron,ad.basis_space,coeff)
   sum(contribs)
 end
 
@@ -215,7 +233,7 @@ function recast(rbop::TransientRBOperator,xrb::AbstractArray)
   rb_space_ndofs = get_rb_space_ndofs(rbop.rbspace)
   rb_time_ndofs = get_rb_time_ndofs(rbop.rbspace)
   xrb_mat = reshape(xrb,rb_time_ndofs,rb_space_ndofs)
-  bs*(bt*xrb_mat)'
+  return bs*(bt*xrb_mat)'
 end
 
 function save(info::RBInfo,op::TransientRBOperator)
