@@ -74,7 +74,7 @@ function collect_solutions(
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   params::Table;
-  nsnaps=50)
+  nsnaps=length(params))
 
   nsols = nsnaps
   printstyled("Generating $nsols solution snapshots\n";color=:blue)
@@ -90,7 +90,7 @@ function collect_residuals(
   snaps::Snapshots,
   params::Table,
   args...;
-  nsnaps=50)
+  nsnaps=length(params))
 
   collector = CollectResidualsMap(fesolver,feop,args...)
 
@@ -112,7 +112,7 @@ function collect_jacobians(
   snaps::Snapshots,
   params::Table,
   args...;
-  i=1,nsnaps=50)
+  i=1,nsnaps=length(params))
 
   collector = CollectJacobiansMap(fesolver,feop,args...;i)
 

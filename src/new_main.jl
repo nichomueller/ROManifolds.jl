@@ -65,16 +65,14 @@ end
 
 #OK
 nsnaps = info.nsnaps_state
-p = realization(feop,nsnaps)
-snap = collect_solutions(feop,fesolver,p;nsnaps)
-rbspace = compress_snapshots(snap)
-ress = collect_residuals(feop,fesolver,snap,p,trian;nsnaps=30)
-rb_res = compress_residuals(feop,fesolver,rbspace,snaps,params;ϵ,nsnaps,st_mdeim)
+params = realization(feop,nsnaps)
+sols = collect_solutions(feop,fesolver,params)
+rbspace = compress_snapshots(sols;ϵ)
+save(info,(sols,params))
 
 #TRY
-trian = Ω
-
-jacs = collect_jacobians(info,feop,fesolver,snap,p,trian);
+nsnaps = info.nsnaps_system
+rb_res = compress_residuals(feop,fesolver,rbspace,sols,params;ϵ,nsnaps,st_mdeim)
 
 
 compress_function(f,fesolver,Ω,p)

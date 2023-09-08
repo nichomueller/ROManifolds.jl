@@ -48,6 +48,11 @@ function Base.hcat(nza::NnzArray{T,N,OT}...) where {T,N,OT}
   NnzArray{OT}(reduce(hcat,nonzero_vals),first(nonzero_idxs),first(nrowss))
 end
 
+function Base.transpose(nza::NnzArray{T,N,OT}) where {T,N,OT}
+  nonzero_val_t = nza.nonzero_val'
+  NnzArray{OT}(nonzero_val_t,nza.nonzero_idx,nza.nrows)
+end
+
 function Base.prod(nza1::NnzArray{T,N,OT},nza2::NnzArray{T,N,OT}) where {T,N,OT}
   msg = """\n
   Cannot hcat the given NnzArrays: the nonzero indices and/or the full

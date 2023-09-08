@@ -46,12 +46,18 @@ get_basis_space(rb::RBSpace) = rb.basis_space
 
 get_basis_time(rb::RBSpace) = rb.basis_time
 
-function add_space_supremizers!(bases_space::BlockMatrix,args...;kwargs...)
+function add_space_supremizers!(
+  bases_space::BlockMatrix,
+  feop::ParamTransientFEOperator,
+  args...;
+  kwargs...)
+
   bsprimal,bsdual... = bases_space.blocks
   for (i,bsd_i) in enumerate(bsdual)
     printstyled("Computing supremizers in space for dual field $i\n";color=:blue)
     filter = (1,i+1)
-    supr_i = space_supremizers(bsd_i,filter,args...)
+    filt_op = filter_operator(feop,filter)
+    supr_i = space_supremizers(bsd_i,filt_op,args...)
     orth_supr_i = gram_schmidt(supr_i,bsprimal)
     append!(bsprimal,orth_supr_i) # THIS IS WRONG
   end
@@ -60,14 +66,12 @@ end
 
 function space_supremizers(
   bs::AbstractMatrix,
-  filter::Tuple{Vararg{Int}},
   snaps::MultiFieldSnapshots,
   feop::ParamTransientFEOperator,
   fesolver::ODESolver,
   params::Table)
 
-  filt_op = filter_operator(feop,filter)
-  collector = CollectJacobiansMap(fesolver,filt_op)
+  collector = CollectJacobiansMap(fesolver,feop)
   constraint_mat = lazy_map(collector,snaps,params)
   if length(constraint_mat) == 1
     return constraint_mat*bs # THIS IS WRONG
