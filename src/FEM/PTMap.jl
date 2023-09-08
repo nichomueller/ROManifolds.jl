@@ -34,19 +34,3 @@ function Arrays.evaluate!(cache,::PTMap{F},args...) where F
   end
   inta
 end
-
-# struct EvalODETrialMap <: Map
-#   op::ParamODEOperator
-# end
-
-# function Arrays.return_value(k::EvalODETrialMap,args...)
-#   allocate_cache(k.op)
-# end
-
-# function Arrays.return_cache(k::EvalODETrialMap,args...)
-#   allocate_cache(k.op)
-# end
-
-# function Arrays.evaluate!(cache,k::EvalODETrialMap,args...)
-#   update_cache!(cache,k.op,args...)
-# end

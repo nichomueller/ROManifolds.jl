@@ -54,18 +54,18 @@ function tpod(::Val{true},snap::Snapshots,args...;kwargs...)
   basis_space,basis_time
 end
 
-function Arrays.return_cache(::typeof(transpose),a::AbstractArray)
-  CachedArray(a)
-end
+# function Arrays.return_cache(::typeof(transpose),a::AbstractArray)
+#   CachedArray(a)
+# end
 
-function Arrays.evaluate!(cache,::typeof(transpose),a::AbstractArray)
-  s = size(a)
-  st = filter(!isempty,(s[1:end-2],s[end],s[end-1]))
-  setsize!(cache,st)
-  b = cache.array
-  b = transpose(a)
-  b
-end
+# function Arrays.evaluate!(cache,::typeof(transpose),a::AbstractArray)
+#   s = size(a)
+#   st = filter(!isempty,(s[1:end-2],s[end],s[end-1]))
+#   setsize!(cache,st)
+#   b = cache.array
+#   b = transpose(a)
+#   b
+# end
 
 function tpod(::Val{false},snap::Snapshots,args...;kwargs...)
   snaps_t = collect(lazy_map(transpose,get_snaps(snap)))
