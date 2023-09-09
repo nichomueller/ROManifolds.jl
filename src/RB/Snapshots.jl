@@ -1,6 +1,6 @@
 struct Snapshots{T,A}
-  snaps::AbstractVector{<:NnzArray{T,2}}
-  function Snapshots(::A,snaps::AbstractVector{<:AbstractArray{T}}) where {A,T}
+  snaps::AbstractVector{<:NnzArray}
+  function Snapshots(::A,snaps::Vector{Vector{T}}) where {A,T}
     snnz = map(compress,snaps)
     new{T,A}(snnz)
   end
@@ -22,12 +22,12 @@ Base.getindex(snap::Snapshots,idx) = getindex(snap.snaps,idx)
 
 Base.collect(snap::Snapshots;transpose=false) = _collect_snaps(Val(transpose),snap)
 
-function _collect_snaps(::Val{false},snap::Snapshots{T}) where T
+function _collect_snaps(::Val{false},snap::Snapshots)
   snaps = get_snaps(snap)
   return hcat(snaps...)
 end
 
-function _collect_snaps(::Val{true},snap::Snapshots{T}) where T
+function _collect_snaps(::Val{true},snap::Snapshots)
   snaps = get_snaps(snap)
   snaps_t = map(transpose,snaps)
   return hcat(snaps_t...)
@@ -35,7 +35,7 @@ end
 
 function Base.show(io::IO,snap::Snapshots{T,A}) where {T,A}
   nsnaps = length(snap)
-  print(io,"Structure storing $nsnaps $A snapshots of eltype $T")
+  print(io,"Structure storing $nsnaps $A snapshots of type $T")
 end
 
 get_snaps(snap::Snapshots) = snap.snaps
@@ -47,9 +47,9 @@ function compress_snapshots(snap::Snapshots,args...;kwargs...)
   else
     snaps = collect(snap;transpose=true)
   end
-  nsnaps = get_nsnaps(snap)
+  nsnaps = length(snap)
   b1 = tpod(snaps,args...;kwargs...)
-  compressed_b1 = b1'*snaps
+  compressed_b1 = prod(b1,snaps)
   compressed_snaps_t = change_mode(compressed_b1,nsnaps)
   b2 = tpod(compressed_snaps_t;kwargs...)
   if s[1] < s[2]
@@ -63,11 +63,12 @@ for A in (:TimeAffinity,:ParamTimeAffinity)
   @eval begin
     function compress_snapshots(snap::Snapshots{T,$A},args...;kwargs...) where T
       snaps = collect(snap)
-      nsnaps = get_nsnaps(snap)
+      nsnaps = length(snap)
       time_ndofs = Int(size(snaps)[2]/nsnaps)
+      S = eltype(T)
 
       basis_space = tpod(snaps,args...;kwargs...)
-      basis_time = ones(T,time_ndofs,1)
+      basis_time = ones(S,time_ndofs,1)
       basis_space,basis_time
     end
   end

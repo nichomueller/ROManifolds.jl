@@ -3,16 +3,6 @@ struct NnzArray{T,N,OT} <: AbstractArray{T,N}
   nonzero_idx::Vector{Int}
   nrows::Int
 
-  function NnzArray(
-    nonzero_val::OT,
-    nonzero_idx::Vector{Int},
-    nrows::Int) where OT
-
-    T = eltype(nonzero_val)
-    N = dims(nonzero_val)
-    new{T,N,OT}(nonzero_val,nonzero_idx,nrows)
-  end
-
   function NnzArray{OT}(
     nonzero_val::AbstractArray{T,N},
     nonzero_idx::Vector{Int},
@@ -75,6 +65,16 @@ function Base.prod(nza1::NnzArray{T,N,OT},nza2::NnzArray{T,N,OT}) where {T,N,OT}
   nonzero_vals_2 = nza2.nonzero_val
   nonzero_vals = nonzero_vals_1' * nonzero_vals_2
   NnzArray{OT}(nonzero_vals,nza1.nonzero_idx,nza1.nrows)
+end
+
+function Base.prod(nza::NnzArray{T,N,OT},a::AbstractArray) where {T,N,OT}
+  nonzero_vals = nza.nonzero_vals' * a
+  NnzArray{OT}(nonzero_vals,nza.nonzero_idx,nza.nrows)
+end
+
+function Base.prod(a::AbstractArray,nza::NnzArray{T,N,OT}) where {T,N,OT}
+  nonzero_vals = a' * nza.nonzero_vals
+  NnzArray{OT}(nonzero_vals,nza.nonzero_idx,nza.nrows)
 end
 
 function recast(nza::NnzArray{T,N,<:AbstractMatrix}) where {T,N}

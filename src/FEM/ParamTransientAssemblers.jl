@@ -84,7 +84,8 @@ function FESpaces.create_from_nz(::Val{true},a::InserterCSC)
   resize!(a.rowval,nnz)
   resize!(a.nzval,nnz)
   nnzvec_idx = get_nonzero_idx(a.colptr,a.rowval)
-  NnzArray(a.nzval,nnzvec_idx,a.nrows)
+  T = eltype(a.nzval)
+  NnzArray{T}(a.nzval,nnzvec_idx,a.nrows)
 end
 
 function FESpaces.numeric_loop_matrix!(
@@ -132,26 +133,25 @@ end
 end
 
 function FESpaces.numeric_loop_vector!(
-  b::Vector{T},
+  b::Vector{<:AbstractVector},
   a::GenericSparseMatrixAssembler,
-  vecdata) where {T<:AbstractVector}
+  vecdata)
 
   for (all_cellvec, _cellids) in zip(vecdata...)
-    cellids = map_cell_rows(a.strategy,_cellids)
+    cellids = FESpaces.map_cell_rows(a.strategy,_cellids)
     if length(cellids) > 0
       all_vals_cache = array_cache(all_cellvec)
       rows_cache = array_cache(cellids)
       rows1 = getindex!(rows_cache,cellids,1)
+      add! = AddEntriesMap(+)
       for k = eachindex(all_cellvec)
         bk = b[k]
         cellveck = getindex!(all_vals_cache,all_cellvec,k)
         vals_cache = array_cache(cellveck)
         vals1 = getindex!(vals_cache,cellveck,1)
-        add! = AddEntriesMap(+)
         add_cache = return_cache(add!,b,vals1,rows1)
         caches = add_cache, vals_cache, rows_cache
-        _numeric_loop_vector!(bk,caches,cellvec,cellids)
-        copyto!(view(b,k),bk)
+        FESpaces._numeric_loop_vector!(bk,caches,cellveck,cellids)
       end
     end
   end

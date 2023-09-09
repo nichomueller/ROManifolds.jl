@@ -11,6 +11,7 @@ function solve(
   for (k,μ) in enumerate(params)
     sols[k] = solve!(sol,solver,ode_op,μ,cache)
   end
+  return sols
 end
 
 function solve!(
