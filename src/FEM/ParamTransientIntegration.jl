@@ -5,6 +5,12 @@ end
 
 const ∫ₚ = PIntegrand
 
+function collect_inputs(x::NTuple{3,Any})
+  u,p,t = x
+  pt = reshape(Iterators.product(p,t) |> collect,:)
+  map((a,b)->(a,b),u,pt)
+end
+
 function Arrays.evaluate(int::PIntegrand,inputs)
   fields = map(i->int.object(i...),inputs)
   meas = int.meas

@@ -8,33 +8,24 @@ end
 
 get_order(op::ParamODEOpFromFEOp) = get_order(op.feop)
 
-function allocate_cache(op::ParamODEOpFromFEOp)
+function allocate_cache(op::ParamODEOpFromFEOp,args...)
   Ut = get_trial(op.feop)
-  U = allocate_trial_space(Ut)
+  U = allocate_trial_space(Ut,args...)
   Uts = (Ut,)
   Us = (U,)
   for i in 1:get_order(op)
     Uts = (Uts...,∂ₚt(Uts[i]))
-    Us = (Us...,allocate_trial_space(Uts[i+1]))
+    Us = (Us...,allocate_trial_space(Uts[i+1],args...))
   end
   fecache = allocate_cache(op.feop)
   ode_cache = (Us,Uts,fecache)
   ode_cache
 end
 
-function allocate_cache(
-  op::ParamODEOpFromFEOp,
-  v::AbstractVector,
-  a::AbstractVector)
-
-  ode_cache = allocate_cache(op)
-  (v,a,ode_cache)
-end
-
 function update_cache!(
   ode_cache,
   op::ParamODEOpFromFEOp,
-  μ::AbstractVector,
+  μ::AbstractArray,
   t::Real)
 
   _Us,Uts,fecache = ode_cache
@@ -44,6 +35,21 @@ function update_cache!(
   end
   fecache = update_cache!(fecache,op.feop,μ,t)
   (Us,Uts,fecache)
+end
+
+function FESpaces.FEFunction(
+  fs::SingleFieldFESpace,
+  free_values::Vector{<:AbstractVector},
+  dirichlet_values::Vector{<:AbstractVector})
+
+  map((fv,dv)->FEFunction(fs,fv,dv),free_values,dirichlet_values)
+end
+
+function ODEs.TransientFETools.TransientCellField(
+  single_field::Vector{T},
+  derivatives::Tuple) where {T<:Union{ODEs.TransientFETools.SingleFieldTypes,ODEs.TransientFETools.MultiFieldTypes}}
+
+  map(TransientCellField,single_field,derivatives)
 end
 
 function allocate_residual(
@@ -67,9 +73,9 @@ function allocate_jacobian(
 end
 
 function residual!(
-  b::AbstractVector,
+  b::AbstractArray,
   op::ParamODEOpFromFEOp,
-  μ::AbstractVector,
+  μ::AbstractArray,
   t::Real,
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
@@ -83,9 +89,9 @@ function residual!(
 end
 
 function jacobian!(
-  A::AbstractMatrix,
+  A::AbstractArray,
   op::ParamODEOpFromFEOp,
-  μ::AbstractVector,
+  μ::AbstractArray,
   t::Real,
   xhF::Tuple{Vararg{AbstractVector}},
   i::Integer,
@@ -101,9 +107,9 @@ function jacobian!(
 end
 
 function jacobians!(
-  J::AbstractMatrix,
+  J::AbstractArray,
   op::ParamODEOpFromFEOp,
-  μ::AbstractVector,
+  μ::AbstractArray,
   t::Real,
   xhF::Tuple{Vararg{AbstractVector}},
   γ::Tuple{Vararg{Real}},

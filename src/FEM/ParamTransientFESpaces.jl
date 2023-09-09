@@ -20,8 +20,8 @@ end
 """
 Allocate the space to be used as first argument in evaluate!
 """
-function allocate_trial_space(U::ParamTransientTrialFESpace)
-  HomogeneousTrialFESpace(U.space)
+function allocate_trial_space(U::ParamTransientTrialFESpace,args...)
+  HomogeneousTrialFESpace(U.space,args...)
 end
 
 """
@@ -46,17 +46,43 @@ function Arrays.evaluate(U::ParamTransientTrialFESpace,μ::AbstractVector,t::Rea
   Uμt
 end
 
-"""
-Parameter evaluation allocating Dirichlet vals
-"""
-function Arrays.evaluate(U::ParamTransientTrialFESpace,μ::AbstractVector)
-  Uμt = evaluate(U,μ,0.)
-  if isa(U.dirichlet_μt,Vector)
-    objects_at_t = t -> map(o->o(μ,t),U.dirichlet_μt)
-  else
-    objects_at_t = t -> U.dirichlet_μt(μ,t)
+# Interface for time marching across parameters
+function FESpaces.HomogeneousTrialFESpace(U::SingleFieldFESpace,n::Int)
+  dirichlet_values = fill(zero_dirichlet_values(U),n)
+  TrialFESpace(dirichlet_values,U)
+end
+
+function FESpaces.TrialFESpace!(
+  f::TrialFESpace,
+  objects::Vector{T}
+  ) where {T<:Union{AbstractArray,Function}}
+
+  dir_values = get_dirichlet_dof_values(f)
+  dv_cache = first(dir_values)
+  dir_values_scratch = zero_dirichlet_values(f)
+  for (n,obj) = enumerate(objects)
+    dv = copy(dv_cache)
+    compute_dirichlet_values_for_tags!(dv,dir_values_scratch,f,obj)
+    dir_values[n] = dv
   end
-  TransientTrialFESpace(Uμt,objects_at_t)
+  dir_values
+end
+
+function evaluate!(Ut::T,U::ParamTransientTrialFESpace,params::Table,t::Real) where T
+  if isa(U.dirichlet_μt,Vector)
+    objects_at_t = map(o->map(μ->o(μ,t),params),U.dirichlet_μt)
+  else
+    objects_at_t = map(μ->U.dirichlet_μt(μ,t),params)
+  end
+  TrialFESpace!(Ut,objects_at_t)
+  Ut
+end
+
+function Arrays.evaluate(U::ParamTransientTrialFESpace,params::Table,t::Real)
+  k = length(params)
+  Ut = allocate_trial_space(U,k)
+  evaluate!(Ut,U,params,t)
+  Ut
 end
 
 """
@@ -113,12 +139,12 @@ function allocate_trial_space(U::ParamTransientMultiFieldTrialFESpace)
   MultiFieldFESpace(spaces)
 end
 
-function evaluate!(Uμt::T,U::ParamTransientMultiFieldTrialFESpace,μ::AbstractVector,t::Real) where T
+function evaluate!(Uμt::T,U::ParamTransientMultiFieldTrialFESpace,μ,t::Real) where T
   spaces_at_μt = [evaluate!(Uμti,Ui,μ,t) for (Uμti,Ui) in zip(Uμt,U)]
   MultiFieldFESpace(spaces_at_μt)
 end
 
-function Arrays.evaluate(U::ParamTransientMultiFieldTrialFESpace,μ::AbstractVector,t::Real)
+function Arrays.evaluate(U::ParamTransientMultiFieldTrialFESpace,μ,t::Real)
   Uμt = allocate_trial_space(U)
   evaluate!(Uμt,U,μ,t)
   Uμt
@@ -128,11 +154,6 @@ function Arrays.evaluate(U::ParamTransientMultiFieldTrialFESpace,::Nothing,::Not
   MultiFieldFESpace([fesp(nothing,nothing) for fesp in U.spaces])
 end
 
-function Arrays.evaluate(U::ParamTransientMultiFieldTrialFESpace,μ::AbstractVector)
-  TransientMultiFieldTrialFESpace([fesp(μ) for fesp in U.spaces])
-end
-
-(U::TransientMultiFieldTrialFESpace)(::AbstractVector,::Real) = U
 (U::ParamTransientMultiFieldTrialFESpace)(μ,t) = evaluate(U,μ,t)
 (U::ParamTransientMultiFieldTrialFESpace)(μ) = evaluate(U,μ)
 
@@ -148,21 +169,3 @@ end
 function ParamTransientMultiFieldFESpace(spaces::Vector{<:SingleFieldFESpace})
   MultiFieldFESpace(spaces)
 end
-
-# function get_fe_basis(
-#   U::ParamTransientMultiFieldTrialFESpace,
-#   i::Int)
-
-#   get_fe_basis(U[i])
-# end
-
-# function get_trial_fe_basis(
-#   U::ParamTransientMultiFieldTrialFESpace,
-#   i::Int)
-
-#   get_trial_fe_basis(U[i])
-# end
-
-# function _split_solutions(trial::TransientMultiFieldTrialFESpace,u::AbstractVector)
-#   _split_solutions(trial(nothing),u)
-# end

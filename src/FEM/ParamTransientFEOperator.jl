@@ -18,7 +18,7 @@ end
 function update_cache!(
   ::Nothing,
   ::ParamTransientFEOperator,
-  ::AbstractVector,
+  ::AbstractArray,
   ::Real)
   nothing
 end
@@ -119,23 +119,26 @@ function collect_trian_res(op::ParamTransientFEOperator)
     dxh = (dxh...,uh)
   end
   xh = TransientCellField(uh,dxh)
-  veccontrib = op.res(μ,t,xh,v)
+  veccontrib = evaluate(op.res(v),(xh,μ,t))
   collect_trian(veccontrib)
 end
 
 function collect_trian_jac(op::ParamTransientFEOperator,i::Int=1)
   μ,t = realization(op),0.
-  uh = zero(op.test)
+  trial_hom = allocate_trial_space(get_trial(op))
+  xh = zero(op.test)
   v = get_fe_basis(op.test)
-  matcontrib = op.jacs[i](μ,t,uh,v,v)
+  u = get_trial_fe_basis(trial_hom)
+  matcontrib = evaluate(op.jacs[i](u,v),(xh,μ,t))
   collect_trian(matcontrib)
 end
 
 function allocate_residual(
   op::ParamTransientFEOperatorFromWeakForm,
   uh::T,
-  cache) where T
+  cache) where {T<:GridapType}
 
+  μ,t = realization(op),0.
   V = get_test(op)
   v = get_fe_basis(V)
   dxh = ()
@@ -143,39 +146,66 @@ function allocate_residual(
     dxh = (dxh...,uh)
   end
   xh = TransientCellField(uh,dxh)
-  vecdata = collect_cell_vector(V,op.res(realization(op),0.0,xh,v))
+  vecdata = collect_cell_vector(V,evaluate(op.res(v),(xh,μ,t)))
   allocate_vector(op.assem,vecdata)
 end
 
-function residual!(
-  b::AbstractVector,
+function allocate_residual(
   op::ParamTransientFEOperatorFromWeakForm,
-  μ::AbstractVector,
+  uh::AbstractVector{T},
+  cache) where {T<:GridapType}
+
+  n = length(uh)
+  uh1 = first(uh)
+  b = allocate_residual(op,uh1,cache)
+  fill(b,n)
+end
+
+function residual!(
+  b::AbstractArray,
+  op::ParamTransientFEOperatorFromWeakForm,
+  μ::AbstractArray,
   t::Real,
   uh::T,
   cache) where T
 
   V = get_test(op)
   v = get_fe_basis(V)
-  vecdata = collect_cell_vector(V,op.res(μ,t,uh,v))
+  inputs = collect_inputs(uh,μ,t)
+  vecdata = collect_cell_vector(V,evaluate(op.res(v),inputs))
   assemble_vector!(b,op.assem,vecdata)
   b
 end
 
 function allocate_jacobian(
   op::ParamTransientFEOperatorFromWeakForm,
-  uh::CellField,
-  cache)
+  uh::T,
+  cache) where {T<:GridapType}
 
   _matdata_jacobians = fill_initial_jacobians(op,uh)
   matdata = _vcat_matdata(_matdata_jacobians)
   allocate_matrix(op.assem,matdata)
 end
 
+for f in (:allocate_residual,:allocate_jacobian)
+  @eval begin
+    function $f(
+      op::ParamTransientFEOperatorFromWeakForm,
+      uh::AbstractVector{T},
+      cache) where {T<:GridapType}
+
+      n = length(uh)
+      uh1 = first(uh)
+      q = $f(op,uh1,cache)
+      fill(q,n)
+    end
+  end
+end
+
 function jacobian!(
-  A::AbstractMatrix,
+  A::AbstractArray,
   op::ParamTransientFEOperatorFromWeakForm,
-  μ::AbstractVector,
+  μ::AbstractArray,
   t::Real,
   uh::T,
   i::Integer,
@@ -188,13 +218,13 @@ function jacobian!(
 end
 
 function jacobians!(
-  A::AbstractMatrix,
+  A::AbstractArray,
   op::ParamTransientFEOperatorFromWeakForm,
-  μ::AbstractVector,
+  μ::AbstractArray,
   t::Real,
-  uh::TransientCellField,
+  uh::T,
   γ::Tuple{Vararg{Real}},
-  cache)
+  cache) where T
 
   _matdata_jacobians = fill_jacobians(op,μ,t,uh,γ)
   matdata = _vcat_matdata(_matdata_jacobians)
@@ -206,6 +236,7 @@ function fill_initial_jacobians(
   op::ParamTransientFEOperatorFromWeakForm,
   uh::T) where T
 
+  μ,t = realization(op),0.
   dxh = ()
   for i in 1:get_order(op)
     dxh = (dxh...,uh)
@@ -213,14 +244,14 @@ function fill_initial_jacobians(
   xh = TransientCellField(uh,dxh)
   _matdata = ()
   for i in 1:get_order(op)+1
-    _matdata = (_matdata...,_matdata_jacobian(op,realization(op),0.0,xh,i,0.0))
+    _matdata = (_matdata...,_matdata_jacobian(op,μ,t,xh,i,0.0))
   end
   return _matdata
 end
 
 function fill_jacobians(
   op::ParamTransientFEOperatorFromWeakForm,
-  μ::AbstractVector,
+  μ::AbstractArray,
   t::Real,
   uh::T,
   γ::Tuple{Vararg{Real}}) where T
@@ -236,7 +267,7 @@ end
 
 function _matdata_jacobian(
   op::ParamTransientFEOperatorFromWeakForm,
-  μ::AbstractVector,
+  μ::AbstractArray,
   t::Real,
   uh::T,
   i::Integer,
@@ -244,7 +275,8 @@ function _matdata_jacobian(
 
   Uh = get_trial(op)(nothing,nothing)
   V = get_test(op)
-  du = get_trial_fe_basis(Uh)
+  u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
-  collect_cell_matrix(Uh,V,γᵢ*op.jacs[i](μ,t,uh,du,v))
+  inputs = collect_inputs(uh,μ,t)
+  collect_cell_matrix(Uh,V,γᵢ*evaluate(op.jacs[i](u,v),inputs))
 end

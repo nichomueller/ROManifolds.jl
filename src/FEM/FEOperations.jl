@@ -1,77 +1,77 @@
-function FESpaces.collect_cell_vector(
-  test::FESpace,
-  a::DomainContribution,
-  trian::Triangulation)
+# function FESpaces.collect_cell_vector(
+#   test::FESpace,
+#   a::DomainContribution,
+#   trian::Triangulation)
 
-  for strian in get_domains(a)
-    if strian == trian
-      scell_vec = get_contribution(a,strian)
-      cell_vec,trian = move_contributions(scell_vec,strian)
-      @assert ndims(eltype(cell_vec)) == 1
-      cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
-      rows = get_cell_dof_ids(test,trian)
-      return cell_vec_r,rows
-    end
-  end
-  @unreachable "Could not find the matching triangulation for the DomainContribution"
-end
+#   for strian in get_domains(a)
+#     if strian == trian
+#       scell_vec = get_contribution(a,strian)
+#       cell_vec,trian = move_contributions(scell_vec,strian)
+#       @assert ndims(eltype(cell_vec)) == 1
+#       cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
+#       rows = get_cell_dof_ids(test,trian)
+#       return cell_vec_r,rows
+#     end
+#   end
+#   @unreachable "Could not find the matching triangulation for the DomainContribution"
+# end
 
-function FESpaces.collect_cell_matrix(
-  trial::FESpace,
-  test::FESpace,
-  a::DomainContribution,
-  trian::Triangulation)
+# function FESpaces.collect_cell_matrix(
+#   trial::FESpace,
+#   test::FESpace,
+#   a::DomainContribution,
+#   trian::Triangulation)
 
-  for strian in get_domains(a)
-    if strian == trian
-      scell_mat = get_contribution(a,strian)
-      cell_mat,trian = move_contributions(scell_mat,strian)
-      @assert ndims(eltype(cell_mat)) == 2
-      cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
-      cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
-      rows = get_cell_dof_ids(test,trian)
-      cols = get_cell_dof_ids(trial,trian)
-      return cell_mat_rc,rows,cols
-    end
-  end
-  @unreachable "Could not find the matching triangulation for the DomainContribution"
-end
+#   for strian in get_domains(a)
+#     if strian == trian
+#       scell_mat = get_contribution(a,strian)
+#       cell_mat,trian = move_contributions(scell_mat,strian)
+#       @assert ndims(eltype(cell_mat)) == 2
+#       cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
+#       cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
+#       rows = get_cell_dof_ids(test,trian)
+#       cols = get_cell_dof_ids(trial,trian)
+#       return cell_mat_rc,rows,cols
+#     end
+#   end
+#   @unreachable "Could not find the matching triangulation for the DomainContribution"
+# end
 
-function collect_cell_contribution(
-  test::FESpace,
-  a::DomainContribution,
-  trian::Triangulation)
+# function collect_cell_contribution(
+#   test::FESpace,
+#   a::DomainContribution,
+#   trian::Triangulation)
 
-  for strian in get_domains(a)
-    if strian == trian || is_parent(strian,trian)
-      scell = get_contribution(a,strian)
-      cell,trian = move_contributions(scell,strian)
-      @assert ndims(eltype(cell)) == 1
-      cell_r = attach_constraints_rows(test,cell,trian)
-      return cell_r
-    end
-  end
-  @unreachable "Could not find the matching triangulation for the DomainContribution"
-end
+#   for strian in get_domains(a)
+#     if strian == trian || is_parent(strian,trian)
+#       scell = get_contribution(a,strian)
+#       cell,trian = move_contributions(scell,strian)
+#       @assert ndims(eltype(cell)) == 1
+#       cell_r = attach_constraints_rows(test,cell,trian)
+#       return cell_r
+#     end
+#   end
+#   @unreachable "Could not find the matching triangulation for the DomainContribution"
+# end
 
-function collect_cell_contribution(
-  trial::FESpace,
-  test::FESpace,
-  a::DomainContribution,
-  trian::Triangulation)
+# function collect_cell_contribution(
+#   trial::FESpace,
+#   test::FESpace,
+#   a::DomainContribution,
+#   trian::Triangulation)
 
-  for strian in get_domains(a)
-    if strian == trian || is_parent(strian,trian)
-      scell = get_contribution(a,strian)
-      cell,trian = move_contributions(scell,strian)
-      @assert ndims(eltype(cell)) == 2
-      cell_c = attach_constraints_cols(trial,cell,trian)
-      cell_rc = attach_constraints_rows(test,cell_c,trian)
-      return cell_rc
-    end
-  end
-  @unreachable "Could not find the matching triangulation for the DomainContribution"
-end
+#   for strian in get_domains(a)
+#     if strian == trian || is_parent(strian,trian)
+#       scell = get_contribution(a,strian)
+#       cell,trian = move_contributions(scell,strian)
+#       @assert ndims(eltype(cell)) == 2
+#       cell_c = attach_constraints_cols(trial,cell,trian)
+#       cell_rc = attach_constraints_rows(test,cell_c,trian)
+#       return cell_rc
+#     end
+#   end
+#   @unreachable "Could not find the matching triangulation for the DomainContribution"
+# end
 
 function collect_trian(a::DomainContribution)
   t = ()
@@ -220,7 +220,7 @@ for f in (:get_L2_norm_matrix,:get_H1_norm_matrix)
 end
 
 function get_L2_norm_matrix(
-  trial::ParamTransientTrialFESpace,
+  trial::TrialFESpace,
   test::FESpace)
 
   trian = get_triangulation(test)
@@ -231,7 +231,7 @@ function get_L2_norm_matrix(
 end
 
 function get_H1_norm_matrix(
-  trial::ParamTransientTrialFESpace,
+  trial::TrialFESpace,
   test::FESpace)
 
   trian = get_triangulation(test)
