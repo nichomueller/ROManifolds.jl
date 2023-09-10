@@ -4,11 +4,11 @@ function solve(
   params::Table)
 
   ode_op = get_algebraic_operator(op)
-  cache = get_solution_cache(solver,op)
+  cache = get_solution_cache(solver,params)
   T = op.test.vector_type
   sol = Vector{T}(undef,length(get_times(solver)))
   sols = Vector{typeof(sol)}(undef,length(params))
-  for (k,μ) in enumerate(params)
+  @inbounds for (k,μ) in enumerate(params)
     sols[k] = solve!(sol,solver,ode_op,μ,cache)
   end
   return sols
@@ -45,9 +45,8 @@ function sol_update(u0::Tuple,uF::Tuple)
   u0
 end
 
-function get_solution_cache(solver::ODESolver,op::ParamTransientFEOperator)
+function get_solution_cache(solver::ODESolver,μ)
   ode_cache = nothing
-  μ = realization(op)
   xh0 = solver.uh0(μ)
   if isa(xh0,Tuple)
     vec_cache = ()
@@ -58,6 +57,14 @@ function get_solution_cache(solver::ODESolver,op::ParamTransientFEOperator)
   else
     vec_cache = get_free_dof_values(xh0)
   end
+  return ode_cache,vec_cache
+end
+
+function get_solution_cache(solver::ODESolver,params::Table)
+  k = length(params)
+  μ = testitem(params)
+  ode_cache,vecμ_cache = get_solution_cache(solver,μ)
+  vec_cache = fill(vecμ_cache,k)
   return ode_cache,vec_cache
 end
 

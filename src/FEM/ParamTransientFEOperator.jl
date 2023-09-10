@@ -119,7 +119,8 @@ function collect_trian_res(op::ParamTransientFEOperator)
     dxh = (dxh...,uh)
   end
   xh = TransientCellField(uh,dxh)
-  veccontrib = evaluate(op.res(v),(xh,μ,t))
+  inputs = collect_inputs(xh,μ,t)
+  veccontrib = evaluate(op.res(v),inputs)
   collect_trian(veccontrib)
 end
 
@@ -129,7 +130,8 @@ function collect_trian_jac(op::ParamTransientFEOperator,i::Int=1)
   xh = zero(op.test)
   v = get_fe_basis(op.test)
   u = get_trial_fe_basis(trial_hom)
-  matcontrib = evaluate(op.jacs[i](u,v),(xh,μ,t))
+  inputs = collect_inputs(xh,μ,t)
+  matcontrib = evaluate(op.jacs[i](u,v),inputs)
   collect_trian(matcontrib)
 end
 
@@ -146,7 +148,8 @@ function allocate_residual(
     dxh = (dxh...,uh)
   end
   xh = TransientCellField(uh,dxh)
-  vecdata = collect_cell_vector(V,evaluate(op.res(v),(xh,μ,t)))
+  inputs = collect_inputs(xh,μ,t)
+  vecdata = collect_cell_vector(V,evaluate(op.res(v),inputs;allocate=true))
   allocate_vector(op.assem,vecdata)
 end
 
@@ -166,12 +169,12 @@ function residual!(
   op::ParamTransientFEOperatorFromWeakForm,
   μ::AbstractArray,
   t::Real,
-  uh::T,
+  xh::T,
   cache) where T
 
   V = get_test(op)
   v = get_fe_basis(V)
-  inputs = collect_inputs(uh,μ,t)
+  inputs = collect_inputs(xh,μ,t)
   vecdata = collect_cell_vector(V,evaluate(op.res(v),inputs))
   assemble_vector!(b,op.assem,vecdata)
   b
@@ -244,7 +247,7 @@ function fill_initial_jacobians(
   xh = TransientCellField(uh,dxh)
   _matdata = ()
   for i in 1:get_order(op)+1
-    _matdata = (_matdata...,_matdata_jacobian(op,μ,t,xh,i,0.0))
+    _matdata = (_matdata...,_matdata_jacobian(op,μ,t,xh,i,0.0;allocate=true))
   end
   return _matdata
 end
@@ -269,14 +272,15 @@ function _matdata_jacobian(
   op::ParamTransientFEOperatorFromWeakForm,
   μ::AbstractArray,
   t::Real,
-  uh::T,
+  xh::T,
   i::Integer,
-  γᵢ::Real) where T
+  γᵢ::Real;
+  kwargs...) where T
 
   Uh = get_trial(op)(nothing,nothing)
   V = get_test(op)
   u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
-  inputs = collect_inputs(uh,μ,t)
-  collect_cell_matrix(Uh,V,γᵢ*evaluate(op.jacs[i](u,v),inputs))
+  inputs = collect_inputs(xh,μ,t)
+  collect_cell_matrix(Uh,V,γᵢ*evaluate(op.jacs[i](u,v),inputs;kwargs...))
 end

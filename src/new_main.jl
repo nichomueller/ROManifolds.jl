@@ -35,8 +35,10 @@ begin
   u0(x,μ) = 0
   u0(μ) = x->u0(x,μ)
 
-  res(v) = (∫ₚ((u,μ,t)->v*∂ₚt(u),dΩ) + ∫ₚ((u,μ,t)->a(μ,t)*∇(v)⋅∇(u),dΩ)
-    - ∫ₚ((u,μ,t)->f(μ,t)*v,dΩ) - ∫ₚ((u,μ,t)->h(μ,t)*v,dΓn))
+  # res(v) = (∫ₚ((u,μ,t)->v*∂ₚt(u),dΩ) + ∫ₚ((u,μ,t)->a(μ,t)*∇(v)⋅∇(u),dΩ)
+  #   - ∫ₚ((u,μ,t)->f(μ,t)*v,dΩ) - ∫ₚ((u,μ,t)->h(μ,t)*v,dΓn))
+  res(v) = ( ∫ₚ((u,μ,t) -> v*∂ₚt(u) + a(μ,t)*∇(v)⋅∇(u) - f(μ,t)*v,dΩ)
+    - ∫ₚ((u,μ,t)->h(μ,t)*v,dΓn) )
   jac(du,v) = ∫ₚ((u,μ,t)->a(μ,t)*∇(v)⋅∇(du),dΩ)
   jac_t(dut,v) = ∫ₚ((u,μ,t)->v*dut,dΩ)
 
@@ -61,14 +63,16 @@ begin
 end
 
 #OK
-nsnaps = 30
-# p = realization(feop,nsnaps)
+nsnaps = 10
+p = realization(feop,nsnaps)
+
+
+#TRY
 # snap = collect_solutions(feop,fesolver,p;nsnaps)
 # save(info,(snap,p))
 snap,p = load(Snapshots,info),load(Table,info)
 rbspace = compress_snapshots(info,snap,feop,fesolver,p)
 
-#TRY
 rb_res = collect_compress_residual(info,feop,fesolver,rbspace,snap,p)
 online_res = collect_residual_contributions(info,feop,fesolver,rb_res)
 

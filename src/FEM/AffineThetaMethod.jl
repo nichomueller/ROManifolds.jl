@@ -12,9 +12,8 @@ function solve_step!(
   tθ = t0+dtθ
 
   if isnothing(cache)
-    ode_cache = allocate_cache(op)
-    vθ = similar(u0)
-    vθ .= 0.0
+    ode_cache = isa(μ,Table) ? allocate_cache(op,length(μ)) : allocate_cache(op)
+    vθ = allocate_intermediate_step(u0)
     l_cache = nothing
     A,b = _allocate_matrix_and_vector(op,u0,ode_cache)
   else
@@ -40,8 +39,8 @@ function solve_step!(
 end
 
 function _matrix_and_vector!(
-  A::AbstractMatrix,
-  b::AbstractVector,
+  A::AbstractArray,
+  b::AbstractArray,
   op::AffineParamODEOperator,
   μ::AbstractArray,
   tθ::Real,
@@ -55,7 +54,7 @@ function _matrix_and_vector!(
 end
 
 function _matrix!(
-  A::AbstractMatrix,
+  A::AbstractArray,
   op::AffineParamODEOperator,
   μ::AbstractArray,
   tθ::Real,
@@ -64,13 +63,12 @@ function _matrix!(
   ode_cache,
   vθ)
 
-  z = zero(eltype(A))
-  LinearAlgebra.fillstored!(A,z)
+  fill_with_zeros!(A)
   jacobians!(A,op,μ,tθ,(vθ,vθ),(1.0,1/dtθ),ode_cache)
 end
 
 function _mass_matrix!(
-  A::AbstractMatrix,
+  A::AbstractArray,
   op::AffineParamODEOperator,
   μ::AbstractArray,
   tθ::Real,
@@ -79,13 +77,12 @@ function _mass_matrix!(
   ode_cache,
   vθ)
 
-  z = zero(eltype(A))
-  LinearAlgebra.fillstored!(A,z)
+  fill_with_zeros!(A)
   jacobian!(A,op,μ,tθ,(vθ,vθ),2,(1/dtθ),ode_cache)
 end
 
 function _vector!(
-  b::AbstractVector,
+  b::AbstractArray,
   op::AffineParamODEOperator,
   μ::AbstractArray,
   tθ::Real,

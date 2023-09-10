@@ -38,18 +38,38 @@ function update_cache!(
 end
 
 function FESpaces.FEFunction(
-  fs::SingleFieldFESpace,
+  fe::SingleFieldFESpace,
   free_values::Vector{<:AbstractVector},
   dirichlet_values::Vector{<:AbstractVector})
 
-  map((fv,dv)->FEFunction(fs,fv,dv),free_values,dirichlet_values)
+  map((fv,dv)->FEFunction(fe,fv,dv),free_values,dirichlet_values)
 end
 
-function ODEs.TransientFETools.TransientCellField(
+function TransientCellField(
   single_field::Vector{T},
-  derivatives::Tuple) where {T<:Union{ODEs.TransientFETools.SingleFieldTypes,ODEs.TransientFETools.MultiFieldTypes}}
+  derivatives::Tuple) where {T<:Union{SingleFieldTypes,MultiFieldTypes}}
 
-  map(TransientCellField,single_field,derivatives)
+  vec_derivatives = map(a->(a,),derivatives...)
+  map(TransientCellField,single_field,vec_derivatives)
+end
+
+function allocate_intermediate_step(u0::AbstractVector)
+  vθ = similar(u0)
+  vθ .= 0.0
+end
+
+function allocate_intermediate_step(u0::Vector{<:AbstractVector})
+  map(allocate_intermediate_step,u0)
+end
+
+function fill_with_zeros!(A::SparseMatrixCSC)
+  z = zero(eltype(A))
+  LinearAlgebra.fillstored!(A,z)
+  A
+end
+
+function fill_with_zeros!(A::Vector{<:SparseMatrixCSC})
+  map(fill_with_zeros!,A)
 end
 
 function allocate_residual(

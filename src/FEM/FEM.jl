@@ -16,6 +16,7 @@ using Gridap.ODEs.TransientFETools
 
 const Float = Float64
 
+import Base: +, -
 import FillArrays:Fill,fill
 import Statistics.mean
 import GridapGmsh:GmshDiscreteModel
@@ -53,6 +54,7 @@ import Gridap.ODEs.TransientFETools:ODEOperator
 import Gridap.ODEs.TransientFETools:OperatorType
 import Gridap.ODEs.TransientFETools:TransientCellField
 import Gridap.ODEs.TransientFETools.TransientMultiFieldCellField
+import Gridap.ODEs.TransientFETools:SingleFieldTypes,MultiFieldTypes
 import Gridap.ODEs.TransientFETools:Affine
 import Gridap.ODEs.TransientFETools:Nonlinear
 import Gridap.ODEs.TransientFETools:solve_step!

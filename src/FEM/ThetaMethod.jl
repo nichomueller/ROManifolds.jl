@@ -13,7 +13,7 @@ function solve_step!(
 
   if isnothing(cache)
     ode_cache = allocate_cache(op)
-    vθ = similar(u0)
+    vθ = allocate_intermediate_step(u0)
     nl_cache = nothing
   else
     ode_cache,vθ,nl_cache = cache
@@ -65,8 +65,7 @@ function jacobian!(
 
   uF = x
   vθ = (x-op.u0)/op.dtθ
-  z = zero(eltype(A))
-  LinearAlgebra.fillstored!(A,z)
+  fill_with_zeros!(A)
   jacobians!(A,op.odeop,op.μ,op.tθ,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)
 end
 

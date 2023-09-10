@@ -26,7 +26,7 @@ end
 
 struct RBAffineDecomposition{T}
   basis_space::Vector{Matrix{T}}
-  basis_time::Vector{<:Array{T}}
+  basis_time::Vector{Matrix{T}}
   mdeim_interpolation::LU
   integration_domain::RBIntegrationDomain
 end
