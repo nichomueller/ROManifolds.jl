@@ -1,23 +1,23 @@
-function CellData.attach_constraints_rows(
-  cellvec::LazyArray{<:Fill{<:PTMap{IntegrationMap}}},
-  cellconstr,
-  cellmask=Fill(true,length(cellconstr)))
+# function CellData.attach_constraints_rows(
+#   cellvec::LazyArray{<:Fill{<:PTMap{IntegrationMap}}},
+#   cellconstr,
+#   cellmask=Fill(true,length(cellconstr)))
 
-  N = length(cellvec)
-  ptmap = PTMap(ConstrainRowsMap())
-  lazy_map(ptmap,cellvec,Fill(cellconstr,N),Fill(cellmask,N))
-end
+#   N = length(cellvec)
+#   ptmap = PTMap(ConstrainRowsMap())
+#   lazy_map(ptmap,cellvec,Fill(cellconstr,N),Fill(cellmask,N))
+# end
 
-function CellData.attach_constraints_cols(
-  cellmat::LazyArray{<:Fill{<:PTMap{IntegrationMap}}},
-  cellconstr,
-  cellmask=Fill(true,length(cellconstr)))
+# function CellData.attach_constraints_cols(
+#   cellmat::LazyArray{<:Fill{<:PTMap{IntegrationMap}}},
+#   cellconstr,
+#   cellmask=Fill(true,length(cellconstr)))
 
-  N = length(cellvec)
-  ptmap = PTMap(ConstrainColsMap())
-  cellconstr_t = lazy_map(transpose,cellconstr)
-  lazy_map(ptmap,cellmat,Fill(cellconstr_t,N),Fill(cellmask,N))
-end
+#   N = length(cellvec)
+#   ptmap = PTMap(ConstrainColsMap())
+#   cellconstr_t = lazy_map(transpose,cellconstr)
+#   lazy_map(ptmap,cellmat,Fill(cellconstr_t,N),Fill(cellmask,N))
+# end
 
 _ndims(x) = isconcretetype(x) ? eltype(x) : _ndims(eltype(x))
 

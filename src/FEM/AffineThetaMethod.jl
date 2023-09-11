@@ -1,9 +1,9 @@
 function solve_step!(
-  uf::AbstractVector,
+  uf::PTArray,
   solver::θMethod,
   op::AffineParamODEOperator,
   μ::AbstractVector,
-  u0::AbstractVector,
+  u0::PTArray,
   t0::Real,
   cache)
 
@@ -12,8 +12,9 @@ function solve_step!(
   tθ = t0+dtθ
 
   if isnothing(cache)
-    ode_cache = isa(μ,Table) ? allocate_cache(op,length(μ)) : allocate_cache(op)
-    vθ = allocate_intermediate_step(u0)
+    ode_cache = allocate_cache(op,μ,t0)
+    vθ = similar(u0)
+    vθ .= 0.0
     l_cache = nothing
     A,b = _allocate_matrix_and_vector(op,u0,ode_cache)
   else
@@ -39,8 +40,8 @@ function solve_step!(
 end
 
 function _matrix_and_vector!(
-  A::AbstractArray,
-  b::AbstractArray,
+  A::PTArray,
+  b::PTArray,
   op::AffineParamODEOperator,
   μ::AbstractArray,
   tθ::Real,
@@ -54,7 +55,7 @@ function _matrix_and_vector!(
 end
 
 function _matrix!(
-  A::AbstractArray,
+  A::PTArray,
   op::AffineParamODEOperator,
   μ::AbstractArray,
   tθ::Real,
@@ -67,22 +68,8 @@ function _matrix!(
   jacobians!(A,op,μ,tθ,(vθ,vθ),(1.0,1/dtθ),ode_cache)
 end
 
-function _mass_matrix!(
-  A::AbstractArray,
-  op::AffineParamODEOperator,
-  μ::AbstractArray,
-  tθ::Real,
-  dtθ::Real,
-  u0,
-  ode_cache,
-  vθ)
-
-  fill_with_zeros!(A)
-  jacobian!(A,op,μ,tθ,(vθ,vθ),2,(1/dtθ),ode_cache)
-end
-
 function _vector!(
-  b::AbstractArray,
+  b::PTArray,
   op::AffineParamODEOperator,
   μ::AbstractArray,
   tθ::Real,
@@ -93,22 +80,4 @@ function _vector!(
 
   residual!(b,op,μ,tθ,(u0,vθ),ode_cache)
   b .*= -1.0
-end
-
-function _allocate_matrix(
-  op::AffineParamODEOperator,
-  u0,
-  ode_cache)
-
-  allocate_jacobian(op,u0,ode_cache)
-end
-
-function _allocate_matrix_and_vector(
-  op::AffineParamODEOperator,
-  u0,
-  ode_cache)
-
-  b = allocate_residual(op,u0,ode_cache)
-  A = allocate_jacobian(op,u0,ode_cache)
-  A,b
 end

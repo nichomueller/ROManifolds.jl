@@ -48,37 +48,33 @@ end
 
 # Interface for time marching across parameters
 function FESpaces.HomogeneousTrialFESpace(U::SingleFieldFESpace,n::Int)
-  dirichlet_values = fill(zero_dirichlet_values(U),n)
+  dirichlet_values = PTArray(zero_dirichlet_values(U),n)
   TrialFESpace(dirichlet_values,U)
 end
 
-function FESpaces.TrialFESpace!(
-  f::TrialFESpace,
-  objects::Vector{T}
-  ) where {T<:Union{AbstractArray,Function}}
-
-  dir_values = get_dirichlet_dof_values(f)
-  dv_cache = first(dir_values)
-  dir_values_scratch = zero_dirichlet_values(f)
-  for (n,obj) = enumerate(objects)
-    dv = copy(dv_cache)
-    compute_dirichlet_values_for_tags!(dv,dir_values_scratch,f,obj)
-    dir_values[n] = dv
+function FESpaces.TrialFESpace!(U::TrialFESpace,objects::PTArray)
+  dir_values = get_dirichlet_dof_values(U)
+  dir_values_cache = testitem(dir_values)
+  dir_values_scratch = zero_dirichlet_values(U)
+  @inbounds for (i,obj) = enumerate(objects)
+    dv = copy(dir_values_cache)
+    compute_dirichlet_values_for_tags!(dv,dir_values_scratch,U,obj)
+    dir_values.array[i] = dv
   end
-  dir_values
+  U
 end
 
-function evaluate!(Ut::T,U::ParamTransientTrialFESpace,params::Table,t::Real) where T
+function evaluate!(Ut::T,U::ParamTransientTrialFESpace,params::AbstractVector,t::Real) where T
   if isa(U.dirichlet_μt,Vector)
-    objects_at_t = map(o->map(μ->o(μ,t),params),U.dirichlet_μt)
+    objects_at_t = PTArray(map(o->map(μ->o(μ,t),params),U.dirichlet_μt))
   else
-    objects_at_t = map(μ->U.dirichlet_μt(μ,t),params)
+    objects_at_t = PTArray(map(μ->U.dirichlet_μt(μ,t),params))
   end
   TrialFESpace!(Ut,objects_at_t)
   Ut
 end
 
-function Arrays.evaluate(U::ParamTransientTrialFESpace,params::Table,t::Real)
+function Arrays.evaluate(U::ParamTransientTrialFESpace,params::AbstractVector,t::Real)
   k = length(params)
   Ut = allocate_trial_space(U,k)
   evaluate!(Ut,U,params,t)

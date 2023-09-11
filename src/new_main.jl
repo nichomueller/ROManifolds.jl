@@ -22,12 +22,15 @@ begin
 
   a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
   a(μ,t) = x->a(x,μ,t)
+  aμt(μ,t) = PTFunction(a,μ,t)
 
   f(x,μ,t) = 1.
   f(μ,t) = x->f(x,μ,t)
+  fμt(μ,t) = PTFunction(f,μ,t)
 
   h(x,μ,t) = abs(cos(t/μ[3]))
   h(μ,t) = x->h(x,μ,t)
+  hμt(μ,t) = PTFunction(h,μ,t)
 
   g(x,μ,t) = μ[1]*exp(-x[1]/μ[2])*abs(sin(t/μ[3]))
   g(μ,t) = x->g(x,μ,t)
@@ -37,10 +40,9 @@ begin
 
   # res(v) = (∫ₚ((u,μ,t)->v*∂ₚt(u),dΩ) + ∫ₚ((u,μ,t)->a(μ,t)*∇(v)⋅∇(u),dΩ)
   #   - ∫ₚ((u,μ,t)->f(μ,t)*v,dΩ) - ∫ₚ((u,μ,t)->h(μ,t)*v,dΓn))
-  res(v) = ( ∫ₚ((u,μ,t) -> v*∂ₚt(u) + a(μ,t)*∇(v)⋅∇(u) - f(μ,t)*v,dΩ)
-    - ∫ₚ((u,μ,t)->h(μ,t)*v,dΓn) )
-  jac(du,v) = ∫ₚ((u,μ,t)->a(μ,t)*∇(v)⋅∇(du),dΩ)
-  jac_t(dut,v) = ∫ₚ((u,μ,t)->v*dut,dΩ)
+  res(μ,t,u,v) = ∫ₚ(v*∂ₚt(u) + aμt(μ,t)*∇(v)⋅∇(u) - fμt(μ,t)*v,dΩ) - ∫ₚ(hμt(μ,t)*v,dΓn)
+  jac(μ,t,u,du,v) = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ)
+  jac_t(μ,t,u,dut,v) = ∫ₚ(v*dut,dΩ)
 
   reffe = ReferenceFE(lagrangian,Float,order)
   test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
