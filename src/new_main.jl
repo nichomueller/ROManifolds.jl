@@ -38,8 +38,6 @@ begin
   u0(x,μ) = 0
   u0(μ) = x->u0(x,μ)
 
-  # res(v) = (∫ₚ((u,μ,t)->v*∂ₚt(u),dΩ) + ∫ₚ((u,μ,t)->a(μ,t)*∇(v)⋅∇(u),dΩ)
-  #   - ∫ₚ((u,μ,t)->f(μ,t)*v,dΩ) - ∫ₚ((u,μ,t)->h(μ,t)*v,dΓn))
   res(μ,t,u,v) = ∫ₚ(v*∂ₚt(u) + aμt(μ,t)*∇(v)⋅∇(u) - fμt(μ,t)*v,dΩ) - ∫ₚ(hμt(μ,t)*v,dΓn)
   jac(μ,t,u,du,v) = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ)
   jac_t(μ,t,u,dut,v) = ∫ₚ(v*dut,dΩ)

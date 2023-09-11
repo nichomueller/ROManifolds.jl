@@ -53,6 +53,7 @@ import Gridap.ODEs.TransientFETools:ODESolver
 import Gridap.ODEs.TransientFETools:ODEOperator
 import Gridap.ODEs.TransientFETools:OperatorType
 import Gridap.ODEs.TransientFETools:TransientCellField
+import Gridap.ODEs.TransientFETools:TransientSingleFieldCellField
 import Gridap.ODEs.TransientFETools.TransientMultiFieldCellField
 import Gridap.ODEs.TransientFETools:SingleFieldTypes,MultiFieldTypes
 import Gridap.ODEs.TransientFETools:Affine
@@ -64,13 +65,14 @@ import Gridap.ODEs.TransientFETools:fill_initial_jacobians
 import Gridap.ODEs.TransientFETools:fill_jacobians
 import Gridap.ODEs.TransientFETools:update_cache!
 import Gridap.ODEs.TransientFETools:jacobians!
-import Gridap.ODEs.TransientFETools:_allocate_matrix_and_vector
+import Gridap.ODEs.ODETools:_allocate_matrix_and_vector
 import Gridap.ODEs.TransientFETools._matdata_jacobian
 import Gridap.ODEs.TransientFETools._vcat_matdata
 
 include("ParamSpace.jl")
 include("DiffOperators.jl")
 include("PTArray.jl")
+include("ParamTransientCellFields.jl")
 include("ParamTransientIntegration.jl")
 include("ParamTransientFESpaces.jl")
 include("ParamTransientFEOperator.jl")

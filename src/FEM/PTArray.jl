@@ -1,4 +1,4 @@
-struct PTArray{T} <: AbstractVector
+struct PTArray{T} <: AbstractVector{T}
   array::Vector{T}
 
   function PTArray(array::Vector{T}) where T
@@ -33,20 +33,32 @@ end
 
 Base.copy(a::PTArray) = PTArray(copy(a.array))
 
-Base.similar(a::PTArray) = PTArray(similar(a.array))
-
-Base.broadcasted(f,a::PTArray,b) = PTArray(map(ai->broadcasted(f,ai,b),a.array))
-
-Base.broadcasted(f,a,b::PTArray) = PTArray(map(bi->broadcasted(f,a,bi),b.array))
-
-function Base.broadcasted(f,a::PTArray{T},b::PTArray{T}) where T
-  @assert length(a) == length(b)
-  c = copy(a)
-  @inbounds for i = eachindex(a)
-    c.array[i] = broadcasted(f,a[i],b[i])
-  end
-  c
+function Base.copyto!(a::PTArray,b::PTArray)
+  PTArray(map(copyto!,a.array,b.array))
 end
+
+function Base.fill!(a::PTArray{T},v::T) where T
+  PTArray(fill!(a.array,v))
+end
+
+function Base.fill!(a::PTArray{T},v::S) where {S,T<:AbstractVector{S}}
+  PTArray(fill!(a.array,fill(v,length(testitem(a)))))
+end
+
+Base.similar(a::PTArray) = PTArray(map(similar,a.array))
+
+# Base.broadcasted(f,a::PTArray,b) = PTArray(map(ai->broadcasted(f,ai,b),a.array))
+
+# Base.broadcasted(f,a,b::PTArray) = PTArray(map(bi->broadcasted(f,a,bi),b.array))
+
+# function Base.broadcasted(f,a::PTArray{T},b::PTArray{T}) where T
+#   @assert length(a) == length(b)
+#   c = copy(a)
+#   @inbounds for i = eachindex(a)
+#     c.array[i] = broadcasted(f,a[i],b[i])
+#   end
+#   c
+# end
 
 function LinearAlgebra.fillstored!(a::PTArray,z)
   a1 = testitem(a)
@@ -98,38 +110,6 @@ function Base.:(==)(a::PTArray,b::PTArray)
   end
   true
 end
-
-# struct PTMap{F}
-#   f::F
-#   length::Int
-
-#   function PTMap(f::F,length::Int) where F
-#     new{F}(f,length,axis)
-#   end
-# end
-
-# function Arrays.return_value(k::PTMap{F},args...) where F
-#   arg = map(testitem,args)
-#   value = return_value(F(),arg...)
-#   PTArray(value,k.length)
-# end
-
-# function Arrays.return_cache(k::PTMap{F},args...) where F
-#   arg = map(testitem,args)
-#   cache = return_cache(F(),arg...)
-#   argcache = map(array_cache,args)
-#   ptarray = return_value(k,args...)
-#   cache,argcache,ptarray
-# end
-
-# function Arrays.evaluate!(cache,k::PTMap{F},args...) where F
-#   cache,argcache,ptarray = cache
-#   @inbounds for q = 1:k.length
-#     argq = map((c,a) -> getindex!(c,a,q),argcache,args)
-#     ptarray[q] = evaluate!(cache,F(),argq...)
-#   end
-#   ptarray
-# end
 
 function Arrays.return_value(
   f::Fields.BroadcastingFieldOpMap,
