@@ -4,6 +4,7 @@ using Serialization
 using BlockArrays
 
 import Gridap.Helpers.@check
+import Gridap.Helpers.@notimplementedif
 import Gridap.Arrays.LazyArray
 
 const Float = Float64

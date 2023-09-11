@@ -46,7 +46,7 @@ function Arrays.return_cache(fpt::GenericPTField,x::AbstractArray{<:Point})
   n = get_nfields(fpt)
   f = testitem(fpt)
   cb,cf = return_cache(f,x)
-  ca = fill(cb.array,n)
+  ca = PTArray(fill(cb.array,n))
   ca,cb,cf
 end
 
@@ -55,8 +55,8 @@ function Arrays.evaluate!(cache,fpt::GenericPTField,x::AbstractArray{<:Point})
   p,t = get_params(fpt),get_times(fpt)
   nt = length(t)
   @inbounds for q = eachindex(ca)
-    pq = p[slow_idx(q,nt)]
-    tq = t[fast_idx(q,nt)]
+    pq = p[fast_idx(q,nt)]
+    tq = t[slow_idx(q,nt)]
     fq = get_field(fpt,pq,tq)
     ca[q] = evaluate!(c,fq,x)
   end
@@ -74,28 +74,3 @@ a(params[1],times[1])*∇(v)⋅∇(u)
 pf = PTFunction(a,params,times)
 pf*∇(v)⋅∇(u)
 boh
-
-# struct PTOperationCellField{DS} <: CellField
-#   op::Operation
-#   args::Tuple
-#   trian::Triangulation
-#   domain_style::DS
-#   memo::Dict{Any,Any}
-
-#   function OperationCellField(op::Operation,args::PTCellField...)
-
-#     @assert length(args) > 0
-#     trian = get_triangulation(first(args))
-#     domain_style = DomainStyle(first(args))
-#     @check all( map(i->DomainStyle(i)==domain_style,args) )
-
-#     if num_cells(trian)>0
-#       x = _get_cell_points(args...)
-#       ax = map(i->i(x),args)
-#       axi = map(first,ax)
-#       Fields.BroadcastingFieldOpMap(op.op)(axi...)
-#     end
-
-#     new{typeof(domain_style)}(op,args,trian,domain_style,Dict())
-#   end
-# end
