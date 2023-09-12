@@ -146,7 +146,8 @@ function Arrays.lazy_map(
   a::PTArray,
   b::AbstractArray)
 
-  ab1 = map(testitem,(a,b))
+  a1 = testitem(a)
+  ab1 = map(testitem,(a1,b))
   T = return_type(k,ab1...)
   PTArray(map(x->lazy_map(k,T,x,b),a.array))
 end
@@ -156,8 +157,9 @@ function Arrays.lazy_map(
   a::AbstractArray,
   b::PTArray)
 
-  ba1 = map(testitem,(b,a))
-  T = return_type(k,ba1...)
+  b1 = testitem(b)
+  ab1 = map(testitem,(a,b1))
+  T = return_type(k,ab1...)
   PTArray(map(x->lazy_map(k,T,a,x),b.array))
 end
 
@@ -166,45 +168,47 @@ function Arrays.lazy_map(
   a::PTArray,
   b::PTArray)
 
-  ba1 = map(testitem,(b,a))
-  T = return_type(k,ba1...)
+  a1 = testitem(a)
+  b1 = testitem(b)
+  ab1 = map(testitem,(a1,b1))
+  T = return_type(k,ab1...)
   PTArray(map((x,y)->lazy_map(k,T,x,y),a.array,b.array))
 end
 
-function Arrays.return_value(
-  f::Fields.BroadcastingFieldOpMap,
-  a::LazyArray{<:Fill,<:AbstractArray},
-  b::AbstractArray)
+# function Arrays.return_value(
+#   f::Fields.BroadcastingFieldOpMap,
+#   a::LazyArray{<:Fill,<:AbstractArray},
+#   b::AbstractArray)
 
-  a1 = testitem(a)
-  value = return_value(f,a1,b)
-  ptvalue = PTArray(value,length(a))
-  ptvalue
-end
+#   a1 = testitem(a)
+#   value = return_value(f,a1,b)
+#   ptvalue = PTArray(value,length(a))
+#   ptvalue
+# end
 
-function Arrays.return_value(
-  f::Fields.BroadcastingFieldOpMap,
-  a::AbstractArray,
-  b::LazyArray{<:Fill,<:AbstractArray})
+# function Arrays.return_value(
+#   f::Fields.BroadcastingFieldOpMap,
+#   a::AbstractArray,
+#   b::LazyArray{<:Fill,<:AbstractArray})
 
-  b1 = testitem(b)
-  value = return_value(f,a,b1)
-  ptvalue = PTArray(value,length(b))
-  ptvalue
-end
+#   b1 = testitem(b)
+#   value = return_value(f,a,b1)
+#   ptvalue = PTArray(value,length(b))
+#   ptvalue
+# end
 
-function Arrays.return_value(
-  f::Fields.BroadcastingFieldOpMap,
-  a::LazyArray{<:Fill,<:AbstractArray},
-  b::LazyArray{<:Fill,<:AbstractArray})
+# function Arrays.return_value(
+#   f::Fields.BroadcastingFieldOpMap,
+#   a::LazyArray{<:Fill,<:AbstractArray},
+#   b::LazyArray{<:Fill,<:AbstractArray})
 
-  @assert length(a) == length(b)
-  a1 = testitem(a)
-  b1 = testitem(b)
-  value = return_value(f,a1,b1)
-  ptvalue = PTArray(value,length(a))
-  ptvalue
-end
+#   @assert length(a) == length(b)
+#   a1 = testitem(a)
+#   b1 = testitem(b)
+#   value = return_value(f,a1,b1)
+#   ptvalue = PTArray(value,length(a))
+#   ptvalue
+# end
 
 function Arrays.return_value(
   f::Fields.BroadcastingFieldOpMap,
