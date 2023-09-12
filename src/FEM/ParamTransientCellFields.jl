@@ -85,7 +85,7 @@ end
 CellData.get_data(f::GenericPTCellField) = f.cell_field
 CellData.get_triangulation(f::GenericPTCellField) = f.trian
 CellData.DomainStyle(::Type{GenericPTCellField{DS}}) where DS = DS()
-function CellData.similar_cell_field(::GenericPTCellField,cell_data,trian,ds)
+function CellData.similar_cell_field(::PTCellField,cell_data,trian,ds)
   GenericPTCellField(cell_data,trian,ds)
 end
 

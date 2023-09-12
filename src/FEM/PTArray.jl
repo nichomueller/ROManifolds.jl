@@ -147,7 +147,7 @@ function Arrays.return_value(
   a::PTArray,
   b::AbstractArray)
 
-  a1 = testitem(a.array)
+  a1 = testitem(a)
   value = return_value(f,a1,b)
   ptvalue = PTArray(value,length(a))
   ptvalue
@@ -158,7 +158,7 @@ function Arrays.return_cache(
   a::PTArray,
   b::AbstractArray)
 
-  a1 = testitem(a.array)
+  a1 = testitem(a)
   cache = return_cache(f,a1,b)
   ptarray = PTArray(cache.array,length(a))
   cache,ptarray
@@ -182,7 +182,7 @@ function Arrays.return_value(
   a::AbstractArray,
   b::PTArray)
 
-  b1 = testitem(b.array)
+  b1 = testitem(b)
   value = return_value(f,a,b1)
   ptvalue = PTArray(value,length(b))
   ptvalue
@@ -193,7 +193,7 @@ function Arrays.return_cache(
   a::AbstractArray,
   b::PTArray)
 
-  b1 = testitem(b.array)
+  b1 = testitem(b)
   cache = return_cache(f,a,b1)
   ptarray = PTArray(cache.array,length(b))
   cache,ptarray
@@ -208,6 +208,31 @@ function Arrays.evaluate!(
   cache,ptarray = cache
   @inbounds for i = eachindex(ptarray)
     ptarray.array[i] = evaluate!(cache,f,a,b[i])
+  end
+  ptarray
+end
+
+function Arrays.return_cache(
+  f::Fields.BroadcastingFieldOpMap,
+  a::PTArray,
+  b::PTArray)
+
+  @assert length(a) == length(b)
+  a1,b1 = map(testitem,(a,b))
+  cache = return_cache(f,a1,b1)
+  ptarray = PTArray(cache.array,length(a))
+  cache,ptarray
+end
+
+function Arrays.evaluate!(
+  cache,
+  f::Fields.BroadcastingFieldOpMap,
+  a::PTArray,
+  b::PTArray)
+
+  cache,ptarray = cache
+  @inbounds for i = eachindex(ptarray)
+    ptarray.array[i] = evaluate!(cache,f,a[i],b[i])
   end
   ptarray
 end
