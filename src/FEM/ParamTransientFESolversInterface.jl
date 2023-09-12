@@ -9,14 +9,14 @@ end
 get_order(op::ParamODEOpFromFEOp) = get_order(op.feop)
 
 function allocate_cache(op::ParamODEOpFromFEOp,μ::AbstractArray,t::Real)
-  n = isa(μ,Table) ? length(μ) : 1
+  n = length(μ)*length(t)
   Ut = get_trial(op.feop)
   U = allocate_trial_space(Ut,n)
   Uts = (Ut,)
   Us = (U,)
   for i in 1:get_order(op)
     Uts = (Uts...,∂ₚt(Uts[i]))
-    Us = (Us...,allocate_trial_space(Uts[i+1]))
+    Us = (Us...,allocate_trial_space(Uts[i+1],n))
   end
   fecache = allocate_cache(op.feop)
   ode_cache = (Us,Uts,fecache)
@@ -40,7 +40,7 @@ end
 
 function allocate_residual(
   op::ParamODEOpFromFEOp,
-  uhF::AbstractVector,
+  uhF::PTArray,
   ode_cache)
 
   Us,_,fecache = ode_cache
@@ -50,7 +50,7 @@ end
 
 function allocate_jacobian(
   op::ParamODEOpFromFEOp,
-  uhF::AbstractVector,
+  uhF::PTArray,
   ode_cache)
 
   Us,_,fecache = ode_cache
@@ -59,12 +59,13 @@ function allocate_jacobian(
 end
 
 function residual!(
-  b::AbstractArray,
+  b::PTArray,
   op::ParamODEOpFromFEOp,
   μ::AbstractArray,
   t::Real,
-  xhF::Tuple{Vararg{AbstractVector}},
+  xhF::Tuple{Vararg{PTArray}},
   ode_cache)
+
   Xh, = ode_cache
   dxh = ()
   for i in 2:get_order(op)+1
@@ -75,7 +76,7 @@ function residual!(
 end
 
 function jacobian!(
-  A::AbstractArray,
+  A::PTArray,
   op::ParamODEOpFromFEOp,
   μ::AbstractArray,
   t::Real,
@@ -83,6 +84,7 @@ function jacobian!(
   i::Integer,
   γᵢ::Real,
   ode_cache)
+
   Xh, = ode_cache
   dxh = ()
   for i in 2:get_order(op)+1
@@ -93,13 +95,14 @@ function jacobian!(
 end
 
 function jacobians!(
-  J::AbstractArray,
+  J::PTArray,
   op::ParamODEOpFromFEOp,
   μ::AbstractArray,
   t::Real,
   xhF::Tuple{Vararg{AbstractVector}},
   γ::Tuple{Vararg{Real}},
   ode_cache)
+
   Xh, = ode_cache
   dxh = ()
   for i in 2:get_order(op)+1

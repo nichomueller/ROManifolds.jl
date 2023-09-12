@@ -1,7 +1,7 @@
-struct PTArray{T} <: AbstractVector{T}
-  array::Vector{T}
+struct PTArray{T}
+  array::AbstractVector{T}
 
-  function PTArray(array::Vector{T}) where T
+  function PTArray(array::AbstractVector{T}) where T
     new{T}(array)
   end
 
@@ -11,20 +11,24 @@ struct PTArray{T} <: AbstractVector{T}
   end
 end
 
-Base.size(b::PTArray) = size(b.array)
-Base.length(b::PTArray) = length(b.array)
+Base.size(a::PTArray) = size(a.array)
+Base.length(a::PTArray) = length(a.array)
 Base.eltype(::Type{PTArray{T}}) where T = T
 Base.eltype(::PTArray{T}) where T = T
-Base.ndims(b::PTArray) = 1
-Base.ndims(::Type{PTArray}) = 1
+Base.ndims(::PTArray) = 1
+Base.ndims(::Type{<:PTArray}) = 1
 Base.eachindex(a::PTArray) = eachindex(a.array)
 
-function Base.getindex(b::PTArray,i...)
-  b.array[i...]
+function Base.getindex(a::PTArray,i...)
+  a.array[i...]
 end
 
-function Base.setindex!(b::PTArray,v,i...)
-  b.array[i...] = v
+function Base.setindex!(a::PTArray,v,i...)
+  a.array[i...] = v
+end
+
+function Base.first(a::PTArray,i...)
+  PTArray(first(a.array,i...))
 end
 
 function Base.show(io::IO,o::PTArray{T}) where T
@@ -47,18 +51,10 @@ end
 
 Base.similar(a::PTArray) = PTArray(map(similar,a.array))
 
-# Base.broadcasted(f,a::PTArray,b) = PTArray(map(ai->broadcasted(f,ai,b),a.array))
-
-# Base.broadcasted(f,a,b::PTArray) = PTArray(map(bi->broadcasted(f,a,bi),b.array))
-
-# function Base.broadcasted(f,a::PTArray{T},b::PTArray{T}) where T
-#   @assert length(a) == length(b)
-#   c = copy(a)
-#   @inbounds for i = eachindex(a)
-#     c.array[i] = broadcasted(f,a[i],b[i])
-#   end
-#   c
-# end
+function Base.materialize!(a::PTArray,b::Base.Broadcast.Broadcasted)
+  map(x->Base.materialize!(x,b),a.array)
+  a
+end
 
 function LinearAlgebra.fillstored!(a::PTArray,z)
   a1 = testitem(a)
@@ -66,21 +62,6 @@ function LinearAlgebra.fillstored!(a::PTArray,z)
   @inbounds for i = eachindex(ptarray)
     a.array[i] .= a1
   end
-end
-
-function Arrays.testitem(a::PTArray{T}) where T
-  @notimplementedif !isconcretetype(T)
-  if length(a) != 0
-    a.array[1]
-  else
-    testvalue(T)
-  end
-end
-
-function Arrays.testvalue(::Type{PTArray{T}}) where T
-  s = ntuple(i->0,Val(1))
-  array = Vector{T}(undef,s)
-  PTArray(array)
 end
 
 function Base.:≈(a::AbstractArray{<:PTArray},b::AbstractArray{<:PTArray})
@@ -109,6 +90,56 @@ function Base.:(==)(a::PTArray,b::PTArray)
     end
   end
   true
+end
+
+function Arrays.testitem(a::PTArray{T}) where T
+  @notimplementedif !isconcretetype(T)
+  if length(a) != 0
+    a.array[1]
+  else
+    testvalue(T)
+  end
+end
+
+function Arrays.testvalue(::Type{PTArray{T}}) where T
+  s = ntuple(i->0,Val(1))
+  array = Vector{T}(undef,s)
+  PTArray(array)
+end
+
+function Arrays.lazy_map(::typeof(evaluate),a::PTArray,args...)
+  lazy_arrays = map(x->lazy_map(evaluate,x,args...),a.array)
+  PTArray(lazy_arrays)
+end
+
+function Arrays.lazy_map(k::Broadcasting{typeof(∘)},a::PTArray,args...)
+  lazy_arrays = map(x->lazy_map(k,x,args...),a.array)
+  PTArray(lazy_arrays)
+end
+
+function Arrays.lazy_map(k::Broadcasting{typeof(gradient)},a::PTArray)
+  lazy_arrays = map(x->lazy_map(k,x),a.array)
+  PTArray(lazy_arrays)
+end
+
+function Arrays.lazy_map(
+  ::Broadcasting{typeof(push_∇)},
+  cell_∇a::PTArray{<:AbstractArray},
+  cell_map::AbstractArray)
+
+  cell_Jt = lazy_map(∇,cell_map)
+  cell_invJt = lazy_map(Operation(pinvJt),cell_Jt)
+  lazy_arrays = map(x->lazy_map(Broadcasting(Operation(⋅)),cell_invJt,x),cell_∇a.array)
+  PTArray(lazy_arrays)
+end
+
+function Arrays.lazy_map(
+  k::Broadcasting{typeof(push_∇)},
+  cell_∇a::PTArray{<:Fields.MemoArray},
+  cell_map::AbstractArray)
+
+  lazy_arrays = map(x->lazy_map(k,x,cell_map),cell_∇a.array)
+  PTArray(lazy_arrays)
 end
 
 function Arrays.return_value(
@@ -176,7 +207,7 @@ function Arrays.evaluate!(
 
   cache,ptarray = cache
   @inbounds for i = eachindex(ptarray)
-    ptarray.array[i] = evaluate!(cache,f,a[i],b)
+    ptarray.array[i] = evaluate!(cache,f,a,b[i])
   end
   ptarray
 end

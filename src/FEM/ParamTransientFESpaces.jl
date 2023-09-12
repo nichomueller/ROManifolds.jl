@@ -7,21 +7,17 @@ struct ParamTransientTrialFESpace{S,B}
   Ud0::B
 
   function ParamTransientTrialFESpace(space::S,dirichlet_μt::Union{Function,Vector{<:Function}}) where S
-    Ud0 = HomogeneousTrialFESpace(space)
+    Ud0 = allocate_trial_space(space)
     B = typeof(Ud0)
     new{S,B}(space,dirichlet_μt,Ud0)
   end
 end
 
-function ParamTransientTrialFESpace(space::S) where S
-  HomogeneousTrialFESpace(space)
-end
-
 """
 Allocate the space to be used as first argument in evaluate!
 """
-function allocate_trial_space(U::ParamTransientTrialFESpace,args...)
-  HomogeneousTrialFESpace(U.space,args...)
+function allocate_trial_space(U::ParamTransientTrialFESpace,n::Int)
+  HomogeneousPTTrialFESpace(U.space,n)
 end
 
 """
@@ -46,24 +42,6 @@ function Arrays.evaluate(U::ParamTransientTrialFESpace,μ::AbstractVector,t::Rea
   Uμt
 end
 
-# Interface for time marching across parameters
-function FESpaces.HomogeneousTrialFESpace(U::SingleFieldFESpace,n::Int)
-  dirichlet_values = PTArray(zero_dirichlet_values(U),n)
-  TrialFESpace(dirichlet_values,U)
-end
-
-function FESpaces.TrialFESpace!(U::TrialFESpace,objects::PTArray)
-  dir_values = get_dirichlet_dof_values(U)
-  dir_values_cache = testitem(dir_values)
-  dir_values_scratch = zero_dirichlet_values(U)
-  @inbounds for (i,obj) = enumerate(objects)
-    dv = copy(dir_values_cache)
-    compute_dirichlet_values_for_tags!(dv,dir_values_scratch,U,obj)
-    dir_values.array[i] = dv
-  end
-  U
-end
-
 function evaluate!(Ut::T,U::ParamTransientTrialFESpace,params::AbstractVector,t::Real) where T
   if isa(U.dirichlet_μt,Vector)
     objects_at_t = PTArray(map(o->map(μ->o(μ,t),params),U.dirichlet_μt))
@@ -75,8 +53,7 @@ function evaluate!(Ut::T,U::ParamTransientTrialFESpace,params::AbstractVector,t:
 end
 
 function Arrays.evaluate(U::ParamTransientTrialFESpace,params::AbstractVector,t::Real)
-  k = length(params)
-  Ut = allocate_trial_space(U,k)
+  Ut = allocate_trial_space(U)
   evaluate!(Ut,U,params,t)
   Ut
 end

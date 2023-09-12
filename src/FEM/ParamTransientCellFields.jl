@@ -8,7 +8,7 @@ end
 
 const PTField = Union{GenericField{PTFunction},
                       FieldGradient{N,GenericField{PTFunction}} where N}
-const GenericPTField = Union{PTField,ZeroField{<:PTField}}
+const GenericPTField = Union{PTField,ZeroField{PTField}}
 
 function get_params(a::GenericField{PTFunction})
   a.object.params
@@ -66,13 +66,14 @@ function Arrays.evaluate!(cache,fpt::GenericPTField,x::AbstractArray{<:Point})
 end
 
 # CELLFIELDS
+abstract type PTCellField <: CellField end
 
-struct GenericPTCellField{DS} <: CellField
-  cell_field::AbstractArray
+struct GenericPTCellField{DS} <: PTCellField
+  cell_field::PTArray
   trian::Triangulation
   domain_style::DS
   function GenericPTCellField(
-    cell_field::AbstractArray,
+    cell_field::PTArray,
     trian::Triangulation,
     domain_style::DomainStyle)
 
@@ -88,20 +89,16 @@ function CellData.similar_cell_field(::GenericPTCellField,cell_data,trian,ds)
   GenericPTCellField(cell_data,trian,ds)
 end
 
-function CellData.CellField(f::PTFunction,trian::Triangulation,domain_style::DomainStyle)
-  s = size(get_cell_map(trian))
-  cell_field = Fill(GenericField(f),s)
-  GenericPTCellField(cell_field,trian,PhysicalDomain())
-end
-
 function CellData.CellField(fs::SingleFieldFESpace,cell_vals::PTArray)
   v = get_fe_basis(fs)
   cell_basis = get_data(v)
-  cell_field = PTArray(map(x->lazy_map(linear_combination,x,cell_basis),cell_vals))
+  cell_field = PTArray(map(x->lazy_map(linear_combination,x,cell_basis),cell_vals.array))
   GenericPTCellField(cell_field,get_triangulation(v),DomainStyle(v))
 end
 
-struct PTSingleFieldFEFunction{T<:CellField} <: FEFunction
+abstract type PTFEFunction <: PTCellField end
+
+struct PTSingleFieldFEFunction{T<:CellField} <: PTFEFunction
   cell_field::T
   cell_dof_values::PTArray{<:AbstractArray{<:AbstractVector{<:Number}}}
   free_values::PTArray{<:AbstractVector{<:Number}}
@@ -128,7 +125,7 @@ function FESpaces.FEFunction(
 end
 
 for T in (:ConstantFESpace,:DirichletFESpace,:FESpaceWithConstantFixed,
-          :FESpaceWithLinearConstraints,:UnconstrainedFESpace)
+  :FESpaceWithLinearConstraints,:UnconstrainedFESpace)
   @eval begin
     function FESpaces.scatter_free_and_dirichlet_values(
       f::$T,
@@ -136,7 +133,7 @@ for T in (:ConstantFESpace,:DirichletFESpace,:FESpaceWithConstantFixed,
       dirichlet_values::PTArray)
 
       ptarrays = map((fv,dv) -> scatter_free_and_dirichlet_values(f,fv,dv),
-        free_values,dirichlet_values)
+        free_values.array,dirichlet_values.array)
       PTArray(ptarrays)
     end
   end
@@ -148,7 +145,7 @@ function TransientCellField(single_field::PTSingleFieldTypes,derivatives::Tuple)
   TransientSingleFieldCellField(single_field,derivatives)
 end
 
-struct PTMultiFieldFEFunction{T<:MultiFieldCellField} <: FEFunction
+struct PTMultiFieldFEFunction{T<:MultiFieldCellField} <: PTFEFunction
   single_fe_functions::Vector{<:PTSingleFieldFEFunction}
   free_values::AbstractArray
   fe_space::MultiFieldFESpace
