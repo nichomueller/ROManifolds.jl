@@ -37,6 +37,7 @@ import Gridap.Algebra:allocate_vector
 import Gridap.Algebra:allocate_matrix
 import Gridap.CellData:ConstrainRowsMap
 import Gridap.CellData:ConstrainColsMap
+import Gridap.CellData:similar_cell_field
 import Gridap.FESpaces:_pair_contribution_when_possible
 import Gridap.FESpaces:assemble_vector
 import Gridap.FESpaces:assemble_matrix

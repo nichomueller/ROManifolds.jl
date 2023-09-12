@@ -4,66 +4,80 @@ struct PTFunction <: Function
   times::Union{Real,Vector{<:Real}}
 end
 
-# FIELDS
-
-const PTField = Union{GenericField{PTFunction},
-                      FieldGradient{N,GenericField{PTFunction}} where N}
-const GenericPTField = Union{PTField,ZeroField{PTField}}
-
-function get_params(a::GenericField{PTFunction})
-  a.object.params
-end
-
-function get_times(a::GenericField{PTFunction})
-  a.object.times
-end
-
-function get_field(a::GenericField{PTFunction},p,t)
-  GenericField(a.object.f(p,t))
-end
-
-function get_params(a::FieldGradient{N,GenericField{PTFunction}} where N)
-  get_params(a.object)
-end
-function get_times(a::FieldGradient{N,GenericField{PTFunction}} where N)
-  get_times(a.object)
-end
-
-function get_field(a::FieldGradient{N,GenericField{PTFunction}} where N,p,t)
-  FieldGradient{N}(get_field(a.object,p,t))
-end
-
-function get_nfields(a::PTField)
-  length(get_params(a))*length(get_times(a))
-end
-
-function Arrays.testitem(a::PTField)
-  p,t = get_params(a),get_times(a)
-  p1,t1 = map(testitem,(p,t))
-  f = get_field(a,p1,t1)
-  return f
-end
-
-function Arrays.return_cache(fpt::GenericPTField,x::AbstractArray{<:Point})
-  n = get_nfields(fpt)
-  f = testitem(fpt)
-  cb,cf = return_cache(f,x)
-  ca = PTArray(fill(cb.array,n))
-  ca,cb,cf
-end
-
-function Arrays.evaluate!(cache,fpt::GenericPTField,x::AbstractArray{<:Point})
-  ca,c... = cache
-  p,t = get_params(fpt),get_times(fpt)
+function get_fields(ptf::PTFunction)
+  p,t = ptf.params,ptf.times
   np = length(p)
-  @inbounds for q = eachindex(ca)
-    pq = p[fast_idx(q,np)]
-    tq = t[slow_idx(q,np)]
-    fq = get_field(fpt,pq,tq)
-    ca[q] = evaluate!(c,fq,x)
+  nt = length(t)
+  npt = np*nt
+  fields = Vector{GenericField}(undef,npt)
+  @inbounds for k = 1:npt
+    pk = p[fast_idx(k,np)]
+    tk = t[slow_idx(k,np)]
+    fields[k] = GenericField(ptf.f(pk,tk))
   end
-  ca
+  fields
 end
+
+# # FIELDS
+
+# const PTField = Union{GenericField{PTFunction},
+#                       FieldGradient{N,GenericField{PTFunction}} where N}
+# const GenericPTField = Union{PTField,ZeroField{PTField}}
+
+# function get_params(a::GenericField{PTFunction})
+#   a.object.params
+# end
+
+# function get_times(a::GenericField{PTFunction})
+#   a.object.times
+# end
+
+# function get_field(a::GenericField{PTFunction},p,t)
+#   GenericField(a.object.f(p,t))
+# end
+
+# function get_params(a::FieldGradient{N,GenericField{PTFunction}} where N)
+#   get_params(a.object)
+# end
+# function get_times(a::FieldGradient{N,GenericField{PTFunction}} where N)
+#   get_times(a.object)
+# end
+
+# function get_field(a::FieldGradient{N,GenericField{PTFunction}} where N,p,t)
+#   FieldGradient{N}(get_field(a.object,p,t))
+# end
+
+# function get_nfields(a::PTField)
+#   length(get_params(a))*length(get_times(a))
+# end
+
+# function Arrays.testitem(a::PTField)
+#   p,t = get_params(a),get_times(a)
+#   p1,t1 = map(testitem,(p,t))
+#   f = get_field(a,p1,t1)
+#   return f
+# end
+
+# function Arrays.return_cache(fpt::GenericPTField,x::AbstractArray{<:Point})
+#   n = get_nfields(fpt)
+#   f = testitem(fpt)
+#   cb,cf = return_cache(f,x)
+#   ca = PTArray(fill(cb.array,n))
+#   ca,cb,cf
+# end
+
+# function Arrays.evaluate!(cache,fpt::GenericPTField,x::AbstractArray{<:Point})
+#   ca,c... = cache
+#   p,t = get_params(fpt),get_times(fpt)
+#   np = length(p)
+#   @inbounds for q = eachindex(ca)
+#     pq = p[fast_idx(q,np)]
+#     tq = t[slow_idx(q,np)]
+#     fq = get_field(fpt,pq,tq)
+#     ca[q] = evaluate!(c,fq,x)
+#   end
+#   ca
+# end
 
 # CELLFIELDS
 abstract type PTCellField <: CellField end
@@ -89,11 +103,47 @@ function CellData.similar_cell_field(::PTCellField,cell_data,trian,ds)
   GenericPTCellField(cell_data,trian,ds)
 end
 
+function CellData.CellField(f::PTFunction,trian::Triangulation,::DomainStyle)
+  s = size(get_cell_map(trian))
+  cell_field = PTArray(map(x->Fill(x,s),get_fields(f)))
+  GenericPTCellField(cell_field,trian,PhysicalDomain())
+end
+
 function CellData.CellField(fs::SingleFieldFESpace,cell_vals::PTArray)
   v = get_fe_basis(fs)
   cell_basis = get_data(v)
   cell_field = PTArray(map(x->lazy_map(linear_combination,x,cell_basis),cell_vals.array))
   GenericPTCellField(cell_field,get_triangulation(v),DomainStyle(v))
+end
+
+function CellData.change_domain_ref_ref(
+  a::PTCellField,ttrian::Triangulation,sglue::FaceToFaceGlue,tglue::FaceToFaceGlue)
+  sface_to_fields = get_data(a)
+  mface_to_sface = sglue.mface_to_tface
+  tface_to_mface = tglue.tface_to_mface
+  tface_to_mface_map = tglue.tface_to_mface_map
+  ptarray = map(sface_to_fields) do sface_to_field
+    mface_to_field = extend(sface_to_field,mface_to_sface)
+    tface_to_field_s = lazy_map(Reindex(mface_to_field),tface_to_mface)
+    tface_to_field_t = lazy_map(Broadcasting(∘),tface_to_field_s,tface_to_mface_map)
+    tface_to_field_t
+  end
+  tface_to_fields_t = PTArray(ptarray)
+  similar_cell_field(a,tface_to_fields_t,ttrian,ReferenceDomain())
+end
+
+function CellData.change_domain_phys_phys(
+  a::PTCellField,ttrian::Triangulation,sglue::FaceToFaceGlue,tglue::FaceToFaceGlue)
+  sface_to_fields = get_data(a)
+  mface_to_sface = sglue.mface_to_tface
+  tface_to_mface = tglue.tface_to_mface
+  ptarray = map(sface_to_fields) do sface_to_field
+    mface_to_field = extend(sface_to_field,mface_to_sface)
+    tface_to_field = lazy_map(Reindex(mface_to_field),tface_to_mface)
+    tface_to_field
+  end
+  tface_to_fields = PTArray(ptarray)
+  similar_cell_field(a,tface_to_fields,ttrian,PhysicalDomain())
 end
 
 abstract type PTFEFunction <: PTCellField end

@@ -102,18 +102,17 @@ function Arrays.testitem(a::PTArray{T}) where T
 end
 
 function Arrays.testvalue(::Type{PTArray{T}}) where T
-  s = ntuple(i->0,Val(1))
-  array = Vector{T}(undef,s)
+  array = Vector{T}(undef,(1,))
   PTArray(array)
 end
 
-function Arrays.lazy_map(::typeof(evaluate),a::PTArray,args...)
-  lazy_arrays = map(x->lazy_map(evaluate,x,args...),a.array)
+function Arrays.lazy_map(::typeof(evaluate),a::PTArray,b::AbstractArray)
+  lazy_arrays = map(x->lazy_map(evaluate,x,b),a.array)
   PTArray(lazy_arrays)
 end
 
-function Arrays.lazy_map(k::Broadcasting{typeof(∘)},a::PTArray,args...)
-  lazy_arrays = map(x->lazy_map(k,x,args...),a.array)
+function Arrays.lazy_map(k::Broadcasting{typeof(∘)},a::PTArray,b::AbstractArray)
+  lazy_arrays = map(x->lazy_map(k,x,b),a.array)
   PTArray(lazy_arrays)
 end
 
@@ -142,6 +141,71 @@ function Arrays.lazy_map(
   PTArray(lazy_arrays)
 end
 
+function Arrays.lazy_map(
+  k::Fields.BroadcastingFieldOpMap,
+  a::PTArray,
+  b::AbstractArray)
+
+  ab1 = map(testitem,(a,b))
+  T = return_type(k,ab1...)
+  PTArray(map(x->lazy_map(k,T,x,b),a.array))
+end
+
+function Arrays.lazy_map(
+  k::Fields.BroadcastingFieldOpMap,
+  a::AbstractArray,
+  b::PTArray)
+
+  ba1 = map(testitem,(b,a))
+  T = return_type(k,ba1...)
+  PTArray(map(x->lazy_map(k,T,a,x),b.array))
+end
+
+function Arrays.lazy_map(
+  k::Fields.BroadcastingFieldOpMap,
+  a::PTArray,
+  b::PTArray)
+
+  ba1 = map(testitem,(b,a))
+  T = return_type(k,ba1...)
+  PTArray(map((x,y)->lazy_map(k,T,x,y),a.array,b.array))
+end
+
+function Arrays.return_value(
+  f::Fields.BroadcastingFieldOpMap,
+  a::LazyArray{<:Fill,<:AbstractArray},
+  b::AbstractArray)
+
+  a1 = testitem(a)
+  value = return_value(f,a1,b)
+  ptvalue = PTArray(value,length(a))
+  ptvalue
+end
+
+function Arrays.return_value(
+  f::Fields.BroadcastingFieldOpMap,
+  a::AbstractArray,
+  b::LazyArray{<:Fill,<:AbstractArray})
+
+  b1 = testitem(b)
+  value = return_value(f,a,b1)
+  ptvalue = PTArray(value,length(b))
+  ptvalue
+end
+
+function Arrays.return_value(
+  f::Fields.BroadcastingFieldOpMap,
+  a::LazyArray{<:Fill,<:AbstractArray},
+  b::LazyArray{<:Fill,<:AbstractArray})
+
+  @assert length(a) == length(b)
+  a1 = testitem(a)
+  b1 = testitem(b)
+  value = return_value(f,a1,b1)
+  ptvalue = PTArray(value,length(a))
+  ptvalue
+end
+
 function Arrays.return_value(
   f::Fields.BroadcastingFieldOpMap,
   a::PTArray,
@@ -151,30 +215,6 @@ function Arrays.return_value(
   value = return_value(f,a1,b)
   ptvalue = PTArray(value,length(a))
   ptvalue
-end
-
-function Arrays.return_cache(
-  f::Fields.BroadcastingFieldOpMap,
-  a::PTArray,
-  b::AbstractArray)
-
-  a1 = testitem(a)
-  cache = return_cache(f,a1,b)
-  ptarray = PTArray(cache.array,length(a))
-  cache,ptarray
-end
-
-function Arrays.evaluate!(
-  cache,
-  f::Fields.BroadcastingFieldOpMap,
-  a::PTArray,
-  b::AbstractArray)
-
-  cache,ptarray = cache
-  @inbounds for i = eachindex(ptarray)
-    ptarray[i] = evaluate!(cache,f,a[i],b)
-  end
-  ptarray
 end
 
 function Arrays.return_value(
@@ -188,6 +228,30 @@ function Arrays.return_value(
   ptvalue
 end
 
+function Arrays.return_value(
+  f::Fields.BroadcastingFieldOpMap,
+  a::PTArray,
+  b::PTArray)
+
+  @assert length(a) == length(b)
+  a1 = testitem(a)
+  b1 = testitem(b)
+  value = return_value(f,a1,b1)
+  ptvalue = PTArray(value,length(a))
+  ptvalue
+end
+
+function Arrays.return_cache(
+  f::Fields.BroadcastingFieldOpMap,
+  a::PTArray,
+  b::AbstractArray)
+
+  a1 = testitem(a)
+  cache = return_cache(f,a1,b)
+  ptarray = return_value(f,a,b)
+  cache,ptarray
+end
+
 function Arrays.return_cache(
   f::Fields.BroadcastingFieldOpMap,
   a::AbstractArray,
@@ -195,8 +259,33 @@ function Arrays.return_cache(
 
   b1 = testitem(b)
   cache = return_cache(f,a,b1)
-  ptarray = PTArray(cache.array,length(b))
+  ptarray = return_value(f,a,b)
   cache,ptarray
+end
+
+function Arrays.return_cache(
+  f::Fields.BroadcastingFieldOpMap,
+  a::PTArray,
+  b::PTArray)
+
+  a1 = testitem(a)
+  b1 = testitem(b)
+  cache = return_cache(f,a1,b1)
+  ptarray = return_value(f,a,b)
+  cache,ptarray
+end
+
+function Arrays.evaluate!(
+  cache,
+  f::Fields.BroadcastingFieldOpMap,
+  a::PTArray,
+  b::AbstractArray)
+
+  cache,ptarray = cache
+  @inbounds for i = eachindex(ptarray)
+    ptarray.array[i] = evaluate!(cache,f,a[i],b)
+  end
+  ptarray
 end
 
 function Arrays.evaluate!(
@@ -207,21 +296,9 @@ function Arrays.evaluate!(
 
   cache,ptarray = cache
   @inbounds for i = eachindex(ptarray)
-    ptarray.array[i] = evaluate!(cache,f,a,b[i])
+    ptarray.array[i] = evaluate!(cache,f,a[i],b)
   end
   ptarray
-end
-
-function Arrays.return_cache(
-  f::Fields.BroadcastingFieldOpMap,
-  a::PTArray,
-  b::PTArray)
-
-  @assert length(a) == length(b)
-  a1,b1 = map(testitem,(a,b))
-  cache = return_cache(f,a1,b1)
-  ptarray = PTArray(cache.array,length(a))
-  cache,ptarray
 end
 
 function Arrays.evaluate!(
@@ -237,24 +314,24 @@ function Arrays.evaluate!(
   ptarray
 end
 
-function Arrays.return_value(f::IntegrationMap,aq::PTArray,args...)
-  aq1 = testitem(aq.array)
-  value = return_value(f,aq1,args...)
-  ptvalue = PTArray(value,length(aq.array))
-  ptvalue
-end
+# function Arrays.return_value(f::IntegrationMap,a::PTArray,args...)
+#   a1 = testitem(a)
+#   value = return_value(f,a1,args...)
+#   ptvalue = PTArray(value,length(a.array))
+#   ptvalue
+# end
 
-function Arrays.return_cache(f::IntegrationMap,aq::PTArray,args...)
-  aq1 = testitem(aq.array)
-  cache = return_cache(f,aq1,args...)
-  ptarray = return_value(f,aq,args...)
-  cache,ptarray
-end
+# function Arrays.return_cache(f::IntegrationMap,a::PTArray,args...)
+#   a1 = testitem(a)
+#   cache = return_cache(f,a1,args...)
+#   ptarray = return_value(f,a,args...)
+#   cache,ptarray
+# end
 
-function Arrays.evaluate!(cache,f::IntegrationMap,aq::PTArray,args...)
-  cache,ptarray = cache
-  @inbounds for i = eachindex(ptarray)
-    ptarray.array[i] = evaluate!(cache,f,aq[i],args...)
-  end
-  ptarray
-end
+# function Arrays.evaluate!(cache,f::IntegrationMap,a::PTArray,args...)
+#   cache,ptarray = cache
+#   @inbounds for i = eachindex(ptarray)
+#     ptarray.array[i] = evaluate!(cache,f,a[i],args...)
+#   end
+#   ptarray
+# end
