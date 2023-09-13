@@ -19,17 +19,6 @@ function PTTrialFESpace!(dir_values::PTArray,space::SingleFieldFESpace,objects)
   PTTrialFESpace(dir_values,space)
 end
 
-# function PTTrialFESpace!(space::PTTrialFESpace,objects)
-#   dir_values = get_dirichlet_dof_values(space)
-#   dir_values_cache = testitem(dir_values)
-#   dir_values_scratch = zero_dirichlet_values(space)
-#   @inbounds for i = eachindex(objects)
-#     dv = copy(dir_values_cache)
-#     compute_dirichlet_values_for_tags!(dv,dir_values_scratch[i],space,objects[i])
-#     dir_values.array[i] = dv
-#   end
-#   space
-# end
 function PTTrialFESpace!(space::PTTrialFESpace,objects)
   dir_values = get_dirichlet_dof_values(space)
   dir_values_scratch = zero_dirichlet_values(space)
@@ -112,7 +101,9 @@ function FESpaces.compute_dirichlet_values_for_tags!(
   f::SingleFieldFESpace,
   tag_to_object::PTArray)
 
+  dvarrays = dirichlet_values.array
+  dvsarrays = dirichlet_values_scratch.array
   dirichlet_values = map((dv,dvs,tto) -> compute_dirichlet_values_for_tags!(dv,dvs,f,tto),
-    dirichlet_values,dirichlet_values_scratch,tag_to_object)
+    dvarrays,dvsarrays,tag_to_object)
   PTArray(dirichlet_values)
 end

@@ -5,94 +5,146 @@ end
 
 const ∫ₚ = PIntegrand
 
-# function collect_inputs(p,t)
-#   reshape(Iterators.product(p,t) |> collect,:)
-# end
+function Arrays.evaluate(int::PIntegrand)
+  obj = int.object
+  meas = int.meas
+  ptintegrate(obj,meas)
+end
 
-# function collect_inputs(p::AbstractArray,t::Real)
-#   reshape(Iterators.product([p],t) |> collect,:)
-# end
+struct PTDomainContribution <: GridapType
+  dict::IdDict{Triangulation,PTArray}
+end
 
-# function collect_inputs(u,p,t)
-#   pt = collect_inputs(p,t)
-#   try
-#     map((a,b)->(a,b...),u,pt)
-#   catch
-#     map((a,b)->(a,b...),(u,),pt)
-#   end
-# end
+PTDomainContribution() = PTDomainContribution(IdDict{Triangulation,PTArray}())
 
-# function Arrays.evaluate(int::PIntegrand,inputs;allocate=false)
-#   if allocate
-#     fields = int.object(first(inputs)...)
-#   else
-#     fields = map(i->int.object(i...),inputs)
-#   end
-#   meas = int.meas
-#   integrate(fields,meas)
-# end
+CellData.num_domains(a::PTDomainContribution) = length(a.dict)
 
-# struct PIntegrands <: GridapType
-#   dict::IdDict{Measure,PIntegrand}
-# end
+CellData.get_domains(a::PTDomainContribution) = keys(a.dict)
 
-# PIntegrands() = PIntegrands(IdDict{Measure,PIntegrand}())
+function CellData.get_contribution(a::PTDomainContribution,trian::Triangulation)
+  if haskey(a.dict,trian)
+     return a.dict[trian]
+  else
+    @unreachable """\n
+    There is not contribution associated with the given mesh in this PTDomainContribution object.
+    """
+  end
+end
 
-# Base.copy(a::PIntegrands) = PIntegrands(copy(a.dict))
+Base.getindex(a::PTDomainContribution,trian::Triangulation) = get_contribution(a,trian)
 
-# CellData.get_domains(a::PIntegrands) = keys(a.dict)
+function CellData.add_contribution!(
+  a::PTDomainContribution,
+  trian::Triangulation,
+  b::PTArray{P},
+  op=+) where P
 
-# function CellData.get_contribution(a::PIntegrands,meas::Measure)
-#   if haskey(a.dict,meas)
-#      return a.dict[meas]
-#   else
-#     @unreachable """\n
-#     There is no form associated with the given mesh in this PIntegrands object.
-#     """
-#   end
-# end
+  S = eltype(P)
+  if !(S<:AbstractMatrix || S<:AbstractVector || S<:Number || S<:ArrayBlock)
+    @unreachable """\n
+    You are trying to add a contribution with eltype $(S).
+    Only cell-wise matrices, vectors, or numbers are accepted.
 
-# Base.getindex(a::PIntegrands,meas::Measure) = get_contribution(a,meas)
+    Make sure that you are defining the terms in your weak form correctly.
+    """
+  end
 
-# for op in (:+,:-)
-#   @eval begin
-#     function ($op)(a::PIntegrand,b::PIntegrand)
-#       c = PIntegrands()
-#       add_contribution!(c,a.meas,a)
-#       add_contribution!(c,b.meas,b,$op)
-#       c
-#     end
+  if length(a.dict) > 0
+    T = eltype(first(values(a.dict)))
+    if T <: AbstractMatrix || S<:(ArrayBlock{A,2} where A)
+      @assert S<:AbstractMatrix || S<:(ArrayBlock{A,2} where A) """\n
+      You are trying to add a contribution with eltype $(S) to a PTDomainContribution that
+      stores cell-wise matrices.
 
-#     function ($op)(a::PIntegrands,b::PIntegrand)
-#       c = copy(a)
-#       add_contribution!(c,b.meas,b,$op)
-#       c
-#     end
+      Make sure that you are defining the terms in your weak form correctly.
+      """
+    elseif T <: AbstractVector || S<:(ArrayBlock{A,1} where A)
+      @assert S<:AbstractVector || S<:(ArrayBlock{A,1} where A) """\n
+      You are trying to add a contribution with eltype $(S) to a PTDomainContribution that
+      stores cell-wise vectors.
 
-#     ($op)(a::PIntegrand,b::PIntegrands) = $op(b,a)
+      Make sure that you are defining the terms in your weak form correctly.
+      """
+    elseif T <: Number
+      @assert S<:Number """\n
+      You are trying to add a contribution with eltype $(S) to a PTDomainContribution that
+      stores cell-wise numbers.
 
-#     function ($op)(a::PIntegrands,b::PIntegrands)
-#       c = copy(a)
-#       for meas in get_domain(b)
-#         add_contribution!(c,meas,b[meas],$op)
-#       end
-#       c
-#     end
-#   end
-# end
+      Make sure that you are defining the terms in your weak form correctly.
+      """
+    end
+  end
 
-# function CellData.add_contribution!(a::PIntegrands,meas::Measure,b::PIntegrand,op=+)
-#   @assert !haskey(a.dict,meas)
-#   newobj = (x...) -> op(b.object(x...))
-#   a.dict[meas] = PIntegrand(newobj,meas)
-#   a
-# end
+  if haskey(a.dict,trian)
+    a.dict[trian] = lazy_map(Broadcasting(op),a.dict[trian],b)
+  else
+    if op == +
+     a.dict[trian] = b
+    else
+     a.dict[trian] = lazy_map(Broadcasting(op),b)
+    end
+  end
+  a
+end
 
-# function Arrays.evaluate(ints::PIntegrands,inputs)
-#   conts = DomainContribution()
-#   for meas in get_domains(ints)
-#     int = ints[meas]
-#     conts += evaluate(int,inputs)
-#   end
-#   conts
-# end
+Base.sum(a::PTDomainContribution)= sum(map(sum,values(a.dict)))
+
+Base.copy(a::PTDomainContribution) = PTDomainContribution(copy(a.dict))
+
+function (+)(a::PTDomainContribution,b::PTDomainContribution)
+  c = copy(a)
+  for (trian,array) in b.dict
+    add_contribution!(c,trian,array)
+  end
+  c
+end
+
+function (-)(a::PTDomainContribution,b::PTDomainContribution)
+  c = copy(a)
+  for (trian,array) in b.dict
+    add_contribution!(c,trian,array,-)
+  end
+  c
+end
+
+function (*)(a::Number,b::PTDomainContribution)
+  c = PTDomainContribution()
+  for (trian,array_old) in b.dict
+    s = size(get_cell_map(trian))
+    array_new = lazy_map(Broadcasting(*),Fill(a,s),array_old)
+    add_contribution!(c,trian,array_new)
+  end
+  c
+end
+
+(*)(a::PTDomainContribution,b::Number) = b*a
+
+function CellData.get_array(a::PTDomainContribution)
+  @assert num_domains(a) == 1 """\n
+  Method get_array(a::PTDomainContribution) can be called only
+  when the PTDomainContribution object involves just one domain.
+  """
+  a.dict[first(keys(a.dict))]
+end
+
+function ptintegrate(f,b::CellData.GenericMeasure)
+  c = integrate(f,b.quad)
+  cont = PTDomainContribution()
+  add_contribution!(cont,b.quad.trian,c)
+  cont
+end
+
+function ptintegrate(f,b::CellData.CompositeMeasure)
+  ic = integrate(f,b.quad)
+  cont = PTDomainContribution()
+  tc = move_contributions(ic,b.itrian,b.ttrian)
+  add_contribution!(cont,b.ttrian,tc)
+  return cont
+end
+
+function CellData.move_contributions(scell_to_val::PTArray,args...)
+  y = map(x->move_contributions(x,args...),scell_to_val.array)
+  ptcell_mat = PTArray(first.(y))
+  trian = first(last.(y))
+  ptcell_mat,trian
+end

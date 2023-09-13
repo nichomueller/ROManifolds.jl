@@ -1,36 +1,15 @@
-# function CellData.attach_constraints_rows(
-#   cellvec::LazyArray{<:Fill{<:PTMap{IntegrationMap}}},
-#   cellconstr,
-#   cellmask=Fill(true,length(cellconstr)))
-
-#   N = length(cellvec)
-#   ptmap = PTMap(ConstrainRowsMap())
-#   lazy_map(ptmap,cellvec,Fill(cellconstr,N),Fill(cellmask,N))
-# end
-
-# function CellData.attach_constraints_cols(
-#   cellmat::LazyArray{<:Fill{<:PTMap{IntegrationMap}}},
-#   cellconstr,
-#   cellmask=Fill(true,length(cellconstr)))
-
-#   N = length(cellvec)
-#   ptmap = PTMap(ConstrainColsMap())
-#   cellconstr_t = lazy_map(transpose,cellconstr)
-#   lazy_map(ptmap,cellmat,Fill(cellconstr_t,N),Fill(cellmask,N))
-# end
-
-_ndims(x) = isconcretetype(x) ? eltype(x) : _ndims(eltype(x))
+# _ndims(x) = isconcretetype(x) ? eltype(x) : _ndims(eltype(x))
 
 function FESpaces.collect_cell_vector(
   test::FESpace,
-  a::DomainContribution)
+  a::PTDomainContribution)
 
   w = []
   r = []
   for strian in get_domains(a)
     scell_vec = get_contribution(a,strian)
-    cell_vec, trian = move_contributions(scell_vec,strian)
-    @assert _ndims(cell_vec) == 1
+    cell_vec,trian = move_contributions(scell_vec,strian)
+    @assert ndims(eltype(testitem(cell_vec))) == 1
     cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
     rows = get_cell_dof_ids(test,trian)
     push!(w,cell_vec_r)
@@ -41,12 +20,12 @@ end
 
 function FESpaces.collect_cell_vector(
   test::FESpace,
-  a::DomainContribution,
+  a::PTDomainContribution,
   strian::Triangulation)
 
   scell_vec = get_contribution(a,strian)
   cell_vec,trian = move_contributions(scell_vec,strian)
-  @assert _ndims(cell_vec) == 1
+  @assert ndims(eltype(testitem(cell_vec))) == 1
   cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
   rows = get_cell_dof_ids(test,trian)
   return cell_vec_r,rows
@@ -55,23 +34,7 @@ end
 function FESpaces.collect_cell_matrix(
   trial::FESpace,
   test::FESpace,
-  a::DomainContribution,
-  strian::Triangulation)
-
-  scell_mat = get_contribution(a,strian)
-  cell_mat,trian = move_contributions(scell_mat,strian)
-  @assert _ndims(cell_mat) == 2
-  cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
-  cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
-  rows = get_cell_dof_ids(test,trian)
-  cols = get_cell_dof_ids(trial,trian)
-  return cell_mat_rc,rows,cols
-end
-
-function collect_cell_matrix(
-  trial::FESpace,
-  test::FESpace,
-  a::DomainContribution)
+  a::PTDomainContribution)
 
   w = []
   r = []
@@ -79,7 +42,7 @@ function collect_cell_matrix(
   for strian in get_domains(a)
     scell_mat = get_contribution(a,strian)
     cell_mat, trian = move_contributions(scell_mat,strian)
-    @assert _ndims(cell_mat) == 2
+    @assert ndims(eltype(testitem(cell_mat))) == 2
     cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
     cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
     rows = get_cell_dof_ids(test,trian)
@@ -91,8 +54,23 @@ function collect_cell_matrix(
   (w,r,c)
 end
 
-function allocate_nnz_vector(a::SparseMatrixAssembler,matdata::LazyArray{<:Fill{<:PTMap}})
-  as_vector = true
+function FESpaces.collect_cell_matrix(
+  trial::FESpace,
+  test::FESpace,
+  a::PTDomainContribution,
+  strian::Triangulation)
+
+  scell_mat = get_contribution(a,strian)
+  cell_mat,trian = move_contributions(scell_mat,strian)
+  @assert ndims(eltype(testitem(cell_mat))) == 2
+  cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
+  cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
+  rows = get_cell_dof_ids(test,trian)
+  cols = get_cell_dof_ids(trial,trian)
+  return cell_mat_rc,rows,cols
+end
+
+function allocate_nnz_vector(a::SparseMatrixAssembler,matdata)
   cache = array_cache(matdata)
   matdata1 = getindex!(cache,matdata,1)
 
@@ -100,35 +78,8 @@ function allocate_nnz_vector(a::SparseMatrixAssembler,matdata::LazyArray{<:Fill{
   symbolic_loop_matrix!(m1,a,matdata1)
   m2 = nz_allocation(m1)
   symbolic_loop_matrix!(m2,a,matdata1)
-  m3 = create_from_nz(Val(as_vector),m2)
-  m3
-end
-
-function FESpaces.create_from_nz(::Val{false},a::InserterCSC)
-  create_from_nz(a)
-end
-
-function FESpaces.create_from_nz(::Val{true},a::InserterCSC)
-  k = 1
-  for j in 1:a.ncols
-    pini = Int(a.colptr[j])
-    pend = pini + Int(a.colnnz[j]) - 1
-    for p in pini:pend
-      a.nzval[k] = a.nzval[p]
-      a.rowval[k] = a.rowval[p]
-      k += 1
-    end
-  end
-  @inbounds for j in 1:a.ncols
-    a.colptr[j+1] = a.colnnz[j]
-  end
-  length_to_ptrs!(a.colptr)
-  nnz = a.colptr[end]-1
-  resize!(a.rowval,nnz)
-  resize!(a.nzval,nnz)
-  nnzvec_idx = get_nonzero_idx(a.colptr,a.rowval)
-  T = eltype(a.nzval)
-  NnzArray{T}(a.nzval,nnzvec_idx,a.nrows)
+  m3 = create_from_nz(m2)
+  compress(m3)
 end
 
 function FESpaces.numeric_loop_matrix!(

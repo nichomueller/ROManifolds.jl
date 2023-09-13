@@ -106,40 +106,45 @@ function Arrays.testvalue(::Type{PTArray{T}}) where T
   PTArray(array)
 end
 
-function Arrays.lazy_map(::typeof(evaluate),a::PTArray,b::AbstractArray)
-  lazy_arrays = map(x->lazy_map(evaluate,x,b),a.array)
+function Arrays.lazy_map(k,a::PTArray,b::AbstractArray...)
+  lazy_arrays = map(x->lazy_map(k,x,b...),a.array)
   PTArray(lazy_arrays)
 end
 
-function Arrays.lazy_map(k::Broadcasting{typeof(∘)},a::PTArray,b::AbstractArray)
-  lazy_arrays = map(x->lazy_map(k,x,b),a.array)
-  PTArray(lazy_arrays)
-end
+# function Arrays.lazy_map(::typeof(evaluate),a::PTArray,b::AbstractArray)
+#   lazy_arrays = map(x->lazy_map(evaluate,x,b),a.array)
+#   PTArray(lazy_arrays)
+# end
+
+# function Arrays.lazy_map(k::Broadcasting{typeof(∘)},a::PTArray,b::AbstractArray)
+#   lazy_arrays = map(x->lazy_map(k,x,b),a.array)
+#   PTArray(lazy_arrays)
+# end
 
 function Arrays.lazy_map(k::Broadcasting{typeof(gradient)},a::PTArray)
   lazy_arrays = map(x->lazy_map(k,x),a.array)
   PTArray(lazy_arrays)
 end
 
-function Arrays.lazy_map(
-  ::Broadcasting{typeof(push_∇)},
-  cell_∇a::PTArray{<:AbstractArray},
-  cell_map::AbstractArray)
+# function Arrays.lazy_map(
+#   ::Broadcasting{typeof(push_∇)},
+#   cell_∇a::PTArray{<:AbstractArray},
+#   cell_map::AbstractArray)
 
-  cell_Jt = lazy_map(∇,cell_map)
-  cell_invJt = lazy_map(Operation(pinvJt),cell_Jt)
-  lazy_arrays = map(x->lazy_map(Broadcasting(Operation(⋅)),cell_invJt,x),cell_∇a.array)
-  PTArray(lazy_arrays)
-end
+#   cell_Jt = lazy_map(∇,cell_map)
+#   cell_invJt = lazy_map(Operation(pinvJt),cell_Jt)
+#   lazy_arrays = map(x->lazy_map(Broadcasting(Operation(⋅)),cell_invJt,x),cell_∇a.array)
+#   PTArray(lazy_arrays)
+# end
 
-function Arrays.lazy_map(
-  k::Broadcasting{typeof(push_∇)},
-  cell_∇a::PTArray{<:Fields.MemoArray},
-  cell_map::AbstractArray)
+# function Arrays.lazy_map(
+#   k::Broadcasting{typeof(push_∇)},
+#   cell_∇a::PTArray{<:Fields.MemoArray},
+#   cell_map::AbstractArray)
 
-  lazy_arrays = map(x->lazy_map(k,x,cell_map),cell_∇a.array)
-  PTArray(lazy_arrays)
-end
+#   lazy_arrays = map(x->lazy_map(k,x,cell_map),cell_∇a.array)
+#   PTArray(lazy_arrays)
+# end
 
 function Arrays.lazy_map(
   k::Fields.BroadcastingFieldOpMap,
@@ -175,39 +180,15 @@ function Arrays.lazy_map(
   PTArray(map((x,y)->lazy_map(k,T,x,y),a.array,b.array))
 end
 
-# function Arrays.return_value(
-#   f::Fields.BroadcastingFieldOpMap,
-#   a::LazyArray{<:Fill,<:AbstractArray},
-#   b::AbstractArray)
+# function Arrays.lazy_map(
+#   k::IntegrationMap,
+#   a::PTArray,
+#   b::AbstractArray...)
 
 #   a1 = testitem(a)
-#   value = return_value(f,a1,b)
-#   ptvalue = PTArray(value,length(a))
-#   ptvalue
-# end
-
-# function Arrays.return_value(
-#   f::Fields.BroadcastingFieldOpMap,
-#   a::AbstractArray,
-#   b::LazyArray{<:Fill,<:AbstractArray})
-
-#   b1 = testitem(b)
-#   value = return_value(f,a,b1)
-#   ptvalue = PTArray(value,length(b))
-#   ptvalue
-# end
-
-# function Arrays.return_value(
-#   f::Fields.BroadcastingFieldOpMap,
-#   a::LazyArray{<:Fill,<:AbstractArray},
-#   b::LazyArray{<:Fill,<:AbstractArray})
-
-#   @assert length(a) == length(b)
-#   a1 = testitem(a)
-#   b1 = testitem(b)
-#   value = return_value(f,a1,b1)
-#   ptvalue = PTArray(value,length(a))
-#   ptvalue
+#   ab1 = map(testitem,(a1,b...))
+#   T = return_type(k,ab1...)
+#   PTArray(map(x->lazy_map(k,T,x,b...),a.array))
 # end
 
 function Arrays.return_value(

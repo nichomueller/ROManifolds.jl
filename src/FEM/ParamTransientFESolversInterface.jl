@@ -9,14 +9,13 @@ end
 get_order(op::ParamODEOpFromFEOp) = get_order(op.feop)
 
 function allocate_cache(op::ParamODEOpFromFEOp,μ::AbstractArray,t::Real)
-  n = length(μ)*length(t)
   Ut = get_trial(op.feop)
-  U = allocate_trial_space(Ut,n)
+  U = allocate_trial_space(Ut,μ,t)
   Uts = (Ut,)
   Us = (U,)
   for i in 1:get_order(op)
     Uts = (Uts...,∂ₚt(Uts[i]))
-    Us = (Us...,allocate_trial_space(Uts[i+1],n))
+    Us = (Us...,allocate_trial_space(Uts[i+1],μ,t))
   end
   fecache = allocate_cache(op.feop)
   ode_cache = (Us,Uts,fecache)

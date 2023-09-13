@@ -18,68 +18,6 @@ function get_fields(ptf::PTFunction)
   fields
 end
 
-# # FIELDS
-
-# const PTField = Union{GenericField{PTFunction},
-#                       FieldGradient{N,GenericField{PTFunction}} where N}
-# const GenericPTField = Union{PTField,ZeroField{PTField}}
-
-# function get_params(a::GenericField{PTFunction})
-#   a.object.params
-# end
-
-# function get_times(a::GenericField{PTFunction})
-#   a.object.times
-# end
-
-# function get_field(a::GenericField{PTFunction},p,t)
-#   GenericField(a.object.f(p,t))
-# end
-
-# function get_params(a::FieldGradient{N,GenericField{PTFunction}} where N)
-#   get_params(a.object)
-# end
-# function get_times(a::FieldGradient{N,GenericField{PTFunction}} where N)
-#   get_times(a.object)
-# end
-
-# function get_field(a::FieldGradient{N,GenericField{PTFunction}} where N,p,t)
-#   FieldGradient{N}(get_field(a.object,p,t))
-# end
-
-# function get_nfields(a::PTField)
-#   length(get_params(a))*length(get_times(a))
-# end
-
-# function Arrays.testitem(a::PTField)
-#   p,t = get_params(a),get_times(a)
-#   p1,t1 = map(testitem,(p,t))
-#   f = get_field(a,p1,t1)
-#   return f
-# end
-
-# function Arrays.return_cache(fpt::GenericPTField,x::AbstractArray{<:Point})
-#   n = get_nfields(fpt)
-#   f = testitem(fpt)
-#   cb,cf = return_cache(f,x)
-#   ca = PTArray(fill(cb.array,n))
-#   ca,cb,cf
-# end
-
-# function Arrays.evaluate!(cache,fpt::GenericPTField,x::AbstractArray{<:Point})
-#   ca,c... = cache
-#   p,t = get_params(fpt),get_times(fpt)
-#   np = length(p)
-#   @inbounds for q = eachindex(ca)
-#     pq = p[fast_idx(q,np)]
-#     tq = t[slow_idx(q,np)]
-#     fq = get_field(fpt,pq,tq)
-#     ca[q] = evaluate!(c,fq,x)
-#   end
-#   ca
-# end
-
-# CELLFIELDS
 abstract type PTCellField <: CellField end
 
 struct GenericPTCellField{DS} <: PTCellField

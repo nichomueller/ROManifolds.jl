@@ -16,7 +16,12 @@ end
 """
 Allocate the space to be used as first argument in evaluate!
 """
-function allocate_trial_space(U::ParamTransientTrialFESpace,n::Int)
+function allocate_trial_space(U::ParamTransientTrialFESpace,args...)
+  HomogeneousTrialFESpace(U.space)
+end
+
+function allocate_trial_space(U::ParamTransientTrialFESpace,μ::Table,t::Real)
+  n = length(μ)*length(t)
   HomogeneousPTTrialFESpace(U.space,n)
 end
 
@@ -36,24 +41,24 @@ end
 """
 Parameter, time evaluation allocating Dirichlet vals
 """
-function Arrays.evaluate(U::ParamTransientTrialFESpace,μ::AbstractVector,t::Real)
-  Uμt = allocate_trial_space(U)
-  evaluate!(Uμt,U,μ,t)
+function Arrays.evaluate(U::ParamTransientTrialFESpace,params::AbstractVector,t::Real)
+  Uμt = allocate_trial_space(U,params,t)
+  evaluate!(Uμt,U,params,t)
   Uμt
 end
 
-function evaluate!(Ut::T,U::ParamTransientTrialFESpace,params::AbstractVector,t::Real) where T
+function evaluate!(Ut::T,U::ParamTransientTrialFESpace,params::Table,t::Real) where T
   if isa(U.dirichlet_μt,Vector)
     objects_at_t = PTArray(map(o->map(μ->o(μ,t),params),U.dirichlet_μt))
   else
     objects_at_t = PTArray(map(μ->U.dirichlet_μt(μ,t),params))
   end
-  TrialFESpace!(Ut,objects_at_t)
+  PTTrialFESpace!(Ut,objects_at_t)
   Ut
 end
 
 function Arrays.evaluate(U::ParamTransientTrialFESpace,params::AbstractVector,t::Real)
-  Ut = allocate_trial_space(U)
+  Ut = allocate_trial_space(U,params,t)
   evaluate!(Ut,U,params,t)
   Ut
 end
@@ -107,8 +112,14 @@ Base.iterate(m::ParamTransientMultiFieldTrialFESpace,state) = iterate(m.spaces,s
 Base.getindex(m::ParamTransientMultiFieldTrialFESpace,field_id::Integer) = m.spaces[field_id]
 Base.length(m::ParamTransientMultiFieldTrialFESpace) = length(m.spaces)
 
-function allocate_trial_space(U::ParamTransientMultiFieldTrialFESpace)
+function allocate_trial_space(U::ParamTransientMultiFieldTrialFESpace,args...)
   spaces = allocate_trial_space.(U.spaces)
+  MultiFieldFESpace(spaces)
+end
+
+function allocate_trial_space(U::ParamTransientMultiFieldTrialFESpace,μ::Table,t::Real)
+  n = length(μ)*length(t)
+  spaces = map(fe->HomogeneousPTTrialFESpace(x,n),U.spaces)
   MultiFieldFESpace(spaces)
 end
 
@@ -118,7 +129,7 @@ function evaluate!(Uμt::T,U::ParamTransientMultiFieldTrialFESpace,μ,t::Real) w
 end
 
 function Arrays.evaluate(U::ParamTransientMultiFieldTrialFESpace,μ,t::Real)
-  Uμt = allocate_trial_space(U)
+  Uμt = allocate_trial_space(U,μ,t)
   evaluate!(Uμt,U,μ,t)
   Uμt
 end
