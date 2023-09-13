@@ -1,3 +1,6 @@
+_ndims(a) = ndims(eltype(a))
+_ndims(a::PTArray) = ndims(eltype(testitem(a)))
+
 function FESpaces.collect_cell_vector(
   test::FESpace,
   a::PTDomainContribution)
@@ -7,7 +10,7 @@ function FESpaces.collect_cell_vector(
   for strian in get_domains(a)
     scell_vec = get_contribution(a,strian)
     cell_vec,trian = move_contributions(scell_vec,strian)
-    @assert ndims(eltype(testitem(cell_vec))) == 1
+    @assert _ndims(cell_vec) == 1
     cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
     rows = get_cell_dof_ids(test,trian)
     push!(w,cell_vec_r)
@@ -23,7 +26,7 @@ function FESpaces.collect_cell_vector(
 
   scell_vec = get_contribution(a,strian)
   cell_vec,trian = move_contributions(scell_vec,strian)
-  @assert ndims(eltype(testitem(cell_vec))) == 1
+  @assert _ndims(cell_vec) == 1
   cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
   rows = get_cell_dof_ids(test,trian)
   return cell_vec_r,rows
@@ -40,7 +43,7 @@ function FESpaces.collect_cell_matrix(
   for strian in get_domains(a)
     scell_mat = get_contribution(a,strian)
     cell_mat, trian = move_contributions(scell_mat,strian)
-    @assert ndims(eltype(testitem(cell_mat))) == 2
+    @assert _ndims(cell_mat) == 2
     cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
     cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
     rows = get_cell_dof_ids(test,trian)
@@ -60,7 +63,7 @@ function FESpaces.collect_cell_matrix(
 
   scell_mat = get_contribution(a,strian)
   cell_mat,trian = move_contributions(scell_mat,strian)
-  @assert ndims(eltype(testitem(cell_mat))) == 2
+  @assert _ndims(cell_mat) == 2
   cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
   cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
   rows = get_cell_dof_ids(test,trian)
@@ -73,7 +76,6 @@ function FESpaces.numeric_loop_matrix!(
   a::GenericSparseMatrixAssembler,
   matdata)
 
-  Acache = testitem(cellmat)
   for (cellmat,_cellidsrows,_cellidscols) in zip(matdata...)
     cellidsrows = map_cell_rows(a.strategy,_cellidsrows)
     cellidscols = map_cell_cols(a.strategy,_cellidscols)
@@ -89,7 +91,7 @@ function FESpaces.numeric_loop_matrix!(
       cols1 = getindex!(cols_cache,cellidscols,1)
       add! = AddEntriesMap(+)
       add_cache = return_cache(add!,A,mat1,rows1,cols1)
-      caches = Acache,add_cache,vals_cache,rows_cache,cols_cache
+      caches = add_cache,vals_cache,rows_cache,cols_cache
       FESpaces._numeric_loop_matrix!(A,caches,cellmat,cellidsrows,cellidscols)
     end
   end

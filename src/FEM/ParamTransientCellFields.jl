@@ -85,6 +85,10 @@ function CellData.change_domain_phys_phys(
   similar_cell_field(a,tface_to_fields,ttrian,PhysicalDomain())
 end
 
+function Arrays.testitem(f::GenericPTCellField)
+  GenericCellField(testitem(f.cell_field),f.trian,f.domain_style)
+end
+
 abstract type PTFEFunction <: PTCellField end
 
 struct PTSingleFieldFEFunction{T<:CellField} <: PTFEFunction
@@ -111,7 +115,7 @@ function FESpaces.FEFunction(
 
   cell_vals = scatter_free_and_dirichlet_values(fs,free_values,dirichlet_values)
   cell_field = CellField(fs,cell_vals)
-  PTSingleFieldFEFunction(cell_field,cell_vals,free_values,dirichlet_values,fs)
+  SingleFieldFEFunction(cell_field,cell_vals,free_values,dirichlet_values,fs)
 end
 
 for T in (:ConstantFESpace,:DirichletFESpace,:FESpaceWithConstantFixed,
@@ -129,6 +133,15 @@ for T in (:ConstantFESpace,:DirichletFESpace,:FESpaceWithConstantFixed,
   end
 end
 
+function Arrays.testitem(f::PTSingleFieldFEFunction)
+  cell_field = testitem(f.cell_field)
+  cell_dof_values = testitem(f.cell_dof_values)
+  free_values = testitem(f.free_values)
+  dirichlet_values = testitem(f.dirichlet_values)
+  fe_space = f.fe_space
+  SingleFieldFEFunction(cell_field,cell_dof_values,free_values,dirichlet_values,fe_space)
+end
+
 const PTSingleFieldTypes = Union{GenericCellField,PTSingleFieldFEFunction}
 
 function TransientCellField(single_field::PTSingleFieldTypes,derivatives::Tuple)
@@ -137,7 +150,7 @@ end
 
 struct PTMultiFieldFEFunction{T<:MultiFieldCellField} <: PTFEFunction
   single_fe_functions::Vector{<:PTSingleFieldFEFunction}
-  free_values::AbstractArray
+  free_values::PTArray
   fe_space::MultiFieldFESpace
   multi_cell_field::T
 
@@ -198,33 +211,10 @@ function TransientCellField(multi_field::MultiFieldTypes,derivatives::Tuple)
   TransientMultiFieldCellField(multi_field,derivatives,transient_single_fields)
 end
 
-# op,solver = feop,fesolver
-# a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
-# a(μ,t) = x->a(x,μ,t)
-# v = get_fe_basis(test)
-# u = get_trial_fe_basis(allocate_trial_space(trial))
-# params = realization(op,2)
-# times = get_times(solver)
-# a(params[1],times[1])*∇(v)⋅∇(u)
-# pf = PTFunction(a,params,times)
-# F = pf*∇(v)⋅∇(u)
-# quad = dΩ.quad
-# # ∫(pf*∇(v)⋅∇(u))dΩ
-# trian_f = get_triangulation(F)
-# trian_x = get_triangulation(dΩ.quad)
-
-# b = change_domain(F,quad.trian,quad.data_domain_style)
-# x = get_cell_points(quad)
-# bx = b(x)
-# cell_map = get_cell_map(quad.trian)
-# cell_Jt = lazy_map(∇,cell_map)
-# cell_Jtx = lazy_map(evaluate,cell_Jt,quad.cell_point)
-# lazy_map(IntegrationMap(),bx,quad.cell_weight,cell_Jtx)
-
-# μ,t = realization(op),dt
-# z(x,μ,t) = x[1]*μ[1]*t
-# z(μ,t) = x->z(x,μ,t)
-# zft(μ,t) = PTFunction(z,μ,t)
-
-# myform(μ,t) = ∫(zft(μ,t)*∇(v)⋅∇(u))dΩ
-# myform(params,times)
+function Arrays.testitem(f::TransientMultiFieldCellField)
+  single_fe_functions = map(testitem,f.single_fe_functions)
+  free_values = testitem(f.free_values)
+  fe_space = f.fe_space
+  multi_cell_field = f.multi_cell_field
+  MultiFieldFEFunction(single_fe_functions,free_values,fe_space,multi_cell_field)
+end

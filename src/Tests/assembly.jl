@@ -1,20 +1,19 @@
 op,solver = feop,fesolver
-ode_op = get_algebraic_operator(op)
-ode_cache = allocate_cache(ode_op,μ)
 μ = realization(op,2)
 t = solver.dt
+u = PTArray([zeros(test.nfree) for _ = 1:2])
+vθ = similar(u)
+vθ .= 1.0
+ode_op = get_algebraic_operator(op)
+ode_cache = allocate_cache(ode_op,μ)
 ode_cache = update_cache!(ode_cache,ode_op,μ,t)
-
-vec_cache = PTArray([zeros(test.nfree) for _ = 1:2])
-V = get_test(op)
-v = get_fe_basis(V)
-U = PTTrialFESpace(vec_cache,V)
-du = get_trial_fe_basis(U)
-
-int = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ)
-dc = evaluate(int)
-matdata = collect_cell_matrix(U(μ,t),V,dc)
-A_ok = allocate_jacobian(ode_op,vec_cache,ode_cache)
+Us,_,fecache = ode_cache
+uh = EvaluationFunction(Us[1],vθ)
+A_ok = allocate_jacobian(op,uh,ode_cache)
+b_ok = allocate_residual(op,uh,ode_cache)
+# _matdata_jacobians = fill_initial_jacobians(op,uh)
+# matdata = _vcat_matdata(_matdata_jacobians)
+# allocate_matrix(op.assem,matdata)
 
 # Gridap
 gok(x,t) = μ[1][1]*exp(-x[1]/μ[1][2])*abs(sin(t/μ[1][3]))

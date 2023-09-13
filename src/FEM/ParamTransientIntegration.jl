@@ -12,10 +12,12 @@ function Arrays.evaluate(int::PIntegrand)
 end
 
 struct PTDomainContribution <: GridapType
-  dict::IdDict{Triangulation,PTArray}
+  dict::IdDict{Triangulation,Union{PTArray,AbstractArray}}
 end
 
-PTDomainContribution() = PTDomainContribution(IdDict{Triangulation,PTArray}())
+function PTDomainContribution()
+  PTDomainContribution(IdDict{Triangulation,Union{PTArray,AbstractArray}}())
+end
 
 CellData.num_domains(a::PTDomainContribution) = length(a.dict)
 
@@ -36,10 +38,9 @@ Base.getindex(a::PTDomainContribution,trian::Triangulation) = get_contribution(a
 function CellData.add_contribution!(
   a::PTDomainContribution,
   trian::Triangulation,
-  b::PTArray{P},
-  op=+) where P
+  b,op=+)
 
-  S = eltype(P)
+  S = eltype(b)
   if !(S<:AbstractMatrix || S<:AbstractVector || S<:Number || S<:ArrayBlock)
     @unreachable """\n
     You are trying to add a contribution with eltype $(S).
@@ -87,10 +88,7 @@ function CellData.add_contribution!(
   a
 end
 
-function Base.sum(a::PTDomainContribution)
-  ptarrays = values(a.dict).array
-  map(x->sum(map(sum,x)),ptarrays)
-end
+Base.sum(a::PTDomainContribution) = sum(map(sum,values(a.dict)))
 
 Base.copy(a::PTDomainContribution) = PTDomainContribution(copy(a.dict))
 
@@ -131,14 +129,14 @@ function CellData.get_array(a::PTDomainContribution)
 end
 
 function ptintegrate(f,b::CellData.GenericMeasure)
-  c = integrate(f,b.quad)
+  c = ptintegrate(f,b.quad)
   cont = PTDomainContribution()
   add_contribution!(cont,b.quad.trian,c)
   cont
 end
 
 function ptintegrate(f,b::CellData.CompositeMeasure)
-  ic = integrate(f,b.quad)
+  ic = ptintegrate(f,b.quad)
   cont = PTDomainContribution()
   tc = move_contributions(ic,b.itrian,b.ttrian)
   add_contribution!(cont,b.ttrian,tc)
@@ -150,4 +148,41 @@ function CellData.move_contributions(scell_to_val::PTArray,args...)
   ptcell_mat = PTArray(first.(y))
   trian = first(last.(y))
   ptcell_mat,trian
+end
+
+function ptintegrate(f::CellField,quad::CellQuadrature)
+  trian_f = get_triangulation(f)
+  trian_x = get_triangulation(quad)
+
+  msg = """\n
+    Your are trying to integrate a CellField using a CellQuadrature defined on incompatible
+    triangulations. Verify that either the two objects are defined in the same triangulation
+    or that the triangulaiton of the CellField is the background triangulation of the CellQuadrature.
+    """
+  @check is_change_possible(trian_f,trian_x) msg
+
+  b = change_domain(f,quad.trian,quad.data_domain_style)
+  x = get_cell_points(quad)
+  bx = b(x)
+  if isaffine(bx)
+    bx = testitem(bx)
+  end
+  if quad.data_domain_style == PhysicalDomain() &&
+            quad.integration_domain_style == PhysicalDomain()
+    lazy_map(IntegrationMap(),bx,quad.cell_weight)
+  elseif quad.data_domain_style == ReferenceDomain() &&
+            quad.integration_domain_style == PhysicalDomain()
+    cell_map = get_cell_map(quad.trian)
+    cell_Jt = lazy_map(∇,cell_map)
+    cell_Jtx = lazy_map(evaluate,cell_Jt,quad.cell_point)
+    lazy_map(IntegrationMap(),bx,quad.cell_weight,cell_Jtx)
+  elseif quad.data_domain_style == ReferenceDomain() &&
+            quad.integration_domain_style == ReferenceDomain()
+    cell_map = Fill(GenericField(identity),length(bx))
+    cell_Jt = lazy_map(∇,cell_map)
+    cell_Jtx = lazy_map(evaluate,cell_Jt,quad.cell_point)
+    lazy_map(IntegrationMap(),bx,quad.cell_weight,cell_Jtx)
+  else
+    @notimplemented
+  end
 end

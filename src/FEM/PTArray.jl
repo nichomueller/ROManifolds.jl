@@ -64,6 +64,11 @@ function LinearAlgebra.fillstored!(a::PTArray,z)
   end
 end
 
+function Base.zero(a::PTArray)
+  b = similar(a)
+  b .= 0.
+end
+
 function Base.:≈(a::AbstractArray{<:PTArray},b::AbstractArray{<:PTArray})
   all(z->z[1]≈z[2],zip(a,b))
 end
@@ -90,6 +95,24 @@ function Base.:(==)(a::PTArray,b::PTArray)
     end
   end
   true
+end
+
+for op in (:+,:-)
+  @eval begin
+    function ($op)(a::PTArray,b::PTArray)
+      PTArray(map($op,a.array,b.array))
+    end
+
+    function ($op)(a::PTArray{T},b::T) where T
+      ptb = fill(b,length(a))
+      PTArray(map($op,a.array,ptb))
+    end
+
+    function ($op)(a::T,b::PTArray{T}) where T
+      pta = fill(a,length(b))
+      PTArray(map($op,pta,b.array))
+    end
+  end
 end
 
 @inline function Algebra.add_entry!(
@@ -139,13 +162,23 @@ function Arrays.testvalue(::Type{PTArray{T}}) where T
   PTArray(array)
 end
 
+function Arrays.lazy_map(k,a::PTArray)
+  lazy_arrays = map(x->lazy_map(k,x),a.array)
+  PTArray(lazy_arrays)
+end
+
 function Arrays.lazy_map(k,a::PTArray,b::AbstractArray...)
   lazy_arrays = map(x->lazy_map(k,x,b...),a.array)
   PTArray(lazy_arrays)
 end
 
-function Arrays.lazy_map(k::Broadcasting{typeof(gradient)},a::PTArray)
-  lazy_arrays = map(x->lazy_map(k,x),a.array)
+function Arrays.lazy_map(k,a::AbstractArray,b::PTArray)
+  lazy_arrays = map(x->lazy_map(k,a,x),b.array)
+  PTArray(lazy_arrays)
+end
+
+function Arrays.lazy_map(k,a::PTArray,b::PTArray)
+  lazy_arrays = map((x,y)->lazy_map(k,x,y),a.array,b.array)
   PTArray(lazy_arrays)
 end
 
@@ -273,7 +306,7 @@ function Arrays.evaluate!(
 
   cache,ptarray = cache
   @inbounds for i = eachindex(ptarray)
-    ptarray.array[i] = evaluate!(cache,f,a[i],b)
+    ptarray.array[i] = evaluate!(cache,f,a,b[i])
   end
   ptarray
 end
@@ -298,11 +331,26 @@ function get_arrays(a::PTArray...)
   map(i->map(x->x.array[i],a),1:n)
 end
 
+isaffine(a) = false
+function isaffine(a::PTArray)
+  a1 = testitem(a)
+  n = length(a)
+  all([a.array[i] == a1 for i = 2:n])
+end
+
 function test_ptarray(a::PTArray,b::AbstractArray)
   a1 = testitem(a)
   @assert typeof(a1) == typeof(b)
   @assert all(a1 .== b)
   return
+end
+
+function test_ptarray(a::AbstractArray,b::PTArray)
+  test_ptarray(b,a)
+end
+
+function test_ptarray(a::PTArray,b::PTArray)
+  (==)(b,a)
 end
 
 # function Arrays.return_value(f::IntegrationMap,a::PTArray,args...)
