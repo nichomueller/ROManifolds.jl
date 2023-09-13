@@ -110,37 +110,36 @@ for OP in (:ParamTransientAffineFEOperator,:ParamTransientFEOperator)
   end
 end
 
-function collect_trian_res(op::ParamTransientFEOperator)
-  μ,t = realization(op),0.
-  uh = zero(op.test)
-  v = get_fe_basis(op.test)
-  dxh = ()
-  for _ in 1:get_order(op)
-    dxh = (dxh...,uh)
-  end
-  xh = TransientCellField(uh,dxh)
-  inputs = collect_inputs(xh,μ,t)
-  veccontrib = evaluate(op.res(v),inputs)
-  collect_trian(veccontrib)
-end
+# function collect_trian_res(op::ParamTransientFEOperator)
+#   μ,t = realization(op),0.
+#   uh = zero(op.test)
+#   v = get_fe_basis(op.test)
+#   dxh = ()
+#   for _ in 1:get_order(op)
+#     dxh = (dxh...,uh)
+#   end
+#   xh = TransientCellField(uh,dxh)
+#   inputs = collect_inputs(xh,μ,t)
+#   veccontrib = evaluate(op.res(v),inputs)
+#   collect_trian(veccontrib)
+# end
 
-function collect_trian_jac(op::ParamTransientFEOperator,i::Int=1)
-  μ,t = realization(op),0.
-  trial_hom = allocate_trial_space(get_trial(op))
-  xh = zero(op.test)
-  v = get_fe_basis(op.test)
-  u = get_trial_fe_basis(trial_hom)
-  inputs = collect_inputs(xh,μ,t)
-  matcontrib = evaluate(op.jacs[i](u,v),inputs)
-  collect_trian(matcontrib)
-end
+# function collect_trian_jac(op::ParamTransientFEOperator,i::Int=1)
+#   μ,t = realization(op),0.
+#   trial_hom = allocate_trial_space(get_trial(op))
+#   xh = zero(op.test)
+#   v = get_fe_basis(op.test)
+#   u = get_trial_fe_basis(trial_hom)
+#   inputs = collect_inputs(xh,μ,t)
+#   matcontrib = evaluate(op.jacs[i](u,v),inputs)
+#   collect_trian(matcontrib)
+# end
 
 function allocate_residual(
   op::ParamTransientFEOperatorFromWeakForm,
   uh::T,
   cache) where {T<:GridapType}
 
-  μ,t = realization(op),0.
   V = get_test(op)
   v = get_fe_basis(V)
   dxh = ()
@@ -148,20 +147,10 @@ function allocate_residual(
     dxh = (dxh...,uh)
   end
   xh = TransientCellField(uh,dxh)
-  inputs = collect_inputs(xh,μ,t)
-  vecdata = collect_cell_vector(V,evaluate(op.res(v),inputs;allocate=true))
-  allocate_vector(op.assem,vecdata)
-end
-
-function allocate_residual(
-  op::ParamTransientFEOperatorFromWeakForm,
-  uh::AbstractVector{T},
-  cache) where {T<:GridapType}
-
   n = length(uh)
-  uh1 = first(uh)
-  b = allocate_residual(op,uh1,cache)
-  fill(b,n)
+  μ,t = realization(op,n),0.
+  vecdata = collect_cell_vector(V,evaluate(op.res(μ,t,xh,v)))
+  allocate_vector(op.assem,vecdata)
 end
 
 function residual!(
@@ -174,8 +163,7 @@ function residual!(
 
   V = get_test(op)
   v = get_fe_basis(V)
-  inputs = collect_inputs(xh,μ,t)
-  vecdata = collect_cell_vector(V,evaluate(op.res(v),inputs))
+  vecdata = collect_cell_vector(V,evaluate(op.res(μ,t,xh,v)))
   assemble_vector!(b,op.assem,vecdata)
   b
 end
@@ -239,15 +227,16 @@ function fill_initial_jacobians(
   op::ParamTransientFEOperatorFromWeakForm,
   uh::T) where T
 
-  μ,t = realization(op),0.
   dxh = ()
   for i in 1:get_order(op)
     dxh = (dxh...,uh)
   end
   xh = TransientCellField(uh,dxh)
   _matdata = ()
+  n = length(uh)
+  μ,t = realization(op,n),0.
   for i in 1:get_order(op)+1
-    _matdata = (_matdata...,_matdata_jacobian(op,μ,t,xh,i,0.0;allocate=true))
+    _matdata = (_matdata...,_matdata_jacobian(op,μ,t,xh,i,0.0))
   end
   return _matdata
 end
@@ -274,13 +263,11 @@ function _matdata_jacobian(
   t::Real,
   xh::T,
   i::Integer,
-  γᵢ::Real;
-  kwargs...) where T
+  γᵢ::Real) where T
 
-  Uh = get_trial(op)(nothing,nothing)
+  Uh = get_trial(op)(μ,t)
   V = get_test(op)
   u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
-  inputs = collect_inputs(xh,μ,t)
-  collect_cell_matrix(Uh,V,γᵢ*evaluate(op.jacs[i](u,v),inputs;kwargs...))
+  collect_cell_matrix(Uh,V,γᵢ*evaluate(op.jacs[i](μ,t,xh,u,v)))
 end

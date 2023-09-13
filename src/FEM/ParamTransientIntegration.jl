@@ -79,15 +79,18 @@ function CellData.add_contribution!(
     a.dict[trian] = lazy_map(Broadcasting(op),a.dict[trian],b)
   else
     if op == +
-     a.dict[trian] = b
+      a.dict[trian] = b
     else
-     a.dict[trian] = lazy_map(Broadcasting(op),b)
+      a.dict[trian] = lazy_map(Broadcasting(op),b)
     end
   end
   a
 end
 
-Base.sum(a::PTDomainContribution)= sum(map(sum,values(a.dict)))
+function Base.sum(a::PTDomainContribution)
+  ptarrays = values(a.dict).array
+  map(x->sum(map(sum,x)),ptarrays)
+end
 
 Base.copy(a::PTDomainContribution) = PTDomainContribution(copy(a.dict))
 

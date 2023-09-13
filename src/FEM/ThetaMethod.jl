@@ -12,7 +12,7 @@ function solve_step!(
   tθ = t0+dtθ
 
   if isnothing(cache)
-    ode_cache = allocate_cache(op)
+    ode_cache = allocate_cache(op,μ)
     vθ = allocate_intermediate_step(u0)
     nl_cache = nothing
   else

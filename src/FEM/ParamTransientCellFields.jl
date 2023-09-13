@@ -34,6 +34,7 @@ struct GenericPTCellField{DS} <: PTCellField
   end
 end
 
+Base.length(f::GenericPTCellField) = length(f.cell_field)
 CellData.get_data(f::GenericPTCellField) = f.cell_field
 CellData.get_triangulation(f::GenericPTCellField) = f.trian
 CellData.DomainStyle(::Type{GenericPTCellField{DS}}) where DS = DS()
@@ -94,6 +95,7 @@ struct PTSingleFieldFEFunction{T<:CellField} <: PTFEFunction
   fe_space::SingleFieldFESpace
 end
 
+Base.length(f::PTSingleFieldFEFunction) = length(f.cell_field)
 CellData.get_data(f::PTSingleFieldFEFunction) = get_data(f.cell_field)
 CellData.get_triangulation(f::PTSingleFieldFEFunction) = get_triangulation(f.cell_field)
 CellData.DomainStyle(::Type{PTSingleFieldFEFunction{T}}) where T = DomainStyle(T)
@@ -155,6 +157,7 @@ struct PTMultiFieldFEFunction{T<:MultiFieldCellField} <: PTFEFunction
   end
 end
 
+Base.length(f::PTMultiFieldFEFunction) = length(first(f.single_fe_functions))
 CellData.get_data(f::PTMultiFieldFEFunction) = get_data(f.multi_cell_field)
 CellData.get_triangulation(f::PTMultiFieldFEFunction) = get_triangulation(f.multi_cell_field)
 CellData.DomainStyle(::Type{PTMultiFieldFEFunction{T}}) where T = DomainStyle(T)

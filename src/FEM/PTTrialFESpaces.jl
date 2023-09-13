@@ -103,7 +103,8 @@ function FESpaces.compute_dirichlet_values_for_tags!(
 
   dvarrays = dirichlet_values.array
   dvsarrays = dirichlet_values_scratch.array
+  ttoarrays = tag_to_object.array
   dirichlet_values = map((dv,dvs,tto) -> compute_dirichlet_values_for_tags!(dv,dvs,f,tto),
-    dvarrays,dvsarrays,tag_to_object)
+    dvarrays,dvsarrays,ttoarrays)
   PTArray(dirichlet_values)
 end

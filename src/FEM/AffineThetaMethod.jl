@@ -12,7 +12,7 @@ function solve_step!(
   tθ = t0+dtθ
 
   if isnothing(cache)
-    ode_cache = allocate_cache(op,μ,t0)
+    ode_cache = allocate_cache(op,μ)
     vθ = similar(u0)
     vθ .= 0.0
     l_cache = nothing
