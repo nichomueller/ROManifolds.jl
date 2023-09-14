@@ -76,55 +76,83 @@ function FESpaces.numeric_loop_matrix!(
   a::GenericSparseMatrixAssembler,
   matdata)
 
+  Acache = zero(A).array
   for (cellmat,_cellidsrows,_cellidscols) in zip(matdata...)
-    cellidsrows = map_cell_rows(a.strategy,_cellidsrows)
-    cellidscols = map_cell_cols(a.strategy,_cellidscols)
-    cellmat1 = testitem(cellmat)
+    cellidsrows = FESpaces.map_cell_rows(a.strategy,_cellidsrows)
+    cellidscols = FESpaces.map_cell_cols(a.strategy,_cellidscols)
+    cellmat1 = isa(cellmat,PTArray) ? testitem(cellmat) : cellmat
     @assert length(cellidscols) == length(cellidsrows)
     @assert length(cellmat1) == length(cellidsrows)
     if length(cellmat1) > 0
-      vals_cache = array_cache(cellmat)
+      vals_cache = array_cache(cellmat1)
       rows_cache = array_cache(cellidsrows)
       cols_cache = array_cache(cellidscols)
-      mat1 = getindex!(vals_cache,cellmat,1)
+      mat1 = getindex!(vals_cache,cellmat1,1)
       rows1 = getindex!(rows_cache,cellidsrows,1)
       cols1 = getindex!(cols_cache,cellidscols,1)
       add! = AddEntriesMap(+)
       add_cache = return_cache(add!,A,mat1,rows1,cols1)
-      caches = add_cache,vals_cache,rows_cache,cols_cache
+      caches = Acache,add_cache,vals_cache,rows_cache,cols_cache
       FESpaces._numeric_loop_matrix!(A,caches,cellmat,cellidsrows,cellidscols)
     end
   end
   A
 end
 
-# @noinline function FESpaces._numeric_loop_matrix!(
-#   mat::PTArray,
-#   caches,cell_vals,cell_rows,cell_cols)
+@noinline function FESpaces._numeric_loop_matrix!(
+  mat::PTArray,caches,cell_vals,cell_rows,cell_cols)
 
-#   mat_cache,add_cache,vals_cache,rows_cache,cols_cache = caches
-#   add! = AddEntriesMap(+)
-#   @inbounds for k = eachindex(mat)
-#     matk = similar(mat_cache)
-#     fillstored!(matk,zero(eltype(matk)))
-#     for cell in 1:length(cell_cols)
-#       rows = getindex!(rows_cache,cell_rows,cell)
-#       cols = getindex!(cols_cache,cell_cols,cell)
-#       vals = getindex!(vals_cache,cell_vals,cell)
-#       evaluate!(add_cache,add!,matk,vals,rows,cols)
-#     end
-#     mat.array[k] .= matk
-#   end
-# end
+  matcache,add_cache,vals_cache,rows_cache,cols_cache = caches
+  add! = AddEntriesMap(+)
+  for k in eachindex(matcache)
+    matk = matcache[k]
+    cell_valsk = isa(cell_vals,PTArray) ? cell_vals[k] : cell_vals
+    for cell in eachindex(cell_cols)
+      rows = getindex!(rows_cache,cell_rows,cell)
+      cols = getindex!(cols_cache,cell_cols,cell)
+      valsk = getindex!(vals_cache,cell_valsk,cell)
+      evaluate!(add_cache,add!,matk,valsk,rows,cols)
+      mat.array[k] = matk
+    end
+  end
+end
 
-# @noinline function FESpaces._numeric_loop_matrix!(arr::PTArray,caches,cell_vals,cell_rows,cell_cols)
-#   add_cache, vals_cache, rows_cache, cols_cache = caches
-#   add! = AddEntriesMap(+)
-#   for cell in 1:length(cell_cols)
-#     rows = getindex!(rows_cache,cell_rows,cell)
-#     cols = getindex!(cols_cache,cell_cols,cell)
-#     idx = cols*arr.nrows .+ rows
-#     vals = getindex!(vals_cache,cell_vals,cell)
-#     evaluate!(add_cache,add!,arr,vals,idx)
-#   end
-# end
+function FESpaces.numeric_loop_vector!(
+  b::PTArray,
+  a::GenericSparseMatrixAssembler,
+  vecdata)
+
+  bcache = zero(b).array
+  for (cellvec,_cellids) in zip(vecdata...)
+    cellids = FESpaces.map_cell_rows(a.strategy,_cellids)
+    cellvec1 = isa(cellvec,PTArray) ? testitem(cellvec) : cellvec
+    if length(cellvec1) > 0
+      vals_cache = array_cache(cellvec1)
+      rows_cache = array_cache(cellids)
+      vec1 = getindex!(vals_cache,cellvec1,1)
+      rows1 = getindex!(rows_cache,cellids,1)
+      add! = AddEntriesMap(+)
+      add_cache = return_cache(add!,b,vec1,rows1)
+      caches = bcache,add_cache,vals_cache,rows_cache
+      FESpaces._numeric_loop_vector!(b,caches,cellvec,cellids)
+    end
+  end
+  b
+end
+
+@noinline function FESpaces._numeric_loop_vector!(
+  vec::PTArray,caches,cell_vals,cell_rows)
+
+  veccache,add_cache,vals_cache,rows_cache = caches
+  add! = AddEntriesMap(+)
+  for k in eachindex(veccache)
+    veck = veccache[k]
+    cell_valsk = isa(cell_vals,PTArray) ? cell_vals[k] : cell_vals
+    for cell in eachindex(rows_cache)
+      rows = getindex!(rows_cache,cell_rows,cell)
+      valsk = getindex!(vals_cache,cell_valsk,cell)
+      evaluate!(add_cache,add!,veck,valsk,rows)
+      vec.array[k] = veck
+    end
+  end
+end

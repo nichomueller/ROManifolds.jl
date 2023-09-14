@@ -1,7 +1,31 @@
-struct PTFunction <: Function
+abstract type ParamTransientFunction{P,T} <: Function end
+
+struct PTFunction{P,T} <: ParamTransientFunction{P,T}
   f::Function
-  params::AbstractArray
-  times::Union{Real,Vector{<:Real}}
+  params::P
+  times::T
+
+  function PTFunction(f::Function,params::P,times::T) where {P,T}
+    new{P,T}(f,params,times)
+  end
+end
+
+function get_fields(ptf::PTFunction{<:AbstractVector{<:Number},<:Real})
+  p,t = ptf.params,ptf.times
+  field = GenericField[]
+  push!(field,GenericField(ptf.f(p,t)))
+  field
+end
+
+function get_fields(ptf::PTFunction{<:AbstractVector{<:Number},<:AbstractVector{<:Real}})
+  p,t = ptf.params,ptf.times
+  nt = length(t)
+  fields = Vector{GenericField}(undef,nt)
+  @inbounds for k = 1:nt
+    tk = t[k]
+    fields[k] = GenericField(ptf.f(p,tk))
+  end
+  fields
 end
 
 function get_fields(ptf::PTFunction)
@@ -115,7 +139,7 @@ function FESpaces.FEFunction(
 
   cell_vals = scatter_free_and_dirichlet_values(fs,free_values,dirichlet_values)
   cell_field = CellField(fs,cell_vals)
-  SingleFieldFEFunction(cell_field,cell_vals,free_values,dirichlet_values,fs)
+  PTSingleFieldFEFunction(cell_field,cell_vals,free_values,dirichlet_values,fs)
 end
 
 for T in (:ConstantFESpace,:DirichletFESpace,:FESpaceWithConstantFixed,

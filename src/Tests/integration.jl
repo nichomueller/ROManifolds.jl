@@ -12,6 +12,8 @@ du = get_trial_fe_basis(U)
 int = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ)
 dc = evaluate(int)
 
+hdc = evaluate(∫ₚ(hμt(μ,t)*v,dΓn))
+
 ode_op = get_algebraic_operator(op)
 ode_cache = allocate_cache(ode_op,μ)
 update_cache!(ode_cache,ode_op,μ,t)
@@ -33,6 +35,8 @@ g_ok(t) = x->g_ok(x,t)
 trial_ok = TransientTrialFESpace(test,g_ok)
 du_ok = get_trial_fe_basis(trial_ok(t))
 dc_ok = ∫(a(μ[1],t)*∇(v)⋅∇(du_ok))dΩ
+
+hdc_ok = ∫(h(μ[1],t)*v)dΓn
 
 feop_ok = TransientAffineFEOperator(res,jac,jac_t,trial_ok,test)
 ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
@@ -95,8 +99,18 @@ function runtest_vector(dc,dc_ok,strian)
 end
 
 runtest_matrix(dc,dc_ok,strian)
+runtest_vector(hdc,hdc_ok,Γn)
 runtest_vector(mdc,mdc_ok,strian)
 
 dj1 = evaluate(op.jacs[1](μ,t,xh,du,v))
 dj1_by_1 = 1. * dj1
 test_ptarray(dj1[Ω],dj1_by_1[Ω])
+
+dc1 = evaluate(∫ₚ(v*∂ₚt(xh) + aμt(μ,t)*∇(v)⋅∇(xh) - fμt(μ,t)*v,dΩ))
+dc2 = evaluate(∫ₚ(hμt(μ,t)*v,dΓn))
+dc3 = dc1-dc2
+dc1_ok = ∫(v*∂t(xh_ok))dΩ + ∫(a(μ[1],t)*∇(v)⋅∇(xh_ok))dΩ - ∫(f(μ[1],t)*v)dΩ
+dc2_ok = ∫(h(μ[1],t)*v)dΓn
+dc3_ok = dc1_ok-dc2_ok
+test_ptarray(dc3[Ω],dc3_ok[Ω])
+test_ptarray(dc3[Γn],dc3_ok[Γn])

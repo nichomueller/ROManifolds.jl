@@ -5,6 +5,18 @@ end
 
 const ∫ₚ = PIntegrand
 
+function (+)(a::PIntegrand,b::PIntegrand)
+  aint = evaluate(a)
+  bint = evaluate(b)
+  (+)(aint,bint)
+end
+
+function (-)(a::PIntegrand,b::PIntegrand)
+  aint = evaluate(a)
+  bint = evaluate(b)
+  (-)(aint,bint)
+end
+
 function Arrays.evaluate(int::PIntegrand)
   obj = int.object
   meas = int.meas
@@ -119,6 +131,10 @@ function (*)(a::Number,b::PTDomainContribution)
 end
 
 (*)(a::PTDomainContribution,b::Number) = b*a
+
+function Arrays.evaluate(a::PTDomainContribution)
+  a
+end
 
 function CellData.get_array(a::PTDomainContribution)
   @assert num_domains(a) == 1 """\n

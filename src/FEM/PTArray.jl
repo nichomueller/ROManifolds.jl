@@ -115,26 +115,71 @@ for op in (:+,:-)
   end
 end
 
-@inline function Algebra.add_entry!(
-  combine::Function,
-  A::PTArray{<:AbstractMatrix},
-  v,i,j)
+# @inline function Algebra.add_entry!(
+#   combine::Function,
+#   A::PTArray{<:AbstractMatrix},
+#   v,i,j)
 
-  aij = A[:][i,j]
-  A[:][i,j] .= combine(aij,v)
-  A
-end
+#   @inbounds for k = eachindex(A)
+#     aijk = A[k][i,j]
+#     A[k][i,j] = combine(aijk,v)
+#   end
+#   A
+# end
 
-@inline function add_entry!(
-  combine::Function,
-  A::PTArray{<:AbstractVector},
-  v::PTArray,
-  i)
+# @inline function Algebra.add_entry!(
+#   combine::Function,
+#   A::PTArray{<:AbstractMatrix},
+#   v::AbstractArray,
+#   i,j)
 
-  ai = A[:][i]
-  A[:][i] .= combine(ai,v)
-  A
-end
+#   # @inbounds for k = eachindex(A)
+#   #   aijk = copy(A.array[k][i,j])
+#   #   A.array[k][i,j] .= combine(aijk,v[k])
+#   # end
+#   aij = map(x -> getindex(x,i,j),A.array)
+#   A.array[k][i,j] .= combine(aijk,v[k])
+#   A
+# end
+
+# @inline function Algebra._add_entries!(
+#   combine::Function,
+#   A::PTArray{<:AbstractMatrix},
+#   vs::PTArray{<:AbstractMatrix},
+#   is,js)
+
+#   @inbounds for (lj,j) in enumerate(js)
+#     if j>0
+#       for (li,i) in enumerate(is)
+#         if i>0
+#           vij = map(x -> getindex(x,li,lj),vs.array)
+#           Algebra.add_entry!(combine,A,vij,i,j)
+#         end
+#       end
+#     end
+#   end
+#   A
+# end
+
+# @inline function Algebra._add_entries!(
+#   combine::Function,
+#   A::PTArray{<:AbstractMatrix},
+#   vs,is,js)
+
+#   @inbounds for (lj,j) in enumerate(js)
+#     if j>0
+#       for (li,i) in enumerate(is)
+#         if i>0
+#           vij = vs[li,lj]
+#           Algebra.add_entry!(combine,A,vij,i,j)
+#         end
+#       end
+#     end
+#   end
+#   A
+# end
+
+Algebra.create_from_nz(a::PTArray) = a
 
 function Arrays.testitem(a::PTArray{T}) where T
   @notimplementedif !isconcretetype(T)
@@ -145,17 +190,17 @@ function Arrays.testitem(a::PTArray{T}) where T
   end
 end
 
-function Arrays.array_cache(a::PTArray)
-  a1 = testitem(a)
-  n = length(a)
-  cache = array_cache(a1)
-  PTArray(cache,n)
-end
+# function Arrays.array_cache(a::PTArray)
+#   a1 = testitem(a)
+#   n = length(a)
+#   cache = array_cache(a1)
+#   PTArray(cache,n)
+# end
 
-function Arrays.getindex!(c::PTArray,a::PTArray,i::Integer)
-  b = map((cache,array)->getindex!(cache,array,i),c.array,a.array)
-  PTArray(b)
-end
+# function Arrays.getindex!(c::PTArray,a::PTArray,i::Integer)
+#   b = map((cache,array)->getindex!(cache,array,i),c.array,a.array)
+#   PTArray(b)
+# end
 
 function Arrays.testvalue(::Type{PTArray{T}}) where T
   array = Vector{T}(undef,(1,))
@@ -341,7 +386,7 @@ end
 function test_ptarray(a::PTArray,b::AbstractArray)
   a1 = testitem(a)
   @assert typeof(a1) == typeof(b)
-  @assert all(a1 .== b)
+  @assert all(a1 .≈ b)
   return
 end
 
@@ -350,27 +395,5 @@ function test_ptarray(a::AbstractArray,b::PTArray)
 end
 
 function test_ptarray(a::PTArray,b::PTArray)
-  (==)(b,a)
+  (≈)(b,a)
 end
-
-# function Arrays.return_value(f::IntegrationMap,a::PTArray,args...)
-#   a1 = testitem(a)
-#   value = return_value(f,a1,args...)
-#   ptvalue = PTArray(value,length(a.array))
-#   ptvalue
-# end
-
-# function Arrays.return_cache(f::IntegrationMap,a::PTArray,args...)
-#   a1 = testitem(a)
-#   cache = return_cache(f,a1,args...)
-#   ptarray = return_value(f,a,args...)
-#   cache,ptarray
-# end
-
-# function Arrays.evaluate!(cache,f::IntegrationMap,a::PTArray,args...)
-#   cache,ptarray = cache
-#   @inbounds for i = eachindex(ptarray)
-#     ptarray.array[i] = evaluate!(cache,f,a[i],args...)
-#   end
-#   ptarray
-# end
