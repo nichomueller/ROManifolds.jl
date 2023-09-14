@@ -6,7 +6,7 @@ end
 
 function reduce_fe_operator(
   info::RBInfo,
-  feop::ParamTransientFEOperator{Top},
+  feop::PTFEOperator{Top},
   fesolver::ODESolver) where Top
 
   nsnaps = info.nsnaps_state
@@ -29,7 +29,7 @@ end
 
 function collect_residual_contributions(
   info::RBInfo,
-  feop::ParamTransientFEOperator,
+  feop::PTFEOperator,
   fesolver::ODESolver,
   rb_res::RBAlgebraicContribution)
 
@@ -52,7 +52,7 @@ end
 
 function collect_jacobian_contributions(
   info::RBInfo,
-  feop::ParamTransientFEOperator,
+  feop::PTFEOperator,
   fesolver::ODESolver,
   rb_jacs::Vector{RBAlgebraicContribution})
 
@@ -77,7 +77,7 @@ function collect_jacobian_contributions(
 end
 
 function residual_coefficient(
-  feop::ParamTransientFEOperator,
+  feop::PTFEOperator,
   fesolver::ODESolver,
   res_ad::RBAffineDecomposition,
   args...;
@@ -89,7 +89,7 @@ function residual_coefficient(
 end
 
 function residual_coefficient(
-  feop::ParamTransientFEOperator,
+  feop::PTFEOperator,
   fesolver::ODESolver,
   res_ad::AbstractArray,
   args...;
@@ -100,7 +100,7 @@ function residual_coefficient(
 end
 
 function jacobian_coefficient(
-  feop::ParamTransientFEOperator,
+  feop::PTFEOperator,
   fesolver::ODESolver,
   jac_ad::RBAffineDecomposition,
   args...;
@@ -112,8 +112,8 @@ function jacobian_coefficient(
 end
 
 function assemble_residual(
-  feop::ParamTransientFEOperator,
-  fesolver::θMethod,
+  feop::PTFEOperator,
+  fesolver::ThetaMethod,
   res_ad::RBAffineDecomposition,
   measures::Vector{Measure},
   input...)
@@ -130,8 +130,8 @@ function assemble_residual(
 end
 
 function assemble_jacobian(
-  feop::ParamTransientFEOperator,
-  fesolver::θMethod,
+  feop::PTFEOperator,
+  fesolver::ThetaMethod,
   jac_ad::RBAffineDecomposition,
   measures::Vector{Measure},
   input...;

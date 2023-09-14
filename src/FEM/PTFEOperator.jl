@@ -1,23 +1,23 @@
 """
 A parametric version of the `Gridap` `TransientFEOperator`
 """
-abstract type ParamTransientFEOperator{C<:OperatorType} <: GridapType end
+abstract type PTFEOperator{C<:OperatorType} <: GridapType end
 
 """
-Returns a `ODEOperator` wrapper of the `ParamFEOperator` that can be
+Returns a `ODEOperator` wrapper of the `PFEOperator` that can be
 straightforwardly used with the `ODETools` module.
 """
-function get_algebraic_operator(feop::ParamTransientFEOperator{C}) where C
-  ParamODEOpFromFEOp{C}(feop)
+function get_algebraic_operator(feop::PTFEOperator{C}) where C
+  PODEOpFromFEOp{C}(feop)
 end
 
-function allocate_cache(::ParamTransientFEOperator)
+function allocate_cache(::PTFEOperator)
   nothing
 end
 
 function update_cache!(
   ::Nothing,
-  ::ParamTransientFEOperator,
+  ::PTFEOperator,
   ::AbstractArray,
   ::Real)
   nothing
@@ -26,31 +26,31 @@ end
 """
 Transient FE operator that is defined by a transient Weak form
 """
-struct ParamTransientFEOperatorFromWeakForm{C<:OperatorType} <: ParamTransientFEOperator{C}
+struct PTFEOperatorFromWeakForm{C<:OperatorType} <: PTFEOperator{C}
   res::Function
   jacs::Tuple{Vararg{Function}}
   assem::Assembler
-  pspace::ParamSpace
+  pspace::PSpace
   trials::Tuple{Vararg{Any}}
   test::FESpace
   order::Integer
 end
 
-function ParamTransientAffineFEOperator(res::Function,jac::Function,jac_t::Function,
+function PTAffineFEOperator(res::Function,jac::Function,jac_t::Function,
   pspace,trial,test)
   assem = SparseMatrixAssembler(trial,test)
-  ParamTransientFEOperatorFromWeakForm{Affine}(
+  PTFEOperatorFromWeakForm{Affine}(
     res,(jac,jac_t),assem,pspace,(trial,∂ₚt(trial)),test,1)
 end
 
-function ParamTransientFEOperator(res::Function,jac::Function,jac_t::Function,
+function PTFEOperator(res::Function,jac::Function,jac_t::Function,
   pspace,trial,test)
   assem = SparseMatrixAssembler(trial,test)
-  ParamTransientFEOperatorFromWeakForm{Nonlinear}(
+  PTFEOperatorFromWeakForm{Nonlinear}(
     res,(jac,jac_t),assem,pspace,(trial,∂ₚt(trial)),test,1)
 end
 
-function ParamTransientFEOperator(res::Function,pspace,trial,test;order::Integer=1)
+function PTFEOperator(res::Function,pspace,trial,test;order::Integer=1)
   function jac_0(μ,t,x,dx0,dv)
     function res_0(y)
       x0 = TransientCellField(y,x.derivatives)
@@ -70,29 +70,29 @@ function ParamTransientFEOperator(res::Function,pspace,trial,test;order::Integer
     end
     jacs = (jacs...,jac_i)
   end
-  ParamTransientFEOperator(res,jacs...,pspace,trial,test)
+  PTFEOperator(res,jacs...,pspace,trial,test)
 end
 
 function FESpaces.SparseMatrixAssembler(
-  trial::Union{ParamTransientTrialFESpace,ParamTransientMultiFieldTrialFESpace},
+  trial::Union{PTTrialFESpace,PTMultiFieldTrialFESpace},
   test::FESpace)
   SparseMatrixAssembler(trial(nothing,nothing),test)
 end
 
-get_test(op::ParamTransientFEOperatorFromWeakForm) = op.test
+get_test(op::PTFEOperatorFromWeakForm) = op.test
 
-get_trial(op::ParamTransientFEOperatorFromWeakForm) = op.trials[1]
+get_trial(op::PTFEOperatorFromWeakForm) = op.trials[1]
 
-get_order(op::ParamTransientFEOperatorFromWeakForm) = op.order
+get_order(op::PTFEOperatorFromWeakForm) = op.order
 
-get_pspace(op::ParamTransientFEOperatorFromWeakForm) = op.pspace
+get_pspace(op::PTFEOperatorFromWeakForm) = op.pspace
 
-realization(op::ParamTransientFEOperator,args...) = realization(op.pspace,args...)
+realization(op::PTFEOperator,args...) = realization(op.pspace,args...)
 
-for OP in (:ParamTransientAffineFEOperator,:ParamTransientFEOperator)
+for OP in (:PTAffineFEOperator,:PTFEOperator)
   @eval begin
     function filter_operator(
-      op::ParamTransientFEOperatorFromWeakForm,
+      op::PTFEOperatorFromWeakForm,
       filter::NTuple{2,Int})
 
       if isa(get_test(op),MultiFieldFESpace)
@@ -111,7 +111,7 @@ for OP in (:ParamTransientAffineFEOperator,:ParamTransientFEOperator)
 end
 
 function allocate_residual(
-  op::ParamTransientFEOperatorFromWeakForm,
+  op::PTFEOperatorFromWeakForm,
   uh::T,
   cache) where T
 
@@ -129,7 +129,7 @@ end
 
 function residual!(
   b::PTArray,
-  op::ParamTransientFEOperatorFromWeakForm,
+  op::PTFEOperatorFromWeakForm,
   μ::AbstractArray,
   t::Real,
   xh::T,
@@ -143,7 +143,7 @@ function residual!(
 end
 
 function allocate_jacobian(
-  op::ParamTransientFEOperatorFromWeakForm,
+  op::PTFEOperatorFromWeakForm,
   uh::T,
   cache) where T
 
@@ -155,7 +155,7 @@ end
 for f in (:allocate_residual,:allocate_jacobian)
   @eval begin
     function $f(
-      op::ParamTransientFEOperatorFromWeakForm,
+      op::PTFEOperatorFromWeakForm,
       uh::PTCellField,
       cache)
 
@@ -169,7 +169,7 @@ end
 
 function jacobian!(
   A::PTArray,
-  op::ParamTransientFEOperatorFromWeakForm,
+  op::PTFEOperatorFromWeakForm,
   μ::AbstractArray,
   t::Real,
   uh::T,
@@ -184,7 +184,7 @@ end
 
 function jacobians!(
   A::PTArray,
-  op::ParamTransientFEOperatorFromWeakForm,
+  op::PTFEOperatorFromWeakForm,
   μ::AbstractArray,
   t::Real,
   uh::T,
@@ -198,7 +198,7 @@ function jacobians!(
 end
 
 function fill_initial_jacobians(
-  op::ParamTransientFEOperatorFromWeakForm,
+  op::PTFEOperatorFromWeakForm,
   uh::T) where T
 
   μ,t = realization(op),0.
@@ -215,7 +215,7 @@ function fill_initial_jacobians(
 end
 
 function fill_jacobians(
-  op::ParamTransientFEOperatorFromWeakForm,
+  op::PTFEOperatorFromWeakForm,
   μ::AbstractArray,
   t::Real,
   uh::T,
@@ -231,7 +231,7 @@ function fill_jacobians(
 end
 
 function _matdata_jacobian(
-  op::ParamTransientFEOperatorFromWeakForm,
+  op::PTFEOperatorFromWeakForm,
   μ::AbstractArray,
   t::Real,
   xh::T,

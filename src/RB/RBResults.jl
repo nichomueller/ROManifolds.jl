@@ -192,7 +192,7 @@ LinearAlgebra.norm(v::AbstractVector,X::AbstractMatrix) = v'*X*v
 
 function post_process(
   info::RBInfo,
-  feop::ParamTransientFEOperator,
+  feop::PTFEOperator,
   fesolver::ODESolver,
   results:: Vector{RBResults})
 
@@ -204,7 +204,7 @@ end
 
 function Gridap.Visualization.writevtk(
   info::RBInfo,
-  feop::ParamTransientFEOperator,
+  feop::PTFEOperator,
   fesolver::ODESolver,
   result::RBResults)
 

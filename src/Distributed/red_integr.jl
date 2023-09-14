@@ -19,7 +19,7 @@ dΓn = Measure(Γn,degree)
 
 ranges = fill([1.,2.],3)
 sampling = UniformSampling()
-pspace = ParamSpace(ranges,sampling)
+pspace = PSpace(ranges,sampling)
 
 a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
 a(μ,t) = x->a(x,μ,t)
@@ -46,11 +46,11 @@ jac_t(μ,t,u,dut,v) = jac_t(μ,t,u,dut,v,dΩ)
 
 reffe = ReferenceFE(lagrangian,Float,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-trial = ParamTransientTrialFESpace(test,g)
-feop = ParamTransientAffineFEOperator(res,jac,jac_t,pspace,trial,test)
+trial = PTransientTrialFESpace(test,g)
+feop = PTAffineFEOperator(res,jac,jac_t,pspace,trial,test)
 t0,tF,dt,θ = 0.,0.05,0.005,1
 uh0(μ) = interpolate_everywhere(u0(μ),trial(μ,t0))
-fesolver = θMethod(LUSolver(),t0,tF,dt,θ,uh0)
+fesolver = ThetaMethod(LUSolver(),t0,tF,dt,θ,uh0)
 
 using PartitionedArrays
 parts = (2,2)
@@ -60,7 +60,7 @@ Dlabels = get_face_labeling(Dmodel)
 add_tag_from_tags!(Dlabels,"dirichlet",[1,2,3,4,5,7,8])
 add_tag_from_tags!(Dlabels,"neumann",[6,])
 Dtest = FESpace(Dmodel,reffe,conformity=:H1,dirichlet_tags="dirichlet")
-Dtrial = ParamTransientTrialFESpace(Dtest,g)
+Dtrial = PTTrialFESpace(Dtest,g)
 DΩ = Triangulation(Dmodel)
 DdΩ = Measure(DΩ,degree)
 DΓn = BoundaryTriangulation(Dmodel,tags=["neumann"])
@@ -68,12 +68,12 @@ DdΓn = Measure(DΓn,degree)
 Dres(μ,t,u,v) = ∫(v*∂ₚt(u))DdΩ + ∫(a(μ,t)*∇(v)⋅∇(u))DdΩ - ∫(f(μ,t)*v)DdΩ - ∫(h(μ,t)*v)DdΓn
 Djac(μ,t,u,du,v) = ∫(a(μ,t)*∇(v)⋅∇(du))DdΩ
 Djac_t(μ,t,u,dut,v) = ∫(v*dut)DdΩ
-Dfeop = ParamTransientAffineFEOperator(Dres,Djac,Djac_t,pspace,Dtrial,Dtest)
+Dfeop = PTAffineFEOperator(Dres,Djac,Djac_t,pspace,Dtrial,Dtest)
 Duh0(μ) = interpolate_everywhere(u0(μ),Dtrial(μ,t0))
-Dfesolver = θMethod(LUSolver(),t0,tF,dt,θ,Duh0)
+Dfesolver = ThetaMethod(LUSolver(),t0,tF,dt,θ,Duh0)
 
 function GridapDistributed.allocate_jacobian(
-  op::ParamTransientFEOperatorFromWeakForm,
+  op::PTFEOperatorFromWeakForm,
   duh::GridapDistributed.DistributedCellField,
   cache)
   _matdata_jacobians = Gridap.ODEs.TransientFETools.fill_initial_jacobians(op,duh)
@@ -82,7 +82,7 @@ function GridapDistributed.allocate_jacobian(
 end
 
 function GridapDistributed.allocate_jacobian(
-  op::ParamTransientFEOperatorFromWeakForm,
+  op::PTFEOperatorFromWeakForm,
   duh::GridapDistributed.DistributedMultiFieldFEFunction,
   cache)
   _matdata_jacobians = Gridap.ODEs.TransientFETools.fill_initial_jacobians(op,duh)
@@ -106,7 +106,7 @@ end
 
 function collect_snapshots(
   ::typeof(assemble_vector),
-  op::ParamTransientFEOperator{Affine},
+  op::PTFEOperator{Affine},
   solver::ODESolver,
   trian::GridapType,
   pinfo::Vector{<:AbstractArray},
@@ -135,7 +135,7 @@ end
 
 function collect_snapshots(
   ::typeof(assemble_matrix),
-  op::ParamTransientFEOperator{Affine},
+  op::PTFEOperator{Affine},
   solver::ODESolver,
   trian::GridapType,
   pinfo::Vector{<:AbstractArray},
@@ -169,7 +169,7 @@ function collect_snapshots(
 end
 
 function _setup_initial_condition(
-  op::ParamTransientFEOperator,
+  op::PTFEOperator,
   solver::ODESolver,
   μ::AbstractArray=realization(op))
 
@@ -177,7 +177,7 @@ function _setup_initial_condition(
 end
 
 function _setup_initial_condition(
-  pop::ParamODEOpFromFEOp,
+  pop::PODEOpFromFEOp,
   solver::ODESolver,
   μ::AbstractArray=realization(pop.feop))
 
@@ -186,7 +186,7 @@ function _setup_initial_condition(
 end
 
 function _evaluation_function(
-  op::ParamTransientFEOperator,
+  op::PTFEOperator,
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
 

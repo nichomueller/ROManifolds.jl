@@ -59,7 +59,7 @@ function compress_snapshots(snap::Snapshots,args...;kwargs...)
   end
 end
 
-for A in (:TimeAffinity,:ParamTimeAffinity)
+for A in (:TimeAffinity,:PTimeAffinity)
   @eval begin
     function compress_snapshots(snap::Snapshots{T,$A},args...;kwargs...) where T
       snaps = collect(snap)
@@ -75,7 +75,7 @@ for A in (:TimeAffinity,:ParamTimeAffinity)
 end
 
 function collect_solutions(
-  feop::ParamTransientFEOperator,
+  feop::PTFEOperator,
   fesolver::ODESolver,
   params::Table;
   nsnaps=length(params))
@@ -89,7 +89,7 @@ function collect_solutions(
 end
 
 function collect_residuals(
-  feop::ParamTransientFEOperator,
+  feop::PTFEOperator,
   fesolver::ODESolver,
   snaps::Snapshots,
   params::Table,
@@ -105,7 +105,7 @@ function collect_residuals(
 end
 
 function collect_jacobians(
-  feop::ParamTransientFEOperator,
+  feop::PTFEOperator,
   fesolver::ODESolver,
   snaps::Snapshots,
   params::Table,

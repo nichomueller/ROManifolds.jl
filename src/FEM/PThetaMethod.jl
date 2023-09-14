@@ -1,7 +1,7 @@
 function solve_step!(
   uf::PTArray,
-  solver::θMethod,
-  op::ParamODEOperator,
+  solver::ThetaMethod,
+  op::PODEOperator,
   μ::AbstractVector,
   u0::PTArray,
   t0::Real,
@@ -21,7 +21,7 @@ function solve_step!(
 
   ode_cache = update_cache!(ode_cache,op,μ,tθ)
 
-  nlop = ParamThetaMethodNonlinearOperator(op,μ,tθ,dtθ,u0,ode_cache,vθ)
+  nlop = PThetaMethodNonlinearOperator(op,μ,tθ,dtθ,u0,ode_cache,vθ)
 
   nl_cache = solve!(uf,solver.nls,nlop,nl_cache)
 
@@ -38,8 +38,8 @@ end
 Nonlinear operator that represents the θ-method nonlinear operator at a
 given time step, i.e., A(t,u_n+θ,(u_n+θ-u_n)/dt)
 """
-struct ParamThetaMethodNonlinearOperator <: PNonlinearOperator
-  odeop::ParamODEOperator
+struct PThetaMethodNonlinearOperator <: PNonlinearOperator
+  odeop::PODEOperator
   μ::AbstractVector
   tθ::Float64
   dtθ::Float64
@@ -50,7 +50,7 @@ end
 
 function residual!(
   b::PTArray,
-  op::ParamThetaMethodNonlinearOperator,
+  op::PThetaMethodNonlinearOperator,
   x::PTArray)
 
   uθ = x
@@ -61,7 +61,7 @@ end
 
 function jacobian!(
   A::PTArray,
-  op::ParamThetaMethodNonlinearOperator,
+  op::PThetaMethodNonlinearOperator,
   x::PTArray)
 
   uF = x
@@ -73,14 +73,14 @@ function jacobian!(
 end
 
 function allocate_residual(
-  op::ParamThetaMethodNonlinearOperator,
+  op::PThetaMethodNonlinearOperator,
   x::PTArray)
 
   allocate_residual(op.odeop,x,op.ode_cache)
 end
 
 function allocate_jacobian(
-  op::ParamThetaMethodNonlinearOperator,
+  op::PThetaMethodNonlinearOperator,
   x::PTArray)
 
   allocate_jacobian(op.odeop,x,op.ode_cache)

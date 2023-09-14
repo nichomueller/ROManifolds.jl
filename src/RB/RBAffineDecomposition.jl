@@ -4,7 +4,7 @@ struct RBIntegrationDomain
   idx::Vector{Int}
 
   function RBIntegrationDomain(
-    feop::ParamTransientFEOperator,
+    feop::PTFEOperator,
     trian::Triangulation,
     times::Vector{<:Real},
     interp_idx_space::Vector{Int},
@@ -33,7 +33,7 @@ end
 
 function collect_compress_residual(
   info::RBInfo,
-  feop::ParamTransientFEOperator,
+  feop::PTFEOperator,
   fesolver::ODESolver,
   rbspace::RBSpace,
   snaps::Snapshots,
@@ -50,7 +50,7 @@ end
 
 function collect_compress_residual(
   info::RBInfo,
-  feop::ParamTransientFEOperator,
+  feop::PTFEOperator,
   fesolver::ODESolver,
   rbspace::SingleFieldRBSpace,
   snaps::SingleFieldSnapshots,
@@ -66,7 +66,7 @@ end
 
 function collect_compress_residual(
   info::RBInfo,
-  feop::ParamTransientFEOperator,
+  feop::PTFEOperator,
   fesolver::ODESolver,
   rbspace::MultiFieldRBSpace,
   snaps::MultiFieldSnapshots,
@@ -89,7 +89,7 @@ end
 
 function collect_compress_jacobians(
   info::RBInfo,
-  feop::ParamTransientFEOperator,
+  feop::PTFEOperator,
   args...)
 
   njacs = length(feop.jacs)
@@ -103,7 +103,7 @@ end
 
 function collect_compress_jacobian(
   info::RBInfo,
-  feop::ParamTransientFEOperator,
+  feop::PTFEOperator,
   fesolver::ODESolver,
   rbspace::RBSpace,
   snaps::Snapshots,
@@ -121,7 +121,7 @@ end
 
 function collect_compress_jacobian(
   info::RBInfo,
-  feop::ParamTransientFEOperator,
+  feop::PTFEOperator,
   fesolver::ODESolver,
   rbspace::SingleFieldRBSpace,
   snaps::SingleFieldSnapshots,
@@ -146,7 +146,7 @@ end
 
 function collect_compress_jacobian(
   info::RBInfo,
-  feop::ParamTransientFEOperator,
+  feop::PTFEOperator,
   fesolver::ODESolver,
   rbspace::MultiFieldRBSpace,
   snaps::MultiFieldSnapshots,
@@ -179,7 +179,7 @@ end
 function compress_component(
   info::RBInfo,
   snap::Snapshots,
-  feop::ParamTransientFEOperator,
+  feop::PTFEOperator,
   trian::Triangulation,
   times::Vector{<:Real},
   args...;

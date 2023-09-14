@@ -1,7 +1,7 @@
 function solve_step!(
   uf::PTArray,
-  solver::θMethod,
-  op::AffineParamODEOperator,
+  solver::ThetaMethod,
+  op::AffinePODEOperator,
   μ::AbstractVector,
   u0::PTArray,
   t0::Real,
@@ -41,7 +41,7 @@ end
 function _matrix_and_vector!(
   A::PTArray,
   b::PTArray,
-  op::AffineParamODEOperator,
+  op::AffinePODEOperator,
   μ::AbstractArray,
   tθ::Real,
   dtθ::Real,
@@ -55,7 +55,7 @@ end
 
 function _matrix!(
   A::PTArray,
-  op::AffineParamODEOperator,
+  op::AffinePODEOperator,
   μ::AbstractArray,
   tθ::Real,
   dtθ::Real,
@@ -70,7 +70,7 @@ end
 
 function _vector!(
   b::PTArray,
-  op::AffineParamODEOperator,
+  op::AffinePODEOperator,
   μ::AbstractArray,
   tθ::Real,
   ::Real,

@@ -16,7 +16,7 @@ begin
 
   ranges = fill([1.,10.],3)
   sampling = UniformSampling()
-  pspace = ParamSpace(ranges,sampling)
+  pspace = PSpace(ranges,sampling)
 
   a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
   a(μ,t) = x->a(x,μ,t)
@@ -43,17 +43,17 @@ begin
   reffe_u = Gridap.ReferenceFE(lagrangian,VectorValue{2,Float},order)
   reffe_p = Gridap.ReferenceFE(lagrangian,Float,order-1)
   test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
-  trial_u = ParamTransientTrialFESpace(test_u,[g0,g])
+  trial_u = PTTrialFESpace(test_u,[g0,g])
   test_p = TestFESpace(model,reffe_p;conformity=:C0)
   trial_p = TrialFESpace(test_p)
-  test = ParamTransientMultiFieldFESpace([test_u,test_p])
-  trial = ParamTransientMultiFieldFESpace([trial_u,trial_p])
-  feop = ParamTransientAffineFEOperator(res,jac,jac_t,pspace,trial,test)
+  test = PTMultiFieldFESpace([test_u,test_p])
+  trial = PTMultiFieldFESpace([trial_u,trial_p])
+  feop = PTAffineFEOperator(res,jac,jac_t,pspace,trial,test)
   t0,tF,dt,θ = 0.,0.05,0.005,1
   uh0(μ) = interpolate_everywhere(u0(μ),trial_u(μ,t0))
   ph0(μ) = interpolate_everywhere(p0(μ),trial_p(μ,t0))
   xh0(μ) = interpolate_everywhere([uh0(μ),ph0(μ)],trial(μ,t0))
-  fesolver = θMethod(LUSolver(),t0,tF,dt,θ,xh0)
+  fesolver = ThetaMethod(LUSolver(),t0,tF,dt,θ,xh0)
 
   ϵ = 1e-4
   compute_supremizers = true

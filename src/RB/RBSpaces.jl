@@ -17,7 +17,7 @@ end
 function compress_snapshots(
   info::RBInfo,
   snaps::SingleFieldSnapshots,
-  feop::ParamTransientFEOperator,
+  feop::PTFEOperator,
   args...)
 
   ϵ = info.ϵ
@@ -45,7 +45,7 @@ end
 function compress_snapshots(
   info::RBInfo,
   snaps::MultiFieldSnapshots,
-  feop::ParamTransientFEOperator;
+  feop::PTFEOperator;
   compute_supremizers=false,
   kwargs...)
 
@@ -67,7 +67,7 @@ get_basis_time(rb::RBSpace) = rb.basis_time
 
 function add_space_supremizers!(
   bases_space::BlockMatrix,
-  feop::ParamTransientFEOperator,
+  feop::PTFEOperator,
   args...;
   kwargs...)
 
@@ -86,7 +86,7 @@ end
 function space_supremizers(
   bs::AbstractMatrix,
   snaps::MultiFieldSnapshots,
-  feop::ParamTransientFEOperator,
+  feop::PTFEOperator,
   fesolver::ODESolver,
   params::Table)
 

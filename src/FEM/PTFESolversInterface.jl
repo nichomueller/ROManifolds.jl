@@ -1,14 +1,14 @@
-abstract type ParamODEOperator{C} <: GridapType end
+abstract type PODEOperator{C} <: GridapType end
 
-const AffineParamODEOperator = ParamODEOperator{Affine}
+const AffinePODEOperator = PODEOperator{Affine}
 
-struct ParamODEOpFromFEOp{C} <: ParamODEOperator{C}
-  feop::ParamTransientFEOperator{C}
+struct PODEOpFromFEOp{C} <: PODEOperator{C}
+  feop::PTFEOperator{C}
 end
 
-get_order(op::ParamODEOpFromFEOp) = get_order(op.feop)
+get_order(op::PODEOpFromFEOp) = get_order(op.feop)
 
-function allocate_cache(op::ParamODEOpFromFEOp,μ::AbstractArray)
+function allocate_cache(op::PODEOpFromFEOp,μ::AbstractArray)
   Ut = get_trial(op.feop)
   U = allocate_trial_space(Ut,μ)
   Uts = (Ut,)
@@ -24,7 +24,7 @@ end
 
 function update_cache!(
   ode_cache,
-  op::ParamODEOpFromFEOp,
+  op::PODEOpFromFEOp,
   μ::AbstractArray,
   t::Real)
 
@@ -38,7 +38,7 @@ function update_cache!(
 end
 
 function allocate_residual(
-  op::ParamODEOpFromFEOp,
+  op::PODEOpFromFEOp,
   uhF::PTArray,
   ode_cache)
 
@@ -48,7 +48,7 @@ function allocate_residual(
 end
 
 function allocate_jacobian(
-  op::ParamODEOpFromFEOp,
+  op::PODEOpFromFEOp,
   uhF::PTArray,
   ode_cache)
 
@@ -59,7 +59,7 @@ end
 
 function residual!(
   b::PTArray,
-  op::ParamODEOpFromFEOp,
+  op::PODEOpFromFEOp,
   μ::AbstractArray,
   t::Real,
   xhF::Tuple{Vararg{PTArray}},
@@ -76,7 +76,7 @@ end
 
 function jacobian!(
   A::PTArray,
-  op::ParamODEOpFromFEOp,
+  op::PODEOpFromFEOp,
   μ::AbstractArray,
   t::Real,
   xhF::Tuple{Vararg{PTArray}},
@@ -95,7 +95,7 @@ end
 
 function jacobians!(
   J::PTArray,
-  op::ParamODEOpFromFEOp,
+  op::PODEOpFromFEOp,
   μ::AbstractArray,
   t::Real,
   xhF::Tuple{Vararg{PTArray}},

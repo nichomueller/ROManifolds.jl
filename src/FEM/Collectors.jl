@@ -1,6 +1,6 @@
 function get_iterative_quantities(
   aff::Affinity,
-  op::ParamTransientFEOperator,
+  op::PTFEOperator,
   solver::ODESolver,
   sols::AbstractArray,
   params::Table;
@@ -49,8 +49,8 @@ function _reorder_iterative_quantities(trials,x,p,t)
 end
 
 function collect_residuals(
-  solver::θMethod,
-  op::ParamTransientFEOperator,
+  solver::ThetaMethod,
+  op::PTFEOperator,
   sols::AbstractArray,
   params::Table,
   trian::Triangulation,
@@ -70,8 +70,8 @@ function collect_residuals(
 end
 
 function collect_jacobians(
-  solver::θMethod,
-  op::ParamTransientFEOperator,
+  solver::ThetaMethod,
+  op::PTFEOperator,
   sols::AbstractArray,
   params::Table,
   trian::Triangulation,
@@ -105,7 +105,7 @@ function setup_initial_condition(
 end
 
 function evaluation_function(
-  op::ParamTransientFEOperator,
+  op::PTFEOperator,
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
 
@@ -119,7 +119,7 @@ end
 
 function compress_function(
   f::Function,
-  solver::θMethod,
+  solver::ThetaMethod,
   trian::Triangulation,
   params::Table;
   kwargs...)

@@ -73,25 +73,25 @@ export is_parent
 export modify_measures
 export is_change_possible
 export get_discrete_model
-# ParamSpace
+# PSpace
 export SamplingStyle
 export UniformSampling
 export realization
 # DiffOperators
 export time_derivative
-# ParamTransientFESpaces
-export ParamTransientTrialFESpace
-# ParamTransientFEOperator
-export ParamTransientFEOperator
-# FilteredParamTransientFEOperator
-export FilteredParamTransientFEOperator
+# PTFESpaces
+export PTTrialFESpace
+# PTFEOperator
+export PTFEOperator
+# FilteredPTFEOperator
+export FilteredPTFEOperator
 export allocate_evaluation_function
 export evaluation_function
 export filter_evaluation_function
 export collect_trian_res
 export collect_trian_jac
 # TimeMarchingSchemes
-export θMethod
+export ThetaMethod
 export get_time_ndofs
 export get_times
 # FECollectors
@@ -99,9 +99,9 @@ export CollectSolutionMap
 # Affinity
 export Affinity
 export ZeroAffinity
-export ParamAffinity
+export PAffinity
 export TimeAffinity
-export ParamTimeAffinity
+export PTimeAffinity
 export NonAffinity
 export affinity_residual
 export affinity_jacobian
@@ -110,13 +110,13 @@ export LagrangianQuadRefFE
 export get_phys_quad_points
 
 include("FEOperations.jl")
-include("ParamSpace.jl")
+include("PSpace.jl")
 include("DiffOperators.jl")
-include("ParamTransientFESpaces.jl")
-include("ParamTransientFEOperator.jl")
-include("ParamTransientFESolversInterface.jl")
-include("ParamTransientFESolvers.jl")
-include("FilteredParamTransientFEOperator.jl")
+include("PTFESpaces.jl")
+include("PTFEOperator.jl")
+include("PTFESolversInterface.jl")
+include("PTFESolvers.jl")
+include("FilteredPTFEOperator.jl")
 include("FECollectors.jl")
 include("TimeMarchingSchemes.jl")
 include("NothingIntegration.jl")

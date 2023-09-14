@@ -33,8 +33,8 @@ export get_nonzero_val
 export recast
 export tpod
 export change_mode
-# ParamStructure
-export ParamStructure
+# PStructure
+export PStructure
 export sum_contributions!
 
 include("Files.jl")
@@ -42,5 +42,5 @@ include("Indexes.jl")
 include("Operations.jl")
 include("BasesConstruction.jl")
 include("NnzArray.jl")
-include("ParamStructure.jl")
+include("PStructure.jl")
 end # module

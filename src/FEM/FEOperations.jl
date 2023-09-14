@@ -1,58 +1,3 @@
-function collect_trian(a::DomainContribution)
-  t = ()
-  for trian in get_domains(a)
-    t = (t...,trian)
-  end
-  unique(t)
-end
-
-function Base.:(==)(
-  a::T,
-  b::T
-  ) where {T<:Union{Grid,Field}}
-
-  for field in propertynames(a)
-    a_field = getproperty(a,field)
-    b_field = getproperty(b,field)
-    if isa(a_field,GridapType)
-      (==)(a_field,b_field)
-    else
-      if isdefined(a_field,1) && !(==)(a_field,b_field)
-        return false
-      end
-    end
-  end
-  return true
-end
-
-function is_parent(tparent::Triangulation,tchild::Triangulation)
-  try
-    try
-      tparent.model == tchild.model && tparent.grid == tchild.grid.parent
-    catch
-      tparent == tchild.parent
-    end
-  catch
-    false
-  end
-end
-
-function modify_measures!(measures::Vector{Measure},m::Measure)
-  for (nmeas,meas) in enumerate(measures)
-    if is_parent(get_triangulation(meas),get_triangulation(m))
-      measures[nmeas] = m
-      return
-    end
-  end
-  @unreachable "Unrecognizable measure"
-end
-
-function modify_measures(measures::Vector{Measure},m::Measure)
-  new_measures = copy(measures)
-  modify_measures!(new_measures,m)
-  new_measures
-end
-
 Gridap.CellData.get_triangulation(m::Measure) = m.quad.trian
 
 function FESpaces.get_order(test::SingleFieldFESpace)
@@ -66,27 +11,6 @@ function FESpaces.get_order(test::MultiFieldFESpace)
 end
 
 Base.zeros(fe::FESpace) = get_free_dof_values(zero(fe))
-
-# Remove when possible
-function CellData.is_change_possible(
-  strian::Triangulation,
-  ttrian::Triangulation)
-
-  msg = """\n
-  Triangulations do not point to the same background discrete model!
-  """
-
-  if strian === ttrian
-    return true
-  end
-
-  @check get_background_model(strian) == get_background_model(ttrian) msg
-
-  D = num_cell_dims(strian)
-  sglue = get_glue(strian,Val(D))
-  tglue = get_glue(ttrian,Val(D))
-  is_change_possible(sglue,tglue)
-end
 
 function get_discrete_model(
   tpath::String,
@@ -128,7 +52,7 @@ get_norm_matrix(::H1Norm,args...) = get_H1_norm_matrix(args...)
 
 for f in (:get_L2_norm_matrix,:get_H1_norm_matrix)
   @eval begin
-    function $f(op::ParamTransientFEOperator)
+    function $f(op::PTFEOperator)
       test = op.test
       trial = get_trial(op)
       trial_hom = allocate_trial_space(trial)

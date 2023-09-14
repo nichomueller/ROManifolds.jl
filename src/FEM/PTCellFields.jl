@@ -1,6 +1,15 @@
-abstract type ParamTransientFunction{P,T} <: Function end
+abstract type AbstractPTFunction{P,T} <: Function end
 
-struct PTFunction{P,T} <: ParamTransientFunction{P,T}
+struct PFunction{P} <: AbstractPTFunction{P,nothing}
+  f::Function
+  params::P
+
+  function PFunction(f::Function,params::P) where P
+    new{P}(f,params)
+  end
+end
+
+struct PTFunction{P,T} <: AbstractPTFunction{P,T}
   f::Function
   params::P
   times::T

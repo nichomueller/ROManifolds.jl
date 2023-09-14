@@ -23,7 +23,7 @@ addprocs(4)
 
   ranges = fill([1.,2.],3)
   sampling = UniformSampling()
-  pspace = ParamSpace(ranges,sampling)
+  pspace = PSpace(ranges,sampling)
 
   a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
   a(μ,t) = x->a(x,μ,t)
@@ -50,11 +50,11 @@ addprocs(4)
 
   reffe = ReferenceFE(lagrangian,Float,order)
   test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-  trial = ParamTransientTrialFESpace(test,g)
-  feop = ParamTransientAffineFEOperator(res,jac,jac_t,pspace,trial,test)
+  trial = PTTrialFESpace(test,g)
+  feop = PTAffineFEOperator(res,jac,jac_t,pspace,trial,test)
   t0,tF,dt,θ = 0.,0.05,0.005,1
   uh0(μ) = interpolate_everywhere(u0(μ),trial(μ,t0))
-  fesolver = θMethod(LUSolver(),t0,tF,dt,θ,uh0)
+  fesolver = ThetaMethod(LUSolver(),t0,tF,dt,θ,uh0)
 
   ϵ = 1e-4
   save_structures = true
