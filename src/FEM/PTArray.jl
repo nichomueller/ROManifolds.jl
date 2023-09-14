@@ -61,8 +61,13 @@ function LinearAlgebra.fillstored!(a::PTArray,z)
 end
 
 function Base.zero(a::PTArray)
+  T = eltype(a)
   b = similar(a)
-  b .= 0.
+  b .= zero(T)
+end
+
+function Base.zeros(a::PTArray)
+  zeros(a).array
 end
 
 function Base.:≈(a::AbstractArray{<:PTArray},b::AbstractArray{<:PTArray})
@@ -109,6 +114,10 @@ for op in (:+,:-)
       PTArray(map($op,pta,b.array))
     end
   end
+end
+
+function Base.transpose(a::PTArray)
+  PTArray(map(transpose,a.array))
 end
 
 Algebra.create_from_nz(a::PTArray) = a

@@ -1,4 +1,4 @@
-function solve_step!(
+function solution_step!(
   uf::PTArray,
   solver::ThetaMethod,
   op::PODEOperator,
@@ -13,7 +13,8 @@ function solve_step!(
 
   if isnothing(cache)
     ode_cache = allocate_cache(op,μ)
-    vθ = allocate_intermediate_step(u0)
+    vθ = similar(u0)
+    vθ .= 0.0
     nl_cache = nothing
   else
     ode_cache,vθ,nl_cache = cache
@@ -26,7 +27,7 @@ function solve_step!(
   nl_cache = solve!(uf,solver.nls,nlop,nl_cache)
 
   if 0.0 < solver.θ < 1.0
-    uf = uf*(1.0/solver.θ)-u0*((1-solver.θ)/solver.θ)
+    @. uf = uf*(1.0/solver.θ)-u0*((1-solver.θ)/solver.θ)
   end
 
   cache = (ode_cache,vθ,nl_cache)

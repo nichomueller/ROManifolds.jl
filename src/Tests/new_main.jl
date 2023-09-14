@@ -48,7 +48,7 @@ begin
   trial = PTTrialFESpace(test,g)
   feop = PTAffineFEOperator(res,jac,jac_t,pspace,trial,test)
   t0,tF,dt,θ = 0.,0.05,0.005,1
-  uh0(μ) = interpolate_everywhere(u0(μ),trial(μ,t0))
+  uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
   fesolver = ThetaMethod(LUSolver(),dt,θ)
 
   ϵ = 1e-4
@@ -63,10 +63,9 @@ begin
   rbsolver = Backslash()
 end
 
-#OK
 nsnaps = 10
 p = realization(feop,nsnaps)
-
+sols = collect_solutions(op,solver,μ,u0)
 
 #TRY
 # snap = collect_solutions(feop,fesolver,p;nsnaps)

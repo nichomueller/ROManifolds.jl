@@ -104,8 +104,8 @@ function FESpaces.compute_dirichlet_values_for_tags!(
   f::SingleFieldFESpace,
   tag_to_object::PTArray) where T
 
-  dv = zero(dirichlet_values).array
-  dvs = zero(dirichlet_values_scratch).array
+  dv = zeros(dirichlet_values)
+  dvs = zeros(dirichlet_values_scratch)
   tto = tag_to_object.array
 
   dirichlet_dof_to_tag = get_dirichlet_dof_tag(f)
@@ -122,4 +122,23 @@ function FESpaces.compute_dirichlet_values_for_tags!(
     dirichlet_values.array[k] = _dv
   end
   dirichlet_values
+end
+
+function FESpaces.interpolate_everywhere(object::PFunction,f::SingleFieldFESpace)
+  p = object.params
+  np = length(p)
+  free_values = PTArray(zero_free_values(f),np)
+  dirichlet_values = PTArray(zero_dirichlet_values(f),np)
+  fv = zeros(free_values)
+  dv = zeros(dirichlet_values_scratch)
+  k = 0
+  for (_fv,_dv) in zip(fv,dv)
+    k += 1
+    objk = object.f(p[k])
+    cell_vals = _cell_vals(fs,objk)
+    gather_free_and_dirichlet_values!(_fv,_dv,f,cell_vals)
+    free_values.array[k] = _fv
+    dirichlet_values.array[k] = _dv
+  end
+  FEFunction(f,free_values,dirichlet_values)
 end

@@ -12,21 +12,21 @@ cache = nothing
 results = PTArray[]
 
 for t in times
-  _,cache = solve_step!(uF,solver,ode_op,μ,w,t,cache)
+  _,cache = solution_step!(uF,solver,ode_op,μ,w,t,cache)
   w = copy(uF)
   push!(results,w)
   println(get_free_dof_values(cache[1]))
 end
-# _,cache_new = solve_step!(uF,solver,ode_op,μ,w,t,cache)
+# _,cache_new = solution_step!(uF,solver,ode_op,μ,w,t,cache)
 # w = copy(uF)
 # push!(results,w)
 
-# _,cache_new_new = solve_step!(uF,solver,ode_op,μ,w,t+dt,cache_new)
+# _,cache_new_new = solution_step!(uF,solver,ode_op,μ,w,t+dt,cache_new)
 # w = copy(uF)
 # cache = copy(cache_new)
 # push!(results,w)
 
-# _,cache_new = solve_step!(uF,solver,ode_op,μ,w,t+2dt,cache)
+# _,cache_new = solution_step!(uF,solver,ode_op,μ,w,t+2dt,cache)
 # w = copy(w)
 # cache = copy(cache_new)
 # push!(results,uF)
