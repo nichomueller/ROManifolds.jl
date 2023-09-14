@@ -128,7 +128,7 @@ function allocate_residual(
 end
 
 function residual!(
-  b::AbstractArray,
+  b::PTArray,
   op::ParamTransientFEOperatorFromWeakForm,
   μ::AbstractArray,
   t::Real,
@@ -168,7 +168,7 @@ for f in (:allocate_residual,:allocate_jacobian)
 end
 
 function jacobian!(
-  A::AbstractArray,
+  A::PTArray,
   op::ParamTransientFEOperatorFromWeakForm,
   μ::AbstractArray,
   t::Real,
@@ -183,7 +183,7 @@ function jacobian!(
 end
 
 function jacobians!(
-  A::AbstractArray,
+  A::PTArray,
   op::ParamTransientFEOperatorFromWeakForm,
   μ::AbstractArray,
   t::Real,

@@ -30,12 +30,12 @@ function solve_step!(
 
   uf = uf + u0
   if 0.0 < solver.θ < 1.0
-    uf = uf*(1.0/solver.θ)-u0*((1-solver.θ)/solver.θ)
+    @. uf = uf*(1.0/solver.θ)-u0*((1-solver.θ)/solver.θ)
   end
 
   cache = (ode_cache,vθ,A,b,l_cache)
-
-  return (uf,cache)
+  tf = t0+dt
+  return (uf,tf,cache)
 end
 
 function _matrix_and_vector!(
@@ -79,5 +79,6 @@ function _vector!(
   vθ)
 
   residual!(b,op,μ,tθ,(u0,vθ),ode_cache)
-  b .*= -1.0
+  b.array .*= -1.0
+  b
 end

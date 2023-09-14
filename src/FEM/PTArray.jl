@@ -32,14 +32,10 @@ function Base.first(a::PTArray,i...)
 end
 
 function Base.show(io::IO,o::PTArray{T}) where T
-  print(io,"PTArray of eltype $T and length $(length(o.array))")
+  print(io,"PTArray of type $T and length $(length(o.array))")
 end
 
 Base.copy(a::PTArray) = PTArray(copy(a.array))
-
-function Base.copyto!(a::PTArray,b::PTArray)
-  PTArray(map(copyto!,a.array,b.array))
-end
 
 function Base.fill!(a::PTArray{T},v::T) where T
   PTArray(fill!(a.array,v))
@@ -59,7 +55,7 @@ end
 function LinearAlgebra.fillstored!(a::PTArray,z)
   a1 = testitem(a)
   fillstored!(a1,z)
-  @inbounds for i = eachindex(ptarray)
+  @inbounds for i = eachindex(a)
     a.array[i] .= a1
   end
 end

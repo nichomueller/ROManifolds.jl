@@ -40,7 +40,7 @@ function HomogeneousPTTrialFESpace!(
   dirichlet_values::PTArray{T},
   U::SingleFieldFESpace) where T
 
-  fill!(dirichlet_values,zero(T))
+  fill!(dirichlet_values,zero(eltype(T)))
   PTTrialFESpace(dirichlet_values,U)
 end
 
@@ -115,7 +115,7 @@ function FESpaces.compute_dirichlet_values_for_tags!(
     _tag_to_object = FESpaces._convert_to_collectable(_tto,num_dirichlet_tags(f))
     for (tag,object) in enumerate(_tag_to_object)
       cell_vals = FESpaces._cell_vals(f,object)
-      fill!(_dvs,zero(T))
+      fill!(_dvs,zero(eltype(T)))
       gather_dirichlet_values!(_dvs,f,cell_vals)
       FESpaces._fill_dirichlet_values_for_tag!(_dv,_dvs,tag,dirichlet_dof_to_tag)
     end

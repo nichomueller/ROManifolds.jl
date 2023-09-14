@@ -1,9 +1,9 @@
 function solve_step!(
-  uf::AbstractVector,
+  uf::PTArray,
   solver::θMethod,
   op::ParamODEOperator,
   μ::AbstractVector,
-  u0::AbstractVector,
+  u0::PTArray,
   t0::Real,
   cache)
 
@@ -43,30 +43,30 @@ struct ParamThetaMethodNonlinearOperator <: PNonlinearOperator
   μ::AbstractVector
   tθ::Float64
   dtθ::Float64
-  u0::AbstractVector
+  u0::PTArray
   ode_cache
-  vθ::AbstractVector
+  vθ::PTArray
 end
 
 function residual!(
-  b::AbstractVector,
+  b::PTArray,
   op::ParamThetaMethodNonlinearOperator,
-  x::AbstractVector)
+  x::PTArray)
 
   uθ = x
   vθ = op.vθ
-  @. vθ = (x-op.u0)/op.dtθ
+  @. vθ.array = (x.array-op.u0)/op.dtθ
   residual!(b,op.odeop,op.μ,op.tθ,(uθ,vθ),op.ode_cache)
 end
 
 function jacobian!(
-  A::AbstractMatrix,
+  A::PTArray,
   op::ParamThetaMethodNonlinearOperator,
-  x::AbstractVector)
+  x::PTArray)
 
   uF = x
   vθ = op.vθ
-  @. vθ = (x-op.u0)/op.dtθ
+  @. vθ.array = (x.array-op.u0)/op.dtθ
   z = zero(eltype(A))
   fillstored!(A,z)
   jacobians!(A,op.odeop,op.μ,op.tθ,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)
@@ -74,14 +74,14 @@ end
 
 function allocate_residual(
   op::ParamThetaMethodNonlinearOperator,
-  x::AbstractVector)
+  x::PTArray)
 
   allocate_residual(op.odeop,x,op.ode_cache)
 end
 
 function allocate_jacobian(
   op::ParamThetaMethodNonlinearOperator,
-  x::AbstractVector)
+  x::PTArray)
 
   allocate_jacobian(op.odeop,x,op.ode_cache)
 end

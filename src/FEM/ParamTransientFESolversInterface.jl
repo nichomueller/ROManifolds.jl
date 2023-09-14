@@ -79,7 +79,7 @@ function jacobian!(
   op::ParamODEOpFromFEOp,
   μ::AbstractArray,
   t::Real,
-  xhF::Tuple{Vararg{AbstractVector}},
+  xhF::Tuple{Vararg{PTArray}},
   i::Integer,
   γᵢ::Real,
   ode_cache)
@@ -98,7 +98,7 @@ function jacobians!(
   op::ParamODEOpFromFEOp,
   μ::AbstractArray,
   t::Real,
-  xhF::Tuple{Vararg{AbstractVector}},
+  xhF::Tuple{Vararg{PTArray}},
   γ::Tuple{Vararg{Real}},
   ode_cache)
 
