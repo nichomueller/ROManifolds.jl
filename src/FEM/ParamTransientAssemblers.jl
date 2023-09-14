@@ -1,6 +1,3 @@
-_ndims(a) = ndims(eltype(a))
-_ndims(a::PTArray) = ndims(eltype(testitem(a)))
-
 function FESpaces.collect_cell_vector(
   test::FESpace,
   a::PTDomainContribution)
@@ -10,7 +7,7 @@ function FESpaces.collect_cell_vector(
   for strian in get_domains(a)
     scell_vec = get_contribution(a,strian)
     cell_vec,trian = move_contributions(scell_vec,strian)
-    @assert _ndims(cell_vec) == 1
+    @assert ndims(eltype(cell_vec)) == 1
     cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
     rows = get_cell_dof_ids(test,trian)
     push!(w,cell_vec_r)
@@ -26,7 +23,7 @@ function FESpaces.collect_cell_vector(
 
   scell_vec = get_contribution(a,strian)
   cell_vec,trian = move_contributions(scell_vec,strian)
-  @assert _ndims(cell_vec) == 1
+  @assert ndims(eltype(cell_vec)) == 1
   cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
   rows = get_cell_dof_ids(test,trian)
   return cell_vec_r,rows
@@ -43,7 +40,7 @@ function FESpaces.collect_cell_matrix(
   for strian in get_domains(a)
     scell_mat = get_contribution(a,strian)
     cell_mat, trian = move_contributions(scell_mat,strian)
-    @assert _ndims(cell_mat) == 2
+    @assert ndims(eltype(cell_mat)) == 2
     cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
     cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
     rows = get_cell_dof_ids(test,trian)
@@ -63,7 +60,7 @@ function FESpaces.collect_cell_matrix(
 
   scell_mat = get_contribution(a,strian)
   cell_mat,trian = move_contributions(scell_mat,strian)
-  @assert _ndims(cell_mat) == 2
+  @assert ndims(eltype(cell_mat)) == 2
   cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
   cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
   rows = get_cell_dof_ids(test,trian)

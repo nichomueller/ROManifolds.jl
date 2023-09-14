@@ -38,7 +38,7 @@ end
 Nonlinear operator that represents the θ-method nonlinear operator at a
 given time step, i.e., A(t,u_n+θ,(u_n+θ-u_n)/dt)
 """
-struct ParamThetaMethodNonlinearOperator <: NonlinearOperator
+struct ParamThetaMethodNonlinearOperator <: PNonlinearOperator
   odeop::ParamODEOperator
   μ::AbstractVector
   tθ::Float64
@@ -54,7 +54,8 @@ function residual!(
   x::AbstractVector)
 
   uθ = x
-  vθ = (x-op.u0)/op.dtθ
+  vθ = op.vθ
+  @. vθ = (x-op.u0)/op.dtθ
   residual!(b,op.odeop,op.μ,op.tθ,(uθ,vθ),op.ode_cache)
 end
 
@@ -64,8 +65,10 @@ function jacobian!(
   x::AbstractVector)
 
   uF = x
-  vθ = (x-op.u0)/op.dtθ
-  fill_with_zeros!(A)
+  vθ = op.vθ
+  @. vθ = (x-op.u0)/op.dtθ
+  z = zero(eltype(A))
+  fillstored!(A,z)
   jacobians!(A,op.odeop,op.μ,op.tθ,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)
 end
 

@@ -24,10 +24,9 @@ function solve_step!(
   ode_cache = update_cache!(ode_cache,op,μ,tθ)
 
   _matrix_and_vector!(A,b,op,μ,tθ,dtθ,u0,ode_cache,vθ)
-  afop = AffineOperator(A,b)
+  afop = PAffineOperator(A,b)
 
-  newmatrix = true
-  l_cache = solve!(uf,solver.nls,afop,l_cache,newmatrix)
+  l_cache = solve!(uf,solver.nls,afop,l_cache)
 
   uf = uf + u0
   if 0.0 < solver.θ < 1.0
@@ -64,7 +63,8 @@ function _matrix!(
   ode_cache,
   vθ)
 
-  fill_with_zeros!(A)
+  z = zero(eltype(A))
+  fillstored!(A,z)
   jacobians!(A,op,μ,tθ,(vθ,vθ),(1.0,1/dtθ),ode_cache)
 end
 

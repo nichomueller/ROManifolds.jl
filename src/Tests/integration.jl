@@ -54,13 +54,11 @@ xh_ok = TransientCellField(uh_ok,dxh_ok)
 mdc_ok = ∫(v*∂t(xh_ok))dΩ
 
 # TESTS
-_ndims(a) = ndims(eltype(a))
-_ndims(a::PTArray) = ndims(eltype(testitem(a)))
 
 function runtest_matrix(dc,dc_ok,strian)
   scell_mat = get_contribution(dc,strian)
   cell_mat,trian = move_contributions(scell_mat,strian)
-  @assert _ndims(cell_mat) == 2
+  @assert ndims(eltype(cell_mat)) == 2
   cell_mat_c = attach_constraints_cols(U(μ,t),cell_mat,trian)
   cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
   rows = get_cell_dof_ids(test,trian)
@@ -68,7 +66,7 @@ function runtest_matrix(dc,dc_ok,strian)
 
   scell_mat_ok = get_contribution(dc_ok,strian)
   cell_mat_ok,trian_ok = move_contributions(scell_mat_ok,strian)
-  @assert _ndims(cell_mat_ok) == 2
+  @assert ndims(eltype(cell_mat_ok)) == 2
   cell_mat_c_ok = attach_constraints_cols(trial_ok(t),cell_mat_ok,trian_ok)
   cell_mat_rc_ok = attach_constraints_rows(test,cell_mat_c_ok,trian_ok)
   rows_ok = get_cell_dof_ids(test,trian_ok)
@@ -83,13 +81,13 @@ end
 function runtest_vector(dc,dc_ok,strian)
   scell_vec = get_contribution(dc,strian)
   cell_vec,trian = move_contributions(scell_vec,strian)
-  @assert _ndims(cell_vec) == 1
+  @assert ndims(eltype(cell_vec)) == 1
   cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
   rows = get_cell_dof_ids(test,trian)
 
   scell_vec_ok = get_contribution(dc_ok,strian)
   cell_vec_ok,trian_ok = move_contributions(scell_vec_ok,strian)
-  @assert _ndims(cell_vec_ok) == 1
+  @assert ndims(eltype(cell_vec_ok)) == 1
   cell_vec_r_ok = attach_constraints_rows(test,cell_vec_ok,trian_ok)
   rows_ok = get_cell_dof_ids(test,trian_ok)
 

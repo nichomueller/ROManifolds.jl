@@ -13,8 +13,8 @@ end
 
 Base.size(a::PTArray) = size(a.array)
 Base.length(a::PTArray) = length(a.array)
-Base.eltype(::Type{PTArray{T}}) where T = T
-Base.eltype(::PTArray{T}) where T = T
+Base.eltype(::Type{PTArray{T}}) where T = eltype(T)
+Base.eltype(::PTArray{T}) where T = eltype(T)
 Base.ndims(::PTArray) = 1
 Base.ndims(::Type{<:PTArray}) = 1
 Base.eachindex(a::PTArray) = eachindex(a.array)
@@ -115,70 +115,6 @@ for op in (:+,:-)
   end
 end
 
-# @inline function Algebra.add_entry!(
-#   combine::Function,
-#   A::PTArray{<:AbstractMatrix},
-#   v,i,j)
-
-#   @inbounds for k = eachindex(A)
-#     aijk = A[k][i,j]
-#     A[k][i,j] = combine(aijk,v)
-#   end
-#   A
-# end
-
-# @inline function Algebra.add_entry!(
-#   combine::Function,
-#   A::PTArray{<:AbstractMatrix},
-#   v::AbstractArray,
-#   i,j)
-
-#   # @inbounds for k = eachindex(A)
-#   #   aijk = copy(A.array[k][i,j])
-#   #   A.array[k][i,j] .= combine(aijk,v[k])
-#   # end
-#   aij = map(x -> getindex(x,i,j),A.array)
-#   A.array[k][i,j] .= combine(aijk,v[k])
-#   A
-# end
-
-# @inline function Algebra._add_entries!(
-#   combine::Function,
-#   A::PTArray{<:AbstractMatrix},
-#   vs::PTArray{<:AbstractMatrix},
-#   is,js)
-
-#   @inbounds for (lj,j) in enumerate(js)
-#     if j>0
-#       for (li,i) in enumerate(is)
-#         if i>0
-#           vij = map(x -> getindex(x,li,lj),vs.array)
-#           Algebra.add_entry!(combine,A,vij,i,j)
-#         end
-#       end
-#     end
-#   end
-#   A
-# end
-
-# @inline function Algebra._add_entries!(
-#   combine::Function,
-#   A::PTArray{<:AbstractMatrix},
-#   vs,is,js)
-
-#   @inbounds for (lj,j) in enumerate(js)
-#     if j>0
-#       for (li,i) in enumerate(is)
-#         if i>0
-#           vij = vs[li,lj]
-#           Algebra.add_entry!(combine,A,vij,i,j)
-#         end
-#       end
-#     end
-#   end
-#   A
-# end
-
 Algebra.create_from_nz(a::PTArray) = a
 
 function Arrays.testitem(a::PTArray{T}) where T
@@ -189,18 +125,6 @@ function Arrays.testitem(a::PTArray{T}) where T
     testvalue(T)
   end
 end
-
-# function Arrays.array_cache(a::PTArray)
-#   a1 = testitem(a)
-#   n = length(a)
-#   cache = array_cache(a1)
-#   PTArray(cache,n)
-# end
-
-# function Arrays.getindex!(c::PTArray,a::PTArray,i::Integer)
-#   b = map((cache,array)->getindex!(cache,array,i),c.array,a.array)
-#   PTArray(b)
-# end
 
 function Arrays.testvalue(::Type{PTArray{T}}) where T
   array = Vector{T}(undef,(1,))
