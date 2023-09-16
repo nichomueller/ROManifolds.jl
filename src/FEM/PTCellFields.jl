@@ -77,14 +77,14 @@ end
 
 function CellData.CellField(f::PTFunction,trian::Triangulation,::DomainStyle)
   s = size(get_cell_map(trian))
-  cell_field = PTArray(map(x->Fill(x,s),get_fields(f)))
+  cell_field = PTArray(lazy_map(x->Fill(x,s),get_fields(f)))
   GenericPTCellField(cell_field,trian,PhysicalDomain())
 end
 
 function CellData.CellField(fs::SingleFieldFESpace,cell_vals::PTArray)
   v = get_fe_basis(fs)
   cell_basis = get_data(v)
-  cell_field = PTArray(map(x->lazy_map(linear_combination,x,cell_basis),cell_vals.array))
+  cell_field = lazy_map(linear_combination,cell_vals,cell_basis)
   GenericPTCellField(cell_field,get_triangulation(v),DomainStyle(v))
 end
 
@@ -126,9 +126,9 @@ abstract type PTFEFunction <: PTCellField end
 
 struct PTSingleFieldFEFunction{T<:CellField} <: PTFEFunction
   cell_field::T
-  cell_dof_values::PTArray{<:AbstractArray{<:AbstractVector{<:Number}}}
-  free_values::PTArray{<:AbstractVector{<:Number}}
-  dirichlet_values::PTArray{<:AbstractVector{<:Number}}
+  cell_dof_values::PTArray
+  free_values::PTArray
+  dirichlet_values::PTArray
   fe_space::SingleFieldFESpace
 end
 
@@ -159,9 +159,9 @@ for T in (:ConstantFESpace,:DirichletFESpace,:FESpaceWithConstantFixed,
       free_values::PTArray,
       dirichlet_values::PTArray)
 
-      ptarrays = map((fv,dv) -> scatter_free_and_dirichlet_values(f,fv,dv),
-        free_values.array,dirichlet_values.array)
-      PTArray(ptarrays)
+      n = length(free_values)
+      fv1,dv1 = map(testitem,(free_values,dirichlet_values))
+      PTArray(scatter_free_and_dirichlet_values(f,fv1,dv1),n)
     end
   end
 end

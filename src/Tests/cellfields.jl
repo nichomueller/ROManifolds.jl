@@ -1,30 +1,16 @@
-op = feop
-p = realization(op,2)
-μ = p
-u = PTArray([zeros(test.nfree) for _ = 1:2])
-ode_op = get_algebraic_operator(op)
-
-cache = nothing
+op,solver = feop,fesolver
+μ = realization(op,2)
 t = solver.dt
-ode_cache = allocate_cache(ode_op,μ)
-vθ = similar(u)
-vθ .= 1.0
+strian = Ω
 
-Us,_,fecache = ode_cache
-uh = EvaluationFunction(Us[1],vθ)
+vec_cache = PTArray([zeros(test.nfree) for _ = 1:2])
 V = get_test(op)
 v = get_fe_basis(V)
-dxh = ()
-for i in 1:get_order(op)
-  dxh = (dxh...,uh)
-end
-xh = TransientCellField(uh,dxh)
-
+U = PTrialFESpace(vec_cache,V)
+du = get_trial_fe_basis(U)
 
 x = get_cell_points(dΩ.quad)
-# r = aμt(μ,dt)*∇(v)
-# r(x)
-q = aμt(μ,dt)*∇(v)⋅∇(xh)
+q = aμt(μ,t)*∇(v)⋅∇(du)
 resq = q(x)
 res1 = resq.array[1]
 
@@ -50,3 +36,13 @@ res1_ok = qok(x)
 
 typeof(res1) == typeof(res1_ok) # true
 all(res1 .== res1_ok) # true
+
+U = trial(μ,t)
+cell_vals = scatter_free_and_dirichlet_values(U,vec_cache,U.dirichlet_values)
+cell_basis = get_data(v)
+# lazy_map(linear_combination,cell_vals,cell_basis)
+lazy_arrays = map(eachindex(cell_vals)) do i
+  ai = _getter_at_ind(i,cell_vals,cell_basis)
+  lazy_map(linear_combination,ai...)
+end
+FEFunction(U,vec_cache)

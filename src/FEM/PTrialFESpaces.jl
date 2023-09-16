@@ -102,15 +102,14 @@ function FESpaces.compute_dirichlet_values_for_tags!(
   dirichlet_values::PTArray{T},
   dirichlet_values_scratch::PTArray{T},
   f::SingleFieldFESpace,
-  tag_to_object::PTArray) where T
+  tag_to_object) where T
 
   dv = zeros(dirichlet_values)
   dvs = zeros(dirichlet_values_scratch)
-  tto = tag_to_object.array
 
   dirichlet_dof_to_tag = get_dirichlet_dof_tag(f)
   k = 0
-  for (_dv,_dvs,_tto) in zip(dv,dvs,tto)
+  for (_dv,_dvs,_tto) in zip(dv,dvs,tag_to_object)
     k += 1
     _tag_to_object = FESpaces._convert_to_collectable(_tto,num_dirichlet_tags(f))
     for (tag,object) in enumerate(_tag_to_object)

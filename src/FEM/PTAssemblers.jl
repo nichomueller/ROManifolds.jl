@@ -73,7 +73,7 @@ function FESpaces.numeric_loop_matrix!(
   a::GenericSparseMatrixAssembler,
   matdata)
 
-  Acache = zero(A).array
+  Acache = zeros(A)
   for (cellmat,_cellidsrows,_cellidscols) in zip(matdata...)
     cellidsrows = FESpaces.map_cell_rows(a.strategy,_cellidsrows)
     cellidscols = FESpaces.map_cell_cols(a.strategy,_cellidscols)
@@ -88,7 +88,7 @@ function FESpaces.numeric_loop_matrix!(
       rows1 = getindex!(rows_cache,cellidsrows,1)
       cols1 = getindex!(cols_cache,cellidscols,1)
       add! = AddEntriesMap(+)
-      add_cache = return_cache(add!,A,mat1,rows1,cols1)
+      add_cache = return_cache(add!,Acache,mat1,rows1,cols1)
       caches = Acache,add_cache,vals_cache,rows_cache,cols_cache
       FESpaces._numeric_loop_matrix!(A,caches,cellmat,cellidsrows,cellidscols)
     end
@@ -119,7 +119,7 @@ function FESpaces.numeric_loop_vector!(
   a::GenericSparseMatrixAssembler,
   vecdata)
 
-  bcache = zero(b).array
+  bcache = zeros(b)
   for (cellvec,_cellids) in zip(vecdata...)
     cellids = FESpaces.map_cell_rows(a.strategy,_cellids)
     cellvec1 = isa(cellvec,PTArray) ? testitem(cellvec) : cellvec
@@ -129,7 +129,7 @@ function FESpaces.numeric_loop_vector!(
       vec1 = getindex!(vals_cache,cellvec1,1)
       rows1 = getindex!(rows_cache,cellids,1)
       add! = AddEntriesMap(+)
-      add_cache = return_cache(add!,b,vec1,rows1)
+      add_cache = return_cache(add!,bcache,vec1,rows1)
       caches = bcache,add_cache,vals_cache,rows_cache
       FESpaces._numeric_loop_vector!(b,caches,cellvec,cellids)
     end

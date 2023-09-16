@@ -49,9 +49,9 @@ end
 
 function evaluate!(Ut::T,U::PTTrialFESpace,params::Table,t::Real) where T
   if isa(U.dirichlet_μt,Vector)
-    objects_at_t = PTArray(map(o->map(μ->o(μ,t),params),U.dirichlet_μt))
+    objects_at_t = map(o->map(μ->o(μ,t),params),U.dirichlet_μt)
   else
-    objects_at_t = PTArray(map(μ->U.dirichlet_μt(μ,t),params))
+    objects_at_t = map(μ->U.dirichlet_μt(μ,t),params)
   end
   PTrialFESpace!(Ut,objects_at_t)
   Ut

@@ -6,7 +6,7 @@ strian = Ω
 vec_cache = PTArray([zeros(test.nfree) for _ = 1:2])
 V = get_test(op)
 v = get_fe_basis(V)
-U = PTTrialFESpace(vec_cache,V)
+U = PTrialFESpace(vec_cache,V)
 du = get_trial_fe_basis(U)
 
 int = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ)

@@ -160,10 +160,12 @@ function ptintegrate(f,b::CellData.CompositeMeasure)
 end
 
 function CellData.move_contributions(scell_to_val::PTArray,args...)
-  y = map(x->move_contributions(x,args...),scell_to_val.array)
-  ptcell_mat = PTArray(first.(y))
-  trian = first(last.(y))
-  ptcell_mat,trian
+  ptcell_mat_trian = map(scell_to_val.array) do x
+    move_contributions(x,args...)
+  end
+  cell_to_val = PTArray(first.(ptcell_mat_trian))
+  trian = first(last.(ptcell_mat_trian))
+  cell_to_val,trian
 end
 
 function ptintegrate(f::CellField,quad::CellQuadrature)

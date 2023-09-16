@@ -140,13 +140,6 @@ function _get_1st_sq(x::Union{AbstractArray,SupportQuantity}...)
   end
 end
 
-aa = rand(3)
-bb = rand(3)
-cc = SupportQuantity([aa,bb])
-dd = SupportQuantity([bb,aa])
-xx = aa,bb,cc,dd
-_getter_at_ind(1,xx...)
-
 function Arrays.lazy_map(k,a::SupportQuantity,x::Union{AbstractArray,SupportQuantity}...)
   lazy_arrays = map(eachindex(a)) do i
     ai = _getter_at_ind(i,a,x...)
@@ -219,9 +212,6 @@ function CellData.CellField(f::PTFunction,trian::Triangulation,::DomainStyle)
   NewGenericPTCellField(cell_field,trian,PhysicalDomain())
 end
 
-# cf = CellField(aμt(μ,t),Ω,ReferenceDomain())
-# cfx = cf(x)
-
 op = feop
 μ = realization(op,2)
 t = dt
@@ -231,20 +221,6 @@ du = get_trial_fe_basis(trial(nothing,nothing))
 
 q = aμt(μ,t)*∇(dv)
 resq = q(x)
-
-# # ax = map(i->i(x),q.args[1])
-# _f,_x = CellData._to_common_domain(q.args[1],x)
-# cell_field = get_data(_f)
-# cell_point = get_data(_x)
-# # lazy_map(evaluate,cell_field,cell_point)
-# ff = cell_field.args[1]
-# gg = cell_field.args[2]
-# gx = lazy_map(evaluate,gg,cell_point)
-# # fx = lazy_map(evaluate,ff,gx)
-# fi = map(testitem,(ff,gx))
-# # T = return_type(evaluate,fi...) # @which evaluate!(nothing,fi...) -> Matrix
-# cache = return_cache(evaluate,fi[1],gx[1])
-# evaluate!(cache,evaluate,fi[1],gx[1])
 
 q_ok = a(μ[1],t)*∇(dv)
 resq_ok = q_ok(x)
@@ -261,25 +237,3 @@ function test_ptarray(a::AbstractArray,b::SupportQuantity)
 end
 
 test_ptarray(resq,resq_ok)
-# # ax_ok = map(i->i(x),q_ok.args[1])
-# _f_ok,_x_ok = CellData._to_common_domain(q_ok.args[1],x)
-# cell_field_ok = get_data(_f_ok)
-# cell_point_ok = get_data(_x_ok)
-# # lazy_map(evaluate,cell_field_ok,cell_point_ok)
-# ff_ok = cell_field_ok.args[1]
-# gg_ok = cell_field_ok.args[2]
-# gx_ok = lazy_map(evaluate,gg_ok,cell_point_ok)
-# # fx_ok = lazy_map(evaluate,ff_ok,gx_ok)
-# fi_ok = map(testitem,(ff_ok,gx_ok))
-# T_ok = return_type(evaluate,fi_ok...) # @which evaluate!(nothing,fi_ok...) -> Vector
-# cache_ok = return_cache(evaluate,fi_ok[1],gx_ok[1])
-# evaluate!(cache_ok,evaluate,fi_ok[1],gx_ok[1])
-
-# typeof(resq[1]) == typeof(resq_ok)
-# all(resq[1] .≈ resq_ok)
-
-# q = aμt(μ,t)*∇(dv)⋅∇(du)
-# resq = q(x)
-# resq_ok = (a(μ[1],t)*∇(dv)⋅∇(du))(x)
-# typeof(resq[1]) == typeof(resq_ok)
-# all(resq[1] .≈ resq_ok)

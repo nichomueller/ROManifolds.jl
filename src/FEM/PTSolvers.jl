@@ -1,31 +1,25 @@
 abstract type PNonlinearOperator <: GridapType end
 
-struct PAffineOperator{A<:AbstractMatrix,B<:AbstractVector} <: PNonlinearOperator
-  matrix::PTArray{A}
-  vector::PTArray{B}
+struct PAffineOperator <: PNonlinearOperator
+  matrix::PTArray
+  vector::PTArray
 end
 
 function Algebra.solve!(x::PTArray,solver,op,args...)
-  xcache = zero(x).array
+  xcache = zeros(x)
   ptsolve!(x,xcache,solver,op,args...)
 end
 
-function Algebra.numerical_setup(
-  ss::Algebra.LUSymbolicSetup,
-  mat::PTArray{<:AbstractMatrix})
-
-  PTArray(map(x->numerical_setup(ss,x),mat.array))
+function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::PTArray)
+  map(x->numerical_setup(ss,x),mat.array)
 end
 
-function Algebra.numerical_setup!(
-  ns::PTArray{<:NumericalSetup},
-  mat::PTArray{<:AbstractMatrix})
-
-  PTArray(map(numerical_setup!,ns.array,mat.array))
+function Algebra.numerical_setup!(ns,mat::PTArray)
+  map(numerical_setup!,ns,mat.array)
 end
 
 function ptsolve!(
-  x::PTArray,xcache::AbstractVector,::LinearSolver,op::PAffineOperator,ns::PTArray{<:NumericalSetup})
+  x::PTArray,xcache::AbstractVector,::LinearSolver,op::PAffineOperator,ns)
 
   A = op.matrix
   b = op.vector
@@ -53,10 +47,10 @@ function ptsolve!(
   ns
 end
 
-struct PNewtonRaphsonCache{A<:AbstractMatrix,B<:AbstractVector} <: GridapType
-  A::PTArray{A}
-  b::PTArray{B}
-  dx::PTArray{B}
+struct PNewtonRaphsonCache <: GridapType
+  A::PTArray
+  b::PTArray
+  dx::PTArray
   ns::NumericalSetup
 end
 
