@@ -71,7 +71,6 @@ import Gridap.ODEs.ODETools:_allocate_matrix_and_vector
 import Gridap.ODEs.TransientFETools._matdata_jacobian
 import Gridap.ODEs.TransientFETools._vcat_matdata
 
-include("FEOperations.jl")
 include("PSpace.jl")
 include("PDiffOperators.jl")
 include("PTArray.jl")
@@ -86,4 +85,4 @@ include("PTSolvers.jl")
 include("PODEQuantities.jl")
 include("PAffineThetaMethod.jl")
 include("PThetaMethod.jl")
-include("Collectors.jl")
+include("FEOperations.jl")

@@ -13,7 +13,7 @@ get_snaps(s::Snapshots) = s.snaps
 num_time_steps(s::Snapshots) = length(s.snaps)
 num_params(s::Snapshots) = length(testitem(s))
 Base.length(s::Snapshots) = num_params(s)
-Array.testitem(s::Snapshots) = testitem(s.snaps)
+Arrays.testitem(s::Snapshots) = testitem(s.snaps)
 
 function Base.size(s::Snapshots)
   s1 = testitem(s)
@@ -28,7 +28,7 @@ function Base.show(io::IO,s::Snapshots{T}) where T
   print(io,"Structure storing $nsnaps snapshots of type $T")
 end
 
-Base.length(s::PTArray) = length(s.snaps)
+Base.length(s::Snapshots) = length(s.snaps)
 Base.eltype(::Type{Snapshots{T}}) where T = eltype(T)
 Base.eltype(::Snapshots{T}) where T = eltype(T)
 Base.ndims(::Snapshots) = 1

@@ -6,7 +6,8 @@ struct PTArray{T}
   end
 
   function PTArray(a::T,length::Int) where T
-    array = fill(a,length)
+    array = Vector{T}(undef,length)
+    fill!(array,a)
     new{T}(array)
   end
 end
@@ -42,7 +43,9 @@ function Base.fill!(a::PTArray{T},v::T) where T
 end
 
 function Base.fill!(a::PTArray{T},v::S) where {S,T<:AbstractVector{S}}
-  PTArray(fill!(a.array,fill(v,length(testitem(a)))))
+  array = Vector{S}(undef,length(a))
+  fill!(array,a)
+  PTArray(fill!(a.array,array))
 end
 
 Base.similar(a::PTArray) = PTArray(map(similar,a.array))

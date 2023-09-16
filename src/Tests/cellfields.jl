@@ -1,10 +1,8 @@
-op,solver = feop,fesolver
+op = feop
 p = realization(op,2)
 μ = p
 u = PTArray([zeros(test.nfree) for _ = 1:2])
 ode_op = get_algebraic_operator(op)
-times = get_times(solver)
-tF = solver.t0
 
 cache = nothing
 t = solver.dt
