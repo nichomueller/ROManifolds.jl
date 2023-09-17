@@ -118,7 +118,7 @@ function FESpaces.compute_dirichlet_values_for_tags!(
       gather_dirichlet_values!(_dvs,f,cell_vals)
       FESpaces._fill_dirichlet_values_for_tag!(_dv,_dvs,tag,dirichlet_dof_to_tag)
     end
-    dirichlet_values.array[k] = _dv
+    dirichlet_values[k] = _dv
   end
   dirichlet_values
 end
@@ -136,8 +136,28 @@ function FESpaces.interpolate_everywhere(object::PFunction,f::SingleFieldFESpace
     objk = object.f(p[k])
     cell_vals = _cell_vals(fs,objk)
     gather_free_and_dirichlet_values!(_fv,_dv,f,cell_vals)
-    free_values.array[k] = _fv
-    dirichlet_values.array[k] = _dv
+    free_values[k] = _fv
+    dirichlet_values[k] = _dv
   end
   FEFunction(f,free_values,dirichlet_values)
+end
+
+function MultiField.restrict_to_field(
+  f::MultiFieldFESpace,
+  free_values::PTArray,
+  field::Integer)
+
+  MultiField._restrict_to_field(f,MultiFieldStyle(f),free_values,field)
+end
+
+function MultiField._restrict_to_field(
+  f,::ConsecutiveMultiFieldStyle,
+  free_values::PTArray,
+  field)
+
+  offsets = compute_field_offsets(f)
+  U = f.spaces
+  pini = offsets[field] + 1
+  pend = offsets[field] + num_free_dofs(U[field])
+  PTArray(map(fv -> SubVector(fv,pini,pend),free_values))
 end

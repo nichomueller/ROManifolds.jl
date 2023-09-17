@@ -16,8 +16,8 @@ end
 """
 Allocate the space to be used as first argument in evaluate!
 """
-function allocate_trial_space(U::PTTrialFESpace,args...)
-  HomogeneousTrialFESpace(U.space)
+function allocate_trial_space(U::SingleFieldFESpace,args...)
+  HomogeneousTrialFESpace(U)
 end
 
 function allocate_trial_space(U::PTTrialFESpace,μ::Table)
@@ -112,14 +112,8 @@ Base.iterate(m::PTMultiFieldTrialFESpace,state) = iterate(m.spaces,state)
 Base.getindex(m::PTMultiFieldTrialFESpace,field_id::Integer) = m.spaces[field_id]
 Base.length(m::PTMultiFieldTrialFESpace) = length(m.spaces)
 
-function allocate_trial_space(U::PTMultiFieldTrialFESpace,args...)
-  spaces = allocate_trial_space.(U.spaces)
-  MultiFieldFESpace(spaces)
-end
-
-function allocate_trial_space(U::PTMultiFieldTrialFESpace,μ::Table)
-  n = length(μ)*length(t)
-  spaces = map(fe->HomogeneousPTrialFESpace(x,n),U.spaces)
+function allocate_trial_space(U::PTMultiFieldTrialFESpace,μ)
+  spaces = map(fe->allocate_trial_space(fe,μ),U.spaces)
   MultiFieldFESpace(spaces)
 end
 

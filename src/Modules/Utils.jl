@@ -24,8 +24,8 @@ export expand
 # BasesConstruction
 export orth_projection
 export gram_schmidt
-# NnzArray
-export NnzArray
+# NnzMatrix
+export NnzMatrix
 export compress
 export compress!
 export convert!
@@ -41,6 +41,6 @@ include("Files.jl")
 include("Indexes.jl")
 include("Operations.jl")
 include("BasesConstruction.jl")
-include("NnzArray.jl")
+include("NnzMatrix.jl")
 include("PStructure.jl")
 end # module

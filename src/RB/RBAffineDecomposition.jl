@@ -204,7 +204,7 @@ function compress_component(
   RBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)
 end
 
-function get_interpolation_idx(basis_space::NnzArray,basis_time::NnzArray)
+function get_interpolation_idx(basis_space::NnzMatrix,basis_time::NnzMatrix)
   idx_space = get_interpolation_idx(basis_space.nonzero_val)
   idx_time = get_interpolation_idx(basis_time.nonzero_val)
   idx_space,idx_time
@@ -225,8 +225,8 @@ function get_interpolation_idx(basis::AbstractMatrix)
 end
 
 function compress(
-  basis_space::NnzArray,
-  basis_time::NnzArray,
+  basis_space::NnzMatrix,
+  basis_time::NnzMatrix,
   args...;
   kwargs...)
 
@@ -234,7 +234,7 @@ function compress(
 end
 
 function compress_space(
-  basis_space::NnzArray,
+  basis_space::NnzMatrix,
   rbspace_row::SingleFieldRBSpace)
 
   entire_bs_row = get_basis_space(rbspace_row)
@@ -246,7 +246,7 @@ function compress_space(
 end
 
 function compress_space(
-  basis_space::NnzArray,
+  basis_space::NnzMatrix,
   rbspace_row::SingleFieldRBSpace,
   rbspace_col::SingleFieldRBSpace)
 
@@ -258,7 +258,7 @@ function compress_space(
 end
 
 function compress_time(
-  basis_time::NnzArray,
+  basis_time::NnzMatrix,
   rbspace_row::SingleFieldRBSpace,
   args...)
 
@@ -267,7 +267,7 @@ function compress_time(
 end
 
 function compress_time(
-  basis_time::NnzArray,
+  basis_time::NnzMatrix,
   rbspace_row::SingleFieldRBSpace{T},
   rbspace_col::SingleFieldRBSpace{T};
   combine_projections=(x,y)->x) where T

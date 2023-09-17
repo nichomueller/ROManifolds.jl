@@ -5,12 +5,84 @@ struct SingleFieldRBSpace{T} <: RBSpace{T}
   basis_time::Matrix{T}
 
   function SingleFieldRBSpace(
-    basis_space_nnz::NnzArray{T},
-    basis_time_nnz::NnzArray{T}) where T
+    basis_space_nnz::NnzMatrix{T},
+    basis_time_nnz::NnzMatrix{T}) where T
 
     basis_space = recast(basis_space_nnz)
     basis_time = get_nonzero_val(basis_time_nnz)
     new{T}(basis_space,basis_time)
+  end
+end
+
+struct MultiFieldRBSpace{T} <: RBSpace{T}
+  basis_space::BlockMatrix{T}
+  basis_time::BlockMatrix{T}
+
+  function MultiFieldRBSpace(
+    basis_space_nnz::BlockNnzArray{T,N,OT},
+    basis_time_nnz::BlockNnzArray{T,N,OT}) where {T,N,OT}
+
+    basis_space = recast(basis_space_nnz)
+    basis_time = get_nonzero_val(basis_time_nnz)
+    new{T}(basis_space,basis_time)
+  end
+end
+
+abstract type PODStyle end
+abstract type DefaultPOD <: PODStyle end
+abstract type SteadyPOD <: PODStyle end
+abstract type TranposedPOD <: PODStyle end
+
+function compress_snapshots(info::RBInfo,nzm::NnzMatrix)
+  ϵ = info.ϵ
+  energy_norm = info.energy_norm
+  norm_matrix = get_norm_matrix(energy_norm,feop)
+  steady = num_time_steps(nzm) == 1 ? SteadyPOD() : DefaultPOD()
+  transposed = size(nzm,1) < size(nzm,2) ? TranposedPOD() : DefaultPOD()
+  compress_snapshots(Val(issteady),nzm,norm_matrix,steady,transposed;ϵ)
+end
+
+function compress_snapshots(
+  nzm::NnzMatrix,
+  norm_matrix,
+  args...;
+  kwargs...)
+
+  basis_space = tpod(nzm,norm_matrix;kwargs...)
+  compressed_nza = prod(basis_space,nzm)
+  compressed_nza_t = change_mode(compressed_nza)
+  basis_time = tpod(compressed_nza_t;kwargs...)
+  basis_space,basis_time
+end
+
+function compress_snapshots(
+  nzm::NnzMatrix,
+  norm_matrix,
+  ::DefaultPOD,
+  ::TranposedPOD;
+  kwargs...)
+
+  nza_t = change_mode(nzm)
+  basis_time = tpod(nza_t;kwargs...)
+  compressed_nza_t = prod(basis_time,nza_t)
+  compressed_nza = change_mode(compressed_nza_t)
+  basis_space = tpod(compressed_nza,norm_matrix;kwargs...)
+  basis_space,basis_time
+end
+
+for T in (:DefaultPOD,:TranposedPOD)
+  @eval begin
+    function compress_snapshots(
+      nzm::NnzMatrix,
+      norm_matrix,
+      ::SteadyPOD,
+      ::$T;
+      kwargs...)
+
+      basis_space = tpod(nzm,norm_matrix;kwargs...)
+      basis_time = ones(eltype(nzm),1,1)
+      basis_space,basis_time
+    end
   end
 end
 
@@ -26,20 +98,6 @@ function compress_snapshots(
 
   basis_space,basis_time = compress_snapshots(snaps,norm_matrix;ϵ)
   SingleFieldRBSpace(basis_space,basis_time)
-end
-
-struct MultiFieldRBSpace{T} <: RBSpace{T}
-  basis_space::BlockMatrix{T}
-  basis_time::BlockMatrix{T}
-
-  function MultiFieldRBSpace(
-    basis_space_nnz::BlockNnzArray{T,N,OT},
-    basis_time_nnz::BlockNnzArray{T,N,OT}) where {T,N,OT}
-
-    basis_space = recast(basis_space_nnz)
-    basis_time = get_nonzero_val(basis_time_nnz)
-    new{T}(basis_space,basis_time)
-  end
 end
 
 function compress_snapshots(

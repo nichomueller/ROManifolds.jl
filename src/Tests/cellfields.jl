@@ -12,7 +12,7 @@ du = get_trial_fe_basis(U)
 x = get_cell_points(dΩ.quad)
 q = aμt(μ,t)*∇(v)⋅∇(du)
 resq = q(x)
-res1 = resq.array[1]
+res1 = resq[1]
 
 # Gridap
 gok(x,t) = μ[1][1]*exp(-x[1]/μ[1][2])*abs(sin(t/μ[1][3]))

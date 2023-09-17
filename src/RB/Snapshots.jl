@@ -1,5 +1,5 @@
 struct Snapshots{T}
-  snaps::Vector{PTArray{NnzArray{T}}}
+  snaps::Vector{PTArray{NnzMatrix{T}}}
   function Snapshots(snaps::AbstractVector{<:PTArray{T}}) where T
     snnz = compress(snaps)
     new{T}(snnz)
@@ -48,19 +48,6 @@ function Base.fill!(s::Snapshots,v)
 end
 
 Base.collect(s::Snapshots;transpose=false) = _collect_snaps(Val(transpose),s)
-
-function _collect_snaps(::Val{false},s::Snapshots{T}) where T
-  # map(x->get_arrays(x),s.snaps...)
-  snaps = map(get_nonzero_val,get_arrays(s.snaps...)...)
-  sz = size(snaps)
-  S = zeros(T,sz...)
-  @inbounds for i = 1:sz[1]
-    for j = 1:sz[2]
-      S[:,j] =
-    end
-  end
-  return hcat(get_arrays(snaps)...)
-end
 
 function _collect_snaps(::Val{true},s::Snapshots{T}) where T
   snaps = get_snaps(s)

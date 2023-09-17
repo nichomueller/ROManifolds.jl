@@ -56,7 +56,7 @@ function residual!(
 
   uθ = x
   vθ = op.vθ
-  @. vθ.array = (x.array-op.u0)/op.dtθ
+  @. vθ = (x-op.u0)/op.dtθ
   residual!(b,op.odeop,op.μ,op.tθ,(uθ,vθ),op.ode_cache)
 end
 
@@ -67,7 +67,7 @@ function jacobian!(
 
   uF = x
   vθ = op.vθ
-  @. vθ.array = (x.array-op.u0)/op.dtθ
+  @. vθ = (x-op.u0)/op.dtθ
   z = zero(eltype(A))
   fillstored!(A,z)
   jacobians!(A,op.odeop,op.μ,op.tθ,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)

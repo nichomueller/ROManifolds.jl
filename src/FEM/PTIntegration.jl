@@ -156,7 +156,7 @@ function ptintegrate(f,b::CellData.CompositeMeasure)
 end
 
 function CellData.move_contributions(scell_to_val::PTArray,args...)
-  ptcell_mat_trian = map(scell_to_val.array) do x
+  ptcell_mat_trian = map(scell_to_val) do x
     move_contributions(x,args...)
   end
   cell_to_val = PTArray(first.(ptcell_mat_trian))

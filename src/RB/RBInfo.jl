@@ -61,3 +61,27 @@ for (fsave,fload) in zip((:save,:save_test),(:load,:load_test))
     end
   end
 end
+
+function save(info::RBInfo,nzm::NnzMatrix)
+  if info.save_structures
+    path = joinpath(info.fe_path,"fesnaps")
+    save(path,nzm)
+  end
+end
+
+function save(info::RBInfo,params::Table)
+  if info.save_structures
+    path = joinpath(info.fe_path,"params")
+    save(path,params)
+  end
+end
+
+function load(T::Type{NnzMatrix},info::RBInfo)
+  path = joinpath(info.fe_path,"fesnaps")
+  load(T,path)
+end
+
+function load(T::Type{Table},info::RBInfo)
+  path = joinpath(info.fe_path,"params")
+  load(T,path)
+end

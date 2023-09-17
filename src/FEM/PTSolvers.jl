@@ -11,11 +11,11 @@ function Algebra.solve!(x::PTArray,solver,op,args...)
 end
 
 function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::PTArray)
-  map(x->numerical_setup(ss,x),mat.array)
+  map(x->numerical_setup(ss,x),mat)
 end
 
 function Algebra.numerical_setup!(ns,mat::PTArray)
-  map(numerical_setup!,ns,mat.array)
+  map(numerical_setup!,ns,mat)
 end
 
 function ptsolve!(
@@ -27,7 +27,7 @@ function ptsolve!(
   numerical_setup!(ns,A)
   @inbounds for (k,xk) in enumerate(xcache)
     solve!(xk,ns[k],b[k])
-    x.array[k] = xk
+    x[k] = xk
   end
   ns
 end
@@ -42,7 +42,7 @@ function ptsolve!(
   ns = numerical_setup(ss,A)
   @inbounds for (k,xk) in enumerate(xcache)
     solve!(xk,ns[k],b[k])
-    x.array[k] = xk
+    x[k] = xk
   end
   ns
 end
@@ -96,7 +96,7 @@ function ptsolve!(
   for xk in eachindex(xcache)
     numerical_setup!(ns,A[k])
     solve!(xk,ns,b[k])
-    x.array[k] = xk
+    x[k] = xk
   end
   cache
 end
@@ -114,7 +114,7 @@ end
 #   for xk in eachindex(xcache)
 #     numerical_setup!(ns,A[k])
 #     Algebra._solve_nr!(xk,A,b,dx,ns,nls,op)
-#     x.array[k] = xk
+#     x[k] = xk
 #   end
 #   cache
 # end

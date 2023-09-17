@@ -12,7 +12,7 @@ struct PTArray{T<:AbstractArray}
   end
 end
 
-get_array(a::PTArray) = a.array
+get_ptarray(a::PTArray) = a.array
 
 Base.size(a::PTArray) = size(a.array)
 Base.length(a::PTArray) = length(a.array)
@@ -53,7 +53,7 @@ struct PTArrayStyle <: Broadcast.BroadcastStyle end
 Base.broadcastable(x::PTArray) = x
 Broadcast.BroadcastStyle(::Type{<:PTArray}) = PTArrayStyle()
 function Base.materialize!(a::PTArray,b::Base.Broadcast.Broadcasted)
-  map(x->Base.materialize!(x,b),a.array)
+  map(x->Base.materialize!(x,b),a)
   a
 end
 
@@ -61,7 +61,7 @@ function Base.materialize!(
   a::PTArray,
   b::Broadcast.Broadcasted{<:PTArrayStyle})
 
-  map((x,y)->Base.materialize!(x,y),a.array,map(z->z.array,b.args)...)
+  map((x,y)->Base.materialize!(x,y),a,map(get_ptarray,b.args)...)
   a
 end
 
@@ -69,7 +69,7 @@ function LinearAlgebra.fillstored!(a::PTArray,z)
   a1 = testitem(a)
   fillstored!(a1,z)
   @inbounds for i = eachindex(a)
-    a.array[i] .= a1
+    a[i] .= a1
   end
 end
 
@@ -91,8 +91,8 @@ function Base.:≈(a::PTArray,b::PTArray)
   if size(a) != size(b)
     return false
   end
-  for i in eachindex(a.array)
-    if !(a.array[i] ≈ b.array[i])
+  for i in eachindex(a)
+    if !(a[i] ≈ b[i])
       return false
     end
   end
@@ -103,8 +103,8 @@ function Base.:(==)(a::PTArray,b::PTArray)
   if size(a) != size(b)
     return false
   end
-  for i in eachindex(a.array)
-    if !(a.array[i] == b.array[i])
+  for i in eachindex(a)
+    if !(a[i] == b[i])
       return false
     end
   end
@@ -116,16 +116,6 @@ for op in (:+,:-)
     function ($op)(a::PTArray,b::PTArray)
       PTArray(map($op,a.array,b.array))
     end
-
-    # function ($op)(a::PTArray{T},b::T) where T
-    #   ptb = fill(b,length(a))
-    #   PTArray(map($op,a.array,ptb))
-    # end
-
-    # function ($op)(a::T,b::PTArray{T}) where T
-    #   pta = fill(a,length(b))
-    #   PTArray(map($op,pta,b.array))
-    # end
   end
 end
 
@@ -139,8 +129,8 @@ function Arrays.CachedArray(a::PTArray)
   ai = testitem(a)
   ci = CachedArray(ai)
   array = Vector{typeof(ci)}(undef,length(a))
-  for i in eachindex(a.array)
-    array[i] = CachedArray(a.array[i])
+  for i in eachindex(a)
+    array[i] = CachedArray(a[i])
   end
   PTArray(array)
 end
@@ -148,7 +138,7 @@ end
 function Arrays.testitem(a::PTArray{T}) where T
   @notimplementedif !isconcretetype(T)
   if length(a) != 0
-    a.array[1]
+    a[1]
   else
     fill(eltype(a),1)
   end
@@ -191,7 +181,7 @@ function Arrays.evaluate!(
   cx,ptval = cache
   @inbounds for i = eachindex(ptval)
     ai = get_at_index(i,a,x...)
-    ptval.array[i] = evaluate!(cx,f,ai...)
+    ptval[i] = evaluate!(cx,f,ai...)
   end
   ptval
 end
@@ -228,7 +218,7 @@ function Arrays.evaluate!(
   cx,ptval = cache
   @inbounds for i = eachindex(ptval)
     ai = get_at_index(i,a,x)
-    ptval.array[i] = evaluate!(cx,f,ai...)
+    ptval[i] = evaluate!(cx,f,ai...)
   end
   ptval
 end
@@ -252,7 +242,7 @@ function Arrays.evaluate!(cache,f,a::PTArray,x::Union{AbstractArray,PTArray}...)
   cx,ptval = cache
   @inbounds for i = eachindex(ptval)
     ai = get_at_index(i,a,x...)
-    ptval.array[i] = evaluate!(cx,f,ai...)
+    ptval[i] = evaluate!(cx,f,ai...)
   end
   ptval
 end
@@ -275,7 +265,7 @@ function Arrays.evaluate!(cache,f,a::AbstractArray,x::PTArray)
   cx,ptval = cache
   @inbounds for i = eachindex(ptval)
     ai = get_at_index(i,a,x)
-    ptval.array[i] = evaluate!(cx,f,ai...)
+    ptval[i] = evaluate!(cx,f,ai...)
   end
   ptval
 end
@@ -305,7 +295,7 @@ function Arrays.lazy_map(
 end
 
 function Arrays.lazy_map(f,a::AbstractArray,x::PTArray)
-  lazy_arrays = map(y->lazy_map(f,a,y),x.array)
+  lazy_arrays = map(y->lazy_map(f,a,y),x)
   PTArray(lazy_arrays)
 end
 
@@ -325,18 +315,11 @@ function _get_1st_pta(x::Union{AbstractArray,PTArray}...)
   end
 end
 
-function get_arrays(a::PTArray...)
-  a1 = first(a)
-  n = length(a1)
-  @assert all(map(length,a) .== n)
-  map(x->x.array,a)
-end
-
 isaffine(a) = false
 function isaffine(a::PTArray)
   a1 = testitem(a)
   n = length(a)
-  all([a.array[i] == a1 for i = 2:n])
+  all([a[i] == a1 for i = 2:n])
 end
 
 function test_ptarray(a::PTArray,b::AbstractArray)

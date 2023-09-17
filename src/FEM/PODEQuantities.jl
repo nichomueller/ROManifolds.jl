@@ -24,17 +24,19 @@ function Base.iterate(sol::PODESolution)
   uf = copy(sol.u0)
   u0 = copy(sol.u0)
   t0 = sol.t0
+  n = 0
 
   uf,tf,cache = solution_step!(uf,sol.solver,sol.op,sol.μ,u0,t0)
 
   u0 .= uf
-  state = (uf,u0,tf,cache)
+  n += 1
+  state = (uf,u0,tf,n,cache)
 
-  return (uf,tf),state
+  return (uf,tf,n),state
 end
 
 function Base.iterate(sol::PODESolution,state)
-  uf,u0,t0,cache = state
+  uf,u0,t0,n,cache = state
 
   if t0 >= sol.tF - ϵ
     return nothing
@@ -43,9 +45,10 @@ function Base.iterate(sol::PODESolution,state)
   uf,tf,cache = solution_step!(uf,sol.solver,sol.op,sol.μ,u0,t0,cache)
 
   u0 .= uf
-  state = (uf,u0,tf,cache)
+  n += 1
+  state = (uf,u0,tf,n,cache)
 
-  return (uf,tf),state
+  return (uf,tf,n),state
 end
 
 struct PODEResidual <: PODEQuantity

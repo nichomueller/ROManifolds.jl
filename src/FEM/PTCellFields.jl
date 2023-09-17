@@ -94,7 +94,7 @@ function CellData.change_domain_ref_ref(
   mface_to_sface = sglue.mface_to_tface
   tface_to_mface = tglue.tface_to_mface
   tface_to_mface_map = tglue.tface_to_mface_map
-  ptarray = map(sface_to_fields.array) do sface_to_field
+  ptarray = map(sface_to_fields) do sface_to_field
     mface_to_field = extend(sface_to_field,mface_to_sface)
     tface_to_field_s = lazy_map(Reindex(mface_to_field),tface_to_mface)
     tface_to_field_t = lazy_map(Broadcasting(∘),tface_to_field_s,tface_to_mface_map)
@@ -109,7 +109,7 @@ function CellData.change_domain_phys_phys(
   sface_to_fields = get_data(a)
   mface_to_sface = sglue.mface_to_tface
   tface_to_mface = tglue.tface_to_mface
-  ptarray = map(sface_to_fields.array) do sface_to_field
+  ptarray = map(sface_to_fields) do sface_to_field
     mface_to_field = extend(sface_to_field,mface_to_sface)
     tface_to_field = lazy_map(Reindex(mface_to_field),tface_to_mface)
     tface_to_field

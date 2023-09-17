@@ -22,11 +22,12 @@ import Gridap.Algebra:solve
 import Gridap.ODEs.TransientFETools:Affine
 import Gridap.ODEs.TransientFETools:ODESolver
 
+include("NnzArrays.jl")
+include("BlockArrays.jl")
 include("RBInfo.jl")
-include("NnzArray.jl")
-include("Snapshots.jl")
-include("RBSpaces.jl")
-include("RBAffineDecomposition.jl")
-include("RBAlgebraicContributions.jl")
-include("RBOperators.jl")
-include("RBResults.jl")
+# include("Snapshots.jl")
+# include("RBSpaces.jl")
+# include("RBAffineDecomposition.jl")
+# include("RBAlgebraicContributions.jl")
+# include("RBOperators.jl")
+# include("RBResults.jl")

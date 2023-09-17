@@ -43,16 +43,6 @@ function spacetime_idx(
   (time_idx .- 1)*Ns .+ space_idx
 end
 
-function get_nonzero_idx(colptr::Vector{Int},rowval::Int)
-  ncols = length(colptr)
-  nvals_cols = colptr[2:end] .- colptr[1:end-1]
-  cols = reduce(vcat,map(i->fill(i,nvals_cols[i]),1:ncols))
-  colval = filter(!isempty,cols)
-  @assert length(colval) == length(rowval)
-  nrows = max(rowval)
-  return colval*nrows .+ rowval
-end
-
 function fast_idx(kst::Int,ns::Int)
   ks = mod(kst,ns)
   ks == 0 ? ns : ks
