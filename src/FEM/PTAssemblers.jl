@@ -109,7 +109,7 @@ end
       cols = getindex!(cols_cache,cell_cols,cell)
       valsk = getindex!(vals_cache,cell_valsk,cell)
       evaluate!(add_cache,add!,matk,valsk,rows,cols)
-      mat.array[k] = matk
+      mat[k] = matk
     end
   end
 end
@@ -149,7 +149,7 @@ end
       rows = getindex!(rows_cache,cell_rows,cell)
       valsk = getindex!(vals_cache,cell_valsk,cell)
       evaluate!(add_cache,add!,veck,valsk,rows)
-      vec.array[k] = veck
+      vec[k] = veck
     end
   end
 end

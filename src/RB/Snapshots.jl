@@ -1,7 +1,7 @@
 struct Snapshots{T}
-  snaps::AbstractVector{<:PTArray{<:NnzArray{T}}}
+  snaps::Vector{PTArray{NnzArray{T}}}
   function Snapshots(snaps::AbstractVector{<:PTArray{T}}) where T
-    snnz = map(compress,snaps)
+    snnz = compress(snaps)
     new{T}(snnz)
   end
 end
@@ -9,7 +9,6 @@ end
 const SingleFieldSnapshots{T} = Snapshots{T} where {T<:AbstractArray}
 const MultiFieldSnapshots{T} = Snapshots{T} where {T<:BlockArray}
 
-get_snaps(s::Snapshots) = s.snaps
 num_time_steps(s::Snapshots) = length(s.snaps)
 num_params(s::Snapshots) = length(testitem(s))
 Base.length(s::Snapshots) = num_params(s)
@@ -29,10 +28,7 @@ function Base.show(io::IO,s::Snapshots{T}) where T
 end
 
 Base.length(s::Snapshots) = length(s.snaps)
-Base.eltype(::Type{Snapshots{T}}) where T = eltype(T)
 Base.eltype(::Snapshots{T}) where T = eltype(T)
-Base.ndims(::Snapshots) = 1
-Base.ndims(::Type{<:Snapshots}) = 1
 Base.eachindex(s::Snapshots) = eachindex(s.snaps)
 
 function Base.getindex(s::Snapshots,i...)
@@ -46,19 +42,27 @@ end
 Base.copy(s::Snapshots) = Snapshots(copy(s.snaps))
 
 function Base.fill!(s::Snapshots,v)
-  for n in num_time_steps(s)
+  for n in 1:num_time_steps(s)
     fill!(s.snaps[n],v)
   end
 end
 
 Base.collect(s::Snapshots;transpose=false) = _collect_snaps(Val(transpose),s)
 
-function _collect_snaps(::Val{false},s::Snapshots)
-  snaps = get_snaps(s)
+function _collect_snaps(::Val{false},s::Snapshots{T}) where T
+  # map(x->get_arrays(x),s.snaps...)
+  snaps = map(get_nonzero_val,get_arrays(s.snaps...)...)
+  sz = size(snaps)
+  S = zeros(T,sz...)
+  @inbounds for i = 1:sz[1]
+    for j = 1:sz[2]
+      S[:,j] =
+    end
+  end
   return hcat(get_arrays(snaps)...)
 end
 
-function _collect_snaps(::Val{true},s::Snapshots)
+function _collect_snaps(::Val{true},s::Snapshots{T}) where T
   snaps = get_snaps(s)
   snaps_t = map(transpose,snaps)
   return hcat(get_arrays(snaps_t)...)

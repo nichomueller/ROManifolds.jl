@@ -23,6 +23,7 @@ import Gridap.ODEs.TransientFETools:Affine
 import Gridap.ODEs.TransientFETools:ODESolver
 
 include("RBInfo.jl")
+include("NnzArray.jl")
 include("Snapshots.jl")
 include("RBSpaces.jl")
 include("RBAffineDecomposition.jl")

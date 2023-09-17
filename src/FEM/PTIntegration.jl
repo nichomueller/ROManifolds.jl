@@ -132,10 +132,6 @@ end
 
 (*)(a::PTDomainContribution,b::Number) = b*a
 
-function Arrays.evaluate(a::PTDomainContribution)
-  a
-end
-
 function CellData.get_array(a::PTDomainContribution)
   @assert num_domains(a) == 1 """\n
   Method get_array(a::PTDomainContribution) can be called only

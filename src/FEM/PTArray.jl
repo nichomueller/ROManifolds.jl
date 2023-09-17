@@ -1,4 +1,4 @@
-struct PTArray{T}
+struct PTArray{T<:AbstractArray}
   array::AbstractVector{T}
 
   function PTArray(array::AbstractVector{T}) where {T<:AbstractArray}
@@ -12,6 +12,8 @@ struct PTArray{T}
   end
 end
 
+get_array(a::PTArray) = a.array
+
 Base.size(a::PTArray) = size(a.array)
 Base.length(a::PTArray) = length(a.array)
 Base.eltype(::Type{PTArray{T}}) where T = eltype(T)
@@ -19,6 +21,7 @@ Base.eltype(::PTArray{T}) where T = eltype(T)
 Base.eachindex(a::PTArray) = eachindex(a.array)
 Base.ndims(::PTArray) = 1
 Base.ndims(::Type{<:PTArray}) = 1
+Base.iterate(a::PTArray,i...) = iterate(a.array,i...)
 
 function Base.getindex(a::PTArray,i...)
   a.array[i...]
@@ -38,13 +41,13 @@ end
 
 Base.copy(a::PTArray) = PTArray(copy(a.array))
 
+Base.similar(a::PTArray) = PTArray(map(similar,a.array))
+
 function Base.fill!(a::PTArray{T},v::S) where {S,T}
   array = Vector{S}(undef,length(a))
   fill!(array,v)
   PTArray(fill!(a.array,array))
 end
-
-Base.similar(a::PTArray) = PTArray(map(similar,a.array))
 
 struct PTArrayStyle <: Broadcast.BroadcastStyle end
 Base.broadcastable(x::PTArray) = x
@@ -326,7 +329,7 @@ function get_arrays(a::PTArray...)
   a1 = first(a)
   n = length(a1)
   @assert all(map(length,a) .== n)
-  map(i->map(x->x.array[i],a),1:n)
+  map(x->x.array,a)
 end
 
 isaffine(a) = false
