@@ -36,13 +36,3 @@ res1_ok = qok(x)
 
 typeof(res1) == typeof(res1_ok) # true
 all(res1 .== res1_ok) # true
-
-U = trial(μ,t)
-cell_vals = scatter_free_and_dirichlet_values(U,vec_cache,U.dirichlet_values)
-cell_basis = get_data(v)
-# lazy_map(linear_combination,cell_vals,cell_basis)
-lazy_arrays = map(eachindex(cell_vals)) do i
-  ai = _getter_at_ind(i,cell_vals,cell_basis)
-  lazy_map(linear_combination,ai...)
-end
-FEFunction(U,vec_cache)

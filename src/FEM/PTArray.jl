@@ -17,6 +17,8 @@ Base.length(a::PTArray) = length(a.array)
 Base.eltype(::Type{PTArray{T}}) where T = eltype(T)
 Base.eltype(::PTArray{T}) where T = eltype(T)
 Base.eachindex(a::PTArray) = eachindex(a.array)
+Base.ndims(::PTArray) = 1
+Base.ndims(::Type{<:PTArray}) = 1
 
 function Base.getindex(a::PTArray,i...)
   a.array[i...]
@@ -44,8 +46,19 @@ end
 
 Base.similar(a::PTArray) = PTArray(map(similar,a.array))
 
+struct PTArrayStyle <: Broadcast.BroadcastStyle end
+Base.broadcastable(x::PTArray) = x
+Broadcast.BroadcastStyle(::Type{<:PTArray}) = PTArrayStyle()
 function Base.materialize!(a::PTArray,b::Base.Broadcast.Broadcasted)
   map(x->Base.materialize!(x,b),a.array)
+  a
+end
+
+function Base.materialize!(
+  a::PTArray,
+  b::Broadcast.Broadcasted{<:PTArrayStyle})
+
+  map((x,y)->Base.materialize!(x,y),a.array,map(z->z.array,b.args)...)
   a
 end
 
@@ -148,7 +161,7 @@ function Arrays.return_value(
   a::PTArray,
   x::Vararg{Union{AbstractArray,PTArray}})
 
-  a1 = _getter_at_ind(1,a,x...)
+  a1 = get_at_index(1,a,x...)
   return_value(f,a1...)
 end
 
@@ -161,7 +174,7 @@ function Arrays.return_cache(
   n = length(sq1)
   val = return_value(f,a,x...)
   ptval = PTArray(val,n)
-  a1 = _getter_at_ind(1,a,x...)
+  a1 = get_at_index(1,a,x...)
   cx = return_cache(f,a1...)
   cx,ptval
 end
@@ -174,7 +187,7 @@ function Arrays.evaluate!(
 
   cx,ptval = cache
   @inbounds for i = eachindex(ptval)
-    ai = _getter_at_ind(i,a,x...)
+    ai = get_at_index(i,a,x...)
     ptval.array[i] = evaluate!(cx,f,ai...)
   end
   ptval
@@ -185,7 +198,7 @@ function Arrays.return_value(
   a::AbstractArray,
   x::PTArray)
 
-  a1 = _getter_at_ind(1,a,x)
+  a1 = get_at_index(1,a,x)
   return_value(f,a1...)
 end
 
@@ -198,7 +211,7 @@ function Arrays.return_cache(
   n = length(sq1)
   val = return_value(f,a,x)
   ptval = PTArray(val,n)
-  a1 = _getter_at_ind(1,a,x)
+  a1 = get_at_index(1,a,x)
   cx = return_cache(f,a1...)
   cx,ptval
 end
@@ -211,14 +224,14 @@ function Arrays.evaluate!(
 
   cx,ptval = cache
   @inbounds for i = eachindex(ptval)
-    ai = _getter_at_ind(i,a,x)
+    ai = get_at_index(i,a,x)
     ptval.array[i] = evaluate!(cx,f,ai...)
   end
   ptval
 end
 
 function Arrays.return_value(f,a::PTArray,x::Union{AbstractArray,PTArray}...)
-  a1 = _getter_at_ind(1,a,x...)
+  a1 = get_at_index(1,a,x...)
   return_value(f,a1)
 end
 
@@ -227,7 +240,7 @@ function Arrays.return_cache(f,a::PTArray,x::Union{AbstractArray,PTArray}...)
   n = length(sq1)
   val = return_value(f,a,x...)
   ptval = PTArray(val,n)
-  a1 = _getter_at_ind(1,a,x...)
+  a1 = get_at_index(1,a,x...)
   cx = return_cache(f,a1)
   cx,ptval
 end
@@ -235,14 +248,14 @@ end
 function Arrays.evaluate!(cache,f,a::PTArray,x::Union{AbstractArray,PTArray}...)
   cx,ptval = cache
   @inbounds for i = eachindex(ptval)
-    ai = _getter_at_ind(i,a,x...)
+    ai = get_at_index(i,a,x...)
     ptval.array[i] = evaluate!(cx,f,ai...)
   end
   ptval
 end
 
 function Arrays.return_value(f,a::AbstractArray,x::PTArray)
-  a1 = _getter_at_ind(1,a,x)
+  a1 = get_at_index(1,a,x)
   return_value(f,a1)
 end
 
@@ -250,7 +263,7 @@ function Arrays.return_cache(f,a::AbstractArray,x::PTArray)
   n = length(x)
   val = return_value(f,a,x)
   ptval = PTArray(val,n)
-  a1 = _getter_at_ind(1,a,x)
+  a1 = get_at_index(1,a,x)
   cx = return_cache(f,a1...)
   cx,ptval
 end
@@ -258,7 +271,7 @@ end
 function Arrays.evaluate!(cache,f,a::AbstractArray,x::PTArray)
   cx,ptval = cache
   @inbounds for i = eachindex(ptval)
-    ai = _getter_at_ind(i,a,x)
+    ai = get_at_index(i,a,x)
     ptval.array[i] = evaluate!(cx,f,ai...)
   end
   ptval
@@ -270,7 +283,7 @@ function Arrays.lazy_map(
   x::Union{AbstractArray,PTArray}...)
 
   lazy_arrays = map(eachindex(a)) do i
-    ai = _getter_at_ind(i,a,x...)
+    ai = get_at_index(i,a,x...)
     lazy_map(f,ai...)
   end
   PTArray(lazy_arrays)
@@ -282,7 +295,7 @@ function Arrays.lazy_map(
   b::Vararg{Union{AbstractArray,PTArray}})
 
   lazy_arrays = map(eachindex(a)) do i
-    ai = _getter_at_ind(i,a,b...)
+    ai = get_at_index(i,a,b...)
     lazy_map(f,ai...)
   end
   PTArray(lazy_arrays)
@@ -293,7 +306,7 @@ function Arrays.lazy_map(f,a::AbstractArray,x::PTArray)
   PTArray(lazy_arrays)
 end
 
-function _getter_at_ind(i::Int,x::Union{AbstractArray,PTArray}...)
+function get_at_index(i::Int,x::Union{AbstractArray,PTArray}...)
   ret = ()
   @inbounds for xj in x
     ret = isa(xj,PTArray) ? (ret...,xj[i]) : (ret...,xj)
@@ -302,7 +315,7 @@ function _getter_at_ind(i::Int,x::Union{AbstractArray,PTArray}...)
 end
 
 function _get_1st_pta(x::Union{AbstractArray,PTArray}...)
-  for xi in x
+  @inbounds for xi in x
     if isa(xi,PTArray)
       return xi
     end

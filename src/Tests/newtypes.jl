@@ -41,7 +41,7 @@ end
 Arrays.testitem(a::SupportQuantity) = testitem(a.array)
 
 function Arrays.return_value(f,a::SupportQuantity,x::Union{AbstractArray,SupportQuantity}...)
-  a1 = _getter_at_ind(1,a,x...)
+  a1 = get_at_index(1,a,x...)
   return_value(f,a1)
 end
 
@@ -50,7 +50,7 @@ function Arrays.return_cache(f,a::SupportQuantity,x::Union{AbstractArray,Support
   n = length(sq1)
   val = return_value(f,a,x...)
   sval = SupportQuantity(val,n)
-  a1 = _getter_at_ind(1,a,x...)
+  a1 = get_at_index(1,a,x...)
   cx = return_cache(f,a1)
   cx,sval
 end
@@ -58,7 +58,7 @@ end
 function Arrays.evaluate!(cache,f,a::SupportQuantity,x::Union{AbstractArray,SupportQuantity}...)
   cx,sval = cache
   @inbounds for i = eachindex(sval)
-    ai = _getter_at_ind(i,a,x...)
+    ai = get_at_index(i,a,x...)
     sval.array[i] = evaluate!(cx,f,ai...)
   end
   sval
@@ -69,7 +69,7 @@ function Arrays.return_value(
   a::SupportQuantity,
   x::Vararg{Union{AbstractArray,SupportQuantity}})
 
-  a1 = _getter_at_ind(1,a,x...)
+  a1 = get_at_index(1,a,x...)
   return_value(f,a1...)
 end
 
@@ -82,7 +82,7 @@ function Arrays.return_cache(
   n = length(sq1)
   val = return_value(f,a,x...)
   sval = SupportQuantity(val,n)
-  a1 = _getter_at_ind(1,a,x...)
+  a1 = get_at_index(1,a,x...)
   cx = return_cache(f,a1...)
   cx,sval
 end
@@ -95,14 +95,14 @@ function Arrays.evaluate!(
 
   cx,sval = cache
   @inbounds for i = eachindex(sval)
-    ai = _getter_at_ind(i,a,x...)
+    ai = get_at_index(i,a,x...)
     sval.array[i] = evaluate!(cx,f,ai...)
   end
   sval
 end
 
 function Arrays.return_value(f,a::AbstractArray,x::SupportQuantity)
-  a1 = _getter_at_ind(1,a,x)
+  a1 = get_at_index(1,a,x)
   return_value(f,a1)
 end
 
@@ -110,7 +110,7 @@ function Arrays.return_cache(f,a::AbstractArray,x::SupportQuantity)
   n = length(x)
   val = return_value(f,a,x)
   sval = SupportQuantity(val,n)
-  a1 = _getter_at_ind(1,a,x)
+  a1 = get_at_index(1,a,x)
   cx = return_cache(f,a1...)
   cx,sval
 end
@@ -118,13 +118,13 @@ end
 function Arrays.evaluate!(cache,f,a::AbstractArray,x::SupportQuantity)
   cx,sval = cache
   @inbounds for i = eachindex(sval)
-    ai = _getter_at_ind(i,a,x)
+    ai = get_at_index(i,a,x)
     sval.array[i] = evaluate!(cx,f,ai...)
   end
   sval
 end
 
-function _getter_at_ind(i::Int,x::Union{AbstractArray,SupportQuantity}...)
+function get_at_index(i::Int,x::Union{AbstractArray,SupportQuantity}...)
   ret = ()
   @inbounds for xj in x
     ret = isa(xj,SupportQuantity) ? (ret...,xj[i]) : (ret...,xj)
@@ -142,7 +142,7 @@ end
 
 function Arrays.lazy_map(k,a::SupportQuantity,x::Union{AbstractArray,SupportQuantity}...)
   lazy_arrays = map(eachindex(a)) do i
-    ai = _getter_at_ind(i,a,x...)
+    ai = get_at_index(i,a,x...)
     lazy_map(k,ai...)
   end
   SupportQuantity(lazy_arrays)
@@ -150,7 +150,7 @@ end
 
 function Arrays.lazy_map(k,a::SupportQuantity,b::Vararg{Union{AbstractArray,SupportQuantity}})
   lazy_arrays = map(eachindex(a)) do i
-    ai = _getter_at_ind(i,a,b...)
+    ai = get_at_index(i,a,b...)
     lazy_map(k,ai...)
   end
   SupportQuantity(lazy_arrays)

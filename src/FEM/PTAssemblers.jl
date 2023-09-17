@@ -77,7 +77,7 @@ function FESpaces.numeric_loop_matrix!(
   for (cellmat,_cellidsrows,_cellidscols) in zip(matdata...)
     cellidsrows = FESpaces.map_cell_rows(a.strategy,_cellidsrows)
     cellidscols = FESpaces.map_cell_cols(a.strategy,_cellidscols)
-    cellmat1 = isa(cellmat,PTArray) ? testitem(cellmat) : cellmat
+    cellmat1 = get_at_index(1,cellmat)
     @assert length(cellidscols) == length(cellidsrows)
     @assert length(cellmat1) == length(cellidsrows)
     if length(cellmat1) > 0
@@ -103,7 +103,7 @@ end
   add! = AddEntriesMap(+)
   for k in eachindex(matcache)
     matk = matcache[k]
-    cell_valsk = isa(cell_vals,PTArray) ? cell_vals[k] : cell_vals
+    cell_valsk = get_at_index(k,cell_vals)
     for cell in eachindex(cell_cols)
       rows = getindex!(rows_cache,cell_rows,cell)
       cols = getindex!(cols_cache,cell_cols,cell)
@@ -122,7 +122,7 @@ function FESpaces.numeric_loop_vector!(
   bcache = zeros(b)
   for (cellvec,_cellids) in zip(vecdata...)
     cellids = FESpaces.map_cell_rows(a.strategy,_cellids)
-    cellvec1 = isa(cellvec,PTArray) ? testitem(cellvec) : cellvec
+    cellvec1 = get_at_index(1,cellvec)
     if length(cellvec1) > 0
       vals_cache = array_cache(cellvec1)
       rows_cache = array_cache(cellids)
@@ -144,7 +144,7 @@ end
   add! = AddEntriesMap(+)
   for k in eachindex(veccache)
     veck = veccache[k]
-    cell_valsk = isa(cell_vals,PTArray) ? cell_vals[k] : cell_vals
+    cell_valsk = get_at_index(k,cell_vals)
     for cell in eachindex(rows_cache)
       rows = getindex!(rows_cache,cell_rows,cell)
       valsk = getindex!(vals_cache,cell_valsk,cell)

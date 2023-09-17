@@ -25,7 +25,7 @@ function ptsolve!(
   b = op.vector
   @assert length(A) == length(b) == length(x)
   numerical_setup!(ns,A)
-  for (k,xk) in enumerate(xcache)
+  @inbounds for (k,xk) in enumerate(xcache)
     solve!(xk,ns[k],b[k])
     x.array[k] = xk
   end
@@ -40,7 +40,7 @@ function ptsolve!(
   @assert length(A) == length(b) == length(x)
   ss = symbolic_setup(ls,testitem(A))
   ns = numerical_setup(ss,A)
-  for (k,xk) in enumerate(xcache)
+  @inbounds for (k,xk) in enumerate(xcache)
     solve!(xk,ns[k],b[k])
     x.array[k] = xk
   end

@@ -27,7 +27,7 @@ function Base.iterate(sol::PODESolution)
 
   uf,tf,cache = solution_step!(uf,sol.solver,sol.op,sol.μ,u0,t0)
 
-  u0.array .= uf.array
+  u0 .= uf
   state = (uf,u0,tf,cache)
 
   return (uf,tf),state
@@ -42,7 +42,7 @@ function Base.iterate(sol::PODESolution,state)
 
   uf,tf,cache = solution_step!(uf,sol.solver,sol.op,sol.μ,u0,t0,cache)
 
-  u0.array .= uf.array
+  u0 .= uf
   state = (uf,u0,tf,cache)
 
   return (uf,tf),state
@@ -75,7 +75,7 @@ function Base.iterate(sol::PODEResidual)
 
   bf,tf,cache = residual_step!(bf,sol.solver,sol.op,sol.μ,b0,t0)
 
-  b0.array .= bf.array
+  b0 .= bf
   state = (bf,b0,tf,cache)
 
   return (bf,tf),state
@@ -90,7 +90,7 @@ function Base.iterate(sol::PODEResidual,state)
 
   bf,tf,cache = residual_step!(bf,sol.solver,sol.op,sol.μ,b0,t0,cache)
 
-  b0.array .= bf.array
+  b0 .= bf
   state = (bf,b0,tf,cache)
 
   return (bf,tf),state
@@ -124,7 +124,7 @@ function Base.iterate(sol::PODEJacobian)
 
   Af,tf,cache = jacobian_step!(Af,sol.solver,sol.op,sol.μ,A0,t0)
 
-  A0.array .= Af.array
+  A0 .= Af
   state = (Af,A0,tf,cache)
 
   return (Af,tf),state
@@ -139,7 +139,7 @@ function Base.iterate(sol::PODEJacobian,state)
 
   Af,tf,cache = jacobian_step!(Af,sol.solver,sol.op,sol.μ,A0,t0,cache)
 
-  A0.array .= Af.array
+  A0 .= Af
   state = (Af,A0,tf,cache)
 
   return (Af,tf),state
