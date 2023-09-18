@@ -16,8 +16,8 @@ end
 """
 Allocate the space to be used as first argument in evaluate!
 """
-function allocate_trial_space(U::SingleFieldFESpace,args...)
-  HomogeneousTrialFESpace(U)
+function allocate_trial_space(U::FESpace,args...)
+  U
 end
 
 function allocate_trial_space(U::PTTrialFESpace,args...)
@@ -30,7 +30,7 @@ function allocate_trial_space(U::PTTrialFESpace,μ::Table)
 end
 
 """
-Peter, time evaluation without allocating Dirichlet vals (returns a TrialFESpace)
+Parameter, time evaluation without allocating Dirichlet vals (returns a TrialFESpace)
 """
 function evaluate!(Uμt::T,U::PTTrialFESpace,μ::AbstractVector,t::Real) where T
   if isa(U.dirichlet_μt,Vector)
@@ -43,7 +43,7 @@ function evaluate!(Uμt::T,U::PTTrialFESpace,μ::AbstractVector,t::Real) where T
 end
 
 """
-Peter, time evaluation allocating Dirichlet vals
+Parameter, time evaluation allocating Dirichlet vals
 """
 function Arrays.evaluate(U::PTTrialFESpace,params::AbstractVector,t::Real)
   Uμt = allocate_trial_space(U,params)
@@ -116,8 +116,8 @@ Base.iterate(m::PTMultiFieldTrialFESpace,state) = iterate(m.spaces,state)
 Base.getindex(m::PTMultiFieldTrialFESpace,field_id::Integer) = m.spaces[field_id]
 Base.length(m::PTMultiFieldTrialFESpace) = length(m.spaces)
 
-function allocate_trial_space(U::PTMultiFieldTrialFESpace,μ)
-  spaces = map(fe->allocate_trial_space(fe,μ),U.spaces)
+function allocate_trial_space(U::PTMultiFieldTrialFESpace,args...)
+  spaces = map(fe->allocate_trial_space(fe,args...),U.spaces)
   MultiFieldFESpace(spaces)
 end
 

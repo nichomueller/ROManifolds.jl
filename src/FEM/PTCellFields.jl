@@ -9,6 +9,22 @@ struct PFunction{P} <: AbstractPTFunction{P,nothing}
   end
 end
 
+function get_fields(pf::PFunction{<:AbstractVector{<:Number}})
+  p = pf.params
+  GenericField(pf.f(p))
+end
+
+function get_fields(pf::PFunction)
+  p = pf.params
+  np = length(p)
+  fields = Vector{GenericField}(undef,np)
+  @inbounds for k = eachindex(p)
+    pk = p[k]
+    fields[k] = GenericField(pf.f(pk))
+  end
+  fields
+end
+
 struct PTFunction{P,T} <: AbstractPTFunction{P,T}
   f::Function
   params::P
@@ -21,9 +37,7 @@ end
 
 function get_fields(ptf::PTFunction{<:AbstractVector{<:Number},<:Real})
   p,t = ptf.params,ptf.times
-  field = GenericField[]
-  push!(field,GenericField(ptf.f(p,t)))
-  field
+  GenericField(ptf.f(p,t))
 end
 
 function get_fields(ptf::PTFunction{<:AbstractVector{<:Number},<:AbstractVector{<:Real}})
@@ -51,6 +65,13 @@ function get_fields(ptf::PTFunction)
   fields
 end
 
+function evaluate!(cache,f::AbstractPTFunction,x::Point)
+  g = get_fields(f)
+  map(g) do gi
+    gi(x)
+  end
+end
+
 abstract type PTCellField <: CellField end
 
 struct GenericPTCellField{DS} <: PTCellField
@@ -75,7 +96,7 @@ function CellData.similar_cell_field(::PTCellField,cell_data,trian,ds)
   GenericPTCellField(cell_data,trian,ds)
 end
 
-function CellData.CellField(f::PTFunction,trian::Triangulation,::DomainStyle)
+function CellData.CellField(f::AbstractPTFunction,trian::Triangulation,::DomainStyle)
   s = size(get_cell_map(trian))
   cell_field = PTArray(lazy_map(x->Fill(x,s),get_fields(f)))
   GenericPTCellField(cell_field,trian,PhysicalDomain())
@@ -149,6 +170,15 @@ function FESpaces.FEFunction(
   PTSingleFieldFEFunction(cell_field,cell_vals,free_values,dirichlet_values,fs)
 end
 
+function FESpaces.FEFunction(
+  fs::SingleFieldFESpace,
+  free_values::PTArray,
+  dirichlet_values::AbstractArray)
+
+  dv = PTArray(dirichlet_values,length(free_values))
+  FEFunction(fs,free_values,dv)
+end
+
 function Arrays.testitem(f::PTSingleFieldFEFunction)
   cell_field = testitem(f.cell_field)
   cell_dof_values = testitem(f.cell_dof_values)
@@ -165,24 +195,26 @@ function TransientCellField(single_field::PTSingleFieldTypes,derivatives::Tuple)
 end
 
 struct PTMultiFieldFEFunction{T<:MultiFieldCellField} <: PTFEFunction
-  single_fe_functions::Vector{<:PTSingleFieldFEFunction}
+  single_fe_functions::PTArray
   free_values::PTArray
   fe_space::MultiFieldFESpace
   multi_cell_field::T
 
   function PTMultiFieldFEFunction(
-    free_values::AbstractVector,
+    free_values::PTArray,
     space::MultiFieldFESpace,
-    single_fe_functions::Vector{<:PTSingleFieldFEFunction})
+    single_fe_functions::PTArray)
 
-    multi_cell_field = MultiFieldCellField(map(i->i.cell_field,single_fe_functions))
-    T = typeof(multi_cell_field)
+    pt_multi_cell_field = map(single_fe_functions) do sff
+      MultiFieldCellField(map(i->i.cell_field,sff))
+    end
+    T = typeof(testitem(pt_multi_cell_field))
 
     new{T}(
       single_fe_functions,
       free_values,
       space,
-      multi_cell_field)
+      pt_multi_cell_field)
   end
 end
 
@@ -208,29 +240,38 @@ end
 
 function FESpaces.get_cell_dof_values(f::PTMultiFieldFEFunction,trian::Triangulation)
   uhs = f.single_fe_functions
-  blockmask = [ is_change_possible(get_triangulation(uh),trian) for uh in uhs ]
+  blockmask = [is_change_possible(get_triangulation(uh),trian) for uh in uhs]
   active_block_ids = findall(blockmask)
   active_block_data = Any[ get_cell_dof_values(uhs[i],trian) for i in active_block_ids ]
   nblocks = length(uhs)
   lazy_map(BlockMap(nblocks,active_block_ids),active_block_data...)
 end
 
-num_fields(m::PTMultiFieldFEFunction) = length(m.single_fe_functions)
+MultiField.num_fields(m::PTMultiFieldFEFunction) = length(m.single_fe_functions)
 Base.iterate(m::PTMultiFieldFEFunction) = iterate(m.single_fe_functions)
 Base.iterate(m::PTMultiFieldFEFunction,state) = iterate(m.single_fe_functions,state)
 Base.getindex(m::PTMultiFieldFEFunction,field_id::Integer) = m.single_fe_functions[field_id]
 
 const PTMultiFieldTypes = Union{MultiFieldCellField,PTMultiFieldFEFunction}
 
-function TransientCellField(multi_field::MultiFieldTypes,derivatives::Tuple)
+function TransientCellField(multi_field::PTMultiFieldTypes,derivatives::Tuple)
   transient_single_fields = _to_transient_single_fields(multi_field,derivatives)
   TransientMultiFieldCellField(multi_field,derivatives,transient_single_fields)
 end
 
-function Arrays.testitem(f::TransientMultiFieldCellField)
+function FESpaces.EvaluationFunction(fe::MultiFieldFESpace,free_values::PTArray)
+  ptblocks = map(free_values) do fv
+    map(1:length(fe.spaces)) do i
+      fvi = restrict_to_field(fe,fv,i)
+      EvaluationFunction(fe.spaces[i],fvi)
+    end
+  end
+  PTMultiFieldFEFunction(free_values,fe,ptblocks)
+end
+
+function Arrays.testitem(f::PTMultiFieldFEFunction)
   single_fe_functions = map(testitem,f.single_fe_functions)
-  free_values = testitem(f.free_values)
+  free_values = map(testitem,f.free_values)
   fe_space = f.fe_space
-  multi_cell_field = f.multi_cell_field
-  MultiFieldFEFunction(single_fe_functions,free_values,fe_space,multi_cell_field)
+  MultiFieldFEFunction(free_values,fe_space,single_fe_functions)
 end

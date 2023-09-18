@@ -70,12 +70,13 @@ import Gridap.ODEs.TransientFETools:jacobians!
 import Gridap.ODEs.ODETools:_allocate_matrix_and_vector
 import Gridap.ODEs.TransientFETools._matdata_jacobian
 import Gridap.ODEs.TransientFETools._vcat_matdata
+import Gridap.ODEs.TransientFETools:_to_transient_single_fields
 
 include("PSpace.jl")
 include("PDiffOperators.jl")
 include("PTArray.jl")
 include("PTCellFields.jl")
-include("PTIntegration.jl")
+include("PTDomainContribution.jl")
 include("PTAssemblers.jl")
 include("PTrialFESpaces.jl")
 include("PTFESpaces.jl")

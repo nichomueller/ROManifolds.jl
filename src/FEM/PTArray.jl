@@ -10,6 +10,8 @@ struct PTArray{T}
     fill!(array,a)
     new{T}(array)
   end
+
+  PTArray(a::PTArray) = a
 end
 
 Base.size(a::PTArray) = size(a.array)
@@ -31,7 +33,7 @@ function Base.map(f,a::PTArray)
 end
 
 function Base.map(f,a::PTArray,x::Union{AbstractArray,PTArray}...)
-  n = length(a)
+  n = get_length(a,x...)
   ax1 = get_at_index(1,(a,x...))
   fax1 = f(ax1...)
   b = PTArray(fax1,n)
@@ -176,7 +178,7 @@ function Arrays.return_cache(
   a::PTArray,
   x::Vararg{Union{AbstractArray,PTArray}})
 
-  n = length(a)
+  n = get_length(a,x...)
   val = return_value(f,a,x...)
   ptval = PTArray(val,n)
   ax1 = get_at_index(1,(a,x...))
@@ -240,7 +242,7 @@ function Arrays.return_value(f,a::PTArray,x::Union{AbstractArray,PTArray}...)
 end
 
 function Arrays.return_cache(f,a::PTArray,x::Union{AbstractArray,PTArray}...)
-  n = length(a)
+  n = get_length(a,x...)
   val = return_value(f,a,x...)
   ptval = PTArray(val,n)
   ax1 = get_at_index(1,(a,x...))
@@ -312,6 +314,13 @@ function get_at_index(::Colon,x::NTuple{N,PTArray}) where N
     ret = (ret...,get_at_index(j,x))
   end
   return ret
+end
+
+function get_length(x::Union{AbstractArray,PTArray}...)
+  pta = map(y->isa(y,PTArray),x)
+  n = length(first(pta))
+  @check all([length(y) == n for y in pta])
+  n
 end
 
 isaffine(a) = false
