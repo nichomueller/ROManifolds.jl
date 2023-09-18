@@ -1,5 +1,3 @@
-# Interface for time marching across parameters
-
 struct PTrialFESpace{S} <: SingleFieldFESpace
   dirichlet_values::PTArray
   space::S
@@ -44,11 +42,7 @@ function HomogeneousPTrialFESpace!(
   PTrialFESpace(dirichlet_values,U)
 end
 
-FESpaces.get_dirichlet_dof_values(f::PTrialFESpace) = f.dirichlet_values
-
 FESpaces.get_free_dof_ids(f::PTrialFESpace) = get_free_dof_ids(f.space)
-
-FESpaces.zero_free_values(f::PTrialFESpace) = zero_free_values(f.space)
 
 FESpaces.get_triangulation(f::PTrialFESpace) = get_triangulation(f.space)
 
@@ -74,73 +68,168 @@ FESpaces.get_dirichlet_dof_ids(f::PTrialFESpace) = get_dirichlet_dof_ids(f.space
 
 FESpaces.get_cell_is_dirichlet(f::PTrialFESpace) = get_cell_is_dirichlet(f.space)
 
-function FESpaces.zero_dirichlet_values(f::PTrialFESpace)
-  n = length(f.dirichlet_values)
-  uD0 = zero_dirichlet_values(f.space)
-  PTArray(uD0,n)
-end
-
 FESpaces.num_dirichlet_tags(f::PTrialFESpace) = num_dirichlet_tags(f.space)
 
 FESpaces.get_dirichlet_dof_tag(f::PTrialFESpace) = get_dirichlet_dof_tag(f.space)
 
-FESpaces.scatter_free_and_dirichlet_values(f::PTrialFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
+function FESpaces.get_dirichlet_dof_values(f::PTrialFESpace)
+  f.dirichlet_values
+end
 
-FESpaces.gather_free_and_dirichlet_values(f::PTrialFESpace,cv) = gather_free_and_dirichlet_values(f.space,cv)
+function FESpaces.zero_free_values(f::PTrialFESpace)
+  n = length(f.dirichlet_values)
+  PTArray(zero_free_values(f.space),n)
+end
 
-FESpaces.gather_free_and_dirichlet_values!(fv,dv,f::PTrialFESpace,cv) = gather_free_and_dirichlet_values!(fv,dv,f.space,cv)
+function FESpaces.zero_dirichlet_values(f::PTrialFESpace)
+  zero(f.dirichlet_values)
+end
 
-FESpaces.gather_dirichlet_values(f::PTrialFESpace,cv) = gather_dirichlet_values(f.space,cv)
+function FESpaces.scatter_free_and_dirichlet_values(f::PTrialFESpace,fv,dv)
+  map((x,y)->scatter_free_and_dirichlet_values(f.space,x,y),fv,dv)
+end
 
-FESpaces.gather_dirichlet_values!(dv,f::PTrialFESpace,cv) = gather_dirichlet_values!(dv,f.space,cv)
+function FESpaces.gather_free_and_dirichlet_values!(
+  free_vals::PTArray,
+  dirichlet_vals::PTArray,
+  f::PTrialFESpace,
+  cell_vals::PTArray)
 
-FESpaces.gather_free_values(f::PTrialFESpace,cv) = gather_free_values(f.space,cv)
+  cell_dofs = get_cell_dof_ids(f)
+  cache_dofs = array_cache(cell_dofs)
+  cell_vals1 = testitem(cell_vals)
+  cache_vals = array_cache(cell_vals1)
+  cells = eachindex(cell_vals1)
 
-FESpaces.gather_free_values!(fv,f::PTrialFESpace,cv) = gather_free_values!(fv,f.space,cv)
+  FESpaces._free_and_dirichlet_values_fill!(
+    free_vals,
+    dirichlet_vals,
+    cache_vals,
+    cache_dofs,
+    cell_vals,
+    cell_dofs,
+    cells)
+
+  (free_vals,dirichlet_vals)
+end
+
+function FESpaces.gather_dirichlet_values!(
+  dirichlet_vals::PTArray,
+  f::PTrialFESpace,
+  cell_vals::PTArray)
+
+  cell_dofs = get_cell_dof_ids(f)
+  cache_dofs = array_cache(cell_dofs)
+  cell_vals1 = testitem(cell_vals)
+  cache_vals = array_cache(cell_vals1)
+  free_vals = zero_free_values(f)
+  cells = f.dirichlet_cells
+
+  FESpaces._free_and_dirichlet_values_fill!(
+    free_vals,
+    dirichlet_vals,
+    cache_vals,
+    cache_dofs,
+    cell_vals,
+    cell_dofs,
+    cells)
+
+  dirichlet_vals
+end
+
+function FESpaces._free_and_dirichlet_values_fill!(
+  free_vals::PTArray,
+  dirichlet_vals::PTArray,
+  cache_vals,
+  cache_dofs,
+  cell_vals::PTArray,
+  cell_dofs,
+  cells)
+
+  @inbounds for cell in cells
+    dofs = getindex!(cache_dofs,cell_dofs,cell)
+    for n in eachindex(free_vals)
+      vals = getindex!(cache_vals,cell_vals[n],cell)
+      for (i,dof) in enumerate(dofs)
+        val = vals[i]
+        if dof > 0
+          free_vals[n][dof] = val
+        elseif dof < 0
+          dirichlet_vals[n][-dof] = val
+        else
+          @unreachable "dof ids either positive or negative, not zero"
+        end
+      end
+    end
+  end
+
+end
 
 function FESpaces.compute_dirichlet_values_for_tags!(
   dirichlet_values::PTArray{T},
   dirichlet_values_scratch::PTArray{T},
-  f::SingleFieldFESpace,
+  f::PTrialFESpace,
   tag_to_object) where T
 
   dv = zeros(dirichlet_values)
   dvs = zeros(dirichlet_values_scratch)
-
   dirichlet_dof_to_tag = get_dirichlet_dof_tag(f)
-  k = 0
-  for (_dv,_dvs,_tto) in zip(dv,dvs,tag_to_object)
-    k += 1
-    _tag_to_object = FESpaces._convert_to_collectable(_tto,num_dirichlet_tags(f))
-    for (tag,object) in enumerate(_tag_to_object)
+  for n in eachindex(dirichlet_values)
+    _tag_to_object = FESpaces._convert_to_collectable(tag_to_object[n],num_dirichlet_tags(f))
+    fill!(dvs[n],zero(eltype(T)))
+    for (tag, object) in enumerate(_tag_to_object)
       cell_vals = FESpaces._cell_vals(f,object)
-      fill!(_dvs,zero(eltype(T)))
-      gather_dirichlet_values!(_dvs,f,cell_vals)
-      FESpaces._fill_dirichlet_values_for_tag!(_dv,_dvs,tag,dirichlet_dof_to_tag)
+      gather_dirichlet_values!(dvs[n],f.space,cell_vals)
+      FESpaces._fill_dirichlet_values_for_tag!(dv[n],dvs[n],tag,dirichlet_dof_to_tag)
     end
-    dirichlet_values[k] = _dv
+    dirichlet_values[n] = dv[n]
   end
   dirichlet_values
 end
 
-function FESpaces.interpolate_everywhere(object::PFunction,f::SingleFieldFESpace)
-  p = object.params
-  np = length(p)
-  free_values = PTArray(zero_free_values(f),np)
-  dirichlet_values = PTArray(zero_dirichlet_values(f),np)
-  fv = zeros(free_values)
-  dv = zeros(dirichlet_values_scratch)
-  k = 0
-  for (_fv,_dv) in zip(fv,dv)
-    k += 1
-    objk = object.f(p[k])
-    cell_vals = _cell_vals(fs,objk)
-    gather_free_and_dirichlet_values!(_fv,_dv,f,cell_vals)
-    free_values[k] = _fv
-    dirichlet_values[k] = _dv
-  end
-  FEFunction(f,free_values,dirichlet_values)
-end
+# function FESpaces.compute_dirichlet_values_for_tags!(
+#   dirichlet_values::PTArray{T},
+#   dirichlet_values_scratch::PTArray{T},
+#   f::PTrialFESpace,
+#   tag_to_object) where T
+
+#   dv = zeros(dirichlet_values)
+#   dvs = zeros(dirichlet_values_scratch)
+
+#   dirichlet_dof_to_tag = get_dirichlet_dof_tag(f)
+#   k = 0
+#   @inbounds for (_dv,_dvs,_tto) in zip(dv,dvs,tag_to_object)
+#     k += 1
+#     _tag_to_object = FESpaces._convert_to_collectable(_tto,num_dirichlet_tags(f))
+#     for (tag,object) in enumerate(_tag_to_object)
+#       cell_vals = FESpaces._cell_vals(f,object)
+#       fill!(_dvs,zero(eltype(T)))
+#       gather_dirichlet_values!(_dvs,f,cell_vals)
+#       FESpaces._fill_dirichlet_values_for_tag!(_dv,_dvs,tag,dirichlet_dof_to_tag)
+#     end
+#     dirichlet_values[k] = _dv
+#   end
+#   dirichlet_values
+# end
+
+# function FESpaces.interpolate_everywhere(object::PFunction,f::SingleFieldFESpace)
+#   p = object.params
+#   np = length(p)
+#   free_values = PTArray(zero_free_values(f),np)
+#   dirichlet_values = PTArray(zero_dirichlet_values(f),np)
+#   fv = zeros(free_values)
+#   dv = zeros(dirichlet_values_scratch)
+#   k = 0
+#   @inbounds for (_fv,_dv) in zip(fv,dv)
+#     k += 1
+#     objk = object.f(p[k])
+#     cell_vals = FESpaces._cell_vals(fs,objk)
+#     gather_free_and_dirichlet_values!(_fv,_dv,f,cell_vals)
+#     free_values[k] = _fv
+#     dirichlet_values[k] = _dv
+#   end
+#   FEFunction(f,free_values,dirichlet_values)
+# end
 
 function MultiField.restrict_to_field(
   f::MultiFieldFESpace,
@@ -151,13 +240,14 @@ function MultiField.restrict_to_field(
 end
 
 function MultiField._restrict_to_field(
-  f,::ConsecutiveMultiFieldStyle,
+  f::MultiFieldFESpace,
+  ::ConsecutiveMultiFieldStyle,
   free_values::PTArray,
-  field)
+  field::Integer)
 
   offsets = compute_field_offsets(f)
   U = f.spaces
   pini = offsets[field] + 1
   pend = offsets[field] + num_free_dofs(U[field])
-  PTArray(map(fv -> SubVector(fv,pini,pend),free_values))
+  map(fv -> SubVector(fv,pini,pend),free_values)
 end

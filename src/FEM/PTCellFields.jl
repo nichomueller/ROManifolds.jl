@@ -94,13 +94,12 @@ function CellData.change_domain_ref_ref(
   mface_to_sface = sglue.mface_to_tface
   tface_to_mface = tglue.tface_to_mface
   tface_to_mface_map = tglue.tface_to_mface_map
-  ptarray = map(sface_to_fields) do sface_to_field
+  tface_to_fields_t = map(sface_to_fields) do sface_to_field
     mface_to_field = extend(sface_to_field,mface_to_sface)
     tface_to_field_s = lazy_map(Reindex(mface_to_field),tface_to_mface)
     tface_to_field_t = lazy_map(Broadcasting(∘),tface_to_field_s,tface_to_mface_map)
     tface_to_field_t
   end
-  tface_to_fields_t = PTArray(ptarray)
   similar_cell_field(a,tface_to_fields_t,ttrian,ReferenceDomain())
 end
 
@@ -109,12 +108,11 @@ function CellData.change_domain_phys_phys(
   sface_to_fields = get_data(a)
   mface_to_sface = sglue.mface_to_tface
   tface_to_mface = tglue.tface_to_mface
-  ptarray = map(sface_to_fields) do sface_to_field
+  tface_to_fields = map(sface_to_fields) do sface_to_field
     mface_to_field = extend(sface_to_field,mface_to_sface)
     tface_to_field = lazy_map(Reindex(mface_to_field),tface_to_mface)
     tface_to_field
   end
-  tface_to_fields = PTArray(ptarray)
   similar_cell_field(a,tface_to_fields,ttrian,PhysicalDomain())
 end
 
@@ -149,21 +147,6 @@ function FESpaces.FEFunction(
   cell_vals = scatter_free_and_dirichlet_values(fs,free_values,dirichlet_values)
   cell_field = CellField(fs,cell_vals)
   PTSingleFieldFEFunction(cell_field,cell_vals,free_values,dirichlet_values,fs)
-end
-
-for T in (:ConstantFESpace,:DirichletFESpace,:FESpaceWithConstantFixed,
-  :FESpaceWithLinearConstraints,:UnconstrainedFESpace)
-  @eval begin
-    function FESpaces.scatter_free_and_dirichlet_values(
-      f::$T,
-      free_values::PTArray,
-      dirichlet_values::PTArray)
-
-      n = length(free_values)
-      fv1,dv1 = map(testitem,(free_values,dirichlet_values))
-      PTArray(scatter_free_and_dirichlet_values(f,fv1,dv1),n)
-    end
-  end
 end
 
 function Arrays.testitem(f::PTSingleFieldFEFunction)

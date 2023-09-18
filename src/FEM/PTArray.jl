@@ -1,7 +1,7 @@
-struct PTArray{T<:AbstractArray}
+struct PTArray{T}
   array::AbstractVector{T}
 
-  function PTArray(array::AbstractVector{T}) where {T<:AbstractArray}
+  function PTArray(array::AbstractVector{T}) where T
     new{T}(array)
   end
 
@@ -12,8 +12,6 @@ struct PTArray{T<:AbstractArray}
   end
 end
 
-get_ptarray(a::PTArray) = a.array
-
 Base.size(a::PTArray) = size(a.array)
 Base.length(a::PTArray) = length(a.array)
 Base.eltype(::Type{PTArray{T}}) where T = eltype(T)
@@ -21,7 +19,38 @@ Base.eltype(::PTArray{T}) where T = eltype(T)
 Base.eachindex(a::PTArray) = eachindex(a.array)
 Base.ndims(::PTArray) = 1
 Base.ndims(::Type{<:PTArray}) = 1
-Base.iterate(a::PTArray,i...) = iterate(a.array,i...)
+
+function Base.map(f,a::PTArray)
+  n = length(a)
+  fa1 = f(testitem(a))
+  b = PTArray(fa1,n)
+  @inbounds for i = 2:n
+    b[i] = f(a[i])
+  end
+  b
+end
+
+function Base.map(f,a::PTArray,x::Union{AbstractArray,PTArray}...)
+  n = length(a)
+  ax1 = get_at_index(1,(a,x...))
+  fax1 = f(ax1...)
+  b = PTArray(fax1,n)
+  @inbounds for i = 2:n
+    axi = get_at_index(i,(a,x...))
+    b[i] = f(axi...)
+  end
+  b
+end
+
+function Base.map(f,a::AbstractArray,x::PTArray)
+  n = length(x)
+  fax1 = f(a,testitem(x))
+  b = PTArray(fax1,n)
+  @inbounds for i = 2:n
+    b[i] = f(a,x[i])
+  end
+  b
+end
 
 function Base.getindex(a::PTArray,i...)
   a.array[i...]
@@ -41,7 +70,7 @@ end
 
 Base.copy(a::PTArray) = PTArray(copy(a.array))
 
-Base.similar(a::PTArray) = PTArray(map(similar,a.array))
+Base.similar(a::PTArray) = map(similar,a)
 
 function Base.fill!(a::PTArray{T},v::S) where {S,T}
   array = Vector{S}(undef,length(a))
@@ -49,19 +78,8 @@ function Base.fill!(a::PTArray{T},v::S) where {S,T}
   PTArray(fill!(a.array,array))
 end
 
-struct PTArrayStyle <: Broadcast.BroadcastStyle end
-Base.broadcastable(x::PTArray) = x
-Broadcast.BroadcastStyle(::Type{<:PTArray}) = PTArrayStyle()
 function Base.materialize!(a::PTArray,b::Base.Broadcast.Broadcasted)
   map(x->Base.materialize!(x,b),a)
-  a
-end
-
-function Base.materialize!(
-  a::PTArray,
-  b::Broadcast.Broadcasted{<:PTArrayStyle})
-
-  map((x,y)->Base.materialize!(x,y),a,map(get_ptarray,b.args)...)
   a
 end
 
@@ -114,13 +132,13 @@ end
 for op in (:+,:-)
   @eval begin
     function ($op)(a::PTArray,b::PTArray)
-      PTArray(map($op,a.array,b.array))
+      map($op,a,b)
     end
   end
 end
 
 function Base.transpose(a::PTArray)
-  PTArray(map(transpose,a.array))
+  map(transpose,a)
 end
 
 Algebra.create_from_nz(a::PTArray) = a
@@ -129,7 +147,7 @@ function Arrays.CachedArray(a::PTArray)
   ai = testitem(a)
   ci = CachedArray(ai)
   array = Vector{typeof(ci)}(undef,length(a))
-  for i in eachindex(a)
+  @inbounds for i in eachindex(a)
     array[i] = CachedArray(a[i])
   end
   PTArray(array)
@@ -144,18 +162,13 @@ function Arrays.testitem(a::PTArray{T}) where T
   end
 end
 
-function Arrays.testvalue(::Type{PTArray{T}}) where T
-  array = Vector{T}(undef,(1,))
-  PTArray(array)
-end
-
 function Arrays.return_value(
   f::Gridap.Fields.BroadcastingFieldOpMap,
   a::PTArray,
   x::Vararg{Union{AbstractArray,PTArray}})
 
-  a1 = get_at_index(1,a,x...)
-  return_value(f,a1...)
+  ax1 = get_at_index(1,(a,x...))
+  return_value(f,ax1...)
 end
 
 function Arrays.return_cache(
@@ -163,12 +176,11 @@ function Arrays.return_cache(
   a::PTArray,
   x::Vararg{Union{AbstractArray,PTArray}})
 
-  sq1 = _get_1st_pta(a,x...)
-  n = length(sq1)
+  n = length(a)
   val = return_value(f,a,x...)
   ptval = PTArray(val,n)
-  a1 = get_at_index(1,a,x...)
-  cx = return_cache(f,a1...)
+  ax1 = get_at_index(1,(a,x...))
+  cx = return_cache(f,ax1...)
   cx,ptval
 end
 
@@ -180,8 +192,8 @@ function Arrays.evaluate!(
 
   cx,ptval = cache
   @inbounds for i = eachindex(ptval)
-    ai = get_at_index(i,a,x...)
-    ptval[i] = evaluate!(cx,f,ai...)
+    axi = get_at_index(i,(a,x...))
+    ptval[i] = evaluate!(cx,f,axi...)
   end
   ptval
 end
@@ -191,8 +203,8 @@ function Arrays.return_value(
   a::AbstractArray,
   x::PTArray)
 
-  a1 = get_at_index(1,a,x)
-  return_value(f,a1...)
+  a1 = get_at_index(1,x)
+  return_value(f,a,a1...)
 end
 
 function Arrays.return_cache(
@@ -200,12 +212,11 @@ function Arrays.return_cache(
   a::AbstractArray,
   x::PTArray)
 
-  sq1 = _get_1st_pta(a,x)
-  n = length(sq1)
+  n = length(x)
   val = return_value(f,a,x)
   ptval = PTArray(val,n)
-  a1 = get_at_index(1,a,x)
-  cx = return_cache(f,a1...)
+  ax1 = get_at_index(1,x)
+  cx = return_cache(f,a,ax1)
   cx,ptval
 end
 
@@ -217,55 +228,54 @@ function Arrays.evaluate!(
 
   cx,ptval = cache
   @inbounds for i = eachindex(ptval)
-    ai = get_at_index(i,a,x)
-    ptval[i] = evaluate!(cx,f,ai...)
+    xi = get_at_index(i,x)
+    ptval[i] = evaluate!(cx,f,a,xi)
   end
   ptval
 end
 
 function Arrays.return_value(f,a::PTArray,x::Union{AbstractArray,PTArray}...)
-  a1 = get_at_index(1,a,x...)
-  return_value(f,a1)
+  ax1 = get_at_index(1,(a,x...))
+  return_value(f,ax1...)
 end
 
 function Arrays.return_cache(f,a::PTArray,x::Union{AbstractArray,PTArray}...)
-  sq1 = _get_1st_pta(a,x...)
-  n = length(sq1)
+  n = length(a)
   val = return_value(f,a,x...)
   ptval = PTArray(val,n)
-  a1 = get_at_index(1,a,x...)
-  cx = return_cache(f,a1)
+  ax1 = get_at_index(1,(a,x...))
+  cx = return_cache(f,ax1...)
   cx,ptval
 end
 
 function Arrays.evaluate!(cache,f,a::PTArray,x::Union{AbstractArray,PTArray}...)
   cx,ptval = cache
   @inbounds for i = eachindex(ptval)
-    ai = get_at_index(i,a,x...)
-    ptval[i] = evaluate!(cx,f,ai...)
+    axi = get_at_index(i,(a,x...))
+    ptval[i] = evaluate!(cx,f,axi...)
   end
   ptval
 end
 
 function Arrays.return_value(f,a::AbstractArray,x::PTArray)
-  a1 = get_at_index(1,a,x)
-  return_value(f,a1)
+  x1 = get_at_index(1,x)
+  return_value(f,a,x1)
 end
 
 function Arrays.return_cache(f,a::AbstractArray,x::PTArray)
   n = length(x)
   val = return_value(f,a,x)
   ptval = PTArray(val,n)
-  a1 = get_at_index(1,a,x)
-  cx = return_cache(f,a1...)
+  x1 = get_at_index(1,x)
+  cx = return_cache(f,a,x1)
   cx,ptval
 end
 
 function Arrays.evaluate!(cache,f,a::AbstractArray,x::PTArray)
   cx,ptval = cache
   @inbounds for i = eachindex(ptval)
-    ai = get_at_index(i,a,x)
-    ptval[i] = evaluate!(cx,f,ai...)
+    xi = get_at_index(i,x)
+    ptval[i] = evaluate!(cx,f,a,xi)
   end
   ptval
 end
@@ -273,46 +283,35 @@ end
 function Arrays.lazy_map(
   f,
   a::PTArray,
-  x::Union{AbstractArray,PTArray}...)
+  x::Vararg{Union{AbstractArray,PTArray}})
 
   lazy_arrays = map(eachindex(a)) do i
-    ai = get_at_index(i,a,x...)
-    lazy_map(f,ai...)
-  end
-  PTArray(lazy_arrays)
-end
-
-function Arrays.lazy_map(
-  f,
-  a::PTArray,
-  b::Vararg{Union{AbstractArray,PTArray}})
-
-  lazy_arrays = map(eachindex(a)) do i
-    ai = get_at_index(i,a,b...)
-    lazy_map(f,ai...)
+    axi = get_at_index(i,(a,x...))
+    lazy_map(f,axi...)
   end
   PTArray(lazy_arrays)
 end
 
 function Arrays.lazy_map(f,a::AbstractArray,x::PTArray)
-  lazy_arrays = map(y->lazy_map(f,a,y),x)
-  PTArray(lazy_arrays)
+  map(y->lazy_map(f,a,y),x)
 end
 
-function get_at_index(i::Int,x::Union{AbstractArray,PTArray}...)
+get_at_index(::Int,x) = x
+get_at_index(i::Int,x::PTArray) = x[i]
+function get_at_index(i::Int,x::NTuple{N,Union{AbstractArray,PTArray}}) where N
   ret = ()
   @inbounds for xj in x
-    ret = isa(xj,PTArray) ? (ret...,xj[i]) : (ret...,xj)
+    ret = (ret...,get_at_index(i,xj))
   end
   return ret
 end
 
-function _get_1st_pta(x::Union{AbstractArray,PTArray}...)
-  @inbounds for xi in x
-    if isa(xi,PTArray)
-      return xi
-    end
+function get_at_index(::Colon,x::NTuple{N,PTArray}) where N
+  ret = ()
+  @inbounds for j in eachindex(first(x))
+    ret = (ret...,get_at_index(j,x))
   end
+  return ret
 end
 
 isaffine(a) = false

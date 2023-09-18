@@ -88,5 +88,5 @@ assemble_matrix_add!(A,op.assem,matdata)
 
 v = get_fe_basis(test)
 b = allocate_residual(op,uh,ode_cache)
-vecdata = collect_cell_vector(test,evaluate(op.res(μ,t,xh,v)))
+vecdata = collect_cell_vector(test,op.res(μ,t,xh,v))
 assemble_vector_add!(b,op.assem,vecdata)

@@ -9,14 +9,6 @@ ode_cache = allocate_cache(ode_op,μ)
 ode_cache = update_cache!(ode_cache,ode_op,μ,t)
 Us,_,fecache = ode_cache
 uh = EvaluationFunction(Us[1],vθ)
-ode_op = get_algebraic_operator(op)
-ode_cache = allocate_cache(ode_op,μ)
-update_cache!(ode_cache,ode_op,μ,t)
-u = PTArray([zeros(test.nfree) for _ = 1:2])
-vθ = similar(u)
-vθ .= 1.0
-Us,_,fecache = ode_cache
-uh = EvaluationFunction(Us[1],vθ)
 dxh = ()
 for i in 1:get_order(op)
   dxh = (dxh...,uh)
@@ -30,7 +22,7 @@ assemble_matrix_add!(A,op.assem,matdata)
 
 v = get_fe_basis(test)
 b = allocate_residual(op,uh,ode_cache)
-vecdata = collect_cell_vector(test,evaluate(op.res(μ,t,xh,v)))
+vecdata = collect_cell_vector(test,op.res(μ,t,xh,v))
 assemble_vector_add!(b,op.assem,vecdata)
 
 # Gridap

@@ -39,7 +39,7 @@ begin
   u0(μ) = x->u0(x,μ)
   u0μ(μ) = PFunction(u0,μ)
 
-  res(μ,t,u,v) = ∫ₚ(v*∂ₚt(u) + aμt(μ,t)*∇(v)⋅∇(u) - fμt(μ,t)*v,dΩ) - ∫ₚ(hμt(μ,t)*v,dΓn)
+  res(μ,t,u,v) = ∫ₚ(v*∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⋅∇(u),dΩ) - ∫ₚ(fμt(μ,t)*v,dΩ) - ∫ₚ(hμt(μ,t)*v,dΓn)
   jac(μ,t,u,du,v) = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ)
   jac_t(μ,t,u,dut,v) = ∫ₚ(v*dut,dΩ)
 

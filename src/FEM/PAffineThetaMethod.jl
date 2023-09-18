@@ -79,71 +79,71 @@ function _vector!(
   vθ)
 
   residual!(b,op,μ,tθ,(u0,vθ),ode_cache)
-  b .*= -1.0
+  b.array .*= -1.0
   b
 end
 
-function residual_step!(
-  rf::PTArray,
-  solver::ThetaMethod,
-  op::PODEOperator,
-  μ::AbstractVector,
-  u0::PTArray,
-  t0::Real,
-  cache)
+# function residual_step!(
+#   rf::PTArray,
+#   solver::ThetaMethod,
+#   op::PODEOperator,
+#   μ::AbstractVector,
+#   u0::PTArray,
+#   t0::Real,
+#   cache)
 
-  dt = solver.dt
-  solver.θ == 0.0 ? dtθ = dt : dtθ = dt*solver.θ
-  tθ = t0+dtθ
+#   dt = solver.dt
+#   solver.θ == 0.0 ? dtθ = dt : dtθ = dt*solver.θ
+#   tθ = t0+dtθ
 
-  if isnothing(cache)
-    ode_cache = allocate_cache(op,μ)
-    vθ = similar(u0)
-    vθ .= 0.0
-    b = allocate_residual(op,u0,ode_cache)
-  else
-    ode_cache,vθ,b = cache
-  end
+#   if isnothing(cache)
+#     ode_cache = allocate_cache(op,μ)
+#     vθ = similar(u0)
+#     vθ .= 0.0
+#     b = allocate_residual(op,u0,ode_cache)
+#   else
+#     ode_cache,vθ,b = cache
+#   end
 
-  ode_cache = update_cache!(ode_cache,op,μ,tθ)
+#   ode_cache = update_cache!(ode_cache,op,μ,tθ)
 
-  _vector!(b,op,μ,tθ,dtθ,u0,ode_cache,vθ)
+#   _vector!(b,op,μ,tθ,dtθ,u0,ode_cache,vθ)
 
-  @. rf = b
+#   @. rf = b
 
-  cache = (ode_cache,vθ,b)
-  tf = t0+dt
-  return (rf,tf,cache)
-end
+#   cache = (ode_cache,vθ,b)
+#   tf = t0+dt
+#   return (rf,tf,cache)
+# end
 
-function jacobian_step!(
-  af::PTArray,
-  solver::ThetaMethod,
-  op::PODEOperator,
-  μ::AbstractVector,
-  A0::PTArray,
-  t0::Real,
-  cache)
+# function jacobian_step!(
+#   af::PTArray,
+#   solver::ThetaMethod,
+#   op::PODEOperator,
+#   μ::AbstractVector,
+#   A0::PTArray,
+#   t0::Real,
+#   cache)
 
-  dt = solver.dt
-  solver.θ == 0.0 ? dtθ = dt : dtθ = dt*solver.θ
-  tθ = t0+dtθ
+#   dt = solver.dt
+#   solver.θ == 0.0 ? dtθ = dt : dtθ = dt*solver.θ
+#   tθ = t0+dtθ
 
-  if isnothing(cache)
-    ode_cache = allocate_cache(op,μ)
-    vθ = similar(r0)
-    vθ .= 0.0
-    A = allocate_jacobian(op,A0,ode_cache)
-  else
-    ode_cache,vθ,A = cache
-  end
+#   if isnothing(cache)
+#     ode_cache = allocate_cache(op,μ)
+#     vθ = similar(r0)
+#     vθ .= 0.0
+#     A = allocate_jacobian(op,A0,ode_cache)
+#   else
+#     ode_cache,vθ,A = cache
+#   end
 
-  ode_cache = update_cache!(ode_cache,op,μ,tθ)
+#   ode_cache = update_cache!(ode_cache,op,μ,tθ)
 
-  _matrix!(A,op,μ,tθ,dtθ,A0,ode_cache,vθ)
-  compress!(af,A)
+#   _matrix!(A,op,μ,tθ,dtθ,A0,ode_cache,vθ)
+#   compress!(af,A)
 
-  cache = (ode_cache,vθ,A)
-  tf = t0+dt
-  return (af,tf,cache)
-end
+#   cache = (ode_cache,vθ,A)
+#   tf = t0+dt
+#   return (af,tf,cache)
+# end

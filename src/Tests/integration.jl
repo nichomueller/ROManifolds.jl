@@ -100,12 +100,12 @@ runtest_matrix(dc,dc_ok,strian)
 runtest_vector(hdc,hdc_ok,Γn)
 runtest_vector(mdc,mdc_ok,strian)
 
-dj1 = evaluate(op.jacs[1](μ,t,xh,du,v))
+dj1 = op.jacs[1](μ,t,xh,du,v)
 dj1_by_1 = 1. * dj1
 test_ptarray(dj1[Ω],dj1_by_1[Ω])
 
-dc1 = evaluate(∫ₚ(v*∂ₚt(xh) + aμt(μ,t)*∇(v)⋅∇(xh) - fμt(μ,t)*v,dΩ))
-dc2 = evaluate(∫ₚ(hμt(μ,t)*v,dΓn))
+dc1 = ∫ₚ(v*∂ₚt(xh) + aμt(μ,t)*∇(v)⋅∇(xh) - fμt(μ,t)*v,dΩ)
+dc2 = ∫ₚ(hμt(μ,t)*v,dΓn)
 dc3 = dc1-dc2
 dc1_ok = ∫(v*∂t(xh_ok))dΩ + ∫(a(μ[1],t)*∇(v)⋅∇(xh_ok))dΩ - ∫(f(μ[1],t)*v)dΩ
 dc2_ok = ∫(h(μ[1],t)*v)dΓn

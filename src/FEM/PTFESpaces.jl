@@ -20,6 +20,10 @@ function allocate_trial_space(U::SingleFieldFESpace,args...)
   HomogeneousTrialFESpace(U)
 end
 
+function allocate_trial_space(U::PTTrialFESpace,args...)
+  HomogeneousTrialFESpace(U.space)
+end
+
 function allocate_trial_space(U::PTTrialFESpace,μ::Table)
   n = length(μ)
   HomogeneousPTrialFESpace(U.space,n)

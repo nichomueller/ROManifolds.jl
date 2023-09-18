@@ -123,7 +123,7 @@ function allocate_residual(
     dxh = (dxh...,uh)
   end
   xh = TransientCellField(uh,dxh)
-  vecdata = collect_cell_vector(V,evaluate(op.res(μ,t,xh,v)))
+  vecdata = collect_cell_vector(V,op.res(μ,t,xh,v))
   allocate_vector(op.assem,vecdata)
 end
 
@@ -137,7 +137,7 @@ function residual!(
 
   V = get_test(op)
   v = get_fe_basis(V)
-  vecdata = collect_cell_vector(V,evaluate(op.res(μ,t,xh,v)))
+  vecdata = collect_cell_vector(V,op.res(μ,t,xh,v))
   assemble_vector!(b,op.assem,vecdata)
   b
 end
@@ -242,5 +242,5 @@ function _matdata_jacobian(
   V = get_test(op)
   u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
-  collect_cell_matrix(Uh,V,γᵢ*evaluate(op.jacs[i](μ,t,xh,u,v)))
+  collect_cell_matrix(Uh,V,γᵢ*op.jacs[i](μ,t,xh,u,v))
 end

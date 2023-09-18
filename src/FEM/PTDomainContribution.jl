@@ -1,43 +1,20 @@
-struct PIntegrand
-  object::CellField
-  meas::Measure
-end
-
-const ∫ₚ = PIntegrand
-
-function (+)(a::PIntegrand,b::PIntegrand)
-  aint = evaluate(a)
-  bint = evaluate(b)
-  (+)(aint,bint)
-end
-
-function (-)(a::PIntegrand,b::PIntegrand)
-  aint = evaluate(a)
-  bint = evaluate(b)
-  (-)(aint,bint)
-end
-
-function Arrays.evaluate(int::PIntegrand)
-  obj = int.object
-  meas = int.meas
-  ptintegrate(obj,meas)
-end
-
 struct PTDomainContribution <: GridapType
-  dict::IdDict{Triangulation,Union{PTArray,AbstractArray}}
+  dict::IdDict{Measure,Union{PTArray,AbstractArray}}
 end
 
 function PTDomainContribution()
-  PTDomainContribution(IdDict{Triangulation,Union{PTArray,AbstractArray}}())
+  PTDomainContribution(IdDict{Measure,Union{PTArray,AbstractArray}}())
 end
+
+CellData.get_triangulation(meas::Measure) = meas.quad.trian
 
 CellData.num_domains(a::PTDomainContribution) = length(a.dict)
 
 CellData.get_domains(a::PTDomainContribution) = keys(a.dict)
 
-function CellData.get_contribution(a::PTDomainContribution,trian::Triangulation)
-  if haskey(a.dict,trian)
-     return a.dict[trian]
+function CellData.get_contribution(a::PTDomainContribution,meas::Measure)
+  if haskey(a.dict,meas)
+     return a.dict[meas]
   else
     @unreachable """\n
     There is not contribution associated with the given mesh in this PTDomainContribution object.
@@ -45,12 +22,25 @@ function CellData.get_contribution(a::PTDomainContribution,trian::Triangulation)
   end
 end
 
-Base.getindex(a::PTDomainContribution,trian::Triangulation) = get_contribution(a,trian)
+function CellData.get_contribution(a::PTDomainContribution,trian::Triangulation)
+  for meas in get_domains(a)
+    mtrian = get_triangulation(meas)
+    if is_parent(trian,mtrian) || trian == mtrian
+      get_contribution(a,meas)
+    end
+  end
+  @unreachable """\n
+    There is not contribution associated with the given mesh in this PTDomainContribution object.
+    """
+end
+
+Base.getindex(a::PTDomainContribution,meas::Measure) = get_contribution(a,meas)
 
 function CellData.add_contribution!(
   a::PTDomainContribution,
-  trian::Triangulation,
-  b,op=+)
+  meas::Measure,
+  b::Union{PTArray,AbstractArray},
+  op=+)
 
   S = eltype(b)
   if !(S<:AbstractMatrix || S<:AbstractVector || S<:Number || S<:ArrayBlock)
@@ -88,13 +78,13 @@ function CellData.add_contribution!(
     end
   end
 
-  if haskey(a.dict,trian)
-    a.dict[trian] = lazy_map(Broadcasting(op),a.dict[trian],b)
+  if haskey(a.dict,meas)
+    a.dict[meas] = lazy_map(Broadcasting(op),a.dict[meas],b)
   else
     if op == +
-      a.dict[trian] = b
+      a.dict[meas] = b
     else
-      a.dict[trian] = lazy_map(Broadcasting(op),b)
+      a.dict[meas] = lazy_map(Broadcasting(op),b)
     end
   end
   a
@@ -106,26 +96,27 @@ Base.copy(a::PTDomainContribution) = PTDomainContribution(copy(a.dict))
 
 function (+)(a::PTDomainContribution,b::PTDomainContribution)
   c = copy(a)
-  for (trian,array) in b.dict
-    add_contribution!(c,trian,array)
+  for (meas,array) in b.dict
+    add_contribution!(c,meas,array)
   end
   c
 end
 
 function (-)(a::PTDomainContribution,b::PTDomainContribution)
   c = copy(a)
-  for (trian,array) in b.dict
-    add_contribution!(c,trian,array,-)
+  for (meas,array) in b.dict
+    add_contribution!(c,meas,array,-)
   end
   c
 end
 
 function (*)(a::Number,b::PTDomainContribution)
   c = PTDomainContribution()
-  for (trian,array_old) in b.dict
+  for (meas,array_old) in b.dict
+    trian = get_triangulation(meas)
     s = size(get_cell_map(trian))
     array_new = lazy_map(Broadcasting(*),Fill(a,s),array_old)
-    add_contribution!(c,trian,array_new)
+    add_contribution!(c,meas,array_new)
   end
   c
 end
@@ -140,26 +131,26 @@ function CellData.get_array(a::PTDomainContribution)
   a.dict[first(keys(a.dict))]
 end
 
-function ptintegrate(f,b::CellData.GenericMeasure)
+function ptintegrate(f::CellField,b::CellData.GenericMeasure)
   c = ptintegrate(f,b.quad)
   cont = PTDomainContribution()
-  add_contribution!(cont,b.quad.trian,c)
+  add_contribution!(cont,b,c)
   cont
 end
 
-function ptintegrate(f,b::CellData.CompositeMeasure)
+function ptintegrate(f::CellField,b::CellData.CompositeMeasure)
   ic = ptintegrate(f,b.quad)
   cont = PTDomainContribution()
   tc = move_contributions(ic,b.itrian,b.ttrian)
-  add_contribution!(cont,b.ttrian,tc)
+  add_contribution!(cont,b,tc)
   return cont
 end
 
 function CellData.move_contributions(scell_to_val::PTArray,args...)
-  ptcell_mat_trian = map(scell_to_val) do x
+  ptcell_mat_trian = map(scell_to_val.array) do x
     move_contributions(x,args...)
   end
-  cell_to_val = PTArray(first.(ptcell_mat_trian))
+  cell_to_val = PTArray(map(first,ptcell_mat_trian))
   trian = first(last.(ptcell_mat_trian))
   cell_to_val,trian
 end
@@ -200,3 +191,5 @@ function ptintegrate(f::CellField,quad::CellQuadrature)
     @notimplemented
   end
 end
+
+const ∫ₚ = ptintegrate

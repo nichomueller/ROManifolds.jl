@@ -1,4 +1,45 @@
-Gridap.CellData.get_triangulation(m::Measure) = m.quad.trian
+function Base.:(==)(
+  a::T,
+  b::T
+  ) where {T<:Union{Grid,Field}}
+
+  for field in propertynames(a)
+    a_field = getproperty(a,field)
+    b_field = getproperty(b,field)
+    if isa(a_field,GridapType)
+      (==)(a_field,b_field)
+    else
+      if isdefined(a_field,1) && !(==)(a_field,b_field)
+        @assert false
+      end
+    end
+  end
+  return true
+end
+
+function is_parent(tparent::Triangulation,tchild::Triangulation)
+  try
+    try
+      tparent.model == tchild.model && tparent.grid == tchild.grid.parent
+    catch
+      tparent == tchild.parent
+    end
+  catch
+    false
+  end
+end
+
+function FESpaces.is_change_possible(strian::Triangulation,ttrian::Triangulation)
+  msg = "Triangulations do not point to the same background discrete model!"
+  if strian == ttrian
+    return true
+  end
+  @check get_background_model(strian) == get_background_model(ttrian) msg
+  D = num_cell_dims(strian)
+  sglue = get_glue(strian,Val(D))
+  tglue = get_glue(ttrian,Val(D))
+  is_change_possible(sglue,tglue)
+end
 
 function FESpaces.get_order(test::SingleFieldFESpace)
   basis = get_fe_basis(test)
