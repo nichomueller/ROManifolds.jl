@@ -198,24 +198,3 @@ function FESpaces.compute_dirichlet_values_for_tags!(
   end
   dirichlet_values
 end
-
-function MultiField.restrict_to_field(
-  f::MultiFieldFESpace,
-  free_values::PTArray,
-  field::Integer)
-
-  MultiField._restrict_to_field(f,MultiFieldStyle(f),free_values,field)
-end
-
-function MultiField._restrict_to_field(
-  f::MultiFieldFESpace,
-  ::ConsecutiveMultiFieldStyle,
-  free_values::PTArray,
-  field::Integer)
-
-  offsets = compute_field_offsets(f)
-  U = f.spaces
-  pini = offsets[field] + 1
-  pend = offsets[field] + num_free_dofs(U[field])
-  map(fv -> SubVector(fv,pini,pend),free_values)
-end

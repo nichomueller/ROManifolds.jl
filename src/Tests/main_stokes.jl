@@ -36,13 +36,8 @@ begin
   p0(μ) = x->p0(x,μ)
   p0μ(μ) = PFunction(p0,μ)
 
-  res(μ,t,(u,p),(v,q),dΩ) = (∫(v⋅∂ₚt(u))dΩ + ∫(a(μ,t)*∇(v)⊙∇(u))dΩ
-    - ∫(p*(∇⋅(v)))dΩ - ∫(q*(∇⋅(u)))dΩ)
-  jac(μ,t,(u,p),(du,dp),(v,q),dΩ) = ∫(a(μ,t)*∇(v)⊙∇(du))dΩ - ∫(dp*(∇⋅(v)))dΩ - ∫(q*(∇⋅(du)))dΩ
-  jac_t(μ,t,(u,p),(dut,dpt),(v,q),dΩ) = ∫(v⋅dut)dΩ
-
-  res(μ,t,(u,p),(v,q)) = ∫ₚ(v⋅∂ₚt(u) + aμt(μ,t)*∇(v)⊙∇(u) - p*(∇⋅(v)) - q*(∇⋅(u)),dΩ)
-  jac(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(aμt(μ,t)⊙∇(v)⋅∇(du) - dp*(∇⋅(v)) - q*(∇⋅(du)),dΩ)
+  res(μ,t,(u,p),(v,q)) = ∫ₚ(v⋅∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(u)),dΩ)
+  jac(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(aμt(μ,t)⊙∇(v)⋅∇(du),dΩ) - ∫ₚ(dp*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(du)),dΩ)
   jac_t(μ,t,(u,p),(dut,dpt),(v,q)) = ∫ₚ(v⋅dut,dΩ)
 
   reffe_u = Gridap.ReferenceFE(lagrangian,VectorValue{2,Float},order)

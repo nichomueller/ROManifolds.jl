@@ -11,7 +11,7 @@ end
 
 function get_fields(pf::PFunction{<:AbstractVector{<:Number}})
   p = pf.params
-  GenericField(pf.f(p))
+  [GenericField(pf.f(p))]
 end
 
 function get_fields(pf::PFunction)
@@ -37,7 +37,7 @@ end
 
 function get_fields(ptf::PTFunction{<:AbstractVector{<:Number},<:Real})
   p,t = ptf.params,ptf.times
-  GenericField(ptf.f(p,t))
+  [GenericField(ptf.f(p,t))]
 end
 
 function get_fields(ptf::PTFunction{<:AbstractVector{<:Number},<:AbstractVector{<:Real}})
@@ -194,27 +194,43 @@ function TransientCellField(single_field::PTSingleFieldTypes,derivatives::Tuple)
   TransientSingleFieldCellField(single_field,derivatives)
 end
 
+# struct PTMultiFieldFEFunction{T<:MultiFieldCellField} <: PTFEFunction
+#   single_fe_functions::PTArray
+#   free_values::PTArray
+#   fe_space::MultiFieldFESpace
+#   multi_cell_field::T
+
+#   function PTMultiFieldFEFunction(
+#     free_values::PTArray,
+#     space::MultiFieldFESpace,
+#     single_fe_functions::PTArray)
+
+#     pt_multi_cell_field = map(single_fe_functions) do sff
+#       MultiFieldCellField(map(i->i.cell_field,sff))
+#     end
+#     T = typeof(testitem(pt_multi_cell_field))
+
+#     new{T}(
+#       single_fe_functions,
+#       free_values,
+#       space,
+#       pt_multi_cell_field)
+#   end
+# end
 struct PTMultiFieldFEFunction{T<:MultiFieldCellField} <: PTFEFunction
-  single_fe_functions::PTArray
-  free_values::PTArray
+  single_fe_functions::Vector{<:PTSingleFieldFEFunction}
+  free_values::Vector{<:PTArray}
   fe_space::MultiFieldFESpace
   multi_cell_field::T
 
   function PTMultiFieldFEFunction(
-    free_values::PTArray,
+    free_values::Vector{<:PTArray},
     space::MultiFieldFESpace,
-    single_fe_functions::PTArray)
+    single_fe_functions::Vector{<:PTSingleFieldFEFunction})
 
-    pt_multi_cell_field = map(single_fe_functions) do sff
-      MultiFieldCellField(map(i->i.cell_field,sff))
-    end
-    T = typeof(testitem(pt_multi_cell_field))
-
-    new{T}(
-      single_fe_functions,
-      free_values,
-      space,
-      pt_multi_cell_field)
+    multi_cell_field = MultiFieldCellField(map(i->i.cell_field,single_fe_functions))
+    T = typeof(multi_cell_field)
+    new{T}(single_fe_functions,free_values,space,multi_cell_field)
   end
 end
 
@@ -259,14 +275,45 @@ function TransientCellField(multi_field::PTMultiFieldTypes,derivatives::Tuple)
   TransientMultiFieldCellField(multi_field,derivatives,transient_single_fields)
 end
 
+# function FESpaces.EvaluationFunction(fe::MultiFieldFESpace,free_values::PTArray)
+#   ptblocks = map(free_values) do fv
+#     map(1:length(fe.spaces)) do i
+#       fvi = restrict_to_field(fe,fv,i)
+#       EvaluationFunction(fe.spaces[i],fvi)
+#     end
+#   end
+#   PTMultiFieldFEFunction(free_values,fe,ptblocks)
+# end
 function FESpaces.EvaluationFunction(fe::MultiFieldFESpace,free_values::PTArray)
-  ptblocks = map(free_values) do fv
-    map(1:length(fe.spaces)) do i
-      fvi = restrict_to_field(fe,fv,i)
-      EvaluationFunction(fe.spaces[i],fvi)
-    end
+  blocks = map(1:length(fe.spaces)) do i
+    free_values_i = restrict_to_field(fe,free_values,i)
+    fe_function_i = EvaluationFunction(fe.spaces[i],free_values_i)
+    free_values_i,fe_function_i
   end
-  PTMultiFieldFEFunction(free_values,fe,ptblocks)
+  free_values = first.(blocks)
+  fe_functions = last.(blocks)
+  PTMultiFieldFEFunction(free_values,fe,fe_functions)
+end
+
+function MultiField.restrict_to_field(
+  f::MultiFieldFESpace,
+  free_values::PTArray,
+  field::Integer)
+
+  MultiField._restrict_to_field(f,MultiFieldStyle(f),free_values,field)
+end
+
+function MultiField._restrict_to_field(
+  f::MultiFieldFESpace,
+  ::ConsecutiveMultiFieldStyle,
+  free_values::PTArray,
+  field::Integer)
+
+  offsets = compute_field_offsets(f)
+  U = f.spaces
+  pini = offsets[field] + 1
+  pend = offsets[field] + num_free_dofs(U[field])
+  map(fv -> SubVector(fv,pini,pend),free_values)
 end
 
 function Arrays.testitem(f::PTMultiFieldFEFunction)

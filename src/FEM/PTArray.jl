@@ -317,7 +317,7 @@ function get_at_index(::Colon,x::NTuple{N,PTArray}) where N
 end
 
 function get_length(x::Union{AbstractArray,PTArray}...)
-  pta = map(y->isa(y,PTArray),x)
+  pta = filter(y->isa(y,PTArray),x)
   n = length(first(pta))
   @check all([length(y) == n for y in pta])
   n

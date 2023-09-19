@@ -1,23 +1,18 @@
 op,solver = feop,fesolver
-μ = realization(op,2)
+K = 2
+μ = realization(op,K)
 t = solver.dt
-strian = Ω
 
-vec_cache = PTArray([zeros(test.nfree) for _ = 1:2])
-V = get_test(op)
+V = get_test(op)#[1]
 v = get_fe_basis(V)
-U = PTrialFESpace(vec_cache,V)
+U = get_trial(op)(nothing,nothing) #[1]
 du = get_trial_fe_basis(U)
-
-int = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ)
-dc = evaluate(int)
-
-hdc = evaluate(∫ₚ(hμt(μ,t)*v,dΓn))
 
 ode_op = get_algebraic_operator(op)
 ode_cache = allocate_cache(ode_op,μ)
 update_cache!(ode_cache,ode_op,μ,t)
-u = PTArray([zeros(test.nfree) for _ = 1:2])
+nfree = num_free_dofs(test)
+u = PTArray([zeros(nfree) for _ = 1:K])
 vθ = similar(u)
 vθ .= 1.0
 Us,_,fecache = ode_cache
@@ -27,18 +22,18 @@ for i in 1:get_order(op)
   dxh = (dxh...,uh)
 end
 xh = TransientCellField(uh,dxh)
-mdc = evaluate(∫ₚ(v*∂ₚt(xh),dΩ))
+
+dca = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ) # dca = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(du),dΩ)
+dch = ∫ₚ(hμt(μ,t)*v,dΓn)
+dcm = ∫ₚ(v*∂ₚt(xh),dΩ) # dcm = ∫ₚ(v⋅∂ₚt(xh[1]),dΩ)
 
 # Gridap
 g_ok(x,t) = g(x,μ[1],t)
 g_ok(t) = x->g_ok(x,t)
-trial_ok = TransientTrialFESpace(test,g_ok)
+trial_ok = TransientTrialFESpace(V,g_ok)
 du_ok = get_trial_fe_basis(trial_ok(t))
-dc_ok = ∫(a(μ[1],t)*∇(v)⋅∇(du_ok))dΩ
 
-hdc_ok = ∫(h(μ[1],t)*v)dΓn
-
-feop_ok = TransientAffineFEOperator(res,jac,jac_t,trial_ok,test)
+feop_ok = TransientAffineFEOperator(res,jac,jac_t,trial_ok,V)
 ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
 uF_ok = similar(u[1])
 uF_ok .= 1.0
@@ -51,12 +46,16 @@ for i in 1:get_order(op)
   dxh_ok = (dxh_ok...,uh_ok)
 end
 xh_ok = TransientCellField(uh_ok,dxh_ok)
-mdc_ok = ∫(v*∂t(xh_ok))dΩ
+
+dc_ok = ∫(a(μ[1],t)*∇(v)⋅∇(du_ok))dΩ # dca_ok = ∫(a(μ[1],t)*∇(v)⊙∇(du_ok))dΩ
+dch_ok = ∫(h(μ[1],t)*v)dΓn
+dcm_ok = ∫(v*∂t(xh_ok))dΩ # dcm_ok = ∫(v⋅∂t(xh_ok))dΩ
 
 # TESTS
 
-function runtest_matrix(dc,dc_ok,strian)
-  scell_mat = get_contribution(dc,strian)
+function runtest_matrix(dc,dc_ok,meas)
+  strian = get_triangulation(meas)
+  scell_mat = get_contribution(dc,meas)
   cell_mat,trian = move_contributions(scell_mat,strian)
   @assert ndims(eltype(cell_mat)) == 2
   cell_mat_c = attach_constraints_cols(U(μ,t),cell_mat,trian)
@@ -78,8 +77,9 @@ function runtest_matrix(dc,dc_ok,strian)
   test_ptarray(cell_mat_rc,cell_mat_rc_ok)
 end
 
-function runtest_vector(dc,dc_ok,strian)
-  scell_vec = get_contribution(dc,strian)
+function runtest_vector(dc,dc_ok,meas)
+  strian = get_triangulation(meas)
+  scell_vec = get_contribution(dc,meas)
   cell_vec,trian = move_contributions(scell_vec,strian)
   @assert ndims(eltype(cell_vec)) == 1
   cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
@@ -96,9 +96,9 @@ function runtest_vector(dc,dc_ok,strian)
   test_ptarray(cell_vec_r,cell_vec_r_ok)
 end
 
-runtest_matrix(dc,dc_ok,strian)
-runtest_vector(hdc,hdc_ok,Γn)
-runtest_vector(mdc,mdc_ok,strian)
+runtest_matrix(dca,dc_ok,dΩ)
+runtest_vector(dch,dch_ok,dΓn)
+runtest_vector(dcm,dcm_ok,dΩ)
 
 dj1 = op.jacs[1](μ,t,xh,du,v)
 dj1_by_1 = 1. * dj1
