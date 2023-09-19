@@ -24,6 +24,10 @@ begin
   a(μ,t) = x->a(x,μ,t)
   aμt(μ,t) = PTFunction(a,μ,t)
 
+  f(x,μ,t) = VectorValue(0,0)
+  f(μ,t) = x->f(x,μ,t)
+  fμt(μ,t) = PTFunction(f,μ,t)
+
   g(x,μ,t) = VectorValue(μ[1]*exp(-x[2]/μ[2])*abs(sin(μ[3]*t)),0)
   g(μ,t) = x->g(x,μ,t)
   # g0(x,μ,t) = VectorValue(0,0)
@@ -36,9 +40,9 @@ begin
   p0(μ) = x->p0(x,μ)
   p0μ(μ) = PFunction(p0,μ)
 
-  res(μ,t,(u,p),(v,q)) = ∫ₚ(v⋅∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(u)),dΩ)
-  jac(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(du),dΩ) - ∫ₚ(dp*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(du)),dΩ)
-  jac_t(μ,t,(u,p),(dut,dpt),(v,q)) = ∫ₚ(v⋅dut,dΩ)
+  m(μ,t,(ut,pt),(v,q)) = ∫ₚ(v⋅ut,dΩ)
+  lhs(μ,t,(u,p),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(u)),dΩ)
+  rhs(μ,t,(u,p),(du,dp),(v,q)) = ∫(v*fμt(μ,t),dΩ)
 
   reffe_u = Gridap.ReferenceFE(lagrangian,VectorValue{2,Float},order)
   reffe_p = Gridap.ReferenceFE(lagrangian,Float,order-1)
@@ -50,7 +54,7 @@ begin
   trial_p = TrialFESpace(test_p)
   test = PTMultiFieldFESpace([test_u,test_p])
   trial = PTMultiFieldFESpace([trial_u,trial_p])
-  feop = PTFEOperator(res,jac,jac_t,pspace,trial,test)
+  feop = PTAffineFEOperator(m,lhs,rhs,pspace,trial,test)
   t0,tF,dt,θ = 0.,0.05,0.005,1
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial_u(μ,t0))
   ph0μ(μ) = interpolate_everywhere(p0μ(μ),trial_p(μ,t0))
@@ -87,3 +91,9 @@ begin
   vecdata = collect_cell_vector(test,op.res(μ,t,xh,v))
   assemble_vector_add!(b,op.assem,vecdata)
 end
+
+u,v = get_trial_fe_basis(trial_u(nothing,nothing)),get_fe_basis(test_u)
+# ptintegrate(aμt(μ,t)*∇(v)⊙∇(u),dΩ.quad)
+cf = aμt(μ,t)*∇(v)⊙∇(u)
+quad = dΩ.quad
+b = change_domain(cf,quad.trian,quad.data_domain_style)

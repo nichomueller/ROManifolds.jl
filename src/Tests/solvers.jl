@@ -3,7 +3,8 @@ ode_op = get_algebraic_operator(op)
 K = 2
 μ = realization(op,K)
 t = t0
-w = PTArray([zeros(test.nfree) for _ = 1:K])
+nfree = num_free_dofs(test)
+w = PTArray([zeros(nfree) for _ = 1:K])
 
 ode_solver = ThetaMethod(LUSolver(),dt,θ)
 sol = PODESolution(ode_solver,ode_op,μ,w,t0,tF)
