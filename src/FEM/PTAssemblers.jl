@@ -147,7 +147,7 @@ end
   for k in eachindex(veccache)
     veck = veccache[k]
     cell_valsk = get_at_index(k,cell_vals)
-    for cell in eachindex(rows_cache)
+    for cell in eachindex(cell_rows)
       rows = getindex!(rows_cache,cell_rows,cell)
       valsk = getindex!(vals_cache,cell_valsk,cell)
       evaluate!(add_cache,add!,veck,valsk,rows)

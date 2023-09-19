@@ -1,7 +1,9 @@
 op,solver = feop,fesolver
-μ = realization(op,2)
+K = 2
+μ = realization(op,K)
 t = solver.dt
-u = PTArray([zeros(test.nfree) for _ = 1:2])
+nfree = num_free_dofs(test)
+u = PTArray([zeros(nfree) for _ = 1:K])
 vθ = similar(u)
 vθ .= 1.0
 ode_op = get_algebraic_operator(op)
@@ -26,16 +28,33 @@ vecdata = collect_cell_vector(test,op.res(μ,t,xh,v))
 assemble_vector_add!(b,op.assem,vecdata)
 
 # Gridap
-p = μ[1]
-gok(x,t) = g(x,p,t)
-gok(t) = x->gok(x,t)
-resok(t,u,v) = ∫(v*∂t(u))dΩ + ∫(a(p,t)*∇(v)⋅∇(u))dΩ - ∫(f(p,t)*v)dΩ - ∫(h(p,t)*v)dΓn
-jacok(t,u,du,v) = ∫(a(p,t)*∇(v)⋅∇(du))dΩ
-jacok_t(t,u,dut,v) = ∫(v*dut)dΩ
-trial_ok = TransientTrialFESpace(test,gok)
-feop_ok = TransientFEOperator(resok,jacok,jacok_t,trial_ok,test)
+test_ok = test
+pp = μ[1]
+g_ok(x,t) = g(x,pp,t)
+g_ok(t) = x->g_ok(x,t)
+poisson = false
+if poisson
+  res_ok(t,u,v) = ∫(v*∂t(u))dΩ + ∫(a(pp,t)*∇(v)⋅∇(u))dΩ - ∫(f(pp,t)*v)dΩ - ∫(h(pp,t)*v)dΓn
+  jac_ok(t,u,du,v) = ∫(a(pp,t)*∇(v)⋅∇(du))dΩ
+  jac_ok_t(t,u,dut,v) = ∫(v*dut)dΩ
+  trial_ok = TransientTrialFESpace(test_ok,g_ok)
+else
+  test_u_ok = test_u
+  test_p_ok = test_p
+  res_ok(t,(u,p),(v,q)) = ∫(v⋅∂t(u))dΩ + ∫(a(pp,t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ - ∫(q*(∇⋅(u)))dΩ
+  jac_ok(t,(u,p),(du,dp),(v,q)) = ∫(a(pp,t)*∇(v)⊙∇(u))dΩ - ∫(dp*(∇⋅(v)))dΩ - ∫(q*(∇⋅(du)))dΩ
+  jac_t_ok(t,(u,p),(dut,dpt),(v,q)) = ∫(v⋅dut)dΩ
+  reffe_u_ok = Gridap.ReferenceFE(lagrangian,VectorValue{2,Float},order)
+  reffe_p_ok = Gridap.ReferenceFE(lagrangian,Float,order-1)
+  test_u_ok = TestFESpace(model,reffe_u_ok;conformity=:H1,dirichlet_tags=["dirichlet"])
+  trial_u_ok = TransientTrialFESpace(test_u_ok,g_ok)
+  test_p_ok = TestFESpace(model,reffe_p_ok;conformity=:C0)
+  trial_p_ok = TrialFESpace(test_p_ok)
+  test_ok = TransientMultiFieldFESpace([test_u_ok,test_p_ok])
+  trial_ok = TransientMultiFieldFESpace([trial_u_ok,trial_p_ok])
+end
+feop_ok = TransientFEOperator(res_ok,jac_ok,jac_t_ok,trial_ok,test_ok)
 du_ok = get_trial_fe_basis(trial_ok(t))
-uh_ok = zero(test)
 
 ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
 uF_ok = similar(u[1])

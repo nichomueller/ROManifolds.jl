@@ -37,7 +37,7 @@ begin
   p0μ(μ) = PFunction(p0,μ)
 
   res(μ,t,(u,p),(v,q)) = ∫ₚ(v⋅∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(u)),dΩ)
-  jac(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(aμt(μ,t)⊙∇(v)⋅∇(du),dΩ) - ∫ₚ(dp*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(du)),dΩ)
+  jac(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(du),dΩ) - ∫ₚ(dp*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(du)),dΩ)
   jac_t(μ,t,(u,p),(dut,dpt),(v,q)) = ∫ₚ(v⋅dut,dΩ)
 
   reffe_u = Gridap.ReferenceFE(lagrangian,VectorValue{2,Float},order)
@@ -50,7 +50,7 @@ begin
   trial_p = TrialFESpace(test_p)
   test = PTMultiFieldFESpace([test_u,test_p])
   trial = PTMultiFieldFESpace([trial_u,trial_p])
-  feop = PTAffineFEOperator(res,jac,jac_t,pspace,trial,test)
+  feop = PTFEOperator(res,jac,jac_t,pspace,trial,test)
   t0,tF,dt,θ = 0.,0.05,0.005,1
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial_u(μ,t0))
   ph0μ(μ) = interpolate_everywhere(p0μ(μ),trial_p(μ,t0))
@@ -58,30 +58,32 @@ begin
   fesolver = ThetaMethod(LUSolver(),dt,θ)
 end
 
-op,solver = feop,fesolver
-μ = realization(op,2)
-t = dt
-nfree = num_free_dofs(test)
-u = PTArray([zeros(nfree) for _ = 1:2])
-vθ = similar(u)
-vθ .= 1.0
-ode_op = get_algebraic_operator(op)
-ode_cache = allocate_cache(ode_op,μ)
-ode_cache = update_cache!(ode_cache,ode_op,μ,t)
-Us,_,fecache = ode_cache
-uh = EvaluationFunction(Us[1],vθ)
-dxh = ()
-for i in 1:get_order(op)
-  dxh = (dxh...,uh)
+begin
+  op,solver = feop,fesolver
+  μ = realization(op,2)
+  t = dt
+  nfree = num_free_dofs(test)
+  u = PTArray([zeros(nfree) for _ = 1:2])
+  vθ = similar(u)
+  vθ .= 0.
+  ode_op = get_algebraic_operator(op)
+  ode_cache = allocate_cache(ode_op,μ)
+  ode_cache = update_cache!(ode_cache,ode_op,μ,t)
+  Us,_,fecache = ode_cache
+  uh = EvaluationFunction(Us[1],vθ)
+  dxh = ()
+  for i in 1:get_order(op)
+    dxh = (dxh...,uh)
+  end
+  xh = TransientCellField(uh,dxh)
+
+  A = allocate_jacobian(op,uh,ode_cache)
+  _matdata_jacobians = fill_jacobians(op,μ,t,xh,(1.,1/t))
+  matdata = _vcat_matdata(_matdata_jacobians)
+  assemble_matrix_add!(A,op.assem,matdata)
+
+  v = get_fe_basis(test)
+  b = allocate_residual(op,uh,ode_cache)
+  vecdata = collect_cell_vector(test,op.res(μ,t,xh,v))
+  assemble_vector_add!(b,op.assem,vecdata)
 end
-xh = TransientCellField(uh,dxh)
-
-A = allocate_jacobian(op,uh,ode_cache)
-_matdata_jacobians = fill_jacobians(op,μ,t,xh,(1.,1/t))
-matdata = _vcat_matdata(_matdata_jacobians)
-assemble_matrix_add!(A,op.assem,matdata)
-
-v = get_fe_basis(test)
-b = allocate_residual(op,uh,ode_cache)
-vecdata = collect_cell_vector(test,op.res(μ,t,xh,v))
-assemble_vector_add!(b,op.assem,vecdata)

@@ -32,7 +32,9 @@ function Base.map(f,a::PTArray)
   b
 end
 
-function Base.map(f,a::PTArray,x::Union{AbstractArray,PTArray}...)
+const AbstractArrayBlock{T,N} = Union{AbstractArray{T,N},ArrayBlock{T,N}}
+
+function Base.map(f,a::PTArray,x::Union{AbstractArrayBlock,PTArray}...)
   n = get_length(a,x...)
   ax1 = get_at_index(1,(a,x...))
   fax1 = f(ax1...)
@@ -44,7 +46,7 @@ function Base.map(f,a::PTArray,x::Union{AbstractArray,PTArray}...)
   b
 end
 
-function Base.map(f,a::AbstractArray,x::PTArray)
+function Base.map(f,a::AbstractArrayBlock,x::PTArray)
   n = length(x)
   fax1 = f(a,testitem(x))
   b = PTArray(fax1,n)
@@ -101,10 +103,6 @@ end
 
 function Base.zeros(a::PTArray)
   zero(a).array
-end
-
-function Base.:≈(a::AbstractArray{<:PTArray},b::AbstractArray{<:PTArray})
-  all(z->z[1]≈z[2],zip(a,b))
 end
 
 function Base.:≈(a::PTArray,b::PTArray)
@@ -167,7 +165,7 @@ end
 function Arrays.return_value(
   f::Gridap.Fields.BroadcastingFieldOpMap,
   a::PTArray,
-  x::Vararg{Union{AbstractArray,PTArray}})
+  x::Vararg{Union{AbstractArrayBlock,PTArray}})
 
   ax1 = get_at_index(1,(a,x...))
   return_value(f,ax1...)
@@ -176,7 +174,7 @@ end
 function Arrays.return_cache(
   f::Gridap.Fields.BroadcastingFieldOpMap,
   a::PTArray,
-  x::Vararg{Union{AbstractArray,PTArray}})
+  x::Vararg{Union{AbstractArrayBlock,PTArray}})
 
   n = get_length(a,x...)
   val = return_value(f,a,x...)
@@ -190,7 +188,7 @@ function Arrays.evaluate!(
   cache,
   f::Gridap.Fields.BroadcastingFieldOpMap,
   a::PTArray,
-  x::Vararg{Union{AbstractArray,PTArray}})
+  x::Vararg{Union{AbstractArrayBlock,PTArray}})
 
   cx,ptval = cache
   @inbounds for i = eachindex(ptval)
@@ -202,16 +200,16 @@ end
 
 function Arrays.return_value(
   f::Gridap.Fields.BroadcastingFieldOpMap,
-  a::AbstractArray,
+  a::AbstractArrayBlock,
   x::PTArray)
 
-  a1 = get_at_index(1,x)
-  return_value(f,a,a1...)
+  x1 = get_at_index(1,x)
+  return_value(f,a,x1)
 end
 
 function Arrays.return_cache(
   f::Gridap.Fields.BroadcastingFieldOpMap,
-  a::AbstractArray,
+  a::AbstractArrayBlock,
   x::PTArray)
 
   n = length(x)
@@ -225,7 +223,7 @@ end
 function Arrays.evaluate!(
   cache,
   f::Gridap.Fields.BroadcastingFieldOpMap,
-  a::AbstractArray,
+  a::AbstractArrayBlock,
   x::PTArray)
 
   cx,ptval = cache
@@ -236,12 +234,12 @@ function Arrays.evaluate!(
   ptval
 end
 
-function Arrays.return_value(f,a::PTArray,x::Union{AbstractArray,PTArray}...)
+function Arrays.return_value(f,a::PTArray,x::Union{AbstractArrayBlock,PTArray}...)
   ax1 = get_at_index(1,(a,x...))
   return_value(f,ax1...)
 end
 
-function Arrays.return_cache(f,a::PTArray,x::Union{AbstractArray,PTArray}...)
+function Arrays.return_cache(f,a::PTArray,x::Union{AbstractArrayBlock,PTArray}...)
   n = get_length(a,x...)
   val = return_value(f,a,x...)
   ptval = PTArray(val,n)
@@ -250,7 +248,7 @@ function Arrays.return_cache(f,a::PTArray,x::Union{AbstractArray,PTArray}...)
   cx,ptval
 end
 
-function Arrays.evaluate!(cache,f,a::PTArray,x::Union{AbstractArray,PTArray}...)
+function Arrays.evaluate!(cache,f,a::PTArray,x::Union{AbstractArrayBlock,PTArray}...)
   cx,ptval = cache
   @inbounds for i = eachindex(ptval)
     axi = get_at_index(i,(a,x...))
@@ -259,12 +257,12 @@ function Arrays.evaluate!(cache,f,a::PTArray,x::Union{AbstractArray,PTArray}...)
   ptval
 end
 
-function Arrays.return_value(f,a::AbstractArray,x::PTArray)
+function Arrays.return_value(f,a::AbstractArrayBlock,x::PTArray)
   x1 = get_at_index(1,x)
   return_value(f,a,x1)
 end
 
-function Arrays.return_cache(f,a::AbstractArray,x::PTArray)
+function Arrays.return_cache(f,a::AbstractArrayBlock,x::PTArray)
   n = length(x)
   val = return_value(f,a,x)
   ptval = PTArray(val,n)
@@ -273,7 +271,7 @@ function Arrays.return_cache(f,a::AbstractArray,x::PTArray)
   cx,ptval
 end
 
-function Arrays.evaluate!(cache,f,a::AbstractArray,x::PTArray)
+function Arrays.evaluate!(cache,f,a::AbstractArrayBlock,x::PTArray)
   cx,ptval = cache
   @inbounds for i = eachindex(ptval)
     xi = get_at_index(i,x)
@@ -285,7 +283,7 @@ end
 function Arrays.lazy_map(
   f,
   a::PTArray,
-  x::Vararg{Union{AbstractArray,PTArray}})
+  x::Vararg{Union{AbstractArrayBlock,PTArray}})
 
   lazy_arrays = map(eachindex(a)) do i
     axi = get_at_index(i,(a,x...))
@@ -294,13 +292,13 @@ function Arrays.lazy_map(
   PTArray(lazy_arrays)
 end
 
-function Arrays.lazy_map(f,a::AbstractArray,x::PTArray)
+function Arrays.lazy_map(f,a::AbstractArrayBlock,x::PTArray)
   map(y->lazy_map(f,a,y),x)
 end
 
 get_at_index(::Int,x) = x
 get_at_index(i::Int,x::PTArray) = x[i]
-function get_at_index(i::Int,x::NTuple{N,Union{AbstractArray,PTArray}}) where N
+function get_at_index(i::Int,x::NTuple{N,Union{AbstractArrayBlock,PTArray}}) where N
   ret = ()
   @inbounds for xj in x
     ret = (ret...,get_at_index(i,xj))
@@ -316,7 +314,7 @@ function get_at_index(::Colon,x::NTuple{N,PTArray}) where N
   return ret
 end
 
-function get_length(x::Union{AbstractArray,PTArray}...)
+function get_length(x::Union{AbstractArrayBlock,PTArray}...)
   pta = filter(y->isa(y,PTArray),x)
   n = length(first(pta))
   @check all([length(y) == n for y in pta])
@@ -330,14 +328,14 @@ function isaffine(a::PTArray)
   all([a[i] == a1 for i = 2:n])
 end
 
-function test_ptarray(a::PTArray,b::AbstractArray)
+function test_ptarray(a::PTArray,b::AbstractArrayBlock)
   a1 = testitem(a)
   @assert typeof(a1) == typeof(b)
   @assert all(a1 .≈ b)
   return
 end
 
-function test_ptarray(a::AbstractArray,b::PTArray)
+function test_ptarray(a::AbstractArrayBlock,b::PTArray)
   test_ptarray(b,a)
 end
 

@@ -198,3 +198,7 @@ function FESpaces.compute_dirichlet_values_for_tags!(
   end
   dirichlet_values
 end
+
+Arrays.testitem(f::FESpace) = f
+Arrays.testitem(f::PTrialFESpace) = TrialFESpace(testitem(f.dirichlet_values),f.space)
+Arrays.testitem(f::MultiFieldFESpace) = MultiFieldFESpace(map(testitem,f.spaces))
