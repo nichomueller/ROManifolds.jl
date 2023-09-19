@@ -1,26 +1,33 @@
-struct PTArray{T}
+struct Nonaffine <: OperatorType end
+
+get_affinity(array::AbstractVector) = all([a == first(array)]) ? Affine() : Nonaffine()
+
+struct PTArray{A,T}
   array::AbstractVector{T}
 
-  function PTArray(array::AbstractVector{T}) where T
-    new{T}(array)
+  function PTArray(::A,array::AbstractVector{T}) where T
+    new{A,T}(array)
   end
 
   function PTArray(a::T,length::Int) where T
     array = Vector{T}(undef,length)
     fill!(array,a)
-    new{T}(array)
+    new{Affine,T}(array)
   end
 
+  PTArray(array::AbstractVector) = PTArray(get_affinity(array),array)
   PTArray(a::PTArray) = a
 end
 
 Base.size(a::PTArray) = size(a.array)
 Base.length(a::PTArray) = length(a.array)
-Base.eltype(::Type{PTArray{T}}) where T = eltype(T)
-Base.eltype(::PTArray{T}) where T = eltype(T)
+Base.eltype(::Type{PTArray{A,T}}) where {A,T} = eltype(T)
+Base.eltype(::PTArray{A,T}) where {A,T} = eltype(T)
 Base.eachindex(a::PTArray) = eachindex(a.array)
 Base.ndims(::PTArray) = 1
 Base.ndims(::Type{<:PTArray}) = 1
+
+const AbstractArrayBlock{T,N} = Union{AbstractArray{T,N},ArrayBlock{T,N}}
 
 function Base.map(f,a::PTArray)
   n = length(a)
@@ -31,8 +38,6 @@ function Base.map(f,a::PTArray)
   end
   b
 end
-
-const AbstractArrayBlock{T,N} = Union{AbstractArray{T,N},ArrayBlock{T,N}}
 
 function Base.map(f,a::PTArray,x::Union{AbstractArrayBlock,PTArray}...)
   n = get_length(a,x...)
@@ -68,18 +73,16 @@ function Base.first(a::PTArray)
   PTArray([first(testitem(a))])
 end
 
-function Base.show(io::IO,o::PTArray{T}) where T
-  print(io,"PTArray of type $T and length $(length(o.array))")
+function Base.show(io::IO,o::PTArray{A,T}) where {A,T}
+  print(io,"PTArray{$A} of type $T and length $(length(o.array))")
 end
 
 Base.copy(a::PTArray) = PTArray(copy(a.array))
 
 Base.similar(a::PTArray) = map(similar,a)
 
-function Base.fill!(a::PTArray{T},v::S) where {S,T}
-  array = Vector{S}(undef,length(a))
-  fill!(array,v)
-  PTArray(fill!(a.array,array))
+function Base.fill!(a::PTArray{A,T},v::T) where {A,T}
+  fill!(a.array,v)
 end
 
 function Base.materialize!(a::PTArray,b::Base.Broadcast.Broadcasted)
@@ -153,7 +156,7 @@ function Arrays.CachedArray(a::PTArray)
   PTArray(array)
 end
 
-function Arrays.testitem(a::PTArray{T}) where T
+function Arrays.testitem(a::PTArray{A,T}) where {A,T}
   @notimplementedif !isconcretetype(T)
   if length(a) != 0
     a[1]
@@ -296,6 +299,72 @@ function Arrays.lazy_map(f,a::AbstractArrayBlock,x::PTArray)
   map(y->lazy_map(f,a,y),x)
 end
 
+# AFFINE SHORTCUTS
+function Base.map(f,a::PTArray{<:Affine})
+  n = length(a)
+  fa1 = f(testitem(a))
+  PTArray(fa1,n)
+end
+
+function Base.map(f,a::PTArray{<:Affine},x::Union{AbstractArrayBlock,PTArray{<:Affine}}...)
+  n = get_length(a,x...)
+  ax1 = get_at_index(1,(a,x...))
+  fax1 = f(ax1...)
+  PTArray(fax1,n)
+end
+
+function Base.map(f,a::AbstractArrayBlock,x::PTArray{<:Affine})
+  n = length(x)
+  fax1 = f(a,testitem(x))
+  PTArray(fax1,n)
+end
+
+function Arrays.evaluate!(
+  cache,
+  f::Gridap.Fields.BroadcastingFieldOpMap,
+  a::PTArray{<:Affine},
+  x::Vararg{Union{AbstractArrayBlock,PTArray{<:Affine}}})
+
+  cx,ptval = cache
+  ax1 = get_at_index(1,(a,x...))
+  evaluate!(cx,f,ax1...)
+  fill!(ptval,cx)
+  ptval
+end
+
+function Arrays.evaluate!(
+  cache,
+  f::Gridap.Fields.BroadcastingFieldOpMap,
+  a::AbstractArrayBlock,
+  x::PTArray{<:Affine})
+
+  cx,ptval = cache
+  x1 = get_at_index(1,x)
+  evaluate!(cx,f,a,x1)
+  fill!(ptval,cx)
+  ptval
+end
+
+function Arrays.evaluate!(
+  cache,f,
+  a::PTArray{<:Affine},
+  x::Union{AbstractArrayBlock,PTArray{<:Affine}}...)
+
+  cx,ptval = cache
+  ax1 = get_at_index(1,(a,x...))
+  evaluate!(cx,f,ax1...)
+  fill!(ptval,cx)
+  ptval
+end
+
+function Arrays.evaluate!(cache,f,a::AbstractArrayBlock,x::PTArray{<:Affine})
+  cx,ptval = cache
+  x1 = get_at_index(1,x)
+  evaluate!(cx,f,a,x1)
+  fill!(ptval,cx)
+  ptval
+end
+
 get_at_index(::Int,x) = x
 get_at_index(i::Int,x::PTArray) = x[i]
 function get_at_index(i::Int,x::NTuple{N,Union{AbstractArrayBlock,PTArray}}) where N
@@ -319,13 +388,6 @@ function get_length(x::Union{AbstractArrayBlock,PTArray}...)
   n = length(first(pta))
   @check all([length(y) == n for y in pta])
   n
-end
-
-isaffine(a) = false
-function isaffine(a::PTArray)
-  a1 = testitem(a)
-  n = length(a)
-  all([a[i] == a1 for i = 2:n])
 end
 
 function test_ptarray(a::PTArray,b::AbstractArrayBlock)

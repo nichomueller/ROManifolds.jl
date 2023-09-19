@@ -132,64 +132,27 @@ function CellData.get_array(a::PTDomainContribution)
 end
 
 function ptintegrate(f::CellField,b::CellData.GenericMeasure)
-  c = ptintegrate(f,b.quad)
+  c = integrate(f,b.quad)
   cont = PTDomainContribution()
   add_contribution!(cont,b,c)
   cont
 end
 
 function ptintegrate(f::CellField,b::CellData.CompositeMeasure)
-  ic = ptintegrate(f,b.quad)
+  ic = integrate(f,b.quad)
   cont = PTDomainContribution()
   tc = move_contributions(ic,b.itrian,b.ttrian)
   add_contribution!(cont,b,tc)
   return cont
 end
 
-function CellData.move_contributions(scell_to_val::PTArray,args...)
+function CellData.move_contributions(scell_to_val::PTArray{A},args...) where A
   ptcell_mat_trian = map(scell_to_val.array) do x
     move_contributions(x,args...)
   end
-  cell_to_val = PTArray(map(first,ptcell_mat_trian))
+  cell_to_val = PTArray(A(),first.(ptcell_mat_trian))
   trian = first(last.(ptcell_mat_trian))
   cell_to_val,trian
-end
-
-function ptintegrate(f::CellField,quad::CellQuadrature)
-  trian_f = get_triangulation(f)
-  trian_x = get_triangulation(quad)
-
-  msg = """\n
-    Your are trying to integrate a CellField using a CellQuadrature defined on incompatible
-    triangulations. Verify that either the two objects are defined in the same triangulation
-    or that the triangulaiton of the CellField is the background triangulation of the CellQuadrature.
-    """
-  @check is_change_possible(trian_f,trian_x) msg
-
-  b = change_domain(f,quad.trian,quad.data_domain_style)
-  x = get_cell_points(quad)
-  bx = b(x)
-  if isaffine(bx)
-    bx = testitem(bx)
-  end
-  if quad.data_domain_style == PhysicalDomain() &&
-            quad.integration_domain_style == PhysicalDomain()
-    lazy_map(IntegrationMap(),bx,quad.cell_weight)
-  elseif quad.data_domain_style == ReferenceDomain() &&
-            quad.integration_domain_style == PhysicalDomain()
-    cell_map = get_cell_map(quad.trian)
-    cell_Jt = lazy_map(∇,cell_map)
-    cell_Jtx = lazy_map(evaluate,cell_Jt,quad.cell_point)
-    lazy_map(IntegrationMap(),bx,quad.cell_weight,cell_Jtx)
-  elseif quad.data_domain_style == ReferenceDomain() &&
-            quad.integration_domain_style == ReferenceDomain()
-    cell_map = Fill(GenericField(identity),length(bx))
-    cell_Jt = lazy_map(∇,cell_map)
-    cell_Jtx = lazy_map(evaluate,cell_Jt,quad.cell_point)
-    lazy_map(IntegrationMap(),bx,quad.cell_weight,cell_Jtx)
-  else
-    @notimplemented
-  end
 end
 
 const ∫ₚ = ptintegrate

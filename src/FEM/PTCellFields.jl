@@ -9,22 +9,6 @@ struct PFunction{P} <: AbstractPTFunction{P,nothing}
   end
 end
 
-function GenericPTField(pf::PFunction{<:AbstractVector{<:Number}})
-  p = pf.params
-  GenericField(pf.f(p))
-end
-
-function GenericPTField(pf::PFunction)
-  p = pf.params
-  np = length(p)
-  fields = Vector{GenericField}(undef,np)
-  @inbounds for k = eachindex(p)
-    pk = p[k]
-    fields[k] = GenericField(pf.f(pk))
-  end
-  fields
-end
-
 struct PTFunction{P,T} <: AbstractPTFunction{P,T}
   f::Function
   params::P
@@ -35,12 +19,28 @@ struct PTFunction{P,T} <: AbstractPTFunction{P,T}
   end
 end
 
-function GenericPTField(ptf::PTFunction{<:AbstractVector{<:Number},<:Real})
+function get_fields(pf::PFunction{<:AbstractVector{<:Number}})
+  p = pf.params
+  GenericField(pf.f(p))
+end
+
+function get_fields(pf::PFunction)
+  p = pf.params
+  np = length(p)
+  fields = Vector{GenericField}(undef,np)
+  @inbounds for k = eachindex(p)
+    pk = p[k]
+    fields[k] = GenericField(pf.f(pk))
+  end
+  fields
+end
+
+function get_fields(ptf::PTFunction{<:AbstractVector{<:Number},<:Real})
   p,t = ptf.params,ptf.times
   GenericField(ptf.f(p,t))
 end
 
-function GenericPTField(ptf::PTFunction{<:AbstractVector{<:Number},<:AbstractVector{<:Real}})
+function get_fields(ptf::PTFunction{<:AbstractVector{<:Number},<:AbstractVector{<:Real}})
   p,t = ptf.params,ptf.times
   nt = length(t)
   fields = Vector{GenericField}(undef,nt)
@@ -51,7 +51,7 @@ function GenericPTField(ptf::PTFunction{<:AbstractVector{<:Number},<:AbstractVec
   fields
 end
 
-function GenericPTField(ptf::PTFunction)
+function get_fields(ptf::PTFunction)
   p,t = ptf.params,ptf.times
   np = length(p)
   nt = length(t)
@@ -66,7 +66,7 @@ function GenericPTField(ptf::PTFunction)
 end
 
 function evaluate!(cache,f::AbstractPTFunction,x::Point)
-  g = GenericPTField(f)
+  g = get_fields(f)
   map(g) do gi
     gi(x)
   end
@@ -88,7 +88,7 @@ struct GenericPTCellField{DS} <: PTCellField
   end
 end
 
-Base.length(f::GenericPTCellField) = length(f.cell_field)
+# Base.length(f::GenericPTCellField) = length(f.cell_field)
 CellData.get_data(f::GenericPTCellField) = f.cell_field
 CellData.get_triangulation(f::GenericPTCellField) = f.trian
 CellData.DomainStyle(::Type{GenericPTCellField{DS}}) where DS = DS()
@@ -103,8 +103,11 @@ function CellData.CellField(
   ::DomainStyle)
 
   s = size(get_cell_map(trian))
-  cell_field = PTArray(lazy_map(x->Fill(x,s),GenericPTField(f)))
-  GenericPTCellField(cell_field,trian,PhysicalDomain())
+  x = get_data(get_cell_points(trian))
+  ptf = get_fields(f)
+  aff = get_affinity(map(f->f(x),ptf))
+  ptcell_field = PTArray(aff,lazy_map(x->Fill(x,s),ptf))
+  GenericPTCellField(ptcell_field,trian,PhysicalDomain())
 end
 
 function CellData.CellField(
@@ -113,7 +116,7 @@ function CellData.CellField(
   ::DomainStyle) where T
 
   s = size(get_cell_map(trian))
-  cell_field = Fill(GenericPTField(f),s)
+  cell_field = Fill(get_fields(f),s)
   GenericCellField(cell_field,trian,PhysicalDomain())
 end
 
@@ -166,7 +169,7 @@ struct PTSingleFieldFEFunction{T<:CellField} <: PTFEFunction
   fe_space::SingleFieldFESpace
 end
 
-Base.length(f::PTSingleFieldFEFunction) = length(f.cell_field)
+# Base.length(f::PTSingleFieldFEFunction) = length(f.cell_field)
 CellData.get_data(f::PTSingleFieldFEFunction) = get_data(f.cell_field)
 CellData.get_triangulation(f::PTSingleFieldFEFunction) = get_triangulation(f.cell_field)
 CellData.DomainStyle(::Type{PTSingleFieldFEFunction{T}}) where T = DomainStyle(T)
@@ -226,7 +229,7 @@ struct PTMultiFieldFEFunction{T<:MultiFieldCellField} <: PTFEFunction
   end
 end
 
-Base.length(f::PTMultiFieldFEFunction) = length(first(f.single_fe_functions))
+# Base.length(f::PTMultiFieldFEFunction) = length(first(f.single_fe_functions))
 CellData.get_data(f::PTMultiFieldFEFunction) = get_data(f.multi_cell_field)
 CellData.get_triangulation(f::PTMultiFieldFEFunction) = get_triangulation(f.multi_cell_field)
 CellData.DomainStyle(::Type{PTMultiFieldFEFunction{T}}) where T = DomainStyle(T)
@@ -246,16 +249,16 @@ function FESpaces.get_cell_dof_values(f::PTMultiFieldFEFunction)
   get_cell_dof_values(f,trian)
 end
 
-function FESpaces.get_cell_dof_values(f::PTMultiFieldFEFunction,trian::Triangulation)
-  uhs = f.single_fe_functions
-  blockmask = [is_change_possible(get_triangulation(uh),trian) for uh in uhs]
-  active_block_ids = findall(blockmask)
-  active_block_data = Any[ get_cell_dof_values(uhs[i],trian) for i in active_block_ids ]
-  nblocks = length(uhs)
-  lazy_map(BlockMap(nblocks,active_block_ids),active_block_data...)
-end
+# function FESpaces.get_cell_dof_values(f::PTMultiFieldFEFunction,trian::Triangulation)
+#   uhs = f.single_fe_functions
+#   blockmask = [is_change_possible(get_triangulation(uh),trian) for uh in uhs]
+#   active_block_ids = findall(blockmask)
+#   active_block_data = Any[ get_cell_dof_values(uhs[i],trian) for i in active_block_ids ]
+#   nblocks = length(uhs)
+#   lazy_map(BlockMap(nblocks,active_block_ids),active_block_data...)
+# end
 
-MultiField.num_fields(m::PTMultiFieldFEFunction) = length(m.single_fe_functions)
+# MultiField.num_fields(m::PTMultiFieldFEFunction) = length(m.single_fe_functions)
 Base.iterate(m::PTMultiFieldFEFunction) = iterate(m.single_fe_functions)
 Base.iterate(m::PTMultiFieldFEFunction,state) = iterate(m.single_fe_functions,state)
 Base.getindex(m::PTMultiFieldFEFunction,field_id::Integer) = m.single_fe_functions[field_id]
@@ -268,7 +271,7 @@ function TransientCellField(multi_field::PTMultiFieldTypes,derivatives::Tuple)
 end
 
 function FESpaces.EvaluationFunction(fe::MultiFieldFESpace,free_values::PTArray)
-  blocks = map(1:length(fe.spaces)) do i
+  blocks = map(eachindex(fe.spaces)) do i
     free_values_i = restrict_to_field(fe,free_values,i)
     fe_function_i = EvaluationFunction(fe.spaces[i],free_values_i)
     free_values_i,fe_function_i

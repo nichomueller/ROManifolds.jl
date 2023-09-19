@@ -35,10 +35,10 @@ function HomogeneousPTrialFESpace(U::PTrialFESpace)
 end
 
 function HomogeneousPTrialFESpace!(
-  dirichlet_values::PTArray{T},
-  U::SingleFieldFESpace) where T
+  dirichlet_values::PTArray,
+  U::SingleFieldFESpace)
 
-  fill!(dirichlet_values,zero(eltype(T)))
+  fill!(dirichlet_values,zero(eltype(dirichlet_values)))
   PTrialFESpace(dirichlet_values,U)
 end
 
@@ -178,10 +178,10 @@ function FESpaces._free_and_dirichlet_values_fill!(
 end
 
 function FESpaces.compute_dirichlet_values_for_tags!(
-  dirichlet_values::PTArray{T},
-  dirichlet_values_scratch::PTArray{T},
+  dirichlet_values::PTArray{A,T},
+  dirichlet_values_scratch::PTArray{A,T},
   f::PTrialFESpace,
-  tag_to_object) where T
+  tag_to_object) where {A,T}
 
   dv = zeros(dirichlet_values)
   dvs = zeros(dirichlet_values_scratch)
