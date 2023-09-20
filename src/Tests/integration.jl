@@ -12,7 +12,7 @@ ode_op = get_algebraic_operator(op)
 ode_cache = allocate_cache(ode_op,μ)
 update_cache!(ode_cache,ode_op,μ,t)
 nfree = num_free_dofs(test)
-u = PTArray{Affine}([zeros(nfree) for _ = 1:K])
+u = PTArray{Nonaffine}([zeros(nfree) for _ = 1:K])
 vθ = similar(u)
 vθ .= 1.0
 Us,_,fecache = ode_cache

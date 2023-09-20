@@ -13,15 +13,42 @@ end
 combine_affinity(A::OperatorType...) = Nonaffine()
 combine_affinity(A::Affine...) = Affine()
 
-struct PTArray{A,T}
-  array::AbstractVector{T}
+abstract type AbstractPTArray{T} end
 
-  function PTArray{A}(array::AbstractVector{T}) where {A,T}
-    new{A,T}(array)
+struct PTArray{T} <: AbstractPTArray{T}
+  array::Vector{T}
+
+  function PTArray(array::Vector{T}) where {T<:AbstractArrayBlock}
+    new{T}(array)
   end
 
-  function PTArray{A}(a::T,length::Int) where {A,T}
-    array = Vector{T}(undef,length)
+  function PTArray{Affine}(a::T,len::Int) where T
+    if isa(a,LazyArray) @assert false end
+    array = Vector{T}(undef,len)
+    fill!(array,a)
+    new{Affine,T}(array)
+  end
+
+  # function PTArray{Affine}(a::T,len::Int) where {T<:LazyArray}
+  #   array = Vector{T}(undef,len)
+  #   fill!(array,a)
+  #   new{Affine,T}(array)
+  # end
+
+  # function PTArray{A}(a::T,len::Int) where {A,T<:LazyArray}
+  #   array = Vector{T}(undef,len)
+  #   fill!(array,a)
+  #   new{A,T}(array)
+  # end
+
+  function PTArray{A}(a::T,len::Int) where {A,T}
+    if isa(a,LazyArray) @assert false end
+    # array = Vector{T}(undef,0)
+    # @inbounds for _ in 1:len
+    #   push!(array,a)
+    # end
+    # array = [copy(a) for _ = 1:len]
+    array = Vector{T}(undef,len)
     fill!(array,a)
     new{A,T}(array)
   end
@@ -91,6 +118,12 @@ Base.similar(a::PTArray) = map(similar,a)
 
 function Base.fill!(a::PTArray{A,T},v::T) where {A,T}
   fill!(a.array,v)
+end
+
+function Base.fill!(a::PTArray{A,T},v::S) where {A,S,T<:AbstractVector{S}}
+  l = length(testitem(a))
+  array = Vector{S}(undef,l)
+  fill!(a,fill!(array,v))
 end
 
 function Base.materialize!(a::PTArray,b::Base.Broadcast.Broadcasted)
@@ -300,13 +333,9 @@ function Arrays.lazy_map(
     axi = get_at_index(i,(a,x...))
     lazy_map(f,axi...)
   end
-  C = if any(map(y->isa(y,PTArray),x))
-    pta = filter(y->isa(y,PTArray),x)
-    combine_affinity(A,get_affinity(pta)...)
-  else
-    A
-  end
-  PTArray{C}(lazy_arrays)
+  pta = filter(y->isa(y,PTArray),x)
+  B = isnothing(pta) ? A() : combine_affinity(A(),get_affinity(pta...))
+  PTArray{typeof(B)}(lazy_arrays)
 end
 
 function Arrays.lazy_map(f,a::AbstractArrayBlock,x::PTArray)
@@ -379,7 +408,8 @@ function Arrays.evaluate!(cache,f,a::AbstractArrayBlock,x::PTArray{<:Affine})
   ptval
 end
 
-get_affinity(::PTArray{<:A}) where A = A
+get_affinity(::PTArray{<:Affine}...) = Affine()
+get_affinity(::PTArray{<:OperatorType}...) = Nonaffine()
 
 get_at_index(::Int,x) = x
 get_at_index(i::Int,x::PTArray) = x[i]
@@ -419,4 +449,11 @@ end
 
 function test_ptarray(a::PTArray,b::PTArray)
   (≈)(b,a)
+end
+
+function test_ptarray(a::PTArray)
+  a1 = a[1]
+  cond1 = all([ai == a1 for ai in a.array])
+  cond2 = all(a1 .== a1[1])
+  @check !(cond1 && !cond2) "Something weird with fill!"
 end

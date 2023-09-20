@@ -78,7 +78,7 @@ end
 
 function FESpaces.zero_free_values(f::PTrialFESpace)
   n = length(f.dirichlet_values)
-  PTArray{Affine}(zero_free_values(f.space),n)
+  PTArray{Nonaffine}(zero_free_values(f.space),n)
 end
 
 function FESpaces.zero_dirichlet_values(f::PTrialFESpace)
@@ -104,7 +104,7 @@ end
 function FESpaces.gather_free_and_dirichlet_values!(
   free_vals::PTArray,
   dirichlet_vals::PTArray,
-  f::FESpace,
+  f::SingleFieldFESpace,
   cell_vals::PTArray)
 
   cell_dofs = get_cell_dof_ids(f)
@@ -127,7 +127,7 @@ end
 
 function FESpaces.gather_dirichlet_values!(
   dirichlet_vals::PTArray,
-  f::FESpace,
+  f::SingleFieldFESpace,
   cell_vals::PTArray)
 
   cell_dofs = get_cell_dof_ids(f)
@@ -175,7 +175,6 @@ function FESpaces._free_and_dirichlet_values_fill!(
       end
     end
   end
-
 end
 
 function FESpaces.compute_dirichlet_values_for_tags!(
@@ -186,8 +185,10 @@ function FESpaces.compute_dirichlet_values_for_tags!(
 
   dirichlet_dof_to_tag = get_dirichlet_dof_tag(f)
   @inbounds for n in eachindex(dirichlet_values)
-    dv = copy(testitem(dirichlet_values))
-    dvs = copy(testitem(dirichlet_values_scratch))
+    # dv = copy(testitem(dirichlet_values))
+    # dvs = copy(testitem(dirichlet_values_scratch))
+    dv = dirichlet_values[n]
+    dvs = dirichlet_values_scratch[n]
     _tag_to_object = FESpaces._convert_to_collectable(tag_to_object[n],num_dirichlet_tags(f))
     fill!(dvs,zero(eltype(T)))
     for (tag, object) in enumerate(_tag_to_object)
@@ -197,6 +198,7 @@ function FESpaces.compute_dirichlet_values_for_tags!(
     end
     dirichlet_values[n] = dv
   end
+  test_ptarray(dirichlet_values)
   dirichlet_values
 end
 

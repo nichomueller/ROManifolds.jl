@@ -5,45 +5,38 @@ struct PAffineOperator <: PNonlinearOperator
   vector::PTArray
 end
 
-function Algebra.solve!(x::PTArray,solver,op,args...)
-  xcache = zeros(x)
-  ptsolve!(x,xcache,solver,op,args...)
-end
-
 function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::PTArray)
-  map(x->numerical_setup(ss,x),mat)
+  map(x->numerical_setup(ss,x),mat.array)
 end
 
 function Algebra.numerical_setup!(ns,mat::PTArray)
-  map(numerical_setup!,ns,mat)
+  map(numerical_setup!,ns,mat.array)
 end
 
-function ptsolve!(
-  x::PTArray,xcache::AbstractVector,::LinearSolver,op::PAffineOperator,ns)
-
+function Algebra.solve!(x::PTArray,::LinearSolver,op::PAffineOperator,ns)
+  xcache = copy(testitem(x))
   A = op.matrix
   b = op.vector
   @assert length(A) == length(b) == length(x)
   numerical_setup!(ns,A)
-  @inbounds for (k,xk) in enumerate(xcache)
-    solve!(xk,ns[k],b[k])
-    x[k] = xk
+  @inbounds for k in eachindex(x)
+    x[k] = solve!(xcache,ns[k],b[k])
   end
+  test_ptarray(x)
   ns
 end
 
-function ptsolve!(
-  x::PTArray,xcache::AbstractVector,ls::LinearSolver,op::PAffineOperator,::Nothing)
-
+function Algebra.solve!(x::PTArray,ls::LinearSolver,op::PAffineOperator,::Nothing)
+  xcache = copy(testitem(x))
   A = op.matrix
   b = op.vector
   @assert length(A) == length(b) == length(x)
   ss = symbolic_setup(ls,testitem(A))
   ns = numerical_setup(ss,A)
-  @inbounds for (k,xk) in enumerate(xcache)
-    solve!(xk,ns[k],b[k])
-    x[k] = xk
+  @inbounds for k in eachindex(x)
+    x[k] = solve!(xcache,ns[k],b[k])
   end
+  test_ptarray(x)
   ns
 end
 

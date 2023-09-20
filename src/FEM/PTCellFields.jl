@@ -106,7 +106,7 @@ function CellData.CellField(
   x = get_data(get_cell_points(trian))
   ptf = get_fields(f)
   A = get_affinity(map(f->f.(x),ptf))
-  ptcell_field = PTArray{A}(lazy_map(x->Fill(x,s),ptf))
+  ptcell_field = PTArray{typeof(A)}(map(x->Fill(x,s),ptf))
   GenericPTCellField(ptcell_field,trian,PhysicalDomain())
 end
 

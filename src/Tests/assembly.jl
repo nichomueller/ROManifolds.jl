@@ -3,7 +3,7 @@ K = 2
 μ = realization(op,K)
 t = solver.dt
 nfree = num_free_dofs(test)
-u = PTArray{Affine}([zeros(nfree) for _ = 1:K])
+u = PTArray{Nonaffine}([zeros(nfree) for _ = 1:K])
 vθ = similar(u)
 vθ .= 1.0
 ode_op = get_algebraic_operator(op)
@@ -32,11 +32,11 @@ test_ok = test
 pp = μ[1]
 g_ok(x,t) = g(x,pp,t)
 g_ok(t) = x->g_ok(x,t)
-poisson = false
+poisson = true
 if poisson
   res_ok(t,u,v) = ∫(v*∂t(u))dΩ + ∫(a(pp,t)*∇(v)⋅∇(u))dΩ - ∫(f(pp,t)*v)dΩ - ∫(h(pp,t)*v)dΓn
   jac_ok(t,u,du,v) = ∫(a(pp,t)*∇(v)⋅∇(du))dΩ
-  jac_ok_t(t,u,dut,v) = ∫(v*dut)dΩ
+  jac_t_ok(t,u,dut,v) = ∫(v*dut)dΩ
   trial_ok = TransientTrialFESpace(test_ok,g_ok)
 else
   test_u_ok = test_u
