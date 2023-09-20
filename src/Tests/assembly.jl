@@ -3,7 +3,7 @@ K = 2
 μ = realization(op,K)
 t = solver.dt
 nfree = num_free_dofs(test)
-u = PTArray([zeros(nfree) for _ = 1:K])
+u = PTArray{Affine}([zeros(nfree) for _ = 1:K])
 vθ = similar(u)
 vθ .= 1.0
 ode_op = get_algebraic_operator(op)

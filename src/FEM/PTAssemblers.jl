@@ -76,6 +76,7 @@ function FESpaces.numeric_loop_matrix!(
   matdata)
 
   Acache = zeros(A)
+  change_affinity = Bool[]
   for (cellmat,_cellidsrows,_cellidscols) in zip(matdata...)
     cellidsrows = FESpaces.map_cell_rows(a.strategy,_cellidsrows)
     cellidscols = FESpaces.map_cell_cols(a.strategy,_cellidscols)
@@ -91,21 +92,22 @@ function FESpaces.numeric_loop_matrix!(
       cols1 = getindex!(cols_cache,cellidscols,1)
       add! = AddEntriesMap(+)
       add_cache = return_cache(add!,Acache,mat1,rows1,cols1)
-      caches = Acache,add_cache,vals_cache,rows_cache,cols_cache
+      caches = Acache,add_cache,vals_cache,rows_cache,cols_cache,change_affinity
       FESpaces._numeric_loop_matrix!(A,caches,cellmat,cellidsrows,cellidscols)
     end
   end
-  A
+  any(change_affinity) ? PTArray{Nonaffine}(A) : A
 end
 
 @noinline function FESpaces._numeric_loop_matrix!(
-  mat::PTArray,caches,cell_vals,cell_rows,cell_cols)
+  mat::PTArray,caches,cell_vals::PTArray,cell_rows,cell_cols)
 
-  matcache,add_cache,vals_cache,rows_cache,cols_cache = caches
+  matcache,add_cache,vals_cache,rows_cache,cols_cache,change_affinity = caches
   add! = AddEntriesMap(+)
+  push!(change_affinity,true)
   for k in eachindex(matcache)
     matk = matcache[k]
-    cell_valsk = get_at_index(k,cell_vals)
+    cell_valsk = cell_vals[k]
     for cell in eachindex(cell_cols)
       rows = getindex!(rows_cache,cell_rows,cell)
       cols = getindex!(cols_cache,cell_cols,cell)
@@ -116,12 +118,30 @@ end
   end
 end
 
+@noinline function FESpaces._numeric_loop_matrix!(
+  mat::PTArray,caches,cell_vals::Union{AbstractArrayBlock,PTArray{Affine}},cell_rows,cell_cols)
+
+  matcache,add_cache,vals_cache,rows_cache,cols_cache,change_affinity = caches
+  push!(change_affinity,false)
+  add! = AddEntriesMap(+)
+  mat1 = matcache[1]
+  cell_vals1 = get_at_index(1,cell_vals)
+  for cell in eachindex(cell_cols)
+    rows = getindex!(rows_cache,cell_rows,cell)
+    cols = getindex!(cols_cache,cell_cols,cell)
+    vals1 = getindex!(vals_cache,cell_vals1,cell)
+    evaluate!(add_cache,add!,mat1,vals1,rows,cols)
+  end
+  fill!(mat,mat1)
+end
+
 function FESpaces.numeric_loop_vector!(
   b::PTArray,
   a::GenericSparseMatrixAssembler,
   vecdata)
 
   bcache = zeros(b)
+  change_affinity = Bool[]
   for (cellvec,_cellids) in zip(vecdata...)
     cellids = FESpaces.map_cell_rows(a.strategy,_cellids)
     cellvec1 = get_at_index(1,cellvec)
@@ -132,21 +152,22 @@ function FESpaces.numeric_loop_vector!(
       rows1 = getindex!(rows_cache,cellids,1)
       add! = AddEntriesMap(+)
       add_cache = return_cache(add!,bcache,vec1,rows1)
-      caches = bcache,add_cache,vals_cache,rows_cache
+      caches = bcache,add_cache,vals_cache,rows_cache,change_affinity
       FESpaces._numeric_loop_vector!(b,caches,cellvec,cellids)
     end
   end
-  b
+  any(change_affinity) ? PTArray{Nonaffine}(b) : b
 end
 
 @noinline function FESpaces._numeric_loop_vector!(
-  vec::PTArray,caches,cell_vals,cell_rows)
+  vec::PTArray,caches,cell_vals::PTArray,cell_rows)
 
-  veccache,add_cache,vals_cache,rows_cache = caches
+  veccache,add_cache,vals_cache,rows_cache,change_affinity = caches
+  push!(change_affinity,true)
   add! = AddEntriesMap(+)
   for k in eachindex(veccache)
     veck = veccache[k]
-    cell_valsk = get_at_index(k,cell_vals)
+    cell_valsk = cell_vals[k]
     for cell in eachindex(cell_rows)
       rows = getindex!(rows_cache,cell_rows,cell)
       valsk = getindex!(vals_cache,cell_valsk,cell)
@@ -154,4 +175,20 @@ end
       vec[k] = veck
     end
   end
+end
+
+@noinline function FESpaces._numeric_loop_vector!(
+  vec::PTArray,caches,cell_vals::Union{AbstractArrayBlock,PTArray{Affine}},cell_rows)
+
+  veccache,add_cache,vals_cache,rows_cache,change_affinity = caches
+  push!(change_affinity,false)
+  add! = AddEntriesMap(+)
+  vec1 = veccache[1]
+  cell_vals1 = get_at_index(1,cell_vals)
+  for cell in eachindex(cell_rows)
+    rows = getindex!(rows_cache,cell_rows,cell)
+    vals1 = getindex!(vals_cache,cell_vals1,cell)
+    evaluate!(add_cache,add!,vec1,vals1,rows)
+  end
+  fill!(vec,vec1)
 end

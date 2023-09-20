@@ -12,7 +12,7 @@ ode_op = get_algebraic_operator(op)
 ode_cache = allocate_cache(ode_op,μ)
 update_cache!(ode_cache,ode_op,μ,t)
 nfree = num_free_dofs(test)
-u = PTArray([zeros(nfree) for _ = 1:K])
+u = PTArray{Affine}([zeros(nfree) for _ = 1:K])
 vθ = similar(u)
 vθ .= 1.0
 Us,_,fecache = ode_cache
@@ -26,6 +26,10 @@ xh = TransientCellField(uh,dxh)
 dca = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ) # dca = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(du),dΩ)
 dch = ∫ₚ(hμt(μ,t)*v,dΓn)
 dcm = ∫ₚ(v*∂ₚt(xh),dΩ) # dcm = ∫ₚ(v⋅∂ₚt(xh[1]),dΩ)
+quad = dΩ.quad
+x = get_cell_points(quad)
+b = change_domain(v*∂ₚt(xh),quad.trian,quad.data_domain_style)
+bx = b(x)
 
 # Gridap
 g_ok(x,t) = g(x,μ[1],t)
@@ -50,6 +54,9 @@ xh_ok = TransientCellField(uh_ok,dxh_ok)
 dc_ok = ∫(a(μ[1],t)*∇(v)⋅∇(du_ok))dΩ # dca_ok = ∫(a(μ[1],t)*∇(v)⊙∇(du_ok))dΩ
 dch_ok = ∫(h(μ[1],t)*v)dΓn
 dcm_ok = ∫(v*∂t(xh_ok))dΩ # dcm_ok = ∫(v⋅∂t(xh_ok))dΩ
+
+b_ok = change_domain(v*∂t(xh_ok),quad.trian,quad.data_domain_style)
+bx_ok = b_ok(x)
 
 # TESTS
 

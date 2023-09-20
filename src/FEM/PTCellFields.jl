@@ -65,7 +65,7 @@ function get_fields(ptf::PTFunction)
   fields
 end
 
-function evaluate!(cache,f::AbstractPTFunction,x::Point)
+function Arrays.evaluate!(cache,f::AbstractPTFunction,x::Point)
   g = get_fields(f)
   map(g) do gi
     gi(x)
@@ -88,7 +88,7 @@ struct GenericPTCellField{DS} <: PTCellField
   end
 end
 
-# Base.length(f::GenericPTCellField) = length(f.cell_field)
+Base.length(f::GenericPTCellField) = length(f.cell_field)
 CellData.get_data(f::GenericPTCellField) = f.cell_field
 CellData.get_triangulation(f::GenericPTCellField) = f.trian
 CellData.DomainStyle(::Type{GenericPTCellField{DS}}) where DS = DS()
@@ -105,8 +105,8 @@ function CellData.CellField(
   s = size(get_cell_map(trian))
   x = get_data(get_cell_points(trian))
   ptf = get_fields(f)
-  aff = get_affinity(map(f->f(x),ptf))
-  ptcell_field = PTArray(aff,lazy_map(x->Fill(x,s),ptf))
+  A = get_affinity(map(f->f.(x),ptf))
+  ptcell_field = PTArray{A}(lazy_map(x->Fill(x,s),ptf))
   GenericPTCellField(ptcell_field,trian,PhysicalDomain())
 end
 
@@ -169,7 +169,7 @@ struct PTSingleFieldFEFunction{T<:CellField} <: PTFEFunction
   fe_space::SingleFieldFESpace
 end
 
-# Base.length(f::PTSingleFieldFEFunction) = length(f.cell_field)
+Base.length(f::PTSingleFieldFEFunction) = length(f.cell_field)
 CellData.get_data(f::PTSingleFieldFEFunction) = get_data(f.cell_field)
 CellData.get_triangulation(f::PTSingleFieldFEFunction) = get_triangulation(f.cell_field)
 CellData.DomainStyle(::Type{PTSingleFieldFEFunction{T}}) where T = DomainStyle(T)
@@ -193,7 +193,7 @@ function FESpaces.FEFunction(
   free_values::PTArray,
   dirichlet_values::AbstractArray)
 
-  dv = PTArray(dirichlet_values,length(free_values))
+  dv = PTArray{Affine}(dirichlet_values,length(free_values))
   FEFunction(fs,free_values,dv)
 end
 
@@ -229,7 +229,7 @@ struct PTMultiFieldFEFunction{T<:MultiFieldCellField} <: PTFEFunction
   end
 end
 
-# Base.length(f::PTMultiFieldFEFunction) = length(first(f.single_fe_functions))
+Base.length(f::PTMultiFieldFEFunction) = length(first(f.single_fe_functions))
 CellData.get_data(f::PTMultiFieldFEFunction) = get_data(f.multi_cell_field)
 CellData.get_triangulation(f::PTMultiFieldFEFunction) = get_triangulation(f.multi_cell_field)
 CellData.DomainStyle(::Type{PTMultiFieldFEFunction{T}}) where T = DomainStyle(T)
@@ -249,19 +249,10 @@ function FESpaces.get_cell_dof_values(f::PTMultiFieldFEFunction)
   get_cell_dof_values(f,trian)
 end
 
-# function FESpaces.get_cell_dof_values(f::PTMultiFieldFEFunction,trian::Triangulation)
-#   uhs = f.single_fe_functions
-#   blockmask = [is_change_possible(get_triangulation(uh),trian) for uh in uhs]
-#   active_block_ids = findall(blockmask)
-#   active_block_data = Any[ get_cell_dof_values(uhs[i],trian) for i in active_block_ids ]
-#   nblocks = length(uhs)
-#   lazy_map(BlockMap(nblocks,active_block_ids),active_block_data...)
-# end
-
-# MultiField.num_fields(m::PTMultiFieldFEFunction) = length(m.single_fe_functions)
 Base.iterate(m::PTMultiFieldFEFunction) = iterate(m.single_fe_functions)
 Base.iterate(m::PTMultiFieldFEFunction,state) = iterate(m.single_fe_functions,state)
 Base.getindex(m::PTMultiFieldFEFunction,field_id::Integer) = m.single_fe_functions[field_id]
+MultiField.num_fields(m::PTMultiFieldFEFunction) = length(m.single_fe_functions)
 
 const PTMultiFieldTypes = Union{MultiFieldCellField,PTMultiFieldFEFunction}
 

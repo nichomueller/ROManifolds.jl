@@ -25,7 +25,7 @@ function PTrialFESpace!(space::PTrialFESpace,objects)
 end
 
 function HomogeneousPTrialFESpace(U::SingleFieldFESpace,n::Int)
-  dirichlet_values = PTArray(zero_dirichlet_values(U),n)
+  dirichlet_values = PTArray{Affine}(zero_dirichlet_values(U),n)
   PTrialFESpace(dirichlet_values,U)
 end
 
@@ -78,7 +78,7 @@ end
 
 function FESpaces.zero_free_values(f::PTrialFESpace)
   n = length(f.dirichlet_values)
-  PTArray(zero_free_values(f.space),n)
+  PTArray{Affine}(zero_free_values(f.space),n)
 end
 
 function FESpaces.zero_dirichlet_values(f::PTrialFESpace)
@@ -158,10 +158,11 @@ function FESpaces._free_and_dirichlet_values_fill!(
   cell_dofs,
   cells)
 
+  cv = copy(cell_vals.array)
   @inbounds for cell in cells
     dofs = getindex!(cache_dofs,cell_dofs,cell)
     for n in eachindex(free_vals)
-      vals = getindex!(cache_vals,cell_vals[n],cell)
+      vals = getindex!(cache_vals,cv[n],cell)
       for (i,dof) in enumerate(dofs)
         val = vals[i]
         if dof > 0
@@ -183,18 +184,18 @@ function FESpaces.compute_dirichlet_values_for_tags!(
   f::PTrialFESpace,
   tag_to_object) where {A,T}
 
-  dv = zeros(dirichlet_values)
-  dvs = zeros(dirichlet_values_scratch)
   dirichlet_dof_to_tag = get_dirichlet_dof_tag(f)
-  for n in eachindex(dirichlet_values)
+  @inbounds for n in eachindex(dirichlet_values)
+    dv = copy(testitem(dirichlet_values))
+    dvs = copy(testitem(dirichlet_values_scratch))
     _tag_to_object = FESpaces._convert_to_collectable(tag_to_object[n],num_dirichlet_tags(f))
-    fill!(dvs[n],zero(eltype(T)))
+    fill!(dvs,zero(eltype(T)))
     for (tag, object) in enumerate(_tag_to_object)
       cell_vals = FESpaces._cell_vals(f,object)
-      gather_dirichlet_values!(dvs[n],f.space,cell_vals)
-      FESpaces._fill_dirichlet_values_for_tag!(dv[n],dvs[n],tag,dirichlet_dof_to_tag)
+      gather_dirichlet_values!(dvs,f.space,cell_vals)
+      FESpaces._fill_dirichlet_values_for_tag!(dv,dvs,tag,dirichlet_dof_to_tag)
     end
-    dirichlet_values[n] = dv[n]
+    dirichlet_values[n] = dv
   end
   dirichlet_values
 end

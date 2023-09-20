@@ -39,14 +39,14 @@ begin
   u0(μ) = x->u0(x,μ)
   u0μ(μ) = PFunction(u0,μ)
 
-  res(μ,t,u,v) = ∫ₚ(v*∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⋅∇(u),dΩ) - ∫ₚ(fμt(μ,t)*v,dΩ) - ∫ₚ(hμt(μ,t)*v,dΓn)
-  jac(μ,t,u,du,v) = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ)
-  jac_t(μ,t,u,dut,v) = ∫ₚ(v*dut,dΩ)
+  m(μ,t,dut,v) = ∫ₚ(v*dut,dΩ)
+  lhs(μ,t,du,v) = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ)
+  rhs(μ,t,v) = ∫ₚ(fμt(μ,t)*v,dΩ) + ∫ₚ(hμt(μ,t)*v,dΓn)
 
   reffe = ReferenceFE(lagrangian,Float,order)
   test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
   trial = PTTrialFESpace(test,g)
-  feop = PTAffineFEOperator(res,jac,jac_t,pspace,trial,test)
+  feop = PTAffineFEOperator(m,lhs,rhs,pspace,trial,test)
   t0,tF,dt,θ = 0.,0.05,0.005,1
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
   fesolver = ThetaMethod(LUSolver(),dt,θ)

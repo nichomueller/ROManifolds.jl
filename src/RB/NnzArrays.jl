@@ -75,7 +75,7 @@ struct NnzMatrix{T} <: AbstractNnzMatrix{T}
   end
 
   NnzMatrix(val::PTArray) = NnzMatrix(val...;nparams=length(testitem(val)))
-  NnzMatrix(val::Vector{<:PTArray}) = NnzMatrix(get_at_index(:,val...)...;nparams=length(testitem(val[1])))
+  NnzMatrix(val::Vector{<:PTArray}) = NnzMatrix(map(v->v[:],val)...;nparams=length(testitem(val[1])))
 end
 
 get_nonzero_val(nzm::NnzMatrix) = nzm.nonzero_val

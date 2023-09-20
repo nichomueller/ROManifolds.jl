@@ -4,7 +4,7 @@ K = 2
 μ = realization(op,K)
 t = t0
 nfree = num_free_dofs(test)
-w = PTArray([zeros(nfree) for _ = 1:K])
+w = get_free_dof_values(uh0μ(μ))
 
 ode_solver = ThetaMethod(LUSolver(),dt,θ)
 sol = PODESolution(ode_solver,ode_op,μ,w,t0,tF)

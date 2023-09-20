@@ -1,22 +1,32 @@
+const AbstractArrayBlock{T,N} = Union{AbstractArray{T,N},ArrayBlock{T,N}}
+
 struct Nonaffine <: OperatorType end
 
-get_affinity(array::AbstractVector) = all([a == first(array)]) ? Affine() : Nonaffine()
+function get_affinity(array::AbstractVector{<:AbstractArrayBlock})
+  if all([a == first(array) for a in array])
+    Affine()
+  else
+    Nonaffine()
+  end
+end
+
+combine_affinity(A::OperatorType...) = Nonaffine()
+combine_affinity(A::Affine...) = Affine()
 
 struct PTArray{A,T}
   array::AbstractVector{T}
 
-  function PTArray(::A,array::AbstractVector{T}) where T
+  function PTArray{A}(array::AbstractVector{T}) where {A,T}
     new{A,T}(array)
   end
 
-  function PTArray(a::T,length::Int) where T
+  function PTArray{A}(a::T,length::Int) where {A,T}
     array = Vector{T}(undef,length)
     fill!(array,a)
-    new{Affine,T}(array)
+    new{A,T}(array)
   end
 
-  PTArray(array::AbstractVector) = PTArray(get_affinity(array),array)
-  PTArray(a::PTArray) = a
+  PTArray{A}(a::PTArray{B,T} where B) where {A,T}  = new{A,T}(a.array)
 end
 
 Base.size(a::PTArray) = size(a.array)
@@ -27,12 +37,10 @@ Base.eachindex(a::PTArray) = eachindex(a.array)
 Base.ndims(::PTArray) = 1
 Base.ndims(::Type{<:PTArray}) = 1
 
-const AbstractArrayBlock{T,N} = Union{AbstractArray{T,N},ArrayBlock{T,N}}
-
 function Base.map(f,a::PTArray)
   n = length(a)
   fa1 = f(testitem(a))
-  b = PTArray(fa1,n)
+  b = PTArray{Nonaffine}(fa1,n)
   @inbounds for i = 2:n
     b[i] = f(a[i])
   end
@@ -40,10 +48,10 @@ function Base.map(f,a::PTArray)
 end
 
 function Base.map(f,a::PTArray,x::Union{AbstractArrayBlock,PTArray}...)
-  n = get_length(a,x...)
+  n = _get_length(a,x...)
   ax1 = get_at_index(1,(a,x...))
   fax1 = f(ax1...)
-  b = PTArray(fax1,n)
+  b = PTArray{Nonaffine}(fax1,n)
   @inbounds for i = 2:n
     axi = get_at_index(i,(a,x...))
     b[i] = f(axi...)
@@ -54,7 +62,7 @@ end
 function Base.map(f,a::AbstractArrayBlock,x::PTArray)
   n = length(x)
   fax1 = f(a,testitem(x))
-  b = PTArray(fax1,n)
+  b = PTArray{Nonaffine}(fax1,n)
   @inbounds for i = 2:n
     b[i] = f(a,x[i])
   end
@@ -69,15 +77,15 @@ function Base.setindex!(a::PTArray,v,i...)
   a.array[i...] = v
 end
 
-function Base.first(a::PTArray)
-  PTArray([first(testitem(a))])
+function Base.first(a::PTArray{<:A}) where A
+  PTArray{A}([first(testitem(a))])
 end
 
 function Base.show(io::IO,o::PTArray{A,T}) where {A,T}
-  print(io,"PTArray{$A} of type $T and length $(length(o.array))")
+  print(io,"$A PTArray of type $T and length $(length(o.array))")
 end
 
-Base.copy(a::PTArray) = PTArray(copy(a.array))
+Base.copy(a::PTArray{<:A}) where A = PTArray{A}(copy(a.array))
 
 Base.similar(a::PTArray) = map(similar,a)
 
@@ -146,14 +154,14 @@ end
 
 Algebra.create_from_nz(a::PTArray) = a
 
-function Arrays.CachedArray(a::PTArray)
+function Arrays.CachedArray(a::PTArray{<:A}) where A
   ai = testitem(a)
   ci = CachedArray(ai)
   array = Vector{typeof(ci)}(undef,length(a))
   @inbounds for i in eachindex(a)
     array[i] = CachedArray(a[i])
   end
-  PTArray(array)
+  PTArray{A}(array)
 end
 
 function Arrays.testitem(a::PTArray{A,T}) where {A,T}
@@ -179,9 +187,9 @@ function Arrays.return_cache(
   a::PTArray,
   x::Vararg{Union{AbstractArrayBlock,PTArray}})
 
-  n = get_length(a,x...)
+  n = _get_length(a,x...)
   val = return_value(f,a,x...)
-  ptval = PTArray(val,n)
+  ptval = PTArray{Nonaffine}(val,n)
   ax1 = get_at_index(1,(a,x...))
   cx = return_cache(f,ax1...)
   cx,ptval
@@ -217,7 +225,7 @@ function Arrays.return_cache(
 
   n = length(x)
   val = return_value(f,a,x)
-  ptval = PTArray(val,n)
+  ptval = PTArray{Nonaffine}(val,n)
   ax1 = get_at_index(1,x)
   cx = return_cache(f,a,ax1)
   cx,ptval
@@ -243,9 +251,9 @@ function Arrays.return_value(f,a::PTArray,x::Union{AbstractArrayBlock,PTArray}..
 end
 
 function Arrays.return_cache(f,a::PTArray,x::Union{AbstractArrayBlock,PTArray}...)
-  n = get_length(a,x...)
+  n = _get_length(a,x...)
   val = return_value(f,a,x...)
-  ptval = PTArray(val,n)
+  ptval = PTArray{Nonaffine}(val,n)
   ax1 = get_at_index(1,(a,x...))
   cx = return_cache(f,ax1...)
   cx,ptval
@@ -268,7 +276,7 @@ end
 function Arrays.return_cache(f,a::AbstractArrayBlock,x::PTArray)
   n = length(x)
   val = return_value(f,a,x)
-  ptval = PTArray(val,n)
+  ptval = PTArray{Nonaffine}(val,n)
   x1 = get_at_index(1,x)
   cx = return_cache(f,a,x1)
   cx,ptval
@@ -285,14 +293,20 @@ end
 
 function Arrays.lazy_map(
   f,
-  a::PTArray,
-  x::Vararg{Union{AbstractArrayBlock,PTArray}})
+  a::PTArray{<:A},
+  x::Vararg{Union{AbstractArrayBlock,PTArray}}) where A
 
   lazy_arrays = map(eachindex(a)) do i
     axi = get_at_index(i,(a,x...))
     lazy_map(f,axi...)
   end
-  PTArray(lazy_arrays)
+  C = if any(map(y->isa(y,PTArray),x))
+    pta = filter(y->isa(y,PTArray),x)
+    combine_affinity(A,get_affinity(pta)...)
+  else
+    A
+  end
+  PTArray{C}(lazy_arrays)
 end
 
 function Arrays.lazy_map(f,a::AbstractArrayBlock,x::PTArray)
@@ -303,20 +317,20 @@ end
 function Base.map(f,a::PTArray{<:Affine})
   n = length(a)
   fa1 = f(testitem(a))
-  PTArray(fa1,n)
+  PTArray{Affine}(fa1,n)
 end
 
 function Base.map(f,a::PTArray{<:Affine},x::Union{AbstractArrayBlock,PTArray{<:Affine}}...)
-  n = get_length(a,x...)
+  n = _get_length(a,x...)
   ax1 = get_at_index(1,(a,x...))
   fax1 = f(ax1...)
-  PTArray(fax1,n)
+  PTArray{Affine}(fax1,n)
 end
 
 function Base.map(f,a::AbstractArrayBlock,x::PTArray{<:Affine})
   n = length(x)
   fax1 = f(a,testitem(x))
-  PTArray(fax1,n)
+  PTArray{Affine}(fax1,n)
 end
 
 function Arrays.evaluate!(
@@ -328,7 +342,7 @@ function Arrays.evaluate!(
   cx,ptval = cache
   ax1 = get_at_index(1,(a,x...))
   evaluate!(cx,f,ax1...)
-  fill!(ptval,cx)
+  fill!(ptval,cx.array)
   ptval
 end
 
@@ -341,7 +355,7 @@ function Arrays.evaluate!(
   cx,ptval = cache
   x1 = get_at_index(1,x)
   evaluate!(cx,f,a,x1)
-  fill!(ptval,cx)
+  fill!(ptval,cx.array)
   ptval
 end
 
@@ -353,7 +367,7 @@ function Arrays.evaluate!(
   cx,ptval = cache
   ax1 = get_at_index(1,(a,x...))
   evaluate!(cx,f,ax1...)
-  fill!(ptval,cx)
+  fill!(ptval,cx.array)
   ptval
 end
 
@@ -361,9 +375,11 @@ function Arrays.evaluate!(cache,f,a::AbstractArrayBlock,x::PTArray{<:Affine})
   cx,ptval = cache
   x1 = get_at_index(1,x)
   evaluate!(cx,f,a,x1)
-  fill!(ptval,cx)
+  fill!(ptval,cx.array)
   ptval
 end
+
+get_affinity(::PTArray{<:A}) where A = A
 
 get_at_index(::Int,x) = x
 get_at_index(i::Int,x::PTArray) = x[i]
@@ -383,7 +399,7 @@ function get_at_index(::Colon,x::NTuple{N,PTArray}) where N
   return ret
 end
 
-function get_length(x::Union{AbstractArrayBlock,PTArray}...)
+function _get_length(x::Union{AbstractArrayBlock,PTArray}...)
   pta = filter(y->isa(y,PTArray),x)
   n = length(first(pta))
   @check all([length(y) == n for y in pta])

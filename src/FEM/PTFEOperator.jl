@@ -165,7 +165,7 @@ for f in (:allocate_residual,:allocate_jacobian)
       n = length(uh)
       uh1 = testitem(uh)
       a = $f(op,uh1,cache)
-      PTArray(a,n)
+      PTArray{Nonaffine}(a,n)
     end
   end
 end
