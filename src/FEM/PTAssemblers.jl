@@ -75,7 +75,7 @@ function FESpaces.numeric_loop_matrix!(
   a::GenericSparseMatrixAssembler,
   matdata)
 
-  Acache = zeros(A)
+  matcache = zeros(A)
   for (cellmat,_cellidsrows,_cellidscols) in zip(matdata...)
     cellidsrows = FESpaces.map_cell_rows(a.strategy,_cellidsrows)
     cellidscols = FESpaces.map_cell_cols(a.strategy,_cellidscols)
@@ -90,8 +90,8 @@ function FESpaces.numeric_loop_matrix!(
       rows1 = getindex!(rows_cache,cellidsrows,1)
       cols1 = getindex!(cols_cache,cellidscols,1)
       add! = AddEntriesMap(+)
-      add_cache = return_cache(add!,Acache,mat1,rows1,cols1)
-      caches = Acache,add_cache,vals_cache,rows_cache,cols_cache
+      add_cache = return_cache(add!,matcache,mat1,rows1,cols1)
+      caches = matcache,add_cache,vals_cache,rows_cache,cols_cache
       FESpaces._numeric_loop_matrix!(A,caches,cellmat,cellidsrows,cellidscols)
     end
   end
@@ -103,7 +103,7 @@ end
 
   matcache,add_cache,vals_cache,rows_cache,cols_cache = caches
   add! = AddEntriesMap(+)
-  for k in eachindex(matcache)
+  for k in eachindex(mat)
     matk = matcache[k]
     cell_valsk = cell_vals[k]
     for cell in eachindex(cell_cols)
@@ -117,7 +117,7 @@ end
 end
 
 @noinline function FESpaces._numeric_loop_matrix!(
-  mat::PTArray,caches,cell_vals::Union{AbstractArrayBlock,PTArray{Affine}},cell_rows,cell_cols)
+  mat::PTArray,caches,cell_vals::Union{AbstractArrayBlock,AffinePTArray},cell_rows,cell_cols)
 
   matcache,add_cache,vals_cache,rows_cache,cols_cache = caches
   add! = AddEntriesMap(+)
@@ -129,7 +129,9 @@ end
     vals1 = getindex!(vals_cache,cell_vals1,cell)
     evaluate!(add_cache,add!,mat1,vals1,rows,cols)
   end
-  fill!(mat,mat1)
+  for k in eachindex(mat)
+    mat[k] = copy(mat1)
+  end
 end
 
 function FESpaces.numeric_loop_vector!(
@@ -137,7 +139,7 @@ function FESpaces.numeric_loop_vector!(
   a::GenericSparseMatrixAssembler,
   vecdata)
 
-  bcache = zeros(b)
+  veccache = zeros(b)
   for (cellvec,_cellids) in zip(vecdata...)
     cellids = FESpaces.map_cell_rows(a.strategy,_cellids)
     cellvec1 = get_at_index(1,cellvec)
@@ -147,8 +149,8 @@ function FESpaces.numeric_loop_vector!(
       vec1 = getindex!(vals_cache,cellvec1,1)
       rows1 = getindex!(rows_cache,cellids,1)
       add! = AddEntriesMap(+)
-      add_cache = return_cache(add!,bcache,vec1,rows1)
-      caches = bcache,add_cache,vals_cache,rows_cache
+      add_cache = return_cache(add!,veccache,vec1,rows1)
+      caches = veccache,add_cache,vals_cache,rows_cache
       FESpaces._numeric_loop_vector!(b,caches,cellvec,cellids)
     end
   end
@@ -159,7 +161,7 @@ end
 
   veccache,add_cache,vals_cache,rows_cache = caches
   add! = AddEntriesMap(+)
-  for k in eachindex(veccache)
+  for k in eachindex(vec)
     veck = veccache[k]
     cell_valsk = cell_vals[k]
     for cell in eachindex(cell_rows)
@@ -172,7 +174,7 @@ end
 end
 
 @noinline function FESpaces._numeric_loop_vector!(
-  vec::PTArray,caches,cell_vals::Union{AbstractArrayBlock,PTArray{Affine}},cell_rows)
+  vec::PTArray,caches,cell_vals::Union{AbstractArrayBlock,AffinePTArray},cell_rows)
 
   veccache,add_cache,vals_cache,rows_cache = caches
   add! = AddEntriesMap(+)
@@ -183,5 +185,7 @@ end
     vals1 = getindex!(vals_cache,cell_vals1,cell)
     evaluate!(add_cache,add!,vec1,vals1,rows)
   end
-  fill!(vec,vec1)
+  for k in eachindex(vec)
+    vec[k] = copy(vec1)
+  end
 end

@@ -5,39 +5,68 @@ struct PAffineOperator <: PNonlinearOperator
   vector::PTArray
 end
 
-function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::PTArray)
-  map(x->numerical_setup(ss,x),mat.array)
+function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::PTArray,args...)
+  ns = Vector{LUNumericalSetup}(undef,length(mat))
+  @inbounds for k = eachindex(mat)
+    ns[k] = numerical_setup(ss,mat[k])
+  end
+  ns
 end
 
-function Algebra.numerical_setup!(ns,mat::PTArray)
-  map(numerical_setup!,ns,mat.array)
+function Algebra.numerical_setup(::Algebra.LUSymbolicSetup,mat::PTArray,::Affine)
+  lu1 = lu(mat[1])
+  ns = Vector{LUNumericalSetup}(undef,length(mat))
+  @inbounds for k = eachindex(mat)
+    ns[k] = LUNumericalSetup(copy(lu1))
+  end
+  ns
+end
+
+function Algebra.numerical_setup!(ns,mat::PTArray,args...)
+  @inbounds for k = eachindex(mat)
+    ns[k].factors = lu(mat[k])
+  end
+end
+
+function Algebra.numerical_setup!(ns,mat::PTArray,::Affine)
+  lu1 = lu(mat[1])
+  @inbounds for k = eachindex(mat)
+    ns[k].factors = copy(lu1)
+  end
 end
 
 function Algebra.solve!(x::PTArray,::LinearSolver,op::PAffineOperator,ns)
-  xcache = copy(testitem(x))
-  A = op.matrix
-  b = op.vector
-  @assert length(A) == length(b) == length(x)
-  numerical_setup!(ns,A)
-  @inbounds for k in eachindex(x)
-    x[k] = solve!(xcache,ns[k],b[k])
-  end
+  A,b = op.matrix,op.vector
+  Aaff,baff = get_affinity(A.array),get_affinity(b.array)
+  numerical_setup!(ns,A,Aaff)
+  _loop_solve!(x,ns,b,Aaff,baff)
   test_ptarray(x)
   ns
 end
 
 function Algebra.solve!(x::PTArray,ls::LinearSolver,op::PAffineOperator,::Nothing)
-  xcache = copy(testitem(x))
-  A = op.matrix
-  b = op.vector
+  A,b = op.matrix,op.vector
   @assert length(A) == length(b) == length(x)
+  Aaff,baff = get_affinity(A.array),get_affinity(b.array)
   ss = symbolic_setup(ls,testitem(A))
-  ns = numerical_setup(ss,A)
-  @inbounds for k in eachindex(x)
-    x[k] = solve!(xcache,ns[k],b[k])
-  end
+  ns = numerical_setup(ss,A,Aaff)
+  _loop_solve!(x,ns,b,Aaff,baff)
   test_ptarray(x)
   ns
+end
+
+function _loop_solve!(x::PTArray,ns,b::PTArray,::Affine,::Affine)
+  x1 = copy(x1)
+  solve!(x1,ns[1],b[1])
+  @inbounds for k in eachindex(x)
+    x[k] = copy(x1)
+  end
+end
+
+function _loop_solve!(x::PTArray,ns,b::PTArray,args...)
+  @inbounds for k in eachindex(x)
+    solve!(x[k],ns[k],b[k])
+  end
 end
 
 struct PNewtonRaphsonCache <: GridapType
@@ -81,18 +110,6 @@ end
 #   _solve_nr!(x,A,b,dx,ns,nls,op)
 #   NewtonRaphsonCache(A,b,dx,ns)
 # end
-
-function ptsolve!(
-  x::PTArray,xcache::AbstractVector,A::PTArray,b::PTArray,cache::NumericalSetup)
-
-  ns = cache
-  for xk in eachindex(xcache)
-    numerical_setup!(ns,A[k])
-    solve!(xk,ns,b[k])
-    x[k] = xk
-  end
-  cache
-end
 
 # function ptsolve!(
 #   x::PTArray,

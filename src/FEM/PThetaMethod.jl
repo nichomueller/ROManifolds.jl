@@ -57,6 +57,8 @@ function residual!(
   uθ = x
   vθ = op.vθ
   @. vθ = (x-op.u0)/op.dtθ
+  z = zero(eltype(b))
+  fill!(b,z)
   residual!(b,op.odeop,op.μ,op.tθ,(uθ,vθ),op.ode_cache)
 end
 

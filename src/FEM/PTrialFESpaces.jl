@@ -25,7 +25,12 @@ function PTrialFESpace!(space::PTrialFESpace,objects)
 end
 
 function HomogeneousPTrialFESpace(U::SingleFieldFESpace,n::Int)
-  dirichlet_values = PTArray{Affine}(zero_dirichlet_values(U),n)
+  dv = zero_dirichlet_values(U)
+  array = Vector{typeof(dv)}(undef,n)
+  @inbounds for i in eachindex(array)
+    array[i] = copy(dv)
+  end
+  dirichlet_values = PTArray(array)
   PTrialFESpace(dirichlet_values,U)
 end
 
@@ -77,12 +82,23 @@ function FESpaces.get_dirichlet_dof_values(f::PTrialFESpace)
 end
 
 function FESpaces.zero_free_values(f::PTrialFESpace)
+  fv = zero_free_values(f.space)
   n = length(f.dirichlet_values)
-  PTArray{Nonaffine}(zero_free_values(f.space),n)
+  array = Vector{typeof(fv)}(undef,n)
+  @inbounds for i in eachindex(array)
+    array[i] = copy(fv)
+  end
+  PTArray(array)
 end
 
 function FESpaces.zero_dirichlet_values(f::PTrialFESpace)
-  zero(f.dirichlet_values)
+  zdv = zero_dirichlet_values(f.space)
+  n = length(f.dirichlet_values)
+  array = Vector{typeof(zdv)}(undef,n)
+  @inbounds for i in eachindex(array)
+    array[i] = copy(zdv)
+  end
+  PTArray(array)
 end
 
 for fe in (:PTrialFESpace,:TrialFESpace,:DirichletFESpace,:ZeroMeanFESpace)
@@ -158,11 +174,10 @@ function FESpaces._free_and_dirichlet_values_fill!(
   cell_dofs,
   cells)
 
-  cv = copy(cell_vals.array)
   @inbounds for cell in cells
     dofs = getindex!(cache_dofs,cell_dofs,cell)
     for n in eachindex(free_vals)
-      vals = getindex!(cache_vals,cv[n],cell)
+      vals = getindex!(cache_vals,cell_vals[n],cell)
       for (i,dof) in enumerate(dofs)
         val = vals[i]
         if dof > 0
@@ -177,16 +192,29 @@ function FESpaces._free_and_dirichlet_values_fill!(
   end
 end
 
+function FESpaces._free_and_dirichlet_values_fill!(
+  free_vals::AffinePTArray,
+  dirichlet_vals::AffinePTArray,
+  cache_vals,
+  cache_dofs,
+  cell_vals::AffinePTArray,
+  cell_dofs,
+  cells)
+
+  fv = free_vals.array
+  dv = dirichlet_vals.array
+  cv = cell_vals.array
+  _free_and_dirichlet_values_fill!(fv,dv,cache_vals,cache_dofs,cv,cell_dofs,cells)
+end
+
 function FESpaces.compute_dirichlet_values_for_tags!(
-  dirichlet_values::PTArray{A,T},
-  dirichlet_values_scratch::PTArray{A,T},
+  dirichlet_values::PTArray{T},
+  dirichlet_values_scratch::PTArray{T},
   f::PTrialFESpace,
-  tag_to_object) where {A,T}
+  tag_to_object) where T
 
   dirichlet_dof_to_tag = get_dirichlet_dof_tag(f)
   @inbounds for n in eachindex(dirichlet_values)
-    # dv = copy(testitem(dirichlet_values))
-    # dvs = copy(testitem(dirichlet_values_scratch))
     dv = dirichlet_values[n]
     dvs = dirichlet_values_scratch[n]
     _tag_to_object = FESpaces._convert_to_collectable(tag_to_object[n],num_dirichlet_tags(f))
@@ -196,10 +224,22 @@ function FESpaces.compute_dirichlet_values_for_tags!(
       gather_dirichlet_values!(dvs,f.space,cell_vals)
       FESpaces._fill_dirichlet_values_for_tag!(dv,dvs,tag,dirichlet_dof_to_tag)
     end
-    dirichlet_values[n] = dv
   end
   test_ptarray(dirichlet_values)
   dirichlet_values
+end
+
+function FESpaces.compute_dirichlet_values_for_tags!(
+  dirichlet_values::AffinePTArray,
+  dirichlet_values_scratch::AffinePTArray,
+  f::PTrialFESpace,
+  tag_to_object)
+
+  dv = dirichlet_values.array
+  dvs = dirichlet_values_scratch.array
+  @assert get_affinity(tag_to_object) == Affine()
+  tto = first(tag_to_object)
+  _free_and_dirichlet_values_fill!(dv,dvs,f,tto)
 end
 
 Arrays.testitem(f::FESpace) = f

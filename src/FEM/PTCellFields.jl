@@ -106,7 +106,7 @@ function CellData.CellField(
   x = get_data(get_cell_points(trian))
   ptf = get_fields(f)
   A = get_affinity(map(f->f.(x),ptf))
-  ptcell_field = PTArray{typeof(A)}(map(x->Fill(x,s),ptf))
+  ptcell_field = PTArray(A,map(x->Fill(x,s),ptf))
   GenericPTCellField(ptcell_field,trian,PhysicalDomain())
 end
 
@@ -193,7 +193,7 @@ function FESpaces.FEFunction(
   free_values::PTArray,
   dirichlet_values::AbstractArray)
 
-  dv = PTArray{Affine}(dirichlet_values,length(free_values))
+  dv = PTArray(dirichlet_values,length(free_values))
   FEFunction(fs,free_values,dv)
 end
 

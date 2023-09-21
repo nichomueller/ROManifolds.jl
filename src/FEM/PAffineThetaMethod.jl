@@ -28,7 +28,7 @@ function solution_step!(
 
   l_cache = solve!(uf,solver.nls,afop,l_cache)
 
-  uf = uf + u0
+  uf .+= u0
   if 0.0 < solver.θ < 1.0
     @. uf = uf*(1.0/solver.θ)-u0*((1-solver.θ)/solver.θ)
   end
@@ -78,6 +78,8 @@ function _vector!(
   ode_cache,
   vθ)
 
+  z = zero(eltype(b))
+  fill!(b,z)
   residual!(b,op,μ,tθ,(u0,vθ),ode_cache)
   b.array .*= -1.0
   b

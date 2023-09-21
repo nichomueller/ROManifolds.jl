@@ -9,26 +9,16 @@ struct PODESolution <: PODEQuantity
   tF::Real
 end
 
-function solution_step!(
-  uf::PTArray,
-  solver::ThetaMethod,
-  op::PODEOperator,
-  μ::AbstractVector,
-  u0::PTArray,
-  t0::Real)
-
-  solution_step!(uf,solver,op,μ,u0,t0,nothing)
-end
-
 function Base.iterate(sol::PODESolution)
   uf = copy(sol.u0)
   u0 = copy(sol.u0)
   t0 = sol.t0
   n = 0
+  cache = nothing
 
-  uf,tf,cache = solution_step!(uf,sol.solver,sol.op,sol.μ,u0,t0)
+  uf,tf,cache = solution_step!(uf,sol.solver,sol.op,sol.μ,u0,t0,cache)
 
-  u0.array .= uf.array
+  u0 .= uf
   n += 1
   state = (uf,u0,tf,n,cache)
 
@@ -44,7 +34,7 @@ function Base.iterate(sol::PODESolution,state)
 
   uf,tf,cache = solution_step!(uf,sol.solver,sol.op,sol.μ,u0,t0,cache)
 
-  u0.array .= uf.array
+  u0 .= uf
   n += 1
   state = (uf,u0,tf,n,cache)
 

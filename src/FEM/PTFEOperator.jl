@@ -141,7 +141,7 @@ function residual!(
   V = get_test(op)
   v = get_fe_basis(V)
   vecdata = collect_cell_vector(V,op.res(μ,t,xh,v))
-  assemble_vector!(b,op.assem,vecdata)
+  assemble_vector_add!(b,op.assem,vecdata)
   b
 end
 
@@ -165,7 +165,11 @@ for f in (:allocate_residual,:allocate_jacobian)
       n = length(uh)
       uh1 = testitem(uh)
       a = $f(op,uh1,cache)
-      PTArray{Nonaffine}(a,n)
+      array = Vector{typeof(a)}(undef,n)
+      @inbounds for i = eachindex(array)
+        array[i] = copy(a)
+      end
+      PTArray(array)
     end
   end
 end

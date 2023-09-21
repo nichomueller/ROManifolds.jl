@@ -3,7 +3,7 @@ K = 2
 μ = realization(op,K)
 t = solver.dt
 nfree = num_free_dofs(test)
-u = PTArray{Nonaffine}([zeros(nfree) for _ = 1:K])
+u = PTArray([zeros(nfree) for _ = 1:K])
 vθ = similar(u)
 vθ .= 1.0
 ode_op = get_algebraic_operator(op)
@@ -34,10 +34,11 @@ g_ok(x,t) = g(x,pp,t)
 g_ok(t) = x->g_ok(x,t)
 poisson = true
 if poisson
-  res_ok(t,u,v) = ∫(v*∂t(u))dΩ + ∫(a(pp,t)*∇(v)⋅∇(u))dΩ - ∫(f(pp,t)*v)dΩ - ∫(h(pp,t)*v)dΓn
-  jac_ok(t,u,du,v) = ∫(a(pp,t)*∇(v)⋅∇(du))dΩ
-  jac_t_ok(t,u,dut,v) = ∫(v*dut)dΩ
+  a_ok(t,u,v) = ∫(a(μ[1],t)*∇(v)⋅∇(u))dΩ
+  b_ok(t,v) = ∫(v*f(μ[1],t))dΩ + ∫(v*h(μ[1],t))dΓn
+  m_ok(t,ut,v) = ∫(ut*v)dΩ
   trial_ok = TransientTrialFESpace(test_ok,g_ok)
+  feop_ok = TransientAffineFEOperator(m_ok,a_ok,b_ok,trial_ok,test_ok)
 else
   test_u_ok = test_u
   test_p_ok = test_p
@@ -52,8 +53,8 @@ else
   trial_p_ok = TrialFESpace(test_p_ok)
   test_ok = TransientMultiFieldFESpace([test_u_ok,test_p_ok])
   trial_ok = TransientMultiFieldFESpace([trial_u_ok,trial_p_ok])
+  feop_ok = TransientFEOperator(res_ok,jac_ok,jac_t_ok,trial_ok,test_ok)
 end
-feop_ok = TransientFEOperator(res_ok,jac_ok,jac_t_ok,trial_ok,test_ok)
 du_ok = get_trial_fe_basis(trial_ok(t))
 
 ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
@@ -76,7 +77,7 @@ assemble_matrix_add!(A_ok,feop_ok.assem_t,matdata_ok)
 test_ptarray(matdata_ok[1][1],matdata[1][1])
 test_ptarray(A_ok,A)
 
-b_ok = allocate_residual(feop_ok,uh_ok,nothing)
+bok = allocate_residual(feop_ok,uh_ok,nothing)
 vecdata_ok = collect_cell_vector(test,feop_ok.res(t,xh_ok,v))
-assemble_vector_add!(b_ok,feop_ok.assem_t,vecdata_ok)
-test_ptarray(b_ok,b)
+assemble_vector_add!(bok,feop_ok.assem_t,vecdata_ok)
+test_ptarray(bok,b)

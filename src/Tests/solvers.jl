@@ -117,35 +117,3 @@ end
 @time evaluate(∫ₚ(hμt(μ,dt)*v,dΓn))
 @time ∫(v*∂t(xh_ok))dΩ + ∫(a(μ[1],dt)*∇(v)⋅∇(xh_ok))dΩ - ∫(f(μ[1],dt)*v)dΩ
 @time ∫(h(μ[1],dt)*v)dΓn
-
-solver = fesolver
-dt = solver.dt
-solver.θ == 0.0 ? dtθ = dt : dtθ = dt*solver.θ
-tθ = t0+dtθ
-ode_cache = allocate_cache(ode_op,μ)
-vθ = similar(w)
-vθ .= 0.0
-l_cache = nothing
-A,b = _allocate_matrix_and_vector(ode_op,w,ode_cache)
-ode_cache = update_cache!(ode_cache,ode_op,μ,tθ)
-_matrix_and_vector!(A,b,ode_op,μ,tθ,dtθ,w,ode_cache,vθ)
-afop = PAffineOperator(A,b)
-A = afop.matrix
-b = afop.vector
-@assert length(A) == length(b) == length(x)
-ss = symbolic_setup(solver.nls,testitem(A))
-ns = numerical_setup(ss,A)
-
-x = copy(w)
-for (k,xk) in enumerate(x.array)
-  solve!(xk,ns[k],b[k])
-  x[k] = xk
-end
-x
-# x
-# xk = testitem(xcache)
-# ldiv!(xk,ns[1].factors,b[1])
-# x[1] = xk
-# xk = testitem(xcache)
-# ldiv!(xk,ns[2].factors,b[2])
-# x[2] = xk

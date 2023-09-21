@@ -146,11 +146,11 @@ function ptintegrate(f::CellField,b::CellData.CompositeMeasure)
   return cont
 end
 
-function CellData.move_contributions(scell_to_val::PTArray{A},args...) where A
+function CellData.move_contributions(scell_to_val::PTArray,args...)
   ptcell_mat_trian = map(scell_to_val.array) do x
     move_contributions(x,args...)
   end
-  cell_to_val = PTArray{A}(first.(ptcell_mat_trian))
+  cell_to_val = PTArray(first.(ptcell_mat_trian))
   trian = first(last.(ptcell_mat_trian))
   cell_to_val,trian
 end

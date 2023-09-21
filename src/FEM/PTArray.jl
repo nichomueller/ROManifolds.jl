@@ -10,134 +10,16 @@ function get_affinity(array::AbstractVector{<:AbstractArrayBlock})
   end
 end
 
-combine_affinity(A::OperatorType...) = Nonaffine()
-combine_affinity(A::Affine...) = Affine()
-
-abstract type AbstractPTArray{T} end
-
-struct PTArray{T} <: AbstractPTArray{T}
-  array::Vector{T}
-
-  function PTArray(array::Vector{T}) where {T<:AbstractArrayBlock}
-    new{T}(array)
-  end
-
-  function PTArray{Affine}(a::T,len::Int) where T
-    if isa(a,LazyArray) @assert false end
-    array = Vector{T}(undef,len)
-    fill!(array,a)
-    new{Affine,T}(array)
-  end
-
-  # function PTArray{Affine}(a::T,len::Int) where {T<:LazyArray}
-  #   array = Vector{T}(undef,len)
-  #   fill!(array,a)
-  #   new{Affine,T}(array)
-  # end
-
-  # function PTArray{A}(a::T,len::Int) where {A,T<:LazyArray}
-  #   array = Vector{T}(undef,len)
-  #   fill!(array,a)
-  #   new{A,T}(array)
-  # end
-
-  function PTArray{A}(a::T,len::Int) where {A,T}
-    if isa(a,LazyArray) @assert false end
-    # array = Vector{T}(undef,0)
-    # @inbounds for _ in 1:len
-    #   push!(array,a)
-    # end
-    # array = [copy(a) for _ = 1:len]
-    array = Vector{T}(undef,len)
-    fill!(array,a)
-    new{A,T}(array)
-  end
-
-  PTArray{A}(a::PTArray{B,T} where B) where {A,T}  = new{A,T}(a.array)
-end
+# Abstract implementation
+abstract type PTArray{T} end
 
 Base.size(a::PTArray) = size(a.array)
-Base.length(a::PTArray) = length(a.array)
-Base.eltype(::Type{PTArray{A,T}}) where {A,T} = eltype(T)
-Base.eltype(::PTArray{A,T}) where {A,T} = eltype(T)
-Base.eachindex(a::PTArray) = eachindex(a.array)
+Base.eltype(::Type{PTArray{T}}) where T = eltype(T)
+Base.eltype(::PTArray{T}) where T = eltype(T)
 Base.ndims(::PTArray) = 1
 Base.ndims(::Type{<:PTArray}) = 1
-
-function Base.map(f,a::PTArray)
-  n = length(a)
-  fa1 = f(testitem(a))
-  b = PTArray{Nonaffine}(fa1,n)
-  @inbounds for i = 2:n
-    b[i] = f(a[i])
-  end
-  b
-end
-
-function Base.map(f,a::PTArray,x::Union{AbstractArrayBlock,PTArray}...)
-  n = _get_length(a,x...)
-  ax1 = get_at_index(1,(a,x...))
-  fax1 = f(ax1...)
-  b = PTArray{Nonaffine}(fax1,n)
-  @inbounds for i = 2:n
-    axi = get_at_index(i,(a,x...))
-    b[i] = f(axi...)
-  end
-  b
-end
-
-function Base.map(f,a::AbstractArrayBlock,x::PTArray)
-  n = length(x)
-  fax1 = f(a,testitem(x))
-  b = PTArray{Nonaffine}(fax1,n)
-  @inbounds for i = 2:n
-    b[i] = f(a,x[i])
-  end
-  b
-end
-
-function Base.getindex(a::PTArray,i...)
-  a.array[i...]
-end
-
-function Base.setindex!(a::PTArray,v,i...)
-  a.array[i...] = v
-end
-
-function Base.first(a::PTArray{<:A}) where A
-  PTArray{A}([first(testitem(a))])
-end
-
-function Base.show(io::IO,o::PTArray{A,T}) where {A,T}
-  print(io,"$A PTArray of type $T and length $(length(o.array))")
-end
-
-Base.copy(a::PTArray{<:A}) where A = PTArray{A}(copy(a.array))
-
-Base.similar(a::PTArray) = map(similar,a)
-
-function Base.fill!(a::PTArray{A,T},v::T) where {A,T}
-  fill!(a.array,v)
-end
-
-function Base.fill!(a::PTArray{A,T},v::S) where {A,S,T<:AbstractVector{S}}
-  l = length(testitem(a))
-  array = Vector{S}(undef,l)
-  fill!(a,fill!(array,v))
-end
-
-function Base.materialize!(a::PTArray,b::Base.Broadcast.Broadcasted)
-  map(x->Base.materialize!(x,b),a)
-  a
-end
-
-function LinearAlgebra.fillstored!(a::PTArray,z)
-  a1 = testitem(a)
-  fillstored!(a1,z)
-  @inbounds for i = eachindex(a)
-    a[i] .= a1
-  end
-end
+Base.first(a::PTArray) = first(testitem(a))
+Algebra.create_from_nz(a::PTArray) = a
 
 function Base.zero(a::PTArray)
   T = eltype(a)
@@ -172,32 +54,43 @@ function Base.:(==)(a::PTArray,b::PTArray)
   end
   true
 end
+# Something wrong with broadcast
+Broadcast.broadcastable(x::PTArray) = x
 
-for op in (:+,:-)
-  @eval begin
-    function ($op)(a::PTArray,b::PTArray)
-      map($op,a,b)
-    end
-  end
+struct PTBroadcastStyle <: Broadcast.BroadcastStyle end
+
+function Broadcast.BroadcastStyle(::Type{<:PTArray})
+  PTBroadcastStyle()
 end
 
-function Base.transpose(a::PTArray)
-  map(transpose,a)
+function Broadcast.BroadcastStyle(
+  ::PTBroadcastStyle,
+  ::Broadcast.DefaultArrayStyle{0})
+  Broadcast.DefaultArrayStyle(Val(0))
 end
 
-Algebra.create_from_nz(a::PTArray) = a
-
-function Arrays.CachedArray(a::PTArray{<:A}) where A
-  ai = testitem(a)
-  ci = CachedArray(ai)
-  array = Vector{typeof(ci)}(undef,length(a))
-  @inbounds for i in eachindex(a)
-    array[i] = CachedArray(a[i])
-  end
-  PTArray{A}(array)
+function Broadcast.BroadcastStyle(
+  ::Broadcast.DefaultArrayStyle{0},
+  ::PTBroadcastStyle)
+  Broadcast.DefaultArrayStyle(Val(0))
 end
 
-function Arrays.testitem(a::PTArray{A,T}) where {A,T}
+function Broadcast.BroadcastStyle(::PTBroadcastStyle,::PTBroadcastStyle)
+  PTBroadcastStyle()
+end
+
+function Base.materialize!(a::PTArray,b::Broadcast.Broadcasted)
+  map(x->Base.materialize!(x,b),a.array)
+  a
+end
+
+function Base.materialize!(a::PTArray,b::Broadcast.Broadcasted{<:PTBroadcastStyle})
+  ptb = map(b.f,b.args...)
+  map(Base.materialize!,a.array,ptb.array)
+  a
+end
+
+function Arrays.testitem(a::PTArray{T}) where T
   @notimplementedif !isconcretetype(T)
   if length(a) != 0
     a[1]
@@ -205,211 +98,6 @@ function Arrays.testitem(a::PTArray{A,T}) where {A,T}
     fill(eltype(a),1)
   end
 end
-
-function Arrays.return_value(
-  f::Gridap.Fields.BroadcastingFieldOpMap,
-  a::PTArray,
-  x::Vararg{Union{AbstractArrayBlock,PTArray}})
-
-  ax1 = get_at_index(1,(a,x...))
-  return_value(f,ax1...)
-end
-
-function Arrays.return_cache(
-  f::Gridap.Fields.BroadcastingFieldOpMap,
-  a::PTArray,
-  x::Vararg{Union{AbstractArrayBlock,PTArray}})
-
-  n = _get_length(a,x...)
-  val = return_value(f,a,x...)
-  ptval = PTArray{Nonaffine}(val,n)
-  ax1 = get_at_index(1,(a,x...))
-  cx = return_cache(f,ax1...)
-  cx,ptval
-end
-
-function Arrays.evaluate!(
-  cache,
-  f::Gridap.Fields.BroadcastingFieldOpMap,
-  a::PTArray,
-  x::Vararg{Union{AbstractArrayBlock,PTArray}})
-
-  cx,ptval = cache
-  @inbounds for i = eachindex(ptval)
-    axi = get_at_index(i,(a,x...))
-    ptval[i] = evaluate!(cx,f,axi...)
-  end
-  ptval
-end
-
-function Arrays.return_value(
-  f::Gridap.Fields.BroadcastingFieldOpMap,
-  a::AbstractArrayBlock,
-  x::PTArray)
-
-  x1 = get_at_index(1,x)
-  return_value(f,a,x1)
-end
-
-function Arrays.return_cache(
-  f::Gridap.Fields.BroadcastingFieldOpMap,
-  a::AbstractArrayBlock,
-  x::PTArray)
-
-  n = length(x)
-  val = return_value(f,a,x)
-  ptval = PTArray{Nonaffine}(val,n)
-  ax1 = get_at_index(1,x)
-  cx = return_cache(f,a,ax1)
-  cx,ptval
-end
-
-function Arrays.evaluate!(
-  cache,
-  f::Gridap.Fields.BroadcastingFieldOpMap,
-  a::AbstractArrayBlock,
-  x::PTArray)
-
-  cx,ptval = cache
-  @inbounds for i = eachindex(ptval)
-    xi = get_at_index(i,x)
-    ptval[i] = evaluate!(cx,f,a,xi)
-  end
-  ptval
-end
-
-function Arrays.return_value(f,a::PTArray,x::Union{AbstractArrayBlock,PTArray}...)
-  ax1 = get_at_index(1,(a,x...))
-  return_value(f,ax1...)
-end
-
-function Arrays.return_cache(f,a::PTArray,x::Union{AbstractArrayBlock,PTArray}...)
-  n = _get_length(a,x...)
-  val = return_value(f,a,x...)
-  ptval = PTArray{Nonaffine}(val,n)
-  ax1 = get_at_index(1,(a,x...))
-  cx = return_cache(f,ax1...)
-  cx,ptval
-end
-
-function Arrays.evaluate!(cache,f,a::PTArray,x::Union{AbstractArrayBlock,PTArray}...)
-  cx,ptval = cache
-  @inbounds for i = eachindex(ptval)
-    axi = get_at_index(i,(a,x...))
-    ptval[i] = evaluate!(cx,f,axi...)
-  end
-  ptval
-end
-
-function Arrays.return_value(f,a::AbstractArrayBlock,x::PTArray)
-  x1 = get_at_index(1,x)
-  return_value(f,a,x1)
-end
-
-function Arrays.return_cache(f,a::AbstractArrayBlock,x::PTArray)
-  n = length(x)
-  val = return_value(f,a,x)
-  ptval = PTArray{Nonaffine}(val,n)
-  x1 = get_at_index(1,x)
-  cx = return_cache(f,a,x1)
-  cx,ptval
-end
-
-function Arrays.evaluate!(cache,f,a::AbstractArrayBlock,x::PTArray)
-  cx,ptval = cache
-  @inbounds for i = eachindex(ptval)
-    xi = get_at_index(i,x)
-    ptval[i] = evaluate!(cx,f,a,xi)
-  end
-  ptval
-end
-
-function Arrays.lazy_map(
-  f,
-  a::PTArray{<:A},
-  x::Vararg{Union{AbstractArrayBlock,PTArray}}) where A
-
-  lazy_arrays = map(eachindex(a)) do i
-    axi = get_at_index(i,(a,x...))
-    lazy_map(f,axi...)
-  end
-  pta = filter(y->isa(y,PTArray),x)
-  B = isnothing(pta) ? A() : combine_affinity(A(),get_affinity(pta...))
-  PTArray{typeof(B)}(lazy_arrays)
-end
-
-function Arrays.lazy_map(f,a::AbstractArrayBlock,x::PTArray)
-  map(y->lazy_map(f,a,y),x)
-end
-
-# AFFINE SHORTCUTS
-function Base.map(f,a::PTArray{<:Affine})
-  n = length(a)
-  fa1 = f(testitem(a))
-  PTArray{Affine}(fa1,n)
-end
-
-function Base.map(f,a::PTArray{<:Affine},x::Union{AbstractArrayBlock,PTArray{<:Affine}}...)
-  n = _get_length(a,x...)
-  ax1 = get_at_index(1,(a,x...))
-  fax1 = f(ax1...)
-  PTArray{Affine}(fax1,n)
-end
-
-function Base.map(f,a::AbstractArrayBlock,x::PTArray{<:Affine})
-  n = length(x)
-  fax1 = f(a,testitem(x))
-  PTArray{Affine}(fax1,n)
-end
-
-function Arrays.evaluate!(
-  cache,
-  f::Gridap.Fields.BroadcastingFieldOpMap,
-  a::PTArray{<:Affine},
-  x::Vararg{Union{AbstractArrayBlock,PTArray{<:Affine}}})
-
-  cx,ptval = cache
-  ax1 = get_at_index(1,(a,x...))
-  evaluate!(cx,f,ax1...)
-  fill!(ptval,cx.array)
-  ptval
-end
-
-function Arrays.evaluate!(
-  cache,
-  f::Gridap.Fields.BroadcastingFieldOpMap,
-  a::AbstractArrayBlock,
-  x::PTArray{<:Affine})
-
-  cx,ptval = cache
-  x1 = get_at_index(1,x)
-  evaluate!(cx,f,a,x1)
-  fill!(ptval,cx.array)
-  ptval
-end
-
-function Arrays.evaluate!(
-  cache,f,
-  a::PTArray{<:Affine},
-  x::Union{AbstractArrayBlock,PTArray{<:Affine}}...)
-
-  cx,ptval = cache
-  ax1 = get_at_index(1,(a,x...))
-  evaluate!(cx,f,ax1...)
-  fill!(ptval,cx.array)
-  ptval
-end
-
-function Arrays.evaluate!(cache,f,a::AbstractArrayBlock,x::PTArray{<:Affine})
-  cx,ptval = cache
-  x1 = get_at_index(1,x)
-  evaluate!(cx,f,a,x1)
-  fill!(ptval,cx.array)
-  ptval
-end
-
-get_affinity(::PTArray{<:Affine}...) = Affine()
-get_affinity(::PTArray{<:OperatorType}...) = Nonaffine()
 
 get_at_index(::Int,x) = x
 get_at_index(i::Int,x::PTArray) = x[i]
@@ -451,9 +139,306 @@ function test_ptarray(a::PTArray,b::PTArray)
   (≈)(b,a)
 end
 
-function test_ptarray(a::PTArray)
+# Default implementation
+struct NonaffinePTArray{T} <: PTArray{T}
+  array::Vector{T}
+
+  function NonaffinePTArray(array::Vector{T}) where {T<:AbstractArrayBlock}
+    new{T}(array)
+  end
+end
+
+function PTArray(array::Vector{T}) where {T<:AbstractArrayBlock}
+  NonaffinePTArray(array)
+end
+
+function PTArray(::Nonaffine,array::Vector{T}) where {T<:AbstractArrayBlock}
+  NonaffinePTArray(array)
+end
+
+Base.length(a::NonaffinePTArray) = length(a.array)
+Base.eachindex(a::NonaffinePTArray) = eachindex(a.array)
+Base.getindex(a::NonaffinePTArray,i...) = a.array[i...]
+Base.setindex!(a::NonaffinePTArray,v,i...) = a.array[i...] = v
+
+function Base.copy(a::NonaffinePTArray{T}) where T
+  b = Vector{T}(undef,length(a))
+  @inbounds for i = eachindex(a)
+    b[i] = copy(a[i])
+  end
+  PTArray(b)
+end
+
+function Base.similar(a::NonaffinePTArray{T}) where T
+  b = Vector{T}(undef,length(a))
+  @inbounds for i = eachindex(a)
+    b[i] = similar(a[i])
+  end
+  PTArray(b)
+end
+
+function Base.show(io::IO,o::NonaffinePTArray{T}) where T
+  print(io,"Nonaffine PTArray of type $T and length $(length(o.array))")
+end
+
+for op in (:+,:-)
+  @eval begin
+    function ($op)(a::NonaffinePTArray,b::NonaffinePTArray)
+      map($op,a,b)
+    end
+  end
+end
+
+function Base.transpose(a::NonaffinePTArray)
+  map(transpose,a)
+end
+
+function Base.fill!(a::NonaffinePTArray,z)
+  @inbounds for i = eachindex(a)
+    ai = a[i]
+    fill!(ai,z)
+  end
+end
+
+function LinearAlgebra.fillstored!(a::NonaffinePTArray,z)
+  @inbounds for i = eachindex(a)
+    ai = a[i]
+    fillstored!(ai,z)
+  end
+end
+
+function Base.map(f,a::PTArray)
+  n = length(a)
+  fa1 = f(testitem(a))
+  array = Vector{typeof(fa1)}(undef,n)
+  @inbounds for i = 1:n
+    array[i] = f(a[i])
+  end
+  PTArray(array)
+end
+
+function Base.map(f,a::PTArray,x::Union{AbstractArrayBlock,PTArray}...)
+  n = _get_length(a,x...)
+  ax1 = get_at_index(1,(a,x...))
+  fax1 = f(ax1...)
+  array = Vector{typeof(fax1)}(undef,n)
+  @inbounds for i = 1:n
+    axi = get_at_index(i,(a,x...))
+    array[i] = f(axi...)
+  end
+  PTArray(array)
+end
+
+function Base.map(f,a::AbstractArrayBlock,x::PTArray)
+  n = length(x)
+  fax1 = f(a,testitem(x))
+  array = Vector{typeof(fax1)}(undef,n)
+  @inbounds for i = 1:n
+    array[i] = f(a,x[i])
+  end
+  PTArray(array)
+end
+
+for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
+  @eval begin
+    function Arrays.return_value(
+      f::$F,
+      a::PTArray,
+      x::Vararg{Union{AbstractArrayBlock,PTArray}})
+
+      ax1 = get_at_index(1,(a,x...))
+      return_value(f,ax1...)
+    end
+
+    function Arrays.return_cache(
+      f::$F,
+      a::PTArray,
+      x::Vararg{Union{AbstractArrayBlock,PTArray}})
+
+      n = _get_length(a,x...)
+      val = return_value(f,a,x...)
+      array = Vector{typeof(val)}(undef,n)
+      ax1 = get_at_index(1,(a,x...))
+      cx = return_cache(f,ax1...)
+      cx,array
+    end
+
+    function Arrays.evaluate!(
+      cache,
+      f::$F,
+      a::PTArray,
+      x::Vararg{Union{AbstractArrayBlock,PTArray}})
+
+      cx,array = cache
+      @inbounds for i = eachindex(array)
+        axi = get_at_index(i,(a,x...))
+        array[i] = evaluate!(cx,f,axi...)
+      end
+      PTArray(array)
+    end
+
+    function Arrays.return_value(
+      f::$F,
+      a::AbstractArrayBlock,
+      x::PTArray)
+
+      x1 = get_at_index(1,x)
+      return_value(f,a,x1)
+    end
+
+    function Arrays.return_cache(
+      f::$F,
+      a::AbstractArrayBlock,
+      x::PTArray)
+
+      n = length(x)
+      val = return_value(f,a,x)
+      array = Vector{typeof(val)}(undef,n)
+      ax1 = get_at_index(1,x)
+      cx = return_cache(f,a,ax1)
+      cx,array
+    end
+
+    function Arrays.evaluate!(
+      cache,
+      f::$F,
+      a::AbstractArrayBlock,
+      x::PTArray)
+
+      cx,array = cache
+      @inbounds for i = eachindex(array)
+        xi = get_at_index(i,x)
+        array[i] = evaluate!(cx,f,a,xi)
+      end
+      PTArray(array)
+    end
+
+    function Arrays.lazy_map(
+      f::$F,
+      a::PTArray,
+      x::Vararg{Union{AbstractArrayBlock,PTArray}})
+
+      _ = _get_length(a,x...)
+      lazy_arrays = map(eachindex(a)) do i
+        axi = get_at_index(i,(a,x...))
+        lazy_map(f,axi...)
+      end
+      PTArray(lazy_arrays)
+    end
+  end
+end
+
+function Arrays.lazy_map(f,a::AbstractArrayBlock,x::PTArray)
+  map(y->lazy_map(f,a,y),x)
+end
+
+function test_ptarray(a::NonaffinePTArray)
   a1 = a[1]
   cond1 = all([ai == a1 for ai in a.array])
   cond2 = all(a1 .== a1[1])
   @check !(cond1 && !cond2) "Something weird with fill!"
+end
+
+# Affine implementation: shortcut for parameter- or time-independent quantities
+struct AffinePTArray{T} <: PTArray{T}
+  array::T
+  len::Int
+
+  function AffinePTArray(array::T,len::Int) where {T<:AbstractArrayBlock}
+    new{T}(array,len)
+  end
+end
+
+function PTArray(array::T,n=1) where {T<:AbstractArrayBlock}
+  AffinePTArray(array,n)
+end
+
+function PTArray(::Affine,array::Vector{T}) where {T<:AbstractArrayBlock}
+  n = length(array)
+  a1 = first(array)
+  AffinePTArray(a1,n)
+end
+
+Base.length(a::AffinePTArray) = a.len
+Base.eachindex(a::AffinePTArray) = Base.OneTo(a.len)
+Base.getindex(a::AffinePTArray,i...) = a.array
+Base.setindex!(a::AffinePTArray,v,i...) = a.array = v
+Base.copy(a::AffinePTArray) = PTArray(copy(a.array),a.len)
+Base.similar(a::AffinePTArray) = PTArray(similar(a.array),a.len)
+
+function Base.show(io::IO,o::AffinePTArray{T}) where T
+  print(io,"Affine PTArray of type $T and length $(o.len)")
+end
+
+for op in (:+,:-)
+  @eval begin
+    function ($op)(a::AffinePTArray,b::AffinePTArray)
+      n = _get_length(a,b)
+      PTArray(($op)(a.array,b.array),n)
+    end
+  end
+end
+
+function Base.transpose(a::AffinePTArray)
+  a.array = a.array'
+end
+
+Base.fill!(a::AffinePTArray,z) = fill!(a.array,z)
+LinearAlgebra.fillstored!(a::AffinePTArray,z) = fillstored!(a.array,z)
+
+function Base.map(f,a::AffinePTArray)
+  n = length(a)
+  fa1 = f(testitem(a))
+  PTArray(fa1,n)
+end
+
+function Base.map(f,a::AffinePTArray,x::Union{AbstractArrayBlock,AffinePTArray}...)
+  n = _get_length(a,x...)
+  ax1 = get_at_index(1,(a,x...))
+  fax1 = f(ax1...)
+  PTArray(fax1,n)
+end
+
+function Base.map(f,a::AbstractArrayBlock,x::AffinePTArray)
+  n = length(x)
+  fax1 = f(a,testitem(x))
+  PTArray(fax1,n)
+end
+
+for F in (:Map,:(Gridap.Fields.BroadcastingFieldOpMap))
+  @eval begin
+    function Arrays.evaluate!(
+      cache,
+      f::$F,
+      a::AffinePTArray,
+      x::Vararg{Union{AbstractArrayBlock,AffinePTArray}})
+
+      cx,array = cache
+      ax1 = get_at_index(1,(a,x...))
+      evaluate!(cx,f,ax1...)
+      PTArray(cx.array,length(array))
+    end
+
+    function Arrays.evaluate!(
+      cache,
+      f::$F,
+      a::AbstractArrayBlock,
+      x::AffinePTArray)
+
+      cx,array = cache
+      x1 = get_at_index(1,x)
+      evaluate!(cx,f,a,x1)
+      PTArray(cx.array,length(array))
+    end
+
+    function Arrays.lazy_map(
+      f::$F,
+      a::AffinePTArray,
+      x::Vararg{Union{AbstractArrayBlock,AffinePTArray}})
+
+      n = _get_length(a,x...)
+      ax1 = get_at_index(1,(a,x...))
+      PTArray(lazy_map(f,ax1...),n)
+    end
+  end
 end
