@@ -16,17 +16,12 @@ end
 """
 Allocate the space to be used as first argument in evaluate!
 """
-function allocate_trial_space(U::FESpace,args...)
-  U
-end
-
 function allocate_trial_space(U::PTTrialFESpace,args...)
   HomogeneousTrialFESpace(U.space)
 end
 
 function allocate_trial_space(U::PTTrialFESpace,μ::Table)
-  n = length(μ)
-  HomogeneousPTrialFESpace(U.space,n)
+  NonaffineHomogeneousPTrialFESpace(U.space,length(μ))
 end
 
 """
@@ -42,15 +37,6 @@ function evaluate!(Uμt::T,U::PTTrialFESpace,μ::AbstractVector,t::Real) where T
   Uμt
 end
 
-"""
-Parameter, time evaluation allocating Dirichlet vals
-"""
-function Arrays.evaluate(U::PTTrialFESpace,params::AbstractVector,t::Real)
-  Uμt = allocate_trial_space(U,params)
-  evaluate!(Uμt,U,params,t)
-  Uμt
-end
-
 function evaluate!(Ut::T,U::PTTrialFESpace,params::Table,t::Real) where T
   if isa(U.dirichlet_μt,Vector)
     objects_at_t = map(o->map(μ->o(μ,t),params),U.dirichlet_μt)
@@ -59,6 +45,15 @@ function evaluate!(Ut::T,U::PTTrialFESpace,params::Table,t::Real) where T
   end
   PTrialFESpace!(Ut,objects_at_t)
   Ut
+end
+
+"""
+Parameter, time evaluation allocating Dirichlet vals
+"""
+function Arrays.evaluate(U::PTTrialFESpace,params::AbstractVector,t::Real)
+  Uμt = allocate_trial_space(U,params)
+  evaluate!(Uμt,U,params,t)
+  Uμt
 end
 
 function Arrays.evaluate(U::PTTrialFESpace,params::AbstractVector,t::Real)
@@ -71,14 +66,12 @@ end
 We can evaluate at `nothing` when we do not care about the Dirichlet vals
 """
 Arrays.evaluate(U::PTTrialFESpace,::Nothing,::Nothing) = U.Ud0
-Arrays.evaluate(U::PTTrialFESpace,::Nothing) = U.Ud0
 
 """
 Functor-like evaluation. It allocates Dirichlet vals in general.
 """
-(U::SingleFieldFESpace)(μ,t) = U
+(U::SingleFieldFESpace)(μ,t) = evaluate(U,μ,t)
 (U::PTTrialFESpace)(μ,t) = evaluate(U,μ,t)
-(U::PTTrialFESpace)(μ) = evaluate(U,μ)
 
 """
 Time derivative of the Dirichlet functions
@@ -94,36 +87,66 @@ Time 2nd derivative of the Dirichlet functions
 
 # Define the PTrialFESpace interface for affine spaces
 
+function allocate_trial_space(U::FESpace,args...)
+  U
+end
+
+function allocate_trial_space(U::FESpace,μ::Table)
+  AffineHomogeneousPTrialFESpace(U,length(μ))
+end
+
 function Arrays.evaluate!(::FESpace,U::FESpace,::AbstractVector,::Real)
   U
 end
 
-function Arrays.evaluate(U::FESpace,::AbstractVector,::Real)
-  U
+function Arrays.evaluate!(Ut::FESpace,::FESpace,::Table,::Real)
+  Ut
 end
 
-function Arrays.evaluate(U::FESpace,::Nothing,::Nothing)
-  U
+function Arrays.evaluate(U::FESpace,params::AbstractVector,t::Real)
+  Uμt = allocate_trial_space(U,params)
+  evaluate!(Uμt,U,params,t)
 end
+
+Arrays.evaluate(U::FESpace,::Nothing,::Nothing) = U
 
 # Define the interface for MultiField
 
 struct PTMultiFieldTrialFESpace
   spaces::Vector
 end
+
 Base.iterate(m::PTMultiFieldTrialFESpace) = iterate(m.spaces)
 Base.iterate(m::PTMultiFieldTrialFESpace,state) = iterate(m.spaces,state)
 Base.getindex(m::PTMultiFieldTrialFESpace,field_id::Integer) = m.spaces[field_id]
 Base.length(m::PTMultiFieldTrialFESpace) = length(m.spaces)
+
+function PTMultiFieldFESpace(spaces::Vector)
+  PTMultiFieldTrialFESpace(spaces)
+end
+
+function PTMultiFieldFESpace(spaces::Vector{<:SingleFieldFESpace})
+  MultiFieldFESpace(spaces)
+end
 
 function allocate_trial_space(U::PTMultiFieldTrialFESpace,args...)
   spaces = map(fe->allocate_trial_space(fe,args...),U.spaces)
   MultiFieldFESpace(spaces)
 end
 
-function evaluate!(Uμt::T,U::PTMultiFieldTrialFESpace,μ,t::Real) where T
+function allocate_trial_space(U::PTMultiFieldTrialFESpace,μ::Table)
+  spaces = map(fe->allocate_trial_space(fe,μ),U.spaces)
+  PMultiFieldFESpace(spaces)
+end
+
+function evaluate!(Uμt,U::PTMultiFieldTrialFESpace,μ,t::Real)
   spaces_at_μt = [evaluate!(Uμti,Ui,μ,t) for (Uμti,Ui) in zip(Uμt,U)]
   MultiFieldFESpace(spaces_at_μt)
+end
+
+function evaluate!(Uμt,U::PTMultiFieldTrialFESpace,μ::Table,t::Real)
+  spaces_at_μt = [evaluate!(Uμti,Ui,μ,t) for (Uμti,Ui) in zip(Uμt,U)]
+  PMultiFieldFESpace(spaces_at_μt)
 end
 
 function Arrays.evaluate(U::PTMultiFieldTrialFESpace,μ,t::Real)
@@ -137,17 +160,8 @@ function Arrays.evaluate(U::PTMultiFieldTrialFESpace,::Nothing,::Nothing)
 end
 
 (U::PTMultiFieldTrialFESpace)(μ,t) = evaluate(U,μ,t)
-(U::PTMultiFieldTrialFESpace)(μ) = evaluate(U,μ)
 
 function ∂ₚt(U::PTMultiFieldTrialFESpace)
   spaces = ∂ₚt.(U.spaces)
   PTMultiFieldFESpace(spaces)
-end
-
-function PTMultiFieldFESpace(spaces::Vector)
-  PTMultiFieldTrialFESpace(spaces)
-end
-
-function PTMultiFieldFESpace(spaces::Vector{<:SingleFieldFESpace})
-  MultiFieldFESpace(spaces)
 end

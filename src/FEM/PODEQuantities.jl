@@ -1,12 +1,42 @@
 abstract type PODEQuantity end
+abstract type PODESolution <: PODEQuantity end
 
-struct PODESolution <: PODEQuantity
+struct SingleFieldPODESolution <: PODESolution
   solver::ODESolver
   op::PODEOperator
   μ::AbstractVector
   u0::PTArray
   t0::Real
   tF::Real
+end
+
+function PODESolution(
+  solver::ODESolver,
+  op::PODEOperator,
+  μ::AbstractVector,
+  u0::PTArray,
+  t0::Real,
+  tF::Real)
+  SingleFieldPODESolution(solver,op,μ,u0,t0,tF)
+end
+
+struct MultiFieldPODESolution <: PODESolution
+  solver::ODESolver
+  op::PODEOperator
+  μ::AbstractVector
+  u0::Vector{<:PTArray}
+  t0::Real
+  tF::Real
+end
+
+function PODESolution(
+  solver::ODESolver,
+  op::PODEOperator,
+  μ::AbstractVector,
+  u0::Vector{<:PTArray},
+  t0::Real,
+  tF::Real)
+  MultiFieldPODESolution(solver,op,μ,u0,t0,tF)
 end
 
 function Base.iterate(sol::PODESolution)

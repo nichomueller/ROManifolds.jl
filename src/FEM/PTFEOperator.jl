@@ -7,7 +7,7 @@ abstract type PTFEOperator{C<:OperatorType} <: GridapType end
 Returns a `ODEOperator` wrapper of the `PFEOperator` that can be
 straightforwardly used with the `ODETools` module.
 """
-function get_algebraic_operator(feop::PTFEOperator{C}) where C
+function TransientFETools.get_algebraic_operator(feop::PTFEOperator{C}) where C
   PODEOpFromFEOp{C}(feop)
 end
 

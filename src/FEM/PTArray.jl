@@ -54,6 +54,7 @@ function Base.:(==)(a::PTArray,b::PTArray)
   end
   true
 end
+
 # Something wrong with broadcast
 Broadcast.broadcastable(x::PTArray) = x
 
@@ -318,8 +319,8 @@ for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
       a::PTArray,
       x::Vararg{Union{AbstractArrayBlock,PTArray}})
 
-      _ = _get_length(a,x...)
-      lazy_arrays = map(eachindex(a)) do i
+      n = _get_length(a,x...)
+      lazy_arrays = map(1:n) do i
         axi = get_at_index(i,(a,x...))
         lazy_map(f,axi...)
       end
@@ -330,13 +331,6 @@ end
 
 function Arrays.lazy_map(f,a::AbstractArrayBlock,x::PTArray)
   map(y->lazy_map(f,a,y),x)
-end
-
-function test_ptarray(a::NonaffinePTArray)
-  a1 = a[1]
-  cond1 = all([ai == a1 for ai in a.array])
-  cond2 = all(a1 .== a1[1])
-  @check !(cond1 && !cond2) "Something weird with fill!"
 end
 
 # Affine implementation: shortcut for parameter- or time-independent quantities

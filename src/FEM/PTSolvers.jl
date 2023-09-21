@@ -40,7 +40,6 @@ function Algebra.solve!(x::PTArray,::LinearSolver,op::PAffineOperator,ns)
   Aaff,baff = get_affinity(A.array),get_affinity(b.array)
   numerical_setup!(ns,A,Aaff)
   _loop_solve!(x,ns,b,Aaff,baff)
-  test_ptarray(x)
   ns
 end
 
@@ -51,7 +50,6 @@ function Algebra.solve!(x::PTArray,ls::LinearSolver,op::PAffineOperator,::Nothin
   ss = symbolic_setup(ls,testitem(A))
   ns = numerical_setup(ss,A,Aaff)
   _loop_solve!(x,ns,b,Aaff,baff)
-  test_ptarray(x)
   ns
 end
 

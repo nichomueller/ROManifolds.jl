@@ -19,11 +19,9 @@ const Float = Float64
 import Base: +, -, *
 import LinearAlgebra: fillstored!
 import FillArrays:Fill,fill
-import Statistics.mean
+import Statistics:mean
 import GridapGmsh:GmshDiscreteModel
-import Gridap.Helpers.@check
-import Gridap.Helpers.@unreachable
-import Gridap.Helpers.@notimplemented
+import Gridap.Helpers:@abstractmethod,@check,@notimplemented,@unreachable
 import Gridap.Arrays:evaluate
 import Gridap.Arrays:evaluate!
 import Gridap.Algebra:InserterCSC
@@ -75,10 +73,10 @@ import Gridap.ODEs.TransientFETools:_to_transient_single_fields
 include("PSpace.jl")
 include("PDiffOperators.jl")
 include("PTArray.jl")
+include("PFESpaces.jl")
 include("PTCellFields.jl")
 include("PTDomainContribution.jl")
 include("PTAssemblers.jl")
-include("PTrialFESpaces.jl")
 include("PTFESpaces.jl")
 include("PTFEOperator.jl")
 include("PTFESolversInterface.jl")
