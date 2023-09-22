@@ -20,24 +20,24 @@ function PODESolution(
   SingleFieldPODESolution(solver,op,μ,u0,t0,tF)
 end
 
-struct MultiFieldPODESolution <: PODESolution
-  solver::ODESolver
-  op::PODEOperator
-  μ::AbstractVector
-  u0::Vector{<:PTArray}
-  t0::Real
-  tF::Real
-end
+# struct MultiFieldPODESolution <: PODESolution
+#   solver::ODESolver
+#   op::PODEOperator
+#   μ::AbstractVector
+#   u0::Vector{<:PTArray}
+#   t0::Real
+#   tF::Real
+# end
 
-function PODESolution(
-  solver::ODESolver,
-  op::PODEOperator,
-  μ::AbstractVector,
-  u0::Vector{<:PTArray},
-  t0::Real,
-  tF::Real)
-  MultiFieldPODESolution(solver,op,μ,u0,t0,tF)
-end
+# function PODESolution(
+#   solver::ODESolver,
+#   op::PODEOperator,
+#   μ::AbstractVector,
+#   u0::Vector{<:PTArray},
+#   t0::Real,
+#   tF::Real)
+#   MultiFieldPODESolution(solver,op,μ,u0,t0,tF)
+# end
 
 function Base.iterate(sol::PODESolution)
   uf = copy(sol.u0)
@@ -58,7 +58,7 @@ end
 function Base.iterate(sol::PODESolution,state)
   uf,u0,t0,n,cache = state
 
-  if t0 >= sol.tF - ϵ
+  if t0 >= sol.tF - 100*eps()
     return nothing
   end
 

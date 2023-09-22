@@ -214,12 +214,12 @@ end
 
 struct PTMultiFieldFEFunction{T<:MultiFieldCellField} <: PTFEFunction
   single_fe_functions::Vector{<:PTSingleFieldFEFunction}
-  free_values::Vector{<:PTArray}
+  free_values::PTArray
   fe_space::PMultiFieldFESpace
   multi_cell_field::T
 
   function PTMultiFieldFEFunction(
-    free_values::Vector{<:PTArray},
+    free_values::PTArray,
     space::PMultiFieldFESpace,
     single_fe_functions::Vector{<:PTSingleFieldFEFunction})
 
@@ -267,35 +267,14 @@ function FESpaces.EvaluationFunction(fe::PMultiFieldFESpace,free_values::PTArray
     fe_function_i = EvaluationFunction(fe.spaces[i],free_values_i)
     free_values_i,fe_function_i
   end
-  free_values = first.(blocks)
+  free_values = vcat(first.(blocks)...)
   fe_functions = last.(blocks)
   PTMultiFieldFEFunction(free_values,fe,fe_functions)
 end
 
-# function MultiField.restrict_to_field(
-#   f::MultiFieldFESpace,
-#   free_values::PTArray,
-#   field::Integer)
-
-#   MultiField._restrict_to_field(f,MultiFieldStyle(f),free_values,field)
-# end
-
-# function MultiField._restrict_to_field(
-#   f::MultiFieldFESpace,
-#   ::ConsecutiveMultiFieldStyle,
-#   free_values::PTArray,
-#   field::Integer)
-
-#   offsets = compute_field_offsets(f)
-#   U = f.spaces
-#   pini = offsets[field] + 1
-#   pend = offsets[field] + num_free_dofs(U[field])
-#   map(fv -> SubVector(fv,pini,pend),free_values)
-# end
-
 function Arrays.testitem(f::PTMultiFieldFEFunction)
   single_fe_functions = map(testitem,f.single_fe_functions)
-  free_values = map(testitem,f.free_values)
+  free_values = testitem(f.free_values)
   fe_space = testitem(f.fe_space)
   MultiFieldFEFunction(free_values,fe_space,single_fe_functions)
 end

@@ -42,7 +42,7 @@ begin
 
   m(μ,t,(ut,pt),(v,q)) = ∫ₚ(v⋅ut,dΩ)
   lhs(μ,t,(u,p),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(u)),dΩ)
-  rhs(μ,t,(v,q)) = ∫(v*fμt(μ,t),dΩ)
+  rhs(μ,t,(v,q)) = ∫ₚ(v⋅fμt(μ,t),dΩ)
 
   reffe_u = Gridap.ReferenceFE(lagrangian,VectorValue{2,Float},order)
   reffe_p = Gridap.ReferenceFE(lagrangian,Float,order-1)

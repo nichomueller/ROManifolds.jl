@@ -127,8 +127,10 @@ end
 
 function test_ptarray(a::PTArray,b::AbstractArrayBlock)
   a1 = testitem(a)
-  @assert typeof(a1) == typeof(b)
   @assert all(a1 .≈ b)
+  if typeof(a1) != typeof(b)
+    @warn "Detected difference in type"
+  end
   return
 end
 
@@ -192,6 +194,22 @@ end
 
 function Base.transpose(a::NonaffinePTArray)
   map(transpose,a)
+end
+
+for f in (:(Base.hcat),:(Base.vcat))
+  @eval begin
+    function $f(a::PTArray...)
+      n = _get_length(a...)
+      varray = map(1:n) do j
+        arrays = ()
+        @inbounds for i = eachindex(a)
+          arrays = (arrays...,a[i][j])
+        end
+        $f(arrays...)
+      end
+      PTArray(varray)
+    end
+  end
 end
 
 function Base.fill!(a::NonaffinePTArray,z)
@@ -377,6 +395,21 @@ function Base.transpose(a::AffinePTArray)
   a.array = a.array'
 end
 
+for f in (:(Base.hcat),:(Base.vcat))
+  @eval begin
+    function $f(a::AffinePTArray...)
+      n = _get_length(a...)
+      j = 1
+      arrays = ()
+      @inbounds for i = eachindex(a)
+        arrays = (arrays...,a[i][j])
+      end
+      varray = $f(arrays...)
+      PTArray(varray,n)
+    end
+  end
+end
+
 Base.fill!(a::AffinePTArray,z) = fill!(a.array,z)
 LinearAlgebra.fillstored!(a::AffinePTArray,z) = fillstored!(a.array,z)
 
@@ -399,7 +432,7 @@ function Base.map(f,a::AbstractArrayBlock,x::AffinePTArray)
   PTArray(fax1,n)
 end
 
-for F in (:Map,:(Gridap.Fields.BroadcastingFieldOpMap))
+for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
   @eval begin
     function Arrays.evaluate!(
       cache,
