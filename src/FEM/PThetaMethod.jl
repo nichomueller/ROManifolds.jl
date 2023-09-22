@@ -49,7 +49,13 @@ struct PThetaMethodNonlinearOperator <: PNonlinearOperator
   vθ::PTArray
 end
 
-function residual!(
+function Algebra.residual(op::PThetaMethodNonlinearOperator,x::PTArray)
+  b = allocate_residual(op,x)
+  residual!(b,op,x)
+  b
+end
+
+function Algebra.residual!(
   b::PTArray,
   op::PThetaMethodNonlinearOperator,
   x::PTArray)
@@ -62,7 +68,13 @@ function residual!(
   residual!(b,op.odeop,op.μ,op.tθ,(uθ,vθ),op.ode_cache)
 end
 
-function jacobian!(
+function Algebra.jacobian(op::PThetaMethodNonlinearOperator,x::PTArray)
+  A = allocate_jacobian(op,x)
+  jacobian!(A,op,x)
+  A
+end
+
+function Algebra.jacobian!(
   A::PTArray,
   op::PThetaMethodNonlinearOperator,
   x::PTArray)
@@ -75,14 +87,14 @@ function jacobian!(
   jacobians!(A,op.odeop,op.μ,op.tθ,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)
 end
 
-function allocate_residual(
+function Algebra.allocate_residual(
   op::PThetaMethodNonlinearOperator,
   x::PTArray)
 
   allocate_residual(op.odeop,x,op.ode_cache)
 end
 
-function allocate_jacobian(
+function Algebra.allocate_jacobian(
   op::PThetaMethodNonlinearOperator,
   x::PTArray)
 

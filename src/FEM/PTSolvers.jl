@@ -1,4 +1,4 @@
-abstract type PNonlinearOperator <: GridapType end
+abstract type PNonlinearOperator <: NonlinearOperator end
 
 struct PAffineOperator <: PNonlinearOperator
   matrix::PTArray
@@ -35,24 +35,6 @@ function Algebra.numerical_setup!(ns,mat::PTArray,::Affine)
   end
 end
 
-function Algebra.solve!(x::PTArray,::LinearSolver,op::PAffineOperator,ns)
-  A,b = op.matrix,op.vector
-  Aaff,baff = get_affinity(A.array),get_affinity(b.array)
-  numerical_setup!(ns,A,Aaff)
-  _loop_solve!(x,ns,b,Aaff,baff)
-  ns
-end
-
-function Algebra.solve!(x::PTArray,ls::LinearSolver,op::PAffineOperator,::Nothing)
-  A,b = op.matrix,op.vector
-  @assert length(A) == length(b) == length(x)
-  Aaff,baff = get_affinity(A.array),get_affinity(b.array)
-  ss = symbolic_setup(ls,testitem(A))
-  ns = numerical_setup(ss,A,Aaff)
-  _loop_solve!(x,ns,b,Aaff,baff)
-  ns
-end
-
 function _loop_solve!(x::PTArray,ns,b::PTArray,::Affine,::Affine)
   x1 = copy(x1)
   solve!(x1,ns[1],b[1])
@@ -67,62 +49,80 @@ function _loop_solve!(x::PTArray,ns,b::PTArray,args...)
   end
 end
 
+function Algebra.solve!(x::PTArray,ls::LinearSolver,op::PAffineOperator,::Nothing)
+  A,b = op.matrix,op.vector
+  @assert length(A) == length(b) == length(x)
+  Aaff,baff = get_affinity(A.array),get_affinity(b.array)
+  ss = symbolic_setup(ls,testitem(A))
+  ns = numerical_setup(ss,A,Aaff)
+  _loop_solve!(x,ns,b,Aaff,baff)
+  ns
+end
+
+function Algebra.solve!(x::PTArray,::LinearSolver,op::PAffineOperator,ns)
+  A,b = op.matrix,op.vector
+  Aaff,baff = get_affinity(A.array),get_affinity(b.array)
+  numerical_setup!(ns,A,Aaff)
+  _loop_solve!(x,ns,b,Aaff,baff)
+  ns
+end
+
 struct PNewtonRaphsonCache <: GridapType
   A::PTArray
   b::PTArray
   dx::PTArray
-  ns::NumericalSetup
+  ns::Vector{<:NumericalSetup}
 end
 
-# function ptsolve!(
-#   x::PTArray,
-#   xcache::AbstractVector,
-#   nls::PNewtonRaphsonSolver,
-#   op::PNonlinearOperator,
-#   cache::PNewtonRaphsonCache)
+function Algebra.solve!(
+  x::PTArray,
+  nls::NewtonRaphsonSolver,
+  op::PNonlinearOperator,
+  ::Nothing)
 
-#   b = cache.b
-#   A = cache.A
-#   @assert length(A) == length(b) == length(x)
-#   dx = cache.dx
-#   ns = cache.ns
-#   residual!(b,op,x)
-#   jacobian!(A,op,x)
-#   numerical_setup!(ns,A)
-#   _solve_nr!(x,A,b,dx,ns,nls,op)
-#   cache
-# end
+  b = residual(op,x)
+  A = jacobian(op,x)
+  dx = similar(b)
+  @assert length(A) == length(b) == length(x)
+  Aaff,baff = get_affinity(A.array),get_affinity(b.array)
+  ss = symbolic_setup(nls.ls,testitem(A))
+  ns = numerical_setup(ss,A,Aaff)
+  Algebra._solve_nr!(x,A,b,dx,ns,nls,op,Aaff,baff)
+  PNewtonRaphsonCache(A,b,dx,ns)
+end
 
-# function ptsolve!(
-#   x::PTArray,
-#   xcache::AbstractVector,
-#   nls::PNewtonRaphsonSolver,
-#   op::PNonlinearOperator,
-#   ::Nothing)
+function Algebra.solve!(
+  x::PTArray,
+  nls::NewtonRaphsonSolver,
+  op::PNonlinearOperator,
+  cache::PNewtonRaphsonCache)
 
-#   b = residual(op,x)
-#   A = jacobian(op,x)
-#   dx = similar(b)
-#   ss = symbolic_setup(nls.ls,A)
-#   ns = numerical_setup(ss,A)
-#   _solve_nr!(x,A,b,dx,ns,nls,op)
-#   NewtonRaphsonCache(A,b,dx,ns)
-# end
+  b = cache.b
+  A = cache.A
+  dx = cache.dx
+  ns = cache.ns
+  residual!(b,op,x)
+  jacobian!(A,op,x)
+  Aaff,baff = get_affinity(A.array),get_affinity(b.array)
+  numerical_setup!(ns,A,Aaff)
+  Algebra._solve_nr!(x,A,b,dx,ns,nls,op,Aaff,baff)
+  cache
+end
 
-# function ptsolve!(
-#   x::PTArray,
-#   xcache::AbstractVector,
-#   nls::PNewtonRaphsonSolver,
-#   A::PTArray,
-#   b::PTArray,
-#   dx::PTArray,
-#   cache::PNewtonRaphsonCache)
-
-#   ns = cache.ns
-#   for xk in eachindex(xcache)
-#     numerical_setup!(ns,A[k])
-#     Algebra._solve_nr!(xk,A,b,dx,ns,nls,op)
-#     x[k] = xk
-#   end
-#   cache
-# end
+function Algebra._solve_nr!(x,A,b,dx,ns,nls,op,Aaff,baff)
+  isconv,conv0 = Algebra._check_convergence(nls,b)
+  if isconv; return; end
+  for iter in 1:nls.max_nliters
+    b.array .*= -1
+    _loop_solve!(dx,ns,b,Aaff,baff)
+    x.array .+= dx.array
+    residual!(b,op,x)
+    isconv = Algebra._check_convergence(nls,b,conv0)
+    if isconv; return; end
+    if iter == nls.max_nliters
+      @unreachable
+    end
+    jacobian!(A,op,x)
+    numerical_setup!(ns,A,Aaff)
+  end
+end

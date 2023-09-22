@@ -31,6 +31,15 @@ function Base.zeros(a::PTArray)
   zero(a).array
 end
 
+function Base.:*(a::Number,b::PTArray)
+  b.array .* a
+  b
+end
+
+function Base.:*(a::PTArray,b::Number)
+  b*a
+end
+
 function Base.:≈(a::PTArray,b::PTArray)
   if size(a) != size(b)
     return false
@@ -55,29 +64,41 @@ function Base.:(==)(a::PTArray,b::PTArray)
   true
 end
 
-# Something wrong with broadcast
-Broadcast.broadcastable(x::PTArray) = x
+struct PTBroadcasted{T}
+  array::PTArray{T}
+end
+_get_pta(a::PTArray) = a
+_get_pta(a::PTBroadcasted) = a.array
 
-struct PTBroadcastStyle <: Broadcast.BroadcastStyle end
-
-function Broadcast.BroadcastStyle(::Type{<:PTArray})
-  PTBroadcastStyle()
+function Base.broadcasted(f,a::Union{PTArray,PTBroadcasted}...)
+  pta = map(_get_pta,a)
+  PTBroadcasted(map(f,pta...))
 end
 
-function Broadcast.BroadcastStyle(
-  ::PTBroadcastStyle,
-  ::Broadcast.DefaultArrayStyle{0})
-  Broadcast.DefaultArrayStyle(Val(0))
+function Base.broadcasted(f,a::Number,b::Union{PTArray,PTBroadcasted})
+  PTBroadcasted(PTArray(map(x->f(a,x),_get_pta(b).array)))
 end
 
-function Broadcast.BroadcastStyle(
-  ::Broadcast.DefaultArrayStyle{0},
-  ::PTBroadcastStyle)
-  Broadcast.DefaultArrayStyle(Val(0))
+function Base.broadcasted(f,a::Union{PTArray,PTBroadcasted},b::Number)
+  PTBroadcasted(PTArray(map(x->f(x,b),_get_pta(a).array)))
 end
 
-function Broadcast.BroadcastStyle(::PTBroadcastStyle,::PTBroadcastStyle)
-  PTBroadcastStyle()
+function Base.broadcasted(
+  f,a::Union{PTArray,PTBroadcasted},
+  b::Broadcast.Broadcasted{Broadcast.DefaultArrayStyle{0}})
+  Base.broadcasted(f,a,Base.materialize(b))
+end
+
+function Base.broadcasted(
+  f,a::Broadcast.Broadcasted{Broadcast.DefaultArrayStyle{0}},
+  b::Union{PTArray,PTBroadcasted})
+  Base.broadcasted(f,Base.materialize(a),b)
+end
+
+function Base.materialize(b::PTBroadcasted{T}) where T
+  a = similar(b.array)
+  Base.materialize!(a,b)
+  a
 end
 
 function Base.materialize!(a::PTArray,b::Broadcast.Broadcasted)
@@ -85,9 +106,8 @@ function Base.materialize!(a::PTArray,b::Broadcast.Broadcasted)
   a
 end
 
-function Base.materialize!(a::PTArray,b::Broadcast.Broadcasted{<:PTBroadcastStyle})
-  ptb = map(b.f,b.args...)
-  map(Base.materialize!,a.array,ptb.array)
+function Base.materialize!(a::PTArray,b::PTBroadcasted)
+  map(Base.materialize!,a.array,b.array.array)
   a
 end
 
