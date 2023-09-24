@@ -13,6 +13,7 @@ end
 # Abstract implementation
 abstract type PTArray{T} end
 
+Arrays.get_array(a::PTArray) = a.array
 Base.size(a::PTArray) = size(a.array)
 Base.eltype(::Type{PTArray{T}}) where T = eltype(T)
 Base.eltype(::PTArray{T}) where T = eltype(T)
@@ -28,11 +29,11 @@ function Base.zero(a::PTArray)
 end
 
 function Base.zeros(a::PTArray)
-  zero(a).array
+  get_array(zero(a))
 end
 
 function Base.:*(a::Number,b::PTArray)
-  b.array .* a
+  get_array(b) .* a
   b
 end
 
@@ -62,6 +63,17 @@ function Base.:(==)(a::PTArray,b::PTArray)
     end
   end
   true
+end
+
+function Arrays.lazy_map(f,a::Union{AbstractArrayBlock,PTArray}...)
+  if any(map(x->isa(x,PTArray),a))
+    pt_lazy_map(f,a...)
+  else
+    @assert all(map(x->isa(x,AbstractArray),a))
+    ai = map(testitem,a)
+    T = return_type(f,ai...)
+    lazy_map(f,T,ai...)
+  end
 end
 
 struct PTBroadcasted{T}
@@ -352,23 +364,15 @@ for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
       PTArray(array)
     end
 
-    function Arrays.lazy_map(
-      f::$F,
-      a::PTArray,
-      x::Vararg{Union{AbstractArrayBlock,PTArray}})
-
-      n = _get_length(a,x...)
+    function pt_lazy_map(f,a::Union{AbstractArrayBlock,PTArray}...)
+      n = _get_length(a...)
       lazy_arrays = map(1:n) do i
-        axi = get_at_index(i,(a,x...))
-        lazy_map(f,axi...)
+        ai = get_at_index(i,a)
+        lazy_map(f,ai...)
       end
       PTArray(lazy_arrays)
     end
   end
-end
-
-function Arrays.lazy_map(f,a::AbstractArrayBlock,x::PTArray)
-  map(y->lazy_map(f,a,y),x)
 end
 
 # Affine implementation: shortcut for parameter- or time-independent quantities
@@ -478,14 +482,10 @@ for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
       PTArray(cx.array,length(array))
     end
 
-    function Arrays.lazy_map(
-      f::$F,
-      a::AffinePTArray,
-      x::Vararg{Union{AbstractArrayBlock,AffinePTArray}})
-
-      n = _get_length(a,x...)
-      ax1 = get_at_index(1,(a,x...))
-      PTArray(lazy_map(f,ax1...),n)
+    function pt_lazy_map(f::$F,a::Union{AbstractArrayBlock,AffinePTArray}...)
+      n = _get_length(a...)
+      a1 = get_at_index(1,a)
+      PTArray(lazy_map(f,a1...),n)
     end
   end
 end

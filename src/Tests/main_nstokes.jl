@@ -48,12 +48,12 @@ begin
   reffe_p = Gridap.ReferenceFE(lagrangian,Float,order-1)
   test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
   trial_u = PTTrialFESpace(test_u,g)
-  test_p = TestFESpace(model,reffe_p;conformity=:L2,constraint=:zeromean)
+  test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
   trial_p = TrialFESpace(test_p)
   test = PTMultiFieldFESpace([test_u,test_p])
   trial = PTMultiFieldFESpace([trial_u,trial_p])
   feop = PTFEOperator(res,jac,jac_t,pspace,trial,test)
-  t0,tF,dt,θ = 0.,0.05,0.005,0.5
+  t0,tf,dt,θ = 0.,0.05,0.005,0.5
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial_u(μ,t0))
   ph0μ(μ) = interpolate_everywhere(p0μ(μ),trial_p(μ,t0))
   xh0μ(μ) = interpolate_everywhere([uh0μ(μ),ph0μ(μ)],trial(μ,t0))

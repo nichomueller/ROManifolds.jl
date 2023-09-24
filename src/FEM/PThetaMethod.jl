@@ -12,7 +12,7 @@ function solution_step!(
   tθ = t0+dtθ
 
   if isnothing(cache)
-    ode_cache = allocate_cache(op,μ)
+    ode_cache = allocate_cache(op,μ,tθ)
     vθ = similar(u0)
     vθ .= 0.0
     nl_cache = nothing
@@ -41,15 +41,15 @@ given time step, i.e., A(t,u_n+θ,(u_n+θ-u_n)/dt)
 """
 struct PThetaMethodNonlinearOperator <: PNonlinearOperator
   odeop::PODEOperator
-  μ::AbstractVector
-  tθ::Float64
-  dtθ::Float64
+  μ
+  tθ
+  dtθ::Float
   u0::PTArray
   ode_cache
   vθ::PTArray
 end
 
-function Algebra.residual(op::PThetaMethodNonlinearOperator,x::PTArray)
+function Algebra.residual(op::PNonlinearOperator,x::PTArray)
   b = allocate_residual(op,x)
   residual!(b,op,x)
   b
@@ -68,9 +68,9 @@ function Algebra.residual!(
   residual!(b,op.odeop,op.μ,op.tθ,(uθ,vθ),op.ode_cache)
 end
 
-function Algebra.jacobian(op::PThetaMethodNonlinearOperator,x::PTArray)
+function Algebra.jacobian(op::PNonlinearOperator,x::PTArray,args...)
   A = allocate_jacobian(op,x)
-  jacobian!(A,op,x)
+  jacobian!(A,op,x,args...)
   A
 end
 
@@ -85,6 +85,20 @@ function Algebra.jacobian!(
   z = zero(eltype(A))
   fillstored!(A,z)
   jacobians!(A,op.odeop,op.μ,op.tθ,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)
+end
+
+function Algebra.jacobian!(
+  A::PTArray,
+  op::PThetaMethodNonlinearOperator,
+  x::PTArray,
+  i::Int)
+
+  uF = x
+  vθ = op.vθ
+  @. vθ = (x-op.u0)/op.dtθ
+  z = zero(eltype(A))
+  fillstored!(A,z)
+  jacobian!(A,op.odeop,op.μ,op.tθ,(uF,vθ),i,(1.0,1/op.dtθ)[i],op.ode_cache)
 end
 
 function Algebra.allocate_residual(

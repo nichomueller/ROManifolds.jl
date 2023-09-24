@@ -1,10 +1,13 @@
-abstract type RBSpace{T} end
+abstract type AbstractRBSpace{T} end
 
-struct SingleFieldRBSpace{T} <: RBSpace{T}
+get_basis_space(rb::AbstractRBSpace) = rb.basis_space
+get_basis_time(rb::AbstractRBSpace) = rb.basis_time
+
+struct RBSpace{T} <: AbstractRBSpace{T}
   basis_space::Matrix{T}
   basis_time::Matrix{T}
 
-  function SingleFieldRBSpace(
+  function RBSpace(
     basis_space_nnz::NnzMatrix{T},
     basis_time_nnz::NnzMatrix{T}) where T
 
@@ -14,13 +17,13 @@ struct SingleFieldRBSpace{T} <: RBSpace{T}
   end
 end
 
-struct MultiFieldRBSpace{T} <: RBSpace{T}
-  basis_space::BlockMatrix{T}
-  basis_time::BlockMatrix{T}
+struct BlockRBSpace{T} <: AbstractRBSpace{T}
+  basis_space::Vector{Matrix{T}}
+  basis_time::Vector{Matrix{T}}
 
-  function MultiFieldRBSpace(
-    basis_space_nnz::BlockNnzArray{T,N,OT},
-    basis_time_nnz::BlockNnzArray{T,N,OT}) where {T,N,OT}
+  function BlockRBSpace(
+    basis_space_nnz::BlockNnzMatrix{T},
+    basis_time_nnz::BlockNnzMatrix{T}) where T
 
     basis_space = recast(basis_space_nnz)
     basis_time = get_nonzero_val(basis_time_nnz)
@@ -29,17 +32,42 @@ struct MultiFieldRBSpace{T} <: RBSpace{T}
 end
 
 abstract type PODStyle end
-abstract type DefaultPOD <: PODStyle end
-abstract type SteadyPOD <: PODStyle end
-abstract type TranposedPOD <: PODStyle end
+struct DefaultPOD <: PODStyle end
+struct SteadyPOD <: PODStyle end
+struct TranposedPOD <: PODStyle end
 
-function compress_snapshots(info::RBInfo,nzm::NnzMatrix)
+function compress_snapshots(info::RBInfo,feop::PTFEOperator,nzm::NnzMatrix,args...)
   ϵ = info.ϵ
   energy_norm = info.energy_norm
   norm_matrix = get_norm_matrix(energy_norm,feop)
-  steady = num_time_steps(nzm) == 1 ? SteadyPOD() : DefaultPOD()
+  steady = num_time_dofs(nzm) == 1 ? SteadyPOD() : DefaultPOD()
   transposed = size(nzm,1) < size(nzm,2) ? TranposedPOD() : DefaultPOD()
-  compress_snapshots(Val(issteady),nzm,norm_matrix,steady,transposed;ϵ)
+  basis_space,basis_time = compress_snapshots(nzm,norm_matrix,steady,transposed;ϵ)
+  RBSpace(basis_space,basis_time)
+end
+
+function compress_snapshots(
+  info::RBInfo,
+  feop::PTFEOperator,
+  nzm::BlockNnzMatrix,
+  args...;
+  compute_supremizers=false,
+  kwargs...)
+
+  nfields = length(nzm)
+  all_idx = index_pairs(1:nfields,1)
+  rb = map(all_idx) do i
+    feopi = filter_operator(feop,i)
+    nzmi = nzm[i]
+    compress_snapshots(info,feopi,nzmi)
+  end
+  bases_space = map(get_basis_space,rb)
+  bases_time = map(get_basis_time,rb)
+  if compute_supremizers
+    add_space_supremizers!(bases_space,feop,nzm;norm_matrix)
+    add_time_supremizers!(bases_time;kwargs...)
+  end
+  BlockRBSpace(basis_space,basis_time)
 end
 
 function compress_snapshots(
@@ -86,85 +114,51 @@ for T in (:DefaultPOD,:TranposedPOD)
   end
 end
 
-function compress_snapshots(
-  info::RBInfo,
-  snaps::SingleFieldSnapshots,
-  feop::PTFEOperator,
-  args...)
-
-  ϵ = info.ϵ
-  energy_norm = info.energy_norm
-  norm_matrix = get_norm_matrix(energy_norm,feop)
-
-  basis_space,basis_time = compress_snapshots(snaps,norm_matrix;ϵ)
-  SingleFieldRBSpace(basis_space,basis_time)
-end
-
-function compress_snapshots(
-  info::RBInfo,
-  snaps::MultiFieldSnapshots,
-  feop::PTFEOperator;
-  compute_supremizers=false,
-  kwargs...)
-
-  ϵ = info.ϵ
-  energy_norm = info.energy_norm
-  norm_matrix = get_norm_matrix(energy_norm,feop)
-
-  basis_space,basis_time = compress_snapshots(snaps,norm_matrix;ϵ)
-  if compute_supremizers
-    add_space_supremizers!(basis_space,snaps,feop,args...;X=norm_matrix)
-    add_time_supremizers!(basis_time;kwargs...)
-  end
-  MultiFieldRBSpace(basis_space,basis_time)
-end
-
-get_basis_space(rb::RBSpace) = rb.basis_space
-
-get_basis_time(rb::RBSpace) = rb.basis_time
-
 function add_space_supremizers!(
-  bases_space::BlockMatrix,
+  bases_space::Vector{<:Matrix},
   feop::PTFEOperator,
   args...;
   kwargs...)
 
-  bsprimal,bsdual... = bases_space.blocks
-  for (i,bsd_i) in enumerate(bsdual)
-    printstyled("Computing supremizers in space for dual field $i\n";color=:blue)
-    filter = (1,i+1)
-    filt_op = filter_operator(feop,filter)
-    supr_i = space_supremizers(bsd_i,filt_op,args...)
-    orth_supr_i = gram_schmidt(supr_i,bsprimal)
-    append!(bsprimal,orth_supr_i) # THIS IS WRONG
+  bs_primal,bs_dual... = bases_space
+  n_dual_fields = length(bs_dual)
+  all_idx = index_pairs(1:n_dual_fields,1)
+  for idx in all_idx
+    printstyled("Computing supremizers in space for dual field $idx\n";color=:blue)
+    feop_i = filter_operator(feop,idx)
+    supr_i = space_supremizers(bs_dual[idx],feop_i,args...)
+    orth_supr_i = gram_schmidt(supr_i,bs_primal)
+    bs_primal = hcat(bs_primal,orth_supr_i)
   end
-  return bsprimal,bsdual
+  return bs_primal,bs_dual
 end
 
-function space_supremizers(
-  bs::AbstractMatrix,
-  snaps::MultiFieldSnapshots,
-  feop::PTFEOperator,
-  fesolver::ODESolver,
-  params::Table)
+# function space_supremizers(
+#   basis_space::AbstractMatrix,
+#   snaps::BlockNnzMatrix,
+#   feop::PTFEOperator,
+#   fesolver::ODESolver,
+#   params::Table)
 
-  collector = CollectJacobiansMap(fesolver,feop)
-  constraint_mat = lazy_map(collector,snaps,params)
-  if length(constraint_mat) == 1
-    return constraint_mat*bs # THIS IS WRONG
-  else
-    return map(*,constraint_mat,snaps) # THIS IS WRONG
-  end
-end
+#   collector = CollectJacobiansMap(fesolver,feop)
+#   constraint_mat = lazy_map(collector,snaps,params)
+#   if length(constraint_mat) == 1
+#     return constraint_mat*basis_space # THIS IS WRONG
+#   else
+#     return map(*,constraint_mat,snaps) # THIS IS WRONG
+#   end
+# end
 
-function add_time_supremizers!(bases_time::BlockMatrix;ttol::Real)
-  btprimal,btdual... = bases_time.blocks
-  for (i,btd_i) in enumerate(tbdual)
-    printstyled("Computing supremizers in time for dual field $i\n";color=:blue)
-    supr_i = add_time_supremizers(btprimal,btd_i;ttol)
-    append!(btprimal,supr_i)
+function add_time_supremizers!(bases_time::Vector{<:Matrix};ttol::Real)
+  bt_primal,bt_dual... = bases_time
+  n_dual_fields = length(bt_dual)
+  all_idx = index_pairs(1:n_dual_fields,1)
+  for idx in all_idx
+    printstyled("Computing supremizers in time for dual field $idx\n";color=:blue)
+    supr_i = add_time_supremizers(bt_primal,bt_dual[idx];ttol)
+    append!(bt_primal,supr_i)
   end
-  return btprimal,btdual
+  return bt_primal,btdual
 end
 
 function add_time_supremizers(bases_time::AbstractMatrix...;ttol=1e-2)
@@ -172,9 +166,9 @@ function add_time_supremizers(bases_time::AbstractMatrix...;ttol=1e-2)
   basis_up = basis_u'*basis_p
 
   function enrich(
-    basis_u::AbstractMatrix{Float},
-    basis_up::AbstractMatrix{Float},
-    v::AbstractArray{Float})
+    basis_u::AbstractMatrix,
+    basis_up::AbstractMatrix,
+    v::AbstractArray)
 
     vnew = orth_complement(v,basis_u)
     vnew /= norm(vnew)
@@ -208,12 +202,8 @@ function add_time_supremizers(bases_time::AbstractMatrix...;ttol=1e-2)
   basis_u
 end
 
-function filter_rbspace(rbspace::RBSpace,filter::Int)
-  if isa(rbspace,MultiFieldRBSpace)
-    _bs,_bt = get_basis_space(rbspace),get_basis_time(rbspace)
-    basis_space,basis_time = _bs.blocks[filter],_bt.blocks[filter]
-    return SingleFieldRBSpace(basis_space,basis_time)
-  else
-    return rbspace
-  end
+function filter_rbspace(rbspace::BlockRBSpace,idx::Int)
+  basis_time = get_basis_space(rbspace)[idx]
+  basis_time = get_basis_time(rbspace)[idx]
+  RBSpace(basis_space,basis_time)
 end

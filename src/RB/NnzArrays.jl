@@ -2,6 +2,29 @@ abstract type AbstractNnzArray{T,N} <: AbstractArray{T,N} end
 const AbstractNnzVector{T} = AbstractNnzArray{T,1}
 const AbstractNnzMatrix{T} = AbstractNnzArray{T,2}
 
+Base.size(nza::AbstractNnzArray,idx...) = size(nza.nonzero_val,idx...)
+Base.getindex(nza::AbstractNnzArray,idx...) = getindex(nza.nonzero_val,idx...)
+Base.eachcol(nza::AbstractNnzArray) = eachcol(nza.nonzero_val)
+get_nonzero_val(nza::AbstractNnzArray) = nza.nonzero_val
+get_nonzero_idx(nza::AbstractNnzArray) = nza.nonzero_idx
+get_nrows(nza::AbstractNnzArray) = nza.nrows
+
+function get_nonzero_val(nza::NTuple{N,AbstractNnzArray}) where N
+  hcat(map(get_nonzero_val,nza)...)
+end
+
+function get_nonzero_idx(nza::NTuple{N,AbstractNnzArray}) where N
+  nz_idx = map(get_nonzero_idx,nza)
+  @check all([i == first(nz_idx) for i in nz_idx])
+  first(nz_idx)
+end
+
+function get_nrows(nza::NTuple{N,AbstractNnzArray}) where N
+  nrows = map(get_nrows,nza)
+  @check all([r == first(nrows) for r in nrows])
+  first(nrows)
+end
+
 struct NnzVector{T} <: AbstractNnzVector{T}
   nonzero_val::Vector{T}
   nonzero_idx::Vector{Int}
@@ -17,33 +40,12 @@ struct NnzVector{T} <: AbstractNnzVector{T}
 
   function NnzVector(mat::SparseMatrixCSC{T,Int}) where T
     nonzero_idx,nonzero_val = findnz(mat[:])
-    nrows = size(entire_array,1)
+    nrows = size(mat,1)
     new{T}(nonzero_val,nonzero_idx,nrows)
   end
 end
 
 Base.length(nzv::NnzVector) = length(nzv.nonzero_val)
-Base.size(nzv::NnzVector) = size(nzv.nonzero_val)
-
-get_nonzero_val(nzv::NnzVector) = nzv.nonzero_val
-get_nonzero_idx(nzv::NnzVector) = nzv.nonzero_idx
-get_nrows(nzv::NnzVector) = nzv.nrows
-
-function get_nonzero_val(nzv::NnzVector...)
-  map(get_nonzero_val,nzv...)
-end
-
-function get_nonzero_idx(nzv::NnzVector...)
-  nz_idx = map(get_nonzero_idx,nzv...)
-  @check all([i == first(nz_idx) for i in nz_idx])
-  first(nz_idx)
-end
-
-function get_nrows(nzv::NnzVector...)
-  nrows = map(get_nrows,nzv...)
-  @check all([r == first(nrows) for r in nrows])
-  first(nrows)
-end
 
 struct NnzMatrix{T} <: AbstractNnzMatrix{T}
   nonzero_val::Matrix{T}
@@ -60,35 +62,42 @@ struct NnzMatrix{T} <: AbstractNnzMatrix{T}
     new{T}(nonzero_val,nonzero_idx,nrows,nparams)
   end
 
-  function NnzMatrix(val::AbstractVector{T}...;nparams=length(val)) where T
+  function NnzMatrix(val::AbstractArray{T}...;nparams=length(val)) where T
     vals = hcat(val...)
-    nonzero_val,nonzero_idx = compress_array(vals)
-    nrows = size(entire_array,1)
+    nonzero_idx,nonzero_val = compress_array(vals)
+    nrows = size(vals,1)
     new{T}(nonzero_val,nonzero_idx,nrows,nparams)
   end
 
   function NnzMatrix(val::NnzVector{T}...;nparams=length(val)) where T
-    nonzero_val = get_nonzero_val(val...)
-    nonzero_idx = get_nonzero_idx(val...)
-    nrows = get_nrows(val...)
+    nonzero_val = get_nonzero_val(val)
+    nonzero_idx = get_nonzero_idx(val)
+    nrows = get_nrows(val)
     new{T}(nonzero_val,nonzero_idx,nrows,nparams)
   end
 
-  NnzMatrix(val::PTArray) = NnzMatrix(val...;nparams=length(testitem(val)))
-  NnzMatrix(val::Vector{<:PTArray}) = NnzMatrix(map(v->v[:],val)...;nparams=length(testitem(val[1])))
+  function NnzMatrix(val::PTArray;nparams=length(val))
+    NnzMatrix(get_array(val)...;nparams)
+  end
+
+  function NnzMatrix(val::Vector{<:PTArray};nparams=length(testitem(val)))
+    @check all([length(vali) == nparams for vali in val])
+    NnzMatrix(get_array(hcat(val...))...;nparams)
+  end
 end
 
-get_nonzero_val(nzm::NnzMatrix) = nzm.nonzero_val
-get_nonzero_idx(nzm::NnzMatrix) = nzm.nonzero_idx
-get_nrows(nzm::NnzMatrix) = nzm.nrows
+Base.length(nza::AbstractNnzArray) = length(nza.nparams)
 num_params(nzm::NnzMatrix) = nzm.nparams
 num_space_dofs(nzm::NnzMatrix) = size(nzm,1)
 num_time_dofs(nzm::NnzMatrix) = Int(size(nzm,2)/nzm.nparams)
 
-Base.length(nzm::NnzMatrix) = length(nzm.nparams)
-Base.size(nzm::NnzMatrix,idx...) = size(nzm.nonzero_val,idx...)
-Base.getindex(nzm::NnzMatrix,idx...) = getindex(nzm.nonzero_val,idx...)
-Base.eachcol(nzm::NnzMatrix) = eachcol(nzm.nonzero_val)
+function Base.copy(nzm::NnzMatrix)
+  NnzMatrix(
+    copy(nzm.nonzero_val),
+    copy(nzm.nonzero_idx),
+    copy(nzm.nrows),
+    copy(nzm.nparams))
+end
 
 function Base.show(io::IO,nzm::NnzMatrix)
   print(io,"NnzMatrix storing $(length(nzm)) compressed transient snapshots")
@@ -130,33 +139,25 @@ function reduce(a::AbstractMatrix,b::AbstractMatrix,nzm::NnzMatrix)
   end
 end
 
-function collect_solutions(
-  op::PTFEOperator,
-  solver::ThetaMethod,
-  μ::Table,
-  u0::PTCellField)
+# function attach_initial_condition(nzm::NnzMatrix,a0::PTArray)
+#   nt = num_time_dofs(nzm)
+#   np = num_params(nzm)
+#   minus_last_nnz = nzm.nonzero_val[:,1:nt*(np-1)]
+#   a0_nnz = map(x->getindex(x,nzm.nonzero_idx),a0.array)
 
-  ode_op = get_algebraic_operator(op)
-  uμt = PODESolution(solver,ode_op,μ,u0,t0,tF)
-  num_iter = Int(tF/solver.dt)
-  solutions = Vector{PTArray}(undef,num_iter)
-  for (u,t,n) in uμt
-    printstyled("Computing fe solution at time $t for every parameter\n";color=:blue)
-    solutions[n] = u
-  end
-  nnz_solutions = NnzMatrix(solutions)
-  return nnz_solutions
-end
-
-# function recast_index(nzm::NnzMatrix,idx::Vector{Int})
-#   nonzero_idx = nzm.nonzero_idx
-#   nrows = nzm.nrows
-#   entire_idx = nonzero_idx[idx]
-#   entire_idx_rows,_ = from_vec_to_mat_idx(entire_idx,nrows)
-#   return entire_idx_rows
+#   nonzero_val = hcat(hcat(a0_nnz...),minus_last_nnz)
+#   NnzMatrix(nonzero_val,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
 # end
 
-function change_mode(nzm::NnzMatrix)
+function recast_index(nzm::NnzMatrix,idx::Vector{Int})
+  nonzero_idx = nzm.nonzero_idx
+  nrows = nzm.nrows
+  entire_idx = nonzero_idx[idx]
+  entire_idx_rows,_ = from_vec_to_mat_idx(entire_idx,nrows)
+  return entire_idx_rows
+end
+
+function change_mode(nzm::NnzMatrix{T}) where T
   space_ndofs = num_space_dofs(nzm)
   time_ndofs = num_time_dofs(nzm)
   nparams = num_params(nzm)

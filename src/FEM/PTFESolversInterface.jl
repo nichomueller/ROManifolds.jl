@@ -8,14 +8,14 @@ end
 
 get_order(op::PODEOpFromFEOp) = get_order(op.feop)
 
-function allocate_cache(op::PODEOpFromFEOp,μ::AbstractArray)
+function allocate_cache(op::PODEOpFromFEOp,μ,t)
   Ut = get_trial(op.feop)
-  U = allocate_trial_space(Ut,μ)
+  U = allocate_trial_space(Ut,μ,t)
   Uts = (Ut,)
   Us = (U,)
   for i in 1:get_order(op)
     Uts = (Uts...,∂ₚt(Uts[i]))
-    Us = (Us...,allocate_trial_space(Uts[i+1],μ))
+    Us = (Us...,allocate_trial_space(Uts[i+1],μ,t))
   end
   fecache = allocate_cache(op.feop)
   ode_cache = (Us,Uts,fecache)
@@ -25,8 +25,8 @@ end
 function update_cache!(
   ode_cache,
   op::PODEOpFromFEOp,
-  μ::AbstractArray,
-  t::Real)
+  μ,
+  t)
 
   _Us,Uts,fecache = ode_cache
   Us = ()
@@ -60,8 +60,8 @@ end
 function residual!(
   b::PTArray,
   op::PODEOpFromFEOp,
-  μ::AbstractArray,
-  t::Real,
+  μ,
+  t,
   xhF::Tuple{Vararg{PTArray}},
   ode_cache)
 
@@ -77,8 +77,8 @@ end
 function jacobian!(
   A::PTArray,
   op::PODEOpFromFEOp,
-  μ::AbstractArray,
-  t::Real,
+  μ,
+  t,
   xhF::Tuple{Vararg{PTArray}},
   i::Integer,
   γᵢ::Real,
@@ -96,8 +96,8 @@ end
 function jacobians!(
   J::PTArray,
   op::PODEOpFromFEOp,
-  μ::AbstractArray,
-  t::Real,
+  μ,
+  t,
   xhF::Tuple{Vararg{PTArray}},
   γ::Tuple{Vararg{Real}},
   ode_cache)

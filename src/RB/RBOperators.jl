@@ -1,7 +1,7 @@
 struct TransientRBOperator{Top}
   rhs::Function
   lhs::Function
-  rbspace::RBSpace
+  rbspace::AbstractRBSpace
 end
 
 function reduce_fe_operator(

@@ -9,7 +9,7 @@ end
 const SingleFieldSnapshots{T} = Snapshots{T} where {T<:AbstractArray}
 const MultiFieldSnapshots{T} = Snapshots{T} where {T<:BlockArray}
 
-num_time_steps(s::Snapshots) = length(s.snaps)
+num_time_dofs(s::Snapshots) = length(s.snaps)
 num_params(s::Snapshots) = length(testitem(s))
 Base.length(s::Snapshots) = num_params(s)
 Arrays.testitem(s::Snapshots) = testitem(s.snaps)
@@ -42,7 +42,7 @@ end
 Base.copy(s::Snapshots) = Snapshots(copy(s.snaps))
 
 function Base.fill!(s::Snapshots,v)
-  for n in 1:num_time_steps(s)
+  for n in 1:num_time_dofs(s)
     fill!(s.snaps[n],v)
   end
 end
@@ -56,7 +56,7 @@ function _collect_snaps(::Val{true},s::Snapshots{T}) where T
 end
 
 function compress_snapshots(s::Snapshots,args...;kwargs...)
-  issteady = num_time_steps(s) == 1
+  issteady = num_time_dofs(s) == 1
   compress_snapshots(Val(issteady),s,args...;kwargs...)
 end
 
@@ -89,7 +89,7 @@ function collect_solutions(
   u0::PTCellField)
 
   ode_op = get_algebraic_operator(op)
-  uμt = PODESolution(solver,ode_op,μ,u0,t0,tF)
+  uμt = PODESolution(solver,ode_op,μ,u0,t0,tf)
   solutions = PTArray[]
   for (u,t) in uμt
     printstyled("Computing fe solution at time $t for every parameter\n";color=:blue)

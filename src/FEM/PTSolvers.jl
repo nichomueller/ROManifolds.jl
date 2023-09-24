@@ -74,6 +74,17 @@ struct PNewtonRaphsonCache <: GridapType
   ns::Vector{<:NumericalSetup}
 end
 
+function Algebra._check_convergence(nls,b::PTArray)
+  n = length(b)
+  m0 = map(Algebra._inf_norm,b.array)
+  ntuple(i->false,Val(n)),m0
+end
+
+function Algebra._check_convergence(nls,b::PTArray,m0)
+  m = map(Algebra._inf_norm,b.array)
+  m .< nls.tol * m0,m
+end
+
 function Algebra.solve!(
   x::PTArray,
   nls::NewtonRaphsonSolver,
@@ -110,15 +121,15 @@ function Algebra.solve!(
 end
 
 function Algebra._solve_nr!(x,A,b,dx,ns,nls,op,Aaff,baff)
-  isconv,conv0 = Algebra._check_convergence(nls,b)
-  if isconv; return; end
+  _,conv0 = Algebra._check_convergence(nls,b)
   for iter in 1:nls.max_nliters
     b.array .*= -1
     _loop_solve!(dx,ns,b,Aaff,baff)
-    x.array .+= dx.array
+    x .+= dx
     residual!(b,op,x)
-    isconv = Algebra._check_convergence(nls,b,conv0)
-    if isconv; return; end
+    isconv,conv = Algebra._check_convergence(nls,b,conv0)
+    println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv))) \n")
+    if all(isconv); return; end
     if iter == nls.max_nliters
       @unreachable
     end

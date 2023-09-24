@@ -18,8 +18,8 @@ end
 function update_cache!(
   ::Nothing,
   ::PTFEOperator,
-  ::AbstractArray,
-  ::Real)
+  ::Any,
+  ::Any)
   nothing
 end
 
@@ -96,10 +96,10 @@ for OP in (:PTAffineFEOperator,:PTFEOperator)
   @eval begin
     function filter_operator(
       op::PTFEOperatorFromWeakForm,
-      filter::NTuple{2,Int})
+      idx::NTuple{2,Int})
 
       if isa(get_test(op),MultiFieldFESpace)
-        row,col = filter
+        row,col = idx
         res = op.res
         jac,jac_t = op.jacs
         pspace = op.pspace
@@ -133,8 +133,8 @@ end
 function residual!(
   b::PTArray,
   op::PTFEOperatorFromWeakForm,
-  μ::AbstractArray,
-  t::Real,
+  μ,
+  t,
   xh::T,
   cache) where T
 
@@ -177,8 +177,8 @@ end
 function jacobian!(
   A::PTArray,
   op::PTFEOperatorFromWeakForm,
-  μ::AbstractArray,
-  t::Real,
+  μ,
+  t,
   uh::T,
   i::Integer,
   γᵢ::Real,
@@ -192,8 +192,8 @@ end
 function jacobians!(
   A::PTArray,
   op::PTFEOperatorFromWeakForm,
-  μ::AbstractArray,
-  t::Real,
+  μ,
+  t,
   uh::T,
   γ::Tuple{Vararg{Real}},
   cache) where T
@@ -223,8 +223,8 @@ end
 
 function fill_jacobians(
   op::PTFEOperatorFromWeakForm,
-  μ::AbstractArray,
-  t::Real,
+  μ,
+  t,
   uh::T,
   γ::Tuple{Vararg{Real}}) where T
 
@@ -239,8 +239,8 @@ end
 
 function _matdata_jacobian(
   op::PTFEOperatorFromWeakForm,
-  μ::AbstractArray,
-  t::Real,
+  μ,
+  t,
   xh::T,
   i::Integer,
   γᵢ::Real) where T
