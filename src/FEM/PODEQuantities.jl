@@ -1,5 +1,16 @@
+abstract type PODESolver <: PODESolver end
+
+struct PThetaMethod <: PODESolver
+  nls::NonlinearSolver
+  uh0::Function
+  θ::Float
+  dt::Float
+  t0::Real
+  tf::Real
+end
+
 struct PODESolution{T}
-  solver::ODESolver
+  solver::PODESolver
   op::PODEOperator
   μ::AbstractVector
   u0::PTArray
@@ -7,7 +18,7 @@ struct PODESolution{T}
   tf::Real
 
   function PODESolution(
-    solver::ODESolver,
+    solver::PODESolver,
     op::PODEOperator,
     μ::AbstractVector,
     u0::PTArray,
@@ -53,13 +64,11 @@ function Base.iterate(sol::PODESolution,state)
 end
 
 function collect_solutions(
-  solver::ODESolver,
+  solver::PODESolver,
   op::PTFEOperator,
-  uh0::Function,
-  μ::Table,
-  t0::Real,
-  tf::Real)
+  μ::Table)
 
+  uh0,t0,tf = solver.uh0,solver.t0,solver.tf
   ode_op = get_algebraic_operator(op)
   u0 = get_free_dof_values(uh0(μ))
   uμt = PODESolution(solver,ode_op,μ,u0,t0,tf)
@@ -73,54 +82,47 @@ function collect_solutions(
 end
 
 function collect_residuals(
-  solver::ThetaMethod,
+  solver::PThetaMethod,
   op::PTFEOperator,
-  uh0::Function,
   sols::Vector{<:PTArray},
-  μ::Table,
-  t0::Real,
-  tf::Real)
+  μ::Table)
 
-  dt,θ = solver.dt,solver.θ
+  uh0,dt,t0,tf,θ = solver.uh0,solver.dt,solver.t0,solver.tf,solver.θ
   dtθ = θ == 0.0 ? dt : dt*θ
   times = t0:dt:(tf-dt) .+ dtθ
   ode_op = get_algebraic_operator(op)
   u0 = get_free_dof_values(uh0(μ))
-  solsθ = copy(sols)
-  solsθ .= sols*θ + hcat(u0,sols[2:end]...)*(1-θ)
+  solsθ = sols*θ + [u0,sols[2:end]...]*(1-θ)
+  ptsolsθ = convert(PTArray,solsθ)
   ode_cache = allocate_cache(ode_op,μ,times)
   ode_cache = update_cache!(ode_cache,ode_op,μ,times)
-  nlop = PThetaMethodNonlinearOperator(ode_op,μ,times,dtθ,solsθ,ode_cache,solsθ)
+  nlop = PThetaMethodNonlinearOperator(ode_op,μ,times,dtθ,ptsolsθ,ode_cache,solsθ)
 
   printstyled("Computing fe residuals for every time and parameter\n";color=:blue)
-  ress = residual(nlop,solsθ)
+  ress = residual(nlop,ptsolsθ)
   return NnzMatrix(ress)
 end
 
 function collect_jacobians(
-  solver::ThetaMethod,
+  solver::PThetaMethod,
   op::PTFEOperator,
-  uh0::Function,
   sols::Vector{<:PTArray},
-  μ::Table,
-  t0::Real,
-  tf::Real)
+  μ::Table)
 
-  dt,θ = solver.dt,solver.θ
+  uh0,dt,t0,tf,θ = solver.uh0,solver.dt,solver.t0,solver.tf,solver.θ
   dtθ = θ == 0.0 ? dt : dt*θ
   times = t0:dt:(tf-dt) .+ dtθ
   ode_op = get_algebraic_operator(op)
   u0 = get_free_dof_values(uh0(μ))
-  sols_prev = attach_initial_condition(sols,u0)
-  solsθ = copy(sols)
-  solsθ.nonzero_val .= sols.nonzero_val*θ + sols_prev*(1-θ)
+  solsθ = sols*θ + [u0,sols[2:end]...]*(1-θ)
+  ptsolsθ = convert(PTArray,solsθ)
   ode_cache = allocate_cache(ode_op,μ,times)
   ode_cache = update_cache!(ode_cache,ode_op,μ,times)
-  nlop = PThetaMethodNonlinearOperator(ode_op,μ,times,dtθ,solsθ,ode_cache,solsθ)
+  nlop = PThetaMethodNonlinearOperator(ode_op,μ,times,dtθ,ptsolsθ,ode_cache,ptsolsθ)
 
   nnz_jacs = map(eachindex(op.jacs)) do i
     printstyled("Computing fe jacobian #$i for every time and parameter\n";color=:blue)
-    jacs_i = jacobian(nlop,solsθ,i)
+    jacs_i = jacobian(nlop,ptsolsθ,i)
     nnz_jacs_i = map(NnzVector,jacs_i)
     NnzMatrix(nnz_jacs_i)
   end

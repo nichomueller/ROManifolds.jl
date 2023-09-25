@@ -1,31 +1,29 @@
-abstract type AbstractNnzArray{T,N} <: AbstractArray{T,N} end
-const AbstractNnzVector{T} = AbstractNnzArray{T,1}
-const AbstractNnzMatrix{T} = AbstractNnzArray{T,2}
+abstract type NnzArray{T,N} <: AbstractArray{T,N} end
 
-Base.size(nza::AbstractNnzArray,idx...) = size(nza.nonzero_val,idx...)
-Base.getindex(nza::AbstractNnzArray,idx...) = getindex(nza.nonzero_val,idx...)
-Base.eachcol(nza::AbstractNnzArray) = eachcol(nza.nonzero_val)
-get_nonzero_val(nza::AbstractNnzArray) = nza.nonzero_val
-get_nonzero_idx(nza::AbstractNnzArray) = nza.nonzero_idx
-get_nrows(nza::AbstractNnzArray) = nza.nrows
+Base.size(nza::NnzArray,idx...) = size(nza.nonzero_val,idx...)
+Base.getindex(nza::NnzArray,idx...) = getindex(nza.nonzero_val,idx...)
+Base.eachcol(nza::NnzArray) = eachcol(nza.nonzero_val)
+get_nonzero_val(nza::NnzArray) = nza.nonzero_val
+get_nonzero_idx(nza::NnzArray) = nza.nonzero_idx
+get_nrows(nza::NnzArray) = nza.nrows
 
-function get_nonzero_val(nza::NTuple{N,AbstractNnzArray}) where N
+function get_nonzero_val(nza::NTuple{N,NnzArray}) where N
   hcat(map(get_nonzero_val,nza)...)
 end
 
-function get_nonzero_idx(nza::NTuple{N,AbstractNnzArray}) where N
+function get_nonzero_idx(nza::NTuple{N,NnzArray}) where N
   nz_idx = map(get_nonzero_idx,nza)
   @check all([i == first(nz_idx) for i in nz_idx])
   first(nz_idx)
 end
 
-function get_nrows(nza::NTuple{N,AbstractNnzArray}) where N
+function get_nrows(nza::NTuple{N,NnzArray}) where N
   nrows = map(get_nrows,nza)
   @check all([r == first(nrows) for r in nrows])
   first(nrows)
 end
 
-struct NnzVector{T} <: AbstractNnzVector{T}
+struct NnzVector{T} <: NnzArray{T,1}
   nonzero_val::Vector{T}
   nonzero_idx::Vector{Int}
   nrows::Int
@@ -47,7 +45,7 @@ end
 
 Base.length(nzv::NnzVector) = length(nzv.nonzero_val)
 
-struct NnzMatrix{T} <: AbstractNnzMatrix{T}
+struct NnzMatrix{T} <: NnzArray{T,2}
   nonzero_val::Matrix{T}
   nonzero_idx::Vector{Int}
   nrows::Int
@@ -79,14 +77,14 @@ struct NnzMatrix{T} <: AbstractNnzMatrix{T}
   function NnzMatrix(val::PTArray;nparams=length(val))
     NnzMatrix(get_array(val)...;nparams)
   end
-
-  function NnzMatrix(val::Vector{<:PTArray};nparams=length(testitem(val)))
-    @check all([length(vali) == nparams for vali in val])
-    NnzMatrix(get_array(hcat(val...))...;nparams)
-  end
 end
 
-Base.length(nza::AbstractNnzArray) = length(nza.nparams)
+function NnzArray(val::Vector{<:PTArray};nparams=length(testitem(val)))
+  @check all([length(vali) == nparams for vali in val])
+  NnzMatrix(get_array(hcat(val...))...;nparams)
+end
+
+Base.length(nza::NnzMatrix) = length(nza.nparams)
 num_params(nzm::NnzMatrix) = nzm.nparams
 num_space_dofs(nzm::NnzMatrix) = size(nzm,1)
 num_time_dofs(nzm::NnzMatrix) = Int(size(nzm,2)/nzm.nparams)
@@ -139,16 +137,6 @@ function reduce(a::AbstractMatrix,b::AbstractMatrix,nzm::NnzMatrix)
   end
 end
 
-# function attach_initial_condition(nzm::NnzMatrix,a0::PTArray)
-#   nt = num_time_dofs(nzm)
-#   np = num_params(nzm)
-#   minus_last_nnz = nzm.nonzero_val[:,1:nt*(np-1)]
-#   a0_nnz = map(x->getindex(x,nzm.nonzero_idx),a0.array)
-
-#   nonzero_val = hcat(hcat(a0_nnz...),minus_last_nnz)
-#   NnzMatrix(nonzero_val,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
-# end
-
 function recast_index(nzm::NnzMatrix,idx::Vector{Int})
   nonzero_idx = nzm.nonzero_idx
   nrows = nzm.nrows
@@ -174,4 +162,27 @@ end
 function tpod(nzm::NnzMatrix,args...;kwargs...)
   nonzero_val = tpod(nzm.nonzero_val,args...;kwargs...)
   return NnzMatrix(nonzero_val,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
+end
+
+struct BlockNnzMatrix{T} <: AbstractVector{NnzMatrix{T}}
+  blocks::Vector{NnzMatrix{T}}
+
+  function BlockNnzMatrix(blocks::Vector{NnzMatrix{T}}) where T
+    @check all([length(nzm) == length(blocks[1]) for nzm in blocks[2:end]])
+    new{T}(blocks)
+  end
+end
+
+Base.size(nzm::BlockNnzMatrix,idx...) = map(x->size(x,idx...),nzm.blocks)
+Base.length(nzm::BlockNnzMatrix) = length(nzm.blocks[1])
+Base.getindex(nzm::BlockNnzMatrix,idx...) = nzm.blocks[idx...]
+Base.iterate(nzm::BlockNnzMatrix,args...) = iterate(nzm.blocks,args...)
+get_nfields(nzm::BlockNnzMatrix) = length(nzm.blocks)
+
+function NnzArray(val::Vector{Vector{<:PTArray}})
+  blocks = map(val) do vali
+    array = get_array(hcat(vali...))
+    NnzMatrix(array...)
+  end
+  BlockNnzMatrix(blocks)
 end

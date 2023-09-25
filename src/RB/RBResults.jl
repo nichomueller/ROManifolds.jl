@@ -42,7 +42,7 @@ function test_rb_operator(
   info::RBInfo,
   feop::TransientFEOperator{Affine},
   rbop::TransientRBOperator{Affine},
-  fesolver::ODESolver,
+  fesolver::PODESolver,
   rbsolver::RBSolver;
   ntests=10,
   postprocess=true)
@@ -62,7 +62,7 @@ function test_rb_operator(
   info::RBInfo,
   feop::TransientFEOperator,
   rbop::TransientRBOperator,
-  fesolver::ODESolver,
+  fesolver::PODESolver,
   rbsolver::RBSolver;
   ntests=10,
   postprocess=true)
@@ -87,7 +87,7 @@ end
 function load_test(
   info::RBInfo,
   feop::TransientFEOperator,
-  fesolver::ODESolver,
+  fesolver::PODESolver,
   ntests::Int)
 
   try
@@ -193,7 +193,7 @@ LinearAlgebra.norm(v::AbstractVector,X::AbstractMatrix) = v'*X*v
 function post_process(
   info::RBInfo,
   feop::PTFEOperator,
-  fesolver::ODESolver,
+  fesolver::PODESolver,
   results:: Vector{RBResults})
 
   result = unique(results)
@@ -205,7 +205,7 @@ end
 function Gridap.Visualization.writevtk(
   info::RBInfo,
   feop::PTFEOperator,
-  fesolver::ODESolver,
+  fesolver::PODESolver,
   result::RBResults)
 
   μ = result.μ

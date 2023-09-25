@@ -1,6 +1,6 @@
 function solution_step!(
   uf::PTArray,
-  solver::ThetaMethod,
+  solver::PThetaMethod,
   op::PODEOperator,
   μ::AbstractVector,
   u0::PTArray,

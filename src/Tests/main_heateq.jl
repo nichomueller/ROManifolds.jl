@@ -5,8 +5,10 @@ begin
   include("$root/src/RB/RB.jl")
 
   mesh = "cube2x2.json"
-  test_path = "$root/tests/poisson/unsteady/$mesh"
   bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
+  # mesh = "elasticity_3cyl2D.json"
+  # bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
+  test_path = "$root/tests/poisson/unsteady/$mesh"
   order = 1
   degree = 2
 
@@ -49,7 +51,7 @@ begin
   feop = PTAffineFEOperator(m,lhs,rhs,pspace,trial,test)
   t0,tf,dt,θ = 0.,0.05,0.005,1
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
-  fesolver = ThetaMethod(LUSolver(),dt,θ)
+  fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
 
   ϵ = 1e-4
   save_structures = true
@@ -62,21 +64,3 @@ begin
                 nsnaps_state,nsnaps_system,st_mdeim)
   rbsolver = Backslash()
 end
-
-nsnaps = 10
-μ = realization(feop,nsnaps)
-sols = collect_solutions(fesolver,feop,uh0μ,μ,t0,tf)
-
-#TRY
-# snap = collect_solutions(feop,fesolver,p;nsnaps)
-# save(info,(snap,p))
-snap,p = load(Snapshots,info),load(Table,info)
-rbspace = compress_snapshots(info,snap,feop,fesolver,p)
-
-rb_res = collect_compress_residual(info,feop,fesolver,rbspace,snap,p)
-online_res = collect_residual_contributions(info,feop,fesolver,rb_res)
-
-rb_jacs = collect_compress_jacobians(info,feop,fesolver,rbspace,snap,p)
-online_jac = collect_jacobians_contributions(info,feop,fesolver,rb_jac)
-
-compress_function(f,fesolver,Ω,p)

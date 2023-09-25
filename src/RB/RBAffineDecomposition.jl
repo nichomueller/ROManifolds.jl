@@ -3,6 +3,10 @@ struct RBIntegrationDomain
   times::Vector{<:Real}
   idx::Vector{Int}
 
+  function RBIntegrationDomain(meas::Measure,times::Vector{<:Real},idx::Vector{Int})
+    new(meas,times,idx)
+  end
+
   function RBIntegrationDomain(
     feop::PTFEOperator,
     meas::Measure,
@@ -21,8 +25,17 @@ struct RBIntegrationDomain
     red_trian = view(trian,red_integr_cells)
     red_meas = Measure(red_trian,degree)
     red_times = st_mdeim ? times[interp_idx_time] : times
-    new(red_meas,red_times,interp_idx_space)
+    RBIntegrationDomain(red_meas,red_times,interp_idx_space)
   end
+end
+
+function Arrays.testvalue(::Type{RBIntegrationDomain},feop::PTFEOperator)
+  test = get_test(feop)
+  trian = get_triangulation(test)
+  meas = Measure(trian,0)
+  times = Vector{Real}(undef,0)
+  idx = Vector{Int}(undef,0)
+  RBIntegrationDomain(meas,times,idx)
 end
 
 struct RBAffineDecomposition{T}
@@ -30,232 +43,152 @@ struct RBAffineDecomposition{T}
   basis_time::Vector{Matrix{T}}
   mdeim_interpolation::LU
   integration_domain::RBIntegrationDomain
-end
 
-function collect_compress_residual(
-  info::RBInfo,
-  feop::PTFEOperator,
-  fesolver::ODESolver,
-  rbspace::AbstractRBSpace,
-  snaps::AbstractNnzMatrix,
-  params::Table)
-
-  cres = RBAlgebraicContribution()
-  ad_res,meas = collect_compress_residual(info,feop,fesolver,rbspace,snaps,params)
-  for (ad,m) in zip(ad_res,meas)
-    add_contribution!(cres,m,ad)
+  function RBAffineDecomposition(
+    basis_space::Vector{Matrix{T}},
+    basis_time::Vector{Matrix{T}},
+    mdeim_interpolation::LU,
+    integration_domain::RBIntegrationDomain) where T
+    new{T}(basis_space,basis_time,mdeim_interpolation,integration_domain)
   end
-  return cres
+
+  function RBAffineDecomposition(
+    info::RBInfo,
+    feop::PTFEOperator,
+    snaps::PTArray,
+    meas::Measure,
+    times::Vector{<:Real},
+    args...;
+    kwargs...)
+
+    basis_space,basis_time = compress(info,snaps;ϵ=info.ϵ)
+    proj_bs,proj_bt = compress(basis_space,basis_time,args...;kwargs...)
+    interp_idx_space = get_interpolation_idx(basis_space)
+    interp_idx_time = get_interpolation_idx(basis_time)
+    entire_interp_idx_space = recast_index(basis_space,interp_idx_space)
+
+    interp_bs = basis_space.nonzero_val[interp_idx_space,:]
+    lu_interp = if info.st_mdeim
+      interp_bt = basis_time.nonzero_val[interp_idx_time,:]
+      interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
+      lu(interp_bst)
+    else
+      lu(interp_bs)
+    end
+
+    integr_domain = RBIntegrationDomain(
+      feop,
+      meas,
+      times,
+      interp_idx_space,
+      interp_idx_time,
+      entire_interp_idx_space;
+      info.st_mdeim)
+
+    RBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)
+  end
 end
+
+function Arrays.testvalue(
+  ::Type{RBAffineDecomposition{T}},
+  feop::PTFEOperator) where T
+
+  basis_space = Vector{Matrix{T}}(undef,0)
+  basis_time = Vector{Matrix{T}}(undef,0)
+  mdeim_interpolation = lu(one(T))
+  integration_domain = testvalue(IntegrationDomain,feop)
+  RBAffineDecomposition(basis_space,basis_time,mdeim_interpolation,integration_domain)
+end
+
+# function collect_compress_residual(args...)
+#   cres = RBAlgebraicContribution()
+#   ad_res,meas = _collect_compress_residual(args...)
+#   for (ad,m) in zip(ad_res,meas)
+#     add_contribution!(cres,m,ad)
+#   end
+#   return cres
+# end
 
 function collect_compress_residual(
   info::RBInfo,
   feop::PTFEOperator,
-  fesolver::ODESolver,
+  fesolver::PODESolver,
   rbspace::RBSpace,
-  snaps::NnzMatrix,
-  params::Table)
+  args...)
 
   nsnaps = info.nsnaps_system
   times = get_times(fesolver)
-  ress,meas = collect_residuals(feop,fesolver,snaps,params;nsnaps)
-  ad_res = if isa(meas,AbstractVector)
-    map(eachindex(meas)) do i
-      compress_component(info,ress[i],feop,meas[i],times,rbspace)
-    end
-  else
-    compress_component(info,ress,feop,meas,times,rbspace)
-  end
+  ress,meas = collect_residuals(feop,fesolver,args...;nsnaps)
+  ad_res = compress_component(info,feop,ress,meas,times,rbspace)
   return ad_res,meas
 end
 
-function collect_compress_residual(
-  info::RBInfo,
-  feop::PTFEOperator,
-  fesolver::ODESolver,
-  rbspace::BlockRBSpace,
-  snaps::BlockNnzMatrix,
-  params::Table)
+# function collect_compress_jacobians(
+#   info::RBInfo,
+#   feop::PTFEOperator,
+#   args...)
 
-  nsnaps = info.nsnaps_system
-  times = get_times(fesolver)
-  nfields = get_nfields(rbspace)
-  all_idx = index_pairs(1:nfields,1)
-  ress,meas = collect_residuals(filt_op,fesolver,snaps,params;nsnaps)
-  ad_res = if isa(meas,AbstractVector)
-    map(eachindex(meas)) do i_meas
-      map(all_idx) do i_field
-        feop_i = filter_operator(feop,i_field)
-        rbspace_i = filter_rbspace(rbspace,i_field)
-        compress_component(info,ress[i_meas],feop_i,meas[i_meas],times,rbspace_i)
-      end
-    end
-  else
-    map(all_idx) do i_field
-      feop_i = filter_operator(feop,i_field)
-      rbspace_i = filter_rbspace(rbspace,i_field)
-      compress_component(info,ress,feop_i,meas,times,rbspace_i)
-    end
-  end
-  return ad_res,meas
-end
+#   njacs = length(feop.jacs)
+#   cjacs = Vector{AbstractRBAlgebraicContribution}(undef,njacs)
+#   for i = 1:njacs
+#     cjac = _collect_compress_jacobian(info,feop,args...;i)
+#     cjacs[i] = copy(cjac)
+#   end
+#   return cjacs
+# end
 
 function collect_compress_jacobians(
   info::RBInfo,
   feop::PTFEOperator,
+  fesolver::PODESolver,
+  rbspace::RBSpace,
   args...)
-
-  njacs = length(feop.jacs)
-  cjacs = Vector{RBAlgebraicContribution}(undef,njacs)
-  for i = 1:njacs
-    cjac = collect_compress_jacobian(info,feop,args...;i)
-    cjacs[i] = copy(cjac)
-  end
-  return cjacs
-end
-
-function collect_compress_jacobian(
-  info::RBInfo,
-  feop::PTFEOperator,
-  fesolver::ODESolver,
-  rbspace::AbstractRBSpace,
-  snaps::AbstractNnzMatrix,
-  params::Table;
-  i=1)
-
-  cjac = RBAlgebraicContribution()
-  ad_jac,meas = collect_compress_jacobian(info,feop,fesolver,rbspace,snaps,params;i)
-  for (ad,m) in zip(ad_jac,meas)
-    add_contribution!(cjac,m,ad)
-  end
-  return cjac
-end
-
-function collect_compress_jacobian(
-  info::RBInfo,
-  feop::PTFEOperator,
-  fesolver::ODESolver,
-  rbspace::AbstractRBSpace,
-  snaps::AbstractNnzMatrix,
-  params::Table;
-  i=1)
 
   nsnaps = info.nsnaps_system
   times = get_times(fesolver)
-  function combine_projections(x,y)
-    if i == 1
-      fesolver.θ*x+(1-fesolver.θ)*y
-    else
-      x-y
-    end
+
+  njacs = length(feop.jacs)
+  ad_jacs = Vector{AbstractRBAlgebraicContribution}(undef,njacs)
+  for i = 1:njacs
+    combine_projections = (x,y) -> i == 1 ? fesolver.θ*x+(1-fesolver.θ)*y : x-y
+    jacs,meas = collect_jacobians(feop,fesolver,args...;i,nsnaps)
+    ad_jacs[i] = compress_component(info,feop,jacs,meas,times,rbspace,rbspace;combine_projections)
   end
-
-  jacs,meas = collect_jacobians(feop,fesolver,snaps,params;nsnaps,i)
-  compress_component(info,jacs,feop,meas,times,rbspace,rbspace;combine_projections)
+  return ad_jacs
 end
-
-# function collect_compress_jacobian(
-#   info::RBInfo,
-#   feop::PTFEOperator,
-#   fesolver::ODESolver,
-#   rbspace::BlockRBSpace,
-#   snaps::MultiFieldSnapshots,
-#   params::Table;
-#   i=1)
-
-#   nsnaps = info.nsnaps_system
-#   nfields = get_nfields(rbspace)
-#   all_idx = index_pairs(1:nfields,1:nfields)
-#   times = get_times(fesolver)
-#   function combine_projections(x,y)
-#     if i == 1
-#       fesolver.θ*x+(1-fesolver.θ)*y
-#     else
-#       x-y
-#     end
-#   end
-
-#   ad_jac = lazy_map(all_idx) do filter
-#     filt_op = filter_operator(feop,filter)
-#     filt_rbspace = filter_rbspace(rbspace,filter[1]),filter_rbspace(rbspace,filter[2])
-
-#     jacs = collect_jacobians(filt_op,fesolver,snaps,params,trian;nsnaps,i)
-#     compress_component(info,jacs,filt_op,trian,times,filt_rbspace...;combine_projections)
-#   end
-#   return ad_jac
-# end
 
 function compress_component(
   info::RBInfo,
-  snap::Vector{<:AbstractNnzMatrix},
   feop::PTFEOperator,
-  meas::Vector{<:Measure},
+  snaps::Vector{PTArray{T}},
+  meas::Vector{Measure},
   args...;
-  kwargs...)
+  kwargs...) where T
 
-  map(eachindex(meas)) do i
-    compress_component(info,snap[i],feop,meas[i],args...;kwargs...)
+  contrib = RBAlgebraicContribution(T)
+  map(eachindex(meas)) do i_meas
+    si,mi = snaps[i_meas],meas[i_meas]
+    ci = compress_component(info,feop,si,mi,args...;kwargs...)
+    add_contribution!(contrib,mi,ci)
   end
 end
 
 function compress_component(
   info::RBInfo,
-  snap::BlockNnzMatrix,
   feop::PTFEOperator,
+  snaps::PTArray{T},
   meas::Measure,
-  times::Vector{<:Real},
-  rbspace::BlockRBSpace...;
-  kwargs...)
-
-  nfields = get_nfields(snap)
-  all_idx = index_pairs(1:nfields,1:nfields)
-  map(all_idx) do idx
-    row,col = idx
-    feop_i = filter_operator(feop,filter)
-    rbspace_i = map(filter_rbspace,rbspace,idx)
-    compress_component(info,snap[col],feop_i,meas,times,rbspace_i...;kwargs...)
-  end
-end
-
-function RBAffineDecomposition(
-  info::RBInfo,
-  snap::AbstractNnzMatrix,
-  feop::PTFEOperator,
-  meas::Measure,
-  times::Vector{<:Real},
   args...;
-  kwargs...)
+  kwargs...) where T
 
-  basis_space,basis_time = tpod(snap;ϵ=info.ϵ)
-  proj_bs,proj_bt = compress(basis_space,basis_time,args...;kwargs...)
-  interp_idx_space,interp_idx_time = get_interpolation_idx(basis_space,basis_time)
-  entire_interp_idx_space = recast_index(basis_space,interp_idx_space)
-
-  interp_bs = basis_space.nonzero_val[interp_idx_space,:]
-  lu_interp = if info.st_mdeim
-    interp_bt = basis_time.nonzero_val[interp_idx_time,:]
-    interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
-    lu(interp_bst)
-  else
-    lu(interp_bs)
-  end
-
-  integr_domain = RBIntegrationDomain(
-    feop,
-    meas,
-    times,
-    interp_idx_space,
-    interp_idx_time,
-    entire_interp_idx_space;
-    info.st_mdeim)
-
-  RBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)
+  contrib = RBAlgebraicContribution(T)
+  ad = RBAffineDecomposition(info,feop,snaps,meas,args...;kwargs...)
+  add_contribution!(contrib,meas,ad)
+  contrib
 end
 
-function get_interpolation_idx(basis_space::NnzMatrix,basis_time::NnzMatrix)
-  idx_space = get_interpolation_idx(basis_space.nonzero_val)
-  idx_time = get_interpolation_idx(basis_time.nonzero_val)
-  idx_space,idx_time
+function get_interpolation_idx(nzm::NnzMatrix)
+  get_interpolation_idx(get_nonzero_val(nzm))
 end
 
 function get_interpolation_idx(basis::AbstractMatrix)
@@ -358,4 +291,106 @@ function find_cells(::Val{false},idx::Vector{Int},cell_dof_ids)
     cells = isempty(cell) ? cells : push!(cells,cell)
   end
   unique(reduce(vcat,cells))
+end
+
+# Multifield interface
+struct RBBlockAffineDecomposition{T}
+  blocks::Matrix{RBAffineDecomposition{T}}
+  touched::Matrix{Bool}
+
+  function RBBlockAffineDecomposition(
+    blocks::Matrix{RBAffineDecomposition{T}},
+    touched::Matrix{Bool}) where T
+
+    @check size(blocks) == size(touched)
+    new{T}(blocks,touched)
+  end
+end
+
+function Arrays.testvalue(
+  ::Type{RBBlockAffineDecomposition{T}},
+  feop::PTFEOperator,
+  nfields::Int) where T
+
+  tval = testvalue(RBAffineDecomposition{T},feop)
+  blocks = Matrix{RBAffineDecomposition{T}}(undef,nfields)
+  touched = Matrix{Bool}(undef,nfields)
+  @inbounds for n = 1:nfields
+    blocks[n] = copy(tval)
+    touched[n] = true
+  end
+  RBBlockAffineDecomposition(blocks,touched)
+end
+
+function compress_component(
+  info::RBInfo,
+  feop::PTFEOperator,
+  snaps::Vector{PTArray{T}},
+  meas::Measure,
+  times::Vector{<:Real},
+  rbspace::BlockRBSpace...;
+  kwargs...) where T
+
+  contrib = RBBlockAlgebraicContribution(T)
+  nfields = get_nfields(testitem(rbspace))
+  all_fields = index_pairs(1:nfields,1)
+  blockad = testvalue(RBBlockAffineDecomposition{T},feop,nfields)
+  @inbounds for i_field = all_fields
+    row,col = all_fields
+    feop_i = filter_operator(feop,i_field)
+    rbspace_i = map(x->filter_rbspace(x,i_field),rbspace)
+    snaps_i = snaps[col]
+    if iszero(snaps_i)
+      blockad.touched[i_field...] = false
+    else
+      blockad.block[i_field...] = RBAffineDecomposition(
+        info,
+        feop_i,
+        snaps_i,
+        meas,
+        times,
+        rbspace_i...;
+        kwargs...)
+    end
+  end
+  add_contribution!(contrib,meas,blockad)
+  contrib
+end
+
+function compress_component(
+  info::RBInfo,
+  feop::PTFEOperator,
+  snaps::Vector{Vector{PTArray{T}}},
+  meas::Vector{Measure},
+  times::Vector{<:Real},
+  rbspace::BlockRBSpace...;
+  kwargs...) where T
+
+  contrib = RBBlockAlgebraicContribution(T)
+  nfields = get_nfields(testitem(rbspace))
+  all_fields = index_pairs(1:nfields,1)
+  map(eachindex(meas)) do i_meas
+    si,mi = snaps[i_meas],meas[i_meas]
+    blockad = testvalue(RBBlockAffineDecomposition{T},feop,nfields)
+    @inbounds for i_field = all_fields
+      row,col = all_fields
+      feop_i = filter_operator(feop,i_field)
+      rbspace_i = map(x->filter_rbspace(x,i_field),rbspace)
+      snaps_i = si[col]
+      if iszero(snaps_i)
+        blockad.touched[i_field...] = false
+      else
+        blockad.block[i_field...] = RBAffineDecomposition(
+          info,
+          feop_i,
+          snaps_i,
+          mi,
+          times,
+          rbspace_i...;
+          kwargs...)
+      end
+    end
+    add_contribution!(contrib,meas,blockad)
+    contrib
+  end
 end

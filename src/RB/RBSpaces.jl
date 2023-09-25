@@ -31,46 +31,76 @@ struct BlockRBSpace{T} <: AbstractRBSpace{T}
   end
 end
 
+get_nfields(rb::BlockRBSpace) = length(rb.basis_space)
+
+function get_reduced_basis(
+  info::RBInfo,
+  feop::PTFEOperator,
+  snaps::Vector{<:PTArray},
+  args...)
+
+  basis_space,basis_time = compress(info,feop,snaps,args...)
+  RBSpace(basis_space,basis_time)
+end
+
+function get_reduced_basis(
+  info::RBInfo,
+  feop::PTFEOperator,
+  snaps::Vector{Vector{<:PTArray}},
+  args...)
+
+  basis_space,basis_time = compress(info,feop,snaps,args...)
+  BlockRBSpace(basis_space,basis_time)
+end
+
 abstract type PODStyle end
 struct DefaultPOD <: PODStyle end
 struct SteadyPOD <: PODStyle end
 struct TranposedPOD <: PODStyle end
 
-function compress_snapshots(info::RBInfo,feop::PTFEOperator,nzm::NnzMatrix,args...)
+function compress(info::RBInfo,snaps::PTArray)
+  nzm = NnzArray(snaps)
+  ϵ = info.ϵ
+  steady = num_time_dofs(nzm) == 1 ? SteadyPOD() : DefaultPOD()
+  transposed = size(nzm,1) < size(nzm,2) ? TranposedPOD() : DefaultPOD()
+  compress(nzm,steady,transposed;ϵ)
+end
+
+function compress(info::RBInfo,feop::PTFEOperator,snaps::Vector{<:PTArray},args...)
+  nzm = NnzArray(snaps)
   ϵ = info.ϵ
   energy_norm = info.energy_norm
   norm_matrix = get_norm_matrix(energy_norm,feop)
   steady = num_time_dofs(nzm) == 1 ? SteadyPOD() : DefaultPOD()
   transposed = size(nzm,1) < size(nzm,2) ? TranposedPOD() : DefaultPOD()
-  basis_space,basis_time = compress_snapshots(nzm,norm_matrix,steady,transposed;ϵ)
-  RBSpace(basis_space,basis_time)
+  compress(nzm,norm_matrix,steady,transposed;ϵ)
 end
 
-function compress_snapshots(
+function compress(
   info::RBInfo,
   feop::PTFEOperator,
-  nzm::BlockNnzMatrix,
+  snaps::Vector{Vector{<:PTArray}},
   args...;
   compute_supremizers=false,
   kwargs...)
 
-  nfields = length(nzm)
+  nzm = NnzArray(snaps)
+  nfields = get_nfields(nzm)
   all_idx = index_pairs(1:nfields,1)
   rb = map(all_idx) do i
     feopi = filter_operator(feop,i)
-    nzmi = nzm[i]
-    compress_snapshots(info,feopi,nzmi)
+    compress(info,feopi,nzm[i])
   end
   bases_space = map(get_basis_space,rb)
   bases_time = map(get_basis_time,rb)
   if compute_supremizers
-    add_space_supremizers!(bases_space,feop,nzm;norm_matrix)
-    add_time_supremizers!(bases_time;kwargs...)
+    bases_space = add_space_supremizers(bases_space,feop,snaps,args...;norm_matrix)
+    bases_time = add_time_supremizers(bases_time;kwargs...)
   end
-  BlockRBSpace(basis_space,basis_time)
+  BlockRBSpace(bases_space,bases_time)
 end
 
-function compress_snapshots(
+function compress(
   nzm::NnzMatrix,
   norm_matrix,
   args...;
@@ -83,7 +113,7 @@ function compress_snapshots(
   basis_space,basis_time
 end
 
-function compress_snapshots(
+function compress(
   nzm::NnzMatrix,
   norm_matrix,
   ::DefaultPOD,
@@ -100,7 +130,7 @@ end
 
 for T in (:DefaultPOD,:TranposedPOD)
   @eval begin
-    function compress_snapshots(
+    function compress(
       nzm::NnzMatrix,
       norm_matrix,
       ::SteadyPOD,
@@ -114,9 +144,10 @@ for T in (:DefaultPOD,:TranposedPOD)
   end
 end
 
-function add_space_supremizers!(
+function add_space_supremizers(
   bases_space::Vector{<:Matrix},
   feop::PTFEOperator,
+  snaps::Vector{Vector{<:PTArray}},
   args...;
   kwargs...)
 
@@ -126,30 +157,30 @@ function add_space_supremizers!(
   for idx in all_idx
     printstyled("Computing supremizers in space for dual field $idx\n";color=:blue)
     feop_i = filter_operator(feop,idx)
-    supr_i = space_supremizers(bs_dual[idx],feop_i,args...)
+    supr_i = space_supremizers(bs_dual[idx],feop_i,snaps[idx],args...)
     orth_supr_i = gram_schmidt(supr_i,bs_primal)
     bs_primal = hcat(bs_primal,orth_supr_i)
   end
   return bs_primal,bs_dual
 end
 
-# function space_supremizers(
-#   basis_space::AbstractMatrix,
-#   snaps::BlockNnzMatrix,
-#   feop::PTFEOperator,
-#   fesolver::ODESolver,
-#   params::Table)
+function space_supremizers(
+  basis_space::Matrix,
+  feop::PTFEOperator,
+  snaps::Vector{<:PTArray},
+  fesolver::PODESolver,
+  args...)
 
-#   collector = CollectJacobiansMap(fesolver,feop)
-#   constraint_mat = lazy_map(collector,snaps,params)
-#   if length(constraint_mat) == 1
-#     return constraint_mat*basis_space # THIS IS WRONG
-#   else
-#     return map(*,constraint_mat,snaps) # THIS IS WRONG
-#   end
-# end
+  constraint_mat = collect_jacobians(fesolver,feop,snaps,args...)
+  if length(constraint_mat) == 1
+    return constraint_mat*basis_space
+  else
+    @assert length(constraint_mat) == length(snaps)
+    return map(*,constraint_mat,snaps)
+  end
+end
 
-function add_time_supremizers!(bases_time::Vector{<:Matrix};ttol::Real)
+function add_time_supremizers(bases_time::Vector{<:Matrix};ttol::Real)
   bt_primal,bt_dual... = bases_time
   n_dual_fields = length(bt_dual)
   all_idx = index_pairs(1:n_dual_fields,1)
@@ -161,8 +192,7 @@ function add_time_supremizers!(bases_time::Vector{<:Matrix};ttol::Real)
   return bt_primal,btdual
 end
 
-function add_time_supremizers(bases_time::AbstractMatrix...;ttol=1e-2)
-  basis_u,basis_p = bases_time
+function add_time_supremizers(basis_u::Matrix,basis_p::Matrix;ttol=1e-2)
   basis_up = basis_u'*basis_p
 
   function enrich(
