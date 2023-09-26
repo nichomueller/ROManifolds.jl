@@ -88,12 +88,12 @@ function collect_solutions(
   u0 = get_free_dof_values(uh0(μ))
   uμt = PODESolution(fesolver,ode_op,μ,u0,t0,tf)
   num_iter = Int(tf/fesolver.dt)
-  solutions = allocate_solution(ode_op,num_iter)
+  sols = allocate_solution(ode_op,num_iter)
   for (u,t,n) in uμt
     printstyled("Computing fe solution at time $t for every parameter\n";color=:blue)
-    solutions[n] = get_solution(ode_op,u)
+    sols[n] = get_solution(ode_op,u)
   end
-  return solutions
+  return Snapshots(sols)
 end
 
 for f in (:allocate_solution,:get_solution)
@@ -122,28 +122,74 @@ function get_solution(fe::MultiFieldFESpace,free_values::PTArray)
   blocks = map(1:length(fe.spaces)) do i
     restrict_to_field(fe,free_values,i)
   end
-  PTArray.(blocks)
+  PTArray(blocks)
 end
 
-function center_solution(
-  solver::PThetaMethod,
-  sols::Vector{<:PTArray{T}},
-  μ::Table) where T
+function collect_residuals(
+  fesolver::PThetaMethod,
+  feop::PTFEOperator,
+  sols::PTArray,
+  μ::Table)
 
-  uh0 = solver.uh0
-  u0 = get_free_dof_values(uh0(μ))
-  solsθ = sols*θ + [u0,sols[2:end]...]*(1-θ)
-  to_ptarray(PTArray{T},solsθ)
+  b = allocate_residual(feop,sols)
+  collect_residuals!(b,fesolver,feop,sols,μ)
 end
 
-function get_at_params(range::UnitRange,sols::Vector{<:PTArray{T}}) where T
-  time_ndofs = length(sols)
-  nparams = length(range)
-  array = Vector{T}(undef,time_ndofs*nparams)
-  for nt in eachindex(sols)
-    for np in range
-      array[(nt-1)*time_ndofs+np] = sols[nt][np]
-    end
-  end
-  return PTArray(array)
+function collect_residuals!(
+  b::PTArray,
+  fesolver::PThetaMethod,
+  feop::PTFEOperator,
+  sols::PTArray,
+  μ::Table)
+
+  dt,θ = fesolver.dt,fesolver.θ
+  dtθ = θ == 0.0 ? dt : dt*θ
+  times = get_times(fesolver)
+
+  ode_op = get_algebraic_operator(feop)
+  ode_cache = allocate_cache(ode_op,μ,times)
+  ode_cache = update_cache!(ode_cache,ode_op,μ,times)
+
+  nlop = PThetaMethodNonlinearOperator(ode_op,μ,times,dtθ,sols,ode_cache,sols)
+  separate_contribs = Val(true)
+
+  printstyled("Computing fe residuals for every time and parameter\n";color=:blue)
+  ress,meas = residual!(b,nlop,sols,separate_contribs)
+  return NnzMatrix.(ress),meas
+end
+
+function collect_jacobians(
+  fesolver::PThetaMethod,
+  feop::PTFEOperator,
+  sols::PTArray,
+  μ::Table;
+  kwargs...)
+
+  A = allocate_jacobian(feop,sols)
+  collect_jacobians!(A,fesolver,feop,sols,μ;kwargs...)
+end
+
+function collect_jacobians!(
+  A::PTArray,
+  fesolver::PThetaMethod,
+  feop::PTFEOperator,
+  sols::PTArray,
+  μ::Table;
+  i=1)
+
+  dt,θ = fesolver.dt,fesolver.θ
+  dtθ = θ == 0.0 ? dt : dt*θ
+  times = get_times(fesolver)
+
+  ode_op = get_algebraic_operator(feop)
+  ode_cache = allocate_cache(ode_op,μ,times)
+  ode_cache = update_cache!(ode_cache,ode_op,μ,times)
+
+  nlop = PThetaMethodNonlinearOperator(ode_op,μ,times,dtθ,sols,ode_cache,sols)
+  separate_contribs = Val(true)
+
+  printstyled("Computing fe jacobian #$i for every time and parameter\n";color=:blue)
+  jacs_i,meas = jacobian!(A,nlop,sols,i,separate_contribs)
+  nnz_jac_i = map(x->NnzMatrix(map(NnzVector,x)),jacs_i)
+  return nnz_jac_i,meas
 end
