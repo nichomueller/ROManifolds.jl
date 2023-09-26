@@ -29,15 +29,30 @@ function CellData.add_contribution!(
 end
 
 struct RBAlgebraicContribution{T} <: AbstractRBAlgebraicContribution{T}
-  dict::IdDict{Measure,RBAffineDecompositions{T}}
+  dict::IdDict{Measure,RBAffineDecomposition{T}}
   function RBAlgebraicContribution(::Type{T}) where T
-    new{T}(IdDict{Measure,RBAffineDecompositions{T}}())
+    new{T}(IdDict{Measure,RBAffineDecomposition{T}}())
   end
 end
 
 struct RBBlockAlgebraicContribution{T} <: AbstractRBAlgebraicContribution{T}
-  dict::IdDict{Measure,RBBlockAffineDecompositions{T}}
-  function RBBlockAlgebraicContribution(::Type{T}) where T
-    new{T}(IdDict{Measure,RBBlockAlgebraicContributions{T}}())
+  block::Matrix{RBAlgebraicContribution{T}}
+  touched::Vector{Int}
+
+  function RBBlockAlgebraicContribution(
+    block::Matrix{RBAlgebraicContribution{T}},
+    touched::Vector{Int}) where T
+
+    new{T}(block,touched)
   end
+end
+
+function Arrays.testvalue(
+  ::Type{RBBlockAlgebraicContribution{T}},
+  feop::PTFEOperator,
+  size::Vararg{Int}) where T
+
+  blocks = Matrix{RBAlgebraicContribution{T}}(undef,size)
+  touched = Matrix{Bool}(undef,size)
+  RBBlockAffineDecomposition(blocks,touched)
 end

@@ -79,7 +79,10 @@ struct NnzMatrix{T} <: NnzArray{T,2}
   end
 end
 
-function NnzArray(val::Vector{<:PTArray};nparams=length(testitem(val)))
+function NnzArray(
+  val::Vector{<:PTArray{Vector{T}}};
+  nparams=length(testitem(val))) where T
+
   @check all([length(vali) == nparams for vali in val])
   NnzMatrix(get_array(hcat(val...))...;nparams)
 end
@@ -122,13 +125,13 @@ function recast(nzm::NnzMatrix{T}) where T
   m
 end
 
-function reduce(a::AbstractMatrix,nzm::NnzMatrix{T}) where T
+function compress(a::AbstractMatrix,nzm::NnzMatrix{T}) where T
   m = zeros(T,nzm.nrows,size(nzm,2))
   m[nzm.nonzero_idx,:] = nzm.nonzero_val
   [a'*v for v in eachcol(m)]
 end
 
-function reduce(a::AbstractMatrix,b::AbstractMatrix,nzm::NnzMatrix)
+function compress(a::AbstractMatrix,b::AbstractMatrix,nzm::NnzMatrix)
   irow,icol = from_vec_to_mat_idx(nzm.nonzero_idx,nzm.nrows)
   ncols = maximum(icol)
   map(eachcol(nzm)) do nzv
@@ -137,7 +140,7 @@ function reduce(a::AbstractMatrix,b::AbstractMatrix,nzm::NnzMatrix)
   end
 end
 
-function recast_index(nzm::NnzMatrix,idx::Vector{Int})
+function recast_idx(nzm::NnzMatrix,idx::Vector{Int})
   nonzero_idx = nzm.nonzero_idx
   nrows = nzm.nrows
   entire_idx = nonzero_idx[idx]
@@ -164,6 +167,89 @@ function tpod(nzm::NnzMatrix,args...;kwargs...)
   return NnzMatrix(nonzero_val,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
 end
 
+function collect_residuals(
+  solver::PThetaMethod,
+  op::PTFEOperator,
+  sols::Snapshots,
+  μ::Table;
+  kwargs...)
+
+  b = allocate_residual(op,sols)
+  collect_residuals!(b,solver,op,sols,μ;kwargs...)
+end
+
+function collect_residuals!(
+  b::PTArray,
+  solver::PThetaMethod,
+  op::PTFEOperator,
+  sols::Snapshots,
+  μ::Table;
+  nsnaps=30)
+
+  uh0,dt,θ = solver.uh0,solver.dt,solver.θ
+  dtθ = θ == 0.0 ? dt : dt*θ
+  times = get_times(solver)
+
+  ode_op = get_algebraic_operator(op)
+
+  sols,μ = sols[1:nsnaps],μ[1:nsnaps]
+  u0 = get_free_dof_values(uh0(μ))
+  solsθ = sols*θ + [u0,sols[2:end]...]*(1-θ)
+  ptsolsθ = convert(PTArray,solsθ)
+
+  ode_cache = allocate_cache(ode_op,μ,times)
+  ode_cache = update_cache!(ode_cache,ode_op,μ,times)
+
+  nlop = PThetaMethodNonlinearOperator(ode_op,μ,times,dtθ,ptsolsθ,ode_cache,solsθ)
+  separate_contribs = Val(true)
+
+  printstyled("Computing fe residuals for every time and parameter\n";color=:blue)
+  ress,meas = residual!(b,nlop,ptsolsθ,separate_contribs)
+  return NnzMatrix.(ress),meas
+end
+
+function collect_jacobian(
+  solver::PThetaMethod,
+  op::PTFEOperator,
+  sols::Snapshots,
+  μ::Table;
+  kwargs...)
+
+  A = allocate_jacobian(op,sols)
+  collect_jacobians!(A,solver,op,sols,μ;kwargs...)
+end
+
+function collect_jacobian!(
+  A::PTArray,
+  solver::PThetaMethod,
+  op::PTFEOperator,
+  sols::Snapshots,
+  μ::Table;
+  nsnaps=30,i=1)
+
+  uh0,dt,θ = solver.uh0,solver.dt,solver.θ
+  dtθ = θ == 0.0 ? dt : dt*θ
+  times = get_times(solver)
+
+  ode_op = get_algebraic_operator(op)
+
+  sols,μ = sols[1:nsnaps],μ[1:nsnaps]
+  u0 = get_free_dof_values(uh0(μ))
+  solsθ = sols*θ + [u0,sols[2:end]...]*(1-θ)
+  ptsolsθ = convert(PTArray,solsθ)
+
+  ode_cache = allocate_cache(ode_op,μ,times)
+  ode_cache = update_cache!(ode_cache,ode_op,μ,times)
+
+  nlop = PThetaMethodNonlinearOperator(ode_op,μ,times,dtθ,ptsolsθ,ode_cache,ptsolsθ)
+  separate_contribs = Val(true)
+
+  printstyled("Computing fe jacobian #$i for every time and parameter\n";color=:blue)
+  jacs_i,meas = jacobian!(A,nlop,ptsolsθ,i,separate_contribs)
+  nnz_jac_i = map(x->NnzMatrix(map(NnzVector,x)),jacs_i)
+  return nnz_jac_i,meas
+end
+
 struct BlockNnzMatrix{T} <: AbstractVector{NnzMatrix{T}}
   blocks::Vector{NnzMatrix{T}}
 
@@ -173,16 +259,16 @@ struct BlockNnzMatrix{T} <: AbstractVector{NnzMatrix{T}}
   end
 end
 
-Base.size(nzm::BlockNnzMatrix,idx...) = map(x->size(x,idx...),nzm.blocks)
-Base.length(nzm::BlockNnzMatrix) = length(nzm.blocks[1])
-Base.getindex(nzm::BlockNnzMatrix,idx...) = nzm.blocks[idx...]
-Base.iterate(nzm::BlockNnzMatrix,args...) = iterate(nzm.blocks,args...)
-get_nfields(nzm::BlockNnzMatrix) = length(nzm.blocks)
-
-function NnzArray(val::Vector{Vector{<:PTArray}})
+function NnzArray(val::Vector{<:PTArray{Vector{Vector{T}}}}) where T
   blocks = map(val) do vali
     array = get_array(hcat(vali...))
     NnzMatrix(array...)
   end
   BlockNnzMatrix(blocks)
 end
+
+Base.size(nzm::BlockNnzMatrix,idx...) = map(x->size(x,idx...),nzm.blocks)
+Base.length(nzm::BlockNnzMatrix) = length(nzm.blocks[1])
+Base.getindex(nzm::BlockNnzMatrix,idx...) = nzm.blocks[idx...]
+Base.iterate(nzm::BlockNnzMatrix,args...) = iterate(nzm.blocks,args...)
+get_nfields(nzm::BlockNnzMatrix) = length(nzm.blocks)

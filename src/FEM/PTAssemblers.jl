@@ -20,9 +20,10 @@ end
 function FESpaces.collect_cell_vector(
   test::FESpace,
   a::PTDomainContribution,
-  strian::Triangulation)
+  meas::Measure)
 
-  scell_vec = get_contribution(a,strian)
+  strian = get_triangulation(meas)
+  scell_vec = get_contribution(a,meas)
   cell_vec,trian = move_contributions(scell_vec,strian)
   @assert ndims(eltype(cell_vec)) == 1
   cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
@@ -58,9 +59,10 @@ function FESpaces.collect_cell_matrix(
   trial::FESpace,
   test::FESpace,
   a::PTDomainContribution,
-  strian::Triangulation)
+  meas::Measure)
 
-  scell_mat = get_contribution(a,strian)
+  strian = get_triangulation(meas)
+  scell_mat = get_contribution(a,meas)
   cell_mat,trian = move_contributions(scell_mat,strian)
   @assert ndims(eltype(cell_mat)) == 2
   cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)

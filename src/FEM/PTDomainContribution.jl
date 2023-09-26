@@ -13,7 +13,7 @@ CellData.num_domains(a::PTDomainContribution) = length(a.dict)
 CellData.get_domains(a::PTDomainContribution) = keys(a.dict)
 
 function CellData.get_contribution(a::PTDomainContribution,meas::Measure)
-  if haskey(a.dict,meas)
+  if haskey(a.dict,meas) || haskey(a.dict,get_parent(meas))
      return a.dict[meas]
   else
     @unreachable """\n

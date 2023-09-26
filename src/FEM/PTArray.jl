@@ -132,6 +132,12 @@ function Arrays.testitem(a::PTArray{T}) where T
   end
 end
 
+function Arrays.setsize!(a::PTArray{<:CachedArray},size::Vararg{Int})
+  @inbounds for i in eachindex(a)
+    setsize!(a[i],size)
+  end
+end
+
 get_at_index(::Int,x) = x
 get_at_index(i::Int,x::PTArray) = x[i]
 function get_at_index(i::Int,x::NTuple{N,Union{AbstractArrayBlock,PTArray}}) where N
@@ -212,11 +218,6 @@ function Base.similar(a::NonaffinePTArray{T}) where T
   PTArray(b)
 end
 
-function Base.convert(::Type{PTArray{T}},a::Vector{NonaffinePTArray{T}}) where T
-  arrays = vcat(map(get_array,a)...)
-  PTArray(arrays)
-end
-
 function Base.show(io::IO,o::NonaffinePTArray{T}) where T
   print(io,"Nonaffine PTArray of type $T and length $(length(o.array))")
 end
@@ -261,6 +262,16 @@ function LinearAlgebra.fillstored!(a::NonaffinePTArray,z)
     ai = a[i]
     fillstored!(ai,z)
   end
+end
+
+function Arrays.CachedArray(a::NonaffinePTArray)
+  ai = testitem(a)
+  ci = CachedArray(ai)
+  array = Vector{typeof(ci)}(undef,length(a))
+  @inbounds for i in eachindex(a)
+    array[i] = CachedArray(a.array[i])
+  end
+  PTArray(array)
 end
 
 function Base.map(f,a::PTArray)
@@ -407,12 +418,6 @@ Base.setindex!(a::AffinePTArray,v,i...) = a.array = v
 Base.copy(a::AffinePTArray) = PTArray(copy(a.array),a.len)
 Base.similar(a::AffinePTArray) = PTArray(similar(a.array),a.len)
 
-function Base.convert(::Type{PTArray{T}},a::Vector{AffinePTArray{T}}) where T
-  array = vcat(map(get_array,a)...)
-  n = length(array)
-  PTArray(array,n)
-end
-
 function Base.show(io::IO,o::AffinePTArray{T}) where T
   print(io,"Affine PTArray of type $T and length $(o.len)")
 end
@@ -446,7 +451,15 @@ for f in (:(Base.hcat),:(Base.vcat))
 end
 
 Base.fill!(a::AffinePTArray,z) = fill!(a.array,z)
+
 LinearAlgebra.fillstored!(a::AffinePTArray,z) = fillstored!(a.array,z)
+
+function Arrays.CachedArray(a::AffinePTArray)
+  n = length(a)
+  ai = testitem(a)
+  ci = CachedArray(ai)
+  PTArray(array,n)
+end
 
 function Base.map(f,a::AffinePTArray)
   n = length(a)

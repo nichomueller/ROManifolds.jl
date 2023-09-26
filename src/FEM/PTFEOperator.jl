@@ -145,6 +145,44 @@ function residual!(
   b
 end
 
+function residual!(
+  b::PTArray,
+  op::PTFEOperatorFromWeakForm,
+  μ,
+  t,
+  xh::T,
+  cache,
+  ::Val{true}) where T
+
+  V = get_test(op)
+  v = get_fe_basis(V)
+  dc = op.res(μ,t,xh,v)
+  nmeas = num_domains(dc)
+  meas = get_domains(dc)
+  bvec = Vector{typeof(b)}(undef,nmeas)
+  for n in 1:nmeas
+    vecdata = collect_cell_vector(V,dc,meas[n])
+    assemble_vector_add!(b,op.assem,vecdata)
+    bvec[n] = copy(b)
+  end
+  bvec,meas
+end
+
+function residual!(
+  b::PTArray,
+  op::PTFEOperatorFromWeakForm,
+  μ,
+  t,
+  xh::T,
+  cache,
+  meas::Measure) where T
+
+  V = get_test(op)
+  v = get_fe_basis(V)
+  vecdata = collect_cell_vector(V,op.res(μ,t,xh,v),meas)
+  assemble_vector_add!(b,op.assem,vecdata)
+end
+
 function allocate_jacobian(
   op::PTFEOperatorFromWeakForm,
   uh::T,
@@ -187,6 +225,53 @@ function jacobian!(
   matdata = _matdata_jacobian(op,μ,t,uh,i,γᵢ)
   assemble_matrix_add!(A,op.assem,matdata)
   A
+end
+
+function jacobian!(
+  A::PTArray,
+  op::PTFEOperatorFromWeakForm,
+  μ,
+  t,
+  uh::T,
+  i::Integer,
+  γᵢ::Real,
+  cache,
+  ::Val{true}) where T
+
+  Uh = get_trial(op)(μ,t)
+  V = get_test(op)
+  u = get_trial_fe_basis(Uh)
+  v = get_fe_basis(V)
+  dc = γᵢ*op.jacs[i](μ,t,uh,u,v)
+  nmeas = num_domains(dc)
+  meas = get_domains(dc)
+  Avec = Vector{typeof(A)}(undef,nmeas)
+  for n in 1:nmeas
+    matdata = collect_cell_matrix(Uh,V,dc,meas[n])
+    assemble_matrix_add!(A,op.assem,matdata)
+    Avec[n] = copy(A)
+  end
+  Avec,meas
+end
+
+function jacobian!(
+  A::PTArray,
+  op::PTFEOperatorFromWeakForm,
+  μ,
+  t,
+  uh::T,
+  i::Integer,
+  γᵢ::Real,
+  cache,
+  meas::Measure) where T
+
+  Uh = get_trial(op)(μ,t)
+  V = get_test(op)
+  u = get_trial_fe_basis(Uh)
+  v = get_fe_basis(V)
+  matdata = collect_cell_matrix(Uh,V,γᵢ*op.jacs[i](μ,t,uh,u,v),meas)
+  assemble_matrix_add!(A,op.assem,matdata)
+  Avec
 end
 
 function jacobians!(

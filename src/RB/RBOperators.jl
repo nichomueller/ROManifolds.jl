@@ -1,22 +1,24 @@
-struct RBResidualMap end
-struct RBJacobianMap end
+function allocate_sys_cache(
+  feop::PTFEOperator,
+  rbspace::RBSpace,
+  snaps::PTArray{T}) where T
 
-function Arrays.return_cache(
-  ::RBResidualMap,
-  rb_res::RBAlgebraicContribution{T};
-  st_mdeim=)
-
-  nmeas = num_domains(rb_res)
-  coeff = zeros(T,)
-  array_coeff = Vector{Matrix{T}}(undef,nmeas)
-  array_lhs = Vector{Matrix{T}}(undef,nmeas)
-  array_rhs = Vector{Matrix{T}}(undef,nmeas)
-  @inbounds for i = 1:nmeas
-    array_coeff[i] = zeros(T)
-  end
+  fe_ndofs = get_num_free_dofs(feop.test)
+  nsnaps = length(snaps)
+  x = PTArray([zeros(T,fe_ndofs) for _ = 1:nsnaps])
+  b = allocate_residual(feop,x)
+  A = allocate_jacobian(feop,x)
+  rb_ndofs = get_rb_ndofs(rbspace)
+  xrb = PTArray([zeros(T,rb_ndofs) for _ = 1:nsnaps])
+  brb = allocate_residual(rbspace,xrb)
+  Arb = allocate_jacobian(rbspace,xrb)
+  res_cache = CachedArray(b),CachedArray(brb),CachedArray(xrb),CachedArray(xrb)
+  jac_cache = CachedArray(A),CachedArray(Arb),CachedArray(xrb),CachedArray(xrb)
+  sol_cache = CachedArray(xrb)
+  res_cache,jac_cache,sol_cache
 end
 
-function reduce_fe_operator(
+function reduced_order_model(
   info::RBInfo,
   feop::PTFEOperator,
   fesolver::PODESolver)
@@ -26,159 +28,253 @@ function reduce_fe_operator(
   params = realization(feop,nsnaps)
   sols = collect_solutions(feop,fesolver,params)
   rbspace = get_reduced_basis(info,feop,sols,fesolver,params)
-
-  rb_res = collect_compress_residual(info,feop,fesolver,rbspace,sols,params)
-  rb_jacs = collect_compress_jacobians(info,feop,fesolver,rbspace,sols,params)
-
+  rbres = collect_compress_residual(info,feop,fesolver,rbspace,sols,params)
+  rbjacs = collect_compress_jacobians(info,feop,fesolver,rbspace,sols,params)
   save(info,(sols,params,rbspace))
 
   # Online phase
   nsnaps = info.nsnaps_online
-  sols,params = load_test(info,feop,fesolver,nsnaps)
-  online_res = collect_residual_contributions(info,feop,fesolver,rb_res,sols,params)
-  online_jac = collect_jacobians_contributions(info,feop,fesolver,rb_jacs,sols,params)
-  rb_results = test_rb_solver(online_res,online_jac,rbspace,sols,params)
+  sols_test,params_test = load_test(info,feop,fesolver,nsnaps)
+  rb_results = test_rb_solver(info,feop,fesolver,rbspace,rbres,rbjacs,sols,sols_test,params_test)
   save(info,rb_results)
 
   return
 end
 
-function collect_residual_contributions(
+function test_rb_solver(
   info::RBInfo,
   feop::PTFEOperator{Affine},
   fesolver::PODESolver,
-  rb_res::RBAlgebraicContribution{T},
+  rbspace::AbstractRBSpace,
+  rbres::AbstractRBAlgebraicContribution{T},
+  rbjacs::AbstractRBAlgebraicContribution{T},
+  ::PTArray,
+  snaps_test::PTArray,
+  params_test::Table) where T
+
+  printstyled("Solving linear RB problems\n";color=:blue)
+  sys_cache = allocate_system_cache(info,feop,fesolver,rbspace,rbres)
+  rhs = collect_rhs_contributions(sys_cache,info,feop,fesolver,rbres,rbspace,params_test)
+  lhs = collect_lhs_contributions(sys_cache,info,feop,fesolver,rbjacs,rbspace,params_test)
+
+  wall_time = @elapsed begin
+    rb_snaps_test = solve(fesolver,rbspace,rhs,lhs)
+  end
+  approx_snaps_test = recast(rbspace,rb_snaps_test)
+  RBResults(info,feop,snaps_test,approx_snaps_test,wall_time)
+end
+
+function test_rb_solver(
+  info::RBInfo,
+  feop::PTFEOperator,
+  fesolver::PODESolver,
+  rbspace::AbstractRBSpace,
+  rbres::AbstractRBAlgebraicContribution{T},
+  rbjacs::AbstractRBAlgebraicContribution{T},
+  snaps::PTArray,
+  snaps_test::PTArray,
+  params_test::Table) where T
+
+  printstyled("Solving nonlinear RB problems with Newton iterations\n";color=:blue)
+  sys_cache = allocate_system_cache(info,feop,fesolver,rbspace,rbres)
+  nl_cache = nothing
+  x = initial_guess(snaps,params_test)
+  _,conv0 = Algebra._check_convergence(fesolver.nls,x)
+  iter = 0
+  wall_time = @elapsed begin
+    for iter in 1:fesolver.nls.max_nliters
+      rhs = collect_rhs_contributions!(sys_cache,info,feop,fesolver,rbres,rbspace,params_test,x)
+      lhs = collect_lhs_contributions!(sys_cache,info,feop,fesolver,rbjacs,rbspace,params_test,x)
+      nl_cache = solve!(x,fesolver,rhs,lhs,nl_cache)
+      x .-= recast(rbspace,x)
+      isconv,conv = Algebra._check_convergence(fesolver.nls,x,conv0)
+      println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv))) \n")
+      if all(isconv); return; end
+      if iter == nls.max_nliters
+        @unreachable
+      end
+    end
+  end
+  RBResults(info,feop,snaps_test,x,wall_time)
+end
+
+function Algebra.solve(fesolver::PODESolver,rhs::PTArray,lhs::PTArray)
+  x = copy(rhs)
+  cache = nothing
+  solve!(x,fesolver,rhs,lhs,cache)
+end
+
+function Algebra.solve!(
+  x::PTArray,
+  fesolver::PODESolver,
+  rhs::PTArray,
+  lhs::PTArray,
+  ::Nothing)
+
+  lhsaff,rhsaff = Nonaffine(),Nonaffine()
+  ss = symbolic_setup(fesolver.nls.ls,testitem(lhs))
+  ns = numerical_setup(ss,lhs,lhsaff)
+  _loop_solve!(x,ns,rhs,lhsaff,rhsaff)
+end
+
+function collect_rhs_contributions!(
+  cache,
+  info::RBInfo,
+  feop::PTFEOperator,
+  fesolver::PODESolver,
+  rbres::RBAlgebraicContribution{T},
   args...) where T
 
-  meas = get_domains(rb_res)
+  coeff_cache,red_cache = cache
+  nmeas = num_domains(rbres)
+  meas = get_domains(rbres)
   st_mdeim = info.st_mdeim
 
-  rb_res_contribs = Matrix{T}[]
+  rb_res_contribs = Vector{PTArray{Matrix{T}}}(undef,nmeas)
   for m in meas
-    coeff = residual_coefficient(feop,fesolver,meas,args...;st_mdeim)
-    rb_res_contrib = rb_contribution(rb_res[m],coeff)
-    push!(rb_res_contribs,rb_res_contrib)
+    rbresm = rbres[m]
+    coeff = rhs_coefficient!(coeff_cache,feop,fesolver,rbresm,meas,args...;st_mdeim)
+    contrib = rb_contribution!(red_cache,rbresm,coeff)
+    push!(rb_res_contribs,contrib)
   end
   return sum(rb_res_contribs)
 end
 
-function collect_jacobian_contributions(
-  info::RBInfo,
-  feop::PTFEOperator{Affine},
+function rhs_coefficient!(
+  cache,
+  feop::PTFEOperator,
   fesolver::PODESolver,
-  rb_jacs::Vector{RBAlgebraicContribution{T}},
+  rbres::RBAffineDecomposition,
+  rbspace::RBSpace,
+  args...;
+  kwargs...)
+
+  rcache,ccache,pcache = cache
+  red_integr_res = assemble_rhs!(rcache,feop,fesolver,rbres,args...)
+  coeff = mdeim_solve!(ccache,rbres,red_integr_res;kwargs...)
+  project_rhs_coefficient!(pcache,rbspace,rbres.basis_time,coeff)
+end
+
+function assemble_rhs!(
+  b::PTArray,
+  feop::PTFEOperator,
+  fesolver::PThetaMethod,
+  rbres::RBAffineDecomposition,
+  meas::Vector{Measure},
+  sols::Snapshots,
+  μ::Table)
+
+  idx = rbres.integration_domain.idx
+  collect_residual!(b,fesolver,feop,sols,μ,meas)
+  map(x->getindex(x,idx),b)
+end
+
+function collect_lhs_contributions!(
+  cache,
+  info::RBInfo,
+  feop::PTFEOperator,
+  fesolver::PODESolver,
+  rbjacs::Vector{AbstractRBAlgebraicContribution{T}},
   args...) where T
 
-  st_mdeim = info.st_mdeim
-
-  rb_jacs_contribs = map(enumerate(rb_jacs)) do i
-    rb_jac_i = rb_jacs[i]
-    meas = get_domains(rb_jacs_i)
-    rb_jac_contribs = Matrix{T}[]
-    for m in meas
-      coeff = jacobian_contribution(feop,fesolver,meas,args...;st_mdeim)
-      rb_jac_contrib = rb_contribution(rb_jac_i[m],coeff)
-      push!(rb_jac_contribs,rb_jac_contrib)
-    end
-    sum(rb_jac_contribs)
+  njacs = length(rbjacs)
+  rb_jacs_contribs = Vector{<:PTArray{Matrix{T}}}(undef,nmeas)
+  for i = 1:njacs
+    rb_jac_i = rbjacs[i]
+    rb_jacs_contribs[i] = collect_lhs_contributions!(cache,info,feop,fesolver,rb_jac_i,args...;i)
   end
   return sum(rb_jacs_contribs)
 end
 
-function residual_coefficient(
+function collect_lhs_contributions!(
+  cache,
+  info::RBInfo,
   feop::PTFEOperator,
   fesolver::PODESolver,
-  res_ad::RBAffineDecomposition,
+  rbjac::RBAlgebraicContribution{T},
   args...;
-  kwargs...)
+  kwargs...) where T
 
-  red_integr_res = assemble_residual(feop,fesolver,res_ad,args...)
-  coeff = mdeim_solve(res_ad,red_integr_res;kwargs...)
-  project_residual_coefficient(res_ad.basis_time,coeff)
+  coeff_cache,red_cache = cache
+  nmeas = num_domains(rbjac)
+  meas = get_domains(rbjac)
+  st_mdeim = info.st_mdeim
+
+  rb_jac_contribs = Vector{PTArray{Matrix{T}}}(undef,nmeas)
+  for m in 1:meas
+    rbjacm = rbjac[m]
+    coeff = lhs_coefficient!(coeff_cache,feop,fesolver,rbjacm,meas,args...;st_mdeim,kwargs...)
+    contrib = rb_contribution!(red_cache,rbjacm,coeff)
+    push!(rb_jac_contribs,contrib)
+  end
+  return sum(rb_jac_contribs)
 end
 
-function jacobian_coefficient(
+function lhs_coefficient!(
+  cache,
   feop::PTFEOperator,
   fesolver::PODESolver,
-  jac_ad::RBAffineDecomposition,
+  rbjac::RBAffineDecomposition,
   args...;
   i::Int=1,kwargs...)
 
-  red_integr_jac = assemble_jacobian(feop,fesolver,jac_ad,args...;i)
-  coeff = mdeim_solve(jac_ad,red_integr_jac;kwargs...)
-  project_jacobian_coefficient(jac_ad.basis_time,coeff)
+  jcache,ccache,pcache = cache
+  red_integr_jac = assemble_lhs!(jcache,feop,fesolver,rbjac,args...;i)
+  coeff = mdeim_solve!(ccache,rbjac,red_integr_jac;kwargs...)
+  project_lhs_coefficient!(pcache,rbjac.basis_time,coeff)
 end
 
-function assemble_residual(
+function assemble_lhs(
   feop::PTFEOperator,
   fesolver::PThetaMethod,
-  res_ad::RBAffineDecomposition,
-  meas::Vector{Measure},
-  input...)
-
-  idx = res_ad.integration_domain.idx
-
-
-  collect_residual(fesolver,feop,snaps,args...)
-  res_cat = reduce(hcat,res)
-  res_cat[idx,:]
-end
-
-function assemble_jacobian(
-  feop::PTFEOperator,
-  fesolver::PThetaMethod,
-  jac_ad::RBAffineDecomposition,
+  rbjac::RBAffineDecomposition,
   measures::Vector{Measure},
   input...;
   i::Int=1)
 
-  idx = jac_ad.integration_domain.idx
-  meas = jac_ad.integration_domain.meas
-  trian = get_triangulation(meas)
-  new_meas = modify_measures(measures,meas)
-
-  collector = CollectJacobiansMap(fesolver,feop,trian,new_meas...;i)
-  jac = collector.f(input...)
-  jac_cat = hcat(jac...)
-  jac_cat.nonzero_val[idx]
+  idx = rbjac.integration_domain.idx
+  collect_residual!(b,fesolver,feop,sols,μ,meas)
+  map(x->getindex(x,idx),b)
 end
 
-function mdeim_solve(ad::RBAffineDecomposition,b::AbstractArray;st_mdeim=false)
+function mdeim_solve!(cache,ad::RBAffineDecomposition,b::PTArray;st_mdeim=false)
   if st_mdeim
-    coeff = mdeim_solve(ad.mdeim_interpolation,reshape(b,:))
-    recast_coefficient(ad.basis_time,coeff)
+    coeff = mdeim_solve!(coeff,ad.mdeim_interpolation,reshape(b,:))
+    recast_coefficient!(ad.basis_time,coeff)
   else
-    mdeim_solve(ad.mdeim_interpolation,b)
+    mdeim_solve!(ad.mdeim_interpolation,b)
   end
 end
 
-function mdeim_solve(mdeim_interp::LU,b::AbstractArray)
-  x = similar(b)
-  # copyto!(x,mdeim_interp.P*b)
-  # copyto!(x,mdeim_interp.L\x)
-  # copyto!(x,mdeim_interp.U\x)
-  ldiv!(mdeim_interp,x)
-  x'
+function mdeim_solve!(cache::PTArray,mdeim_interp::LU,b::PTArray)
+  setsize!(cache,size(testitem(b)))
+  ldiv!(x,mdeim_interp,b)
+  x_t = map(transpose,x)
 end
 
-function recast_coefficient(
-  basis_time::Vector{<:Array{T}},
-  coeff::AbstractMatrix) where T
+function recast_coefficient!(
+  rcoeff::PTArray{<:CachedArray{T}},
+  basis_time::Vector{Matrix{T}},
+  coeff::PTArray) where T
 
   bt,_ = basis_time
   Nt,Qt = size(bt)
-  Qs = Int(length(coeff)/Qt)
-  rcoeff = zeros(T,Nt,Qs)
+  Qs = Int(length(testitem(coeff))/Qt)
+  setsize!(rcoeff,Nt,Qs)
 
-  @fastmath @inbounds for qs in 1:Qs
-    sorted_idx = [(i-1)*Qs+qs for i = 1:Qt]
-    copyto!(view(rcoeff,:,qs),bt*coeff[sorted_idx])
+  @inbounds for n = eachindex(coeff)
+    rn = rcoeff[n].array
+    cn = coeff[n]
+    for qs in 1:Qs
+      sorted_idx = [(i-1)*Qs+qs for i = 1:Qt]
+      copyto!(view(rn,:,qs),bt*cn[sorted_idx])
+    end
   end
 
-  rcoeff
+  PTArray(map(x->getproperty(x,:array)),rcoeff.array)
 end
 
-function project_residual_coefficient(
+function project_rhs_coefficient(
   basis_time::Vector{<:Array{T}},
   coeff::AbstractMatrix) where T
 
@@ -198,7 +294,7 @@ function project_residual_coefficient(
   pcoeff_v
 end
 
-function project_jacobian_coefficient(
+function project_lhs_coefficient(
   basis_time::Vector{<:Array{T}},
   coeff::AbstractMatrix) where T
 
@@ -218,31 +314,65 @@ function project_jacobian_coefficient(
   pcoeff_v
 end
 
-function rb_contribution(
+function rb_contribution!(
+  cache::PTArray{<:CachedArray{T}},
   ad::RBAffineDecomposition,
-  coeff::Vector{PTArray{T}}) where T
+  coeff::PTArray{T}) where T
 
+  bs = ad.basis_space
   sz = map(*,size(ad.basis_space),size(coeff))
-  rb_contrib = zeros(T,sz...)
-  Threads.@threads for i = eachindex(coeff)
-    LinearAlgebra.kron!(rb_contrib,ad.basis_space[i],coeff[i])
-  end
-  rb_contrib
-end
-
-function recast(rbspace::RBSpace,xrb::PTArray{T}) where T
-  basis_space = get_basis_space(rbspace)
-  basis_time = get_basis_time(rbspace)
-  ns_rb = size(basis_space,2)
-  nt_rb = size(basis_time,2)
-
-  n = length(xrb)
-  array = Vector{T}(undef,n)
-  @inbounds for i = 1:n
-    xrb_mat_i = reshape(xrb[i],nt_rb,ns_rb)
-    x_i = basis_space*(basis_time*xrb_mat_i)'
-    array[i] = copy(x_i)
+  setsize!(cache,sz)
+  @inbounds for n = eachindex(coeff)
+    rn = cache[n].array
+    cn = coeff[n]
+    Threads.@threads for i = eachindex(coeff)
+      LinearAlgebra.kron!(rn,ad.basis_space[i],cn[i])
+    end
   end
 
-  PTArray(array)
+  PTArray(map(x->getproperty(x,:array)),rcoeff.array)
 end
+
+# Multifield interface
+# function rhs_coefficient!(
+#   cache,
+#   feop::PTFEOperator,
+#   fesolver::PODESolver,
+#   rbres::BlockRBAffineDecomposition,
+#   rbspace::BlockRBSpace,
+#   args...;
+#   kwargs...)
+
+#   nfields = get_nfields(rbres)
+#   @inbounds for (row,col) in index_pairs(nfields,1)
+#     if rbres.touched[row,col]
+#       rhs_coefficient!(cache,feop,fesolver,rbres[row,col],args...;kwargs...)
+#     else
+#       nrows = get_spacetime_ndofs(rbspace[row])
+#       ncols = get_spacetime_ndofs(rbspace[col])
+#       zero_rhs_coeff(rbres)
+#     end
+#   end
+# end
+# function collect_rhs_contributions!(
+#   cache,
+#   info::RBInfo,
+#   feop::PTFEOperator,
+#   fesolver::PODESolver,
+#   rbres::BlockRBAffineDecomposition,
+#   rbspace::BlockRBSpace,
+#   args...) where T
+
+#   nfields = get_nfields(rbres)
+#   rb_res_contribs = Vector{<:PTArray{Matrix{T}}}(undef,nmeas)
+#   @inbounds for (row,col) in index_pairs(nfields,1)
+#     if rbres.touched[row,col]
+#       collect_rhs_contributions!(cache,feop,fesolver,rbres[row,col],rbspace[row],args...;kwargs...)
+#     else
+#       nrows = get_spacetime_ndofs(rbspace[row])
+#       ncols = get_spacetime_ndofs(rbspace[col])
+#       zero_rhs_coeff(rbres)
+#     end
+#   end
+#   return sum(rb_res_contribs)
+# end

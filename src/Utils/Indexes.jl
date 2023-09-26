@@ -53,7 +53,7 @@ function slow_idx(kst::Int,ns::Int)
 end
 
 function index_pairs(a,b)
-  collect(Iterators.product(a,b))
+  collect(Iterators.product(1:a,1:b))
 end
 
 function idx_batches(v::AbstractArray)

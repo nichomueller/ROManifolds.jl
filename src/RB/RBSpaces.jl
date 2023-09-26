@@ -8,6 +8,12 @@ struct RBSpace{T} <: AbstractRBSpace{T}
   basis_time::Matrix{T}
 
   function RBSpace(
+    basis_space::Matrix{T},
+    basis_time::Matrix{T}) where T
+    new{T}(basis_space,basis_time)
+  end
+
+  function RBSpace(
     basis_space_nnz::NnzMatrix{T},
     basis_time_nnz::NnzMatrix{T}) where T
 
@@ -17,9 +23,42 @@ struct RBSpace{T} <: AbstractRBSpace{T}
   end
 end
 
+function get_reduced_basis(
+  info::RBInfo,
+  feop::PTFEOperator,
+  snaps::Vector{<:PTArray},
+  args...)
+
+  basis_space,basis_time = compress(info,feop,snaps,args...)
+  RBSpace(basis_space,basis_time)
+end
+
+function recast(rbspace::RBSpace,x::PTArray{T}) where T
+  basis_space = get_basis_space(rbspace)
+  basis_time = get_basis_time(rbspace)
+  ns_rb = size(basis_space,2)
+  nt_rb = size(basis_time,2)
+
+  n = length(x)
+  array = Vector{T}(undef,n)
+  @inbounds for i = 1:n
+    x_mat_i = reshape(x[i],nt_rb,ns_rb)
+    x_i = basis_space*(basis_time*x_mat_i)'
+    array[i] = copy(x_i)
+  end
+
+  PTArray(array)
+end
+
 struct BlockRBSpace{T} <: AbstractRBSpace{T}
   basis_space::Vector{Matrix{T}}
   basis_time::Vector{Matrix{T}}
+
+  function BlockRBSpace(
+    basis_space::Vector{Matrix{T}},
+    basis_time::Vector{Matrix{T}}) where T
+    new{T}(basis_space,basis_time)
+  end
 
   function BlockRBSpace(
     basis_space_nnz::BlockNnzMatrix{T},
@@ -32,16 +71,7 @@ struct BlockRBSpace{T} <: AbstractRBSpace{T}
 end
 
 get_nfields(rb::BlockRBSpace) = length(rb.basis_space)
-
-function get_reduced_basis(
-  info::RBInfo,
-  feop::PTFEOperator,
-  snaps::Vector{<:PTArray},
-  args...)
-
-  basis_space,basis_time = compress(info,feop,snaps,args...)
-  RBSpace(basis_space,basis_time)
-end
+Base.getindex(rb::BlockRBSpace,i...) = RBSpace(rb.basis_space[i...],rb.basis_time[i...])
 
 function get_reduced_basis(
   info::RBInfo,
@@ -66,7 +96,7 @@ function compress(info::RBInfo,snaps::PTArray)
   compress(nzm,steady,transposed;ϵ)
 end
 
-function compress(info::RBInfo,feop::PTFEOperator,snaps::Vector{<:PTArray},args...)
+function compress(info::RBInfo,feop::PTFEOperator,snaps::Snapshots,args...)
   nzm = NnzArray(snaps)
   ϵ = info.ϵ
   energy_norm = info.energy_norm
@@ -79,14 +109,14 @@ end
 function compress(
   info::RBInfo,
   feop::PTFEOperator,
-  snaps::Vector{Vector{<:PTArray}},
+  snaps::BlockSnapshots,
   args...;
   compute_supremizers=false,
   kwargs...)
 
   nzm = NnzArray(snaps)
   nfields = get_nfields(nzm)
-  all_idx = index_pairs(1:nfields,1)
+  all_idx = index_pairs(nfields,1)
   rb = map(all_idx) do i
     feopi = filter_operator(feop,i)
     compress(info,feopi,nzm[i])
@@ -147,13 +177,13 @@ end
 function add_space_supremizers(
   bases_space::Vector{<:Matrix},
   feop::PTFEOperator,
-  snaps::Vector{Vector{<:PTArray}},
+  snaps::BlockSnapshots,
   args...;
   kwargs...)
 
   bs_primal,bs_dual... = bases_space
   n_dual_fields = length(bs_dual)
-  all_idx = index_pairs(1:n_dual_fields,1)
+  all_idx = index_pairs(n_dual_fields,1)
   for idx in all_idx
     printstyled("Computing supremizers in space for dual field $idx\n";color=:blue)
     feop_i = filter_operator(feop,idx)
@@ -183,7 +213,7 @@ end
 function add_time_supremizers(bases_time::Vector{<:Matrix};ttol::Real)
   bt_primal,bt_dual... = bases_time
   n_dual_fields = length(bt_dual)
-  all_idx = index_pairs(1:n_dual_fields,1)
+  all_idx = index_pairs(n_dual_fields,1)
   for idx in all_idx
     printstyled("Computing supremizers in time for dual field $idx\n";color=:blue)
     supr_i = add_time_supremizers(bt_primal,bt_dual[idx];ttol)

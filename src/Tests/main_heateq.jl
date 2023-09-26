@@ -62,5 +62,4 @@ begin
   st_mdeim = false
   info = RBInfo(test_path;ϵ,load_structures,save_structures,energy_norm,
                 nsnaps_state,nsnaps_system,st_mdeim)
-  rbsolver = Backslash()
 end
