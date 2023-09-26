@@ -26,10 +26,12 @@ end
 function get_reduced_basis(
   info::RBInfo,
   feop::PTFEOperator,
-  snaps::Vector{<:PTArray},
+  snaps::Snapshots,
   args...)
 
-  basis_space,basis_time = compress(info,feop,snaps,args...)
+  energy_norm = info.energy_norm
+  norm_matrix = get_norm_matrix(energy_norm,feop)
+  basis_space,basis_time = compress(info,feop,snaps,norm_matrix,args...)
   RBSpace(basis_space,basis_time)
 end
 
@@ -76,34 +78,21 @@ Base.getindex(rb::BlockRBSpace,i...) = RBSpace(rb.basis_space[i...],rb.basis_tim
 function get_reduced_basis(
   info::RBInfo,
   feop::PTFEOperator,
-  snaps::Vector{Vector{<:PTArray}},
+  snaps::BlockSnapshots,
   args...)
 
-  basis_space,basis_time = compress(info,feop,snaps,args...)
+  energy_norm = info.energy_norm
+  norm_matrix = get_norm_matrix(energy_norm,feop)
+  basis_space,basis_time = compress(info,feop,snaps,norm_matrix,args...)
   BlockRBSpace(basis_space,basis_time)
 end
 
-abstract type PODStyle end
-struct DefaultPOD <: PODStyle end
-struct SteadyPOD <: PODStyle end
-struct TranposedPOD <: PODStyle end
-
-function compress(info::RBInfo,snaps::PTArray)
+function compress(info::RBInfo,::PTFEOperator,snaps,args...)
   nzm = NnzArray(snaps)
   ϵ = info.ϵ
   steady = num_time_dofs(nzm) == 1 ? SteadyPOD() : DefaultPOD()
   transposed = size(nzm,1) < size(nzm,2) ? TranposedPOD() : DefaultPOD()
-  compress(nzm,steady,transposed;ϵ)
-end
-
-function compress(info::RBInfo,feop::PTFEOperator,snaps::Vector{<:PTArray},args...)
-  nzm = NnzArray(snaps)
-  ϵ = info.ϵ
-  energy_norm = info.energy_norm
-  norm_matrix = get_norm_matrix(energy_norm,feop)
-  steady = num_time_dofs(nzm) == 1 ? SteadyPOD() : DefaultPOD()
-  transposed = size(nzm,1) < size(nzm,2) ? TranposedPOD() : DefaultPOD()
-  compress(nzm,norm_matrix,steady,transposed;ϵ)
+  compress(nzm,steady,transposed,args...;ϵ)
 end
 
 function compress(
@@ -124,62 +113,18 @@ function compress(
   bases_space = map(get_basis_space,rb)
   bases_time = map(get_basis_time,rb)
   if compute_supremizers
-    bases_space = add_space_supremizers(bases_space,feop,snaps,args...;norm_matrix)
+    bases_space = add_space_supremizers(bases_space,feop,snaps,args...)
     bases_time = add_time_supremizers(bases_time;kwargs...)
   end
   BlockRBSpace(bases_space,bases_time)
-end
-
-function compress(
-  nzm::NnzMatrix,
-  norm_matrix,
-  args...;
-  kwargs...)
-
-  basis_space = tpod(nzm,norm_matrix;kwargs...)
-  compressed_nza = prod(basis_space,nzm)
-  compressed_nza_t = change_mode(compressed_nza)
-  basis_time = tpod(compressed_nza_t;kwargs...)
-  basis_space,basis_time
-end
-
-function compress(
-  nzm::NnzMatrix,
-  norm_matrix,
-  ::DefaultPOD,
-  ::TranposedPOD;
-  kwargs...)
-
-  nza_t = change_mode(nzm)
-  basis_time = tpod(nza_t;kwargs...)
-  compressed_nza_t = prod(basis_time,nza_t)
-  compressed_nza = change_mode(compressed_nza_t)
-  basis_space = tpod(compressed_nza,norm_matrix;kwargs...)
-  basis_space,basis_time
-end
-
-for T in (:DefaultPOD,:TranposedPOD)
-  @eval begin
-    function compress(
-      nzm::NnzMatrix,
-      norm_matrix,
-      ::SteadyPOD,
-      ::$T;
-      kwargs...)
-
-      basis_space = tpod(nzm,norm_matrix;kwargs...)
-      basis_time = ones(eltype(nzm),1,1)
-      basis_space,basis_time
-    end
-  end
 end
 
 function add_space_supremizers(
   bases_space::Vector{<:Matrix},
   feop::PTFEOperator,
   snaps::BlockSnapshots,
-  args...;
-  kwargs...)
+  norm_matrix,
+  args...)
 
   bs_primal,bs_dual... = bases_space
   n_dual_fields = length(bs_dual)
@@ -188,7 +133,7 @@ function add_space_supremizers(
     printstyled("Computing supremizers in space for dual field $idx\n";color=:blue)
     feop_i = filter_operator(feop,idx)
     supr_i = space_supremizers(bs_dual[idx],feop_i,snaps[idx],args...)
-    orth_supr_i = gram_schmidt(supr_i,bs_primal)
+    orth_supr_i = gram_schmidt(supr_i,bs_primal,norm_matrix)
     bs_primal = hcat(bs_primal,orth_supr_i)
   end
   return bs_primal,bs_dual
@@ -197,7 +142,7 @@ end
 function space_supremizers(
   basis_space::Matrix,
   feop::PTFEOperator,
-  snaps::Vector{<:PTArray},
+  snaps::Snapshots,
   fesolver::PODESolver,
   args...)
 

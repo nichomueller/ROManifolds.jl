@@ -105,12 +105,12 @@ function collect_compress_rhs_lhs(
   feop::PTFEOperator,
   fesolver::PThetaMethod,
   rbspace::RBSpace,
-  snaps::Vector{<:PTArray},
+  snaps::Snapshots,
   μ::Table)
 
   nsnaps = info.nsnaps
-  _snaps,_μ = get_at_params(1:nsnaps,snaps),μ[1:nsnaps]
-  _snapsθ = center_solution(fesolver,_snaps,_μ)
+  snapsθ = recenter(fesolver,snaps,μ)
+  _snapsθ,_μ = snapsθ[1:nsnaps],μ[1:nsnaps]
   rhs = collect_compress_rhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
   lhs = collect_compress_lhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
   rhs,lhs
@@ -152,7 +152,7 @@ end
 function compress_component(
   info::RBInfo,
   feop::PTFEOperator,
-  snaps::Vector{<:PTArray{T}},
+  snaps::Snapshots{T},
   meas::Vector{Measure},
   args...;
   kwargs...) where T

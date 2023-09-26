@@ -11,7 +11,7 @@ for (u,t,n) in uμst
   printstyled("Computing fe solution at time $t for every parameter\n";color=:blue)
   snaps[n] = get_solution(ode_op,u)
 end
-snaps = solutions
+snaps = Snapshots(snaps)
 
 # get_reduced_basis(info,feop,snaps)
 nzm = NnzArray(snaps)
@@ -20,3 +20,14 @@ compressed_nza = prod(basis_space,nzm)
 compressed_nza_t = change_mode(compressed_nza)
 basis_time = tpod(compressed_nza_t;ϵ=1e-4)
 rbspace = RBSpace(basis_space,basis_time)
+
+# change mode
+# space_ndofs = num_space_dofs(nzm)
+# time_ndofs = num_time_dofs(nzm)
+# nparams = num_params(nzm)
+# idx = time_param_idx(time_ndofs,nparams)
+
+# mode2 = zeros(time_ndofs,space_ndofs*nparams)
+# @inbounds for (i,col) = enumerate(eachcol(idx))
+#   mode2[i,:] = reshape(nzm.nonzero_val[:,col]',:)
+# end

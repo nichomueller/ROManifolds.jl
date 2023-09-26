@@ -80,17 +80,17 @@ struct NnzMatrix{T} <: NnzArray{T,2}
 end
 
 function NnzArray(
-  val::Vector{<:PTArray{Vector{T}}};
-  nparams=length(testitem(val))) where T
+  s::Snapshots{T};
+  nparams=length(testitem(s.snaps))) where T
 
-  @check all([length(vali) == nparams for vali in val])
-  NnzMatrix(get_array(hcat(val...))...;nparams)
+  @check all([length(vali) == nparams for vali in s.snaps])
+  NnzMatrix(get_array(hcat(s.snaps...))...;nparams)
 end
 
-Base.length(nza::NnzMatrix) = length(nza.nparams)
-num_params(nzm::NnzMatrix) = nzm.nparams
+Base.length(nzm::NnzMatrix) = nzm.nparams
+num_params(nzm::NnzMatrix) = length(nzm)
 num_space_dofs(nzm::NnzMatrix) = size(nzm,1)
-num_time_dofs(nzm::NnzMatrix) = Int(size(nzm,2)/nzm.nparams)
+num_time_dofs(nzm::NnzMatrix) = Int(size(nzm,2)/length(nzm))
 
 function Base.copy(nzm::NnzMatrix)
   NnzMatrix(
@@ -148,23 +148,64 @@ function recast_idx(nzm::NnzMatrix,idx::Vector{Int})
   return entire_idx_rows
 end
 
-function get_at_params(range::UnitRange,nzm::NnzMatrix{T},transpose=false) where T
-  space_ndofs = num_space_dofs(nzm)
-  time_ndofs = num_time_dofs(nzm)
-  nparams = length(range)
-  idx = time_param_idx(time_ndofs,range)
-  if transpose
-    mat = zeros(T,time_ndofs,space_ndofs*nparams)
-    @inbounds for col = eachcol(idx)
-      mat[col,:] = reshape(nzm.nonzero_val[:,col]',:)
-    end
-  else
-    mat = zeros(T,space_ndofs,time_ndofs*nparams)
-    @inbounds for col = eachcol(idx)
-      mat[:,col] = nzm.nonzero_val[:,col]
+abstract type PODStyle end
+struct DefaultPOD <: PODStyle end
+struct SteadyPOD <: PODStyle end
+struct TranposedPOD <: PODStyle end
+
+function compress(nzm::NnzMatrix,args...;kwargs...)
+  steady = num_time_dofs(nzm) == 1 ? SteadyPOD() : DefaultPOD()
+  transposed = size(nzm,1) < size(nzm,2) ? TranposedPOD() : DefaultPOD()
+  compress(nzm,steady,transposed,args...;kwargs...)
+end
+
+function compress(
+  nzm::NnzMatrix,
+  ::PODStyle,
+  ::PODStyle,
+  args...;
+  kwargs...)
+
+  basis_space,basis_time = transient_tpod(nzm,args...;kwargs...)
+  basis_space,basis_time
+end
+
+function compress(
+  nzm::NnzMatrix,
+  ::DefaultPOD,
+  ::TranposedPOD,
+  args...;
+  kwargs...)
+
+  nzm_t = change_mode(nzm)
+  basis_time,basis_space = transient_tpod(nzm_t,args...;kwargs...)
+  basis_space,basis_time
+end
+
+for T in (:DefaultPOD,:TranposedPOD)
+  @eval begin
+    function compress(
+      nzm::NnzMatrix,
+      ::SteadyPOD,
+      ::$T,
+      args...;
+      kwargs...)
+
+      basis_space = tpod(nzm,args...;kwargs...)
+      basis_time = ones(eltype(nzm),1,1)
+      basis_space,basis_time
     end
   end
-  return mat
+end
+
+tpod(nzm::NnzMatrix,args...;kwargs...) = tpod(nzm.nonzero_val,args...;kwargs...)
+
+function transient_tpod(nzm::NnzMatrix,args...;kwargs...)
+  basis_axis1 = tpod(nzm,args...;kwargs...)
+  compressed_nzm = prod(basis_axis1,nzm)
+  compressed_nzm_t = change_mode(compressed_nzm)
+  basis_axis2 = tpod(compressed_nzm_t;kwargs...)
+  basis_axis1,basis_axis2
 end
 
 function change_mode(nzm::NnzMatrix{T}) where T
@@ -174,16 +215,11 @@ function change_mode(nzm::NnzMatrix{T}) where T
   idx = time_param_idx(time_ndofs,nparams)
 
   mode2 = zeros(T,time_ndofs,space_ndofs*nparams)
-  @inbounds for col = eachcol(idx)
-    mode2[n,:] = reshape(nzm.nonzero_val[:,col]',:)
+  @inbounds for (i,col) = enumerate(eachcol(idx))
+    mode2[i,:] = reshape(nzm.nonzero_val[:,col]',:)
   end
 
   return NnzMatrix(mode2,nzm.nonzero_idx,nzm.nrows,nparams)
-end
-
-function tpod(nzm::NnzMatrix,args...;kwargs...)
-  nonzero_val = tpod(nzm.nonzero_val,args...;kwargs...)
-  return NnzMatrix(nonzero_val,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
 end
 
 struct BlockNnzMatrix{T} <: AbstractVector{NnzMatrix{T}}
@@ -195,9 +231,9 @@ struct BlockNnzMatrix{T} <: AbstractVector{NnzMatrix{T}}
   end
 end
 
-function NnzArray(val::Vector{<:PTArray{Vector{Vector{T}}}}) where T
-  blocks = map(val) do vali
-    array = get_array(hcat(vali...))
+function NnzArray(s::BlockSnapshots{T}) where T
+  blocks = map(s.snaps) do val
+    array = get_array(hcat(val...))
     NnzMatrix(array...)
   end
   BlockNnzMatrix(blocks)

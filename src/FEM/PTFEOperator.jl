@@ -160,8 +160,8 @@ function residual!(
   nmeas = num_domains(dc)
   meas = get_domains(dc)
   bvec = Vector{typeof(b)}(undef,nmeas)
-  for n in 1:nmeas
-    vecdata = collect_cell_vector(V,dc,meas[n])
+  for (n,m) in enumerate(meas)
+    vecdata = collect_cell_vector(V,dc,m)
     assemble_vector_add!(b,op.assem,vecdata)
     bvec[n] = copy(b)
   end
@@ -246,8 +246,8 @@ function jacobian!(
   nmeas = num_domains(dc)
   meas = get_domains(dc)
   Avec = Vector{typeof(A)}(undef,nmeas)
-  for n in 1:nmeas
-    matdata = collect_cell_matrix(Uh,V,dc,meas[n])
+  for (n,m) in enumerate(meas)
+    matdata = collect_cell_matrix(Uh,V,dc,m)
     assemble_matrix_add!(A,op.assem,matdata)
     Avec[n] = copy(A)
   end

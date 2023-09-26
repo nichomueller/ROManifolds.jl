@@ -22,13 +22,17 @@ function FESpaces.collect_cell_vector(
   a::PTDomainContribution,
   meas::Measure)
 
+  w = []
+  r = []
   strian = get_triangulation(meas)
   scell_vec = get_contribution(a,meas)
   cell_vec,trian = move_contributions(scell_vec,strian)
   @assert ndims(eltype(cell_vec)) == 1
   cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
   rows = get_cell_dof_ids(test,trian)
-  return cell_vec_r,rows
+  push!(w,cell_vec_r)
+  push!(r,rows)
+  (w,r)
 end
 
 function FESpaces.collect_cell_matrix(
@@ -61,6 +65,9 @@ function FESpaces.collect_cell_matrix(
   a::PTDomainContribution,
   meas::Measure)
 
+  w = []
+  r = []
+  c = []
   strian = get_triangulation(meas)
   scell_mat = get_contribution(a,meas)
   cell_mat,trian = move_contributions(scell_mat,strian)
@@ -69,7 +76,10 @@ function FESpaces.collect_cell_matrix(
   cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
   rows = get_cell_dof_ids(test,trian)
   cols = get_cell_dof_ids(trial,trian)
-  return cell_mat_rc,rows,cols
+  push!(w,cell_mat_rc)
+  push!(r,rows)
+  push!(c,cols)
+  (w,r,c)
 end
 
 function FESpaces.numeric_loop_matrix!(
