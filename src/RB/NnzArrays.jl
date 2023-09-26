@@ -148,15 +148,34 @@ function recast_idx(nzm::NnzMatrix,idx::Vector{Int})
   return entire_idx_rows
 end
 
+function get_at_params(range::UnitRange,nzm::NnzMatrix{T},transpose=false) where T
+  space_ndofs = num_space_dofs(nzm)
+  time_ndofs = num_time_dofs(nzm)
+  nparams = length(range)
+  idx = time_param_idx(time_ndofs,range)
+  if transpose
+    mat = zeros(T,time_ndofs,space_ndofs*nparams)
+    @inbounds for col = eachcol(idx)
+      mat[col,:] = reshape(nzm.nonzero_val[:,col]',:)
+    end
+  else
+    mat = zeros(T,space_ndofs,time_ndofs*nparams)
+    @inbounds for col = eachcol(idx)
+      mat[:,col] = nzm.nonzero_val[:,col]
+    end
+  end
+  return mat
+end
+
 function change_mode(nzm::NnzMatrix{T}) where T
   space_ndofs = num_space_dofs(nzm)
   time_ndofs = num_time_dofs(nzm)
   nparams = num_params(nzm)
-  mode2 = zeros(T,time_ndofs,space_ndofs*nparams)
+  idx = time_param_idx(time_ndofs,nparams)
 
-  _mode2(n::Int) = nzm.nonzero_val[:,n:nparams:nparams*(time_ndofs-1)+n]'
-  @inbounds for n = 1:time_ndofs
-    mode2[n,:] = reshape(nzm.nonzero_val[:,(n-1)*nparams+1:n*nparams]',:)
+  mode2 = zeros(T,time_ndofs,space_ndofs*nparams)
+  @inbounds for col = eachcol(idx)
+    mode2[n,:] = reshape(nzm.nonzero_val[:,col]',:)
   end
 
   return NnzMatrix(mode2,nzm.nonzero_idx,nzm.nrows,nparams)
@@ -168,84 +187,70 @@ function tpod(nzm::NnzMatrix,args...;kwargs...)
 end
 
 function collect_residuals(
-  solver::PThetaMethod,
-  op::PTFEOperator,
-  sols::Snapshots,
-  μ::Table;
-  kwargs...)
+  fesolver::PThetaMethod,
+  feop::PTFEOperator,
+  sols::PTArray,
+  μ::Table)
 
-  b = allocate_residual(op,sols)
-  collect_residuals!(b,solver,op,sols,μ;kwargs...)
+  b = allocate_residual(feop,sols)
+  collect_residuals!(b,fesolver,feop,sols,μ)
 end
 
 function collect_residuals!(
   b::PTArray,
-  solver::PThetaMethod,
-  op::PTFEOperator,
-  sols::Snapshots,
-  μ::Table;
-  nsnaps=30)
+  fesolver::PThetaMethod,
+  feop::PTFEOperator,
+  sols::PTArray,
+  μ::Table)
 
-  uh0,dt,θ = solver.uh0,solver.dt,solver.θ
+  dt,θ = fesolver.dt,fesolver.θ
   dtθ = θ == 0.0 ? dt : dt*θ
-  times = get_times(solver)
+  times = get_times(fesolver)
 
-  ode_op = get_algebraic_operator(op)
-
-  sols,μ = sols[1:nsnaps],μ[1:nsnaps]
-  u0 = get_free_dof_values(uh0(μ))
-  solsθ = sols*θ + [u0,sols[2:end]...]*(1-θ)
-  ptsolsθ = convert(PTArray,solsθ)
-
+  ode_op = get_algebraic_operator(feop)
   ode_cache = allocate_cache(ode_op,μ,times)
   ode_cache = update_cache!(ode_cache,ode_op,μ,times)
 
-  nlop = PThetaMethodNonlinearOperator(ode_op,μ,times,dtθ,ptsolsθ,ode_cache,solsθ)
+  nlop = PThetaMethodNonlinearOperator(ode_op,μ,times,dtθ,sols,ode_cache,sols)
   separate_contribs = Val(true)
 
   printstyled("Computing fe residuals for every time and parameter\n";color=:blue)
-  ress,meas = residual!(b,nlop,ptsolsθ,separate_contribs)
+  ress,meas = residual!(b,nlop,sols,separate_contribs)
   return NnzMatrix.(ress),meas
 end
 
 function collect_jacobian(
-  solver::PThetaMethod,
-  op::PTFEOperator,
-  sols::Snapshots,
+  fesolver::PThetaMethod,
+  feop::PTFEOperator,
+  sols::PTArray,
   μ::Table;
   kwargs...)
 
-  A = allocate_jacobian(op,sols)
-  collect_jacobians!(A,solver,op,sols,μ;kwargs...)
+  A = allocate_jacobian(feop,sols)
+  collect_jacobians!(A,fesolver,feop,sols,μ;kwargs...)
 end
 
 function collect_jacobian!(
   A::PTArray,
-  solver::PThetaMethod,
-  op::PTFEOperator,
-  sols::Snapshots,
+  fesolver::PThetaMethod,
+  feop::PTFEOperator,
+  sols::PTArray,
   μ::Table;
-  nsnaps=30,i=1)
+  i=1)
 
-  uh0,dt,θ = solver.uh0,solver.dt,solver.θ
+  dt,θ = fesolver.dt,fesolver.θ
   dtθ = θ == 0.0 ? dt : dt*θ
-  times = get_times(solver)
+  times = get_times(fesolver)
 
-  ode_op = get_algebraic_operator(op)
-
-  sols,μ = sols[1:nsnaps],μ[1:nsnaps]
-  u0 = get_free_dof_values(uh0(μ))
-  solsθ = sols*θ + [u0,sols[2:end]...]*(1-θ)
-  ptsolsθ = convert(PTArray,solsθ)
-
+  ode_op = get_algebraic_operator(feop)
   ode_cache = allocate_cache(ode_op,μ,times)
   ode_cache = update_cache!(ode_cache,ode_op,μ,times)
 
-  nlop = PThetaMethodNonlinearOperator(ode_op,μ,times,dtθ,ptsolsθ,ode_cache,ptsolsθ)
+  nlop = PThetaMethodNonlinearOperator(ode_op,μ,times,dtθ,sols,ode_cache,sols)
   separate_contribs = Val(true)
 
   printstyled("Computing fe jacobian #$i for every time and parameter\n";color=:blue)
-  jacs_i,meas = jacobian!(A,nlop,ptsolsθ,i,separate_contribs)
+  jacs_i,meas = jacobian!(A,nlop,sols,i,separate_contribs)
   nnz_jac_i = map(x->NnzMatrix(map(NnzVector,x)),jacs_i)
   return nnz_jac_i,meas
 end

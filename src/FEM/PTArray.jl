@@ -139,11 +139,21 @@ function Arrays.setsize!(a::PTArray{<:CachedArray},size::Vararg{Int})
 end
 
 get_at_index(::Int,x) = x
+
 get_at_index(i::Int,x::PTArray) = x[i]
+
 function get_at_index(i::Int,x::NTuple{N,Union{AbstractArrayBlock,PTArray}}) where N
   ret = ()
   @inbounds for xj in x
     ret = (ret...,get_at_index(i,xj))
+  end
+  return ret
+end
+
+function get_at_index(range::UnitRange{Int},x::NTuple{N,PTArray}) where N
+  ret = ()
+  @inbounds for j in range
+    ret = (ret...,get_at_index(j,x))
   end
   return ret
 end

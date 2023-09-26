@@ -26,16 +26,15 @@ function reduced_order_model(
   # Offline phase
   nsnaps = info.nsnaps_state
   params = realization(feop,nsnaps)
-  sols = collect_solutions(feop,fesolver,params)
+  sols = collect_solutions(fesolver,feop,params)
   rbspace = get_reduced_basis(info,feop,sols,fesolver,params)
-  rbres = collect_compress_residual(info,feop,fesolver,rbspace,sols,params)
-  rbjacs = collect_compress_jacobians(info,feop,fesolver,rbspace,sols,params)
-  save(info,(sols,params,rbspace))
+  rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
+  save(info,(sols,params,rbspace,rbrhs,rblhs))
 
   # Online phase
   nsnaps = info.nsnaps_online
   sols_test,params_test = load_test(info,feop,fesolver,nsnaps)
-  rb_results = test_rb_solver(info,feop,fesolver,rbspace,rbres,rbjacs,sols,sols_test,params_test)
+  rb_results = test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,sols_test,params_test)
   save(info,rb_results)
 
   return
@@ -161,7 +160,7 @@ function assemble_rhs!(
   fesolver::PThetaMethod,
   rbres::RBAffineDecomposition,
   meas::Vector{Measure},
-  sols::Snapshots,
+  sols::PTArray,
   μ::Table)
 
   idx = rbres.integration_domain.idx

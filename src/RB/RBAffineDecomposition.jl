@@ -100,28 +100,42 @@ function Arrays.testvalue(
   RBAffineDecomposition(basis_space,basis_time,mdeim_interpolation,integration_domain)
 end
 
-function collect_compress_residual(
+function collect_compress_rhs_lhs(
+  info::RBInfo,
+  feop::PTFEOperator,
+  fesolver::PThetaMethod,
+  rbspace::RBSpace,
+  snaps::Vector{<:PTArray},
+  μ::Table)
+
+  nsnaps = info.nsnaps
+  _snaps,_μ = get_at_params(1:nsnaps,snaps),μ[1:nsnaps]
+  _snapsθ = center_solution(fesolver,_snaps,_μ)
+  rhs = collect_compress_rhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
+  lhs = collect_compress_lhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
+  rhs,lhs
+end
+
+function collect_compress_rhs(
   info::RBInfo,
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbspace::RBSpace,
   args...)
 
-  nsnaps = info.nsnaps_system
   times = get_times(fesolver)
-  ress,meas = collect_residuals(feop,fesolver,args...;nsnaps)
+  ress,meas = collect_residuals(fesolver,feop,args...)
   ad_res = compress_component(info,feop,ress,meas,times,rbspace)
   return ad_res
 end
 
-function collect_compress_jacobians(
+function collect_compress_lhs(
   info::RBInfo,
   feop::PTFEOperator,
   fesolver::PThetaMethod,
   rbspace::RBSpace,
   args...)
 
-  nsnaps = info.nsnaps_system
   times = get_times(fesolver)
   θ = fesolver.θ
 
@@ -129,7 +143,7 @@ function collect_compress_jacobians(
   ad_jacs = Vector{RBAlgebraicContribution}(undef,njacs)
   for i = 1:njacs
     combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : x-y
-    jacs,meas = collect_jacobians(feop,fesolver,args...;i,nsnaps)
+    jacs,meas = collect_jacobians(fesolver,feop,args...;i)
     ad_jacs[i] = compress_component(info,feop,jacs,meas,times,rbspace,rbspace;combine_projections)
   end
   return ad_jacs
@@ -242,14 +256,13 @@ end
 
 # Multifield interface
 
-function collect_compress_residual(
+function collect_compress_rhs(
   info::RBInfo,
   feop::PTFEOperator,
   times::Vector{<:Real},
   rbspace::BlockRBSpace...;
   kwargs...)
 
-  nsnaps = info.nsnaps_system
   nfields = get_nfields(testitem(rbspace))
   times = get_times(fesolver)
   contrib = testvalue(RBBlockAlgebraicContribution{T},feop,(nfields,1))
@@ -257,7 +270,7 @@ function collect_compress_residual(
     row,_ = i_field
     feop_i = filter_operator(feop,i_field)
     rbspace_i = map(x->filter_rbspace(x,row),rbspace)
-    ress_i,meas_i = collect_residuals(feop_i,fesolver,args...;nsnaps)
+    ress_i,meas_i = collect_residuals(feop_i,fesolver,args...)
     if iszero(ress_i)
       contrib.touched[row,1] = false
     else
@@ -267,14 +280,13 @@ function collect_compress_residual(
   return contrib
 end
 
-function collect_compress_jacobian(
+function collect_compress_lhs(
   info::RBInfo,
   feop::PTFEOperator,
   times::Vector{<:Real},
   rbspace::BlockRBSpace...;
   kwargs...)
 
-  nsnaps = info.nsnaps_system
   njacs = length(feop.jacs)
   nfields = get_nfields(testitem(rbspace))
   times = get_times(fesolver)
@@ -287,7 +299,7 @@ function collect_compress_jacobian(
     rbspace_i = map(x->filter_rbspace(x,i_field),rbspace)
     for i = 1:njacs
       combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : x-y
-      jacs_i,meas_i = collect_jacobians(feop,fesolver,args...;i,nsnaps)
+      jacs_i,meas_i = collect_jacobians(feop,fesolver,args...;i)
       if iszero(ress_i)
         contribs[i].touched[row,col] = false
       else

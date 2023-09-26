@@ -56,6 +56,9 @@ function index_pairs(a,b)
   collect(Iterators.product(1:a,1:b))
 end
 
+time_param_idx(ntimes::Int,range::UnitRange) = collect(range) .+ collect(0:ntimes-1)'*ntimes
+time_param_idx(ntimes::Int,nparams::Int) = collect(1:nparams) .+ collect(0:ntimes-1)'*ntimes
+
 function idx_batches(v::AbstractArray)
   nbatches = Threads.nthreads()
   [round(Int,i) for i in range(0,length(v),nbatches+1)]

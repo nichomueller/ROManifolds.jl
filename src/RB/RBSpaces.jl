@@ -96,7 +96,7 @@ function compress(info::RBInfo,snaps::PTArray)
   compress(nzm,steady,transposed;ϵ)
 end
 
-function compress(info::RBInfo,feop::PTFEOperator,snaps::Snapshots,args...)
+function compress(info::RBInfo,feop::PTFEOperator,snaps::Vector{<:PTArray},args...)
   nzm = NnzArray(snaps)
   ϵ = info.ϵ
   energy_norm = info.energy_norm

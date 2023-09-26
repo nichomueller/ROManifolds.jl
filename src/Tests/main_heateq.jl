@@ -57,9 +57,15 @@ begin
   save_structures = true
   load_structures = true
   energy_norm = l2Norm()
-  nsnaps_state = 80
-  nsnaps_system = 30
+  nsnaps_state = 10
+  nsnaps_system = 10
   st_mdeim = false
   info = RBInfo(test_path;ϵ,load_structures,save_structures,energy_norm,
                 nsnaps_state,nsnaps_system,st_mdeim)
 end
+
+# WORKS
+nsnaps = info.nsnaps_state
+params = realization(feop,nsnaps)
+sols = collect_solutions(fesolver,feop,params)
+rbspace = get_reduced_basis(info,feop,sols,fesolver,params)
