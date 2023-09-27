@@ -244,14 +244,14 @@ function save_test(info::RBInfo,params::Table)
   end
 end
 
-function load_test(T::Type{Snapshots},info::RBInfo)
+function load_test(info::RBInfo,T::Type{Snapshots})
   path = joinpath(info.fe_path,"fesnaps_test")
-  load(T,path)
+  load(path,T)
 end
 
-function load_test(T::Type{Table},info::RBInfo)
+function load_test(info::RBInfo,T::Type{Table})
   path = joinpath(info.fe_path,"params_test")
-  load(T,path)
+  load(path,T)
 end
 
 function save(info::RBInfo,result::RBResults)
@@ -259,7 +259,7 @@ function save(info::RBInfo,result::RBResults)
   save(path,result)
 end
 
-function load(T::Type{RBResults},info::RBInfo)
+function load(info::RBInfo,T::Type{RBResults})
   path = joinpath(info.rb_path,"rbresults")
-  load(T,path)
+  load(path,T)
 end

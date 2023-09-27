@@ -131,6 +131,15 @@ function CellData.get_array(a::PTDomainContribution)
   a.dict[first(keys(a.dict))]
 end
 
+function CellData.move_contributions(scell_to_val::PTArray,args...)
+  ptcell_mat_trian = map(scell_to_val.array) do x
+    move_contributions(x,args...)
+  end
+  cell_to_val = PTArray(first.(ptcell_mat_trian))
+  trian = first(last.(ptcell_mat_trian))
+  cell_to_val,trian
+end
+
 function ptintegrate(f::CellField,b::CellData.GenericMeasure)
   c = integrate(f,b.quad)
   cont = PTDomainContribution()
@@ -144,15 +153,6 @@ function ptintegrate(f::CellField,b::CellData.CompositeMeasure)
   tc = move_contributions(ic,b.itrian,b.ttrian)
   add_contribution!(cont,b,tc)
   return cont
-end
-
-function CellData.move_contributions(scell_to_val::PTArray,args...)
-  ptcell_mat_trian = map(scell_to_val.array) do x
-    move_contributions(x,args...)
-  end
-  cell_to_val = PTArray(first.(ptcell_mat_trian))
-  trian = first(last.(ptcell_mat_trian))
-  cell_to_val,trian
 end
 
 const ∫ₚ = ptintegrate

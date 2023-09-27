@@ -28,6 +28,30 @@ function CellData.add_contribution!(
   a
 end
 
+function save(info::RBInfo,a::AbstractRBAlgebraicContribution)
+  if info.save_structures
+    path = joinpath(info.rb_path,"rb_rhs")
+    save(path,a)
+  end
+end
+
+function load(info::RBInfo,T::Type{AbstractRBAlgebraicContribution})
+  path = joinpath(info.rb_path,"rb_rhs")
+  load(path,T)
+end
+
+function save(info::RBInfo,a::Vector{<:AbstractRBAlgebraicContribution})
+  if info.save_structures
+    path = joinpath(info.rb_path,"rb_lhs")
+    save(path,a)
+  end
+end
+
+function load(info::RBInfo,T::Type{Vector{AbstractRBAlgebraicContribution}})
+  path = joinpath(info.rb_path,"rb_lhs")
+  load(path,T)
+end
+
 struct RBAlgebraicContribution{T} <: AbstractRBAlgebraicContribution{T}
   dict::IdDict{Measure,RBAffineDecomposition{T}}
   function RBAlgebraicContribution(::Type{T}) where T

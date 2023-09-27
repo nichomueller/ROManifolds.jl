@@ -110,12 +110,12 @@ function Base.prod(nza1::NnzMatrix,nza2::NnzMatrix)
 end
 
 function Base.prod(nzm::NnzMatrix,a::AbstractArray)
-  nonzero_vals = nzm.nonzero_vals' * a
+  nonzero_vals = nzm.nonzero_val' * a
   NnzMatrix(nonzero_vals,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
 end
 
 function Base.prod(a::AbstractArray,nzm::NnzMatrix)
-  nonzero_vals = a' * nzm.nonzero_vals
+  nonzero_vals = a' * nzm.nonzero_val
   NnzMatrix(nonzero_vals,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
 end
 
@@ -123,6 +123,14 @@ function recast(nzm::NnzMatrix{T}) where T
   m = zeros(T,nzm.nrows,size(nzm,2))
   m[nzm.nonzero_idx,:] = nzm.nonzero_val
   m
+end
+
+function recast_idx(nzm::NnzMatrix,idx::Vector{Int})
+  nonzero_idx = nzm.nonzero_idx
+  nrows = nzm.nrows
+  entire_idx = nonzero_idx[idx]
+  entire_idx_rows,_ = from_vec_to_mat_idx(entire_idx,nrows)
+  return entire_idx_rows
 end
 
 function compress(a::AbstractMatrix,nzm::NnzMatrix{T}) where T
@@ -140,23 +148,15 @@ function compress(a::AbstractMatrix,b::AbstractMatrix,nzm::NnzMatrix)
   end
 end
 
-function recast_idx(nzm::NnzMatrix,idx::Vector{Int})
-  nonzero_idx = nzm.nonzero_idx
-  nrows = nzm.nrows
-  entire_idx = nonzero_idx[idx]
-  entire_idx_rows,_ = from_vec_to_mat_idx(entire_idx,nrows)
-  return entire_idx_rows
-end
-
 abstract type PODStyle end
 struct DefaultPOD <: PODStyle end
 struct SteadyPOD <: PODStyle end
 struct TranposedPOD <: PODStyle end
 
-function compress(nzm::NnzMatrix,args...;kwargs...)
+function compress(nzm::NnzMatrix,norm_matrix=nothing;kwargs...)
   steady = num_time_dofs(nzm) == 1 ? SteadyPOD() : DefaultPOD()
   transposed = size(nzm,1) < size(nzm,2) ? TranposedPOD() : DefaultPOD()
-  compress(nzm,steady,transposed,args...;kwargs...)
+  compress(nzm,steady,transposed,norm_matrix;kwargs...)
 end
 
 function compress(
@@ -198,7 +198,10 @@ for T in (:DefaultPOD,:TranposedPOD)
   end
 end
 
-tpod(nzm::NnzMatrix,args...;kwargs...) = tpod(nzm.nonzero_val,args...;kwargs...)
+function tpod(nzm::NnzMatrix,args...;kwargs...)
+  nonzero_val = tpod(nzm.nonzero_val,args...;kwargs...)
+  NnzMatrix(nonzero_val,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
+end
 
 function transient_tpod(nzm::NnzMatrix,args...;kwargs...)
   basis_axis1 = tpod(nzm,args...;kwargs...)

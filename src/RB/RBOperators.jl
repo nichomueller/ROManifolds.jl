@@ -24,6 +24,14 @@ function reduced_order_model(
   fesolver::PODESolver)
 
   # Offline phase
+  if info.load_structures
+    sols,params,rbspace,rbrhs,rblhs = load(info,(
+      AbstractSnapshots,
+      Table,
+      AbstractRBSpace,
+      AbstractRBAlgebraicContribution,
+      AbstractRBAlgebraicContribution))
+  end
   nsnaps = info.nsnaps_state
   params = realization(feop,nsnaps)
   sols = collect_solutions(fesolver,feop,params)
@@ -47,8 +55,8 @@ function test_rb_solver(
   rbspace::AbstractRBSpace,
   rbres::AbstractRBAlgebraicContribution{T},
   rbjacs::AbstractRBAlgebraicContribution{T},
-  ::PTArray,
-  snaps_test::PTArray,
+  ::Snapshots,
+  snaps_test::Snapshots,
   params_test::Table) where T
 
   printstyled("Solving linear RB problems\n";color=:blue)
@@ -159,7 +167,7 @@ function assemble_rhs!(
   feop::PTFEOperator,
   fesolver::PThetaMethod,
   rbres::RBAffineDecomposition,
-  meas::Vector{Measure},
+  meas::Base.KeySet{Measure},
   sols::PTArray,
   μ::Table)
 
@@ -223,17 +231,18 @@ function lhs_coefficient!(
   project_lhs_coefficient!(pcache,rbjac.basis_time,coeff)
 end
 
-function assemble_lhs(
+function assemble_lhs!(
+  A::PTArray,
   feop::PTFEOperator,
   fesolver::PThetaMethod,
   rbjac::RBAffineDecomposition,
-  measures::Vector{Measure},
+  meas::Base.KeySet{Measure},
   input...;
   i::Int=1)
 
   idx = rbjac.integration_domain.idx
-  collect_residual!(b,fesolver,feop,sols,μ,meas)
-  map(x->getindex(x,idx),b)
+  collect_jacobian!(A,fesolver,feop,sols,μ,meas;i)
+  map(x->getindex(x,idx),A)
 end
 
 function mdeim_solve!(cache,ad::RBAffineDecomposition,b::PTArray;st_mdeim=false)

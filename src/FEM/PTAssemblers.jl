@@ -82,6 +82,8 @@ function FESpaces.collect_cell_matrix(
   (w,r,c)
 end
 
+Algebra.create_from_nz(a::PTArray) = a
+
 function FESpaces.numeric_loop_matrix!(
   A::PTArray,
   a::GenericSparseMatrixAssembler,

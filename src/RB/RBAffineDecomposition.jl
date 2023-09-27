@@ -39,14 +39,14 @@ function Arrays.testvalue(::Type{RBIntegrationDomain},feop::PTFEOperator)
 end
 
 struct RBAffineDecomposition{T}
-  basis_space::Vector{Matrix{T}}
-  basis_time::Matrix{T}
+  basis_space::Vector{Array{T}}
+  basis_time::Array{T}
   mdeim_interpolation::LU
   integration_domain::RBIntegrationDomain
 
   function RBAffineDecomposition(
-    basis_space::Vector{Matrix{T}},
-    basis_time::Matrix{T},
+    basis_space::Vector{<:Array{T}},
+    basis_time::Array{T},
     mdeim_interpolation::LU,
     integration_domain::RBIntegrationDomain) where T
     new{T}(basis_space,basis_time,mdeim_interpolation,integration_domain)
@@ -55,16 +55,15 @@ struct RBAffineDecomposition{T}
   function RBAffineDecomposition(
     info::RBInfo,
     feop::PTFEOperator,
-    snaps::PTArray,
+    nzm::NnzMatrix,
     meas::Measure,
     times::Vector{<:Real},
     args...;
     kwargs...)
 
-    basis_space,basis_time = compress(info,snaps;ϵ=info.ϵ)
+    basis_space,basis_time = compress(nzm;ϵ=info.ϵ)
     proj_bs,proj_bt = compress(basis_space,basis_time,args...;kwargs...)
-    interp_idx_space = get_interpolation_idx(basis_space)
-    interp_idx_time = get_interpolation_idx(basis_time)
+    interp_idx_space,interp_idx_time = get_interpolation_idx(basis_space,basis_time)
     entire_interp_idx_space = recast_idx(basis_space,interp_idx_space)
 
     interp_bs = basis_space.nonzero_val[interp_idx_space,:]
@@ -108,7 +107,7 @@ function collect_compress_rhs_lhs(
   snaps::Snapshots,
   μ::Table)
 
-  nsnaps = info.nsnaps
+  nsnaps = info.nsnaps_system
   snapsθ = recenter(fesolver,snaps,μ)
   _snapsθ,_μ = snapsθ[1:nsnaps],μ[1:nsnaps]
   rhs = collect_compress_rhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
@@ -121,10 +120,12 @@ function collect_compress_rhs(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbspace::RBSpace,
-  args...)
+  snaps::Snapshots,
+  μ::Table)
 
   times = get_times(fesolver)
-  ress,meas = collect_residuals(fesolver,feop,args...)
+  separate_contribs = Val(true)
+  ress,meas = collect_residuals(fesolver,feop,snaps,μ,separate_contribs)
   ad_res = compress_component(info,feop,ress,meas,times,rbspace)
   return ad_res
 end
@@ -134,16 +135,18 @@ function collect_compress_lhs(
   feop::PTFEOperator,
   fesolver::PThetaMethod,
   rbspace::RBSpace,
-  args...)
+  snaps::Snapshots,
+  μ::Table)
 
   times = get_times(fesolver)
   θ = fesolver.θ
+  separate_contribs = Val(true)
 
   njacs = length(feop.jacs)
   ad_jacs = Vector{RBAlgebraicContribution}(undef,njacs)
   for i = 1:njacs
     combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : x-y
-    jacs,meas = collect_jacobians(fesolver,feop,args...;i)
+    jacs,meas = collect_jacobians(fesolver,feop,snaps,μ,separate_contribs;i)
     ad_jacs[i] = compress_component(info,feop,jacs,meas,times,rbspace,rbspace;combine_projections)
   end
   return ad_jacs
@@ -152,21 +155,22 @@ end
 function compress_component(
   info::RBInfo,
   feop::PTFEOperator,
-  snaps::Snapshots{T},
-  meas::Vector{Measure},
+  snaps::Vector{NnzMatrix{T}},
+  meas::Base.KeySet{Measure},
   args...;
   kwargs...) where T
 
   contrib = RBAlgebraicContribution(T)
-  map(eachindex(meas)) do i_meas
-    si,mi = snaps[i_meas],meas[i_meas]
+  for (i,mi) in enumerate(meas)
+    si = snaps[i]
     ci = RBAffineDecomposition(info,feop,si,mi,args...;kwargs...)
     add_contribution!(contrib,mi,ci)
   end
+  contrib
 end
 
-function get_interpolation_idx(nzm::NnzMatrix)
-  get_interpolation_idx(get_nonzero_val(nzm))
+function get_interpolation_idx(nzm::NnzMatrix...)
+  get_interpolation_idx.(get_nonzero_val.(nzm))
 end
 
 function get_interpolation_idx(basis::AbstractMatrix)
@@ -192,8 +196,7 @@ function compress_space(
   rbspace_row::RBSpace)
 
   entire_bs_row = get_basis_space(rbspace_row)
-  entire_bs = recast(basis_space)
-  compress(entire_bs_row,entire_bs)
+  compress(entire_bs_row,basis_space)
 end
 
 function compress_space(

@@ -56,32 +56,18 @@ for (fsave,fload) in zip((:save,:save_test),(:load,:load_test))
       map(obj->$fsave(info,obj),expand(objs))
     end
 
-    function $fload(types::Tuple,info::RBInfo)
-      map(type->$fload(type,info),expand(types))
+    function $fload(info::RBInfo,types::Tuple)
+      map(type->$fload(info,type),expand(types))
     end
-  end
 end
-
-function save(info::RBInfo,nzm::NnzMatrix)
-  if info.save_structures
-    path = joinpath(info.fe_path,"fesnaps")
-    save(path,nzm)
-  end
 end
 
 function save(info::RBInfo,params::Table)
-  if info.save_structures
-    path = joinpath(info.fe_path,"params")
-    save(path,params)
-  end
-end
-
-function load(T::Type{NnzMatrix},info::RBInfo)
-  path = joinpath(info.fe_path,"fesnaps")
-  load(T,path)
-end
-
-function load(T::Type{Table},info::RBInfo)
   path = joinpath(info.fe_path,"params")
-  load(T,path)
+  save(path,params)
+  end
+
+function load(info::RBInfo,T::Type{Table})
+  path = joinpath(info.fe_path,"params")
+  load(path,T)
 end

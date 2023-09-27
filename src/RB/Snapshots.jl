@@ -48,3 +48,15 @@ Snapshots(s::Vector{Vector{<:PTArray{T}}}) where T = BlockSnapshots(s)
 
 Base.getindex(s::BlockSnapshots,i...) = s.blocks[i...]
 Base.iterate(s::BlockSnapshots,args...) = iterate(s.blocks,args...)
+
+function save(info::RBInfo,nzm::AbstractSnapshots)
+  if info.save_structures
+    path = joinpath(info.fe_path,"fesnaps")
+    save(path,nzm)
+  end
+end
+
+function load(info::RBInfo,T::Type{<:AbstractSnapshots})
+  path = joinpath(info.fe_path,"fesnaps")
+  load(path,T)
+end

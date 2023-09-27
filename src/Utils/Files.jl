@@ -27,7 +27,7 @@ function save(path::String,obj)
   return nothing
 end
 
-function load(::Type{T},path::String)::T where T
+function load(path::String,::Type{T})::T where T
   obj = deserialize(correct_path(path))
   @assert typeof(obj) <: T
   return obj

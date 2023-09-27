@@ -20,7 +20,6 @@ Base.eltype(::PTArray{T}) where T = eltype(T)
 Base.ndims(::PTArray) = 1
 Base.ndims(::Type{<:PTArray}) = 1
 Base.first(a::PTArray) = first(testitem(a))
-Algebra.create_from_nz(a::PTArray) = a
 
 function Base.zero(a::PTArray)
   T = eltype(a)

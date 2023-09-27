@@ -3,6 +3,18 @@ abstract type AbstractRBSpace{T} end
 get_basis_space(rb::AbstractRBSpace) = rb.basis_space
 get_basis_time(rb::AbstractRBSpace) = rb.basis_time
 
+function save(info::RBInfo,a::AbstractRBSpace)
+  if info.save_structures
+    path = joinpath(info.rb_path,"rbspace")
+    save(path,a)
+  end
+end
+
+function load(info::RBInfo,T::Type{AbstractRBSpace})
+  path = joinpath(info.rb_path,"rbspace")
+  load(path,T)
+end
+
 struct RBSpace{T} <: AbstractRBSpace{T}
   basis_space::Matrix{T}
   basis_time::Matrix{T}
