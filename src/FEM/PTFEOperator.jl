@@ -173,12 +173,12 @@ function residual!(
   t,
   xh::T,
   cache,
-  trian::Triangulation...) where T
+  trian::Triangulation,
+  meas::Measure...) where T
 
   V = get_test(op)
   v = get_fe_basis(V)
-  meas = map(t->get_measure(op,t),trian)
-  vecdata = collect_cell_vector(V,op.res(μ,t,xh,v;meas),trian)
+  vecdata = collect_cell_vector(V,op.res(μ,t,xh,v,meas),trian)
   assemble_vector_add!(b,op.assem,vecdata)
 end
 
@@ -268,7 +268,7 @@ function jacobian!(
   u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
   meas = map(t->get_measure(op,t),trian)
-  matdata = collect_cell_matrix(Uh,V,γᵢ*op.jacs[i](μ,t,uh,u,v;meas),trian)
+  matdata = collect_cell_matrix(Uh,V,γᵢ*op.jacs[i](μ,t,uh,u,v,meas),trian)
   assemble_matrix_add!(A,op.assem,matdata)
   Avec
 end

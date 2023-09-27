@@ -267,7 +267,7 @@ function rhs_coefficient!(
 end
 
 function assemble_rhs!(
-  b::PTArray,
+  cache::PTArray,
   feop::PTFEOperator,
   fesolver::PThetaMethod,
   rbres::RBAffineDecomposition,
@@ -275,13 +275,20 @@ function assemble_rhs!(
   sols::PTArray,
   μ::Table)
 
+  ndofs = num_free_dofs(feop.test)
+  setsize!(cache,(ndofs,))
+  b = get_array(cache)
+
   red_idx = rbres.integration_domain.idx
   red_times = rbres.integration_domain.times
   red_trian = rbres.integration_domain.trian
   strian = substitute_trian(red_trian,trian)
+  meas = map(t->get_measure(op,t),strian)
+
   ode_op = get_algebraic_operator(feop)
   ode_cache = allocate_cache(ode_op,μ,red_times)
-  collect_residuals!(b,fesolver,ode_op,sols,μ,ode_cache,strian...)
+
+  collect_residuals!(b,fesolver,ode_op,sols,μ,ode_cache,red_trian,meas...)
   map(x->getindex(x,red_idx),b)
 end
 
@@ -300,7 +307,7 @@ function lhs_coefficient!(
 end
 
 function assemble_lhs!(
-  A::PTArray,
+  cache::PTArray,
   feop::PTFEOperator,
   fesolver::PThetaMethod,
   rbjac::RBAffineDecomposition,
@@ -308,13 +315,21 @@ function assemble_lhs!(
   input...;
   i::Int=1)
 
+  ndofs_row = num_free_dofs(feop.test)
+  ndofs_col = num_free_dofs(get_trial(feop)(nothing,nothing))
+  setsize!(cache,(ndofs_row,ndofs_col))
+  A = get_array(cache)
+
   red_idx = rbjac.integration_domain.idx
   red_times = rbjac.integration_domain.times
   red_trian = rbjac.integration_domain.trian
   strian = substitute_trian(red_trian,trian)
+  meas = map(t->get_measure(op,t),strian)
+
   ode_op = get_algebraic_operator(feop)
   ode_cache = allocate_cache(ode_op,μ,red_times)
-  collect_jacobians!(A,fesolver,ode_op,sols,μ,ode_cache,strian...;i)
+
+  collect_jacobians!(A,fesolver,ode_op,sols,μ,ode_cache,red_trian,meas...;i)
   map(x->getindex(x,red_idx),A)
 end
 

@@ -63,7 +63,7 @@ function allocate_sys_cache(
 
   res_cache = (CachedArray(b),CachedArray(brb),CachedArray(xrb)),CachedArray(xrb)
   jac_cache = (CachedArray(A),CachedArray(Arb),CachedArray(xrb)),CachedArray(xrb)
-  res_cache,jac_cache,sol_cache
+  res_cache,jac_cache
 end
 
 function test_rb_solver(

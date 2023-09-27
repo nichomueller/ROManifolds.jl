@@ -18,8 +18,7 @@ function Base.:(==)(
 end
 
 function substitute_trian(vtrian::Triangulation,trian::Base.KeySet{Triangulation})
-  ntrian = num_domains(trian)
-  strian = Vector{Triangulation}(undef,ntrian)
+  strian = Triangulation[]
   _count = 0
   for t in trian
     if is_parent(t,vtrian)

@@ -131,10 +131,14 @@ function Arrays.testitem(a::PTArray{T}) where T
   end
 end
 
-function Arrays.setsize!(a::PTArray{<:CachedArray},size::Vararg{Int})
+function Arrays.setsize!(a::PTArray{<:CachedArray},size::Tuple{Vararg{Int}})
   @inbounds for i in eachindex(a)
     setsize!(a[i],size)
   end
+end
+
+function Arrays.get_array(a::PTArray{<:CachedArray})
+  PTArray(map(x->getproperty(x,:array),a.array))
 end
 
 get_at_index(::Int,x) = x
@@ -462,6 +466,11 @@ end
 Base.fill!(a::AffinePTArray,z) = fill!(a.array,z)
 
 LinearAlgebra.fillstored!(a::AffinePTArray,z) = fillstored!(a.array,z)
+
+function Arrays.get_array(a::AffinePTArray{<:CachedArray})
+  n = length(a)
+  PTArray(a[1].array,n)
+end
 
 function Arrays.CachedArray(a::AffinePTArray)
   n = length(a)
