@@ -12,15 +12,11 @@ using Gridap.CellData
 using Gridap.MultiField
 
 import BlockArrays:BlockVector,BlockMatrix,BlockArray,mortar
-import Gridap.Helpers.@check
-import Gridap.Helpers.@unreachable
-import Gridap.Arrays:Table
-import Gridap.Arrays:evaluate!
-import Gridap.Algebra:allocate_jacobian
-import Gridap.Algebra:allocate_residual
-import Gridap.Algebra:solve
-import Gridap.ODEs.TransientFETools:Affine
-import Gridap.ODEs.TransientFETools:ODESolver
+import Gridap.Helpers:@check,@unreachable
+import Gridap.Arrays:Table,evaluate!
+import Gridap.Algebra:allocate_matrix,allocate_vector,solve
+# import Gridap.Geometry:GridView,TriangulationView
+import Gridap.ODEs.TransientFETools:Affine,TransientFETools,ODESolver
 
 include("RBInfo.jl")
 include("Snapshots.jl")
@@ -28,5 +24,33 @@ include("NnzArrays.jl")
 include("RBSpaces.jl")
 include("RBAffineDecomposition.jl")
 include("RBAlgebraicContribution.jl")
-include("RBOperators.jl")
-# include("RBResults.jl")
+include("RBResults.jl")
+
+function reduced_basis_model(
+  info::RBInfo,
+  feop::PTFEOperator,
+  fesolver::PODESolver)
+
+  # Offline phase
+  if info.load_structures
+    sols,params,rbspace,rbrhs,rblhs = load(info,(
+      AbstractSnapshots,
+      Table,
+      AbstractRBSpace,
+      AbstractRBAlgebraicContribution,
+      AbstractRBAlgebraicContribution))
+  end
+  nsnaps = info.nsnaps_state
+  params = realization(feop,nsnaps)
+  sols = collect_solutions(fesolver,feop,params)
+  rbspace = get_reduced_basis(info,feop,sols,fesolver,params)
+  rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
+  save(info,(sols,params,rbspace,rbrhs,rblhs))
+
+  # Online phase
+  nsnaps = info.nsnaps_online
+  rb_results = test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,nsnaps)
+  save(info,rb_results)
+
+  return
+end

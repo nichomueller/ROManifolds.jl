@@ -1,161 +1,168 @@
-struct RBResults
-  μ::AbstractArray
-  sol::AbstractArray
-  sol_approx::AbstractArray
-  relative_err::Float
+abstract type AbstractRBResults end
+
+Base.length(r::AbstractRBResults) = length(r.params)
+
+struct RBResults <: AbstractRBResults
+  params::Table
+  sol::PTArray
+  sol_approx::PTArray
+  relative_err::Vector{Float}
   wall_time::Float
 end
 
 function RBResults(
-  μ::AbstractArray,
-  sol::AbstractArray,
-  sol_approx::AbstractArray,
+  params::Table,
+  sol::PTArray,
+  sol_approx::PTArray,
   wall_time::Float;
   kwargs...)
 
   relative_err = compute_relative_error(sol,sol_approx;kwargs...)
+  new(params,sol,sol_approx,relative_err,wall_time)
+end
 
-  printstyled("-------------------------------------------------------------\n")
-  printstyled("Average online relative errors err_u: $relative_err\n";color=:red)
-  printstyled("Average online wall time: $wall_time s\n";color=:red)
-  printstyled("-------------------------------------------------------------\n")
+get_avg_error(r::RBResults) = sum(r.relative_err) / length(r)
+get_avg_time(r::RBResults) = r.wall_time / length(r)
 
+function Base.show(io::IO,r::RBResults)
+  avg_err = get_avg_error(r)
+  avg_time = get_avg_time(r)
+  print(io,"-------------------------------------------------------------\n")
+  print(io,"Average online relative errors: $avg_err\n")
+  print(io,"Average online wall time: $avg_time s\n")
+  print(io,"-------------------------------------------------------------\n")
+end
+
+function Base.first(r::RBResults)
+  μ = r.params[1]
+  sol = r.sol[1]
+  sol_approx = r.sol_approx[1]
+  relative_err = get_avg_error(r)
+  wall_time = get_avg_time(r)
   RBResults(μ,sol,sol_approx,relative_err,wall_time)
 end
 
-function Base.unique(results::Vector{RBResults})
-  ntests = length(results)
-  results1 = first(results)
-  μ = results1.μ
-  sol = results1.sol
-  sol_approx = results1.sol_approx
-  relative_err = sum([r.relative_err for r in results]) / ntests
-  wall_time = sum([r.wall_time for r in results]) / ntests
-  RBResults(μ,sol,sol_approx,relative_err,wall_time)
+function allocate_sys_cache(
+  feop::PTFEOperator,
+  fesolver::PODESolver,
+  rbspace::AbstractRBSpace,
+  params::Table)
+
+  times = get_times(fesolver)
+  ode_op = get_algebraic_operator(feop)
+  ode_cache = allocate_cache(ode_op,params,times)
+  b = allocate_residual(ode_op,sols_test,ode_cache)
+  A = allocate_jacobian(ode_op,sols_test,ode_cache)
+
+  rb_ndofs = num_rb_dofs(rbspace)
+  n = length(params)*length(times)
+  T = eltype(b)
+  brb = PTArray([zeros(T,rb_ndofs) for _ = 1:n])
+  Arb = PTArray([zeros(T,rb_ndofs,rb_ndofs) for _ = 1:n])
+  xrb = copy(brb)
+
+  res_cache = (CachedArray(b),CachedArray(brb),CachedArray(xrb)),CachedArray(xrb)
+  jac_cache = (CachedArray(A),CachedArray(Arb),CachedArray(xrb)),CachedArray(xrb)
+  res_cache,jac_cache,sol_cache
 end
 
-abstract type RBSolver end
-struct Backslash <:RBSolver end
-struct NewtonIterations <:RBSolver end
-
-function test_rb_operator(
+function test_rb_solver(
   info::RBInfo,
-  feop::TransientFEOperator{Affine},
-  rbop::TransientRBOperator{Affine},
+  feop::PTFEOperator{Affine},
   fesolver::PODESolver,
-  rbsolver::RBSolver;
-  ntests=10,
-  postprocess=true)
+  rbspace::AbstractRBSpace,
+  rbres::AbstractRBAlgebraicContribution,
+  rbjacs::AbstractRBAlgebraicContribution,
+  ntests::Int)
 
-  sols,params = load_test(info,feop,fesolver,ntests)
-  norm_matrix = get_norm_matrix(info.energy_norm,feop)
-  results = lazy_map((u,μ)->do_test(rbsolver,rbop,u,μ;norm_matrix),sols,params)
+  snaps_test,params_test = load_test(info,feop,fesolver,ntests)
 
-  if postprocess
-    post_process(info,feop,fesolver,results)
+  printstyled("Solving linear RB problems\n";color=:blue)
+  sys_cache = allocate_sys_cache(feop,fesolver,rbspace,params_test)
+  rhs = collect_rhs_contributions(sys_cache,info,feop,fesolver,rbres,rbspace,params_test)
+  lhs = collect_lhs_contributions(sys_cache,info,feop,fesolver,rbjacs,rbspace,params_test)
+
+  wall_time = @elapsed begin
+    rb_snaps_test = solve(fesolver,rbspace,rhs,lhs)
   end
-
-  return
+  approx_snaps_test = recast(rbspace,rb_snaps_test)
+  RBResults(info,feop,snaps_test,approx_snaps_test,wall_time)
 end
 
-function test_rb_operator(
+function test_rb_solver(
   info::RBInfo,
-  feop::TransientFEOperator,
-  rbop::TransientRBOperator,
+  feop::PTFEOperator,
   fesolver::PODESolver,
-  rbsolver::RBSolver;
-  ntests=10,
-  postprocess=true)
+  rbspace::AbstractRBSpace,
+  rbres::AbstractRBAlgebraicContribution,
+  rbjacs::AbstractRBAlgebraicContribution,
+  ntests::Int)
 
-  sols,params = load_test(info,feop,fesolver,ntests)
-  norm_matrix = get_norm_matrix(info.energy_norm,feop)
+  snaps_test,params_test = load_test(info,feop,fesolver,ntests)
 
-  results = RBResults[]
-  for (u,μ) in zip(sols,params)
-    ic = initial_condition(sols,params,μ)
-    urb,wall_time = solve(rbsolver,rbop,μ,ic)
-    push!(results,RBResults(u,urb,wall_time;norm_matrix))
+  printstyled("Solving nonlinear RB problems with Newton iterations\n";color=:blue)
+  sys_cache = allocate_sys_cache(feop,fesolver,rbspace,params_test)
+  nl_cache = nothing
+  x = initial_guess(info,params_test)
+  _,conv0 = Algebra._check_convergence(fesolver.nls,x)
+  wall_time = @elapsed begin
+    for iter in 1:fesolver.nls.max_nliters
+      rhs = collect_rhs_contributions!(sys_cache,info,feop,fesolver,rbres,rbspace,params_test,x)
+      lhs = collect_lhs_contributions!(sys_cache,info,feop,fesolver,rbjacs,rbspace,params_test,x)
+      nl_cache = solve!(x,fesolver,rhs,lhs,nl_cache)
+      x .-= recast(rbspace,x)
+      isconv,conv = Algebra._check_convergence(fesolver.nls,x,conv0)
+      println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv))) \n")
+      if all(isconv); return; end
+      if iter == nls.max_nliters
+        @unreachable
+      end
+    end
   end
-  if postprocess
-    μ = params[1]
-    r = unique(results)
-    save(info,r)
-    writevtk(info,feop,fesolver,r,μ)
-  end
+  RBResults(info,feop,snaps_test,x,wall_time)
 end
 
 function load_test(
   info::RBInfo,
-  feop::TransientFEOperator,
+  feop::PTFEOperator,
   fesolver::PODESolver,
   ntests::Int)
 
   try
     @check info.load_structures
     sols,params = load_test((Snapshots,Table),info)
-    n = min(ntests,length(params))
-    return sols[1:n],params[1:n]
+    return sols[1:ntests],params[1:ntests]
   catch
-    params = realization(feop,nsnaps)
-    sols = collect_solutions(feop,fesolver,params)
+    params = realization(feop,ntests)
+    sols = collect_solutions(fesolver,feop,params)
     save_test(info,(sols,params))
-    return sols,params
+    return sols[1:ntests],params[1:ntests]
   end
 end
 
-function do_test(
-  ::Backslash,
-  rbop::TransientRBOperator{Affine},
-  μ::AbstractArray,
-  urb::AbstractArray;
-  kwargs...)
-
-  wall_time = @elapsed begin
-    rhs = rbop.rhs(μ)
-    lhs = rbop.lhs(μ)
-    urb = recast(rbop,lhs \ rhs)
-  end
-
-  return RBResults(μ,u,urb,wall_time;kwargs...)
+function Algebra.solve(fesolver::PODESolver,rhs::PTArray,lhs::PTArray)
+  x = copy(rhs)
+  cache = nothing
+  solve!(x,fesolver,rhs,lhs,cache)
 end
 
-function do_test(
-  ::NewtonIterations,
-  rbop::TransientRBOperator{Affine},
-  μ::AbstractArray,
-  urb::AbstractArray;
-  tol=1e-10,
-  maxtol=1e10,
-  maxit=20)
+function Algebra.solve!(
+  x::PTArray,
+  fesolver::PODESolver,
+  rhs::PTArray,
+  lhs::PTArray,
+  ::Nothing)
 
-  err = 1.
-  iter = 0
-
-  wall_time = @elapsed begin
-    while norm(err) ≥ tol && iter < maxit
-      if norm(err) ≥ maxtol
-        printstyled("Newton iterations did not converge\n";color=:red)
-        return urb
-      end
-      rhs = rbop.rhs(μ)
-      lhs = rbop.lhs(μ)
-      rberr = lhs \ rhs
-      err = recast(rbop,rberr)
-      urb -= err
-      l2_err = norm(err)/length(err)
-      iter += 1
-      printstyled("Newton method: ℓ^2 err = $l2_err, iter = $iter\n";color=:red)
-    end
-  end
-
-  urb,wall_time
+  lhsaff,rhsaff = Nonaffine(),Nonaffine()
+  ss = symbolic_setup(fesolver.nls.ls,testitem(lhs))
+  ns = numerical_setup(ss,lhs,lhsaff)
+  _loop_solve!(x,ns,rhs,lhsaff,rhsaff)
 end
 
 # function initial_condition(
-#   sols::Snapshots,
-#   params::Table,
-#   μ::AbstractArray)
-
+#   info::RBInfo,
+    # params_test::Table)
+    # snaps,params = load(info,{Snapshots,Table})
 #   kdtree = KDTree(params)
 #   idx,dist = knn(kdtree,μ)
 #   get_data(sols[idx])

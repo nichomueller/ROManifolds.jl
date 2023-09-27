@@ -5,10 +5,10 @@ CellData.get_domains(a::AbstractRBAlgebraicContribution) = keys(a.dict)
 
 function CellData.get_contribution(
   a::AbstractRBAlgebraicContribution,
-  meas::Measure)
+  trian::Triangulation)
 
-  if haskey(a.dict,meas)
-    return a.dict[meas]
+  if haskey(a.dict,trian)
+    return a.dict[trian]
   else
     @unreachable """\n
     There is not contribution associated with the given mesh in this RBAlgebraicContribution object.
@@ -16,15 +16,15 @@ function CellData.get_contribution(
   end
 end
 
-Base.getindex(a::AbstractRBAlgebraicContribution,meas::Measure) = get_contribution(a,meas)
+Base.getindex(a::AbstractRBAlgebraicContribution,trian::Triangulation) = get_contribution(a,trian)
 
 function CellData.add_contribution!(
   a::AbstractRBAlgebraicContribution,
-  meas::Measure,
+  trian::Triangulation,
   b)
 
-  @check !haskey(a.dict,meas)
-  a.dict[meas] = b
+  @check !haskey(a.dict,trian)
+  a.dict[trian] = b
   a
 end
 
@@ -53,10 +53,74 @@ function load(info::RBInfo,T::Type{Vector{AbstractRBAlgebraicContribution}})
 end
 
 struct RBAlgebraicContribution{T} <: AbstractRBAlgebraicContribution{T}
-  dict::IdDict{Measure,RBAffineDecomposition{T}}
+  dict::IdDict{Triangulation,RBAffineDecomposition{T}}
   function RBAlgebraicContribution(::Type{T}) where T
-    new{T}(IdDict{Measure,RBAffineDecomposition{T}}())
+    new{T}(IdDict{Triangulation,RBAffineDecomposition{T}}())
   end
+end
+
+function collect_rhs_contributions!(
+  cache,
+  info::RBInfo,
+  feop::PTFEOperator,
+  fesolver::PODESolver,
+  rbres::RBAlgebraicContribution{T},
+  rbspace::RBSpace,
+  args...) where T
+
+  coeff_cache,rb_cache = cache
+  trian = get_domains(rbres)
+  st_mdeim = info.st_mdeim
+
+  rb_res_contribs = Vector{PTArray{Matrix{T}}}(undef,num_domains(rbres))
+  for t in trian
+    rbrest = rbres[t]
+    coeff = rhs_coefficient!(coeff_cache,feop,fesolver,rbrest,rbspace,trian,args...;st_mdeim)
+    contrib = rb_contribution!(rb_cache,rbrest,coeff)
+    push!(rb_res_contribs,contrib)
+  end
+  return sum(rb_res_contribs)
+end
+
+function collect_lhs_contributions!(
+  cache,
+  info::RBInfo,
+  feop::PTFEOperator,
+  fesolver::PODESolver,
+  rbjacs::Vector{AbstractRBAlgebraicContribution{T}},
+  args...) where T
+
+  njacs = length(rbjacs)
+  rb_jacs_contribs = Vector{<:PTArray{Matrix{T}}}(undef,njacs)
+  for i = 1:njacs
+    rb_jac_i = rbjacs[i]
+    rb_jacs_contribs[i] = collect_lhs_contributions!(cache,info,feop,fesolver,rb_jac_i,args...;i)
+  end
+  return sum(rb_jacs_contribs)
+end
+
+function collect_lhs_contributions!(
+  cache,
+  info::RBInfo,
+  feop::PTFEOperator,
+  fesolver::PODESolver,
+  rbjac::RBAlgebraicContribution{T},
+  rbspace::RBSpace,
+  args...;
+  kwargs...) where T
+
+  coeff_cache,rb_cache = cache
+  trian = get_domains(rbjac)
+  st_mdeim = info.st_mdeim
+
+  rb_jac_contribs = Vector{PTArray{Matrix{T}}}(undef,num_domains(rbjac))
+  for t in 1:trian
+    rbjact = rbjac[t]
+    coeff = lhs_coefficient!(coeff_cache,feop,fesolver,rbjact,rbspace,trian,args...;st_mdeim,kwargs...)
+    contrib = rb_contribution!(rb_cache,rbjact,coeff)
+    push!(rb_jac_contribs,contrib)
+  end
+  return sum(rb_jac_contribs)
 end
 
 struct RBBlockAlgebraicContribution{T} <: AbstractRBAlgebraicContribution{T}

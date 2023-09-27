@@ -17,6 +17,22 @@ function Base.:(==)(
   return true
 end
 
+function substitute_trian(vtrian::Triangulation,trian::Base.KeySet{Triangulation})
+  ntrian = num_domains(trian)
+  strian = Vector{Triangulation}(undef,ntrian)
+  _count = 0
+  for t in trian
+    if is_parent(t,vtrian)
+      push!(strian,vtrian)
+      _count += 1
+    else
+      push!(strian,t)
+    end
+  end
+  @check _count == 1
+  strian
+end
+
 function is_parent(tparent::Triangulation,tchild::Triangulation)
   try
     try

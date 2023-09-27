@@ -1,9 +1,9 @@
 struct PTDomainContribution <: GridapType
-  dict::IdDict{Measure,Union{PTArray,AbstractArray}}
+  dict::IdDict{Triangulation,Union{PTArray,AbstractArray}}
 end
 
 function PTDomainContribution()
-  PTDomainContribution(IdDict{Measure,Union{PTArray,AbstractArray}}())
+  PTDomainContribution(IdDict{Triangulation,Union{PTArray,AbstractArray}}())
 end
 
 CellData.get_triangulation(meas::Measure) = meas.quad.trian
@@ -12,9 +12,9 @@ CellData.num_domains(a::PTDomainContribution) = length(a.dict)
 
 CellData.get_domains(a::PTDomainContribution) = keys(a.dict)
 
-function CellData.get_contribution(a::PTDomainContribution,meas::Measure)
-  if haskey(a.dict,meas) || haskey(a.dict,get_parent(meas))
-     return a.dict[meas]
+function CellData.get_contribution(a::PTDomainContribution,trian::Triangulation)
+  if haskey(a.dict,trian) || haskey(a.dict,trian.parent)
+     return a.dict[trian]
   else
     @unreachable """\n
     There is not contribution associated with the given mesh in this PTDomainContribution object.
@@ -22,23 +22,11 @@ function CellData.get_contribution(a::PTDomainContribution,meas::Measure)
   end
 end
 
-function CellData.get_contribution(a::PTDomainContribution,trian::Triangulation)
-  for meas in get_domains(a)
-    mtrian = get_triangulation(meas)
-    if is_parent(trian,mtrian) || trian == mtrian
-      get_contribution(a,meas)
-    end
-  end
-  @unreachable """\n
-    There is not contribution associated with the given mesh in this PTDomainContribution object.
-    """
-end
-
-Base.getindex(a::PTDomainContribution,meas::Measure) = get_contribution(a,meas)
+Base.getindex(a::PTDomainContribution,trian::Triangulation) = get_contribution(a,trian)
 
 function CellData.add_contribution!(
   a::PTDomainContribution,
-  meas::Measure,
+  trian::Triangulation,
   b::Union{PTArray,AbstractArray},
   op=+)
 
@@ -78,13 +66,13 @@ function CellData.add_contribution!(
     end
   end
 
-  if haskey(a.dict,meas)
-    a.dict[meas] = lazy_map(Broadcasting(op),a.dict[meas],b)
+  if haskey(a.dict,trian)
+    a.dict[trian] = lazy_map(Broadcasting(op),a.dict[trian],b)
   else
     if op == +
-      a.dict[meas] = b
+      a.dict[trian] = b
     else
-      a.dict[meas] = lazy_map(Broadcasting(op),b)
+      a.dict[trian] = lazy_map(Broadcasting(op),b)
     end
   end
   a
@@ -96,27 +84,26 @@ Base.copy(a::PTDomainContribution) = PTDomainContribution(copy(a.dict))
 
 function (+)(a::PTDomainContribution,b::PTDomainContribution)
   c = copy(a)
-  for (meas,array) in b.dict
-    add_contribution!(c,meas,array)
+  for (trian,array) in b.dict
+    add_contribution!(c,trian,array)
   end
   c
 end
 
 function (-)(a::PTDomainContribution,b::PTDomainContribution)
   c = copy(a)
-  for (meas,array) in b.dict
-    add_contribution!(c,meas,array,-)
+  for (trian,array) in b.dict
+    add_contribution!(c,trian,array,-)
   end
   c
 end
 
 function (*)(a::Number,b::PTDomainContribution)
   c = PTDomainContribution()
-  for (meas,array_old) in b.dict
-    trian = get_triangulation(meas)
+  for (trian,array_old) in b.dict
     s = size(get_cell_map(trian))
     array_new = lazy_map(Broadcasting(*),Fill(a,s),array_old)
-    add_contribution!(c,meas,array_new)
+    add_contribution!(c,trian,array_new)
   end
   c
 end
@@ -143,7 +130,7 @@ end
 function CellData.integrate(f::PTCellField,b::CellData.GenericMeasure)
   c = integrate(f,b.quad)
   cont = PTDomainContribution()
-  add_contribution!(cont,b,c)
+  add_contribution!(cont,b.quad.trian,c)
   cont
 end
 
@@ -151,6 +138,6 @@ function CellData.integrate(f::PTCellField,b::CellData.CompositeMeasure)
   ic = integrate(f,b.quad)
   cont = PTDomainContribution()
   tc = move_contributions(ic,b.itrian,b.ttrian)
-  add_contribution!(cont,b,tc)
+  add_contribution!(cont,b.quad.trian,tc)
   return cont
 end

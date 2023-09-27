@@ -3,15 +3,23 @@ abstract type AbstractRBSpace{T} end
 get_basis_space(rb::AbstractRBSpace) = rb.basis_space
 get_basis_time(rb::AbstractRBSpace) = rb.basis_time
 
-function save(info::RBInfo,a::AbstractRBSpace)
+function Algebra.allocate_vector(rb::AbstractRBSpace{T}) where T
+  zeros(T,num_rb_dofs(rb))
+end
+
+function Algebra.allocate_vector(rb::AbstractRBSpace{T}) where T
+  zeros(T,num_rb_dofs(rb))
+end
+
+function save(info::RBInfo,rb::AbstractRBSpace)
   if info.save_structures
-    path = joinpath(info.rb_path,"rbspace")
-    save(path,a)
+    path = joinpath(info.rb_path,"rb")
+    save(path,rb)
   end
 end
 
 function load(info::RBInfo,T::Type{AbstractRBSpace})
-  path = joinpath(info.rb_path,"rbspace")
+  path = joinpath(info.rb_path,"rb")
   load(path,T)
 end
 
@@ -35,6 +43,10 @@ struct RBSpace{T} <: AbstractRBSpace{T}
   end
 end
 
+function num_rb_dofs(rb::RBSpace)
+  size(rb.basis_space,2)*size(rb.basis_time,2)
+end
+
 function get_reduced_basis(
   info::RBInfo,
   feop::PTFEOperator,
@@ -47,9 +59,9 @@ function get_reduced_basis(
   RBSpace(basis_space,basis_time)
 end
 
-function recast(rbspace::RBSpace,x::PTArray{T}) where T
-  basis_space = get_basis_space(rbspace)
-  basis_time = get_basis_time(rbspace)
+function recast(rb::RBSpace,x::PTArray{T}) where T
+  basis_space = get_basis_space(rb)
+  basis_time = get_basis_time(rb)
   ns_rb = size(basis_space,2)
   nt_rb = size(basis_time,2)
 
@@ -86,6 +98,15 @@ end
 
 get_nfields(rb::BlockRBSpace) = length(rb.basis_space)
 Base.getindex(rb::BlockRBSpace,i...) = RBSpace(rb.basis_space[i...],rb.basis_time[i...])
+
+function num_rb_dofs(rb::BlockRBSpace)
+  nfields = get_nfields(rb)
+  ndofs = 0
+  @inbounds for i = 1:nfields
+    ndofs += num_rb_dofs(rb[i])
+  end
+  ndofs
+end
 
 function get_reduced_basis(
   info::RBInfo,
@@ -219,8 +240,8 @@ function add_time_supremizers(basis_u::Matrix,basis_p::Matrix;ttol=1e-2)
   basis_u
 end
 
-function filter_rbspace(rbspace::BlockRBSpace,idx::Int)
-  basis_time = get_basis_space(rbspace)[idx]
-  basis_time = get_basis_time(rbspace)[idx]
+function filter_rbspace(rb::BlockRBSpace,idx::Int)
+  basis_time = get_basis_space(rb)[idx]
+  basis_time = get_basis_time(rb)[idx]
   RBSpace(basis_space,basis_time)
 end

@@ -79,15 +79,17 @@ function FESpaces.SparseMatrixAssembler(
   SparseMatrixAssembler(trial(nothing,nothing),test)
 end
 
-get_test(op::PTFEOperatorFromWeakForm) = op.test
+get_test(op::PTFEOperator) = op.test
 
-get_trial(op::PTFEOperatorFromWeakForm) = op.trials[1]
+get_trial(op::PTFEOperator) = op.trials[1]
 
-get_order(op::PTFEOperatorFromWeakForm) = op.order
+get_order(op::PTFEOperator) = op.order
 
-get_pspace(op::PTFEOperatorFromWeakForm) = op.pspace
+get_pspace(op::PTFEOperator) = op.pspace
 
 realization(op::PTFEOperator,args...) = realization(op.pspace,args...)
+
+get_measure(op::PTFEOperator,trian::Triangulation) = Measure(trian,get_order(op.test))
 
 for OP in (:PTAffineFEOperator,:PTFEOperator)
   @eval begin
@@ -154,15 +156,14 @@ function residual!(
   V = get_test(op)
   v = get_fe_basis(V)
   dc = op.res(μ,t,xh,v)
-  nmeas = num_domains(dc)
-  meas = get_domains(dc)
-  bvec = Vector{typeof(b)}(undef,nmeas)
-  for (n,m) in enumerate(meas)
-    vecdata = collect_cell_vector(V,dc,m)
+  trian = get_domains(dc)
+  bvec = Vector{typeof(b)}(undef,num_domains(dc))
+  for (n,t) in enumerate(trian)
+    vecdata = collect_cell_vector(V,dc,t)
     assemble_vector_add!(b,op.assem,vecdata)
     bvec[n] = copy(b)
   end
-  bvec,meas
+  bvec,trian
 end
 
 function residual!(
@@ -172,11 +173,12 @@ function residual!(
   t,
   xh::T,
   cache,
-  meas::Measure...) where T
+  trian::Triangulation...) where T
 
   V = get_test(op)
   v = get_fe_basis(V)
-  vecdata = collect_cell_vector(V,op.res(μ,t,xh,v),meas)
+  meas = map(t->get_measure(op,t),trian)
+  vecdata = collect_cell_vector(V,op.res(μ,t,xh,v;meas),trian)
   assemble_vector_add!(b,op.assem,vecdata)
 end
 
@@ -240,15 +242,14 @@ function jacobian!(
   u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
   dc = γᵢ*op.jacs[i](μ,t,uh,u,v)
-  nmeas = num_domains(dc)
-  meas = get_domains(dc)
-  Avec = Vector{typeof(A)}(undef,nmeas)
-  for (n,m) in enumerate(meas)
-    matdata = collect_cell_matrix(Uh,V,dc,m)
+  trian = get_domains(dc)
+  Avec = Vector{typeof(A)}(undef,num_domains(dc))
+  for (n,t) in enumerate(trian)
+    matdata = collect_cell_matrix(Uh,V,dc,t)
     assemble_matrix_add!(A,op.assem,matdata)
     Avec[n] = copy(A)
   end
-  Avec,meas
+  Avec,trian
 end
 
 function jacobian!(
@@ -260,13 +261,14 @@ function jacobian!(
   i::Integer,
   γᵢ::Real,
   cache,
-  meas::Measure...) where T
+  trian::Triangulation...) where T
 
   Uh = get_trial(op)(μ,t)
   V = get_test(op)
   u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
-  matdata = collect_cell_matrix(Uh,V,γᵢ*op.jacs[i](μ,t,uh,u,v),meas)
+  meas = map(t->get_measure(op,t),trian)
+  matdata = collect_cell_matrix(Uh,V,γᵢ*op.jacs[i](μ,t,uh,u,v;meas),trian)
   assemble_matrix_add!(A,op.assem,matdata)
   Avec
 end
