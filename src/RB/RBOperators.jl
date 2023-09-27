@@ -172,7 +172,7 @@ function assemble_rhs!(
   μ::Table)
 
   idx = rbres.integration_domain.idx
-  collect_residual!(b,fesolver,feop,sols,μ,meas)
+  collect_residual!(b,fesolver,feop,sols,μ,meas...)
   map(x->getindex(x,idx),b)
 end
 
@@ -241,7 +241,7 @@ function assemble_lhs!(
   i::Int=1)
 
   idx = rbjac.integration_domain.idx
-  collect_jacobian!(A,fesolver,feop,sols,μ,meas;i)
+  collect_jacobian!(A,fesolver,feop,sols,μ,meas...;i)
   map(x->getindex(x,idx),A)
 end
 

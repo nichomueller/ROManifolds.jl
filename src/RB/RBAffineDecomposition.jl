@@ -120,7 +120,7 @@ function collect_compress_rhs(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbspace::RBSpace,
-  snaps::Snapshots,
+  snaps::PTArray,
   μ::Table)
 
   times = get_times(fesolver)
@@ -135,7 +135,7 @@ function collect_compress_lhs(
   feop::PTFEOperator,
   fesolver::PThetaMethod,
   rbspace::RBSpace,
-  snaps::Snapshots,
+  snaps::PTArray,
   μ::Table)
 
   times = get_times(fesolver)

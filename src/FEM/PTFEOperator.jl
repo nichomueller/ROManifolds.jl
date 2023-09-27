@@ -36,11 +36,8 @@ struct PTFEOperatorFromWeakForm{C<:OperatorType} <: PTFEOperator{C}
   order::Integer
 end
 
-function PTAffineFEOperator(m::Function,a::Function,b::Function,
+function PTAffineFEOperator(res::Function,jac::Function,jac_t::Function,
   pspace,trial,test)
-  res(μ,t,u,v) = m(μ,t,∂ₚt(u),v) + a(μ,t,u,v) - b(μ,t,v)
-  jac(μ,t,u,du,v) = a(μ,t,du,v)
-  jac_t(μ,t,u,dut,v) = m(μ,t,dut,v)
   assem = SparseMatrixAssembler(trial,test)
   PTFEOperatorFromWeakForm{Affine}(
     res,(jac,jac_t),assem,pspace,(trial,∂ₚt(trial)),test,1)
@@ -175,7 +172,7 @@ function residual!(
   t,
   xh::T,
   cache,
-  meas::Measure) where T
+  meas::Measure...) where T
 
   V = get_test(op)
   v = get_fe_basis(V)
@@ -263,7 +260,7 @@ function jacobian!(
   i::Integer,
   γᵢ::Real,
   cache,
-  meas::Measure) where T
+  meas::Measure...) where T
 
   Uh = get_trial(op)(μ,t)
   V = get_test(op)

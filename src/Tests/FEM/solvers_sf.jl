@@ -1,11 +1,10 @@
 K = 2
 μ = realization(feop,K)
-ode_solver = ThetaMethod(LUSolver(),dt,θ)
 
 # POISSON
 ode_op = get_algebraic_operator(feop)
 w = get_free_dof_values(uh0μ(μ))
-sol = PODESolution(ode_solver,ode_op,μ,w,t0,tf)
+sol = PODESolution(fesolver,ode_op,μ,w,t0,tf)
 
 results = PTArray[]
 for (uh,t) in sol

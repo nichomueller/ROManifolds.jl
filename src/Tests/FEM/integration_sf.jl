@@ -9,7 +9,7 @@ U = get_trial(feop)(nothing,nothing)
 du = get_trial_fe_basis(U)
 
 ode_op = get_algebraic_operator(feop)
-ode_cache = allocate_cache(ode_op,μ)
+ode_cache = allocate_cache(ode_op,μ,t)
 update_cache!(ode_cache,ode_op,μ,t)
 nfree = num_free_dofs(test)
 u = PTArray([zeros(nfree) for _ = 1:K])
@@ -23,9 +23,9 @@ for i in 1:get_order(feop)
 end
 xh = TransientCellField(uh,dxh)
 
-dca = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ) # dca = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(du),dΩ)
-dch = ∫ₚ(hμt(μ,t)*v,dΓn)
-dcm = ∫ₚ(v*∂ₚt(xh),dΩ) # dcm = ∫ₚ(v⋅∂ₚt(xh[1]),dΩ)
+dca = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
+dch = ∫(hμt(μ,t)*v)dΓn
+dcm = ∫(v*∂ₚt(xh))dΩ
 quad = dΩ.quad
 x = get_cell_points(quad)
 b = change_domain(v*∂ₚt(xh),quad.trian,quad.data_domain_style)

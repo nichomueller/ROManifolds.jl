@@ -41,14 +41,15 @@ begin
   u0(μ) = x->u0(x,μ)
   u0μ(μ) = PFunction(u0,μ)
 
-  m(μ,t,dut,v) = ∫ₚ(v*dut,dΩ)
-  lhs(μ,t,du,v) = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ)
-  rhs(μ,t,v) = ∫ₚ(fμt(μ,t)*v,dΩ) + ∫ₚ(hμt(μ,t)*v,dΓn)
+  jac_t(μ,t,u,dut,v,meas=(dΩ,)) = ∫(v*dut)meas[1]
+  jac(μ,t,u,du,v,meas=(dΩ,)) = ∫(aμt(μ,t)*∇(v)⋅∇(du))meas[1]
+  res(μ,t,u,v,meas=(dΩ,dΓn)) = (∫(v*∂ₚt(u))meas[1] + ∫(aμt(μ,t)*∇(v)⋅∇(u))meas[1]
+    - ∫(fμt(μ,t)*v)meas[1] - ∫(hμt(μ,t)*v)meas[2])
 
   reffe = ReferenceFE(lagrangian,Float,order)
   test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
   trial = PTTrialFESpace(test,g)
-  feop = PTAffineFEOperator(m,lhs,rhs,pspace,trial,test)
+  feop = PTAffineFEOperator(res,jac,jac_t,pspace,trial,test)
   t0,tf,dt,θ = 0.,0.05,0.005,1
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
   fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)

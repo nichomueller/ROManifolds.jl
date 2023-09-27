@@ -140,19 +140,17 @@ function CellData.move_contributions(scell_to_val::PTArray,args...)
   cell_to_val,trian
 end
 
-function ptintegrate(f::CellField,b::CellData.GenericMeasure)
+function CellData.integrate(f::PTCellField,b::CellData.GenericMeasure)
   c = integrate(f,b.quad)
   cont = PTDomainContribution()
   add_contribution!(cont,b,c)
   cont
 end
 
-function ptintegrate(f::CellField,b::CellData.CompositeMeasure)
+function CellData.integrate(f::PTCellField,b::CellData.CompositeMeasure)
   ic = integrate(f,b.quad)
   cont = PTDomainContribution()
   tc = move_contributions(ic,b.itrian,b.ttrian)
   add_contribution!(cont,b,tc)
   return cont
 end
-
-const ∫ₚ = ptintegrate

@@ -159,6 +159,87 @@ function Arrays.testitem(f::GenericPTCellField)
   GenericCellField(testitem(f.cell_field),f.trian,f.domain_style)
 end
 
+struct PTOperationCellField{DS} <: PTCellField
+  op::Operation
+  args::Tuple
+  trian::Triangulation
+  domain_style::DS
+  memo::Dict{Any,Any}
+
+  function PTOperationCellField(op::Operation,args::CellField...)
+    @assert length(args) > 0
+    trian = get_triangulation(first(args))
+    domain_style = DomainStyle(first(args))
+    @check all( map(i->DomainStyle(i)==domain_style,args) )
+    if num_cells(trian)>0
+      x = _get_cell_points(args...)
+      ax = map(i->i(x),args)
+      axi = map(first,ax)
+      Fields.BroadcastingFieldOpMap(op.op)(axi...)
+    end
+    new{typeof(domain_style)}(op,args,trian,domain_style,Dict())
+  end
+end
+
+function CellData._get_cell_points(args::CellField...)
+  k = findfirst(i->isa(i,CellState),args)
+  if k === nothing
+    j = findall(i->isa(i,Union{OperationCellField,PTOperationCellField}),args)
+    if length(j) == 0
+      CellData._get_cell_points(first(args))
+    else
+      CellData._get_cell_points(args[j]...)
+    end
+  else
+    args[k].points
+  end
+end
+
+function CellData._get_cell_points(a::PTOperationCellField...)
+  b = []
+  for ai in a
+    for i in ai.args
+      push!(b,i)
+    end
+  end
+  CellData._get_cell_points(b...)
+end
+
+function CellData._get_cell_points(a::PTOperationCellField)
+  CellData._get_cell_points(a.args...)
+end
+
+function CellData.get_data(f::PTOperationCellField)
+  a = map(get_data,f.args)
+  lazy_map(Broadcasting(f.op),a...)
+end
+
+CellData.get_triangulation(f::PTOperationCellField) = f.trian
+CellData.DomainStyle(::Type{PTOperationCellField{DS}}) where DS = DS()
+
+function Arrays.evaluate!(cache,f::PTOperationCellField,x::CellPoint)
+  ax = map(i->i(x),f.args)
+  lazy_map(Fields.BroadcastingFieldOpMap(f.op.op),ax...)
+end
+
+function CellData.change_domain(
+  f::PTOperationCellField,
+  target_trian::Triangulation,
+  target_domain::DomainStyle)
+
+  args = map(i->change_domain(i,target_trian,target_domain),f.args)
+  PTOperationCellField(f.op,args...)
+end
+
+function CellData._operate_cellfields(k::Operation,a...)
+  b = _to_common_domain(a...)
+  if any(x->isa(x,Union{PTFEFunction,PTCellField,PTArray}),b)
+    PTOperationCellField(k,b...)
+  else
+    OperationCellField(k,b...)
+  end
+end
+
 abstract type PTFEFunction <: PTCellField end
 
 struct PTSingleFieldFEFunction{T<:CellField} <: PTFEFunction
