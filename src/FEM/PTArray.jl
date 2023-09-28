@@ -137,6 +137,14 @@ function Arrays.setsize!(a::PTArray{<:CachedArray},size::Tuple{Vararg{Int}})
   end
 end
 
+function LinearAlgebra.ldiv!(a::PTArray,m::LU,b::PTArray)
+  @check length(a) == length(b)
+  @inbounds for i = eachindex(a)
+    ai,bi = a[i],b[i]
+    ldiv!(ai,m,bi)
+  end
+end
+
 function Arrays.get_array(a::PTArray{<:CachedArray})
   PTArray(map(x->getproperty(x,:array),a.array))
 end
@@ -466,6 +474,11 @@ end
 Base.fill!(a::AffinePTArray,z) = fill!(a.array,z)
 
 LinearAlgebra.fillstored!(a::AffinePTArray,z) = fillstored!(a.array,z)
+
+function LinearAlgebra.ldiv!(a::AffinePTArray,m::LU,b::AffinePTArray)
+  @check length(a) == length(b)
+  ldiv!(testitem(a),m,testitem(b))
+end
 
 function Arrays.get_array(a::AffinePTArray{<:CachedArray})
   n = length(a)

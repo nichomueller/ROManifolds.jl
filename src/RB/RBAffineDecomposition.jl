@@ -254,14 +254,13 @@ function rhs_coefficient!(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbres::RBAffineDecomposition,
-  rbspace::RBSpace,
   args...;
   kwargs...)
 
   rcache,ccache,pcache = cache
   red_integr_res = assemble_rhs!(rcache,feop,fesolver,rbres,args...)
   coeff = mdeim_solve!(ccache,rbres,red_integr_res;kwargs...)
-  project_rhs_coefficient!(pcache,rbspace,rbres.basis_time,coeff)
+  project_rhs_coefficient!(pcache,rbres.basis_time,coeff)
 end
 
 function assemble_rhs!(
@@ -342,70 +341,76 @@ end
 
 function mdeim_solve!(cache::PTArray,mdeim_interp::LU,b::PTArray)
   setsize!(cache,size(testitem(b)))
-  x = map(y->ldiv!(y,mdeim_interp,b),cache)
+  x = get_array(cache)
+  ldiv!(x,mdeim_interp,b)
   map(transpose,x)
 end
 
 function recast_coefficient!(
-  rcoeff::PTArray{<:CachedArray{T}},
-  basis_time::Vector{Matrix{T}},
+  cache::PTArray{<:CachedArray{T}},
+  basis_time::Matrix{T},
   coeff::PTArray) where T
 
-  bt,_ = basis_time
-  Nt,Qt = size(bt)
+  Nt,Qt = size(basis_time)
   Qs = Int(length(testitem(coeff))/Qt)
-  setsize!(rcoeff,Nt,Qs)
+  setsize!(cache,Nt,Qs)
+  array = get_array(cache)
 
   @inbounds for n = eachindex(coeff)
-    rn = rcoeff[n].array
+    an = array[n]
     cn = coeff[n]
     for qs in 1:Qs
       sorted_idx = [(i-1)*Qs+qs for i = 1:Qt]
-      copyto!(view(rn,:,qs),bt*cn[sorted_idx])
+      copyto!(view(an,:,qs),basis_time*cn[sorted_idx])
     end
   end
 
-  PTArray(map(x->getproperty(x,:array)),rcoeff.array)
+  PTArray(array)
 end
 
-function project_rhs_coefficient(
-  basis_time::Vector{<:Array{T}},
-  coeff::AbstractMatrix) where T
+function project_rhs_coefficient!(
+  cache::CachedArray{T},
+  basis_time::Matrix{T},
+  coeff::PTArray) where T
 
-  _,bt_proj = basis_time
-  nt_row = size(bt_proj,2)
-  Qs = size(coeff,2)
-  pcoeff = zeros(T,nt_row,1)
-  pcoeff_v = Vector{typeof(pcoeff)}(undef,Qs)
+  nt_row = size(basis_time,2)
+  setsize!(cache,(nt_row,))
+  array = cache.array
+  ptarray = PTArray([copy(array) for _ = eachindex(coeff)])
 
-  @inbounds for (ic,c) in enumerate(eachcol(coeff))
-    for (row,b) in enumerate(eachcol(bt_proj))
-      pcoeff[row] = sum(b.*c)
+  @inbounds for n = eachindex(coeff)
+    cn = coeff[n]
+    Qs = size(coeff,2)
+    for i in axes(basis_time,2)
+      array[i] = sum(basis_time[:,i].*cn)
     end
-    pcoeff_v[ic] = pcoeff
+    ptarray[n] .= array
   end
 
-  pcoeff_v
+  ptarray
 end
 
-function project_lhs_coefficient(
-  basis_time::Vector{<:Array{T}},
-  coeff::AbstractMatrix) where T
+function project_lhs_coefficient!(
+  cache::CachedArray{T},
+  basis_time::Array{T,3},
+  coeff::PTArray) where T
 
-  _,bt_proj = basis_time
-  nt_row,nt_col = size(bt_proj)[2:3]
+  nt_row = size(basis_time,2)
+  nt_col = size(basis_time,3)
   Qs = size(coeff,2)
-  pcoeff = zeros(T,nt_row,nt_col)
-  pcoeff_v = Vector{typeof(pcoeff)}(undef,Qs)
+  setsize!(cache,(nt_row,nt_col))
+  array = cache.array
+  ptarray = PTArray([copy(array) for _ = 1:Qs])
 
-  @inbounds for (ic,c) in enumerate(eachcol(coeff))
-    for col in axes(bt_proj,3), row in axes(bt_proj,2)
-      pcoeff[row,col] = sum(bt_proj[:,row,col].*c)
+  @inbounds for n = 1:Qs
+    cn = coeff[n]
+    for col in axes(basis_time,3), row in axes(basis_time,2)
+      array[row,col] = sum(basis_time[:,row,col].*cn)
     end
-    pcoeff_v[ic] = pcoeff
+    ptarray[n] .= array
   end
 
-  pcoeff_v
+  ptarray
 end
 
 function rb_contribution!(
@@ -416,15 +421,17 @@ function rb_contribution!(
   bs = ad.basis_space
   sz = map(*,size(bs),size(coeff))
   setsize!(cache,sz)
+  array = get_array(cache)
+
   @inbounds for n = eachindex(coeff)
-    rn = cache[n].array
+    an = array[n]
     cn = coeff[n]
     Threads.@threads for i = eachindex(coeff)
-      LinearAlgebra.kron!(rn,bs[i],cn[i])
+      LinearAlgebra.kron!(an,bs[i],cn[i])
     end
   end
 
-  PTArray(map(x->getproperty(x,:array)),rcoeff.array)
+  PTArray(array)
 end
 
 # Multifield interface

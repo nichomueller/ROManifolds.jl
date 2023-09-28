@@ -225,5 +225,5 @@ function collect_jacobians!(
 
   printstyled("Computing fe residual for every time and parameter\n";color=:blue)
   jacs_i,trian = jacobian!(A,nlop,sols,i,return_trian)
-  return map(x->NnzMatrix(map(NnzVector,x)),jacs_i),trian
+  return map(x->NnzMatrix(map(NnzVector,x);nparams=length(nlop.μ)),jacs_i),trian
 end

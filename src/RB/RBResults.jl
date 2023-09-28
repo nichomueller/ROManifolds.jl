@@ -61,8 +61,8 @@ function allocate_sys_cache(
   Arb = PTArray([zeros(T,rb_ndofs,rb_ndofs) for _ = 1:n])
   xrb = copy(brb)
 
-  res_cache = (CachedArray(b),CachedArray(brb),CachedArray(xrb)),CachedArray(xrb)
-  jac_cache = (CachedArray(A),CachedArray(Arb),CachedArray(xrb)),CachedArray(xrb)
+  res_cache = (CachedArray(b),CachedArray(brb),CachedArray(xrb[1])),CachedArray(xrb)
+  jac_cache = (CachedArray(A),CachedArray(Arb),CachedArray(xrb[1])),CachedArray(xrb)
   res_cache,jac_cache
 end
 
@@ -79,8 +79,8 @@ function test_rb_solver(
 
   printstyled("Solving linear RB problems\n";color=:blue)
   sys_cache = allocate_sys_cache(feop,fesolver,rbspace,params_test)
-  rhs = collect_rhs_contributions(sys_cache,info,feop,fesolver,rbres,rbspace,params_test)
-  lhs = collect_lhs_contributions(sys_cache,info,feop,fesolver,rbjacs,rbspace,params_test)
+  rhs = collect_rhs_contributions(sys_cache,info,feop,fesolver,rbres,params_test)
+  lhs = collect_lhs_contributions(sys_cache,info,feop,fesolver,rbjacs,params_test)
 
   wall_time = @elapsed begin
     rb_snaps_test = solve(fesolver,rbspace,rhs,lhs)
@@ -107,8 +107,8 @@ function test_rb_solver(
   _,conv0 = Algebra._check_convergence(fesolver.nls,x)
   wall_time = @elapsed begin
     for iter in 1:fesolver.nls.max_nliters
-      rhs = collect_rhs_contributions!(sys_cache,info,feop,fesolver,rbres,rbspace,params_test,x)
-      lhs = collect_lhs_contributions!(sys_cache,info,feop,fesolver,rbjacs,rbspace,params_test,x)
+      rhs = collect_rhs_contributions!(sys_cache,info,feop,fesolver,rbres,params_test,x)
+      lhs = collect_lhs_contributions!(sys_cache,info,feop,fesolver,rbjacs,params_test,x)
       nl_cache = solve!(x,fesolver,rhs,lhs,nl_cache)
       x .-= recast(rbspace,x)
       isconv,conv = Algebra._check_convergence(fesolver.nls,x,conv0)

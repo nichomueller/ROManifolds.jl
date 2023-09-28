@@ -65,7 +65,6 @@ function collect_rhs_contributions!(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbres::RBAlgebraicContribution{T},
-  rbspace::RBSpace,
   args...) where T
 
   coeff_cache,rb_cache = cache
@@ -75,7 +74,7 @@ function collect_rhs_contributions!(
   rb_res_contribs = Vector{PTArray{Matrix{T}}}(undef,num_domains(rbres))
   for t in trian
     rbrest = rbres[t]
-    coeff = rhs_coefficient!(coeff_cache,feop,fesolver,rbrest,rbspace,trian,args...;st_mdeim)
+    coeff = rhs_coefficient!(coeff_cache,feop,fesolver,rbrest,trian,args...;st_mdeim)
     contrib = rb_contribution!(rb_cache,rbrest,coeff)
     push!(rb_res_contribs,contrib)
   end
@@ -105,7 +104,6 @@ function collect_lhs_contributions!(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbjac::RBAlgebraicContribution{T},
-  rbspace::RBSpace,
   args...;
   kwargs...) where T
 
@@ -116,7 +114,7 @@ function collect_lhs_contributions!(
   rb_jac_contribs = Vector{PTArray{Matrix{T}}}(undef,num_domains(rbjac))
   for t in 1:trian
     rbjact = rbjac[t]
-    coeff = lhs_coefficient!(coeff_cache,feop,fesolver,rbjact,rbspace,trian,args...;st_mdeim,kwargs...)
+    coeff = lhs_coefficient!(coeff_cache,feop,fesolver,rbjact,trian,args...;st_mdeim,kwargs...)
     contrib = rb_contribution!(rb_cache,rbjact,coeff)
     push!(rb_jac_contribs,contrib)
   end
