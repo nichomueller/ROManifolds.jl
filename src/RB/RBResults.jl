@@ -45,8 +45,8 @@ end
 function allocate_sys_cache(
   feop::PTFEOperator,
   fesolver::PODESolver,
-  rbspace::AbstractRBSpace,
-  params::Table)
+  rbspace::AbstractRBSpace{T},
+  params::Table) where T
 
   times = get_times(fesolver)
   ode_op = get_algebraic_operator(feop)
@@ -56,13 +56,17 @@ function allocate_sys_cache(
 
   rb_ndofs = num_rb_dofs(rbspace)
   n = length(params)*length(times)
-  T = eltype(b)
   brb = PTArray([zeros(T,rb_ndofs) for _ = 1:n])
   Arb = PTArray([zeros(T,rb_ndofs,rb_ndofs) for _ = 1:n])
-  xrb = copy(brb)
 
-  res_cache = (CachedArray(b),CachedArray(brb),CachedArray(xrb[1])),CachedArray(xrb)
-  jac_cache = (CachedArray(A),CachedArray(Arb),CachedArray(xrb[1])),CachedArray(xrb)
+  k = RBContributionMap()
+  rbres = testvalue(RBAffineDecomposition{T},feop;vector=true)
+  rbjac = testvalue(RBAffineDecomposition{T},feop;vector=false)
+  res_contrib_cache = return_cache(k,rbres.basis_space,rbres.basis_time)
+  jac_contrib_cache = return_cache(k,rbjac.basis_space,rbjac.basis_time)
+
+  res_cache = (CachedArray(b),CachedArray(brb[1]),CachedArray(brb)),res_contrib_cache
+  jac_cache = (CachedArray(A),CachedArray(Arb[1]),CachedArray(Arb)),jac_contrib_cache
   res_cache,jac_cache
 end
 
@@ -78,9 +82,9 @@ function test_rb_solver(
   snaps_test,params_test = load_test(info,feop,fesolver,ntests)
 
   printstyled("Solving linear RB problems\n";color=:blue)
-  sys_cache = allocate_sys_cache(feop,fesolver,rbspace,params_test)
-  rhs = collect_rhs_contributions(sys_cache,info,feop,fesolver,rbres,params_test)
-  lhs = collect_lhs_contributions(sys_cache,info,feop,fesolver,rbjacs,params_test)
+  rhs_cache,lhs_cache = allocate_sys_cache(feop,fesolver,rbspace,params_test)
+  rhs = collect_rhs_contributions(rhs_cache,info,feop,fesolver,rbres,params_test)
+  lhs = collect_lhs_contributions(lhs_cache,info,feop,fesolver,rbjacs,params_test)
 
   wall_time = @elapsed begin
     rb_snaps_test = solve(fesolver,rbspace,rhs,lhs)
@@ -101,14 +105,14 @@ function test_rb_solver(
   snaps_test,params_test = load_test(info,feop,fesolver,ntests)
 
   printstyled("Solving nonlinear RB problems with Newton iterations\n";color=:blue)
-  sys_cache = allocate_sys_cache(feop,fesolver,rbspace,params_test)
+  rhs_cache,lhs_cache = allocate_sys_cache(feop,fesolver,rbspace,params_test)
   nl_cache = nothing
   x = initial_guess(info,params_test)
   _,conv0 = Algebra._check_convergence(fesolver.nls,x)
   wall_time = @elapsed begin
     for iter in 1:fesolver.nls.max_nliters
-      rhs = collect_rhs_contributions!(sys_cache,info,feop,fesolver,rbres,params_test,x)
-      lhs = collect_lhs_contributions!(sys_cache,info,feop,fesolver,rbjacs,params_test,x)
+      rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,params_test,x)
+      lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,params_test,x)
       nl_cache = solve!(x,fesolver,rhs,lhs,nl_cache)
       x .-= recast(rbspace,x)
       isconv,conv = Algebra._check_convergence(fesolver.nls,x,conv0)

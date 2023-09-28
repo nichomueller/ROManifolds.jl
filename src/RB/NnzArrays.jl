@@ -212,16 +212,9 @@ function transient_tpod(nzm::NnzMatrix,args...;kwargs...)
 end
 
 function change_mode(nzm::NnzMatrix{T}) where T
-  space_ndofs = num_space_dofs(nzm)
   time_ndofs = num_time_dofs(nzm)
   nparams = num_params(nzm)
-  idx = time_param_idx(time_ndofs,nparams)
-
-  mode2 = zeros(T,time_ndofs,space_ndofs*nparams)
-  @inbounds for (i,col) = enumerate(eachcol(idx))
-    mode2[i,:] = reshape(nzm.nonzero_val[:,col]',:)
-  end
-
+  mode2 = change_mode(nzm.nonzero_val,time_ndofs,nparams)
   return NnzMatrix(mode2,nzm.nonzero_idx,nzm.nrows,nparams)
 end
 

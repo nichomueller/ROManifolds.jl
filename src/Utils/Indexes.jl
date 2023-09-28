@@ -59,6 +59,26 @@ end
 time_param_idx(ntimes::Int,range::UnitRange) = collect(range) .+ collect(0:ntimes-1)'*ntimes
 time_param_idx(ntimes::Int,nparams::Int) = collect(1:nparams) .+ collect(0:ntimes-1)'*ntimes
 
+function change_mode(mat::Matrix{T},time_ndofs::Int,nparams::Int) where T
+  space_ndofs = Int(length(mat)/(time_ndofs*nparams))
+  idx = time_param_idx(time_ndofs,nparams)
+  mode2 = zeros(T,time_ndofs,space_ndofs*nparams)
+  @inbounds for (i,col) = enumerate(eachcol(idx))
+    mode2[i,:] = reshape(mat[:,col]',:)
+  end
+  return mode2
+end
+
+function change_order(mat::Matrix{T},time_ndofs::Int) where T
+  nparams = Int(size(mat,2)/time_ndofs)
+  idx = time_param_idx(time_ndofs,nparams)
+  mode2 = zeros(T,size(mat))
+  @inbounds for (i,col) = enumerate(eachcol(idx))
+    mode2[:,i] = reshape(mat[:,col]',:)
+  end
+  return mode2
+end
+
 function idx_batches(v::AbstractArray)
   nbatches = Threads.nthreads()
   [round(Int,i) for i in range(0,length(v),nbatches+1)]
