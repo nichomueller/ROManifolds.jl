@@ -88,11 +88,11 @@ function Arrays.testvalue(
   vector=true) where T
 
   if vector
-    basis_space = Vector{Vector{T}}(undef,0)
-    basis_time = Matrix{T}(undef,0,0)
+    basis_space = [zeros(T,1)]
+    basis_time = zeros(T,1,1)
   else
-    basis_space = Vector{Matrix{T}}(undef,0)
-    basis_time = Array{T,3}(undef,0,0,0)
+    basis_space = [zeros(T,1,1)]
+    basis_time = zeros(T,1,1,1)
   end
   mdeim_interpolation = lu(one(T))
   integration_domain = testvalue(RBIntegrationDomain,feop)
@@ -277,9 +277,9 @@ function assemble_rhs!(
   sols::PTArray,
   μ::Table)
 
+  times = get_times(fesolver)
   ndofs = num_free_dofs(feop.test)
   setsize!(cache,(ndofs,))
-  b = get_array(cache)
 
   red_idx = rbres.integration_domain.idx
   red_times = rbres.integration_domain.times
@@ -290,7 +290,16 @@ function assemble_rhs!(
   ode_op = get_algebraic_operator(feop)
   ode_cache = allocate_cache(ode_op,μ,red_times)
 
-  nzm = collect_residuals!(b,fesolver,ode_op,sols,μ,ode_cache,red_trian,meas...)
+  if length(red_times) < length(times)
+    b = get_array(cache;len=length(red_times)*length(μ))
+    time_idx = findall(x->x in red_times,times)
+    idx = param_time_idx(time_idx,length(μ))
+    _sols = PTArray(sols[idx])
+  else
+    b = get_array(cache)
+    _sols = sols
+  end
+  nzm = collect_residuals!(b,fesolver,ode_op,_sols,μ,ode_cache,red_trian,meas...)
   nzm[red_idx,:]
 end
 
@@ -313,13 +322,14 @@ function assemble_lhs!(
   fesolver::PThetaMethod,
   rbjac::RBAffineDecomposition,
   trian::Base.KeySet{Triangulation},
-  input...;
+  sols::PTArray,
+  μ::Table;
   i::Int=1)
 
+  times = get_times(fesolver)
   ndofs_row = num_free_dofs(feop.test)
   ndofs_col = num_free_dofs(get_trial(feop)(nothing,nothing))
   setsize!(cache,(ndofs_row,ndofs_col))
-  A = get_array(cache)
 
   red_idx = rbjac.integration_domain.idx
   red_times = rbjac.integration_domain.times
@@ -330,6 +340,15 @@ function assemble_lhs!(
   ode_op = get_algebraic_operator(feop)
   ode_cache = allocate_cache(ode_op,μ,red_times)
 
+  if length(red_times) < length(times)
+    A = get_array(cache;len=length(red_times)*length(μ))
+    time_idx = findall(x->x in red_times,times)
+    idx = param_time_idx(time_idx,length(μ))
+    _sols = PTArray(sols[idx])
+  else
+    A = get_array(cache)
+    _sols = sols
+  end
   nzm = collect_jacobians!(A,fesolver,ode_op,sols,μ,ode_cache,red_trian,meas...;i)
   nzm[red_idx,:]
 end
@@ -352,7 +371,7 @@ end
 function mdeim_solve!(cache::CachedArray,mdeim_interp::LU,q::Matrix)
   setsize!(cache,size(q))
   x = cache.array
-  ldiv!(x,mdeim_interp,b)
+  ldiv!(x,mdeim_interp,q)
   x
 end
 
@@ -367,7 +386,7 @@ function recast_coefficient!(
   ptarray = get_array(cache)
 
   @inbounds for n = eachindex(ptarray)
-    ptarray[n] .= coeff[:,(n-1)*Nt+1:n*Nt]
+    ptarray[n] .= coeff[:,(n-1)*Nt+1:n*Nt]'
   end
 
   ptarray
@@ -399,7 +418,7 @@ struct RBContributionMap <: Map end
 
 function Arrays.return_cache(
   ::RBContributionMap,
-  proj_basis_space::Vector{Vector{T}},
+  proj_basis_space::AbstractVector,
   basis_time::Matrix{T}) where T
 
   proj1 = testitem(proj_basis_space)
@@ -413,7 +432,7 @@ end
 
 function Arrays.return_cache(
   ::RBContributionMap,
-  proj_basis_space::Vector{Matrix{T}},
+  proj_basis_space::AbstractVector,
   basis_time::Array{T,3}) where T
 
   proj1 = testitem(proj_basis_space)
@@ -430,7 +449,7 @@ end
 function Arrays.evaluate!(
   ::RBContributionMap,
   cache,
-  proj_basis_space::Vector{Vector{T}},
+  proj_basis_space::AbstractVector,
   basis_time::Matrix{T},
   coeff::Matrix{T}) where T
 
@@ -460,7 +479,7 @@ end
 function Arrays.evaluate!(
   ::RBContributionMap,
   cache,
-  proj_basis_space::Vector{Matrix{T}},
+  proj_basis_space::AbstractVector,
   basis_time::Array{T,3},
   coeff::Matrix{T}) where T
 
@@ -502,9 +521,6 @@ function rb_contribution!(
   basis_time = ad.basis_time
   k = RBContributionMap()
   map(coeff) do cn
-    println(typeof(basis_space_proj))
-    println(typeof(basis_time))
-    println(typeof(cn))
     evaluate!(k,cache,basis_space_proj,basis_time,cn)
   end
 end

@@ -56,8 +56,10 @@ function index_pairs(a,b)
   collect(Iterators.product(1:a,1:b))
 end
 
-time_param_idx(ntimes::Int,range::UnitRange) = collect(range) .+ collect(0:ntimes-1)'*ntimes
-time_param_idx(ntimes::Int,nparams::Int) = collect(1:nparams) .+ collect(0:ntimes-1)'*ntimes
+time_param_idx(ntimes::Int,range::UnitRange) = collect(range) .+ collect(0:ntimes-1)'*maximum(range)
+time_param_idx(ntimes::Int,nparams::Int) = time_param_idx(ntimes,1:nparams)
+param_time_idx(times::Vector,nparams::Int) = vcat((collect(1:nparams) .+ (times .- 1)'*nparams)...)
+param_time_idx(ntimes::Int,nparams::Int) = param_time_idx(collect(1:ntimes),nparams)
 
 function change_mode(mat::Matrix{T},time_ndofs::Int,nparams::Int) where T
   space_ndofs = Int(length(mat)/(time_ndofs*nparams))
@@ -69,14 +71,17 @@ function change_mode(mat::Matrix{T},time_ndofs::Int,nparams::Int) where T
   return mode2
 end
 
+reorder_col_idx(ntimes::Int,range::UnitRange) = collect(range) .+ collect(0:ntimes-1)'*ntimes
+reorder_col_idx(ntimes::Int,nparams::Int) = collect(1:nparams) .+ collect(0:ntimes-1)'*ntimes
+
 function change_order(mat::Matrix{T},time_ndofs::Int) where T
   nparams = Int(size(mat,2)/time_ndofs)
-  idx = time_param_idx(time_ndofs,nparams)
-  mode2 = zeros(T,size(mat))
-  @inbounds for (i,col) = enumerate(eachcol(idx))
-    mode2[:,i] = reshape(mat[:,col]',:)
+  idx = reorder_col_idx(time_ndofs,nparams)
+  _mat = zeros(T,size(mat))
+  @inbounds for i = axes(idx,1)
+    _mat[:,idx[i,:]] = mat[:,idx[:,i]]
   end
-  return mode2
+  return _mat
 end
 
 function idx_batches(v::AbstractArray)

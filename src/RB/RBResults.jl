@@ -55,9 +55,9 @@ function allocate_sys_cache(
   A = allocate_jacobian(ode_op,sols_test,ode_cache)
 
   rb_ndofs = num_rb_dofs(rbspace)
-  n = length(params)*length(times)
-  brb = PTArray([zeros(T,rb_ndofs) for _ = 1:n])
-  Arb = PTArray([zeros(T,rb_ndofs,rb_ndofs) for _ = 1:n])
+  ncoeff = length(params)
+  coeff = zeros(T,rb_ndofs,rb_ndofs)
+  ptcoeff = PTArray([zeros(T,rb_ndofs,rb_ndofs) for _ = 1:ncoeff])
 
   k = RBContributionMap()
   rbres = testvalue(RBAffineDecomposition{T},feop;vector=true)
@@ -65,8 +65,8 @@ function allocate_sys_cache(
   res_contrib_cache = return_cache(k,rbres.basis_space,rbres.basis_time)
   jac_contrib_cache = return_cache(k,rbjac.basis_space,rbjac.basis_time)
 
-  res_cache = (CachedArray(b),CachedArray(brb[1]),CachedArray(brb)),res_contrib_cache
-  jac_cache = (CachedArray(A),CachedArray(Arb[1]),CachedArray(Arb)),jac_contrib_cache
+  res_cache = (CachedArray(b),CachedArray(coeff),CachedArray(ptcoeff)),res_contrib_cache
+  jac_cache = (CachedArray(A),CachedArray(coeff),CachedArray(ptcoeff)),jac_contrib_cache
   res_cache,jac_cache
 end
 

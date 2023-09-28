@@ -269,7 +269,6 @@ function jacobian!(
   V = get_test(op)
   u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
-  meas = map(t->get_measure(op,t),trian)
   matdata = collect_cell_matrix(Uh,V,γᵢ*op.jacs[i](μ,t,uh,u,v,meas),trian)
   assemble_matrix_add!(A,op.assem,matdata)
   A

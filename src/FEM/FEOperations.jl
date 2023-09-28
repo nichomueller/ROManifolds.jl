@@ -44,6 +44,14 @@ function is_parent(tparent::Triangulation,tchild::Triangulation)
   end
 end
 
+function get_parent(tchild::Triangulation)
+  try
+    Triangulation(tchild.model)
+  catch
+    tchild.parent
+  end
+end
+
 function FESpaces.is_change_possible(strian::Triangulation,ttrian::Triangulation)
   msg = "Triangulations do not point to the same background discrete model!"
   if strian == ttrian

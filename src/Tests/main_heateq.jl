@@ -60,7 +60,7 @@ begin
   energy_norm = l2Norm()
   nsnaps_state = 10
   nsnaps_system = 10
-  st_mdeim = false
+  st_mdeim = true
   info = RBInfo(test_path;ϵ,load_structures,save_structures,energy_norm,
                 nsnaps_state,nsnaps_system,st_mdeim)
 end
