@@ -180,6 +180,7 @@ function residual!(
   v = get_fe_basis(V)
   vecdata = collect_cell_vector(V,op.res(μ,t,xh,v,meas),trian)
   assemble_vector_add!(b,op.assem,vecdata)
+  b,trian
 end
 
 function allocate_jacobian(
@@ -261,7 +262,8 @@ function jacobian!(
   i::Integer,
   γᵢ::Real,
   cache,
-  trian::Triangulation...) where T
+  trian::Triangulation,
+  meas::Measure...) where T
 
   Uh = get_trial(op)(μ,t)
   V = get_test(op)
@@ -270,7 +272,7 @@ function jacobian!(
   meas = map(t->get_measure(op,t),trian)
   matdata = collect_cell_matrix(Uh,V,γᵢ*op.jacs[i](μ,t,uh,u,v,meas),trian)
   assemble_matrix_add!(A,op.assem,matdata)
-  Avec
+  A,trian
 end
 
 function jacobians!(

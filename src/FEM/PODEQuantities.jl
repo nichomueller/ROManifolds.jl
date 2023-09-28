@@ -130,34 +130,14 @@ function collect_residuals(
   feop::PTFEOperator,
   sols::PTArray,
   μ::Table,
-  args...)
+  args...;
+  kwargs...)
 
   times = get_times(fesolver)
   ode_op = get_algebraic_operator(feop)
   ode_cache = allocate_cache(ode_op,μ,times)
   b = allocate_residual(ode_op,sols,ode_cache)
-  collect_residuals!(b,fesolver,ode_op,sols,μ,ode_cache,args...)
-end
-
-function collect_residuals!(
-  b::PTArray,
-  fesolver::PThetaMethod,
-  ode_op::PODEOperator,
-  sols::PTArray,
-  μ::Table,
-  ode_cache,
-  args...)
-
-  dt,θ = fesolver.dt,fesolver.θ
-  dtθ = θ == 0.0 ? dt : dt*θ
-  times = get_times(fesolver)
-  nparams = length(μ)
-  ode_cache = update_cache!(ode_cache,ode_op,μ,times)
-  nlop = PThetaMethodNonlinearOperator(ode_op,μ,times,dtθ,sols,ode_cache,sols)
-
-  printstyled("Computing fe residuals for every time and parameter\n";color=:blue)
-  ress,meas = residual!(b,nlop,sols,args...)
-  return NnzMatrix.(ress;nparams),meas
+  collect_residuals!(b,fesolver,ode_op,sols,μ,ode_cache,args...;kwargs...)
 end
 
 function collect_jacobians(
@@ -175,25 +155,75 @@ function collect_jacobians(
   collect_jacobians!(A,fesolver,ode_op,sols,μ,ode_cache,args...;kwargs...)
 end
 
-function collect_jacobians!(
-  A::PTArray,
-  fesolver::PThetaMethod,
-  ode_op::PODEOperator,
+for fun in (:collect_residuals!,:collect_jacobians!)
+  @eval begin
+    function $fun(
+      q::PTArray,
+      fesolver::PThetaMethod,
+      ode_op::PODEOperator,
+      sols::PTArray,
+      μ::Table,
+      ode_cache,
+      args...;
+      return_trian=false,
+      kwargs...)
+
+      dt,θ = fesolver.dt,fesolver.θ
+      dtθ = θ == 0.0 ? dt : dt*θ
+      times = get_times(fesolver)
+      ode_cache = update_cache!(ode_cache,ode_op,μ,times)
+      nlop = PThetaMethodNonlinearOperator(ode_op,μ,times,dtθ,sols,ode_cache,sols)
+      $fun(Val(return_trian),q,nlop,sols,args...;kwargs...)
+    end
+  end
+end
+
+function collect_residuals!(
+  return_trian,
+  b::PTArray,
+  nlop::PNonlinearOperator,
   sols::PTArray,
-  μ::Table,
-  ode_cache,
+  args...)
+
+  printstyled("Computing fe residual for every time and parameter\n";color=:blue)
+  ress = residual!(b,nlop,sols,args...)
+  return NnzMatrix(ress;nparams=length(nlop.μ))
+end
+
+function collect_residuals!(
+  return_trian::Val{true},
+  b::PTArray,
+  nlop::PNonlinearOperator,
+  sols::PTArray,
+  args...)
+
+  printstyled("Computing fe residual for every time and parameter\n";color=:blue)
+  ress,trian = residual!(b,nlop,sols,return_trian)
+  return NnzMatrix.(ress;nparams=length(nlop.μ)),trian
+end
+
+function collect_jacobians!(
+  return_trian,
+  A::PTArray,
+  nlop::PNonlinearOperator,
+  sols::PTArray,
   args...;
   i=1)
 
-  dt,θ = fesolver.dt,fesolver.θ
-  dtθ = θ == 0.0 ? dt : dt*θ
-  times = get_times(fesolver)
-  nparams = length(μ)
-  ode_cache = update_cache!(ode_cache,ode_op,μ,times)
-  nlop = PThetaMethodNonlinearOperator(ode_op,μ,times,dtθ,sols,ode_cache,sols)
-
   printstyled("Computing fe jacobian #$i for every time and parameter\n";color=:blue)
-  jacs_i,meas = jacobian!(A,nlop,sols,i,args...)
-  nnz_jac_i = map(x->NnzMatrix(map(NnzVector,x);nparams),jacs_i)
-  return nnz_jac_i,meas
+  jacs_i = jacobian!(A,nlop,sols,i,args...)
+  return NnzMatrix(map(NnzVector,jacs_i);nparams=length(nlop.μ))
+end
+
+function collect_jacobians!(
+  return_trian::Val{true},
+  A::PTArray,
+  nlop::PNonlinearOperator,
+  sols::PTArray,
+  args...;
+  i=1)
+
+  printstyled("Computing fe residual for every time and parameter\n";color=:blue)
+  jacs_i,trian = jacobian!(A,nlop,sols,i,return_trian)
+  return map(x->NnzMatrix(map(NnzVector,x)),jacs_i),trian
 end

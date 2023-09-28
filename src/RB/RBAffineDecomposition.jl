@@ -118,8 +118,7 @@ function collect_compress_rhs(
   μ::Table)
 
   times = get_times(fesolver)
-  separate_contribs = Val(true)
-  ress,trian = collect_residuals(fesolver,feop,snaps,μ,separate_contribs)
+  ress,trian = collect_residuals(fesolver,feop,snaps,μ;return_trian=true)
   ad_res = compress_component(info,feop,ress,trian,times,rbspace)
   return ad_res
 end
@@ -134,13 +133,12 @@ function collect_compress_lhs(
 
   times = get_times(fesolver)
   θ = fesolver.θ
-  separate_contribs = Val(true)
 
   njacs = length(feop.jacs)
   ad_jacs = Vector{RBAlgebraicContribution}(undef,njacs)
   for i = 1:njacs
     combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : x-y
-    jacs,trian = collect_jacobians(fesolver,feop,snaps,μ,separate_contribs;i)
+    jacs,trian = collect_jacobians(fesolver,feop,snaps,μ;i,return_trian=true)
     ad_jacs[i] = compress_component(info,feop,jacs,trian,times,rbspace,rbspace;combine_projections)
   end
   return ad_jacs
@@ -283,7 +281,7 @@ function assemble_rhs!(
   red_times = rbres.integration_domain.times
   red_trian = rbres.integration_domain.trian
   strian = substitute_trian(red_trian,trian)
-  meas = map(t->get_measure(op,t),strian)
+  meas = map(t->get_measure(feop,t),strian)
 
   ode_op = get_algebraic_operator(feop)
   ode_cache = allocate_cache(ode_op,μ,red_times)
@@ -324,7 +322,7 @@ function assemble_lhs!(
   red_times = rbjac.integration_domain.times
   red_trian = rbjac.integration_domain.trian
   strian = substitute_trian(red_trian,trian)
-  meas = map(t->get_measure(op,t),strian)
+  meas = map(t->get_measure(feop,t),strian)
 
   ode_op = get_algebraic_operator(feop)
   ode_cache = allocate_cache(ode_op,μ,red_times)
@@ -380,8 +378,8 @@ function project_rhs_coefficient(
   pcoeff = zeros(T,nt_row,1)
   pcoeff_v = Vector{typeof(pcoeff)}(undef,Qs)
 
-  @fastmath @inbounds for (ic,c) in enumerate(eachcol(coeff))
-    @fastmath @inbounds for (row,b) in enumerate(eachcol(bt_proj))
+  @inbounds for (ic,c) in enumerate(eachcol(coeff))
+    for (row,b) in enumerate(eachcol(bt_proj))
       pcoeff[row] = sum(b.*c)
     end
     pcoeff_v[ic] = pcoeff
@@ -400,8 +398,8 @@ function project_lhs_coefficient(
   pcoeff = zeros(T,nt_row,nt_col)
   pcoeff_v = Vector{typeof(pcoeff)}(undef,Qs)
 
-  @fastmath @inbounds for (ic,c) in enumerate(eachcol(coeff))
-    @fastmath @inbounds for col in axes(bt_proj,3), row in axes(bt_proj,2)
+  @inbounds for (ic,c) in enumerate(eachcol(coeff))
+    for col in axes(bt_proj,3), row in axes(bt_proj,2)
       pcoeff[row,col] = sum(bt_proj[:,row,col].*c)
     end
     pcoeff_v[ic] = pcoeff
@@ -416,13 +414,13 @@ function rb_contribution!(
   coeff::PTArray{T}) where T
 
   bs = ad.basis_space
-  sz = map(*,size(ad.basis_space),size(coeff))
+  sz = map(*,size(bs),size(coeff))
   setsize!(cache,sz)
   @inbounds for n = eachindex(coeff)
     rn = cache[n].array
     cn = coeff[n]
     Threads.@threads for i = eachindex(coeff)
-      LinearAlgebra.kron!(rn,ad.basis_space[i],cn[i])
+      LinearAlgebra.kron!(rn,bs[i],cn[i])
     end
   end
 
