@@ -34,13 +34,13 @@ end
 
 struct RBAffineDecomposition{T}
   basis_space::Vector{Array{T}}
-  basis_time::Array{T}
+  basis_time::Vector{Array{T}}
   mdeim_interpolation::LU
   integration_domain::RBIntegrationDomain
 
   function RBAffineDecomposition(
     basis_space::Vector{<:Array{T}},
-    basis_time::Array{T},
+    basis_time::Vector{<:Array{T}},
     mdeim_interpolation::LU,
     integration_domain::RBIntegrationDomain) where T
     new{T}(basis_space,basis_time,mdeim_interpolation,integration_domain)
@@ -89,10 +89,10 @@ function Arrays.testvalue(
 
   if vector
     basis_space = [zeros(T,1)]
-    basis_time = zeros(T,1,1)
+    basis_time = [zeros(T,1,1),zeros(T,1,1)]
   else
     basis_space = [zeros(T,1,1)]
-    basis_time = zeros(T,1,1,1)
+    basis_time = [zeros(T,1,1),zeros(T,1,1,1)]
   end
   mdeim_interpolation = lu(one(T))
   integration_domain = testvalue(RBIntegrationDomain,feop)
@@ -124,7 +124,7 @@ function collect_compress_rhs(
   μ::Table)
 
   times = get_times(fesolver)
-  ress,trian = collect_residuals(fesolver,feop,snaps,μ;return_trian=true)
+  ress,trian = collect_residuals_for_trian(fesolver,feop,snaps,μ,times)
   ad_res = compress_component(info,feop,ress,trian,times,rbspace)
   return ad_res
 end
@@ -133,18 +133,18 @@ function collect_compress_lhs(
   info::RBInfo,
   feop::PTFEOperator,
   fesolver::PThetaMethod,
-  rbspace::RBSpace,
+  rbspace::RBSpace{T},
   snaps::PTArray,
-  μ::Table)
+  μ::Table) where T
 
   times = get_times(fesolver)
   θ = fesolver.θ
 
   njacs = length(feop.jacs)
-  ad_jacs = Vector{RBAlgebraicContribution}(undef,njacs)
+  ad_jacs = Vector{RBAlgebraicContribution{T}}(undef,njacs)
   for i = 1:njacs
     combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : x-y
-    jacs,trian = collect_jacobians(fesolver,feop,snaps,μ;i,return_trian=true)
+    jacs,trian = collect_jacobians_for_trian(fesolver,feop,snaps,μ,times;i)
     ad_jacs[i] = compress_component(info,feop,jacs,trian,times,rbspace,rbspace;combine_projections)
   end
   return ad_jacs
@@ -185,8 +185,8 @@ function get_interpolation_idx(basis::AbstractMatrix)
   unique(idx)
 end
 
-function compress(basis_space::NnzMatrix,::NnzMatrix,args...;kwargs...)
-  compress_space(basis_space,args...),compress_time(args...;kwargs...)
+function compress(basis_space::NnzMatrix,basis_time::NnzMatrix,args...;kwargs...)
+  compress_space(basis_space,args...),compress_time(basis_time,args...;kwargs...)
 end
 
 function compress_space(
@@ -207,11 +207,12 @@ function compress_space(
   compress(entire_bs_row,entire_bs_col,basis_space)
 end
 
-function compress_time(rbspace_row::RBSpace,args...;kwargs...)
-  get_basis_time(rbspace_row)
+function compress_time(basis_time::NnzMatrix,rbspace_row::RBSpace,args...;kwargs...)
+  [basis_time.nonzero_val,get_basis_time(rbspace_row)]
 end
 
 function compress_time(
+  basis_time::NnzMatrix,
   rbspace_row::RBSpace{T},
   rbspace_col::RBSpace{T};
   combine_projections=(x,y)->x) where T
@@ -229,7 +230,7 @@ function compress_time(
     bt_proj_shift[2:end,it,jt] .= bt_row[2:end,it].*bt_col[1:end-1,jt]
   end
 
-  combine_projections(bt_proj,bt_proj_shift)
+  [basis_time.nonzero_val,combine_projections(bt_proj,bt_proj_shift)]
 end
 
 function find_cells(idx::Vector{Int},cell_dof_ids)
@@ -299,7 +300,7 @@ function assemble_rhs!(
     b = get_array(cache)
     _sols = sols
   end
-  nzm = collect_residuals!(b,fesolver,ode_op,_sols,μ,ode_cache,red_trian,meas...)
+  nzm = collect_residuals!(b,fesolver,ode_op,_sols,μ,red_times,ode_cache,red_trian,meas...)
   nzm[red_idx,:]
 end
 
@@ -349,7 +350,7 @@ function assemble_lhs!(
     A = get_array(cache)
     _sols = sols
   end
-  nzm = collect_jacobians!(A,fesolver,ode_op,sols,μ,ode_cache,red_trian,meas...;i)
+  nzm = collect_jacobians!(A,fesolver,ode_op,_sols,μ,red_times,ode_cache,red_trian,meas...;i)
   nzm[red_idx,:]
 end
 
@@ -394,10 +395,11 @@ end
 
 function recast_coefficient!(
   cache::PTArray{<:CachedArray{T}},
-  basis_time::Matrix{T},
+  basis_time::Vector{<:Array{T}},
   coeff::Matrix{T}) where T
 
-  Nt,Qt = size(basis_time)
+  _basis_time,_ = basis_time
+  Nt,Qt = size(_basis_time)
   Qs = Int(size(coeff,1)/Qt)
   setsize!(cache,(Nt,Qs))
   ptarray = get_array(cache)
@@ -407,7 +409,7 @@ function recast_coefficient!(
     cn = coeff[:,n]
     for qs in 1:Qs
       sorted_idx = [(i-1)*Qs+qs for i = 1:Qt]
-      an[:,qs] .= basis_time*cn[sorted_idx]
+      an[:,qs] .= _basis_time*cn[sorted_idx]
     end
   end
 
@@ -505,7 +507,7 @@ function Arrays.evaluate!(
         @fastmath @inbounds array_coeff[row,col] = sum(basis_time[:,row,col].*coeff[:,i])
       end
     end
-    LinearAlgebra.kron!(array_proj,proj_basis_space,array_coeff)
+    LinearAlgebra.kron!(array_proj,proj_basis_space[i],array_coeff)
     array_proj_global .+= array_proj
   end
 
@@ -518,7 +520,7 @@ function rb_contribution!(
   coeff::PTArray{T}) where T
 
   basis_space_proj = ad.basis_space
-  basis_time = ad.basis_time
+  basis_time = last(ad.basis_time)
   k = RBContributionMap()
   map(coeff) do cn
     evaluate!(k,cache,basis_space_proj,basis_time,cn)

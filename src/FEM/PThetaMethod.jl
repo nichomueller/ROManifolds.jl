@@ -49,23 +49,42 @@ struct PThetaMethodNonlinearOperator <: PNonlinearOperator
   vθ::PTArray
 end
 
+
+function Algebra.allocate_residual(
+  op::PThetaMethodNonlinearOperator,
+  x::PTArray)
+
+  allocate_residual(op.odeop,x,op.ode_cache)
+end
+
+function Algebra.allocate_jacobian(
+  op::PThetaMethodNonlinearOperator,
+  x::PTArray)
+
+  allocate_jacobian(op.odeop,x,op.ode_cache)
+end
+
 function Algebra.residual(op::PNonlinearOperator,x::PTArray,args...)
   b = allocate_residual(op,x)
   residual!(b,op,x,args...)
 end
 
-function Algebra.residual!(
-  b::PTArray,
-  op::PThetaMethodNonlinearOperator,
-  x::PTArray,
-  args...)
+for fun in (:(Algebra.residual!),:residual_for_trian!)
+  @eval begin
+    function $fun(
+      b::PTArray,
+      op::PThetaMethodNonlinearOperator,
+      x::PTArray,
+      args...)
 
-  uθ = x
-  vθ = op.vθ
-  @. vθ = (x-op.u0)/op.dtθ
-  z = zero(eltype(b))
-  fill!(b,z)
-  residual!(b,op.odeop,op.μ,op.tθ,(uθ,vθ),op.ode_cache,args...)
+      uθ = x
+      vθ = op.vθ
+      @. vθ = (x-op.u0)/op.dtθ
+      z = zero(eltype(b))
+      fill!(b,z)
+      $fun(b,op.odeop,op.μ,op.tθ,(uθ,vθ),op.ode_cache,args...)
+    end
+  end
 end
 
 function Algebra.jacobian(op::PNonlinearOperator,x::PTArray,args...)
@@ -86,31 +105,21 @@ function Algebra.jacobian!(
   jacobians!(A,op.odeop,op.μ,op.tθ,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)
 end
 
-function Algebra.jacobian!(
-  A::PTArray,
-  op::PThetaMethodNonlinearOperator,
-  x::PTArray,
-  i::Int,
-  args...)
+for fun in (:(Algebra.jacobian!),:jacobian_for_trian!)
+  @eval begin
+    function $fun(
+      A::PTArray,
+      op::PThetaMethodNonlinearOperator,
+      x::PTArray,
+      i::Int,
+      args...)
 
-  uF = x
-  vθ = op.vθ
-  @. vθ = (x-op.u0)/op.dtθ
-  z = zero(eltype(A))
-  fillstored!(A,z)
-  jacobian!(A,op.odeop,op.μ,op.tθ,(uF,vθ),i,(1.0,1/op.dtθ)[i],op.ode_cache,args...)
-end
-
-function Algebra.allocate_residual(
-  op::PThetaMethodNonlinearOperator,
-  x::PTArray)
-
-  allocate_residual(op.odeop,x,op.ode_cache)
-end
-
-function Algebra.allocate_jacobian(
-  op::PThetaMethodNonlinearOperator,
-  x::PTArray)
-
-  allocate_jacobian(op.odeop,x,op.ode_cache)
+      uF = x
+      vθ = op.vθ
+      @. vθ = (x-op.u0)/op.dtθ
+      z = zero(eltype(A))
+      fillstored!(A,z)
+      $fun(A,op.odeop,op.μ,op.tθ,(uF,vθ),i,(1.0,1/op.dtθ)[i],op.ode_cache,args...)
+    end
+  end
 end

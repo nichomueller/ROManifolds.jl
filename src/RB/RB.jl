@@ -1,6 +1,7 @@
 using LinearAlgebra
 using SparseArrays
 using Serialization
+using NearestNeighbors
 using Gridap
 using Gridap.Algebra
 using Gridap.FESpaces
@@ -11,11 +12,10 @@ using Gridap.Fields
 using Gridap.CellData
 using Gridap.MultiField
 
-import BlockArrays:BlockVector,BlockMatrix,BlockArray,mortar
+import StaticArrays: SVector
 import Gridap.Helpers:@check,@unreachable
 import Gridap.Arrays:Table,evaluate!
 import Gridap.Algebra:allocate_matrix,allocate_vector,solve
-# import Gridap.Geometry:GridView,TriangulationView
 import Gridap.ODEs.TransientFETools:Affine,TransientFETools,ODESolver
 
 include("RBInfo.jl")
@@ -48,8 +48,7 @@ function reduced_basis_model(
   save(info,(sols,params,rbspace,rbrhs,rblhs))
 
   # Online phase
-  nsnaps = info.nsnaps_online
-  rb_results = test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,nsnaps)
+  rb_results = test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params)
   save(info,rb_results)
 
   return

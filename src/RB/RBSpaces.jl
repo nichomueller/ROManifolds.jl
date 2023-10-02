@@ -66,11 +66,10 @@ function recast(rb::RBSpace,x::PTArray{T}) where T
   nt_rb = size(basis_time,2)
 
   n = length(x)
-  array = Vector{T}(undef,n)
+  array = Vector{Matrix{eltype(T)}}(undef,n)
   @inbounds for i = 1:n
     x_mat_i = reshape(x[i],nt_rb,ns_rb)
-    x_i = basis_space*(basis_time*x_mat_i)'
-    array[i] = copy(x_i)
+    array[i] = basis_space*(basis_time*x_mat_i)'
   end
 
   PTArray(array)
@@ -115,7 +114,7 @@ function get_reduced_basis(
   args...)
 
   energy_norm = info.energy_norm
-  norm_matrix = get_norm_matrix(energy_norm,feop)
+  norm_matrix = get_norm_matrix.(energy_norm,feop)
   basis_space,basis_time = compress(info,feop,snaps,norm_matrix,args...)
   BlockRBSpace(basis_space,basis_time)
 end

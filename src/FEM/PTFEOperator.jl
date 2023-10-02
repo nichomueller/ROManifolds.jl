@@ -151,7 +151,23 @@ function residual!(
   t,
   xh::T,
   cache,
-  ::Val{true}) where T
+  trian::Triangulation,
+  meas::Measure...) where T
+
+  V = get_test(op)
+  v = get_fe_basis(V)
+  vecdata = collect_cell_vector(V,op.res(μ,t,xh,v,meas),trian)
+  assemble_vector_add!(b,op.assem,vecdata)
+  b
+end
+
+function residual_for_trian!(
+  b::PTArray,
+  op::PTFEOperatorFromWeakForm,
+  μ,
+  t,
+  xh::T,
+  cache) where T
 
   V = get_test(op)
   v = get_fe_basis(V)
@@ -164,23 +180,6 @@ function residual!(
     bvec[n] = copy(b)
   end
   bvec,trian
-end
-
-function residual!(
-  b::PTArray,
-  op::PTFEOperatorFromWeakForm,
-  μ,
-  t,
-  xh::T,
-  cache,
-  trian::Triangulation,
-  meas::Measure...) where T
-
-  V = get_test(op)
-  v = get_fe_basis(V)
-  vecdata = collect_cell_vector(V,op.res(μ,t,xh,v,meas),trian)
-  assemble_vector_add!(b,op.assem,vecdata)
-  b
 end
 
 function allocate_jacobian(
@@ -236,7 +235,27 @@ function jacobian!(
   i::Integer,
   γᵢ::Real,
   cache,
-  ::Val{true}) where T
+  trian::Triangulation,
+  meas::Measure...) where T
+
+  Uh = get_trial(op)(μ,t)
+  V = get_test(op)
+  u = get_trial_fe_basis(Uh)
+  v = get_fe_basis(V)
+  matdata = collect_cell_matrix(Uh,V,γᵢ*op.jacs[i](μ,t,uh,u,v,meas),trian)
+  assemble_matrix_add!(A,op.assem,matdata)
+  A
+end
+
+function jacobian_for_trian!(
+  A::PTArray,
+  op::PTFEOperatorFromWeakForm,
+  μ,
+  t,
+  uh::T,
+  i::Integer,
+  γᵢ::Real,
+  cache) where T
 
   Uh = get_trial(op)(μ,t)
   V = get_test(op)
@@ -251,27 +270,6 @@ function jacobian!(
     Avec[n] = copy(A)
   end
   Avec,trian
-end
-
-function jacobian!(
-  A::PTArray,
-  op::PTFEOperatorFromWeakForm,
-  μ,
-  t,
-  uh::T,
-  i::Integer,
-  γᵢ::Real,
-  cache,
-  trian::Triangulation,
-  meas::Measure...) where T
-
-  Uh = get_trial(op)(μ,t)
-  V = get_test(op)
-  u = get_trial_fe_basis(Uh)
-  v = get_fe_basis(V)
-  matdata = collect_cell_matrix(Uh,V,γᵢ*op.jacs[i](μ,t,uh,u,v,meas),trian)
-  assemble_matrix_add!(A,op.assem,matdata)
-  A
 end
 
 function jacobians!(

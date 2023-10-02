@@ -28,7 +28,7 @@ function from_sparse_idx_to_full_idx(
 end
 
 function from_sparse_idx_to_full_idx(
-  sparse_idx::Vector{Int},
+  sparse_idx,
   sparse_to_full_idx::Vector{Int})
 
   sparse_to_full(sidx) = from_sparse_idx_to_full_idx(sidx,sparse_to_full_idx)
@@ -71,15 +71,15 @@ function change_mode(mat::Matrix{T},time_ndofs::Int,nparams::Int) where T
   return mode2
 end
 
-reorder_col_idx(ntimes::Int,range::UnitRange) = collect(range) .+ collect(0:ntimes-1)'*ntimes
-reorder_col_idx(ntimes::Int,nparams::Int) = collect(1:nparams) .+ collect(0:ntimes-1)'*ntimes
+reorder_col_idx(ntimes::Int,range::UnitRange) = collect(range) .+ collect(0:ntimes-1)'*nparams
+reorder_col_idx(ntimes::Int,nparams::Int) = collect(1:nparams) .+ collect(0:ntimes-1)'*nparams
 
 function change_order(mat::Matrix{T},time_ndofs::Int) where T
   nparams = Int(size(mat,2)/time_ndofs)
   idx = reorder_col_idx(time_ndofs,nparams)
   _mat = zeros(T,size(mat))
-  @inbounds for i = axes(idx,1)
-    _mat[:,idx[i,:]] = mat[:,idx[:,i]]
+  @inbounds for i = 1:nparams
+    _mat[:,(i-1)*time_ndofs+1:i*time_ndofs] = mat[:,idx[i,:]]
   end
   return _mat
 end

@@ -1,7 +1,12 @@
 abstract type NnzArray{T,N} <: AbstractArray{T,N} end
 
 Base.size(nza::NnzArray,idx...) = size(nza.nonzero_val,idx...)
-Base.getindex(nza::NnzArray,idx...) = getindex(nza.nonzero_val,idx...)
+function Base.getindex(nza::NnzArray,row)
+  getindex(nza.nonzero_val,from_sparse_idx_to_full_idx(row,nza.nonzero_idx))
+end
+function Base.getindex(nza::NnzArray,row,col)
+  getindex(nza.nonzero_val,from_sparse_idx_to_full_idx(row,nza.nonzero_idx),col)
+end
 Base.eachcol(nza::NnzArray) = eachcol(nza.nonzero_val)
 get_nonzero_val(nza::NnzArray) = nza.nonzero_val
 get_nonzero_idx(nza::NnzArray) = nza.nonzero_idx

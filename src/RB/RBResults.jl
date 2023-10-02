@@ -8,28 +8,34 @@ struct RBResults <: AbstractRBResults
   sol_approx::PTArray
   relative_err::Vector{Float}
   wall_time::Float
+  nallocations::Float
 end
 
 function RBResults(
   params::Table,
   sol::PTArray,
   sol_approx::PTArray,
-  wall_time::Float;
+  stats::NamedTuple;
   kwargs...)
 
   relative_err = compute_relative_error(sol,sol_approx;kwargs...)
-  new(params,sol,sol_approx,relative_err,wall_time)
+  wall_time = stats[:time]
+  nallocations = stats[:bytes]/1e6
+  RBResults(params,sol,sol_approx,relative_err,wall_time,nallocations)
 end
 
 get_avg_error(r::RBResults) = sum(r.relative_err) / length(r)
 get_avg_time(r::RBResults) = r.wall_time / length(r)
+get_avg_nallocs(r::RBResults) = r.nallocations / length(r)
 
 function Base.show(io::IO,r::RBResults)
   avg_err = get_avg_error(r)
   avg_time = get_avg_time(r)
+  avg_nallocs = get_avg_nallocs(r)
   print(io,"-------------------------------------------------------------\n")
   print(io,"Average online relative errors: $avg_err\n")
-  print(io,"Average online wall time: $avg_time s\n")
+  print(io,"Average online wall time: $avg_time [s]\n")
+  print(io,"Average number of allocations: $avg_nallocs [Mb]\n")
   print(io,"-------------------------------------------------------------\n")
 end
 
@@ -39,20 +45,54 @@ function Base.first(r::RBResults)
   sol_approx = r.sol_approx[1]
   relative_err = get_avg_error(r)
   wall_time = get_avg_time(r)
-  RBResults(μ,sol,sol_approx,relative_err,wall_time)
+  nallocations = get_avg_nallocs(r)
+  μ,sol,sol_approx,relative_err,wall_time,nallocations
+end
+
+function save(info::RBInfo,r::RBResults)
+  if info.save_structures
+    path = joinpath(info.rb_path,"results")
+    save(path,r)
+  end
+end
+
+function load(info::RBInfo,T::Type{RBResults})
+  path = joinpath(info.rb_path,"results")
+  load(path,T)
+end
+
+function post_process(
+  info::RBInfo,
+  feop::PTFEOperator,
+  fesolver::PODESolver,
+  sol::PTArray,
+  params::Table,
+  sol_approx::PTArray{T},
+  stats::NamedTuple) where T
+
+  energy_norm = energy_norm=info.energy_norm
+  norm_matrix = get_norm_matrix(energy_norm,feop)
+  _sol = space_time_matrices(sol;nparams=length(params))
+
+  results = RBResults(params,_sol,sol_approx,stats;norm_matrix)
+  show(results)
+  save(info,results)
+  writevtk(info,feop,fesolver,results)
+  return
 end
 
 function allocate_sys_cache(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbspace::AbstractRBSpace{T},
+  snaps_test::PTArray,
   params::Table) where T
 
   times = get_times(fesolver)
   ode_op = get_algebraic_operator(feop)
   ode_cache = allocate_cache(ode_op,params,times)
-  b = allocate_residual(ode_op,sols_test,ode_cache)
-  A = allocate_jacobian(ode_op,sols_test,ode_cache)
+  b = allocate_residual(ode_op,snaps_test,ode_cache)
+  A = allocate_jacobian(ode_op,snaps_test,ode_cache)
 
   rb_ndofs = num_rb_dofs(rbspace)
   ncoeff = length(params)
@@ -62,8 +102,8 @@ function allocate_sys_cache(
   k = RBContributionMap()
   rbres = testvalue(RBAffineDecomposition{T},feop;vector=true)
   rbjac = testvalue(RBAffineDecomposition{T},feop;vector=false)
-  res_contrib_cache = return_cache(k,rbres.basis_space,rbres.basis_time)
-  jac_contrib_cache = return_cache(k,rbjac.basis_space,rbjac.basis_time)
+  res_contrib_cache = return_cache(k,rbres.basis_space,last(rbres.basis_time))
+  jac_contrib_cache = return_cache(k,rbjac.basis_space,last(rbjac.basis_time))
 
   res_cache = (CachedArray(b),CachedArray(coeff),CachedArray(ptcoeff)),res_contrib_cache
   jac_cache = (CachedArray(A),CachedArray(coeff),CachedArray(ptcoeff)),jac_contrib_cache
@@ -77,20 +117,22 @@ function test_rb_solver(
   rbspace::AbstractRBSpace,
   rbres::AbstractRBAlgebraicContribution,
   rbjacs::AbstractRBAlgebraicContribution,
-  ntests::Int)
+  snaps::PTArray,
+  params::Table)
 
-  snaps_test,params_test = load_test(info,feop,fesolver,ntests)
+  snaps_test,params_test = load_test(info,feop,fesolver)
 
   printstyled("Solving linear RB problems\n";color=:blue)
-  rhs_cache,lhs_cache = allocate_sys_cache(feop,fesolver,rbspace,params_test)
-  rhs = collect_rhs_contributions(rhs_cache,info,feop,fesolver,rbres,params_test)
-  lhs = collect_lhs_contributions(lhs_cache,info,feop,fesolver,rbjacs,params_test)
+  x = initial_guess(snaps,params,params_test)
+  rhs_cache,lhs_cache = allocate_sys_cache(feop,fesolver,rbspace,snaps_test,params_test)
+  rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,x,params_test)
+  lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,x,params_test)
 
-  wall_time = @elapsed begin
-    rb_snaps_test = solve(fesolver,rbspace,rhs,lhs)
+  stats = @timed begin
+    rb_snaps_test = solve(fesolver.nls,rhs,lhs)
   end
   approx_snaps_test = recast(rbspace,rb_snaps_test)
-  RBResults(info,feop,snaps_test,approx_snaps_test,wall_time)
+  post_process(info,feop,fesolver,snaps_test,params_test,approx_snaps_test,stats)
 end
 
 function test_rb_solver(
@@ -100,20 +142,21 @@ function test_rb_solver(
   rbspace::AbstractRBSpace,
   rbres::AbstractRBAlgebraicContribution,
   rbjacs::AbstractRBAlgebraicContribution,
-  ntests::Int)
+  snaps::PTArray,
+  params::Table)
 
-  snaps_test,params_test = load_test(info,feop,fesolver,ntests)
+  snaps_test,params_test = load_test(info,feop,fesolver)
 
   printstyled("Solving nonlinear RB problems with Newton iterations\n";color=:blue)
-  rhs_cache,lhs_cache = allocate_sys_cache(feop,fesolver,rbspace,params_test)
+  rhs_cache,lhs_cache = allocate_sys_cache(feop,fesolver,rbspace,snaps_test,params_test)
   nl_cache = nothing
-  x = initial_guess(info,params_test)
-  _,conv0 = Algebra._check_convergence(fesolver.nls,x)
-  wall_time = @elapsed begin
+  x = initial_guess(snaps,params,params_test)
+  _,conv0 = Algebra._check_convergence(fesolver.nls.ls,x)
+  stats = @timed begin
     for iter in 1:fesolver.nls.max_nliters
-      rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,params_test,x)
-      lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,params_test,x)
-      nl_cache = solve!(x,fesolver,rhs,lhs,nl_cache)
+      rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,x,params_test)
+      lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,x,params_test)
+      nl_cache = solve!(x,fesolver.nls,rhs,lhs,nl_cache)
       x .-= recast(rbspace,x)
       isconv,conv = Algebra._check_convergence(fesolver.nls,x,conv0)
       println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv))) \n")
@@ -123,18 +166,18 @@ function test_rb_solver(
       end
     end
   end
-  RBResults(info,feop,snaps_test,x,wall_time)
+  post_process(info,feop,fesolver,snaps_test,params_test,x,stats)
 end
 
 function load_test(
   info::RBInfo,
   feop::PTFEOperator,
-  fesolver::PODESolver,
-  ntests::Int)
+  fesolver::PODESolver)
 
+  ntests = info.nsnaps_test
   try
     @check info.load_structures
-    sols,params = load_test((Snapshots,Table),info)
+    sols,params = load_test(info,(Snapshots,Table))
     return sols[1:ntests],params[1:ntests]
   catch
     params = realization(feop,ntests)
@@ -144,89 +187,90 @@ function load_test(
   end
 end
 
-function Algebra.solve(fesolver::PODESolver,rhs::PTArray,lhs::PTArray)
+function Algebra.solve(ls::LinearSolver,rhs::PTArray,lhs::PTArray)
   x = copy(rhs)
   cache = nothing
-  solve!(x,fesolver,rhs,lhs,cache)
+  solve!(x,ls,rhs,lhs,cache)
 end
 
 function Algebra.solve!(
   x::PTArray,
-  fesolver::PODESolver,
+  ls::LinearSolver,
   rhs::PTArray,
   lhs::PTArray,
   ::Nothing)
 
   lhsaff,rhsaff = Nonaffine(),Nonaffine()
-  ss = symbolic_setup(fesolver.nls.ls,testitem(lhs))
+  ss = symbolic_setup(ls,testitem(lhs))
   ns = numerical_setup(ss,lhs,lhsaff)
   _loop_solve!(x,ns,rhs,lhsaff,rhsaff)
+  x
 end
 
-# function initial_condition(
-#   info::RBInfo,
-    # params_test::Table)
-    # snaps,params = load(info,{Snapshots,Table})
-#   kdtree = KDTree(params)
-#   idx,dist = knn(kdtree,μ)
-#   get_data(sols[idx])
-# end
+function initial_guess(
+  sols::Snapshots,
+  params::Table,
+  params_test::Table)
 
-function compute_relative_error(
-  sol::AbstractVector,
-  sol_approx::AbstractVector;
-  norm_matrix=nothing)
-
-  absolute_err = norm(sol-sol_approx,norm_matrix)
-  snap_norm = norm(sol,norm_matrix)
-  absolute_err/snap_norm
+  kdtree = KDTree(map(x -> SVector(Tuple(x)),params))
+  idx_dist = map(x -> nn(kdtree,SVector(Tuple(x))),params_test)
+  sols[first.(idx_dist)]
 end
 
-function compute_relative_error(
-  sol::AbstractMatrix,
-  sol_approx::AbstractMatrix;
-  norm_matrix=nothing)
-
-  time_ndofs = size(sol,2)
-  absolute_err,snap_norm = zeros(time_ndofs),zeros(time_ndofs)
-  for i = 1:time_ndofs
-    absolute_err[i] = norm(sol[:,i]-sol_approx[:,i],norm_matrix)
-    snap_norm[i] = norm(sol[:,i],norm_matrix)
+function space_time_matrices(sol::PTArray{Vector{T}};nparams=length(sol)) where T
+  mat = hcat(get_array(sol)...)
+  array = Vector{Matrix{eltype(T)}}(undef,nparams)
+  @inbounds for i = 1:nparams
+    array[i] = mat[:,(i-1)*nparams+1:i*nparams]
   end
+  PTArray(array)
+end
 
-  norm(absolute_err)/norm(snap_norm)
+function compute_relative_error(
+  sol::PTArray{Matrix{T}},
+  sol_approx::PTArray{Matrix{T}};
+  kwargs...) where T
+
+  @assert length(sol) == length(sol_approx)
+
+  time_ndofs = length(testitem(sol))
+  nparams = length(sol)
+  ncache = zeros(T,time_ndofs)
+  dcache = zeros(T,time_ndofs)
+  cache = ncache,dcache
+  err = Vector{T}(undef,nparams)
+  @inbounds for i = 1:nparams
+    erri = compute_relative_error!(cache,sol[i],sol_approx[i];kwargs...)
+    err[i] = erri
+  end
+  err
+end
+
+function compute_relative_error!(cache,sol,sol_approx;norm_matrix=nothing)
+  ncache,dcache = cache
+  @inbounds for i = axes(sol,2)
+    ncache[i] = norm(sol[:,i]-sol_approx[:,i],norm_matrix)
+    dcache[i] = norm(sol[:,i],norm_matrix)
+  end
+  norm(ncache)/norm(dcache)
 end
 
 LinearAlgebra.norm(v::AbstractVector,::Nothing) = norm(v)
 
 LinearAlgebra.norm(v::AbstractVector,X::AbstractMatrix) = v'*X*v
 
-function post_process(
-  info::RBInfo,
-  feop::PTFEOperator,
-  fesolver::PODESolver,
-  results:: Vector{RBResults})
-
-  result = unique(results)
-  save(info,result)
-  writevtk(info,feop,fesolver,result)
-  return
-end
-
 function Gridap.Visualization.writevtk(
   info::RBInfo,
   feop::PTFEOperator,
   fesolver::PODESolver,
-  result::RBResults)
+  results::RBResults)
 
-  μ = result.μ
   test = get_test(feop)
   trial = get_trial(feop)
   trian = get_triangulation(test)
   times = get_times(fesolver)
 
-  sol = result.sol
-  sol_approx = result.sol_approx
+  μ,sol,sol_approx, = first(results)
   pointwise_err = abs.(sol-sol_approx)
 
   plt_dir = joinpath(info.rb_path,"plots")

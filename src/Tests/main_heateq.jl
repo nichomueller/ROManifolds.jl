@@ -60,9 +60,10 @@ begin
   energy_norm = l2Norm()
   nsnaps_state = 10
   nsnaps_system = 10
-  st_mdeim = true
+  nsnaps_test = 10
+  st_mdeim = false
   info = RBInfo(test_path;ϵ,load_structures,save_structures,energy_norm,
-                nsnaps_state,nsnaps_system,st_mdeim)
+                nsnaps_state,nsnaps_system,nsnaps_test,st_mdeim)
 end
 
 # WORKS
@@ -72,6 +73,17 @@ sols = collect_solutions(fesolver,feop,params)
 rbspace = get_reduced_basis(info,feop,sols,fesolver,params)
 rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
 save(info,(sols,params,rbspace,rbrhs,rblhs))
-sols,params,rbspace,rbrhs,rblhs = load(info,(AbstractSnapshots,Table,AbstractRBSpace,
-  AbstractRBAlgebraicContribution,AbstractRBAlgebraicContribution))
+sols,params,rbspace = load(info,(AbstractSnapshots,Table,AbstractRBSpace))
+rbrhs,rblhs = load(info,(AbstractRBAlgebraicContribution,Vector{AbstractRBAlgebraicContribution}))
+
+snaps_test,params_test = load_test(info,feop,fesolver)
+x = initial_guess(sols,params,params_test)
+rhs_cache,lhs_cache = allocate_sys_cache(feop,fesolver,rbspace,snaps_test,params_test)
+rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbrhs,x,params_test)
+lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,x,params_test)
+stats = @timed begin
+  rb_snaps_test = solve(fesolver.nls,rhs,lhs)
+end
+approx_snaps_test = recast(rbspace,rb_snaps_test)
+post_process(info,feop,fesolver,snaps_test,params_test,approx_snaps_test,stats)
 # DOESN'T
