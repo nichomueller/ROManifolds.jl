@@ -48,8 +48,6 @@ function reduced_basis_model(
   save(info,(sols,params,rbspace,rbrhs,rblhs))
 
   # Online phase
-  rb_results = test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params)
-  save(info,rb_results)
-
+  test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params)
   return
 end

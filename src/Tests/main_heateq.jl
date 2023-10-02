@@ -64,6 +64,7 @@ begin
   st_mdeim = false
   info = RBInfo(test_path;ϵ,load_structures,save_structures,energy_norm,
                 nsnaps_state,nsnaps_system,nsnaps_test,st_mdeim)
+  reduced_basis_model(info,feop,fesolver)
 end
 
 # WORKS

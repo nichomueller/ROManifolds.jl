@@ -116,8 +116,8 @@ function test_rb_solver(
   fesolver::PODESolver,
   rbspace::AbstractRBSpace,
   rbres::AbstractRBAlgebraicContribution,
-  rbjacs::AbstractRBAlgebraicContribution,
-  snaps::PTArray,
+  rbjacs::Vector{<:AbstractRBAlgebraicContribution},
+  snaps::Snapshots,
   params::Table)
 
   snaps_test,params_test = load_test(info,feop,fesolver)
@@ -141,8 +141,8 @@ function test_rb_solver(
   fesolver::PODESolver,
   rbspace::AbstractRBSpace,
   rbres::AbstractRBAlgebraicContribution,
-  rbjacs::AbstractRBAlgebraicContribution,
-  snaps::PTArray,
+  rbjacs::Vector{<:AbstractRBAlgebraicContribution},
+  snaps::Snapshots,
   params::Table)
 
   snaps_test,params_test = load_test(info,feop,fesolver)
