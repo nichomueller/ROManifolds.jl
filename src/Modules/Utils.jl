@@ -18,7 +18,7 @@ export create_dir!
 export save
 export load
 #Indexes
-export from_vec_to_mat_idx
+export vec_to_mat_idx
 # Operations
 export expand
 # BasesConstruction

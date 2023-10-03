@@ -57,12 +57,13 @@ struct RBAffineDecomposition{T}
 
     basis_space,basis_time = compress(nzm;ϵ=info.ϵ)
     proj_bs,proj_bt = compress_space_time(basis_space,basis_time,args...;kwargs...)
-    interp_idx_space,interp_idx_time = get_interpolation_idx(basis_space,basis_time)
+    interp_idx_space = get_interpolation_idx(basis_space)
+    interp_idx_time = get_interpolation_idx(basis_time)
     entire_interp_idx_space = recast_idx(basis_space,interp_idx_space)
 
     interp_bs = basis_space.nonzero_val[interp_idx_space,:]
     lu_interp = if info.st_mdeim
-      interp_bt = basis_time.nonzero_val[interp_idx_time,:]
+      interp_bt = basis_time[interp_idx_time,:]
       interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
       lu(interp_bst)
     else
@@ -167,8 +168,8 @@ function compress_component(
   contrib
 end
 
-function get_interpolation_idx(nzm::NnzMatrix...)
-  get_interpolation_idx.(get_nonzero_val.(nzm))
+function get_interpolation_idx(nzm::NnzMatrix)
+  get_interpolation_idx(get_nonzero_val(nzm))
 end
 
 function get_interpolation_idx(basis::AbstractMatrix)
@@ -185,7 +186,7 @@ function get_interpolation_idx(basis::AbstractMatrix)
   unique(idx)
 end
 
-function compress_space_time(basis_space::NnzMatrix,basis_time::NnzMatrix,args...;kwargs...)
+function compress_space_time(basis_space::NnzMatrix,basis_time::Matrix,args...;kwargs...)
   compress_space(basis_space,args...),compress_time(basis_time,args...;kwargs...)
 end
 
@@ -207,12 +208,12 @@ function compress_space(
   compress(entire_bs_row,entire_bs_col,basis_space)
 end
 
-function compress_time(basis_time::NnzMatrix,rbspace_row::RBSpace,args...;kwargs...)
-  [basis_time.nonzero_val,get_basis_time(rbspace_row)]
+function compress_time(basis_time::Matrix,rbspace_row::RBSpace,args...;kwargs...)
+  [basis_time,get_basis_time(rbspace_row)]
 end
 
 function compress_time(
-  basis_time::NnzMatrix,
+  basis_time::Matrix,
   rbspace_row::RBSpace{T},
   rbspace_col::RBSpace{T};
   combine_projections=(x,y)->x) where T
@@ -230,7 +231,7 @@ function compress_time(
     bt_proj_shift[2:end,it,jt] .= bt_row[2:end,it].*bt_col[1:end-1,jt]
   end
 
-  [basis_time.nonzero_val,combine_projections(bt_proj,bt_proj_shift)]
+  [basis_time,combine_projections(bt_proj,bt_proj_shift)]
 end
 
 function find_cells(idx::Vector{Int},cell_dof_ids)
@@ -361,7 +362,7 @@ function mdeim_solve!(cache,ad::RBAffineDecomposition,q::Matrix;st_mdeim=false)
   _q = change_order(q,time_ndofs)
   coeff = if st_mdeim
     _coeff = mdeim_solve!(csolve,ad.mdeim_interpolation,reshape(_q,:,nparams))
-    recast_coefficient!(crecast,ad.basis_time,_coeff)
+    recast_coefficient!(crecast,first(ad.basis_time),_coeff)
   else
     _coeff = mdeim_solve!(csolve,ad.mdeim_interpolation,_q)
     recast_coefficient!(crecast,_coeff)
@@ -395,11 +396,10 @@ end
 
 function recast_coefficient!(
   cache::PTArray{<:CachedArray{T}},
-  basis_time::Vector{<:Array{T}},
+  basis_time::Matrix{T},
   coeff::Matrix{T}) where T
 
-  _basis_time,_ = basis_time
-  Nt,Qt = size(_basis_time)
+  Nt,Qt = size(basis_time)
   Qs = Int(size(coeff,1)/Qt)
   setsize!(cache,(Nt,Qs))
   ptarray = get_array(cache)
@@ -409,7 +409,7 @@ function recast_coefficient!(
     cn = coeff[:,n]
     for qs in 1:Qs
       sorted_idx = [(i-1)*Qs+qs for i = 1:Qt]
-      an[:,qs] .= _basis_time*cn[sorted_idx]
+      an[:,qs] .= basis_time*cn[sorted_idx]
     end
   end
 

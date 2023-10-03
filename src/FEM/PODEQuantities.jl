@@ -53,7 +53,7 @@ function Base.iterate(sol::PODESolution)
   n = 0
   cache = nothing
 
-  uf,tf,cache = solution_step!(uf,sol.solver,sol.op,sol.μ,u0,t0,cache)
+  uf,tf,cache = solve_step!(uf,sol.solver,sol.op,sol.μ,u0,t0,cache)
 
   u0 .= uf
   n += 1
@@ -69,7 +69,7 @@ function Base.iterate(sol::PODESolution,state)
     return nothing
   end
 
-  uf,tf,cache = solution_step!(uf,sol.solver,sol.op,sol.μ,u0,t0,cache)
+  uf,tf,cache = solve_step!(uf,sol.solver,sol.op,sol.μ,u0,t0,cache)
 
   u0 .= uf
   n += 1

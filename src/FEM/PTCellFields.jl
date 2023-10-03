@@ -111,9 +111,9 @@ function CellData.CellField(
 end
 
 function CellData.CellField(
-  f::AbstractPTFunction{<:AbstractVector{<:Number},T},
+  f::AbstractPTFunction{<:AbstractVector{<:Number},<:Union{Real,Nothing}},
   trian::Triangulation,
-  ::DomainStyle) where T
+  ::DomainStyle)
 
   s = size(get_cell_map(trian))
   cell_field = Fill(get_fields(f),s)

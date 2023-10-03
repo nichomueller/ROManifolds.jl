@@ -33,7 +33,7 @@ for (uh,t) in sol_gridap
 end
 
 for i in eachindex(results)
-  test_ptarray(results[i],results_ok[i])
+  test_ptarray(results[i],results_ok[i];n)
 end
 
 boh = PTArray[]

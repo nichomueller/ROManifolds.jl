@@ -22,3 +22,12 @@ test_ptarray(result,result_ok)
 affine_cf = fμt(μ,dt)*v
 affine_pt = affine_cf(x)
 @assert isa(affine_pt,AffinePTArray)
+
+
+μ = rand(3)
+t = [0,1]
+cf = aμt(μ,t)*∇(v)⋅∇(du)
+result = cf(x)
+cf_ok = a(μ,t[1])*∇(v)⋅∇(du)
+result_ok = cf_ok(x)
+test_ptarray(result,result_ok)

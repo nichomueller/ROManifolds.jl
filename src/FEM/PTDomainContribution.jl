@@ -1,9 +1,9 @@
 struct PTDomainContribution <: GridapType
-  dict::IdDict{Triangulation,Union{PTArray,AbstractArray}}
+  dict::IdDict{Triangulation,PTArray}
 end
 
 function PTDomainContribution()
-  PTDomainContribution(IdDict{Triangulation,Union{PTArray,AbstractArray}}())
+  PTDomainContribution(IdDict{Triangulation,PTArray}())
 end
 
 CellData.get_triangulation(meas::Measure) = meas.quad.trian
@@ -19,54 +19,48 @@ function CellData.get_contribution(a::PTDomainContribution,trian::Triangulation)
     return a.dict[get_parent(trian)]
   else
     @unreachable """\n
-    There is not contribution associated with the given mesh in this PTDomainContribution object.
+    There is no contribution associated with the given mesh in this PTDomainContribution object.
     """
   end
 end
 
 Base.getindex(a::PTDomainContribution,trian::Triangulation) = get_contribution(a,trian)
 
-function CellData.add_contribution!(
-  a::PTDomainContribution,
-  trian::Triangulation,
-  b::Union{PTArray,AbstractArray},
-  op=+)
+Base.sum(a::PTDomainContribution) = sum(map(sum,values(a.dict)))
 
+Base.copy(a::PTDomainContribution) = PTDomainContribution(copy(a.dict))
+
+function error_message(a::PTDomainContribution,b::Union{PTArray,AbstractArray})
   S = eltype(b)
-  if !(S<:AbstractMatrix || S<:AbstractVector || S<:Number || S<:ArrayBlock)
-    @unreachable """\n
-    You are trying to add a contribution with eltype $(S).
-    Only cell-wise matrices, vectors, or numbers are accepted.
+  message = """\n
+  You are trying to add a contribution with eltype $(S).
+  Only cell-wise matrices, vectors, or numbers are accepted.
 
-    Make sure that you are defining the terms in your weak form correctly.
-    """
+  Make sure that you are defining the terms in your weak form correctly.
+  """
+  if !(S<:AbstractMatrix || S<:AbstractVector || S<:Number || S<:ArrayBlock)
+    @unreachable message
   end
 
   if length(a.dict) > 0
     T = eltype(first(values(a.dict)))
     if T <: AbstractMatrix || S<:(ArrayBlock{A,2} where A)
-      @assert S<:AbstractMatrix || S<:(ArrayBlock{A,2} where A) """\n
-      You are trying to add a contribution with eltype $(S) to a PTDomainContribution that
-      stores cell-wise matrices.
-
-      Make sure that you are defining the terms in your weak form correctly.
-      """
+      @assert S<:AbstractMatrix || S<:(ArrayBlock{A,2} where A) message
     elseif T <: AbstractVector || S<:(ArrayBlock{A,1} where A)
-      @assert S<:AbstractVector || S<:(ArrayBlock{A,1} where A) """\n
-      You are trying to add a contribution with eltype $(S) to a PTDomainContribution that
-      stores cell-wise vectors.
-
-      Make sure that you are defining the terms in your weak form correctly.
-      """
+      @assert S<:AbstractVector || S<:(ArrayBlock{A,1} where A) message
     elseif T <: Number
-      @assert S<:Number """\n
-      You are trying to add a contribution with eltype $(S) to a PTDomainContribution that
-      stores cell-wise numbers.
-
-      Make sure that you are defining the terms in your weak form correctly.
-      """
+      @assert S<:Number message
     end
   end
+end
+
+function CellData.add_contribution!(
+  a::PTDomainContribution,
+  trian::Triangulation,
+  b::PTArray,
+  op=+)
+
+  error_message(a,b)
 
   if haskey(a.dict,trian)
     a.dict[trian] = lazy_map(Broadcasting(op),a.dict[trian],b)
@@ -80,11 +74,22 @@ function CellData.add_contribution!(
   a
 end
 
-Base.sum(a::PTDomainContribution) = sum(map(sum,values(a.dict)))
+function CellData.add_contribution!(
+  a::PTDomainContribution,
+  trian::Triangulation,
+  b::AbstractArray,
+  op=+)
 
-Base.copy(a::PTDomainContribution) = PTDomainContribution(copy(a.dict))
+  n = 0
+  for atrian in get_domains(a)
+    n = length(a[atrian])
+    break
+  end
+  ptb = PTArray(b,n)
+  add_contribution!(a,trian,ptb,op)
+end
 
-function (+)(a::PTDomainContribution,b::PTDomainContribution)
+function (+)(a::PTDomainContribution,b::Union{PTDomainContribution,DomainContribution})
   c = copy(a)
   for (trian,array) in b.dict
     add_contribution!(c,trian,array)
@@ -92,10 +97,22 @@ function (+)(a::PTDomainContribution,b::PTDomainContribution)
   c
 end
 
-function (-)(a::PTDomainContribution,b::PTDomainContribution)
+function (-)(a::PTDomainContribution,b::Union{PTDomainContribution,DomainContribution})
   c = copy(a)
   for (trian,array) in b.dict
     add_contribution!(c,trian,array,-)
+  end
+  c
+end
+
+function (+)(a::DomainContribution,b::PTDomainContribution)
+  (+)(b,a)
+end
+
+function (-)(a::DomainContribution,b::PTDomainContribution)
+  c = (-)(b,a)
+  for (trian,_) in c.dict
+    c.dict[trian] = lazy_map(Broadcasting(-),c.dict[trian])
   end
   c
 end

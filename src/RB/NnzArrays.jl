@@ -1,16 +1,18 @@
 abstract type NnzArray{T,N} <: AbstractArray{T,N} end
 
 Base.size(nza::NnzArray,idx...) = size(nza.nonzero_val,idx...)
-function Base.getindex(nza::NnzArray,row)
-  getindex(nza.nonzero_val,from_sparse_idx_to_full_idx(row,nza.nonzero_idx))
-end
-function Base.getindex(nza::NnzArray,row,col)
-  getindex(nza.nonzero_val,from_sparse_idx_to_full_idx(row,nza.nonzero_idx),col)
-end
 Base.eachcol(nza::NnzArray) = eachcol(nza.nonzero_val)
 get_nonzero_val(nza::NnzArray) = nza.nonzero_val
 get_nonzero_idx(nza::NnzArray) = nza.nonzero_idx
 get_nrows(nza::NnzArray) = nza.nrows
+
+function Base.getindex(nza::NnzArray,row)
+  nza.nonzero_val[sparse_to_full_idx(row,nza.nonzero_idx)]
+end
+
+function Base.getindex(nza::NnzArray,row,col)
+  nza.nonzero_val[sparse_to_full_idx(row,nza.nonzero_idx),col]
+end
 
 function get_nonzero_val(nza::NTuple{N,NnzArray}) where N
   hcat(map(get_nonzero_val,nza)...)
@@ -138,7 +140,7 @@ function recast_idx(nzm::NnzMatrix,idx::Vector{Int})
   nonzero_idx = nzm.nonzero_idx
   nrows = nzm.nrows
   entire_idx = nonzero_idx[idx]
-  entire_idx_rows,_ = from_vec_to_mat_idx(entire_idx,nrows)
+  entire_idx_rows,_ = vec_to_mat_idx(entire_idx,nrows)
   return entire_idx_rows
 end
 
@@ -149,7 +151,7 @@ function compress(a::AbstractMatrix,nzm::NnzMatrix{T}) where T
 end
 
 function compress(a::AbstractMatrix,b::AbstractMatrix,nzm::NnzMatrix)
-  irow,icol = from_vec_to_mat_idx(nzm.nonzero_idx,nzm.nrows)
+  irow,icol = vec_to_mat_idx(nzm.nonzero_idx,nzm.nrows)
   ncols = maximum(icol)
   map(eachcol(nzm)) do nzv
     m = sparse(irow,icol,nzv,nzm.nrows,ncols)
