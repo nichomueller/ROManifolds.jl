@@ -39,7 +39,7 @@ function reduced_basis_model(
     nsnaps = info.nsnaps_state
     params = realization(feop,nsnaps)
     sols = collect_solutions(fesolver,feop,params)
-    rbspace = get_reduced_basis(info,feop,sols,fesolver,params)
+    rbspace = reduced_basis(info,feop,sols,fesolver,params)
     rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
     save(info,(sols,params,rbspace,rbrhs,rblhs))
   end

@@ -32,22 +32,13 @@ struct RBSpace{T} <: AbstractRBSpace{T}
     basis_time::Matrix{T}) where T
     new{T}(basis_space,basis_time)
   end
-
-  function RBSpace(
-    basis_space_nnz::NnzMatrix{T},
-    basis_time_nnz::NnzMatrix{T}) where T
-
-    basis_space = recast(basis_space_nnz)
-    basis_time = get_nonzero_val(basis_time_nnz)
-    new{T}(basis_space,basis_time)
-  end
 end
 
 function num_rb_dofs(rb::RBSpace)
   size(rb.basis_space,2)*size(rb.basis_time,2)
 end
 
-function get_reduced_basis(
+function reduced_basis(
   info::RBInfo,
   feop::PTFEOperator,
   snaps::Snapshots,
@@ -55,7 +46,8 @@ function get_reduced_basis(
 
   energy_norm = info.energy_norm
   norm_matrix = get_norm_matrix(energy_norm,feop)
-  basis_space,basis_time = compress(info,feop,snaps,norm_matrix,args...)
+  basis_space_nnz,basis_time = compress(info,feop,snaps,norm_matrix,args...)
+  basis_space = recast(basis_space_nnz)
   RBSpace(basis_space,basis_time)
 end
 
@@ -84,15 +76,6 @@ struct BlockRBSpace{T} <: AbstractRBSpace{T}
     basis_time::Vector{Matrix{T}}) where T
     new{T}(basis_space,basis_time)
   end
-
-  function BlockRBSpace(
-    basis_space_nnz::BlockNnzMatrix{T},
-    basis_time_nnz::BlockNnzMatrix{T}) where T
-
-    basis_space = recast(basis_space_nnz)
-    basis_time = get_nonzero_val(basis_time_nnz)
-    new{T}(basis_space,basis_time)
-  end
 end
 
 get_nfields(rb::BlockRBSpace) = length(rb.basis_space)
@@ -107,7 +90,7 @@ function num_rb_dofs(rb::BlockRBSpace)
   ndofs
 end
 
-function get_reduced_basis(
+function reduced_basis(
   info::RBInfo,
   feop::PTFEOperator,
   snaps::BlockSnapshots,
@@ -115,7 +98,8 @@ function get_reduced_basis(
 
   energy_norm = info.energy_norm
   norm_matrix = get_norm_matrix.(energy_norm,feop)
-  basis_space,basis_time = compress(info,feop,snaps,norm_matrix,args...)
+  basis_space_nnz,basis_time = compress(info,feop,snaps,norm_matrix,args...)
+  basis_space = recast(basis_space_nnz)
   BlockRBSpace(basis_space,basis_time)
 end
 
@@ -123,8 +107,7 @@ function compress(info::RBInfo,::PTFEOperator,snaps,args...)
   nzm = NnzArray(snaps)
   ϵ = info.ϵ
   steady = num_time_dofs(nzm) == 1 ? SteadyPOD() : DefaultPOD()
-  transposed = size(nzm,1) < size(nzm,2) ? TranposedPOD() : DefaultPOD()
-  compress(nzm,steady,transposed,args...;ϵ)
+  compress(nzm,steady,args...;ϵ)
 end
 
 function compress(

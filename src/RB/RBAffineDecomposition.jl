@@ -56,7 +56,7 @@ struct RBAffineDecomposition{T}
     kwargs...)
 
     basis_space,basis_time = compress(nzm;ϵ=info.ϵ)
-    proj_bs,proj_bt = compress(basis_space,basis_time,args...;kwargs...)
+    proj_bs,proj_bt = compress_space_time(basis_space,basis_time,args...;kwargs...)
     interp_idx_space,interp_idx_time = get_interpolation_idx(basis_space,basis_time)
     entire_interp_idx_space = recast_idx(basis_space,interp_idx_space)
 
@@ -185,7 +185,7 @@ function get_interpolation_idx(basis::AbstractMatrix)
   unique(idx)
 end
 
-function compress(basis_space::NnzMatrix,basis_time::NnzMatrix,args...;kwargs...)
+function compress_space_time(basis_space::NnzMatrix,basis_time::NnzMatrix,args...;kwargs...)
   compress_space(basis_space,args...),compress_time(basis_time,args...;kwargs...)
 end
 

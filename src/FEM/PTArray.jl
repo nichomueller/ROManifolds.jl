@@ -184,17 +184,17 @@ function _get_length(x::Union{AbstractArrayBlock,PTArray}...)
   n
 end
 
-function test_ptarray(a::PTArray,b::AbstractArrayBlock)
-  a1 = a[2] # a1 = testitem(a)
-  @assert all(a1 .≈ b)
-  if typeof(a1) != typeof(b)
+function test_ptarray(a::PTArray,b::AbstractArrayBlock;n=1)
+  _a = a[n]
+  @assert all(_a .≈ b) "Incorrect approximation detected for index $n"
+  if typeof(_a) != typeof(b)
     @warn "Detected difference in type"
   end
   return
 end
 
-function test_ptarray(a::AbstractArrayBlock,b::PTArray)
-  test_ptarray(b,a)
+function test_ptarray(a::AbstractArrayBlock,b::PTArray;kwargs...)
+  test_ptarray(b,a;kwargs...)
 end
 
 function test_ptarray(a::PTArray,b::PTArray)

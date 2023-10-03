@@ -59,19 +59,6 @@ function truncation(Σ::AbstractArray,ϵ::Real)
   rb_ndofs
 end
 
-function change_mode(mat::AbstractMatrix{T},nparams::Int) where T
-  mode1_ndofs = size(mat,1)
-  mode2_ndofs = Int(size(mat,2)/nparams)
-  mode2 = zeros(T,mode2_ndofs,mode1_ndofs*nparams)
-
-  _mode2(k::Int) = mat[:,(k-1)*mode2_ndofs+1:k*mode2_ndofs]'
-  @inbounds for k = 1:nparams
-    setindex!(mode2,_mode2(k),:,(k-1)*mode1_ndofs+1:k*mode1_ndofs)
-  end
-
-  mode2
-end
-
 function projection(
   vnew::AbstractArray{Float},
   basis::AbstractMatrix{Float};

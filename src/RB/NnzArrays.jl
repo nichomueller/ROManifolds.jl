@@ -109,9 +109,13 @@ function Base.show(io::IO,nzm::NnzMatrix)
   print(io,"NnzMatrix storing $(length(nzm)) compressed transient snapshots")
 end
 
-function Base.prod(nza1::NnzMatrix,nza2::NnzMatrix)
-  nonzero_vals = nza1.nonzero_val' * nza2.nonzero_val
-  NnzMatrix(nonzero_vals,nza1.nonzero_idx,nza1.nrows,nza1.nparams)
+function Base.prod(nzm1::NnzMatrix,nzm2::NnzMatrix)
+  @assert nzm1.nonzero_idx == nzm2.nonzero_idx
+  @assert nzm1.nrows == nzm2.nrows
+  @assert nzm1.nparams == nzm2.nparams
+
+  nonzero_vals = nzm1.nonzero_val' * nzm2.nonzero_val
+  NnzMatrix(nonzero_vals,nzm1.nonzero_idx,nzm1.nrows,nzm1.nparams)
 end
 
 function Base.prod(nzm::NnzMatrix,a::AbstractArray)
@@ -156,51 +160,34 @@ end
 abstract type PODStyle end
 struct DefaultPOD <: PODStyle end
 struct SteadyPOD <: PODStyle end
-struct TranposedPOD <: PODStyle end
 
 function compress(nzm::NnzMatrix,norm_matrix=nothing;kwargs...)
   steady = num_time_dofs(nzm) == 1 ? SteadyPOD() : DefaultPOD()
-  transposed = size(nzm,1) < size(nzm,2) ? TranposedPOD() : DefaultPOD()
-  compress(nzm,steady,transposed,norm_matrix;kwargs...)
+  compress(nzm,steady,norm_matrix;kwargs...)
 end
 
 function compress(
   nzm::NnzMatrix,
   ::PODStyle,
-  ::PODStyle,
   args...;
   kwargs...)
 
-  basis_space,basis_time = transient_tpod(nzm,args...;kwargs...)
+  basis_space = tpod(nzm,args...;kwargs...)
+  compressed_nzm = prod(basis_space,nzm)
+  compressed_nzm_t = change_mode(compressed_nzm)
+  basis_time = tpod(compressed_nzm_t;kwargs...)
   basis_space,basis_time
 end
 
 function compress(
   nzm::NnzMatrix,
-  ::DefaultPOD,
-  ::TranposedPOD,
+  ::SteadyPOD,
   args...;
   kwargs...)
 
-  nzm_t = change_mode(nzm)
-  basis_time,basis_space = transient_tpod(nzm_t,args...;kwargs...)
+  basis_space = tpod(nzm,args...;kwargs...)
+  basis_time = ones(eltype(nzm),1,1)
   basis_space,basis_time
-end
-
-for T in (:DefaultPOD,:TranposedPOD)
-  @eval begin
-    function compress(
-      nzm::NnzMatrix,
-      ::SteadyPOD,
-      ::$T,
-      args...;
-      kwargs...)
-
-      basis_space = tpod(nzm,args...;kwargs...)
-      basis_time = ones(eltype(nzm),1,1)
-      basis_space,basis_time
-    end
-  end
 end
 
 function tpod(nzm::NnzMatrix,args...;kwargs...)
@@ -220,7 +207,7 @@ function change_mode(nzm::NnzMatrix{T}) where T
   time_ndofs = num_time_dofs(nzm)
   nparams = num_params(nzm)
   mode2 = change_mode(nzm.nonzero_val,time_ndofs,nparams)
-  return NnzMatrix(mode2,nzm.nonzero_idx,nzm.nrows,nparams)
+  return mode2
 end
 
 struct BlockNnzMatrix{T} <: AbstractVector{NnzMatrix{T}}
