@@ -185,7 +185,7 @@ function _get_length(x::Union{AbstractArrayBlock,PTArray}...)
 end
 
 function test_ptarray(a::PTArray,b::AbstractArrayBlock)
-  a1 = testitem(a)
+  a1 = a[2] # a1 = testitem(a)
   @assert all(a1 .≈ b)
   if typeof(a1) != typeof(b)
     @warn "Detected difference in type"

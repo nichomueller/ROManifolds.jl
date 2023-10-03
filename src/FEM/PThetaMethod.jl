@@ -54,14 +54,14 @@ function Algebra.allocate_residual(
   op::PThetaMethodNonlinearOperator,
   x::PTArray)
 
-  allocate_residual(op.odeop,x,op.ode_cache)
+  allocate_residual(op.odeop,op.μ,op.tθ,x,op.ode_cache)
 end
 
 function Algebra.allocate_jacobian(
   op::PThetaMethodNonlinearOperator,
   x::PTArray)
 
-  allocate_jacobian(op.odeop,x,op.ode_cache)
+  allocate_jacobian(op.odeop,op.μ,op.tθ,x,op.ode_cache)
 end
 
 function Algebra.residual(op::PNonlinearOperator,x::PTArray,args...)

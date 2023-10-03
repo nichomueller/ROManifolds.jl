@@ -33,19 +33,16 @@ function reduced_basis_model(
 
   # Offline phase
   if info.load_structures
-    sols,params,rbspace,rbrhs,rblhs = load(info,(
-      AbstractSnapshots,
-      Table,
-      AbstractRBSpace,
-      AbstractRBAlgebraicContribution,
-      AbstractRBAlgebraicContribution))
+    sols,params,rbspace = load(info,(AbstractSnapshots,Table,AbstractRBSpace))
+    rbrhs,rblhs = load(info,(AbstractRBAlgebraicContribution,Vector{AbstractRBAlgebraicContribution}))
+  else
+    nsnaps = info.nsnaps_state
+    params = realization(feop,nsnaps)
+    sols = collect_solutions(fesolver,feop,params)
+    rbspace = get_reduced_basis(info,feop,sols,fesolver,params)
+    rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
+    save(info,(sols,params,rbspace,rbrhs,rblhs))
   end
-  nsnaps = info.nsnaps_state
-  params = realization(feop,nsnaps)
-  sols = collect_solutions(fesolver,feop,params)
-  rbspace = get_reduced_basis(info,feop,sols,fesolver,params)
-  rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
-  save(info,(sols,params,rbspace,rbrhs,rblhs))
 
   # Online phase
   test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params)

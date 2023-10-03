@@ -109,13 +109,13 @@ function FESpaces.numeric_loop_matrix!(
 end
 
 @noinline function FESpaces._numeric_loop_matrix!(
-  mat::PTArray,caches,cell_vals::PTArray,cell_rows,cell_cols)
+  mat::PTArray,caches,cell_vals,cell_rows,cell_cols)
 
   matcache,add_cache,vals_cache,rows_cache,cols_cache = caches
   add! = AddEntriesMap(+)
   for k in eachindex(mat)
     matk = matcache[k]
-    cell_valsk = cell_vals[k]
+    cell_valsk = get_at_index(k,cell_vals)
     for cell in eachindex(cell_cols)
       rows = getindex!(rows_cache,cell_rows,cell)
       cols = getindex!(cols_cache,cell_cols,cell)
@@ -123,24 +123,6 @@ end
       evaluate!(add_cache,add!,matk,valsk,rows,cols)
       mat[k] = matk
     end
-  end
-end
-
-@noinline function FESpaces._numeric_loop_matrix!(
-  mat::PTArray,caches,cell_vals::Union{AbstractArrayBlock,AffinePTArray},cell_rows,cell_cols)
-
-  matcache,add_cache,vals_cache,rows_cache,cols_cache = caches
-  add! = AddEntriesMap(+)
-  mat1 = matcache[1]
-  cell_vals1 = get_at_index(1,cell_vals)
-  for cell in eachindex(cell_cols)
-    rows = getindex!(rows_cache,cell_rows,cell)
-    cols = getindex!(cols_cache,cell_cols,cell)
-    vals1 = getindex!(vals_cache,cell_vals1,cell)
-    evaluate!(add_cache,add!,mat1,vals1,rows,cols)
-  end
-  for k in eachindex(mat)
-    mat[k] = copy(mat1)
   end
 end
 
@@ -167,35 +149,18 @@ function FESpaces.numeric_loop_vector!(
 end
 
 @noinline function FESpaces._numeric_loop_vector!(
-  vec::PTArray,caches,cell_vals::PTArray,cell_rows)
+  vec::PTArray,caches,cell_vals,cell_rows)
 
   veccache,add_cache,vals_cache,rows_cache = caches
   add! = AddEntriesMap(+)
   for k in eachindex(vec)
     veck = veccache[k]
-    cell_valsk = cell_vals[k]
+    cell_valsk = get_at_index(k,cell_vals)
     for cell in eachindex(cell_rows)
       rows = getindex!(rows_cache,cell_rows,cell)
       valsk = getindex!(vals_cache,cell_valsk,cell)
       evaluate!(add_cache,add!,veck,valsk,rows)
       vec[k] = veck
     end
-  end
-end
-
-@noinline function FESpaces._numeric_loop_vector!(
-  vec::PTArray,caches,cell_vals::Union{AbstractArrayBlock,AffinePTArray},cell_rows)
-
-  veccache,add_cache,vals_cache,rows_cache = caches
-  add! = AddEntriesMap(+)
-  vec1 = veccache[1]
-  cell_vals1 = get_at_index(1,cell_vals)
-  for cell in eachindex(cell_rows)
-    rows = getindex!(rows_cache,cell_rows,cell)
-    vals1 = getindex!(vals_cache,cell_vals1,cell)
-    evaluate!(add_cache,add!,vec1,vals1,rows)
-  end
-  for k in eachindex(vec)
-    vec[k] = copy(vec1)
   end
 end

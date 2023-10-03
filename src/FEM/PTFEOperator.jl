@@ -114,10 +114,11 @@ end
 
 function allocate_residual(
   op::PTFEOperatorFromWeakForm,
-  uh::T,
-  cache) where T
+  μ::AbstractVector,
+  t::T,
+  uh::S,
+  cache) where {T,S}
 
-  μ,t = realization(op),0.
   V = get_test(op)
   v = get_fe_basis(V)
   dxh = ()
@@ -132,10 +133,10 @@ end
 function residual!(
   b::PTArray,
   op::PTFEOperatorFromWeakForm,
-  μ,
-  t,
-  xh::T,
-  cache) where T
+  μ::AbstractVector,
+  t::T,
+  xh::S,
+  cache) where {T,S}
 
   V = get_test(op)
   v = get_fe_basis(V)
@@ -147,12 +148,12 @@ end
 function residual!(
   b::PTArray,
   op::PTFEOperatorFromWeakForm,
-  μ,
-  t,
-  xh::T,
+  μ::AbstractVector,
+  t::T,
+  xh::S,
   cache,
   trian::Triangulation,
-  meas::Measure...) where T
+  meas::Measure...) where {T,S}
 
   V = get_test(op)
   v = get_fe_basis(V)
@@ -164,10 +165,10 @@ end
 function residual_for_trian!(
   b::PTArray,
   op::PTFEOperatorFromWeakForm,
-  μ,
-  t,
-  xh::T,
-  cache) where T
+  μ::AbstractVector,
+  t::T,
+  xh::S,
+  cache) where {T,S}
 
   V = get_test(op)
   v = get_fe_basis(V)
@@ -184,10 +185,12 @@ end
 
 function allocate_jacobian(
   op::PTFEOperatorFromWeakForm,
-  uh::T,
-  cache) where T
+  μ::AbstractVector,
+  t::T,
+  uh::S,
+  cache) where {T,S}
 
-  _matdata_jacobians = fill_initial_jacobians(op,uh)
+  _matdata_jacobians = fill_initial_jacobians(op,μ,t,uh)
   matdata = _vcat_matdata(_matdata_jacobians)
   allocate_matrix(op.assem,matdata)
 end
@@ -196,12 +199,16 @@ for f in (:allocate_residual,:allocate_jacobian)
   @eval begin
     function $f(
       op::PTFEOperatorFromWeakForm,
+      μ::AbstractVector,
+      t::T,
       uh::PTCellField,
-      cache)
+      cache) where T
 
       n = length(uh)
+      μ1 = isa(μ,Table) ? testitem(μ) : μ
+      t1 = isa(t,AbstractVector) ? testitem(t) : t
       uh1 = testitem(uh)
-      a = $f(op,uh1,cache)
+      a = $f(op,μ1,t1,uh1,cache)
       array = Vector{typeof(a)}(undef,n)
       @inbounds for i = eachindex(array)
         array[i] = copy(a)
@@ -214,12 +221,12 @@ end
 function jacobian!(
   A::PTArray,
   op::PTFEOperatorFromWeakForm,
-  μ,
-  t,
-  uh::T,
+  μ::AbstractVector,
+  t::T,
+  uh::S,
   i::Integer,
   γᵢ::Real,
-  cache) where T
+  cache) where {T,S}
 
   matdata = _matdata_jacobian(op,μ,t,uh,i,γᵢ)
   assemble_matrix_add!(A,op.assem,matdata)
@@ -229,14 +236,14 @@ end
 function jacobian!(
   A::PTArray,
   op::PTFEOperatorFromWeakForm,
-  μ,
-  t,
-  uh::T,
+  μ::AbstractVector,
+  t::T,
+  uh::S,
   i::Integer,
   γᵢ::Real,
   cache,
   trian::Triangulation,
-  meas::Measure...) where T
+  meas::Measure...) where {T,S}
 
   Uh = get_trial(op)(μ,t)
   V = get_test(op)
@@ -250,12 +257,12 @@ end
 function jacobian_for_trian!(
   A::PTArray,
   op::PTFEOperatorFromWeakForm,
-  μ,
-  t,
-  uh::T,
+  μ::AbstractVector,
+  t::T,
+  uh::S,
   i::Integer,
   γᵢ::Real,
-  cache) where T
+  cache) where {T,S}
 
   Uh = get_trial(op)(μ,t)
   V = get_test(op)
@@ -275,11 +282,11 @@ end
 function jacobians!(
   A::PTArray,
   op::PTFEOperatorFromWeakForm,
-  μ,
-  t,
-  uh::T,
+  μ::AbstractVector,
+  t::T,
+  uh::S,
   γ::Tuple{Vararg{Real}},
-  cache) where T
+  cache) where {T,S}
 
   _matdata_jacobians = fill_jacobians(op,μ,t,uh,γ)
   matdata = _vcat_matdata(_matdata_jacobians)
@@ -289,9 +296,10 @@ end
 
 function fill_initial_jacobians(
   op::PTFEOperatorFromWeakForm,
-  uh::T) where T
+  μ::AbstractVector,
+  t::T,
+  uh::S) where {T,S}
 
-  μ,t = realization(op),0.
   dxh = ()
   for i in 1:get_order(op)
     dxh = (dxh...,uh)
@@ -306,10 +314,10 @@ end
 
 function fill_jacobians(
   op::PTFEOperatorFromWeakForm,
-  μ,
-  t,
-  uh::T,
-  γ::Tuple{Vararg{Real}}) where T
+  μ::AbstractVector,
+  t::T,
+  uh::S,
+  γ::Tuple{Vararg{Real}}) where {T,S}
 
   _matdata = ()
   for i in 1:get_order(op)+1
@@ -322,11 +330,11 @@ end
 
 function _matdata_jacobian(
   op::PTFEOperatorFromWeakForm,
-  μ,
-  t,
-  xh::T,
+  μ::AbstractVector,
+  t::T,
+  xh::S,
   i::Integer,
-  γᵢ::Real) where T
+  γᵢ::Real) where {T,S}
 
   Uh = get_trial(op)(μ,t)
   V = get_test(op)

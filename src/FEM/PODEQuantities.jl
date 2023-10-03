@@ -91,7 +91,8 @@ function collect_solutions(
   sols = allocate_solution(ode_op,num_iter)
   for (u,t,n) in uμt
     printstyled("Computing fe solution at time $t for every parameter\n";color=:blue)
-    sols[n] = get_solution(ode_op,u)
+    sol = get_solution(ode_op,u)
+    sols[n] = copy(sol)
   end
   return Snapshots(sols)
 end
@@ -140,7 +141,7 @@ for (fun,fun!) in zip(
 
       ode_op = get_algebraic_operator(feop)
       ode_cache = allocate_cache(ode_op,μ,times)
-      b = allocate_residual(ode_op,sols,ode_cache)
+      b = allocate_residual(ode_op,μ,times,sols,ode_cache)
       $fun!(b,fesolver,ode_op,sols,μ,times,ode_cache,args...;kwargs...)
     end
   end
@@ -161,7 +162,7 @@ for (fun,fun!) in zip(
 
       ode_op = get_algebraic_operator(feop)
       ode_cache = allocate_cache(ode_op,μ,times)
-      A = allocate_jacobian(ode_op,sols,ode_cache)
+      A = allocate_jacobian(ode_op,μ,times,sols,ode_cache)
       $fun!(A,fesolver,ode_op,sols,μ,times,ode_cache,args...;kwargs...)
     end
   end

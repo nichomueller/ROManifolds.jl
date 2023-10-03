@@ -91,8 +91,8 @@ function allocate_sys_cache(
   times = get_times(fesolver)
   ode_op = get_algebraic_operator(feop)
   ode_cache = allocate_cache(ode_op,params,times)
-  b = allocate_residual(ode_op,snaps_test,ode_cache)
-  A = allocate_jacobian(ode_op,snaps_test,ode_cache)
+  b = allocate_residual(ode_op,params,times,snaps_test,ode_cache)
+  A = allocate_jacobian(ode_op,params,times,snaps_test,ode_cache)
 
   rb_ndofs = num_rb_dofs(rbspace)
   ncoeff = length(params)

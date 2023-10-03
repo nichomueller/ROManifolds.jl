@@ -12,16 +12,19 @@ for (uh,t) in sol
   push!(results,ye)
 end
 
-g_ok(x,t) = g(x,μ[1],t)
+n = 2
+p,v = μ[n],w[n]
+g_ok(x,t) = g(x,p,t)
 g_ok(t) = x->g_ok(x,t)
-a_ok(t,u,v) = ∫(a(μ[1],t)*∇(v)⋅∇(u))dΩ
-b_ok(t,v) = ∫(v*f(μ[1],t))dΩ + ∫(v*h(μ[1],t))dΓn
+a_ok(t,u,v) = ∫(a(p,t)*∇(v)⋅∇(u))dΩ
+b_ok(t,v) = ∫(v*f(p,t))dΩ + ∫(v*h(p,t))dΓn
 m_ok(t,ut,v) = ∫(ut*v)dΩ
 
 trial_ok = TransientTrialFESpace(test,g_ok)
 feop_ok = TransientAffineFEOperator(m_ok,a_ok,b_ok,trial_ok,test)
 ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
-sol_gridap = Gridap.ODEs.TransientFETools.GenericODESolution(ode_solver,ode_op_ok,w[1],t0,tf)
+ode_solver = ThetaMethod(LUSolver(),dt,θ)
+sol_gridap = Gridap.ODEs.TransientFETools.GenericODESolution(ode_solver,ode_op_ok,v,t0,tf)
 
 results_ok = Vector{Float}[]
 for (uh,t) in sol_gridap

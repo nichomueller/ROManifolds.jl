@@ -16,7 +16,7 @@ function solution_step!(
     vθ = similar(u0)
     vθ .= 0.0
     l_cache = nothing
-    A,b = _allocate_matrix_and_vector(op,u0,ode_cache)
+    A,b = _allocate_matrix_and_vector(op,μ,t0,u0,ode_cache)
   else
     ode_cache,vθ,A,b,l_cache = cache
   end
@@ -36,6 +36,12 @@ function solution_step!(
   cache = (ode_cache,vθ,A,b,l_cache)
   tf = t0+dt
   return (uf,tf,cache)
+end
+
+function _allocate_matrix_and_vector(odeop,μ,t0,u0,ode_cache)
+  b = allocate_residual(odeop,μ,t0,u0,ode_cache)
+  A = allocate_jacobian(odeop,μ,t0,u0,ode_cache)
+  return A,b
 end
 
 function _matrix_and_vector!(

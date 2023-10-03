@@ -7,16 +7,17 @@ end
 
 Base.length(s::Snapshots) = length(s.snaps)
 Base.size(s::Snapshots{T},args...) where {T<:AbstractArray} = size(testitem(first(s.snaps)),args...)
+Base.eachindex(s::Snapshots) = eachindex(s.snaps)
 num_space_dofs(s::Snapshots) = size(s,1)
 num_time_dofs(s::Snapshots) = length(s)
 num_params(s::Snapshots) = length(first(s.snaps))
 
-function Base.getindex(s::Snapshots{T},range) where T
+function Base.getindex(s::Snapshots{T},idx) where T
   time_ndofs = num_time_dofs(s)
-  nrange = length(range)
+  nrange = length(idx)
   array = Vector{T}(undef,time_ndofs*nrange)
   for nt in 1:time_ndofs
-    for (i,r) in enumerate(range)
+    for (i,r) in enumerate(idx)
       array[(nt-1)*nrange+i] = s.snaps[nt][r]
     end
   end
