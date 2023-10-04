@@ -1,17 +1,5 @@
 μ = realization(feop,10)
-
 sols = collect_solutions(fesolver,feop,μ)
-  # uh0,t0,tf = fesolver.uh0,fesolver.t0,fesolver.tf
-  # ode_op = get_algebraic_operator(feop)
-  # uu0 = get_free_dof_values(uh0(μ))
-  # uμst = PODESolution(fesolver,ode_op,μ,uu0,t0,tf)
-  # num_iter = Int(tf/fesolver.dt)
-  # sols = allocate_solution(ode_op,num_iter)
-  # for (u,t,n) in uμst
-  #   printstyled("Computing fe solution at time $t for every parameter\n";color=:blue)
-  #   sols[n] = get_solution(ode_op,u)
-  # end
-  # sols = Snapshots(sols)
 
 function _get_gridap_sol(n::Int)
   p = μ[n]

@@ -3,8 +3,7 @@ abstract type AbstractSnapshots{T} end
 struct Snapshots{T<:AbstractArray} <: AbstractSnapshots{T}
   snaps::Vector{PTArray{T}}
   function Snapshots(s::Vector{<:PTArray{T}}) where T
-    r = reorder(s)
-    new{T}(r)
+    new{T}(s)
   end
 end
 
@@ -30,23 +29,6 @@ end
 function Base.convert(::Type{PTArray{T}},a::Snapshots{T}) where T
   arrays = vcat(map(get_array,a.snaps)...)
   PTArray(arrays)
-end
-
-function reorder(s::Vector{PTArray{T}}) where T
-  time_ndofs = length(s)
-  s1 = testitem(s)
-  nparams = length(s1)
-
-  array = Vector{T}(undef,time_ndofs)
-  r = Vector{PTArray{T}}(undef,nparams)
-  @inbounds for np in 1:nparams
-    for nt in 1:time_ndofs
-      array[nt] = s[nt][np]
-    end
-    r[np] = PTArray(copy(array))
-  end
-
-  return r
 end
 
 function recenter(

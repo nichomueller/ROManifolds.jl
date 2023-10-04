@@ -35,16 +35,13 @@ function index_pairs(a,b)
   collect(Iterators.product(1:a,1:b))
 end
 
-m2_idx(m2_ndofs::Int,nparams::Int) = collect(1:nparams) .+ collect(0:m2_ndofs-1)'*nparams
-
 function change_mode(mat::Matrix{T},nparams::Int) where T
   mode1_ndofs = size(mat,1)
   mode2_ndofs = Int(size(mat,2)/nparams)
-  mode2_idx = m2_idx(mode2_ndofs,nparams)
   mode2 = zeros(T,mode2_ndofs,mode1_ndofs*nparams)
 
-  @inbounds for i = 1:mode2_ndofs
-    mode2[i,:] = reshape(mat[:,mode2_idx[:,i]],:)
+  @inbounds for i = 1:nparams
+    mode2[:,(i-1)*mode1_ndofs+1:i*mode1_ndofs] = mat[:,(i-1)*mode2_ndofs+1:i*mode2_ndofs]'
   end
   return mode2
 end
