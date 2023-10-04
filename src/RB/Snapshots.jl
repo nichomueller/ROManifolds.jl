@@ -34,9 +34,10 @@ function recenter(
   s::Snapshots{T},
   μ::Table) where T
 
+  θ = solver.θ
   uh0 = solver.uh0
   u0 = get_free_dof_values(uh0(μ))
-  sθ = s.snaps*θ + [u0,s.snaps[2:end]...]*(1-θ)
+  sθ = s.snaps.*θ + [u0,s.snaps[2:end]...].*(1-θ)
   Snapshots(sθ)
 end
 

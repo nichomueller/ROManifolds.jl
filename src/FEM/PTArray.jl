@@ -31,12 +31,11 @@ function Base.zeros(a::PTArray)
   get_array(zero(a))
 end
 
-function Base.:*(a::Number,b::PTArray)
-  get_array(b) .* a
-  b
+function Base.:*(a::PTArray,b::Number)
+  map(ai->(*)(ai,b),a)
 end
 
-function Base.:*(a::PTArray,b::Number)
+function Base.:*(a::Number,b::PTArray)
   b*a
 end
 
@@ -198,7 +197,7 @@ function test_ptarray(a::AbstractArrayBlock,b::PTArray;kwargs...)
 end
 
 function test_ptarray(a::PTArray,b::PTArray)
-  (≈)(b,a)
+  @assert (≈)(b,a)
 end
 
 # Default implementation

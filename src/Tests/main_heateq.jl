@@ -8,7 +8,7 @@ begin
   bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
   # mesh = "elasticity_3cyl2D.json"
   # bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
-  test_path = "$root/tests/poisson/unsteady/$mesh"
+  test_path = "$root/tests/poisson/unsteady/_$mesh"
   order = 1
   degree = 2
 
@@ -87,4 +87,3 @@ stats = @timed begin
 end
 approx_snaps_test = recast(rbspace,rb_snaps_test)
 post_process(info,feop,fesolver,snaps_test,params_test,approx_snaps_test,stats)
-# DOESN'T
