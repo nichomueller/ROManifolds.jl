@@ -61,7 +61,7 @@ struct RBAffineDecomposition{T}
     interp_idx_time = get_interpolation_idx(basis_time)
     entire_interp_idx_space = recast_idx(basis_space,interp_idx_space)
 
-    interp_bs = basis_space.nonzero_val[interp_idx_space,:]
+    interp_bs = basis_space[interp_idx_space,:]
     lu_interp = if info.st_mdeim
       interp_bt = basis_time[interp_idx_time,:]
       interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)

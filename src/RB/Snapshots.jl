@@ -16,11 +16,11 @@ num_params(s::Snapshots) = length(first(s.snaps))
 
 function Base.getindex(s::Snapshots{T},idx) where T
   time_ndofs = num_time_dofs(s)
-  nidx = length(idx)
-  array = Vector{T}(undef,time_ndofs*nidx)
-  for (count,i) in enumerate(idx)
-    for nt in 1:time_ndofs
-      @inbounds array[(count-1)*time_ndofs+nt] = s.snaps[i][nt]
+  nrange = length(idx)
+  array = Vector{T}(undef,time_ndofs*nrange)
+  for nt in 1:time_ndofs
+    for (i,r) in enumerate(idx)
+      array[(nt-1)*nrange+i] = s.snaps[nt][r]
     end
   end
   return PTArray(array)

@@ -128,7 +128,7 @@ function Algebra._solve_nr!(x,A,b,dx,ns,nls,op,Aaff,baff)
     x .+= dx
     residual!(b,op,x)
     isconv,conv = Algebra._check_convergence(nls,b,conv0)
-    println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv))) \n")
+    println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv)))")
     if all(isconv); return; end
     if iter == nls.max_nliters
       @unreachable

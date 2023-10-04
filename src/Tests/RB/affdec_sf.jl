@@ -32,9 +32,8 @@ ress,trian = collect_residuals_for_trian(fesolver,feop,_snapsθ,_μ,times)
   #   bvec[n] = copy(b)
   # end
   # nzm = NnzMatrix(bvec[1];nparams=length(params))
-nzm = ress[1]
+nzm,_trian = ress[2],Γn
 full_val = recast(nzm)
-_trian = Ω
 basis_space,basis_time = compress(nzm;ϵ=info.ϵ)
 proj_bs,proj_bt = compress_space_time(basis_space,basis_time,rbspace)
 interp_idx_space,interp_idx_time = get_interpolation_idx(basis_space),get_interpolation_idx(basis_time)

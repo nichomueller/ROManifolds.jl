@@ -25,13 +25,22 @@ end
 N = 10
 results_ok = _get_gridap_sol(N)
 for i in eachindex(results_ok)
-  println(isapprox(sols.snaps[i][N],results_ok[i]))
+  @assert isapprox(sols.snaps[i][N],results_ok[i])
 end
 
 _u = sols[N]
 for i in eachindex(results_ok)
-  println(isapprox(_u[i],results_ok[i]))
+  @assert isapprox(_u[i],results_ok[i])
 end
+
+# MODE2
+results_ok = _get_gridap_sol(N)
+m2_ok = hcat(results_ok...)'
+nzm = NnzArray(sols)
+m2 = change_mode(nzm)
+time_ndofs = get_time_ndofs(fesolver)
+space_ndofs = size(m2_ok,2)
+@assert isapprox(m2_ok,m2[:,(N-1)*space_ndofs+1:N*space_ndofs])
 
 # RES/JAC
 μ = realization(feop,10)

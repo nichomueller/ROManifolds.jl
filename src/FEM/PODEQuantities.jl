@@ -90,7 +90,7 @@ function collect_solutions(
   num_iter = Int(tf/fesolver.dt)
   sols = allocate_solution(ode_op,num_iter)
   for (u,t,n) in uμt
-    printstyled("Computing fe solution at time $t for every parameter\n";color=:blue)
+    println("Computing fe solution at time $t for every parameter")
     sol = get_solution(ode_op,u)
     sols[n] = copy(sol)
   end
@@ -198,7 +198,7 @@ function collect_residuals!(
   sols::PTArray,
   args...)
 
-  printstyled("Computing fe residual for every time and parameter\n";color=:blue)
+  println("Computing fe residual for every time and parameter")
   ress = residual!(b,nlop,sols,args...)
   return NnzMatrix(ress;nparams=length(nlop.μ))
 end
@@ -209,7 +209,7 @@ function collect_residuals_for_trian!(
   sols::PTArray,
   args...)
 
-  printstyled("Computing fe residual for every time and parameter\n";color=:blue)
+  println("Computing fe residual for every time and parameter")
   ress,trian = residual_for_trian!(b,nlop,sols)
   return NnzMatrix.(ress;nparams=length(nlop.μ)),trian
 end
@@ -221,7 +221,7 @@ function collect_jacobians!(
   args...;
   i=1)
 
-  printstyled("Computing fe jacobian #$i for every time and parameter\n";color=:blue)
+  println("Computing fe jacobian #$i for every time and parameter")
   jacs_i = jacobian!(A,nlop,sols,i,args...)
   return NnzMatrix(map(NnzVector,jacs_i);nparams=length(nlop.μ))
 end
@@ -233,7 +233,7 @@ function collect_jacobians_for_trian!(
   args...;
   i=1)
 
-  printstyled("Computing fe residual for every time and parameter\n";color=:blue)
+  println("Computing fe jacobian #$i for every time and parameter")
   jacs_i,trian = jacobian_for_trian!(A,nlop,sols,i)
-  return map(x->NnzMatrix(map(NnzVector,x);nparams=length(nlop.μ)),jacs_i),trian
+  return NnzMatrix.(map(NnzVector,jacs_i);nparams=length(nlop.μ)),trian
 end

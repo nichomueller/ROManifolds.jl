@@ -39,7 +39,6 @@ function change_mode(mat::Matrix{T},nparams::Int) where T
   mode1_ndofs = size(mat,1)
   mode2_ndofs = Int(size(mat,2)/nparams)
   mode2 = zeros(T,mode2_ndofs,mode1_ndofs*nparams)
-
   @inbounds for i = 1:nparams
     mode2[:,(i-1)*mode1_ndofs+1:i*mode1_ndofs] = mat[:,(i-1)*mode2_ndofs+1:i*mode2_ndofs]'
   end

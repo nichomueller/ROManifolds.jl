@@ -1,6 +1,6 @@
 abstract type AbstractPTFunction{P,T} <: Function end
 
-struct PFunction{P} <: AbstractPTFunction{P,nothing}
+struct PFunction{P} <: AbstractPTFunction{P,Nothing}
   f::Function
   params::P
 
@@ -40,13 +40,13 @@ function get_fields(ptf::PTFunction{<:AbstractVector{<:Number},<:Real})
   GenericField(ptf.f(p,t))
 end
 
-function get_fields(ptf::PTFunction{<:Table,<:Real})
+function get_fields(ptf::PTFunction{<:AbstractVector{<:Number},<:AbstractVector{<:Number}})
   p,t = ptf.params,ptf.times
-  np = length(p)
-  fields = Vector{GenericField}(undef,np)
-  @inbounds for k = 1:np
-    pk = p[k]
-    fields[k] = GenericField(ptf.f(pk,t))
+  nt = length(t)
+  fields = Vector{GenericField}(undef,nt)
+  @inbounds for k = 1:nt
+    tk = t[k]
+    fields[k] = GenericField(ptf.f(p,tk))
   end
   fields
 end

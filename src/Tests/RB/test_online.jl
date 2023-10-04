@@ -9,32 +9,9 @@ trian = get_domains(rbres)
 coeff_cache,rb_cache = res_cache
 _trian = Ω
 rbrest = rbres[_trian]
-coeff = rhs_coefficient!(coeff_cache,feop,fesolver,rbrest,trian,u,Table([p]);st_mdeim)
-rb_res_contribs = rb_contribution!(rb_cache,rbrest,coeff)
-  # _coeff = coeff.array[1]
-  # proj_basis_space = rbrest.basis_space
-  # basis_time = last(rbrest.basis_time)
-  # @assert length(proj_basis_space) == size(_coeff,2)
-  # proj1 = testitem(proj_basis_space)
-
-  # cache_coeff,cache_proj,cache_proj_global = rb_cache
-  # num_rb_times = size(basis_time,2)
-  # _num_rb_dofs = length(proj1)*size(basis_time,2)
-  # setsize!(cache_coeff,(num_rb_times,))
-  # setsize!(cache_proj,(_num_rb_dofs,))
-  # setsize!(cache_proj_global,(_num_rb_dofs,))
-
-  # array_coeff = cache_coeff.array
-  # array_proj = cache_proj.array
-  # array_proj_global = cache_proj_global.array
-
-  # @inbounds for i = axes(_coeff,2)
-  #   array_coeff .= basis_time'*_coeff[:,i]
-  #   LinearAlgebra.kron!(array_proj,proj_basis_space[i],array_coeff)
-  #   array_proj_global .+= array_proj
-  # end
-
-res_approx = recast(rbspace,rb_res_contribs)
+# coeff = rhs_coefficient!(coeff_cache,feop,fesolver,rbrest,trian,u,Table([p]);st_mdeim)
+  rcache,scache... = coeff_cache
+  red_integr_res = assemble_rhs!(rcache,feop,fesolver,rbrest,trian,u,Table([p]))
 
 # CHECK THAT THE RESIDUALS/JACOBIANS ARE == TO GRIDAP'S RESIDUALS/JACOBIANS
 # nlop = PThetaMethodNonlinearOperator(ode_op,p,times,dt*θ,u,ode_cache,u)

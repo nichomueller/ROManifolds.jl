@@ -122,7 +122,7 @@ function test_rb_solver(
 
   snaps_test,params_test = load_test(info,feop,fesolver)
 
-  printstyled("Solving linear RB problems\n";color=:blue)
+  println("Solving linear RB problems\n")
   x = initial_guess(snaps,params,params_test)
   rhs_cache,lhs_cache = allocate_sys_cache(feop,fesolver,rbspace,snaps_test,params_test)
   rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,x,params_test)
@@ -147,7 +147,7 @@ function test_rb_solver(
 
   snaps_test,params_test = load_test(info,feop,fesolver)
 
-  printstyled("Solving nonlinear RB problems with Newton iterations\n";color=:blue)
+  println("Solving nonlinear RB problems with Newton iterations\n")
   rhs_cache,lhs_cache = allocate_sys_cache(feop,fesolver,rbspace,snaps_test,params_test)
   nl_cache = nothing
   x = initial_guess(snaps,params,params_test)

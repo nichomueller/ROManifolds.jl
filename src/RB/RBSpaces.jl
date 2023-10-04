@@ -145,7 +145,7 @@ function add_space_supremizers(
   n_dual_fields = length(bs_dual)
   all_idx = index_pairs(n_dual_fields,1)
   for idx in all_idx
-    printstyled("Computing supremizers in space for dual field $idx\n";color=:blue)
+    println("Computing supremizers in space for dual field $idx")
     feop_i = filter_operator(feop,idx)
     supr_i = space_supremizers(bs_dual[idx],feop_i,snaps[idx],args...)
     orth_supr_i = gram_schmidt(supr_i,bs_primal,norm_matrix)
@@ -175,7 +175,7 @@ function add_time_supremizers(bases_time::Vector{<:Matrix};ttol::Real)
   n_dual_fields = length(bt_dual)
   all_idx = index_pairs(n_dual_fields,1)
   for idx in all_idx
-    printstyled("Computing supremizers in time for dual field $idx\n";color=:blue)
+    println("Computing supremizers in time for dual field $idx")
     supr_i = add_time_supremizers(bt_primal,bt_dual[idx];ttol)
     append!(bt_primal,supr_i)
   end
@@ -218,7 +218,7 @@ function add_time_supremizers(basis_u::Matrix,basis_p::Matrix;ttol=1e-2)
     ntp += 1
   end
 
-  printstyled("Added $count time supremizers\n";color=:blue)
+  println("Added $count time supremizers")
   basis_u
 end
 
