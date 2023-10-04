@@ -1,12 +1,15 @@
 abstract type AbstractSnapshots{T} end
 
-struct Snapshots{T} <: AbstractSnapshots{T}
+struct Snapshots{T<:AbstractArray} <: AbstractSnapshots{T}
   snaps::Vector{PTArray{T}}
-  Snapshots(s::Vector{<:PTArray{T}}) where T = new{T}(s)
+  function Snapshots(s::Vector{<:PTArray{T}}) where T
+    r = reorder(s)
+    new{T}(r)
+  end
 end
 
 Base.length(s::Snapshots) = length(s.snaps)
-Base.size(s::Snapshots{T},args...) where {T<:AbstractArray} = size(testitem(first(s.snaps)),args...)
+Base.size(s::Snapshots,args...) = size(testitem(first(s.snaps)),args...)
 Base.eachindex(s::Snapshots) = eachindex(s.snaps)
 num_space_dofs(s::Snapshots) = size(s,1)
 num_time_dofs(s::Snapshots) = length(s)
@@ -14,11 +17,11 @@ num_params(s::Snapshots) = length(first(s.snaps))
 
 function Base.getindex(s::Snapshots{T},idx) where T
   time_ndofs = num_time_dofs(s)
-  nrange = length(idx)
-  array = Vector{T}(undef,time_ndofs*nrange)
-  for nt in 1:time_ndofs
-    for (i,r) in enumerate(idx)
-      array[(nt-1)*nrange+i] = s.snaps[nt][r]
+  nidx = length(idx)
+  array = Vector{T}(undef,time_ndofs*nidx)
+  for (count,i) in enumerate(idx)
+    for nt in 1:time_ndofs
+      @inbounds array[(count-1)*time_ndofs+nt] = s.snaps[i][nt]
     end
   end
   return PTArray(array)
@@ -27,6 +30,23 @@ end
 function Base.convert(::Type{PTArray{T}},a::Snapshots{T}) where T
   arrays = vcat(map(get_array,a.snaps)...)
   PTArray(arrays)
+end
+
+function reorder(s::Vector{PTArray{T}}) where T
+  time_ndofs = length(s)
+  s1 = testitem(s)
+  nparams = length(s1)
+
+  array = Vector{T}(undef,time_ndofs)
+  r = Vector{PTArray{T}}(undef,nparams)
+  @inbounds for np in 1:nparams
+    for nt in 1:time_ndofs
+      array[nt] = s[nt][np]
+    end
+    r[np] = PTArray(copy(array))
+  end
+
+  return r
 end
 
 function recenter(

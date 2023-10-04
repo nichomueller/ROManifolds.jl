@@ -206,9 +206,8 @@ function transient_tpod(nzm::NnzMatrix,args...;kwargs...)
 end
 
 function change_mode(nzm::NnzMatrix{T}) where T
-  time_ndofs = num_time_dofs(nzm)
   nparams = num_params(nzm)
-  mode2 = change_mode(nzm.nonzero_val,time_ndofs,nparams)
+  mode2 = change_mode(nzm.nonzero_val,nparams)
   return mode2
 end
 

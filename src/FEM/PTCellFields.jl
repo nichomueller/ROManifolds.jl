@@ -40,13 +40,13 @@ function get_fields(ptf::PTFunction{<:AbstractVector{<:Number},<:Real})
   GenericField(ptf.f(p,t))
 end
 
-function get_fields(ptf::PTFunction{<:AbstractVector{<:Number},<:AbstractVector{<:Real}})
+function get_fields(ptf::PTFunction{<:Table,<:Real})
   p,t = ptf.params,ptf.times
-  nt = length(t)
-  fields = Vector{GenericField}(undef,nt)
-  @inbounds for k = 1:nt
-    tk = t[k]
-    fields[k] = GenericField(ptf.f(p,tk))
+  np = length(p)
+  fields = Vector{GenericField}(undef,np)
+  @inbounds for k = 1:np
+    pk = p[k]
+    fields[k] = GenericField(ptf.f(pk,t))
   end
   fields
 end
@@ -58,8 +58,8 @@ function get_fields(ptf::PTFunction)
   npt = np*nt
   fields = Vector{GenericField}(undef,npt)
   @inbounds for k = 1:npt
-    pk = p[fast_idx(k,np)]
-    tk = t[slow_idx(k,np)]
+    pk = p[slow_idx(k,nt)]
+    tk = t[fast_idx(k,nt)]
     fields[k] = GenericField(ptf.f(pk,tk))
   end
   fields

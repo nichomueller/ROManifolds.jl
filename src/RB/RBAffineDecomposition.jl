@@ -355,16 +355,15 @@ function assemble_lhs!(
   nzm[red_idx,:]
 end
 
-function mdeim_solve!(cache,ad::RBAffineDecomposition,q::Matrix;st_mdeim=false)
+function mdeim_solve!(cache,ad::RBAffineDecomposition,a::Matrix;st_mdeim=false)
   csolve,crecast = cache
   time_ndofs = length(ad.integration_domain.times)
-  nparams = Int(size(q,2)/time_ndofs)
-  _q = change_order(q,time_ndofs)
+  nparams = Int(size(a,2)/time_ndofs)
   coeff = if st_mdeim
-    _coeff = mdeim_solve!(csolve,ad.mdeim_interpolation,reshape(_q,:,nparams))
+    _coeff = mdeim_solve!(csolve,ad.mdeim_interpolation,reshape(a,:,nparams))
     recast_coefficient!(crecast,first(ad.basis_time),_coeff)
   else
-    _coeff = mdeim_solve!(csolve,ad.mdeim_interpolation,_q)
+    _coeff = mdeim_solve!(csolve,ad.mdeim_interpolation,a)
     recast_coefficient!(crecast,_coeff)
   end
   return coeff
