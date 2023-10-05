@@ -97,10 +97,11 @@ function test_affine_decomposition_rhs(
   feop::PTFEOperator,
   fesolver::PThetaMethod,
   rbres::RBAffineDecomposition,
-  trian::Base.KeySet{Triangulation},
+  meas::Measure,
   sols::PTArray,
-  μ::Table;
-  st_mdeim=true)
+  μ::Table,
+  offline_sols::Snapshots,
+  offline_params::Table)
 
   rcache,scache... = cache
 
@@ -110,12 +111,8 @@ function test_affine_decomposition_rhs(
 
   red_idx = rbres.integration_domain.idx
   red_times = rbres.integration_domain.times
-  red_trian = rbres.integration_domain.trian
-  strian = substitute_trian(red_trian,trian)
-  red_meas = map(t->get_measure(feop,t),strian)
-  full_meas = map(t->get_measure(feop,t),[trian...])
-
-  test_red_meas(feop,fesolver,sols,μ,red_meas...)
+  red_meas = rbres.integration_domain.meas
+  full_idx = collect(1:test.nfree)
 
   ode_op = get_algebraic_operator(feop)
   ode_cache = allocate_cache(ode_op,μ,red_times)
@@ -129,35 +126,175 @@ function test_affine_decomposition_rhs(
     b = get_array(rcache)
     _sols = sols
   end
-  nzm = collect_residuals!(b,fesolver,ode_op,_sols,μ,red_times,ode_cache,red_meas...)
-  nzm_full = collect_residuals!(b,fesolver,ode_op,_sols,μ,red_times,ode_cache,full_meas...)
-  basis_space,_ = compress(nzm_full)
-  red_idx_full = sparse_to_full_idx(red_idx,nzm.nonzero_idx)
-  red_integr_res = nzm[red_idx_full,:]
-  err_res = maximum(abs.(nzm-nzm_full))
-  println("Resiudal difference for selected triangulation is $err_res")
+  bfull = copy(b)
+  res = collect_residuals!(b,fesolver,ode_op,_sols,μ,red_times,ode_cache,red_idx,red_meas)
+  res_full = collect_residuals!(bfull,fesolver,ode_op,_sols,μ,red_times,ode_cache,full_idx,meas)
+  res_offline,_ = collect_residuals_for_trian(fesolver,feop,offline_sols[1:30],offline_params[1:30],times)
 
-  coeff = mdeim_solve!(scache,rbres,red_integr_res;st_mdeim)
-  coeff_ok = basis_space'*nzm_full
+  err_res = maximum(abs.(res-res_full[red_idx,:]))
+  println("Residual difference for selected triangulation is $err_res")
+
+  coeff = mdeim_solve!(scache[1],rbres.mdeim_interpolation,res)
+  try
+    basis_space = tpod(res_offline[1])
+    coeff_ok = basis_space'*res_full
+  catch
+    basis_space = tpod(res_offline[2])
+    coeff_ok = basis_space'*res_full
+  end
   err_coeff = maximum(abs.(coeff-coeff_ok))
   println("Residual coefficient difference for selected triangulation is $err_coeff")
 end
 
-function test_red_meas(feop,trian,sols,μ,red_meas...;n=1)
-  t = 1.
-  dv = get_fe_basis(feop.test)
+rbres,rbjac = rbrhs,rblhs
+sols_test,params_test = load_test(info,feop,fesolver)
+res_cache,jac_cache = allocate_sys_cache(feop,fesolver,rbspace,sols_test,params_test)
+
+rbrest = rbres[Ω]
+meas = dΩ
+cache = res_cache[1]
+
+test_affine_decomposition_rhs(cache,feop,fesolver,rbrest,meas,sols_test,params_test,sols,params)
+
+# rcache,scache... = cache
+
+# times = get_times(fesolver)
+# ndofs = num_free_dofs(feop.test)
+# setsize!(rcache,(ndofs,))
+
+# red_idx = rbrest.integration_domain.idx
+# red_times = rbrest.integration_domain.times
+# red_meas = rbrest.integration_domain.meas
+# full_idx = collect(1:test.nfree)
+
+# ode_op = get_algebraic_operator(feop)
+# ode_cache = allocate_cache(ode_op,params_test,red_times)
+# b = get_array(rcache)
+# bfull = copy(b)
+# Res = collect_residuals!(b,fesolver,ode_op,sols_test,params_test,red_times,ode_cache,red_idx,red_meas)
+# Res_full = collect_residuals!(bfull,fesolver,ode_op,sols_test,params_test,red_times,ode_cache,full_idx,meas)
+
+# err_res = maximum(abs.(Res-Res_full[red_idx,:]))
+# println("Resiudal difference for selected triangulation is $err_res")
+
+# #coeff = mdeim_solve!(scache,rbres,res;st_mdeim)
+# coeff = mdeim_solve!(scache[1],rbrest.mdeim_interpolation,Res)
+# basis_space = tpod(Res_full)
+# coeff_ok = basis_space'*Res_full
+
+# function _alt_mdeim_solve(lu,A)
+#   P_A = lu.P*A
+#   y = lu.L \ P_A
+#   x = lu.U \ y
+#   x
+# end
+
+# _coeff = _alt_mdeim_solve(rbrest.mdeim_interpolation,Res)
+# @check coeff ≈ _coeff
+# _coeff_ok = basis_space[red_idx]'*Res_full
+
+
+function test_affine_decomposition_lhs(
+  cache,
+  feop::PTFEOperator,
+  fesolver::PThetaMethod,
+  rbjac::RBAffineDecomposition,
+  meas::Measure,
+  sols::PTArray,
+  μ::Table,
+  offline_sols::Snapshots,
+  offline_params::Table;
+  i=1)
+
+  jcache,scache... = cache
+
+  times = get_times(fesolver)
+  ndofs_row = num_free_dofs(feop.test)
+  ndofs_col = num_free_dofs(get_trial(feop)(nothing,nothing))
+  setsize!(jcache,(ndofs_row,ndofs_col))
+
+  red_idx = rbjac.integration_domain.idx
+  red_times = rbjac.integration_domain.times
+  red_meas = rbjac.integration_domain.meas
+
+  #test_red_meas(feop,fesolver,sols,μ,red_meas)
+
   ode_op = get_algebraic_operator(feop)
-  ode_cache = allocate_cache(ode_op,μ,t)
-  ode_cache = update_cache!(ode_cache,ode_op,μ,t)
-  Xh, = ode_cache
-  dxh = ()
-  _xh = (sols,sols-sols)
-  for i in 2:get_order(feop)+1
-    dxh = (dxh...,EvaluationFunction(Xh[i],_xh[i]))
+  ode_cache = allocate_cache(ode_op,μ,red_times)
+
+  if length(red_times) < length(times)
+    A = get_array(jcache;len=length(red_times)*length(μ))
+    time_idx = findall(x->x in red_times,times)
+    idx = param_time_idx(time_idx,length(μ))
+    _sols = PTArray(sols[idx])
+  else
+    A = get_array(jcache)
+    _sols = sols
   end
-  xh = TransientCellField(EvaluationFunction(Xh[1],_xh[1]),dxh)
-  vecdata = collect_cell_vector(feop.test,feop.res(μ,t,xh,dv),trian)
-  red_vecdata = collect_cell_vector(feop.test,feop.res(μ,t,xh,dv,red_meas),trian)
-  err = maximum(map((x,y)->maximum(abs.(x-y)),(vecdata[1][1][n],red_vecdata[1][1][n])))
-  println("Maximum error at cell level is $err")
+  Afull = copy(A)
+  full_idx = findnz(Afull[1][:])[1]
+  jac = collect_jacobians!(A,fesolver,ode_op,_sols,μ,red_times,ode_cache,red_idx,red_meas;i)
+  jac_full = collect_jacobians!(Afull,fesolver,ode_op,_sols,μ,red_times,ode_cache,full_idx,meas;i)
+  jac_offline,_ = collect_jacobians_for_trian(fesolver,feop,offline_sols[1:30],offline_params[1:30],times;i)
+  basis_space = tpod(jac_offline[1])
+  interp_idx_space = get_interpolation_idx(basis_space)
+  err_jac = maximum(abs.(Jac-Jac_full[interp_idx_space,:]))
+  println("Jacobian #$i difference for selected triangulation is $err_jac")
+
+  coeff = mdeim_solve!(scache[1],rbjac.mdeim_interpolation,jac)
+  coeff_ok = basis_space'*jac_full
+  err_coeff = maximum(abs.(coeff-coeff_ok))
+  println("Jacobian #$i coefficient difference for selected triangulation is $err_coeff")
 end
+
+i = 1
+rbjact = rbjac[i][Ω]
+
+meas = dΩ
+cache = jac_cache[1]
+test_affine_decomposition_lhs(cache,feop,fesolver,rbjact,meas,sols_test,params_test,sols,params)
+
+# jcache,scache... = cache
+
+# times = get_times(fesolver)
+# ndofs_row = num_free_dofs(feop.test)
+# ndofs_col = num_free_dofs(get_trial(feop)(nothing,nothing))
+# setsize!(jcache,(ndofs_row,ndofs_col))
+
+# red_idx = rbjact.integration_domain.idx
+# red_times = rbjact.integration_domain.times
+# red_meas = rbjact.integration_domain.meas
+
+# #test_red_meas(feop,fesolver,sols,μ,red_meas)
+
+# ode_op = get_algebraic_operator(feop)
+# ode_cache = allocate_cache(ode_op,params_test,red_times)
+
+# if length(red_times) < length(times)
+#   A = get_array(jcache;len=length(red_times)*length(params_test))
+#   time_idx = findall(x->x in red_times,times)
+#   idx = param_time_idx(time_idx,length(params_test))
+#   _sols = PTArray(sols_test[idx])
+# else
+#   A = get_array(jcache)
+#   _sols = sols_test
+# end
+# Afull = copy(A)
+# full_idx = findnz(Afull[1][:])[1]
+# Jac = collect_jacobians!(A,fesolver,ode_op,_sols,params_test,red_times,ode_cache,red_idx,red_meas;i)
+# Jac_full = collect_jacobians!(Afull,fesolver,ode_op,_sols,params_test,red_times,ode_cache,full_idx,meas;i)
+# Jac_offline,_ = collect_jacobians_for_trian(fesolver,feop,sols[1:30],params[1:30],times;i)
+# basis_space = tpod(Jac_offline[1])
+# interp_idx_space = get_interpolation_idx(basis_space)
+# err_jac = maximum(abs.(Jac-Jac_full[interp_idx_space,:]))
+
+# coeff = mdeim_solve!(scache[1],rbjact.mdeim_interpolation,Jac)
+# coeff_ok = basis_space'*Jac_full
+# err_coeff = maximum(abs.(coeff-coeff_ok))
+# println("Jacobian #$i coefficient difference for selected triangulation is $err_coeff")
+
+# luok = lu(basis_space[interp_idx_space,:])
+# luok.L ≈ rbjact.mdeim_interpolation.L
+
+# _coeff = mdeim_solve!(scache[1],luok,Jac)
+# _err_coeff = maximum(abs.(_coeff-coeff_ok))
