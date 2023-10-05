@@ -12,12 +12,11 @@ struct RBIntegrationDomain
     trian::Triangulation,
     times::Vector{<:Real},
     interp_idx_space::Vector{Int},
-    interp_idx_time::Vector{Int},
-    entire_interp_idx_space::Vector{Int};
+    interp_idx_time::Vector{Int};
     st_mdeim=false)
 
     cell_dof_ids = get_cell_dof_ids(feop.test,trian)
-    red_integr_cells = find_cells(entire_interp_idx_space,cell_dof_ids)
+    red_integr_cells = find_cells(interp_idx_space,cell_dof_ids)
     red_trian = view(trian,red_integr_cells)
     red_times = st_mdeim ? times[interp_idx_time] : times
     RBIntegrationDomain(red_trian,red_times,interp_idx_space)
@@ -56,7 +55,7 @@ struct RBAffineDecomposition{T}
     kwargs...)
 
     basis_space,basis_time = compress(nzm;ϵ=info.ϵ)
-    proj_bs,proj_bt = compress_space_time(basis_space,basis_time,args...;kwargs...)
+    proj_bs,proj_bt = project_space_time(basis_space,basis_time,args...;kwargs...)
     interp_idx_space = get_interpolation_idx(basis_space)
     interp_idx_time = get_interpolation_idx(basis_time)
     entire_interp_idx_space = recast_idx(basis_space,interp_idx_space)
@@ -74,9 +73,8 @@ struct RBAffineDecomposition{T}
       feop,
       trian,
       times,
-      interp_idx_space,
-      interp_idx_time,
-      entire_interp_idx_space;
+      entire_interp_idx_space,
+      interp_idx_time;
       info.st_mdeim)
 
     RBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)
@@ -186,11 +184,11 @@ function get_interpolation_idx(basis::AbstractMatrix)
   unique(idx)
 end
 
-function compress_space_time(basis_space::NnzMatrix,basis_time::Matrix,args...;kwargs...)
-  compress_space(basis_space,args...),compress_time(basis_time,args...;kwargs...)
+function project_space_time(basis_space::NnzMatrix,basis_time::Matrix,args...;kwargs...)
+  project_space(basis_space,args...),project_time(basis_time,args...;kwargs...)
 end
 
-function compress_space(
+function project_space(
   basis_space::NnzMatrix,
   rbspace_row::RBSpace)
 
@@ -198,7 +196,7 @@ function compress_space(
   compress(entire_bs_row,basis_space)
 end
 
-function compress_space(
+function project_space(
   basis_space::NnzMatrix,
   rbspace_row::RBSpace,
   rbspace_col::RBSpace)
@@ -208,11 +206,11 @@ function compress_space(
   compress(entire_bs_row,entire_bs_col,basis_space)
 end
 
-function compress_time(basis_time::Matrix,rbspace_row::RBSpace,args...;kwargs...)
+function project_time(basis_time::Matrix,rbspace_row::RBSpace,args...;kwargs...)
   [basis_time,get_basis_time(rbspace_row)]
 end
 
-function compress_time(
+function project_time(
   basis_time::Matrix,
   rbspace_row::RBSpace{T},
   rbspace_col::RBSpace{T};
@@ -302,7 +300,8 @@ function assemble_rhs!(
     _sols = sols
   end
   nzm = collect_residuals!(b,fesolver,ode_op,_sols,μ,red_times,ode_cache,red_trian,meas...)
-  nzm[red_idx,:]
+  red_idx_full = sparse_to_full_idx(red_idx,nzm.nonzero_idx)
+  nzm[red_idx_full,:]
 end
 
 function lhs_coefficient!(
@@ -351,8 +350,9 @@ function assemble_lhs!(
     A = get_array(cache)
     _sols = sols
   end
-  nzm = collect_jacobians!(A,fesolver,ode_op,_sols,μ,red_times,ode_cache,red_trian,meas...;i)
-  nzm[red_idx,:]
+  nzm = collect_jacobians!(A,fesolver,ode_op,_sols,μ,red_times,ode_cache,meas...;i)
+  red_idx_full = compress_idx(nzm,red_idx)
+  nzm[red_idx_full,:]
 end
 
 function mdeim_solve!(cache,ad::RBAffineDecomposition,a::Matrix;st_mdeim=false)

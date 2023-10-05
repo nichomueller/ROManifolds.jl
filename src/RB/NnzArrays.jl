@@ -152,6 +152,13 @@ function compress(a::AbstractMatrix,b::AbstractMatrix,nzm::NnzMatrix)
   end
 end
 
+function compress_idx(nzm::NnzMatrix,idx::Vector{Int})
+  nonzero_idx = nzm.nonzero_idx
+  nrows = nzm.nrows
+  idx_rows,_ = vec_to_mat_idx(nonzero_idx,nrows)
+  return sparse_to_full_idx(idx,idx_rows)
+end
+
 abstract type PODStyle end
 struct DefaultPOD <: PODStyle end
 struct SteadyPOD <: PODStyle end

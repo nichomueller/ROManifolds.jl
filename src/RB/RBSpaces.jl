@@ -67,6 +67,19 @@ function recast(rb::RBSpace,x::PTArray{T}) where T
   PTArray(array)
 end
 
+function test_reduced_basis(rb::RBSpace,s::Snapshots;n=1)
+  sn = s[n]
+  basis_space = get_basis_space(rb)
+  basis_time = get_basis_time(rb)
+  mat = hcat(get_array(sn)...)
+  rb_proj = (basis_space'*mat)*basis_time
+  rb_approx = basis_space*(basis_time*rb_proj')'
+  err = maximum(abs.(mat-rb_approx))
+  println("RB approximation error in infty norm of snapshot $n = $err")
+  return rb_proj
+end
+
+# Multifield interface
 struct BlockRBSpace{T} <: AbstractRBSpace{T}
   basis_space::Vector{Matrix{T}}
   basis_time::Vector{Matrix{T}}

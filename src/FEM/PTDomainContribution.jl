@@ -13,10 +13,8 @@ CellData.num_domains(a::PTDomainContribution) = length(a.dict)
 CellData.get_domains(a::PTDomainContribution) = keys(a.dict)
 
 function CellData.get_contribution(a::PTDomainContribution,trian::Triangulation)
-  if haskey(a.dict,trian) || haskey(a.dict,get_parent(trian))
-     return a.dict[trian]
-  elseif haskey(a.dict,get_parent(trian))
-    return a.dict[get_parent(trian)]
+  if haskey(a.dict,trian)
+    return a.dict[trian]
   else
     @unreachable """\n
     There is no contribution associated with the given mesh in this PTDomainContribution object.

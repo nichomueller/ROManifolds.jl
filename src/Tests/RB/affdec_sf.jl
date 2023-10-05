@@ -76,8 +76,88 @@ jacs,trian = collect_jacobians_for_trian(fesolver,feop,_snapsθ,_μ,times;i)
   basis_space,basis_time = compress(jacs[1];ϵ=info.ϵ)
   proj_bs,proj_bt = compress_space_time(basis_space,basis_time,rbspace,rbspace;combine_projections)
 
-  nzm = jacs[1]
-  full_val = nzm.nonzero_val
+  interp_idx_space,interp_idx_time = get_interpolation_idx(basis_space),get_interpolation_idx(basis_time)
+  entire_interp_idx_space = recast_idx(basis_space,interp_idx_space)
+
   maximum(abs.(full_val - basis_space*basis_space'*full_val)) <= ϵ*10
   m2 = change_mode(nzm)
   maximum(abs.(m2 - basis_time*basis_time'*m2)) <= ϵ*10
+
+  interp_bs = basis_space[interp_idx_space,:]
+  lu_interp = if info.st_mdeim
+    interp_bt = basis_time[interp_idx_time,:]
+    interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
+    lu(interp_bst)
+  else
+    lu(interp_bs)
+  end
+
+function test_affine_decomposition_rhs(
+  cache,
+  feop::PTFEOperator,
+  fesolver::PThetaMethod,
+  rbres::RBAffineDecomposition,
+  trian::Base.KeySet{Triangulation},
+  sols::PTArray,
+  μ::Table;
+  st_mdeim=true)
+
+  rcache,scache... = cache
+
+  times = get_times(fesolver)
+  ndofs = num_free_dofs(feop.test)
+  setsize!(rcache,(ndofs,))
+
+  red_idx = rbres.integration_domain.idx
+  red_times = rbres.integration_domain.times
+  red_trian = rbres.integration_domain.trian
+  strian = substitute_trian(red_trian,trian)
+  red_meas = map(t->get_measure(feop,t),strian)
+  full_meas = map(t->get_measure(feop,t),[trian...])
+
+  test_red_meas(feop,fesolver,sols,μ,red_meas...)
+
+  ode_op = get_algebraic_operator(feop)
+  ode_cache = allocate_cache(ode_op,μ,red_times)
+
+  if length(red_times) < length(times)
+    b = get_array(rcache;len=length(red_times)*length(μ))
+    time_idx = findall(x->x in red_times,times)
+    idx = param_time_idx(time_idx,length(μ))
+    _sols = PTArray(sols[idx])
+  else
+    b = get_array(rcache)
+    _sols = sols
+  end
+  nzm = collect_residuals!(b,fesolver,ode_op,_sols,μ,red_times,ode_cache,red_meas...)
+  nzm_full = collect_residuals!(b,fesolver,ode_op,_sols,μ,red_times,ode_cache,full_meas...)
+  basis_space,_ = compress(nzm_full)
+  red_idx_full = sparse_to_full_idx(red_idx,nzm.nonzero_idx)
+  red_integr_res = nzm[red_idx_full,:]
+  err_res = maximum(abs.(nzm-nzm_full))
+  println("Resiudal difference for selected triangulation is $err_res")
+
+  coeff = mdeim_solve!(scache,rbres,red_integr_res;st_mdeim)
+  coeff_ok = basis_space'*nzm_full
+  err_coeff = maximum(abs.(coeff-coeff_ok))
+  println("Residual coefficient difference for selected triangulation is $err_coeff")
+end
+
+function test_red_meas(feop,trian,sols,μ,red_meas...;n=1)
+  t = 1.
+  dv = get_fe_basis(feop.test)
+  ode_op = get_algebraic_operator(feop)
+  ode_cache = allocate_cache(ode_op,μ,t)
+  ode_cache = update_cache!(ode_cache,ode_op,μ,t)
+  Xh, = ode_cache
+  dxh = ()
+  _xh = (sols,sols-sols)
+  for i in 2:get_order(feop)+1
+    dxh = (dxh...,EvaluationFunction(Xh[i],_xh[i]))
+  end
+  xh = TransientCellField(EvaluationFunction(Xh[1],_xh[1]),dxh)
+  vecdata = collect_cell_vector(feop.test,feop.res(μ,t,xh,dv),trian)
+  red_vecdata = collect_cell_vector(feop.test,feop.res(μ,t,xh,dv,red_meas),trian)
+  err = maximum(map((x,y)->maximum(abs.(x-y)),(vecdata[1][1][n],red_vecdata[1][1][n])))
+  println("Maximum error at cell level is $err")
+end

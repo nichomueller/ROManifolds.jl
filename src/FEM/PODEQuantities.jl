@@ -235,5 +235,5 @@ function collect_jacobians_for_trian!(
 
   println("Computing fe jacobian #$i for every time and parameter")
   jacs_i,trian = jacobian_for_trian!(A,nlop,sols,i)
-  return NnzMatrix.(map(NnzVector,jacs_i);nparams=length(nlop.μ)),trian
+  return map(x->NnzMatrix(map(NnzVector,x);nparams=length(nlop.μ)),jacs_i),trian
 end

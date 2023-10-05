@@ -152,13 +152,18 @@ function residual!(
   t::T,
   xh::S,
   cache,
-  trian::Triangulation,
   meas::Measure...) where {T,S}
 
   V = get_test(op)
   v = get_fe_basis(V)
-  vecdata = collect_cell_vector(V,op.res(μ,t,xh,v,meas),trian)
-  assemble_vector_add!(b,op.assem,vecdata)
+  dc = op.res(μ,t,xh,v,meas)
+  for t in get_domains(dc)
+    if is_child(t)
+      vecdata = collect_cell_vector(V,dc,t)
+      assemble_vector_add!(b,op.assem,vecdata)
+      break
+    end
+  end
   b
 end
 
@@ -242,15 +247,20 @@ function jacobian!(
   i::Integer,
   γᵢ::Real,
   cache,
-  trian::Triangulation,
   meas::Measure...) where {T,S}
 
   Uh = get_trial(op)(μ,t)
   V = get_test(op)
   u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
-  matdata = collect_cell_matrix(Uh,V,γᵢ*op.jacs[i](μ,t,uh,u,v,meas),trian)
-  assemble_matrix_add!(A,op.assem,matdata)
+  dc = γᵢ*op.jacs[i](μ,t,uh,u,v,meas)
+  for t in get_domains(dc)
+    if is_child(t)
+      matdata = collect_cell_matrix(Uh,V,dc,t)
+      assemble_matrix_add!(A,op.assem,matdata)
+      break
+    end
+  end
   A
 end
 

@@ -44,11 +44,13 @@ function is_parent(tparent::Triangulation,tchild::Triangulation)
   end
 end
 
-function get_parent(tchild::Triangulation)
-  try
-    Triangulation(tchild.model)
-  catch
-    tchild.parent
+is_child(::Geometry.TriangulationView) = true
+is_child(::BoundaryTriangulation) = false
+function is_child(trian::Triangulation)
+  if hasproperty(trian,:grid) && hasproperty(trian.grid,:parent)
+    true
+  else
+    false
   end
 end
 
