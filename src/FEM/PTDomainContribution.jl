@@ -158,3 +158,126 @@ function CellData.integrate(f::PTCellField,b::CellData.CompositeMeasure)
   add_contribution!(cont,b.quad.trian,tc)
   return cont
 end
+
+struct PTIntegrand{T<:CellField}
+  object::T
+  meas::Measure
+  PTIntegrand(object::T,meas::Measure) where T = new{T}(object,meas)
+end
+
+const ∫ₚ = PTIntegrand
+
+function CellData.get_contribution(int::PTIntegrand,meas::Measure)
+  trian = get_triangulation(meas)
+  itrian = get_triangulation(int.meas)
+  if itrian == trian || is_parent(itrian,trian)
+    return integrate(int.object,meas)
+  end
+  @unreachable """\n
+    There is no contribution associated with the given mesh in this PTIntegrand object.
+  """
+end
+
+Base.getindex(int::PTIntegrand,meas::Measure) = get_contribution(int,meas)
+
+function CellData.integrate(int::PTIntegrand,args...)
+  cont = DomainContribution()
+  integral = integrate(int.object,int.meas)
+  trian = get_triangulation(int.meas)
+  add_contribution!(cont,trian,integral[trian])
+end
+
+function CellData.integrate(int::PTIntegrand{<:PTCellField},args...)
+  cont = PTDomainContribution()
+  integral = integrate(int.object,int.meas)
+  trian = get_triangulation(int.meas)
+  add_contribution!(cont,trian,integral[trian])
+end
+
+struct CollectionPTIntegrand
+  dict::IdDict{Function,Tuple{Vararg{PTIntegrand}}}
+end
+
+function CollectionPTIntegrand()
+  CollectionPTIntegrand(IdDict{Function,Tuple{Vararg{PTIntegrand}}}())
+end
+
+function CellData.get_contribution(a::CollectionPTIntegrand,meas::Measure,cont=PTDomainContribution())
+  trian = get_triangulation(meas)
+  for (op,int) in a.dict
+    for i in int
+      itrian = get_triangulation(i.meas)
+      if itrian == trian || is_parent(itrian,trian)
+        integral = integrate(i.object,meas)
+        add_contribution!(cont,trian,integral[trian],op)
+      end
+    end
+  end
+  if num_domains(cont) > 0
+    return cont
+  end
+  @unreachable """\n
+    There is no contribution associated with the given mesh in this PTIntegrand object.
+  """
+end
+
+Base.getindex(int::CollectionPTIntegrand,meas::Measure) = get_contribution(int,meas)
+
+function CellData.add_contribution!(a::CollectionPTIntegrand,op::Function,b::PTIntegrand)
+  if haskey(a.dict,op)
+    a.dict[op] = (a.dict[op]...,b)
+  else
+    a.dict[op] = (b,)
+  end
+end
+
+for op in (:+,:-)
+  @eval begin
+    function ($op)(a::PTIntegrand,b::PTIntegrand)
+      c = CollectionPTIntegrand()
+      add_contribution!(c,+,a)
+      add_contribution!(c,$op,b)
+      c
+    end
+
+    function ($op)(a::CollectionPTIntegrand,b::PTIntegrand)
+      add_contribution!(a,$op,b)
+      a
+    end
+
+    function ($op)(a::PTIntegrand,b::CollectionPTIntegrand)
+      c = CollectionPTIntegrand()
+      add_contribution!(c,+,a)
+      for (_op,int) in b.dict
+        if (&)($op == +,_op == +) || (&)($op == -,_op == -)
+          add_contribution!(c,+,int)
+        else
+          add_contribution!(c,-,int)
+        end
+      end
+      c
+    end
+
+    function ($op)(a::CollectionPTIntegrand,b::CollectionPTIntegrand)
+      for (_op,int) in b.dict
+        if (&)($op == +,_op == +) || (&)($op == -,_op == -)
+          add_contribution!(a,+,int)
+        else
+          add_contribution!(a,-,int)
+        end
+      end
+      a
+    end
+  end
+end
+
+function CellData.integrate(a::CollectionPTIntegrand,cont=PTDomainContribution())
+  for (op,int) in a.dict
+    for i in int
+      itrian = get_triangulation(i.meas)
+      integral = integrate(i)
+      add_contribution!(cont,itrian,integral[itrian],op)
+    end
+  end
+  cont
+end

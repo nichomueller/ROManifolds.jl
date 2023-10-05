@@ -196,11 +196,12 @@ function collect_residuals!(
   b::PTArray,
   nlop::PNonlinearOperator,
   sols::PTArray,
+  nonzero_idx::Vector{Int},
   args...)
 
   println("Computing fe residual for every time and parameter")
   ress = residual!(b,nlop,sols,args...)
-  return NnzMatrix(ress;nparams=length(nlop.μ))
+  return hcat(map(x->getindex(x,nonzero_idx),ress.array)...)
 end
 
 function collect_residuals_for_trian!(
@@ -218,12 +219,13 @@ function collect_jacobians!(
   A::PTArray,
   nlop::PNonlinearOperator,
   sols::PTArray,
+  nonzero_idx::Vector{Int},
   args...;
   i=1)
 
   println("Computing fe jacobian #$i for every time and parameter")
   jacs_i = jacobian!(A,nlop,sols,i,args...)
-  return NnzMatrix(map(NnzVector,jacs_i);nparams=length(nlop.μ))
+  return Matrix(hcat(map(x->x[nonzero_idx],jacs_i.array)...))
 end
 
 function collect_jacobians_for_trian!(

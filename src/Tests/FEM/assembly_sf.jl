@@ -24,6 +24,34 @@ assemble_matrix_add!(A,op.assem,matdata)
 
 v = get_fe_basis(test)
 b = allocate_residual(op,μ,t,uh,ode_cache)
+  n = length(uh)
+  μ1 = isa(μ,Table) ? testitem(μ) : μ
+  t1 = isa(t,AbstractVector) ? testitem(t) : t
+  uh1 = testitem(uh)
+  V = get_test(op)
+  v = get_fe_basis(V)
+  dxh1 = ()
+  for i in 1:get_order(op)
+    dxh1 = (dxh1...,uh1)
+  end
+  xh1 = TransientCellField(uh1,dxh1)
+  dc = integrate(op.res(μ1,t1,xh1,v))
+  w = []
+  r = []
+  for strian in get_domains(dc)
+    scell_vec = get_contribution(dc,strian)
+    cell_vec,trian = move_contributions(scell_vec,strian)
+    @assert ndims(eltype(cell_vec)) == 1
+    cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
+    rows = get_cell_dof_ids(test,trian)
+    push!(w,cell_vec_r)
+    push!(r,rows)
+  end
+  (w,r)
+  old_res(μ,t,u,v) = ∫(v*∂ₚt(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
+  dc_old = old_res(μ1,t1,xh1,v)
+  dc_old[Ω]
+
 vecdata = collect_cell_vector(test,op.res(μ,t,xh,v))
 assemble_vector_add!(b,op.assem,vecdata)
 

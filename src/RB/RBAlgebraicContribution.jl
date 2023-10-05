@@ -114,7 +114,7 @@ function collect_rhs_contributions!(
   rb_res_contribs = Vector{PTArray{Vector{T}}}(undef,num_domains(rbres))
   for (i,t) in enumerate(trian)
     rbrest = rbres[t]
-    coeff = rhs_coefficient!(coeff_cache,feop,fesolver,rbrest,trian,args...;st_mdeim)
+    coeff = rhs_coefficient!(coeff_cache,feop,fesolver,rbrest,args...;st_mdeim)
     rb_res_contribs[i] = rb_contribution!(rb_cache,rbrest,coeff)
   end
   return sum(rb_res_contribs)
@@ -153,7 +153,7 @@ function collect_lhs_contributions!(
   rb_jac_contribs = Vector{PTArray{Matrix{T}}}(undef,num_domains(rbjac))
   for (i,t) in enumerate(trian)
     rbjact = rbjac[t]
-    coeff = lhs_coefficient!(coeff_cache,feop,fesolver,rbjact,trian,args...;st_mdeim,kwargs...)
+    coeff = lhs_coefficient!(coeff_cache,feop,fesolver,rbjact,args...;st_mdeim,kwargs...)
     rb_jac_contribs[i] = rb_contribution!(rb_cache,rbjact,coeff)
   end
   return sum(rb_jac_contribs)

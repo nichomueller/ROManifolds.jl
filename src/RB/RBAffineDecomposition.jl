@@ -1,34 +1,16 @@
 struct RBIntegrationDomain
-  trian::Triangulation
+  meas::Measure
   times::Vector{<:Real}
   idx::Vector{Int}
-
-  function RBIntegrationDomain(trian::Triangulation,times::Vector{<:Real},idx::Vector{Int})
-    new(trian,times,idx)
-  end
-
-  function RBIntegrationDomain(
-    feop::PTFEOperator,
-    trian::Triangulation,
-    times::Vector{<:Real},
-    interp_idx_space::Vector{Int},
-    interp_idx_time::Vector{Int};
-    st_mdeim=false)
-
-    cell_dof_ids = get_cell_dof_ids(feop.test,trian)
-    red_integr_cells = find_cells(interp_idx_space,cell_dof_ids)
-    red_trian = view(trian,red_integr_cells)
-    red_times = st_mdeim ? times[interp_idx_time] : times
-    RBIntegrationDomain(red_trian,red_times,interp_idx_space)
-  end
 end
 
 function Arrays.testvalue(::Type{RBIntegrationDomain},feop::PTFEOperator)
   test = get_test(feop)
   trian = get_triangulation(test)
+  meas = get_measure(feop,trian)
   times = Vector{Real}(undef,0)
   idx = Vector{Int}(undef,0)
-  RBIntegrationDomain(trian,times,idx)
+  RBIntegrationDomain(meas,times,idx)
 end
 
 struct RBAffineDecomposition{T}
@@ -58,7 +40,8 @@ struct RBAffineDecomposition{T}
     proj_bs,proj_bt = project_space_time(basis_space,basis_time,args...;kwargs...)
     interp_idx_space = get_interpolation_idx(basis_space)
     interp_idx_time = get_interpolation_idx(basis_time)
-    entire_interp_idx_space = recast_idx(basis_space,interp_idx_space)
+    entire_interp_idx_space = recast_idx(nzm,interp_idx_space)
+    entire_interp_idx_rows,_ = vec_to_mat_idx(entire_interp_idx_space,nzm.nrows)
 
     interp_bs = basis_space[interp_idx_space,:]
     lu_interp = if info.st_mdeim
@@ -69,13 +52,12 @@ struct RBAffineDecomposition{T}
       lu(interp_bs)
     end
 
-    integr_domain = RBIntegrationDomain(
-      feop,
-      trian,
-      times,
-      entire_interp_idx_space,
-      interp_idx_time;
-      info.st_mdeim)
+    cell_dof_ids = get_cell_dof_ids(feop.test,trian)
+    red_integr_cells = find_cells(entire_interp_idx_rows,cell_dof_ids)
+    red_trian = view(trian,red_integr_cells)
+    red_meas = get_measure(feop,red_trian)
+    red_times = st_mdeim ? times[interp_idx_time] : times
+    integr_domain = RBIntegrationDomain(red_meas,red_times,entire_interp_idx_space)
 
     RBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)
   end
@@ -273,7 +255,6 @@ function assemble_rhs!(
   feop::PTFEOperator,
   fesolver::PThetaMethod,
   rbres::RBAffineDecomposition,
-  trian::Base.KeySet{Triangulation},
   sols::PTArray,
   μ::Table)
 
@@ -283,9 +264,7 @@ function assemble_rhs!(
 
   red_idx = rbres.integration_domain.idx
   red_times = rbres.integration_domain.times
-  red_trian = rbres.integration_domain.trian
-  strian = substitute_trian(red_trian,trian)
-  meas = map(t->get_measure(feop,t),strian)
+  red_meas = rbres.integration_domain.meas
 
   ode_op = get_algebraic_operator(feop)
   ode_cache = allocate_cache(ode_op,μ,red_times)
@@ -299,9 +278,8 @@ function assemble_rhs!(
     b = get_array(cache)
     _sols = sols
   end
-  nzm = collect_residuals!(b,fesolver,ode_op,_sols,μ,red_times,ode_cache,red_trian,meas...)
-  red_idx_full = sparse_to_full_idx(red_idx,nzm.nonzero_idx)
-  nzm[red_idx_full,:]
+  res = collect_residuals!(b,fesolver,ode_op,_sols,μ,red_times,ode_cache,red_idx,red_meas)
+  res
 end
 
 function lhs_coefficient!(
@@ -322,7 +300,6 @@ function assemble_lhs!(
   feop::PTFEOperator,
   fesolver::PThetaMethod,
   rbjac::RBAffineDecomposition,
-  trian::Base.KeySet{Triangulation},
   sols::PTArray,
   μ::Table;
   i::Int=1)
@@ -334,9 +311,7 @@ function assemble_lhs!(
 
   red_idx = rbjac.integration_domain.idx
   red_times = rbjac.integration_domain.times
-  red_trian = rbjac.integration_domain.trian
-  strian = substitute_trian(red_trian,trian)
-  meas = map(t->get_measure(feop,t),strian)
+  red_meas = rbjac.integration_domain.meas
 
   ode_op = get_algebraic_operator(feop)
   ode_cache = allocate_cache(ode_op,μ,red_times)
@@ -350,9 +325,8 @@ function assemble_lhs!(
     A = get_array(cache)
     _sols = sols
   end
-  nzm = collect_jacobians!(A,fesolver,ode_op,_sols,μ,red_times,ode_cache,meas...;i)
-  red_idx_full = compress_idx(nzm,red_idx)
-  nzm[red_idx_full,:]
+  jac_i = collect_jacobians!(A,fesolver,ode_op,_sols,μ,red_times,ode_cache,red_idx,red_meas;i)
+  jac_i
 end
 
 function mdeim_solve!(cache,ad::RBAffineDecomposition,a::Matrix;st_mdeim=false)

@@ -23,9 +23,9 @@ for i in 1:get_order(feop)
 end
 xh = TransientCellField(uh,dxh)
 
-dca = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
-dch = ∫(hμt(μ,t)*v)dΓn
-dcm = ∫(v*∂ₚt(xh))dΩ
+dca = integrate(∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ))
+dch = integrate(∫ₚ(hμt(μ,t)*v,dΓn))
+dcm = integrate(∫ₚ(v*∂ₚt(xh),dΩ))
 quad = dΩ.quad
 x = get_cell_points(quad)
 b = change_domain(v*∂ₚt(xh),quad.trian,quad.data_domain_style)
@@ -111,14 +111,15 @@ dj1 = feop.jacs[1](μ,t,xh,du,v)
 dj1_by_1 = 1. * dj1
 test_ptarray(dj1[Ω],dj1_by_1[Ω])
 
-dc1 = ∫(v*∂ₚt(xh))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(xh))dΩ - ∫(fμt(μ,t)*v)dΩ
-dc2 = ∫(hμt(μ,t)*v)dΓn
+dc1 = ∫ₚ(v*∂ₚt(xh),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⋅∇(xh),dΩ) - ∫ₚ(fμt(μ,t)*v,dΩ)
+dc2 = ∫ₚ(hμt(μ,t)*v,dΓn)
 dc3 = dc1-dc2
+DC = integrate(dc3)
 dc1_ok = ∫(v*∂t(xh_ok))dΩ + ∫(a(μ[1],t)*∇(v)⋅∇(xh_ok))dΩ - ∫(f(μ[1],t)*v)dΩ
 dc2_ok = ∫(h(μ[1],t)*v)dΓn
 dc3_ok = dc1_ok-dc2_ok
-test_ptarray(dc3[Ω],dc3_ok[Ω])
-test_ptarray(dc3[Γn],dc3_ok[Γn])
+test_ptarray(DC[Ω],dc3_ok[Ω])
+test_ptarray(DC[Γn],dc3_ok[Γn])
 
 test_ptarray((dcm + dch_ok)[Ω],(dcm_ok + dch_ok)[Ω])
 test_ptarray((dch_ok + dcm)[Ω],(dch_ok + dcm_ok)[Ω])

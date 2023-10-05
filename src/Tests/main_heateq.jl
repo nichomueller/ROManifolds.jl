@@ -41,10 +41,9 @@ begin
   u0(μ) = x->u0(x,μ)
   u0μ(μ) = PFunction(u0,μ)
 
-  jac_t(μ,t,u,dut,v,meas=(dΩ,)) = ∫(v*dut)meas[1]
-  jac(μ,t,u,du,v,meas=(dΩ,)) = ∫(aμt(μ,t)*∇(v)⋅∇(du))meas[1]
-  res(μ,t,u,v,meas=(dΩ,dΓn)) = (∫(v*∂ₚt(u))meas[1] + ∫(aμt(μ,t)*∇(v)⋅∇(u))meas[1]
-    - ∫(fμt(μ,t)*v)meas[1] - ∫(hμt(μ,t)*v)meas[2])
+  jac_t(μ,t,u,dut,v) = ∫ₚ(v*dut,dΩ)
+  jac(μ,t,u,du,v) = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ)
+  res(μ,t,u,v) = ∫ₚ(v*∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⋅∇(u),dΩ) - ∫ₚ(fμt(μ,t)*v,dΩ) - ∫ₚ(hμt(μ,t)*v,dΓn)
 
   reffe = ReferenceFE(lagrangian,Float,order)
   test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])

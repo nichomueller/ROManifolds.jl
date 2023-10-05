@@ -131,10 +131,8 @@ end
 
 function recast_idx(nzm::NnzMatrix,idx::Vector{Int})
   nonzero_idx = nzm.nonzero_idx
-  nrows = nzm.nrows
   entire_idx = nonzero_idx[idx]
-  entire_idx_rows,_ = vec_to_mat_idx(entire_idx,nrows)
-  return entire_idx_rows
+  return entire_idx
 end
 
 function compress(a::AbstractMatrix,nzm::NnzMatrix{T}) where T
@@ -150,13 +148,6 @@ function compress(a::AbstractMatrix,b::AbstractMatrix,nzm::NnzMatrix)
     m = sparse(irow,icol,nzv,nzm.nrows,ncols)
     a'*m*b
   end
-end
-
-function compress_idx(nzm::NnzMatrix,idx::Vector{Int})
-  nonzero_idx = nzm.nonzero_idx
-  nrows = nzm.nrows
-  idx_rows,_ = vec_to_mat_idx(nonzero_idx,nrows)
-  return sparse_to_full_idx(idx,idx_rows)
 end
 
 abstract type PODStyle end

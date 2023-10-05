@@ -89,7 +89,7 @@ get_pspace(op::PTFEOperator) = op.pspace
 
 realization(op::PTFEOperator,args...) = realization(op.pspace,args...)
 
-get_measure(op::PTFEOperator,trian::Triangulation) = Measure(trian,get_order(op.test))
+get_measure(op::PTFEOperator,trian::Triangulation) = Measure(trian,2*get_order(op.test))
 
 for OP in (:PTAffineFEOperator,:PTFEOperator)
   @eval begin
@@ -126,66 +126,9 @@ function allocate_residual(
     dxh = (dxh...,uh)
   end
   xh = TransientCellField(uh,dxh)
-  vecdata = collect_cell_vector(V,op.res(μ,t,xh,v))
+  dc = integrate(op.res(μ,t,xh,v),DomainContribution())
+  vecdata = collect_cell_vector(V,dc)
   allocate_vector(op.assem,vecdata)
-end
-
-function residual!(
-  b::PTArray,
-  op::PTFEOperatorFromWeakForm,
-  μ::AbstractVector,
-  t::T,
-  xh::S,
-  cache) where {T,S}
-
-  V = get_test(op)
-  v = get_fe_basis(V)
-  vecdata = collect_cell_vector(V,op.res(μ,t,xh,v))
-  assemble_vector_add!(b,op.assem,vecdata)
-  b
-end
-
-function residual!(
-  b::PTArray,
-  op::PTFEOperatorFromWeakForm,
-  μ::AbstractVector,
-  t::T,
-  xh::S,
-  cache,
-  meas::Measure...) where {T,S}
-
-  V = get_test(op)
-  v = get_fe_basis(V)
-  dc = op.res(μ,t,xh,v,meas)
-  for t in get_domains(dc)
-    if is_child(t)
-      vecdata = collect_cell_vector(V,dc,t)
-      assemble_vector_add!(b,op.assem,vecdata)
-      break
-    end
-  end
-  b
-end
-
-function residual_for_trian!(
-  b::PTArray,
-  op::PTFEOperatorFromWeakForm,
-  μ::AbstractVector,
-  t::T,
-  xh::S,
-  cache) where {T,S}
-
-  V = get_test(op)
-  v = get_fe_basis(V)
-  dc = op.res(μ,t,xh,v)
-  trian = get_domains(dc)
-  bvec = Vector{typeof(b)}(undef,num_domains(dc))
-  for (n,t) in enumerate(trian)
-    vecdata = collect_cell_vector(V,dc,t)
-    assemble_vector_add!(b,op.assem,vecdata)
-    bvec[n] = copy(b)
-  end
-  bvec,trian
 end
 
 function allocate_jacobian(
@@ -223,6 +166,60 @@ for f in (:allocate_residual,:allocate_jacobian)
   end
 end
 
+function residual!(
+  b::PTArray,
+  op::PTFEOperatorFromWeakForm,
+  μ::AbstractVector,
+  t::T,
+  xh::S,
+  cache) where {T,S}
+
+  V = get_test(op)
+  v = get_fe_basis(V)
+  dc = integrate(op.res(μ,t,xh,v))
+  vecdata = collect_cell_vector(V,dc)
+  assemble_vector_add!(b,op.assem,vecdata)
+  b
+end
+
+function residual!(
+  b::PTArray,
+  op::PTFEOperatorFromWeakForm,
+  μ::AbstractVector,
+  t::T,
+  xh::S,
+  cache,
+  meas::Measure) where {T,S}
+
+  V = get_test(op)
+  v = get_fe_basis(V)
+  dc = op.res(μ,t,xh,v)[meas]
+  vecdata = collect_cell_vector(V,dc)
+  assemble_vector_add!(b,op.assem,vecdata)
+  b
+end
+
+function residual_for_trian!(
+  b::PTArray,
+  op::PTFEOperatorFromWeakForm,
+  μ::AbstractVector,
+  t::T,
+  xh::S,
+  cache) where {T,S}
+
+  V = get_test(op)
+  v = get_fe_basis(V)
+  dc = integrate(op.res(μ,t,xh,v))
+  trian = get_domains(dc)
+  bvec = Vector{typeof(b)}(undef,num_domains(dc))
+  for (n,t) in enumerate(trian)
+    vecdata = collect_cell_vector(V,dc,t)
+    assemble_vector_add!(b,op.assem,vecdata)
+    bvec[n] = copy(b)
+  end
+  bvec,trian
+end
+
 function jacobian!(
   A::PTArray,
   op::PTFEOperatorFromWeakForm,
@@ -247,20 +244,15 @@ function jacobian!(
   i::Integer,
   γᵢ::Real,
   cache,
-  meas::Measure...) where {T,S}
+  meas::Measure) where {T,S}
 
   Uh = get_trial(op)(μ,t)
   V = get_test(op)
   u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
-  dc = γᵢ*op.jacs[i](μ,t,uh,u,v,meas)
-  for t in get_domains(dc)
-    if is_child(t)
-      matdata = collect_cell_matrix(Uh,V,dc,t)
-      assemble_matrix_add!(A,op.assem,matdata)
-      break
-    end
-  end
+  dc = γᵢ*op.jacs[i](μ,t,uh,u,v)[meas]
+  matdata = collect_cell_matrix(Uh,V,dc)
+  assemble_matrix_add!(A,op.assem,matdata)
   A
 end
 
@@ -278,7 +270,7 @@ function jacobian_for_trian!(
   V = get_test(op)
   u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
-  dc = γᵢ*op.jacs[i](μ,t,uh,u,v)
+  dc = γᵢ*integrate(op.jacs[i](μ,t,uh,u,v))
   trian = get_domains(dc)
   Avec = Vector{typeof(A)}(undef,num_domains(dc))
   for (n,t) in enumerate(trian)
@@ -310,6 +302,7 @@ function fill_initial_jacobians(
   t::T,
   uh::S) where {T,S}
 
+  cont = DomainContribution()
   dxh = ()
   for i in 1:get_order(op)
     dxh = (dxh...,uh)
@@ -317,7 +310,7 @@ function fill_initial_jacobians(
   xh = TransientCellField(uh,dxh)
   _matdata = ()
   for i in 1:get_order(op)+1
-    _matdata = (_matdata...,_matdata_jacobian(op,μ,t,xh,i,0.0))
+    _matdata = (_matdata...,_matdata_jacobian(op,μ,t,xh,i,0.0,cont))
   end
   return _matdata
 end
@@ -344,11 +337,13 @@ function _matdata_jacobian(
   t::T,
   xh::S,
   i::Integer,
-  γᵢ::Real) where {T,S}
+  γᵢ::Real,
+  args...) where {T,S}
 
   Uh = get_trial(op)(μ,t)
   V = get_test(op)
   u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
-  collect_cell_matrix(Uh,V,γᵢ*op.jacs[i](μ,t,xh,u,v))
+  dc = γᵢ*integrate(op.jacs[i](μ,t,xh,u,v),args...)
+  collect_cell_matrix(Uh,V,dc)
 end
