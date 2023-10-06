@@ -51,6 +51,16 @@ function reduced_basis(
   RBSpace(basis_space,basis_time)
 end
 
+function recast(rb::RBSpace,x::AbstractVector)
+  basis_space = get_basis_space(rb)
+  basis_time = get_basis_time(rb)
+  ns_rb = size(basis_space,2)
+  nt_rb = size(basis_time,2)
+
+  x_mat_i = reshape(x,nt_rb,ns_rb)
+  return basis_space*(basis_time*x_mat_i)'
+end
+
 function recast(rb::RBSpace,x::PTArray{T}) where T
   basis_space = get_basis_space(rb)
   basis_time = get_basis_time(rb)
@@ -67,13 +77,30 @@ function recast(rb::RBSpace,x::PTArray{T}) where T
   PTArray(array)
 end
 
-function test_reduced_basis(rb::RBSpace,s::Snapshots;n=1)
-  sn = s[n]
+for f in (:space_time_projection,:test_reduced_basis)
+  @eval begin
+    function $f(rb::RBSpace,s::Snapshots;n=1)
+      snap = s[n]
+      $f(rb,snap)
+    end
+
+    function $f(rb::RBSpace,snap::PTArray{<:AbstractVector})
+      mat = hcat(get_array(snap)...)
+      $f(rb,mat)
+    end
+  end
+end
+
+function space_time_projection(rb::RBSpace,mat::AbstractMatrix)
   basis_space = get_basis_space(rb)
   basis_time = get_basis_time(rb)
-  mat = hcat(get_array(sn)...)
-  rb_proj = (basis_space'*mat)*basis_time
-  rb_approx = basis_space*(basis_time*rb_proj')'
+  proj_mat = (basis_space'*mat)*basis_time
+  return reshape(proj_mat',:)
+end
+
+function test_reduced_basis(rb::RBSpace,mat::AbstractMatrix)
+  rb_proj = space_time_projection(rb,mat)
+  rb_approx = recast(rb,rb_proj)
   err = maximum(abs.(mat-rb_approx))
   println("RB approximation error in infty norm of snapshot $n = $err")
   return rb_proj

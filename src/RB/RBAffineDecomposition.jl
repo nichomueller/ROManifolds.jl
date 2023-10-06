@@ -258,7 +258,6 @@ function assemble_rhs!(
   sols::PTArray,
   μ::Table)
 
-  times = get_times(fesolver)
   ndofs = num_free_dofs(feop.test)
   setsize!(cache,(ndofs,))
 
@@ -266,20 +265,10 @@ function assemble_rhs!(
   red_times = rbres.integration_domain.times
   red_meas = rbres.integration_domain.meas
 
-  ode_op = get_algebraic_operator(feop)
-  ode_cache = allocate_cache(ode_op,μ,red_times)
+  b = get_array(cache;len=length(red_times)*length(μ))
+  sols = get_solutions_at_times(sols,fesolver,red_times)
 
-  if length(red_times) < length(times)
-    b = get_array(cache;len=length(red_times)*length(μ))
-    time_idx = findall(x->x in red_times,times)
-    idx = param_time_idx(time_idx,length(μ))
-    _sols = PTArray(sols[idx])
-  else
-    b = get_array(cache)
-    _sols = sols
-  end
-  res = collect_residuals!(b,fesolver,ode_op,_sols,μ,red_times,ode_cache,red_idx,red_meas)
-  res
+  collect_residuals_for_idx!(b,fesolver,sols,μ,red_times,red_idx,red_meas)
 end
 
 function lhs_coefficient!(
@@ -304,7 +293,6 @@ function assemble_lhs!(
   μ::Table;
   i::Int=1)
 
-  times = get_times(fesolver)
   ndofs_row = num_free_dofs(feop.test)
   ndofs_col = num_free_dofs(get_trial(feop)(nothing,nothing))
   setsize!(cache,(ndofs_row,ndofs_col))
@@ -313,20 +301,10 @@ function assemble_lhs!(
   red_times = rbjac.integration_domain.times
   red_meas = rbjac.integration_domain.meas
 
-  ode_op = get_algebraic_operator(feop)
-  ode_cache = allocate_cache(ode_op,μ,red_times)
+  A = get_array(cache;len=length(red_times)*length(μ))
+  sols = get_solutions_at_times(sols,fesolver,red_times)
 
-  if length(red_times) < length(times)
-    A = get_array(cache;len=length(red_times)*length(μ))
-    time_idx = findall(x->x in red_times,times)
-    idx = param_time_idx(time_idx,length(μ))
-    _sols = PTArray(sols[idx])
-  else
-    A = get_array(cache)
-    _sols = sols
-  end
-  jac_i = collect_jacobians!(A,fesolver,ode_op,_sols,μ,red_times,ode_cache,red_idx,red_meas;i)
-  jac_i
+  collect_jacobians_for_idx!(A,fesolver,sols,μ,red_times,red_idx,red_meas;i)
 end
 
 function mdeim_solve!(cache,ad::RBAffineDecomposition,a::Matrix;st_mdeim=false)
@@ -387,6 +365,16 @@ function recast_coefficient!(
   end
 
   ptarray
+end
+
+function get_solutions_at_times(sols::PTArray,fesolver::PODESolver,red_times::Vector{<:Real})
+  times = get_times(fesolver)
+  if length(red_times) < length(times)
+    time_idx = findall(x->x in red_times,times)
+    map(x->getindex(x,time_idx),sols)
+  else
+    sols
+  end
 end
 
 struct RBContributionMap <: Map end

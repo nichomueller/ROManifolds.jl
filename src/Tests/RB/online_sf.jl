@@ -43,8 +43,7 @@ ode_cache = allocate_cache(ode_op,params_test,red_times)
 if length(red_times) < length(times)
   b = get_array(rcache;len=length(red_times)*length(params_test))
   time_idx = findall(x->x in red_times,times)
-  idx = param_time_idx(time_idx,length(params_test))
-  _sols = PTArray(sols_test[idx])
+  _sols = map(x->getindex(x,time_idx),sols)
 else
   b = get_array(rcache)
   _sols = sols_test
