@@ -68,7 +68,7 @@ end
 
 for n = 1:N
   xh_ok,_ = get_cell_field_gridap(n)
-  #test_ptarray(xh.cellfield.cell_dof_values,xh_ok.cellfield.cell_dof_values;n)
+  test_ptarray(xh.cellfield.cell_dof_values,xh_ok.cellfield.cell_dof_values;n)
   test_ptarray(xh.cellfield.dirichlet_values,xh_ok.cellfield.dirichlet_values;n)
 end
 

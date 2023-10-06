@@ -16,26 +16,46 @@ end
 """
 Allocate the space to be used as first argument in evaluate!
 """
-function allocate_trial_space(U::PTTrialFESpace,args...)
+function allocate_trial_space(U::PTTrialFESpace,μ,t)
+  _length(a) = 1
+  _length(a::Table) = length(a)
+  NonaffineHomogeneousPTrialFESpace(U.space,_length(μ)*length(t))
+end
+
+function allocate_trial_space(U::PTTrialFESpace,::Vector{<:Number},::Real)
   HomogeneousTrialFESpace(U.space)
-end
-
-function allocate_trial_space(U::PTTrialFESpace,μ::Table,::Real)
-  NonaffineHomogeneousPTrialFESpace(U.space,length(μ))
-end
-
-function allocate_trial_space(U::PTTrialFESpace,::AbstractVector,t::Vector{<:Real})
-  NonaffineHomogeneousPTrialFESpace(U.space,length(t))
-end
-
-function allocate_trial_space(U::PTTrialFESpace,μ::Table,t::Vector{<:Real})
-  NonaffineHomogeneousPTrialFESpace(U.space,length(μ)*length(t))
 end
 
 """
 Parameter, time evaluation without allocating Dirichlet vals (returns a TrialFESpace)
 """
-function evaluate!(Uμt::T,U::PTTrialFESpace,μ,t) where T
+function evaluate!(Ut::T,U::PTTrialFESpace,μ,t) where T
+  objects_at_μt = []
+  for μi in μ, ti in t
+    if isa(U.dirichlet_μt,Vector)
+      push!(objects_at_μt,map(o->o(μi,ti),U.dirichlet_μt))
+    else
+      push!(objects_at_μt,U.dirichlet_μt(μi,ti))
+    end
+  end
+  PTrialFESpace!(Ut,objects_at_μt)
+  Ut
+end
+
+function evaluate!(Ut::T,U::PTTrialFESpace,μ::Vector{<:Number},t) where T
+  objects_at_μt = []
+  for ti in t
+    if isa(U.dirichlet_μt,Vector)
+      push!(objects_at_μt,map(o->o(μ,ti),U.dirichlet_μt))
+    else
+      push!(objects_at_μt,U.dirichlet_μt(μ,ti))
+    end
+  end
+  PTrialFESpace!(Ut,objects_at_μt)
+  Ut
+end
+
+function evaluate!(Uμt::T,U::PTTrialFESpace,μ::Vector{<:Number},t::Real) where T
   if isa(U.dirichlet_μt,Vector)
     objects_at_μt = map(o->o(μ,t),U.dirichlet_μt)
   else
@@ -43,47 +63,6 @@ function evaluate!(Uμt::T,U::PTTrialFESpace,μ,t) where T
   end
   TrialFESpace!(Uμt,objects_at_μt)
   Uμt
-end
-
-function evaluate!(Ut::T,U::PTTrialFESpace,μ::Table,t::Real) where T
-  objects_at_t = []
-  for μi in μ
-    if isa(U.dirichlet_μt,Vector)
-      push!(objects_at_t,map(o->o(μi,t),U.dirichlet_μt))
-    else
-      push!(objects_at_t,U.dirichlet_μt(μi,t))
-    end
-  end
-  PTrialFESpace!(Ut,objects_at_t)
-  Ut
-end
-
-function evaluate!(Ut::T,U::PTTrialFESpace,μ::AbstractVector,t::Vector{<:Real}) where T
-  objects_at_t = []
-  for ti in t
-    if isa(U.dirichlet_μt,Vector)
-      push!(objects_at_t,map(o->o(μ,ti),U.dirichlet_μt))
-    else
-      push!(objects_at_t,U.dirichlet_μt(μ,ti))
-    end
-  end
-  PTrialFESpace!(Ut,objects_at_t)
-  Ut
-end
-
-function evaluate!(Ut::T,U::PTTrialFESpace,μ::Table,t::Vector{<:Real}) where T
-  objects_at_t = []
-  for ti in t
-    for μi in μ
-      if isa(U.dirichlet_μt,Vector)
-        push!(objects_at_t,map(o->o(μi,ti),U.dirichlet_μt))
-      else
-        push!(objects_at_t,U.dirichlet_μt(μi,ti))
-      end
-    end
-  end
-  PTrialFESpace!(Ut,objects_at_t)
-  Ut
 end
 
 """
@@ -124,22 +103,18 @@ function allocate_trial_space(U::FESpace,args...)
   U
 end
 
-function allocate_trial_space(U::FESpace,μ::Table,::Real)
-  AffineHomogeneousPTrialFESpace(U,length(μ))
+function allocate_trial_space(U::FESpace,μ,t)
+  _length(a) = 1
+  _length(a::Table) = length(a)
+  if isa(μ,Vector{<:Number}) && isa(t,Real)
+    U
+  else
+    AffineHomogeneousPTrialFESpace(U,_length(μ)*length(t))
+  end
 end
 
-function allocate_trial_space(U::FESpace,::AbstractVector,t::Vector{<:Real})
-  AffineHomogeneousPTrialFESpace(U,length(t))
-end
-
-function allocate_trial_space(U::FESpace,μ::Table,t::Vector{<:Real})
-  AffineHomogeneousPTrialFESpace(U,length(μ)*length(t))
-end
-
-Arrays.evaluate!(::FESpace,U::FESpace,args...) = U
-Arrays.evaluate!(Ut::FESpace,::FESpace,::Table,::Real) = Ut
-Arrays.evaluate!(Ut::FESpace,::FESpace,::AbstractVector,::Vector{<:Real}) = Ut
-Arrays.evaluate!(Ut::FESpace,::FESpace,::Table,::Vector{<:Real}) = Ut
+Arrays.evaluate!(Ut::FESpace,::FESpace,μ,t) = Ut
+Arrays.evaluate!(::FESpace,U::FESpace,::Vector{<:Number},::Real) = U
 
 function Arrays.evaluate(U::FESpace,μ,t)
   Uμt = allocate_trial_space(U,μ,t)
@@ -167,24 +142,24 @@ function PTMultiFieldFESpace(spaces::Vector{<:SingleFieldFESpace})
   MultiFieldFESpace(spaces)
 end
 
-function allocate_trial_space(U::PTMultiFieldTrialFESpace,μ::AbstractVector,t::Real)
-  spaces = map(fe->allocate_trial_space(fe,μ,t),U.spaces)
-  MultiFieldFESpace(spaces)
-end
-
 function allocate_trial_space(U::PTMultiFieldTrialFESpace,args...)
   spaces = map(fe->allocate_trial_space(fe,args...),U.spaces)
   PMultiFieldFESpace(spaces)
 end
 
-function evaluate!(Uμt,U::PTMultiFieldTrialFESpace,μ::AbstractVector,t::Real)
-  spaces_at_μt = [evaluate!(Uμti,Ui,μ,t) for (Uμti,Ui) in zip(Uμt,U)]
-  MultiFieldFESpace(spaces_at_μt)
+function allocate_trial_space(U::PTMultiFieldTrialFESpace,μ::Vector,t::Real)
+  spaces = map(fe->allocate_trial_space(fe,μ,t),U.spaces)
+  MultiFieldFESpace(spaces)
 end
 
 function evaluate!(Uμt,U::PTMultiFieldTrialFESpace,μ,t)
   spaces_at_μt = [evaluate!(Uμti,Ui,μ,t) for (Uμti,Ui) in zip(Uμt,U)]
   PMultiFieldFESpace(spaces_at_μt)
+end
+
+function evaluate!(Uμt,U::PTMultiFieldTrialFESpace,μ::Vector,t::Real)
+  spaces_at_μt = [evaluate!(Uμti,Ui,μ,t) for (Uμti,Ui) in zip(Uμt,U)]
+  MultiFieldFESpace(spaces_at_μt)
 end
 
 function Arrays.evaluate(U::PTMultiFieldTrialFESpace,μ,t)
