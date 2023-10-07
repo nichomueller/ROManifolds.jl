@@ -71,7 +71,7 @@ function post_process(
   stats::NamedTuple) where T
 
   energy_norm = energy_norm=info.energy_norm
-  norm_matrix = get_norm_matrix(energy_norm,feop)
+  norm_matrix = get_norm_matrix(feop,energy_norm)
   _sol = space_time_matrices(sol;nparams=length(params))
 
   results = RBResults(params,_sol,sol_approx,stats;norm_matrix)

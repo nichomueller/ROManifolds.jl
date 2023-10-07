@@ -1,6 +1,6 @@
 # INDEX OF TEST
 K = 2
-μ = realization(op,K)
+μ = realization(feop,K)
 times = get_times(fesolver)
 Nt = length(times)
 N = K*Nt
@@ -25,6 +25,8 @@ for i in 2:get_order(feop)+1
 end
 xh = TransientCellField(EvaluationFunction(Xh[1],_xh[1]),dxh)
 
+dv = get_fe_basis(test)
+du = get_trial_fe_basis(trial(nothing,nothing))
 b = allocate_residual(ode_op,μ,times,_snapsθ,ode_cache)
 vecdata = collect_cell_vector(test,integrate(feop.res(μ,times,xh,dv)))#,trian)
 assemble_vector_add!(b,feop.assem,vecdata)
@@ -60,7 +62,7 @@ function gridap_res_jac_for_int(_sols,n::Int)
   p = μ[slow_idx(n,Nt)]
   t = times[fast_idx(n,Nt)]
   sols = _sols[fast_idx(n,Nt)]
-  sols = ones(nfree)
+  # sols = ones(nfree)
 
   g_ok(x,t) = g(x,p,t)
   g_ok(t) = x->g_ok(x,t)
@@ -103,22 +105,17 @@ for np = 1:K
     xh_ok,res_ok,jac_ok = gridap_res_jac_for_int(sols_ok,n)
     test_ptarray(xh.cellfield.dirichlet_values,xh_ok.cellfield.dirichlet_values;n)
     test_ptarray(xh.cellfield.cell_dof_values,xh_ok.cellfield.cell_dof_values;n)
-    # test_ptarray(b,res_ok;n)
-    # test_ptarray(A,jac_ok;n)
+    test_ptarray(b,res_ok;n)
+    test_ptarray(A,jac_ok;n)
   end
 end
 
-np = 1
-nt = 2
-n = (np-1)*Nt+nt
-xh_ok,res_ok,jac_ok = gridap_res_jac_for_int(sols_ok,n)
-
-# # MODE2
+# MODE2
 # nzm = NnzArray(sols)
 # m2 = change_mode(nzm)
 # m2_ok = hcat(sols_ok...)'
 # space_ndofs = size(m2_ok,2)
-# @assert isapprox(m2_ok,m2[:,(N-1)*space_ndofs+1:N*space_ndofs])
+# @assert isapprox(m2_ok,m2[:,(K-1)*space_ndofs+1:K*space_ndofs])
 
 # INVESTIGATE JACOBIAN
 solsθ = recenter(fesolver,sols,μ)[1:N]

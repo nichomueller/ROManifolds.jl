@@ -4,10 +4,10 @@ begin
   include("$root/src/FEM/FEM.jl")
   include("$root/src/RB/RB.jl")
 
-  mesh = "cube2x2.json"
-  bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
-  # mesh = "elasticity_3cyl2D.json"
-  # bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
+  # mesh = "cube2x2.json"
+  # bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
+  mesh = "elasticity_3cyl2D.json"
+  bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
   test_path = "$root/tests/poisson/unsteady/_$mesh"
   order = 1
   degree = 2
@@ -56,9 +56,9 @@ begin
   ϵ = 1e-4
   save_structures = true
   load_structures = false
-  energy_norm = l2Norm()
-  nsnaps_state = 50
-  nsnaps_system = 30
+  energy_norm = :l2
+  nsnaps_state = 80
+  nsnaps_system = 50
   nsnaps_test = 10
   st_mdeim = false
   info = RBInfo(test_path;ϵ,load_structures,save_structures,energy_norm,

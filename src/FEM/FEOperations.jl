@@ -80,16 +80,28 @@ function set_labels!(model,bnd_info)
   end
 end
 
-abstract type NormStyle end
-struct l2Norm <: NormStyle end
-struct L2Norm <: NormStyle end
-struct H1Norm <: NormStyle end
+function LinearAlgebra.norm(a::AbstractArray,op::PTFEOperator,norm_style=:l2)
+  if norm_style == :l2
+    norm(a)
+  elseif norm_style == :L2 || :H1
+    norm_matrix = get_norm_matrix(op,norm_style)
+    norm(a,norm_matrix)
+  else
+    @unreachable
+  end
+end
 
-get_norm_matrix(::l2Norm,args...) = nothing
-
-get_norm_matrix(::L2Norm,args...) = get_L2_norm_matrix(args...)
-
-get_norm_matrix(::H1Norm,args...) = get_H1_norm_matrix(args...)
+function get_norm_matrix(op::PTFEOperator,norm_style=:l2)
+  if norm_style == :l2
+    nothing
+  elseif norm_style == :L2
+    get_L2_norm_matrix(op)
+  elseif norm_style == :H1
+    get_H1_norm_matrix(op)
+  else
+    @unreachable
+  end
+end
 
 for f in (:get_L2_norm_matrix,:get_H1_norm_matrix)
   @eval begin

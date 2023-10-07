@@ -429,6 +429,7 @@ function Arrays.evaluate!(
   array_coeff = cache_coeff.array
   array_proj = cache_proj.array
   array_proj_global = cache_proj_global.array
+  array_proj_global .= zero(T)
 
   @inbounds for i = axes(coeff,2)
     array_coeff .= basis_time'*coeff[:,i]
@@ -461,6 +462,7 @@ function Arrays.evaluate!(
   array_coeff = cache_coeff.array
   array_proj = cache_proj.array
   array_proj_global = cache_proj_global.array
+  array_proj_global .= zero(T)
 
   for i = axes(coeff,2)
     for col in 1:num_rb_times_col

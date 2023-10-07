@@ -5,7 +5,7 @@ struct RBInfo
   nsnaps_test::Int
   fe_path::String
   rb_path::String
-  energy_norm::Union{NormStyle,Vector{<:NormStyle}}
+  energy_norm::Union{Symbol,Vector{Symbol}}
   st_mdeim::Bool
   fun_mdeim::Bool
   load_structures::Bool
@@ -14,7 +14,7 @@ struct RBInfo
 end
 
 function RBInfo(test_path::String;ϵ=1e-4,nsnaps_state=80,nsnaps_system=20,nsnaps_test=10,
-  energy_norm=[l2Norm()],st_mdeim=false,fun_mdeim=false,
+  energy_norm=[:l2],st_mdeim=false,fun_mdeim=false,
   load_structures=false,save_structures=true,postprocess=false)
 
   fe_path = get_fe_path(test_path)
