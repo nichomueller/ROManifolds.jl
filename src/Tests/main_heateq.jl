@@ -4,11 +4,9 @@ begin
   include("$root/src/FEM/FEM.jl")
   include("$root/src/RB/RB.jl")
 
-  # mesh = "cube2x2.json"
-  # bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
   mesh = "elasticity_3cyl2D.json"
   bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
-  test_path = "$root/tests/poisson/unsteady/_$mesh"
+  test_path = "$root/tests/poisson/unsteady/$mesh"
   order = 1
   degree = 2
 
@@ -55,7 +53,7 @@ begin
 
   ϵ = 1e-4
   save_structures = true
-  load_structures = false
+  load_structures = true
   energy_norm = :l2
   nsnaps_state = 50
   nsnaps_system = 20
@@ -63,26 +61,5 @@ begin
   st_mdeim = false
   info = RBInfo(test_path;ϵ,load_structures,save_structures,energy_norm,
                 nsnaps_state,nsnaps_system,nsnaps_test,st_mdeim)
-  # reduced_basis_model(info,feop,fesolver)
+  reduced_basis_model(info,feop,fesolver)
 end
-
-# WORKS
-nsnaps = info.nsnaps_state
-params = realization(feop,nsnaps)
-sols = collect_solutions(fesolver,feop,params)
-rbspace = reduced_basis(info,feop,sols,fesolver,params)
-rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
-save(info,(sols,params,rbspace,rbrhs,rblhs))
-sols,params,rbspace = load(info,(AbstractSnapshots,Table,AbstractRBSpace))
-rbrhs,rblhs = load(info,(AbstractRBAlgebraicContribution,Vector{AbstractRBAlgebraicContribution}))
-
-snaps_test,params_test = load_test(info,feop,fesolver)
-x = initial_guess(sols,params,params_test)
-rhs_cache,lhs_cache = allocate_sys_cache(feop,fesolver,rbspace,snaps_test,params_test)
-rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbrhs,x,params_test)
-lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,x,params_test)
-stats = @timed begin
-  rb_snaps_test = solve(fesolver.nls,rhs,lhs)
-end
-approx_snaps_test = recast(rbspace,rb_snaps_test)
-post_process(info,feop,fesolver,snaps_test,params_test,approx_snaps_test,stats)

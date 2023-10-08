@@ -1,6 +1,6 @@
 rbres,rbjac = rbrhs,rblhs
 sols_test,params_test = load_test(info,feop,fesolver)
-res_cache,jac_cache = allocate_sys_cache(feop,fesolver,rbspace,sols_test,params_test)
+res_cache,jac_cache = allocate_online_cache(feop,fesolver,rbspace,sols_test,params_test)
 
 function test_affine_decomposition_rhs(
   cache,
@@ -217,48 +217,3 @@ rbjact = rbjac[i][Ω]
 
 meas = dΩ
 test_rb_contribution_lhs(jac_cache,feop,fesolver,rbjact,rbspace,meas,sols_test,params_test;i,st_mdeim)
-
-# NONAFFINE CASE
-i = 1
-rbjact = rbjac[i][Ω]
-meas = dΩ
-coeff_cache,rb_cache = jac_cache
-coeff = lhs_coefficient!(coeff_cache,feop,fesolver,rbjact,sols_test,params_test;st_mdeim,i)
-basis_space_proj = rbjact.basis_space
-basis_time = last(rbjact.basis_time)
-idx = 1
-cidx = coeff[idx]
-contrib = evaluate!(RBContributionMap(),rb_cache,basis_space_proj,basis_time,cidx)
-
-times = get_times(fesolver)
-ntimes = get_time_ndofs(fesolver)
-p,t = params[slow_idx(idx,ntimes)],times[fast_idx(idx,ntimes)]
-A = assemble_matrix((du,dv)->∫(a(p,t)*∇(dv)⋅∇(du))dΩ,trial(p,t),test)
-Ared = rbspace.basis_space'*A*rbspace.basis_space
-btbt = rbspace.basis_time'*rbspace.basis_time
-btbt_shift = rbspace.basis_time[2:end,:]'*rbspace.basis_time[1:end-1,:]
-Arb = LinearAlgebra.kron(Ared,θ*btbt+(1-θ)*btbt_shift)
-
-# AFFINE CASE WORKS
-i = 2
-rbjact = rbjac[i][Ω]
-meas = dΩ
-coeff_cache,rb_cache = jac_cache
-coeff = lhs_coefficient!(coeff_cache,feop,fesolver,rbjact,sols_test,params_test;st_mdeim,i)
-basis_space_proj = rbjact.basis_space
-basis_time = last(rbjact.basis_time)
-idx = 1
-cidx = coeff[idx]
-contrib = evaluate!(RBContributionMap(),rb_cache,basis_space_proj,basis_time,cidx)
-
-all_contribs = map(coeff) do cn
-  evaluate!(RBContributionMap(),rb_cache,basis_space_proj,basis_time,cn)
-end
-@check all([ci ≈ contrib for ci = all_contribs.array])
-
-M = assemble_matrix((du,dv)->∫(dv*du)dΩ,trial(params[1],dt),test)/(dt*θ)
-Mred = rbspace.basis_space'*M*rbspace.basis_space
-btbt = rbspace.basis_time'*rbspace.basis_time
-btbt_shift = rbspace.basis_time[2:end,:]'*rbspace.basis_time[1:end-1,:]
-Mrb = LinearAlgebra.kron(Mred,btbt-btbt_shift)
-@check isapprox(Mrb,contrib)

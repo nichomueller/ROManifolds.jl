@@ -81,7 +81,7 @@ function post_process(
   return
 end
 
-function allocate_sys_cache(
+function allocate_online_cache(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbspace::AbstractRBSpace{T},
@@ -124,7 +124,7 @@ function test_rb_solver(
 
   println("Solving linear RB problems\n")
   x = initial_guess(snaps,params,params_test)
-  rhs_cache,lhs_cache = allocate_sys_cache(feop,fesolver,rbspace,snaps_test,params_test)
+  rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,rbspace,snaps_test,params_test)
   rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,x,params_test)
   lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,x,params_test)
 
@@ -148,7 +148,7 @@ function test_rb_solver(
   snaps_test,params_test = load_test(info,feop,fesolver)
 
   println("Solving nonlinear RB problems with Newton iterations\n")
-  rhs_cache,lhs_cache = allocate_sys_cache(feop,fesolver,rbspace,snaps_test,params_test)
+  rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,rbspace,snaps_test,params_test)
   nl_cache = nothing
   x = initial_guess(snaps,params,params_test)
   _,conv0 = Algebra._check_convergence(fesolver.nls.ls,x)

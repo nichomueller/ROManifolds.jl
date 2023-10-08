@@ -84,7 +84,7 @@ function load(info::RBInfo,::Type{Vector{AbstractRBAlgebraicContribution}})
   ad_jacs = RBAlgebraicContribution{T}[]
   push!(ad_jacs,ad_jac1)
   i = 2
-  while isfile(correct_path(joinpath(info.rb_path,"rb_lhs_$i")))
+  while isdir(joinpath(info.rb_path,"rb_lhs_$i"))
     path = joinpath(info.rb_path,"rb_lhs_$i")
     push!(ad_jacs,load_algebraic_contrib(path,AbstractRBAlgebraicContribution))
     i += 1

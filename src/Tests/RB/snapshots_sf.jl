@@ -117,154 +117,51 @@ end
 # space_ndofs = size(m2_ok,2)
 # @assert isapprox(m2_ok,m2[:,(K-1)*space_ndofs+1:K*space_ndofs])
 
-# INVESTIGATE JACOBIAN
-solsθ = recenter(fesolver,sols,μ)[1:N]
-ode_op = get_algebraic_operator(feop)
-ode_cache = allocate_cache(ode_op,μ[1:N],times)
-ode_cache = update_cache!(ode_cache,ode_op,μ[1:N],times)
-Xh, = ode_cache
-dxh = ()
-_xh = (solsθ,solsθ-solsθ)
-for i in 2:get_order(feop)+1
-  dxh = (dxh...,EvaluationFunction(Xh[i],_xh[i]))
-end
-xh = TransientCellField(EvaluationFunction(Xh[1],_xh[1]),dxh)
-
-# DOMAIN CONTRIB
-dc = integrate(feop.jacs[1](μ[1:N],times,xh,du,dv))
-dc_ok = [∫(a(p,t)*∇(dv)⋅∇(du))dΩ for p in μ for t in times]
-for n in eachindex(dc_ok)
-  test_ptarray(dc[Ω],dc_ok[n][Ω];n)
-end
-
-# CELL DATA
-g_ok(x,t) = g(x,rand(3),t)
-g_ok(t) = x->g_ok(x,t)
-trial_ok = TransientTrialFESpace(test,g_ok)
-matdata = collect_cell_matrix(trial(μ,times),test,dc)
+times = get_times(fesolver)
 ntimes = length(times)
-for n in eachindex(dc_ok)
-  matdata_ok = collect_cell_matrix(trial_ok(times[fast_idx(n,ntimes)]),test,dc_ok[n])
-  test_ptarray(matdata[1][1],matdata_ok[1][1];n)
-end
-
-# ALGEBRAIC STRUCTURE
-A = allocate_jacobian(ode_op,μ,times,solsθ,ode_cache)
-A0 = copy(A[1])
-assemble_matrix_add!(A,feop.assem,matdata)
-for n in eachindex(dc_ok)
-  matdata_ok = collect_cell_matrix(trial_ok(times[fast_idx(n,ntimes)]),test,dc_ok[n])
-  A_ok = copy(A0)
-  assemble_matrix_add!(A_ok,feop.assem,matdata_ok)
-  test_ptarray(A,A_ok;n)
-end
-
-# INVESTIGATE RESIDUAL
-solsθ = recenter(fesolver,sols,μ)[N:N]
-ode_op = get_algebraic_operator(feop)
-ode_cache = allocate_cache(ode_op,μ[N:N],times)
-ode_cache = update_cache!(ode_cache,ode_op,μ[N:N],times)
-Xh, = ode_cache
-dxh = ()
-_xh = (solsθ,solsθ-solsθ)
-for i in 2:get_order(feop)+1
-  dxh = (dxh...,EvaluationFunction(Xh[i],_xh[i]))
-end
-xh = TransientCellField(EvaluationFunction(Xh[1],_xh[1]),dxh)
-
-# DOMAIN CONTRIB
-res_fun(p,t,u,v) = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(u),dΩ) #- ∫ₚ(fμt(μ,t)*v,dΩ) - ∫ₚ(hμt(μ,t)*v,dΓn) #∫ₚ(v*∂ₚt(u),dΩ) +
-dc = integrate(res_fun(μ[N:N],times,xh,dv))
-dc_ok = []
-res_ok_fun(p,t,u,v) = ∫(a(p,t)*∇(v)⋅∇(u))dΩ #- ∫(v*f(p,t))dΩ - ∫(v*h(p,t))dΓn # ∫(∂t(u)*v)dΩ +
-for (nt,t) in enumerate(times)
-  ode_op_ok = get_algebraic_operator(feop_ok)
-  ode_cache_ok = Gridap.ODEs.TransientFETools.allocate_cache(ode_op_ok)
-  Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
-  Xh_ok, = ode_cache_ok
-  dxh_ok = ()
-  _xh_ok = (sols_ok[nt],sols_ok[nt]-sols_ok[nt])
-  for i in 2:get_order(feop)+1
-    dxh_ok = (dxh_ok...,EvaluationFunction(Xh_ok[i],_xh_ok[i]))
-  end
-  xh_ok = TransientCellField(EvaluationFunction(Xh_ok[1],_xh_ok[1]),dxh_ok)
-  push!(dc_ok,res_ok_fun(μ[N],t,xh_ok,dv))
-end
-for n in eachindex(dc_ok)
-  test_ptarray(dc[Ω],dc_ok[n][Ω];n)
-end
-
-dc1 = collect(dc[Ω][1])
-dc_ok1 = collect(dc_ok[1][Ω])
-
-
-# CELL DATA
-g_ok(x,t) = g(x,rand(3),t)
+u,μ = snaps_test[1:ntimes],params_test[1]
+g_ok(x,t) = g(x,μ,t)
 g_ok(t) = x->g_ok(x,t)
+a_ok(t,u,v) = ∫(a(μ,t)*∇(v)⋅∇(u))dΩ
+b_ok(t,v) = ∫(v*f(μ,t))dΩ + ∫(v*h(μ,t))dΓn
+m_ok(t,ut,v) = ∫(ut*v)dΩ
+
 trial_ok = TransientTrialFESpace(test,g_ok)
-matdata = collect_cell_matrix(trial(μ,times),test,dc)
-ntimes = length(times)
-for n in eachindex(dc_ok)
-  matdata_ok = collect_cell_matrix(trial_ok(times[fast_idx(n,ntimes)]),test,dc_ok[n])
-  test_ptarray(matdata[1][1],matdata_ok[1][1];n)
-end
+feop_ok = TransientAffineFEOperator(m_ok,a_ok,b_ok,trial_ok,test)
+ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
 
-# ALGEBRAIC STRUCTURE
-A = allocate_jacobian(ode_op,μ,times,solsθ,ode_cache)
-A0 = copy(A[1])
-assemble_matrix_add!(A,feop.assem,matdata)
-for n in eachindex(dc_ok)
-  matdata_ok = collect_cell_matrix(trial_ok(times[fast_idx(n,ntimes)]),test,dc_ok[n])
-  A_ok = copy(A0)
-  assemble_matrix_add!(A_ok,feop.assem,matdata_ok)
-  test_ptarray(A,A_ok;n)
-end
-
-
-
-
-
-
-
-
-
-
-# @check all([A[n] == assemble_matrix(∫(a(params[slow_idx(n,ntimes)],times[fast_idx(n,ntimes)])*∇(dv)⋅∇(du))dΩ,
-#   trial_ok(times[fast_idx(n,ntimes)]),test) for n = 1:100])
-nparams = length(μ)
-@check all([A[n] == assemble_matrix(∫(a(μ[fast_idx(n,nparams)],times[slow_idx(n,nparams)])*∇(dv)⋅∇(du))dΩ,
-  trial_ok(times[slow_idx(n,nparams)]),test) for n = 1:100])
-
-n = 1
-for p in μ, t in times
-  Aok = assemble_matrix(∫(a(p,t)*∇(dv)⋅∇(du))dΩ,trial_ok(t),test)
-  A_ok = copy(A0)
-  matdata_ok = collect_cell_matrix(trial_ok(t),test,∫(a(p,t)*∇(dv)⋅∇(du))dΩ)
-  assemble_matrix_add!(A_ok,feop.assem,matdata_ok)
-  @check Aok == A_ok
-  @check A[n] == Aok "not true for n = $n"
-  n += 1
-end
-
-μ = μ[1:2]
-solsθ = recenter(fesolver,sols,μ)[1:2]
 ode_op = get_algebraic_operator(feop)
-ode_cache = allocate_cache(ode_op,μ,times)
-ode_cache = update_cache!(ode_cache,ode_op,μ,times)
-Xh, = ode_cache
-dxh = ()
-_xh = (solsθ,solsθ-solsθ)
-for i in 2:get_order(feop)+1
-  dxh = (dxh...,EvaluationFunction(Xh[i],_xh[i]))
-end
-xh = TransientCellField(EvaluationFunction(Xh[1],_xh[1]),dxh)
-A = allocate_jacobian(ode_op,μ,times,solsθ,ode_cache)
-assemble_matrix_add!(A,feop.assem,matdata)
+ode_cache = allocate_cache(ode_op,params_test,times)
+ode_cache = update_cache!(ode_cache,ode_op,params_test,times)
+ptb = allocate_residual(ode_op,params_test,times,snaps_test,ode_cache)
+ptA = allocate_jacobian(ode_op,params_test,times,snaps_test,ode_cache)
+vθ = copy(snaps_test) .* 0.
+nlop = get_nonlinear_operator(ode_op,params_test,times,dt*θ,snaps_test,ode_cache,vθ)
+residual!(ptb,nlop,copy(snaps_test))
+jacobian!(ptA,nlop,copy(snaps_test))
+ptb1 = ptb[1:10]
+ptA1 = ptA[1:10]
 
-for (n,t) in enumerate(times)
-  @check assemble_matrix(∫(a(μ[1],t)*∇(dv)⋅∇(du))dΩ,trial_ok(t),test) == A[n]
-end
+M = assemble_matrix((du,dv)->∫(dv*du)dΩ,trial(μ,dt),test)/(dt*θ)
+vθ = zeros(test.nfree)
+ode_cache = Gridap.ODEs.TransientFETools.allocate_cache(ode_op_ok)
+nlop0 = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t0,dtθ,vθ,ode_cache,vθ)
+b = allocate_residual(nlop0,vθ)
+bok = copy(b)
+A = allocate_jacobian(nlop0,vθ)
+Aok = copy(A)
 
-for (n,t) in enumerate(times)
-  @check assemble_matrix(∫(a(μ[2],t)*∇(dv)⋅∇(du))dΩ,trial_ok(t),test) == A[ntimes+n]
+for (nt,t) in enumerate(get_times(fesolver))
+  un = u[nt]
+  unprev = nt > 1 ? u[nt-1] : get_free_dof_values(uh0μ(p))
+  ode_cache = Gridap.ODEs.TransientFETools.update_cache!(ode_cache,ode_op_ok,t)
+  nlop = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t,dtθ,unprev,ode_cache,vθ)
+  z = zero(eltype(A))
+  fillstored!(A,z)
+  fill!(b,z)
+  residual!(b,ode_op_ok,t,(vθ,vθ),ode_cache)
+  jacobians!(A,ode_op_ok,t,(vθ,vθ),(1.0,1/dtθ),ode_cache)
+  @assert b ≈ ptb1[nt] "Failed when n = $nt"
+  @assert A ≈ ptA1[nt] "Failed when n = $nt"
+  @assert A \ (M*unprev - b) ≈ un "Failed when n = $nt"
 end
