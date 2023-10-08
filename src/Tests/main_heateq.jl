@@ -57,7 +57,7 @@ begin
   save_structures = true
   load_structures = false
   energy_norm = :l2
-  nsnaps_state = 80
+  nsnaps_state = 50
   nsnaps_system = 20
   nsnaps_test = 10
   st_mdeim = false

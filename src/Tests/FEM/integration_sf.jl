@@ -78,3 +78,13 @@ for n = 1:N
   test_ptarray(dcjac1[Ω],dcjac1_ok[Ω];n)
   # test_ptarray(dcjac2[Ω],dcjac2_ok[Ω];n)
 end
+
+dc_ok = integrate(feop.res(μ,times,xh,v))
+dc = feop.res(μ,times,xh,v)[dΩ] + feop.res(μ,times,xh,v)[dΓn]
+for t in get_domains(dc_ok)
+  test_ptarray(dc_ok[t],dc[t])
+end
+
+ciao(μ,t,u,v) = ∫(v*∂ₚt(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
+
+dcc = ciao(μ,times,xh,v)

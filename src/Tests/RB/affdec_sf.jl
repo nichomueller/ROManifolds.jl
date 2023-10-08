@@ -13,7 +13,6 @@ function test_affine_decomposition_rhs(
   sols::Snapshots,
   params::Table)
 
-  nsnaps_system = 50
   rcache,scache... = cache
 
   times = get_times(fesolver)
@@ -151,18 +150,20 @@ function test_rb_contribution_rhs(
   b = get_array(rcache;len=length(red_times)*length(params))
   sols = get_solutions_at_times(sols,fesolver,red_times)
   res_full = collect_residuals_for_idx!(b,fesolver,sols,params,red_times,full_idx,meas)
+  global contrib_ok
   for n in eachindex(params)
     tidx = (n-1)*length(red_times)+1 : n*length(red_times)
     contrib_ok = space_time_projection(res_full[:,tidx],rbspace)
     err_contrib = ℓ∞(contribs[n]-contrib_ok)
     println("Residual contribution difference for selected triangulation is $err_contrib")
   end
+  return contribs,contrib_ok
 end
 
-rbrest = rbres[Γn]
-meas = dΓn
+rbrest = rbres[Ω]
+meas = dΩ
 
-test_rb_contribution_rhs(res_cache,feop,fesolver,rbrest,rbspace,meas,sols_test,params_test;st_mdeim)
+contribs,contrib_ok=test_rb_contribution_rhs(res_cache,feop,fesolver,rbrest,rbspace,meas,sols_test,params_test;st_mdeim)
 
 function test_rb_contribution_lhs(
   cache,
@@ -200,6 +201,7 @@ function test_rb_contribution_lhs(
   jac_full = collect_jacobians_for_idx!(A,fesolver,sols,params,red_times,full_idx,meas;i)
 
   sols = get_solutions_at_times(sols,fesolver,red_times)
+  global contrib_ok
   for n in eachindex(params)
     tidx = (n-1)*length(red_times)+1 : n*length(red_times)
     nzmidx = NnzMatrix(jac_full[:,tidx],findnz(Afull[1][:])[1],test.nfree,1)
@@ -207,6 +209,7 @@ function test_rb_contribution_lhs(
     err_contrib = ℓ∞(contribs[n]-contrib_ok)
     println("Jacobian #$i contribution difference for selected triangulation is $err_contrib")
   end
+  return contribs,contrib_ok
 end
 
 i = 1

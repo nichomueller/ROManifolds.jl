@@ -68,3 +68,53 @@ for (n,tn) in enumerate(times)
   push!(gridap_jac,jac_ok)
   println(isapprox(jac_ok,my_jac[n]))
 end
+
+# NEW TESTS
+times = get_times(fesolver)
+ntimes = length(times)
+u,μ = snaps_test[1:ntimes],params_test[1]
+g_ok(x,t) = g(x,μ,t)
+g_ok(t) = x->g_ok(x,t)
+a_ok(t,u,v) = ∫(a(μ,t)*∇(v)⋅∇(u))dΩ
+b_ok(t,v) = ∫(v*f(μ,t))dΩ + ∫(v*h(μ,t))dΓn
+m_ok(t,ut,v) = ∫(ut*v)dΩ
+
+trial_ok = TransientTrialFESpace(test,g_ok)
+feop_ok = TransientAffineFEOperator(m_ok,a_ok,b_ok,trial_ok,test)
+ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
+
+ode_op = get_algebraic_operator(feop)
+ode_cache = allocate_cache(ode_op,params_test,times)
+ode_cache = update_cache!(ode_cache,ode_op,params_test,times)
+ptb = allocate_residual(ode_op,params_test,times,snaps_test,ode_cache)
+ptA = allocate_jacobian(ode_op,params_test,times,snaps_test,ode_cache)
+vθ = copy(snaps_test) .* 0.
+nlop = get_nonlinear_operator(ode_op,params_test,times,dt*θ,snaps_test,ode_cache,vθ)
+residual!(ptb,nlop,copy(snaps_test))
+jacobian!(ptA,nlop,copy(snaps_test))
+ptb1 = ptb[1:10]
+ptA1 = ptA[1:10]
+
+M = assemble_matrix((du,dv)->∫(dv*du)dΩ,trial(μ,dt),test)/(dt*θ)
+vθ = zeros(test.nfree)
+ode_cache = Gridap.ODEs.TransientFETools.allocate_cache(ode_op_ok)
+nlop0 = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t0,dtθ,vθ,ode_cache,vθ)
+b = allocate_residual(nlop0,vθ)
+bok = copy(b)
+A = allocate_jacobian(nlop0,vθ)
+Aok = copy(A)
+
+for (nt,t) in enumerate(get_times(fesolver))
+  un = u[nt]
+  unprev = nt > 1 ? u[nt-1] : get_free_dof_values(uh0μ(p))
+  ode_cache = Gridap.ODEs.TransientFETools.update_cache!(ode_cache,ode_op_ok,t)
+  nlop = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t,dtθ,unprev,ode_cache,vθ)
+  z = zero(eltype(A))
+  fillstored!(A,z)
+  fill!(b,z)
+  residual!(b,ode_op_ok,t,(vθ,vθ),ode_cache)
+  jacobians!(A,ode_op_ok,t,(vθ,vθ),(1.0,1/dtθ),ode_cache)
+  @assert b ≈ ptb1[nt] "Failed when n = $nt"
+  @assert A ≈ ptA1[nt] "Failed when n = $nt"
+  @assert A \ (M*unprev - b) ≈ un "Failed when n = $nt"
+end

@@ -141,7 +141,8 @@ for fun in (:collect_residuals_for_idx!,:collect_jacobians_for_idx!)
       dtθ = θ == 0.0 ? dt : dt*θ
       ode_op = get_algebraic_operator(feop)
       ode_cache = allocate_cache(ode_op,μ,times)
-      sols_cache = copy(sols)
+      ode_cache = update_cache!(ode_cache,ode_op,μ,times)
+      sols_cache = copy(sols) .* 0.
       nlop = get_nonlinear_operator(ode_op,μ,times,dtθ,sols,ode_cache,sols_cache)
       $fun(q,nlop,sols,args...;kwargs...)
     end
@@ -194,7 +195,7 @@ for fun in (:collect_residuals_for_trian!,:collect_jacobians_for_trian!)
       dt,θ = fesolver.dt,fesolver.θ
       dtθ = θ == 0.0 ? dt : dt*θ
       ode_cache = update_cache!(ode_cache,ode_op,μ,times)
-      sols_cache = copy(sols)
+      sols_cache = copy(sols) .* 0.
       nlop = get_nonlinear_operator(ode_op,μ,times,dtθ,sols,ode_cache,sols_cache)
       $fun(q,nlop,sols,args...;kwargs...)
     end
