@@ -157,7 +157,7 @@ function test_rb_solver(
       rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,x,params_test)
       lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,x,params_test)
       nl_cache = solve!(x,fesolver.nls,rhs,lhs,nl_cache)
-      x .-= recast(rbspace,x)
+      x .= recast(rbspace,x)
       isconv,conv = Algebra._check_convergence(fesolver.nls,x,conv0)
       println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv))) \n")
       if all(isconv); return; end

@@ -49,16 +49,20 @@ struct PThetaMethodNonlinearOperator <: PNonlinearOperator
   vθ::PTArray
 end
 
+function get_nonlinear_operator(
+  odeop::PODEOperator,μ,tθ,dtθ::Float,u0::PTArray,ode_cache,vθ::PTArray)
+  PThetaMethodNonlinearOperator(odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
+end
 
 function Algebra.allocate_residual(
-  op::PThetaMethodNonlinearOperator,
+  op::PNonlinearOperator,
   x::PTArray)
 
   allocate_residual(op.odeop,op.μ,op.tθ,x,op.ode_cache)
 end
 
 function Algebra.allocate_jacobian(
-  op::PThetaMethodNonlinearOperator,
+  op::PNonlinearOperator,
   x::PTArray)
 
   allocate_jacobian(op.odeop,op.μ,op.tθ,x,op.ode_cache)

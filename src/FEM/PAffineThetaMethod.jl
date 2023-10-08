@@ -38,6 +38,66 @@ function solve_step!(
   return (uf,tf,cache)
 end
 
+struct PAffineThetaMethodOperator <: PNonlinearOperator
+  odeop::AffinePODEOperator
+  μ
+  tθ
+  dtθ::Float
+  u0::PTArray
+  ode_cache
+  vθ::PTArray
+end
+
+function get_nonlinear_operator(
+  odeop::AffinePODEOperator,μ,tθ,dtθ::Float,u0::PTArray,ode_cache,vθ::PTArray)
+  PAffineThetaMethodOperator(odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
+end
+
+for fun in (:(Algebra.residual!),:residual_for_trian!)
+  @eval begin
+    function $fun(
+      b::PTArray,
+      op::PAffineThetaMethodOperator,
+      ::PTArray,
+      args...)
+
+      vθ = op.vθ
+      z = zero(eltype(b))
+      fill!(b,z)
+      $fun(b,op.odeop,op.μ,op.tθ,(vθ,vθ),op.ode_cache,args...)
+    end
+  end
+end
+
+function Algebra.jacobian!(
+  A::PTArray,
+  op::PAffineThetaMethodOperator,
+  ::PTArray)
+
+  vθ = op.vθ
+  z = zero(eltype(A))
+  fillstored!(A,z)
+  jacobians!(A,op.odeop,op.μ,op.tθ,(vθ,vθ),(1.0,1/op.dtθ),op.ode_cache)
+end
+
+for fun in (:(Algebra.jacobian!),:jacobian_for_trian!)
+  @eval begin
+    function $fun(
+      A::PTArray,
+      op::PAffineThetaMethodOperator,
+      ::PTArray,
+      i::Int,
+      args...)
+
+      vθ = op.vθ
+      z = zero(eltype(A))
+      fillstored!(A,z)
+      $fun(A,op.odeop,op.μ,op.tθ,(vθ,vθ),i,(1.0,1/op.dtθ)[i],op.ode_cache,args...)
+    end
+  end
+end
+
+# SHORTCUTS
 function _allocate_matrix_and_vector(odeop,μ,t0,u0,ode_cache)
   b = allocate_residual(odeop,μ,t0,u0,ode_cache)
   A = allocate_jacobian(odeop,μ,t0,u0,ode_cache)

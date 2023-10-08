@@ -51,6 +51,7 @@ function reduced_basis(
   RBSpace(basis_space,basis_time)
 end
 
+# VERY IMPORTANT: A MINUS SIGN IS NEEDED TO COMPENSATE THE RESIDUAL
 function recast(rb::RBSpace,x::AbstractVector)
   basis_space = get_basis_space(rb)
   basis_time = get_basis_time(rb)
@@ -58,7 +59,7 @@ function recast(rb::RBSpace,x::AbstractVector)
   nt_rb = size(basis_time,2)
 
   x_mat_i = reshape(x,nt_rb,ns_rb)
-  return basis_space*(basis_time*x_mat_i)'
+  return -basis_space*(basis_time*x_mat_i)'
 end
 
 function recast(rb::RBSpace,x::PTArray{T}) where T
@@ -71,7 +72,7 @@ function recast(rb::RBSpace,x::PTArray{T}) where T
   array = Vector{Matrix{eltype(T)}}(undef,n)
   @inbounds for i = 1:n
     x_mat_i = reshape(x[i],nt_rb,ns_rb)
-    array[i] = basis_space*(basis_time*x_mat_i)'
+    array[i] = -basis_space*(basis_time*x_mat_i)'
   end
 
   PTArray(array)
