@@ -39,3 +39,5 @@ function compress_array(entire_array::AbstractMatrix)
   nonzero_idx = findall(x -> abs(x) ≥ eps(),sum_cols)
   nonzero_idx,entire_array[nonzero_idx,:]
 end
+
+ℓ∞(x) = maximum(abs.(x))

@@ -486,7 +486,7 @@ function rb_contribution!(
   basis_time = last(ad.basis_time)
   k = RBContributionMap()
   map(coeff) do cn
-    evaluate!(k,cache,basis_space_proj,basis_time,cn)
+    copy(evaluate!(k,cache,basis_space_proj,basis_time,cn))
   end
 end
 

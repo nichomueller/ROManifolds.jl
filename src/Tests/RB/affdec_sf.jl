@@ -1,9 +1,6 @@
-function test_sols()
-  nparams = length(sols[1])
-  ntimes = length(sols)
-  @check all([!iszero(sols[nt][np]) for nt = 1:ntimes,np = 1:nparams])
-  @check all([!iszero(sols_test[(nt-1)*nparams+np]) for nt = 1:ntimes,np = 1:nparams])
-end
+rbres,rbjac = rbrhs,rblhs
+sols_test,params_test = load_test(info,feop,fesolver)
+res_cache,jac_cache = allocate_sys_cache(feop,fesolver,rbspace,sols_test,params_test)
 
 function test_affine_decomposition_rhs(
   cache,
@@ -54,14 +51,10 @@ function test_affine_decomposition_rhs(
   coeff = mdeim_solve!(scache[1],rbrest.mdeim_interpolation,Res)
   basis_space = tpod(recast(Res_offline[idx]))
   coeff_ok = basis_space'*Res_full
-  err_coeff = maximum(abs.(coeff-coeff_ok))
+  err_coeff = maximum(abs.(coeff)-abs.(coeff_ok))
   println("Residual coefficient difference for selected triangulation is $err_coeff")
   return coeff,coeff_ok
 end
-
-rbres,rbjac = rbrhs,rblhs
-sols_test,params_test = load_test(info,feop,fesolver)
-res_cache,jac_cache = allocate_sys_cache(feop,fesolver,rbspace,sols_test,params_test)
 
 rbrest = rbres[Ω]
 meas = dΩ
@@ -111,7 +104,7 @@ function test_affine_decomposition_lhs(
 
   coeff = mdeim_solve!(scache[1],rbjac.mdeim_interpolation,jac)
   coeff_ok = basis_space'*jac_full
-  err_coeff = maximum(abs.(coeff-coeff_ok))
+  err_coeff = maximum(abs.(coeff)-abs.(coeff_ok))
   println("Jacobian #$i coefficient difference for selected triangulation is $err_coeff")
   return coeff,coeff_ok
 end
@@ -121,6 +114,10 @@ rbjact = rbjac[i][Ω]
 
 meas = dΩ
 cache = jac_cache[1]
+
+# offline error
+coeff,coeff_ok = test_affine_decomposition_lhs(cache,feop,fesolver,rbjact,meas,sols[1],params[1:1],sols,params;i)
+# online error
 coeff,coeff_ok = test_affine_decomposition_lhs(cache,feop,fesolver,rbjact,meas,sols_test,params_test,sols,params;i)
 
 function test_rb_contribution_rhs(
@@ -138,8 +135,10 @@ function test_rb_contribution_rhs(
   coeff = rhs_coefficient!(coeff_cache,feop,fesolver,ad,sols,params;st_mdeim)
   basis_space_proj = ad.basis_space
   basis_time = last(ad.basis_time)
-  c1 = coeff[1]
-  contrib1 = evaluate!(RBContributionMap(),rb_cache,basis_space_proj,basis_time,c1)
+  contribs = Vector{Vector{Float}}(undef,length(coeff))
+  @inbounds for i = eachindex(coeff)
+    contribs[i] = copy(evaluate!(RBContributionMap(),rb_cache,basis_space_proj,basis_time,coeff[i]))
+  end
 
   rcache, = coeff_cache
 
@@ -152,20 +151,18 @@ function test_rb_contribution_rhs(
   b = get_array(rcache;len=length(red_times)*length(params))
   sols = get_solutions_at_times(sols,fesolver,red_times)
   res_full = collect_residuals_for_idx!(b,fesolver,sols,params,red_times,full_idx,meas)
-  contrib1_ok = space_time_projection(res_full[:,1:get_time_ndofs(fesolver)],rbspace)
-  err_contrib = maximum(abs.(contrib1-contrib1_ok))
-  println("Residual contribution difference for selected triangulation is $err_contrib")
-  return contrib1,contrib1_ok
+  for n in eachindex(params)
+    tidx = (n-1)*length(red_times)+1 : n*length(red_times)
+    contrib_ok = space_time_projection(res_full[:,tidx],rbspace)
+    err_contrib = ℓ∞(contribs[n]-contrib_ok)
+    println("Residual contribution difference for selected triangulation is $err_contrib")
+  end
 end
 
-rbres,rbjac = rbrhs,rblhs
-sols_test,params_test = load_test(info,feop,fesolver)
-res_cache,jac_cache = allocate_sys_cache(feop,fesolver,rbspace,sols_test,params_test)
+rbrest = rbres[Γn]
+meas = dΓn
 
-rbrest = rbres[Ω]
-meas = dΩ
-
-contrib1,contrib1_ok = test_rb_contribution_rhs(res_cache,feop,fesolver,rbrest,rbspace,meas,sols_test,params_test;st_mdeim)
+test_rb_contribution_rhs(res_cache,feop,fesolver,rbrest,rbspace,meas,sols_test,params_test;st_mdeim)
 
 function test_rb_contribution_lhs(
   cache,
@@ -179,12 +176,15 @@ function test_rb_contribution_lhs(
   st_mdeim=true,
   i=1)
 
+  combine_projections = (x,y) -> i == 1 ? fesolver.θ*x+(1-fesolver.θ)*y : x-y
   coeff_cache,rb_cache = cache
   coeff = lhs_coefficient!(coeff_cache,feop,fesolver,ad,sols,params;st_mdeim,i)
   basis_space_proj = ad.basis_space
   basis_time = last(ad.basis_time)
-  c1 = coeff[1]
-  contrib1 = evaluate!(RBContributionMap(),rb_cache,basis_space_proj,basis_time,c1)
+  contribs = Vector{Matrix{Float}}(undef,length(coeff))
+  @inbounds for i = eachindex(coeff)
+    contribs[i] = copy(evaluate!(RBContributionMap(),rb_cache,basis_space_proj,basis_time,coeff[i]))
+  end
 
   jcache, = coeff_cache
 
@@ -197,46 +197,23 @@ function test_rb_contribution_lhs(
   A = get_array(jcache;len=length(red_times)*length(params))
   Afull = copy(A)
   full_idx = findnz(Afull[1][:])[1]
+  jac_full = collect_jacobians_for_idx!(A,fesolver,sols,params,red_times,full_idx,meas;i)
 
   sols = get_solutions_at_times(sols,fesolver,red_times)
-  jac_full = collect_jacobians_for_idx!(A,fesolver,sols,params,red_times,full_idx,meas)
-  contrib1_ok = space_time_projection(jac_full[:,1:get_time_ndofs(fesolver)],rbspace,rbspace)
-  err_contrib = maximum(abs.(contrib1-contrib1_ok))
-  println("Jacobian #$i contribution difference for selected triangulation is $err_contrib")
-  return contrib1,contrib1_ok
+  for n in eachindex(params)
+    tidx = (n-1)*length(red_times)+1 : n*length(red_times)
+    nzmidx = NnzMatrix(jac_full[:,tidx],findnz(Afull[1][:])[1],test.nfree,1)
+    contrib_ok = space_time_projection(nzmidx,rbspace,rbspace;combine_projections)
+    err_contrib = ℓ∞(contribs[n]-contrib_ok)
+    println("Jacobian #$i contribution difference for selected triangulation is $err_contrib")
+  end
 end
 
 i = 1
 rbjact = rbjac[i][Ω]
 
 meas = dΩ
-contrib1,contrib1_ok = test_rb_contribution_lhs(
-  jac_cache,feop,fesolver,rbjact,rbspace,meas,sols_test,params_test;i,st_mdeim)
-
-coeff_cache,rb_cache = jac_cache
-coeff = lhs_coefficient!(coeff_cache,feop,fesolver,rbjact,sols_test,params_test;st_mdeim,i)
-basis_space_proj = rbjact.basis_space
-basis_time = last(rbjact.basis_time)
-c1 = coeff[1]
-contrib1 = evaluate!(RBContributionMap(),rb_cache,basis_space_proj,basis_time,c1)
-
-jcache, = coeff_cache
-
-ndofs_row = num_free_dofs(feop.test)
-ndofs_col = num_free_dofs(get_trial(feop)(nothing,nothing))
-setsize!(jcache,(ndofs_row,ndofs_col))
-
-red_times = rbjact.integration_domain.times
-A = get_array(jcache;len=length(red_times)*length(params_test))
-Afull = copy(A)
-full_idx = findnz(Afull[1][:])[1]
-
-sols = get_solutions_at_times(sols_test,fesolver,red_times)
-jac_full = collect_jacobians_for_idx!(A,fesolver,sols_test,params_test,red_times,full_idx,meas;i)
-_jac_full = NnzMatrix(jac_full)
-contrib1_ok = space_time_projection(rbspace,jac_full[:,1:get_time_ndofs(fesolver)])
-err_contrib = maximum(abs.(contrib1-contrib1_ok))
-println("Jacobian #$i contribution difference for selected triangulation is $err_contrib")
+test_rb_contribution_lhs(jac_cache,feop,fesolver,rbjact,rbspace,meas,sols_test,params_test;i,st_mdeim)
 
 # NONAFFINE CASE
 i = 1
