@@ -77,7 +77,7 @@ function post_process(
   results = RBResults(params,_sol,sol_approx,stats;norm_matrix)
   show(results)
   save(info,results)
-  writevtk(info,feop,fesolver,results)
+  # writevtk(info,feop,fesolver,results)
   return
 end
 
@@ -181,7 +181,7 @@ function load_test(
     return sols[1:ntests],params[1:ntests]
   catch
     params = realization(feop,ntests)
-    sols = collect_solutions(fesolver,feop,params)
+    sols, = collect_solutions(fesolver,feop,params)
     save_test(info,(sols,params))
     return sols[1:ntests],params[1:ntests]
   end

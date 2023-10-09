@@ -32,16 +32,21 @@ function reduced_basis_model(
   fesolver::PODESolver)
 
   # Offline phase
-  if info.load_structures
-    sols,params,rbspace = load(info,(AbstractSnapshots,Table,AbstractRBSpace))
-    rbrhs,rblhs = load(info,(AbstractRBAlgebraicContribution,Vector{AbstractRBAlgebraicContribution}))
+  if info.load_solutions
+    sols,params = load(info,(AbstractSnapshots,Table))
   else
     nsnaps = info.nsnaps_state
     params = realization(feop,nsnaps)
-    sols = collect_solutions(fesolver,feop,params)
+    sols,stats = collect_solutions(fesolver,feop,params)
+    save(info,(sols,params,stats))
+  end
+  if info.load_structures
+    rbspace = load(info,AbstractRBSpace)
+    rbrhs,rblhs = load(info,(AbstractRBAlgebraicContribution,Vector{AbstractRBAlgebraicContribution}))
+  else
     rbspace = reduced_basis(info,feop,sols,fesolver,params)
     rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
-    save(info,(sols,params,rbspace,rbrhs,rblhs))
+    save(info,(rbspace,rbrhs,rblhs))
   end
 
   # Online phase

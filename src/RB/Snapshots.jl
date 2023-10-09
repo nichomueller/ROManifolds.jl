@@ -54,7 +54,7 @@ Base.getindex(s::BlockSnapshots,i...) = s.blocks[i...]
 Base.iterate(s::BlockSnapshots,args...) = iterate(s.blocks,args...)
 
 function save(info::RBInfo,nzm::AbstractSnapshots)
-  if info.save_structures
+  if info.save_solutions
     path = joinpath(info.fe_path,"fesnaps")
     save(path,nzm)
   end

@@ -8,19 +8,21 @@ struct RBInfo
   energy_norm::Union{Symbol,Vector{Symbol}}
   st_mdeim::Bool
   fun_mdeim::Bool
+  load_solutions::Bool
+  save_solutions::Bool
   load_structures::Bool
   save_structures::Bool
   postprocess::Bool
 end
 
 function RBInfo(test_path::String;ϵ=1e-4,nsnaps_state=80,nsnaps_system=20,nsnaps_test=10,
-  energy_norm=[:l2],st_mdeim=false,fun_mdeim=false,
+  energy_norm=:l2,st_mdeim=false,fun_mdeim=false,load_solutions=false,save_solutions=true,
   load_structures=false,save_structures=true,postprocess=false)
 
   fe_path = get_fe_path(test_path)
   rb_path = get_rb_path(test_path,ϵ;st_mdeim,fun_mdeim)
   RBInfo(ϵ,nsnaps_state,nsnaps_system,nsnaps_test,fe_path,rb_path,energy_norm,
-    st_mdeim,fun_mdeim,load_structures,save_structures,postprocess)
+    st_mdeim,fun_mdeim,load_solutions,save_solutions,load_structures,save_structures,postprocess)
 end
 
 function get_fe_path(tpath::String)
@@ -64,11 +66,25 @@ end
 end
 
 function save(info::RBInfo,params::Table)
-  path = joinpath(info.fe_path,"params")
-  save(path,params)
+  if info.save_solutions
+    path = joinpath(info.fe_path,"params")
+    save(path,params)
+  end
   end
 
 function load(info::RBInfo,T::Type{Table})
   path = joinpath(info.fe_path,"params")
+  load(path,T)
+end
+
+function save(info::RBInfo,stats::NamedTuple)
+  if info.save_solutions
+    path = joinpath(info.fe_path,"stats")
+    save(path,stats)
+  end
+  end
+
+function load(info::RBInfo,T::Type{NamedTuple})
+  path = joinpath(info.fe_path,"stats")
   load(path,T)
 end

@@ -89,12 +89,12 @@ function collect_solutions(
   uμt = PODESolution(fesolver,ode_op,μ,u0,t0,tf)
   num_iter = Int(tf/fesolver.dt)
   sols = allocate_solution(ode_op,num_iter)
-  for (u,t,n) in uμt
+  stats = @timed for (u,t,n) in uμt
     println("Computing fe solution at time $t for every parameter")
     sol = get_solution(ode_op,u)
     sols[n] = copy(sol)
   end
-  return Snapshots(sols)
+  return Snapshots(sols),stats
 end
 
 for f in (:allocate_solution,:get_solution)

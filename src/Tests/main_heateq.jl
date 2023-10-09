@@ -16,7 +16,7 @@ begin
   Γn = BoundaryTriangulation(model,tags=["neumann"])
   dΓn = Measure(Γn,degree)
 
-  ranges = fill([1.,2.],3)
+  ranges = fill([1.,10.],3)
   sampling = UniformSampling()
   pspace = PSpace(ranges,sampling)
 
@@ -47,19 +47,21 @@ begin
   test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
   trial = PTTrialFESpace(test,g)
   feop = PTAffineFEOperator(res,jac,jac_t,pspace,trial,test)
-  t0,tf,dt,θ = 0.,0.05,0.005,1
+  t0,tf,dt,θ = 0.,0.05,0.005,0.5
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
   fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
 
   ϵ = 1e-4
+  load_solutions = false
+  save_solutions = true
+  load_structures = false
   save_structures = true
-  load_structures = true
   energy_norm = :l2
   nsnaps_state = 50
   nsnaps_system = 20
   nsnaps_test = 10
   st_mdeim = false
-  info = RBInfo(test_path;ϵ,load_structures,save_structures,energy_norm,
-                nsnaps_state,nsnaps_system,nsnaps_test,st_mdeim)
-  reduced_basis_model(info,feop,fesolver)
+  info = RBInfo(test_path;ϵ,load_solutions,save_solutions,load_structures,save_structures,
+                energy_norm,nsnaps_state,nsnaps_system,nsnaps_test,st_mdeim)
+  # reduced_basis_model(info,feop,fesolver)
 end

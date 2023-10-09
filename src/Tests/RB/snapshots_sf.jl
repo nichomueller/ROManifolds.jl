@@ -153,7 +153,7 @@ Aok = copy(A)
 
 for (nt,t) in enumerate(get_times(fesolver))
   un = u[nt]
-  unprev = nt > 1 ? u[nt-1] : get_free_dof_values(uh0μ(p))
+  unprev = nt > 1 ? u[nt-1] : get_free_dof_values(uh0μ(μ))
   ode_cache = Gridap.ODEs.TransientFETools.update_cache!(ode_cache,ode_op_ok,t)
   nlop = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t,dtθ,unprev,ode_cache,vθ)
   z = zero(eltype(A))
@@ -163,5 +163,5 @@ for (nt,t) in enumerate(get_times(fesolver))
   jacobians!(A,ode_op_ok,t,(vθ,vθ),(1.0,1/dtθ),ode_cache)
   @assert b ≈ ptb1[nt] "Failed when n = $nt"
   @assert A ≈ ptA1[nt] "Failed when n = $nt"
-  @assert A \ (M*unprev - b) ≈ un "Failed when n = $nt"
+  @assert A \ (M*unprev - b) ≈ θ*un + (1-θ)*unprev "Failed when n = $nt"
 end

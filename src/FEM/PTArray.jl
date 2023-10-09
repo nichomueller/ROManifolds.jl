@@ -240,8 +240,8 @@ function Base.similar(a::NonaffinePTArray{T}) where T
   PTArray(b)
 end
 
-function Base.show(io::IO,o::NonaffinePTArray{T}) where T
-  print(io,"Nonaffine PTArray of type $T and length $(length(o.array))")
+function Base.show(io::IO,a::NonaffinePTArray{T}) where T
+  print(io,"Nonaffine PTArray of type $T and length $(length(a.array))")
 end
 
 for op in (:+,:-)
@@ -440,7 +440,7 @@ Base.setindex!(a::AffinePTArray,v,i...) = a.array = v
 Base.copy(a::AffinePTArray) = PTArray(copy(a.array),a.len)
 Base.similar(a::AffinePTArray) = PTArray(similar(a.array),a.len)
 
-function Base.show(io::IO,o::AffinePTArray{T}) where T
+function Base.show(io::IO,a::AffinePTArray{T}) where T
   print(io,"Affine PTArray of type $T and length $(o.len)")
 end
 
