@@ -77,7 +77,7 @@ function post_process(
   results = RBResults(params,_sol,sol_approx,stats;norm_matrix)
   show(results)
   save(info,results)
-  # writevtk(info,feop,fesolver,results)
+  writevtk(info,feop,fesolver,results)
   return
 end
 
@@ -129,9 +129,10 @@ function test_rb_solver(
   lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,x,params_test)
 
   stats = @timed begin
-    rb_snaps_test = solve(fesolver.nls,rhs,lhs)
+    rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs)
   end
   approx_snaps_test = recast(rbspace,rb_snaps_test)
+  # approx_snaps_test = recast_at_center(fesolver,rbspace,rb_snaps_test,params_test)
   post_process(info,feop,fesolver,snaps_test,params_test,approx_snaps_test,stats)
 end
 
@@ -156,8 +157,8 @@ function test_rb_solver(
     for iter in 1:fesolver.nls.max_nliters
       rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,x,params_test)
       lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,x,params_test)
-      nl_cache = solve!(x,fesolver.nls,rhs,lhs,nl_cache)
-      x .= recast(rbspace,x)
+      nl_cache = rb_solve!(x,fesolver.nls,rhs,lhs,nl_cache)
+      x .= recast_at_center(fesolver,rbspace,x,params_test)
       isconv,conv = Algebra._check_convergence(fesolver.nls,x,conv0)
       println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv))) \n")
       if all(isconv); return; end
@@ -187,23 +188,28 @@ function load_test(
   end
 end
 
-function Algebra.solve(ls::LinearSolver,rhs::PTArray,lhs::PTArray)
+function rb_solve(ls::LinearSolver,rhs::PTArray,lhs::PTArray)
   x = copy(rhs)
   cache = nothing
-  solve!(x,ls,rhs,lhs,cache)
+  rb_solve!(x,ls,rhs,lhs,cache)
 end
 
-function Algebra.solve!(
+function rb_solve!(
   x::PTArray,
   ls::LinearSolver,
   rhs::PTArray,
   lhs::PTArray,
   ::Nothing)
 
-  lhsaff,rhsaff = Nonaffine(),Nonaffine()
   ss = symbolic_setup(ls,testitem(lhs))
-  ns = numerical_setup(ss,lhs,lhsaff)
-  _loop_solve!(x,ns,rhs,lhsaff,rhsaff)
+  ns = numerical_setup(ss,lhs)
+  _rb_loop_solve!(x,ns,rhs)
+end
+
+function _rb_loop_solve!(x::PTArray,ns,b::PTArray)
+  @inbounds for k in eachindex(x)
+    solve!(x[k],ns[k],-b[k])
+  end
   x
 end
 

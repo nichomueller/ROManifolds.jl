@@ -124,7 +124,7 @@ function collect_compress_lhs(
   njacs = length(feop.jacs)
   ad_jacs = Vector{RBAlgebraicContribution{T}}(undef,njacs)
   for i = 1:njacs
-    combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : x-y
+    combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*x-θ*y
     jacs,trian = collect_jacobians_for_trian(fesolver,feop,snaps,μ,times;i)
     ad_jacs[i] = compress_component(info,feop,jacs,trian,times,rbspace,rbspace;combine_projections)
   end
@@ -534,7 +534,7 @@ function collect_compress_lhs(
     feop_i = filter_operator(feop,i_field)
     rbspace_i = map(x->filter_rbspace(x,i_field),rbspace)
     for i = 1:njacs
-      combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : x-y
+      combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*x-θ*y
       jacs_i,meas_i = collect_jacobians(feop,fesolver,args...;i)
       if iszero(ress_i)
         contribs[i].touched[row,col] = false

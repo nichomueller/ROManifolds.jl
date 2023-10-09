@@ -52,7 +52,7 @@ begin
   fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
 
   ϵ = 1e-4
-  load_solutions = false
+  load_solutions = true
   save_solutions = true
   load_structures = false
   save_structures = true
@@ -63,5 +63,26 @@ begin
   st_mdeim = false
   info = RBInfo(test_path;ϵ,load_solutions,save_solutions,load_structures,save_structures,
                 energy_norm,nsnaps_state,nsnaps_system,nsnaps_test,st_mdeim)
-  # reduced_basis_model(info,feop,fesolver)
+  reduced_basis_model(info,feop,fesolver)
 end
+
+sols,params = load(info,(AbstractSnapshots,Table))
+rbspace = load(info,AbstractRBSpace)
+rbrhs,rblhs = load(info,(AbstractRBAlgebraicContribution,Vector{AbstractRBAlgebraicContribution}))
+snaps_test,params_test = load_test(info,feop,fesolver)
+
+println("Solving linear RB problems\n")
+x = initial_guess(sols,params,params_test)
+rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,rbspace,snaps_test,params_test)
+rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbrhs,x,params_test)
+lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,x,params_test)
+
+stats = @timed begin
+  rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs)
+end
+approx_snaps_test = recast(rbspace,rb_snaps_test)
+# approx_snaps_test = recast_at_center(fesolver,rbspace,rb_snaps_test,params_test)
+post_process(info,feop,fesolver,snaps_test,params_test,approx_snaps_test,stats)
+
+sol1 = approx_snaps_test[1]
+sol1_ok = hcat(snaps_test[1:10]...)

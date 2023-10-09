@@ -97,7 +97,7 @@ end
 
 # something not right when i=2
 i = 2
-combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : x-y
+combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*x-θ*y
 jacs,trians = collect_jacobians_for_trian(fesolver,feop,sols[1:10],params,times;i)
 nzm,trian = jacs[1],[trians...][1]
 basis_space,basis_time = compress(nzm;ϵ=info.ϵ)

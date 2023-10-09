@@ -177,7 +177,7 @@ function test_rb_contribution_lhs(
   st_mdeim=true,
   i=1)
 
-  combine_projections = (x,y) -> i == 1 ? fesolver.θ*x+(1-fesolver.θ)*y : x-y
+  combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*x-θ*y
   coeff_cache,rb_cache = cache
   coeff = lhs_coefficient!(coeff_cache,feop,fesolver,ad,sols,params;st_mdeim,i)
   basis_space_proj = ad.basis_space
