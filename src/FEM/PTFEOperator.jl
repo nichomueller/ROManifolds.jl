@@ -93,9 +93,9 @@ get_measure(op::PTFEOperator,trian::Triangulation) = Measure(trian,2*get_order(o
 
 for OP in (:PTAffineFEOperator,:PTFEOperator)
   @eval begin
-    function filter_operator(
+    function Base.getindex(
       op::PTFEOperatorFromWeakForm,
-      idx::NTuple{2,Int})
+      idx::Int...)
 
       if isa(get_test(op),MultiFieldFESpace)
         row,col = idx

@@ -84,7 +84,7 @@ end
 function allocate_online_cache(
   feop::PTFEOperator,
   fesolver::PODESolver,
-  rbspace::AbstractRBSpace{T},
+  rbspace::RBSpace{T},
   snaps_test::PTArray,
   params::Table) where T
 
@@ -115,8 +115,8 @@ function test_rb_solver(
   feop::PTFEOperator{Affine},
   fesolver::PODESolver,
   rbspace::AbstractRBSpace,
-  rbres::AbstractRBAlgebraicContribution,
-  rbjacs::Vector{<:AbstractRBAlgebraicContribution},
+  rbres::RBAlgebraicContribution,
+  rbjacs::Vector{<:RBAlgebraicContribution},
   snaps::Snapshots,
   params::Table)
 
@@ -140,8 +140,8 @@ function test_rb_solver(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbspace::AbstractRBSpace,
-  rbres::AbstractRBAlgebraicContribution,
-  rbjacs::Vector{<:AbstractRBAlgebraicContribution},
+  rbres::RBAlgebraicContribution,
+  rbjacs::Vector{<:RBAlgebraicContribution},
   snaps::Snapshots,
   params::Table)
 
@@ -181,7 +181,8 @@ function load_test(
     return sols[1:ntests],params[1:ntests]
   catch
     params = realization(feop,ntests)
-    sols, = collect_solutions(fesolver,feop,params)
+    test = get_test(feop)
+    sols, = collect_solutions(fesolver,feop,test,params)
     save_test(info,(sols,params))
     return sols[1:ntests],params[1:ntests]
   end

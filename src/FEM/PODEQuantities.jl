@@ -81,49 +81,41 @@ end
 function collect_solutions(
   fesolver::PODESolver,
   feop::PTFEOperator,
+  test::FESpace,
   μ::Table)
 
   uh0,t0,tf = fesolver.uh0,fesolver.t0,fesolver.tf
   ode_op = get_algebraic_operator(feop)
   u0 = get_free_dof_values(uh0(μ))
+  time_ndofs = get_time_ndofs(fesolver)
+  T = get_vector_type(test)
   uμt = PODESolution(fesolver,ode_op,μ,u0,t0,tf)
-  num_iter = Int(tf/fesolver.dt)
-  sols = allocate_solution(ode_op,num_iter)
-  stats = @timed for (u,t,n) in uμt
+  sols = Vector{PTArray{T}}(undef,time_ndofs)
+  stats = @timed for (sol,t,n) in uμt
     println("Computing fe solution at time $t for every parameter")
-    sol = get_solution(ode_op,u)
     sols[n] = copy(sol)
   end
   return Snapshots(sols),stats
 end
 
-for f in (:allocate_solution,:get_solution)
-  @eval begin
-    function $f(op::PODEOperator,args...)
-      $f(get_test(op.feop),args...)
-    end
+function collect_solutions(
+  fesolver::PODESolver,
+  feop::PTFEOperator,
+  test::MultiFieldFESpace,
+  μ::Table)
+
+  uh0,t0,tf = fesolver.uh0,fesolver.t0,fesolver.tf
+  ode_op = get_algebraic_operator(feop)
+  u0 = get_free_dof_values(uh0(μ))
+  time_ndofs = get_time_ndofs(fesolver)
+  T = get_vector_type(test)
+  uμt = PODESolution(fesolver,ode_op,μ,u0,t0,tf)
+  sols = Vector{Vector{PTArray{T}}}(undef,time_ndofs)
+  stats = @timed for (sol,t,n) in uμt
+    println("Computing fe solution at time $t for every parameter")
+    sols[n] = restrict_to_field(test,copy(sol))
   end
-end
-
-function allocate_solution(fe::FESpace,niter::Int)
-  T = get_vector_type(fe)
-  Vector{PTArray{T}}(undef,niter)
-end
-
-function allocate_solution(fe::MultiFieldFESpace,niter::Int)
-  T = get_vector_type(fe)
-  Vector{Vector{PTArray{T}}}(undef,niter)
-end
-
-function get_solution(::FESpace,free_values::PTArray)
-  free_values
-end
-
-function get_solution(fe::MultiFieldFESpace,free_values::PTArray)
-  blocks = map(1:length(fe.spaces)) do i
-    restrict_to_field(fe,free_values,i)
-  end
-  PTArray(blocks)
+  return BlockSnapshots(sols),stats
 end
 
 for fun in (:collect_residuals_for_idx!,:collect_jacobians_for_idx!)

@@ -61,7 +61,7 @@ struct NnzMatrix{T} <: NnzArray{T,2}
   end
 
   function NnzMatrix(val::AbstractArray{T}...;nparams=length(val)) where T
-    vals = hcat(val...)
+    vals = stack(val)
     nonzero_idx,nonzero_val = compress_array(vals)
     nrows = size(vals,1)
     new{T}(nonzero_val,nonzero_idx,nrows,nparams)
@@ -188,39 +188,8 @@ function tpod(nzm::NnzMatrix,args...;kwargs...)
   NnzMatrix(nonzero_val,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
 end
 
-function transient_tpod(nzm::NnzMatrix,args...;kwargs...)
-  basis_axis1 = tpod(nzm,args...;kwargs...)
-  compressed_nzm = prod(basis_axis1,nzm)
-  compressed_nzm_t = change_mode(compressed_nzm)
-  basis_axis2 = tpod(compressed_nzm_t;kwargs...)
-  basis_axis1,basis_axis2
-end
-
 function change_mode(nzm::NnzMatrix{T}) where T
   nparams = num_params(nzm)
   mode2 = change_mode(nzm.nonzero_val,nparams)
   return mode2
 end
-
-struct BlockNnzMatrix{T} <: AbstractVector{NnzMatrix{T}}
-  blocks::Vector{NnzMatrix{T}}
-
-  function BlockNnzMatrix(blocks::Vector{NnzMatrix{T}}) where T
-    @check all([length(nzm) == length(blocks[1]) for nzm in blocks[2:end]])
-    new{T}(blocks)
-  end
-end
-
-function NnzArray(s::BlockSnapshots{T}) where T
-  blocks = map(s.snaps) do val
-    array = get_array(hcat(val...))
-    NnzMatrix(array...)
-  end
-  BlockNnzMatrix(blocks)
-end
-
-Base.size(nzm::BlockNnzMatrix,idx...) = map(x->size(x,idx...),nzm.blocks)
-Base.length(nzm::BlockNnzMatrix) = length(nzm.blocks[1])
-Base.getindex(nzm::BlockNnzMatrix,idx...) = nzm.blocks[idx...]
-Base.iterate(nzm::BlockNnzMatrix,args...) = iterate(nzm.blocks,args...)
-get_nfields(nzm::BlockNnzMatrix) = length(nzm.blocks)

@@ -1,6 +1,4 @@
-abstract type AbstractSnapshots{T} end
-
-struct Snapshots{T<:AbstractArray} <: AbstractSnapshots{T}
+struct Snapshots{T<:AbstractArray}
   snaps::Vector{PTArray{T}}
   function Snapshots(s::Vector{<:PTArray{T}}) where T
     new{T}(s)
@@ -43,24 +41,14 @@ function recenter(
   Snapshots(sθ)
 end
 
-struct BlockSnapshots{T} <: AbstractSnapshots{T}
-  blocks::Vector{Vector{PTArray{T}}}
-  BlockSnapshots(blocks::Vector{Vector{<:PTArray{T}}}) where T = new{T}(blocks)
-end
-
-Snapshots(s::Vector{Vector{<:PTArray{T}}}) where T = BlockSnapshots(s)
-
-Base.getindex(s::BlockSnapshots,i...) = s.blocks[i...]
-Base.iterate(s::BlockSnapshots,args...) = iterate(s.blocks,args...)
-
-function save(info::RBInfo,nzm::AbstractSnapshots)
+function save(info::RBInfo,nzm::Snapshots)
   if info.save_solutions
     path = joinpath(info.fe_path,"fesnaps")
     save(path,nzm)
   end
 end
 
-function load(info::RBInfo,T::Type{<:AbstractSnapshots})
+function load(info::RBInfo,T::Type{<:Snapshots})
   path = joinpath(info.fe_path,"fesnaps")
   load(path,T)
 end

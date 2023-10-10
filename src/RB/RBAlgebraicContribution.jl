@@ -1,10 +1,15 @@
-abstract type AbstractRBAlgebraicContribution{T} end
+struct RBAlgebraicContribution{T}
+  dict::IdDict{Triangulation,RBAffineDecomposition{T}}
+  function RBAlgebraicContribution(::Type{T}) where T
+    new{T}(IdDict{Triangulation,RBAffineDecomposition{T}}())
+  end
+end
 
-CellData.num_domains(a::AbstractRBAlgebraicContribution) = length(a.dict)
-CellData.get_domains(a::AbstractRBAlgebraicContribution) = keys(a.dict)
+CellData.num_domains(a::RBAlgebraicContribution) = length(a.dict)
+CellData.get_domains(a::RBAlgebraicContribution) = keys(a.dict)
 
 function CellData.get_contribution(
-  a::AbstractRBAlgebraicContribution,
+  a::RBAlgebraicContribution,
   trian::Triangulation)
 
   if haskey(a.dict,trian)
@@ -16,11 +21,11 @@ function CellData.get_contribution(
   end
 end
 
-Base.getindex(a::AbstractRBAlgebraicContribution,trian::Triangulation) = get_contribution(a,trian)
-Base.eltype(::AbstractRBAlgebraicContribution{T}) where T = T
+Base.getindex(a::RBAlgebraicContribution,trian::Triangulation) = get_contribution(a,trian)
+Base.eltype(::RBAlgebraicContribution{T}) where T = T
 
 function CellData.add_contribution!(
-  a::AbstractRBAlgebraicContribution,
+  a::RBAlgebraicContribution,
   trian::Triangulation,
   b)
 
@@ -29,7 +34,7 @@ function CellData.add_contribution!(
   a
 end
 
-function save_algebraic_contrib(path::String,a::AbstractRBAlgebraicContribution{T}) where T
+function save_algebraic_contrib(path::String,a::RBAlgebraicContribution{T}) where T
   create_dir!(path)
   cpath = joinpath(path,"contrib")
   tpath = joinpath(path,"trian")
@@ -42,7 +47,7 @@ function save_algebraic_contrib(path::String,a::AbstractRBAlgebraicContribution{
   end
 end
 
-function load_algebraic_contrib(path::String,::Type{AbstractRBAlgebraicContribution})
+function load_algebraic_contrib(path::String,::Type{RBAlgebraicContribution})
   cpath = joinpath(path,"contrib")
   tpath = joinpath(path,"trian")
   T = load(joinpath(path,"type"),DataType)
@@ -57,19 +62,19 @@ function load_algebraic_contrib(path::String,::Type{AbstractRBAlgebraicContribut
   a
 end
 
-function save(info::RBInfo,a::AbstractRBAlgebraicContribution{T}) where T
+function save(info::RBInfo,a::RBAlgebraicContribution{T}) where T
   if info.save_structures
     path = joinpath(info.rb_path,"rb_rhs")
     save_algebraic_contrib(path,a)
   end
 end
 
-function load(info::RBInfo,T::Type{AbstractRBAlgebraicContribution})
+function load(info::RBInfo,T::Type{RBAlgebraicContribution})
   path = joinpath(info.rb_path,"rb_rhs")
   load_algebraic_contrib(path,T)
 end
 
-function save(info::RBInfo,a::Vector{<:AbstractRBAlgebraicContribution{T}}) where T
+function save(info::RBInfo,a::Vector{RBAlgebraicContribution{T}}) where T
   if info.save_structures
     for i = eachindex(a)
       path = joinpath(info.rb_path,"rb_lhs_$i")
@@ -78,25 +83,86 @@ function save(info::RBInfo,a::Vector{<:AbstractRBAlgebraicContribution{T}}) wher
   end
 end
 
-function load(info::RBInfo,::Type{Vector{AbstractRBAlgebraicContribution}})
-  ad_jac1 = load_algebraic_contrib(joinpath(info.rb_path,"rb_lhs_1"),AbstractRBAlgebraicContribution)
+function load(info::RBInfo,::Type{Vector{RBAlgebraicContribution}})
+  ad_jac1 = load_algebraic_contrib(joinpath(info.rb_path,"rb_lhs_1"),RBAlgebraicContribution)
   T = eltype(ad_jac1)
   ad_jacs = RBAlgebraicContribution{T}[]
   push!(ad_jacs,ad_jac1)
   i = 2
   while isdir(joinpath(info.rb_path,"rb_lhs_$i"))
     path = joinpath(info.rb_path,"rb_lhs_$i")
-    push!(ad_jacs,load_algebraic_contrib(path,AbstractRBAlgebraicContribution))
+    push!(ad_jacs,load_algebraic_contrib(path,RBAlgebraicContribution))
     i += 1
   end
   ad_jacs
 end
 
-struct RBAlgebraicContribution{T} <: AbstractRBAlgebraicContribution{T}
-  dict::IdDict{Triangulation,RBAffineDecomposition{T}}
-  function RBAlgebraicContribution(::Type{T}) where T
-    new{T}(IdDict{Triangulation,RBAffineDecomposition{T}}())
+function collect_compress_rhs_lhs(
+  info::RBInfo,
+  feop::PTFEOperator,
+  fesolver::PThetaMethod,
+  rbspace::RBSpace,
+  snaps::Snapshots,
+  μ::Table)
+
+  nsnaps = info.nsnaps_system
+  snapsθ = recenter(fesolver,snaps,μ)
+  _snapsθ,_μ = snapsθ[1:nsnaps],μ[1:nsnaps]
+  rhs = collect_compress_rhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
+  lhs = collect_compress_lhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
+  rhs,lhs
+end
+
+function collect_compress_rhs(
+  info::RBInfo,
+  feop::PTFEOperator,
+  fesolver::PODESolver,
+  rbspace::RBSpace,
+  snaps::PTArray,
+  μ::Table)
+
+  times = get_times(fesolver)
+  ress,trian = collect_residuals_for_trian(fesolver,feop,snaps,μ,times)
+  ad_res = compress_component(info,feop,ress,trian,times,rbspace)
+  return ad_res
+end
+
+function collect_compress_lhs(
+  info::RBInfo,
+  feop::PTFEOperator,
+  fesolver::PThetaMethod,
+  rbspace::RBSpace{T},
+  snaps::PTArray,
+  μ::Table) where T
+
+  times = get_times(fesolver)
+  θ = fesolver.θ
+
+  njacs = length(feop.jacs)
+  ad_jacs = Vector{RBAlgebraicContribution{T}}(undef,njacs)
+  for i = 1:njacs
+    combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*x-θ*y
+    jacs,trian = collect_jacobians_for_trian(fesolver,feop,snaps,μ,times;i)
+    ad_jacs[i] = compress_component(info,feop,jacs,trian,times,rbspace,rbspace;combine_projections)
   end
+  return ad_jacs
+end
+
+function compress_component(
+  info::RBInfo,
+  feop::PTFEOperator,
+  snaps::Vector{NnzMatrix{T}},
+  trian::Base.KeySet{Triangulation},
+  args...;
+  kwargs...) where T
+
+  contrib = RBAlgebraicContribution(T)
+  for (i,ti) in enumerate(trian)
+    si = snaps[i]
+    ci = RBAffineDecomposition(info,feop,si,ti,args...;kwargs...)
+    add_contribution!(contrib,ti,ci)
+  end
+  contrib
 end
 
 function collect_rhs_contributions!(
@@ -125,7 +191,7 @@ function collect_lhs_contributions!(
   info::RBInfo,
   feop::PTFEOperator,
   fesolver::PODESolver,
-  rbjacs::Vector{<:AbstractRBAlgebraicContribution{T}},
+  rbjacs::Vector{RBAlgebraicContribution{T}},
   args...) where T
 
   njacs = length(rbjacs)
@@ -159,7 +225,7 @@ function collect_lhs_contributions!(
   return sum(rb_jac_contribs)
 end
 
-struct RBBlockAlgebraicContribution{T} <: AbstractRBAlgebraicContribution{T}
+struct RBBlockAlgebraicContribution{T} <: RBAlgebraicContribution{T}
   block::Matrix{RBAlgebraicContribution{T}}
   touched::Vector{Int}
 

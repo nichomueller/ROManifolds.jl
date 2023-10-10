@@ -256,7 +256,7 @@ function Base.transpose(a::NonaffinePTArray)
   map(transpose,a)
 end
 
-for f in (:(Base.hcat),:(Base.vcat))
+for f in (:(Base.hcat),:(Base.vcat),:(Base.hvcat))
   @eval begin
     function $f(a::PTArray...)
       n = _get_length(a...)
@@ -457,7 +457,7 @@ function Base.transpose(a::AffinePTArray)
   a.array = a.array'
 end
 
-for f in (:(Base.hcat),:(Base.vcat))
+for f in (:(Base.hcat),:(Base.vcat),:(Base.hvcat))
   @eval begin
     function $f(a::AffinePTArray...)
       n = _get_length(a...)

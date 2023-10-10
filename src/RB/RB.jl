@@ -24,6 +24,7 @@ include("NnzArrays.jl")
 include("RBSpaces.jl")
 include("RBAffineDecomposition.jl")
 include("RBAlgebraicContribution.jl")
+include("RBBlocks.jl")
 include("RBResults.jl")
 
 function reduced_basis_model(
@@ -33,16 +34,17 @@ function reduced_basis_model(
 
   # Offline phase
   if info.load_solutions
-    sols,params = load(info,(AbstractSnapshots,Table))
+    sols,params = load(info,(Snapshots,Table))
   else
     nsnaps = info.nsnaps_state
     params = realization(feop,nsnaps)
-    sols,stats = collect_solutions(fesolver,feop,params)
+    test = get_test(feop)
+    sols,stats = collect_solutions(fesolver,feop,test,params)
     save(info,(sols,params,stats))
   end
   if info.load_structures
-    rbspace = load(info,AbstractRBSpace)
-    rbrhs,rblhs = load(info,(AbstractRBAlgebraicContribution,Vector{AbstractRBAlgebraicContribution}))
+    rbspace = load(info,RBSpace)
+    rbrhs,rblhs = load(info,(RBAlgebraicContribution,Vector{RBAlgebraicContribution}))
   else
     rbspace = reduced_basis(info,feop,sols,fesolver,params)
     rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)

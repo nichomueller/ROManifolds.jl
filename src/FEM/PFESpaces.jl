@@ -436,6 +436,13 @@ function MultiField.compute_field_offsets(f::PMultiFieldFESpace)
   offsets
 end
 
+function MultiField.restrict_to_field(fe::MultiFieldFESpace,free_values::PTArray)
+  blocks = map(1:length(fe.spaces)) do i
+    restrict_to_field(fe,free_values,i)
+  end
+  PTArray(blocks)
+end
+
 function FESpaces.get_cell_isconstrained(f::PMultiFieldFESpace)
   msg = """\n
   This method does not make sense for multi-field
