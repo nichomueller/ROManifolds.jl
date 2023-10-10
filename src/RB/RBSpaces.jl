@@ -77,31 +77,6 @@ function recast(rb::RBSpace,x::PTArray{T}) where T
   PTArray(array)
 end
 
-# function recast_at_center(
-#   fesolver::PODESolver,
-#   rb::RBSpace,
-#   x::PTArray{T},
-#   params_test::Table) where T
-
-#   θ = fesolver.θ
-#   uh0 = fesolver.uh0(params_test)
-#   u0 = get_free_dof_values(uh0)
-#   basis_space = get_basis_space(rb)
-#   basis_time = get_basis_time(rb)
-#   ns_rb = size(basis_space,2)
-#   nt_rb = size(basis_time,2)
-
-#   n = length(x)
-#   array = Vector{Matrix{eltype(T)}}(undef,n)
-#   @inbounds for i = 1:n
-#     x_mat_i = reshape(x[i],nt_rb,ns_rb)
-#     x_approx_i = basis_space*(basis_time*x_mat_i)'
-#     array[i] = θ*x_approx_i + (1-θ)*hcat(u0[i],x_approx_i[:,1:end-1])
-#   end
-
-#   PTArray(array)
-# end
-
 for f in (:space_time_projection,:test_reduced_basis)
   @eval begin
     function $f(s::Snapshots,rb::RBSpace...;n=1)

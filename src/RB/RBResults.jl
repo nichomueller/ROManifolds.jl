@@ -132,7 +132,6 @@ function test_rb_solver(
     rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs)
   end
   approx_snaps_test = recast(rbspace,rb_snaps_test)
-  # approx_snaps_test = recast_at_center(fesolver,rbspace,rb_snaps_test,params_test)
   post_process(info,feop,fesolver,snaps_test,params_test,approx_snaps_test,stats)
 end
 
@@ -158,7 +157,7 @@ function test_rb_solver(
       rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,x,params_test)
       lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,x,params_test)
       nl_cache = rb_solve!(x,fesolver.nls,rhs,lhs,nl_cache)
-      x .= recast_at_center(fesolver,rbspace,x,params_test)
+      x .= recast(rbspace,x)
       isconv,conv = Algebra._check_convergence(fesolver.nls,x,conv0)
       println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv))) \n")
       if all(isconv); return; end
@@ -177,7 +176,7 @@ function load_test(
 
   ntests = info.nsnaps_test
   try
-    @check info.load_structures
+    @check info.load_solutions
     sols,params = load_test(info,(Snapshots,Table))
     return sols[1:ntests],params[1:ntests]
   catch
@@ -225,9 +224,10 @@ end
 
 function space_time_matrices(sol::PTArray{Vector{T}};nparams=length(sol)) where T
   mat = hcat(get_array(sol)...)
+  ntimes = Int(size(mat,2)/nparams)
   array = Vector{Matrix{eltype(T)}}(undef,nparams)
   @inbounds for i = 1:nparams
-    array[i] = mat[:,(i-1)*nparams+1:i*nparams]
+    array[i] = mat[:,(i-1)*ntimes+1:i*ntimes]
   end
   PTArray(array)
 end

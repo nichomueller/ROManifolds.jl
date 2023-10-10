@@ -56,7 +56,7 @@ struct RBAffineDecomposition{T}
     red_integr_cells = find_cells(entire_interp_idx_rows,cell_dof_ids)
     red_trian = view(trian,red_integr_cells)
     red_meas = get_measure(feop,red_trian)
-    red_times = st_mdeim ? times[interp_idx_time] : times
+    red_times = info.st_mdeim ? times[interp_idx_time] : times
     integr_domain = RBIntegrationDomain(red_meas,red_times,entire_interp_idx_space)
 
     RBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)
@@ -268,7 +268,7 @@ function assemble_rhs!(
   b = get_array(cache;len=length(red_times)*length(μ))
   sols = get_solutions_at_times(sols,fesolver,red_times)
 
-  collect_residuals_for_idx!(b,fesolver,sols,μ,red_times,red_idx,red_meas)
+  collect_residuals_for_idx!(b,fesolver,feop,sols,μ,red_times,red_idx,red_meas)
 end
 
 function lhs_coefficient!(
@@ -304,7 +304,7 @@ function assemble_lhs!(
   A = get_array(cache;len=length(red_times)*length(μ))
   sols = get_solutions_at_times(sols,fesolver,red_times)
 
-  collect_jacobians_for_idx!(A,fesolver,sols,μ,red_times,red_idx,red_meas;i)
+  collect_jacobians_for_idx!(A,fesolver,feop,sols,μ,red_times,red_idx,red_meas;i)
 end
 
 function mdeim_solve!(cache,ad::RBAffineDecomposition,a::Matrix;st_mdeim=false)
@@ -369,9 +369,12 @@ end
 
 function get_solutions_at_times(sols::PTArray,fesolver::PODESolver,red_times::Vector{<:Real})
   times = get_times(fesolver)
-  if length(red_times) < length(times)
-    time_idx = findall(x->x in red_times,times)
-    map(x->getindex(x,time_idx),sols)
+  time_ndofs = length(times)
+  nparams = Int(length(sols)/time_ndofs)
+  if length(red_times) < time_ndofs
+    tidx = findall(x->x in red_times,times)
+    ptidx = reshape(transpose(collect(0:nparams-1)*time_ndofs .+ tidx'),:)
+    PTArray(sols[ptidx])
   else
     sols
   end

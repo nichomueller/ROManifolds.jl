@@ -11,7 +11,8 @@ function test_affine_decomposition_rhs(
   sols_test::PTArray,
   params_test::Table,
   sols::Snapshots,
-  params::Table)
+  params::Table;
+  st_mdeim=false)
 
   rcache,scache... = cache
 
@@ -27,8 +28,8 @@ function test_affine_decomposition_rhs(
   b = get_array(rcache;len=length(red_times)*length(params_test))
   sols_test = get_solutions_at_times(sols_test,fesolver,red_times)
   bfull = copy(b)
-  Res = collect_residuals_for_idx!(b,fesolver,sols_test,params_test,red_times,red_idx,red_meas)
-  Res_full = collect_residuals_for_idx!(bfull,fesolver,sols_test,params_test,red_times,full_idx,meas)
+  Res = collect_residuals_for_idx!(b,fesolver,feop,sols_test,params_test,red_times,red_idx,red_meas)
+  Res_full = collect_residuals_for_idx!(bfull,fesolver,feop,sols_test,params_test,red_times,full_idx,meas)
   Res_offline,trian = collect_residuals_for_trian(
       fesolver,feop,sols[1:nsnaps_system],params[1:nsnaps_system],times)
 
@@ -47,9 +48,9 @@ function test_affine_decomposition_rhs(
   end
 
   idx = ret_idx()
-  coeff = mdeim_solve!(scache[1],rbrest.mdeim_interpolation,Res)
+  coeff = mdeim_solve!(scache[1],rbrest,Res;st_mdeim)
   basis_space = tpod(recast(Res_offline[idx]))
-  coeff_ok = basis_space'*Res_full
+  coeff_ok = transpose(basis_space'*Res_full)
   err_coeff = maximum(abs.(coeff)-abs.(coeff_ok))
   println("Residual coefficient difference for selected triangulation is $err_coeff")
   return coeff,coeff_ok
@@ -60,9 +61,9 @@ meas = dΩ
 cache = res_cache[1]
 
 # offline error
-coeff,coeff_ok = test_affine_decomposition_rhs(cache,feop,fesolver,rbrest,meas,sols[1],params[1:1],sols,params)
+coeff,coeff_ok = test_affine_decomposition_rhs(cache,feop,fesolver,rbrest,meas,sols[1],params[1:1],sols,params;st_mdeim)
 # online error
-coeff,coeff_ok = test_affine_decomposition_rhs(cache,feop,fesolver,rbrest,meas,sols_test,params_test,sols,params)
+coeff,coeff_ok = test_affine_decomposition_rhs(cache,feop,fesolver,rbrest,meas,sols_test,params_test,sols,params;st_mdeim)
 
 function test_affine_decomposition_lhs(
   cache,
@@ -92,8 +93,8 @@ function test_affine_decomposition_lhs(
 
   Afull = copy(A)
   full_idx = findnz(Afull[1][:])[1]
-  jac = collect_jacobians_for_idx!(A,fesolver,sols,μ,red_times,red_idx,red_meas;i)
-  jac_full = collect_jacobians_for_idx!(Afull,fesolver,sols,μ,red_times,full_idx,meas;i)
+  jac = collect_jacobians_for_idx!(A,fesolver,feop,sols,μ,red_times,red_idx,red_meas;i)
+  jac_full = collect_jacobians_for_idx!(Afull,fesolver,feop,sols,μ,red_times,full_idx,meas;i)
   jac_offline,_ = collect_jacobians_for_trian(
     fesolver,feop,offline_sols[1:nsnaps_system],offline_params[1:nsnaps_system],times;i)
   basis_space = tpod(jac_offline[1])
@@ -149,7 +150,7 @@ function test_rb_contribution_rhs(
 
   b = get_array(rcache;len=length(red_times)*length(params))
   sols = get_solutions_at_times(sols,fesolver,red_times)
-  res_full = collect_residuals_for_idx!(b,fesolver,sols,params,red_times,full_idx,meas)
+  res_full = collect_residuals_for_idx!(b,fesolver,feop,sols,params,red_times,full_idx,meas)
   global contrib_ok
   for n in eachindex(params)
     tidx = (n-1)*length(red_times)+1 : n*length(red_times)
@@ -198,7 +199,7 @@ function test_rb_contribution_lhs(
   A = get_array(jcache;len=length(red_times)*length(params))
   Afull = copy(A)
   full_idx = findnz(Afull[1][:])[1]
-  jac_full = collect_jacobians_for_idx!(A,fesolver,sols,params,red_times,full_idx,meas;i)
+  jac_full = collect_jacobians_for_idx!(A,fesolver,feop,sols,params,red_times,full_idx,meas;i)
 
   sols = get_solutions_at_times(sols,fesolver,red_times)
   global contrib_ok

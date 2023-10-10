@@ -131,6 +131,7 @@ for fun in (:collect_residuals_for_idx!,:collect_jacobians_for_idx!)
     function $fun(
       q::PTArray,
       fesolver::PThetaMethod,
+      feop::PTFEOperator,
       sols::PTArray,
       μ::Table,
       times::Vector{<:Real},
