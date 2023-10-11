@@ -58,7 +58,7 @@ begin
   test = PTMultiFieldFESpace([test_u,test_p])
   trial = PTMultiFieldFESpace([trial_u,trial_p])
   feop = PTAffineFEOperator(res,jac,jac_t,pspace,trial,test)
-  t0,tf,dt,θ = 0.,0.05,0.005,0.5
+  t0,tf,dt,θ = 0.,0.05,0.005,1
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial_u(μ,t0))
   ph0μ(μ) = interpolate_everywhere(p0μ(μ),trial_p(μ,t0))
   xh0μ(μ) = interpolate_everywhere([uh0μ(μ),ph0μ(μ)],trial(μ,t0))
@@ -84,25 +84,37 @@ nsnaps = info.nsnaps_state
 params = realization(feop,nsnaps)
 trial = get_trial(feop)
 sols,stats = collect_solutions(fesolver,feop,trial,params)
-# rbspace = reduced_basis(info,feop,sols,fesolver,params)
-energy_norm = info.energy_norm
-nblocks = get_nblocks(sols)
-blocks = map(index_pairs(nblocks,1)) do (row,col)
-  feop_row_col = feop[row,col]
-  snaps_row = sols[row]
-  energy_norm_row = energy_norm[row]
-  norm_matrix = get_norm_matrix(feop,energy_norm_row)
-  basis_space_nnz,basis_time = compress(info,feop_row_col,snaps_row,norm_matrix,fesolver,params)
-  basis_space = recast(basis_space_nnz)
-  basis_space,basis_time,norm_matrix
-end
-bases_space = getindex.(blocks,1)
-bases_time = getindex.(blocks,2)
-norm_matrix = getindex.(blocks,3)
-if compute_supremizers
-  bases_space = add_space_supremizers(bases_space,feop,norm_matrix,params)
-  bases_time = add_time_supremizers(bases_time)
-end
-BlockRBSpace(bases_space,bases_time)
+rbspace = reduced_basis(info,feop,sols,fesolver,params)
+# energy_norm = info.energy_norm
+# nblocks = get_nblocks(sols)
+# blocks = map(index_pairs(nblocks,1)) do (row,col)
+#   feop_row_col = feop[row,col]
+#   snaps_row = sols[row]
+#   energy_norm_row = energy_norm[row]
+#   norm_matrix = get_norm_matrix(feop,energy_norm_row)
+#   basis_space_nnz,basis_time = compress(info,feop_row_col,snaps_row,norm_matrix,fesolver,params)
+#   basis_space = recast(basis_space_nnz)
+#   basis_space,basis_time,norm_matrix
+# end
+# bases_space = getindex.(blocks,1)
+# bases_time = getindex.(blocks,2)
+# norm_matrix = getindex.(blocks,3)
+# if compute_supremizers
+#   bases_space = add_space_supremizers(bases_space,feop,norm_matrix,params)
+#   bases_time = add_time_supremizers(bases_time)
+# end
+# rbspace = BlockRBSpace(bases_space,bases_time)
 
-rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
+# rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
+nblocks = get_nblocks(rbspace)
+nsnaps = info.nsnaps_system
+snapsθ = recenter(fesolver,sols,params)
+_μ = params[1:nsnaps]
+_snapsθ = map(1:nblocks) do row
+  snapsθ_row = snapsθ[row]
+  snapsθ_row[1:nsnaps]
+end
+
+rhs = collect_compress_rhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
+lhs = collect_compress_lhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
+rhs,lhs

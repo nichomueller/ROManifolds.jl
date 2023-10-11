@@ -60,35 +60,48 @@ end
 
 function orth_projection(
   v::Vector{T},
-  basis::Matrix{T};
-  X=nothing) where T
+  basis::Matrix{T},
+  args...) where T
 
   proj = similar(v)
   proj .= zero(T)
   @inbounds for b = eachcol(basis)
-    proj += isnothing(X) ? b*sum(v'*b)/sum(b'*b) : b*sum(v'*X*b)/sum(b'*X*b)
+    proj += b*sum(v'*b)/sum(b'*b)
+  end
+  proj
+end
+
+function orth_projection(
+  v::Vector{T},
+  basis::Matrix{T},
+  X::SparseMatrixCSC) where T
+
+  proj = similar(v)
+  proj .= zero(T)
+  @inbounds for b = eachcol(basis)
+    proj += b*sum(v'*X*b)/sum(b'*X*b)
   end
   proj
 end
 
 function orth_complement!(
   v::Vector{T},
-  basis::Matrix{T};
-  kwargs...) where T
+  basis::Matrix{T},
+  args...) where T
 
-  copyto!(v,v-orth_projection(v,basis;kwargs...))
+  v .= v-orth_projection(v,basis,args...)
 end
 
 function gram_schmidt!(
   mat::Matrix{T},
-  basis::Matrix{T};
-  kwargs...) where T
+  basis::Matrix{T},
+  args...) where T
 
   @inbounds for i = axes(mat,2)
     mat_i = mat[:,i]
-    orth_complement!(mat_i,basis;kwargs...)
+    orth_complement!(mat_i,basis,args...)
     if i > 1
-      orth_complement!(mat_i,mat[:,1:i-1];kwargs...)
+      orth_complement!(mat_i,mat[:,1:i-1],args...)
     end
     mat_i /= norm(mat_i)
     mat[:,i] .= mat_i

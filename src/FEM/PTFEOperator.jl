@@ -102,24 +102,27 @@ for OP in (:PTAffineFEOperator,:PTFEOperator)
         trials_col = getindex(get_trial(op),col)
         test_row = getindex(op.test,row)
 
-        empty_vec = []
+        empty_dv,empty_du,empty_u = Any[],Any[],Any[]
         for n in eachindex(get_test(op).spaces)
-          push!(empty_vec,nothing)
-        end
-        function u_col(u)
-          empty_vec[col] = u
-          return empty_vec
-        end
-        function du_col(du)
-          empty_vec[col] = du
-          return empty_vec
-        end
-        function dv_row(dv)
-          empty_vec[row] = dv
-          return empty_vec
+          push!(empty_dv,nothing)
+          push!(empty_du,nothing)
+          push!(empty_u,nothing)
         end
 
-        res(μ,t,u,dv) = op.res(μ,t,u,dv_row(dv))
+        function u_col(u)
+          empty_u[col] = u
+          return empty_u
+        end
+        function du_col(du)
+          empty_du[col] = du
+          return empty_du
+        end
+        function dv_row(dv)
+          empty_dv[row] = dv
+          return empty_dv
+        end
+
+        res(μ,t,u,dv) = op.res(μ,t,u_col(u),dv_row(dv))
         jac(μ,t,u,du,dv) = op.jacs[1](μ,t,u_col(u),du_col(du),dv_row(dv))
         jac_t(μ,t,u,dut,dv) = op.jacs[2](μ,t,u_col(u),du_col(dut),dv_row(dv))
 
@@ -145,7 +148,7 @@ function allocate_residual(
     dxh = (dxh...,uh)
   end
   xh = TransientCellField(uh,dxh)
-  dc = integrate(op.res(μ,t,xh,v),DomainContribution())
+  dc = integrate(op.res(μ,t,xh,v))
   vecdata = collect_cell_vector(V,dc)
   allocate_vector(op.assem,vecdata)
 end
@@ -321,7 +324,6 @@ function fill_initial_jacobians(
   t::T,
   uh::S) where {T,S}
 
-  cont = DomainContribution()
   dxh = ()
   for i in 1:get_order(op)
     dxh = (dxh...,uh)
@@ -329,7 +331,7 @@ function fill_initial_jacobians(
   xh = TransientCellField(uh,dxh)
   _matdata = ()
   for i in 1:get_order(op)+1
-    _matdata = (_matdata...,_matdata_jacobian(op,μ,t,xh,i,0.0,cont))
+    _matdata = (_matdata...,_matdata_jacobian(op,μ,t,xh,i,0.0))
   end
   return _matdata
 end
@@ -356,13 +358,12 @@ function _matdata_jacobian(
   t::T,
   xh::S,
   i::Integer,
-  γᵢ::Real,
-  args...) where {T,S}
+  γᵢ::Real) where {T,S}
 
   Uh = get_trial(op)(μ,t)
   V = get_test(op)
   u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
-  dc = γᵢ*integrate(op.jacs[i](μ,t,xh,u,v),args...)
+  dc = γᵢ*integrate(op.jacs[i](μ,t,xh,u,v))
   collect_cell_matrix(Uh,V,dc)
 end

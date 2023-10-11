@@ -100,7 +100,7 @@ function space_time_projection(mat::AbstractMatrix,rb::RBSpace)
   basis_space = get_basis_space(rb)
   basis_time = get_basis_time(rb)
   st_proj = (basis_space'*mat)*basis_time
-  return reshape(st_proj',:)
+  return vec(st_proj')
 end
 
 function space_time_projection(

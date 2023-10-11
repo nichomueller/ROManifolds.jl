@@ -181,17 +181,7 @@ end
 Base.getindex(int::PTIntegrand,meas::Measure) = get_contribution(int,meas)
 
 function CellData.integrate(int::PTIntegrand,args...)
-  cont = DomainContribution()
-  integral = integrate(int.object,int.meas)
-  trian = get_triangulation(int.meas)
-  add_contribution!(cont,trian,integral[trian])
-end
-
-function CellData.integrate(int::PTIntegrand{<:PTCellField},args...)
-  cont = PTDomainContribution()
-  integral = integrate(int.object,int.meas)
-  trian = get_triangulation(int.meas)
-  add_contribution!(cont,trian,integral[trian])
+  integrate(int.object,int.meas)
 end
 
 struct CollectionPTIntegrand
@@ -202,7 +192,19 @@ function CollectionPTIntegrand()
   CollectionPTIntegrand(IdDict{Function,Tuple{Vararg{PTIntegrand}}}())
 end
 
-function CellData.get_contribution(a::CollectionPTIntegrand,meas::Measure,cont=PTDomainContribution())
+function init_contribution(a::CollectionPTIntegrand)
+  cont = DomainContribution()
+  for (op,int) in a.dict
+    if any(map(x->isa(x,PTCellField),int))
+      cont = PTDomainContribution()
+      break
+    end
+  end
+  cont
+end
+
+function CellData.get_contribution(a::CollectionPTIntegrand,meas::Measure)
+  cont = init_contribution(a)
   trian = get_triangulation(meas)
   for (op,int) in a.dict
     for i in int
@@ -271,7 +273,8 @@ for op in (:+,:-)
   end
 end
 
-function CellData.integrate(a::CollectionPTIntegrand,cont=PTDomainContribution())
+function CellData.integrate(a::CollectionPTIntegrand)
+  cont = init_contribution(a)
   for (op,int) in a.dict
     for i in int
       itrian = get_triangulation(i.meas)
@@ -297,28 +300,30 @@ Base.broadcasted(f,a::CellField,b::Nothing) = Operation((i,j)->f.(i,j))(a,b)
 Fields.gradient(::Nothing) = nothing
 LinearAlgebra.dot(::typeof(∇),::Nothing) = nothing
 
-CellData.integrate(::Nothing,::GenericMeasure) = nothing
-
-CellData.integrate(::Nothing,::CellQuadrature) = nothing
+CellData.integrate(::Nothing,args...) = nothing
 
 CellData.integrate(::Any,::Nothing) = nothing
 
-for T in (:DomainContribution,:PTDomainContribution)
+PTIntegrand(::Nothing,::Measure) = nothing
+
+for T in (:DomainContribution,:PTDomainContribution,:PTIntegrand)
   @eval begin
     (+)(::Nothing,b::$T) = b
 
     (+)(a::$T,::Nothing) = a
 
-    function (-)(::Nothing,b::$T)
-      for (trian,array) in b.dict
-        b.dict[trian] = -array
-      end
-      b
-    end
-
     (-)(a::$T,::Nothing) = a
   end
 end
+
+function (-)(::Nothing,b::Union{DomainContribution,PTDomainContribution})
+  for (trian,array) in b.dict
+    b.dict[trian] = -array
+  end
+  b
+end
+
+(-)(::Nothing,b::PTIntegrand) = PTIntegrand(-b.object,b.meas)
 
 function FESpaces.collect_cell_vector(test,::Nothing,args...)
   nothing

@@ -35,8 +35,8 @@ function recenter(
   μ::Table) where T
 
   θ = fesolver.θ
-  uh0 = fesolver.uh0
-  u0 = get_free_dof_values(uh0(μ))
+  uh0 = fesolver.uh0(μ)
+  u0 = get_free_dof_values(uh0)
   sθ = s.snaps.*θ + [u0,s.snaps[2:end]...].*(1-θ)
   Snapshots(sθ)
 end

@@ -305,7 +305,7 @@ function get_solutions_at_times(sols::PTArray,fesolver::PODESolver,red_times::Ve
   nparams = Int(length(sols)/time_ndofs)
   if length(red_times) < time_ndofs
     tidx = findall(x->x in red_times,times)
-    ptidx = reshape(transpose(collect(0:nparams-1)*time_ndofs .+ tidx'),:)
+    ptidx = vec(transpose(collect(0:nparams-1)*time_ndofs .+ tidx'))
     PTArray(sols[ptidx])
   else
     sols

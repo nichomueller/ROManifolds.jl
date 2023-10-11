@@ -412,7 +412,7 @@ function split_fields(fe::PMultiFieldFESpace,free_values::PTArray)
   fields = map(1:length(fe.spaces)) do field
     pini = offsets[field] + 1
     pend = offsets[field] + num_free_dofs(fe.spaces[field])
-    map(x->getindex(x,pini+1:pend),free_values)
+    map(x->getindex(x,pini:pend),free_values)
   end
   fields
 end

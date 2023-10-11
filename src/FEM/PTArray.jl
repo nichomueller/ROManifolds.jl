@@ -441,7 +441,7 @@ Base.copy(a::AffinePTArray) = PTArray(copy(a.array),a.len)
 Base.similar(a::AffinePTArray) = PTArray(similar(a.array),a.len)
 
 function Base.show(io::IO,a::AffinePTArray{T}) where T
-  print(io,"Affine PTArray of type $T and length $(o.len)")
+  print(io,"Affine PTArray of type $T and length $(a.len)")
 end
 
 for op in (:+,:-)

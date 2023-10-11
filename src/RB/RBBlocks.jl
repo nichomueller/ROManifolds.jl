@@ -8,18 +8,43 @@ get_nblocks(b) = length(b.blocks)
 struct BlockSnapshots{T} <: RBBlock{T,1}
   blocks::Vector{Snapshots{T}}
 
-  function BlockSnapshots(v::Vector{Vector{PTArray{T}}}) where T
+  function BlockSnapshots(blocks::Vector{Snapshots{T}}) where T
+    new{T}(blocks)
+  end
+
+  function BlockSnapshots(v::Vector{<:Vector{<:PTArray{T}}}) where T
     nblocks = length(testitem(v))
     blocks = Vector{Snapshots{T}}(undef,nblocks)
     @inbounds for n in 1:nblocks
       vn = map(x->getindex(x,n),v)
       blocks[n] = Snapshots(vn)
     end
-    new{T}(blocks)
+    BlockSnapshots(blocks)
   end
 end
 
 const AbstractSnapshots{T} = Union{Snapshots{T},BlockSnapshots{T}}
+
+function recenter(
+  fesolver::PThetaMethod,
+  s::BlockSnapshots{T},
+  μ::Table) where T
+
+  θ = fesolver.θ
+  uh0 = fesolver.uh0(μ)
+  u0 = get_free_dof_values(uh0)
+  nblocks = get_nblocks(rbspace)
+  pend = 1
+  sθ = map(1:nblocks) do row
+    s_row = s[row]
+    s1_row = testitem(testitem(s_row.snaps))
+    pini = pend
+    pend = pini + size(s1_row,1) - 1
+    u0_row = map(x->getindex(x,pini:pend),u0)
+    s_row.snaps.*θ + [u0_row,s_row.snaps[2:end]...].*(1-θ)
+  end
+  BlockSnapshots(Snapshots.(sθ))
+end
 
 struct BlockNnzMatrix{T} <: RBBlock{T,1}
   blocks::Vector{NnzMatrix{T}}
@@ -39,14 +64,14 @@ function NnzArray(s::BlockSnapshots{T}) where T
 end
 
 struct BlockRBSpace{T} <: RBBlock{T,1}
-  blocks::Vector{BlockRBSpace{T}}
+  blocks::Vector{RBSpace{T}}
 
-  function BlockRBSpace(blocks::Vector{BlockRBSpace{T}}) where T
+  function BlockRBSpace(blocks::Vector{RBSpace{T}}) where T
     new{T}(blocks)
   end
 
   function BlockRBSpace(bases_space::Vector{Matrix{T}},bases_time::Vector{Matrix{T}}) where T
-    blocks = map(RBSpace,(bases_space,bases_time))
+    blocks = map(RBSpace,bases_space,bases_time)
     BlockRBSpace(blocks)
   end
 end
@@ -97,15 +122,16 @@ function add_space_supremizers(
   args...)
 
   bs_primal,bs_dual... = bases_space
+  nm_primal,nm_dual... = norm_matrix
   dual_nfields = length(bs_dual)
-  for (row,col) in index_pairs(dual_nfields,1)
-    println("Computing supremizers in space for dual field $row")
-    feop_row_col = feop[row+1,col]
-    supr_row = space_supremizers(bs_dual[row],feop_row_col,args...)
-    orth_supr_row = gram_schmidt(supr_row,bs_primal,norm_matrix[row+1])
-    bs_primal = hcat(bs_primal,orth_supr_row)
+  for (row,col) in index_pairs(1,dual_nfields)
+    println("Computing supremizers in space for dual field $col")
+    feop_row_col = feop[row,col+1]
+    supr_row = space_supremizers(bs_dual[col],feop_row_col,args...)
+    gram_schmidt!(supr_row,bs_primal,nm_dual[col])
+    bs_primal = hcat(bs_primal,supr_row)
   end
-  return bs_primal,bs_dual
+  return [bs_primal,bs_dual...]
 end
 
 function space_supremizers(
@@ -116,9 +142,9 @@ function space_supremizers(
   μ = testitem(params)
   u = zero(feop.test)
   t = 0.
-  j(du,dv) = feop.jacs[1](μ,t,u,du,dv)
+  j(du,dv) = integrate(feop.jacs[1](μ,t,u,du,dv),DomainContribution())
   trial_dual = get_trial(feop)
-  constraint_mat = assemble_matrix(j,trial_dual(μ,t),test)
+  constraint_mat = assemble_matrix(j,trial_dual(μ,t),feop.test)
   constraint_mat*basis_space
 end
 
@@ -130,7 +156,7 @@ function add_time_supremizers(bases_time::Vector{<:Matrix};kwargs...)
     supr_row = add_time_supremizers(bt_primal,bt_dual[row];kwargs...)
     bt_primal = hcat(bt_primal,supr_row)
   end
-  return bt_primal,bt_dual
+  return [bt_primal,bt_dual...]
 end
 
 function add_time_supremizers(basis_u::Matrix,basis_p::Matrix;ttol=1e-2)
@@ -195,10 +221,11 @@ function collect_compress_rhs_lhs(
 
   nblocks = get_nblocks(rbspace)
   nsnaps = info.nsnaps_system
-  _μ = snapsθ[1:nsnaps]
+  snapsθ = recenter(fesolver,snaps,μ)
+  _μ = μ[1:nsnaps]
   _snapsθ = map(1:nblocks) do row
-    snapsθ = recenter(fesolver,snaps[row],μ)
-    snapsθ[1:nsnaps]
+    snapsθ_row = snapsθ[row]
+    snapsθ_row[1:nsnaps]
   end
   rhs = collect_compress_rhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
   lhs = collect_compress_lhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
