@@ -281,3 +281,49 @@ function CellData.integrate(a::CollectionPTIntegrand,cont=PTDomainContribution()
   end
   cont
 end
+
+for op in (:inner,:outer,:double_contraction,:+,:-,:*,:cross,:dot,:/)
+  @eval begin
+    ($op)(::Nothing,::Nothing) = nothing
+    ($op)(::Any,::Nothing) = nothing
+    ($op)(::Nothing,::Any) = nothing
+  end
+end
+
+Base.broadcasted(f,a::Nothing,b::Nothing) = Operation((i,j)->f.(i,j))(a,b)
+Base.broadcasted(f,a::Nothing,b::CellField) = Operation((i,j)->f.(i,j))(a,b)
+Base.broadcasted(f,a::CellField,b::Nothing) = Operation((i,j)->f.(i,j))(a,b)
+
+Fields.gradient(::Nothing) = nothing
+LinearAlgebra.dot(::typeof(∇),::Nothing) = nothing
+
+CellData.integrate(::Nothing,::GenericMeasure) = nothing
+
+CellData.integrate(::Nothing,::CellQuadrature) = nothing
+
+CellData.integrate(::Any,::Nothing) = nothing
+
+for T in (:DomainContribution,:PTDomainContribution)
+  @eval begin
+    (+)(::Nothing,b::$T) = b
+
+    (+)(a::$T,::Nothing) = a
+
+    function (-)(::Nothing,b::$T)
+      for (trian,array) in b.dict
+        b.dict[trian] = -array
+      end
+      b
+    end
+
+    (-)(a::$T,::Nothing) = a
+  end
+end
+
+function FESpaces.collect_cell_vector(test,::Nothing,args...)
+  nothing
+end
+
+function FESpaces.collect_cell_matrix(trial,test,::Nothing,args...)
+  nothing
+end

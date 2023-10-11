@@ -6,6 +6,7 @@ struct RBInfo
   fe_path::String
   rb_path::String
   energy_norm::Union{Symbol,Vector{Symbol}}
+  compute_supremizers::Bool
   st_mdeim::Bool
   fun_mdeim::Bool
   load_solutions::Bool
@@ -16,12 +17,12 @@ struct RBInfo
 end
 
 function RBInfo(test_path::String;ϵ=1e-4,nsnaps_state=80,nsnaps_system=20,nsnaps_test=10,
-  energy_norm=:l2,st_mdeim=false,fun_mdeim=false,load_solutions=false,save_solutions=true,
-  load_structures=false,save_structures=true,postprocess=false)
+  energy_norm=:l2,compute_supremizers=true,st_mdeim=false,fun_mdeim=false,
+  load_solutions=false,save_solutions=true,load_structures=false,save_structures=true,postprocess=false)
 
   fe_path = get_fe_path(test_path)
   rb_path = get_rb_path(test_path,ϵ;st_mdeim,fun_mdeim)
-  RBInfo(ϵ,nsnaps_state,nsnaps_system,nsnaps_test,fe_path,rb_path,energy_norm,
+  RBInfo(ϵ,nsnaps_state,nsnaps_system,nsnaps_test,fe_path,rb_path,energy_norm,compute_supremizers,
     st_mdeim,fun_mdeim,load_solutions,save_solutions,load_structures,save_structures,postprocess)
 end
 

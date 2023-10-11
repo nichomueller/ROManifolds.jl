@@ -8,8 +8,13 @@ get_nblocks(b) = length(b.blocks)
 struct BlockSnapshots{T} <: RBBlock{T,1}
   blocks::Vector{Snapshots{T}}
 
-  function BlockSnapshots(v::Vector{Vector{<:PTArray{T}}}) where T
-    blocks = Snapshots.(v)
+  function BlockSnapshots(v::Vector{Vector{PTArray{T}}}) where T
+    nblocks = length(testitem(v))
+    blocks = Vector{Snapshots{T}}(undef,nblocks)
+    @inbounds for n in 1:nblocks
+      vn = map(x->getindex(x,n),v)
+      blocks[n] = Snapshots(vn)
+    end
     new{T}(blocks)
   end
 end
@@ -62,22 +67,24 @@ function reduced_basis(
   feop::PTFEOperator,
   snaps::BlockSnapshots,
   args...;
-  compute_supremizers=false,
   kwargs...)
 
   energy_norm = info.energy_norm
   nblocks = get_nblocks(snaps)
-  bases = map(1:nblocks) do n
-    feopn = feop[n]
-    norm_matrix = get_norm_matrix(feop,energy_norm[n])
-    basis_space_nnz,basis_time = compress(info,feopn,snaps[n],norm_matrix,args...)
+  blocks = map(index_pairs(nblocks,1)) do (row,col)
+    feop_row_col = feop[row,col]
+    snaps_row = sols[row]
+    energy_norm_row = energy_norm[row]
+    norm_matrix = get_norm_matrix(feop,energy_norm_row)
+    basis_space_nnz,basis_time = compress(info,feop_row_col,snaps_row,norm_matrix,args...)
     basis_space = recast(basis_space_nnz)
-    basis_space,basis_time
+    basis_space,basis_time,norm_matrix
   end
-  bases_space = first.(bases)
-  bases_time = last.(bases)
-  if compute_supremizers
-    bases_space = add_space_supremizers(bases_space,feop,snaps,args...)
+  bases_space = getindex.(blocks,1)
+  bases_time = getindex.(blocks,2)
+  norm_matrix = getindex.(blocks,3)
+  if info.compute_supremizers
+    bases_space = add_space_supremizers(bases_space,feop,norm_matrix,args...)
     bases_time = add_time_supremizers(bases_time;kwargs...)
   end
   BlockRBSpace(bases_space,bases_time)
@@ -86,19 +93,17 @@ end
 function add_space_supremizers(
   bases_space::Vector{<:Matrix},
   feop::PTFEOperator,
-  snaps::BlockSnapshots,
-  norm_matrix,
+  norm_matrix::AbstractVector,
   args...)
 
   bs_primal,bs_dual... = bases_space
-  n_dual_fields = length(bs_dual)
-  all_idx = index_pairs(n_dual_fields,1)
-  for idx in all_idx
-    println("Computing supremizers in space for dual field $idx")
-    feop_i = feop[idx]
-    supr_i = space_supremizers(bs_dual[idx],feop_i,snaps[idx],args...)
-    orth_supr_i = gram_schmidt(supr_i,bs_primal,norm_matrix)
-    bs_primal = hcat(bs_primal,orth_supr_i)
+  dual_nfields = length(bs_dual)
+  for (row,col) in index_pairs(dual_nfields,1)
+    println("Computing supremizers in space for dual field $row")
+    feop_row_col = feop[row+1,col]
+    supr_row = space_supremizers(bs_dual[row],feop_row_col,args...)
+    orth_supr_row = gram_schmidt(supr_row,bs_primal,norm_matrix[row+1])
+    bs_primal = hcat(bs_primal,orth_supr_row)
   end
   return bs_primal,bs_dual
 end
@@ -106,29 +111,26 @@ end
 function space_supremizers(
   basis_space::Matrix,
   feop::PTFEOperator,
-  snaps::Snapshots,
-  fesolver::PODESolver,
-  args...)
+  params::Table)
 
-  constraint_mat = collect_jacobians(fesolver,feop,snaps,args...)
-  if length(constraint_mat) == 1
-    return constraint_mat*basis_space
-  else
-    @assert length(constraint_mat) == length(snaps)
-    return map(*,constraint_mat,snaps)
-  end
+  μ = testitem(params)
+  u = zero(feop.test)
+  t = 0.
+  j(du,dv) = feop.jacs[1](μ,t,u,du,dv)
+  trial_dual = get_trial(feop)
+  constraint_mat = assemble_matrix(j,trial_dual(μ,t),test)
+  constraint_mat*basis_space
 end
 
-function add_time_supremizers(bases_time::Vector{<:Matrix};ttol::Real)
+function add_time_supremizers(bases_time::Vector{<:Matrix};kwargs...)
   bt_primal,bt_dual... = bases_time
-  n_dual_fields = length(bt_dual)
-  all_idx = index_pairs(n_dual_fields,1)
-  for idx in all_idx
-    println("Computing supremizers in time for dual field $idx")
-    supr_i = add_time_supremizers(bt_primal,bt_dual[idx];ttol)
-    append!(bt_primal,supr_i)
+  dual_nfields = length(bt_dual)
+  for (row,col) in index_pairs(dual_nfields,1)
+    println("Computing supremizers in time for dual field $row")
+    supr_row = add_time_supremizers(bt_primal,bt_dual[row];kwargs...)
+    bt_primal = hcat(bt_primal,supr_row)
   end
-  return bt_primal,btdual
+  return bt_primal,bt_dual
 end
 
 function add_time_supremizers(basis_u::Matrix,basis_p::Matrix;ttol=1e-2)
@@ -171,7 +173,7 @@ function add_time_supremizers(basis_u::Matrix,basis_p::Matrix;ttol=1e-2)
   basis_u
 end
 
-struct BlockRBAlgebraicContribution{T,N} <: BlockRBAlgebraicContribution{T,N}
+struct BlockRBAlgebraicContribution{T,N} <: RBBlock{T,N}
   blocks::Array{RBAlgebraicContribution{T},N}
 
   function BlockRBAlgebraicContribution(

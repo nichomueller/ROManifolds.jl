@@ -224,25 +224,3 @@ function collect_lhs_contributions!(
   end
   return sum(rb_jac_contribs)
 end
-
-struct RBBlockAlgebraicContribution{T} <: RBAlgebraicContribution{T}
-  block::Matrix{RBAlgebraicContribution{T}}
-  touched::Vector{Int}
-
-  function RBBlockAlgebraicContribution(
-    block::Matrix{RBAlgebraicContribution{T}},
-    touched::Vector{Int}) where T
-
-    new{T}(block,touched)
-  end
-end
-
-function Arrays.testvalue(
-  ::Type{RBBlockAlgebraicContribution{T}},
-  feop::PTFEOperator,
-  size::Vararg{Int}) where T
-
-  blocks = Matrix{RBAlgebraicContribution{T}}(undef,size)
-  touched = Matrix{Bool}(undef,size)
-  RBBlockAffineDecomposition(blocks,touched)
-end

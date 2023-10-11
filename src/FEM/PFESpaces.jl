@@ -407,6 +407,16 @@ function CellData.CellField(fe::PMultiFieldFESpace,cell_values)
   MultiFieldCellField(single_fields)
 end
 
+function split_fields(fe::PMultiFieldFESpace,free_values::PTArray)
+  offsets = compute_field_offsets(fe)
+  fields = map(1:length(fe.spaces)) do field
+    pini = offsets[field] + 1
+    pend = offsets[field] + num_free_dofs(fe.spaces[field])
+    map(x->getindex(x,pini+1:pend),free_values)
+  end
+  fields
+end
+
 function MultiField.restrict_to_field(f::PMultiFieldFESpace,free_values::PTArray,field::Integer)
   MultiField._restrict_to_field(f,MultiFieldStyle(f),free_values,field)
 end
@@ -434,13 +444,6 @@ function MultiField.compute_field_offsets(f::PMultiFieldFESpace)
     offsets[i+1] = offsets[i] + num_free_dofs(Ui)
   end
   offsets
-end
-
-function MultiField.restrict_to_field(fe::MultiFieldFESpace,free_values::PTArray)
-  blocks = map(1:length(fe.spaces)) do i
-    restrict_to_field(fe,free_values,i)
-  end
-  PTArray(blocks)
 end
 
 function FESpaces.get_cell_isconstrained(f::PMultiFieldFESpace)

@@ -3,7 +3,9 @@ begin
   include("$root/src/Utils/Utils.jl")
   include("$root/src/FEM/FEM.jl")
   include("$root/src/RB/RB.jl")
+end
 
+begin
   # mesh = "model_circle_2D_coarse.json"
   mesh = "cube2x2.json"
   test_path = "$root/tests/stokes/unsteady/$mesh"
@@ -40,9 +42,10 @@ begin
   p0(μ) = x->p0(x,μ)
   p0μ(μ) = PFunction(p0,μ)
 
-  m(μ,t,(ut,pt),(v,q)) = ∫ₚ(v⋅ut,dΩ)
-  lhs(μ,t,(u,p),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(u)),dΩ)
-  rhs(μ,t,(v,q)) = ∫ₚ(v⋅fμt(μ,t),dΩ)
+  jac_t(μ,t,(u,p),(dut,dpt),(v,q)) = ∫ₚ(v⋅dut,dΩ)
+  jac(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(du),dΩ) - ∫ₚ(dp*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(du)),dΩ)
+  res(μ,t,(u,p),(v,q)) = (∫ₚ(v⋅∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ)
+    - ∫ₚ(q*(∇⋅(u)),dΩ) - ∫ₚ(v⋅fμt(μ,t),dΩ))
 
   reffe_u = Gridap.ReferenceFE(lagrangian,VectorValue{2,Float},order)
   reffe_p = Gridap.ReferenceFE(lagrangian,Float,order-1)
@@ -54,46 +57,52 @@ begin
   trial_p = TrialFESpace(test_p)
   test = PTMultiFieldFESpace([test_u,test_p])
   trial = PTMultiFieldFESpace([trial_u,trial_p])
-  feop = PTAffineFEOperator(m,lhs,rhs,pspace,trial,test)
+  feop = PTAffineFEOperator(res,jac,jac_t,pspace,trial,test)
   t0,tf,dt,θ = 0.,0.05,0.005,0.5
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial_u(μ,t0))
   ph0μ(μ) = interpolate_everywhere(p0μ(μ),trial_p(μ,t0))
   xh0μ(μ) = interpolate_everywhere([uh0μ(μ),ph0μ(μ)],trial(μ,t0))
-  fesolver = PThetaMethod(LUSolver(),dt,θ)
+  fesolver = PThetaMethod(LUSolver(),xh0μ,θ,dt,t0,tf)
+
+  ϵ = 1e-4
+  load_solutions = true
+  save_solutions = true
+  load_structures = false
+  save_structures = true
+  energy_norm = [:l2,:l2]
+  compute_supremizers = true
+  nsnaps_state = 50
+  nsnaps_system = 20
+  nsnaps_test = 10
+  st_mdeim = true
+  info = RBInfo(test_path;ϵ,load_solutions,save_solutions,load_structures,save_structures,
+                energy_norm,compute_supremizers,nsnaps_state,nsnaps_system,nsnaps_test,st_mdeim)
+  # reduced_basis_model(info,feop,fesolver)
 end
 
-begin
-  op,solver = feop,fesolver
-  μ = realization(op,2)
-  t = dt
-  nfree = num_free_dofs(test)
-  u = PTArray([zeros(nfree) for _ = 1:2])
-  vθ = similar(u)
-  vθ .= 0.
-  ode_op = get_algebraic_operator(op)
-  ode_cache = allocate_cache(ode_op,μ)
-  ode_cache = update_cache!(ode_cache,ode_op,μ,t)
-  Us,_,fecache = ode_cache
-  uh = EvaluationFunction(Us[1],vθ)
-  dxh = ()
-  for i in 1:get_order(op)
-    dxh = (dxh...,uh)
-  end
-  xh = TransientCellField(uh,dxh)
-
-  A = allocate_jacobian(op,uh,ode_cache)
-  _matdata_jacobians = fill_jacobians(op,μ,t,xh,(1.,1/t))
-  matdata = _vcat_matdata(_matdata_jacobians)
-  assemble_matrix_add!(A,op.assem,matdata)
-
-  v = get_fe_basis(test)
-  b = allocate_residual(op,uh,ode_cache)
-  vecdata = collect_cell_vector(test,op.res(μ,t,xh,v))
-  assemble_vector_add!(b,op.assem,vecdata)
+nsnaps = info.nsnaps_state
+params = realization(feop,nsnaps)
+trial = get_trial(feop)
+sols,stats = collect_solutions(fesolver,feop,trial,params)
+# rbspace = reduced_basis(info,feop,sols,fesolver,params)
+energy_norm = info.energy_norm
+nblocks = get_nblocks(sols)
+blocks = map(index_pairs(nblocks,1)) do (row,col)
+  feop_row_col = feop[row,col]
+  snaps_row = sols[row]
+  energy_norm_row = energy_norm[row]
+  norm_matrix = get_norm_matrix(feop,energy_norm_row)
+  basis_space_nnz,basis_time = compress(info,feop_row_col,snaps_row,norm_matrix,fesolver,params)
+  basis_space = recast(basis_space_nnz)
+  basis_space,basis_time,norm_matrix
 end
+bases_space = getindex.(blocks,1)
+bases_time = getindex.(blocks,2)
+norm_matrix = getindex.(blocks,3)
+if compute_supremizers
+  bases_space = add_space_supremizers(bases_space,feop,norm_matrix,params)
+  bases_time = add_time_supremizers(bases_time)
+end
+BlockRBSpace(bases_space,bases_time)
 
-u,v = get_trial_fe_basis(trial_u(nothing,nothing)),get_fe_basis(test_u)
-# ptintegrate(aμt(μ,t)*∇(v)⊙∇(u),dΩ.quad)
-cf = aμt(μ,t)*∇(v)⊙∇(u)
-quad = dΩ.quad
-b = change_domain(cf,quad.trian,quad.data_domain_style)
+rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)

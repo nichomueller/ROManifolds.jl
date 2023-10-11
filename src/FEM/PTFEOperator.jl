@@ -95,16 +95,35 @@ for OP in (:PTAffineFEOperator,:PTFEOperator)
   @eval begin
     function Base.getindex(
       op::PTFEOperatorFromWeakForm,
-      idx::Int...)
+      row::Int,
+      col::Int)
 
       if isa(get_test(op),MultiFieldFESpace)
-        row,col = idx
-        res = op.res
-        jac,jac_t = op.jacs
-        pspace = op.pspace
-        trials_col = map(x->getindex(x,col),op.trials)
+        trials_col = getindex(get_trial(op),col)
         test_row = getindex(op.test,row)
-        return $OP(res,jac,jac_t,pspace,trials_col,test_row)
+
+        empty_vec = []
+        for n in eachindex(get_test(op).spaces)
+          push!(empty_vec,nothing)
+        end
+        function u_col(u)
+          empty_vec[col] = u
+          return empty_vec
+        end
+        function du_col(du)
+          empty_vec[col] = du
+          return empty_vec
+        end
+        function dv_row(dv)
+          empty_vec[row] = dv
+          return empty_vec
+        end
+
+        res(μ,t,u,dv) = op.res(μ,t,u,dv_row(dv))
+        jac(μ,t,u,du,dv) = op.jacs[1](μ,t,u_col(u),du_col(du),dv_row(dv))
+        jac_t(μ,t,u,dut,dv) = op.jacs[2](μ,t,u_col(u),du_col(dut),dv_row(dv))
+
+        return $OP(res,jac,jac_t,op.pspace,trials_col,test_row)
       else
         return op
       end

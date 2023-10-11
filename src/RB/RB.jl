@@ -38,8 +38,8 @@ function reduced_basis_model(
   else
     nsnaps = info.nsnaps_state
     params = realization(feop,nsnaps)
-    test = get_test(feop)
-    sols,stats = collect_solutions(fesolver,feop,test,params)
+    trial = get_trial(feop)
+    sols,stats = collect_solutions(fesolver,feop,trial,params)
     save(info,(sols,params,stats))
   end
   if info.load_structures

@@ -28,6 +28,7 @@ uh0_ok = interpolate_everywhere(u0_ok,trial_u_ok(t0))
 ph0_ok = interpolate_everywhere(p0_ok,trial_p(t0))
 xh0_ok = interpolate_everywhere([uh0_ok,ph0_ok],trial_ok(t0))
 ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
+ode_solver = ThetaMethod(LUSolver(),dt,θ)
 sol_gridap = Gridap.ODEs.TransientFETools.GenericODESolution(ode_solver,ode_op_ok,w[1],t0,tf)
 
 results_ok = Vector{Float}[]

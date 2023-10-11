@@ -61,7 +61,7 @@ struct NnzMatrix{T} <: NnzArray{T,2}
   end
 
   function NnzMatrix(val::AbstractArray{T}...;nparams=length(val)) where T
-    vals = stack(val)
+    vals = hcat(val...)
     nonzero_idx,nonzero_val = compress_array(vals)
     nrows = size(vals,1)
     new{T}(nonzero_val,nonzero_idx,nrows,nparams)

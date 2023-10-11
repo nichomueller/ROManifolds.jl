@@ -181,8 +181,8 @@ function load_test(
     return sols[1:ntests],params[1:ntests]
   catch
     params = realization(feop,ntests)
-    test = get_test(feop)
-    sols, = collect_solutions(fesolver,feop,test,params)
+    trial = get_trial(feop)
+    sols, = collect_solutions(fesolver,feop,trial,params)
     save_test(info,(sols,params))
     return sols[1:ntests],params[1:ntests]
   end
