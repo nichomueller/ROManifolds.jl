@@ -258,6 +258,7 @@ end
 
 Base.iterate(m::PTMultiFieldFEFunction) = iterate(m.single_fe_functions)
 Base.iterate(m::PTMultiFieldFEFunction,state) = iterate(m.single_fe_functions,state)
+Base.getindex(m::PTMultiFieldFEFunction,::Colon) = m
 Base.getindex(m::PTMultiFieldFEFunction,field_id::Integer) = m.single_fe_functions[field_id]
 MultiField.num_fields(m::PTMultiFieldFEFunction) = length(m.single_fe_functions)
 

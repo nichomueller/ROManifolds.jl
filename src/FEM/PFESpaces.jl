@@ -566,6 +566,7 @@ end
 
 Base.iterate(m::PMultiFieldFESpace) = iterate(m.spaces)
 Base.iterate(m::PMultiFieldFESpace,state) = iterate(m.spaces,state)
+Base.getindex(m::PMultiFieldFESpace,::Colon) = m
 Base.getindex(m::PMultiFieldFESpace,field_id::Integer) = m.spaces[field_id]
 Base.length(m::PMultiFieldFESpace) = length(m.spaces)
 

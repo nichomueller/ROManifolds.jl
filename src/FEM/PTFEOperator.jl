@@ -93,38 +93,28 @@ get_measure(op::PTFEOperator,trian::Triangulation) = Measure(trian,2*get_order(o
 
 for OP in (:PTAffineFEOperator,:PTFEOperator)
   @eval begin
-    function Base.getindex(
-      op::PTFEOperatorFromWeakForm,
-      row::Int,
-      col::Int)
-
+    function Base.getindex(op::PTFEOperatorFromWeakForm,row,col)
       if isa(get_test(op),MultiFieldFESpace)
         trials_col = getindex(get_trial(op),col)
         test_row = getindex(op.test,row)
 
-        empty_dv,empty_du,empty_u = Any[],Any[],Any[]
-        for n in eachindex(get_test(op).spaces)
-          push!(empty_dv,nothing)
-          push!(empty_du,nothing)
-          push!(empty_u,nothing)
+        function single_field(q,idx::Int)
+          vq = Any[]
+          for i in eachindex(get_test(op).spaces)
+            if i == idx
+              push!(vq,q)
+            else
+              push!(vq,nothing)
+            end
+          end
+          vq
         end
 
-        function u_col(u)
-          empty_u[col] = u
-          return empty_u
-        end
-        function du_col(du)
-          empty_du[col] = du
-          return empty_du
-        end
-        function dv_row(dv)
-          empty_dv[row] = dv
-          return empty_dv
-        end
+        single_field(q,::Colon) = q
 
-        res(μ,t,u,dv) = op.res(μ,t,u_col(u),dv_row(dv))
-        jac(μ,t,u,du,dv) = op.jacs[1](μ,t,u_col(u),du_col(du),dv_row(dv))
-        jac_t(μ,t,u,dut,dv) = op.jacs[2](μ,t,u_col(u),du_col(dut),dv_row(dv))
+        res(μ,t,u,dv) = op.res(μ,t,single_field(u,col),single_field(dv,row))
+        jac(μ,t,u,du,dv) = op.jacs[1](μ,t,single_field(u,col),single_field(du,col),single_field(dv,row))
+        jac_t(μ,t,u,dut,dv) = op.jacs[2](μ,t,single_field(u,col),single_field(dut,col),single_field(dv,row))
 
         return $OP(res,jac,jac_t,op.pspace,trials_col,test_row)
       else
@@ -331,7 +321,10 @@ function fill_initial_jacobians(
   xh = TransientCellField(uh,dxh)
   _matdata = ()
   for i in 1:get_order(op)+1
-    _matdata = (_matdata...,_matdata_jacobian(op,μ,t,xh,i,0.0))
+    _data = _matdata_jacobian(op,μ,t,xh,i,0.0)
+    if !isnothing(_data)
+      _matdata = (_matdata...,_matdata_jacobian(op,μ,t,xh,i,0.0))
+    end
   end
   return _matdata
 end
@@ -346,7 +339,10 @@ function fill_jacobians(
   _matdata = ()
   for i in 1:get_order(op)+1
     if (γ[i] > 0.0)
-      _matdata = (_matdata...,_matdata_jacobian(op,μ,t,uh,i,γ[i]))
+      _data = _matdata_jacobian(op,μ,t,uh,i,γ[i])
+      if !isnothing(_data)
+        _matdata = (_matdata...,_data)
+      end
     end
   end
   return _matdata

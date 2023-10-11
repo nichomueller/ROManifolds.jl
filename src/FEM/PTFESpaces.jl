@@ -131,6 +131,7 @@ end
 
 Base.iterate(m::PTMultiFieldTrialFESpace) = iterate(m.spaces)
 Base.iterate(m::PTMultiFieldTrialFESpace,state) = iterate(m.spaces,state)
+Base.getindex(m::PTMultiFieldTrialFESpace,::Colon) = m
 Base.getindex(m::PTMultiFieldTrialFESpace,field_id::Integer) = m.spaces[field_id]
 Base.length(m::PTMultiFieldTrialFESpace) = length(m.spaces)
 

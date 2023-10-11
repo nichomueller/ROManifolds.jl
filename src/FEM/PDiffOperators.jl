@@ -21,5 +21,4 @@ end
 
 const ∂ₚt = p_time_derivative
 
-#default
 ∂ₚt(f) = ∂t(f)

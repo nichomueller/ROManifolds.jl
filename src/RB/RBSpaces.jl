@@ -16,12 +16,12 @@ function num_rb_dofs(rb::RBSpace)
   size(rb.basis_space,2)*size(rb.basis_time,2)
 end
 
-function Algebra.allocate_vector(rb::RBSpace{T}) where T
-  zeros(T,num_rb_dofs(rb))
+function Algebra.allocate_vector(rb_row::RBSpace{T}) where T
+  zeros(T,num_rb_dofs(rb_row))
 end
 
-function Algebra.allocate_vector(rb::RBSpace{T}) where T
-  zeros(T,num_rb_dofs(rb))
+function Algebra.allocate_matrix(rb_row::RBSpace{T},rb_col::RBSpace{T}) where T
+  zeros(T,num_rb_dofs(rb_row),num_rb_dofs(rb_col))
 end
 
 function save(info::RBInfo,rb::RBSpace)

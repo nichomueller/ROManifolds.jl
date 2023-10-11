@@ -84,7 +84,7 @@ nsnaps = info.nsnaps_state
 params = realization(feop,nsnaps)
 trial = get_trial(feop)
 sols,stats = collect_solutions(fesolver,feop,trial,params)
-rbspace = reduced_basis(info,feop,sols,fesolver,params)
+rbspace = reduced_basis(info,feop,sols,params)
 # energy_norm = info.energy_norm
 # nblocks = get_nblocks(sols)
 # blocks = map(index_pairs(nblocks,1)) do (row,col)
@@ -116,5 +116,25 @@ _snapsθ = map(1:nblocks) do row
 end
 
 rhs = collect_compress_rhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
-lhs = collect_compress_lhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
-rhs,lhs
+# times = get_times(fesolver)
+# nblocks = get_nblocks(rbspace)
+# @assert length(_snapsθ) == nblocks
+# row = 2
+# feop_row_col = feop[row,:]
+# vsnaps = vcat(_snapsθ...)
+# rbspace_row = rbspace[row]
+# ress,trian = collect_residuals_for_trian(fesolver,feop_row_col,vsnaps,_μ,times)
+# compress_component(info,feop_row_col,ress,trian,times,rbspace_row)
+
+times = get_times(fesolver)
+njacs = length(feop.jacs)
+ad_jacs = Vector{BlockRBAlgebraicContribution{Float,2}}(undef,njacs)
+i = 1
+combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*x-θ*y
+row,col = 2,2
+feop_row_col = feop[row,col]
+snaps_col = _snapsθ[col]
+rbspace_row = rbspace[row]
+rbspace_col = rbspace[col]
+jacs,trian = collect_jacobians_for_trian(fesolver,feop_row_col,snaps_col,_μ,times;i)
+compress_component(info,feop_row_col,jacs,trian,times,rbspace_row,rbspace_col;combine_projections)

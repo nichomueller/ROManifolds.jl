@@ -122,11 +122,11 @@ function test_rb_solver(
 
   snaps_test,params_test = load_test(info,feop,fesolver)
 
-  println("Solving linear RB problems\n")
+  println("Solving linear RB problems")
   x = initial_guess(snaps,params,params_test)
   rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,rbspace,snaps_test,params_test)
-  rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,x,params_test)
-  lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,x,params_test)
+  rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,rbspace,x,params_test)
+  lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,rbspace,x,params_test)
 
   stats = @timed begin
     rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs)
@@ -147,19 +147,19 @@ function test_rb_solver(
 
   snaps_test,params_test = load_test(info,feop,fesolver)
 
-  println("Solving nonlinear RB problems with Newton iterations\n")
+  println("Solving nonlinear RB problems with Newton iterations")
   rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,rbspace,snaps_test,params_test)
   nl_cache = nothing
   x = initial_guess(snaps,params,params_test)
   _,conv0 = Algebra._check_convergence(fesolver.nls.ls,x)
   stats = @timed begin
     for iter in 1:fesolver.nls.max_nliters
-      rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,x,params_test)
-      lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,x,params_test)
+      rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,rbspace,x,params_test)
+      lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,rbspace,x,params_test)
       nl_cache = rb_solve!(x,fesolver.nls,rhs,lhs,nl_cache)
       x .= recast(rbspace,x)
       isconv,conv = Algebra._check_convergence(fesolver.nls,x,conv0)
-      println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv))) \n")
+      println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv)))")
       if all(isconv); return; end
       if iter == nls.max_nliters
         @unreachable

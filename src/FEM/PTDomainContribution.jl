@@ -195,7 +195,7 @@ end
 function init_contribution(a::CollectionPTIntegrand)
   cont = DomainContribution()
   for (op,int) in a.dict
-    if any(map(x->isa(x,PTCellField),int))
+    if any(map(x->isa(x,PTIntegrand{<:PTCellField}),int))
       cont = PTDomainContribution()
       break
     end
@@ -306,7 +306,7 @@ CellData.integrate(::Any,::Nothing) = nothing
 
 PTIntegrand(::Nothing,::Measure) = nothing
 
-for T in (:DomainContribution,:PTDomainContribution,:PTIntegrand)
+for T in (:DomainContribution,:PTDomainContribution,:PTIntegrand,:CollectionPTIntegrand)
   @eval begin
     (+)(::Nothing,b::$T) = b
 
@@ -325,10 +325,18 @@ end
 
 (-)(::Nothing,b::PTIntegrand) = PTIntegrand(-b.object,b.meas)
 
-function FESpaces.collect_cell_vector(test,::Nothing,args...)
+function (-)(::Nothing,b::CollectionPTIntegrand)
+  c = CollectionPTIntegrand()
+  for (op,int) in b.dict
+    add_contribution!(c,-,int)
+  end
+  c
+end
+
+function FESpaces.collect_cell_vector(::FESpace,::Nothing,args...)
   nothing
 end
 
-function FESpaces.collect_cell_matrix(trial,test,::Nothing,args...)
+function FESpaces.collect_cell_matrix(::FESpace,::FESpace,::Nothing,args...)
   nothing
 end

@@ -46,7 +46,7 @@ function reduced_basis_model(
     rbspace = load(info,RBSpace)
     rbrhs,rblhs = load(info,(RBAlgebraicContribution,Vector{RBAlgebraicContribution}))
   else
-    rbspace = reduced_basis(info,feop,sols,fesolver,params)
+    rbspace = reduced_basis(info,feop,sols,params)
     rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
     save(info,(rbspace,rbrhs,rblhs))
   end

@@ -96,12 +96,12 @@ function reduced_basis(
 
   energy_norm = info.energy_norm
   nblocks = get_nblocks(snaps)
-  blocks = map(index_pairs(nblocks,1)) do (row,col)
+  blocks = map(index_pairs(1,nblocks)) do (row,col)
     feop_row_col = feop[row,col]
-    snaps_row = sols[row]
-    energy_norm_row = energy_norm[row]
-    norm_matrix = get_norm_matrix(feop,energy_norm_row)
-    basis_space_nnz,basis_time = compress(info,feop_row_col,snaps_row,norm_matrix,args...)
+    snaps_col = sols[col]
+    energy_norm_col = energy_norm[col]
+    norm_matrix = get_norm_matrix(feop,energy_norm_col)
+    basis_space_nnz,basis_time = compress(info,feop_row_col,snaps_col,norm_matrix,args...)
     basis_space = recast(basis_space_nnz)
     basis_space,basis_time,norm_matrix
   end
@@ -122,14 +122,14 @@ function add_space_supremizers(
   args...)
 
   bs_primal,bs_dual... = bases_space
-  nm_primal,nm_dual... = norm_matrix
+  nm_primal, = norm_matrix
   dual_nfields = length(bs_dual)
   for (row,col) in index_pairs(1,dual_nfields)
     println("Computing supremizers in space for dual field $col")
     feop_row_col = feop[row,col+1]
-    supr_row = space_supremizers(bs_dual[col],feop_row_col,args...)
-    gram_schmidt!(supr_row,bs_primal,nm_dual[col])
-    bs_primal = hcat(bs_primal,supr_row)
+    supr_col = space_supremizers(bs_dual[col],feop_row_col,args...)
+    gram_schmidt!(supr_col,bs_primal,nm_primal)
+    bs_primal = hcat(bs_primal,supr_col)
   end
   return [bs_primal,bs_dual...]
 end
@@ -151,10 +151,10 @@ end
 function add_time_supremizers(bases_time::Vector{<:Matrix};kwargs...)
   bt_primal,bt_dual... = bases_time
   dual_nfields = length(bt_dual)
-  for (row,col) in index_pairs(dual_nfields,1)
-    println("Computing supremizers in time for dual field $row")
-    supr_row = add_time_supremizers(bt_primal,bt_dual[row];kwargs...)
-    bt_primal = hcat(bt_primal,supr_row)
+  for col in 1:dual_nfields
+    println("Computing supremizers in time for dual field $col")
+    supr_col = add_time_supremizers(bt_primal,bt_dual[col];kwargs...)
+    bt_primal = hcat(bt_primal,supr_col)
   end
   return [bt_primal,bt_dual...]
 end
@@ -201,11 +201,13 @@ end
 
 struct BlockRBAlgebraicContribution{T,N} <: RBBlock{T,N}
   blocks::Array{RBAlgebraicContribution{T},N}
+  touched::Array{Bool,N}
 
   function BlockRBAlgebraicContribution(
-    blocks::Array{RBAlgebraicContribution{T},N}) where {T,N}
+    blocks::Array{RBAlgebraicContribution{T},N},
+    touched::Array{Bool,N}) where {T,N}
 
-    new{T,N}(blocks)
+    new{T,N}(blocks,touched)
   end
 end
 
@@ -243,14 +245,22 @@ function collect_compress_rhs(
   times = get_times(fesolver)
   nblocks = get_nblocks(rbspace)
   @assert length(snaps) == nblocks
-  blocks = map(index_pairs(nblocks,1)) do (row,col)
-    feop_row_col = feop[row,col]
-    snaps_row = snaps[row]
+  result = map(1:nblocks) do row
+    feop_row_col = feop[row,:]
+    vsnaps = vcat(snaps...)
     rbspace_row = rbspace[row]
-    ress,trian = collect_residuals_for_trian(fesolver,feop_row_col,snaps_row,μ,times)
-    compress_component(info,feop_row,ress,trian,times,rbspace_row)
+    touched = check_touched_residuals(feop_row_col,vsnaps,μ,times)
+    if touched
+      ress,trian = collect_residuals_for_trian(fesolver,feop_row_col,vsnaps,μ,times)
+      rbres = compress_component(info,feop_row_col,ress,trian,times,rbspace_row)
+    else
+      rbres = testvalue(RBAlgebraicContribution,feop;vector=true)
+    end
+    rbres,touched
   end
-  return BlockRBAlgebraicContribution(blocks)
+  blocks = first.(result)
+  touched = last.(result)
+  return BlockRBAlgebraicContribution(blocks,touched)
 end
 
 function collect_compress_lhs(
@@ -268,17 +278,65 @@ function collect_compress_lhs(
   ad_jacs = Vector{BlockRBAlgebraicContribution{T,2}}(undef,njacs)
   for i = 1:njacs
     combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*x-θ*y
-    blocks = map(index_pairs(nblocks,nblocks)) do (row,col)
+    result_i = map(index_pairs(nblocks,nblocks)) do (row,col)
       feop_row_col = feop[row,col]
-      snaps_row = snaps[row]
+      snaps_col = snaps[col]
       rbspace_row = rbspace[row]
       rbspace_col = rbspace[col]
-      jacs,trian = collect_jacobians_for_trian(fesolver,feop_row_col,snaps_row,μ,times;i)
-      compress_component(info,feop_row_col,jacs,trian,times,rbspace_row,rbspace_col;combine_projections)
+      touched = check_touched_jacobians(feop_row_col,snaps_col,μ,times;i)
+      if touched
+        jacs,trian = collect_jacobians_for_trian(fesolver,feop_row_col,snaps_col,μ,times;i)
+        rbjac = compress_component(info,feop_row_col,jacs,trian,times,rbspace_row,rbspace_col;combine_projections)
+      else
+        rbjac = testvalue(RBAlgebraicContribution,feop;vector=false)
+      end
+      rbjac,touched
     end
-    ad_jacs[i] = BlockRBAlgebraicContribution(blocks)
+    blocks_i = first.(result_i)
+    touched_i = last.(touched_i)
+    ad_jacs[i] = BlockRBAlgebraicContribution(blocks_i,touched_i)
   end
   return ad_jacs
+end
+
+function check_touched_residuals(
+  feop::PTFEOperator,
+  sols::PTArray,
+  μ::Table,
+  times::Vector{<:Real};
+  kwargs...)
+
+  ode_op = get_algebraic_operator(feop)
+  test = get_test(feop)
+  Us, = allocate_cache(ode_op,μ,times)
+  uh = EvaluationFunction(Us[1],sols)
+  μ1 = testitem(μ)
+  t1 = testitem(times)
+  uh1 = testitem(uh)
+  dv = get_fe_basis(test)
+  int = feop.res(μ1,t1,uh1,dv)
+  return isnothing(int)
+end
+
+function check_touched_jacobians(
+  feop::PTFEOperator,
+  sols::PTArray,
+  μ::Table,
+  times::Vector{<:Real};
+  i=1)
+
+  ode_op = get_algebraic_operator(feop)
+  test = get_test(feop)
+  trial = get_trial(feop)
+  Us, = allocate_cache(ode_op,μ,times)
+  uh = EvaluationFunction(Us[1],sols)
+  μ1 = testitem(μ)
+  t1 = testitem(times)
+  uh1 = testitem(uh)
+  dv = get_fe_basis(test)
+  du = get_trial_fe_basis(trial(nothing,nothing))
+  int = feop.jacs[i](μ1,t1,uh1,dv,du)
+  return isnothing(int)
 end
 
 function collect_rhs_contributions!(
@@ -287,15 +345,21 @@ function collect_rhs_contributions!(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbres::BlockRBAlgebraicContribution{T,1},
+  rbspace::BlockRBSpace{T},
   sols::Vector{<:PTArray},
   args...) where T
 
   nblocks = get_nblocks(rbres)
-  blocks = map(index_pairs(nblocks,1)) do (row,col)
-    feop_row_col = feop[row,col]
-    sols_row = sols[row]
+  blocks = map(1:nblocks) do row
+    feop_row = feop[row,:]
+    vsnaps = vcat(sols...)
     rbres_row = rbres[row]
-    collect_rhs_contributions!(cache,info,feop_row_col,fesolver,rbres_row,sols_row,args...)
+    if rbres_row.touched
+      collect_rhs_contributions!(cache,info,feop_row,fesolver,rbres_row,vsnaps,args...)
+    else
+      rbspace_row = rbspace[row]
+      allocate_vector(rbspace_row)
+    end
   end
   vcat(blocks...)
 end
@@ -306,6 +370,7 @@ function collect_lhs_contributions!(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbjacs::Vector{BlockRBAlgebraicContribution{T,2}},
+  rbspace::BlockRBSpace{T},
   sols::Vector{<:PTArray},
   args...) where T
 
@@ -316,9 +381,15 @@ function collect_lhs_contributions!(
     rb_jac_i = rbjacs[i]
     blocks = map(index_pairs(nblocks,nblocks)) do (row,col)
       feop_row_col = feop[row,col]
-      sols_row = sols[row]
+      sols_col = sols[col]
       rb_jac_i_row_col = rb_jac_i[row,col]
-      collect_lhs_contributions!(cache,info,feop_row_col,fesolver,rb_jac_i_row_col,sols_row,args...;i)
+      if rb_jac_i_row_col.touched
+        collect_lhs_contributions!(cache,info,feop_row_col,fesolver,rb_jac_i_row_col,sols_col,args...;i)
+      else
+        rbspace_row = rbspace[row]
+        rbspace_col = rbspace[col]
+        allocate_matrix(rbspace_row,rbspace_col)
+      end
     end
     rb_jacs_contribs[i] = hvcat(blocks...)
   end

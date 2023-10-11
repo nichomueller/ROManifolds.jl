@@ -24,6 +24,17 @@ end
 Base.getindex(a::RBAlgebraicContribution,trian::Triangulation) = get_contribution(a,trian)
 Base.eltype(::RBAlgebraicContribution{T}) where T = T
 
+function Arrays.testvalue(
+  ::Type{RBAlgebraicContribution{T}},
+  feop::PTFEOperator;
+  kwargs...) where T
+
+  a = RBAlgebraicContribution(T)
+  trian = get_triangulation(feop.test)
+  ad = testvalue(RBAlgebraicContribution{T},feop;kwargs...)
+  add_contribution!(a,trian,ad)
+end
+
 function CellData.add_contribution!(
   a::RBAlgebraicContribution,
   trian::Triangulation,
@@ -171,6 +182,7 @@ function collect_rhs_contributions!(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbres::RBAlgebraicContribution{T},
+  ::RBSpace{T},
   args...) where T
 
   coeff_cache,rb_cache = cache
@@ -192,6 +204,7 @@ function collect_lhs_contributions!(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbjacs::Vector{RBAlgebraicContribution{T}},
+  ::RBSpace{T},
   args...) where T
 
   njacs = length(rbjacs)
