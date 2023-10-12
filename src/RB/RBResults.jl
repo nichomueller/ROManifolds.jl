@@ -1,52 +1,53 @@
-abstract type AbstractRBResults end
-
-Base.length(r::AbstractRBResults) = length(r.params)
-
-struct RBResults <: AbstractRBResults
+struct RBResults{T}
+  name::Symbol
   params::Table
-  sol::PTArray
-  sol_approx::PTArray
+  sol::PTArray{Matrix{T}}
+  sol_approx::PTArray{Matrix{T}}
   relative_err::Vector{Float}
   wall_time::Float
   nallocations::Float
+
+  function RBResults(
+    params::Table,
+    sol::PTArray{Matrix{T}},
+    sol_approx::PTArray{Matrix{T}},
+    stats::NamedTuple;
+    name=:vel,
+    kwargs...) where T
+
+    relative_err = compute_relative_error(sol,sol_approx;kwargs...)
+    wall_time = stats[:time]
+    nallocations = stats[:bytes]/1e6
+    new{T}(name,params,sol,sol_approx,relative_err,wall_time,nallocations)
+  end
 end
 
-function RBResults(
-  params::Table,
-  sol::PTArray,
-  sol_approx::PTArray,
-  stats::NamedTuple;
-  kwargs...)
-
-  relative_err = compute_relative_error(sol,sol_approx;kwargs...)
-  wall_time = stats[:time]
-  nallocations = stats[:bytes]/1e6
-  RBResults(params,sol,sol_approx,relative_err,wall_time,nallocations)
-end
-
+Base.length(r::RBResults) = length(r.params)
 get_avg_error(r::RBResults) = sum(r.relative_err) / length(r)
 get_avg_time(r::RBResults) = r.wall_time / length(r)
 get_avg_nallocs(r::RBResults) = r.nallocations / length(r)
 
 function Base.show(io::IO,r::RBResults)
+  name = r.name
   avg_err = get_avg_error(r)
   avg_time = get_avg_time(r)
   avg_nallocs = get_avg_nallocs(r)
   print(io,"-------------------------------------------------------------\n")
-  print(io,"Average online relative errors: $avg_err\n")
+  print(io,"Average online relative errors for $name: $avg_err\n")
   print(io,"Average online wall time: $avg_time [s]\n")
   print(io,"Average number of allocations: $avg_nallocs [Mb]\n")
   print(io,"-------------------------------------------------------------\n")
 end
 
 function Base.first(r::RBResults)
+  name = r.name
   μ = r.params[1]
   sol = r.sol[1]
   sol_approx = r.sol_approx[1]
   relative_err = get_avg_error(r)
   wall_time = get_avg_time(r)
   nallocations = get_avg_nallocs(r)
-  μ,sol,sol_approx,relative_err,wall_time,nallocations
+  name,μ,sol,sol_approx,relative_err,wall_time,nallocations
 end
 
 function save(info::RBInfo,r::RBResults)
@@ -70,10 +71,9 @@ function post_process(
   sol_approx::PTArray{T},
   stats::NamedTuple) where T
 
-  energy_norm = energy_norm=info.energy_norm
+  energy_norm = info.energy_norm
   norm_matrix = get_norm_matrix(feop,energy_norm)
   _sol = space_time_matrices(sol;nparams=length(params))
-
   results = RBResults(params,_sol,sol_approx,stats;norm_matrix)
   show(results)
   save(info,results)
@@ -94,10 +94,8 @@ function allocate_online_cache(
   b = allocate_residual(ode_op,params,times,snaps_test,ode_cache)
   A = allocate_jacobian(ode_op,params,times,snaps_test,ode_cache)
 
-  rb_ndofs = num_rb_dofs(rbspace)
-  ncoeff = length(params)
-  coeff = zeros(T,rb_ndofs,rb_ndofs)
-  ptcoeff = PTArray([zeros(T,rb_ndofs,rb_ndofs) for _ = 1:ncoeff])
+  coeff = allocate_matrix(rbspace,rbspace)
+  ptcoeff = PTArray([allocate_matrix(rbspace,rbspace) for _ = eachindex(params)])
 
   k = RBContributionMap()
   rbres = testvalue(RBAffineDecomposition{T},feop;vector=true)
@@ -114,10 +112,10 @@ function test_rb_solver(
   info::RBInfo,
   feop::PTFEOperator{Affine},
   fesolver::PODESolver,
-  rbspace::AbstractRBSpace,
-  rbres::RBAlgebraicContribution,
-  rbjacs::Vector{<:RBAlgebraicContribution},
-  snaps::Snapshots,
+  rbspace,
+  rbres,
+  rbjacs,
+  snaps,
   params::Table)
 
   snaps_test,params_test = load_test(info,feop,fesolver)
@@ -139,10 +137,10 @@ function test_rb_solver(
   info::RBInfo,
   feop::PTFEOperator,
   fesolver::PODESolver,
-  rbspace::AbstractRBSpace,
-  rbres::RBAlgebraicContribution,
-  rbjacs::Vector{<:RBAlgebraicContribution},
-  snaps::Snapshots,
+  rbspace,
+  rbres,
+  rbjacs,
+  snaps,
   params::Table)
 
   snaps_test,params_test = load_test(info,feop,fesolver)
@@ -277,7 +275,7 @@ function Gridap.Visualization.writevtk(
   trian = get_triangulation(test)
   times = get_times(fesolver)
 
-  μ,sol,sol_approx, = first(results)
+  name,μ,sol,sol_approx, = first(results)
   pointwise_err = abs.(sol-sol_approx)
 
   plt_dir = joinpath(info.rb_path,"plots")
@@ -286,9 +284,9 @@ function Gridap.Visualization.writevtk(
     fsol = FEFunction(trial(μ,t),sol[:,it])
     fsol_approx = FEFunction(trial(μ,t),sol_approx[:,it])
     ferr = FEFunction(trial(μ,t),pointwise_err[:,it])
-    writevtk(trian,joinpath(plt_dir,"sol_$(it).vtu"),cellfields=["err"=>fsol])
-    writevtk(trian,joinpath(plt_dir,"sol_approx_$(it).vtu"),cellfields=["err"=>fsol_approx])
-    writevtk(trian,joinpath(plt_dir,"err_$(it).vtu"),cellfields=["err"=>ferr])
+    writevtk(trian,joinpath(plt_dir,"$(name)_$(it).vtu"),cellfields=["$name"=>fsol])
+    writevtk(trian,joinpath(plt_dir,"$(name)_approx_$(it).vtu"),cellfields=["$(name)_approx"=>fsol_approx])
+    writevtk(trian,joinpath(plt_dir,"$(name)_err_$(it).vtu"),cellfields=["$(name)_err"=>ferr])
   end
 end
 

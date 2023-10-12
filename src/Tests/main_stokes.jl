@@ -80,61 +80,58 @@ begin
   # reduced_basis_model(info,feop,fesolver)
 end
 
+sols,params = load(info,(BlockSnapshots,Table))
+rbspace = load(info,BlockRBSpace)
+rbrhs,rblhs = load(info,(VecBlockRBAlgebraicContribution,Vector{MatBlockRBAlgebraicContribution}))
+
 nsnaps = info.nsnaps_state
 params = realization(feop,nsnaps)
 trial = get_trial(feop)
 sols,stats = collect_solutions(fesolver,feop,trial,params)
+save(info,(sols,params,stats))
 rbspace = reduced_basis(info,feop,sols,params)
-# energy_norm = info.energy_norm
-# nblocks = get_nblocks(sols)
-# blocks = map(index_pairs(nblocks,1)) do (row,col)
-#   feop_row_col = feop[row,col]
-#   snaps_row = sols[row]
-#   energy_norm_row = energy_norm[row]
-#   norm_matrix = get_norm_matrix(feop,energy_norm_row)
-#   basis_space_nnz,basis_time = compress(info,feop_row_col,snaps_row,norm_matrix,fesolver,params)
-#   basis_space = recast(basis_space_nnz)
-#   basis_space,basis_time,norm_matrix
-# end
-# bases_space = getindex.(blocks,1)
-# bases_time = getindex.(blocks,2)
-# norm_matrix = getindex.(blocks,3)
-# if compute_supremizers
-#   bases_space = add_space_supremizers(bases_space,feop,norm_matrix,params)
-#   bases_time = add_time_supremizers(bases_time)
-# end
-# rbspace = BlockRBSpace(bases_space,bases_time)
+rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
+save(info,(rbspace,rbrhs,rblhs))
 
-# rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
-nblocks = get_nblocks(rbspace)
-nsnaps = info.nsnaps_system
-snapsθ = recenter(fesolver,sols,params)
-_μ = params[1:nsnaps]
-_snapsθ = map(1:nblocks) do row
-  snapsθ_row = snapsθ[row]
-  snapsθ_row[1:nsnaps]
+snaps_test,params_test = load_test(info,feop,fesolver)
+x = initial_guess(sols,params,params_test)
+rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,rbspace,snaps_test,params_test)
+rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbrhs,rbspace,x,params_test)
+lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,rbspace,x,params_test)
+stats = @timed begin
+  rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs)
 end
+approx_snaps_test = recast(rbspace,rb_snaps_test)
 
-rhs = collect_compress_rhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
-# times = get_times(fesolver)
-# nblocks = get_nblocks(rbspace)
-# @assert length(_snapsθ) == nblocks
-# row = 2
-# feop_row_col = feop[row,:]
-# vsnaps = vcat(_snapsθ...)
-# rbspace_row = rbspace[row]
-# ress,trian = collect_residuals_for_trian(fesolver,feop_row_col,vsnaps,_μ,times)
-# compress_component(info,feop_row_col,ress,trian,times,rbspace_row)
 
-times = get_times(fesolver)
-njacs = length(feop.jacs)
-ad_jacs = Vector{BlockRBAlgebraicContribution{Float,2}}(undef,njacs)
+# lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,rbspace,x,params_test)
+njacs = length(rblhs)
+nblocks = get_nblocks(testitem(rblhs))
+rb_jacs_contribs = Vector{PTArray{Matrix{Float}}}(undef,njacs)
 i = 1
-combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*x-θ*y
-row,col = 2,2
+row,col = 1,1
+
+rb_jac_i = rblhs[i]
 feop_row_col = feop[row,col]
-snaps_col = _snapsθ[col]
+sols_col = x[col]
+rb_jac_i_row_col,touched_i_row_col = rb_jac_i[row,col]
 rbspace_row = rbspace[row]
 rbspace_col = rbspace[col]
-jacs,trian = collect_jacobians_for_trian(fesolver,feop_row_col,snaps_col,_μ,times;i)
-compress_component(info,feop_row_col,jacs,trian,times,rbspace_row,rbspace_col;combine_projections)
+# collect_lhs_contributions!(lhs_cache,info,feop_row_col,fesolver,rb_jac_i_row_col,rbspace_col,sols_col,params_test;i)
+coeff_cache,rb_cache = lhs_cache
+trian = [get_domains(rb_jac_i_row_col)...]
+st_mdeim = info.st_mdeim
+times = get_times(fesolver)
+
+rb_jac_contribs = Vector{PTArray{Matrix{Float}}}(undef,num_domains(rb_jac_i_row_col))
+rbjact = rb_jac_i_row_col[Ω]
+# coeff = lhs_coefficient!(coeff_cache,feop_row_col,fesolver,rbjact,sols_col,params_test;st_mdeim,i)
+Uh = get_trial(feop_row_col)(params_test,times)
+V = get_test(feop_row_col)
+u = get_trial_fe_basis(Uh)
+v = get_fe_basis(V)
+v0 = zero(test_u)
+dc = feop_row_col.jacs[i](params_test,times,v0,u,v)[dΩ]
+matdata = collect_cell_matrix(Uh,V,dc)
+A = allocate_jacobian(op,x)
+assemble_matrix_add!(A,op.assem,matdata)

@@ -24,8 +24,8 @@ include("NnzArrays.jl")
 include("RBSpaces.jl")
 include("RBAffineDecomposition.jl")
 include("RBAlgebraicContribution.jl")
-include("RBBlocks.jl")
 include("RBResults.jl")
+include("RBBlocks.jl")
 
 function reduced_basis_model(
   info::RBInfo,

@@ -63,7 +63,7 @@ for (fsave,fload) in zip((:save,:save_test),(:load,:load_test))
     function $fload(info::RBInfo,types::Tuple)
       map(type->$fload(info,type),expand(types))
     end
-end
+  end
 end
 
 function save(info::RBInfo,params::Table)
@@ -71,7 +71,7 @@ function save(info::RBInfo,params::Table)
     path = joinpath(info.fe_path,"params")
     save(path,params)
   end
-  end
+end
 
 function load(info::RBInfo,T::Type{Table})
   path = joinpath(info.fe_path,"params")
@@ -83,7 +83,7 @@ function save(info::RBInfo,stats::NamedTuple)
     path = joinpath(info.fe_path,"stats")
     save(path,stats)
   end
-  end
+end
 
 function load(info::RBInfo,T::Type{NamedTuple})
   path = joinpath(info.fe_path,"stats")

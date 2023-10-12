@@ -23,7 +23,25 @@ struct BlockSnapshots{T} <: RBBlock{T,1}
   end
 end
 
-const AbstractSnapshots{T} = Union{Snapshots{T},BlockSnapshots{T}}
+function Base.getindex(s::BlockSnapshots{T},idx::UnitRange{Int}) where T
+  nblocks = get_nblocks(s)
+  map(1:nblocks) do row
+    srow = s[row]
+    srow[idx]
+  end
+end
+
+function save(info::RBInfo,s::BlockSnapshots)
+  if info.save_solutions
+    path = joinpath(info.fe_path,"fesnaps")
+    save(path,s)
+  end
+end
+
+function load(info::RBInfo,T::Type{BlockSnapshots})
+  path = joinpath(info.fe_path,"fesnaps")
+  load(path,T)
+end
 
 function recenter(
   fesolver::PThetaMethod,
@@ -76,7 +94,17 @@ struct BlockRBSpace{T} <: RBBlock{T,1}
   end
 end
 
-const AbstractRBSpace{T} = Union{RBSpace{T},BlockRBSpace{T}}
+function save(info::RBInfo,rb::BlockRBSpace)
+  if info.save_structures
+    path = joinpath(info.rb_path,"rb")
+    save(path,rb)
+  end
+end
+
+function load(info::RBInfo,T::Type{BlockRBSpace})
+  path = joinpath(info.rb_path,"rb")
+  load(path,T)
+end
 
 function num_rb_dofs(rb::BlockRBSpace)
   nblocks = get_nblocks(rb)
@@ -96,8 +124,8 @@ function reduced_basis(
 
   energy_norm = info.energy_norm
   nblocks = get_nblocks(snaps)
-  blocks = map(index_pairs(1,nblocks)) do (row,col)
-    feop_row_col = feop[row,col]
+  blocks = map(1:nblocks) do col
+    feop_row_col = feop[1,col]
     snaps_col = sols[col]
     energy_norm_col = energy_norm[col]
     norm_matrix = get_norm_matrix(feop,energy_norm_col)
@@ -124,9 +152,9 @@ function add_space_supremizers(
   bs_primal,bs_dual... = bases_space
   nm_primal, = norm_matrix
   dual_nfields = length(bs_dual)
-  for (row,col) in index_pairs(1,dual_nfields)
+  for col in 1:dual_nfields
     println("Computing supremizers in space for dual field $col")
-    feop_row_col = feop[row,col+1]
+    feop_row_col = feop[1,col+1]
     supr_col = space_supremizers(bs_dual[col],feop_row_col,args...)
     gram_schmidt!(supr_col,bs_primal,nm_primal)
     bs_primal = hcat(bs_primal,supr_col)
@@ -201,17 +229,104 @@ end
 
 struct BlockRBAlgebraicContribution{T,N} <: RBBlock{T,N}
   blocks::Array{RBAlgebraicContribution{T},N}
-  touched::Array{Bool,N}
+  touched::BitArray{N}
 
   function BlockRBAlgebraicContribution(
     blocks::Array{RBAlgebraicContribution{T},N},
-    touched::Array{Bool,N}) where {T,N}
+    touched::BitArray{N}) where {T,N}
 
     new{T,N}(blocks,touched)
   end
 end
 
-const AbstractRBAlgebraicContribution{T,N} = Union{RBAlgebraicContribution{T},BlockRBAlgebraicContribution{T,N}}
+const VecBlockRBAlgebraicContribution{T} = BlockRBAlgebraicContribution{T,1}
+const MatBlockRBAlgebraicContribution{T} = BlockRBAlgebraicContribution{T,2}
+
+Base.getindex(a::BlockRBAlgebraicContribution,idx...) = a.blocks[idx...],a.touched[idx...]
+get_nblocks(a::MatBlockRBAlgebraicContribution) = size(a.blocks,2)
+
+function save_algebraic_contrib(path::String,a::VecBlockRBAlgebraicContribution{T}) where T
+  for row in 1:get_nblocks(a)
+    block,touched = a[row]
+    rpath = joinpath(path,"block_$row")
+    create_dir!(rpath)
+    tpath = joinpath(rpath,"touched")
+    save_algebraic_contrib(rpath,block)
+    save(tpath,touched)
+  end
+end
+
+function save_algebraic_contrib(path::String,a::MatBlockRBAlgebraicContribution{T}) where T
+  create_dir!(path)
+  for (row,col) in index_pairs(get_nblocks(a),get_nblocks(a))
+    block,touched = a[row,col]
+    rcpath = joinpath(path,"block_$(row)_$(col)")
+    create_dir!(rcpath)
+    tpath = joinpath(rcpath,"touched")
+    save_algebraic_contrib(rcpath,block)
+    save(tpath,touched)
+  end
+end
+
+function load_algebraic_contrib(path::String,::Type{VecBlockRBAlgebraicContribution})
+  nblocks = num_active_dirs(path)
+  result = map(1:nblocks) do row
+    rpath = joinpath(path,"block_$row")
+    tpath = joinpath(rpath,"touched")
+    block = load_algebraic_contrib(rpath,RBAlgebraicContribution)
+    touched = load(tpath,Bool)
+    block,touched
+  end
+  blocks = first.(result)
+  touched = last.(result)
+  return BlockRBAlgebraicContribution(blocks,touched)
+end
+
+function load_algebraic_contrib(path::String,::Type{MatBlockRBAlgebraicContribution})
+  nblocks = num_active_dirs(path)
+  result = map(index_pairs(nblocks,nblocks)) do (row,col)
+    rcpath = joinpath(path,"block_$(row)_$(col)")
+    tpath = joinpath(rcpath,"touched")
+    block = load_algebraic_contrib(rcpath,RBAlgebraicContribution)
+    touched = load(tpath,Bool)
+    block,touched
+  end
+  blocks = first.(result)
+  touched = last.(result)
+  return BlockRBAlgebraicContribution(blocks,touched)
+end
+
+function save(info::RBInfo,a::VecBlockRBAlgebraicContribution)
+  if info.save_structures
+    path = joinpath(info.rb_path,"rb_rhs")
+    save_algebraic_contrib(path,a)
+  end
+end
+
+function load(info::RBInfo,T::Type{VecBlockRBAlgebraicContribution})
+  path = joinpath(info.rb_path,"rb_rhs")
+  load_algebraic_contrib(path,T)
+end
+
+function save(info::RBInfo,a::Vector{MatBlockRBAlgebraicContribution{T}}) where T
+  if info.save_structures
+    for i = eachindex(a)
+      path = joinpath(info.rb_path,"rb_lhs_$i")
+      save_algebraic_contrib(path,a[i])
+    end
+  end
+end
+
+function load(info::RBInfo,::Type{Vector{MatBlockRBAlgebraicContribution}})
+  T = load(joinpath(joinpath(joinpath(info.rb_path,"rb_lhs_1"),"block_1_1"),"type"),DataType)
+  njacs = num_active_dirs(info.rb_path)
+  ad_jacs = Vector{MatBlockRBAlgebraicContribution{T}}(undef,njacs)
+  for i = 1:njacs
+    path = joinpath(info.rb_path,"rb_lhs_$i")
+    ad_jacs[i] = load_algebraic_contrib(path,MatBlockRBAlgebraicContribution)
+  end
+  ad_jacs
+end
 
 function collect_compress_rhs_lhs(
   info::RBInfo,
@@ -221,14 +336,9 @@ function collect_compress_rhs_lhs(
   snaps::BlockSnapshots,
   μ::Table)
 
-  nblocks = get_nblocks(rbspace)
   nsnaps = info.nsnaps_system
   snapsθ = recenter(fesolver,snaps,μ)
-  _μ = μ[1:nsnaps]
-  _snapsθ = map(1:nblocks) do row
-    snapsθ_row = snapsθ[row]
-    snapsθ_row[1:nsnaps]
-  end
+  _snapsθ,_μ = snapsθ[1:nsnaps],μ[1:nsnaps]
   rhs = collect_compress_rhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
   lhs = collect_compress_lhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
   rhs,lhs
@@ -238,9 +348,9 @@ function collect_compress_rhs(
   info::RBInfo,
   feop::PTFEOperator,
   fesolver::PODESolver,
-  rbspace::BlockRBSpace,
+  rbspace::BlockRBSpace{T},
   snaps::Vector{<:PTArray},
-  μ::Table)
+  μ::Table) where T
 
   times = get_times(fesolver)
   nblocks = get_nblocks(rbspace)
@@ -254,7 +364,7 @@ function collect_compress_rhs(
       ress,trian = collect_residuals_for_trian(fesolver,feop_row_col,vsnaps,μ,times)
       rbres = compress_component(info,feop_row_col,ress,trian,times,rbspace_row)
     else
-      rbres = testvalue(RBAlgebraicContribution,feop;vector=true)
+      rbres = testvalue(RBAlgebraicContribution{T},feop_row_col;vector=true)
     end
     rbres,touched
   end
@@ -273,6 +383,7 @@ function collect_compress_lhs(
 
   times = get_times(fesolver)
   θ = fesolver.θ
+  nblocks = get_nblocks(rbspace)
 
   njacs = length(feop.jacs)
   ad_jacs = Vector{BlockRBAlgebraicContribution{T,2}}(undef,njacs)
@@ -288,12 +399,12 @@ function collect_compress_lhs(
         jacs,trian = collect_jacobians_for_trian(fesolver,feop_row_col,snaps_col,μ,times;i)
         rbjac = compress_component(info,feop_row_col,jacs,trian,times,rbspace_row,rbspace_col;combine_projections)
       else
-        rbjac = testvalue(RBAlgebraicContribution,feop;vector=false)
+        rbjac = testvalue(RBAlgebraicContribution{T},feop_row_col;vector=false)
       end
       rbjac,touched
     end
     blocks_i = first.(result_i)
-    touched_i = last.(touched_i)
+    touched_i = last.(result_i)
     ad_jacs[i] = BlockRBAlgebraicContribution(blocks_i,touched_i)
   end
   return ad_jacs
@@ -313,9 +424,14 @@ function check_touched_residuals(
   μ1 = testitem(μ)
   t1 = testitem(times)
   uh1 = testitem(uh)
+  dxh1 = ()
+  for i in 1:get_order(feop)
+    dxh1 = (dxh1...,uh1)
+  end
+  xh1 = TransientCellField(uh1,dxh1)
   dv = get_fe_basis(test)
-  int = feop.res(μ1,t1,uh1,dv)
-  return isnothing(int)
+  int = feop.res(μ1,t1,xh1,dv)
+  return !isnothing(int)
 end
 
 function check_touched_jacobians(
@@ -333,10 +449,15 @@ function check_touched_jacobians(
   μ1 = testitem(μ)
   t1 = testitem(times)
   uh1 = testitem(uh)
+  dxh1 = ()
+  for i in 1:get_order(feop)
+    dxh1 = (dxh1...,uh1)
+  end
+  xh1 = TransientCellField(uh1,dxh1)
   dv = get_fe_basis(test)
   du = get_trial_fe_basis(trial(nothing,nothing))
-  int = feop.jacs[i](μ1,t1,uh1,dv,du)
-  return isnothing(int)
+  int = feop.jacs[i](μ1,t1,xh1,du,dv)
+  return !isnothing(int)
 end
 
 function collect_rhs_contributions!(
@@ -353,11 +474,11 @@ function collect_rhs_contributions!(
   blocks = map(1:nblocks) do row
     feop_row = feop[row,:]
     vsnaps = vcat(sols...)
-    rbres_row = rbres[row]
-    if rbres_row.touched
-      collect_rhs_contributions!(cache,info,feop_row,fesolver,rbres_row,vsnaps,args...)
+    rbres_row,touched_row = rbres[row]
+    rbspace_row = rbspace[row]
+    if touched_row
+      collect_rhs_contributions!(cache,info,feop_row,fesolver,rbres_row,rbspace_row,vsnaps,args...)
     else
-      rbspace_row = rbspace[row]
       allocate_vector(rbspace_row)
     end
   end
@@ -382,16 +503,80 @@ function collect_lhs_contributions!(
     blocks = map(index_pairs(nblocks,nblocks)) do (row,col)
       feop_row_col = feop[row,col]
       sols_col = sols[col]
-      rb_jac_i_row_col = rb_jac_i[row,col]
-      if rb_jac_i_row_col.touched
-        collect_lhs_contributions!(cache,info,feop_row_col,fesolver,rb_jac_i_row_col,sols_col,args...;i)
+      rb_jac_i_row_col,touched_i_row_col = rb_jac_i[row,col]
+      rbspace_row = rbspace[row]
+      rbspace_col = rbspace[col]
+      if touched_i_row_col
+        collect_lhs_contributions!(
+            cache,info,feop_row_col,fesolver,rb_jac_i_row_col,rbspace_col,sols_col,args...;i)
       else
-        rbspace_row = rbspace[row]
-        rbspace_col = rbspace[col]
         allocate_matrix(rbspace_row,rbspace_col)
       end
     end
     rb_jacs_contribs[i] = hvcat(blocks...)
   end
   return sum(rb_jacs_contribs)
+end
+
+function save_test(info::RBInfo,snaps::BlockSnapshots)
+  if info.save_structures
+    path = joinpath(info.fe_path,"fesnaps_test")
+    save(path,snaps)
+  end
+end
+
+function load_test(info::RBInfo,T::Type{BlockSnapshots})
+  path = joinpath(info.fe_path,"fesnaps_test")
+  load(path,T)
+end
+
+function post_process(
+  info::RBInfo,
+  feop::PTFEOperator,
+  fesolver::PODESolver,
+  sol::Vector{<:PTArray},
+  params::Table,
+  sol_approx::Vector{PTArray{T}},
+  stats::NamedTuple) where T
+
+  nblocks = length(sol)
+  energy_norm = info.energy_norm
+  map(1:nblocks) do col
+    feop_col = feop[col,col]
+    sol_col = sol[col]
+    sol_approx_col = sol_approx[col]
+    norm_matrix_col = get_norm_matrix(feop_col,energy_norm[col])
+    _sol_col = space_time_matrices(sol_col;nparams=length(params))
+    results = RBResults(params,_sol_col,sol_approx_col,stats;name=Symbol("field$col"),norm_matrix_col)
+    show(results)
+    save(info,results)
+    writevtk(info,feop_col,fesolver,results)
+  end
+  return
+end
+
+function allocate_online_cache(
+  feop::PTFEOperator,
+  fesolver::PODESolver,
+  rbspace::BlockRBSpace{T},
+  snaps_test::Vector{<:PTArray},
+  params::Table) where T
+
+  rbspace1 = rbspace[1]
+  vsnaps = vcat(snaps_test...)
+  allocate_online_cache(feop,fesolver,rbspace1,vsnaps,params)
+end
+
+function initial_guess(
+  sols::BlockSnapshots,
+  params::Table,
+  params_test::Table)
+
+  nblocks = get_nblocks(sols)
+  kdtree = KDTree(map(x -> SVector(Tuple(x)),params))
+  idx_dist = map(x -> nn(kdtree,SVector(Tuple(x))),params_test)
+  map(1:nblocks) do row
+    srow = sols[row]
+    srow[first.(idx_dist)]
+  end
 end

@@ -31,7 +31,7 @@ function Arrays.testvalue(
 
   a = RBAlgebraicContribution(T)
   trian = get_triangulation(feop.test)
-  ad = testvalue(RBAlgebraicContribution{T},feop;kwargs...)
+  ad = testvalue(RBAffineDecomposition{T},feop;kwargs...)
   add_contribution!(a,trian,ad)
 end
 
@@ -95,15 +95,12 @@ function save(info::RBInfo,a::Vector{RBAlgebraicContribution{T}}) where T
 end
 
 function load(info::RBInfo,::Type{Vector{RBAlgebraicContribution}})
-  ad_jac1 = load_algebraic_contrib(joinpath(info.rb_path,"rb_lhs_1"),RBAlgebraicContribution)
-  T = eltype(ad_jac1)
-  ad_jacs = RBAlgebraicContribution{T}[]
-  push!(ad_jacs,ad_jac1)
-  i = 2
-  while isdir(joinpath(info.rb_path,"rb_lhs_$i"))
+  T = load(joinpath(joinpath(info.rb_path,"rb_lhs_1"),"type"),DataType)
+  njacs = num_active_dirs(info.rb_path)
+  ad_jacs = Vector{RBAlgebraicContribution{T}}(undef,njacs)
+  for i = 1:njacs
     path = joinpath(info.rb_path,"rb_lhs_$i")
-    push!(ad_jacs,load_algebraic_contrib(path,RBAlgebraicContribution))
-    i += 1
+    ad_jacs[i] = load_algebraic_contrib(path,RBAlgebraicContribution)
   end
   ad_jacs
 end
@@ -204,7 +201,6 @@ function collect_lhs_contributions!(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbjacs::Vector{RBAlgebraicContribution{T}},
-  ::RBSpace{T},
   args...) where T
 
   njacs = length(rbjacs)
@@ -222,6 +218,7 @@ function collect_lhs_contributions!(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbjac::RBAlgebraicContribution{T},
+  ::RBSpace{T},
   args...;
   kwargs...) where T
 

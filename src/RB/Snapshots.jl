@@ -41,10 +41,10 @@ function recenter(
   Snapshots(sθ)
 end
 
-function save(info::RBInfo,nzm::Snapshots)
+function save(info::RBInfo,s::Snapshots)
   if info.save_solutions
     path = joinpath(info.fe_path,"fesnaps")
-    save(path,nzm)
+    save(path,s)
   end
 end
 
