@@ -93,8 +93,7 @@ function collect_solutions(
   T = get_vector_type(trial_μt)
   uμt = PODESolution(fesolver,ode_op,μ,u0,t0,tf)
   sols = Vector{PTArray{T}}(undef,time_ndofs)
-  printstyled("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters\n";
-    underline=true)
+  println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters\n")
   stats = @timed for (sol,t,n) in uμt
     sols[n] = copy(sol)
   end
@@ -117,8 +116,7 @@ function collect_solutions(
   T = get_vector_type(trial_μt)
   uμt = PODESolution(fesolver,ode_op,μ,u0,t0,tf)
   sols = Vector{Vector{PTArray{T}}}(undef,time_ndofs)
-  printstyled("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters\n";
-    underline=true)
+  println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters\n")
   stats = @timed for (sol,t,n) in uμt
     sols[n] = split_fields(trial_μt,copy(sol))
   end

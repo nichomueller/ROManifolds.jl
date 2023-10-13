@@ -82,7 +82,7 @@ end
 
 sols,params = load(info,(BlockSnapshots,Table))
 rbspace = load(info,BlockRBSpace)
-rbrhs,rblhs = load(info,(VecBlockRBAlgebraicContribution,Vector{MatBlockRBAlgebraicContribution}))
+rbrhs,rblhs = load(info,(BlockRBVecAlgebraicContribution,Vector{BlockRBMatAlgebraicContribution}))
 
 nsnaps = info.nsnaps_state
 params = realization(feop,nsnaps)
@@ -95,13 +95,12 @@ save(info,(rbspace,rbrhs,rblhs))
 snaps_test,params_test = load_test(info,feop,fesolver)
 x = initial_guess(sols,params,params_test)
 rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,snaps_test,params_test)
-rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbrhs,rbspace,x,params_test)
-lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,rbspace,x,params_test)
+rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbrhs,x,params_test)
+lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,x,params_test)
 stats = @timed begin
   rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs)
 end
 approx_snaps_test = recast(rbspace,rb_snaps_test)
-
 
 # lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,rbspace,x,params_test)
 njacs = length(rblhs)

@@ -241,36 +241,46 @@ function add_time_supremizers(basis_u::Matrix,basis_p::Matrix;ttol=1e-2)
   basis_u
 end
 
-struct BlockRBAlgebraicContribution{T,N} <: RBBlock{T,N}
-  blocks::Array{RBAlgebraicContribution{T},N}
-  touched::BitArray{N}
+abstract type BlockRBAlgebraicContribution{T,N} <: RBBlock{T,N} end
 
-  function BlockRBAlgebraicContribution(
-    blocks::Array{RBAlgebraicContribution{T},N},
-    touched::BitArray{N}) where {T,N}
+struct BlockRBVecAlgebraicContribution{T} <: BlockRBAlgebraicContribution{T,1}
+  blocks::Vector{RBVecAlgebraicContribution{T}}
+  touched::Vector{Bool}
 
-    new{T,N}(blocks,touched)
+  function BlockRBVecAlgebraicContribution(
+    blocks::Vector{RBVecAlgebraicContribution{T}},
+    touched::Vector{Bool}) where T
+
+    new{T}(blocks,touched)
   end
 end
 
-const VecBlockRBAlgebraicContribution{T} = BlockRBAlgebraicContribution{T,1}
-const MatBlockRBAlgebraicContribution{T} = BlockRBAlgebraicContribution{T,2}
+struct BlockRBMatAlgebraicContribution{T} <: BlockRBAlgebraicContribution{T,2}
+  blocks::Matrix{RBMatAlgebraicContribution{T}}
+  touched::Matrix{Bool}
 
-Base.getindex(a::BlockRBAlgebraicContribution,idx...) = a.blocks[idx...],a.touched[idx...]
-get_nblocks(a::MatBlockRBAlgebraicContribution) = size(a.blocks,2)
+  function BlockRBMatAlgebraicContribution(
+    blocks::Matrix{RBMatAlgebraicContribution{T}},
+    touched::Matrix{Bool}) where T
 
-function Base.show(io::IO,a::BlockRBAlgebraicContribution{T}) where T
+    new{T}(blocks,touched)
+  end
+end
+
+Base.getindex(a::BlockRBAlgebraicContribution,idx...) = a.blocks[idx...]
+get_nblocks(a::BlockRBMatAlgebraicContribution) = size(a.blocks,2)
+
+function Base.show(io::IO,a::BlockRBAlgebraicContribution)
   for row in axes(a,1), col in axes(a,2)
-    a_row_col,touched = a[row,col]
-    if touched
+    if a.touched[row,col]
       print(io,"\n")
       printstyled("RB ALGEBRAIC CONTRIBUTIONS INFO, BLOCK ($row,$col)\n";underline=true)
-      for trian in get_domains(a_row_col)
-        atrian = a_row_col[trian]
+      for trian in get_domains(a.blocks[row,col])
+        atrian = a.blocks[row,col][trian]
         red_method = get_reduction_method(atrian)
         red_var = get_reduced_variable(atrian)
-        nbs = get_space_ndofs(atrian)
-        nbt = get_time_ndofs(atrian)
+        nbs = length(atrian.basis_space)
+        nbt = size(atrian.basis_time[1],2)
         print(io,"$red_var on a $trian, reduction in $red_method\n")
         print(io,"number basis vectors in (space, time) = ($nbs,$nbt)\n")
       end
@@ -278,74 +288,75 @@ function Base.show(io::IO,a::BlockRBAlgebraicContribution{T}) where T
   end
 end
 
-function Base.show(io::IO,a::Vector{<:BlockRBAlgebraicContribution})
-  map(x->show(io,x),a)
-end
-
-function save_algebraic_contrib(path::String,a::VecBlockRBAlgebraicContribution{T}) where T
+function save_algebraic_contrib(path::String,a::BlockRBVecAlgebraicContribution{T}) where T
+  tpath = joinpath(path,"touched")
+  create_dir!(tpath)
+  save(tpath,a.touched)
   for row in 1:get_nblocks(a)
-    block,touched = a[row]
-    rpath = joinpath(path,"block_$row")
-    create_dir!(rpath)
-    tpath = joinpath(rpath,"touched")
-    save_algebraic_contrib(rpath,block)
-    save(tpath,touched)
+    if a.touched[row]
+      rpath = joinpath(path,"block_$row")
+      create_dir!(rpath)
+      save_algebraic_contrib(rpath,a.blocks[row])
+    end
   end
 end
 
-function save_algebraic_contrib(path::String,a::MatBlockRBAlgebraicContribution{T}) where T
-  create_dir!(path)
+function save_algebraic_contrib(path::String,a::BlockRBMatAlgebraicContribution{T}) where T
+  tpath = joinpath(path,"touched")
+  create_dir!(tpath)
+  save(tpath,a.touched)
   for (row,col) in index_pairs(get_nblocks(a),get_nblocks(a))
-    block,touched = a[row,col]
-    rcpath = joinpath(path,"block_$(row)_$(col)")
-    create_dir!(rcpath)
-    tpath = joinpath(rcpath,"touched")
-    save_algebraic_contrib(rcpath,block)
-    save(tpath,touched)
+    if a.touched[row,col]
+      rcpath = joinpath(path,"block_$(row)_$(col)")
+      create_dir!(rcpath)
+      save_algebraic_contrib(rcpath,a.blocks[row,col])
+    end
   end
 end
 
-function load_algebraic_contrib(path::String,::Type{VecBlockRBAlgebraicContribution})
-  nblocks = num_active_dirs(path)
-  result = map(1:nblocks) do row
-    rpath = joinpath(path,"block_$row")
-    tpath = joinpath(rpath,"touched")
-    block = load_algebraic_contrib(rpath,RBAlgebraicContribution)
-    touched = load(tpath,Bool)
-    block,touched
+function load_algebraic_contrib(path::String,::Type{BlockRBVecAlgebraicContribution})
+  T = load(joinpath(joinpath(path,"block_1"),"type"),DataType)
+  tpath = joinpath(path,"touched")
+  touched = load(tpath,Vector{Bool})
+  nblocks = length(touched)
+  blocks = Vector{RBVecAlgebraicContribution{T}}(undef,nblocks)
+  for row = 1:nblocks
+    if touched[row]
+      rpath = joinpath(path,"block_$row")
+      blocks[row] = load_algebraic_contrib(rpath,RBVecAlgebraicContribution)
+    end
   end
-  blocks = first.(result)
-  touched = last.(result)
-  return BlockRBAlgebraicContribution(blocks,touched)
+  return BlockRBVecAlgebraicContribution(blocks,touched)
 end
 
-function load_algebraic_contrib(path::String,::Type{MatBlockRBAlgebraicContribution})
-  nblocks = num_active_dirs(path)
-  result = map(index_pairs(nblocks,nblocks)) do (row,col)
-    rcpath = joinpath(path,"block_$(row)_$(col)")
-    tpath = joinpath(rcpath,"touched")
-    block = load_algebraic_contrib(rcpath,RBAlgebraicContribution)
-    touched = load(tpath,Bool)
-    block,touched
+function load_algebraic_contrib(path::String,::Type{BlockRBMatAlgebraicContribution})
+  T = load(joinpath(joinpath(path,"block_1_1"),"type"),DataType)
+  tpath = joinpath(path,"touched")
+  touched = load(tpath,Matrix{Bool})
+  nblocks = size(touched,1)
+  blocks = Matrix{RBMatAlgebraicContribution{T}}(undef,nblocks,nblocks)
+  for (row,col) = index_pairs(nblocks,nblocks)
+    if touched[row,col]
+      rcpath = joinpath(path,"block_$(row)_$(col)")
+      blocks[row,col] = load_algebraic_contrib(rcpath,RBMatAlgebraicContribution)
+    end
   end
-  blocks = first.(result)
-  touched = last.(result)
-  return BlockRBAlgebraicContribution(blocks,touched)
+  return BlockRBMatAlgebraicContribution(blocks,touched)
 end
 
-function save(info::RBInfo,a::VecBlockRBAlgebraicContribution)
+function save(info::RBInfo,a::BlockRBVecAlgebraicContribution)
   if info.save_structures
     path = joinpath(info.rb_path,"rb_rhs")
     save_algebraic_contrib(path,a)
   end
 end
 
-function load(info::RBInfo,T::Type{VecBlockRBAlgebraicContribution})
+function load(info::RBInfo,T::Type{BlockRBVecAlgebraicContribution})
   path = joinpath(info.rb_path,"rb_rhs")
   load_algebraic_contrib(path,T)
 end
 
-function save(info::RBInfo,a::Vector{MatBlockRBAlgebraicContribution{T}}) where T
+function save(info::RBInfo,a::Vector{BlockRBMatAlgebraicContribution{T}}) where T
   if info.save_structures
     for i = eachindex(a)
       path = joinpath(info.rb_path,"rb_lhs_$i")
@@ -354,15 +365,34 @@ function save(info::RBInfo,a::Vector{MatBlockRBAlgebraicContribution{T}}) where 
   end
 end
 
-function load(info::RBInfo,::Type{Vector{MatBlockRBAlgebraicContribution}})
+function load(info::RBInfo,::Type{Vector{BlockRBMatAlgebraicContribution}})
   T = load(joinpath(joinpath(joinpath(info.rb_path,"rb_lhs_1"),"block_1_1"),"type"),DataType)
   njacs = num_active_dirs(info.rb_path)
-  ad_jacs = Vector{MatBlockRBAlgebraicContribution{T}}(undef,njacs)
+  ad_jacs = Vector{BlockRBMatAlgebraicContribution{T}}(undef,njacs)
   for i = 1:njacs
     path = joinpath(info.rb_path,"rb_lhs_$i")
-    ad_jacs[i] = load_algebraic_contrib(path,MatBlockRBAlgebraicContribution)
+    ad_jacs[i] = load_algebraic_contrib(path,BlockRBMatAlgebraicContribution)
   end
   ad_jacs
+end
+
+function field_offsets(f::MultiFieldFESpace)
+  nfields = length(f.spaces)
+  offsets = zeros(Int,nfields+1)
+  @inbounds for field = 1:nfields
+    offsets[field+1] = offsets[field] + num_free_dofs(f.spaces[field])
+  end
+  offsets
+end
+
+function field_offsets(a::BlockRBAlgebraicContribution)
+  nblocks = get_nblocks(a)
+  offsets = zeros(Int,nblocks+1)
+  @inbounds for block = 1:nblocks
+    trian = first([get_domains(a[block])...])
+    offsets[block+1] = offsets[block] + size(a[block][trian].basis_space[1],1)
+  end
+  offsets
 end
 
 function collect_compress_rhs(
@@ -376,24 +406,23 @@ function collect_compress_rhs(
   times = get_times(fesolver)
   nblocks = get_nblocks(rbspace)
   @assert length(snaps) == nblocks
-  result = map(1:nblocks) do row
-    feop_row_col = feop[row,:]
-    vsnaps = vcat(snaps...)
-    rbspace_row = rbspace[row]
-    touched = check_touched_residuals(feop_row_col,vsnaps,μ,times)
-    if touched
+  touched = check_touched_residuals(feop,snaps,μ,times)
+  vsnaps = vcat(snaps...)
+
+  blocks = Vector{RBVecAlgebraicContribution{T}}(undef,nblocks)
+  @inbounds for row = 1:nblocks
+    touched_row = touched[row]
+    if touched_row
+      feop_row_col = feop[row,:]
+      rbspace_row = rbspace[row]
       ress,trian = collect_residuals_for_trian(fesolver,feop_row_col,vsnaps,μ,times)
-      rbres = compress_component(info,feop_row_col,ress,trian,times,rbspace_row)
-    else
-      rbres = testvalue(RBAlgebraicContribution{T},feop_row_col;vector=true)
+      ad_res = RBVecAlgebraicContribution(T)
+      compress_component!(ad_res,info,feop_row_col,ress,trian,times,rbspace_row)
+      blocks[row] = ad_res
     end
-    rbres,touched
   end
-  blocks = first.(result)
-  touched = last.(result)
-  ad_res = BlockRBAlgebraicContribution(blocks,touched)
-  show(ad_res)
-  return ad_res
+
+  BlockRBVecAlgebraicContribution(blocks,touched)
 end
 
 function collect_compress_lhs(
@@ -407,40 +436,50 @@ function collect_compress_lhs(
   times = get_times(fesolver)
   θ = fesolver.θ
   nblocks = get_nblocks(rbspace)
+  @assert length(snaps) == nblocks
 
   njacs = length(feop.jacs)
-  ad_jacs = Vector{BlockRBAlgebraicContribution{T,2}}(undef,njacs)
+  ad_jacs = Vector{BlockRBMatAlgebraicContribution{T}}(undef,njacs)
   for i = 1:njacs
     combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*x-θ*y
-    result_i = map(index_pairs(nblocks,nblocks)) do (row,col)
-      feop_row_col = feop[row,col]
-      snaps_col = snaps[col]
-      rbspace_row = rbspace[row]
-      rbspace_col = rbspace[col]
-      touched = check_touched_jacobians(feop_row_col,snaps_col,μ,times;i)
-      if touched
+    touched_i = check_touched_jacobians(feop,snaps,μ,times;i)
+    blocks_i = Matrix{RBMatAlgebraicContribution{T}}(undef,nblocks,nblocks)
+    for (row,col) = index_pairs(nblocks,nblocks)
+      touched_row_col = touched_i[row,col]
+      if touched_row_col
+        feop_row_col = feop[row,col]
+        snaps_col = snaps[col]
+        rbspace_row = rbspace[row]
+        rbspace_col = rbspace[col]
         jacs,trian = collect_jacobians_for_trian(fesolver,feop_row_col,snaps_col,μ,times;i)
-        rbjac = compress_component(info,feop_row_col,jacs,trian,times,rbspace_row,rbspace_col;combine_projections)
-      else
-        rbjac = testvalue(RBAlgebraicContribution{T},feop_row_col;vector=false)
+        ad_jac = RBMatAlgebraicContribution(T)
+        compress_component!(
+          ad_jac,info,feop_row_col,jacs,trian,times,rbspace_row,rbspace_col;combine_projections)
+        blocks_i[row,col] = ad_jac
       end
-      rbjac,touched
     end
-    blocks_i = first.(result_i)
-    touched_i = last.(result_i)
-    ad_jac_i = BlockRBAlgebraicContribution(blocks_i,touched_i)
-    show(ad_jac_i)
-    ad_jacs[i] = ad_jac_i
+    ad_jacs[i] = BlockRBMatAlgebraicContribution(blocks_i,touched_i)
   end
+
   return ad_jacs
+end
+
+function check_touched_residuals(feop::PTFEOperator,sols::Vector{<:PTArray},args...)
+  nblocks = length(sols)
+  vsnaps = vcat(sols...)
+  touched = Vector{Bool}(undef,nblocks)
+  for row = 1:nblocks
+    feop_row_col = feop[row,:]
+    touched[row] = check_touched_residuals(feop_row_col,vsnaps,args...)
+  end
+  return touched
 end
 
 function check_touched_residuals(
   feop::PTFEOperator,
   sols::PTArray,
   μ::Table,
-  times::Vector{<:Real};
-  kwargs...)
+  times::Vector{<:Real})
 
   ode_op = get_algebraic_operator(feop)
   test = get_test(feop)
@@ -457,6 +496,17 @@ function check_touched_residuals(
   dv = get_fe_basis(test)
   int = feop.res(μ1,t1,xh1,dv)
   return !isnothing(int)
+end
+
+function check_touched_jacobians(feop::PTFEOperator,sols::Vector{<:PTArray},args...;kwargs...)
+  nblocks = length(sols)
+  touched = Matrix{Bool}(undef,nblocks,nblocks)
+  for (row,col) = index_pairs(nblocks,nblocks)
+    feop_row_col = feop[row,col]
+    sols_col = sols[col]
+    touched[row,col] = check_touched_jacobians(feop_row_col,sols_col,args...;kwargs...)
+  end
+  return touched
 end
 
 function check_touched_jacobians(
@@ -490,22 +540,24 @@ function collect_rhs_contributions!(
   info::RBInfo,
   feop::PTFEOperator,
   fesolver::PODESolver,
-  rbres::BlockRBAlgebraicContribution{T,1},
-  rbspace::BlockRBSpace{T},
+  rbres::BlockRBVecAlgebraicContribution{T},
   sols::Vector{<:PTArray},
   args...) where T
 
   nblocks = get_nblocks(rbres)
-  blocks = map(1:nblocks) do row
-    feop_row = feop[row,:]
-    vsnaps = vcat(sols...)
-    rbres_row,touched_row = rbres[row]
-    rbspace_row = rbspace[row]
-    if touched_row
-      collect_rhs_contributions!(cache,info,feop_row,fesolver,rbres_row,rbspace_row,vsnaps,args...)
+  offsets = field_offsets(feop.test)
+  blocks = Vector{PTArray{Vector{T}}}(undef,nblocks)
+  for row = 1:nblocks
+    cache_row = cache_at_index(cache,offsets[row]+1:offsets[row+1])
+    if rbres.touched[row]
+      feop_row = feop[row,:]
+      vsnaps = vcat(sols...)
+      blocks[row] = collect_rhs_contributions!(
+        cache_row,info,feop_row,fesolver,rbres.blocks[row],vsnaps,args...)
     else
-      veccache, = cache[1]
-      allocate_vector!(veccache,rbspace_row)
+      rbcache,_ = last(cache_row_col)
+      s = (rb_offsets_i[row+1]-rb_offsets_i[row],)
+      blocks[row] = setsize!(rbcache,s)
     end
   end
   vcat(blocks...)
@@ -516,28 +568,29 @@ function collect_lhs_contributions!(
   info::RBInfo,
   feop::PTFEOperator,
   fesolver::PODESolver,
-  rbjacs::Vector{BlockRBAlgebraicContribution{T,2}},
-  rbspace::BlockRBSpace{T},
+  rbjacs::Vector{BlockRBMatAlgebraicContribution{T}},
   sols::Vector{<:PTArray},
   args...) where T
 
   njacs = length(rbjacs)
   nblocks = get_nblocks(testitem(rbjacs))
+  offsets = field_offsets(feop.test)
   rb_jacs_contribs = Vector{PTArray{Matrix{T}}}(undef,njacs)
   for i = 1:njacs
     rb_jac_i = rbjacs[i]
-    blocks = map(index_pairs(nblocks,nblocks)) do (row,col)
-      feop_row_col = feop[row,col]
-      sols_col = sols[col]
-      rb_jac_i_row_col,touched_i_row_col = rb_jac_i[row,col]
-      rbspace_row = rbspace[row]
-      rbspace_col = rbspace[col]
-      if touched_i_row_col
-        collect_lhs_contributions!(
-            cache,info,feop_row_col,fesolver,rb_jac_i_row_col,rbspace_col,sols_col,args...;i)
+    rb_offsets_i = field_offsets(rb_jac_i)
+    blocks = Matrix{PTArray{Matrix{T}}}(undef,nblocks,nblocks)
+    for (row,col) = index_pairs(nblocks,nblocks)
+      cache_row_col = cache_at_index(cache,offsets[row]+1:offsets[row+1],offsets[col]+1:offsets[col+1])
+      if rb_jac_i.touched[row,col]
+        feop_row_col = feop[row,col]
+        sols_col = sols[col]
+        blocks[row,col] = collect_lhs_contributions!(
+          cache_row_col,info,feop_row_col,fesolver,rb_jac_i.blocks[row,col],sols_col,args...;i)
       else
-        matcache, = cache[1]
-        allocate_matrix!(matcache,rbspace_row,rbspace_col)
+        rbcache,_ = last(cache_row_col)
+        s = (rb_offsets_i[row+1]-rb_offsets_i[row],rb_offsets_i[col+1]-rb_offsets_i[col])
+        blocks[row,col] = setsize!(rbcache,s)
       end
     end
     rb_jacs_contribs[i] = hvcat(blocks...)
@@ -590,6 +643,13 @@ function allocate_online_cache(
 
   vsnaps = vcat(snaps_test...)
   allocate_online_cache(feop,fesolver,vsnaps,params)
+end
+
+function cache_at_index(cache,idx::UnitRange{Int}...)
+  coeff_cache,rb_cache = cache
+  alg_cache,solve_cache... = coeff_cache
+  alg_cache_idx = map(x->getindex(x,idx...),alg_cache)
+  return (alg_cache_idx,solve_cache...),rb_cache
 end
 
 function initial_guess(

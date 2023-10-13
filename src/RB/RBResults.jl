@@ -94,14 +94,11 @@ function allocate_online_cache(
   coeff = zeros(T,1,1)
   ptcoeff = PTArray([zeros(T,1,1) for _ = eachindex(params)])
 
-  k = RBContributionMap()
-  rbres = testvalue(RBAffineDecomposition{T},feop;vector=true)
-  rbjac = testvalue(RBAffineDecomposition{T},feop;vector=false)
-  res_contrib_cache = return_cache(k,rbres.basis_space,last(rbres.basis_time))
-  jac_contrib_cache = return_cache(k,rbjac.basis_space,last(rbjac.basis_time))
+  res_contrib_cache = return_cache(RBVecContributionMap(T))
+  jac_contrib_cache = return_cache(RBMatContributionMap(T))
 
-  res_cache = (CachedArray(b),CachedArray(coeff),CachedArray(ptcoeff)),res_contrib_cache
-  jac_cache = (CachedArray(A),CachedArray(coeff),CachedArray(ptcoeff)),jac_contrib_cache
+  res_cache = (b,CachedArray(coeff),CachedArray(ptcoeff)),res_contrib_cache
+  jac_cache = (A,CachedArray(coeff),CachedArray(ptcoeff)),jac_contrib_cache
   res_cache,jac_cache
 end
 
@@ -120,8 +117,8 @@ function test_rb_solver(
   println("Solving linear RB problems")
   x = initial_guess(snaps,params,params_test)
   rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,snaps_test,params_test)
-  rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,rbspace,x,params_test)
-  lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,rbspace,x,params_test)
+  rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,x,params_test)
+  lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,x,params_test)
 
   stats = @timed begin
     rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs)
@@ -149,8 +146,8 @@ function test_rb_solver(
   _,conv0 = Algebra._check_convergence(fesolver.nls.ls,x)
   stats = @timed begin
     for iter in 1:fesolver.nls.max_nliters
-      rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,rbspace,x,params_test)
-      lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,rbspace,x,params_test)
+      rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,x,params_test)
+      lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,x,params_test)
       nl_cache = rb_solve!(x,fesolver.nls,rhs,lhs,nl_cache)
       x .= recast(rbspace,x)
       isconv,conv = Algebra._check_convergence(fesolver.nls,x,conv0)

@@ -45,7 +45,7 @@ function single_field_rb_model(
   end
   if info.load_structures
     rbspace = load(info,RBSpace)
-    rbrhs,rblhs = load(info,(RBAlgebraicContribution,Vector{RBAlgebraicContribution}))
+    rbrhs,rblhs = load(info,(RBVecAlgebraicContribution,Vector{RBMatAlgebraicContribution}))
   else
     rbspace = reduced_basis(info,feop,sols,params)
     rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
@@ -76,7 +76,7 @@ function multi_field_rb_model(
   end
   if info.load_structures
     rbspace = load(info,RBSpace)
-    rbrhs,rblhs = load(info,(VecBlockRBAlgebraicContribution,Vector{MatBlockRBAlgebraicContribution}))
+    rbrhs,rblhs = load(info,(BlockRBVecAlgebraicContribution,Vector{BlockRBMatAlgebraicContribution}))
   else
     rbspace = reduced_basis(info,feop,sols,params)
     rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)

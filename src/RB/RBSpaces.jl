@@ -25,16 +25,6 @@ function num_rb_dofs(rb::RBSpace)
   size(rb.basis_space,2)*size(rb.basis_time,2)
 end
 
-function allocate_vector!(cache,rb_row::RBSpace)
-  sz = (num_rb_dofs(rb_row),)
-  setsize!(cache,sz)
-end
-
-function allocate_matrix!(cache,rb_row::RBSpace,rb_col::RBSpace)
-  sz = num_rb_dofs(rb_row),num_rb_dofs(rb_col)
-  setsize!(cache,sz)
-end
-
 function save(info::RBInfo,rb::RBSpace)
   if info.save_structures
     path = joinpath(info.rb_path,"rb")

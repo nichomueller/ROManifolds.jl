@@ -144,10 +144,8 @@ function LinearAlgebra.ldiv!(a::PTArray,m::LU,b::PTArray)
   end
 end
 
-function Arrays.get_array(a::PTArray{<:CachedArray};len=length(a))
-  @check len ≤ length(a)
-  array = map(x->getproperty(x,:array),a[1:len])
-  PTArray(array)
+function Arrays.get_array(a::PTArray{<:CachedArray})
+  map(x->getproperty(x,:array),a)
 end
 
 get_at_index(::Int,x) = x
@@ -479,11 +477,6 @@ LinearAlgebra.fillstored!(a::AffinePTArray,z) = fillstored!(a.array,z)
 function LinearAlgebra.ldiv!(a::AffinePTArray,m::LU,b::AffinePTArray)
   @check length(a) == length(b)
   ldiv!(testitem(a),m,testitem(b))
-end
-
-function Arrays.get_array(a::AffinePTArray{<:CachedArray};len=length(a))
-  @check len ≤ length(a)
-  PTArray(a[1].array,len)
 end
 
 function Arrays.CachedArray(a::AffinePTArray)
