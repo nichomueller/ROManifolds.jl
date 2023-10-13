@@ -55,7 +55,7 @@ function heat_equation()
   fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
 
   ϵ = 1e-4
-  load_solutions = false
+  load_solutions = true
   save_solutions = true
   load_structures = false
   save_structures = true
@@ -66,7 +66,7 @@ function heat_equation()
   st_mdeim = true
   info = RBInfo(test_path;ϵ,load_solutions,save_solutions,load_structures,save_structures,
                 energy_norm,nsnaps_state,nsnaps_system,nsnaps_test,st_mdeim)
-  reduced_basis_model(info,feop,fesolver)
+  single_field_rb_model(info,feop,fesolver)
 end
 
 heat_equation()

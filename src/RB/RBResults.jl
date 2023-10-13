@@ -32,11 +32,9 @@ function Base.show(io::IO,r::RBResults)
   avg_err = get_avg_error(r)
   avg_time = get_avg_time(r)
   avg_nallocs = get_avg_nallocs(r)
-  print(io,"-------------------------------------------------------------\n")
   print(io,"Average online relative errors for $name: $avg_err\n")
   print(io,"Average online wall time: $avg_time [s]\n")
   print(io,"Average number of allocations: $avg_nallocs [Mb]\n")
-  print(io,"-------------------------------------------------------------\n")
 end
 
 function Base.first(r::RBResults)
@@ -84,8 +82,7 @@ end
 function allocate_online_cache(
   feop::PTFEOperator,
   fesolver::PODESolver,
-  rbspace::RBSpace{T},
-  snaps_test::PTArray,
+  snaps_test::PTArray{Vector{T}},
   params::Table) where T
 
   times = get_times(fesolver)
@@ -94,8 +91,8 @@ function allocate_online_cache(
   b = allocate_residual(ode_op,params,times,snaps_test,ode_cache)
   A = allocate_jacobian(ode_op,params,times,snaps_test,ode_cache)
 
-  coeff = allocate_matrix(rbspace,rbspace)
-  ptcoeff = PTArray([allocate_matrix(rbspace,rbspace) for _ = eachindex(params)])
+  coeff = zeros(T,1,1)
+  ptcoeff = PTArray([zeros(T,1,1) for _ = eachindex(params)])
 
   k = RBContributionMap()
   rbres = testvalue(RBAffineDecomposition{T},feop;vector=true)
@@ -122,7 +119,7 @@ function test_rb_solver(
 
   println("Solving linear RB problems")
   x = initial_guess(snaps,params,params_test)
-  rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,rbspace,snaps_test,params_test)
+  rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,snaps_test,params_test)
   rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,rbspace,x,params_test)
   lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,rbspace,x,params_test)
 
@@ -146,7 +143,7 @@ function test_rb_solver(
   snaps_test,params_test = load_test(info,feop,fesolver)
 
   println("Solving nonlinear RB problems with Newton iterations")
-  rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,rbspace,snaps_test,params_test)
+  rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,snaps_test,params_test)
   nl_cache = nothing
   x = initial_guess(snaps,params,params_test)
   _,conv0 = Algebra._check_convergence(fesolver.nls.ls,x)

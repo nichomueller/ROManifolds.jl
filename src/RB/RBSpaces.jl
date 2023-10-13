@@ -9,19 +9,30 @@ struct RBSpace{T}
   end
 end
 
+function Base.show(io::IO,rb::RBSpace)
+  nbs = size(rb.basis_space,2)
+  nbt = size(rb.basis_time,2)
+  printstyled("RB SPACE INFO\n";underline=true)
+  print(io,"Reduced basis space with #(basis space, basis time) = ($nbs,$nbt)\n")
+end
+
 get_basis_space(rb::RBSpace) = rb.basis_space
 get_basis_time(rb::RBSpace) = rb.basis_time
+get_space_ndofs(rb::RBSpace) = size(rb.basis_space,2)
+get_time_ndofs(rb::RBSpace) = size(rb.basis_time,2)
 
 function num_rb_dofs(rb::RBSpace)
   size(rb.basis_space,2)*size(rb.basis_time,2)
 end
 
-function Algebra.allocate_vector(rb_row::RBSpace{T}) where T
-  zeros(T,num_rb_dofs(rb_row))
+function allocate_vector!(cache,rb_row::RBSpace)
+  sz = (num_rb_dofs(rb_row),)
+  setsize!(cache,sz)
 end
 
-function Algebra.allocate_matrix(rb_row::RBSpace{T},rb_col::RBSpace{T}) where T
-  zeros(T,num_rb_dofs(rb_row),num_rb_dofs(rb_col))
+function allocate_matrix!(cache,rb_row::RBSpace,rb_col::RBSpace)
+  sz = num_rb_dofs(rb_row),num_rb_dofs(rb_col)
+  setsize!(cache,sz)
 end
 
 function save(info::RBInfo,rb::RBSpace)
@@ -46,7 +57,9 @@ function reduced_basis(
   norm_matrix = get_norm_matrix(feop,energy_norm)
   basis_space_nnz,basis_time = compress(info,feop,snaps,norm_matrix,args...)
   basis_space = recast(basis_space_nnz)
-  RBSpace(basis_space,basis_time)
+  rbspace = RBSpace(basis_space,basis_time)
+  show(rbspace)
+  return rbspace
 end
 
 function compress(info::RBInfo,::PTFEOperator,snaps,args...)

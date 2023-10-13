@@ -52,10 +52,7 @@ end
 
 function truncation(s::Vector,ϵ::Real)
   energies = cumsum(s.^2;dims=1)
-  rb_ndofs = first(findall(x->x ≥ (1-ϵ^2)*energies[end],energies))[1]
-  err = sqrt(1-energies[rb_ndofs]/energies[end])
-  println("POD truncated at ϵ = $ϵ: number basis vectors = $rb_ndofs; projection error ≤ $err")
-  rb_ndofs
+  first(findall(x->x ≥ (1-ϵ^2)*energies[end],energies))[1]
 end
 
 function orth_projection(

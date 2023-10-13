@@ -89,13 +89,16 @@ function collect_solutions(
   ode_op = get_algebraic_operator(feop)
   u0 = get_free_dof_values(uh0(μ))
   time_ndofs = get_time_ndofs(fesolver)
+  nparams = length(μ)
   T = get_vector_type(trial_μt)
   uμt = PODESolution(fesolver,ode_op,μ,u0,t0,tf)
   sols = Vector{PTArray{T}}(undef,time_ndofs)
+  printstyled("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters\n";
+    underline=true)
   stats = @timed for (sol,t,n) in uμt
-    println("Computing fe solution at time $t for every parameter")
     sols[n] = copy(sol)
   end
+  println("Time marching complete")
   return Snapshots(sols),stats
 end
 
@@ -110,13 +113,16 @@ function collect_solutions(
   ode_op = get_algebraic_operator(feop)
   u0 = get_free_dof_values(uh0(μ))
   time_ndofs = get_time_ndofs(fesolver)
+  nparams = length(μ)
   T = get_vector_type(trial_μt)
   uμt = PODESolution(fesolver,ode_op,μ,u0,t0,tf)
   sols = Vector{Vector{PTArray{T}}}(undef,time_ndofs)
+  printstyled("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters\n";
+    underline=true)
   stats = @timed for (sol,t,n) in uμt
-    println("Computing fe solution at time $t for every parameter")
     sols[n] = split_fields(trial_μt,copy(sol))
   end
+  println("Time marching complete")
   return BlockSnapshots(sols),stats
 end
 
@@ -204,7 +210,6 @@ function collect_residuals_for_idx!(
   nonzero_idx::Vector{Int},
   args...)
 
-  println("Computing fe residual for every time and parameter")
   ress = residual!(b,nlop,sols,args...)
   return hcat(map(x->getindex(x,nonzero_idx),ress.array)...)
 end
@@ -215,7 +220,6 @@ function collect_residuals_for_trian!(
   sols::PTArray,
   args...)
 
-  println("Computing fe residual for every time and parameter")
   ress,trian = residual_for_trian!(b,nlop,sols)
   return NnzMatrix.(ress;nparams=length(nlop.μ)),trian
 end
@@ -228,7 +232,6 @@ function collect_jacobians_for_idx!(
   args...;
   i=1)
 
-  println("Computing fe jacobian #$i for every time and parameter")
   jacs_i = jacobian!(A,nlop,sols,i,args...)
   return Matrix(hcat(map(x->x[nonzero_idx],jacs_i.array)...))
 end
@@ -240,7 +243,6 @@ function collect_jacobians_for_trian!(
   args...;
   i=1)
 
-  println("Computing fe jacobian #$i for every time and parameter")
   jacs_i,trian = jacobian_for_trian!(A,nlop,sols,i)
   return map(x->NnzMatrix(map(NnzVector,x);nparams=length(nlop.μ)),jacs_i),trian
 end

@@ -2,6 +2,8 @@ abstract type RBBlock{T,N} end
 
 Base.getindex(b::RBBlock,i...) = b.blocks[i...]
 Base.iterate(b::RBBlock,args...) = iterate(b.blocks,args...)
+Base.enumerate(b::RBBlock) = enumerate(b.blocks)
+Base.axes(b::RBBlock,i...) = axes(b.blocks,i...)
 get_blocks(b) = b.blocks
 get_nblocks(b) = length(b.blocks)
 
@@ -94,6 +96,16 @@ struct BlockRBSpace{T} <: RBBlock{T,1}
   end
 end
 
+function Base.show(io::IO,rb::BlockRBSpace)
+  for (row,block) in enumerate(rb)
+    nbs = size(block.basis_space,2)
+    nbt = size(block.basis_time,2)
+    print(io,"\n")
+    printstyled("RB SPACE INFO FIELD $row\n";underline=true)
+    print(io,"Reduced basis space with #(basis space, basis time) = ($nbs,$nbt)\n")
+  end
+end
+
 function save(info::RBInfo,rb::BlockRBSpace)
   if info.save_structures
     path = joinpath(info.rb_path,"rb")
@@ -140,7 +152,9 @@ function reduced_basis(
     bases_space = add_space_supremizers(bases_space,feop,norm_matrix,args...)
     bases_time = add_time_supremizers(bases_time;kwargs...)
   end
-  BlockRBSpace(bases_space,bases_time)
+  rbspace = BlockRBSpace(bases_space,bases_time)
+  show(rbspace)
+  return rbspace
 end
 
 function add_space_supremizers(
@@ -245,6 +259,29 @@ const MatBlockRBAlgebraicContribution{T} = BlockRBAlgebraicContribution{T,2}
 Base.getindex(a::BlockRBAlgebraicContribution,idx...) = a.blocks[idx...],a.touched[idx...]
 get_nblocks(a::MatBlockRBAlgebraicContribution) = size(a.blocks,2)
 
+function Base.show(io::IO,a::BlockRBAlgebraicContribution{T}) where T
+  for row in axes(a,1), col in axes(a,2)
+    a_row_col,touched = a[row,col]
+    if touched
+      print(io,"\n")
+      printstyled("RB ALGEBRAIC CONTRIBUTIONS INFO, BLOCK ($row,$col)\n";underline=true)
+      for trian in get_domains(a_row_col)
+        atrian = a_row_col[trian]
+        red_method = get_reduction_method(atrian)
+        red_var = get_reduced_variable(atrian)
+        nbs = get_space_ndofs(atrian)
+        nbt = get_time_ndofs(atrian)
+        print(io,"$red_var on a $trian, reduction in $red_method\n")
+        print(io,"number basis vectors in (space, time) = ($nbs,$nbt)\n")
+      end
+    end
+  end
+end
+
+function Base.show(io::IO,a::Vector{<:BlockRBAlgebraicContribution})
+  map(x->show(io,x),a)
+end
+
 function save_algebraic_contrib(path::String,a::VecBlockRBAlgebraicContribution{T}) where T
   for row in 1:get_nblocks(a)
     block,touched = a[row]
@@ -328,22 +365,6 @@ function load(info::RBInfo,::Type{Vector{MatBlockRBAlgebraicContribution}})
   ad_jacs
 end
 
-function collect_compress_rhs_lhs(
-  info::RBInfo,
-  feop::PTFEOperator,
-  fesolver::PThetaMethod,
-  rbspace::BlockRBSpace,
-  snaps::BlockSnapshots,
-  μ::Table)
-
-  nsnaps = info.nsnaps_system
-  snapsθ = recenter(fesolver,snaps,μ)
-  _snapsθ,_μ = snapsθ[1:nsnaps],μ[1:nsnaps]
-  rhs = collect_compress_rhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
-  lhs = collect_compress_lhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
-  rhs,lhs
-end
-
 function collect_compress_rhs(
   info::RBInfo,
   feop::PTFEOperator,
@@ -370,7 +391,9 @@ function collect_compress_rhs(
   end
   blocks = first.(result)
   touched = last.(result)
-  return BlockRBAlgebraicContribution(blocks,touched)
+  ad_res = BlockRBAlgebraicContribution(blocks,touched)
+  show(ad_res)
+  return ad_res
 end
 
 function collect_compress_lhs(
@@ -405,7 +428,9 @@ function collect_compress_lhs(
     end
     blocks_i = first.(result_i)
     touched_i = last.(result_i)
-    ad_jacs[i] = BlockRBAlgebraicContribution(blocks_i,touched_i)
+    ad_jac_i = BlockRBAlgebraicContribution(blocks_i,touched_i)
+    show(ad_jac_i)
+    ad_jacs[i] = ad_jac_i
   end
   return ad_jacs
 end
@@ -479,7 +504,8 @@ function collect_rhs_contributions!(
     if touched_row
       collect_rhs_contributions!(cache,info,feop_row,fesolver,rbres_row,rbspace_row,vsnaps,args...)
     else
-      allocate_vector(rbspace_row)
+      veccache, = cache[1]
+      allocate_vector!(veccache,rbspace_row)
     end
   end
   vcat(blocks...)
@@ -510,7 +536,8 @@ function collect_lhs_contributions!(
         collect_lhs_contributions!(
             cache,info,feop_row_col,fesolver,rb_jac_i_row_col,rbspace_col,sols_col,args...;i)
       else
-        allocate_matrix(rbspace_row,rbspace_col)
+        matcache, = cache[1]
+        allocate_matrix!(matcache,rbspace_row,rbspace_col)
       end
     end
     rb_jacs_contribs[i] = hvcat(blocks...)
@@ -558,13 +585,11 @@ end
 function allocate_online_cache(
   feop::PTFEOperator,
   fesolver::PODESolver,
-  rbspace::BlockRBSpace{T},
   snaps_test::Vector{<:PTArray},
-  params::Table) where T
+  params::Table)
 
-  rbspace1 = rbspace[1]
   vsnaps = vcat(snaps_test...)
-  allocate_online_cache(feop,fesolver,rbspace1,vsnaps,params)
+  allocate_online_cache(feop,fesolver,vsnaps,params)
 end
 
 function initial_guess(

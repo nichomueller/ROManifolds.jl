@@ -24,6 +24,23 @@ end
 Base.getindex(a::RBAlgebraicContribution,trian::Triangulation) = get_contribution(a,trian)
 Base.eltype(::RBAlgebraicContribution{T}) where T = T
 
+function Base.show(io::IO,a::RBAlgebraicContribution{T}) where T
+  printstyled("RB ALGEBRAIC CONTRIBUTIONS INFO\n";underline=true)
+  for trian in get_domains(a)
+    atrian = a[trian]
+    red_method = get_reduction_method(atrian)
+    red_var = get_reduced_variable(atrian)
+    nbs = get_space_ndofs(atrian)
+    nbt = get_time_ndofs(atrian)
+    print(io,"$red_var on a $trian, reduction in $red_method\n")
+    print(io,"number basis vectors in (space, time) = ($nbs,$nbt)\n")
+  end
+end
+
+function Base.show(io::IO,a::Vector{<:RBAlgebraicContribution})
+  map(x->show(io,x),a)
+end
+
 function Arrays.testvalue(
   ::Type{RBAlgebraicContribution{T}},
   feop::PTFEOperator;
@@ -109,8 +126,8 @@ function collect_compress_rhs_lhs(
   info::RBInfo,
   feop::PTFEOperator,
   fesolver::PThetaMethod,
-  rbspace::RBSpace,
-  snaps::Snapshots,
+  rbspace,
+  snaps,
   μ::Table)
 
   nsnaps = info.nsnaps_system
@@ -132,6 +149,7 @@ function collect_compress_rhs(
   times = get_times(fesolver)
   ress,trian = collect_residuals_for_trian(fesolver,feop,snaps,μ,times)
   ad_res = compress_component(info,feop,ress,trian,times,rbspace)
+  show(ad_res)
   return ad_res
 end
 
@@ -151,7 +169,9 @@ function collect_compress_lhs(
   for i = 1:njacs
     combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*x-θ*y
     jacs,trian = collect_jacobians_for_trian(fesolver,feop,snaps,μ,times;i)
-    ad_jacs[i] = compress_component(info,feop,jacs,trian,times,rbspace,rbspace;combine_projections)
+    ad_jac_i = compress_component(info,feop,jacs,trian,times,rbspace,rbspace;combine_projections)
+    show(ad_jac_i)
+    ad_jacs[i] = ad_jac_i
   end
   return ad_jacs
 end

@@ -80,6 +80,20 @@ function Arrays.testvalue(
   RBAffineDecomposition(basis_space,basis_time,mdeim_interpolation,integration_domain)
 end
 
+get_space_ndofs(rb::RBAffineDecomposition) = length(rb.basis_space)
+get_time_ndofs(rb::RBAffineDecomposition) = size(rb.basis_time[1],2)
+
+function get_reduction_method(a::RBAffineDecomposition)
+  nbs = length(a.basis_space)
+  nbt = size(a.basis_time[1],2)
+  lu_interp = a.mdeim_interpolation
+  size(lu_interp,1) == nbs*nbt ? :spacetime : :space
+end
+
+function get_reduced_variable(a::RBAffineDecomposition{T}) where T
+  isa(a.basis_time[2],Array{T,3}) ? :jacobian : :residual
+end
+
 function get_interpolation_idx(nzm::NnzMatrix)
   get_interpolation_idx(get_nonzero_val(nzm))
 end
@@ -125,7 +139,7 @@ function project_time(basis_time::Matrix,rbspace_row::RBSpace,args...;kwargs...)
 end
 
 function project_time(
-  basis_time::Matrix,
+  basis_time::Matrix{T},
   rbspace_row::RBSpace{T},
   rbspace_col::RBSpace{T};
   combine_projections=(x,y)->x) where T
