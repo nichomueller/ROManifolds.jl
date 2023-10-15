@@ -63,6 +63,31 @@ function Base.:(==)(a::PTArray,b::PTArray)
   true
 end
 
+for f in (:(Base.hcat),:(Base.vcat))
+  @eval begin
+    function $f(a::PTArray...)
+      n = _get_length(a...)
+      carray = map(1:n) do j
+        arrays = ()
+        @inbounds for i = eachindex(a)
+          arrays = (arrays...,a[i][j])
+        end
+        $f(arrays...)
+      end
+      PTArray(carray)
+    end
+  end
+end
+
+function Base.hvcat(nblocks::Int,a::PTArray...)
+  nrows = Int(length(a)/nblocks)
+  varray = map(1:nrows) do row
+    vcat(a[(row-1)*nblocks+1:row*nblocks]...)
+  end
+  hvarray = hcat(varray...)
+  hvarray
+end
+
 function Arrays.lazy_map(f,a::Union{AbstractArrayBlock,PTArray}...)
   if any(map(x->isa(x,PTArray),a))
     pt_lazy_map(f,a...)
@@ -254,22 +279,6 @@ function Base.transpose(a::NonaffinePTArray)
   map(transpose,a)
 end
 
-for f in (:(Base.hcat),:(Base.vcat),:(Base.hvcat))
-  @eval begin
-    function $f(a::PTArray...)
-      n = _get_length(a...)
-      varray = map(1:n) do j
-        arrays = ()
-        @inbounds for i = eachindex(a)
-          arrays = (arrays...,a[i][j])
-        end
-        $f(arrays...)
-      end
-      PTArray(varray)
-    end
-  end
-end
-
 function Base.fill!(a::NonaffinePTArray,z)
   @inbounds for i = eachindex(a)
     ai = a[i]
@@ -455,7 +464,7 @@ function Base.transpose(a::AffinePTArray)
   a.array = a.array'
 end
 
-for f in (:(Base.hcat),:(Base.vcat),:(Base.hvcat))
+for f in (:(Base.hcat),:(Base.vcat))
   @eval begin
     function $f(a::AffinePTArray...)
       n = _get_length(a...)

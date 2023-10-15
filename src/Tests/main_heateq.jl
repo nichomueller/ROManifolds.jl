@@ -55,9 +55,9 @@ function heat_equation()
   fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
 
   ϵ = 1e-4
-  load_solutions = true
+  load_solutions = false
   save_solutions = true
-  load_structures = true
+  load_structures = false
   save_structures = true
   energy_norm = :l2
   nsnaps_state = 50

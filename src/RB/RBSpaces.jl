@@ -20,6 +20,7 @@ get_basis_space(rb::RBSpace) = rb.basis_space
 get_basis_time(rb::RBSpace) = rb.basis_time
 get_space_ndofs(rb::RBSpace) = size(rb.basis_space,2)
 get_time_ndofs(rb::RBSpace) = size(rb.basis_time,2)
+get_rb_ndofs(rb::RBSpace) = get_space_ndofs(rb)*get_time_ndofs(rb)
 
 function num_rb_dofs(rb::RBSpace)
   size(rb.basis_space,2)*size(rb.basis_time,2)

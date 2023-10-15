@@ -106,6 +106,16 @@ function Base.show(io::IO,rb::BlockRBSpace)
   end
 end
 
+function field_offsets(rb::BlockRBSpace)
+  nblocks = get_nblocks(rb)
+  offsets = zeros(Int,nblocks+1)
+  @inbounds for block = 1:nblocks
+    ndofs = get_rb_ndofs(rb[block])
+    offsets[block+1] = offsets[block] + ndofs
+  end
+  offsets
+end
+
 function save(info::RBInfo,rb::BlockRBSpace)
   if info.save_structures
     path = joinpath(info.rb_path,"rb")
@@ -385,16 +395,6 @@ function field_offsets(f::MultiFieldFESpace)
   offsets
 end
 
-function field_offsets(a::BlockRBAlgebraicContribution)
-  nblocks = get_nblocks(a)
-  offsets = zeros(Int,nblocks+1)
-  @inbounds for block = 1:nblocks
-    trian = first([get_domains(a[block])...])
-    offsets[block+1] = offsets[block] + size(a[block][trian].basis_space[1],1)
-  end
-  offsets
-end
-
 function collect_compress_rhs(
   info::RBInfo,
   feop::PTFEOperator,
@@ -541,11 +541,13 @@ function collect_rhs_contributions!(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbres::BlockRBVecAlgebraicContribution{T},
+  rbspace::BlockRBSpace,
   sols::Vector{<:PTArray},
-  args...) where T
+  params::Table) where T
 
   nblocks = get_nblocks(rbres)
   offsets = field_offsets(feop.test)
+  rb_offsets = field_offsets(rbspace)
   blocks = Vector{PTArray{Vector{T}}}(undef,nblocks)
   for row = 1:nblocks
     cache_row = cache_at_index(cache,offsets[row]+1:offsets[row+1])
@@ -553,11 +555,14 @@ function collect_rhs_contributions!(
       feop_row = feop[row,:]
       vsnaps = vcat(sols...)
       blocks[row] = collect_rhs_contributions!(
-        cache_row,info,feop_row,fesolver,rbres.blocks[row],vsnaps,args...)
+        cache_row,info,feop_row,fesolver,rbres.blocks[row],vsnaps,params)
     else
       rbcache,_ = last(cache_row_col)
-      s = (rb_offsets_i[row+1]-rb_offsets_i[row],)
-      blocks[row] = setsize!(rbcache,s)
+      s = (rb_offsets[row+1]-rb_offsets[row],)
+      setsize!(rbcache,s)
+      array = rbcache.array
+      array .= zero(T)
+      blocks[row] = PTArray([copy(array) for _ = eachindex(params)])
     end
   end
   vcat(blocks...)
@@ -569,16 +574,17 @@ function collect_lhs_contributions!(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbjacs::Vector{BlockRBMatAlgebraicContribution{T}},
+  rbspace::BlockRBSpace,
   sols::Vector{<:PTArray},
-  args...) where T
+  params::Table) where T
 
   njacs = length(rbjacs)
   nblocks = get_nblocks(testitem(rbjacs))
   offsets = field_offsets(feop.test)
+  rb_offsets = field_offsets(rbspace)
   rb_jacs_contribs = Vector{PTArray{Matrix{T}}}(undef,njacs)
   for i = 1:njacs
     rb_jac_i = rbjacs[i]
-    rb_offsets_i = field_offsets(rb_jac_i)
     blocks = Matrix{PTArray{Matrix{T}}}(undef,nblocks,nblocks)
     for (row,col) = index_pairs(nblocks,nblocks)
       cache_row_col = cache_at_index(cache,offsets[row]+1:offsets[row+1],offsets[col]+1:offsets[col+1])
@@ -586,14 +592,17 @@ function collect_lhs_contributions!(
         feop_row_col = feop[row,col]
         sols_col = sols[col]
         blocks[row,col] = collect_lhs_contributions!(
-          cache_row_col,info,feop_row_col,fesolver,rb_jac_i.blocks[row,col],sols_col,args...;i)
+          cache_row_col,info,feop_row_col,fesolver,rb_jac_i.blocks[row,col],sols_col,params;i)
       else
         rbcache,_ = last(cache_row_col)
-        s = (rb_offsets_i[row+1]-rb_offsets_i[row],rb_offsets_i[col+1]-rb_offsets_i[col])
-        blocks[row,col] = setsize!(rbcache,s)
+        s = (rb_offsets[row+1]-rb_offsets[row],rb_offsets[col+1]-rb_offsets[col])
+        setsize!(rbcache,s)
+        array = rbcache.array
+        array .= zero(T)
+        blocks[row,col] = PTArray([copy(array) for _ = eachindex(params)])
       end
     end
-    rb_jacs_contribs[i] = hvcat(blocks...)
+    rb_jacs_contribs[i] = hvcat(nblocks,blocks...)
   end
   return sum(rb_jacs_contribs)
 end

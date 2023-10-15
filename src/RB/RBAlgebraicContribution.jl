@@ -60,6 +60,11 @@ function CellData.add_contribution!(
   a
 end
 
+function get_rb_ndofs(a::RBAlgebraicContribution)
+  trian = first([get_domains(a)...])
+  get_rb_ndofs(a[trian])
+end
+
 function save_algebraic_contrib(path::String,a::RBAlgebraicContribution{T,N} where N) where T
   create_dir!(path)
   cpath = joinpath(path,"contrib")
@@ -202,6 +207,7 @@ function collect_rhs_contributions!(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbres::RBVecAlgebraicContribution{T},
+  rbspace::BlockRBSpace,
   args...) where T
 
   coeff_cache,rb_cache = cache
@@ -223,6 +229,7 @@ function collect_lhs_contributions!(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbjacs::Vector{RBMatAlgebraicContribution{T}},
+  rbspace::BlockRBSpace,
   args...) where T
 
   njacs = length(rbjacs)

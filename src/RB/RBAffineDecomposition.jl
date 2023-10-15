@@ -68,6 +68,13 @@ function get_reduction_method(a::RBAffineDecomposition)
   size(lu_interp,1) == nbs*nbt ? :spacetime : :space
 end
 
+function get_rb_ndofs(a::RBAffineDecomposition)
+  space_ndofs = size(a.basis_space[1],1)
+  time_ndofs = size(a.basis_time[2],2)
+  ndofs = space_ndofs*time_ndofs
+  return ndofs
+end
+
 function get_interpolation_idx(nzm::NnzMatrix)
   get_interpolation_idx(get_nonzero_val(nzm))
 end

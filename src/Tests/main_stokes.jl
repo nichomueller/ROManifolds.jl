@@ -95,117 +95,44 @@ save(info,(rbspace,rbrhs,rblhs))
 snaps_test,params_test = load_test(info,feop,fesolver)
 x = initial_guess(sols,params,params_test)
 rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,snaps_test,params_test)
-rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbrhs,x,params_test)
-lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,x,params_test)
+rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbrhs,rbspace,x,params_test)
+lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,rbspace,x,params_test)
 stats = @timed begin
   rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs)
 end
 approx_snaps_test = recast(rbspace,rb_snaps_test)
 
 # lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,rbspace,x,params_test)
+T = Float
 njacs = length(rblhs)
 nblocks = get_nblocks(testitem(rblhs))
-rb_jacs_contribs = Vector{PTArray{Matrix{Float}}}(undef,njacs)
+offsets = field_offsets(feop.test)
+rb_jacs_contribs = Vector{PTArray{Matrix{T}}}(undef,njacs)
 i = 1
-row,col = 1,1
-
 rb_jac_i = rblhs[i]
-feop_row_col = feop[row,col]
-sols_col = x[col]
-rb_jac_i_row_col,touched_i_row_col = rb_jac_i[row,col]
-rbspace_row = rbspace[row]
-rbspace_col = rbspace[col]
-# collect_lhs_contributions!(lhs_cache,info,feop_row_col,fesolver,rb_jac_i_row_col,rbspace_col,sols_col,params_test;i)
-coeff_cache,rb_cache = lhs_cache
-trian = [get_domains(rb_jac_i_row_col)...]
-st_mdeim = info.st_mdeim
-times = get_times(fesolver)
-
-rb_jac_contribs = Vector{PTArray{Matrix{Float}}}(undef,num_domains(rb_jac_i_row_col))
-rbjact = rb_jac_i_row_col[Ω]
-# coeff = lhs_coefficient!(coeff_cache,feop_row_col,fesolver,rbjact,sols_col,params_test;st_mdeim,i)
-  jcache = coeff_cache[1]
-  ndofs_row = num_free_dofs(feop_row_col.test)
-  ndofs_col = num_free_dofs(get_trial(feop_row_col)(nothing,nothing))
-  setsize!(jcache,(ndofs_row,ndofs_col))
-
-  red_idx = rbjact.integration_domain.idx
-  red_times = rbjact.integration_domain.times
-  red_meas = rbjact.integration_domain.meas
-
-  A = get_array(jcache;len=length(red_times)*length(params_test))
-  _sols = get_solutions_at_times(sols_col,fesolver,times)
-
-  # collect_jacobians_for_idx!(A,fesolver,feop_row_col,_sols,params_test,times,red_idx,red_meas;i)
-  dt,θ = fesolver.dt,fesolver.θ
-  dtθ = θ == 0.0 ? dt : dt*θ
-  ode_op = get_algebraic_operator(feop_row_col)
-  ode_cache = allocate_cache(ode_op,params_test,times)
-  ode_cache = update_cache!(ode_cache,ode_op,params_test,times)
-  sols_cache = copy(_sols) .* 0.
-  nlop = get_nonlinear_operator(ode_op,params_test,times,dtθ,_sols,ode_cache,sols_cache)
-  uF = _sols
-  vθ = nlop.vθ
-  @. vθ = (_sols-nlop.u0)/nlop.dtθ
-  z = zero(eltype(A))
-  fillstored!(A,z)
-  Xh, = ode_cache
-  dxh = ()
-  for i in 2:get_order(feop_row_col)+1
-    dxh = (dxh...,EvaluationFunction(Xh[i],(vθ,vθ)[i]))
+rb_offsets_row = field_offsets(rb_jac_i)
+blocks = Matrix{PTArray{Matrix{T}}}(undef,nblocks,nblocks)
+for (row,col) = index_pairs(nblocks,nblocks)
+  cache_row_col = cache_at_index(lhs_cache,offsets[row]+1:offsets[row+1],offsets[col]+1:offsets[col+1])
+  if rb_jac_i.touched[row,col]
+    feop_row_col = feop[row,col]
+    sols_col = x[col]
+    blocks[row,col] = collect_lhs_contributions!(
+      cache_row_col,info,feop_row_col,fesolver,rb_jac_i.blocks[row,col],sols_col,params_test;i)
+  else
+    rbcache,_ = last(cache_row_col)
+    s = (rb_offsets_i[row+1]-rb_offsets_i[row],rb_offsets_i[col+1]-rb_offsets_i[col])
+    setsize!(rbcache,s)
+    array = rbcache.array
+    array .= zero(T)
+    blocks[row,col] = PTArray([copy(array) for _ = eachindex(params_test)])
   end
-  xh=TransientCellField(EvaluationFunction(Xh[1],(vθ,vθ)[1]),dxh)
-  Uh = get_trial(feop_row_col)(params_test,times)
-  V = get_test(feop_row_col)
-  u = get_trial_fe_basis(Uh)
-  v = get_fe_basis(V)
-  dc = feop_row_col.jacs[i](params_test,times,xh,u,v)[dΩ]
-  # matdata = collect_cell_matrix(Uh,V,dc)
-    w = []
-    r = []
-    c = []
-    strian = [get_domains(dc)...][1]
-    scell_mat = get_contribution(dc,strian)
-    cell_mat, trian = move_contributions(scell_mat,strian)
-    @assert ndims(eltype(cell_mat)) == 2
-    cell_mat_c = attach_constraints_cols(Uh,cell_mat,trian)
-    cell_mat_rc = attach_constraints_rows(V,cell_mat_c,trian)
-    rows = get_cell_dof_ids(V,trian)
-    cols = get_cell_dof_ids(Uh,trian)
-    push!(w,cell_mat_rc)
-    push!(r,rows)
-    push!(c,cols)
-  assemble_matrix_add!(A,feop_row_col.assem,(w,r,c))
+end
+rb_jacs_contribs[i] = hvcat(nblocks,blocks...)
 
-
-__jacs,__trian = collect_jacobians_for_trian(fesolver,feop_row_col,_sols,params_test,times;i)
-  _ode_op = get_algebraic_operator(feop_row_col)
-  _ode_cache = allocate_cache(ode_op,params_test,times)
-  _A = allocate_jacobian(ode_op,params_test,times,_sols,ode_cache)
-  _ode_cache = update_cache!(ode_cache,ode_op,params_test,times)
-  _sols_cache = copy(_sols) .* 0.
-  _nlop = get_nonlinear_operator(_ode_op,params_test,times,dtθ,_sols,_ode_cache,_sols_cache)
-  _vθ = _nlop.vθ
-  _z = zero(eltype(_A))
-  fillstored!(_A,_z)
-  _Xh, = _ode_cache
-  _dxh = ()
-  for i in 2:get_order(feop_row_col)+1
-    _dxh = (_dxh...,EvaluationFunction(_Xh[i],(_sols,_sols)[i]))
-  end
-  _xh=TransientCellField(EvaluationFunction(Xh[1],(_sols,_sols)[1]),dxh)
-  _Uh = get_trial(feop_row_col)(params_test,times)
-  _V = get_test(feop_row_col)
-  _u = get_trial_fe_basis(_Uh)
-  _v = get_fe_basis(_V)
-  _dc = integrate(feop_row_col.jacs[i](params_test,times,xh,u,v))
-  _trian = get_domains(_dc)
-  t = [_trian...][1]
-  _matdata = collect_cell_matrix(_Uh,_V,_dc,t)
-  assemble_matrix_add!(_A,feop_row_col.assem,_matdata)
-
-full_ode_op = get_algebraic_operator(feop)
-full_ode_cache = allocate_cache(full_ode_op,params_test,times)
-M = allocate_jacobian(full_ode_op,params_test,times,vcat(x...),full_ode_cache)[1]
-Nc = CachedArray(M)
-Mboh = setsize!(Mc,(24,24))
+nrows = Int(length(blocks)/nblocks)
+harray = map(1:nrows) do row
+  hcat(blocks[(row-1)*nblocks:row*nblocks]...)
+end
+hvarray = vcat(harray...)
+hvarray
