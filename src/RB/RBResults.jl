@@ -97,8 +97,8 @@ function allocate_online_cache(
   res_contrib_cache = return_cache(RBVecContributionMap(T))
   jac_contrib_cache = return_cache(RBMatContributionMap(T))
 
-  res_cache = (b,CachedArray(coeff),CachedArray(ptcoeff)),res_contrib_cache
-  jac_cache = (A,CachedArray(coeff),CachedArray(ptcoeff)),jac_contrib_cache
+  res_cache = (CachedArray(b),CachedArray(coeff),CachedArray(ptcoeff)),res_contrib_cache
+  jac_cache = (CachedArray(A),CachedArray(coeff),CachedArray(ptcoeff)),jac_contrib_cache
   res_cache,jac_cache
 end
 

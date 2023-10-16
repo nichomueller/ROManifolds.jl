@@ -74,7 +74,7 @@ begin
   nsnaps_state = 50
   nsnaps_system = 20
   nsnaps_test = 10
-  st_mdeim = true
+  st_mdeim = false
   info = RBInfo(test_path;ϵ,load_solutions,save_solutions,load_structures,save_structures,
                 energy_norm,compute_supremizers,nsnaps_state,nsnaps_system,nsnaps_test,st_mdeim)
   # multi_field_rb_model(info,feop,fesolver)

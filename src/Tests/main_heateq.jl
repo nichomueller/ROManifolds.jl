@@ -55,18 +55,18 @@ function heat_equation()
   fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
 
   ϵ = 1e-4
-  load_solutions = false
+  load_solutions = true
   save_solutions = true
-  load_structures = false
+  load_structures = true
   save_structures = true
   energy_norm = :l2
   nsnaps_state = 50
   nsnaps_system = 20
   nsnaps_test = 10
-  st_mdeim = true
+  st_mdeim = false
   info = RBInfo(test_path;ϵ,load_solutions,save_solutions,load_structures,save_structures,
                 energy_norm,nsnaps_state,nsnaps_system,nsnaps_test,st_mdeim)
-  single_field_rb_model(info,feop,fesolver)
+  # single_field_rb_model(info,feop,fesolver)
 end
 
 heat_equation()

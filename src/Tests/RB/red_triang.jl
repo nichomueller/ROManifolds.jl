@@ -170,7 +170,7 @@ ode_op = get_algebraic_operator(feop)
 ode_cache = allocate_cache(ode_op,params_test,red_times)
 
 if length(red_times) < length(times)
-  A = get_array(cache;len=length(red_times)*length(params_test))
+  A = PTArray(cache[1:length(red_times)*length(params_test)])
   time_idx = findall(x->x in red_times,times)
   _sols = map(x->getindex(x,time_idx),sols)
 else

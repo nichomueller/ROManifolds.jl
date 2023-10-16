@@ -207,7 +207,7 @@ function collect_rhs_contributions!(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbres::RBVecAlgebraicContribution{T},
-  rbspace::BlockRBSpace,
+  rbspace::RBSpace,
   args...) where T
 
   coeff_cache,rb_cache = cache
@@ -229,7 +229,7 @@ function collect_lhs_contributions!(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbjacs::Vector{RBMatAlgebraicContribution{T}},
-  rbspace::BlockRBSpace,
+  rbspace::RBSpace,
   args...) where T
 
   njacs = length(rbjacs)

@@ -185,11 +185,15 @@ function assemble_rhs!(
   sols::PTArray,
   μ::Table)
 
+  ndofs = num_free_dofs(feop.test)
+  setsize!(cache,(ndofs,))
+
   red_idx = rbres.integration_domain.idx
   red_times = rbres.integration_domain.times
   red_meas = rbres.integration_domain.meas
 
-  b = PTArray(cache[1:length(red_times)*length(μ)])
+  N = length(red_times)*length(μ)
+  b = PTArray(map(x->x.array,cache[1:N]))
   sols = get_solutions_at_times(sols,fesolver,red_times)
 
   collect_residuals_for_idx!(b,fesolver,feop,sols,μ,red_times,red_idx,red_meas)
@@ -217,11 +221,16 @@ function assemble_lhs!(
   μ::Table;
   i::Int=1)
 
+  ndofs_row = num_free_dofs(feop.test)
+  ndofs_col = num_free_dofs(get_trial(feop)(nothing,nothing))
+  setsize!(cache,(ndofs_row,ndofs_col))
+
   red_idx = rbjac.integration_domain.idx
   red_times = rbjac.integration_domain.times
   red_meas = rbjac.integration_domain.meas
 
-  A = PTArray(cache[1:length(red_times)*length(μ)])
+  N = length(red_times)*length(μ)
+  A = PTArray(map(x->x.array,cache[1:N]))
   sols = get_solutions_at_times(sols,fesolver,red_times)
 
   collect_jacobians_for_idx!(A,fesolver,feop,sols,μ,red_times,red_idx,red_meas;i)
