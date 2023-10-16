@@ -18,13 +18,13 @@ function SparseArrays.findnz(S::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
 
   count = 1
   @inbounds for col = 1:size(S,2), k = SparseArrays.getcolptr(S)[col] : (SparseArrays.getcolptr(S)[col+1]-1)
-      I[count] = rowvals(S)[k]
-      J[count] = col
-      V[count] = nonzeros(S)[k]
-      count += 1
+    I[count] = rowvals(S)[k]
+    J[count] = col
+    V[count] = nonzeros(S)[k]
+    count += 1
   end
 
-  nz = findall(x -> x .>= eps(),V)
+  nz = findall(x -> x .>= eps(),abs.(V))
 
   (I[nz],J[nz],V[nz])
 end

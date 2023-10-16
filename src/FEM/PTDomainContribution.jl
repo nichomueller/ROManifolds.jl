@@ -299,6 +299,7 @@ Base.broadcasted(f,a::CellField,b::Nothing) = Operation((i,j)->f.(i,j))(a,b)
 
 Fields.gradient(::Nothing) = nothing
 LinearAlgebra.dot(::typeof(∇),::Nothing) = nothing
+∂ₚt(::Nothing) = nothing
 
 CellData.integrate(::Nothing,args...) = nothing
 

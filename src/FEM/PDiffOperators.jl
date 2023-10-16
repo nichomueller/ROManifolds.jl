@@ -21,4 +21,4 @@ end
 
 const ∂ₚt = p_time_derivative
 
-∂ₚt(f) = ∂t(f)
+∂ₚtt(f::Function) = ∂ₚt(∂ₚt(f))

@@ -53,7 +53,7 @@ function recenter(
   θ = fesolver.θ
   uh0 = fesolver.uh0(μ)
   u0 = get_free_dof_values(uh0)
-  nblocks = get_nblocks(rbspace)
+  nblocks = get_nblocks(s)
   pend = 1
   sθ = map(1:nblocks) do row
     s_row = s[row]
@@ -148,7 +148,7 @@ function reduced_basis(
   nblocks = get_nblocks(snaps)
   blocks = map(1:nblocks) do col
     feop_row_col = feop[1,col]
-    snaps_col = sols[col]
+    snaps_col = snaps[col]
     energy_norm_col = energy_norm[col]
     norm_matrix = get_norm_matrix(feop,energy_norm_col)
     basis_space_nnz,basis_time = compress(info,feop_row_col,snaps_col,norm_matrix,args...)
@@ -553,9 +553,10 @@ function collect_rhs_contributions!(
     cache_row = cache_at_index(cache,offsets[row]+1:offsets[row+1])
     if rbres.touched[row]
       feop_row = feop[row,:]
+      rbspace_row = rbspace[row]
       vsnaps = vcat(sols...)
       blocks[row] = collect_rhs_contributions!(
-        cache_row,info,feop_row,fesolver,rbres.blocks[row],vsnaps,params)
+        cache_row,info,feop_row,fesolver,rbres.blocks[row],rbspace_row,vsnaps,params)
     else
       rbcache,_ = last(cache_row_col)
       s = (rb_offsets[row+1]-rb_offsets[row],)

@@ -126,7 +126,7 @@ function space_time_projection(
   end
   st_proj = combine_projections(st_proj_center,st_proj_shift)
   st_proj_mat = zeros(T,ns_row*nt_row,ns_col*nt_col)
-  @inbounds for i = 1:ns_row, j = 1:ns_col
+  @inbounds for i = 1:ns_col, j = 1:ns_row
     st_proj_mat[1+(j-1)*nt_row:j*nt_row,1+(i-1)*nt_col:i*nt_col] = st_proj[:,:,(i-1)*ns_row+j]
   end
   return st_proj_mat

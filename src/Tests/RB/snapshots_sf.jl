@@ -6,7 +6,7 @@ Nt = length(times)
 N = K*Nt
 nfree = test.nfree
 
-sols = collect_solutions(fesolver,feop,μ)
+sols, = collect_solutions(fesolver,feop,get_trial(feop),μ)
 
 snapsθ = recenter(fesolver,sols,μ)
 [test_ptarray(snapsθ.snaps[i],sols.snaps[i]) for i = eachindex(snapsθ.snaps)]

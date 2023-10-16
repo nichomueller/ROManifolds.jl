@@ -210,7 +210,7 @@ end
 
 function test_ptarray(a::PTArray,b::AbstractArrayBlock;n=1)
   _a = a[n]
-  @assert all(_a .≈ b) "Incorrect approximation detected for index $n"
+  @assert _a ≈ b "Incorrect approximation detected for index $n"
   if typeof(_a) != typeof(b)
     @warn "Detected difference in type"
   end

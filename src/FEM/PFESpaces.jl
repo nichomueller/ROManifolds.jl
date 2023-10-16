@@ -350,7 +350,7 @@ function FESpaces.get_free_dof_ids(f::PMultiFieldFESpace,::ConsecutiveMultiField
   for U in f.spaces
     push!(block_num_dofs,num_free_dofs(U))
   end
-  BlockArrays.blockedrange(block_num_dofs)
+  blockedrange(block_num_dofs)
 end
 
 FESpaces.get_dof_value_type(::PMultiFieldFESpace{MS,CS,V}) where {MS,CS,V} = eltype(V)

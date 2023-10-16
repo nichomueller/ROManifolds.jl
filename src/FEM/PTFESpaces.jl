@@ -88,8 +88,11 @@ Functor-like evaluation. It allocates Dirichlet vals in general.
 """
 Time derivative of the Dirichlet functions
 """
-∂ₚt(U::PTTrialFESpace) =
-  PTTrialFESpace(U.space,∂ₚt.(U.dirichlet_μt))
+∂ₚt(U::PTTrialFESpace) = PTTrialFESpace(U.space,∂ₚt.(U.dirichlet_μt))
+∂ₚt(U::SingleFieldFESpace) = HomogeneousTrialFESpace(U)
+∂ₚt(U::MultiFieldFESpace) = MultiFieldFESpace(∂t.(U.spaces))
+∂ₚt(f::Union{Gridap.ODEs.TransientFETools.TransientCellField,Gridap.ODEs.TransientFETools.TransientFEBasis}) = ∂t(f)
+∂ₚt(f::Gridap.ODEs.TransientFETools.TransientMultiFieldCellField) = ∂t(f)
 
 """
 Time 2nd derivative of the Dirichlet functions
