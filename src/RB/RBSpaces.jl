@@ -107,8 +107,13 @@ function space_time_projection(mat::AbstractMatrix,rb::RBSpace)
   return vec(st_proj')
 end
 
+function space_time_projection(nzm::NnzMatrix,rb::RBSpace)
+  mat = recast(nzm)
+  space_time_projection(mat,rb)
+end
+
 function space_time_projection(
-  mat::NnzMatrix{T},rb_row::RBSpace,rb_col::RBSpace;combine_projections=(x,y)->x) where T
+  nzm::NnzMatrix{T},rb_row::RBSpace,rb_col::RBSpace;combine_projections=(x,y)->x) where T
   basis_space_row = get_basis_space(rb_row)
   basis_time_row = get_basis_time(rb_row)
   basis_space_col = get_basis_space(rb_col)
@@ -116,7 +121,7 @@ function space_time_projection(
   ns_row,ns_col = size(basis_space_row,2),size(basis_space_col,2)
   nt_row,nt_col = size(basis_time_row,2),size(basis_time_col,2)
 
-  s_proj = compress(basis_space_row,basis_space_col,mat)
+  s_proj = compress(basis_space_row,basis_space_col,nzm)
   s_proj_mat = hcat([x[:] for x in s_proj]...)'  # time_ndofs x ns_row*ns_col
   st_proj_center = zeros(T,nt_row,nt_col,ns_row*ns_col)
   st_proj_shift = zeros(T,nt_row,nt_col,ns_row*ns_col)

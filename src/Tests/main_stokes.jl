@@ -6,11 +6,11 @@ begin
 end
 
 begin
-  # mesh = "model_circle_2D_coarse.json"
-  mesh = "cube2x2.json"
+  mesh = "model_circle_2D_coarse.json"
+  # mesh = "cube2x2.json"
   test_path = "$root/tests/stokes/unsteady/$mesh"
-  # bnd_info = Dict("dirichlet0" => ["noslip"],"dirichlet" => ["inlet"],"neumann" => ["outlet"])
-  bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
+  bnd_info = Dict("dirichlet0" => ["noslip"],"dirichlet" => ["inlet"],"neumann" => ["outlet"])
+  # bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
   order = 2
   degree = 4
 
@@ -26,14 +26,10 @@ begin
   a(μ,t) = x->a(x,μ,t)
   aμt(μ,t) = PTFunction(a,μ,t)
 
-  f(x,μ,t) = VectorValue(0,0)
-  f(μ,t) = x->f(x,μ,t)
-  fμt(μ,t) = PTFunction(f,μ,t)
-
   g(x,μ,t) = VectorValue(μ[1]*exp(-x[2]/μ[2])*abs(sin(μ[3]*t)),0)
   g(μ,t) = x->g(x,μ,t)
-  # g0(x,μ,t) = VectorValue(0,0)
-  # g0(μ,t) = x->g0(x,μ,t)
+  g0(x,μ,t) = VectorValue(0,0)
+  g0(μ,t) = x->g0(x,μ,t)
 
   u0(x,μ) = VectorValue(0,0)
   u0(μ) = x->u0(x,μ)
@@ -44,15 +40,14 @@ begin
 
   jac_t(μ,t,(u,p),(dut,dpt),(v,q)) = ∫ₚ(v⋅dut,dΩ)
   jac(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(du),dΩ) - ∫ₚ(dp*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(du)),dΩ)
-  res(μ,t,(u,p),(v,q)) = (∫ₚ(v⋅∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ)
-    - ∫ₚ(q*(∇⋅(u)),dΩ) - ∫ₚ(v⋅fμt(μ,t),dΩ))
+  res(μ,t,(u,p),(v,q)) = ∫ₚ(v⋅∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(u)),dΩ)
 
   reffe_u = Gridap.ReferenceFE(lagrangian,VectorValue{2,Float},order)
   reffe_p = Gridap.ReferenceFE(lagrangian,Float,order-1)
-  # test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
-  test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
-  # trial_u = PTTrialFESpace(test_u,[g0,g])
-  trial_u = PTTrialFESpace(test_u,g)
+  test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
+  # test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
+  trial_u = PTTrialFESpace(test_u,[g0,g])
+  # trial_u = PTTrialFESpace(test_u,g)
   test_p = TestFESpace(model,reffe_p;conformity=:L2,constraint=:zeromean)
   trial_p = TrialFESpace(test_p)
   test = PTMultiFieldFESpace([test_u,test_p])
@@ -65,7 +60,7 @@ begin
   fesolver = PThetaMethod(LUSolver(),xh0μ,θ,dt,t0,tf)
 
   ϵ = 1e-4
-  load_solutions = true
+  load_solutions = false
   save_solutions = true
   load_structures = false
   save_structures = true
@@ -77,7 +72,7 @@ begin
   st_mdeim = false
   info = RBInfo(test_path;ϵ,load_solutions,save_solutions,load_structures,save_structures,
                 energy_norm,compute_supremizers,nsnaps_state,nsnaps_system,nsnaps_test,st_mdeim)
-  # multi_field_rb_model(info,feop,fesolver)
+  multi_field_rb_model(info,feop,fesolver)
 end
 
 sols,params = load(info,(BlockSnapshots,Table))
@@ -101,38 +96,55 @@ stats = @timed begin
   rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs)
 end
 approx_snaps_test = recast(rbspace,rb_snaps_test)
+post_process(info,feop,fesolver,snaps_test,params_test,approx_snaps_test,stats)
 
-# lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,rbspace,x,params_test)
-T = Float
-njacs = length(rblhs)
-nblocks = get_nblocks(testitem(rblhs))
-offsets = field_offsets(feop.test)
-rb_jacs_contribs = Vector{PTArray{Matrix{T}}}(undef,njacs)
-i = 1
-rb_jac_i = rblhs[i]
-rb_offsets_row = field_offsets(rb_jac_i)
-blocks = Matrix{PTArray{Matrix{T}}}(undef,nblocks,nblocks)
-for (row,col) = index_pairs(nblocks,nblocks)
-  cache_row_col = cache_at_index(lhs_cache,offsets[row]+1:offsets[row+1],offsets[col]+1:offsets[col+1])
-  if rb_jac_i.touched[row,col]
-    feop_row_col = feop[row,col]
-    sols_col = x[col]
-    blocks[row,col] = collect_lhs_contributions!(
-      cache_row_col,info,feop_row_col,fesolver,rb_jac_i.blocks[row,col],sols_col,params_test;i)
-  else
-    rbcache,_ = last(cache_row_col)
-    s = (rb_offsets_i[row+1]-rb_offsets_i[row],rb_offsets_i[col+1]-rb_offsets_i[col])
-    setsize!(rbcache,s)
-    array = rbcache.array
-    array .= zero(T)
-    blocks[row,col] = PTArray([copy(array) for _ = eachindex(params_test)])
-  end
-end
-rb_jacs_contribs[i] = hvcat(nblocks,blocks...)
+μ = params_test[1]
+bsu,btu = rbspace[1].basis_space,rbspace[1].basis_time
+bsp,btp = rbspace[2].basis_space,rbspace[2].basis_time
 
-nrows = Int(length(blocks)/nblocks)
-harray = map(1:nrows) do row
-  hcat(blocks[(row-1)*nblocks:row*nblocks]...)
-end
-hvarray = vcat(harray...)
-hvarray
+urb = space_time_projection(hcat(snaps_test[1][1:10]...),rbspace[1])
+prb = space_time_projection(hcat(snaps_test[2][1:10]...),rbspace[2])
+_urb = rb_snaps_test[1][1:get_rb_ndofs(rbspace[1])]
+_prb = rb_snaps_test[1][1+get_rb_ndofs(rbspace[1]):end]
+
+Aμ(t) = assemble_matrix((du,dv)->∫(a(μ,t)*∇(dv)⊙∇(du))dΩ,trial_u(μ,t),test_u)
+Mμ(t) = assemble_matrix((du,dv)->∫(dv⋅du)dΩ,trial_u(μ,dt),test_u)/(dt*θ)
+A = NnzMatrix([NnzVector(Aμ(t)) for t in get_times(fesolver)]...)
+M = NnzMatrix([NnzVector(Mμ(t)) for t in get_times(fesolver)]...)
+Arb = space_time_projection(A,rbspace[1],rbspace[1];combine_projections=(x,y)->θ*x+(1-θ)*y)
+Mrb = space_time_projection(M,rbspace[1],rbspace[1];combine_projections=(x,y)->θ*x-θ*y)
+lhs1_ok = Arb+Mrb
+lhs1 = lhs[1][1:get_rb_ndofs(rbspace[1]),1:get_rb_ndofs(rbspace[1])]
+println(ℓ∞(lhs1_ok - lhs1))
+
+BT1 = -assemble_matrix((dp,dv)->∫(dp*(∇⋅(dv)))dΩ,trial_p,test_u)
+BTμ = [BT1 for _ = 1:get_time_ndofs(fesolver)]
+BT = NnzMatrix(NnzVector.(BTμ)...)
+BTrb = space_time_projection(BT,rbspace[1],rbspace[2];combine_projections=(x,y)->θ*x+(1-θ)*y)
+lhs2_ok = BTrb
+lhs2 = lhs[1][1:get_rb_ndofs(rbspace[1]),get_rb_ndofs(rbspace[1])+1:end]
+println(ℓ∞(lhs2_ok - lhs2))
+
+B1 = -assemble_matrix((du,dq)->∫(dq*(∇⋅(du)))dΩ,trial_u(nothing,nothing),test_p)
+Bμ = [B1 for _ = 1:get_time_ndofs(fesolver)]
+B = NnzMatrix(NnzVector.(Bμ)...)
+Brb = space_time_projection(B,rbspace[2],rbspace[1];combine_projections=(x,y)->θ*x+(1-θ)*y)
+lhs3_ok = Brb
+lhs3 = lhs[1][get_rb_ndofs(rbspace[1])+1:end,1:get_rb_ndofs(rbspace[1])]
+println(ℓ∞(lhs3_ok - lhs3))
+
+dir(t) = zero(trial_u(μ,t))
+ddir(t) = zero(∂ₚt(trial_u)(μ,t))
+Lu(t) = assemble_vector(dv->∫(a(μ,t)*∇(dv)⊙∇(dir(t)))dΩ,test_u) + assemble_vector(dv->∫(dv⋅ddir(t))dΩ,test_u)
+Lp(t) = assemble_vector(dq->∫(dq*(∇⋅(dir(t))))dΩ,test_p)
+
+Lut = NnzMatrix([Lu(t) for t in get_times(fesolver)]...)
+Lpt = NnzMatrix([Lp(t) for t in get_times(fesolver)]...)
+Lurb = space_time_projection(Lut,rbspace[1])
+Lprb = space_time_projection(Lpt,rbspace[2])
+rhs1_ok = Lurb
+rhs1 = rhs[1][1:get_rb_ndofs(rbspace[1])]
+println(ℓ∞(rhs1_ok - rhs1))
+rhs2_ok = Lprb
+rhs2 = rhs[1][1+get_rb_ndofs(rbspace[1]):end]
+println(ℓ∞(rhs2_ok - rhs2))

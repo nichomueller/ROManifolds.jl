@@ -137,6 +137,16 @@ function num_rb_dofs(rb::BlockRBSpace)
   ndofs
 end
 
+function recast(rb::BlockRBSpace,x::PTArray{T}) where T
+  nblocks = get_nblocks(rb)
+  offset = field_offsets(rb)
+  map(1:nblocks) do row
+    rb_row = rb[row]
+    x_row = map(y->y[offset[row]+1:offset[row+1]],x)
+    recast(rb_row,x_row)
+  end
+end
+
 function reduced_basis(
   info::RBInfo,
   feop::PTFEOperator,
@@ -205,8 +215,7 @@ function add_time_supremizers(bases_time::Vector{<:Matrix};kwargs...)
   dual_nfields = length(bt_dual)
   for col in 1:dual_nfields
     println("Computing supremizers in time for dual field $col")
-    supr_col = add_time_supremizers(bt_primal,bt_dual[col];kwargs...)
-    bt_primal = hcat(bt_primal,supr_col)
+    add_time_supremizers(bt_primal,bt_dual[col];kwargs...)
   end
   return [bt_primal,bt_dual...]
 end
@@ -626,8 +635,8 @@ function post_process(
   fesolver::PODESolver,
   sol::Vector{<:PTArray},
   params::Table,
-  sol_approx::Vector{PTArray{T}},
-  stats::NamedTuple) where T
+  sol_approx::Vector{<:PTArray},
+  stats::NamedTuple)
 
   nblocks = length(sol)
   energy_norm = info.energy_norm
@@ -637,7 +646,8 @@ function post_process(
     sol_approx_col = sol_approx[col]
     norm_matrix_col = get_norm_matrix(feop_col,energy_norm[col])
     _sol_col = space_time_matrices(sol_col;nparams=length(params))
-    results = RBResults(params,_sol_col,sol_approx_col,stats;name=Symbol("field$col"),norm_matrix_col)
+    results = RBResults(
+      params,_sol_col,sol_approx_col,stats;name=Symbol("field$col"),norm_matrix=norm_matrix_col)
     show(results)
     save(info,results)
     writevtk(info,feop_col,fesolver,results)
