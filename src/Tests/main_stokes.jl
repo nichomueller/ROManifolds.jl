@@ -6,11 +6,11 @@ begin
 end
 
 begin
-  mesh = "model_circle_2D_coarse.json"
-  # mesh = "cube2x2.json"
+  # mesh = "model_circle_2D_coarse.json"
+  mesh = "cube2x2.json"
   test_path = "$root/tests/stokes/unsteady/$mesh"
-  bnd_info = Dict("dirichlet0" => ["noslip"],"dirichlet" => ["inlet"],"neumann" => ["outlet"])
-  # bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
+  # bnd_info = Dict("dirichlet0" => ["noslip"],"dirichlet" => ["inlet"],"neumann" => ["outlet"])
+  bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
   order = 2
   degree = 4
 
@@ -44,10 +44,10 @@ begin
 
   reffe_u = Gridap.ReferenceFE(lagrangian,VectorValue{2,Float},order)
   reffe_p = Gridap.ReferenceFE(lagrangian,Float,order-1)
-  test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
-  # test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
-  trial_u = PTTrialFESpace(test_u,[g0,g])
-  # trial_u = PTTrialFESpace(test_u,g)
+  # test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
+  test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
+  # trial_u = PTTrialFESpace(test_u,[g0,g])
+  trial_u = PTTrialFESpace(test_u,g)
   test_p = TestFESpace(model,reffe_p;conformity=:L2,constraint=:zeromean)
   trial_p = TrialFESpace(test_p)
   test = PTMultiFieldFESpace([test_u,test_p])
@@ -60,7 +60,7 @@ begin
   fesolver = PThetaMethod(LUSolver(),xh0μ,θ,dt,t0,tf)
 
   ϵ = 1e-4
-  load_solutions = false
+  load_solutions = true
   save_solutions = true
   load_structures = false
   save_structures = true
@@ -72,7 +72,7 @@ begin
   st_mdeim = false
   info = RBInfo(test_path;ϵ,load_solutions,save_solutions,load_structures,save_structures,
                 energy_norm,compute_supremizers,nsnaps_state,nsnaps_system,nsnaps_test,st_mdeim)
-  multi_field_rb_model(info,feop,fesolver)
+  # multi_field_rb_model(info,feop,fesolver)
 end
 
 sols,params = load(info,(BlockSnapshots,Table))
@@ -136,7 +136,7 @@ println(ℓ∞(lhs3_ok - lhs3))
 dir(t) = zero(trial_u(μ,t))
 ddir(t) = zero(∂ₚt(trial_u)(μ,t))
 Lu(t) = assemble_vector(dv->∫(a(μ,t)*∇(dv)⊙∇(dir(t)))dΩ,test_u) + assemble_vector(dv->∫(dv⋅ddir(t))dΩ,test_u)
-Lp(t) = assemble_vector(dq->∫(dq*(∇⋅(dir(t))))dΩ,test_p)
+Lp(t) = -assemble_vector(dq->∫(dq*(∇⋅(dir(t))))dΩ,test_p)
 
 Lut = NnzMatrix([Lu(t) for t in get_times(fesolver)]...)
 Lpt = NnzMatrix([Lp(t) for t in get_times(fesolver)]...)
@@ -148,3 +148,77 @@ println(ℓ∞(rhs1_ok - rhs1))
 rhs2_ok = Lprb
 rhs2 = rhs[1][1+get_rb_ndofs(rbspace[1]):end]
 println(ℓ∞(rhs2_ok - rhs2))
+
+println(norm(Lut))
+println(norm(Lpt))
+
+LHS1 = lhs[1]
+RHS1 = vcat(rhs1_ok,rhs2_ok)
+X1rb = LHS1 \ RHS1
+U1 = recast(rbspace[1],X1rb[1:get_rb_ndofs(rbspace[1])])
+P1 = recast(rbspace[2],X1rb[1+get_rb_ndofs(rbspace[1]):end])
+println(ℓ∞(U1 - hcat(snaps_test[1][1:10]...)))
+println(ℓ∞(P1 - hcat(snaps_test[2][1:10]...)))
+
+# phiphi = rbspace[1].basis_time'rbspace[1].basis_time
+# phiphi_shift = rbspace[1].basis_time[1:end-1,:]'rbspace[1].basis_time[2:end,:]
+# MM = bsu'*Mμ(dt)*bsu
+# resultM = kron(MM,phiphi') - kron(MM,phiphi_shift')
+# @assert resultM ≈ Mrb
+
+phiphi_up = rbspace[1].basis_time'rbspace[2].basis_time
+BTBT = bsu'*BT1*bsp
+resultBT = kron(BTBT,phiphi_up)
+
+phiphi_pu = rbspace[2].basis_time'rbspace[1].basis_time
+BB = bsp'*B1*bsu
+resultB = kron(BB,phiphi_pu)
+
+np = get_rb_ndofs(rbspace[2])
+LHS1 = vcat(hcat(lhs1_ok,resultBT),hcat(resultB,zeros(np,np)))
+RHS1 = vcat(rhs1_ok,rhs2_ok)
+X1rb = LHS1 \ RHS1
+U1 = recast(rbspace[1],X1rb[1:get_rb_ndofs(rbspace[1])])
+P1 = recast(rbspace[2],X1rb[1+get_rb_ndofs(rbspace[1]):end])
+println(ℓ∞(U1 - hcat(snaps_test[1][1:10]...)))
+println(ℓ∞(P1 - hcat(snaps_test[2][1:10]...)))
+
+
+
+# investigating res
+row = 1
+trian = [get_domains(rbrhs[row])...][1]
+offsets = field_offsets(feop.test)
+cache_row = cache_at_index(res_cache,offsets[row]+1:offsets[row+1])
+ad = rbrhs[row][trian]
+sols,params = sols_test,params_test
+vsols = vcat(sols...)
+T = Float
+feop_row = feop[row,:]
+
+coeff_cache,rb_cache = cache_row
+coeff = rhs_coefficient!(coeff_cache,feop_row,fesolver,ad,vsols,params;st_mdeim)
+basis_space_proj = ad.basis_space
+basis_time = last(ad.basis_time)
+contribs = Vector{Vector{T}}(undef,length(coeff))
+k = RBVecContributionMap(T)
+@inbounds for i = eachindex(coeff)
+  contribs[i] = copy(evaluate!(k,rb_cache,basis_space_proj,basis_time,coeff[i]))
+end
+
+rcache, = coeff_cache
+red_times = ad.integration_domain.times
+full_idx = collect(get_free_dof_ids(feop_row.test))
+meas = get_measure(feop_row,trian)
+b = PTArray(rcache[1:length(red_times)*length(params)])
+vsols = get_solutions_at_times(vsols,fesolver,red_times)
+nfree = length(get_free_dof_ids(feop_row.test))
+res_full = collect_residuals_for_idx!(b,fesolver,feop_row,vsols,params,red_times,full_idx,meas)
+global contrib_ok
+for n in eachindex(params)
+  tidx = (n-1)*length(red_times)+1 : n*length(red_times)
+  nzmidx = NnzMatrix(res_full[:,tidx],full_idx,nfree,1)
+  contrib_ok = space_time_projection(nzmidx,rbspace[1])
+  err_contrib = ℓ∞(contribs[n]-contrib_ok)
+  println("Residual contribution difference for selected triangulation is $err_contrib")
+end

@@ -301,7 +301,7 @@ Fields.gradient(::Nothing) = nothing
 LinearAlgebra.dot(::typeof(∇),::Nothing) = nothing
 ∂ₚt(::Nothing) = nothing
 
-CellData.integrate(::Nothing,args...) = nothing
+CellData.integrate(::Nothing,::GenericMeasure) = nothing
 
 CellData.integrate(::Any,::Nothing) = nothing
 

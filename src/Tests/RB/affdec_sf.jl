@@ -149,11 +149,14 @@ function test_rb_contribution_rhs(
 
   b = PTArray(rcache[1:length(red_times)*length(params)])
   sols = get_solutions_at_times(sols,fesolver,red_times)
+  nfree = length(get_free_dof_ids(feop.test))
   res_full = collect_residuals_for_idx!(b,fesolver,feop,sols,params,red_times,full_idx,meas)
   global contrib_ok
   for n in eachindex(params)
     tidx = (n-1)*length(red_times)+1 : n*length(red_times)
-    contrib_ok = space_time_projection(res_full[:,tidx],rbspace)
+    nzmidx = NnzMatrix(res_full[:,tidx],full_idx,nfree,1)
+    println(norm(nzmidx))
+    contrib_ok = space_time_projection(nzmidx,rbspace)
     err_contrib = ℓ∞(contribs[n]-contrib_ok)
     println("Residual contribution difference for selected triangulation is $err_contrib")
   end
@@ -189,7 +192,7 @@ function test_rb_contribution_lhs(
 
   A = PTArray(jcache[1:length(red_times)*length(params)])
   Afull = copy(A)
-  full_idx = findnz(Afull[1][:])[1]
+  full_idx = Afull[1][:].nzind
   jac_full = collect_jacobians_for_idx!(A,fesolver,feop,sols,params,red_times,full_idx,meas;i)
 
   sols = get_solutions_at_times(sols,fesolver,red_times)
@@ -197,7 +200,7 @@ function test_rb_contribution_lhs(
   global contrib_ok
   for n in eachindex(params)
     tidx = (n-1)*length(red_times)+1 : n*length(red_times)
-    nzmidx = NnzMatrix(jac_full[:,tidx],findnz(Afull[1][:])[1],nfree,1)
+    nzmidx = NnzMatrix(jac_full[:,tidx],full_idx,nfree,1)
     contrib_ok = space_time_projection(nzmidx,rbspace_row,rbspace_col;combine_projections)
     err_contrib = ℓ∞(contribs[n]-contrib_ok)
     println("Jacobian #$i contribution difference for selected triangulation is $err_contrib")

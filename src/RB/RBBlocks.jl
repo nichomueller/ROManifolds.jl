@@ -419,7 +419,7 @@ function collect_compress_rhs(
   vsnaps = vcat(snaps...)
 
   blocks = Vector{RBVecAlgebraicContribution{T}}(undef,nblocks)
-  @inbounds for row = 1:nblocks
+  for row = 1:nblocks
     touched_row = touched[row]
     if touched_row
       feop_row_col = feop[row,:]

@@ -169,7 +169,11 @@ function load_test(
   ntests = info.nsnaps_test
   try
     @check info.load_solutions
-    sols,params = load_test(info,(Snapshots,Table))
+    sols,params = try
+      load_test(info,(Snapshots,Table))
+    catch
+      load_test(info,(BlockSnapshots,Table))
+    end
     return sols[1:ntests],params[1:ntests]
   catch
     params = realization(feop,ntests)

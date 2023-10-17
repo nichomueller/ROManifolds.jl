@@ -91,9 +91,9 @@ realization(op::PTFEOperator,args...) = realization(op.pspace,args...)
 
 get_measure(op::PTFEOperator,trian::Triangulation) = Measure(trian,2*get_order(op.test))
 
-for OP in (:PTAffineFEOperator,:PTFEOperator)
+for (AFF,OP) in zip((:Affine,:Nonlinear),(:PTAffineFEOperator,:PTFEOperator))
   @eval begin
-    function Base.getindex(op::PTFEOperatorFromWeakForm,row,col)
+    function Base.getindex(op::PTFEOperatorFromWeakForm{$AFF},row,col)
       if isa(get_test(op),MultiFieldFESpace)
         trials_col = getindex(get_trial(op),col)
         test_row = getindex(op.test,row)
