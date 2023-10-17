@@ -36,8 +36,8 @@ test_p_ok = test_p
 rhs_ok(t,(u,p),(v,q)) = ∫(v⋅f(μ[1],t))dΩ
 lhs_ok(t,(u,p),(du,dp),(v,q)) = ∫(a(μ[1],t)*∇(v)⊙∇(du))dΩ - ∫(dp*(∇⋅(v)))dΩ - ∫(q*(∇⋅(du)))dΩ
 m_ok(t,(dut,dpt),(v,q)) = ∫(v⋅dut)dΩ
-reffe_u_ok = Gridap.ReferenceFE(lagrangian,VectorValue{2,Float},order)
-reffe_p_ok = Gridap.ReferenceFE(lagrangian,Float,order-1)
+reffe_u_ok = ReferenceFE(lagrangian,VectorValue{2,Float},order)
+reffe_p_ok = ReferenceFE(lagrangian,Float,order-1)
 test_u_ok = TestFESpace(model,reffe_u_ok;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial_u_ok = TransientTrialFESpace(test_u_ok,g_ok)
 test_p_ok = TestFESpace(model,reffe_p_ok;conformity=:C0)

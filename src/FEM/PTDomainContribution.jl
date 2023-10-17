@@ -225,11 +225,11 @@ end
 
 Base.getindex(int::CollectionPTIntegrand,meas::Measure) = get_contribution(int,meas)
 
-function CellData.add_contribution!(a::CollectionPTIntegrand,op::Function,b::PTIntegrand)
+function CellData.add_contribution!(a::CollectionPTIntegrand,op::Function,b::PTIntegrand...)
   if haskey(a.dict,op)
-    a.dict[op] = (a.dict[op]...,b)
+    a.dict[op] = (a.dict[op]...,b...)
   else
-    a.dict[op] = (b,)
+    a.dict[op] = b
   end
 end
 
@@ -252,9 +252,9 @@ for op in (:+,:-)
       add_contribution!(c,+,a)
       for (_op,int) in b.dict
         if (&)($op == +,_op == +) || (&)($op == -,_op == -)
-          add_contribution!(c,+,int)
+          add_contribution!(c,+,int...)
         else
-          add_contribution!(c,-,int)
+          add_contribution!(c,-,int...)
         end
       end
       c
@@ -263,9 +263,9 @@ for op in (:+,:-)
     function ($op)(a::CollectionPTIntegrand,b::CollectionPTIntegrand)
       for (_op,int) in b.dict
         if (&)($op == +,_op == +) || (&)($op == -,_op == -)
-          add_contribution!(a,+,int)
+          add_contribution!(a,+,int...)
         else
-          add_contribution!(a,-,int)
+          add_contribution!(a,-,int...)
         end
       end
       a
@@ -329,7 +329,7 @@ end
 function (-)(::Nothing,b::CollectionPTIntegrand)
   c = CollectionPTIntegrand()
   for (op,int) in b.dict
-    add_contribution!(c,-,int)
+    add_contribution!(c,-,int...)
   end
   c
 end

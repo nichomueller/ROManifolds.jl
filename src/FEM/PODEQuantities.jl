@@ -59,7 +59,7 @@ function Base.iterate(sol::PODESolution)
   n += 1
   state = (uf,u0,tf,n,cache)
 
-  return (uf,tf,n),state
+  return (uf,n),state
 end
 
 function Base.iterate(sol::PODESolution,state)
@@ -75,7 +75,7 @@ function Base.iterate(sol::PODESolution,state)
   n += 1
   state = (uf,u0,tf,n,cache)
 
-  return (uf,tf,n),state
+  return (uf,n),state
 end
 
 function collect_solutions(
@@ -94,7 +94,7 @@ function collect_solutions(
   uμt = PODESolution(fesolver,ode_op,μ,u0,t0,tf)
   sols = Vector{PTArray{T}}(undef,time_ndofs)
   println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
-  stats = @timed for (sol,t,n) in uμt
+  stats = @timed for (sol,n) in uμt
     sols[n] = copy(sol)
   end
   println("Time marching complete")
@@ -117,7 +117,7 @@ function collect_solutions(
   uμt = PODESolution(fesolver,ode_op,μ,u0,t0,tf)
   sols = Vector{Vector{PTArray{T}}}(undef,time_ndofs)
   println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
-  stats = @timed for (sol,t,n) in uμt
+  stats = @timed for (sol,n) in uμt
     sols[n] = split_fields(trial_μt,copy(sol))
   end
   println("Time marching complete")

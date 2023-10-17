@@ -74,14 +74,22 @@ struct PNewtonRaphsonCache <: GridapType
   ns::Vector{<:NumericalSetup}
 end
 
+function _inf_norm(b::AbstractArray)
+  m = 0
+  for bi in b
+    m = max(m,abs(bi))
+  end
+  m
+end
+
 function Algebra._check_convergence(nls,b::PTArray)
   n = length(b)
-  m0 = map(Algebra._inf_norm,b.array)
+  m0 = map(_inf_norm,b.array)
   ntuple(i->false,Val(n)),m0
 end
 
 function Algebra._check_convergence(nls,b::PTArray,m0)
-  m = map(Algebra._inf_norm,b.array)
+  m = map(_inf_norm,b.array)
   m .< nls.tol * m0,m
 end
 
