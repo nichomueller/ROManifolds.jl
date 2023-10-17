@@ -75,7 +75,7 @@ function multi_field_rb_model(
     save(info,(sols,params,stats))
   end
   if info.load_structures
-    rbspace = load(info,RBSpace)
+    rbspace = load(info,BlockRBSpace)
     rbrhs,rblhs = load(info,(BlockRBVecAlgebraicContribution,Vector{BlockRBMatAlgebraicContribution}))
   else
     rbspace = reduced_basis(info,feop,sols,params)

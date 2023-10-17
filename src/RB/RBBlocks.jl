@@ -204,7 +204,7 @@ function space_supremizers(
   μ = testitem(params)
   u = zero(feop.test)
   t = 0.
-  j(du,dv) = integrate(feop.jacs[1](μ,t,u,du,dv),DomainContribution())
+  j(du,dv) = integrate(feop.jacs[1](μ,t,u,du,dv))
   trial_dual = get_trial(feop)
   constraint_mat = assemble_matrix(j,trial_dual(μ,t),feop.test)
   constraint_mat*basis_space
@@ -215,7 +215,7 @@ function add_time_supremizers(bases_time::Vector{<:Matrix};kwargs...)
   dual_nfields = length(bt_dual)
   for col in 1:dual_nfields
     println("Computing supremizers in time for dual field $col")
-    add_time_supremizers(bt_primal,bt_dual[col];kwargs...)
+    bt_primal = add_time_supremizers(bt_primal,bt_dual[col];kwargs...)
   end
   return [bt_primal,bt_dual...]
 end
@@ -228,7 +228,8 @@ function add_time_supremizers(basis_u::Matrix,basis_p::Matrix;ttol=1e-2)
     basis_up::AbstractMatrix,
     v::AbstractArray)
 
-    vnew = orth_complement(v,basis_u)
+    vnew = copy(v)
+    orth_complement!(vnew,basis_u)
     vnew /= norm(vnew)
     hcat(basis_u,vnew),vcat(basis_up,vnew'*basis_p)
   end

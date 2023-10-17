@@ -180,7 +180,7 @@ end
 
 Base.getindex(int::PTIntegrand,meas::Measure) = get_contribution(int,meas)
 
-function CellData.integrate(int::PTIntegrand,args...)
+function CellData.integrate(int::PTIntegrand)
   integrate(int.object,int.meas)
 end
 
@@ -301,7 +301,7 @@ Fields.gradient(::Nothing) = nothing
 LinearAlgebra.dot(::typeof(∇),::Nothing) = nothing
 ∂ₚt(::Nothing) = nothing
 
-CellData.integrate(::Nothing,::GenericMeasure) = nothing
+CellData.integrate(::Nothing,args...) = nothing
 
 CellData.integrate(::Any,::Nothing) = nothing
 

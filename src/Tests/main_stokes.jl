@@ -5,12 +5,10 @@ begin
   include("$root/src/RB/RB.jl")
 end
 
-begin
-  # mesh = "model_circle_2D_coarse.json"
-  mesh = "cube2x2.json"
+function stokes_equation()
+  mesh = "model_circle_2D_coarse.json"
   test_path = "$root/tests/stokes/unsteady/$mesh"
-  # bnd_info = Dict("dirichlet0" => ["noslip"],"dirichlet" => ["inlet"],"neumann" => ["outlet"])
-  bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
+  bnd_info = Dict("dirichlet0" => ["noslip"],"dirichlet" => ["inlet"],"neumann" => ["outlet"])
   order = 2
   degree = 4
 
@@ -44,23 +42,21 @@ begin
 
   reffe_u = Gridap.ReferenceFE(lagrangian,VectorValue{2,Float},order)
   reffe_p = Gridap.ReferenceFE(lagrangian,Float,order-1)
-  # test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
-  test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
-  # trial_u = PTTrialFESpace(test_u,[g0,g])
-  trial_u = PTTrialFESpace(test_u,g)
-  test_p = TestFESpace(model,reffe_p;conformity=:L2,constraint=:zeromean)
+  test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
+  trial_u = PTTrialFESpace(test_u,[g0,g])
+  test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
   trial_p = TrialFESpace(test_p)
   test = PTMultiFieldFESpace([test_u,test_p])
   trial = PTMultiFieldFESpace([trial_u,trial_p])
   feop = PTAffineFEOperator(res,jac,jac_t,pspace,trial,test)
-  t0,tf,dt,θ = 0.,0.05,0.005,1
+  t0,tf,dt,θ = 0.,0.3,0.005,0.5
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial_u(μ,t0))
   ph0μ(μ) = interpolate_everywhere(p0μ(μ),trial_p(μ,t0))
   xh0μ(μ) = interpolate_everywhere([uh0μ(μ),ph0μ(μ)],trial(μ,t0))
   fesolver = PThetaMethod(LUSolver(),xh0μ,θ,dt,t0,tf)
 
   ϵ = 1e-4
-  load_solutions = true
+  load_solutions = false
   save_solutions = true
   load_structures = false
   save_structures = true
@@ -72,153 +68,7 @@ begin
   st_mdeim = false
   info = RBInfo(test_path;ϵ,load_solutions,save_solutions,load_structures,save_structures,
                 energy_norm,compute_supremizers,nsnaps_state,nsnaps_system,nsnaps_test,st_mdeim)
-  # multi_field_rb_model(info,feop,fesolver)
+  multi_field_rb_model(info,feop,fesolver)
 end
 
-sols,params = load(info,(BlockSnapshots,Table))
-rbspace = load(info,BlockRBSpace)
-rbrhs,rblhs = load(info,(BlockRBVecAlgebraicContribution,Vector{BlockRBMatAlgebraicContribution}))
-
-nsnaps = info.nsnaps_state
-params = realization(feop,nsnaps)
-sols,stats = collect_solutions(fesolver,feop,trial,params)
-save(info,(sols,params,stats))
-rbspace = reduced_basis(info,feop,sols,params)
-rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
-save(info,(rbspace,rbrhs,rblhs))
-
-snaps_test,params_test = load_test(info,feop,fesolver)
-x = initial_guess(sols,params,params_test)
-rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,snaps_test,params_test)
-rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbrhs,rbspace,x,params_test)
-lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,rbspace,x,params_test)
-stats = @timed begin
-  rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs)
-end
-approx_snaps_test = recast(rbspace,rb_snaps_test)
-post_process(info,feop,fesolver,snaps_test,params_test,approx_snaps_test,stats)
-
-μ = params_test[1]
-bsu,btu = rbspace[1].basis_space,rbspace[1].basis_time
-bsp,btp = rbspace[2].basis_space,rbspace[2].basis_time
-
-urb = space_time_projection(hcat(snaps_test[1][1:10]...),rbspace[1])
-prb = space_time_projection(hcat(snaps_test[2][1:10]...),rbspace[2])
-_urb = rb_snaps_test[1][1:get_rb_ndofs(rbspace[1])]
-_prb = rb_snaps_test[1][1+get_rb_ndofs(rbspace[1]):end]
-
-Aμ(t) = assemble_matrix((du,dv)->∫(a(μ,t)*∇(dv)⊙∇(du))dΩ,trial_u(μ,t),test_u)
-Mμ(t) = assemble_matrix((du,dv)->∫(dv⋅du)dΩ,trial_u(μ,dt),test_u)/(dt*θ)
-A = NnzMatrix([NnzVector(Aμ(t)) for t in get_times(fesolver)]...)
-M = NnzMatrix([NnzVector(Mμ(t)) for t in get_times(fesolver)]...)
-Arb = space_time_projection(A,rbspace[1],rbspace[1];combine_projections=(x,y)->θ*x+(1-θ)*y)
-Mrb = space_time_projection(M,rbspace[1],rbspace[1];combine_projections=(x,y)->θ*x-θ*y)
-lhs1_ok = Arb+Mrb
-lhs1 = lhs[1][1:get_rb_ndofs(rbspace[1]),1:get_rb_ndofs(rbspace[1])]
-println(ℓ∞(lhs1_ok - lhs1))
-
-BT1 = -assemble_matrix((dp,dv)->∫(dp*(∇⋅(dv)))dΩ,trial_p,test_u)
-BTμ = [BT1 for _ = 1:get_time_ndofs(fesolver)]
-BT = NnzMatrix(NnzVector.(BTμ)...)
-BTrb = space_time_projection(BT,rbspace[1],rbspace[2];combine_projections=(x,y)->θ*x+(1-θ)*y)
-lhs2_ok = BTrb
-lhs2 = lhs[1][1:get_rb_ndofs(rbspace[1]),get_rb_ndofs(rbspace[1])+1:end]
-println(ℓ∞(lhs2_ok - lhs2))
-
-B1 = -assemble_matrix((du,dq)->∫(dq*(∇⋅(du)))dΩ,trial_u(nothing,nothing),test_p)
-Bμ = [B1 for _ = 1:get_time_ndofs(fesolver)]
-B = NnzMatrix(NnzVector.(Bμ)...)
-Brb = space_time_projection(B,rbspace[2],rbspace[1];combine_projections=(x,y)->θ*x+(1-θ)*y)
-lhs3_ok = Brb
-lhs3 = lhs[1][get_rb_ndofs(rbspace[1])+1:end,1:get_rb_ndofs(rbspace[1])]
-println(ℓ∞(lhs3_ok - lhs3))
-
-dir(t) = zero(trial_u(μ,t))
-ddir(t) = zero(∂ₚt(trial_u)(μ,t))
-Lu(t) = assemble_vector(dv->∫(a(μ,t)*∇(dv)⊙∇(dir(t)))dΩ,test_u) + assemble_vector(dv->∫(dv⋅ddir(t))dΩ,test_u)
-Lp(t) = -assemble_vector(dq->∫(dq*(∇⋅(dir(t))))dΩ,test_p)
-
-Lut = NnzMatrix([Lu(t) for t in get_times(fesolver)]...)
-Lpt = NnzMatrix([Lp(t) for t in get_times(fesolver)]...)
-Lurb = space_time_projection(Lut,rbspace[1])
-Lprb = space_time_projection(Lpt,rbspace[2])
-rhs1_ok = Lurb
-rhs1 = rhs[1][1:get_rb_ndofs(rbspace[1])]
-println(ℓ∞(rhs1_ok - rhs1))
-rhs2_ok = Lprb
-rhs2 = rhs[1][1+get_rb_ndofs(rbspace[1]):end]
-println(ℓ∞(rhs2_ok - rhs2))
-
-println(norm(Lut))
-println(norm(Lpt))
-
-LHS1 = lhs[1]
-RHS1 = vcat(rhs1_ok,rhs2_ok)
-X1rb = LHS1 \ RHS1
-U1 = recast(rbspace[1],X1rb[1:get_rb_ndofs(rbspace[1])])
-P1 = recast(rbspace[2],X1rb[1+get_rb_ndofs(rbspace[1]):end])
-println(ℓ∞(U1 - hcat(snaps_test[1][1:10]...)))
-println(ℓ∞(P1 - hcat(snaps_test[2][1:10]...)))
-
-# phiphi = rbspace[1].basis_time'rbspace[1].basis_time
-# phiphi_shift = rbspace[1].basis_time[1:end-1,:]'rbspace[1].basis_time[2:end,:]
-# MM = bsu'*Mμ(dt)*bsu
-# resultM = kron(MM,phiphi') - kron(MM,phiphi_shift')
-# @assert resultM ≈ Mrb
-
-phiphi_up = rbspace[1].basis_time'rbspace[2].basis_time
-BTBT = bsu'*BT1*bsp
-resultBT = kron(BTBT,phiphi_up)
-
-phiphi_pu = rbspace[2].basis_time'rbspace[1].basis_time
-BB = bsp'*B1*bsu
-resultB = kron(BB,phiphi_pu)
-
-np = get_rb_ndofs(rbspace[2])
-LHS1 = vcat(hcat(lhs1_ok,resultBT),hcat(resultB,zeros(np,np)))
-RHS1 = vcat(rhs1_ok,rhs2_ok)
-X1rb = LHS1 \ RHS1
-U1 = recast(rbspace[1],X1rb[1:get_rb_ndofs(rbspace[1])])
-P1 = recast(rbspace[2],X1rb[1+get_rb_ndofs(rbspace[1]):end])
-println(ℓ∞(U1 - hcat(snaps_test[1][1:10]...)))
-println(ℓ∞(P1 - hcat(snaps_test[2][1:10]...)))
-
-
-
-# investigating res
-row = 1
-trian = [get_domains(rbrhs[row])...][1]
-offsets = field_offsets(feop.test)
-cache_row = cache_at_index(res_cache,offsets[row]+1:offsets[row+1])
-ad = rbrhs[row][trian]
-sols,params = sols_test,params_test
-vsols = vcat(sols...)
-T = Float
-feop_row = feop[row,:]
-
-coeff_cache,rb_cache = cache_row
-coeff = rhs_coefficient!(coeff_cache,feop_row,fesolver,ad,vsols,params;st_mdeim)
-basis_space_proj = ad.basis_space
-basis_time = last(ad.basis_time)
-contribs = Vector{Vector{T}}(undef,length(coeff))
-k = RBVecContributionMap(T)
-@inbounds for i = eachindex(coeff)
-  contribs[i] = copy(evaluate!(k,rb_cache,basis_space_proj,basis_time,coeff[i]))
-end
-
-rcache, = coeff_cache
-red_times = ad.integration_domain.times
-full_idx = collect(get_free_dof_ids(feop_row.test))
-meas = get_measure(feop_row,trian)
-b = PTArray(rcache[1:length(red_times)*length(params)])
-vsols = get_solutions_at_times(vsols,fesolver,red_times)
-nfree = length(get_free_dof_ids(feop_row.test))
-res_full = collect_residuals_for_idx!(b,fesolver,feop_row,vsols,params,red_times,full_idx,meas)
-global contrib_ok
-for n in eachindex(params)
-  tidx = (n-1)*length(red_times)+1 : n*length(red_times)
-  nzmidx = NnzMatrix(res_full[:,tidx],full_idx,nfree,1)
-  contrib_ok = space_time_projection(nzmidx,rbspace[1])
-  err_contrib = ℓ∞(contribs[n]-contrib_ok)
-  println("Residual contribution difference for selected triangulation is $err_contrib")
-end
+stokes_equation()
