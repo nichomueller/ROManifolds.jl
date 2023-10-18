@@ -85,6 +85,31 @@ trial = get_trial(feop)
 sols,stats = collect_solutions(fesolver,feop,trial,params)
 save(info,(sols,params,stats))
 
+rbspace = reduced_basis(info,feop,sols,params)
+rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
+save(info,(rbspace,rbrhs,rblhs))
+
+snaps_test,params_test = load_test(info,feop,fesolver)
+
+println("Solving nonlinear RB problems with Newton iterations")
+rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,snaps_test,params_test)
+nl_cache = nothing
+x = initial_guess(sols,params,params_test)
+xrb = space_time_projection(x,rbspace)
+_,conv0 = Algebra._check_convergence(fesolver.nls.ls,xrb)
+iter = 1
+rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbrhs,rbspace,x,params_test)
+lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,rbspace,x,params_test)
+nl_cache = rb_solve!(xrb,fesolver.nls.ls,rhs,lhs,nl_cache)
+x .= recast(rbspace,xrb)
+isconv,conv = Algebra._check_convergence(fesolver.nls,xrb,conv0)
+println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv)))")
+if all(isconv); return; end
+if iter == nls.max_nliters
+  @unreachable
+end
+post_process(info,feop,fesolver,snaps_test,params_test,x,stats)
+
 μ = params
 ode_op = get_algebraic_operator(feop)
 ode_cache = allocate_cache(ode_op,μ,dt)
@@ -116,3 +141,45 @@ add_contribution!(contrib,+,mm)
 for (_op,int) in aa.dict
   add_contribution!(contrib,+,int...)
 end
+
+du1 = get_trial_fe_basis(trial_u(nothing,nothing))
+du = [du1,nothing]
+dv1 = get_fe_basis(test_u)
+dv = [dv1,nothing]
+μ = params
+ode_op = get_algebraic_operator(feop)
+ode_cache = allocate_cache(ode_op,μ,dt)
+w0 = get_free_dof_values(xh0μ(μ))
+vθ = similar(w0)
+vθ .= 0.0
+nl_cache = nothing
+Us,_,fecache = update_cache!(ode_cache,ode_op,μ,dt)
+Xh, = ode_cache
+dxh = ()
+for i in 2:get_order(feop)+1
+  dxh = (dxh...,EvaluationFunction(Xh[i],vθ))
+end
+xh = TransientCellField(EvaluationFunction(Xh[1],vθ),dxh)
+xh = [xh[1],nothing]
+∫ₚ(dv1⊙(dconv∘(du1,∇(du1),xh[1],∇(xh[1]))),dΩ)
+nt = nothing
+∫ₚ(nt⊙(dconv∘(nt,∇(nt),nt,∇(nt))),dΩ)
+
+feop_row_col = feop[1,2]
+u = zero(feop_row_col.test)
+j(du,dv) = integrate(feop_row_col.jacs[1](μ[1],dt,u,du,dv))
+trial_dual = get_trial(feop_row_col)
+# assemble_matrix(j,trial_dual(μ[1],dt),feop_row_col.test)
+integrate(feop_row_col.jacs[1](μ[1],dt,zero(test_u),
+  get_trial_fe_basis(trial_p),get_fe_basis(test_u)))
+
+∫ₚ(get_fe_basis(test_u)⊙(dconv∘(nt,∇(nt),nt,nt)),dΩ)
+
+x1 = x[1]
+rb1 = rbspace[1]
+time_ndofs = get_time_ndofs(rb1)
+ptproj = map(1:time_ndofs) do n
+  mat = hcat(a[(n-1)*time_ndofs+1:n*time_ndofs]...)
+  space_time_projection(mat,rb1)
+end
+PTArray(ptproj)

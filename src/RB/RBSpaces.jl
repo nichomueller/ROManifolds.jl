@@ -18,9 +18,11 @@ end
 
 get_basis_space(rb::RBSpace) = rb.basis_space
 get_basis_time(rb::RBSpace) = rb.basis_time
-get_space_ndofs(rb::RBSpace) = size(rb.basis_space,2)
-get_time_ndofs(rb::RBSpace) = size(rb.basis_time,2)
-get_rb_ndofs(rb::RBSpace) = get_space_ndofs(rb)*get_time_ndofs(rb)
+get_space_ndofs(rb::RBSpace) = size(rb.basis_space,1)
+get_time_ndofs(rb::RBSpace) = size(rb.basis_time,1)
+get_rb_space_ndofs(rb::RBSpace) = size(rb.basis_space,2)
+get_rb_time_ndofs(rb::RBSpace) = size(rb.basis_time,2)
+get_rb_ndofs(rb::RBSpace) = get_rb_time_ndofs(rb)*get_rb_space_ndofs(rb)
 
 function num_rb_dofs(rb::RBSpace)
   size(rb.basis_space,2)*size(rb.basis_time,2)
@@ -86,18 +88,18 @@ function recast(rb::RBSpace,x::PTArray{T}) where T
   PTArray(array)
 end
 
-for f in (:space_time_projection,:test_reduced_basis)
-  @eval begin
-    function $f(s::Snapshots,rb::RBSpace...;n=1)
-      snap = s[n]
-      $f(snap,rb...)
-    end
+function space_time_projection(x::Vector{<:PTArray},rb::RBSpace{T}) where T
+  x1 = testitem(x)
+  time_ndofs = get_time_ndofs(rb)
+  nparams = Int(length(x1)/time_ndofs)
 
-    function $f(snap::PTArray{<:AbstractVector},rb::RBSpace...)
-      mat = hcat(get_array(snap)...)
-      $f(mat,rb...)
-    end
+  array = Vector{Vector{T}}(undef,nparams)
+  @inbounds for np = 1:nparams
+    x_row_np = hcat(x_row[(np-1)*time_ndofs+1:np*time_ndofs]...)
+    array[np] = space_time_projection(x_row_np,rb_row)
   end
+
+  return PTArray(array)
 end
 
 function space_time_projection(mat::AbstractMatrix,rb::RBSpace)

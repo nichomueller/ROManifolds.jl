@@ -147,6 +147,18 @@ function recast(rb::BlockRBSpace,x::PTArray{T}) where T
   end
 end
 
+function space_time_projection(x::Vector{<:PTArray},rb::BlockRBSpace{T}) where T
+  nblocks = get_nblocks(rb)
+  @assert length(x) == nblocks
+
+  blocks = map(1:nblocks) do row
+    x_row = x[row]
+    rb_row = rb[row]
+    space_time_projection(x_row,rb_row)
+  end
+  return vcat(blocks...)
+end
+
 function reduced_basis(
   info::RBInfo,
   feop::PTFEOperator,

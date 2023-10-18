@@ -66,8 +66,8 @@ function post_process(
   fesolver::PODESolver,
   sol::PTArray,
   params::Table,
-  sol_approx::PTArray{T},
-  stats::NamedTuple) where T
+  sol_approx::PTArray,
+  stats::NamedTuple)
 
   energy_norm = info.energy_norm
   norm_matrix = get_norm_matrix(feop,energy_norm)
@@ -146,9 +146,9 @@ function test_rb_solver(
   _,conv0 = Algebra._check_convergence(fesolver.nls.ls,x)
   stats = @timed begin
     for iter in 1:fesolver.nls.max_nliters
-      rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,x,params_test)
-      lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,x,params_test)
-      nl_cache = rb_solve!(x,fesolver.nls,rhs,lhs,nl_cache)
+      rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,rbspace,x,params_test)
+      lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,rbspace,x,params_test)
+      nl_cache = rb_solve!(x,fesolver.nls.ls,rhs,lhs,nl_cache)
       x .= recast(rbspace,x)
       isconv,conv = Algebra._check_convergence(fesolver.nls,x,conv0)
       println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv)))")
