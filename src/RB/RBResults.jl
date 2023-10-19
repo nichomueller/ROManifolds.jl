@@ -69,10 +69,12 @@ function post_process(
   sol_approx::PTArray,
   stats::NamedTuple)
 
+  nparams = length(params)
   energy_norm = info.energy_norm
   norm_matrix = get_norm_matrix(feop,energy_norm)
-  _sol = space_time_matrices(sol;nparams=length(params))
-  results = RBResults(params,_sol,sol_approx,stats;norm_matrix)
+  _sol = space_time_matrices(sol;nparams)
+  _sol_approx = space_time_matrices(sol_approx;nparams)
+  results = RBResults(params,_sol,_sol_approx,stats;norm_matrix)
   show(results)
   save(info,results)
   writevtk(info,feop,fesolver,results)
@@ -123,7 +125,7 @@ function test_rb_solver(
   stats = @timed begin
     rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs)
   end
-  approx_snaps_test = recast(rbspace,rb_snaps_test)
+  approx_snaps_test = recast(rb_snaps_test,rbspace)
   post_process(info,feop,fesolver,snaps_test,params_test,approx_snaps_test,stats)
 end
 
@@ -143,14 +145,15 @@ function test_rb_solver(
   rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,snaps_test,params_test)
   nl_cache = nothing
   x = initial_guess(snaps,params,params_test)
-  _,conv0 = Algebra._check_convergence(fesolver.nls.ls,x)
+  xrb = space_time_projection(x,rbspace)
+  _,conv0 = Algebra._check_convergence(fesolver.nls.ls,xrb)
   stats = @timed begin
     for iter in 1:fesolver.nls.max_nliters
       rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,rbspace,x,params_test)
       lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,rbspace,x,params_test)
-      nl_cache = rb_solve!(x,fesolver.nls.ls,rhs,lhs,nl_cache)
-      x .= recast(rbspace,x)
-      isconv,conv = Algebra._check_convergence(fesolver.nls,x,conv0)
+      nl_cache = rb_solve!(xrb,fesolver.nls.ls,rhs,lhs,nl_cache)
+      x .= recast(xrb,rbspace)
+      isconv,conv = Algebra._check_convergence(fesolver.nls,xrb,conv0)
       println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv)))")
       if all(isconv); return; end
       if iter == nls.max_nliters
@@ -188,6 +191,7 @@ function rb_solve(ls::LinearSolver,rhs::PTArray,lhs::PTArray)
   x = copy(rhs)
   cache = nothing
   rb_solve!(x,ls,rhs,lhs,cache)
+  return x
 end
 
 function rb_solve!(
@@ -200,6 +204,19 @@ function rb_solve!(
   ss = symbolic_setup(ls,testitem(lhs))
   ns = numerical_setup(ss,lhs)
   _rb_loop_solve!(x,ns,rhs)
+  return ns
+end
+
+function rb_solve!(
+  x::PTArray,
+  ::LinearSolver,
+  rhs::PTArray,
+  lhs::PTArray,
+  ns)
+
+  numerical_setup!(ns,lhs)
+  _rb_loop_solve!(x,ns,rhs)
+  return ns
 end
 
 function _rb_loop_solve!(x::PTArray,ns,b::PTArray)

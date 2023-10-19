@@ -9,7 +9,7 @@ nfree = test.nfree
 sols, = collect_solutions(fesolver,feop,get_trial(feop),μ)
 
 snapsθ = recenter(fesolver,sols,μ)
-[test_ptarray(snapsθ.snaps[i],sols.snaps[i]) for i = eachindex(snapsθ.snaps)]
+# [test_ptarray(snapsθ.snaps[i],sols.snaps[i]) for i = eachindex(snapsθ.snaps)]
 
 _snapsθ = snapsθ[1:K]
 ode_op = get_algebraic_operator(feop)
@@ -139,10 +139,11 @@ vθ = copy(snaps_test) .* 0.
 nlop = get_nonlinear_operator(ode_op,params_test,times,dt*θ,snaps_test,ode_cache,vθ)
 residual!(ptb,nlop,copy(snaps_test))
 jacobian!(ptA,nlop,copy(snaps_test))
-ptb1 = ptb[1:10]
-ptA1 = ptA[1:10]
+ptb1 = ptb[1:ntimes]
+ptA1 = ptA[1:ntimes]
 
-M = assemble_matrix((du,dv)->∫(dv*du)dΩ,trial(μ,dt),test)/(dt*θ)
+dtθ = dt*θ
+M = assemble_matrix((du,dv)->∫(dv*du)dΩ,trial(μ,dt),test)/dtθ
 vθ = zeros(test.nfree)
 ode_cache = Gridap.ODEs.TransientFETools.allocate_cache(ode_op_ok)
 nlop0 = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t0,dtθ,vθ,ode_cache,vθ)

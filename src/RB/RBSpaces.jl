@@ -62,41 +62,36 @@ function compress(info::RBInfo,::PTFEOperator,snaps,args...)
   compress(nzm,steady,args...;ϵ)
 end
 
-function recast(rb::RBSpace,x::AbstractVector)
+function recast(x::AbstractVector,rb::RBSpace)
   basis_space = get_basis_space(rb)
   basis_time = get_basis_time(rb)
-  ns_rb = size(basis_space,2)
-  nt_rb = size(basis_time,2)
+  ns_rb = get_rb_space_ndofs(rb)
+  nt_rb = get_rb_time_ndofs(rb)
 
-  x_mat_i = reshape(x,nt_rb,ns_rb)
-  return basis_space*(basis_time*x_mat_i)'
+  x_mat = reshape(x,nt_rb,ns_rb)
+  xrb_mat = basis_space*(basis_time*x_mat)'
+  xrb = collect(eachcol(xrb_mat))
+  return xrb
 end
 
-function recast(rb::RBSpace,x::PTArray{T}) where T
-  basis_space = get_basis_space(rb)
-  basis_time = get_basis_time(rb)
-  ns_rb = size(basis_space,2)
-  nt_rb = size(basis_time,2)
-
-  n = length(x)
-  array = Vector{Matrix{eltype(T)}}(undef,n)
-  @inbounds for i = 1:n
-    x_mat_i = reshape(x[i],nt_rb,ns_rb)
-    array[i] = basis_space*(basis_time*x_mat_i)'
+function recast(x::PTArray,rb::RBSpace{T}) where T
+  time_ndofs = get_time_ndofs(rb)
+  nparams = length(x)
+  array = Vector{Vector{T}}(undef,time_ndofs*nparams)
+  @inbounds for i = 1:nparams
+    array[(i-1)*time_ndofs+1:i*time_ndofs] = recast(rb,x[i])
   end
-
   PTArray(array)
 end
 
-function space_time_projection(x::Vector{<:PTArray},rb::RBSpace{T}) where T
-  x1 = testitem(x)
+function space_time_projection(x::PTArray,rb::RBSpace{T}) where T
   time_ndofs = get_time_ndofs(rb)
-  nparams = Int(length(x1)/time_ndofs)
+  nparams = Int(length(x)/time_ndofs)
 
   array = Vector{Vector{T}}(undef,nparams)
   @inbounds for np = 1:nparams
-    x_row_np = hcat(x_row[(np-1)*time_ndofs+1:np*time_ndofs]...)
-    array[np] = space_time_projection(x_row_np,rb_row)
+    x_np = hcat(x[(np-1)*time_ndofs+1:np*time_ndofs]...)
+    array[np] = space_time_projection(x_np,rb)
   end
 
   return PTArray(array)
@@ -141,7 +136,7 @@ end
 
 function test_reduced_basis(mat::AbstractMatrix,rb::RBSpace)
   rb_proj = space_time_projection(mat,rb)
-  rb_approx = recast(rb,rb_proj)
+  rb_approx = recast(rb_proj,rb)
   err = maximum(abs.(mat-rb_approx))
   println("RB approximation error in infty norm of snapshot $n = $err")
   return rb_proj

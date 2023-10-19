@@ -137,13 +137,13 @@ function num_rb_dofs(rb::BlockRBSpace)
   ndofs
 end
 
-function recast(rb::BlockRBSpace,x::PTArray{T}) where T
+function recast(x::PTArray,rb::BlockRBSpace)
   nblocks = get_nblocks(rb)
   offset = field_offsets(rb)
   map(1:nblocks) do row
     rb_row = rb[row]
     x_row = map(y->y[offset[row]+1:offset[row+1]],x)
-    recast(rb_row,x_row)
+    recast(x_row,rb_row)
   end
 end
 
