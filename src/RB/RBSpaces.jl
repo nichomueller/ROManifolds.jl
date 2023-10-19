@@ -79,7 +79,7 @@ function recast(x::PTArray,rb::RBSpace{T}) where T
   nparams = length(x)
   array = Vector{Vector{T}}(undef,time_ndofs*nparams)
   @inbounds for i = 1:nparams
-    array[(i-1)*time_ndofs+1:i*time_ndofs] = recast(rb,x[i])
+    array[(i-1)*time_ndofs+1:i*time_ndofs] = recast(x[i],rb)
   end
   PTArray(array)
 end

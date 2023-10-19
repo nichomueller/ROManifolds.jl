@@ -24,6 +24,28 @@ function get_times(fesolver::PThetaMethod)
   collect(t0:dt:tf-dt) .+ dt*θ
 end
 
+function recenter(fesolver::PThetaMethod,vec::Vector{<:AbstractVector},μ::AbstractVector)
+  θ = fesolver.θ
+  uμ0 = zeros(size(vec[1]))#get_free_dof_values(fesolver.uh0(μ))
+  vecθ = θ*vec + (1-θ)*[uμ0,vec[1:end-1]...]
+  return vecθ
+end
+
+function recenter(fesolver::PThetaMethod,a::PTArray{T},params::Table) where T
+  nparams = length(params)
+  time_ndofs = Int(length(a)/nparams)
+  array = Vector{T}(undef,nparams*time_ndofs)
+  for (n,μn) in enumerate(params)
+    idx = (n-1)*time_ndofs+1:n*time_ndofs
+    array[idx] = recenter(fesolver,a[idx],μn)
+  end
+  return PTArray(array)
+end
+
+function recenter(fesolver::PThetaMethod,a::Vector{<:PTArray},params::Table)
+  map(a->recenter(fesolver,a,params),a)
+end
+
 struct PODESolution{T}
   solver::PODESolver
   op::PODEOperator
@@ -141,7 +163,7 @@ for fun in (:collect_residuals_for_idx!,:collect_jacobians_for_idx!)
       ode_op = get_algebraic_operator(feop)
       ode_cache = allocate_cache(ode_op,μ,times)
       ode_cache = update_cache!(ode_cache,ode_op,μ,times)
-      sols_cache = copy(sols) .* 0.
+      sols_cache = copy(sols)
       nlop = get_nonlinear_operator(ode_op,μ,times,dtθ,sols,ode_cache,sols_cache)
       $fun(q,nlop,sols,args...;kwargs...)
     end
@@ -194,7 +216,7 @@ for fun in (:collect_residuals_for_trian!,:collect_jacobians_for_trian!)
       dt,θ = fesolver.dt,fesolver.θ
       dtθ = θ == 0.0 ? dt : dt*θ
       ode_cache = update_cache!(ode_cache,ode_op,μ,times)
-      sols_cache = copy(sols) .* 0.
+      sols_cache = copy(sols)
       nlop = get_nonlinear_operator(ode_op,μ,times,dtθ,sols,ode_cache,sols_cache)
       $fun(q,nlop,sols,args...;kwargs...)
     end

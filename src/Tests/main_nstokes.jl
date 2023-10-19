@@ -64,9 +64,9 @@ begin
   fesolver = PThetaMethod(nls,xh0μ,θ,dt,t0,tf)
 
   ϵ = 1e-4
-  load_solutions = false
+  load_solutions = true
   save_solutions = true
-  load_structures = false
+  load_structures = true
   save_structures = true
   energy_norm = [:l2,:l2]
   compute_supremizers = true
@@ -93,8 +93,9 @@ rbspace = reduced_basis(info,feop,sols,params)
 rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
 save(info,(rbspace,rbrhs,rblhs))
 
-snaps_test,params_test = load_test(info,feop,fesolver)
+test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params)
 
+snaps_test,params_test = load_test(info,feop,fesolver)
 println("Solving nonlinear RB problems with Newton iterations")
 rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,snaps_test,params_test)
 nl_cache = nothing
@@ -102,6 +103,7 @@ x = initial_guess(sols,params,params_test)
 xrb = space_time_projection(x,rbspace)
 _,conv0 = Algebra._check_convergence(fesolver.nls.ls,xrb)
 iter = 1
+x .= recenter(fesolver,x,μ)
 rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbrhs,rbspace,x,params_test)
 lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,rbspace,x,params_test)
 nl_cache = rb_solve!(xrb,fesolver.nls.ls,rhs,lhs,nl_cache)

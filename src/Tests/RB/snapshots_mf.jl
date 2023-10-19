@@ -374,7 +374,6 @@ jacobian!(ptA,nlop,copy(un))
 ptb1 = ptb[1:Nt]
 ptA1 = ptA[1:Nt]
 
-M = assemble_matrix((du,dv)->∫(dv⋅du)dΩ,trial_u(μn,dt),test_u)/(dt*θ)
 vθ = zeros(Nu+Np)
 ode_cache = Gridap.ODEs.TransientFETools.allocate_cache(ode_op_ok)
 nlop0 = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t0,dt*θ,vθ,ode_cache,vθ)
@@ -383,6 +382,7 @@ Aok = allocate_jacobian(nlop0,vθ)
 
 v0 = zeros(size(vθ))
 
+# OK
 for (kt,t) in enumerate(get_times(fesolver))
   uk = un[kt]
   ukprev = kt > 1 ? un[kt-1] : get_free_dof_values(xh0μ(μn))
@@ -397,7 +397,7 @@ for (kt,t) in enumerate(get_times(fesolver))
     fillstored!(Aok,z)
     fill!(bok,z)
     residual!(bok,ode_op_ok,t,(x,vθ),ode_cache_ok)
-    jacobians!(Aok,ode_op_ok,t,(x,vθ),(1.0,1/(dt*θ)),ode_cache_ok) # or v0
+    jacobians!(Aok,ode_op_ok,t,(x,v0),(1.0,1/(dt*θ)),ode_cache_ok)
     dx = - Aok \ bok
     x .+= dx
     ndx = norm(dx)
@@ -409,6 +409,40 @@ for (kt,t) in enumerate(get_times(fesolver))
 
   @assert x ≈ θ*uk + (1-θ)*ukprev "Failed when n = $kt"
 end
+
+M = assemble_matrix((du,dv)->∫(dv⋅du)dΩ,trial_u(μn,dt),test_u)
+bcopy = copy(bok)
+for (kt,t) in enumerate(get_times(fesolver))
+  uk = un[kt]
+  ukprev = kt > 1 ? un[kt-1] : get_free_dof_values(xh0μ(μn))
+  ode_cache_ok = Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  nlop = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t,dt*θ,ukprev,ode_cache_ok,vθ)
+
+  x = copy(ukprev)
+
+  for niter in 1:20
+    @. vθ = (x-nlop.u0) / nlop.dtθ
+    z = zero(eltype(Aok))
+    fillstored!(Aok,z)
+    fill!(bok,z)
+    fill!(bcopy,z)
+    residual!(bok,ode_op_ok,t,(x,vθ),ode_cache_ok)
+    residual!(bcopy,ode_op_ok,t,(x,v0),ode_cache_ok)
+    bprev = vcat(M*vθ[1:Nu],zeros(Np))
+    jacobians!(Aok,ode_op_ok,t,(x,v0),(1.0,1/(dt*θ)),ode_cache_ok)
+    dx = -Aok \ (bprev + bcopy)
+    x .+= dx
+    ndx = norm(dx)
+    println("Iter $niter, norm error $ndx")
+    if ndx ≤ eps()*100
+      break
+    end
+  end
+
+  @assert x ≈ θ*uk + (1-θ)*ukprev "Failed when n = $kt"
+end
+
+# VERIFIED EQUALITIES
 
 dir(t) = zero(trial_u(μn,t))
 ddir(t) = zero(∂ₚt(trial_u)(μn,t))
@@ -441,112 +475,18 @@ for (kt,t) in enumerate(get_times(fesolver))
   @assert LHS(xh_ok[1],t) ≈ Aok "Failed when n = $kt"
 end
 
-# for (kt,t) in enumerate(get_times(fesolver))
-#   uk = un[kt]
-#   ukprev = kt > 1 ? un[kt-1] : get_free_dof_values(xh0μ(μn))
-#   ode_cache_ok = Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
-#   nlop = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t,dt*θ,ukprev,ode_cache_ok,vθ)
+resa = assemble_vector(dv->∫(a(μn,t)*∇(dv)⊙∇(xh_ok[1]))dΩ,test_u)
+lifta = assemble_vector(dv->∫(a(μn,t)*∇(dv)⊙∇(dir(t)))dΩ,test_u)
+ax = assemble_matrix((du,dv)->∫(a(μn,t)*∇(dv)⊙∇(du))dΩ,trial_u(μn,t),test_u)*x[1:Nu]
+resa ≈ lifta + ax
 
-#   z = zero(eltype(Aok))
-#   fill!(bok,z)
-#   residual!(bok,ode_op_ok,t,(ukprev,v0),ode_cache_ok)
+resm = assemble_vector(dv->∫(dv⋅∂ₚt(xh_ok[1]))dΩ,test_u)
+liftm = assemble_vector(dv->∫(dv⋅ddir(t))dΩ,test_u)
+mx = assemble_matrix((du,dv)->∫(dv⋅du)dΩ,trial_u(μn,t),test_u)*x[1:Nu]/nlop.dtθ
+resm ≈ liftm + mx
 
-#   Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
-#   Xh_ok,_,_ = ode_cache_ok
-#   dxh_ok = (EvaluationFunction(Xh_ok[2],v0),)
-#   xh_ok = TransientCellField(EvaluationFunction(Xh_ok[1],ukprev),dxh_ok)
-
-#   @assert RHS(xh_ok[1],t) ≈ bok "Failed when n = $kt"
-# end
-
-# kt,t = 2,times[2]
-# uk = un[kt]
-# ukprev = kt > 1 ? un[kt-1] : get_free_dof_values(xh0μ(μn))
-# ode_cache_ok = Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
-# fillstored!(Aok,z)
-# fill!(bok,z)
-# residual!(bok,ode_op_ok,t,(ukprev,v0),ode_cache_ok)
-# Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
-# Xh_ok,_,_ = ode_cache_ok
-# dxh_ok = (EvaluationFunction(Xh_ok[2],v0),)
-# xh_ok = TransientCellField(EvaluationFunction(Xh_ok[1],ukprev),dxh_ok)
-
-# # bprev = vcat(M*ukprev[1:Nu],zeros(Np))
-
-# RHS(xh_ok[1],t) - bok
-for (kt,t) in enumerate(get_times(fesolver))
-  uk = un[kt]
-  ukprev = kt > 1 ? un[kt-1] : get_free_dof_values(xh0μ(μn))
-  ode_cache_ok = Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
-  nlop = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t,dt*θ,ukprev,ode_cache_ok,vθ)
-
-  x = copy(ukprev)
-
-  for niter in 1:20
-    @. vθ = (x-nlop.u0) / nlop.dtθ
-    z = zero(eltype(Aok))
-    fillstored!(Aok,z)
-    fill!(bok,z)
-    residual!(bok,ode_op_ok,t,(x,vθ),ode_cache_ok)
-    jacobians!(Aok,ode_op_ok,t,(x,vθ),(1.0,1/(dt*θ)),ode_cache_ok) # or v0
-    dx = - Aok \ bok
-    x .+= dx
-    ndx = norm(dx)
-    println("Iter $niter, norm error $ndx")
-    if ndx ≤ eps()*100
-      break
-    end
-
-    Xh_ok,_,_ = ode_cache_ok
-    dxh_ok = (EvaluationFunction(Xh_ok[2],vθ),)
-    xh_ok = TransientCellField(EvaluationFunction(Xh_ok[1],ukprev),dxh_ok)
-    bprev = vcat(M*nlop.u0[1:Nu],zeros(Np))
-    @assert RHS(xh_ok[1],t) ≈ bok - bprev
-  end
-
-  @assert x ≈ θ*uk + (1-θ)*ukprev "Failed when n = $kt"
-end
-
-kt,t = 2,times[2]
-uk = un[kt]
-ukprev = kt > 1 ? un[kt-1] : get_free_dof_values(xh0μ(μn))
-ode_cache_ok = Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
-nlop = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t,dt*θ,ukprev,ode_cache_ok,vθ)
-
-x = copy(ukprev)
-
-niter = 1
-@. vθ = (x-nlop.u0) / nlop.dtθ
-z = zero(eltype(Aok))
-fillstored!(Aok,z)
-fill!(bok,z)
-residual!(bok,ode_op_ok,t,(x,vθ),ode_cache_ok)
-jacobians!(Aok,ode_op_ok,t,(x,vθ),(1.0,1/(dt*θ)),ode_cache_ok) # or v0
-dx = - Aok \ bok
-x .+= dx
-ndx = norm(dx)
-println("Iter $niter, norm error $ndx")
-
-Xh_ok,_,_ = ode_cache_ok
-dxh_ok = (EvaluationFunction(Xh_ok[2],vθ),)
-xh_ok = TransientCellField(EvaluationFunction(Xh_ok[1],ukprev),dxh_ok)
-bprev = vcat(M*nlop.u0[1:Nu],zeros(Np))
-@assert RHS(xh_ok[1],t) + RHS_add(nlop.u0) - LHS(xh_ok[1],t) ≈ bok
-
-
-
-ginterp(t) = interpolate_dirichlet(g(μn,t),trial_u(μn,t))
-dg_interp(t) = interpolate_dirichlet(∂t(g)(μn,t),trial_u(μn,t))
-la(t,v) = ∫(a(μn,t)*∇(v)⊙∇(ginterp(t)))dΩ
-lb(t,q) = ∫(q*(∇⋅(ginterp(t))))dΩ
-lc(t,u,v) = ∫(v⊙(∇(ginterp(t))'⋅u))dΩ
-lm(t,v) = ∫(v⋅dg_interp(t))dΩ
-LA(t) = assemble_vector(v->la(t,v),test_u)
-LB(t) = assemble_vector(q->lb(t,q),test_p)
-LC(t,u) = assemble_vector(v->lc(t,u,v),test_u)
-LM(t) = assemble_vector(v->lm(t,v),test_u)
-
-RHS(t,u) = -vcat(LA(t)+LC(t,u)+LM(t),LB(t))
-RHSadd(t,uprev) = vcat(M*uprev/(dt*θ),zeros(Np))
-
-Res(t,x,xh,xprev) = LHS(t,x[1])*xh - (RHS(t,x[1])+RHSadd(t,xprev[1:Nu]))
+cform(w,u,v) = ∫(v⊙(∇(u)'⋅w))dΩ
+resc = assemble_vector(dv->c_ok(t,xh_ok[1],dv),test_u)
+liftc = assemble_vector(dv->cform(xh_ok[1],dir(t),dv),test_u)
+cx = assemble_matrix((du,dv)->cform(xh_ok[1],du,dv),trial_u(μn,t),test_u)*x[1:Nu]
+resc ≈ liftc + cx

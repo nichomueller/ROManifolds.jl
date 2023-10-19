@@ -38,7 +38,7 @@ function solve_step!(
   return (uf,tf,cache)
 end
 
-struct PAffineThetaMethodOperator <: PNonlinearOperator
+struct PThetaAffineMethodOperator <: PNonlinearOperator
   odeop::AffinePODEOperator
   μ
   tθ
@@ -50,18 +50,19 @@ end
 
 function get_nonlinear_operator(
   odeop::AffinePODEOperator,μ,tθ,dtθ::Float,u0::PTArray,ode_cache,vθ::PTArray)
-  PAffineThetaMethodOperator(odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
+  PThetaAffineMethodOperator(odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
 end
 
 for fun in (:(Algebra.residual!),:residual_for_trian!)
   @eval begin
     function $fun(
       b::PTArray,
-      op::PAffineThetaMethodOperator,
+      op::PThetaAffineMethodOperator,
       ::PTArray,
       args...)
 
       vθ = op.vθ
+      @. vθ = 0.
       z = zero(eltype(b))
       fill!(b,z)
       $fun(b,op.odeop,op.μ,op.tθ,(vθ,vθ),op.ode_cache,args...)
@@ -71,10 +72,11 @@ end
 
 function Algebra.jacobian!(
   A::PTArray,
-  op::PAffineThetaMethodOperator,
+  op::PThetaAffineMethodOperator,
   ::PTArray)
 
   vθ = op.vθ
+  @. vθ = 0.
   z = zero(eltype(A))
   fillstored!(A,z)
   jacobians!(A,op.odeop,op.μ,op.tθ,(vθ,vθ),(1.0,1/op.dtθ),op.ode_cache)
@@ -84,12 +86,13 @@ for fun in (:(Algebra.jacobian!),:jacobian_for_trian!)
   @eval begin
     function $fun(
       A::PTArray,
-      op::PAffineThetaMethodOperator,
+      op::PThetaAffineMethodOperator,
       ::PTArray,
       i::Int,
       args...)
 
       vθ = op.vθ
+      @. vθ = 0.
       z = zero(eltype(A))
       fillstored!(A,z)
       $fun(A,op.odeop,op.μ,op.tθ,(vθ,vθ),i,(1.0,1/op.dtθ)[i],op.ode_cache,args...)
