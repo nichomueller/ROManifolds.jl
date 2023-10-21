@@ -192,6 +192,8 @@ end
 
 # LINEAR
 snaps_test,params_test = load_test(info,feop,fesolver)
+times = get_times(fesolver)
+Nt = get_time_ndofs(fesolver)
 Nu,Np = test_u.nfree,length(get_free_dof_ids(test_p))
 n = 1
 un = PTArray(vcat(snaps_test...)[1:Nt])
@@ -341,8 +343,11 @@ for (row,col) = index_pairs(nblocks,nblocks)
 end
 
 # NONLINEAR
+times = get_times(fesolver)
 Nu,Np = test_u.nfree,length(get_free_dof_ids(test_p))
+Nt = get_time_ndofs(fesolver)
 n = 1
+θdt = θ*dt
 un = PTArray(vcat(snaps_test...)[1:Nt])
 μn = params_test[n]
 g_ok(x,t) = g(x,μn,t)
@@ -375,8 +380,8 @@ ptb1 = ptb[1:Nt]
 ptA1 = ptA[1:Nt]
 
 vθ = zeros(Nu+Np)
-ode_cache = Gridap.ODEs.TransientFETools.allocate_cache(ode_op_ok)
-nlop0 = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t0,dt*θ,vθ,ode_cache,vθ)
+ode_cache_ok = Gridap.ODEs.TransientFETools.allocate_cache(ode_op_ok)
+nlop0 = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t0,dt*θ,vθ,ode_cache_ok,vθ)
 bok = allocate_residual(nlop0,vθ)
 Aok = allocate_jacobian(nlop0,vθ)
 
@@ -424,9 +429,7 @@ for (kt,t) in enumerate(get_times(fesolver))
     @. vθ = (x-nlop.u0) / nlop.dtθ
     z = zero(eltype(Aok))
     fillstored!(Aok,z)
-    fill!(bok,z)
     fill!(bcopy,z)
-    residual!(bok,ode_op_ok,t,(x,vθ),ode_cache_ok)
     residual!(bcopy,ode_op_ok,t,(x,v0),ode_cache_ok)
     bprev = vcat(M*vθ[1:Nu],zeros(Np))
     jacobians!(Aok,ode_op_ok,t,(x,v0),(1.0,1/(dt*θ)),ode_cache_ok)
@@ -446,13 +449,13 @@ end
 
 dir(t) = zero(trial_u(μn,t))
 ddir(t) = zero(∂ₚt(trial_u)(μn,t))
-Lu_l(u,t) = (assemble_vector(dv->∫(a(μn,t)*∇(dv)⊙∇(u))dΩ,test_u)
-  + assemble_vector(dv->∫(dv⋅∂ₚt(u))dΩ,test_u))
+Lu_l((u,p),t) = (assemble_vector(dv->∫(a(μn,t)*∇(dv)⊙∇(u))dΩ,test_u) + assemble_vector(dv->∫(dv⋅∂ₚt(u))dΩ,test_u) -
+  assemble_vector(dv->∫(p*(∇⋅(dv)))dΩ,test_u))
 Lu_nl(u,t) = assemble_vector(dv->c_ok(t,u,dv),test_u)
 Lp(u,t) = -assemble_vector(dq->∫(dq*(∇⋅(u)))dΩ,test_p)
-RHS(u,t) = vcat(Lu_nl(u,t) + Lu_l(u,t), Lp(u,t))
-RHS_add(u) = vcat(M*u, zeros(Np))
-LHS_l_11(t) = M + assemble_matrix((du,dv)->∫(a(μn,t)*∇(dv)⊙∇(du))dΩ,trial_u(μn,t),test_u)
+RHS((u,p),t) = vcat(Lu_nl(u,t) + Lu_l((u,p),t), Lp(u,t))
+RHS_add(u) = vcat(M*u/θdt, zeros(Np))
+LHS_l_11(t) = M/θdt + assemble_matrix((du,dv)->∫(a(μn,t)*∇(dv)⊙∇(du))dΩ,trial_u(μn,t),test_u)
 LHS_l_12 = -assemble_matrix((dp,dv)->∫(dp*(∇⋅(dv)))dΩ,trial_p,test_u)
 LHS_nl(u,t) = assemble_matrix((du,dv)->dc_ok(t,u,du,dv),trial_u(μn,t),test_u)
 LHS(u,t) = vcat(hcat(LHS_l_11(t)+LHS_nl(u,t),LHS_l_12),hcat(LHS_l_12',sparse(zeros(Np,Np))))
@@ -466,6 +469,8 @@ for (kt,t) in enumerate(get_times(fesolver))
   z = zero(eltype(Aok))
   fillstored!(Aok,z)
   jacobians!(Aok,ode_op_ok,t,(ukprev,v0),(1.0,1/(dt*θ)),ode_cache_ok)
+  fill!(bok,z)
+  residual!(bok,ode_op_ok,t,(ukprev,v0),ode_cache_ok)
 
   Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
   Xh_ok,_,_ = ode_cache_ok
@@ -473,20 +478,159 @@ for (kt,t) in enumerate(get_times(fesolver))
   xh_ok = TransientCellField(EvaluationFunction(Xh_ok[1],ukprev),dxh_ok)
 
   @assert LHS(xh_ok[1],t) ≈ Aok "Failed when n = $kt"
+  @assert RHS(xh_ok,t) ≈ bok "Failed when n = $kt"
+
+  x = copy(ukprev)
+
+  for niter in 1:20
+    @. vθ = (x-nlop.u0) / nlop.dtθ
+    dxh_ok = (EvaluationFunction(Xh_ok[2],v0),)
+    xh_ok = TransientCellField(EvaluationFunction(Xh_ok[1],x),dxh_ok)
+    bprev = vcat(M*vθ[1:Nu],zeros(Np))
+    println(ℓ∞(LHS(xh_ok[1],t)))
+    dx = -LHS(xh_ok[1],t) \ (bprev + RHS(xh_ok,t))
+    x .+= dx
+    ndx = norm(dx)
+    println("Iter $niter, norm error $ndx")
+    if ndx ≤ eps()*100
+      break
+    end
+  end
+
+  @assert x ≈ θ*uk + (1-θ)*ukprev "Failed when n = $kt"
 end
 
-resa = assemble_vector(dv->∫(a(μn,t)*∇(dv)⊙∇(xh_ok[1]))dΩ,test_u)
-lifta = assemble_vector(dv->∫(a(μn,t)*∇(dv)⊙∇(dir(t)))dΩ,test_u)
-ax = assemble_matrix((du,dv)->∫(a(μn,t)*∇(dv)⊙∇(du))dΩ,trial_u(μn,t),test_u)*x[1:Nu]
-resa ≈ lifta + ax
+#
+nblocks = 2
+times = get_times(fesolver)
+Nt = length(times)
+Nu = length(get_free_dof_ids(test_u))
+Np = length(get_free_dof_ids(test_p))
+# μ = realization(feop)
+# u = [PTArray([zeros(Nu) for _ = 1:Nt]),PTArray([zeros(Np) for _ = 1:Nt])]
+snaps_test,params_test = load_test(info,feop,fesolver)
+μ = params_test[1]
+u = PTArray(snaps_test[1][1:10])
+p = PTArray(snaps_test[2][1:10])
+x = [u,p]
+vx = vcat(x...)
 
-resm = assemble_vector(dv->∫(dv⋅∂ₚt(xh_ok[1]))dΩ,test_u)
-liftm = assemble_vector(dv->∫(dv⋅ddir(t))dΩ,test_u)
-mx = assemble_matrix((du,dv)->∫(dv⋅du)dΩ,trial_u(μn,t),test_u)*x[1:Nu]/nlop.dtθ
-resm ≈ liftm + mx
+# RESIDUAL
 
-cform(w,u,v) = ∫(v⊙(∇(u)'⋅w))dΩ
-resc = assemble_vector(dv->c_ok(t,xh_ok[1],dv),test_u)
-liftc = assemble_vector(dv->cform(xh_ok[1],dir(t),dv),test_u)
-cx = assemble_matrix((du,dv)->cform(xh_ok[1],du,dv),trial_u(μn,t),test_u)*x[1:Nu]
-resc ≈ liftc + cx
+bvec = []
+for (kt,t) in enumerate(get_times(fesolver))
+  uk = vx[kt]
+  ukprev = kt > 1 ? vx[kt-1] : get_free_dof_values(xh0μ(μ))
+  ukθ = θ*uk + (1-θ)*ukprev
+  ode_cache_ok = Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+
+  Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  Xh_ok,_,_ = ode_cache_ok
+  dxh_ok = (EvaluationFunction(Xh_ok[2],v0),)
+  xh_ok = TransientCellField(EvaluationFunction(Xh_ok[1],ukθ),dxh_ok)
+  fill!(bok,zero(eltype(bok)))
+  residual!(bok,ode_op_ok,t,(ukθ,v0),ode_cache_ok)
+
+  push!(bvec,copy(bok))
+end
+
+Rblock = Vector{Matrix{Float}}(undef,nblocks)
+Ridx1,Rcomp1 = compress_array(hcat(bvec...)[1:Nu,:])
+Ridx2,Rcomp2 = compress_array(hcat(bvec...)[1+Nu:end,:])
+Rblock[1] = Rcomp1
+Rblock[2] = Rcomp2
+
+b1 = PTArray([zeros(Nu) for _ = 1:Nt])
+b2 = PTArray([zeros(Np) for _ = 1:Nt])
+bblock = Vector{Any}(undef,nblocks)
+bblock[1] = b1
+bblock[2] = b2
+bidx = [Ridx1,Ridx2]
+
+touched = check_touched_residuals(feop,x,Table([μ]),times)
+for row = 1:nblocks
+  touched_row = touched[row]
+  if touched_row
+    feop_row_col = feop[row,:]
+    b = bblock[row]
+    res1, = collect_residuals_for_trian(fesolver,feop_row_col,vx,Table([μ]),times)
+    res2 = collect_residuals_for_idx!(b,fesolver,feop_row_col,vx,Table([μ]),times,bidx[row])
+    @assert isapprox(res1[1].nonzero_val,Rblock[row]) "Failed when row = $row"
+    @assert isapprox(res2,Rblock[row]) "Failed when row = $row"
+  end
+end
+
+# JACOBIAN
+function original_findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
+  numnz = nnz(x)
+  I = Vector{Ti}(undef, numnz)
+  V = Vector{Tv}(undef, numnz)
+  nzind = SparseArrays.nonzeroinds(x)
+  nzval = nonzeros(x)
+  @inbounds for i = 1:numnz
+    I[i] = nzind[i]
+    V[i] = nzval[i]
+  end
+  (I, V)
+end
+
+Aμ_l(t) = assemble_matrix((du,dv)->∫(a(μ,t)*∇(dv)⊙∇(du))dΩ,trial_u(μ,t),test_u)
+Aμ_nl(u,t) = assemble_matrix((du,dv)->dc_ok(t,u,du,dv),trial_u(μ,t),test_u)
+Bμ = -assemble_matrix((du,dq)->∫(dq*(∇⋅(du)))dΩ,trial_u(μ,dt),test_p)
+Jblock = Matrix{Matrix{Float}}(undef,nblocks,nblocks)
+Jidx11 = original_findnz(Aμ_l(dt)[:])[1]
+Jidx12 = findnz(Bμ'[:])[1]
+Jidx21 = findnz(Bμ[:])[1]
+Aidx = Matrix{Any}(undef,nblocks,nblocks)
+Aidx[1,1] = Jidx11
+Aidx[1,2] = Jidx12
+Aidx[2,1] = Jidx21
+
+A11 = PTArray([Aμ_l(dt) for _ = 1:Nt])
+fillstored!(A11,0.)
+A12 = PTArray([sparse(Bμ') for _ = 1:Nt])
+fillstored!(A12,0.)
+A21 = PTArray([Bμ for _ = 1:Nt])
+fillstored!(A21,0.)
+Ablock = Matrix{Any}(undef,nblocks,nblocks)
+Ablock[1,1] = A11
+Ablock[1,2] = A12
+Ablock[2,1] = A21
+
+i = 1
+
+Avec = []
+for (kt,t) in enumerate(get_times(fesolver))
+  uk = vx[kt]
+  ukprev = kt > 1 ? vx[kt-1] : get_free_dof_values(xh0μ(μ))
+  ukθ = θ*uk + (1-θ)*ukprev
+  ode_cache_ok = Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+
+  Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  Xh_ok,_,_ = ode_cache_ok
+  dxh_ok = (EvaluationFunction(Xh_ok[2],v0),)
+  xh_ok = TransientCellField(EvaluationFunction(Xh_ok[1],ukθ),dxh_ok)
+  fillstored!(Aok,zero(eltype(Aok)))
+  jacobian!(Aok,ode_op_ok,t,(ukθ,v0),i,(1.0,1/(dt*θ))[i],ode_cache_ok)
+
+  push!(Avec,copy(Aok))
+end
+
+Jblock[1,1] = hcat(map(x->original_findnz(x[1:Nu,1:Nu][:])[2],Avec)...)
+Jblock[1,2] = hcat(map(x->findnz(x[1:Nu,1+Nu:end][:])[2],Avec)...)
+Jblock[2,1] = hcat(map(x->findnz(x[1+Nu:end,1:Nu][:])[2],Avec)...)
+
+touched = check_touched_jacobians(feop,x,Table([μ]),times;i)
+for (row,col) = index_pairs(nblocks,nblocks)
+  touched_row_col = touched[row,col]
+  if touched_row_col
+    println("(row,col) = ($row,$col)")
+    feop_row_col = feop[row,col]
+    snaps_col = x[col]
+    A = Ablock[row,col]
+    jac1, = collect_jacobians_for_trian(fesolver,feop_row_col,snaps_col,Table([μ]),times;i)
+    jac2 = collect_jacobians_for_idx!(A,fesolver,feop_row_col,snaps_col,Table([μ]),times,Aidx[row,col])
+    @assert isapprox(jac1[1].nonzero_val,Jblock[row,col]) "Failed when (row,col) = ($row,$col)"
+    @assert isapprox(jac2,Jblock[row,col]) "Failed when (row,col) = ($row,$col)"
+  end
+end

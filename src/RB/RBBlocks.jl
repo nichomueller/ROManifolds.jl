@@ -652,15 +652,17 @@ function post_process(
   stats::NamedTuple)
 
   nblocks = length(sol)
+  nparams = length(params)
   energy_norm = info.energy_norm
   map(1:nblocks) do col
     feop_col = feop[col,col]
     sol_col = sol[col]
     sol_approx_col = sol_approx[col]
     norm_matrix_col = get_norm_matrix(feop_col,energy_norm[col])
-    _sol_col = space_time_matrices(sol_col;nparams=length(params))
+    _sol_col = space_time_matrices(sol_col;nparams)
+    _sol_approx_col = space_time_matrices(sol_approx_col;nparams)
     results = RBResults(
-      params,_sol_col,sol_approx_col,stats;name=Symbol("field$col"),norm_matrix=norm_matrix_col)
+      params,_sol_col,_sol_approx_col,stats;name=Symbol("field$col"),norm_matrix=norm_matrix_col)
     show(results)
     save(info,results)
     writevtk(info,feop_col,fesolver,results)

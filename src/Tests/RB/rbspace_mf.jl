@@ -36,25 +36,6 @@ _bases_space = add_space_supremizers(bases_space,feop,norm_matrix,μ)
 @assert _bases_space[1] == bs_primal_supr
 @assert _bases_space[2] == bs_dual
 
-ntp = 1
-while ntp ≤ size(basis_up,2)
-  proj = ntp == 1 ? zeros(size(basis_up[:,1])) : orth_projection(basis_up[:,ntp],basis_up[:,1:ntp-1])
-  dist = norm(basis_up[:,1]-proj)
-  println(dist)
-  if dist ≤ 1e-2
-    basis_u,basis_up = enrich(basis_u,basis_up,basis_p[:,ntp])
-    count += 1
-    ntp = 0
-  else
-    basis_up[:,ntp] -= proj
-  end
-  ntp += 1
-end
-
-println("Added $count time supremizers")
-basis_u
-
-
 nparams,time_ndofs=length(μ),get_time_ndofs(fesolver)
 for nb in 1:nblocks
   nzm = NnzArray(sols[nb])
@@ -65,3 +46,8 @@ for nb in 1:nblocks
   m2 = change_mode(nzm)
   println(norm(m2 - bt*bt'*m2)/norm(m2))
 end
+
+rbspace[1].basis_space'*rbspace[1].basis_space
+rbspace[2].basis_space'*rbspace[2].basis_space
+rbspace[1].basis_time'*rbspace[1].basis_time
+rbspace[2].basis_time'*rbspace[2].basis_time
