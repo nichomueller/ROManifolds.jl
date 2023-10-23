@@ -487,7 +487,6 @@ for (kt,t) in enumerate(get_times(fesolver))
     dxh_ok = (EvaluationFunction(Xh_ok[2],v0),)
     xh_ok = TransientCellField(EvaluationFunction(Xh_ok[1],x),dxh_ok)
     bprev = vcat(M*vθ[1:Nu],zeros(Np))
-    println(ℓ∞(LHS(xh_ok[1],t)))
     dx = -LHS(xh_ok[1],t) \ (bprev + RHS(xh_ok,t))
     x .+= dx
     ndx = norm(dx)

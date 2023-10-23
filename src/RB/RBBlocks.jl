@@ -580,7 +580,7 @@ function collect_rhs_contributions!(
       blocks[row] = collect_rhs_contributions!(
         cache_row,info,feop_row,fesolver,rbres.blocks[row],rbspace_row,vsnaps,params)
     else
-      rbcache,_ = last(cache_row_col)
+      rbcache,_ = last(cache_row)
       s = (rb_offsets[row+1]-rb_offsets[row],)
       setsize!(rbcache,s)
       array = rbcache.array
@@ -614,8 +614,10 @@ function collect_lhs_contributions!(
       if rb_jac_i.touched[row,col]
         feop_row_col = feop[row,col]
         sols_col = sols[col]
+        rbspace_row = rbspace[row]
+        rbspace_col = rbspace[col]
         blocks[row,col] = collect_lhs_contributions!(
-          cache_row_col,info,feop_row_col,fesolver,rb_jac_i.blocks[row,col],sols_col,params;i)
+          cache_row_col,info,feop_row_col,fesolver,rb_jac_i.blocks[row,col],rbspace_row,rbspace_col,sols_col,params;i)
       else
         rbcache,_ = last(cache_row_col)
         s = (rb_offsets[row+1]-rb_offsets[row],rb_offsets[col+1]-rb_offsets[col])

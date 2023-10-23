@@ -166,3 +166,57 @@ for (nt,t) in enumerate(get_times(fesolver))
   @assert A ≈ ptA1[nt] "Failed when n = $nt"
   @assert A \ (M*unprev - b) ≈ θ*un + (1-θ)*unprev "Failed when n = $nt"
 end
+
+# DIFFERENT TEST
+g_ok(x,t) = g(x,μn,t)
+g_ok(t) = x->g_ok(x,t)
+m_ok(t,u,v) = ∫(v*u)dΩ
+a_ok(t,(u,p),(v,q)) = ∫(a(μn,t)*∇(v)⋅∇(u))dΩ
+
+jac_t_ok(t,u,dut,v) = m_ok(t,dut,v)
+jac_ok(t,u,du,v) = a_ok(t,(du,dp),(v,q))
+res_ok(t,u,v) = m_ok(t,∂t(u),v) + a_ok(t,(u,p),(v,q))
+trial_ok = TransientTrialFESpace(test,g_ok)
+feop_ok = TransientFEOperator(res_ok,jac_ok,jac_t_ok,trial_ok,test)
+ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
+ode_cache_ok = allocate_cache(ode_op_ok)
+
+function my_get_u(u,t)
+  v0 = zero(u)
+  Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  Xh_ok,_,_ = ode_cache_ok
+  dxh_ok = (EvaluationFunction(Xh_ok[2],v0),)
+  TransientCellField(EvaluationFunction(Xh_ok[1],v0),dxh_ok)
+end
+
+sols,params = load(info,(Snapshots,Table))
+rbspace = load(info,RBSpace)
+rbrhs,rblhs = load(info,(RBVecAlgebraicContribution,Vector{RBMatAlgebraicContribution}))
+snaps_test,params_test = load_test(info,feop,fesolver)
+x = initial_guess(sols,params,params_test)
+x .= recenter(fesolver,x,params)
+rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,snaps_test,params_test)
+rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbrhs,rbspace,x,params_test)
+lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,rbspace,x,params_test)
+
+times = get_times(fesolver)
+ntimes = length(times)
+xn = PTArray(snaps_test[1:ntimes])
+μn = params_test[1]
+M = assemble_matrix((du,dv)->∫(dv⋅du)dΩ,trial(μn,dt),test) / (θ*dt)
+AA(t) = assemble_matrix((du,dv)->∫(a(μn,t)*∇(dv)⊙∇(du))dΩ,trial(μn,t),test)
+R(u,t) = (assemble_vector(dv -> ∫(dv*∂ₚt(u))dΩ,test)
+  + assemble_vector(dv -> ∫(a(μn,t)*∇(dv)⋅∇(u))dΩ,test)
+  - assemble_vector(dv -> ∫(f(μn,t)*dv)dΩ,test)
+  - assemble_vector(dv -> ∫(h(μn,t)*dv)dΓn,test))
+
+LHS1 = NnzMatrix([NnzVector(AA(t)) for t in times]...)
+LHS2 = NnzMatrix([NnzVector(M) for t in times]...)
+RHS = NnzMatrix([R(my_get_u(u,t),t) for (u,t) in zip(xn.array,times)]...)
+LHS1_rb = space_time_projection(LHS1,rbspace,rbspace;combine_projections=(x,y)->θ*x+θ*y)
+LHS2_rb = space_time_projection(LHS2,rbspace,rbspace;combine_projections=(x,y)->θ*x-θ*y)
+LHS_rb = LHS1_rb + LHS2_rb
+RHS_rb = space_time_projection(RHS,rbspace)
+
+norm(lhs[1] - LHS_rb)
+norm(rhs[1] - RHS_rb)

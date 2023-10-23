@@ -16,6 +16,7 @@ end
 
 CellData.num_domains(a::RBAlgebraicContribution) = length(a.dict)
 CellData.get_domains(a::RBAlgebraicContribution) = keys(a.dict)
+Base.iszero(a::RBAlgebraicContribution) = num_domains(a) == 0
 
 function CellData.get_contribution(
   a::RBAlgebraicContribution,
@@ -196,8 +197,10 @@ function compress_component!(
 
   for (i,ti) in enumerate(trian)
     si = snaps[i]
-    ci = RBAffineDecomposition(info,feop,si,ti,args...;kwargs...)
-    add_contribution!(contrib,ti,ci)
+    if !iszero(si)
+      ci = RBAffineDecomposition(info,feop,si,ti,args...;kwargs...)
+      add_contribution!(contrib,ti,ci)
+    end
   end
 end
 
@@ -207,18 +210,24 @@ function collect_rhs_contributions!(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbres::RBVecAlgebraicContribution{T},
-  rbspace::RBSpace,
-  args...) where T
+  rbspace::RBSpace{T},
+  sols::PTArray,
+  params::Table) where T
 
   coeff_cache,rb_cache = cache
-  trian = get_domains(rbres)
   st_mdeim = info.st_mdeim
   k = RBVecContributionMap(T)
   rb_res_contribs = Vector{PTArray{Vector{T}}}(undef,num_domains(rbres))
-  for (i,t) in enumerate(trian)
-    rbrest = rbres[t]
-    coeff = rhs_coefficient!(coeff_cache,feop,fesolver,rbrest,args...;st_mdeim)
-    rb_res_contribs[i] = rb_contribution!(rb_cache,k,rbrest,coeff)
+  if iszero(rbres)
+    nrow = get_rb_ndofs(rbspace)
+    contrib = PTArray([zeros(T,nrow) for _ = eachindex(params)])
+    rb_res_contribs[i] = contrib
+  else
+    for (i,t) in enumerate(get_domains(rbres))
+      rbrest = rbres[t]
+      coeff = rhs_coefficient!(coeff_cache,feop,fesolver,rbrest,sols,params;st_mdeim)
+      rb_res_contribs[i] = rb_contribution!(rb_cache,k,rbrest,coeff)
+    end
   end
   return sum(rb_res_contribs)
 end
@@ -229,14 +238,15 @@ function collect_lhs_contributions!(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbjacs::Vector{RBMatAlgebraicContribution{T}},
-  rbspace::RBSpace,
+  rbspace::RBSpace{T},
   args...) where T
 
   njacs = length(rbjacs)
   rb_jacs_contribs = Vector{PTArray{Matrix{T}}}(undef,njacs)
   for i = 1:njacs
     rb_jac_i = rbjacs[i]
-    rb_jacs_contribs[i] = collect_lhs_contributions!(cache,info,feop,fesolver,rb_jac_i,args...;i)
+    rb_jacs_contribs[i] = collect_lhs_contributions!(
+      cache,info,feop,fesolver,rb_jac_i,rbspace,rbspace,args...;i)
   end
   return sum(rb_jacs_contribs)
 end
@@ -247,7 +257,10 @@ function collect_lhs_contributions!(
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbjac::RBMatAlgebraicContribution{T},
-  args...;
+  rbspace_row::RBSpace{T},
+  rbspace_col::RBSpace{T},
+  sols::PTArray,
+  params::Table;
   kwargs...) where T
 
   coeff_cache,rb_cache = cache
@@ -255,10 +268,17 @@ function collect_lhs_contributions!(
   st_mdeim = info.st_mdeim
   k = RBMatContributionMap(T)
   rb_jac_contribs = Vector{PTArray{Matrix{T}}}(undef,num_domains(rbjac))
-  for (i,t) in enumerate(trian)
-    rbjact = rbjac[t]
-    coeff = lhs_coefficient!(coeff_cache,feop,fesolver,rbjact,args...;st_mdeim,kwargs...)
-    rb_jac_contribs[i] = rb_contribution!(rb_cache,k,rbjact,coeff)
+  if iszero(rbjac)
+    nrow = get_rb_ndofs(rbspace_row)
+    ncol = get_rb_ndofs(rbspace_col)
+    contrib = PTArray([zeros(T,nrow,ncol) for _ = eachindex(params)])
+    rb_jac_contribs[i] = contrib
+  else
+    for (i,t) in enumerate(trian)
+      rbjact = rbjac[t]
+      coeff = lhs_coefficient!(coeff_cache,feop,fesolver,rbjact,sols,params;st_mdeim,kwargs...)
+      rb_jac_contribs[i] = rb_contribution!(rb_cache,k,rbjact,coeff)
+    end
   end
   return sum(rb_jac_contribs)
 end

@@ -1,4 +1,7 @@
-function tpod(mat::Matrix,args...;ϵ=1e-4)
+function tpod(mat::Matrix{T},args...;ϵ=1e-4) where T
+  if isempty(mat)
+    return zeros(T,0,1)
+  end
   tpod(Val(size(mat,1) > size(mat,2)),mat,args...;ϵ)
 end
 

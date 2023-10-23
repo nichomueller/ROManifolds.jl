@@ -118,7 +118,7 @@ function test_rb_solver(
 
   println("Solving linear RB problems")
   x = initial_guess(snaps,params,params_test)
-  x .= recenter(fesolver,x,μ)
+  x .= recenter(fesolver,x,params)
   rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,snaps_test,params_test)
   rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,rbspace,x,params_test)
   lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,rbspace,x,params_test)

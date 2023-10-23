@@ -37,7 +37,7 @@ function test_affine_decomposition_rhs(
   meas::Measure,
   sols_test::PTArray,
   params_test::Table,
-  sols::Snapshots,
+  sols::PTArray,
   params::Table;
   st_mdeim=false)
 
@@ -55,7 +55,7 @@ function test_affine_decomposition_rhs(
   Res = collect_residuals_for_idx!(b,fesolver,feop,sols_test,params_test,red_times,red_idx,red_meas)
   Res_full = collect_residuals_for_idx!(bfull,fesolver,feop,sols_test,params_test,red_times,full_idx,meas)
   Res_offline,trian = collect_residuals_for_trian(
-      fesolver,feop,sols[1:nsnaps_system],params[1:nsnaps_system],times)
+      fesolver,feop,sols,params,times)
 
   err_res = maximum(abs.(Res-Res_full[red_idx,:]))
   println("Residual difference for selected triangulation is $err_res")
@@ -67,8 +67,6 @@ function test_affine_decomposition_rhs(
     Resn = Res_full[:,(n-1)*length(times)+1:n*length(times)]
     coeff_ok = transpose(basis_space'*Resn)
     coeffn = coeff[n]
-    println(length(coeff))
-    println(size(coeffn))
     err_coeff = maximum(abs.(coeffn)-abs.(coeff_ok))
     println("Residual coefficient difference for selected triangulation is $err_coeff")
   end
@@ -82,7 +80,7 @@ function test_affine_decomposition_lhs(
   meas::Measure,
   sols_test::PTArray,
   params_test::Table,
-  sols::Snapshots,
+  sols::PTArray,
   params::Table;
   st_mdeim=false,
   i=1)
@@ -102,7 +100,7 @@ function test_affine_decomposition_lhs(
   Jac = collect_jacobians_for_idx!(A,fesolver,feop,sols_test,params_test,red_times,red_idx,red_meas;i)
   Jac_full = collect_jacobians_for_idx!(Afull,fesolver,feop,sols_test,params_test,red_times,full_idx,meas;i)
   Jac_offline,_ = collect_jacobians_for_trian(
-    fesolver,feop,sols[1:nsnaps_system],params[1:nsnaps_system],times;i)
+    fesolver,feop,sols,params,times;i)
   basis_space = tpod(Jac_offline[1])
   interp_idx_space = get_interpolation_idx(basis_space)
   err_jac = maximum(abs.(Jac-Jac_full[interp_idx_space,:]))
@@ -155,7 +153,6 @@ function test_rb_contribution_rhs(
   for n in eachindex(params)
     tidx = (n-1)*length(red_times)+1 : n*length(red_times)
     nzmidx = NnzMatrix(res_full[:,tidx],full_idx,nfree,1)
-    println(norm(nzmidx))
     contrib_ok = space_time_projection(nzmidx,rbspace)
     err_contrib = ℓ∞(contribs[n]-contrib_ok)
     println("Residual contribution difference for selected triangulation is $err_contrib")
@@ -213,7 +210,7 @@ sols_test,params_test = load_test(info,feop,fesolver)
 res_cache,jac_cache = allocate_online_cache(feop,fesolver,sols_test,params_test)
 
 # test_affine_decomposition_rhs(
-#   res_cache[1],feop,fesolver,rbres,sols_test,params_test,sols,params;st_mdeim)
+#   res_cache[1],feop,fesolver,rbres,sols_test,params_test,sols[1:nsnaps_system],params[1:nsnaps_system];st_mdeim)
 
 # test_rb_contribution_rhs(
 #   res_cache,feop,fesolver,rbres,rbspace,sols_test,params_test;st_mdeim)
@@ -221,7 +218,7 @@ res_cache,jac_cache = allocate_online_cache(feop,fesolver,sols_test,params_test)
 # i = 1
 
 # coeff,coeff_ok = test_affine_decomposition_lhs(
-#   jac_cache[1],feop,fesolver,rbjac[i],sols_test,params_test,sols,params;i,st_mdeim)
+#   jac_cache[1],feop,fesolver,rbjac[i],sols_test,params_test,sols[1:nsnaps_system],params[1:nsnaps_system];i,st_mdeim)
 
 # test_rb_contribution_lhs(
 #   jac_cache,feop,fesolver,rbjac[i],rbspace,rbspace,sols_test,params_test;i,st_mdeim)
