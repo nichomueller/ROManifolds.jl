@@ -32,201 +32,156 @@ ode_cache_ok = Gridap.ODEs.TransientFETools.allocate_cache(ode_op_ok)
 nlop0 = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t0,dt*θ,vθ,ode_cache_ok,vθ)
 bok = allocate_residual(nlop0,vθ)
 Aok = allocate_jacobian(nlop0,vθ)
-z = zero(eltype(Aok))
-fillstored!(Aok,z)
-fill!(bcopy,z)
-residual!(bcopy,ode_op_ok,t,(x,v0),ode_cache_ok)
-bprev = vcat(M*vθ[1:Nu],zeros(Np))
-jacobians!(Aok,ode_op_ok,t,(x,v0),(1.0,1/(dt*θ)),ode_cache_ok)
 
-M = assemble_matrix((du,dv)->∫(dv⋅du)dΩ,trial_u(μn,dt),test_u) / (θ*dt)
-AA(t) = assemble_matrix((du,dv)->∫(a(μn,t)*∇(dv)⊙∇(du))dΩ,trial_u(μn,t),test_u)
-dC(u,t) = assemble_matrix((du,dv)->dc_ok(t,u,du,dv),trial_u(μn,t),test_u)
-B = -assemble_matrix((du,dq)->∫(dq*(∇⋅(du)))dΩ,trial_u(μn,dt),test_p)
-R1((u,p),t) = (assemble_vector(dv -> ∫(dv⋅∂ₚt(u))dΩ,test_u)
-  + assemble_vector(dv -> ∫(a(μn,t)*∇(dv)⊙∇(u))dΩ,test_u)
-  + assemble_vector(dv -> c_ok(t,u,dv),test_u)
-  - assemble_vector(dv -> ∫(p*(∇⋅(dv)))dΩ,test_u))
-R2((u,p),t) = - assemble_vector(dq -> ∫(dq*(∇⋅(u)))dΩ,test_p)
+M = assemble_matrix((du,dv)->∫(dv⋅du)dΩ,trial_u(μn,dt),test_u)
 
-function my_get_u(u,t)
-  Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
-  Xh_ok,_,_ = ode_cache_ok
-  dxh_ok = (EvaluationFunction(Xh_ok[2],v0),)
-  TransientCellField(EvaluationFunction(Xh_ok[1],u),dxh_ok)
+function return_quantities(ode_cache_ok,x::PTArray,kt)
+  xk = x[kt]
+  xk_1 = kt > 1 ? x[kt-1] : get_free_dof_values(xh0μ(μn))
+  t = times[kt]
+  ode_cache_ok = Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+
+  vθ = (xk-xk_1) / θdt
+  bprev = vcat(M*vθ[1:Nu],zeros(Np))
+
+  z = zero(eltype(Aok))
+  fillstored!(Aok,z)
+  fill!(bok,z)
+  residual!(bok,ode_op_ok,t,(xk,v0),ode_cache_ok)
+  jacobians!(Aok,ode_op_ok,t,(xk,v0),(1.0,1/(dt*θ)),ode_cache_ok)
+  return (bok,bprev),Aok
 end
 
-xn0 = map(zero,xn)
-
-for iter in 1:fesolver.nls.max_nliters
-  xtest = vcat(xn0...)
-
-  LHS111 = NnzMatrix([NnzVector(AA(t) + dC(my_get_u(u,t)[1],t)) for (u,t) in zip(xtest.array,times)]...)
-  LHS112 = NnzMatrix([NnzVector(M) for _ = 1:ntimes]...)
-  LHS21 = NnzMatrix([NnzVector(B) for _ = 1:ntimes]...)
-  LHS12 = NnzMatrix([NnzVector(sparse(B')) for _ = 1:ntimes]...)
-
-  LHS111_rb = space_time_projection(LHS111,rbspace[1],rbspace[1])
-  LHS112_rb = space_time_projection(LHS112,rbspace[1],rbspace[1];combine_projections=(x,y)->x-y)
-  LHS11_rb = LHS111_rb + LHS112_rb
-  LHS21_rb = space_time_projection(LHS21,rbspace[2],rbspace[1])
-  LHS12_rb = space_time_projection(LHS12,rbspace[1],rbspace[2])
-
-  np = get_rb_ndofs(rbspace[2])
-  LHS_rb = vcat(hcat(LHS11_rb,LHS12_rb),hcat(LHS21_rb,zeros(np,np)))
-
-  R11 = NnzMatrix([R1(my_get_u(u,t),t) for (u,t) in zip(xtest.array,times)]...)
-  R21 = NnzMatrix([R2(my_get_u(u,t),t) for (u,t) in zip(xtest.array,times)]...)
-  RHS1_rb = space_time_projection(R11,rbspace[1])
-  RHS2_rb = space_time_projection(R21,rbspace[2])
-  RHS_rb = vcat(RHS1_rb,RHS2_rb)
-
-  # println(norm(LHS_rb))
-  # println(norm(RHS_rb))
-  dxrb = NonaffinePTArray([LHS_rb \ RHS_rb])
-  xn0 -= recast(dxrb,rbspace)
-
-  println("norm dx = $(norm(map(norm,dxrb.array)))")
-end
-
-xappcat = hcat(vcat(xn0...).array...)
-xcat = hcat(vcat(xn...).array...)
-norm(xcat - xappcat)
-
+x = copy(xcat) .* 0.
 nu = get_rb_ndofs(rbspace[1])
-xn0 = map(zero,xn)
-rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,xn,Table([μn]))
+# WORKS!!!!!!!!!!
 for iter in 1:fesolver.nls.max_nliters
-  xtest = vcat(xn0...)
-  LHS111 = NnzMatrix([NnzVector(AA(t) + dC(my_get_u(u,t)[1],t)) for (u,t) in zip(xtest.array,times)]...)
-  LHS112 = NnzMatrix([NnzVector(M) for _ = 1:ntimes]...)
-  LHS21 = NnzMatrix([NnzVector(B) for _ = 1:ntimes]...)
-  LHS12 = NnzMatrix([NnzVector(sparse(B')) for _ = 1:ntimes]...)
-  LHS111_rb = space_time_projection(LHS111,rbspace[1],rbspace[1])
-  LHS112_rb = space_time_projection(LHS112,rbspace[1],rbspace[1];combine_projections=(x,y)->x-y)
-  LHS11_rb = LHS111_rb + LHS112_rb
+  A,b = [],[]
+  for kt = eachindex(times)
+    (bk,_),Ak = return_quantities(ode_cache_ok,x,kt)
+    push!(b,copy(bk))
+    push!(A,copy(Ak))
+  end
+
+  LHS11_1 = NnzMatrix(map(x->NnzVector(x[1:Nu,1:Nu] - M/θdt),A)...)
+  LHS11_2 = NnzMatrix([NnzVector(M/θdt) for _ = times]...)
+  LHS21 = NnzMatrix(map(x->NnzVector(x[1+Nu:end,1:Nu]),A)...)
+  LHS12 = NnzMatrix(map(x->NnzVector(x[1:Nu,1+Nu:end]),A)...)
+
+  LHS11_rb_1 = space_time_projection(LHS11_1,rbspace[1],rbspace[1])
+  LHS11_rb_2 = space_time_projection(LHS11_2,rbspace[1],rbspace[1];combine_projections=(x,y)->x-y)
+  LHS11_rb = LHS11_rb_1 + LHS11_rb_2
   LHS21_rb = space_time_projection(LHS21,rbspace[2],rbspace[1])
   LHS12_rb = space_time_projection(LHS12,rbspace[1],rbspace[2])
+
   np = get_rb_ndofs(rbspace[2])
   LHS_rb = vcat(hcat(LHS11_rb,LHS12_rb),hcat(LHS21_rb,zeros(np,np)))
-  R11 = NnzMatrix([R1(my_get_u(u,t),t) for (u,t) in zip(xtest.array,times)]...)
-  R21 = NnzMatrix([R2(my_get_u(u,t),t) for (u,t) in zip(xtest.array,times)]...)
-  RHS1_rb = space_time_projection(R11,rbspace[1])
-  RHS2_rb = space_time_projection(R21,rbspace[2])
+
+  R1 = NnzMatrix(map(x->x[1:Nu],b)...)
+  R2 = NnzMatrix(map(x->x[1+Nu:end],b)...)
+  RHS1_rb = space_time_projection(R1,rbspace[1])
+  RHS2_rb = space_time_projection(R2,rbspace[2])
   RHS_rb = vcat(RHS1_rb,RHS2_rb)
-  # dxrb = NonaffinePTArray([LHS_rb \ RHS_rb])
-  # xn0 -= recast(dxrb,rbspace)
 
-  rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbrhs,rbspace,xn0,Table([μn]))
-  lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,rbspace,xn0,Table([μn]))
+  println("Norm (RHS1,LHS11) = ($(RHS1_rb[1]),$(norm(LHS11_rb[1])))")
+  xrb = space_time_projection(map(x->x[1:Nu],x),rbspace[1]),space_time_projection(map(x->x[1+Nu:end],x),rbspace[2])
+  dxrb = LHS_rb \ (vcat(LHS11_rb_2*vcat(xrb...)[1][1:nu],zeros(np)) + RHS_rb)
+  dxrb_1,dxrb_2 = dxrb[1:nu],dxrb[1+nu:end]
+  xiter = vcat(recast(PTArray(dxrb_1),rbspace[1]),recast(PTArray(dxrb_2),rbspace[2]))
+  x -= xiter
 
-  dxrb = NonaffinePTArray([lhs[1] \ RHS_rb]) # vcat(RHS1_rb,rhs[1][1+nu:end])])#
-  xn0 -= recast(dxrb,rbspace)
-  # println(norm(LHS_rb - lhs[1]))
-  # println(norm(RHS_rb - rhs[1]))
-
-  println("norm dx = $(norm(map(norm,dxrb.array)))")
+  nerr = norm(dxrb)
+  println("norm dx = $nerr")
+  if nerr ≤ 1e-10
+    break
+  end
 end
 
-# CONCLUSIONS: THE RESIDUAL BASIS DOESN'T DESCRIBE THE MANIFOLD
+norm(hcat(xcat.array...) - hcat(x.array...)) / norm(hcat(xcat.array...))
 
-# case 1 works
-xn,μn = [PTArray(snaps_test[1][1:ntimes]),PTArray(snaps_test[2][1:ntimes])],params_test[1:1]
+# COMPARISON
+for fun in (:(Algebra.residual!),:residual_for_trian!)
+  @eval begin
+    function $fun(
+      b::PTArray,
+      op::PThetaMethodNonlinearOperator,
+      x::PTArray,
+      args...)
 
-# case 2 doesn't
-xn,μn = zero.([PTArray(snaps_test[1][1:ntimes]),PTArray(snaps_test[2][1:ntimes])]),params_test[1:1]
+      println("DIO CANE")
+      uθ = zero(x)
+      vθ = zero(x)
+      z = zero(eltype(b))
+      fill!(b,z)
+      $fun(b,op.odeop,op.μ,op.tθ,(uθ,vθ),op.ode_cache,args...)
+    end
+  end
+end
 
-# case 3
-xn,μn = [PTArray(snaps_test[1][1+ntimes:2*ntimes]),PTArray(snaps_test[2][1:ntimes])],params_test[1:1]
-
-_xn = vcat(xn...)
-rbrest = rbrhs[1][Ω]
-_feop = feop[1,:]
-offsets = field_offsets(feop.test)
-rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,xn,μn)
-rhs_cache_row = cache_at_index(rhs_cache,offsets[1]+1:offsets[2])
-rcache,scache... = rhs_cache[1]
-
-times = get_times(fesolver)
-red_idx = rbrest.integration_domain.idx
-red_times = rbrest.integration_domain.times
-red_meas = rbrest.integration_domain.meas
-full_idx = collect(get_free_dof_ids(_feop.test))
-
-b = PTArray(rcache[1:length(red_times)*length(μn)])
-_xn = get_solutions_at_times(_xn,fesolver,red_times)
-bfull = copy(b)
-Res_full = collect_residuals_for_idx!(bfull,fesolver,_feop,_xn,μn,red_times,full_idx,dΩ)
-Res_offline,trian = collect_residuals_for_trian(fesolver,_feop,vcat(sols[1:20]...),params[1:20],times)
-
-_basis_space = tpod(Res_offline[1])
-err_proj = Res_full - _basis_space*_basis_space'*Res_full
-
-#
-row,col = 1,1
-rbjact = rblhs[1][row,col][Ω]
-_feop = feop[row,col]
-_xn = xn[1]
-
-lhs_cache_row_col = cache_at_index(lhs_cache,offsets[row]+1:offsets[row+1],offsets[col]+1:offsets[col+1])
-jcache,scache... = lhs_cache_row_col[1]
-
-times = get_times(fesolver)
-red_idx = rbjact.integration_domain.idx
-red_times = rbjact.integration_domain.times
-red_meas = rbjact.integration_domain.meas
-
-
-A = PTArray(jcache[1:length(red_times)*length(μn)])
-_xn = get_solutions_at_times(_xn,fesolver,red_times)
-Afull = copy(A)
-full_idx = Afull[1][:].nzind
-Jac_full = collect_jacobians_for_idx!(Afull,fesolver,_feop,_xn,μn,red_times,full_idx,dΩ)
-Jac_offline,trian = collect_jacobians_for_trian(fesolver,_feop,vcat(sols[1:20]...),params[1:20],times)
-
-_basis_space = tpod(Jac_offline[1])
-err_proj = Jac_full - _basis_space*_basis_space'*Jac_full
-
-
-#
-# alternative
-_jac(μ,t,(u,p),(du,dp),(v,q)) = a(μ,t,(du,dp),(v,q)) + ∫ₚ(v⊙(∇(du)'⋅u),dΩ)
+Base.adjoint(::Nothing) = nothing
+_c(u,du,dv) = ∫ₚ(dv⊙(∇(du)'⋅u),dΩ)
+_jac(μ,t,(u,p),(du,dp),(v,q)) = a(μ,t,(du,dp),(v,q)) + _c(u,du,v)
 _feop = PTFEOperator(res,_jac,jac_t,pspace,trial,test)
 
-# OFFLINE
-row,col = 1,1
-nsnaps = info.nsnaps_system
-snapsθ = recenter(fesolver,sols,params)
-_snapsθ,_μ = snapsθ[1:nsnaps],params[1:nsnaps]
+rbrhs,rbjac = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
+_,rblhs = collect_compress_rhs_lhs(info,_feop,fesolver,rbspace,sols,params)
 
-# block (1,1) _jac
-ad_lhs11 = collect_compress_lhs(info,_feop[1,1],fesolver,rbspace[1],_snapsθ[1],_μ)
-# _res
-ad_rhs = collect_compress_rhs(info,_feop,fesolver,rbspace,zero.(_snapsθ),_μ)
+rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,xn,Table([μn]))
 
-# ONLINE
-xn,μn = [PTArray(snaps_test[1][1:ntimes]),PTArray(snaps_test[2][1:ntimes])],params_test[1:1]
-rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,xn,μn)
-x = map(zero,xn)
-x0 = map(copy,x)
-offsets = field_offsets(feop.test)
-lhs_cache_row_col = cache_at_index(lhs_cache,offsets[row]+1:offsets[row+1],offsets[col]+1:offsets[col+1])
+y = map(zero,xn)
+ycat = vcat(y...)
+yrb = space_time_projection(map(x->x[1:Nu],ycat),rbspace[1]),space_time_projection(map(x->x[1+Nu:end],ycat),rbspace[2])
+rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbrhs,rbspace,y,Table([μn]))
+j = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjac,rbspace,y,Table([μn]))
+lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,rbspace,y,Table([μn]))
+r = lhs*vcat(yrb...) + rhs
 
-for iter in 1:fesolver.nls.max_nliters
-  j = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,rbspace,x,μn)
-  lhs11 = collect_lhs_contributions!(lhs_cache_row_col,info,_feop[1,1],fesolver,ad_lhs11,rbspace[1],x[1],μn)
-  lhs = vcat(hcat(lhs11[1],j[1][1:nu,1+nu:end]),j[1][1+nu:end,:])
-  rhs = collect_rhs_contributions!(rhs_cache,info,_feop,fesolver,ad_rhs,rbspace,x0,μn)
-  xrb = space_time_projection(x,rbspace)
-  r = lhs*xrb[1] - rhs[1]
-
-  dxrb = NonaffinePTArray([j[1] \ r])
-  x -= recast(dxrb,rbspace)
-  err = map(norm,dxrb.array)
-  err_inf = norm(err)
-  println("Iter $iter, error norm: $err_inf")
+x = copy(xcat) .* 0.
+A,b = [],[]
+for kt = eachindex(times)
+  (bk,_),Ak = return_quantities(ode_cache_ok,x,kt)
+  push!(b,copy(bk))
+  push!(A,copy(Ak))
 end
 
-xappcat = hcat(vcat(x...).array...)
-xcat = hcat(vcat(xn...).array...)
-norm(xcat - xappcat)
+LHS11_1 = NnzMatrix(map(x->NnzVector(x[1:Nu,1:Nu] - M/θdt),A)...)
+LHS11_2 = NnzMatrix([NnzVector(M/θdt) for _ = times]...)
+LHS21 = NnzMatrix(map(x->NnzVector(x[1+Nu:end,1:Nu]),A)...)
+LHS12 = NnzMatrix(map(x->NnzVector(x[1:Nu,1+Nu:end]),A)...)
+
+LHS11_rb_1 = space_time_projection(LHS11_1,rbspace[1],rbspace[1])
+LHS11_rb_2 = space_time_projection(LHS11_2,rbspace[1],rbspace[1];combine_projections=(x,y)->x-y)
+LHS11_rb = LHS11_rb_1 + LHS11_rb_2
+LHS21_rb = space_time_projection(LHS21,rbspace[2],rbspace[1])
+LHS12_rb = space_time_projection(LHS12,rbspace[1],rbspace[2])
+
+np = get_rb_ndofs(rbspace[2])
+LHS_rb = vcat(hcat(LHS11_rb,LHS12_rb),hcat(LHS21_rb,zeros(np,np)))
+
+R1 = NnzMatrix(map(x->x[1:Nu],b)...)
+R2 = NnzMatrix(map(x->x[1+Nu:end],b)...)
+RHS1_rb = space_time_projection(R1,rbspace[1])
+RHS2_rb = space_time_projection(R2,rbspace[2])
+RHS_rb = vcat(RHS1_rb,RHS2_rb)
+println("Error norm (jac,res): ($(norm(lhs[1] - LHS_rb)),$(norm(rhs[1] - RHS_rb)))")
+
+y = map(zero,xn)
+for iter in 1:fesolver.nls.max_nliters
+  ycat = vcat(y...)
+  yrb = space_time_projection(map(x->x[1:Nu],ycat),rbspace[1]),space_time_projection(map(x->x[1+Nu:end],ycat),rbspace[2])
+  rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbrhs,rbspace,y,Table([μn]))
+  j = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjac,rbspace,y,Table([μn]))
+  lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,rbspace,y,Table([μn]))
+  r = lhs*vcat(yrb...) + rhs
+
+  dxrb = NonaffinePTArray([j[1] \ r[1]])
+  y -= recast(dxrb,rbspace)
+
+  nerr = norm(dxrb[1])
+  println("norm dx = $nerr")
+  if nerr ≤ 1e-10
+    break
+  end
+end
+
+norm(hcat(xcat.array...) - hcat(vcat(y...).array...)) / norm(hcat(xcat.array...))

@@ -81,12 +81,12 @@ for fun in (:(Algebra.residual!),:residual_for_trian!)
       x::PTArray,
       args...)
 
-      uθ = x
+      uF = zero(x)
       vθ = op.vθ
       @. vθ = (x-op.u0)/op.dtθ
       z = zero(eltype(b))
       fill!(b,z)
-      $fun(b,op.odeop,op.μ,op.tθ,(uθ,vθ),op.ode_cache,args...)
+      $fun(b,op.odeop,op.μ,op.tθ,(uF,vθ),op.ode_cache,args...)
     end
   end
 end

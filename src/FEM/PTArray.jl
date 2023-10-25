@@ -31,6 +31,14 @@ function Base.zeros(a::PTArray)
   get_array(zero(a))
 end
 
+for op in (:+,:-,:*)
+  @eval begin
+    function ($op)(a::PTArray,b::PTArray)
+      map($op,a,b)
+    end
+  end
+end
+
 function Base.:*(a::PTArray,b::Number)
   map(ai->(*)(ai,b),a)
 end
@@ -267,14 +275,6 @@ function Base.show(io::IO,a::NonaffinePTArray{T}) where T
   print(io,"Nonaffine PTArray of type $T and length $(length(a.array))")
 end
 
-for op in (:+,:-)
-  @eval begin
-    function ($op)(a::NonaffinePTArray,b::NonaffinePTArray)
-      map($op,a,b)
-    end
-  end
-end
-
 function Base.transpose(a::NonaffinePTArray)
   map(transpose,a)
 end
@@ -449,15 +449,6 @@ Base.similar(a::AffinePTArray) = PTArray(similar(a.array),a.len)
 
 function Base.show(io::IO,a::AffinePTArray{T}) where T
   print(io,"Affine PTArray of type $T and length $(a.len)")
-end
-
-for op in (:+,:-)
-  @eval begin
-    function ($op)(a::AffinePTArray,b::AffinePTArray)
-      n = _get_length(a,b)
-      PTArray(($op)(a.array,b.array),n)
-    end
-  end
 end
 
 function Base.transpose(a::AffinePTArray)

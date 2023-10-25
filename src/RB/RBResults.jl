@@ -189,11 +189,22 @@ function load_test(
   end
 end
 
-function rb_solve(ls::LinearSolver,rhs::PTArray,lhs::PTArray)
+function rb_solve(ls::LinearSolver,rhs::PTArray,lhs::Vector{<:PTArray})
   x = copy(rhs)
   cache = nothing
-  rb_solve!(x,ls,rhs,lhs,cache)
+  rb_solve!(x,ls,rhs,sum(lhs),cache)
   return x
+end
+
+function rb_solve!(
+  x::PTArray,
+  ls::LinearSolver,
+  rhs::PTArray,
+  lhs::Vector{<:PTArray},
+  args...)
+
+  @. rhs = lhs[end]*x - rhs
+  rb_solve!(x,ls,rhs,sum(lhs[1:end-1]),cache)
 end
 
 function rb_solve!(

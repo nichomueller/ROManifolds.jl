@@ -182,3 +182,9 @@ function ∂ₚt(U::PTMultiFieldTrialFESpace)
   spaces = ∂ₚt.(U.spaces)
   PTMultiFieldFESpace(spaces)
 end
+
+function FESpaces.SparseMatrixAssembler(
+  trial::Union{PTTrialFESpace,PTMultiFieldTrialFESpace},
+  test::FESpace)
+  SparseMatrixAssembler(trial(nothing,nothing),test)
+end

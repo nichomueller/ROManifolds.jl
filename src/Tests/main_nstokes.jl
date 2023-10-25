@@ -6,11 +6,11 @@ begin
 end
 
 begin
-  mesh = "model_circle_2D_coarse.json"
+  mesh = "cube2x2.json"
+  bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
+  # mesh = "model_circle_2D_coarse.json"
+  # bnd_info = Dict("dirichlet0" => ["noslip"],"dirichlet" => ["inlet"],"neumann" => ["outlet"])
   test_path = "$root/tests/navier-stokes/unsteady/$mesh"
-  bnd_info = Dict("dirichlet0" => ["noslip"],"dirichlet" => ["inlet"],"neumann" => ["outlet"])
-  # mesh = "cube2x2.json"
-  # bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
   order = 2
   degree = 4
 
@@ -26,9 +26,6 @@ begin
   a(μ,t) = x->a(x,μ,t)
   aμt(μ,t) = PTFunction(a,μ,t)
 
-  conv(u,∇u) = (∇u')⋅u
-  dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
-
   g(x,μ,t) = VectorValue(μ[1]*exp(-x[2]/μ[2])*abs(sin(μ[3]*t)),0)
   g(μ,t) = x->g(x,μ,t)
 
@@ -41,23 +38,24 @@ begin
 
   m(μ,t,u,v) = ∫ₚ(v⋅u,dΩ)
   a(μ,t,(u,p),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(u)),dΩ)
-  c(μ,t,u,v) = ∫ₚ(v⊙(conv∘(u,∇(u))),dΩ)
-  dc(μ,t,u,du,v) = ∫ₚ(v⊙(dconv∘(du,∇(du),u,∇(u))),dΩ)
+  c(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(v⊙(∇(du)'⋅u),dΩ)
+  dc(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(v⊙(∇(du)'⋅u),dΩ) + ∫ₚ(v⊙(∇(u)'⋅du),dΩ)
 
   jac_t(μ,t,(u,p),(dut,dpt),(v,q)) = m(μ,t,dut,v)
-  jac(μ,t,(u,p),(du,dp),(v,q)) = a(μ,t,(du,dp),(v,q)) + dc(μ,t,u,du,v)
-  res(μ,t,(u,p),(v,q)) = m(μ,t,∂ₚt(u),v) + a(μ,t,(u,p),(v,q)) + c(μ,t,u,v)
+  jac(μ,t,(u,p),(du,dp),(v,q)) = a(μ,t,(du,dp),(v,q))
+  res(μ,t,(u,p),(v,q)) = m(μ,t,∂ₚt(u),v) + a(μ,t,(u,p),(v,q))
+  nfun = c,dc
 
   reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float},order)
   reffe_p = ReferenceFE(lagrangian,Float,order-1)
-  # test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
-  test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
+  test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
+  # test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
   trial_u = PTTrialFESpace(test_u,g)
   test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
   trial_p = TrialFESpace(test_p)
   test = PTMultiFieldFESpace([test_u,test_p])
   trial = PTMultiFieldFESpace([trial_u,trial_p])
-  feop = PTFEOperator(res,jac,jac_t,pspace,trial,test)
+  feop = PTFEOperator(res,jac,jac_t,nfun,pspace,trial,test)
   t0,tf,dt,θ = 0.,0.05,0.005,1
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial_u(μ,t0))
   ph0μ(μ) = interpolate_everywhere(p0μ(μ),trial_p(μ,t0))
@@ -67,7 +65,7 @@ begin
   fesolver = PThetaMethod(nls,xh0μ,θ,dt,t0,tf)
 
   ϵ = 1e-4
-  load_solutions = true
+  load_solutions = false
   save_solutions = true
   load_structures = false
   save_structures = true

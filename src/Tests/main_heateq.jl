@@ -42,14 +42,14 @@ function heat_equation()
   u0(μ) = x->u0(x,μ)
   u0μ(μ) = PFunction(u0,μ)
 
-  jac_t(μ,t,u,dut,v) = ∫ₚ(v*dut,dΩ)
-  jac(μ,t,u,du,v) = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ)
-  res(μ,t,u,v) = ∫ₚ(v*∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⋅∇(u),dΩ) - ∫ₚ(fμt(μ,t)*v,dΩ) - ∫ₚ(hμt(μ,t)*v,dΓn)
+  m(μ,t,dut,v) = ∫ₚ(v*dut,dΩ)
+  lhs(μ,t,du,v) = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ)
+  rhs(μ,t,v) = ∫ₚ(fμt(μ,t)*v,dΩ) + ∫ₚ(hμt(μ,t)*v,dΓn)
 
   reffe = ReferenceFE(lagrangian,Float,order)
   test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
   trial = PTTrialFESpace(test,g)
-  feop = PTAffineFEOperator(res,jac,jac_t,pspace,trial,test)
+  feop = PTAffineFEOperator(m,lhs,rhs,pspace,trial,test)
   t0,tf,dt,θ = 0.,0.3,0.005,0.5
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
   fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
