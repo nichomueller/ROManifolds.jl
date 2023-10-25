@@ -49,10 +49,8 @@ function Base.first(r::RBResults)
 end
 
 function save(info::RBInfo,r::RBResults)
-  if info.save_structures
-    path = joinpath(info.rb_path,"results")
-    save(path,r)
-  end
+  path = joinpath(info.rb_path,"results")
+  save(path,r)
 end
 
 function load(info::RBInfo,T::Type{RBResults})
@@ -112,9 +110,9 @@ function test_rb_solver(
   rbres,
   rbjacs,
   snaps,
-  params::Table)
-
-  snaps_test,params_test = load_test(info,feop,fesolver)
+  params::Table,
+  snaps_test,
+  params_test::Table)
 
   println("Solving linear RB problems")
   x = initial_guess(snaps,params,params_test)
@@ -138,9 +136,9 @@ function test_rb_solver(
   rbres,
   rbjacs,
   snaps,
-  params::Table)
-
-  snaps_test,params_test = load_test(info,feop,fesolver)
+  params::Table,
+  snaps_test,
+  params_test::Table)
 
   println("Solving nonlinear RB problems with Newton iterations")
   rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,snaps_test,params_test)
@@ -164,29 +162,6 @@ function test_rb_solver(
     end
   end
   post_process(info,feop,fesolver,snaps_test,params_test,x,stats)
-end
-
-function load_test(
-  info::RBInfo,
-  feop::PTFEOperator,
-  fesolver::PODESolver)
-
-  ntests = info.nsnaps_test
-  try
-    @check info.load_solutions
-    sols,params = try
-      load_test(info,(Snapshots,Table))
-    catch
-      load_test(info,(BlockSnapshots,Table))
-    end
-    return sols[1:ntests],params[1:ntests]
-  catch
-    params = realization(feop,ntests)
-    trial = get_trial(feop)
-    sols, = collect_solutions(fesolver,feop,trial,params)
-    save_test(info,(sols,params))
-    return sols[1:ntests],params[1:ntests]
-  end
 end
 
 function rb_solve(ls::LinearSolver,rhs::PTArray,lhs::Vector{<:PTArray})
@@ -316,30 +291,6 @@ function Gridap.Visualization.writevtk(
     writevtk(trian,joinpath(plt_dir,"$(name)_approx_$(it).vtu"),cellfields=["$(name)_approx"=>fsol_approx])
     writevtk(trian,joinpath(plt_dir,"$(name)_err_$(it).vtu"),cellfields=["$(name)_err"=>ferr])
   end
-end
-
-function save_test(info::RBInfo,snaps::Snapshots)
-  if info.save_structures
-    path = joinpath(info.fe_path,"fesnaps_test")
-    save(path,snaps)
-  end
-end
-
-function save_test(info::RBInfo,params::Table)
-  if info.save_structures
-    path = joinpath(info.fe_path,"params_test")
-    save(path,params)
-  end
-end
-
-function load_test(info::RBInfo,T::Type{Snapshots})
-  path = joinpath(info.fe_path,"fesnaps_test")
-  load(path,T)
-end
-
-function load_test(info::RBInfo,T::Type{Table})
-  path = joinpath(info.fe_path,"params_test")
-  load(path,T)
 end
 
 function save(info::RBInfo,result::RBResults)

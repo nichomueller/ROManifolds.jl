@@ -42,13 +42,31 @@ function recenter(
 end
 
 function save(info::RBInfo,s::Snapshots)
-  if info.save_solutions
-    path = joinpath(info.fe_path,"fesnaps")
-    save(path,s)
-  end
+  path = joinpath(info.fe_path,"fesnaps")
+  save(path,s)
 end
 
 function load(info::RBInfo,T::Type{<:Snapshots})
   path = joinpath(info.fe_path,"fesnaps")
+  load(path,T)
+end
+
+function save_test(info::RBInfo,snaps::Snapshots)
+  path = joinpath(info.fe_path,"fesnaps_test")
+  save(path,snaps)
+end
+
+function save_test(info::RBInfo,params::Table)
+  path = joinpath(info.fe_path,"params_test")
+  save(path,params)
+end
+
+function load_test(info::RBInfo,T::Type{Snapshots})
+  path = joinpath(info.fe_path,"fesnaps_test")
+  load(path,T)
+end
+
+function load_test(info::RBInfo,T::Type{Table})
+  path = joinpath(info.fe_path,"params_test")
   load(path,T)
 end

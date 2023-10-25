@@ -100,10 +100,8 @@ for (AC,AD) in zip((:RBVecAlgebraicContribution,:RBMatAlgebraicContribution),
 end
 
 function save(info::RBInfo,a::RBVecAlgebraicContribution)
-  if info.save_structures
-    path = joinpath(info.rb_path,"rb_rhs")
-    save_algebraic_contrib(path,a)
-  end
+  path = joinpath(info.rb_path,"rb_rhs")
+  save_algebraic_contrib(path,a)
 end
 
 function load(info::RBInfo,T::Type{RBVecAlgebraicContribution})
@@ -112,11 +110,9 @@ function load(info::RBInfo,T::Type{RBVecAlgebraicContribution})
 end
 
 function save(info::RBInfo,a::Vector{<:RBMatAlgebraicContribution})
-  if info.save_structures
-    for i = eachindex(a)
-      path = joinpath(info.rb_path,"rb_lhs_$i")
-      save_algebraic_contrib(path,a[i])
-    end
+  for i = eachindex(a)
+    path = joinpath(info.rb_path,"rb_lhs_$i")
+    save_algebraic_contrib(path,a[i])
   end
 end
 
@@ -137,15 +133,35 @@ function collect_compress_rhs_lhs(
   fesolver::PThetaMethod,
   rbspace,
   snaps,
-  μ::Table)
+  μ::Table,
+  nsnaps::Int)
 
-  nsnaps = info.nsnaps_system
   snapsθ = recenter(fesolver,snaps,μ)
   _snapsθ,_μ = snapsθ[1:nsnaps],μ[1:nsnaps]
   rhs = collect_compress_rhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
   lhs = collect_compress_lhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
   show(rhs),show(lhs)
   rhs,lhs
+end
+
+function collect_compress_rhs_lhs(
+  info::RBInfo,
+  feop::NonlinearPTFEOperator,
+  fesolver::PThetaMethod,
+  rbspace,
+  snaps,
+  μ::Table,
+  nsnaps::Int)
+
+  snapsθ = recenter(fesolver,snaps,μ)
+  _snapsθ,_μ = snapsθ[1:nsnaps],μ[1:nsnaps]
+  lfeop = linear_operator(feop)
+  rhs = collect_compress_rhs(info,lfeop,fesolver,rbspace,_snapsθ,_μ)
+  lhs = collect_compress_lhs(info,lfeop,fesolver,rbspace,_snapsθ,_μ)
+  nlfeop = nonlinear_operator(feop)
+  nllhs = collect_compress_lhs(info,nlfeop,fesolver,rbspace,_snapsθ,_μ)
+  show(rhs),show(lhs)
+  rhs,lhs,nllhs
 end
 
 function collect_compress_rhs(

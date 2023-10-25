@@ -66,9 +66,38 @@ function stokes_equation()
   nsnaps_system = 20
   nsnaps_test = 10
   st_mdeim = false
-  info = RBInfo(test_path;ϵ,load_solutions,save_solutions,load_structures,save_structures,
-                energy_norm,compute_supremizers,nsnaps_state,nsnaps_system,nsnaps_test,st_mdeim)
-  multi_field_rb_model(info,feop,fesolver)
+  postprocess = true
+  info = RBInfo(test_path;ϵ,energy_norm,compute_supremizers,st_mdeim,postprocess)
+
+  # Offline phase
+  printstyled("OFFLINE PHASE\n";bold=true,underline=true)
+  if load_solutions
+    sols,params = load(info,(BlockSnapshots,Table))
+    snaps_test,params_test = load_test(info,(BlockSnapshots,Table))
+  else
+    params = realization(feop,nsnaps_state)
+    sols,stats = collect_multi_field_solutions(fesolver,feop,trial,params)
+    params_test = realization(feop,nsnaps_test)
+    sols_test, = collect_multi_field_solutions(fesolver,feop,trial,params)
+    if save_solutions
+      save(info,(sols,params,stats))
+      save_test(info,(sols_test,params_test))
+    end
+  end
+  if load_structures
+    rbspace = load(info,BlockRBSpace)
+    rbrhs,rblhs = load(info,(BlockRBVecAlgebraicContribution,Vector{BlockRBMatAlgebraicContribution}))
+  else
+    rbspace = reduced_basis(info,feop,sols,params)
+    rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params,nsnaps_system)
+    if save_structures
+      save(info,(rbspace,rbrhs,rblhs))
+    end
+  end
+
+  # Online phase
+  printstyled("ONLINE PHASE\n";bold=true,underline=true)
+  test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params,snaps_test,params_test)
 end
 
 stokes_equation()

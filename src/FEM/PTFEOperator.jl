@@ -29,21 +29,11 @@ get_order(op::PTFEOperator) = op.order
 get_pspace(op::PTFEOperator) = op.pspace
 realization(op::PTFEOperator,args...) = realization(op.pspace,args...)
 get_measure(op::PTFEOperator,trian::Triangulation) = Measure(trian,2*get_order(op.test))
-function get_jacobian(op::PTFEOperator,i::Int)
-  if i == 1
-    (μ,t,u,du,v) -> op.jacs[1](μ,t,u,du,v) + op.jacs[end](μ,t,u,du,v)
-  elseif i == 2
-    op.jacs[2]
-  else
-    (μ,t,u,du,v) -> op.jacs[1](μ,t,u,du,v) + op.jacs[end-1](μ,t,u,du,v)
-  end
-end
-get_jacobian(op::PTFEOperator{Affine},i::Int) = op.jacs[i]
 
 """
 Transient FE operator that is defined by a transient Weak form
 """
-struct PTFEOperatorFromWeakForm{C<:OperatorType} <: PTFEOperator{C}
+struct PTFEOperatorFromWeakForm <: PTFEOperator{Affine}
   res::Function
   jacs::Tuple{Vararg{Function}}
   assem::Assembler
@@ -53,23 +43,66 @@ struct PTFEOperatorFromWeakForm{C<:OperatorType} <: PTFEOperator{C}
   order::Integer
 end
 
-function PTAffineFEOperator(m::Function,a::Function,b::Function,pspace,trial,test)
+function AffinePTFEOperator(
+  m::Function,a::Function,b::Function,pspace,trial,test)
   res(μ,t,u,v) = m(μ,t,∂t(u),v) + a(μ,t,u,v) - b(μ,t,v)
   jac(μ,t,u,du,v) = a(μ,t,du,v)
   jac_t(μ,t,u,dut,v) = m(μ,t,dut,v)
   assem = SparseMatrixAssembler(trial,test)
-  PTFEOperatorFromWeakForm{Affine}(
-    res,(jac,jac_t),assem,pspace,(trial,∂ₚt(trial)),test,1)
+  PTFEOperatorFromWeakForm(res,(jac,jac_t),assem,pspace,(trial,∂ₚt(trial)),test,1)
 end
 
-function PTFEOperator(r::Function,a::Function,m::Function,nl::NTuple{2,Function},pspace,trial,test)
-  res(μ,t,u,v) = r(μ,t,u,v) + nl[1](μ,t,u,u,v)
+function get_residual(op::PTFEOperatorFromWeakForm)
+  return op.res
+end
+
+function get_jacobian(op::PTFEOperatorFromWeakForm)
+  return op.jacs
+end
+
+struct NonlinearPTFEOperator <: PTFEOperator{Nonlinear}
+  res::Function
+  jacs::Tuple{Vararg{Function}}
+  nl::Tuple{Vararg{Function}}
+  assem::Assembler
+  pspace::PSpace
+  trials::Tuple{Vararg{Any}}
+  test::FESpace
+  order::Integer
+end
+
+function NonlinearPTFEOperator(
+  res::Function,jac::Function,jac_t::Function,nl::Tuple{Vararg{Function}},pspace,trial,test)
   assem = SparseMatrixAssembler(trial,test)
-  PTFEOperatorFromWeakForm{Nonlinear}(
-    res,(a,m,nl...),assem,pspace,(trial,∂ₚt(trial)),test,1)
+  NonlinearPTFEOperator(res,(jac,jac_t),nl,assem,pspace,(trial,∂ₚt(trial)),test,1)
 end
 
-function single_field(op::PTFEOperatorFromWeakForm,q,idx::Int)
+function get_residual(op::NonlinearPTFEOperator)
+  res(μ,t,u,v) = op.res(μ,t,u,v) + op.nl[1](μ,t,u,u,v)
+  return res
+end
+
+function get_jacobian(op::NonlinearPTFEOperator)
+  jac(μ,t,u,du,v) = op.jacs[1](μ,t,u,du,v) + op.nl[2](μ,t,u,du,v)
+  jac_t(μ,t,u,du,v) = op.jacs[2](μ,t,u,du,v)
+  return jac,jac_t
+end
+
+function linear_operator(op::NonlinearPTFEOperator)
+  res(μ,t,u,v) = op.res(μ,t,u,v) + op.nl[1](μ,t,u,u,v)
+  jac(μ,t,u,du,v) = op.jacs[1](μ,t,u,du,v) + op.nl[1](μ,t,u,du,v)
+  jac_t(μ,t,u,du,v) = op.jacs[2](μ,t,u,du,v)
+  return PTFEOperatorFromWeakForm(res,(jac,jac_t),op.pspace,op.trials,op.test,op.order)
+end
+
+function nonlinear_operator(op::NonlinearPTFEOperator)
+  res(μ,t,u,v) = 0
+  jac(μ,t,u,du,v) = op.nl[2](μ,t,u,du,v) - op.nl[1](μ,t,u,du,v)
+  jac_t(μ,t,u,du,v) = 0
+  return PTFEOperatorFromWeakForm(res,(jac,jac_t),op.pspace,op.trials,op.test,op.order)
+end
+
+function single_field(op::PTFEOperator,q,idx::Int)
   vq = Any[]
   for i in eachindex(get_test(op).spaces)
     if i == idx
@@ -81,11 +114,11 @@ function single_field(op::PTFEOperatorFromWeakForm,q,idx::Int)
   vq
 end
 
-function single_field(::PTFEOperatorFromWeakForm,q,::Colon)
+function single_field(::PTFEOperator,q,::Colon)
   q
 end
 
-function Base.getindex(op::PTFEOperatorFromWeakForm{Affine},row,col)
+function Base.getindex(op::PTFEOperatorFromWeakForm,row,col)
   if isa(get_test(op),MultiFieldFESpace)
     trials_col = getindex(get_trial(op),col)
     test_row = getindex(op.test,row)
@@ -99,7 +132,7 @@ function Base.getindex(op::PTFEOperatorFromWeakForm{Affine},row,col)
   end
 end
 
-function Base.getindex(op::PTFEOperatorFromWeakForm{Nonlinear},row,col)
+function Base.getindex(op::NonlinearPTFEOperator,row,col)
   if isa(get_test(op),MultiFieldFESpace)
     trials_col = getindex(get_trial(op),col)
     test_row = getindex(op.test,row)
@@ -107,16 +140,16 @@ function Base.getindex(op::PTFEOperatorFromWeakForm{Nonlinear},row,col)
     res(μ,t,u,dv) = op.res(μ,t,sf(u,col),sf(dv,row))
     jac(μ,t,u,du,dv) = op.jacs[1](μ,t,sf(u,col),sf(du,col),sf(dv,row))
     jac_t(μ,t,u,dut,dv) = op.jacs[2](μ,t,sf(u,col),sf(dut,col),sf(dv,row))
-    nlf(μ,t,u,dut,dv) = op.jacs[end-1](μ,t,sf(u,col),sf(dut,col),sf(dv,row))
-    dnlf(μ,t,u,dut,dv) = op.jacs[end](μ,t,sf(u,col),sf(dut,col),sf(dv,row))
-    return PTFEOperator(res,jac,jac_t,(nlf,dnlf),op.pspace,trials_col,test_row)
+    nl(μ,t,u,dut,dv) = op.nl[1](μ,t,sf(u,col),sf(dut,col),sf(dv,row))
+    dnl(μ,t,u,dut,dv) = op.nl[2](μ,t,sf(u,col),sf(dut,col),sf(dv,row))
+    return PTFEOperator(res,jac,jac_t,(nl,dnl),op.pspace,trials_col,test_row)
   else
     return op
   end
 end
 
 function allocate_residual(
-  op::PTFEOperatorFromWeakForm,
+  op::PTFEOperator,
   μ::AbstractVector,
   t::T,
   uh::S,
@@ -129,13 +162,14 @@ function allocate_residual(
     dxh = (dxh...,uh)
   end
   xh = TransientCellField(uh,dxh)
-  dc = integrate(op.res(μ,t,xh,v))
+  res = get_residual(op)
+  dc = integrate(res(μ,t,xh,v))
   vecdata = collect_cell_vector(V,dc)
   allocate_vector(op.assem,vecdata)
 end
 
 function allocate_jacobian(
-  op::PTFEOperatorFromWeakForm,
+  op::PTFEOperator,
   μ::AbstractVector,
   t::T,
   uh::S,
@@ -149,7 +183,7 @@ end
 for f in (:allocate_residual,:allocate_jacobian)
   @eval begin
     function $f(
-      op::PTFEOperatorFromWeakForm,
+      op::PTFEOperator,
       μ::AbstractVector,
       t::T,
       uh::PTCellField,
@@ -171,7 +205,7 @@ end
 
 function residual!(
   b::PTArray,
-  op::PTFEOperatorFromWeakForm,
+  op::PTFEOperator,
   μ::AbstractVector,
   t::T,
   xh::S,
@@ -179,7 +213,8 @@ function residual!(
 
   V = get_test(op)
   v = get_fe_basis(V)
-  dc = integrate(op.res(μ,t,xh,v))
+  res = get_residual(op)
+  dc = integrate(res(μ,t,xh,v))
   vecdata = collect_cell_vector(V,dc)
   assemble_vector_add!(b,op.assem,vecdata)
   b
@@ -187,7 +222,7 @@ end
 
 function residual!(
   b::PTArray,
-  op::PTFEOperatorFromWeakForm,
+  op::PTFEOperator,
   μ::AbstractVector,
   t::T,
   xh::S,
@@ -196,7 +231,8 @@ function residual!(
 
   V = get_test(op)
   v = get_fe_basis(V)
-  dc = op.res(μ,t,xh,v)[meas]
+  res = get_residual(op)
+  dc = res(μ,t,xh,v)[meas]
   vecdata = collect_cell_vector(V,dc)
   assemble_vector_add!(b,op.assem,vecdata)
   b
@@ -204,7 +240,7 @@ end
 
 function residual_for_trian!(
   b::PTArray,
-  op::PTFEOperatorFromWeakForm,
+  op::PTFEOperator,
   μ::AbstractVector,
   t::T,
   xh::S,
@@ -212,7 +248,8 @@ function residual_for_trian!(
 
   V = get_test(op)
   v = get_fe_basis(V)
-  dc = integrate(op.res(μ,t,xh,v))
+  res = get_residual(op)
+  dc = integrate(res(μ,t,xh,v))
   trian = get_domains(dc)
   bvec = Vector{typeof(b)}(undef,num_domains(dc))
   for (n,t) in enumerate(trian)
@@ -225,7 +262,7 @@ end
 
 function jacobian!(
   A::PTArray,
-  op::PTFEOperatorFromWeakForm,
+  op::PTFEOperator,
   μ::AbstractVector,
   t::T,
   uh::S,
@@ -240,7 +277,7 @@ end
 
 function jacobian!(
   A::PTArray,
-  op::PTFEOperatorFromWeakForm,
+  op::PTFEOperator,
   μ::AbstractVector,
   t::T,
   uh::S,
@@ -253,8 +290,8 @@ function jacobian!(
   V = get_test(op)
   u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
-  jac = get_jacobian(op,i)
-  dc = γᵢ*jac(μ,t,uh,u,v)[meas]
+  jac = get_jacobian(op)
+  dc = γᵢ*jac[i](μ,t,uh,u,v)[meas]
   matdata = collect_cell_matrix(Uh,V,dc)
   assemble_matrix_add!(A,op.assem,matdata)
   A
@@ -262,7 +299,7 @@ end
 
 function jacobian_for_trian!(
   A::PTArray,
-  op::PTFEOperatorFromWeakForm,
+  op::PTFEOperator,
   μ::AbstractVector,
   t::T,
   uh::S,
@@ -274,8 +311,8 @@ function jacobian_for_trian!(
   V = get_test(op)
   u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
-  jac = get_jacobian(op,i)
-  dc = γᵢ*integrate(jac(μ,t,uh,u,v))
+  jac = get_jacobian(op)
+  dc = γᵢ*integrate(jac[i](μ,t,uh,u,v))
   trian = get_domains(dc)
   Avec = Vector{typeof(A)}(undef,num_domains(dc))
   for (n,t) in enumerate(trian)
@@ -288,7 +325,7 @@ end
 
 function jacobians!(
   A::PTArray,
-  op::PTFEOperatorFromWeakForm,
+  op::PTFEOperator,
   μ::AbstractVector,
   t::T,
   uh::S,
@@ -302,7 +339,7 @@ function jacobians!(
 end
 
 function fill_initial_jacobians(
-  op::PTFEOperatorFromWeakForm,
+  op::PTFEOperator,
   μ::AbstractVector,
   t::T,
   uh::S) where {T,S}
@@ -323,7 +360,7 @@ function fill_initial_jacobians(
 end
 
 function fill_jacobians(
-  op::PTFEOperatorFromWeakForm,
+  op::PTFEOperator,
   μ::AbstractVector,
   t::T,
   uh::S,
@@ -342,7 +379,7 @@ function fill_jacobians(
 end
 
 function _matdata_jacobian(
-  op::PTFEOperatorFromWeakForm,
+  op::PTFEOperator,
   μ::AbstractVector,
   t::T,
   xh::S,
@@ -353,7 +390,7 @@ function _matdata_jacobian(
   V = get_test(op)
   u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
-  jac = get_jacobian(op,i)
-  dc = γᵢ*integrate(jac(μ,t,xh,u,v))
+  jac = get_jacobian(op)
+  dc = γᵢ*integrate(jac[i](μ,t,xh,u,v))
   collect_cell_matrix(Uh,V,dc)
 end

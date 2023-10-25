@@ -34,10 +34,8 @@ function Base.getindex(s::BlockSnapshots{T},idx::UnitRange{Int}) where T
 end
 
 function save(info::RBInfo,s::BlockSnapshots)
-  if info.save_solutions
-    path = joinpath(info.fe_path,"fesnaps")
-    save(path,s)
-  end
+  path = joinpath(info.fe_path,"fesnaps")
+  save(path,s)
 end
 
 function load(info::RBInfo,T::Type{BlockSnapshots})
@@ -117,10 +115,8 @@ function field_offsets(rb::BlockRBSpace)
 end
 
 function save(info::RBInfo,rb::BlockRBSpace)
-  if info.save_structures
-    path = joinpath(info.rb_path,"rb")
-    save(path,rb)
-  end
+  path = joinpath(info.rb_path,"rb")
+  save(path,rb)
 end
 
 function load(info::RBInfo,T::Type{BlockRBSpace})
@@ -377,10 +373,8 @@ function load_algebraic_contrib(path::String,::Type{BlockRBMatAlgebraicContribut
 end
 
 function save(info::RBInfo,a::BlockRBVecAlgebraicContribution)
-  if info.save_structures
-    path = joinpath(info.rb_path,"rb_rhs")
-    save_algebraic_contrib(path,a)
-  end
+  path = joinpath(info.rb_path,"rb_rhs")
+  save_algebraic_contrib(path,a)
 end
 
 function load(info::RBInfo,T::Type{BlockRBVecAlgebraicContribution})
@@ -389,11 +383,9 @@ function load(info::RBInfo,T::Type{BlockRBVecAlgebraicContribution})
 end
 
 function save(info::RBInfo,a::Vector{BlockRBMatAlgebraicContribution{T}}) where T
-  if info.save_structures
-    for i = eachindex(a)
-      path = joinpath(info.rb_path,"rb_lhs_$i")
-      save_algebraic_contrib(path,a[i])
-    end
+  for i = eachindex(a)
+    path = joinpath(info.rb_path,"rb_lhs_$i")
+    save_algebraic_contrib(path,a[i])
   end
 end
 
@@ -633,10 +625,8 @@ function collect_lhs_contributions!(
 end
 
 function save_test(info::RBInfo,snaps::BlockSnapshots)
-  if info.save_structures
-    path = joinpath(info.fe_path,"fesnaps_test")
-    save(path,snaps)
-  end
+  path = joinpath(info.fe_path,"fesnaps_test")
+  save(path,snaps)
 end
 
 function load_test(info::RBInfo,T::Type{BlockSnapshots})

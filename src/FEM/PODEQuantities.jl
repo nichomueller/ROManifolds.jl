@@ -100,19 +100,17 @@ function Base.iterate(sol::PODESolution,state)
   return (uf,n),state
 end
 
-function collect_solutions(
+function collect_single_field_solutions(
   fesolver::PODESolver,
   feop::PTFEOperator,
-  trial::PTTrialFESpace,
   μ::Table)
 
   uh0,t0,tf = fesolver.uh0,fesolver.t0,fesolver.tf
-  trial_μt = trial(μ,t0)
   ode_op = get_algebraic_operator(feop)
   u0 = get_free_dof_values(uh0(μ))
   time_ndofs = get_time_ndofs(fesolver)
   nparams = length(μ)
-  T = get_vector_type(trial_μt)
+  T = get_vector_type(feop.test)
   uμt = PODESolution(fesolver,ode_op,μ,u0,t0,tf)
   sols = Vector{PTArray{T}}(undef,time_ndofs)
   println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
@@ -123,24 +121,22 @@ function collect_solutions(
   return Snapshots(sols),stats
 end
 
-function collect_solutions(
+function collect_multi_field_solutions(
   fesolver::PODESolver,
   feop::PTFEOperator,
-  trial::PTMultiFieldTrialFESpace,
   μ::Table)
 
   uh0,t0,tf = fesolver.uh0,fesolver.t0,fesolver.tf
-  trial_μt = trial(μ,t0)
   ode_op = get_algebraic_operator(feop)
   u0 = get_free_dof_values(uh0(μ))
   time_ndofs = get_time_ndofs(fesolver)
   nparams = length(μ)
-  T = get_vector_type(trial_μt)
+  T = get_vector_type(feop.test)
   uμt = PODESolution(fesolver,ode_op,μ,u0,t0,tf)
   sols = Vector{Vector{PTArray{T}}}(undef,time_ndofs)
   println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
   stats = @timed for (sol,n) in uμt
-    sols[n] = split_fields(trial_μt,copy(sol))
+    sols[n] = split_fields(feop.test,copy(sol))
   end
   println("Time marching complete")
   return BlockSnapshots(sols),stats

@@ -29,10 +29,8 @@ function num_rb_dofs(rb::RBSpace)
 end
 
 function save(info::RBInfo,rb::RBSpace)
-  if info.save_structures
-    path = joinpath(info.rb_path,"rb")
-    save(path,rb)
-  end
+  path = joinpath(info.rb_path,"rb")
+  save(path,rb)
 end
 
 function load(info::RBInfo,T::Type{RBSpace})
