@@ -33,6 +33,16 @@ function Base.getindex(s::BlockSnapshots{T},idx::UnitRange{Int}) where T
   end
 end
 
+function field_offsets(s::BlockSnapshots)
+  nblocks = get_nblocks(s)
+  offsets = zeros(Int,nblocks+1)
+  @inbounds for block = 1:nblocks
+    ndofs = num_space_dofs(s[block])
+    offsets[block+1] = offsets[block] + ndofs
+  end
+  offsets
+end
+
 function save(info::RBInfo,s::BlockSnapshots)
   path = joinpath(info.fe_path,"fesnaps")
   save(path,s)
@@ -41,17 +51,6 @@ end
 function load(info::RBInfo,T::Type{BlockSnapshots})
   path = joinpath(info.fe_path,"fesnaps")
   load(path,T)
-end
-
-function get_at_center(
-  fesolver::PThetaMethod,
-  s::BlockSnapshots,
-  μ::Table,
-  nsnap::Int)
-
-  sθ = recenter(fesolver,s,μ)
-  vsθ = vcat(sθ...)
-  return vsθ[1:nsnap],μ[1:nsnap]
 end
 
 function recenter(
@@ -63,14 +62,12 @@ function recenter(
   uh0 = fesolver.uh0(μ)
   u0 = get_free_dof_values(uh0)
   nblocks = get_nblocks(s)
-  pend = 1
+  offsets = field_offsets(s)
   sθ = map(1:nblocks) do row
     s_row = s[row]
-    s1_row = testitem(testitem(s_row.snaps))
-    pini = pend
-    pend = pini + size(s1_row,1) - 1
-    u0_row = map(x->getindex(x,pini:pend),u0)
-    s_row.snaps.*θ + [u0_row,s_row.snaps[2:end]...].*(1-θ)
+    snaps_row = copy(s_row.snaps)
+    u0_row = map(x->getindex(x,offsets[row]+1:offsets[row+1]),u0)
+    snaps_row.*θ + [u0_row,snaps_row[2:end]...].*(1-θ)
   end
   BlockSnapshots(Snapshots.(sθ))
 end
@@ -634,16 +631,6 @@ function collect_lhs_contributions!(
     rb_jacs_contribs[i] = hvcat(nblocks,blocks...)
   end
   return sum(rb_jacs_contribs)
-end
-
-function save_test(info::RBInfo,snaps::BlockSnapshots)
-  path = joinpath(info.fe_path,"fesnaps_test")
-  save(path,snaps)
-end
-
-function load_test(info::RBInfo,T::Type{BlockSnapshots})
-  path = joinpath(info.fe_path,"fesnaps_test")
-  load(path,T)
 end
 
 function post_process(

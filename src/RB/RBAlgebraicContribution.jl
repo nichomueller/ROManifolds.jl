@@ -129,37 +129,38 @@ end
 
 function collect_compress_rhs_lhs(
   info::RBInfo,
-  feop::PTFEOperator,
+  feop::PTFEOperator{Affine},
   fesolver::PThetaMethod,
   rbspace,
-  snaps::PTArray,
-  μ::Table)
+  snaps,
+  μ::Table;
+  nsnaps_mdeim=20)
 
-  nsnaps = info.nsnaps_system
-  _snaps,_μ = get_at_center(fesolver,snaps,μ,nsnaps)
-  rhs = collect_compress_rhs(info,feop,fesolver,rbspace,_snaps,_μ)
-  lhs = collect_compress_lhs(info,feop,fesolver,rbspace,_snaps,_μ)
+  snapsθ = recenter(fesolver,snaps,μ)
+  _snapsθ,_μ = snapsθ[1:nsnaps_mdeim],μ[1:nsnaps_mdeim]
+  rhs = collect_compress_rhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
+  lhs = collect_compress_lhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
   show(rhs),show(lhs)
-
   rhs,lhs
 end
 
 function collect_compress_rhs_lhs(
   info::RBInfo,
-  feop::NonlinearPTFEOperator,
+  feop::PTFEOperator{Nonlinear},
   fesolver::PThetaMethod,
   rbspace,
   snaps::PTArray,
-  μ::Table)
+  μ::Table;
+  nsnaps_mdeim=20)
 
-  nsnaps = info.nsnaps_system
-  _snaps,_μ = get_at_center(fesolver,snaps,μ,nsnaps)
+  snapsθ = recenter(fesolver,snaps,μ)
+  _snapsθ,_μ = snapsθ[1:nsnaps_mdeim],μ[1:nsnaps_mdeim]
 
   lfeop = linear_operator(feop)
-  rhs = collect_compress_rhs(info,lfeop,fesolver,rbspace,_snaps,_μ)
-  lhs = collect_compress_lhs(info,lfeop,fesolver,rbspace,_snaps,_μ)
+  rhs = collect_compress_rhs(info,lfeop,fesolver,rbspace,_snapsθ,_μ)
+  lhs = collect_compress_lhs(info,lfeop,fesolver,rbspace,_snapsθ,_μ)
   nlfeop = nonlinear_operator(feop)
-  nllhs = collect_compress_lhs(info,nlfeop,fesolver,rbspace,_snaps,_μ)
+  nllhs = collect_compress_lhs(info,nlfeop,fesolver,rbspace,_snapsθ,_μ)
   show(rhs),show(lhs)
 
   rhs,lhs,nllhs

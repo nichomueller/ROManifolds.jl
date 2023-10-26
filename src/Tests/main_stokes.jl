@@ -85,7 +85,6 @@ function stokes_equation()
     sols_test, = collect_multi_field_solutions(fesolver,feop,params_test)
     if save_solutions
       save(info,(sols,params,stats))
-      save_test(info,(sols_test,params_test))
     end
   end
   if load_structures

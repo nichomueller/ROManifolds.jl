@@ -81,7 +81,6 @@ begin
   printstyled("OFFLINE PHASE\n";bold=true,underline=true)
   if load_solutions
     sols,params = load(info,(BlockSnapshots,Table))
-    sols_test,params_test = load_test(info,(BlockSnapshots,Table))
   else
     params = realization(feop,nsnaps_state)
     sols,stats = collect_multi_field_solutions(fesolver,feop,params)
@@ -89,7 +88,6 @@ begin
     sols_test, = collect_multi_field_solutions(fesolver,feop,params_test)
     if save_solutions
       save(info,(sols,params,stats))
-      save_test(info,(sols_test,params_test))
     end
   end
   if load_structures

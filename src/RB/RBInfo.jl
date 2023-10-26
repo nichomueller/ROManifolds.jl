@@ -5,16 +5,15 @@ struct RBInfo
   energy_norm::Union{Symbol,Vector{Symbol}}
   compute_supremizers::Bool
   st_mdeim::Bool
-  nsnaps_mdeim::Int
   postprocess::Bool
 end
 
 function RBInfo(test_path::String;ϵ=1e-4,energy_norm=:l2,compute_supremizers=true,
-  st_mdeim=false,nsnaps_mdeim=20,postprocess=false)
+  st_mdeim=false,postprocess=false)
 
   fe_path = get_fe_path(test_path)
   rb_path = get_rb_path(test_path,ϵ;st_mdeim)
-  RBInfo(ϵ,fe_path,rb_path,energy_norm,compute_supremizers,st_mdeim,nsnaps_mdeim,postprocess)
+  RBInfo(ϵ,fe_path,rb_path,energy_norm,compute_supremizers,st_mdeim,postprocess)
 end
 
 function get_fe_path(tpath::String)
@@ -34,16 +33,12 @@ function get_rb_path(tpath::String,ϵ::Float;st_mdeim=false)
   rb_path
 end
 
-for (fsave,fload) in zip((:save,:save_test),(:load,:load_test))
-  @eval begin
-    function $fsave(info::RBInfo,objs::Tuple)
-      map(obj->$fsave(info,obj),expand(objs))
-    end
+function save(info::RBInfo,objs::Tuple)
+  map(obj->save(info,obj),expand(objs))
+end
 
-    function $fload(info::RBInfo,types::Tuple)
-      map(type->$fload(info,type),expand(types))
-    end
-  end
+function load(info::RBInfo,types::Tuple)
+  map(type->load(info,type),expand(types))
 end
 
 function save(info::RBInfo,params::Table)

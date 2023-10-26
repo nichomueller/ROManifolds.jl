@@ -8,6 +8,7 @@ end
 Base.length(s::Snapshots) = length(s.snaps)
 Base.size(s::Snapshots,args...) = size(testitem(first(s.snaps)),args...)
 Base.eachindex(s::Snapshots) = eachindex(s.snaps)
+Base.lastindex(s::Snapshots) = num_params(s)
 num_space_dofs(s::Snapshots) = size(s,1)
 num_time_dofs(s::Snapshots) = length(s)
 num_params(s::Snapshots) = length(first(s.snaps))
@@ -24,19 +25,9 @@ function Base.getindex(s::Snapshots{T},idx) where T
   return PTArray(array)
 end
 
-function Base.convert(::Type{PTArray{T}},a::Snapshots{T}) where T
-  arrays = vcat(map(get_array,a.snaps)...)
-  PTArray(arrays)
-end
-
-function get_at_center(
-  fesolver::PThetaMethod,
-  s::Snapshots,
-  μ::Table,
-  nsnap::Int)
-
-  sθ = recenter(fesolver,s,μ)
-  return sθ[1:nsnap],μ[1:nsnap]
+function Base.copy(s::Snapshots)
+  scopy = copy.(s.snaps)
+  Snapshots(scopy)
 end
 
 function recenter(
@@ -47,7 +38,8 @@ function recenter(
   θ = fesolver.θ
   uh0 = fesolver.uh0(μ)
   u0 = get_free_dof_values(uh0)
-  sθ = s.snaps.*θ + [u0,s.snaps[2:end]...].*(1-θ)
+  snaps = copy(s.snaps)
+  sθ = snaps.*θ + [u0,snaps[2:end]...].*(1-θ)
   Snapshots(sθ)
 end
 
@@ -58,25 +50,5 @@ end
 
 function load(info::RBInfo,T::Type{<:Snapshots})
   path = joinpath(info.fe_path,"fesnaps")
-  load(path,T)
-end
-
-function save_test(info::RBInfo,snaps::Snapshots)
-  path = joinpath(info.fe_path,"fesnaps_test")
-  save(path,snaps)
-end
-
-function save_test(info::RBInfo,params::Table)
-  path = joinpath(info.fe_path,"params_test")
-  save(path,params)
-end
-
-function load_test(info::RBInfo,T::Type{Snapshots})
-  path = joinpath(info.fe_path,"fesnaps_test")
-  load(path,T)
-end
-
-function load_test(info::RBInfo,T::Type{Table})
-  path = joinpath(info.fe_path,"params_test")
   load(path,T)
 end

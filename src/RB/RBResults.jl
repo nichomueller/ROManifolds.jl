@@ -40,17 +40,6 @@ function Base.show(io::IO,r::RBResults)
   print(io,"FEM/RB memory speedup: $speedup_memory%\n")
 end
 
-function Base.first(r::RBResults)
-  name = r.name
-  μ = r.params[1]
-  sol = r.sol[1]
-  sol_approx = r.sol_approx[1]
-  relative_err = get_avg_error(r)
-  wall_time = get_avg_time(r)
-  nallocations = get_avg_nallocs(r)
-  name,μ,sol,sol_approx,relative_err,wall_time,nallocations
-end
-
 function save(info::RBInfo,r::RBResults)
   path = joinpath(info.rb_path,"results")
   save(path,r)
@@ -68,7 +57,7 @@ function post_process(
   sol::PTArray,
   params::Table,
   sol_approx::PTArray,
-  rb_stats::NamedTuple)
+  stats::NamedTuple)
 
   nparams = length(params)
   energy_norm = info.energy_norm
@@ -76,7 +65,8 @@ function post_process(
   _sol = space_time_matrices(sol;nparams)
   _sol_approx = space_time_matrices(sol_approx;nparams)
   fem_stats = load(info,ComputationInfo)
-  results = RBResults(params,_sol,fem_stats,_sol_approx,rb_stats;norm_matrix)
+  rb_stats = ComputationInfo(stats,nparams)
+  results = RBResults(params,_sol,_sol_approx,fem_stats,rb_stats;norm_matrix)
   show(results)
   save(info,results)
   writevtk(info,feop,fesolver,results)
@@ -114,11 +104,11 @@ function test_rb_solver(
   rbres,
   rbjacs,
   snaps,
-  params::Table,
-  snaps_test,
-  params_test::Table)
+  params::Table;
+  nsnaps_test=10)
 
   println("Solving linear RB problems")
+  snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
   x = initial_guess(snaps,params,params_test)
   rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,x,params_test)
   stats = @timed begin
@@ -127,6 +117,7 @@ function test_rb_solver(
     lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,rbspace,x,params_test)
     rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs)
   end
+  println(norm(snaps_test[1]))
   approx_snaps_test = recast(rb_snaps_test,rbspace)
   post_process(info,feop,fesolver,snaps_test,params_test,approx_snaps_test,stats)
 end
@@ -139,11 +130,11 @@ function test_rb_solver(
   rbres,
   rbjacs::Tuple,
   snaps,
-  params::Table,
-  snaps_test,
-  params_test::Table)
+  params::Table;
+  nsnaps_test=10)
 
   println("Solving nonlinear RB problems with Newton iterations")
+  snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
   lrbjacs,nlrbjacs = rbjacs
   x = initial_guess(snaps,params,params_test)
   rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,x,params_test)
@@ -215,9 +206,10 @@ function initial_guess(
   params::Table,
   params_test::Table)
 
+  scopy = copy(sols)
   kdtree = KDTree(map(x -> SVector(Tuple(x)),params))
   idx_dist = map(x -> nn(kdtree,SVector(Tuple(x))),params_test)
-  sols[first.(idx_dist)]
+  scopy[first.(idx_dist)]
 end
 
 function space_time_matrices(sol::PTArray{Vector{T}};nparams=length(sol)) where T
@@ -274,7 +266,10 @@ function Gridap.Visualization.writevtk(
   trian = get_triangulation(test)
   times = get_times(fesolver)
 
-  name,μ,sol,sol_approx, = first(results)
+  name = results.name
+  μ = results.params[1]
+  sol = results.sol[1]
+  sol_approx = results.sol_approx[1]
   pointwise_err = abs.(sol-sol_approx)
 
   plt_dir = joinpath(info.rb_path,"plots")

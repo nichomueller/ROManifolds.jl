@@ -25,9 +25,10 @@ function get_times(fesolver::PThetaMethod)
 end
 
 function recenter(fesolver::PThetaMethod,vec::Vector{<:AbstractVector},μ::AbstractVector)
+  _vec = copy(vec)
   θ = fesolver.θ
   uμ0 = get_free_dof_values(fesolver.uh0(μ))
-  vecθ = θ*vec + (1-θ)*[uμ0,vec[1:end-1]...]
+  vecθ = θ*_vec + (1-θ)*[uμ0,_vec[1:end-1]...]
   return vecθ
 end
 

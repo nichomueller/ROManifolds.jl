@@ -252,6 +252,7 @@ end
 
 Base.length(a::NonaffinePTArray) = length(a.array)
 Base.eachindex(a::NonaffinePTArray) = eachindex(a.array)
+Base.lastindex(a::NonaffinePTArray) = lastindex(a.array)
 Base.getindex(a::NonaffinePTArray,i...) = a.array[i...]
 Base.setindex!(a::NonaffinePTArray,v,i...) = a.array[i...] = v
 
@@ -442,6 +443,7 @@ end
 
 Base.length(a::AffinePTArray) = a.len
 Base.eachindex(a::AffinePTArray) = Base.OneTo(a.len)
+Base.lastindex(a::AffinePTArray) = a.len
 Base.getindex(a::AffinePTArray,i...) = a.array
 Base.setindex!(a::AffinePTArray,v,i...) = a.array = v
 Base.copy(a::AffinePTArray) = PTArray(copy(a.array),a.len)
