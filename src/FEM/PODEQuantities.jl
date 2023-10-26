@@ -24,27 +24,21 @@ function get_times(fesolver::PThetaMethod)
   collect(t0:dt:tf-dt) .+ dt*θ
 end
 
-function recenter(fesolver::PThetaMethod,vec::Vector{<:AbstractVector},μ::AbstractVector)
-  _vec = copy(vec)
+function recenter(fesolver::PThetaMethod,a::PTArray,params::Table)
   θ = fesolver.θ
-  uμ0 = get_free_dof_values(fesolver.uh0(μ))
-  vecθ = θ*_vec + (1-θ)*[uμ0,_vec[1:end-1]...]
-  return vecθ
-end
-
-function recenter(fesolver::PThetaMethod,a::PTArray{T},params::Table) where T
-  nparams = length(params)
-  time_ndofs = Int(length(a)/nparams)
-  array = Vector{T}(undef,nparams*time_ndofs)
-  for (n,μn) in enumerate(params)
-    idx = (n-1)*time_ndofs+1:n*time_ndofs
-    array[idx] = recenter(fesolver,a[idx],μn)
-  end
-  return PTArray(array)
+  ah0 = fesolver.uh0(params)
+  a0 = get_free_dof_values(ah0)
+  recenter(a,a0;θ)
 end
 
 function recenter(fesolver::PThetaMethod,a::Vector{<:PTArray},params::Table)
-  map(a->recenter(fesolver,a,params),a)
+  θ = fesolver.θ
+  ah0 = fesolver.uh0(params)
+  map(eachindex(a)) do i
+    ai = a[i]
+    ai0 = get_free_dof_values(ah0[i])
+    recenter(ai,ai0;θ)
+  end
 end
 
 struct PODESolution{T}

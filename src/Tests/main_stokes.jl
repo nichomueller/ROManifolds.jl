@@ -24,10 +24,6 @@ function stokes_equation()
   a(μ,t) = x->a(x,μ,t)
   aμt(μ,t) = PTFunction(a,μ,t)
 
-  f(x,μ,t) = VectorValue(0,0)
-  f(μ,t) = x->f(x,μ,t)
-  fμt(μ,t) = PTFunction(f,μ,t)
-
   g(x,μ,t) = VectorValue(μ[1]*exp(-x[2]/μ[2])*abs(sin(μ[3]*t)),0)
   g(μ,t) = x->g(x,μ,t)
   g0(x,μ,t) = VectorValue(0,0)
@@ -40,9 +36,9 @@ function stokes_equation()
   p0(μ) = x->p0(x,μ)
   p0μ(μ) = PFunction(p0,μ)
 
-  m(μ,t,(dut,dpt),(v,q)) = ∫ₚ(v⋅dut,dΩ)
-  lhs(μ,t,(du,dp),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(du),dΩ) - ∫ₚ(dp*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(du)),dΩ)
-  rhs(μ,t,(v,q)) = ∫ₚ(fμt(μ,t)⋅v,dΩ)
+  res(μ,t,(u,p),(v,q)) = ∫ₚ(v⋅∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(u)),dΩ)
+  jac(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(du),dΩ) - ∫ₚ(dp*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(du)),dΩ)
+  jac_t(μ,t,(u,p),(dut,dpt),(v,q)) = ∫ₚ(v⋅dut,dΩ)
 
   reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float},order)
   reffe_p = ReferenceFE(lagrangian,Float,order-1)
@@ -52,7 +48,7 @@ function stokes_equation()
   trial_p = TrialFESpace(test_p)
   test = PTMultiFieldFESpace([test_u,test_p])
   trial = PTMultiFieldFESpace([trial_u,trial_p])
-  feop = AffinePTFEOperator(m,lhs,rhs,pspace,trial,test)
+  feop = AffinePTFEOperator(res,jac,jac_t,pspace,trial,test)
   t0,tf,dt,θ = 0.,0.3,0.005,0.5
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial_u(μ,t0))
   ph0μ(μ) = interpolate_everywhere(p0μ(μ),trial_p(μ,t0))
@@ -67,7 +63,7 @@ function stokes_equation()
   energy_norm = [:l2,:l2]
   compute_supremizers = true
   nsnaps_state = 50
-  nsnaps_system = 20
+  nsnaps_mdeim = 20
   nsnaps_test = 10
   st_mdeim = false
   postprocess = true
@@ -77,12 +73,9 @@ function stokes_equation()
   printstyled("OFFLINE PHASE\n";bold=true,underline=true)
   if load_solutions
     sols,params = load(info,(BlockSnapshots,Table))
-    sols_test,params_test = load_test(info,(BlockSnapshots,Table))
   else
-    params = realization(feop,nsnaps_state)
+    params = realization(feop,nsnaps_state+nsnaps_test)
     sols,stats = collect_multi_field_solutions(fesolver,feop,params)
-    params_test = realization(feop,nsnaps_test)
-    sols_test, = collect_multi_field_solutions(fesolver,feop,params_test)
     if save_solutions
       save(info,(sols,params,stats))
     end
@@ -92,7 +85,7 @@ function stokes_equation()
     rbrhs,rblhs = load(info,(BlockRBVecAlgebraicContribution,Vector{BlockRBMatAlgebraicContribution}))
   else
     rbspace = reduced_basis(info,feop,sols,params)
-    rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params,nsnaps_system)
+    rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params;nsnaps_mdeim)
     if save_structures
       save(info,(rbspace,rbrhs,rblhs))
     end
@@ -100,7 +93,7 @@ function stokes_equation()
 
   # Online phase
   printstyled("ONLINE PHASE\n";bold=true,underline=true)
-  test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params,sols_test[1:nsnaps_test],params_test)
+  test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params;nsnaps_test)
 end
 
 stokes_equation()

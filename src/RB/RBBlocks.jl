@@ -4,6 +4,8 @@ Base.getindex(b::RBBlock,i...) = b.blocks[i...]
 Base.iterate(b::RBBlock,args...) = iterate(b.blocks,args...)
 Base.enumerate(b::RBBlock) = enumerate(b.blocks)
 Base.axes(b::RBBlock,i...) = axes(b.blocks,i...)
+Base.lastindex(b::RBBlock) = lastindex(testitem(b))
+Arrays.testitem(b::RBBlock) = testitem(b.blocks)
 get_blocks(b) = b.blocks
 get_nblocks(b) = length(b.blocks)
 
@@ -33,16 +35,6 @@ function Base.getindex(s::BlockSnapshots{T},idx::UnitRange{Int}) where T
   end
 end
 
-function field_offsets(s::BlockSnapshots)
-  nblocks = get_nblocks(s)
-  offsets = zeros(Int,nblocks+1)
-  @inbounds for block = 1:nblocks
-    ndofs = num_space_dofs(s[block])
-    offsets[block+1] = offsets[block] + ndofs
-  end
-  offsets
-end
-
 function save(info::RBInfo,s::BlockSnapshots)
   path = joinpath(info.fe_path,"fesnaps")
   save(path,s)
@@ -60,13 +52,11 @@ function recenter(
 
   θ = fesolver.θ
   uh0 = fesolver.uh0(μ)
-  u0 = get_free_dof_values(uh0)
   nblocks = get_nblocks(s)
-  offsets = field_offsets(s)
   sθ = map(1:nblocks) do row
     s_row = s[row]
+    u0_row = get_free_dof_values(uh0[row])
     snaps_row = copy(s_row.snaps)
-    u0_row = map(x->getindex(x,offsets[row]+1:offsets[row+1]),u0)
     snaps_row.*θ + [u0_row,snaps_row[2:end]...].*(1-θ)
   end
   BlockSnapshots(Snapshots.(sθ))
@@ -645,6 +635,8 @@ function post_process(
   nblocks = length(sol)
   nparams = length(params)
   energy_norm = info.energy_norm
+  fem_stats = load(info,ComputationInfo)
+  rb_stats = ComputationInfo(stats,nparams)
   map(1:nblocks) do col
     feop_col = feop[col,col]
     sol_col = sol[col]
@@ -652,8 +644,8 @@ function post_process(
     norm_matrix_col = get_norm_matrix(feop_col,energy_norm[col])
     _sol_col = space_time_matrices(sol_col;nparams)
     _sol_approx_col = space_time_matrices(sol_approx_col;nparams)
-    results = RBResults(
-      params,_sol_col,_sol_approx_col,stats;name=Symbol("field$col"),norm_matrix=norm_matrix_col)
+    results = RBResults(params,_sol_col,_sol_approx_col,fem_stats,rb_stats;
+      name=Symbol("field$col"),norm_matrix=norm_matrix_col)
     show(results)
     save(info,results)
     writevtk(info,feop_col,fesolver,results)

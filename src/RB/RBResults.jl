@@ -31,8 +31,8 @@ function Base.show(io::IO,r::RBResults)
   avg_err = get_avg_error(r)
   avg_time = get_avg_time(r.rb_stats)
   avg_nallocs = get_avg_nallocs(r.rb_stats)
-  speedup_time = get_speedup_time(r)*100
-  speedup_memory = get_speedup_memory(r)*100
+  speedup_time = Float32(get_speedup_time(r)*100)
+  speedup_memory = Float32(get_speedup_memory(r)*100)
   print(io,"Average online relative errors for $name: $avg_err\n")
   print(io,"Average online wall time: $avg_time [s]\n")
   print(io,"Average number of allocations: $avg_nallocs [Mb]\n")
@@ -112,12 +112,11 @@ function test_rb_solver(
   x = initial_guess(snaps,params,params_test)
   rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,x,params_test)
   stats = @timed begin
-    x .= recenter(fesolver,x,params)
+    x .= recenter(fesolver,x,params_test)
     rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,rbspace,x,params_test)
     lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,rbspace,x,params_test)
     rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs)
   end
-  println(norm(snaps_test[1]))
   approx_snaps_test = recast(rb_snaps_test,rbspace)
   post_process(info,feop,fesolver,snaps_test,params_test,approx_snaps_test,stats)
 end
@@ -250,10 +249,6 @@ function compute_relative_error!(cache,sol,sol_approx;norm_matrix=nothing)
   end
   norm(ncache)/norm(dcache)
 end
-
-LinearAlgebra.norm(v::AbstractVector,::Nothing) = norm(v)
-
-LinearAlgebra.norm(v::AbstractVector,X::AbstractMatrix) = v'*X*v
 
 function Gridap.Visualization.writevtk(
   info::RBInfo,

@@ -181,6 +181,17 @@ function Arrays.get_array(a::PTArray{<:CachedArray})
   map(x->getproperty(x,:array),a)
 end
 
+function recenter(a::PTArray{T},a0::PTArray{T};kwargs...) where T
+  n = length(a)
+  n0 = length(a0)
+  ndiff = Int(n/n0)
+  array = Vector{T}(undef,n)
+  @inbounds for i = 1:n0
+    array[(i-1)*ndiff+1:i*ndiff] = recenter(a[(i-1)*ndiff+1:i*ndiff],a0[i];kwargs...)
+  end
+  PTArray(array)
+end
+
 get_at_index(::Int,x) = x
 
 get_at_index(i::Int,x::PTArray) = x[i]

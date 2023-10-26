@@ -185,3 +185,19 @@ for iter in 1:fesolver.nls.max_nliters
 end
 
 norm(hcat(xcat.array...) - hcat(vcat(y...).array...)) / norm(hcat(xcat.array...))
+
+_feop = feop[1,2]
+μ = testitem(params)
+u = zero(_feop.test)
+t = 0.
+dv = get_fe_basis(_feop.test)
+trial_dual = get_trial(_feop)
+du = get_trial_fe_basis(trial_dual(nothing,nothing))
+_feop.jacs[1](μ,t,u,du,dv)
+
+u = zero(feop.test)
+t = 0.
+# jac = get_jacobian(_feop)
+jj(du,dv) = integrate(feop.jacs[1](μ,t,u,du,dv))#integrate(jac[1](μ,t,u,du,dv))
+trial_dual = get_trial(feop)
+constraint_mat = assemble_matrix(jj,trial_dual(μ,t),feop.test)
