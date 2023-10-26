@@ -61,11 +61,11 @@ function heat_equation()
   save_structures = true
   energy_norm = :l2
   nsnaps_state = 50
-  nsnaps_system = 20
+  nsnaps_mdeim = 20
   nsnaps_test = 10
   st_mdeim = false
   postprocess = true
-  info = RBInfo(test_path;ϵ,energy_norm,st_mdeim,postprocess)
+  info = RBInfo(test_path;ϵ,energy_norm,nsnaps_mdeim,st_mdeim,postprocess)
 
   # Offline phase
   printstyled("OFFLINE PHASE\n";bold=true,underline=true)
@@ -73,13 +73,10 @@ function heat_equation()
     sols,params = load(info,(Snapshots,Table))
     sols_test,params_test = load_test(info,(Snapshots,Table))
   else
-    params = realization(feop,nsnaps_state)
+    params = realization(feop,nsnaps_state+nsnaps_test)
     sols,stats = collect_single_field_solutions(fesolver,feop,params)
-    params_test = realization(feop,nsnaps_test)
-    sols_test, = collect_single_field_solutions(fesolver,feop,params_test)
     if save_solutions
       save(info,(sols,params,stats))
-      save_test(info,(sols_test,params_test))
     end
   end
   if load_structures
@@ -87,7 +84,7 @@ function heat_equation()
     rbrhs,rblhs = load(info,(RBVecAlgebraicContribution,Vector{RBMatAlgebraicContribution}))
   else
     rbspace = reduced_basis(info,feop,sols,params)
-    rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params,nsnaps_system)
+    rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
     if save_structures
       save(info,(rbspace,rbrhs,rblhs))
     end
@@ -95,7 +92,7 @@ function heat_equation()
 
   # Online phase
   printstyled("ONLINE PHASE\n";bold=true,underline=true)
-  test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params,sols_test[1:nsnaps_test],params_test)
+  test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols_test,params_test,sols_test,params_test)
 end
 
 heat_equation()

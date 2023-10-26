@@ -43,10 +43,21 @@ function load(info::RBInfo,T::Type{BlockSnapshots})
   load(path,T)
 end
 
+function get_at_center(
+  fesolver::PThetaMethod,
+  s::BlockSnapshots,
+  μ::Table,
+  nsnap::Int)
+
+  sθ = recenter(fesolver,s,μ)
+  vsθ = vcat(sθ...)
+  return vsθ[1:nsnap],μ[1:nsnap]
+end
+
 function recenter(
   fesolver::PThetaMethod,
-  s::BlockSnapshots{T},
-  μ::Table) where T
+  s::BlockSnapshots,
+  μ::Table)
 
   θ = fesolver.θ
   uh0 = fesolver.uh0(μ)

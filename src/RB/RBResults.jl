@@ -79,8 +79,6 @@ function post_process(
   results = RBResults(params,_sol,fem_stats,_sol_approx,rb_stats;norm_matrix)
   show(results)
   save(info,results)
-  su_time,su_nallocs = get_avg_speedup(info,results)
-
   writevtk(info,feop,fesolver,results)
   return
 end

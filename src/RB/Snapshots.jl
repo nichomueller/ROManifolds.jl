@@ -29,10 +29,20 @@ function Base.convert(::Type{PTArray{T}},a::Snapshots{T}) where T
   PTArray(arrays)
 end
 
+function get_at_center(
+  fesolver::PThetaMethod,
+  s::Snapshots,
+  μ::Table,
+  nsnap::Int)
+
+  sθ = recenter(fesolver,s,μ)
+  return sθ[1:nsnap],μ[1:nsnap]
+end
+
 function recenter(
   fesolver::PThetaMethod,
-  s::Snapshots{T},
-  μ::Table) where T
+  s::Snapshots,
+  μ::Table)
 
   θ = fesolver.θ
   uh0 = fesolver.uh0(μ)

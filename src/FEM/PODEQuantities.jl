@@ -26,7 +26,7 @@ end
 
 function recenter(fesolver::PThetaMethod,vec::Vector{<:AbstractVector},μ::AbstractVector)
   θ = fesolver.θ
-  uμ0 = get_free_dof_values(fesolver.uh0(μ)) #zeros(size(vec[1]))#
+  uμ0 = get_free_dof_values(fesolver.uh0(μ))
   vecθ = θ*vec + (1-θ)*[uμ0,vec[1:end-1]...]
   return vecθ
 end
