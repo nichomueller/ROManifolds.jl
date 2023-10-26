@@ -26,7 +26,7 @@ end
 
 function recenter(fesolver::PThetaMethod,vec::Vector{<:AbstractVector},μ::AbstractVector)
   θ = fesolver.θ
-  uμ0 = zeros(size(vec[1]))#get_free_dof_values(fesolver.uh0(μ))
+  uμ0 = get_free_dof_values(fesolver.uh0(μ)) #zeros(size(vec[1]))#
   vecθ = θ*vec + (1-θ)*[uμ0,vec[1:end-1]...]
   return vecθ
 end
@@ -118,7 +118,7 @@ function collect_single_field_solutions(
     sols[n] = copy(sol)
   end
   println("Time marching complete")
-  return Snapshots(sols),stats
+  return Snapshots(sols),ComputationInfo(stats,nparams)
 end
 
 function collect_multi_field_solutions(
@@ -139,7 +139,7 @@ function collect_multi_field_solutions(
     sols[n] = split_fields(feop.test,copy(sol))
   end
   println("Time marching complete")
-  return BlockSnapshots(sols),stats
+  return BlockSnapshots(sols),ComputationInfo(stats,nparams)
 end
 
 for fun in (:collect_residuals_for_idx!,:collect_jacobians_for_idx!)

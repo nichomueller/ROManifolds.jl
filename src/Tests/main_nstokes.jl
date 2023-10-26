@@ -55,7 +55,7 @@ begin
   trial_p = TrialFESpace(test_p)
   test = PTMultiFieldFESpace([test_u,test_p])
   trial = PTMultiFieldFESpace([trial_u,trial_p])
-  feop = PTFEOperator(res,jac,jac_t,nfun,pspace,trial,test)
+  feop = NonlinearPTFEOperator(res,jac,jac_t,nfun,pspace,trial,test)
   t0,tf,dt,θ = 0.,0.05,0.005,1
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial_u(μ,t0))
   ph0μ(μ) = interpolate_everywhere(p0μ(μ),trial_p(μ,t0))
@@ -68,7 +68,7 @@ begin
   load_solutions = false
   save_solutions = true
   load_structures = false
-  save_structures = true
+  save_structures = false
   energy_norm = [:l2,:l2]
   compute_supremizers = true
   nsnaps_state = 50
@@ -81,12 +81,12 @@ begin
   printstyled("OFFLINE PHASE\n";bold=true,underline=true)
   if load_solutions
     sols,params = load(info,(BlockSnapshots,Table))
-    snaps_test,params_test = load_test(info,(BlockSnapshots,Table))
+    sols_test,params_test = load_test(info,(BlockSnapshots,Table))
   else
     params = realization(feop,nsnaps_state)
-    sols,stats = collect_multi_field_solutions(fesolver,feop,trial,params)
+    sols,stats = collect_multi_field_solutions(fesolver,feop,params)
     params_test = realization(feop,nsnaps_test)
-    sols_test, = collect_multi_field_solutions(fesolver,feop,trial,params)
+    sols_test, = collect_multi_field_solutions(fesolver,feop,params_test)
     if save_solutions
       save(info,(sols,params,stats))
       save_test(info,(sols_test,params_test))
@@ -97,7 +97,7 @@ begin
     rbrhs,rblhs = load(info,(BlockRBVecAlgebraicContribution,Vector{BlockRBMatAlgebraicContribution}))
   else
     rbspace = reduced_basis(info,feop,sols,params)
-    rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params,nsnaps_system)
+    rbrhs,rblhs... = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params,nsnaps_system)
     if save_structures
       save(info,(rbspace,rbrhs,rblhs))
     end
@@ -105,7 +105,7 @@ begin
 
   # Online phase
   printstyled("ONLINE PHASE\n";bold=true,underline=true)
-  test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params,snaps_test,params_test)
+  test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params,sols_test[1:nsnaps_test],params_test)
 end
 
 sols,params = load(info,(BlockSnapshots,Table))

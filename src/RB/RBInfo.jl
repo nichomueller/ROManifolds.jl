@@ -55,12 +55,25 @@ function load(info::RBInfo,T::Type{Table})
   load(path,T)
 end
 
-function save(info::RBInfo,stats::NamedTuple)
-  path = joinpath(info.fe_path,"stats")
-  save(path,stats)
+struct ComputationInfo
+  avg_time::Float
+  avg_nallocs::Float
+  function ComputationInfo(stats::NamedTuple,nruns::Int)
+    avg_time = stats[:time] / nruns
+    avg_nallocs = stats[:bytes] / (1e6*nruns)
+    new(avg_time,avg_nallocs)
+  end
 end
 
-function load(info::RBInfo,T::Type{NamedTuple})
+get_avg_time(cinfo::ComputationInfo) = cinfo.avg_time
+get_avg_nallocs(cinfo::ComputationInfo) = cinfo.avg_nallocs
+
+function save(info::RBInfo,cinfo::ComputationInfo)
+  path = joinpath(info.fe_path,"stats")
+  save(path,cinfo)
+end
+
+function load(info::RBInfo,T::Type{ComputationInfo})
   path = joinpath(info.fe_path,"stats")
   load(path,T)
 end

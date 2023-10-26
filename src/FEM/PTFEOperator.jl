@@ -126,7 +126,7 @@ function Base.getindex(op::PTFEOperatorFromWeakForm,row,col)
     res(μ,t,u,dv) = op.res(μ,t,sf(u,col),sf(dv,row))
     jac(μ,t,u,du,dv) = op.jacs[1](μ,t,sf(u,col),sf(du,col),sf(dv,row))
     jac_t(μ,t,u,dut,dv) = op.jacs[2](μ,t,sf(u,col),sf(dut,col),sf(dv,row))
-    return PTAffineFEOperator(res,jac,jac_t,op.pspace,trials_col,test_row)
+    return AffinePTFEOperator(res,jac,jac_t,op.pspace,trials_col,test_row)
   else
     return op
   end
@@ -142,7 +142,7 @@ function Base.getindex(op::NonlinearPTFEOperator,row,col)
     jac_t(μ,t,u,dut,dv) = op.jacs[2](μ,t,sf(u,col),sf(dut,col),sf(dv,row))
     nl(μ,t,u,dut,dv) = op.nl[1](μ,t,sf(u,col),sf(dut,col),sf(dv,row))
     dnl(μ,t,u,dut,dv) = op.nl[2](μ,t,sf(u,col),sf(dut,col),sf(dv,row))
-    return PTFEOperator(res,jac,jac_t,(nl,dnl),op.pspace,trials_col,test_row)
+    return NonlinearPTFEOperator(res,jac,jac_t,(nl,dnl),op.pspace,trials_col,test_row)
   else
     return op
   end

@@ -407,7 +407,7 @@ function CellData.CellField(fe::PMultiFieldFESpace,cell_values)
   MultiFieldCellField(single_fields)
 end
 
-function split_fields(fe::PMultiFieldFESpace,free_values::PTArray)
+function split_fields(fe::Union{PMultiFieldFESpace,MultiFieldFESpace},free_values::PTArray)
   offsets = compute_field_offsets(fe)
   fields = map(1:length(fe.spaces)) do field
     pini = offsets[field] + 1

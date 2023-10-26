@@ -49,7 +49,7 @@ function heat_equation()
   reffe = ReferenceFE(lagrangian,Float,order)
   test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
   trial = PTTrialFESpace(test,g)
-  feop = PTAffineFEOperator(m,lhs,rhs,pspace,trial,test)
+  feop = AffinePTFEOperator(m,lhs,rhs,pspace,trial,test)
   t0,tf,dt,θ = 0.,0.3,0.005,0.5
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
   fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
@@ -71,12 +71,12 @@ function heat_equation()
   printstyled("OFFLINE PHASE\n";bold=true,underline=true)
   if load_solutions
     sols,params = load(info,(Snapshots,Table))
-    snaps_test,params_test = load_test(info,(Snapshots,Table))
+    sols_test,params_test = load_test(info,(Snapshots,Table))
   else
     params = realization(feop,nsnaps_state)
-    sols,stats = collect_single_field_solutions(fesolver,feop,trial,params)
+    sols,stats = collect_single_field_solutions(fesolver,feop,params)
     params_test = realization(feop,nsnaps_test)
-    sols_test, = collect_single_field_solutions(fesolver,feop,trial,params)
+    sols_test, = collect_single_field_solutions(fesolver,feop,params_test)
     if save_solutions
       save(info,(sols,params,stats))
       save_test(info,(sols_test,params_test))
@@ -95,7 +95,7 @@ function heat_equation()
 
   # Online phase
   printstyled("ONLINE PHASE\n";bold=true,underline=true)
-  test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params,snaps_test,params_test)
+  test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params,sols_test[1:nsnaps_test],params_test)
 end
 
 heat_equation()

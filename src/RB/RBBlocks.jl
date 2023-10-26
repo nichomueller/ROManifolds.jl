@@ -212,7 +212,8 @@ function space_supremizers(
   μ = testitem(params)
   u = zero(feop.test)
   t = 0.
-  j(du,dv) = integrate(feop.jacs[1](μ,t,u,du,dv))
+  jac = get_jacobian(feop)
+  j(du,dv) = integrate(jac[1](μ,t,u,du,dv))
   trial_dual = get_trial(feop)
   constraint_mat = assemble_matrix(j,trial_dual(μ,t),feop.test)
   constraint_mat*basis_space

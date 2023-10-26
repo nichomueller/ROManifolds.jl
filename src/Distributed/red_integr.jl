@@ -47,7 +47,7 @@ jac_t(μ,t,u,dut,v) = jac_t(μ,t,u,dut,v,dΩ)
 reffe = ReferenceFE(lagrangian,Float,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = PTransientTrialFESpace(test,g)
-feop = PTAffineFEOperator(res,jac,jac_t,pspace,trial,test)
+feop = AffinePTFEOperator(res,jac,jac_t,pspace,trial,test)
 t0,tf,dt,θ = 0.,0.05,0.005,1
 uh0(μ) = interpolate_everywhere(u0(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),t0,tf,dt,θ,uh0)
@@ -68,7 +68,7 @@ DdΓn = Measure(DΓn,degree)
 Dres(μ,t,u,v) = ∫(v*∂ₚt(u))DdΩ + ∫(a(μ,t)*∇(v)⋅∇(u))DdΩ - ∫(f(μ,t)*v)DdΩ - ∫(h(μ,t)*v)DdΓn
 Djac(μ,t,u,du,v) = ∫(a(μ,t)*∇(v)⋅∇(du))DdΩ
 Djac_t(μ,t,u,dut,v) = ∫(v*dut)DdΩ
-Dfeop = PTAffineFEOperator(Dres,Djac,Djac_t,pspace,Dtrial,Dtest)
+Dfeop = AffinePTFEOperator(Dres,Djac,Djac_t,pspace,Dtrial,Dtest)
 Duh0(μ) = interpolate_everywhere(u0(μ),Dtrial(μ,t0))
 Dfesolver = ThetaMethod(LUSolver(),t0,tf,dt,θ,Duh0)
 

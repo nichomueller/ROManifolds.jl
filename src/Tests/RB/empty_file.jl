@@ -121,7 +121,7 @@ end
 Base.adjoint(::Nothing) = nothing
 _c(u,du,dv) = ∫ₚ(dv⊙(∇(du)'⋅u),dΩ)
 _jac(μ,t,(u,p),(du,dp),(v,q)) = a(μ,t,(du,dp),(v,q)) + _c(u,du,v)
-_feop = PTFEOperator(res,_jac,jac_t,pspace,trial,test)
+_feop = NonlinearPTFEOperator(res,_jac,jac_t,pspace,trial,test)
 
 rbrhs,rbjac = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
 _,rblhs = collect_compress_rhs_lhs(info,_feop,fesolver,rbspace,sols,params)

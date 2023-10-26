@@ -4,37 +4,40 @@ struct RBResults{T}
   sol::PTArray{Matrix{T}}
   sol_approx::PTArray{Matrix{T}}
   relative_err::Vector{Float}
-  wall_time::Float
-  nallocations::Float
+  fem_stats::ComputationInfo
+  rb_stats::ComputationInfo
 
   function RBResults(
     params::Table,
     sol::PTArray{Matrix{T}},
     sol_approx::PTArray{Matrix{T}},
-    stats::NamedTuple;
+    fem_stats::ComputationInfo,
+    rb_stats::ComputationInfo;
     name=:vel,
     kwargs...) where T
 
     relative_err = compute_relative_error(sol,sol_approx;kwargs...)
-    wall_time = stats[:time]
-    nallocations = stats[:bytes]/1e6
-    new{T}(name,params,sol,sol_approx,relative_err,wall_time,nallocations)
+    new{T}(name,params,sol,sol_approx,relative_err,fem_stats,rb_stats)
   end
 end
 
 Base.length(r::RBResults) = length(r.params)
 get_avg_error(r::RBResults) = sum(r.relative_err) / length(r)
-get_avg_time(r::RBResults) = r.wall_time / length(r)
-get_avg_nallocs(r::RBResults) = r.nallocations / length(r)
+get_speedup_time(r::RBResults) = get_avg_time(r.fem_stats) / get_avg_time(r.rb_stats)
+get_speedup_memory(r::RBResults) = get_avg_nallocs(r.fem_stats) / get_avg_nallocs(r.rb_stats)
 
 function Base.show(io::IO,r::RBResults)
   name = r.name
   avg_err = get_avg_error(r)
-  avg_time = get_avg_time(r)
-  avg_nallocs = get_avg_nallocs(r)
+  avg_time = get_avg_time(r.rb_stats)
+  avg_nallocs = get_avg_nallocs(r.rb_stats)
+  speedup_time = get_speedup_time(r)*100
+  speedup_memory = get_speedup_memory(r)*100
   print(io,"Average online relative errors for $name: $avg_err\n")
   print(io,"Average online wall time: $avg_time [s]\n")
   print(io,"Average number of allocations: $avg_nallocs [Mb]\n")
+  print(io,"FEM/RB wall time speedup: $speedup_time%\n")
+  print(io,"FEM/RB memory speedup: $speedup_memory%\n")
 end
 
 function Base.first(r::RBResults)
@@ -65,16 +68,19 @@ function post_process(
   sol::PTArray,
   params::Table,
   sol_approx::PTArray,
-  stats::NamedTuple)
+  rb_stats::NamedTuple)
 
   nparams = length(params)
   energy_norm = info.energy_norm
   norm_matrix = get_norm_matrix(feop,energy_norm)
   _sol = space_time_matrices(sol;nparams)
   _sol_approx = space_time_matrices(sol_approx;nparams)
-  results = RBResults(params,_sol,_sol_approx,stats;norm_matrix)
+  fem_stats = load(info,ComputationInfo)
+  results = RBResults(params,_sol,fem_stats,_sol_approx,rb_stats;norm_matrix)
   show(results)
   save(info,results)
+  su_time,su_nallocs = get_avg_speedup(info,results)
+
   writevtk(info,feop,fesolver,results)
   return
 end
@@ -116,12 +122,11 @@ function test_rb_solver(
 
   println("Solving linear RB problems")
   x = initial_guess(snaps,params,params_test)
-  x .= recenter(fesolver,x,params)
-  rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,snaps_test,params_test)
-  rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,rbspace,x,params_test)
-  lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,rbspace,x,params_test)
-
+  rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,x,params_test)
   stats = @timed begin
+    x .= recenter(fesolver,x,params)
+    rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,rbspace,x,params_test)
+    lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,rbspace,x,params_test)
     rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs)
   end
   approx_snaps_test = recast(rb_snaps_test,rbspace)
@@ -134,23 +139,27 @@ function test_rb_solver(
   fesolver::PODESolver,
   rbspace,
   rbres,
-  rbjacs,
+  rbjacs::Tuple,
   snaps,
   params::Table,
   snaps_test,
   params_test::Table)
 
   println("Solving nonlinear RB problems with Newton iterations")
-  rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,snaps_test,params_test)
-  nl_cache = nothing
+  lrbjacs,nlrbjacs = rbjacs
   x = initial_guess(snaps,params,params_test)
-  xrb = space_time_projection(x,rbspace)
+  rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,x,params_test)
+  nl_cache = nothing
   _,conv0 = Algebra._check_convergence(fesolver.nls.ls,xrb)
   stats = @timed begin
     for iter in 1:fesolver.nls.max_nliters
       x .= recenter(fesolver,x,params_test)
+      xrb = space_time_projection(x,rbspace)
       rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,rbspace,x,params_test)
-      lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,rbspace,x,params_test)
+      llhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,lrbjacs,rbspace,x,params_test)
+      nllhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,nlrbjacs,rbspace,x,params_test)
+      lhs = llhs + nllhs
+      rhs .= llhs*xrb + rhs
       nl_cache = rb_solve!(xrb,fesolver.nls.ls,rhs,lhs,nl_cache)
       x .= recast(xrb,rbspace)
       isconv,conv = Algebra._check_convergence(fesolver.nls,xrb,conv0)
@@ -164,22 +173,11 @@ function test_rb_solver(
   post_process(info,feop,fesolver,snaps_test,params_test,x,stats)
 end
 
-function rb_solve(ls::LinearSolver,rhs::PTArray,lhs::Vector{<:PTArray})
+function rb_solve(ls::LinearSolver,rhs::PTArray,lhs::PTArray)
   x = copy(rhs)
   cache = nothing
-  rb_solve!(x,ls,rhs,sum(lhs),cache)
+  rb_solve!(x,ls,rhs,lhs,cache)
   return x
-end
-
-function rb_solve!(
-  x::PTArray,
-  ls::LinearSolver,
-  rhs::PTArray,
-  lhs::Vector{<:PTArray},
-  args...)
-
-  @. rhs = lhs[end]*x - rhs
-  rb_solve!(x,ls,rhs,sum(lhs[1:end-1]),cache)
 end
 
 function rb_solve!(

@@ -264,7 +264,7 @@ function collect_lhs_contributions!(
     rb_jacs_contribs[i] = collect_lhs_contributions!(
       cache,info,feop,fesolver,rb_jac_i,rbspace,rbspace,args...;i)
   end
-  return rb_jacs_contribs
+  return sum(rb_jacs_contribs)
 end
 
 function collect_lhs_contributions!(
