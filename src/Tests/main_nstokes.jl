@@ -36,15 +36,12 @@ begin
   p0(μ) = x->p0(x,μ)
   p0μ(μ) = PFunction(p0,μ)
 
-  m(μ,t,u,v) = ∫ₚ(v⋅u,dΩ)
-  a(μ,t,(u,p),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(u)),dΩ)
   c(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(v⊙(∇(du)'⋅u),dΩ)
   dc(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(v⊙(∇(du)'⋅u),dΩ) + ∫ₚ(v⊙(∇(u)'⋅du),dΩ)
 
-  jac_t(μ,t,(u,p),(dut,dpt),(v,q)) = m(μ,t,dut,v)
-  jac(μ,t,(u,p),(du,dp),(v,q)) = a(μ,t,(du,dp),(v,q))
-  res(μ,t,(u,p),(v,q)) = m(μ,t,∂ₚt(u),v) + a(μ,t,(u,p),(v,q))
-  nfun = c,dc
+  res(μ,t,(u,p),(v,q)) = ∫ₚ(v⋅∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(u)),dΩ)
+  jac(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(du),dΩ) - ∫ₚ(dp*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(du)),dΩ)
+  jac_t(μ,t,(u,p),(dut,dpt),(v,q)) = ∫ₚ(v⋅dut,dΩ)
 
   reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float},order)
   reffe_p = ReferenceFE(lagrangian,Float,order-1)
@@ -55,7 +52,7 @@ begin
   trial_p = TrialFESpace(test_p)
   test = PTMultiFieldFESpace([test_u,test_p])
   trial = PTMultiFieldFESpace([trial_u,trial_p])
-  feop = NonlinearPTFEOperator(res,jac,jac_t,nfun,pspace,trial,test)
+  feop = NonlinearPTFEOperator(res,jac,jac_t,(c,dc),pspace,trial,test)
   t0,tf,dt,θ = 0.,0.05,0.005,1
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial_u(μ,t0))
   ph0μ(μ) = interpolate_everywhere(p0μ(μ),trial_p(μ,t0))
@@ -75,50 +72,35 @@ begin
   nsnaps_system = 30
   nsnaps_test = 10
   st_mdeim = false
+  postprocess = true
   info = RBInfo(test_path;ϵ,energy_norm,compute_supremizers,st_mdeim,postprocess)
-
-  # Offline phase
-  printstyled("OFFLINE PHASE\n";bold=true,underline=true)
-  if load_solutions
-    sols,params = load(info,(BlockSnapshots,Table))
-  else
-    params = realization(feop,nsnaps_state)
-    sols,stats = collect_multi_field_solutions(fesolver,feop,params)
-    params_test = realization(feop,nsnaps_test)
-    sols_test, = collect_multi_field_solutions(fesolver,feop,params_test)
-    if save_solutions
-      save(info,(sols,params,stats))
-    end
-  end
-  if load_structures
-    rbspace = load(info,BlockRBSpace)
-    rbrhs,rblhs = load(info,(BlockRBVecAlgebraicContribution,Vector{BlockRBMatAlgebraicContribution}))
-  else
-    rbspace = reduced_basis(info,feop,sols,params)
-    rbrhs,rblhs... = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params,nsnaps_system)
-    if save_structures
-      save(info,(rbspace,rbrhs,rblhs))
-    end
-  end
-
-  # Online phase
-  printstyled("ONLINE PHASE\n";bold=true,underline=true)
-  test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params,sols_test[1:nsnaps_test],params_test)
 end
 
-sols,params = load(info,(BlockSnapshots,Table))
-rbspace = load(info,BlockRBSpace)
-rbrhs,rblhs = load(info,(BlockRBVecAlgebraicContribution,Vector{BlockRBMatAlgebraicContribution}))
+# Offline phase
+printstyled("OFFLINE PHASE\n";bold=true,underline=true)
+if load_solutions
+  sols,params = load(info,(BlockSnapshots,Table))
+else
+  params = realization(feop,nsnaps_state+nsnaps_test)
+  sols,stats = collect_multi_field_solutions(fesolver,feop,params)
+  if save_solutions
+    save(info,(sols,params,stats))
+  end
+end
+if load_structures
+  rbspace = load(info,BlockRBSpace)
+  rbrhs,rblhs = load(info,(BlockRBVecAlgebraicContribution,Vector{BlockRBMatAlgebraicContribution}))
+else
+  rbspace = reduced_basis(info,feop,sols,params)
+  rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params;nsnaps_mdeim)
+  if save_structures
+    save(info,(rbspace,rbrhs,rblhs))
+  end
+end
 
-nsnaps = info.nsnaps_state
-params = realization(feop,nsnaps)
-trial = get_trial(feop)
-sols,stats = collect_solutions(fesolver,feop,trial,params)
-save(info,(sols,params,stats))
-
-rbspace = reduced_basis(info,feop,sols,params)
-rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
-save(info,(rbspace,rbrhs,rblhs))
+# Online phase
+printstyled("ONLINE PHASE\n";bold=true,underline=true)
+test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params;nsnaps_test)
 
 snaps_test,params_test = load_test(info,feop,fesolver)
 println("Solving nonlinear RB problems with Newton iterations")
