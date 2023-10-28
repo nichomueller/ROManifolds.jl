@@ -58,7 +58,7 @@ function stokes_equation()
   ϵ = 1e-4
   load_solutions = true
   save_solutions = true
-  load_structures = false
+  load_structures = true
   save_structures = true
   energy_norm = [:l2,:l2]
   compute_supremizers = true

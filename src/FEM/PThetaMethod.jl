@@ -81,7 +81,7 @@ for fun in (:(Algebra.residual!),:residual_for_trian!)
       x::PTArray,
       args...)
 
-      uF = zero(x)
+      uF = x
       vθ = op.vθ
       @. vθ = (x-op.u0)/op.dtθ
       z = zero(eltype(b))
