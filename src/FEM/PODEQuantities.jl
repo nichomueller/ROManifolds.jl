@@ -197,16 +197,14 @@ function collect_jacobians_for_trian(
 end
 
 function collect_residuals_for_idx!(
-  b::PTArray{T},
-  fesolver::PThetaMethod,
-  feop::PTFEOperator,
+  cache,
   sols::PTArray{T},
   μ::Table,
   times::Vector{<:Real},
   nonzero_idx::Vector{Int},
   meas::Measure) where T
 
-  nlop = init_residual_collector(fesolver,feop,sols,μ,times)
+  b,nlop = cache
   ress = residual!(b,nlop,sols,meas)
   N = length(μ)*length(times)
   resmat = zeros(eltype(T),length(nonzero_idx),N)
@@ -217,9 +215,7 @@ function collect_residuals_for_idx!(
 end
 
 function collect_jacobians_for_idx!(
-  A::PTArray{T},
-  fesolver::PThetaMethod,
-  feop::PTFEOperator,
+  cache,
   sols::PTArray{T},
   μ::Table,
   times::Vector{<:Real},
@@ -227,7 +223,7 @@ function collect_jacobians_for_idx!(
   meas::Measure;
   i=1) where T
 
-  nlop = init_jacobian_collector(fesolver,feop,sols,μ,times)
+  A,nlop = cache
   jacs_i = jacobian!(A,nlop,sols,i,meas)
   N = length(μ)*length(times)
   jacimat = zeros(eltype(T),length(nonzero_idx),N)

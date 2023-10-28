@@ -234,6 +234,7 @@ function collect_rhs_contributions!(
 
   coeff_cache,rb_cache = cache
   st_mdeim = info.st_mdeim
+  times = get_times(fesolver)
   k = RBVecContributionMap(T)
   rb_res_contribs = Vector{PTArray{Vector{T}}}(undef,num_domains(rbres))
   if iszero(rbres)
@@ -243,7 +244,7 @@ function collect_rhs_contributions!(
   else
     for (i,t) in enumerate(get_domains(rbres))
       rbrest = rbres[t]
-      coeff = rhs_coefficient!(coeff_cache,feop,fesolver,rbrest,sols,params;st_mdeim)
+      coeff = rhs_coefficient!(coeff_cache,rbrest,sols,params,times;st_mdeim)
       rb_res_contribs[i] = rb_contribution!(rb_cache,k,rbrest,coeff)
     end
   end
@@ -283,6 +284,7 @@ function collect_lhs_contributions!(
 
   coeff_cache,rb_cache = cache
   trian = get_domains(rbjac)
+  times = get_times(fesolver)
   st_mdeim = info.st_mdeim
   k = RBMatContributionMap(T)
   rb_jac_contribs = Vector{PTArray{Matrix{T}}}(undef,num_domains(rbjac))
@@ -294,7 +296,7 @@ function collect_lhs_contributions!(
   else
     for (i,t) in enumerate(trian)
       rbjact = rbjac[t]
-      coeff = lhs_coefficient!(coeff_cache,feop,fesolver,rbjact,sols,params;st_mdeim,kwargs...)
+      coeff = lhs_coefficient!(coeff_cache,rbjact,sols,params,times;st_mdeim,kwargs...)
       rb_jac_contribs[i] = rb_contribution!(rb_cache,k,rbjact,coeff)
     end
   end

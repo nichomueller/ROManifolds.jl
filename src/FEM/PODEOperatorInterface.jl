@@ -18,8 +18,7 @@ function allocate_cache(op::PODEOpFromFEOp,μ::AbstractVector,t::T) where T
     Us = (Us...,allocate_trial_space(Uts[i+1],μ,t))
   end
   fecache = allocate_cache(op.feop)
-  ode_cache = (Us,Uts,fecache)
-  ode_cache
+  Us,Uts,fecache
 end
 
 function update_cache!(
@@ -34,7 +33,17 @@ function update_cache!(
     Us = (Us...,evaluate!(_Us[i],Uts[i],μ,t))
   end
   fecache = update_cache!(fecache,op.feop,μ,t)
-  (Us,Uts,fecache)
+  Us,Uts,fecache
+end
+
+function cache_at_idx(ode_cache,idx::Int)
+  _Us,_Uts,fecache = ode_cache
+  Us,Uts = (),()
+  for i in eachindex(_Us)
+    Us = (Us...,_Us[i][idx])
+    Uts = (Uts...,_Uts[i][idx])
+  end
+  Us,Uts,fecache
 end
 
 function allocate_residual(

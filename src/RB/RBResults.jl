@@ -31,8 +31,8 @@ function Base.show(io::IO,r::RBResults)
   avg_err = get_avg_error(r)
   avg_time = get_avg_time(r.rb_stats)
   avg_nallocs = get_avg_nallocs(r.rb_stats)
-  speedup_time = Float32(get_speedup_time(r)*100)
-  speedup_memory = Float32(get_speedup_memory(r)*100)
+  speedup_time = Float16(get_speedup_time(r)*100)
+  speedup_memory = Float16(get_speedup_memory(r)*100)
   print(io,"Average online relative errors for $name: $avg_err\n")
   print(io,"Average online wall time: $avg_time [s]\n")
   print(io,"Average number of allocations: $avg_nallocs [Mb]\n")
@@ -76,14 +76,14 @@ end
 function allocate_online_cache(
   feop::PTFEOperator,
   fesolver::PODESolver,
-  snaps_test::PTArray{Vector{T}},
+  snaps::PTArray{Vector{T}},
   params::Table) where T
 
   times = get_times(fesolver)
-  ode_op = get_algebraic_operator(feop)
-  ode_cache = allocate_cache(ode_op,params,times)
-  b = allocate_residual(ode_op,params,times,snaps_test,ode_cache)
-  A = allocate_jacobian(ode_op,params,times,snaps_test,ode_cache)
+  nlopb = init_residual_collector(fesolver,feop,snaps,params,times)
+  b = allocate_residual(nlopb,snaps)
+  nlopA = init_residual_collector(fesolver,feop,snaps,params,times)
+  A = allocate_jacobian(nlopA,snaps)
 
   coeff = zeros(T,1,1)
   ptcoeff = PTArray([zeros(T,1,1) for _ = eachindex(params)])
@@ -91,8 +91,8 @@ function allocate_online_cache(
   res_contrib_cache = return_cache(RBVecContributionMap(T))
   jac_contrib_cache = return_cache(RBMatContributionMap(T))
 
-  res_cache = (b,CachedArray(coeff),CachedArray(ptcoeff)),res_contrib_cache
-  jac_cache = (A,CachedArray(coeff),CachedArray(ptcoeff)),jac_contrib_cache
+  res_cache = ((b,nlopb),(CachedArray(coeff),CachedArray(ptcoeff))),res_contrib_cache
+  jac_cache = ((A,nlopA),(CachedArray(coeff),CachedArray(ptcoeff))),jac_contrib_cache
   res_cache,jac_cache
 end
 

@@ -559,11 +559,10 @@ function collect_rhs_contributions!(
   params::Table) where T
 
   nblocks = get_nblocks(rbres)
-  offsets = field_offsets(feop.test)
   rb_offsets = field_offsets(rbspace)
   blocks = Vector{PTArray{Vector{T}}}(undef,nblocks)
   for row = 1:nblocks
-    cache_row = cache_at_index(cache,offsets[row]+1:offsets[row+1])
+    cache_row = cache_at_index(cache,feop,row)
     if rbres.touched[row]
       feop_row = feop[row,:]
       rbspace_row = rbspace[row]
@@ -594,14 +593,13 @@ function collect_lhs_contributions!(
 
   njacs = length(rbjacs)
   nblocks = get_nblocks(testitem(rbjacs))
-  offsets = field_offsets(feop.test)
   rb_offsets = field_offsets(rbspace)
   rb_jacs_contribs = Vector{PTArray{Matrix{T}}}(undef,njacs)
   for i = 1:njacs
     rb_jac_i = rbjacs[i]
     blocks = Matrix{PTArray{Matrix{T}}}(undef,nblocks,nblocks)
     for (row,col) = index_pairs(nblocks,nblocks)
-      cache_row_col = cache_at_index(cache,offsets[row]+1:offsets[row+1],offsets[col]+1:offsets[col+1])
+      cache_row_col = cache_at_index(cache,feop,row,col)
       if rb_jac_i.touched[row,col]
         feop_row_col = feop[row,col]
         sols_col = sols[col]
@@ -663,11 +661,27 @@ function allocate_online_cache(
   allocate_online_cache(feop,fesolver,vsnaps,params)
 end
 
-function cache_at_index(cache,idx::UnitRange{Int}...)
+function cache_at_index(cache,feop::PTFEOperator,row::Int)
   coeff_cache,rb_cache = cache
-  alg_cache,solve_cache... = coeff_cache
-  alg_cache_idx = map(x->getindex(x,idx...),alg_cache)
-  return (alg_cache_idx,solve_cache...),rb_cache
+  (q,nlop),solve_cache = coeff_cache
+  offsets = field_offsets(feop.test)
+  q_idx = map(x->getindex(x,offsets[row]+1:offsets[row+1]),q)
+  odeop_idx = get_algebraic_operator(feop[row,:])
+  nlop_idx = get_nonlinear_operator(odeop_idx,nlop.μ,nlop.tθ,nlop.dtθ,nlop.u0,nlop.ode_cache,nlop.vθ)
+  return ((q_idx,nlop_idx),solve_cache),rb_cache
+end
+
+function cache_at_index(cache,feop::PTFEOperator,row::Int,col::Int)
+  coeff_cache,rb_cache = cache
+  (q,nlop),solve_cache = coeff_cache
+  offsets = field_offsets(feop.test)
+  q_idx = map(x->getindex(x,offsets[row]+1:offsets[row+1],offsets[col]+1:offsets[col+1]),q)
+  odeop_idx = get_algebraic_operator(feop[row,col])
+  u0_idx = map(x->getindex(x,offsets[col]+1:offsets[col+1]),nlop.u0)
+  vθ_idx = map(x->getindex(x,offsets[col]+1:offsets[col+1]),nlop.vθ)
+  ode_cache_idx = cache_at_idx(nlop.ode_cache,col)
+  nlop_idx = get_nonlinear_operator(odeop_idx,nlop.μ,nlop.tθ,nlop.dtθ,u0_idx,ode_cache_idx,vθ_idx)
+  return ((q_idx,nlop_idx),solve_cache),rb_cache
 end
 
 function initial_guess(

@@ -166,65 +166,59 @@ end
 
 function rhs_coefficient!(
   cache,
-  feop::PTFEOperator,
-  fesolver::PODESolver,
   rbres::RBVecAffineDecomposition,
   args...;
   kwargs...)
 
-  rcache,scache... = cache
-  red_integr_res = assemble_rhs!(rcache,feop,fesolver,rbres,args...)
+  rcache,scache = cache
+  red_integr_res = assemble_rhs!(rcache,rbres,args...)
   mdeim_solve!(scache,rbres,red_integr_res;kwargs...)
 end
 
 function assemble_rhs!(
-  cache::PTArray,
-  feop::PTFEOperator,
-  fesolver::PThetaMethod,
+  cache,
   rbres::RBVecAffineDecomposition,
   sols::PTArray,
-  μ::Table)
+  μ::Table,
+  times::Vector{<:Real})
 
   red_idx = rbres.integration_domain.idx
   red_times = rbres.integration_domain.times
   red_meas = rbres.integration_domain.meas
 
-  b = PTArray(cache[1:length(red_times)*length(μ)])
-  sols = get_solutions_at_times(sols,fesolver,red_times)
+  cache = get_cache_at_times(cache,times,red_times)
+  sols = get_solutions_at_times(sols,times,red_times)
 
-  collect_residuals_for_idx!(b,fesolver,feop,sols,μ,red_times,red_idx,red_meas)
+  collect_residuals_for_idx!(cache,sols,μ,red_times,red_idx,red_meas)
 end
 
 function lhs_coefficient!(
   cache,
-  feop::PTFEOperator,
-  fesolver::PODESolver,
   rbjac::RBMatAffineDecomposition,
   args...;
   i::Int=1,kwargs...)
 
-  jcache,scache... = cache
-  red_integr_jac = assemble_lhs!(jcache,feop,fesolver,rbjac,args...;i)
+  jcache,scache = cache
+  red_integr_jac = assemble_lhs!(jcache,rbjac,args...;i)
   mdeim_solve!(scache,rbjac,red_integr_jac;kwargs...)
 end
 
 function assemble_lhs!(
-  cache::PTArray,
-  feop::PTFEOperator,
-  fesolver::PThetaMethod,
+  cache,
   rbjac::RBMatAffineDecomposition,
   sols::PTArray,
-  μ::Table;
+  μ::Table,
+  times::Vector{<:Real};
   i::Int=1)
 
   red_idx = rbjac.integration_domain.idx
   red_times = rbjac.integration_domain.times
   red_meas = rbjac.integration_domain.meas
 
-  A = PTArray(cache[1:length(red_times)*length(μ)])
-  sols = get_solutions_at_times(sols,fesolver,red_times)
+  cache = get_cache_at_times(cache,times,red_times)
+  sols = get_solutions_at_times(sols,times,red_times)
 
-  collect_jacobians_for_idx!(A,fesolver,feop,sols,μ,red_times,red_idx,red_meas;i)
+  collect_jacobians_for_idx!(cache,sols,μ,red_times,red_idx,red_meas;i)
 end
 
 function mdeim_solve!(cache,ad::RBAffineDecomposition,a::Matrix;st_mdeim=false)
@@ -287,8 +281,20 @@ function recast_coefficient!(
   ptarray
 end
 
-function get_solutions_at_times(sols::PTArray,fesolver::PODESolver,red_times::Vector{<:Real})
-  times = get_times(fesolver)
+function get_cache_at_times(cache,times::Vector{<:Real},red_times::Vector{<:Real})
+  q,nlop = cache
+  time_ndofs = length(times)
+  time_ndofs_red = length(red_times)
+  nparams = Int(length(q)/time_ndofs)
+  if length(red_times) < time_ndofs
+    # red_q = PTArray(q[1:time_ndofs_red*nparams])
+    @notimplemented
+  else
+    return q,nlop
+  end
+end
+
+function get_solutions_at_times(sols::PTArray,times::Vector{<:Real},red_times::Vector{<:Real})
   time_ndofs = length(times)
   nparams = Int(length(sols)/time_ndofs)
   if length(red_times) < time_ndofs
