@@ -7,12 +7,12 @@ g_ok(x,t) = g(x,μn,t)
 g_ok(t) = x->g_ok(x,t)
 m_ok(t,u,v) = ∫(v⋅u)dΩ
 a_ok(t,(u,p),(v,q)) = ∫(a(μn,t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ - ∫(q*(∇⋅(u)))dΩ
-c_ok(t,u,v) = ∫(v⊙(conv∘(u,∇(u))))dΩ
-dc_ok(t,u,du,v) = ∫(v⊙(dconv∘(du,∇(du),u,∇(u))))dΩ
+c_ok(t,u,du,v) = ∫(v⊙(∇(du)'⋅u))dΩ
+dc_ok(t,u,du,v) = ∫(v⊙(∇(du)'⋅u))dΩ + ∫(v⊙(∇(u)'⋅du))dΩ
 
 jac_t_ok(t,(u,p),(dut,dpt),(v,q)) = m_ok(t,dut,v)
 Jac_ok(t,(u,p),(du,dp),(v,q)) = a_ok(t,(du,dp),(v,q)) + dc_ok(t,u,du,v)
-Res_ok(t,(u,p),(v,q)) = m_ok(t,∂t(u),v) + a_ok(t,(u,p),(v,q)) + c_ok(t,u,v)
+Res_ok(t,(u,p),(v,q)) = m_ok(t,∂t(u),v) + a_ok(t,(u,p),(v,q)) + c_ok(t,u,u,v)
 trial_u_ok = TransientTrialFESpace(test_u,g_ok)
 trial_ok = TransientMultiFieldFESpace([trial_u_ok,trial_p])
 feop_ok = TransientFEOperator(Res_ok,Jac_ok,jac_t_ok,trial_ok,test)

@@ -54,6 +54,16 @@ function get_nonlinear_operator(
   PThetaMethodNonlinearOperator(odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
 end
 
+for f in (:linear_operator,:nonlinear_operator)
+  @eval begin
+    function $f(op::PThetaMethodNonlinearOperator)
+      feop = $f(op.odeop.feop)
+      odeop = get_algebraic_operator(feop)
+      return PThetaMethodNonlinearOperator(odeop,op.μ,op.tθ,op.dtθ,op.u0,op.ode_cache,op.vθ)
+    end
+  end
+end
+
 function Algebra.allocate_residual(
   op::PNonlinearOperator,
   x::PTArray)
@@ -73,20 +83,34 @@ function Algebra.residual(op::PNonlinearOperator,x::PTArray,args...)
   residual!(b,op,x,args...)
 end
 
-for fun in (:(Algebra.residual!),:residual_for_trian!)
+function residual!(
+  b::PTArray,
+  op::PThetaMethodNonlinearOperator,
+  x::PTArray,
+  args...)
+
+  uF = x
+  vθ = op.vθ
+  @. vθ = (x-op.u0)/op.dtθ
+  z = zero(eltype(b))
+  fill!(b,z)
+  residual!(b,op.odeop,op.μ,op.tθ,(uF,vθ),op.ode_cache,args...)
+end
+
+for (f,g) in zip((:residual_for_trian!,:residual_for_idx!),(:residual_for_trian!,:residual!))
   @eval begin
-    function $fun(
+    function $f(
       b::PTArray,
       op::PThetaMethodNonlinearOperator,
       x::PTArray,
       args...)
 
-      uF = x
+      uF = zero(x)
       vθ = op.vθ
       @. vθ = (x-op.u0)/op.dtθ
       z = zero(eltype(b))
       fill!(b,z)
-      $fun(b,op.odeop,op.μ,op.tθ,(uF,vθ),op.ode_cache,args...)
+      $g(b,op.odeop,op.μ,op.tθ,(uF,vθ),op.ode_cache,args...)
     end
   end
 end
@@ -96,22 +120,10 @@ function Algebra.jacobian(op::PNonlinearOperator,x::PTArray,args...)
   jacobian!(A,op,x,args...)
 end
 
-function Algebra.jacobian!(
-  A::PTArray,
-  op::PThetaMethodNonlinearOperator,
-  x::PTArray)
-
-  uF = x
-  vθ = op.vθ
-  @. vθ = (x-op.u0)/op.dtθ
-  z = zero(eltype(A))
-  fillstored!(A,z)
-  jacobians!(A,op.odeop,op.μ,op.tθ,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)
-end
-
-for fun in (:(Algebra.jacobian!),:jacobian_for_trian!)
+for (f,g) in zip((:jacobian!,:jacobian_for_trian!,:jacobian_for_idx!),
+                 (:jacobian!,:jacobian_for_trian!,:jacobian!))
   @eval begin
-    function $fun(
+    function $f(
       A::PTArray,
       op::PThetaMethodNonlinearOperator,
       x::PTArray,
@@ -123,7 +135,7 @@ for fun in (:(Algebra.jacobian!),:jacobian_for_trian!)
       @. vθ = (x-op.u0)/op.dtθ
       z = zero(eltype(A))
       fillstored!(A,z)
-      $fun(A,op.odeop,op.μ,op.tθ,(uF,vθ),i,(1.0,1/op.dtθ)[i],op.ode_cache,args...)
+      $g(A,op.odeop,op.μ,op.tθ,(uF,vθ),i,(1.0,1/op.dtθ)[i],op.ode_cache,args...)
     end
   end
 end

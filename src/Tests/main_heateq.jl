@@ -57,7 +57,7 @@ function heat_equation()
   ϵ = 1e-4
   load_solutions = true
   save_solutions = true
-  load_structures = true
+  load_structures = false
   save_structures = true
   energy_norm = :l2
   nsnaps_state = 50

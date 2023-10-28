@@ -80,10 +80,9 @@ function allocate_online_cache(
   params::Table) where T
 
   times = get_times(fesolver)
-  nlopb = init_residual_collector(fesolver,feop,snaps,params,times)
-  b = allocate_residual(nlopb,snaps)
-  nlopA = init_residual_collector(fesolver,feop,snaps,params,times)
-  A = allocate_jacobian(nlopA,snaps)
+  nlop = init_collector(fesolver,feop,snaps,params,times)
+  b = allocate_residual(nlop,snaps)
+  A = allocate_jacobian(nlop,snaps)
 
   coeff = zeros(T,1,1)
   ptcoeff = PTArray([zeros(T,1,1) for _ = eachindex(params)])
@@ -91,8 +90,8 @@ function allocate_online_cache(
   res_contrib_cache = return_cache(RBVecContributionMap(T))
   jac_contrib_cache = return_cache(RBMatContributionMap(T))
 
-  res_cache = ((b,nlopb),(CachedArray(coeff),CachedArray(ptcoeff))),res_contrib_cache
-  jac_cache = ((A,nlopA),(CachedArray(coeff),CachedArray(ptcoeff))),jac_contrib_cache
+  res_cache = ((b,nlop),(CachedArray(coeff),CachedArray(ptcoeff))),res_contrib_cache
+  jac_cache = ((A,nlop),(CachedArray(coeff),CachedArray(ptcoeff))),jac_contrib_cache
   res_cache,jac_cache
 end
 
@@ -109,12 +108,13 @@ function test_rb_solver(
 
   println("Solving linear RB problems")
   snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
+  times = get_times(fesolver)
   x = initial_guess(snaps,params,params_test)
   rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,x,params_test)
   stats = @timed begin
     x .= recenter(fesolver,x,params_test)
-    rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,rbspace,x,params_test)
-    lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjacs,rbspace,x,params_test)
+    rhs = collect_rhs_contributions!(rhs_cache,info,rbres,rbspace,times)
+    lhs = collect_lhs_contributions!(lhs_cache,info,rbjacs,rbspace,times)
     rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs)
   end
   approx_snaps_test = recast(rb_snaps_test,rbspace)
@@ -134,8 +134,10 @@ function test_rb_solver(
 
   println("Solving nonlinear RB problems with Newton iterations")
   snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
+  times = get_times(fesolver)
   lrbjacs,nlrbjacs = rbjacs
   x = initial_guess(snaps,params,params_test)
+  xrb = space_time_projection(x,rbspace)
   rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,x,params_test)
   nl_cache = nothing
   _,conv0 = Algebra._check_convergence(fesolver.nls.ls,xrb)
@@ -143,13 +145,13 @@ function test_rb_solver(
     for iter in 1:fesolver.nls.max_nliters
       x .= recenter(fesolver,x,params_test)
       xrb = space_time_projection(x,rbspace)
-      rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbres,rbspace,x,params_test)
-      llhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,lrbjacs,rbspace,x,params_test)
-      nllhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,nlrbjacs,rbspace,x,params_test)
+      rhs = collect_rhs_contributions!(rhs_cache,info,rbres,rbspace,times)
+      llhs = collect_lhs_contributions!(lhs_cache,info,lrbjacs,rbspace,times)
+      nllhs = collect_lhs_contributions!(lhs_cache,info,nlrbjacs,rbspace,times)
       lhs = llhs + nllhs
       rhs .= llhs*xrb + rhs
       nl_cache = rb_solve!(xrb,fesolver.nls.ls,rhs,lhs,nl_cache)
-      x .= recast(xrb,rbspace)
+      x .+= recast(xrb,rbspace)
       isconv,conv = Algebra._check_convergence(fesolver.nls,xrb,conv0)
       println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv)))")
       if all(isconv); return; end

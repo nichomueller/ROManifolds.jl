@@ -136,10 +136,13 @@ function collect_compress_rhs_lhs(
   μ::Table;
   nsnaps_mdeim=20)
 
+  θ = fesolver.θ
   snapsθ = recenter(fesolver,snaps,μ)
   _snapsθ,_μ = snapsθ[1:nsnaps_mdeim],μ[1:nsnaps_mdeim]
-  rhs = collect_compress_rhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
-  lhs = collect_compress_lhs(info,feop,fesolver,rbspace,_snapsθ,_μ)
+  times = get_times(fesolver)
+  lop = init_collector(fesolver,feop,_snapsθ,_μ,times)
+  rhs = collect_compress_rhs(info,lop,rbspace;θ)
+  lhs = collect_compress_lhs(info,lop,rbspace;θ)
   show(rhs),show(lhs)
   rhs,lhs
 end
@@ -149,18 +152,21 @@ function collect_compress_rhs_lhs(
   feop::PTFEOperator{Nonlinear},
   fesolver::PThetaMethod,
   rbspace,
-  snaps::PTArray,
+  snaps,
   μ::Table;
   nsnaps_mdeim=20)
 
+  θ = fesolver.θ
   snapsθ = recenter(fesolver,snaps,μ)
   _snapsθ,_μ = snapsθ[1:nsnaps_mdeim],μ[1:nsnaps_mdeim]
+  times = get_times(fesolver)
+  nlop = init_collector(fesolver,feop,_snapsθ,_μ,times)
 
-  lfeop = linear_operator(feop)
-  rhs = collect_compress_rhs(info,lfeop,fesolver,rbspace,_snapsθ,_μ)
-  lhs = collect_compress_lhs(info,lfeop,fesolver,rbspace,_snapsθ,_μ)
-  nlfeop = nonlinear_operator(feop)
-  nllhs = collect_compress_lhs(info,nlfeop,fesolver,rbspace,_snapsθ,_μ)
+  lop = linear_operator(nlop)
+  rhs = collect_compress_rhs(info,lop,rbspace;θ)
+  lhs = collect_compress_lhs(info,lop,rbspace;θ)
+  _nlop = nonlinear_operator(nlop)
+  nllhs = collect_compress_lhs(info,_nlop,rbspace;θ)
   show(rhs),show(lhs)
 
   rhs,lhs,nllhs
@@ -168,37 +174,29 @@ end
 
 function collect_compress_rhs(
   info::RBInfo,
-  feop::PTFEOperator,
-  fesolver::PODESolver,
-  rbspace::RBSpace{T},
-  snaps::PTArray,
-  μ::Table) where T
+  nlop::PNonlinearOperator,
+  rbspace::RBSpace{T};
+  kwargs...) where T
 
-  times = get_times(fesolver)
-  ress,trian = collect_residuals_for_trian(fesolver,feop,snaps,μ,times)
+  ress,trian = collect_residuals_for_trian(nlop)
   ad_res = RBVecAlgebraicContribution(T)
-  compress_component!(ad_res,info,feop,ress,trian,times,rbspace)
+  compress_component!(ad_res,info,nlop,ress,trian,rbspace)
   return ad_res
 end
 
 function collect_compress_lhs(
   info::RBInfo,
-  feop::PTFEOperator,
-  fesolver::PThetaMethod,
-  rbspace::RBSpace{T},
-  snaps::PTArray,
-  μ::Table) where T
+  nlop::PNonlinearOperator,
+  rbspace::RBSpace{T};
+  θ::Real=1) where T
 
-  times = get_times(fesolver)
-  θ = fesolver.θ
-
-  njacs = length(feop.jacs)
+  njacs = length(nlop.odeop.feop.jacs)
   ad_jacs = Vector{RBMatAlgebraicContribution{T}}(undef,njacs)
   for i = 1:njacs
     combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*x-θ*y
-    jacs,trian = collect_jacobians_for_trian(fesolver,feop,snaps,μ,times;i)
+    jacs,trian = collect_jacobians_for_trian(nlop;i)
     ad_jac_i = RBMatAlgebraicContribution(T)
-    compress_component!(ad_jac_i,info,feop,jacs,trian,times,rbspace,rbspace;combine_projections)
+    compress_component!(ad_jac_i,info,nlop,jacs,trian,rbspace,rbspace;combine_projections)
     ad_jacs[i] = ad_jac_i
   end
   return ad_jacs
@@ -207,7 +205,7 @@ end
 function compress_component!(
   contrib::RBAlgebraicContribution,
   info::RBInfo,
-  feop::PTFEOperator,
+  nlop::PNonlinearOperator,
   snaps::Vector{<:NnzMatrix},
   trian::Base.KeySet{Triangulation},
   args...;
@@ -216,7 +214,7 @@ function compress_component!(
   for (i,ti) in enumerate(trian)
     si = snaps[i]
     if !iszero(si)
-      ci = RBAffineDecomposition(info,feop,si,ti,args...;kwargs...)
+      ci = RBAffineDecomposition(info,nlop,si,ti,args...;kwargs...)
       add_contribution!(contrib,ti,ci)
     end
   end
@@ -225,26 +223,23 @@ end
 function collect_rhs_contributions!(
   cache,
   info::RBInfo,
-  feop::PTFEOperator,
-  fesolver::PODESolver,
   rbres::RBVecAlgebraicContribution{T},
   rbspace::RBSpace{T},
-  sols::PTArray,
-  params::Table) where T
+  times::Vector{<:Real}) where T
 
   coeff_cache,rb_cache = cache
   st_mdeim = info.st_mdeim
-  times = get_times(fesolver)
   k = RBVecContributionMap(T)
   rb_res_contribs = Vector{PTArray{Vector{T}}}(undef,num_domains(rbres))
   if iszero(rbres)
+    _,nlop = cache
     nrow = get_rb_ndofs(rbspace)
-    contrib = PTArray([zeros(T,nrow) for _ = eachindex(params)])
+    contrib = PTArray([zeros(T,nrow) for _ = eachindex(nlop.μ)])
     rb_res_contribs[i] = contrib
   else
     for (i,t) in enumerate(get_domains(rbres))
       rbrest = rbres[t]
-      coeff = rhs_coefficient!(coeff_cache,rbrest,sols,params,times;st_mdeim)
+      coeff = rhs_coefficient!(coeff_cache,rbrest,times;st_mdeim)
       rb_res_contribs[i] = rb_contribution!(rb_cache,k,rbrest,coeff)
     end
   end
@@ -254,18 +249,15 @@ end
 function collect_lhs_contributions!(
   cache,
   info::RBInfo,
-  feop::PTFEOperator,
-  fesolver::PODESolver,
   rbjacs::Vector{RBMatAlgebraicContribution{T}},
   rbspace::RBSpace{T},
-  args...) where T
+  times::Vector{<:Real}) where T
 
   njacs = length(rbjacs)
   rb_jacs_contribs = Vector{PTArray{Matrix{T}}}(undef,njacs)
   for i = 1:njacs
     rb_jac_i = rbjacs[i]
-    rb_jacs_contribs[i] = collect_lhs_contributions!(
-      cache,info,feop,fesolver,rb_jac_i,rbspace,rbspace,args...;i)
+    rb_jacs_contribs[i] = collect_lhs_contributions!(cache,info,rb_jac_i,rbspace,rbspace,times;i)
   end
   return sum(rb_jacs_contribs)
 end
@@ -273,30 +265,27 @@ end
 function collect_lhs_contributions!(
   cache,
   info::RBInfo,
-  feop::PTFEOperator,
-  fesolver::PODESolver,
   rbjac::RBMatAlgebraicContribution{T},
   rbspace_row::RBSpace{T},
   rbspace_col::RBSpace{T},
-  sols::PTArray,
-  params::Table;
+  times::Vector{<:Real};
   kwargs...) where T
 
   coeff_cache,rb_cache = cache
   trian = get_domains(rbjac)
-  times = get_times(fesolver)
   st_mdeim = info.st_mdeim
   k = RBMatContributionMap(T)
   rb_jac_contribs = Vector{PTArray{Matrix{T}}}(undef,num_domains(rbjac))
   if iszero(rbjac)
+    _,nlop = cache
     nrow = get_rb_ndofs(rbspace_row)
     ncol = get_rb_ndofs(rbspace_col)
-    contrib = PTArray([zeros(T,nrow,ncol) for _ = eachindex(params)])
+    contrib = PTArray([zeros(T,nrow,ncol) for _ = eachindex(nlop.μ)])
     rb_jac_contribs[i] = contrib
   else
     for (i,t) in enumerate(trian)
       rbjact = rbjac[t]
-      coeff = lhs_coefficient!(coeff_cache,rbjact,sols,params,times;st_mdeim,kwargs...)
+      coeff = lhs_coefficient!(coeff_cache,rbjact,times;st_mdeim,kwargs...)
       rb_jac_contribs[i] = rb_contribution!(rb_cache,k,rbjact,coeff)
     end
   end

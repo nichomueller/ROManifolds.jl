@@ -293,10 +293,11 @@ for op in (:inner,:outer,:double_contraction,:+,:-,:*,:cross,:dot,:/)
   end
 end
 
+Base.adjoint(::Nothing) = nothing
 Base.broadcasted(f,a::Nothing,b::Nothing) = Operation((i,j)->f.(i,j))(a,b)
 Base.broadcasted(f,a::Nothing,b::CellField) = Operation((i,j)->f.(i,j))(a,b)
 Base.broadcasted(f,a::CellField,b::Nothing) = Operation((i,j)->f.(i,j))(a,b)
-Base.:(∘)(::Function,::Tuple{Vararg{Union{Nothing,CellField}}}) = nothing
+# Base.:(∘)(::Function,::Tuple{Vararg{Union{Nothing,CellField}}}) = nothing
 
 Fields.gradient(::Nothing) = nothing
 LinearAlgebra.dot(::typeof(∇),::Nothing) = nothing

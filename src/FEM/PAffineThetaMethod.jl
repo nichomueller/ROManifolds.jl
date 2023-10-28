@@ -53,9 +53,10 @@ function get_nonlinear_operator(
   PThetaAffineMethodOperator(odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
 end
 
-for fun in (:(Algebra.residual!),:residual_for_trian!)
+for (f,g) in zip((:residual!,:residual_for_trian!,:residual_for_idx!),
+                 (:residual!,:residual_for_trian!,:residual!))
   @eval begin
-    function $fun(
+    function $f(
       b::PTArray,
       op::PThetaAffineMethodOperator,
       ::PTArray,
@@ -64,7 +65,7 @@ for fun in (:(Algebra.residual!),:residual_for_trian!)
       vθ = op.vθ
       z = zero(eltype(b))
       fill!(b,z)
-      $fun(b,op.odeop,op.μ,op.tθ,(vθ,vθ),op.ode_cache,args...)
+      $g(b,op.odeop,op.μ,op.tθ,(vθ,vθ),op.ode_cache,args...)
     end
   end
 end
@@ -80,9 +81,10 @@ function Algebra.jacobian!(
   jacobians!(A,op.odeop,op.μ,op.tθ,(vθ,vθ),(1.0,1/op.dtθ),op.ode_cache)
 end
 
-for fun in (:(Algebra.jacobian!),:jacobian_for_trian!)
+for (f,g) in zip((:jacobian!,:jacobian_for_trian!,:jacobian_for_idx!),
+                 (:jacobian!,:jacobian_for_trian!,:jacobian!))
   @eval begin
-    function $fun(
+    function $f(
       A::PTArray,
       op::PThetaAffineMethodOperator,
       ::PTArray,
@@ -92,7 +94,7 @@ for fun in (:(Algebra.jacobian!),:jacobian_for_trian!)
       vθ = op.vθ
       z = zero(eltype(A))
       fillstored!(A,z)
-      $fun(A,op.odeop,op.μ,op.tθ,(vθ,vθ),i,(1.0,1/op.dtθ)[i],op.ode_cache,args...)
+      $g(A,op.odeop,op.μ,op.tθ,(vθ,vθ),i,(1.0,1/op.dtθ)[i],op.ode_cache,args...)
     end
   end
 end

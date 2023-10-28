@@ -412,15 +412,13 @@ function collect_compress_rhs(
   info::RBInfo,
   feop::PTFEOperator,
   fesolver::PODESolver,
-  rbspace::BlockRBSpace{T},
-  snaps::Vector{<:PTArray},
-  μ::Table) where T
+  nlop::PNonlinearOperator,
+  rbspace::BlockRBSpace{T}) where T
 
   times = get_times(fesolver)
   nblocks = get_nblocks(rbspace)
   @assert length(snaps) == nblocks
-  touched = check_touched_residuals(feop,snaps,μ,times)
-  vsnaps = vcat(snaps...)
+  touched = check_touched_residuals(nlop)
 
   blocks = Vector{RBVecAlgebraicContribution{T}}(undef,nblocks)
   for row = 1:nblocks
@@ -428,7 +426,7 @@ function collect_compress_rhs(
     if touched_row
       feop_row_col = feop[row,:]
       rbspace_row = rbspace[row]
-      ress,trian = collect_residuals_for_trian(fesolver,feop_row_col,vsnaps,μ,times)
+      ress,trian = collect_residuals_for_trian(nlop)
       ad_res = RBVecAlgebraicContribution(T)
       compress_component!(ad_res,info,feop_row_col,ress,trian,times,rbspace_row)
       blocks[row] = ad_res
@@ -442,9 +440,8 @@ function collect_compress_lhs(
   info::RBInfo,
   feop::PTFEOperator,
   fesolver::PThetaMethod,
-  rbspace::BlockRBSpace{T},
-  snaps::Vector{<:PTArray},
-  μ::Table) where T
+  nlop::PNonlinearOperator,
+  rbspace::BlockRBSpace{T}) where T
 
   times = get_times(fesolver)
   θ = fesolver.θ
@@ -455,16 +452,15 @@ function collect_compress_lhs(
   ad_jacs = Vector{BlockRBMatAlgebraicContribution{T}}(undef,njacs)
   for i = 1:njacs
     combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*x-θ*y
-    touched_i = check_touched_jacobians(feop,snaps,μ,times;i)
+    touched_i = check_touched_jacobians(nlop;i)
     blocks_i = Matrix{RBMatAlgebraicContribution{T}}(undef,nblocks,nblocks)
     for (row,col) = index_pairs(nblocks,nblocks)
       touched_row_col = touched_i[row,col]
       if touched_row_col
         feop_row_col = feop[row,col]
-        snaps_col = snaps[col]
         rbspace_row = rbspace[row]
         rbspace_col = rbspace[col]
-        jacs,trian = collect_jacobians_for_trian(fesolver,feop_row_col,snaps_col,μ,times;i)
+        jacs,trian = collect_jacobians_for_trian(nlop;i)
         ad_jac = RBMatAlgebraicContribution(T)
         compress_component!(
           ad_jac,info,feop_row_col,jacs,trian,times,rbspace_row,rbspace_col;combine_projections)
@@ -477,13 +473,13 @@ function collect_compress_lhs(
   return ad_jacs
 end
 
-function check_touched_residuals(feop::PTFEOperator,sols::Vector{<:PTArray},args...)
-  nblocks = length(sols)
-  vsnaps = vcat(sols...)
+function check_touched_residuals(nlop::PNonlinearOperator)
+  nblocks = length(nlop.u0)
+  vsnaps = vcat(nlop.u0...)
   touched = Vector{Bool}(undef,nblocks)
   for row = 1:nblocks
-    feop_row_col = feop[row,:]
-    touched[row] = check_touched_residuals(feop_row_col,vsnaps,args...)
+    feop_row_col = nlop.odeop.feop[row,:]
+    touched[row] = check_touched_residuals(feop_row_col,vsnaps,nlop.μ,nlop.tθ)
   end
   return touched
 end
@@ -511,13 +507,13 @@ function check_touched_residuals(
   return !isnothing(int)
 end
 
-function check_touched_jacobians(feop::PTFEOperator,sols::Vector{<:PTArray},args...;kwargs...)
-  nblocks = length(sols)
+function check_touched_jacobians(nlop::PNonlinearOperator;kwargs...)
+  nblocks = length(nlop.u0)
   touched = Matrix{Bool}(undef,nblocks,nblocks)
   for (row,col) = index_pairs(nblocks,nblocks)
-    feop_row_col = feop[row,col]
-    sols_col = sols[col]
-    touched[row,col] = check_touched_jacobians(feop_row_col,sols_col,args...;kwargs...)
+    feop_row_col = nlop.odeop.feop[row,col]
+    sols_col = nlop.u0[col]
+    touched[row,col] = check_touched_jacobians(feop_row_col,sols_col,nlop.μ,nlop.tθ;kwargs...)
   end
   return touched
 end
@@ -551,31 +547,26 @@ end
 function collect_rhs_contributions!(
   cache,
   info::RBInfo,
-  feop::PTFEOperator,
-  fesolver::PODESolver,
   rbres::BlockRBVecAlgebraicContribution{T},
-  rbspace::BlockRBSpace,
-  sols::Vector{<:PTArray},
-  params::Table) where T
+  rbspace::BlockRBSpace{T},
+  times::Vector{<:Real}) where T
 
   nblocks = get_nblocks(rbres)
   rb_offsets = field_offsets(rbspace)
   blocks = Vector{PTArray{Vector{T}}}(undef,nblocks)
   for row = 1:nblocks
-    cache_row = cache_at_index(cache,feop,row)
+    cache_row = cache_at_index(cache,row)
     if rbres.touched[row]
-      feop_row = feop[row,:]
       rbspace_row = rbspace[row]
-      vsnaps = vcat(sols...)
       blocks[row] = collect_rhs_contributions!(
-        cache_row,info,feop_row,fesolver,rbres.blocks[row],rbspace_row,vsnaps,params)
+        cache_row,info,rbres.blocks[row],rbspace_row,times)
     else
       rbcache,_ = last(cache_row)
       s = (rb_offsets[row+1]-rb_offsets[row],)
       setsize!(rbcache,s)
       array = rbcache.array
       array .= zero(T)
-      blocks[row] = PTArray([copy(array) for _ = eachindex(params)])
+      blocks[row] = PTArray([copy(array) for _ = eachindex(nlop.μ)])
     end
   end
   vcat(blocks...)
@@ -584,12 +575,9 @@ end
 function collect_lhs_contributions!(
   cache,
   info::RBInfo,
-  feop::PTFEOperator,
-  fesolver::PODESolver,
   rbjacs::Vector{BlockRBMatAlgebraicContribution{T}},
-  rbspace::BlockRBSpace,
-  sols::Vector{<:PTArray},
-  params::Table) where T
+  rbspace::BlockRBSpace{T},
+  times::Vector{<:Real}) where T
 
   njacs = length(rbjacs)
   nblocks = get_nblocks(testitem(rbjacs))
@@ -599,21 +587,19 @@ function collect_lhs_contributions!(
     rb_jac_i = rbjacs[i]
     blocks = Matrix{PTArray{Matrix{T}}}(undef,nblocks,nblocks)
     for (row,col) = index_pairs(nblocks,nblocks)
-      cache_row_col = cache_at_index(cache,feop,row,col)
+      cache_row_col = cache_at_index(cache,row,col)
       if rb_jac_i.touched[row,col]
-        feop_row_col = feop[row,col]
-        sols_col = sols[col]
         rbspace_row = rbspace[row]
         rbspace_col = rbspace[col]
         blocks[row,col] = collect_lhs_contributions!(
-          cache_row_col,info,feop_row_col,fesolver,rb_jac_i.blocks[row,col],rbspace_row,rbspace_col,sols_col,params;i)
+          cache_row_col,info,rb_jac_i.blocks[row,col],rbspace_row,rbspace_col,times;i)
       else
         rbcache,_ = last(cache_row_col)
         s = (rb_offsets[row+1]-rb_offsets[row],rb_offsets[col+1]-rb_offsets[col])
         setsize!(rbcache,s)
         array = rbcache.array
         array .= zero(T)
-        blocks[row,col] = PTArray([copy(array) for _ = eachindex(params)])
+        blocks[row,col] = PTArray([copy(array) for _ = eachindex(nlop.μ)])
       end
     end
     rb_jacs_contribs[i] = hvcat(nblocks,blocks...)
@@ -661,7 +647,9 @@ function allocate_online_cache(
   allocate_online_cache(feop,fesolver,vsnaps,params)
 end
 
-function cache_at_index(cache,feop::PTFEOperator,row::Int)
+function cache_at_index(cache,row::Int)
+  (_,nlop),_ = cache
+  feop = nlop.odeop.feop
   coeff_cache,rb_cache = cache
   (q,nlop),solve_cache = coeff_cache
   offsets = field_offsets(feop.test)
@@ -671,7 +659,9 @@ function cache_at_index(cache,feop::PTFEOperator,row::Int)
   return ((q_idx,nlop_idx),solve_cache),rb_cache
 end
 
-function cache_at_index(cache,feop::PTFEOperator,row::Int,col::Int)
+function cache_at_index(cache,row::Int,col::Int)
+  (_,nlop),_ = cache
+  feop = nlop.odeop.feop
   coeff_cache,rb_cache = cache
   (q,nlop),solve_cache = coeff_cache
   offsets = field_offsets(feop.test)

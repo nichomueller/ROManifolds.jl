@@ -62,18 +62,18 @@ begin
   fesolver = PThetaMethod(nls,xh0μ,θ,dt,t0,tf)
 
   ϵ = 1e-4
-  load_solutions = false
+  load_solutions = true
   save_solutions = true
   load_structures = false
-  save_structures = false
+  save_structures = true
   energy_norm = [:l2,:l2]
   compute_supremizers = true
   nsnaps_state = 50
-  nsnaps_system = 30
+  nsnaps_mdeim = 30
   nsnaps_test = 10
   st_mdeim = false
   postprocess = true
-  info = RBInfo(test_path;ϵ,energy_norm,compute_supremizers,st_mdeim,postprocess)
+  info = RBInfo(test_path;ϵ,energy_norm,compute_supremizers,st_mdeim,nsnaps_mdeim,postprocess)
 end
 
 # Offline phase
@@ -92,39 +92,34 @@ if load_structures
   rbrhs,rblhs = load(info,(BlockRBVecAlgebraicContribution,Vector{BlockRBMatAlgebraicContribution}))
 else
   rbspace = reduced_basis(info,feop,sols,params)
-  rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params;nsnaps_mdeim)
-  if save_structures
-    save(info,(rbspace,rbrhs,rblhs))
-  end
+  rbrhs,rblhs,nl_rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params;nsnaps_mdeim)
+  # if save_structures
+  #   save(info,(rbspace,rbrhs,rblhs))
+  # end
 end
 
 # Online phase
 printstyled("ONLINE PHASE\n";bold=true,underline=true)
-test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params;nsnaps_test)
-
-snaps_test,params_test = load_test(info,feop,fesolver)
+# test_rb_solver(info,feop,fesolver,rbspace,rbrhs,(rblhs,nl_rblhs),sols,params;nsnaps_test)
+snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
 println("Solving nonlinear RB problems with Newton iterations")
 xn,μn = [PTArray(snaps_test[1][1:ntimes]),PTArray(snaps_test[2][1:ntimes])],params_test[1:1]
 rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,xn,μn)
 nl_cache = nothing
 x = map(zero,xn)
+xrb = space_time_projection(x,rbspace)
 for iter in 1:fesolver.nls.max_nliters
-  # x = recenter(fesolver,x,params_test)
   rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbrhs,rbspace,x,μn)
-  lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,rbspace,x,μn)
+  llhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,rbspace,x,μn)
+  nllhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,nl_rblhs,rbspace,x,μn)
+  lhs = llhs + nllhs
+  rhs .= llhs*xrb + rhs
   dxrb = NonaffinePTArray([lhs[1] \ rhs[1]])
   x -= recast(dxrb,rbspace)
+  xrb = space_time_projection(x,rbspace)
   err = map(norm,dxrb.array)
   err_inf = norm(err)
-  # println(norm(lhs[1]))
-  # println(norm(rhs[1]))
   println("Iter $iter, error norm: $err_inf")
-  # if err_inf ≤ fesolver.nls.tol
-  #   return x
-  # end
-  # if iter == fesolver.nls.max_nliters
-  #   @unreachable
-  # end
 end
 post_process(info,feop,fesolver,snaps_test,params_test,x,stats)
 
