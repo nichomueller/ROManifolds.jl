@@ -402,10 +402,7 @@ function collect_compress_rhs(
   op::PTAlgebraicOperator,
   rbspace::BlockRBSpace{T}) where T
 
-  times = get_times(fesolver)
   nblocks = get_nblocks(rbspace)
-  @assert length(snaps) == nblocks
-
   blocks = Vector{RBVecAlgebraicContribution{T}}(undef,nblocks)
   touched = Vector{Bool}(undef,nblocks)
   for row = 1:nblocks
@@ -415,7 +412,7 @@ function collect_compress_rhs(
       rbspace_row = rbspace[row]
       ress,trian = collect_residuals_for_trian(op_row_col)
       ad_res = RBVecAlgebraicContribution(T)
-      compress_component!(ad_res,info,op_row_col,ress,trian,times,rbspace_row)
+      compress_component!(ad_res,info,op_row_col,ress,trian,rbspace_row)
       blocks[row] = ad_res
     end
   end
@@ -426,13 +423,10 @@ end
 function collect_compress_lhs(
   info::RBInfo,
   op::PTAlgebraicOperator,
-  rbspace::BlockRBSpace{T}) where T
+  rbspace::BlockRBSpace{T};
+  θ::Real=1) where T
 
-  times = get_times(fesolver)
-  θ = fesolver.θ
   nblocks = get_nblocks(rbspace)
-  @assert length(snaps) == nblocks
-
   njacs = length(feop.jacs)
   ad_jacs = Vector{BlockRBMatAlgebraicContribution{T}}(undef,njacs)
   for i = 1:njacs
@@ -448,7 +442,7 @@ function collect_compress_lhs(
         jacs,trian = collect_jacobians_for_trian(op_row_col;i)
         ad_jac = RBMatAlgebraicContribution(T)
         compress_component!(
-          ad_jac,info,op_row_col,jacs,trian,times,rbspace_row,rbspace_col;combine_projections)
+          ad_jac,info,op_row_col,jacs,trian,rbspace_row,rbspace_col;combine_projections)
         blocks_i[row,col] = ad_jac
       end
     end

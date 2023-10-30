@@ -5,6 +5,14 @@ struct PTAffineOperator <: PTAlgebraicOperator{Affine}
   vector::PTArray
 end
 
+function Base.getindex(op::PTAlgebraicOperator,row::Int,col=:)
+  feop = op.odeop.feop
+  feop_idx = feop[idx...]
+  if isa(col,Colon)
+  else
+  end
+end
+
 struct PTThetaAffineMethodOperator <: PTAlgebraicOperator{Affine}
   odeop::AffinePODEOperator
   μ

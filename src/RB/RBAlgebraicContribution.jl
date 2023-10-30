@@ -141,7 +141,7 @@ function collect_compress_rhs_lhs(
   snapsθ = recenter(snaps,fesolver.uh0(μ);θ)
   _snapsθ,_μ = snapsθ[1:nsnaps_mdeim],μ[1:nsnaps_mdeim]
   lop = get_ptoperator(fesolver,feop,_snapsθ,_μ)
-  rhs = collect_compress_rhs(info,lop,rbspace;θ)
+  rhs = collect_compress_rhs(info,lop,rbspace)
   lhs = collect_compress_lhs(info,lop,rbspace;θ)
   show(rhs),show(lhs)
 
@@ -164,7 +164,7 @@ function collect_compress_rhs_lhs(
   op = get_ptoperator(fesolver,feop,_snapsθ,_μ)
 
   lop = linear_operator(op)
-  rhs = collect_compress_rhs(info,lop,rbspace;θ)
+  rhs = collect_compress_rhs(info,lop,rbspace)
   lhs = collect_compress_lhs(info,lop,rbspace;θ)
   nlop = nonlinear_operator(op)
   nllhs = collect_compress_lhs(info,nlop,rbspace;θ)
@@ -176,8 +176,7 @@ end
 function collect_compress_rhs(
   info::RBInfo,
   op::PTAlgebraicOperator,
-  rbspace::RBSpace{T};
-  kwargs...) where T
+  rbspace::RBSpace{T}) where T
 
   ress,trian = collect_residuals_for_trian(op)
   ad_res = RBVecAlgebraicContribution(T)
