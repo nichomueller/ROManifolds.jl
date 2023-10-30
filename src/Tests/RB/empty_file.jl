@@ -104,7 +104,7 @@ for fun in (:(Algebra.residual!),:residual_for_trian!)
   @eval begin
     function $fun(
       b::PTArray,
-      op::PThetaMethodNonlinearOperator,
+      op::PTThetaMethodOperator,
       x::PTArray,
       args...)
 

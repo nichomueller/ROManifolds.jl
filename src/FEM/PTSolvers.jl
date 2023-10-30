@@ -1,10 +1,3 @@
-abstract type PNonlinearOperator <: NonlinearOperator end
-
-struct PAffineOperator <: PNonlinearOperator
-  matrix::PTArray
-  vector::PTArray
-end
-
 function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::PTArray)
   ns = Vector{LUNumericalSetup}(undef,length(mat))
   @inbounds for k = eachindex(mat)
@@ -39,7 +32,7 @@ function _loop_solve!(x::AffinePTArray,ns,b::AffinePTArray)
   solve!(x[1],ns[1],b[1])
 end
 
-function Algebra.solve!(x::PTArray,ls::LinearSolver,op::PAffineOperator,::Nothing)
+function Algebra.solve!(x::PTArray,ls::LinearSolver,op::PTAffineOperator,::Nothing)
   A,b = op.matrix,op.vector
   @assert length(A) == length(b) == length(x)
   ss = symbolic_setup(ls,testitem(A))
@@ -48,7 +41,7 @@ function Algebra.solve!(x::PTArray,ls::LinearSolver,op::PAffineOperator,::Nothin
   ns
 end
 
-function Algebra.solve!(x::PTArray,::LinearSolver,op::PAffineOperator,ns)
+function Algebra.solve!(x::PTArray,::LinearSolver,op::PTAffineOperator,ns)
   A,b = op.matrix,op.vector
   numerical_setup!(ns,A)
   _loop_solve!(x,ns,b)
@@ -84,7 +77,7 @@ end
 function Algebra.solve!(
   x::PTArray,
   nls::NewtonRaphsonSolver,
-  op::PNonlinearOperator,
+  op::PTAlgebraicOperator,
   ::Nothing)
 
   b = residual(op,x)
@@ -100,7 +93,7 @@ end
 function Algebra.solve!(
   x::PTArray,
   nls::NewtonRaphsonSolver,
-  op::PNonlinearOperator,
+  op::PTAlgebraicOperator,
   cache::PNewtonRaphsonCache)
 
   b = cache.b

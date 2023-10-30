@@ -67,7 +67,8 @@ function stokes_equation()
   nsnaps_test = 10
   st_mdeim = false
   postprocess = true
-  info = RBInfo(test_path;ϵ,norm_style,compute_supremizers,st_mdeim,postprocess)
+  info = RBInfo(test_path;ϵ,norm_style,compute_supremizers,nsnaps_state,
+    nsnaps_mdeim,nsnaps_test,st_mdeim,postprocess)
 
   # Offline phase
   printstyled("OFFLINE PHASE\n";bold=true,underline=true)
@@ -84,8 +85,8 @@ function stokes_equation()
     rbspace = load(info,BlockRBSpace)
     rbrhs,rblhs = load(info,(BlockRBVecAlgebraicContribution,Vector{BlockRBMatAlgebraicContribution}))
   else
-    rbspace = reduced_basis(info,feop,sols;nsnaps_state)
-    rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params;nsnaps_mdeim)
+    rbspace = reduced_basis(info,feop,sols)
+    rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
     if save_structures
       save(info,(rbspace,rbrhs,rblhs))
     end
@@ -93,7 +94,7 @@ function stokes_equation()
 
   # Online phase
   printstyled("ONLINE PHASE\n";bold=true,underline=true)
-  test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params;nsnaps_test)
+  test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params)
 end
 
 stokes_equation()

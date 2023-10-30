@@ -24,7 +24,7 @@ function solve_step!(
   ode_cache = update_cache!(ode_cache,op,μ,tθ)
 
   _matrix_and_vector!(A,b,op,μ,tθ,dtθ,u0,ode_cache,vθ)
-  afop = PAffineOperator(A,b)
+  afop = PTAffineOperator(A,b)
 
   l_cache = solve!(uf,solver.nls,afop,l_cache)
 
@@ -38,27 +38,12 @@ function solve_step!(
   return (uf,tf,cache)
 end
 
-struct PThetaAffineMethodOperator <: PNonlinearOperator
-  odeop::AffinePODEOperator
-  μ
-  tθ
-  dtθ::Float
-  u0::PTArray
-  ode_cache
-  vθ::PTArray
-end
-
-function get_nonlinear_operator(
-  odeop::AffinePODEOperator,μ,tθ,dtθ::Float,u0::PTArray,ode_cache,vθ::PTArray)
-  PThetaAffineMethodOperator(odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
-end
-
 for (f,g) in zip((:residual!,:residual_for_trian!,:residual_for_idx!),
                  (:residual!,:residual_for_trian!,:residual!))
   @eval begin
     function $f(
       b::PTArray,
-      op::PThetaAffineMethodOperator,
+      op::PTThetaAffineMethodOperator,
       ::PTArray,
       args...)
 
@@ -72,7 +57,7 @@ end
 
 function Algebra.jacobian!(
   A::PTArray,
-  op::PThetaAffineMethodOperator,
+  op::PTThetaAffineMethodOperator,
   ::PTArray)
 
   vθ = op.vθ
@@ -86,7 +71,7 @@ for (f,g) in zip((:jacobian!,:jacobian_for_trian!,:jacobian_for_idx!),
   @eval begin
     function $f(
       A::PTArray,
-      op::PThetaAffineMethodOperator,
+      op::PTThetaAffineMethodOperator,
       ::PTArray,
       i::Int,
       args...)

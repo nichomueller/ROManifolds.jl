@@ -216,7 +216,7 @@ ode_cache = update_cache!(ode_cache,ode_op,Table([μn]),times)
 ptb = allocate_residual(ode_op,Table([μn]),times,un,ode_cache)
 ptA = allocate_jacobian(ode_op,Table([μn]),times,un,ode_cache)
 vθ = copy(un) .* 0.
-nlop = get_nonlinear_operator(ode_op,Table([μn]),times,dt*θ,un,ode_cache,vθ)
+nlop = get_ptoperator(ode_op,Table([μn]),times,dt*θ,un,ode_cache,vθ)
 residual!(ptb,nlop,copy(un))
 jacobian!(ptA,nlop,copy(un))
 ptb1 = ptb[1:10]
@@ -373,7 +373,7 @@ ode_cache = update_cache!(ode_cache,ode_op,Table([μn]),times)
 ptb = allocate_residual(ode_op,Table([μn]),times,un,ode_cache)
 ptA = allocate_jacobian(ode_op,Table([μn]),times,un,ode_cache)
 vθ = copy(un) .* 0.
-nlop = get_nonlinear_operator(ode_op,Table([μn]),times,dt*θ,un,ode_cache,vθ)
+nlop = get_ptoperator(ode_op,Table([μn]),times,dt*θ,un,ode_cache,vθ)
 residual!(ptb,nlop,copy(un))
 jacobian!(ptA,nlop,copy(un))
 ptb1 = ptb[1:Nt]

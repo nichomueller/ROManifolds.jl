@@ -66,7 +66,7 @@ end
 # A,b = _allocate_matrix_and_vector(ode_op,w0,ode_cache)
 # ode_cache = update_cache!(ode_cache,ode_op,μ,tθ)
 # _matrix_and_vector!(A,b,ode_op,μ,tθ,dtθ,w0,ode_cache,vθ)
-# afop = PAffineOperator(A,b)
+# afop = PTAffineOperator(A,b)
 # l_cache = solve!(wf,solver.nls,afop,l_cache)
 # wf = wf + w0
 # w0.array .= wf.array
@@ -75,7 +75,7 @@ end
 # tθ = t0+dtθ
 # ode_cache = update_cache!(ode_cache,ode_op,μ,tθ)
 # _matrix_and_vector!(A,b,ode_op,μ,tθ,dtθ,w0,ode_cache,vθ)
-# afop = PAffineOperator(A,b)
+# afop = PTAffineOperator(A,b)
 # l_cache = solve!(wf,solver.nls,afop,l_cache)
 # wf = wf + w0
 # w0.array .= wf.array

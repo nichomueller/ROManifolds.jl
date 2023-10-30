@@ -21,7 +21,7 @@ struct RBAffineDecomposition{T,N}
 
   function RBAffineDecomposition(
     info::RBInfo,
-    nlop::PNonlinearOperator,
+    op::PTAlgebraicOperator,
     nzm::NnzMatrix,
     trian::Triangulation,
     args...;
@@ -43,11 +43,11 @@ struct RBAffineDecomposition{T,N}
       lu(interp_bs)
     end
 
-    cell_dof_ids = get_cell_dof_ids(nlop.odeop.feop.test,trian)
+    cell_dof_ids = get_cell_dof_ids(op.odeop.feop.test,trian)
     red_integr_cells = find_cells(entire_interp_idx_rows,cell_dof_ids)
     red_trian = view(trian,red_integr_cells)
-    red_meas = get_measure(nlop.odeop.feop,red_trian)
-    red_times = info.st_mdeim ? nlop.tθ[interp_idx_time] : nlop.tθ
+    red_meas = get_measure(op.odeop.feop,red_trian)
+    red_times = info.st_mdeim ? op.tθ[interp_idx_time] : op.tθ
     integr_domain = RBIntegrationDomain(red_meas,red_times,entire_interp_idx_space)
 
     RBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)
@@ -165,57 +165,59 @@ end
 
 function rhs_coefficient!(
   cache,
+  op::PTAlgebraicOperator,
   rbres::RBVecAffineDecomposition,
   times::Vector{<:Real};
   kwargs...)
 
-  rcache,scache = cache
-  red_integr_res = assemble_rhs!(rcache,rbres,times)
+  rcache,scache... = cache
+  red_integr_res = assemble_rhs!(rcache,op,rbres,times)
   mdeim_solve!(scache,rbres,red_integr_res;kwargs...)
 end
 
 function assemble_rhs!(
   cache,
+  op::PTAlgebraicOperator,
   rbres::RBVecAffineDecomposition,
   times::Vector{<:Real})
 
-  _,nlop = cache
   red_idx = rbres.integration_domain.idx
   red_times = rbres.integration_domain.times
   red_meas = rbres.integration_domain.meas
 
   cache = get_cache_at_times(cache,times,red_times)
-  sols = get_solutions_at_times(nlop.u0,times,red_times)
+  sols = get_solutions_at_times(op.u0,times,red_times)
 
-  collect_residuals_for_idx!(cache,sols,red_idx,red_meas)
+  collect_residuals_for_idx!(cache,op,sols,red_idx,red_meas)
 end
 
 function lhs_coefficient!(
   cache,
+  op::PTAlgebraicOperator,
   rbjac::RBMatAffineDecomposition,
   times::Vector{<:Real};
   i::Int=1,kwargs...)
 
-  jcache,scache = cache
-  red_integr_jac = assemble_lhs!(jcache,rbjac,times;i)
+  jcache,scache... = cache
+  red_integr_jac = assemble_lhs!(jcache,op,rbjac,times;i)
   mdeim_solve!(scache,rbjac,red_integr_jac;kwargs...)
 end
 
 function assemble_lhs!(
   cache,
+  op::PTAlgebraicOperator,
   rbjac::RBMatAffineDecomposition,
   times::Vector{<:Real};
   i::Int=1)
 
-  _,nlop = cache
   red_idx = rbjac.integration_domain.idx
   red_times = rbjac.integration_domain.times
   red_meas = rbjac.integration_domain.meas
 
   cache = get_cache_at_times(cache,times,red_times)
-  sols = get_solutions_at_times(nlop.u0,times,red_times)
+  sols = get_solutions_at_times(op.u0,times,red_times)
 
-  collect_jacobians_for_idx!(cache,sols,red_idx,red_meas;i)
+  collect_jacobians_for_idx!(cache,op,sols,red_idx,red_meas;i)
 end
 
 function mdeim_solve!(cache,ad::RBAffineDecomposition,a::Matrix;st_mdeim=false)
@@ -278,16 +280,14 @@ function recast_coefficient!(
   ptarray
 end
 
-function get_cache_at_times(cache,times::Vector{<:Real},red_times::Vector{<:Real})
-  q,nlop = cache
+function get_cache_at_times(q,times::Vector{<:Real},red_times::Vector{<:Real})
   time_ndofs = length(times)
   time_ndofs_red = length(red_times)
   nparams = Int(length(q)/time_ndofs)
   if length(red_times) < time_ndofs
-    # red_q = PTArray(q[1:time_ndofs_red*nparams])
-    @notimplemented
+    return PTArray(q[1:time_ndofs_red*nparams])
   else
-    return q,nlop
+    return q
   end
 end
 

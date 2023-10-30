@@ -21,16 +21,20 @@ struct RBInfo
   rb_path::String
   norm_style::Union{Symbol,Vector{Symbol}}
   compute_supremizers::Bool
+  nsnaps_state::Int
+  nsnaps_mdeim::Int
+  nsnaps_test::Int
   st_mdeim::Bool
   postprocess::Bool
 end
 
 function RBInfo(test_path::String;ϵ=1e-4,norm_style=:l2,compute_supremizers=true,
-  st_mdeim=false,postprocess=false)
+  nsnaps_state=50,nsnaps_mdeim=20,nsnaps_test=10,st_mdeim=false,postprocess=false)
 
   fe_path = get_fe_path(test_path)
   rb_path = get_rb_path(test_path,ϵ;st_mdeim)
-  RBInfo(ϵ,fe_path,rb_path,norm_style,compute_supremizers,st_mdeim,postprocess)
+  RBInfo(ϵ,fe_path,rb_path,norm_style,compute_supremizers,nsnaps_state,
+    nsnaps_mdeim,nsnaps_test,st_mdeim,postprocess)
 end
 
 function get_norm_matrix(info::RBInfo,feop::PTFEOperator;norm_style=:l2)

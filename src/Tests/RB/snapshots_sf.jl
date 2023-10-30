@@ -136,7 +136,7 @@ ode_cache = update_cache!(ode_cache,ode_op,params_test,times)
 ptb = allocate_residual(ode_op,params_test,times,snaps_test,ode_cache)
 ptA = allocate_jacobian(ode_op,params_test,times,snaps_test,ode_cache)
 vθ = copy(snaps_test) .* 0.
-nlop = get_nonlinear_operator(ode_op,params_test,times,dt*θ,snaps_test,ode_cache,vθ)
+nlop = get_ptoperator(ode_op,params_test,times,dt*θ,snaps_test,ode_cache,vθ)
 residual!(ptb,nlop,copy(snaps_test))
 jacobian!(ptA,nlop,copy(snaps_test))
 ptb1 = ptb[1:ntimes]

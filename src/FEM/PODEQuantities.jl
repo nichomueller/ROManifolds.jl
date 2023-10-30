@@ -133,42 +133,51 @@ function collect_multi_field_solutions(
   return BlockSnapshots(sols),ComputationInfo(stats,nparams)
 end
 
-function init_collector(
+function get_ptoperator(
   fesolver::PThetaMethod,
   feop::PTFEOperator,
   sols::PTArray,
-  μ::Table,
-  times::Vector{<:Real})
+  μ::Table)
 
   dtθ = fesolver.θ == 0.0 ? fesolver.dt : fesolver.dt*fesolver.θ
   ode_op = get_algebraic_operator(feop)
+  times = get_times(fesolver)
   ode_cache = allocate_cache(ode_op,μ,times)
   ode_cache = update_cache!(ode_cache,ode_op,μ,times)
   sols_cache = zero(sols)
-  nlop = get_nonlinear_operator(ode_op,μ,times,dtθ,sols,ode_cache,sols_cache)
-  return nlop
+  get_ptoperator(ode_op,μ,times,dtθ,sols,ode_cache,sols_cache)
 end
 
-function collect_residuals_for_trian(nlop::PNonlinearOperator)
-  b = allocate_residual(nlop,nlop.u0)
-  ress,trian = residual_for_trian!(b,nlop,nlop.u0)
-  return NnzMatrix.(ress;nparams=length(nlop.μ)),trian
+function get_ptoperator(
+  fesolver::PThetaMethod,
+  feop::PTFEOperator,
+  sols::Vector{<:PTArray},
+  μ::Table)
+
+  vsols = vcat(sols...)
+  get_ptoperator(fesolver,feop,vsols,μ)
 end
 
-function collect_jacobians_for_trian(nlop::PNonlinearOperator;i=1)
-  A = allocate_jacobian(nlop,nlop.u0)
-  jacs_i,trian = jacobian_for_trian!(A,nlop,nlop.u0,i)
-  return map(x->NnzMatrix(map(NnzVector,x);nparams=length(nlop.μ)),jacs_i),trian
+function collect_residuals_for_trian(op::PTAlgebraicOperator)
+  b = allocate_residual(op,op.u0)
+  ress,trian = residual_for_trian!(b,op,op.u0)
+  return NnzMatrix.(ress;nparams=length(op.μ)),trian
+end
+
+function collect_jacobians_for_trian(op::PTAlgebraicOperator;i=1)
+  A = allocate_jacobian(op,op.u0)
+  jacs_i,trian = jacobian_for_trian!(A,op,op.u0,i)
+  return map(x->NnzMatrix(map(NnzVector,x);nparams=length(op.μ)),jacs_i),trian
 end
 
 function collect_residuals_for_idx!(
-  cache,
+  b::PTArray,
+  op::PTAlgebraicOperator,
   sols::PTArray{T},
   nonzero_idx::Vector{Int},
   meas::Measure) where T
 
-  b,nlop = cache
-  ress = residual_for_idx!(b,nlop,sols,meas)
+  ress = residual_for_idx!(b,op,sols,meas)
   N = length(ress)
   resmat = zeros(eltype(T),length(nonzero_idx),N)
   @inbounds for n = 1:N
@@ -178,14 +187,14 @@ function collect_residuals_for_idx!(
 end
 
 function collect_jacobians_for_idx!(
-  cache,
+  A::PTArray,
+  op::PTAlgebraicOperator,
   sols::PTArray{T},
   nonzero_idx::Vector{Int},
   meas::Measure;
   i=1) where T
 
-  A,nlop = cache
-  jacs_i = jacobian_for_idx!(A,nlop,sols,i,meas)
+  jacs_i = jacobian_for_idx!(A,op,sols,i,meas)
   N = length(jacs_i)
   jacimat = zeros(eltype(T),length(nonzero_idx),N)
   @inbounds for n = 1:N

@@ -1,14 +1,14 @@
 """
 A parametric version of the `Gridap` `TransientFEOperator`
 """
-abstract type PTFEOperator{C<:OperatorType} <: GridapType end
+abstract type PTFEOperator{T<:OperatorType} <: GridapType end
 
 """
 Returns a `ODEOperator` wrapper of the `PFEOperator` that can be
 straightforwardly used with the `ODETools` module.
 """
-function TransientFETools.get_algebraic_operator(feop::PTFEOperator{C}) where C
-  PODEOpFromFEOp{C}(feop)
+function TransientFETools.get_algebraic_operator(feop::PTFEOperator{T}) where T
+  PODEOpFromFEOp{T}(feop)
 end
 
 function allocate_cache(::PTFEOperator)
@@ -117,8 +117,8 @@ end
 
 function Base.getindex(op::PTFEOperatorFromWeakForm,row,col)
   if isa(get_test(op),MultiFieldFESpace)
-    trials_col = getindex(get_trial(op),col)
-    test_row = getindex(op.test,row)
+    trials_col = get_trial(op)[col]
+    test_row = op.test[row]
     sf(q,idx) = single_field(op,q,idx)
     res(μ,t,u,dv) = op.res(μ,t,sf(u,col),sf(dv,row))
     jac(μ,t,u,du,dv) = op.jacs[1](μ,t,sf(u,col),sf(du,col),sf(dv,row))
@@ -131,8 +131,8 @@ end
 
 function Base.getindex(op::NonlinearPTFEOperator,row,col)
   if isa(get_test(op),MultiFieldFESpace)
-    trials_col = getindex(get_trial(op),col)
-    test_row = getindex(op.test,row)
+    trials_col = get_trial(op)[col]
+    test_row = op.test[row]
     sf(q,idx) = single_field(op,q,idx)
     res(μ,t,u,dv) = op.res(μ,t,sf(u,col),sf(dv,row))
     jac(μ,t,u,du,dv) = op.jacs[1](μ,t,sf(u,col),sf(du,col),sf(dv,row))

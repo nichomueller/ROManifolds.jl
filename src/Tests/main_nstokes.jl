@@ -73,7 +73,8 @@ begin
   nsnaps_test = 10
   st_mdeim = false
   postprocess = true
-  info = RBInfo(test_path;ϵ,norm_style,compute_supremizers,st_mdeim,nsnaps_mdeim,postprocess)
+  info = RBInfo(test_path;ϵ,norm_style,compute_supremizers,nsnaps_state,
+    nsnaps_mdeim,nsnaps_test,st_mdeim,postprocess)
 end
 
 # Offline phase
@@ -91,8 +92,8 @@ if load_structures
   rbspace = load(info,BlockRBSpace)
   rbrhs,rblhs = load(info,(BlockRBVecAlgebraicContribution,Vector{BlockRBMatAlgebraicContribution}))
 else
-  rbspace = reduced_basis(info,feop,sols;nsnaps_state)
-  rbrhs,rblhs,nl_rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params;nsnaps_mdeim)
+  rbspace = reduced_basis(info,feop,sols)
+  rbrhs,rblhs,nl_rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
   # if save_structures
   #   save(info,(rbspace,rbrhs,rblhs))
   # end
@@ -100,7 +101,7 @@ end
 
 # Online phase
 printstyled("ONLINE PHASE\n";bold=true,underline=true)
-# test_rb_solver(info,feop,fesolver,rbspace,rbrhs,(rblhs,nl_rblhs),sols,params;nsnaps_test)
+# test_rb_solver(info,feop,fesolver,rbspace,rbrhs,(rblhs,nl_rblhs),sols,params)
 snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
 println("Solving nonlinear RB problems with Newton iterations")
 xn,μn = [PTArray(snaps_test[1][1:ntimes]),PTArray(snaps_test[2][1:ntimes])],params_test[1:1]
