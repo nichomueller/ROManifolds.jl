@@ -154,17 +154,19 @@ abstract type PODStyle end
 struct DefaultPOD <: PODStyle end
 struct SteadyPOD <: PODStyle end
 
-function compress(nzm::NnzMatrix,norm_matrix=nothing;kwargs...)
+function compress(info::RBInfo,::PTFEOperator,snaps,args...)
+  nzm = NnzArray(snaps)
+  ϵ = info.ϵ
   steady = num_time_dofs(nzm) == 1 ? SteadyPOD() : DefaultPOD()
-  compress(nzm,steady,norm_matrix;kwargs...)
+  compress(nzm,steady,args...;ϵ)
 end
 
-function compress(
-  nzm::NnzMatrix,
-  ::PODStyle,
-  args...;
-  kwargs...)
+function compress(nzm::NnzMatrix,args...;kwargs...)
+  steady = num_time_dofs(nzm) == 1 ? SteadyPOD() : DefaultPOD()
+  compress(nzm,steady,args...;kwargs...)
+end
 
+function compress(nzm::NnzMatrix,::PODStyle,args...;kwargs...)
   basis_space = tpod(nzm,args...;kwargs...)
   compressed_nzm = prod(basis_space,nzm)
   compressed_nzm_t = change_mode(compressed_nzm)
@@ -172,12 +174,7 @@ function compress(
   basis_space,basis_time
 end
 
-function compress(
-  nzm::NnzMatrix,
-  ::SteadyPOD,
-  args...;
-  kwargs...)
-
+function compress(nzm::NnzMatrix,::SteadyPOD,args...;kwargs...)
   basis_space = tpod(nzm,args...;kwargs...)
   basis_time = ones(eltype(nzm),1,1)
   basis_space,basis_time

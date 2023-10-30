@@ -60,8 +60,8 @@ function post_process(
   stats::NamedTuple)
 
   nparams = length(params)
-  energy_norm = info.energy_norm
-  norm_matrix = get_norm_matrix(feop,energy_norm)
+  norm_style = info.norm_style
+  norm_matrix = get_norm_matrix(info,feop;norm_style)
   _sol = space_time_matrices(sol;nparams)
   _sol_approx = space_time_matrices(sol_approx;nparams)
   fem_stats = load(info,ComputationInfo)
@@ -112,7 +112,7 @@ function test_rb_solver(
   x = initial_guess(snaps,params,params_test)
   rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,x,params_test)
   stats = @timed begin
-    x .= recenter(fesolver,x,params_test)
+    x .= recenter(x,fesolver.uh0(params_test);θ=fesolver.θ)
     rhs = collect_rhs_contributions!(rhs_cache,info,rbres,rbspace,times)
     lhs = collect_lhs_contributions!(lhs_cache,info,rbjacs,rbspace,times)
     rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs)
@@ -143,7 +143,7 @@ function test_rb_solver(
   _,conv0 = Algebra._check_convergence(fesolver.nls.ls,xrb)
   stats = @timed begin
     for iter in 1:fesolver.nls.max_nliters
-      x .= recenter(fesolver,x,params_test)
+      x .= recenter(x,fesolver.uh0(params_test);θ=fesolver.θ)
       xrb = space_time_projection(x,rbspace)
       rhs = collect_rhs_contributions!(rhs_cache,info,rbres,rbspace,times)
       llhs = collect_lhs_contributions!(lhs_cache,info,lrbjacs,rbspace,times)

@@ -66,14 +66,14 @@ begin
   save_solutions = true
   load_structures = false
   save_structures = true
-  energy_norm = [:l2,:l2]
+  norm_style = [:l2,:l2]
   compute_supremizers = true
   nsnaps_state = 50
   nsnaps_mdeim = 30
   nsnaps_test = 10
   st_mdeim = false
   postprocess = true
-  info = RBInfo(test_path;ϵ,energy_norm,compute_supremizers,st_mdeim,nsnaps_mdeim,postprocess)
+  info = RBInfo(test_path;ϵ,norm_style,compute_supremizers,st_mdeim,nsnaps_mdeim,postprocess)
 end
 
 # Offline phase
@@ -91,7 +91,7 @@ if load_structures
   rbspace = load(info,BlockRBSpace)
   rbrhs,rblhs = load(info,(BlockRBVecAlgebraicContribution,Vector{BlockRBMatAlgebraicContribution}))
 else
-  rbspace = reduced_basis(info,feop,sols,params)
+  rbspace = reduced_basis(info,feop,sols;nsnaps_state)
   rbrhs,rblhs,nl_rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params;nsnaps_mdeim)
   # if save_structures
   #   save(info,(rbspace,rbrhs,rblhs))

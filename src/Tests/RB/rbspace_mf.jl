@@ -2,13 +2,13 @@
 sols, = collect_solutions(fesolver,feop,get_trial(feop),μ)
 rbspace = reduced_basis(info,feop,sols,params)
 
-energy_norm = info.energy_norm
+norm_style = info.norm_style
 nblocks = get_nblocks(sols)
 blocks = map(1:nblocks) do col
   feop_row_col = feop[1,col]
   snaps_col = sols[col]
-  energy_norm_col = energy_norm[col]
-  norm_matrix = get_norm_matrix(feop,energy_norm_col)
+  norm_style_col = norm_style[col]
+  norm_matrix = get_norm_matrix(feop,norm_style_col)
   basis_space_nnz,basis_time = compress(info,feop_row_col,snaps_col,norm_matrix,μ)
   basis_space = recast(basis_space_nnz)
   basis_space,basis_time,norm_matrix

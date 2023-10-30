@@ -137,7 +137,7 @@ function collect_compress_rhs_lhs(
   nsnaps_mdeim=20)
 
   θ = fesolver.θ
-  snapsθ = recenter(fesolver,snaps,μ)
+  snapsθ = recenter(snaps,fesolver.uh0(μ);θ)
   _snapsθ,_μ = snapsθ[1:nsnaps_mdeim],μ[1:nsnaps_mdeim]
   times = get_times(fesolver)
   lop = init_collector(fesolver,feop,_snapsθ,_μ,times)
@@ -157,7 +157,7 @@ function collect_compress_rhs_lhs(
   nsnaps_mdeim=20)
 
   θ = fesolver.θ
-  snapsθ = recenter(fesolver,snaps,μ)
+  snapsθ = recenter(snaps,fesolver.uh0(μ);θ)
   _snapsθ,_μ = snapsθ[1:nsnaps_mdeim],μ[1:nsnaps_mdeim]
   times = get_times(fesolver)
   nlop = init_collector(fesolver,feop,_snapsθ,_μ,times)

@@ -1,21 +1,3 @@
-struct RBInfo
-  ϵ::Float
-  fe_path::String
-  rb_path::String
-  energy_norm::Union{Symbol,Vector{Symbol}}
-  compute_supremizers::Bool
-  st_mdeim::Bool
-  postprocess::Bool
-end
-
-function RBInfo(test_path::String;ϵ=1e-4,energy_norm=:l2,compute_supremizers=true,
-  st_mdeim=false,postprocess=false)
-
-  fe_path = get_fe_path(test_path)
-  rb_path = get_rb_path(test_path,ϵ;st_mdeim)
-  RBInfo(ϵ,fe_path,rb_path,energy_norm,compute_supremizers,st_mdeim,postprocess)
-end
-
 function get_fe_path(tpath::String)
   create_dir!(tpath)
   fepath = joinpath(tpath,"fem")
@@ -33,6 +15,41 @@ function get_rb_path(tpath::String,ϵ::Float;st_mdeim=false)
   rb_path
 end
 
+struct RBInfo
+  ϵ::Float
+  fe_path::String
+  rb_path::String
+  norm_style::Union{Symbol,Vector{Symbol}}
+  compute_supremizers::Bool
+  st_mdeim::Bool
+  postprocess::Bool
+end
+
+function RBInfo(test_path::String;ϵ=1e-4,norm_style=:l2,compute_supremizers=true,
+  st_mdeim=false,postprocess=false)
+
+  fe_path = get_fe_path(test_path)
+  rb_path = get_rb_path(test_path,ϵ;st_mdeim)
+  RBInfo(ϵ,fe_path,rb_path,norm_style,compute_supremizers,st_mdeim,postprocess)
+end
+
+function get_norm_matrix(info::RBInfo,feop::PTFEOperator;norm_style=:l2)
+  try
+    T = get_vector_type(feop.test)
+    load(info,SparseMatrixCSC{eltype(T),Int};norm_style)
+  catch
+    if norm_style == :l2
+      nothing
+    elseif norm_style == :L2
+      get_L2_norm_matrix(feop)
+    elseif norm_style == :H1
+      get_H1_norm_matrix(feop)
+    else
+      @unreachable
+    end
+  end
+end
+
 function save(info::RBInfo,objs::Tuple)
   map(obj->save(info,obj),expand(objs))
 end
@@ -48,6 +65,16 @@ end
 
 function load(info::RBInfo,T::Type{Table})
   path = joinpath(info.fe_path,"params")
+  load(path,T)
+end
+
+function save(info::RBInfo,norm_matrix::SparseMatrixCSC{T,Int};norm_style=:l2) where T
+  path = joinpath(info.fe_path,"$(norm_style)_norm_matrix")
+  save(path,norm_matrix)
+end
+
+function load(info::RBInfo,T::Type{SparseMatrixCSC{S,Int}};norm_style=:l2) where S
+  path = joinpath(info.fe_path,"$(norm_style)_norm_matrix")
   load(path,T)
 end
 

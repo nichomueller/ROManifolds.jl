@@ -30,16 +30,10 @@ function Base.copy(s::Snapshots)
   Snapshots(scopy)
 end
 
-function recenter(
-  fesolver::PThetaMethod,
-  s::Snapshots,
-  μ::Table)
-
-  θ = fesolver.θ
-  uh0 = fesolver.uh0(μ)
-  u0 = get_free_dof_values(uh0)
+function recenter(s::Snapshots,uh0::PTFEFunction;θ::Real=1)
   snaps = copy(s.snaps)
-  sθ = snaps.*θ + [u0,snaps[2:end]...].*(1-θ)
+  u0 = get_free_dof_values(uh0)
+  sθ = snaps*θ + [u0,snaps[2:end]...]*(1-θ)
   Snapshots(sθ)
 end
 

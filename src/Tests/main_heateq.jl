@@ -57,15 +57,15 @@ function heat_equation()
   ϵ = 1e-4
   load_solutions = true
   save_solutions = true
-  load_structures = false
+  load_structures = true
   save_structures = true
-  energy_norm = :l2
+  norm_style = :l2
   nsnaps_state = 50
   nsnaps_mdeim = 20
   nsnaps_test = 10
   st_mdeim = false
   postprocess = true
-  info = RBInfo(test_path;ϵ,energy_norm,st_mdeim,postprocess)
+  info = RBInfo(test_path;ϵ,norm_style,st_mdeim,postprocess)
 
   # Offline phase
   printstyled("OFFLINE PHASE\n";bold=true,underline=true)
@@ -82,7 +82,7 @@ function heat_equation()
     rbspace = load(info,RBSpace)
     rbrhs,rblhs = load(info,(RBVecAlgebraicContribution,Vector{RBMatAlgebraicContribution}))
   else
-    rbspace = reduced_basis(info,feop,sols,params)
+    rbspace = reduced_basis(info,feop,sols;nsnaps_state)
     rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params;nsnaps_mdeim)
     if save_structures
       save(info,(rbspace,rbrhs,rblhs))

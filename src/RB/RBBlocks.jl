@@ -45,21 +45,12 @@ function load(info::RBInfo,T::Type{BlockSnapshots})
   load(path,T)
 end
 
-function recenter(
-  fesolver::PThetaMethod,
-  s::BlockSnapshots,
-  μ::Table)
-
-  θ = fesolver.θ
-  uh0 = fesolver.uh0(μ)
+function recenter(s::BlockSnapshots,uh0::PTFEFunction;θ::Real=1)
   nblocks = get_nblocks(s)
   sθ = map(1:nblocks) do row
-    s_row = s[row]
-    u0_row = get_free_dof_values(uh0[row])
-    snaps_row = copy(s_row.snaps)
-    snaps_row.*θ + [u0_row,snaps_row[2:end]...].*(1-θ)
+    recenter(s[row],uh0[row];θ)
   end
-  BlockSnapshots(Snapshots.(sθ))
+  BlockSnapshots(sθ)
 end
 
 struct BlockNnzMatrix{T} <: RBBlock{T,1}
@@ -156,58 +147,46 @@ end
 function reduced_basis(
   info::RBInfo,
   feop::PTFEOperator,
-  snaps::BlockSnapshots,
-  args...;
+  snaps::BlockSnapshots;
   kwargs...)
 
-  energy_norm = info.energy_norm
+  norm_style = info.norm_style
   nblocks = get_nblocks(snaps)
   blocks = map(1:nblocks) do col
     feop_row_col = feop[1,col]
     snaps_col = snaps[col]
-    energy_norm_col = energy_norm[col]
-    norm_matrix = get_norm_matrix(feop,energy_norm_col)
-    basis_space_nnz,basis_time = compress(info,feop_row_col,snaps_col,norm_matrix,args...)
-    basis_space = recast(basis_space_nnz)
-    basis_space,basis_time,norm_matrix
+    norm_matrix = get_norm_matrix(info,feop;norm_style=norm_style[col])
+    reduced_basis(info,feop_row_col,snaps_col,norm_matrix;kwargs...)
   end
-  bases_space = getindex.(blocks,1)
-  bases_time = getindex.(blocks,2)
-  norm_matrix = getindex.(blocks,3)
   if info.compute_supremizers
-    bases_space = add_space_supremizers(bases_space,feop,norm_matrix,args...)
-    bases_time = add_time_supremizers(bases_time;kwargs...)
+    bases_space = add_space_supremizers(info,feop,blocks)
+    bases_time = add_time_supremizers(blocks;kwargs...)
   end
   rbspace = BlockRBSpace(bases_space,bases_time)
-  show(rbspace)
   return rbspace
 end
 
 function add_space_supremizers(
-  bases_space::Vector{<:Matrix},
+  info::RBInfo,
   feop::PTFEOperator,
-  norm_matrix::AbstractVector,
-  args...)
+  blocks::Vector{RBSpace{T}}) where T
 
-  bs_primal,bs_dual... = bases_space
-  nm_primal, = norm_matrix
+  bs_primal,bs_dual... = map(get_basis_space,blocks)
+  primal_norm_style = info.norm_style[1]
+  nm_primal = load(info,SparseMatrixCSC{T,Int};norm_style=primal_norm_style)
   dual_nfields = length(bs_dual)
   for col in 1:dual_nfields
     println("Computing supremizers in space for dual field $col")
     feop_row_col = feop[1,col+1]
-    supr_col = space_supremizers(bs_dual[col],feop_row_col,args...)
+    supr_col = space_supremizers(bs_dual[col],feop_row_col)
     gram_schmidt!(supr_col,bs_primal,nm_primal)
     bs_primal = hcat(bs_primal,supr_col)
   end
   return [bs_primal,bs_dual...]
 end
 
-function space_supremizers(
-  basis_space::Matrix,
-  feop::PTFEOperator,
-  params::Table)
-
-  μ = testitem(params)
+function space_supremizers(basis_space::Matrix,feop::PTFEOperator)
+  μ = realization(feop)
   u = zero(feop.test)
   t = 0.
   jac = get_jacobian(feop)
@@ -618,14 +597,14 @@ function post_process(
 
   nblocks = length(sol)
   nparams = length(params)
-  energy_norm = info.energy_norm
+  norm_style = info.norm_style
   fem_stats = load(info,ComputationInfo)
   rb_stats = ComputationInfo(stats,nparams)
   map(1:nblocks) do col
     feop_col = feop[col,col]
     sol_col = sol[col]
     sol_approx_col = sol_approx[col]
-    norm_matrix_col = get_norm_matrix(feop_col,energy_norm[col])
+    norm_matrix_col = get_norm_matrix(info,feop_col;norm_style=norm_style[col])
     _sol_col = space_time_matrices(sol_col;nparams)
     _sol_approx_col = space_time_matrices(sol_approx_col;nparams)
     results = RBResults(params,_sol_col,_sol_approx_col,fem_stats,rb_stats;
