@@ -175,9 +175,9 @@ function collect_residuals_for_idx!(
   op::PTAlgebraicOperator,
   sols::PTArray{T},
   nonzero_idx::Vector{Int},
-  meas::Measure) where T
+  args...) where T
 
-  ress = residual_for_idx!(b,op,sols,meas)
+  ress = residual_for_idx!(b,op,sols,args...)
   N = length(ress)
   resmat = zeros(eltype(T),length(nonzero_idx),N)
   @inbounds for n = 1:N
@@ -191,10 +191,10 @@ function collect_jacobians_for_idx!(
   op::PTAlgebraicOperator,
   sols::PTArray{T},
   nonzero_idx::Vector{Int},
-  meas::Measure;
+  args...;
   i=1) where T
 
-  jacs_i = jacobian_for_idx!(A,op,sols,i,meas)
+  jacs_i = jacobian_for_idx!(A,op,sols,i,args...)
   N = length(jacs_i)
   jacimat = zeros(eltype(T),length(nonzero_idx),N)
   @inbounds for n = 1:N

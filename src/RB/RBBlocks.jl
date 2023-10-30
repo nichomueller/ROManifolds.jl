@@ -35,15 +35,6 @@ function Base.getindex(s::BlockSnapshots{T},idx::UnitRange{Int}) where T
   end
 end
 
-function Base.vcat(s::BlockSnapshots{T}...) where T
-  l = length(testitem(s))
-  vsnaps = Vector{PTArray{T}}(undef,l)
-  @inbounds for i = 1:l
-    vsnaps[i] = vcat(map(n->s[n].snaps[i],1:nblocks)...)
-  end
-  Snapshots(vsnaps)
-end
-
 function save(info::RBInfo,s::BlockSnapshots)
   path = joinpath(info.fe_path,"fesnaps")
   save(path,s)
@@ -133,21 +124,21 @@ end
 
 function recast(x::PTArray,rb::BlockRBSpace)
   nblocks = get_nblocks(rb)
-  offset = field_offsets(rb)
-  map(1:nblocks) do row
+  offsets = field_offsets(rb)
+  blocks = map(1:nblocks) do row
     rb_row = rb[row]
-    x_row = map(y->y[offset[row]+1:offset[row+1]],x)
+    x_row = get_at_offsets(x,offsets,row)
     recast(x_row,rb_row)
   end
+  return vcat(blocks...)
 end
 
-function space_time_projection(x::Vector{<:PTArray},rb::BlockRBSpace{T}) where T
+function space_time_projection(x::PTArray,op::PTAlgebraicOperator,rb::BlockRBSpace)
   nblocks = get_nblocks(rb)
-  @assert length(x) == nblocks
-
+  offsets = field_offsets(op.odeop.feop.test)
   blocks = map(1:nblocks) do row
-    x_row = x[row]
     rb_row = rb[row]
+    x_row = get_at_offsets(x,offsets,row)
     space_time_projection(x_row,rb_row)
   end
   return vcat(blocks...)
@@ -427,7 +418,7 @@ function collect_compress_lhs(
   θ::Real=1) where T
 
   nblocks = get_nblocks(rbspace)
-  njacs = length(feop.jacs)
+  njacs = length(op.odeop.feop.jacs)
   ad_jacs = Vector{BlockRBMatAlgebraicContribution{T}}(undef,njacs)
   for i = 1:njacs
     combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*x-θ*y
@@ -475,9 +466,9 @@ function check_touched_jacobians(op::PTAlgebraicOperator;i=1)
   test = get_test(feop)
   trial = get_trial(feop)
   Us, = op.ode_cache
-  uh = EvaluationFunction(Us[1],sols)
-  μ1 = testitem(μ)
-  t1 = testitem(times)
+  uh = EvaluationFunction(Us[1],op.u0)
+  μ1 = testitem(op.μ)
+  t1 = testitem(op.tθ)
   uh1 = testitem(uh)
   dxh1 = ()
   for i in 1:get_order(feop)
@@ -495,8 +486,7 @@ function collect_rhs_contributions!(
   info::RBInfo,
   op::PTAlgebraicOperator,
   rbres::BlockRBVecAlgebraicContribution{T},
-  rbspace::BlockRBSpace{T},
-  times::Vector{<:Real}) where T
+  rbspace::BlockRBSpace{T}) where T
 
   nblocks = get_nblocks(rbres)
   blocks = Vector{PTArray{Vector{T}}}(undef,nblocks)
@@ -506,7 +496,7 @@ function collect_rhs_contributions!(
     if rbres.touched[row]
       rbspace_row = rbspace[row]
       blocks[row] = collect_rhs_contributions!(
-        cache_row,info,op_row_col,rbres[row],rbspace_row,times)
+        cache_row,info,op_row_col,rbres[row],rbspace_row)
     else
       rb_offsets = field_offsets(rbspace)
       s = (rb_offsets[row+1]-rb_offsets[row],)
@@ -525,8 +515,7 @@ function collect_lhs_contributions!(
   info::RBInfo,
   op::PTAlgebraicOperator,
   rbjacs::Vector{BlockRBMatAlgebraicContribution{T}},
-  rbspace::BlockRBSpace{T},
-  times::Vector{<:Real}) where T
+  rbspace::BlockRBSpace{T}) where T
 
   njacs = length(rbjacs)
   nblocks = get_nblocks(testitem(rbjacs))
@@ -541,7 +530,7 @@ function collect_lhs_contributions!(
         rbspace_row = rbspace[row]
         rbspace_col = rbspace[col]
         blocks[row,col] = collect_lhs_contributions!(
-          cache_row_col,info,op_row_col,rb_jac_i[row,col],rbspace_row,rbspace_col,times;i)
+          cache_row_col,info,op_row_col,rb_jac_i[row,col],rbspace_row,rbspace_col;i)
       else
         rb_offsets = field_offsets(rbspace)
         s = (rb_offsets[row+1]-rb_offsets[row],rb_offsets[col+1]-rb_offsets[col])
@@ -589,18 +578,18 @@ end
 
 function cache_at_index(cache,op::PTAlgebraicOperator,row::Int)
   coeff_cache,rb_cache = cache
-  b,solve_cache = coeff_cache
+  b,solve_cache... = coeff_cache
   offsets = field_offsets(op.odeop.feop.test)
-  b_idx = map(x->getindex(x,offsets[row]+1:offsets[row+1]),b)
-  return ((b_idx,nlop_idx),solve_cache),rb_cache
+  b_idx = get_at_offsets(b,offsets,row)
+  return (b_idx,solve_cache...),rb_cache
 end
 
 function cache_at_index(cache,op::PTAlgebraicOperator,row::Int,col::Int)
   coeff_cache,rb_cache = cache
-  A,solve_cache = coeff_cache
+  A,solve_cache... = coeff_cache
   offsets = field_offsets(op.odeop.feop.test)
-  A_idx = map(x->getindex(x,offsets[row]+1:offsets[row+1],offsets[col]+1:offsets[col+1]),A)
-  return (A_idx,solve_cache),rb_cache
+  A_idx = get_at_offsets(A,offsets,row,col)
+  return (A_idx,solve_cache...),rb_cache
 end
 
 function initial_guess(

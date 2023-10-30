@@ -85,14 +85,14 @@ function get_jacobian(op::NonlinearPTFEOperator)
   return jac,jac_t
 end
 
-function linear_operator(op::NonlinearPTFEOperator)
+function get_linear_operator(op::NonlinearPTFEOperator)
   res(μ,t,u,v) = op.res(μ,t,u,v) + op.nl[1](μ,t,u,u,v)
   jac(μ,t,u,du,v) = op.jacs[1](μ,t,u,du,v) + op.nl[1](μ,t,u,du,v)
   jac_t(μ,t,u,du,v) = op.jacs[2](μ,t,u,du,v)
   return PTFEOperatorFromWeakForm(res,(jac,jac_t),op.assem,op.pspace,op.trials,op.test,op.order)
 end
 
-function nonlinear_operator(op::NonlinearPTFEOperator)
+function get_nonlinear_operator(op::NonlinearPTFEOperator)
   res(μ,t,u,v) = nothing
   jac(μ,t,u,du,v) = op.nl[2](μ,t,u,du,v) - op.nl[1](μ,t,u,du,v)
   jac_t(μ,t,u,du,v) = nothing

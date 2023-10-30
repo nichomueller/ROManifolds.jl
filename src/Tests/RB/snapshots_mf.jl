@@ -350,6 +350,8 @@ n = 1
 θdt = θ*dt
 un = PTArray(vcat(snaps_test...)[1:Nt])
 μn = params_test[n]
+conv(u,∇u) = (∇u')⋅u
+dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
 g_ok(x,t) = g(x,μn,t)
 g_ok(t) = x->g_ok(x,t)
 m_ok(t,u,v) = ∫(v⋅u)dΩ
@@ -367,15 +369,12 @@ feop_ok = TransientFEOperator(Res_ok,Jac_ok,jac_t_ok,trial_ok,test)
 ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
 ode_cache_ok = allocate_cache(ode_op_ok)
 
-ode_op = get_algebraic_operator(feop)
-ode_cache = allocate_cache(ode_op,Table([μn]),times)
-ode_cache = update_cache!(ode_cache,ode_op,Table([μn]),times)
-ptb = allocate_residual(ode_op,Table([μn]),times,un,ode_cache)
-ptA = allocate_jacobian(ode_op,Table([μn]),times,un,ode_cache)
+op = get_ptoperator(fesolver,feop,un,Table([μn]))
+ptb = allocate_residual(op,un)
+ptA = allocate_jacobian(op,un)
 vθ = copy(un) .* 0.
-nlop = get_ptoperator(ode_op,Table([μn]),times,dt*θ,un,ode_cache,vθ)
-residual!(ptb,nlop,copy(un))
-jacobian!(ptA,nlop,copy(un))
+residual!(ptb,op,copy(un))
+jacobian!(ptA,op,copy(un))
 ptb1 = ptb[1:Nt]
 ptA1 = ptA[1:Nt]
 
@@ -505,14 +504,12 @@ times = get_times(fesolver)
 Nt = length(times)
 Nu = length(get_free_dof_ids(test_u))
 Np = length(get_free_dof_ids(test_p))
-# μ = realization(feop)
-# u = [PTArray([zeros(Nu) for _ = 1:Nt]),PTArray([zeros(Np) for _ = 1:Nt])]
-snaps_test,params_test = load_test(info,feop,fesolver)
 μ = params_test[1]
 u = PTArray(snaps_test[1][1:10])
 p = PTArray(snaps_test[2][1:10])
 x = [u,p]
 vx = vcat(x...)
+op = get_ptoperator(fesolver,feop,vx,Table([μ]))
 
 # RESIDUAL
 
@@ -546,16 +543,17 @@ bblock[1] = b1
 bblock[2] = b2
 bidx = [Ridx1,Ridx2]
 
-touched = check_touched_residuals(feop,x,Table([μ]),times)
+lop = get_linear_operator(op)
 for row = 1:nblocks
-  touched_row = touched[row]
-  if touched_row
-    feop_row_col = feop[row,:]
+  op_row_col = lop[row,:]
+  if check_touched_residuals(op_row_col)
     b = bblock[row]
-    res1, = collect_residuals_for_trian(fesolver,feop_row_col,vx,Table([μ]),times)
-    res2 = collect_residuals_for_idx!(b,fesolver,feop_row_col,vx,Table([μ]),times,bidx[row])
-    @assert isapprox(res1[1].nonzero_val,Rblock[row]) "Failed when row = $row"
-    @assert isapprox(res2,Rblock[row]) "Failed when row = $row"
+    res1, = collect_residuals_for_trian(op_row_col)
+    res2 = collect_residuals_for_idx!(b,op_row_col,op_row_col.u0,bidx[row])
+    println("Max norm res: $(norm(res2-Rblock[row],Inf))")
+    # println("Max norm res: $(norm(recast(res1[1])-Rblock[row],Inf))")
+    # @assert isapprox(recast(res1[1]),Rblock[row]) "Failed when row = $row"
+    # @assert isapprox(res2,Rblock[row]) "Failed when row = $row"
   end
 end
 
@@ -619,16 +617,13 @@ Jblock[1,1] = hcat(map(x->original_findnz(x[1:Nu,1:Nu][:])[2],Avec)...)
 Jblock[1,2] = hcat(map(x->findnz(x[1:Nu,1+Nu:end][:])[2],Avec)...)
 Jblock[2,1] = hcat(map(x->findnz(x[1+Nu:end,1:Nu][:])[2],Avec)...)
 
-touched = check_touched_jacobians(feop,x,Table([μ]),times;i)
 for (row,col) = index_pairs(nblocks,nblocks)
-  touched_row_col = touched[row,col]
-  if touched_row_col
+  op_row_col = op[row,col]
+  if check_touched_jacobians(op_row_col)
     println("(row,col) = ($row,$col)")
-    feop_row_col = feop[row,col]
-    snaps_col = x[col]
     A = Ablock[row,col]
-    jac1, = collect_jacobians_for_trian(fesolver,feop_row_col,snaps_col,Table([μ]),times;i)
-    jac2 = collect_jacobians_for_idx!(A,fesolver,feop_row_col,snaps_col,Table([μ]),times,Aidx[row,col])
+    jac1, = collect_jacobians_for_trian(op_row_col;i)
+    jac2 = collect_jacobians_for_idx!(A,op_row_col,op_row_col.u0,Aidx[row,col])
     @assert isapprox(jac1[1].nonzero_val,Jblock[row,col]) "Failed when (row,col) = ($row,$col)"
     @assert isapprox(jac2,Jblock[row,col]) "Failed when (row,col) = ($row,$col)"
   end

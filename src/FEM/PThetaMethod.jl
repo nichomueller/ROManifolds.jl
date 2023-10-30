@@ -67,9 +67,18 @@ for (f,g) in zip((:residual_for_trian!,:residual_for_idx!),(:residual_for_trian!
   end
 end
 
-function Algebra.jacobian(op::PTAlgebraicOperator,x::PTArray,args...)
-  A = allocate_jacobian(op,x)
-  jacobian!(A,op,x,args...)
+function jacobian!(
+  A::PTArray,
+  op::PTThetaMethodOperator,
+  x::PTArray,
+  args...)
+
+  uF = x
+  vθ = op.vθ
+  @. vθ = (x-op.u0)/op.dtθ
+  z = zero(eltype(A))
+  fillstored!(A,z)
+  jacobians!(A,op.odeop,op.μ,op.tθ,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache,args...)
 end
 
 for (f,g) in zip((:jacobian!,:jacobian_for_trian!,:jacobian_for_idx!),
@@ -87,7 +96,8 @@ for (f,g) in zip((:jacobian!,:jacobian_for_trian!,:jacobian_for_idx!),
       @. vθ = (x-op.u0)/op.dtθ
       z = zero(eltype(A))
       fillstored!(A,z)
-      $g(A,op.odeop,op.μ,op.tθ,(uF,vθ),i,(1.0,1/op.dtθ)[i],op.ode_cache,args...)
+      γ = (1.0,1/op.dtθ)
+      $g(A,op.odeop,op.μ,op.tθ,(uF,vθ),i,γ[i],op.ode_cache,args...)
     end
   end
 end

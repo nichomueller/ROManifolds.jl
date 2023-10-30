@@ -35,11 +35,11 @@ Aok = allocate_jacobian(nlop0,vθ)
 
 M = assemble_matrix((du,dv)->∫(dv⋅du)dΩ,trial_u(μn,dt),test_u)
 
-function return_quantities(ode_cache_ok,x::PTArray,kt)
+function return_quantities(ode_op,ode_cache,x::PTArray,kt)
   xk = x[kt]
   xk_1 = kt > 1 ? x[kt-1] : get_free_dof_values(xh0μ(μn))
   t = times[kt]
-  ode_cache_ok = Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  ode_cache = Gridap.ODEs.TransientFETools.update_cache!(ode_cache,ode_op,t)
 
   vθ = (xk-xk_1) / θdt
   bprev = vcat(M*vθ[1:Nu],zeros(Np))
@@ -47,8 +47,8 @@ function return_quantities(ode_cache_ok,x::PTArray,kt)
   z = zero(eltype(Aok))
   fillstored!(Aok,z)
   fill!(bok,z)
-  residual!(bok,ode_op_ok,t,(xk,v0),ode_cache_ok)
-  jacobians!(Aok,ode_op_ok,t,(xk,v0),(1.0,1/(dt*θ)),ode_cache_ok)
+  residual!(bok,ode_op,t,(xk,v0),ode_cache)
+  jacobians!(Aok,ode_op,t,(xk,v0),(1.0,1/(dt*θ)),ode_cache)
   return (bok,bprev),Aok
 end
 
@@ -58,7 +58,7 @@ nu = get_rb_ndofs(rbspace[1])
 for iter in 1:fesolver.nls.max_nliters
   A,b = [],[]
   for kt = eachindex(times)
-    (bk,_),Ak = return_quantities(ode_cache_ok,x,kt)
+    (bk,_),Ak = return_quantities(ode_op_ok,ode_cache_ok,x,kt)
     push!(b,copy(bk))
     push!(A,copy(Ak))
   end
@@ -100,46 +100,10 @@ end
 norm(hcat(xcat.array...) - hcat(x.array...)) / norm(hcat(xcat.array...))
 
 # COMPARISON
-for fun in (:(Algebra.residual!),:residual_for_trian!)
-  @eval begin
-    function $fun(
-      b::PTArray,
-      op::PTThetaMethodOperator,
-      x::PTArray,
-      args...)
-
-      println("DIO CANE")
-      uθ = zero(x)
-      vθ = zero(x)
-      z = zero(eltype(b))
-      fill!(b,z)
-      $fun(b,op.odeop,op.μ,op.tθ,(uθ,vθ),op.ode_cache,args...)
-    end
-  end
-end
-
-Base.adjoint(::Nothing) = nothing
-_c(u,du,dv) = ∫ₚ(dv⊙(∇(du)'⋅u),dΩ)
-_jac(μ,t,(u,p),(du,dp),(v,q)) = a(μ,t,(du,dp),(v,q)) + _c(u,du,v)
-_feop = NonlinearPTFEOperator(res,_jac,jac_t,pspace,trial,test)
-
-rbrhs,rbjac = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
-_,rblhs = collect_compress_rhs_lhs(info,_feop,fesolver,rbspace,sols,params)
-
-rhs_cache,lhs_cache = allocate_online_cache(feop,fesolver,xn,Table([μn]))
-
-y = map(zero,xn)
-ycat = vcat(y...)
-yrb = space_time_projection(map(x->x[1:Nu],ycat),rbspace[1]),space_time_projection(map(x->x[1+Nu:end],ycat),rbspace[2])
-rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbrhs,rbspace,y,Table([μn]))
-j = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjac,rbspace,y,Table([μn]))
-lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,rbspace,y,Table([μn]))
-r = lhs*vcat(yrb...) + rhs
-
-x = copy(xcat) .* 0.
+x = copy(xcat) #.* 0.
 A,b = [],[]
 for kt = eachindex(times)
-  (bk,_),Ak = return_quantities(ode_cache_ok,x,kt)
+  (bk,_),Ak = return_quantities(ode_op_ok,ode_cache_ok,x,kt)
   push!(b,copy(bk))
   push!(A,copy(Ak))
 end
@@ -163,25 +127,118 @@ R2 = NnzMatrix(map(x->x[1+Nu:end],b)...)
 RHS1_rb = space_time_projection(R1,rbspace[1])
 RHS2_rb = space_time_projection(R2,rbspace[2])
 RHS_rb = vcat(RHS1_rb,RHS2_rb)
-println("Error norm (jac,res): ($(norm(lhs[1] - LHS_rb)),$(norm(rhs[1] - RHS_rb)))")
 
-y = map(zero,xn)
-for iter in 1:fesolver.nls.max_nliters
-  ycat = vcat(y...)
-  yrb = space_time_projection(map(x->x[1:Nu],ycat),rbspace[1]),space_time_projection(map(x->x[1+Nu:end],ycat),rbspace[2])
-  rhs = collect_rhs_contributions!(rhs_cache,info,feop,fesolver,rbrhs,rbspace,y,Table([μn]))
-  j = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rbjac,rbspace,y,Table([μn]))
-  lhs = collect_lhs_contributions!(lhs_cache,info,feop,fesolver,rblhs,rbspace,y,Table([μn]))
-  r = lhs*vcat(yrb...) + rhs
+op = get_ptoperator(fesolver,feop,x,Table([μn]))
+xrb = space_time_projection(x,op,rbspace)
+rhs = collect_rhs_contributions!(rhs_cache,info,op,rbrhs,rbspace)
+llhs = collect_lhs_contributions!(lhs_cache,info,op,rblhs,rbspace)
+nllhs = collect_lhs_contributions!(lhs_cache,info,op,nl_rblhs,rbspace)
+_LHS_rb = llhs + nllhs
+_RHS_rb = rhs - llhs*xrb
+norm(LHS_rb - _LHS_rb[1],Inf)
+norm(RHS_rb + _RHS_rb[1],Inf)
 
-  dxrb = NonaffinePTArray([j[1] \ r[1]])
-  y -= recast(dxrb,rbspace)
+# verify splitting operator
+x = copy(xcat)
 
-  nerr = norm(dxrb[1])
-  println("norm dx = $nerr")
-  if nerr ≤ 1e-10
-    break
-  end
+A,b = [],[]
+for kt = eachindex(times)
+  (bk,_),Ak = return_quantities(ode_op_ok,ode_cache_ok,x,kt)
+  push!(b,copy(bk))
+  push!(A,copy(Ak))
 end
 
-norm(hcat(xcat.array...) - hcat(vcat(y...).array...)) / norm(hcat(xcat.array...))
+Jac_ok_lin(t,(u,p),(du,dp),(v,q)) = a_ok(t,(du,dp),(v,q)) + c_ok(t,u,du,v)
+Res_ok_lin(t,(u,p),(v,q)) = m_ok(t,∂t(u),v) + a_ok(t,(u,p),(v,q)) + c_ok(t,u,u,v)
+Jac_ok_nlin(t,(u,p),(du,dp),(v,q)) = ∫(v⊙(∇(u)'⋅du))dΩ
+Res_ok_nlin(t,(u,p),(v,q)) = nothing
+jac_t_ok_nlin(t,(u,p),(du,dp),(v,q)) = nothing
+
+feop_ok_lin = TransientFEOperator(Res_ok_lin,Jac_ok_lin,jac_t_ok,trial_ok,test)
+ode_op_ok_lin = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok_lin)
+ode_cache_ok_lin = allocate_cache(ode_op_ok_lin)
+
+Alin,blin = [],[]
+for kt = eachindex(times)
+  (bk,_),Ak = return_quantities(ode_op_ok_lin,ode_cache_ok_lin,x,kt)
+  push!(blin,copy(bk))
+  push!(Alin,copy(Ak))
+end
+
+feop_ok_nlin = TransientFEOperator(Res_ok_nlin,Jac_ok_nlin,jac_t_ok_nlin,trial_ok,test)
+ode_op_ok_nlin = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok_nlin)
+ode_cache_ok_nlin = allocate_cache(ode_op_ok_nlin)
+
+
+FESpaces.numeric_loop_vector!(b,a::SparseMatrixAssembler,vecdata::Nothing) = nothing
+function Gridap.ODEs.TransientFETools.fill_jacobians(
+  op::Gridap.ODEs.TransientFETools.TransientFEOperatorsFromWeakForm,
+  t::Real,
+  xh::T,
+  γ::Tuple{Vararg{Real}}) where T
+  _matdata = ()
+  for i in 1:Gridap.ODEs.TransientFETools.get_order(op)+1
+    if (γ[i] > 0.0)
+      _data = Gridap.ODEs.TransientFETools._matdata_jacobian(op,t,xh,i,γ[i])
+      if !isnothing(_data)
+        _matdata = (_matdata...,_data)
+      end
+    end
+  end
+  return _matdata
+end
+
+Anlin,bnlin = [],[]
+for kt = eachindex(times)
+  (bk,_),Ak = return_quantities(ode_op_ok_nlin,ode_cache_ok_nlin,x,kt)
+  push!(bnlin,copy(bk))
+  push!(Anlin,copy(Ak))
+end
+
+for kt = eachindex(times)
+  @assert A[kt] ≈ Alin[kt] + Anlin[kt] "Jac failed when kt = $kt"
+  @assert b[kt] ≈ blin[kt] + bnlin[kt] "Res failed when kt = $kt"
+end
+
+# linear part
+LHS11_1 = NnzMatrix(map(x->NnzVector(x[1:Nu,1:Nu] - M/θdt),Alin)...)
+LHS11_2 = NnzMatrix([NnzVector(M/θdt) for _ = times]...)
+LHS21 = NnzMatrix(map(x->NnzVector(x[1+Nu:end,1:Nu]),Alin)...)
+LHS12 = NnzMatrix(map(x->NnzVector(x[1:Nu,1+Nu:end]),Alin)...)
+
+LHS11_rb_1 = space_time_projection(LHS11_1,rbspace[1],rbspace[1])
+LHS11_rb_2 = space_time_projection(LHS11_2,rbspace[1],rbspace[1];combine_projections=(x,y)->x-y)
+LHS11_rb = LHS11_rb_1 + LHS11_rb_2
+LHS21_rb = space_time_projection(LHS21,rbspace[2],rbspace[1])
+LHS12_rb = space_time_projection(LHS12,rbspace[1],rbspace[2])
+
+np = get_rb_ndofs(rbspace[2])
+LHS_rb = vcat(hcat(LHS11_rb,LHS12_rb),hcat(LHS21_rb,zeros(np,np)))
+
+R1 = NnzMatrix(map(x->x[1:Nu],blin)...)
+R2 = NnzMatrix(map(x->x[1+Nu:end],blin)...)
+RHS1_rb = space_time_projection(R1,rbspace[1])
+RHS2_rb = space_time_projection(R2,rbspace[2])
+RHS_rb = vcat(RHS1_rb,RHS2_rb)
+
+op = get_ptoperator(fesolver,feop,x,Table([μn]))
+xrb = space_time_projection(x,op,rbspace)
+rhs = collect_rhs_contributions!(rhs_cache,info,op,rbrhs,rbspace)
+llhs = collect_lhs_contributions!(lhs_cache,info,op,rblhs,rbspace)
+_LHS_rb = llhs + nllhs
+_RHS_rb = rhs - llhs*xrb
+norm(LHS_rb - _LHS_rb[1],Inf)
+norm(RHS_rb + _RHS_rb[1],Inf)
+
+#nonlinear part
+LHS11 = NnzMatrix(map(x->NnzVector(x[1:Nu,1:Nu]),Anlin)...)
+LHS11_rb = space_time_projection(LHS11,rbspace[1],rbspace[1])
+
+nu = get_rb_ndofs(rbspace[1])
+np = get_rb_ndofs(rbspace[2])
+LHS_rb = vcat(hcat(LHS11_rb,zeros(nu,np)),hcat(zeros(np,nu),zeros(np,np)))
+
+op = get_ptoperator(fesolver,feop,x,Table([μn]))
+xrb = space_time_projection(x,op,rbspace)
+nllhs = collect_lhs_contributions!(lhs_cache,info,op,nl_rblhs,rbspace)
+norm(LHS_rb - nllhs[1],Inf)

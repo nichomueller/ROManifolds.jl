@@ -140,9 +140,9 @@ function collect_compress_rhs_lhs(
 
   snapsθ = recenter(snaps,fesolver.uh0(μ);θ)
   _snapsθ,_μ = snapsθ[1:nsnaps_mdeim],μ[1:nsnaps_mdeim]
-  lop = get_ptoperator(fesolver,feop,_snapsθ,_μ)
-  rhs = collect_compress_rhs(info,lop,rbspace)
-  lhs = collect_compress_lhs(info,lop,rbspace;θ)
+  op = get_ptoperator(fesolver,feop,_snapsθ,_μ)
+  rhs = collect_compress_rhs(info,op,rbspace)
+  lhs = collect_compress_lhs(info,op,rbspace;θ)
   show(rhs),show(lhs)
 
   rhs,lhs
@@ -163,10 +163,10 @@ function collect_compress_rhs_lhs(
   _snapsθ,_μ = snapsθ[1:nsnaps_mdeim],μ[1:nsnaps_mdeim]
   op = get_ptoperator(fesolver,feop,_snapsθ,_μ)
 
-  lop = linear_operator(op)
+  lop = get_linear_operator(op)
   rhs = collect_compress_rhs(info,lop,rbspace)
   lhs = collect_compress_lhs(info,lop,rbspace;θ)
-  nlop = nonlinear_operator(op)
+  nlop = get_nonlinear_operator(op)
   nllhs = collect_compress_lhs(info,nlop,rbspace;θ)
   show(rhs),show(lhs)
 
@@ -225,8 +225,7 @@ function collect_rhs_contributions!(
   info::RBInfo,
   op::PTAlgebraicOperator,
   rbres::RBVecAlgebraicContribution{T},
-  rbspace::RBSpace{T},
-  times::Vector{<:Real}) where T
+  rbspace::RBSpace{T}) where T
 
   coeff_cache,rb_cache = cache
   st_mdeim = info.st_mdeim
@@ -239,7 +238,7 @@ function collect_rhs_contributions!(
   else
     for (i,t) in enumerate(get_domains(rbres))
       rbrest = rbres[t]
-      coeff = rhs_coefficient!(coeff_cache,op,rbrest,times;st_mdeim)
+      coeff = rhs_coefficient!(coeff_cache,op,rbrest;st_mdeim)
       rb_res_contribs[i] = rb_contribution!(rb_cache,k,rbrest,coeff)
     end
   end
@@ -251,14 +250,13 @@ function collect_lhs_contributions!(
   info::RBInfo,
   op::PTAlgebraicOperator,
   rbjacs::Vector{RBMatAlgebraicContribution{T}},
-  rbspace::RBSpace{T},
-  times::Vector{<:Real}) where T
+  rbspace::RBSpace{T}) where T
 
   njacs = length(rbjacs)
   rb_jacs_contribs = Vector{PTArray{Matrix{T}}}(undef,njacs)
   for i = 1:njacs
     rb_jac_i = rbjacs[i]
-    rb_jacs_contribs[i] = collect_lhs_contributions!(cache,info,op,rb_jac_i,rbspace,rbspace,times;i)
+    rb_jacs_contribs[i] = collect_lhs_contributions!(cache,info,op,rb_jac_i,rbspace,rbspace;i)
   end
   return sum(rb_jacs_contribs)
 end
@@ -269,8 +267,7 @@ function collect_lhs_contributions!(
   op::PTAlgebraicOperator,
   rbjac::RBMatAlgebraicContribution{T},
   rbspace_row::RBSpace{T},
-  rbspace_col::RBSpace{T},
-  times::Vector{<:Real};
+  rbspace_col::RBSpace{T};
   kwargs...) where T
 
   coeff_cache,rb_cache = cache
@@ -286,7 +283,7 @@ function collect_lhs_contributions!(
   else
     for (i,t) in enumerate(trian)
       rbjact = rbjac[t]
-      coeff = lhs_coefficient!(coeff_cache,op,rbjact,times;st_mdeim,kwargs...)
+      coeff = lhs_coefficient!(coeff_cache,op,rbjact;st_mdeim,kwargs...)
       rb_jac_contribs[i] = rb_contribution!(rb_cache,k,rbjact,coeff)
     end
   end

@@ -30,6 +30,15 @@ function Base.copy(s::Snapshots)
   Snapshots(scopy)
 end
 
+function Base.vcat(s::Snapshots{T}...) where T
+  l = length(first(s))
+  vsnaps = Vector{PTArray{T}}(undef,l)
+  @inbounds for i = 1:l
+    vsnaps[i] = vcat(map(n->s[n].snaps[i],eachindex(s))...)
+  end
+  Snapshots(vsnaps)
+end
+
 function recenter(s::Snapshots,uh0::PTFEFunction;θ::Real=1)
   snaps = copy(s.snaps)
   u0 = get_free_dof_values(uh0)

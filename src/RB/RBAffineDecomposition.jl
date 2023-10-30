@@ -166,27 +166,25 @@ end
 function rhs_coefficient!(
   cache,
   op::PTAlgebraicOperator,
-  rbres::RBVecAffineDecomposition,
-  times::Vector{<:Real};
+  rbres::RBVecAffineDecomposition;
   kwargs...)
 
   rcache,scache... = cache
-  red_integr_res = assemble_rhs!(rcache,op,rbres,times)
+  red_integr_res = assemble_rhs!(rcache,op,rbres)
   mdeim_solve!(scache,rbres,red_integr_res;kwargs...)
 end
 
 function assemble_rhs!(
   cache,
   op::PTAlgebraicOperator,
-  rbres::RBVecAffineDecomposition,
-  times::Vector{<:Real})
+  rbres::RBVecAffineDecomposition)
 
   red_idx = rbres.integration_domain.idx
   red_times = rbres.integration_domain.times
   red_meas = rbres.integration_domain.meas
 
-  cache = get_cache_at_times(cache,times,red_times)
-  sols = get_solutions_at_times(op.u0,times,red_times)
+  cache = get_cache_at_times(cache,op.tθ,red_times)
+  sols = get_solutions_at_times(op.u0,op.tθ,red_times)
 
   collect_residuals_for_idx!(cache,op,sols,red_idx,red_meas)
 end
@@ -194,28 +192,26 @@ end
 function lhs_coefficient!(
   cache,
   op::PTAlgebraicOperator,
-  rbjac::RBMatAffineDecomposition,
-  times::Vector{<:Real};
+  rbjac::RBMatAffineDecomposition;
   i::Int=1,kwargs...)
 
   jcache,scache... = cache
-  red_integr_jac = assemble_lhs!(jcache,op,rbjac,times;i)
+  red_integr_jac = assemble_lhs!(jcache,op,rbjac;i)
   mdeim_solve!(scache,rbjac,red_integr_jac;kwargs...)
 end
 
 function assemble_lhs!(
   cache,
   op::PTAlgebraicOperator,
-  rbjac::RBMatAffineDecomposition,
-  times::Vector{<:Real};
+  rbjac::RBMatAffineDecomposition;
   i::Int=1)
 
   red_idx = rbjac.integration_domain.idx
   red_times = rbjac.integration_domain.times
   red_meas = rbjac.integration_domain.meas
 
-  cache = get_cache_at_times(cache,times,red_times)
-  sols = get_solutions_at_times(op.u0,times,red_times)
+  cache = get_cache_at_times(cache,op.tθ,red_times)
+  sols = get_solutions_at_times(op.u0,op.tθ,red_times)
 
   collect_jacobians_for_idx!(cache,op,sols,red_idx,red_meas;i)
 end
