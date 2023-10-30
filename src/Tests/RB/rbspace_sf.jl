@@ -1,6 +1,5 @@
-μ = realization(feop,10)
-sols = collect_solutions(fesolver,feop,μ)
-rbspace = reduced_basis(info,feop,sols,fesolver,μ)
+sols,params = load(info,(Snapshots,Table))
+rbspace = reduced_basis(info,feop,sols;nsnaps_state)
   # nzm = NnzArray(sols)
   # basis_space = tpod(nzm,nothing;ϵ=1e-4)
   # compressed_nza = prod(basis_space,nzm)
@@ -8,7 +7,7 @@ rbspace = reduced_basis(info,feop,sols,fesolver,μ)
   # basis_time = tpod(compressed_nza_t;ϵ=1e-4)
   # rbspace = RBSpace(basis_space,basis_time)
 
-nparams,time_ndofs=length(μ),get_time_ndofs(fesolver)
+nparams,time_ndofs=length(params),get_time_ndofs(fesolver)
 nzm = NnzArray(sols)
 full_val = recast(nzm)
 bs = rbspace.basis_space

@@ -153,16 +153,16 @@ function reduced_basis(
   norm_style = info.norm_style
   nblocks = get_nblocks(snaps)
   blocks = map(1:nblocks) do col
-    feop_row_col = feop[1,col]
     snaps_col = snaps[col]
     norm_matrix = get_norm_matrix(info,feop;norm_style=norm_style[col])
-    reduced_basis(info,feop_row_col,snaps_col,norm_matrix;kwargs...)
+    reduced_basis(snaps_col,norm_matrix;ϵ=info.ϵ)
   end
   if info.compute_supremizers
     bases_space = add_space_supremizers(info,feop,blocks)
     bases_time = add_time_supremizers(blocks;kwargs...)
   end
   rbspace = BlockRBSpace(bases_space,bases_time)
+  show(rbspace)
   return rbspace
 end
 

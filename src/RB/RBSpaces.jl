@@ -38,25 +38,25 @@ function load(info::RBInfo,T::Type{RBSpace})
   load(path,T)
 end
 
-function reduced_basis(info::RBInfo,feop::PTFEOperator,snaps::Snapshots;kwargs...)
+function reduced_basis(info::RBInfo,feop::PTFEOperator,snaps::Snapshots)
+  ϵ = info.ϵ
   norm_style = info.norm_style
   norm_matrix = get_norm_matrix(info,feop;norm_style)
-  reduced_basis(info,feop,snaps,norm_matrix;kwargs...)
+  rbspace = reduced_basis(snaps,norm_matrix;ϵ)
+  show(rbspace)
+  return rbspace
 end
 
 function reduced_basis(
-  info::RBInfo,
-  feop::PTFEOperator,
-  s::Snapshots,
+  snaps::Snapshots,
   norm_matrix;
-  nsnaps_state=50)
+  nsnaps_state=50,
+  kwargs...)
 
-  _s = Snapshots(map(x->x[1:nsnaps_state],s.snaps))
-  basis_space_nnz,basis_time = compress(info,feop,_s,norm_matrix)
+  nzm = NnzMatrix(snaps[1:nsnaps_state].array...;nparams=nsnaps_state)
+  basis_space_nnz,basis_time = compress(nzm,norm_matrix;kwargs...)
   basis_space = recast(basis_space_nnz)
-  rbspace = RBSpace(basis_space,basis_time)
-  show(rbspace)
-  return rbspace
+  return RBSpace(basis_space,basis_time)
 end
 
 function recast(x::AbstractVector,rb::RBSpace)
