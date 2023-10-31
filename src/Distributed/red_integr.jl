@@ -177,7 +177,7 @@ function _setup_initial_condition(
 end
 
 function _setup_initial_condition(
-  pop::PODEOpFromFEOp,
+  pop::PODEOperator,
   solver::ODESolver,
   μ::AbstractArray=realization(pop.feop))
 

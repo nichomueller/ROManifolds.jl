@@ -103,9 +103,10 @@ end
 test_rb_solver(info,feop,fesolver,rbspace,rbrhs,(rblhs,nl_rblhs),sols,params)
 
 nsnaps_test = info.nsnaps_test
-snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
+ntimes = get_time_ndofs(fesolver)
+snaps_test,params_test = sols[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
 xn,μn = [PTArray(snaps_test[1][1:ntimes]),PTArray(snaps_test[2][1:ntimes])],params_test[1:1]
-x = initial_guess(snaps,params,μn)
+x = initial_guess(sols,params,μn)
 op = get_ptoperator(fesolver,feop,x,μn)
 xrb = space_time_projection(x,op,rbspace)
 rhs_cache,lhs_cache = allocate_cache(op,x)

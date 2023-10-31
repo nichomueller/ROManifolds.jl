@@ -148,7 +148,7 @@ function test_rb_solver(
       rhs .= llhs*xrb + rhs
       nl_cache = rb_solve!(xrb,fesolver.nls.ls,rhs,lhs,nl_cache)
       x .+= recast(xrb,rbspace)
-      op = get_ptoperator(op,x)
+      op = update_ptoperator(op,x)
       isconv,conv = Algebra._check_convergence(fesolver.nls,xrb,conv0)
       println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv)))")
       if all(isconv); return; end

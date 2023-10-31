@@ -6,9 +6,9 @@ struct PODEOpFromFEOp{C} <: PODEOperator{C}
   feop::PTFEOperator{C}
 end
 
-get_order(op::PODEOpFromFEOp) = get_order(op.feop)
+get_order(op::PODEOperator) = get_order(op.feop)
 
-function allocate_cache(op::PODEOpFromFEOp,μ::AbstractVector,t::T) where T
+function allocate_cache(op::PODEOperator,μ::AbstractVector,t::T) where T
   Ut = get_trial(op.feop)
   U = allocate_trial_space(Ut,μ,t)
   Uts = (Ut,)
@@ -23,7 +23,7 @@ end
 
 function update_cache!(
   ode_cache,
-  op::PODEOpFromFEOp,
+  op::PODEOperator,
   μ::AbstractVector,
   t::T) where T
 
@@ -47,7 +47,7 @@ function cache_at_idx(ode_cache,idx::Int)
 end
 
 function allocate_residual(
-  op::PODEOpFromFEOp,
+  op::PODEOperator,
   μ::AbstractVector,
   t::T,
   uhF::PTArray,
@@ -59,7 +59,7 @@ function allocate_residual(
 end
 
 function allocate_jacobian(
-  op::PODEOpFromFEOp,
+  op::PODEOperator,
   μ::AbstractVector,
   t::T,
   uhF::PTArray,
@@ -74,7 +74,7 @@ for fun in (:residual!,:residual_for_trian!)
   @eval begin
     function $fun(
       b::PTArray,
-      op::PODEOpFromFEOp,
+      op::PODEOperator,
       μ::AbstractVector,
       t::T,
       xhF::Tuple{Vararg{PTArray}},
@@ -96,7 +96,7 @@ for fun in (:jacobian!,:jacobian_for_trian!)
   @eval begin
     function $fun(
       A::PTArray,
-      op::PODEOpFromFEOp,
+      op::PODEOperator,
       μ::AbstractVector,
       t::T,
       xhF::Tuple{Vararg{PTArray}},
@@ -118,7 +118,7 @@ end
 
 function jacobians!(
   J::PTArray,
-  op::PODEOpFromFEOp,
+  op::PODEOperator,
   μ::AbstractVector,
   t::T,
   xhF::Tuple{Vararg{PTArray}},

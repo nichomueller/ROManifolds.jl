@@ -28,7 +28,7 @@ function Base.getindex(op::PTAlgebraicOperator,row::Int,col=:)
   end
 end
 
-function get_ptoperator(op::PTAlgebraicOperator,x::PTArray)
+function update_ptoperator(op::PTAlgebraicOperator,x::PTArray)
   odeop,μ,tθ,dtθ,ode_cache,vθ = op.odeop,op.μ,op.tθ,op.dtθ,op.ode_cache,op.vθ
   get_ptoperator(odeop,μ,tθ,dtθ,x,ode_cache,vθ)
 end
