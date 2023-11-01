@@ -79,14 +79,6 @@ struct NnzMatrix{T} <: NnzArray{T,2}
   end
 end
 
-function NnzArray(
-  s::Snapshots{T};
-  nparams=length(testitem(s.snaps))) where T
-
-  @check all([length(vali) == nparams for vali in s.snaps])
-  NnzMatrix(get_array(hcat(s.snaps...))...;nparams)
-end
-
 Base.length(nzm::NnzMatrix) = nzm.nparams
 num_params(nzm::NnzMatrix) = length(nzm)
 num_space_dofs(nzm::NnzMatrix) = size(nzm,1)
@@ -153,13 +145,6 @@ end
 abstract type PODStyle end
 struct DefaultPOD <: PODStyle end
 struct SteadyPOD <: PODStyle end
-
-# function compress(info::RBInfo,::PTFEOperator,snaps,args...)
-#   nzm = NnzArray(snaps)
-#   ϵ = info.ϵ
-#   steady = num_time_dofs(nzm) == 1 ? SteadyPOD() : DefaultPOD()
-#   compress(nzm,steady,args...;ϵ)
-# end
 
 function compress(nzm::NnzMatrix,args...;kwargs...)
   steady = num_time_dofs(nzm) == 1 ? SteadyPOD() : DefaultPOD()

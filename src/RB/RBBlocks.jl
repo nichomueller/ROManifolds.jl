@@ -1,9 +1,9 @@
 abstract type RBBlock{T,N} end
 
-Base.getindex(b::RBBlock,i...) = b.blocks[i...]
+Base.getindex(b::RBBlock,i::Int...) = b.blocks[i...]
 Base.iterate(b::RBBlock,args...) = iterate(b.blocks,args...)
 Base.enumerate(b::RBBlock) = enumerate(b.blocks)
-Base.axes(b::RBBlock,i...) = axes(b.blocks,i...)
+Base.axes(b::RBBlock,i::Int...) = axes(b.blocks,i...)
 Base.lastindex(b::RBBlock) = lastindex(testitem(b))
 Arrays.testitem(b::RBBlock) = testitem(b.blocks)
 get_blocks(b) = b.blocks
@@ -60,14 +60,6 @@ struct BlockNnzMatrix{T} <: RBBlock{T,1}
     @check all([length(nzm) == length(blocks[1]) for nzm in blocks[2:end]])
     new{T}(blocks)
   end
-end
-
-function NnzArray(s::BlockSnapshots{T}) where T
-  blocks = map(s.snaps) do val
-    array = get_array(hcat(val...))
-    NnzMatrix(array...)
-  end
-  BlockNnzMatrix(blocks)
 end
 
 struct BlockRBSpace{T} <: RBBlock{T,1}
@@ -244,7 +236,9 @@ function add_time_supremizers(basis_u::Matrix,basis_p::Matrix;ttol=1e-2)
     ntp += 1
   end
 
-  println("Added $count time supremizers")
+  if count > 0
+    println("Added $count time supremizer(s)")
+  end
   basis_u
 end
 
