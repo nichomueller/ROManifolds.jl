@@ -93,14 +93,14 @@ if load_structures
   rbrhs,rblhs = load(info,(BlockRBVecAlgebraicContribution,Vector{BlockRBMatAlgebraicContribution}))
 else
   rbspace = reduced_basis(info,feop,sols)
-  rbrhs,rblhs,nl_rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
+  rbrhs,rblhs,nl_rbrhs,nl_rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,params)
   # if save_structures
   #   save(info,(rbspace,rbrhs,rblhs))
   # end
 end
 
 # Online phase
-test_rb_solver(info,feop,fesolver,rbspace,rbrhs,(rblhs,nl_rblhs),sols,params)
+# test_rb_solver(info,feop,fesolver,rbspace,rbrhs,(rblhs,nl_rblhs),sols,params)
 
 nsnaps_test = info.nsnaps_test
 ntimes = get_time_ndofs(fesolver)
@@ -114,14 +114,15 @@ _,conv0 = Algebra._check_convergence(fesolver.nls.ls,xrb)
 for iter in 1:fesolver.nls.max_nliters
   x .= recenter(x,fesolver.uh0(μn);θ=fesolver.θ)
   xrb = space_time_projection(x,op,rbspace)
-  rhs = collect_rhs_contributions!(rhs_cache,info,op,rbrhs,rbspace)
+  lrhs = collect_rhs_contributions!(rhs_cache,info,op,rbrhs,rbspace)
   llhs = collect_lhs_contributions!(lhs_cache,info,op,rblhs,rbspace)
+  nlrhs = collect_rhs_contributions!(rhs_cache,info,op,nl_rbrhs,rbspace)
   nllhs = collect_lhs_contributions!(lhs_cache,info,op,nl_rblhs,rbspace)
   lhs = llhs + nllhs
-  rhs .= llhs*xrb + rhs
+  rhs = llhs*xrb - (lrhs+nlrhs)
   xrb = PTArray([lhs[1] \ rhs[1]])
-  x -= recast(xrb,rbspace)
-  op = get_ptoperator(op,x)
+  x -= vcat(recast(xrb,rbspace)...)
+  op = update_ptoperator(op,x)
   isconv,conv = Algebra._check_convergence(fesolver.nls,xrb,conv0)
   println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv)))")
   if all(isconv); return; end

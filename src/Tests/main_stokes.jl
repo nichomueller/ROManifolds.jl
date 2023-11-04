@@ -58,7 +58,7 @@ function stokes_equation()
   ϵ = 1e-4
   load_solutions = true
   save_solutions = true
-  load_structures = true
+  load_structures = false
   save_structures = true
   norm_style = [:l2,:l2]
   compute_supremizers = true
@@ -86,7 +86,7 @@ function stokes_equation()
     rbrhs,rblhs = load(info,(BlockRBVecAlgebraicContribution,Vector{BlockRBMatAlgebraicContribution}))
   else
     rbspace = reduced_basis(info,feop,sols)
-    rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,sols,params)
+    rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,params)
     if save_structures
       save(info,(rbspace,rbrhs,rblhs))
     end

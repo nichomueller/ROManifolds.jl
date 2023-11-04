@@ -94,15 +94,15 @@ end
 function collect_single_field_solutions(
   fesolver::PODESolver,
   feop::PTFEOperator,
-  μ::Table)
+  params::Table)
 
   uh0,t0,tf = fesolver.uh0,fesolver.t0,fesolver.tf
   ode_op = get_algebraic_operator(feop)
-  u0 = get_free_dof_values(uh0(μ))
+  u0 = get_free_dof_values(uh0(params))
   time_ndofs = get_time_ndofs(fesolver)
-  nparams = length(μ)
+  nparams = length(params)
   T = get_vector_type(feop.test)
-  uμt = PODESolution(fesolver,ode_op,μ,u0,t0,tf)
+  uμt = PODESolution(fesolver,ode_op,params,u0,t0,tf)
   sols = Vector{PTArray{T}}(undef,time_ndofs)
   println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
   stats = @timed for (sol,n) in uμt
@@ -115,15 +115,15 @@ end
 function collect_multi_field_solutions(
   fesolver::PODESolver,
   feop::PTFEOperator,
-  μ::Table)
+  params::Table)
 
   uh0,t0,tf = fesolver.uh0,fesolver.t0,fesolver.tf
   ode_op = get_algebraic_operator(feop)
-  u0 = get_free_dof_values(uh0(μ))
+  u0 = get_free_dof_values(uh0(params))
   time_ndofs = get_time_ndofs(fesolver)
-  nparams = length(μ)
+  nparams = length(params)
   T = get_vector_type(feop.test)
-  uμt = PODESolution(fesolver,ode_op,μ,u0,t0,tf)
+  uμt = PODESolution(fesolver,ode_op,params,u0,t0,tf)
   sols = Vector{Vector{PTArray{T}}}(undef,time_ndofs)
   println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
   stats = @timed for (sol,n) in uμt
@@ -137,25 +137,25 @@ function get_ptoperator(
   fesolver::PThetaMethod,
   feop::PTFEOperator,
   sols::PTArray,
-  μ::Table)
+  params::Table)
 
   dtθ = fesolver.θ == 0.0 ? fesolver.dt : fesolver.dt*fesolver.θ
   ode_op = get_algebraic_operator(feop)
   times = get_times(fesolver)
-  ode_cache = allocate_cache(ode_op,μ,times)
-  ode_cache = update_cache!(ode_cache,ode_op,μ,times)
+  ode_cache = allocate_cache(ode_op,params,times)
+  ode_cache = update_cache!(ode_cache,ode_op,params,times)
   sols_cache = zero(sols)
-  get_ptoperator(ode_op,μ,times,dtθ,sols,ode_cache,sols_cache)
+  get_ptoperator(ode_op,params,times,dtθ,sols,ode_cache,sols_cache)
 end
 
 function get_ptoperator(
   fesolver::PThetaMethod,
   feop::PTFEOperator,
   sols::Vector{<:PTArray},
-  μ::Table)
+  params::Table)
 
   vsols = vcat(sols...)
-  get_ptoperator(fesolver,feop,vsols,μ)
+  get_ptoperator(fesolver,feop,vsols,params)
 end
 
 function collect_residuals_for_trian(op::PTAlgebraicOperator)

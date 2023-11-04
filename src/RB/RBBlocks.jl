@@ -246,6 +246,25 @@ function add_time_supremizers(basis_u::Matrix,basis_p::Matrix;ttol=1e-2)
   basis_u
 end
 
+function get_ptoperator(
+  fesolver::PThetaMethod,
+  feop::PTFEOperator,
+  rbspace::BlockRBSpace{T},
+  params::Table;
+  kwargs...) where T
+
+  nblocks = get_nblocks(rbspace)
+  space_ndofs = cumsum([0,map(get_space_ndofs,rbspace.blocks)...])
+  rb_space_ndofs = map(get_rb_space_ndofs,rbspace.blocks)
+  basis_space = zeros(T,last(space_ndofs),maximum(rb_space_ndofs))
+  @inbounds for n = 1:nblocks
+    basis_space[space_ndofs[n]+1:space_ndofs[n+1],1:rb_space_ndofs[n]] = get_basis_space(rbspace[n])
+  end
+  basis_time = get_basis_time(testitem(rbspace))
+  _rbspace = RBSpace(basis_space,basis_time)
+  get_ptoperator(fesolver,feop,_rbspace,params;kwargs...)
+end
+
 abstract type BlockRBAlgebraicContribution{T,N} <: RBBlock{T,N} end
 
 struct BlockRBVecAlgebraicContribution{T} <: BlockRBAlgebraicContribution{T,1}

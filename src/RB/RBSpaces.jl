@@ -139,3 +139,36 @@ function test_reduced_basis(mat::AbstractMatrix,rb::RBSpace)
   println("RB approximation error in infty norm of snapshot $n = $err")
   return rb_proj
 end
+
+function get_ptoperator(
+  fesolver::PThetaMethod,
+  feop::PTFEOperator,
+  rbspace::RBSpace{T},
+  params::Table;
+  conservative=false) where T
+
+  dtθ = fesolver.θ == 0.0 ? fesolver.dt : fesolver.dt*fesolver.θ
+  ode_op = get_algebraic_operator(feop)
+  times = get_times(fesolver)
+  bs = get_basis_space(rbspace)
+  ns = get_rb_space_ndofs(rbspace)
+
+  if conservative
+    nparams = length(params)
+    μ = Table([params[mod(n,nparams) == 0 ? ns : mod(n,nparams)] for n = 1:nparams*ns])
+  else
+    μ = params
+  end
+
+  ode_cache = allocate_cache(ode_op,μ,times)
+  ode_cache = update_cache!(ode_cache,ode_op,μ,times)
+  N = length(times)*length(μ)
+  array = Vector{Vector{T}}(undef,N)
+  @inbounds for n = 1:N
+    col = mod(n,ns) == 0 ? ns : mod(n,ns)
+    array[n] = bs[:,col]
+  end
+  sols = PTArray(array)
+  sols_cache = zero(sols)
+  get_ptoperator(ode_op,μ,times,dtθ,sols,ode_cache,sols_cache)
+end

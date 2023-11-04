@@ -57,9 +57,8 @@ for (f,g) in zip((:residual_for_trian!,:residual_for_idx!),(:residual_for_trian!
       x::PTArray,
       args...)
 
-      uF = zero(x)
+      uF = x
       vθ = op.vθ
-      @. vθ = (x-op.u0)/op.dtθ
       z = zero(eltype(b))
       fill!(b,z)
       $g(b,op.odeop,op.μ,op.tθ,(uF,vθ),op.ode_cache,args...)
@@ -81,8 +80,23 @@ function jacobian!(
   jacobians!(A,op.odeop,op.μ,op.tθ,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache,args...)
 end
 
-for (f,g) in zip((:jacobian!,:jacobian_for_trian!,:jacobian_for_idx!),
-                 (:jacobian!,:jacobian_for_trian!,:jacobian!))
+function jacobian!(
+  A::PTArray,
+  op::PTThetaMethodOperator,
+  x::PTArray,
+  i::Int,
+  args...)
+
+  uF = x
+  vθ = op.vθ
+  @. vθ = (x-op.u0)/op.dtθ
+  z = zero(eltype(A))
+  fillstored!(A,z)
+  γ = (1.0,1/op.dtθ)
+  jacobian!(A,op.odeop,op.μ,op.tθ,(uF,vθ),i,γ[i],op.ode_cache,args...)
+end
+
+for (f,g) in zip((:jacobian_for_trian!,:jacobian_for_idx!),(:jacobian_for_trian!,:jacobian!))
   @eval begin
     function $f(
       A::PTArray,
@@ -93,7 +107,6 @@ for (f,g) in zip((:jacobian!,:jacobian_for_trian!,:jacobian_for_idx!),
 
       uF = x
       vθ = op.vθ
-      @. vθ = (x-op.u0)/op.dtθ
       z = zero(eltype(A))
       fillstored!(A,z)
       γ = (1.0,1/op.dtθ)
