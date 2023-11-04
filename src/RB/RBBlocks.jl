@@ -27,12 +27,25 @@ struct BlockSnapshots{T} <: RBBlock{T,1}
   end
 end
 
-function Base.getindex(s::BlockSnapshots{T},idx::UnitRange{Int}) where T
+function Base.getindex(s::BlockSnapshots,idx::UnitRange{Int})
   nblocks = get_nblocks(s)
   map(1:nblocks) do row
     srow = s[row]
     srow[idx]
   end
+end
+
+function recenter(s::BlockSnapshots,uh0::PTFEFunction;θ::Real=1)
+  nblocks = get_nblocks(s)
+  sθ = map(1:nblocks) do row
+    recenter(s[row],uh0[row];θ)
+  end
+  BlockSnapshots(sθ)
+end
+
+function nearest_neighbor(sols::BlockSnapshots,params::Table,params_test::Table)
+  vsols = vcat(sols...)
+  nearest_neighbor(vsols,params,params_test)
 end
 
 function save(info::RBInfo,s::BlockSnapshots)
@@ -43,14 +56,6 @@ end
 function load(info::RBInfo,T::Type{BlockSnapshots})
   path = joinpath(info.fe_path,"fesnaps")
   load(path,T)
-end
-
-function recenter(s::BlockSnapshots,uh0::PTFEFunction;θ::Real=1)
-  nblocks = get_nblocks(s)
-  sθ = map(1:nblocks) do row
-    recenter(s[row],uh0[row];θ)
-  end
-  BlockSnapshots(sθ)
 end
 
 struct BlockNnzMatrix{T} <: RBBlock{T,1}
@@ -117,12 +122,11 @@ end
 function recast(x::PTArray,rb::BlockRBSpace)
   nblocks = get_nblocks(rb)
   offsets = field_offsets(rb)
-  blocks = map(1:nblocks) do row
+  map(1:nblocks) do row
     rb_row = rb[row]
     x_row = get_at_offsets(x,offsets,row)
     recast(x_row,rb_row)
   end
-  return vcat(blocks...)
 end
 
 function space_time_projection(x::PTArray,op::PTAlgebraicOperator,rb::BlockRBSpace)
@@ -147,7 +151,7 @@ function reduced_basis(
   nblocks = get_nblocks(snaps)
   blocks = map(1:nblocks) do col
     snaps_col = snaps[col]
-    norm_matrix = get_norm_matrix(info,feop;norm_style=norm_style[col])
+    norm_matrix = get_norm_matrix(info,feop,norm_style[col])
     reduced_basis(snaps_col,norm_matrix;ϵ,nsnaps_state)
   end
   if info.compute_supremizers
@@ -165,8 +169,8 @@ function add_space_supremizers(
   blocks::Vector{RBSpace{T}}) where T
 
   bs_primal,bs_dual... = map(get_basis_space,blocks)
-  primal_norm_style = info.norm_style[1]
-  nm_primal = get_norm_matrix(info,feop;norm_style=primal_norm_style)
+  primal_norm_style = first(info.norm_style)
+  nm_primal = get_norm_matrix(info,feop,primal_norm_style)
   dual_nfields = length(bs_dual)
   for col in 1:dual_nfields
     println("Computing supremizers in space for dual field $col")
@@ -268,7 +272,6 @@ struct BlockRBMatAlgebraicContribution{T} <: BlockRBAlgebraicContribution{T,2}
   end
 end
 
-Base.getindex(a::BlockRBAlgebraicContribution,idx...) = a.blocks[idx...]
 get_nblocks(a::BlockRBMatAlgebraicContribution) = size(a.blocks,2)
 
 function Base.show(io::IO,a::BlockRBAlgebraicContribution)
@@ -371,15 +374,6 @@ function load(info::RBInfo,::Type{Vector{BlockRBMatAlgebraicContribution}})
     ad_jacs[i] = load_algebraic_contrib(path,BlockRBMatAlgebraicContribution)
   end
   ad_jacs
-end
-
-function field_offsets(f::MultiFieldFESpace)
-  nfields = length(f.spaces)
-  offsets = zeros(Int,nfields+1)
-  @inbounds for field = 1:nfields
-    offsets[field+1] = offsets[field] + num_free_dofs(f.spaces[field])
-  end
-  offsets
 end
 
 function collect_compress_rhs(
@@ -554,19 +548,20 @@ function post_process(
   norm_style = info.norm_style
   fem_stats = load(info,ComputationInfo)
   rb_stats = ComputationInfo(stats,nparams)
-  map(1:nblocks) do col
+  blocks = map(1:nblocks) do col
     feop_col = feop[col,col]
     sol_col = sol[col]
     sol_approx_col = sol_approx[col]
-    norm_matrix_col = get_norm_matrix(info,feop_col;norm_style=norm_style[col])
+    norm_matrix_col = get_norm_matrix(info,feop_col,norm_style[col])
     _sol_col = space_time_matrices(sol_col;nparams)
     _sol_approx_col = space_time_matrices(sol_approx_col;nparams)
-    results = RBResults(params,_sol_col,_sol_approx_col,fem_stats,rb_stats;
-      name=Symbol("field$col"),norm_matrix=norm_matrix_col)
-    show(results)
+    results = RBResults(
+      params,_sol_col,_sol_approx_col,fem_stats,rb_stats,norm_matrix_col;name=Symbol("field$col"))
     save(info,results)
     writevtk(info,feop_col,fesolver,results)
+    results
   end
+  show(blocks)
   return
 end
 
@@ -584,13 +579,4 @@ function cache_at_index(cache,op::PTAlgebraicOperator,row::Int,col::Int)
   offsets = field_offsets(op.odeop.feop.test)
   A_idx = get_at_offsets(A,offsets,row,col)
   return (A_idx,solve_cache...),rb_cache
-end
-
-function initial_guess(
-  sols::BlockSnapshots,
-  params::Table,
-  params_test::Table)
-
-  vsols = vcat(sols...)
-  initial_guess(vsols,params,params_test)
 end

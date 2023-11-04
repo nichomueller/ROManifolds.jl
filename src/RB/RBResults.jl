@@ -3,7 +3,7 @@ struct RBResults{T}
   params::Table
   sol::PTArray{Matrix{T}}
   sol_approx::PTArray{Matrix{T}}
-  relative_err::Vector{Float}
+  relative_err::PTArray{Vector{T}}
   fem_stats::ComputationInfo
   rb_stats::ComputationInfo
 
@@ -12,28 +12,46 @@ struct RBResults{T}
     sol::PTArray{Matrix{T}},
     sol_approx::PTArray{Matrix{T}},
     fem_stats::ComputationInfo,
-    rb_stats::ComputationInfo;
-    name=:vel,
-    kwargs...) where T
+    rb_stats::ComputationInfo,
+    args...;
+    name=:vel) where T
 
-    relative_err = compute_relative_error(sol,sol_approx;kwargs...)
+    relative_err = compute_relative_error(sol,sol_approx,args...)
     new{T}(name,params,sol,sol_approx,relative_err,fem_stats,rb_stats)
   end
 end
 
 Base.length(r::RBResults) = length(r.params)
+get_name(r::RBResults) = r.name
 get_avg_error(r::RBResults) = sum(r.relative_err) / length(r)
 get_speedup_time(r::RBResults) = get_avg_time(r.fem_stats) / get_avg_time(r.rb_stats)
 get_speedup_memory(r::RBResults) = get_avg_nallocs(r.fem_stats) / get_avg_nallocs(r.rb_stats)
 
 function Base.show(io::IO,r::RBResults)
-  name = r.name
+  name = get_name(r)
   avg_err = get_avg_error(r)
   avg_time = get_avg_time(r.rb_stats)
   avg_nallocs = get_avg_nallocs(r.rb_stats)
   speedup_time = Float16(get_speedup_time(r)*100)
   speedup_memory = Float16(get_speedup_memory(r)*100)
   print(io,"Average online relative errors for $name: $avg_err\n")
+  print(io,"Average online wall time: $avg_time [s]\n")
+  print(io,"Average number of allocations: $avg_nallocs [Mb]\n")
+  print(io,"FEM/RB wall time speedup: $speedup_time%\n")
+  print(io,"FEM/RB memory speedup: $speedup_memory%\n")
+end
+
+function Base.show(io::IO,r::Vector{<:RBResults})
+  map(r) do ri
+    name = get_name(ri)
+    avg_err = get_avg_error(ri)
+    print(io,"Average online relative errors for $name: $avg_err\n")
+  end
+  r1 = first(r)
+  avg_time = get_avg_time(r1.rb_stats)
+  avg_nallocs = get_avg_nallocs(r1.rb_stats)
+  speedup_time = Float16(get_speedup_time(r1)*100)
+  speedup_memory = Float16(get_speedup_memory(r1)*100)
   print(io,"Average online wall time: $avg_time [s]\n")
   print(io,"Average number of allocations: $avg_nallocs [Mb]\n")
   print(io,"FEM/RB wall time speedup: $speedup_time%\n")
@@ -61,12 +79,12 @@ function post_process(
 
   nparams = length(params)
   norm_style = info.norm_style
-  norm_matrix = get_norm_matrix(info,feop;norm_style)
+  norm_matrix = get_norm_matrix(info,feop,norm_style)
   _sol = space_time_matrices(sol;nparams)
   _sol_approx = space_time_matrices(sol_approx;nparams)
   fem_stats = load(info,ComputationInfo)
   rb_stats = ComputationInfo(stats,nparams)
-  results = RBResults(params,_sol,_sol_approx,fem_stats,rb_stats;norm_matrix)
+  results = RBResults(params,_sol,_sol_approx,fem_stats,rb_stats,norm_matrix)
   show(results)
   save(info,results)
   writevtk(info,feop,fesolver,results)
@@ -105,7 +123,7 @@ function test_rb_solver(
   nsnaps_test = info.nsnaps_test
   snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
   op = get_ptoperator(fesolver,feop,snaps_test,params_test)
-  x = initial_guess(snaps,params,params_test)
+  x = nearest_neighbor(snaps,params,params_test)
   rhs_cache,lhs_cache = allocate_cache(op,x)
   stats = @timed begin
     x .= recenter(x,fesolver.uh0(params_test);θ=fesolver.θ)
@@ -131,7 +149,7 @@ function test_rb_solver(
   nsnaps_test = info.nsnaps_test
   snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
   lrbjacs,nlrbjacs = rbjacs
-  x = initial_guess(snaps,params,params_test)
+  x = nearest_neighbor(snaps,params,params_test)
   op = get_ptoperator(fesolver,feop,x,params_test)
   xrb = space_time_projection(x,op,rbspace)
   rhs_cache,lhs_cache = allocate_cache(op,x)
@@ -199,17 +217,6 @@ function _rb_loop_solve!(x::PTArray,ns,b::PTArray)
   x
 end
 
-function initial_guess(
-  sols::Snapshots,
-  params::Table,
-  params_test::Table)
-
-  scopy = copy(sols)
-  kdtree = KDTree(map(x -> SVector(Tuple(x)),params))
-  idx_dist = map(x -> nn(kdtree,SVector(Tuple(x))),params_test)
-  scopy[first.(idx_dist)]
-end
-
 function space_time_matrices(sol::PTArray{Vector{T}};nparams=length(sol)) where T
   mat = hcat(get_array(sol)...)
   ntimes = Int(size(mat,2)/nparams)
@@ -222,8 +229,8 @@ end
 
 function compute_relative_error(
   sol::PTArray{Matrix{T}},
-  sol_approx::PTArray{Matrix{T}};
-  kwargs...) where T
+  sol_approx::PTArray{Matrix{T}},
+  args...) where T
 
   @assert length(sol) == length(sol_approx)
 
@@ -234,13 +241,12 @@ function compute_relative_error(
   cache = ncache,dcache
   err = Vector{T}(undef,nparams)
   @inbounds for i = 1:nparams
-    erri = compute_relative_error!(cache,sol[i],sol_approx[i];kwargs...)
-    err[i] = erri
+    err[i] = compute_relative_error!(cache,sol[i],sol_approx[i],args...)
   end
-  err
+  PTArray(err)
 end
 
-function compute_relative_error!(cache,sol,sol_approx;norm_matrix=nothing)
+function compute_relative_error!(cache,sol,sol_approx,norm_matrix=nothing)
   ncache,dcache = cache
   @inbounds for i = axes(sol,2)
     ncache[i] = norm(sol[:,i]-sol_approx[:,i],norm_matrix)

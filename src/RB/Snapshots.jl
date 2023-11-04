@@ -46,6 +46,13 @@ function recenter(s::Snapshots,uh0::PTFEFunction;θ::Real=1)
   Snapshots(sθ)
 end
 
+function nearest_neighbor(sols::Snapshots,params::Table,params_test::Table)
+  _sols = copy(sols)
+  kdtree = KDTree(map(x -> SVector(Tuple(x)),params))
+  idx_dist = map(x -> nn(kdtree,SVector(Tuple(x))),params_test)
+  _sols[first.(idx_dist)]
+end
+
 function save(info::RBInfo,s::Snapshots)
   path = joinpath(info.fe_path,"fesnaps")
   save(path,s)

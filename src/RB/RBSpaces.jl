@@ -42,7 +42,7 @@ function reduced_basis(info::RBInfo,feop::PTFEOperator,snaps::Snapshots)
   ϵ = info.ϵ
   nsnaps_state = info.nsnaps_state
   norm_style = info.norm_style
-  norm_matrix = get_norm_matrix(info,feop;norm_style)
+  norm_matrix = get_norm_matrix(info,feop,norm_style)
   rbspace = reduced_basis(snaps,norm_matrix;ϵ,nsnaps_state)
   show(rbspace)
   return rbspace

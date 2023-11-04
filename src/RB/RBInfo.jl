@@ -37,7 +37,7 @@ function RBInfo(test_path::String;ϵ=1e-4,norm_style=:l2,compute_supremizers=tru
     nsnaps_mdeim,nsnaps_test,st_mdeim,postprocess)
 end
 
-function get_norm_matrix(info::RBInfo,feop::PTFEOperator;norm_style=:l2)
+function get_norm_matrix(info::RBInfo,feop::PTFEOperator,norm_style::Symbol)
   try
     T = get_vector_type(feop.test)
     load(info,SparseMatrixCSC{eltype(T),Int};norm_style)

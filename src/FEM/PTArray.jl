@@ -31,6 +31,10 @@ function Base.zeros(a::PTArray)
   get_array(zero(a))
 end
 
+function Base.sum(a::PTArray)
+  sum(a.array)
+end
+
 for op in (:+,:-,:*)
   @eval begin
     function ($op)(a::PTArray,b::PTArray)
