@@ -119,7 +119,7 @@ for iter in 1:fesolver.nls.max_nliters
   nlrhs = collect_rhs_contributions!(rhs_cache,info,op,nl_rbrhs,rbspace)
   nllhs = collect_lhs_contributions!(lhs_cache,info,op,nl_rblhs,rbspace)
   lhs = llhs + nllhs
-  rhs = llhs*xrb - (lrhs+nlrhs)
+  rhs = llhs*xrb + (lrhs+nlrhs)
   xrb = PTArray([lhs[1] \ rhs[1]])
   x -= vcat(recast(xrb,rbspace)...)
   op = update_ptoperator(op,x)
