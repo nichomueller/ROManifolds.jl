@@ -111,11 +111,11 @@ function load(info::RBInfo,T::Type{BlockRBSpace})
   load(path,T)
 end
 
-function num_rb_dofs(rb::BlockRBSpace)
+function get_rb_ndofs(rb::BlockRBSpace)
   nblocks = get_nblocks(rb)
   ndofs = 0
   @inbounds for i = 1:nblocks
-    ndofs += num_rb_dofs(rb[i])
+    ndofs += get_rb_ndofs(rb[i])
   end
   ndofs
 end

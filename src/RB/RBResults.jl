@@ -186,7 +186,7 @@ for (f,g) in zip((:single_field_rb_solver,:multi_field_rb_solver),
       op = get_ptoperator(fesolver,feop,snaps_test,params_test)
       rhs_cache,lhs_cache = allocate_cache(op,snaps_test)
       nl_cache = nothing
-      _,conv0 = Algebra._check_convergence(fesolver.nls.ls,xrb)
+      conv0 = ones(nsnaps_test)
       stats = @timed begin
         for iter in 1:fesolver.nls.max_nliters
           x .= recenter(x,fesolver.uh0(params_test);θ=fesolver.θ)
@@ -198,7 +198,7 @@ for (f,g) in zip((:single_field_rb_solver,:multi_field_rb_solver),
           op = update_ptoperator(op,x)
           isconv,conv = Algebra._check_convergence(fesolver.nls,xrb,conv0)
           println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv)))")
-          if all(isconv); return; end
+          if all(isconv); break; end
           if iter == nls.max_nliters
             @unreachable
           end
