@@ -1,8 +1,9 @@
 times = get_times(fesolver)
 ntimes = length(times)
-xn,μn = [PTArray(snaps_test[1][1:ntimes]),PTArray(snaps_test[2][1:ntimes])],params_test[1]
-xcat = vcat(xn...)
+xn,μn = PTArray(snaps_test[1:ntimes]),params_test[1]
 
+g0_ok(x,t) = g0(x,μn,t)
+g0_ok(t) = x->g0_ok(x,t)
 g_ok(x,t) = g(x,μn,t)
 g_ok(t) = x->g_ok(x,t)
 m_ok(t,u,v) = ∫(v⋅u)dΩ
@@ -13,7 +14,7 @@ dc_ok(t,u,du,v) = ∫(v⊙(∇(du)'⋅u))dΩ + ∫(v⊙(∇(u)'⋅du))dΩ
 jac_t_ok(t,(u,p),(dut,dpt),(v,q)) = m_ok(t,dut,v)
 Jac_ok(t,(u,p),(du,dp),(v,q)) = a_ok(t,(du,dp),(v,q)) + dc_ok(t,u,du,v)
 Res_ok(t,(u,p),(v,q)) = m_ok(t,∂t(u),v) + a_ok(t,(u,p),(v,q)) + c_ok(t,u,u,v)
-trial_u_ok = TransientTrialFESpace(test_u,g_ok)
+trial_u_ok = TransientTrialFESpace(test_u,[g0_ok,g_ok])
 trial_ok = TransientMultiFieldFESpace([trial_u_ok,trial_p])
 feop_ok = TransientFEOperator(Res_ok,Jac_ok,jac_t_ok,trial_ok,test)
 ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
@@ -22,8 +23,8 @@ ode_cache_ok = allocate_cache(ode_op_ok)
 times = get_times(fesolver)
 kt = 1
 t = times[kt]
-v0 = zero(xcat[1])
-x = kt > 1 ? xcat[kt-1] : get_free_dof_values(xh0μ(μn))
+v0 = zero(xn[1])
+x = kt > 1 ? xn[kt-1] : get_free_dof_values(xh0μ(μn))
 Nu,Np = test_u.nfree,length(get_free_dof_ids(test_p))
 Nt = get_time_ndofs(fesolver)
 θdt = θ*dt
@@ -48,10 +49,11 @@ function return_quantities(ode_op,ode_cache,x::PTArray,kt)
   return bok,Aok
 end
 
-x = copy(xcat) .* 0.
+x = copy(xn) .* 0.
 nu = get_rb_ndofs(rbspace[1])
 # WORKS!!!!!!!!!!
 for iter in 1:fesolver.nls.max_nliters
+  xrb = space_time_projection(map(x->x[1:Nu],x),rbspace[1]),space_time_projection(map(x->x[1+Nu:end],x),rbspace[2])
   A,b = [],[]
   for kt = eachindex(times)
     bk,Ak = return_quantities(ode_op_ok,ode_cache_ok,x,kt)
@@ -77,11 +79,11 @@ for iter in 1:fesolver.nls.max_nliters
   R2 = NnzMatrix(map(x->x[1+Nu:end],b)...)
   RHS1_rb = space_time_projection(R1,rbspace[1])
   RHS2_rb = space_time_projection(R2,rbspace[2])
-  RHS_rb = vcat(RHS1_rb,RHS2_rb)
+  _RHS_rb = vcat(RHS1_rb,RHS2_rb)
+  RHS_rb = vcat(LHS11_rb_2*vcat(xrb...)[1][1:nu],zeros(np)) + _RHS_rb
 
   println("Norm (RHS1,LHS11) = ($(RHS1_rb[1]),$(norm(LHS11_rb[1])))")
-  xrb = space_time_projection(map(x->x[1:Nu],x),rbspace[1]),space_time_projection(map(x->x[1+Nu:end],x),rbspace[2])
-  dxrb = LHS_rb \ (vcat(LHS11_rb_2*vcat(xrb...)[1][1:nu],zeros(np)) + RHS_rb)
+  dxrb = LHS_rb \ RHS_rb
   dxrb_1,dxrb_2 = dxrb[1:nu],dxrb[1+nu:end]
   xiter = vcat(recast(PTArray(dxrb_1),rbspace[1]),recast(PTArray(dxrb_2),rbspace[2]))
   x -= xiter
@@ -93,10 +95,10 @@ for iter in 1:fesolver.nls.max_nliters
   end
 end
 
-norm(hcat(xcat.array...) - hcat(x.array...)) / norm(hcat(xcat.array...))
+norm(hcat(xn.array...) - hcat(x.array...)) / norm(hcat(xn.array...))
 
 # COMPARISON
-x = copy(xcat) #.* 0.
+x = copy(xn) #.* 0.
 xrb = space_time_projection(x,op,rbspace)
 A,b = [],[]
 for kt = eachindex(times)

@@ -6,11 +6,9 @@ begin
 end
 
 function navier_stokes_equation()
-  mesh = "cube2x2.json"
-  bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
-  # mesh = "model_circle_2D_coarse.json"
-  # bnd_info = Dict("dirichlet0" => ["noslip"],"dirichlet" => ["inlet"],"neumann" => ["outlet"])
+  mesh = "model_circle_2D_coarse.json"
   test_path = "$root/tests/navier-stokes/unsteady/$mesh"
+  bnd_info = Dict("dirichlet0" => ["noslip"],"dirichlet" => ["inlet"],"neumann" => ["outlet"])
   order = 2
   degree = 4
 
@@ -28,6 +26,8 @@ function navier_stokes_equation()
 
   g(x,μ,t) = VectorValue(μ[1]*exp(-x[2]/μ[2])*abs(sin(μ[3]*t)),0)
   g(μ,t) = x->g(x,μ,t)
+  g0(x,μ,t) = VectorValue(0,0)
+  g0(μ,t) = x->g0(x,μ,t)
 
   u0(x,μ) = VectorValue(0,0)
   u0(μ) = x->u0(x,μ)
@@ -47,9 +47,8 @@ function navier_stokes_equation()
 
   reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float},order)
   reffe_p = ReferenceFE(lagrangian,Float,order-1)
-  test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
-  # test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
-  trial_u = PTTrialFESpace(test_u,g)
+  test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
+  trial_u = PTTrialFESpace(test_u,[g0,g])
   test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
   trial_p = TrialFESpace(test_p)
   test = PTMultiFieldFESpace([test_u,test_p])
@@ -64,9 +63,9 @@ function navier_stokes_equation()
   fesolver = PThetaMethod(nls,xh0μ,θ,dt,t0,tf)
 
   ϵ = 1e-4
-  load_solutions = true
+  load_solutions = false
   save_solutions = true
-  load_structures = true
+  load_structures = false
   save_structures = true
   norm_style = [:l2,:l2]
   compute_supremizers = true
