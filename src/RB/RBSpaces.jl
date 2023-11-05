@@ -24,10 +24,6 @@ get_rb_space_ndofs(rb::RBSpace) = size(rb.basis_space,2)
 get_rb_time_ndofs(rb::RBSpace) = size(rb.basis_time,2)
 get_rb_ndofs(rb::RBSpace) = get_rb_time_ndofs(rb)*get_rb_space_ndofs(rb)
 
-function num_rb_dofs(rb::RBSpace)
-  size(rb.basis_space,2)*size(rb.basis_time,2)
-end
-
 function save(info::RBInfo,rb::RBSpace)
   path = joinpath(info.rb_path,"rb")
   save(path,rb)

@@ -181,25 +181,28 @@ for (f,g) in zip((:single_field_rb_solver,:multi_field_rb_solver),
 
       println("Solving nonlinear RB problems with Newton iterations")
       nsnaps_test = info.nsnaps_test
+      snaps_train,params_train = snaps[1:nsnaps_test],params[1:nsnaps_test]
       snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
-      x = nearest_neighbor(snaps,params,params_test)
+      x = nearest_neighbor(snaps_train,params_train,params_test)
       op = get_ptoperator(fesolver,feop,snaps_test,params_test)
+      xrb = space_time_projection(x,op,rbspace)
+      dxrb = similar(xrb)
       rhs_cache,lhs_cache = allocate_cache(op,snaps_test)
       nl_cache = nothing
       conv0 = ones(nsnaps_test)
       stats = @timed begin
         for iter in 1:fesolver.nls.max_nliters
-          x .= recenter(x,fesolver.uh0(params_test);θ=fesolver.θ)
-          xrb = space_time_projection(x,op,rbspace)
+          x = recenter(x,fesolver.uh0(params_test);θ=fesolver.θ)
+          op = update_ptoperator(op,x)
           rhs = collect_rhs_contributions!(rhs_cache,info,op,rbres,rbspace)
           lhs,lhs_t = collect_lhs_contributions!(lhs_cache,info,op,rbjacs,rbspace)
-          nl_cache = rb_solve!(xrb,fesolver.nls.ls,rhs+lhs_t*xrb,lhs+lhs_t,nl_cache)
-          x .+= recast(xrb,rbspace)
-          op = update_ptoperator(op,x)
-          isconv,conv = Algebra._check_convergence(fesolver.nls,xrb,conv0)
+          nl_cache = rb_solve!(dxrb,fesolver.nls.ls,rhs+lhs_t*xrb,lhs+lhs_t,nl_cache)
+          xrb += dxrb
+          x = recast(xrb,rbspace)
+          isconv,conv = Algebra._check_convergence(fesolver.nls,dxrb,conv0)
           println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv)))")
           if all(isconv); break; end
-          if iter == nls.max_nliters
+          if iter == fesolver.nls.max_nliters
             @unreachable
           end
         end
@@ -246,6 +249,25 @@ function _rb_loop_solve!(x::PTArray,ns,b::PTArray)
     solve!(x[k],ns[k],-b[k])
   end
   x
+end
+
+function nearest_neighbor(
+  sols_train::PTArray{T},
+  params_train::Table,
+  params_test::Table) where T
+
+  nparams_train = length(params_train)
+  ntimes = Int(length(sols_train)/nparams_train)
+  kdtree = KDTree(map(x -> SVector(Tuple(x)),params_train))
+  idx_dist = map(x -> nn(kdtree,SVector(Tuple(x))),params_test)
+  idx = first.(idx_dist)
+  nparams_test = length(params_test)
+  array = Vector{T}(undef,nparams_test*ntimes)
+  @inbounds for n = 1:nparams_test
+    idxn = idx[n]
+    array[(n-1)*ntimes+1:n*ntimes] = sols_train[(idxn-1)*ntimes+1:idxn*ntimes]
+  end
+  PTArray(array)
 end
 
 function space_time_matrices(sol::PTArray{Vector{T}};nparams=length(sol)) where T

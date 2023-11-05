@@ -44,11 +44,6 @@ function recenter(s::BlockSnapshots,uh0::PTFEFunction;θ::Real=1)
   BlockSnapshots(sθ)
 end
 
-function nearest_neighbor(sols::BlockSnapshots,params::Table,params_test::Table)
-  vsols = vcat(sols...)
-  nearest_neighbor(vsols,params,params_test)
-end
-
 function save(info::RBInfo,s::BlockSnapshots)
   path = joinpath(info.fe_path,"fesnaps")
   save(path,s)
