@@ -34,9 +34,6 @@ function Base.getindex(op::TempPTFEOperator,row,col)
   end
 end
 
-get_residual(op::TempPTFEOperator) = op.res
-get_jacobian(op::TempPTFEOperator) = op.jacs
-
 struct TempPODEOperator <: PODEOperator{Nonlinear}
   feop::TempPTFEOperator
 end

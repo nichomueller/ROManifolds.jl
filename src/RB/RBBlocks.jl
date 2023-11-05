@@ -29,10 +29,11 @@ end
 
 function Base.getindex(s::BlockSnapshots,idx::UnitRange{Int})
   nblocks = get_nblocks(s)
-  map(1:nblocks) do row
+  blocks = map(1:nblocks) do row
     srow = s[row]
     srow[idx]
   end
+  vcat(blocks...)
 end
 
 function recenter(s::BlockSnapshots,uh0::PTFEFunction;θ::Real=1)
@@ -122,11 +123,12 @@ end
 function recast(x::PTArray,rb::BlockRBSpace)
   nblocks = get_nblocks(rb)
   offsets = field_offsets(rb)
-  map(1:nblocks) do row
+  blocks = map(1:nblocks) do row
     rb_row = rb[row]
     x_row = get_at_offsets(x,offsets,row)
     recast(x_row,rb_row)
   end
+  return vcat(blocks...)
 end
 
 function space_time_projection(x::PTArray,op::PTAlgebraicOperator,rb::BlockRBSpace)
@@ -186,8 +188,7 @@ function space_supremizers(basis_space::Matrix,feop::PTFEOperator)
   μ = realization(feop)
   u = zero(feop.test)
   t = 0.
-  jac = get_jacobian(feop)
-  j(du,dv) = integrate(jac[1](μ,t,u,du,dv))
+  j(du,dv) = integrate(feop.jacs[1](μ,t,u,du,dv))
   trial_dual = get_trial(feop)
   constraint_mat = assemble_matrix(j,trial_dual(μ,t),feop.test)
   constraint_mat*basis_space
@@ -550,38 +551,7 @@ function collect_lhs_contributions!(
     end
     rb_jacs_contribs[i] = hvcat(nblocks,blocks...)
   end
-  return sum(rb_jacs_contribs)
-end
-
-function post_process(
-  info::RBInfo,
-  feop::PTFEOperator,
-  fesolver::PODESolver,
-  sol::Vector{<:PTArray},
-  params::Table,
-  sol_approx::Vector{<:PTArray},
-  stats::NamedTuple)
-
-  nblocks = length(sol)
-  nparams = length(params)
-  norm_style = info.norm_style
-  fem_stats = load(info,ComputationInfo)
-  rb_stats = ComputationInfo(stats,nparams)
-  blocks = map(1:nblocks) do col
-    feop_col = feop[col,col]
-    sol_col = sol[col]
-    sol_approx_col = sol_approx[col]
-    norm_matrix_col = get_norm_matrix(info,feop_col,norm_style[col])
-    _sol_col = space_time_matrices(sol_col;nparams)
-    _sol_approx_col = space_time_matrices(sol_approx_col;nparams)
-    results = RBResults(
-      params,_sol_col,_sol_approx_col,fem_stats,rb_stats,norm_matrix_col;name=Symbol("field$col"))
-    save(info,results)
-    writevtk(info,feop_col,fesolver,results)
-    results
-  end
-  show(blocks)
-  return
+  return rb_jacs_contribs
 end
 
 function cache_at_index(cache,op::PTAlgebraicOperator,row::Int)

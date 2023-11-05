@@ -129,7 +129,7 @@ end
 
 function collect_compress_rhs_lhs(
   info::RBInfo,
-  feop::PTFEOperator{Affine},
+  feop::PTFEOperator,
   fesolver::PThetaMethod,
   rbspace,
   params::Table)
@@ -144,29 +144,6 @@ function collect_compress_rhs_lhs(
   show(rhs),show(lhs)
 
   rhs,lhs
-end
-
-function collect_compress_rhs_lhs(
-  info::RBInfo,
-  feop::PTFEOperator{Nonlinear},
-  fesolver::PThetaMethod,
-  rbspace,
-  params::Table)
-
-  θ = fesolver.θ
-  nsnaps_mdeim = info.nsnaps_mdeim
-  μ = params[1:nsnaps_mdeim]
-  op = get_ptoperator(fesolver,feop,rbspace,μ)
-
-  lop = get_linear_operator(op)
-  rhs = collect_compress_rhs(info,lop,rbspace)
-  lhs = collect_compress_lhs(info,lop,rbspace;θ)
-  nlop = get_nonlinear_operator(op)
-  nlrhs = collect_compress_rhs(info,nlop,rbspace)
-  nllhs = collect_compress_lhs(info,nlop,rbspace;θ)
-  show(rhs),show(lhs)
-
-  rhs,lhs,nlrhs,nllhs
 end
 
 function collect_compress_rhs(
@@ -254,7 +231,7 @@ function collect_lhs_contributions!(
     rb_jac_i = rbjacs[i]
     rb_jacs_contribs[i] = collect_lhs_contributions!(cache,info,op,rb_jac_i,rbspace,rbspace;i)
   end
-  return sum(rb_jacs_contribs)
+  return rb_jacs_contribs
 end
 
 function collect_lhs_contributions!(

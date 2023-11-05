@@ -563,18 +563,6 @@ for row = 1:nblocks
   end
 end
 
-lop = get_linear_operator(op)
-for row = 1:nblocks
-  op_row_col = lop[row,:]
-  if check_touched_residuals(op_row_col)
-    b = bblock[row]
-    res1, = collect_residuals_for_trian(op_row_col)
-    res2 = collect_residuals_for_idx!(b,op_row_col,op_row_col.u0,bidx[row])
-    @assert isapprox(res1[1],Rblock[row]) "Failed when row = $row"
-    @assert isapprox(res2,Rblock[row]) "Failed when row = $row"
-  end
-end
-
 # JACOBIAN
 function original_findnz(x::SparseVector{Tv,Ti}) where {Tv,Ti}
   numnz = nnz(x)

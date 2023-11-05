@@ -34,9 +34,6 @@ function Base.getindex(op::TempPTFEOperator,row,col)
   end
 end
 
-get_residual(op::TempPTFEOperator) = op.res
-get_jacobian(op::TempPTFEOperator) = op.jacs
-
 struct TempPODEOperator <: PODEOperator{Nonlinear}
   feop::TempPTFEOperator
 end
@@ -341,20 +338,17 @@ begin
   _feop = NonlinearPTFEOperator(_res,_jac,_jac_t,(_c,_dc),pspace,trial,test)
 end
 
-sols,params = load(info,(BlockSnapshots,Table))
-rbspace = load(info,BlockRBSpace)
-_rbrhs,_rblhs,_nl_rbrhs,_nl_rblhs = collect_compress_rhs_lhs(info,_feop,fesolver,rbspace,params)
+_rbrhs,_rblhs,_nl_rblhs = collect_compress_rhs_lhs(info,_feop,fesolver,rbspace,params)
 _x = copy(xn) .* 0.
 _op = get_ptoperator(fesolver,_feop,_x,Table([μn]))
 _xrb = space_time_projection(_x,_op,rbspace)
 _rhs_cache,_lhs_cache = allocate_cache(_op,xn)
 for iter in 1:fesolver.nls.max_nliters
-  _lrhs = collect_rhs_contributions!(_rhs_cache,info,_op,_rbrhs,rbspace)
+  __rhs = collect_rhs_contributions!(_rhs_cache,info,_op,_rbrhs,rbspace)
   _llhs = collect_lhs_contributions!(_lhs_cache,info,_op,_rblhs,rbspace)
-  _nlrhs = collect_rhs_contributions!(_rhs_cache,info,_op,_nl_rbrhs,rbspace)
   _nllhs = collect_lhs_contributions!(_lhs_cache,info,_op,_nl_rblhs,rbspace)
   _lhs = _llhs + _nllhs
-  _rhs = _llhs*_xrb + (_lrhs + _nlrhs) #
+  _rhs = _llhs*_xrb + __rhs
   _dxrb = NonaffinePTArray([_lhs[1] \ _rhs[1]])
   _xrb -= _dxrb
   _x = vcat(recast(_xrb,rbspace)...)

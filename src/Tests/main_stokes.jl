@@ -58,7 +58,7 @@ function stokes_equation()
   ϵ = 1e-4
   load_solutions = true
   save_solutions = true
-  load_structures = false
+  load_structures = true
   save_structures = true
   norm_style = [:l2,:l2]
   compute_supremizers = true
@@ -94,7 +94,7 @@ function stokes_equation()
 
   # Online phase
   printstyled("ONLINE PHASE\n";bold=true,underline=true)
-  test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params)
+  multi_field_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params)
 end
 
 stokes_equation()

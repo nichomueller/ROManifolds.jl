@@ -63,18 +63,6 @@ function get_ptoperator(
   PTThetaMethodOperator(odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
 end
 
-function get_linear_operator(op::PTThetaMethodOperator)
-  feop = get_linear_operator(op.odeop.feop)
-  odeop = get_algebraic_operator(feop)
-  return PTThetaAffineMethodOperator(odeop,op.μ,op.tθ,op.dtθ,op.u0,op.ode_cache,op.vθ)
-end
-
-function get_nonlinear_operator(op::PTThetaMethodOperator)
-  feop = get_nonlinear_operator(op.odeop.feop)
-  odeop = get_algebraic_operator(feop)
-  return PTThetaMethodOperator(odeop,op.μ,op.tθ,op.dtθ,op.u0,op.ode_cache,op.vθ)
-end
-
 function Algebra.allocate_residual(
   op::PTAlgebraicOperator,
   x::PTArray)

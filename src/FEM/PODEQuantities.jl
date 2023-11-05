@@ -148,16 +148,6 @@ function get_ptoperator(
   get_ptoperator(ode_op,params,times,dtθ,sols,ode_cache,sols_cache)
 end
 
-function get_ptoperator(
-  fesolver::PThetaMethod,
-  feop::PTFEOperator,
-  sols::Vector{<:PTArray},
-  params::Table)
-
-  vsols = vcat(sols...)
-  get_ptoperator(fesolver,feop,vsols,params)
-end
-
 function collect_residuals_for_trian(op::PTAlgebraicOperator)
   b = allocate_residual(op,op.u0)
   ress,trian = residual_for_trian!(b,op,op.u0)

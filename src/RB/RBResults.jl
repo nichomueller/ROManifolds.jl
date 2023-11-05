@@ -68,7 +68,7 @@ function load(info::RBInfo,T::Type{RBResults})
   load(path,T)
 end
 
-function post_process(
+function single_field_post_process(
   info::RBInfo,
   feop::PTFEOperator,
   fesolver::PODESolver,
@@ -91,6 +91,38 @@ function post_process(
   return
 end
 
+function multi_field_post_process(
+  info::RBInfo,
+  feop::PTFEOperator,
+  fesolver::PODESolver,
+  sol::PTArray,
+  params::Table,
+  sol_approx::PTArray,
+  stats::NamedTuple)
+
+  nblocks = length(feop.test.spaces)
+  nparams = length(params)
+  norm_style = info.norm_style
+  offsets = field_offsets(feop.test)
+  fem_stats = load(info,ComputationInfo)
+  rb_stats = ComputationInfo(stats,nparams)
+  blocks = map(1:nblocks) do col
+    feop_col = feop[col,col]
+    sol_col = get_at_offsets(sol,offsets,col)
+    sol_approx_col = get_at_offsets(sol_approx,offsets,col)
+    norm_matrix_col = get_norm_matrix(info,feop_col,norm_style[col])
+    _sol_col = space_time_matrices(sol_col;nparams)
+    _sol_approx_col = space_time_matrices(sol_approx_col;nparams)
+    results = RBResults(
+      params,_sol_col,_sol_approx_col,fem_stats,rb_stats,norm_matrix_col;name=Symbol("field$col"))
+    save(info,results)
+    writevtk(info,feop_col,fesolver,results)
+    results
+  end
+  show(blocks)
+  return
+end
+
 function allocate_cache(
   op::PTAlgebraicOperator,
   snaps::PTArray{Vector{T}}) where T
@@ -109,73 +141,72 @@ function allocate_cache(
   res_cache,jac_cache
 end
 
-function test_rb_solver(
-  info::RBInfo,
-  feop::PTFEOperator{Affine},
-  fesolver::PODESolver,
-  rbspace,
-  rbres,
-  rbjacs,
-  snaps,
-  params::Table)
+for (f,g) in zip((:single_field_rb_solver,:multi_field_rb_solver),
+  (:single_field_post_process,:multi_field_post_process))
+  @eval begin
 
-  println("Solving linear RB problems")
-  nsnaps_test = info.nsnaps_test
-  snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
-  op = get_ptoperator(fesolver,feop,snaps_test,params_test)
-  x = nearest_neighbor(snaps,params,params_test)
-  rhs_cache,lhs_cache = allocate_cache(op,x)
-  stats = @timed begin
-    x .= recenter(x,fesolver.uh0(params_test);θ=fesolver.θ)
-    rhs = collect_rhs_contributions!(rhs_cache,info,op,rbres,rbspace)
-    lhs = collect_lhs_contributions!(lhs_cache,info,op,rbjacs,rbspace)
-    rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs)
-  end
-  approx_snaps_test = recast(rb_snaps_test,rbspace)
-  post_process(info,feop,fesolver,snaps_test,params_test,approx_snaps_test,stats)
-end
+    function $f(
+      info::RBInfo,
+      feop::PTFEOperator{Affine},
+      fesolver::PODESolver,
+      rbspace,
+      rbres,
+      rbjacs,
+      snaps,
+      params::Table)
 
-function test_rb_solver(
-  info::RBInfo,
-  feop::PTFEOperator,
-  fesolver::PODESolver,
-  rbspace,
-  rbres,
-  rbjacs::Tuple,
-  snaps,
-  params::Table)
-
-  println("Solving nonlinear RB problems with Newton iterations")
-  nsnaps_test = info.nsnaps_test
-  snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
-  lrbjacs,nlrbjacs = rbjacs
-  x = nearest_neighbor(snaps,params,params_test)
-  op = get_ptoperator(fesolver,feop,x,params_test)
-  xrb = space_time_projection(x,op,rbspace)
-  rhs_cache,lhs_cache = allocate_cache(op,x)
-  nl_cache = nothing
-  _,conv0 = Algebra._check_convergence(fesolver.nls.ls,xrb)
-  stats = @timed begin
-    for iter in 1:fesolver.nls.max_nliters
-      x .= recenter(x,fesolver.uh0(params_test);θ=fesolver.θ)
-      xrb = space_time_projection(x,op,rbspace)
-      rhs = collect_rhs_contributions!(rhs_cache,info,op,rbres,rbspace)
-      llhs = collect_lhs_contributions!(lhs_cache,info,op,lrbjacs,rbspace)
-      nllhs = collect_lhs_contributions!(lhs_cache,info,op,nlrbjacs,rbspace)
-      lhs = llhs + nllhs
-      rhs .= llhs*xrb + rhs
-      nl_cache = rb_solve!(xrb,fesolver.nls.ls,rhs,lhs,nl_cache)
-      x .+= recast(xrb,rbspace)
-      op = update_ptoperator(op,x)
-      isconv,conv = Algebra._check_convergence(fesolver.nls,xrb,conv0)
-      println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv)))")
-      if all(isconv); return; end
-      if iter == nls.max_nliters
-        @unreachable
+      println("Solving linear RB problems")
+      nsnaps_test = info.nsnaps_test
+      snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
+      op = get_ptoperator(fesolver,feop,snaps_test,params_test)
+      rhs_cache,lhs_cache = allocate_cache(op,snaps_test)
+      stats = @timed begin
+        rhs = collect_rhs_contributions!(rhs_cache,info,op,rbres,rbspace)
+        lhs,lhs_t = collect_lhs_contributions!(lhs_cache,info,op,rbjacs,rbspace)
+        rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs+lhs_t)
       end
+      approx_snaps_test = recast(rb_snaps_test,rbspace)
+      $g(info,feop,fesolver,snaps_test,params_test,approx_snaps_test,stats)
+    end
+
+    function $f(
+      info::RBInfo,
+      feop::PTFEOperator,
+      fesolver::PODESolver,
+      rbspace,
+      rbres,
+      rbjacs,
+      snaps,
+      params::Table)
+
+      println("Solving nonlinear RB problems with Newton iterations")
+      nsnaps_test = info.nsnaps_test
+      snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
+      x = nearest_neighbor(snaps,params,params_test)
+      op = get_ptoperator(fesolver,feop,snaps_test,params_test)
+      rhs_cache,lhs_cache = allocate_cache(op,snaps_test)
+      nl_cache = nothing
+      _,conv0 = Algebra._check_convergence(fesolver.nls.ls,xrb)
+      stats = @timed begin
+        for iter in 1:fesolver.nls.max_nliters
+          x .= recenter(x,fesolver.uh0(params_test);θ=fesolver.θ)
+          xrb = space_time_projection(x,op,rbspace)
+          rhs = collect_rhs_contributions!(rhs_cache,info,op,rbres,rbspace)
+          lhs,lhs_t = collect_lhs_contributions!(lhs_cache,info,op,rbjacs,rbspace)
+          nl_cache = rb_solve!(xrb,fesolver.nls.ls,rhs+lhs_t*xrb,lhs+lhs_t,nl_cache)
+          x .+= recast(xrb,rbspace)
+          op = update_ptoperator(op,x)
+          isconv,conv = Algebra._check_convergence(fesolver.nls,xrb,conv0)
+          println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv)))")
+          if all(isconv); return; end
+          if iter == nls.max_nliters
+            @unreachable
+          end
+        end
+      end
+      $g(info,feop,fesolver,snaps_test,params_test,x,stats)
     end
   end
-  post_process(info,feop,fesolver,snaps_test,params_test,x,stats)
 end
 
 function rb_solve(ls::LinearSolver,rhs::PTArray,lhs::PTArray)
@@ -264,7 +295,7 @@ function Gridap.Visualization.writevtk(
   test = get_test(feop)
   trial = get_trial(feop)
   trian = get_triangulation(test)
-  times = get_times(fesolver)
+  times = collect(fesolver.t0:fesolver.dt:fesolver.tf-fesolver.dt)
 
   name = results.name
   μ = results.params[1]

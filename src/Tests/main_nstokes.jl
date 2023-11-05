@@ -36,11 +36,13 @@ begin
   p0(μ) = x->p0(x,μ)
   p0μ(μ) = PFunction(p0,μ)
 
-  c(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(v⊙(∇(du)'⋅u),dΩ)
-  dc(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(v⊙(∇(du)'⋅u),dΩ) + ∫ₚ(v⊙(∇(u)'⋅du),dΩ)
+  conv(u,∇u) = (∇u')⋅u
+  dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
+  c(u,v) = ∫ₚ(v⊙(conv∘(u,∇(u))),dΩ)
+  dc(u,du,v) = ∫ₚ(v⊙(dconv∘(du,∇(du),u,∇(u))),dΩ)
 
-  res(μ,t,(u,p),(v,q)) = ∫ₚ(v⋅∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(u)),dΩ)
-  jac(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(du),dΩ) - ∫ₚ(dp*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(du)),dΩ)
+  res(μ,t,(u,p),(v,q)) = ∫ₚ(v⋅∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) + c(u,v) - ∫ₚ(p*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(u)),dΩ)
+  jac(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(du),dΩ) + dc(u,du,v) - ∫ₚ(dp*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(du)),dΩ)
   jac_t(μ,t,(u,p),(dut,dpt),(v,q)) = ∫ₚ(v⋅dut,dΩ)
 
   reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float},order)
@@ -52,7 +54,7 @@ begin
   trial_p = TrialFESpace(test_p)
   test = PTMultiFieldFESpace([test_u,test_p])
   trial = PTMultiFieldFESpace([trial_u,trial_p])
-  feop = NonlinearPTFEOperator(res,jac,jac_t,(c,dc),pspace,trial,test)
+  feop = PTFEOperator(res,jac,jac_t,pspace,trial,test)
   t0,tf,dt,θ = 0.,0.05,0.005,1
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial_u(μ,t0))
   ph0μ(μ) = interpolate_everywhere(p0μ(μ),trial_p(μ,t0))
@@ -93,14 +95,14 @@ if load_structures
   rbrhs,rblhs = load(info,(BlockRBVecAlgebraicContribution,Vector{BlockRBMatAlgebraicContribution}))
 else
   rbspace = reduced_basis(info,feop,sols)
-  rbrhs,rblhs,nl_rbrhs,nl_rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,params)
-  # if save_structures
-  #   save(info,(rbspace,rbrhs,rblhs))
-  # end
+  rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,params)
+  if save_structures
+    save(info,(rbspace,rbrhs,rblhs))
+  end
 end
 
 # Online phase
-# test_rb_solver(info,feop,fesolver,rbspace,rbrhs,(rblhs,nl_rblhs),sols,params)
+# multi_field_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params)
 
 nsnaps_test = info.nsnaps_test
 ntimes = get_time_ndofs(fesolver)

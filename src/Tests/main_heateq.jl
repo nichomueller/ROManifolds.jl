@@ -90,7 +90,7 @@ function heat_equation()
   end
   # Online phase
   printstyled("ONLINE PHASE\n";bold=true,underline=true)
-  test_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params)
+  single_field_rb_solver(info,feop,fesolver,rbspace,rbrhs,rblhs,sols,params)
 end
 
 heat_equation()
