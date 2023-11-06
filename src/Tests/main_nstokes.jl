@@ -36,13 +36,11 @@ function navier_stokes_equation()
   p0(μ) = x->p0(x,μ)
   p0μ(μ) = PFunction(p0,μ)
 
-  conv(u,∇u) = (∇u')⋅u
-  dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
-  c(u,v) = ∫ₚ(v⊙(conv∘(u,∇(u))),dΩ)
-  dc(u,du,v) = ∫ₚ(v⊙(dconv∘(du,∇(du),u,∇(u))),dΩ)
+  c(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(v⊙(∇(du)'⋅u),dΩ)
+  dc(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(v⊙(∇(du)'⋅u),dΩ) + ∫ₚ(v⊙(∇(u)'⋅du),dΩ)
 
-  res(μ,t,(u,p),(v,q)) = ∫ₚ(v⋅∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) + c(u,v) - ∫ₚ(p*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(u)),dΩ)
-  jac(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(du),dΩ) + dc(u,du,v) - ∫ₚ(dp*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(du)),dΩ)
+  res_lin(μ,t,(u,p),(v,q)) = ∫ₚ(v⋅∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(u)),dΩ)
+  jac_lin(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(du),dΩ) - ∫ₚ(dp*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(du)),dΩ)
   jac_t(μ,t,(u,p),(dut,dpt),(v,q)) = ∫ₚ(v⋅dut,dΩ)
 
   reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float},order)
@@ -53,7 +51,7 @@ function navier_stokes_equation()
   trial_p = TrialFESpace(test_p)
   test = PTMultiFieldFESpace([test_u,test_p])
   trial = PTMultiFieldFESpace([trial_u,trial_p])
-  feop = PTFEOperator(res,jac,jac_t,pspace,trial,test)
+  feop = PTFEOperator(res_lin,jac_lin,jac_t,(c,dc),pspace,trial,test)
   t0,tf,dt,θ = 0.,0.05,0.005,1
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial_u(μ,t0))
   ph0μ(μ) = interpolate_everywhere(p0μ(μ),trial_p(μ,t0))
@@ -63,9 +61,9 @@ function navier_stokes_equation()
   fesolver = PThetaMethod(nls,xh0μ,θ,dt,t0,tf)
 
   ϵ = 1e-4
-  load_solutions = false
+  load_solutions = true
   save_solutions = true
-  load_structures = false
+  load_structures = true
   save_structures = true
   norm_style = [:l2,:l2]
   compute_supremizers = true
@@ -90,7 +88,8 @@ function navier_stokes_equation()
   end
   if load_structures
     rbspace = load(info,BlockRBSpace)
-    rbrhs,rblhs = load(info,(BlockRBVecAlgebraicContribution,Vector{BlockRBMatAlgebraicContribution}))
+    rbrhs,rblhs = load(info,(NTuple{2,BlockRBVecAlgebraicContribution{Float}},
+      NTuple{3,Vector{BlockRBMatAlgebraicContribution{Float}}}))
   else
     rbspace = reduced_basis(info,feop,sols)
     rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,params)

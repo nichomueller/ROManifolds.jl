@@ -34,23 +34,6 @@ end
 Base.getindex(a::RBAlgebraicContribution,trian::Triangulation) = get_contribution(a,trian)
 Base.eltype(::RBAlgebraicContribution{T,N} where N) where T = T
 
-function Base.show(io::IO,a::RBAlgebraicContribution)
-  printstyled("RB ALGEBRAIC CONTRIBUTIONS INFO\n";underline=true)
-  for trian in get_domains(a)
-    atrian = a[trian]
-    red_method = get_reduction_method(atrian)
-    red_var = get_reduced_variable(atrian)
-    nbs = length(atrian.basis_space)
-    nbt = size(atrian.basis_time[1],2)
-    print(io,"$red_var on a $trian, reduction in $red_method\n")
-    print(io,"number basis vectors in (space, time) = ($nbs,$nbt)\n")
-  end
-end
-
-function Base.show(io::IO,a::Vector{<:RBAlgebraicContribution})
-  map(x->show(io,x),a)
-end
-
 function CellData.add_contribution!(
   a::RBAlgebraicContribution,
   trian::Triangulation,
@@ -70,8 +53,6 @@ function save_algebraic_contrib(path::String,a::RBAlgebraicContribution{T,N} whe
   create_dir!(path)
   cpath = joinpath(path,"contrib")
   tpath = joinpath(path,"trian")
-  Tpath = joinpath(path,"type")
-  save(Tpath,T)
   for (i,trian) in enumerate(get_domains(a))
     ai = a[trian]
     save(cpath*"_$i",ai)
@@ -79,24 +60,32 @@ function save_algebraic_contrib(path::String,a::RBAlgebraicContribution{T,N} whe
   end
 end
 
-for (AC,AD) in zip((:RBVecAlgebraicContribution,:RBMatAlgebraicContribution),
-                   (:RBVecAffineDecomposition,:RBMatAffineDecomposition))
-  @eval begin
-    function load_algebraic_contrib(path::String,::Type{$AC})
-      cpath = joinpath(path,"contrib")
-      tpath = joinpath(path,"trian")
-      T = load(joinpath(path,"type"),DataType)
-      a = $AC(T)
-      i = 1
-      while isfile(correct_path(cpath*"_$i"))
-        ai = load(cpath*"_$i",$AD{T})
-        ti = load(tpath*"_$i",Triangulation)
-        add_contribution!(a,ti,ai)
-        i += 1
-      end
-      a
-    end
+function load_algebraic_contrib(path::String,::Type{RBVecAlgebraicContribution{T}}) where T
+  cpath = joinpath(path,"contrib")
+  tpath = joinpath(path,"trian")
+  a = RBVecAlgebraicContribution(T)
+  i = 1
+  while isfile(correct_path(cpath*"_$i"))
+    ai = load(cpath*"_$i",RBVecAffineDecomposition{T})
+    ti = load(tpath*"_$i",Triangulation)
+    add_contribution!(a,ti,ai)
+    i += 1
   end
+  a
+end
+
+function load_algebraic_contrib(path::String,::Type{RBMatAlgebraicContribution{T}}) where T
+  cpath = joinpath(path,"contrib")
+  tpath = joinpath(path,"trian")
+  a = RBMatAlgebraicContribution(T)
+  i = 1
+  while isfile(correct_path(cpath*"_$i"))
+    ai = load(cpath*"_$i",RBMatAffineDecomposition{T})
+    ti = load(tpath*"_$i",Triangulation)
+    add_contribution!(a,ti,ai)
+    i += 1
+  end
+  a
 end
 
 function save(info::RBInfo,a::RBVecAlgebraicContribution)
@@ -104,9 +93,53 @@ function save(info::RBInfo,a::RBVecAlgebraicContribution)
   save_algebraic_contrib(path,a)
 end
 
-function load(info::RBInfo,T::Type{RBVecAlgebraicContribution})
+function load(info::RBInfo,::Type{RBVecAlgebraicContribution{T}}) where T
   path = joinpath(info.rb_path,"rb_rhs")
-  load_algebraic_contrib(path,T)
+  load_algebraic_contrib(path,RBVecAlgebraicContribution{T})
+end
+
+function save(info::RBInfo,a::NTuple{2,RBVecAlgebraicContribution})
+  a_lin,a_nlin = a
+  path_lin = joinpath(info.rb_path,"rb_rhs_lin")
+  path_nlin = joinpath(info.rb_path,"rb_rhs_nlin")
+  save_algebraic_contrib(path_lin,a_lin)
+  save_algebraic_contrib(path_nlin,a_nlin)
+end
+
+function load(info::RBInfo,::Type{NTuple{2,RBVecAlgebraicContribution{T}}}) where T
+  path_lin = joinpath(info.rb_path,"rb_rhs_lin")
+  path_nlin = joinpath(info.rb_path,"rb_rhs_nlin")
+  a_lin = load_algebraic_contrib(path_lin,RBVecAlgebraicContribution{T})
+  a_nlin = load_algebraic_contrib(path_nlin,RBVecAlgebraicContribution{T})
+  a_lin,a_nlin
+end
+
+function save(info::RBInfo,a::NTuple{3,Vector{<:RBMatAlgebraicContribution}})
+  a_lin,a_nlin,a_aux = a
+  for i = eachindex(a_lin)
+    path_lin = joinpath(info.rb_path,"rb_lhs_lin_$i")
+    path_nlin = joinpath(info.rb_path,"rb_lhs_nlin_$i")
+    path_aux = joinpath(info.rb_path,"rb_lhs_aux_$i")
+    save_algebraic_contrib(path_lin,a_lin[i])
+    save_algebraic_contrib(path_nlin,a_nlin[i])
+    save_algebraic_contrib(path_aux,a_aux[i])
+  end
+end
+
+function load(info::RBInfo,::Type{NTuple{3,Vector{RBMatAlgebraicContribution{T}}}}) where T
+  njacs = num_active_dirs(info.rb_path)
+  ad_jacs_lin = Vector{RBMatAlgebraicContribution{T}}(undef,njacs)
+  ad_jacs_nlin = Vector{RBMatAlgebraicContribution{T}}(undef,njacs)
+  ad_jacs_aux = Vector{RBMatAlgebraicContribution{T}}(undef,njacs)
+  for i = 1:njacs
+    path_lin = joinpath(info.rb_path,"rb_lhs_lin_$i")
+    path_nlin = joinpath(info.rb_path,"rb_lhs_nlin_$i")
+    path_aux = joinpath(info.rb_path,"rb_lhs_aux_$i")
+    ad_jacs_lin[i] = load_algebraic_contrib(path_lin,RBMatAlgebraicContribution{T})
+    ad_jacs_nlin[i] = load_algebraic_contrib(path_nlin,RBMatAlgebraicContribution{T})
+    ad_jacs_aux[i] = load_algebraic_contrib(path_aux,RBMatAlgebraicContribution{T})
+  end
+  ad_jacs_lin,ad_jacs_nlin,ad_jacs_aux
 end
 
 function save(info::RBInfo,a::Vector{<:RBMatAlgebraicContribution})
@@ -116,15 +149,32 @@ function save(info::RBInfo,a::Vector{<:RBMatAlgebraicContribution})
   end
 end
 
-function load(info::RBInfo,::Type{Vector{RBMatAlgebraicContribution}})
-  T = load(joinpath(joinpath(info.rb_path,"rb_lhs_1"),"type"),DataType)
+function load(info::RBInfo,::Type{Vector{RBMatAlgebraicContribution{T}}}) where T
   njacs = num_active_dirs(info.rb_path)
   ad_jacs = Vector{RBMatAlgebraicContribution{T}}(undef,njacs)
   for i = 1:njacs
     path = joinpath(info.rb_path,"rb_lhs_$i")
-    ad_jacs[i] = load_algebraic_contrib(path,RBMatAlgebraicContribution)
+    ad_jacs[i] = load_algebraic_contrib(path,RBMatAlgebraicContribution{T})
   end
   ad_jacs
+end
+
+function collect_compress_rhs_lhs(
+  info::RBInfo,
+  feop::PTFEOperator{Affine},
+  fesolver::PThetaMethod,
+  rbspace,
+  params::Table)
+
+  θ = fesolver.θ
+  nsnaps_mdeim = info.nsnaps_mdeim
+  μ = params[1:nsnaps_mdeim]
+  op = get_ptoperator(fesolver,feop,rbspace,μ)
+
+  rhs = collect_compress_rhs(info,op,rbspace)
+  lhs = collect_compress_lhs(info,op,rbspace;θ)
+
+  return rhs,lhs
 end
 
 function collect_compress_rhs_lhs(
@@ -139,11 +189,19 @@ function collect_compress_rhs_lhs(
   μ = params[1:nsnaps_mdeim]
   op = get_ptoperator(fesolver,feop,rbspace,μ)
 
-  rhs = collect_compress_rhs(info,op,rbspace)
-  lhs = collect_compress_lhs(info,op,rbspace;θ)
-  show(rhs),show(lhs)
+  op_lin = linear_operator(op)
+  rhs_lin = collect_compress_rhs(info,op_lin,rbspace)
+  lhs_lin = collect_compress_lhs(info,op_lin,rbspace;θ)
+  op_nlin = nonlinear_operator(op)
+  rhs_nlin = collect_compress_rhs(info,op_nlin,rbspace)
+  lhs_nlin = collect_compress_lhs(info,op_nlin,rbspace;θ)
+  op_aux = auxiliary_operator(op)
+  rblhs_aux = collect_compress_lhs(info,op_aux,rbspace;θ)
 
-  rhs,lhs
+  rhs = rhs_lin,rhs_nlin
+  lhs = lhs_lin,lhs_nlin,rblhs_aux
+
+  return rhs,lhs
 end
 
 function collect_compress_rhs(
@@ -191,6 +249,20 @@ function compress_component!(
       add_contribution!(contrib,ti,ci)
     end
   end
+end
+
+function collect_rhs_lhs_contributions!(
+  cache,
+  info::RBInfo,
+  op::PTAlgebraicOperator,
+  rbres,
+  rbjacs,
+  rbspace)
+
+  rhs_cache,lhs_cache = cache
+  rhs = collect_rhs_contributions!(rhs_cache,info,op,rbres,rbspace)
+  lhs = collect_lhs_contributions!(lhs_cache,info,op,rbjacs,rbspace)
+  return rhs,lhs
 end
 
 function collect_rhs_contributions!(

@@ -80,7 +80,8 @@ function heat_equation()
   end
   if load_structures
     rbspace = load(info,RBSpace)
-    rbrhs,rblhs = load(info,(RBVecAlgebraicContribution,Vector{RBMatAlgebraicContribution}))
+    rbrhs,rblhs = load(info,(RBVecAlgebraicContribution{Float},
+      Vector{RBMatAlgebraicContribution{Float}}))
   else
     rbspace = reduced_basis(info,feop,sols)
     rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,params)

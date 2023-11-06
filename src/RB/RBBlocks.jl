@@ -183,7 +183,8 @@ function space_supremizers(basis_space::Matrix,feop::PTFEOperator)
   μ = realization(feop)
   u = zero(feop.test)
   t = 0.
-  j(du,dv) = integrate(feop.jacs[1](μ,t,u,du,dv))
+  jac = get_jacobian(feop)
+  j(du,dv) = integrate(jac[1](μ,t,u,du,dv))
   trial_dual = get_trial(feop)
   constraint_mat = assemble_matrix(j,trial_dual(μ,t),feop.test)
   constraint_mat*basis_space
@@ -289,25 +290,7 @@ end
 
 get_nblocks(a::BlockRBMatAlgebraicContribution) = size(a.blocks,2)
 
-function Base.show(io::IO,a::BlockRBAlgebraicContribution)
-  for row in axes(a,1), col in axes(a,2)
-    if a.touched[row,col]
-      print(io,"\n")
-      printstyled("RB ALGEBRAIC CONTRIBUTIONS INFO, BLOCK ($row,$col)\n";underline=true)
-      for trian in get_domains(a.blocks[row,col])
-        atrian = a.blocks[row,col][trian]
-        red_method = get_reduction_method(atrian)
-        red_var = get_reduced_variable(atrian)
-        nbs = length(atrian.basis_space)
-        nbt = size(atrian.basis_time[1],2)
-        print(io,"$red_var on a $trian, reduction in $red_method\n")
-        print(io,"number basis vectors in (space, time) = ($nbs,$nbt)\n")
-      end
-    end
-  end
-end
-
-function save_algebraic_contrib(path::String,a::BlockRBVecAlgebraicContribution{T}) where T
+function save_algebraic_contrib(path::String,a::BlockRBVecAlgebraicContribution)
   tpath = joinpath(path,"touched")
   create_dir!(tpath)
   save(tpath,a.touched)
@@ -320,7 +303,7 @@ function save_algebraic_contrib(path::String,a::BlockRBVecAlgebraicContribution{
   end
 end
 
-function save_algebraic_contrib(path::String,a::BlockRBMatAlgebraicContribution{T}) where T
+function save_algebraic_contrib(path::String,a::BlockRBMatAlgebraicContribution)
   tpath = joinpath(path,"touched")
   create_dir!(tpath)
   save(tpath,a.touched)
@@ -333,8 +316,7 @@ function save_algebraic_contrib(path::String,a::BlockRBMatAlgebraicContribution{
   end
 end
 
-function load_algebraic_contrib(path::String,::Type{BlockRBVecAlgebraicContribution})
-  T = load(joinpath(joinpath(path,"block_1"),"type"),DataType)
+function load_algebraic_contrib(path::String,::Type{BlockRBVecAlgebraicContribution{T}}) where T
   tpath = joinpath(path,"touched")
   touched = load(tpath,Vector{Bool})
   nblocks = length(touched)
@@ -342,14 +324,13 @@ function load_algebraic_contrib(path::String,::Type{BlockRBVecAlgebraicContribut
   for row = 1:nblocks
     if touched[row]
       rpath = joinpath(path,"block_$row")
-      blocks[row] = load_algebraic_contrib(rpath,RBVecAlgebraicContribution)
+      blocks[row] = load_algebraic_contrib(rpath,RBVecAlgebraicContribution{T})
     end
   end
   return BlockRBVecAlgebraicContribution(blocks,touched)
 end
 
-function load_algebraic_contrib(path::String,::Type{BlockRBMatAlgebraicContribution})
-  T = load(joinpath(joinpath(path,"block_1_1"),"type"),DataType)
+function load_algebraic_contrib(path::String,::Type{BlockRBMatAlgebraicContribution{T}}) where T
   tpath = joinpath(path,"touched")
   touched = load(tpath,Matrix{Bool})
   nblocks = size(touched,1)
@@ -357,7 +338,7 @@ function load_algebraic_contrib(path::String,::Type{BlockRBMatAlgebraicContribut
   for (row,col) = index_pairs(nblocks,nblocks)
     if touched[row,col]
       rcpath = joinpath(path,"block_$(row)_$(col)")
-      blocks[row,col] = load_algebraic_contrib(rcpath,RBMatAlgebraicContribution)
+      blocks[row,col] = load_algebraic_contrib(rcpath,RBMatAlgebraicContribution{T})
     end
   end
   return BlockRBMatAlgebraicContribution(blocks,touched)
@@ -368,27 +349,70 @@ function save(info::RBInfo,a::BlockRBVecAlgebraicContribution)
   save_algebraic_contrib(path,a)
 end
 
-function load(info::RBInfo,T::Type{BlockRBVecAlgebraicContribution})
+function load(info::RBInfo,::Type{BlockRBVecAlgebraicContribution{T}}) where T
   path = joinpath(info.rb_path,"rb_rhs")
-  load_algebraic_contrib(path,T)
+  load_algebraic_contrib(path,BlockRBVecAlgebraicContribution{T})
 end
 
-function save(info::RBInfo,a::Vector{BlockRBMatAlgebraicContribution{T}}) where T
+function save(info::RBInfo,a::Vector{BlockRBMatAlgebraicContribution})
   for i = eachindex(a)
     path = joinpath(info.rb_path,"rb_lhs_$i")
     save_algebraic_contrib(path,a[i])
   end
 end
 
-function load(info::RBInfo,::Type{Vector{BlockRBMatAlgebraicContribution}})
-  T = load(joinpath(joinpath(joinpath(info.rb_path,"rb_lhs_1"),"block_1_1"),"type"),DataType)
+function load(info::RBInfo,::Type{Vector{BlockRBMatAlgebraicContribution{T}}}) where T
   njacs = num_active_dirs(info.rb_path)
   ad_jacs = Vector{BlockRBMatAlgebraicContribution{T}}(undef,njacs)
   for i = 1:njacs
     path = joinpath(info.rb_path,"rb_lhs_$i")
-    ad_jacs[i] = load_algebraic_contrib(path,BlockRBMatAlgebraicContribution)
+    ad_jacs[i] = load_algebraic_contrib(path,BlockRBMatAlgebraicContribution{T})
   end
   ad_jacs
+end
+
+function save(info::RBInfo,a::NTuple{2,BlockRBVecAlgebraicContribution})
+  a_lin,a_nlin = a
+  path_lin = joinpath(info.rb_path,"rb_rhs_lin")
+  path_nlin = joinpath(info.rb_path,"rb_rhs_nlin")
+  save_algebraic_contrib(path_lin,a_lin)
+  save_algebraic_contrib(path_nlin,a_nlin)
+end
+
+function load(info::RBInfo,::Type{NTuple{2,BlockRBVecAlgebraicContribution{T}}}) where T
+  path_lin = joinpath(info.rb_path,"rb_rhs_lin")
+  path_nlin = joinpath(info.rb_path,"rb_rhs_nlin")
+  a_lin = load_algebraic_contrib(path_lin,BlockRBVecAlgebraicContribution{T})
+  a_nlin = load_algebraic_contrib(path_nlin,BlockRBVecAlgebraicContribution{T})
+  a_lin,a_nlin
+end
+
+function save(info::RBInfo,a::NTuple{3,Vector{<:BlockRBMatAlgebraicContribution}})
+  a_lin,a_nlin,a_aux = a
+  for i = eachindex(a_lin)
+    path_lin = joinpath(info.rb_path,"rb_lhs_lin_$i")
+    path_nlin = joinpath(info.rb_path,"rb_lhs_nlin_$i")
+    path_aux = joinpath(info.rb_path,"rb_lhs_aux_$i")
+    save_algebraic_contrib(path_lin,a_lin[i])
+    save_algebraic_contrib(path_nlin,a_nlin[i])
+    save_algebraic_contrib(path_aux,a_aux[i])
+  end
+end
+
+function load(info::RBInfo,::Type{NTuple{3,Vector{BlockRBMatAlgebraicContribution{T}}}}) where T
+  njacs = num_active_dirs(info.rb_path)
+  ad_jacs_lin = Vector{BlockRBMatAlgebraicContribution{T}}(undef,njacs)
+  ad_jacs_nlin = Vector{BlockRBMatAlgebraicContribution{T}}(undef,njacs)
+  ad_jacs_aux = Vector{BlockRBMatAlgebraicContribution{T}}(undef,njacs)
+  for i = 1:njacs
+    path_lin = joinpath(info.rb_path,"rb_lhs_lin_$i")
+    path_nlin = joinpath(info.rb_path,"rb_lhs_nlin_$i")
+    path_aux = joinpath(info.rb_path,"rb_lhs_aux_$i")
+    ad_jacs_lin[i] = load_algebraic_contrib(path_lin,BlockRBMatAlgebraicContribution{T})
+    ad_jacs_nlin[i] = load_algebraic_contrib(path_nlin,BlockRBMatAlgebraicContribution{T})
+    ad_jacs_aux[i] = load_algebraic_contrib(path_aux,BlockRBMatAlgebraicContribution{T})
+  end
+  ad_jacs_lin,ad_jacs_nlin,ad_jacs_aux
 end
 
 function collect_compress_rhs(
@@ -460,7 +484,8 @@ function check_touched_residuals(op::PTAlgebraicOperator)
   end
   xh1 = TransientCellField(uh1,dxh1)
   dv = get_fe_basis(test)
-  int = feop.res(μ1,t1,xh1,dv)
+  res = get_residual(feop)
+  int = res(μ1,t1,xh1,dv)
   return !isnothing(int)
 end
 
@@ -480,7 +505,8 @@ function check_touched_jacobians(op::PTAlgebraicOperator;i=1)
   xh1 = TransientCellField(uh1,dxh1)
   dv = get_fe_basis(test)
   du = get_trial_fe_basis(trial(nothing,nothing))
-  int = feop.jacs[i](μ1,t1,xh1,du,dv)
+  jac = get_jacobian(feop)
+  int = jac[i](μ1,t1,xh1,du,dv)
   return !isnothing(int)
 end
 

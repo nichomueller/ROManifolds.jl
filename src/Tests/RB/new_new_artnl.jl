@@ -215,6 +215,39 @@ end
 
 Base.:(∘)(::Function,::Tuple{Vararg{Union{Nothing,CellField}}}) = nothing
 
+function collect_compress_rhs(
+  info::RBInfo,
+  feop::PTFEOperator,
+  fesolver::PThetaMethod,
+  rbspace,
+  μ::Table)
+
+  nsnaps_mdeim = info.nsnaps_mdeim
+  _μ = μ[1:nsnaps_mdeim]
+  op = get_ptoperator(fesolver,feop,rbspace,_μ)
+  rhs = collect_compress_rhs(info,op,rbspace)
+  show(rhs)
+  rhs
+end
+
+function collect_compress_lhs(
+  info::RBInfo,
+  feop::PTFEOperator,
+  fesolver::PThetaMethod,
+  rbspace,
+  μ::Table)
+
+  nsnaps_mdeim = info.nsnaps_mdeim
+  θ = fesolver.θ
+  _μ = μ[1:nsnaps_mdeim]
+  op = get_ptoperator(fesolver,feop,rbspace,_μ)
+  lhs = collect_compress_lhs(info,op,rbspace;θ)
+  show(lhs)
+  lhs
+end
+
+Base.getindex(::Nothing,::GenericMeasure) = nothing
+
 begin
   mesh = "model_circle_2D_coarse.json"
   test_path = "$root/tests/navier-stokes/unsteady/$mesh"
@@ -291,7 +324,7 @@ end
 
 sols,params = load(info,(BlockSnapshots,Table))
 rbspace = load(info,BlockRBSpace)
-rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,params)
+# rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,params)
 
 snaps_test,params_test = sols[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
 times = get_times(fesolver)
@@ -429,39 +462,6 @@ for iter in 1:fesolver.nls.max_nliters
 end
 
 ############################# LIKE OLD CODE ####################################
-function collect_compress_rhs(
-  info::RBInfo,
-  feop::PTFEOperator,
-  fesolver::PThetaMethod,
-  rbspace,
-  μ::Table)
-
-  nsnaps_mdeim = info.nsnaps_mdeim
-  _μ = μ[1:nsnaps_mdeim]
-  op = get_ptoperator(fesolver,feop,rbspace,_μ)
-  rhs = collect_compress_rhs(info,op,rbspace)
-  show(rhs)
-  rhs
-end
-
-function collect_compress_lhs(
-  info::RBInfo,
-  feop::PTFEOperator,
-  fesolver::PThetaMethod,
-  rbspace,
-  μ::Table)
-
-  nsnaps_mdeim = info.nsnaps_mdeim
-  θ = fesolver.θ
-  _μ = μ[1:nsnaps_mdeim]
-  op = get_ptoperator(fesolver,feop,rbspace,_μ)
-  lhs = collect_compress_lhs(info,op,rbspace;θ)
-  show(lhs)
-  lhs
-end
-
-Base.getindex(::Nothing,::GenericMeasure) = nothing
-
 # linear part (Stokes)
 res_lin(μ,t,(u,p),(v,q)) = ∫ₚ(v⋅∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(u)),dΩ)
 jac_lin(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(du),dΩ) - ∫ₚ(dp*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(du)),dΩ)
@@ -514,99 +514,251 @@ for iter in 1:20
 end
 
 norm(hcat(xn.array...) - hcat(x.array...)) / norm(hcat(xn.array...))
-
 ################################################################################
-# linear part (Stokes)
-res_lin(μ,t,(u,p),(v,q)) = nothing
-jac_lin(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(du),dΩ) - ∫ₚ(dp*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(du)),dΩ)
-jac_t_lin(μ,t,(u,p),(dut,dpt),(v,q)) = ∫ₚ(v⋅dut,dΩ)
-feop_lin = AffinePTFEOperator(res_lin,jac_lin,jac_t_lin,pspace,trial,test)
-rblhs_lin = collect_compress_lhs(info,feop_lin,fesolver,rbspace,params)
+g0_ok(x,t) = g0(x,μn,t)
+g0_ok(t) = x->g0_ok(x,t)
+g_ok(x,t) = g(x,μn,t)
+g_ok(t) = x->g_ok(x,t)
+m_ok(t,u,v) = ∫(v⋅u)dΩ
+a_ok(t,(u,p),(v,q)) = ∫(a(μn,t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ - ∫(q*(∇⋅(u)))dΩ
+_c(u,v) = ∫(v⊙(conv∘(u,∇(u))))dΩ
+c_ok(u,du,v) = ∫(v⊙(∇(du)'⋅u))dΩ
+dc_ok(u,du,v) = ∫(v⊙(∇(du)'⋅u))dΩ + ∫(v⊙(∇(u)'⋅du))dΩ
 
-# nonlinear part
-_c(u,du,v) = ∫ₚ(v⊙(∇(du)'⋅u),dΩ)
-dir(μ,t) = zero(trial_u(μ,t))
-res_nlin(μ,t,(u,p),(v,q)) = ∫ₚ(v⋅∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(u)),dΩ) +_c(u,dir(μ,t),v)
-jac_nlin(μ,t,(u,p),(du,dp),(v,q)) = dc(u,du,v)
-jac_t_nlin(μ,t,(u,p),(dut,dpt),(v,q)) = nothing
-feop_nlin = PTFEOperator(res_nlin,jac_nlin,jac_t_nlin,pspace,trial,test)
-rbrhs_nlin,rblhs_nlin = collect_compress_rhs_lhs(info,feop_nlin,fesolver,rbspace,params)
+jac_t_ok(t,(u,p),(dut,dpt),(v,q)) = m_ok(t,dut,v)
+Jac_ok(t,(u,p),(du,dp),(v,q)) = a_ok(t,(du,dp),(v,q)) + dc_ok(u,du,v)
+Res_ok(t,(u,p),(v,q)) = m_ok(t,∂t(u),v) + a_ok(t,(u,p),(v,q)) + c_ok(u,u,v)
+trial_u_ok = TransientTrialFESpace(test_u,[g0_ok,g_ok])
+trial_ok = TransientMultiFieldFESpace([trial_u_ok,trial_p])
+feop_ok = TransientFEOperator(Res_ok,Jac_ok,jac_t_ok,trial_ok,test)
+ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
+ode_cache_ok = allocate_cache(ode_op_ok)
+ode_cache_ok = update_cache!(ode_cache_ok,ode_op_ok,dt)
+Xh, = ode_cache_ok
+dxh = ()
+_xn = xn[1]
+dxh = (EvaluationFunction(Xh[2],zeros(size(_xn))),)
+xh = TransientCellField(EvaluationFunction(Xh[1],copy(_xn)),dxh)
+xh0 = TransientCellField(EvaluationFunction(Xh[1],zeros(size(_xn))),dxh)
+du = get_trial_fe_basis(trial_ok(nothing))
+dv = get_fe_basis(test)
 
-# aux part
-res_aux(μ,t,(u,p),(v,q)) = nothing
-jac_aux(μ,t,(u,p),(du,dp),(v,q)) = _c(u,du,v)
-jac_t_aux(μ,t,(u,p),(dut,dpt),(v,q)) = nothing
-feop_aux = PTFEOperator(res_aux,jac_aux,jac_t_aux,pspace,trial,test)
-rblhs_aux = collect_compress_lhs(info,feop_aux,fesolver,rbspace,params)
+Nu = test_u.nfree
+Np = length(get_free_dof_ids(test_p))
+_trial_ok = trial_u_ok(dt)
+dir_ok = zero(_trial_ok)
+
+# TEST 1
+vc1 = assemble_vector(v->_c(xh[1],v),test_u)
+vc2 = (assemble_vector(v->c_ok(xh[1],dir_ok,v),test_u) +
+  assemble_matrix((u,v)->c_ok(xh[1],u,v),_trial_ok,test_u)*_xn[1:Nu])
+
+vc1 ≈ vc2
+
+# TEST 2
+newtrial_ok = trial_ok(dt)
+newdir_ok = zero(newtrial_ok)
+newc((u,p),(v,q)) = ∫(v⊙(conv∘(u,∇(u))))dΩ
+newc_ok((u,p),(du,dp),(v,q)) = ∫(v⊙(∇(du)'⋅u))dΩ
+l1 = assemble_vector(v->a_ok(dt,xh0,v) + newc_ok(xh,newdir_ok,v),test)
+lhslin = assemble_matrix((u,v) -> a_ok(dt,u,v),newtrial_ok,test)
+lhsaux = assemble_matrix((u,v) -> newc_ok(xh,u,v),newtrial_ok,test)
+v1 = l1 + (lhslin+lhsaux)*_xn
+v2 = assemble_vector(v->a_ok(dt,xh,v) + newc(xh,v),test)
+
+vc1 ≈ vc2
+################################################################################
+
+res1(μ,t,(u,p),(v,q)) = ∫ₚ(v⋅∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(u)),dΩ) + c(u,v)
+jac1(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(du),dΩ) - ∫ₚ(dp*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(du)),dΩ) + dc(u,du,v)
+jac_t1(μ,t,(u,p),(dut,dpt),(v,q)) = ∫ₚ(v⋅dut,dΩ)
+feop1 = PTFEOperator(res1,jac1,jac_t1,pspace,trial,test)
+rbrhs1,rblhs1 = collect_compress_rhs_lhs(info,feop1,fesolver,rbspace,params)
 
 x = copy(xn) .* 0.
 op_lin = get_ptoperator(fesolver,feop_lin,x,Table([μn]))
 op_nlin = get_ptoperator(fesolver,feop_nlin,x,Table([μn]))
 op_aux = get_ptoperator(fesolver,feop_aux,x,Table([μn]))
-xrb = space_time_projection(x,op_lin,rbspace)
-rhs_cache,lhs_cache = allocate_cache(op_lin,x)
+op1 = get_ptoperator(fesolver,feop1,x,Table([μn]))
+xrb = space_time_projection(x,op1,rbspace)
+rhs_cache,lhs_cache = allocate_cache(op,x)
 
 for iter in 1:20
+  rhs_lin = collect_rhs_contributions!(rhs_cache,info,op_lin,rbrhs_lin,rbspace)
   lhs_lin,lhs_t = collect_lhs_contributions!(lhs_cache,info,op_lin,rblhs_lin,rbspace)
   rhs_nlin = collect_rhs_contributions!(rhs_cache,info,op_nlin,rbrhs_nlin,rbspace)
   lhs_nlin, = collect_lhs_contributions!(lhs_cache,info,op_nlin,rblhs_nlin,rbspace)
   lhs_aux, = collect_lhs_contributions!(lhs_cache,info,op_aux,rblhs_aux,rbspace)
   lhs = lhs_lin+lhs_t+lhs_nlin
-  rhs = rhs_nlin+(lhs_t+lhs_aux)*xrb
-  dxrb = PTArray(lhs[1] \ rhs[1])
-  xrb -= dxrb
-  x = recast(xrb,rbspace)
-  op_lin = update_ptoperator(op_lin,x)
-  op_nlin = update_ptoperator(op_nlin,x)
-  op_aux = update_ptoperator(op_aux,x)
-  nerr = norm(dxrb[1])
-  println("norm dx = $nerr")
-  if nerr ≤ 1e-10
-    break
-  end
-end
+  rhs = rhs_lin+rhs_nlin+(lhs_lin+lhs_t+lhs_aux)*xrb
 
-norm(hcat(xn.array...) - hcat(x.array...)) / norm(hcat(xn.array...))
-
-############################## SHORTER STRATEGY ################################
-# PART1
-ddir(μ,t) = zero(∂ₚt(trial_u)(μ,t))
-res1(μ,t,(u,p),(v,q)) = (∫ₚ(v⋅ddir(μ,t),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⊙∇(dir(μ,t)),dΩ)
-  + _c(u,dir(μ,t),v) - ∫ₚ(zero(trial_p)*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(dir(μ,t))),dΩ))
-jac1(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(du),dΩ) + dc(u,du,v) - ∫ₚ(dp*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(du)),dΩ)
-jac_t1(μ,t,(u,p),(dut,dpt),(v,q)) = ∫ₚ(v⋅dut,dΩ)
-feop1 = PTFEOperator(res1,jac1,jac_t1,pspace,trial,test)
-rbrhs1,rblhs1 = collect_compress_rhs_lhs(info,feop1,fesolver,rbspace,params)
-
-# PART2
-res2(μ,t,(u,p),(v,q)) = nothing
-jac2(μ,t,(u,p),(du,dp),(v,q)) = _c(u,du,v)
-jac_t2(μ,t,(u,p),(dut,dpt),(v,q)) = nothing
-feop2 = PTFEOperator(res2,jac2,jac_t2,pspace,trial,test)
-rblhs2 = collect_compress_lhs(info,feop2,fesolver,rbspace,params)
-
-x = copy(xn) .* 0.
-op1 = get_ptoperator(fesolver,feop1,x,Table([μn]))
-op2 = get_ptoperator(fesolver,feop2,x,Table([μn]))
-xrb = space_time_projection(x,op1,rbspace)
-rhs_cache,lhs_cache = allocate_cache(op1,x)
-
-for iter in 1:20
   rhs1 = collect_rhs_contributions!(rhs_cache,info,op1,rbrhs1,rbspace)
   lhs1,lhs_t = collect_lhs_contributions!(lhs_cache,info,op1,rblhs1,rbspace)
-  lhs2, = collect_lhs_contributions!(lhs_cache,info,op2,rblhs2,rbspace)
-  lhs = lhs1+lhs_t
-  rhs = rhs1+(lhs2+lhs_t)*xrb
+  lhs_wrong = lhs_t+lhs1
+  rhs_wrong = rhs1+lhs_t*xrb
+
   dxrb = PTArray(lhs[1] \ rhs[1])
   xrb -= dxrb
   x = recast(xrb,rbspace)
   op1 = update_ptoperator(op1,x)
-  op2 = update_ptoperator(op2,x)
-  nerr = norm(dxrb[1])
-  println("norm dx = $nerr")
-  if nerr ≤ 1e-10
+  println("norm dx = $(norm(dxrb[1]))")
+  println("norm res = $(norm(rhs[1] - rhs_wrong[1],Inf))")
+  println("norm jac = $(norm(lhs[1] - lhs_wrong[1],Inf))")
+  if norm(dxrb[1]) ≤ 1e-10
     break
   end
 end
 
 norm(hcat(xn.array...) - hcat(x.array...)) / norm(hcat(xn.array...))
+
+################################################################################
+function temporary_collect_compress_rhs(
+  info::RBInfo,
+  feop::PTFEOperator,
+  fesolver::PThetaMethod,
+  snaps,
+  rbspace,
+  params::Table)
+
+  nsnaps_mdeim = info.nsnaps_mdeim
+  μ = params[1:nsnaps_mdeim]
+  snapsθ = recenter(snaps,fesolver.uh0(params);θ=fesolver.θ)
+  _snapsθ = snapsθ[1:nsnaps_mdeim]
+  op = get_ptoperator(fesolver,feop,_snapsθ,μ)
+
+  rhs = collect_compress_rhs(info,op,rbspace)
+  show(rhs)
+
+  rhs
+end
+
+ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
+ode_cache_ok = allocate_cache(ode_op_ok)
+x = PTArray(snaps_test[1+length(times):2*length(times)])
+
+function return_cu(x,ode_cache_ok,ode_op_ok,kt)
+  xk = x[kt]
+  t = times[kt]
+  ode_cache_ok = Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  Xh, = ode_cache_ok
+  dxh = ()
+  dxh = (EvaluationFunction(Xh[2],zeros(size(xk))),)
+  xh = TransientCellField(EvaluationFunction(Xh[1],copy(xk)),dxh)
+  assemble_vector(v->_c(xh[1],v),test_u)
+end
+
+function artificial_curb(feop_ok,rbspace,x)
+  ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
+  ode_cache_ok = allocate_cache(ode_op_ok)
+  cu = NnzMatrix([return_cu(x,ode_cache_ok,ode_op_ok,kt) for kt in eachindex(times)]...)
+  r1 = space_time_projection(cu,rbspace[1])
+  r2 = zeros(get_rb_ndofs(rbspace[2]))
+  NonaffinePTArray([vcat(r1,r2)])
+end
+
+_res1(μ,t,(u,p),(v,q)) = c(u,v)
+_jac1(μ,t,(u,p),(du,dp),(v,q)) = nothing
+_jac_t1(μ,t,(u,p),(dut,dpt),(v,q)) = nothing
+_feop1 = PTFEOperator(_res1,_jac1,_jac_t1,pspace,trial,test)
+rbrhs1 = collect_compress_rhs(info,_feop1,fesolver,rbspace,params)
+temp_rbrhs1 = temporary_collect_compress_rhs(info,_feop1,fesolver,sols,rbspace,params)
+_op1 = get_ptoperator(fesolver,_feop1,x,Table([μn]))
+rhs1 = collect_rhs_contributions!(rhs_cache,info,_op1,rbrhs1,rbspace)
+temp_rhs1 = collect_rhs_contributions!(rhs_cache,info,_op1,temp_rbrhs1,rbspace)
+curb = artificial_curb(feop_ok,rbspace,x)
+norm(curb[1]-rhs1[1],Inf)
+norm(curb[1]-temp_rhs1[1],Inf)
+
+function return_au(x,ode_cache_ok,ode_op_ok,kt)
+  xk = x[kt]
+  t = times[kt]
+  ode_cache_ok = Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  Xh, = ode_cache_ok
+  dxh = ()
+  dxh = (EvaluationFunction(Xh[2],zeros(size(xk))),)
+  xh = TransientCellField(EvaluationFunction(Xh[1],copy(xk)),dxh)
+  assemble_vector(v->a_ok(t,xh,v),test)
+end
+
+function artificial_aurb(feop_ok,rbspace,x)
+  ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
+  ode_cache_ok = allocate_cache(ode_op_ok)
+  au = NnzMatrix([return_au(x,ode_cache_ok,ode_op_ok,kt) for kt in eachindex(times)]...)
+  auwhole = recast(au)
+  au1 = auwhole[1:Nu,:]
+  au2 = auwhole[1+Nu:end,:]
+  r1 = space_time_projection(au1,rbspace[1])
+  r2 = space_time_projection(au2,rbspace[2])
+  NonaffinePTArray([vcat(r1,r2)])
+end
+
+_res2(μ,t,(u,p),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(u)),dΩ)
+_jac2(μ,t,(u,p),(du,dp),(v,q)) = nothing
+_jac_t2(μ,t,(u,p),(dut,dpt),(v,q)) = nothing
+_feop2 = PTFEOperator(_res2,_jac2,_jac_t2,pspace,trial,test)
+rbrhs2 = collect_compress_rhs(info,_feop2,fesolver,rbspace,params)
+_op2 = get_ptoperator(fesolver,_feop2,x,Table([μn]))
+rhs2 = collect_rhs_contributions!(rhs_cache,info,_op2,rbrhs2,rbspace)
+aurb = artificial_aurb(feop_ok,rbspace,x)
+norm(aurb[1]-rhs2[1],Inf)
+
+function return_au(x,ode_cache_ok,ode_op_ok,kt)
+  xk = x[kt]
+  t = times[kt]
+  ode_cache_ok = Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  Xh, = ode_cache_ok
+  dxh = ()
+  dxh = (EvaluationFunction(Xh[2],zeros(size(xk))),)
+  xh = TransientCellField(EvaluationFunction(Xh[1],copy(xk)),dxh)
+  v = assemble_vector(v->∫(a(μn,t)*∇(v)⊙∇(xh[1]))dΩ,test_u)
+  vcat(v,zeros(Np))
+end
+
+function artificial_aurb(feop_ok,rbspace,x)
+  ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
+  ode_cache_ok = allocate_cache(ode_op_ok)
+  au = NnzMatrix([return_au(x,ode_cache_ok,ode_op_ok,kt) for kt in eachindex(times)]...)
+  r1 = space_time_projection(au.nonzero_val,rbspace[1])
+  r2 = zeros(get_rb_ndofs(rbspace[2]))
+  NonaffinePTArray([vcat(r1,r2)])
+end
+
+_res3(μ,t,(u,p),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ)
+_jac3(μ,t,(u,p),(du,dp),(v,q)) = nothing
+_jac_t3(μ,t,(u,p),(dut,dpt),(v,q)) = nothing
+_feop3 = PTFEOperator(_res3,_jac3,_jac_t3,pspace,trial,test)
+rbrhs3 = collect_compress_rhs(info,_feop3,fesolver,rbspace,params)
+_op3 = get_ptoperator(fesolver,_feop3,x,Table([μn]))
+rhs3 = collect_rhs_contributions!(rhs_cache,info,_op3,rbrhs3,rbspace)
+aurb = artificial_aurb(feop_ok,rbspace,x)
+norm(aurb[1]-rhs3[1],Inf)
+
+function return_bu(x,ode_cache_ok,ode_op_ok,kt)
+  xk = x[kt]
+  t = times[kt]
+  ode_cache_ok = Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  Xh, = ode_cache_ok
+  dxh = ()
+  dxh = (EvaluationFunction(Xh[2],zeros(size(xk))),)
+  xh = TransientCellField(EvaluationFunction(Xh[1],copy(xk)),dxh)
+  assemble_vector(q->∫(q*(∇⋅(xh[1])))dΩ,test_p)
+end
+
+function artificial_burb(feop_ok,rbspace,x)
+  ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
+  ode_cache_ok = allocate_cache(ode_op_ok)
+  bu = NnzMatrix([return_bu(x,ode_cache_ok,ode_op_ok,kt) for kt in eachindex(times)]...)
+  mat = recast(bu)
+  space_time_projection(mat,rbspace[2])
+end
+
+_res4(μ,t,(u,p),(v,q)) = ∫ₚ(q*(∇⋅(xh[1])),dΩ)
+_jac4(μ,t,(u,p),(du,dp),(v,q)) = nothing
+_jac_t4(μ,t,(u,p),(dut,dpt),(v,q)) = nothing
+_feop4 = PTFEOperator(_res4,_jac4,_jac_t4,pspace,trial,test)
+rbrhs4 = temporary_collect_compress_rhs(info,_feop4,fesolver,sols,rbspace,params)
+_op4 = get_ptoperator(fesolver,_feop4,x,Table([μn]))
+rhs4 = collect_rhs_contributions!(rhs_cache,info,_op4,rbrhs4,rbspace)
+burb = artificial_burb(feop_ok,rbspace,x)
+norm(burb-rhs4[1][nu+1:end],Inf)
+################################################################################

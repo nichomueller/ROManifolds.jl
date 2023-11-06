@@ -55,11 +55,11 @@ function get_norm_matrix(info::RBInfo,feop::PTFEOperator,norm_style::Symbol)
 end
 
 function save(info::RBInfo,objs::Tuple)
-  map(obj->save(info,obj),expand(objs))
+  map(obj->save(info,obj),objs)
 end
 
 function load(info::RBInfo,types::Tuple)
-  map(type->load(info,type),expand(types))
+  map(type->load(info,type),types)
 end
 
 function save(info::RBInfo,params::Table)

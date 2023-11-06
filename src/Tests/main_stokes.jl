@@ -83,7 +83,8 @@ function stokes_equation()
   end
   if load_structures
     rbspace = load(info,BlockRBSpace)
-    rbrhs,rblhs = load(info,(BlockRBVecAlgebraicContribution,Vector{BlockRBMatAlgebraicContribution}))
+    rbrhs,rblhs = load(info,(BlockRBVecAlgebraicContribution{Float},
+      Vector{BlockRBMatAlgebraicContribution{Float}}))
   else
     rbspace = reduced_basis(info,feop,sols)
     rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,params)

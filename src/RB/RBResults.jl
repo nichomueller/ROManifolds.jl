@@ -159,10 +159,9 @@ for (f,g) in zip((:single_field_rb_solver,:multi_field_rb_solver),
       nsnaps_test = info.nsnaps_test
       snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
       op = get_ptoperator(fesolver,feop,snaps_test,params_test)
-      rhs_cache,lhs_cache = allocate_cache(op,snaps_test)
+      cache = allocate_cache(op,snaps_test)
       stats = @timed begin
-        rhs = collect_rhs_contributions!(rhs_cache,info,op,rbres,rbspace)
-        lhs,lhs_t = collect_lhs_contributions!(lhs_cache,info,op,rbjacs,rbspace)
+        rhs,(lhs,lhs_t) = collect_rhs_lhs_contributions!(cache,info,op,rbres,rbjacs,rbspace)
         rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs+lhs_t)
       end
       approx_snaps_test = recast(rb_snaps_test,rbspace)
@@ -174,8 +173,8 @@ for (f,g) in zip((:single_field_rb_solver,:multi_field_rb_solver),
       feop::PTFEOperator,
       fesolver::PODESolver,
       rbspace,
-      rbres,
-      rbjacs,
+      rbres::Tuple,
+      rbjacs::Tuple,
       snaps,
       params::Table)
 
@@ -185,18 +184,28 @@ for (f,g) in zip((:single_field_rb_solver,:multi_field_rb_solver),
       snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
       x = nearest_neighbor(snaps_train,params_train,params_test)
       op = get_ptoperator(fesolver,feop,snaps_test,params_test)
+      op_lin = linear_operator(op)
+      op_nlin = nonlinear_operator(op)
+      op_aux = auxiliary_operator(op)
       xrb = space_time_projection(x,op,rbspace)
       dxrb = similar(xrb)
-      rhs_cache,lhs_cache = allocate_cache(op,snaps_test)
-      nl_cache = nothing
+      cache = allocate_cache(op,snaps_test)
+      rhs_cache,lhs_cache = cache
+      newt_cache = nothing
       conv0 = ones(nsnaps_test)
       stats = @timed begin
+        rbrhs_lin,rbrhs_nlin = rbres
+        rblhs_lin,rblhs_nlin,rblhs_aux = rbjacs
+        rhs_lin,(lhs_lin,lhs_t) = collect_rhs_lhs_contributions!(cache,info,op_lin,rbrhs_lin,rblhs_lin,rbspace)
         for iter in 1:fesolver.nls.max_nliters
           x = recenter(x,fesolver.uh0(params_test);θ=fesolver.θ)
-          op = update_ptoperator(op,x)
-          rhs = collect_rhs_contributions!(rhs_cache,info,op,rbres,rbspace)
-          lhs,lhs_t = collect_lhs_contributions!(lhs_cache,info,op,rbjacs,rbspace)
-          nl_cache = rb_solve!(dxrb,fesolver.nls.ls,rhs+lhs_t*xrb,lhs+lhs_t,nl_cache)
+          op_nlin = update_ptoperator(op_nlin,x)
+          op_aux = update_ptoperator(op_aux,x)
+          rhs_nlin,(lhs_nlin,) = collect_rhs_lhs_contributions!(cache,info,op_nlin,rbrhs_nlin,rblhs_nlin,rbspace)
+          lhs_aux, = collect_lhs_contributions!(lhs_cache,info,op_aux,rblhs_aux,rbspace)
+          lhs = lhs_lin+lhs_t+lhs_nlin
+          rhs = rhs_lin+rhs_nlin+(lhs_lin+lhs_t+lhs_aux)*xrb
+          newt_cache = rb_solve!(dxrb,fesolver.nls.ls,rhs,lhs,newt_cache)
           xrb += dxrb
           x = recast(xrb,rbspace)
           isconv,conv = Algebra._check_convergence(fesolver.nls,dxrb,conv0)

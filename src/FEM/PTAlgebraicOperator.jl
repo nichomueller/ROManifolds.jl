@@ -33,6 +33,16 @@ function update_ptoperator(op::PTAlgebraicOperator,x::PTArray)
   get_ptoperator(odeop,μ,tθ,dtθ,x,ode_cache,vθ)
 end
 
+for f in (:linear_operator,:nonlinear_operator,:auxiliary_operator)
+  @eval begin
+    function $f(op::PTAlgebraicOperator)
+      feop = $f(op.odeop.feop)
+      odeop = get_algebraic_operator(feop)
+      return get_ptoperator(odeop,op.μ,op.tθ,op.dtθ,op.u0,op.ode_cache,op.vθ)
+    end
+  end
+end
+
 struct PTThetaAffineMethodOperator <: PTAlgebraicOperator{Affine}
   odeop::AffinePODEOperator
   μ
