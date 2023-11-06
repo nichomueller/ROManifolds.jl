@@ -76,16 +76,6 @@ struct BlockRBSpace{T} <: RBBlock{T,1}
   end
 end
 
-function Base.show(io::IO,rb::BlockRBSpace)
-  for (row,block) in enumerate(rb)
-    nbs = size(block.basis_space,2)
-    nbt = size(block.basis_time,2)
-    print(io,"\n")
-    printstyled("RB SPACE INFO FIELD $row\n";underline=true)
-    print(io,"Reduced basis space with #(basis space, basis time) = ($nbs,$nbt)\n")
-  end
-end
-
 function field_offsets(rb::BlockRBSpace)
   nblocks = get_nblocks(rb)
   offsets = zeros(Int,nblocks+1)
@@ -142,6 +132,8 @@ function reduced_basis(
   feop::PTFEOperator,
   snaps::BlockSnapshots)
 
+  println("Computing RB space")
+
   ϵ = info.ϵ
   nsnaps_state = info.nsnaps_state
   norm_style = info.norm_style
@@ -155,9 +147,7 @@ function reduced_basis(
     bases_space = add_space_supremizers(info,feop,blocks)
     bases_time = add_time_supremizers(blocks)
   end
-  rbspace = BlockRBSpace(bases_space,bases_time)
-  show(rbspace)
-  return rbspace
+  return BlockRBSpace(bases_space,bases_time)
 end
 
 function add_space_supremizers(
@@ -521,19 +511,14 @@ function collect_rhs_contributions!(
   blocks = Vector{PTArray{Vector{T}}}(undef,nblocks)
   for row = 1:nblocks
     op_row_col = op[row,:]
+    rbspace_row = rbspace[row]
     cache_row = cache_at_index(cache,op,row)
     if rbres.touched[row]
-      rbspace_row = rbspace[row]
       blocks[row] = collect_rhs_contributions!(
         cache_row,info,op_row_col,rbres[row],rbspace_row)
     else
-      rb_offsets = field_offsets(rbspace)
-      s = (rb_offsets[row+1]-rb_offsets[row],)
-      rbcache,_ = last(cache_row)
-      setsize!(rbcache,s)
-      array = rbcache.array
-      array .= zero(T)
-      blocks[row] = PTArray([copy(array) for _ = eachindex(op.μ)])
+      nrow = get_rb_ndofs(rbspace_row)
+      blocks[row] = AffinePTArray(zeros(T,nrow),length(op.μ))
     end
   end
   vcat(blocks...)
@@ -554,20 +539,16 @@ function collect_lhs_contributions!(
     blocks = Matrix{PTArray{Matrix{T}}}(undef,nblocks,nblocks)
     for (row,col) = index_pairs(nblocks,nblocks)
       op_row_col = op[row,col]
+      rbspace_row = rbspace[row]
+      rbspace_col = rbspace[col]
       cache_row_col = cache_at_index(cache,op,row,col)
       if rb_jac_i.touched[row,col]
-        rbspace_row = rbspace[row]
-        rbspace_col = rbspace[col]
         blocks[row,col] = collect_lhs_contributions!(
           cache_row_col,info,op_row_col,rb_jac_i[row,col],rbspace_row,rbspace_col;i)
       else
-        rb_offsets = field_offsets(rbspace)
-        s = (rb_offsets[row+1]-rb_offsets[row],rb_offsets[col+1]-rb_offsets[col])
-        rbcache,_ = last(cache_row_col)
-        setsize!(rbcache,s)
-        array = rbcache.array
-        array .= zero(T)
-        blocks[row,col] = PTArray([copy(array) for _ = eachindex(op.μ)])
+        nrow = get_rb_ndofs(rbspace_row)
+        ncol = get_rb_ndofs(rbspace_col)
+        blocks[row,col] = AffinePTArray(zeros(T,nrow,ncol),length(op.μ))
       end
     end
     rb_jacs_contribs[i] = hvcat(nblocks,blocks...)

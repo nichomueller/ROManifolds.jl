@@ -276,26 +276,30 @@ function recast_coefficient!(
   ptarray
 end
 
-function get_cache_at_times(q,times::Vector{<:Real},red_times::Vector{<:Real})
-  time_ndofs = length(times)
-  time_ndofs_red = length(red_times)
-  nparams = Int(length(q)/time_ndofs)
-  if length(red_times) < time_ndofs
-    return PTArray(q[1:time_ndofs_red*nparams])
-  else
-    return q
-  end
-end
+for T in (:NonaffinePTArray,:AffinePTArray)
+  @eval begin
+    function get_cache_at_times(q::$T,times::Vector{<:Real},red_times::Vector{<:Real})
+      time_ndofs = length(times)
+      time_ndofs_red = length(red_times)
+      nparams = Int(length(q)/time_ndofs)
+      if length(red_times) < time_ndofs
+        return $T(q[1:time_ndofs_red*nparams])
+      else
+        return q
+      end
+    end
 
-function get_solutions_at_times(sols::PTArray,times::Vector{<:Real},red_times::Vector{<:Real})
-  time_ndofs = length(times)
-  nparams = Int(length(sols)/time_ndofs)
-  if length(red_times) < time_ndofs
-    tidx = findall(x->x in red_times,times)
-    ptidx = vec(transpose(collect(0:nparams-1)*time_ndofs .+ tidx'))
-    PTArray(sols[ptidx])
-  else
-    sols
+    function get_solutions_at_times(sols::$T,times::Vector{<:Real},red_times::Vector{<:Real})
+      time_ndofs = length(times)
+      nparams = Int(length(sols)/time_ndofs)
+      if length(red_times) < time_ndofs
+        tidx = findall(x->x in red_times,times)
+        ptidx = vec(transpose(collect(0:nparams-1)*time_ndofs .+ tidx'))
+        $T(sols[ptidx])
+      else
+        sols
+      end
+    end
   end
 end
 

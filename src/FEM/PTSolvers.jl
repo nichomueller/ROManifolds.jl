@@ -28,10 +28,6 @@ function _loop_solve!(x::PTArray,ns,b::PTArray)
   end
 end
 
-function _loop_solve!(x::AffinePTArray,ns,b::AffinePTArray)
-  solve!(x[1],ns[1],b[1])
-end
-
 function Algebra.solve!(x::PTArray,ls::LinearSolver,op::PTAffineOperator,::Nothing)
   A,b = op.matrix,op.vector
   @assert length(A) == length(b) == length(x)

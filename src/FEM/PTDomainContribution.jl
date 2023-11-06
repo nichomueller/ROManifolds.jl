@@ -83,7 +83,7 @@ function CellData.add_contribution!(
     n = length(a[atrian])
     break
   end
-  ptb = PTArray(b,n)
+  ptb = AffinePTArray(b,n)
   add_contribution!(a,trian,ptb,op)
 end
 
@@ -135,13 +135,17 @@ function CellData.get_array(a::PTDomainContribution)
   a.dict[first(keys(a.dict))]
 end
 
-function CellData.move_contributions(scell_to_val::PTArray,args...)
-  ptcell_mat_trian = map(scell_to_val.array) do x
-    move_contributions(x,args...)
+for T in (:NonaffinePTArray,:AffinePTArray)
+  @eval begin
+    function CellData.move_contributions(scell_to_val::$T,args...)
+      ptcell_mat_trian = map(scell_to_val.array) do x
+        move_contributions(x,args...)
+      end
+      cell_to_val = $T(first.(ptcell_mat_trian))
+      trian = first(last.(ptcell_mat_trian))
+      cell_to_val,trian
+    end
   end
-  cell_to_val = PTArray(first.(ptcell_mat_trian))
-  trian = first(last.(ptcell_mat_trian))
-  cell_to_val,trian
 end
 
 function CellData.integrate(f::PTCellField,b::CellData.GenericMeasure)
@@ -285,6 +289,8 @@ function CellData.integrate(a::CollectionPTIntegrand)
   cont
 end
 
+# Interface that allows to entirely eliminate terms from the (PT)DomainContribution
+
 for op in (:inner,:outer,:double_contraction,:+,:-,:*,:cross,:dot,:/)
   @eval begin
     ($op)(::Nothing,::Nothing) = nothing
@@ -297,8 +303,6 @@ Base.adjoint(::Nothing) = nothing
 Base.broadcasted(f,a::Nothing,b::Nothing) = Operation((i,j)->f.(i,j))(a,b)
 Base.broadcasted(f,a::Nothing,b::CellField) = Operation((i,j)->f.(i,j))(a,b)
 Base.broadcasted(f,a::CellField,b::Nothing) = Operation((i,j)->f.(i,j))(a,b)
-Base.:(∘)(::Function,::Tuple{Vararg{Union{Nothing,CellField}}}) = nothing
-
 Fields.gradient(::Nothing) = nothing
 LinearAlgebra.dot(::typeof(∇),::Nothing) = nothing
 ∂ₚt(::Nothing) = nothing
@@ -312,9 +316,7 @@ PTIntegrand(::Nothing,::Measure) = nothing
 for T in (:DomainContribution,:PTDomainContribution,:PTIntegrand,:CollectionPTIntegrand)
   @eval begin
     (+)(::Nothing,b::$T) = b
-
     (+)(a::$T,::Nothing) = a
-
     (-)(a::$T,::Nothing) = a
   end
 end

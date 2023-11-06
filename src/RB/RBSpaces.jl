@@ -9,13 +9,6 @@ struct RBSpace{T}
   end
 end
 
-function Base.show(io::IO,rb::RBSpace)
-  nbs = size(rb.basis_space,2)
-  nbt = size(rb.basis_time,2)
-  printstyled("RB SPACE INFO\n";underline=true)
-  print(io,"Reduced basis space with #(basis space, basis time) = ($nbs,$nbt)\n")
-end
-
 get_basis_space(rb::RBSpace) = rb.basis_space
 get_basis_time(rb::RBSpace) = rb.basis_time
 get_space_ndofs(rb::RBSpace) = size(rb.basis_space,1)
@@ -35,13 +28,13 @@ function load(info::RBInfo,T::Type{RBSpace})
 end
 
 function reduced_basis(info::RBInfo,feop::PTFEOperator,snaps::Snapshots)
+  println("Computing RB space")
+
   ϵ = info.ϵ
   nsnaps_state = info.nsnaps_state
   norm_style = info.norm_style
   norm_matrix = get_norm_matrix(info,feop,norm_style)
-  rbspace = reduced_basis(snaps,norm_matrix;ϵ,nsnaps_state)
-  show(rbspace)
-  return rbspace
+  return reduced_basis(snaps,norm_matrix;ϵ,nsnaps_state)
 end
 
 function reduced_basis(
@@ -68,17 +61,17 @@ function recast(x::AbstractVector,rb::RBSpace)
   return xrb
 end
 
-function recast(x::PTArray,rb::RBSpace{T}) where T
+function recast(x::NonaffinePTArray,rb::RBSpace{T}) where T
   time_ndofs = get_time_ndofs(rb)
   nparams = length(x)
   array = Vector{Vector{T}}(undef,time_ndofs*nparams)
   @inbounds for i = 1:nparams
     array[(i-1)*time_ndofs+1:i*time_ndofs] = recast(x[i],rb)
   end
-  PTArray(array)
+  NonaffinePTArray(array)
 end
 
-function space_time_projection(x::PTArray,rb::RBSpace{T}) where T
+function space_time_projection(x::NonaffinePTArray,rb::RBSpace{T}) where T
   time_ndofs = get_time_ndofs(rb)
   nparams = Int(length(x)/time_ndofs)
 
@@ -88,7 +81,7 @@ function space_time_projection(x::PTArray,rb::RBSpace{T}) where T
     array[np] = space_time_projection(x_np,rb)
   end
 
-  return PTArray(array)
+  return NonaffinePTArray(array)
 end
 
 function space_time_projection(mat::AbstractMatrix,rb::RBSpace)
@@ -164,7 +157,7 @@ function get_ptoperator(
     col = mod(n,ns) == 0 ? ns : mod(n,ns)
     array[n] = bs[:,col]
   end
-  sols = PTArray(array)
+  sols = NonaffinePTArray(array)
   sols_cache = zero(sols)
   get_ptoperator(ode_op,μ,times,dtθ,sols,ode_cache,sols_cache)
 end

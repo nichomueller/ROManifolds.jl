@@ -3,7 +3,8 @@ const AbstractArrayBlock{T,N} = Union{AbstractArray{T,N},ArrayBlock{T,N}}
 struct Nonaffine <: OperatorType end
 
 function get_affinity(array::AbstractVector{<:AbstractArrayBlock})
-  if all([a == first(array) for a in array])
+  a1 = testitem(a)
+  if all([a == a1 for a in array]) && !iszero(a1)
     Affine()
   else
     Nonaffine()
@@ -12,6 +13,11 @@ end
 
 # Abstract implementation
 abstract type PTArray{T} end
+
+function PTArray(array::Vector{T}) where {T<:AbstractArrayBlock}
+  affinity = get_affinity(array)
+  PTArray(affinity,array)
+end
 
 Arrays.get_array(a::PTArray) = a.array
 Base.size(a::PTArray) = size(a.array)
@@ -257,10 +263,6 @@ struct NonaffinePTArray{T} <: PTArray{T}
   end
 end
 
-function PTArray(array::Vector{T}) where {T<:AbstractArrayBlock}
-  NonaffinePTArray(array)
-end
-
 function PTArray(::Nonaffine,array::Vector{T}) where {T<:AbstractArrayBlock}
   NonaffinePTArray(array)
 end
@@ -276,7 +278,7 @@ function Base.copy(a::NonaffinePTArray{T}) where T
   @inbounds for i = eachindex(a)
     b[i] = copy(a[i])
   end
-  PTArray(b)
+  NonaffinePTArray(b)
 end
 
 function Base.similar(a::NonaffinePTArray{T}) where T
@@ -284,7 +286,7 @@ function Base.similar(a::NonaffinePTArray{T}) where T
   @inbounds for i = eachindex(a)
     b[i] = similar(a[i])
   end
-  PTArray(b)
+  NonaffinePTArray(b)
 end
 
 function Base.show(io::IO,a::NonaffinePTArray{T}) where T
@@ -316,7 +318,7 @@ function Arrays.CachedArray(a::NonaffinePTArray)
   @inbounds for i in eachindex(a)
     array[i] = CachedArray(a.array[i])
   end
-  PTArray(array)
+  NonaffinePTArray(array)
 end
 
 function Base.map(f,a::PTArray)
@@ -326,7 +328,7 @@ function Base.map(f,a::PTArray)
   @inbounds for i = 1:n
     array[i] = f(a[i])
   end
-  PTArray(array)
+  NonaffinePTArray(array)
 end
 
 function Base.map(f,a::PTArray,x::Union{AbstractArrayBlock,PTArray}...)
@@ -338,7 +340,7 @@ function Base.map(f,a::PTArray,x::Union{AbstractArrayBlock,PTArray}...)
     axi = get_at_index(i,(a,x...))
     array[i] = f(axi...)
   end
-  PTArray(array)
+  NonaffinePTArray(array)
 end
 
 function Base.map(f,a::AbstractArrayBlock,x::PTArray)
@@ -348,7 +350,7 @@ function Base.map(f,a::AbstractArrayBlock,x::PTArray)
   @inbounds for i = 1:n
     array[i] = f(a,x[i])
   end
-  PTArray(array)
+  NonaffinePTArray(array)
 end
 
 for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
@@ -386,7 +388,7 @@ for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
         axi = get_at_index(i,(a,x...))
         array[i] = evaluate!(cx,f,axi...)
       end
-      PTArray(array)
+      NonaffinePTArray(array)
     end
 
     function Arrays.return_value(
@@ -422,7 +424,7 @@ for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
         xi = get_at_index(i,x)
         array[i] = evaluate!(cx,f,a,xi)
       end
-      PTArray(array)
+      NonaffinePTArray(array)
     end
 
     function pt_lazy_map(f,a::Union{AbstractArrayBlock,PTArray}...)
@@ -431,7 +433,7 @@ for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
         ai = get_at_index(i,a)
         lazy_map(f,ai...)
       end
-      PTArray(lazy_arrays)
+      NonaffinePTArray(lazy_arrays)
     end
   end
 end
@@ -441,13 +443,9 @@ struct AffinePTArray{T} <: PTArray{T}
   array::T
   len::Int
 
-  function AffinePTArray(array::T,len::Int) where {T<:AbstractArrayBlock}
+  function AffinePTArray(array::T,len::Int=1) where {T<:AbstractArrayBlock}
     new{T}(array,len)
   end
-end
-
-function PTArray(array::T,n=1) where {T<:AbstractArrayBlock}
-  AffinePTArray(array,n)
 end
 
 function PTArray(::Affine,array::Vector{T}) where {T<:AbstractArrayBlock}
@@ -461,8 +459,8 @@ Base.eachindex(a::AffinePTArray) = Base.OneTo(a.len)
 Base.lastindex(a::AffinePTArray) = a.len
 Base.getindex(a::AffinePTArray,i...) = a.array
 Base.setindex!(a::AffinePTArray,v,i...) = a.array = v
-Base.copy(a::AffinePTArray) = PTArray(copy(a.array),a.len)
-Base.similar(a::AffinePTArray) = PTArray(similar(a.array),a.len)
+Base.copy(a::AffinePTArray) = AffinePTArray(copy(a.array),a.len)
+Base.similar(a::AffinePTArray) = AffinePTArray(similar(a.array),a.len)
 
 function Base.show(io::IO,a::AffinePTArray{T}) where T
   print(io,"Affine PTArray of type $T and length $(a.len)")
@@ -482,7 +480,7 @@ for f in (:(Base.hcat),:(Base.vcat))
         arrays = (arrays...,a[i][j])
       end
       varray = $f(arrays...)
-      PTArray(varray,n)
+      AffinePTArray(varray,n)
     end
   end
 end
@@ -500,26 +498,26 @@ function Arrays.CachedArray(a::AffinePTArray)
   n = length(a)
   ai = testitem(a)
   ci = CachedArray(ai)
-  PTArray(array,n)
+  AffinePTArray(array,n)
 end
 
 function Base.map(f,a::AffinePTArray)
   n = length(a)
   fa1 = f(testitem(a))
-  PTArray(fa1,n)
+  AffinePTArray(fa1,n)
 end
 
 function Base.map(f,a::AffinePTArray,x::Union{AbstractArrayBlock,AffinePTArray}...)
   n = _get_length(a,x...)
   ax1 = get_at_index(1,(a,x...))
   fax1 = f(ax1...)
-  PTArray(fax1,n)
+  AffinePTArray(fax1,n)
 end
 
 function Base.map(f,a::AbstractArrayBlock,x::AffinePTArray)
   n = length(x)
   fax1 = f(a,testitem(x))
-  PTArray(fax1,n)
+  AffinePTArray(fax1,n)
 end
 
 for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
@@ -533,7 +531,7 @@ for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
       cx,array = cache
       ax1 = get_at_index(1,(a,x...))
       evaluate!(cx,f,ax1...)
-      PTArray(cx.array,length(array))
+      AffinePTArray(cx.array,length(array))
     end
 
     function Arrays.evaluate!(
@@ -545,13 +543,13 @@ for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
       cx,array = cache
       x1 = get_at_index(1,x)
       evaluate!(cx,f,a,x1)
-      PTArray(cx.array,length(array))
+      AffinePTArray(cx.array,length(array))
     end
 
     function pt_lazy_map(f::$F,a::Union{AbstractArrayBlock,AffinePTArray}...)
       n = _get_length(a...)
       a1 = get_at_index(1,a)
-      PTArray(lazy_map(f,a1...),n)
+      AffinePTArray(lazy_map(f,a1...),n)
     end
   end
 end

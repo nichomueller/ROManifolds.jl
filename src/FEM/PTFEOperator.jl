@@ -163,10 +163,10 @@ end
 
 function allocate_residual(
   op::PTFEOperator,
-  μ::AbstractVector,
-  t::T,
+  μ::Vector,
+  t::Real,
   uh::S,
-  cache) where {T,S}
+  cache) where S
 
   V = get_test(op)
   v = get_fe_basis(V)
@@ -183,37 +183,32 @@ end
 
 function allocate_jacobian(
   op::PTFEOperator,
-  μ::AbstractVector,
-  t::T,
+  μ::Vector,
+  t::Real,
   uh::S,
-  cache) where {T,S}
+  cache) where S
 
   _matdata_jacobians = fill_initial_jacobians(op,μ,t,uh)
   matdata = _vcat_matdata(_matdata_jacobians)
   allocate_matrix(op.assem,matdata)
 end
 
-for f in (:allocate_residual,:allocate_jacobian)
-  @eval begin
-    function $f(
-      op::PTFEOperator,
-      μ::AbstractVector,
-      t::T,
-      uh::PTCellField,
-      cache) where T
+function allocate_residual(
+  op::PTFEOperator,
+  μ::P,
+  t::T,
+  uh::PTCellField,
+  cache) where {P,T}
 
-      n = length(uh)
-      μ1 = isa(μ,Table) ? testitem(μ) : μ
-      t1 = isa(t,AbstractVector) ? testitem(t) : t
-      uh1 = testitem(uh)
-      a = $f(op,μ1,t1,uh1,cache)
-      array = Vector{typeof(a)}(undef,n)
-      @inbounds for i = eachindex(array)
-        array[i] = copy(a)
-      end
-      PTArray(array)
-    end
+  μ1 = P <: Table ? testitem(μ) : μ
+  t1 = T <: AbstractVector ? testitem(t) : t
+  uh1 = testitem(uh)
+  b = allocate_residual(op,μ1,t1,uh1,cache)
+  array = Vector{typeof(b)}(undef,n)
+  @inbounds for i = eachindex(array)
+    array[i] = copy(b)
   end
+  PTArray(array)
 end
 
 function residual!(

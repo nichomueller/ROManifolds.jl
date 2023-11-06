@@ -124,7 +124,7 @@ function NonaffineHomogeneousPTrialFESpace(U::SingleFieldFESpace,n::Int)
   @inbounds for i in eachindex(array)
     array[i] = copy(dv)
   end
-  dirichlet_values = PTArray(array)
+  dirichlet_values = NonaffinePTArray(array)
   NonaffinePTrialFESpace(dirichlet_values,U)
 end
 
@@ -135,7 +135,7 @@ function FESpaces.zero_free_values(f::NonaffinePTrialFESpace)
   @inbounds for i in eachindex(array)
     array[i] = copy(fv)
   end
-  PTArray(array)
+  NonaffinePTArray(array)
 end
 
 function FESpaces.zero_dirichlet_values(f::NonaffinePTrialFESpace)
@@ -145,7 +145,7 @@ function FESpaces.zero_dirichlet_values(f::NonaffinePTrialFESpace)
   @inbounds for i in eachindex(array)
     array[i] = copy(zdv)
   end
-  PTArray(array)
+  NonaffinePTArray(array)
 end
 
 function FESpaces.compute_dirichlet_values_for_tags!(
@@ -242,20 +242,20 @@ end
 
 function AffineHomogeneousPTrialFESpace(U::SingleFieldFESpace,n::Int)
   dv = zero_dirichlet_values(U)
-  dirichlet_values = PTArray(dv,n)
+  dirichlet_values = AffinePTArray(dv,n)
   AffinePTrialFESpace(dirichlet_values,U)
 end
 
 function FESpaces.zero_free_values(f::AffinePTrialFESpace)
   fv = zero_free_values(f.space)
   n = length(f.dirichlet_values)
-  PTArray(fv,n)
+  AffinePTArray(fv,n)
 end
 
 function FESpaces.zero_dirichlet_values(f::AffinePTrialFESpace)
   zdv = zero_dirichlet_values(f.space)
   n = length(f.dirichlet_values)
-  PTArray(zdv,n)
+  AffinePTArray(zdv,n)
 end
 
 function FESpaces._free_and_dirichlet_values_fill!(

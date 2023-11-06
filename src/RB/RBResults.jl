@@ -131,7 +131,7 @@ function allocate_cache(
   A = allocate_jacobian(op,snaps)
 
   coeff = zeros(T,1,1)
-  ptcoeff = PTArray([zeros(T,1,1) for _ = eachindex(op.μ)])
+  ptcoeff = NonaffinePTArray([zeros(T,1,1) for _ = eachindex(op.μ)])
 
   res_contrib_cache = return_cache(RBVecContributionMap(T))
   jac_contrib_cache = return_cache(RBMatContributionMap(T))
@@ -276,7 +276,7 @@ function nearest_neighbor(
     idxn = idx[n]
     array[(n-1)*ntimes+1:n*ntimes] = sols_train[(idxn-1)*ntimes+1:idxn*ntimes]
   end
-  PTArray(array)
+  NonaffinePTArray(array)
 end
 
 function space_time_matrices(sol::PTArray{Vector{T}};nparams=length(sol)) where T
@@ -286,7 +286,7 @@ function space_time_matrices(sol::PTArray{Vector{T}};nparams=length(sol)) where 
   @inbounds for i = 1:nparams
     array[i] = mat[:,(i-1)*ntimes+1:i*ntimes]
   end
-  PTArray(array)
+  NonaffinePTArray(array)
 end
 
 function compute_relative_error(
@@ -305,7 +305,7 @@ function compute_relative_error(
   @inbounds for i = 1:nparams
     err[i] = compute_relative_error!(cache,sol[i],sol_approx[i],args...)
   end
-  PTArray(err)
+  NonaffinePTArray(err)
 end
 
 function compute_relative_error!(cache,sol,sol_approx,norm_matrix=nothing)

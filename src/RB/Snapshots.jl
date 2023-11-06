@@ -22,7 +22,7 @@ function Base.getindex(s::Snapshots{T},idx) where T
       array[(i-1)*time_ndofs+nt] = s.snaps[nt][r]
     end
   end
-  return PTArray(array)
+  return NonaffinePTArray(array)
 end
 
 function Base.copy(s::Snapshots)

@@ -37,26 +37,13 @@ function recenter(a::Vector{<:PTArray},ah0::PTFEFunction;θ::Real=1)
   end
 end
 
-struct PODESolution{T}
+struct PODESolution
   solver::PODESolver
   op::PODEOperator
   μ::AbstractVector
   u0::PTArray
   t0::Real
   tf::Real
-
-  function PODESolution(
-    solver::PODESolver,
-    op::PODEOperator,
-    μ::AbstractVector,
-    u0::PTArray,
-    t0::Real,
-    tf::Real)
-
-    test = get_test(op.feop)
-    T = typeof(test)
-    new{T}(solver,op,μ,u0,t0,tf)
-  end
 end
 
 function Base.iterate(sol::PODESolution)

@@ -200,7 +200,7 @@ function FESpaces.FEFunction(
   free_values::PTArray,
   dirichlet_values::AbstractArray)
 
-  dv = PTArray(dirichlet_values,length(free_values))
+  dv = AffinePTArray(dirichlet_values,length(free_values))
   FEFunction(fs,free_values,dv)
 end
 

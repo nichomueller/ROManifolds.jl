@@ -171,6 +171,7 @@ function collect_compress_rhs_lhs(
   μ = params[1:nsnaps_mdeim]
   op = get_ptoperator(fesolver,feop,rbspace,μ)
 
+  println("Computing RB affine decomposition (linear)")
   rhs = collect_compress_rhs(info,op,rbspace)
   lhs = collect_compress_lhs(info,op,rbspace;θ)
 
@@ -189,12 +190,15 @@ function collect_compress_rhs_lhs(
   μ = params[1:nsnaps_mdeim]
   op = get_ptoperator(fesolver,feop,rbspace,μ)
 
+  println("Computing RB affine decomposition (linear)")
   op_lin = linear_operator(op)
   rhs_lin = collect_compress_rhs(info,op_lin,rbspace)
   lhs_lin = collect_compress_lhs(info,op_lin,rbspace;θ)
+  println("Computing RB affine decomposition (nonlinear)")
   op_nlin = nonlinear_operator(op)
   rhs_nlin = collect_compress_rhs(info,op_nlin,rbspace)
   lhs_nlin = collect_compress_lhs(info,op_nlin,rbspace;θ)
+  println("Computing RB affine decomposition (auxiliary)")
   op_aux = auxiliary_operator(op)
   rblhs_aux = collect_compress_lhs(info,op_aux,rbspace;θ)
 
@@ -278,7 +282,7 @@ function collect_rhs_contributions!(
   rb_res_contribs = Vector{PTArray{Vector{T}}}(undef,num_domains(rbres))
   if iszero(rbres)
     nrow = get_rb_ndofs(rbspace)
-    contrib = PTArray([zeros(T,nrow) for _ = eachindex(op.μ)])
+    contrib = AffinePTArray(zeros(T,nrow),length(op.μ))
     rb_res_contribs[i] = contrib
   else
     for (i,t) in enumerate(get_domains(rbres))
@@ -323,7 +327,7 @@ function collect_lhs_contributions!(
   if iszero(rbjac)
     nrow = get_rb_ndofs(rbspace_row)
     ncol = get_rb_ndofs(rbspace_col)
-    contrib = PTArray([zeros(T,nrow,ncol) for _ = eachindex(op.μ)])
+    contrib = AffinePTArray(zeros(T,nrow,ncol),length(op.μ))
     rb_jac_contribs[i] = contrib
   else
     for (i,t) in enumerate(trian)
