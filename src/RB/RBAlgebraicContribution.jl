@@ -98,6 +98,23 @@ function load(info::RBInfo,::Type{RBVecAlgebraicContribution{T}}) where T
   load_algebraic_contrib(path,RBVecAlgebraicContribution{T})
 end
 
+function save(info::RBInfo,a::Vector{<:RBMatAlgebraicContribution})
+  for i = eachindex(a)
+    path = joinpath(info.rb_path,"rb_lhs_$i")
+    save_algebraic_contrib(path,a[i])
+  end
+end
+
+function load(info::RBInfo,::Type{Vector{RBMatAlgebraicContribution{T}}}) where T
+  njacs = num_active_dirs(info.rb_path)
+  ad_jacs = Vector{RBMatAlgebraicContribution{T}}(undef,njacs)
+  for i = 1:njacs
+    path = joinpath(info.rb_path,"rb_lhs_$i")
+    ad_jacs[i] = load_algebraic_contrib(path,RBMatAlgebraicContribution{T})
+  end
+  ad_jacs
+end
+
 function save(info::RBInfo,a::NTuple{2,RBVecAlgebraicContribution})
   a_lin,a_nlin = a
   path_lin = joinpath(info.rb_path,"rb_rhs_lin")
@@ -140,23 +157,6 @@ function load(info::RBInfo,::Type{NTuple{3,Vector{RBMatAlgebraicContribution{T}}
     ad_jacs_aux[i] = load_algebraic_contrib(path_aux,RBMatAlgebraicContribution{T})
   end
   ad_jacs_lin,ad_jacs_nlin,ad_jacs_aux
-end
-
-function save(info::RBInfo,a::Vector{<:RBMatAlgebraicContribution})
-  for i = eachindex(a)
-    path = joinpath(info.rb_path,"rb_lhs_$i")
-    save_algebraic_contrib(path,a[i])
-  end
-end
-
-function load(info::RBInfo,::Type{Vector{RBMatAlgebraicContribution{T}}}) where T
-  njacs = num_active_dirs(info.rb_path)
-  ad_jacs = Vector{RBMatAlgebraicContribution{T}}(undef,njacs)
-  for i = 1:njacs
-    path = joinpath(info.rb_path,"rb_lhs_$i")
-    ad_jacs[i] = load_algebraic_contrib(path,RBMatAlgebraicContribution{T})
-  end
-  ad_jacs
 end
 
 function collect_compress_rhs_lhs(

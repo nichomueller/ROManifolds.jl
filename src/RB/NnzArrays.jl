@@ -7,22 +7,6 @@ get_nonzero_val(nza::NnzArray) = nza.nonzero_val
 get_nonzero_idx(nza::NnzArray) = nza.nonzero_idx
 get_nrows(nza::NnzArray) = nza.nrows
 
-function get_nonzero_val(nza::Vector{<:NnzArray})
-  stack(map(get_nonzero_val,nza))
-end
-
-function get_nonzero_idx(nza::Vector{<:NnzArray})
-  nz_idx = map(get_nonzero_idx,nza)
-  @check all([i == first(nz_idx) for i in nz_idx])
-  first(nz_idx)
-end
-
-function get_nrows(nza::Vector{<:NnzArray})
-  nrows = map(get_nrows,nza)
-  @check all([r == first(nrows) for r in nrows])
-  first(nrows)
-end
-
 struct NnzVector{T} <: NnzArray{T,1}
   nonzero_val::Vector{T}
   nonzero_idx::Vector{Int}
@@ -60,22 +44,37 @@ struct NnzMatrix{T} <: NnzArray{T,2}
     new{T}(nonzero_val,nonzero_idx,nrows,nparams)
   end
 
-  function NnzMatrix(val::Vector{<:AbstractArray{T}};nparams=length(val)) where T
-    vals = stack(val)
-    nonzero_idx,nonzero_val = compress_array(vals)
-    nrows = size(vals,1)
+  function NnzMatrix(val::NonaffinePTArray{<:AbstractArray{T}};nparams=length(val)) where T
+    vals = get_array(val)
+    idx_val = map(compress_array,vals)
+    nonzero_idx = first(first.(idx_val))
+    nonzero_val = stack(last.(idx_val))
+    nrows = size(testitem(val),1)
     new{T}(nonzero_val,nonzero_idx,nrows,nparams)
   end
 
-  function NnzMatrix(val::Vector{NnzVector{T}};nparams=length(val)) where T
-    nonzero_val = get_nonzero_val(val)
-    nonzero_idx = get_nonzero_idx(val)
-    nrows = get_nrows(val)
+  function NnzMatrix(val::NonaffinePTArray{NnzVector{T}};nparams=length(val)) where T
+    vals = get_array(val)
+    nonzero_idx = get_nonzero_idx(first(vals))
+    nonzero_val = stack(map(get_nonzero_val,vals))
+    nrows = get_nrows(first(vals))
     new{T}(nonzero_val,nonzero_idx,nrows,nparams)
   end
 
-  function NnzMatrix(val::PTArray;nparams=length(val))
-    NnzMatrix(get_array(val);nparams)
+  function NnzMatrix(val::AffinePTArray{<:AbstractArray{T}};nparams=length(val)) where T
+    v = get_array(val)
+    nonzero_idx,nonzero_val = compress_array(v)
+    nonzero_val = repeat(v,1,val.len)
+    nrows = size(first(val),1)
+    new{T}(nonzero_val,nonzero_idx,nrows,nparams)
+  end
+
+  function NnzMatrix(val::AffinePTArray{NnzVector{T}};nparams=length(val)) where T
+    v = get_array(val)
+    nonzero_idx = get_nonzero_idx(v)
+    nonzero_val = repeat(get_nonzero_val(v),1,val.len)
+    nrows = get_nrows(v)
+    new{T}(nonzero_val,nonzero_idx,nrows,nparams)
   end
 end
 
@@ -142,16 +141,7 @@ function compress(a::AbstractMatrix,b::AbstractMatrix,nzm::NnzMatrix)
   end
 end
 
-abstract type PODStyle end
-struct DefaultPOD <: PODStyle end
-struct SteadyPOD <: PODStyle end
-
 function compress(nzm::NnzMatrix,args...;kwargs...)
-  steady = num_time_dofs(nzm) == 1 ? SteadyPOD() : DefaultPOD()
-  compress(nzm,steady,args...;kwargs...)
-end
-
-function compress(nzm::NnzMatrix,::DefaultPOD,args...;kwargs...)
   basis_space = tpod(nzm,args...;kwargs...)
   compressed_nzm = prod(basis_space,nzm)
   compressed_nzm_t = change_mode(compressed_nzm)
@@ -159,14 +149,8 @@ function compress(nzm::NnzMatrix,::DefaultPOD,args...;kwargs...)
   basis_space,basis_time
 end
 
-function compress(nzm::NnzMatrix,::SteadyPOD,args...;kwargs...)
-  basis_space = tpod(nzm,args...;kwargs...)
-  basis_time = ones(eltype(nzm),1,1)
-  basis_space,basis_time
-end
-
-function tpod(nzm::NnzMatrix,args...;kwargs...)
-  nonzero_val = tpod(nzm.nonzero_val,args...;kwargs...)
+function tpod(nzm::NnzMatrix,args...;ϵ=1e-4,kwargs...)
+  nonzero_val = tpod(nzm.nonzero_val,args...;ϵ)
   NnzMatrix(nonzero_val,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
 end
 

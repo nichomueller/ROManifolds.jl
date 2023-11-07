@@ -73,17 +73,11 @@ function get_ptoperator(
   PTThetaMethodOperator(odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
 end
 
-function Algebra.allocate_residual(
-  op::PTAlgebraicOperator,
-  x::PTArray)
-
+function allocate_residual(op::PTAlgebraicOperator,x::PTArray)
   allocate_residual(op.odeop,op.μ,op.tθ,x,op.ode_cache)
 end
 
-function Algebra.allocate_jacobian(
-  op::PTAlgebraicOperator,
-  x::PTArray)
-
+function allocate_jacobian(op::PTAlgebraicOperator,x::PTArray)
   allocate_jacobian(op.odeop,op.μ,op.tθ,x,op.ode_cache)
 end
 
