@@ -154,14 +154,14 @@ function collect_jacobians_for_trian(op::PTAlgebraicOperator;i=1)
   ntrian = length(trian)
   nzm_i = Vector{NnzMatrix{eltype(A)}}(undef,ntrian)
   @inbounds for n = 1:ntrian
-    nzv_i_n = NnzVector.(jacs_i[n])
+    nzv_i_n = map(NnzVector,jacs_i[n])
     nzm_i[n] = NnzMatrix(nzv_i_n;nparams)
   end
   return nzm_i,trian
 end
 
 function collect_residuals_for_idx!(
-  b::PTArray{T},
+  b::PTArray,
   op::PTAlgebraicOperator,
   sols::PTArray{T},
   nonzero_idx::Vector{Int},
@@ -177,7 +177,7 @@ function collect_residuals_for_idx!(
 end
 
 function collect_jacobians_for_idx!(
-  A::PTArray{T},
+  A::PTArray,
   op::PTAlgebraicOperator,
   sols::PTArray{T},
   nonzero_idx::Vector{Int},

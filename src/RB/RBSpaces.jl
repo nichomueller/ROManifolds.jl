@@ -43,7 +43,7 @@ function reduced_basis(
   nsnaps_state=50,
   kwargs...)
 
-  nzm = NnzMatrix(snaps[1:nsnaps_state].array...;nparams=nsnaps_state)
+  nzm = NnzMatrix(snaps[1:nsnaps_state];nparams=nsnaps_state)
   basis_space_nnz,basis_time = compress(nzm,norm_matrix;kwargs...)
   basis_space = recast(basis_space_nnz)
   return RBSpace(basis_space,basis_time)

@@ -3,7 +3,7 @@ struct RBResults{T}
   params::Table
   sol::PTArray{Matrix{T}}
   sol_approx::PTArray{Matrix{T}}
-  relative_err::PTArray{Vector{T}}
+  relative_err::Vector{T}
   fem_stats::ComputationInfo
   rb_stats::ComputationInfo
 
@@ -305,7 +305,7 @@ function compute_relative_error(
   @inbounds for i = 1:nparams
     err[i] = compute_relative_error!(cache,sol[i],sol_approx[i],args...)
   end
-  NonaffinePTArray(err)
+  err
 end
 
 function compute_relative_error!(cache,sol,sol_approx,norm_matrix=nothing)

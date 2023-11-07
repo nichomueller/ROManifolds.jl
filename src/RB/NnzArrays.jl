@@ -7,17 +7,17 @@ get_nonzero_val(nza::NnzArray) = nza.nonzero_val
 get_nonzero_idx(nza::NnzArray) = nza.nonzero_idx
 get_nrows(nza::NnzArray) = nza.nrows
 
-function get_nonzero_val(nza::NTuple{N,NnzArray}) where N
+function get_nonzero_val(nza::Vector{<:NnzArray})
   stack(map(get_nonzero_val,nza))
 end
 
-function get_nonzero_idx(nza::NTuple{N,NnzArray}) where N
+function get_nonzero_idx(nza::Vector{<:NnzArray})
   nz_idx = map(get_nonzero_idx,nza)
   @check all([i == first(nz_idx) for i in nz_idx])
   first(nz_idx)
 end
 
-function get_nrows(nza::NTuple{N,NnzArray}) where N
+function get_nrows(nza::Vector{<:NnzArray})
   nrows = map(get_nrows,nza)
   @check all([r == first(nrows) for r in nrows])
   first(nrows)
@@ -60,14 +60,14 @@ struct NnzMatrix{T} <: NnzArray{T,2}
     new{T}(nonzero_val,nonzero_idx,nrows,nparams)
   end
 
-  function NnzMatrix(val::AbstractArray{T}...;nparams=length(val)) where T
+  function NnzMatrix(val::Vector{<:AbstractArray{T}};nparams=length(val)) where T
     vals = stack(val)
     nonzero_idx,nonzero_val = compress_array(vals)
     nrows = size(vals,1)
     new{T}(nonzero_val,nonzero_idx,nrows,nparams)
   end
 
-  function NnzMatrix(val::NnzVector{T}...;nparams=length(val)) where T
+  function NnzMatrix(val::Vector{NnzVector{T}};nparams=length(val)) where T
     nonzero_val = get_nonzero_val(val)
     nonzero_idx = get_nonzero_idx(val)
     nrows = get_nrows(val)

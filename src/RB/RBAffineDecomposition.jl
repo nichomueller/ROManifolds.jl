@@ -141,10 +141,6 @@ function project_time(
 end
 
 function find_cells(idx::Vector{Int},cell_dof_ids)
-  find_cells(Val{length(idx)>length(cell_dof_ids)}(),idx,cell_dof_ids)
-end
-
-function find_cells(::Val{true},idx::Vector{Int},cell_dof_ids)
   cells = Int[]
   for cell = eachindex(cell_dof_ids)
     if !isempty(intersect(idx,abs.(cell_dof_ids[cell])))
@@ -152,15 +148,6 @@ function find_cells(::Val{true},idx::Vector{Int},cell_dof_ids)
     end
   end
   unique(cells)
-end
-
-function find_cells(::Val{false},idx::Vector{Int},cell_dof_ids)
-  cells = Vector{Int}[]
-  for i = idx
-    cell = findall(x->!isempty(intersect(abs.(x),i)),cell_dof_ids)
-    cells = isempty(cell) ? cells : push!(cells,cell)
-  end
-  unique(reduce(vcat,cells))
 end
 
 function rhs_coefficient!(
