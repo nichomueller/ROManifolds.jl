@@ -3,13 +3,15 @@ const AbstractArrayBlock{T,N} = Union{AbstractArray{T,N},ArrayBlock{T,N}}
 struct Nonaffine <: OperatorType end
 
 function get_affinity(array::AbstractVector{<:AbstractArrayBlock})
-  a1 = testitem(a)
-  if all([a == a1 for a in array]) && !iszero(a1)
+  a1 = testitem(array)
+  if all([a == a1 for a in array])
     Affine()
   else
     Nonaffine()
   end
 end
+
+isaffine(::AbstractArrayBlock) = true
 
 # Abstract implementation
 abstract type PTArray{T} end
@@ -81,20 +83,28 @@ function Base.:(==)(a::PTArray,b::PTArray)
   true
 end
 
-for f in (:(Base.hcat),:(Base.vcat))
-  @eval begin
-    function $f(a::PTArray...)
-      n = _get_length(a...)
-      carray = map(1:n) do j
-        arrays = ()
-        @inbounds for i = eachindex(a)
-          arrays = (arrays...,a[i][j])
-        end
-        $f(arrays...)
-      end
-      PTArray(carray)
+function Base.vcat(a::PTArray...)
+  n = _get_length(a...)
+  varray = map(1:n) do j
+    arrays = ()
+    @inbounds for i = eachindex(a)
+      arrays = (arrays...,a[i][j])
     end
+    vcat(arrays...)
   end
+  PTArray(varray)
+end
+
+function Base.stack(a::PTArray...)
+  n = _get_length(a...)
+  harray = map(1:n) do j
+    arrays = ()
+    @inbounds for i = eachindex(a)
+      arrays = (arrays...,a[i][j])
+    end
+    stack(arrays)
+  end
+  PTArray(harray)
 end
 
 function Base.hvcat(nblocks::Int,a::PTArray...)
@@ -102,7 +112,7 @@ function Base.hvcat(nblocks::Int,a::PTArray...)
   varray = map(1:nrows) do row
     vcat(a[(row-1)*nblocks+1:row*nblocks]...)
   end
-  hvarray = hcat(varray...)
+  hvarray = stack(varray)
   hvarray
 end
 
@@ -267,10 +277,12 @@ function PTArray(::Nonaffine,array::Vector{T}) where {T<:AbstractArrayBlock}
   NonaffinePTArray(array)
 end
 
+isaffine(::NonaffinePTArray) = false
+
 Base.length(a::NonaffinePTArray) = length(a.array)
 Base.eachindex(a::NonaffinePTArray) = eachindex(a.array)
 Base.lastindex(a::NonaffinePTArray) = lastindex(a.array)
-Base.getindex(a::NonaffinePTArray,i...) = a.array[i...]
+Base.getindex(a::NonaffinePTArray,i::Int) = a.array[i]
 Base.setindex!(a::NonaffinePTArray,v,i...) = a.array[i...] = v
 
 function Base.copy(a::NonaffinePTArray{T}) where T
@@ -454,13 +466,19 @@ function PTArray(::Affine,array::Vector{T}) where {T<:AbstractArrayBlock}
   AffinePTArray(a1,n)
 end
 
+isaffine(::AffinePTArray) = true
+
 Base.length(a::AffinePTArray) = a.len
 Base.eachindex(a::AffinePTArray) = Base.OneTo(a.len)
 Base.lastindex(a::AffinePTArray) = a.len
-Base.getindex(a::AffinePTArray,i...) = a.array
 Base.setindex!(a::AffinePTArray,v,i...) = a.array = v
 Base.copy(a::AffinePTArray) = AffinePTArray(copy(a.array),a.len)
 Base.similar(a::AffinePTArray) = AffinePTArray(similar(a.array),a.len)
+
+function Base.getindex(a::AffinePTArray,i::Int)
+  @assert i ≤ a.len
+  a.array
+end
 
 function Base.show(io::IO,a::AffinePTArray{T}) where T
   print(io,"Affine PTArray of type $T and length $(a.len)")
@@ -470,19 +488,26 @@ function Base.transpose(a::AffinePTArray)
   a.array = a.array'
 end
 
-for f in (:(Base.hcat),:(Base.vcat))
-  @eval begin
-    function $f(a::AffinePTArray...)
-      n = _get_length(a...)
-      j = 1
-      arrays = ()
-      @inbounds for i = eachindex(a)
-        arrays = (arrays...,a[i][j])
-      end
-      varray = $f(arrays...)
-      AffinePTArray(varray,n)
-    end
+function Base.vcat(a::AffinePTArray...)
+  n = _get_length(a...)
+  j = 1
+  arrays = ()
+  @inbounds for i = eachindex(a)
+    arrays = (arrays...,a[i][j])
   end
+  varray = vcat(arrays...)
+  AffinePTArray(varray,n)
+end
+
+function Base.stack(a::PTArray...)
+  n = _get_length(a...)
+  j = 1
+  arrays = ()
+  @inbounds for i = eachindex(a)
+    arrays = (arrays...,a[i][j])
+  end
+  harray = stack(arrays)
+  PTArray(harray)
 end
 
 Base.fill!(a::AffinePTArray,z) = fill!(a.array,z)

@@ -90,7 +90,7 @@ function collect_single_field_solutions(
   nparams = length(params)
   T = get_vector_type(feop.test)
   uμt = PODESolution(fesolver,ode_op,params,u0,t0,tf)
-  sols = Vector{PTArray{T}}(undef,time_ndofs)
+  sols = Vector{NonaffinePTArray{T}}(undef,time_ndofs)
   println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
   stats = @timed for (sol,n) in uμt
     sols[n] = copy(sol)
@@ -111,7 +111,7 @@ function collect_multi_field_solutions(
   nparams = length(params)
   T = get_vector_type(feop.test)
   uμt = PODESolution(fesolver,ode_op,params,u0,t0,tf)
-  sols = Vector{Vector{PTArray{T}}}(undef,time_ndofs)
+  sols = Vector{Vector{NonaffinePTArray{T}}}(undef,time_ndofs)
   println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
   stats = @timed for (sol,n) in uμt
     sols[n] = split_fields(feop.test,copy(sol))
@@ -138,17 +138,30 @@ end
 function collect_residuals_for_trian(op::PTAlgebraicOperator)
   b = allocate_residual(op,op.u0)
   ress,trian = residual_for_trian!(b,op,op.u0)
-  return NnzMatrix.(ress;nparams=length(op.μ)),trian
+  nparams = length(op.μ)
+  ntrian = length(trian)
+  nzm = Vector{NnzMatrix{eltype(b)}}(undef,ntrian)
+  @inbounds for n = 1:ntrian
+    nzm[n] = NnzMatrix(ress[n];nparams)
+  end
+  return nzm,trian
 end
 
 function collect_jacobians_for_trian(op::PTAlgebraicOperator;i=1)
   A = allocate_jacobian(op,op.u0)
   jacs_i,trian = jacobian_for_trian!(A,op,op.u0,i)
-  return map(x->NnzMatrix(map(NnzVector,x);nparams=length(op.μ)),jacs_i),trian
+  nparams = length(op.μ)
+  ntrian = length(trian)
+  nzm_i = Vector{NnzMatrix{eltype(A)}}(undef,ntrian)
+  @inbounds for n = 1:ntrian
+    nzv_i_n = NnzVector.(jacs_i[n])
+    nzm_i[n] = NnzMatrix(nzv_i_n;nparams)
+  end
+  return nzm_i,trian
 end
 
 function collect_residuals_for_idx!(
-  b::PTArray,
+  b::PTArray{T},
   op::PTAlgebraicOperator,
   sols::PTArray{T},
   nonzero_idx::Vector{Int},
@@ -164,7 +177,7 @@ function collect_residuals_for_idx!(
 end
 
 function collect_jacobians_for_idx!(
-  A::PTArray,
+  A::PTArray{T},
   op::PTAlgebraicOperator,
   sols::PTArray{T},
   nonzero_idx::Vector{Int},

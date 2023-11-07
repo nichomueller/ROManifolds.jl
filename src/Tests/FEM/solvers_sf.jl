@@ -9,8 +9,7 @@ sol = PODESolution(fesolver,ode_op,μ,w,t0,tf)
 
 results = PTArray[]
 for (uh,t) in sol
-  ye = copy(uh)
-  push!(results,ye)
+  push!(results,copy(uh))
 end
 
 n = 2
@@ -29,60 +28,27 @@ sol_gridap = Gridap.ODEs.TransientFETools.GenericODESolution(ode_solver,ode_op_o
 
 results_ok = Vector{Float}[]
 for (uh,t) in sol_gridap
-  ye = copy(uh)
-  push!(results_ok,ye)
+  push!(results_ok,copy(uh))
 end
 
 for i in eachindex(results)
   test_ptarray(results[i],results_ok[i];n)
 end
 
-boh = PTArray[]
-@time for (uh,t) in sol
-  push!(boh,uh)
-end
+# affinity
+a(x,μ,t) = 1
+a(μ,t) = x->a(x,μ,t)
+aμt(μ,t) = PTFunction(a,μ,t)
 
-boh_ok = Vector{Float}[]
-@time for (uh,t) in sol_gridap
-  push!(boh_ok,uh)
-end
+res(μ,t,u,v) = ∫ₚ(v*∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(fμt(μ,t)*v,dΩ) - ∫ₚ(hμt(μ,t)*v,dΓn)
+jac(μ,t,u,du,v) = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ)
+jac_t(μ,t,u,dut,v) = ∫ₚ(v*dut,dΩ)
 
-Aμ(t) = assemble_matrix((u,v) -> ∫(a(p,t)*∇(v)⋅∇(u))dΩ,trial(p,t),test)
-Mμ(t) = assemble_matrix((u,v) -> ∫(v*u)dΩ,trial(p,t),test)
-Fμ(t) = assemble_vector(v -> ∫(v*f(p,t))dΩ,test)
-Hμ(t) = assemble_vector(v -> ∫(v*h(p,t))dΓn,test)
+feop = AffinePTFEOperator(res,jac,jac_t,pspace,trial,test)
 
-Lμ(t) = (assemble_vector(v->∫(a(p,t)*∇(v)⋅∇(zero(trial(p,t))))dΩ,test)
- + assemble_vector(v->∫(v*zero(∂ₚt(trial)(p,t)))dΩ,test))
-
-for (nt,t) in enumerate(get_times(fesolver))
-  un = results_ok[nt]
-  unprev = nt > 1 ? results_ok[nt-1] : get_free_dof_values(uh0μ(p))
-  Jn = Aμ(t) + Mμ(t)/dtθ
-  rn = Fμ(t) + Hμ(t) - Lμ(t) + Mμ(t)*unprev/dtθ #- Lμ(t,un,unprev)
-  @assert Jn \ rn ≈ un "Failed when n = $nt"
-end
-
-M = assemble_matrix((du,dv)->∫(dv*du)dΩ,trial(rand(3),dt),test)/(dt*θ)
-vθ = zeros(test.nfree)
-ode_cache = Gridap.ODEs.TransientFETools.allocate_cache(ode_op_ok)
-nlop0 = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t0,dtθ,vθ,ode_cache,vθ)
-b = allocate_residual(nlop0,vθ)
-bok = copy(b)
-A = allocate_jacobian(nlop0,vθ)
-Aok = copy(A)
-for (nt,t) in enumerate(get_times(fesolver))
-  un = results_ok[nt]
-  unprev = nt > 1 ? results_ok[nt-1] : get_free_dof_values(uh0μ(p))
-  ode_cache = Gridap.ODEs.TransientFETools.update_cache!(ode_cache,ode_op_ok,t)
-  nlop = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t,dtθ,unprev,ode_cache,vθ)
-  z = zero(eltype(A))
-  fillstored!(A,z)
-  fill!(b,z)
-  residual!(b,ode_op_ok,t,(vθ,vθ),ode_cache)
-  jacobians!(A,ode_op_ok,t,(vθ,vθ),(1.0,1/dtθ),ode_cache)
-  # Gridap.ODEs.ODETools._vector!(bok,ode_op_ok,t,dtθ,unprev,ode_cache,vθ)
-  # Gridap.ODEs.ODETools._matrix!(Aok,ode_op_ok,t,dtθ,unprev,ode_cache,vθ)
-  @assert A \ (M*unprev - b) ≈ un "Failed when n = $nt"
-  # println("t = $t, diff res = $(ℓ∞(b + bok)), diff jac = $(ℓ∞(A - Aok))")
-end
+ode_op = get_algebraic_operator(feop)
+ode_cache = allocate_cache(ode_op,μ,t0)
+vθ = similar(w)
+vθ .= 0.0
+l_cache = nothing
+A,b = _allocate_matrix_and_vector(ode_op,μ,t0,vθ,ode_cache)

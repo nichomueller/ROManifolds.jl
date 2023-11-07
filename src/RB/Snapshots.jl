@@ -1,6 +1,6 @@
 struct Snapshots{T<:AbstractArray}
-  snaps::Vector{PTArray{T}}
-  function Snapshots(s::Vector{<:PTArray{T}}) where T
+  snaps::Vector{NonaffinePTArray{T}}
+  function Snapshots(s::Vector{NonaffinePTArray{T}}) where T
     new{T}(s)
   end
 end
@@ -32,7 +32,7 @@ end
 
 function Base.vcat(s::Snapshots{T}...) where T
   l = length(first(s))
-  vsnaps = Vector{PTArray{T}}(undef,l)
+  vsnaps = Vector{NonaffinePTArray{T}}(undef,l)
   @inbounds for i = 1:l
     vsnaps[i] = vcat(map(n->s[n].snaps[i],eachindex(s))...)
   end

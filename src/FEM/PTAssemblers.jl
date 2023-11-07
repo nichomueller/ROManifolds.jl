@@ -80,6 +80,20 @@ end
 
 Algebra.create_from_nz(a::PTArray) = a
 
+function FESpaces.allocate_matrix(::Nonaffine,a::SparseMatrixAssembler,matdata;N=1)
+  A = allocate_matrix(a,matdata)
+  array = Vector{typeof(A)}(undef,N)
+  @inbounds for n = 1:N
+    array[n] = copy(A)
+  end
+  NonaffinePTArray(array)
+end
+
+function FESpaces.allocate_matrix(::Affine,a::SparseMatrixAssembler,matdata;N=1)
+  A = allocate_matrix(a,matdata)
+  AffinePTArray(A,N)
+end
+
 function FESpaces.numeric_loop_matrix!(
   A::PTArray,
   a::GenericSparseMatrixAssembler,
@@ -109,7 +123,7 @@ function FESpaces.numeric_loop_matrix!(
 end
 
 @noinline function FESpaces._numeric_loop_matrix!(
-  mat::PTArray,caches,cell_vals,cell_rows,cell_cols)
+  mat::NonaffinePTArray,caches,cell_vals,cell_rows,cell_cols)
 
   matcache,add_cache,vals_cache,rows_cache,cols_cache = caches
   add! = AddEntriesMap(+)
@@ -124,6 +138,37 @@ end
       mat[k] = matk
     end
   end
+end
+
+@noinline function FESpaces._numeric_loop_matrix!(
+  mat::AffinePTArray,caches,cell_vals,cell_rows,cell_cols)
+
+  @assert isaffine(cell_vals)
+  matcache,add_cache,vals_cache,rows_cache,cols_cache = caches
+  add! = AddEntriesMap(+)
+  mat1 = matcache[1]
+  cell_vals1 = get_at_index(1,cell_vals)
+  for cell in eachindex(cell_cols)
+    rows = getindex!(rows_cache,cell_rows,cell)
+    cols = getindex!(cols_cache,cell_cols,cell)
+    vals1 = getindex!(vals_cache,cell_vals1,cell)
+    evaluate!(add_cache,add!,mat1,vals1,rows,cols)
+    mat[1] = mat1
+  end
+end
+
+function FESpaces.allocate_vector(::Nonaffine,a::SparseMatrixAssembler,vecdata;N=1)
+  b = allocate_vector(a,vecdata)
+  array = Vector{typeof(b)}(undef,N)
+  @inbounds for n = 1:N
+    array[n] = copy(b)
+  end
+  NonaffinePTArray(array)
+end
+
+function FESpaces.allocate_vector(::Affine,a::SparseMatrixAssembler,vecdata;N=1)
+  b = allocate_vector(a,vecdata)
+  AffinePTArray(b,N)
 end
 
 function FESpaces.numeric_loop_vector!(
@@ -149,7 +194,7 @@ function FESpaces.numeric_loop_vector!(
 end
 
 @noinline function FESpaces._numeric_loop_vector!(
-  vec::PTArray,caches,cell_vals,cell_rows)
+  vec::NonaffinePTArray,caches,cell_vals,cell_rows)
 
   veccache,add_cache,vals_cache,rows_cache = caches
   add! = AddEntriesMap(+)
@@ -162,5 +207,21 @@ end
       evaluate!(add_cache,add!,veck,valsk,rows)
       vec[k] = veck
     end
+  end
+end
+
+@noinline function FESpaces._numeric_loop_vector!(
+  vec::AffinePTArray,caches,cell_vals,cell_rows)
+
+  @assert isaffine(cell_vals)
+  veccache,add_cache,vals_cache,rows_cache = caches
+  add! = AddEntriesMap(+)
+  vec1 = veccache[1]
+  cell_vals1 = get_at_index(1,cell_vals)
+  for cell in eachindex(cell_rows)
+    rows = getindex!(rows_cache,cell_rows,cell)
+    vals1 = getindex!(vals_cache,cell_vals1,cell)
+    evaluate!(add_cache,add!,vec1,vals1,rows)
+    vec[1] = vec1
   end
 end

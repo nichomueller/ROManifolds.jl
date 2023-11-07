@@ -32,7 +32,7 @@ import Gridap.Polynomials: get_order
 import Gridap.ODEs.ODETools: _allocate_matrix_and_vector
 import Gridap.ODEs.TransientFETools: ODESolver,ODEOperator,OperatorType,TransientCellField,TransientSingleFieldCellField,TransientMultiFieldCellField
 import Gridap.ODEs.TransientFETools: SingleFieldTypes,MultiFieldTypes,Affine,Nonlinear,solve_step!,allocate_trial_space,allocate_cache
-import Gridap.ODEs.TransientFETools: fill_initial_jacobians,fill_jacobians,update_cache!,jacobians!,_matdata_jacobian,_vcat_matdata,_to_transient_single_fields
+import Gridap.ODEs.TransientFETools: fill_jacobians,update_cache!,jacobians!,_matdata_jacobian,_vcat_matdata,_to_transient_single_fields
 import Gridap.TensorValues: inner,outer,double_contraction,symmetric_part
 
 include("PSpace.jl")

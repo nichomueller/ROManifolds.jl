@@ -280,7 +280,7 @@ function nearest_neighbor(
 end
 
 function space_time_matrices(sol::PTArray{Vector{T}};nparams=length(sol)) where T
-  mat = hcat(get_array(sol)...)
+  mat = stack(get_array(sol))
   ntimes = Int(size(mat,2)/nparams)
   array = Vector{Matrix{eltype(T)}}(undef,nparams)
   @inbounds for i = 1:nparams

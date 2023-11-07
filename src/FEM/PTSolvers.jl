@@ -1,4 +1,4 @@
-function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::PTArray)
+function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::NonaffinePTArray)
   ns = Vector{LUNumericalSetup}(undef,length(mat))
   @inbounds for k = eachindex(mat)
     ns[k] = numerical_setup(ss,mat[k])
@@ -6,13 +6,13 @@ function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::PTArray)
   ns
 end
 
-function Algebra.numerical_setup(::Algebra.LUSymbolicSetup,mat::AffinePTArray)
-  ns = LUNumericalSetup[]
-  push!(ns,lu(mat[1]))
+function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::AffinePTArray)
+  ns = Vector{LUNumericalSetup}(undef,1)
+  ns[1] = numerical_setup(ss,mat[1])
   ns
 end
 
-function Algebra.numerical_setup!(ns,mat::PTArray)
+function Algebra.numerical_setup!(ns,mat::NonaffinePTArray)
   @inbounds for k = eachindex(mat)
     ns[k].factors = lu(mat[k])
   end

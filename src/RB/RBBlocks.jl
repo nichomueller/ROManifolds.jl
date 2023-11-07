@@ -16,7 +16,7 @@ struct BlockSnapshots{T} <: RBBlock{T,1}
     new{T}(blocks)
   end
 
-  function BlockSnapshots(v::Vector{<:Vector{<:PTArray{T}}}) where T
+  function BlockSnapshots(v::Vector{Vector{NonaffinePTArray{T}}}) where T
     nblocks = length(testitem(v))
     blocks = Vector{Snapshots{T}}(undef,nblocks)
     @inbounds for n in 1:nblocks

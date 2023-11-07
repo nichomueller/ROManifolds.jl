@@ -57,7 +57,6 @@ import Gridap.ODEs.TransientFETools:Nonlinear
 import Gridap.ODEs.TransientFETools:solve_step!
 import Gridap.ODEs.TransientFETools:allocate_trial_space
 import Gridap.ODEs.TransientFETools:allocate_cache
-import Gridap.ODEs.TransientFETools:fill_initial_jacobians
 import Gridap.ODEs.TransientFETools:fill_jacobians
 import Gridap.ODEs.TransientFETools:update_cache!
 import Gridap.ODEs.TransientFETools:jacobians!

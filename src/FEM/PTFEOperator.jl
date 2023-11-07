@@ -163,10 +163,10 @@ end
 
 function allocate_residual(
   op::PTFEOperator,
-  μ::Vector,
-  t::Real,
-  uh::S,
-  cache) where S
+  μ::P,
+  t::T,
+  uh::PTCellField,
+  cache) where {P,T}
 
   V = get_test(op)
   v = get_fe_basis(V)
@@ -177,38 +177,36 @@ function allocate_residual(
   xh = TransientCellField(uh,dxh)
   res = get_residual(op)
   dc = integrate(res(μ,t,xh,v))
-  vecdata = collect_cell_vector(V,dc)
-  allocate_vector(op.assem,vecdata)
+  dc1 = testitem(dc)
+  N = length(uh)
+  aff = get_affinity(dc)
+  vecdata1 = collect_cell_vector(V,dc1)
+  allocate_vector(aff,op.assem,vecdata1;N)
 end
 
 function allocate_jacobian(
-  op::PTFEOperator,
-  μ::Vector,
-  t::Real,
-  uh::S,
-  cache) where S
-
-  _matdata_jacobians = fill_initial_jacobians(op,μ,t,uh)
-  matdata = _vcat_matdata(_matdata_jacobians)
-  allocate_matrix(op.assem,matdata)
-end
-
-function allocate_residual(
   op::PTFEOperator,
   μ::P,
   t::T,
   uh::PTCellField,
   cache) where {P,T}
 
-  μ1 = P <: Table ? testitem(μ) : μ
-  t1 = T <: AbstractVector ? testitem(t) : t
-  uh1 = testitem(uh)
-  b = allocate_residual(op,μ1,t1,uh1,cache)
-  array = Vector{typeof(b)}(undef,n)
-  @inbounds for i = eachindex(array)
-    array[i] = copy(b)
+  Uh = get_trial(op)(μ,t)
+  V = get_test(op)
+  u = get_trial_fe_basis(Uh)
+  v = get_fe_basis(V)
+  dxh = ()
+  for i in 1:get_order(op)
+    dxh = (dxh...,uh)
   end
-  PTArray(array)
+  xh = TransientCellField(uh,dxh)
+  jac = get_jacobian(op)
+  dc = integrate(jac[1](μ,t,xh,u,v))
+  dc1 = testitem(dc)
+  N = length(uh)
+  aff = get_affinity(dc)
+  matdata1 = collect_cell_matrix(Uh,V,dc1)
+  allocate_matrix(aff,op.assem,matdata1;N)
 end
 
 function residual!(
@@ -344,27 +342,6 @@ function jacobians!(
   matdata = _vcat_matdata(_matdata_jacobians)
   assemble_matrix_add!(A,op.assem,matdata)
   A
-end
-
-function fill_initial_jacobians(
-  op::PTFEOperator,
-  μ::AbstractVector,
-  t::T,
-  uh::S) where {T,S}
-
-  dxh = ()
-  for i in 1:get_order(op)
-    dxh = (dxh...,uh)
-  end
-  xh = TransientCellField(uh,dxh)
-  _matdata = ()
-  for i in 1:get_order(op)+1
-    _data = _matdata_jacobian(op,μ,t,xh,i,0.0)
-    if !isnothing(_data)
-      _matdata = (_matdata...,_matdata_jacobian(op,μ,t,xh,i,0.0))
-    end
-  end
-  return _matdata
 end
 
 function fill_jacobians(

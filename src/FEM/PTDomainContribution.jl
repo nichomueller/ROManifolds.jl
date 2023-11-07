@@ -160,7 +160,26 @@ function CellData.integrate(f::PTCellField,b::CellData.CompositeMeasure)
   cont = PTDomainContribution()
   tc = move_contributions(ic,b.itrian,b.ttrian)
   add_contribution!(cont,b.quad.trian,tc)
-  return cont
+  cont
+end
+
+function Arrays.testitem(a::PTDomainContribution)
+  b = DomainContribution()
+  for (trian,array) in a.dict
+    add_contribution!(b,trian,testitem(array))
+  end
+  b
+end
+
+function get_affinity(a::PTDomainContribution)
+  aff = Affine()
+  for (trian,array) in a.dict
+    if !isaffine(array)
+      aff = Nonaffine()
+      break
+    end
+  end
+  aff
 end
 
 struct PTIntegrand{T<:CellField}

@@ -7,8 +7,8 @@ end
 
 function heat_equation()
   root = pwd()
-  mesh = "elasticity_3cyl2D.json"
-  bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
+  mesh = "cube2x2.json"
+  bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
   test_path = "$root/tests/poisson/unsteady/$mesh"
   order = 1
   degree = 2

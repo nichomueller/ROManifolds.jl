@@ -8,7 +8,7 @@ get_nonzero_idx(nza::NnzArray) = nza.nonzero_idx
 get_nrows(nza::NnzArray) = nza.nrows
 
 function get_nonzero_val(nza::NTuple{N,NnzArray}) where N
-  hcat(map(get_nonzero_val,nza)...)
+  stack(map(get_nonzero_val,nza))
 end
 
 function get_nonzero_idx(nza::NTuple{N,NnzArray}) where N
@@ -61,7 +61,7 @@ struct NnzMatrix{T} <: NnzArray{T,2}
   end
 
   function NnzMatrix(val::AbstractArray{T}...;nparams=length(val)) where T
-    vals = hcat(val...)
+    vals = stack(val)
     nonzero_idx,nonzero_val = compress_array(vals)
     nrows = size(vals,1)
     new{T}(nonzero_val,nonzero_idx,nrows,nparams)
@@ -75,7 +75,7 @@ struct NnzMatrix{T} <: NnzArray{T,2}
   end
 
   function NnzMatrix(val::PTArray;nparams=length(val))
-    NnzMatrix(get_array(val)...;nparams)
+    NnzMatrix(get_array(val);nparams)
   end
 end
 
