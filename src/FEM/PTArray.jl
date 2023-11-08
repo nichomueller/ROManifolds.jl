@@ -139,11 +139,11 @@ function Base.broadcasted(f,a::Union{PTArray,PTBroadcasted}...)
 end
 
 function Base.broadcasted(f,a::Number,b::Union{PTArray,PTBroadcasted})
-  PTBroadcasted(PTArray(map(x->f(a,x),_get_pta(b).array)))
+  PTBroadcasted(map(x->f(a,x),_get_pta(b)))
 end
 
 function Base.broadcasted(f,a::Union{PTArray,PTBroadcasted},b::Number)
-  PTBroadcasted(PTArray(map(x->f(x,b),_get_pta(a).array)))
+  PTBroadcasted(map(x->f(x,b),_get_pta(a)))
 end
 
 function Base.broadcasted(
@@ -159,18 +159,18 @@ function Base.broadcasted(
 end
 
 function Base.materialize(b::PTBroadcasted{T}) where T
-  a = similar(b.array)
+  a = similar(b)
   Base.materialize!(a,b)
   a
 end
 
 function Base.materialize!(a::PTArray,b::Broadcast.Broadcasted)
-  map(x->Base.materialize!(x,b),a.array)
+  map(x->Base.materialize!(x,b),a)
   a
 end
 
 function Base.materialize!(a::PTArray,b::PTBroadcasted)
-  map(Base.materialize!,a.array,b.array.array)
+  map(Base.materialize!,a,b.array)
   a
 end
 
@@ -282,7 +282,7 @@ isaffine(::NonaffinePTArray) = false
 Base.length(a::NonaffinePTArray) = length(a.array)
 Base.eachindex(a::NonaffinePTArray) = eachindex(a.array)
 Base.lastindex(a::NonaffinePTArray) = lastindex(a.array)
-Base.getindex(a::NonaffinePTArray,i::Int) = a.array[i]
+Base.getindex(a::NonaffinePTArray,i...) = a.array[i...]
 Base.setindex!(a::NonaffinePTArray,v,i...) = a.array[i...] = v
 
 function Base.copy(a::NonaffinePTArray{T}) where T
@@ -471,14 +471,10 @@ isaffine(::AffinePTArray) = true
 Base.length(a::AffinePTArray) = a.len
 Base.eachindex(a::AffinePTArray) = Base.OneTo(a.len)
 Base.lastindex(a::AffinePTArray) = a.len
+Base.getindex(a::AffinePTArray,i...) = a.array
 Base.setindex!(a::AffinePTArray,v,i...) = a.array = v
 Base.copy(a::AffinePTArray) = AffinePTArray(copy(a.array),a.len)
 Base.similar(a::AffinePTArray) = AffinePTArray(similar(a.array),a.len)
-
-function Base.getindex(a::AffinePTArray,i::Int)
-  @assert i ≤ a.len
-  a.array
-end
 
 function Base.show(io::IO,a::AffinePTArray{T}) where T
   print(io,"Affine PTArray of type $T and length $(a.len)")

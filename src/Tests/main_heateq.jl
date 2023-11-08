@@ -9,6 +9,8 @@ function heat_equation()
   root = pwd()
   mesh = "elasticity_3cyl2D.json"
   bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
+  # mesh = "cube2x2.json"
+  # bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
   test_path = "$root/tests/poisson/unsteady/$mesh"
   order = 1
   degree = 2
@@ -55,7 +57,7 @@ function heat_equation()
   fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
 
   ϵ = 1e-4
-  load_solutions = false
+  load_solutions = true
   save_solutions = true
   load_structures = false
   save_structures = true
