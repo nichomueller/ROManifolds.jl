@@ -92,12 +92,12 @@ struct PTOperationCellField{DS} <: PTCellField
   domain_style::DS
   memo::Dict{Any,Any}
 
-  function PTOperationCellField(op::Operation,args::CellField...)
+  function PTOperationCellField(op::Operation,args::CellField...;initial_check=false)
     @assert length(args) > 0
     trian = get_triangulation(first(args))
     domain_style = DomainStyle(first(args))
     @check all( map(i->DomainStyle(i)==domain_style,args) )
-    if num_cells(trian)>0
+    if initial_check && num_cells(trian)>0
       x = _get_cell_points(args...)
       ax = map(i->i(x),args)
       axi = map(first,ax)

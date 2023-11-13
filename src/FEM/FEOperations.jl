@@ -1,8 +1,4 @@
-function Base.:(==)(
-  a::T,
-  b::T
-  ) where {T<:Union{Grid,Field}}
-
+function Base.:(==)(a::T,b::T) where {T<:Union{Grid,Field}}
   for field in propertynames(a)
     a_field = getproperty(a,field)
     b_field = getproperty(b,field)
