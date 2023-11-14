@@ -225,7 +225,7 @@ red_x = get_cell_points(red_quad)
 (a(μ,t)*∇(dv)⊙∇(du))(x)
 
 idx = Int32.(idx)
-_model = MyDiscreteModelPortion(model,idx)
+_model = RBDiscreteModelPortion(model,idx)
 red_test = TestFESpace(_model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 red_trial = PTTrialFESpace(red_test,g)
 tt = Triangulation(_model)
@@ -303,7 +303,7 @@ end
 
 ################################################################################
 idx = Int32.(idx)
-_model = MyDiscreteModelPortion(model,idx)
+_model = RBDiscreteModelPortion(model,idx)
 red_test = TestFESpace(_model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 red_trial = PTTrialFESpace(red_test,g)
 tt = Triangulation(_model)
@@ -410,8 +410,8 @@ cell_types = get_cell_type(grid)[idx]
 # cell_map = get_cell_map(grid)[idx]
 cell_map = Geometry._compute_cell_map(node_coordinates,cell_node_ids,reffes,cell_types,Geometry.get_has_affine_map(reffes))
 orien = OrientationStyle(grid)
-__grid = MyGridPortion(Int32.(idx),node_coordinates,cell_node_ids,reffes,cell_types,cell_map,orien)
-__model = MyDiscreteModelPortion(model,__grid)
+__grid = RBGridPortion(Int32.(idx),node_coordinates,cell_node_ids,reffes,cell_types,cell_map,orien)
+__model = RBDiscreteModelPortion(model,__grid)
 __Ω = Triangulation(__model)
 __dΩ = Measure(__Ω,degree)
 __test = TestFESpace(__model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
@@ -510,3 +510,76 @@ t = rand(10)
 rtrian = view(Ω,idx)
 rmeas = Measure(rtrian,2)
 @time ∫(aμt(μ,t)*∇(dv)⋅∇(du))rmeas
+
+###################
+###################
+###################
+idx = Int32.(rand(1:1360,10))
+red_grid = RBGridPortion(model,idx)
+red_model = RBDiscreteModelPortion(model,red_grid)
+grid = get_grid(red_model)
+trian = Triangulation(red_model)
+
+
+# aa = map(i->test.cell_dofs_ids[i],test.dirichlet_cells)
+# ddofs = Vector{Int32}(undef,test.ndirichlet)
+# for i in 1:test.ndirichlet
+#   ddofs[i] =
+# end
+# uddofs = unique(ddofs)
+
+# function dirichlet_dof_to_cell_ids(test)
+#   dcells = map(i->test.cell_dofs_ids[i],test.dirichlet_cells)
+#   map(cell -> count(x->x<0,cell),dcells)
+# end
+
+# ptrs = dirichlet_dof_to_cell_ids(test)
+# ptrs_idx = ptrs[idx]
+
+function get_reduced_dirichlet_ids(test,reduced_dirichlet_cells)
+  dirichlet_cell_dofs_ids = map(i->test.cell_dofs_ids[i],reduced_dirichlet_cells)
+  dirichlet_ids = vcat(filter.(x->x<0,dirichlet_cell_dofs_ids)...)
+  @. dirichlet_ids *= -one(Int32)
+  sorted_dirichlet_ids = sort(dirichlet_ids)
+  unique(sorted_dirichlet_ids)
+end
+
+function get_reduced_free_ids(reduced_cell_dofs_ids)
+  ids = vcat(filter.(x->x>0,reduced_cell_dofs_ids)...)
+  sorted_ids = sort(ids)
+  unique(sorted_ids)
+end
+
+
+#################
+cell_to_parent_cell = idx
+cell_dofs_ids = test.cell_dofs_ids[cell_to_parent_cell]
+cell_is_dirichlet = test.cell_is_dirichlet[cell_to_parent_cell]
+dirichlet_cells = intersect(test.dirichlet_cells,cell_to_parent_cell)
+cell_basis = test.fe_basis.cell_basis[cell_to_parent_cell]
+trian = Triangulation(model)
+fe_basis = FESpaces.SingleFieldFEBasis(cell_basis,trian,FESpaces.TestBasis(),test.fe_basis.domain_style)
+cell_dof_basis = test.fe_dof_basis.cell_dof[cell_to_parent_cell]
+fe_dof_basis = CellDof(cell_dof_basis,trian,test.fe_dof_basis.domain_style)
+ndirichlet = length(cell_is_dirichlet)
+nfree = length(cell_to_parent_cell)
+ntags = test.ntags
+vector_type = test.vector_type
+dirichlet_dofs = get_reduced_dirichlet_ids(test,dirichlet_cells)
+free_dofs = get_reduced_free_ids(cell_dofs_ids)
+dirichlet_dof_tag = test.dirichlet_dof_tag[dirichlet_dofs]
+glue = test.metadata
+if isnothing(glue)
+  UnconstrainedFESpace(vector_type,nfree,ndirichlet,cell_dofs_ids,fe_basis,
+    fe_dof_basis,cell_is_dirichlet,dirichlet_dof_tag,dirichlet_cells,ntags)
+else
+  dirichlet_dof_to_comp = glue.dirichlet_dof_to_comp[dirichlet_dofs]
+  dirichlet_dof_to_node = glue.dirichlet_dof_to_node[dirichlet_dofs]
+  free_dof_to_comp = glue.free_dof_to_comp[free_dofs]
+  free_dof_to_node = glue.free_dof_to_node[free_dofs]
+  node_and_comp_to_dof = glue.node_and_comp_to_dof[dofs]
+  metadata = NodeToDofGlue(free_dof_to_node,free_dof_to_comp,diri_dof_to_node,
+    diri_dof_to_comp,node_and_comp_to_dof)
+  UnconstrainedFESpace(vector_type,nfree,ndirichlet,cell_dofs_ids,fe_basis,
+    fe_dof_basis,cell_is_dirichlet,dirichlet_dof_tag,dirichlet_cells,ntags,glue)
+end

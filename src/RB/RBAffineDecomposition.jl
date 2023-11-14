@@ -1,7 +1,25 @@
 struct RBIntegrationDomain
+  op::PTAlgebraicOperator
   meas::Measure
   times::Vector{<:Real}
-  idx::Vector{Int}
+
+  function RBIntegrationDomain(
+    op::PTAlgebraicOperator,
+    trian::Triangulation,
+    idx::Vector{Int};
+    st_mdeim=false)
+
+    feop = op.odeop.feop
+    cell_dof_ids = get_cell_dof_ids(feop.test,trian)
+    red_integr_cells = find_cells(idx,cell_dof_ids)
+    model = get_background_model(trian)
+    red_grid = RBGridPortion(model,red_integr_cells)
+    red_model = RBDiscreteModelPortion(model,red_grid)
+    red_feop = reduce_feop(feop.res,red_model)
+    red_meas = get_measure(feop,red_trian)
+    red_times = st_mdeim ? op.tθ[interp_idx_time] : op.tθ
+    new(red_feop,red_meas,red_times)
+  end
 end
 
 struct RBAffineDecomposition{T,N}
@@ -27,6 +45,7 @@ struct RBAffineDecomposition{T,N}
     args...;
     kwargs...)
 
+    st_mdeim = info.st_mdeim
     basis_space,basis_time = compress(nzm;ϵ=info.ϵ)
     proj_bs,proj_bt = project_space_time(basis_space,basis_time,args...;kwargs...)
     interp_idx_space = get_interpolation_idx(basis_space)
@@ -35,7 +54,7 @@ struct RBAffineDecomposition{T,N}
     entire_interp_idx_rows,_ = vec_to_mat_idx(entire_interp_idx_space,nzm.nrows)
 
     interp_bs = basis_space[interp_idx_space,:]
-    lu_interp = if info.st_mdeim
+    lu_interp = if st_mdeim
       interp_bt = basis_time[interp_idx_time,:]
       interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
       lu(interp_bst)
@@ -43,12 +62,7 @@ struct RBAffineDecomposition{T,N}
       lu(interp_bs)
     end
 
-    cell_dof_ids = get_cell_dof_ids(op.odeop.feop.test,trian)
-    red_integr_cells = find_cells(entire_interp_idx_rows,cell_dof_ids)
-    red_trian = view(trian,red_integr_cells)
-    red_meas = get_measure(op.odeop.feop,red_trian)
-    red_times = info.st_mdeim ? op.tθ[interp_idx_time] : op.tθ
-    integr_domain = RBIntegrationDomain(red_meas,red_times,entire_interp_idx_space)
+    integr_domain = RBIntegrationDomain(op,trian,entire_interp_idx_rows;st_mdeim)
 
     RBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)
   end
@@ -80,7 +94,7 @@ end
 
 function get_interpolation_idx(basis::AbstractMatrix)
   n = size(basis,2)
-  idx = zeros(Int,n)
+  idx = zeros(Int32,n)
   idx[1] = argmax(abs.(basis[:,1]))
   if n > 1
     @inbounds for i = 2:n

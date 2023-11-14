@@ -86,7 +86,7 @@ for fun in (:residual!,:residual_for_trian!)
       for i in 2:get_order(op)+1
         dxh = (dxh...,EvaluationFunction(Xh[i],xhF[i]))
       end
-      xh=TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
+      xh = TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
       $fun(b,op.feop,μ,t,xh,ode_cache,args...)
     end
   end
@@ -110,7 +110,7 @@ for fun in (:jacobian!,:jacobian_for_trian!)
       for i in 2:get_order(op)+1
         dxh = (dxh...,EvaluationFunction(Xh[i],xhF[i]))
       end
-      xh=TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
+      xh = TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
       $fun(A,op.feop,μ,t,xh,i,γᵢ,ode_cache,args...)
     end
   end
@@ -130,6 +130,6 @@ function jacobians!(
   for i in 2:get_order(op)+1
     dxh = (dxh...,EvaluationFunction(Xh[i],xhF[i]))
   end
-  xh=TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
+  xh = TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
   jacobians!(J,op.feop,μ,t,xh,γ,ode_cache)
 end

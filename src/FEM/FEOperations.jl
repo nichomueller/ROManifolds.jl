@@ -5,7 +5,7 @@ function Base.:(==)(a::T,b::T) where {T<:Union{Grid,Field}}
     if isa(a_field,GridapType)
       (==)(a_field,b_field)
     else
-      if isdefined(a_field,1) && !(==)(a_field,b_field)
+      if isdefined(a_field,1) && !(===)(a_field,b_field)
         @assert false
       end
     end
