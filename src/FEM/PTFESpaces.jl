@@ -17,8 +17,8 @@ end
 Allocate the space to be used as first argument in evaluate!
 """
 function allocate_trial_space(U::PTTrialFESpace,μ,t)
-  _length(a) = 1
-  _length(a::Table) = length(a)
+  _length(a::Vector{<:Number}) = 1
+  _length(a) = length(a)
   NonaffineHomogeneousPTrialFESpace(U.space,_length(μ)*length(t))
 end
 

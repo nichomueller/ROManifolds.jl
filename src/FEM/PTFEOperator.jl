@@ -28,7 +28,6 @@ get_trial(op::PTFEOperator) = op.trials[1]
 get_order(op::PTFEOperator) = op.order
 get_pspace(op::PTFEOperator) = op.pspace
 realization(op::PTFEOperator,args...) = realization(op.pspace,args...)
-get_measure(op::PTFEOperator,trian::Triangulation) = Measure(trian,2*get_order(op.test))
 
 """
 Transient FE operator that is defined by a transient Weak form

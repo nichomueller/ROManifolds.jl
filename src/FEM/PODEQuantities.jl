@@ -163,32 +163,20 @@ end
 function collect_residuals_for_idx!(
   b::PTArray,
   op::PTAlgebraicOperator,
-  sols::PTArray{T},
-  nonzero_idx::Vector{Int},
-  args...) where T
+  args...)
 
-  ress = residual_for_idx!(b,op,sols,args...)
-  N = length(ress)
-  resmat = zeros(eltype(T),length(nonzero_idx),N)
-  @inbounds for n = 1:N
-    resmat[:,n] = ress[n][nonzero_idx]
-  end
+  ress = residual_for_idx!(b,op,op.u0,args...)
+  resmat = stack(ress)
   return resmat
 end
 
 function collect_jacobians_for_idx!(
   A::PTArray,
   op::PTAlgebraicOperator,
-  sols::PTArray{T},
-  nonzero_idx::Vector{Int},
   args...;
-  i=1) where T
+  i=1)
 
-  jacs_i = jacobian_for_idx!(A,op,sols,i,args...)
-  N = length(jacs_i)
-  jacimat = zeros(eltype(T),length(nonzero_idx),N)
-  @inbounds for n = 1:N
-    jacimat[:,n] = jacs_i[n][nonzero_idx].nzval
-  end
+  jacs_i = jacobian_for_idx!(A,op,op.u0,i,args...)
+  jacimat = stack(jacs_i)
   return jacimat
 end

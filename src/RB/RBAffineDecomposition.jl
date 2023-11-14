@@ -1,24 +1,25 @@
 struct RBIntegrationDomain
-  op::PTAlgebraicOperator
+  feop::PTFEOperator
   meas::Measure
-  times::Vector{<:Real}
+  idx_space::Vector{Int32}
+  idx_time::Vector{Int32}
 
   function RBIntegrationDomain(
-    op::PTAlgebraicOperator,
+    feop::PTFEOperator,
     trian::Triangulation,
-    idx::Vector{Int};
-    st_mdeim=false)
+    idx_space::Vector{Int32},
+    idx_time::Vector{Int32})
 
-    feop = op.odeop.feop
     cell_dof_ids = get_cell_dof_ids(feop.test,trian)
-    red_integr_cells = find_cells(idx,cell_dof_ids)
+    red_integr_cells = find_cells(idx_space,cell_dof_ids)
     model = get_background_model(trian)
-    red_grid = RBGridPortion(model,red_integr_cells)
+    grid = get_grid(model)
+    red_grid = RBGridPortion(grid,red_integr_cells)
     red_model = RBDiscreteModelPortion(model,red_grid)
-    red_feop = reduce_feop(feop.res,red_model)
-    red_meas = get_measure(feop,red_trian)
-    red_times = st_mdeim ? op.tθ[interp_idx_time] : op.tθ
-    new(red_feop,red_meas,red_times)
+    red_feop = reduce_feoperator(feop,red_model)
+    red_trian = Triangulation(red_model)
+    red_meas = Measure(red_trian,2*get_order(feop.test))
+    new(red_feop,red_meas,idx_space,idx_time)
   end
 end
 
@@ -45,25 +46,22 @@ struct RBAffineDecomposition{T,N}
     args...;
     kwargs...)
 
-    st_mdeim = info.st_mdeim
     basis_space,basis_time = compress(nzm;ϵ=info.ϵ)
     proj_bs,proj_bt = project_space_time(basis_space,basis_time,args...;kwargs...)
     interp_idx_space = get_interpolation_idx(basis_space)
-    interp_idx_time = get_interpolation_idx(basis_time)
     entire_interp_idx_space = recast_idx(nzm,interp_idx_space)
     entire_interp_idx_rows,_ = vec_to_mat_idx(entire_interp_idx_space,nzm.nrows)
-
     interp_bs = basis_space[interp_idx_space,:]
-    lu_interp = if st_mdeim
+    if info.st_mdeim
+      interp_idx_time = get_interpolation_idx(basis_time)
       interp_bt = basis_time[interp_idx_time,:]
       interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
-      lu(interp_bst)
+      lu_interp = lu(interp_bst)
     else
-      lu(interp_bs)
+      lu_interp = lu(interp_bs)
+      interp_idx_time = collect(eachindex(op.tθ))
     end
-
-    integr_domain = RBIntegrationDomain(op,trian,entire_interp_idx_rows;st_mdeim)
-
+    integr_domain = RBIntegrationDomain(op.odeop.feop,trian,entire_interp_idx_rows,interp_idx_time)
     RBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)
   end
 end
@@ -71,8 +69,10 @@ end
 const RBVecAffineDecomposition{T} = RBAffineDecomposition{T,1}
 const RBMatAffineDecomposition{T} = RBAffineDecomposition{T,2}
 
-get_reduced_variable(::RBVecAffineDecomposition) = :residual
-get_reduced_variable(::RBMatAffineDecomposition) = :jacobian
+get_reduced_feop(a::RBAffineDecomposition) = a.integration_domain.feop
+get_reduced_measure(a::RBAffineDecomposition) = a.integration_domain.meas
+get_reduced_triangulation(a::RBAffineDecomposition) = get_triangulation(get_reduced_measure(a))
+get_reduced_times(a::RBAffineDecomposition) = a.integration_domain.times
 
 function get_reduction_method(a::RBAffineDecomposition)
   nbs = length(a.basis_space)
@@ -154,8 +154,8 @@ function project_time(
   [basis_time,combine_projections(bt_proj,bt_proj_shift)]
 end
 
-function find_cells(idx::Vector{Int},cell_dof_ids)
-  cells = Int[]
+function find_cells(idx::Vector{Int32},cell_dof_ids)
+  cells = Int32[]
   for cell = eachindex(cell_dof_ids)
     if !isempty(intersect(idx,abs.(cell_dof_ids[cell])))
       append!(cells,cell)
@@ -180,14 +180,10 @@ function assemble_rhs!(
   op::PTAlgebraicOperator,
   rbres::RBVecAffineDecomposition)
 
-  red_idx = rbres.integration_domain.idx
-  red_times = rbres.integration_domain.times
-  red_meas = rbres.integration_domain.meas
-
-  cache = get_cache_at_times(cache,op.tθ,red_times)
-  sols = get_solutions_at_times(op.u0,op.tθ,red_times)
-
-  collect_residuals_for_idx!(cache,op,sols,red_idx,red_meas)
+  red_cache = selectidx(cache,op,rbres)
+  red_op = reduce_ptoperator(op,rbres)
+  red_meas = get_reduced_measure(rbres)
+  collect_residuals_for_idx!(red_cache,red_op,red_meas)
 end
 
 function lhs_coefficient!(
@@ -207,14 +203,10 @@ function assemble_lhs!(
   rbjac::RBMatAffineDecomposition;
   i::Int=1)
 
-  red_idx = rbjac.integration_domain.idx
-  red_times = rbjac.integration_domain.times
-  red_meas = rbjac.integration_domain.meas
-
-  cache = get_cache_at_times(cache,op.tθ,red_times)
-  sols = get_solutions_at_times(op.u0,op.tθ,red_times)
-
-  collect_jacobians_for_idx!(cache,op,sols,red_idx,red_meas;i)
+  red_cache = selectidx(cache,op,rbjac)
+  red_op = reduce_ptoperator(op,rbjac)
+  red_meas = get_reduced_measure(rbjac)
+  collect_jacobians_for_idx!(red_cache,red_op,red_meas;i)
 end
 
 function mdeim_solve!(cache,ad::RBAffineDecomposition,a::Matrix;st_mdeim=false)
@@ -277,31 +269,23 @@ function recast_coefficient!(
   ptarray
 end
 
-for T in (:NonaffinePTArray,:AffinePTArray)
-  @eval begin
-    function get_cache_at_times(q::$T,times::Vector{<:Real},red_times::Vector{<:Real})
-      time_ndofs = length(times)
-      time_ndofs_red = length(red_times)
-      nparams = Int(length(q)/time_ndofs)
-      if length(red_times) < time_ndofs
-        return $T(q[1:time_ndofs_red*nparams])
-      else
-        return q
-      end
-    end
+function reduce_ptoperator(op::PTAlgebraicOperator,ad::RBAffineDecomposition)
+  red_odeop = get_algebraic_operator(red_feop)
+  red_ode_cache = reduce_cache(op.ode_cache,red_feop)
+  red_times = get_reduced_times(ad)
+  red_u0 = selectidx(op.u0,op,ad)
+  red_vθ = selectidx(op.vθ,op,ad)
+  get_ptoperator(red_odeop,op.μ,red_times,op.dtθ,red_u0,red_ode_cache,red_vθ)
+end
 
-    function get_solutions_at_times(sols::$T,times::Vector{<:Real},red_times::Vector{<:Real})
-      time_ndofs = length(times)
-      nparams = Int(length(sols)/time_ndofs)
-      if length(red_times) < time_ndofs
-        tidx = findall(x->x in red_times,times)
-        ptidx = vec(transpose(collect(0:nparams-1)*time_ndofs .+ tidx'))
-        $T(sols[ptidx])
-      else
-        sols
-      end
-    end
-  end
+function selectidx(a::PTArray,op::PTAlgebraicOperator,ad::RBAffineDecomposition)
+  trian = get_reduced_triangulation(ad)
+  grid = get_grid(trian)
+  node_to_parent_node = get_node_to_parent_node(grid)
+  times = op.θ
+  red_times = get_reduced_times(ad)
+  time_to_parent_time = findall(x->x in red_times,times)
+  selectidx(a,node_to_parent_node,time_to_parent_time;nparams=length(op.μ))
 end
 
 abstract type RBContributionMap{T} <: Map end
