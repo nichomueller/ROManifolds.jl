@@ -58,18 +58,18 @@ function Base.show(io::IO,r::Vector{<:RBResults})
   print(io,"FEM/RB memory speedup: $speedup_memory%\n")
 end
 
-function save(info::RBInfo,r::RBResults)
-  path = joinpath(info.rb_path,"results")
+function save(rbinfo::RBInfo,r::RBResults)
+  path = joinpath(rbinfo.rb_path,"results")
   save(path,r)
 end
 
-function load(info::RBInfo,T::Type{RBResults})
-  path = joinpath(info.rb_path,"results")
+function load(rbinfo::RBInfo,T::Type{RBResults})
+  path = joinpath(rbinfo.rb_path,"results")
   load(path,T)
 end
 
-function single_field_post_process(
-  info::RBInfo,
+function post_process(
+  rbinfo::RBInfo,
   feop::PTFEOperator,
   fesolver::PODESolver,
   sol::PTArray,
@@ -78,21 +78,20 @@ function single_field_post_process(
   stats::NamedTuple)
 
   nparams = length(params)
-  norm_style = info.norm_style
-  norm_matrix = get_norm_matrix(info,feop,norm_style)
+  norm_matrix = get_norm_matrix(rbinfo,feop)
   _sol = space_time_matrices(sol;nparams)
   _sol_approx = space_time_matrices(sol_approx;nparams)
-  fem_stats = load(info,ComputationInfo)
+  fem_stats = load(rbinfo,ComputationInfo)
   rb_stats = ComputationInfo(stats,nparams)
   results = RBResults(params,_sol,_sol_approx,fem_stats,rb_stats,norm_matrix)
   show(results)
-  save(info,results)
-  writevtk(info,feop,fesolver,results)
+  save(rbinfo,results)
+  writevtk(rbinfo,feop,fesolver,results)
   return
 end
 
-function multi_field_post_process(
-  info::RBInfo,
+function post_process(
+  rbinfo::BlockRBInfo,
   feop::PTFEOperator,
   fesolver::PODESolver,
   sol::PTArray,
@@ -102,21 +101,21 @@ function multi_field_post_process(
 
   nblocks = length(feop.test.spaces)
   nparams = length(params)
-  norm_style = info.norm_style
   offsets = field_offsets(feop.test)
-  fem_stats = load(info,ComputationInfo)
+  fem_stats = load(rbinfo,ComputationInfo)
   rb_stats = ComputationInfo(stats,nparams)
   blocks = map(1:nblocks) do col
+    rbinfo_col = rbinfo[col]
     feop_col = feop[col,col]
     sol_col = get_at_offsets(sol,offsets,col)
     sol_approx_col = get_at_offsets(sol_approx,offsets,col)
-    norm_matrix_col = get_norm_matrix(info,feop_col,norm_style[col])
+    norm_matrix_col = get_norm_matrix(rbinfo_col,feop_col)
     _sol_col = space_time_matrices(sol_col;nparams)
     _sol_approx_col = space_time_matrices(sol_approx_col;nparams)
     results = RBResults(
       params,_sol_col,_sol_approx_col,fem_stats,rb_stats,norm_matrix_col;name=Symbol("field$col"))
-    save(info,results)
-    writevtk(info,feop_col,fesolver,results)
+    save(rbinfo,results)
+    writevtk(rbinfo,feop_col,fesolver,results)
     results
   end
   show(blocks)
@@ -129,6 +128,8 @@ function allocate_cache(
 
   b = allocate_residual(op,snaps)
   A = allocate_jacobian(op,snaps)
+  bmat = zeros(T,1,1)
+  Amat = zeros(T,1,1)
 
   coeff = zeros(T,1,1)
   ptcoeff = NonaffinePTArray([zeros(T,1,1) for _ = eachindex(op.μ)])
@@ -136,89 +137,83 @@ function allocate_cache(
   res_contrib_cache = return_cache(RBVecContributionMap(T))
   jac_contrib_cache = return_cache(RBMatContributionMap(T))
 
-  res_cache = (b,CachedArray(coeff),CachedArray(ptcoeff)),res_contrib_cache
-  jac_cache = (A,CachedArray(coeff),CachedArray(ptcoeff)),jac_contrib_cache
+  res_cache = ((b,CachedArray(bmat)),(CachedArray(coeff),CachedArray(ptcoeff))),res_contrib_cache
+  jac_cache = ((A,CachedArray(Amat)),(CachedArray(coeff),CachedArray(ptcoeff))),jac_contrib_cache
   res_cache,jac_cache
 end
 
-for (f,g) in zip((:single_field_rb_solver,:multi_field_rb_solver),
-  (:single_field_post_process,:multi_field_post_process))
-  @eval begin
+function rb_solver(
+  rbinfo::RBInfo,
+  feop::PTFEOperator{Affine},
+  fesolver::PODESolver,
+  rbspace,
+  rbres,
+  rbjacs,
+  snaps,
+  params::Table)
 
-    function $f(
-      info::RBInfo,
-      feop::PTFEOperator{Affine},
-      fesolver::PODESolver,
-      rbspace,
-      rbres,
-      rbjacs,
-      snaps,
-      params::Table)
+  println("Solving linear RB problems")
+  nsnaps_test = rbinfo.nsnaps_test
+  snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
+  op = get_ptoperator(fesolver,feop,snaps_test,params_test)
+  cache = allocate_cache(op,snaps_test)
+  stats = @timed begin
+    rhs,(lhs,lhs_t) = collect_rhs_lhs_contributions!(cache,rbinfo,op,rbres,rbjacs,rbspace)
+    rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs+lhs_t)
+  end
+  approx_snaps_test = recast(rb_snaps_test,rbspace)
+  post_process(rbinfo,feop,fesolver,snaps_test,params_test,approx_snaps_test,stats)
+end
 
-      println("Solving linear RB problems")
-      nsnaps_test = info.nsnaps_test
-      snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
-      op = get_ptoperator(fesolver,feop,snaps_test,params_test)
-      cache = allocate_cache(op,snaps_test)
-      stats = @timed begin
-        rhs,(lhs,lhs_t) = collect_rhs_lhs_contributions!(cache,info,op,rbres,rbjacs,rbspace)
-        rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs+lhs_t)
+function rb_solver(
+  rbinfo::BlockRBInfo,
+  feop::PTFEOperator,
+  fesolver::PODESolver,
+  rbspace,
+  rbres::Tuple,
+  rbjacs::Tuple,
+  snaps,
+  params::Table)
+
+  println("Solving nonlinear RB problems with Newton iterations")
+  nsnaps_test = rbinfo.nsnaps_test
+  snaps_train,params_train = snaps[1:nsnaps_test],params[1:nsnaps_test]
+  snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
+  x = nearest_neighbor(snaps_train,params_train,params_test)
+  op = get_ptoperator(fesolver,feop,snaps_test,params_test)
+  op_lin = linear_operator(op)
+  op_nlin = nonlinear_operator(op)
+  op_aux = auxiliary_operator(op)
+  xrb = space_time_projection(x,op,rbspace)
+  dxrb = similar(xrb)
+  cache = allocate_cache(op,snaps_test)
+  rhs_cache,lhs_cache = cache
+  newt_cache = nothing
+  conv0 = ones(nsnaps_test)
+  stats = @timed begin
+    rbrhs_lin,rbrhs_nlin = rbres
+    rblhs_lin,rblhs_nlin,rblhs_aux = rbjacs
+    rhs_lin,(lhs_lin,lhs_t) = collect_rhs_lhs_contributions!(cache,rbinfo,op_lin,rbrhs_lin,rblhs_lin,rbspace)
+    for iter in 1:fesolver.nls.max_nliters
+      x = recenter(x,fesolver.uh0(params_test);θ=fesolver.θ)
+      op_nlin = update_ptoperator(op_nlin,x)
+      op_aux = update_ptoperator(op_aux,x)
+      rhs_nlin,(lhs_nlin,) = collect_rhs_lhs_contributions!(cache,rbinfo,op_nlin,rbrhs_nlin,rblhs_nlin,rbspace)
+      lhs_aux, = collect_lhs_contributions!(lhs_cache,rbinfo,op_aux,rblhs_aux,rbspace)
+      lhs = lhs_lin+lhs_t+lhs_nlin
+      rhs = rhs_lin+rhs_nlin+(lhs_lin+lhs_t+lhs_aux)*xrb
+      newt_cache = rb_solve!(dxrb,fesolver.nls.ls,rhs,lhs,newt_cache)
+      xrb += dxrb
+      x = recast(xrb,rbspace)
+      isconv,conv = Algebra._check_convergence(fesolver.nls,dxrb,conv0)
+      println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv)))")
+      if all(isconv); break; end
+      if iter == fesolver.nls.max_nliters
+        @unreachable
       end
-      approx_snaps_test = recast(rb_snaps_test,rbspace)
-      $g(info,feop,fesolver,snaps_test,params_test,approx_snaps_test,stats)
-    end
-
-    function $f(
-      info::RBInfo,
-      feop::PTFEOperator,
-      fesolver::PODESolver,
-      rbspace,
-      rbres::Tuple,
-      rbjacs::Tuple,
-      snaps,
-      params::Table)
-
-      println("Solving nonlinear RB problems with Newton iterations")
-      nsnaps_test = info.nsnaps_test
-      snaps_train,params_train = snaps[1:nsnaps_test],params[1:nsnaps_test]
-      snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
-      x = nearest_neighbor(snaps_train,params_train,params_test)
-      op = get_ptoperator(fesolver,feop,snaps_test,params_test)
-      op_lin = linear_operator(op)
-      op_nlin = nonlinear_operator(op)
-      op_aux = auxiliary_operator(op)
-      xrb = space_time_projection(x,op,rbspace)
-      dxrb = similar(xrb)
-      cache = allocate_cache(op,snaps_test)
-      rhs_cache,lhs_cache = cache
-      newt_cache = nothing
-      conv0 = ones(nsnaps_test)
-      stats = @timed begin
-        rbrhs_lin,rbrhs_nlin = rbres
-        rblhs_lin,rblhs_nlin,rblhs_aux = rbjacs
-        rhs_lin,(lhs_lin,lhs_t) = collect_rhs_lhs_contributions!(cache,info,op_lin,rbrhs_lin,rblhs_lin,rbspace)
-        for iter in 1:fesolver.nls.max_nliters
-          x = recenter(x,fesolver.uh0(params_test);θ=fesolver.θ)
-          op_nlin = update_ptoperator(op_nlin,x)
-          op_aux = update_ptoperator(op_aux,x)
-          rhs_nlin,(lhs_nlin,) = collect_rhs_lhs_contributions!(cache,info,op_nlin,rbrhs_nlin,rblhs_nlin,rbspace)
-          lhs_aux, = collect_lhs_contributions!(lhs_cache,info,op_aux,rblhs_aux,rbspace)
-          lhs = lhs_lin+lhs_t+lhs_nlin
-          rhs = rhs_lin+rhs_nlin+(lhs_lin+lhs_t+lhs_aux)*xrb
-          newt_cache = rb_solve!(dxrb,fesolver.nls.ls,rhs,lhs,newt_cache)
-          xrb += dxrb
-          x = recast(xrb,rbspace)
-          isconv,conv = Algebra._check_convergence(fesolver.nls,dxrb,conv0)
-          println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv)))")
-          if all(isconv); break; end
-          if iter == fesolver.nls.max_nliters
-            @unreachable
-          end
-        end
-      end
-      $g(info,feop,fesolver,snaps_test,params_test,x,stats)
     end
   end
+  post_process(rbinfo,feop,fesolver,snaps_test,params_test,x,stats)
 end
 
 function rb_solve(ls::LinearSolver,rhs::PTArray,lhs::PTArray)
@@ -318,7 +313,7 @@ function compute_relative_error!(cache,sol,sol_approx,norm_matrix=nothing)
 end
 
 function Gridap.Visualization.writevtk(
-  info::RBInfo,
+  rbinfo::RBInfo,
   feop::PTFEOperator,
   fesolver::PODESolver,
   results::RBResults)
@@ -334,7 +329,7 @@ function Gridap.Visualization.writevtk(
   sol_approx = results.sol_approx[1]
   pointwise_err = abs.(sol-sol_approx)
 
-  plt_dir = joinpath(info.rb_path,"plots")
+  plt_dir = joinpath(rbinfo.rb_path,"plots")
   create_dir!(plt_dir)
   for (it,t) in enumerate(times)
     fsol = FEFunction(trial(μ,t),sol[:,it])
@@ -346,12 +341,12 @@ function Gridap.Visualization.writevtk(
   end
 end
 
-function save(info::RBInfo,result::RBResults)
-  path = joinpath(info.rb_path,"rbresults")
+function save(rbinfo::RBInfo,result::RBResults)
+  path = joinpath(rbinfo.rb_path,"rbresults")
   save(path,result)
 end
 
-function load(info::RBInfo,T::Type{RBResults})
-  path = joinpath(info.rb_path,"rbresults")
+function load(rbinfo::RBInfo,T::Type{RBResults})
+  path = joinpath(rbinfo.rb_path,"rbresults")
   load(path,T)
 end

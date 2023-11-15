@@ -161,22 +161,36 @@ function collect_jacobians_for_trian(op::PTAlgebraicOperator;i=1)
 end
 
 function collect_residuals_for_idx!(
-  b::PTArray,
+  cache,
   op::PTAlgebraicOperator,
+  sols::PTArray,
+  idx::Vector{Int},
   args...)
 
-  ress = residual_for_idx!(b,op,op.u0,args...)
-  resmat = stack(ress)
-  return resmat
+  b,bidx = cache
+  ress = residual_for_idx!(b,op,sols,args...)
+  setsize!(bidx,(length(idx),length(ress)))
+  bidxmat = bidx.array
+  @inbounds for n = eachindex(ress)
+    bidxmat[:,n] = ress[n][idx]
+  end
+  return bidxmat
 end
 
 function collect_jacobians_for_idx!(
-  A::PTArray,
+  cache,
   op::PTAlgebraicOperator,
+  sols::PTArray,
+  idx::Vector{Int},
   args...;
   i=1)
 
-  jacs_i = jacobian_for_idx!(A,op,op.u0,i,args...)
-  jacimat = stack(jacs_i)
-  return jacimat
+  A,Aidx = cache
+  jacs_i = jacobian_for_idx!(A,op,sols,i,args...)
+  setsize!(Aidx,(length(idx),length(jacs_i)))
+  Aidxmat = Aidx.array
+  @inbounds for n = eachindex(jacs_i)
+    Aidxmat[:,n] = jacs_i[n][idx].nzval
+  end
+  return Aidxmat
 end

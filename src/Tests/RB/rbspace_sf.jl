@@ -1,5 +1,5 @@
-sols,params = load(info,(Snapshots,Table))
-rbspace = reduced_basis(info,feop,sols;nsnaps_state)
+sols,params = load(rbinfo,(Snapshots,Table))
+rbspace = reduced_basis(rbinfo,feop,sols;nsnaps_state)
   # nzm = NnzArray(sols)
   # basis_space = tpod(nzm,nothing;ϵ=1e-4)
   # compressed_nza = prod(basis_space,nzm)

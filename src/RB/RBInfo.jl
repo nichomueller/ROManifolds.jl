@@ -1,3 +1,25 @@
+struct FEInfo
+  reffe::Tuple{<:ReferenceFEName,Any,Any}
+  conformity::Symbol
+  constraint::Any
+  dirichlet_tags::AbstractVector
+  dirichlet_masks::Any
+  function FEInfo(
+    reffe::Tuple{<:ReferenceFEName,Any,Any};
+    conformity=:H1,
+    constraint=nothing,
+    dirichlet_tags=Int[],
+    dirichlet_masks=nothing)
+    new(reffe,conformity,constraint,dirichlet_tags,dirichlet_masks)
+  end
+end
+
+struct BlockFEInfo
+  blocks::Vector{FEInfo}
+end
+
+Base.getindex(feinfo::BlockFEInfo,i::Int) = feinfo.blocks[i]
+
 function get_fe_path(tpath::String)
   create_dir!(tpath)
   fepath = joinpath(tpath,"fem")
@@ -16,31 +38,37 @@ function get_rb_path(tpath::String,ϵ::Float;st_mdeim=false)
 end
 
 struct RBInfo
+  feinfo::FEInfo
   ϵ::Float
   fe_path::String
   rb_path::String
-  norm_style::Union{Symbol,Vector{Symbol}}
-  compute_supremizers::Bool
+  norm_style::Symbol
   nsnaps_state::Int
   nsnaps_mdeim::Int
   nsnaps_test::Int
   st_mdeim::Bool
-  postprocess::Bool
 end
 
-function RBInfo(test_path::String;ϵ=1e-4,norm_style=:l2,compute_supremizers=true,
-  nsnaps_state=50,nsnaps_mdeim=20,nsnaps_test=10,st_mdeim=false,postprocess=false)
+function RBInfo(
+  feinfo::FEInfo,
+  test_path::String;
+  ϵ=1e-4,
+  norm_style=:l2,
+  nsnaps_state=50,
+  nsnaps_mdeim=20,
+  nsnaps_test=10,
+  st_mdeim=false)
 
   fe_path = get_fe_path(test_path)
   rb_path = get_rb_path(test_path,ϵ;st_mdeim)
-  RBInfo(ϵ,fe_path,rb_path,norm_style,compute_supremizers,nsnaps_state,
-    nsnaps_mdeim,nsnaps_test,st_mdeim,postprocess)
+  RBInfo(feinfo,ϵ,fe_path,rb_path,norm_style,nsnaps_state,
+    nsnaps_mdeim,nsnaps_test,st_mdeim)
 end
 
-function get_norm_matrix(info::RBInfo,feop::PTFEOperator,norm_style::Symbol)
+function get_norm_matrix(rbinfo::RBInfo,feop::PTFEOperator)
   try
     T = get_vector_type(feop.test)
-    load(info,SparseMatrixCSC{eltype(T),Int};norm_style)
+    load(rbinfo,SparseMatrixCSC{eltype(T),Int};norm_style=rbinfo.norm_style)
   catch
     if norm_style == :l2
       nothing
@@ -54,31 +82,68 @@ function get_norm_matrix(info::RBInfo,feop::PTFEOperator,norm_style::Symbol)
   end
 end
 
-function save(info::RBInfo,objs::Tuple)
-  map(obj->save(info,obj),objs)
+struct BlockRBInfo
+  feinfo::BlockFEInfo
+  ϵ::Vector{Float}
+  fe_path::String
+  rb_path::String
+  norm_style::Vector{Symbol}
+  compute_supremizers::Bool
+  nsnaps_state::Int
+  nsnaps_mdeim::Int
+  nsnaps_test::Int
+  st_mdeim::Bool
 end
 
-function load(info::RBInfo,types::Tuple)
-  map(type->load(info,type),types)
+function BlockRBInfo(
+  feinfo::BlockFEInfo,
+  test_path::String;
+  ϵ=[1e-4,1e-4],
+  norm_style=[:l2,:l2],
+  compute_supremizers=true,
+  nsnaps_state=50,
+  nsnaps_mdeim=20,
+  nsnaps_test=10,
+  st_mdeim=false)
+
+  fe_path = get_fe_path(test_path)
+  rb_path = get_rb_path(test_path,ϵ;st_mdeim)
+  BlockRBInfo(feinfo,ϵ,fe_path,rb_path,norm_style,compute_supremizers,nsnaps_state,
+    nsnaps_mdeim,nsnaps_test,st_mdeim)
 end
 
-function save(info::RBInfo,params::Table)
-  path = joinpath(info.fe_path,"params")
+function Base.getindex(rbinfo::BlockRBInfo,i::Int)
+  feinfo_i = rbinfo.feinfo[i]
+  norm_style_i = rbinfo.norm_style[i]
+  RBInfo(feinfo_i,rbinfo.ϵ,rbinfo.fe_path,rbinfo.rb_path,norm_style_i,
+    rbinfo.nsnaps_state,rbinfo.nsnaps_mdeim,rbinfo.nsnaps_test,rbinfo.st_mdeim)
+end
+
+function save(rbinfo::RBInfo,objs::Tuple)
+  map(obj->save(rbinfo,obj),objs)
+end
+
+function load(rbinfo::RBInfo,types::Tuple)
+  map(type->load(rbinfo,type),types)
+end
+
+function save(rbinfo::RBInfo,params::Table)
+  path = joinpath(rbinfo.fe_path,"params")
   save(path,params)
 end
 
-function load(info::RBInfo,T::Type{Table})
-  path = joinpath(info.fe_path,"params")
+function load(rbinfo::RBInfo,T::Type{Table})
+  path = joinpath(rbinfo.fe_path,"params")
   load(path,T)
 end
 
-function save(info::RBInfo,norm_matrix::SparseMatrixCSC{T,Int};norm_style=:l2) where T
-  path = joinpath(info.fe_path,"$(norm_style)_norm_matrix")
+function save(rbinfo::RBInfo,norm_matrix::SparseMatrixCSC{T,Int};norm_style=:l2) where T
+  path = joinpath(rbinfo.fe_path,"$(norm_style)_norm_matrix")
   save(path,norm_matrix)
 end
 
-function load(info::RBInfo,T::Type{SparseMatrixCSC{S,Int}};norm_style=:l2) where S
-  path = joinpath(info.fe_path,"$(norm_style)_norm_matrix")
+function load(rbinfo::RBInfo,T::Type{SparseMatrixCSC{S,Int}};norm_style=:l2) where S
+  path = joinpath(rbinfo.fe_path,"$(norm_style)_norm_matrix")
   load(path,T)
 end
 
@@ -95,12 +160,12 @@ end
 get_avg_time(cinfo::ComputationInfo) = cinfo.avg_time
 get_avg_nallocs(cinfo::ComputationInfo) = cinfo.avg_nallocs
 
-function save(info::RBInfo,cinfo::ComputationInfo)
-  path = joinpath(info.fe_path,"stats")
+function save(rbinfo::RBInfo,cinfo::ComputationInfo)
+  path = joinpath(rbinfo.fe_path,"stats")
   save(path,cinfo)
 end
 
-function load(info::RBInfo,T::Type{ComputationInfo})
-  path = joinpath(info.fe_path,"stats")
+function load(rbinfo::RBInfo,T::Type{ComputationInfo})
+  path = joinpath(rbinfo.fe_path,"stats")
   load(path,T)
 end

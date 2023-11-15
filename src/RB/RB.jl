@@ -2,6 +2,7 @@ using LinearAlgebra
 using SparseArrays
 using Serialization
 using NearestNeighbors
+using UnPack
 using Gridap
 using Gridap.Algebra
 using Gridap.FESpaces
@@ -22,7 +23,6 @@ include("RBInfo.jl")
 include("Snapshots.jl")
 include("NnzArrays.jl")
 include("RBSpaces.jl")
-include("RBGeometry.jl")
 include("RBAffineDecomposition.jl")
 include("RBAlgebraicContribution.jl")
 include("RBResults.jl")

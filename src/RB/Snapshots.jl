@@ -46,12 +46,12 @@ function recenter(s::Snapshots,uh0::PTFEFunction;θ::Real=1)
   Snapshots(sθ)
 end
 
-function save(info::RBInfo,s::Snapshots)
-  path = joinpath(info.fe_path,"fesnaps")
+function save(rbinfo::RBInfo,s::Snapshots)
+  path = joinpath(rbinfo.fe_path,"fesnaps")
   save(path,s)
 end
 
-function load(info::RBInfo,T::Type{<:Snapshots})
-  path = joinpath(info.fe_path,"fesnaps")
+function load(rbinfo::RBInfo,T::Type{Snapshots{S}}) where S
+  path = joinpath(rbinfo.fe_path,"fesnaps")
   load(path,T)
 end

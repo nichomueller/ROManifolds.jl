@@ -184,7 +184,7 @@ for np = 1:K
 end
 
 # LINEAR
-snaps_test,params_test = load_test(info,feop,fesolver)
+snaps_test,params_test = load_test(rbinfo,feop,fesolver)
 times = get_times(fesolver)
 Nt = get_time_ndofs(fesolver)
 Nu,Np = test_u.nfree,length(get_free_dof_ids(test_p))
@@ -254,7 +254,7 @@ Np = length(get_free_dof_ids(test_p))
 # OK
 # μ = realization(feop)
 # u = [PTArray([zeros(Nu) for _ = 1:Nt]),PTArray([zeros(Np) for _ = 1:Nt])]
-snaps_test,params_test = load_test(info,feop,fesolver)
+snaps_test,params_test = load_test(rbinfo,feop,fesolver)
 μ = params_test[1]
 u = [PTArray(snaps_test[1][1:10]),PTArray(snaps_test[1][1:10])]
 vu = vcat(u...)

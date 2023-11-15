@@ -58,5 +58,5 @@ end
 
 function Base.argmax(v::Vector,nval::Int)
   s = sort(v,rev=true)
-  Int32.(indexin(s,v))[1:nval]
+  Int.(indexin(s,v))[1:nval]
 end

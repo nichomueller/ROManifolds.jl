@@ -44,13 +44,13 @@ function recenter(s::BlockSnapshots,uh0::PTFEFunction;θ::Real=1)
   BlockSnapshots(sθ)
 end
 
-function save(info::RBInfo,s::BlockSnapshots)
-  path = joinpath(info.fe_path,"fesnaps")
+function save(rbinfo::RBInfo,s::BlockSnapshots)
+  path = joinpath(rbinfo.fe_path,"fesnaps")
   save(path,s)
 end
 
-function load(info::RBInfo,T::Type{BlockSnapshots})
-  path = joinpath(info.fe_path,"fesnaps")
+function load(rbinfo::RBInfo,T::Type{BlockSnapshots{S}}) where S
+  path = joinpath(rbinfo.fe_path,"fesnaps")
   load(path,T)
 end
 
@@ -86,13 +86,13 @@ function field_offsets(rb::BlockRBSpace)
   offsets
 end
 
-function save(info::RBInfo,rb::BlockRBSpace)
-  path = joinpath(info.rb_path,"rb")
+function save(rbinfo::RBInfo,rb::BlockRBSpace)
+  path = joinpath(rbinfo.rb_path,"rb")
   save(path,rb)
 end
 
-function load(info::RBInfo,T::Type{BlockRBSpace})
-  path = joinpath(info.rb_path,"rb")
+function load(rbinfo::RBInfo,T::Type{BlockRBSpace{S}}) where S
+  path = joinpath(rbinfo.rb_path,"rb")
   load(path,T)
 end
 
@@ -128,36 +128,31 @@ function space_time_projection(x::PTArray,op::PTAlgebraicOperator,rb::BlockRBSpa
 end
 
 function reduced_basis(
-  info::RBInfo,
+  rbinfo::RBInfo,
   feop::PTFEOperator,
   snaps::BlockSnapshots)
 
-  println("Computing RB space")
-
-  ϵ = info.ϵ
-  nsnaps_state = info.nsnaps_state
-  norm_style = info.norm_style
   nblocks = get_nblocks(snaps)
   blocks = map(1:nblocks) do col
+    rbinfo_col = rbinfo[col]
+    feop_col = feop[col]
     snaps_col = snaps[col]
-    norm_matrix = get_norm_matrix(info,feop,norm_style[col])
-    reduced_basis(snaps_col,norm_matrix;ϵ,nsnaps_state)
+    reduced_basis(rbinfo_col,feop_col,snaps_col)
   end
-  if info.compute_supremizers
-    bases_space = add_space_supremizers(info,feop,blocks)
+  if rbinfo.compute_supremizers
+    bases_space = add_space_supremizers(rbinfo,feop,blocks)
     bases_time = add_time_supremizers(blocks)
   end
   return BlockRBSpace(bases_space,bases_time)
 end
 
 function add_space_supremizers(
-  info::RBInfo,
+  rbinfo::RBInfo,
   feop::PTFEOperator,
   blocks::Vector{RBSpace{T}}) where T
 
   bs_primal,bs_dual... = map(get_basis_space,blocks)
-  primal_norm_style = first(info.norm_style)
-  nm_primal = get_norm_matrix(info,feop,primal_norm_style)
+  nm_primal = get_norm_matrix(rbinfo[1],feop)
   dual_nfields = length(bs_dual)
   for col in 1:dual_nfields
     println("Computing supremizers in space for dual field $col")
@@ -334,79 +329,79 @@ function load_algebraic_contrib(path::String,::Type{BlockRBMatAlgebraicContribut
   return BlockRBMatAlgebraicContribution(blocks,touched)
 end
 
-function save(info::RBInfo,a::BlockRBVecAlgebraicContribution)
-  path = joinpath(info.rb_path,"rb_rhs")
+function save(rbinfo::RBInfo,a::BlockRBVecAlgebraicContribution)
+  path = joinpath(rbinfo.rb_path,"rb_rhs")
   save_algebraic_contrib(path,a)
 end
 
-function load(info::RBInfo,::Type{BlockRBVecAlgebraicContribution{T}}) where T
-  path = joinpath(info.rb_path,"rb_rhs")
-  load_algebraic_contrib(path,BlockRBVecAlgebraicContribution{T})
+function load(rbinfo::RBInfo,T::Type{BlockRBVecAlgebraicContribution{S}}) where S
+  path = joinpath(rbinfo.rb_path,"rb_rhs")
+  load_algebraic_contrib(path,T)
 end
 
-function save(info::RBInfo,a::Vector{BlockRBMatAlgebraicContribution})
+function save(rbinfo::RBInfo,a::Vector{BlockRBMatAlgebraicContribution})
   for i = eachindex(a)
-    path = joinpath(info.rb_path,"rb_lhs_$i")
+    path = joinpath(rbinfo.rb_path,"rb_lhs_$i")
     save_algebraic_contrib(path,a[i])
   end
 end
 
-function load(info::RBInfo,::Type{Vector{BlockRBMatAlgebraicContribution{T}}}) where T
-  njacs = num_active_dirs(info.rb_path)
-  ad_jacs = Vector{BlockRBMatAlgebraicContribution{T}}(undef,njacs)
+function load(rbinfo::RBInfo,T::Type{Vector{BlockRBMatAlgebraicContribution{S}}}) where S
+  njacs = num_active_dirs(rbinfo.rb_path)
+  ad_jacs = Vector{BlockRBMatAlgebraicContribution{S}}(undef,njacs)
   for i = 1:njacs
-    path = joinpath(info.rb_path,"rb_lhs_$i")
-    ad_jacs[i] = load_algebraic_contrib(path,BlockRBMatAlgebraicContribution{T})
+    path = joinpath(rbinfo.rb_path,"rb_lhs_$i")
+    ad_jacs[i] = load_algebraic_contrib(path,T)
   end
   ad_jacs
 end
 
-function save(info::RBInfo,a::NTuple{2,BlockRBVecAlgebraicContribution})
+function save(rbinfo::RBInfo,a::NTuple{2,BlockRBVecAlgebraicContribution})
   a_lin,a_nlin = a
-  path_lin = joinpath(info.rb_path,"rb_rhs_lin")
-  path_nlin = joinpath(info.rb_path,"rb_rhs_nlin")
+  path_lin = joinpath(rbinfo.rb_path,"rb_rhs_lin")
+  path_nlin = joinpath(rbinfo.rb_path,"rb_rhs_nlin")
   save_algebraic_contrib(path_lin,a_lin)
   save_algebraic_contrib(path_nlin,a_nlin)
 end
 
-function load(info::RBInfo,::Type{NTuple{2,BlockRBVecAlgebraicContribution{T}}}) where T
-  path_lin = joinpath(info.rb_path,"rb_rhs_lin")
-  path_nlin = joinpath(info.rb_path,"rb_rhs_nlin")
-  a_lin = load_algebraic_contrib(path_lin,BlockRBVecAlgebraicContribution{T})
-  a_nlin = load_algebraic_contrib(path_nlin,BlockRBVecAlgebraicContribution{T})
+function load(rbinfo::RBInfo,T::Type{NTuple{2,BlockRBVecAlgebraicContribution{S}}}) where S
+  path_lin = joinpath(rbinfo.rb_path,"rb_rhs_lin")
+  path_nlin = joinpath(rbinfo.rb_path,"rb_rhs_nlin")
+  a_lin = load_algebraic_contrib(path_lin,T)
+  a_nlin = load_algebraic_contrib(path_nlin,T)
   a_lin,a_nlin
 end
 
-function save(info::RBInfo,a::NTuple{3,Vector{<:BlockRBMatAlgebraicContribution}})
+function save(rbinfo::RBInfo,a::NTuple{3,Vector{<:BlockRBMatAlgebraicContribution}})
   a_lin,a_nlin,a_aux = a
   for i = eachindex(a_lin)
-    path_lin = joinpath(info.rb_path,"rb_lhs_lin_$i")
-    path_nlin = joinpath(info.rb_path,"rb_lhs_nlin_$i")
-    path_aux = joinpath(info.rb_path,"rb_lhs_aux_$i")
+    path_lin = joinpath(rbinfo.rb_path,"rb_lhs_lin_$i")
+    path_nlin = joinpath(rbinfo.rb_path,"rb_lhs_nlin_$i")
+    path_aux = joinpath(rbinfo.rb_path,"rb_lhs_aux_$i")
     save_algebraic_contrib(path_lin,a_lin[i])
     save_algebraic_contrib(path_nlin,a_nlin[i])
     save_algebraic_contrib(path_aux,a_aux[i])
   end
 end
 
-function load(info::RBInfo,::Type{NTuple{3,Vector{BlockRBMatAlgebraicContribution{T}}}}) where T
-  njacs = num_active_dirs(info.rb_path)
-  ad_jacs_lin = Vector{BlockRBMatAlgebraicContribution{T}}(undef,njacs)
-  ad_jacs_nlin = Vector{BlockRBMatAlgebraicContribution{T}}(undef,njacs)
-  ad_jacs_aux = Vector{BlockRBMatAlgebraicContribution{T}}(undef,njacs)
+function load(rbinfo::RBInfo,T::Type{NTuple{3,Vector{BlockRBMatAlgebraicContribution{S}}}}) where S
+  njacs = num_active_dirs(rbinfo.rb_path)
+  ad_jacs_lin = Vector{BlockRBMatAlgebraicContribution{S}}(undef,njacs)
+  ad_jacs_nlin = Vector{BlockRBMatAlgebraicContribution{S}}(undef,njacs)
+  ad_jacs_aux = Vector{BlockRBMatAlgebraicContribution{S}}(undef,njacs)
   for i = 1:njacs
-    path_lin = joinpath(info.rb_path,"rb_lhs_lin_$i")
-    path_nlin = joinpath(info.rb_path,"rb_lhs_nlin_$i")
-    path_aux = joinpath(info.rb_path,"rb_lhs_aux_$i")
-    ad_jacs_lin[i] = load_algebraic_contrib(path_lin,BlockRBMatAlgebraicContribution{T})
-    ad_jacs_nlin[i] = load_algebraic_contrib(path_nlin,BlockRBMatAlgebraicContribution{T})
-    ad_jacs_aux[i] = load_algebraic_contrib(path_aux,BlockRBMatAlgebraicContribution{T})
+    path_lin = joinpath(rbinfo.rb_path,"rb_lhs_lin_$i")
+    path_nlin = joinpath(rbinfo.rb_path,"rb_lhs_nlin_$i")
+    path_aux = joinpath(rbinfo.rb_path,"rb_lhs_aux_$i")
+    ad_jacs_lin[i] = load_algebraic_contrib(path_lin,T)
+    ad_jacs_nlin[i] = load_algebraic_contrib(path_nlin,T)
+    ad_jacs_aux[i] = load_algebraic_contrib(path_aux,T)
   end
   ad_jacs_lin,ad_jacs_nlin,ad_jacs_aux
 end
 
 function collect_compress_rhs(
-  info::RBInfo,
+  rbinfo::BlockRBInfo,
   op::PTAlgebraicOperator,
   rbspace::BlockRBSpace{T}) where T
 
@@ -417,10 +412,11 @@ function collect_compress_rhs(
     op_row_col = op[row,:]
     touched[row] = check_touched_residuals(op_row_col)
     if touched[row]
+      rbinfo_row = rbinfo[row]
       rbspace_row = rbspace[row]
       ress,trian = collect_residuals_for_trian(op_row_col)
       ad_res = RBVecAlgebraicContribution(T)
-      compress_component!(ad_res,info,op_row_col,ress,trian,rbspace_row)
+      compress_component!(ad_res,rbinfo_row,op_row_col,ress,trian,rbspace_row)
       blocks[row] = ad_res
     end
   end
@@ -429,7 +425,7 @@ function collect_compress_rhs(
 end
 
 function collect_compress_lhs(
-  info::RBInfo,
+  rbinfo::BlockRBInfo,
   op::PTAlgebraicOperator,
   rbspace::BlockRBSpace{T};
   θ::Real=1) where T
@@ -445,12 +441,13 @@ function collect_compress_lhs(
       op_row_col = op[row,col]
       touched_i[row,col] = check_touched_jacobians(op_row_col;i)
       if touched_i[row,col]
+        rbinfo_col = rbinfo[col]
         rbspace_row = rbspace[row]
         rbspace_col = rbspace[col]
         jacs,trian = collect_jacobians_for_trian(op_row_col;i)
         ad_jac = RBMatAlgebraicContribution(T)
         compress_component!(
-          ad_jac,info,op_row_col,jacs,trian,rbspace_row,rbspace_col;combine_projections)
+          ad_jac,rbinfo_col,op_row_col,jacs,trian,rbspace_row,rbspace_col;combine_projections)
         blocks_i[row,col] = ad_jac
       end
     end
@@ -502,7 +499,7 @@ end
 
 function collect_rhs_contributions!(
   cache,
-  info::RBInfo,
+  rbinfo::BlockRBInfo,
   op::PTAlgebraicOperator,
   rbres::BlockRBVecAlgebraicContribution{T},
   rbspace::BlockRBSpace{T}) where T
@@ -514,8 +511,9 @@ function collect_rhs_contributions!(
     rbspace_row = rbspace[row]
     cache_row = cache_at_index(cache,op,row)
     if rbres.touched[row]
+      rbinfo_row = rbinfo[row]
       blocks[row] = collect_rhs_contributions!(
-        cache_row,info,op_row_col,rbres[row],rbspace_row)
+        cache_row,rbinfo_row,op_row_col,rbres[row],rbspace_row)
     else
       nrow = get_rb_ndofs(rbspace_row)
       blocks[row] = AffinePTArray(zeros(T,nrow),length(op.μ))
@@ -526,7 +524,7 @@ end
 
 function collect_lhs_contributions!(
   cache,
-  info::RBInfo,
+  rbinfo::BlockRBInfo,
   op::PTAlgebraicOperator,
   rbjacs::Vector{BlockRBMatAlgebraicContribution{T}},
   rbspace::BlockRBSpace{T}) where T
@@ -543,8 +541,9 @@ function collect_lhs_contributions!(
       rbspace_col = rbspace[col]
       cache_row_col = cache_at_index(cache,op,row,col)
       if rb_jac_i.touched[row,col]
+        rbinfo_col = rbinfo[col]
         blocks[row,col] = collect_lhs_contributions!(
-          cache_row_col,info,op_row_col,rb_jac_i[row,col],rbspace_row,rbspace_col;i)
+          cache_row_col,rbinfo_col,op_row_col,rb_jac_i[row,col],rbspace_row,rbspace_col;i)
       else
         nrow = get_rb_ndofs(rbspace_row)
         ncol = get_rb_ndofs(rbspace_col)

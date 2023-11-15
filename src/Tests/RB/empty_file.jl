@@ -129,10 +129,10 @@ RHS_rb = vcat(RHS1_rb,RHS2_rb)
 _RHS_rb = vcat(LHS11_rb_2*xrb[1][1:nu],zeros(np)) + RHS_rb
 
 op = get_ptoperator(fesolver,feop,x,Table([μn]))
-lrhs = collect_rhs_contributions!(rhs_cache,info,op,rbrhs,rbspace)
-llhs = collect_lhs_contributions!(lhs_cache,info,op,rblhs,rbspace)
-nlrhs = collect_rhs_contributions!(rhs_cache,info,op,nl_rbrhs,rbspace)
-nllhs = collect_lhs_contributions!(lhs_cache,info,op,nl_rblhs,rbspace)
+lrhs = collect_rhs_contributions!(rhs_cache,rbinfo,op,rbrhs,rbspace)
+llhs = collect_lhs_contributions!(lhs_cache,rbinfo,op,rblhs,rbspace)
+nlrhs = collect_rhs_contributions!(rhs_cache,rbinfo,op,nl_rbrhs,rbspace)
+nllhs = collect_lhs_contributions!(lhs_cache,rbinfo,op,nl_rblhs,rbspace)
 lhs = llhs + nllhs
 rhs = llhs*xrb + (lrhs+nlrhs)
 norm(LHS_rb - lhs[1],Inf)

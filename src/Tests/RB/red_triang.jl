@@ -1,5 +1,5 @@
 rbres,rbjac = rbrhs,rblhs
-sols_test,params_test = load_test(info,feop,fesolver)
+sols_test,params_test = load_test(rbinfo,feop,fesolver)
 res_cache,jac_cache = allocate_online_cache(feop,fesolver,rbspace,sols_test,params_test)
 
 # RESIDUALS
@@ -100,7 +100,7 @@ i = 2
 combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*x-θ*y
 jacs,trians = collect_jacobians_for_trian(fesolver,feop,sols[1:10],params,times;i)
 nzm,trian = jacs[1],[trians...][1]
-basis_space,basis_time = compress(nzm;ϵ=info.ϵ)
+basis_space,basis_time = compress(nzm;ϵ=rbinfo.ϵ)
 
 M = assemble_matrix((u,v)->∫(u*v)dΩ,trial(nothing,nothing),test)/(θ*dt)
 # bs = basis_space.nonzero_val
@@ -127,7 +127,7 @@ COEFF_OK = basis_space'*nzm.nonzero_val[:,1]
 @check nzm.nonzero_val[:,1] ≈ bs*COEFF_OK
 
 interp_bs = basis_space[interp_idx_space,:]
-lu_interp = if info.st_mdeim
+lu_interp = if rbinfo.st_mdeim
   interp_bt = basis_time[interp_idx_time,:]
   interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
   lu(interp_bst)
