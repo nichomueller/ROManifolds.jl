@@ -2,7 +2,6 @@ using LinearAlgebra
 using SparseArrays
 using Serialization
 using NearestNeighbors
-using UnPack
 using Gridap
 using Gridap.Algebra
 using Gridap.FESpaces
@@ -14,6 +13,7 @@ using Gridap.CellData
 using Gridap.MultiField
 
 import StaticArrays: SVector
+import UnPack: @unpack
 import Gridap.Helpers:@check,@unreachable
 import Gridap.Arrays:Table,evaluate!
 import Gridap.Algebra:allocate_matrix,allocate_vector,solve

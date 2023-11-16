@@ -1,25 +1,3 @@
-struct FEInfo
-  reffe::Tuple{<:ReferenceFEName,Any,Any}
-  conformity::Symbol
-  constraint::Any
-  dirichlet_tags::AbstractVector
-  dirichlet_masks::Any
-  function FEInfo(
-    reffe::Tuple{<:ReferenceFEName,Any,Any};
-    conformity=:H1,
-    constraint=nothing,
-    dirichlet_tags=Int[],
-    dirichlet_masks=nothing)
-    new(reffe,conformity,constraint,dirichlet_tags,dirichlet_masks)
-  end
-end
-
-struct BlockFEInfo
-  blocks::Vector{FEInfo}
-end
-
-Base.getindex(feinfo::BlockFEInfo,i::Int) = feinfo.blocks[i]
-
 function get_fe_path(tpath::String)
   create_dir!(tpath)
   fepath = joinpath(tpath,"fem")
@@ -38,7 +16,6 @@ function get_rb_path(tpath::String,ϵ::Float;st_mdeim=false)
 end
 
 struct RBInfo
-  feinfo::FEInfo
   ϵ::Float
   fe_path::String
   rb_path::String
@@ -50,7 +27,6 @@ struct RBInfo
 end
 
 function RBInfo(
-  feinfo::FEInfo,
   test_path::String;
   ϵ=1e-4,
   norm_style=:l2,
@@ -61,7 +37,7 @@ function RBInfo(
 
   fe_path = get_fe_path(test_path)
   rb_path = get_rb_path(test_path,ϵ;st_mdeim)
-  RBInfo(feinfo,ϵ,fe_path,rb_path,norm_style,nsnaps_state,
+  RBInfo(ϵ,fe_path,rb_path,norm_style,nsnaps_state,
     nsnaps_mdeim,nsnaps_test,st_mdeim)
 end
 
@@ -83,7 +59,6 @@ function get_norm_matrix(rbinfo::RBInfo,feop::PTFEOperator)
 end
 
 struct BlockRBInfo
-  feinfo::BlockFEInfo
   ϵ::Vector{Float}
   fe_path::String
   rb_path::String
@@ -96,7 +71,6 @@ struct BlockRBInfo
 end
 
 function BlockRBInfo(
-  feinfo::BlockFEInfo,
   test_path::String;
   ϵ=[1e-4,1e-4],
   norm_style=[:l2,:l2],
@@ -108,14 +82,14 @@ function BlockRBInfo(
 
   fe_path = get_fe_path(test_path)
   rb_path = get_rb_path(test_path,ϵ;st_mdeim)
-  BlockRBInfo(feinfo,ϵ,fe_path,rb_path,norm_style,compute_supremizers,nsnaps_state,
+  BlockRBInfo(ϵ,fe_path,rb_path,norm_style,compute_supremizers,nsnaps_state,
     nsnaps_mdeim,nsnaps_test,st_mdeim)
 end
 
 function Base.getindex(rbinfo::BlockRBInfo,i::Int)
-  feinfo_i = rbinfo.feinfo[i]
+  ϵ_i = rbinfo.ϵ[i]
   norm_style_i = rbinfo.norm_style[i]
-  RBInfo(feinfo_i,rbinfo.ϵ,rbinfo.fe_path,rbinfo.rb_path,norm_style_i,
+  RBInfo(ϵ_i,rbinfo.fe_path,rbinfo.rb_path,norm_style_i,
     rbinfo.nsnaps_state,rbinfo.nsnaps_mdeim,rbinfo.nsnaps_test,rbinfo.st_mdeim)
 end
 

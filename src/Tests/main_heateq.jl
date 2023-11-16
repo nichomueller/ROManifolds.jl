@@ -15,9 +15,9 @@ function heat_equation()
   order = 1
   degree = 2
   model = get_discrete_model(test_path,mesh,bnd_info)
-  Ω = Triangulation(model)
+  Ω = TriangulationWithTags(model)
   dΩ = Measure(Ω,degree)
-  Γn = BoundaryTriangulation(model,tags=["neumann"])
+  Γn = BoundaryTriangulationWithTags(model,tags=["neumann"])
   dΓn = Measure(Γn,degree)
 
   ranges = fill([1.,10.],3)
@@ -49,8 +49,7 @@ function heat_equation()
 
   T = Float
   reffe = ReferenceFE(lagrangian,T,order)
-  feinfo = FEInfo(reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-  test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
+  test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"],keep_keys=true)
   trial = PTTrialFESpace(test,g)
   feop = AffinePTFEOperator(res,jac,jac_t,pspace,trial,test)
   t0,tf,dt,θ = 0.,0.3,0.005,0.5
@@ -67,7 +66,7 @@ function heat_equation()
   nsnaps_mdeim = 20
   nsnaps_test = 10
   st_mdeim = false
-  rbinfo = RBInfo(feinfo,test_path;ϵ,norm_style,nsnaps_state,nsnaps_mdeim,nsnaps_test,st_mdeim)
+  rbinfo = RBInfo(test_path;ϵ,norm_style,nsnaps_state,nsnaps_mdeim,nsnaps_test,st_mdeim)
 
   # Offline phase
   printstyled("OFFLINE PHASE\n";bold=true,underline=true)
@@ -97,32 +96,3 @@ function heat_equation()
 end
 
 heat_equation()
-
-
-μ = params[1:nsnaps_mdeim]
-op = get_ptoperator(fesolver,feop,rbspace,μ)
-nzm,trian = collect_residuals_for_trian(op)
-_nzm,_trian = nzm[1],Γn
-basis_space,basis_time = compress(_nzm;ϵ=rbinfo.ϵ)
-proj_bs,proj_bt = project_space_time(basis_space,basis_time,rbspace)
-interp_idx_space = get_interpolation_idx(basis_space)
-interp_bs = basis_space[interp_idx_space,:]
-if rbinfo.st_mdeim
-  interp_idx_time = get_interpolation_idx(basis_time)
-  interp_bt = basis_time[interp_idx_time,:]
-  interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
-  lu_interp = lu(interp_bst)
-else
-  lu_interp = lu(interp_bs)
-  interp_idx_time = collect(eachindex(op.tθ))
-end
-# integr_domain = RBIntegrationDomain(feinfo,op.odeop.feop,nzm,trian,interp_idx_space,interp_idx_time)
-recast_idx_space = recast_idx(_nzm,interp_idx_space)
-recast_idx_space_rows,_ = vec_to_mat_idx(recast_idx_space,_nzm.nrows)
-cell_dof_ids = get_cell_dof_ids(feop.test,_trian)
-red_integr_cells = find_cells(recast_idx_space_rows,cell_dof_ids)
-model = get_background_model(_trian)
-red_model = DiscreteModelPortion(model,red_integr_cells)
-red_feop = reduce_feoperator(feop,feinfo,red_model)
-red_trian = Triangulation(red_model)
-red_meas = Measure(red_trian,2*get_order(feop.test))

@@ -12,7 +12,7 @@ function stokes_equation()
   order = 2
   degree = 4
   model = get_discrete_model(test_path,mesh,bnd_info)
-  Ω = Triangulation(model)
+  Ω = TriangulationWithTags(model)
   dΩ = Measure(Ω,degree)
 
   ranges = fill([1.,10.],3)
@@ -42,9 +42,9 @@ function stokes_equation()
   T = Float
   reffe_u = ReferenceFE(lagrangian,VectorValue{2,T},order)
   reffe_p = ReferenceFE(lagrangian,T,order-1)
-  test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"])
+  test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet0","dirichlet"],keep_keys=true)
   trial_u = PTTrialFESpace(test_u,[g0,g])
-  test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
+  test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean,keep_keys=true)
   trial_p = TrialFESpace(test_p)
   test = PTMultiFieldFESpace([test_u,test_p])
   trial = PTMultiFieldFESpace([trial_u,trial_p])

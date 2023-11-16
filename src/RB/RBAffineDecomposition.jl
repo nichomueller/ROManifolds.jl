@@ -1,79 +1,50 @@
-function reduce_feoperator(
-  feop::PTFEOperatorFromWeakForm{Affine},
-  feinfo::FEInfo,
-  model::DiscreteModelPortion)
-
-  @unpack reffe,conformity,constraint,dirichlet_tags,dirichlet_masks = feinfo
-  dirichlet_μt = get_trial(feop).dirichlet_μt
-  test = TestFESpace(model,reffe;conformity,constraint,dirichlet_tags,dirichlet_masks)
-  trial = PTTrialFESpace(test,dirichlet_μt)
-  AffinePTFEOperator(feop.res,feop.jacs[1],feop.jacs[2],feop.pspace,trial,test)
-end
-
-function reduce_feoperator(
-  feop::PTFEOperatorFromWeakForm{Nonlinear},
-  feinfo::FEInfo,
-  model::DiscreteModelPortion)
-
-  @unpack reffe,conformity,constraint,dirichlet_tags,dirichlet_masks = feinfo
-  dirichlet_μt = get_trial(feop).dirichlet_μt
-  test = TestFESpace(model,reffe;conformity,constraint,dirichlet_tags,dirichlet_masks)
-  trial = PTTrialFESpace(test,dirichlet_μt)
-  PTFEOperator(feop.res,feop.jacs[1],feop.jacs[2],feop.nl,feop.pspace,trial,test)
-end
-
 struct RBIntegrationDomain
   feop::PTFEOperator
   meas::Measure
   idx_space::Vector{Int}
   idx_space_row::Vector{Int}
   idx_time::Vector{Int}
+end
 
-  function RBIntegrationDomain(
-    feinfo::FEInfo,
-    feop::PTFEOperator,
-    nzm::NnzMatrix,
-    trian::Triangulation,
-    idx_space::Vector{Int},
-    idx_time::Vector{Int})
+function RBIntegrationDomain(
+  feop::PTFEOperator,
+  nzm::NnzMatrix,
+  trian::TriangulationWithTags,
+  idx_space::Vector{Int},
+  idx_time::Vector{Int})
 
-    recast_idx_space = recast_idx(nzm,idx_space)
-    recast_idx_space_rows,_ = vec_to_mat_idx(recast_idx_space,nzm.nrows)
-    cell_dof_ids = get_cell_dof_ids(feop.test,trian)
-    red_integr_cells = find_cells(recast_idx_space_rows,cell_dof_ids)
-    model = get_background_model(trian)
-    red_model = DiscreteModelPortion(model,red_integr_cells)
-    red_feop = reduce_feoperator(feop,feinfo,red_model)
-    red_trian = Triangulation(red_model)
-    red_meas = Measure(red_trian,2*get_order(feop.test))
-    new(red_feop,red_meas,recast_idx_space,recast_idx_space_rows,idx_time)
+  recast_idx_space = recast_idx(nzm,idx_space)
+  recast_idx_space_rows,_ = vec_to_mat_idx(recast_idx_space,nzm.nrows)
+  cell_dof_ids = get_cell_dof_ids(feop.test,trian)
+  red_integr_cells = find_cells(recast_idx_space_rows,cell_dof_ids)
+  model = get_background_model(trian)
+  red_model = DiscreteModelPortion(model,red_integr_cells)
+  red_trian = if isa(trian,BoundaryTriangulationWithTags)
+    BoundaryTriangulationWithTags(red_model,tags=get_tags(trian))
+  else
+    TriangulationWithTags(red_model,tags=get_tags(trian))
   end
-
-  function RBIntegrationDomain(
-    feinfo::FEInfo,
-    feop::PTFEOperator,
-    nzm::NnzMatrix,
-    trian::BoundaryTriangulation,
-    idx_space::Vector{Int},
-    idx_time::Vector{Int})
-
-    @notimplemented
-  end
+  red_trian = TriangulationWithTags(red_model,tags=get_tags(trian))
+  red_meas = Measure(red_trian,2*get_order(feop.test))
+  red_feop = reduce_fe_operator(feop,red_model)
+  RBIntegrationDomain(red_feop,red_meas,recast_idx_space,recast_idx_space_rows,idx_time)
 end
 
 function reduce_ptoperator(op::PTAlgebraicOperator,rbintd::RBIntegrationDomain)
+  red_feop = rbintd.feop
   red_odeop = get_algebraic_operator(red_feop)
   red_ode_cache = reduce_cache(op.ode_cache,red_feop)
-  red_times = rbintd.times
+  times = op.tθ
+  red_times = times[rbintd.idx_time]
   red_u0 = selectidx(op.u0,op,rbintd)
   red_vθ = selectidx(op.vθ,op,rbintd)
   get_ptoperator(red_odeop,op.μ,red_times,op.dtθ,red_u0,red_ode_cache,red_vθ)
 end
 
 function selectidx(a::PTArray,op::PTAlgebraicOperator,rbintd::RBIntegrationDomain)
-  idx = rbintd
+  idx = rbintd.idx_space_row
   times = op.tθ
-  red_times = rbintd.times
+  red_times = times[rbintd.idx_time]
   time_to_parent_time = findall(x->x in red_times,times)
   selectidx(a,idx,time_to_parent_time;nparams=length(op.μ))
 end
@@ -101,7 +72,6 @@ struct RBAffineDecomposition{T,N}
     args...;
     kwargs...)
 
-    feinfo = rbinfo.feinfo
     basis_space,basis_time = compress(nzm;ϵ=rbinfo.ϵ)
     proj_bs,proj_bt = project_space_time(basis_space,basis_time,args...;kwargs...)
     interp_idx_space = get_interpolation_idx(basis_space)
@@ -115,7 +85,7 @@ struct RBAffineDecomposition{T,N}
       lu_interp = lu(interp_bs)
       interp_idx_time = collect(eachindex(op.tθ))
     end
-    integr_domain = RBIntegrationDomain(feinfo,op.odeop.feop,nzm,trian,interp_idx_space,interp_idx_time)
+    integr_domain = RBIntegrationDomain(op.odeop.feop,nzm,trian,interp_idx_space,interp_idx_time)
     RBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)
   end
 end
@@ -233,7 +203,7 @@ function assemble_rhs!(
   red_cache = selectidx(b,op,rbintd),bmat
   red_op = reduce_ptoperator(op,rbintd)
   red_meas = rbintd.meas
-  red_idx = rbintd.idx
+  red_idx = rbintd.idx_space
   collect_residuals_for_idx!(red_cache,red_op,red_idx,red_meas)
 end
 
@@ -258,7 +228,7 @@ function assemble_lhs!(
   red_cache = selectidx(A,op,rbintd),Amat
   red_op = reduce_ptoperator(op,rbintd)
   red_meas = rbintd.meas
-  red_idx = rbintd.idx
+  red_idx = rbintd.idx_space
   collect_jacobians_for_idx!(red_cache,red_op,red_idx,red_meas;i)
 end
 
