@@ -22,7 +22,7 @@ function PTArray(array::Vector{T}) where {T<:AbstractArrayBlock}
 end
 
 Arrays.get_array(a::PTArray) = a.array
-Base.size(a::PTArray) = size(a.array)
+Base.size(a::PTArray,i...) = size(testitem(a),i...)
 Base.eltype(::Type{PTArray{T}}) where T = eltype(T)
 Base.eltype(::PTArray{T}) where T = eltype(T)
 Base.ndims(::PTArray) = 1
@@ -60,9 +60,7 @@ function Base.:*(a::Number,b::PTArray)
 end
 
 function Base.:≈(a::PTArray,b::PTArray)
-  if size(a) != size(b)
-    return false
-  end
+  @assert size(a) == size(b)
   for i in eachindex(a)
     if !(a[i] ≈ b[i])
       return false
@@ -72,9 +70,7 @@ function Base.:≈(a::PTArray,b::PTArray)
 end
 
 function Base.:(==)(a::PTArray,b::PTArray)
-  if size(a) != size(b)
-    return false
-  end
+  @assert size(a) == size(b)
   for i in eachindex(a)
     if !(a[i] == b[i])
       return false

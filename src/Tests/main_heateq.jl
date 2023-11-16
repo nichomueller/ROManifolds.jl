@@ -96,3 +96,22 @@ function heat_equation()
 end
 
 heat_equation()
+
+
+nsnaps_test = rbinfo.nsnaps_test
+snaps_test,params_test = sols[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
+op = get_ptoperator(fesolver,feop,snaps_test,params_test)
+cache = allocate_cache(op,snaps_test)
+rhs_cache,lhs_cache = cache
+rcache,scache = rhs_cache
+ad = rbrhs[Ω]
+rbintd = ad.integration_domain
+# red_op = reduce_ptoperator(op,rbintd)
+red_odeop = get_algebraic_operator(rbintd.feop)
+# red_ode_cache = reduce_cache(op,rbintd)
+red_ddofs_to_ddofs = rbintd.red_ddofs_to_ddofs
+red_test = get_test(rbintd.feop)
+trials,pttrials,fecache = op.ode_cache
+red_dvals = map(t -> t.dirichlet_values[red_ddofs_to_ddofs],trials)
+# red_trials = map(dv -> PTrialFESpace(red_test,dv),red_dvals)
+# dirichlet_values = compute_dirichlet_values_for_tags(space,objects)

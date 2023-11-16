@@ -1,16 +1,14 @@
 struct FEKeys{T,M}
   cell_reffe::AbstractArray{<:ReferenceFE}
   conformity::Symbol
-  labels::FaceLabeling
   dirichlet_tags::T
   dirichlet_masks::M
   function FEKeys(
     cell_reffe::AbstractArray{<:ReferenceFE},
     conformity::Symbol,
-    labels::FaceLabeling,
     dirichlet_tags::T,
     dirichlet_masks::M) where {T,M}
-    new{T,M}(cell_reffe,conformity,labels,dirichlet_tags,dirichlet_masks)
+    new{T,M}(cell_reffe,conformity,dirichlet_tags,dirichlet_masks)
   end
 end
 
@@ -131,11 +129,7 @@ function FESpaces.FESpace(
 
   conf = Conformity(testitem(cell_reffe),conformity)
 
-  if keep_keys
-    keys = FEKeys(cell_reffe,conformity,labels,dirichlet_tags,dirichlet_masks)
-  else
-    keys = nothing
-  end
+  keys = keep_keys ? FEKeys(cell_reffe,conformity,dirichlet_tags,dirichlet_masks) : nothing
 
   if FESpaces._use_clagrangian(trian,cell_reffe,conf) &&
     isnothing(constraint) &&
@@ -168,8 +162,8 @@ function reduce_fe_space(
   model::DiscreteModelPortion)
 
   glue,keys = fs.metadata
-  @unpack cell_reffe,conformity,labels,dirichlet_tags,dirichlet_masks = keys
-  FESpace(model,cell_reffe;conformity,labels,dirichlet_tags,dirichlet_masks)
+  @unpack cell_reffe,conformity,dirichlet_tags,dirichlet_masks = keys
+  FESpace(model,cell_reffe;conformity,dirichlet_tags,dirichlet_masks)
 end
 
 function reduce_fe_space(
@@ -177,8 +171,8 @@ function reduce_fe_space(
   model::DiscreteModelPortion)
 
   keys = fs.metadata
-  @unpack cell_reffe,conformity,labels,dirichlet_tags,dirichlet_masks = keys
-  FESpace(model,cell_reffe;conformity,labels,dirichlet_tags,dirichlet_masks)
+  @unpack cell_reffe,conformity,dirichlet_tags,dirichlet_masks = keys
+  FESpace(model,cell_reffe;conformity,dirichlet_tags,dirichlet_masks)
 end
 
 function reduce_fe_space(fs::FESpaceWithConstantFixed,model::DiscreteModelPortion)

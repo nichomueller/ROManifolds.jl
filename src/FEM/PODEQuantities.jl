@@ -163,12 +163,11 @@ end
 function collect_residuals_for_idx!(
   cache,
   op::PTAlgebraicOperator,
-  sols::PTArray,
   idx::Vector{Int},
   args...)
 
   b,bidx = cache
-  ress = residual_for_idx!(b,op,sols,args...)
+  ress = residual_for_idx!(b,op,op.u0,args...)
   setsize!(bidx,(length(idx),length(ress)))
   bidxmat = bidx.array
   @inbounds for n = eachindex(ress)
@@ -180,13 +179,12 @@ end
 function collect_jacobians_for_idx!(
   cache,
   op::PTAlgebraicOperator,
-  sols::PTArray,
   idx::Vector{Int},
   args...;
   i=1)
 
   A,Aidx = cache
-  jacs_i = jacobian_for_idx!(A,op,sols,i,args...)
+  jacs_i = jacobian_for_idx!(A,op,op.u0,i,args...)
   setsize!(Aidx,(length(idx),length(jacs_i)))
   Aidxmat = Aidx.array
   @inbounds for n = eachindex(jacs_i)
