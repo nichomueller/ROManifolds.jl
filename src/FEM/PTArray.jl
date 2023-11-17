@@ -446,20 +446,8 @@ for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
   end
 end
 
-function selectidx_space(a::PTArray,idx_space)
-  @notimplemented
-end
-
-function selectidx_space(a::PTArray{<:AbstractVector},idx_space)
-  map(b->b[idx_space],a)
-end
-
-function selectidx_space(a::PTArray{<:AbstractMatrix},idx_space)
-  map(b->b[idx_space,idx_space],a)
-end
-
-function selectidx(a::PTArray,idx_space,idx_time;nparams=Int(length(a)/length(idx_time)))
-  a_space = selectidx_space(a,idx_space)
+function selectidx(a::PTArray{<:AbstractVector},idx_space,idx_time;nparams=Int(length(a)/length(idx_time)))
+  a_space = map(b->b[idx_space],a)
   time_ndofs = Int(length(a)/nparams)
   ptidx = vec(transpose(collect(0:nparams-1)*time_ndofs .+ idx_time'))
   NonaffinePTArray(a_space[ptidx])
@@ -590,14 +578,6 @@ for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
   end
 end
 
-function selectidx_space(a::AffinePTArray{<:AbstractVector},idx_space)
-  a[idx_space]
-end
-
-function selectidx_space(a::AffinePTArray{<:AbstractMatrix},idx_space)
-  a[idx_space,idx_space]
-end
-
-function selectidx(a::AffinePTArray,idx_space,args...;kwargs...)
-  AffinePTArray(selectidx_space(a),length(a))
+function selectidx(a::AffinePTArray{<:AbstractVector},idx_space,args...;kwargs...)
+  AffinePTArray(a[idx_space],length(a))
 end

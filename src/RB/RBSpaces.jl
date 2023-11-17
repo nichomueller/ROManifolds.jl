@@ -131,8 +131,7 @@ function get_ptoperator(
   fesolver::PThetaMethod,
   feop::PTFEOperator,
   rbspace::RBSpace{T},
-  params::Table;
-  conservative=false) where T
+  params::Table) where T
 
   dtθ = fesolver.θ == 0.0 ? fesolver.dt : fesolver.dt*fesolver.θ
   ode_op = get_algebraic_operator(feop)
@@ -140,16 +139,9 @@ function get_ptoperator(
   bs = get_basis_space(rbspace)
   ns = get_rb_space_ndofs(rbspace)
 
-  if conservative
-    nparams = length(params)
-    μ = Table([params[mod(n,nparams) == 0 ? ns : mod(n,nparams)] for n = 1:nparams*ns])
-  else
-    μ = params
-  end
-
-  ode_cache = allocate_cache(ode_op,μ,times)
-  ode_cache = update_cache!(ode_cache,ode_op,μ,times)
-  N = length(times)*length(μ)
+  ode_cache = allocate_cache(ode_op,params,times)
+  ode_cache = update_cache!(ode_cache,ode_op,params,times)
+  N = length(times)*length(params)
   array = Vector{Vector{T}}(undef,N)
   @inbounds for n = 1:N
     col = mod(n,ns) == 0 ? ns : mod(n,ns)
@@ -157,5 +149,5 @@ function get_ptoperator(
   end
   sols = NonaffinePTArray(array)
   sols_cache = zero(sols)
-  get_ptoperator(ode_op,μ,times,dtθ,sols,ode_cache,sols_cache)
+  get_ptoperator(ode_op,params,times,dtθ,sols,ode_cache,sols_cache)
 end
