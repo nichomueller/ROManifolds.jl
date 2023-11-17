@@ -76,12 +76,20 @@ struct BlockRBSpace{T} <: RBBlock{T,1}
   end
 end
 
-function field_offsets(rb::BlockRBSpace)
+function rb_offsets(rb::BlockRBSpace)
   nblocks = get_nblocks(rb)
   offsets = zeros(Int,nblocks+1)
   @inbounds for block = 1:nblocks
-    ndofs = get_rb_ndofs(rb[block])
-    offsets[block+1] = offsets[block] + ndofs
+    offsets[block+1] = offsets[block] + get_rb_ndofs(rb[block])
+  end
+  offsets
+end
+
+function fe_offsets(rb::BlockRBSpace)
+  nblocks = get_nblocks(rb)
+  offsets = zeros(Int,nfields+1)
+  @inbounds for block = 1:nblocks
+    offsets[block+1] = offsets[block] + size(get_basis_space(rb[block]),1)
   end
   offsets
 end
@@ -107,7 +115,7 @@ end
 
 function recast(x::PTArray,rb::BlockRBSpace)
   nblocks = get_nblocks(rb)
-  offsets = field_offsets(rb)
+  offsets = rb_offsets(rb)
   blocks = map(1:nblocks) do row
     rb_row = rb[row]
     x_row = get_at_offsets(x,offsets,row)
@@ -116,9 +124,9 @@ function recast(x::PTArray,rb::BlockRBSpace)
   return vcat(blocks...)
 end
 
-function space_time_projection(x::PTArray,op::PTAlgebraicOperator,rb::BlockRBSpace)
+function space_time_projection(x::PTArray,rb::BlockRBSpace)
   nblocks = get_nblocks(rb)
-  offsets = field_offsets(op.odeop.feop.test)
+  offsets = fe_offsets(rb)
   blocks = map(1:nblocks) do row
     rb_row = rb[row]
     x_row = get_at_offsets(x,offsets,row)
@@ -509,11 +517,10 @@ function collect_rhs_contributions!(
   for row = 1:nblocks
     op_row_col = op[row,:]
     rbspace_row = rbspace[row]
-    cache_row = cache_at_index(cache,op,row)
     if rbres.touched[row]
       rbinfo_row = rbinfo[row]
       blocks[row] = collect_rhs_contributions!(
-        cache_row,rbinfo_row,op_row_col,rbres[row],rbspace_row)
+        cache,rbinfo_row,op_row_col,rbres[row],rbspace_row)
     else
       nrow = get_rb_ndofs(rbspace_row)
       blocks[row] = AffinePTArray(zeros(T,nrow),length(op.μ))
@@ -525,7 +532,6 @@ end
 function collect_lhs_contributions!(
   cache,
   rbinfo::BlockRBInfo,
-  op::PTAlgebraicOperator,
   rbjacs::Vector{BlockRBMatAlgebraicContribution{T}},
   rbspace::BlockRBSpace{T}) where T
 
@@ -536,14 +542,12 @@ function collect_lhs_contributions!(
     rb_jac_i = rbjacs[i]
     blocks = Matrix{PTArray{Matrix{T}}}(undef,nblocks,nblocks)
     for (row,col) = index_pairs(nblocks,nblocks)
-      op_row_col = op[row,col]
       rbspace_row = rbspace[row]
       rbspace_col = rbspace[col]
-      cache_row_col = cache_at_index(cache,op,row,col)
       if rb_jac_i.touched[row,col]
         rbinfo_col = rbinfo[col]
         blocks[row,col] = collect_lhs_contributions!(
-          cache_row_col,rbinfo_col,op_row_col,rb_jac_i[row,col],rbspace_row,rbspace_col;i)
+          cache,rbinfo_col,op_row_col,rb_jac_i[row,col],rbspace_row,rbspace_col;i)
       else
         nrow = get_rb_ndofs(rbspace_row)
         ncol = get_rb_ndofs(rbspace_col)
@@ -553,20 +557,4 @@ function collect_lhs_contributions!(
     rb_jacs_contribs[i] = hvcat(nblocks,blocks...)
   end
   return rb_jacs_contribs
-end
-
-function cache_at_index(cache,op::PTAlgebraicOperator,row::Int)
-  coeff_cache,rb_cache = cache
-  b,solve_cache... = coeff_cache
-  offsets = field_offsets(op.odeop.feop.test)
-  b_idx = get_at_offsets(b,offsets,row)
-  return (b_idx,solve_cache...),rb_cache
-end
-
-function cache_at_index(cache,op::PTAlgebraicOperator,row::Int,col::Int)
-  coeff_cache,rb_cache = cache
-  A,solve_cache... = coeff_cache
-  offsets = field_offsets(op.odeop.feop.test)
-  A_idx = get_at_offsets(A,offsets,row,col)
-  return (A_idx,solve_cache...),rb_cache
 end

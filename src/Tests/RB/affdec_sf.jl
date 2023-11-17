@@ -35,8 +35,8 @@ function test_affine_decomposition_rhs(
   meas::Measure,
   rbspace::RBSpace{T},) where T
 
-  coeff_cache,rb_cache = cache
-  b,scache... = coeff_cache
+  mdeim_cache,rb_cache = cache
+  b,scache... = mdeim_cache
 
   times = op.tθ
   red_idx = rbrest.integration_domain.idx
@@ -92,8 +92,8 @@ function test_affine_decomposition_lhs(
   rbspace_col::RBSpace{T};
   i=1) where T
 
-  coeff_cache,rb_cache = cache
-  A,scache... = coeff_cache
+  mdeim_cache,rb_cache = cache
+  A,scache... = mdeim_cache
 
   times = op.tθ
   red_idx = rbjact.integration_domain.idx

@@ -8,15 +8,6 @@ function FESpaces.get_order(test::MultiFieldFESpace)
   maximum(orders)
 end
 
-function field_offsets(f::MultiFieldFESpace)
-  nfields = length(f.spaces)
-  offsets = zeros(Int,nfields+1)
-  @inbounds for field = 1:nfields
-    offsets[field+1] = offsets[field] + num_free_dofs(f.spaces[field])
-  end
-  offsets
-end
-
 Base.zeros(fe::FESpace) = get_free_dof_values(zero(fe))
 
 function get_discrete_model(

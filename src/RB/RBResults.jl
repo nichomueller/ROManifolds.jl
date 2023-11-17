@@ -122,23 +122,17 @@ function post_process(
   return
 end
 
-function allocate_cache(
-  op::PTAlgebraicOperator,
-  snaps::PTArray{Vector{T}}) where T
-
-  b = allocate_residual(op,snaps)
-  A = allocate_jacobian(op,snaps)
-  bmat = zeros(T,1,1)
-  Amat = zeros(T,1,1)
-
-  coeff = zeros(T,1,1)
-  ptcoeff = NonaffinePTArray([zeros(T,1,1) for _ = eachindex(op.μ)])
+function allocate_cache(snaps_test::PTArray{Vector{T}},params_test::Table) where T
+  mat = CachedArray(zeros(T,1,1))
+  coeff = CachedArray(zeros(T,1,1))
+  ptcoeff = CachedArray(NonaffinePTArray([zeros(T,1,1) for _ = eachindex(params_test)]))
+  mdeim_cache = (mat,(coeff,ptcoeff))
 
   res_contrib_cache = return_cache(RBVecContributionMap(T))
   jac_contrib_cache = return_cache(RBMatContributionMap(T))
 
-  res_cache = ((b,CachedArray(bmat)),(CachedArray(coeff),CachedArray(ptcoeff))),res_contrib_cache
-  jac_cache = ((A,CachedArray(Amat)),(CachedArray(coeff),CachedArray(ptcoeff))),jac_contrib_cache
+  res_cache = mdeim_cache,res_contrib_cache
+  jac_cache = mdeim_cache,jac_contrib_cache
   res_cache,jac_cache
 end
 
@@ -155,10 +149,11 @@ function rb_solver(
   println("Solving linear RB problems")
   nsnaps_test = rbinfo.nsnaps_test
   snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
-  op = get_ptoperator(fesolver,feop,snaps_test,params_test)
-  cache = allocate_cache(op,snaps_test)
+  cache = allocate_cache(snaps_test,params_test)
   stats = @timed begin
-    rhs,(lhs,lhs_t) = collect_rhs_lhs_contributions!(cache,rbinfo,op,rbres,rbjacs,rbspace)
+    update_reduced_operator!(rbres,snaps_test,params_test)
+    update_reduced_operator!(rbjacs,snaps_test,params_test)
+    rhs,(lhs,lhs_t) = collect_rhs_lhs_contributions!(cache,rbinfo,rbres,rbjacs,rbspace)
     rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs+lhs_t)
   end
   approx_snaps_test = recast(rb_snaps_test,rbspace)
@@ -184,7 +179,7 @@ function rb_solver(
   op_lin = linear_operator(op)
   op_nlin = nonlinear_operator(op)
   op_aux = auxiliary_operator(op)
-  xrb = space_time_projection(x,op,rbspace)
+  xrb = space_time_projection(x,rbspace)
   dxrb = similar(xrb)
   cache = allocate_cache(op,snaps_test)
   rhs_cache,lhs_cache = cache

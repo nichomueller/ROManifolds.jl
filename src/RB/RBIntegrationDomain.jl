@@ -1,60 +1,39 @@
-struct RBIntegrationCache{T,N}
-  x::NonaffinePTArray{Vector{T}}
-  q::PTArray{Array{T,N}}
-  ode_cache::PTODECacheType
-  function RBIntegrationCache(
-    x::NonaffinePTArray{Vector{T}},
-    q::PTArray{Array{T,N}},
-    ode_cache::PTODECacheType) where {T,N}
-    new{T,N}(x,q,ode_cache)
-  end
-end
-
 function allocate_algebraic_cache(
   ::Val{1},
   odeop::PODEOperator,
-  x::NonaffinePTArray,
   μ::Table,
-  t::Real,
-  ode_cache::PTODECacheType)
+  t::Vector{<:Real},
+  x::NonaffinePTArray,
+  ode_cache,
+  meas::Measure)
 
-  b = allocate_residual(odeop,μ,t,x,ode_cache)
-  RBIntegrationCache(x,b,ode_cache)
+  allocate_residual(odeop,μ,t,x,ode_cache)
 end
 
 function allocate_algebraic_cache(
   ::Val{2},
   odeop::PODEOperator,
-  x::NonaffinePTArray,
   μ::Table,
   t::Real,
-  ode_cache::PTODECacheType)
+  x::NonaffinePTArray,
+  ode_cache)
 
-  A = allocate_jacobian(odeop,μ,t,x,ode_cache)
-  RBIntegrationCache(x,A,ode_cache)
-end
-
-function update_cache!(cache::RBIntegrationCache,x::NonaffinePTArray)
-  xold = cache.x
-  @. xold = x
-  cache
+  allocate_jacobian(odeop,μ,t,x,ode_cache)
 end
 
 struct RBIntegrationDomain{T,N}
-  feop::PTFEOperator
+  op::PTAlgebraicOperator
   meas::Measure
   idx_space::Vector{Int}
-  times::Vector{<:Real}
   idx_time::Vector{Int}
-  cache::RBIntegrationCache{T,N}
+  cache::PTArray{<:AbstractArray{T,N}}
   function RBIntegrationDomain(
-    feop::PTFEOperator,
+    op::PTAlgebraicOperator,
     meas::Measure,
     idx_space::Vector{Int},
-    times::Vector{<:Real},
     idx_time::Vector{Int},
-    cache::RBIntegrationCache{T,N}) where {T,N}
-    new{T,N}(feop,meas,idx_space,times,idx_time,cache)
+    cache::PTArray{<:AbstractArray{T,N}}) where {T,N}
+    new{T,N}(op,meas,idx_space,idx_time,cache)
   end
 end
 
@@ -89,13 +68,13 @@ function RBIntegrationDomain(
   red_times = times[idx_time]
   time_to_parent_time = findall(x->x in red_times,times)
 
-  x = NonaffinePTArray([zeros(T,red_nfree)])
-  μ = testitem(op.μ)
-  t = testitem(times)
-  red_ode_cache = allocate_cache(red_odeop,μ,t)
-  red_cache = allocate_algebraic_cache(Val(N),red_odeop,μ,t,x,red_ode_cache)
+  x = NonaffinePTArray([zeros(T,red_nfree) for _ = 1:length(op.μ)*length(times)])
+  red_ode_cache = allocate_cache(red_odeop,op.μ,times)
+  red_cache = allocate_algebraic_cache(Val(N),red_odeop,op.μ,times,x,red_ode_cache,red_meas)
 
-  RBIntegrationDomain(red_feop,red_meas,recast_idx_space,red_times,time_to_parent_time,red_cache)
+  red_op = get_ptoperator(red_odeop,op.μ,red_times,op.dtθ,u0,ode_cache,vθ)
+
+  RBIntegrationDomain(red_op,red_meas,recast_idx_space,time_to_parent_time,red_cache)
 end
 
 function get_space_row_idx(op::PTAlgebraicOperator,rbintd::RBIntegrationDomain)
@@ -112,9 +91,44 @@ function selectidx(a::PTArray,rbintd::RBIntegrationDomain;kwargs...)
   selectidx(a,idx_space,idx_time;kwargs...)
 end
 
-function update_cache!(rbintd::RBIntegrationDomain,x::NonaffinePTArray,μ::Table)
+function _update_solution!(x::NonaffinePTArray,x0::NonaffinePTArray)
+  @. x = x0
+  x
+end
+
+function _update_parameter!(μ::Table,μ0::Table)
+  @. μ = μ0
+  μ
+end
+
+function _update_cache!(cache::NonaffinePTArray,n::Int)
+  cache0 = NonaffinePTArray(cache[1:n])
+  @. cache = cache0
+  cache
+end
+
+function _update_cache!(cache::AffinePTArray,n::Int)
+  cache0 = AffinePTArray(cache.array,n)
+  @. cache = cache0
+  cache
+end
+
+function update_reduced_operator!(rbintd::RBIntegrationDomain,x::NonaffinePTArray,μ::Table)
+  op = rbintd.op
+
   xidx = selectidx(x,rbintd;nparams=length(μ))
-  cache = rbintd.cache
-  update_cache!(cache,xidx)
+  _update_solution!(op.u0,xidx)
+
+  if op.μ != μ
+    _update_parameter!(op.μ,μ)
+  end
+
+  N = length(rbintd.cache)
+  n = length(μ)*length(op.tθ)
+  @assert N ≥ n
+  if length(rbintd.cache) < N
+    _update_cache!(op.cache,n)
+  end
+
   rbintd
 end

@@ -6,8 +6,6 @@ struct PODEOpFromFEOp{C} <: PODEOperator{C}
   feop::PTFEOperator{C}
 end
 
-const PTODECacheType{S,B} = Tuple{Tuple{Vararg{PTrialFESpace{S}}},Tuple{Vararg{PTTrialFESpace{S,B}}},Nothing}
-
 get_order(op::PODEOperator) = get_order(op.feop)
 
 function allocate_cache(op::PODEOperator,μ::AbstractVector,t::T) where T

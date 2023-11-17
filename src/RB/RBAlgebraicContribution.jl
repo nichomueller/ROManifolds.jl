@@ -44,6 +44,18 @@ function CellData.add_contribution!(
   a
 end
 
+function update_reduced_operator!(a::RBAlgebraicContribution,args...)
+  for trian in get_domains(a)
+    update_reduced_operator!(a[trian],args...)
+  end
+end
+
+function update_reduced_operator!(a::Vector{<:RBAlgebraicContribution},args...)
+  for ai in a
+    update_reduced_operator!(ai,args...)
+  end
+end
+
 function get_rb_ndofs(a::RBAlgebraicContribution)
   trian = first([get_domains(a)...])
   get_rb_ndofs(a[trian])
@@ -255,39 +267,32 @@ function compress_component!(
   end
 end
 
-function collect_rhs_lhs_contributions!(
-  cache,
-  rbinfo::RBInfo,
-  op::PTAlgebraicOperator,
-  rbres,
-  rbjacs,
-  rbspace)
-
+function collect_rhs_lhs_contributions!(cache,rbinfo,rbres,rbjacs,rbspace)
   rhs_cache,lhs_cache = cache
-  rhs = collect_rhs_contributions!(rhs_cache,rbinfo,op,rbres,rbspace)
-  lhs = collect_lhs_contributions!(lhs_cache,rbinfo,op,rbjacs,rbspace)
+  rhs = collect_rhs_contributions!(rhs_cache,rbinfo,rbres,rbspace)
+  lhs = collect_lhs_contributions!(lhs_cache,rbinfo,rbjacs,rbspace)
   return rhs,lhs
 end
 
 function collect_rhs_contributions!(
   cache,
   rbinfo::RBInfo,
-  op::PTAlgebraicOperator,
   rbres::RBVecAlgebraicContribution{T},
   rbspace::RBSpace{T}) where T
 
-  coeff_cache,rb_cache = cache
+  mdeim_cache,rb_cache = cache
   st_mdeim = rbinfo.st_mdeim
   k = RBVecContributionMap(T)
   rb_res_contribs = Vector{PTArray{Vector{T}}}(undef,num_domains(rbres))
   if iszero(rbres)
+    op = get_ptoperator(rbres)
     nrow = get_rb_ndofs(rbspace)
     contrib = AffinePTArray(zeros(T,nrow),length(op.μ))
     rb_res_contribs[i] = contrib
   else
     for (i,t) in enumerate(get_domains(rbres))
       rbrest = rbres[t]
-      coeff = rhs_coefficient!(coeff_cache,op,rbrest;st_mdeim)
+      coeff = rhs_coefficient!(mdeim_cache,rbrest;st_mdeim)
       rb_res_contribs[i] = rb_contribution!(rb_cache,k,rbrest,coeff)
     end
   end
@@ -297,7 +302,6 @@ end
 function collect_lhs_contributions!(
   cache,
   rbinfo::RBInfo,
-  op::PTAlgebraicOperator,
   rbjacs::Vector{RBMatAlgebraicContribution{T}},
   rbspace::RBSpace{T}) where T
 
@@ -319,12 +323,13 @@ function collect_lhs_contributions!(
   rbspace_col::RBSpace{T};
   kwargs...) where T
 
-  coeff_cache,rb_cache = cache
+  mdeim_cache,rb_cache = cache
   trian = get_domains(rbjac)
   st_mdeim = rbinfo.st_mdeim
   k = RBMatContributionMap(T)
   rb_jac_contribs = Vector{PTArray{Matrix{T}}}(undef,num_domains(rbjac))
   if iszero(rbjac)
+    op = get_ptoperator(rbres)
     nrow = get_rb_ndofs(rbspace_row)
     ncol = get_rb_ndofs(rbspace_col)
     contrib = AffinePTArray(zeros(T,nrow,ncol),length(op.μ))
@@ -332,7 +337,7 @@ function collect_lhs_contributions!(
   else
     for (i,t) in enumerate(trian)
       rbjact = rbjac[t]
-      coeff = lhs_coefficient!(coeff_cache,op,rbjact;st_mdeim,kwargs...)
+      coeff = lhs_coefficient!(mdeim_cache,rbjact;st_mdeim,kwargs...)
       rb_jac_contribs[i] = rb_contribution!(rb_cache,k,rbjact,coeff)
     end
   end

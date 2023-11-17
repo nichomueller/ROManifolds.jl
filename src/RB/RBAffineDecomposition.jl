@@ -2,13 +2,13 @@ struct RBAffineDecomposition{T,N}
   basis_space::Vector{Array{T,N}}
   basis_time::Vector{Array{T}}
   mdeim_interpolation::LU
-  integration_domain::RBIntegrationDomain
+  integration_domain::RBIntegrationDomain{T,N}
 
   function RBAffineDecomposition(
     basis_space::Vector{Array{T,N}},
     basis_time::Vector{<:Array{T}},
     mdeim_interpolation::LU,
-    integration_domain::RBIntegrationDomain) where {T,N}
+    integration_domain::RBIntegrationDomain{T,N}) where {T,N}
 
     new{T,N}(basis_space,basis_time,mdeim_interpolation,integration_domain)
   end
@@ -34,13 +34,17 @@ struct RBAffineDecomposition{T,N}
       interp_idx_time = collect(eachindex(op.tθ))
       lu_interp = lu(interp_bs)
     end
-    integr_domain = RBIntegrationDomain(op,nzm,trian,interp_idx_space,times,args)
+    integr_domain = RBIntegrationDomain(op,nzm,trian,interp_idx_space,interp_idx_time,args)
     RBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)
   end
 end
 
 const RBVecAffineDecomposition{T} = RBAffineDecomposition{T,1}
 const RBMatAffineDecomposition{T} = RBAffineDecomposition{T,2}
+
+function update_reduced_operator!(a::RBAffineDecomposition,args...)
+  update_reduced_operator!(a.integration_domain,args...)
+end
 
 function get_rb_ndofs(a::RBAffineDecomposition)
   space_ndofs = size(a.basis_space[1],1)
@@ -129,50 +133,29 @@ function get_reduced_cells(idx::Vector{Int},cell_dof_ids::Table)
   unique(cells)
 end
 
-function rhs_coefficient!(
-  cache,
-  op::PTAlgebraicOperator,
-  rbres::RBVecAffineDecomposition;
-  kwargs...)
-
+function rhs_coefficient!(cache,rbres::RBVecAffineDecomposition;kwargs...)
   rcache,scache = cache
-  red_integr_res = assemble_rhs!(rcache,op,rbres.integration_domain)
+  red_integr_res = assemble_rhs!(rcache,rbres.integration_domain)
   mdeim_solve!(scache,rbres,red_integr_res;kwargs...)
 end
 
-function assemble_rhs!(
-  cache,
-  op::PTAlgebraicOperator,
-  rbintd::RBIntegrationDomain)
-
-  b,bmat = cache
-  red_cache = selectidx(b,op,rbintd),bmat
-  red_op = reduce_ptoperator(op,rbintd)
+function assemble_rhs!(rmat::CachedMatrix,rbintd::RBIntegrationDomain)
+  red_cache = rbintd.cache,rmat
+  red_op = rbintd.op
   red_meas = rbintd.meas
   red_idx = rbintd.idx_space
   collect_residuals_for_idx!(red_cache,red_op,red_idx,red_meas)
 end
 
-function lhs_coefficient!(
-  cache,
-  op::PTAlgebraicOperator,
-  rbjac::RBMatAffineDecomposition;
-  i::Int=1,kwargs...)
-
+function lhs_coefficient!(cache,rbjac::RBMatAffineDecomposition;i::Int=1,kwargs...)
   jcache,scache = cache
-  red_integr_jac = assemble_lhs!(jcache,op,rbjac.integration_domain;i)
+  red_integr_jac = assemble_lhs!(jcache,rbjac.integration_domain;i)
   mdeim_solve!(scache,rbjac,red_integr_jac;kwargs...)
 end
 
-function assemble_lhs!(
-  cache,
-  op::PTAlgebraicOperator,
-  rbintd::RBIntegrationDomain;
-  i::Int=1)
-
-  A,Amat = cache
-  red_cache = selectidx(A,op,rbintd),Amat
-  red_op = reduce_ptoperator(op,rbintd)
+function assemble_lhs!(rmat::CachedMatrix,rbintd::RBIntegrationDomain;i::Int=1)
+  red_cache = rbintd.cache,rmat
+  red_op = rbintd.op
   red_meas = rbintd.meas
   red_idx = rbintd.idx_space
   collect_jacobians_for_idx!(red_cache,red_op,red_idx,red_meas;i)
