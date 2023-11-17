@@ -193,7 +193,7 @@ const ∫ₚ = PTIntegrand
 function CellData.get_contribution(int::PTIntegrand,meas::Measure)
   trian = get_triangulation(meas)
   itrian = get_triangulation(int.meas)
-  if itrian == trian || is_parent(itrian,trian)
+  if itrian == trian
     return integrate(int.object,meas)
   end
   @unreachable """\n
@@ -232,7 +232,7 @@ function CellData.get_contribution(a::CollectionPTIntegrand,meas::Measure)
   for (op,int) in a.dict
     for i in int
       itrian = get_triangulation(i.meas)
-      if itrian == trian || is_parent(itrian,trian)
+      if itrian == trian
         integral = integrate(i.object,meas)
         add_contribution!(cont,trian,integral[trian],op)
       end

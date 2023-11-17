@@ -103,15 +103,45 @@ snaps_test,params_test = sols[end-nsnaps_test+1:end],params[end-nsnaps_test+1:en
 op = get_ptoperator(fesolver,feop,snaps_test,params_test)
 cache = allocate_cache(op,snaps_test)
 rhs_cache,lhs_cache = cache
-rcache,scache = rhs_cache
-ad = rbrhs[Ω]
+coeff_cache,rb_cache = lhs_cache
+rcache,scache = coeff_cache
+rblhs1 = rblhs[1]
+trians = [get_domains(rblhs1)...]
+trian = first(trians)
+ad = rblhs1[trian]
 rbintd = ad.integration_domain
-# red_op = reduce_ptoperator(op,rbintd)
-red_odeop = get_algebraic_operator(rbintd.feop)
-# red_ode_cache = reduce_cache(op,rbintd)
-red_ddofs_to_ddofs = rbintd.red_ddofs_to_ddofs
-red_test = get_test(rbintd.feop)
-trials,pttrials,fecache = op.ode_cache
-red_dvals = map(t -> t.dirichlet_values[red_ddofs_to_ddofs],trials)
-# red_trials = map(dv -> PTrialFESpace(red_test,dv),red_dvals)
-# dirichlet_values = compute_dirichlet_values_for_tags(space,objects)
+A,Amat = rcache
+red_cache = selectidx(A,op,rbintd),Amat
+red_op = reduce_ptoperator(op,rbintd)
+red_meas = rbintd.meas
+red_idx = rbintd.idx_space
+
+cell_to_parent_cell = rand(1:num_free_dofs(test),10)
+rmodel = Geometry.DiscreteModelPortion(model,cell_to_parent_cell)
+rtrian = TriangulationWithTags(rmodel)
+rmeas = Measure(rtrian,2)
+rtest = TestFESpace(rmodel,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
+rtrial = PTTrialFESpace(rtest,g)
+rfeop = AffinePTFEOperator(res,jac,jac_t,pspace,trial,test)
+rassem = SparseMatrixAssembler(rtrial,rtest)
+dv = get_fe_basis(rtest)
+du = get_trial_fe_basis(rtrial(nothing,nothing))
+matdata = collect_cell_matrix(rtrial(nothing,nothing),rtest,∫(∇(dv)⋅∇(du))rmeas)
+rA = allocate_matrix(rassem,matdata)
+
+m1 = nz_counter(get_matrix_builder(rassem),(get_rows(rassem),get_cols(rassem)))
+symbolic_loop_matrix!(m1,rassem,matdata)
+m2 = nz_allocation(m1)
+symbolic_loop_matrix!(m2,rassem,matdata)
+m3 = create_from_nz(m2)
+m3
+
+assem = SparseMatrixAssembler(trial,test)
+dv = get_fe_basis(test)
+du = get_trial_fe_basis(trial(nothing,nothing))
+matdata = collect_cell_matrix(trial(nothing,nothing),test,∫(∇(dv)⋅∇(du))dΩ)
+A = allocate_matrix(assem,matdata)
+
+cell_dof_ids = get_cell_dof_ids(test,Ω)
+red_fdofs_to_fdofs = get_reduced_fdofs_to_fdofs(cell_to_parent_cell,cell_dof_ids)
+_rA = A[red_fdofs_to_fdofs,red_fdofs_to_fdofs]

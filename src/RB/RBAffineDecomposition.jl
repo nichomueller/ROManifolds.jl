@@ -16,7 +16,6 @@ function RBIntegrationDomain(
 
   test = get_test(feop)
   model = get_background_model(trian)
-  tags = get_tags(trian)
 
   recast_idx_space = recast_idx(nzm,idx_space)
   recast_idx_space_rows,_ = vec_to_mat_idx(recast_idx_space,nzm.nrows)
@@ -27,9 +26,9 @@ function RBIntegrationDomain(
 
   red_model = DiscreteModelPortion(model,red_cells)
   red_trian = if isa(trian,BoundaryTriangulationWithTags)
-    BoundaryTriangulationWithTags(red_model,tags)
+    BoundaryTriangulationWithTags(red_model,tags=get_tags(trian),id=get_id(trian))
   else
-    TriangulationWithTags(red_model,tags)
+    TriangulationWithTags(red_model,tags=get_tags(trian),id=get_id(trian))
   end
   red_meas = Measure(red_trian,2*get_order(test))
   red_feop = reduce_fe_operator(feop,red_model)
@@ -110,8 +109,8 @@ struct RBAffineDecomposition{T,N}
       interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
       lu_interp = lu(interp_bst)
     else
-      lu_interp = lu(interp_bs)
       interp_idx_time = collect(eachindex(op.tθ))
+      lu_interp = lu(interp_bs)
     end
     integr_domain = RBIntegrationDomain(op.odeop.feop,nzm,trian,interp_idx_space,interp_idx_time)
     RBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)
@@ -215,19 +214,19 @@ function get_reduced_cells(idx::Vector{Int},cell_dof_ids::Table)
   unique(cells)
 end
 
-function get_reduced_fdofs_to_fdofs(idx::Vector{Int},cell_dof_ids)
-  get_reduced_fdofs_to_fdofs(idx,Table(cell_dof_ids))
+function get_reduced_fdofs_to_fdofs(cells::Vector{Int},cell_dof_ids)
+  get_reduced_fdofs_to_fdofs(cells,Table(cell_dof_ids))
 end
 
 function get_reduced_fdofs_to_fdofs(cells::Vector{Int},cell_dof_ids::Table)
   red_cell_dof_ids = cell_dof_ids[cells]
   red_dof_ids = red_cell_dof_ids.data
   red_free_dof_ids = red_dof_ids[findall(x->x>0,red_dof_ids)]
-  unique(red_free_dof_ids)
+  red_free_dof_ids
 end
 
-function get_reduced_ddofs_to_ddofs(idx::Vector{Int},cell_dof_ids)
-  get_reduced_fdofs_to_fdofs(idx,Table(cell_dof_ids))
+function get_reduced_ddofs_to_ddofs(cells::Vector{Int},cell_dof_ids)
+  get_reduced_ddofs_to_ddofs(cells,Table(cell_dof_ids))
 end
 
 function get_reduced_ddofs_to_ddofs(cells::Vector{Int},cell_dof_ids::Table)
@@ -235,7 +234,7 @@ function get_reduced_ddofs_to_ddofs(cells::Vector{Int},cell_dof_ids::Table)
   red_dof_ids = red_cell_dof_ids.data
   red_dir_dof_ids = red_dof_ids[findall(x->x<0,red_dof_ids)]
   @. red_dir_dof_ids *= -1
-  unique(red_dir_dof_ids)
+  red_dir_dof_ids
 end
 
 function rhs_coefficient!(
@@ -289,7 +288,7 @@ end
 
 function mdeim_solve!(cache,ad::RBAffineDecomposition,a::Matrix;st_mdeim=false)
   csolve,crecast = cache
-  time_ndofs = length(ad.integration_domain.times)
+  time_ndofs = length(ad.integration_domain.idx_time)
   nparams = Int(size(a,2)/time_ndofs)
   coeff = if st_mdeim
     _coeff = mdeim_solve!(csolve,ad.mdeim_interpolation,reshape(a,:,nparams))

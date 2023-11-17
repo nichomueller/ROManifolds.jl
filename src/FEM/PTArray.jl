@@ -197,13 +197,6 @@ function Arrays.get_array(a::PTArray{<:CachedArray})
   map(x->getproperty(x,:array),a)
 end
 
-function selectidx(a::PTArray,idx_space,idx_time;nparams=Int(length(a)/length(idx_time)))
-  a_space = map(b->b[idx_space],a)
-  time_ndofs = Int(length(a)/nparams)
-  ptidx = vec(transpose(collect(0:nparams-1)*time_ndofs .+ idx_time'))
-  PTArray(a_space[ptidx])
-end
-
 function recenter(a::PTArray{T},a0::PTArray{T};kwargs...) where T
   n = length(a)
   n0 = length(a0)
@@ -453,6 +446,25 @@ for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
   end
 end
 
+function selectidx_space(a::PTArray,idx_space)
+  @notimplemented
+end
+
+function selectidx_space(a::PTArray{<:AbstractVector},idx_space)
+  map(b->b[idx_space],a)
+end
+
+function selectidx_space(a::PTArray{<:AbstractMatrix},idx_space)
+  map(b->b[idx_space,idx_space],a)
+end
+
+function selectidx(a::PTArray,idx_space,idx_time;nparams=Int(length(a)/length(idx_time)))
+  a_space = selectidx_space(a,idx_space)
+  time_ndofs = Int(length(a)/nparams)
+  ptidx = vec(transpose(collect(0:nparams-1)*time_ndofs .+ idx_time'))
+  NonaffinePTArray(a_space[ptidx])
+end
+
 # Affine implementation: shortcut for parameter- or time-independent quantities
 struct AffinePTArray{T} <: PTArray{T}
   array::T
@@ -578,6 +590,14 @@ for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
   end
 end
 
+function selectidx_space(a::AffinePTArray{<:AbstractVector},idx_space)
+  a[idx_space]
+end
+
+function selectidx_space(a::AffinePTArray{<:AbstractMatrix},idx_space)
+  a[idx_space,idx_space]
+end
+
 function selectidx(a::AffinePTArray,idx_space,args...;kwargs...)
-  AffinePTArray(a[idx_space])
+  AffinePTArray(selectidx_space(a),length(a))
 end

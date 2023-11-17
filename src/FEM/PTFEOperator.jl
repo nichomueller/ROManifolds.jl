@@ -111,14 +111,9 @@ function auxiliary_operator(op::NonlinearPTFEOperator)
 end
 
 function single_field(op::PTFEOperator,q,idx::Int)
-  vq = Any[]
-  for i in eachindex(get_test(op).spaces)
-    if i == idx
-      push!(vq,q)
-    else
-      push!(vq,nothing)
-    end
-  end
+  vq = Vector{Any}(undef,num_free_dofs(get_test(op)))
+  fill!(vq,nothing)
+  vq[idx] = q
   vq
 end
 

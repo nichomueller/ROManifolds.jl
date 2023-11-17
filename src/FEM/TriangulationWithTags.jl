@@ -1,6 +1,11 @@
 abstract type TriangulationWithTags{Dc,Dp} <: Triangulation{Dc,Dp} end
 
 get_tags(trian::TriangulationWithTags) = trian.tags
+get_id(trian::TriangulationWithTags) = trian.id
+
+function Base.:(==)(a::TriangulationWithTags,b::TriangulationWithTags)
+  get_id(a) == get_id(b)
+end
 
 function TriangulationWithTags(model::DiscreteModel,filter::AbstractArray)
   d = num_cell_dims(model)
@@ -11,18 +16,20 @@ function TriangulationWithTags(
   ::Type{ReferenceFE{d}},
   model::DiscreteModel,
   labels::FaceLabeling;
-  tags=nothing) where d
+  tags=nothing,
+  id=nothing) where d
 
+  id = isnothing(id) ? rand(UInt) : id
   if isnothing(tags)
     grid = Grid(ReferenceFE{d},model)
     tface_to_mface = IdentityVector(num_cells(grid))
-    BodyFittedTriangulationWithTags(model,grid,tface_to_mface,tags)
+    BodyFittedTriangulationWithTags(model,grid,tface_to_mface,tags,id)
   else
     mface_to_mask = get_face_mask(labels,tags,d)
     mgrid = Grid(ReferenceFE{d},model)
     tgrid = GridPortion(mgrid,mface_to_mask)
     tface_to_mface = tgrid.cell_to_parent_cell
-    BodyFittedTriangulationWithTags(model,tgrid,tface_to_mface,tags)
+    BodyFittedTriangulationWithTags(model,tgrid,tface_to_mface,tags,id)
   end
 end
 
@@ -42,18 +49,6 @@ function TriangulationWithTags(trian::TriangulationWithTags,args...;kwargs...)
   @notimplemented
 end
 
-function TriangulationWithTags(trian::TriangulationWithTags)
-  trian
-end
-
-function TriangulationWithTags(trian::TriangulationWithTags,::AbstractArray{<:Integer})
-  @notimplemented
-end
-
-function TriangulationWithTags(trian::TriangulationWithTags,::AbstractArray{<:Bool})
-  @notimplemented
-end
-
 function InteriorWithTags(args...;kwargs...)
   TriangulationWithTags(args...;kwargs...)
 end
@@ -63,10 +58,13 @@ struct BodyFittedTriangulationWithTags{Dt,Dp,A,B,C,T} <: TriangulationWithTags{D
   grid::B
   tface_to_mface::C
   tags::T
+  id::UInt
+
   function BodyFittedTriangulationWithTags(
     model::DiscreteModel,
     grid::Grid,tface_to_mface,
-    tags::T) where T
+    tags::T,
+    id::UInt) where T
 
     Dp = num_point_dims(model)
     @assert Dp == num_point_dims(grid)
@@ -74,7 +72,7 @@ struct BodyFittedTriangulationWithTags{Dt,Dp,A,B,C,T} <: TriangulationWithTags{D
     A = typeof(model)
     B = typeof(grid)
     C = typeof(tface_to_mface)
-    new{Dt,Dp,A,B,C,T}(model,grid,tface_to_mface,tags)
+    new{Dt,Dp,A,B,C,T}(model,grid,tface_to_mface,tags,id)
   end
 end
 
@@ -95,21 +93,23 @@ struct BoundaryTriangulationWithTags{Dc,Dp,A,B,T} <: TriangulationWithTags{Dc,Dp
   trian::A
   glue::B
   tags::T
+  id::UInt
 
   function BoundaryTriangulationWithTags(
     trian::BodyFittedTriangulation,
     glue::FaceToCellGlue,
-    tags::T) where T
+    tags::T,
+    id::UInt) where T
 
     Dc = num_cell_dims(trian)
     Dp = num_point_dims(trian)
     A = typeof(trian)
     B = typeof(glue)
-    new{Dc,Dp,A,B,T}(trian,glue,tags)
+    new{Dc,Dp,A,B,T}(trian,glue,tags,id)
   end
 end
 
-function Boundary(args...;kwargs...)
+function BoundaryWithTags(args...;kwargs...)
   BoundaryTriangulationWithTags(args...;kwargs...)
 end
 
@@ -117,7 +117,8 @@ function BoundaryTriangulationWithTags(
   model::DiscreteModel,
   face_to_bgface::AbstractVector{<:Integer},
   bgface_to_lcell::AbstractVector{<:Integer},
-  tags)
+  tags::T,
+  id::UInt) where T
 
   D = num_cell_dims(model)
   topo = get_grid_topology(model)
@@ -128,7 +129,27 @@ function BoundaryTriangulationWithTags(
   glue = FaceToCellGlue(topo,cell_grid,face_grid,face_to_bgface,bgface_to_lcell)
   trian = BodyFittedTriangulation(model,face_grid,face_to_bgface)
 
-  BoundaryTriangulationWithTags(trian,glue,tags)
+  BoundaryTriangulationWithTags(trian,glue,tags,id)
+end
+
+function BoundaryTriangulationWithTags(
+  model::DiscreteModel,
+  bgface_to_mask::AbstractVector{Bool},
+  bgface_to_lcell::AbstractVector{<:Integer},
+  tags::T,
+  id::UInt) where T
+
+  face_to_bgface = findall(bgface_to_mask)
+  BoundaryTriangulationWithTags(model,face_to_bgface,bgface_to_lcell,tags,id)
+end
+
+function BoundaryTriangulationWithTags(
+  model::DiscreteModel,
+  bgface_to_mask::AbstractVector{Bool},
+  lcell::Integer=1,
+  args...)
+
+  BoundaryTriangulationWithTags(model,bgface_to_mask,Fill(lcell,num_facets(model)),args...)
 end
 
 function BoundaryTriangulationWithTags(
@@ -141,24 +162,11 @@ end
 
 function BoundaryTriangulationWithTags(
   model::DiscreteModel,
-  bgface_to_mask::AbstractVector{Bool},
-  bgface_to_lcell::AbstractVector{<:Integer},
-  args...)
+  labels::FaceLabeling;
+  tags=nothing,
+  id=nothing)
 
-  face_to_bgface = findall(bgface_to_mask)
-  BoundaryTriangulationWithTags(model,face_to_bgface,bgface_to_lcell,args...)
-end
-
-function BoundaryTriangulationWithTags(
-  model::DiscreteModel,
-  bgface_to_mask::AbstractVector{Bool},
-  lcell::Integer=1,
-  args...)
-
-  BoundaryTriangulationWithTags(model,bgface_to_mask,Fill(lcell,num_facets(model)),args...)
-end
-
-function BoundaryTriangulationWithTags(model::DiscreteModel,labels::FaceLabeling;tags=nothing)
+  id = isnothing(id) ? rand(UInt) : id
   D = num_cell_dims(model)
   if isnothing(tags)
     topo = get_grid_topology(model)
@@ -166,12 +174,12 @@ function BoundaryTriangulationWithTags(model::DiscreteModel,labels::FaceLabeling
   else
     face_to_mask = get_face_mask(labels,tags,D-1)
   end
-  BoundaryTriangulationWithTags(model,face_to_mask,tags)
+  BoundaryTriangulationWithTags(model,face_to_mask,tags,id)
 end
 
-function BoundaryTriangulationWithTags(model::DiscreteModel;tags=nothing)
+function BoundaryTriangulationWithTags(model::DiscreteModel;kwargs...)
   labels = get_face_labeling(model)
-  BoundaryTriangulationWithTags(model,labels,tags=tags)
+  BoundaryTriangulationWithTags(model,labels;kwargs...)
 end
 
 function BoundaryTriangulationWithTags(rtrian::Triangulation,args...;kwargs...)

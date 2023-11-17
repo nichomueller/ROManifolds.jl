@@ -68,7 +68,6 @@ import Gridap.ODEs.TransientFETools:∂tt
 # FEOperations
 export collect_cell_contribution
 export collect_trian
-export is_parent
 export modify_measures
 export is_change_possible
 export get_discrete_model
