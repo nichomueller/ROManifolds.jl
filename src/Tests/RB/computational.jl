@@ -9,7 +9,7 @@ meas = Measure(trian,2)
 @time ∫(aμt(μ,t)*∇(dv)⋅∇(du))meas
 
 rmodel = Geometry.DiscreteModelPortion(model,cell_to_parent_cell)
-rtrian = TriangulationWithTags(rmodel)
+rtrian = Triangulation(rmodel)
 rmeas = Measure(rtrian,2)
 rtest = TestFESpace(rmodel,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 rtrial = PTTrialFESpace(rtest,g)

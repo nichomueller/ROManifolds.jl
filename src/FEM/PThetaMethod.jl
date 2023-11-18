@@ -56,15 +56,21 @@ function residual!(b::PTArray,op::PTThetaMethodOperator,x::PTArray)
   @. vθ = (x-op.u0)/op.dtθ
   z = zero(eltype(b))
   fill!(b,z)
-  residual!(b,op.odeop,op.μ,op.tθ,(uF,vθ),op.ode_cache,args...)
+  residual!(b,op.odeop,op.μ,op.tθ,(uF,vθ),op.ode_cache)
 end
 
-function residual_for_trian!(b::PTArray,op::PTThetaMethodOperator,x::PTArray)
+function residual_for_trian!(
+  b::PTArray,
+  op::PTThetaMethodOperator,
+  x::PTArray,
+  t=op.tθ,
+  args...)
+
   uF = x
   vθ = op.vθ
   z = zero(eltype(b))
   fill!(b,z)
-  residual_for_trian!(b,op.odeop,op.μ,op.tθ,(uF,vθ),op.ode_cache,args...)
+  residual_for_trian!(b,op.odeop,op.μ,t,(uF,vθ),op.ode_cache,args...)
 end
 
 function jacobian!(A::PTArray,op::PTThetaMethodOperator,x::PTArray)
@@ -73,7 +79,7 @@ function jacobian!(A::PTArray,op::PTThetaMethodOperator,x::PTArray)
   @. vθ = (x-op.u0)/op.dtθ
   z = zero(eltype(A))
   fillstored!(A,z)
-  jacobians!(A,op.odeop,op.μ,op.tθ,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache,args...)
+  jacobians!(A,op.odeop,op.μ,op.tθ,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)
 end
 
 function jacobian!(A::PTArray,op::PTThetaMethodOperator,x::PTArray,i::Int)
@@ -83,14 +89,21 @@ function jacobian!(A::PTArray,op::PTThetaMethodOperator,x::PTArray,i::Int)
   z = zero(eltype(A))
   fillstored!(A,z)
   γ = (1.0,1/op.dtθ)
-  jacobian!(A,op.odeop,op.μ,op.tθ,(uF,vθ),i,γ[i],op.ode_cache,args...)
+  jacobian!(A,op.odeop,op.μ,op.tθ,(uF,vθ),i,γ[i],op.ode_cache)
 end
 
-function jacobian_for_trian!(A::PTArray,op::PTThetaMethodOperator,x::PTArray,i::Int)
+function jacobian_for_trian!(
+  A::PTArray,
+  op::PTThetaMethodOperator,
+  x::PTArray,
+  i::Int,
+  t=op.tθ,
+  args...)
+
   uF = x
   vθ = op.vθ
   z = zero(eltype(A))
   fillstored!(A,z)
   γ = (1.0,1/op.dtθ)
-  jacobian_for_trian!(A,op.odeop,op.μ,op.tθ,(uF,vθ),i,γ[i],op.ode_cache,args...)
+  jacobian_for_trian!(A,op.odeop,op.μ,t,(uF,vθ),i,γ[i],op.ode_cache,args...)
 end

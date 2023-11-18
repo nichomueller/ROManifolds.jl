@@ -435,13 +435,6 @@ function recenter(a::PTArray{T},a0::PTArray{T};kwargs...) where T
   NonaffinePTArray(array)
 end
 
-function selectidx(a::PTArray{<:AbstractVector},idx_space,idx_time;nparams=Int(length(a)/length(idx_time)))
-  a_space = map(b->b[idx_space],a)
-  time_ndofs = Int(length(a)/nparams)
-  ptidx = vec(transpose(collect(0:nparams-1)*time_ndofs .+ idx_time'))
-  NonaffinePTArray(a_space[ptidx])
-end
-
 # Affine implementation: shortcut for parameter- or time-independent quantities
 struct AffinePTArray{T} <: PTArray{T}
   array::T
@@ -563,8 +556,4 @@ end
 function recenter(a::AffinePTArray,a0::AffinePTArray;kwargs...)
   array = recenter(a.array,a0.array;kwargs...)
   AffinePTArray(array)
-end
-
-function selectidx(a::AffinePTArray{<:AbstractVector},idx_space,args...;kwargs...)
-  AffinePTArray(a[idx_space],length(a))
 end

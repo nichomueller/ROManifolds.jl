@@ -1,3 +1,9 @@
+struct RBIntegrationDomain
+  meas::Measure
+  times::Vector{<:Real}
+  idx::Vector{Int}
+end
+
 abstract type RBAffineDecomposition{T,N} end
 const RBVecAffineDecomposition{T} = RBAffineDecomposition{T,1}
 const RBMatAffineDecomposition{T} = RBAffineDecomposition{T,2}
@@ -6,13 +12,13 @@ struct GenericRBAffineDecomposition{T,N}
   basis_space::Vector{Array{T,N}}
   basis_time::Vector{Array{T}}
   mdeim_interpolation::LU
-  integration_domain::RBIntegrationDomain{T,N}
+  integration_domain::RBIntegrationDomain
 
   function GenericRBAffineDecomposition(
     basis_space::Vector{Array{T,N}},
     basis_time::Vector{<:Array{T}},
     mdeim_interpolation::LU,
-    integration_domain::RBIntegrationDomain{T,N}) where {T,N}
+    integration_domain::RBIntegrationDomain) where {T,N}
 
     new{T,N}(basis_space,basis_time,mdeim_interpolation,integration_domain)
   end
@@ -33,6 +39,7 @@ function RBAffineDecomposition(
   args...;
   kwargs...)
 
+  test = op.odeop.feop.test
   basis_space,basis_time = compress(nzm;ϵ=rbinfo.ϵ)
   proj_bs,proj_bt = project_space_time(basis_space,basis_time,args...;kwargs...)
   interp_idx_space = get_interpolation_idx(basis_space)
@@ -46,7 +53,14 @@ function RBAffineDecomposition(
     interp_idx_time = collect(eachindex(op.tθ))
     lu_interp = lu(interp_bs)
   end
-  integr_domain = RBIntegrationDomain(op,nzm,trian,interp_idx_space,interp_idx_time,args)
+  red_times = op.tθ[interp_idx_time]
+  cell_dof_ids = get_cell_dof_ids(test,trian)
+  recast_interp_idx_space = recast_idx(nzm,interp_idx_space)
+  recast_interp_idx_rows,_ = vec_to_mat_idx(recast_interp_idx_space,nzm.nrows)
+  red_integr_cells = find_cells(recast_interp_idx_rows,cell_dof_ids)
+  red_trian = view(trian,red_integr_cells)
+  red_meas = Measure(red_trian,2*get_order(test))
+  integr_domain = RBIntegrationDomain(red_meas,red_times,recast_interp_idx_space)
   GenericRBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)
 end
 
@@ -60,10 +74,6 @@ function RBAffineDecomposition(
 
   projection = space_time_projection(nzm,args...;kwargs...)
   TrivialRBAffineDecomposition(projection)
-end
-
-function update_reduced_operator!(a::RBAffineDecomposition,args...)
-  update_reduced_operator!(a.integration_domain,args...)
 end
 
 function get_rb_ndofs(a::RBAffineDecomposition)
@@ -153,62 +163,82 @@ function get_reduced_cells(idx::Vector{Int},cell_dof_ids::Table)
   unique(cells)
 end
 
-# function collect_reduced_residuals!(
-#   cache,
-#   op::PTOperator,
-#   idx::Vector{Int},
-#   args...)
+function ()
 
-#   b,bidx = cache
-#   ress = residual_for_idx!(b,op,op.u0,args...)
-#   setsize!(bidx,(length(idx),length(ress)))
-#   bidxmat = bidx.array
-#   @inbounds for n = eachindex(ress)
-#     bidxmat[:,n] = ress[n][idx]
-#   end
-#   return bidxmat
-# end
-
-# function collect_reduced_jacobians!(
-#   cache,
-#   op::PTOperator,
-#   idx::Vector{Int},
-#   args...;
-#   i=1)
-
-#   A,Aidx = cache
-#   jacs_i = jacobian_for_idx!(A,op,op.u0,i,args...)
-#   setsize!(Aidx,(length(idx),length(jacs_i)))
-#   Aidxmat = Aidx.array
-#   @inbounds for n = eachindex(jacs_i)
-#     Aidxmat[:,n] = jacs_i[n][idx].nzval
-#   end
-#   return Aidxmat
-# end
-
-function collect_reduced_residuals!(cache,a::Vector{<:RBMatAffineDecomposition})
-  residual!(cache,map(get_integration_domain,a))
 end
 
-# function collect_reduced_residuals!(cache,dom::RBIntegrationDomain)
-#   red_cache = dom.cache,cache
-#   red_op = dom.op
-#   red_meas = dom.meas
-#   red_idx = dom.idx_space
-#   collect_reduced_residuals!(red_cache,red_op,red_idx,red_meas)
-# end
+function collect_reduced_residuals!(
+  cache,
+  op::PTOperator,
+  a::Vector{RBVecAffineDecomposition{T}}) where T
 
-function collect_reduced_jacobians!(cache,a::Vector{<:RBMatAffineDecomposition};i::Int=1)
-  jacobian!(cache,get_integration_domain(a),i)
+  b,Mcache = cache
+  dom = map(get_integration_domain,a)
+  meas = map(get_measure,dom)
+  times = map(get_times,dom)
+  common_time = union(times...)
+  x = get_quantity_at_time(op.u0,op.tθ,common_time)
+  _b = get_quantity_at_time(b,op.tθ,common_time)
+  ress,trian = residual_for_trian!(_b,x,common_time,meas...)
+  Mvec = Vector{Matrix{T}}(undef,length(trian))
+  for j in eachindex(trian)
+    ress_j = ress[j]
+    idx_j = get_idx_space(dom[j]) # careful here: might have to compare triangs
+    pt_idx_j = _get_pt_index(ress_j,common_time,times[j])
+    setsize!(Mcache,(length(idx_j),length(pt_idx_j)))
+    M = Mcache.array
+    @inbounds for n = pt_idx_j
+      M[:,n] = ress_j[n][idx_j]
+    end
+    Mvec[i] = copy(M)
+  end
 end
 
-# function collect_reduced_jacobians!(cache,dom::RBIntegrationDomain;i::Int=1)
-#   red_cache = dom.cache,cache
-#   red_op = dom.op
-#   red_meas = dom.meas
-#   red_idx = dom.idx_space
-#   collect_reduced_jacobians!(red_cache,red_op,red_idx,red_meas;i)
-# end
+function collect_reduced_jacobians!(
+  cache,
+  op::PTOperator,
+  a::Vector{RBMatAffineDecomposition{T}};
+  i::Int=1) where T
+
+  A,Mcache = cache
+  dom = map(get_integration_domain,a)
+  meas = map(get_measure,dom)
+  times = map(get_times,dom)
+  common_time = union(times...)
+  x = get_quantity_at_time(op.u0,op.tθ,common_time)
+  _A = get_quantity_at_time(A,op.tθ,common_time)
+  jacs_i,trian = jacobian_for_trian!(_A,op,x,i,common_time,meas...)
+  Mvec = Vector{Matrix{T}}(undef,length(trian))
+  for j in eachindex(trian)
+    jacs_i_j = jacs_i[j]
+    idx_j = get_idx_space(dom[j]) # careful here: might have to compare triangs
+    pt_idx_j = _get_pt_index(jacs_i_j,common_time,times[j])
+    setsize!(Mcache,(length(idx_j),length(pt_idx_j)))
+    M = Mcache.array
+    @inbounds for n = pt_idx_j
+      M[:,n] = jacs_i_j[n][idx_j].nzval
+    end
+    Mvec[i] = copy(M)
+  end
+end
+
+function _get_pt_index(a::PTArray,times::Vector{<:Real},red_times::Vector{<:Real})
+  if times == red_times
+    return collect(eachindex(a))
+  end
+  time_ndofs = length(times)
+  nparams = Int(length(a)/time_ndofs)
+  tidx = findall(x->x in red_times,times)
+  ptidx = vec(transpose(collect(0:nparams-1)*time_ndofs .+ tidx'))
+  return ptidx
+end
+
+function _get_quantity_at_time(a::PTArray,times::Vector{<:Real},red_times::Vector{<:Real})
+  if times == red_times
+    return a
+  end
+  return a[_get_pt_index(a,times,red_times)]
+end
 
 function rb_coefficient!(cache,a::RBAffineDecomposition,b::Matrix;st_mdeim=false)
   csolve,crecast = cache

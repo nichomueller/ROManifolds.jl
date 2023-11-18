@@ -506,12 +506,13 @@ function collect_rhs_contributions!(
   nblocks = get_nblocks(rbres)
   blocks = Vector{PTArray{Vector{T}}}(undef,nblocks)
   for row = 1:nblocks
+    cache_row = cache_at_index(cache,rbspace,row)
     op_row_col = op[row,:]
     rbspace_row = rbspace[row]
     if rbres.touched[row]
       rbinfo_row = rbinfo[row]
       blocks[row] = collect_rhs_contributions!(
-        cache,rbinfo_row,op_row_col,rbres[row],rbspace_row)
+        cache_row,rbinfo_row,op_row_col,rbres[row],rbspace_row)
     else
       nrow = get_rb_ndofs(rbspace_row)
       blocks[row] = AffinePTArray(zeros(T,nrow),length(op.μ))
@@ -533,12 +534,14 @@ function collect_lhs_contributions!(
     rb_jac_i = rbjacs[i]
     blocks = Matrix{PTArray{Matrix{T}}}(undef,nblocks,nblocks)
     for (row,col) = index_pairs(nblocks,nblocks)
+      cache_row_col = cache_at_index(cache,rbspace,row,col)
+      op_row_col = op[row,col]
       rbspace_row = rbspace[row]
       rbspace_col = rbspace[col]
       if rb_jac_i.touched[row,col]
         rbinfo_col = rbinfo[col]
         blocks[row,col] = collect_lhs_contributions!(
-          cache,rbinfo_col,op_row_col,rb_jac_i[row,col],rbspace_row,rbspace_col;i)
+          cache_row_col,rbinfo_col,op_row_col,rb_jac_i[row,col],rbspace_row,rbspace_col;i)
       else
         nrow = get_rb_ndofs(rbspace_row)
         ncol = get_rb_ndofs(rbspace_col)
@@ -548,4 +551,12 @@ function collect_lhs_contributions!(
     rb_jacs_contribs[i] = hvcat(nblocks,blocks...)
   end
   return rb_jacs_contribs
+end
+
+function cache_at_index(cache,rbspace::RBBlock,args...)
+  coeff_cache,rb_cache = cache
+  (a,b),solve_cache = coeff_cache
+  offsets = fe_offsets(rbspace)
+  aidx = get_at_offsets(a,offsets,args...)
+  return ((aidx,b),solve_cache),rb_cache
 end

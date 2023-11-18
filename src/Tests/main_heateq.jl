@@ -7,17 +7,17 @@ end
 
 function heat_equation()
   root = pwd()
-  mesh = "elasticity_3cyl2D.json"
-  bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
-  # mesh = "cube2x2.json"
-  # bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
+  # mesh = "elasticity_3cyl2D.json"
+  # bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
+  mesh = "cube2x2.json"
+  bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
   test_path = "$root/tests/poisson/unsteady/$mesh"
   order = 1
   degree = 2
   model = get_discrete_model(test_path,mesh,bnd_info)
-  Ω = TriangulationWithTags(model)
+  Ω = Triangulation(model)
   dΩ = Measure(Ω,degree)
-  Γn = BoundaryTriangulationWithTags(model,tags=["neumann"])
+  Γn = BoundaryTriangulation(model,tags=["neumann"])
   dΓn = Measure(Γn,degree)
 
   ranges = fill([1.,10.],3)
@@ -49,7 +49,7 @@ function heat_equation()
 
   T = Float
   reffe = ReferenceFE(lagrangian,T,order)
-  test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"],keep_keys=true)
+  test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
   trial = PTTrialFESpace(test,g)
   feop = AffinePTFEOperator(res,jac,jac_t,pspace,trial,test)
   t0,tf,dt,θ = 0.,0.3,0.005,0.5
@@ -96,38 +96,3 @@ function heat_equation()
 end
 
 heat_equation()
-
-
-nsnaps_test = rbinfo.nsnaps_test
-snaps_test,params_test = sols[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
-op = get_ptoperator(fesolver,feop,snaps_test,params_test)
-cache = allocate_cache(op,snaps_test)
-rhs_cache,lhs_cache = cache
-mdeim_cache,rb_cache = lhs_cache
-rcache,scache = mdeim_cache
-rblhs1 = rblhs[1]
-trians = [get_domains(rblhs1)...]
-trian = first(trians)
-ad = rblhs1[trian]
-dom = ad.integration_domain
-A,Amat = rcache
-red_cache = selectidx(A,op,dom),Amat
-red_op = reduce_ptoperator(op,dom)
-red_meas = dom.meas
-red_idx = dom.idx_space
-
-idx_space = rand(1:num_free_dofs(test)^2,3)
-idx_space_row,idx_space_col = vec_to_mat_idx(idx_space,num_free_dofs(test))
-cell_dof_ids = get_cell_dof_ids(test,trian)
-cell_to_parent_cell = get_reduced_cells(idx_space_row,cell_dof_ids)
-rmodel = Geometry.DiscreteModelPortion(model,cell_to_parent_cell)
-rtrian = TriangulationWithTags(rmodel)
-rmeas = Measure(rtrian,2)
-rtest = TestFESpace(rmodel,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-rtrial = PTTrialFESpace(rtest,g)
-rfeop = AffinePTFEOperator(res,jac,jac_t,pspace,trial,test)
-rassem = SparseMatrixAssembler(rtrial,rtest)
-dv = get_fe_basis(rtest)
-du = get_trial_fe_basis(rtrial(nothing,nothing))
-matdata = collect_cell_matrix(rtrial(nothing,nothing),rtest,∫(∇(dv)⋅∇(du))rmeas)
-rA = allocate_matrix(rassem,matdata)

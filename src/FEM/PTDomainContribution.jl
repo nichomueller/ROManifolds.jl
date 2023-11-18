@@ -171,26 +171,6 @@ function Arrays.testitem(a::PTDomainContribution)
   b
 end
 
-# function CellData.get_contribution(a::CollectionPTIntegrand,meas::Measure)
-#   cont = init_contribution(a)
-#   trian = get_triangulation(meas)
-#   for (op,int) in a.dict
-#     for i in int
-#       itrian = get_triangulation(i.meas)
-#       if itrian == trian
-#         integral = integrate(i.object,meas)
-#         add_contribution!(cont,trian,integral[trian],op)
-#       end
-#     end
-#   end
-#   if num_domains(cont) > 0
-#     return cont
-#   end
-#   @unreachable """\n
-#     There is no contribution associated with the given mesh in this PTIntegrand object.
-#   """
-# end
-
 # Interface that allows to entirely eliminate terms from the (PT)DomainContribution
 
 for op in (:inner,:outer,:double_contraction,:+,:-,:*,:cross,:dot,:/)

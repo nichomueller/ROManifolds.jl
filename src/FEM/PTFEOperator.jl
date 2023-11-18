@@ -222,12 +222,13 @@ function residual_for_trian!(
   μ::AbstractVector,
   t::T,
   xh::S,
-  cache) where {T,S}
+  cache,
+  args...) where {T,S}
 
   V = get_test(op)
   v = get_fe_basis(V)
   res = get_residual(op)
-  dc = res(μ,t,xh,v)
+  dc = res(μ,t,xh,v,args...)
   trian = get_domains(dc)
   bvec = Vector{typeof(b)}(undef,num_domains(dc))
   for (n,t) in enumerate(trian)
@@ -261,14 +262,15 @@ function jacobian_for_trian!(
   uh::S,
   i::Integer,
   γᵢ::Real,
-  cache) where {T,S}
+  cache,
+  args...) where {T,S}
 
   Uh = get_trial(op)(μ,t)
   V = get_test(op)
   u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
   jac = get_jacobian(op)
-  dc = γᵢ*jac[i](μ,t,uh,u,v)
+  dc = γᵢ*jac[i](μ,t,uh,u,v,args...)
   trian = get_domains(dc)
   Avec = Vector{typeof(A)}(undef,num_domains(dc))
   for (n,t) in enumerate(trian)

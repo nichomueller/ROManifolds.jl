@@ -101,17 +101,26 @@ function Base.prod(nzm1::NnzMatrix,nzm2::NnzMatrix)
   @assert nzm1.nparams == nzm2.nparams
 
   nonzero_vals = nzm1.nonzero_val' * nzm2.nonzero_val
-  NnzMatrix(nonzero_vals,nzm1.nonzero_idx,nzm1.nrows,nzm1.nparams)
+  NnzMatrix{Nonaffine}(nonzero_vals,nzm1.nonzero_idx,nzm1.nrows,nzm1.nparams)
 end
 
-function Base.prod(nzm::NnzMatrix,a::AbstractArray)
+function Base.prod(nzm1::NnzMatrix{T,Affine} where T,nzm2::NnzMatrix{T,Affine} where T)
+  @assert nzm1.nonzero_idx == nzm2.nonzero_idx
+  @assert nzm1.nrows == nzm2.nrows
+  @assert nzm1.nparams == nzm2.nparams
+
+  nonzero_vals = nzm1.nonzero_val' * nzm2.nonzero_val
+  NnzMatrix{Affine}(nonzero_vals,nzm1.nonzero_idx,nzm1.nrows,nzm1.nparams)
+end
+
+function Base.prod(nzm::NnzMatrix{T,A} where T,a::AbstractArray) where A
   nonzero_vals = nzm.nonzero_val' * a
-  NnzMatrix(nonzero_vals,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
+  NnzMatrix{A}(nonzero_vals,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
 end
 
-function Base.prod(a::AbstractArray,nzm::NnzMatrix)
+function Base.prod(a::AbstractArray,nzm::NnzMatrix{T,A} where T) where A
   nonzero_vals = a' * nzm.nonzero_val
-  NnzMatrix(nonzero_vals,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
+  NnzMatrix{A}(nonzero_vals,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
 end
 
 function recast(nzm::NnzMatrix{T}) where T
@@ -149,9 +158,9 @@ function compress(nzm::NnzMatrix,args...;kwargs...)
   basis_space,basis_time
 end
 
-function tpod(nzm::NnzMatrix,args...;ϵ=1e-4,kwargs...)
+function tpod(nzm::NnzMatrix{T,A} where T,args...;ϵ=1e-4,kwargs...) where A
   nonzero_val = tpod(nzm.nonzero_val,args...;ϵ)
-  NnzMatrix(nonzero_val,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
+  NnzMatrix{A}(nonzero_val,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
 end
 
 function change_mode(nzm::NnzMatrix{T}) where T
