@@ -43,9 +43,9 @@ function heat_equation()
   u0(μ) = x->u0(x,μ)
   u0μ(μ) = PFunction(u0,μ)
 
-  res(μ,t,u,v) = ∫ₚ(v*∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⋅∇(u),dΩ) - ∫ₚ(fμt(μ,t)*v,dΩ) - ∫ₚ(hμt(μ,t)*v,dΓn)
-  jac(μ,t,u,du,v) = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ)
-  jac_t(μ,t,u,dut,v) = ∫ₚ(v*dut,dΩ)
+  res(μ,t,u,v) = ∫(v*∂ₚt(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
+  jac(μ,t,u,du,v) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
+  jac_t(μ,t,u,dut,v) = ∫(v*dut)dΩ
 
   T = Float
   reffe = ReferenceFE(lagrangian,T,order)
@@ -109,12 +109,12 @@ rblhs1 = rblhs[1]
 trians = [get_domains(rblhs1)...]
 trian = first(trians)
 ad = rblhs1[trian]
-rbintd = ad.integration_domain
+dom = ad.integration_domain
 A,Amat = rcache
-red_cache = selectidx(A,op,rbintd),Amat
-red_op = reduce_ptoperator(op,rbintd)
-red_meas = rbintd.meas
-red_idx = rbintd.idx_space
+red_cache = selectidx(A,op,dom),Amat
+red_op = reduce_ptoperator(op,dom)
+red_meas = dom.meas
+red_idx = dom.idx_space
 
 idx_space = rand(1:num_free_dofs(test)^2,3)
 idx_space_row,idx_space_col = vec_to_mat_idx(idx_space,num_free_dofs(test))

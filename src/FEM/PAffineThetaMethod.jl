@@ -38,50 +38,54 @@ function solve_step!(
   return (uf,tf,cache)
 end
 
-for (f,g) in zip((:residual!,:residual_for_trian!,:residual_for_idx!),
-                 (:residual!,:residual_for_trian!,:residual!))
-  @eval begin
-    function $f(
-      b::PTArray,
-      op::PTThetaAffineMethodOperator,
-      ::PTArray,
-      args...)
-
-      vθ = op.vθ
-      z = zero(eltype(b))
-      fill!(b,z)
-      $g(b,op.odeop,op.μ,op.tθ,(vθ,vθ),op.ode_cache,args...)
-    end
-  end
+struct PTThetaAffineMethodOperator <: PTOperator{Affine}
+  odeop::AffinePODEOperator
+  μ
+  tθ
+  dtθ::Float
+  u0::PTArray
+  ode_cache
+  vθ::PTArray
 end
 
-function Algebra.jacobian!(
-  A::PTArray,
-  op::PTThetaAffineMethodOperator,
-  ::PTArray)
+function get_ptoperator(
+  odeop::AffinePODEOperator,μ,tθ,dtθ::Float,u0::PTArray,ode_cache,vθ::PTArray)
+  PTThetaAffineMethodOperator(odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
+end
 
+function residual!(b::PTArray,op::PTThetaAffineMethodOperator,::PTArray)
+  vθ = op.vθ
+  z = zero(eltype(b))
+  fill!(b,z)
+  residual!(b,op.odeop,op.μ,op.tθ,(vθ,vθ),op.ode_cache,args...)
+end
+
+function residual_for_trian!(b::PTArray,op::PTThetaAffineMethodOperator,::PTArray)
+  vθ = op.vθ
+  z = zero(eltype(b))
+  fill!(b,z)
+  residual_for_trian!(b,op.odeop,op.μ,op.tθ,(vθ,vθ),op.ode_cache,args...)
+end
+
+function jacobian!(A::PTArray,op::PTThetaAffineMethodOperator,::PTArray)
   vθ = op.vθ
   z = zero(eltype(A))
   fillstored!(A,z)
   jacobians!(A,op.odeop,op.μ,op.tθ,(vθ,vθ),(1.0,1/op.dtθ),op.ode_cache)
 end
 
-for (f,g) in zip((:jacobian!,:jacobian_for_trian!,:jacobian_for_idx!),
-                 (:jacobian!,:jacobian_for_trian!,:jacobian!))
-  @eval begin
-    function $f(
-      A::PTArray,
-      op::PTThetaAffineMethodOperator,
-      ::PTArray,
-      i::Int,
-      args...)
+function jacobian!(A::PTArray,op::PTThetaAffineMethodOperator,::PTArray,i::Int)
+  vθ = op.vθ
+  z = zero(eltype(A))
+  fillstored!(A,z)
+  jacobian!(A,op.odeop,op.μ,op.tθ,(vθ,vθ),i,(1.0,1/op.dtθ)[i],op.ode_cache,args...)
+end
 
-      vθ = op.vθ
-      z = zero(eltype(A))
-      fillstored!(A,z)
-      $g(A,op.odeop,op.μ,op.tθ,(vθ,vθ),i,(1.0,1/op.dtθ)[i],op.ode_cache,args...)
-    end
-  end
+function jacobian_for_trian!(A::PTArray,op::PTThetaAffineMethodOperator,::PTArray,i::Int)
+  vθ = op.vθ
+  z = zero(eltype(A))
+  fillstored!(A,z)
+  jacobian_for_trian!(A,op.odeop,op.μ,op.tθ,(vθ,vθ),i,(1.0,1/op.dtθ)[i],op.ode_cache,args...)
 end
 
 # SHORTCUTS

@@ -35,12 +35,22 @@ function solve_step!(
   return (uf,tf,cache)
 end
 
-function residual!(
-  b::PTArray,
-  op::PTThetaMethodOperator,
-  x::PTArray,
-  args...)
+struct PTThetaMethodOperator <: PTOperator{Nonlinear}
+  odeop::PODEOperator
+  μ
+  tθ
+  dtθ::Float
+  u0::PTArray
+  ode_cache
+  vθ::PTArray
+end
 
+function get_ptoperator(
+  odeop::PODEOperator,μ,tθ,dtθ::Float,u0::PTArray,ode_cache,vθ::PTArray)
+  PTThetaMethodOperator(odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
+end
+
+function residual!(b::PTArray,op::PTThetaMethodOperator,x::PTArray)
   uF = x
   vθ = op.vθ
   @. vθ = (x-op.u0)/op.dtθ
@@ -49,29 +59,15 @@ function residual!(
   residual!(b,op.odeop,op.μ,op.tθ,(uF,vθ),op.ode_cache,args...)
 end
 
-for (f,g) in zip((:residual_for_trian!,:residual_for_idx!),(:residual_for_trian!,:residual!))
-  @eval begin
-    function $f(
-      b::PTArray,
-      op::PTThetaMethodOperator,
-      x::PTArray,
-      args...)
-
-      uF = x
-      vθ = op.vθ
-      z = zero(eltype(b))
-      fill!(b,z)
-      $g(b,op.odeop,op.μ,op.tθ,(uF,vθ),op.ode_cache,args...)
-    end
-  end
+function residual_for_trian!(b::PTArray,op::PTThetaMethodOperator,x::PTArray)
+  uF = x
+  vθ = op.vθ
+  z = zero(eltype(b))
+  fill!(b,z)
+  residual_for_trian!(b,op.odeop,op.μ,op.tθ,(uF,vθ),op.ode_cache,args...)
 end
 
-function jacobian!(
-  A::PTArray,
-  op::PTThetaMethodOperator,
-  x::PTArray,
-  args...)
-
+function jacobian!(A::PTArray,op::PTThetaMethodOperator,x::PTArray)
   uF = x
   vθ = op.vθ
   @. vθ = (x-op.u0)/op.dtθ
@@ -80,13 +76,7 @@ function jacobian!(
   jacobians!(A,op.odeop,op.μ,op.tθ,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache,args...)
 end
 
-function jacobian!(
-  A::PTArray,
-  op::PTThetaMethodOperator,
-  x::PTArray,
-  i::Int,
-  args...)
-
+function jacobian!(A::PTArray,op::PTThetaMethodOperator,x::PTArray,i::Int)
   uF = x
   vθ = op.vθ
   @. vθ = (x-op.u0)/op.dtθ
@@ -96,21 +86,11 @@ function jacobian!(
   jacobian!(A,op.odeop,op.μ,op.tθ,(uF,vθ),i,γ[i],op.ode_cache,args...)
 end
 
-for (f,g) in zip((:jacobian_for_trian!,:jacobian_for_idx!),(:jacobian_for_trian!,:jacobian!))
-  @eval begin
-    function $f(
-      A::PTArray,
-      op::PTThetaMethodOperator,
-      x::PTArray,
-      i::Int,
-      args...)
-
-      uF = x
-      vθ = op.vθ
-      z = zero(eltype(A))
-      fillstored!(A,z)
-      γ = (1.0,1/op.dtθ)
-      $g(A,op.odeop,op.μ,op.tθ,(uF,vθ),i,γ[i],op.ode_cache,args...)
-    end
-  end
+function jacobian_for_trian!(A::PTArray,op::PTThetaMethodOperator,x::PTArray,i::Int)
+  uF = x
+  vθ = op.vθ
+  z = zero(eltype(A))
+  fillstored!(A,z)
+  γ = (1.0,1/op.dtθ)
+  jacobian_for_trian!(A,op.odeop,op.μ,op.tθ,(uF,vθ),i,γ[i],op.ode_cache,args...)
 end

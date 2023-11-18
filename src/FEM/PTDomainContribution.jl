@@ -23,10 +23,10 @@ function CellData.get_contribution(a::PTDomainContribution,trian::Triangulation)
 end
 
 Base.getindex(a::PTDomainContribution,trian::Triangulation) = get_contribution(a,trian)
-
 Base.sum(a::PTDomainContribution) = sum(map(sum,values(a.dict)))
-
 Base.copy(a::PTDomainContribution) = PTDomainContribution(copy(a.dict))
+affinity(a::DomainContribution) = Affine()
+affinity(a::PTDomainContribution) = Nonaffine()
 
 function error_message(a::PTDomainContribution,b::Union{PTArray,AbstractArray})
   S = eltype(b)
@@ -171,142 +171,25 @@ function Arrays.testitem(a::PTDomainContribution)
   b
 end
 
-function get_affinity(a::PTDomainContribution)
-  aff = Affine()
-  for (trian,array) in a.dict
-    if !isaffine(array)
-      aff = Nonaffine()
-      break
-    end
-  end
-  aff
-end
-
-struct PTIntegrand{T<:CellField}
-  object::T
-  meas::Measure
-  PTIntegrand(object::T,meas::Measure) where T = new{T}(object,meas)
-end
-
-const ∫ₚ = PTIntegrand
-
-function CellData.get_contribution(int::PTIntegrand,meas::Measure)
-  trian = get_triangulation(meas)
-  itrian = get_triangulation(int.meas)
-  if itrian == trian
-    return integrate(int.object,meas)
-  end
-  @unreachable """\n
-    There is no contribution associated with the given mesh in this PTIntegrand object.
-  """
-end
-
-Base.getindex(int::PTIntegrand,meas::Measure) = get_contribution(int,meas)
-
-function CellData.integrate(int::PTIntegrand)
-  integrate(int.object,int.meas)
-end
-
-struct CollectionPTIntegrand
-  dict::IdDict{Function,Tuple{Vararg{PTIntegrand}}}
-end
-
-function CollectionPTIntegrand()
-  CollectionPTIntegrand(IdDict{Function,Tuple{Vararg{PTIntegrand}}}())
-end
-
-function init_contribution(a::CollectionPTIntegrand)
-  cont = DomainContribution()
-  for (op,int) in a.dict
-    if any(map(x->isa(x,PTIntegrand{<:PTCellField}),int))
-      cont = PTDomainContribution()
-      break
-    end
-  end
-  cont
-end
-
-function CellData.get_contribution(a::CollectionPTIntegrand,meas::Measure)
-  cont = init_contribution(a)
-  trian = get_triangulation(meas)
-  for (op,int) in a.dict
-    for i in int
-      itrian = get_triangulation(i.meas)
-      if itrian == trian
-        integral = integrate(i.object,meas)
-        add_contribution!(cont,trian,integral[trian],op)
-      end
-    end
-  end
-  if num_domains(cont) > 0
-    return cont
-  end
-  @unreachable """\n
-    There is no contribution associated with the given mesh in this PTIntegrand object.
-  """
-end
-
-Base.getindex(int::CollectionPTIntegrand,meas::Measure) = get_contribution(int,meas)
-
-function CellData.add_contribution!(a::CollectionPTIntegrand,op::Function,b::PTIntegrand...)
-  if haskey(a.dict,op)
-    a.dict[op] = (a.dict[op]...,b...)
-  else
-    a.dict[op] = b
-  end
-end
-
-for op in (:+,:-)
-  @eval begin
-    function ($op)(a::PTIntegrand,b::PTIntegrand)
-      c = CollectionPTIntegrand()
-      add_contribution!(c,+,a)
-      add_contribution!(c,$op,b)
-      c
-    end
-
-    function ($op)(a::CollectionPTIntegrand,b::PTIntegrand)
-      add_contribution!(a,$op,b)
-      a
-    end
-
-    function ($op)(a::PTIntegrand,b::CollectionPTIntegrand)
-      c = CollectionPTIntegrand()
-      add_contribution!(c,+,a)
-      for (_op,int) in b.dict
-        if (&)($op == +,_op == +) || (&)($op == -,_op == -)
-          add_contribution!(c,+,int...)
-        else
-          add_contribution!(c,-,int...)
-        end
-      end
-      c
-    end
-
-    function ($op)(a::CollectionPTIntegrand,b::CollectionPTIntegrand)
-      for (_op,int) in b.dict
-        if (&)($op == +,_op == +) || (&)($op == -,_op == -)
-          add_contribution!(a,+,int...)
-        else
-          add_contribution!(a,-,int...)
-        end
-      end
-      a
-    end
-  end
-end
-
-function CellData.integrate(a::CollectionPTIntegrand)
-  cont = init_contribution(a)
-  for (op,int) in a.dict
-    for i in int
-      itrian = get_triangulation(i.meas)
-      integral = integrate(i)
-      add_contribution!(cont,itrian,integral[itrian],op)
-    end
-  end
-  cont
-end
+# function CellData.get_contribution(a::CollectionPTIntegrand,meas::Measure)
+#   cont = init_contribution(a)
+#   trian = get_triangulation(meas)
+#   for (op,int) in a.dict
+#     for i in int
+#       itrian = get_triangulation(i.meas)
+#       if itrian == trian
+#         integral = integrate(i.object,meas)
+#         add_contribution!(cont,trian,integral[trian],op)
+#       end
+#     end
+#   end
+#   if num_domains(cont) > 0
+#     return cont
+#   end
+#   @unreachable """\n
+#     There is no contribution associated with the given mesh in this PTIntegrand object.
+#   """
+# end
 
 # Interface that allows to entirely eliminate terms from the (PT)DomainContribution
 
@@ -330,31 +213,18 @@ CellData.integrate(::Nothing,args...) = nothing
 
 CellData.integrate(::Any,::Nothing) = nothing
 
-PTIntegrand(::Nothing,::Measure) = nothing
-
-for T in (:DomainContribution,:PTDomainContribution,:PTIntegrand,:CollectionPTIntegrand)
+for T in (:DomainContribution,:PTDomainContribution)
   @eval begin
     (+)(::Nothing,b::$T) = b
     (+)(a::$T,::Nothing) = a
     (-)(a::$T,::Nothing) = a
+    function (-)(::Nothing,b::$T)
+      for (trian,array) in b.dict
+        b.dict[trian] = -array
+      end
+      b
+    end
   end
-end
-
-function (-)(::Nothing,b::Union{DomainContribution,PTDomainContribution})
-  for (trian,array) in b.dict
-    b.dict[trian] = -array
-  end
-  b
-end
-
-(-)(::Nothing,b::PTIntegrand) = PTIntegrand(-b.object,b.meas)
-
-function (-)(::Nothing,b::CollectionPTIntegrand)
-  c = CollectionPTIntegrand()
-  for (op,int) in b.dict
-    add_contribution!(c,-,int...)
-  end
-  c
 end
 
 function FESpaces.collect_cell_vector(::FESpace,::Nothing,args...)

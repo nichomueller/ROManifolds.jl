@@ -34,9 +34,9 @@ begin
   p0(x,μ) = 0
   p0(μ) = x->p0(x,μ)
   p0μ(μ) = PFunction(p0,μ)
-  m(μ,t,(ut,pt),(v,q)) = ∫ₚ(v⋅ut,dΩ)
-  lhs(μ,t,(u,p),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(u)),dΩ)
-  rhs(μ,t,(v,q)) = ∫(v*fμt(μ,t),dΩ)
+  m(μ,t,(ut,pt),(v,q)) = ∫(v⋅ut)dΩ
+  lhs(μ,t,(u,p),(v,q)) = ∫(aμt(μ,t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ - ∫(q*(∇⋅(u)))dΩ
+  rhs(μ,t,(v,q)) = ∫(v*fμt(μ,t))dΩ
   reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float},order)
   reffe_p = ReferenceFE(lagrangian,Float,order-1)
   test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])

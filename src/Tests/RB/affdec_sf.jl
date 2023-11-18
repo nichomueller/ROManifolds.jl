@@ -13,8 +13,8 @@ for f in (:test_affine_decomposition_rhs,:test_affine_decomposition_lhs)
   @eval begin
     function $f(
       cache,
-      op::PTAlgebraicOperator,
-      op_offline::PTAlgebraicOperator,
+      op::PTOperator,
+      op_offline::PTOperator,
       ad::RBAlgebraicContribution,
       args...;
       kwargs...)
@@ -29,8 +29,8 @@ end
 
 function test_affine_decomposition_rhs(
   cache,
-  op::PTAlgebraicOperator,
-  op_offline::PTAlgebraicOperator,
+  op::PTOperator,
+  op_offline::PTOperator,
   rbrest::RBAffineDecomposition{T},
   meas::Measure,
   rbspace::RBSpace{T},) where T
@@ -48,8 +48,8 @@ function test_affine_decomposition_rhs(
 
   bfull = copy(b)
   sols = op.u0
-  res = collect_residuals_for_idx!(b,op,sols,red_idx,red_meas)
-  res_full = collect_residuals_for_idx!(bfull,op,sols,full_idx,red_meas)
+  res = collect_reduced_residuals!(b,op,sols,red_idx,red_meas)
+  res_full = collect_reduced_residuals!(bfull,op,sols,full_idx,red_meas)
 
   err_res = maximum(abs.(res-res_full[red_idx,:]))
   println("Residual difference for selected triangulation is $err_res")
@@ -84,8 +84,8 @@ end
 
 function test_affine_decomposition_lhs(
   cache,
-  op::PTAlgebraicOperator,
-  op_offline::PTAlgebraicOperator,
+  op::PTOperator,
+  op_offline::PTOperator,
   rbjact::RBAffineDecomposition,
   meas::Measure,
   rbspace_row::RBSpace{T},
@@ -106,8 +106,8 @@ function test_affine_decomposition_lhs(
   sols = op.u0
   full_idx = findnz(Afull[1][:])[1]
   nfree = length(get_free_dof_ids(op.odeop.feop.test))
-  jac = collect_jacobians_for_idx!(A,op,sols,red_idx,red_meas;i)
-  jac_full = collect_jacobians_for_idx!(Afull,op,sols,full_idx,red_meas;i)
+  jac = collect_reduced_jacobians!(A,op,sols,red_idx,red_meas;i)
+  jac_full = collect_reduced_jacobians!(Afull,op,sols,full_idx,red_meas;i)
   jac_offline,trian = collect_jacobians_for_trian(op_offline;i)
   basis_space = tpod(jac_offline[1])
   interp_idx_space = get_interpolation_idx(basis_space)

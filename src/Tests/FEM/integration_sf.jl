@@ -25,9 +25,9 @@ for i in 1:get_order(feop)
 end
 xh = TransientCellField(uh,dxh)
 
-dca = integrate(∫ₚ(aμt(μ,times)*∇(dv)⋅∇(xh),dΩ))
-dch = integrate(∫ₚ(hμt(μ,times)*dv,dΓn))
-dcm = integrate(∫ₚ(dv*∂ₚt(xh),dΩ))
+dca = integrate(∫(aμt(μ,times)*∇(dv)⋅∇(xh))dΩ)
+dch = integrate(∫(hμt(μ,times)*dv)dΓn)
+dcm = integrate(∫(dv*∂ₚt(xh))dΩ)
 dc = dcm + dca - dch
 
 dcres = integrate(feop.res(μ,times,xh,dv))

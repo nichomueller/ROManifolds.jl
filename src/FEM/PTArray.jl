@@ -2,24 +2,10 @@ const AbstractArrayBlock{T,N} = Union{AbstractArray{T,N},ArrayBlock{T,N}}
 
 struct Nonaffine <: OperatorType end
 
-function get_affinity(array::AbstractVector{<:AbstractArrayBlock})
-  a1 = testitem(array)
-  if all([a == a1 for a in array])
-    Affine()
-  else
-    Nonaffine()
-  end
-end
-
 isaffine(::AbstractArrayBlock) = true
 
 # Abstract implementation
 abstract type PTArray{T} end
-
-function PTArray(array::Vector{T}) where {T<:AbstractArrayBlock}
-  affinity = get_affinity(array)
-  PTArray(affinity,array)
-end
 
 Arrays.get_array(a::PTArray) = a.array
 Base.size(a::PTArray,i...) = size(testitem(a),i...)
@@ -77,30 +63,6 @@ function Base.:(==)(a::PTArray,b::PTArray)
     end
   end
   true
-end
-
-function Base.vcat(a::PTArray...)
-  n = _get_length(a...)
-  varray = map(1:n) do j
-    arrays = ()
-    @inbounds for i = eachindex(a)
-      arrays = (arrays...,a[i][j])
-    end
-    vcat(arrays...)
-  end
-  PTArray(varray)
-end
-
-function Base.stack(a::PTArray...)
-  n = _get_length(a...)
-  harray = map(1:n) do j
-    arrays = ()
-    @inbounds for i = eachindex(a)
-      arrays = (arrays...,a[i][j])
-    end
-    stack(arrays)
-  end
-  PTArray(harray)
 end
 
 function Base.hvcat(nblocks::Int,a::PTArray...)
@@ -197,15 +159,12 @@ function Arrays.get_array(a::PTArray{<:CachedArray})
   map(x->getproperty(x,:array),a)
 end
 
-function recenter(a::PTArray{T},a0::PTArray{T};kwargs...) where T
-  n = length(a)
-  n0 = length(a0)
-  ndiff = Int(n/n0)
-  array = Vector{T}(undef,n)
-  @inbounds for i = 1:n0
-    array[(i-1)*ndiff+1:i*ndiff] = recenter(a[(i-1)*ndiff+1:i*ndiff],a0[i];kwargs...)
-  end
-  PTArray(array)
+function get_at_offsets(x::PTArray{<:AbstractVector},offsets::Vector{Int},row::Int)
+  map(y->y[offsets[row]+1:offsets[row+1]],x)
+end
+
+function get_at_offsets(x::PTArray{<:AbstractMatrix},offsets::Vector{Int},row::Int,col::Int)
+  map(y->y[offsets[row]+1:offsets[row+1],offsets[col]+1:offsets[col+1]],x)
 end
 
 get_at_index(::Int,x) = x
@@ -245,7 +204,7 @@ end
 
 function test_ptarray(a::PTArray,b::AbstractArrayBlock;n=1)
   _a = a[n]
-  @assert _a ≈ b "Incorrect approximation detected for index $n"
+  @assert _a ≈ b "Detected difference in value for index $n"
   if typeof(_a) != typeof(b)
     @warn "Detected difference in type"
   end
@@ -263,14 +222,9 @@ end
 # Default implementation
 struct NonaffinePTArray{T} <: PTArray{T}
   array::Vector{T}
-
   function NonaffinePTArray(array::Vector{T}) where {T<:AbstractArrayBlock}
     new{T}(array)
   end
-end
-
-function PTArray(::Nonaffine,array::Vector{T}) where {T<:AbstractArrayBlock}
-  NonaffinePTArray(array)
 end
 
 isaffine(::NonaffinePTArray) = false
@@ -303,6 +257,30 @@ end
 
 function Base.transpose(a::NonaffinePTArray)
   map(transpose,a)
+end
+
+function Base.vcat(a::PTArray...)
+  n = _get_length(a...)
+  varray = map(1:n) do j
+    arrays = ()
+    @inbounds for i = eachindex(a)
+      arrays = (arrays...,a[i][j])
+    end
+    vcat(arrays...)
+  end
+  NonaffinePTArray(varray)
+end
+
+function Base.stack(a::PTArray...)
+  n = _get_length(a...)
+  harray = map(1:n) do j
+    arrays = ()
+    @inbounds for i = eachindex(a)
+      arrays = (arrays...,a[i][j])
+    end
+    stack(arrays)
+  end
+  NonaffinePTArray(harray)
 end
 
 function Base.fill!(a::NonaffinePTArray,z)
@@ -446,6 +424,17 @@ for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
   end
 end
 
+function recenter(a::PTArray{T},a0::PTArray{T};kwargs...) where T
+  n = length(a)
+  n0 = length(a0)
+  ndiff = Int(n/n0)
+  array = Vector{T}(undef,n)
+  @inbounds for i = 1:n0
+    array[(i-1)*ndiff+1:i*ndiff] = recenter(a[(i-1)*ndiff+1:i*ndiff],a0[i];kwargs...)
+  end
+  NonaffinePTArray(array)
+end
+
 function selectidx(a::PTArray{<:AbstractVector},idx_space,idx_time;nparams=Int(length(a)/length(idx_time)))
   a_space = map(b->b[idx_space],a)
   time_ndofs = Int(length(a)/nparams)
@@ -457,16 +446,9 @@ end
 struct AffinePTArray{T} <: PTArray{T}
   array::T
   len::Int
-
   function AffinePTArray(array::T,len::Int=1) where {T<:AbstractArrayBlock}
     new{T}(array,len)
   end
-end
-
-function PTArray(::Affine,array::Vector{T}) where {T<:AbstractArrayBlock}
-  n = length(array)
-  a1 = first(array)
-  AffinePTArray(a1,n)
 end
 
 isaffine(::AffinePTArray) = true
@@ -498,7 +480,7 @@ function Base.vcat(a::AffinePTArray...)
   AffinePTArray(varray,n)
 end
 
-function Base.stack(a::PTArray...)
+function Base.stack(a::AffinePTArray...)
   n = _get_length(a...)
   j = 1
   arrays = ()
@@ -506,7 +488,7 @@ function Base.stack(a::PTArray...)
     arrays = (arrays...,a[i][j])
   end
   harray = stack(arrays)
-  PTArray(harray)
+  AffinePTArray(harray)
 end
 
 Base.fill!(a::AffinePTArray,z) = fill!(a.array,z)
@@ -576,6 +558,11 @@ for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
       AffinePTArray(lazy_map(f,a1...),n)
     end
   end
+end
+
+function recenter(a::AffinePTArray,a0::AffinePTArray;kwargs...)
+  array = recenter(a.array,a0.array;kwargs...)
+  AffinePTArray(array)
 end
 
 function selectidx(a::AffinePTArray{<:AbstractVector},idx_space,args...;kwargs...)

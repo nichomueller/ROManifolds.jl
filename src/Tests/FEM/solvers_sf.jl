@@ -40,9 +40,9 @@ a(x,μ,t) = 1
 a(μ,t) = x->a(x,μ,t)
 aμt(μ,t) = PTFunction(a,μ,t)
 
-res(μ,t,u,v) = ∫ₚ(v*∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(fμt(μ,t)*v,dΩ) - ∫ₚ(hμt(μ,t)*v,dΓn)
-jac(μ,t,u,du,v) = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ)
-jac_t(μ,t,u,dut,v) = ∫ₚ(v*dut,dΩ)
+res(μ,t,u,v) = ∫(v*∂ₚt(u))dΩ + ∫(aμt(μ,t)*∇(v)⊙∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
+jac(μ,t,u,du,v) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
+jac_t(μ,t,u,dut,v) = ∫(v*dut)dΩ
 
 feop = AffinePTFEOperator(res,jac,jac_t,pspace,trial,test)
 

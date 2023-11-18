@@ -170,12 +170,10 @@ function allocate_residual(
   end
   xh = TransientCellField(uh,dxh)
   res = get_residual(op)
-  dc = integrate(res(μ,t,xh,v))
+  dc = res(μ,t,xh,v)
   dc1 = testitem(dc)
-  N = length(uh)
-  aff = get_affinity(dc)
   vecdata1 = collect_cell_vector(V,dc1)
-  allocate_vector(aff,op.assem,vecdata1;N)
+  allocate_vector(affinity(dc),op.assem,vecdata1;N=length(uh))
 end
 
 function allocate_jacobian(
@@ -195,12 +193,10 @@ function allocate_jacobian(
   end
   xh = TransientCellField(uh,dxh)
   jac = get_jacobian(op)
-  dc = integrate(jac[1](μ,t,xh,u,v))
+  dc = jac[1](μ,t,xh,u,v)
   dc1 = testitem(dc)
-  N = length(uh)
-  aff = get_affinity(dc)
   matdata1 = collect_cell_matrix(Uh,V,dc1)
-  allocate_matrix(aff,op.assem,matdata1;N)
+  allocate_matrix(affinity(dc),op.assem,matdata1;N=length(uh))
 end
 
 function residual!(
@@ -214,25 +210,7 @@ function residual!(
   V = get_test(op)
   v = get_fe_basis(V)
   res = get_residual(op)
-  dc = integrate(res(μ,t,xh,v))
-  vecdata = collect_cell_vector(V,dc)
-  assemble_vector_add!(b,op.assem,vecdata)
-  b
-end
-
-function residual!(
-  b::PTArray,
-  op::PTFEOperator,
-  μ::AbstractVector,
-  t::T,
-  xh::S,
-  cache,
-  meas::Measure) where {T,S}
-
-  V = get_test(op)
-  v = get_fe_basis(V)
-  res = get_residual(op)
-  dc = res(μ,t,xh,v)[meas]
+  dc = res(μ,t,xh,v)
   vecdata = collect_cell_vector(V,dc)
   assemble_vector_add!(b,op.assem,vecdata)
   b
@@ -249,7 +227,7 @@ function residual_for_trian!(
   V = get_test(op)
   v = get_fe_basis(V)
   res = get_residual(op)
-  dc = integrate(res(μ,t,xh,v))
+  dc = res(μ,t,xh,v)
   trian = get_domains(dc)
   bvec = Vector{typeof(b)}(undef,num_domains(dc))
   for (n,t) in enumerate(trian)
@@ -275,28 +253,6 @@ function jacobian!(
   A
 end
 
-function jacobian!(
-  A::PTArray,
-  op::PTFEOperator,
-  μ::AbstractVector,
-  t::T,
-  uh::S,
-  i::Integer,
-  γᵢ::Real,
-  cache,
-  meas::Measure) where {T,S}
-
-  Uh = get_trial(op)(μ,t)
-  V = get_test(op)
-  u = get_trial_fe_basis(Uh)
-  v = get_fe_basis(V)
-  jac = get_jacobian(op)
-  dc = γᵢ*jac[i](μ,t,uh,u,v)[meas]
-  matdata = collect_cell_matrix(Uh,V,dc)
-  assemble_matrix_add!(A,op.assem,matdata)
-  A
-end
-
 function jacobian_for_trian!(
   A::PTArray,
   op::PTFEOperator,
@@ -312,7 +268,7 @@ function jacobian_for_trian!(
   u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
   jac = get_jacobian(op)
-  dc = γᵢ*integrate(jac[i](μ,t,uh,u,v))
+  dc = γᵢ*jac[i](μ,t,uh,u,v)
   trian = get_domains(dc)
   Avec = Vector{typeof(A)}(undef,num_domains(dc))
   for (n,t) in enumerate(trian)
@@ -370,6 +326,6 @@ function _matdata_jacobian(
   u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
   jac = get_jacobian(op)
-  dc = γᵢ*integrate(jac[i](μ,t,xh,u,v))
+  dc = γᵢ*jac[i](μ,t,xh,u,v)
   collect_cell_matrix(Uh,V,dc)
 end

@@ -36,13 +36,13 @@ g(μ,t) = x->g(x,μ,t)
 u0(x,μ) = 0
 u0(μ) = x->u0(x,μ)
 
-res(μ,t,u,v,dΩ,dΓn) = ∫(v*∂ₚt(u))dΩ + ∫(a(μ,t)*∇(v)⋅∇(u))dΩ - ∫(f(μ,t)*v)dΩ - ∫(h(μ,t)*v)dΓn
-jac(μ,t,u,du,v,dΩ) = ∫(a(μ,t)*∇(v)⋅∇(du))dΩ
-jac_t(μ,t,u,dut,v,dΩ) = ∫(v*dut)dΩ
+res(μ,t,u,v,dΩ)dΓn = ∫(v*∂ₚt(u))dΩ + ∫(a(μ,t)*∇(v)⋅∇(u))dΩ - ∫(f(μ,t)*v)dΩ - ∫(h(μ,t)*v)dΓn
+jac(μ,t,u,du,v)dΩ = ∫(a(μ,t)*∇(v)⋅∇(du))dΩ
+jac_t(μ,t,u,dut,v)dΩ = ∫(v*dut)dΩ
 
-res(μ,t,u,v) = res(μ,t,u,v,dΩ,dΓn)
-jac(μ,t,u,du,v) = jac(μ,t,u,du,v,dΩ)
-jac_t(μ,t,u,dut,v) = jac_t(μ,t,u,dut,v,dΩ)
+res(μ,t,u,v) = res(μ,t,u,v,dΩ)dΓn
+jac(μ,t,u,du,v) = jac(μ,t,u,du,v)dΩ
+jac_t(μ,t,u,dut,v) = jac_t(μ,t,u,dut,v)dΩ
 
 reffe = ReferenceFE(lagrangian,Float,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])

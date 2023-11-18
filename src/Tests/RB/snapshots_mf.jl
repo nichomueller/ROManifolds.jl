@@ -286,7 +286,7 @@ for row = 1:nblocks
     feop_row_col = feop[row,:]
     b = bblock[row]
     res1, = collect_residuals_for_trian(fesolver,feop_row_col,vu,Table([μ]),times)
-    res2 = collect_residuals_for_idx!(b,fesolver,feop_row_col,vu,Table([μ]),times,bidx[row])
+    res2 = collect_reduced_residuals!(b,fesolver,feop_row_col,vu,Table([μ]),times,bidx[row])
     @assert isapprox(res1[1].nonzero_val,Rblock[row])
     @assert isapprox(res2,Rblock[row])
   end
@@ -329,7 +329,7 @@ for (row,col) = index_pairs(nblocks,nblocks)
     snaps_col = u[col]
     A = Ablock[row,col]
     jac1, = collect_jacobians_for_trian(fesolver,feop_row_col,snaps_col,Table([μ]),times;i)
-    jac2 = collect_jacobians_for_idx!(A,fesolver,feop_row_col,snaps_col,Table([μ]),times,Aidx[row,col])
+    jac2 = collect_reduced_jacobians!(A,fesolver,feop_row_col,snaps_col,Table([μ]),times,Aidx[row,col])
     @assert isapprox(jac1[1].nonzero_val,Jblock[row,col])
     @assert isapprox(jac2,Jblock[row,col])
   end
@@ -552,7 +552,7 @@ for row = 1:nblocks
   if check_touched_residuals(op_row_col)
     b = bblock[row]
     res1, = collect_residuals_for_trian(op_row_col)
-    res2 = collect_residuals_for_idx!(b,op_row_col,op_row_col.u0,bidx[row])
+    res2 = collect_reduced_residuals!(b,op_row_col,op_row_col.u0,bidx[row])
     @assert isapprox(res1[1],Rblock[row]) "Failed when row = $row"
     @assert isapprox(res2,Rblock[row]) "Failed when row = $row"
   end
@@ -624,7 +624,7 @@ for (row,col) = index_pairs(nblocks,nblocks)
     println("(row,col) = ($row,$col)")
     A = Ablock[row,col]
     jac1, = collect_jacobians_for_trian(op_row_col;i)
-    jac2 = collect_jacobians_for_idx!(A,op_row_col,op_row_col.u0,Aidx[row,col])
+    jac2 = collect_reduced_jacobians!(A,op_row_col,op_row_col.u0,Aidx[row,col])
     @assert isapprox(jac1[1].nonzero_val,Jblock[row,col]) "Failed when (row,col) = ($row,$col)"
     @assert isapprox(jac2,Jblock[row,col]) "Failed when (row,col) = ($row,$col)"
   end

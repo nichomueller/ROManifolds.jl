@@ -1,10 +1,14 @@
-struct RBAffineDecomposition{T,N}
+abstract type RBAffineDecomposition{T,N} end
+const RBVecAffineDecomposition{T} = RBAffineDecomposition{T,1}
+const RBMatAffineDecomposition{T} = RBAffineDecomposition{T,2}
+
+struct GenericRBAffineDecomposition{T,N}
   basis_space::Vector{Array{T,N}}
   basis_time::Vector{Array{T}}
   mdeim_interpolation::LU
   integration_domain::RBIntegrationDomain{T,N}
 
-  function RBAffineDecomposition(
+  function GenericRBAffineDecomposition(
     basis_space::Vector{Array{T,N}},
     basis_time::Vector{<:Array{T}},
     mdeim_interpolation::LU,
@@ -12,35 +16,51 @@ struct RBAffineDecomposition{T,N}
 
     new{T,N}(basis_space,basis_time,mdeim_interpolation,integration_domain)
   end
+end
 
-  function RBAffineDecomposition(
-    rbinfo::RBInfo,
-    op::PTAlgebraicOperator,
-    nzm::NnzMatrix,
-    trian::Triangulation,
-    args...;
-    kwargs...)
-
-    basis_space,basis_time = compress(nzm;ϵ=rbinfo.ϵ)
-    proj_bs,proj_bt = project_space_time(basis_space,basis_time,args...;kwargs...)
-    interp_idx_space = get_interpolation_idx(basis_space)
-    interp_bs = basis_space[interp_idx_space,:]
-    if rbinfo.st_mdeim
-      interp_idx_time = get_interpolation_idx(basis_time)
-      interp_bt = basis_time[interp_idx_time,:]
-      interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
-      lu_interp = lu(interp_bst)
-    else
-      interp_idx_time = collect(eachindex(op.tθ))
-      lu_interp = lu(interp_bs)
-    end
-    integr_domain = RBIntegrationDomain(op,nzm,trian,interp_idx_space,interp_idx_time,args)
-    RBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)
+struct TrivialRBAffineDecomposition{T,N}
+  projection::Array{T,N}
+  function TrivialRBAffineDecomposition(projection::Array{T,N}) where {T,N}
+    new{T,N}(projection)
   end
 end
 
-const RBVecAffineDecomposition{T} = RBAffineDecomposition{T,1}
-const RBMatAffineDecomposition{T} = RBAffineDecomposition{T,2}
+function RBAffineDecomposition(
+  rbinfo::RBInfo,
+  op::PTOperator,
+  nzm::NnzMatrix,
+  trian::Triangulation,
+  args...;
+  kwargs...)
+
+  basis_space,basis_time = compress(nzm;ϵ=rbinfo.ϵ)
+  proj_bs,proj_bt = project_space_time(basis_space,basis_time,args...;kwargs...)
+  interp_idx_space = get_interpolation_idx(basis_space)
+  interp_bs = basis_space[interp_idx_space,:]
+  if rbinfo.st_mdeim
+    interp_idx_time = get_interpolation_idx(basis_time)
+    interp_bt = basis_time[interp_idx_time,:]
+    interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
+    lu_interp = lu(interp_bst)
+  else
+    interp_idx_time = collect(eachindex(op.tθ))
+    lu_interp = lu(interp_bs)
+  end
+  integr_domain = RBIntegrationDomain(op,nzm,trian,interp_idx_space,interp_idx_time,args)
+  GenericRBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)
+end
+
+function RBAffineDecomposition(
+  rbinfo::RBInfo,
+  op::PTOperator,
+  nzm::NnzMatrix{Affine},
+  trian::Triangulation,
+  args...;
+  kwargs...)
+
+  projection = space_time_projection(nzm,args...;kwargs...)
+  TrivialRBAffineDecomposition(projection)
+end
 
 function update_reduced_operator!(a::RBAffineDecomposition,args...)
   update_reduced_operator!(a.integration_domain,args...)
@@ -57,7 +77,7 @@ function get_interpolation_idx(nzm::NnzMatrix)
   get_interpolation_idx(get_nonzero_val(nzm))
 end
 
-function get_interpolation_idx(basis::AbstractMatrix)
+function get_interpolation_idx(basis::Matrix)
   n = size(basis,2)
   idx = zeros(Int,n)
   idx[1] = argmax(abs.(basis[:,1]))
@@ -133,52 +153,87 @@ function get_reduced_cells(idx::Vector{Int},cell_dof_ids::Table)
   unique(cells)
 end
 
-function rhs_coefficient!(cache,rbres::RBVecAffineDecomposition;kwargs...)
-  rcache,scache = cache
-  red_integr_res = assemble_rhs!(rcache,rbres.integration_domain)
-  mdeim_solve!(scache,rbres,red_integr_res;kwargs...)
+# function collect_reduced_residuals!(
+#   cache,
+#   op::PTOperator,
+#   idx::Vector{Int},
+#   args...)
+
+#   b,bidx = cache
+#   ress = residual_for_idx!(b,op,op.u0,args...)
+#   setsize!(bidx,(length(idx),length(ress)))
+#   bidxmat = bidx.array
+#   @inbounds for n = eachindex(ress)
+#     bidxmat[:,n] = ress[n][idx]
+#   end
+#   return bidxmat
+# end
+
+# function collect_reduced_jacobians!(
+#   cache,
+#   op::PTOperator,
+#   idx::Vector{Int},
+#   args...;
+#   i=1)
+
+#   A,Aidx = cache
+#   jacs_i = jacobian_for_idx!(A,op,op.u0,i,args...)
+#   setsize!(Aidx,(length(idx),length(jacs_i)))
+#   Aidxmat = Aidx.array
+#   @inbounds for n = eachindex(jacs_i)
+#     Aidxmat[:,n] = jacs_i[n][idx].nzval
+#   end
+#   return Aidxmat
+# end
+
+function collect_reduced_residuals!(cache,a::Vector{<:RBMatAffineDecomposition})
+  residual!(cache,map(get_integration_domain,a))
 end
 
-function assemble_rhs!(rmat::CachedMatrix,rbintd::RBIntegrationDomain)
-  red_cache = rbintd.cache,rmat
-  red_op = rbintd.op
-  red_meas = rbintd.meas
-  red_idx = rbintd.idx_space
-  collect_residuals_for_idx!(red_cache,red_op,red_idx,red_meas)
+# function collect_reduced_residuals!(cache,dom::RBIntegrationDomain)
+#   red_cache = dom.cache,cache
+#   red_op = dom.op
+#   red_meas = dom.meas
+#   red_idx = dom.idx_space
+#   collect_reduced_residuals!(red_cache,red_op,red_idx,red_meas)
+# end
+
+function collect_reduced_jacobians!(cache,a::Vector{<:RBMatAffineDecomposition};i::Int=1)
+  jacobian!(cache,get_integration_domain(a),i)
 end
 
-function lhs_coefficient!(cache,rbjac::RBMatAffineDecomposition;i::Int=1,kwargs...)
-  jcache,scache = cache
-  red_integr_jac = assemble_lhs!(jcache,rbjac.integration_domain;i)
-  mdeim_solve!(scache,rbjac,red_integr_jac;kwargs...)
-end
+# function collect_reduced_jacobians!(cache,dom::RBIntegrationDomain;i::Int=1)
+#   red_cache = dom.cache,cache
+#   red_op = dom.op
+#   red_meas = dom.meas
+#   red_idx = dom.idx_space
+#   collect_reduced_jacobians!(red_cache,red_op,red_idx,red_meas;i)
+# end
 
-function assemble_lhs!(rmat::CachedMatrix,rbintd::RBIntegrationDomain;i::Int=1)
-  red_cache = rbintd.cache,rmat
-  red_op = rbintd.op
-  red_meas = rbintd.meas
-  red_idx = rbintd.idx_space
-  collect_jacobians_for_idx!(red_cache,red_op,red_idx,red_meas;i)
-end
-
-function mdeim_solve!(cache,ad::RBAffineDecomposition,a::Matrix;st_mdeim=false)
+function rb_coefficient!(cache,a::RBAffineDecomposition,b::Matrix;st_mdeim=false)
   csolve,crecast = cache
-  time_ndofs = length(ad.integration_domain.times)
-  nparams = Int(size(a,2)/time_ndofs)
+  time_ndofs = length(a.integration_domain.times)
+  nparams = Int(size(b,2)/time_ndofs)
   coeff = if st_mdeim
-    _coeff = mdeim_solve!(csolve,ad.mdeim_interpolation,reshape(a,:,nparams))
-    recast_coefficient!(crecast,first(ad.basis_time),_coeff)
+    _coeff = mdeim_solve!(csolve,a.mdeim_interpolation,reshape(b,:,nparams))
+    recast_coefficient!(crecast,first(a.basis_time),_coeff)
   else
-    _coeff = mdeim_solve!(csolve,ad.mdeim_interpolation,a)
+    _coeff = mdeim_solve!(csolve,a.mdeim_interpolation,b)
     recast_coefficient!(crecast,_coeff)
   end
   return coeff
 end
 
-function mdeim_solve!(cache::CachedArray,mdeim_interp::LU,q::Matrix)
+function rb_coefficient!(cache,::TrivialRBAffineDecomposition,args...;kwargs...)
+  _,ptcache = cache
+  setsize!(ptcache,(1,1))
+  get_array(ptcache)
+end
+
+function mdeim_solve!(cache::CachedArray,mdeim_interpolation::LU,q::Matrix)
   setsize!(cache,size(q))
   x = cache.array
-  ldiv!(x,mdeim_interp,q)
+  ldiv!(x,mdeim_interpolation,q)
   x
 end
 
@@ -312,12 +367,41 @@ end
 function rb_contribution!(
   cache,
   k::RBContributionMap,
-  ad::RBAffineDecomposition,
+  a::RBAffineDecomposition,
   coeff::PTArray)
 
-  basis_space_proj = ad.basis_space
-  basis_time = last(ad.basis_time)
+  basis_space_proj = a.basis_space
+  basis_time = last(a.basis_time)
   map(coeff) do cn
     copy(evaluate!(k,cache,basis_space_proj,basis_time,cn))
   end
+end
+
+function rb_contribution!(
+  cache,
+  k::RBContributionMap,
+  a::TrivialRBAffineDecomposition,
+  coeff::PTArray)
+
+  AffinePTArray(a.projection,length(coeff))
+end
+
+function empty_rb_contribution(
+  ::RBVecContributionMap{T},
+  rbinfo::RBInfo,
+  rbspace::RBSpace{T}) where T
+
+  nrow = get_rb_ndofs(rbspace)
+  return AffinePTArray(zeros(T,nrow),rbinfo.nsnaps_test)
+end
+
+function empty_rb_contribution(
+  ::RBMatContributionMap{T},
+  rbinfo::RBInfo,
+  rbspace_row::RBSpace{T},
+  rbspace_col::RBSpace{T}) where T
+
+  nrow = get_rb_ndofs(rbspace_row)
+  ncol = get_rb_ndofs(rbspace_col)
+  return AffinePTArray(zeros(T,nrow,ncol),rbinfo.nsnaps_test)
 end

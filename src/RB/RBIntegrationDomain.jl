@@ -22,13 +22,13 @@ function allocate_algebraic_cache(
 end
 
 struct RBIntegrationDomain{T,N}
-  op::PTAlgebraicOperator
+  op::PTOperator
   meas::Measure
   idx_space::Vector{Int}
   idx_time::Vector{Int}
-  cache::PTArray{<:AbstractArray{T,N}}
+  cache::PTArray{AbstractArray{T,N}}
   function RBIntegrationDomain(
-    op::PTAlgebraicOperator,
+    op::PTOperator,
     meas::Measure,
     idx_space::Vector{Int},
     idx_time::Vector{Int},
@@ -38,15 +38,17 @@ struct RBIntegrationDomain{T,N}
 end
 
 function RBIntegrationDomain(
-  op::PTAlgebraicOperator,
+  op::PTOperator,
   nzm::NnzMatrix,
   trian::TriangulationWithTags,
   idx_space::Vector{Int},
   idx_time::Vector{Int},
-  ::NTuple{N,RBSpace{T}}) where {T,N}
+  ::NTuple{N,RBSpace{T}};
+  nparams::Int=10) where {T,N}
 
   feop = op.odeop.feop
   model = get_background_model(trian)
+  μ = realization(feop,nparams)
   times = op.tθ
 
   recast_idx_space = recast_idx(nzm,idx_space)
@@ -68,67 +70,114 @@ function RBIntegrationDomain(
   red_times = times[idx_time]
   time_to_parent_time = findall(x->x in red_times,times)
 
-  x = NonaffinePTArray([zeros(T,red_nfree) for _ = 1:length(op.μ)*length(times)])
-  red_ode_cache = allocate_cache(red_odeop,op.μ,times)
-  red_cache = allocate_algebraic_cache(Val(N),red_odeop,op.μ,times,x,red_ode_cache,red_meas)
+  x = NonaffinePTArray([zeros(T,red_nfree) for _ = 1:length(μ)*length(red_times)])
+  red_ode_cache = allocate_cache(red_odeop,μ,red_times)
+  red_cache = allocate_algebraic_cache(Val(N),red_odeop,μ,red_times,x,red_ode_cache,red_meas)
 
-  red_op = get_ptoperator(red_odeop,op.μ,red_times,op.dtθ,u0,ode_cache,vθ)
+  red_op = get_ptoperator(red_odeop,μ,red_times,op.dtθ,x,ode_cache,x)
 
   RBIntegrationDomain(red_op,red_meas,recast_idx_space,time_to_parent_time,red_cache)
 end
 
-function get_space_row_idx(op::PTAlgebraicOperator,rbintd::RBIntegrationDomain)
+function get_space_row_idx(op::PTOperator,dom::RBIntegrationDomain)
   feop = op.odeop.feop
   test = get_test(feop)
   nrows = num_free_dofs(test)
-  idx_space_row, = vec_to_mat_idx(rbintd.idx_space,nrows)
+  idx_space_row, = vec_to_mat_idx(dom.idx_space,nrows)
   return idx_space_row
 end
 
-function selectidx(a::PTArray,rbintd::RBIntegrationDomain;kwargs...)
-  idx_space = rbintd.idx_space
-  idx_time = rbintd.idx_time
+function selectidx(a::PTArray,dom::RBIntegrationDomain;kwargs...)
+  idx_space = dom.idx_space
+  idx_time = dom.idx_time
   selectidx(a,idx_space,idx_time;kwargs...)
 end
 
-function _update_solution!(x::NonaffinePTArray,x0::NonaffinePTArray)
-  @. x = x0
-  x
+# selectidx(x,dom;nparams=length(μ))
+function jacobian!(cache,dom::Vector{<:RBIntegrationDomain},x::PTArray,μ::Table,i=1)
+  meas = map(get_measure,dom)
+  idx_space = map(get_idx_space,dom)
+  vθ = op.vθ
+  z = zero(eltype(A))
+  fillstored!(A,z)
+  jacobian!(A,op.odeop,op.μ,op.tθ,(vθ,vθ),i,(1.0,1/op.dtθ)[i],op.ode_cache,args...)
 end
 
-function _update_parameter!(μ::Table,μ0::Table)
-  @. μ = μ0
-  μ
+function jacobian!(
+  cache,
+  feop,
+  ::PTArray,
+  i::Int,
+  args...)
+
+  vθ = op.vθ
+  z = zero(eltype(A))
+  fillstored!(A,z)
+  jacobian!(A,op.odeop,op.μ,op.tθ,(vθ,vθ),i,(1.0,1/op.dtθ)[i],op.ode_cache,args...)
 end
 
-function _update_cache!(cache::NonaffinePTArray,n::Int)
-  cache0 = NonaffinePTArray(cache[1:n])
-  @. cache = cache0
-  cache
-end
+function residual!(
+  cache,
+  op::PTFEOperator,
+  μ::AbstractVector,
+  t::T,
+  uh::S,
+  fecache,
+  meas::Vector{Measure},
+  idx::Vector{Vector{Int}}) where {T,S}
 
-function _update_cache!(cache::AffinePTArray,n::Int)
-  cache0 = AffinePTArray(cache.array,n)
-  @. cache = cache0
-  cache
-end
-
-function update_reduced_operator!(rbintd::RBIntegrationDomain,x::NonaffinePTArray,μ::Table)
-  op = rbintd.op
-
-  xidx = selectidx(x,rbintd;nparams=length(μ))
-  _update_solution!(op.u0,xidx)
-
-  if op.μ != μ
-    _update_parameter!(op.μ,μ)
+  b,Mcache = cache
+  V = get_test(op)
+  v = get_fe_basis(V)
+  res = get_residual(op)
+  dc = res(μ,t,uh,v,meas...)
+  trian = get_domains(dc)
+  ntrian = num_domains(dc)
+  setsize!(Mcache,(length(idx),ntrian))
+  M = Mcache.array
+  Mvec = Vector{typeof(M)}(undef,ntrian)
+  for (i,itrian) in enumerate(trian)
+    vecdata = collect_cell_vector(V,dc,itrian)
+    assemble_vector_add!(b,op.assem,vecdata)
+    @inbounds for n = eachindex(b)
+      M[:,n] = b[n][idx]
+    end
+    Mvec[i] = copy(M)
   end
+  Mvec
+end
 
-  N = length(rbintd.cache)
-  n = length(μ)*length(op.tθ)
-  @assert N ≥ n
-  if length(rbintd.cache) < N
-    _update_cache!(op.cache,n)
+function jacobian!(
+  cache,
+  op::PTFEOperator,
+  μ::AbstractVector,
+  t::T,
+  uh::S,
+  i::Integer,
+  γᵢ::Real,
+  fecache,
+  meas::Vector{Measure},
+  idx::Vector{Vector{Int}}) where {T,S}
+
+  A,Mcache = cache
+  Uh = get_trial(op)(μ,t)
+  V = get_test(op)
+  u = get_trial_fe_basis(Uh)
+  v = get_fe_basis(V)
+  jac = get_jacobian(op)
+  dc = γᵢ*jac[i](μ,t,uh,u,v,meas...)
+  trian = get_domains(dc)
+  ntrian = num_domains(dc)
+  setsize!(Mcache,(length(idx),ntrian))
+  M = Mcache.array
+  Mvec = Vector{typeof(M)}(undef,ntrian)
+  for (i,itrian) in enumerate(trian)
+    matdata = collect_cell_matrix(Uh,V,dc,itrian)
+    assemble_matrix_add!(A,op.assem,matdata)
+    @inbounds for n = eachindex(A)
+      M[:,n] = A[n][idx].nzval
+    end
+    Mvec[i] = copy(M)
   end
-
-  rbintd
+  Mvec
 end

@@ -49,8 +49,8 @@ for i in 1:get_order(feop_row_col)
 end
 xh = TransientCellField(uh,dxh)
 
-# res(μ,t,(u,p),(v,q)) = (∫ₚ(v⋅∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ)
-# - ∫ₚ(q*(∇⋅(u)),dΩ) - ∫ₚ(v⋅fμt(μ,t),dΩ))
+# res(μ,t,(u,p),(v,q)) = (∫(v⋅∂ₚt(u))dΩ + ∫(aμt(μ,t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ
+# - ∫(q*(∇⋅(u)))dΩ - ∫(v⋅fμt(μ,t))dΩ)
 empty_dv,empty_du,empty_u = Any[],Any[],Any[]
 for n in eachindex(get_test(feop).spaces)
   push!(empty_dv,nothing)
@@ -72,7 +72,7 @@ function dv_row(dv)
 end
 
 dcr = integrate(feop_row_col.res(μ,times,xh,dv))
-dcr_manual = integrate(∫ₚ(dv⋅∂ₚt(xh),dΩ) + ∫ₚ(aμt(μ,times)*∇(dv)⊙∇(xh),dΩ))
+dcr_manual = integrate(∫(dv⋅∂ₚt(xh))dΩ + ∫(aμt(μ,times)*∇(dv)⊙∇(xh))dΩ)
 
 ũ = (xh,nothing)#u_col(xh)
 dṽ = (dv,nothing)#dv_row(dv)

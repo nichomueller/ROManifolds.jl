@@ -1,48 +1,22 @@
-abstract type RBAlgebraicContribution{T,N} end
-
-struct RBVecAlgebraicContribution{T} <: RBAlgebraicContribution{T,1}
-  dict::IdDict{Triangulation,RBVecAffineDecomposition{T}}
-  function RBVecAlgebraicContribution(::Type{T}) where T
-    new{T}(IdDict{Triangulation,RBVecAffineDecomposition{T}}())
+struct RBAlgebraicContribution{T,N}
+  affine_decompositions::Vector{RBAffineDecomposition{T,N}}
+  function RBAlgebraicContribution(
+    affine_decompositions::Vector{RBAffineDecomposition{T,N}}
+    ) where {T,N}
+    new{T,N}(affine_decompositions)
   end
 end
 
-struct RBMatAlgebraicContribution{T} <: RBAlgebraicContribution{T,2}
-  dict::IdDict{Triangulation,RBMatAffineDecomposition{T}}
-  function RBMatAlgebraicContribution(::Type{T}) where T
-    new{T}(IdDict{Triangulation,RBMatAffineDecomposition{T}}())
-  end
-end
+const RBVecAlgebraicContribution{T} = RBAlgebraicContribution{T,1}
+const RBMatAlgebraicContribution{T} = RBAlgebraicContribution{T,2}
 
-CellData.num_domains(a::RBAlgebraicContribution) = length(a.dict)
-CellData.get_domains(a::RBAlgebraicContribution) = keys(a.dict)
-Base.iszero(a::RBAlgebraicContribution) = num_domains(a) == 0
-
-function CellData.get_contribution(
-  a::RBAlgebraicContribution,
-  trian::Triangulation)
-
-  if haskey(a.dict,trian)
-    return a.dict[trian]
-  else
-    @unreachable """\n
-    There is not contribution associated with the given mesh in this RBAlgebraicContribution object.
-    """
-  end
-end
-
-Base.getindex(a::RBAlgebraicContribution,trian::Triangulation) = get_contribution(a,trian)
+Base.length(a::RBAlgebraicContribution) = length(a.affine_decompositions)
+Base.getindex(a::RBAlgebraicContribution,i::Int) = a.affine_decompositions[i]
+Base.iterate(a::RBAlgebraicContribution,i...) = iterate(a.affine_decompositions,i...)
 Base.eltype(::RBAlgebraicContribution{T,N} where N) where T = T
-
-function CellData.add_contribution!(
-  a::RBAlgebraicContribution,
-  trian::Triangulation,
-  b)
-
-  @check !haskey(a.dict,trian)
-  a.dict[trian] = b
-  a
-end
+Base.ndims(::RBAlgebraicContribution{T,N} where T) where N = N
+Base.isempty(a::RBAlgebraicContribution) = isempty(a.affine_decompositions)
+CellData.get_domains(a::RBAlgebraicContribution) = map(get_integration_domain,a.affine_decompositions)
 
 function update_reduced_operator!(a::RBAlgebraicContribution,args...)
   for trian in get_domains(a)
@@ -63,41 +37,34 @@ end
 
 function save_algebraic_contrib(path::String,a::RBAlgebraicContribution{T,N} where N) where T
   create_dir!(path)
-  cpath = joinpath(path,"contrib")
-  tpath = joinpath(path,"trian")
-  for (i,trian) in enumerate(get_domains(a))
-    ai = a[trian]
-    save(cpath*"_$i",ai)
-    save(tpath*"_$i",trian)
+  adpath = joinpath(path,"ad")
+  for ai in a
+    save(adpath*"_$i",ai)
   end
 end
 
 function load_algebraic_contrib(path::String,::Type{RBVecAlgebraicContribution{T}}) where T
-  cpath = joinpath(path,"contrib")
-  tpath = joinpath(path,"trian")
-  a = RBVecAlgebraicContribution(T)
+  adpath = joinpath(path,"ad")
+  a = RBVecAffineDecomposition{T}[]
   i = 1
-  while isfile(correct_path(cpath*"_$i"))
-    ai = load(cpath*"_$i",RBVecAffineDecomposition{T})
-    ti = load(tpath*"_$i",Triangulation)
-    add_contribution!(a,ti,ai)
+  while isfile(correct_path(adpath*"_$i"))
+    ai = load(adpath*"_$i",RBVecAffineDecomposition{T})
+    push!(a,ai)
     i += 1
   end
-  a
+  RBAlgebraicContribution(a)
 end
 
 function load_algebraic_contrib(path::String,::Type{RBMatAlgebraicContribution{T}}) where T
-  cpath = joinpath(path,"contrib")
-  tpath = joinpath(path,"trian")
-  a = RBMatAlgebraicContribution(T)
+  adpath = joinpath(path,"ad")
+  a = RBMatAffineDecomposition{T}[]
   i = 1
-  while isfile(correct_path(cpath*"_$i"))
-    ai = load(cpath*"_$i",RBMatAffineDecomposition{T})
-    ti = load(tpath*"_$i",Triangulation)
+  while isfile(correct_path(adpath*"_$i"))
+    ai = load(adpath*"_$i",RBMatAffineDecomposition{T})
     add_contribution!(a,ti,ai)
     i += 1
   end
-  a
+  RBAlgebraicContribution(a)
 end
 
 function save(rbinfo::RBInfo,a::RBVecAlgebraicContribution)
@@ -178,14 +145,12 @@ function collect_compress_rhs_lhs(
   rbspace,
   params::Table)
 
-  θ = fesolver.θ
-  nsnaps_mdeim = rbinfo.nsnaps_mdeim
-  μ = params[1:nsnaps_mdeim]
+  μ = params[1:rbinfo.nsnaps_mdeim]
   op = get_ptoperator(fesolver,feop,rbspace,μ)
 
   println("Computing RB affine decomposition (linear)")
   rhs = collect_compress_rhs(rbinfo,op,rbspace)
-  lhs = collect_compress_lhs(rbinfo,op,rbspace;θ)
+  lhs = collect_compress_lhs(rbinfo,op,rbspace)
 
   return rhs,lhs
 end
@@ -197,22 +162,20 @@ function collect_compress_rhs_lhs(
   rbspace,
   params::Table)
 
-  θ = fesolver.θ
-  nsnaps_mdeim = rbinfo.nsnaps_mdeim
-  μ = params[1:nsnaps_mdeim]
+  μ = params[1:rbinfo.nsnaps_mdeim]
   op = get_ptoperator(fesolver,feop,rbspace,μ)
 
   println("Computing RB affine decomposition (linear)")
   op_lin = linear_operator(op)
   rhs_lin = collect_compress_rhs(rbinfo,op_lin,rbspace)
-  lhs_lin = collect_compress_lhs(rbinfo,op_lin,rbspace;θ)
+  lhs_lin = collect_compress_lhs(rbinfo,op_lin,rbspace)
   println("Computing RB affine decomposition (nonlinear)")
   op_nlin = nonlinear_operator(op)
   rhs_nlin = collect_compress_rhs(rbinfo,op_nlin,rbspace)
-  lhs_nlin = collect_compress_lhs(rbinfo,op_nlin,rbspace;θ)
+  lhs_nlin = collect_compress_lhs(rbinfo,op_nlin,rbspace)
   println("Computing RB affine decomposition (auxiliary)")
   op_aux = auxiliary_operator(op)
-  rblhs_aux = collect_compress_lhs(rbinfo,op_aux,rbspace;θ)
+  rblhs_aux = collect_compress_lhs(rbinfo,op_aux,rbspace)
 
   rhs = rhs_lin,rhs_nlin
   lhs = lhs_lin,lhs_nlin,rblhs_aux
@@ -222,48 +185,41 @@ end
 
 function collect_compress_rhs(
   rbinfo::RBInfo,
-  op::PTAlgebraicOperator,
+  op::PTOperator,
   rbspace::RBSpace{T}) where T
 
   ress,trian = collect_residuals_for_trian(op)
-  ad_res = RBVecAlgebraicContribution(T)
-  compress_component!(ad_res,rbinfo,op,ress,trian,rbspace)
-  return ad_res
+  affine_decompositions = compress_component(rbinfo,op,ress,trian,rbspace)
+  RBAlgebraicContribution(affine_decompositions)
 end
 
 function collect_compress_lhs(
   rbinfo::RBInfo,
-  op::PTAlgebraicOperator,
-  rbspace::RBSpace{T};
-  θ::Real=1) where T
+  op::PTOperator,
+  rbspace::RBSpace{T}) where T
 
+  θ = op.θ
   njacs = length(op.odeop.feop.jacs)
   ad_jacs = Vector{RBMatAlgebraicContribution{T}}(undef,njacs)
   for i = 1:njacs
     combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*x-θ*y
     jacs,trian = collect_jacobians_for_trian(op;i)
-    ad_jac_i = RBMatAlgebraicContribution(T)
-    compress_component!(ad_jac_i,rbinfo,op,jacs,trian,rbspace,rbspace;combine_projections)
-    ad_jacs[i] = ad_jac_i
+    affine_decompositions = compress_component(rbinfo,op,jacs,trian,rbspace,rbspace;combine_projections)
+    ad_jacs[i] = RBAlgebraicContribution(affine_decompositions)
   end
   return ad_jacs
 end
 
-function compress_component!(
-  contrib::RBAlgebraicContribution,
+function compress_component(
   rbinfo::RBInfo,
-  op::PTAlgebraicOperator,
+  op::PTOperator,
   snaps::Vector{<:NnzMatrix},
   trian::Base.KeySet{Triangulation},
   args...;
   kwargs...)
 
-  for (i,ti) in enumerate(trian)
-    si = snaps[i]
-    if !iszero(si)
-      ci = RBAffineDecomposition(rbinfo,op,si,ti,args...;kwargs...)
-      add_contribution!(contrib,ti,ci)
-    end
+  map(zip(snaps,trian)) do (si,ti)
+    RBAffineDecomposition(rbinfo,op,si,ti,args...;kwargs...)
   end
 end
 
@@ -272,6 +228,14 @@ function collect_rhs_lhs_contributions!(cache,rbinfo,rbres,rbjacs,rbspace)
   rhs = collect_rhs_contributions!(rhs_cache,rbinfo,rbres,rbspace)
   lhs = collect_lhs_contributions!(lhs_cache,rbinfo,rbjacs,rbspace)
   return rhs,lhs
+end
+
+function collect_reduced_residuals!(cache,rbres::RBVecAlgebraicContribution)
+  collect_reduced_residuals!(cache,rbres.affine_decompositions)
+end
+
+function collect_reduced_jacobians!(cache,rbres::RBMatAlgebraicContribution)
+  collect_reduced_jacobians!(cache,rbres.affine_decompositions)
 end
 
 function collect_rhs_contributions!(
@@ -283,17 +247,15 @@ function collect_rhs_contributions!(
   mdeim_cache,rb_cache = cache
   st_mdeim = rbinfo.st_mdeim
   k = RBVecContributionMap(T)
-  rb_res_contribs = Vector{PTArray{Vector{T}}}(undef,num_domains(rbres))
-  if iszero(rbres)
-    op = get_ptoperator(rbres)
-    nrow = get_rb_ndofs(rbspace)
-    contrib = AffinePTArray(zeros(T,nrow),length(op.μ))
-    rb_res_contribs[i] = contrib
+  if isempty(rbres)
+    return empty_rb_contribution(k,rbinfo,rbspace)
   else
-    for (i,t) in enumerate(get_domains(rbres))
-      rbrest = rbres[t]
-      coeff = rhs_coefficient!(mdeim_cache,rbrest;st_mdeim)
-      rb_res_contribs[i] = rb_contribution!(rb_cache,k,rbrest,coeff)
+    collect_cache,coeff_cache = mdeim_cache
+    res = collect_reduced_residuals!(collect_cache,rbres)
+    rb_res_contribs = Vector{PTArray{Vector{T}}}(undef,length(rbres))
+    for (rbresi,resi) in zip(rbres,res)
+      coeff = rb_coefficient!(coeff_cache,rbresi,resi;st_mdeim)
+      rb_res_contribs[i] = rb_contribution!(rb_cache,k,rbresi,coeff)
     end
   end
   return sum(rb_res_contribs)
@@ -309,7 +271,7 @@ function collect_lhs_contributions!(
   rb_jacs_contribs = Vector{PTArray{Matrix{T}}}(undef,njacs)
   for i = 1:njacs
     rb_jac_i = rbjacs[i]
-    rb_jacs_contribs[i] = collect_lhs_contributions!(cache,rbinfo,op,rb_jac_i,rbspace,rbspace;i)
+    rb_jacs_contribs[i] = collect_lhs_contributions!(cache,rbinfo,rb_jac_i,rbspace,rbspace;i)
   end
   return rb_jacs_contribs
 end
@@ -317,28 +279,24 @@ end
 function collect_lhs_contributions!(
   cache,
   rbinfo::RBInfo,
-  op::PTAlgebraicOperator,
   rbjac::RBMatAlgebraicContribution{T},
   rbspace_row::RBSpace{T},
   rbspace_col::RBSpace{T};
   kwargs...) where T
 
   mdeim_cache,rb_cache = cache
-  trian = get_domains(rbjac)
   st_mdeim = rbinfo.st_mdeim
   k = RBMatContributionMap(T)
-  rb_jac_contribs = Vector{PTArray{Matrix{T}}}(undef,num_domains(rbjac))
-  if iszero(rbjac)
-    op = get_ptoperator(rbres)
-    nrow = get_rb_ndofs(rbspace_row)
-    ncol = get_rb_ndofs(rbspace_col)
-    contrib = AffinePTArray(zeros(T,nrow,ncol),length(op.μ))
-    rb_jac_contribs[i] = contrib
+  rb_jac_contribs = Vector{PTArray{Matrix{T}}}(undef,length(rbjac))
+  if isempty(rbjac)
+    return empty_rb_contribution(k,rbinfo,rbspace_row,rbspace_col)
   else
-    for (i,t) in enumerate(trian)
-      rbjact = rbjac[t]
-      coeff = lhs_coefficient!(mdeim_cache,rbjact;st_mdeim,kwargs...)
-      rb_jac_contribs[i] = rb_contribution!(rb_cache,k,rbjact,coeff)
+    collect_cache,coeff_cache = mdeim_cache
+    jac = collect_reduced_jacobians!(collect_cache,rbres)
+    rb_jac_contribs = Vector{PTArray{Matrix{T}}}(undef,length(rbjac))
+    for (rbjaci,jaci) in zip(rbjac,jac)
+      coeff = rb_coefficient!(coeff_cache,rbjaci,jaci;st_mdeim)
+      rb_jac_contribs[i] = rb_contribution!(rb_cache,k,rbjaci,coeff)
     end
   end
   return sum(rb_jac_contribs)

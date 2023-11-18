@@ -54,15 +54,6 @@ function load(rbinfo::RBInfo,T::Type{BlockSnapshots{S}}) where S
   load(path,T)
 end
 
-struct BlockNnzMatrix{T} <: RBBlock{T,1}
-  blocks::Vector{NnzMatrix{T}}
-
-  function BlockNnzMatrix(blocks::Vector{NnzMatrix{T}}) where T
-    @check all([length(nzm) == length(blocks[1]) for nzm in blocks[2:end]])
-    new{T}(blocks)
-  end
-end
-
 struct BlockRBSpace{T} <: RBBlock{T,1}
   blocks::Vector{RBSpace{T}}
 
@@ -177,7 +168,7 @@ function space_supremizers(basis_space::Matrix,feop::PTFEOperator)
   u = zero(feop.test)
   t = 0.
   jac = get_jacobian(feop)
-  j(du,dv) = integrate(jac[1](μ,t,u,du,dv))
+  j(du,dv) = jac[1](μ,t,u,du,dv)
   trial_dual = get_trial(feop)
   constraint_mat = assemble_matrix(j,trial_dual(μ,t),feop.test)
   constraint_mat*basis_space
@@ -302,9 +293,9 @@ function save_algebraic_contrib(path::String,a::BlockRBMatAlgebraicContribution)
   save(tpath,a.touched)
   for (row,col) in index_pairs(get_nblocks(a),get_nblocks(a))
     if a.touched[row,col]
-      rcpath = joinpath(path,"block_$(row)_$(col)")
-      create_dir!(rcpath)
-      save_algebraic_contrib(rcpath,a.blocks[row,col])
+      adpath = joinpath(path,"block_$(row)_$(col)")
+      create_dir!(adpath)
+      save_algebraic_contrib(adpath,a.blocks[row,col])
     end
   end
 end
@@ -330,8 +321,8 @@ function load_algebraic_contrib(path::String,::Type{BlockRBMatAlgebraicContribut
   blocks = Matrix{RBMatAlgebraicContribution{T}}(undef,nblocks,nblocks)
   for (row,col) = index_pairs(nblocks,nblocks)
     if touched[row,col]
-      rcpath = joinpath(path,"block_$(row)_$(col)")
-      blocks[row,col] = load_algebraic_contrib(rcpath,RBMatAlgebraicContribution{T})
+      adpath = joinpath(path,"block_$(row)_$(col)")
+      blocks[row,col] = load_algebraic_contrib(adpath,RBMatAlgebraicContribution{T})
     end
   end
   return BlockRBMatAlgebraicContribution(blocks,touched)
@@ -410,7 +401,7 @@ end
 
 function collect_compress_rhs(
   rbinfo::BlockRBInfo,
-  op::PTAlgebraicOperator,
+  op::PTOperator,
   rbspace::BlockRBSpace{T}) where T
 
   nblocks = get_nblocks(rbspace)
@@ -434,7 +425,7 @@ end
 
 function collect_compress_lhs(
   rbinfo::BlockRBInfo,
-  op::PTAlgebraicOperator,
+  op::PTOperator,
   rbspace::BlockRBSpace{T};
   θ::Real=1) where T
 
@@ -465,7 +456,7 @@ function collect_compress_lhs(
   return ad_jacs
 end
 
-function check_touched_residuals(op::PTAlgebraicOperator)
+function check_touched_residuals(op::PTOperator)
   feop = op.odeop.feop
   test = get_test(feop)
   Us, = op.ode_cache
@@ -484,7 +475,7 @@ function check_touched_residuals(op::PTAlgebraicOperator)
   return !isnothing(int)
 end
 
-function check_touched_jacobians(op::PTAlgebraicOperator;i=1)
+function check_touched_jacobians(op::PTOperator;i=1)
   feop = op.odeop.feop
   test = get_test(feop)
   trial = get_trial(feop)
@@ -508,7 +499,7 @@ end
 function collect_rhs_contributions!(
   cache,
   rbinfo::BlockRBInfo,
-  op::PTAlgebraicOperator,
+  op::PTOperator,
   rbres::BlockRBVecAlgebraicContribution{T},
   rbspace::BlockRBSpace{T}) where T
 

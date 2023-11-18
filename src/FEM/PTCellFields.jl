@@ -31,8 +31,7 @@ function CellData.CellField(
   s = size(get_cell_map(trian))
   x = get_cell_points(trian) |> get_data
   ptf = get_fields(f)
-  A = get_affinity(map(f->f.(x),ptf))
-  ptcell_field = PTArray(A,map(x->Fill(x,s),ptf))
+  ptcell_field = NonaffinePTArray(map(x->Fill(x,s),ptf))
   GenericPTCellField(ptcell_field,trian,PhysicalDomain())
 end
 

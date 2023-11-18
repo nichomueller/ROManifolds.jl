@@ -28,6 +28,11 @@ function _loop_solve!(x::PTArray,ns,b::PTArray)
   end
 end
 
+struct PTAffineOperator <: PTOperator{Affine}
+  matrix::PTArray
+  vector::PTArray
+end
+
 function Algebra.solve!(x::PTArray,ls::LinearSolver,op::PTAffineOperator,::Nothing)
   A,b = op.matrix,op.vector
   @assert length(A) == length(b) == length(x)
@@ -73,7 +78,7 @@ end
 function Algebra.solve!(
   x::PTArray,
   nls::NewtonRaphsonSolver,
-  op::PTAlgebraicOperator,
+  op::PTOperator,
   ::Nothing)
 
   b = residual(op,x)
@@ -89,7 +94,7 @@ end
 function Algebra.solve!(
   x::PTArray,
   nls::NewtonRaphsonSolver,
-  op::PTAlgebraicOperator,
+  op::PTOperator,
   cache::PNewtonRaphsonCache)
 
   b = cache.b
