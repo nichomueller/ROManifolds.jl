@@ -4,11 +4,15 @@ struct RBIntegrationDomain
   idx::Vector{Int}
 end
 
+get_measure(i::RBIntegrationDomain) = i.meas
+get_times(i::RBIntegrationDomain) = i.times
+get_idx_space(i::RBIntegrationDomain) = i.idx
+
 abstract type RBAffineDecomposition{T,N} end
 const RBVecAffineDecomposition{T} = RBAffineDecomposition{T,1}
 const RBMatAffineDecomposition{T} = RBAffineDecomposition{T,2}
 
-struct GenericRBAffineDecomposition{T,N}
+struct GenericRBAffineDecomposition{T,N} <: RBAffineDecomposition{T,N}
   basis_space::Vector{Array{T,N}}
   basis_time::Vector{Array{T}}
   mdeim_interpolation::LU
@@ -24,7 +28,7 @@ struct GenericRBAffineDecomposition{T,N}
   end
 end
 
-struct TrivialRBAffineDecomposition{T,N}
+struct TrivialRBAffineDecomposition{T,N} <: RBAffineDecomposition{T,N}
   projection::Array{T,N}
   function TrivialRBAffineDecomposition(projection::Array{T,N}) where {T,N}
     new{T,N}(projection)
@@ -57,7 +61,7 @@ function RBAffineDecomposition(
   cell_dof_ids = get_cell_dof_ids(test,trian)
   recast_interp_idx_space = recast_idx(nzm,interp_idx_space)
   recast_interp_idx_rows,_ = vec_to_mat_idx(recast_interp_idx_space,nzm.nrows)
-  red_integr_cells = find_cells(recast_interp_idx_rows,cell_dof_ids)
+  red_integr_cells = get_reduced_cells(recast_interp_idx_rows,cell_dof_ids)
   red_trian = view(trian,red_integr_cells)
   red_meas = Measure(red_trian,2*get_order(test))
   integr_domain = RBIntegrationDomain(red_meas,red_times,recast_interp_idx_space)
@@ -75,6 +79,8 @@ function RBAffineDecomposition(
   projection = space_time_projection(nzm,args...;kwargs...)
   TrivialRBAffineDecomposition(projection)
 end
+
+get_integration_domain(a::RBAffineDecomposition) = a.integration_domain
 
 function get_rb_ndofs(a::RBAffineDecomposition)
   space_ndofs = size(a.basis_space[1],1)
@@ -163,10 +169,6 @@ function get_reduced_cells(idx::Vector{Int},cell_dof_ids::Table)
   unique(cells)
 end
 
-function ()
-
-end
-
 function collect_reduced_residuals!(
   cache,
   op::PTOperator,
@@ -177,11 +179,12 @@ function collect_reduced_residuals!(
   meas = map(get_measure,dom)
   times = map(get_times,dom)
   common_time = union(times...)
-  x = get_quantity_at_time(op.u0,op.tθ,common_time)
-  _b = get_quantity_at_time(b,op.tθ,common_time)
-  ress,trian = residual_for_trian!(_b,x,common_time,meas...)
-  Mvec = Vector{Matrix{T}}(undef,length(trian))
-  for j in eachindex(trian)
+  x = _get_quantity_at_time(op.u0,op.tθ,common_time)
+  _b = _get_quantity_at_time(b,op.tθ,common_time)
+  ress,trian = residual_for_trian!(_b,op,x,common_time,meas)
+  ntrian = length(trian)
+  Mvec = Vector{Matrix{T}}(undef,ntrian)
+  for j in 1:ntrian
     ress_j = ress[j]
     idx_j = get_idx_space(dom[j]) # careful here: might have to compare triangs
     pt_idx_j = _get_pt_index(ress_j,common_time,times[j])
@@ -190,8 +193,9 @@ function collect_reduced_residuals!(
     @inbounds for n = pt_idx_j
       M[:,n] = ress_j[n][idx_j]
     end
-    Mvec[i] = copy(M)
+    Mvec[j] = copy(M)
   end
+  return Mvec
 end
 
 function collect_reduced_jacobians!(
@@ -205,11 +209,12 @@ function collect_reduced_jacobians!(
   meas = map(get_measure,dom)
   times = map(get_times,dom)
   common_time = union(times...)
-  x = get_quantity_at_time(op.u0,op.tθ,common_time)
-  _A = get_quantity_at_time(A,op.tθ,common_time)
-  jacs_i,trian = jacobian_for_trian!(_A,op,x,i,common_time,meas...)
-  Mvec = Vector{Matrix{T}}(undef,length(trian))
-  for j in eachindex(trian)
+  x = _get_quantity_at_time(op.u0,op.tθ,common_time)
+  _A = _get_quantity_at_time(A,op.tθ,common_time)
+  jacs_i,trian = jacobian_for_trian!(_A,op,x,i,common_time,meas)
+  ntrian = length(trian)
+  Mvec = Vector{Matrix{T}}(undef,ntrian)
+  for j in 1:ntrian
     jacs_i_j = jacs_i[j]
     idx_j = get_idx_space(dom[j]) # careful here: might have to compare triangs
     pt_idx_j = _get_pt_index(jacs_i_j,common_time,times[j])
@@ -218,8 +223,9 @@ function collect_reduced_jacobians!(
     @inbounds for n = pt_idx_j
       M[:,n] = jacs_i_j[n][idx_j].nzval
     end
-    Mvec[i] = copy(M)
+    Mvec[j] = copy(M)
   end
+  return Mvec
 end
 
 function _get_pt_index(a::PTArray,times::Vector{<:Real},red_times::Vector{<:Real})

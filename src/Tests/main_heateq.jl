@@ -43,9 +43,12 @@ function heat_equation()
   u0(μ) = x->u0(x,μ)
   u0μ(μ) = PFunction(u0,μ)
 
-  res(μ,t,u,v) = ∫(v*∂ₚt(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
-  jac(μ,t,u,du,v) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
-  jac_t(μ,t,u,dut,v) = ∫(v*dut)dΩ
+  res(μ,t,u,v,(dΩ,dΓn)) = ∫(v*∂ₚt(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
+  res(μ,t,u,v) = res(μ,t,u,v,(dΩ,dΓn))
+  jac(μ,t,u,du,v,(dΩ,)) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
+  jac(μ,t,u,du,v) = jac(μ,t,u,du,v,(dΩ,))
+  jac_t(μ,t,u,dut,v,(dΩ,)) = ∫(v*dut)dΩ
+  jac_t(μ,t,u,du,v) = jac_t(μ,t,u,du,v,(dΩ,))
 
   T = Float
   reffe = ReferenceFE(lagrangian,T,order)
@@ -96,3 +99,18 @@ function heat_equation()
 end
 
 heat_equation()
+
+nsnaps_test = rbinfo.nsnaps_test
+snaps_test,params_test = sols[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
+op = get_ptoperator(fesolver,feop,snaps_test,params_test)
+rhs_cache,lhs_cache = allocate_cache(op,snaps_test)
+mdeim_cache,rb_cache = rhs_cache
+st_mdeim = rbinfo.st_mdeim
+k = RBVecContributionMap(Float)
+collect_cache,coeff_cache = mdeim_cache
+_res = collect_reduced_residuals!(collect_cache,op,rbrhs)
+rb_res_contribs = Vector{PTArray{Vector{Float}}}(undef,length(rbrhs))
+for (rbresi,resi) in zip(rbrhs,_res)
+  coeff = rb_coefficient!(coeff_cache,rbresi,resi;st_mdeim)
+  rb_res_contribs[i] = rb_contribution!(rb_cache,k,rbresi,coeff)
+end

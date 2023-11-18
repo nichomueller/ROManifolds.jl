@@ -1,7 +1,7 @@
 struct RBAlgebraicContribution{T,N}
   affine_decompositions::Vector{RBAffineDecomposition{T,N}}
   function RBAlgebraicContribution(
-    affine_decompositions::Vector{RBAffineDecomposition{T,N}}
+    affine_decompositions::Vector{<:RBAffineDecomposition{T,N}}
     ) where {T,N}
     new{T,N}(affine_decompositions)
   end
@@ -12,6 +12,7 @@ const RBMatAlgebraicContribution{T} = RBAlgebraicContribution{T,2}
 
 Base.length(a::RBAlgebraicContribution) = length(a.affine_decompositions)
 Base.getindex(a::RBAlgebraicContribution,i::Int) = a.affine_decompositions[i]
+Base.eachindex(a::RBAlgebraicContribution) = eachindex(a.affine_decompositions)
 Base.iterate(a::RBAlgebraicContribution,i...) = iterate(a.affine_decompositions,i...)
 Base.eltype(::RBAlgebraicContribution{T,N} where N) where T = T
 Base.ndims(::RBAlgebraicContribution{T,N} where T) where N = N
@@ -26,7 +27,7 @@ end
 function save_algebraic_contrib(path::String,a::RBAlgebraicContribution{T,N} where N) where T
   create_dir!(path)
   adpath = joinpath(path,"ad")
-  for ai in a
+  for (i,ai) in enumerate(a)
     save(adpath*"_$i",ai)
   end
 end
@@ -138,7 +139,7 @@ function collect_compress_rhs_lhs(
 
   println("Computing RB affine decomposition (linear)")
   rhs = collect_compress_rhs(rbinfo,op,rbspace)
-  lhs = collect_compress_lhs(rbinfo,op,rbspace)
+  lhs = collect_compress_lhs(rbinfo,op,rbspace;θ=fesolver.θ)
 
   return rhs,lhs
 end
@@ -156,14 +157,14 @@ function collect_compress_rhs_lhs(
   println("Computing RB affine decomposition (linear)")
   op_lin = linear_operator(op)
   rhs_lin = collect_compress_rhs(rbinfo,op_lin,rbspace)
-  lhs_lin = collect_compress_lhs(rbinfo,op_lin,rbspace)
+  lhs_lin = collect_compress_lhs(rbinfo,op_lin,rbspace;θ=fesolver.θ)
   println("Computing RB affine decomposition (nonlinear)")
   op_nlin = nonlinear_operator(op)
   rhs_nlin = collect_compress_rhs(rbinfo,op_nlin,rbspace)
-  lhs_nlin = collect_compress_lhs(rbinfo,op_nlin,rbspace)
+  lhs_nlin = collect_compress_lhs(rbinfo,op_nlin,rbspace;θ=fesolver.θ)
   println("Computing RB affine decomposition (auxiliary)")
   op_aux = auxiliary_operator(op)
-  rblhs_aux = collect_compress_lhs(rbinfo,op_aux,rbspace)
+  rblhs_aux = collect_compress_lhs(rbinfo,op_aux,rbspace;θ=fesolver.θ)
 
   rhs = rhs_lin,rhs_nlin
   lhs = lhs_lin,lhs_nlin,rblhs_aux
@@ -184,9 +185,9 @@ end
 function collect_compress_lhs(
   rbinfo::RBInfo,
   op::PTOperator,
-  rbspace::RBSpace{T}) where T
+  rbspace::RBSpace{T};
+  θ=1) where T
 
-  θ = op.θ
   njacs = length(op.odeop.feop.jacs)
   ad_jacs = Vector{RBMatAlgebraicContribution{T}}(undef,njacs)
   for i = 1:njacs
@@ -242,9 +243,9 @@ function collect_rhs_contributions!(
     collect_cache,coeff_cache = mdeim_cache
     res = collect_reduced_residuals!(collect_cache,op,rbres)
     rb_res_contribs = Vector{PTArray{Vector{T}}}(undef,length(rbres))
-    for (rbresi,resi) in zip(rbres,res)
-      coeff = rb_coefficient!(coeff_cache,rbresi,resi;st_mdeim)
-      rb_res_contribs[i] = rb_contribution!(rb_cache,k,rbresi,coeff)
+    for i = eachindex(rbres)
+      coeff = rb_coefficient!(coeff_cache,rbres[i],res[i];st_mdeim)
+      rb_res_contribs[i] = rb_contribution!(rb_cache,k,rbres[i],coeff)
     end
   end
   return sum(rb_res_contribs)
@@ -283,11 +284,11 @@ function collect_lhs_contributions!(
     return empty_rb_contribution(k,rbinfo,rbspace_row,rbspace_col)
   else
     collect_cache,coeff_cache = mdeim_cache
-    jac = collect_reduced_jacobians!(collect_cache,op,rbres)
+    jac = collect_reduced_jacobians!(collect_cache,op,rbjac)
     rb_jac_contribs = Vector{PTArray{Matrix{T}}}(undef,length(rbjac))
-    for (rbjaci,jaci) in zip(rbjac,jac)
-      coeff = rb_coefficient!(coeff_cache,rbjaci,jaci;st_mdeim)
-      rb_jac_contribs[i] = rb_contribution!(rb_cache,k,rbjaci,coeff)
+    for i = eachindex(rbjac)
+      coeff = rb_coefficient!(coeff_cache,rbjac[i],jac[i];st_mdeim)
+      rb_jac_contribs[i] = rb_contribution!(rb_cache,k,rbjac[i],coeff)
     end
   end
   return sum(rb_jac_contribs)

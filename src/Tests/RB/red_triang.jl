@@ -37,7 +37,7 @@ vecdata_red = collect_cell_vector(feop.test,dcred,red_trian)
 
 # stuff from AffineDecomposition
 cell_dof_ids = get_cell_dof_ids(feop.test,trian)
-red_integr_cells = find_cells(red_idx,cell_dof_ids)
+red_integr_cells = get_reduced_cells(red_idx,cell_dof_ids)
 red_trian = view(trian,red_integr_cells)
 red_meas = get_measure(feop,red_trian)
 
@@ -83,7 +83,7 @@ matdata_red = collect_cell_matrix(get_trial(feop)(params_test,times),feop.test,d
 
 # stuff from AffineDecomposition
 cell_dof_ids = get_cell_dof_ids(feop.test,trian)
-red_integr_cells = find_cells(red_idx,cell_dof_ids)
+red_integr_cells = get_reduced_cells(red_idx,cell_dof_ids)
 red_trian = view(trian,red_integr_cells)
 red_meas = get_measure(feop,red_trian)
 
@@ -136,7 +136,7 @@ else
 end
 
 cell_dof_ids = get_cell_dof_ids(feop.test,trian)
-red_integr_cells = find_cells(entire_interp_idx_rows,cell_dof_ids)
+red_integr_cells = get_reduced_cells(entire_interp_idx_rows,cell_dof_ids)
 red_trian = view(trian,red_integr_cells)
 red_meas = get_measure(feop,red_trian)
 red_times = st_mdeim ? times[interp_idx_time] : times

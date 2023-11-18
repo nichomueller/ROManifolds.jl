@@ -127,7 +127,7 @@ function allocate_cache(op::PTOperator,snaps::PTArray{Vector{T}}) where T
   A = allocate_jacobian(op,snaps)
   mat = CachedArray(zeros(T,1,1))
   coeff = CachedArray(zeros(T,1,1))
-  ptcoeff = CachedArray(NonaffinePTArray([zeros(T,1,1) for _ = eachindex(op,μ)]))
+  ptcoeff = CachedArray(NonaffinePTArray([zeros(T,1,1) for _ = eachindex(op.μ)]))
 
   res_contrib_cache = return_cache(RBVecContributionMap(T))
   jac_contrib_cache = return_cache(RBMatContributionMap(T))
