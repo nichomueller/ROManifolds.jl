@@ -145,15 +145,15 @@ end
 
   mat_cache,add_cache,vals_cache,rows_cache,cols_cache = caches
   add! = AddEntriesMap(+)
-  mat1 = mat_cache[1]
   cell_vals1 = get_at_index(1,cell_vals)
-  for cell in eachindex(cell_cols)
-    rows = getindex!(rows_cache,cell_rows,cell)
-    cols = getindex!(cols_cache,cell_cols,cell)
-    vals1 = getindex!(vals_cache,cell_vals1,cell)
-    evaluate!(add_cache,add!,mat1,vals1,rows,cols)
-    for k in eachindex(mat)
-      mat[k] = copy(mat1)
+  for k in eachindex(mat)
+    matk = mat_cache[k]
+    for cell in eachindex(cell_cols)
+      rows = getindex!(rows_cache,cell_rows,cell)
+      cols = getindex!(cols_cache,cell_cols,cell)
+      vals1 = getindex!(vals_cache,cell_vals1,cell)
+      evaluate!(add_cache,add!,matk,vals1,rows,cols)
+      mat[k] = matk
     end
   end
 end
@@ -232,14 +232,14 @@ end
 
   vec_cache,add_cache,vals_cache,rows_cache = caches
   add! = AddEntriesMap(+)
-  vec1 = vec_cache[1]
   cell_vals1 = get_at_index(1,cell_vals)
-  for cell in eachindex(cell_rows)
-    rows = getindex!(rows_cache,cell_rows,cell)
-    vals1 = getindex!(vals_cache,cell_vals1,cell)
-    evaluate!(add_cache,add!,vec1,vals1,rows)
-    for k in eachindex(vec)
-      vec[k] = copy(vec1)
+  for k in eachindex(vec)
+    veck = vec_cache[k]
+    for cell in eachindex(cell_rows)
+      rows = getindex!(rows_cache,cell_rows,cell)
+      vals1 = getindex!(vals_cache,cell_vals1,cell)
+      evaluate!(add_cache,add!,veck,vals1,rows)
+      vec[k] = veck
     end
   end
 end

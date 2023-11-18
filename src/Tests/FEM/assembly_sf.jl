@@ -5,7 +5,7 @@ times = [dt,2dt,3dt]
 Nt = length(times)
 N = K*Nt
 nfree = num_free_dofs(test)
-u = PTArray([zeros(nfree) for _ = 1:N])
+u = NonaffinePTArray([zeros(nfree) for _ = 1:N])
 vθ = similar(u)
 vθ .= 1.0
 ode_op = get_algebraic_operator(op)
@@ -26,8 +26,7 @@ assemble_matrix_add!(A,op.assem,matdata)
 
 v = get_fe_basis(test)
 b = allocate_residual(op,μ,times,uh,ode_cache)
-dc = integrate(op.res(μ,times,xh,v))
-vecdata = collect_cell_vector(test,integrate(op.res(μ,times,xh,v)))
+vecdata = collect_cell_vector(test,op.res(μ,times,xh,v))
 assemble_vector_add!(b,op.assem,vecdata)
 
 # Gridap
