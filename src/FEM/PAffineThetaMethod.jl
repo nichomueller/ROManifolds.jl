@@ -53,13 +53,6 @@ function get_ptoperator(
   PTThetaAffineMethodOperator(odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
 end
 
-function residual!(b::PTArray,op::PTThetaAffineMethodOperator,::PTArray)
-  vθ = op.vθ
-  z = zero(eltype(b))
-  fill!(b,z)
-  residual!(b,op.odeop,op.μ,op.tθ,(vθ,vθ),op.ode_cache)
-end
-
 function residual_for_trian!(
   b::PTArray,
   op::PTThetaAffineMethodOperator,
@@ -71,20 +64,6 @@ function residual_for_trian!(
   z = zero(eltype(b))
   fill!(b,z)
   residual_for_trian!(b,op.odeop,op.μ,t,(vθ,vθ),op.ode_cache,args...)
-end
-
-function jacobian!(A::PTArray,op::PTThetaAffineMethodOperator,::PTArray)
-  vθ = op.vθ
-  z = zero(eltype(A))
-  fillstored!(A,z)
-  jacobians!(A,op.odeop,op.μ,op.tθ,(vθ,vθ),(1.0,1/op.dtθ),op.ode_cache)
-end
-
-function jacobian!(A::PTArray,op::PTThetaAffineMethodOperator,::PTArray,i::Int)
-  vθ = op.vθ
-  z = zero(eltype(A))
-  fillstored!(A,z)
-  jacobian!(A,op.odeop,op.μ,op.tθ,(vθ,vθ),i,(1.0,1/op.dtθ)[i],op.ode_cache)
 end
 
 function jacobian_for_trian!(
@@ -104,7 +83,7 @@ end
 # SHORTCUTS
 function _allocate_matrix_and_vector(odeop,μ,t0,u0,ode_cache)
   b = allocate_residual(odeop,μ,t0,u0,ode_cache)
-  A = allocate_jacobian(odeop,μ,t0,u0,ode_cache)
+  A = allocate_jacobian(odeop,μ,t0,u0,1,ode_cache)
   return A,b
 end
 

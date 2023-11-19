@@ -138,24 +138,18 @@ end
 function collect_residuals_for_trian(op::PTOperator)
   b = allocate_residual(op,op.u0)
   ress,trian = residual_for_trian!(b,op,op.u0)
-  nparams = length(op.μ)
-  ntrian = length(trian)
-  nzm = Vector{NnzMatrix{eltype(b)}}(undef,ntrian)
-  @inbounds for n = 1:ntrian
-    nzm[n] = NnzMatrix(ress[n];nparams)
+  nzm = map(ress) do res
+    NnzMatrix(res;nparams=length(op.μ))
   end
   return nzm,trian
 end
 
 function collect_jacobians_for_trian(op::PTOperator;i=1)
-  A = allocate_jacobian(op,op.u0)
+  A = allocate_jacobian(op,op.u0,i)
   jacs_i,trian = jacobian_for_trian!(A,op,op.u0,i)
-  nparams = length(op.μ)
-  ntrian = length(trian)
-  nzm_i = Vector{NnzMatrix{eltype(A)}}(undef,ntrian)
-  @inbounds for n = 1:ntrian
-    nzv_i_n = map(NnzVector,jacs_i[n])
-    nzm_i[n] = NnzMatrix(nzv_i_n;nparams)
+  nzm_i = map(jacs_i) do jac_i
+    nzv_i = map(NnzVector,jac_i)
+    NnzMatrix(nzv_i;nparams=length(op.μ))
   end
   return nzm_i,trian
 end

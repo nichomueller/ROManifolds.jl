@@ -81,8 +81,10 @@ function Algebra.solve!(
   op::PTOperator,
   ::Nothing)
 
-  b = residual(op,x)
-  A = jacobian(op,x)
+  b = allocate_residual(op,x)
+  residual!(b,op,x)
+  A = allocate_jacobian(op,x)
+  jacobian!(A,op,x)
   dx = similar(b)
   @assert length(A) == length(b) == length(x)
   ss = symbolic_setup(nls.ls,testitem(A))

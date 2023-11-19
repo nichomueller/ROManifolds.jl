@@ -63,11 +63,12 @@ function allocate_jacobian(
   μ::AbstractVector,
   t::T,
   uhF::PTArray,
+  i::Integer,
   ode_cache) where T
 
   Us,_,fecache = ode_cache
   uh = EvaluationFunction(Us[1],uhF)
-  allocate_jacobian(op.feop,μ,t,uh,fecache)
+  allocate_jacobian(op.feop,μ,t,uh,i,fecache)
 end
 
 for fun in (:residual!,:residual_for_trian!)

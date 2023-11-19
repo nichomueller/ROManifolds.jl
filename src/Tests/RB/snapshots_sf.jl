@@ -25,10 +25,10 @@ xh = TransientCellField(EvaluationFunction(Xh[1],_xh[1]),dxh)
 dv = get_fe_basis(test)
 du = get_trial_fe_basis(trial(nothing,nothing))
 b = allocate_residual(ode_op,μ,times,_snaps,ode_cache)
-vecdata = collect_cell_vector(test,integrate(feop.res(μ,times,xh,dv)))#,trian)
+vecdata = collect_cell_vector(test,feop.res(μ,times,xh,dv))
 assemble_vector_add!(b,feop.assem,vecdata)
-A = allocate_jacobian(ode_op,μ,times,_snaps,ode_cache)
-matdata = collect_cell_matrix(trial(μ,times),test,integrate(feop.jacs[1](μ,times,xh,du,dv)))#,trian)
+A = allocate_jacobian(ode_op,μ,times,_snaps,1,ode_cache)
+matdata = collect_cell_matrix(trial(μ,times),test,feop.jacs[1](μ,times,xh,du,dv))#,trian)
 assemble_matrix_add!(A,feop.assem,matdata)
 
 function gridap_solutions_for_int(n::Int)
@@ -120,7 +120,7 @@ end
 times = get_times(fesolver)
 ntimes = length(times)
 snaps_test,params_test = sols[1:K],μ[1:K]
-u,μ = PTArray(snaps_test[1:ntimes]),params_test[1]
+u,μ = NonaffinePTArray(snaps_test[1:ntimes]),params_test[1]
 g_ok(x,t) = g(x,μ,t)
 g_ok(t) = x->g_ok(x,t)
 a_ok(t,u,v) = ∫(a(μ,t)*∇(v)⋅∇(u))dΩ
@@ -135,7 +135,7 @@ ode_op = get_algebraic_operator(feop)
 ode_cache = allocate_cache(ode_op,params_test,times)
 ode_cache = update_cache!(ode_cache,ode_op,params_test,times)
 ptb = allocate_residual(ode_op,params_test,times,snaps_test,ode_cache)
-ptA = allocate_jacobian(ode_op,params_test,times,snaps_test,ode_cache)
+ptA = allocate_jacobian(ode_op,params_test,times,snaps_test,1,ode_cache)
 vθ = zero(snaps_test)
 nlop = get_ptoperator(ode_op,params_test,times,dt*θ,snaps_test,ode_cache,vθ)
 residual!(ptb,nlop,copy(snaps_test))
@@ -149,9 +149,7 @@ vθ = zeros(test.nfree)
 ode_cache = Gridap.ODEs.TransientFETools.allocate_cache(ode_op_ok)
 nlop0 = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t0,dtθ,vθ,ode_cache,vθ)
 b = allocate_residual(nlop0,vθ)
-bok = copy(b)
 A = allocate_jacobian(nlop0,vθ)
-Aok = copy(A)
 
 for (nt,t) in enumerate(get_times(fesolver))
   un = u[nt]
@@ -166,4 +164,63 @@ for (nt,t) in enumerate(get_times(fesolver))
   @assert b ≈ ptb1[nt] "Failed when n = $nt"
   @assert A ≈ ptA1[nt] "Failed when n = $nt"
   @assert A \ (M*unprev - b) ≈ θ*un + (1-θ)*unprev "Failed when n = $nt"
+end
+
+nsnaps_test = 10
+rbres,rbjac = rbrhs.affine_decompositions,rblhs[1].affine_decompositions
+snaps_train,params_train = sols[1:nsnaps_test],params[1:nsnaps_test]
+snaps_test,params_test = sols[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
+op = get_ptoperator(fesolver,feop,snaps_test,params_test)
+op_offline = get_ptoperator(fesolver,feop,snaps_train,params_train)
+rhs_cache,lhs_cache = allocate_cache(op,snaps_test)
+rhs_mdeim_cache, = rhs_cache
+rhs_collect_cache, = rhs_mdeim_cache
+_res = collect_reduced_residuals!(rhs_collect_cache,op,rbres)
+
+b,Mcache = rhs_collect_cache
+dom = map(get_integration_domain,rbres)
+meas = map(get_measure,dom)
+times = map(get_times,dom)
+common_time = union(times...)
+x = _get_quantity_at_time(op.u0,op.tθ,common_time)
+_b = _get_quantity_at_time(b,op.tθ,common_time)
+ress,trian = residual_for_trian!(_b,op,x,common_time,meas)
+ntrian = length(trian)
+Mvec = Vector{Matrix{T}}(undef,ntrian)
+for j in 1:ntrian
+  ress_j = ress[j]
+  idx_j = get_idx_space(dom[j]) # careful here: might have to compare triangs
+  pt_idx_j = _get_pt_index(ress_j,common_time,times[j])
+  setsize!(Mcache,(length(idx_j),length(pt_idx_j)))
+  M = Mcache.array
+  @inbounds for n = pt_idx_j
+    M[:,n] = ress_j[n][idx_j]
+  end
+  Mvec[j] = copy(M)
+end
+
+# res_full, = collect_residuals_for_trian(op)
+# res1(μ,t,u,v) = ∫(v*∂ₚt(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ
+# res2(μ,t,u,v) = -∫(hμt(μ,t)*v)dΓn
+# times = op.tθ
+# ode_op = get_algebraic_operator(feop)
+# ode_cache = allocate_cache(ode_op,params_test,times)
+# ode_cache = update_cache!(ode_cache,ode_op,params_test,times)
+# ω = zero(snaps_test)
+# Xh, = ode_cache
+# dxh = ()
+# dxh = (EvaluationFunction(Xh[2],ω),)
+# xh = TransientCellField(EvaluationFunction(Xh[1],ω),dxh)
+# b = allocate_residual(ode_op,params_test,times,ω,ode_cache)
+# vecdata = collect_cell_vector(test,res1(params_test,times,xh,dv))
+# assemble_vector_add!(b,feop.assem,vecdata)
+
+# bmat = stack(b.array)
+# bmat ≈ res_full[1]
+
+form(μ,t,u,v) = ∫(fμt(μ,t)*v)dΩ + ∫(hμt(μ,t)*v)dΓn
+for n = 1:1000
+  dc = form(params_test,times,xh,dv)
+  trians = [get_domains(dc)...]
+  @assert typeof(trians[2]) <: BoundaryTriangulation "Failed for n = $n"
 end

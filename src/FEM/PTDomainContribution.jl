@@ -163,6 +163,10 @@ function CellData.integrate(f::PTCellField,b::CellData.CompositeMeasure)
   cont
 end
 
+function Arrays.testitem(a::DomainContribution)
+  a
+end
+
 function Arrays.testitem(a::PTDomainContribution)
   b = DomainContribution()
   for (trian,array) in a.dict

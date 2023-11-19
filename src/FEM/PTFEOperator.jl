@@ -165,7 +165,7 @@ function allocate_residual(
   V = get_test(op)
   v = get_fe_basis(V)
   dxh = ()
-  for i in 1:get_order(op)
+  for _ in 1:get_order(op)
     dxh = (dxh...,uh)
   end
   xh = TransientCellField(uh,dxh)
@@ -181,6 +181,7 @@ function allocate_jacobian(
   μ::P,
   t::T,
   uh::PTCellField,
+  i::Integer,
   cache) where {P,T}
 
   Uh = get_trial(op)(μ,t)
@@ -188,12 +189,12 @@ function allocate_jacobian(
   u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
   dxh = ()
-  for i in 1:get_order(op)
+  for _ in 1:get_order(op)
     dxh = (dxh...,uh)
   end
   xh = TransientCellField(uh,dxh)
   jac = get_jacobian(op)
-  dc = jac[1](μ,t,xh,u,v)
+  dc = jac[i](μ,t,xh,u,v)
   dc1 = testitem(dc)
   matdata1 = collect_cell_matrix(Uh,V,dc1)
   allocate_matrix(affinity(dc),op.assem,matdata1;N=length(uh))

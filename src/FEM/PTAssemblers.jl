@@ -163,14 +163,12 @@ end
 
   mat_cache,add_cache,vals_cache,rows_cache,cols_cache = caches
   add! = AddEntriesMap(+)
-  mat1 = mat_cache[1]
   cell_vals1 = get_at_index(1,cell_vals)
   for cell in eachindex(cell_cols)
     rows = getindex!(rows_cache,cell_rows,cell)
     cols = getindex!(cols_cache,cell_cols,cell)
     vals1 = getindex!(vals_cache,cell_vals1,cell)
-    evaluate!(add_cache,add!,mat1,vals1,rows,cols)
-    mat[1] = mat1
+    evaluate!(add_cache,add!,mat.array,vals1,rows,cols)
   end
 end
 
