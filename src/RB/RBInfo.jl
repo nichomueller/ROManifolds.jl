@@ -42,9 +42,10 @@ function RBInfo(
 end
 
 function get_norm_matrix(rbinfo::RBInfo,feop::PTFEOperator)
+  norm_style = rbinfo.norm_style
   try
     T = get_vector_type(feop.test)
-    load(rbinfo,SparseMatrixCSC{eltype(T),Int};norm_style=rbinfo.norm_style)
+    load(rbinfo,SparseMatrixCSC{eltype(T),Int};norm_style)
   catch
     if norm_style == :l2
       nothing

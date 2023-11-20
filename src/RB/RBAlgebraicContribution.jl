@@ -223,8 +223,8 @@ function collect_reduced_residuals!(cache,op::PTOperator,rbres::RBVecAlgebraicCo
   collect_reduced_residuals!(cache,op,rbres.affine_decompositions)
 end
 
-function collect_reduced_jacobians!(cache,op::PTOperator,rbres::RBMatAlgebraicContribution)
-  collect_reduced_jacobians!(cache,op,rbres.affine_decompositions)
+function collect_reduced_jacobians!(cache,op::PTOperator,rbres::RBMatAlgebraicContribution;kwargs...)
+  collect_reduced_jacobians!(cache,op,rbres.affine_decompositions;kwargs...)
 end
 
 function collect_rhs_contributions!(
@@ -284,7 +284,7 @@ function collect_lhs_contributions!(
     return empty_rb_contribution(k,rbinfo,rbspace_row,rbspace_col)
   else
     collect_cache,coeff_cache = mdeim_cache
-    jac = collect_reduced_jacobians!(collect_cache,op,rbjac)
+    jac = collect_reduced_jacobians!(collect_cache,op,rbjac;kwargs...)
     rb_jac_contribs = Vector{PTArray{Matrix{T}}}(undef,length(rbjac))
     for i = eachindex(rbjac)
       coeff = rb_coefficient!(coeff_cache,rbjac[i],jac[i];st_mdeim)
