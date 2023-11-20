@@ -74,6 +74,42 @@ function get_rb_ndofs(a::_RBAlgebraicContribution)
   get_rb_ndofs(a[trian])
 end
 
+for (AC,AD) in zip((:_RBVecAlgebraicContribution,:_RBMatAlgebraicContribution),
+  (:_RBVecAffineDecomposition,:_RBMatAffineDecomposition))
+  @eval begin
+    function load_algebraic_contrib(path::String,::Type{$AC})
+      cpath = joinpath(path,"contrib")
+      tpath = joinpath(path,"trian")
+      T = load(joinpath(path,"type"),DataType)
+      a = $AC(T)
+      i = 1
+      while isfile(correct_path(cpath*"_$i"))
+        ai = load(cpath*"_$i",$AD{T})
+        ti = load(tpath*"_$i",Triangulation)
+        add_contribution!(a,ti,ai)
+        i += 1
+      end
+      a
+    end
+  end
+end
+
+function load(info::RBInfo,T::Type{_RBVecAlgebraicContribution})
+  path = joinpath(info.rb_path,"rb_rhs")
+  load_algebraic_contrib(path,T)
+end
+
+function load(info::RBInfo,::Type{Vector{_RBMatAlgebraicContribution}})
+  T = load(joinpath(joinpath(info.rb_path,"rb_lhs_1"),"type"),DataType)
+  njacs = num_active_dirs(info.rb_path)
+  ad_jacs = Vector{_RBMatAlgebraicContribution{T}}(undef,njacs)
+  for i = 1:njacs
+    path = joinpath(info.rb_path,"rb_lhs_$i")
+    ad_jacs[i] = load_algebraic_contrib(path,RBMatAlgebraicContribution)
+  end
+  ad_jacs
+end
+
 function old_collect_compress_rhs_lhs(
   rbinfo::RBInfo,
   feop::PTFEOperator{Affine},
@@ -400,10 +436,8 @@ end
 
 begin
   root = pwd()
-  mesh = "model_circle_2D_coarse.json"
-  bnd_info = Dict("dirichlet" => ["inlet","outlet"],"neumann" => ["noslip"])
-  # mesh = "cube2x2.json"
-  # bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
+  mesh = "elasticity_3cyl2D.json"
+  bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
   test_path = "$root/tests/poisson/unsteady/$mesh"
   order = 1
   degree = 2
@@ -461,18 +495,19 @@ begin
   st_mdeim = false
   rbinfo = RBInfo(test_path;ϵ,norm_style,nsnaps_state,nsnaps_mdeim,nsnaps_test,st_mdeim)
 
-  # sols,params = load(rbinfo,(Snapshots{Vector{T}},Table))
-  # rbspace = load(rbinfo,RBSpace{T})
-  params = realization(feop,nsnaps_state+nsnaps_test)
-  sols,stats = collect_single_field_solutions(fesolver,feop,params)
-  rbspace = reduced_basis(rbinfo,feop,sols)
-  if save_solutions
-    save(rbinfo,(sols,params,stats))
-  end
+  sols,params = load(rbinfo,(Snapshots{Vector{T}},Table))
+  rbspace = load(rbinfo,RBSpace{T})
+  # params = realization(feop,nsnaps_state+nsnaps_test)
+  # sols,stats = collect_single_field_solutions(fesolver,feop,params)
+  # rbspace = reduced_basis(rbinfo,feop,sols)
+  # if save_solutions
+  #   save(rbinfo,(sols,params,stats))
+  # end
 end
 
 rbrhs,rblhs = collect_compress_rhs_lhs(rbinfo,feop,fesolver,rbspace,params)
-old_rbrhs,old_rblhs = old_collect_compress_rhs_lhs(rbinfo,feop,fesolver,rbspace,params)
+# old_rbrhs,old_rblhs = old_collect_compress_rhs_lhs(rbinfo,feop,fesolver,rbspace,params)
+old_rbrhs,old_rblhs = load(info,(_RBVecAlgebraicContribution,Vector{_RBMatAlgebraicContribution}))
 
 println("Comparing linear RB problems")
 nsnaps_test = rbinfo.nsnaps_test
