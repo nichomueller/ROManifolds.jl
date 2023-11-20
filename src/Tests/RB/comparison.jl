@@ -538,7 +538,7 @@ begin
   test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
   trial = PTTrialFESpace(test,g)
   feop = AffinePTFEOperator(res,jac,jac_t,pspace,trial,test)
-  t0,tf,dt,θ = 0.,0.3,0.005,1
+  t0,tf,dt,θ = 0.,0.3,0.005,0.5
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
   fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
 
@@ -574,7 +574,7 @@ old_rbrhs,old_rblhs = load(rbinfo,(_RBVecAlgebraicContribution,Vector{_RBMatAlge
 
 ad1 = rbrhs.affine_decompositions[1]
 trians = [get_domains(old_rbrhs)...]
-old_ad1 = old_rbrhs[trians[1]]
+old_ad1 = old_rbrhs[trians[2]]
 for name in propertynames(ad1)
   field = getproperty(ad1,name)
   old_field = getproperty(old_ad1,name)
