@@ -123,6 +123,16 @@ function get_rb_ndofs(a::_RBAlgebraicContribution)
   get_rb_ndofs(a[trian])
 end
 
+function old_load(path::String,::Type{RBAffineDecomposition{T,N}}) where {T,N}
+  bs = load(joinpath(path,"bs"),Vector{Array{T,N}})
+  bt = load(joinpath(path,"bt"),Vector{<:Array})
+  lu = load(joinpath(path,"lu"),LU)
+  meas = load(joinpath(path,"meas"),Measure)
+  idx = load(joinpath(path,"idx"),Vector{Int})
+  times = load(joinpath(path,"times"),Vector{<:Real})
+  GenericRBAffineDecomposition(bs,bt,lu,RBIntegrationDomain(meas,times,idx))
+end
+
 for (AC,AD) in zip((:_RBVecAlgebraicContribution,:_RBMatAlgebraicContribution),
   (:RBVecAffineDecomposition,:RBMatAffineDecomposition))
   @eval begin
@@ -133,7 +143,7 @@ for (AC,AD) in zip((:_RBVecAlgebraicContribution,:_RBMatAlgebraicContribution),
       a = $AC(T)
       i = 1
       while isfile(correct_path(cpath*"_$i"))
-        ai = load(cpath*"_$i",$AD{T})
+        ai = old_load(cpath*"_$i",$AD{T})
         ti = load(tpath*"_$i",Triangulation)
         add_contribution!(a,ti,ai)
         i += 1
@@ -154,7 +164,7 @@ function load(info::RBInfo,::Type{Vector{_RBMatAlgebraicContribution}})
   ad_jacs = Vector{_RBMatAlgebraicContribution{T}}(undef,njacs)
   for i = 1:njacs
     path = joinpath(info.rb_path,"rb_lhs_$i")
-    ad_jacs[i] = load_algebraic_contrib(path,RBMatAlgebraicContribution)
+    ad_jacs[i] = load_algebraic_contrib(path,_RBMatAlgebraicContribution)
   end
   ad_jacs
 end
@@ -559,8 +569,19 @@ old_M = stack(map(x->stack(x.array),old_sols.snaps))
 norm(M-old_M,Inf)
 
 rbrhs,rblhs = collect_compress_rhs_lhs(rbinfo,feop,fesolver,rbspace,params)
-old_rbrhs,old_rblhs = old_collect_compress_rhs_lhs(rbinfo,feop,fesolver,rbspace,params)
-# old_rbrhs,old_rblhs = load(rbinfo,(_RBVecAlgebraicContribution,Vector{_RBMatAlgebraicContribution}))
+# old_rbrhs,old_rblhs = old_collect_compress_rhs_lhs(rbinfo,feop,fesolver,rbspace,params)
+old_rbrhs,old_rblhs = load(rbinfo,(_RBVecAlgebraicContribution,Vector{_RBMatAlgebraicContribution}))
+
+ad1 = rbrhs.affine_decompositions[1]
+trians = [get_domains(old_rbrhs)...]
+old_ad1 = old_rbrhs[trians[1]]
+for name in propertynames(ad1)
+  field = getproperty(ad1,name)
+  old_field = getproperty(old_ad1,name)
+  if isa(field,Array)
+    @assert field ≈ old_field "Failed for $name"
+  end
+end
 
 println("Comparing linear RB problems")
 nsnaps_test = rbinfo.nsnaps_test
