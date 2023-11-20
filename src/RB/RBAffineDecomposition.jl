@@ -181,12 +181,12 @@ function collect_reduced_residuals!(
   common_time = union(times...)
   x = _get_quantity_at_time(op.u0,op.tθ,common_time)
   _b = _get_quantity_at_time(b,op.tθ,common_time)
-  ress,trian = residual_for_trian!(_b,op,x,common_time,meas) # reverse(meas)
+  ress,trian = residual_for_trian!(_b,op,x,common_time,meas...)
   ntrian = length(trian)
   Mvec = Vector{Matrix{T}}(undef,ntrian)
   for j in 1:ntrian
     ress_j = ress[j]
-    idx_j = get_idx_space(dom[j]) # careful here: might have to compare triangs
+    idx_j = get_idx_space(dom[j])
     pt_idx_j = _get_pt_index(ress_j,common_time,times[j])
     setsize!(Mcache,(length(idx_j),length(pt_idx_j)))
     M = Mcache.array
@@ -211,12 +211,12 @@ function collect_reduced_jacobians!(
   common_time = union(times...)
   x = _get_quantity_at_time(op.u0,op.tθ,common_time)
   _A = _get_quantity_at_time(A,op.tθ,common_time)
-  jacs_i,trian = jacobian_for_trian!(_A,op,x,i,common_time,meas) #reverse(meas)
+  jacs_i,trian = jacobian_for_trian!(_A,op,x,i,common_time,meas...)
   ntrian = length(trian)
   Mvec = Vector{Matrix{T}}(undef,ntrian)
   for j in 1:ntrian
     jacs_i_j = jacs_i[j]
-    idx_j = get_idx_space(dom[j]) # careful here: might have to compare triangs
+    idx_j = get_idx_space(dom[j])
     pt_idx_j = _get_pt_index(jacs_i_j,common_time,times[j])
     setsize!(Mcache,(length(idx_j),length(pt_idx_j)))
     M = Mcache.array

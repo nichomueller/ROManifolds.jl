@@ -23,7 +23,7 @@ function test_affine_decomposition_rhs(
     coeff = rb_coefficient!(coeff_cache,rbres_i,res_i;st_mdeim=false)
     basis_space = tpod(res_offline_i)#tpod(recast(res_offline_i))
 
-    for n = 1:length(op_offline.μ)
+    for n = 1:length(op.μ)
       resn = res_full_i[:,(n-1)*length(times)+1:n*length(times)]
       coeff_ok = transpose(basis_space'*resn)
       coeffn = coeff[n]
@@ -38,7 +38,7 @@ function test_affine_decomposition_rhs(
     @inbounds for i = eachindex(coeff)
       contribs[i] = copy(evaluate!(k,rb_cache,basis_space_proj,basis_time,coeff[i]))
     end
-    for n in eachindex(op_offline.μ)
+    for n in eachindex(op.μ)
       tidx = (n-1)*length(times)+1 : n*length(times)
       nzmidx = NnzMatrix{Nonaffine}(res_full_i[:,tidx],res_full_i.nonzero_idx,nfree,1)
       contrib_ok = space_time_projection(nzmidx,rbspace)
@@ -77,7 +77,7 @@ function test_affine_decomposition_lhs(
     coeff = rb_coefficient!(coeff_cache,rbjac_i,jac_i;st_mdeim=false)
     basis_space = tpod(jac_offline_i)
 
-    for n = 1:length(op_offline.μ)
+    for n = 1:length(op.μ)
       jacn = jac_full_i[:,(n-1)*length(times)+1:n*length(times)]
       coeff_ok = transpose(basis_space'*jacn)
       coeffn = coeff[n]
@@ -92,7 +92,7 @@ function test_affine_decomposition_lhs(
     @inbounds for i = eachindex(coeff)
       contribs[i] = copy(evaluate!(k,rb_cache,basis_space_proj,basis_time,coeff[i]))
     end
-    for n in eachindex(op_offline.μ)
+    for n in eachindex(op.μ)
       tidx = (n-1)*length(times)+1 : n*length(times)
       nzmidx = NnzMatrix{Nonaffine}(jac_full_i[:,tidx],jac_full_i.nonzero_idx,nfree,1)
       contrib_ok = space_time_projection(nzmidx,rbspace_row,rbspace_col;combine_projections)
@@ -103,12 +103,12 @@ function test_affine_decomposition_lhs(
 end
 
 nsnaps_test = 10
-snaps_train,params_train = sols[1:nsnaps_state],params[1:nsnaps_state]
+snaps_train,params_train = sols[1:nsnaps_mdeim],params[1:nsnaps_mdeim]
 snaps_test,params_test = sols[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
 op = get_ptoperator(fesolver,feop,snaps_test,params_test)
 op_offline = get_ptoperator(fesolver,feop,snaps_train,params_train)
 rhs_cache,lhs_cache = allocate_cache(op,snaps_test)
 
 test_affine_decomposition_rhs(rhs_cache,op,op_offline,rbrhs.affine_decompositions,rbspace)
-j = 2
-test_affine_decomposition_lhs(lhs_cache,op,op_offline,rblhs[i].affine_decompositions,rbspace,rbspace;j)
+j = 1
+test_affine_decomposition_lhs(lhs_cache,op,op_offline,rblhs[j].affine_decompositions,rbspace,rbspace;j)

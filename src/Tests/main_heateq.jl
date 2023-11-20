@@ -57,10 +57,10 @@ function heat_equation()
   fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
 
   ϵ = 1e-4
-  load_solutions = true
+  load_solutions = false
   save_solutions = true
   load_structures = false
-  save_structures = true
+  save_structures = false
   norm_style = :l2
   nsnaps_state = 50
   nsnaps_mdeim = 20
@@ -100,14 +100,11 @@ heat_equation()
 nsnaps_test = rbinfo.nsnaps_test
 snaps_test,params_test = sols[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
 op = get_ptoperator(fesolver,feop,snaps_test,params_test)
-rhs_cache,lhs_cache = allocate_cache(op,snaps_test)
-mdeim_cache,rb_cache = rhs_cache
-st_mdeim = rbinfo.st_mdeim
-k = RBVecContributionMap(Float)
-collect_cache,coeff_cache = mdeim_cache
-_res = collect_reduced_residuals!(collect_cache,op,rbrhs)
-rb_res_contribs = Vector{PTArray{Vector{Float}}}(undef,length(rbrhs))
-for (rbresi,resi) in zip(rbrhs,_res)
-  coeff = rb_coefficient!(coeff_cache,rbresi,resi;st_mdeim)
-  rb_res_contribs[i] = rb_contribution!(rb_cache,k,rbresi,coeff)
+cache = allocate_cache(op,snaps_test)
+stats = @timed begin
+  rhs,(lhs,lhs_t) = collect_rhs_lhs_contributions!(cache,rbinfo,op,rbrhs,rblhs,rbspace)
+  rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs+lhs_t)
 end
+approx_snaps_test = recast(rb_snaps_test,rbspace)
+_sol = space_time_matrices(snaps_test;nparams=nsnaps_test)
+_sol_approx = space_time_matrices(approx_snaps_test;nparams=nsnaps_test)

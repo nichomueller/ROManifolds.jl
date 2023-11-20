@@ -5,10 +5,25 @@ function Base.:(==)(a::T,b::T) where {T<:Union{Grid,Field}}
     try isdefined(a_field,1) && isdefined(b_field,1)
       (==)(a_field,b_field)
     catch
-      false
+      return false
     end
   end
   return true
+end
+
+function Geometry.is_change_possible(strian::Triangulation,ttrian::Triangulation)
+  if strian == ttrian
+    return true
+  end
+  @check get_background_model(strian) == get_background_model(ttrian) "Triangulations do not point to the same background discrete model!"
+  D = num_cell_dims(strian)
+  sglue = get_glue(strian,Val(D))
+  tglue = get_glue(ttrian,Val(D))
+  is_change_possible(sglue,tglue)
+end
+
+function is_parent(tparent::Triangulation,tchild::Triangulation)
+  false
 end
 
 function is_parent(tparent::BodyFittedTriangulation,tchild::BodyFittedTriangulation)
@@ -16,7 +31,7 @@ function is_parent(tparent::BodyFittedTriangulation,tchild::BodyFittedTriangulat
 end
 
 function is_parent(tparent::BoundaryTriangulation,tchild::Geometry.TriangulationView)
-  is_parent(tparent.trian,tchild.parent.trian)
+  get_grid(tparent.trian) == get_grid(tchild.parent.trian)
 end
 
 function FESpaces.get_order(test::SingleFieldFESpace)

@@ -8,7 +8,7 @@ rbspace = reduced_basis(rbinfo,feop,sols;nsnaps_state)
   # rbspace = RBSpace(basis_space,basis_time)
 
 nparams,time_ndofs=length(params),get_time_ndofs(fesolver)
-nzm = NnzArray(sols)
+nzm = NnzMatrix(sols[1:nsnaps_state];nparams=nsnaps_state)
 full_val = recast(nzm)
 bs = rbspace.basis_space
 bt = rbspace.basis_time
