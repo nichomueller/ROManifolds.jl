@@ -5,6 +5,55 @@ begin
   include("$root/src/RB/RB.jl")
 end
 
+struct _Snapshots{T<:AbstractArray}
+  snaps::Vector{PTArray{T}}
+  function _Snapshots(s::Vector{<:PTArray{T}}) where T
+    new{T}(s)
+  end
+end
+
+Base.length(s::_Snapshots) = length(s.snaps)
+Base.size(s::_Snapshots,args...) = size(testitem(first(s.snaps)),args...)
+Base.eachindex(s::_Snapshots) = eachindex(s.snaps)
+Base.lastindex(s::_Snapshots) = num_params(s)
+num_space_dofs(s::_Snapshots) = size(s,1)
+num_time_dofs(s::_Snapshots) = length(s)
+num_params(s::_Snapshots) = length(first(s.snaps))
+
+function Base.getindex(s::_Snapshots{T},idx) where T
+  time_ndofs = num_time_dofs(s)
+  nrange = length(idx)
+  array = Vector{T}(undef,time_ndofs*nrange)
+  for (i,r) in enumerate(idx)
+    for nt in 1:time_ndofs
+      array[(i-1)*time_ndofs+nt] = s.snaps[nt][r]
+    end
+  end
+  return NonaffinePTArray(array)
+end
+
+function Base.copy(s::_Snapshots)
+  scopy = copy.(s.snaps)
+  _Snapshots(scopy)
+end
+
+function recenter(s::_Snapshots,uh0::PTFEFunction;θ::Real=1)
+  snaps = copy(s.snaps)
+  u0 = get_free_dof_values(uh0)
+  sθ = snaps*θ + [u0,snaps[2:end]...]*(1-θ)
+  _Snapshots(sθ)
+end
+
+function save(info::RBInfo,s::_Snapshots)
+  path = joinpath(info.fe_path,"fesnaps")
+  save(path,s)
+end
+
+function load(info::RBInfo,T::Type{<:_Snapshots})
+  path = joinpath(info.fe_path,"fesnaps")
+  load(path,T)
+end
+
 abstract type _RBAlgebraicContribution{T,N} end
 
 struct _RBVecAlgebraicContribution{T} <: _RBAlgebraicContribution{T,1}
@@ -75,7 +124,7 @@ function get_rb_ndofs(a::_RBAlgebraicContribution)
 end
 
 for (AC,AD) in zip((:_RBVecAlgebraicContribution,:_RBMatAlgebraicContribution),
-  (:_RBVecAffineDecomposition,:_RBMatAffineDecomposition))
+  (:RBVecAffineDecomposition,:RBMatAffineDecomposition))
   @eval begin
     function load_algebraic_contrib(path::String,::Type{$AC})
       cpath = joinpath(path,"contrib")
@@ -495,7 +544,7 @@ begin
   st_mdeim = false
   rbinfo = RBInfo(test_path;ϵ,norm_style,nsnaps_state,nsnaps_mdeim,nsnaps_test,st_mdeim)
 
-  sols,params = load(rbinfo,(Snapshots{Vector{T}},Table))
+  sols,params = load(rbinfo,(_Snapshots,Table))
   rbspace = load(rbinfo,RBSpace{T})
   # params = realization(feop,nsnaps_state+nsnaps_test)
   # sols,stats = collect_single_field_solutions(fesolver,feop,params)
@@ -505,9 +554,13 @@ begin
   # end
 end
 
+M = stack(map(x->stack(x.array),sols.snaps))
+old_M = stack(map(x->stack(x.array),old_sols.snaps))
+norm(M-old_M,Inf)
+
 rbrhs,rblhs = collect_compress_rhs_lhs(rbinfo,feop,fesolver,rbspace,params)
-# old_rbrhs,old_rblhs = old_collect_compress_rhs_lhs(rbinfo,feop,fesolver,rbspace,params)
-old_rbrhs,old_rblhs = load(info,(_RBVecAlgebraicContribution,Vector{_RBMatAlgebraicContribution}))
+old_rbrhs,old_rblhs = old_collect_compress_rhs_lhs(rbinfo,feop,fesolver,rbspace,params)
+# old_rbrhs,old_rblhs = load(rbinfo,(_RBVecAlgebraicContribution,Vector{_RBMatAlgebraicContribution}))
 
 println("Comparing linear RB problems")
 nsnaps_test = rbinfo.nsnaps_test
