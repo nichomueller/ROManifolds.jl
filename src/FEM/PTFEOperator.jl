@@ -170,10 +170,10 @@ function allocate_residual(
   end
   xh = TransientCellField(uh,dxh)
   res = get_residual(op)
-  dc = res(μ,t,xh,v)
+  dc = integrate(res(μ,t,xh,v))
   dc1 = testitem(dc)
   vecdata1 = collect_cell_vector(V,dc1)
-  allocate_vector(affinity(dc),op.assem,vecdata1;N=length(uh))
+  allocate_vector(dc,op.assem,vecdata1;N=length(uh))
 end
 
 function allocate_jacobian(
@@ -194,10 +194,10 @@ function allocate_jacobian(
   end
   xh = TransientCellField(uh,dxh)
   jac = get_jacobian(op)
-  dc = jac[i](μ,t,xh,u,v)
+  dc = integrate(jac[i](μ,t,xh,u,v))
   dc1 = testitem(dc)
   matdata1 = collect_cell_matrix(Uh,V,dc1)
-  allocate_matrix(affinity(dc),op.assem,matdata1;N=length(uh))
+  allocate_matrix(dc,op.assem,matdata1;N=length(uh))
 end
 
 function residual!(
@@ -211,7 +211,7 @@ function residual!(
   V = get_test(op)
   v = get_fe_basis(V)
   res = get_residual(op)
-  dc = res(μ,t,xh,v)
+  dc = integrate(res(μ,t,xh,v))
   vecdata = collect_cell_vector(V,dc)
   assemble_vector_add!(b,op.assem,vecdata)
   b
@@ -229,7 +229,7 @@ function residual_for_trian!(
   V = get_test(op)
   v = get_fe_basis(V)
   res = get_residual(op)
-  dc = res(μ,t,xh,v,args...)
+  dc = integrate(res(μ,t,xh,v),args...)
   trian = get_domains(dc)
   bvec = Vector{typeof(b)}(undef,num_domains(dc))
   for (n,t) in enumerate(trian)
@@ -271,7 +271,7 @@ function jacobian_for_trian!(
   u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
   jac = get_jacobian(op)
-  dc = γᵢ*jac[i](μ,t,uh,u,v,args...)
+  dc = γᵢ*integrate(jac[i](μ,t,uh,u,v),args...)
   trian = get_domains(dc)
   Avec = Vector{typeof(A)}(undef,num_domains(dc))
   for (n,t) in enumerate(trian)
@@ -329,6 +329,6 @@ function _matdata_jacobian(
   u = get_trial_fe_basis(Uh)
   v = get_fe_basis(V)
   jac = get_jacobian(op)
-  dc = γᵢ*jac[i](μ,t,xh,u,v)
+  dc = γᵢ*integrate(jac[i](μ,t,xh,u,v))
   collect_cell_matrix(Uh,V,dc)
 end

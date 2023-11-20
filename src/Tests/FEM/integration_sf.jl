@@ -14,7 +14,7 @@ ode_op = get_algebraic_operator(feop)
 ode_cache = allocate_cache(ode_op,μ,times)
 update_cache!(ode_cache,ode_op,μ,times)
 nfree = num_free_dofs(test)
-u = PTArray([zeros(nfree) for _ = 1:N])
+u = NonaffinePTArray([zeros(nfree) for _ = 1:N])
 vθ = similar(u)
 vθ .= 1.0
 Us,_,fecache = ode_cache
@@ -25,10 +25,15 @@ for i in 1:get_order(feop)
 end
 xh = TransientCellField(uh,dxh)
 
-dca = integrate(∫(aμt(μ,times)*∇(dv)⋅∇(xh))dΩ)
-dch = integrate(∫(hμt(μ,times)*dv)dΓn)
-dcm = integrate(∫(dv*∂ₚt(xh))dΩ)
+dca = ∫(aμt(μ,times)*∇(dv)⋅∇(xh))dΩ
+dch = ∫(hμt(μ,times)*dv)dΓn
+dcm = ∫(dv*∂ₚt(xh))dΩ
 dc = dcm + dca - dch
+dca1 = integrate(∫ₚ(aμt(μ,times)*∇(dv)⋅∇(xh),dΩ))
+dch1 = integrate(∫ₚ(hμt(μ,times)*dv,dΓn))
+dcm1 = integrate(∫ₚ(dv*∂ₚt(xh),dΩ))
+dc1 = dcm1 + dca1 - dch1
+test_ptarray(dc[Ω],dc1[Ω])
 
 dcres = integrate(feop.res(μ,times,xh,dv))
 dcjac1 = integrate(feop.jacs[1](μ,times,xh,du,dv))

@@ -184,20 +184,23 @@ times = map(get_times,dom)
 common_time = union(times...)
 x = _get_quantity_at_time(op.u0,op.tθ,common_time)
 _b = _get_quantity_at_time(b,op.tθ,common_time)
-ress,trian = residual_for_trian!(_b,op,x,common_time,meas)
-ntrian = length(trian)
-Mvec = Vector{Matrix{T}}(undef,ntrian)
-for j in 1:ntrian
-  ress_j = ress[j]
-  idx_j = get_idx_space(dom[j]) # careful here: might have to compare triangs
-  pt_idx_j = _get_pt_index(ress_j,common_time,times[j])
-  setsize!(Mcache,(length(idx_j),length(pt_idx_j)))
-  M = Mcache.array
-  @inbounds for n = pt_idx_j
-    M[:,n] = ress_j[n][idx_j]
-  end
-  Mvec[j] = copy(M)
-end
+# ress,trian = residual_for_trian!(_b,op,x,common_time,meas)
+# residual_for_trian!(b,op.odeop,op.μ,op.tθ,(op.vθ,op.vθ),op.ode_cache,meas)
+Xh, = op.ode_cache
+dxh = (EvaluationFunction(Xh[2],op.vθ),)
+xh = TransientCellField(EvaluationFunction(Xh[1],op.vθ),dxh)
+V = get_test(feop)
+v = get_fe_basis(V)
+dc = res(op.μ,op.tθ,xh,v,meas)
+
+_temp_res(μ,t,u,v) = ∫(v*∂ₚt(u))dΓn + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΓn - ∫(fμt(μ,t)*v)dΓn - ∫(hμt(μ,t)*v)dΩ
+_temp_feop = AffinePTFEOperator(_temp_res,jac,jac_t,pspace,trial,test)
+_temp_op = get_ptoperator(fesolver,_temp_feop,snaps_test,params_test)
+_temp_res_full, = collect_residuals_for_trian(_temp_op)
+
+_temp_feop = AffinePTFEOperator(Res,jac,jac_t,pspace,trial,test)
+_temp_op = get_ptoperator(fesolver,_temp_feop,snaps_test,params_test)
+_res = collect_reduced_residuals!(rhs_collect_cache,_temp_op,rbres)
 
 # res_full, = collect_residuals_for_trian(op)
 # res1(μ,t,u,v) = ∫(v*∂ₚt(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ

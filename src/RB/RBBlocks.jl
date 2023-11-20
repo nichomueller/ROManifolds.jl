@@ -168,7 +168,7 @@ function space_supremizers(basis_space::Matrix,feop::PTFEOperator)
   u = zero(feop.test)
   t = 0.
   jac = get_jacobian(feop)
-  j(du,dv) = jac[1](μ,t,u,du,dv)
+  j(du,dv) = integrate(jac[1](μ,t,u,du,dv))
   trial_dual = get_trial(feop)
   constraint_mat = assemble_matrix(j,trial_dual(μ,t),feop.test)
   constraint_mat*basis_space
@@ -471,7 +471,7 @@ function check_touched_residuals(op::PTOperator)
   xh1 = TransientCellField(uh1,dxh1)
   dv = get_fe_basis(test)
   res = get_residual(feop)
-  int = res(μ1,t1,xh1,dv)
+  int = integrate(res(μ1,t1,xh1,dv))
   return !isnothing(int)
 end
 

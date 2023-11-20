@@ -80,7 +80,7 @@ end
 
 Algebra.create_from_nz(a::PTArray) = a
 
-function FESpaces.allocate_matrix(::Nonaffine,a::SparseMatrixAssembler,matdata;N=1)
+function FESpaces.allocate_matrix(::PTDomainContribution,a::SparseMatrixAssembler,matdata;N=1)
   A = allocate_matrix(a,matdata)
   array = Vector{typeof(A)}(undef,N)
   @inbounds for n = 1:N
@@ -89,7 +89,7 @@ function FESpaces.allocate_matrix(::Nonaffine,a::SparseMatrixAssembler,matdata;N
   NonaffinePTArray(array)
 end
 
-function FESpaces.allocate_matrix(::Affine,a::SparseMatrixAssembler,matdata;N=1)
+function FESpaces.allocate_matrix(::DomainContribution,a::SparseMatrixAssembler,matdata;N=1)
   A = allocate_matrix(a,matdata)
   AffinePTArray(A,N)
 end
@@ -172,7 +172,7 @@ end
   end
 end
 
-function FESpaces.allocate_vector(::Nonaffine,a::SparseMatrixAssembler,vecdata;N=1)
+function FESpaces.allocate_vector(::PTDomainContribution,a::SparseMatrixAssembler,vecdata;N=1)
   b = allocate_vector(a,vecdata)
   array = Vector{typeof(b)}(undef,N)
   @inbounds for n = 1:N
@@ -181,7 +181,7 @@ function FESpaces.allocate_vector(::Nonaffine,a::SparseMatrixAssembler,vecdata;N
   NonaffinePTArray(array)
 end
 
-function FESpaces.allocate_vector(::Affine,a::SparseMatrixAssembler,vecdata;N=1)
+function FESpaces.allocate_vector(::DomainContribution,a::SparseMatrixAssembler,vecdata;N=1)
   b = allocate_vector(a,vecdata)
   AffinePTArray(b,N)
 end

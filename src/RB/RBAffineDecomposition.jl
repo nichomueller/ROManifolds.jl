@@ -181,7 +181,7 @@ function collect_reduced_residuals!(
   common_time = union(times...)
   x = _get_quantity_at_time(op.u0,op.tθ,common_time)
   _b = _get_quantity_at_time(b,op.tθ,common_time)
-  ress,trian = residual_for_trian!(_b,op,x,common_time,meas)
+  ress,trian = residual_for_trian!(_b,op,x,common_time,meas) # reverse(meas)
   ntrian = length(trian)
   Mvec = Vector{Matrix{T}}(undef,ntrian)
   for j in 1:ntrian
@@ -211,7 +211,7 @@ function collect_reduced_jacobians!(
   common_time = union(times...)
   x = _get_quantity_at_time(op.u0,op.tθ,common_time)
   _A = _get_quantity_at_time(A,op.tθ,common_time)
-  jacs_i,trian = jacobian_for_trian!(_A,op,x,i,common_time,meas)
+  jacs_i,trian = jacobian_for_trian!(_A,op,x,i,common_time,meas) #reverse(meas)
   ntrian = length(trian)
   Mvec = Vector{Matrix{T}}(undef,ntrian)
   for j in 1:ntrian

@@ -25,8 +25,6 @@ end
 Base.getindex(a::PTDomainContribution,trian::Triangulation) = get_contribution(a,trian)
 Base.sum(a::PTDomainContribution) = sum(map(sum,values(a.dict)))
 Base.copy(a::PTDomainContribution) = PTDomainContribution(copy(a.dict))
-affinity(a::DomainContribution) = Affine()
-affinity(a::PTDomainContribution) = Nonaffine()
 
 function error_message(a::PTDomainContribution,b::Union{PTArray,AbstractArray})
   S = eltype(b)
@@ -175,6 +173,124 @@ function Arrays.testitem(a::PTDomainContribution)
   b
 end
 
+# Interface to easily pass from one measure to another
+
+struct PTIntegrand{T<:CellField}
+  object::T
+  meas::Measure
+end
+
+const ∫ₚ = PTIntegrand
+
+function Arrays.getindex(cont,a::PTIntegrand,meas::Measure)
+  trian = get_triangulation(meas)
+  itrian = get_triangulation(a.meas)
+  if itrian == trian || is_parent(itrian,trian)
+    integral = integrate(a.object,meas)
+    add_contribution!(cont,trian,integral[trian])
+    return cont
+  end
+  @unreachable """\n
+    There is no contribution associated with the given mesh in this PTIntegrand object.
+  """
+end
+
+function CellData.integrate(a::PTIntegrand)
+  integrate(a.object,a.meas)
+end
+
+function CellData.integrate(a::PTIntegrand,meas::Measure...)
+  @assert length(meas) == 1
+  cont = init_contribution(a)
+  for m in meas
+    getindex!(cont,a,m)
+  end
+  cont
+end
+
+struct CollectionPTIntegrand{T,N}
+  operations::NTuple{N,Union{typeof(+),typeof(-)}}
+  integrands::NTuple{N,PTIntegrand{T}}
+end
+
+function Base.iterate(a::CollectionPTIntegrand)
+  state = 1
+  (a.operations[state],a.integrands[state]),state
+end
+
+function Base.iterate(a::CollectionPTIntegrand{T,N} where T,state) where N
+  if state > N
+    return nothing
+  end
+  (a.operations[state],a.integrands[state]),state+1
+end
+
+function init_contribution(a...)
+  PTDomainContribution()
+end
+
+function init_contribution(
+  a::Union{PTIntegrand{<:OperationCellField},CollectionPTIntegrand{<:OperationCellField}}...)
+  DomainContribution()
+end
+
+function Arrays.getindex!(cont,a::CollectionPTIntegrand,meas::Measure)
+  trian = get_triangulation(meas)
+  for (op,int) in a
+    itrian = get_triangulation(int.meas)
+    if itrian == trian || is_parent(itrian,trian)
+      integral = integrate(int.object,meas)
+      add_contribution!(cont,trian,integral[trian],op)
+    end
+  end
+  if num_domains(cont) > 0
+    return cont
+  end
+  @unreachable """\n
+    There is no contribution associated with the given mesh in this PTIntegrand object.
+  """
+end
+
+for op in (:+,:-)
+  @eval begin
+    function ($op)(a::PTIntegrand,b::PTIntegrand)
+      CollectionPTIntegrand((+,$op),(a,b))
+    end
+
+    function ($op)(a::CollectionPTIntegrand,b::PTIntegrand)
+      CollectionPTIntegrand((a.operations...,$op),(a.integrands...,b))
+    end
+
+    function ($op)(a::PTIntegrand,b::CollectionPTIntegrand)
+      CollectionPTIntegrand(($op,b.operations...),(a,b.integrands...))
+    end
+
+    function ($op)(a::CollectionPTIntegrand,b::CollectionPTIntegrand)
+      operations = (a.operations...,b.operations...)
+      integrands = (a.integrands...,b.integrands...)
+      CollectionPTIntegrand(operations,integrands)
+    end
+  end
+end
+
+function CellData.integrate(a::CollectionPTIntegrand)
+  cont = init_contribution(a)
+  for (op,int) in a
+    itrian = get_triangulation(int.meas)
+    integral = integrate(int)
+    add_contribution!(cont,itrian,integral[itrian],op)
+  end
+  cont
+end
+
+function CellData.integrate(a::CollectionPTIntegrand,meas::Measure...)
+  cont = init_contribution(a)
+  for m in meas
+    getindex!(cont,a,m)
+  end
+  cont
+end
+
 # Interface that allows to entirely eliminate terms from the (PT)DomainContribution
 
 for op in (:inner,:outer,:double_contraction,:+,:-,:*,:cross,:dot,:/)
@@ -197,18 +313,36 @@ CellData.integrate(::Nothing,args...) = nothing
 
 CellData.integrate(::Any,::Nothing) = nothing
 
-for T in (:DomainContribution,:PTDomainContribution)
+for T in (:DomainContribution,:PTDomainContribution,:PTIntegrand,:CollectionPTIntegrand)
   @eval begin
     (+)(::Nothing,b::$T) = b
     (+)(a::$T,::Nothing) = a
     (-)(a::$T,::Nothing) = a
-    function (-)(::Nothing,b::$T)
-      for (trian,array) in b.dict
-        b.dict[trian] = -array
-      end
-      b
-    end
   end
+end
+
+function (-)(::Nothing,b::DomainContribution)
+  for (trian,array) in b.dict
+    b.dict[trian] = -array
+  end
+  b
+end
+
+function (-)(::Nothing,b::PTDomainContribution)
+  for (trian,array) in b.dict
+    b.dict[trian] = -array
+  end
+  b
+end
+
+function (-)(::Nothing,b::PTIntegrand)
+  PTIntegrand(-b.object,b.meas)
+end
+
+function (-)(::Nothing,b::CollectionPTIntegrand)
+  _neg_sign(::typeof(+)) = -
+  _neg_sign(::typeof(-)) = +
+  CollectionPTIntegrand(map(_neg_sign,b.operations),b.integrands)
 end
 
 function FESpaces.collect_cell_vector(::FESpace,::Nothing,args...)

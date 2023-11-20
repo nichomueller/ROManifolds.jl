@@ -1,3 +1,24 @@
+function Base.:(==)(a::T,b::T) where {T<:Union{Grid,Field}}
+  for field in propertynames(a)
+    a_field = getproperty(a,field)
+    b_field = getproperty(b,field)
+    try isdefined(a_field,1) && isdefined(b_field,1)
+      (==)(a_field,b_field)
+    catch
+      false
+    end
+  end
+  return true
+end
+
+function is_parent(tparent::BodyFittedTriangulation,tchild::BodyFittedTriangulation)
+  get_grid(tparent) == get_grid(tchild).parent
+end
+
+function is_parent(tparent::BoundaryTriangulation,tchild::Geometry.TriangulationView)
+  is_parent(tparent.trian,tchild.parent.trian)
+end
+
 function FESpaces.get_order(test::SingleFieldFESpace)
   basis = get_fe_basis(test)
   first(FESpaces.get_order(first(basis.cell_basis.values).fields))

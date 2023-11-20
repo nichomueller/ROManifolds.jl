@@ -43,12 +43,9 @@ function heat_equation()
   u0(μ) = x->u0(x,μ)
   u0μ(μ) = PFunction(u0,μ)
 
-  res(μ,t,u,v,(dΩ,dΓn)) = ∫(v*∂ₚt(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
-  res(μ,t,u,v) = res(μ,t,u,v,(dΩ,dΓn))
-  jac(μ,t,u,du,v,(dΩ,)) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
-  jac(μ,t,u,du,v) = jac(μ,t,u,du,v,(dΩ,))
-  jac_t(μ,t,u,dut,v,(dΩ,)) = ∫(v*dut)dΩ
-  jac_t(μ,t,u,du,v) = jac_t(μ,t,u,du,v,(dΩ,))
+  res(μ,t,u,v) = ∫ₚ(v*∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⋅∇(u),dΩ) - ∫ₚ(fμt(μ,t)*v,dΩ) - ∫ₚ(hμt(μ,t)*v,dΓn)
+  jac(μ,t,u,du,v) = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ)
+  jac_t(μ,t,u,dut,v) = ∫ₚ(v*dut,dΩ)
 
   T = Float
   reffe = ReferenceFE(lagrangian,T,order)
