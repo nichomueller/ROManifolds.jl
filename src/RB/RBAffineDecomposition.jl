@@ -169,23 +169,36 @@ function get_reduced_cells(idx::Vector{Int},cell_dof_ids::Table)
   unique(cells)
 end
 
+function _get_at_matching_trian(
+  q::Vector{<:PTArray},
+  trians::Base.KeySet{Triangulation},
+  trian::Triangulation)
+
+  for (i,itrian) in enumerate(trians)
+    if itrian === trian
+      return q[i]
+    end
+  end
+end
+
 function collect_reduced_residuals!(
   cache,
   op::PTOperator,
   a::Vector{RBVecAffineDecomposition{T}}) where T
 
   b,Mcache = cache
-  dom = map(get_integration_domain,a)
-  meas = map(get_measure,dom)
-  times = map(get_times,dom)
+  dom = get_integration_domain.(a)
+  meas = get_measure.(dom)
+  _trian = get_triangulation.(meas)
+  ntrian = length(_trian)
+  times = get_times.(dom)
   common_time = union(times...)
   x = _get_quantity_at_time(op.u0,op.tθ,common_time)
-  _b = _get_quantity_at_time(b,op.tθ,common_time)
-  ress,trian = residual_for_trian!(_b,op,x,common_time,meas...)
-  ntrian = length(trian)
+  bt = _get_quantity_at_time(b,op.tθ,common_time)
+  ress,trian = residual_for_trian!(bt,op,x,common_time,meas...)
   Mvec = Vector{Matrix{T}}(undef,ntrian)
   for j in 1:ntrian
-    ress_j = ress[j]
+    ress_j = _get_at_matching_trian(ress,trian,_trian[j])
     idx_j = get_idx_space(dom[j])
     pt_idx_j = _get_pt_index(ress_j,common_time,times[j])
     setsize!(Mcache,(length(idx_j),length(pt_idx_j)))
@@ -205,17 +218,19 @@ function collect_reduced_jacobians!(
   i::Int=1) where T
 
   A,Mcache = cache
-  dom = map(get_integration_domain,a)
-  meas = map(get_measure,dom)
-  times = map(get_times,dom)
+  dom = get_integration_domain.(a)
+  meas = get_measure.(dom)
+  _trian = get_triangulation.(meas)
+  ntrian = length(_trian)
+  times = get_times.(dom)
   common_time = union(times...)
   x = _get_quantity_at_time(op.u0,op.tθ,common_time)
-  _A = _get_quantity_at_time(A,op.tθ,common_time)
-  jacs_i,trian = jacobian_for_trian!(_A,op,x,i,common_time,meas...)
+  At = _get_quantity_at_time(A,op.tθ,common_time)
+  jacs_i,trian = jacobian_for_trian!(At,op,x,i,common_time,meas...)
   ntrian = length(trian)
   Mvec = Vector{Matrix{T}}(undef,ntrian)
   for j in 1:ntrian
-    jacs_i_j = jacs_i[j]
+    jacs_i_j = _get_at_matching_trian(jacs_i,trian,_trian[j])
     idx_j = get_idx_space(dom[j])
     pt_idx_j = _get_pt_index(jacs_i_j,common_time,times[j])
     setsize!(Mcache,(length(idx_j),length(pt_idx_j)))

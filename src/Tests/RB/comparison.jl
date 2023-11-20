@@ -400,8 +400,8 @@ end
 
 begin
   root = pwd()
-  mesh = "elasticity_3cyl2D.json"
-  bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
+  mesh = "model_circle_2D_coarse.json"
+  bnd_info = Dict("dirichlet" => ["inlet","outlet"],"neumann" => ["noslip"])
   # mesh = "cube2x2.json"
   # bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
   test_path = "$root/tests/poisson/unsteady/$mesh"
@@ -495,6 +495,7 @@ approx_snaps_test = recast(rb_snaps_test,rbspace)
 old_approx_snaps_mat = space_time_matrices(old_approx_snaps_test;nparams=nsnaps_test)
 approx_snaps_mat = space_time_matrices(approx_snaps_test;nparams=nsnaps_test)
 snaps_mat = space_time_matrices(snaps_test;nparams=nsnaps_test)
+post_process(rbinfo,feop,fesolver,snaps_test,params_test,old_approx_snaps_test,stats)
 
 # background check
 old_approx_snaps_mat[1] - snaps_mat[1]
