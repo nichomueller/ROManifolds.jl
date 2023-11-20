@@ -1,5 +1,5 @@
-sols,params = load(rbinfo,(Snapshots,Table))
-rbspace = reduced_basis(rbinfo,feop,sols;nsnaps_state)
+sols,params = load(rbinfo,(Snapshots{Vector{Float}},Table))
+rbspace = reduced_basis(rbinfo,feop,sols)
   # nzm = NnzArray(sols)
   # basis_space = tpod(nzm,nothing;ϵ=1e-4)
   # compressed_nza = prod(basis_space,nzm)
@@ -12,6 +12,6 @@ nzm = NnzMatrix(sols[1:nsnaps_state];nparams=nsnaps_state)
 full_val = recast(nzm)
 bs = rbspace.basis_space
 bt = rbspace.basis_time
-maximum(abs.(full_val - bs*bs'*full_val)) <= ϵ*10
+norm(full_val - bs*bs'*full_val) / norm(full_val) <= ϵ
 m2 = change_mode(nzm)
-maximum(abs.(m2 - bt*bt'*m2)) <= ϵ*10
+norm(m2 - bt*bt'*m2,Inf) / norm(m2) <= ϵ

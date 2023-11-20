@@ -312,28 +312,24 @@ function recast_coefficient!(
   ptarray
 end
 
-abstract type RBContributionMap{T} <: Map end
-struct RBVecContributionMap{T} <: RBContributionMap{T}
-  RBVecContributionMap(::Type{T}) where T = new{T}()
-end
-struct RBMatContributionMap{T} <: RBContributionMap{T}
-  RBMatContributionMap(::Type{T}) where T = new{T}()
-end
+abstract type RBContributionMap <: Map end
+struct RBVecContributionMap <: RBContributionMap end
+struct RBMatContributionMap <: RBContributionMap end
 
-function Arrays.return_cache(::RBVecContributionMap{T}) where T
+function Arrays.return_cache(::RBVecContributionMap,snaps::PTArray{Vector{T}}) where T
   array_coeff = zeros(T,1)
   array_proj = zeros(T,1)
   CachedArray(array_coeff),CachedArray(array_proj),CachedArray(array_proj)
 end
 
-function Arrays.return_cache(::RBMatContributionMap{T}) where T
+function Arrays.return_cache(::RBMatContributionMap,snaps::PTArray{Vector{T}}) where T
   array_coeff = zeros(T,1,1)
   array_proj = zeros(T,1,1)
   CachedArray(array_coeff),CachedArray(array_proj),CachedArray(array_proj)
 end
 
 function Arrays.evaluate!(
-  ::RBVecContributionMap{T},
+  ::RBVecContributionMap,
   cache,
   proj_basis_space::AbstractVector,
   basis_time::Matrix{T},
@@ -364,7 +360,7 @@ function Arrays.evaluate!(
 end
 
 function Arrays.evaluate!(
-  ::RBMatContributionMap{T},
+  ::RBMatContributionMap,
   cache,
   proj_basis_space::AbstractVector,
   basis_time::Array{T,3},
@@ -423,7 +419,7 @@ function rb_contribution!(
 end
 
 function empty_rb_contribution(
-  ::RBVecContributionMap{T},
+  ::RBVecContributionMap,
   rbinfo::RBInfo,
   rbspace::RBSpace{T}) where T
 
@@ -432,7 +428,7 @@ function empty_rb_contribution(
 end
 
 function empty_rb_contribution(
-  ::RBMatContributionMap{T},
+  ::RBMatContributionMap,
   rbinfo::RBInfo,
   rbspace_row::RBSpace{T},
   rbspace_col::RBSpace{T}) where T

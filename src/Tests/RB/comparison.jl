@@ -131,7 +131,7 @@ function collect_rhs_contributions!(
 
   coeff_cache,rb_cache = cache
   st_mdeim = rbinfo.st_mdeim
-  k = RBVecContributionMap(T)
+  k = RBVecContributionMap()
   rb_res_contribs = Vector{PTArray{Vector{T}}}(undef,num_domains(rbres))
   if iszero(rbres)
     nrow = get_rb_ndofs(rbspace)
@@ -175,7 +175,7 @@ function collect_lhs_contributions!(
   coeff_cache,rb_cache = cache
   trian = get_domains(rbjac)
   st_mdeim = rbinfo.st_mdeim
-  k = RBMatContributionMap(T)
+  k = RBMatContributionMap()
   rb_jac_contribs = Vector{PTArray{Matrix{T}}}(undef,num_domains(rbjac))
   if iszero(rbjac)
     nrow = get_rb_ndofs(rbspace_row)
@@ -390,8 +390,8 @@ function old_allocate_cache(
   coeff = zeros(T,1,1)
   ptcoeff = NonaffinePTArray([zeros(T,1,1) for _ = eachindex(op.μ)])
 
-  res_contrib_cache = return_cache(RBVecContributionMap(T))
-  jac_contrib_cache = return_cache(RBMatContributionMap(T))
+  res_contrib_cache = return_cache(RBVecContributionMap(),snaps)
+  jac_contrib_cache = return_cache(RBMatContributionMap(),snaps)
 
   res_cache = (b,CachedArray(coeff),CachedArray(ptcoeff)),res_contrib_cache
   jac_cache = (A,CachedArray(coeff),CachedArray(ptcoeff)),jac_contrib_cache
@@ -400,10 +400,10 @@ end
 
 begin
   root = pwd()
-  # mesh = "elasticity_3cyl2D.json"
-  # bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
-  mesh = "cube2x2.json"
-  bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
+  mesh = "elasticity_3cyl2D.json"
+  bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
+  # mesh = "cube2x2.json"
+  # bnd_info = Dict("dirichlet" => [1,2,3,4,5,7,8],"neumann" => [6])
   test_path = "$root/tests/poisson/unsteady/$mesh"
   order = 1
   degree = 2
@@ -445,7 +445,7 @@ begin
   test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
   trial = PTTrialFESpace(test,g)
   feop = AffinePTFEOperator(res,jac,jac_t,pspace,trial,test)
-  t0,tf,dt,θ = 0.,0.3,0.005,0.5
+  t0,tf,dt,θ = 0.,0.3,0.005,1
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
   fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
 
@@ -461,8 +461,14 @@ begin
   st_mdeim = false
   rbinfo = RBInfo(test_path;ϵ,norm_style,nsnaps_state,nsnaps_mdeim,nsnaps_test,st_mdeim)
 
-  sols,params = load(rbinfo,(Snapshots{Vector{T}},Table))
-  rbspace = load(rbinfo,RBSpace{T})
+  # sols,params = load(rbinfo,(Snapshots{Vector{T}},Table))
+  # rbspace = load(rbinfo,RBSpace{T})
+  params = realization(feop,nsnaps_state+nsnaps_test)
+  sols,stats = collect_single_field_solutions(fesolver,feop,params)
+  rbspace = reduced_basis(rbinfo,feop,sols)
+  if save_solutions
+    save(rbinfo,(sols,params,stats))
+  end
 end
 
 rbrhs,rblhs = collect_compress_rhs_lhs(rbinfo,feop,fesolver,rbspace,params)
@@ -489,6 +495,14 @@ approx_snaps_test = recast(rb_snaps_test,rbspace)
 old_approx_snaps_mat = space_time_matrices(old_approx_snaps_test;nparams=nsnaps_test)
 approx_snaps_mat = space_time_matrices(approx_snaps_test;nparams=nsnaps_test)
 snaps_mat = space_time_matrices(snaps_test;nparams=nsnaps_test)
+
+# background check
+old_approx_snaps_mat[1] - snaps_mat[1]
+
+# compare rb contribs
+stack((old_rhs - rhs).array)
+stack((old_lhs - lhs).array)
+stack((old_lhs_t - lhs_t).array)
 
 # compare affine decomp
 trians_res = get_domains(old_rbrhs)

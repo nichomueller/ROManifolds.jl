@@ -1,3 +1,5 @@
+_sparse_to_full(sparse_idx,sparse_to_full_idx) = findall(x->x == sparse_idx,sparse_to_full_idx)[1]
+
 function test_affine_decomposition_rhs(
   cache,
   op::PTOperator,
@@ -18,8 +20,6 @@ function test_affine_decomposition_rhs(
 
   for i in eachindex(res)
     rbres_i,res_i,res_full_i,res_offline_i = rbres[i],res[i],res_full[i],res_offline[i]
-    err_res = maximum(abs.(res_i-res_full_i))
-    println("Residual difference for selected triangulation is $err_res")
     coeff = rb_coefficient!(coeff_cache,rbres_i,res_i;st_mdeim=false)
     basis_space = tpod(res_offline_i)#tpod(recast(res_offline_i))
 
@@ -34,7 +34,7 @@ function test_affine_decomposition_rhs(
     basis_space_proj = rbres_i.basis_space
     basis_time = last(rbres_i.basis_time)
     contribs = Vector{Vector{T}}(undef,length(coeff))
-    k = RBVecContributionMap(T)
+    k = RBVecContributionMap()
     @inbounds for i = eachindex(coeff)
       contribs[i] = copy(evaluate!(k,rb_cache,basis_space_proj,basis_time,coeff[i]))
     end
@@ -71,9 +71,6 @@ function test_affine_decomposition_lhs(
 
   for i in eachindex(jac)
     rbjac_i,jac_i,jac_full_i,jac_offline_i = rbjac[i],jac[i],jac_full[i],jac_offline[i]
-    red_idx = rbjac_i.integration_domain.idx
-    err_jac = maximum(abs.(jac_i-jac_full_i[red_idx,:]))
-    println("Jacobian #$j difference for selected triangulation is $err_jac")
     coeff = rb_coefficient!(coeff_cache,rbjac_i,jac_i;st_mdeim=false)
     basis_space = tpod(jac_offline_i)
 
@@ -88,7 +85,7 @@ function test_affine_decomposition_lhs(
     basis_space_proj = rbjac_i.basis_space
     basis_time = last(rbjac_i.basis_time)
     contribs = Vector{Matrix{T}}(undef,length(coeff))
-    k = RBMatContributionMap(T)
+    k = RBMatContributionMap()
     @inbounds for i = eachindex(coeff)
       contribs[i] = copy(evaluate!(k,rb_cache,basis_space_proj,basis_time,coeff[i]))
     end

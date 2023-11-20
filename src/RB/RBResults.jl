@@ -129,8 +129,8 @@ function allocate_cache(op::PTOperator,snaps::PTArray{Vector{T}}) where T
   coeff = CachedArray(zeros(T,1,1))
   ptcoeff = CachedArray(NonaffinePTArray([zeros(T,1,1) for _ = eachindex(op.μ)]))
 
-  res_contrib_cache = return_cache(RBVecContributionMap(T))
-  jac_contrib_cache = return_cache(RBMatContributionMap(T))
+  res_contrib_cache = return_cache(RBVecContributionMap(),snaps)
+  jac_contrib_cache = return_cache(RBMatContributionMap(),snaps)
 
   res_cache = ((b,mat),(coeff,ptcoeff)),res_contrib_cache
   jac_cache = ((A,mat),(coeff,ptcoeff)),jac_contrib_cache
@@ -161,7 +161,7 @@ function rb_solver(
 end
 
 function rb_solver(
-  rbinfo::BlockRBInfo,
+  rbinfo::RBInfo,
   feop::PTFEOperator,
   fesolver::PODESolver,
   rbspace,
