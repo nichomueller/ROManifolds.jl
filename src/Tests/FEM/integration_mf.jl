@@ -1,5 +1,27 @@
-μ = realization(feop)
-t = dt
+μ = realization(feop,2)
+times = [dt,2*dt]
+V = get_test(feop)
+dv = get_fe_basis(V)
+U = get_trial(feop)(nothing,nothing)
+du = get_trial_fe_basis(U)
+u = zero(feop.test)
+ode_op = get_algebraic_operator(feop)
+ode_cache = allocate_cache(ode_op,μ,times)
+update_cache!(ode_cache,ode_op,μ,times)
+nfree = num_free_dofs(V)
+u = NonaffinePTArray([zeros(V) for _ = 1:length(μ)*length(times)])
+vθ = similar(u)
+vθ .= 1.0
+Us,_,fecache = ode_cache
+uh = EvaluationFunction(Us[1],vθ)
+dxh = ()
+for i in 1:get_order(feop)
+  dxh = (dxh...,uh)
+end
+xh = TransientCellField(uh,dxh)
+transient_single_fields = _to_transient_single_fields(uh,dxh)
+PTTransientMultiFieldCellField(multi_field,derivatives,transient_single_fields)
+
 row,col = 1,2
 feop_row_col = feop[row,col]
 u = zero(feop_row_col.test)
@@ -29,10 +51,6 @@ V = get_test(feop_row_col)
 dv = get_fe_basis(V)
 U = get_trial(feop_row_col)(nothing,nothing)
 du = get_trial_fe_basis(U)
-# V = get_test(feop)
-# dv = get_fe_basis(V)
-# U = get_trial(feop)(nothing,nothing)
-# du = get_trial_fe_basis(U)
 
 ode_op = get_algebraic_operator(feop_row_col)
 ode_cache = allocate_cache(ode_op,μ,times)

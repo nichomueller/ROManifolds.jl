@@ -228,7 +228,7 @@ struct PTTransientSingleFieldCellField{A} <: PTTransientCellField
   derivatives::Tuple
 end
 
-const PTSingleFieldTypes = Union{GenericCellField,PTSingleFieldFEFunction}
+const PTSingleFieldTypes = Union{GenericPTCellField,PTSingleFieldFEFunction}
 
 function TransientCellField(single_field::PTSingleFieldTypes,derivatives::Tuple)
   PTTransientSingleFieldCellField(single_field,derivatives)
@@ -331,6 +331,7 @@ FESpaces.get_triangulation(f::PTMultiFieldFEFunction) = get_triangulation(f.mult
 CellData.DomainStyle(::Type{PTMultiFieldFEFunction{T}}) where T = DomainStyle(T)
 FESpaces.get_free_dof_values(f::PTMultiFieldFEFunction) = f.free_values
 FESpaces.get_fe_space(f::PTMultiFieldFEFunction) = f.fe_space
+MultiField.num_fields(a::PTMultiFieldFEFunction) = length(a.single_fe_functions)
 
 function FESpaces.get_cell_dof_values(f::PTMultiFieldFEFunction)
   msg = """\n
@@ -375,7 +376,7 @@ struct PTTransientMultiFieldCellField{A} <: PTTransientCellField
   transient_single_fields::Vector{<:PTTransientCellField}
 end
 
-const PTMultiFieldTypes = Union{MultiFieldCellField,PTMultiFieldFEFunction}
+const PTMultiFieldTypes = Union{PTMultiFieldCellField,PTMultiFieldFEFunction}
 
 function TransientCellField(multi_field::PTMultiFieldTypes,derivatives::Tuple)
   transient_single_fields = _to_transient_single_fields(multi_field,derivatives)
@@ -417,6 +418,23 @@ function Base.getindex(f::TransientMultiFieldCellField,indices::Vector{<:Int})
   end
   transient_single_fields = _to_transient_single_fields(cellfield,derivatives)
   PTTransientMultiFieldCellField(cellfield,derivatives,transient_single_fields)
+end
+
+function Gridap.ODEs.TransientFETools._to_transient_single_fields(
+  multi_field::PTMultiFieldTypes,
+  derivatives::Tuple)
+
+  transient_single_fields = PTTransientCellField[]
+  for ifield in 1:num_fields(multi_field)
+    single_field = multi_field[ifield]
+    single_derivatives = ()
+    for ifield_derivatives in derivatives
+      single_derivatives = (single_derivatives...,getindex(ifield_derivatives,ifield))
+    end
+    transient_single_field = PTTransientSingleFieldCellField(single_field,single_derivatives)
+    push!(transient_single_fields,transient_single_field)
+  end
+  transient_single_fields
 end
 
 Base.iterate(f::PTTransientMultiFieldCellField)  = iterate(f.transient_single_fields)

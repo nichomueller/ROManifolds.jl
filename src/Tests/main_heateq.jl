@@ -17,7 +17,6 @@ function heat_equation()
   Γn = BoundaryTriangulation(model,tags=["neumann"])
   dΩ = Measure(Ω,degree)
   dΓn = Measure(Γn,degree)
-  trians = Ω,Γn
 
   ranges = fill([1.,10.],3)
   sampling = UniformSampling()
@@ -81,7 +80,7 @@ function heat_equation()
   if load_structures
     rbspace = load(rbinfo,RBSpace{T})
     rbrhs,rblhs = load(rbinfo,(RBVecAlgebraicContribution{T},
-      Vector{RBMatAlgebraicContribution{T}}),trians...)
+      Vector{RBMatAlgebraicContribution{T}}),Ω,Γn)
   else
     rbspace = reduced_basis(rbinfo,feop,sols)
     rbrhs,rblhs = collect_compress_rhs_lhs(rbinfo,feop,fesolver,rbspace,params)

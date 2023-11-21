@@ -5,7 +5,7 @@ function get_fe_path(tpath::String)
   fepath
 end
 
-function get_rb_path(tpath::String,ϵ::Float;st_mdeim=false)
+function get_rb_path(tpath::String,ϵ;st_mdeim=false)
   @assert isdir(tpath) "Provide valid path for the current test"
   keyword = st_mdeim ? "st" : "standard"
   outermost_path = joinpath(tpath,"rb")
