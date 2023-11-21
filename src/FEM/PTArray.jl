@@ -70,7 +70,7 @@ function Base.hvcat(nblocks::Int,a::PTArray...)
   varray = map(1:nrows) do row
     vcat(a[(row-1)*nblocks+1:row*nblocks]...)
   end
-  hvarray = stack(varray)
+  hvarray = hcat(varray...)
   hvarray
 end
 
@@ -259,8 +259,20 @@ function Base.transpose(a::NonaffinePTArray)
   map(transpose,a)
 end
 
+function Base.hcat(a::PTArray...)
+  n = length(first(a))
+  harray = map(1:n) do j
+    arrays = ()
+    @inbounds for i = eachindex(a)
+      arrays = (arrays...,a[i][j])
+    end
+    hcat(arrays...)
+  end
+  NonaffinePTArray(harray)
+end
+
 function Base.vcat(a::PTArray...)
-  n = _get_length(a...)
+  n = length(first(a))
   varray = map(1:n) do j
     arrays = ()
     @inbounds for i = eachindex(a)
@@ -272,7 +284,7 @@ function Base.vcat(a::PTArray...)
 end
 
 function Base.stack(a::PTArray...)
-  n = _get_length(a...)
+  n = length(first(a))
   harray = map(1:n) do j
     arrays = ()
     @inbounds for i = eachindex(a)
@@ -462,8 +474,19 @@ function Base.transpose(a::AffinePTArray)
   a.array = a.array'
 end
 
+function Base.hcat(a::AffinePTArray...)
+  n = length(first(a))
+  j = 1
+  arrays = ()
+  @inbounds for i = eachindex(a)
+    arrays = (arrays...,a[i][j])
+  end
+  harray = hcat(arrays...)
+  AffinePTArray(harray,n)
+end
+
 function Base.vcat(a::AffinePTArray...)
-  n = _get_length(a...)
+  n = length(first(a))
   j = 1
   arrays = ()
   @inbounds for i = eachindex(a)

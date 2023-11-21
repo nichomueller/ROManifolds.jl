@@ -17,9 +17,9 @@ function get_all_subfiles(path::String)
 end
 
 """Create a directory at the given path"""
-function create_dir!(path::String)
+function create_dir(path::String)
   if !isdir(path)
-    create_dir!(get_parent_dir(path))
+    create_dir(get_parent_dir(path))
     mkdir(path)
   end
   return

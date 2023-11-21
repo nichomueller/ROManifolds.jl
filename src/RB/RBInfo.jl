@@ -1,7 +1,7 @@
 function get_fe_path(tpath::String)
-  create_dir!(tpath)
+  create_dir(tpath)
   fepath = joinpath(tpath,"fem")
-  create_dir!(fepath)
+  create_dir(fepath)
   fepath
 end
 
@@ -11,7 +11,7 @@ function get_rb_path(tpath::String,ϵ;st_mdeim=false)
   outermost_path = joinpath(tpath,"rb")
   outer_path = joinpath(outermost_path,keyword)
   rb_path = joinpath(outer_path,"$ϵ")
-  create_dir!(rb_path)
+  create_dir(rb_path)
   rb_path
 end
 

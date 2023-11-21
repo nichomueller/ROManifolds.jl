@@ -70,7 +70,7 @@ end
 
 function fe_offsets(rb::BlockRBSpace)
   nblocks = get_nblocks(rb)
-  offsets = zeros(Int,nfields+1)
+  offsets = zeros(Int,nblocks+1)
   @inbounds for block = 1:nblocks
     offsets[block+1] = offsets[block] + size(get_basis_space(rb[block]),1)
   end
@@ -254,12 +254,10 @@ get_nblocks(a::BlockRBMatAlgebraicContribution) = size(a.blocks,2)
 
 function save_algebraic_contrib(path::String,a::BlockRBVecAlgebraicContribution)
   tpath = joinpath(path,"touched")
-  create_dir!(tpath)
   save(tpath,a.touched)
   for row in 1:get_nblocks(a)
     if a.touched[row]
       rpath = joinpath(path,"block_$row")
-      create_dir!(rpath)
       save_algebraic_contrib(rpath,a.blocks[row])
     end
   end
@@ -267,12 +265,10 @@ end
 
 function save_algebraic_contrib(path::String,a::BlockRBMatAlgebraicContribution)
   tpath = joinpath(path,"touched")
-  create_dir!(tpath)
   save(tpath,a.touched)
   for (row,col) in index_pairs(get_nblocks(a),get_nblocks(a))
     if a.touched[row,col]
       adpath = joinpath(path,"block_$(row)_$(col)")
-      create_dir!(adpath)
       save_algebraic_contrib(adpath,a.blocks[row,col])
     end
   end
@@ -294,7 +290,7 @@ function load_algebraic_contrib(path::String,::Type{BlockRBVecAlgebraicContribut
 end
 
 function load_algebraic_contrib(path::String,::Type{BlockRBMatAlgebraicContribution{T}},args...) where T
-  S = BlockRBMatAlgebraicContribution{T}
+  S = RBMatAlgebraicContribution{T}
   tpath = joinpath(path,"touched")
   touched = load(tpath,Matrix{Bool})
   nblocks = size(touched,1)
@@ -506,6 +502,7 @@ end
 function collect_lhs_contributions!(
   cache,
   rbinfo::BlockRBInfo,
+  op::PTOperator,
   rbjacs::Vector{BlockRBMatAlgebraicContribution{T}},
   rbspace::BlockRBSpace{T}) where T
 

@@ -178,6 +178,9 @@ end
 
 const ∫ₚ = PTIntegrand
 
+init_contribution(::PTIntegrand{<:OperationCellField}) = DomainContribution()
+init_contribution(::PTIntegrand) = PTDomainContribution()
+
 function Arrays.getindex!(cont,a::PTIntegrand,meas::Measure)
   trian = get_triangulation(meas)
   itrian = get_triangulation(a.meas)

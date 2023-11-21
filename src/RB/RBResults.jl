@@ -58,12 +58,12 @@ function Base.show(io::IO,r::Vector{<:RBResults})
   print(io,"FEM/RB memory speedup: $speedup_memory%\n")
 end
 
-function save(rbinfo::RBInfo,r::RBResults)
+function save(rbinfo::AbstractRBInfo,r::RBResults)
   path = joinpath(rbinfo.rb_path,"results")
   save(path,r)
 end
 
-function load(rbinfo::RBInfo,T::Type{RBResults})
+function load(rbinfo::AbstractRBInfo,T::Type{RBResults})
   path = joinpath(rbinfo.rb_path,"results")
   load(path,T)
 end
@@ -290,7 +290,7 @@ function compute_relative_error!(cache,sol,sol_approx,norm_matrix=nothing)
 end
 
 function Gridap.Visualization.writevtk(
-  rbinfo::RBInfo,
+  rbinfo::AbstractRBInfo,
   feop::PTFEOperator,
   fesolver::PODESolver,
   results::RBResults)
@@ -307,7 +307,7 @@ function Gridap.Visualization.writevtk(
   pointwise_err = abs.(sol-sol_approx)
 
   plt_dir = joinpath(rbinfo.rb_path,"plots")
-  create_dir!(plt_dir)
+  create_dir(plt_dir)
   for (it,t) in enumerate(times)
     fsol = FEFunction(trial(μ,t),sol[:,it])
     fsol_approx = FEFunction(trial(μ,t),sol_approx[:,it])
@@ -316,14 +316,4 @@ function Gridap.Visualization.writevtk(
     writevtk(trian,joinpath(plt_dir,"$(name)_approx_$(it).vtu"),cellfields=["$(name)_approx"=>fsol_approx])
     writevtk(trian,joinpath(plt_dir,"$(name)_err_$(it).vtu"),cellfields=["$(name)_err"=>ferr])
   end
-end
-
-function save(rbinfo::RBInfo,result::RBResults)
-  path = joinpath(rbinfo.rb_path,"rbresults")
-  save(path,result)
-end
-
-function load(rbinfo::RBInfo,T::Type{RBResults})
-  path = joinpath(rbinfo.rb_path,"rbresults")
-  load(path,T)
 end

@@ -25,7 +25,7 @@ function get_rb_ndofs(a::RBAlgebraicContribution)
 end
 
 function save_algebraic_contrib(path::String,a::RBAlgebraicContribution)
-  create_dir!(path)
+  create_dir(path)
   adpath = joinpath(path,"ad")
   for (i,ai) in enumerate(a)
     save(adpath*"_$i",ai)

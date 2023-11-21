@@ -14,7 +14,7 @@ export EMatrix
 
 #Files
 export get_parent_dir
-export create_dir!
+export create_dir
 export save
 export load
 #Indexes
