@@ -11,20 +11,16 @@ get_nblocks(b) = length(b.blocks)
 
 struct BlockSnapshots{T} <: RBBlock{T,1}
   blocks::Vector{Snapshots{T}}
+end
 
-  function BlockSnapshots(blocks::Vector{Snapshots{T}}) where T
-    new{T}(blocks)
+function BlockSnapshots(v::Vector{Vector{NonaffinePTArray{T}}}) where T
+  nblocks = length(testitem(v))
+  blocks = Vector{Snapshots{T}}(undef,nblocks)
+  @inbounds for n in 1:nblocks
+    vn = map(x->getindex(x,n),v)
+    blocks[n] = Snapshots(vn)
   end
-
-  function BlockSnapshots(v::Vector{Vector{NonaffinePTArray{T}}}) where T
-    nblocks = length(testitem(v))
-    blocks = Vector{Snapshots{T}}(undef,nblocks)
-    @inbounds for n in 1:nblocks
-      vn = map(x->getindex(x,n),v)
-      blocks[n] = Snapshots(vn)
-    end
-    BlockSnapshots(blocks)
-  end
+  BlockSnapshots(blocks)
 end
 
 function Base.getindex(s::BlockSnapshots,idx::UnitRange{Int})
@@ -56,15 +52,11 @@ end
 
 struct BlockRBSpace{T} <: RBBlock{T,1}
   blocks::Vector{RBSpace{T}}
+end
 
-  function BlockRBSpace(blocks::Vector{RBSpace{T}}) where T
-    new{T}(blocks)
-  end
-
-  function BlockRBSpace(bases_space::Vector{Matrix{T}},bases_time::Vector{Matrix{T}}) where T
-    blocks = map(RBSpace,bases_space,bases_time)
-    BlockRBSpace(blocks)
-  end
+function BlockRBSpace(bases_space::Vector{Matrix{T}},bases_time::Vector{Matrix{T}}) where T
+  blocks = map(RBSpace,bases_space,bases_time)
+  BlockRBSpace(blocks)
 end
 
 function rb_offsets(rb::BlockRBSpace)
@@ -251,25 +243,11 @@ abstract type BlockRBAlgebraicContribution{T,N} <: RBBlock{T,N} end
 struct BlockRBVecAlgebraicContribution{T} <: BlockRBAlgebraicContribution{T,1}
   blocks::Vector{RBVecAlgebraicContribution{T}}
   touched::Vector{Bool}
-
-  function BlockRBVecAlgebraicContribution(
-    blocks::Vector{RBVecAlgebraicContribution{T}},
-    touched::Vector{Bool}) where T
-
-    new{T}(blocks,touched)
-  end
 end
 
 struct BlockRBMatAlgebraicContribution{T} <: BlockRBAlgebraicContribution{T,2}
   blocks::Matrix{RBMatAlgebraicContribution{T}}
   touched::Matrix{Bool}
-
-  function BlockRBMatAlgebraicContribution(
-    blocks::Matrix{RBMatAlgebraicContribution{T}},
-    touched::Matrix{Bool}) where T
-
-    new{T}(blocks,touched)
-  end
 end
 
 get_nblocks(a::BlockRBMatAlgebraicContribution) = size(a.blocks,2)

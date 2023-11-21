@@ -14,9 +14,10 @@ function heat_equation()
   degree = 2
   model = get_discrete_model(test_path,mesh,bnd_info)
   Ω = Triangulation(model)
-  dΩ = Measure(Ω,degree)
   Γn = BoundaryTriangulation(model,tags=["neumann"])
+  dΩ = Measure(Ω,degree)
   dΓn = Measure(Γn,degree)
+  trians = Ω,Γn
 
   ranges = fill([1.,10.],3)
   sampling = UniformSampling()
@@ -55,9 +56,9 @@ function heat_equation()
   fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
 
   ϵ = 1e-4
-  load_solutions = false
+  load_solutions = true
   save_solutions = true
-  load_structures = false
+  load_structures = true
   save_structures = true
   norm_style = :l2
   nsnaps_state = 50
@@ -80,7 +81,7 @@ function heat_equation()
   if load_structures
     rbspace = load(rbinfo,RBSpace{T})
     rbrhs,rblhs = load(rbinfo,(RBVecAlgebraicContribution{T},
-      Vector{RBMatAlgebraicContribution{T}}))
+      Vector{RBMatAlgebraicContribution{T}}),trians...)
   else
     rbspace = reduced_basis(rbinfo,feop,sols)
     rbrhs,rblhs = collect_compress_rhs_lhs(rbinfo,feop,fesolver,rbspace,params)

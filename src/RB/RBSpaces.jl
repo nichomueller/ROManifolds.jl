@@ -1,12 +1,6 @@
 struct RBSpace{T}
   basis_space::Matrix{T}
   basis_time::Matrix{T}
-
-  function RBSpace(
-    basis_space::Matrix{T},
-    basis_time::Matrix{T}) where T
-    new{T}(basis_space,basis_time)
-  end
 end
 
 get_basis_space(rb::RBSpace) = rb.basis_space

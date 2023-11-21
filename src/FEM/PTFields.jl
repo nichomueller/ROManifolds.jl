@@ -3,20 +3,12 @@ abstract type AbstractPTFunction{P,T} <: Function end
 struct PFunction{P} <: AbstractPTFunction{P,Nothing}
   f::Function
   params::P
-
-  function PFunction(f::Function,params::P) where P
-    new{P}(f,params)
-  end
 end
 
 struct PTFunction{P,T} <: AbstractPTFunction{P,T}
   f::Function
   params::P
   times::T
-
-  function PTFunction(f::Function,params::P,times::T) where {P,T}
-    new{P,T}(f,params,times)
-  end
 end
 
 function get_fields(pf::PFunction{<:AbstractVector{<:Number}})

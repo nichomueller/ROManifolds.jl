@@ -12,14 +12,6 @@ struct NnzVector{T} <: NnzArray{T,1}
   nonzero_idx::Vector{Int}
   nrows::Int
 
-  function NnzVector(
-    nonzero_val::Matrix{T},
-    nonzero_idx::Vector{Int},
-    nrows::Int) where T
-
-    new{T}(nonzero_val,nonzero_idx,nrows)
-  end
-
   function NnzVector(mat::SparseMatrixCSC{T,Int}) where T
     nonzero_idx,nonzero_val = findnz(mat[:])
     nrows = size(mat,1)

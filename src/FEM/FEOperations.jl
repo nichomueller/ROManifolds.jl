@@ -1,37 +1,52 @@
-function Base.:(==)(a::T,b::T) where {T<:Union{Grid,Field}}
-  for field in propertynames(a)
-    a_field = getproperty(a,field)
-    b_field = getproperty(b,field)
-    try isdefined(a_field,1) && isdefined(b_field,1)
-      (==)(a_field,b_field)
-    catch
-      return false
-    end
-  end
-  return true
-end
-
-function Geometry.is_change_possible(strian::Triangulation,ttrian::Triangulation)
-  if strian == ttrian
-    return true
-  end
-  @check get_background_model(strian) == get_background_model(ttrian) "Triangulations do not point to the same background discrete model!"
-  D = num_cell_dims(strian)
-  sglue = get_glue(strian,Val(D))
-  tglue = get_glue(ttrian,Val(D))
-  is_change_possible(sglue,tglue)
-end
-
-function is_parent(tparent::Triangulation,tchild::Triangulation)
+function is_parent(tparent::Triangulation,tchild::Triangulation;kwargs...)
   false
 end
 
-function is_parent(tparent::BodyFittedTriangulation,tchild::BodyFittedTriangulation)
-  get_grid(tparent) == get_grid(tchild).parent
+function is_parent(tparent::BodyFittedTriangulation,tchild::BodyFittedTriangulation;shallow=false)
+  if shallow
+    tparent.grid.cell_node_ids == tchild.grid.parent.cell_node_ids
+  else
+    tparent.grid === tchild.grid.parent
+  end
 end
 
-function is_parent(tparent::BoundaryTriangulation,tchild::Geometry.TriangulationView)
-  get_grid(tparent.trian) == get_grid(tchild.parent.trian)
+function is_parent(tparent::BoundaryTriangulation,tchild::TriangulationView;shallow=false)
+  if shallow
+    (tparent.trian.grid.parent.cell_node_ids == tchild.parent.trian.grid.parent.cell_node_ids &&
+      tparent.glue.face_to_cell == tchild.parent.glue.face_to_cell)
+  else
+    tparent === tchild.parent
+  end
+end
+
+function correct_triangulation(trian::BodyFittedTriangulation,new_trian::BodyFittedTriangulation)
+  old_grid = get_grid(trian)
+  new_model = get_background_model(new_trian)
+  new_grid = GridView(get_grid(new_trian),old_grid.cell_to_parent_cell)
+  BodyFittedTriangulation(new_model,new_grid,trian.tface_to_mface)
+end
+
+function correct_triangulation(trian::TriangulationView,new_trian::BoundaryTriangulation)
+  TriangulationView(new_trian,trian.cell_to_parent_cell)
+end
+
+function correct_quadrature(quad::CellQuadrature,new_trian::Triangulation)
+  @unpack (cell_quad,cell_point,cell_weight,trian,
+    data_domain_style,integration_domain_style) = quad
+  CellQuadrature(cell_quad,cell_point,cell_weight,new_trian,data_domain_style,integration_domain_style)
+end
+
+function correct_measure(meas::Measure,trians::Triangulation...)
+  trian = get_triangulation(meas)
+  for t in trians
+    if is_parent(t,trian;shallow=true)
+      new_trian = correct_triangulation(trian,t)
+      new_quad = correct_quadrature(meas.quad,new_trian)
+      new_meas = Measure(new_quad)
+      return new_meas
+    end
+  end
+  @unreachable
 end
 
 function FESpaces.get_order(test::SingleFieldFESpace)

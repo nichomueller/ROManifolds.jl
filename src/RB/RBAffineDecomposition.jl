@@ -17,22 +17,10 @@ struct GenericRBAffineDecomposition{T,N} <: RBAffineDecomposition{T,N}
   basis_time::Vector{Array{T}}
   mdeim_interpolation::LU
   integration_domain::RBIntegrationDomain
-
-  function GenericRBAffineDecomposition(
-    basis_space::Vector{Array{T,N}},
-    basis_time::Vector{<:Array{T}},
-    mdeim_interpolation::LU,
-    integration_domain::RBIntegrationDomain) where {T,N}
-
-    new{T,N}(basis_space,basis_time,mdeim_interpolation,integration_domain)
-  end
 end
 
 struct TrivialRBAffineDecomposition{T,N} <: RBAffineDecomposition{T,N}
   projection::Array{T,N}
-  function TrivialRBAffineDecomposition(projection::Array{T,N}) where {T,N}
-    new{T,N}(projection)
-  end
 end
 
 function RBAffineDecomposition(
@@ -87,6 +75,21 @@ function get_rb_ndofs(a::RBAffineDecomposition)
   time_ndofs = size(a.basis_time[2],2)
   ndofs = space_ndofs*time_ndofs
   return ndofs
+end
+
+function correct_measure(a::TrivialRBAffineDecomposition,args...)
+  a
+end
+
+function correct_measure(a::GenericRBAffineDecomposition,trians::Triangulation...)
+  if all(isnothing.(trians))
+    return a
+  end
+  dom = get_integration_domain(a)
+  meas = get_measure(dom)
+  new_meas = correct_measure(meas,trians...)
+  new_dom = RBIntegrationDomain(new_meas,dom.times,dom.idx)
+  return GenericRBAffineDecomposition(a.basis_space,a.basis_time,a.mdeim_interpolation,new_dom)
 end
 
 function get_interpolation_idx(nzm::NnzMatrix)

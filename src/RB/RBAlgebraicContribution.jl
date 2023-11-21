@@ -1,10 +1,5 @@
 struct RBAlgebraicContribution{T,N}
   affine_decompositions::Vector{RBAffineDecomposition{T,N}}
-  function RBAlgebraicContribution(
-    affine_decompositions::Vector{<:RBAffineDecomposition{T,N}}
-    ) where {T,N}
-    new{T,N}(affine_decompositions)
-  end
 end
 
 const RBVecAlgebraicContribution{T} = RBAlgebraicContribution{T,1}
@@ -32,24 +27,32 @@ function save_algebraic_contrib(path::String,a::RBAlgebraicContribution{T,N} whe
   end
 end
 
-function load_algebraic_contrib(path::String,::Type{RBVecAlgebraicContribution{T}}) where T
+function load_algebraic_contrib(
+  path::String,
+  ::Type{RBVecAlgebraicContribution{T}},
+  args...) where T
   adpath = joinpath(path,"ad")
   a = RBVecAffineDecomposition{T}[]
   i = 1
   while isfile(correct_path(adpath*"_$i"))
-    ai = load(adpath*"_$i",RBVecAffineDecomposition{T})
+    _ai = load(adpath*"_$i",RBVecAffineDecomposition{T})
+    ai = correct_measure(_ai,args...)
     push!(a,ai)
     i += 1
   end
   RBAlgebraicContribution(a)
 end
 
-function load_algebraic_contrib(path::String,::Type{RBMatAlgebraicContribution{T}}) where T
+function load_algebraic_contrib(
+  path::String,
+  ::Type{RBMatAlgebraicContribution{T}},
+  args...) where T
   adpath = joinpath(path,"ad")
   a = RBMatAffineDecomposition{T}[]
   i = 1
   while isfile(correct_path(adpath*"_$i"))
-    ai = load(adpath*"_$i",RBMatAffineDecomposition{T})
+    _ai = load(adpath*"_$i",RBMatAffineDecomposition{T})
+    ai = correct_measure(_ai,args...)
     push!(a,ai)
     i += 1
   end
@@ -61,9 +64,12 @@ function save(rbinfo::RBInfo,a::RBVecAlgebraicContribution)
   save_algebraic_contrib(path,a)
 end
 
-function load(rbinfo::RBInfo,T::Type{RBVecAlgebraicContribution{S}}) where S
+function load(
+  rbinfo::RBInfo,
+  T::Type{RBVecAlgebraicContribution{S}},
+  args...) where S
   path = joinpath(rbinfo.rb_path,"rb_rhs")
-  load_algebraic_contrib(path,T)
+  load_algebraic_contrib(path,T,args...)
 end
 
 function save(rbinfo::RBInfo,a::Vector{<:RBMatAlgebraicContribution})
@@ -73,12 +79,15 @@ function save(rbinfo::RBInfo,a::Vector{<:RBMatAlgebraicContribution})
   end
 end
 
-function load(rbinfo::RBInfo,T::Type{Vector{RBMatAlgebraicContribution{S}}}) where S
+function load(
+  rbinfo::RBInfo,
+  T::Type{Vector{RBMatAlgebraicContribution{S}}},
+  args...) where S
   njacs = num_active_dirs(rbinfo.rb_path)
   ad_jacs = Vector{RBMatAlgebraicContribution{S}}(undef,njacs)
   for i = 1:njacs
     path = joinpath(rbinfo.rb_path,"rb_lhs_$i")
-    ad_jacs[i] = load_algebraic_contrib(path,eltype(T))
+    ad_jacs[i] = load_algebraic_contrib(path,eltype(T),args...)
   end
   ad_jacs
 end
@@ -91,11 +100,14 @@ function save(rbinfo::RBInfo,a::NTuple{2,RBVecAlgebraicContribution})
   save_algebraic_contrib(path_nlin,a_nlin)
 end
 
-function load(rbinfo::RBInfo,T::Type{NTuple{2,RBVecAlgebraicContribution{S}}}) where S
+function load(
+  rbinfo::RBInfo,
+  T::Type{NTuple{2,RBVecAlgebraicContribution{S}}},
+  args...) where S
   path_lin = joinpath(rbinfo.rb_path,"rb_rhs_lin")
   path_nlin = joinpath(rbinfo.rb_path,"rb_rhs_nlin")
-  a_lin = load_algebraic_contrib(path_lin,eltype(T))
-  a_nlin = load_algebraic_contrib(path_nlin,eltype(T))
+  a_lin = load_algebraic_contrib(path_lin,eltype(T),args...)
+  a_nlin = load_algebraic_contrib(path_nlin,eltype(T),args...)
   a_lin,a_nlin
 end
 
@@ -111,7 +123,10 @@ function save(rbinfo::RBInfo,a::NTuple{3,Vector{<:RBMatAlgebraicContribution}})
   end
 end
 
-function load(rbinfo::RBInfo,T::Type{NTuple{3,Vector{RBMatAlgebraicContribution{S}}}}) where S
+function load(
+  rbinfo::RBInfo,
+  T::Type{NTuple{3,Vector{RBMatAlgebraicContribution{S}}}},
+  args...) where S
   njacs = num_active_dirs(rbinfo.rb_path)
   ad_jacs_lin = Vector{RBMatAlgebraicContribution{S}}(undef,njacs)
   ad_jacs_nlin = Vector{RBMatAlgebraicContribution{S}}(undef,njacs)
@@ -120,9 +135,9 @@ function load(rbinfo::RBInfo,T::Type{NTuple{3,Vector{RBMatAlgebraicContribution{
     path_lin = joinpath(rbinfo.rb_path,"rb_lhs_lin_$i")
     path_nlin = joinpath(rbinfo.rb_path,"rb_lhs_nlin_$i")
     path_aux = joinpath(rbinfo.rb_path,"rb_lhs_aux_$i")
-    ad_jacs_lin[i] = load_algebraic_contrib(path_lin,eltype(eltype(T)))
-    ad_jacs_nlin[i] = load_algebraic_contrib(path_nlin,eltype(eltype(T)))
-    ad_jacs_aux[i] = load_algebraic_contrib(path_aux,eltype(eltype(T)))
+    ad_jacs_lin[i] = load_algebraic_contrib(path_lin,eltype(eltype(T)),args...)
+    ad_jacs_nlin[i] = load_algebraic_contrib(path_nlin,eltype(eltype(T)),args...)
+    ad_jacs_aux[i] = load_algebraic_contrib(path_aux,eltype(eltype(T)),args...)
   end
   ad_jacs_lin,ad_jacs_nlin,ad_jacs_aux
 end

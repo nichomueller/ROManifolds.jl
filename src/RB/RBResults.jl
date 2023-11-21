@@ -6,19 +6,19 @@ struct RBResults{T}
   relative_err::Vector{T}
   fem_stats::ComputationInfo
   rb_stats::ComputationInfo
+end
 
-  function RBResults(
-    params::Table,
-    sol::PTArray{Matrix{T}},
-    sol_approx::PTArray{Matrix{T}},
-    fem_stats::ComputationInfo,
-    rb_stats::ComputationInfo,
-    args...;
-    name=:vel) where T
+function RBResults(
+  params::Table,
+  sol::PTArray{Matrix{T}},
+  sol_approx::PTArray{Matrix{T}},
+  fem_stats::ComputationInfo,
+  rb_stats::ComputationInfo,
+  args...;
+  name=:vel) where T
 
-    relative_err = compute_relative_error(sol,sol_approx,args...)
-    new{T}(name,params,sol,sol_approx,relative_err,fem_stats,rb_stats)
-  end
+  relative_err = compute_relative_error(sol,sol_approx,args...)
+  RBResults(name,params,sol,sol_approx,relative_err,fem_stats,rb_stats)
 end
 
 Base.length(r::RBResults) = length(r.params)

@@ -181,7 +181,7 @@ const ∫ₚ = PTIntegrand
 function Arrays.getindex!(cont,a::PTIntegrand,meas::Measure)
   trian = get_triangulation(meas)
   itrian = get_triangulation(a.meas)
-  if itrian == trian || is_parent(itrian,trian)
+  if itrian === trian || is_parent(itrian,trian)
     integral = integrate(a.object,meas.quad)
     add_contribution!(cont,trian,integral)
     return cont
@@ -228,7 +228,7 @@ function Arrays.getindex!(cont,a::CollectionPTIntegrand{T,N} where T,meas::Measu
     op,int = a[i]
     imeas = int.meas
     itrian = get_triangulation(imeas)
-    if itrian == trian || is_parent(itrian,trian)
+    if itrian === trian || is_parent(itrian,trian)
       integral = integrate(int.object,meas.quad)
       add_contribution!(cont,trian,integral,op)
     end

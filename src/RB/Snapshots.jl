@@ -1,8 +1,5 @@
 struct Snapshots{T<:AbstractArray}
   snaps::Vector{NonaffinePTArray{T}}
-  function Snapshots(s::Vector{NonaffinePTArray{T}}) where T
-    new{T}(s)
-  end
 end
 
 Base.length(s::Snapshots) = length(s.snaps)

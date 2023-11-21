@@ -94,12 +94,12 @@ function Base.getindex(rbinfo::BlockRBInfo,i::Int)
     rbinfo.nsnaps_state,rbinfo.nsnaps_mdeim,rbinfo.nsnaps_test,rbinfo.st_mdeim)
 end
 
-function save(rbinfo::RBInfo,objs::Tuple)
-  map(obj->save(rbinfo,obj),objs)
+function save(rbinfo::RBInfo,objs::Tuple,args...;kwargs...)
+  map(obj->save(rbinfo,obj,args...;kwargs...),objs)
 end
 
-function load(rbinfo::RBInfo,types::Tuple)
-  map(type->load(rbinfo,type),types)
+function load(rbinfo::RBInfo,types::Tuple,args...;kwargs...)
+  map(type->load(rbinfo,type,args...;kwargs...),types)
 end
 
 function save(rbinfo::RBInfo,params::Table)
