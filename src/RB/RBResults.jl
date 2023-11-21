@@ -137,16 +137,7 @@ function allocate_cache(op::PTOperator,snaps::PTArray{Vector{T}}) where T
   res_cache,jac_cache
 end
 
-function rb_solver(
-  rbinfo::RBInfo,
-  feop::PTFEOperator{Affine},
-  fesolver::PODESolver,
-  rbspace,
-  rbres,
-  rbjacs,
-  snaps,
-  params::Table)
-
+function rb_solver(rbinfo,feop::PTFEOperator{Affine},fesolver,rbspace,rbres,rbjacs,snaps,params)
   println("Solving linear RB problems")
   nsnaps_test = rbinfo.nsnaps_test
   snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
@@ -160,16 +151,7 @@ function rb_solver(
   post_process(rbinfo,feop,fesolver,snaps_test,params_test,approx_snaps_test,stats)
 end
 
-function rb_solver(
-  rbinfo::RBInfo,
-  feop::PTFEOperator,
-  fesolver::PODESolver,
-  rbspace,
-  rbres::Tuple,
-  rbjacs::Tuple,
-  snaps,
-  params::Table)
-
+function rb_solver(rbinfo,feop,fesolver,rbspace,rbres,rbjacs,snaps,params)
   println("Solving nonlinear RB problems with Newton iterations")
   nsnaps_test = rbinfo.nsnaps_test
   snaps_train,params_train = snaps[1:nsnaps_test],params[1:nsnaps_test]

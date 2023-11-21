@@ -49,6 +49,8 @@ function correct_measure(meas::Measure,trians::Triangulation...)
   @unreachable
 end
 
+field_offsets(f::MultiFieldFESpace) = [compute_field_offsets(f)...,num_free_dofs(f)]
+
 function FESpaces.get_order(test::SingleFieldFESpace)
   basis = get_fe_basis(test)
   first(FESpaces.get_order(first(basis.cell_basis.values).fields))

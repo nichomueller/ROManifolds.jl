@@ -204,25 +204,38 @@ function CellData.integrate(a::PTIntegrand,meas::GenericMeasure...)
   cont
 end
 
-struct CollectionPTIntegrand{T,N}
+abstract type CollectionPTIntegrand{N} end
+
+struct AffineCollectionPTIntegrand{N} <: CollectionPTIntegrand{N}
   operations::NTuple{N,Union{typeof(+),typeof(-)}}
-  integrands::NTuple{N,PTIntegrand{T}}
+  integrands::NTuple{N,PTIntegrand{OperationCellField}}
 end
+
+struct NonaffineCollectionPTIntegrand{N} <: CollectionPTIntegrand{N}
+  operations::NTuple{N,Union{typeof(+),typeof(-)}}
+  integrands::NTuple{N,PTIntegrand}
+end
+
+function CollectionPTIntegrand(
+  operations,
+  integrands::NTuple{N,PTIntegrand{OperationCellField}}) where N
+  AffineCollectionPTIntegrand(operations,integrands)
+end
+
+function CollectionPTIntegrand(
+  operations,
+  integrands::NTuple{N,PTIntegrand}) where N
+  NonaffineCollectionPTIntegrand(operations,integrands)
+end
+
+init_contribution(a::AffineCollectionPTIntegrand...) = DomainContribution()
+init_contribution(a::NonaffineCollectionPTIntegrand...) = PTDomainContribution()
 
 function Base.getindex(a::CollectionPTIntegrand,i::Int)
   a.operations[i],a.integrands[i]
 end
 
-function init_contribution(a...)
-  PTDomainContribution()
-end
-
-function init_contribution(
-  a::Union{PTIntegrand{<:OperationCellField},CollectionPTIntegrand{<:OperationCellField}}...)
-  DomainContribution()
-end
-
-function Arrays.getindex!(cont,a::CollectionPTIntegrand{T,N} where T,meas::Measure) where N
+function Arrays.getindex!(cont,a::CollectionPTIntegrand{N},meas::Measure) where N
   trian = get_triangulation(meas)
   for i = 1:N
     op,int = a[i]
@@ -263,7 +276,7 @@ for op in (:+,:-)
   end
 end
 
-function CellData.integrate(a::CollectionPTIntegrand{T,N} where T) where N
+function CellData.integrate(a::CollectionPTIntegrand{N}) where N
   cont = init_contribution(a)
   for i = 1:N
     op,int = a[i]
@@ -304,6 +317,8 @@ LinearAlgebra.dot(::typeof(∇),::Nothing) = nothing
 CellData.integrate(::Nothing,args...) = nothing
 
 CellData.integrate(::Any,::Nothing) = nothing
+
+PTIntegrand(::Nothing,::Measure) = nothing
 
 for T in (:DomainContribution,:PTDomainContribution,:PTIntegrand,:CollectionPTIntegrand)
   @eval begin

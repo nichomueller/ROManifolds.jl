@@ -56,9 +56,9 @@ function stokes_equation()
   fesolver = PThetaMethod(LUSolver(),xh0μ,θ,dt,t0,tf)
 
   ϵ = [1e-4,1e-4]
-  load_solutions = false
+  load_solutions = true
   save_solutions = true
-  load_structures = false
+  load_structures = true
   save_structures = true
   norm_style = [:l2,:l2]
   compute_supremizers = true

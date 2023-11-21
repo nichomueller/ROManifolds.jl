@@ -359,17 +359,6 @@ function Arrays.testitem(f::PTMultiFieldFEFunction)
   MultiFieldFEFunction(free_values,fe_space,single_fe_functions)
 end
 
-function FESpaces.EvaluationFunction(fe::PMultiFieldFESpace,free_values::PTArray)
-  blocks = map(eachindex(fe.spaces)) do i
-    free_values_i = restrict_to_field(fe,free_values,i)
-    fe_function_i = EvaluationFunction(fe.spaces[i],free_values_i)
-    free_values_i,fe_function_i
-  end
-  free_values = vcat(first.(blocks)...)
-  fe_functions = last.(blocks)
-  PTMultiFieldFEFunction(free_values,fe,fe_functions)
-end
-
 struct PTTransientMultiFieldCellField{A} <: PTTransientCellField
   cellfield::A
   derivatives::Tuple
@@ -410,7 +399,7 @@ function Base.getindex(f::PTTransientMultiFieldCellField,ifield::Integer)
   PTTransientSingleFieldCellField(single_field,single_derivatives)
 end
 
-function Base.getindex(f::TransientMultiFieldCellField,indices::Vector{<:Int})
+function Base.getindex(f::PTTransientMultiFieldCellField,indices::Vector{<:Int})
   cellfield = PTMultiFieldCellField(f.cellfield[indices],DomainStyle(f.cellfield))
   derivatives = ()
   for derivative in f.derivatives

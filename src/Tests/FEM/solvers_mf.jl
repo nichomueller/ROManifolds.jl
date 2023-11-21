@@ -13,15 +13,17 @@ for (uh,t) in sol
   push!(results,ye)
 end
 
+g0_ok(x,t) = g0(x,μ[1],t)
+g0_ok(t) = x->g0_ok(x,t)
 g_ok(x,t) = g(x,μ[1],t)
 g_ok(t) = x->g_ok(x,t)
 u0_ok(x) = u0(x,μ[1])
 p0_ok(x) = p0(x,μ[1])
 a_ok(t,(u,p),(v,q)) = ∫(a(μ[1],t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ - ∫(q*(∇⋅(u)))dΩ
-b_ok(t,(v,q)) = ∫(v⋅f(μ[1],t))dΩ
+b_ok(t,(v,q)) = ∫(v⋅g0(μ[1],t))dΩ
 m_ok(t,(ut,pt),(v,q)) = ∫(v⋅ut)dΩ
 
-trial_u_ok = TransientTrialFESpace(test_u,g_ok)
+trial_u_ok = TransientTrialFESpace(test_u,[g0_ok,g_ok])
 trial_ok =  TransientMultiFieldFESpace([trial_u_ok,trial_p])
 feop_ok = TransientAffineFEOperator(m_ok,a_ok,b_ok,trial_ok,test)
 uh0_ok = interpolate_everywhere(u0_ok,trial_u_ok(t0))

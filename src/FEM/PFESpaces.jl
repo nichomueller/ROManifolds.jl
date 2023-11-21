@@ -604,6 +604,17 @@ function FESpaces.interpolate_dirichlet(objects,fe::PMultiFieldFESpace)
   PTMultiFieldFEFunction(free_values,fe,blocks)
 end
 
+function FESpaces.EvaluationFunction(fe::PMultiFieldFESpace,free_values::PTArray)
+  blocks = map(eachindex(fe.spaces)) do i
+    free_values_i = restrict_to_field(fe,free_values,i)
+    fe_function_i = EvaluationFunction(fe.spaces[i],free_values_i)
+    free_values_i,fe_function_i
+  end
+  free_values = vcat(first.(blocks)...)
+  fe_functions = last.(blocks)
+  PTMultiFieldFEFunction(free_values,fe,fe_functions)
+end
+
 function Arrays.testitem(f::PMultiFieldFESpace)
   MultiFieldFESpace(f.vector_type,map(testitem,f.spaces),f.multi_field_style)
 end

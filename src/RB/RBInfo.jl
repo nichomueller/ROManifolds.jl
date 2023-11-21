@@ -15,7 +15,9 @@ function get_rb_path(tpath::String,ϵ;st_mdeim=false)
   rb_path
 end
 
-struct RBInfo
+abstract type AbstractRBInfo end
+
+struct RBInfo <: AbstractRBInfo
   ϵ::Float
   fe_path::String
   rb_path::String
@@ -59,7 +61,7 @@ function get_norm_matrix(rbinfo::RBInfo,feop::PTFEOperator)
   end
 end
 
-struct BlockRBInfo
+struct BlockRBInfo <: AbstractRBInfo
   ϵ::Vector{Float}
   fe_path::String
   rb_path::String
@@ -94,30 +96,30 @@ function Base.getindex(rbinfo::BlockRBInfo,i::Int)
     rbinfo.nsnaps_state,rbinfo.nsnaps_mdeim,rbinfo.nsnaps_test,rbinfo.st_mdeim)
 end
 
-function save(rbinfo::RBInfo,objs::Tuple,args...;kwargs...)
+function save(rbinfo::AbstractRBInfo,objs::Tuple,args...;kwargs...)
   map(obj->save(rbinfo,obj,args...;kwargs...),objs)
 end
 
-function load(rbinfo::RBInfo,types::Tuple,args...;kwargs...)
+function load(rbinfo::AbstractRBInfo,types::Tuple,args...;kwargs...)
   map(type->load(rbinfo,type,args...;kwargs...),types)
 end
 
-function save(rbinfo::RBInfo,params::Table)
+function save(rbinfo::AbstractRBInfo,params::Table)
   path = joinpath(rbinfo.fe_path,"params")
   save(path,params)
 end
 
-function load(rbinfo::RBInfo,T::Type{Table})
+function load(rbinfo::AbstractRBInfo,T::Type{Table})
   path = joinpath(rbinfo.fe_path,"params")
   load(path,T)
 end
 
-function save(rbinfo::RBInfo,norm_matrix::SparseMatrixCSC{T,Int};norm_style=:l2) where T
+function save(rbinfo::AbstractRBInfo,norm_matrix::SparseMatrixCSC{T,Int};norm_style=:l2) where T
   path = joinpath(rbinfo.fe_path,"$(norm_style)_norm_matrix")
   save(path,norm_matrix)
 end
 
-function load(rbinfo::RBInfo,T::Type{SparseMatrixCSC{S,Int}};norm_style=:l2) where S
+function load(rbinfo::AbstractRBInfo,T::Type{SparseMatrixCSC{S,Int}};norm_style=:l2) where S
   path = joinpath(rbinfo.fe_path,"$(norm_style)_norm_matrix")
   load(path,T)
 end
@@ -135,12 +137,12 @@ end
 get_avg_time(cinfo::ComputationInfo) = cinfo.avg_time
 get_avg_nallocs(cinfo::ComputationInfo) = cinfo.avg_nallocs
 
-function save(rbinfo::RBInfo,cinfo::ComputationInfo)
+function save(rbinfo::AbstractRBInfo,cinfo::ComputationInfo)
   path = joinpath(rbinfo.fe_path,"stats")
   save(path,cinfo)
 end
 
-function load(rbinfo::RBInfo,T::Type{ComputationInfo})
+function load(rbinfo::AbstractRBInfo,T::Type{ComputationInfo})
   path = joinpath(rbinfo.fe_path,"stats")
   load(path,T)
 end
