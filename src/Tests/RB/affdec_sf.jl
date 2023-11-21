@@ -22,6 +22,9 @@ function test_affine_decomposition_rhs(
     rbres_i,res_i,res_full_i,res_offline_i = rbres[i],res[i],res_full[i],res_offline[i]
     coeff = rb_coefficient!(coeff_cache,rbres_i,res_i;st_mdeim=false)
     basis_space = tpod(res_offline_i)#tpod(recast(res_offline_i))
+    space_idx = get_interpolation_idx(basis_space)
+    err_res = maximum(abs.(res_i-res_full_i[space_idx,:]))
+    println("Residual difference for selected triangulation is $err_res")
 
     for n = 1:length(op.μ)
       resn = res_full_i[:,(n-1)*length(times)+1:n*length(times)]

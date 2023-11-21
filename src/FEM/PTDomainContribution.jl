@@ -229,7 +229,7 @@ function Arrays.getindex!(cont,a::CollectionPTIntegrand{T,N} where T,meas::Measu
     imeas = int.meas
     itrian = get_triangulation(imeas)
     if itrian == trian || is_parent(itrian,trian)
-      integral = integrate(int.object,imeas.quad)
+      integral = integrate(int.object,meas.quad)
       add_contribution!(cont,trian,integral,op)
     end
   end

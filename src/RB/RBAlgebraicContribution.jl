@@ -279,7 +279,6 @@ function collect_lhs_contributions!(
   mdeim_cache,rb_cache = cache
   st_mdeim = rbinfo.st_mdeim
   k = RBMatContributionMap()
-  rb_jac_contribs = Vector{PTArray{Matrix{T}}}(undef,length(rbjac))
   if isempty(rbjac)
     return empty_rb_contribution(k,rbinfo,rbspace_row,rbspace_col)
   else
