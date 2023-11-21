@@ -17,11 +17,44 @@ struct GenericRBAffineDecomposition{T,N} <: RBAffineDecomposition{T,N}
   basis_time::Vector{Array{T}}
   mdeim_interpolation::LU
   integration_domain::RBIntegrationDomain
+  function GenericRBAffineDecomposition(
+    basis_space::Vector{Array{T,N}},
+    basis_time::Vector{<:Array{T}},
+    mdeim_interpolation::LU,
+    integration_domain::RBIntegrationDomain) where {T,N}
+    new{T,N}(basis_space,basis_time,mdeim_interpolation,integration_domain)
+  end
+end
+
+istrivial(::RBAffineDecomposition) = false
+get_integration_domain(a::GenericRBAffineDecomposition) = a.integration_domain
+
+function get_rb_ndofs(a::GenericRBAffineDecomposition)
+  space_ndofs = size(a.basis_space[1],1)
+  time_ndofs = size(a.basis_time[2],2)
+  ndofs = space_ndofs*time_ndofs
+  return ndofs
+end
+
+function correct_measure(a::GenericRBAffineDecomposition,trians::Triangulation...)
+  if all(isnothing.(trians))
+    return a
+  end
+  dom = get_integration_domain(a)
+  meas = get_measure(dom)
+  new_meas = correct_measure(meas,trians...)
+  new_dom = RBIntegrationDomain(new_meas,dom.times,dom.idx)
+  return GenericRBAffineDecomposition(a.basis_space,a.basis_time,a.mdeim_interpolation,new_dom)
 end
 
 struct TrivialRBAffineDecomposition{T,N} <: RBAffineDecomposition{T,N}
   projection::Array{T,N}
 end
+
+get_projection(a::TrivialRBAffineDecomposition) = a.projection
+istrivial(::TrivialRBAffineDecomposition) = true
+get_rb_ndofs(a::TrivialRBAffineDecomposition) = size(get_projection(a),1)
+correct_measure(a::TrivialRBAffineDecomposition,args...) = a
 
 function RBAffineDecomposition(
   rbinfo::RBInfo,
@@ -59,37 +92,14 @@ end
 function RBAffineDecomposition(
   rbinfo::RBInfo,
   op::PTOperator,
-  nzm::NnzMatrix{Affine},
+  nzm::NnzMatrix{T,Affine} where T,
   trian::Triangulation,
   args...;
   kwargs...)
 
-  projection = space_time_projection(nzm,args...;kwargs...)
+  nzm1 = testitem(nzm)
+  projection = space_time_projection(nzm1,args...;kwargs...)
   TrivialRBAffineDecomposition(projection)
-end
-
-get_integration_domain(a::RBAffineDecomposition) = a.integration_domain
-
-function get_rb_ndofs(a::RBAffineDecomposition)
-  space_ndofs = size(a.basis_space[1],1)
-  time_ndofs = size(a.basis_time[2],2)
-  ndofs = space_ndofs*time_ndofs
-  return ndofs
-end
-
-function correct_measure(a::TrivialRBAffineDecomposition,args...)
-  a
-end
-
-function correct_measure(a::GenericRBAffineDecomposition,trians::Triangulation...)
-  if all(isnothing.(trians))
-    return a
-  end
-  dom = get_integration_domain(a)
-  meas = get_measure(dom)
-  new_meas = correct_measure(meas,trians...)
-  new_dom = RBIntegrationDomain(new_meas,dom.times,dom.idx)
-  return GenericRBAffineDecomposition(a.basis_space,a.basis_time,a.mdeim_interpolation,new_dom)
 end
 
 function get_interpolation_idx(nzm::NnzMatrix)
@@ -189,6 +199,24 @@ function collect_reduced_residuals!(
   op::PTOperator,
   a::Vector{RBVecAffineDecomposition{T}}) where T
 
+  a1 = filter(istrivial,a)
+  a2 = filter(!istrivial,a)
+  if !isempty(a1) && !isempty(a2)
+    res1 = map(get_projection,a1)
+    res2 = _collect_reduced_residuals!(cache,op,a2)
+    return res1,res2
+  elseif isempty(a1)
+    return _collect_reduced_residuals!(cache,op,a2)
+  else
+    return map(get_projection,a1)
+  end
+end
+
+function _collect_reduced_residuals!(
+  cache,
+  op::PTOperator,
+  a::Vector{RBVecAffineDecomposition{T}}) where T
+
   b,Mcache = cache
   dom = get_integration_domain.(a)
   meas = get_measure.(dom)
@@ -215,6 +243,25 @@ function collect_reduced_residuals!(
 end
 
 function collect_reduced_jacobians!(
+  cache,
+  op::PTOperator,
+  a::Vector{RBMatAffineDecomposition{T}};
+  kwargs...) where T
+
+  a1 = filter(istrivial,a)
+  a2 = filter(!istrivial,a)
+  if !isempty(a1) && !isempty(a2)
+    jac1 = map(get_projection,a1)
+    jac2 = _collect_reduced_jacobians!(cache,op,a2;kwargs...)
+    return jac1,jac2
+  elseif isempty(a1)
+    return _collect_reduced_jacobians!(cache,op,a2;kwargs...)
+  else
+    return map(get_projection,a1)
+  end
+end
+
+function _collect_reduced_jacobians!(
   cache,
   op::PTOperator,
   a::Vector{RBMatAffineDecomposition{T}};
@@ -264,7 +311,7 @@ function _get_quantity_at_time(a::PTArray,times::Vector{<:Real},red_times::Vecto
   return a[_get_pt_index(a,times,red_times)]
 end
 
-function rb_coefficient!(cache,a::RBAffineDecomposition,b::Matrix;st_mdeim=false)
+function rb_coefficient!(cache,a::GenericRBAffineDecomposition,b::Matrix;st_mdeim=false)
   csolve,crecast = cache
   time_ndofs = length(a.integration_domain.times)
   nparams = Int(size(b,2)/time_ndofs)

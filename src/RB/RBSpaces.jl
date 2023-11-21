@@ -98,7 +98,7 @@ function space_time_projection(
   nt_row,nt_col = size(basis_time_row,2),size(basis_time_col,2)
 
   s_proj = compress(basis_space_row,basis_space_col,nzm)
-  s_proj_mat = stack([x[:] for x in s_proj])'  # time_ndofs x ns_row*ns_col
+  s_proj_mat = stack([vec(x) for x in s_proj])'  # time_ndofs x ns_row*ns_col
   st_proj_center = zeros(T,nt_row,nt_col,ns_row*ns_col)
   st_proj_shift = zeros(T,nt_row,nt_col,ns_row*ns_col)
   @inbounds for ins = 1:ns_row*ns_col, jt = 1:nt_col, it = 1:nt_row

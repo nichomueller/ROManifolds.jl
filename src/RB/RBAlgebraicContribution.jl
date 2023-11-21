@@ -1,5 +1,10 @@
 struct RBAlgebraicContribution{T,N}
   affine_decompositions::Vector{RBAffineDecomposition{T,N}}
+  function RBAlgebraicContribution(
+    affine_decompositions::Vector{<:RBAffineDecomposition{T,N}}
+    ) where {T,N}
+    new{T,N}(affine_decompositions)
+  end
 end
 
 const RBVecAlgebraicContribution{T} = RBAlgebraicContribution{T,1}
@@ -19,7 +24,7 @@ function get_rb_ndofs(a::RBAlgebraicContribution)
   get_rb_ndofs(a[trian])
 end
 
-function save_algebraic_contrib(path::String,a::RBAlgebraicContribution{T,N} where N) where T
+function save_algebraic_contrib(path::String,a::RBAlgebraicContribution)
   create_dir!(path)
   adpath = joinpath(path,"ad")
   for (i,ai) in enumerate(a)

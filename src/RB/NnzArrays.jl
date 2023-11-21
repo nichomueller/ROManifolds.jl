@@ -115,6 +115,11 @@ function Base.prod(a::AbstractArray,nzm::NnzMatrix{T,A} where T) where A
   NnzMatrix{A}(nonzero_vals,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
 end
 
+function Arrays.testitem(nzm::NnzMatrix{T,A} where T) where A
+  mode2_ndofs = Int(size(nzm,2)/nzm.nparams)
+  NnzMatrix{A}(nzm.nonzero_val[:,1:mode2_ndofs],nzm.nonzero_idx,nzm.nrows,1)
+end
+
 function recast(nzm::NnzMatrix{T}) where T
   m = zeros(T,nzm.nrows,size(nzm,2))
   m[nzm.nonzero_idx,:] = nzm.nonzero_val
