@@ -35,12 +35,12 @@ function navier_stokes_equation()
   p0(μ) = x->p0(x,μ)
   p0μ(μ) = PFunction(p0,μ)
 
-  c(μ,t,(u,p),(du,dp),(v,q)) = ∫(v⊙(∇(du)'⋅u))dΩ
-  dc(μ,t,(u,p),(du,dp),(v,q)) = ∫(v⊙(∇(du)'⋅u))dΩ + ∫(v⊙(∇(u)'⋅du))dΩ
+  c(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(v⊙(∇(du)'⋅u),dΩ)
+  dc(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(v⊙(∇(du)'⋅u),dΩ) + ∫ₚ(v⊙(∇(u)'⋅du),dΩ)
 
-  res_lin(μ,t,(u,p),(v,q)) = ∫(v⋅∂ₚt(u))dΩ + ∫(aμt(μ,t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ - ∫(q*(∇⋅(u)))dΩ
-  jac_lin(μ,t,(u,p),(du,dp),(v,q)) = ∫(aμt(μ,t)*∇(v)⊙∇(du))dΩ - ∫(dp*(∇⋅(v)))dΩ - ∫(q*(∇⋅(du)))dΩ
-  jac_t(μ,t,(u,p),(dut,dpt),(v,q)) = ∫(v⋅dut)dΩ
+  res_lin(μ,t,(u,p),(v,q)) = ∫ₚ(v⋅∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⊙∇(u),dΩ) - ∫ₚ(p*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(u)),dΩ)
+  jac_lin(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(aμt(μ,t)*∇(v)⊙∇(du),dΩ) - ∫ₚ(dp*(∇⋅(v)),dΩ) - ∫ₚ(q*(∇⋅(du)),dΩ)
+  jac_t(μ,t,(u,p),(dut,dpt),(v,q)) = ∫ₚ(v⋅dut,dΩ)
 
   T = Float
   reffe_u = ReferenceFE(lagrangian,VectorValue{2,T},order)
@@ -52,7 +52,7 @@ function navier_stokes_equation()
   test = PTMultiFieldFESpace([test_u,test_p])
   trial = PTMultiFieldFESpace([trial_u,trial_p])
   feop = PTFEOperator(res_lin,jac_lin,jac_t,(c,dc),pspace,trial,test)
-  t0,tf,dt,θ = 0.,0.05,0.005,1
+  t0,tf,dt,θ = 0.,0.05,0.005,0.5
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial_u(μ,t0))
   ph0μ(μ) = interpolate_everywhere(p0μ(μ),trial_p(μ,t0))
   xh0μ(μ) = interpolate_everywhere([uh0μ(μ),ph0μ(μ)],trial(μ,t0))
@@ -71,7 +71,7 @@ function navier_stokes_equation()
   nsnaps_mdeim = 30
   nsnaps_test = 10
   st_mdeim = false
-  rbinfo = RBInfo(test_path;ϵ,norm_style,compute_supremizers,nsnaps_state,
+  rbinfo = BlockRBInfo(test_path;ϵ,norm_style,compute_supremizers,nsnaps_state,
     nsnaps_mdeim,nsnaps_test,st_mdeim)
 
   # Offline phase
@@ -88,7 +88,7 @@ function navier_stokes_equation()
   if load_structures
     rbspace = load(rbinfo,BlockRBSpace{T})
     rbrhs,rblhs = load(rbinfo,(NTuple{2,BlockRBVecAlgebraicContribution{T}},
-      NTuple{3,Vector{BlockRBMatAlgebraicContribution{T}}}))
+      NTuple{3,Vector{BlockRBMatAlgebraicContribution{T}}}),Ω)
   else
     rbspace = reduced_basis(rbinfo,feop,sols)
     rbrhs,rblhs = collect_compress_rhs_lhs(rbinfo,feop,fesolver,rbspace,params)

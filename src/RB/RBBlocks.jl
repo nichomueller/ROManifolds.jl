@@ -253,6 +253,7 @@ end
 get_nblocks(a::BlockRBMatAlgebraicContribution) = size(a.blocks,2)
 
 function save_algebraic_contrib(path::String,a::BlockRBVecAlgebraicContribution)
+  create_dir(path)
   tpath = joinpath(path,"touched")
   save(tpath,a.touched)
   for row in 1:get_nblocks(a)
@@ -264,6 +265,7 @@ function save_algebraic_contrib(path::String,a::BlockRBVecAlgebraicContribution)
 end
 
 function save_algebraic_contrib(path::String,a::BlockRBMatAlgebraicContribution)
+  create_dir(path)
   tpath = joinpath(path,"touched")
   save(tpath,a.touched)
   for (row,col) in index_pairs(get_nblocks(a),get_nblocks(a))

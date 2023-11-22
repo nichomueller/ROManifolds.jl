@@ -1,228 +1,343 @@
-rbres,rbjac = rbrhs,rblhs
-sols_test,params_test = load_test(rbinfo,feop,fesolver)
-res_cache,jac_cache = allocate_online_cache(feop,fesolver,rbspace,sols_test,params_test)
+# struct MyGridView{Dc,Dp,A,B} <: Grid{Dc,Dp}
+#   parent::A
+#   cell_to_parent_cell::B
+#   function MyGridView(parent::Grid,cell_to_parent_cell::AbstractArray)
+#     Dc = num_cell_dims(parent)
+#     Dp = num_point_dims(parent)
+#     A = typeof(parent)
+#     B = typeof(cell_to_parent_cell)
+#     new{Dc,Dp,A,B}(parent,cell_to_parent_cell)
+#   end
+# end
 
-# RESIDUALS
-trians = get_domains(rbres)
-trian,full_meas = Ω,dΩ #Γn,dΓn
-rbrest = rbres[trian]
-cache, = res_cache
+# struct EvalAt{A,B}
+#   parent::A
+#   cell_to_parent_cell::B
+# end
 
-rcache,scache... = cache
+# myview(a::Grid,b::AbstractArray) = MyGridView(a,b)
 
-times = get_times(fesolver)
-ndofs = num_free_dofs(feop.test)
-setsize!(rcache,(ndofs,))
+# function myview(t::BodyFittedTriangulation,ids::AbstractArray)
+#   model = t.model
+#   grid = myview(t.grid,ids)
+#   tface_to_mface = lazy_map(Reindex(t.tface_to_mface),ids)# t.tface_to_mface[ids]
+#   BodyFittedTriangulation(model,grid,tface_to_mface)
+# end
 
-red_idx = rbrest.integration_domain.idx
-red_times = rbrest.integration_domain.times
-red_meas = rbrest.integration_domain.meas
-red_trian = get_triangulation(red_meas)
+# function MyGridView(parent::Grid,parent_cell_to_mask::AbstractArray{Bool})
+#   cell_to_parent_cell = findall(collect1d(parent_cell_to_mask))
+#   MyGridView(parent,cell_to_parent_cell)
+# end
 
-dv = get_fe_basis(feop.test)
-ode_op = get_algebraic_operator(feop)
-ode_cache = allocate_cache(ode_op,params_test,times)
-ode_cache = update_cache!(ode_cache,ode_op,params_test,times)
-Xh, = ode_cache
-dxh = ()
-_xh = (sols_test,sols_test-sols_test)
-for i in 2:get_order(feop)+1
-  dxh = (dxh...,EvaluationFunction(Xh[i],_xh[i]))
-end
-xh = TransientCellField(EvaluationFunction(Xh[1],_xh[1]),dxh)
-dc = feop.res(params_test,times,xh,dv)[full_meas]
-vecdata = collect_cell_vector(feop.test,dc,trian)
-dcred = feop.res(params_test,times,xh,dv)[red_meas]
-vecdata_red = collect_cell_vector(feop.test,dcred,red_trian)
+# function MyGridView(parent::Grid,parent_cell_to_mask::AbstractVector{Bool})
+#   cell_to_parent_cell = findall(parent_cell_to_mask)
+#   MyGridView(parent,cell_to_parent_cell)
+# end
 
-# stuff from AffineDecomposition
-cell_dof_ids = get_cell_dof_ids(feop.test,trian)
-red_integr_cells = get_reduced_cells(red_idx,cell_dof_ids)
-red_trian = view(trian,red_integr_cells)
-red_meas = get_measure(feop,red_trian)
+# function Geometry.OrientationStyle(::Type{MyGridView{Dc,Dp,G}}) where {Dc,Dp,G}
+#   OrientationStyle(G)
+# end
 
-_f(x,y) = maximum(abs.(x-y))
-maximum(map(_f,vecdata[1][1][1][red_integr_cells],vecdata_red[1][1][1][:]))
+# function Geometry.RegularityStyle(::Type{MyGridView{Dc,Dp,G}}) where {Dc,Dp,G}
+#   RegularityStyle(G)
+# end
 
+# function Geometry.get_node_coordinates(grid::MyGridView)
+#   get_node_coordinates(grid.parent)
+# end
 
-# JACOBIANS
-i = 2
-trians = get_domains(rbjac[i])
-trian,full_meas = Ω,dΩ
-rbjact = rbjac[i][trian]
-cache, = jac_cache
+# function Geometry.get_cell_node_ids(grid::MyGridView)
+#   get_cell_node_ids(grid.parent)[grid.cell_to_parent_cell]
+# end
 
-jcache,scache... = cache
+# function Geometry.get_reffes(grid::MyGridView)
+#   get_reffes(grid.parent)
+# end
 
-times = get_times(fesolver)
-ndofs_row = num_free_dofs(feop.test)
-ndofs_col = num_free_dofs(get_trial(feop)(nothing,nothing))
-setsize!(jcache,(ndofs_row,ndofs_col))
+# function Geometry.get_cell_type(grid::MyGridView)
+#   get_cell_type(grid.parent)[grid.cell_to_parent_cell]
+# end
 
-red_idx = rbjact.integration_domain.idx
-red_times = rbjact.integration_domain.times
-red_meas = rbjact.integration_domain.meas
-red_trian = get_triangulation(red_meas)
+# function Geometry.get_cell_map(grid::MyGridView)
+#   # EvalAt(get_cell_map(grid.parent),grid.cell_to_parent_cell)
+#   lazy_map(Reindex(get_cell_map(grid.parent)),grid.cell_to_parent_cell)
+# end
 
-dv = get_fe_basis(feop.test)
-du = get_trial_fe_basis(get_trial(feop)(nothing,nothing))
-ode_op = get_algebraic_operator(feop)
-ode_cache = allocate_cache(ode_op,params_test,times)
-ode_cache = update_cache!(ode_cache,ode_op,params_test,times)
-Xh, = ode_cache
-dxh = ()
-_xh = (sols_test,sols_test-sols_test)
-for i in 2:get_order(feop)+1
-  dxh = (dxh...,EvaluationFunction(Xh[i],_xh[i]))
-end
-xh = TransientCellField(EvaluationFunction(Xh[1],_xh[1]),dxh)
-dc = feop.jacs[i](params_test,times,xh,du,dv)[full_meas]
-matdata = collect_cell_matrix(get_trial(feop)(params_test,times),feop.test,dc,trian)
-dcred = feop.jacs[i](params_test,times,xh,du,dv)[red_meas]
-matdata_red = collect_cell_matrix(get_trial(feop)(params_test,times),feop.test,dcred,red_trian)
+# function Geometry.get_facet_normal(grid::MyGridView)
+#   # EvalAt(get_facet_normal(grid.parent),grid.cell_to_parent_cell)
+#   lazy_map(Reindex(get_facet_normal(grid.parent)),grid.cell_to_parent_cell)
+# end
 
-# stuff from AffineDecomposition
-cell_dof_ids = get_cell_dof_ids(feop.test,trian)
-red_integr_cells = get_reduced_cells(red_idx,cell_dof_ids)
-red_trian = view(trian,red_integr_cells)
-red_meas = get_measure(feop,red_trian)
-
-_f(x,y) = maximum(abs.(x-y))
-if i == 1
-  maximum(map(_f,matdata[1][1][1][red_integr_cells],matdata_red[1][1][1][:]))
-else
-  maximum(map(_f,matdata[1][1][red_integr_cells],matdata_red[1][1][:]))
+struct MaskedCellPoint{DS,A,B,C} <: CellDatum
+  cell_point::CellPoint{DS,A,B,C}
+  mask::Vector{Int}
 end
 
+CellData.get_cell_points(x::MaskedCellPoint) = x.cell_point
+get_mask(x::MaskedCellPoint) = x.mask
+CellData.get_triangulation(x::MaskedCellPoint) = get_triangulation(get_cell_points(x))
+CellData.DomainStyle(x::MaskedCellPoint) = DomainStyle(get_cell_points(x))
 
-# something not right when i=2
-i = 2
-combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*x-θ*y
-jacs,trians = collect_jacobians_for_trian(fesolver,feop,sols[1:10],params,times;i)
-nzm,trian = jacs[1],[trians...][1]
-basis_space,basis_time = compress(nzm;ϵ=rbinfo.ϵ)
-
-M = assemble_matrix((u,v)->∫(u*v)dΩ,trial(nothing,nothing),test)/(θ*dt)
-# bs = basis_space.nonzero_val
-# bt = basis_time
-# nparams = 10
-# m2 = change_mode(nzm.nonzero_val,nparams)
-# @check bs*bs'*nzm.nonzero_val ≈ nzm.nonzero_val
-# @check bt*bt'*m2 ≈ m2
-# @check NnzVector(M).nonzero_val ≈ nzm.nonzero_val[:,1]
-# @check abs.(bs) ≈ abs.(tpod(nzm.nonzero_val[:,1:1]))
-
-proj_bs,proj_bt = project_space_time(basis_space,basis_time,rbspace,rbspace;combine_projections)
-interp_idx_space = get_interpolation_idx(basis_space)
-interp_idx_time = get_interpolation_idx(basis_time)
-entire_interp_idx_space = recast_idx(nzm,interp_idx_space)
-entire_interp_idx_rows,_ = vec_to_mat_idx(entire_interp_idx_space,nzm.nrows)
-
-irow,icol = vec_to_mat_idx(nzm.nonzero_idx,nzm.nrows)
-ncols = maximum(icol)
-BS = sparse(irow,icol,bs[:],nzm.nrows,ncols)
-COEFF_OK = basis_space'*nzm.nonzero_val[:,1]
-@check proj_bs[1] ≈ rbspace.basis_space'*BS*rbspace.basis_space
-@check proj_bt[1] ≈ bt
-@check nzm.nonzero_val[:,1] ≈ bs*COEFF_OK
-
-interp_bs = basis_space[interp_idx_space,:]
-lu_interp = if rbinfo.st_mdeim
-  interp_bt = basis_time[interp_idx_time,:]
-  interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
-  lu(interp_bst)
-else
-  lu(interp_bs)
+function CellData.get_data(x::MaskedCellPoint)
+  mask = get_mask(x)
+  function _get_data(data::CompressedArray)
+    CompressedArray(data[mask],data.ptrs[mask])
+  end
+  function _get_data(data::LazyArray)
+    lazy_map(Reindex(data),mask)
+  end
+  _get_data(get_data(get_cell_points(x)))
 end
 
-cell_dof_ids = get_cell_dof_ids(feop.test,trian)
-red_integr_cells = get_reduced_cells(entire_interp_idx_rows,cell_dof_ids)
-red_trian = view(trian,red_integr_cells)
-red_meas = get_measure(feop,red_trian)
-red_times = st_mdeim ? times[interp_idx_time] : times
-integr_domain = RBIntegrationDomain(red_meas,red_times,entire_interp_idx_space)
-
-opposite_cells = setdiff(collect(eachindex(cell_dof_ids)),red_integr_cells)
-for idx in entire_interp_idx_rows
-  @check any([idx ∈ cell_dof_ids[cell] for cell in red_integr_cells])
-  @check !any([idx ∈ cell_dof_ids[cell] for cell in opposite_cells])
+function CellData.change_domain(a::MaskedCellPoint,args...)
+  MaskedCellPoint(change_domain(get_cell_points(a),args...),get_mask(a))
 end
 
-nnzidx = findnz(M[:])[1]
-Mred = assemble_matrix((u,v)->∫(u*v)red_meas,trial(nothing,nothing),test)/(θ*dt)
-norm(Mred[nnzidx][interp_idx_space] - M[nnzidx][interp_idx_space])
-
-cache, = jac_cache
-trian,full_meas = Ω,dΩ
-rbjact = rbjac[i][trian]
-# red_jac2 = assemble_lhs!(cache[1],feop,fesolver,rbjact,sols_test,params_test;i=2)
-# coeff = mdeim_solve!(cache[2],rbjact,red_jac2;st_mdeim)
-times = get_times(fesolver)
-ndofs_row = num_free_dofs(feop.test)
-ndofs_col = num_free_dofs(get_trial(feop)(nothing,nothing))
-setsize!(cache[1],(ndofs_row,ndofs_col))
-
-red_idx = rbjact.integration_domain.idx
-red_times = rbjact.integration_domain.times
-red_meas = rbjact.integration_domain.meas
-
-ode_op = get_algebraic_operator(feop)
-ode_cache = allocate_cache(ode_op,params_test,red_times)
-
-if length(red_times) < length(times)
-  A = PTArray(cache[1:length(red_times)*length(params_test)])
-  time_idx = findall(x->x in red_times,times)
-  _sols = map(x->getindex(x,time_idx),sols)
-else
-  A = get_array(cache[1])
-  _sols = sols_test
+function get_masked_cell_points(trian::Triangulation,mask::Vector{Int})
+  MaskedCellPoint(get_cell_points(trian),mask)
 end
-jac_i = collect_jacobians!(A,fesolver,ode_op,_sols,params_test,red_times,ode_cache,red_idx,red_meas;i)
-coeff = mdeim_solve!(cache[2:3],rbjact,jac_i;st_mdeim)
 
-coeff_param1 = coeff[1]
-coeff_param1_time1 = coeff_param1[1]
-jac_i_mdeim_red_param1_time1 = basis_space*coeff_param1_time1
+function get_masked_cell_points(a::CellQuadrature,mask::Vector{Int})
+  MaskedCellPoint(get_cell_points(a),mask)
+end
 
-irow,icol = vec_to_mat_idx(nzm.nonzero_idx,nzm.nrows)
-ncols = maximum(icol)
-jac_i_mdeim_param1_time1 = sparse(irow,icol,jac_i_mdeim_red_param1_time1[:],nzm.nrows,ncols)
-jac_i_param1_time1 = sparse(irow,icol,nzm.nonzero_val[:,1],nzm.nrows,ncols)
-maximum(abs.(jac_i_mdeim_param1_time1 - jac_i_param1_time1))
+function CellData.evaluate!(cache,f::CellField,x::MaskedCellPoint)
+  _f, _x = CellData._to_common_domain(f,x)
+  cell_field = get_data(_f)
+  cell_point = get_data(_x)
+  lazy_map(evaluate,cell_field,cell_point)
+end
 
-M = assemble_matrix((u,v)->∫(u*v)dΩ,trial(nothing,nothing),test)
-isapprox(M/(dt*θ),jac_i_param1_time1)
+function CellData._to_common_domain(f::CellField,x::MaskedCellPoint)
+  trian_x = get_triangulation(x)
+  f_on_trian_x = change_domain(f,trian_x,DomainStyle(x))
+  f_on_trian_x, x
+end
+
+function Arrays.evaluate!(cache,f::OperationCellField,x::MaskedCellPoint)
+  ax = map(i->i(x),f.args)
+  lazy_map(Fields.BroadcastingFieldOpMap(f.op.op),ax...)
+end
+
+μ = rand(3)
+t = dt
+dv = get_fe_basis(test)
+du = get_trial_fe_basis(trial(nothing,nothing))
+idx = [1,10,20]
+Ξ = view(Ω,idx)
+dΞ = Measure(Ξ,2)
+
+@time dc = ∫(a(μ,t)*∇(dv)⋅∇(du))dΩ
+@time _dchat = ∫(a(μ,t)*∇(dv)⋅∇(du))dΞ
+
+∫(a(μ,t)*∇(dv)⋅∇(du))dΞ
+
+ff = a(μ,t)*∇(dv)⋅∇(du)
+quad = dΩ.quad
+trian_f = get_triangulation(ff)
+trian_x = get_triangulation(quad)
+b = change_domain(ff,quad.trian,quad.data_domain_style)
+cell_map = get_cell_map(quad.trian)
+cell_Jt = lazy_map(∇,cell_map)
+cell_Jtx = lazy_map(evaluate,cell_Jt,quad.cell_point)
+
+x = get_cell_points(quad)
+@time bx = b(x)
+@time lazy_map(IntegrationMap(),bx,quad.cell_weight,cell_Jtx)
+
+x̃ = get_masked_cell_points(quad,idx)
+@time bx̃ = b(x̃)
+@time lazy_map(IntegrationMap(),bx̃,quad.cell_weight,cell_Jtx)
+
+cell_field = get_data(∇(du))
+cell_point = get_data(x)
+_cell_point = get_data(x̃)
+@time lazy_map(evaluate,cell_field,cell_point)
+@time lazy_map(evaluate,cell_field,_cell_point)
+
+@time i_to_basis_x = lazy_map(evaluate,cell_field.args[1],cell_point)
+@time _i_to_basis_x = lazy_map(evaluate,cell_field.args[1],_cell_point)
+
+@time lazy_map(Gridap.Fields.TransposeMap(),i_to_basis_x)
+@time lazy_map(Gridap.Fields.TransposeMap(),_i_to_basis_x)
+
+fi = map(testitem,(i_to_basis_x,))
+T = return_type(Gridap.Fields.TransposeMap(),i_to_basis_x)
+lazy_map(Gridap.Fields.TransposeMap(),T,i_to_basis_x)
+
+_fi = map(testitem,(_i_to_basis_x,))
+_T = return_type(Gridap.Fields.TransposeMap(),_i_to_basis_x)
+lazy_map(Gridap.Fields.TransposeMap(),_T,_i_to_basis_x)
+
+# WHY IS THE TYPE DIFFERENT
+# _i_to_basis_x = lazy_map(evaluate,cell_field.args[1],_cell_point)
+_a = cell_field.args[1]
+function rettype(k,f::AbstractArray...)
+  fi = map(testitem,f)
+  return_type(k,fi...)
+end
+
+x = cell_point
+fx = map(fi->lazy_map(evaluate,fi,x),_a.args)
+# lazy_map(evaluate,_a.args[2],x)
+T = rettype(evaluate,_a.args[2],x)
+lazy_map(evaluate,_T,_a.args[2],x)
+
+_x = _cell_point
+_fx = map(fi->lazy_map(evaluate,fi,_x),_a.args)
+# lazy_map(evaluate,_a.args[2],_x)
+_T = rettype(evaluate,_a.args[2],_x)
+lazy_map(evaluate,_T,_a.args[2],_x)
+
+# function lazy_map(::typeof(evaluate),::Type{T},g::CompressedArray...) where T
+#   if _have_same_ptrs(g)
+#     _lazy_map_compressed(g...)
+#   else
+#     LazyArray(T,g...)
+#   end
+# end
+
+Arrays._have_same_ptrs((_a.args[2],x))
+Arrays._have_same_ptrs((_a.args[2],_x))
 
 #
-t = get_domains(rbrhs1)
-trians1 = [t...]
+ddu = ∇(du)
+get_data(∇(du))
 
-ad1 = rbrhs[Ω]
-ad2 = rbrhs1[trians1[1]]
 
-trians1[1] == Ω
-trians1[2] == Γn
-ad1.basis_space == ad2.basis_space
-ad1.basis_time == ad2.basis_time
-ad1.integration_domain.idx == ad2.integration_domain.idx
-ad1.integration_domain.times == ad2.integration_domain.times
-get_triangulation(ad1.integration_domain.meas) == get_triangulation(ad2.integration_domain.meas)
-ad1.mdeim_interpolation.L == ad2.mdeim_interpolation.L
-ad1.mdeim_interpolation.U == ad2.mdeim_interpolation.U
+# struct MyReindex{A} <: Map
+#   values::A
+# end
 
-for i = 1:2
-  t = get_domains(rblhs1[1])
-  trians1 = [t...]
+# function Arrays.testargs(k::MyReindex,i)
+#   @check length(k.values) !=0 "This map has empty domain"
+#   (one(i),)
+# end
+# function Arrays.testargs(k::MyReindex,i::Integer...)
+#   @check length(k.values) !=0 "This map has empty domain"
+#   map(one,i)
+# end
+# function Arrays.return_value(k::MyReindex,i...)
+#   length(k.values)!=0 ? evaluate(k,testargs(k,i...)...) : testitem(k.values)
+# end
+# Arrays.return_cache(k::MyReindex,i...) = array_cache(k.values)
+# Arrays.evaluate!(cache,k::MyReindex,i...) = getindex!(cache,k.values,i...)
+# Arrays.evaluate(k::MyReindex,i...) = k.values[i...]
 
-  ad1 = rblhs[i][Ω]
-  ad2 = rblhs1[i][trians1[1]]
+# function Arrays.lazy_map(k::MyReindex{<:Fill},::Type{T}, j_to_i::AbstractArray) where T
+#   v = k.values.value
+#   Fill(v,size(j_to_i)...)
+# end
 
-  trians1[1] == Ω # false
-  ad1.basis_space == ad2.basis_space
-  ad1.basis_time == ad2.basis_time
-  ad1.integration_domain.idx == ad2.integration_domain.idx
-  ad1.integration_domain.times == ad2.integration_domain.times
-  get_triangulation(ad1.integration_domain.meas) == get_triangulation(ad2.integration_domain.meas)
-  ad1.mdeim_interpolation.L == ad2.mdeim_interpolation.L
-  ad1.mdeim_interpolation.U == ad2.mdeim_interpolation.U
-end
+# function Arrays.lazy_map(k::MyReindex{<:CompressedArray},::Type{T}, j_to_i::AbstractArray) where T
+#   i_to_v = k.values
+#   values = i_to_v.values
+#   ptrs = i_to_v.ptrs[j_to_i]
+#   CompressedArray(values,ptrs)
+# end
+
+# function Arrays.lazy_map(k::MyReindex{<:LazyArray},::Type{T},j_to_i::AbstractArray) where T
+#   i_to_maps = k.values.maps
+#   i_to_args = k.values.args
+#   j_to_maps = lazy_map(MyReindex(i_to_maps),eltype(i_to_maps),j_to_i)
+#   j_to_args = map(i_to_fk->lazy_map(MyReindex(i_to_fk),eltype(i_to_fk),j_to_i),i_to_args)
+#   LazyArray(T,j_to_maps,j_to_args...)
+# end
+
+# function Arrays.lazy_map(k::MyReindex{<:Fields.MemoArray},::Type{T},j_to_i::AbstractArray) where T
+#   i_to_v = k.values.parent
+#   j_to_v = lazy_map(MyReindex(i_to_v),T,j_to_i)
+#   MemoArray(j_to_v)
+# end
+
+# struct ValuesAtMask{A,B} <: Map
+#   values::A
+#   mask::B
+# end
+
+# function Arrays.return_value(k::ValuesAtMask,i...)
+#   length(k.values)!=0 ? evaluate(k,testargs(k,i...)...) : testitem(k.values)
+# end
+
+# Arrays.return_cache(k::ValuesAtMask,i...) = array_cache(k.values)
+# Arrays.evaluate!(cache,k::ValuesAtMask,i...) = getindex!(cache,k.values,k.mask[i...])
+# Arrays.evaluate(k::ValuesAtMask,i...) = k.values[k.mask[i...]]
+
+# function Arrays.lazy_map(k::ValuesAtMask{<:Fill},::Type{T}) where T
+#   v = k.values.value
+#   Fill(v,size(k.mask)...)
+# end
+
+# function Arrays.lazy_map(k::ValuesAtMask{<:CompressedArray},::Type{T}) where T
+#   i_to_v = k.values
+#   values = i_to_v.values
+#   ptrs = i_to_v.ptrs[k.mask]
+#   CompressedArray(values,ptrs)
+# end
+
+# function Arrays.lazy_map(k::ValuesAtMask{<:LazyArray},::Type{T}) where T
+#   i_to_maps = k.values.maps
+#   i_to_args = k.values.args
+#   j_to_maps = lazy_map(ValuesAtMask(i_to_maps,k.mask),eltype(i_to_maps))
+#   j_to_args = map(i_to_fk->lazy_map(ValuesAtMask(i_to_fk,k.mask),eltype(i_to_fk)),i_to_args)
+#   LazyArray(T,j_to_maps,j_to_args...)
+# end
+
+# function Arrays.lazy_map(f,k::ValuesAtMask,args...)
+#   ValuesAtMask(lazy_map(f,k.values,args...),k.mask)
+# end
+
+# myview(a::Grid,b::AbstractArray) = MyGridView(a,b)
+
+# function myview(t::BodyFittedTriangulation,ids::AbstractArray)
+#   model = t.model
+#   grid = myview(t.grid,ids)
+#   tface_to_mface = t.tface_to_mface[ids] # lazy_map(MyReindex(t.tface_to_mface),ids) #
+#   BodyFittedTriangulation(model,grid,tface_to_mface)
+# end
+
+# function MyGridView(parent::Grid,parent_cell_to_mask::AbstractArray{Bool})
+#   cell_to_parent_cell = findall(collect1d(parent_cell_to_mask))
+#   MyGridView(parent,cell_to_parent_cell)
+# end
+
+# function MyGridView(parent::Grid,parent_cell_to_mask::AbstractVector{Bool})
+#   cell_to_parent_cell = findall(parent_cell_to_mask)
+#   MyGridView(parent,cell_to_parent_cell)
+# end
+
+# function Geometry.OrientationStyle(::Type{MyGridView{Dc,Dp,G}}) where {Dc,Dp,G}
+#   OrientationStyle(G)
+# end
+
+# function Geometry.RegularityStyle(::Type{MyGridView{Dc,Dp,G}}) where {Dc,Dp,G}
+#   RegularityStyle(G)
+# end
+
+# function Geometry.get_node_coordinates(grid::MyGridView)
+#   get_node_coordinates(grid.parent)
+# end
+
+# function Geometry.get_cell_node_ids(grid::MyGridView)
+#   # get_cell_node_ids(grid.parent)[grid.cell_to_parent_cell]
+#   ValuesAtMask(get_cell_node_ids(grid.parent),grid.cell_to_parent_cell)
+# end
+
+# function Geometry.get_reffes(grid::MyGridView)
+#   get_reffes(grid.parent)
+# end
+
+# function Geometry.get_cell_type(grid::MyGridView)
+#   # get_cell_type(grid.parent)[grid.cell_to_parent_cell]
+#   ValuesAtMask(get_cell_type(grid.parent),grid.cell_to_parent_cell)
+# end
+
+# function Geometry.get_cell_map(grid::MyGridView)
+#   ValuesAtMask(get_cell_map(grid.parent),grid.cell_to_parent_cell)
+#   # lazy_map(MyReindex(get_cell_map(grid.parent)),grid.cell_to_parent_cell)
+# end
+
+# function Geometry.get_facet_normal(grid::MyGridView)
+#   ValuesAtMask(get_facet_normal(grid.parent),grid.cell_to_parent_cell)
+#   # lazy_map(MyReindex(get_facet_normal(grid.parent)),grid.cell_to_parent_cell)
+# end
