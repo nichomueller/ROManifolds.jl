@@ -36,7 +36,7 @@ struct ReducedUnstructuredGrid{Dc,Dp,Tp,O,Tn} <: Grid{Dc,Dp}
     else
       lazy_map(Reindex(get_facet_normal(parent)),cell_to_parent_cell)
     end
-    cell_map = lazy_map(MyReindex(get_cell_map(parent)),cell_to_parent_cell)
+    cell_map = lazy_map(Reindex(get_cell_map(parent)),cell_to_parent_cell)
     new{Dc,Dp,Tp,O,Tn}(node_coordinates,cell_node_ids,reffes,cell_types,
       orientation_style,facet_normal,cell_map)
   end
@@ -54,12 +54,132 @@ end
 
 abstract type ReducedTriangulation{Dt,Dp} <: Triangulation{Dt,Dp} end
 
-function is_parent(strian::Triangulation,ttrian::ReducedTriangulation)
-  objectid(strian) == ttrian.parent_id
-end
-
 function ReducedTriangulation(::Triangulation,::AbstractArray)
   @notimplemented
+end
+
+function is_parent(parent::Triangulation,child::Triangulation;kwargs...)
+  false
+end
+
+function Geometry.get_glue(trian::ReducedTriangulation{Dt},::Val{Dt}) where Dt
+  tface_to_mface = trian.tface_to_mface
+  tface_to_mface_map = Fill(GenericField(identity),num_cells(trian))
+  if isa(tface_to_mface,IdentityVector) && num_faces(trian.model,Dt) == num_cells(trian)
+    mface_to_tface = tface_to_mface
+  else
+    nmfaces = num_faces(trian.model,Dt)
+    mface_to_tface = PosNegPartition(tface_to_mface,Int32(nmfaces))
+  end
+  FaceToFaceGlue(tface_to_mface,tface_to_mface_map,mface_to_tface)
+end
+
+function CellData.change_domain(
+  a::CellField,
+  strian::Triangulation,::ReferenceDomain,
+  ttrian::ReducedTriangulation,::ReferenceDomain)
+
+  msg = """\n
+  We cannot move the given CellField to the reference domain of the requested triangulation.
+  Make sure that the given triangulation is either the same as the triangulation on which the
+  CellField is defined, or that the latter triangulation is the background of the former.
+  """
+
+  if is_parent(strian,ttrian)
+    sface_to_field = get_data(a)
+    sglue = get_glue(strian,Val(D))
+    mface_to_sface = sglue.mface_to_tface
+    tface_to_mface = ttrian.tface_to_mface
+    mface_to_field = extend(sface_to_field,mface_to_sface)
+    tface_to_field_s = lazy_map(Reindex(mface_to_field),tface_to_mface)
+    return similar_cell_field(a,tface_to_field_s,ttrian,ReferenceDomain())
+  end
+  @assert is_change_possible(strian,ttrian) msg
+  sglue = get_glue(strian,Val(D))
+  tglue = get_glue(ttrian,Val(D))
+  change_domain_ref_ref(a,ttrian,sglue,tglue)
+end
+
+function CellData.change_domain(
+  a::CellDof,
+  strian::Triangulation,::ReferenceDomain,
+  ttrian::ReducedTriangulation,::ReferenceDomain)
+
+  msg = """\n
+  We cannot move the given CellField to the reference domain of the requested triangulation.
+  Make sure that the given triangulation is either the same as the triangulation on which the
+  CellField is defined, or that the latter triangulation is the background of the former.
+  """
+
+  if is_parent(strian,ttrian)
+    return CellDof(ttrian.tface_to_mface,ttrian,ReferenceDomain())
+  end
+  @assert is_change_possible(strian,ttrian) msg
+  sglue = get_glue(strian,Val(D))
+  tglue = get_glue(ttrian,Val(D))
+  change_domain_ref_ref(a,ttrian,sglue,tglue)
+end
+
+function CellData.change_domain(
+  a::CellField,
+  strian::Triangulation,::PhysicalDomain,
+  ttrian::ReducedTriangulation,::PhysicalDomain)
+
+  msg = """\n
+  We cannot move the given CellField to the reference domain of the requested triangulation.
+  Make sure that the given triangulation is either the same as the triangulation on which the
+  CellField is defined, or that the latter triangulation is the background of the former.
+  """
+
+  if is_parent(strian,ttrian)
+    sface_to_field = get_data(a)
+    sglue = get_glue(strian,Val(D))
+    mface_to_sface = sglue.mface_to_tface
+    tface_to_mface = ttrian.tface_to_mface
+    mface_to_field = extend(sface_to_field,mface_to_sface)
+    tface_to_field_s = lazy_map(Reindex(mface_to_field),tface_to_mface)
+    return similar_cell_field(a,tface_to_field_s,ttrian,PhysicalDomain())
+  end
+  @assert is_change_possible(strian,ttrian) msg
+  sglue = get_glue(strian,Val(D))
+  tglue = get_glue(ttrian,Val(D))
+  change_domain_phys_phys(a,ttrian,sglue,tglue)
+end
+
+function CellData.change_domain(
+  a::CellDof,
+  strian::Triangulation,::PhysicalDomain,
+  ttrian::ReducedTriangulation,::PhysicalDomain)
+
+  msg = """\n
+  We cannot move the given CellField to the reference domain of the requested triangulation.
+  Make sure that the given triangulation is either the same as the triangulation on which the
+  CellField is defined, or that the latter triangulation is the background of the former.
+  """
+
+  if is_parent(strian,ttrian)
+    return CellDof(ttrian.tface_to_mface,ttrian,PhysicalDomain())
+  end
+  @assert is_change_possible(strian,ttrian) msg
+  sglue = get_glue(strian,Val(D))
+  tglue = get_glue(ttrian,Val(D))
+  change_domain_phys_phys(a,ttrian,sglue,tglue)
+end
+
+function ReducedMeasure(meas::Measure,trians::Triangulation...)
+  trian = get_triangulation(meas)
+  for t in trians
+    if is_parent(t,trian;shallow=true)
+      new_trian = ReducedTriangulation(trian,t)
+      @unpack (cell_quad,cell_point,cell_weight,trian,
+        data_domain_style,integration_domain_style) = meas.quad
+      new_quad = CellQuadrature(cell_quad,cell_point,cell_weight,new_trian,
+        data_domain_style,integration_domain_style)
+      new_meas = Measure(new_quad)
+      return new_meas
+    end
+  end
+  @unreachable
 end
 
 struct ReducedBodyFittedTriangulation{Dt,Dp,A,B,C} <: ReducedTriangulation{Dt,Dp}
@@ -87,111 +207,24 @@ function ReducedTriangulation(trian::BodyFittedTriangulation,ids::AbstractArray)
   ReducedBodyFittedTriangulation(parent_id,model,grid,tface_to_mface)
 end
 
+function ReducedTriangulation(child::ReducedBodyFittedTriangulation,parent::BodyFittedTriangulation)
+  parent_id = objectid(parent)
+  ReducedBodyFittedTriangulation(parent_id,child.model,child.grid,child.tface_to_mface)
+end
+
 Geometry.get_background_model(trian::ReducedBodyFittedTriangulation) = trian.model
 Geometry.get_grid(trian::ReducedBodyFittedTriangulation) = trian.grid
 
-function Geometry.get_glue(trian::ReducedTriangulation{Dt},::Val{Dt}) where Dt
-  tface_to_mface = trian.tface_to_mface
-  tface_to_mface_map = Fill(GenericField(identity),num_cells(trian))
-  if isa(tface_to_mface,IdentityVector) && num_faces(trian.model,Dt) == num_cells(trian)
-    mface_to_tface = tface_to_mface
+function is_parent(
+  parent::BodyFittedTriangulation{Dc,Dp,Tp,O,Tn},
+  child::ReducedBodyFittedTriangulation{Dc,Dp,Tp,O,Tn};
+  shallow=false) where {Dc,Dp,Tp,O,Tn}
+
+  if shallow
+    get_node_coordinates(get_grid(parent)) == get_node_coordinates(get_grid(child))
   else
-    nmfaces = num_faces(trian.model,Dt)
-    mface_to_tface = PosNegPartition(tface_to_mface,Int32(nmfaces))
+    objectid(parent) == child.parent_id
   end
-  FaceToFaceGlue(tface_to_mface,tface_to_mface_map,mface_to_tface)
-end
-
-function CellData.change_domain(
-  a::CellField,
-  strian::BodyFittedTriangulation,::ReferenceDomain,
-  ttrian::ReducedBodyFittedTriangulation,::ReferenceDomain)
-
-  msg = """\n
-  We cannot move the given CellField to the reference domain of the requested triangulation.
-  Make sure that the given triangulation is either the same as the triangulation on which the
-  CellField is defined, or that the latter triangulation is the background of the former.
-  """
-
-  if is_parent(strian,ttrian)
-    sface_to_field = get_data(a)
-    sglue = get_glue(strian,Val(D))
-    mface_to_sface = sglue.mface_to_tface
-    tface_to_mface = ttrian.tface_to_mface
-    mface_to_field = extend(sface_to_field,mface_to_sface)
-    tface_to_field_s = lazy_map(Reindex(mface_to_field),tface_to_mface)
-    return similar_cell_field(a,tface_to_field_s,ttrian,ReferenceDomain())
-  end
-  @assert is_change_possible(strian,ttrian) msg
-  sglue = get_glue(strian,Val(D))
-  tglue = get_glue(ttrian,Val(D))
-  change_domain_ref_ref(a,ttrian,sglue,tglue)
-end
-
-function CellData.change_domain(
-  a::CellDof,
-  strian::BodyFittedTriangulation,::ReferenceDomain,
-  ttrian::ReducedBodyFittedTriangulation,::ReferenceDomain)
-
-  msg = """\n
-  We cannot move the given CellField to the reference domain of the requested triangulation.
-  Make sure that the given triangulation is either the same as the triangulation on which the
-  CellField is defined, or that the latter triangulation is the background of the former.
-  """
-
-  if is_parent(strian,ttrian)
-    return CellDof(ttrian.tface_to_mface,ttrian,ReferenceDomain())
-  end
-  @assert is_change_possible(strian,ttrian) msg
-  sglue = get_glue(strian,Val(D))
-  tglue = get_glue(ttrian,Val(D))
-  change_domain_ref_ref(a,ttrian,sglue,tglue)
-end
-
-function CellData.change_domain(
-  a::CellField,
-  strian::BodyFittedTriangulation,::PhysicalDomain,
-  ttrian::ReducedBodyFittedTriangulation,::PhysicalDomain)
-
-  msg = """\n
-  We cannot move the given CellField to the reference domain of the requested triangulation.
-  Make sure that the given triangulation is either the same as the triangulation on which the
-  CellField is defined, or that the latter triangulation is the background of the former.
-  """
-
-  if is_parent(strian,ttrian)
-    sface_to_field = get_data(a)
-    sglue = get_glue(strian,Val(D))
-    mface_to_sface = sglue.mface_to_tface
-    tface_to_mface = ttrian.tface_to_mface
-    mface_to_field = extend(sface_to_field,mface_to_sface)
-    tface_to_field_s = lazy_map(Reindex(mface_to_field),tface_to_mface)
-    return similar_cell_field(a,tface_to_field_s,ttrian,PhysicalDomain())
-  end
-  @assert is_change_possible(strian,ttrian) msg
-  sglue = get_glue(strian,Val(D))
-  tglue = get_glue(ttrian,Val(D))
-  change_domain_phys_phys(a,ttrian,sglue,tglue)
-end
-
-function CellData.change_domain(
-  a::CellDof,
-  strian::BodyFittedTriangulation,::PhysicalDomain,
-  ttrian::ReducedBodyFittedTriangulation,::PhysicalDomain)
-
-  msg = """\n
-  We cannot move the given CellField to the reference domain of the requested triangulation.
-  Make sure that the given triangulation is either the same as the triangulation on which the
-  CellField is defined, or that the latter triangulation is the background of the former.
-  """
-
-  if is_parent(strian,ttrian)
-    return CellDof(ttrian.tface_to_mface,ttrian,PhysicalDomain())
-  end
-  @assert is_change_possible(strian,ttrian) msg
-  sglue = get_glue(strian,Val(D))
-  tglue = get_glue(ttrian,Val(D))
-  change_domain_phys_phys(a,ttrian,sglue,tglue)
 end
 
 struct ReducedBoundaryTriangulation{Dc,Dp,A,B} <: ReducedTriangulation{Dc,Dp}
@@ -212,19 +245,18 @@ struct ReducedBoundaryTriangulation{Dc,Dp,A,B} <: ReducedTriangulation{Dc,Dp}
   end
 end
 
-function ReducedTriangulation(t::BoundaryTriangulation,ids::AbstractArray)
-  parent_id = objectid(t)
+function ReducedTriangulation(trian::BoundaryTriangulation,ids::AbstractArray)
+  parent_id = objectid(trian)
 
-  face_to_bgface = t.glue.face_to_bgface[ids]
-  bgface_to_lcell = t.glue.bgface_to_lcell
+  face_to_bgface = trian.glue.face_to_bgface[ids]
+  bgface_to_lcell = trian.glue.bgface_to_lcell
 
-  model = get_background_model(t)
+  model = get_background_model(trian)
   D = num_cell_dims(model)
   topo = get_grid_topology(model)
   bgface_grid = Grid(ReferenceFE{D-1},model)
 
-  face_grid = view(bgface_grid,face_to_bgface)
-  # face_grid = ReducedUnstructuredGrid(bgface_grid,face_to_bgface) this would be faster
+  face_grid = ReducedUnstructuredGrid(bgface_grid,face_to_bgface)
   cell_grid = get_grid(model)
   glue = FaceToCellGlue(topo,cell_grid,face_grid,face_to_bgface,bgface_to_lcell)
   trian = BodyFittedTriangulation(model,face_grid,face_to_bgface)
@@ -232,9 +264,14 @@ function ReducedTriangulation(t::BoundaryTriangulation,ids::AbstractArray)
   ReducedBoundaryTriangulation(parent_id,trian,glue)
 end
 
-Geometry.get_background_model(t::ReducedBoundaryTriangulation) = get_background_model(t.trian)
-Geometry.get_grid(t::ReducedBoundaryTriangulation) = get_grid(t.trian)
-Geometry.get_glue(t::ReducedBoundaryTriangulation{D},::Val{D}) where D = get_glue(t.trian,Val(D))
+function ReducedTriangulation(child::ReducedBoundaryTriangulation,parent::BoundaryTriangulation)
+  parent_id = objectid(parent)
+  ReducedBoundaryTriangulation(parent_id,child.trian,child.glue)
+end
+
+Geometry.get_background_model(trian::ReducedBoundaryTriangulation) = get_background_model(trian.trian)
+Geometry.get_grid(trian::ReducedBoundaryTriangulation) = get_grid(trian.trian)
+Geometry.get_glue(trian::ReducedBoundaryTriangulation{D},::Val{D}) where D = get_glue(trian.trian,Val(D))
 
 function Geometry.get_glue(trian::ReducedBoundaryTriangulation,::Val{Dp}) where Dp
   model = get_background_model(trian)
@@ -326,4 +363,16 @@ function Geometry._compute_face_to_q_vertex_coords(trian::ReducedBoundaryTriangu
   end
 
   Geometry.FaceCompressedVector(ctype_to_lface_to_pindex_to_qcoords,trian.glue)
+end
+
+function is_parent(
+  parent::BoundaryTriangulation{Dc,Dp,A,B},
+  child::ReducedBoundaryTriangulation{Dc,Dp,A,B};
+  shallow=false) where {Dc,Dp,A,B}
+
+  if shallow
+    get_node_coordinates(get_grid(parent)) == get_node_coordinates(get_grid(child))
+  else
+    objectid(parent) == child.parent_id
+  end
 end

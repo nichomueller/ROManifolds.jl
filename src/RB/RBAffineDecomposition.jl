@@ -36,13 +36,13 @@ function get_rb_ndofs(a::GenericRBAffineDecomposition)
   return ndofs
 end
 
-function correct_measure(a::GenericRBAffineDecomposition,trians::Triangulation...)
+function ReducedMeasure(a::GenericRBAffineDecomposition,trians::Triangulation...)
   if all(isnothing.(trians))
     return a
   end
   dom = get_integration_domain(a)
   meas = get_measure(dom)
-  new_meas = correct_measure(meas,trians...)
+  new_meas = ReducedMeasure(meas,trians...)
   new_dom = RBIntegrationDomain(new_meas,dom.times,dom.idx)
   return GenericRBAffineDecomposition(a.basis_space,a.basis_time,a.mdeim_interpolation,new_dom)
 end
@@ -54,7 +54,7 @@ end
 get_projection(a::TrivialRBAffineDecomposition) = a.projection
 istrivial(::TrivialRBAffineDecomposition) = true
 get_rb_ndofs(a::TrivialRBAffineDecomposition) = size(get_projection(a),1)
-correct_measure(a::TrivialRBAffineDecomposition,args...) = a
+ReducedMeasure(a::TrivialRBAffineDecomposition,args...) = a
 
 function RBAffineDecomposition(
   rbinfo::RBInfo,

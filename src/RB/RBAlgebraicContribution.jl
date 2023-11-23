@@ -39,7 +39,7 @@ function load_algebraic_contrib(path::String,::Type{RBVecAlgebraicContribution{T
   i = 1
   while isfile(correct_path(adpath*"_$i"))
     _ai = load(adpath*"_$i",S)
-    ai = correct_measure(_ai,args...)
+    ai = ReducedMeasure(_ai,args...)
     push!(a,ai)
     i += 1
   end
@@ -53,7 +53,7 @@ function load_algebraic_contrib(path::String,::Type{RBMatAlgebraicContribution{T
   i = 1
   while isfile(correct_path(adpath*"_$i"))
     _ai = load(adpath*"_$i",S)
-    ai = correct_measure(_ai,args...)
+    ai = ReducedMeasure(_ai,args...)
     push!(a,ai)
     i += 1
   end
@@ -146,7 +146,7 @@ function collect_compress_rhs_lhs(rbinfo,feop::PTFEOperator{Affine},fesolver,rbs
   return rhs,lhs
 end
 
-function collect_compress_rhs_lhs(rbinfo,feop,fesolver::PThetaMethod,rbspace,params)
+function collect_compress_rhs_lhs(rbinfo,feop,fesolver,rbspace,params)
   μ = params[1:rbinfo.nsnaps_mdeim]
   op = get_ptoperator(fesolver,feop,rbspace,μ)
 

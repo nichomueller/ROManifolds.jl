@@ -1,5 +1,7 @@
 abstract type RBBlock{T,N} end
 
+Base.eltype(::RBBlock{T,N} where N) where T = T
+Base.ndims(::RBBlock{T,N} where T) where N = N
 Base.getindex(b::RBBlock,i::Int...) = b.blocks[i...]
 Base.iterate(b::RBBlock,args...) = iterate(b.blocks,args...)
 Base.enumerate(b::RBBlock) = enumerate(b.blocks)

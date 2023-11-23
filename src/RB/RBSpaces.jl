@@ -3,6 +3,7 @@ struct RBSpace{T}
   basis_time::Matrix{T}
 end
 
+Base.eltype(::RBSpace{T}) where T = T
 get_basis_space(rb::RBSpace) = rb.basis_space
 get_basis_time(rb::RBSpace) = rb.basis_time
 get_space_ndofs(rb::RBSpace) = size(rb.basis_space,1)
