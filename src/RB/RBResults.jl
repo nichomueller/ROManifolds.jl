@@ -122,19 +122,23 @@ function post_process(
   return
 end
 
-function allocate_cache(op::PTOperator,snaps::PTArray{Vector{T}}) where T
-  b = allocate_residual(op,snaps)
-  A = allocate_jacobian(op,snaps)
+function allocate_cache(op,rbspace)
+  T = eltype(rbspace)
+  b = allocate_residual(op,op.u0)
+  A = allocate_jacobian(op,op.u0)
   mat = CachedArray(zeros(T,1,1))
   coeff = CachedArray(zeros(T,1,1))
   ptcoeff = CachedArray(NonaffinePTArray([zeros(T,1,1) for _ = eachindex(op.μ)]))
 
-  res_contrib_cache = return_cache(RBVecContributionMap(),snaps)
-  jac_contrib_cache = return_cache(RBMatContributionMap(),snaps)
+  res_contrib_cache = return_cache(RBVecContributionMap(),op.u0)
+  jac_contrib_cache = return_cache(RBMatContributionMap(),op.u0)
+
+  rb_ndofs = get_rb_ndofs(rbspace)
+  solve_cache = zeros(T,rb_ndofs),zeros(T,rb_ndofs,rb_ndofs)
 
   res_cache = ((b,mat),(coeff,ptcoeff)),res_contrib_cache
   jac_cache = ((A,mat),(coeff,ptcoeff)),jac_contrib_cache
-  res_cache,jac_cache
+  res_cache,jac_cache,solve_cache
 end
 
 function rb_solver(rbinfo,feop::PTFEOperator{Affine},fesolver,rbspace,rbres,rbjacs,snaps,params)
@@ -142,10 +146,11 @@ function rb_solver(rbinfo,feop::PTFEOperator{Affine},fesolver,rbspace,rbres,rbja
   nsnaps_test = rbinfo.nsnaps_test
   snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
   op = get_ptoperator(fesolver,feop,snaps_test,params_test)
-  cache = allocate_cache(op,snaps_test)
+  cache,(_,lhs) = allocate_cache(op,rbspace)
   stats = @timed begin
-    rhs,(lhs,lhs_t) = collect_rhs_lhs_contributions!(cache,rbinfo,op,rbres,rbjacs,rbspace)
-    rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs+lhs_t)
+    rhs,(_lhs,_lhs_t) = collect_rhs_lhs_contributions!(cache,rbinfo,op,rbres,rbjacs,rbspace)
+    @. lhs = _lhs+_lhs_t
+    rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs)
   end
   approx_snaps_test = recast(rb_snaps_test,rbspace)
   post_process(rbinfo,feop,fesolver,snaps_test,params_test,approx_snaps_test,stats)
@@ -163,25 +168,25 @@ function rb_solver(rbinfo,feop,fesolver,rbspace,rbres,rbjacs,snaps,params)
   op_aux = auxiliary_operator(op)
   xrb = space_time_projection(x,rbspace)
   dxrb = similar(xrb)
-  cache = allocate_cache(op,snaps_test)
-  rhs_cache,lhs_cache = cache
+  cache,(rhs,lhs) = allocate_cache(op,rbspace)
   newt_cache = nothing
+  uh0_test = fesolver.uh0(params_test)
   conv0 = ones(nsnaps_test)
+  rbrhs_lin,rbrhs_nlin = rbres
+  rblhs_lin,rblhs_nlin,rblhs_aux = rbjacs
   stats = @timed begin
-    rbrhs_lin,rbrhs_nlin = rbres
-    rblhs_lin,rblhs_nlin,rblhs_aux = rbjacs
     rhs_lin,(lhs_lin,lhs_t) = collect_rhs_lhs_contributions!(cache,rbinfo,op_lin,rbrhs_lin,rblhs_lin,rbspace)
     for iter in 1:fesolver.nls.max_nliters
-      x = recenter(x,fesolver.uh0(params_test);θ=fesolver.θ)
+      recenter!(x,uh0_test;θ=fesolver.θ) # careful
       op_nlin = update_ptoperator(op_nlin,x)
       op_aux = update_ptoperator(op_aux,x)
       rhs_nlin,(lhs_nlin,) = collect_rhs_lhs_contributions!(cache,rbinfo,op_nlin,rbrhs_nlin,rblhs_nlin,rbspace)
-      lhs_aux, = collect_lhs_contributions!(lhs_cache,rbinfo,op_aux,rblhs_aux,rbspace)
-      lhs = lhs_lin+lhs_t+lhs_nlin
-      rhs = rhs_lin+rhs_nlin+(lhs_lin+lhs_t+lhs_aux)*xrb
+      lhs_aux, = collect_lhs_contributions!(cache[2],rbinfo,op_aux,rblhs_aux,rbspace)
+      @. lhs = lhs_lin+lhs_t+lhs_nlin
+      @. rhs = rhs_lin+rhs_nlin+(lhs_lin+lhs_t+lhs_aux)*xrb
       newt_cache = rb_solve!(dxrb,fesolver.nls.ls,rhs,lhs,newt_cache)
       xrb += dxrb
-      x = recast(xrb,rbspace)
+      recast!(x,xrb,rbspace) # careful
       isconv,conv = Algebra._check_convergence(fesolver.nls,dxrb,conv0)
       println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv)))")
       if all(isconv); break; end

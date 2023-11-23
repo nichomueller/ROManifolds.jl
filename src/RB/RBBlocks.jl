@@ -395,9 +395,7 @@ function collect_compress_rhs(
     if touched[row]
       rbinfo_row = rbinfo[row]
       rbspace_row = rbspace[row]
-      ress,trian = collect_residuals_for_trian(op_row_col)
-      affine_decompositions = compress_component(rbinfo_row,op_row_col,ress,trian,rbspace_row)
-      blocks[row] = RBAlgebraicContribution(affine_decompositions)
+      blocks[row] = collect_compress_rhs(rbinfo_row,op_row_col,rbspace_row)
     end
   end
 
@@ -414,7 +412,6 @@ function collect_compress_lhs(
   njacs = length(op.odeop.feop.jacs)
   ad_jacs = Vector{BlockRBMatAlgebraicContribution{T}}(undef,njacs)
   for i = 1:njacs
-    combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*x-θ*y
     touched_i = Matrix{Bool}(undef,nblocks,nblocks)
     blocks_i = Matrix{RBMatAlgebraicContribution{T}}(undef,nblocks,nblocks)
     for (row,col) = index_pairs(nblocks,nblocks)
@@ -424,10 +421,7 @@ function collect_compress_lhs(
         rbinfo_col = rbinfo[col]
         rbspace_row = rbspace[row]
         rbspace_col = rbspace[col]
-        jacs,trian = collect_jacobians_for_trian(op_row_col;i)
-        affine_decompositions = compress_component(
-          rbinfo_col,op_row_col,jacs,trian,rbspace_row,rbspace_col;combine_projections)
-          blocks_i[row,col] = RBAlgebraicContribution(affine_decompositions)
+        blocks_i[row,col] = _collect_compress_lhs(rbinfo_col,op_row_col,rbspace_row,rbspace_col;i,θ)
       end
     end
     ad_jacs[i] = BlockRBMatAlgebraicContribution(blocks_i,touched_i)

@@ -83,7 +83,7 @@ function RBAffineDecomposition(
   recast_interp_idx_space = recast_idx(nzm,interp_idx_space)
   recast_interp_idx_rows,_ = vec_to_mat_idx(recast_interp_idx_space,nzm.nrows)
   red_integr_cells = get_reduced_cells(recast_interp_idx_rows,cell_dof_ids)
-  red_trian = view(trian,red_integr_cells)
+  red_trian = ReducedTriangulation(trian,red_integr_cells)
   red_meas = Measure(red_trian,2*get_order(test))
   integr_domain = RBIntegrationDomain(red_meas,red_times,recast_interp_idx_space)
   GenericRBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)

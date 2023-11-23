@@ -57,7 +57,7 @@ function Arrays.lazy_map(k::MyReindex{<:LazyArray},::Type{T},j_to_i::AbstractArr
   LazyArray(T,j_to_maps,j_to_args...)
 end
 
-function Arrays.lazy_map(k::MyReindex{<:PTArray},j_to_i::AbstractArray) where T
+function Arrays.lazy_map(k::MyReindex{<:PTArray},j_to_i::AbstractArray)
   map(value -> lazy_map(MyReindex(value),j_to_i),k.values)
 end
 
@@ -233,38 +233,9 @@ _dv = get_fe_basis(_test)
 _du = get_trial_fe_basis(_trial(nothing,nothing))
 @time ∫(aμt(params,times)*∇(_dv)⋅∇(_du))_dt
 
-quadhat = dΩhat.quad
-bhat = change_domain(ff,quadhat.trian,quadhat.data_domain_style)
-duhat = bhat.args[2]
-duhat.cell_basis
-# temp = a(μ,t)*∇(dv)
-# @time begin
-#   sglue = get_glue(Ω,Val(2))
-#   tglue = get_glue(Ωhat,Val(2))
-#   sface_to_field = get_data(temp.args[1])
-#   mface_to_sface = sglue.mface_to_tface
-#   tface_to_mface = tglue.tface_to_mface
-#   tface_to_mface_map = tglue.tface_to_mface_map
-#   mface_to_field = extend(sface_to_field,mface_to_sface)
-#   tface_to_field_s = lazy_map(Reindex(mface_to_field),tface_to_mface)
-#   tface_to_field_t = lazy_map(Broadcasting(∘),tface_to_field_s,tface_to_mface_map)
-# end
-
-# @time begin
-#   sglue = get_glue(Ω,Val(2))
-#   sface_to_field = get_data(temp.args[1])
-#   mface_to_sface = sglue.mface_to_tface
-#   tface_to_mface = Ωhat.tface_to_mface
-#   tface_to_mface_map = Fill(GenericField(identity),num_cells(Ωhat))
-#   mface_to_field = extend(sface_to_field,mface_to_sface)
-#   tface_to_field_s = lazy_map(Reindex(mface_to_field),tface_to_mface)
-#   tface_to_field_t = lazy_map(Broadcasting(∘),tface_to_field_s,tface_to_mface_map)
-# end
-
-# tface_to_mface = trian.tface_to_mface
-# tface_to_mface_map = Fill(GenericField(identity),num_cells(trian))
-# nmfaces = num_faces(trian.model,Dt)
-# mface_to_tface = PosNegPartition(tface_to_mface,Int32(nmfaces))
+_Ωhat = ReducedTriangulation(Ω,idx)
+_dΩhat = Measure(Ωhat,2)
+@time ∫(aμt(params,times)*∇(dv)⋅∇(du))_dΩhat
 
 sglue = get_glue(Ω,Val(2))
 mface_to_sface = sglue.mface_to_tface
@@ -304,3 +275,34 @@ _cell_Jtx = lazy_map(evaluate,_cell_Jt,_quad.cell_point)
 _x = get_cell_points(_quad)
 _bx = _b(_x)
 _integral = lazy_map(IntegrationMap(),_bx,_quad.cell_weight,_cell_Jtx)
+
+Γnhat = view(Γn,[1,5,10])
+dΓnhat = Measure(Γnhat,2)
+@time dc = ∫(hμt(params,times)*dv)dΓn
+@time dchat = ∫(hμt(params,times)*dv)dΓnhat
+
+_Γnhat = ReducedTriangulation(Γn,[1,5,10])
+_dΓnhat = Measure(_Γnhat,2)
+@time ∫(hμt(params,times)*dv)_dΓnhat
+rtrian = ReducedTriangulation(Γn.trian,[1,5,10])
+
+# rtrian = ReducedBodyFittedTriangulation(parent_id,model,boundary_grid,Γn.trian.tface_to_mface)
+rtrian = _ReducedTriangulation(Γn,[1,5,10])
+boh = Measure(rtrian,2)
+@time dcboh = ∫(hμt(params,times)*dv)boh
+
+dchat[Γnhat] == dcboh[rtrian]
+
+quad = boh.quad #dΓn.quad
+_f = hμt(params,times)*dv
+trian_f = get_triangulation(_f)
+trian_x = get_triangulation(quad)
+is_change_possible(trian_f,trian_x)
+
+b = change_domain(f,quad.trian,quad.data_domain_style)
+x = get_cell_points(quad)
+bx = b(x)
+cell_map = get_cell_map(quad.trian)
+cell_Jt = lazy_map(∇,cell_map)
+cell_Jtx = lazy_map(evaluate,cell_Jt,quad.cell_point)
+lazy_map(IntegrationMap(),bx,quad.cell_weight,cell_Jtx)

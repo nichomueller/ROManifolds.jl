@@ -174,25 +174,33 @@ function collect_compress_rhs(
   rbspace::RBSpace{T}) where T
 
   ress,trian = collect_residuals_for_trian(op)
-  affine_decompositions = compress_component(rbinfo,op,ress,trian,rbspace)
-  RBAlgebraicContribution(affine_decompositions)
+  compress_component(rbinfo,op,ress,trian,rbspace)
 end
 
 function collect_compress_lhs(
   rbinfo::RBInfo,
   op::PTOperator,
   rbspace::RBSpace{T};
-  θ=1) where T
+  kwargs...) where T
 
   njacs = length(op.odeop.feop.jacs)
   ad_jacs = Vector{RBMatAlgebraicContribution{T}}(undef,njacs)
   for i = 1:njacs
-    combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*x-θ*y
-    jacs,trian = collect_jacobians_for_trian(op;i)
-    affine_decompositions = compress_component(rbinfo,op,jacs,trian,rbspace,rbspace;combine_projections)
-    ad_jacs[i] = RBAlgebraicContribution(affine_decompositions)
+    ad_jacs[i] = _collect_compress_lhs(rbinfo,op,rbspace,rbspace;i,kwargs...)
   end
   return ad_jacs
+end
+
+function _collect_compress_lhs(
+  rbinfo::RBInfo,
+  op::PTOperator,
+  rbspace_row::RBSpace,
+  rbspace_col::RBSpace;
+  i=1,θ=1)
+
+  combine_projections = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*x-θ*y
+  jacs,trian = collect_jacobians_for_trian(op;i)
+  compress_component(rbinfo,op,jacs,trian,rbspace_row,rbspace_col;combine_projections)
 end
 
 function compress_component(
@@ -203,9 +211,10 @@ function compress_component(
   args...;
   kwargs...)
 
-  map(zip(snaps,trian)) do (si,ti)
+  affine_decompositions = map(zip(snaps,trian)) do (si,ti)
     RBAffineDecomposition(rbinfo,op,si,ti,args...;kwargs...)
   end
+  return RBAlgebraicContribution(affine_decompositions)
 end
 
 function collect_rhs_lhs_contributions!(cache,rbinfo,op,rbres,rbjacs,rbspace)

@@ -28,7 +28,7 @@ import Gridap.Arrays: evaluate,evaluate!
 import Gridap.Algebra: InserterCSC,LUNumericalSetup,solve,solve!,residual!,jacobian!,allocate_jacobian,allocate_residual,allocate_vector,allocate_matrix
 import Gridap.CellData: ConstrainRowsMap,ConstrainColsMap,OperationCellField,GenericMeasure,similar_cell_field,_get_cell_points,_operate_cellfields,_to_common_domain
 import Gridap.FESpaces: _pair_contribution_when_possible,assemble_vector,assemble_matrix,collect_cell_vector,collect_cell_matrix,get_fe_basis,get_trial_fe_basis
-import Gridap.Geometry: FaceToCellGlue,TriangulationView,GridView,DiscreteModelPortion
+import Gridap.Geometry: FaceToCellGlue,TriangulationView,GridView,DiscreteModelPortion,_compute_face_to_q_vertex_coords
 import Gridap.MultiField: MultiFieldCellField,MultiFieldFEBasisComponent,num_fields
 import Gridap.Polynomials: get_order
 import Gridap.ODEs.ODETools: _allocate_matrix_and_vector,∂t,∂tt
@@ -54,3 +54,4 @@ include("PODEQuantities.jl")
 include("PAffineThetaMethod.jl")
 include("PThetaMethod.jl")
 include("FEOperations.jl")
+include("ReducedTriangulation.jl")
