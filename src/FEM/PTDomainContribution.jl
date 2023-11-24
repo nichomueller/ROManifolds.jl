@@ -181,30 +181,8 @@ const ∫ₚ = PTIntegrand
 init_contribution(::PTIntegrand{<:OperationCellField}) = DomainContribution()
 init_contribution(::PTIntegrand) = PTDomainContribution()
 
-function Arrays.getindex!(cont,a::PTIntegrand,meas::Measure)
-  trian = get_triangulation(meas)
-  itrian = get_triangulation(a.meas)
-  if itrian === trian || is_parent(itrian,trian)
-    integral = integrate(a.object,meas.quad)
-    add_contribution!(cont,trian,integral)
-    return cont
-  end
-  @unreachable """\n
-    There is no contribution associated with the given mesh in this PTIntegrand object.
-  """
-end
-
 function CellData.integrate(a::PTIntegrand)
   integrate(a.object,a.meas)
-end
-
-function CellData.integrate(a::PTIntegrand,meas::GenericMeasure...)
-  @assert length(meas) == 1
-  cont = init_contribution(a)
-  for m in meas
-    getindex!(cont,a,m)
-  end
-  cont
 end
 
 abstract type CollectionPTIntegrand{N} end
@@ -238,25 +216,6 @@ function Base.getindex(a::CollectionPTIntegrand,i::Int)
   a.operations[i],a.integrands[i]
 end
 
-function Arrays.getindex!(cont,a::CollectionPTIntegrand{N},meas::Measure) where N
-  trian = get_triangulation(meas)
-  for i = 1:N
-    op,int = a[i]
-    imeas = int.meas
-    itrian = get_triangulation(imeas)
-    if itrian === trian || is_parent(itrian,trian)
-      integral = integrate(int.object,meas.quad)
-      add_contribution!(cont,trian,integral,op)
-    end
-  end
-  if num_domains(cont) > 0
-    return cont
-  end
-  @unreachable """\n
-    There is no contribution associated with the given mesh in this PTIntegrand object.
-  """
-end
-
 for op in (:+,:-)
   @eval begin
     function ($op)(a::PTIntegrand,b::PTIntegrand)
@@ -287,14 +246,6 @@ function CellData.integrate(a::CollectionPTIntegrand{N}) where N
     itrian = get_triangulation(imeas)
     integral = integrate(int.object,imeas.quad)
     add_contribution!(cont,itrian,integral,op)
-  end
-  cont
-end
-
-function CellData.integrate(a::CollectionPTIntegrand,meas::GenericMeasure...)
-  cont = init_contribution(a)
-  for m in meas
-    getindex!(cont,a,m)
   end
   cont
 end

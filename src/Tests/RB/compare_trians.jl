@@ -1,6 +1,6 @@
 dv = get_fe_basis(test)
 du = get_trial_fe_basis(trial(nothing,nothing))
-idx = [1,10,20]
+idx = collect(1:5:50)
 μ = rand(3)
 t = dt
 params = realization(feop,10)
@@ -64,3 +64,76 @@ dΓnhat = Measure(Γnhat,2)
 _Γnhat = ReducedTriangulation(Γn,idx)
 _dΓnhat = Measure(_Γnhat,2)
 @time _dchat = ∫(hμt(params,times)*dv)_dΓnhat
+
+
+############################### NEW TESTS ######################################
+ff = a(μ,t)*∇(dv)⋅∇(du)
+
+quad = dΩ.quad
+baseline_stats = @timed begin
+  b = change_domain(ff,quad.trian,quad.data_domain_style)
+  cell_map = get_cell_map(quad.trian)
+  cell_Jt = lazy_map(∇,cell_map)
+  cell_Jtx = lazy_map(evaluate,cell_Jt,quad.cell_point)
+  x = get_cell_points(quad)
+  bx = b(x)
+  integral = lazy_map(IntegrationMap(),bx,quad.cell_weight,cell_Jtx)
+end
+
+reduced_stats = @timed begin
+  b = change_domain(ff,quad.trian,quad.data_domain_style)
+  cell_map = get_cell_map(quad.trian)
+  cell_Jt = lazy_map(∇,cell_map)
+  cell_Jtx = lazy_map(evaluate,cell_Jt,quad.cell_point)
+  x = get_cell_points(quad)
+  bx = b(x)
+  _bx = lazy_map(Reindex(bx),idx)
+  _w = lazy_map(Reindex(quad.cell_weight),idx)
+  _Jx = lazy_map(Reindex(cell_Jtx),idx)
+  _integral = lazy_map(IntegrationMap(),_bx,_w,_Jx)
+end
+
+Ξ = ReducedTriangulation(Ω,idx)
+dΞ = Measure(Ξ,2)
+_quad = dΞ.quad
+prev_red_stats = @timed begin
+  _b = change_domain(ff,_quad.trian,_quad.data_domain_style)
+  _cell_map = get_cell_map(_quad.trian)
+  _cell_Jt = lazy_map(∇,_cell_map)
+  _cell_Jtx = lazy_map(evaluate,_cell_Jt,_quad.cell_point)
+  _x = get_cell_points(_quad)
+  __bx = _b(_x)
+  __integral = lazy_map(IntegrationMap(),__bx,_quad.cell_weight,_cell_Jtx)
+end
+
+snaps_test,params_test = sols[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
+op = get_ptoperator(fesolver,feop,snaps_test,params_test)
+
+form(μ,t,du,v) = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ)
+opf = form(params_test,times,du,dv)
+rdΩ = ReducedMeasure(dΩ,idx)
+Ωhat = view(Ω,idx)
+dΩhat = Measure(Ωhat,2)
+rdc = integrate(opf,rdΩ)#integrate(ff,rdΩ.meas.quad,rdΩ.cell_to_parent_cell)
+vdc = integrate(opf.object,dΩhat)
+dc = integrate(opf.object,dΩ)
+
+ptrian = get_parent_triangulation(rdΩ)
+trian = get_triangulation(rdΩ)
+
+A = allocate_jacobian(op,op.vθ)#[1]
+_A = copy(A)
+@assert rdc[trian][idx] == dc[Ω][idx]
+matdata = collect_cell_matrix(trial(nothing,nothing),test,rdc)
+assemble_matrix_add!(A,feop.assem,matdata)
+
+cell_mat,ttrian = move_contributions(rdc[trian],trian)
+cell_mat_c = attach_constraints_cols(trial(nothing,nothing),cell_mat,ttrian)
+cell_mat_rc = attach_constraints_rows(test,cell_mat_c,ttrian)
+
+_matdata = collect_cell_matrix(trial(nothing,nothing),test,vdc)
+assemble_matrix_add!(_A,feop.assem,_matdata)
+
+_cell_mat,_ttrian = move_contributions(vdc[Ωhat],Ωhat)
+_cell_mat_c = attach_constraints_cols(trial(nothing,nothing),_cell_mat,_ttrian)
+_cell_mat_rc = attach_constraints_rows(test,_cell_mat_c,_ttrian)

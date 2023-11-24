@@ -6,7 +6,6 @@ begin
 end
 
 function heat_equation()
-  root = pwd()
   mesh = "elasticity_3cyl2D.json"
   bnd_info = Dict("dirichlet" => ["dirichlet"],"neumann" => ["neumann"])
   test_path = "$root/tests/poisson/unsteady/$mesh"
@@ -57,7 +56,7 @@ function heat_equation()
   ϵ = 1e-4
   load_solutions = true
   save_solutions = true
-  load_structures = false
+  load_structures = true
   save_structures = true
   norm_style = :l2
   nsnaps_state = 50

@@ -85,6 +85,7 @@ function CellData.change_domain(
   CellField is defined, or that the latter triangulation is the background of the former.
   """
 
+  D = num_cell_dims(strian)
   if is_parent(strian,ttrian)
     sface_to_field = get_data(a)
     sglue = get_glue(strian,Val(D))
@@ -97,7 +98,7 @@ function CellData.change_domain(
   @assert is_change_possible(strian,ttrian) msg
   sglue = get_glue(strian,Val(D))
   tglue = get_glue(ttrian,Val(D))
-  change_domain_ref_ref(a,ttrian,sglue,tglue)
+  CellData.change_domain_ref_ref(a,ttrian,sglue,tglue)
 end
 
 function CellData.change_domain(
@@ -115,9 +116,10 @@ function CellData.change_domain(
     return CellDof(ttrian.tface_to_mface,ttrian,ReferenceDomain())
   end
   @assert is_change_possible(strian,ttrian) msg
+  D = num_cell_dims(strian)
   sglue = get_glue(strian,Val(D))
   tglue = get_glue(ttrian,Val(D))
-  change_domain_ref_ref(a,ttrian,sglue,tglue)
+  CellData.change_domain_ref_ref(a,ttrian,sglue,tglue)
 end
 
 function CellData.change_domain(
@@ -131,6 +133,7 @@ function CellData.change_domain(
   CellField is defined, or that the latter triangulation is the background of the former.
   """
 
+  D = num_cell_dims(strian)
   if is_parent(strian,ttrian)
     sface_to_field = get_data(a)
     sglue = get_glue(strian,Val(D))
@@ -143,7 +146,7 @@ function CellData.change_domain(
   @assert is_change_possible(strian,ttrian) msg
   sglue = get_glue(strian,Val(D))
   tglue = get_glue(ttrian,Val(D))
-  change_domain_phys_phys(a,ttrian,sglue,tglue)
+  CellData.change_domain_phys_phys(a,ttrian,sglue,tglue)
 end
 
 function CellData.change_domain(
@@ -161,25 +164,10 @@ function CellData.change_domain(
     return CellDof(ttrian.tface_to_mface,ttrian,PhysicalDomain())
   end
   @assert is_change_possible(strian,ttrian) msg
+  D = num_cell_dims(strian)
   sglue = get_glue(strian,Val(D))
   tglue = get_glue(ttrian,Val(D))
-  change_domain_phys_phys(a,ttrian,sglue,tglue)
-end
-
-function ReducedMeasure(meas::Measure,trians::Triangulation...)
-  trian = get_triangulation(meas)
-  for t in trians
-    if is_parent(t,trian;shallow=true)
-      new_trian = ReducedTriangulation(trian,t)
-      @unpack (cell_quad,cell_point,cell_weight,trian,
-        data_domain_style,integration_domain_style) = meas.quad
-      new_quad = CellQuadrature(cell_quad,cell_point,cell_weight,new_trian,
-        data_domain_style,integration_domain_style)
-      new_meas = Measure(new_quad)
-      return new_meas
-    end
-  end
-  @unreachable
+  CellData.change_domain_phys_phys(a,ttrian,sglue,tglue)
 end
 
 struct ReducedBodyFittedTriangulation{Dt,Dp,A,B,C} <: ReducedTriangulation{Dt,Dp}
@@ -209,16 +197,16 @@ end
 
 function ReducedTriangulation(child::ReducedBodyFittedTriangulation,parent::BodyFittedTriangulation)
   parent_id = objectid(parent)
-  ReducedBodyFittedTriangulation(parent_id,child.model,child.grid,child.tface_to_mface)
+  ReducedBodyFittedTriangulation(parent_id,parent.model,child.grid,child.tface_to_mface)
 end
 
 Geometry.get_background_model(trian::ReducedBodyFittedTriangulation) = trian.model
 Geometry.get_grid(trian::ReducedBodyFittedTriangulation) = trian.grid
 
 function is_parent(
-  parent::BodyFittedTriangulation{Dc,Dp,Tp,O,Tn},
-  child::ReducedBodyFittedTriangulation{Dc,Dp,Tp,O,Tn};
-  shallow=false) where {Dc,Dp,Tp,O,Tn}
+  parent::BodyFittedTriangulation{Dt,Dp},
+  child::ReducedBodyFittedTriangulation{Dt,Dp};
+  shallow=false) where {Dt,Dp}
 
   if shallow
     get_node_coordinates(get_grid(parent)) == get_node_coordinates(get_grid(child))
@@ -266,7 +254,8 @@ end
 
 function ReducedTriangulation(child::ReducedBoundaryTriangulation,parent::BoundaryTriangulation)
   parent_id = objectid(parent)
-  ReducedBoundaryTriangulation(parent_id,child.trian,child.glue)
+  trian = BodyFittedTriangulation(parent.trian.model,child.trian.grid,child.trian.tface_to_mface)
+  ReducedBoundaryTriangulation(parent_id,trian,child.glue)
 end
 
 Geometry.get_background_model(trian::ReducedBoundaryTriangulation) = get_background_model(trian.trian)
@@ -366,9 +355,9 @@ function Geometry._compute_face_to_q_vertex_coords(trian::ReducedBoundaryTriangu
 end
 
 function is_parent(
-  parent::BoundaryTriangulation{Dc,Dp,A,B},
-  child::ReducedBoundaryTriangulation{Dc,Dp,A,B};
-  shallow=false) where {Dc,Dp,A,B}
+  parent::BoundaryTriangulation{Dc,Dp},
+  child::ReducedBoundaryTriangulation{Dc,Dp};
+  shallow=false) where {Dc,Dp}
 
   if shallow
     get_node_coordinates(get_grid(parent)) == get_node_coordinates(get_grid(child))

@@ -43,7 +43,7 @@ function FESpaces.collect_cell_matrix(
   c = []
   for strian in get_domains(a)
     scell_mat = get_contribution(a,strian)
-    cell_mat, trian = move_contributions(scell_mat,strian)
+    cell_mat,trian = move_contributions(scell_mat,strian)
     @assert ndims(eltype(cell_mat)) == 2
     cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
     cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)

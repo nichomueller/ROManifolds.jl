@@ -1,5 +1,5 @@
 struct RBIntegrationDomain
-  meas::Measure
+  meas::ReducedMeasure
   times::Vector{<:Real}
   idx::Vector{Int}
 end
@@ -42,8 +42,10 @@ function ReducedMeasure(a::GenericRBAffineDecomposition,trians::Triangulation...
   end
   dom = get_integration_domain(a)
   meas = get_measure(dom)
+  times = get_times(dom)
+  idx = get_idx_space(dom)
   new_meas = ReducedMeasure(meas,trians...)
-  new_dom = RBIntegrationDomain(new_meas,dom.times,dom.idx)
+  new_dom = RBIntegrationDomain(new_meas,times,idx)
   return GenericRBAffineDecomposition(a.basis_space,a.basis_time,a.mdeim_interpolation,new_dom)
 end
 
@@ -65,6 +67,7 @@ function RBAffineDecomposition(
   kwargs...)
 
   test = op.odeop.feop.test
+  meas = Measure(trian,2*get_order(test))
   basis_space,basis_time = compress(nzm;ϵ=rbinfo.ϵ)
   proj_bs,proj_bt = project_space_time(basis_space,basis_time,args...;kwargs...)
   interp_idx_space = get_interpolation_idx(basis_space)
@@ -83,8 +86,7 @@ function RBAffineDecomposition(
   recast_interp_idx_space = recast_idx(nzm,interp_idx_space)
   recast_interp_idx_rows,_ = vec_to_mat_idx(recast_interp_idx_space,nzm.nrows)
   red_integr_cells = get_reduced_cells(recast_interp_idx_rows,cell_dof_ids)
-  red_trian = ReducedTriangulation(trian,red_integr_cells)
-  red_meas = Measure(red_trian,2*get_order(test))
+  red_meas = ReducedMeasure(meas,red_integr_cells)
   integr_domain = RBIntegrationDomain(red_meas,red_times,recast_interp_idx_space)
   GenericRBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)
 end

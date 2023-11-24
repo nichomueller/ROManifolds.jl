@@ -32,13 +32,13 @@ function Base.show(io::IO,r::RBResults)
   avg_err = get_avg_error(r)
   avg_time = get_avg_time(r.rb_stats)
   avg_nallocs = get_avg_nallocs(r.rb_stats)
-  speedup_time = Float16(get_speedup_time(r)*100)
-  speedup_memory = Float16(get_speedup_memory(r)*100)
+  speedup_time = Float16(get_speedup_time(r))
+  speedup_memory = Float16(get_speedup_memory(r))
   print(io,"Average online relative errors for $name: $avg_err\n")
   print(io,"Average online wall time: $avg_time [s]\n")
   print(io,"Average number of allocations: $avg_nallocs [Mb]\n")
-  print(io,"FEM/RB wall time speedup: $speedup_time%\n")
-  print(io,"FEM/RB memory speedup: $speedup_memory%\n")
+  print(io,"FEM/RB wall time speedup: $speedup_time\n")
+  print(io,"FEM/RB memory speedup: $speedup_memory\n")
 end
 
 function Base.show(io::IO,r::Vector{<:RBResults})
@@ -50,12 +50,12 @@ function Base.show(io::IO,r::Vector{<:RBResults})
   r1 = first(r)
   avg_time = get_avg_time(r1.rb_stats)
   avg_nallocs = get_avg_nallocs(r1.rb_stats)
-  speedup_time = Float16(get_speedup_time(r1)*100)
-  speedup_memory = Float16(get_speedup_memory(r1)*100)
+  speedup_time = Float16(get_speedup_time(r1))
+  speedup_memory = Float16(get_speedup_memory(r1))
   print(io,"Average online wall time: $avg_time [s]\n")
   print(io,"Average number of allocations: $avg_nallocs [Mb]\n")
-  print(io,"FEM/RB wall time speedup: $speedup_time%\n")
-  print(io,"FEM/RB memory speedup: $speedup_memory%\n")
+  print(io,"FEM/RB wall time speedup: $speedup_time\n")
+  print(io,"FEM/RB memory speedup: $speedup_memory\n")
 end
 
 function save(rbinfo::AbstractRBInfo,r::RBResults)
@@ -134,11 +134,12 @@ function allocate_cache(op,rbspace)
   jac_contrib_cache = return_cache(RBMatContributionMap(),op.u0)
 
   rb_ndofs = get_rb_ndofs(rbspace)
-  solve_cache = zeros(T,rb_ndofs),zeros(T,rb_ndofs,rb_ndofs)
+  rhs_solve_cache = NonaffinePTArray([zeros(T,rb_ndofs) for _ = eachindex(op.μ)])
+  lhs_solve_cache = NonaffinePTArray([zeros(T,rb_ndofs,rb_ndofs) for _ = eachindex(op.μ)])
 
   res_cache = ((b,mat),(coeff,ptcoeff)),res_contrib_cache
   jac_cache = ((A,mat),(coeff,ptcoeff)),jac_contrib_cache
-  res_cache,jac_cache,solve_cache
+  (res_cache,jac_cache),(rhs_solve_cache,lhs_solve_cache)
 end
 
 function rb_solver(rbinfo,feop::PTFEOperator{Affine},fesolver,rbspace,rbres,rbjacs,snaps,params)

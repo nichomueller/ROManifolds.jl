@@ -1,3 +1,15 @@
+function Base.:(==)(a::S,b::T;shallow=false) where {S<:Triangulation,T<:Triangulation}
+  false
+end
+
+function Base.:(==)(a::T,b::T;shallow=false) where {T<:Triangulation}
+  if shallow
+    get_node_coordinates(get_grid(a)) == get_node_coordinates(get_grid(b))
+  else
+    a === b
+  end
+end
+
 field_offsets(f::MultiFieldFESpace) = [compute_field_offsets(f)...,num_free_dofs(f)]
 
 function FESpaces.get_order(test::SingleFieldFESpace)
