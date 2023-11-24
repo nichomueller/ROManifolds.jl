@@ -24,16 +24,16 @@ function get_times(fesolver::PThetaMethod)
   collect(t0:dt:tf-dt) .+ dt*θ
 end
 
-function recenter(a::PTArray,ah0::PTFEFunction;θ::Real=1)
+function recenter(a::PTArray,ah0::PTFEFunction;kwargs...)
   a0 = get_free_dof_values(ah0)
-  recenter(a,a0;θ)
+  recenter(a,a0;kwargs...)
 end
 
-function recenter(a::Vector{<:PTArray},ah0::PTFEFunction;θ::Real=1)
+function recenter(a::Vector{<:PTArray},ah0::PTFEFunction;kwargs...)
   map(eachindex(a)) do i
     ai = a[i]
     ai0 = get_free_dof_values(ah0[i])
-    recenter(ai,ai0;θ)
+    recenter(ai,ai0;kwargs...)
   end
 end
 

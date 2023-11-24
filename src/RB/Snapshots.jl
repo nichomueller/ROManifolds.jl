@@ -36,13 +36,6 @@ function Base.vcat(s::Snapshots{T}...) where T
   Snapshots(vsnaps)
 end
 
-function recenter(s::Snapshots,uh0::PTFEFunction;θ::Real=1)
-  snaps = copy(s.snaps)
-  u0 = get_free_dof_values(uh0)
-  sθ = snaps*θ + [u0,snaps[2:end]...]*(1-θ)
-  Snapshots(sθ)
-end
-
 function save(rbinfo::RBInfo,s::Snapshots)
   path = joinpath(rbinfo.fe_path,"fesnaps")
   save(path,s)

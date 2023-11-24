@@ -95,41 +95,6 @@ function CellData.integrate(f::CellField,quad::CellQuadrature,cell_to_parent_cel
   end
 end
 
-# function CellData.integrate(f::CellField,quad::CellQuadrature,cell_to_parent_cell::Vector{Int})
-#   trian_f = get_triangulation(f)
-#   trian_x = get_triangulation(quad)
-
-#   msg = """\n
-#     Your are trying to integrate a CellField using a CellQuadrature defined on incompatible
-#     triangulations. Verify that either the two objects are defined in the same triangulation
-#     or that the triangulaiton of the CellField is the background triangulation of the CellQuadrature.
-#     """
-#   @check is_change_possible(trian_f,trian_x) msg
-
-#   b = change_domain(f,quad.trian,quad.data_domain_style)
-#   x = get_cell_points(quad)
-#   bx = b(x)
-#   integral = if quad.data_domain_style == PhysicalDomain() &&
-#             quad.integration_domain_style == PhysicalDomain()
-#     lazy_map(IntegrationMap(),bx,quad.cell_weight)
-#   elseif quad.data_domain_style == ReferenceDomain() &&
-#             quad.integration_domain_style == PhysicalDomain()
-#     cell_map = get_cell_map(quad.trian)
-#     cell_Jt = lazy_map(∇,cell_map)
-#     cell_Jtx = lazy_map(evaluate,cell_Jt,quad.cell_point)
-#     lazy_map(IntegrationMap(),bx,quad.cell_weight,cell_Jtx)
-#   elseif quad.data_domain_style == ReferenceDomain() &&
-#             quad.integration_domain_style == ReferenceDomain()
-#     cell_map = Fill(GenericField(identity),length(bx))
-#     cell_Jt = lazy_map(∇,cell_map)
-#     cell_Jtx = lazy_map(evaluate,cell_Jt,quad.cell_point)
-#     lazy_map(IntegrationMap(),bx,quad.cell_weight,cell_Jtx)
-#   else
-#     @notimplemented
-#   end
-#   return lazy_map(Reindex(integral),cell_to_parent_cell)
-# end
-
 function Arrays.getindex!(cont,a::PTIntegrand,rmeas::ReducedMeasure)
   @unpack meas,cell_to_parent_cell = rmeas
   ptrian = get_parent_triangulation(rmeas)

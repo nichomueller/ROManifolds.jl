@@ -178,7 +178,7 @@ function rb_solver(rbinfo,feop,fesolver,rbspace,rbres,rbjacs,snaps,params)
   stats = @timed begin
     rhs_lin,(lhs_lin,lhs_t) = collect_rhs_lhs_contributions!(cache,rbinfo,op_lin,rbrhs_lin,rblhs_lin,rbspace)
     for iter in 1:fesolver.nls.max_nliters
-      recenter!(x,uh0_test;θ=fesolver.θ) # careful
+      x = recenter(x,uh0_test;θ=fesolver.θ)
       op_nlin = update_ptoperator(op_nlin,x)
       op_aux = update_ptoperator(op_aux,x)
       rhs_nlin,(lhs_nlin,) = collect_rhs_lhs_contributions!(cache,rbinfo,op_nlin,rbrhs_nlin,rblhs_nlin,rbspace)
@@ -187,7 +187,7 @@ function rb_solver(rbinfo,feop,fesolver,rbspace,rbres,rbjacs,snaps,params)
       @. rhs = rhs_lin+rhs_nlin+(lhs_lin+lhs_t+lhs_aux)*xrb
       newt_cache = rb_solve!(dxrb,fesolver.nls.ls,rhs,lhs,newt_cache)
       xrb += dxrb
-      recast!(x,xrb,rbspace) # careful
+      x = recast(xrb,rbspace)
       isconv,conv = Algebra._check_convergence(fesolver.nls,dxrb,conv0)
       println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv)))")
       if all(isconv); break; end

@@ -34,10 +34,10 @@ function Base.getindex(s::BlockSnapshots,idx::UnitRange{Int})
   vcat(blocks...)
 end
 
-function recenter(s::BlockSnapshots,uh0::PTFEFunction;θ::Real=1)
+function recenter(s::BlockSnapshots,uh0::PTFEFunction;kwargs...)
   nblocks = get_nblocks(s)
   sθ = map(1:nblocks) do row
-    recenter(s[row],uh0[row];θ)
+    recenter(s[row],uh0[row];kwargs...)
   end
   BlockSnapshots(sθ)
 end
