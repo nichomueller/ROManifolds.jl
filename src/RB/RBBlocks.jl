@@ -229,7 +229,7 @@ function get_ptoperator(
   kwargs...) where T
 
   nblocks = get_nblocks(rbspace)
-  space_ndofs = cumsum([0,map(get_space_ndofs,rbspace.blocks)...])
+  space_ndofs = fe_offsets(rbspace)
   rb_space_ndofs = map(get_rb_space_ndofs,rbspace.blocks)
   basis_space = zeros(T,last(space_ndofs),maximum(rb_space_ndofs))
   @inbounds for n = 1:nblocks

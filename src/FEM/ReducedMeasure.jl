@@ -72,24 +72,23 @@ function CellData.integrate(f::CellField,quad::CellQuadrature,cell_to_parent_cel
   @check is_change_possible(trian_f,trian_x) msg
 
   k = RBIntegrationMap(cell_to_parent_cell)
-  b = change_domain(f,quad.trian,quad.data_domain_style)
   x = get_cell_points(quad)
-  bx = b(x)
+  fx = f(x)
   if quad.data_domain_style == PhysicalDomain() &&
             quad.integration_domain_style == PhysicalDomain()
-    lazy_map(k,bx,quad.cell_weight)
+    lazy_map(k,fx,quad.cell_weight)
   elseif quad.data_domain_style == ReferenceDomain() &&
             quad.integration_domain_style == PhysicalDomain()
     cell_map = get_cell_map(quad.trian)
     cell_Jt = lazy_map(∇,cell_map)
     cell_Jtx = lazy_map(evaluate,cell_Jt,quad.cell_point)
-    lazy_map(k,bx,quad.cell_weight,cell_Jtx)
+    lazy_map(k,fx,quad.cell_weight,cell_Jtx)
   elseif quad.data_domain_style == ReferenceDomain() &&
             quad.integration_domain_style == ReferenceDomain()
-    cell_map = Fill(GenericField(identity),length(bx))
+    cell_map = Fill(GenericField(identity),length(fx))
     cell_Jt = lazy_map(∇,cell_map)
     cell_Jtx = lazy_map(evaluate,cell_Jt,quad.cell_point)
-    lazy_map(k,bx,quad.cell_weight,cell_Jtx)
+    lazy_map(k,fx,quad.cell_weight,cell_Jtx)
   else
     @notimplemented
   end
