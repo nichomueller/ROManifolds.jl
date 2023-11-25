@@ -8,15 +8,15 @@ function p_time_derivative(f::Function)
 end
 
 function _p_time_derivative_f(f,x,μ,t,::Any)
-  ForwardDiff.derivative(t->f(μ,t)(x),t)
+  derivative(t->f(μ,t)(x),t)
 end
 
 function _p_time_derivative_f(f,x,μ,t,::VectorValue)
-  VectorValue(ForwardDiff.derivative(t->get_array(f(μ,t)(x)),t))
+  VectorValue(derivative(t->get_array(f(μ,t)(x)),t))
 end
 
 function _p_time_derivative_f(f,x,μ,t,::TensorValue)
-  TensorValue(ForwardDiff.derivative(t->get_array(f(μ,t)(x)),t))
+  TensorValue(derivative(t->get_array(f(μ,t)(x)),t))
 end
 
 const ∂ₚt = p_time_derivative

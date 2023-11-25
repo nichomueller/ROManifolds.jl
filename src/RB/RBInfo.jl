@@ -62,7 +62,7 @@ function get_norm_matrix(rbinfo::RBInfo,feop::PTFEOperator)
 end
 
 struct BlockRBInfo <: AbstractRBInfo
-  ϵ::Vector{Float}
+  ϵ::Float
   fe_path::String
   rb_path::String
   norm_style::Vector{Symbol}
@@ -75,7 +75,7 @@ end
 
 function BlockRBInfo(
   test_path::String;
-  ϵ=[1e-4,1e-4],
+  ϵ=1e-4,
   norm_style=[:l2,:l2],
   compute_supremizers=true,
   nsnaps_state=50,
@@ -90,9 +90,8 @@ function BlockRBInfo(
 end
 
 function Base.getindex(rbinfo::BlockRBInfo,i::Int)
-  ϵ_i = rbinfo.ϵ[i]
   norm_style_i = rbinfo.norm_style[i]
-  RBInfo(ϵ_i,rbinfo.fe_path,rbinfo.rb_path,norm_style_i,
+  RBInfo(rbinfo.ϵ,rbinfo.fe_path,rbinfo.rb_path,norm_style_i,
     rbinfo.nsnaps_state,rbinfo.nsnaps_mdeim,rbinfo.nsnaps_test,rbinfo.st_mdeim)
 end
 

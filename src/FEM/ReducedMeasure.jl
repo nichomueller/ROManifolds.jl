@@ -1,16 +1,16 @@
-function Arrays.lazy_map(k::Reindex{<:Table},::Type{T},j_to_i::AbstractArray) where T
+function lazy_map(k::Reindex{<:Table},::Type{T},j_to_i::AbstractArray) where T
   i_to_v = k.values
   Table(i_to_v[j_to_i])
 end
 
-function Arrays.lazy_map(k::Reindex{<:CompressedArray},::Type{T},j_to_i::AbstractArray) where T
+function lazy_map(k::Reindex{<:CompressedArray},::Type{T},j_to_i::AbstractArray) where T
   i_to_v = k.values
   values = i_to_v.values
   ptrs = i_to_v.ptrs[j_to_i]
   CompressedArray(values,ptrs)
 end
 
-function Arrays.lazy_map(k::Reindex{<:PTArray},j_to_i::AbstractArray)
+function lazy_map(k::Reindex{<:PTArray},j_to_i::AbstractArray)
   map(value -> lazy_map(Reindex(value),j_to_i),k.values)
 end
 
@@ -20,7 +20,7 @@ end
 
 for T in (:AbstractArray,:PTArray)
   @eval begin
-    function Arrays.lazy_map(
+    function lazy_map(
       k::RBIntegrationMap,
       b::$T,
       w::AbstractArray,
@@ -35,7 +35,7 @@ for T in (:AbstractArray,:PTArray)
   end
 end
 
-struct ReducedMeasure
+struct ReducedMeasure <: Measure
   meas::Measure
   cell_to_parent_cell::Vector{Int}
 end
@@ -94,7 +94,7 @@ function CellData.integrate(f::CellField,quad::CellQuadrature,cell_to_parent_cel
   end
 end
 
-function Arrays.getindex!(cont,a::PTIntegrand,rmeas::ReducedMeasure)
+function getindex!(cont,a::PTIntegrand,rmeas::ReducedMeasure)
   @unpack meas,cell_to_parent_cell = rmeas
   ptrian = get_parent_triangulation(rmeas)
   trian = get_triangulation(rmeas)
@@ -122,7 +122,7 @@ function CellData.integrate(a::PTIntegrand,meas::ReducedMeasure...)
   cont
 end
 
-function Arrays.getindex!(cont,a::CollectionPTIntegrand{N},rmeas::ReducedMeasure) where N
+function getindex!(cont,a::CollectionPTIntegrand{N},rmeas::ReducedMeasure) where N
   @unpack meas,cell_to_parent_cell = rmeas
   ptrian = get_parent_triangulation(rmeas)
   trian = get_triangulation(rmeas)

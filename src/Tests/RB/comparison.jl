@@ -84,7 +84,7 @@ load_solutions = true
 save_solutions = true
 load_structures = true
 save_structures = true
-norm_style = [:l2,:l2]
+norm_style = :l2
 compute_supremizers = true
 nsnaps_state = 50
 nsnaps_mdeim = 30
@@ -195,7 +195,7 @@ function new_nl_rb_solver(rbinfo,feop,fesolver,rbspace,rbres,rbjacs,snaps,params
       newt_cache = rb_solve!(dxrb,fesolver.nls.ls,rhs,lhs,newt_cache)
       xrb += dxrb
       x = recast(xrb,rbspace)
-      isconv,conv = Algebra._check_convergence(fesolver.nls,dxrb,conv0)
+      isconv,conv = Algebra._check_convergence(1e-4,dxrb,conv0)
       println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv)))")
       if all(isconv); break; end
       if iter == fesolver.nls.max_nliters
@@ -208,15 +208,52 @@ end
 
 Base.:(∘)(::Function,::Tuple{Vararg{Union{Nothing,CellField}}}) = nothing
 
+jac_nl(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(v⊙(dconv∘(du,∇(du),u,∇(u))),dΩ)
 res_nl(μ,t,(u,p),(v,q)) = ∫ₚ(v⊙(conv∘(u,∇(u))),dΩ)
-feop_nl = PTFEOperator(res_nl,jac_lin,jac_t,pspace,trial,test)
+# jac_nl(μ,t,(u,p),(du,dp),(v,q)) = ∫ₚ(v⊙(∇(du)'⋅u),dΩ) + ∫ₚ(v⊙(∇(u)'⋅du),dΩ)
+# res_nl(μ,t,(u,p),(v,q)) =  ∫ₚ(v⊙(∇(du)'⋅u),dΩ)
+feop_nl = PTFEOperator(res_nl,jac_nl,jac_t,pspace,trial,test)
 op_nlin = get_ptoperator(fesolver,feop_nl,rbspace,params_mdeim)
 rhs_nlin = collect_compress_rhs(rbinfo,op_nlin,rbspace)
+# lhs_nlin = collect_compress_lhs(rbinfo,op_nlin,rbspace)
 
 rbrhs_lin,_ = rbrhs
-rblhs_lin,rblhs_nlin,_ = rblhs
+rblhs_lin,lhs_nlin,_ = rblhs
 
 new_rbrhs = rbrhs_lin,rhs_nlin
-new_rblhs = rblhs_lin,rblhs_nlin
+new_rblhs = rblhs_lin,lhs_nlin
 
 new_nl_rb_solver(rbinfo,feop,fesolver,rbspace,new_rbrhs,new_rblhs,sols,params)
+
+function get_rec_snaps(s::Snapshots{Vector{T}},rb::RBSpace{T},n::Int=1) where T
+  rmat = map(1:n) do count
+    mati = stack(s[count].array)
+    project_recast(mati,rb)
+  end
+  array = Vector{T}[]
+  for i = 1:n
+    for j = 1:length(rmat[1])
+      push!(array,rmat[i][j])
+    end
+  end
+  NonaffinePTArray(array)
+end
+
+function get_rec_snaps(s::BlockSnapshots,rb::BlockRBSpace,args...)
+  map((si,bi) -> get_rec_snaps(si,bi,args...),s.blocks,rb.blocks)
+end
+
+snaps_mdeim_rec = get_rec_snaps(sols,rbspace,nsnaps_mdeim)
+vsnaps_mdeim_rec = vcat(snaps_mdeim_rec...)
+op_nlin = get_ptoperator(fesolver,feop_nl,vsnaps_mdeim_rec,params_mdeim)
+rhs_nlin = collect_compress_rhs(rbinfo,op_nlin,rbspace)
+lhs_nlin = collect_compress_lhs(rbinfo,op_nlin,rbspace)
+rbrhs_lin,_ = rbrhs
+rblhs_lin,_,_ = rblhs
+new_rbrhs = rbrhs_lin,rhs_nlin
+new_rblhs = rblhs_lin,lhs_nlin
+new_nl_rb_solver(rbinfo,feop,fesolver,rbspace,new_rbrhs,new_rblhs,sols,params)
+get_ptoperator(fesolver,feop,sols,params)
+
+mati = stack(sols[1][1].array)
+test_reduced_basis(mati,rbspace[1])

@@ -114,7 +114,7 @@ function CellData._to_common_domain(f::CellField,x::MaskedCellPoint)
   f_on_trian_x, x
 end
 
-function Arrays.evaluate!(cache,f::OperationCellField,x::MaskedCellPoint)
+function evaluate!(cache,f::OperationCellField,x::MaskedCellPoint)
   ax = map(i->i(x),f.args)
   lazy_map(Fields.BroadcastingFieldOpMap(f.op.op),ax...)
 end
@@ -217,26 +217,26 @@ get_data(∇(du))
 #   @check length(k.values) !=0 "This map has empty domain"
 #   map(one,i)
 # end
-# function Arrays.return_value(k::MyReindex,i...)
+# function return_value(k::MyReindex,i...)
 #   length(k.values)!=0 ? evaluate(k,testargs(k,i...)...) : testitem(k.values)
 # end
 # Arrays.return_cache(k::MyReindex,i...) = array_cache(k.values)
 # Arrays.evaluate!(cache,k::MyReindex,i...) = getindex!(cache,k.values,i...)
 # Arrays.evaluate(k::MyReindex,i...) = k.values[i...]
 
-# function Arrays.lazy_map(k::MyReindex{<:Fill},::Type{T}, j_to_i::AbstractArray) where T
+# function lazy_map(k::MyReindex{<:Fill},::Type{T}, j_to_i::AbstractArray) where T
 #   v = k.values.value
 #   Fill(v,size(j_to_i)...)
 # end
 
-# function Arrays.lazy_map(k::MyReindex{<:CompressedArray},::Type{T}, j_to_i::AbstractArray) where T
+# function lazy_map(k::MyReindex{<:CompressedArray},::Type{T}, j_to_i::AbstractArray) where T
 #   i_to_v = k.values
 #   values = i_to_v.values
 #   ptrs = i_to_v.ptrs[j_to_i]
 #   CompressedArray(values,ptrs)
 # end
 
-# function Arrays.lazy_map(k::MyReindex{<:LazyArray},::Type{T},j_to_i::AbstractArray) where T
+# function lazy_map(k::MyReindex{<:LazyArray},::Type{T},j_to_i::AbstractArray) where T
 #   i_to_maps = k.values.maps
 #   i_to_args = k.values.args
 #   j_to_maps = lazy_map(MyReindex(i_to_maps),eltype(i_to_maps),j_to_i)
@@ -244,7 +244,7 @@ get_data(∇(du))
 #   LazyArray(T,j_to_maps,j_to_args...)
 # end
 
-# function Arrays.lazy_map(k::MyReindex{<:Fields.MemoArray},::Type{T},j_to_i::AbstractArray) where T
+# function lazy_map(k::MyReindex{<:Fields.MemoArray},::Type{T},j_to_i::AbstractArray) where T
 #   i_to_v = k.values.parent
 #   j_to_v = lazy_map(MyReindex(i_to_v),T,j_to_i)
 #   MemoArray(j_to_v)
@@ -255,7 +255,7 @@ get_data(∇(du))
 #   mask::B
 # end
 
-# function Arrays.return_value(k::ValuesAtMask,i...)
+# function return_value(k::ValuesAtMask,i...)
 #   length(k.values)!=0 ? evaluate(k,testargs(k,i...)...) : testitem(k.values)
 # end
 
@@ -263,19 +263,19 @@ get_data(∇(du))
 # Arrays.evaluate!(cache,k::ValuesAtMask,i...) = getindex!(cache,k.values,k.mask[i...])
 # Arrays.evaluate(k::ValuesAtMask,i...) = k.values[k.mask[i...]]
 
-# function Arrays.lazy_map(k::ValuesAtMask{<:Fill},::Type{T}) where T
+# function lazy_map(k::ValuesAtMask{<:Fill},::Type{T}) where T
 #   v = k.values.value
 #   Fill(v,size(k.mask)...)
 # end
 
-# function Arrays.lazy_map(k::ValuesAtMask{<:CompressedArray},::Type{T}) where T
+# function lazy_map(k::ValuesAtMask{<:CompressedArray},::Type{T}) where T
 #   i_to_v = k.values
 #   values = i_to_v.values
 #   ptrs = i_to_v.ptrs[k.mask]
 #   CompressedArray(values,ptrs)
 # end
 
-# function Arrays.lazy_map(k::ValuesAtMask{<:LazyArray},::Type{T}) where T
+# function lazy_map(k::ValuesAtMask{<:LazyArray},::Type{T}) where T
 #   i_to_maps = k.values.maps
 #   i_to_args = k.values.args
 #   j_to_maps = lazy_map(ValuesAtMask(i_to_maps,k.mask),eltype(i_to_maps))
@@ -283,7 +283,7 @@ get_data(∇(du))
 #   LazyArray(T,j_to_maps,j_to_args...)
 # end
 
-# function Arrays.lazy_map(f,k::ValuesAtMask,args...)
+# function lazy_map(f,k::ValuesAtMask,args...)
 #   ValuesAtMask(lazy_map(f,k.values,args...),k.mask)
 # end
 

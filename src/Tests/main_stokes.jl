@@ -55,7 +55,7 @@ function stokes_equation()
   xh0μ(μ) = interpolate_everywhere([uh0μ(μ),ph0μ(μ)],trial(μ,t0))
   fesolver = PThetaMethod(LUSolver(),xh0μ,θ,dt,t0,tf)
 
-  ϵ = [1e-4,1e-4]
+  ϵ = 1e-4
   load_solutions = true
   save_solutions = true
   load_structures = false

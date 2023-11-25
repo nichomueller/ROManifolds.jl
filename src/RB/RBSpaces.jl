@@ -50,7 +50,7 @@ function recast(x::AbstractVector,rb::RBSpace)
 
   x_mat = reshape(x,nt_rb,ns_rb)
   xrb_mat = basis_space*(basis_time*x_mat)'
-  xrb = collect(eachcol(xrb_mat))
+  xrb = [xrb_mat[:,i] for i = axes(xrb_mat,2)]
   return xrb
 end
 
@@ -114,12 +114,9 @@ function space_time_projection(
   return st_proj_mat
 end
 
-function test_reduced_basis(mat::AbstractMatrix,rb::RBSpace)
+function project_recast(mat::AbstractMatrix,rb::RBSpace)
   rb_proj = space_time_projection(mat,rb)
-  rb_approx = recast(rb_proj,rb)
-  err = maximum(abs.(mat-rb_approx))
-  println("RB approximation error in infty norm of snapshot $n = $err")
-  return rb_proj
+  recast(rb_proj,rb)
 end
 
 function get_ptoperator(

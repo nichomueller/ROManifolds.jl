@@ -102,7 +102,7 @@ function FESpaces.gather_dirichlet_values!(
   dirichlet_vals
 end
 
-function Arrays.testitem(f::PTrialFESpace)
+function testitem(f::PTrialFESpace)
   TrialFESpace(testitem(f.dirichlet_values),f.space)
 end
 
@@ -615,6 +615,6 @@ function FESpaces.EvaluationFunction(fe::PMultiFieldFESpace,free_values::PTArray
   PTMultiFieldFEFunction(free_values,fe,fe_functions)
 end
 
-function Arrays.testitem(f::PMultiFieldFESpace)
+function testitem(f::PMultiFieldFESpace)
   MultiFieldFESpace(f.vector_type,map(testitem,f.spaces),f.multi_field_style)
 end

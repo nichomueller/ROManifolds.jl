@@ -157,7 +157,7 @@ function rb_solver(rbinfo,feop::PTFEOperator{Affine},fesolver,rbspace,rbres,rbja
   post_process(rbinfo,feop,fesolver,snaps_test,params_test,approx_snaps_test,stats)
 end
 
-function rb_solver(rbinfo,feop,fesolver,rbspace,rbres,rbjacs,snaps,params)
+function rb_solver(rbinfo,feop,fesolver,rbspace,rbres,rbjacs,snaps,params;tol=rbinfo.ϵ)
   println("Solving nonlinear RB problems with Newton iterations")
   nsnaps_test = rbinfo.nsnaps_test
   snaps_train,params_train = snaps[1:nsnaps_test],params[1:nsnaps_test]
@@ -188,7 +188,7 @@ function rb_solver(rbinfo,feop,fesolver,rbspace,rbres,rbjacs,snaps,params)
       newt_cache = rb_solve!(dxrb,fesolver.nls.ls,rhs,lhs,newt_cache)
       xrb += dxrb
       x = recast(xrb,rbspace)
-      isconv,conv = Algebra._check_convergence(fesolver.nls,dxrb,conv0)
+      isconv,conv = Algebra._check_convergence(tol,dxrb,conv0)
       println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv)))")
       if all(isconv); break; end
       if iter == fesolver.nls.max_nliters

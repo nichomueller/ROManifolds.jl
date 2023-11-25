@@ -1,4 +1,4 @@
-function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::NonaffinePTArray)
+function numerical_setup(ss::Algebra.LUSymbolicSetup,mat::NonaffinePTArray)
   ns = Vector{LUNumericalSetup}(undef,length(mat))
   @inbounds for k = eachindex(mat)
     ns[k] = numerical_setup(ss,mat[k])
@@ -6,19 +6,19 @@ function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::NonaffinePTArr
   ns
 end
 
-function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::AffinePTArray)
+function numerical_setup(ss::Algebra.LUSymbolicSetup,mat::AffinePTArray)
   ns = Vector{LUNumericalSetup}(undef,1)
   ns[1] = numerical_setup(ss,mat[1])
   ns
 end
 
-function Algebra.numerical_setup!(ns,mat::NonaffinePTArray)
+function numerical_setup!(ns,mat::NonaffinePTArray)
   @inbounds for k = eachindex(mat)
     ns[k].factors = lu(mat[k])
   end
 end
 
-function Algebra.numerical_setup!(ns,mat::AffinePTArray)
+function numerical_setup!(ns,mat::AffinePTArray)
   ns[1].factors = lu(mat[1])
 end
 
@@ -33,7 +33,7 @@ struct PTAffineOperator <: PTOperator{Affine}
   vector::PTArray
 end
 
-function Algebra.solve!(x::PTArray,ls::LinearSolver,op::PTAffineOperator,::Nothing)
+function solve!(x::PTArray,ls::LinearSolver,op::PTAffineOperator,::Nothing)
   A,b = op.matrix,op.vector
   @assert length(A) == length(b) == length(x)
   ss = symbolic_setup(ls,testitem(A))
@@ -42,7 +42,7 @@ function Algebra.solve!(x::PTArray,ls::LinearSolver,op::PTAffineOperator,::Nothi
   ns
 end
 
-function Algebra.solve!(x::PTArray,::LinearSolver,op::PTAffineOperator,ns)
+function solve!(x::PTArray,::LinearSolver,op::PTAffineOperator,ns)
   A,b = op.matrix,op.vector
   numerical_setup!(ns,A)
   _loop_solve!(x,ns,b)
@@ -64,18 +64,18 @@ function _inf_norm(b::AbstractArray)
   m
 end
 
-function Algebra._check_convergence(nls,b::PTArray)
+function Algebra._check_convergence(tol,b::PTArray)
   n = length(b)
   m0 = map(_inf_norm,b.array)
   ntuple(i->false,Val(n)),m0
 end
 
-function Algebra._check_convergence(nls,b::PTArray,m0)
+function Algebra._check_convergence(tol,b::PTArray,m0)
   m = map(_inf_norm,b.array)
-  m .< nls.tol * m0,m
+  m .< tol * m0,m
 end
 
-function Algebra.solve!(
+function solve!(
   x::PTArray,
   nls::NewtonRaphsonSolver,
   op::PTOperator,
@@ -93,7 +93,7 @@ function Algebra.solve!(
   PNewtonRaphsonCache(A,b,dx,ns)
 end
 
-function Algebra.solve!(
+function solve!(
   x::PTArray,
   nls::NewtonRaphsonSolver,
   op::PTOperator,
@@ -111,13 +111,13 @@ function Algebra.solve!(
 end
 
 function Algebra._solve_nr!(x::PTArray,A::PTArray,b::PTArray,dx::PTArray,ns,nls,op)
-  _,conv0 = Algebra._check_convergence(nls,b)
+  _,conv0 = Algebra._check_convergence(nls.tol,b)
   for iter in 1:nls.max_nliters
     b.array .*= -1
     _loop_solve!(dx,ns,b)
     x .+= dx
     residual!(b,op,x)
-    isconv,conv = Algebra._check_convergence(nls,b,conv0)
+    isconv,conv = Algebra._check_convergence(nls.tol,b,conv0)
     println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv)))")
     if all(isconv); return; end
     if iter == nls.max_nliters

@@ -68,7 +68,7 @@ end
 """
 Parameter, time evaluation allocating Dirichlet vals
 """
-function Arrays.evaluate(U::PTTrialFESpace,μ,t)
+function evaluate(U::PTTrialFESpace,μ,t)
   Uμt = allocate_trial_space(U,μ,t)
   evaluate!(Uμt,U,μ,t)
   Uμt
@@ -119,7 +119,7 @@ end
 Arrays.evaluate!(Ut::FESpace,::FESpace,μ,t) = Ut
 Arrays.evaluate!(::FESpace,U::FESpace,::Vector{<:Number},::Real) = U
 
-function Arrays.evaluate(U::FESpace,μ,t)
+function evaluate(U::FESpace,μ,t)
   Uμt = allocate_trial_space(U,μ,t)
   evaluate!(Uμt,U,μ,t)
 end
@@ -166,13 +166,13 @@ function evaluate!(Uμt,U::PTMultiFieldTrialFESpace,μ::Vector,t::Real)
   MultiFieldFESpace(spaces_at_μt)
 end
 
-function Arrays.evaluate(U::PTMultiFieldTrialFESpace,μ,t)
+function evaluate(U::PTMultiFieldTrialFESpace,μ,t)
   Uμt = allocate_trial_space(U,μ,t)
   evaluate!(Uμt,U,μ,t)
   Uμt
 end
 
-function Arrays.evaluate(U::PTMultiFieldTrialFESpace,::Nothing,::Nothing)
+function evaluate(U::PTMultiFieldTrialFESpace,::Nothing,::Nothing)
   MultiFieldFESpace([fesp(nothing,nothing) for fesp in U.spaces])
 end
 

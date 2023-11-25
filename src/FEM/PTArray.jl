@@ -74,7 +74,7 @@ function Base.hvcat(nblocks::Int,a::PTArray...)
   hvarray
 end
 
-function Arrays.lazy_map(f,a::Union{AbstractArrayBlock,PTArray}...)
+function lazy_map(f,a::Union{AbstractArrayBlock,PTArray}...)
   if any(map(x->isa(x,PTArray),a))
     pt_lazy_map(f,a...)
   else
@@ -132,7 +132,7 @@ function Base.materialize!(a::PTArray,b::PTBroadcasted)
   a
 end
 
-function Arrays.testitem(a::PTArray{T}) where T
+function testitem(a::PTArray{T}) where T
   @notimplementedif !isconcretetype(T)
   if length(a) != 0
     a[1]
@@ -141,7 +141,7 @@ function Arrays.testitem(a::PTArray{T}) where T
   end
 end
 
-function Arrays.setsize!(a::PTArray{<:CachedArray},size::Tuple{Vararg{Int}})
+function setsize!(a::PTArray{<:CachedArray},size::Tuple{Vararg{Int}})
   @inbounds for i in eachindex(a)
     setsize!(a[i],size)
   end
@@ -309,7 +309,7 @@ function LinearAlgebra.fillstored!(a::NonaffinePTArray,z)
   end
 end
 
-function Arrays.CachedArray(a::NonaffinePTArray)
+function CachedArray(a::NonaffinePTArray)
   ai = testitem(a)
   ci = CachedArray(ai)
   array = Vector{typeof(ci)}(undef,length(a))
@@ -353,7 +353,7 @@ end
 
 for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
   @eval begin
-    function Arrays.return_value(
+    function return_value(
       f::$F,
       a::PTArray,
       x::Vararg{Union{AbstractArrayBlock,PTArray}})
@@ -362,7 +362,7 @@ for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
       return_value(f,ax1...)
     end
 
-    function Arrays.return_cache(
+    function return_cache(
       f::$F,
       a::PTArray,
       x::Vararg{Union{AbstractArrayBlock,PTArray}})
@@ -375,7 +375,7 @@ for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
       cx,array
     end
 
-    function Arrays.evaluate!(
+    function evaluate!(
       cache,
       f::$F,
       a::PTArray,
@@ -389,7 +389,7 @@ for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
       NonaffinePTArray(array)
     end
 
-    function Arrays.return_value(
+    function return_value(
       f::$F,
       a::AbstractArrayBlock,
       x::PTArray)
@@ -398,7 +398,7 @@ for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
       return_value(f,a,x1)
     end
 
-    function Arrays.return_cache(
+    function return_cache(
       f::$F,
       a::AbstractArrayBlock,
       x::PTArray)
@@ -411,7 +411,7 @@ for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
       cx,array
     end
 
-    function Arrays.evaluate!(
+    function evaluate!(
       cache,
       f::$F,
       a::AbstractArrayBlock,
@@ -516,7 +516,7 @@ function LinearAlgebra.ldiv!(a::AffinePTArray,m::LU,b::AffinePTArray)
   ldiv!(testitem(a),m,testitem(b))
 end
 
-function Arrays.CachedArray(a::AffinePTArray)
+function CachedArray(a::AffinePTArray)
   n = length(a)
   ai = testitem(a)
   ci = CachedArray(ai)
@@ -544,7 +544,7 @@ end
 
 for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
   @eval begin
-    function Arrays.evaluate!(
+    function evaluate!(
       cache,
       f::$F,
       a::AffinePTArray,
@@ -556,7 +556,7 @@ for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
       AffinePTArray(cx.array,length(array))
     end
 
-    function Arrays.evaluate!(
+    function evaluate!(
       cache,
       f::$F,
       a::AbstractArrayBlock,

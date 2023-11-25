@@ -52,7 +52,7 @@ function navier_stokes_equation()
   test = PTMultiFieldFESpace([test_u,test_p])
   trial = PTMultiFieldFESpace([trial_u,trial_p])
   feop = PTFEOperator(res_lin,jac_lin,jac_t,(c,dc),pspace,trial,test)
-  t0,tf,dt,θ = 0.,0.05,0.005,0.5
+  t0,tf,dt,θ = 0.,0.3,0.005,0.5
   uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial_u(μ,t0))
   ph0μ(μ) = interpolate_everywhere(p0μ(μ),trial_p(μ,t0))
   xh0μ(μ) = interpolate_everywhere([uh0μ(μ),ph0μ(μ)],trial(μ,t0))
@@ -60,10 +60,10 @@ function navier_stokes_equation()
   nls = NewtonRaphsonSolver(LUSolver(),1e-10,20)
   fesolver = PThetaMethod(nls,xh0μ,θ,dt,t0,tf)
 
-  ϵ = [1e-4,1e-4]
+  ϵ = 1e-4
   load_solutions = true
   save_solutions = true
-  load_structures = true
+  load_structures = false
   save_structures = true
   norm_style = [:l2,:l2]
   compute_supremizers = true

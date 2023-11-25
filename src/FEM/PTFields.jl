@@ -57,7 +57,7 @@ function get_fields(ptf::PTFunction)
   fields
 end
 
-function Arrays.evaluate!(cache,f::AbstractPTFunction,x::Point)
+function evaluate!(cache,f::AbstractPTFunction,x::Point)
   g = get_fields(f)
   map(g) do gi
     gi(x)

@@ -6,6 +6,7 @@ Base.length(s::Snapshots) = length(s.snaps)
 Base.size(s::Snapshots,args...) = size(testitem(first(s.snaps)),args...)
 Base.eachindex(s::Snapshots) = eachindex(s.snaps)
 Base.lastindex(s::Snapshots) = num_params(s)
+Base.copy(s::Snapshots) = Snapshots(copy.(s.snaps))
 num_space_dofs(s::Snapshots) = size(s,1)
 num_time_dofs(s::Snapshots) = length(s)
 num_params(s::Snapshots) = length(first(s.snaps))
@@ -20,11 +21,6 @@ function Base.getindex(s::Snapshots{T},idx) where T
     end
   end
   return NonaffinePTArray(array)
-end
-
-function Base.copy(s::Snapshots)
-  scopy = copy.(s.snaps)
-  Snapshots(scopy)
 end
 
 function Base.vcat(s::Snapshots{T}...) where T

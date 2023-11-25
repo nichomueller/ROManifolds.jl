@@ -80,7 +80,7 @@ function CellData.change_domain_phys_phys(
   similar_cell_field(a,tface_to_fields,ttrian,PhysicalDomain())
 end
 
-function Arrays.testitem(f::GenericPTCellField)
+function testitem(f::GenericPTCellField)
   GenericCellField(testitem(f.cell_field),f.trian,f.domain_style)
 end
 
@@ -142,7 +142,7 @@ end
 CellData.get_triangulation(f::PTOperationCellField) = f.trian
 CellData.DomainStyle(::Type{PTOperationCellField{DS}}) where DS = DS()
 
-function Arrays.evaluate!(cache,f::PTOperationCellField,x::CellPoint)
+function evaluate!(cache,f::PTOperationCellField,x::CellPoint)
   ax = map(i->i(x),f.args)
   lazy_map(Fields.BroadcastingFieldOpMap(f.op.op),ax...)
 end
@@ -203,7 +203,7 @@ function FESpaces.FEFunction(
   FEFunction(fs,free_values,dv)
 end
 
-function Arrays.testitem(f::PTSingleFieldFEFunction)
+function testitem(f::PTSingleFieldFEFunction)
   cell_field = testitem(f.cell_field)
   cell_dof_values = testitem(f.cell_dof_values)
   free_values = testitem(f.free_values)
@@ -352,7 +352,7 @@ Base.getindex(m::PTMultiFieldFEFunction,::Colon) = m
 Base.getindex(m::PTMultiFieldFEFunction,field_id::Integer) = m.single_fe_functions[field_id]
 MultiField.num_fields(m::PTMultiFieldFEFunction) = length(m.single_fe_functions)
 
-function Arrays.testitem(f::PTMultiFieldFEFunction)
+function testitem(f::PTMultiFieldFEFunction)
   single_fe_functions = map(testitem,f.single_fe_functions)
   free_values = testitem(f.free_values)
   fe_space = testitem(f.fe_space)
