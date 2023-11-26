@@ -198,7 +198,7 @@ function _evaluation_function(
   TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
 end
 
-function Gridap.FESpaces.collect_cell_vector(
+function Gridap.collect_cell_vector(
   test::GridapDistributed.DistributedFESpace,
   a::GridapDistributed.DistributedDomainContribution,
   trian::GridapDistributed.DistributedTriangulation)
@@ -206,7 +206,7 @@ function Gridap.FESpaces.collect_cell_vector(
   map(collect_cell_vector,local_views(test),local_views(a),trian.trians)
 end
 
-function Gridap.FESpaces.collect_cell_matrix(
+function Gridap.collect_cell_matrix(
   trial::GridapDistributed.DistributedFESpace,
   test::GridapDistributed.DistributedFESpace,
   a::GridapDistributed.DistributedDomainContribution,

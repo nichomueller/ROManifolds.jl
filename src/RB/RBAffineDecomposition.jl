@@ -29,7 +29,7 @@ end
 istrivial(::RBAffineDecomposition) = false
 get_integration_domain(a::GenericRBAffineDecomposition) = a.integration_domain
 
-function get_rb_ndofs(a::GenericRBAffineDecomposition)
+function num_rb_ndofs(a::GenericRBAffineDecomposition)
   space_ndofs = size(a.basis_space[1],1)
   time_ndofs = size(a.basis_time[2],2)
   ndofs = space_ndofs*time_ndofs
@@ -55,7 +55,7 @@ end
 
 get_projection(a::TrivialRBAffineDecomposition) = a.projection
 istrivial(::TrivialRBAffineDecomposition) = true
-get_rb_ndofs(a::TrivialRBAffineDecomposition) = size(get_projection(a),1)
+num_rb_ndofs(a::TrivialRBAffineDecomposition) = size(get_projection(a),1)
 ReducedMeasure(a::TrivialRBAffineDecomposition,args...) = a
 
 function RBAffineDecomposition(
@@ -83,7 +83,7 @@ function RBAffineDecomposition(
   end
   red_times = op.tθ[interp_idx_time]
   cell_dof_ids = get_cell_dof_ids(test,trian)
-  recast_interp_idx_space = recast_idx(nzm,interp_idx_space)
+  recast_interp_idx_space = recast(nzm,interp_idx_space)
   recast_interp_idx_rows,_ = vec_to_mat_idx(recast_interp_idx_space,nzm.nrows)
   red_integr_cells = get_reduced_cells(recast_interp_idx_rows,cell_dof_ids)
   red_meas = ReducedMeasure(meas,red_integr_cells)
@@ -485,22 +485,22 @@ function rb_contribution!(
   AffinePTArray(a.projection,length(coeff))
 end
 
-function empty_rb_contribution(
+function zero_rb_contribution(
   ::RBVecContributionMap,
   rbinfo::RBInfo,
   rbspace::RBSpace{T}) where T
 
-  nrow = get_rb_ndofs(rbspace)
+  nrow = num_rb_ndofs(rbspace)
   return AffinePTArray(zeros(T,nrow),rbinfo.nsnaps_test)
 end
 
-function empty_rb_contribution(
+function zero_rb_contribution(
   ::RBMatContributionMap,
   rbinfo::RBInfo,
   rbspace_row::RBSpace{T},
   rbspace_col::RBSpace{T}) where T
 
-  nrow = get_rb_ndofs(rbspace_row)
-  ncol = get_rb_ndofs(rbspace_col)
+  nrow = num_rb_ndofs(rbspace_row)
+  ncol = num_rb_ndofs(rbspace_col)
   return AffinePTArray(zeros(T,nrow,ncol),rbinfo.nsnaps_test)
 end

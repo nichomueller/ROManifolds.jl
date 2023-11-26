@@ -19,9 +19,9 @@ Base.ndims(::RBAlgebraicContribution{T,N} where T) where N = N
 Base.isempty(a::RBAlgebraicContribution) = isempty(a.affine_decompositions)
 CellData.get_domains(a::RBAlgebraicContribution) = map(get_integration_domain,a.affine_decompositions)
 
-function get_rb_ndofs(a::RBAlgebraicContribution)
+function num_rb_ndofs(a::RBAlgebraicContribution)
   trian = first([get_domains(a)...])
-  get_rb_ndofs(a[trian])
+  num_rb_ndofs(a[trian])
 end
 
 function save_algebraic_contrib(path::String,a::RBAlgebraicContribution)
@@ -224,14 +224,6 @@ function collect_rhs_lhs_contributions!(cache,rbinfo,op,rbres,rbjacs,rbspace)
   return rhs,lhs
 end
 
-function collect_reduced_residuals!(cache,op::PTOperator,rbres::RBVecAlgebraicContribution)
-  collect_reduced_residuals!(cache,op,rbres.affine_decompositions)
-end
-
-function collect_reduced_jacobians!(cache,op::PTOperator,rbres::RBMatAlgebraicContribution;kwargs...)
-  collect_reduced_jacobians!(cache,op,rbres.affine_decompositions;kwargs...)
-end
-
 function collect_rhs_contributions!(
   cache,
   rbinfo::RBInfo,
@@ -243,7 +235,7 @@ function collect_rhs_contributions!(
   st_mdeim = rbinfo.st_mdeim
   k = RBVecContributionMap()
   if isempty(rbres)
-    return empty_rb_contribution(k,rbinfo,rbspace)
+    return zero_rb_contribution(k,rbinfo,rbspace)
   else
     collect_cache,coeff_cache = mdeim_cache
     res = collect_reduced_residuals!(collect_cache,op,rbres)
@@ -285,7 +277,7 @@ function collect_lhs_contributions!(
   st_mdeim = rbinfo.st_mdeim
   k = RBMatContributionMap()
   if isempty(rbjac)
-    return empty_rb_contribution(k,rbinfo,rbspace_row,rbspace_col)
+    return zero_rb_contribution(k,rbinfo,rbspace_row,rbspace_col)
   else
     collect_cache,coeff_cache = mdeim_cache
     jac = collect_reduced_jacobians!(collect_cache,op,rbjac;kwargs...)
@@ -296,4 +288,12 @@ function collect_lhs_contributions!(
     end
   end
   return sum(rb_jac_contribs)
+end
+
+function collect_reduced_residuals!(cache,op::PTOperator,rbres::RBVecAlgebraicContribution)
+  collect_reduced_residuals!(cache,op,rbres.affine_decompositions)
+end
+
+function collect_reduced_jacobians!(cache,op::PTOperator,rbres::RBMatAlgebraicContribution;kwargs...)
+  collect_reduced_jacobians!(cache,op,rbres.affine_decompositions;kwargs...)
 end

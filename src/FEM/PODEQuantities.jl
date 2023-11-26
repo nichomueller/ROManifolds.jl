@@ -9,7 +9,7 @@ struct PThetaMethod <: PODESolver
   tf::Real
 end
 
-function get_time_ndofs(fesolver::PThetaMethod)
+function num_time_dofs(fesolver::PThetaMethod)
   dt = fesolver.dt
   t0 = fesolver.t0
   tf = fesolver.tf
@@ -86,7 +86,7 @@ function collect_single_field_solutions(
   uh0,t0,tf = fesolver.uh0,fesolver.t0,fesolver.tf
   ode_op = get_algebraic_operator(feop)
   u0 = get_free_dof_values(uh0(params))
-  time_ndofs = get_time_ndofs(fesolver)
+  time_ndofs = num_time_dofs(fesolver)
   nparams = length(params)
   T = get_vector_type(feop.test)
   uμt = PODESolution(fesolver,ode_op,params,u0,t0,tf)
@@ -107,7 +107,7 @@ function collect_multi_field_solutions(
   uh0,t0,tf = fesolver.uh0,fesolver.t0,fesolver.tf
   ode_op = get_algebraic_operator(feop)
   u0 = get_free_dof_values(uh0(params))
-  time_ndofs = get_time_ndofs(fesolver)
+  time_ndofs = num_time_dofs(fesolver)
   nparams = length(params)
   T = get_vector_type(feop.test)
   uμt = PODESolution(fesolver,ode_op,params,u0,t0,tf)

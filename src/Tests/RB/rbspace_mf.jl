@@ -36,7 +36,7 @@ _bases_space = add_space_supremizers(bases_space,feop,norm_matrix,μ)
 @assert _bases_space[1] == bs_primal_supr
 @assert _bases_space[2] == bs_dual
 
-nparams,time_ndofs=length(μ),get_time_ndofs(fesolver)
+nparams,time_ndofs=length(μ),num_time_dofs(fesolver)
 for nb in 1:nblocks
   nzm = NnzArray(sols[nb])
   full_val = recast(nzm)

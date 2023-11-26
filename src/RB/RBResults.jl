@@ -1,127 +1,3 @@
-struct RBResults{T}
-  name::Symbol
-  params::Table
-  sol::PTArray{Matrix{T}}
-  sol_approx::PTArray{Matrix{T}}
-  relative_err::Vector{T}
-  fem_stats::ComputationInfo
-  rb_stats::ComputationInfo
-end
-
-function RBResults(
-  params::Table,
-  sol::PTArray{Matrix{T}},
-  sol_approx::PTArray{Matrix{T}},
-  fem_stats::ComputationInfo,
-  rb_stats::ComputationInfo,
-  args...;
-  name=:vel) where T
-
-  relative_err = compute_relative_error(sol,sol_approx,args...)
-  RBResults(name,params,sol,sol_approx,relative_err,fem_stats,rb_stats)
-end
-
-Base.length(r::RBResults) = length(r.params)
-get_name(r::RBResults) = r.name
-get_avg_error(r::RBResults) = sum(r.relative_err) / length(r)
-get_speedup_time(r::RBResults) = get_avg_time(r.fem_stats) / get_avg_time(r.rb_stats)
-get_speedup_memory(r::RBResults) = get_avg_nallocs(r.fem_stats) / get_avg_nallocs(r.rb_stats)
-
-function Base.show(io::IO,r::RBResults)
-  name = get_name(r)
-  avg_err = get_avg_error(r)
-  avg_time = get_avg_time(r.rb_stats)
-  avg_nallocs = get_avg_nallocs(r.rb_stats)
-  speedup_time = Float16(get_speedup_time(r))
-  speedup_memory = Float16(get_speedup_memory(r))
-  print(io,"Average online relative errors for $name: $avg_err\n")
-  print(io,"Average online wall time: $avg_time [s]\n")
-  print(io,"Average number of allocations: $avg_nallocs [Mb]\n")
-  print(io,"FEM/RB wall time speedup: $speedup_time\n")
-  print(io,"FEM/RB memory speedup: $speedup_memory\n")
-end
-
-function Base.show(io::IO,r::Vector{<:RBResults})
-  map(r) do ri
-    name = get_name(ri)
-    avg_err = get_avg_error(ri)
-    print(io,"Average online relative errors for $name: $avg_err\n")
-  end
-  r1 = first(r)
-  avg_time = get_avg_time(r1.rb_stats)
-  avg_nallocs = get_avg_nallocs(r1.rb_stats)
-  speedup_time = Float16(get_speedup_time(r1))
-  speedup_memory = Float16(get_speedup_memory(r1))
-  print(io,"Average online wall time: $avg_time [s]\n")
-  print(io,"Average number of allocations: $avg_nallocs [Mb]\n")
-  print(io,"FEM/RB wall time speedup: $speedup_time\n")
-  print(io,"FEM/RB memory speedup: $speedup_memory\n")
-end
-
-function save(rbinfo::AbstractRBInfo,r::RBResults)
-  path = joinpath(rbinfo.rb_path,"results")
-  save(path,r)
-end
-
-function load(rbinfo::AbstractRBInfo,T::Type{RBResults})
-  path = joinpath(rbinfo.rb_path,"results")
-  load(path,T)
-end
-
-function post_process(
-  rbinfo::RBInfo,
-  feop::PTFEOperator,
-  fesolver::PODESolver,
-  sol::PTArray,
-  params::Table,
-  sol_approx::PTArray,
-  stats::NamedTuple)
-
-  nparams = length(params)
-  norm_matrix = get_norm_matrix(rbinfo,feop)
-  _sol = space_time_matrices(sol;nparams)
-  _sol_approx = space_time_matrices(sol_approx;nparams)
-  fem_stats = load(rbinfo,ComputationInfo)
-  rb_stats = ComputationInfo(stats,nparams)
-  results = RBResults(params,_sol,_sol_approx,fem_stats,rb_stats,norm_matrix)
-  show(results)
-  save(rbinfo,results)
-  writevtk(rbinfo,feop,fesolver,results)
-  return
-end
-
-function post_process(
-  rbinfo::BlockRBInfo,
-  feop::PTFEOperator,
-  fesolver::PODESolver,
-  sol::PTArray,
-  params::Table,
-  sol_approx::PTArray,
-  stats::NamedTuple)
-
-  nblocks = length(feop.test.spaces)
-  nparams = length(params)
-  offsets = field_offsets(feop.test)
-  fem_stats = load(rbinfo,ComputationInfo)
-  rb_stats = ComputationInfo(stats,nparams)
-  blocks = map(1:nblocks) do col
-    rbinfo_col = rbinfo[col]
-    feop_col = feop[col,col]
-    sol_col = get_at_offsets(sol,offsets,col)
-    sol_approx_col = get_at_offsets(sol_approx,offsets,col)
-    norm_matrix_col = get_norm_matrix(rbinfo_col,feop_col)
-    _sol_col = space_time_matrices(sol_col;nparams)
-    _sol_approx_col = space_time_matrices(sol_approx_col;nparams)
-    results = RBResults(
-      params,_sol_col,_sol_approx_col,fem_stats,rb_stats,norm_matrix_col;name=Symbol("field$col"))
-    save(rbinfo,results)
-    writevtk(rbinfo,feop_col,fesolver,results)
-    results
-  end
-  show(blocks)
-  return
-end
-
 function allocate_cache(op,rbspace)
   T = eltype(rbspace)
   b = allocate_residual(op,op.u0)
@@ -133,7 +9,7 @@ function allocate_cache(op,rbspace)
   res_contrib_cache = return_cache(RBVecContributionMap(),op.u0)
   jac_contrib_cache = return_cache(RBMatContributionMap(),op.u0)
 
-  rb_ndofs = get_rb_ndofs(rbspace)
+  rb_ndofs = num_rb_ndofs(rbspace)
   rhs_solve_cache = NonaffinePTArray([zeros(T,rb_ndofs) for _ = eachindex(op.μ)])
   lhs_solve_cache = NonaffinePTArray([zeros(T,rb_ndofs,rb_ndofs) for _ = eachindex(op.μ)])
 
@@ -154,7 +30,7 @@ function rb_solver(rbinfo,feop::PTFEOperator{Affine},fesolver,rbspace,rbres,rbja
     rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs)
   end
   approx_snaps_test = recast(rb_snaps_test,rbspace)
-  post_process(rbinfo,feop,fesolver,snaps_test,params_test,approx_snaps_test,stats)
+  post_process(rbinfo,feop,snaps_test,approx_snaps_test,params_test,stats)
 end
 
 function rb_solver(rbinfo,feop,fesolver,rbspace,rbres,rbjacs,snaps,params;tol=rbinfo.ϵ)
@@ -196,7 +72,7 @@ function rb_solver(rbinfo,feop,fesolver,rbspace,rbres,rbjacs,snaps,params;tol=rb
       end
     end
   end
-  post_process(rbinfo,feop,fesolver,snaps_test,params_test,x,stats)
+  post_process(rbinfo,feop,snaps_test,x,params_test,stats)
 end
 
 function rb_solve(ls::LinearSolver,rhs::PTArray,lhs::PTArray)
@@ -257,6 +133,86 @@ function nearest_neighbor(
   NonaffinePTArray(array)
 end
 
+struct RBResults{T}
+  name::Symbol
+  params::Table
+  sol::PTArray{Matrix{T}}
+  sol_approx::PTArray{Matrix{T}}
+  relative_err::Vector{T}
+  fem_stats::ComputationInfo
+  rb_stats::ComputationInfo
+end
+
+function RBResults(
+  params::Table,
+  sol::PTArray{Matrix{T}},
+  sol_approx::PTArray{Matrix{T}},
+  fem_stats::ComputationInfo,
+  rb_stats::ComputationInfo,
+  args...;
+  name=:vel) where T
+
+  relative_err = compute_relative_error(sol,sol_approx,args...)
+  RBResults(name,params,sol,sol_approx,relative_err,fem_stats,rb_stats)
+end
+
+Base.length(r::RBResults) = length(r.params)
+get_name(r::RBResults) = r.name
+get_avg_error(r::RBResults) = sum(r.relative_err) / length(r)
+get_speedup_time(r::RBResults) = get_avg_time(r.fem_stats) / get_avg_time(r.rb_stats)
+get_speedup_memory(r::RBResults) = get_avg_nallocs(r.fem_stats) / get_avg_nallocs(r.rb_stats)
+
+function Base.show(io::IO,r::RBResults)
+  name = get_name(r)
+  avg_err = get_avg_error(r)
+  print(io,"Average online relative errors for $name: $avg_err\n")
+  show_speedup(io,r)
+end
+
+function show_speedup(io::IO,r::RBResults)
+  avg_time = get_avg_time(r.rb_stats)
+  avg_nallocs = get_avg_nallocs(r.rb_stats)
+  speedup_time = Float16(get_speedup_time(r))
+  speedup_memory = Float16(get_speedup_memory(r))
+  print(io,"Average online wall time: $avg_time [s]\n")
+  print(io,"Average number of allocations: $avg_nallocs [Mb]\n")
+  print(io,"FEM/RB wall time speedup: $speedup_time\n")
+  print(io,"FEM/RB memory speedup: $speedup_memory\n")
+end
+
+function save(rbinfo::RBInfo,r::RBResults)
+  name = get_name(r)
+  path = joinpath(rbinfo.rb_path,"results_$name")
+  save(path,r)
+end
+
+function load(rbinfo::RBInfo,T::Type{RBResults};name=:vel)
+  path = joinpath(rbinfo.rb_path,"results_$name")
+  load(path,T)
+end
+
+function post_process(
+  rbinfo::RBInfo,
+  feop::PTFEOperator,
+  sol::PTArray,
+  sol_approx::PTArray,
+  params::Table,
+  stats::NamedTuple;
+  show_results=true)
+
+  nparams = length(params)
+  norm_matrix = get_norm_matrix(rbinfo,feop)
+  _sol = space_time_matrices(sol;nparams)
+  _sol_approx = space_time_matrices(sol_approx;nparams)
+  fem_stats = load(rbinfo,ComputationInfo)
+  rb_stats = ComputationInfo(stats,nparams)
+  results = RBResults(params,_sol,_sol_approx,fem_stats,rb_stats,norm_matrix)
+  if show_results
+    show(results)
+  end
+  return results
+end
+
 function space_time_matrices(sol::PTArray{Vector{T}};nparams=length(sol)) where T
   mat = stack(get_array(sol))
   ntimes = Int(size(mat,2)/nparams)
@@ -295,8 +251,8 @@ function compute_relative_error!(cache,sol,sol_approx,norm_matrix=nothing)
   norm(ncache)/norm(dcache)
 end
 
-function Gridap.Visualization.writevtk(
-  rbinfo::AbstractRBInfo,
+function plot_results(
+  rbinfo::RBInfo,
   feop::PTFEOperator,
   fesolver::PODESolver,
   results::RBResults)

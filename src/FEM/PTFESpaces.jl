@@ -22,7 +22,8 @@ function allocate_trial_space(U::PTTrialFESpace,μ,t)
   NonaffineHomogeneousPTrialFESpace(U.space,_length(μ)*length(t))
 end
 
-function allocate_trial_space(U::PTTrialFESpace,::Vector{<:Number},::Real)
+function Gridap.ODEs.TransientFETools.allocate_trial_space(
+  U::PTTrialFESpace,::Vector{<:Number},::Real)
   HomogeneousTrialFESpace(U.space)
 end
 
@@ -77,7 +78,7 @@ end
 """
 We can evaluate at `nothing` when we do not care about the Dirichlet vals
 """
-Arrays.evaluate(U::PTTrialFESpace,::Nothing,::Nothing) = U.Ud0
+evaluate(U::PTTrialFESpace,::Nothing,::Nothing) = U.Ud0
 
 """
 Functor-like evaluation. It allocates Dirichlet vals in general.
@@ -91,8 +92,6 @@ Time derivative of the Dirichlet functions
 ∂ₚt(U::PTTrialFESpace) = PTTrialFESpace(U.space,∂ₚt.(U.dirichlet_μt))
 ∂ₚt(U::SingleFieldFESpace) = HomogeneousTrialFESpace(U)
 ∂ₚt(U::MultiFieldFESpace) = MultiFieldFESpace(∂t.(U.spaces))
-∂ₚt(f::Union{Gridap.ODEs.TransientFETools.TransientCellField,Gridap.ODEs.TransientFETools.TransientFEBasis}) = ∂t(f)
-∂ₚt(f::Gridap.ODEs.TransientFETools.TransientMultiFieldCellField) = ∂t(f)
 
 """
 Time 2nd derivative of the Dirichlet functions
@@ -102,11 +101,11 @@ Time 2nd derivative of the Dirichlet functions
 
 # Define the PTrialFESpace interface for affine spaces
 
-function allocate_trial_space(U::FESpace,args...)
+function Gridap.ODEs.TransientFETools.allocate_trial_space(U::FESpace,args...)
   U
 end
 
-function allocate_trial_space(U::FESpace,μ,t)
+function Gridap.ODEs.TransientFETools.allocate_trial_space(U::FESpace,μ,t)
   _length(a) = 1
   _length(a::Table) = length(a)
   if isa(μ,Vector{<:Number}) && isa(t,Real)
@@ -116,7 +115,7 @@ function allocate_trial_space(U::FESpace,μ,t)
   end
 end
 
-Arrays.evaluate!(Ut::FESpace,::FESpace,μ,t) = Ut
+evaluate!(Ut::FESpace,::FESpace,μ,t) = Ut
 Arrays.evaluate!(::FESpace,U::FESpace,::Vector{<:Number},::Real) = U
 
 function evaluate(U::FESpace,μ,t)
@@ -146,12 +145,14 @@ function PTMultiFieldFESpace(spaces::Vector{<:SingleFieldFESpace})
   MultiFieldFESpace(spaces)
 end
 
-function allocate_trial_space(U::PTMultiFieldTrialFESpace,args...)
+function Gridap.ODEs.TransientFETools.allocate_trial_space(
+  U::PTMultiFieldTrialFESpace,args...)
   spaces = map(fe->allocate_trial_space(fe,args...),U.spaces)
   PMultiFieldFESpace(spaces)
 end
 
-function allocate_trial_space(U::PTMultiFieldTrialFESpace,μ::Vector,t::Real)
+function Gridap.ODEs.TransientFETools.allocate_trial_space(
+  U::PTMultiFieldTrialFESpace,μ::Vector,t::Real)
   spaces = map(fe->allocate_trial_space(fe,μ,t),U.spaces)
   MultiFieldFESpace(spaces)
 end
@@ -183,7 +184,7 @@ function ∂ₚt(U::PTMultiFieldTrialFESpace)
   PTMultiFieldFESpace(spaces)
 end
 
-function FESpaces.SparseMatrixAssembler(
+function SparseMatrixAssembler(
   trial::Union{PTTrialFESpace,PTMultiFieldTrialFESpace},
   test::FESpace)
   SparseMatrixAssembler(trial(nothing,nothing),test)

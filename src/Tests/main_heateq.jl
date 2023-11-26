@@ -58,6 +58,7 @@ function heat_equation()
   save_solutions = true
   load_structures = true
   save_structures = true
+  postprocess = true
   norm_style = :l2
   nsnaps_state = 50
   nsnaps_mdeim = 20
@@ -89,7 +90,11 @@ function heat_equation()
   end
   # Online phase
   printstyled("ONLINE PHASE\n";bold=true,underline=true)
-  rb_solver(rbinfo,feop,fesolver,rbspace,rbrhs,rblhs,sols,params)
+  results = rb_solver(rbinfo,feop,fesolver,rbspace,rbrhs,rblhs,sols,params)
+  if postprocess
+    plot_results(rbinfo,feop,fesolver,results)
+    save(rbinfo,results)
+  end
 end
 
 heat_equation()

@@ -90,7 +90,7 @@ export collect_trian_res
 export collect_trian_jac
 # TimeMarchingSchemes
 export ThetaMethod
-export get_time_ndofs
+export num_time_dofs
 export get_times
 # FECollectors
 export CollectSolutionMap

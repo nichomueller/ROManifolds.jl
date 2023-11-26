@@ -186,7 +186,7 @@ end
 # LINEAR
 snaps_test,params_test = load_test(rbinfo,feop,fesolver)
 times = get_times(fesolver)
-Nt = get_time_ndofs(fesolver)
+Nt = num_time_dofs(fesolver)
 Nu,Np = test_u.nfree,length(get_free_dof_ids(test_p))
 n = 1
 un = PTArray(vcat(snaps_test...)[1:Nt])
@@ -338,7 +338,7 @@ end
 # NONLINEAR
 times = get_times(fesolver)
 Nu,Np = test_u.nfree,length(get_free_dof_ids(test_p))
-Nt = get_time_ndofs(fesolver)
+Nt = num_time_dofs(fesolver)
 n = 1
 θdt = θ*dt
 un = PTArray(snaps_test[1:Nt])

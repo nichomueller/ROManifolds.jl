@@ -61,20 +61,20 @@ function BlockRBSpace(bases_space::Vector{Matrix{T}},bases_time::Vector{Matrix{T
   BlockRBSpace(blocks)
 end
 
-function rb_offsets(rb::BlockRBSpace)
-  nblocks = get_nblocks(rb)
-  offsets = zeros(Int,nblocks+1)
-  @inbounds for block = 1:nblocks
-    offsets[block+1] = offsets[block] + get_rb_ndofs(rb[block])
-  end
-  offsets
-end
-
 function fe_offsets(rb::BlockRBSpace)
   nblocks = get_nblocks(rb)
   offsets = zeros(Int,nblocks+1)
   @inbounds for block = 1:nblocks
     offsets[block+1] = offsets[block] + size(get_basis_space(rb[block]),1)
+  end
+  offsets
+end
+
+function rb_offsets(rb::BlockRBSpace)
+  nblocks = get_nblocks(rb)
+  offsets = zeros(Int,nblocks+1)
+  @inbounds for block = 1:nblocks
+    offsets[block+1] = offsets[block] + num_rb_ndofs(rb[block])
   end
   offsets
 end
@@ -89,11 +89,11 @@ function load(rbinfo::BlockRBInfo,T::Type{BlockRBSpace{S}}) where S
   load(path,T)
 end
 
-function get_rb_ndofs(rb::BlockRBSpace)
+function num_rb_ndofs(rb::BlockRBSpace)
   nblocks = get_nblocks(rb)
   ndofs = 0
   @inbounds for i = 1:nblocks
-    ndofs += get_rb_ndofs(rb[i])
+    ndofs += num_rb_ndofs(rb[i])
   end
   ndofs
 end
@@ -230,7 +230,7 @@ function get_ptoperator(
 
   nblocks = get_nblocks(rbspace)
   space_ndofs = fe_offsets(rbspace)
-  rb_space_ndofs = map(get_rb_space_ndofs,rbspace.blocks)
+  rb_space_ndofs = map(num_rb_space_ndofs,rbspace.blocks)
   basis_space = zeros(T,last(space_ndofs),maximum(rb_space_ndofs))
   @inbounds for n = 1:nblocks
     basis_space[space_ndofs[n]+1:space_ndofs[n+1],1:rb_space_ndofs[n]] = get_basis_space(rbspace[n])
@@ -490,7 +490,7 @@ function collect_rhs_contributions!(
       blocks[row] = collect_rhs_contributions!(
         cache_row,rbinfo_row,op_row_col,rbres[row],rbspace_row)
     else
-      nrow = get_rb_ndofs(rbspace_row)
+      nrow = num_rb_ndofs(rbspace_row)
       blocks[row] = AffinePTArray(zeros(T,nrow),length(op.μ))
     end
   end
@@ -520,8 +520,8 @@ function collect_lhs_contributions!(
         blocks[row,col] = collect_lhs_contributions!(
           cache_row_col,rbinfo_col,op_row_col,rb_jac_i[row,col],rbspace_row,rbspace_col;i)
       else
-        nrow = get_rb_ndofs(rbspace_row)
-        ncol = get_rb_ndofs(rbspace_col)
+        nrow = num_rb_ndofs(rbspace_row)
+        ncol = num_rb_ndofs(rbspace_col)
         blocks[row,col] = AffinePTArray(zeros(T,nrow,ncol),length(op.μ))
       end
     end
@@ -536,4 +536,42 @@ function cache_at_index(cache,rbspace::RBBlock,args...)
   offsets = fe_offsets(rbspace)
   aidx = get_at_offsets(a,offsets,args...)
   return ((aidx,b),solve_cache),rb_cache
+end
+
+struct BlockRBResults{T} <: RBBlock{T,1}
+  blocks::Vector{RBResults{T}}
+end
+
+function Base.show(io::IO,r::BlockRBResults)
+  map(r) do ri
+    name = get_name(ri)
+    avg_err = get_avg_error(ri)
+    print(io,"Average online relative errors for $name: $avg_err\n")
+  end
+  show_speedup(io,first(r))
+end
+
+function post_process(
+  rbinfo::BlockRBInfo,
+  feop::PTFEOperator,
+  sol::PTArray,
+  sol_approx::PTArray,
+  params::Table,
+  stats::NamedTuple;
+  show_results=true)
+
+  nblocks = length(feop.test.spaces)
+  offsets = field_offsets(feop.test)
+  blocks = map(1:nblocks) do col
+    rbinfo_col = rbinfo[col]
+    feop_col = feop[col,col]
+    sol_col = get_at_offsets(sol,offsets,col)
+    sol_approx_col = get_at_offsets(sol_approx,offsets,col)
+    post_process(rbinfo_col,feop_col,sol_col,sol_approx_col,params,stats;show_results=false)
+  end
+  results = BlockRBResults(blocks)
+  if show_results
+    show(results)
+  end
+  return results
 end

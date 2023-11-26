@@ -75,10 +75,10 @@ end
 
 CellData.get_cell_points(x::MaskedCellPoint) = x.cell_point
 get_mask(x::MaskedCellPoint) = x.mask
-CellData.get_triangulation(x::MaskedCellPoint) = get_triangulation(get_cell_points(x))
-CellData.DomainStyle(x::MaskedCellPoint) = DomainStyle(get_cell_points(x))
+get_triangulation(x::MaskedCellPoint) = get_triangulation(get_cell_points(x))
+DomainStyle(x::MaskedCellPoint) = DomainStyle(get_cell_points(x))
 
-function CellData.get_data(x::MaskedCellPoint)
+function get_data(x::MaskedCellPoint)
   mask = get_mask(x)
   function _get_data(data::CompressedArray)
     CompressedArray(data[mask],data.ptrs[mask])
@@ -89,7 +89,7 @@ function CellData.get_data(x::MaskedCellPoint)
   _get_data(get_data(get_cell_points(x)))
 end
 
-function CellData.change_domain(a::MaskedCellPoint,args...)
+function change_domain(a::MaskedCellPoint,args...)
   MaskedCellPoint(change_domain(get_cell_points(a),args...),get_mask(a))
 end
 

@@ -6,11 +6,11 @@ end
 Base.eltype(::RBSpace{T}) where T = T
 get_basis_space(rb::RBSpace) = rb.basis_space
 get_basis_time(rb::RBSpace) = rb.basis_time
-get_space_ndofs(rb::RBSpace) = size(rb.basis_space,1)
-get_time_ndofs(rb::RBSpace) = size(rb.basis_time,1)
-get_rb_space_ndofs(rb::RBSpace) = size(rb.basis_space,2)
-get_rb_time_ndofs(rb::RBSpace) = size(rb.basis_time,2)
-get_rb_ndofs(rb::RBSpace) = get_rb_time_ndofs(rb)*get_rb_space_ndofs(rb)
+num_space_dofs(rb::RBSpace) = size(rb.basis_space,1)
+num_time_dofs(rb::RBSpace) = size(rb.basis_time,1)
+num_rb_space_ndofs(rb::RBSpace) = size(rb.basis_space,2)
+num_rb_time_ndofs(rb::RBSpace) = size(rb.basis_time,2)
+num_rb_ndofs(rb::RBSpace) = num_rb_time_ndofs(rb)*num_rb_space_ndofs(rb)
 
 function save(rbinfo::RBInfo,rb::RBSpace)
   path = joinpath(rbinfo.rb_path,"rb")
@@ -45,8 +45,8 @@ end
 function recast(x::AbstractVector,rb::RBSpace)
   basis_space = get_basis_space(rb)
   basis_time = get_basis_time(rb)
-  ns_rb = get_rb_space_ndofs(rb)
-  nt_rb = get_rb_time_ndofs(rb)
+  ns_rb = num_rb_space_ndofs(rb)
+  nt_rb = num_rb_time_ndofs(rb)
 
   x_mat = reshape(x,nt_rb,ns_rb)
   xrb_mat = basis_space*(basis_time*x_mat)'
@@ -55,7 +55,7 @@ function recast(x::AbstractVector,rb::RBSpace)
 end
 
 function recast(x::NonaffinePTArray,rb::RBSpace{T}) where T
-  time_ndofs = get_time_ndofs(rb)
+  time_ndofs = num_time_dofs(rb)
   nparams = length(x)
   array = Vector{Vector{T}}(undef,time_ndofs*nparams)
   @inbounds for i = 1:nparams
@@ -65,7 +65,7 @@ function recast(x::NonaffinePTArray,rb::RBSpace{T}) where T
 end
 
 function space_time_projection(x::NonaffinePTArray,rb::RBSpace{T}) where T
-  time_ndofs = get_time_ndofs(rb)
+  time_ndofs = num_time_dofs(rb)
   nparams = Int(length(x)/time_ndofs)
 
   array = Vector{Vector{T}}(undef,nparams)
@@ -129,7 +129,7 @@ function get_ptoperator(
   ode_op = get_algebraic_operator(feop)
   times = get_times(fesolver)
   bs = get_basis_space(rbspace)
-  ns = get_rb_space_ndofs(rbspace)
+  ns = num_rb_space_ndofs(rbspace)
 
   ode_cache = allocate_cache(ode_op,params,times)
   ode_cache = update_cache!(ode_cache,ode_op,params,times)

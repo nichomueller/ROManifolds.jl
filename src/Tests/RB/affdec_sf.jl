@@ -1,5 +1,3 @@
-_sparse_to_full(sparse_idx,sparse_to_full_idx) = findall(x->x == sparse_idx,sparse_to_full_idx)[1]
-
 function test_affine_decomposition_rhs(
   cache,
   op::PTOperator,

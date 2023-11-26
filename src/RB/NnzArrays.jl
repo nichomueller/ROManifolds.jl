@@ -126,7 +126,7 @@ function recast(nzm::NnzMatrix{T}) where T
   m
 end
 
-function recast_idx(nzm::NnzMatrix,idx::Vector{Int})
+function recast(nzm::NnzMatrix,idx::Vector{Int})
   nonzero_idx = nzm.nonzero_idx
   entire_idx = nonzero_idx[idx]
   return entire_idx

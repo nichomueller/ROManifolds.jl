@@ -67,7 +67,7 @@ function Geometry.get_glue(trian::ReducedTriangulation{Dt},::Val{Dt}) where Dt
   FaceToFaceGlue(tface_to_mface,tface_to_mface_map,mface_to_tface)
 end
 
-function CellData.change_domain(
+function change_domain(
   a::CellField,
   strian::Triangulation,::ReferenceDomain,
   ttrian::ReducedTriangulation,::ReferenceDomain)
@@ -94,7 +94,7 @@ function CellData.change_domain(
   CellData.change_domain_ref_ref(a,ttrian,sglue,tglue)
 end
 
-function CellData.change_domain(
+function change_domain(
   a::CellDof,
   strian::Triangulation,::ReferenceDomain,
   ttrian::ReducedTriangulation,::ReferenceDomain)
@@ -115,7 +115,7 @@ function CellData.change_domain(
   CellData.change_domain_ref_ref(a,ttrian,sglue,tglue)
 end
 
-function CellData.change_domain(
+function change_domain(
   a::CellField,
   strian::Triangulation,::PhysicalDomain,
   ttrian::ReducedTriangulation,::PhysicalDomain)
@@ -142,7 +142,7 @@ function CellData.change_domain(
   CellData.change_domain_phys_phys(a,ttrian,sglue,tglue)
 end
 
-function CellData.change_domain(
+function change_domain(
   a::CellDof,
   strian::Triangulation,::PhysicalDomain,
   ttrian::ReducedTriangulation,::PhysicalDomain)

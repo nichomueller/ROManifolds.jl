@@ -22,13 +22,13 @@ function spacetime_idx(
   (time_idx .- 1)*Ns .+ space_idx
 end
 
+function slow_idx(kst::Int,ns::Int)
+  Int(floor((kst-1)/ns)+1)
+end
+
 function fast_idx(kst::Int,ns::Int)
   ks = mod(kst,ns)
   ks == 0 ? ns : ks
-end
-
-function slow_idx(kst::Int,ns::Int)
-  Int(floor((kst-1)/ns)+1)
 end
 
 function index_pairs(a,b)

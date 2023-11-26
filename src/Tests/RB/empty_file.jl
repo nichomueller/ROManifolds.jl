@@ -26,7 +26,7 @@ t = times[kt]
 v0 = zero(xn[1])
 x = kt > 1 ? xn[kt-1] : get_free_dof_values(xh0μ(μn))
 Nu,Np = test_u.nfree,length(get_free_dof_ids(test_p))
-Nt = get_time_ndofs(fesolver)
+Nt = num_time_dofs(fesolver)
 θdt = θ*dt
 vθ = zeros(Nu+Np)
 ode_cache_ok = Gridap.ODEs.TransientFETools.allocate_cache(ode_op_ok)
@@ -50,7 +50,7 @@ function return_quantities(ode_op,ode_cache,x::PTArray,kt)
 end
 
 x = copy(xn) .* 0.
-nu = get_rb_ndofs(rbspace[1])
+nu = num_rb_ndofs(rbspace[1])
 # WORKS!!!!!!!!!!
 for iter in 1:fesolver.nls.max_nliters
   xrb = space_time_projection(map(x->x[1:Nu],x),rbspace[1]),space_time_projection(map(x->x[1+Nu:end],x),rbspace[2])
@@ -72,7 +72,7 @@ for iter in 1:fesolver.nls.max_nliters
   LHS21_rb = space_time_projection(LHS21,rbspace[2],rbspace[1])
   LHS12_rb = space_time_projection(LHS12,rbspace[1],rbspace[2])
 
-  np = get_rb_ndofs(rbspace[2])
+  np = num_rb_ndofs(rbspace[2])
   LHS_rb = vcat(hcat(LHS11_rb,LHS12_rb),hcat(LHS21_rb,zeros(np,np)))
 
   R1 = NnzMatrix(map(x->x[1:Nu],b)...)
@@ -118,7 +118,7 @@ LHS11_rb = LHS11_rb_1 + LHS11_rb_2
 LHS21_rb = space_time_projection(LHS21,rbspace[2],rbspace[1])
 LHS12_rb = space_time_projection(LHS12,rbspace[1],rbspace[2])
 
-np = get_rb_ndofs(rbspace[2])
+np = num_rb_ndofs(rbspace[2])
 LHS_rb = vcat(hcat(LHS11_rb,LHS12_rb),hcat(LHS21_rb,zeros(np,np)))
 
 R1 = NnzMatrix(map(x->x[1:Nu],b)...)

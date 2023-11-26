@@ -7,7 +7,7 @@ isaffine(::AbstractArrayBlock) = true
 # Abstract implementation
 abstract type PTArray{T} end
 
-Arrays.get_array(a::PTArray) = a.array
+get_array(a::PTArray) = a.array
 Base.size(a::PTArray,i...) = size(testitem(a),i...)
 Base.eltype(::Type{PTArray{T}}) where T = eltype(T)
 Base.eltype(::PTArray{T}) where T = eltype(T)
@@ -155,7 +155,7 @@ function LinearAlgebra.ldiv!(a::PTArray,m::LU,b::PTArray)
   end
 end
 
-function Arrays.get_array(a::PTArray{<:CachedArray})
+function get_array(a::PTArray{<:CachedArray})
   map(x->getproperty(x,:array),a)
 end
 
@@ -351,7 +351,7 @@ function Base.map(f,a::AbstractArrayBlock,x::PTArray)
   NonaffinePTArray(array)
 end
 
-for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
+for F in (:Map,:Function,:(Fields.BroadcastingFieldOpMap))
   @eval begin
     function return_value(
       f::$F,
@@ -542,7 +542,7 @@ function Base.map(f,a::AbstractArrayBlock,x::AffinePTArray)
   AffinePTArray(fax1,n)
 end
 
-for F in (:Map,:Function,:(Gridap.Fields.BroadcastingFieldOpMap))
+for F in (:Map,:Function,:(Fields.BroadcastingFieldOpMap))
   @eval begin
     function evaluate!(
       cache,

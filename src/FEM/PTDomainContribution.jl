@@ -6,13 +6,13 @@ function PTDomainContribution()
   PTDomainContribution(IdDict{Triangulation,PTArray}())
 end
 
-CellData.get_triangulation(meas::Measure) = meas.quad.trian
+Geometry.get_triangulation(meas::Measure) = meas.quad.trian
 
-CellData.num_domains(a::PTDomainContribution) = length(a.dict)
+num_domains(a::PTDomainContribution) = length(a.dict)
 
-CellData.get_domains(a::PTDomainContribution) = keys(a.dict)
+get_domains(a::PTDomainContribution) = keys(a.dict)
 
-function CellData.get_contribution(a::PTDomainContribution,trian::Triangulation)
+function get_contribution(a::PTDomainContribution,trian::Triangulation)
   if haskey(a.dict,trian)
     return a.dict[trian]
   else
@@ -26,7 +26,7 @@ Base.getindex(a::PTDomainContribution,trian::Triangulation) = get_contribution(a
 Base.sum(a::PTDomainContribution) = sum(map(sum,values(a.dict)))
 Base.copy(a::PTDomainContribution) = PTDomainContribution(copy(a.dict))
 
-function CellData.add_contribution!(
+function add_contribution!(
   a::PTDomainContribution,
   trian::Triangulation,
   b::PTArray,
@@ -66,7 +66,7 @@ function CellData.add_contribution!(
   a
 end
 
-function CellData.add_contribution!(
+function add_contribution!(
   a::PTDomainContribution,
   trian::Triangulation,
   b::AbstractArray,
@@ -121,7 +121,7 @@ end
 
 (*)(a::PTDomainContribution,b::Number) = b*a
 
-function CellData.get_array(a::PTDomainContribution)
+function get_array(a::PTDomainContribution)
   @assert num_domains(a) == 1 """\n
   Method get_array(a::PTDomainContribution) can be called only
   when the PTDomainContribution object involves just one domain.
@@ -131,7 +131,7 @@ end
 
 for T in (:NonaffinePTArray,:AffinePTArray)
   @eval begin
-    function CellData.move_contributions(scell_to_val::$T,args...)
+    function Geometry.move_contributions(scell_to_val::$T,args...)
       ptcell_mat_trian = map(scell_to_val.array) do x
         move_contributions(x,args...)
       end
@@ -142,14 +142,14 @@ for T in (:NonaffinePTArray,:AffinePTArray)
   end
 end
 
-function CellData.integrate(f::PTCellField,b::CellData.GenericMeasure)
+function integrate(f::PTCellField,b::GenericMeasure)
   c = integrate(f,b.quad)
   cont = PTDomainContribution()
   add_contribution!(cont,b.quad.trian,c)
   cont
 end
 
-function CellData.integrate(f::PTCellField,b::CellData.CompositeMeasure)
+function integrate(f::PTCellField,b::CompositeMeasure)
   ic = integrate(f,b.quad)
   cont = PTDomainContribution()
   tc = move_contributions(ic,b.itrian,b.ttrian)
@@ -181,7 +181,7 @@ const ∫ₚ = PTIntegrand
 init_contribution(::PTIntegrand{<:OperationCellField}) = DomainContribution()
 init_contribution(::PTIntegrand) = PTDomainContribution()
 
-function CellData.integrate(a::PTIntegrand)
+function integrate(a::PTIntegrand)
   integrate(a.object,a.meas)
 end
 
@@ -238,7 +238,7 @@ for op in (:+,:-)
   end
 end
 
-function CellData.integrate(a::CollectionPTIntegrand{N}) where N
+function integrate(a::CollectionPTIntegrand{N}) where N
   cont = init_contribution(a)
   for i = 1:N
     op,int = a[i]

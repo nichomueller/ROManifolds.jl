@@ -6,7 +6,7 @@ rbspace = reduced_basis(rbinfo,feop,sols)
 # compressed_nza_t = change_mode(compressed_nza)
 # basis_time = tpod(compressed_nza_t;ϵ=1e-4)
 # rbspace = RBSpace(basis_space,basis_time)
-nparams,time_ndofs=length(params),get_time_ndofs(fesolver)
+nparams,time_ndofs=length(params),num_time_dofs(fesolver)
 nzm = NnzMatrix(sols[1:nsnaps_state];nparams=nsnaps_state)
 full_val = recast(nzm)
 bs = rbspace.basis_space

@@ -40,7 +40,7 @@ struct ReducedMeasure <: Measure
   cell_to_parent_cell::Vector{Int}
 end
 
-CellData.get_triangulation(rmeas::ReducedMeasure) = view(rmeas.meas.quad.trian,rmeas.cell_to_parent_cell)
+get_triangulation(rmeas::ReducedMeasure) = view(rmeas.meas.quad.trian,rmeas.cell_to_parent_cell)
 get_parent_triangulation(rmeas::ReducedMeasure) = rmeas.meas.quad.trian
 
 function ReducedMeasure(rmeas::ReducedMeasure,trians::Triangulation...)
@@ -60,7 +60,7 @@ function ReducedMeasure(rmeas::ReducedMeasure,trians::Triangulation...)
   @unreachable
 end
 
-function CellData.integrate(f::CellField,quad::CellQuadrature,cell_to_parent_cell::Vector{Int})
+function integrate(f::CellField,quad::CellQuadrature,cell_to_parent_cell::Vector{Int})
   trian_f = get_triangulation(f)
   trian_x = get_triangulation(quad)
 
@@ -109,11 +109,11 @@ function getindex!(cont,a::PTIntegrand,rmeas::ReducedMeasure)
   """
 end
 
-function CellData.integrate(a::PTIntegrand)
+function integrate(a::PTIntegrand)
   integrate(a.object,a.meas)
 end
 
-function CellData.integrate(a::PTIntegrand,meas::ReducedMeasure...)
+function integrate(a::PTIntegrand,meas::ReducedMeasure...)
   @assert length(meas) == 1
   cont = init_contribution(a)
   for m in meas
@@ -143,7 +143,7 @@ function getindex!(cont,a::CollectionPTIntegrand{N},rmeas::ReducedMeasure) where
   """
 end
 
-function CellData.integrate(a::CollectionPTIntegrand,meas::ReducedMeasure...)
+function integrate(a::CollectionPTIntegrand,meas::ReducedMeasure...)
   cont = init_contribution(a)
   for m in meas
     getindex!(cont,a,m)
