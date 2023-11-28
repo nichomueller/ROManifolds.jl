@@ -1,3 +1,85 @@
+abstract type PODESolver <: ODESolver end
+
+struct PThetaMethod <: PODESolver
+  nls::NonlinearSolver
+  uh0::Function
+  θ::Float
+  dt::Float
+  t0::Real
+  tf::Real
+end
+
+function num_time_dofs(fesolver::PThetaMethod)
+  dt = fesolver.dt
+  t0 = fesolver.t0
+  tf = fesolver.tf
+  Int((tf-t0)/dt)
+end
+
+function get_times(fesolver::PThetaMethod)
+  θ = fesolver.θ
+  dt = fesolver.dt
+  t0 = fesolver.t0
+  tf = fesolver.tf
+  collect(t0:dt:tf-dt) .+ dt*θ
+end
+
+function get_ptoperator(
+  fesolver::PODESolver,
+  feop::PTFEOperator,
+  sols::PTArray,
+  params::Table)
+
+  dtθ = fesolver.θ == 0.0 ? fesolver.dt : fesolver.dt*fesolver.θ
+  ode_op = get_algebraic_operator(feop)
+  times = get_times(fesolver)
+  ode_cache = allocate_cache(ode_op,params,times)
+  ode_cache = update_cache!(ode_cache,ode_op,params,times)
+  sols_cache = zero(sols)
+  get_ptoperator(ode_op,params,times,dtθ,sols,ode_cache,sols_cache)
+end
+
+struct PODESolution
+  solver::PODESolver
+  op::PODEOperator
+  μ::AbstractVector
+  u0::PTArray
+  t0::Real
+  tf::Real
+end
+
+function Base.iterate(sol::PODESolution)
+  uf = copy(sol.u0)
+  u0 = copy(sol.u0)
+  t0 = sol.t0
+  n = 0
+  cache = nothing
+
+  uf,tf,cache = solve_step!(uf,sol.solver,sol.op,sol.μ,u0,t0,cache)
+
+  u0 .= uf
+  n += 1
+  state = (uf,u0,tf,n,cache)
+
+  return (uf,n),state
+end
+
+function Base.iterate(sol::PODESolution,state)
+  uf,u0,t0,n,cache = state
+
+  if t0 >= sol.tf - 100*eps()
+    return nothing
+  end
+
+  uf,tf,cache = solve_step!(uf,sol.solver,sol.op,sol.μ,u0,t0,cache)
+
+  u0 .= uf
+  n += 1
+  state = (uf,u0,tf,n,cache)
+
+  return (uf,n),state
+end
+
 function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::NonaffinePTArray)
   ns = Vector{LUNumericalSetup}(undef,length(mat))
   @inbounds for k = eachindex(mat)

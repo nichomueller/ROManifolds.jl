@@ -147,7 +147,7 @@ function Arrays.evaluate!(cache,f::PTOperationCellField,x::CellPoint)
   lazy_map(Fields.BroadcastingFieldOpMap(f.op.op),ax...)
 end
 
-function change_domain(
+function CellData.change_domain(
   f::PTOperationCellField,
   target_trian::Triangulation,
   target_domain::DomainStyle)

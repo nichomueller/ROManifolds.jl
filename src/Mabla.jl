@@ -87,8 +87,7 @@ export PThetaMethod
 export PODESolution
 export num_time_dofs
 export get_times
-export collect_single_field_solutions
-export collect_multi_field_solutions
+export collect_solutions
 export collect_residuals_for_trian
 export collect_jacobians_for_trian
 export PTThetaAffineMethodOperator

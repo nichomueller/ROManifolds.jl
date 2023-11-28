@@ -60,25 +60,25 @@ function load_algebraic_contrib(path::String,::Type{RBMatAlgebraicContribution{T
   RBAlgebraicContribution(a)
 end
 
-function save(rbinfo::RBInfo,a::RBVecAlgebraicContribution)
+function Utils.save(rbinfo::RBInfo,a::RBVecAlgebraicContribution)
   path = joinpath(rbinfo.rb_path,"rb_rhs")
   save_algebraic_contrib(path,a)
 end
 
-function load(rbinfo::RBInfo,::Type{RBVecAlgebraicContribution{T}},args...) where T
+function Utils.load(rbinfo::RBInfo,::Type{RBVecAlgebraicContribution{T}},args...) where T
   S = RBVecAlgebraicContribution{T}
   path = joinpath(rbinfo.rb_path,"rb_rhs")
   load_algebraic_contrib(path,S,args...)
 end
 
-function save(rbinfo::RBInfo,a::Vector{<:RBMatAlgebraicContribution})
+function Utils.save(rbinfo::RBInfo,a::Vector{<:RBMatAlgebraicContribution})
   for i = eachindex(a)
     path = joinpath(rbinfo.rb_path,"rb_lhs_$i")
     save_algebraic_contrib(path,a[i])
   end
 end
 
-function load(rbinfo::RBInfo,::Type{Vector{RBMatAlgebraicContribution{T}}},args...) where T
+function Utils.load(rbinfo::RBInfo,::Type{Vector{RBMatAlgebraicContribution{T}}},args...) where T
   S = RBMatAlgebraicContribution{T}
   njacs = num_active_dirs(rbinfo.rb_path)
   ad_jacs = Vector{S}(undef,njacs)
@@ -89,7 +89,7 @@ function load(rbinfo::RBInfo,::Type{Vector{RBMatAlgebraicContribution{T}}},args.
   ad_jacs
 end
 
-function save(rbinfo::RBInfo,a::NTuple{2,RBVecAlgebraicContribution})
+function Utils.save(rbinfo::RBInfo,a::NTuple{2,RBVecAlgebraicContribution})
   a_lin,a_nlin = a
   path_lin = joinpath(rbinfo.rb_path,"rb_rhs_lin")
   path_nlin = joinpath(rbinfo.rb_path,"rb_rhs_nlin")
@@ -97,7 +97,7 @@ function save(rbinfo::RBInfo,a::NTuple{2,RBVecAlgebraicContribution})
   save_algebraic_contrib(path_nlin,a_nlin)
 end
 
-function load(rbinfo::RBInfo,::Type{NTuple{2,RBVecAlgebraicContribution{T}}},args...) where T
+function Utils.load(rbinfo::RBInfo,::Type{NTuple{2,RBVecAlgebraicContribution{T}}},args...) where T
   S = RBVecAlgebraicContribution{T}
   path_lin = joinpath(rbinfo.rb_path,"rb_rhs_lin")
   path_nlin = joinpath(rbinfo.rb_path,"rb_rhs_nlin")
@@ -106,7 +106,7 @@ function load(rbinfo::RBInfo,::Type{NTuple{2,RBVecAlgebraicContribution{T}}},arg
   a_lin,a_nlin
 end
 
-function save(rbinfo::RBInfo,a::NTuple{3,Vector{<:RBMatAlgebraicContribution}})
+function Utils.save(rbinfo::RBInfo,a::NTuple{3,Vector{<:RBMatAlgebraicContribution}})
   a_lin,a_nlin,a_aux = a
   for i = eachindex(a_lin)
     path_lin = joinpath(rbinfo.rb_path,"rb_lhs_lin_$i")
@@ -118,7 +118,7 @@ function save(rbinfo::RBInfo,a::NTuple{3,Vector{<:RBMatAlgebraicContribution}})
   end
 end
 
-function load(rbinfo::RBInfo,::Type{NTuple{3,Vector{RBMatAlgebraicContribution{T}}}},args...) where T
+function Utils.load(rbinfo::RBInfo,::Type{NTuple{3,Vector{RBMatAlgebraicContribution{T}}}},args...) where T
   S = RBMatAlgebraicContribution{T}
   njacs = num_active_dirs(rbinfo.rb_path)
   ad_jacs_lin = Vector{S}(undef,njacs)

@@ -34,7 +34,7 @@ function Base.getindex(s::BlockSnapshots,idx::UnitRange{Int})
   vcat(blocks...)
 end
 
-function recenter(s::BlockSnapshots,uh0::PTFEFunction;kwargs...)
+function Utils.recenter(s::BlockSnapshots,uh0::PTFEFunction;kwargs...)
   nblocks = get_nblocks(s)
   sθ = map(1:nblocks) do row
     recenter(s[row],uh0[row];kwargs...)
@@ -42,14 +42,38 @@ function recenter(s::BlockSnapshots,uh0::PTFEFunction;kwargs...)
   BlockSnapshots(sθ)
 end
 
-function save(rbinfo::BlockRBInfo,s::BlockSnapshots)
+function Utils.save(rbinfo::BlockRBInfo,s::BlockSnapshots)
   path = joinpath(rbinfo.fe_path,"fesnaps")
   save(path,s)
 end
 
-function load(rbinfo::BlockRBInfo,T::Type{BlockSnapshots{S}}) where S
+function Utils.load(rbinfo::BlockRBInfo,T::Type{BlockSnapshots{S}}) where S
   path = joinpath(rbinfo.fe_path,"fesnaps")
   load(path,T)
+end
+
+function collect_solutions(
+  rbinfo::BlockRBInfo,
+  fesolver::PODESolver,
+  feop::PTFEOperator)
+
+  uh0,t0,tf = fesolver.uh0,fesolver.t0,fesolver.tf
+  ode_op = get_algebraic_operator(feop)
+  nparams = rbinfo.nsnaps_state+rbinfo.nsnaps_test
+  params = realization(feop,nparams)
+  u0 = get_free_dof_values(uh0(params))
+  time_ndofs = num_time_dofs(fesolver)
+  T = get_vector_type(feop.test)
+  uμt = PODESolution(fesolver,ode_op,params,u0,t0,tf)
+  snaps = Vector{Vector{NonaffinePTArray{T}}}(undef,time_ndofs)
+  println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
+  stats = @timed for (snap,n) in uμt
+    snaps[n] = split_fields(feop.test,copy(snap))
+  end
+  println("Time marching complete")
+  sols = BlockSnapshots(snaps)
+  cinfo = ComputationInfo(stats,nparams)
+  return sols,params,cinfo
 end
 
 struct BlockRBSpace{T} <: RBBlock{T,1}
@@ -79,12 +103,12 @@ function rb_offsets(rb::BlockRBSpace)
   offsets
 end
 
-function save(rbinfo::BlockRBInfo,rb::BlockRBSpace)
+function Utils.save(rbinfo::BlockRBInfo,rb::BlockRBSpace)
   path = joinpath(rbinfo.rb_path,"rb")
   save(path,rb)
 end
 
-function load(rbinfo::BlockRBInfo,T::Type{BlockRBSpace{S}}) where S
+function Utils.load(rbinfo::BlockRBInfo,T::Type{BlockRBSpace{S}}) where S
   path = joinpath(rbinfo.rb_path,"rb")
   load(path,T)
 end
@@ -222,7 +246,7 @@ function add_time_supremizers(basis_u::Matrix,basis_p::Matrix;ttol=1e-2)
 end
 
 function get_ptoperator(
-  fesolver::PThetaMethod,
+  fesolver::PODESolver,
   feop::PTFEOperator,
   rbspace::BlockRBSpace{T},
   params::Table;
@@ -308,25 +332,25 @@ function load_algebraic_contrib(path::String,::Type{BlockRBMatAlgebraicContribut
   return BlockRBMatAlgebraicContribution(blocks,touched)
 end
 
-function save(rbinfo::BlockRBInfo,a::BlockRBVecAlgebraicContribution)
+function Utils.save(rbinfo::BlockRBInfo,a::BlockRBVecAlgebraicContribution)
   path = joinpath(rbinfo.rb_path,"rb_rhs")
   save_algebraic_contrib(path,a)
 end
 
-function load(rbinfo::BlockRBInfo,::Type{BlockRBVecAlgebraicContribution{T}},args...) where T
+function Utils.load(rbinfo::BlockRBInfo,::Type{BlockRBVecAlgebraicContribution{T}},args...) where T
   S = BlockRBVecAlgebraicContribution{T}
   path = joinpath(rbinfo.rb_path,"rb_rhs")
   load_algebraic_contrib(path,S,args...)
 end
 
-function save(rbinfo::BlockRBInfo,a::Vector{<:BlockRBMatAlgebraicContribution})
+function Utils.save(rbinfo::BlockRBInfo,a::Vector{<:BlockRBMatAlgebraicContribution})
   for i = eachindex(a)
     path = joinpath(rbinfo.rb_path,"rb_lhs_$i")
     save_algebraic_contrib(path,a[i])
   end
 end
 
-function load(rbinfo::BlockRBInfo,::Type{Vector{BlockRBMatAlgebraicContribution{T}}},args...) where T
+function Utils.load(rbinfo::BlockRBInfo,::Type{Vector{BlockRBMatAlgebraicContribution{T}}},args...) where T
   S = BlockRBMatAlgebraicContribution{T}
   njacs = num_active_dirs(rbinfo.rb_path)
   ad_jacs = Vector{S}(undef,njacs)
@@ -337,7 +361,7 @@ function load(rbinfo::BlockRBInfo,::Type{Vector{BlockRBMatAlgebraicContribution{
   ad_jacs
 end
 
-function save(rbinfo::BlockRBInfo,a::NTuple{2,BlockRBVecAlgebraicContribution})
+function Utils.save(rbinfo::BlockRBInfo,a::NTuple{2,BlockRBVecAlgebraicContribution})
   a_lin,a_nlin = a
   path_lin = joinpath(rbinfo.rb_path,"rb_rhs_lin")
   path_nlin = joinpath(rbinfo.rb_path,"rb_rhs_nlin")
@@ -345,7 +369,7 @@ function save(rbinfo::BlockRBInfo,a::NTuple{2,BlockRBVecAlgebraicContribution})
   save_algebraic_contrib(path_nlin,a_nlin)
 end
 
-function load(rbinfo::BlockRBInfo,::Type{NTuple{2,BlockRBVecAlgebraicContribution{T}}},args...) where T
+function Utils.load(rbinfo::BlockRBInfo,::Type{NTuple{2,BlockRBVecAlgebraicContribution{T}}},args...) where T
   S = BlockRBVecAlgebraicContribution{T}
   path_lin = joinpath(rbinfo.rb_path,"rb_rhs_lin")
   path_nlin = joinpath(rbinfo.rb_path,"rb_rhs_nlin")
@@ -354,7 +378,7 @@ function load(rbinfo::BlockRBInfo,::Type{NTuple{2,BlockRBVecAlgebraicContributio
   a_lin,a_nlin
 end
 
-function save(rbinfo::BlockRBInfo,a::NTuple{3,Vector{<:BlockRBMatAlgebraicContribution}})
+function Utils.save(rbinfo::BlockRBInfo,a::NTuple{3,Vector{<:BlockRBMatAlgebraicContribution}})
   a_lin,a_nlin,a_aux = a
   for i = eachindex(a_lin)
     path_lin = joinpath(rbinfo.rb_path,"rb_lhs_lin_$i")
@@ -366,7 +390,7 @@ function save(rbinfo::BlockRBInfo,a::NTuple{3,Vector{<:BlockRBMatAlgebraicContri
   end
 end
 
-function load(rbinfo::BlockRBInfo,::Type{NTuple{3,Vector{BlockRBMatAlgebraicContribution{T}}}},args...) where T
+function Utils.load(rbinfo::BlockRBInfo,::Type{NTuple{3,Vector{BlockRBMatAlgebraicContribution{T}}}},args...) where T
   S = BlockRBMatAlgebraicContribution{T}
   njacs = num_active_dirs(rbinfo.rb_path)
   ad_jacs_lin = Vector{S}(undef,njacs)

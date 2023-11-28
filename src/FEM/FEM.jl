@@ -49,6 +49,8 @@ import Gridap.CellData: GenericMeasure
 import Gridap.CellData: CompositeMeasure
 import Gridap.CellData: DomainStyle
 import Gridap.CellData: OperationCellField
+import Gridap.CellData: change_domain
+import Gridap.CellData: similar_cell_field
 import Gridap.CellData: _get_cell_points
 import Gridap.CellData: _operate_cellfields
 import Gridap.CellData: _to_common_domain
@@ -59,6 +61,8 @@ import Gridap.FESpaces: _pair_contribution_when_possible
 import Gridap.MultiField: MultiFieldFEBasisComponent
 import Gridap.ReferenceFEs: get_order
 import Gridap.ODEs.ODETools: _allocate_matrix_and_vector
+import Gridap.ODEs.ODETools: residual!
+import Gridap.ODEs.ODETools: jacobian!
 import Gridap.ODEs.ODETools: jacobians!
 import Gridap.ODEs.TransientFETools: ODESolver
 import Gridap.ODEs.TransientFETools: ODEOperator
@@ -141,8 +145,6 @@ export PThetaMethod
 export PODESolution
 export num_time_dofs
 export get_times
-export collect_single_field_solutions
-export collect_multi_field_solutions
 export collect_residuals_for_trian
 export collect_jacobians_for_trian
 export PTThetaAffineMethodOperator
@@ -165,7 +167,6 @@ include("PTFEOperator.jl")
 include("PODEOperatorInterface.jl")
 include("PTOperator.jl")
 include("PTSolvers.jl")
-include("PODEQuantities.jl")
 include("PAffineThetaMethod.jl")
 include("PThetaMethod.jl")
 include("FEUtils.jl")

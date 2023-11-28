@@ -8,6 +8,19 @@ function ReferenceFEs.get_order(test::MultiFieldFESpace)
   maximum(orders)
 end
 
+function Utils.recenter(a::PTArray,ah0::PTFEFunction;kwargs...)
+  a0 = get_free_dof_values(ah0)
+  recenter(a,a0;kwargs...)
+end
+
+function Utils.recenter(a::Vector{<:PTArray},ah0::PTFEFunction;kwargs...)
+  map(eachindex(a)) do i
+    ai = a[i]
+    ai0 = get_free_dof_values(ah0[i])
+    recenter(ai,ai0;kwargs...)
+  end
+end
+
 for f in (:get_L2_norm_matrix,:get_H1_norm_matrix)
   @eval begin
     function $f(op::PTFEOperator)

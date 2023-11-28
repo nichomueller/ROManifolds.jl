@@ -71,7 +71,7 @@ function Algebra.allocate_jacobian(
   allocate_jacobian(op.feop,μ,t,uh,i,fecache)
 end
 
-for fun in (:residual!,:residual_for_trian!)
+for fun in (:(Algebra.residual!),:residual_for_trian!)
   @eval begin
     function $fun(
       b::PTArray,
@@ -93,7 +93,7 @@ for fun in (:residual!,:residual_for_trian!)
   end
 end
 
-for fun in (:jacobian!,:jacobian_for_trian!)
+for fun in (:(Algebra.jacobian!),:jacobian_for_trian!)
   @eval begin
     function $fun(
       A::PTArray,

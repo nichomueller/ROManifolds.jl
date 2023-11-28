@@ -435,7 +435,7 @@ function pt_lazy_map(f,a::Union{AbstractArrayBlock,PTArray}...)
   NonaffinePTArray(lazy_arrays)
 end
 
-function recenter(a::PTArray{T},a0::PTArray{T};kwargs...) where T
+function Utils.recenter(a::PTArray{T},a0::PTArray{T};kwargs...) where T
   n = length(a)
   n0 = length(a0)
   ndiff = Int(n/n0)
@@ -575,7 +575,7 @@ for F in (:Map,:Function,:(Fields.BroadcastingFieldOpMap))
   end
 end
 
-function recenter(a::AffinePTArray,a0::AffinePTArray;kwargs...)
+function Utils.recenter(a::AffinePTArray,a0::AffinePTArray;kwargs...)
   array = recenter(a.array,a0.array;kwargs...)
   AffinePTArray(array)
 end

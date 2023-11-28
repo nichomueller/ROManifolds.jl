@@ -2,9 +2,6 @@ module HeatEquationTest
 
 using Gridap
 using Mabla
-# include("../src/Utils/Utils.jl")
-# include("../src/FEM/FEM.jl")
-# include("../src/RB/RB.jl")
 
 root = pwd()
 model = DiscreteModelFromFile(joinpath(root,"models/elasticity_3cyl2D.json"))
@@ -52,9 +49,9 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
 
 ϵ = 1e-4
-load_solutions = true
+load_solutions = false
 save_solutions = true
-load_structures = true
+load_structures = false
 save_structures = true
 postprocess = true
 norm_style = :l2
@@ -69,8 +66,7 @@ printstyled("OFFLINE PHASE\n";bold=true,underline=true)
 if load_solutions
   sols,params = load(rbinfo,(Snapshots{Vector{T}},Table))
 else
-  params = realization(feop,nsnaps_state+nsnaps_test)
-  sols,stats = collect_single_field_solutions(fesolver,feop,params)
+  sols,params,stats = collect_solutions(rbinfo,fesolver,feop)
   if save_solutions
     save(rbinfo,(sols,params,stats))
   end

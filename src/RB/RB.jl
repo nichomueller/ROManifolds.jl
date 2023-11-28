@@ -34,6 +34,7 @@ export Snapshots
 export num_space_dofs
 export num_time_dofs
 export num_params
+export collect_solutions
 export NnzArray
 export NnzVector
 export NnzMatrix

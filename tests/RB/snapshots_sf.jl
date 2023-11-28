@@ -6,7 +6,7 @@ Nt = length(times)
 N = K*Nt
 nfree = test.nfree
 
-sols, = collect_single_field_solutions(fesolver,feop,μ)
+sols, = collect_solutions(fesolver,feop,μ)
 
 _snaps = sols[1:K]
 ode_op = get_algebraic_operator(feop)

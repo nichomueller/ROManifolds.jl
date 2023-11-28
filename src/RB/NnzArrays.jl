@@ -73,7 +73,7 @@ end
 Base.length(nzm::NnzMatrix) = nzm.nparams
 num_params(nzm::NnzMatrix) = length(nzm)
 num_space_dofs(nzm::NnzMatrix) = size(nzm,1)
-num_time_dofs(nzm::NnzMatrix) = Int(size(nzm,2)/length(nzm))
+FEM.num_time_dofs(nzm::NnzMatrix) = Int(size(nzm,2)/length(nzm))
 
 function Base.copy(nzm::NnzMatrix)
   NnzMatrix(
@@ -160,7 +160,7 @@ function tpod(nzm::NnzMatrix{T,A} where T,args...;ϵ=1e-4,kwargs...) where A
   NnzMatrix{A}(nonzero_val,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
 end
 
-function change_mode(nzm::NnzMatrix{T}) where T
+function Utils.change_mode(nzm::NnzMatrix{T}) where T
   nparams = num_params(nzm)
   mode2 = change_mode(nzm.nonzero_val,nparams)
   return mode2

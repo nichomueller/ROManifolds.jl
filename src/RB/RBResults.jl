@@ -180,13 +180,13 @@ function show_speedup(io::IO,r::RBResults)
   print(io,"FEM/RB memory speedup: $speedup_memory\n")
 end
 
-function save(rbinfo::RBInfo,r::RBResults)
+function Utils.save(rbinfo::RBInfo,r::RBResults)
   name = get_name(r)
   path = joinpath(rbinfo.rb_path,"results_$name")
   save(path,r)
 end
 
-function load(rbinfo::RBInfo,T::Type{RBResults};name=:vel)
+function Utils.load(rbinfo::RBInfo,T::Type{RBResults};name=:vel)
   path = joinpath(rbinfo.rb_path,"results_$name")
   load(path,T)
 end

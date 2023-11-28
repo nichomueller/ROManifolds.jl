@@ -78,7 +78,7 @@ function FESpaces.collect_cell_matrix(
   (w,r,c)
 end
 
-create_from_nz(a::PTArray) = a
+Algebra.create_from_nz(a::PTArray) = a
 
 function Algebra.allocate_matrix(::PTDomainContribution,a::SparseMatrixAssembler,matdata;N=1)
   A = allocate_matrix(a,matdata)

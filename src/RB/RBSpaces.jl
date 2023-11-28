@@ -7,17 +7,17 @@ Base.eltype(::RBSpace{T}) where T = T
 get_basis_space(rb::RBSpace) = rb.basis_space
 get_basis_time(rb::RBSpace) = rb.basis_time
 num_space_dofs(rb::RBSpace) = size(rb.basis_space,1)
-num_time_dofs(rb::RBSpace) = size(rb.basis_time,1)
+FEM.num_time_dofs(rb::RBSpace) = size(rb.basis_time,1)
 num_rb_space_ndofs(rb::RBSpace) = size(rb.basis_space,2)
 num_rb_time_ndofs(rb::RBSpace) = size(rb.basis_time,2)
 num_rb_ndofs(rb::RBSpace) = num_rb_time_ndofs(rb)*num_rb_space_ndofs(rb)
 
-function save(rbinfo::RBInfo,rb::RBSpace)
+function Utils.save(rbinfo::RBInfo,rb::RBSpace)
   path = joinpath(rbinfo.rb_path,"rb")
   save(path,rb)
 end
 
-function load(rbinfo::RBInfo,T::Type{RBSpace{S}}) where S
+function Utils.load(rbinfo::RBInfo,T::Type{RBSpace{S}}) where S
   path = joinpath(rbinfo.rb_path,"rb")
   load(path,T)
 end

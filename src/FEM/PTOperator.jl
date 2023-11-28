@@ -37,3 +37,22 @@ function update_ptoperator(op::PTOperator,x::PTArray)
   odeop,μ,tθ,dtθ,ode_cache,vθ = op.odeop,op.μ,op.tθ,op.dtθ,op.ode_cache,op.vθ
   get_ptoperator(odeop,μ,tθ,dtθ,x,ode_cache,vθ)
 end
+
+function collect_residuals_for_trian(op::PTOperator)
+  b = allocate_residual(op,op.u0)
+  ress,trian = residual_for_trian!(b,op,op.u0)
+  nzm = map(ress) do res
+    NnzMatrix(res;nparams=length(op.μ))
+  end
+  return nzm,trian
+end
+
+function collect_jacobians_for_trian(op::PTOperator;i=1)
+  A = allocate_jacobian(op,op.u0,i)
+  jacs_i,trian = jacobian_for_trian!(A,op,op.u0,i)
+  nzm_i = map(jacs_i) do jac_i
+    nzv_i = map(NnzVector,jac_i)
+    NnzMatrix(nzv_i;nparams=length(op.μ))
+  end
+  return nzm_i,trian
+end

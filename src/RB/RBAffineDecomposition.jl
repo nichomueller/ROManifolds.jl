@@ -5,7 +5,7 @@ struct RBIntegrationDomain
 end
 
 get_measure(i::RBIntegrationDomain) = i.meas
-get_times(i::RBIntegrationDomain) = i.times
+FEM.get_times(i::RBIntegrationDomain) = i.times
 get_idx_space(i::RBIntegrationDomain) = i.idx
 
 abstract type RBAffineDecomposition{T,N} end

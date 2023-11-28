@@ -74,8 +74,7 @@ function stokes_equation()
   if load_solutions
     sols,params = load(rbinfo,(BlockSnapshots{Vector{T}},Table))
   else
-    params = realization(feop,nsnaps_state+nsnaps_test)
-    sols,stats = collect_multi_field_solutions(fesolver,feop,params)
+    sols,params,stats = collect_solutions(rbinfo,fesolver,feop)
     if save_solutions
       save(rbinfo,(sols,params,stats))
     end
