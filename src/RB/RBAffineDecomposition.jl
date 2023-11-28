@@ -383,19 +383,19 @@ abstract type RBContributionMap <: Map end
 struct RBVecContributionMap <: RBContributionMap end
 struct RBMatContributionMap <: RBContributionMap end
 
-function return_cache(::RBVecContributionMap,snaps::PTArray{Vector{T}}) where T
+function Arrays.return_cache(::RBVecContributionMap,snaps::PTArray{Vector{T}}) where T
   array_coeff = zeros(T,1)
   array_proj = zeros(T,1)
   CachedArray(array_coeff),CachedArray(array_proj),CachedArray(array_proj)
 end
 
-function return_cache(::RBMatContributionMap,snaps::PTArray{Vector{T}}) where T
+function Arrays.return_cache(::RBMatContributionMap,snaps::PTArray{Vector{T}}) where T
   array_coeff = zeros(T,1,1)
   array_proj = zeros(T,1,1)
   CachedArray(array_coeff),CachedArray(array_proj),CachedArray(array_proj)
 end
 
-function evaluate!(
+function Arrays.evaluate!(
   ::RBVecContributionMap,
   cache,
   proj_basis_space::AbstractVector,
@@ -426,7 +426,7 @@ function evaluate!(
   array_proj_global
 end
 
-function evaluate!(
+function Arrays.evaluate!(
   ::RBMatContributionMap,
   cache,
   proj_basis_space::AbstractVector,

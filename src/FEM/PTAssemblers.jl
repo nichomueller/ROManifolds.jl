@@ -1,4 +1,4 @@
-function collect_cell_vector(
+function FESpaces.collect_cell_vector(
   test::FESpace,
   a::PTDomainContribution)
 
@@ -16,7 +16,7 @@ function collect_cell_vector(
   (w,r)
 end
 
-function collect_cell_vector(
+function FESpaces.collect_cell_vector(
   test::FESpace,
   a::Union{DomainContribution,PTDomainContribution},
   strian::Triangulation)
@@ -33,7 +33,7 @@ function collect_cell_vector(
   (w,r)
 end
 
-function collect_cell_matrix(
+function FESpaces.collect_cell_matrix(
   trial::FESpace,
   test::FESpace,
   a::PTDomainContribution)
@@ -56,7 +56,7 @@ function collect_cell_matrix(
   (w,r,c)
 end
 
-function collect_cell_matrix(
+function FESpaces.collect_cell_matrix(
   trial::FESpace,
   test::FESpace,
   a::Union{DomainContribution,PTDomainContribution},
@@ -80,7 +80,7 @@ end
 
 create_from_nz(a::PTArray) = a
 
-function allocate_matrix(::PTDomainContribution,a::SparseMatrixAssembler,matdata;N=1)
+function Algebra.allocate_matrix(::PTDomainContribution,a::SparseMatrixAssembler,matdata;N=1)
   A = allocate_matrix(a,matdata)
   array = Vector{typeof(A)}(undef,N)
   @inbounds for n = 1:N
@@ -89,12 +89,12 @@ function allocate_matrix(::PTDomainContribution,a::SparseMatrixAssembler,matdata
   NonaffinePTArray(array)
 end
 
-function allocate_matrix(::DomainContribution,a::SparseMatrixAssembler,matdata;N=1)
+function Algebra.allocate_matrix(::DomainContribution,a::SparseMatrixAssembler,matdata;N=1)
   A = allocate_matrix(a,matdata)
   AffinePTArray(A,N)
 end
 
-function numeric_loop_matrix!(
+function FESpaces.numeric_loop_matrix!(
   A::PTArray,
   a::GenericSparseMatrixAssembler,
   matdata)
@@ -172,7 +172,7 @@ end
   end
 end
 
-function allocate_vector(::PTDomainContribution,a::SparseMatrixAssembler,vecdata;N=1)
+function Algebra.allocate_vector(::PTDomainContribution,a::SparseMatrixAssembler,vecdata;N=1)
   b = allocate_vector(a,vecdata)
   array = Vector{typeof(b)}(undef,N)
   @inbounds for n = 1:N
@@ -181,12 +181,12 @@ function allocate_vector(::PTDomainContribution,a::SparseMatrixAssembler,vecdata
   NonaffinePTArray(array)
 end
 
-function allocate_vector(::DomainContribution,a::SparseMatrixAssembler,vecdata;N=1)
+function Algebra.allocate_vector(::DomainContribution,a::SparseMatrixAssembler,vecdata;N=1)
   b = allocate_vector(a,vecdata)
   AffinePTArray(b,N)
 end
 
-function numeric_loop_vector!(
+function FESpaces.numeric_loop_vector!(
   b::PTArray,
   a::GenericSparseMatrixAssembler,
   vecdata)

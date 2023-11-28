@@ -6,9 +6,9 @@ struct PODEOpFromFEOp{C} <: PODEOperator{C}
   feop::PTFEOperator{C}
 end
 
-get_order(op::PODEOperator) = get_order(op.feop)
+ReferenceFEs.get_order(op::PODEOperator) = get_order(op.feop)
 
-function allocate_cache(op::PODEOperator,μ::AbstractVector,t::T) where T
+function TransientFETools.allocate_cache(op::PODEOperator,μ::AbstractVector,t::T) where T
   Ut = get_trial(op.feop)
   U = allocate_trial_space(Ut,μ,t)
   Uts = (Ut,)
@@ -21,7 +21,7 @@ function allocate_cache(op::PODEOperator,μ::AbstractVector,t::T) where T
   Us,Uts,fecache
 end
 
-function update_cache!(
+function TransientFETools.update_cache!(
   ode_cache,
   op::PODEOperator,
   μ::AbstractVector,
@@ -46,7 +46,7 @@ function cache_at_idx(ode_cache,idx::Int)
   Us,Uts,fecache
 end
 
-function allocate_residual(
+function Algebra.allocate_residual(
   op::PODEOperator,
   μ::AbstractVector,
   t::T,
@@ -58,7 +58,7 @@ function allocate_residual(
   allocate_residual(op.feop,μ,t,uh,fecache)
 end
 
-function allocate_jacobian(
+function Algebra.allocate_jacobian(
   op::PODEOperator,
   μ::AbstractVector,
   t::T,
@@ -117,7 +117,7 @@ for fun in (:jacobian!,:jacobian_for_trian!)
   end
 end
 
-function jacobians!(
+function ODETools.jacobians!(
   J::PTArray,
   op::PODEOperator,
   μ::AbstractVector,

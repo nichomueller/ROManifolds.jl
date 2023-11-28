@@ -1,4 +1,4 @@
-function solve_step!(
+function TransientFETools.solve_step!(
   uf::PTArray,
   solver::PThetaMethod,
   op::PODEOperator,
@@ -50,7 +50,7 @@ function get_ptoperator(
   PTThetaMethodOperator(odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
 end
 
-function residual!(b::PTArray,op::PTThetaMethodOperator,x::PTArray)
+function Algebra.residual!(b::PTArray,op::PTThetaMethodOperator,x::PTArray)
   uF = x
   vθ = op.vθ
   @. vθ = (x-op.u0)/op.dtθ
@@ -73,7 +73,7 @@ function residual_for_trian!(
   residual_for_trian!(b,op.odeop,op.μ,t,(uF,vθ),op.ode_cache,args...)
 end
 
-function jacobian!(A::PTArray,op::PTThetaMethodOperator,x::PTArray)
+function ODETools.jacobian!(A::PTArray,op::PTThetaMethodOperator,x::PTArray)
   uF = x
   vθ = op.vθ
   @. vθ = (x-op.u0)/op.dtθ
@@ -82,7 +82,7 @@ function jacobian!(A::PTArray,op::PTThetaMethodOperator,x::PTArray)
   jacobians!(A,op.odeop,op.μ,op.tθ,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)
 end
 
-function jacobian!(A::PTArray,op::PTThetaMethodOperator,x::PTArray,i::Int)
+function Algebra.jacobian!(A::PTArray,op::PTThetaMethodOperator,x::PTArray,i::Int)
   uF = x
   vθ = op.vθ
   @. vθ = (x-op.u0)/op.dtθ

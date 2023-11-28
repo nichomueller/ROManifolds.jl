@@ -15,15 +15,15 @@ struct GenericPTCellField{DS} <: PTCellField
 end
 
 Base.length(f::GenericPTCellField) = length(f.cell_field)
-get_data(f::GenericPTCellField) = f.cell_field
-get_triangulation(f::GenericPTCellField) = f.trian
-DomainStyle(::Type{GenericPTCellField{DS}}) where DS = DS()
+CellData.get_data(f::GenericPTCellField) = f.cell_field
+FESpaces.get_triangulation(f::GenericPTCellField) = f.trian
+CellData.DomainStyle(::Type{GenericPTCellField{DS}}) where DS = DS()
 
-function similar_cell_field(::PTCellField,cell_data,trian,ds)
+function CellData.similar_cell_field(::PTCellField,cell_data,trian,ds)
   GenericPTCellField(cell_data,trian,ds)
 end
 
-function CellField(
+function CellData.CellField(
   f::AbstractPTFunction,
   trian::Triangulation,
   ::DomainStyle)
@@ -35,7 +35,7 @@ function CellField(
   GenericPTCellField(ptcell_field,trian,PhysicalDomain())
 end
 
-function CellField(
+function CellData.CellField(
   f::AbstractPTFunction{<:AbstractVector{<:Number},<:Union{Real,Nothing}},
   trian::Triangulation,
   ::DomainStyle)
@@ -45,7 +45,7 @@ function CellField(
   GenericCellField(cell_field,trian,PhysicalDomain())
 end
 
-function CellField(fs::SingleFieldFESpace,cell_vals::PTArray)
+function CellData.CellField(fs::SingleFieldFESpace,cell_vals::PTArray)
   v = get_fe_basis(fs)
   cell_basis = get_data(v)
   cell_field = lazy_map(linear_combination,cell_vals,cell_basis)
@@ -80,7 +80,7 @@ function CellData.change_domain_phys_phys(
   similar_cell_field(a,tface_to_fields,ttrian,PhysicalDomain())
 end
 
-function testitem(f::GenericPTCellField)
+function Arrays.testitem(f::GenericPTCellField)
   GenericCellField(testitem(f.cell_field),f.trian,f.domain_style)
 end
 
@@ -134,15 +134,15 @@ function CellData._get_cell_points(a::PTOperationCellField)
   CellData._get_cell_points(a.args...)
 end
 
-function get_data(f::PTOperationCellField)
+function CellData.get_data(f::PTOperationCellField)
   a = map(get_data,f.args)
   lazy_map(Broadcasting(f.op),a...)
 end
 
-get_triangulation(f::PTOperationCellField) = f.trian
-DomainStyle(::Type{PTOperationCellField{DS}}) where DS = DS()
+FESpaces.get_triangulation(f::PTOperationCellField) = f.trian
+CellData.DomainStyle(::Type{PTOperationCellField{DS}}) where DS = DS()
 
-function evaluate!(cache,f::PTOperationCellField,x::CellPoint)
+function Arrays.evaluate!(cache,f::PTOperationCellField,x::CellPoint)
   ax = map(i->i(x),f.args)
   lazy_map(Fields.BroadcastingFieldOpMap(f.op.op),ax...)
 end
@@ -176,9 +176,9 @@ struct PTSingleFieldFEFunction{T<:CellField} <: PTFEFunction
 end
 
 Base.length(f::PTSingleFieldFEFunction) = length(f.cell_field)
-get_data(f::PTSingleFieldFEFunction) = get_data(f.cell_field)
-get_triangulation(f::PTSingleFieldFEFunction) = get_triangulation(f.cell_field)
-DomainStyle(::Type{PTSingleFieldFEFunction{T}}) where T = DomainStyle(T)
+CellData.get_data(f::PTSingleFieldFEFunction) = get_data(f.cell_field)
+FESpaces.get_triangulation(f::PTSingleFieldFEFunction) = get_triangulation(f.cell_field)
+CellData.DomainStyle(::Type{PTSingleFieldFEFunction{T}}) where T = DomainStyle(T)
 
 FESpaces.get_free_dof_values(f::PTSingleFieldFEFunction) = f.free_values
 FESpaces.get_cell_dof_values(f::PTSingleFieldFEFunction) = f.cell_dof_values
@@ -203,7 +203,7 @@ function FEFunction(
   FEFunction(fs,free_values,dv)
 end
 
-function testitem(f::PTSingleFieldFEFunction)
+function Arrays.testitem(f::PTSingleFieldFEFunction)
   cell_field = testitem(f.cell_field)
   cell_dof_values = testitem(f.cell_dof_values)
   free_values = testitem(f.free_values)
@@ -214,12 +214,12 @@ end
 
 abstract type PTTransientCellField <: PTCellField end
 
-get_data(f::PTTransientCellField) = @abstractmethod
-get_triangulation(f::PTTransientCellField) = @abstractmethod
-DomainStyle(::Type{PTTransientCellField}) =  @abstractmethod
-gradient(f::PTTransientCellField) =  @abstractmethod
-∇∇(f::PTTransientCellField) =  @abstractmethod
-function change_domain(f::PTTransientCellField,trian::Triangulation,::DomainStyle)
+CellData.get_data(f::PTTransientCellField) = @abstractmethod
+FESpaces.get_triangulation(f::PTTransientCellField) = @abstractmethod
+CellData.DomainStyle(::Type{PTTransientCellField}) =  @abstractmethod
+Fields.gradient(f::PTTransientCellField) =  @abstractmethod
+Fields.∇∇(f::PTTransientCellField) =  @abstractmethod
+function CellData.change_domain(f::PTTransientCellField,trian::Triangulation,::DomainStyle)
   @abstractmethod
 end
 
@@ -230,19 +230,19 @@ end
 
 const PTSingleFieldTypes = Union{GenericPTCellField,PTSingleFieldFEFunction}
 
-function TransientCellField(single_field::PTSingleFieldTypes,derivatives::Tuple)
+function TransientFETools.TransientCellField(single_field::PTSingleFieldTypes,derivatives::Tuple)
   PTTransientSingleFieldCellField(single_field,derivatives)
 end
 
-get_data(f::PTTransientSingleFieldCellField) = get_data(f.cellfield)
-get_triangulation(f::PTTransientSingleFieldCellField) = get_triangulation(f.cellfield)
-DomainStyle(::Type{<:PTTransientSingleFieldCellField{A}}) where A = DomainStyle(A)
-gradient(f::PTTransientSingleFieldCellField) = gradient(f.cellfield)
-∇∇(f::PTTransientSingleFieldCellField) = ∇∇(f.cellfield)
-change_domain(f::PTTransientSingleFieldCellField,trian::Triangulation,target_domain::DomainStyle) = change_domain(f.cellfield,trian,target_domain)
+CellData.get_data(f::PTTransientSingleFieldCellField) = get_data(f.cellfield)
+FESpaces.get_triangulation(f::PTTransientSingleFieldCellField) = get_triangulation(f.cellfield)
+CellData.DomainStyle(::Type{<:PTTransientSingleFieldCellField{A}}) where A = DomainStyle(A)
+Fields.gradient(f::PTTransientSingleFieldCellField) = gradient(f.cellfield)
+Fields.∇∇(f::PTTransientSingleFieldCellField) = ∇∇(f.cellfield)
+CellData.change_domain(f::PTTransientSingleFieldCellField,trian::Triangulation,target_domain::DomainStyle) = change_domain(f.cellfield,trian,target_domain)
 
 # Skeleton related Operations
-function Base.getproperty(f::TransientSingleFieldCellField, sym::Symbol)
+function Base.getproperty(f::PTTransientSingleFieldCellField, sym::Symbol)
   if sym in (:⁺,:plus,:⁻, :minus)
     derivatives = ()
     if sym in (:⁺,:plus)
@@ -262,12 +262,12 @@ function Base.getproperty(f::TransientSingleFieldCellField, sym::Symbol)
   end
 end
 
-function ∂t(f::PTTransientCellField)
+function TransientFETools.∂t(f::PTTransientCellField)
   cellfield,derivatives = Gridap.Helpers.first_and_tail(f.derivatives)
   TransientCellField(cellfield,derivatives)
 end
 
-∂tt(f::PTTransientCellField) = ∂t(∂t(f))
+TransientFETools.∂tt(f::PTTransientCellField) = ∂t(∂t(f))
 
 struct PTMultiFieldCellField{DS<:DomainStyle} <: PTCellField
   single_fields::Vector{<:PTCellField}
@@ -285,7 +285,7 @@ function PTMultiFieldCellField(single_fields::Vector{<:PTCellField})
   PTMultiFieldCellField{typeof(domain_style)}(single_fields,domain_style)
 end
 
-function get_data(f::PTMultiFieldCellField)
+function CellData.get_data(f::PTMultiFieldCellField)
   s = """
   Function get_data is not implemented for PTMultiFieldCellField at this moment.
   You need to extract the individual fields and then evaluate them separatelly.
@@ -296,14 +296,14 @@ function get_data(f::PTMultiFieldCellField)
   @notimplemented s
 end
 
-function get_triangulation(f::PTMultiFieldCellField)
+function FESpaces.get_triangulation(f::PTMultiFieldCellField)
   s1 = first(f.single_fields)
   trian = get_triangulation(s1)
   @check all(map(i->trian===get_triangulation(i),f.single_fields))
   trian
 end
-DomainStyle(::Type{PTMultiFieldCellField{DS}}) where DS = DS()
-num_fields(a::PTMultiFieldCellField) = length(a.single_fields)
+CellData.DomainStyle(::Type{PTMultiFieldCellField{DS}}) where DS = DS()
+MultiField.num_fields(a::PTMultiFieldCellField) = length(a.single_fields)
 Base.getindex(a::PTMultiFieldCellField,i::Integer) = a.single_fields[i]
 Base.iterate(a::PTMultiFieldCellField)  = iterate(a.single_fields)
 Base.iterate(a::PTMultiFieldCellField,state)  = iterate(a.single_fields,state)
@@ -326,14 +326,14 @@ struct PTMultiFieldFEFunction{T<:PTMultiFieldCellField} <: PTFEFunction
 end
 
 Base.length(f::PTMultiFieldFEFunction) = length(first(f.single_fe_functions))
-get_data(f::PTMultiFieldFEFunction) = get_data(f.multi_cell_field)
-get_triangulation(f::PTMultiFieldFEFunction) = get_triangulation(f.multi_cell_field)
-DomainStyle(::Type{PTMultiFieldFEFunction{T}}) where T = DomainStyle(T)
+CellData.get_data(f::PTMultiFieldFEFunction) = get_data(f.multi_cell_field)
+FESpaces.get_triangulation(f::PTMultiFieldFEFunction) = get_triangulation(f.multi_cell_field)
+CellData.DomainStyle(::Type{PTMultiFieldFEFunction{T}}) where T = DomainStyle(T)
 FESpaces.get_free_dof_values(f::PTMultiFieldFEFunction) = f.free_values
 FESpaces.get_fe_space(f::PTMultiFieldFEFunction) = f.fe_space
-num_fields(a::PTMultiFieldFEFunction) = length(a.single_fe_functions)
+MultiField.num_fields(a::PTMultiFieldFEFunction) = length(a.single_fe_functions)
 
-function get_cell_dof_values(f::PTMultiFieldFEFunction)
+function FESpaces.get_cell_dof_values(f::PTMultiFieldFEFunction)
   msg = """\n
   This method does not make sense for multi-field
   since each field can be defined on a different triangulation.
@@ -350,9 +350,8 @@ Base.iterate(m::PTMultiFieldFEFunction) = iterate(m.single_fe_functions)
 Base.iterate(m::PTMultiFieldFEFunction,state) = iterate(m.single_fe_functions,state)
 Base.getindex(m::PTMultiFieldFEFunction,::Colon) = m
 Base.getindex(m::PTMultiFieldFEFunction,field_id::Integer) = m.single_fe_functions[field_id]
-num_fields(m::PTMultiFieldFEFunction) = length(m.single_fe_functions)
 
-function testitem(f::PTMultiFieldFEFunction)
+function Arrays.testitem(f::PTMultiFieldFEFunction)
   single_fe_functions = map(testitem,f.single_fe_functions)
   free_values = testitem(f.free_values)
   fe_space = testitem(f.fe_space)
@@ -367,12 +366,12 @@ end
 
 const PTMultiFieldTypes = Union{PTMultiFieldCellField,PTMultiFieldFEFunction}
 
-function TransientCellField(multi_field::PTMultiFieldTypes,derivatives::Tuple)
+function TransientFETools.TransientCellField(multi_field::PTMultiFieldTypes,derivatives::Tuple)
   transient_single_fields = _to_transient_single_fields(multi_field,derivatives)
   PTTransientMultiFieldCellField(multi_field,derivatives,transient_single_fields)
 end
 
-function get_data(::PTTransientMultiFieldCellField)
+function CellData.get_data(::PTTransientMultiFieldCellField)
   s = """
   Function get_data is not implemented for PTTransientMultiFieldCellField at this moment.
   You need to extract the individual fields and then evaluate them separatelly.
@@ -383,12 +382,12 @@ function get_data(::PTTransientMultiFieldCellField)
   @notimplemented s
 end
 
-get_triangulation(f::PTTransientMultiFieldCellField) = get_triangulation(f.cellfield)
-DomainStyle(::Type{PTTransientMultiFieldCellField{A}}) where A = DomainStyle(A)
-num_fields(f::PTTransientMultiFieldCellField) = length(f.cellfield)
-gradient(f::PTTransientMultiFieldCellField) = gradient(f.cellfield)
-∇∇(f::PTTransientMultiFieldCellField) = ∇∇(f.cellfield)
-change_domain(f::PTTransientMultiFieldCellField,trian::Triangulation,target_domain::DomainStyle) = change_domain(f.cellfield,trian,target_domain)
+FESpaces.get_triangulation(f::PTTransientMultiFieldCellField) = get_triangulation(f.cellfield)
+CellData.DomainStyle(::Type{PTTransientMultiFieldCellField{A}}) where A = DomainStyle(A)
+MultiField.num_fields(f::PTTransientMultiFieldCellField) = length(f.cellfield)
+Fields.gradient(f::PTTransientMultiFieldCellField) = gradient(f.cellfield)
+Fields.∇∇(f::PTTransientMultiFieldCellField) = ∇∇(f.cellfield)
+CellData.change_domain(f::PTTransientMultiFieldCellField,trian::Triangulation,target_domain::DomainStyle) = change_domain(f.cellfield,trian,target_domain)
 
 function Base.getindex(f::PTTransientMultiFieldCellField,ifield::Integer)
   single_field = f.cellfield[ifield]
@@ -409,7 +408,7 @@ function Base.getindex(f::PTTransientMultiFieldCellField,indices::Vector{<:Int})
   PTTransientMultiFieldCellField(cellfield,derivatives,transient_single_fields)
 end
 
-function Gridap.ODEs.TransientFETools._to_transient_single_fields(
+function TransientFETools._to_transient_single_fields(
   multi_field::PTMultiFieldTypes,
   derivatives::Tuple)
 
@@ -429,7 +428,7 @@ end
 Base.iterate(f::PTTransientMultiFieldCellField)  = iterate(f.transient_single_fields)
 Base.iterate(f::PTTransientMultiFieldCellField,state)  = iterate(f.transient_single_fields,state)
 
-function ∂t(f::PTTransientMultiFieldCellField)
+function TransientFETools.∂t(f::PTTransientMultiFieldCellField)
   cellfield, derivatives = Gridap.Helpers.first_and_tail(f.derivatives)
   transient_single_field_derivatives = TransientCellField[]
   for transient_single_field in f.transient_single_fields
@@ -438,4 +437,4 @@ function ∂t(f::PTTransientMultiFieldCellField)
   PTTransientMultiFieldCellField(cellfield,derivatives,transient_single_field_derivatives)
 end
 
-∂tt(f::PTTransientMultiFieldCellField) = ∂t(∂t(f))
+TransientFETools.∂tt(f::PTTransientMultiFieldCellField) = ∂t(∂t(f))

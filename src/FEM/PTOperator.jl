@@ -25,11 +25,11 @@ for f in (:linear_operator,:nonlinear_operator,:auxiliary_operator)
   end
 end
 
-function allocate_residual(op::PTOperator,x::PTArray)
+function Algebra.allocate_residual(op::PTOperator,x::PTArray)
   allocate_residual(op.odeop,op.μ,op.tθ,x,op.ode_cache)
 end
 
-function allocate_jacobian(op::PTOperator,x::PTArray,i=1)
+function Algebra.allocate_jacobian(op::PTOperator,x::PTArray,i=1)
   allocate_jacobian(op.odeop,op.μ,op.tθ,x,i,op.ode_cache)
 end
 

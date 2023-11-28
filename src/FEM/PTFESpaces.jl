@@ -16,13 +16,13 @@ end
 """
 Allocate the space to be used as first argument in evaluate!
 """
-function allocate_trial_space(U::PTTrialFESpace,μ,t)
+function TransientFETools.allocate_trial_space(U::PTTrialFESpace,μ,t)
   _length(a::Vector{<:Number}) = 1
   _length(a) = length(a)
   NonaffineHomogeneousPTrialFESpace(U.space,_length(μ)*length(t))
 end
 
-function Gridap.ODEs.TransientFETools.allocate_trial_space(
+function TransientFETools.allocate_trial_space(
   U::PTTrialFESpace,::Vector{<:Number},::Real)
   HomogeneousTrialFESpace(U.space)
 end
@@ -30,7 +30,7 @@ end
 """
 Parameter, time evaluation without allocating Dirichlet vals (returns a TrialFESpace)
 """
-function evaluate!(Ut::T,U::PTTrialFESpace,μ,t) where T
+function Arrays.evaluate!(Ut::T,U::PTTrialFESpace,μ,t) where T
   objects_at_μt = []
   for μi in μ, ti in t
     if isa(U.dirichlet_μt,Vector)
@@ -43,7 +43,7 @@ function evaluate!(Ut::T,U::PTTrialFESpace,μ,t) where T
   Ut
 end
 
-function evaluate!(Ut::T,U::PTTrialFESpace,μ::Vector{<:Number},t) where T
+function Arrays.evaluate!(Ut::T,U::PTTrialFESpace,μ::Vector{<:Number},t) where T
   objects_at_μt = []
   for ti in t
     if isa(U.dirichlet_μt,Vector)
@@ -56,7 +56,7 @@ function evaluate!(Ut::T,U::PTTrialFESpace,μ::Vector{<:Number},t) where T
   Ut
 end
 
-function evaluate!(Uμt::T,U::PTTrialFESpace,μ::Vector{<:Number},t::Real) where T
+function Arrays.evaluate!(Uμt::T,U::PTTrialFESpace,μ::Vector{<:Number},t::Real) where T
   if isa(U.dirichlet_μt,Vector)
     objects_at_μt = map(o->o(μ,t),U.dirichlet_μt)
   else
@@ -69,7 +69,7 @@ end
 """
 Parameter, time evaluation allocating Dirichlet vals
 """
-function evaluate(U::PTTrialFESpace,μ,t)
+function Arrays.evaluate(U::PTTrialFESpace,μ,t)
   Uμt = allocate_trial_space(U,μ,t)
   evaluate!(Uμt,U,μ,t)
   Uμt
@@ -78,7 +78,7 @@ end
 """
 We can evaluate at `nothing` when we do not care about the Dirichlet vals
 """
-evaluate(U::PTTrialFESpace,::Nothing,::Nothing) = U.Ud0
+Arrays.evaluate(U::PTTrialFESpace,::Nothing,::Nothing) = U.Ud0
 
 """
 Functor-like evaluation. It allocates Dirichlet vals in general.
@@ -101,11 +101,11 @@ Time 2nd derivative of the Dirichlet functions
 
 # Define the PTrialFESpace interface for affine spaces
 
-function Gridap.ODEs.TransientFETools.allocate_trial_space(U::FESpace,args...)
+function TransientFETools.allocate_trial_space(U::FESpace,args...)
   U
 end
 
-function Gridap.ODEs.TransientFETools.allocate_trial_space(U::FESpace,μ,t)
+function TransientFETools.allocate_trial_space(U::FESpace,μ,t)
   _length(a) = 1
   _length(a::Table) = length(a)
   if isa(μ,Vector{<:Number}) && isa(t,Real)
@@ -115,10 +115,10 @@ function Gridap.ODEs.TransientFETools.allocate_trial_space(U::FESpace,μ,t)
   end
 end
 
-evaluate!(Ut::FESpace,::FESpace,μ,t) = Ut
+Arrays.evaluate!(Ut::FESpace,::FESpace,μ,t) = Ut
 Arrays.evaluate!(::FESpace,U::FESpace,::Vector{<:Number},::Real) = U
 
-function evaluate(U::FESpace,μ,t)
+function Arrays.evaluate(U::FESpace,μ,t)
   Uμt = allocate_trial_space(U,μ,t)
   evaluate!(Uμt,U,μ,t)
 end
@@ -145,35 +145,35 @@ function PTMultiFieldFESpace(spaces::Vector{<:SingleFieldFESpace})
   MultiFieldFESpace(spaces)
 end
 
-function Gridap.ODEs.TransientFETools.allocate_trial_space(
+function TransientFETools.allocate_trial_space(
   U::PTMultiFieldTrialFESpace,args...)
   spaces = map(fe->allocate_trial_space(fe,args...),U.spaces)
   PMultiFieldFESpace(spaces)
 end
 
-function Gridap.ODEs.TransientFETools.allocate_trial_space(
+function TransientFETools.allocate_trial_space(
   U::PTMultiFieldTrialFESpace,μ::Vector,t::Real)
   spaces = map(fe->allocate_trial_space(fe,μ,t),U.spaces)
   MultiFieldFESpace(spaces)
 end
 
-function evaluate!(Uμt,U::PTMultiFieldTrialFESpace,μ,t)
+function Arrays.evaluate!(Uμt,U::PTMultiFieldTrialFESpace,μ,t)
   spaces_at_μt = [evaluate!(Uμti,Ui,μ,t) for (Uμti,Ui) in zip(Uμt,U)]
   PMultiFieldFESpace(spaces_at_μt)
 end
 
-function evaluate!(Uμt,U::PTMultiFieldTrialFESpace,μ::Vector,t::Real)
+function Arrays.evaluate!(Uμt,U::PTMultiFieldTrialFESpace,μ::Vector,t::Real)
   spaces_at_μt = [evaluate!(Uμti,Ui,μ,t) for (Uμti,Ui) in zip(Uμt,U)]
   MultiFieldFESpace(spaces_at_μt)
 end
 
-function evaluate(U::PTMultiFieldTrialFESpace,μ,t)
+function Arrays.evaluate(U::PTMultiFieldTrialFESpace,μ,t)
   Uμt = allocate_trial_space(U,μ,t)
   evaluate!(Uμt,U,μ,t)
   Uμt
 end
 
-function evaluate(U::PTMultiFieldTrialFESpace,::Nothing,::Nothing)
+function Arrays.evaluate(U::PTMultiFieldTrialFESpace,::Nothing,::Nothing)
   MultiFieldFESpace([fesp(nothing,nothing) for fesp in U.spaces])
 end
 
@@ -184,7 +184,7 @@ function ∂ₚt(U::PTMultiFieldTrialFESpace)
   PTMultiFieldFESpace(spaces)
 end
 
-function SparseMatrixAssembler(
+function FESpaces.SparseMatrixAssembler(
   trial::Union{PTTrialFESpace,PTMultiFieldTrialFESpace},
   test::FESpace)
   SparseMatrixAssembler(trial(nothing,nothing),test)

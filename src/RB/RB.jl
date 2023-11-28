@@ -1,4 +1,4 @@
-module
+module RB
 using Mabla.Utils
 using Mabla.FEM
 using LinearAlgebra
@@ -14,23 +14,90 @@ using Gridap.Geometry
 using Gridap.Fields
 using Gridap.CellData
 using Gridap.MultiField
+using Gridap.ODEs.ODETools
+using Gridap.ODEs.TransientFETools
 
 import StaticArrays: SVector
 import UnPack: @unpack
-import Gridap.Helpers: @check,@unreachable
-import Gridap.Arrays: Table,evaluate!
-import Gridap.Algebra: allocate_matrix,allocate_vector,solve
-import Gridap.ODEs.ODETools: solve_step!
-import Gridap.ODEs.TransientFETools: ODESolver
+import Gridap.Helpers: @check
+import Gridap.Helpers: @unreachable
+import Gridap.Arrays: evaluate!
+import Gridap.Algebra: allocate_matrix
+import Gridap.Algebra: allocate_vector
+import Gridap.Algebra: solve
 
-export RBInfo,BlockRBInfo,ComputationInfo,get_norm_matrix
-export Snapshots,num_space_dofs,num_time_dofs,num_params
-export NnzArray,NnzVector,NnzMatrix,get_nonzero_val,get_nonzero_idx,get_nrows,recast,compress
-export RBSpace,reduced_basis,get_basis_space,get_basis_time,num_rb_space_ndofs,num_rb_time_ndofs,num_rb_ndofs,space_time_projection
-export RBAffineDecomposition,RBVecAffineDecomposition,RBMatAffineDecomposition,GenericRBAffineDecomposition,TrivialRBAffineDecomposition,RBIntegrationDomain,RBContributionMap,RBVecContributionMap,RBMatContributionMap,get_interpolation_idx,project_space,project_time,project_space_time,get_reduced_cells,collect_reduced_residuals!,collect_reduced_jacobians!,rb_coefficient!,rb_contribution!,zero_rb_contribution
-export RBAlgebraicContribution,RBVecAlgebraicContribution,RBMatAlgebraicContribution,collect_compress_rhs,collect_compress_lhs,collect_compress_rhs_lhs,compress_component,collect_rhs_contributions!,collect_lhs_contributions!,collect_rhs_lhs_contributions!
-export RBResults,rb_solver,post_process,plot_results,compute_relative_error,nearest_neighbor
-export RBBlock,BlockSnapshots,BlockRBSpace,BlockRBAlgebraicContribution,BlockRBVecAlgebraicContribution,BlockRBMatAlgebraicContribution,BlockRBResults,get_blocks,get_nblocks,fe_offsets,rb_offsets,add_space_supremizers,add_time_supremizers
+export RBInfo
+export BlockRBInfo
+export ComputationInfo
+export get_norm_matrix
+export Snapshots
+export num_space_dofs
+export num_time_dofs
+export num_params
+export NnzArray
+export NnzVector
+export NnzMatrix
+export get_nonzero_val
+export get_nonzero_idx
+export get_nrows
+export recast
+export compress
+export RBSpace
+export reduced_basis
+export get_basis_space
+export get_basis_time
+export num_rb_space_ndofs
+export num_rb_time_ndofs
+export num_rb_ndofs
+export space_time_projection
+export RBAffineDecomposition
+export RBVecAffineDecomposition
+export RBMatAffineDecomposition
+export GenericRBAffineDecomposition
+export TrivialRBAffineDecomposition
+export RBIntegrationDomain
+export RBContributionMap
+export RBVecContributionMap
+export RBMatContributionMap
+export get_interpolation_idx
+export project_space
+export project_time
+export project_space_time
+export get_reduced_cells
+export collect_reduced_residuals!
+export collect_reduced_jacobians!
+export rb_coefficient!
+export rb_contribution!
+export zero_rb_contribution
+export RBAlgebraicContribution
+export RBVecAlgebraicContribution
+export RBMatAlgebraicContribution
+export collect_compress_rhs
+export collect_compress_lhs
+export collect_compress_rhs_lhs
+export compress_component
+export collect_rhs_contributions!
+export collect_lhs_contributions!
+export collect_rhs_lhs_contributions!
+export RBResults
+export rb_solver
+export post_process
+export plot_results
+export compute_relative_error
+export nearest_neighbor
+export RBBlock
+export BlockSnapshots
+export BlockRBSpace
+export BlockRBAlgebraicContribution
+export BlockRBVecAlgebraicContribution
+export BlockRBMatAlgebraicContribution
+export BlockRBResults
+export get_blocks
+export get_nblocks
+export fe_offsets
+export rb_offsets
+export add_space_supremizers
+export add_time_supremizers
 
 include("RBInfo.jl")
 include("Snapshots.jl")

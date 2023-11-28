@@ -1,4 +1,4 @@
-function solve_step!(
+function TransientFETools.solve_step!(
   uf::PTArray,
   solver::PThetaMethod,
   op::AffinePODEOperator,

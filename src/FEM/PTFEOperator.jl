@@ -11,11 +11,11 @@ function TransientFETools.get_algebraic_operator(feop::PTFEOperator{T}) where T
   PODEOpFromFEOp{T}(feop)
 end
 
-function allocate_cache(::PTFEOperator)
+function TransientFETools.allocate_cache(::PTFEOperator)
   nothing
 end
 
-function update_cache!(
+function TransientFETools.update_cache!(
   ::Nothing,
   ::PTFEOperator,
   ::Any,
@@ -23,10 +23,9 @@ function update_cache!(
   nothing
 end
 
-get_test(op::PTFEOperator) = op.test
-get_trial(op::PTFEOperator) = op.trials[1]
-get_order(op::PTFEOperator) = op.order
-get_pspace(op::PTFEOperator) = op.pspace
+FESpaces.get_test(op::PTFEOperator) = op.test
+FESpaces.get_trial(op::PTFEOperator) = op.trials[1]
+ReferenceFEs.get_order(op::PTFEOperator) = op.order
 realization(op::PTFEOperator,args...) = realization(op.pspace,args...)
 
 """
@@ -155,7 +154,7 @@ function Base.getindex(op::NonlinearPTFEOperator,row,col)
   end
 end
 
-function allocate_residual(
+function Algebra.allocate_residual(
   op::PTFEOperator,
   μ::P,
   t::T,
@@ -176,7 +175,7 @@ function allocate_residual(
   allocate_vector(dc,op.assem,vecdata1;N=length(uh))
 end
 
-function allocate_jacobian(
+function Algebra.allocate_jacobian(
   op::PTFEOperator,
   μ::P,
   t::T,
@@ -200,7 +199,7 @@ function allocate_jacobian(
   allocate_matrix(dc,op.assem,matdata1;N=length(uh))
 end
 
-function residual!(
+function Algebra.residual!(
   b::PTArray,
   op::PTFEOperator,
   μ::AbstractVector,
@@ -240,7 +239,7 @@ function residual_for_trian!(
   bvec,trian
 end
 
-function jacobian!(
+function Algebra.jacobian!(
   A::PTArray,
   op::PTFEOperator,
   μ::AbstractVector,
@@ -282,7 +281,7 @@ function jacobian_for_trian!(
   Avec,trian
 end
 
-function jacobians!(
+function ODETools.jacobians!(
   A::PTArray,
   op::PTFEOperator,
   μ::AbstractVector,
@@ -297,7 +296,7 @@ function jacobians!(
   A
 end
 
-function fill_jacobians(
+function TransientFETools.fill_jacobians(
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
@@ -316,7 +315,7 @@ function fill_jacobians(
   return _matdata
 end
 
-function _matdata_jacobian(
+function TransientFETools._matdata_jacobian(
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,

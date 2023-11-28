@@ -1,16 +1,16 @@
-function lazy_map(k::Reindex{<:Table},::Type{T},j_to_i::AbstractArray) where T
+function Arrays.lazy_map(k::Reindex{<:Table},::Type{T},j_to_i::AbstractArray) where T
   i_to_v = k.values
   Table(i_to_v[j_to_i])
 end
 
-function lazy_map(k::Reindex{<:CompressedArray},::Type{T},j_to_i::AbstractArray) where T
+function Arrays.lazy_map(k::Reindex{<:CompressedArray},::Type{T},j_to_i::AbstractArray) where T
   i_to_v = k.values
   values = i_to_v.values
   ptrs = i_to_v.ptrs[j_to_i]
   CompressedArray(values,ptrs)
 end
 
-function lazy_map(k::Reindex{<:PTArray},j_to_i::AbstractArray)
+function Arrays.lazy_map(k::Reindex{<:PTArray},j_to_i::AbstractArray)
   map(value -> lazy_map(Reindex(value),j_to_i),k.values)
 end
 
@@ -20,7 +20,7 @@ end
 
 for T in (:AbstractArray,:PTArray)
   @eval begin
-    function lazy_map(
+    function Arrays.lazy_map(
       k::RBIntegrationMap,
       b::$T,
       w::AbstractArray,
@@ -40,8 +40,20 @@ struct ReducedMeasure <: Measure
   cell_to_parent_cell::Vector{Int}
 end
 
-get_triangulation(rmeas::ReducedMeasure) = view(rmeas.meas.quad.trian,rmeas.cell_to_parent_cell)
+FESpaces.get_triangulation(rmeas::ReducedMeasure) = view(rmeas.meas.quad.trian,rmeas.cell_to_parent_cell)
 get_parent_triangulation(rmeas::ReducedMeasure) = rmeas.meas.quad.trian
+
+function Base.:(==)(a::S,b::T;shallow=false) where {S<:Triangulation,T<:Triangulation}
+  false
+end
+
+function Base.:(==)(a::T,b::T;shallow=false) where {T<:Triangulation}
+  if shallow
+    get_node_coordinates(get_grid(a)) == get_node_coordinates(get_grid(b))
+  else
+    a === b
+  end
+end
 
 function ReducedMeasure(rmeas::ReducedMeasure,trians::Triangulation...)
   @unpack meas,cell_to_parent_cell = rmeas
@@ -60,7 +72,7 @@ function ReducedMeasure(rmeas::ReducedMeasure,trians::Triangulation...)
   @unreachable
 end
 
-function integrate(f::CellField,quad::CellQuadrature,cell_to_parent_cell::Vector{Int})
+function Fields.integrate(f::CellField,quad::CellQuadrature,cell_to_parent_cell::Vector{Int})
   trian_f = get_triangulation(f)
   trian_x = get_triangulation(quad)
 
@@ -94,7 +106,7 @@ function integrate(f::CellField,quad::CellQuadrature,cell_to_parent_cell::Vector
   end
 end
 
-function getindex!(cont,a::PTIntegrand,rmeas::ReducedMeasure)
+function Arrays.getindex!(cont,a::PTIntegrand,rmeas::ReducedMeasure)
   @unpack meas,cell_to_parent_cell = rmeas
   ptrian = get_parent_triangulation(rmeas)
   trian = get_triangulation(rmeas)
@@ -109,11 +121,7 @@ function getindex!(cont,a::PTIntegrand,rmeas::ReducedMeasure)
   """
 end
 
-function integrate(a::PTIntegrand)
-  integrate(a.object,a.meas)
-end
-
-function integrate(a::PTIntegrand,meas::ReducedMeasure...)
+function Fields.integrate(a::PTIntegrand,meas::ReducedMeasure...)
   @assert length(meas) == 1
   cont = init_contribution(a)
   for m in meas
@@ -122,7 +130,7 @@ function integrate(a::PTIntegrand,meas::ReducedMeasure...)
   cont
 end
 
-function getindex!(cont,a::CollectionPTIntegrand{N},rmeas::ReducedMeasure) where N
+function Arrays.getindex!(cont,a::CollectionPTIntegrand{N},rmeas::ReducedMeasure) where N
   @unpack meas,cell_to_parent_cell = rmeas
   ptrian = get_parent_triangulation(rmeas)
   trian = get_triangulation(rmeas)
@@ -143,7 +151,7 @@ function getindex!(cont,a::CollectionPTIntegrand{N},rmeas::ReducedMeasure) where
   """
 end
 
-function integrate(a::CollectionPTIntegrand,meas::ReducedMeasure...)
+function Fields.integrate(a::CollectionPTIntegrand,meas::ReducedMeasure...)
   cont = init_contribution(a)
   for m in meas
     getindex!(cont,a,m)

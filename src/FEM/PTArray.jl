@@ -74,7 +74,7 @@ function Base.hvcat(nblocks::Int,a::PTArray...)
   hvarray
 end
 
-function lazy_map(f,a::Union{AbstractArrayBlock,PTArray}...)
+function Arrays.lazy_map(f,a::Union{AbstractArrayBlock,PTArray}...)
   if any(map(x->isa(x,PTArray),a))
     pt_lazy_map(f,a...)
   else
@@ -132,8 +132,7 @@ function Base.materialize!(a::PTArray,b::PTBroadcasted)
   a
 end
 
-function testitem(a::PTArray{T}) where T
-  @notimplementedif !isconcretetype(T)
+function Arrays.testitem(a::PTArray{T}) where T
   if length(a) != 0
     a[1]
   else
@@ -141,7 +140,7 @@ function testitem(a::PTArray{T}) where T
   end
 end
 
-function setsize!(a::PTArray{<:CachedArray},size::Tuple{Vararg{Int}})
+function Arrays.setsize!(a::PTArray{<:CachedArray},size::Tuple{Vararg{Int}})
   @inbounds for i in eachindex(a)
     setsize!(a[i],size)
   end
@@ -155,7 +154,7 @@ function LinearAlgebra.ldiv!(a::PTArray,m::LU,b::PTArray)
   end
 end
 
-function get_array(a::PTArray{<:CachedArray})
+function Arrays.get_array(a::PTArray{<:CachedArray})
   map(x->getproperty(x,:array),a)
 end
 
@@ -309,7 +308,7 @@ function LinearAlgebra.fillstored!(a::NonaffinePTArray,z)
   end
 end
 
-function CachedArray(a::NonaffinePTArray)
+function Arrays.CachedArray(a::NonaffinePTArray)
   ai = testitem(a)
   ci = CachedArray(ai)
   array = Vector{typeof(ci)}(undef,length(a))
@@ -353,7 +352,7 @@ end
 
 for F in (:Map,:Function,:(Fields.BroadcastingFieldOpMap))
   @eval begin
-    function return_value(
+    function Arrays.return_value(
       f::$F,
       a::PTArray,
       x::Vararg{Union{AbstractArrayBlock,PTArray}})
@@ -362,7 +361,7 @@ for F in (:Map,:Function,:(Fields.BroadcastingFieldOpMap))
       return_value(f,ax1...)
     end
 
-    function return_cache(
+    function Arrays.return_cache(
       f::$F,
       a::PTArray,
       x::Vararg{Union{AbstractArrayBlock,PTArray}})
@@ -375,7 +374,7 @@ for F in (:Map,:Function,:(Fields.BroadcastingFieldOpMap))
       cx,array
     end
 
-    function evaluate!(
+    function Arrays.evaluate!(
       cache,
       f::$F,
       a::PTArray,
@@ -389,7 +388,7 @@ for F in (:Map,:Function,:(Fields.BroadcastingFieldOpMap))
       NonaffinePTArray(array)
     end
 
-    function return_value(
+    function Arrays.return_value(
       f::$F,
       a::AbstractArrayBlock,
       x::PTArray)
@@ -398,7 +397,7 @@ for F in (:Map,:Function,:(Fields.BroadcastingFieldOpMap))
       return_value(f,a,x1)
     end
 
-    function return_cache(
+    function Arrays.return_cache(
       f::$F,
       a::AbstractArrayBlock,
       x::PTArray)
@@ -411,7 +410,7 @@ for F in (:Map,:Function,:(Fields.BroadcastingFieldOpMap))
       cx,array
     end
 
-    function evaluate!(
+    function Arrays.evaluate!(
       cache,
       f::$F,
       a::AbstractArrayBlock,
@@ -424,16 +423,16 @@ for F in (:Map,:Function,:(Fields.BroadcastingFieldOpMap))
       end
       NonaffinePTArray(array)
     end
-
-    function pt_lazy_map(f,a::Union{AbstractArrayBlock,PTArray}...)
-      n = _get_length(a...)
-      lazy_arrays = map(1:n) do i
-        ai = get_at_index(i,a)
-        lazy_map(f,ai...)
-      end
-      NonaffinePTArray(lazy_arrays)
-    end
   end
+end
+
+function pt_lazy_map(f,a::Union{AbstractArrayBlock,PTArray}...)
+  n = _get_length(a...)
+  lazy_arrays = map(1:n) do i
+    ai = get_at_index(i,a)
+    lazy_map(f,ai...)
+  end
+  NonaffinePTArray(lazy_arrays)
 end
 
 function recenter(a::PTArray{T},a0::PTArray{T};kwargs...) where T
@@ -516,7 +515,7 @@ function LinearAlgebra.ldiv!(a::AffinePTArray,m::LU,b::AffinePTArray)
   ldiv!(testitem(a),m,testitem(b))
 end
 
-function CachedArray(a::AffinePTArray)
+function Arrays.CachedArray(a::AffinePTArray)
   n = length(a)
   ai = testitem(a)
   ci = CachedArray(ai)
@@ -544,7 +543,7 @@ end
 
 for F in (:Map,:Function,:(Fields.BroadcastingFieldOpMap))
   @eval begin
-    function evaluate!(
+    function Arrays.evaluate!(
       cache,
       f::$F,
       a::AffinePTArray,
@@ -556,7 +555,7 @@ for F in (:Map,:Function,:(Fields.BroadcastingFieldOpMap))
       AffinePTArray(cx.array,length(array))
     end
 
-    function evaluate!(
+    function Arrays.evaluate!(
       cache,
       f::$F,
       a::AbstractArrayBlock,

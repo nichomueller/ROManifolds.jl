@@ -1,4 +1,4 @@
-function numerical_setup(ss::Algebra.LUSymbolicSetup,mat::NonaffinePTArray)
+function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::NonaffinePTArray)
   ns = Vector{LUNumericalSetup}(undef,length(mat))
   @inbounds for k = eachindex(mat)
     ns[k] = numerical_setup(ss,mat[k])
@@ -6,19 +6,19 @@ function numerical_setup(ss::Algebra.LUSymbolicSetup,mat::NonaffinePTArray)
   ns
 end
 
-function numerical_setup(ss::Algebra.LUSymbolicSetup,mat::AffinePTArray)
+function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::AffinePTArray)
   ns = Vector{LUNumericalSetup}(undef,1)
   ns[1] = numerical_setup(ss,mat[1])
   ns
 end
 
-function numerical_setup!(ns,mat::NonaffinePTArray)
+function Algebra.numerical_setup!(ns,mat::NonaffinePTArray)
   @inbounds for k = eachindex(mat)
     ns[k].factors = lu(mat[k])
   end
 end
 
-function numerical_setup!(ns,mat::AffinePTArray)
+function Algebra.numerical_setup!(ns,mat::AffinePTArray)
   ns[1].factors = lu(mat[1])
 end
 
@@ -33,7 +33,7 @@ struct PTAffineOperator <: PTOperator{Affine}
   vector::PTArray
 end
 
-function solve!(x::PTArray,ls::LinearSolver,op::PTAffineOperator,::Nothing)
+function Algebra.solve!(x::PTArray,ls::LinearSolver,op::PTAffineOperator,::Nothing)
   A,b = op.matrix,op.vector
   @assert length(A) == length(b) == length(x)
   ss = symbolic_setup(ls,testitem(A))
@@ -42,7 +42,7 @@ function solve!(x::PTArray,ls::LinearSolver,op::PTAffineOperator,::Nothing)
   ns
 end
 
-function solve!(x::PTArray,::LinearSolver,op::PTAffineOperator,ns)
+function Algebra.solve!(x::PTArray,::LinearSolver,op::PTAffineOperator,ns)
   A,b = op.matrix,op.vector
   numerical_setup!(ns,A)
   _loop_solve!(x,ns,b)
@@ -75,7 +75,7 @@ function Algebra._check_convergence(tol,b::PTArray,m0)
   m .< tol * m0,m
 end
 
-function solve!(
+function Algebra.solve!(
   x::PTArray,
   nls::NewtonRaphsonSolver,
   op::PTOperator,
@@ -93,7 +93,7 @@ function solve!(
   PNewtonRaphsonCache(A,b,dx,ns)
 end
 
-function solve!(
+function Algebra.solve!(
   x::PTArray,
   nls::NewtonRaphsonSolver,
   op::PTOperator,

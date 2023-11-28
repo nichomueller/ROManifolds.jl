@@ -3,11 +3,12 @@ struct UniformSampling <: SamplingStyle end
 struct NormalSampling <: SamplingStyle end
 
 struct PSpace
-  domain::Vector{Vector{Float}}
+  domain::Table
   sampling_style::SamplingStyle
-  function PSpace(d::Vector{Vector{Float}},s::SamplingStyle)
-    new([Float.(di) for di = d],s)
-  end
+end
+
+function PSpace(d::Vector{Vector{Float}},sampling::SamplingStyle=UniformSampling())
+  PSpace(Table(d),sampling)
 end
 
 function realization(d::Vector{<:Number},::UniformSampling)

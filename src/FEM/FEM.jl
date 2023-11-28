@@ -11,47 +11,145 @@ using Gridap.Geometry
 using Gridap.Fields
 using Gridap.CellData
 using Gridap.MultiField
+using Gridap.ODEs.ODETools
 using Gridap.ODEs.TransientFETools
 
-import Base: inv,abs,abs2,*,+,-,/,adjoint,transpose,real,imag,conj
-import LinearAlgebra: det,tr,cross,dot,⋅,rmul!,fillstored!
-import Distributions: Uniform,Normal
-import ForwardDiff : derivative
-import FillArrays: Fill,fill
+import Base: inv
+import Base: abs
+import Base: abs2
+import Base: *
+import Base: +
+import Base: -
+import Base: /
+import Base: adjoint
+import Base: transpose
+import Base: real
+import Base: imag
+import Base: conj
+import LinearAlgebra: det
+import LinearAlgebra: tr
+import LinearAlgebra: cross
+import LinearAlgebra: ⋅
+import LinearAlgebra: fillstored!
+import Distributions: Uniform
+import Distributions: Normal
+import ForwardDiff: derivative
+import FillArrays: Fill
+import FillArrays: fill
 import BlockArrays: blockedrange
-import Statistics: mean
 import UnPack: @unpack
-import GridapGmsh: GmshDiscreteModel
-import Gridap.Helpers: @abstractmethod,@check,@notimplemented,@unreachable
-import Gridap.Arrays: CachedArray,lazy_map,testitem,return_value,return_cache,evaluate!,evaluate,getindex!,setsize!,get_array,create_from_nz
-import Gridap.Algebra: InserterCSC,LUNumericalSetup,solve,solve!,residual!,jacobian!,allocate_jacobian,allocate_residual,allocate_vector,allocate_matrix,numerical_setup,numerical_setup!
-import Grida.Fields: integrate
-import Gridap.CellData: CellField,GenericMeasure,CompositeMeasure,ConstrainRowsMap,ConstrainColsMap,DomainStyle,OperationCellField,gradient,∇∇,add_contribution!,get_contribution,move_contributions,get_data,get_domains,num_domains,change_domains,similar_cell_field,_get_cell_points,_operate_cellfields,_to_common_domain
-import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction,assemble_vector,assemble_matrix,numeric_loop_vector!,numeric_loop_matrix!,collect_cell_vector,collect_cell_matrix,get_cell_dof_values,get_fe_basis,get_trial_fe_basis,get_triangulation,_pair_contribution_when_possible,scatter_free_and_dirichlet_values,gather_dirichlet_values!,zero_free_values,zero_dirichlet_values,compute_dirichlet_values_for_tags!,num_free_dofs,get_free_dof_ids,get_cell_dof_ids,get_cell_isconstrained,get_cell_constraints,get_cell_is_dirichlet,interpolate_everywhere,interpolate_dirichlet,interpolate!
-import Gridap.Geometry: FaceToCellGlue,TriangulationView,GridView,DiscreteModelPortion,_compute_face_to_q_vertex_coords
-import Gridap.MultiField: MultiFieldCellField,MultiFieldFEBasisComponent,MultiFieldStyle,num_fields,restrict_to_field,compute_field_offsets
+import Gridap.Helpers: @abstractmethod
+import Gridap.Helpers: @check
+import Gridap.Helpers: @notimplemented
+import Gridap.Helpers: @unreachable
+import Gridap.Algebra: InserterCSC
+import Gridap.Algebra: LUNumericalSetup
+import Gridap.CellData: CellField
+import Gridap.CellData: GenericMeasure
+import Gridap.CellData: CompositeMeasure
+import Gridap.CellData: DomainStyle
+import Gridap.CellData: OperationCellField
+import Gridap.CellData: _get_cell_points
+import Gridap.CellData: _operate_cellfields
+import Gridap.CellData: _to_common_domain
+import Gridap.FESpaces: FEFunction
+import Gridap.FESpaces: SparseMatrixAssembler
+import Gridap.FESpaces: EvaluationFunction
+import Gridap.FESpaces: _pair_contribution_when_possible
+import Gridap.MultiField: MultiFieldFEBasisComponent
 import Gridap.ReferenceFEs: get_order
-import Gridap.ODEs.ODETools: _allocate_matrix_and_vector,∂t,∂tt
-import Gridap.ODEs.TransientFETools: ODESolver,ODEOperator,OperatorType,TransientCellField,TransientSingleFieldCellField,TransientMultiFieldCellField,TransientFEBasis
-import Gridap.ODEs.TransientFETools: SingleFieldTypes,MultiFieldTypes,Affine,Nonlinear,solve_step!,allocate_trial_space,allocate_cache
-import Gridap.ODEs.TransientFETools: fill_jacobians,fill_initial_jacobians,update_cache!,jacobians!,_matdata_jacobian,_vcat_matdata,_to_transient_single_fields
-import Gridap.TensorValues: inner,outer,double_contraction,symmetric_part
+import Gridap.ODEs.ODETools: _allocate_matrix_and_vector
+import Gridap.ODEs.ODETools: jacobians!
+import Gridap.ODEs.TransientFETools: ODESolver
+import Gridap.ODEs.TransientFETools: ODEOperator
+import Gridap.ODEs.TransientFETools: OperatorType
+import Gridap.ODEs.TransientFETools: TransientCellField
+import Gridap.ODEs.TransientFETools: TransientSingleFieldCellField
+import Gridap.ODEs.TransientFETools: TransientMultiFieldCellField
+import Gridap.ODEs.TransientFETools: TransientFEBasis
+import Gridap.ODEs.TransientFETools: SingleFieldTypes
+import Gridap.ODEs.TransientFETools: MultiFieldTypes
+import Gridap.ODEs.TransientFETools: allocate_trial_space
+import Gridap.ODEs.TransientFETools: fill_jacobians
+import Gridap.ODEs.TransientFETools: _matdata_jacobian
+import Gridap.ODEs.TransientFETools: _vcat_matdata
+import Gridap.ODEs.TransientFETools: _to_transient_single_fields
+import Gridap.TensorValues: inner
+import Gridap.TensorValues: outer
+import Gridap.TensorValues: double_contraction
+import Gridap.TensorValues: symmetric_part
 
-export PSpace,UniformSampling,NormalSampling,realization
-export ∂ₚt,∂ₚtt
-export Nonaffine,PTArray,NonaffinePTArray,AffinePTArray,get_at_offsets,recenter,test_ptarray
-export PTrialFESpace,NonaffinePTrialFESpace,AffinePTrialFESpace,PMultiFieldFESpace
-export AbstractPTFunction,PFunction,PTFunction
-export PTCellField,GenericPTCellField,PTOperationCellField,PTFEFunction,PTSingleFieldFEFunction,PTTransientCellField,PTTransientSingleFieldCellField,PTSingleFieldTypes,PTMultiFieldCellField,PTMultiFieldFEFunction,PTTransientMultiFieldCellField
-export PTDomainContribution,PTIntegrand,∫ₚ,CollectionPTIntegrand
-export PTTrialFESpace,PTMultiFieldTrialFESpace
-export PTFEOperator,PTFEOperatorFromWeakForm,AffinePTFEOperator,NonlinearPTFEOperator,get_residual,get_jacobian,linear_operator,nonlinear_operator,auxiliary_operator,residual_for_trian!,jacobian_for_trian!
-export PODEOperator,AffinePODEOperator,PODEOpFromFEOp
-export PTOperator,get_ptoperator,update_ptoperator
+export Table
+export PSpace
+export UniformSampling
+export NormalSampling
+export realization
+export ∂ₚt
+export ∂ₚtt
+export Nonaffine
+export PTArray
+export NonaffinePTArray
+export AffinePTArray
+export get_at_offsets
+export recenter
+export test_ptarray
+export PTrialFESpace
+export NonaffinePTrialFESpace
+export AffinePTrialFESpace
+export PMultiFieldFESpace
+export field_offsets
+export AbstractPTFunction
+export PFunction
+export PTFunction
+export PTCellField
+export GenericPTCellField
+export PTOperationCellField
+export PTFEFunction
+export PTSingleFieldFEFunction
+export PTTransientCellField
+export PTTransientSingleFieldCellField
+export PTSingleFieldTypes
+export PTMultiFieldCellField
+export PTMultiFieldFEFunction
+export PTTransientMultiFieldCellField
+export PTDomainContribution
+export PTIntegrand
+export ∫ₚ
+export CollectionPTIntegrand
+export PTTrialFESpace
+export PTMultiFieldTrialFESpace
+export PTFEOperator
+export PTFEOperatorFromWeakForm
+export AffinePTFEOperator
+export NonlinearPTFEOperator
+export get_residual
+export get_jacobian
+export linear_operator
+export nonlinear_operator
+export auxiliary_operator
+export residual_for_trian!
+export jacobian_for_trian!
+export PODEOperator
+export AffinePODEOperator
+export PODEOpFromFEOp
+export PTOperator
+export get_ptoperator
+export update_ptoperator
 export _check_convergence
-export PODESolver,PThetaMethod,PODESolution,num_time_dofs,get_times,collect_single_field_solutions,collect_multi_field_solutions,collect_residuals_for_trian,collect_jacobians_for_trian
-export PTThetaAffineMethodOperator,PTThetaMethodOperator
-export get_discrete_model,set_labels!,field_offsets,get_order,get_L2_norm_matrix,get_H1_norm_matrix
+export PODESolver
+export PThetaMethod
+export PODESolution
+export num_time_dofs
+export get_times
+export collect_single_field_solutions
+export collect_multi_field_solutions
+export collect_residuals_for_trian
+export collect_jacobians_for_trian
+export PTThetaAffineMethodOperator
+export PTThetaMethodOperator
+export get_order
+export get_L2_norm_matrix
+export get_H1_norm_matrix
 export ReducedMeasure
 
 include("PSpace.jl")
@@ -70,6 +168,6 @@ include("PTSolvers.jl")
 include("PODEQuantities.jl")
 include("PAffineThetaMethod.jl")
 include("PThetaMethod.jl")
-include("FEOperations.jl")
+include("FEUtils.jl")
 include("ReducedMeasure.jl")
 end # module

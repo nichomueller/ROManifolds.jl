@@ -1,3 +1,8 @@
+name = "Mabla"
+uuid = "5e268b46-e3f2-4507-a9b4-79adf7aa2a7d"
+authors = ["nichomueller <nicholas.mueller@monash.edu>"]
+version = "0.1.0"
+
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 BlockArrays = "8e7c35d0-a365-5155-bbbb-fb81a777f24e"
@@ -15,11 +20,13 @@ MPIClusterManagers = "e7922434-ae4b-11e9-05c5-9780451d2c66"
 MPIPreferences = "3da0fdf6-3ccc-4f1b-acd9-58baa6c99267"
 NearestNeighbors = "b8a86587-4115-5ab1-83bc-aa920d37bbce"
 PartitionedArrays = "5a9dfac6-5c52-46f7-8278-5e2210713be9"
+PkgTemplates = "14b8a8f1-9102-5b29-a752-f990bacb7fe1"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 Serialization = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 SuiteSparse = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"

@@ -28,7 +28,7 @@ Manifest.toml
 .vscode
 
 # Folder where the results are stored
-/tests
+/results
 
 # Folder with deprecated source code
 /src/deprecated
