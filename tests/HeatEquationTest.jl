@@ -112,7 +112,7 @@ j = 2
 ress_j = RB._get_at_matching_trian(ress,trian,_trian[j])
 idx_space_j = RB.get_idx_space(dom[j])
 ress_jt = RB.get_at_time_integration_domain(dom[j],ress_j,icomm)
-setsize!(Mcache,(length(idx_space_j),length(ress_jt)))
+FEM.setsize!(Mcache,(length(idx_space_j),length(ress_jt)))
 M = Mcache.array
 @inbounds for (n,rjt) = enumerate(ress_jt.array)
   M[:,n] = rjt[idx_space_j]
