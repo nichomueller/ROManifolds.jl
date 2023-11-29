@@ -49,16 +49,16 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
 
 ϵ = 1e-4
-load_solutions = false
+load_solutions = true
 save_solutions = true
-load_structures = false
+load_structures = true
 save_structures = true
 postprocess = true
 norm_style = :l2
 nsnaps_state = 50
 nsnaps_mdeim = 20
 nsnaps_test = 10
-st_mdeim = false
+st_mdeim = true
 rbinfo = RBInfo(test_path;ϵ,norm_style,nsnaps_state,nsnaps_mdeim,nsnaps_test,st_mdeim)
 
 # Offline phase
@@ -90,3 +90,40 @@ if postprocess
   save(rbinfo,results)
 end
 end
+
+nsnaps_test = rbinfo.nsnaps_test
+snaps_test,params_test = sols[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
+op = get_ptoperator(fesolver,feop,snaps_test,params_test)
+(rhs_cache,lhs_cache),(_,lhs) = Gridap.ODEs.TransientFETools.allocate_cache(op,rbspace)
+mdeim_cache,rb_cache = rhs_cache
+collect_cache,coeff_cache = mdeim_cache
+b,Mcache = collect_cache
+ad = rbrhs.affine_decompositions
+dom = RB.get_integration_domain.(ad)
+meas = RB.get_measure.(dom)
+_trian = get_triangulation.(meas)
+ntrian = length(_trian)
+nparams = length(op.μ)
+icomm = RB.common_time_integration_domain(dom)
+opt = RB.get_at_time_integration_domain(dom,op)
+bt = RB.get_at_time_integration_domain(dom,b,nparams)
+ress,trian = residual_for_trian!(bt,opt,op.u0,meas...)
+j = 2
+ress_j = RB._get_at_matching_trian(ress,trian,_trian[j])
+idx_space_j = RB.get_idx_space(dom[j])
+ress_jt = RB.get_at_time_integration_domain(dom[j],ress_j,icomm)
+setsize!(Mcache,(length(idx_space_j),length(ress_jt)))
+M = Mcache.array
+@inbounds for (n,rjt) = enumerate(ress_jt.array)
+  M[:,n] = rjt[idx_space_j]
+end
+
+resok,trianok = residual_for_trian!(b,op,op.u0)
+Mok = hcat([resok[j][n][idx_space_j] for n in eachindex(resok[j])]...)
+
+time_ndofs = 60
+nparams = 10
+idx_time_j = RB.get_idx_time(dom[j])
+ptidx = vec(transpose(collect(0:nparams-1)*time_ndofs .+ idx_time_j'))
+
+@assert M ≈ Mok[:,ptidx]

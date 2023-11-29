@@ -29,7 +29,7 @@ import Base: conj
 import LinearAlgebra: det
 import LinearAlgebra: tr
 import LinearAlgebra: cross
-import LinearAlgebra: ⋅
+import LinearAlgebra: dot
 import LinearAlgebra: fillstored!
 import Distributions: Uniform
 import Distributions: Normal
@@ -101,6 +101,7 @@ export PTrialFESpace
 export NonaffinePTrialFESpace
 export AffinePTrialFESpace
 export PMultiFieldFESpace
+export split_fields
 export field_offsets
 export AbstractPTFunction
 export PFunction
@@ -121,6 +122,7 @@ export PTIntegrand
 export ∫ₚ
 export CollectionPTIntegrand
 export PTTrialFESpace
+export PTMultiFieldFESpace
 export PTMultiFieldTrialFESpace
 export PTFEOperator
 export PTFEOperatorFromWeakForm
@@ -145,8 +147,6 @@ export PThetaMethod
 export PODESolution
 export num_time_dofs
 export get_times
-export collect_residuals_for_trian
-export collect_jacobians_for_trian
 export PTThetaAffineMethodOperator
 export PTThetaMethodOperator
 export get_order

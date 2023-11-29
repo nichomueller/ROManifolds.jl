@@ -93,32 +93,36 @@ function Base.getindex(rbinfo::BlockRBInfo,i::Int)
     rbinfo.nsnaps_state,rbinfo.nsnaps_mdeim,rbinfo.nsnaps_test,rbinfo.st_mdeim)
 end
 
-function Utils.save(rbinfo,objs::Tuple,args...;kwargs...)
-  map(obj->save(rbinfo,obj,args...;kwargs...),objs)
-end
+for Ti in (:RBInfo,:BlockRBInfo)
+  @eval begin
+    function Utils.save(rbinfo::$Ti,objs::Tuple,args...;kwargs...)
+      map(obj->save(rbinfo,obj,args...;kwargs...),objs)
+    end
 
-function Utils.load(rbinfo,types::Tuple,args...;kwargs...)
-  map(type->load(rbinfo,type,args...;kwargs...),types)
-end
+    function Utils.load(rbinfo::$Ti,types::Tuple,args...;kwargs...)
+      map(type->load(rbinfo,type,args...;kwargs...),types)
+    end
 
-function Utils.save(rbinfo,params::Table)
-  path = joinpath(rbinfo.fe_path,"params")
-  save(path,params)
-end
+    function Utils.save(rbinfo::$Ti,params::Table)
+      path = joinpath(rbinfo.fe_path,"params")
+      save(path,params)
+    end
 
-function Utils.load(rbinfo,T::Type{Table})
-  path = joinpath(rbinfo.fe_path,"params")
-  load(path,T)
-end
+    function Utils.load(rbinfo::$Ti,T::Type{Table})
+      path = joinpath(rbinfo.fe_path,"params")
+      load(path,T)
+    end
 
-function Utils.save(rbinfo,norm_matrix::SparseMatrixCSC{T,Int};norm_style=:l2) where T
-  path = joinpath(rbinfo.fe_path,"$(norm_style)_norm_matrix")
-  save(path,norm_matrix)
-end
+    function Utils.save(rbinfo::$Ti,norm_matrix::SparseMatrixCSC{T,Int};norm_style=:l2) where T
+      path = joinpath(rbinfo.fe_path,"$(norm_style)_norm_matrix")
+      save(path,norm_matrix)
+    end
 
-function Utils.load(rbinfo,T::Type{SparseMatrixCSC{S,Int}};norm_style=:l2) where S
-  path = joinpath(rbinfo.fe_path,"$(norm_style)_norm_matrix")
-  load(path,T)
+    function Utils.load(rbinfo::$Ti,T::Type{SparseMatrixCSC{S,Int}};norm_style=:l2) where S
+      path = joinpath(rbinfo.fe_path,"$(norm_style)_norm_matrix")
+      load(path,T)
+    end
+  end
 end
 
 struct ComputationInfo
@@ -134,12 +138,16 @@ end
 get_avg_time(cinfo::ComputationInfo) = cinfo.avg_time
 get_avg_nallocs(cinfo::ComputationInfo) = cinfo.avg_nallocs
 
-function Utils.save(rbinfo,cinfo::ComputationInfo)
-  path = joinpath(rbinfo.fe_path,"stats")
-  save(path,cinfo)
-end
+for Ti in (:RBInfo,:BlockRBInfo)
+  @eval begin
+    function Utils.save(rbinfo::$Ti,cinfo::ComputationInfo)
+      path = joinpath(rbinfo.fe_path,"stats")
+      save(path,cinfo)
+    end
 
-function Utils.load(rbinfo,T::Type{ComputationInfo})
-  path = joinpath(rbinfo.fe_path,"stats")
-  load(path,T)
+    function Utils.load(rbinfo::$Ti,T::Type{ComputationInfo})
+      path = joinpath(rbinfo.fe_path,"stats")
+      load(path,T)
+    end
+  end
 end

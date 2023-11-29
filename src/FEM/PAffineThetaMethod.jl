@@ -57,13 +57,12 @@ function residual_for_trian!(
   b::PTArray,
   op::PTThetaAffineMethodOperator,
   ::PTArray,
-  t=op.tθ,
   args...)
 
   vθ = op.vθ
   z = zero(eltype(b))
   fill!(b,z)
-  residual_for_trian!(b,op.odeop,op.μ,t,(vθ,vθ),op.ode_cache,args...)
+  residual_for_trian!(b,op.odeop,op.μ,op.tθ,(vθ,vθ),op.ode_cache,args...)
 end
 
 function jacobian_for_trian!(
@@ -71,13 +70,12 @@ function jacobian_for_trian!(
   op::PTThetaAffineMethodOperator,
   ::PTArray,
   i::Int,
-  t=op.tθ,
   args...)
 
   vθ = op.vθ
   z = zero(eltype(A))
   fillstored!(A,z)
-  jacobian_for_trian!(A,op.odeop,op.μ,t,(vθ,vθ),i,(1.0,1/op.dtθ)[i],op.ode_cache,args...)
+  jacobian_for_trian!(A,op.odeop,op.μ,op.tθ,(vθ,vθ),i,(1.0,1/op.dtθ)[i],op.ode_cache,args...)
 end
 
 # SHORTCUTS

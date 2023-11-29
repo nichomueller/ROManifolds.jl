@@ -7,7 +7,7 @@ isaffine(::AbstractArrayBlock) = true
 # Abstract implementation
 abstract type PTArray{T} end
 
-get_array(a::PTArray) = a.array
+Arrays.get_array(a::PTArray) = a.array
 Base.size(a::PTArray,i...) = size(testitem(a),i...)
 Base.eltype(::Type{PTArray{T}}) where T = eltype(T)
 Base.eltype(::PTArray{T}) where T = eltype(T)

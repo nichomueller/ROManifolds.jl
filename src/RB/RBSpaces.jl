@@ -119,7 +119,7 @@ function project_recast(mat::AbstractMatrix,rb::RBSpace)
   recast(rb_proj,rb)
 end
 
-function get_ptoperator(
+function FEM.get_ptoperator(
   fesolver::PThetaMethod,
   feop::PTFEOperator,
   rbspace::RBSpace{T},

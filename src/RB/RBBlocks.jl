@@ -1,5 +1,6 @@
 abstract type RBBlock{T,N} end
 
+Base.length(b::RBBlock) = length(b.blocks)
 Base.eltype(::RBBlock{T,N} where N) where T = T
 Base.ndims(::RBBlock{T,N} where T) where N = N
 Base.getindex(b::RBBlock,i::Int...) = b.blocks[i...]
@@ -9,7 +10,6 @@ Base.axes(b::RBBlock,i::Int...) = axes(b.blocks,i...)
 Base.lastindex(b::RBBlock) = lastindex(testitem(b))
 Arrays.testitem(b::RBBlock) = testitem(b.blocks)
 get_blocks(b) = b.blocks
-get_nblocks(b) = length(b.blocks)
 
 struct BlockSnapshots{T} <: RBBlock{T,1}
   blocks::Vector{Snapshots{T}}
@@ -26,7 +26,7 @@ function BlockSnapshots(v::Vector{Vector{NonaffinePTArray{T}}}) where T
 end
 
 function Base.getindex(s::BlockSnapshots,idx::UnitRange{Int})
-  nblocks = get_nblocks(s)
+  nblocks = length(s)
   blocks = map(1:nblocks) do row
     srow = s[row]
     srow[idx]
@@ -35,7 +35,7 @@ function Base.getindex(s::BlockSnapshots,idx::UnitRange{Int})
 end
 
 function Utils.recenter(s::BlockSnapshots,uh0::PTFEFunction;kwargs...)
-  nblocks = get_nblocks(s)
+  nblocks = length(s)
   sθ = map(1:nblocks) do row
     recenter(s[row],uh0[row];kwargs...)
   end
@@ -86,7 +86,7 @@ function BlockRBSpace(bases_space::Vector{Matrix{T}},bases_time::Vector{Matrix{T
 end
 
 function fe_offsets(rb::BlockRBSpace)
-  nblocks = get_nblocks(rb)
+  nblocks = length(rb)
   offsets = zeros(Int,nblocks+1)
   @inbounds for block = 1:nblocks
     offsets[block+1] = offsets[block] + size(get_basis_space(rb[block]),1)
@@ -95,7 +95,7 @@ function fe_offsets(rb::BlockRBSpace)
 end
 
 function rb_offsets(rb::BlockRBSpace)
-  nblocks = get_nblocks(rb)
+  nblocks = length(rb)
   offsets = zeros(Int,nblocks+1)
   @inbounds for block = 1:nblocks
     offsets[block+1] = offsets[block] + num_rb_ndofs(rb[block])
@@ -114,7 +114,7 @@ function Utils.load(rbinfo::BlockRBInfo,T::Type{BlockRBSpace{S}}) where S
 end
 
 function num_rb_ndofs(rb::BlockRBSpace)
-  nblocks = get_nblocks(rb)
+  nblocks = length(rb)
   ndofs = 0
   @inbounds for i = 1:nblocks
     ndofs += num_rb_ndofs(rb[i])
@@ -123,7 +123,7 @@ function num_rb_ndofs(rb::BlockRBSpace)
 end
 
 function recast(x::PTArray,rb::BlockRBSpace)
-  nblocks = get_nblocks(rb)
+  nblocks = length(rb)
   offsets = rb_offsets(rb)
   blocks = map(1:nblocks) do row
     rb_row = rb[row]
@@ -134,7 +134,7 @@ function recast(x::PTArray,rb::BlockRBSpace)
 end
 
 function space_time_projection(x::PTArray,rb::BlockRBSpace)
-  nblocks = get_nblocks(rb)
+  nblocks = length(rb)
   offsets = fe_offsets(rb)
   blocks = map(1:nblocks) do row
     rb_row = rb[row]
@@ -149,7 +149,7 @@ function reduced_basis(
   feop::PTFEOperator,
   snaps::BlockSnapshots)
 
-  nblocks = get_nblocks(snaps)
+  nblocks = length(snaps)
   blocks = map(1:nblocks) do col
     rbinfo_col = rbinfo[col]
     feop_col = feop[col,col]
@@ -245,14 +245,14 @@ function add_time_supremizers(basis_u::Matrix,basis_p::Matrix;ttol=1e-2)
   basis_u
 end
 
-function get_ptoperator(
+function FEM.get_ptoperator(
   fesolver::PODESolver,
   feop::PTFEOperator,
   rbspace::BlockRBSpace{T},
   params::Table;
   kwargs...) where T
 
-  nblocks = get_nblocks(rbspace)
+  nblocks = length(rbspace)
   space_ndofs = fe_offsets(rbspace)
   rb_space_ndofs = map(num_rb_space_ndofs,rbspace.blocks)
   basis_space = zeros(T,last(space_ndofs),maximum(rb_space_ndofs))
@@ -276,13 +276,13 @@ struct BlockRBMatAlgebraicContribution{T} <: BlockRBAlgebraicContribution{T,2}
   touched::Matrix{Bool}
 end
 
-get_nblocks(a::BlockRBMatAlgebraicContribution) = size(a.blocks,2)
+Base.length(a::BlockRBMatAlgebraicContribution) = size(a.blocks,2)
 
 function save_algebraic_contrib(path::String,a::BlockRBVecAlgebraicContribution)
   create_dir(path)
   tpath = joinpath(path,"touched")
   save(tpath,a.touched)
-  for row in 1:get_nblocks(a)
+  for row in 1:length(a)
     if a.touched[row]
       rpath = joinpath(path,"block_$row")
       save_algebraic_contrib(rpath,a.blocks[row])
@@ -294,7 +294,7 @@ function save_algebraic_contrib(path::String,a::BlockRBMatAlgebraicContribution)
   create_dir(path)
   tpath = joinpath(path,"touched")
   save(tpath,a.touched)
-  for (row,col) in index_pairs(get_nblocks(a),get_nblocks(a))
+  for (row,col) in index_pairs(length(a),length(a))
     if a.touched[row,col]
       adpath = joinpath(path,"block_$(row)_$(col)")
       save_algebraic_contrib(adpath,a.blocks[row,col])
@@ -412,7 +412,7 @@ function collect_compress_rhs(
   op::PTOperator,
   rbspace::BlockRBSpace{T}) where T
 
-  nblocks = get_nblocks(rbspace)
+  nblocks = length(rbspace)
   blocks = Vector{RBVecAlgebraicContribution{T}}(undef,nblocks)
   touched = Vector{Bool}(undef,nblocks)
   for row = 1:nblocks
@@ -434,7 +434,7 @@ function collect_compress_lhs(
   rbspace::BlockRBSpace{T};
   θ::Real=1) where T
 
-  nblocks = get_nblocks(rbspace)
+  nblocks = length(rbspace)
   njacs = length(op.odeop.feop.jacs)
   ad_jacs = Vector{BlockRBMatAlgebraicContribution{T}}(undef,njacs)
   for i = 1:njacs
@@ -503,7 +503,7 @@ function collect_rhs_contributions!(
   rbres::BlockRBVecAlgebraicContribution{T},
   rbspace::BlockRBSpace{T}) where T
 
-  nblocks = get_nblocks(rbres)
+  nblocks = length(rbres)
   blocks = Vector{PTArray{Vector{T}}}(undef,nblocks)
   for row = 1:nblocks
     cache_row = cache_at_index(cache,rbspace,row)
@@ -529,7 +529,7 @@ function collect_lhs_contributions!(
   rbspace::BlockRBSpace{T}) where T
 
   njacs = length(rbjacs)
-  nblocks = get_nblocks(testitem(rbjacs))
+  nblocks = length(testitem(rbjacs))
   rb_jacs_contribs = Vector{PTArray{Matrix{T}}}(undef,njacs)
   for i = 1:njacs
     rb_jac_i = rbjacs[i]

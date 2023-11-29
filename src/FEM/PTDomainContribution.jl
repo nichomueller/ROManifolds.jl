@@ -274,7 +274,7 @@ CellData.integrate(::Any,::Nothing) = nothing
 
 PTIntegrand(::Nothing,::Measure) = nothing
 
-for T in (:DomainContribution,:PTDomainContribution,:PTIntegrand,:CollectionPTIntegrand)
+for T in (:(CellData.DomainContribution),:PTDomainContribution,:PTIntegrand,:CollectionPTIntegrand)
   @eval begin
     (+)(::Nothing,b::$T) = b
     (+)(a::$T,::Nothing) = a

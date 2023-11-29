@@ -43,6 +43,7 @@ export PTrialFESpace
 export NonaffinePTrialFESpace
 export AffinePTrialFESpace
 export PMultiFieldFESpace
+export split_fields
 export field_offsets
 export AbstractPTFunction
 export PFunction
@@ -63,6 +64,7 @@ export PTIntegrand
 export ∫ₚ
 export CollectionPTIntegrand
 export PTTrialFESpace
+export PTMultiFieldFESpace
 export PTMultiFieldTrialFESpace
 export PTFEOperator
 export PTFEOperatorFromWeakForm
@@ -167,7 +169,6 @@ export BlockRBVecAlgebraicContribution
 export BlockRBMatAlgebraicContribution
 export BlockRBResults
 export get_blocks
-export get_nblocks
 export fe_offsets
 export rb_offsets
 export add_space_supremizers

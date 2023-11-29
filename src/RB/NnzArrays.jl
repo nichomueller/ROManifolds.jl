@@ -155,7 +155,7 @@ function compress(nzm::NnzMatrix,args...;kwargs...)
   basis_space,basis_time
 end
 
-function tpod(nzm::NnzMatrix{T,A} where T,args...;ϵ=1e-4,kwargs...) where A
+function Utils.tpod(nzm::NnzMatrix{T,A} where T,args...;ϵ=1e-4,kwargs...) where A
   nonzero_val = tpod(nzm.nonzero_val,args...;ϵ)
   NnzMatrix{A}(nonzero_val,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
 end
@@ -164,4 +164,23 @@ function Utils.change_mode(nzm::NnzMatrix{T}) where T
   nparams = num_params(nzm)
   mode2 = change_mode(nzm.nonzero_val,nparams)
   return mode2
+end
+
+function collect_residuals_for_trian(op::PTOperator)
+  b = allocate_residual(op,op.u0)
+  ress,trian = residual_for_trian!(b,op,op.u0)
+  nzm = map(ress) do res
+    NnzMatrix(res;nparams=length(op.μ))
+  end
+  return nzm,trian
+end
+
+function collect_jacobians_for_trian(op::PTOperator;i=1)
+  A = allocate_jacobian(op,op.u0,i)
+  jacs_i,trian = jacobian_for_trian!(A,op,op.u0,i)
+  nzm_i = map(jacs_i) do jac_i
+    nzv_i = map(NnzVector,jac_i)
+    NnzMatrix(nzv_i;nparams=length(op.μ))
+  end
+  return nzm_i,trian
 end

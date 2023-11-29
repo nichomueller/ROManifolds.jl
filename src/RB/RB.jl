@@ -43,6 +43,8 @@ export get_nonzero_idx
 export get_nrows
 export recast
 export compress
+export collect_residuals_for_trian
+export collect_jacobians_for_trian
 export RBSpace
 export reduced_basis
 export get_basis_space
@@ -94,7 +96,6 @@ export BlockRBVecAlgebraicContribution
 export BlockRBMatAlgebraicContribution
 export BlockRBResults
 export get_blocks
-export get_nblocks
 export fe_offsets
 export rb_offsets
 export add_space_supremizers

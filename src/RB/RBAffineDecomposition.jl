@@ -1,12 +1,76 @@
 struct RBIntegrationDomain
   meas::ReducedMeasure
   times::Vector{<:Real}
-  idx::Vector{Int}
+  idx_space::Vector{Int}
+  idx_time::Vector{Int}
 end
 
 get_measure(i::RBIntegrationDomain) = i.meas
 FEM.get_times(i::RBIntegrationDomain) = i.times
-get_idx_space(i::RBIntegrationDomain) = i.idx
+get_idx_space(i::RBIntegrationDomain) = i.idx_space
+get_idx_time(i::RBIntegrationDomain) = i.idx_time
+
+function common_time_integration_domain(i::Vector{RBIntegrationDomain})
+  red_idx_time = map(get_idx_time,i)
+  return union(red_idx_time...)
+end
+
+function get_at_time_integration_domain(
+  i::Vector{RBIntegrationDomain},
+  afull::NonaffinePTArray,
+  nparams::Int)
+
+  idx_time = common_time_integration_domain(i)
+  time_ndofs = Int(length(afull)/nparams)
+  ptidx = vec(transpose(collect(0:nparams-1)*time_ndofs .+ idx_time'))
+  acomm = NonaffinePTArray(afull[ptidx])
+  return acomm
+end
+
+function get_at_time_integration_domain(
+  i::RBIntegrationDomain,
+  acomm::NonaffinePTArray,
+  icomm::Vector{Int})
+
+  idx_time = get_idx_time(i)
+  time_ndofs = length(icomm)
+  nparams = Int(length(acomm)/time_ndofs)
+  ptidx = Int[]
+  for i = eachindex(icomm)
+    if icomm[i] ∈ idx_time
+      for j = 1:nparams
+        @inbounds push!(ptidx,(i-1)*nparams+j)
+      end
+    end
+  end
+  acomm = NonaffinePTArray(acomm[ptidx])
+  return acomm
+end
+
+function get_at_time_integration_domain(
+  i::Vector{RBIntegrationDomain},
+  op::PTOperator)
+
+  nparams = length(op.μ)
+  time_ndofs = length(op.tθ)
+  idx_time = common_time_integration_domain(i)
+  if length(idx_time) == time_ndofs
+    return op
+  end
+  red_times = op.tθ[idx_time]
+  ptidx = vec(transpose(collect(0:nparams-1)*time_ndofs .+ idx_time'))
+  u0_idx = NonaffinePTArray(op.u0[ptidx])
+  _Us,Uts,fecache = op.ode_cache
+  Us = ()
+  for j in eachindex(_Us)
+    spacei = _Us[j].space
+    dvi = NonaffinePTArray(_Us[j].dirichlet_values[ptidx])
+    Us = (Us...,NonaffinePTrialFESpace(dvi,spacei))
+  end
+  ode_cache_idx = Us,Uts,fecache
+  vθ_idx = NonaffinePTArray(op.vθ[ptidx])
+  get_ptoperator(op.odeop,op.μ,red_times,op.dtθ,u0_idx,ode_cache_idx,vθ_idx)
+end
 
 abstract type RBAffineDecomposition{T,N} end
 const RBVecAffineDecomposition{T} = RBAffineDecomposition{T,1}
@@ -43,9 +107,10 @@ function ReducedMeasure(a::GenericRBAffineDecomposition,trians::Triangulation...
   dom = get_integration_domain(a)
   meas = get_measure(dom)
   times = get_times(dom)
-  idx = get_idx_space(dom)
+  idx_space = get_idx_space(dom)
+  idx_time = get_idx_time(dom)
   new_meas = ReducedMeasure(meas,trians...)
-  new_dom = RBIntegrationDomain(new_meas,times,idx)
+  new_dom = RBIntegrationDomain(new_meas,times,idx_space,idx_time)
   return GenericRBAffineDecomposition(a.basis_space,a.basis_time,a.mdeim_interpolation,new_dom)
 end
 
@@ -87,7 +152,7 @@ function RBAffineDecomposition(
   recast_interp_idx_rows,_ = vec_to_mat_idx(recast_interp_idx_space,nzm.nrows)
   red_integr_cells = get_reduced_cells(recast_interp_idx_rows,cell_dof_ids)
   red_meas = ReducedMeasure(meas,red_integr_cells)
-  integr_domain = RBIntegrationDomain(red_meas,red_times,recast_interp_idx_space)
+  integr_domain = RBIntegrationDomain(red_meas,red_times,recast_interp_idx_space,interp_idx_time)
   GenericRBAffineDecomposition(proj_bs,proj_bt,lu_interp,integr_domain)
 end
 
@@ -224,20 +289,20 @@ function _collect_reduced_residuals!(
   meas = get_measure.(dom)
   _trian = get_triangulation.(meas)
   ntrian = length(_trian)
-  times = get_times.(dom)
-  common_time = union(times...)
-  x = _get_quantity_at_time(op.u0,op.tθ,common_time)
-  bt = _get_quantity_at_time(b,op.tθ,common_time)
-  ress,trian = residual_for_trian!(bt,op,x,common_time,meas...)
+  nparams = length(op.μ)
+  icomm = common_time_integration_domain(dom)
+  opt = get_at_time_integration_domain(dom,op)
+  bt = get_at_time_integration_domain(dom,b,nparams)
+  ress,trian = residual_for_trian!(bt,opt,op.u0,meas...)
   Mvec = Vector{Matrix{T}}(undef,ntrian)
   for j in 1:ntrian
     ress_j = _get_at_matching_trian(ress,trian,_trian[j])
-    idx_j = get_idx_space(dom[j])
-    pt_idx_j = _get_pt_index(ress_j,common_time,times[j])
-    setsize!(Mcache,(length(idx_j),length(pt_idx_j)))
+    idx_space_j = get_idx_space(dom[j])
+    ress_jt = get_at_time_integration_domain(dom[j],ress_j,icomm)
+    setsize!(Mcache,(length(idx_space_j),length(ress_jt)))
     M = Mcache.array
-    @inbounds for n = pt_idx_j
-      M[:,n] = ress_j[n][idx_j]
+    @inbounds for (n,rjt) = enumerate(ress_jt.array)
+      M[:,n] = rjt[idx_space_j]
     end
     Mvec[j] = copy(M)
   end
@@ -274,43 +339,32 @@ function _collect_reduced_jacobians!(
   meas = get_measure.(dom)
   _trian = get_triangulation.(meas)
   ntrian = length(_trian)
-  times = get_times.(dom)
-  common_time = union(times...)
-  x = _get_quantity_at_time(op.u0,op.tθ,common_time)
-  At = _get_quantity_at_time(A,op.tθ,common_time)
-  jacs_i,trian = jacobian_for_trian!(At,op,x,i,common_time,meas...)
-  ntrian = length(trian)
+  nparams = length(op.μ)
+  icomm = common_time_integration_domain(dom)
+  opt = get_at_time_integration_domain(dom,op)
+  At = get_at_time_integration_domain(dom,A,nparams)
+  jacs_i,trian = jacobian_for_trian!(At,opt,opt.u0,i,meas...)
   Mvec = Vector{Matrix{T}}(undef,ntrian)
   for j in 1:ntrian
     jacs_i_j = _get_at_matching_trian(jacs_i,trian,_trian[j])
-    idx_j = get_idx_space(dom[j])
-    pt_idx_j = _get_pt_index(jacs_i_j,common_time,times[j])
-    setsize!(Mcache,(length(idx_j),length(pt_idx_j)))
+    idx_space_j = get_idx_space(dom[j])
+    jacs_i_jt = get_at_time_integration_domain(dom[j],jacs_i_j,icomm)
+    setsize!(Mcache,(length(idx_space_j),length(jacs_i_jt)))
     M = Mcache.array
-    @inbounds for n = pt_idx_j
-      M[:,n] = jacs_i_j[n][idx_j].nzval
+    @inbounds for (n,jjt) = enumerate(jacs_i_jt.array)
+      M[:,n] = jjt[idx_space_j].nzval
     end
     Mvec[j] = copy(M)
   end
   return Mvec
 end
 
-function _get_pt_index(a::PTArray,times::Vector{<:Real},red_times::Vector{<:Real})
-  if times == red_times
-    return collect(eachindex(a))
-  end
+function _get_pt_index(times::Vector{<:Real},idx_time::Vector{Int};nparams=1)
   time_ndofs = length(times)
-  nparams = Int(length(a)/time_ndofs)
-  tidx = findall(x->x in red_times,times)
-  ptidx = vec(transpose(collect(0:nparams-1)*time_ndofs .+ tidx'))
-  return ptidx
-end
-
-function _get_quantity_at_time(a::PTArray,times::Vector{<:Real},red_times::Vector{<:Real})
-  if times == red_times
-    return a
+  if length(idx_time) == time_ndofs
+    return collect(1:time_ndofs)
   end
-  return a[_get_pt_index(a,times,red_times)]
+  return vec(transpose(collect(0:nparams-1)*time_ndofs .+ idx_time'))
 end
 
 function rb_coefficient!(cache,a::GenericRBAffineDecomposition,b::Matrix;st_mdeim=false)
