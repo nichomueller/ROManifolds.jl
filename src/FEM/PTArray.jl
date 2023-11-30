@@ -74,16 +74,16 @@ function Base.hvcat(nblocks::Int,a::PTArray...)
   hvarray
 end
 
-function Arrays.lazy_map(f,a::Union{AbstractArrayBlock,PTArray}...)
-  if any(map(x->isa(x,PTArray),a))
-    pt_lazy_map(f,a...)
-  else
-    @assert all(map(x->isa(x,AbstractArray),a))
-    ai = map(testitem,a)
-    T = return_type(f,ai...)
-    lazy_map(f,T,ai...)
-  end
-end
+# function Arrays.lazy_map(f,a::Union{AbstractArrayBlock,PTArray}...)
+#   if any(map(x->isa(x,PTArray),a))
+#     pt_lazy_map(f,a...)
+#   else
+#     @assert all(map(x->isa(x,AbstractArray),a))
+#     ai = map(testitem,a)
+#     T = return_type(f,ai...)
+#     lazy_map(f,T,ai...)
+#   end
+# end
 
 struct PTBroadcasted{T}
   array::PTArray{T}
@@ -426,14 +426,14 @@ for F in (:Map,:Function,:(Fields.BroadcastingFieldOpMap))
   end
 end
 
-function pt_lazy_map(f,a::Union{AbstractArrayBlock,PTArray}...)
-  n = _get_length(a...)
-  lazy_arrays = map(1:n) do i
-    ai = get_at_index(i,a)
-    lazy_map(f,ai...)
-  end
-  NonaffinePTArray(lazy_arrays)
-end
+# function pt_lazy_map(f,a::Union{AbstractArrayBlock,PTArray}...)
+#   n = _get_length(a...)
+#   lazy_arrays = map(1:n) do i
+#     ai = get_at_index(i,a)
+#     lazy_map(f,ai...)
+#   end
+#   NonaffinePTArray(lazy_arrays)
+# end
 
 function Utils.recenter(a::PTArray{T},a0::PTArray{T};kwargs...) where T
   n = length(a)
@@ -567,11 +567,11 @@ for F in (:Map,:Function,:(Fields.BroadcastingFieldOpMap))
       AffinePTArray(cx.array,length(array))
     end
 
-    function pt_lazy_map(f::$F,a::Union{AbstractArrayBlock,AffinePTArray}...)
-      n = _get_length(a...)
-      a1 = get_at_index(1,a)
-      AffinePTArray(lazy_map(f,a1...),n)
-    end
+    # function pt_lazy_map(f::$F,a::Union{AbstractArrayBlock,AffinePTArray}...)
+    #   n = _get_length(a...)
+    #   a1 = get_at_index(1,a)
+    #   AffinePTArray(lazy_map(f,a1...),n)
+    # end
   end
 end
 

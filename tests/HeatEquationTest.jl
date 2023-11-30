@@ -51,7 +51,7 @@ fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
 ϵ = 1e-4
 load_solutions = true
 save_solutions = true
-load_structures = false
+load_structures = true
 save_structures = true
 postprocess = true
 norm_style = :H1
@@ -90,50 +90,3 @@ if postprocess
   save(rbinfo,results)
 end
 end
-
-nsnaps_test = rbinfo.nsnaps_test
-snaps_test,params_test = sols[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
-op = get_ptoperator(fesolver,feop,snaps_test,params_test)
-
-# l2
-rbinfo = RBInfo(test_path;ϵ,norm_style=:l2,nsnaps_state,nsnaps_mdeim,nsnaps_test,st_mdeim)
-rbspace = reduced_basis(rbinfo,feop,sols)
-rbrhs,rblhs = collect_compress_rhs_lhs(rbinfo,feop,fesolver,rbspace,params)
-cache,(_,lhs) = Gridap.ODEs.TransientFETools.allocate_cache(op,rbspace)
-stats = @timed begin
-  rhs,(_lhs,_lhs_t) = collect_rhs_lhs_contributions!(cache,rbinfo,op,rbrhs,rblhs,rbspace)
-  @. lhs = _lhs+_lhs_t
-  rb_snaps_test = Mabla.RB.rb_solve(fesolver.nls,rhs,lhs)
-end
-approx_snaps_test = recast(rb_snaps_test,rbspace)
-sol_approx = Mabla.RB.space_time_matrices(approx_snaps_test;nparams=nsnaps_test)
-k = 60
-norm(sol_approx[1][:,k] - snaps_test[k])
-norm(snaps_test[k])
-
-# H1
-_rbinfo = RBInfo(test_path;ϵ,norm_style=:H1,nsnaps_state,nsnaps_mdeim,nsnaps_test,st_mdeim)
-_rbspace = reduced_basis(_rbinfo,feop,sols)
-_rbrhs,_rblhs = collect_compress_rhs_lhs(_rbinfo,feop,fesolver,_rbspace,params)
-cache,(_,_lhs) = Gridap.ODEs.TransientFETools.allocate_cache(op,_rbspace)
-stats = @timed begin
-  _rhs,(__lhs,__lhs_t) = collect_rhs_lhs_contributions!(cache,_rbinfo,op,_rbrhs,_rblhs,_rbspace)
-  @. _lhs = __lhs+__lhs_t
-  _rb_snaps_test = Mabla.RB.rb_solve(fesolver.nls,_rhs,_lhs)
-end
-_approx_snaps_test = recast(_rb_snaps_test,_rbspace)
-_sol_approx = Mabla.RB.space_time_matrices(_approx_snaps_test;nparams=nsnaps_test)
-k = 60
-norm_matrix = get_norm_matrix(_rbinfo,feop)
-norm(_sol_approx[1][:,k] - snaps_test[k],norm_matrix)
-norm(_sol_approx[1][:,k] - snaps_test[k])
-norm(snaps_test[k],norm_matrix)
-
-norm(_bs*_bs'*snaps_test[k] - snaps_test[k],norm_matrix)
-norm(_bs*_bs'*snaps_test[k] - snaps_test[k])
-norm(_bs*_bs'*norm_matrix*snaps_test[k] - snaps_test[k],norm_matrix)
-norm(_bs*_bs'*norm_matrix*snaps_test[k] - snaps_test[k])
-norm(bs*bs'*snaps_test[k] - snaps_test[k])
-
-norm(_sol_approx[1][:,k] - snaps_test[k],L)
-norm(snaps_test[k],L)
