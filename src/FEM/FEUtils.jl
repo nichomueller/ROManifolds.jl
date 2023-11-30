@@ -28,7 +28,7 @@ for f in (:get_L2_norm_matrix,:get_H1_norm_matrix)
       test = op.test
       trial = get_trial(op)
       trial_hom = allocate_trial_space(trial,μ,t)
-      $f(test,trial_hom)
+      $f(trial_hom,test)
     end
 
     function $f(

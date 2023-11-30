@@ -33,16 +33,15 @@ function get_at_time_integration_domain(
   icomm::Vector{Int})
 
   idx_time = get_idx_time(i)
-  time_ndofs = length(icomm)
-  nparams = Int(length(acomm)/time_ndofs)
-  ptidx = Int[]
+  comm_time_ndofs = length(icomm)
+  nparams = Int(length(acomm)/comm_time_ndofs)
+  idx_comm_to_idx_time = Int[]
   for i = eachindex(icomm)
     if icomm[i] ∈ idx_time
-      for j = 1:nparams
-        @inbounds push!(ptidx,(i-1)*nparams+j)
-      end
+      push!(idx_comm_to_idx_time,first(findall(x->x==icomm[i],idx_time)))
     end
   end
+  ptidx = vec(transpose(collect(0:nparams-1)*comm_time_ndofs .+ idx_comm_to_idx_time'))
   acomm = NonaffinePTArray(acomm[ptidx])
   return acomm
 end

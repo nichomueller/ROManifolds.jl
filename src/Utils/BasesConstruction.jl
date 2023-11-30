@@ -12,7 +12,7 @@ function tpod(::Val{true},mat::Matrix,args...;ϵ=1e-4)
   n = truncation(s,ϵ)
   U = mat*V[:,1:n]
   for i = axes(U,2)
-    U[:,i] /= (s[i]+eps())
+    U[:,i] /= s[i]+eps()
   end
   U
 end
@@ -25,10 +25,10 @@ function tpod(::Val{false},mat::Matrix,args...;ϵ=1e-4)
   U[:,1:n]
 end
 
-function tpod(::Val{true},mat::Matrix,X::Matrix;ϵ=1e-4)
-  H = cholesky(X)
-  L = sparse(H.L)
-  Xmat = L'*mat[H.p,:]
+function tpod(::Val{true},mat::Matrix,X::AbstractMatrix;ϵ=1e-4)
+  C = cholesky(X)
+  L = sparse(C.L)
+  Xmat = L'*mat[C.p,:]
 
   cmat = Xmat'*Xmat
   _,s2,V = svd(cmat)
@@ -36,21 +36,21 @@ function tpod(::Val{true},mat::Matrix,X::Matrix;ϵ=1e-4)
   n = truncation(s,ϵ)
   U = Xmat*V[:,1:n]
   for i = axes(U,2)
-    U[:,i] /= (s[i]+eps())
+    U[:,i] /= s[i]+eps()
   end
-  (L'\U[:,1:n])[invperm(H.p),:]
+  (L'\U[:,1:n])[invperm(C.p),:]
 end
 
-function tpod(::Val{false},mat::Matrix,X::Matrix;ϵ=1e-4)
-  H = cholesky(X)
-  L = sparse(H.L)
-  Xmat = L'*mat[H.p,:]
+function tpod(::Val{false},mat::Matrix,X::AbstractMatrix;ϵ=1e-4)
+  C = cholesky(X)
+  L = sparse(C.L)
+  Xmat = L'*mat[C.p,:]
 
   cmat = Xmat*Xmat'
   U,s2,_ = svd(cmat)
   s = sqrt.(s2)
   n = truncation(s,ϵ)
-  (L'\U[:,1:n])[invperm(H.p),:]
+  (L'\U[:,1:n])[invperm(C.p),:]
 end
 
 function truncation(s::Vector,ϵ::Real)
