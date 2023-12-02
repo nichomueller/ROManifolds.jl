@@ -86,8 +86,11 @@ Base.getindex(a::PTArray,i...) = a.array[i...]
 Base.setindex!(a::PTArray,v,i...) = a.array[i...] = v
 Base.iterate(a::PTArray,i...) = iterate(a.array,i...)
 
-function Base.show(io::IO,a::PTArray{T}) where T
-  print(io,"Nonaffine PTArray of type $T and length $(length(a.array))")
+function Base.show(io::IO,::MIME"text/plain",a::PTArray{T}) where T
+  println(io, "PTArray with eltype $T and elements")
+  for i in eachindex(a)
+    println(io,"  ",a.array[i])
+  end
 end
 
 function Base.copy(a::PTArray{T}) where T
@@ -377,23 +380,6 @@ function _get_length(x::Union{AbstractArrayBlock,PTArray}...)
   n
 end
 
-function test_ptarray(a::PTArray,b::AbstractArrayBlock;n=1)
-  _a = a[n]
-  @assert _a ≈ b "Detected difference in value for index $n"
-  if typeof(_a) != typeof(b)
-    @warn "Detected difference in type"
-  end
-  return
-end
-
-function test_ptarray(a::AbstractArrayBlock,b::PTArray;kwargs...)
-  test_ptarray(b,a;kwargs...)
-end
-
-function test_ptarray(a::PTArray,b::PTArray)
-  @assert (≈)(b,a)
-end
-
 for F in (:Map,:Function)
   @eval begin
     function Arrays.return_value(
@@ -567,8 +553,15 @@ function Arrays.return_value(
   a::PTArray,
   x::Vararg{AbstractArray})
 
+  n = _get_length(a,x...)
   ax1 = get_at_index(1,(a,x...))
-  return_value(f,ax1...)
+  v1 = return_value(f,ax1...)
+  array = Vector{typeof(v1)}(undef,n)
+  for i = 1:n
+    axi = get_at_index(i,(a,x...))
+    array[i] = return_value(f,axi...)
+  end
+  PTArray(array)
 end
 
 function Arrays.return_cache(
@@ -577,11 +570,16 @@ function Arrays.return_cache(
   x::Vararg{AbstractArray})
 
   n = _get_length(a,x...)
-  val = return_value(f,a,x...)
-  array = Vector{typeof(val)}(undef,n)
   ax1 = get_at_index(1,(a,x...))
-  cx = return_cache(f,ax1...)
-  cx,array
+  c1 = return_cache(f,ax1...)
+  b1 = evaluate!(c1,f,ax1...)
+  cache = Vector{typeof(c1)}(undef,n)
+  array = Vector{typeof(b1)}(undef,n)
+  for i = 1:n
+    axi = get_at_index(i,(a,x...))
+    cache[i] = return_cache(f,axi...)
+  end
+  cache,array
 end
 
 function Arrays.evaluate!(
@@ -592,7 +590,7 @@ function Arrays.evaluate!(
 
   cx,array = cache
   @inbounds for i = eachindex(array)
-    array[i] = evaluate!(cx,f,a[i],b)
+    array[i] = evaluate!(cx[i],f,a[i],b)
   end
   PTArray(array)
 end
@@ -605,7 +603,7 @@ function Arrays.evaluate!(
 
   cx,array = cache
   @inbounds for i = eachindex(array)
-    array[i] = evaluate!(cx,f,a[i],b)
+    array[i] = evaluate!(cx[i],f,a[i],b)
   end
   PTArray(array)
 end
@@ -618,7 +616,7 @@ function Arrays.evaluate!(
 
   cx,array = cache
   @inbounds for i = eachindex(array)
-    array[i] = evaluate!(cx,f,b[i],a)
+    array[i] = evaluate!(cx[i],f,b[i],a)
   end
   PTArray(array)
 end
@@ -631,7 +629,7 @@ function Arrays.evaluate!(
 
   cx,array = cache
   @inbounds for i = eachindex(array)
-    array[i] = evaluate!(cx,f,a[i],b)
+    array[i] = evaluate!(cx[i],f,a[i],b)
   end
   PTArray(array)
 end
@@ -644,7 +642,7 @@ function Arrays.evaluate!(
 
   cx,array = cache
   @inbounds for i = eachindex(array)
-    array[i] = evaluate!(cx,f,b[i],a)
+    array[i] = evaluate!(cx[i],f,b[i],a)
   end
   PTArray(array)
 end
@@ -657,7 +655,7 @@ function Arrays.evaluate!(
 
   cx,array = cache
   @inbounds for i = eachindex(array)
-    array[i] = evaluate!(cx,f,a[i],b)
+    array[i] = evaluate!(cx[i],f,a[i],b)
   end
   PTArray(array)
 end
@@ -670,7 +668,7 @@ function Arrays.evaluate!(
 
   cx,array = cache
   @inbounds for i = eachindex(array)
-    array[i] = evaluate!(cx,f,b[i],a)
+    array[i] = evaluate!(cx[i],f,b[i],a)
   end
   PTArray(array)
 end
@@ -684,7 +682,7 @@ function Arrays.evaluate!(
   cx,array = cache
   @inbounds for i = eachindex(array)
     axi = get_at_index(i,(a,x...))
-    array[i] = evaluate!(cx,f,axi...)
+    array[i] = evaluate!(cx[i],f,axi...)
   end
   PTArray(array)
 end
