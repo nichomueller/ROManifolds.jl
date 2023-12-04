@@ -54,6 +54,7 @@ import Gridap.CellData: similar_cell_field
 import Gridap.CellData: _get_cell_points
 import Gridap.CellData: _operate_cellfields
 import Gridap.CellData: _to_common_domain
+import Gridap.Fields: BroadcastingFieldOpMap
 import Gridap.FESpaces: FEFunction
 import Gridap.FESpaces: SparseMatrixAssembler
 import Gridap.FESpaces: EvaluationFunction
@@ -92,14 +93,10 @@ export ∂ₚt
 export ∂ₚtt
 export Nonaffine
 export PTArray
-export NonaffinePTArray
-export AffinePTArray
 export get_at_offsets
 export recenter
 export test_ptarray
 export PTrialFESpace
-export NonaffinePTrialFESpace
-export AffinePTrialFESpace
 export PMultiFieldFESpace
 export split_fields
 export field_offsets
@@ -109,7 +106,6 @@ export PTFunction
 export PTCellField
 export GenericPTCellField
 export PTOperationCellField
-export PTFEFunction
 export PTSingleFieldFEFunction
 export PTTransientCellField
 export PTTransientSingleFieldCellField
@@ -117,7 +113,6 @@ export PTSingleFieldTypes
 export PTMultiFieldCellField
 export PTMultiFieldFEFunction
 export PTTransientMultiFieldCellField
-export PTDomainContribution
 export PTIntegrand
 export ∫ₚ
 export CollectionPTIntegrand
@@ -160,7 +155,7 @@ include("PTArray.jl")
 include("PFESpaces.jl")
 include("PTFields.jl")
 include("PTCellFields.jl")
-include("PTDomainContribution.jl")
+include("PTIntegrand.jl")
 include("PTAssemblers.jl")
 include("PTFESpaces.jl")
 include("PTFEOperator.jl")

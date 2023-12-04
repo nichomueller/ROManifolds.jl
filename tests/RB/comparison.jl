@@ -18,7 +18,7 @@ err = nzm_online - basis_space*basis_space'*nzm_online
 
 Φ = rbspace.basis_space
 α = rand(size(Φ,2))
-β = NonaffinePTArray([Φ*α])
+β = PTArray([Φ*α])
 b_wrong = allocate_residual(op_online,sols_online)
 residual!(b_wrong,op_online,sols_online)
 nzm_wrong = NnzMatrix(b_wrong;nparams=1)
@@ -236,7 +236,7 @@ function get_rec_snaps(s::Snapshots{Vector{T}},rb::RBSpace{T},n::Int=1) where T
       push!(array,rmat[i][j])
     end
   end
-  NonaffinePTArray(array)
+  PTArray(array)
 end
 
 function get_rec_snaps(s::BlockSnapshots,rb::BlockRBSpace,args...)

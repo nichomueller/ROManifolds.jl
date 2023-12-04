@@ -195,7 +195,7 @@ end
 function Algebra._solve_nr!(x::PTArray,A::PTArray,b::PTArray,dx::PTArray,ns,nls,op)
   _,conv0 = Algebra._check_convergence(nls.tol,b)
   for iter in 1:nls.max_nliters
-    b.array .*= -1
+    b .*= -1
     _loop_solve!(dx,ns,b)
     x .+= dx
     residual!(b,op,x)

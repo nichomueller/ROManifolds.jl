@@ -17,19 +17,19 @@ end
 
 function get_at_time_integration_domain(
   i::Vector{RBIntegrationDomain},
-  afull::NonaffinePTArray,
+  afull::PTArray,
   nparams::Int)
 
   idx_time = common_time_integration_domain(i)
   time_ndofs = Int(length(afull)/nparams)
   ptidx = vec(transpose(collect(0:nparams-1)*time_ndofs .+ idx_time'))
-  acomm = NonaffinePTArray(afull[ptidx])
+  acomm = PTArray(afull[ptidx])
   return acomm
 end
 
 function get_at_time_integration_domain(
   i::RBIntegrationDomain,
-  acomm::NonaffinePTArray,
+  acomm::PTArray,
   icomm::Vector{Int})
 
   idx_time = get_idx_time(i)
@@ -42,7 +42,7 @@ function get_at_time_integration_domain(
     end
   end
   ptidx = vec(transpose(collect(0:nparams-1)*comm_time_ndofs .+ idx_comm_to_idx_time'))
-  acomm = NonaffinePTArray(acomm[ptidx])
+  acomm = PTArray(acomm[ptidx])
   return acomm
 end
 
@@ -58,16 +58,16 @@ function get_at_time_integration_domain(
   end
   red_times = op.tθ[idx_time]
   ptidx = vec(transpose(collect(0:nparams-1)*time_ndofs .+ idx_time'))
-  u0_idx = NonaffinePTArray(op.u0[ptidx])
+  u0_idx = PTArray(op.u0[ptidx])
   _Us,Uts,fecache = op.ode_cache
   Us = ()
   for j in eachindex(_Us)
     spacei = _Us[j].space
-    dvi = NonaffinePTArray(_Us[j].dirichlet_values[ptidx])
-    Us = (Us...,NonaffinePTrialFESpace(dvi,spacei))
+    dvi = PTArray(_Us[j].dirichlet_values[ptidx])
+    Us = (Us...,PTrialFESpace(dvi,spacei))
   end
   ode_cache_idx = Us,Uts,fecache
-  vθ_idx = NonaffinePTArray(op.vθ[ptidx])
+  vθ_idx = PTArray(op.vθ[ptidx])
   get_ptoperator(op.odeop,op.μ,red_times,op.dtθ,u0_idx,ode_cache_idx,vθ_idx)
 end
 
@@ -535,7 +535,7 @@ function rb_contribution!(
   a::TrivialRBAffineDecomposition,
   coeff::PTArray)
 
-  AffinePTArray(a.projection,length(coeff))
+  [a.projection for _ = eachindex(coeff)]
 end
 
 function zero_rb_contribution(
@@ -544,7 +544,7 @@ function zero_rb_contribution(
   rbspace::RBSpace{T}) where T
 
   nrow = num_rb_ndofs(rbspace)
-  return AffinePTArray(zeros(T,nrow),rbinfo.nsnaps_test)
+  [zeros(T,nrow) for _ = 1:rbinfo.nsnaps_test]
 end
 
 function zero_rb_contribution(
@@ -555,5 +555,5 @@ function zero_rb_contribution(
 
   nrow = num_rb_ndofs(rbspace_row)
   ncol = num_rb_ndofs(rbspace_col)
-  return AffinePTArray(zeros(T,nrow,ncol),rbinfo.nsnaps_test)
+  [zeros(T,nrow,ncol) for _ = 1:rbinfo.nsnaps_test]
 end

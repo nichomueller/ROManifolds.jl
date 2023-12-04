@@ -8,12 +8,12 @@ function ReferenceFEs.get_order(test::MultiFieldFESpace)
   maximum(orders)
 end
 
-function Utils.recenter(a::PTArray,ah0::PTFEFunction;kwargs...)
+function Utils.recenter(a::PTArray,ah0::FEFunction;kwargs...)
   a0 = get_free_dof_values(ah0)
   recenter(a,a0;kwargs...)
 end
 
-function Utils.recenter(a::Vector{<:PTArray},ah0::PTFEFunction;kwargs...)
+function Utils.recenter(a::Vector{<:PTArray},ah0::FEFunction;kwargs...)
   map(eachindex(a)) do i
     ai = a[i]
     ai0 = get_free_dof_values(ah0[i])

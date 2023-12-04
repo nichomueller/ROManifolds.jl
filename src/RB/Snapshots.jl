@@ -1,5 +1,5 @@
 struct Snapshots{T<:AbstractArray}
-  snaps::Vector{NonaffinePTArray{T}}
+  snaps::Vector{PTArray{T}}
 end
 
 Base.length(s::Snapshots) = length(s.snaps)
@@ -20,12 +20,12 @@ function Base.getindex(s::Snapshots{T},idx) where T
       array[(i-1)*time_ndofs+nt] = s.snaps[nt][r]
     end
   end
-  return NonaffinePTArray(array)
+  return PTArray(array)
 end
 
 function Base.vcat(s::Snapshots{T}...) where T
   l = length(first(s))
-  vsnaps = Vector{NonaffinePTArray{T}}(undef,l)
+  vsnaps = Vector{PTArray{T}}(undef,l)
   @inbounds for i = 1:l
     vsnaps[i] = vcat(map(n->s[n].snaps[i],eachindex(s))...)
   end
@@ -55,7 +55,7 @@ function collect_solutions(
   time_ndofs = num_time_dofs(fesolver)
   T = get_vector_type(feop.test)
   uμt = PODESolution(fesolver,ode_op,params,u0,t0,tf)
-  snaps = Vector{NonaffinePTArray{T}}(undef,time_ndofs)
+  snaps = Vector{PTArray{T}}(undef,time_ndofs)
   println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
   stats = @timed for (snap,n) in uμt
     snaps[n] = copy(snap)

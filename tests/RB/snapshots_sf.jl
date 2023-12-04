@@ -120,7 +120,7 @@ end
 times = get_times(fesolver)
 ntimes = length(times)
 snaps_test,params_test = sols[1:K],μ[1:K]
-u,μ = NonaffinePTArray(snaps_test[1:ntimes]),params_test[1]
+u,μ = PTArray(snaps_test[1:ntimes]),params_test[1]
 g_ok(x,t) = g(x,μ,t)
 g_ok(t) = x->g_ok(x,t)
 a_ok(t,u,v) = ∫(a(μ,t)*∇(v)⋅∇(u))dΩ

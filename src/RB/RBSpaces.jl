@@ -54,17 +54,17 @@ function recast(x::AbstractVector,rb::RBSpace)
   return xrb
 end
 
-function recast(x::NonaffinePTArray,rb::RBSpace{T}) where T
+function recast(x::PTArray,rb::RBSpace{T}) where T
   time_ndofs = num_time_dofs(rb)
   nparams = length(x)
   array = Vector{Vector{T}}(undef,time_ndofs*nparams)
   @inbounds for i = 1:nparams
     array[(i-1)*time_ndofs+1:i*time_ndofs] = recast(x[i],rb)
   end
-  NonaffinePTArray(array)
+  PTArray(array)
 end
 
-function space_time_projection(x::NonaffinePTArray,rb::RBSpace{T}) where T
+function space_time_projection(x::PTArray,rb::RBSpace{T}) where T
   time_ndofs = num_time_dofs(rb)
   nparams = Int(length(x)/time_ndofs)
 
@@ -74,7 +74,7 @@ function space_time_projection(x::NonaffinePTArray,rb::RBSpace{T}) where T
     array[np] = space_time_projection(x_np,rb)
   end
 
-  return NonaffinePTArray(array)
+  return PTArray(array)
 end
 
 function space_time_projection(mat::AbstractMatrix,rb::RBSpace)
@@ -139,7 +139,7 @@ function FEM.get_ptoperator(
     col = mod(n,ns) == 0 ? ns : mod(n,ns)
     array[n] = bs[:,col]
   end
-  sols = NonaffinePTArray(array)
+  sols = PTArray(array)
   sols_cache = zero(sols)
   get_ptoperator(ode_op,params,times,dtθ,sols,ode_cache,sols_cache)
 end

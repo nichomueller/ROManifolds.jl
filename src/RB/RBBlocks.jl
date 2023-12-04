@@ -15,7 +15,7 @@ struct BlockSnapshots{T} <: RBBlock{T,1}
   blocks::Vector{Snapshots{T}}
 end
 
-function BlockSnapshots(v::Vector{Vector{NonaffinePTArray{T}}}) where T
+function BlockSnapshots(v::Vector{Vector{PTArray{T}}}) where T
   nblocks = length(testitem(v))
   blocks = Vector{Snapshots{T}}(undef,nblocks)
   @inbounds for n in 1:nblocks
@@ -34,7 +34,7 @@ function Base.getindex(s::BlockSnapshots,idx::UnitRange{Int})
   vcat(blocks...)
 end
 
-function Utils.recenter(s::BlockSnapshots,uh0::PTFEFunction;kwargs...)
+function Utils.recenter(s::BlockSnapshots,uh0::FEFunction;kwargs...)
   nblocks = length(s)
   sθ = map(1:nblocks) do row
     recenter(s[row],uh0[row];kwargs...)
@@ -65,7 +65,7 @@ function collect_solutions(
   time_ndofs = num_time_dofs(fesolver)
   T = get_vector_type(feop.test)
   uμt = PODESolution(fesolver,ode_op,params,u0,t0,tf)
-  snaps = Vector{Vector{NonaffinePTArray{T}}}(undef,time_ndofs)
+  snaps = Vector{Vector{PTArray{T}}}(undef,time_ndofs)
   println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
   stats = @timed for (snap,n) in uμt
     snaps[n] = split_fields(feop.test,copy(snap))
@@ -515,7 +515,7 @@ function collect_rhs_contributions!(
         cache_row,rbinfo_row,op_row_col,rbres[row],rbspace_row)
     else
       nrow = num_rb_ndofs(rbspace_row)
-      blocks[row] = AffinePTArray(zeros(T,nrow),length(op.μ))
+      blocks[row] = [zeros(T,nrow) for _ = eachindex(op.μ)]
     end
   end
   vcat(blocks...)
@@ -546,7 +546,7 @@ function collect_lhs_contributions!(
       else
         nrow = num_rb_ndofs(rbspace_row)
         ncol = num_rb_ndofs(rbspace_col)
-        blocks[row,col] = AffinePTArray(zeros(T,nrow,ncol),length(op.μ))
+        blocks[row,col] = [zeros(T,nrow,ncol) for _ = eachindex(op.μ)]
       end
     end
     rb_jacs_contribs[i] = hvcat(nblocks,blocks...)

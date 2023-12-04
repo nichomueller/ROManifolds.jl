@@ -128,6 +128,6 @@ function _vector!(
   z = zero(eltype(b))
   fill!(b,z)
   residual!(b,op,μ,tθ,(u0,vθ),ode_cache)
-  b.array .*= -1.0
+  b .*= -1.0
   b
 end

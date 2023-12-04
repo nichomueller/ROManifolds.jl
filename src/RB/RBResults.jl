@@ -4,14 +4,14 @@ function TransientFETools.allocate_cache(op,rbspace)
   A = allocate_jacobian(op,op.u0)
   mat = CachedArray(zeros(T,1,1))
   coeff = CachedArray(zeros(T,1,1))
-  ptcoeff = CachedArray(NonaffinePTArray([zeros(T,1,1) for _ = eachindex(op.μ)]))
+  ptcoeff = CachedArray(PTArray([zeros(T,1,1) for _ = eachindex(op.μ)]))
 
   res_contrib_cache = return_cache(RBVecContributionMap(),op.u0)
   jac_contrib_cache = return_cache(RBMatContributionMap(),op.u0)
 
   rb_ndofs = num_rb_ndofs(rbspace)
-  rhs_solve_cache = NonaffinePTArray([zeros(T,rb_ndofs) for _ = eachindex(op.μ)])
-  lhs_solve_cache = NonaffinePTArray([zeros(T,rb_ndofs,rb_ndofs) for _ = eachindex(op.μ)])
+  rhs_solve_cache = PTArray([zeros(T,rb_ndofs) for _ = eachindex(op.μ)])
+  lhs_solve_cache = PTArray([zeros(T,rb_ndofs,rb_ndofs) for _ = eachindex(op.μ)])
 
   res_cache = ((b,mat),(coeff,ptcoeff)),res_contrib_cache
   jac_cache = ((A,mat),(coeff,ptcoeff)),jac_contrib_cache
@@ -130,7 +130,7 @@ function nearest_neighbor(
     idxn = idx[n]
     array[(n-1)*ntimes+1:n*ntimes] = sols_train[(idxn-1)*ntimes+1:idxn*ntimes]
   end
-  NonaffinePTArray(array)
+  PTArray(array)
 end
 
 struct RBResults{T}
@@ -220,7 +220,7 @@ function space_time_matrices(sol::PTArray{Vector{T}};nparams=length(sol)) where 
   @inbounds for i = 1:nparams
     array[i] = mat[:,(i-1)*ntimes+1:i*ntimes]
   end
-  NonaffinePTArray(array)
+  PTArray(array)
 end
 
 function compute_relative_error(

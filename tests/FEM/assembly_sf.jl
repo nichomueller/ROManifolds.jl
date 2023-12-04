@@ -5,7 +5,7 @@ times = [dt,2dt,3dt]
 Nt = length(times)
 N = K*Nt
 nfree = num_free_dofs(test)
-u = NonaffinePTArray([zeros(nfree) for _ = 1:N])
+u = PTArray([zeros(nfree) for _ = 1:N])
 vθ = similar(u)
 vθ .= 1.0
 ode_op = get_algebraic_operator(op)

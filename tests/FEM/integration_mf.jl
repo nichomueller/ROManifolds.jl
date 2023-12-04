@@ -9,7 +9,7 @@ ode_op = get_algebraic_operator(feop)
 ode_cache = allocate_cache(ode_op,μ,times)
 update_cache!(ode_cache,ode_op,μ,times)
 nfree = num_free_dofs(V)
-u = NonaffinePTArray([zeros(V) for _ = 1:length(μ)*length(times)])
+u = PTArray([zeros(V) for _ = 1:length(μ)*length(times)])
 vθ = similar(u)
 vθ .= 1.0
 Us,_,fecache = ode_cache

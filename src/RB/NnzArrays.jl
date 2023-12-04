@@ -37,7 +37,7 @@ struct NnzMatrix{T,A} <: NnzArray{T,2}
   end
 end
 
-function NnzMatrix(val::NonaffinePTArray{<:AbstractArray};nparams=length(val))
+function NnzMatrix(val::PTArray{<:AbstractArray};nparams=length(val),kwargs...)
   vals = get_array(val)
   idx_val = map(compress_array,vals)
   nonzero_idx = first(first.(idx_val))
@@ -46,7 +46,7 @@ function NnzMatrix(val::NonaffinePTArray{<:AbstractArray};nparams=length(val))
   NnzMatrix{Nonaffine}(nonzero_val,nonzero_idx,nrows,nparams)
 end
 
-function NnzMatrix(val::NonaffinePTArray{<:NnzVector};nparams=length(val))
+function NnzMatrix(val::PTArray{<:NnzVector};nparams=length(val),kwargs...)
   vals = get_array(val)
   nonzero_idx = get_nonzero_idx(first(vals))
   nonzero_val = stack(map(get_nonzero_val,vals))
@@ -54,19 +54,17 @@ function NnzMatrix(val::NonaffinePTArray{<:NnzVector};nparams=length(val))
   NnzMatrix{Nonaffine}(nonzero_val,nonzero_idx,nrows,nparams)
 end
 
-function NnzMatrix(val::AffinePTArray{<:AbstractArray};nparams=length(val))
-  v = get_array(val)
-  nonzero_idx,nonzero_val = compress_array(v)
-  nonzero_val = repeat(v,1,val.len)
-  nrows = size(first(val),1)
+function NnzMatrix(val::AbstractArray;nparams=length(val),ntimes=1)
+  nonzero_idx,nonzero_val = compress_array(val)
+  nonzero_val = repeat(val,1,ntimes)
+  nrows = size(val,1)
   NnzMatrix{Affine}(nonzero_val,nonzero_idx,nrows,nparams)
 end
 
-function NnzMatrix(val::AffinePTArray{<:NnzVector};nparams=length(val))
-  v = get_array(val)
-  nonzero_idx = get_nonzero_idx(v)
-  nonzero_val = repeat(get_nonzero_val(v),1,val.len)
-  nrows = get_nrows(v)
+function NnzMatrix(val::NnzVector;nparams=length(val),ntimes=1)
+  nonzero_idx = get_nonzero_idx(val)
+  nonzero_val = repeat(get_nonzero_val(val),1,ntimes)
+  nrows = get_nrows(val)
   NnzMatrix{Affine}(nonzero_val,nonzero_idx,nrows,nparams)
 end
 

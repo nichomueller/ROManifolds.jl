@@ -80,7 +80,7 @@ function Base.iterate(sol::PODESolution,state)
   return (uf,n),state
 end
 
-function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::NonaffinePTArray)
+function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::PTArray)
   ns = Vector{LUNumericalSetup}(undef,length(mat))
   @inbounds for k = eachindex(mat)
     ns[k] = numerical_setup(ss,mat[k])
@@ -88,20 +88,10 @@ function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::NonaffinePTArr
   ns
 end
 
-function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::AffinePTArray)
-  ns = Vector{LUNumericalSetup}(undef,1)
-  ns[1] = numerical_setup(ss,mat[1])
-  ns
-end
-
-function Algebra.numerical_setup!(ns,mat::NonaffinePTArray)
+function Algebra.numerical_setup!(ns,mat::PTArray)
   @inbounds for k = eachindex(mat)
     ns[k].factors = lu(mat[k])
   end
-end
-
-function Algebra.numerical_setup!(ns,mat::AffinePTArray)
-  ns[1].factors = lu(mat[1])
 end
 
 function _loop_solve!(x::PTArray,ns,b::PTArray)
@@ -195,7 +185,7 @@ end
 function Algebra._solve_nr!(x::PTArray,A::PTArray,b::PTArray,dx::PTArray,ns,nls,op)
   _,conv0 = Algebra._check_convergence(nls.tol,b)
   for iter in 1:nls.max_nliters
-    b.array .*= -1
+    b .*= -1
     _loop_solve!(dx,ns,b)
     x .+= dx
     residual!(b,op,x)

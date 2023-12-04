@@ -15,7 +15,7 @@ function TransientFETools.allocate_cache(::PTFEOperator)
   nothing
 end
 
-function TransientFETools.update_cache!(
+function Gridap.ODEs.TransientFETools.update_cache!(
   ::Nothing,
   ::PTFEOperator,
   ::Any,
@@ -154,7 +154,7 @@ function Base.getindex(op::NonlinearPTFEOperator,row,col)
   end
 end
 
-function Algebra.allocate_residual(
+function Gridap.Algebra.allocate_residual(
   op::PTFEOperator,
   μ::P,
   t::T,
@@ -175,7 +175,7 @@ function Algebra.allocate_residual(
   allocate_vector(dc,op.assem,vecdata1;N=length(uh))
 end
 
-function Algebra.allocate_jacobian(
+function Gridap.Algebra.allocate_jacobian(
   op::PTFEOperator,
   μ::P,
   t::T,

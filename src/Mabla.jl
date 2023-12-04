@@ -34,14 +34,10 @@ export ∂ₚt
 export ∂ₚtt
 export Nonaffine
 export PTArray
-export NonaffinePTArray
-export AffinePTArray
 export get_at_offsets
 export recenter
 export test_ptarray
 export PTrialFESpace
-export NonaffinePTrialFESpace
-export AffinePTrialFESpace
 export PMultiFieldFESpace
 export split_fields
 export field_offsets
@@ -51,7 +47,6 @@ export PTFunction
 export PTCellField
 export GenericPTCellField
 export PTOperationCellField
-export PTFEFunction
 export PTSingleFieldFEFunction
 export PTTransientCellField
 export PTTransientSingleFieldCellField
@@ -59,7 +54,6 @@ export PTSingleFieldTypes
 export PTMultiFieldCellField
 export PTMultiFieldFEFunction
 export PTTransientMultiFieldCellField
-export PTDomainContribution
 export PTIntegrand
 export ∫ₚ
 export CollectionPTIntegrand
