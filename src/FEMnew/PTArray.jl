@@ -1,75 +1,14 @@
-abstract type AbstractPTFunction{P,T} <: Function end
-
-struct PFunction{P} <: AbstractPTFunction{P,Nothing}
-  f::Function
-  params::P
-end
-
-struct PTFunction{P,T} <: AbstractPTFunction{P,T}
-  f::Function
-  params::P
-  times::T
-end
-
-function get_fields(pf::PFunction{<:AbstractVector{<:Number}})
-  p = pf.params
-  GenericField(pf.f(p))
-end
-
-function get_fields(pf::PFunction)
-  p = pf.params
-  np = length(p)
-  fields = Vector{GenericField}(undef,np)
-  @inbounds for k = eachindex(p)
-    pk = p[k]
-    fields[k] = GenericField(pf.f(pk))
+# struct PTArray{T,N} <: AbstractArray{T,N}
+#   array::AbstractArray{T,N}
+# end
+struct PTArray{T,N,A} <: AbstractArray{T,N}
+  array::A
+  function PTArray(array::AbstractArray)
+    A = typeof(array)
+    T = eltype(array)
+    N = ndims(T)
+    new{T,N,A}(array)
   end
-  fields
-end
-
-function get_fields(ptf::PTFunction{<:AbstractVector{<:Number},<:Real})
-  p,t = ptf.params,ptf.times
-  GenericField(ptf.f(p,t))
-end
-
-function get_fields(ptf::PTFunction{<:AbstractVector{<:Number},<:AbstractVector{<:Number}})
-  p,t = ptf.params,ptf.times
-  nt = length(t)
-  fields = Vector{GenericField}(undef,nt)
-  @inbounds for k = 1:nt
-    tk = t[k]
-    fields[k] = GenericField(ptf.f(p,tk))
-  end
-  fields
-end
-
-function get_fields(ptf::PTFunction)
-  p,t = ptf.params,ptf.times
-  np = length(p)
-  nt = length(t)
-  npt = np*nt
-  fields = Vector{GenericField}(undef,npt)
-  @inbounds for k = 1:npt
-    pk = p[slow_idx(k,nt)]
-    tk = t[fast_idx(k,nt)]
-    fields[k] = GenericField(ptf.f(pk,tk))
-  end
-  fields
-end
-
-function Arrays.evaluate!(cache,f::AbstractPTFunction,x::Point)
-  g = get_fields(f)
-  map(g) do gi
-    gi(x)
-  end
-end
-
-const AbstractArrayBlock{T,N} = Union{AbstractArray{T,N},ArrayBlock{T,N}}
-
-struct Nonaffine <: OperatorType end
-
-struct PTArray{T,N} <: AbstractArray{T,N}
-  array::AbstractArrayBlock{T,N}
 end
 
 Arrays.get_array(a::PTArray) = a.array
@@ -77,7 +16,7 @@ Base.size(a::PTArray,i...) = size(testitem(a),i...)
 Base.eltype(::Type{PTArray{T}}) where T = eltype(T)
 Base.eltype(::PTArray{T}) where T = eltype(T)
 Base.ndims(::PTArray{T,N} where T) where N = N
-Base.ndims(::Type{<:PTArray{T,N}} where T) where N = N
+Base.ndims(::Type{PTArray{T,N}} where T) where N = N
 Base.first(a::PTArray) = first(testitem(a))
 Base.length(a::PTArray) = length(a.array)
 Base.eachindex(a::PTArray) = eachindex(a.array)
@@ -242,7 +181,7 @@ function Base.map(f,a::PTArray)
   PTArray(array)
 end
 
-function Base.map(f,a::PTArray,x::Union{AbstractArrayBlock,PTArray}...)
+function Base.map(f,a::PTArray,x::Union{AbstractArray,PTArray}...)
   n = _get_length(a,x...)
   ax1 = get_at_index(1,(a,x...))
   fax1 = f(ax1...)
@@ -254,7 +193,7 @@ function Base.map(f,a::PTArray,x::Union{AbstractArrayBlock,PTArray}...)
   PTArray(array)
 end
 
-function Base.map(f,a::AbstractArrayBlock,x::PTArray)
+function Base.map(f,a::AbstractArray,x::PTArray)
   n = length(x)
   fax1 = f(a,testitem(x))
   array = Vector{typeof(fax1)}(undef,n)
@@ -349,7 +288,7 @@ get_at_index(::Int,x) = x
 
 get_at_index(i::Int,x::PTArray) = x[i]
 
-function get_at_index(i::Int,x::NTuple{N,Union{AbstractArrayBlock,PTArray}}) where N
+function get_at_index(i::Int,x::NTuple{N,Union{AbstractArray,PTArray}}) where N
   ret = ()
   @inbounds for xj in x
     ret = (ret...,get_at_index(i,xj))
@@ -373,180 +312,88 @@ function get_at_index(::Colon,x::NTuple{N,PTArray}) where N
   return ret
 end
 
-function _get_length(x::Union{AbstractArrayBlock,PTArray}...)
+function _get_length(x::Union{AbstractArray,PTArray}...)
   pta = filter(y->isa(y,PTArray),x)
   n = length(first(pta))
   @check all([length(y) == n for y in pta])
   n
 end
 
-for F in (:Map,:Function)
-  @eval begin
-    function Arrays.return_value(
-      f::$F,
-      a::PTArray,
-      x::Vararg{Union{AbstractArrayBlock,PTArray}})
+# for F in (:Map,:Function)
+#   @eval begin
+#     function Arrays.return_value(
+#       f::$F,
+#       a::PTArray,
+#       x::Vararg{Union{AbstractArray,PTArray}})
 
-      ax1 = get_at_index(1,(a,x...))
-      return_value(f,ax1...)
-    end
+#       ax1 = get_at_index(1,(a,x...))
+#       return_value(f,ax1...)
+#     end
 
-    function Arrays.return_cache(
-      f::$F,
-      a::PTArray,
-      x::Vararg{Union{AbstractArrayBlock,PTArray}})
+#     function Arrays.return_cache(
+#       f::$F,
+#       a::PTArray,
+#       x::Vararg{Union{AbstractArray,PTArray}})
 
-      n = _get_length(a,x...)
-      val = return_value(f,a,x...)
-      array = Vector{typeof(val)}(undef,n)
-      ax1 = get_at_index(1,(a,x...))
-      cx = return_cache(f,ax1...)
-      cx,array
-    end
+#       n = _get_length(a,x...)
+#       val = return_value(f,a,x...)
+#       array = Vector{typeof(val)}(undef,n)
+#       ax1 = get_at_index(1,(a,x...))
+#       cx = return_cache(f,ax1...)
+#       cx,array
+#     end
 
-    function Arrays.evaluate!(
-      cache,
-      f::$F,
-      a::PTArray,
-      x::Vararg{Union{AbstractArrayBlock,PTArray}})
+#     function Arrays.evaluate!(
+#       cache,
+#       f::$F,
+#       a::PTArray,
+#       x::Vararg{Union{AbstractArray,PTArray}})
 
-      cx,array = cache
-      @inbounds for i = eachindex(array)
-        axi = get_at_index(i,(a,x...))
-        array[i] = evaluate!(cx,f,axi...)
-      end
-      PTArray(array)
-    end
+#       cx,array = cache
+#       @inbounds for i = eachindex(array)
+#         axi = get_at_index(i,(a,x...))
+#         array[i] = evaluate!(cx,f,axi...)
+#       end
+#       PTArray(array)
+#     end
 
-    function Arrays.return_value(
-      f::$F,
-      a::AbstractArrayBlock,
-      x::PTArray)
+#     function Arrays.return_value(
+#       f::$F,
+#       a::AbstractArray,
+#       x::PTArray)
 
-      x1 = get_at_index(1,x)
-      return_value(f,a,x1)
-    end
+#       x1 = get_at_index(1,x)
+#       return_value(f,a,x1)
+#     end
 
-    function Arrays.return_cache(
-      f::$F,
-      a::AbstractArrayBlock,
-      x::PTArray)
+#     function Arrays.return_cache(
+#       f::$F,
+#       a::AbstractArray,
+#       x::PTArray)
 
-      n = length(x)
-      val = return_value(f,a,x)
-      array = Vector{typeof(val)}(undef,n)
-      ax1 = get_at_index(1,x)
-      cx = return_cache(f,a,ax1)
-      cx,array
-    end
+#       n = length(x)
+#       val = return_value(f,a,x)
+#       array = Vector{typeof(val)}(undef,n)
+#       ax1 = get_at_index(1,x)
+#       cx = return_cache(f,a,ax1)
+#       cx,array
+#     end
 
-    function Arrays.evaluate!(
-      cache,
-      f::$F,
-      a::AbstractArrayBlock,
-      x::PTArray)
+#     function Arrays.evaluate!(
+#       cache,
+#       f::$F,
+#       a::AbstractArray,
+#       x::PTArray)
 
-      cx,array = cache
-      @inbounds for i = eachindex(array)
-        xi = get_at_index(i,x)
-        array[i] = evaluate!(cx,f,a,xi)
-      end
-      PTArray(array)
-    end
-  end
-end
-
-struct NewFieldArray
-  fields::AbstractVector{GenericField}
-  function NewFieldArray(f::PTFunction)
-    fields = get_fields(f)
-    new(fields)
-  end
-  function NewFieldArray(f::AbstractVector{<:Function})
-    fields = GenericField.(f)
-    new(fields)
-  end
-end
-
-Base.size(a::NewFieldArray) = size(a.fields)
-Base.length(a::NewFieldArray) = length(a.fields)
-Base.IndexStyle(::Type{<:NewFieldArray}) = IndexLinear()
-Base.getindex(a::NewFieldArray,i::Integer) = GenericField(a.fields[i])
-Base.iterate(a::NewFieldArray,i...) = iterate(a.fields,i...)
-
-function Arrays.testitem(f::NewFieldArray)
-  f[1]
-end
-
-struct PTMap <: Map
-  length::Int
-end
-
-function PTMap(l::Vector{Int})
-  @assert length(l) == 1
-  PTMap(first(l))
-end
-
-function PTMap(l::NTuple{1,Int})
-  PTMap(first(l))
-end
-
-Base.length(k::PTMap) = k.length
-Base.eachindex(k::PTMap) = Base.OneTo(k.length)
-
-function Arrays.return_cache(f::NewFieldArray,x)
-  fi = testitem(f)
-  li = return_cache(fi,x)
-  fix = evaluate!(li,fi,x)
-  l = Vector{typeof(li)}(undef,size(f.fields))
-  g = Vector{typeof(fix)}(undef,size(f.fields))
-  for i in eachindex(f.fields)
-    l[i] = return_cache(f.fields[i],x)
-  end
-  PTArray(g),l
-end
-
-function Arrays.evaluate!(cache,f::NewFieldArray,x)
-  g,l = cache
-  for i in eachindex(f.fields)
-    g.array[i] = evaluate!(l[i],f.fields[i],x)
-  end
-  g
-end
-
-abstract type PTCellField <: CellField end
-
-struct GenericPTCellField{DS} <: PTCellField
-  cell_field::AbstractArray
-  trian::Triangulation
-  domain_style::DS
-  function GenericPTCellField(
-    cell_field::AbstractArray,
-    trian::Triangulation,
-    domain_style::DomainStyle)
-
-    DS = typeof(domain_style)
-    new{DS}(Fields.MemoArray(cell_field),trian,domain_style)
-  end
-end
-
-Base.length(f::GenericPTCellField) = length(f.cell_field)
-CellData.get_data(f::GenericPTCellField) = f.cell_field
-FESpaces.get_triangulation(f::GenericPTCellField) = f.trian
-CellData.DomainStyle(::Type{GenericPTCellField{DS}}) where DS = DS()
-
-function CellData.similar_cell_field(::PTCellField,cell_data,trian,ds)
-  GenericPTCellField(cell_data,trian,ds)
-end
-
-function CellData.CellField(f::PTFunction,trian::Triangulation,::DomainStyle)
-  # x = get_cell_points(trian) |> get_data
-  # field = NewFieldArray(f)
-  # ptfield = lazy_map(field,x)
-  s = size(get_cell_map(trian))
-  cell_field = Fill(NewFieldArray(f),s)
-  GenericPTCellField(cell_field,trian,PhysicalDomain())
-end
+#       cx,array = cache
+#       @inbounds for i = eachindex(array)
+#         xi = get_at_index(i,x)
+#         array[i] = evaluate!(cx,f,a,xi)
+#       end
+#       PTArray(array)
+#     end
+#   end
+# end
 
 function Arrays.return_value(
   f::BroadcastingFieldOpMap,
@@ -683,6 +530,50 @@ function Arrays.evaluate!(
   @inbounds for i = eachindex(array)
     axi = get_at_index(i,(a,x...))
     array[i] = evaluate!(cx[i],f,axi...)
+  end
+  PTArray(array)
+end
+
+function Arrays.return_value(
+  f::IntegrationMap,
+  a::PTArray,
+  w,
+  j::AbstractVector)
+
+  v1 = return_value(f,a[1],w,j)
+  array = Vector{typeof(v1)}(undef,length(a))
+  for i = eachindex(a)
+    array[i] = return_value(f,a[i],w,j)
+  end
+  PTArray(array)
+end
+
+function Arrays.return_cache(
+  f::IntegrationMap,
+  a::PTArray,
+  w,
+  j::AbstractVector)
+
+  c1 = return_cache(f,a[1],w,j)
+  b1 = evaluate!(c1,f,a[1],w,j)
+  cache = Vector{typeof(c1)}(undef,length(a))
+  array = Vector{typeof(b1)}(undef,length(a))
+  for i = eachindex(a)
+    cache[i] = return_cache(f,a[i],w,j)
+  end
+  cache,array
+end
+
+function Arrays.evaluate!(
+  cache,
+  f::IntegrationMap,
+  a::PTArray,
+  w,
+  j::AbstractVector)
+
+  cx,array = cache
+  @inbounds for i = eachindex(array)
+    array[i] = evaluate!(cx[i],f,a[i],w,j)
   end
   PTArray(array)
 end
