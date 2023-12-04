@@ -32,11 +32,9 @@ export NormalSampling
 export realization
 export ∂ₚt
 export ∂ₚtt
-export Nonaffine
 export PTArray
 export get_at_offsets
 export recenter
-export test_ptarray
 export PTrialFESpace
 export PMultiFieldFESpace
 export split_fields

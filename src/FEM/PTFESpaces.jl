@@ -19,7 +19,14 @@ Allocate the space to be used as first argument in evaluate!
 function TransientFETools.allocate_trial_space(U::PTTrialFESpace,μ,t)
   _length(a::Vector{<:Number}) = 1
   _length(a) = length(a)
-  HomogeneousPTrialFESpace(U.space,_length(μ)*length(t))
+
+  dv = zero_dirichlet_values(U.space)
+  array = Vector{typeof(dv)}(undef,_length(μ)*length(t))
+  @inbounds for i in eachindex(array)
+    array[i] = copy(dv)
+  end
+  dir_values = PTArray(array)
+  TrialFESpace(U.space,dir_values)
 end
 
 function TransientFETools.allocate_trial_space(
@@ -39,7 +46,7 @@ function Arrays.evaluate!(Ut::T,U::PTTrialFESpace,μ,t) where T
       push!(objects_at_μt,U.dirichlet_μt(μi,ti))
     end
   end
-  PTrialFESpace!(Ut,objects_at_μt)
+  TrialFESpace!(Ut,objects_at_μt)
   Ut
 end
 
@@ -52,7 +59,7 @@ function Arrays.evaluate!(Ut::T,U::PTTrialFESpace,μ::Vector{<:Number},t) where 
       push!(objects_at_μt,U.dirichlet_μt(μ,ti))
     end
   end
-  PTrialFESpace!(Ut,objects_at_μt)
+  TrialFESpace!(Ut,objects_at_μt)
   Ut
 end
 

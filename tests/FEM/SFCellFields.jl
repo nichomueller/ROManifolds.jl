@@ -101,3 +101,15 @@ for k in 1:2
     @check A[(k-1)*3+m] == A_ok "Detected difference in value for index $((k-1)*3+m)"
   end
 end
+
+μ = Table([rand(3) for _ = 1:2])
+tag_to_object = []
+for μi in μ, ti in times
+  if isa(trial.dirichlet_μt,Vector)
+    push!(tag_to_object,map(o->o(μi,ti),U.dirichlet_μt))
+  else
+    push!(tag_to_object,trial.dirichlet_μt(μi,ti))
+  end
+end
+dirichlet_dof_to_tag = Gridap.FESpaces.get_dirichlet_dof_tag(test)
+_tag_to_object = Gridap.FESpaces._convert_to_collectable(tag_to_object,num_dirichlet_tags(test))

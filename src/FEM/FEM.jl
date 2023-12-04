@@ -91,13 +91,9 @@ export NormalSampling
 export realization
 export ∂ₚt
 export ∂ₚtt
-export Nonaffine
 export PTArray
 export get_at_offsets
 export recenter
-export test_ptarray
-export PTrialFESpace
-export PMultiFieldFESpace
 export split_fields
 export field_offsets
 export AbstractPTFunction
@@ -152,7 +148,6 @@ export ReducedMeasure
 include("PSpace.jl")
 include("PDiffOperators.jl")
 include("PTArray.jl")
-include("PFESpaces.jl")
 include("PTFields.jl")
 include("PTCellFields.jl")
 include("PTIntegrand.jl")

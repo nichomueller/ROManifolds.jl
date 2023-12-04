@@ -1,8 +1,14 @@
-abstract type PTrialFESpace{S} <: SingleFieldFESpace end
+struct PTrialFESpace{S} <: SingleFieldFESpace
+  dirichlet_values::AbstractVector
+  space::S
+  function PTrialFESpace(dirichlet_values::AbstractVector,space::SingleFieldFESpace)
+    new{typeof(space)}(dirichlet_values,space)
+  end
+end
 
 function PTrialFESpace(space::SingleFieldFESpace,objects)
-  dirichlet_values = compute_dirichlet_values_for_tags(space,objects)
-  PTrialFESpace(dirichlet_values,space)
+  dir_values = compute_dirichlet_values_for_tags(space,objects)
+  PTrialFESpace(dir_values,space)
 end
 
 function PTrialFESpace!(dir_values::PTArray,space::SingleFieldFESpace,objects)
@@ -24,8 +30,8 @@ function HomogeneousPTrialFESpace(U::SingleFieldFESpace,n::Int)
   @inbounds for i in eachindex(array)
     array[i] = copy(dv)
   end
-  dirichlet_values = PTArray(array)
-  PTrialFESpace(dirichlet_values,U)
+  dir_values = PTArray(array)
+  PTrialFESpace(dir_values,U)
 end
 
 FESpaces.get_free_dof_ids(f::PTrialFESpace) = get_free_dof_ids(f.space)
