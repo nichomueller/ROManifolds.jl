@@ -16,7 +16,7 @@ import Base: *
 import Base: +
 import Base: -
 import Base: /
-import Gridap.Helpers: @check,@unreachable
+import Gridap.Helpers: @check,@unreachable,@abstractmethod
 import Gridap.Fields: BroadcastingFieldOpMap
 import Gridap.CellData: OperationCellField
 import Gridap.CellData: _get_cell_points
@@ -25,8 +25,13 @@ import Gridap.CellData: _to_common_domain
 import Gridap.CellData: GenericMeasure
 const Float = Float64
 include("../../src/Utils/Indexes.jl")
-# include("../../src/FEMnew/NewFile.jl")
-include("../../src/FEMnew/FEMnew.jl")
+include("../../src/FEM/PSpace.jl")
+include("../../src/FEM/PDiffOperators.jl")
+include("../../src/FEM/PTArray.jl")
+include("../../src/FEM/PTFields.jl")
+include("../../src/FEM/PTCellFields.jl")
+include("../../src/FEM/PTIntegrand.jl")
+include("../../src/FEM/PTAssemblers.jl")
 
 root = pwd()
 model = DiscreteModelFromFile(joinpath(root,"models/cube2x2.json"))
@@ -102,14 +107,71 @@ for k in 1:2
   end
 end
 
-μ = Table([rand(3) for _ = 1:2])
-tag_to_object = []
-for μi in μ, ti in times
-  if isa(trial.dirichlet_μt,Vector)
-    push!(tag_to_object,map(o->o(μi,ti),U.dirichlet_μt))
-  else
-    push!(tag_to_object,trial.dirichlet_μt(μi,ti))
-  end
-end
-dirichlet_dof_to_tag = Gridap.FESpaces.get_dirichlet_dof_tag(test)
-_tag_to_object = Gridap.FESpaces._convert_to_collectable(tag_to_object,num_dirichlet_tags(test))
+fs = trial(μ,t0)
+object = u0μ(μ)
+free_values = Gridap.FESpaces.zero_free_values(fs)
+dirichlet_values = Gridap.FESpaces.zero_dirichlet_values(fs)
+s = Gridap.FESpaces.get_fe_dof_basis(fs)
+trian = Gridap.FESpaces.get_triangulation(s)
+cf = CellField(object,trian,DomainStyle(s))
+b = Gridap.FESpaces.change_domain(cf,s.domain_style)
+_f = Gridap.CellData.get_data(s),Gridap.CellData.get_data(b)
+fi = map(Gridap.Arrays.testitem,_f)
+b,field = Gridap.Arrays.testargs(evaluate,fi...)[1],Gridap.Arrays.testargs(evaluate,fi...)[2]
+# c,x = field,b.nodes
+# _cf = map(fi -> Gridap.Arrays.return_cache(fi,x),c.fields)
+# lx = map((ci,fi) -> Gridap.Arrays.evaluate!(ci,fi,x),_cf,c.fields)
+# ck = Gridap.Arrays.return_cache(c.op,map(Gridap.Arrays.testitem,lx)...)
+#   f̃ = c.op
+#   x̃ = map(Gridap.Arrays.testitem,lx)
+#   fi = testitem(f̃)
+#   li = return_cache(fi,x̃...)
+#   fix = evaluate!(li,fi,x̃...)
+#   l = Vector{typeof(li)}(undef,size(f̃.fields))
+#   g = Vector{typeof(fix)}(undef,size(f̃.fields))
+#   for i in eachindex(f̃.fields)
+#     l[i] = return_cache(f̃.fields[i],x̃)
+#   end
+#   PTArray(g),l
+# r = c.op.(lx...)
+# ca = Gridap.Arrays.CachedArray(r)
+
+# sx = size(x)
+# Gridap.Arrays.setsize!(ca,sx)
+# lx = map((ci,fi) -> evaluate!(ci,fi,x),_cf,c.fields)
+# r = ca.array
+# for i in eachindex(x)
+#   @inbounds r[i] = evaluate!(ck,c.op,map(lxi -> lxi[i], lx)...)
+# end
+c,cf = Gridap.Arrays.return_cache(b,field)
+vals = evaluate!(cf,field,b.nodes)
+ndofs = length(b.dof_to_node)
+S = eltype(vals)
+ncomps = num_components(S)
+
+gμ(x,t) = exp(-x[1])*abs(sin(t))
+gμ(t) = x->gμ(x,t)
+trialμ = Gridap.TransientTrialFESpace(test,gμ)
+fs = trialμ(t0)
+objectμ = u0μ(μ[1])
+free_valuesμ = Gridap.FESpaces.zero_free_values(fs)
+dirichlet_valuesμ = Gridap.FESpaces.zero_dirichlet_values(fs)
+sμ = Gridap.FESpaces.get_fe_dof_basis(fs)
+cfμ = CellField(objectμ,trian,DomainStyle(sμ))
+bμ = Gridap.FESpaces.change_domain(cfμ,s.domain_style)
+fμ = Gridap.CellData.get_data(sμ),Gridap.CellData.get_data(bμ)
+fμi = map(Gridap.Arrays.testitem,fμ)
+bμ,fieldμ = Gridap.Arrays.testargs(evaluate,fμi...)[1],Gridap.Arrays.testargs(evaluate,fμi...)[2]
+# cμ,xμ = fieldμ,bμ.nodes
+# _cfμ = map(fi -> Gridap.Arrays.return_cache(fi,x),cμ.fields)
+# lxμ = map((ci,fi) -> Gridap.Arrays.evaluate!(ci,fi,x),_cfμ,cμ.fields)
+# ckμ = Gridap.Arrays.return_cache(cμ.op,map(Gridap.Arrays.testitem,lxμ)...)
+# rμ = cμ.op.(lxμ...)
+# caμ = Gridap.Arrays.CachedArray(rμ)
+cμ,cfμ = Gridap.Arrays.return_cache(bμ,fieldμ)
+cacheμ = cμ,cfμ
+# Gridap.Arrays.evaluate!(cacheμ,bμ,fieldμ)
+valsμ = evaluate!(cfμ,fieldμ,bμ.nodes)
+ndofs = length(bμ.dof_to_node)
+Sμ = eltype(valsμ)
+ncomps = num_components(Sμ)

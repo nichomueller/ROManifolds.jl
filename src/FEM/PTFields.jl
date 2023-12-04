@@ -63,3 +63,50 @@ function Arrays.evaluate!(cache,f::AbstractPTFunction,x::Point)
     gi(x)
   end
 end
+
+abstract type PTField <: Field end
+
+struct PTGenericField <: PTField
+  fields::AbstractVector{GenericField}
+  function PTGenericField(f::AbstractPTFunction)
+    fields = get_fields(f)
+    new(fields)
+  end
+end
+
+Base.size(a::PTGenericField) = size(a.fields)
+Base.length(a::PTGenericField) = length(a.fields)
+Base.IndexStyle(::Type{<:PTGenericField}) = IndexLinear()
+Base.getindex(a::PTGenericField,i::Integer) = GenericField(a.fields[i])
+Arrays.testitem(f::PTGenericField) = f[1]
+
+# function Base.broadcasted(f::PTGenericField,x)
+#   array = map(f.fields) do f
+#     f.(x)
+#   end
+#   PTArray(array)
+# end
+
+for T in (:Point,:(AbstractArray{<:Point}))
+  @eval begin
+    function Arrays.return_cache(f::PTGenericField,x::$T)
+      fi = testitem(f)
+      li = return_cache(fi,x)
+      fix = evaluate!(li,fi,x)
+      l = Vector{typeof(li)}(undef,size(f.fields))
+      g = Vector{typeof(fix)}(undef,size(f.fields))
+      for i in eachindex(f.fields)
+        l[i] = return_cache(f.fields[i],x)
+      end
+      PTArray(g),l
+    end
+
+    function Arrays.evaluate!(cache,f::PTGenericField,x::$T)
+      g,l = cache
+      for i in eachindex(f.fields)
+        g.array[i] = evaluate!(l[i],f.fields[i],x)
+      end
+      g
+    end
+  end
+end

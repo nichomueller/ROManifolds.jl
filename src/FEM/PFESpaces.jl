@@ -100,6 +100,27 @@ function FESpaces.zero_dirichlet_values(f::PTrialFESpace)
   PTArray(array)
 end
 
+function FESpaces.compute_dirichlet_values_for_tags!(
+  dirichlet_values::PTArray{T},
+  dirichlet_values_scratch::PTArray{T},
+  f::PTrialFESpace,
+  tag_to_object) where T
+
+  dirichlet_dof_to_tag = get_dirichlet_dof_tag(f)
+  @inbounds for n in eachindex(dirichlet_values)
+    dv = dirichlet_values[n]
+    dvs = dirichlet_values_scratch[n]
+    _tag_to_object = FESpaces._convert_to_collectable(tag_to_object[n],num_dirichlet_tags(f))
+    fill!(dvs,zero(eltype(T)))
+    for (tag,object) in enumerate(_tag_to_object)
+      cell_vals = FESpaces._cell_vals(f,object)
+      gather_dirichlet_values!(dvs,f.space,cell_vals)
+      FESpaces._fill_dirichlet_values_for_tag!(dv,dvs,tag,dirichlet_dof_to_tag)
+    end
+  end
+  dirichlet_values
+end
+
 # MultiField interface
 struct PMultiFieldFESpace{MS<:MultiFieldStyle,CS<:ConstraintStyle,V} <: FESpace
   vector_type::Type{V}

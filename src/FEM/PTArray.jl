@@ -1,11 +1,14 @@
-struct PTArray{T,N,A} <: AbstractArray{T,N}
-  array::A
-  function PTArray(array::AbstractArray)
-    A = typeof(array)
-    T = eltype(array)
-    N = ndims(T)
-    new{T,N,A}(array)
-  end
+# struct PTArray{T,N,A} <: AbstractArray{T,N}
+#   array::A
+#   function PTArray(array::AbstractArray)
+#     A = typeof(array)
+#     T = eltype(array)
+#     N = ndims(T)
+#     new{T,N,A}(array)
+#   end
+# end
+struct PTArray{T,N} <: AbstractArray{T,N}
+  array::AbstractArray{T,N}
 end
 
 Arrays.get_array(a::PTArray) = a.array
@@ -20,7 +23,7 @@ Base.eachindex(a::PTArray) = eachindex(a.array)
 Base.lastindex(a::PTArray) = lastindex(a.array)
 Base.getindex(a::PTArray,i...) = a.array[i...]
 Base.setindex!(a::PTArray,v,i...) = a.array[i...] = v
-Base.iterate(a::PTArray,i...) = iterate(a.array,i...)
+# Base.iterate(a::PTArray,i...) = iterate(a.array,i...)
 
 function Base.show(io::IO,::MIME"text/plain",a::PTArray{T}) where T
   println(io, "PTArray with eltype $T and elements")
@@ -158,15 +161,15 @@ function LinearAlgebra.fillstored!(a::PTArray,z)
   end
 end
 
-function Arrays.CachedArray(a::PTArray)
-  ai = testitem(a)
-  ci = CachedArray(ai)
-  array = Vector{typeof(ci)}(undef,length(a))
-  @inbounds for i in eachindex(a)
-    array[i] = CachedArray(a.array[i])
-  end
-  PTArray(array)
-end
+# function Arrays.CachedArray(a::PTArray)
+#   ai = testitem(a)
+#   ci = CachedArray(ai)
+#   array = Vector{typeof(ci)}(undef,length(a))
+#   @inbounds for i in eachindex(a)
+#     array[i] = CachedArray(a.array[i])
+#   end
+#   PTArray(array)
+# end
 
 function Base.map(f,a::PTArray)
   fa1 = f(testitem(a))
@@ -241,11 +244,11 @@ function Arrays.testitem(a::PTArray{T}) where T
   end
 end
 
-function Arrays.setsize!(a::PTArray{<:CachedArray},size::Tuple{Vararg{Int}})
-  @inbounds for i in eachindex(a)
-    setsize!(a[i],size)
-  end
-end
+# function Arrays.setsize!(a::PTArray{<:CachedArray},size::Tuple{Vararg{Int}})
+#   @inbounds for i in eachindex(a)
+#     setsize!(a[i],size)
+#   end
+# end
 
 function LinearAlgebra.ldiv!(a::PTArray,m::LU,b::PTArray)
   @inbounds for i = eachindex(a)
@@ -254,9 +257,9 @@ function LinearAlgebra.ldiv!(a::PTArray,m::LU,b::PTArray)
   end
 end
 
-function Arrays.get_array(a::PTArray{<:CachedArray})
-  map(x->getproperty(x,:array),a)
-end
+# function Arrays.get_array(a::PTArray{<:CachedArray})
+#   map(x->getproperty(x,:array),a)
+# end
 
 function get_at_offsets(x::PTArray{<:AbstractVector},offsets::Vector{Int},row::Int)
   map(y->y[offsets[row]+1:offsets[row+1]],x)
@@ -442,13 +445,13 @@ function Arrays.evaluate!(
   PTArray(array)
 end
 
-function Utils.recenter(a::PTArray{T},a0::PTArray{T};kwargs...) where T
-  n = length(a)
-  n0 = length(a0)
-  ndiff = Int(n/n0)
-  array = Vector{T}(undef,n)
-  @inbounds for i = 1:n0
-    array[(i-1)*ndiff+1:i*ndiff] = recenter(a[(i-1)*ndiff+1:i*ndiff],a0[i];kwargs...)
-  end
-  PTArray(array)
-end
+# function Utils.recenter(a::PTArray{T},a0::PTArray{T};kwargs...) where T
+#   n = length(a)
+#   n0 = length(a0)
+#   ndiff = Int(n/n0)
+#   array = Vector{T}(undef,n)
+#   @inbounds for i = 1:n0
+#     array[(i-1)*ndiff+1:i*ndiff] = recenter(a[(i-1)*ndiff+1:i*ndiff],a0[i];kwargs...)
+#   end
+#   PTArray(array)
+# end

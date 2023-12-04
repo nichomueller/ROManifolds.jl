@@ -85,36 +85,50 @@ import Gridap.TensorValues: double_contraction
 import Gridap.TensorValues: symmetric_part
 
 export Table
+
 export PSpace
 export UniformSampling
 export NormalSampling
 export realization
+include("PSpace.jl")
+
 export ∂ₚt
 export ∂ₚtt
+include("PDiffOperators.jl")
+
 export PTArray
 export get_at_offsets
 export recenter
-export split_fields
-export field_offsets
+include("PTArray.jl")
+
 export AbstractPTFunction
 export PFunction
 export PTFunction
+export PTField
+export PTGenericField
+include("PTFields.jl")
+
+export PTrialFESpace
+export PMultiFieldFESpace
+export split_fields
+export field_offsets
+include("PFESpaces.jl")
+
 export PTCellField
-export GenericPTCellField
-export PTOperationCellField
-export PTSingleFieldFEFunction
-export PTTransientCellField
-export PTTransientSingleFieldCellField
-export PTSingleFieldTypes
-export PTMultiFieldCellField
-export PTMultiFieldFEFunction
-export PTTransientMultiFieldCellField
+include("PTCellFields.jl")
+
 export PTIntegrand
 export ∫ₚ
 export CollectionPTIntegrand
+include("PTIntegrand.jl")
+
+include("PTAssemblers.jl")
+
 export PTTrialFESpace
 export PTMultiFieldFESpace
 export PTMultiFieldTrialFESpace
+include("PTFESpaces.jl")
+
 export PTFEOperator
 export PTFEOperatorFromWeakForm
 export AffinePTFEOperator
@@ -126,39 +140,37 @@ export nonlinear_operator
 export auxiliary_operator
 export residual_for_trian!
 export jacobian_for_trian!
+include("PTFEOperator.jl")
+
 export PODEOperator
 export AffinePODEOperator
 export PODEOpFromFEOp
+include("PODEOperatorInterface.jl")
+
 export PTOperator
 export get_ptoperator
 export update_ptoperator
-export _check_convergence
+include("PTOperator.jl")
+
 export PODESolver
 export PThetaMethod
 export PODESolution
 export num_time_dofs
 export get_times
+export _check_convergence
+include("PTSolvers.jl")
+
 export PTThetaAffineMethodOperator
+include("PAffineThetaMethod.jl")
+
 export PTThetaMethodOperator
+include("PThetaMethod.jl")
+
 export get_order
 export get_L2_norm_matrix
 export get_H1_norm_matrix
-export ReducedMeasure
-
-include("PSpace.jl")
-include("PDiffOperators.jl")
-include("PTArray.jl")
-include("PTFields.jl")
-include("PTCellFields.jl")
-include("PTIntegrand.jl")
-include("PTAssemblers.jl")
-include("PTFESpaces.jl")
-include("PTFEOperator.jl")
-include("PODEOperatorInterface.jl")
-include("PTOperator.jl")
-include("PTSolvers.jl")
-include("PAffineThetaMethod.jl")
-include("PThetaMethod.jl")
 include("FEUtils.jl")
+
+export ReducedMeasure
 include("ReducedMeasure.jl")
 end # module
