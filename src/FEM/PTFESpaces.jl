@@ -96,8 +96,7 @@ Time derivative of the Dirichlet functions
 """
 Time 2nd derivative of the Dirichlet functions
 """
-∂ₚtt(U::PTTrialFESpace) =
-  PTTrialFESpace(U.space,∂ₚtt.(U.dirichlet_μt))
+∂ₚtt(U::PTTrialFESpace) = PTTrialFESpace(U.space,∂ₚtt.(U.dirichlet_μt))
 
 # Define the PTrialFESpace interface for affine spaces
 
@@ -118,6 +117,12 @@ function Arrays.evaluate(U::FESpace,μ,t)
 end
 
 Arrays.evaluate(U::FESpace,::Nothing,::Nothing) = U
+
+function FESpaces.SparseMatrixAssembler(
+  trial::PTTrialFESpace,
+  test::FESpace)
+  SparseMatrixAssembler(trial(nothing,nothing),test)
+end
 
 # Define the interface for MultiField
 
@@ -179,7 +184,7 @@ function ∂ₚt(U::PTMultiFieldTrialFESpace)
 end
 
 function FESpaces.SparseMatrixAssembler(
-  trial::Union{PTTrialFESpace,PTMultiFieldTrialFESpace},
+  trial::PTMultiFieldTrialFESpace,
   test::FESpace)
   SparseMatrixAssembler(trial(nothing,nothing),test)
 end

@@ -9,7 +9,7 @@ function Fields.integrate(a::PTIntegrand)
   integrate(a.object,a.meas)
 end
 
-struct CollectionPTIntegrand{N} <: CollectionPTIntegrand{N}
+struct CollectionPTIntegrand{N}
   operations::NTuple{N,Union{typeof(+),typeof(-)}}
   integrands::NTuple{N,PTIntegrand}
 end
