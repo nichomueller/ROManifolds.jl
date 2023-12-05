@@ -1,14 +1,11 @@
-# struct PTArray{T,N,A} <: AbstractArray{T,N}
-#   array::A
-#   function PTArray(array::AbstractArray)
-#     A = typeof(array)
-#     T = eltype(array)
-#     N = ndims(T)
-#     new{T,N,A}(array)
-#   end
-# end
-struct PTArray{T,N} <: AbstractArray{T,N}
-  array::AbstractArray{T,N}
+struct PTArray{T,N,A} <: AbstractArray{T,N}
+  array::A
+  function PTArray(array::AbstractArray)
+    A = typeof(array)
+    T = eltype(array)
+    N = isa(T,AbstractArray) ? ndims(T) : 1
+    new{T,N,A}(array)
+  end
 end
 
 Arrays.get_array(a::PTArray) = a.array
@@ -23,7 +20,6 @@ Base.eachindex(a::PTArray) = eachindex(a.array)
 Base.lastindex(a::PTArray) = lastindex(a.array)
 Base.getindex(a::PTArray,i...) = a.array[i...]
 Base.setindex!(a::PTArray,v,i...) = a.array[i...] = v
-# Base.iterate(a::PTArray,i...) = iterate(a.array,i...)
 
 function Base.show(io::IO,::MIME"text/plain",a::PTArray{T}) where T
   println(io, "PTArray with eltype $T and elements")
@@ -244,22 +240,12 @@ function Arrays.testitem(a::PTArray{T}) where T
   end
 end
 
-# function Arrays.setsize!(a::PTArray{<:CachedArray},size::Tuple{Vararg{Int}})
-#   @inbounds for i in eachindex(a)
-#     setsize!(a[i],size)
-#   end
-# end
-
 function LinearAlgebra.ldiv!(a::PTArray,m::LU,b::PTArray)
   @inbounds for i = eachindex(a)
     ai,bi = a[i],b[i]
     ldiv!(ai,m,bi)
   end
 end
-
-# function Arrays.get_array(a::PTArray{<:CachedArray})
-#   map(x->getproperty(x,:array),a)
-# end
 
 function get_at_offsets(x::PTArray{<:AbstractVector},offsets::Vector{Int},row::Int)
   map(y->y[offsets[row]+1:offsets[row+1]],x)
@@ -294,7 +280,7 @@ function Arrays.return_cache(
   for i = eachindex(a)
     cache[i] = return_cache(f,a[i],b...)
   end
-  cache,array
+  cache,PTArray(array)
 end
 
 function Arrays.evaluate!(
@@ -307,7 +293,7 @@ function Arrays.evaluate!(
   @inbounds for i = eachindex(array)
     array[i] = evaluate!(cx[i],f,a[i],b)
   end
-  PTArray(array)
+  array
 end
 
 function Arrays.evaluate!(
@@ -320,7 +306,7 @@ function Arrays.evaluate!(
   @inbounds for i = eachindex(array)
     array[i] = evaluate!(cx[i],f,a[i],b)
   end
-  PTArray(array)
+  array
 end
 
 function Arrays.evaluate!(
@@ -333,7 +319,7 @@ function Arrays.evaluate!(
   @inbounds for i = eachindex(array)
     array[i] = evaluate!(cx[i],f,b[i],a)
   end
-  PTArray(array)
+  array
 end
 
 function Arrays.evaluate!(
@@ -346,7 +332,7 @@ function Arrays.evaluate!(
   @inbounds for i = eachindex(array)
     array[i] = evaluate!(cx[i],f,a[i],b)
   end
-  PTArray(array)
+  array
 end
 
 function Arrays.evaluate!(
@@ -359,7 +345,7 @@ function Arrays.evaluate!(
   @inbounds for i = eachindex(array)
     array[i] = evaluate!(cx[i],f,b[i],a)
   end
-  PTArray(array)
+  array
 end
 
 function Arrays.evaluate!(
@@ -372,7 +358,7 @@ function Arrays.evaluate!(
   @inbounds for i = eachindex(array)
     array[i] = evaluate!(cx[i],f,a[i],b)
   end
-  PTArray(array)
+  array
 end
 
 function Arrays.evaluate!(
@@ -385,20 +371,94 @@ function Arrays.evaluate!(
   @inbounds for i = eachindex(array)
     array[i] = evaluate!(cx[i],f,b[i],a)
   end
-  PTArray(array)
+  array
 end
 
 function Arrays.evaluate!(
   cache,
   f::BroadcastingFieldOpMap,
   a::PTArray,
-  b::AbstractArray...)
+  x::Vararg{AbstractArray})
 
   cx,array = cache
   @inbounds for i = eachindex(array)
-    array[i] = evaluate!(cx[i],f,a[i],b...)
+    axi = get_at_index(i,(a,x...))
+    array[i] = evaluate!(cx[i],f,axi...)
+  end
+  array
+end
+
+function Base.getindex(k::Broadcasting{<:PosNegReindex{<:PTArray,<:PTArray}},i::Int)
+  fi = PosNegReindex(k.f.values_pos[i],k.f.values_neg[i])
+  Broadcasting(fi)
+end
+
+function Arrays.return_value(
+  k::Broadcasting{<:PosNegReindex{<:PTArray,<:PTArray}},
+  x::Union{Number,AbstractArray{<:Number}}...)
+
+  npos = length(k.f.values_pos)
+  nneg = length(k.f.values_neg)
+  @assert npos == nneg
+  v1 = return_value(k[1],x...)
+  array = Vector{typeof(v1)}(undef,npos)
+  for i = 1:npos
+    array[i] = return_value(k[i],x...)
   end
   PTArray(array)
+end
+
+function Arrays.return_cache(
+  k::Broadcasting{<:PosNegReindex{<:PTArray,<:PTArray}},
+  x::Union{Number,AbstractArray{<:Number}}...)
+
+  npos = length(k.f.values_pos)
+  nneg = length(k.f.values_neg)
+  @assert npos == nneg
+  c1 = return_cache(k[1],x...)
+  b1 = evaluate!(c1,k[1],x...)
+  cache = Vector{typeof(c1)}(undef,npos)
+  array = Vector{typeof(b1)}(undef,npos)
+  for i = 1:npos
+    cache[i] = return_cache(k[i],x...)
+  end
+  cache,PTArray(array)
+end
+
+function Arrays.evaluate!(
+  cache,
+  k::Broadcasting{<:PosNegReindex{<:PTArray,<:PTArray}},
+  x::Union{Number,AbstractArray{<:Number}}...)
+
+  cx,array = cache
+  @inbounds for i = eachindex(array)
+    array[i] = evaluate!(cx[i],k[i],x...)
+  end
+  array
+end
+
+function Arrays.evaluate!(
+  cache,
+  k::Broadcasting{<:PosNegReindex{<:PTArray,<:PTArray}},
+  x::AbstractArray{<:Number})
+
+  cx,array = cache
+  @inbounds for i = eachindex(array)
+    array[i] = evaluate!(cx[i],k[i],x)
+  end
+  array
+end
+
+function Arrays.evaluate!(
+  cache,
+  k::Broadcasting{<:PosNegReindex{<:PTArray,<:PTArray}},
+  x::Number...)
+
+  cx,array = cache
+  @inbounds for i = eachindex(array)
+    array[i] = evaluate!(cx[i],k[i],x...)
+  end
+  array
 end
 
 function Arrays.return_value(
@@ -428,7 +488,7 @@ function Arrays.return_cache(
   for i = eachindex(a)
     cache[i] = return_cache(f,a[i],w,j)
   end
-  cache,array
+  cache,PTArray(array)
 end
 
 function Arrays.evaluate!(
@@ -442,7 +502,16 @@ function Arrays.evaluate!(
   @inbounds for i = eachindex(array)
     array[i] = evaluate!(cx[i],f,a[i],w,j)
   end
-  PTArray(array)
+  array
+end
+
+function Fields.linear_combination(a::PTArray,b::AbstractArray)
+  ab1 = linear_combination(a[1],b)
+  c = Vector{typeof(ab1)}(undef,length(a))
+  for i in eachindex(a)
+    c[i] = linear_combination(a[i],b)
+  end
+  PTArray(c)
 end
 
 # function Utils.recenter(a::PTArray{T},a0::PTArray{T};kwargs...) where T
