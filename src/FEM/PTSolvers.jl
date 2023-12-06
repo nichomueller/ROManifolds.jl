@@ -81,7 +81,7 @@ function Base.iterate(sol::PODESolution,state)
 end
 
 function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::PTArray)
-  ns = Vector{LUNumericalSetup}(undef,length(mat))
+  ns = Vector{Algebra.LUNumericalSetup}(undef,length(mat))
   @inbounds for k = eachindex(mat)
     ns[k] = numerical_setup(ss,mat[k])
   end

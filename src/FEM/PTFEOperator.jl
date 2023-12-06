@@ -158,45 +158,47 @@ function Gridap.Algebra.allocate_residual(
   op::PTFEOperator,
   μ::P,
   t::T,
-  uh::PTCellField,
-  cache) where {P,T}
+  xh::S,
+  cache) where {P,T,S}
 
-  V = get_test(op)
-  v = get_fe_basis(V)
-  dxh = ()
-  for _ in 1:get_order(op)
-    dxh = (dxh...,uh)
-  end
-  xh = TransientCellField(uh,dxh)
+  test = get_test(op)
+  v = get_fe_basis(test)
   res = get_residual(op)
   dc = integrate(res(μ,t,xh,v))
-  dc1 = testitem(dc)
-  vecdata1 = collect_cell_vector(V,dc1)
-  allocate_vector(dc,op.assem,vecdata1;N=length(uh))
+  vecdata = collect_cell_vector(test,dc)
+  assem = op.assem
+  for trian in get_domains(dc)
+    if typeof(dc[trian]) <: AbstractArray{<:PTArray}
+      assem = PTSparseMatrixAssembler(assem,μ,t)
+      break
+    end
+  end
+  allocate_vector(assem,vecdata)
 end
 
 function Gridap.Algebra.allocate_jacobian(
   op::PTFEOperator,
   μ::P,
   t::T,
-  uh::PTCellField,
+  xh::S,
   i::Integer,
-  cache) where {P,T}
+  cache) where {P,T,S}
 
-  Uh = get_trial(op)(μ,t)
-  V = get_test(op)
-  u = get_trial_fe_basis(Uh)
-  v = get_fe_basis(V)
-  dxh = ()
-  for _ in 1:get_order(op)
-    dxh = (dxh...,uh)
-  end
-  xh = TransientCellField(uh,dxh)
+  trial = get_trial(op)(μ,t)
+  test = get_test(op)
+  u = get_trial_fe_basis(trial)
+  v = get_fe_basis(test)
   jac = get_jacobian(op)
   dc = integrate(jac[i](μ,t,xh,u,v))
-  dc1 = testitem(dc)
-  matdata1 = collect_cell_matrix(Uh,V,dc1)
-  allocate_matrix(dc,op.assem,matdata1;N=length(uh))
+  matdata = collect_cell_matrix(trial,test,dc)
+  assem = op.assem
+  for trian in get_domains(dc)
+    if typeof(dc[trian]) <: AbstractArray{<:PTArray}
+      assem = PTSparseMatrixAssembler(assem,μ,t)
+      break
+    end
+  end
+  allocate_matrix(assem,matdata)
 end
 
 function Algebra.residual!(
@@ -207,11 +209,11 @@ function Algebra.residual!(
   xh::S,
   cache) where {T,S}
 
-  V = get_test(op)
-  v = get_fe_basis(V)
+  test = get_test(op)
+  v = get_fe_basis(test)
   res = get_residual(op)
   dc = integrate(res(μ,t,xh,v))
-  vecdata = collect_cell_vector(V,dc)
+  vecdata = collect_cell_vector(test,dc)
   assemble_vector_add!(b,op.assem,vecdata)
   b
 end
@@ -225,14 +227,14 @@ function residual_for_trian!(
   cache,
   args...) where {T,S}
 
-  V = get_test(op)
-  v = get_fe_basis(V)
+  test = get_test(op)
+  v = get_fe_basis(test)
   res = get_residual(op)
   dc = integrate(res(μ,t,xh,v),args...)
   trian = get_domains(dc)
   bvec = Vector{typeof(b)}(undef,num_domains(dc))
   for (n,t) in enumerate(trian)
-    vecdata = collect_cell_vector(V,dc,t)
+    vecdata = collect_cell_vector(test,dc,t)
     assemble_vector_add!(b,op.assem,vecdata)
     bvec[n] = copy(b)
   end
@@ -265,16 +267,16 @@ function jacobian_for_trian!(
   cache,
   args...) where {T,S}
 
-  Uh = get_trial(op)(μ,t)
-  V = get_test(op)
-  u = get_trial_fe_basis(Uh)
-  v = get_fe_basis(V)
+  trial = get_trial(op)(μ,t)
+  test = get_test(op)
+  u = get_trial_fe_basis(trial)
+  v = get_fe_basis(test)
   jac = get_jacobian(op)
   dc = γᵢ*integrate(jac[i](μ,t,uh,u,v),args...)
   trian = get_domains(dc)
   Avec = Vector{typeof(A)}(undef,num_domains(dc))
   for (n,t) in enumerate(trian)
-    matdata = collect_cell_matrix(Uh,V,dc,t)
+    matdata = collect_cell_matrix(trial,test,dc,t)
     assemble_matrix_add!(A,op.assem,matdata)
     Avec[n] = copy(A)
   end
@@ -323,11 +325,11 @@ function TransientFETools._matdata_jacobian(
   i::Integer,
   γᵢ::Real) where {T,S}
 
-  Uh = get_trial(op)(μ,t)
-  V = get_test(op)
-  u = get_trial_fe_basis(Uh)
-  v = get_fe_basis(V)
+  trial = get_trial(op)(μ,t)
+  test = get_test(op)
+  u = get_trial_fe_basis(trial)
+  v = get_fe_basis(test)
   jac = get_jacobian(op)
   dc = γᵢ*integrate(jac[i](μ,t,xh,u,v))
-  collect_cell_matrix(Uh,V,dc)
+  collect_cell_matrix(trial,test,dc)
 end

@@ -1,3 +1,92 @@
+abstract type PTBuilder end
+
+Algebra.LoopStyle(::Type{<:PTBuilder}) = Loop()
+
+struct SparsePTMatrixBuilder{B} <: PTBuilder
+  builder::B
+  length::Integer
+end
+
+struct PTArrayBuilder{B} <: PTBuilder
+  builder::B
+  length::Integer
+end
+
+struct PTCounter{C}
+  counter::C
+  length::Integer
+end
+
+Algebra.LoopStyle(::Type{<:PTCounter}) = Loop()
+
+struct PTInserter{I}
+  inserters::PTArray{I}
+  function PTInserter(inserter::I,len::Integer) where I
+    array = Vector{I}(undef,len)
+    for i = 1:len
+      array[i] = copy(inserter)
+    end
+    new{I}(PTArray(array))
+  end
+end
+
+Algebra.LoopStyle(::Type{<:PTInserter}) = Loop()
+
+function PTSparseMatrixAssembler(assem::SparseMatrixAssembler,μ,t)
+  len = _length(μ,t)
+  GenericSparseMatrixAssembler(
+    SparsePTMatrixBuilder(assem.matrix_builder,len),
+    PTArrayBuilder(assem.vector_builder,len),
+    assem.rows,
+    assem.cols,
+    assem.strategy)
+end
+
+function Algebra.nz_counter(b::PTBuilder,args...)
+  counter = nz_counter(b.builder,args...)
+  PTCounter(counter,b.length)
+end
+
+function Algebra.nz_allocation(c::PTCounter)
+  inserter = nz_allocation(c.counter)
+  PTInserter(inserter,c.length)
+end
+
+@inline function Algebra.add_entry!(f::Function,c::PTCounter,args...)
+  add_entry!(f,c.counter,args...)
+end
+
+function Algebra.create_from_nz(i::PTInserter)
+  A = create_from_nz(first(i.inserters))
+  array = Vector{typeof(A)}(undef,length(i.inserters))
+  for j = eachindex(i.inserters)
+    array[j] = copy(A)
+  end
+  PTArray(array)
+end
+
+function Base.copy(i::Algebra.InserterCSC)
+  Algebra.InserterCSC(
+    copy(i.nrows),
+    copy(i.ncols),
+    copy(i.colptr),
+    copy(i.colnnz),
+    copy(i.rowval),
+    copy(i.nzval))
+end
+
+@inline function Algebra.add_entry!(f::Function,i::PTInserter,args...)
+  for inserter in i.inserters
+    add_entry!(f,inserter,args...)
+  end
+end
+
+@inline function Algebra.add_entry!(f::Function,i::PTInserter,v::PTArray,args...)
+  for (inserter,value) in zip(i.inserters,v.array)
+    add_entry!(f,inserter,value,args...)
+  end
+end
+
 function Gridap.FESpaces.collect_cell_vector(
   test::FESpace,
   a::DomainContribution,
@@ -38,6 +127,22 @@ function Gridap.FESpaces.collect_cell_matrix(
 end
 
 Algebra.create_from_nz(a::PTArray) = a
+
+@inline function Algebra._add_entries!(combine::Function,A::PTArray,vs,is,js)
+  for (lj,j) in enumerate(js)
+    if j>0
+      for (li,i) in enumerate(is)
+        if i>0
+          for Ak in A
+            vij = vs[li,lj]
+            add_entry!(combine,Ak,vij,i,j)
+          end
+        end
+      end
+    end
+  end
+  A
+end
 
 @inline function Algebra._add_entries!(combine::Function,A::PTArray,vs::Nothing,is,js)
   for (lj,j) in enumerate(js)
@@ -81,6 +186,18 @@ end
   A
 end
 
+@inline function Algebra._add_entries!(combine::Function,A::PTArray,vs,is)
+  for (li, i) in enumerate(is)
+    if i>0
+      for Ak in A
+        vi = vs[li]
+        add_entry!(Ak,vi,i)
+      end
+    end
+  end
+  A
+end
+
 @inline function Algebra._add_entries!(combine::Function,A::PTArray,vs::PTArray,is)
   for (li, i) in enumerate(is)
     if i>0
@@ -92,31 +209,3 @@ end
   end
   A
 end
-
-# function Algebra.allocate_matrix(::PTDomainContribution,a::SparseMatrixAssembler,matdata;N=1)
-#   A = allocate_matrix(a,matdata)
-#   array = Vector{typeof(A)}(undef,N)
-#   @inbounds for n = 1:N
-#     array[n] = copy(A)
-#   end
-#   PTArray(array)
-# end
-
-# function Algebra.allocate_matrix(::DomainContribution,a::SparseMatrixAssembler,matdata;N=1)
-#   A = allocate_matrix(a,matdata)
-#   AffinePTArray(A,N)
-# end
-
-# function Algebra.allocate_vector(::PTDomainContribution,a::SparseMatrixAssembler,vecdata;N=1)
-#   b = allocate_vector(a,vecdata)
-#   array = Vector{typeof(b)}(undef,N)
-#   @inbounds for n = 1:N
-#     array[n] = copy(b)
-#   end
-#   PTArray(array)
-# end
-
-# function Algebra.allocate_vector(::DomainContribution,a::SparseMatrixAssembler,vecdata;N=1)
-#   b = allocate_vector(a,vecdata)
-#   AffinePTArray(b,N)
-# end

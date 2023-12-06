@@ -78,7 +78,6 @@ import Gridap.ODEs.TransientFETools: allocate_trial_space
 import Gridap.ODEs.TransientFETools: fill_jacobians
 import Gridap.ODEs.TransientFETools: _matdata_jacobian
 import Gridap.ODEs.TransientFETools: _vcat_matdata
-import Gridap.ODEs.TransientFETools: _to_transient_single_fields
 import Gridap.TensorValues: inner
 import Gridap.TensorValues: outer
 import Gridap.TensorValues: double_contraction

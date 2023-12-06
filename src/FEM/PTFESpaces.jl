@@ -17,9 +17,7 @@ end
 Allocate the space to be used as first argument in evaluate!
 """
 function TransientFETools.allocate_trial_space(U::PTTrialFESpace,μ,t)
-  _length(a::Vector{<:Number}) = 1
-  _length(a) = length(a)
-  HomogeneousPTrialFESpace(U.space,_length(μ)*length(t))
+  HomogeneousPTrialFESpace(U.space,_length(μ,t))
 end
 
 function TransientFETools.allocate_trial_space(

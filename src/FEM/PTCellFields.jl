@@ -41,6 +41,10 @@ function FESpaces.FEFunction(
   SingleFieldPTFEFunction(cell_field,cell_vals,free_values,dirichlet_values,fs)
 end
 
+function TransientFETools.TransientCellField(single_field::SingleFieldPTFEFunction,derivatives::Tuple)
+  TransientSingleFieldCellField(single_field,derivatives)
+end
+
 struct MultiFieldPTFEFunction{T<:MultiFieldCellField} <: FEFunction
   single_fe_functions::Vector{<:SingleFieldPTFEFunction}
   free_values::AbstractArray
@@ -64,7 +68,7 @@ struct MultiFieldPTFEFunction{T<:MultiFieldCellField} <: FEFunction
 end
 
 CellData.get_data(f::MultiFieldPTFEFunction) = get_data(f.multi_cell_field)
-CellData.get_triangulation(f::MultiFieldPTFEFunction) = get_triangulation(f.multi_cell_field)
+FESpaces.get_triangulation(f::MultiFieldPTFEFunction) = get_triangulation(f.multi_cell_field)
 CellData.DomainStyle(::Type{MultiFieldPTFEFunction{T}}) where T = DomainStyle(T)
 FESpaces.get_free_dof_values(f::MultiFieldPTFEFunction) = f.free_values
 FESpaces.get_fe_space(f::MultiFieldPTFEFunction) = f.fe_space
@@ -102,4 +106,9 @@ function FESpaces.FEFunction(fe::PTMultiFieldTrialFESpace,free_values::PTArray)
     FEFunction(fe.spaces[i],free_values_i)
   end
   MultiFieldPTFEFunction(free_values,fe,blocks)
+end
+
+function TransientFETools.TransientCellField(multi_field::MultiFieldPTFEFunction,derivatives::Tuple)
+  transient_single_fields = TransientFETools._to_transient_single_fields(multi_field,derivatives)
+  PTTransientMultiFieldCellField(multi_field,derivatives,transient_single_fields)
 end

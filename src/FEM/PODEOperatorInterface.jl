@@ -53,9 +53,14 @@ function Gridap.Algebra.allocate_residual(
   uhF::PTArray,
   ode_cache) where T
 
-  Us,_,fecache = ode_cache
-  uh = EvaluationFunction(Us[1],uhF)
-  allocate_residual(op.feop,μ,t,uh,fecache)
+  Xh,_,fecache = ode_cache
+  uh = EvaluationFunction(Xh[1],uhF)
+  dxh = ()
+  for _ in 1:get_order(op)
+    dxh = (dxh...,uh)
+  end
+  xh = TransientCellField(uh,dxh)
+  allocate_residual(op.feop,μ,t,xh,fecache)
 end
 
 function Gridap.Algebra.allocate_jacobian(
@@ -66,9 +71,14 @@ function Gridap.Algebra.allocate_jacobian(
   i::Integer,
   ode_cache) where T
 
-  Us,_,fecache = ode_cache
-  uh = EvaluationFunction(Us[1],uhF)
-  allocate_jacobian(op.feop,μ,t,uh,i,fecache)
+  Xh,_,fecache = ode_cache
+  uh = EvaluationFunction(Xh[1],uhF)
+  dxh = ()
+  for _ in 1:get_order(op)
+    dxh = (dxh...,uh)
+  end
+  xh = TransientCellField(uh,dxh)
+  allocate_jacobian(op.feop,μ,t,xh,i,fecache)
 end
 
 for fun in (:(Algebra.residual!),:residual_for_trian!)

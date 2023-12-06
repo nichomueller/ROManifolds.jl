@@ -3,28 +3,29 @@ struct PTArray{T,N,A} <: AbstractArray{T,N}
   function PTArray(array::AbstractArray)
     A = typeof(array)
     T = eltype(array)
-    N = isa(T,AbstractArray) ? ndims(T) : 1
+    N = T <: AbstractArray ? ndims(T) : 1
     new{T,N,A}(array)
   end
 end
 
 Arrays.get_array(a::PTArray) = a.array
+Arrays.testitem(a::PTArray) = testitem(get_array(a))
 Base.size(a::PTArray,i...) = size(testitem(a),i...)
 Base.eltype(::Type{PTArray{T}}) where T = eltype(T)
 Base.eltype(::PTArray{T}) where T = eltype(T)
 Base.ndims(::PTArray{T,N} where T) where N = N
 Base.ndims(::Type{PTArray{T,N}} where T) where N = N
-Base.first(a::PTArray) = first(testitem(a))
-Base.length(a::PTArray) = length(a.array)
-Base.eachindex(a::PTArray) = eachindex(a.array)
-Base.lastindex(a::PTArray) = lastindex(a.array)
-Base.getindex(a::PTArray,i...) = a.array[i...]
-Base.setindex!(a::PTArray,v,i...) = a.array[i...] = v
+Base.first(a::PTArray) = testitem(a)#first(testitem(a))
+Base.length(a::PTArray) = length(get_array(a))
+Base.eachindex(a::PTArray) = eachindex(get_array(a))
+Base.lastindex(a::PTArray) = lastindex(get_array(a))
+Base.getindex(a::PTArray,i...) = get_array(a)[i...]
+Base.setindex!(a::PTArray,v,i...) = get_array(a)[i...] = v
 
 function Base.show(io::IO,::MIME"text/plain",a::PTArray{T}) where T
   println(io, "PTArray with eltype $T and elements")
   for i in eachindex(a)
-    println(io,"  ",a.array[i])
+    println(io,"  ",a[i])
   end
 end
 
@@ -55,19 +56,21 @@ function Base.zeros(a::PTArray)
 end
 
 function Base.sum(a::PTArray)
-  sum(a.array)
+  sum(get_array(a))
 end
 
 for op in (:+,:-,:*)
   @eval begin
     function ($op)(a::PTArray,b::PTArray)
-      map($op,a,b)
+      array = ($op)(get_array(a),get_array(b))
+      PTArray(array)
     end
   end
 end
 
 function Base.:*(a::PTArray,b::Number)
-  map(ai->(*)(ai,b),a)
+  array = get_array(a)*b
+  PTArray(array)
 end
 
 function Base.:*(a::Number,b::PTArray)
@@ -167,11 +170,12 @@ end
 #   PTArray(array)
 # end
 
-function Base.map(f,a::PTArray)
-  fa1 = f(testitem(a))
-  array = Vector{typeof(fa1)}(undef,length(a))
-  @inbounds for i = eachindex(a)
-    array[i] = f(a[i])
+function Base.map(f,a::PTArray...)
+  fa1 = f(map(testitem,a)...)
+  array = Vector{typeof(fa1)}(undef,length(first(a)))
+  @inbounds for i = eachindex(first(a))
+    ai = map(x->getindex(x,i),a)
+    array[i] = f(ai...)
   end
   PTArray(array)
 end
@@ -180,7 +184,7 @@ function Base.map(f,a::PTArray,b::AbstractArray...)
   f1 = f(a[1],b...)
   array = Vector{typeof(f1)}(undef,length(a))
   @inbounds for i = eachindex(a)
-    array[i] = f(b[1],b...)
+    array[i] = f(a[i],b...)
   end
   PTArray(array)
 end
@@ -232,14 +236,6 @@ function Base.materialize!(a::PTArray,b::PTBroadcasted)
   a
 end
 
-function Arrays.testitem(a::PTArray{T}) where T
-  if length(a) != 0
-    a[1]
-  else
-    fill(eltype(a),1)
-  end
-end
-
 function LinearAlgebra.ldiv!(a::PTArray,m::LU,b::PTArray)
   @inbounds for i = eachindex(a)
     ai,bi = a[i],b[i]
@@ -247,23 +243,283 @@ function LinearAlgebra.ldiv!(a::PTArray,m::LU,b::PTArray)
   end
 end
 
-function get_at_offsets(x::PTArray{<:AbstractVector},offsets::Vector{Int},row::Int)
-  map(y->y[offsets[row]+1:offsets[row+1]],x)
+# function get_at_offsets(x::PTArray{<:AbstractVector},offsets::Vector{Int},row::Int)
+#   map(y->y[offsets[row]+1:offsets[row+1]],x)
+# end
+
+# function get_at_offsets(x::PTArray{<:AbstractMatrix},offsets::Vector{Int},row::Int,col::Int)
+#   map(y->y[offsets[row]+1:offsets[row+1],offsets[col]+1:offsets[col+1]],x)
+# end
+for op in (:+,:-,:*)
+  @eval begin
+    function Arrays.return_value(
+      f::Broadcasting{typeof($op)},
+      a::PTArray)
+
+      v1 = return_value(f,a[1])
+      array = Vector{typeof(v1)}(undef,length(a))
+      for i = eachindex(a)
+        array[i] = return_value(f,a[i])
+      end
+      PTArray(array)
+    end
+
+    function Arrays.return_cache(
+      f::Broadcasting{typeof($op)},
+      a::PTArray)
+
+      c1 = return_cache(f,a[1])
+      b1 = evaluate!(c1,f,a[1])
+      cache = Vector{typeof(c1)}(undef,length(a))
+      array = Vector{typeof(b1)}(undef,length(a))
+      for i = eachindex(a)
+        cache[i] = return_cache(f,a[i])
+      end
+      cache,PTArray(array)
+    end
+
+    function Arrays.evaluate!(
+      cache,
+      f::Broadcasting{typeof($op)},
+      a::PTArray)
+
+      cx,array = cache
+      @inbounds for i = eachindex(array)
+        array[i] = evaluate!(cx[i],f,a[i])
+      end
+      array
+    end
+  end
 end
 
-function get_at_offsets(x::PTArray{<:AbstractMatrix},offsets::Vector{Int},row::Int,col::Int)
-  map(y->y[offsets[row]+1:offsets[row+1],offsets[col]+1:offsets[col+1]],x)
+for op in (:+,:-,:*)
+  @eval begin
+    function Arrays.return_value(
+      f::Broadcasting{typeof($op)},
+      a::PTArray,
+      b::AbstractArray)
+
+      v1 = return_value(f,a[1],b)
+      array = Vector{typeof(v1)}(undef,length(a))
+      for i = eachindex(a)
+        array[i] = return_value(f,a[i],b)
+      end
+      PTArray(array)
+    end
+
+    function Arrays.return_value(
+      f::Broadcasting{typeof($op)},
+      a::AbstractArray,
+      b::PTArray)
+
+      v1 = return_value(f,a,b[1])
+      array = Vector{typeof(v1)}(undef,length(b))
+      for i = eachindex(b)
+        array[i] = return_value(f,a,b[i])
+      end
+      PTArray(array)
+    end
+
+    function Arrays.return_value(
+      f::Broadcasting{typeof($op)},
+      a::PTArray,
+      b::PTArray)
+
+      v1 = return_value(f,a[1],b[1])
+      array = Vector{typeof(v1)}(undef,length(a))
+      for i = eachindex(a)
+        array[i] = return_value(f,a[i],b[i])
+      end
+      PTArray(array)
+    end
+
+    function Arrays.return_cache(
+      f::Broadcasting{typeof($op)},
+      a::PTArray,
+      b::AbstractArray)
+
+      c1 = return_cache(f,a[1],b)
+      b1 = evaluate!(c1,f,a[1],b)
+      cache = Vector{typeof(c1)}(undef,length(a))
+      array = Vector{typeof(b1)}(undef,length(a))
+      for i = eachindex(a)
+        cache[i] = return_cache(f,a[i],b)
+      end
+      cache,PTArray(array)
+    end
+
+    function Arrays.return_cache(
+      f::Broadcasting{typeof($op)},
+      a::AbstractArray,
+      b::PTArray)
+
+      c1 = return_cache(f,a,b[1])
+      b1 = evaluate!(c1,f,a,b[1])
+      cache = Vector{typeof(c1)}(undef,length(b))
+      array = Vector{typeof(b1)}(undef,length(b))
+      for i = eachindex(b)
+        cache[i] = return_cache(f,a,b[i])
+      end
+      cache,PTArray(array)
+    end
+
+    function Arrays.return_cache(
+      f::Broadcasting{typeof($op)},
+      a::PTArray,
+      b::PTArray)
+
+      c1 = return_cache(f,a[1],b[1])
+      b1 = evaluate!(c1,f,a[1],b[1])
+      cache = Vector{typeof(c1)}(undef,length(a))
+      array = Vector{typeof(b1)}(undef,length(a))
+      for i = eachindex(a)
+        cache[i] = return_cache(f,a[i],b[i])
+      end
+      cache,PTArray(array)
+    end
+
+    function Arrays.evaluate!(
+      cache,
+      f::Broadcasting{typeof($op)},
+      a::PTArray,
+      b::AbstractArray)
+
+      cx,array = cache
+      @inbounds for i = eachindex(array)
+        array[i] = evaluate!(cx[i],f,a[i],b)
+      end
+      array
+    end
+
+    function Arrays.evaluate!(
+      cache,
+      f::Broadcasting{typeof($op)},
+      a::AbstractArray,
+      b::PTArray)
+
+      cx,array = cache
+      @inbounds for i = eachindex(array)
+        array[i] = evaluate!(cx[i],f,a,b[i])
+      end
+      array
+    end
+
+    function Arrays.evaluate!(
+      cache,
+      f::Broadcasting{typeof($op)},
+      a::PTArray,
+      b::PTArray)
+
+      cx,array = cache
+      @inbounds for i = eachindex(array)
+        array[i] = evaluate!(cx[i],f,a[i],b[i])
+      end
+      array
+    end
+  end
+end
+
+function Arrays.return_value(
+  f::Broadcasting{typeof(*)},
+  a::PTArray,
+  b::Number)
+
+  v1 = return_value(f,a[1],b)
+  array = Vector{typeof(v1)}(undef,length(a))
+  for i = eachindex(a)
+    array[i] = return_value(f,a[i],b)
+  end
+  PTArray(array)
+end
+
+function Arrays.return_cache(
+  f::Broadcasting{typeof(*)},
+  a::PTArray,
+  b::Number)
+
+  c1 = return_cache(f,a[1],b)
+  b1 = evaluate!(c1,f,a[1],b)
+  cache = Vector{typeof(c1)}(undef,length(a))
+  array = Vector{typeof(b1)}(undef,length(a))
+  for i = eachindex(a)
+    cache[i] = return_cache(f,a[i],b)
+  end
+  cache,PTArray(array)
+end
+
+function Arrays.evaluate!(
+  cache,
+  f::Broadcasting{typeof(*)},
+  a::PTArray,
+  b::Number)
+
+  cx,array = cache
+  @inbounds for i = eachindex(array)
+    array[i] = evaluate!(cx[i],f,a[i],b)
+  end
+  array
+end
+
+function Arrays.return_value(
+  f::Broadcasting{typeof(*)},
+  a::Number,
+  b::PTArray)
+
+  return_value(f,b,a)
+end
+
+function Arrays.return_cache(
+  f::Broadcasting{typeof(*)},
+  a::Number,
+  b::PTArray)
+
+  return_cache(f,b,a)
+end
+
+function Arrays.evaluate!(
+  cache,
+  f::Broadcasting{typeof(*)},
+  a::Number,
+  b::PTArray)
+
+  evaluate!(cache,f,b,a)
 end
 
 function Arrays.return_value(
   f::BroadcastingFieldOpMap,
   a::PTArray,
-  b::AbstractArray...)
+  b::AbstractArray)
 
   v1 = return_value(f,a[1],b)
   array = Vector{typeof(v1)}(undef,length(a))
   for i = eachindex(a)
-    array[i] = return_value(f,a[i],b...)
+    array[i] = return_value(f,a[i],b)
+  end
+  PTArray(array)
+end
+
+function Arrays.return_value(
+  f::BroadcastingFieldOpMap,
+  a::AbstractArray,
+  b::PTArray)
+
+  v1 = return_value(f,a,b[1])
+  array = Vector{typeof(v1)}(undef,length(b))
+  for i = eachindex(b)
+    array[i] = return_value(f,a,b[i])
+  end
+  PTArray(array)
+end
+
+function Arrays.return_value(
+  f::BroadcastingFieldOpMap,
+  a::PTArray,
+  b::PTArray)
+
+  v1 = return_value(f,a[1],b[1])
+  array = Vector{typeof(v1)}(undef,length(a))
+  for i = eachindex(a)
+    array[i] = return_value(f,a[i],b[i])
   end
   PTArray(array)
 end
@@ -271,14 +527,44 @@ end
 function Arrays.return_cache(
   f::BroadcastingFieldOpMap,
   a::PTArray,
-  b::AbstractArray...)
+  b::AbstractArray)
 
-  c1 = return_cache(f,a[1],b...)
-  b1 = evaluate!(c1,f,a[1],b...)
+  c1 = return_cache(f,a[1],b)
+  b1 = evaluate!(c1,f,a[1],b)
   cache = Vector{typeof(c1)}(undef,length(a))
   array = Vector{typeof(b1)}(undef,length(a))
   for i = eachindex(a)
-    cache[i] = return_cache(f,a[i],b...)
+    cache[i] = return_cache(f,a[i],b)
+  end
+  cache,PTArray(array)
+end
+
+function Arrays.return_cache(
+  f::BroadcastingFieldOpMap,
+  a::AbstractArray,
+  b::PTArray)
+
+  c1 = return_cache(f,a,b[1])
+  b1 = evaluate!(c1,f,a,b[1])
+  cache = Vector{typeof(c1)}(undef,length(b))
+  array = Vector{typeof(b1)}(undef,length(b))
+  for i = eachindex(b)
+    cache[i] = return_cache(f,a,b[i])
+  end
+  cache,PTArray(array)
+end
+
+function Arrays.return_cache(
+  f::BroadcastingFieldOpMap,
+  a::PTArray,
+  b::PTArray)
+
+  c1 = return_cache(f,a[1],b[1])
+  b1 = evaluate!(c1,f,a[1],b[1])
+  cache = Vector{typeof(c1)}(undef,length(a))
+  array = Vector{typeof(b1)}(undef,length(a))
+  for i = eachindex(a)
+    cache[i] = return_cache(f,a[i],b[i])
   end
   cache,PTArray(array)
 end
@@ -299,12 +585,12 @@ end
 function Arrays.evaluate!(
   cache,
   f::BroadcastingFieldOpMap,
-  a::PTArray{<:AbstractMatrix},
-  b::AbstractArray{S,3} where S)
+  a::AbstractArray{T,N},
+  b::PTArray{<:AbstractArray{S,N}}) where {T,S,N}
 
   cx,array = cache
   @inbounds for i = eachindex(array)
-    array[i] = evaluate!(cx[i],f,a[i],b)
+    array[i] = evaluate!(cx[i],f,a,b[i])
   end
   array
 end
@@ -312,80 +598,205 @@ end
 function Arrays.evaluate!(
   cache,
   f::BroadcastingFieldOpMap,
-  b::PTArray{<:AbstractArray{S,3} where S},
-  a::AbstractMatrix)
+  a::PTArray{<:AbstractArray{T,N}},
+  b::PTArray{<:AbstractArray{S,N}}) where {T,S,N}
 
   cx,array = cache
   @inbounds for i = eachindex(array)
-    array[i] = evaluate!(cx[i],f,b[i],a)
+    array[i] = evaluate!(cx[i],f,a[i],b[i])
   end
   array
 end
 
-function Arrays.evaluate!(
-  cache,
-  f::BroadcastingFieldOpMap,
-  a::PTArray{<:AbstractVector},
-  b::AbstractMatrix)
+for S in (:AbstractVector,:AbstractMatrix)
+  for T in setdiff((:AbstractVector,:AbstractMatrix),(S,))
+    @eval begin
+      function Arrays.evaluate!(
+        cache,
+        f::BroadcastingFieldOpMap,
+        a::PTArray{<:$S},
+        b::$T)
 
-  cx,array = cache
-  @inbounds for i = eachindex(array)
-    array[i] = evaluate!(cx[i],f,a[i],b)
+        cx,array = cache
+        @inbounds for i = eachindex(array)
+          array[i] = evaluate!(cx[i],f,a[i],b)
+        end
+        array
+      end
+
+      function Arrays.evaluate!(
+        cache,
+        f::BroadcastingFieldOpMap,
+        a::$S,
+        b::PTArray{<:$T})
+
+        cx,array = cache
+        @inbounds for i = eachindex(array)
+          array[i] = evaluate!(cx[i],f,a,b[i])
+        end
+        array
+      end
+
+      function Arrays.evaluate!(
+        cache,
+        f::BroadcastingFieldOpMap,
+        a::PTArray{<:$S},
+        b::PTArray{<:$T})
+
+        cx,array = cache
+        @inbounds for i = eachindex(array)
+          array[i] = evaluate!(cx[i],f,a[i],b[i])
+        end
+        array
+      end
+    end
   end
-  array
+
+  @eval begin
+    function Arrays.evaluate!(
+      cache,
+      f::BroadcastingFieldOpMap,
+      a::PTArray{<:$S},
+      b::AbstractArray{U,3} where U)
+
+      cx,array = cache
+      @inbounds for i = eachindex(array)
+        array[i] = evaluate!(cx[i],f,a[i],b)
+      end
+      array
+    end
+
+    function Arrays.evaluate!(
+      cache,
+      f::BroadcastingFieldOpMap,
+      a::$S,
+      b::PTArray{<:AbstractArray{U,3}} where U)
+
+      cx,array = cache
+      @inbounds for i = eachindex(array)
+        array[i] = evaluate!(cx[i],f,a,b[i])
+      end
+      array
+    end
+
+    function Arrays.evaluate!(
+      cache,
+      f::BroadcastingFieldOpMap,
+      a::PTArray{<:AbstractArray{U,3}} where U,
+      b::$S)
+
+      cx,array = cache
+      @inbounds for i = eachindex(array)
+        array[i] = evaluate!(cx[i],f,a[i],b)
+      end
+      array
+    end
+
+    function Arrays.evaluate!(
+      cache,
+      f::BroadcastingFieldOpMap,
+      a::AbstractArray{U,3} where U,
+      b::PTArray{<:$S})
+
+      cx,array = cache
+      @inbounds for i = eachindex(array)
+        array[i] = evaluate!(cx[i],f,a,b[i])
+      end
+      array
+    end
+  end
 end
 
-function Arrays.evaluate!(
-  cache,
-  f::BroadcastingFieldOpMap,
-  b::PTArray{<:AbstractMatrix},
-  a::AbstractVector)
-
-  cx,array = cache
-  @inbounds for i = eachindex(array)
-    array[i] = evaluate!(cx[i],f,b[i],a)
-  end
-  array
+function Base.getindex(k::LinearCombinationField{<:PTArray},i::Int)
+  LinearCombinationField(k.values[i],k.fields,k.column)
 end
 
-function Arrays.evaluate!(
-  cache,
-  f::BroadcastingFieldOpMap,
-  a::PTArray{<:AbstractVector},
-  b::AbstractArray{S,3} where S)
+for T in (:(Point),:(AbstractVector{<:Point}))
+  @eval begin
+    function Arrays.return_value(a::LinearCombinationField{<:PTArray},x::$T)
+      v1 = return_value(a[1],x)
+      array = Vector{typeof(v1)}(undef,length(a.values))
+      for i = eachindex(a.values)
+        array[i] = return_value(a[i],x)
+      end
+      PTArray(array)
+    end
 
-  cx,array = cache
-  @inbounds for i = eachindex(array)
-    array[i] = evaluate!(cx[i],f,a[i],b)
+    function Arrays.return_cache(a::LinearCombinationField{<:PTArray},x::$T)
+      c1 = return_cache(a[1],x)
+      b1 = evaluate!(c1,a[1],x)
+      cache = Vector{typeof(c1)}(undef,length(a.values))
+      array = Vector{typeof(b1)}(undef,length(a.values))
+      for i = eachindex(a.values)
+        cache[i] = return_cache(a[i],x)
+      end
+      cache,PTArray(array)
+    end
+
+    function Arrays.evaluate!(cache,a::LinearCombinationField{<:PTArray},x::$T)
+      cx,array = cache
+      @inbounds for i = eachindex(array)
+        array[i] = evaluate!(cx[i],a[i],x)
+      end
+      array
+    end
   end
-  array
 end
 
-function Arrays.evaluate!(
-  cache,
-  f::BroadcastingFieldOpMap,
-  b::PTArray{<:AbstractArray{S,3} where S},
-  a::AbstractVector)
+for S in (:AbstractVector,:AbstractMatrix,:AbstractArray)
+  for T in (:AbstractVector,:AbstractMatrix,:AbstractArray)
+    @eval begin
+      function Arrays.return_value(
+        k::LinearCombinationMap{<:Integer},
+        v::PTArray{<:$S},
+        fx::$T)
 
-  cx,array = cache
-  @inbounds for i = eachindex(array)
-    array[i] = evaluate!(cx[i],f,b[i],a)
+        v1 = return_value(k,v[1],fx)
+        array = Vector{typeof(v1)}(undef,length(v))
+        for i = eachindex(v)
+          array[i] = return_value(k,v[i],fx)
+        end
+        PTArray(array)
+      end
+
+      function Arrays.return_cache(
+        k::LinearCombinationMap{<:Integer},
+        v::PTArray{<:$S},
+        fx::$T)
+
+        c1 = return_cache(k,v[1],fx)
+        b1 = evaluate!(c1,k,v[1],fx)
+        cache = Vector{typeof(c1)}(undef,length(v))
+        array = Vector{typeof(b1)}(undef,length(v))
+        for i = eachindex(v)
+          cache[i] = return_cache(k,v[i],fx)
+        end
+        cache,PTArray(array)
+      end
+
+      function Arrays.evaluate!(
+        cache,
+        k::LinearCombinationMap{<:Integer},
+        v::PTArray{<:$S},
+        fx::$T)
+
+        cx,array = cache
+        @inbounds for i = eachindex(array)
+          array[i] = evaluate!(cx[i],k,v[i],fx)
+        end
+        array
+      end
+    end
   end
-  array
 end
 
-function Arrays.evaluate!(
-  cache,
-  f::BroadcastingFieldOpMap,
-  a::PTArray,
-  x::Vararg{AbstractArray})
-
-  cx,array = cache
-  @inbounds for i = eachindex(array)
-    axi = get_at_index(i,(a,x...))
-    array[i] = evaluate!(cx[i],f,axi...)
+function Fields.linear_combination(a::PTArray,b::AbstractArray)
+  ab1 = linear_combination(a[1],b)
+  c = Vector{typeof(ab1)}(undef,length(a))
+  for i in eachindex(a)
+    c[i] = linear_combination(a[i],b)
   end
-  array
+  PTArray(c)
 end
 
 function Base.getindex(k::Broadcasting{<:PosNegReindex{<:PTArray,<:PTArray}},i::Int)
@@ -503,15 +914,6 @@ function Arrays.evaluate!(
     array[i] = evaluate!(cx[i],f,a[i],w,j)
   end
   array
-end
-
-function Fields.linear_combination(a::PTArray,b::AbstractArray)
-  ab1 = linear_combination(a[1],b)
-  c = Vector{typeof(ab1)}(undef,length(a))
-  for i in eachindex(a)
-    c[i] = linear_combination(a[i],b)
-  end
-  PTArray(c)
 end
 
 # function Utils.recenter(a::PTArray{T},a0::PTArray{T};kwargs...) where T

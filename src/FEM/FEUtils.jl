@@ -1,3 +1,5 @@
+FESpaces.get_triangulation(meas::Measure) = meas.quad.trian
+
 function ReferenceFEs.get_order(test::SingleFieldFESpace)
   basis = get_fe_basis(test)
   first(FESpaces.get_order(first(basis.cell_basis.values).fields))

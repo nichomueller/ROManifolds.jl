@@ -5,63 +5,55 @@ struct PFunction{P} <: AbstractPTFunction{P,Nothing}
   params::P
 end
 
+Base.length(pf::PFunction) = length(pf.params)
+Base.length(pf::PFunction{<:AbstractVector{<:Real}}) = 1
+Base.eachindex(pf::PFunction) = Base.OneTo(length(pf))
+_length(μ::Vector{<:Number}) = 1
+_length(μ) = length(μ)
+
+function Base.getindex(pf::PFunction,i::Int)
+  pf.f(pf.params[i])
+end
+
+function Base.getindex(pf::PFunction{<:AbstractVector{<:Real}},i::Int)
+  @assert i == 1
+  pf.f(pf.params)
+end
+
 struct PTFunction{P,T} <: AbstractPTFunction{P,T}
   f::Function
   params::P
   times::T
 end
 
-function get_fields(pf::PFunction{<:AbstractVector{<:Number}})
-  p = pf.params
-  GenericField(pf.f(p))
+Base.length(ptf::PTFunction) = length(ptf.params)*length(ptf.times)
+Base.length(ptf::PTFunction{<:AbstractVector{<:Real},<:AbstractVector{<:Real}}) = length(ptf.times)
+Base.length(ptf::PTFunction{<:AbstractVector{<:Real},<:Real}) = 1
+Base.eachindex(ptf::PTFunction) = Base.OneTo(length(ptf))
+_length(μ::Vector{<:Number},t) = length(t)
+_length(μ,t) = length(μ)*length(t)
+
+function Base.getindex(ptf::PTFunction,i::Int)
+  nt = length(ptf.times)
+  ptf.f(ptf.params[slow_idx(i,nt)],ptf.times[fast_idx(i,nt)])
 end
 
-function get_fields(pf::PFunction)
-  p = pf.params
-  np = length(p)
-  fields = Vector{GenericField}(undef,np)
-  @inbounds for k = eachindex(p)
-    pk = p[k]
-    fields[k] = GenericField(pf.f(pk))
+function Base.getindex(ptf::PTFunction{<:AbstractVector{<:Real},<:AbstractVector{<:Real}},i::Int)
+  ptf.f(ptf.params,ptf.times[i])
+end
+
+function Base.getindex(ptf::PTFunction{<:AbstractVector{<:Real},<:Real},i::Int)
+  @assert i == 1
+  ptf.f(ptf.params,ptf.times)
+end
+
+function get_fields(ptf::AbstractPTFunction)
+  n = length(ptf)
+  fields = Vector{GenericField}(undef,n)
+  @inbounds for k = eachindex(ptf)
+    fields[k] = GenericField(ptf[k])
   end
   fields
-end
-
-function get_fields(ptf::PTFunction{<:AbstractVector{<:Number},<:Real})
-  p,t = ptf.params,ptf.times
-  GenericField(ptf.f(p,t))
-end
-
-function get_fields(ptf::PTFunction{<:AbstractVector{<:Number},<:AbstractVector{<:Number}})
-  p,t = ptf.params,ptf.times
-  nt = length(t)
-  fields = Vector{GenericField}(undef,nt)
-  @inbounds for k = 1:nt
-    tk = t[k]
-    fields[k] = GenericField(ptf.f(p,tk))
-  end
-  fields
-end
-
-function get_fields(ptf::PTFunction)
-  p,t = ptf.params,ptf.times
-  np = length(p)
-  nt = length(t)
-  npt = np*nt
-  fields = Vector{GenericField}(undef,npt)
-  @inbounds for k = 1:npt
-    pk = p[slow_idx(k,nt)]
-    tk = t[fast_idx(k,nt)]
-    fields[k] = GenericField(ptf.f(pk,tk))
-  end
-  fields
-end
-
-function Arrays.evaluate!(cache,f::AbstractPTFunction,x::Point)
-  g = get_fields(f)
-  map(g) do gi
-    gi(x)
-  end
 end
 
 abstract type PTField <: Field end
@@ -76,16 +68,13 @@ end
 
 Base.size(a::PTGenericField) = size(a.fields)
 Base.length(a::PTGenericField) = length(a.fields)
+Base.eachindex(a::PTGenericField) = eachindex(a.fields)
 Base.IndexStyle(::Type{<:PTGenericField}) = IndexLinear()
 Base.getindex(a::PTGenericField,i::Integer) = GenericField(a.fields[i])
-Arrays.testitem(f::PTGenericField) = f[1]
 
-# function Base.broadcasted(f::PTGenericField,x)
-#   array = map(f.fields) do f
-#     f.(x)
-#   end
-#   PTArray(array)
-# end
+function Arrays.testitem(f::PTGenericField)
+  f[1]
+end
 
 for T in (:Point,:(AbstractArray{<:Point}))
   @eval begin
