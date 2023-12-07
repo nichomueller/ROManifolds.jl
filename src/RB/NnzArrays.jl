@@ -11,12 +11,16 @@ struct NnzVector{T} <: NnzArray{T,1}
   nonzero_val::Vector{T}
   nonzero_idx::Vector{Int}
   nrows::Int
+end
 
-  function NnzVector(mat::SparseMatrixCSC{T,Int}) where T
-    nonzero_idx,nonzero_val = findnz(mat[:])
-    nrows = size(mat,1)
-    new{T}(nonzero_val,nonzero_idx,nrows)
-  end
+function NnzVector(mat::SparseMatrixCSC{T,Int}) where T
+  nonzero_idx,nonzero_val = findnz(mat[:])
+  nrows = size(mat,1)
+  NnzVector{T}(nonzero_val,nonzero_idx,nrows)
+end
+
+function NnzVector(mat::AbstractArray{<:SparseMatrixCSC})
+  map(NnzVector,mat)
 end
 
 Base.length(nzv::NnzVector) = length(nzv.nonzero_val)
@@ -24,6 +28,7 @@ Base.length(nzv::NnzVector) = length(nzv.nonzero_val)
 struct Nonaffine <: OperatorType end
 
 struct NnzMatrix{T,A} <: NnzArray{T,2}
+  affinity::A
   nonzero_val::Matrix{T}
   nonzero_idx::Vector{Int}
   nrows::Int
@@ -36,7 +41,7 @@ function NnzMatrix(val::PTArray{<:AbstractArray{T}};nparams=length(val),kwargs..
   nonzero_idx = first(first.(idx_val))
   nonzero_val = stack(last.(idx_val))
   nrows = size(testitem(val),1)
-  NnzMatrix{Nonaffine,T}(nonzero_val,nonzero_idx,nrows,nparams)
+  NnzMatrix(Nonaffine(),nonzero_val,nonzero_idx,nrows,nparams)
 end
 
 function NnzMatrix(val::PTArray{<:NnzVector{T}};nparams=length(val),kwargs...) where T
@@ -44,21 +49,21 @@ function NnzMatrix(val::PTArray{<:NnzVector{T}};nparams=length(val),kwargs...) w
   nonzero_idx = get_nonzero_idx(first(vals))
   nonzero_val = stack(map(get_nonzero_val,vals))
   nrows = get_nrows(first(vals))
-  NnzMatrix{Nonaffine}(nonzero_val,nonzero_idx,nrows,nparams)
+  NnzMatrix(Nonaffine(),nonzero_val,nonzero_idx,nrows,nparams)
 end
 
 function NnzMatrix(val::AbstractArray{T};nparams=length(val),ntimes=1) where T
   nonzero_idx,nonzero_val = compress_array(val)
   nonzero_val = repeat(val,1,ntimes)
   nrows = size(val,1)
-  NnzMatrix{Affine}(nonzero_val,nonzero_idx,nrows,nparams)
+  NnzMatrix(Affine(),nonzero_val,nonzero_idx,nrows,nparams)
 end
 
 function NnzMatrix(val::NnzVector{T};nparams=length(val),ntimes=1) where T
   nonzero_idx = get_nonzero_idx(val)
   nonzero_val = repeat(get_nonzero_val(val),1,ntimes)
   nrows = get_nrows(val)
-  NnzMatrix{Affine}(nonzero_val,nonzero_idx,nrows,nparams)
+  NnzMatrix(Affine(),nonzero_val,nonzero_idx,nrows,nparams)
 end
 
 Base.length(nzm::NnzMatrix) = nzm.nparams
@@ -67,48 +72,35 @@ num_space_dofs(nzm::NnzMatrix) = size(nzm,1)
 FEM.num_time_dofs(nzm::NnzMatrix) = Int(size(nzm,2)/length(nzm))
 
 function Base.copy(nzm::NnzMatrix)
-  NnzMatrix(
-    copy(nzm.nonzero_val),
-    copy(nzm.nonzero_idx),
-    copy(nzm.nrows),
-    copy(nzm.nparams))
+  NnzMatrix(nzm.affinity,copy(nzm.nonzero_val),nzm.nonzero_idx,nzm.nrows,nzm.nparams)
 end
 
 function Base.show(io::IO,nzm::NnzMatrix)
   print(io,"NnzMatrix storing $(length(nzm)) compressed transient snapshots")
 end
 
-function Base.prod(nzm1::NnzMatrix,nzm2::NnzMatrix)
+function Base.prod(nzm1::T,nzm2::T) where {T<:NnzMatrix}
   @assert nzm1.nonzero_idx == nzm2.nonzero_idx
   @assert nzm1.nrows == nzm2.nrows
   @assert nzm1.nparams == nzm2.nparams
 
   nonzero_vals = nzm1.nonzero_val' * nzm2.nonzero_val
-  NnzMatrix{Nonaffine}(nonzero_vals,nzm1.nonzero_idx,nzm1.nrows,nzm1.nparams)
+  NnzMatrix(nzm1.affinity,nonzero_vals,nzm1.nonzero_idx,nzm1.nrows,nzm1.nparams)
 end
 
-function Base.prod(nzm1::NnzMatrix{T,Affine} where T,nzm2::NnzMatrix{T,Affine} where T)
-  @assert nzm1.nonzero_idx == nzm2.nonzero_idx
-  @assert nzm1.nrows == nzm2.nrows
-  @assert nzm1.nparams == nzm2.nparams
-
-  nonzero_vals = nzm1.nonzero_val' * nzm2.nonzero_val
-  NnzMatrix{Affine}(nonzero_vals,nzm1.nonzero_idx,nzm1.nrows,nzm1.nparams)
-end
-
-function Base.prod(nzm::NnzMatrix{T,A} where T,a::AbstractArray) where A
+function Base.prod(nzm::NnzMatrix,a::AbstractArray)
   nonzero_vals = nzm.nonzero_val' * a
-  NnzMatrix{A}(nonzero_vals,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
+  NnzMatrix(nzm.affinity,nonzero_vals,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
 end
 
-function Base.prod(a::AbstractArray,nzm::NnzMatrix{T,A} where T) where A
+function Base.prod(a::AbstractArray,nzm::NnzMatrix)
   nonzero_vals = a' * nzm.nonzero_val
-  NnzMatrix{A}(nonzero_vals,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
+  NnzMatrix(nzm.affinity,nonzero_vals,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
 end
 
-function Arrays.testitem(nzm::NnzMatrix{T,A} where T) where A
+function Arrays.testitem(nzm::NnzMatrix)
   mode2_ndofs = Int(size(nzm,2)/nzm.nparams)
-  NnzMatrix{A}(nzm.nonzero_val[:,1:mode2_ndofs],nzm.nonzero_idx,nzm.nrows,1)
+  NnzMatrix(nzm.affinity,nzm.nonzero_val[:,1:mode2_ndofs],nzm.nonzero_idx,nzm.nrows,1)
 end
 
 function recast(nzm::NnzMatrix{T}) where T
@@ -146,12 +138,12 @@ function compress(nzm::NnzMatrix,args...;kwargs...)
   basis_space,basis_time
 end
 
-function Utils.tpod(nzm::NnzMatrix{T,A} where T,args...;ϵ=1e-4,kwargs...) where A
+function Utils.tpod(nzm::NnzMatrix,args...;ϵ=1e-4,kwargs...)
   nonzero_val = tpod(nzm.nonzero_val,args...;ϵ)
-  NnzMatrix{A}(nonzero_val,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
+  NnzMatrix(nzm.affinity,nonzero_val,nzm.nonzero_idx,nzm.nrows,nzm.nparams)
 end
 
-function Utils.change_mode(nzm::NnzMatrix{T}) where T
+function Utils.change_mode(nzm::NnzMatrix)
   nparams = num_params(nzm)
   mode2 = change_mode(nzm.nonzero_val,nparams)
   return mode2
@@ -170,8 +162,7 @@ function collect_jacobians_for_trian(op::PTOperator;i=1)
   A = allocate_jacobian(op,op.u0,i)
   jacs_i,trian = jacobian_for_trian!(A,op,op.u0,i)
   nzm_i = map(jacs_i) do jac_i
-    nzv_i = map(NnzVector,jac_i)
-    NnzMatrix(nzv_i;nparams=length(op.μ))
+    NnzMatrix(NnzVector(jac_i);nparams=length(op.μ))
   end
   return nzm_i,trian
 end

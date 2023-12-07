@@ -1,9 +1,9 @@
 function TransientFETools.solve_step!(
-  uf::PTArray,
+  uf::AbstractVector,
   solver::PThetaMethod,
   op::AffinePODEOperator,
   μ::AbstractVector,
-  u0::PTArray,
+  u0::AbstractVector,
   t0::Real,
   cache)
 
@@ -43,20 +43,27 @@ struct PTThetaAffineMethodOperator <: PTOperator{Affine}
   μ
   tθ
   dtθ::Float
-  u0::PTArray
+  u0::AbstractVector
   ode_cache
-  vθ::PTArray
+  vθ::AbstractVector
 end
 
 function get_ptoperator(
-  odeop::AffinePODEOperator,μ,tθ,dtθ::Float,u0::PTArray,ode_cache,vθ::PTArray)
+  odeop::AffinePODEOperator,
+  μ,
+  tθ,
+  dtθ::Float,
+  u0::AbstractVector,
+  ode_cache,
+  vθ::AbstractVector)
+
   PTThetaAffineMethodOperator(odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
 end
 
 function residual_for_trian!(
-  b::PTArray,
+  b::AbstractVector,
   op::PTThetaAffineMethodOperator,
-  ::PTArray,
+  ::AbstractVector,
   args...)
 
   vθ = op.vθ
@@ -66,9 +73,9 @@ function residual_for_trian!(
 end
 
 function jacobian_for_trian!(
-  A::PTArray,
+  A::AbstractMatrix,
   op::PTThetaAffineMethodOperator,
-  ::PTArray,
+  ::AbstractVector,
   i::Int,
   args...)
 
@@ -86,8 +93,8 @@ function _allocate_matrix_and_vector(odeop,μ,t0,u0,ode_cache)
 end
 
 function _matrix_and_vector!(
-  A::PTArray,
-  b::PTArray,
+  A::AbstractMatrix,
+  b::AbstractVector,
   op::AffinePODEOperator,
   μ,
   tθ,
@@ -101,7 +108,7 @@ function _matrix_and_vector!(
 end
 
 function _matrix!(
-  A::PTArray,
+  A::AbstractMatrix,
   op::AffinePODEOperator,
   μ,
   tθ,
@@ -116,7 +123,7 @@ function _matrix!(
 end
 
 function _vector!(
-  b::PTArray,
+  b::AbstractVector,
   op::AffinePODEOperator,
   μ,
   tθ,

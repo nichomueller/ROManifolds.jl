@@ -26,6 +26,7 @@ include("FEM/FEM.jl")
 using Mabla.FEM
 
 export Table
+export Affine
 export PSpace
 export UniformSampling
 export NormalSampling

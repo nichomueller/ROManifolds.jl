@@ -243,13 +243,6 @@ function LinearAlgebra.ldiv!(a::PTArray,m::LU,b::PTArray)
   end
 end
 
-# function get_at_offsets(x::PTArray{<:AbstractVector},offsets::Vector{Int},row::Int)
-#   map(y->y[offsets[row]+1:offsets[row+1]],x)
-# end
-
-# function get_at_offsets(x::PTArray{<:AbstractMatrix},offsets::Vector{Int},row::Int,col::Int)
-#   map(y->y[offsets[row]+1:offsets[row+1],offsets[col]+1:offsets[col+1]],x)
-# end
 for op in (:+,:-,:*)
   @eval begin
     function Arrays.return_value(
@@ -925,4 +918,12 @@ function Utils.recenter(a::PTArray{T},a0::PTArray{T};kwargs...) where T
     array[(i-1)*ndiff+1:i*ndiff] = recenter(a[(i-1)*ndiff+1:i*ndiff],a0[i];kwargs...)
   end
   PTArray(array)
+end
+
+function get_at_offsets(x::PTArray{<:AbstractVector},offsets::Vector{Int},row::Int)
+  map(y->y[offsets[row]+1:offsets[row+1]],x)
+end
+
+function get_at_offsets(x::PTArray{<:AbstractMatrix},offsets::Vector{Int},row::Int,col::Int)
+  map(y->y[offsets[row]+1:offsets[row+1],offsets[col]+1:offsets[col+1]],x)
 end

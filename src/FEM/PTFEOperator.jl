@@ -202,7 +202,7 @@ function Algebra.allocate_jacobian(
 end
 
 function Algebra.residual!(
-  b::PTArray,
+  b::AbstractVector,
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
@@ -219,7 +219,7 @@ function Algebra.residual!(
 end
 
 function residual_for_trian!(
-  b::PTArray,
+  b::AbstractVector,
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
@@ -242,7 +242,7 @@ function residual_for_trian!(
 end
 
 function Algebra.jacobian!(
-  A::PTArray,
+  A::AbstractMatrix,
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
@@ -257,7 +257,7 @@ function Algebra.jacobian!(
 end
 
 function jacobian_for_trian!(
-  A::PTArray,
+  A::AbstractMatrix,
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
@@ -284,7 +284,7 @@ function jacobian_for_trian!(
 end
 
 function ODETools.jacobians!(
-  A::PTArray,
+  A::AbstractMatrix,
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,

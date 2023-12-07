@@ -50,7 +50,7 @@ function Algebra.allocate_residual(
   op::PODEOperator,
   μ::AbstractVector,
   t::T,
-  uhF::PTArray,
+  uhF::AbstractVector,
   ode_cache) where T
 
   Xh,_,fecache = ode_cache
@@ -67,7 +67,7 @@ function Algebra.allocate_jacobian(
   op::PODEOperator,
   μ::AbstractVector,
   t::T,
-  uhF::PTArray,
+  uhF::AbstractVector,
   i::Integer,
   ode_cache) where T
 
@@ -84,11 +84,11 @@ end
 for fun in (:(Algebra.residual!),:residual_for_trian!)
   @eval begin
     function $fun(
-      b::PTArray,
+      b::AbstractVector,
       op::PODEOperator,
       μ::AbstractVector,
       t::T,
-      xhF::Tuple{Vararg{PTArray}},
+      xhF::Tuple{Vararg{AbstractVector}},
       ode_cache,
       args...) where T
 
@@ -106,11 +106,11 @@ end
 for fun in (:(Algebra.jacobian!),:jacobian_for_trian!)
   @eval begin
     function $fun(
-      A::PTArray,
+      A::AbstractMatrix,
       op::PODEOperator,
       μ::AbstractVector,
       t::T,
-      xhF::Tuple{Vararg{PTArray}},
+      xhF::Tuple{Vararg{AbstractVector}},
       i::Integer,
       γᵢ::Real,
       ode_cache,
@@ -128,11 +128,11 @@ for fun in (:(Algebra.jacobian!),:jacobian_for_trian!)
 end
 
 function ODETools.jacobians!(
-  J::PTArray,
+  J::AbstractArray,
   op::PODEOperator,
   μ::AbstractVector,
   t::T,
-  xhF::Tuple{Vararg{PTArray}},
+  xhF::Tuple{Vararg{AbstractArray}},
   γ::Tuple{Vararg{Real}},
   ode_cache) where T
 

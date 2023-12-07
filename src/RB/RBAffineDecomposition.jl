@@ -64,7 +64,6 @@ function get_at_time_integration_domain(
   for j in eachindex(_Us)
     spacei = _Us[j].space
     dvi = PTArray(_Us[j].dirichlet_values[ptidx])
-    # Us = (Us...,TrialPFESpace(dvi,spacei))
     Us = (Us...,TrialPFESpace(dvi,spacei))
   end
   ode_cache_idx = Us,Uts,fecache
@@ -357,14 +356,6 @@ function _collect_reduced_jacobians!(
     Mvec[j] = copy(M)
   end
   return Mvec
-end
-
-function _get_pt_index(times::Vector{<:Real},idx_time::Vector{Int};nparams=1)
-  time_ndofs = length(times)
-  if length(idx_time) == time_ndofs
-    return collect(1:time_ndofs)
-  end
-  return vec(transpose(collect(0:nparams-1)*time_ndofs .+ idx_time'))
 end
 
 function rb_coefficient!(cache,a::GenericRBAffineDecomposition,b::Matrix;st_mdeim=false)

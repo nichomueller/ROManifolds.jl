@@ -1,9 +1,9 @@
 function TransientFETools.solve_step!(
-  uf::PTArray,
+  uf::AbstractArray,
   solver::PThetaMethod,
   op::PODEOperator,
   μ::AbstractVector,
-  u0::PTArray,
+  u0::AbstractArray,
   t0::Real,
   cache)
 
@@ -40,17 +40,28 @@ struct PTThetaMethodOperator <: PTOperator{Nonlinear}
   μ
   tθ
   dtθ::Float
-  u0::PTArray
+  u0::AbstractVector
   ode_cache
-  vθ::PTArray
+  vθ::AbstractVector
 end
 
 function get_ptoperator(
-  odeop::PODEOperator,μ,tθ,dtθ::Float,u0::PTArray,ode_cache,vθ::PTArray)
+  odeop::PODEOperator,
+  μ,
+  tθ,
+  dtθ::Float,
+  u0::AbstractVector,
+  ode_cache,
+  vθ::AbstractVector)
+
   PTThetaMethodOperator(odeop,μ,tθ,dtθ,u0,ode_cache,vθ)
 end
 
-function Algebra.residual!(b::PTArray,op::PTThetaMethodOperator,x::PTArray)
+function Algebra.residual!(
+  b::AbstractVector,
+  op::PTThetaMethodOperator,
+  x::AbstractVector)
+
   uF = x
   vθ = op.vθ
   @. vθ = (x-op.u0)/op.dtθ
@@ -60,9 +71,9 @@ function Algebra.residual!(b::PTArray,op::PTThetaMethodOperator,x::PTArray)
 end
 
 function residual_for_trian!(
-  b::PTArray,
+  b::AbstractVector,
   op::PTThetaMethodOperator,
-  x::PTArray,
+  x::AbstractVector,
   args...)
 
   uF = x
@@ -72,7 +83,11 @@ function residual_for_trian!(
   residual_for_trian!(b,op.odeop,op.μ,op.tθ,(uF,vθ),op.ode_cache,args...)
 end
 
-function ODETools.jacobian!(A::PTArray,op::PTThetaMethodOperator,x::PTArray)
+function ODETools.jacobian!(
+  A::AbstractMatrix,
+  op::PTThetaMethodOperator,
+  x::AbstractVector)
+
   uF = x
   vθ = op.vθ
   @. vθ = (x-op.u0)/op.dtθ
@@ -81,7 +96,12 @@ function ODETools.jacobian!(A::PTArray,op::PTThetaMethodOperator,x::PTArray)
   jacobians!(A,op.odeop,op.μ,op.tθ,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)
 end
 
-function Algebra.jacobian!(A::PTArray,op::PTThetaMethodOperator,x::PTArray,i::Int)
+function Algebra.jacobian!(
+  A::AbstractMatrix,
+  op::PTThetaMethodOperator,
+  x::AbstractVector,
+  i::Int)
+
   uF = x
   vθ = op.vθ
   @. vθ = (x-op.u0)/op.dtθ
@@ -92,9 +112,9 @@ function Algebra.jacobian!(A::PTArray,op::PTThetaMethodOperator,x::PTArray,i::In
 end
 
 function jacobian_for_trian!(
-  A::PTArray,
+  A::AbstractMatrix,
   op::PTThetaMethodOperator,
-  x::PTArray,
+  x::AbstractVector,
   i::Int,
   args...)
 

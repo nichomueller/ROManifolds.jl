@@ -86,6 +86,7 @@ import Gridap.TensorValues: double_contraction
 import Gridap.TensorValues: symmetric_part
 
 export Table
+export Affine
 
 export PSpace
 export UniformSampling
