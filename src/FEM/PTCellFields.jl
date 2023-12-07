@@ -45,7 +45,7 @@ function TransientFETools.TransientCellField(single_field::SingleFieldPTFEFuncti
   TransientSingleFieldCellField(single_field,derivatives)
 end
 
-struct MultiFieldPTFEFunction{T<:MultiFieldCellField} <: FEFunction
+struct MultiFieldPTFEFunction{T<:MultiFieldCellField} <: PTCellField
   single_fe_functions::Vector{<:SingleFieldPTFEFunction}
   free_values::AbstractArray
   fe_space::MultiFieldFESpace
@@ -100,7 +100,7 @@ Base.iterate(m::MultiFieldPTFEFunction) = iterate(m.single_fe_functions)
 Base.iterate(m::MultiFieldPTFEFunction,state) = iterate(m.single_fe_functions,state)
 Base.getindex(m::MultiFieldPTFEFunction,field_id::Integer) = m.single_fe_functions[field_id]
 
-function FESpaces.FEFunction(fe::PTMultiFieldTrialFESpace,free_values::PTArray)
+function FESpaces.FEFunction(fe::MultiFieldPFESpace,free_values::PTArray)
   blocks = map(1:length(fe.spaces)) do i
     free_values_i = restrict_to_field(fe,free_values,i)
     FEFunction(fe.spaces[i],free_values_i)
@@ -108,7 +108,15 @@ function FESpaces.FEFunction(fe::PTMultiFieldTrialFESpace,free_values::PTArray)
   MultiFieldPTFEFunction(free_values,fe,blocks)
 end
 
+function CellData.CellField(fe::MultiFieldPFESpace,cell_values)
+  single_fields = map(1:length(fe.spaces)) do i
+    cell_values_field = lazy_map(a->a.array[i],cell_values)
+    CellField(fe.spaces[i],cell_values_field)
+  end
+  MultiFieldCellField(single_fields)
+end
+
 function TransientFETools.TransientCellField(multi_field::MultiFieldPTFEFunction,derivatives::Tuple)
   transient_single_fields = TransientFETools._to_transient_single_fields(multi_field,derivatives)
-  PTTransientMultiFieldCellField(multi_field,derivatives,transient_single_fields)
+  TransientMultiFieldCellField(multi_field,derivatives,transient_single_fields)
 end

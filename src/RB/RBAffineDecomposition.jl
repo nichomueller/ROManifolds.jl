@@ -64,8 +64,8 @@ function get_at_time_integration_domain(
   for j in eachindex(_Us)
     spacei = _Us[j].space
     dvi = PTArray(_Us[j].dirichlet_values[ptidx])
-    # Us = (Us...,PTrialFESpace(dvi,spacei))
-    Us = (Us...,PTrialFESpace(dvi,spacei))
+    # Us = (Us...,TrialPFESpace(dvi,spacei))
+    Us = (Us...,TrialPFESpace(dvi,spacei))
   end
   ode_cache_idx = Us,Uts,fecache
   vθ_idx = PTArray(op.vθ[ptidx])

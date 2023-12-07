@@ -43,11 +43,11 @@ trial_ok = TransientMultiFieldFESpace([trial_u_ok,trial_p])
 feop_ok = TransientAffineFEOperator(m_ok,lhs_ok,rhs_ok,trial_ok,test)
 du_ok = get_trial_fe_basis(trial_ok(t))
 
-ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
+ode_op_ok = TransientFETools.get_algebraic_operator(feop_ok)
 uF_ok = similar(u[1])
 uF_ok .= 1.0
-ode_cache_ok = Gridap.ODEs.TransientFETools.allocate_cache(ode_op_ok)
-Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+ode_cache_ok = TransientFETools.allocate_cache(ode_op_ok)
+TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
 Us_ok,_,_ = ode_cache_ok
 uh_ok = EvaluationFunction(Us_ok[1],uF_ok)
 dxh_ok = ()
@@ -61,7 +61,7 @@ rhs_ok(t,get_fe_basis(test_ok))
 
 A_ok = allocate_jacobian(feop_ok,t,uh_ok,nothing)
 _matdata_jacobians_ok = fill_jacobians(feop_ok,t,xh_ok,(1.,1/t))
-matdata_ok = Gridap.ODEs.TransientFETools._vcat_matdata(_matdata_jacobians_ok)
+matdata_ok = TransientFETools._vcat_matdata(_matdata_jacobians_ok)
 assemble_matrix_add!(A_ok,feop_ok.assem_t,matdata_ok)
 test_ptarray(A_ok,A)
 

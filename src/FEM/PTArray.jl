@@ -15,7 +15,7 @@ Base.eltype(::Type{PTArray{T}}) where T = eltype(T)
 Base.eltype(::PTArray{T}) where T = eltype(T)
 Base.ndims(::PTArray{T,N} where T) where N = N
 Base.ndims(::Type{PTArray{T,N}} where T) where N = N
-Base.first(a::PTArray) = testitem(a)#first(testitem(a))
+Base.first(a::PTArray) = testitem(a)
 Base.length(a::PTArray) = length(get_array(a))
 Base.eachindex(a::PTArray) = eachindex(get_array(a))
 Base.lastindex(a::PTArray) = lastindex(get_array(a))
@@ -916,13 +916,13 @@ function Arrays.evaluate!(
   array
 end
 
-# function Utils.recenter(a::PTArray{T},a0::PTArray{T};kwargs...) where T
-#   n = length(a)
-#   n0 = length(a0)
-#   ndiff = Int(n/n0)
-#   array = Vector{T}(undef,n)
-#   @inbounds for i = 1:n0
-#     array[(i-1)*ndiff+1:i*ndiff] = recenter(a[(i-1)*ndiff+1:i*ndiff],a0[i];kwargs...)
-#   end
-#   PTArray(array)
-# end
+function Utils.recenter(a::PTArray{T},a0::PTArray{T};kwargs...) where T
+  n = length(a)
+  n0 = length(a0)
+  ndiff = Int(n/n0)
+  array = Vector{T}(undef,n)
+  @inbounds for i = 1:n0
+    array[(i-1)*ndiff+1:i*ndiff] = recenter(a[(i-1)*ndiff+1:i*ndiff],a0[i];kwargs...)
+  end
+  PTArray(array)
+end

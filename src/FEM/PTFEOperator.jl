@@ -15,7 +15,7 @@ function TransientFETools.allocate_cache(::PTFEOperator)
   nothing
 end
 
-function Gridap.ODEs.TransientFETools.update_cache!(
+function TransientFETools.update_cache!(
   ::Nothing,
   ::PTFEOperator,
   ::Any,
@@ -154,12 +154,12 @@ function Base.getindex(op::NonlinearPTFEOperator,row,col)
   end
 end
 
-function Gridap.Algebra.allocate_residual(
+function Algebra.allocate_residual(
   op::PTFEOperator,
   μ::P,
   t::T,
-  xh::S,
-  cache) where {P,T,S}
+  xh::CellField,
+  cache) where {P,T}
 
   test = get_test(op)
   v = get_fe_basis(test)
@@ -176,13 +176,13 @@ function Gridap.Algebra.allocate_residual(
   allocate_vector(assem,vecdata)
 end
 
-function Gridap.Algebra.allocate_jacobian(
+function Algebra.allocate_jacobian(
   op::PTFEOperator,
   μ::P,
   t::T,
-  xh::S,
+  xh::CellField,
   i::Integer,
-  cache) where {P,T,S}
+  cache) where {P,T}
 
   trial = get_trial(op)(μ,t)
   test = get_test(op)
@@ -206,8 +206,8 @@ function Algebra.residual!(
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
-  xh::S,
-  cache) where {T,S}
+  xh::CellField,
+  cache) where T
 
   test = get_test(op)
   v = get_fe_basis(test)
@@ -223,9 +223,9 @@ function residual_for_trian!(
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
-  xh::S,
+  xh::CellField,
   cache,
-  args...) where {T,S}
+  args...) where T
 
   test = get_test(op)
   v = get_fe_basis(test)
@@ -246,10 +246,10 @@ function Algebra.jacobian!(
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
-  uh::S,
+  uh::CellField,
   i::Integer,
   γᵢ::Real,
-  cache) where {T,S}
+  cache) where T
 
   matdata = _matdata_jacobian(op,μ,t,uh,i,γᵢ)
   assemble_matrix_add!(A,op.assem,matdata)
@@ -261,11 +261,11 @@ function jacobian_for_trian!(
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
-  uh::S,
+  uh::CellField,
   i::Integer,
   γᵢ::Real,
   cache,
-  args...) where {T,S}
+  args...) where T
 
   trial = get_trial(op)(μ,t)
   test = get_test(op)
@@ -288,9 +288,9 @@ function ODETools.jacobians!(
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
-  uh::S,
+  uh::CellField,
   γ::Tuple{Vararg{Real}},
-  cache) where {T,S}
+  cache) where T
 
   _matdata_jacobians = fill_jacobians(op,μ,t,uh,γ)
   matdata = _vcat_matdata(_matdata_jacobians)
@@ -302,8 +302,8 @@ function TransientFETools.fill_jacobians(
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
-  uh::S,
-  γ::Tuple{Vararg{Real}}) where {T,S}
+  uh::CellField,
+  γ::Tuple{Vararg{Real}}) where T
 
   _matdata = ()
   for i in 1:get_order(op)+1
@@ -321,9 +321,9 @@ function TransientFETools._matdata_jacobian(
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
-  xh::S,
+  xh::CellField,
   i::Integer,
-  γᵢ::Real) where {T,S}
+  γᵢ::Real) where T
 
   trial = get_trial(op)(μ,t)
   test = get_test(op)

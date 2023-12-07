@@ -17,7 +17,7 @@ Res_ok(t,(u,p),(v,q)) = m_ok(t,∂t(u),v) + a_ok(t,(u,p),(v,q)) + c_ok(t,u,u,v)
 trial_u_ok = TransientTrialFESpace(test_u,[g0_ok,g_ok])
 trial_ok = TransientMultiFieldFESpace([trial_u_ok,trial_p])
 feop_ok = TransientFEOperator(Res_ok,Jac_ok,jac_t_ok,trial_ok,test)
-ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
+ode_op_ok = TransientFETools.get_algebraic_operator(feop_ok)
 ode_cache_ok = allocate_cache(ode_op_ok)
 
 times = get_times(fesolver)
@@ -29,7 +29,7 @@ Nu,Np = test_u.nfree,length(get_free_dof_ids(test_p))
 Nt = num_time_dofs(fesolver)
 θdt = θ*dt
 vθ = zeros(Nu+Np)
-ode_cache_ok = Gridap.ODEs.TransientFETools.allocate_cache(ode_op_ok)
+ode_cache_ok = TransientFETools.allocate_cache(ode_op_ok)
 nlop0 = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t0,dt*θ,vθ,ode_cache_ok,vθ)
 bok = allocate_residual(nlop0,vθ)
 Aok = allocate_jacobian(nlop0,vθ)
@@ -39,7 +39,7 @@ M = assemble_matrix((du,dv)->∫(dv⋅du)dΩ,trial_u(μn,dt),test_u)
 function return_quantities(ode_op,ode_cache,x::PTArray,kt)
   xk = x[kt]
   t = times[kt]
-  ode_cache = Gridap.ODEs.TransientFETools.update_cache!(ode_cache,ode_op,t)
+  ode_cache = TransientFETools.update_cache!(ode_cache,ode_op,t)
 
   z = zero(eltype(Aok))
   fillstored!(Aok,z)

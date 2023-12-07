@@ -38,10 +38,10 @@ function gridap_solutions_for_int(n::Int)
   trial_u_ok = TransientTrialFESpace(test_u,[g0_ok,g_ok])
   trial_ok = TransientMultiFieldFESpace([trial_u_ok,trial_p])
   feop_ok = TransientAffineFEOperator(m_ok,a_ok,b_ok,trial_ok,test)
-  ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
+  ode_op_ok = TransientFETools.get_algebraic_operator(feop_ok)
   w0 = get_free_dof_values(xh0μ(μn))
   ode_solver = ThetaMethod(LUSolver(),dt,θ)
-  sol_gridap = Gridap.ODEs.TransientFETools.GenericODESolution(ode_solver,ode_op_ok,w0,t0,tf)
+  sol_gridap = TransientFETools.GenericODESolution(ode_solver,ode_op_ok,w0,t0,tf)
 
   sols_ok = []
   for (uh,t) in sol_gridap
@@ -67,11 +67,11 @@ function gridap_res_jac_for_int(_sols,n::Int)
   trial_u_ok = TransientTrialFESpace(test_u,[g0_ok,g_ok])
   trial_ok = TransientMultiFieldFESpace([trial_u_ok,trial_p])
   feop_ok = TransientAffineFEOperator(m_ok,a_ok,b_ok,trial_ok,test)
-  ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
+  ode_op_ok = TransientFETools.get_algebraic_operator(feop_ok)
   ode_cache_ok = allocate_cache(ode_op_ok)
 
   xhF_ok = copy(sols),copy(0. * sols)
-  Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
   Xh_ok,_,_ = ode_cache_ok
   dxh_ok = ()
   for i in 2:2
@@ -118,11 +118,11 @@ function nl_gridap_solutions_for_int(n::Int)
   trial_u_ok = TransientTrialFESpace(test_u,[g0_ok,g_ok])
   trial_ok = TransientMultiFieldFESpace([trial_u_ok,trial_p])
   feop_ok = TransientFEOperator(res_ok,jac_ok,jac_t_ok,trial_ok,test)
-  ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
+  ode_op_ok = TransientFETools.get_algebraic_operator(feop_ok)
   w0 = get_free_dof_values(xh0μ(μn))
   nls = NewtonRaphsonSolver(LUSolver(),1e-10,20)
   ode_solver = ThetaMethod(nls,dt,θ)
-  sol_gridap = Gridap.ODEs.TransientFETools.GenericODESolution(ode_solver,ode_op_ok,w0,t0,tf)
+  sol_gridap = TransientFETools.GenericODESolution(ode_solver,ode_op_ok,w0,t0,tf)
 
   sols_ok = []
   for (uh,t) in sol_gridap
@@ -153,11 +153,11 @@ function nl_gridap_res_jac_for_int(_sols,n::Int)
   trial_u_ok = TransientTrialFESpace(test_u,[g0_ok,g_ok])
   trial_ok = TransientMultiFieldFESpace([trial_u_ok,trial_p])
   feop_ok = TransientFEOperator(res_ok,jac_ok,jac_t_ok,trial_ok,test)
-  ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
+  ode_op_ok = TransientFETools.get_algebraic_operator(feop_ok)
   ode_cache_ok = allocate_cache(ode_op_ok)
 
   xhF_ok = copy(sols),copy(0. * sols)
-  Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
   Xh_ok,_,_ = ode_cache_ok
   dxh_ok = ()
   for i in 2:2
@@ -200,7 +200,7 @@ m_ok(t,(ut,pt),(v,q)) = ∫(ut⋅v)dΩ
 trial_u_ok = TransientTrialFESpace(test_u,g_ok)
 trial_ok = TransientMultiFieldFESpace([trial_u_ok,trial_p])
 feop_ok = TransientAffineFEOperator(m_ok,a_ok,b_ok,trial_ok,test)
-ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
+ode_op_ok = TransientFETools.get_algebraic_operator(feop_ok)
 ode_cache_ok = allocate_cache(ode_op_ok)
 
 ode_op = get_algebraic_operator(feop)
@@ -217,7 +217,7 @@ ptA1 = ptA[1:10]
 
 M = assemble_matrix((du,dv)->∫(dv⋅du)dΩ,trial_u(μn,dt),test_u)/(dt*θ)
 vθ = zeros(Nu+Np)
-ode_cache = Gridap.ODEs.TransientFETools.allocate_cache(ode_op_ok)
+ode_cache = TransientFETools.allocate_cache(ode_op_ok)
 nlop0 = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t0,dt*θ,vθ,ode_cache,vθ)
 bok = allocate_residual(nlop0,vθ)
 Aok = allocate_jacobian(nlop0,vθ)
@@ -230,7 +230,7 @@ Lp(t) = -assemble_vector(dq->∫(dq*(∇⋅(dir(t))))dΩ,test_p)
 for (kt,t) in enumerate(get_times(fesolver))
   uk = un[kt]
   ukprev = kt > 1 ? un[kt-1] : get_free_dof_values(xh0μ(μn))
-  ode_cache_ok = Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  ode_cache_ok = TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
   nlop = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t,dt*θ,ukprev,ode_cache_ok,vθ)
   z = zero(eltype(Aok))
   fillstored!(Aok,z)
@@ -372,8 +372,8 @@ ptb1 = ptb[1:Nt]
 ptA1 = ptA[1:Nt]
 
 vθ = zeros(Nu+Np)
-ode_op_ok = Gridap.ODEs.TransientFETools.get_algebraic_operator(feop_ok)
-ode_cache_ok = Gridap.ODEs.TransientFETools.allocate_cache(ode_op_ok)
+ode_op_ok = TransientFETools.get_algebraic_operator(feop_ok)
+ode_cache_ok = TransientFETools.allocate_cache(ode_op_ok)
 nlop0 = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t0,dt*θ,vθ,ode_cache_ok,vθ)
 bok = allocate_residual(nlop0,vθ)
 Aok = allocate_jacobian(nlop0,vθ)
@@ -384,7 +384,7 @@ v0 = zeros(size(vθ))
 for (kt,t) in enumerate(get_times(fesolver))
   uk = un[kt]
   ukprev = kt > 1 ? un[kt-1] : get_free_dof_values(xh0μ(μn))
-  ode_cache_ok = Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  ode_cache_ok = TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
   nlop = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t,dt*θ,ukprev,ode_cache_ok,vθ)
 
   x = copy(ukprev)
@@ -413,7 +413,7 @@ bcopy = copy(bok)
 for (kt,t) in enumerate(get_times(fesolver))
   uk = un[kt]
   ukprev = kt > 1 ? un[kt-1] : get_free_dof_values(xh0μ(μn))
-  ode_cache_ok = Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  ode_cache_ok = TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
   nlop = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t,dt*θ,ukprev,ode_cache_ok,vθ)
 
   x = copy(ukprev)
@@ -454,7 +454,7 @@ LHS(u,t) = vcat(hcat(LHS_l_11(t)+LHS_nl(u,t),LHS_l_12),hcat(LHS_l_12',sparse(zer
 for (kt,t) in enumerate(get_times(fesolver))
   uk = un[kt]
   ukprev = kt > 1 ? un[kt-1] : get_free_dof_values(xh0μ(μn))
-  ode_cache_ok = Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  ode_cache_ok = TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
   nlop = Gridap.ODEs.ODETools.ThetaMethodNonlinearOperator(ode_op_ok,t,dt*θ,ukprev,ode_cache_ok,vθ)
 
   z = zero(eltype(Aok))
@@ -463,7 +463,7 @@ for (kt,t) in enumerate(get_times(fesolver))
   fill!(bok,z)
   residual!(bok,ode_op_ok,t,(ukprev,v0),ode_cache_ok)
 
-  Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
   Xh_ok,_,_ = ode_cache_ok
   dxh_ok = (EvaluationFunction(Xh_ok[2],v0),)
   xh_ok = TransientCellField(EvaluationFunction(Xh_ok[1],ukprev),dxh_ok)
@@ -493,7 +493,7 @@ end
 for (kt,t) in enumerate(get_times(fesolver))
   uk = un[kt]
   ukprev = kt > 1 ? un[kt-1] : get_free_dof_values(xh0μ(μn))
-  ode_cache_ok = Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  ode_cache_ok = TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
 
   z = zero(eltype(Aok))
   fillstored!(Aok,z)
@@ -501,7 +501,7 @@ for (kt,t) in enumerate(get_times(fesolver))
   fill!(bok,z)
   residual!(bok,ode_op_ok,t,(ukprev,v0),ode_cache_ok)
 
-  Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
   Xh_ok,_,_ = ode_cache_ok
   dxh_ok = (EvaluationFunction(Xh_ok[2],v0),)
   xh_ok = TransientCellField(EvaluationFunction(Xh_ok[1],ukprev),dxh_ok)
@@ -525,9 +525,9 @@ for (kt,t) in enumerate(get_times(fesolver))
   uk = un[kt]
   ukprev = kt > 1 ? un[kt-1] : get_free_dof_values(xh0μ(μn))
   ukθ = θ*uk + (1-θ)*ukprev
-  ode_cache_ok = Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  ode_cache_ok = TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
 
-  Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
   fill!(bok,zero(eltype(bok)))
   residual!(bok,ode_op_ok,t,(v0,v0),ode_cache_ok) # zero in nl case
 
@@ -602,9 +602,9 @@ for (kt,t) in enumerate(get_times(fesolver))
   uk = un[kt]
   ukprev = kt > 1 ? un[kt-1] : get_free_dof_values(xh0μ(μn))
   ukθ = θ*uk + (1-θ)*ukprev
-  ode_cache_ok = Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  ode_cache_ok = TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
 
-  Gridap.ODEs.TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
+  TransientFETools.update_cache!(ode_cache_ok,ode_op_ok,t)
   Xh_ok,_,_ = ode_cache_ok
   dxh_ok = (EvaluationFunction(Xh_ok[2],v0),)
   xh_ok = TransientCellField(EvaluationFunction(Xh_ok[1],ukθ),dxh_ok)

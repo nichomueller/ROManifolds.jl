@@ -21,7 +21,7 @@ function TransientFETools.allocate_cache(op::PODEOperator,μ::AbstractVector,t::
   Us,Uts,fecache
 end
 
-function Gridap.ODEs.TransientFETools.update_cache!(
+function TransientFETools.update_cache!(
   ode_cache,
   op::PODEOperator,
   μ::AbstractVector,
@@ -46,7 +46,7 @@ function cache_at_idx(ode_cache,idx::Int)
   Us,Uts,fecache
 end
 
-function Gridap.Algebra.allocate_residual(
+function Algebra.allocate_residual(
   op::PODEOperator,
   μ::AbstractVector,
   t::T,
@@ -63,7 +63,7 @@ function Gridap.Algebra.allocate_residual(
   allocate_residual(op.feop,μ,t,xh,fecache)
 end
 
-function Gridap.Algebra.allocate_jacobian(
+function Algebra.allocate_jacobian(
   op::PODEOperator,
   μ::AbstractVector,
   t::T,

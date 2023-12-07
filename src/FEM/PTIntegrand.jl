@@ -1,6 +1,6 @@
-struct PTIntegrand{T<:CellField}
+struct PTIntegrand{T,M}
   object::T
-  meas::Measure
+  meas::M
 end
 
 const ∫ₚ = PTIntegrand
@@ -9,9 +9,9 @@ function Fields.integrate(a::PTIntegrand)
   integrate(a.object,a.meas)
 end
 
-struct CollectionPTIntegrand{N}
+struct CollectionPTIntegrand{I,N}
   operations::NTuple{N,Union{typeof(+),typeof(-)}}
-  integrands::NTuple{N,PTIntegrand}
+  integrands::NTuple{N,I}
 end
 
 function Base.getindex(a::CollectionPTIntegrand,i::Int)
@@ -43,10 +43,10 @@ end
 function Fields.integrate(a::CollectionPTIntegrand{N}) where N
   cont = DomainContribution()
   for i = 1:N
-    op,int = a[i]
-    imeas = int.meas
+    op,integrand = a[i]
+    imeas = integrand.meas
     itrian = get_triangulation(imeas)
-    integral = integrate(int.object,imeas.quad)
+    integral = integrate(integrand.object,imeas.quad)
     add_contribution!(cont,itrian,integral,op)
   end
   cont
@@ -77,7 +77,7 @@ CellData.integrate(::Any,::Nothing) = nothing
 
 PTIntegrand(::Nothing,::Measure) = nothing
 
-for T in (:DomainContribution,:PTIntegrand,:CollectionPTIntegrand)
+for T in (:DomainContribution,:PTIntegrand)#,:CollectionPTIntegrand)
   @eval begin
     (+)(::Nothing,b::$T) = b
     (+)(a::$T,::Nothing) = a
@@ -87,7 +87,7 @@ end
 
 function (-)(::Nothing,b::DomainContribution)
   for (trian,array) in b.dict
-    b.dict[trian] = -array
+    b.dict[trian] = lazy_map(Broadcasting(-),array)
   end
   b
 end
@@ -96,11 +96,11 @@ function (-)(::Nothing,b::PTIntegrand)
   PTIntegrand(-b.object,b.meas)
 end
 
-function (-)(::Nothing,b::CollectionPTIntegrand)
-  _neg_sign(::typeof(+)) = -
-  _neg_sign(::typeof(-)) = +
-  CollectionPTIntegrand(map(_neg_sign,b.operations),b.integrands)
-end
+# function (-)(::Nothing,b::CollectionPTIntegrand)
+#   _neg_sign(::typeof(+)) = -
+#   _neg_sign(::typeof(-)) = +
+#   CollectionPTIntegrand(map(_neg_sign,b.operations),b.integrands)
+# end
 
 function FESpaces.collect_cell_vector(::FESpace,::Nothing,args...)
   nothing

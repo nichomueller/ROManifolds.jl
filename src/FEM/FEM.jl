@@ -55,6 +55,8 @@ import Gridap.CellData: _get_cell_points
 import Gridap.CellData: _operate_cellfields
 import Gridap.CellData: _to_common_domain
 import Gridap.Fields: BroadcastingFieldOpMap
+import Gridap.Fields: LinearCombinationField
+import Gridap.Fields: LinearCombinationMap
 import Gridap.FESpaces: FEFunction
 import Gridap.FESpaces: SparseMatrixAssembler
 import Gridap.FESpaces: EvaluationFunction
@@ -107,8 +109,8 @@ export PTField
 export PTGenericField
 include("PTFields.jl")
 
-export PTrialFESpace
-export PMultiFieldFESpace
+export TrialPFESpace
+export MultiFieldPFESpace
 export split_fields
 export field_offsets
 include("PFESpaces.jl")
@@ -123,9 +125,9 @@ include("PTIntegrand.jl")
 
 include("PTAssemblers.jl")
 
-export PTTrialFESpace
-export PTMultiFieldFESpace
-export PTMultiFieldTrialFESpace
+export TransientTrialPFESpace
+export TransientMultiFieldPFESpace
+export TransientMultiFieldTrialPFESpace
 include("PTFESpaces.jl")
 
 export PTFEOperator

@@ -246,7 +246,7 @@ _m = DiscreteModelPortion(model,idx)
 _t = Triangulation(_m)
 _dt = Measure(_t,2)
 _test = TestFESpace(_m,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-_trial = PTTrialFESpace(_test,g)
+_trial = TransientTrialPFESpace(_test,g)
 _dv = get_fe_basis(_test)
 _du = get_trial_fe_basis(_trial(nothing,nothing))
 @time ∫(aμt(params,times)*∇(_dv)⋅∇(_du))_dt
