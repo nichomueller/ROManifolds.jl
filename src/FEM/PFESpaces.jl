@@ -1,7 +1,4 @@
-abstract type PFESpace <: FESpace end
-abstract type SingleFieldPFESpace <: PFESpace end
-
-struct TrialPFESpace{S} <: PSingleFieldFESpace
+struct TrialPFESpace{S} <: SingleFieldFESpace
   dirichlet_values::PTArray
   space::S
   function TrialPFESpace(dirichlet_values::PTArray,space::SingleFieldFESpace)
@@ -74,14 +71,6 @@ FESpaces.get_dirichlet_dof_tag(f::TrialPFESpace) = get_dirichlet_dof_tag(f.space
 FESpaces.get_dirichlet_dof_values(f::TrialPFESpace) = f.dirichlet_values
 
 FESpaces.scatter_free_and_dirichlet_values(f::TrialPFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
-
-FESpaces.gather_free_and_dirichlet_values(f::TrialPFESpace,cv) = gather_free_and_dirichlet_values(f.space,cv)
-
-FESpaces.gather_free_and_dirichlet_values!(fv,dv,f::TrialPFESpace,cv) = gather_free_and_dirichlet_values!(fv,dv,f.space,cv)
-
-FESpaces.gather_dirichlet_values!(dv,f::TrialPFESpace,cv) = gather_dirichlet_values!(dv,f.space,cv)
-
-FESpaces.gather_free_values!(fv,f::TrialPFESpace,cv) = gather_free_values!(fv,f.space,cv)
 
 # These functions allow us to pass from cell-wise PTArray(s) to global PTArray(s)
 function FESpaces.zero_free_values(f::TrialPFESpace)
@@ -164,6 +153,12 @@ function FESpaces.gather_free_and_dirichlet_values!(
     cells)
 
   (free_vals,dirichlet_vals)
+end
+
+function FESpaces.gather_free_values!(free_values,f::TrialPFESpace,cell_vals)
+  dirichlet_values = zero_dirichlet_values(f)
+  gather_free_and_dirichlet_values!(free_values,dirichlet_values,f,cell_vals)
+  free_values
 end
 
 function FESpaces.gather_dirichlet_values!(
@@ -257,7 +252,7 @@ function FESpaces.interpolate_dirichlet!(
 end
 
 # MultiField interface
-struct MultiFieldPFESpace{MS<:MultiFieldStyle,CS<:ConstraintStyle,V} <: PFESpace
+struct MultiFieldPFESpace{MS<:MultiFieldStyle,CS<:ConstraintStyle,V} <: FESpace
   vector_type::Type{V}
   spaces::Vector{<:TrialPFESpace}
   multi_field_style::MS

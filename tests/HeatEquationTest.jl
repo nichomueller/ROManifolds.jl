@@ -49,9 +49,9 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
 
 ϵ = 1e-4
-load_solutions = true
+load_solutions = false
 save_solutions = true
-load_structures = true
+load_structures = false
 save_structures = true
 postprocess = true
 norm_style = :H1

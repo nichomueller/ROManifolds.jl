@@ -40,7 +40,7 @@ for op in (:+,:-)
   end
 end
 
-function Fields.integrate(a::CollectionPTIntegrand{N}) where N
+function Fields.integrate(a::CollectionPTIntegrand{I,N} where I) where N
   cont = DomainContribution()
   for i = 1:N
     op,integrand = a[i]

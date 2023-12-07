@@ -1,3 +1,5 @@
+include("./SingleFieldUtilsTests.jl")
+
 module AssemblyTests
 
 using LinearAlgebra
@@ -17,7 +19,7 @@ using Gridap.ODEs.TransientFETools
 using Mabla
 using Mabla.FEM
 
-using SingleFieldUtilsTests
+using Main.SingleFieldUtilsTests
 
 ntimes = 3
 nparams = 2

@@ -1,23 +1,23 @@
-function FEM.TrialPFESpace(f::DistributedSingleFieldFESpace{<:SingleFieldPFESpace})
+function FEM.TrialPFESpace(f::DistributedSingleFieldFESpace)
   spaces = map(TrialPFESpace,f.spaces)
   DistributedSingleFieldFESpace(spaces,f.gids,f.vector_type)
 end
 
-function FEM.TrialPFESpace(f::DistributedSingleFieldFESpace{<:SingleFieldPFESpace},fun)
+function FEM.TrialPFESpace(f::DistributedSingleFieldFESpace,fun)
   spaces = map(f.spaces) do s
     TrialPFESpace(s,fun)
   end
   DistributedSingleFieldFESpace(spaces,f.gids,f.vector_type)
 end
 
-function FEM.TrialPFESpace(fun,f::DistributedSingleFieldFESpace{<:SingleFieldPFESpace})
+function FEM.TrialPFESpace(fun,f::DistributedSingleFieldFESpace)
   spaces = map(f.spaces) do s
     TrialPFESpace(fun,s)
   end
   DistributedSingleFieldFESpace(spaces,f.gids,f.vector_type)
 end
 
-function FEM.TrialPFESpace!(f::DistributedSingleFieldFESpace{<:SingleFieldPFESpace},fun)
+function FEM.TrialPFESpace!(f::DistributedSingleFieldFESpace,fun)
   spaces = map(f.spaces) do s
     TrialPFESpace!(s,fun)
   end

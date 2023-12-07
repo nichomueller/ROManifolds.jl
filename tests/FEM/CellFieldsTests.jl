@@ -1,3 +1,5 @@
+include("./SingleFieldUtilsTests.jl")
+
 module CellFieldTests
 
 using LinearAlgebra

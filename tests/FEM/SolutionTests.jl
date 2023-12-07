@@ -1,3 +1,5 @@
+include("./SingleFieldUtilsTests.jl")
+
 module SolutionTests
 
 using LinearAlgebra
@@ -17,13 +19,12 @@ using Gridap.ODEs.TransientFETools
 using Mabla
 using Mabla.FEM
 
-using SingleFieldUtilsTests
+using Main.SingleFieldUtilsTests
 
+import Gridap.Helpers: @check
 import Gridap.ODEs.TransientFETools: get_algebraic_operator,GenericODESolution
 
 ntimes = 3
-t0 = 0
-dt = 0.1
 tf = (ntimes-1)*dt
 θ = 0.5
 nparams = 2
@@ -31,8 +32,8 @@ params = realization(feop,nparams)
 
 ode_op = get_algebraic_operator(feop)
 fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
-w = get_free_dof_values(uh0μ(μ))
-sol = PODESolution(fesolver,ode_op,μ,w,t0,tf)
+w = get_free_dof_values(uh0μ(params))
+sol = PODESolution(fesolver,ode_op,params,w,t0,tf)
 
 results = PTArray[]
 for (uh,t) in sol
@@ -46,12 +47,12 @@ for np in 1:nparams
   sol_t = GenericODESolution(ode_solver,ode_op_t,w[np],t0,tf)
 
   results_t = Vector{Float}[]
-  for (uh,t) in sol_gridap
+  for (uh,t) in sol_t
     push!(results_t,copy(uh))
   end
 
   for (α,β) in zip(results,results_t)
-    @check isapprox(α[n],β)
+    @check isapprox(α[n],β) "Detected difference in value for index $n"
   end
 end
 
