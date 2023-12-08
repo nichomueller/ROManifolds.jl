@@ -1,4 +1,4 @@
-include("./SingleFieldUtilsTests.jl")
+include("./SingleFieldUtilsFEMTests.jl")
 
 module SolutionTests
 
@@ -19,14 +19,13 @@ using Gridap.ODEs.TransientFETools
 using Mabla
 using Mabla.FEM
 
-using Main.SingleFieldUtilsTests
+using Main.SingleFieldUtilsFEMTests
 
 import Gridap.Helpers: @check
 import Gridap.ODEs.TransientFETools: get_algebraic_operator,GenericODESolution
 
 ntimes = 3
 tf = (ntimes-1)*dt
-θ = 0.5
 nparams = 2
 params = realization(feop,nparams)
 
@@ -52,7 +51,7 @@ for np in 1:nparams
   end
 
   for (α,β) in zip(results,results_t)
-    @check isapprox(α[n],β) "Detected difference in value for index $n"
+    @check isapprox(α[np],β) "Detected difference in value for index $np"
   end
 end
 

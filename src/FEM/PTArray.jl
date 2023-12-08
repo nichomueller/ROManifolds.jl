@@ -59,9 +59,14 @@ function Base.sum(a::PTArray)
   sum(get_array(a))
 end
 
-for op in (:+,:-,:*)
+for op in (:+,:-)
   @eval begin
-    function ($op)(a::PTArray,b::PTArray)
+    function ($op)(a::PTArray{T,N},b::PTArray{T,N}) where {T,N}
+      array = ($op)(get_array(a),get_array(b))
+      PTArray(array)
+    end
+
+    function ($op)(a::PTArray{T,N},b::AbstractArray{T,N}) where {T,N}
       array = ($op)(get_array(a),get_array(b))
       PTArray(array)
     end
@@ -160,15 +165,26 @@ function LinearAlgebra.fillstored!(a::PTArray,z)
   end
 end
 
-# function Arrays.CachedArray(a::PTArray)
-#   ai = testitem(a)
-#   ci = CachedArray(ai)
-#   array = Vector{typeof(ci)}(undef,length(a))
-#   @inbounds for i in eachindex(a)
-#     array[i] = CachedArray(a.array[i])
-#   end
-#   PTArray(array)
-# end
+function Arrays.CachedArray(a::PTArray)
+  ai = testitem(a)
+  ci = CachedArray(ai)
+  array = Vector{typeof(ci)}(undef,length(a))
+  @inbounds for i in eachindex(a)
+    array[i] = CachedArray(a.array[i])
+  end
+  PTArray(array)
+end
+
+function Arrays.setsize!(
+  a::PTArray{<:CachedArray{T,N}},
+  s::NTuple{N,Int}) where {T,N}
+
+  @inbounds for i in eachindex(a)
+    setsize!(a.array[i],s)
+  end
+end
+
+Arrays.get_array(a::PTArray{<:CachedArray}) = map(x->x.array,a.array)
 
 function Base.map(f,a::PTArray...)
   fa1 = f(map(testitem,a)...)

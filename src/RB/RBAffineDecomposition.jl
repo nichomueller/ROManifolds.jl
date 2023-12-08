@@ -375,7 +375,7 @@ end
 function rb_coefficient!(cache,::TrivialRBAffineDecomposition,args...;kwargs...)
   _,ptcache = cache
   setsize!(ptcache,(1,1))
-  get_array(ptcache)
+  PTArray(get_array(ptcache))
 end
 
 function mdeim_solve!(cache::CachedArray,mdeim_interpolation::LU,q::Matrix)
@@ -386,42 +386,42 @@ function mdeim_solve!(cache::CachedArray,mdeim_interpolation::LU,q::Matrix)
 end
 
 function recast_coefficient!(
-  cache::PTArray{<:CachedArray{T}},
-  coeff::Matrix{T}) where T
+  cache::PTArray{<:CachedArray},
+  coeff::AbstractMatrix)
 
   Qs = Int(size(coeff,1))
   nparams = length(cache)
   Nt = Int(size(coeff,2)/nparams)
   setsize!(cache,(Nt,Qs))
-  ptarray = get_array(cache)
+  array = get_array(cache)
 
-  @inbounds for n = eachindex(ptarray)
-    ptarray[n] .= coeff[:,(n-1)*Nt+1:n*Nt]'
+  @inbounds for n = eachindex(array)
+    array[n] = coeff[:,(n-1)*Nt+1:n*Nt]'
   end
 
-  ptarray
+  PTArray(array)
 end
 
 function recast_coefficient!(
-  cache::PTArray{<:CachedArray{T}},
-  basis_time::Matrix{T},
-  coeff::Matrix{T}) where T
+  cache::PTArray{<:CachedArray},
+  basis_time::AbstractMatrix,
+  coeff::AbstractMatrix)
 
   Nt,Qt = size(basis_time)
   Qs = Int(size(coeff,1)/Qt)
   setsize!(cache,(Nt,Qs))
-  ptarray = get_array(cache)
+  array = get_array(cache)
 
-  @inbounds for n = axes(coeff,2)
-    an = ptarray[n]
+  @inbounds for n = eachindex(array)
+    an = array[n]
     cn = coeff[:,n]
     for qs in 1:Qs
       sorted_idx = [(i-1)*Qs+qs for i = 1:Qt]
-      an[:,qs] .= basis_time*cn[sorted_idx]
+      an[:,qs] = basis_time*cn[sorted_idx]
     end
   end
 
-  ptarray
+  PTArray(array)
 end
 
 abstract type RBContributionMap <: Map end
@@ -527,7 +527,8 @@ function rb_contribution!(
   a::TrivialRBAffineDecomposition,
   coeff::PTArray)
 
-  [a.projection for _ = eachindex(coeff)]
+  array = [a.projection for _ = eachindex(coeff)]
+  PTArray(array)
 end
 
 function zero_rb_contribution(

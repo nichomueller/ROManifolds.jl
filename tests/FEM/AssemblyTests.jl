@@ -1,4 +1,4 @@
-include("./SingleFieldUtilsTests.jl")
+include("./SingleFieldUtilsFEMTests.jl")
 
 module AssemblyTests
 
@@ -19,7 +19,9 @@ using Gridap.ODEs.TransientFETools
 using Mabla
 using Mabla.FEM
 
-using Main.SingleFieldUtilsTests
+using Main.SingleFieldUtilsFEMTests
+
+import Gridap.Helpers: @check
 
 ntimes = 3
 nparams = 2
@@ -27,33 +29,35 @@ times = rand(ntimes)
 params = realization(feop,nparams)
 
 int_mat = ∫(aμt(params,times)*∇(dv)⋅∇(du))dΩ
-matdata = collect_cell_matrix(trial0,test,int)
-global matdata_ok
+matdata = collect_cell_matrix(trial0,test,int_mat)
+global matdata_t
 for np in 1:nparams
   for nt in 1:ntimes
     int_mat_t = ∫(a(params[np],times[nt])*∇(dv)⋅∇(du))dΩ
-    matdata_ok = collect_cell_matrix(trial0,test,int_ok)
-    check_ptarray(matdata[1][1],matdata_ok[1][1];n = (np-1)*ntimes+nt)
+    matdata_t = collect_cell_matrix(trial0,test,int_mat_t)
+    check_ptarray(matdata[1][1],matdata_t[1][1];n = (np-1)*ntimes+nt)
   end
 end
 
-@check matdata[2] == matdata_ok[2]
-@check matdata[3] == matdata_ok[3]
+@check matdata[2] == matdata_t[2]
+@check matdata[3] == matdata_t[3]
 
-xh = compute_xh(feop,params,times)
+u = ones(num_free_dofs(test))
+ptu = PTArray([copy(u) for _ = 1:ntimes*nparams])
+xh = compute_xh(feop,params,times,(ptu,ptu))
 int_vec = ∫(aμt(params,times)*∇(dv)⋅∇(xh))dΩ
 
 vecdata = collect_cell_vector(test,int_vec)
-global vecdata_ok
+global vecdata_t
 for np in 1:nparams
   feop_t = get_feoperator_gridap(feop,params[np])
   for nt in 1:ntimes
-    xh_t = compute_xh_gridap(feop_t,times[nt])
+    xh_t = compute_xh_gridap(feop_t,times[nt],(u,u))
     int_vec_t = ∫(a(params[np],times[nt])*∇(dv)⋅∇(xh_t))dΩ
     vecdata_t = collect_cell_vector(test,int_vec_t)
     check_ptarray(vecdata[1][1],vecdata_t[1][1];n = (np-1)*ntimes+nt)
   end
 end
-@check vecdata[2] == vecdata_ok[2]
+@check vecdata[2] == vecdata_t[2]
 
 end # module

@@ -1,4 +1,4 @@
-include("./SingleFieldUtilsTests.jl")
+include("./SingleFieldUtilsFEMTests.jl")
 
 module CellFieldTests
 
@@ -19,7 +19,7 @@ using Gridap.ODEs.TransientFETools
 using Mabla
 using Mabla.FEM
 
-using Main.SingleFieldUtilsTests
+using Main.SingleFieldUtilsFEMTests
 
 ntimes = 3
 nparams = 2
@@ -39,14 +39,16 @@ for np in 1:nparams
   end
 end
 
-xh = compute_xh(feop,params,times)
+u = ones(num_free_dofs(test))
+ptu = PTArray([copy(u) for _ = 1:ntimes*nparams])
+xh = compute_xh(feop,params,times,(ptu,ptu))
 cf_vec = aμt(params,times)*∇(dv)⋅∇(xh)
 cfx_vec = cf_vec(x)
 
 for np in 1:nparams
   feop_t = get_feoperator_gridap(feop,params[np])
   for nt in 1:ntimes
-    xh_t = compute_xh_gridap(feop_t,times[nt])
+    xh_t = compute_xh_gridap(feop_t,times[nt],(u,u))
     cf_vec_t = a(params[np],times[nt])*∇(dv)⋅∇(xh_t)
     cfx_vec_t = cf_vec_t(x)
     check_ptarray(cfx_vec,cfx_vec_t;n = (np-1)*ntimes+nt)

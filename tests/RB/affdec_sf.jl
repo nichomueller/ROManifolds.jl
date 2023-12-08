@@ -41,7 +41,7 @@ function test_affine_decomposition_rhs(
     end
     for n in eachindex(op.μ)
       tidx = (n-1)*length(times)+1 : n*length(times)
-      nzmidx = NnzMatrix{Nonaffine}(res_full_i[:,tidx],res_full_i.nonzero_idx,nfree,1)
+      nzmidx = NnzMatrix(Mabla.RB.Nonaffine(),res_full_i[:,tidx],res_full_i.nonzero_idx,nfree,1)
       contrib_ok = space_time_projection(nzmidx,rbspace)
       err_contrib = norm(contribs[n]-contrib_ok,Inf)
       println("Residual contribution difference for selected triangulation is $err_contrib")
@@ -92,7 +92,7 @@ function test_affine_decomposition_lhs(
     end
     for n in eachindex(op.μ)
       tidx = (n-1)*length(times)+1 : n*length(times)
-      nzmidx = NnzMatrix{Nonaffine}(jac_full_i[:,tidx],jac_full_i.nonzero_idx,nfree,1)
+      nzmidx = NnzMatrix(Mabla.RB.Nonaffine(),jac_full_i[:,tidx],jac_full_i.nonzero_idx,nfree,1)
       contrib_ok = space_time_projection(nzmidx,rbspace_row,rbspace_col;combine_projections)
       err_contrib = norm(contribs[n]-contrib_ok,Inf)
       println("Jacobian #$j contribution difference for selected triangulation is $err_contrib")
@@ -105,7 +105,7 @@ snaps_train,params_train = sols[1:nsnaps_mdeim],params[1:nsnaps_mdeim]
 snaps_test,params_test = sols[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
 op = get_ptoperator(fesolver,feop,snaps_test,params_test)
 op_offline = get_ptoperator(fesolver,feop,snaps_train,params_train)
-rhs_cache,lhs_cache = allocate_cache(op,snaps_test)
+(rhs_cache,lhs_cache),_ = Gridap.ODEs.TransientFETools.allocate_cache(op,rbspace)
 
 test_affine_decomposition_rhs(rhs_cache,op,op_offline,rbrhs.affine_decompositions,rbspace)
 j = 1

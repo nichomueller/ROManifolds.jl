@@ -123,14 +123,18 @@ end
 
 function Fields.integrate(a::PTIntegrand,meas::ReducedMeasure...)
   @assert length(meas) == 1
-  cont = init_contribution(a)
+  cont = DomainContribution()
   for m in meas
     getindex!(cont,a,m)
   end
   cont
 end
 
-function Arrays.getindex!(cont,a::CollectionPTIntegrand{N},rmeas::ReducedMeasure) where N
+function Arrays.getindex!(
+  cont,
+  a::CollectionPTIntegrand{I,N} where I,
+  rmeas::ReducedMeasure) where N
+
   @unpack meas,cell_to_parent_cell = rmeas
   ptrian = get_parent_triangulation(rmeas)
   trian = get_triangulation(rmeas)
@@ -152,7 +156,7 @@ function Arrays.getindex!(cont,a::CollectionPTIntegrand{N},rmeas::ReducedMeasure
 end
 
 function Fields.integrate(a::CollectionPTIntegrand,meas::ReducedMeasure...)
-  cont = init_contribution(a)
+  cont = DomainContribution()
   for m in meas
     getindex!(cont,a,m)
   end

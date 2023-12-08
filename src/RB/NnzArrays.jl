@@ -52,18 +52,18 @@ function NnzMatrix(val::PTArray{<:NnzVector{T}};nparams=length(val),kwargs...) w
   NnzMatrix(Nonaffine(),nonzero_val,nonzero_idx,nrows,nparams)
 end
 
-function NnzMatrix(val::AbstractArray{T};nparams=length(val),ntimes=1) where T
+function NnzMatrix(val::AbstractArray{T};ntimes=1,kwargs...) where T
   nonzero_idx,nonzero_val = compress_array(val)
   nonzero_val = repeat(val,1,ntimes)
   nrows = size(val,1)
-  NnzMatrix(Affine(),nonzero_val,nonzero_idx,nrows,nparams)
+  NnzMatrix(Affine(),nonzero_val,nonzero_idx,nrows,1)
 end
 
-function NnzMatrix(val::NnzVector{T};nparams=length(val),ntimes=1) where T
+function NnzMatrix(val::NnzVector{T};ntimes=1,kwargs...) where T
   nonzero_idx = get_nonzero_idx(val)
   nonzero_val = repeat(get_nonzero_val(val),1,ntimes)
   nrows = get_nrows(val)
-  NnzMatrix(Affine(),nonzero_val,nonzero_idx,nrows,nparams)
+  NnzMatrix(Affine(),nonzero_val,nonzero_idx,nrows,1)
 end
 
 Base.length(nzm::NnzMatrix) = nzm.nparams
@@ -153,7 +153,7 @@ function collect_residuals_for_trian(op::PTOperator)
   b = allocate_residual(op,op.u0)
   ress,trian = residual_for_trian!(b,op,op.u0)
   nzm = map(ress) do res
-    NnzMatrix(res;nparams=length(op.μ))
+    NnzMatrix(res;nparams=length(op.μ),ntimes=length(op.tθ))
   end
   return nzm,trian
 end
@@ -162,7 +162,7 @@ function collect_jacobians_for_trian(op::PTOperator;i=1)
   A = allocate_jacobian(op,op.u0,i)
   jacs_i,trian = jacobian_for_trian!(A,op,op.u0,i)
   nzm_i = map(jacs_i) do jac_i
-    NnzMatrix(NnzVector(jac_i);nparams=length(op.μ))
+    NnzMatrix(NnzVector(jac_i);nparams=length(op.μ),ntimes=length(op.tθ))
   end
   return nzm_i,trian
 end

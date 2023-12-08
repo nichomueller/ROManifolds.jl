@@ -54,11 +54,11 @@ save_solutions = true
 load_structures = false
 save_structures = true
 postprocess = true
-norm_style = :H1
+norm_style = :l2
 nsnaps_state = 50
 nsnaps_mdeim = 20
 nsnaps_test = 10
-st_mdeim = true
+st_mdeim = false
 rbinfo = RBInfo(test_path;ϵ,norm_style,nsnaps_state,nsnaps_mdeim,nsnaps_test,st_mdeim)
 
 # Offline phase

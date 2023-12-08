@@ -235,6 +235,7 @@ function residual_for_trian!(
   bvec = Vector{typeof(b)}(undef,num_domains(dc))
   for (n,t) in enumerate(trian)
     vecdata = collect_cell_vector(test,dc,t)
+    fill!(b,zero(eltype(b)))
     assemble_vector_add!(b,op.assem,vecdata)
     bvec[n] = copy(b)
   end
@@ -277,6 +278,7 @@ function jacobian_for_trian!(
   Avec = Vector{typeof(A)}(undef,num_domains(dc))
   for (n,t) in enumerate(trian)
     matdata = collect_cell_matrix(trial,test,dc,t)
+    fillstored!(A,zero(eltype(A)))
     assemble_matrix_add!(A,op.assem,matdata)
     Avec[n] = copy(A)
   end

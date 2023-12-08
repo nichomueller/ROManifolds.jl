@@ -13,7 +13,7 @@ function num_time_dofs(fesolver::PThetaMethod)
   dt = fesolver.dt
   t0 = fesolver.t0
   tf = fesolver.tf
-  Int((tf-t0)/dt)
+  floor(Int,(tf-t0)/dt)
 end
 
 function get_times(fesolver::PThetaMethod)
