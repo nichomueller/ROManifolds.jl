@@ -86,26 +86,6 @@ function compute_xh(
   return TransientCellField(uh,dxh)
 end
 
-# function compute_res(feop::PTFEOperator,params::Table,times::Vector{<:Real},trian=Ω)
-#   dv = get_fe_basis(test)
-#   xh = compute_xh(feop,params,times)
-#   assem = PTSparseMatrixAssembler(feop.assem,params,times)
-#   res_contrib = integrate(feop.res(params,times,xh,dv))
-#   vecdata = collect_cell_vector(test,res_contrib,trian)
-#   assemble_vector(assem,vecdata)
-# end
-
-# function compute_jac(feop::PTFEOperator,params::Table,times::Vector{<:Real},trian=Ω,i=1)
-#   dv = get_fe_basis(test)
-#   du = get_trial_fe_basis(trial0)
-#   xh = compute_xh(feop,params,times)
-#   assem = PTSparseMatrixAssembler(feop.assem,params,times)
-#   γᵢ = (1,1/(θ*dt))[i]
-#   jac_contrib = γᵢ*integrate(feop.jacs[i](params,times,xh,du,dv))
-#   matdata = collect_cell_matrix(trial0,test,jac_contrib,trian)
-#   assemble_matrix(assem,matdata)
-# end
-
 function get_feoperator_gridap(
   feop::PTFEOperator{Affine},
   μ::Vector{<:Real})

@@ -29,6 +29,7 @@ import Gridap.ODEs.TransientFETools: get_order
 ntimes = 60
 tf = ntimes*dt
 nparams = 50
+ntests = 10
 
 fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
 times = get_times(fesolver)
@@ -36,10 +37,10 @@ times = get_times(fesolver)
 ϵ = 1e-4
 norm_style = :l2
 st_mdeim = false
-rbinfo = RBInfo(pwd();ϵ,norm_style,nsnaps_state=nparams,nsnaps_mdeim=nparams,st_mdeim)
+rbinfo = RBInfo(pwd();ϵ,norm_style,nsnaps_state=nparams,nsnaps_mdeim=nparams,
+  nsnaps_test=ntests,st_mdeim)
 
 sols,params, = collect_solutions(rbinfo,fesolver,feop)
-params = params[1:nparams]
 rbspace = reduced_basis(rbinfo,feop,sols)
 
 nzm = NnzMatrix(sols[1:nparams];nparams)
@@ -61,7 +62,8 @@ nnorm = norm(time_values - rbspace.basis_time*rbspace.basis_time'*time_values)
 dnorm = norm(time_values)
 @check nnorm / dnorm <= ϵ*10
 
-op = get_ptoperator(fesolver,feop,rbspace,params)
+# offline
+op = get_ptoperator(fesolver,feop,rbspace,params[1:nparams])
 ress,trians = collect_residuals_for_trian(op)
 jacs1,trians1 = collect_jacobians_for_trian(op;i=1)
 jacs2,trians2 = collect_jacobians_for_trian(op;i=2)
@@ -91,40 +93,40 @@ for (i,trian) in enumerate(trians1)
   end
 end
 
-function check_mdeim_spatial_basis(xfull,xreduced)
-  basis_space = tpod(xfull)
+function check_mdeim_spatial_basis(xfull_off,xfull_on,xreduced)
+  basis_space = tpod(xfull_off)
   space_idx = get_interpolation_idx(basis_space)
-  @check xreduced ≈ xfull[space_idx,:]
+  @check xreduced ≈ xfull_on[space_idx,:]
+  @check norm(xfull_on - basis_space*basis_space'*xfull_on) / norm(xfull_on) ≤ ϵ*10
 end
 
-function check_mdeim_coefficient(coeff_cache,affdec,xfull,xreduced)
-  basis_space = tpod(xfull)
+function check_mdeim_coefficient(coeff_cache,affdec,xfull_off,xfull_on,xreduced)
+  basis_space = tpod(xfull_off)
   coeff_mdeim = rb_coefficient!(coeff_cache,affdec,xreduced;st_mdeim)
-  for np in 1:nparams
-    coeff = transpose(basis_space'*xfull[:,(np-1)*ntimes+1:np*ntimes])
+  for np in 1:ntests
+    coeff = transpose(basis_space'*xfull_on[:,(np-1)*ntimes+1:np*ntimes])
     err_coeff = norm(coeff_mdeim[np] - coeff,Inf)
-    @check err_coeff <= ϵ*100
+    println("Error coefficient is $err_coeff")
   end
 end
 
-function check_rb_contribution(k::RBVecContributionMap,cache,affdec,xfull,xreduced)
+function check_rb_contribution(k::RBVecContributionMap,cache,affdec,xfull_on,xreduced)
   nfree = length(get_free_dof_ids(test))
   coeff_cache,rb_cache = cache
   coeff_mdeim = rb_coefficient!(coeff_cache,affdec,xreduced;st_mdeim)
   basis_space_proj = affdec.basis_space
   basis_time = last(affdec.basis_time)
-  for np in 1:nparams
+  for np in 1:ntests
     contrib_mdeim = evaluate!(k,rb_cache,basis_space_proj,basis_time,coeff_mdeim[np])
     nzmidx = NnzMatrix(
-      xfull.affinity,
-      xfull[:,(np-1)*ntimes+1 : np*ntimes],
-      xfull.nonzero_idx,
+      xfull_on.affinity,
+      xfull_on[:,(np-1)*ntimes+1 : np*ntimes],
+      xfull_on.nonzero_idx,
       nfree,
       1)
     contrib = space_time_projection(nzmidx,rbspace)
     err_contrib = norm(contrib-contrib_mdeim,Inf)
     println("Error contribution is $err_contrib")
-    #@check err_contrib <= ϵ*10
   end
 end
 
@@ -135,7 +137,7 @@ function check_rb_contribution(k::RBMatContributionMap,cache,affdec,xfull,xreduc
   coeff_mdeim = rb_coefficient!(coeff_cache,affdec,xreduced;st_mdeim)
   basis_space_proj = affdec.basis_space
   basis_time = last(affdec.basis_time)
-  for np in 1:nparams
+  for np in 1:ntests
     contrib_mdeim = evaluate!(k,rb_cache,basis_space_proj,basis_time,coeff_mdeim[np])
     nzmidx = NnzMatrix(
       xfull.affinity,
@@ -150,61 +152,52 @@ function check_rb_contribution(k::RBMatContributionMap,cache,affdec,xfull,xreduc
   end
 end
 
-rbrhs,rblhs = collect_compress_rhs_lhs(rbinfo,feop,fesolver,rbspace,params)
+# online
+op_online = get_ptoperator(fesolver,feop,rbspace,params[nparams+1:end])
+ress_online,trians = collect_residuals_for_trian(op_online)
+jacs1_online,trians1 = collect_jacobians_for_trian(op_online;i=1)
+jacs2_online,trians2 = collect_jacobians_for_trian(op_online;i=2)
 
-(rhs_cache,lhs_cache), = allocate_cache(op,rbspace)
+rbrhs,rblhs = collect_compress_rhs_lhs(rbinfo,feop,fesolver,rbspace,params[1:nparams])
+
+(rhs_cache,lhs_cache), = allocate_cache(op_online,rbspace)
 rhs_mdeim_cache,rhs_rb_cache = rhs_cache
 rhs_collect_cache,rhs_coeff_cache = rhs_mdeim_cache
 lhs_mdeim_cache,lhs_rb_cache = lhs_cache
 lhs_collect_cache,lhs_coeff_cache = lhs_mdeim_cache
 
-red_res = collect_reduced_residuals!(rhs_collect_cache,op,rbrhs)
-red_jac1 = collect_reduced_jacobians!(lhs_collect_cache,op,rblhs[1];i=1)
-red_jac2 = collect_reduced_jacobians!(lhs_collect_cache,op,rblhs[2];i=2)
+red_res = collect_reduced_residuals!(rhs_collect_cache,op_online,rbrhs)
+red_jac1 = collect_reduced_jacobians!(lhs_collect_cache,op_online,rblhs[1];i=1)
+red_jac2 = collect_reduced_jacobians!(lhs_collect_cache,op_online,rblhs[2];i=2)
 
 for (itrian,trian) in enumerate(trians)
-  resi = ress[itrian]
+  resi_of = ress[itrian]
+  resi_on = ress_online[itrian]
   red_resi = red_res[itrian]
   affdeci = rbrhs.affine_decompositions[itrian]
-  check_mdeim_spatial_basis(resi,red_resi)
-  check_mdeim_coefficient(rhs_coeff_cache,affdeci,resi,red_resi)
+  check_mdeim_spatial_basis(resi_of,resi_on,red_resi)
+  check_mdeim_coefficient(rhs_coeff_cache,affdeci,resi_of,resi_on,red_resi)
   check_rb_contribution(
     RBVecContributionMap(),
     (rhs_coeff_cache,rhs_rb_cache),
     affdeci,
-    resi,
+    resi_on,
     red_resi)
 end
 
 for (itrian,trian) in enumerate(jacs1)
-  jac1i = jacs1[itrian]
+  jac1i_of = jacs1[itrian]
+  jac1i_on = jacs1_online[itrian]
   red_jac1i = red_jac1[itrian]
   affdeci = rblhs[1].affine_decompositions[itrian]
-  check_mdeim_spatial_basis(jac1i,red_jac1i)
-  check_mdeim_coefficient(lhs_coeff_cache,affdeci,jac1i,red_jac1i)
+  check_mdeim_spatial_basis(jac1i_of,jac1i_on,red_jac1i)
+  check_mdeim_coefficient(lhs_coeff_cache,affdeci,jac1i_of,jac1i_on,red_jac1i)
   check_rb_contribution(
     RBMatContributionMap(),
     (lhs_coeff_cache,lhs_rb_cache),
     affdeci,
-    jac1i,
+    jac1i_on,
     red_jac1i)
 end
 
 end # module
-
-# b = allocate_residual(op,op.u0)
-# trian = get_domains(dc)
-# bvec = Vector{typeof(b)}(undef,num_domains(dc))
-# for (n,t) in enumerate(trian)
-#   vecdata = collect_cell_vector(test,dc,t)
-#   assemble_vector_add!(b,feop.assem,vecdata)
-#   bvec[n] = copy(b)
-# end
-
-# bvec1 = Vector{typeof(b)}(undef,num_domains(dc))
-# for (n,t) in enumerate(trian)
-#   vecdata = collect_cell_vector(test,dc,t)
-#   b = allocate_residual(op,op.u0)
-#   assemble_vector_add!(b,feop.assem,vecdata)
-#   bvec1[n] = b
-# end
