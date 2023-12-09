@@ -29,10 +29,9 @@ tf = (ntimes-1)*dt
 nparams = 2
 params = realization(feop,nparams)
 
-ode_op = get_algebraic_operator(feop)
 fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
 w = get_free_dof_values(uh0μ(params))
-sol = PODESolution(fesolver,ode_op,params,w,t0,tf)
+sol = PODESolution(fesolver,feop,params,w,t0,tf)
 
 results = PTArray[]
 for (uh,t) in sol

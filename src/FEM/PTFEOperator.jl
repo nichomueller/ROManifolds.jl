@@ -3,24 +3,36 @@ A parametric version of the `Gridap` `TransientFEOperator`
 """
 abstract type PTFEOperator{T<:OperatorType} <: GridapType end
 
-"""
-Returns a `ODEOperator` wrapper of the `PFEOperator` that can be
-straightforwardly used with the `ODETools` module.
-"""
-function TransientFETools.get_algebraic_operator(feop::PTFEOperator{T}) where T
-  PODEOpFromFEOp{T}(feop)
-end
+function TransientFETools.allocate_cache(
+  op::PTFEOperator,
+  μ::AbstractVector,
+  t::T) where T
 
-function TransientFETools.allocate_cache(::PTFEOperator)
-  nothing
+  Ut = get_trial(op)
+  U = allocate_trial_space(Ut,μ,t)
+  Uts = (Ut,)
+  Us = (U,)
+  for i in 1:get_order(op)
+    Uts = (Uts...,∂ₚt(Uts[i]))
+    Us = (Us...,allocate_trial_space(Uts[i+1],μ,t))
+  end
+  fecache = nothing
+  Us,Uts,fecache
 end
 
 function TransientFETools.update_cache!(
-  ::Nothing,
-  ::PTFEOperator,
-  ::Any,
-  ::Any)
-  nothing
+  ode_cache,
+  op::PTFEOperator,
+  μ::AbstractVector,
+  t::T) where T
+
+  _Us,Uts,fecache = ode_cache
+  Us = ()
+  for i in 1:get_order(op)+1
+    Us = (Us...,evaluate!(_Us[i],Uts[i],μ,t))
+  end
+  fecache = nothing
+  Us,Uts,fecache
 end
 
 FESpaces.get_test(op::PTFEOperator) = op.test
@@ -111,8 +123,7 @@ function Algebra.allocate_residual(
   op::PTFEOperator,
   μ::P,
   t::T,
-  xh::CellField,
-  cache) where {P,T}
+  xh::CellField) where {P,T}
 
   test = get_test(op)
   v = get_fe_basis(test)
@@ -133,14 +144,13 @@ function Algebra.allocate_jacobian(
   μ::P,
   t::T,
   xh::CellField,
-  i::Integer,
-  cache) where {P,T}
+  i::Integer) where {P,T}
 
   trial = get_trial(op)(μ,t)
   test = get_test(op)
   u = get_trial_fe_basis(trial)
   v = get_fe_basis(test)
-  dc = integrate(op.jac[i](μ,t,xh,u,v))
+  dc = integrate(op.jacs[i](μ,t,xh,u,v))
   matdata = collect_cell_matrix(trial,test,dc)
   assem = op.assem
   for trian in get_domains(dc)
@@ -157,8 +167,7 @@ function Algebra.residual!(
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
-  xh::CellField,
-  cache) where T
+  xh::CellField) where T
 
   test = get_test(op)
   v = get_fe_basis(test)
@@ -174,7 +183,6 @@ function residual_for_trian!(
   μ::AbstractVector,
   t::T,
   xh::CellField,
-  cache,
   args...) where T
 
   test = get_test(op)
@@ -198,8 +206,7 @@ function Algebra.jacobian!(
   t::T,
   uh::CellField,
   i::Integer,
-  γᵢ::Real,
-  cache) where T
+  γᵢ::Real) where T
 
   matdata = _matdata_jacobian(op,μ,t,uh,i,γᵢ)
   assemble_matrix_add!(A,op.assem,matdata)
@@ -214,14 +221,13 @@ function jacobian_for_trian!(
   uh::CellField,
   i::Integer,
   γᵢ::Real,
-  cache,
   args...) where T
 
   trial = get_trial(op)(μ,t)
   test = get_test(op)
   u = get_trial_fe_basis(trial)
   v = get_fe_basis(test)
-  dc = γᵢ*integrate(op.jac[i](μ,t,uh,u,v),args...)
+  dc = γᵢ*integrate(op.jacs[i](μ,t,uh,u,v),args...)
   trian = get_domains(dc)
   Avec = Vector{typeof(A)}(undef,num_domains(dc))
   for (n,t) in enumerate(trian)
@@ -239,8 +245,7 @@ function ODETools.jacobians!(
   μ::AbstractVector,
   t::T,
   uh::CellField,
-  γ::Tuple{Vararg{Real}},
-  cache) where T
+  γ::Tuple{Vararg{Real}}) where T
 
   _matdata_jacobians = fill_jacobians(op,μ,t,uh,γ)
   matdata = _vcat_matdata(_matdata_jacobians)
@@ -279,6 +284,6 @@ function TransientFETools._matdata_jacobian(
   test = get_test(op)
   u = get_trial_fe_basis(trial)
   v = get_fe_basis(test)
-  dc = γᵢ*integrate(op.jac[i](μ,t,xh,u,v))
+  dc = γᵢ*integrate(op.jacs[i](μ,t,xh,u,v))
   collect_cell_matrix(trial,test,dc)
 end

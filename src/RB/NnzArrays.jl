@@ -35,11 +35,9 @@ struct NnzMatrix{T,A} <: NnzArray{T,2}
   nparams::Int
 end
 
-function NnzMatrix(val::PTArray{<:AbstractArray{T}};nparams=length(val),kwargs...) where T
+function NnzMatrix(val::PTArray{<:AbstractVector{T}};nparams=length(val),kwargs...) where T
   vals = get_array(val)
-  idx_val = map(compress_array,vals)
-  nonzero_idx = first(first.(idx_val))
-  nonzero_val = stack(last.(idx_val))
+  nonzero_idx,nonzero_val = compress_array(stack(vals))
   nrows = size(testitem(val),1)
   NnzMatrix(Nonaffine(),nonzero_val,nonzero_idx,nrows,nparams)
 end
@@ -52,7 +50,7 @@ function NnzMatrix(val::PTArray{<:NnzVector{T}};nparams=length(val),kwargs...) w
   NnzMatrix(Nonaffine(),nonzero_val,nonzero_idx,nrows,nparams)
 end
 
-function NnzMatrix(val::AbstractArray{T};ntimes=1,kwargs...) where T
+function NnzMatrix(val::AbstractVector{T};ntimes=1,kwargs...) where T
   nonzero_idx,nonzero_val = compress_array(val)
   nonzero_val = repeat(val,1,ntimes)
   nrows = size(val,1)

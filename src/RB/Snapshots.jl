@@ -48,13 +48,12 @@ function collect_solutions(
   feop::PTFEOperator)
 
   uh0,t0,tf = fesolver.uh0,fesolver.t0,fesolver.tf
-  ode_op = get_algebraic_operator(feop)
   nparams = rbinfo.nsnaps_state+rbinfo.nsnaps_test
   params = realization(feop,nparams)
   u0 = get_free_dof_values(uh0(params))
   time_ndofs = num_time_dofs(fesolver)
   T = get_vector_type(feop.test)
-  uμt = PODESolution(fesolver,ode_op,params,u0,t0,tf)
+  uμt = PODESolution(fesolver,feop,params,u0,t0,tf)
   snaps = Vector{PTArray{T}}(undef,time_ndofs)
   println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
   stats = @timed for (snap,n) in uμt

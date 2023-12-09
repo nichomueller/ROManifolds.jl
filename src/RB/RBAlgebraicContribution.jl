@@ -179,7 +179,7 @@ function collect_compress_lhs(
   rbspace::RBSpace{T};
   kwargs...) where T
 
-  njacs = length(op.odeop.feop.jacs)
+  njacs = length(op.feop.jacs)
   ad_jacs = Vector{RBMatAlgebraicContribution{T}}(undef,njacs)
   for i = 1:njacs
     ad_jacs[i] = _collect_compress_lhs(rbinfo,op,rbspace,rbspace;i,kwargs...)

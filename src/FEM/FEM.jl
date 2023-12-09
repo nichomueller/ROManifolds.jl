@@ -67,9 +67,6 @@ import Gridap.ODEs.ODETools: residual!
 import Gridap.ODEs.ODETools: jacobian!
 import Gridap.ODEs.ODETools: jacobians!
 import Gridap.ODEs.ODETools: _allocate_matrix_and_vector
-import Gridap.ODEs.ODETools: _matrix_and_vector!
-import Gridap.ODEs.ODETools: _matrix!
-import Gridap.ODEs.ODETools: _vector!
 import Gridap.ODEs.TransientFETools: ODESolver
 import Gridap.ODEs.TransientFETools: ODEOperator
 import Gridap.ODEs.TransientFETools: OperatorType
@@ -155,7 +152,7 @@ export _check_convergence
 include("PTSolvers.jl")
 
 export PTThetaMethodOperator
-export PTThetaAffineMethodOperator
+export PTAffineThetaMethodOperator
 include("PThetaMethod.jl")
 
 export get_order

@@ -119,20 +119,19 @@ function project_recast(mat::AbstractMatrix,rb::RBSpace)
   recast(rb_proj,rb)
 end
 
-function FEM.get_algebraic_operator(
+function TransientFETools.get_algebraic_operator(
   fesolver::PThetaMethod,
   feop::PTFEOperator,
   rbspace::RBSpace{T},
   params::Table) where T
 
   dtθ = fesolver.θ == 0.0 ? fesolver.dt : fesolver.dt*fesolver.θ
-  ode_op = get_algebraic_operator(feop)
   times = get_times(fesolver)
   bs = get_basis_space(rbspace)
   ns = num_rb_space_ndofs(rbspace)
 
-  ode_cache = allocate_cache(ode_op,params,times)
-  ode_cache = update_cache!(ode_cache,ode_op,params,times)
+  ode_cache = allocate_cache(feop,params,times)
+  ode_cache = update_cache!(ode_cache,feop,params,times)
   N = length(times)*length(params)
   array = Vector{Vector{T}}(undef,N)
   @inbounds for n = 1:N
@@ -141,5 +140,5 @@ function FEM.get_algebraic_operator(
   end
   sols = PTArray(array)
   sols_cache = zero(sols)
-  get_algebraic_operator(ode_op,params,times,dtθ,sols,ode_cache,sols_cache)
+  get_algebraic_operator(feop,params,times,dtθ,sols,ode_cache,sols_cache)
 end

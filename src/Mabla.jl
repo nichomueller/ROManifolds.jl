@@ -69,7 +69,7 @@ export get_times
 export collect_solutions
 export collect_residuals_for_trian
 export collect_jacobians_for_trian
-export PTThetaAffineMethodOperator
+export PTAffineThetaMethodOperator
 export PTThetaMethodOperator
 export get_order
 export get_L2_norm_matrix

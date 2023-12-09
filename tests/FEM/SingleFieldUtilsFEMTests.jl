@@ -72,9 +72,8 @@ function compute_xh(
   times::Vector{<:Real},
   u::Tuple)
 
-  ode_op = get_algebraic_operator(feop)
-  ode_cache = allocate_cache(ode_op,params,times)
-  update_cache!(ode_cache,ode_op,params,times)
+  ode_cache = allocate_cache(feop,params,times)
+  update_cache!(ode_cache,feop,params,times)
   Us, = ode_cache
 
   uh = EvaluationFunction(Us[1],u[1])
@@ -107,9 +106,9 @@ function compute_xh_gridap(
   t::Real,
   u::Tuple)
 
-  odeop = get_algebraic_operator(feop)
-  ode_cache = allocate_cache(odeop)
-  update_cache!(ode_cache,odeop,t)
+  ode_op = get_algebraic_operator(feop)
+  ode_cache = allocate_cache(ode_op)
+  update_cache!(ode_cache,ode_op,t)
   Uh, = ode_cache
   uh = EvaluationFunction(Uh[1],u[1])
   dxh = ()

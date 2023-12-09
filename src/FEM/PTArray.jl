@@ -259,6 +259,13 @@ function LinearAlgebra.ldiv!(a::PTArray,m::LU,b::PTArray)
   end
 end
 
+function LinearAlgebra.rmul!(a::PTArray,b::Number)
+  @inbounds for i = eachindex(a)
+    ai = a[i]
+    rmul!(ai,b)
+  end
+end
+
 for op in (:+,:-,:*)
   @eval begin
     function Arrays.return_value(

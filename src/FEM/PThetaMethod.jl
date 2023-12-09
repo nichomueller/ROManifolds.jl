@@ -1,4 +1,4 @@
-# abstract implementation covers the general nonlinear case
+# general nonlinear case
 function TransientFETools.solve_step!(
   uf::AbstractArray,
   solver::PThetaMethod,
@@ -37,7 +37,7 @@ function TransientFETools.solve_step!(
 end
 
 struct PTThetaMethodOperator{P,T} <: PTAlgebraicOperator{Nonlinear}
-  odeop::PTFEOperator
+  feop::PTFEOperator
   μ::P
   t::T
   dtθ::Float
@@ -47,7 +47,7 @@ struct PTThetaMethodOperator{P,T} <: PTAlgebraicOperator{Nonlinear}
 end
 
 function TransientFETools.get_algebraic_operator(
-  odeop::PTFEOperator,
+  feop::PTFEOperator,
   μ,
   t,
   dtθ::Float,
@@ -55,7 +55,7 @@ function TransientFETools.get_algebraic_operator(
   ode_cache,
   vθ::AbstractVector)
 
-  PTThetaMethodOperator(odeop,μ,t,dtθ,u0,ode_cache,vθ)
+  PTThetaMethodOperator(feop,μ,t,dtθ,u0,ode_cache,vθ)
 end
 
 function Algebra.residual!(
@@ -68,7 +68,7 @@ function Algebra.residual!(
   @. vθ = (x-op.u0)/op.dtθ
   z = zero(eltype(b))
   fill!(b,z)
-  residual!(b,op.odeop,op.μ,op.t,(uF,vθ),op.ode_cache)
+  residual!(b,op,(uF,vθ))
 end
 
 function residual_for_trian!(
@@ -81,10 +81,10 @@ function residual_for_trian!(
   vθ = op.vθ
   z = zero(eltype(b))
   fill!(b,z)
-  residual_for_trian!(b,op.odeop,op.μ,op.t,(uF,vθ),op.ode_cache,args...)
+  residual_for_trian!(b,op,(uF,vθ),args...)
 end
 
-function ODETools.jacobian!(
+function Algebra.jacobian!(
   A::AbstractMatrix,
   op::PTThetaMethodOperator,
   x::AbstractVector)
@@ -94,7 +94,7 @@ function ODETools.jacobian!(
   @. vθ = (x-op.u0)/op.dtθ
   z = zero(eltype(A))
   fillstored!(A,z)
-  jacobians!(A,op.odeop,op.μ,op.t,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)
+  jacobians!(A,op,(uF,vθ),(1.0,1/op.dtθ))
 end
 
 function Algebra.jacobian!(
@@ -109,7 +109,7 @@ function Algebra.jacobian!(
   z = zero(eltype(A))
   fillstored!(A,z)
   γ = (1.0,1/op.dtθ)
-  jacobian!(A,op.odeop,op.μ,op.t,(uF,vθ),i,γ[i],op.ode_cache)
+  jacobian!(A,op,(uF,vθ),i,γ[i])
 end
 
 function jacobian_for_trian!(
@@ -124,7 +124,7 @@ function jacobian_for_trian!(
   z = zero(eltype(A))
   fillstored!(A,z)
   γ = (1.0,1/op.dtθ)
-  jacobian_for_trian!(A,op.odeop,op.μ,op.t,(uF,vθ),i,γ[i],op.ode_cache,args...)
+  jacobian_for_trian!(A,op,(uF,vθ),i,γ[i],args...)
 end
 
 # specializations for affine case
@@ -146,30 +146,81 @@ function TransientFETools.solve_step!(
     vθ = similar(u0)
     vθ .= 0.0
     l_cache = nothing
-    A,b = _allocate_matrix_and_vector(op,μ,t0,u0,ode_cache)
   else
-    ode_cache,vθ,A,b,l_cache = cache
+    ode_cache,vθ,l_cache = cache
   end
 
   ode_cache = update_cache!(ode_cache,op,μ,tθ)
 
-  _matrix_and_vector!(A,b,op,μ,tθ,dtθ,u0,ode_cache,vθ)
-  afop = PTAffineOperator(A,b)
+  lop = PTAffineThetaMethodOperator(op,μ,tθ,dtθ,u0,ode_cache,vθ)
 
-  l_cache = solve!(uf,solver.nls,afop,l_cache)
+  l_cache = solve!(uf,solver.nls,lop,l_cache)
 
   uf .+= u0
   if 0.0 < solver.θ < 1.0
     @. uf = uf*(1.0/solver.θ)-u0*((1-solver.θ)/solver.θ)
   end
 
-  cache = (ode_cache,vθ,A,b,l_cache)
+  cache = (ode_cache,vθ,l_cache)
   tf = t0+dt
   return (uf,tf,cache)
 end
 
-struct PTThetaAffineMethodOperator{P,T} <: PTAlgebraicOperator{Affine}
-  odeop::PTFEOperator{Affine}
+# function ODETools._allocate_matrix_and_vector(op,μ,t0,u0,ode_cache)
+#   b = allocate_residual(op,μ,t0,xh)
+#   A = allocate_jacobian(op,μ,t0,xh,1)
+#   return A,b
+# end
+
+# function ODETools._matrix_and_vector!(
+#   A::AbstractMatrix,
+#   b::AbstractVector,
+#   op::PTFEOperator{Affine},
+#   μ,
+#   t,
+#   dtθ,
+#   u0,
+#   ode_cache,
+#   vθ)
+
+#   _matrix!(A,op,μ,t,dtθ,u0,ode_cache,vθ)
+#   _vector!(b,op,μ,t,dtθ,u0,ode_cache,vθ)
+# end
+
+# function ODETools._matrix!(
+#   A::AbstractMatrix,
+#   op::PTFEOperator{Affine},
+#   μ,
+#   t,
+#   dtθ,
+#   u0,
+#   ode_cache,
+#   vθ)
+
+#   z = zero(eltype(A))
+#   fillstored!(A,z)
+#   jacobians!(A,op,μ,t,(vθ,vθ),(1.0,1/dtθ),ode_cache)
+# end
+
+# function ODETools._vector!(
+#   b::AbstractVector,
+#   op::PTFEOperator{Affine},
+#   μ,
+#   t,
+#   dtθ,
+#   u0,
+#   ode_cache,
+#   vθ)
+
+#   z = zero(eltype(b))
+#   fill!(b,z)
+#   residual!(b,op,μ,t,(u0,vθ),ode_cache)
+#   b .*= -1.0
+#   b
+# end
+
+struct PTAffineThetaMethodOperator{P,T} <: PTAlgebraicOperator{Affine}
+  feop::PTFEOperator{Affine}
   μ::P
   t::T
   dtθ::Float
@@ -179,7 +230,7 @@ struct PTThetaAffineMethodOperator{P,T} <: PTAlgebraicOperator{Affine}
 end
 
 function TransientFETools.get_algebraic_operator(
-  odeop::PTFEOperator{Affine},
+  feop::PTFEOperator{Affine},
   μ,
   t,
   dtθ::Float,
@@ -187,24 +238,62 @@ function TransientFETools.get_algebraic_operator(
   ode_cache,
   vθ::AbstractVector)
 
-  PTThetaAffineMethodOperator(odeop,μ,t,dtθ,u0,ode_cache,vθ)
+  PTAffineThetaMethodOperator(feop,μ,t,dtθ,u0,ode_cache,vθ)
+end
+
+function Algebra.residual!(
+  b::AbstractVector,
+  op::PTAffineThetaMethodOperator,
+  x::AbstractVector)
+
+  uF = x
+  vθ = op.vθ
+  z = zero(eltype(b))
+  fill!(b,z)
+  residual!(b,op,(uF,vθ))
 end
 
 function residual_for_trian!(
   b::AbstractVector,
-  op::PTThetaAffineMethodOperator,
+  op::PTAffineThetaMethodOperator,
   x::AbstractVector,
   args...)
 
   vθ = op.vθ
   z = zero(eltype(b))
   fill!(b,z)
-  residual_for_trian!(b,op.odeop,op.μ,op.t,(vθ,vθ),op.ode_cache,args...)
+  residual_for_trian!(b,op,(vθ,vθ),args...)
+end
+
+function Algebra.jacobian!(
+  A::AbstractMatrix,
+  op::PTAffineThetaMethodOperator,
+  x::AbstractVector)
+
+  uF = x
+  vθ = op.vθ
+  z = zero(eltype(A))
+  fillstored!(A,z)
+  jacobians!(A,op,(uF,vθ),(1.0,1/op.dtθ))
+end
+
+function Algebra.jacobian!(
+  A::AbstractMatrix,
+  op::PTAffineThetaMethodOperator,
+  x::AbstractVector,
+  i::Int)
+
+  uF = x
+  vθ = op.vθ
+  z = zero(eltype(A))
+  fillstored!(A,z)
+  γ = (1.0,1/op.dtθ)
+  jacobian!(A,op,(uF,vθ),i,γ[i])
 end
 
 function jacobian_for_trian!(
   A::AbstractMatrix,
-  op::PTThetaAffineMethodOperator,
+  op::PTAffineThetaMethodOperator,
   x::AbstractVector,
   i::Int,
   args...)
@@ -213,58 +302,5 @@ function jacobian_for_trian!(
   z = zero(eltype(A))
   fillstored!(A,z)
   γ = (1.0,1/op.dtθ)
-  jacobian_for_trian!(A,op.odeop,op.μ,op.t,(vθ,vθ),i,γ[i],op.ode_cache,args...)
-end
-
-function ODETools._allocate_matrix_and_vector(odeop,μ,t0,u0,ode_cache)
-  b = allocate_residual(odeop,μ,t0,u0,ode_cache)
-  A = allocate_jacobian(odeop,μ,t0,u0,1,ode_cache)
-  return A,b
-end
-
-function ODETools._matrix_and_vector!(
-  A::AbstractMatrix,
-  b::AbstractVector,
-  op::PTFEOperator{Affine},
-  μ,
-  t,
-  dtθ,
-  u0,
-  ode_cache,
-  vθ)
-
-  _matrix!(A,op,μ,t,dtθ,u0,ode_cache,vθ)
-  _vector!(b,op,μ,t,dtθ,u0,ode_cache,vθ)
-end
-
-function ODETools._matrix!(
-  A::AbstractMatrix,
-  op::PTFEOperator{Affine},
-  μ,
-  t,
-  dtθ,
-  u0,
-  ode_cache,
-  vθ)
-
-  z = zero(eltype(A))
-  fillstored!(A,z)
-  jacobians!(A,op,μ,t,(vθ,vθ),(1.0,1/dtθ),ode_cache)
-end
-
-function ODETools._vector!(
-  b::AbstractVector,
-  op::PTFEOperator{Affine},
-  μ,
-  t,
-  dtθ,
-  u0,
-  ode_cache,
-  vθ)
-
-  z = zero(eltype(b))
-  fill!(b,z)
-  residual!(b,op,μ,t,(u0,vθ),ode_cache)
-  b .*= -1.0
-  b
+  jacobian_for_trian!(A,op,(vθ,vθ),i,γ[i],args...)
 end

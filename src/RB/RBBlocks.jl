@@ -58,13 +58,12 @@ function collect_solutions(
   feop::PTFEOperator)
 
   uh0,t0,tf = fesolver.uh0,fesolver.t0,fesolver.tf
-  ode_op = get_algebraic_operator(feop)
   nparams = rbinfo.nsnaps_state+rbinfo.nsnaps_test
   params = realization(feop,nparams)
   u0 = get_free_dof_values(uh0(params))
   time_ndofs = num_time_dofs(fesolver)
   T = get_vector_type(feop.test)
-  uμt = PODESolution(fesolver,ode_op,params,u0,t0,tf)
+  uμt = PODESolution(fesolver,feop,params,u0,t0,tf)
   snaps = Vector{Vector{PTArray{T}}}(undef,time_ndofs)
   println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
   stats = @timed for (snap,n) in uμt
@@ -244,7 +243,7 @@ function add_time_supremizers(basis_u::Matrix,basis_p::Matrix;ttol=1e-2)
   basis_u
 end
 
-function FEM.get_algebraic_operator(
+function TransientFETools.get_algebraic_operator(
   fesolver::PODESolver,
   feop::PTFEOperator,
   rbspace::BlockRBSpace{T},
@@ -434,7 +433,7 @@ function collect_compress_lhs(
   θ::Real=1) where T
 
   nblocks = length(rbspace)
-  njacs = length(op.odeop.feop.jacs)
+  njacs = length(op.feop.jacs)
   ad_jacs = Vector{BlockRBMatAlgebraicContribution{T}}(undef,njacs)
   for i = 1:njacs
     touched_i = Matrix{Bool}(undef,nblocks,nblocks)
@@ -456,7 +455,7 @@ function collect_compress_lhs(
 end
 
 function check_touched_residuals(op::PTAlgebraicOperator)
-  feop = op.odeop.feop
+  feop = op.feop
   test = get_test(feop)
   Us, = op.ode_cache
   uh = EvaluationFunction(Us[1],op.u0)
@@ -474,7 +473,7 @@ function check_touched_residuals(op::PTAlgebraicOperator)
 end
 
 function check_touched_jacobians(op::PTAlgebraicOperator;i=1)
-  feop = op.odeop.feop
+  feop = op.feop
   test = get_test(feop)
   trial = get_trial(feop)
   Us, = op.ode_cache

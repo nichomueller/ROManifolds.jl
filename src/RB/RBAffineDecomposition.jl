@@ -68,7 +68,7 @@ function get_at_time_integration_domain(
   end
   ode_cache_idx = Us,Uts,fecache
   vθ_idx = PTArray(op.vθ[ptidx])
-  get_algebraic_operator(op.odeop,op.μ,red_times,op.dtθ,u0_idx,ode_cache_idx,vθ_idx)
+  get_algebraic_operator(op.feop,op.μ,red_times,op.dtθ,u0_idx,ode_cache_idx,vθ_idx)
 end
 
 abstract type RBAffineDecomposition{T,N} end
@@ -130,7 +130,7 @@ function RBAffineDecomposition(
   args...;
   kwargs...)
 
-  test = op.odeop.feop.test
+  test = op.feop.test
   meas = Measure(trian,2*get_order(test))
   basis_space,basis_time = compress(nzm;ϵ=rbinfo.ϵ)
   proj_bs,proj_bt = project_space_time(basis_space,basis_time,args...;kwargs...)
