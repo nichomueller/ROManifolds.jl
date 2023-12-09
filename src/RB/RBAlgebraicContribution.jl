@@ -137,7 +137,7 @@ end
 
 function collect_compress_rhs_lhs(rbinfo,feop::PTFEOperator{Affine},fesolver,rbspace,params)
   μ = params[1:rbinfo.nsnaps_mdeim]
-  op = get_ptoperator(fesolver,feop,rbspace,μ)
+  op = get_algebraic_operator(fesolver,feop,rbspace,μ)
 
   println("Computing RB affine decomposition (linear)")
   rhs = collect_compress_rhs(rbinfo,op,rbspace)
@@ -146,31 +146,27 @@ function collect_compress_rhs_lhs(rbinfo,feop::PTFEOperator{Affine},fesolver,rbs
   return rhs,lhs
 end
 
-function collect_compress_rhs_lhs(rbinfo,feop,fesolver,rbspace,params)
+function collect_compress_rhs_lhs(rbinfo,feop_lin,feop_nonlin,fesolver,rbspace,params)
   μ = params[1:rbinfo.nsnaps_mdeim]
-  op = get_ptoperator(fesolver,feop,rbspace,μ)
 
   println("Computing RB affine decomposition (linear)")
-  op_lin = linear_operator(op)
+  op_lin = get_algebraic_operator(fesolver,feop_lin,rbspace,μ)
   rhs_lin = collect_compress_rhs(rbinfo,op_lin,rbspace)
   lhs_lin = collect_compress_lhs(rbinfo,op_lin,rbspace;θ=fesolver.θ)
   println("Computing RB affine decomposition (nonlinear)")
-  op_nlin = nonlinear_operator(op)
+  op_nlin = get_algebraic_operator(fesolver,feop_nonlin,rbspace,μ)
   rhs_nlin = collect_compress_rhs(rbinfo,op_nlin,rbspace)
   lhs_nlin = collect_compress_lhs(rbinfo,op_nlin,rbspace;θ=fesolver.θ)
-  println("Computing RB affine decomposition (auxiliary)")
-  op_aux = auxiliary_operator(op)
-  rblhs_aux = collect_compress_lhs(rbinfo,op_aux,rbspace;θ=fesolver.θ)
 
   rhs = rhs_lin,rhs_nlin
-  lhs = lhs_lin,lhs_nlin,rblhs_aux
+  lhs = lhs_lin,lhs_nlin
 
   return rhs,lhs
 end
 
 function collect_compress_rhs(
   rbinfo::RBInfo,
-  op::PTOperator,
+  op::PTAlgebraicOperator,
   rbspace::RBSpace{T}) where T
 
   ress,trian = collect_residuals_for_trian(op)
@@ -179,7 +175,7 @@ end
 
 function collect_compress_lhs(
   rbinfo::RBInfo,
-  op::PTOperator,
+  op::PTAlgebraicOperator,
   rbspace::RBSpace{T};
   kwargs...) where T
 
@@ -193,7 +189,7 @@ end
 
 function _collect_compress_lhs(
   rbinfo::RBInfo,
-  op::PTOperator,
+  op::PTAlgebraicOperator,
   rbspace_row::RBSpace,
   rbspace_col::RBSpace;
   i=1,θ=1)
@@ -205,7 +201,7 @@ end
 
 function compress_component(
   rbinfo::RBInfo,
-  op::PTOperator,
+  op::PTAlgebraicOperator,
   snaps::Vector{<:NnzMatrix},
   trian::Base.KeySet{Triangulation},
   args...;
@@ -227,7 +223,7 @@ end
 function collect_rhs_contributions!(
   cache,
   rbinfo::RBInfo,
-  op::PTOperator,
+  op::PTAlgebraicOperator,
   rbres::RBVecAlgebraicContribution{T},
   rbspace::RBSpace{T}) where T
 
@@ -251,7 +247,7 @@ end
 function collect_lhs_contributions!(
   cache,
   rbinfo::RBInfo,
-  op::PTOperator,
+  op::PTAlgebraicOperator,
   rbjacs::Vector{RBMatAlgebraicContribution{T}},
   rbspace::RBSpace{T}) where T
 
@@ -267,7 +263,7 @@ end
 function collect_lhs_contributions!(
   cache,
   rbinfo::RBInfo,
-  op::PTOperator,
+  op::PTAlgebraicOperator,
   rbjac::RBMatAlgebraicContribution{T},
   rbspace_row::RBSpace{T},
   rbspace_col::RBSpace{T};
@@ -290,10 +286,10 @@ function collect_lhs_contributions!(
   return sum(rb_jac_contribs)
 end
 
-function collect_reduced_residuals!(cache,op::PTOperator,rbres::RBVecAlgebraicContribution)
+function collect_reduced_residuals!(cache,op::PTAlgebraicOperator,rbres::RBVecAlgebraicContribution)
   collect_reduced_residuals!(cache,op,rbres.affine_decompositions)
 end
 
-function collect_reduced_jacobians!(cache,op::PTOperator,rbres::RBMatAlgebraicContribution;kwargs...)
+function collect_reduced_jacobians!(cache,op::PTAlgebraicOperator,rbres::RBMatAlgebraicContribution;kwargs...)
   collect_reduced_jacobians!(cache,op,rbres.affine_decompositions;kwargs...)
 end

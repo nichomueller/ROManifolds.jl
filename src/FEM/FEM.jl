@@ -63,10 +63,13 @@ import Gridap.FESpaces: EvaluationFunction
 import Gridap.FESpaces: _pair_contribution_when_possible
 import Gridap.MultiField: MultiFieldFEBasisComponent
 import Gridap.ReferenceFEs: get_order
-import Gridap.ODEs.ODETools: _allocate_matrix_and_vector
 import Gridap.ODEs.ODETools: residual!
 import Gridap.ODEs.ODETools: jacobian!
 import Gridap.ODEs.ODETools: jacobians!
+import Gridap.ODEs.ODETools: _allocate_matrix_and_vector
+import Gridap.ODEs.ODETools: _matrix_and_vector!
+import Gridap.ODEs.ODETools: _matrix!
+import Gridap.ODEs.ODETools: _vector!
 import Gridap.ODEs.TransientFETools: ODESolver
 import Gridap.ODEs.TransientFETools: ODEOperator
 import Gridap.ODEs.TransientFETools: OperatorType
@@ -135,24 +138,13 @@ export PTFEOperator
 export PTFEOperatorFromWeakForm
 export AffinePTFEOperator
 export NonlinearPTFEOperator
-export get_residual
-export get_jacobian
-export linear_operator
-export nonlinear_operator
-export auxiliary_operator
 export residual_for_trian!
 export jacobian_for_trian!
 include("PTFEOperator.jl")
 
-export PODEOperator
-export AffinePODEOperator
-export PODEOpFromFEOp
-include("PODEOperatorInterface.jl")
-
-export PTOperator
-export get_ptoperator
-export update_ptoperator
-include("PTOperator.jl")
+export PTAlgebraicOperator
+export update_algebraic_operator
+include("PTAlgebraicOperator.jl")
 
 export PODESolver
 export PThetaMethod
@@ -162,10 +154,8 @@ export get_times
 export _check_convergence
 include("PTSolvers.jl")
 
-export PTThetaAffineMethodOperator
-include("PAffineThetaMethod.jl")
-
 export PTThetaMethodOperator
+export PTThetaAffineMethodOperator
 include("PThetaMethod.jl")
 
 export get_order

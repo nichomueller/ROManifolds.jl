@@ -149,20 +149,20 @@ function Utils.change_mode(nzm::NnzMatrix)
   return mode2
 end
 
-function collect_residuals_for_trian(op::PTOperator)
+function collect_residuals_for_trian(op::PTAlgebraicOperator)
   b = allocate_residual(op,op.u0)
   ress,trian = residual_for_trian!(b,op,op.u0)
   nzm = map(ress) do res
-    NnzMatrix(res;nparams=length(op.μ),ntimes=length(op.tθ))
+    NnzMatrix(res;nparams=length(op.μ),ntimes=length(op.t))
   end
   return nzm,trian
 end
 
-function collect_jacobians_for_trian(op::PTOperator;i=1)
+function collect_jacobians_for_trian(op::PTAlgebraicOperator;i=1)
   A = allocate_jacobian(op,op.u0,i)
   jacs_i,trian = jacobian_for_trian!(A,op,op.u0,i)
   nzm_i = map(jacs_i) do jac_i
-    NnzMatrix(NnzVector(jac_i);nparams=length(op.μ),ntimes=length(op.tθ))
+    NnzMatrix(NnzVector(jac_i);nparams=length(op.μ),ntimes=length(op.t))
   end
   return nzm_i,trian
 end

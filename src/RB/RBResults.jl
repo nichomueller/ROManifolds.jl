@@ -22,7 +22,7 @@ function rb_solver(rbinfo,feop::PTFEOperator{Affine},fesolver,rbspace,rbres,rbja
   println("Solving linear RB problems")
   nsnaps_test = rbinfo.nsnaps_test
   snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
-  op = get_ptoperator(fesolver,feop,snaps_test,params_test)
+  op = get_algebraic_operator(fesolver,feop,snaps_test,params_test)
   cache,(_,lhs) = allocate_cache(op,rbspace)
   stats = @timed begin
     rhs,(_lhs,_lhs_t) = collect_rhs_lhs_contributions!(cache,rbinfo,op,rbres,rbjacs,rbspace)
@@ -33,16 +33,14 @@ function rb_solver(rbinfo,feop::PTFEOperator{Affine},fesolver,rbspace,rbres,rbja
   post_process(rbinfo,feop,snaps_test,approx_snaps_test,params_test,stats)
 end
 
-function rb_solver(rbinfo,feop,fesolver,rbspace,rbres,rbjacs,snaps,params;tol=rbinfo.ϵ)
+function rb_solver(rbinfo,feop_lin,feop_nlin,fesolver,rbspace,rbres,rbjacs,snaps,params;tol=rbinfo.ϵ)
   println("Solving nonlinear RB problems with Newton iterations")
   nsnaps_test = rbinfo.nsnaps_test
   snaps_train,params_train = snaps[1:nsnaps_test],params[1:nsnaps_test]
   snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
   x = nearest_neighbor(snaps_train,params_train,params_test)
-  op = get_ptoperator(fesolver,feop,snaps_test,params_test)
-  op_lin = linear_operator(op)
-  op_nlin = nonlinear_operator(op)
-  op_aux = auxiliary_operator(op)
+  op_lin = get_algebraic_operator(fesolver,feop_lin,snaps_test,params_test)
+  op_nlin = get_algebraic_operator(fesolver,feop_nlin,snaps_test,params_test)
   xrb = space_time_projection(x,rbspace)
   dxrb = similar(xrb)
   cache,(rhs,lhs) = allocate_cache(op,rbspace)
@@ -50,17 +48,15 @@ function rb_solver(rbinfo,feop,fesolver,rbspace,rbres,rbjacs,snaps,params;tol=rb
   uh0_test = fesolver.uh0(params_test)
   conv0 = ones(nsnaps_test)
   rbrhs_lin,rbrhs_nlin = rbres
-  rblhs_lin,rblhs_nlin,rblhs_aux = rbjacs
+  rblhs_lin,rblhs_nlin = rbjacs
   stats = @timed begin
     rhs_lin,(lhs_lin,lhs_t) = collect_rhs_lhs_contributions!(cache,rbinfo,op_lin,rbrhs_lin,rblhs_lin,rbspace)
     for iter in 1:fesolver.nls.max_nliters
       x = recenter(x,uh0_test;θ=fesolver.θ)
-      op_nlin = update_ptoperator(op_nlin,x)
-      op_aux = update_ptoperator(op_aux,x)
+      op_nlin = update_algebraic_operator(op_nlin,x)
       rhs_nlin,(lhs_nlin,) = collect_rhs_lhs_contributions!(cache,rbinfo,op_nlin,rbrhs_nlin,rblhs_nlin,rbspace)
-      lhs_aux, = collect_lhs_contributions!(cache[2],rbinfo,op_aux,rblhs_aux,rbspace)
       @. lhs = lhs_lin+lhs_t+lhs_nlin
-      @. rhs = rhs_lin+rhs_nlin+(lhs_lin+lhs_t+lhs_aux)*xrb
+      @. rhs = rhs_lin+rhs_nlin+(lhs_lin+lhs_t)*xrb
       newt_cache = rb_solve!(dxrb,fesolver.nls.ls,rhs,lhs,newt_cache)
       xrb += dxrb
       x = recast(xrb,rbspace)

@@ -24,7 +24,7 @@ function get_times(fesolver::PThetaMethod)
   collect(t0:dt:tf-dt) .+ dt*θ
 end
 
-function get_ptoperator(
+function get_algebraic_operator(
   fesolver::PODESolver,
   feop::PTFEOperator,
   sols::PTArray,
@@ -36,12 +36,12 @@ function get_ptoperator(
   ode_cache = allocate_cache(ode_op,params,times)
   ode_cache = update_cache!(ode_cache,ode_op,params,times)
   sols_cache = zero(sols)
-  get_ptoperator(ode_op,params,times,dtθ,sols,ode_cache,sols_cache)
+  get_algebraic_operator(ode_op,params,times,dtθ,sols,ode_cache,sols_cache)
 end
 
 struct PODESolution
   solver::PODESolver
-  op::PODEOperator
+  op::PTFEOperator
   μ::AbstractVector
   u0::PTArray
   t0::Real
@@ -100,7 +100,7 @@ function _loop_solve!(x::PTArray,ns,b::PTArray)
   end
 end
 
-struct PTAffineOperator <: PTOperator{Affine}
+struct PTAffineOperator <: PTAlgebraicOperator{Affine}
   matrix::PTArray
   vector::PTArray
 end
@@ -150,7 +150,7 @@ end
 function Algebra.solve!(
   x::PTArray,
   nls::NewtonRaphsonSolver,
-  op::PTOperator,
+  op::PTAlgebraicOperator,
   ::Nothing)
 
   b = allocate_residual(op,x)
@@ -168,7 +168,7 @@ end
 function Algebra.solve!(
   x::PTArray,
   nls::NewtonRaphsonSolver,
-  op::PTOperator,
+  op::PTAlgebraicOperator,
   cache::PNewtonRaphsonCache)
 
   b = cache.b

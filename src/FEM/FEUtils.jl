@@ -2,12 +2,15 @@ FESpaces.get_triangulation(meas::Measure) = meas.quad.trian
 
 function ReferenceFEs.get_order(test::SingleFieldFESpace)
   basis = get_fe_basis(test)
-  first(FESpaces.get_order(first(basis.cell_basis.values).fields))
-end
-
-function ReferenceFEs.get_order(test::MultiFieldFESpace)
-  orders = map(get_order,test)
-  maximum(orders)
+  cell_basis = get_data(basis)
+  try # if cartesian model
+    shapefun = first(cell_basis).fields
+    get_order(shapefun)
+  catch
+    shapefuns = first(cell_basis.values).fields
+    orders = get_order(shapefuns)
+    first(orders)
+  end
 end
 
 function Utils.recenter(a::PTArray,ah0::FEFunction;kwargs...)

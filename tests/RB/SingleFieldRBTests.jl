@@ -63,7 +63,7 @@ dnorm = norm(time_values)
 @check nnorm / dnorm <= ϵ*10
 
 # offline
-op = get_ptoperator(fesolver,feop,rbspace,params[1:nparams])
+op = get_algebraic_operator(fesolver,feop,rbspace,params[1:nparams])
 ress,trians = collect_residuals_for_trian(op)
 jacs1,trians1 = collect_jacobians_for_trian(op;i=1)
 jacs2,trians2 = collect_jacobians_for_trian(op;i=2)
@@ -153,7 +153,7 @@ function check_rb_contribution(k::RBMatContributionMap,cache,affdec,xfull,xreduc
 end
 
 # online
-op_online = get_ptoperator(fesolver,feop,rbspace,params[nparams+1:end])
+op_online = get_algebraic_operator(fesolver,feop,rbspace,params[nparams+1:end])
 ress_online,trians = collect_residuals_for_trian(op_online)
 jacs1_online,trians1 = collect_jacobians_for_trian(op_online;i=1)
 jacs2_online,trians2 = collect_jacobians_for_trian(op_online;i=2)

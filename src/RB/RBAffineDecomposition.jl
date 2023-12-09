@@ -48,15 +48,15 @@ end
 
 function get_at_time_integration_domain(
   i::Vector{RBIntegrationDomain},
-  op::PTOperator)
+  op::PTAlgebraicOperator)
 
   nparams = length(op.μ)
-  time_ndofs = length(op.tθ)
+  time_ndofs = length(op.t)
   idx_time = common_time_integration_domain(i)
   if length(idx_time) == time_ndofs
     return op
   end
-  red_times = op.tθ[idx_time]
+  red_times = op.t[idx_time]
   ptidx = vec(transpose(collect(0:nparams-1)*time_ndofs .+ idx_time'))
   u0_idx = PTArray(op.u0[ptidx])
   _Us,Uts,fecache = op.ode_cache
@@ -68,7 +68,7 @@ function get_at_time_integration_domain(
   end
   ode_cache_idx = Us,Uts,fecache
   vθ_idx = PTArray(op.vθ[ptidx])
-  get_ptoperator(op.odeop,op.μ,red_times,op.dtθ,u0_idx,ode_cache_idx,vθ_idx)
+  get_algebraic_operator(op.odeop,op.μ,red_times,op.dtθ,u0_idx,ode_cache_idx,vθ_idx)
 end
 
 abstract type RBAffineDecomposition{T,N} end
@@ -124,7 +124,7 @@ ReducedMeasure(a::TrivialRBAffineDecomposition,args...) = a
 
 function RBAffineDecomposition(
   rbinfo::RBInfo,
-  op::PTOperator,
+  op::PTAlgebraicOperator,
   nzm::NnzMatrix,
   trian::Triangulation,
   args...;
@@ -142,10 +142,10 @@ function RBAffineDecomposition(
     interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
     lu_interp = lu(interp_bst)
   else
-    interp_idx_time = collect(eachindex(op.tθ))
+    interp_idx_time = collect(eachindex(op.t))
     lu_interp = lu(interp_bs)
   end
-  red_times = op.tθ[interp_idx_time]
+  red_times = op.t[interp_idx_time]
   cell_dof_ids = get_cell_dof_ids(test,trian)
   recast_interp_idx_space = recast(nzm,interp_idx_space)
   recast_interp_idx_rows,_ = vec_to_mat_idx(recast_interp_idx_space,nzm.nrows)
@@ -157,7 +157,7 @@ end
 
 function RBAffineDecomposition(
   rbinfo::RBInfo,
-  op::PTOperator,
+  op::PTAlgebraicOperator,
   nzm::NnzMatrix{T,Affine} where T,
   trian::Triangulation,
   args...;
@@ -262,7 +262,7 @@ end
 
 function collect_reduced_residuals!(
   cache,
-  op::PTOperator,
+  op::PTAlgebraicOperator,
   a::Vector{RBVecAffineDecomposition{T}}) where T
 
   a1 = filter(istrivial,a)
@@ -280,7 +280,7 @@ end
 
 function _collect_reduced_residuals!(
   cache,
-  op::PTOperator,
+  op::PTAlgebraicOperator,
   a::Vector{RBVecAffineDecomposition{T}}) where T
 
   b,Mcache = cache
@@ -310,7 +310,7 @@ end
 
 function collect_reduced_jacobians!(
   cache,
-  op::PTOperator,
+  op::PTAlgebraicOperator,
   a::Vector{RBMatAffineDecomposition{T}};
   kwargs...) where T
 
@@ -329,7 +329,7 @@ end
 
 function _collect_reduced_jacobians!(
   cache,
-  op::PTOperator,
+  op::PTAlgebraicOperator,
   a::Vector{RBMatAffineDecomposition{T}};
   i::Int=1) where T
 

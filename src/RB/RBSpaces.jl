@@ -119,7 +119,7 @@ function project_recast(mat::AbstractMatrix,rb::RBSpace)
   recast(rb_proj,rb)
 end
 
-function FEM.get_ptoperator(
+function FEM.get_algebraic_operator(
   fesolver::PThetaMethod,
   feop::PTFEOperator,
   rbspace::RBSpace{T},
@@ -141,5 +141,5 @@ function FEM.get_ptoperator(
   end
   sols = PTArray(array)
   sols_cache = zero(sols)
-  get_ptoperator(ode_op,params,times,dtθ,sols,ode_cache,sols_cache)
+  get_algebraic_operator(ode_op,params,times,dtθ,sols,ode_cache,sols_cache)
 end

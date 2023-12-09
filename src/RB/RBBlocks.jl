@@ -185,8 +185,7 @@ function space_supremizers(basis_space::Matrix,feop::PTFEOperator)
   μ = realization(feop)
   u = zero(feop.test)
   t = 0.
-  jac = get_jacobian(feop)
-  j(du,dv) = integrate(jac[1](μ,t,u,du,dv))
+  j(du,dv) = integrate(feop.jac[1](μ,t,u,du,dv))
   trial_dual = get_trial(feop)
   constraint_mat = assemble_matrix(j,trial_dual(μ,t),feop.test)
   constraint_mat*basis_space
@@ -245,7 +244,7 @@ function add_time_supremizers(basis_u::Matrix,basis_p::Matrix;ttol=1e-2)
   basis_u
 end
 
-function FEM.get_ptoperator(
+function FEM.get_algebraic_operator(
   fesolver::PODESolver,
   feop::PTFEOperator,
   rbspace::BlockRBSpace{T},
@@ -261,7 +260,7 @@ function FEM.get_ptoperator(
   end
   basis_time = get_basis_time(testitem(rbspace))
   _rbspace = RBSpace(basis_space,basis_time)
-  get_ptoperator(fesolver,feop,_rbspace,params;kwargs...)
+  get_algebraic_operator(fesolver,feop,_rbspace,params;kwargs...)
 end
 
 abstract type BlockRBAlgebraicContribution{T,N} <: RBBlock{T,N} end
@@ -409,7 +408,7 @@ end
 
 function collect_compress_rhs(
   rbinfo::BlockRBInfo,
-  op::PTOperator,
+  op::PTAlgebraicOperator,
   rbspace::BlockRBSpace{T}) where T
 
   nblocks = length(rbspace)
@@ -430,7 +429,7 @@ end
 
 function collect_compress_lhs(
   rbinfo::BlockRBInfo,
-  op::PTOperator,
+  op::PTAlgebraicOperator,
   rbspace::BlockRBSpace{T};
   θ::Real=1) where T
 
@@ -456,13 +455,13 @@ function collect_compress_lhs(
   return ad_jacs
 end
 
-function check_touched_residuals(op::PTOperator)
+function check_touched_residuals(op::PTAlgebraicOperator)
   feop = op.odeop.feop
   test = get_test(feop)
   Us, = op.ode_cache
   uh = EvaluationFunction(Us[1],op.u0)
   μ1 = testitem(op.μ)
-  t1 = testitem(op.tθ)
+  t1 = testitem(op.t)
   uh1 = testitem(uh)
   dxh1 = ()
   for i in 1:get_order(feop)
@@ -470,19 +469,18 @@ function check_touched_residuals(op::PTOperator)
   end
   xh1 = TransientCellField(uh1,dxh1)
   dv = get_fe_basis(test)
-  res = get_residual(feop)
-  int = integrate(res(μ1,t1,xh1,dv))
+  int = integrate(feop.res(μ1,t1,xh1,dv))
   return !isnothing(int)
 end
 
-function check_touched_jacobians(op::PTOperator;i=1)
+function check_touched_jacobians(op::PTAlgebraicOperator;i=1)
   feop = op.odeop.feop
   test = get_test(feop)
   trial = get_trial(feop)
   Us, = op.ode_cache
   uh = EvaluationFunction(Us[1],op.u0)
   μ1 = testitem(op.μ)
-  t1 = testitem(op.tθ)
+  t1 = testitem(op.t)
   uh1 = testitem(uh)
   dxh1 = ()
   for i in 1:get_order(feop)
@@ -491,15 +489,14 @@ function check_touched_jacobians(op::PTOperator;i=1)
   xh1 = TransientCellField(uh1,dxh1)
   dv = get_fe_basis(test)
   du = get_trial_fe_basis(trial(nothing,nothing))
-  jac = get_jacobian(feop)
-  int = jac[i](μ1,t1,xh1,du,dv)
+  int = feop.jac[i](μ1,t1,xh1,du,dv)
   return !isnothing(int)
 end
 
 function collect_rhs_contributions!(
   cache,
   rbinfo::BlockRBInfo,
-  op::PTOperator,
+  op::PTAlgebraicOperator,
   rbres::BlockRBVecAlgebraicContribution{T},
   rbspace::BlockRBSpace{T}) where T
 
@@ -524,7 +521,7 @@ end
 function collect_lhs_contributions!(
   cache,
   rbinfo::BlockRBInfo,
-  op::PTOperator,
+  op::PTAlgebraicOperator,
   rbjacs::Vector{BlockRBMatAlgebraicContribution{T}},
   rbspace::BlockRBSpace{T}) where T
 
