@@ -166,59 +166,6 @@ function TransientFETools.solve_step!(
   return (uf,tf,cache)
 end
 
-# function ODETools._allocate_matrix_and_vector(op,μ,t0,u0,ode_cache)
-#   b = allocate_residual(op,μ,t0,xh)
-#   A = allocate_jacobian(op,μ,t0,xh,1)
-#   return A,b
-# end
-
-# function ODETools._matrix_and_vector!(
-#   A::AbstractMatrix,
-#   b::AbstractVector,
-#   op::PTFEOperator{Affine},
-#   μ,
-#   t,
-#   dtθ,
-#   u0,
-#   ode_cache,
-#   vθ)
-
-#   _matrix!(A,op,μ,t,dtθ,u0,ode_cache,vθ)
-#   _vector!(b,op,μ,t,dtθ,u0,ode_cache,vθ)
-# end
-
-# function ODETools._matrix!(
-#   A::AbstractMatrix,
-#   op::PTFEOperator{Affine},
-#   μ,
-#   t,
-#   dtθ,
-#   u0,
-#   ode_cache,
-#   vθ)
-
-#   z = zero(eltype(A))
-#   fillstored!(A,z)
-#   jacobians!(A,op,μ,t,(vθ,vθ),(1.0,1/dtθ),ode_cache)
-# end
-
-# function ODETools._vector!(
-#   b::AbstractVector,
-#   op::PTFEOperator{Affine},
-#   μ,
-#   t,
-#   dtθ,
-#   u0,
-#   ode_cache,
-#   vθ)
-
-#   z = zero(eltype(b))
-#   fill!(b,z)
-#   residual!(b,op,μ,t,(u0,vθ),ode_cache)
-#   b .*= -1.0
-#   b
-# end
-
 struct PTAffineThetaMethodOperator{P,T} <: PTAlgebraicOperator{Affine}
   feop::PTFEOperator{Affine}
   μ::P
@@ -246,11 +193,15 @@ function Algebra.residual!(
   op::PTAffineThetaMethodOperator,
   x::AbstractVector)
 
+  Us,=op.ode_cache
+  # println("Norm x: $(norm(x[1]))")
+  # println("Norm x0: $(norm(op.vθ[1]))")
+  # println("Norm dv: $(norm(Us[1].dirichlet_values[1]))")
+
   uF = x
   vθ = op.vθ
-  z = zero(eltype(b))
-  fill!(b,z)
   residual!(b,op,(uF,vθ))
+  println("Norm b: $(norm(b[1]))")
 end
 
 function residual_for_trian!(
@@ -270,11 +221,10 @@ function Algebra.jacobian!(
   op::PTAffineThetaMethodOperator,
   x::AbstractVector)
 
-  uF = x
   vθ = op.vθ
   z = zero(eltype(A))
   fillstored!(A,z)
-  jacobians!(A,op,(uF,vθ),(1.0,1/op.dtθ))
+  jacobians!(A,op,(vθ,vθ),(1.0,1/op.dtθ))
 end
 
 function Algebra.jacobian!(
@@ -283,12 +233,11 @@ function Algebra.jacobian!(
   x::AbstractVector,
   i::Int)
 
-  uF = x
   vθ = op.vθ
   z = zero(eltype(A))
   fillstored!(A,z)
   γ = (1.0,1/op.dtθ)
-  jacobian!(A,op,(uF,vθ),i,γ[i])
+  jacobian!(A,op,(vθ,vθ),i,γ[i])
 end
 
 function jacobian_for_trian!(

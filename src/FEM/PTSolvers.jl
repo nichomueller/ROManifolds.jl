@@ -133,6 +133,37 @@ struct PTLinearSolverCache <: GridapType
   ns::PTArray{<:NumericalSetup}
 end
 
+function Algebra.solve!(
+  x::PTArray{<:AbstractVector},
+  ls::LinearSolver,
+  op::NonlinearOperator,
+  cache::Nothing)
+
+  b = residual(op,x)
+  A = jacobian(op,x)
+  ss = symbolic_setup(ls,A)
+  ns = numerical_setup(ss,A)
+  rmul!(b,-1)
+  solve!(x,ns,b)
+  Algebra.LinearSolverCache(A,b,ns)
+end
+
+function Algebra.solve!(
+  x::PTArray{<:AbstractVector},
+  ls::LinearSolver,
+  op::NonlinearOperator,
+  cache::PTLinearSolverCache)
+
+  b = cache.b
+  A = cache.A
+  ns = cache.ns
+  residual!(b,op,x)
+  numerical_setup!(ns,A)
+  rmul!(b,-1)
+  solve!(x,ns,b)
+  cache
+end
+
 function Algebra.LinearSolverCache(A::PTArray,b::PTArray,ns::PTArray)
   PTLinearSolverCache(A,b,ns)
 end
