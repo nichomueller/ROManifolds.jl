@@ -247,6 +247,8 @@ function ODETools.jacobians!(
   uh::CellField,
   γ::Tuple{Vararg{Real}}) where T
 
+  println("Pre norm jac: $(norm(A[1]))")
+
   _matdata_jacobians = fill_jacobians(op,μ,t,uh,γ)
   matdata = _vcat_matdata(_matdata_jacobians)
   assemble_matrix_add!(A,op.assem,matdata)
@@ -280,6 +282,8 @@ function TransientFETools._matdata_jacobian(
   i::Integer,
   γᵢ::Real) where T
 
+  println("Jac $i at time $t, coeff $γᵢ")
+  println("dv: $(norm(xh.cellfield.dirichlet_values[1])), fv: $(norm(xh.cellfield.free_values[1]))")
   trial = get_trial(op)(μ,t)
   test = get_test(op)
   u = get_trial_fe_basis(trial)

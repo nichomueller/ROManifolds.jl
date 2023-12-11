@@ -24,7 +24,11 @@ import Gridap.ODEs.TransientFETools: get_order
 import Gridap.ODEs.TransientFETools: _matdata_jacobian
 
 root = pwd()
-model = DiscreteModelFromFile(joinpath(root,"models/elasticity_3cyl2D.json"))
+# model = DiscreteModelFromFile(joinpath(root,"models/elasticity_3cyl2D.json"))
+model = DiscreteModelFromFile(joinpath(root,"models/cube2x2.json"))
+labels = get_face_labeling(model)
+add_tag_from_tags!(labels,"neumann",[6,])
+add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,7,8])
 order = 1
 Ω = Triangulation(model)
 dΩ = Measure(Ω,2*order)

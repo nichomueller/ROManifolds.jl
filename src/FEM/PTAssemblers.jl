@@ -176,7 +176,7 @@ end
 end
 
 @inline function Algebra._add_entries!(combine::Function,A::PTArray,vs::Nothing,is)
-  for (li, i) in enumerate(is)
+  for (li,i) in enumerate(is)
     if i>0
       for Ak in A
         add_entry!(Ak,nothing,i)
@@ -187,7 +187,7 @@ end
 end
 
 @inline function Algebra._add_entries!(combine::Function,A::PTArray,vs,is)
-  for (li, i) in enumerate(is)
+  for (li,i) in enumerate(is)
     if i>0
       for Ak in A
         vi = vs[li]
@@ -199,7 +199,7 @@ end
 end
 
 @inline function Algebra._add_entries!(combine::Function,A::PTArray,vs::PTArray,is)
-  for (li, i) in enumerate(is)
+  for (li,i) in enumerate(is)
     if i>0
       for (Ak,vsk) in zip(A,vs)
         vik = vsk[li]

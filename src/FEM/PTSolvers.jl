@@ -158,6 +158,7 @@ function Algebra.solve!(
   A = cache.A
   ns = cache.ns
   residual!(b,op,x)
+  jacobian!(A,op,x)
   numerical_setup!(ns,A)
   rmul!(b,-1)
   solve!(x,ns,b)

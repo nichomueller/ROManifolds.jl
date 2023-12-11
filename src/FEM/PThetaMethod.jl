@@ -193,15 +193,11 @@ function Algebra.residual!(
   op::PTAffineThetaMethodOperator,
   x::AbstractVector)
 
-  Us,=op.ode_cache
-  # println("Norm x: $(norm(x[1]))")
-  # println("Norm x0: $(norm(op.vθ[1]))")
-  # println("Norm dv: $(norm(Us[1].dirichlet_values[1]))")
-
   uF = x
   vθ = op.vθ
+  z = zero(eltype(b))
+  fill!(b,z)
   residual!(b,op,(uF,vθ))
-  println("Norm b: $(norm(b[1]))")
 end
 
 function residual_for_trian!(
