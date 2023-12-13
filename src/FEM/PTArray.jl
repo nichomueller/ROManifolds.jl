@@ -67,7 +67,12 @@ for op in (:+,:-)
     end
 
     function ($op)(a::PTArray{T,N},b::AbstractArray{T,N}) where {T,N}
-      array = ($op)(get_array(a),get_array(b))
+      array = ($op)(get_array(a),b)
+      PTArray(array)
+    end
+
+    function ($op)(a::AbstractArray{T,N},b::PTArray{T,N}) where {T,N}
+      array = ($op)(a,get_array(b))
       PTArray(array)
     end
   end

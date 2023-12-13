@@ -37,6 +37,8 @@ export PTArray
 export get_at_offsets
 export recenter
 export TrialPFESpace
+export TrialPFESpace!
+export HomogeneousTrialPFESpace
 export MultiFieldPFESpace
 export split_fields
 export field_offsets
@@ -150,4 +152,7 @@ export fe_offsets
 export rb_offsets
 export add_space_supremizers
 export add_time_supremizers
+
+include("Distributed/Distributed.jl")
+using Mabla.Distributed
 end # module

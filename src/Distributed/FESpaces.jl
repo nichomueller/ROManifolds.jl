@@ -24,6 +24,13 @@ function FEM.TrialPFESpace!(f::DistributedSingleFieldFESpace,fun)
   DistributedSingleFieldFESpace(spaces,f.gids,f.vector_type)
 end
 
+function FEM.HomogeneousTrialPFESpace(f::DistributedSingleFieldFESpace,args...)
+  spaces = map(f.spaces) do s
+    HomogeneousTrialPFESpace(s,args...)
+  end
+  DistributedSingleFieldFESpace(spaces,f.gids,f.vector_type)
+end
+
 function FESpaces.collect_cell_matrix(
   trial::DistributedFESpace,
   test::DistributedFESpace,
@@ -57,4 +64,14 @@ function FEM.PTSparseMatrixAssembler(assem::DistributedSparseMatrixAssembler,μ,
     PTArrayBuilder(assem.vector_builder,len),
     assem.test_dofs_gids_prange,
     assem.trial_dofs_gids_prange)
+end
+
+function FESpaces.zero_free_values(
+  f::DistributedSingleFieldFESpace{<:AbstractArray{<:TrialPFESpace}})
+
+  index_partition = partition(f.gids)
+  vector_partition = map(local_views(f)) do fi
+    Gridap.FESpaces.zero_free_values(fi)
+  end
+  PVector(vector_partition,index_partition)
 end

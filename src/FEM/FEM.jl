@@ -111,12 +111,16 @@ export PTGenericField
 include("PTFields.jl")
 
 export TrialPFESpace
+export TrialPFESpace!
+export HomogeneousTrialPFESpace
 export MultiFieldPFESpace
 export split_fields
 export field_offsets
 include("PFESpaces.jl")
 
 export PTCellField
+export SingleFieldPTFEFunction
+export MultiFieldPTFEFunction
 include("PTCellFields.jl")
 
 export PTIntegrand
