@@ -1,10 +1,9 @@
-struct PTArray{T,N,A} <: AbstractArray{T,N}
+struct PTArray{T,A} <: AbstractVector{T}
   array::A
-  function PTArray(array::AbstractArray)
+  function PTArray(array::AbstractVector)
     A = typeof(array)
     T = eltype(array)
-    N = T <: AbstractArray ? ndims(T) : 1
-    new{T,N,A}(array)
+    new{T,A}(array)
   end
 end
 
@@ -13,8 +12,8 @@ Arrays.testitem(a::PTArray) = testitem(get_array(a))
 Base.size(a::PTArray,i...) = size(testitem(a),i...)
 Base.eltype(::Type{PTArray{T}}) where T = eltype(T)
 Base.eltype(::PTArray{T}) where T = eltype(T)
-Base.ndims(::PTArray{T,N} where T) where N = N
-Base.ndims(::Type{PTArray{T,N}} where T) where N = N
+Base.ndims(::PTArray{T}) where T = isa(T,AbstractArray) ? ndims(T) : 1
+Base.ndims(::Type{<:PTArray{T}}) where T = isa(T,AbstractArray) ? ndims(T) : 1
 Base.first(a::PTArray) = testitem(a)
 Base.length(a::PTArray) = length(get_array(a))
 Base.eachindex(a::PTArray) = eachindex(get_array(a))
@@ -67,17 +66,17 @@ end
 
 for op in (:+,:-)
   @eval begin
-    function ($op)(a::PTArray{T,N},b::PTArray{T,N}) where {T,N}
+    function ($op)(a::PTArray{T},b::PTArray{T}) where T
       array = ($op)(get_array(a),get_array(b))
       PTArray(array)
     end
 
-    function ($op)(a::PTArray{T,N},b::AbstractArray{T,N}) where {T,N}
+    function ($op)(a::PTArray{T},b::AbstractArray{T}) where T
       array = ($op)(get_array(a),b)
       PTArray(array)
     end
 
-    function ($op)(a::AbstractArray{T,N},b::PTArray{T,N}) where {T,N}
+    function ($op)(a::AbstractArray{T},b::PTArray{T}) where T
       array = ($op)(a,get_array(b))
       PTArray(array)
     end
@@ -275,6 +274,18 @@ function LinearAlgebra.rmul!(a::PTArray,b::Number)
     ai = a[i]
     rmul!(ai,b)
   end
+end
+
+function Arrays.return_value(f::Broadcasting{typeof(∘)},a::PTArray{<:Field},b::Field)
+  args = map(x->return_value(f,x,b),a)
+  data = map(x->getproperty(x,:fields),args)
+  Fields.OperationField(∘,data)
+end
+
+function Arrays.return_value(f::Broadcasting{typeof(∘)},a::Field,b::PTArray{<:Field})
+  args = map(x->return_value(f,a,x),b)
+  data = map(x->getproperty(x,:fields),args)
+  Fields.OperationField(∘,data)
 end
 
 for op in (:+,:-,:*)

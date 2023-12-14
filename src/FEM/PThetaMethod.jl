@@ -85,7 +85,7 @@ function residual_for_trian!(
 end
 
 function Algebra.jacobian!(
-  A::AbstractMatrix,
+  A::AbstractArray,
   op::PTThetaMethodOperator,
   x::AbstractVector)
 
@@ -98,7 +98,7 @@ function Algebra.jacobian!(
 end
 
 function Algebra.jacobian!(
-  A::AbstractMatrix,
+  A::AbstractArray,
   op::PTThetaMethodOperator,
   x::AbstractVector,
   i::Int)
@@ -113,7 +113,7 @@ function Algebra.jacobian!(
 end
 
 function jacobian_for_trian!(
-  A::AbstractMatrix,
+  A::AbstractArray,
   op::PTThetaMethodOperator,
   x::AbstractVector,
   i::Int,
@@ -213,7 +213,7 @@ function residual_for_trian!(
 end
 
 function Algebra.jacobian!(
-  A::AbstractMatrix,
+  A::AbstractArray,
   op::PTAffineThetaMethodOperator,
   x::AbstractVector)
 
@@ -224,7 +224,7 @@ function Algebra.jacobian!(
 end
 
 function Algebra.jacobian!(
-  A::AbstractMatrix,
+  A::AbstractArray,
   op::PTAffineThetaMethodOperator,
   x::AbstractVector,
   i::Int)
@@ -237,7 +237,7 @@ function Algebra.jacobian!(
 end
 
 function jacobian_for_trian!(
-  A::AbstractMatrix,
+  A::AbstractArray,
   op::PTAffineThetaMethodOperator,
   x::AbstractVector,
   i::Int,

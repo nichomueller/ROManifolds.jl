@@ -1,4 +1,4 @@
-function TransientFETools.allocate_cache(op,rbspace)
+function TransientFETools.allocate_cache(op::PTAlgebraicOperator,rbspace)
   T = eltype(rbspace)
   N = length(op.μ)
   b = allocate_residual(op,op.u0)

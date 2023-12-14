@@ -144,6 +144,7 @@ export residual_for_trian!
 export jacobian_for_trian!
 include("PTFEOperator.jl")
 
+export PTNonlinearOperator
 export PTAlgebraicOperator
 export update_algebraic_operator
 include("PTAlgebraicOperator.jl")

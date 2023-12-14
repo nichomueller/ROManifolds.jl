@@ -1,4 +1,5 @@
-abstract type PTAlgebraicOperator{T<:OperatorType} <: NonlinearOperator end
+abstract type PTNonlinearOperator <: NonlinearOperator end
+abstract type PTAlgebraicOperator{T<:OperatorType} <: PTNonlinearOperator end
 
 function Base.getindex(op::PTAlgebraicOperator,row::Int,col=:)
   feop = op.feop
@@ -69,7 +70,7 @@ end
 for fun in (:(Algebra.jacobian!),:jacobian_for_trian!)
   @eval begin
     function $fun(
-      A::AbstractMatrix,
+      A::AbstractArray,
       op::PTAlgebraicOperator,
       xhF::Tuple{Vararg{AbstractVector}},
       args...)
@@ -86,7 +87,7 @@ for fun in (:(Algebra.jacobian!),:jacobian_for_trian!)
 end
 
 function ODETools.jacobians!(
-  A::AbstractMatrix,
+  A::AbstractArray,
   op::PTAlgebraicOperator,
   xhF::Tuple{Vararg{AbstractVector}},
   args...)

@@ -1,5 +1,5 @@
 function ODETools.jacobians!(
-  A::AbstractMatrix,
+  A::AbstractArray,
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,

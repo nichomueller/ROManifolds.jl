@@ -123,7 +123,7 @@ function Algebra.allocate_residual(
   op::PTFEOperator,
   μ::P,
   t::T,
-  xh::CellField) where {P,T}
+  xh) where {P,T}
 
   test = get_test(op)
   v = get_fe_basis(test)
@@ -143,7 +143,7 @@ function Algebra.allocate_jacobian(
   op::PTFEOperator,
   μ::P,
   t::T,
-  xh::CellField,
+  xh,
   i::Integer) where {P,T}
 
   trial = get_trial(op)(μ,t)
@@ -167,7 +167,7 @@ function Algebra.residual!(
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
-  xh::CellField) where T
+  xh) where T
 
   test = get_test(op)
   v = get_fe_basis(test)
@@ -182,7 +182,7 @@ function residual_for_trian!(
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
-  xh::CellField,
+  xh,
   args...) where T
 
   test = get_test(op)
@@ -200,25 +200,25 @@ function residual_for_trian!(
 end
 
 function Algebra.jacobian!(
-  A::AbstractMatrix,
+  A::AbstractArray,
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
-  uh::CellField,
+  xh,
   i::Integer,
   γᵢ::Real) where T
 
-  matdata = _matdata_jacobian(op,μ,t,uh,i,γᵢ)
+  matdata = _matdata_jacobian(op,μ,t,xh,i,γᵢ)
   assemble_matrix_add!(A,op.assem,matdata)
   A
 end
 
 function jacobian_for_trian!(
-  A::AbstractMatrix,
+  A::AbstractArray,
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
-  uh::CellField,
+  xh,
   i::Integer,
   γᵢ::Real,
   args...) where T
@@ -227,7 +227,7 @@ function jacobian_for_trian!(
   test = get_test(op)
   u = get_trial_fe_basis(trial)
   v = get_fe_basis(test)
-  dc = γᵢ*integrate(op.jacs[i](μ,t,uh,u,v),args...)
+  dc = γᵢ*integrate(op.jacs[i](μ,t,xh,u,v),args...)
   trian = get_domains(dc)
   Avec = Vector{typeof(A)}(undef,num_domains(dc))
   for (n,t) in enumerate(trian)
@@ -240,14 +240,14 @@ function jacobian_for_trian!(
 end
 
 function ODETools.jacobians!(
-  A::AbstractMatrix,
+  A::AbstractArray,
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
-  uh::CellField,
+  xh,
   γ::Tuple{Vararg{Real}}) where T
 
-  _matdata_jacobians = fill_jacobians(op,μ,t,uh,γ)
+  _matdata_jacobians = fill_jacobians(op,μ,t,xh,γ)
   matdata = _vcat_matdata(_matdata_jacobians)
   assemble_matrix_add!(A,op.assem,matdata)
   A
@@ -257,13 +257,13 @@ function TransientFETools.fill_jacobians(
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
-  uh::CellField,
+  xh,
   γ::Tuple{Vararg{Real}}) where T
 
   _matdata = ()
   for i in 1:get_order(op)+1
     if (γ[i] > 0.0)
-      _data = _matdata_jacobian(op,μ,t,uh,i,γ[i])
+      _data = _matdata_jacobian(op,μ,t,xh,i,γ[i])
       if !isnothing(_data)
         _matdata = (_matdata...,_data)
       end
@@ -276,7 +276,7 @@ function TransientFETools._matdata_jacobian(
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
-  xh::CellField,
+  xh,
   i::Integer,
   γᵢ::Real) where T
 

@@ -1,17 +1,27 @@
 function FESpaces.get_triangulation(meas::DistributedMeasure)
-  trian = map(local_views(meas)) do m
-    m.quad.trian
+  @assert false
+  trian_model = map(meas.measures) do m
+    trian = m.quad.trian
+    model = get_background_model(trian)
+    trian,model
   end
-  DistributedTriangulation(trian)
+  trian = first.(trian_model)
+  model = DistributedDiscreteModel(last.(trian_model))
+  println(typeof(trian))
+  println(typeof(model))
+  DistributedTriangulation(trian,model)
 end
 
-function Fields.integrate(a::CollectionPTIntegrand{N,<:PTIntegrand{<:DistributedCellField}}) where N
+function Fields.integrate(
+  a::CollectionPTIntegrand{<:PTIntegrand{<:DistributedCellField},N}) where N
+
   cont = Vector{DistributedDomainContribution}(undef,N)
   for i = 1:N
     op,integrand = a[i]
     imeas = integrand.meas
-    conti = map(local_views(imeas)) do m
-      integral = integrate(integrand.object,m.quad)
+    println(typeof(integrand.object))
+    conti = map(integrand.object.fields,imeas.measures) do f,m
+      integral = integrate(f,m.quad)
       lazy_map(Broadcasting(op),integral)
     end
     cont[i] = conti

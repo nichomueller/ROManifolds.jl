@@ -61,6 +61,7 @@ export AffinePTFEOperator
 export NonlinearPTFEOperator
 export residual_for_trian!
 export jacobian_for_trian!
+export PTNonlinearOperator
 export PTAlgebraicOperator
 export update_algebraic_operator
 export _check_convergence

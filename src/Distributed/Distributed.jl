@@ -28,6 +28,7 @@ import PartitionedArrays: is_consistent
 import PartitionedArrays: exchange_impl!
 import PartitionedArrays: allocate_local_values
 
+import GridapDistributed: DistributedDiscreteModel
 import GridapDistributed: DistributedCellDatum
 import GridapDistributed: DistributedCellField
 import GridapDistributed: DistributedFESpace
@@ -37,7 +38,7 @@ import GridapDistributed: DistributedSparseMatrixAssembler
 import GridapDistributed: DistributedDomainContribution
 import GridapDistributed: DistributedTriangulation
 import GridapDistributed: DistributedMeasure
-import GridapDistributed: DistributedMultiFieldPTFEFunction
+import GridapDistributed: DistributedMultiFieldFEFunction
 import GridapDistributed: TransientDistributedCellField
 import GridapDistributed: local_views
 

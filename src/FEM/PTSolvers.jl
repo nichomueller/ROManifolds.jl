@@ -79,11 +79,11 @@ function Base.iterate(sol::PODESolution,state)
   return (uf,n),state
 end
 
-function Algebra.symbolic_setup(s::BackslashSolver,mat::PTArray{<:AbstractMatrix})
+function Algebra.symbolic_setup(s::BackslashSolver,mat::Union{PTArray,AbstractArray{<:PTArray}})
   symbolic_setup(s,testitem(mat))
 end
 
-function Algebra.symbolic_setup(s::LUSolver,mat::PTArray{<:AbstractMatrix})
+function Algebra.symbolic_setup(s::LUSolver,mat::Union{PTArray,AbstractArray{<:PTArray}})
   symbolic_setup(s,testitem(mat))
 end
 
@@ -107,12 +107,17 @@ function Algebra.solve!(x::PTArray,ns,b::PTArray)
   end
 end
 
-struct PTAffineOperator <: NonlinearOperator
-  matrix::PTArray
-  vector::PTArray
+struct PTAffineOperator <: PTNonlinearOperator
+  matrix::AbstractArray
+  vector::AbstractVector
 end
 
-function Algebra.solve!(x::PTArray,ls::LinearSolver,op::PTAffineOperator,::Nothing)
+function Algebra.solve!(
+  x::AbstractVector,
+  ls::LinearSolver,
+  op::PTAffineOperator,
+  ::Nothing)
+
   A,b = op.matrix,op.vector
   ss = symbolic_setup(ls,A)
   ns = numerical_setup(ss,A)
@@ -120,7 +125,12 @@ function Algebra.solve!(x::PTArray,ls::LinearSolver,op::PTAffineOperator,::Nothi
   ns
 end
 
-function Algebra.solve!(x::PTArray,::LinearSolver,op::PTAffineOperator,ns)
+function Algebra.solve!(
+  x::AbstractVector,
+  ::LinearSolver,
+  op::PTAffineOperator,
+  ns)
+
   A,b = op.matrix,op.vector
   numerical_setup!(ns,A)
   solve!(x,ns,b)
@@ -128,15 +138,15 @@ function Algebra.solve!(x::PTArray,::LinearSolver,op::PTAffineOperator,ns)
 end
 
 struct PTLinearSolverCache <: GridapType
-  A::PTArray{<:AbstractMatrix}
-  b::PTArray{<:AbstractVector}
-  ns::PTArray{<:NumericalSetup}
+  A::AbstractArray
+  b::AbstractVector
+  ns::AbstractVector
 end
 
 function Algebra.solve!(
-  x::PTArray{<:AbstractVector},
+  x::AbstractVector,
   ls::LinearSolver,
-  op::NonlinearOperator,
+  op::PTNonlinearOperator,
   cache::Nothing)
 
   b = residual(op,x)
@@ -149,9 +159,9 @@ function Algebra.solve!(
 end
 
 function Algebra.solve!(
-  x::PTArray{<:AbstractVector},
+  x::AbstractVector,
   ls::LinearSolver,
-  op::NonlinearOperator,
+  op::PTNonlinearOperator,
   cache::PTLinearSolverCache)
 
   b = cache.b
@@ -165,22 +175,27 @@ function Algebra.solve!(
   cache
 end
 
-function Algebra.LinearSolverCache(A::PTArray,b::PTArray,ns::PTArray)
+function Algebra.LinearSolverCache(A::AbstractArray,b::AbstractVector,ns::AbstractVector)
   PTLinearSolverCache(A,b,ns)
 end
 
 struct PTNewtonRaphsonCache <: GridapType
-  A::PTArray{<:AbstractMatrix}
-  b::PTArray{<:AbstractVector}
-  dx::PTArray{<:AbstractVector}
-  ns::PTArray{<:NumericalSetup}
+  A::AbstractArray
+  b::AbstractVector
+  dx::AbstractVector
+  ns::AbstractVector
 end
 
-function Algebra.NewtonRaphsonCache(A::PTArray,b::PTArray,dx::PTArray,ns::PTArray)
+function Algebra.NewtonRaphsonCache(
+  A::AbstractArray,
+  b::AbstractVector,
+  dx::AbstractVector,
+  ns::AbstractVector)
+
   PTNewtonRaphsonCache(A,b,dx,ns)
 end
 
-function _inf_norm(b::AbstractArray)
+function _inf_norm(b)
   m = 0
   for bi in b
     m = max(m,abs(bi))
