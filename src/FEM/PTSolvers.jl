@@ -42,7 +42,7 @@ struct PODESolution
   solver::PODESolver
   op::PTFEOperator
   μ::AbstractVector
-  u0::PTArray
+  u0::AbstractVector
   t0::Real
   tf::Real
 end

@@ -99,6 +99,7 @@ export ∂ₚtt
 include("PDiffOperators.jl")
 
 export PTArray
+export ptzeros
 export get_at_offsets
 export recenter
 include("PTArray.jl")

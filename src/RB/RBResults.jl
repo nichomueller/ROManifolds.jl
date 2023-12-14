@@ -1,20 +1,23 @@
 function TransientFETools.allocate_cache(op,rbspace)
   T = eltype(rbspace)
+  N = length(op.μ)
   b = allocate_residual(op,op.u0)
   A = allocate_jacobian(op,op.u0)
-  mat = CachedArray(zeros(T,1,1))
-  coeff = CachedArray(zeros(T,1,1))
-  ptcoeff = CachedArray(PTArray([zeros(T,1,1) for _ = eachindex(op.μ)]))
+  mat = zeros(T,1,1)
+  cmat = CachedArray(mat)
+  coeff = CachedArray(mat)
+  ptcoeff = CachedArray(ptzeros(mat,N))
 
   res_contrib_cache = return_cache(RBVecContributionMap(),op.u0)
   jac_contrib_cache = return_cache(RBMatContributionMap(),op.u0)
 
   rb_ndofs = num_rb_ndofs(rbspace)
-  rhs_solve_cache = PTArray([zeros(T,rb_ndofs) for _ = eachindex(op.μ)])
-  lhs_solve_cache = PTArray([zeros(T,rb_ndofs,rb_ndofs) for _ = eachindex(op.μ)])
 
-  res_cache = ((b,mat),(coeff,ptcoeff)),res_contrib_cache
-  jac_cache = ((A,mat),(coeff,ptcoeff)),jac_contrib_cache
+  rhs_solve_cache = ptzeros(zeros(T,rb_ndofs),N)
+  lhs_solve_cache = ptzeros(zeros(T,rb_ndofs,rb_ndofs),N)
+
+  res_cache = ((b,cmat),(coeff,ptcoeff)),res_contrib_cache
+  jac_cache = ((A,cmat),(coeff,ptcoeff)),jac_contrib_cache
   (res_cache,jac_cache),(rhs_solve_cache,lhs_solve_cache)
 end
 

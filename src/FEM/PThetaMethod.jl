@@ -1,10 +1,10 @@
 # general nonlinear case
 function TransientFETools.solve_step!(
-  uf::AbstractArray,
+  uf::AbstractVector,
   solver::PThetaMethod,
   op::PTFEOperator,
   μ::AbstractVector,
-  u0::AbstractArray,
+  u0::AbstractVector,
   t0::Real,
   cache)
 

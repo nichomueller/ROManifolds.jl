@@ -55,6 +55,12 @@ function Base.zeros(a::PTArray)
   get_array(zero(a))
 end
 
+function ptzeros(a::AbstractArray{T},N::Integer) where T
+  b = similar(a)
+  fill!(b,zero(T))
+  PTArray([copy(b) for _ = 1:N])
+end
+
 function Base.sum(a::PTArray)
   sum(get_array(a))
 end

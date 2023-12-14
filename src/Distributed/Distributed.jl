@@ -26,6 +26,7 @@ import Gridap.Helpers: @notimplemented
 
 import PartitionedArrays: is_consistent
 import PartitionedArrays: exchange_impl!
+import PartitionedArrays: allocate_local_values
 
 import GridapDistributed: DistributedCellDatum
 import GridapDistributed: DistributedCellField
@@ -49,6 +50,7 @@ export OPTIONS_CG_JACOBI,OPTIONS_CG_AMG,OPTIONS_MUMPS,OPTIONS_NEUTON_MUMPS,OPTIO
 export PTJaggedArray
 export PTVectorAssemblyCache
 
+include("PTArray.jl")
 include("Primitives.jl")
 include("FESpaces.jl")
 include("MultiField.jl")

@@ -34,6 +34,7 @@ export realization
 export ∂ₚt
 export ∂ₚtt
 export PTArray
+export ptzeros
 export get_at_offsets
 export recenter
 export TrialPFESpace
