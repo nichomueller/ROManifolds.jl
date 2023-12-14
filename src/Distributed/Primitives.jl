@@ -157,14 +157,12 @@ end
 Base.size(a::PTJaggedArray) = (length(a.ptrs)-1,)
 
 function Base.getindex(a::PTJaggedArray,i::Int)
-  @notimplemented "Iterate over the inner jagged arrays instead"
+  map(a.data) do data
+    getindex(JaggedArray(data,a.ptrs),i)
+  end
 end
 
 function Base.setindex!(a::PTJaggedArray,v,i::Int)
-  @notimplemented "Iterate over the inner jagged arrays instead"
-end
-
-function Base.setindex!(a::PTJaggedArray,ptv::PTArray,i::Int)
   @notimplemented "Iterate over the inner jagged arrays instead"
 end
 
@@ -251,7 +249,9 @@ function PartitionedArrays.assemble_impl!(f,vector_partition,cache,::Type{<:PTVe
     map(vector_partition,cache) do values,cache
       local_indices_rcv = cache.local_indices_rcv
       for (p,lid) in enumerate(local_indices_rcv.data)
-        values[lid] = f(values[lid],cache.buffer_rcv.data[p])
+        for k in eachindex(values)
+          values[k][lid] = f(values[k][lid],cache.buffer_rcv.data[k][p])
+        end
       end
     end
     nothing
