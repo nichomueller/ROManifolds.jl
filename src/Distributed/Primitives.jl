@@ -157,21 +157,19 @@ end
 Base.size(a::PTJaggedArray) = (length(a.ptrs)-1,)
 
 function Base.getindex(a::PTJaggedArray,i::Int)
-  u = one(eltype(a.ptrs))
-  pini = a.ptrs[i]
-  pend = a.ptrs[i+1]-u
-  map(a->view(a,pini:pend),a.data)
+  @notimplemented "Iterate over the inner jagged arrays instead"
 end
 
 function Base.setindex!(a::PTJaggedArray,v,i::Int)
-  u = one(eltype(a.ptrs))
-  pini = a.ptrs[i]
-  pend = a.ptrs[i+1]-u
-  map(a->a[pini:pend],a.data)
+  @notimplemented "Iterate over the inner jagged arrays instead"
+end
+
+function Base.setindex!(a::PTJaggedArray,ptv::PTArray,i::Int)
+  @notimplemented "Iterate over the inner jagged arrays instead"
 end
 
 function Base.show(io::IO,a::PTJaggedArray{A,B}) where {A,B}
-  print(io,"PTJaggedArray{$A,$B}($(map(collect,a)))")
+  print(io,"PTJaggedArray{$A,$B}")
 end
 
 PartitionedArrays.jagged_array(data::PTArray,ptrs::Vector) = PTJaggedArray(data,ptrs)
@@ -219,13 +217,15 @@ end
 
 function PartitionedArrays.assembly_buffers(
   values::PTArray,local_indices_snd,local_indices_rcv)
+
   T = eltype(values)
   ptrs = local_indices_snd.ptrs
   data = zeros(T,ptrs[end]-1)
   ptdata = PTArray([copy(data) for _ = eachindex(values)])
-
   buffer_snd = PTJaggedArray(ptdata,ptrs)
   ptrs = local_indices_rcv.ptrs
+  data = zeros(T,ptrs[end]-1)
+  ptdata = PTArray([copy(data) for _ = eachindex(values)])
   buffer_rcv = PTJaggedArray(ptdata,ptrs)
   buffer_snd,buffer_rcv
 end
@@ -233,12 +233,8 @@ end
 function PartitionedArrays.assemble_impl!(f,vector_partition,cache,::Type{<:PTVectorAssemblyCache})
   buffer_snd = map(vector_partition,cache) do values,cache
     local_indices_snd = cache.local_indices_snd
-    @assert length(values) == length(cache.buffer_snd.data)
-    @assert length(testitem(values)) == length(testitem(cache.buffer_snd.data))
-    #@assert length(testitem(values)) == length(local_indices_snd.data) "$(length(testitem(values))) != $(length(local_indices_snd.data))"
-    println(local_indices_snd.data)
-    for k in eachindex(values)
-      for (p,lid) in enumerate(local_indices_snd.data)
+    for (p,lid) in enumerate(local_indices_snd.data)
+      for k in eachindex(values)
         cache.buffer_snd.data[k][p] = values[k][lid]
       end
     end
@@ -248,7 +244,7 @@ function PartitionedArrays.assemble_impl!(f,vector_partition,cache,::Type{<:PTVe
     cache.neighbors_snd,cache.neighbors_rcv,cache.buffer_rcv
   end |> tuple_of_arrays
   graph = ExchangeGraph(neighbors_snd,neighbors_rcv)
-  t = my_exchange!(buffer_rcv,buffer_snd,graph)
+  t = exchange!(buffer_rcv,buffer_snd,graph)
   # Fill values from rcv buffer asynchronously
   @async begin
     wait(t)
@@ -262,45 +258,26 @@ function PartitionedArrays.assemble_impl!(f,vector_partition,cache,::Type{<:PTVe
   end
 end
 
-function my_exchange!(rcv,snd,graph::ExchangeGraph)
-  T = eltype(eltype(snd))
-  my_exchange_impl!(rcv,snd,graph,T)
-end
+function PartitionedArrays.exchange_impl!(
+  rcv,snd,graph,::Type{T}) where T<:AbstractVector{<:AbstractVector}
 
-
-function my_exchange_impl!(rcv,snd,graph,::Type{T}) where T
   @assert is_consistent(graph)
+  @assert eltype(rcv) <: PTJaggedArray
   snd_ids = graph.snd
   rcv_ids = graph.rcv
   @assert length(rcv_ids) == length(rcv)
   @assert length(rcv_ids) == length(snd)
   for rcv_id in 1:length(rcv_ids)
-      for (i, snd_id) in enumerate(rcv_ids[rcv_id])
-          j = first(findall(k->k==rcv_id,snd_ids[snd_id]))
-          rcv[rcv_id][i] = snd[snd_id][j]
-      end
-  end
-  @async rcv
-end
-
-function my_exchange_impl!(rcv,snd,graph,::Type{T}) where T<:AbstractVector
-  @assert is_consistent(graph)
-  @assert eltype(rcv) <: PTJaggedArray
-  snd_ids = graph.snd
-  rcv_ids = graph.rcv
-  # @assert length(rcv_ids) == length(rcv)
-  # @assert length(rcv_ids) == length(snd)
-  for rcv_id in 1:length(rcv_ids)
-    for (i,snd_id) in enumerate(rcv_ids[rcv_id])
+    for (i, snd_id) in enumerate(rcv_ids[rcv_id])
       snd_snd_id = JaggedArray(snd[snd_id])
       j = first(findall(k->k==rcv_id,snd_ids[snd_id]))
       ptrs_rcv = rcv[rcv_id].ptrs
       ptrs_snd = snd_snd_id.ptrs
       @assert ptrs_rcv[i+1]-ptrs_rcv[i] == ptrs_snd[j+1]-ptrs_snd[j]
-      for k in eachindex()
-        for p in 1:(ptrs_rcv[i+1]-ptrs_rcv[i])
-          p_rcv = p+ptrs_rcv[i]-1
-          p_snd = p+ptrs_snd[j]-1
+      for p in 1:(ptrs_rcv[i+1]-ptrs_rcv[i])
+        p_rcv = p+ptrs_rcv[i]-1
+        p_snd = p+ptrs_snd[j]-1
+        for k in eachindex(snd_snd_id.data)
           rcv[rcv_id].data[k][p_rcv] = snd_snd_id.data[k][p_snd]
         end
       end

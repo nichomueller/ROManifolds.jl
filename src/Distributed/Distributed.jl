@@ -22,6 +22,10 @@ using PartitionedArrays
 
 import Base: +
 import Base: -
+import Gridap.Helpers: @notimplemented
+
+import PartitionedArrays: is_consistent
+import PartitionedArrays: exchange_impl!
 
 import GridapDistributed: DistributedCellDatum
 import GridapDistributed: DistributedCellField
@@ -42,6 +46,8 @@ const OPTIONS_MUMPS = "-pc_type lu -ksp_type preonly -ksp_converged_reason -pc_f
 const OPTIONS_MINRES = "-ksp_type minres -ksp_converged_reason -ksp_rtol 1.0e-10"
 
 export OPTIONS_CG_JACOBI,OPTIONS_CG_AMG,OPTIONS_MUMPS,OPTIONS_NEUTON_MUMPS,OPTIONS_MINRES
+export PTJaggedArray
+export PTVectorAssemblyCache
 
 include("Primitives.jl")
 include("FESpaces.jl")
