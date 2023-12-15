@@ -22,25 +22,36 @@ using PartitionedArrays
 
 import Base: +
 import Base: -
+import UnPack: @unpack
+import Gridap.Helpers: @check
 import Gridap.Helpers: @notimplemented
+import Gridap.Helpers: @unreachable
 
 import PartitionedArrays: is_consistent
 import PartitionedArrays: exchange_impl!
 import PartitionedArrays: allocate_local_values
 
 import GridapDistributed: DistributedDiscreteModel
+import GridapDistributed: PSparseMatrixBuilderCOO
+import GridapDistributed: DistributedCounterCOO
+import GridapDistributed: PVectorBuilder
+import GridapDistributed: PVectorCounter
+import GridapDistributed: DistributedSparseMatrixAssembler
+import GridapDistributed: PVectorAllocationTrackOnlyValues
+import GridapDistributed: ArrayAllocationTrackTouchedAndValues
+import GridapDistributed: PVectorAllocationTrackTouchedAndValues
 import GridapDistributed: DistributedCellDatum
 import GridapDistributed: DistributedCellField
 import GridapDistributed: DistributedFESpace
 import GridapDistributed: DistributedSingleFieldFESpace
 import GridapDistributed: DistributedSingleFieldFEFunction
-import GridapDistributed: DistributedSparseMatrixAssembler
 import GridapDistributed: DistributedDomainContribution
 import GridapDistributed: DistributedTriangulation
 import GridapDistributed: DistributedMeasure
 import GridapDistributed: DistributedMultiFieldFEFunction
 import GridapDistributed: TransientDistributedCellField
 import GridapDistributed: local_views
+import GridapDistributed: _rhs_callback
 
 const OPTIONS_CG_JACOBI = "-pc_type jacobi -ksp_type cg -ksp_converged_reason -ksp_rtol 1.0e-10"
 const OPTIONS_CG_AMG = "-pc_type gamg -ksp_type cg -ksp_converged_reason -ksp_rtol 1.0e-10"
@@ -53,6 +64,7 @@ export PTVectorAssemblyCache
 
 include("PTArray.jl")
 include("Primitives.jl")
+include("Algebra.jl")
 include("FESpaces.jl")
 include("MultiField.jl")
 include("PTCellData.jl")

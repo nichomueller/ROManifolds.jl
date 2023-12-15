@@ -52,6 +52,13 @@ export MultiFieldPTFEFunction
 export PTIntegrand
 export ∫ₚ
 export CollectionPTIntegrand
+export PTBuilder
+export SparsePTMatrixBuilder
+export PTArrayBuilder
+export PTCounter
+export PTInserter
+export PTSparseMatrixAssembler
+export get_assembler
 export TransientTrialPFESpace
 export TransientMultiFieldPFESpace
 export TransientMultiFieldTrialPFESpace

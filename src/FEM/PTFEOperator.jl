@@ -119,6 +119,31 @@ function Base.getindex(op::NonlinearPTFEOperator,row,col)
   end
 end
 
+function get_assembler(
+  assem::SparseMatrixAssembler,dc::DomainContribution,μ,t)
+  for trian in get_domains(dc)
+    if typeof(dc[trian]) <: AbstractArray{<:PTArray}
+      assem = PTSparseMatrixAssembler(assem,μ,t)
+      break
+    end
+  end
+  return assem
+end
+
+# function Algebra.allocate_residual(
+#   op::PTFEOperator,
+#   μ::P,
+#   t::T,
+#   xh) where {P,T}
+
+#   test = get_test(op)
+#   v = get_fe_basis(test)
+#   dc = integrate(op.res(μ,t,xh,v))
+#   vecdata = collect_cell_vector(test,dc)
+#   assem = get_assembler(op.assem,dc,μ,t)
+#   allocate_vector(assem,vecdata)
+# end
+
 function Algebra.allocate_residual(
   op::PTFEOperator,
   μ::P,
@@ -127,17 +152,28 @@ function Algebra.allocate_residual(
 
   test = get_test(op)
   v = get_fe_basis(test)
-  dc = integrate(op.res(μ,t,xh,v))
+  dc = op.res(μ,t,xh,v)
   vecdata = collect_cell_vector(test,dc)
-  assem = op.assem
-  for trian in get_domains(dc)
-    if typeof(dc[trian]) <: AbstractArray{<:PTArray}
-      assem = PTSparseMatrixAssembler(assem,μ,t)
-      break
-    end
-  end
+  assem = PTSparseMatrixAssembler(op.assem,μ,t)
   allocate_vector(assem,vecdata)
 end
+
+# function Algebra.allocate_jacobian(
+#   op::PTFEOperator,
+#   μ::P,
+#   t::T,
+#   xh,
+#   i::Integer) where {P,T}
+
+#   trial = get_trial(op)(μ,t)
+#   test = get_test(op)
+#   u = get_trial_fe_basis(trial)
+#   v = get_fe_basis(test)
+#   dc = integrate(op.jacs[i](μ,t,xh,u,v))
+#   matdata = collect_cell_matrix(trial,test,dc)
+#   assem = assem = get_assembler(op.assem,dc,μ,t)
+#   allocate_matrix(assem,matdata)
+# end
 
 function Algebra.allocate_jacobian(
   op::PTFEOperator,
@@ -150,17 +186,26 @@ function Algebra.allocate_jacobian(
   test = get_test(op)
   u = get_trial_fe_basis(trial)
   v = get_fe_basis(test)
-  dc = integrate(op.jacs[i](μ,t,xh,u,v))
+  dc = op.jacs[i](μ,t,xh,u,v)
   matdata = collect_cell_matrix(trial,test,dc)
-  assem = op.assem
-  for trian in get_domains(dc)
-    if typeof(dc[trian]) <: AbstractArray{<:PTArray}
-      assem = PTSparseMatrixAssembler(assem,μ,t)
-      break
-    end
-  end
+  assem = PTSparseMatrixAssembler(op.assem,μ,t)
   allocate_matrix(assem,matdata)
 end
+
+# function Algebra.residual!(
+#   b::AbstractVector,
+#   op::PTFEOperator,
+#   μ::AbstractVector,
+#   t::T,
+#   xh) where T
+
+#   test = get_test(op)
+#   v = get_fe_basis(test)
+#   dc = integrate(op.res(μ,t,xh,v))
+#   vecdata = collect_cell_vector(test,dc)
+#   assemble_vector_add!(b,op.assem,vecdata)
+#   b
+# end
 
 function Algebra.residual!(
   b::AbstractVector,
@@ -171,7 +216,7 @@ function Algebra.residual!(
 
   test = get_test(op)
   v = get_fe_basis(test)
-  dc = integrate(op.res(μ,t,xh,v))
+  dc = op.res(μ,t,xh,v)
   vecdata = collect_cell_vector(test,dc)
   assemble_vector_add!(b,op.assem,vecdata)
   b
@@ -188,15 +233,7 @@ function residual_for_trian!(
   test = get_test(op)
   v = get_fe_basis(test)
   dc = integrate(op.res(μ,t,xh,v),args...)
-  trian = get_domains(dc)
-  bvec = Vector{typeof(b)}(undef,num_domains(dc))
-  for (n,t) in enumerate(trian)
-    vecdata = collect_cell_vector(test,dc,t)
-    fill!(b,zero(eltype(b)))
-    assemble_vector_add!(b,op.assem,vecdata)
-    bvec[n] = copy(b)
-  end
-  bvec,trian
+  assemble_separate_vector_add!(b,op,dc)
 end
 
 function Algebra.jacobian!(
@@ -228,15 +265,7 @@ function jacobian_for_trian!(
   u = get_trial_fe_basis(trial)
   v = get_fe_basis(test)
   dc = γᵢ*integrate(op.jacs[i](μ,t,xh,u,v),args...)
-  trian = get_domains(dc)
-  Avec = Vector{typeof(A)}(undef,num_domains(dc))
-  for (n,t) in enumerate(trian)
-    matdata = collect_cell_matrix(trial,test,dc,t)
-    fillstored!(A,zero(eltype(A)))
-    assemble_matrix_add!(A,op.assem,matdata)
-    Avec[n] = copy(A)
-  end
-  Avec,trian
+  assemble_separate_matrix_add!(A,op,dc)
 end
 
 function ODETools.jacobians!(
@@ -272,6 +301,21 @@ function TransientFETools.fill_jacobians(
   return _matdata
 end
 
+# function TransientFETools._matdata_jacobian(
+#   op::PTFEOperator,
+#   μ::AbstractVector,
+#   t::T,
+#   xh,
+#   i::Integer,
+#   γᵢ::Real) where T
+
+#   trial = get_trial(op)(μ,t)
+#   test = get_test(op)
+#   u = get_trial_fe_basis(trial)
+#   v = get_fe_basis(test)
+#   dc = γᵢ*integrate(op.jacs[i](μ,t,xh,u,v))
+#   collect_cell_matrix(trial,test,dc)
+# end
 function TransientFETools._matdata_jacobian(
   op::PTFEOperator,
   μ::AbstractVector,
@@ -284,6 +328,41 @@ function TransientFETools._matdata_jacobian(
   test = get_test(op)
   u = get_trial_fe_basis(trial)
   v = get_fe_basis(test)
-  dc = γᵢ*integrate(op.jacs[i](μ,t,xh,u,v))
+  dc = γᵢ*op.jacs[i](μ,t,xh,u,v)
   collect_cell_matrix(trial,test,dc)
+end
+
+function assemble_separate_vector_add!(
+  b::AbstractVector,
+  op::PTFEOperator,
+  dc::DomainContribution)
+
+  test = get_test(op)
+  trian = get_domains(dc)
+  bvec = Vector{typeof(b)}(undef,num_domains(dc))
+  for (n,t) in enumerate(trian)
+    vecdata = collect_cell_vector(test,dc,t)
+    fill!(b,zero(eltype(b)))
+    assemble_vector_add!(b,op.assem,vecdata)
+    bvec[n] = copy(b)
+  end
+  bvec,trian
+end
+
+function assemble_separate_matrix_add!(
+  A::AbstractArray,
+  op::PTFEOperator,
+  dc::DomainContribution)
+
+  test = get_test(op)
+  trial = get_trial(op)(nothing,nothing)
+  trian = get_domains(dc)
+  Avec = Vector{typeof(A)}(undef,num_domains(dc))
+  for (n,t) in enumerate(trian)
+    matdata = collect_cell_matrix(trial,test,dc,t)
+    fillstored!(A,zero(eltype(A)))
+    assemble_matrix_add!(A,op.assem,matdata)
+    Avec[n] = copy(A)
+  end
+  Avec,trian
 end

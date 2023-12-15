@@ -131,6 +131,13 @@ export ∫ₚ
 export CollectionPTIntegrand
 include("PTIntegrand.jl")
 
+export PTBuilder
+export SparsePTMatrixBuilder
+export PTArrayBuilder
+export PTCounter
+export PTInserter
+export PTSparseMatrixAssembler
+export get_assembler
 include("PTAssemblers.jl")
 
 export TransientTrialPFESpace

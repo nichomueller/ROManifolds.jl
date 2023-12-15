@@ -12,6 +12,14 @@ function PartitionedArrays.allocate_local_values(::Type{<:PTArray},indices)
   @notimplemented "The length of the PTArray is needed"
 end
 
+function PartitionedArrays.own_values(values::PTArray,indices)
+  map(a->own_values(a,indices),values)
+end
+
+function PartitionedArrays.ghost_values(values::PTArray,indices)
+  map(a->ghost_values(a,indices),values)
+end
+
 function PartitionedArrays.p_vector_cache_impl(
   ::Type{<:PTArray},vector_partition,index_partition)
 
