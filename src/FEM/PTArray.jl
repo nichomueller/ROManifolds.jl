@@ -276,6 +276,37 @@ function LinearAlgebra.rmul!(a::PTArray,b::Number)
   end
 end
 
+function Base.length(
+  a::BroadcastOpFieldArray{O,T,N,<:Tuple{Vararg{Union{Any,PTArray}}}}
+  ) where {O,T,N}
+  pta = filter(x->isa(x,PTArray),a.args)
+  l = map(length,pta)
+  @assert all(l .== first(l))
+  return first(l)
+end
+
+function Base.size(
+  a::BroadcastOpFieldArray{O,T,N,<:Tuple{Vararg{Union{Any,PTArray}}}}
+  ) where {O,T,N}
+  return (length(a),)
+end
+
+function Base.getindex(
+  a::BroadcastOpFieldArray{O,T,N,<:Tuple{PTArray,Any}},
+  i::Integer) where {O,T,N}
+
+  ai = a.args[1][i]
+  Operation(a.op)(ai,a.args[2])
+end
+
+function Base.getindex(
+  a::BroadcastOpFieldArray{O,T,N,<:Tuple{Any,PTArray}},
+  i::Integer) where {O,T,N}
+
+  ai = a.args[2][i]
+  Operation(a.op)(a.args[1],ai)
+end
+
 function Arrays.return_value(f::Broadcasting{typeof(∘)},a::PTArray{<:Field},b::Field)
   args = map(x->return_value(f,x,b),a)
   data = map(x->getproperty(x,:fields),args)
@@ -287,6 +318,87 @@ function Arrays.return_value(f::Broadcasting{typeof(∘)},a::Field,b::PTArray{<:
   data = map(x->getproperty(x,:fields),args)
   Fields.OperationField(∘,data)
 end
+#Fields.BroadcastOpFieldArray{O,T,N,<:Tuple{Vararg{Union{Any,PTArray}}}} where {O,T,N}
+
+# function Arrays.return_value(
+#   k::Broadcasting{<:Operation},
+#   args::Union{Field,PTArray{<:Field}}...)
+
+#   OperationField(k.f.op,args...)
+# end
+
+# function Arrays.evaluate!(
+#   cache,
+#   k::Broadcasting{<:Operation},
+#   args::Union{Field,PTArray{<:Field}}...)
+
+#   OperationField(k.f.op,args...)
+# end
+
+# function Arrays.testitem(c::OperationField{O,<:Union{Field,PTArray{<:Field}}} where O)
+#   fields = map(testitem,c.fields)
+#   OperationField(c.op,fields)
+# end
+
+# function Arrays.return_value(
+#   c::OperationField{O,<:Union{Field,PTArray{<:Field}}} where O,
+#   x::Point)
+
+#   v1 = return_value(f,testitem(c))
+#   array = Vector{typeof(v1)}(undef,length(a))
+#   for i = eachindex(a)
+#     array[i] = return_value(f,a[i])
+#   end
+#   PTArray(array)
+# end
+
+# function Arrays.return_cache(
+#   c::OperationField{O,<:Union{Field,PTArray{<:Field}}} where O,
+#   x::Point)
+
+#   cl = map(fi -> return_cache(fi,x),c.fields)
+#   lx = map(fi -> return_value(fi,x),c.fields)
+#   ck = return_cache(c.op,lx...)
+#   ck,cl
+# end
+
+# function Arrays.evaluate!(
+#   cache,
+#   c::OperationField{O,<:Union{Field,PTArray{<:Field}}} where O,
+#   x::Point)
+
+#   ck,cf = cache
+#   lx = map((ci,fi) -> evaluate!(ci,fi,x),cf,c.fields)
+#   evaluate!(ck,c.op,lx...)
+# end
+
+# function Arrays.return_cache(
+#   c::OperationField{O,<:Union{Field,PTArray{<:Field}}} where O,
+#   x::AbstractArray{<:Point})
+
+#   cf = map(fi -> return_cache(fi,x),c.fields)
+#   lx = map((ci,fi) -> evaluate!(ci,fi,x),cf,c.fields)
+#   ck = return_cache(c.op,map(testitem,lx)...)
+#   r = c.op.(lx...)
+#   ca = CachedArray(r)
+#   ca,ck,cf
+# end
+
+# function Arrays.evaluate!(
+#   cache,
+#   c::OperationField{O,<:Union{Field,PTArray{<:Field}}} where O,
+#   x::AbstractArray{<:Point})
+
+#   ca,ck,cf = cache
+#   sx = size(x)
+#   setsize!(ca,sx)
+#   lx = map((ci,fi) -> evaluate!(ci,fi,x),cf,c.fields)
+#   r = ca.array
+#   for i in eachindex(x)
+#     @inbounds r[i] = evaluate!(ck,c.op,map(lxi -> lxi[i], lx)...)
+#   end
+#   r
+# end
 
 for op in (:+,:-,:*)
   @eval begin

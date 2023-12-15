@@ -54,6 +54,8 @@ import Gridap.CellData: similar_cell_field
 import Gridap.CellData: _get_cell_points
 import Gridap.CellData: _operate_cellfields
 import Gridap.CellData: _to_common_domain
+import Gridap.Fields: OperationField
+import Gridap.Fields: BroadcastOpFieldArray
 import Gridap.Fields: BroadcastingFieldOpMap
 import Gridap.Fields: LinearCombinationField
 import Gridap.Fields: LinearCombinationMap

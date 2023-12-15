@@ -222,7 +222,38 @@ tface_to_field_s = lazy_map(Reindex(mface_to_field),tface_to_mface)
 # tface_to_field_t = lazy_map(Broadcasting(∘),tface_to_field_s,tface_to_mface_map)
 fi = map(testitem,(tface_to_field_s,tface_to_mface_map))
 return_value(Broadcasting(∘),fi...)
-broadcast((y...) ->(∘)(testargs(∘,y...)...),fi...)
+broadcast((∘),fi...)
+
+function Base.:(∘)(f::PTArray{<:Field},g::Field)
+  op = map(x -> (∘)(x,g),f)
+  Operation(∘)(op)
+end
+function Base.:(∘)(f::Field,g::PTArray{<:Field})
+  op = map(x -> (∘)(f,x),g)
+  Operation(∘)(op)
+end
+
+function Arrays.return_value(
+  f::Broadcasting{typeof(∘)},
+  a::Fields.BroadcastOpFieldArray{O,T,N,<:Tuple{Vararg{Union{Any,PTArray}}}} where {O,T,N},
+  b::Field)
+
+  args = map(x->return_value(f,x,b),a)
+  data = map(x->getproperty(x,:fields),args)
+  Fields.OperationField(∘,data)
+end
+TODO
+# function Base.:(∘)(
+#   f::BroadcastOpFieldArray{O,T,N,<:Tuple{Vararg{Union{Any,PTArray}}}} where {O,T,N},
+#   g::Field)
+
+#   op = map(x -> (∘)(x,g),f)
+#   Operation(∘)(op)
+# end
+# function Base.:(∘)(f::Field,g::PTArray{<:Field})
+#   op = map(x -> (∘)(f,x),g)
+#   Operation(∘)(op)
+# end
 
 # times = get_times(fesolver)
 # dv = get_fe_basis(test)
@@ -291,9 +322,8 @@ test_ode_cache = update_cache!(test_ode_cache,test_op,t0)
 test_Xh, = test_ode_cache
 test_xh = TransientCellField(EvaluationFunction(test_Xh[1],test_vθ),(EvaluationFunction(test_Xh[1],test_vθ),))
 test_du = get_trial_fe_basis(test_trial(nothing))
-∫(∇(dv)⋅∇(test_xh))dΩ
 
-test_cf = dv*test_xh
+test_cf = a(μ[1],dt)*∇(dv)⋅∇(test_xh)
 test_sface_to_field = get_data(test_cf.args[2])
 mface_to_sface = sglue.mface_to_tface
 tface_to_mface = tglue.tface_to_mface
@@ -304,6 +334,7 @@ test_tface_to_field_t = lazy_map(Broadcasting(∘),test_tface_to_field_s,tface_t
 test_fi = map(testitem,(test_tface_to_field_s,tface_to_mface_map))
 return_value(Broadcasting(∘),test_fi...)
 broadcast((y...) ->(∘)(testargs(∘,y...)...),test_fi...)
+(∘)(test_fi...)
 
 function FESpaces.change_domain(a::CellField,strian::Triangulation,::ReferenceDomain,ttrian::Triangulation,::ReferenceDomain)
   msg = """\n
@@ -367,9 +398,10 @@ for _ in 1:get_order(lop.feop)
   dxh = (dxh...,uh)
 end
 xh = TransientCellField(uh,dxh)
-cf = dv*xh
-∫(dv*xh)dΩ
+dv = get_fe_basis(test)
+test_cf = aμt(μ,dt)*∇(dv)⋅∇(xh)
 quad = dΩ.quad
+cf = dv*∂ₚt(xh)
 strian = get_triangulation(cf.args[2])
 ttrian = quad.trian
 D = num_cell_dims(strian)
@@ -383,31 +415,13 @@ mface_to_field = extend(sface_to_field,mface_to_sface)
 tface_to_field_s = lazy_map(Reindex(mface_to_field),tface_to_mface)
 fi = map(testitem,(tface_to_field_s,tface_to_mface_map))
 return_value(Broadcasting(∘),fi...)
-broadcast((y...) ->(∘)(testargs(∘,y...)...),fi...)
 
 (∘)(fi...)
 
-# Base.:∘(f::PTArray{<:Field},g::Field) = map(f->Operation(f)(g),f)
-# Base.:∘(f::Field,g::PTArray{<:Field}) = map(g->Operation(f)(g),g)
+c = aμt(μ,dt)*∇(dv)
+d = ∇(xh)
+Operation(dot)(c,d)
 
-# function Arrays.evaluate!(
-#   cache,
-#   ::Broadcasting{typeof(∘)},
-#   f::PTArray{<:Field},
-#   g::Field)
-
-#   map(f) do f
-#     f∘g
-#   end
-# end
-
-# function Arrays.evaluate!(
-#   cache,
-#   ::Broadcasting{typeof(∘)},
-#   f::Field,
-#   g::PTArray{<:Field})
-
-#   map(g) do g
-#     f∘g
-#   end
-# end
+test_c = a(μ[1],dt)*∇(dv)
+test_d = ∇(test_xh)
+Operation(dot)(c,d)
