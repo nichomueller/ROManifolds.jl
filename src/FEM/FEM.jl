@@ -31,12 +31,13 @@ import LinearAlgebra: tr
 import LinearAlgebra: cross
 import LinearAlgebra: dot
 import LinearAlgebra: fillstored!
+import BlockArrays: blockedrange
+import FillArrays: Fill
+import FillArrays: fill
+import SparseArrays: AbstractSparseMatrix
 import Distributions: Uniform
 import Distributions: Normal
 import ForwardDiff: derivative
-import FillArrays: Fill
-import FillArrays: fill
-import BlockArrays: blockedrange
 import UnPack: @unpack
 import Gridap.Helpers: @abstractmethod
 import Gridap.Helpers: @check
@@ -137,6 +138,7 @@ export PTArrayBuilder
 export PTCounter
 export PTInserter
 export PTSparseMatrixAssembler
+export PTAllocationCOO
 export get_assembler
 include("PTAssemblers.jl")
 

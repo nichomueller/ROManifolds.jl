@@ -58,6 +58,7 @@ export PTArrayBuilder
 export PTCounter
 export PTInserter
 export PTSparseMatrixAssembler
+export PTAllocationCOO
 export get_assembler
 export TransientTrialPFESpace
 export TransientMultiFieldPFESpace

@@ -10,10 +10,12 @@ end
 Arrays.get_array(a::PTArray) = a.array
 Arrays.testitem(a::PTArray) = testitem(get_array(a))
 Base.size(a::PTArray,i...) = size(testitem(a),i...)
-Base.eltype(::Type{PTArray{T}}) where T = eltype(T)
+Base.eltype(::Type{<:PTArray{T}}) where T = eltype(T)
 Base.eltype(::PTArray{T}) where T = eltype(T)
-Base.ndims(::PTArray{T}) where T = isa(T,AbstractArray) ? ndims(T) : 1
-Base.ndims(::Type{<:PTArray{T}}) where T = isa(T,AbstractArray) ? ndims(T) : 1
+Base.ndims(::PTArray) = 1
+Base.ndims(::PTArray{T}) where T<:AbstractArray = ndims(T)
+Base.ndims(::Type{<:PTArray}) = 1
+Base.ndims(::Type{<:PTArray{T}}) where T<:AbstractArray = ndims(T)
 Base.first(a::PTArray) = testitem(a)
 Base.length(a::PTArray) = length(get_array(a))
 Base.eachindex(a::PTArray) = eachindex(get_array(a))

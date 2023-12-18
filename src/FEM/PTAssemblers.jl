@@ -87,6 +87,56 @@ end
   end
 end
 
+# coo format
+# function Algebra.is_entry_stored(
+#   ::Type{<:SparsePTMatrixBuilder{<:SparseMatrixBuilder{T}}},i,j) where T
+#   is_entry_stored(T,i,j)
+# end
+
+# function Algebra.allocate_coo_vectors(
+#   ::Type{<:SparsePTMatrixBuilder{<:SparseMatrixBuilder{<:AbstractSparseMatrix{Tv,Ti}}}},
+#   n::Integer) where {Tv,Ti}
+#   zeros(Ti,n),zeros(Ti,n),zeros(Tv,n)
+# end
+
+function Algebra.nz_allocation(c::PTCounter{<:Algebra.CounterCOO})
+  allocation = nz_allocation(c.counter)
+  PTAllocationCOO(allocation,c.length)
+end
+
+# function Algebra.finalize_coo!(
+#   ::Type{<:SparsePTMatrixBuilder{<:SparseMatrixBuilder{T}}},I,J,V,m,n) where T
+#   finalize_coo!(T,I,J,V,m,n)
+# end
+
+# function sparse_from_coo(::Type{<:SparseMatrixCSC},I,J,V,m,n)
+#   sparse(I,J,V,m,n)
+# end
+
+struct PTAllocationCOO{T,A,B,C}
+  allocation::Algebra.AllocationCOO{T,A,B,C}
+  length::Integer
+end
+
+Algebra.LoopStyle(::Type{<:PTAllocationCOO}) = Loop()
+
+@inline function Algebra.add_entry!(f::Function,a::PTAllocationCOO,args...)
+  add_entry!(f,a.allocation,args...)
+end
+
+@inline function Algebra.add_entry!(f::Function,a::PTAllocationCOO,v::PTArray,args...)
+  @notimplemented
+end
+
+function Algebra.create_from_nz(a::PTAllocationCOO)
+  A = create_from_nz(a.allocation)
+  array = Vector{typeof(A)}(undef,a.length)
+  for j = 1:a.length
+    array[j] = copy(A)
+  end
+  PTArray(array)
+end
+
 function FESpaces.collect_cell_vector(
   test::FESpace,
   a::DomainContribution,

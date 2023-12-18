@@ -51,6 +51,7 @@ import GridapDistributed: DistributedTriangulation
 import GridapDistributed: DistributedMeasure
 import GridapDistributed: DistributedMultiFieldFEFunction
 import GridapDistributed: TransientDistributedCellField
+import GridapDistributed: change_axes
 import GridapDistributed: local_views
 import GridapDistributed: _rhs_callback
 

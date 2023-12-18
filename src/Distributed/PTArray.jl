@@ -1,12 +1,10 @@
-Base.zero(::Type{<:Vector{T}}) where T = zero(T)
-
 function PartitionedArrays.allocate_local_values(
   a::PTArray,
   ::Type{T},
-  indices) where {T<:AbstractArray}
+  indices) where T
 
   map(a) do ai
-    similar(ai,eltype(T),local_length(indices))
+    similar(ai,T,local_length(indices))
   end
 end
 
@@ -23,7 +21,24 @@ function PartitionedArrays.ghost_values(values::PTArray,indices)
 end
 
 function PartitionedArrays.p_vector_cache_impl(
-  ::Type{<:PTArray},vector_partition,index_partition)
+  ::Type{<:PTArray},
+  vector_partition,
+  index_partition)
+
+  neighbors_snd,neighbors_rcv = assembly_neighbors(index_partition)
+  indices_snd,indices_rcv = assembly_local_indices(
+      index_partition,neighbors_snd,neighbors_rcv)
+  buffers_snd,buffers_rcv = map(PartitionedArrays.assembly_buffers,
+    vector_partition,indices_snd,indices_rcv) |> tuple_of_arrays
+  map(PTVectorAssemblyCache,
+    neighbors_snd,neighbors_rcv,indices_snd,indices_rcv,buffers_snd,buffers_rcv)
+end
+
+function PartitionedArrays.p_sparse_matrix_cache_impl(
+  ::Type{<:PTArray},
+  matrix_partition,
+  row_partition,
+  col_partition)
 
   neighbors_snd,neighbors_rcv = assembly_neighbors(index_partition)
   indices_snd,indices_rcv = assembly_local_indices(

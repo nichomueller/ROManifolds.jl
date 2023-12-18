@@ -42,17 +42,186 @@ struct PPTSparseMatrixBuilderCOO{T,B}
 end
 
 function Algebra.nz_counter(
-  builder::PPTSparseMatrixBuilderCOO{A},axs::Tuple{<:PRange,<:PRange}) where A
+  builder::PPTSparseMatrixBuilderCOO{<:SparsePTMatrixBuilder{<:SparseMatrixBuilder{A}}},
+  axs::Tuple{<:PRange,<:PRange}) where A
+  b = builder.local_matrix
   test_dofs_gids_prange,trial_dofs_gids_prange = axs
   counters = map(partition(test_dofs_gids_prange),partition(trial_dofs_gids_prange)) do r,c
     axs = (Base.OneTo(local_length(r)),Base.OneTo(local_length(c)))
-    Algebra.CounterCOO{A}(axs)
+    counter = Algebra.CounterCOO{A}(axs)
+    PTCounter(counter,b.length)
   end
-  DistributedCounterCOO(builder.par_strategy,counters,test_dofs_gids_prange,trial_dofs_gids_prange)
+  DistributedPTCounterCOO(builder.par_strategy,counters,test_dofs_gids_prange,trial_dofs_gids_prange)
 end
 
 function Algebra.get_array_type(::PPTSparseMatrixBuilderCOO{Tv}) where Tv
   @notimplemented
+end
+
+struct DistributedPTCounterCOO{A,B,C,D} <: GridapType
+  par_strategy::A
+  counters::B
+  test_dofs_gids_prange::C
+  trial_dofs_gids_prange::D
+  function DistributedPTCounterCOO(
+    par_strategy,
+    counters::AbstractArray{<:PTCounter},
+    test_dofs_gids_prange::PRange,
+    trial_dofs_gids_prange::PRange)
+    A = typeof(par_strategy)
+    B = typeof(counters)
+    C = typeof(test_dofs_gids_prange)
+    D = typeof(trial_dofs_gids_prange)
+    new{A,B,C,D}(par_strategy,counters,test_dofs_gids_prange,trial_dofs_gids_prange)
+  end
+end
+
+function GridapDistributed.local_views(a::DistributedPTCounterCOO)
+  a.counters
+end
+
+function GridapDistributed.local_views(
+  a::DistributedPTCounterCOO,test_dofs_gids_prange,trial_dofs_gids_prange)
+  @check test_dofs_gids_prange === a.test_dofs_gids_prange
+  @check trial_dofs_gids_prange === a.trial_dofs_gids_prange
+  a.counters
+end
+
+function Algebra.nz_allocation(a::DistributedPTCounterCOO)
+  allocs = map(nz_allocation,a.counters)
+  DistributedPTAllocationCOO(a.par_strategy,allocs,a.test_dofs_gids_prange,a.trial_dofs_gids_prange)
+end
+
+struct DistributedPTAllocationCOO{A,B,C,D} <: GridapType
+  par_strategy::A
+  allocs::B
+  test_dofs_gids_prange::C
+  trial_dofs_gids_prange::D
+  function DistributedPTAllocationCOO(
+    par_strategy,
+    allocs::AbstractArray{<:PTAllocationCOO},
+    test_dofs_gids_prange::PRange,
+    trial_dofs_gids_prange::PRange)
+    A = typeof(par_strategy)
+    B = typeof(allocs)
+    C = typeof(test_dofs_gids_prange)
+    D = typeof(trial_dofs_gids_prange)
+    new{A,B,C,D}(par_strategy,allocs,test_dofs_gids_prange,trial_dofs_gids_prange)
+  end
+end
+
+function GridapDistributed.change_axes(a::PTAllocationCOO,axes)
+  PTAllocationCOO(change_axes(a.allocation,axes),a.length)
+end
+
+function GridapDistributed.change_axes(
+  a::DistributedPTAllocationCOO{A,B,<:PRange,<:PRange},
+  axes::Tuple{<:PRange,<:PRange}) where {A,B}
+  local_axes = map(partition(axes[1]),partition(axes[2])) do rows,cols
+    (Base.OneTo(local_length(rows)), Base.OneTo(local_length(cols)))
+  end
+  allocs = map(change_axes,a.allocs,local_axes)
+  DistributedPTAllocationCOO(a.par_strategy,allocs,axes[1],axes[2])
+end
+
+function GridapDistributed.change_axes(
+  a::MatrixBlock{<:DistributedPTAllocationCOO},
+  axes::Tuple{<:Vector,<:Vector})
+  block_ids  = CartesianIndices(a.array)
+  rows, cols = axes
+  array = map(block_ids) do I
+    change_axes(a[I],(rows[I[1]],cols[I[2]]))
+  end
+  return ArrayBlock(array,a.touched)
+end
+
+function GridapDistributed.local_views(a::DistributedPTAllocationCOO)
+  a.allocs
+end
+
+function GridapDistributed.local_views(
+  a::DistributedPTAllocationCOO,test_dofs_gids_prange,trial_dofs_gids_prange)
+  @check test_dofs_gids_prange === a.test_dofs_gids_prange
+  @check trial_dofs_gids_prange === a.trial_dofs_gids_prange
+  map(a.allocs) do alloc
+    alloc.allocation
+  end
+end
+
+function GridapDistributed.local_views(a::MatrixBlock{<:DistributedPTAllocationCOO})
+  array = map(local_views,a.array) |> to_parray_of_arrays
+  return map(ai -> ArrayBlock(ai,a.touched),array)
+end
+
+function GridapDistributed.get_allocations(a::DistributedPTAllocationCOO)
+  I,J,V = map(local_views(a)) do alloc
+    _alloc = alloc.allocation
+    _alloc.I,_alloc.J,_alloc.V
+  end |> tuple_of_arrays
+  return I,J,V
+end
+
+function GridapDistributed.get_allocations(a::ArrayBlock{<:DistributedPTAllocationCOO})
+  tuple_of_array_of_parrays = map(get_allocations,a.array) |> tuple_of_arrays
+  return tuple_of_array_of_parrays
+end
+
+GridapDistributed.get_test_gids(a::DistributedPTAllocationCOO)  = a.test_dofs_gids_prange
+GridapDistributed.get_trial_gids(a::DistributedPTAllocationCOO) = a.trial_dofs_gids_prange
+GridapDistributed.get_test_gids(a::ArrayBlock{<:DistributedPTAllocationCOO})  = map(get_test_gids,diag(a.array))
+GridapDistributed.get_trial_gids(a::ArrayBlock{<:DistributedPTAllocationCOO}) = map(get_trial_gids,diag(a.array))
+
+function Algebra.create_from_nz(a::DistributedPTAllocationCOO{<:FullyAssembledRows})
+  f(x) = nothing
+  A, = GridapDistributed._fa_create_from_nz_with_callback(f,a)
+  return A
+end
+
+function Algebra.create_from_nz(a::ArrayBlock{<:DistributedPTAllocationCOO{<:FullyAssembledRows}})
+  f(x) = nothing
+  A, = GridapDistributed._fa_create_from_nz_with_callback(f,a)
+  return A
+end
+
+function Algebra.create_from_nz(a::DistributedPTAllocationCOO{<:SubAssembledRows})
+  f(x) = nothing
+  A, = GridapDistributed._sa_create_from_nz_with_callback(f,f,a)
+  return A
+end
+
+function Algebra.create_from_nz(a::ArrayBlock{<:DistributedPTAllocationCOO{<:SubAssembledRows}})
+  f(x) = nothing
+  A, = GridapDistributed._sa_create_from_nz_with_callback(f,f,a)
+  return A
+end
+
+function Algebra.create_from_nz(
+  a::DistributedPTAllocationCOO{<:FullyAssembledRows},
+  c_fespace::PVectorAllocationTrackOnlyValues{<:FullyAssembledRows})
+
+  function callback(rows)
+    _rhs_callback(c_fespace,rows)
+  end
+
+  A,b = GridapDistributed._fa_create_from_nz_with_callback(callback,a)
+  return A,b
+end
+
+function Algebra.create_from_nz(
+  a::DistributedPTAllocationCOO{<:SubAssembledRows},
+  c_fespace::PVectorAllocationTrackOnlyValues{<:SubAssembledRows})
+
+  function callback(rows)
+    _rhs_callback(c_fespace,rows)
+  end
+
+  function async_callback(b)
+    # now we can assemble contributions
+    assemble!(b)
+  end
+
+  A,b = GridapDistributed._sa_create_from_nz_with_callback(callback,async_callback,a)
+  return A,b
 end
 
 struct PPTVectorBuilder{T,B}
