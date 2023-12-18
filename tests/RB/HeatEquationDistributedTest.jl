@@ -191,96 +191,76 @@ dv = get_fe_basis(test)
 dc = feop.res(μ,dt,xh,dv)
 vecdata = collect_cell_vector(test,dc)
 assem = PTSparseMatrixAssembler(feop.assem,μ,dt)
-allocate_vector(assem,vecdata)
+b = allocate_vector(assem,vecdata)
+assemble_vector_add!(b,assem,vecdata)
 
-_a = assem # feop.assem #
-v1 = nz_counter(get_vector_builder(_a),(get_rows(_a),))
-symbolic_loop_vector!(v1,_a,vecdata)
-v2 = nz_allocation(v1)
-symbolic_loop_vector!(v2,_a,vecdata)
-v3 = create_from_nz(v2)
+rows = get_rows(assem)
+b1 = local_views(b,rows)[1]
+a1 = local_views(assem)[1]
+v1 = vecdata[1]
+# numeric_loop_vector!(b1,a1,v1)
+strategy = FESpaces.get_assembly_strategy(a1)
+cellvec, _cellids = map(first,v1)
+cellids = FESpaces.map_cell_rows(strategy,_cellids)
+rows_cache = array_cache(cellids)
+vals_cache = array_cache(cellvec)
+vals1 = getindex!(vals_cache,cellvec,1)
+rows1 = getindex!(rows_cache,cellids,1)
+add! = AddEntriesMap(+)
+add_cache = return_cache(add!,b1,vals1,rows1)
+caches = add_cache, vals_cache, rows_cache
+# _numeric_loop_vector!(b1,caches,cellvec,cellids)
+@assert length(cellvec) == length(cellids)
+add! = AddEntriesMap(+)
+cell = 1
+rows = getindex!(rows_cache,cellids,cell)
+vals = getindex!(vals_cache,cellvec,cell)
+evaluate!(add_cache,add!,b1,vals,rows)
 
-test_dofs_prange = v2.test_dofs_gids_prange
-ngrdofs = length(test_dofs_prange)
-allocations = local_views(v2.allocations)
-indices = partition(test_dofs_prange)
-I_ghost_lids_to_dofs_ghost_lids = map(allocations, indices) do allocation, indices
-  dofs_lids_touched = findall(allocation.touched)
-  loc_to_gho = local_to_ghost(indices)
-  n_I_ghost_lids = count((x)->loc_to_gho[x]!=0,dofs_lids_touched)
-  I_ghost_lids = Vector{Int32}(undef,n_I_ghost_lids)
-  cur = 1
-  for lid in dofs_lids_touched
-    dof_lid = loc_to_gho[lid]
-    if dof_lid != 0
-      I_ghost_lids[cur] = dof_lid
-      cur = cur+1
+@inline function Algebra._add_entries!(combine::Function,A,vs,is)
+  println(typeof(A))
+  println(typeof(vs))
+  for (li, i) in enumerate(is)
+    if i>0
+      vi = vs[li]
+      add_entry!(A,vi,i)
     end
   end
-  I_ghost_lids
+  A
 end
 
-gids_ghost_to_global,gids_ghost_to_owner = map(
-  GridapDistributed.find_gid_and_owner,
-  I_ghost_lids_to_dofs_ghost_lids,
-  indices) |> tuple_of_arrays
-rows = GridapDistributed._setup_prange_impl_(
-  ngrdofs,indices,gids_ghost_to_global,gids_ghost_to_owner)
-b_fespace = PVector(v2.values,partition(v2.test_dofs_gids_prange))
-b = similar(b_fespace,eltype(b_fespace),(rows,))
-b .= b_fespace
+for (li,i) in enumerate(rows)
+  if i>0
+    for (Ak,vsk) in zip(b1,vals)
+      vik = vsk[li]
+      # println(typeof(Ak))
+      # println(typeof(vals))
+      add_entry!(Ak,vik,i)
+    end
+  end
+end
 
 ################################################################################
-model = CartesianDiscreteModel(domain,mesh_cells)
-order = 1
-degree = 2*order
-Ω = Triangulation(model)
-Γn = BoundaryTriangulation(model,tags=[7,8])
-dΩ = Measure(Ω,degree)
-dΓn = Measure(Γn,degree)
-
-ranges = fill([1.,10.],3)
-pspace = PSpace(ranges)
-
-a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
-a(μ,t) = x->a(x,μ,t)
-aμt(μ,t) = PTFunction(a,μ,t)
-
-f(x,μ,t) = 1.
-f(μ,t) = x->f(x,μ,t)
-fμt(μ,t) = PTFunction(f,μ,t)
-
-h(x,μ,t) = abs(cos(t/μ[3]))
-h(μ,t) = x->h(x,μ,t)
-hμt(μ,t) = PTFunction(h,μ,t)
-
-g(x,μ,t) = μ[1]*exp(-x[1]/μ[2])*abs(sin(t/μ[3]))
-g(μ,t) = x->g(x,μ,t)
-
-u0(x,μ) = 0
-u0(μ) = x->u0(x,μ)
-u0μ(μ) = PFunction(u0,μ)
-
-res(μ,t,u,v) = ∫(v*∂ₚt(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
-jac(μ,t,u,du,v) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
-jac_t(μ,t,u,dut,v) = ∫(v*dut)dΩ
+gg(x,t) = g(x,μ[1],t)
+gg(t) = x->gg(x,t)
+res(t,u,v) = ∫(v*∂t(u))dΩ + ∫(a(μ[1],t)*∇(v)⋅∇(u))dΩ - ∫(f(μ[1],t)*v)dΩ - ∫(h(μ[1],t)*v)dΓn
+jac(t,u,du,v) = ∫(a(μ[1],t)*∇(v)⋅∇(du))dΩ
+jac_t(t,u,dut,v) = ∫(v*dut)dΩ
+uu00(x) = u0(x,μ[1])
 
 T = Float64
 reffe = ReferenceFE(lagrangian,T,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6])
-trial = TransientTrialPFESpace(test,g)
-feop = AffinePTFEOperator(res,jac,jac_t,pspace,trial,test)
-t0,tf,dt,θ = 0.,0.3,0.005,0.5
-uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
-fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
+trial = TransientTrialFESpace(test,gg)
+feop = TransientAffineFEOperator(res,jac,jac_t,trial,test)
 
-nparams = 2
-μ = realization(feop,nparams)
-ode_cache = allocate_cache(feop,μ,t0)
+uu00h = interpolate_everywhere(uu00,trial(t0))
+w0 = get_free_dof_values(uu00h)
 vθ = similar(w0)
 vθ .= 0.0
-ode_cache = update_cache!(ode_cache,feop,μ,t0)
-lop = PTAffineThetaMethodOperator(feop,μ,t0,dt*θ,w0,ode_cache,vθ)
+odeop = get_algebraic_operator(feop)
+ode_cache = allocate_cache(odeop)
+ode_cache = update_cache!(ode_cache,odeop,t0)
 Xh, = ode_cache
 uh = EvaluationFunction(Xh[1],vθ)
 dxh = ()
@@ -289,12 +269,31 @@ for _ in 1:get_order(lop.feop)
 end
 xh = TransientCellField(uh,dxh)
 dv = get_fe_basis(test)
-dc = feop.res(μ,dt,xh,dv)
+dc = ∫(a(μ[1],dt)*∇(dv)⋅∇(xh))dΩ #feop.res(dt,xh,dv)
 _vecdata = collect_cell_vector(test,dc)
-_assem = PTSparseMatrixAssembler(feop.assem,μ,dt)
-#
-_v1 = nz_counter(get_vector_builder(_assem),(get_rows(_assem),))
-symbolic_loop_vector!(_v1,_assem,_vecdata)
-_v2 = nz_allocation(_v1)
-symbolic_loop_vector!(_v2,_assem,_vecdata)
-_v3 = create_from_nz(_v2)
+_assem = feop.assem_t
+_b = allocate_vector(_assem,_vecdata)
+assemble_vector_add!(_b,_assem,_vecdata)
+
+rows = get_rows(_assem)
+_b1 = local_views(_b,rows)[1]
+_a1 = local_views(_assem)[1]
+_v1 = _vecdata[1]
+# numeric_loop_vector!(_b1,_a1,_v1)
+strategy = FESpaces.get_assembly_strategy(_a1)
+cellvec, _cellids = map(first,_v1)
+cellids = FESpaces.map_cell_rows(strategy,_cellids)
+rows_cache = array_cache(cellids)
+vals_cache = array_cache(cellvec)
+vals1 = getindex!(vals_cache,cellvec,1)
+rows1 = getindex!(rows_cache,cellids,1)
+add! = AddEntriesMap(+)
+add_cache = return_cache(add!,_b1,vals1,rows1)
+caches = add_cache, vals_cache, rows_cache
+# _numeric_loop_vector!(_b1,caches,cellvec,cellids)
+@assert length(cellvec) == length(cellids)
+add! = AddEntriesMap(+)
+cell = 1
+rows = getindex!(rows_cache,cellids,cell)
+vals = getindex!(vals_cache,cellvec,cell)
+evaluate!(add_cache,add!,_b1,vals,rows)

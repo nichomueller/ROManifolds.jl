@@ -1,3 +1,5 @@
+Base.zero(::Type{<:Vector{T}}) where T = zero(T)
+
 function PartitionedArrays.allocate_local_values(
   a::PTArray,
   ::Type{T},
@@ -134,4 +136,11 @@ function PartitionedArrays.copy_cache(a::PTVectorAssemblyCache)
                   a.local_indices_rcv,
                   buffer_snd,
                   buffer_rcv)
+end
+
+Base.length(a::LocalView{T,N,<:PTArray}) where {T,N} = length(a.plids_to_value)
+Base.size(a::LocalView{T,N,<:PTArray}) where {T,N} = (length(a),)
+
+function Base.getindex(a::LocalView{T,N,<:PTArray},i::Integer...) where {T,N}
+  LocalView(a.plids_to_value[i...],a.d_to_lid_to_plid)
 end

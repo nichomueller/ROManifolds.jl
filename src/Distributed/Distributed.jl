@@ -32,6 +32,7 @@ import PartitionedArrays: exchange_impl!
 import PartitionedArrays: allocate_local_values
 
 import GridapDistributed: DistributedDiscreteModel
+import GridapDistributed: LocalView
 import GridapDistributed: PSparseMatrixBuilderCOO
 import GridapDistributed: DistributedCounterCOO
 import GridapDistributed: PVectorBuilder

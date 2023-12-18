@@ -128,7 +128,12 @@ end
 
 Algebra.create_from_nz(a::PTArray) = a
 
-@inline function Algebra._add_entries!(combine::Function,A::PTArray,vs,is,js)
+@inline function Algebra._add_entries!(
+  combine::Function,
+  A::AbstractVector{<:AbstractArray},
+  vs,
+  is,js)
+
   for (lj,j) in enumerate(js)
     if j>0
       for (li,i) in enumerate(is)
@@ -144,7 +149,12 @@ Algebra.create_from_nz(a::PTArray) = a
   A
 end
 
-@inline function Algebra._add_entries!(combine::Function,A::PTArray,vs::Nothing,is,js)
+@inline function Algebra._add_entries!(
+  combine::Function,
+  A::AbstractVector{<:AbstractArray},
+  vs::Nothing,
+  is,js)
+
   for (lj,j) in enumerate(js)
     if j>0
       for (li,i) in enumerate(is)
@@ -159,7 +169,12 @@ end
   A
 end
 
-@inline function Algebra._add_entries!(combine::Function,A::PTArray,vs::PTArray,is,js)
+@inline function Algebra._add_entries!(
+  combine::Function,
+  A::AbstractVector{<:AbstractArray},
+  vs::PTArray,
+  is,js)
+
   for (lj,j) in enumerate(js)
     if j>0
       for (li,i) in enumerate(is)
@@ -175,7 +190,12 @@ end
   A
 end
 
-@inline function Algebra._add_entries!(combine::Function,A::PTArray,vs::Nothing,is)
+@inline function Algebra._add_entries!(
+  combine::Function,
+  A::AbstractVector{<:AbstractArray},
+  vs::Nothing,
+  is)
+
   for (li,i) in enumerate(is)
     if i>0
       for Ak in A
@@ -186,7 +206,12 @@ end
   A
 end
 
-@inline function Algebra._add_entries!(combine::Function,A::PTArray,vs,is)
+@inline function Algebra._add_entries!(
+  combine::Function,
+  A::AbstractVector{<:AbstractArray},
+  vs,
+  is)
+
   for (li,i) in enumerate(is)
     if i>0
       for Ak in A
@@ -198,7 +223,12 @@ end
   A
 end
 
-@inline function Algebra._add_entries!(combine::Function,A::PTArray,vs::PTArray,is)
+@inline function Algebra._add_entries!(
+  combine::Function,
+  A::AbstractVector{<:AbstractArray},
+  vs::PTArray,
+  is)
+
   for (li,i) in enumerate(is)
     if i>0
       for (Ak,vsk) in zip(A,vs)
