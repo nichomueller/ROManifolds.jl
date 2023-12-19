@@ -29,7 +29,11 @@ import Gridap.Helpers: @unreachable
 
 import PartitionedArrays: is_consistent
 import PartitionedArrays: exchange_impl!
+import PartitionedArrays: exchange_fetch
 import PartitionedArrays: allocate_local_values
+import PartitionedArrays: assembly_buffers
+import PartitionedArrays: length_to_ptrs!
+import PartitionedArrays: rewind_ptrs!
 
 import GridapDistributed: DistributedDiscreteModel
 import GridapDistributed: LocalView

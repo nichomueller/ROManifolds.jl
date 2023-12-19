@@ -216,7 +216,6 @@ function Algebra.create_from_nz(
   end
 
   function async_callback(b)
-    # now we can assemble contributions
     assemble!(b)
   end
 
