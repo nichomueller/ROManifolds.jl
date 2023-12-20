@@ -184,40 +184,38 @@ l_cache = nothing
 ode_cache = update_cache!(ode_cache,feop,μ,t0)
 lop = PTAffineThetaMethodOperator(feop,μ,t0,dt*θ,w,ode_cache,vθ)
 # l_cache = solve!(w,fesolver.nls,lop,l_cache)
-# A = jacobian(op,x)
-A = allocate_jacobian(lop,vθ)
-x = copy(w)
-Xh, = lop.ode_cache
-uh = EvaluationFunction(Xh[1],x)
-dxh = ()
-for _ in 1:get_order(feop)
-  dxh = (dxh...,uh)
-end
-xh = TransientCellField(uh,dxh)
-_matdata_jacobians = TransientFETools.fill_jacobians(feop,μ,t0,xh,(1.0,1/lop.dtθ))
-matdata = TransientFETools._vcat_matdata(_matdata_jacobians)
-# assemble_matrix_add!(A,feop.assem,matdata)
-# numeric_loop_matrix!(A,feop.assem,matdata)
-rows = get_rows(feop.assem)
-cols = get_cols(feop.assem)
-# map(numeric_loop_matrix!,local_views(A,rows,cols),local_views(feop.assem),matdata)
-numeric_loop_matrix!(local_views(A,rows,cols),local_views(feop.assem),matdata)
+A = jacobian(lop,w)
+PartitionedArrays.to_trivial_partition(A)
+
 ################################################################################
-gg(x,t) = g(x,μ[1],t)
-gg(t) = x->gg(x,t)
-res(t,u,v) = ∫(∇(v)⋅∇(u))dΩ
-jac(t,u,du,v) = ∫(∇(v)⋅∇(du))dΩ
-jac_t(t,u,dut,v) = ∫(v*dut)dΩ
+
+gok(x,t) = g(x,μ[1],t)
+gok(t) = x->gok(x,t)
+resok(t,u,v) = ∫(∇(v)⋅∇(u))dΩ
+jacok(t,u,du,v) = ∫(∇(v)⋅∇(du))dΩ
+jac_tok(t,u,dut,v) = ∫(v*dut)dΩ
 uu00(x) = u0(x,μ[1])
 
-T = Float64
-reffe = ReferenceFE(lagrangian,T,order)
-test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6])
-trial = TransientTrialFESpace(test,gg)
-feop = TransientFEOperator(res,jac,jac_t,trial,test)
+testok = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6])
+trialok = TransientTrialFESpace(testok,gok)
+feopok = TransientFEOperator(resok,jacok,jac_tok,trialok,testok)
 
-uu00h = interpolate_everywhere(uu00,trial(t0))
-w0 = get_free_dof_values(uu00h)
+uu00h = interpolate_everywhere(uu00,trialok(t0))
 ode_solver = ThetaMethod(LUSolver(),dt,θ)
-solok = solve(ode_solver,feop,uu00h,t0,tf)
+solok = solve(ode_solver,feopok,uu00h,t0,tf)
 Base.iterate(solok)
+
+wok = get_free_dof_values(uu00h)
+odeopok = get_algebraic_operator(feopok)
+ode_cacheok = TransientFETools.allocate_cache(odeopok)
+vθok = similar(wok)
+vθok .= 0.0
+l_cache = nothing
+ode_cache = TransientFETools.update_cache!(ode_cacheok,odeopok,t0)
+opok = ODETools.ThetaMethodNonlinearOperator(odeopok,t0,dt*θ,wok,ode_cacheok,vθok)
+Aok = jacobian(opok,wok)
+PartitionedArrays.to_trivial_partition(Aok)
+
+map(local_views(A),local_views(Aok)) do a,aok
+  println(isapprox(a[1],aok))
+end

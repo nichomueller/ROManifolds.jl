@@ -2,6 +2,7 @@ module FEM
 using Mabla.Utils
 
 using LinearAlgebra
+using SparseArrays
 using Gridap
 using Gridap.Algebra
 using Gridap.FESpaces
@@ -34,7 +35,6 @@ import LinearAlgebra: fillstored!
 import BlockArrays: blockedrange
 import FillArrays: Fill
 import FillArrays: fill
-import SparseArrays: AbstractSparseMatrix
 import Distributions: Uniform
 import Distributions: Normal
 import ForwardDiff: derivative
@@ -102,6 +102,7 @@ export ∂ₚtt
 include("PDiffOperators.jl")
 
 export PTArray
+export ptarray
 export ptzeros
 export get_at_offsets
 export recenter

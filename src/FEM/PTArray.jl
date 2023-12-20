@@ -59,6 +59,10 @@ function Base.zeros(a::PTArray)
   get_array(zero(a))
 end
 
+function ptarray(a::AbstractArray,N::Integer)
+  PTArray([copy(a) for _ = 1:N])
+end
+
 function ptzeros(a::AbstractArray{T},N::Integer) where T
   b = similar(a)
   fill!(b,zero(T))
@@ -196,6 +200,12 @@ function Arrays.setsize!(
 
   @inbounds for i in eachindex(a)
     setsize!(a.array[i],s)
+  end
+end
+
+function SparseArrays.resize!(a::PTArray,args...)
+  map(a) do ai
+    resize!(ai,args...)
   end
 end
 

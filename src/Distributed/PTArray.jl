@@ -181,15 +181,12 @@ function PartitionedArrays.p_sparse_matrix_cache_impl(
   end
   part = linear_indices(row_partition)
   parts_snd, parts_rcv = assembly_neighbors(row_partition)
-  matrix_partition1 = map(matrix_partition) do matrix_partition
-    first(matrix_partition)
-  end
   k_snd,gi_snd,gj_snd = map(
-    setup_snd,part,parts_snd,row_partition,col_partition,matrix_partition1) |> tuple_of_arrays
+    setup_snd,part,parts_snd,row_partition,col_partition,matrix_partition) |> tuple_of_arrays
   graph = ExchangeGraph(parts_snd,parts_rcv)
   gi_rcv = exchange_fetch(gi_snd,graph)
   gj_rcv = exchange_fetch(gj_snd,graph)
-  k_rcv = map(setup_rcv,part,row_partition,col_partition,gi_rcv,gj_rcv,matrix_partition1)
+  k_rcv = map(setup_rcv,part,row_partition,col_partition,gi_rcv,gj_rcv,matrix_partition)
   buffers = map(assembly_buffers,matrix_partition,k_snd,k_rcv) |> tuple_of_arrays
   cache = map(VectorAssemblyCache,parts_snd,parts_rcv,k_snd,k_rcv,buffers...)
   map(PTSparseMatrixAssemblyCache,cache)
@@ -371,7 +368,6 @@ function PartitionedArrays.assemble_coo!(
   graph = ExchangeGraph(parts_snd,parts_rcv)
   t1 = exchange(gi_snd,graph)
   t2 = exchange(gj_snd,graph)
-  println(typeof(v_snd))
   t3 = exchange(v_snd,graph)
   @async begin
     gi_rcv = fetch(t1)
@@ -427,6 +423,7 @@ end
 
 
 Base.size(a::PTJaggedArray) = (length(a.ptrs)-1,)
+# Base.length(a::PTJaggedArray{<:PTArray}) = (length(a.ptrs)-1,)
 
 function Base.getindex(a::PTJaggedArray,i::Int)
   map(a.data) do data

@@ -46,13 +46,39 @@ function PartitionedArrays.assemble_impl!(
   assemble!(f,data,vcache)
 end
 
+function PartitionedArrays.allocate_exchange_impl(
+  snd::Vector{<:PTJaggedArray},
+  graph,
+  ::Type{T}) where T<:AbstractVector
+
+  N = length(snd[1].data)
+  n_snd = map(snd) do snd
+    map(length,snd.data.array)
+  end
+  n_rcv = exchange_fetch(n_snd,graph)
+  S = eltype(eltype(eltype(eltype(snd))))
+  rcv = map(n_rcv) do n_rcv
+    ptrs = zeros(Int32,length(n_rcv)+1)
+    ptrs[2:end] = n_rcv
+    length_to_ptrs!(ptrs)
+    n_data = ptrs[end]-1
+    data = Vector{S}(undef,n_data)
+    ptdata = ptarray(data,N)
+    JaggedArray(ptdata,ptrs)
+  end
+  rcv
+end
+
 function PartitionedArrays.exchange_impl!(
-  rcv,snd,graph,::Type{T}) where T<:AbstractVector{<:AbstractVector}
+  rcv::Vector{<:PTJaggedArray},
+  snd::Vector{<:PTJaggedArray},
+  graph,
+  ::Type{T}) where T<:AbstractVector
 
   @assert is_consistent(graph)
-  @assert eltype(rcv) <: PTJaggedArray "failed for type $(typeof(rcv))"
   snd_ids = graph.snd
   rcv_ids = graph.rcv
+  @assert typeof(rcv) == typeof(snd)
   @assert length(rcv_ids) == length(rcv)
   @assert length(rcv_ids) == length(snd)
   for rcv_id in 1:length(rcv_ids)
