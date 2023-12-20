@@ -70,7 +70,7 @@ end
 for fun in (:(Algebra.jacobian!),:jacobian_for_trian!)
   @eval begin
     function $fun(
-      A::AbstractArray,
+      A::AbstractMatrix,
       op::PTAlgebraicOperator,
       xhF::Tuple{Vararg{AbstractVector}},
       args...)
@@ -87,7 +87,7 @@ for fun in (:(Algebra.jacobian!),:jacobian_for_trian!)
 end
 
 function ODETools.jacobians!(
-  A::AbstractArray,
+  A::AbstractMatrix,
   op::PTAlgebraicOperator,
   xhF::Tuple{Vararg{AbstractVector}},
   args...)

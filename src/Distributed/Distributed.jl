@@ -22,16 +22,30 @@ using PartitionedArrays
 
 import Base: +
 import Base: -
+import LinearAlgebra: fillstored!
+import SparseArrays: AbstractSparseMatrixCSC
+import SparseMatricesCSR: SparseMatrixCSR
+import SparseMatricesCSR: getoffset
 import UnPack: @unpack
+
 import Gridap.Helpers: @check
 import Gridap.Helpers: @notimplemented
 import Gridap.Helpers: @unreachable
 
+import PartitionedArrays: SubSparseMatrix
+import PartitionedArrays: EltypeVector
+import PartitionedArrays: NZIteratorCSC
+import PartitionedArrays: NZIteratorCSR
+import PartitionedArrays: VectorAssemblyCache
+import PartitionedArrays: SparseMatrixAssemblyCache
 import PartitionedArrays: is_consistent
 import PartitionedArrays: exchange_impl!
 import PartitionedArrays: exchange_fetch
+import PartitionedArrays: assemble_coo!
 import PartitionedArrays: allocate_local_values
 import PartitionedArrays: assembly_buffers
+import PartitionedArrays: trivial_partition
+import PartitionedArrays: to_trivial_partition
 import PartitionedArrays: length_to_ptrs!
 import PartitionedArrays: rewind_ptrs!
 
@@ -74,5 +88,4 @@ include("Algebra.jl")
 include("FESpaces.jl")
 include("MultiField.jl")
 include("PTCellData.jl")
-include("Transient.jl")
 end

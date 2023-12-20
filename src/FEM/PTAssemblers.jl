@@ -159,9 +159,9 @@ Algebra.create_from_nz(a::PTArray) = a
 
 @inline function Algebra._add_entries!(
   combine::Function,
-  A::AbstractVector{<:AbstractArray},
+  A::AbstractMatrix{T},
   vs,
-  is,js)
+  is,js) where T<:AbstractArray
 
   for (lj,j) in enumerate(js)
     if j>0
@@ -180,9 +180,9 @@ end
 
 @inline function Algebra._add_entries!(
   combine::Function,
-  A::AbstractVector{<:AbstractArray},
+  A::AbstractMatrix{T},
   vs::Nothing,
-  is,js)
+  is,js) where T<:AbstractArray
 
   for (lj,j) in enumerate(js)
     if j>0
@@ -200,9 +200,9 @@ end
 
 @inline function Algebra._add_entries!(
   combine::Function,
-  A::AbstractVector{<:AbstractArray},
+  A::AbstractMatrix{T},
   vs::PTArray,
-  is,js)
+  is,js) where T<:AbstractArray
 
   for (lj,j) in enumerate(js)
     if j>0
@@ -221,9 +221,9 @@ end
 
 @inline function Algebra._add_entries!(
   combine::Function,
-  A::AbstractVector{<:AbstractArray},
+  A::AbstractVector{T},
   vs::Nothing,
-  is)
+  is) where T<:AbstractArray
 
   for (li,i) in enumerate(is)
     if i>0
@@ -237,9 +237,9 @@ end
 
 @inline function Algebra._add_entries!(
   combine::Function,
-  A::AbstractVector{<:AbstractArray},
+  A::AbstractVector{T},
   vs,
-  is)
+  is) where T<:AbstractArray
 
   for (li,i) in enumerate(is)
     if i>0
@@ -254,9 +254,9 @@ end
 
 @inline function Algebra._add_entries!(
   combine::Function,
-  A::AbstractVector{<:AbstractArray},
+  A::AbstractVector{T},
   vs::PTArray,
-  is)
+  is) where T<:AbstractArray
 
   for (li,i) in enumerate(is)
     if i>0

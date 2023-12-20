@@ -138,7 +138,7 @@ function Algebra.solve!(
 end
 
 struct PTLinearSolverCache <: GridapType
-  A::AbstractArray
+  A::AbstractMatrix
   b::AbstractVector
   ns::AbstractVector
 end
@@ -175,19 +175,19 @@ function Algebra.solve!(
   cache
 end
 
-function Algebra.LinearSolverCache(A::AbstractArray,b::AbstractVector,ns::AbstractVector)
+function Algebra.LinearSolverCache(A::AbstractMatrix,b::AbstractVector,ns::AbstractVector)
   PTLinearSolverCache(A,b,ns)
 end
 
 struct PTNewtonRaphsonCache <: GridapType
-  A::AbstractArray
+  A::AbstractMatrix
   b::AbstractVector
   dx::AbstractVector
   ns::AbstractVector
 end
 
 function Algebra.NewtonRaphsonCache(
-  A::AbstractArray,
+  A::AbstractMatrix,
   b::AbstractVector,
   dx::AbstractVector,
   ns::AbstractVector)

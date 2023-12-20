@@ -1,4 +1,9 @@
-function PartitionedArrays.assemble_impl!(f,vector_partition,cache,::Type{<:PTVectorAssemblyCache})
+function PartitionedArrays.assemble_impl!(
+  f,
+  vector_partition,
+  cache,
+  ::Type{<:PTVectorAssemblyCache})
+
   buffer_snd = map(vector_partition,cache) do values,cache
     local_indices_snd = cache.local_indices_snd
     for (p,lid) in enumerate(local_indices_snd.data)
@@ -28,11 +33,24 @@ function PartitionedArrays.assemble_impl!(f,vector_partition,cache,::Type{<:PTVe
   end
 end
 
+function PartitionedArrays.assemble_impl!(
+  f,
+  matrix_partition,
+  cache,
+  ::Type{<:PTSparseMatrixAssemblyCache})
+
+  vcache = map(i->i.cache,cache)
+  data = map(matrix_partition) do matrix_partition
+    map(nonzeros,matrix_partition)
+  end
+  assemble!(f,data,vcache)
+end
+
 function PartitionedArrays.exchange_impl!(
   rcv,snd,graph,::Type{T}) where T<:AbstractVector{<:AbstractVector}
 
   @assert is_consistent(graph)
-  @assert eltype(rcv) <: PTJaggedArray
+  @assert eltype(rcv) <: PTJaggedArray "failed for type $(typeof(rcv))"
   snd_ids = graph.snd
   rcv_ids = graph.rcv
   @assert length(rcv_ids) == length(rcv)

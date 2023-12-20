@@ -64,9 +64,12 @@ pspace = PSpace(fill([1.,10.],3))
 dv = get_fe_basis(test)
 du = get_trial_fe_basis(trial0)
 
-res(μ,t,u,v) = ∫ₚ(v*∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⋅∇(u),dΩ) - ∫ₚ(fμt(μ,t)*v,dΩ) - ∫ₚ(hμt(μ,t)*v,dΓn)
-jac(μ,t,u,du,v) = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ)
-jac_t(μ,t,u,dut,v) = ∫ₚ(v*dut,dΩ)
+# res(μ,t,u,v) = ∫ₚ(v*∂ₚt(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⋅∇(u),dΩ) - ∫ₚ(fμt(μ,t)*v,dΩ) - ∫ₚ(hμt(μ,t)*v,dΓn)
+# jac(μ,t,u,du,v) = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ)
+# jac_t(μ,t,u,dut,v) = ∫ₚ(v*dut,dΩ)
+res(μ,t,u,v) = ∫(v*∂ₚt(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
+jac(μ,t,u,du,v) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
+jac_t(μ,t,u,dut,v) = ∫(v*dut)dΩ
 
 feop = AffinePTFEOperator(res,jac,jac_t,pspace,trial,test)
 

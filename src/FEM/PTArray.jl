@@ -1,9 +1,14 @@
-struct PTArray{T,A} <: AbstractVector{T}
+struct PTArray{T,N,A} <: AbstractArray{T,N}
   array::A
-  function PTArray(array::AbstractVector)
+  function PTArray(array::AbstractVector{T}) where T<:AbstractArray
+    N = ndims(T)
     A = typeof(array)
+    new{T,N,A}(array)
+  end
+  function PTArray(array::A) where A
     T = eltype(array)
-    new{T,A}(array)
+    N = 1
+    new{T,N,A}(array)
   end
 end
 
@@ -12,10 +17,8 @@ Arrays.testitem(a::PTArray) = testitem(get_array(a))
 Base.size(a::PTArray,i...) = size(testitem(a),i...)
 Base.eltype(::Type{<:PTArray{T}}) where T = eltype(T)
 Base.eltype(::PTArray{T}) where T = eltype(T)
-Base.ndims(::PTArray) = 1
-Base.ndims(::PTArray{T}) where T<:AbstractArray = ndims(T)
-Base.ndims(::Type{<:PTArray}) = 1
-Base.ndims(::Type{<:PTArray{T}}) where T<:AbstractArray = ndims(T)
+Base.ndims(::PTArray{T,N} where T) where N = N
+Base.ndims(::Type{<:PTArray{T,N}} where T) where N = N
 Base.first(a::PTArray) = testitem(a)
 Base.length(a::PTArray) = length(get_array(a))
 Base.eachindex(a::PTArray) = eachindex(get_array(a))

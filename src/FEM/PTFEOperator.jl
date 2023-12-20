@@ -237,7 +237,7 @@ function residual_for_trian!(
 end
 
 function Algebra.jacobian!(
-  A::AbstractArray,
+  A::AbstractMatrix,
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
@@ -251,7 +251,7 @@ function Algebra.jacobian!(
 end
 
 function jacobian_for_trian!(
-  A::AbstractArray,
+  A::AbstractMatrix,
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
@@ -269,7 +269,7 @@ function jacobian_for_trian!(
 end
 
 function ODETools.jacobians!(
-  A::AbstractArray,
+  A::AbstractMatrix,
   op::PTFEOperator,
   μ::AbstractVector,
   t::T,
@@ -350,7 +350,7 @@ function assemble_separate_vector_add!(
 end
 
 function assemble_separate_matrix_add!(
-  A::AbstractArray,
+  A::AbstractMatrix,
   op::PTFEOperator,
   dc::DomainContribution)
 
