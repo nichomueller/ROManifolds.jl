@@ -210,6 +210,24 @@ function PartitionedArrays.assembly_buffers(
   buffer_snd,buffer_rcv
 end
 
+function PartitionedArrays.from_trivial_partition!(
+  c::PVector{<:PTArray},c_in_main::PVector{<:PTArray})
+
+  destination = 1
+  consistent!(c_in_main) |> wait
+  map(own_values(c),partition(c_in_main),partition(axes(c,1))) do cown,my_c_in_main,indices
+    part = part_id(indices)
+    if part == destination
+      map(cown,my_c_in_main) do cown,my_c_in_main
+        cown .= view(my_c_in_main,own_to_global(indices))
+      end
+    else
+      cown .= my_c_in_main
+    end
+  end
+  c
+end
+
 function PartitionedArrays.to_trivial_partition(
   b::PVector{<:PTArray},
   row_partition_in_main)
@@ -225,7 +243,9 @@ function PartitionedArrays.to_trivial_partition(
 
     part = part_id(indices)
     if part == destination
-      my_b_in_main[own_to_global(indices)] .= bown
+      map(my_b_in_main,bown) do my_b_in_main,bown
+        my_b_in_main[own_to_global(indices)] .= bown
+      end
     else
       my_b_in_main .= bown
     end

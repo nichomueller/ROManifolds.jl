@@ -7,8 +7,6 @@ function FESpaces.get_triangulation(meas::DistributedMeasure)
   end
   trian = first.(trian_model)
   model = DistributedDiscreteModel(last.(trian_model))
-  println(typeof(trian))
-  println(typeof(model))
   DistributedTriangulation(trian,model)
 end
 
@@ -19,7 +17,6 @@ function Fields.integrate(
   for i = 1:N
     op,integrand = a[i]
     imeas = integrand.meas
-    println(typeof(integrand.object))
     conti = map(integrand.object.fields,imeas.measures) do f,m
       integral = integrate(f,m.quad)
       lazy_map(Broadcasting(op),integral)

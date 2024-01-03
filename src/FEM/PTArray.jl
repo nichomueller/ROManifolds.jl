@@ -41,10 +41,22 @@ function Base.copy(a::PTArray{T}) where T
   PTArray(b)
 end
 
-function Base.similar(a::PTArray{T}) where T
-  b = Vector{T}(undef,length(a))
+# function Base.similar(a::PTArray{T}) where T
+#   b = Vector{T}(undef,length(a))
+#   @inbounds for i = eachindex(a)
+#     b[i] = similar(a[i])
+#   end
+#   PTArray(b)
+# end
+function Base.similar(
+  a::PTArray,
+  type::Type{T}=eltype(testitem(a)),
+  ndim::Union{Integer,AbstractUnitRange}=length(testitem(a))) where T
+
+  elb = similar(testitem(a),type,ndim)
+  b = Vector{typeof(elb)}(undef,length(a))
   @inbounds for i = eachindex(a)
-    b[i] = similar(a[i])
+    b[i] = similar(a[i],type,ndim)
   end
   PTArray(b)
 end
@@ -277,10 +289,30 @@ function Base.materialize!(a::PTArray,b::PTBroadcasted)
   a
 end
 
+function LinearAlgebra.lu(a::PTArray)
+  map(a) do ai
+    lu(ai)
+  end
+end
+
+function LinearAlgebra.lu!(a::PTArray,b::PTArray)
+  @inbounds for i = eachindex(a)
+    ai,bi = a[i],b[i]
+    lu!(ai,bi)
+  end
+end
+
 function LinearAlgebra.ldiv!(a::PTArray,m::LU,b::PTArray)
   @inbounds for i = eachindex(a)
     ai,bi = a[i],b[i]
     ldiv!(ai,m,bi)
+  end
+end
+
+function LinearAlgebra.ldiv!(a::PTArray,m::AbstractArray,b::PTArray)
+  @inbounds for i = eachindex(a)
+    ai,mi,bi = a[i],m[i],b[i]
+    ldiv!(ai,mi,bi)
   end
 end
 
