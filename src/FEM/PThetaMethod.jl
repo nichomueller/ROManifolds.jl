@@ -193,7 +193,7 @@ function Algebra.residual!(
   op::PTAffineThetaMethodOperator,
   x::AbstractVector)
 
-  uF = x
+  uF = op.u0
   vθ = op.vθ
   z = zero(eltype(b))
   fill!(b,z)
