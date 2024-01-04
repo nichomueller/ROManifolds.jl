@@ -17,6 +17,21 @@ function Base.copy(a::PVector)
   PVector(values,a.index_partition)
 end
 
+function Algebra.LinearSolverCache(
+  A::PSparseMatrix{<:PTArray},
+  b::PVector{<:PTArray},
+  ns::NumericalSetup)
+  FEM.PTLinearSolverCache(A,b,ns)
+end
+
+function Algebra.NewtonRaphsonCache(
+  A::PSparseMatrix{<:PTArray},
+  b::PVector{<:PTArray},
+  dx::PVector{<:PTArray},
+  ns::NumericalSetup)
+  FEM.PTNewtonRaphsonCache(A,b,dx,ns)
+end
+
 function PartitionedArrays.allocate_local_values(
   a::PTArray,
   ::Type{T},
