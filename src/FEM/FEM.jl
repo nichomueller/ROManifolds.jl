@@ -45,6 +45,7 @@ import Gridap.Helpers: @notimplemented
 import Gridap.Helpers: @unreachable
 import Gridap.Algebra: InserterCSC
 import Gridap.Algebra: LUNumericalSetup
+import Gridap.Algebra: BackslashNumericalSetup
 import Gridap.CellData: CellField
 import Gridap.CellData: GenericMeasure
 import Gridap.CellData: CompositeMeasure

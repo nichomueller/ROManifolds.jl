@@ -87,23 +87,15 @@ function Algebra.symbolic_setup(s::LUSolver,mat::Union{PTArray,AbstractArray{<:P
   symbolic_setup(s,testitem(mat))
 end
 
-function Algebra.numerical_setup(ss::Algebra.LUSymbolicSetup,mat::PTArray)
-  ns = Vector{Algebra.LUNumericalSetup}(undef,length(mat))
-  @inbounds for k = eachindex(mat)
-    ns[k] = numerical_setup(ss,mat[k])
-  end
-  PTArray(ns)
-end
-
-function Algebra.numerical_setup!(ns,mat::PTArray)
-  @inbounds for k = eachindex(mat)
-    ns[k].factors = lu(mat[k])
-  end
-end
-
-function Algebra.solve!(x::PTArray,ns,b::PTArray)
+function Algebra.solve!(x::PTArray,ns::BackslashNumericalSetup,b::PTArray)
   @inbounds for k in eachindex(x)
-    solve!(x[k],ns[k],b[k])
+    solve!(x[k],BackslashNumericalSetup(ns.A[k]),b[k])
+  end
+end
+
+function Algebra.solve!(x::PTArray,ns::LUNumericalSetup,b::PTArray)
+  @inbounds for k in eachindex(x)
+    solve!(x[k],LUNumericalSetup(ns.factors[k]),b[k])
   end
 end
 
@@ -140,7 +132,7 @@ end
 struct PTLinearSolverCache <: GridapType
   A::AbstractMatrix
   b::AbstractVector
-  ns::AbstractVector
+  ns::NumericalSetup
 end
 
 function Algebra.solve!(
@@ -175,7 +167,10 @@ function Algebra.solve!(
   cache
 end
 
-function Algebra.LinearSolverCache(A::AbstractMatrix,b::AbstractVector,ns::AbstractVector)
+function Algebra.LinearSolverCache(
+  A::Union{PTArray,AbstractMatrix{<:PTArray}},
+  b::Union{PTArray,AbstractVector{<:PTArray}},
+  ns::NumericalSetup)
   PTLinearSolverCache(A,b,ns)
 end
 
@@ -183,14 +178,14 @@ struct PTNewtonRaphsonCache <: GridapType
   A::AbstractMatrix
   b::AbstractVector
   dx::AbstractVector
-  ns::AbstractVector
+  ns::NumericalSetup
 end
 
 function Algebra.NewtonRaphsonCache(
-  A::AbstractMatrix,
-  b::AbstractVector,
-  dx::AbstractVector,
-  ns::AbstractVector)
+  A::Union{PTArray,AbstractMatrix{<:PTArray}},
+  b::Union{PTArray,AbstractVector{<:PTArray}},
+  dx::Union{PTArray,AbstractVector{<:PTArray}},
+  ns::NumericalSetup)
 
   PTNewtonRaphsonCache(A,b,dx,ns)
 end

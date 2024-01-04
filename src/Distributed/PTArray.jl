@@ -1,3 +1,22 @@
+function Base.materialize(b::PBroadcasted{<:AbstractArray{<:PTBroadcasted}})
+  own_values_out = map(Base.materialize,b.own_values)
+  T = eltype(eltype(own_values_out))
+  pta = ptarray(zeros(T,length(first(b.index_partition))),length(first(b.own_values).array))
+  vector_partition = map(b.index_partition) do indices
+    allocate_local_values(pta,T,indices)
+  end
+  a = PVector(vector_partition,b.index_partition)
+  Base.materialize!(a,b)
+  a
+end
+
+function Base.copy(a::PVector)
+  values = map(local_views(a)) do v
+    copy(v)
+  end
+  PVector(values,a.index_partition)
+end
+
 function PartitionedArrays.allocate_local_values(
   a::PTArray,
   ::Type{T},
@@ -217,12 +236,12 @@ function PartitionedArrays.from_trivial_partition!(
   consistent!(c_in_main) |> wait
   map(own_values(c),partition(c_in_main),partition(axes(c,1))) do cown,my_c_in_main,indices
     part = part_id(indices)
-    if part == destination
-      map(cown,my_c_in_main) do cown,my_c_in_main
+    map(cown,my_c_in_main) do cown,my_c_in_main
+      if part == destination
         cown .= view(my_c_in_main,own_to_global(indices))
+      else
+        cown .= my_c_in_main
       end
-    else
-      cown .= my_c_in_main
     end
   end
   c
@@ -242,12 +261,12 @@ function PartitionedArrays.to_trivial_partition(
     partition(axes(b,1))) do bown,my_b_in_main,indices
 
     part = part_id(indices)
-    if part == destination
-      map(my_b_in_main,bown) do my_b_in_main,bown
+    map(my_b_in_main,bown) do my_b_in_main,bown
+      if part == destination
         my_b_in_main[own_to_global(indices)] .= bown
+      else
+        my_b_in_main .= bown
       end
-    else
-      my_b_in_main .= bown
     end
   end
   assemble!(b_in_main) |> wait
@@ -443,7 +462,6 @@ end
 
 
 Base.size(a::PTJaggedArray) = (length(a.ptrs)-1,)
-# Base.length(a::PTJaggedArray{<:PTArray}) = (length(a.ptrs)-1,)
 
 function Base.getindex(a::PTJaggedArray,i::Int)
   map(a.data) do data

@@ -156,7 +156,7 @@ function TransientFETools.solve_step!(
 
   l_cache = solve!(uf,solver.nls,lop,l_cache)
 
-  uf .+= u0
+  uf = uf + u0
   if 0.0 < solver.θ < 1.0
     @. uf = uf*(1.0/solver.θ)-u0*((1-solver.θ)/solver.θ)
   end

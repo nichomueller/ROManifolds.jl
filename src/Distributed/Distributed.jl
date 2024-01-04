@@ -32,12 +32,15 @@ import Gridap.Helpers: @check
 import Gridap.Helpers: @notimplemented
 import Gridap.Helpers: @unreachable
 
+import Mabla.FEM: PTBroadcasted
+
 import PartitionedArrays: SubSparseMatrix
 import PartitionedArrays: EltypeVector
 import PartitionedArrays: NZIteratorCSC
 import PartitionedArrays: NZIteratorCSR
 import PartitionedArrays: VectorAssemblyCache
 import PartitionedArrays: SparseMatrixAssemblyCache
+import PartitionedArrays: PBroadcasted
 import PartitionedArrays: is_consistent
 import PartitionedArrays: allocate_exchange_impl
 import PartitionedArrays: exchange_impl!

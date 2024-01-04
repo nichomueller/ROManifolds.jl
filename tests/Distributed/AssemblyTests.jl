@@ -51,35 +51,44 @@ end
 # with jacobian
 u = zero_free_values(trial(params,times))
 u .= one(Float64)
+b = copy(u)
+x = similar(u)
 xh = compute_xh(feop,params,times,(u,u))
 int_mat = feop.jacs[1](params,times,xh,du,dv)
 matdata = collect_cell_matrix(trial0,test,int_mat)
 A = allocate_jacobian(feop,params,times,xh,1)
 assemble_matrix_add!(A,feop.assem,matdata)
 luA = lu(A)
+ldiv!(x,luA,b)
 for np in 1:nparams
   feop_t = get_feoperator_gridap(feop,params[np])
   for nt in 1:ntimes
     u_t = zero_free_values(test)
     u_t .= one(Float64)
+    b_t = copy(u_t)
+    x_t = similar(u_t)
     xh_t = compute_xh_gridap(feop_t,times[nt],(u_t,u_t))
     int_mat_t = feop_t.jacs[1](times[nt],xh_t,du,dv)
     matdata_t = collect_cell_matrix(feop_t.trials[1](nothing),test,int_mat_t)
     A_t = allocate_jacobian(feop_t,times[nt],xh_t.cellfield,nothing)
     assemble_matrix_add!(A_t,feop_t.assem_t,matdata_t)
     luA_t = lu(A_t)
+    ldiv!(x_t,luA_t,b_t)
     map(local_views(matdata),
         local_views(matdata_t),
         local_views(A),
         local_views(A_t),
         local_views(luA.lu_in_main),
-        local_views(luA_t.lu_in_main)) do matdata,matdata_t,A,A_t,luA,luA_t
+        local_views(luA_t.lu_in_main),
+        local_views(x),
+        local_views(x_t)) do matdata,matdata_t,A,A_t,luA,luA_t,x,x_t
       check_ptarray(matdata[1][1],matdata_t[1][1];n = (np-1)*ntimes+nt)
       @check matdata[2] == matdata_t[2]
       @check A[(np-1)*ntimes+nt] ≈ A_t
       if !(isnothing(luA) && isnothing(luA_t))
         @check luA[(np-1)*ntimes+nt] ≈ luA_t
       end
+      @check x[(np-1)*ntimes+nt] ≈ x_t "Failed at index $((np-1)*ntimes+nt)"
     end
   end
 end

@@ -41,13 +41,6 @@ function Base.copy(a::PTArray{T}) where T
   PTArray(b)
 end
 
-# function Base.similar(a::PTArray{T}) where T
-#   b = Vector{T}(undef,length(a))
-#   @inbounds for i = eachindex(a)
-#     b[i] = similar(a[i])
-#   end
-#   PTArray(b)
-# end
 function Base.similar(
   a::PTArray,
   type::Type{T}=eltype(testitem(a)),
@@ -274,7 +267,7 @@ function Base.broadcasted(
 end
 
 function Base.materialize(b::PTBroadcasted{T}) where T
-  a = similar(b)
+  a = similar(b.array)
   Base.materialize!(a,b)
   a
 end
