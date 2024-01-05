@@ -10,11 +10,30 @@ function Base.materialize(b::PBroadcasted{<:AbstractArray{<:PTBroadcasted}})
   a
 end
 
-function Base.copy(a::PVector)
+function Base.copy(a::PVector{<:PTArray})
   values = map(local_views(a)) do v
     copy(v)
   end
   PVector(values,a.index_partition)
+end
+
+function Base.collect(v::PVector{<:PTArray})
+  own_values_v = own_values(v)
+  own_to_global_v = map(own_to_global,partition(axes(v,1)))
+  vals = gather(own_values_v,destination=:all)
+  ids = gather(own_to_global_v,destination=:all)
+  n = length(v)
+  T = eltype(v)
+  map(vals,ids) do myvals,myids
+    u = Vector{T}(undef,n)
+    ptu = ptarray(u,length(first(myvals)))
+    for (a,b) in zip(myvals,myids)
+      for k = eachindex(a)
+        ptu[k][b] = a[k]
+      end
+    end
+    ptu
+  end |> getany
 end
 
 function Algebra.LinearSolverCache(

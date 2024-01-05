@@ -48,6 +48,7 @@ import PartitionedArrays: exchange_fetch
 import PartitionedArrays: assemble_coo!
 import PartitionedArrays: allocate_local_values
 import PartitionedArrays: assembly_buffers
+import PartitionedArrays: getany
 import PartitionedArrays: trivial_partition
 import PartitionedArrays: to_trivial_partition
 import PartitionedArrays: length_to_ptrs!

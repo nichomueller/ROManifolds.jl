@@ -58,11 +58,13 @@ function collect_solutions(
   u0 = get_free_dof_values(uh0(params))
   time_ndofs = num_time_dofs(fesolver)
   uμt = PODESolution(fesolver,feop,params,u0,t0,tf)
-  T = get_snapshot_type(feop.test)
-  snaps = Vector{T}(undef,time_ndofs)
+  # T = get_snapshot_type(feop.test)
+  # snaps = Vector{T}(undef,time_ndofs)
   println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
-  stats = @timed for (snap,n) in uμt
-    snaps[n] = copy(snap)
+  stats = @timed begin
+    snaps = map(uμt) do (snap,n)
+      copy(snap)
+    end
   end
   println("Time marching complete")
   sols = Snapshots(snaps)

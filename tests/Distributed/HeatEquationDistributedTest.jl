@@ -25,9 +25,9 @@ load_structures = false
 save_structures = true
 postprocess = true
 norm_style = :H1
-nsnaps_state = 50
-nsnaps_mdeim = 20
-nsnaps_test = 10
+nsnaps_state = 10
+nsnaps_mdeim = 2
+nsnaps_test = 2
 st_mdeim = true
 rbinfo = RBInfo(test_path;ϵ,norm_style,nsnaps_state,nsnaps_mdeim,nsnaps_test,st_mdeim)
 
@@ -75,27 +75,81 @@ reffe = ReferenceFE(lagrangian,T,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6])
 trial = TransientTrialPFESpace(test,g)
 feop = AffinePTFEOperator(res,jac,jac_t,pspace,trial,test)
-t0,tf,dt,θ = 0.,0.3,0.005,0.5
+t0,tf,dt,θ = 0.,0.1,0.005,0.5
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
 
-sols,params,stats = collect_solutions(rbinfo,fesolver,feop)
-rbspace = reduced_basis(rbinfo,feop,sols)
+# sols,params,stats = collect_solutions(rbinfo,fesolver,feop)
+# rbspace = reduced_basis(rbinfo,feop,sols)
 
 uh0,t0,tf = fesolver.uh0,fesolver.t0,fesolver.tf
 nparams = rbinfo.nsnaps_state+rbinfo.nsnaps_test
 params = realization(feop,nparams)
 time_ndofs = num_time_dofs(fesolver)
 uμt = PODESolution(fesolver,feop,params,get_free_dof_values(uh0μ(params)),t0,tf)
-T = get_snapshot_type(feop.test)
-snaps = Vector{T}(undef,time_ndofs)
-println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
-stats = @timed for (snap,n) in uμt
-  println(typeof(snap))
+Base.length(x::PODESolution) = Int((x.tf-x.t0)/x.solver.dt)
+stats = @timed begin
+  snaps = map(uμt) do (snap,n)
+    copy(snap)
+  end
 end
-map(uμt) do snap,n
-  snap
+# sols = Snapshots(snaps)
+# rbspace = reduced_basis(rbinfo,feop,sols)
+
+x = snaps[1]
+values = map(local_views(x)) do x
+  x[1]
 end
-stats = @timed for (snap,n) in uμt
-  snaps[n] = snap #copy(snap)
+y = PVector(values,x.index_partition)
+
+collect(y)
+collect(x)
+
+snd = own_values(x)
+destination=:all
+T = eltype(snd)
+rcv = allocate_gather(snd;destination)
+@assert size(rcv) == size(snd)
+for j in eachindex(rcv)
+  for i in 1:length(snd)
+    rcv[j][i] .= snd[i]
+  end
 end
+
+typeof(rcv[1][1][1])
+typeof(snd[1][1])
+
+_snd = own_values(y)
+_T = eltype(_snd)
+_rcv = allocate_gather(_snd;destination)
+@assert size(_rcv) == size(_snd)
+
+typeof(_rcv[1][1])
+typeof(_snd[1])
+
+for j in eachindex(rcv)
+  for i in 1:length(snd)
+    _rcv[j][i] = _snd[i]
+  end
+end
+
+@assert typeof(rcv[1][1][1]) == typeof(_rcv[1][1])
+@assert typeof(snd[1][1]) == typeof(_snd[1])
+
+v = x
+own_values_v = own_values(v)
+own_to_global_v = map(own_to_global,partition(axes(v,1)))
+vals = gather(own_values_v,destination=:all)
+ids = gather(own_to_global_v,destination=:all)
+n = length(v)
+T = eltype(v)
+xx = map(vals,ids) do myvals,myids
+  u = Vector{T}(undef,n)
+  ptu = ptarray(u,length(first(myvals)))
+  for (a,b) in zip(myvals,myids)
+    for k = eachindex(a)
+      ptu[k][b] = a[k]
+    end
+  end
+  ptu
+end |> PartitionedArrays.getany

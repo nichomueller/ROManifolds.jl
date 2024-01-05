@@ -1,3 +1,114 @@
+function PartitionedArrays.allocate_gather_impl(
+  snd::AbstractVector{<:PTArray},
+  destination,
+  ::Type{T}) where T<:AbstractVector
+
+  l = map(snd) do snd
+    length(first(snd))
+  end
+  l_dest = gather(l;destination)
+  function f(l,snd)
+    elT = eltype(snd)
+    ptrs = length_to_ptrs!(pushfirst!(l,one(eltype(l))))
+    ndata = ptrs[end]-1
+    data = Vector{elT}(undef,ndata)
+    ptdata = ptarray(data,length(snd))
+    PTJaggedArray{Vector{elT},Int32}(ptdata,ptrs)
+  end
+  if isa(destination,Integer)
+    function g(l,snd)
+      elT = eltype(snd)
+      ptrs = Vector{Int32}(undef,1)
+      data = Vector{elT}(undef,0)
+      ptdata = ptarray(data,length(snd))
+      PTJaggedArray(ptdata,ptrs)
+    end
+    rcv = map_main(f,l_dest,snd;otherwise=g,main=destination)
+  else
+    @assert destination === :all
+    rcv = map(f,l_dest,snd)
+  end
+  rcv
+end
+
+function PartitionedArrays.gather_impl!(
+  rcv::AbstractVector{<:PTJaggedArray},
+  snd::AbstractVector{<:PTArray},
+  destination,
+  ::Type{T}) where T
+
+  if isa(destination,Integer)
+    @assert length(rcv[destination]) == length(snd)
+    for i in 1:length(snd)
+      rcv[destination][i] .= snd[i]
+    end
+  else
+    @assert destination === :all
+    for j in eachindex(rcv)
+      for i in 1:length(snd)
+        rcv[j][i] .= snd[i]
+      end
+    end
+  end
+  rcv
+end
+
+function PartitionedArrays.allocate_scatter_impl(
+  snd::AbstractVector{<:PTArray},
+  source,
+  ::Type{T}) where T <:AbstractVector
+
+  counts = map(snd) do snd
+    map(length,snd)
+  end
+  counts_scat = scatter(counts;source)
+  S = eltype(T)
+  map(counts_scat) do count
+    Vector{S}(undef,count)
+  end
+end
+
+function PartitionedArrays.scatter_impl!(
+  rcv::AbstractVector{<:PTArray},
+  snd::AbstractVector{<:PTArray},
+  source,
+  ::Type{T}) where T
+
+  @assert source !== :all "Scatter all not implemented"
+  @assert length(snd[source]) == length(rcv)
+  for i in 1:length(snd)
+    rcv[i] = snd[source][i]
+  end
+  rcv
+end
+
+function PartitionedArrays.allocate_emit_impl(
+  snd::AbstractVector{<:PTArray},
+  source,
+  ::Type{T}) where T<:AbstractVector
+
+  @assert source !== :all "Scatter all not implemented"
+  n = map(length,snd)
+  n_all = emit(n;source)
+  S = eltype(T)
+  map(n_all) do n
+    Vector{S}(undef,n)
+  end
+end
+
+function PartitionedArrays.emit_impl!(
+  rcv::AbstractVector{<:PTArray},
+  snd::AbstractVector{<:PTArray},
+  source,
+  ::Type{T}) where T
+
+  @assert source !== :all "Emit all not implemented"
+  for i in eachindex(rcv)
+    rcv[i] = snd[source]
+  end
+  rcv
+end
+
 function PartitionedArrays.assemble_impl!(
   f,
   vector_partition,
