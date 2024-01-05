@@ -1,5 +1,5 @@
 function TransientFETools.allocate_cache(op::PTAlgebraicOperator,rbspace)
-  T = eltype(rbspace)
+  T = eltype(get_vector_type(rbspace))
   N = length(op.μ)
   b = allocate_residual(op,op.u0)
   A = allocate_jacobian(op,op.u0)

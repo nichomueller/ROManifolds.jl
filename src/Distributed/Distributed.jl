@@ -85,6 +85,9 @@ const OPTIONS_MINRES = "-ksp_type minres -ksp_converged_reason -ksp_rtol 1.0e-10
 export OPTIONS_CG_JACOBI,OPTIONS_CG_AMG,OPTIONS_MUMPS,OPTIONS_NEUTON_MUMPS,OPTIONS_MINRES
 export PTJaggedArray
 export PTVectorAssemblyCache
+export DistributedSnapshots
+export DistributedRBSpace
+export project_recast
 
 include("PTArray.jl")
 include("Primitives.jl")
@@ -92,4 +95,5 @@ include("Algebra.jl")
 include("FESpaces.jl")
 include("MultiField.jl")
 include("PTCellData.jl")
+include("SingleRB.jl")
 end

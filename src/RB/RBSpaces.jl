@@ -3,7 +3,6 @@ struct RBSpace{T}
   basis_time::Matrix{T}
 end
 
-Base.eltype(::RBSpace{T}) where T = T
 get_basis_space(rb::RBSpace) = rb.basis_space
 get_basis_time(rb::RBSpace) = rb.basis_time
 num_space_dofs(rb::RBSpace) = size(rb.basis_space,1)
@@ -11,6 +10,7 @@ FEM.num_time_dofs(rb::RBSpace) = size(rb.basis_time,1)
 num_rb_space_ndofs(rb::RBSpace) = size(rb.basis_space,2)
 num_rb_time_ndofs(rb::RBSpace) = size(rb.basis_time,2)
 num_rb_ndofs(rb::RBSpace) = num_rb_time_ndofs(rb)*num_rb_space_ndofs(rb)
+FESpaces.get_vector_type(::RBSpace{T}) where T = Vector{T}
 
 function Utils.save(rbinfo::RBInfo,rb::RBSpace)
   path = joinpath(rbinfo.rb_path,"rb")
@@ -112,11 +112,6 @@ function space_time_projection(
     st_proj_mat[1+(j-1)*nt_row:j*nt_row,1+(i-1)*nt_col:i*nt_col] = st_proj[:,:,(i-1)*ns_row+j]
   end
   return st_proj_mat
-end
-
-function project_recast(mat::AbstractMatrix,rb::RBSpace)
-  rb_proj = space_time_projection(mat,rb)
-  recast(rb_proj,rb)
 end
 
 function TransientFETools.get_algebraic_operator(

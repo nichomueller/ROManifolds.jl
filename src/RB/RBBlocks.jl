@@ -1,7 +1,6 @@
 abstract type RBBlock{T,N} end
 
 Base.length(b::RBBlock) = length(b.blocks)
-Base.eltype(::RBBlock{T,N} where N) where T = T
 Base.ndims(::RBBlock{T,N} where T) where N = N
 Base.getindex(b::RBBlock,i::Int...) = b.blocks[i...]
 Base.iterate(b::RBBlock,args...) = iterate(b.blocks,args...)
@@ -9,6 +8,7 @@ Base.enumerate(b::RBBlock) = enumerate(b.blocks)
 Base.axes(b::RBBlock,i::Int...) = axes(b.blocks,i...)
 Base.lastindex(b::RBBlock) = lastindex(testitem(b))
 Arrays.testitem(b::RBBlock) = testitem(b.blocks)
+FESpaces.get_vector_type(::RBBlock{T,N} where N) where T = Vector{T}
 get_blocks(b) = b.blocks
 
 struct BlockSnapshots{T} <: RBBlock{T,1}
@@ -52,6 +52,11 @@ function Utils.load(rbinfo::BlockRBInfo,T::Type{BlockSnapshots{S}}) where S
   load(path,T)
 end
 
+function get_snapshot_type(fe::MultiFieldFESpace)
+  T = get_vector_type(fe)
+  return Vector{PTArray{T}}
+end
+
 function collect_solutions(
   rbinfo::BlockRBInfo,
   fesolver::PODESolver,
@@ -62,9 +67,9 @@ function collect_solutions(
   params = realization(feop,nparams)
   u0 = get_free_dof_values(uh0(params))
   time_ndofs = num_time_dofs(fesolver)
-  T = get_vector_type(feop.test)
   uμt = PODESolution(fesolver,feop,params,u0,t0,tf)
-  snaps = Vector{Vector{PTArray{T}}}(undef,time_ndofs)
+  T = get_snapshot_type(feop.test)
+  snaps = Vector{T}(undef,time_ndofs)
   println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
   stats = @timed for (snap,n) in uμt
     snaps[n] = split_fields(feop.test,copy(snap))
