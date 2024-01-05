@@ -42,11 +42,6 @@ function Utils.load(rbinfo::RBInfo,T::Type{Snapshots{S}}) where S
   load(path,T)
 end
 
-function get_snapshot_type(fe::SingleFieldFESpace)
-  T = get_vector_type(fe)
-  return PTArray{T}
-end
-
 function collect_solutions(
   rbinfo::RBInfo,
   fesolver::PODESolver,
@@ -58,8 +53,6 @@ function collect_solutions(
   u0 = get_free_dof_values(uh0(params))
   time_ndofs = num_time_dofs(fesolver)
   uμt = PODESolution(fesolver,feop,params,u0,t0,tf)
-  # T = get_snapshot_type(feop.test)
-  # snaps = Vector{T}(undef,time_ndofs)
   println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
   stats = @timed begin
     snaps = map(uμt) do (snap,n)

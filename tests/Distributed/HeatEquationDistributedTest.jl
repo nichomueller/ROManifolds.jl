@@ -93,6 +93,7 @@ stats = @timed begin
     copy(snap)
   end
 end
+Snapshots(snaps)
 # sols = Snapshots(snaps)
 # rbspace = reduced_basis(rbinfo,feop,sols)
 
@@ -105,51 +106,18 @@ y = PVector(values,x.index_partition)
 collect(y)
 collect(x)
 
-snd = own_values(x)
-destination=:all
-T = eltype(snd)
-rcv = allocate_gather(snd;destination)
-@assert size(rcv) == size(snd)
-for j in eachindex(rcv)
-  for i in 1:length(snd)
-    rcv[j][i] .= snd[i]
-  end
+_snaps = map(snaps) do a
+  b = local_views(a)
 end
 
-typeof(rcv[1][1][1])
-typeof(snd[1][1])
+A = [rand(3) for _ = 1:4]
+loc_len = length(first(A))
+B = map(i->getindex.(A,i),1:loc_len)
 
-_snd = own_values(y)
-_T = eltype(_snd)
-_rcv = allocate_gather(_snd;destination)
-@assert size(_rcv) == size(_snd)
-
-typeof(_rcv[1][1])
-typeof(_snd[1])
-
-for j in eachindex(rcv)
-  for i in 1:length(snd)
-    _rcv[j][i] = _snd[i]
+idx = map(part_id,snaps[1].index_partition)
+_snaps = map(idx) do i
+  map(snaps) do a
+    b = local_views(a)
+    b[i]
   end
 end
-
-@assert typeof(rcv[1][1][1]) == typeof(_rcv[1][1])
-@assert typeof(snd[1][1]) == typeof(_snd[1])
-
-v = x
-own_values_v = own_values(v)
-own_to_global_v = map(own_to_global,partition(axes(v,1)))
-vals = gather(own_values_v,destination=:all)
-ids = gather(own_to_global_v,destination=:all)
-n = length(v)
-T = eltype(v)
-xx = map(vals,ids) do myvals,myids
-  u = Vector{T}(undef,n)
-  ptu = ptarray(u,length(first(myvals)))
-  for (a,b) in zip(myvals,myids)
-    for k = eachindex(a)
-      ptu[k][b] = a[k]
-    end
-  end
-  ptu
-end |> PartitionedArrays.getany

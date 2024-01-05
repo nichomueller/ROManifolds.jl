@@ -59,12 +59,13 @@ function PartitionedArrays.allocate_scatter_impl(
   ::Type{T}) where T <:AbstractVector
 
   counts = map(snd) do snd
-    map(length,snd)
+    map(length,first(snd))
   end
   counts_scat = scatter(counts;source)
   S = eltype(T)
-  map(counts_scat) do count
-    Vector{S}(undef,count)
+  map(snd,counts_scat) do snd,count
+    data = Vector{S}(undef,count)
+    ptarray(data,length(snd))
   end
 end
 
@@ -77,7 +78,7 @@ function PartitionedArrays.scatter_impl!(
   @assert source !== :all "Scatter all not implemented"
   @assert length(snd[source]) == length(rcv)
   for i in 1:length(snd)
-    rcv[i] = snd[source][i]
+    rcv[i] .= snd[source][i]
   end
   rcv
 end
@@ -88,11 +89,14 @@ function PartitionedArrays.allocate_emit_impl(
   ::Type{T}) where T<:AbstractVector
 
   @assert source !== :all "Scatter all not implemented"
-  n = map(length,snd)
+  n = map(snd) do snd
+    length(first(snd))
+  end
   n_all = emit(n;source)
   S = eltype(T)
-  map(n_all) do n
-    Vector{S}(undef,n)
+  map(n_all,snd) do n,snd
+    data = Vector{S}(undef,n)
+    ptarray(data,length(snd))
   end
 end
 
@@ -104,7 +108,7 @@ function PartitionedArrays.emit_impl!(
 
   @assert source !== :all "Emit all not implemented"
   for i in eachindex(rcv)
-    rcv[i] = snd[source]
+    rcv[i] .= snd[source]
   end
   rcv
 end

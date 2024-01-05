@@ -52,11 +52,6 @@ function Utils.load(rbinfo::BlockRBInfo,T::Type{BlockSnapshots{S}}) where S
   load(path,T)
 end
 
-function get_snapshot_type(fe::MultiFieldFESpace)
-  T = get_vector_type(fe)
-  return Vector{PTArray{T}}
-end
-
 function collect_solutions(
   rbinfo::BlockRBInfo,
   fesolver::PODESolver,
@@ -71,8 +66,10 @@ function collect_solutions(
   T = get_snapshot_type(feop.test)
   snaps = Vector{T}(undef,time_ndofs)
   println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
-  stats = @timed for (snap,n) in uμt
-    snaps[n] = split_fields(feop.test,copy(snap))
+  stats = @timed begin
+    snaps = map(uμt) do (snap,n)
+      split_fields(feop.test,copy(snap))
+    end
   end
   println("Time marching complete")
   sols = BlockSnapshots(snaps)
