@@ -47,17 +47,16 @@ function PartitionedArrays.assemble_impl!(
 end
 
 function PartitionedArrays.allocate_exchange_impl(
-  snd::Vector{<:PTJaggedArray},
+  snd::AbstractVector{<:PTJaggedArray},
   graph,
   ::Type{T}) where T<:AbstractVector
 
-  N = length(snd[1].data)
-  n_snd = map(snd) do snd
-    map(length,snd.data.array)
-  end
+  N,n_snd = map(snd) do snd
+    length(snd.data),map(length,snd.data.array)
+  end |> tuple_of_arrays
   n_rcv = exchange_fetch(n_snd,graph)
   S = eltype(eltype(eltype(eltype(snd))))
-  rcv = map(n_rcv) do n_rcv
+  rcv = map(N,n_rcv) do N,n_rcv
     ptrs = zeros(Int32,length(n_rcv)+1)
     ptrs[2:end] = n_rcv
     length_to_ptrs!(ptrs)
@@ -70,8 +69,8 @@ function PartitionedArrays.allocate_exchange_impl(
 end
 
 function PartitionedArrays.exchange_impl!(
-  rcv::Vector{<:PTJaggedArray},
-  snd::Vector{<:PTJaggedArray},
+  rcv::AbstractVector{<:PTJaggedArray},
+  snd::AbstractVector{<:PTJaggedArray},
   graph,
   ::Type{T}) where T<:AbstractVector
 

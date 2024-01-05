@@ -1,8 +1,8 @@
 function Base.materialize(b::PBroadcasted{<:AbstractArray{<:PTBroadcasted}})
   own_values_out = map(Base.materialize,b.own_values)
   T = eltype(eltype(own_values_out))
-  pta = ptarray(zeros(T,length(first(b.index_partition))),length(first(b.own_values).array))
-  vector_partition = map(b.index_partition) do indices
+  vector_partition = map(b.own_values,b.index_partition) do values,indices
+    pta = ptarray(zeros(T,length(indices)),length(values.array))
     allocate_local_values(pta,T,indices)
   end
   a = PVector(vector_partition,b.index_partition)
@@ -190,7 +190,7 @@ function PartitionedArrays.p_sparse_matrix_cache_impl(
           ptrs[owner_to_i[owner]] += 1
       end
     end
-    PartitionedArrays.rewind_ptrs!(ptrs)
+    rewind_ptrs!(ptrs)
     k_snd = JaggedArray(k_snd_data,ptrs)
     gi_snd = JaggedArray(gi_snd_data,ptrs)
     gj_snd = JaggedArray(gj_snd_data,ptrs)
@@ -354,7 +354,7 @@ end
 function PartitionedArrays.assemble_coo!(
   I,
   J,
-  V::Vector{<:PTArray},
+  V::AbstractVector{<:PTArray},
   row_partition)
 
   function setup_snd(part,parts_snd,row_lids,coo_values)
@@ -486,10 +486,6 @@ end
 
 function Base.setindex!(a::PTJaggedArray,v,i::Int)
   @notimplemented "Iterate over the inner jagged arrays instead"
-end
-
-function Base.show(io::IO,a::PTJaggedArray{A,B}) where {A,B}
-  print(io,"PTJaggedArray{$A,$B}")
 end
 
 PartitionedArrays.jagged_array(data::PTArray,ptrs::Vector) = PTJaggedArray(data,ptrs)
