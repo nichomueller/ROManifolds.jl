@@ -17,11 +17,16 @@ function num_time_dofs(fesolver::PThetaMethod)
 end
 
 function get_times(fesolver::PThetaMethod)
-  θ = fesolver.θ
   dt = fesolver.dt
   t0 = fesolver.t0
   tf = fesolver.tf
-  collect(t0:dt:tf-dt) .+ dt*θ
+  collect(t0:dt:tf-dt)
+end
+
+function get_stencil_times(fesolver::PThetaMethod)
+  θ = fesolver.θ
+  dt = fesolver.dt
+  get_times(fesolver) .+ dt*θ
 end
 
 function TransientFETools.get_algebraic_operator(
@@ -31,7 +36,7 @@ function TransientFETools.get_algebraic_operator(
   params::Table)
 
   dtθ = fesolver.θ == 0.0 ? fesolver.dt : fesolver.dt*fesolver.θ
-  times = get_times(fesolver)
+  times = get_stencil_times(fesolver)
   ode_cache = allocate_cache(feop,params,times)
   ode_cache = update_cache!(ode_cache,feop,params,times)
   sols_cache = zero(sols)
@@ -46,6 +51,8 @@ struct PODESolution
   t0::Real
   tf::Real
 end
+
+Base.length(sol::PODESolution) = Int((sol.tf-sol.t0)/sol.solver.dt)
 
 function Base.iterate(sol::PODESolution)
   uf = copy(sol.u0)

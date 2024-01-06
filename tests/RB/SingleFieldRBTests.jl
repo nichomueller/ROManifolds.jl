@@ -32,7 +32,7 @@ nparams = 50
 ntests = 10
 
 fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
-times = get_times(fesolver)
+times = get_stencil_times(fesolver)
 
 ϵ = 1e-4
 norm_style = :l2

@@ -121,7 +121,7 @@ function TransientFETools.get_algebraic_operator(
   params::Table) where T
 
   dtθ = fesolver.θ == 0.0 ? fesolver.dt : fesolver.dt*fesolver.θ
-  times = get_times(fesolver)
+  times = get_stencil_times(fesolver)
   bs = get_basis_space(rbspace)
   ns = num_rb_space_ndofs(rbspace)
 

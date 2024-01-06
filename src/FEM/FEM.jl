@@ -165,6 +165,7 @@ export PThetaMethod
 export PODESolution
 export num_time_dofs
 export get_times
+export get_stencil_times
 export _check_convergence
 include("PTSolvers.jl")
 

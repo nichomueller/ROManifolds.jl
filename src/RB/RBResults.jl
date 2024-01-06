@@ -135,7 +135,7 @@ end
 struct RBResults{T}
   name::Symbol
   params::Table
-  sol::PTArray{Matrix{T}}
+  sol::PTArray{<:Matrix{T}}
   sol_approx::PTArray{Matrix{T}}
   relative_err::Vector{T}
   fem_stats::ComputationInfo
@@ -144,12 +144,12 @@ end
 
 function RBResults(
   params::Table,
-  sol::PTArray{Matrix{T}},
-  sol_approx::PTArray{Matrix{T}},
+  sol::PTArray,
+  sol_approx::PTArray,
   fem_stats::ComputationInfo,
   rb_stats::ComputationInfo,
   args...;
-  name=:vel) where T
+  name=:vel)
 
   relative_err = compute_relative_error(sol,sol_approx,args...)
   RBResults(name,params,sol,sol_approx,relative_err,fem_stats,rb_stats)
@@ -254,27 +254,37 @@ function plot_results(
   rbinfo::RBInfo,
   feop::PTFEOperator,
   fesolver::PODESolver,
-  results::RBResults)
+  results::RBResults;
+  entry=1)
 
   test = get_test(feop)
   trial = get_trial(feop)
   trian = get_triangulation(test)
-  times = collect(fesolver.t0:fesolver.dt:fesolver.tf-fesolver.dt)
+  times = get_times(fesolver)
 
   name = results.name
-  μ = results.params[1]
-  sol = results.sol[1]
-  sol_approx = results.sol_approx[1]
+  μ = results.params[entry]
+  sol = results.sol[entry]
+  sol_approx = results.sol_approx[entry]
   pointwise_err = abs.(sol-sol_approx)
+
+  trialμt = trial(μ,times)
+  fsol = FEFunction(trialμt,sol)
+  fsol_approx = FEFunction(trialμt,sol_approx)
+  ferr = FEFunction(trialμt,pointwise_err)
 
   plt_dir = joinpath(rbinfo.rb_path,"plots")
   create_dir(plt_dir)
-  for (it,t) in enumerate(times)
-    fsol = FEFunction(trial(μ,t),sol[:,it])
-    fsol_approx = FEFunction(trial(μ,t),sol_approx[:,it])
-    ferr = FEFunction(trial(μ,t),pointwise_err[:,it])
-    writevtk(trian,joinpath(plt_dir,"$(name)_$(it).vtu"),cellfields=["$name"=>fsol])
-    writevtk(trian,joinpath(plt_dir,"$(name)_approx_$(it).vtu"),cellfields=["$(name)_approx"=>fsol_approx])
-    writevtk(trian,joinpath(plt_dir,"$(name)_err_$(it).vtu"),cellfields=["$(name)_err"=>ferr])
+
+  _plot(plt_dir,"$name",trian,fsol)
+  _plot(plt_dir,"$(name)_approx",trian,fsol_approx)
+  _plot(plt_dir,"$(name)_err",trian,ferr)
+end
+
+function _plot(path,name,trian,x)
+  createpvd(path) do pvd
+    for (xt,t) in x
+      pvd[t] = createvtk(trian,joinpath(path,"_$t.vtu"),cellfields=[name=>xt])
+    end
   end
 end

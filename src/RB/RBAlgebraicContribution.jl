@@ -72,7 +72,7 @@ function Utils.load(rbinfo::RBInfo,::Type{RBVecAlgebraicContribution{T}},args...
 end
 
 function Utils.save(rbinfo::RBInfo,a::Vector{<:RBMatAlgebraicContribution})
-  for i = eachindex(a)
+  map(eachindex(a)) do i
     path = joinpath(rbinfo.rb_path,"rb_lhs_$i")
     save_algebraic_contrib(path,a[i])
   end
@@ -81,12 +81,10 @@ end
 function Utils.load(rbinfo::RBInfo,::Type{Vector{RBMatAlgebraicContribution{T}}},args...) where T
   S = RBMatAlgebraicContribution{T}
   njacs = num_active_dirs(rbinfo.rb_path)
-  ad_jacs = Vector{S}(undef,njacs)
-  for i = 1:njacs
+  map(1:njacs) do i
     path = joinpath(rbinfo.rb_path,"rb_lhs_$i")
-    ad_jacs[i] = load_algebraic_contrib(path,S,args...)
+    load_algebraic_contrib(path,S,args...)
   end
-  ad_jacs
 end
 
 function Utils.save(rbinfo::RBInfo,a::NTuple{2,RBVecAlgebraicContribution})
@@ -106,33 +104,26 @@ function Utils.load(rbinfo::RBInfo,::Type{NTuple{2,RBVecAlgebraicContribution{T}
   a_lin,a_nlin
 end
 
-function Utils.save(rbinfo::RBInfo,a::NTuple{3,Vector{<:RBMatAlgebraicContribution}})
-  a_lin,a_nlin,a_aux = a
-  for i = eachindex(a_lin)
+function Utils.save(rbinfo::RBInfo,a::NTuple{2,Vector{<:RBMatAlgebraicContribution}})
+  a_lin,a_nlin = a
+  map(eachindex(a_lin)) do i
     path_lin = joinpath(rbinfo.rb_path,"rb_lhs_lin_$i")
     path_nlin = joinpath(rbinfo.rb_path,"rb_lhs_nlin_$i")
-    path_aux = joinpath(rbinfo.rb_path,"rb_lhs_aux_$i")
     save_algebraic_contrib(path_lin,a_lin[i])
     save_algebraic_contrib(path_nlin,a_nlin[i])
-    save_algebraic_contrib(path_aux,a_aux[i])
   end
 end
 
-function Utils.load(rbinfo::RBInfo,::Type{NTuple{3,Vector{RBMatAlgebraicContribution{T}}}},args...) where T
+function Utils.load(rbinfo::RBInfo,::Type{NTuple{2,Vector{RBMatAlgebraicContribution{T}}}},args...) where T
   S = RBMatAlgebraicContribution{T}
   njacs = num_active_dirs(rbinfo.rb_path)
-  ad_jacs_lin = Vector{S}(undef,njacs)
-  ad_jacs_nlin = Vector{S}(undef,njacs)
-  ad_jacs_aux = Vector{S}(undef,njacs)
-  for i = 1:njacs
+  map(1:njacs) do i
     path_lin = joinpath(rbinfo.rb_path,"rb_lhs_lin_$i")
     path_nlin = joinpath(rbinfo.rb_path,"rb_lhs_nlin_$i")
-    path_aux = joinpath(rbinfo.rb_path,"rb_lhs_aux_$i")
-    ad_jacs_lin[i] = load_algebraic_contrib(path_lin,S,args...)
-    ad_jacs_nlin[i] = load_algebraic_contrib(path_nlin,S,args...)
-    ad_jacs_aux[i] = load_algebraic_contrib(path_aux,S,args...)
-  end
-  ad_jacs_lin,ad_jacs_nlin,ad_jacs_aux
+    ad_jacs_lin = load_algebraic_contrib(path_lin,S,args...)
+    ad_jacs_nlin = load_algebraic_contrib(path_nlin,S,args...)
+    ad_jacs_lin,ad_jacs_nlin
+  end |> tuple_of_arrays
 end
 
 function collect_compress_rhs_lhs(rbinfo,feop::PTFEOperator{Affine},fesolver,rbspace,params)
@@ -176,15 +167,12 @@ end
 function collect_compress_lhs(
   rbinfo::RBInfo,
   op::PTAlgebraicOperator,
-  rbspace::RBSpace{T};
-  kwargs...) where T
+  rbspace::RBSpace;
+  kwargs...)
 
-  njacs = length(op.feop.jacs)
-  ad_jacs = Vector{RBMatAlgebraicContribution{T}}(undef,njacs)
-  for i = 1:njacs
-    ad_jacs[i] = _collect_compress_lhs(rbinfo,op,rbspace,rbspace;i,kwargs...)
+  map(eachindex(op.feop.jacs)) do i
+    _collect_compress_lhs(rbinfo,op,rbspace,rbspace;i,kwargs...)
   end
-  return ad_jacs
 end
 
 function _collect_compress_lhs(
@@ -224,72 +212,72 @@ function collect_rhs_contributions!(
   cache,
   rbinfo::RBInfo,
   op::PTAlgebraicOperator,
-  rbres::RBVecAlgebraicContribution{T},
-  rbspace::RBSpace{T}) where T
+  rbres::RBVecAlgebraicContribution,
+  rbspace::RBSpace)
 
   mdeim_cache,rb_cache = cache
   st_mdeim = rbinfo.st_mdeim
   k = RBVecContributionMap()
   if isempty(rbres)
-    return zero_rb_contribution(k,rbinfo,rbspace)
+    zero_rb_contribution(k,rbinfo,rbspace)
   else
     collect_cache,coeff_cache = mdeim_cache
     res = collect_reduced_residuals!(collect_cache,op,rbres)
-    rb_res_contribs = Vector{PTArray{Vector{T}}}(undef,length(rbres))
-    for i = eachindex(rbres)
+    rb_res_contribs = map(eachindex(rbres)) do i
       coeff = rb_coefficient!(coeff_cache,rbres[i],res[i];st_mdeim)
-      rb_res_contribs[i] = rb_contribution!(rb_cache,k,rbres[i],coeff)
+      rb_contribution!(rb_cache,k,rbres[i],coeff)
     end
+    sum(rb_res_contribs)
   end
-  return sum(rb_res_contribs)
 end
 
 function collect_lhs_contributions!(
   cache,
   rbinfo::RBInfo,
   op::PTAlgebraicOperator,
-  rbjacs::Vector{RBMatAlgebraicContribution{T}},
-  rbspace::RBSpace{T}) where T
+  rbjacs::Vector{<:RBMatAlgebraicContribution},
+  rbspace::RBSpace)
 
-  njacs = length(rbjacs)
-  rb_jacs_contribs = Vector{PTArray{Matrix{T}}}(undef,njacs)
-  for i = 1:njacs
-    rb_jac_i = rbjacs[i]
-    rb_jacs_contribs[i] = collect_lhs_contributions!(cache,rbinfo,op,rb_jac_i,rbspace,rbspace;i)
+  map(eachindex(rbjacs)) do i
+    collect_lhs_contributions!(cache,rbinfo,op,rbjacs[i],rbspace,rbspace;i)
   end
-  return rb_jacs_contribs
 end
 
 function collect_lhs_contributions!(
   cache,
   rbinfo::RBInfo,
   op::PTAlgebraicOperator,
-  rbjac::RBMatAlgebraicContribution{T},
-  rbspace_row::RBSpace{T},
-  rbspace_col::RBSpace{T};
-  kwargs...) where T
+  rbjac::RBMatAlgebraicContribution,
+  rbspace_row::RBSpace,
+  rbspace_col::RBSpace;
+  kwargs...)
 
   mdeim_cache,rb_cache = cache
   st_mdeim = rbinfo.st_mdeim
   k = RBMatContributionMap()
   if isempty(rbjac)
-    return zero_rb_contribution(k,rbinfo,rbspace_row,rbspace_col)
+    zero_rb_contribution(k,rbinfo,rbspace_row,rbspace_col)
   else
     collect_cache,coeff_cache = mdeim_cache
     jac = collect_reduced_jacobians!(collect_cache,op,rbjac;kwargs...)
-    rb_jac_contribs = Vector{PTArray{Matrix{T}}}(undef,length(rbjac))
-    for i = eachindex(rbjac)
+    rb_jac_contribs = map(eachindex(rbjac)) do i
       coeff = rb_coefficient!(coeff_cache,rbjac[i],jac[i];st_mdeim)
-      rb_jac_contribs[i] = rb_contribution!(rb_cache,k,rbjac[i],coeff)
+      rb_contribution!(rb_cache,k,rbjac[i],coeff)
     end
+    sum(rb_jac_contribs)
   end
-  return sum(rb_jac_contribs)
 end
 
-function collect_reduced_residuals!(cache,op::PTAlgebraicOperator,rbres::RBVecAlgebraicContribution)
+function collect_reduced_residuals!(
+  cache,op::PTAlgebraicOperator,
+  rbres::RBVecAlgebraicContribution)
   collect_reduced_residuals!(cache,op,rbres.affine_decompositions)
 end
 
-function collect_reduced_jacobians!(cache,op::PTAlgebraicOperator,rbres::RBMatAlgebraicContribution;kwargs...)
-  collect_reduced_jacobians!(cache,op,rbres.affine_decompositions;kwargs...)
+function collect_reduced_jacobians!(
+  cache,
+  op::PTAlgebraicOperator,
+  rbjac::RBMatAlgebraicContribution;
+  kwargs...)
+  collect_reduced_jacobians!(cache,op,rbjac.affine_decompositions;kwargs...)
 end

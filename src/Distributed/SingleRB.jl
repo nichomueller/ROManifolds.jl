@@ -1,3 +1,21 @@
+function FEM.get_L2_norm_matrix(
+  trial::DistributedSingleFieldFESpace,
+  test::DistributedSingleFieldFESpace)
+
+  map(local_views(trial),local_views(test)) do trial,test
+    get_L2_norm_matrix(trial,test)
+  end
+end
+
+function FEM.get_H1_norm_matrix(
+  trial::DistributedSingleFieldFESpace,
+  test::DistributedSingleFieldFESpace)
+
+  map(local_views(trial),local_views(test)) do trial,test
+    get_H1_norm_matrix(trial,test)
+  end
+end
+
 struct DistributedSnapshots{T<:AbstractVector{<:Snapshots}}
   snaps::T
 end
@@ -6,12 +24,18 @@ function RB.Snapshots(snaps::Vector{<:PVector{<:PTArray}})
   s1 = first(snaps)
   parts = map(part_id,s1.index_partition)
   snap_parts = map(parts) do part
-    snaps = map(snaps) do si
+    snap_part = map(snaps) do si
       local_views(si)[part]
     end
-    Snapshots(snaps)
+    Snapshots(snap_part)
   end
   DistributedSnapshots(snap_parts)
+end
+
+function Base.getindex(s::DistributedSnapshots,idx)
+  map(s.snaps) do snaps
+    getindex(snaps,idx)
+  end
 end
 
 struct DistributedRBSpace{T<:AbstractVector{<:RBSpace}}
@@ -19,8 +43,8 @@ struct DistributedRBSpace{T<:AbstractVector{<:RBSpace}}
 end
 
 function RB.reduced_basis(rbinfo::RBInfo,feop::PTFEOperator,s::DistributedSnapshots)
-  rbspace = map(snaps.snaps) do s
-    reduced_basis(rbinfo,feop,s)
+  rbspace = map(s.snaps) do snaps
+    reduced_basis(rbinfo,feop,snaps)
   end
   DistributedRBSpace(rbspace)
 end

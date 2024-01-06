@@ -79,6 +79,7 @@ export PThetaMethod
 export PODESolution
 export num_time_dofs
 export get_times
+export get_stencil_times
 export collect_solutions
 export collect_residuals_for_trian
 export collect_jacobians_for_trian

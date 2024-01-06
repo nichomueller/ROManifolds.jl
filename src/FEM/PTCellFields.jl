@@ -41,6 +41,37 @@ function FESpaces.FEFunction(
   SingleFieldPTFEFunction(cell_field,cell_vals,free_values,dirichlet_values,fs)
 end
 
+function Base.iterate(f::SingleFieldPTFEFunction)
+  state = 1
+
+  data = getindex.(get_data(f),state)
+  cell_field = GenericCellField(data,get_triangulation(f),DomainStyle(f))
+  cell_dof_values = f.cell_dof_values[state]
+  free_values = f.free_values[state]
+  dirichlet_values = f.dirichlet_values[state]
+  fe_space = TrialFESpace(dirichlet_values,f.fe_space.space)
+  sf = SingleFieldFEFunction(cell_field,cell_dof_values,free_values,dirichlet_values,fe_space)
+
+  (sf,state),state
+end
+
+function Base.iterate(f::SingleFieldPTFEFunction,state)
+  if state >= length(f.free_values)
+    return nothing
+  end
+  state += 1
+
+  data = getindex.(get_data(f),state)
+  cell_field = GenericCellField(data,get_triangulation(f),DomainStyle(f))
+  cell_dof_values = f.cell_dof_values[state]
+  free_values = f.free_values[state]
+  dirichlet_values = f.dirichlet_values[state]
+  fe_space = TrialFESpace(dirichlet_values,f.fe_space.space)
+  sf = SingleFieldFEFunction(cell_field,cell_dof_values,free_values,dirichlet_values,fe_space)
+
+  (sf,state),state
+end
+
 function TransientFETools.TransientCellField(single_field::SingleFieldPTFEFunction,derivatives::Tuple)
   TransientSingleFieldCellField(single_field,derivatives)
 end

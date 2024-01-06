@@ -13,16 +13,14 @@ get_blocks(b) = b.blocks
 
 struct BlockSnapshots{T} <: RBBlock{T,1}
   blocks::Vector{Snapshots{T}}
-end
 
-function BlockSnapshots(v::Vector{Vector{PTArray{T}}}) where T
-  nblocks = length(testitem(v))
-  blocks = Vector{Snapshots{T}}(undef,nblocks)
-  @inbounds for n in 1:nblocks
-    vn = map(x->getindex(x,n),v)
-    blocks[n] = Snapshots(vn)
+  function BlockSnapshots(snaps::Vector{<:AbstractVector{<:PTArray}})
+    nblocks = length(testitem(snaps))
+    block_snaps = map(1:nblocks) do i
+      Snapshots(getindex.(snaps,i))
+    end
+    BlockSnapshots(block_snaps)
   end
-  BlockSnapshots(blocks)
 end
 
 function Base.getindex(s::BlockSnapshots,idx::UnitRange{Int})
@@ -47,9 +45,9 @@ function Utils.save(rbinfo::BlockRBInfo,s::BlockSnapshots)
   save(path,s)
 end
 
-function Utils.load(rbinfo::BlockRBInfo,T::Type{BlockSnapshots{S}}) where S
+function Utils.load(rbinfo::BlockRBInfo,::Type{BlockSnapshots{T}}) where T
   path = joinpath(rbinfo.fe_path,"fesnaps")
-  load(path,T)
+  load(path,BlockSnapshots{AbstractVector{<:PTArray{T}}})
 end
 
 function collect_solutions(
@@ -57,14 +55,11 @@ function collect_solutions(
   fesolver::PODESolver,
   feop::PTFEOperator)
 
-  uh0,t0,tf = fesolver.uh0,fesolver.t0,fesolver.tf
   nparams = rbinfo.nsnaps_state+rbinfo.nsnaps_test
   params = realization(feop,nparams)
-  u0 = get_free_dof_values(uh0(params))
+  u0 = get_free_dof_values(fesolver.uh0(params))
   time_ndofs = num_time_dofs(fesolver)
-  uμt = PODESolution(fesolver,feop,params,u0,t0,tf)
-  T = get_snapshot_type(feop.test)
-  snaps = Vector{T}(undef,time_ndofs)
+  uμt = PODESolution(fesolver,feop,params,u0,fesolver.t0,fesolver.tf)
   println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
   stats = @timed begin
     snaps = map(uμt) do (snap,n)
@@ -344,7 +339,7 @@ function Utils.load(rbinfo::BlockRBInfo,::Type{BlockRBVecAlgebraicContribution{T
 end
 
 function Utils.save(rbinfo::BlockRBInfo,a::Vector{<:BlockRBMatAlgebraicContribution})
-  for i = eachindex(a)
+  map(eachindex(a)) do i
     path = joinpath(rbinfo.rb_path,"rb_lhs_$i")
     save_algebraic_contrib(path,a[i])
   end
@@ -353,12 +348,10 @@ end
 function Utils.load(rbinfo::BlockRBInfo,::Type{Vector{BlockRBMatAlgebraicContribution{T}}},args...) where T
   S = BlockRBMatAlgebraicContribution{T}
   njacs = num_active_dirs(rbinfo.rb_path)
-  ad_jacs = Vector{S}(undef,njacs)
-  for i = 1:njacs
+  map(1:njacs) do i
     path = joinpath(rbinfo.rb_path,"rb_lhs_$i")
-    ad_jacs[i] = load_algebraic_contrib(path,S,args...)
+    load_algebraic_contrib(path,S,args...)
   end
-  ad_jacs
 end
 
 function Utils.save(rbinfo::BlockRBInfo,a::NTuple{2,BlockRBVecAlgebraicContribution})
@@ -379,32 +372,25 @@ function Utils.load(rbinfo::BlockRBInfo,::Type{NTuple{2,BlockRBVecAlgebraicContr
 end
 
 function Utils.save(rbinfo::BlockRBInfo,a::NTuple{3,Vector{<:BlockRBMatAlgebraicContribution}})
-  a_lin,a_nlin,a_aux = a
-  for i = eachindex(a_lin)
+  a_lin,a_nlin = a
+  map(eachindex(a_lin)) do i
     path_lin = joinpath(rbinfo.rb_path,"rb_lhs_lin_$i")
     path_nlin = joinpath(rbinfo.rb_path,"rb_lhs_nlin_$i")
-    path_aux = joinpath(rbinfo.rb_path,"rb_lhs_aux_$i")
     save_algebraic_contrib(path_lin,a_lin[i])
     save_algebraic_contrib(path_nlin,a_nlin[i])
-    save_algebraic_contrib(path_aux,a_aux[i])
   end
 end
 
 function Utils.load(rbinfo::BlockRBInfo,::Type{NTuple{3,Vector{BlockRBMatAlgebraicContribution{T}}}},args...) where T
   S = BlockRBMatAlgebraicContribution{T}
   njacs = num_active_dirs(rbinfo.rb_path)
-  ad_jacs_lin = Vector{S}(undef,njacs)
-  ad_jacs_nlin = Vector{S}(undef,njacs)
-  ad_jacs_aux = Vector{S}(undef,njacs)
-  for i = 1:njacs
+  map(1:njacs) do i
     path_lin = joinpath(rbinfo.rb_path,"rb_lhs_lin_$i")
     path_nlin = joinpath(rbinfo.rb_path,"rb_lhs_nlin_$i")
-    path_aux = joinpath(rbinfo.rb_path,"rb_lhs_aux_$i")
-    ad_jacs_lin[i] = load_algebraic_contrib(path_lin,S,args...)
-    ad_jacs_nlin[i] = load_algebraic_contrib(path_nlin,S,args...)
-    ad_jacs_aux[i] = load_algebraic_contrib(path_aux,S,args...)
-  end
-  ad_jacs_lin,ad_jacs_nlin,ad_jacs_aux
+    ad_jacs_lin = load_algebraic_contrib(path_lin,S,args...)
+    ad_jacs_nlin = load_algebraic_contrib(path_nlin,S,args...)
+    ad_jacs_lin,ad_jacs_nlin
+  end |> tuple_of_arrays
 end
 
 function collect_compress_rhs(
