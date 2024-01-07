@@ -277,7 +277,7 @@ function save_algebraic_contrib(path::String,a::BlockRBVecAlgebraicContribution)
   create_dir(path)
   tpath = joinpath(path,"touched")
   save(tpath,a.touched)
-  for row in 1:length(a)
+  map(eachindex(a)) do row
     if a.touched[row]
       rpath = joinpath(path,"block_$row")
       save_algebraic_contrib(rpath,a.blocks[row])
@@ -289,7 +289,7 @@ function save_algebraic_contrib(path::String,a::BlockRBMatAlgebraicContribution)
   create_dir(path)
   tpath = joinpath(path,"touched")
   save(tpath,a.touched)
-  for (row,col) in index_pairs(length(a),length(a))
+  map(index_pairs(length(a),length(a))) do row,col
     if a.touched[row,col]
       adpath = joinpath(path,"block_$(row)_$(col)")
       save_algebraic_contrib(adpath,a.blocks[row,col])

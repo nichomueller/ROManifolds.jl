@@ -54,27 +54,21 @@ function recast(x::AbstractVector,rb::RBSpace)
   return xrb
 end
 
-function recast(x::PTArray,rb::RBSpace{T}) where T
-  time_ndofs = num_time_dofs(rb)
-  nparams = length(x)
-  array = Vector{Vector{T}}(undef,time_ndofs*nparams)
-  @inbounds for i = 1:nparams
-    array[(i-1)*time_ndofs+1:i*time_ndofs] = recast(x[i],rb)
+function recast(x::PTArray,rb::RBSpace)
+  array = map(eachindex(x)) do xi
+    recast(xi,rb)
   end
-  PTArray(array)
+  PTArray(array...)
 end
 
-function space_time_projection(x::PTArray,rb::RBSpace{T}) where T
+function space_time_projection(x::PTArray,rb::RBSpace)
   time_ndofs = num_time_dofs(rb)
   nparams = Int(length(x)/time_ndofs)
-
-  array = Vector{Vector{T}}(undef,nparams)
-  @inbounds for np = 1:nparams
+  array = map(1:nparams) do np
     x_np = stack(x[(np-1)*time_ndofs+1:np*time_ndofs])
-    array[np] = space_time_projection(x_np,rb)
+    space_time_projection(x_np,rb)
   end
-
-  return PTArray(array)
+  PTArray(array)
 end
 
 function space_time_projection(mat::AbstractMatrix,rb::RBSpace)

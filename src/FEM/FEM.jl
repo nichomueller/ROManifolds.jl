@@ -86,6 +86,7 @@ import Gridap.TensorValues: inner
 import Gridap.TensorValues: outer
 import Gridap.TensorValues: double_contraction
 import Gridap.TensorValues: symmetric_part
+import PartitionedArrays: tuple_of_arrays
 
 export Table
 export Affine

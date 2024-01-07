@@ -123,12 +123,34 @@ end
 #   end
 # end
 
-function myplot(sol::TempType,trian::Triangulation)
-  createpvd("sol") do pvd
-    for (x,t) in sol
-      pvd[t] = createvtk(trian,"sol_$t"*".vtu",cellfields=["u"=>x])
-    end
+function _plot(path,name,trian,x)
+  for (uₕ,t) in x
+    writevtk(trian,joinpath(path,"_$t.vtu"),cellfields=[name=>uₕ])
   end
+end
+
+import GridapDistributed: DistributedCellField
+function Base.iterate(f::DistributedCellField{<:Vector{<:SingleFieldPTFEFunction}})
+  fit,nit = map(local_views(f)) do f
+    first(iterate(f))
+  end |> tuple_of_arrays
+  return (fit,first(nit)),first(nit)
+end
+
+function Base.iterate(f::DistributedCellField{<:Vector{<:SingleFieldPTFEFunction}},state)
+  fn = map(local_views(f)) do f
+    iterate(f,state)
+  end
+  if isa(fn,AbstractVector{Nothing})
+    return nothing
+  else
+    fit,nit = tuple_of_arrays(fn)
+    return (first.(fit),first(nit)),first(nit)
+  end
+end
+
+for (u,t) in uh
+  println(t)
 end
 
 μ = params[1]
@@ -139,9 +161,7 @@ trial0 = trial(μ,times)
 arr = PVector(sol,partition(trial0.gids))
 uh = FEFunction(trial0,arr)
 
-for (it,t) in enumerate(times)
-  uht =
-end
+_plot(joinpath("plots/ptsol"),"u",Ω,uh)
 
 function main_gridap(ranks,μ)
   domain = (0,1,0,1)

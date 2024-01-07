@@ -555,13 +555,12 @@ function FESpaces.interpolate_dirichlet(objects,fe::MultiFieldPFESpace)
 end
 
 function FESpaces.EvaluationFunction(fe::MultiFieldPFESpace,free_values::PTArray)
-  blocks = map(eachindex(fe.spaces)) do i
+  free_values,fe_functions = map(eachindex(fe.spaces)) do i
     free_values_i = restrict_to_field(fe,free_values,i)
     fe_function_i = EvaluationFunction(fe.spaces[i],free_values_i)
     free_values_i,fe_function_i
-  end
-  free_values = vcat(first.(blocks)...)
-  fe_functions = last.(blocks)
+  end |> tuple_of_arrays
+  free_values = vcat(free_values...)
   PTMultiFieldFEFunction(free_values,fe,fe_functions)
 end
 

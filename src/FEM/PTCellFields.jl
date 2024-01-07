@@ -46,7 +46,7 @@ function Base.iterate(f::SingleFieldPTFEFunction)
 
   data = getindex.(get_data(f),state)
   cell_field = GenericCellField(data,get_triangulation(f),DomainStyle(f))
-  cell_dof_values = f.cell_dof_values[state]
+  cell_dof_values = getindex.(f.cell_dof_values,state)
   free_values = f.free_values[state]
   dirichlet_values = f.dirichlet_values[state]
   fe_space = TrialFESpace(dirichlet_values,f.fe_space.space)
@@ -63,7 +63,7 @@ function Base.iterate(f::SingleFieldPTFEFunction,state)
 
   data = getindex.(get_data(f),state)
   cell_field = GenericCellField(data,get_triangulation(f),DomainStyle(f))
-  cell_dof_values = f.cell_dof_values[state]
+  cell_dof_values = getindex.(f.cell_dof_values,state)
   free_values = f.free_values[state]
   dirichlet_values = f.dirichlet_values[state]
   fe_space = TrialFESpace(dirichlet_values,f.fe_space.space)

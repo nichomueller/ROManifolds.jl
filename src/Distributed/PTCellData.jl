@@ -1,12 +1,11 @@
 function FESpaces.get_triangulation(meas::DistributedMeasure)
   @assert false
-  trian_model = map(meas.measures) do m
+  trian,model = map(meas.measures) do m
     trian = m.quad.trian
     model = get_background_model(trian)
     trian,model
-  end
-  trian = first.(trian_model)
-  model = DistributedDiscreteModel(last.(trian_model))
+  end |> tuple_of_arrays
+  model = DistributedDiscreteModel(model)
   DistributedTriangulation(trian,model)
 end
 

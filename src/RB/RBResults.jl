@@ -121,8 +121,7 @@ function nearest_neighbor(
   nparams_train = length(params_train)
   ntimes = Int(length(sols_train)/nparams_train)
   kdtree = KDTree(map(x -> SVector(Tuple(x)),params_train))
-  idx_dist = map(x -> nn(kdtree,SVector(Tuple(x))),params_test)
-  idx = first.(idx_dist)
+  idx, = map(x -> nn(kdtree,SVector(Tuple(x))),params_test) |> tuple_of_arrays
   nparams_test = length(params_test)
   array = Vector{T}(undef,nparams_test*ntimes)
   @inbounds for n = 1:nparams_test
@@ -135,8 +134,8 @@ end
 struct RBResults{T}
   name::Symbol
   params::Table
-  sol::PTArray{<:Matrix{T}}
-  sol_approx::PTArray{Matrix{T}}
+  sol::AbstractVector
+  sol_approx::AbstractVector
   relative_err::Vector{T}
   fem_stats::ComputationInfo
   rb_stats::ComputationInfo
@@ -151,8 +150,14 @@ function RBResults(
   args...;
   name=:vel)
 
-  relative_err = compute_relative_error(sol,sol_approx,args...)
-  RBResults(name,params,sol,sol_approx,relative_err,fem_stats,rb_stats)
+  nparams = length(params)
+  ntimes = Int(length(sol)/nparams)
+  _sol,_sol_approx = map(eachindex(params)) do np
+    idx = (np-1)*ntimes+1:np*ntimes
+    sol[idx],sol_approx[idx]
+  end |> tuple_of_arrays
+  relative_err = compute_relative_error(_sol,_sol_approx,args...)
+  RBResults(name,params,_sol,_sol_approx,relative_err,fem_stats,rb_stats)
 end
 
 Base.length(r::RBResults) = length(r.params)
@@ -201,31 +206,19 @@ function post_process(
 
   nparams = length(params)
   norm_matrix = get_norm_matrix(rbinfo,feop)
-  _sol = space_time_matrices(sol;nparams)
-  _sol_approx = space_time_matrices(sol_approx;nparams)
   fem_stats = load(rbinfo,ComputationInfo)
   rb_stats = ComputationInfo(stats,nparams)
-  results = RBResults(params,_sol,_sol_approx,fem_stats,rb_stats,norm_matrix)
+  results = RBResults(params,sol,sol_approx,fem_stats,rb_stats,norm_matrix)
   if show_results
     show(results)
   end
   return results
 end
 
-function space_time_matrices(sol::PTArray{Vector{T}};nparams=length(sol)) where T
-  mat = stack(get_array(sol))
-  ntimes = Int(size(mat,2)/nparams)
-  array = Vector{Matrix{eltype(T)}}(undef,nparams)
-  @inbounds for i = 1:nparams
-    array[i] = mat[:,(i-1)*ntimes+1:i*ntimes]
-  end
-  PTArray(array)
-end
-
 function compute_relative_error(
-  sol::PTArray{Matrix{T}},
-  sol_approx::PTArray{Matrix{T}},
-  args...) where T
+  sol::AbstractVector{<:PTArray},
+  sol_approx::AbstractVector{<:PTArray},
+  args...)
 
   @assert length(sol) == length(sol_approx)
 
@@ -234,11 +227,10 @@ function compute_relative_error(
   ncache = zeros(T,time_ndofs)
   dcache = zeros(T,time_ndofs)
   cache = ncache,dcache
-  err = Vector{T}(undef,nparams)
-  @inbounds for i = 1:nparams
-    err[i] = compute_relative_error!(cache,sol[i],sol_approx[i],args...)
+
+  map(1:nparams) do i
+    compute_relative_error!(cache,sol[i],sol_approx[i],args...)
   end
-  err
 end
 
 function compute_relative_error!(cache,sol,sol_approx,norm_matrix=nothing)
@@ -282,9 +274,7 @@ function plot_results(
 end
 
 function _plot(path,name,trian,x)
-  createpvd(path) do pvd
-    for (xt,t) in x
-      pvd[t] = createvtk(trian,joinpath(path,"_$t.vtu"),cellfields=[name=>xt])
-    end
+  for (xt,t) in x
+    writevtk(trian,joinpath(path,"_$t.vtu"),cellfields=[name=>xt])
   end
 end

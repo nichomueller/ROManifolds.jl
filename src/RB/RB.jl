@@ -25,6 +25,7 @@ import Gridap.Arrays: evaluate!
 import Gridap.Algebra: allocate_matrix
 import Gridap.Algebra: allocate_vector
 import Gridap.Algebra: solve
+import PartitionedArrays: tuple_of_arrays
 
 export RBInfo
 export BlockRBInfo
