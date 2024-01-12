@@ -74,10 +74,10 @@ res(μ,t,u,v) = ∫(v*∂ₚt(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(
 jac(μ,t,u,du,v) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
 jac_t(μ,t,u,dut,v) = ∫(v*dut)dΩ
 
-feop = AffinePTFEOperator(res,jac,jac_t,pspace,trial,test)
+feop = AffineTransientPFEOperator(res,jac,jac_t,pspace,trial,test)
 
 function compute_xh(
-  feop::PTFEOperator,
+  feop::TransientPFEOperator,
   params::Table,
   times::Vector{<:Real},
   u::Tuple)
@@ -96,7 +96,7 @@ function compute_xh(
 end
 
 function get_feoperator_gridap(
-  feop::PTFEOperator{Affine},
+  feop::TransientPFEOperator{Affine},
   μ::Vector{<:Real})
 
   trial_μt = get_trial(feop)

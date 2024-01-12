@@ -44,7 +44,7 @@ end
 function collect_solutions(
   rbinfo::RBInfo,
   fesolver::PODESolver,
-  feop::PTFEOperator)
+  feop::TransientPFEOperator)
 
   nparams = rbinfo.nsnaps_state+rbinfo.nsnaps_test
   params = realization(feop,nparams)

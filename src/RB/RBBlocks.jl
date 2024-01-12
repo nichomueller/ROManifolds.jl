@@ -53,7 +53,7 @@ end
 function collect_solutions(
   rbinfo::BlockRBInfo,
   fesolver::PODESolver,
-  feop::PTFEOperator)
+  feop::TransientPFEOperator)
 
   nparams = rbinfo.nsnaps_state+rbinfo.nsnaps_test
   params = realization(feop,nparams)
@@ -142,7 +142,7 @@ end
 
 function reduced_basis(
   rbinfo::BlockRBInfo,
-  feop::PTFEOperator,
+  feop::TransientPFEOperator,
   snaps::BlockSnapshots)
 
   nblocks = length(snaps)
@@ -161,7 +161,7 @@ end
 
 function add_space_supremizers(
   rbinfo::BlockRBInfo,
-  feop::PTFEOperator,
+  feop::TransientPFEOperator,
   blocks::Vector{RBSpace{T}}) where T
 
   bs_primal,bs_dual... = map(get_basis_space,blocks)
@@ -177,7 +177,7 @@ function add_space_supremizers(
   return [bs_primal,bs_dual...]
 end
 
-function space_supremizers(basis_space::Matrix,feop::PTFEOperator)
+function space_supremizers(basis_space::Matrix,feop::TransientPFEOperator)
   μ = realization(feop)
   u = zero(feop.test)
   t = 0.
@@ -242,7 +242,7 @@ end
 
 function TransientFETools.get_algebraic_operator(
   fesolver::PODESolver,
-  feop::PTFEOperator,
+  feop::TransientPFEOperator,
   rbspace::BlockRBSpace{T},
   params::Table;
   kwargs...) where T
@@ -561,7 +561,7 @@ end
 
 function post_process(
   rbinfo::BlockRBInfo,
-  feop::PTFEOperator,
+  feop::TransientPFEOperator,
   sol::PTArray,
   sol_approx::PTArray,
   params::Table,

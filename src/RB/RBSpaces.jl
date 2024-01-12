@@ -22,7 +22,7 @@ function Utils.load(rbinfo::RBInfo,T::Type{RBSpace{S}}) where S
   load(path,T)
 end
 
-function reduced_basis(rbinfo::RBInfo,feop::PTFEOperator,snaps::Snapshots)
+function reduced_basis(rbinfo::RBInfo,feop::TransientPFEOperator,snaps::Snapshots)
   println("Computing RB space")
   ϵ = rbinfo.ϵ
   nsnaps_state = rbinfo.nsnaps_state
@@ -117,7 +117,7 @@ end
 
 function TransientFETools.get_algebraic_operator(
   fesolver::PThetaMethod,
-  feop::PTFEOperator,
+  feop::TransientPFEOperator,
   rbspace::RBSpace{T},
   params::Table) where T
 

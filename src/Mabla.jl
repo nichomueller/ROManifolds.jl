@@ -50,9 +50,6 @@ export PTFunction
 export PTCellField
 export SingleFieldPTFEFunction
 export MultiFieldPTFEFunction
-export PTIntegrand
-export ∫ₚ
-export CollectionPTIntegrand
 export PTBuilder
 export SparsePTMatrixBuilder
 export PTArrayBuilder
@@ -64,10 +61,10 @@ export get_assembler
 export TransientTrialPFESpace
 export TransientMultiFieldPFESpace
 export TransientMultiFieldTrialPFESpace
-export PTFEOperator
-export PTFEOperatorFromWeakForm
-export AffinePTFEOperator
-export NonlinearPTFEOperator
+export TransientPFEOperator
+export TransientPFEOperatorFromWeakForm
+export AffineTransientPFEOperator
+export NonlinearTransientPFEOperator
 export residual_for_trian!
 export jacobian_for_trian!
 export PTNonlinearOperator

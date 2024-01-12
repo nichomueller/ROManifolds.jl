@@ -76,7 +76,7 @@ T = Float64
 reffe = ReferenceFE(lagrangian,T,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6])
 trial = TransientTrialPFESpace(test,g)
-feop = AffinePTFEOperator(res,jac,jac_t,pspace,trial,test)
+feop = AffineTransientPFEOperator(res,jac,jac_t,pspace,trial,test)
 t0,tf,dt,θ = 0.,0.1,0.01,0.5
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
@@ -199,7 +199,7 @@ dΓn = Measure(Γn,degree)
 
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6])
 trial = TransientTrialPFESpace(test,g)
-feop = AffinePTFEOperator(res,jac,jac_t,pspace,trial,test)
+feop = AffineTransientPFEOperator(res,jac,jac_t,pspace,trial,test)
 t0,tf,dt,θ = 0.,0.1,0.01,0.5
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 

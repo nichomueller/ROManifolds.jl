@@ -31,7 +31,7 @@ end
 
 function TransientFETools.get_algebraic_operator(
   fesolver::PODESolver,
-  feop::PTFEOperator,
+  feop::TransientPFEOperator,
   sols::PTArray,
   params::Table)
 
@@ -45,7 +45,7 @@ end
 
 struct PODESolution
   solver::PODESolver
-  op::PTFEOperator
+  op::TransientPFEOperator
   μ::AbstractVector
   u0::AbstractVector
   t0::Real
@@ -86,13 +86,13 @@ function Base.iterate(sol::PODESolution,state)
   return (uf,n),state
 end
 
-function Algebra.symbolic_setup(s::BackslashSolver,mat::Union{PTArray,AbstractArray{<:PTArray}})
-  symbolic_setup(s,testitem(mat))
-end
+Algebra.symbolic_setup(s::BackslashSolver,mat::PTArray) = symbolic_setup(s,testitem(mat))
 
-function Algebra.symbolic_setup(s::LUSolver,mat::Union{PTArray,AbstractArray{<:PTArray}})
-  symbolic_setup(s,testitem(mat))
-end
+Algebra.symbolic_setup(s::BackslashSolver,mat::AbstractArray{<:PTArray}) = symbolic_setup(s,testitem(mat))
+
+Algebra.symbolic_setup(s::LUSolver,mat::PTArray) = symbolic_setup(s,testitem(mat))
+
+Algebra.symbolic_setup(s::LUSolver,mat::AbstractArray{<:PTArray}) = symbolic_setup(s,testitem(mat))
 
 struct PTAffineOperator <: PTNonlinearOperator
   matrix::AbstractArray
@@ -166,50 +166,7 @@ function Algebra.LinearSolverCache(A::PTArray,b::PTArray,ns::NumericalSetup)
   PTLinearSolverCache(A,b,ns)
 end
 
-struct PTNewtonRaphsonCache <: GridapType
-  A::AbstractMatrix
-  b::AbstractVector
-  dx::AbstractVector
-  ns::NumericalSetup
-end
-
-function Algebra.NewtonRaphsonCache(A::PTArray,b::PTArray,dx::PTArray,ns::NumericalSetup)
-  PTNewtonRaphsonCache(A,b,dx,ns)
-end
-
-function _inf_norm(b)
-  m = 0
-  for bi in b
-    m = max(m,abs(bi))
-  end
-  m
-end
-
-function Algebra._check_convergence(tol,b::PTArray)
-  n = length(b)
-  m0 = map(_inf_norm,b.array)
-  ntuple(i->false,Val(n)),m0
-end
-
-function Algebra._check_convergence(tol,b::PTArray,m0)
-  m = map(_inf_norm,b.array)
-  m .< tol * m0,m
-end
-
-function Algebra._solve_nr!(x::PTArray,A::PTArray,b::PTArray,dx::PTArray,ns,nls,op)
-  _,conv0 = Algebra._check_convergence(nls.tol,b)
-  for iter in 1:nls.max_nliters
-    b .*= -1
-    solve!(dx,ns,b)
-    x .+= dx
-    residual!(b,op,x)
-    isconv,conv = Algebra._check_convergence(nls.tol,b,conv0)
-    println("Iter $iter, f(x;μ) inf-norm ∈ $((minimum(conv),maximum(conv)))")
-    if all(isconv); return; end
-    if iter == nls.max_nliters
-      @unreachable
-    end
-    jacobian!(A,op,x)
-    numerical_setup!(ns,A)
-  end
+function Algebra._check_convergence(nls,b::PTArray,m0)
+  m = maximum(abs,b)
+  return all(m .< nls.tol * m0)
 end

@@ -2,7 +2,7 @@
 function TransientFETools.solve_step!(
   uf::AbstractVector,
   solver::PThetaMethod,
-  op::PTFEOperator,
+  op::TransientPFEOperator,
   μ::AbstractVector,
   u0::AbstractVector,
   t0::Real,
@@ -37,7 +37,7 @@ function TransientFETools.solve_step!(
 end
 
 struct PTThetaMethodOperator{P,T} <: PTAlgebraicOperator{Nonlinear}
-  feop::PTFEOperator
+  feop::TransientPFEOperator
   μ::P
   t::T
   dtθ::Float
@@ -47,7 +47,7 @@ struct PTThetaMethodOperator{P,T} <: PTAlgebraicOperator{Nonlinear}
 end
 
 function TransientFETools.get_algebraic_operator(
-  feop::PTFEOperator,
+  feop::TransientPFEOperator,
   μ,
   t,
   dtθ::Float,
@@ -131,7 +131,7 @@ end
 function TransientFETools.solve_step!(
   uf::AbstractVector,
   solver::PThetaMethod,
-  op::PTFEOperator{Affine},
+  op::TransientPFEOperator{Affine},
   μ::AbstractVector,
   u0::AbstractVector,
   t0::Real,
@@ -167,7 +167,7 @@ function TransientFETools.solve_step!(
 end
 
 struct PTAffineThetaMethodOperator{P,T} <: PTAlgebraicOperator{Affine}
-  feop::PTFEOperator{Affine}
+  feop::TransientPFEOperator{Affine}
   μ::P
   t::T
   dtθ::Float
@@ -177,7 +177,7 @@ struct PTAffineThetaMethodOperator{P,T} <: PTAlgebraicOperator{Affine}
 end
 
 function TransientFETools.get_algebraic_operator(
-  feop::PTFEOperator{Affine},
+  feop::TransientPFEOperator{Affine},
   μ,
   t,
   dtθ::Float,

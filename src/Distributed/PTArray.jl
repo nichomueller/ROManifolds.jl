@@ -43,14 +43,6 @@ function Algebra.LinearSolverCache(
   FEM.PTLinearSolverCache(A,b,ns)
 end
 
-function Algebra.NewtonRaphsonCache(
-  A::PSparseMatrix{<:PTArray},
-  b::PVector{<:PTArray},
-  dx::PVector{<:PTArray},
-  ns::NumericalSetup)
-  FEM.PTNewtonRaphsonCache(A,b,dx,ns)
-end
-
 function PartitionedArrays.allocate_local_values(
   a::PTArray,
   ::Type{T},
@@ -620,7 +612,7 @@ end
 
 function ODETools.jacobians!(
   A::AbstractMatrix,
-  op::PTFEOperator,
+  op::TransientPFEOperator,
   μ::AbstractVector,
   t::T,
   xh::TransientDistributedCellField,

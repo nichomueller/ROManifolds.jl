@@ -44,7 +44,7 @@ test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
 trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldPFESpace([test_u,test_p])
 trial = TransientMultiFieldPFESpace([trial_u,trial_p])
-feop = AffinePTFEOperator(res,jac,jac_t,pspace,trial,test)
+feop = AffineTransientPFEOperator(res,jac,jac_t,pspace,trial,test)
 t0,tf,dt,θ = 0.,0.3,0.005,0.5
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial_u(μ,t0))
 ph0μ(μ) = interpolate_everywhere(p0μ(μ),trial_p(μ,t0))

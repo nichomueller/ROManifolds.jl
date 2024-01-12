@@ -128,11 +128,6 @@ export SingleFieldPTFEFunction
 export MultiFieldPTFEFunction
 include("PTCellFields.jl")
 
-export PTIntegrand
-export ∫ₚ
-export CollectionPTIntegrand
-include("PTIntegrand.jl")
-
 export PTBuilder
 export SparsePTMatrixBuilder
 export PTArrayBuilder
@@ -148,13 +143,13 @@ export TransientMultiFieldPFESpace
 export TransientMultiFieldTrialPFESpace
 include("PTFESpaces.jl")
 
-export PTFEOperator
-export PTFEOperatorFromWeakForm
-export AffinePTFEOperator
-export NonlinearPTFEOperator
+export TransientPFEOperator
+export TransientPFEOperatorFromWeakForm
+export AffineTransientPFEOperator
+export NonlinearTransientPFEOperator
 export residual_for_trian!
 export jacobian_for_trian!
-include("PTFEOperator.jl")
+include("TransientPFEOperator.jl")
 
 export PTNonlinearOperator
 export PTAlgebraicOperator

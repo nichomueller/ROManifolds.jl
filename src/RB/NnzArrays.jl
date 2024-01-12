@@ -25,8 +25,6 @@ end
 
 Base.length(nzv::NnzVector) = length(nzv.nonzero_val)
 
-struct Nonaffine <: OperatorType end
-
 struct NnzMatrix{T,A} <: NnzArray{T,2}
   affinity::A
   nonzero_val::Matrix{T}

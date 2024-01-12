@@ -133,7 +133,7 @@ function main(ranks)
   jac(μ,t,u,du,v) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
   jac_t(μ,t,u,dut,v) = ∫(v*dut)dΩ
 
-  feop = AffinePTFEOperator(res,jac,jac_t,pspace,trial,test)
+  feop = AffineTransientPFEOperator(res,jac,jac_t,pspace,trial,test)
   fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
   w = get_free_dof_values(uh0μ(params))
   sol = PODESolution(fesolver,feop,params,w,t0,tf)

@@ -182,10 +182,68 @@ function Base.fill!(a::PTArray,z)
   end
 end
 
+function Base.maximum(f,a::PTArray)
+  map(a) do ai
+    maximum(f,ai)
+  end
+end
+
+function Base.minimum(f,a::PTArray)
+  map(a) do ai
+    minimum(f,ai)
+  end
+end
+
 function LinearAlgebra.fillstored!(a::PTArray,z)
   @inbounds for i = eachindex(a)
     ai = a[i]
     fillstored!(ai,z)
+  end
+end
+
+function LinearAlgebra.mul!(
+  c::PTArray,
+  a::PTArray,
+  b::PTArray,
+  α::Number,β::Number)
+
+  @inbounds for i = eachindex(a)
+    ci,ai,bi = c[i],a[i],b[i]
+    mul!(ci,ai,bi,α,β)
+  end
+end
+
+function LinearAlgebra.ldiv!(a::PTArray,m::LU,b::PTArray)
+  @inbounds for i = eachindex(a)
+    ai,bi = a[i],b[i]
+    ldiv!(ai,m,bi)
+  end
+end
+
+function LinearAlgebra.ldiv!(a::PTArray,m::AbstractArray,b::PTArray)
+  @inbounds for i = eachindex(a)
+    ai,mi,bi = a[i],m[i],b[i]
+    ldiv!(ai,mi,bi)
+  end
+end
+
+function LinearAlgebra.rmul!(a::PTArray,b::Number)
+  @inbounds for i = eachindex(a)
+    ai = a[i]
+    rmul!(ai,b)
+  end
+end
+
+function LinearAlgebra.lu(a::PTArray)
+  map(a) do ai
+    lu(ai)
+  end
+end
+
+function LinearAlgebra.lu!(a::PTArray,b::PTArray)
+  @inbounds for i = eachindex(a)
+    ai,bi = a[i],b[i]
+    lu!(ai,bi)
   end
 end
 
@@ -280,40 +338,6 @@ end
 function Base.materialize!(a::PTArray,b::PTBroadcasted)
   map(Base.materialize!,a,b.array)
   a
-end
-
-function LinearAlgebra.lu(a::PTArray)
-  map(a) do ai
-    lu(ai)
-  end
-end
-
-function LinearAlgebra.lu!(a::PTArray,b::PTArray)
-  @inbounds for i = eachindex(a)
-    ai,bi = a[i],b[i]
-    lu!(ai,bi)
-  end
-end
-
-function LinearAlgebra.ldiv!(a::PTArray,m::LU,b::PTArray)
-  @inbounds for i = eachindex(a)
-    ai,bi = a[i],b[i]
-    ldiv!(ai,m,bi)
-  end
-end
-
-function LinearAlgebra.ldiv!(a::PTArray,m::AbstractArray,b::PTArray)
-  @inbounds for i = eachindex(a)
-    ai,mi,bi = a[i],m[i],b[i]
-    ldiv!(ai,mi,bi)
-  end
-end
-
-function LinearAlgebra.rmul!(a::PTArray,b::Number)
-  @inbounds for i = eachindex(a)
-    ai = a[i]
-    rmul!(ai,b)
-  end
 end
 
 function Base.length(
