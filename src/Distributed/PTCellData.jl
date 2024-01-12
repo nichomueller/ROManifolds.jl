@@ -1,3 +1,28 @@
+function Base.iterate(
+  f::DistributedCellField{<:Vector{<:SingleFieldPTFEFunction}}
+  )
+
+  fit,nit = map(local_views(f)) do f
+    first(iterate(f))
+  end |> tuple_of_arrays
+  return (fit,first(nit)),first(nit)
+end
+
+function Base.iterate(
+  f::DistributedCellField{<:Vector{<:SingleFieldPTFEFunction}},
+  state)
+
+  fn = map(local_views(f)) do f
+    iterate(f,state)
+  end
+  if isa(fn,AbstractVector{Nothing})
+    return nothing
+  else
+    fit,nit = tuple_of_arrays(fn)
+    return (first.(fit),first(nit)),first(nit)
+  end
+end
+
 function FESpaces.get_triangulation(meas::DistributedMeasure)
   @assert false
   trian,model = map(meas.measures) do m

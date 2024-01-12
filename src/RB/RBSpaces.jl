@@ -108,6 +108,13 @@ function space_time_projection(
   return st_proj_mat
 end
 
+function project_recast(snap::PTArray,rb::RBSpace)
+  mat = stack(snap.array)
+  rb_proj = space_time_projection(mat,rb)
+  array = recast(rb_proj,rb)
+  PTArray(array)
+end
+
 function TransientFETools.get_algebraic_operator(
   fesolver::PThetaMethod,
   feop::PTFEOperator,

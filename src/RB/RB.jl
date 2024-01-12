@@ -54,6 +54,7 @@ export num_rb_space_ndofs
 export num_rb_time_ndofs
 export num_rb_ndofs
 export space_time_projection
+export project_recast
 export RBAffineDecomposition
 export RBVecAffineDecomposition
 export RBMatAffineDecomposition

@@ -21,11 +21,25 @@ struct DistributedSnapshots{T<:AbstractVector{<:Snapshots}}
 end
 
 function RB.Snapshots(snaps::Vector{<:PVector{<:PTArray}})
+  _type(a::PVector{V}) where V = V
+  # snap_parts = map(parts) do part
+  #   snap_part = map(snaps) do si
+  #     local_views(si)[part]
+  #   end
+  #   Snapshots(snap_part)
+  # end
   s1 = first(snaps)
+  T = _type(s1)
   parts = map(part_id,s1.index_partition)
   snap_parts = map(parts) do part
-    snap_part = map(snaps) do si
-      local_views(si)[part]
+    cache = T[]
+    for si in snaps
+      map(local_views(si),si.index_partition) do sij,j
+        if j == part
+          push!(cache,sij)
+        end
+        cache
+      end
     end
     Snapshots(snap_part)
   end
@@ -49,10 +63,11 @@ function RB.reduced_basis(rbinfo::RBInfo,feop::PTFEOperator,s::DistributedSnapsh
   DistributedRBSpace(rbspace)
 end
 
-function project_recast(snap::PVector{<:PTArray},rb::DistributedRBSpace)
-  map(local_views(snap),rb.rbspace) do s,rb
+function RB.project_recast(snap::AbstractVector{<:PTArray},rb::DistributedRBSpace)
+  map(snap,rb.rbspace) do s,rb
     mat = stack(s.array)
     rb_proj = space_time_projection(mat,rb)
-    recast(rb_proj,rb)
+    array = recast(rb_proj,rb)
+    PTArray(array)
   end
 end

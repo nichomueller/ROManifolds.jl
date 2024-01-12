@@ -275,6 +275,6 @@ end
 
 function _plot(path,name,trian,x)
   for (xt,t) in x
-    writevtk(trian,joinpath(path,"_$t.vtu"),cellfields=[name=>xt])
+    writevtk(trian,path*"_$t.vtu",cellfields=[name=>xt])
   end
 end

@@ -34,7 +34,9 @@ rbinfo = RBInfo(test_path;ϵ,norm_style,nsnaps_state,nsnaps_mdeim,nsnaps_test,st
 domain = (0,1,0,1)
 mesh_partition = (2,2)
 mesh_cells = (4,4)
-ranks = LinearIndices((4,))
+ranks = with_debug() do distribute
+  distribute(LinearIndices((prod(4),)))
+end
 model = CartesianDiscreteModel(ranks,mesh_partition,domain,mesh_cells)
 
 order = 1
@@ -79,78 +81,48 @@ t0,tf,dt,θ = 0.,0.1,0.01,0.5
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
 
-sols,params,stats = collect_solutions(rbinfo,fesolver,feop)
-rbspace = reduced_basis(rbinfo,feop,sols)
-
-nparams = rbinfo.nsnaps_state+rbinfo.nsnaps_test
-params = realization(feop,nparams)
-w = get_free_dof_values(fesolver.uh0(params))
+# sols,params,stats = collect_solutions(rbinfo,fesolver,feop)
+params = realization(feop,nsnaps_state+nsnaps_test)
+w0 = get_free_dof_values(fesolver.uh0(params))
 time_ndofs = num_time_dofs(fesolver)
-uμt = PODESolution(fesolver,feop,params,w,fesolver.t0,fesolver.tf)
+uμt = PODESolution(fesolver,feop,params,w0,fesolver.t0,fesolver.tf)
 println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
 stats = @timed begin
   snaps = map(uμt) do (snap,n)
     copy(snap)
   end
 end
-
-# trial0 = trial(μ,times)
-# # FEFunction(trial0,snaps[1])
-# x = sols[1]
-# px = PVector(x,partition(test.gids))
-# free_values = change_ghost(x,trial0.gids,is_consistent=false,make_consistent=true)
-# fields = map(FEFunction,trial0.spaces,partition(free_values))
-# trial0.spaces[1].dirichlet_values
-
-# function _plot_results(trian,trial,times,u)
-#   for (it,t) in enumerate(times)
-#     fsol = FEFunction(trial(μ,t),u[it])
-#     writevtk(trian,joinpath(plt_dir,"u$(it).vtu"),cellfields=[u=>fsol])
-#   end
-# end
-
-# parts = get_parts(Ω)
-# import Gridap.Visualization: visualization_data,write_vtk_file
-# map(visualization_data(arg,args...;kwargs...)) do visdata
-#   write_vtk_file(parts,visdata.grid,visdata.filebase,
-#     celldata=visdata.celldata,nodaldata=visdata.nodaldata)
-# end
-
-# createpvd("sol") do pvd
-#   for (it,t) in enumerate(times)
-#     fsol = FEFunction(trial(μ,t),sol[it])
-#     pvd[t] = createvtk(Ω,"u$t"*".vtu",cellfields=["u"=>fsol])
-#   end
-# end
-
-function _plot(path,name,trian,x)
-  for (uₕ,t) in x
-    writevtk(trian,joinpath(path,"_$t.vtu"),cellfields=[name=>uₕ])
+# sols = Snapshots(snaps)
+_type(a::PVector{V}) where V = V
+s1 = first(snaps)
+S = _type(s1)
+parts = map(part_id,s1.index_partition)
+snap_parts = map(parts) do part
+  cache = S[]
+  for si in snaps
+    map(local_views(si),si.index_partition) do sij,j
+      if j == part
+        push!(cache,sij)
+      end
+    end
+    cache
   end
+  Snapshots(cache)
+end
+DistributedSnapshots(snap_parts)
+rbspace = reduced_basis(rbinfo,feop,sols)
+x = sols[1]
+xrec = project_recast(x,rbspace)
+err = map(x,xrec) do x,xrec
+  x - xrec
 end
 
-import GridapDistributed: DistributedCellField
-function Base.iterate(f::DistributedCellField{<:Vector{<:SingleFieldPTFEFunction}})
-  fit,nit = map(local_views(f)) do f
-    first(iterate(f))
-  end |> tuple_of_arrays
-  return (fit,first(nit)),first(nit)
-end
-
-function Base.iterate(f::DistributedCellField{<:Vector{<:SingleFieldPTFEFunction}},state)
-  fn = map(local_views(f)) do f
-    iterate(f,state)
+function _plot(ranks,path,name,trian,x)
+  createpvd(ranks,path) do pvd
+    for (xt,t) in x
+      pvd[t] = createvtk(trian,path*"_$t.vtu",cellfields=[name=>xt])
+    end
   end
-  if isa(fn,AbstractVector{Nothing})
-    return nothing
-  else
-    fit,nit = tuple_of_arrays(fn)
-    return (first.(fit),first(nit)),first(nit)
-  end
-end
-
-for (u,t) in uh
-  println(t)
 end
 
 μ = params[1]
@@ -161,7 +133,7 @@ trial0 = trial(μ,times)
 arr = PVector(sol,partition(trial0.gids))
 uh = FEFunction(trial0,arr)
 
-_plot(joinpath("plots/ptsol"),"u",Ω,uh)
+_plot(ranks,joinpath("plots/ptsol"),"u",Ω,uh)
 
 function main_gridap(ranks,μ)
   domain = (0,1,0,1)
@@ -201,12 +173,54 @@ function main_gridap(ranks,μ)
   uh0 = interpolate_everywhere(u0,trial(t0))
   sol = solve(ode_solver,feop,uh0,t0,tf)
 
-  for (uₕ,t) in sol
-    writevtk(Ω,"poisson_transient_solution_$t"*".vtu",cellfields=["u"=>uₕ])
+  # for (uₕ,t) in sol
+  #   writevtk(Ω,"poisson_transient_solution_$t"*".vtu",cellfields=["u"=>uₕ])
+  # end
+  createpvd(ranks,"gridap_plots/sol") do pvd
+    for (uₕ,t) in sol
+      pvd[t] = createvtk(Ω,"gridap_plots/sol_$t"*".vtu",cellfields=["u"=>uₕ])
+    end
   end
 end
 
 with_debug() do distribute
   ranks = distribute(LinearIndices((4,)))
-  results_t = main_gridap(ranks,rand(3))
+  results_t = main_gridap(ranks,params[1])
 end
+
+##############
+
+model = CartesianDiscreteModel(domain,mesh_partition)
+
+Ω = Triangulation(model)
+Γn = BoundaryTriangulation(model,tags=[7,8])
+dΩ = Measure(Ω,degree)
+dΓn = Measure(Γn,degree)
+
+test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6])
+trial = TransientTrialPFESpace(test,g)
+feop = AffinePTFEOperator(res,jac,jac_t,pspace,trial,test)
+t0,tf,dt,θ = 0.,0.1,0.01,0.5
+uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
+
+function _project_recast(snap::PTArray,rb::RBSpace)
+  mat = stack(snap.array)
+  rb_proj = space_time_projection(mat,rb)
+  array = recast(rb_proj,rb)
+  PTArray(array)
+end
+
+w0 = get_free_dof_values(fesolver.uh0(params))
+time_ndofs = num_time_dofs(fesolver)
+uμt = PODESolution(fesolver,feop,params,w0,fesolver.t0,fesolver.tf)
+println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
+stats = @timed begin
+  _snaps = map(uμt) do (snap,n)
+    copy(snap)
+  end
+end
+_sols = Snapshots(_snaps)
+_rbspace = reduced_basis(rbinfo,feop,_sols)
+_x = _sols[1]
+_xrec = _project_recast(_x,_rbspace)
+_err = _x - _xrec
