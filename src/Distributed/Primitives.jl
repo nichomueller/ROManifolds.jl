@@ -1,5 +1,5 @@
 function PartitionedArrays.allocate_gather_impl(
-  snd::AbstractVector{<:PTArray},
+  snd::AbstractVector{<:PArray},
   destination,
   ::Type{T}) where T<:AbstractVector
 
@@ -12,7 +12,7 @@ function PartitionedArrays.allocate_gather_impl(
     ptrs = length_to_ptrs!(pushfirst!(l,one(eltype(l))))
     ndata = ptrs[end]-1
     data = Vector{elT}(undef,ndata)
-    ptdata = ptarray(data,length(snd))
+    ptdata = parray(data,length(snd))
     PTJaggedArray{Vector{elT},Int32}(ptdata,ptrs)
   end
   if isa(destination,Integer)
@@ -20,7 +20,7 @@ function PartitionedArrays.allocate_gather_impl(
       elT = eltype(snd)
       ptrs = Vector{Int32}(undef,1)
       data = Vector{elT}(undef,0)
-      ptdata = ptarray(data,length(snd))
+      ptdata = parray(data,length(snd))
       PTJaggedArray(ptdata,ptrs)
     end
     rcv = map_main(f,l_dest,snd;otherwise=g,main=destination)
@@ -33,7 +33,7 @@ end
 
 function PartitionedArrays.gather_impl!(
   rcv::AbstractVector{<:PTJaggedArray},
-  snd::AbstractVector{<:PTArray},
+  snd::AbstractVector{<:PArray},
   destination,
   ::Type{T}) where T
 
@@ -54,7 +54,7 @@ function PartitionedArrays.gather_impl!(
 end
 
 function PartitionedArrays.allocate_scatter_impl(
-  snd::AbstractVector{<:PTArray},
+  snd::AbstractVector{<:PArray},
   source,
   ::Type{T}) where T <:AbstractVector
 
@@ -65,13 +65,13 @@ function PartitionedArrays.allocate_scatter_impl(
   S = eltype(T)
   map(snd,counts_scat) do snd,count
     data = Vector{S}(undef,count)
-    ptarray(data,length(snd))
+    parray(data,length(snd))
   end
 end
 
 function PartitionedArrays.scatter_impl!(
-  rcv::AbstractVector{<:PTArray},
-  snd::AbstractVector{<:PTArray},
+  rcv::AbstractVector{<:PArray},
+  snd::AbstractVector{<:PArray},
   source,
   ::Type{T}) where T
 
@@ -84,7 +84,7 @@ function PartitionedArrays.scatter_impl!(
 end
 
 function PartitionedArrays.allocate_emit_impl(
-  snd::AbstractVector{<:PTArray},
+  snd::AbstractVector{<:PArray},
   source,
   ::Type{T}) where T<:AbstractVector
 
@@ -96,13 +96,13 @@ function PartitionedArrays.allocate_emit_impl(
   S = eltype(T)
   map(n_all,snd) do n,snd
     data = Vector{S}(undef,n)
-    ptarray(data,length(snd))
+    parray(data,length(snd))
   end
 end
 
 function PartitionedArrays.emit_impl!(
-  rcv::AbstractVector{<:PTArray},
-  snd::AbstractVector{<:PTArray},
+  rcv::AbstractVector{<:PArray},
+  snd::AbstractVector{<:PArray},
   source,
   ::Type{T}) where T
 
@@ -177,7 +177,7 @@ function PartitionedArrays.allocate_exchange_impl(
     length_to_ptrs!(ptrs)
     n_data = ptrs[end]-1
     data = Vector{S}(undef,n_data)
-    ptdata = ptarray(data,N)
+    ptdata = parray(data,N)
     JaggedArray(ptdata,ptrs)
   end
   rcv

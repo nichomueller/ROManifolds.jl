@@ -33,14 +33,14 @@ struct NnzMatrix{T,A} <: NnzArray{T,2}
   nparams::Int
 end
 
-function NnzMatrix(val::PTArray{<:AbstractVector{T}};nparams=length(val),kwargs...) where T
+function NnzMatrix(val::PArray{<:AbstractVector{T}};nparams=length(val),kwargs...) where T
   vals = get_array(val)
   nonzero_idx,nonzero_val = compress_array(stack(vals))
   nrows = size(testitem(val),1)
   NnzMatrix(Nonlinear(),nonzero_val,nonzero_idx,nrows,nparams)
 end
 
-function NnzMatrix(val::PTArray{<:NnzVector{T}};nparams=length(val),kwargs...) where T
+function NnzMatrix(val::PArray{<:NnzVector{T}};nparams=length(val),kwargs...) where T
   vals = get_array(val)
   nonzero_idx = get_nonzero_idx(first(vals))
   nonzero_val = stack(map(get_nonzero_val,vals))
@@ -145,7 +145,7 @@ function Utils.change_mode(nzm::NnzMatrix)
   return mode2
 end
 
-function collect_residuals_for_trian(op::PTAlgebraicOperator)
+function collect_residuals_for_trian(op::NonlinearOperator)
   b = allocate_residual(op,op.u0)
   ress,trian = residual_for_trian!(b,op,op.u0)
   nzm = map(ress) do res
@@ -154,7 +154,7 @@ function collect_residuals_for_trian(op::PTAlgebraicOperator)
   return nzm,trian
 end
 
-function collect_jacobians_for_trian(op::PTAlgebraicOperator;i=1)
+function collect_jacobians_for_trian(op::NonlinearOperator;i=1)
   A = allocate_jacobian(op,op.u0,i)
   jacs_i,trian = jacobian_for_trian!(A,op,op.u0,i)
   nzm_i = map(jacs_i) do jac_i

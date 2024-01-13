@@ -38,7 +38,7 @@ for np in 1:nparams
 end
 
 u = ones(num_free_dofs(test))
-ptu = PTArray([copy(u) for _ = 1:ntimes*nparams])
+ptu = PArray([copy(u) for _ = 1:ntimes*nparams])
 xh = compute_xh(feop,params,times,(ptu,ptu))
 int_vec = ∫(aμt(params,times)*∇(dv)⋅∇(xh))dΩ
 
@@ -75,7 +75,7 @@ for np in 1:nparams
 end
 
 dv = get_fe_basis(test)
-ptu0 = PTArray([u0 for _  = 1:ntimes*nparams])
+ptu0 = PArray([u0 for _  = 1:ntimes*nparams])
 xh = compute_xh(feop,params,times,(ptu0,ptu0))
 dc = integrate(feop.res(params,times,xh,dv))
 for np = 1:nparams

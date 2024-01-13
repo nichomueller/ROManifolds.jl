@@ -62,7 +62,7 @@ ph0μ(μ) = interpolate_everywhere(p0μ(μ),trial_p(μ,t0))
 xh0μ(μ) = interpolate_everywhere([uh0μ(μ),ph0μ(μ)],trial(μ,t0))
 
 nls = NewtonRaphsonSolver(LUSolver(),1e-10,20)
-fesolver = PThetaMethod(nls,xh0μ,θ,dt,t0,tf)
+fesolver = ThetaMethod(nls,θ,dt)
 
 ϵ = 1e-4
 load_solutions = false

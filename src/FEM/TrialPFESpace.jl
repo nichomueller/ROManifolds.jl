@@ -1,12 +1,12 @@
 struct TrialPFESpace{S} <: SingleFieldFESpace
-  dirichlet_values::PTArray
+  dirichlet_values::PArray
   space::S
-  function TrialPFESpace(dirichlet_values::PTArray,space::SingleFieldFESpace)
+  function TrialPFESpace(dirichlet_values::PArray,space::SingleFieldFESpace)
     new{typeof(space)}(dirichlet_values,space)
   end
 end
 
-function TrialPFESpace(U::SingleFieldFESpace,dirichlet_values::PTArray)
+function TrialPFESpace(U::SingleFieldFESpace,dirichlet_values::PArray)
   TrialPFESpace(dirichlet_values,U)
 end
 
@@ -16,7 +16,7 @@ function HomogeneousTrialPFESpace(U::SingleFieldFESpace,n::Int)
   @inbounds for i in eachindex(array)
     array[i] = copy(dv)
   end
-  dirichlet_values = PTArray(array)
+  dirichlet_values = PArray(array)
   TrialPFESpace(dirichlet_values,U)
 end
 
@@ -25,7 +25,7 @@ function TrialPFESpace(space::SingleFieldFESpace,objects)
   TrialPFESpace(dirichlet_values,space)
 end
 
-function TrialPFESpace!(dir_values::PTArray,space::SingleFieldFESpace,objects)
+function TrialPFESpace!(dir_values::PArray,space::SingleFieldFESpace,objects)
   dir_values_scratch = zero_dirichlet_values(space)
   dir_values = compute_dirichlet_values_for_tags!(dir_values,dir_values_scratch,space,objects)
   TrialPFESpace!(dir_values,space)
@@ -72,7 +72,7 @@ FESpaces.get_dirichlet_dof_values(f::TrialPFESpace) = f.dirichlet_values
 
 FESpaces.scatter_free_and_dirichlet_values(f::TrialPFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
 
-# These functions allow us to pass from cell-wise PTArray(s) to global PTArray(s)
+# These functions allow us to pass from cell-wise PArray(s) to global PArray(s)
 function FESpaces.zero_free_values(f::TrialPFESpace)
   fv = zero_free_values(f.space)
   n = length(f.dirichlet_values)
@@ -80,7 +80,7 @@ function FESpaces.zero_free_values(f::TrialPFESpace)
   @inbounds for i in eachindex(array)
     array[i] = copy(fv)
   end
-  PTArray(array)
+  PArray(array)
 end
 
 function FESpaces.zero_dirichlet_values(f::TrialPFESpace)
@@ -90,12 +90,12 @@ function FESpaces.zero_dirichlet_values(f::TrialPFESpace)
   @inbounds for i in eachindex(array)
     array[i] = copy(zdv)
   end
-  PTArray(array)
+  PArray(array)
 end
 
 function FESpaces.compute_dirichlet_values_for_tags!(
-  dirichlet_values::PTArray{T},
-  dirichlet_values_scratch::PTArray{T},
+  dirichlet_values::PArray{T},
+  dirichlet_values_scratch::PArray{T},
   f::TrialPFESpace,
   tag_to_object) where T
 
@@ -185,12 +185,12 @@ function FESpaces.gather_dirichlet_values!(
 end
 
 function FESpaces._free_and_dirichlet_values_fill!(
-  free_vals::PTArray,
-  dirichlet_vals::PTArray,
+  free_vals::PArray,
+  dirichlet_vals::PArray,
   cache_vals,
   cache_dofs,
-  cell_vals::PTArray,
-  cell_dofs::PTArray,
+  cell_vals::PArray,
+  cell_dofs::PArray,
   cells)
 
   for cell in cells
@@ -214,7 +214,7 @@ end
 
 function FESpaces.interpolate!(
   object::AbstractPTFunction,
-  free_values::PTArray,
+  free_values::PArray,
   fs::TrialPFESpace)
 
   for k in eachindex(object)
@@ -226,8 +226,8 @@ end
 
 function FESpaces.interpolate_everywhere!(
   object::AbstractPTFunction,
-  free_values::PTArray,
-  dirichlet_values::PTArray,
+  free_values::PArray,
+  dirichlet_values::PArray,
   fs::TrialPFESpace)
 
   for k in eachindex(object)
@@ -239,8 +239,8 @@ end
 
 function FESpaces.interpolate_dirichlet!(
   object::AbstractPTFunction,
-  free_values::PTArray,
-  dirichlet_values::PTArray,
+  free_values::PArray,
+  dirichlet_values::PArray,
   fs::TrialPFESpace)
 
   for k in eachindex(object)
@@ -357,7 +357,7 @@ function FESpaces.get_trial_fe_basis(f::MultiFieldPFESpace)
   MultiFieldCellField(all_febases)
 end
 
-function split_fields(fe::Union{MultiFieldPFESpace,MultiFieldFESpace},free_values::PTArray)
+function split_fields(fe::Union{MultiFieldPFESpace,MultiFieldFESpace},free_values::PArray)
   offsets = compute_field_offsets(fe)
   fields = map(1:length(fe.spaces)) do field
     pini = offsets[field] + 1
@@ -367,14 +367,14 @@ function split_fields(fe::Union{MultiFieldPFESpace,MultiFieldFESpace},free_value
   fields
 end
 
-function MultiField.restrict_to_field(f::MultiFieldPFESpace,free_values::PTArray,field::Integer)
+function MultiField.restrict_to_field(f::MultiFieldPFESpace,free_values::PArray,field::Integer)
   MultiField._restrict_to_field(f,MultiFieldStyle(f),free_values,field)
 end
 
 function MultiField._restrict_to_field(
   f::MultiFieldPFESpace,
   ::ConsecutiveMultiFieldStyle,
-  free_values::PTArray,
+  free_values::PArray,
   field::Integer)
 
   offsets = compute_field_offsets(f)
@@ -520,9 +520,9 @@ Base.getindex(m::MultiFieldPFESpace,::Colon) = m
 Base.getindex(m::MultiFieldPFESpace,field_id::Integer) = m.spaces[field_id]
 Base.length(m::MultiFieldPFESpace) = length(m.spaces)
 
-function FESpaces.interpolate!(objects,free_values::PTArray,fe::MultiFieldPFESpace)
+function FESpaces.interpolate!(objects,free_values::PArray,fe::MultiFieldPFESpace)
   block_free_values = block_zero_free_values(fe)
-  blocks = SingleFieldPTFEFunction[]
+  blocks = SingleFieldPFEFunction[]
   for (free_values_i,U,object) in zip(block_free_values,fe.spaces,objects)
     uhi = interpolate!(object,free_values_i,U)
     push!(blocks,uhi)
@@ -533,7 +533,7 @@ end
 function FESpaces.interpolate_everywhere(objects,fe::MultiFieldPFESpace)
   free_values = zero_free_values(fe)
   block_free_values = block_zero_free_values(fe)
-  blocks = SingleFieldPTFEFunction[]
+  blocks = SingleFieldPFEFunction[]
   for (free_values_i,U,object) in zip(block_free_values,fe.spaces,objects)
     dirichlet_values_i = zero_dirichlet_values(U)
     uhi = interpolate_everywhere!(object,free_values_i,dirichlet_values_i,U)
@@ -545,7 +545,7 @@ end
 function FESpaces.interpolate_dirichlet(objects,fe::MultiFieldPFESpace)
   free_values = zero_free_values(fe)
   block_free_values = block_zero_free_values(fe)
-  blocks = SingleFieldPTFEFunction[]
+  blocks = SingleFieldPFEFunction[]
   for (free_values_i,U,object) in zip(block_free_values,fe.spaces,objects)
     dirichlet_values_i = zero_dirichlet_values(U)
     uhi = interpolate_dirichlet!(object,free_values_i,dirichlet_values_i,U)
@@ -554,7 +554,7 @@ function FESpaces.interpolate_dirichlet(objects,fe::MultiFieldPFESpace)
   PTMultiFieldFEFunction(free_values,fe,blocks)
 end
 
-function FESpaces.EvaluationFunction(fe::MultiFieldPFESpace,free_values::PTArray)
+function FESpaces.EvaluationFunction(fe::MultiFieldPFESpace,free_values::PArray)
   free_values,fe_functions = map(eachindex(fe.spaces)) do i
     free_values_i = restrict_to_field(fe,free_values,i)
     fe_function_i = EvaluationFunction(fe.spaces[i],free_values_i)

@@ -42,11 +42,11 @@ for np in 1:nparams
 end
 
 u = ones(num_free_dofs(test))
-ptu = PTArray([copy(u) for _ = 1:ntimes*nparams])
+ptu = PArray([copy(u) for _ = 1:ntimes*nparams])
 xh = compute_xh(feop,params,times,(ptu,ptu))
 int_vec = ∫(dv*∂ₚt(xh))dΩ + ∫(aμt(params,times)*∇(dv)⋅∇(xh))dΩ
 vecdata = collect_cell_vector(test,int_vec)
-b = PTArray([ones(num_free_dofs(test)) for _ = 1:ntimes*nparams])
+b = PArray([ones(num_free_dofs(test)) for _ = 1:ntimes*nparams])
 assemble_vector_add!(b,feop.assem,vecdata)
 for np in 1:nparams
   feop_t = get_feoperator_gridap(feop,params[np])
@@ -64,11 +64,11 @@ end
 
 # with residual
 u = ones(num_free_dofs(test))
-ptu = PTArray([copy(u) for _ = 1:ntimes*nparams])
+ptu = PArray([copy(u) for _ = 1:ntimes*nparams])
 xh = compute_xh(feop,params,times,(ptu,ptu))
 int_vec = integrate(feop.res(params,times,xh,dv))
 vecdata = collect_cell_vector(test,int_vec)
-b = PTArray([ones(num_free_dofs(test)) for _ = 1:ntimes*nparams])
+b = PArray([ones(num_free_dofs(test)) for _ = 1:ntimes*nparams])
 assemble_vector_add!(b,feop.assem,vecdata)
 for np in 1:nparams
   feop_t = get_feoperator_gridap(feop,params[np])

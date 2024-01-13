@@ -90,7 +90,7 @@ export DistributedSnapshots
 export DistributedRBSpace
 export project_recast
 
-include("PTArray.jl")
+include("PArray.jl")
 include("Primitives.jl")
 # include("Algebra.jl")
 include("FESpaces.jl")

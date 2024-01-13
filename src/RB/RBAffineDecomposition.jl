@@ -17,19 +17,19 @@ end
 
 function get_at_time_integration_domain(
   i::Vector{RBIntegrationDomain},
-  afull::PTArray,
+  afull::PArray,
   nparams::Int)
 
   idx_time = common_time_integration_domain(i)
   time_ndofs = Int(length(afull)/nparams)
   ptidx = vec(transpose(collect(0:nparams-1)*time_ndofs .+ idx_time'))
-  acomm = PTArray(afull[ptidx])
+  acomm = PArray(afull[ptidx])
   return acomm
 end
 
 function get_at_time_integration_domain(
   i::RBIntegrationDomain,
-  acomm::PTArray,
+  acomm::PArray,
   icomm::Vector{Int})
 
   idx_time = get_idx_time(i)
@@ -42,13 +42,13 @@ function get_at_time_integration_domain(
     end
   end
   ptidx = vec(transpose(collect(0:nparams-1)*comm_time_ndofs .+ idx_comm_to_idx_time'))
-  acomm = PTArray(acomm[ptidx])
+  acomm = PArray(acomm[ptidx])
   return acomm
 end
 
 function get_at_time_integration_domain(
   i::Vector{RBIntegrationDomain},
-  op::PTAlgebraicOperator)
+  op::NonlinearOperator)
 
   nparams = length(op.μ)
   time_ndofs = length(op.t)
@@ -58,17 +58,17 @@ function get_at_time_integration_domain(
   end
   red_times = op.t[idx_time]
   ptidx = vec(transpose(collect(0:nparams-1)*time_ndofs .+ idx_time'))
-  u0_idx = PTArray(op.u0[ptidx])
+  u0_idx = PArray(op.u0[ptidx])
   _Us,Uts,fecache = op.ode_cache
   Us = ()
   for j in eachindex(_Us)
     spacei = _Us[j].space
-    dvi = PTArray(_Us[j].dirichlet_values[ptidx])
+    dvi = PArray(_Us[j].dirichlet_values[ptidx])
     Us = (Us...,TrialPFESpace(dvi,spacei))
   end
   ode_cache_idx = Us,Uts,fecache
-  vθ_idx = PTArray(op.vθ[ptidx])
-  get_algebraic_operator(op.feop,op.μ,red_times,op.dtθ,u0_idx,ode_cache_idx,vθ_idx)
+  vθ_idx = PArray(op.vθ[ptidx])
+  get_method_operator(op.feop,op.μ,red_times,op.dtθ,u0_idx,ode_cache_idx,vθ_idx)
 end
 
 abstract type RBAffineDecomposition{T,N} end
@@ -124,7 +124,7 @@ ReducedMeasure(a::TrivialRBAffineDecomposition,args...) = a
 
 function RBAffineDecomposition(
   rbinfo::RBInfo,
-  op::PTAlgebraicOperator,
+  op::NonlinearOperator,
   nzm::NnzMatrix,
   trian::Triangulation,
   args...;
@@ -157,7 +157,7 @@ end
 
 function RBAffineDecomposition(
   rbinfo::RBInfo,
-  op::PTAlgebraicOperator,
+  op::NonlinearOperator,
   nzm::NnzMatrix{T,Affine} where T,
   trian::Triangulation,
   args...;
@@ -249,7 +249,7 @@ function get_reduced_cells(idx::Vector{Int},cell_dof_ids::Table)
 end
 
 function _get_at_matching_trian(
-  q::Vector{<:PTArray},
+  q::Vector{<:PArray},
   trians::Base.KeySet{Triangulation},
   trian::Triangulation)
 
@@ -262,7 +262,7 @@ end
 
 function collect_reduced_residuals!(
   cache,
-  op::PTAlgebraicOperator,
+  op::NonlinearOperator,
   a::Vector{RBVecAffineDecomposition{T}}) where T
 
   a1 = filter(istrivial,a)
@@ -280,7 +280,7 @@ end
 
 function _collect_reduced_residuals!(
   cache,
-  op::PTAlgebraicOperator,
+  op::NonlinearOperator,
   a::Vector{RBVecAffineDecomposition{T}}) where T
 
   b,Mcache = cache
@@ -310,7 +310,7 @@ end
 
 function collect_reduced_jacobians!(
   cache,
-  op::PTAlgebraicOperator,
+  op::NonlinearOperator,
   a::Vector{RBMatAffineDecomposition{T}};
   kwargs...) where T
 
@@ -329,7 +329,7 @@ end
 
 function _collect_reduced_jacobians!(
   cache,
-  op::PTAlgebraicOperator,
+  op::NonlinearOperator,
   a::Vector{RBMatAffineDecomposition{T}};
   i::Int=1) where T
 
@@ -375,7 +375,7 @@ end
 function rb_coefficient!(cache,::TrivialRBAffineDecomposition,args...;kwargs...)
   _,ptcache = cache
   setsize!(ptcache,(1,1))
-  PTArray(get_array(ptcache))
+  PArray(get_array(ptcache))
 end
 
 function mdeim_solve!(cache::CachedArray,mdeim_interpolation::LU,q::Matrix)
@@ -386,7 +386,7 @@ function mdeim_solve!(cache::CachedArray,mdeim_interpolation::LU,q::Matrix)
 end
 
 function recast_coefficient!(
-  cache::PTArray{<:CachedArray},
+  cache::PArray{<:CachedArray},
   coeff::AbstractMatrix)
 
   Qs = Int(size(coeff,1))
@@ -399,11 +399,11 @@ function recast_coefficient!(
     array[n] = coeff[:,(n-1)*Nt+1:n*Nt]'
   end
 
-  PTArray(array)
+  PArray(array)
 end
 
 function recast_coefficient!(
-  cache::PTArray{<:CachedArray},
+  cache::PArray{<:CachedArray},
   basis_time::AbstractMatrix,
   coeff::AbstractMatrix)
 
@@ -421,20 +421,20 @@ function recast_coefficient!(
     end
   end
 
-  PTArray(array)
+  PArray(array)
 end
 
 abstract type RBContributionMap <: Map end
 struct RBVecContributionMap <: RBContributionMap end
 struct RBMatContributionMap <: RBContributionMap end
 
-function Arrays.return_cache(::RBVecContributionMap,snaps::PTArray{Vector{T}}) where T
+function Arrays.return_cache(::RBVecContributionMap,snaps::PArray{Vector{T}}) where T
   array_coeff = zeros(T,1)
   array_proj = zeros(T,1)
   CachedArray(array_coeff),CachedArray(array_proj),CachedArray(array_proj)
 end
 
-function Arrays.return_cache(::RBMatContributionMap,snaps::PTArray{Vector{T}}) where T
+function Arrays.return_cache(::RBMatContributionMap,snaps::PArray{Vector{T}}) where T
   array_coeff = zeros(T,1,1)
   array_proj = zeros(T,1,1)
   CachedArray(array_coeff),CachedArray(array_proj),CachedArray(array_proj)
@@ -512,7 +512,7 @@ function rb_contribution!(
   cache,
   k::RBContributionMap,
   a::RBAffineDecomposition,
-  coeff::PTArray)
+  coeff::PArray)
 
   basis_space_proj = a.basis_space
   basis_time = last(a.basis_time)
@@ -525,10 +525,10 @@ function rb_contribution!(
   cache,
   k::RBContributionMap,
   a::TrivialRBAffineDecomposition,
-  coeff::PTArray)
+  coeff::PArray)
 
   array = [a.projection for _ = eachindex(coeff)]
-  PTArray(array)
+  PArray(array)
 end
 
 function zero_rb_contribution(

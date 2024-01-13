@@ -14,7 +14,7 @@ get_blocks(b) = b.blocks
 struct BlockSnapshots{T} <: RBBlock{T,1}
   blocks::Vector{Snapshots{T}}
 
-  function BlockSnapshots(snaps::Vector{<:AbstractVector{<:PTArray}})
+  function BlockSnapshots(snaps::Vector{<:AbstractVector{<:PArray}})
     nblocks = length(testitem(snaps))
     block_snaps = map(1:nblocks) do i
       Snapshots(getindex.(snaps,i))
@@ -47,7 +47,7 @@ end
 
 function Utils.load(rbinfo::BlockRBInfo,::Type{BlockSnapshots{T}}) where T
   path = joinpath(rbinfo.fe_path,"fesnaps")
-  load(path,BlockSnapshots{AbstractVector{<:PTArray{T}}})
+  load(path,BlockSnapshots{AbstractVector{<:PArray{T}}})
 end
 
 function collect_solutions(
@@ -118,7 +118,7 @@ function num_rb_ndofs(rb::BlockRBSpace)
   ndofs
 end
 
-function recast(x::PTArray,rb::BlockRBSpace)
+function recast(x::PArray,rb::BlockRBSpace)
   nblocks = length(rb)
   offsets = rb_offsets(rb)
   blocks = map(1:nblocks) do row
@@ -129,7 +129,7 @@ function recast(x::PTArray,rb::BlockRBSpace)
   return vcat(blocks...)
 end
 
-function space_time_projection(x::PTArray,rb::BlockRBSpace)
+function space_time_projection(x::PArray,rb::BlockRBSpace)
   nblocks = length(rb)
   offsets = fe_offsets(rb)
   blocks = map(1:nblocks) do row
@@ -240,7 +240,7 @@ function add_time_supremizers(basis_u::Matrix,basis_p::Matrix;ttol=1e-2)
   basis_u
 end
 
-function FESpaces.get_algebraic_operator(
+function get_method_operator(
   fesolver::ODESolver,
   feop::TransientPFEOperator,
   rbspace::BlockRBSpace{T},
@@ -256,7 +256,7 @@ function FESpaces.get_algebraic_operator(
   end
   basis_time = get_basis_time(testitem(rbspace))
   _rbspace = RBSpace(basis_space,basis_time)
-  get_algebraic_operator(fesolver,feop,_rbspace,params;kwargs...)
+  get_method_operator(fesolver,feop,_rbspace,params;kwargs...)
 end
 
 abstract type BlockRBAlgebraicContribution{T,N} <: RBBlock{T,N} end
@@ -395,7 +395,7 @@ end
 
 function collect_compress_rhs(
   rbinfo::BlockRBInfo,
-  op::PTAlgebraicOperator,
+  op::NonlinearOperator,
   rbspace::BlockRBSpace{T}) where T
 
   nblocks = length(rbspace)
@@ -416,7 +416,7 @@ end
 
 function collect_compress_lhs(
   rbinfo::BlockRBInfo,
-  op::PTAlgebraicOperator,
+  op::NonlinearOperator,
   rbspace::BlockRBSpace{T};
   θ::Real=1) where T
 
@@ -442,7 +442,7 @@ function collect_compress_lhs(
   return ad_jacs
 end
 
-function check_touched_residuals(op::PTAlgebraicOperator)
+function check_touched_residuals(op::NonlinearOperator)
   feop = op.feop
   test = get_test(feop)
   Us, = op.ode_cache
@@ -460,7 +460,7 @@ function check_touched_residuals(op::PTAlgebraicOperator)
   return !isnothing(int)
 end
 
-function check_touched_jacobians(op::PTAlgebraicOperator;i=1)
+function check_touched_jacobians(op::NonlinearOperator;i=1)
   feop = op.feop
   test = get_test(feop)
   trial = get_trial(feop)
@@ -483,12 +483,12 @@ end
 function collect_rhs_contributions!(
   cache,
   rbinfo::BlockRBInfo,
-  op::PTAlgebraicOperator,
+  op::NonlinearOperator,
   rbres::BlockRBVecAlgebraicContribution{T},
   rbspace::BlockRBSpace{T}) where T
 
   nblocks = length(rbres)
-  blocks = Vector{PTArray{Vector{T}}}(undef,nblocks)
+  blocks = Vector{PArray{Vector{T}}}(undef,nblocks)
   for row = 1:nblocks
     cache_row = cache_at_index(cache,rbspace,row)
     op_row_col = op[row,:]
@@ -508,16 +508,16 @@ end
 function collect_lhs_contributions!(
   cache,
   rbinfo::BlockRBInfo,
-  op::PTAlgebraicOperator,
+  op::NonlinearOperator,
   rbjacs::Vector{BlockRBMatAlgebraicContribution{T}},
   rbspace::BlockRBSpace{T}) where T
 
   njacs = length(rbjacs)
   nblocks = length(testitem(rbjacs))
-  rb_jacs_contribs = Vector{PTArray{Matrix{T}}}(undef,njacs)
+  rb_jacs_contribs = Vector{PArray{Matrix{T}}}(undef,njacs)
   for i = 1:njacs
     rb_jac_i = rbjacs[i]
-    blocks = Matrix{PTArray{Matrix{T}}}(undef,nblocks,nblocks)
+    blocks = Matrix{PArray{Matrix{T}}}(undef,nblocks,nblocks)
     for (row,col) = index_pairs(nblocks,nblocks)
       cache_row_col = cache_at_index(cache,rbspace,row,col)
       op_row_col = op[row,col]
@@ -562,8 +562,8 @@ end
 function post_process(
   rbinfo::BlockRBInfo,
   feop::TransientPFEOperator,
-  sol::PTArray,
-  sol_approx::PTArray,
+  sol::PArray,
+  sol_approx::PArray,
   params::Table,
   stats::NamedTuple;
   show_results=true)

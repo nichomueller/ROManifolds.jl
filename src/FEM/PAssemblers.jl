@@ -1,20 +1,23 @@
-struct PTSparseMatrixAssember <: Assembler
-  assem::SparseMatrixAssembler
+function Algebra.allocate_vector(
+  a::SparseMatrixAssember,
+  vecdata::Tuple{<:AbstractVector{<:PArray},Any})
+
+  cellvec,cellidsrows = vecdata
+  cellvec1 = first.(cellvec)
+  n = length(first(cellvec))
+  vec = allocate_vector(a,(cellvec1,cellidsrows))
+  parray(vec,n)
 end
 
-function PTSparseMatrixAssember(trial::TrialPFESpace,test::FESpace)
-  trial0 = trial(nothing)
-  PTSparseMatrixAssember(PTSparseMatrixAssember(trial0,test))
-end
+function Algebra.allocate_matrix(
+  a::SparseMatrixAssember,
+  matdata::Tuple{<:AbstractVector{<:PArray},Any,Any})
 
-function PTSparseMatrixAssember(trial::TransientTrialPFESpace,test::FESpace)
-  trial0 = trial(nothing,nothing)
-  PTSparseMatrixAssember(PTSparseMatrixAssember(trial0,test))
-end
-
-function Algebra.allocate_vector(a::PTSparseMatrixAssember,vecdata)
-
-  data = first()
+  cellmat,cellidsrows,cellidscols = matdata
+  cellmat1 = first.(cellmat)
+  n = length(first(cellmat))
+  mat = allocate_matrix(a,(cellmat1,cellidsrows,cellidscols))
+  parray(mat,n)
 end
 
 function FESpaces.collect_cell_vector(
@@ -56,7 +59,7 @@ function FESpaces.collect_cell_matrix(
   (w,r,c)
 end
 
-Algebra.create_from_nz(a::PTArray) = a
+Algebra.create_from_nz(a::PArray) = a
 
 @inline function Algebra._add_entries!(
   combine::Function,
@@ -102,7 +105,7 @@ end
 @inline function Algebra._add_entries!(
   combine::Function,
   A::AbstractMatrix{T},
-  vs::PTArray,
+  vs::PArray,
   is,js) where T<:AbstractArray
 
   for (lj,j) in enumerate(js)
@@ -156,7 +159,7 @@ end
 @inline function Algebra._add_entries!(
   combine::Function,
   A::AbstractVector{T},
-  vs::PTArray,
+  vs::PArray,
   is) where T<:AbstractArray
 
   for (li,i) in enumerate(is)

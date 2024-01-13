@@ -1,48 +1,48 @@
-struct PTArray{T,N,A} <: AbstractArray{T,N}
+struct PArray{T,N,A} <: AbstractArray{T,N}
   array::A
-  function PTArray(array::AbstractVector{T}) where T<:AbstractArray
+  function PArray(array::AbstractVector{T}) where T<:AbstractArray
     N = ndims(T)
     A = typeof(array)
     new{T,N,A}(array)
   end
-  function PTArray(array::A) where A
+  function PArray(array::A) where A
     T = eltype(array)
     N = 1
     new{T,N,A}(array)
   end
 end
 
-Arrays.get_array(a::PTArray) = a.array
-Arrays.testitem(a::PTArray) = testitem(get_array(a))
-Base.size(a::PTArray,i...) = size(testitem(a),i...)
-Base.eltype(::Type{<:PTArray{T}}) where T = eltype(T)
-Base.eltype(::PTArray{T}) where T = eltype(T)
-Base.ndims(::PTArray{T,N} where T) where N = N
-Base.ndims(::Type{<:PTArray{T,N}} where T) where N = N
-Base.first(a::PTArray) = testitem(a)
-Base.length(a::PTArray) = length(get_array(a))
-Base.eachindex(a::PTArray) = eachindex(get_array(a))
-Base.lastindex(a::PTArray) = lastindex(get_array(a))
-Base.getindex(a::PTArray,i...) = get_array(a)[i...]
-Base.setindex!(a::PTArray,v,i...) = get_array(a)[i...] = v
+Arrays.get_array(a::PArray) = a.array
+Arrays.testitem(a::PArray) = testitem(get_array(a))
+Base.size(a::PArray,i...) = size(testitem(a),i...)
+Base.eltype(::Type{<:PArray{T}}) where T = eltype(T)
+Base.eltype(::PArray{T}) where T = eltype(T)
+Base.ndims(::PArray{T,N} where T) where N = N
+Base.ndims(::Type{<:PArray{T,N}} where T) where N = N
+Base.first(a::PArray) = testitem(a)
+Base.length(a::PArray) = length(get_array(a))
+Base.eachindex(a::PArray) = eachindex(get_array(a))
+Base.lastindex(a::PArray) = lastindex(get_array(a))
+Base.getindex(a::PArray,i...) = get_array(a)[i...]
+Base.setindex!(a::PArray,v,i...) = get_array(a)[i...] = v
 
-function Base.show(io::IO,::MIME"text/plain",a::PTArray{T}) where T
-  println(io, "PTArray with eltype $T and elements")
+function Base.show(io::IO,::MIME"text/plain",a::PArray{T}) where T
+  println(io, "PArray with eltype $T and elements")
   for i in eachindex(a)
     println(io,"  ",a[i])
   end
 end
 
-function Base.copy(a::PTArray{T}) where T
+function Base.copy(a::PArray{T}) where T
   b = Vector{T}(undef,length(a))
   @inbounds for i = eachindex(a)
     b[i] = copy(a[i])
   end
-  PTArray(b)
+  PArray(b)
 end
 
 function Base.similar(
-  a::PTArray,
+  a::PArray,
   type::Type{T}=eltype(testitem(a)),
   ndim::Union{Integer,AbstractUnitRange}=length(testitem(a))) where T
 
@@ -51,62 +51,62 @@ function Base.similar(
   @inbounds for i = eachindex(a)
     b[i] = similar(a[i],type,ndim)
   end
-  PTArray(b)
+  PArray(b)
 end
 
-function Base.zero(a::PTArray)
+function Base.zero(a::PArray)
   T = eltype(a)
   b = similar(a)
   b .= zero(T)
 end
 
-function Base.zeros(a::PTArray)
+function Base.zeros(a::PArray)
   get_array(zero(a))
 end
 
-function ptarray(a::AbstractArray,N::Integer)
-  PTArray([copy(a) for _ = 1:N])
+function parray(a::AbstractArray,N::Integer)
+  PArray([copy(a) for _ = 1:N])
 end
 
-function ptzeros(a::AbstractArray{T},N::Integer) where T
+function pzeros(a::AbstractArray{T},N::Integer) where T
   b = similar(a)
   fill!(b,zero(T))
-  PTArray([copy(b) for _ = 1:N])
+  PArray([copy(b) for _ = 1:N])
 end
 
-function Base.sum(a::PTArray)
+function Base.sum(a::PArray)
   sum(get_array(a))
 end
 
 for op in (:+,:-)
   @eval begin
-    function ($op)(a::PTArray{T},b::PTArray{T}) where T
+    function ($op)(a::PArray{T},b::PArray{T}) where T
       array = ($op)(get_array(a),get_array(b))
-      PTArray(array)
+      PArray(array)
     end
 
-    function ($op)(a::PTArray{T},b::AbstractArray{T}) where T
+    function ($op)(a::PArray{T},b::AbstractArray{T}) where T
       array = ($op)(get_array(a),b)
-      PTArray(array)
+      PArray(array)
     end
 
-    function ($op)(a::AbstractArray{T},b::PTArray{T}) where T
+    function ($op)(a::AbstractArray{T},b::PArray{T}) where T
       array = ($op)(a,get_array(b))
-      PTArray(array)
+      PArray(array)
     end
   end
 end
 
-function Base.:*(a::PTArray,b::Number)
+function Base.:*(a::PArray,b::Number)
   array = get_array(a)*b
-  PTArray(array)
+  PArray(array)
 end
 
-function Base.:*(a::Number,b::PTArray)
+function Base.:*(a::Number,b::PArray)
   b*a
 end
 
-function Base.:≈(a::PTArray,b::PTArray)
+function Base.:≈(a::PArray,b::PArray)
   @assert size(a) == size(b)
   for i in eachindex(a)
     if !(a[i] ≈ b[i])
@@ -116,7 +116,7 @@ function Base.:≈(a::PTArray,b::PTArray)
   true
 end
 
-function Base.:(==)(a::PTArray,b::PTArray)
+function Base.:(==)(a::PArray,b::PArray)
   @assert size(a) == size(b)
   for i in eachindex(a)
     if !(a[i] == b[i])
@@ -126,11 +126,11 @@ function Base.:(==)(a::PTArray,b::PTArray)
   true
 end
 
-function Base.transpose(a::PTArray)
+function Base.transpose(a::PArray)
   map(transpose,a)
 end
 
-function Base.hcat(a::PTArray...)
+function Base.hcat(a::PArray...)
   n = length(first(a))
   harray = map(1:n) do j
     arrays = ()
@@ -139,10 +139,10 @@ function Base.hcat(a::PTArray...)
     end
     hcat(arrays...)
   end
-  PTArray(harray)
+  PArray(harray)
 end
 
-function Base.vcat(a::PTArray...)
+function Base.vcat(a::PArray...)
   n = length(first(a))
   varray = map(1:n) do j
     arrays = ()
@@ -151,10 +151,10 @@ function Base.vcat(a::PTArray...)
     end
     vcat(arrays...)
   end
-  PTArray(varray)
+  PArray(varray)
 end
 
-function Base.stack(a::PTArray...)
+function Base.stack(a::PArray...)
   n = length(first(a))
   harray = map(1:n) do j
     arrays = ()
@@ -163,10 +163,10 @@ function Base.stack(a::PTArray...)
     end
     stack(arrays)
   end
-  PTArray(harray)
+  PArray(harray)
 end
 
-function Base.hvcat(nblocks::Int,a::PTArray...)
+function Base.hvcat(nblocks::Int,a::PArray...)
   nrows = Int(length(a)/nblocks)
   varray = map(1:nrows) do row
     vcat(a[(row-1)*nblocks+1:row*nblocks]...)
@@ -175,26 +175,26 @@ function Base.hvcat(nblocks::Int,a::PTArray...)
   hvarray
 end
 
-function Base.fill!(a::PTArray,z)
+function Base.fill!(a::PArray,z)
   @inbounds for i = eachindex(a)
     ai = a[i]
     fill!(ai,z)
   end
 end
 
-function Base.maximum(f,a::PTArray)
+function Base.maximum(f,a::PArray)
   map(a) do ai
     maximum(f,ai)
   end
 end
 
-function Base.minimum(f,a::PTArray)
+function Base.minimum(f,a::PArray)
   map(a) do ai
     minimum(f,ai)
   end
 end
 
-function LinearAlgebra.fillstored!(a::PTArray,z)
+function LinearAlgebra.fillstored!(a::PArray,z)
   @inbounds for i = eachindex(a)
     ai = a[i]
     fillstored!(ai,z)
@@ -202,9 +202,9 @@ function LinearAlgebra.fillstored!(a::PTArray,z)
 end
 
 function LinearAlgebra.mul!(
-  c::PTArray,
-  a::PTArray,
-  b::PTArray,
+  c::PArray,
+  a::PArray,
+  b::PArray,
   α::Number,β::Number)
 
   @inbounds for i = eachindex(a)
@@ -213,52 +213,52 @@ function LinearAlgebra.mul!(
   end
 end
 
-function LinearAlgebra.ldiv!(a::PTArray,m::LU,b::PTArray)
+function LinearAlgebra.ldiv!(a::PArray,m::LU,b::PArray)
   @inbounds for i = eachindex(a)
     ai,bi = a[i],b[i]
     ldiv!(ai,m,bi)
   end
 end
 
-function LinearAlgebra.ldiv!(a::PTArray,m::AbstractArray,b::PTArray)
+function LinearAlgebra.ldiv!(a::PArray,m::AbstractArray,b::PArray)
   @inbounds for i = eachindex(a)
     ai,mi,bi = a[i],m[i],b[i]
     ldiv!(ai,mi,bi)
   end
 end
 
-function LinearAlgebra.rmul!(a::PTArray,b::Number)
+function LinearAlgebra.rmul!(a::PArray,b::Number)
   @inbounds for i = eachindex(a)
     ai = a[i]
     rmul!(ai,b)
   end
 end
 
-function LinearAlgebra.lu(a::PTArray)
+function LinearAlgebra.lu(a::PArray)
   map(a) do ai
     lu(ai)
   end
 end
 
-function LinearAlgebra.lu!(a::PTArray,b::PTArray)
+function LinearAlgebra.lu!(a::PArray,b::PArray)
   @inbounds for i = eachindex(a)
     ai,bi = a[i],b[i]
     lu!(ai,bi)
   end
 end
 
-function Arrays.CachedArray(a::PTArray)
+function Arrays.CachedArray(a::PArray)
   ai = testitem(a)
   ci = CachedArray(ai)
   array = Vector{typeof(ci)}(undef,length(a))
   @inbounds for i in eachindex(a)
     array[i] = CachedArray(a.array[i])
   end
-  PTArray(array)
+  PArray(array)
 end
 
 function Arrays.setsize!(
-  a::PTArray{<:CachedArray{T,N}},
+  a::PArray{<:CachedArray{T,N}},
   s::NTuple{N,Int}) where {T,N}
 
   @inbounds for i in eachindex(a)
@@ -266,61 +266,61 @@ function Arrays.setsize!(
   end
 end
 
-function SparseArrays.resize!(a::PTArray,args...)
+function SparseArrays.resize!(a::PArray,args...)
   map(a) do ai
     resize!(ai,args...)
   end
 end
 
-Arrays.get_array(a::PTArray{<:CachedArray}) = map(x->x.array,a.array)
+Arrays.get_array(a::PArray{<:CachedArray}) = map(x->x.array,a.array)
 
-function Base.map(f,a::PTArray...)
+function Base.map(f,a::PArray...)
   fa1 = f(map(testitem,a)...)
   array = Vector{typeof(fa1)}(undef,length(first(a)))
   @inbounds for i = eachindex(first(a))
     ai = map(x->getindex(x,i),a)
     array[i] = f(ai...)
   end
-  PTArray(array)
+  PArray(array)
 end
 
-function Base.map(f,a::PTArray,b::AbstractArray...)
+function Base.map(f,a::PArray,b::AbstractArray...)
   f1 = f(a[1],b...)
   array = Vector{typeof(f1)}(undef,length(a))
   @inbounds for i = eachindex(a)
     array[i] = f(a[i],b...)
   end
-  PTArray(array)
+  PArray(array)
 end
 
 struct PTBroadcasted{T}
-  array::PTArray{T}
+  array::PArray{T}
 end
-_get_pta(a::PTArray) = a
+_get_pta(a::PArray) = a
 _get_pta(a::PTBroadcasted) = a.array
 
-function Base.broadcasted(f,a::Union{PTArray,PTBroadcasted}...)
+function Base.broadcasted(f,a::Union{PArray,PTBroadcasted}...)
   pta = map(_get_pta,a)
   PTBroadcasted(map(f,pta...))
 end
 
-function Base.broadcasted(f,a::Number,b::Union{PTArray,PTBroadcasted})
+function Base.broadcasted(f,a::Number,b::Union{PArray,PTBroadcasted})
   PTBroadcasted(map(x->f(a,x),_get_pta(b)))
 end
 
-function Base.broadcasted(f,a::Union{PTArray,PTBroadcasted},b::Number)
+function Base.broadcasted(f,a::Union{PArray,PTBroadcasted},b::Number)
   PTBroadcasted(map(x->f(x,b),_get_pta(a)))
 end
 
 function Base.broadcasted(
-  f,a::Union{PTArray,PTBroadcasted},
+  f,a::Union{PArray,PTBroadcasted},
   b::Broadcast.Broadcasted{Broadcast.DefaultArrayStyle{0}})
   Base.broadcasted(f,a,Base.materialize(b))
 end
 
 function Base.broadcasted(
   f,a::Broadcast.Broadcasted{Broadcast.DefaultArrayStyle{0}},
-  b::Union{PTArray,PTBroadcasted})
+  b::Union{PArray,PTBroadcasted})
   Base.broadcasted(f,Base.materialize(a),b)
 end
 
@@ -330,33 +330,33 @@ function Base.materialize(b::PTBroadcasted{T}) where T
   a
 end
 
-function Base.materialize!(a::PTArray,b::Broadcast.Broadcasted)
+function Base.materialize!(a::PArray,b::Broadcast.Broadcasted)
   map(x->Base.materialize!(x,b),a)
   a
 end
 
-function Base.materialize!(a::PTArray,b::PTBroadcasted)
+function Base.materialize!(a::PArray,b::PTBroadcasted)
   map(Base.materialize!,a,b.array)
   a
 end
 
 function Base.length(
-  a::BroadcastOpFieldArray{O,T,N,<:Tuple{Vararg{Union{Any,PTArray}}}}
+  a::BroadcastOpFieldArray{O,T,N,<:Tuple{Vararg{Union{Any,PArray}}}}
   ) where {O,T,N}
-  pta = filter(x->isa(x,PTArray),a.args)
+  pta = filter(x->isa(x,PArray),a.args)
   l = map(length,pta)
   @assert all(l .== first(l))
   return first(l)
 end
 
 function Base.size(
-  a::BroadcastOpFieldArray{O,T,N,<:Tuple{Vararg{Union{Any,PTArray}}}}
+  a::BroadcastOpFieldArray{O,T,N,<:Tuple{Vararg{Union{Any,PArray}}}}
   ) where {O,T,N}
   return (length(a),)
 end
 
 function Base.getindex(
-  a::BroadcastOpFieldArray{O,T,N,<:Tuple{PTArray,Any}},
+  a::BroadcastOpFieldArray{O,T,N,<:Tuple{PArray,Any}},
   i::Integer) where {O,T,N}
 
   ai = a.args[1][i]
@@ -364,20 +364,20 @@ function Base.getindex(
 end
 
 function Base.getindex(
-  a::BroadcastOpFieldArray{O,T,N,<:Tuple{Any,PTArray}},
+  a::BroadcastOpFieldArray{O,T,N,<:Tuple{Any,PArray}},
   i::Integer) where {O,T,N}
 
   ai = a.args[2][i]
   Operation(a.op)(a.args[1],ai)
 end
 
-function Arrays.return_value(f::Broadcasting{typeof(∘)},a::PTArray{<:Field},b::Field)
+function Arrays.return_value(f::Broadcasting{typeof(∘)},a::PArray{<:Field},b::Field)
   args = map(x->return_value(f,x,b),a)
   data = map(x->getproperty(x,:fields),args)
   OperationField(∘,data)
 end
 
-function Arrays.return_value(f::Broadcasting{typeof(∘)},a::Field,b::PTArray{<:Field})
+function Arrays.return_value(f::Broadcasting{typeof(∘)},a::Field,b::PArray{<:Field})
   args = map(x->return_value(f,a,x),b)
   data = map(x->getproperty(x,:fields),args)
   OperationField(∘,data)
@@ -387,19 +387,19 @@ for op in (:+,:-,:*)
   @eval begin
     function Arrays.return_value(
       f::Broadcasting{typeof($op)},
-      a::PTArray)
+      a::PArray)
 
       v1 = return_value(f,a[1])
       array = Vector{typeof(v1)}(undef,length(a))
       for i = eachindex(a)
         array[i] = return_value(f,a[i])
       end
-      PTArray(array)
+      PArray(array)
     end
 
     function Arrays.return_cache(
       f::Broadcasting{typeof($op)},
-      a::PTArray)
+      a::PArray)
 
       c1 = return_cache(f,a[1])
       b1 = evaluate!(c1,f,a[1])
@@ -408,13 +408,13 @@ for op in (:+,:-,:*)
       for i = eachindex(a)
         cache[i] = return_cache(f,a[i])
       end
-      cache,PTArray(array)
+      cache,PArray(array)
     end
 
     function Arrays.evaluate!(
       cache,
       f::Broadcasting{typeof($op)},
-      a::PTArray)
+      a::PArray)
 
       cx,array = cache
       @inbounds for i = eachindex(array)
@@ -429,7 +429,7 @@ for op in (:+,:-,:*)
   @eval begin
     function Arrays.return_value(
       f::Broadcasting{typeof($op)},
-      a::PTArray,
+      a::PArray,
       b::AbstractArray)
 
       v1 = return_value(f,a[1],b)
@@ -437,38 +437,38 @@ for op in (:+,:-,:*)
       for i = eachindex(a)
         array[i] = return_value(f,a[i],b)
       end
-      PTArray(array)
+      PArray(array)
     end
 
     function Arrays.return_value(
       f::Broadcasting{typeof($op)},
       a::AbstractArray,
-      b::PTArray)
+      b::PArray)
 
       v1 = return_value(f,a,b[1])
       array = Vector{typeof(v1)}(undef,length(b))
       for i = eachindex(b)
         array[i] = return_value(f,a,b[i])
       end
-      PTArray(array)
+      PArray(array)
     end
 
     function Arrays.return_value(
       f::Broadcasting{typeof($op)},
-      a::PTArray,
-      b::PTArray)
+      a::PArray,
+      b::PArray)
 
       v1 = return_value(f,a[1],b[1])
       array = Vector{typeof(v1)}(undef,length(a))
       for i = eachindex(a)
         array[i] = return_value(f,a[i],b[i])
       end
-      PTArray(array)
+      PArray(array)
     end
 
     function Arrays.return_cache(
       f::Broadcasting{typeof($op)},
-      a::PTArray,
+      a::PArray,
       b::AbstractArray)
 
       c1 = return_cache(f,a[1],b)
@@ -478,13 +478,13 @@ for op in (:+,:-,:*)
       for i = eachindex(a)
         cache[i] = return_cache(f,a[i],b)
       end
-      cache,PTArray(array)
+      cache,PArray(array)
     end
 
     function Arrays.return_cache(
       f::Broadcasting{typeof($op)},
       a::AbstractArray,
-      b::PTArray)
+      b::PArray)
 
       c1 = return_cache(f,a,b[1])
       b1 = evaluate!(c1,f,a,b[1])
@@ -493,13 +493,13 @@ for op in (:+,:-,:*)
       for i = eachindex(b)
         cache[i] = return_cache(f,a,b[i])
       end
-      cache,PTArray(array)
+      cache,PArray(array)
     end
 
     function Arrays.return_cache(
       f::Broadcasting{typeof($op)},
-      a::PTArray,
-      b::PTArray)
+      a::PArray,
+      b::PArray)
 
       c1 = return_cache(f,a[1],b[1])
       b1 = evaluate!(c1,f,a[1],b[1])
@@ -508,13 +508,13 @@ for op in (:+,:-,:*)
       for i = eachindex(a)
         cache[i] = return_cache(f,a[i],b[i])
       end
-      cache,PTArray(array)
+      cache,PArray(array)
     end
 
     function Arrays.evaluate!(
       cache,
       f::Broadcasting{typeof($op)},
-      a::PTArray,
+      a::PArray,
       b::AbstractArray)
 
       cx,array = cache
@@ -528,7 +528,7 @@ for op in (:+,:-,:*)
       cache,
       f::Broadcasting{typeof($op)},
       a::AbstractArray,
-      b::PTArray)
+      b::PArray)
 
       cx,array = cache
       @inbounds for i = eachindex(array)
@@ -540,8 +540,8 @@ for op in (:+,:-,:*)
     function Arrays.evaluate!(
       cache,
       f::Broadcasting{typeof($op)},
-      a::PTArray,
-      b::PTArray)
+      a::PArray,
+      b::PArray)
 
       cx,array = cache
       @inbounds for i = eachindex(array)
@@ -554,7 +554,7 @@ end
 
 function Arrays.return_value(
   f::Broadcasting{typeof(*)},
-  a::PTArray,
+  a::PArray,
   b::Number)
 
   v1 = return_value(f,a[1],b)
@@ -562,12 +562,12 @@ function Arrays.return_value(
   for i = eachindex(a)
     array[i] = return_value(f,a[i],b)
   end
-  PTArray(array)
+  PArray(array)
 end
 
 function Arrays.return_cache(
   f::Broadcasting{typeof(*)},
-  a::PTArray,
+  a::PArray,
   b::Number)
 
   c1 = return_cache(f,a[1],b)
@@ -577,13 +577,13 @@ function Arrays.return_cache(
   for i = eachindex(a)
     cache[i] = return_cache(f,a[i],b)
   end
-  cache,PTArray(array)
+  cache,PArray(array)
 end
 
 function Arrays.evaluate!(
   cache,
   f::Broadcasting{typeof(*)},
-  a::PTArray,
+  a::PArray,
   b::Number)
 
   cx,array = cache
@@ -596,7 +596,7 @@ end
 function Arrays.return_value(
   f::Broadcasting{typeof(*)},
   a::Number,
-  b::PTArray)
+  b::PArray)
 
   return_value(f,b,a)
 end
@@ -604,7 +604,7 @@ end
 function Arrays.return_cache(
   f::Broadcasting{typeof(*)},
   a::Number,
-  b::PTArray)
+  b::PArray)
 
   return_cache(f,b,a)
 end
@@ -613,14 +613,14 @@ function Arrays.evaluate!(
   cache,
   f::Broadcasting{typeof(*)},
   a::Number,
-  b::PTArray)
+  b::PArray)
 
   evaluate!(cache,f,b,a)
 end
 
 function Arrays.return_value(
   f::BroadcastingFieldOpMap,
-  a::PTArray,
+  a::PArray,
   b::AbstractArray)
 
   v1 = return_value(f,a[1],b)
@@ -628,38 +628,38 @@ function Arrays.return_value(
   for i = eachindex(a)
     array[i] = return_value(f,a[i],b)
   end
-  PTArray(array)
+  PArray(array)
 end
 
 function Arrays.return_value(
   f::BroadcastingFieldOpMap,
   a::AbstractArray,
-  b::PTArray)
+  b::PArray)
 
   v1 = return_value(f,a,b[1])
   array = Vector{typeof(v1)}(undef,length(b))
   for i = eachindex(b)
     array[i] = return_value(f,a,b[i])
   end
-  PTArray(array)
+  PArray(array)
 end
 
 function Arrays.return_value(
   f::BroadcastingFieldOpMap,
-  a::PTArray,
-  b::PTArray)
+  a::PArray,
+  b::PArray)
 
   v1 = return_value(f,a[1],b[1])
   array = Vector{typeof(v1)}(undef,length(a))
   for i = eachindex(a)
     array[i] = return_value(f,a[i],b[i])
   end
-  PTArray(array)
+  PArray(array)
 end
 
 function Arrays.return_cache(
   f::BroadcastingFieldOpMap,
-  a::PTArray,
+  a::PArray,
   b::AbstractArray)
 
   c1 = return_cache(f,a[1],b)
@@ -669,13 +669,13 @@ function Arrays.return_cache(
   for i = eachindex(a)
     cache[i] = return_cache(f,a[i],b)
   end
-  cache,PTArray(array)
+  cache,PArray(array)
 end
 
 function Arrays.return_cache(
   f::BroadcastingFieldOpMap,
   a::AbstractArray,
-  b::PTArray)
+  b::PArray)
 
   c1 = return_cache(f,a,b[1])
   b1 = evaluate!(c1,f,a,b[1])
@@ -684,13 +684,13 @@ function Arrays.return_cache(
   for i = eachindex(b)
     cache[i] = return_cache(f,a,b[i])
   end
-  cache,PTArray(array)
+  cache,PArray(array)
 end
 
 function Arrays.return_cache(
   f::BroadcastingFieldOpMap,
-  a::PTArray,
-  b::PTArray)
+  a::PArray,
+  b::PArray)
 
   c1 = return_cache(f,a[1],b[1])
   b1 = evaluate!(c1,f,a[1],b[1])
@@ -699,13 +699,13 @@ function Arrays.return_cache(
   for i = eachindex(a)
     cache[i] = return_cache(f,a[i],b[i])
   end
-  cache,PTArray(array)
+  cache,PArray(array)
 end
 
 function Arrays.evaluate!(
   cache,
   f::BroadcastingFieldOpMap,
-  a::PTArray{<:AbstractArray{T,N}},
+  a::PArray{<:AbstractArray{T,N}},
   b::AbstractArray{S,N}) where {T,S,N}
 
   cx,array = cache
@@ -719,7 +719,7 @@ function Arrays.evaluate!(
   cache,
   f::BroadcastingFieldOpMap,
   a::AbstractArray{T,N},
-  b::PTArray{<:AbstractArray{S,N}}) where {T,S,N}
+  b::PArray{<:AbstractArray{S,N}}) where {T,S,N}
 
   cx,array = cache
   @inbounds for i = eachindex(array)
@@ -731,8 +731,8 @@ end
 function Arrays.evaluate!(
   cache,
   f::BroadcastingFieldOpMap,
-  a::PTArray{<:AbstractArray{T,N}},
-  b::PTArray{<:AbstractArray{S,N}}) where {T,S,N}
+  a::PArray{<:AbstractArray{T,N}},
+  b::PArray{<:AbstractArray{S,N}}) where {T,S,N}
 
   cx,array = cache
   @inbounds for i = eachindex(array)
@@ -747,7 +747,7 @@ for S in (:AbstractVector,:AbstractMatrix)
       function Arrays.evaluate!(
         cache,
         f::BroadcastingFieldOpMap,
-        a::PTArray{<:$S},
+        a::PArray{<:$S},
         b::$T)
 
         cx,array = cache
@@ -761,7 +761,7 @@ for S in (:AbstractVector,:AbstractMatrix)
         cache,
         f::BroadcastingFieldOpMap,
         a::$S,
-        b::PTArray{<:$T})
+        b::PArray{<:$T})
 
         cx,array = cache
         @inbounds for i = eachindex(array)
@@ -773,8 +773,8 @@ for S in (:AbstractVector,:AbstractMatrix)
       function Arrays.evaluate!(
         cache,
         f::BroadcastingFieldOpMap,
-        a::PTArray{<:$S},
-        b::PTArray{<:$T})
+        a::PArray{<:$S},
+        b::PArray{<:$T})
 
         cx,array = cache
         @inbounds for i = eachindex(array)
@@ -789,7 +789,7 @@ for S in (:AbstractVector,:AbstractMatrix)
     function Arrays.evaluate!(
       cache,
       f::BroadcastingFieldOpMap,
-      a::PTArray{<:$S},
+      a::PArray{<:$S},
       b::AbstractArray{U,3} where U)
 
       cx,array = cache
@@ -803,7 +803,7 @@ for S in (:AbstractVector,:AbstractMatrix)
       cache,
       f::BroadcastingFieldOpMap,
       a::$S,
-      b::PTArray{<:AbstractArray{U,3}} where U)
+      b::PArray{<:AbstractArray{U,3}} where U)
 
       cx,array = cache
       @inbounds for i = eachindex(array)
@@ -815,7 +815,7 @@ for S in (:AbstractVector,:AbstractMatrix)
     function Arrays.evaluate!(
       cache,
       f::BroadcastingFieldOpMap,
-      a::PTArray{<:AbstractArray{U,3}} where U,
+      a::PArray{<:AbstractArray{U,3}} where U,
       b::$S)
 
       cx,array = cache
@@ -829,7 +829,7 @@ for S in (:AbstractVector,:AbstractMatrix)
       cache,
       f::BroadcastingFieldOpMap,
       a::AbstractArray{U,3} where U,
-      b::PTArray{<:$S})
+      b::PArray{<:$S})
 
       cx,array = cache
       @inbounds for i = eachindex(array)
@@ -840,22 +840,22 @@ for S in (:AbstractVector,:AbstractMatrix)
   end
 end
 
-function Base.getindex(k::LinearCombinationField{<:PTArray},i::Int)
+function Base.getindex(k::LinearCombinationField{<:PArray},i::Int)
   LinearCombinationField(k.values[i],k.fields,k.column)
 end
 
 for T in (:(Point),:(AbstractVector{<:Point}))
   @eval begin
-    function Arrays.return_value(a::LinearCombinationField{<:PTArray},x::$T)
+    function Arrays.return_value(a::LinearCombinationField{<:PArray},x::$T)
       v1 = return_value(a[1],x)
       array = Vector{typeof(v1)}(undef,length(a.values))
       for i = eachindex(a.values)
         array[i] = return_value(a[i],x)
       end
-      PTArray(array)
+      PArray(array)
     end
 
-    function Arrays.return_cache(a::LinearCombinationField{<:PTArray},x::$T)
+    function Arrays.return_cache(a::LinearCombinationField{<:PArray},x::$T)
       c1 = return_cache(a[1],x)
       b1 = evaluate!(c1,a[1],x)
       cache = Vector{typeof(c1)}(undef,length(a.values))
@@ -863,10 +863,10 @@ for T in (:(Point),:(AbstractVector{<:Point}))
       for i = eachindex(a.values)
         cache[i] = return_cache(a[i],x)
       end
-      cache,PTArray(array)
+      cache,PArray(array)
     end
 
-    function Arrays.evaluate!(cache,a::LinearCombinationField{<:PTArray},x::$T)
+    function Arrays.evaluate!(cache,a::LinearCombinationField{<:PArray},x::$T)
       cx,array = cache
       @inbounds for i = eachindex(array)
         array[i] = evaluate!(cx[i],a[i],x)
@@ -881,7 +881,7 @@ for S in (:AbstractVector,:AbstractMatrix,:AbstractArray)
     @eval begin
       function Arrays.return_value(
         k::LinearCombinationMap{<:Integer},
-        v::PTArray{<:$S},
+        v::PArray{<:$S},
         fx::$T)
 
         v1 = return_value(k,v[1],fx)
@@ -889,12 +889,12 @@ for S in (:AbstractVector,:AbstractMatrix,:AbstractArray)
         for i = eachindex(v)
           array[i] = return_value(k,v[i],fx)
         end
-        PTArray(array)
+        PArray(array)
       end
 
       function Arrays.return_cache(
         k::LinearCombinationMap{<:Integer},
-        v::PTArray{<:$S},
+        v::PArray{<:$S},
         fx::$T)
 
         c1 = return_cache(k,v[1],fx)
@@ -904,13 +904,13 @@ for S in (:AbstractVector,:AbstractMatrix,:AbstractArray)
         for i = eachindex(v)
           cache[i] = return_cache(k,v[i],fx)
         end
-        cache,PTArray(array)
+        cache,PArray(array)
       end
 
       function Arrays.evaluate!(
         cache,
         k::LinearCombinationMap{<:Integer},
-        v::PTArray{<:$S},
+        v::PArray{<:$S},
         fx::$T)
 
         cx,array = cache
@@ -923,22 +923,22 @@ for S in (:AbstractVector,:AbstractMatrix,:AbstractArray)
   end
 end
 
-function Fields.linear_combination(a::PTArray,b::AbstractArray)
+function Fields.linear_combination(a::PArray,b::AbstractArray)
   ab1 = linear_combination(a[1],b)
   c = Vector{typeof(ab1)}(undef,length(a))
   for i in eachindex(a)
     c[i] = linear_combination(a[i],b)
   end
-  PTArray(c)
+  PArray(c)
 end
 
-function Base.getindex(k::Broadcasting{<:PosNegReindex{<:PTArray,<:PTArray}},i::Int)
+function Base.getindex(k::Broadcasting{<:PosNegReindex{<:PArray,<:PArray}},i::Int)
   fi = PosNegReindex(k.f.values_pos[i],k.f.values_neg[i])
   Broadcasting(fi)
 end
 
 function Arrays.return_value(
-  k::Broadcasting{<:PosNegReindex{<:PTArray,<:PTArray}},
+  k::Broadcasting{<:PosNegReindex{<:PArray,<:PArray}},
   x::Union{Number,AbstractArray{<:Number}}...)
 
   npos = length(k.f.values_pos)
@@ -949,11 +949,11 @@ function Arrays.return_value(
   for i = 1:npos
     array[i] = return_value(k[i],x...)
   end
-  PTArray(array)
+  PArray(array)
 end
 
 function Arrays.return_cache(
-  k::Broadcasting{<:PosNegReindex{<:PTArray,<:PTArray}},
+  k::Broadcasting{<:PosNegReindex{<:PArray,<:PArray}},
   x::Union{Number,AbstractArray{<:Number}}...)
 
   npos = length(k.f.values_pos)
@@ -966,12 +966,12 @@ function Arrays.return_cache(
   for i = 1:npos
     cache[i] = return_cache(k[i],x...)
   end
-  cache,PTArray(array)
+  cache,PArray(array)
 end
 
 function Arrays.evaluate!(
   cache,
-  k::Broadcasting{<:PosNegReindex{<:PTArray,<:PTArray}},
+  k::Broadcasting{<:PosNegReindex{<:PArray,<:PArray}},
   x::Union{Number,AbstractArray{<:Number}}...)
 
   cx,array = cache
@@ -983,7 +983,7 @@ end
 
 function Arrays.evaluate!(
   cache,
-  k::Broadcasting{<:PosNegReindex{<:PTArray,<:PTArray}},
+  k::Broadcasting{<:PosNegReindex{<:PArray,<:PArray}},
   x::AbstractArray{<:Number})
 
   cx,array = cache
@@ -995,7 +995,7 @@ end
 
 function Arrays.evaluate!(
   cache,
-  k::Broadcasting{<:PosNegReindex{<:PTArray,<:PTArray}},
+  k::Broadcasting{<:PosNegReindex{<:PArray,<:PArray}},
   x::Number...)
 
   cx,array = cache
@@ -1007,7 +1007,7 @@ end
 
 function Arrays.return_value(
   f::IntegrationMap,
-  a::PTArray,
+  a::PArray,
   w,
   j::AbstractVector)
 
@@ -1016,12 +1016,12 @@ function Arrays.return_value(
   for i = eachindex(a)
     array[i] = return_value(f,a[i],w,j)
   end
-  PTArray(array)
+  PArray(array)
 end
 
 function Arrays.return_cache(
   f::IntegrationMap,
-  a::PTArray,
+  a::PArray,
   w,
   j::AbstractVector)
 
@@ -1032,13 +1032,13 @@ function Arrays.return_cache(
   for i = eachindex(a)
     cache[i] = return_cache(f,a[i],w,j)
   end
-  cache,PTArray(array)
+  cache,PArray(array)
 end
 
 function Arrays.evaluate!(
   cache,
   f::IntegrationMap,
-  a::PTArray,
+  a::PArray,
   w,
   j::AbstractVector)
 
@@ -1049,7 +1049,7 @@ function Arrays.evaluate!(
   array
 end
 
-function Utils.recenter(a::PTArray{T},a0::PTArray{T};kwargs...) where T
+function Utils.recenter(a::PArray{T},a0::PArray{T};kwargs...) where T
   n = length(a)
   n0 = length(a0)
   ndiff = Int(n/n0)
@@ -1057,13 +1057,13 @@ function Utils.recenter(a::PTArray{T},a0::PTArray{T};kwargs...) where T
   @inbounds for i = 1:n0
     array[(i-1)*ndiff+1:i*ndiff] = recenter(a[(i-1)*ndiff+1:i*ndiff],a0[i];kwargs...)
   end
-  PTArray(array)
+  PArray(array)
 end
 
-function get_at_offsets(x::PTArray{<:AbstractVector},offsets::Vector{Int},row::Int)
+function get_at_offsets(x::PArray{<:AbstractVector},offsets::Vector{Int},row::Int)
   map(y->y[offsets[row]+1:offsets[row+1]],x)
 end
 
-function get_at_offsets(x::PTArray{<:AbstractMatrix},offsets::Vector{Int},row::Int,col::Int)
+function get_at_offsets(x::PArray{<:AbstractMatrix},offsets::Vector{Int},row::Int,col::Int)
   map(y->y[offsets[row]+1:offsets[row+1],offsets[col]+1:offsets[col+1]],x)
 end

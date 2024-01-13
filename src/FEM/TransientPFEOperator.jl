@@ -124,29 +124,29 @@ end
 function Algebra.allocate_jacobian(
   op::TransientPFEOperatorFromWeakForm,
   r::Realization,
-  xh::CellField,
+  uh::CellField,
   cache)
 
-  _matdata_jacobians = fill_initial_jacobians(op,r,xh,cache)
+  _matdata_jacobians = fill_initial_jacobians(op,r,uh,cache)
   matdata = _vcat_matdata(_matdata_jacobians)
   allocate_matrix(op.assem,matdata)
 end
 
 function Algebra.allocate_jacobian(
-  op::TransientPFEOperatorFromWeakForm,
+  op::TransientPFEOperator,
   r::Realization,
-  xh::CellField,
-  i::Integer,
-  cache)
+  uh::CellField,
+  i::Integer)
 
-  trial, = cache
-  test = get_test(op)
-  u = get_trial_fe_basis(trial)
-  v = get_fe_basis(test)
   dxh = ()
   for i in 1:get_order(op)
     dxh = (dxh...,uh)
   end
+  xh = TransientCellField(uh,dxh)
+  trial = evaluate(get_trial(op),nothing,nothing)
+  test = get_test(op)
+  u = get_trial_fe_basis(trial)
+  v = get_fe_basis(test)
   dc = op.jacs[i](get_parameters(r),get_times(r),xh,u,v)
   matdata = collect_cell_matrix(trial,test,dc)
   allocate_matrix(op.assem,matdata)
@@ -155,13 +155,13 @@ end
 function Algebra.residual!(
   b::AbstractVector,
   op::TransientPFEOperatorFromWeakForm,
-  μ::AbstractVector,
-  t::T,
-  xh) where T
+  r::Realization,
+  xh::T,
+  cache) where T
 
   test = get_test(op)
   v = get_fe_basis(test)
-  dc = op.res(μ,t,xh,v)
+  dc = op.res(get_parameters(r),get_times(r),xh,v)
   vecdata = collect_cell_vector(test,dc)
   assemble_vector_add!(b,op.assem,vecdata)
   b
@@ -170,27 +170,27 @@ end
 function residual_for_trian!(
   b::AbstractVector,
   op::TransientPFEOperatorFromWeakForm,
-  μ::AbstractVector,
-  t::T,
-  xh,
+  r::Realization,
+  xh::T,
+  cache,
   args...) where T
 
   test = get_test(op)
   v = get_fe_basis(test)
-  dc = integrate(op.res(μ,t,xh,v),args...)
+  dc = op.res(get_parameters(r),get_times(r),xh,v,args...)
   assemble_separate_vector_add!(b,op,dc)
 end
 
 function Algebra.jacobian!(
   A::AbstractMatrix,
   op::TransientPFEOperatorFromWeakForm,
-  μ::AbstractVector,
-  t::T,
-  xh,
+  r::Realization,
+  xh::T,
   i::Integer,
-  γᵢ::Real) where T
+  γᵢ::Real,
+  cache) where T
 
-  matdata = _matdata_jacobian(op,μ,t,xh,i,γᵢ)
+  matdata = _matdata_jacobian(op,r,xh,i,γᵢ)
   assemble_matrix_add!(A,op.assem,matdata)
   A
 end
@@ -198,46 +198,65 @@ end
 function jacobian_for_trian!(
   A::AbstractMatrix,
   op::TransientPFEOperatorFromWeakForm,
-  μ::AbstractVector,
-  t::T,
-  xh,
+  r::Realization,
+  xh::T,
   i::Integer,
   γᵢ::Real,
+  cache,
   args...) where T
 
-  trial = get_trial(op)(μ,t)
+  trial = evaluate(get_trial(op),nothing,nothing)
   test = get_test(op)
   u = get_trial_fe_basis(trial)
   v = get_fe_basis(test)
-  dc = γᵢ*integrate(op.jacs[i](μ,t,xh,u,v),args...)
+  dc = γᵢ*op.jacs[i](get_parameters(r),get_times(r),xh,u,v,args...)
   assemble_separate_matrix_add!(A,op,dc)
 end
 
 function ODETools.jacobians!(
   A::AbstractMatrix,
   op::TransientPFEOperatorFromWeakForm,
-  μ::AbstractVector,
-  t::T,
-  xh,
-  γ::Tuple{Vararg{Real}}) where T
+  r::Realization,
+  xh::T,
+  γ::Tuple{Vararg{Real}},
+  cache) where T
 
-  _matdata_jacobians = fill_jacobians(op,μ,t,xh,γ)
+  _matdata_jacobians = fill_jacobians(op,r,xh,γ)
   matdata = _vcat_matdata(_matdata_jacobians)
   assemble_matrix_add!(A,op.assem,matdata)
   A
 end
 
+function TransientFETools.fill_initial_jacobians(
+  op::TransientFEOperatorsFromWeakForm,
+  r::Realization,
+  xh::T) where T
+
+  dxh = ()
+  for i in 1:get_order(op)
+    dxh = (dxh...,uh)
+  end
+  xh = TransientCellField(uh,dxh)
+  _matdata = ()
+  for i in 1:get_order(op)+1
+    _data = _matdata_jacobian(op,r,xh,i,0.0)
+    if !isnothing(_data)
+      _matdata = (_matdata...,_data)
+    end
+  end
+  return _matdata
+end
+
 function TransientFETools.fill_jacobians(
   op::TransientPFEOperatorFromWeakForm,
-  μ::AbstractVector,
-  t::T,
-  xh,
+  r::Realization,
+  xh::T,
   γ::Tuple{Vararg{Real}}) where T
 
   _matdata = ()
   for i in 1:get_order(op)+1
     if (γ[i] > 0.0)
-      _data = _matdata_jacobian(op,μ,t,xh,i,γ[i])
+      _data = _matdata_jacobian(op,r,xh,i,γ[i])
       if !isnothing(_data)
         _matdata = (_matdata...,_data)
       end
@@ -248,17 +267,16 @@ end
 
 function TransientFETools._matdata_jacobian(
   op::TransientPFEOperatorFromWeakForm,
-  μ::AbstractVector,
-  t::T,
-  xh,
+  r::Realization,
+  xh::T,
   i::Integer,
   γᵢ::Real) where T
 
-  trial = get_trial(op)(μ,t)
+  trial = evaluate(get_trial(op),nothing,nothing)
   test = get_test(op)
   u = get_trial_fe_basis(trial)
   v = get_fe_basis(test)
-  dc = γᵢ*op.jacs[i](μ,t,xh,u,v)
+  dc = γᵢ*op.jacs[i](get_parameters(r),get_times(r),xh,u,v)
   collect_cell_matrix(trial,test,dc)
 end
 

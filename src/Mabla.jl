@@ -33,9 +33,9 @@ export NormalSampling
 export realization
 export ∂ₚt
 export ∂ₚtt
-export PTArray
-export ptarray
-export ptzeros
+export PArray
+export parray
+export pzeros
 export get_at_offsets
 export recenter
 export TrialPFESpace
@@ -47,9 +47,9 @@ export field_offsets
 export AbstractPTFunction
 export PFunction
 export PTFunction
-export PTCellField
-export SingleFieldPTFEFunction
-export MultiFieldPTFEFunction
+export PCellField
+export SingleFieldPFEFunction
+export MultiFieldPFEFunction
 export TransientTrialPFESpace
 export TransientMultiFieldPFESpace
 export TransientMultiFieldTrialPFESpace
@@ -61,7 +61,7 @@ export residual_for_trian!
 export jacobian_for_trian!
 export PTNonlinearOperator
 export PTAlgebraicOperator
-export update_algebraic_operator
+export update_method_operator
 export _check_convergence
 export PODESolution
 export num_time_dofs
@@ -70,8 +70,8 @@ export get_stencil_times
 export collect_solutions
 export collect_residuals_for_trian
 export collect_jacobians_for_trian
-export PTAffineThetaMethodOperator
-export PTThetaMethodOperator
+export AffinePThetaMethodOperator
+export PThetaMethodOperator
 export get_order
 export get_L2_norm_matrix
 export get_H1_norm_matrix

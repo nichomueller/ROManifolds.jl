@@ -54,21 +54,21 @@ function recast(x::AbstractVector,rb::RBSpace)
   return xrb
 end
 
-function recast(x::PTArray,rb::RBSpace)
+function recast(x::PArray,rb::RBSpace)
   array = map(eachindex(x)) do xi
     recast(xi,rb)
   end
-  PTArray(array...)
+  PArray(array...)
 end
 
-function space_time_projection(x::PTArray,rb::RBSpace)
+function space_time_projection(x::PArray,rb::RBSpace)
   time_ndofs = num_time_dofs(rb)
   nparams = Int(length(x)/time_ndofs)
   array = map(1:nparams) do np
     x_np = stack(x[(np-1)*time_ndofs+1:np*time_ndofs])
     space_time_projection(x_np,rb)
   end
-  PTArray(array)
+  PArray(array)
 end
 
 function space_time_projection(mat::AbstractMatrix,rb::RBSpace)
@@ -108,15 +108,15 @@ function space_time_projection(
   return st_proj_mat
 end
 
-function project_recast(snap::PTArray,rb::RBSpace)
+function project_recast(snap::PArray,rb::RBSpace)
   mat = stack(snap.array)
   rb_proj = space_time_projection(mat,rb)
   array = recast(rb_proj,rb)
-  PTArray(array)
+  PArray(array)
 end
 
-function FESpaces.get_algebraic_operator(
-  fesolver::PThetaMethod,
+function get_method_operator(
+  fesolver::ThetaMethod,
   feop::TransientPFEOperator,
   rbspace::RBSpace{T},
   params::Table) where T
@@ -134,7 +134,7 @@ function FESpaces.get_algebraic_operator(
     col = mod(n,ns) == 0 ? ns : mod(n,ns)
     array[n] = bs[:,col]
   end
-  sols = PTArray(array)
+  sols = PArray(array)
   sols_cache = zero(sols)
-  get_algebraic_operator(feop,params,times,dtθ,sols,ode_cache,sols_cache)
+  get_method_operator(feop,params,times,dtθ,sols,ode_cache,sols_cache)
 end

@@ -4,7 +4,7 @@ struct DistributedMultiFieldPTFEFunction{A,B,C} <: GridapType
   free_values::C
   function DistributedMultiFieldPTFEFunction(
     field_fe_fun::AbstractVector{<:DistributedSingleFieldFEFunction},
-    part_fe_fun::AbstractArray{<:MultiFieldPTFEFunction},
+    part_fe_fun::AbstractArray{<:MultiFieldPFEFunction},
     free_values::AbstractVector)
     A = typeof(field_fe_fun)
     B = typeof(part_fe_fun)

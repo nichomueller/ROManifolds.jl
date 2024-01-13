@@ -1,4 +1,4 @@
-struct Snapshots{A<:AbstractVector{<:PTArray}}
+struct Snapshots{A<:AbstractVector{<:PArray}}
   snaps::A
 end
 
@@ -21,7 +21,7 @@ function Base.getindex(s::Snapshots,idx)
       array[(i-1)*time_ndofs+nt] = s.snaps[nt][r]
     end
   end
-  return PTArray(array)
+  return PArray(array)
 end
 
 function Base.vcat(s::Snapshots...)
@@ -38,7 +38,7 @@ end
 
 function Utils.load(rbinfo::RBInfo,::Type{Snapshots{T}}) where T
   path = joinpath(rbinfo.fe_path,"fesnaps")
-  load(path,Snapshots{AbstractVector{<:PTArray{T}}})
+  load(path,Snapshots{AbstractVector{<:PArray{T}}})
 end
 
 function collect_solutions(

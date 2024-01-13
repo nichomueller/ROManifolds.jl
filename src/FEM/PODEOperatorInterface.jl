@@ -13,16 +13,15 @@ TransientFETools.get_order(op::PODEOpFromFEOp) = get_order(op.feop)
 
 function TransientFETools.allocate_cache(
   op::PODEOpFromFEOp,
-  μ::AbstractVector,
-  t)
+  r::Realization)
 
   Ut = get_trial(op.feop)
-  U = allocate_trial_space(Ut,μ,t)
+  U = allocate_trial_space(Ut,get_parameters(r),get_times(r))
   Uts = (Ut,)
   Us = (U,)
   for i in 1:get_order(op)
     Uts = (Uts...,∂ₚt(Uts[i]))
-    Us = (Us...,allocate_trial_space(Uts[i+1],μ,t))
+    Us = (Us...,allocate_trial_space(Uts[i+1],get_parameters(r),get_times(r)))
   end
   fecache = allocate_cache(op.feop)
   Us,Uts,fecache
@@ -31,42 +30,132 @@ end
 function TransientFETools.update_cache!(
   ode_cache,
   op::PODEOpFromFEOp,
-  μ::AbstractVector,
-  t)
+  r::Realization)
 
   _Us,Uts,fecache = ode_cache
   Us = ()
   for i in 1:get_order(op)+1
-    Us = (Us...,evaluate!(_Us[i],Uts[i],μ,t))
+    Us = (Us...,evaluate!(_Us[i],Uts[i],get_parameters(r),get_times(r)))
   end
   fecache = allocate_cache(op.feop)
   Us,Uts,fecache
 end
 
-function Algebra.allocate_residual(op::PODEOpFromFEOp,μ,t,x::AbstractVector,ode_cache)
+function Algebra.allocate_residual(
+  op::PODEOpFromFEOp,
+  r::Realization,
+  x::AbstractVector,
+  ode_cache)
+
   Us,Uts,fecache = ode_cache
   xh = EvaluationFunction(Us[1],x)
-  allocate_residual(op.feop,μ,t,xh,fecache)
-end
-
-function Algebra.allocate_residual(op::PODEOpFromFEOp,μ,t,x::AbstractVector,ode_cache)
-  Us, = ode_cache
-  xh = EvaluationFunction(Us[1],x)
-  allocate_residual(op.feop,μ,t,xh,ode_cache)
+  allocate_residual(op.feop,r,xh,fecache)
 end
 
 function Algebra.allocate_jacobian(
-  op::TransientPFEOperator,
-  μ::P,
-  t::T,
-  xh,
-  i::Integer) where {P,T}
+  op::PODEOpFromFEOp,
+  r::Realization,
+  x::AbstractVector,
+  ode_cache)
 
-  trial = get_trial(op)(μ,t)
-  test = get_test(op)
-  u = get_trial_fe_basis(trial)
-  v = get_fe_basis(test)
-  dc = op.jacs[i](μ,t,xh,u,v)
-  matdata = collect_cell_matrix(trial,test,dc)
-  allocate_matrix(op.assem,matdata)
+  Us,Uts,fecache = ode_cache
+  xh = EvaluationFunction(Us[1],x)
+  allocate_residual(op.feop,r,xh,fecache)
+end
+
+function Algebra.allocate_jacobian(
+  op::PODEOpFromFEOp,
+  r::Realization,
+  x::AbstractVector,
+  i::Integer,
+  ode_cache)
+
+  Us,Uts,fecache = ode_cache
+  xh = EvaluationFunction(Us[1],x)
+  allocate_residual(op.feop,r,xh,i)
+end
+
+function Algebra.residual!(
+  b::AbstractVector,
+  op::PODEOpFromFEOp,
+  r::Realization,
+  xhF::Tuple{Vararg{AbstractVector}},
+  ode_cache)
+
+  Xh, = ode_cache
+  dxh = ()
+  for i in 2:get_order(op)+1
+    dxh = (dxh...,EvaluationFunction(Xh[i],xhF[i]))
+  end
+  xh=TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
+  residual!(b,op.feop,r,xh,ode_cache)
+end
+
+function residual_for_trian!(
+  b::AbstractVector,
+  op::PODEOpFromFEOp,
+  r::Realization,
+  xhF::Tuple{Vararg{AbstractVector}},
+  ode_cache)
+
+  Xh, = ode_cache
+  dxh = ()
+  for i in 2:get_order(op)+1
+    dxh = (dxh...,EvaluationFunction(Xh[i],xhF[i]))
+  end
+  xh=TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
+  residual_for_trian!(b,op.feop,r,xh,ode_cache)
+end
+
+function Algebra.jacobian!(
+  A::AbstractMatrix,
+  op::PODEOpFromFEOp,
+  r::Realization,
+  xhF::Tuple{Vararg{AbstractVector}},
+  i::Integer,
+  γᵢ::Real,
+  ode_cache)
+
+  Xh, = ode_cache
+  dxh = ()
+  for i in 2:get_order(op)+1
+    dxh = (dxh...,EvaluationFunction(Xh[i],xhF[i]))
+  end
+  xh=TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
+  jacobian!(A,op.feop,r,xh,i,γᵢ,ode_cache)
+end
+
+function jacobian_for_trian!(
+  A::AbstractMatrix,
+  op::PODEOpFromFEOp,
+  r::Realization,
+  xhF::Tuple{Vararg{AbstractVector}},
+  i::Integer,
+  γᵢ::Real,
+  ode_cache)
+
+  Xh, = ode_cache
+  dxh = ()
+  for i in 2:get_order(op)+1
+    dxh = (dxh...,EvaluationFunction(Xh[i],xhF[i]))
+  end
+  xh=TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
+  jacobian_for_trian!(A,op.feop,r,xh,i,γᵢ,ode_cache)
+end
+
+function ODETools.jacobians!(
+  A::AbstractMatrix,
+  op::PODEOpFromFEOp,
+  r::Realization,
+  xhF::Tuple{Vararg{AbstractVector}},
+  γ::Tuple{Vararg{Real}},
+  ode_cache)
+
+  Xh, = ode_cache
+  dxh = ()
+  for i in 2:get_order(op)+1
+    dxh = (dxh...,EvaluationFunction(Xh[i],xhF[i]))
+  end
+  xh=TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
+  jacobians!(A,op.feop,r,xh,γ,ode_cache)
 end

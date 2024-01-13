@@ -103,19 +103,19 @@ export ∂ₚt
 export ∂ₚtt
 include("PDiffOperators.jl")
 
-export PTArray
-export ptarray
-export ptzeros
+export PArray
+export parray
+export pzeros
 export get_at_offsets
 export recenter
-include("PTArray.jl")
+include("PArray.jl")
 
 export AbstractPTFunction
 export PFunction
 export PTFunction
-export PTField
-export PTGenericField
-include("PTFields.jl")
+export PField
+export PGenericField
+include("PField.jl")
 
 export TrialPFESpace
 export TrialPFESpace!
@@ -123,20 +123,19 @@ export HomogeneousTrialPFESpace
 export MultiFieldPFESpace
 export split_fields
 export field_offsets
-include("PFESpaces.jl")
-
-export PTCellField
-export SingleFieldPTFEFunction
-export MultiFieldPTFEFunction
-include("PTCellFields.jl")
-
-export PTSparseMatrixAssember
-include("PTAssemblers.jl")
+include("TrialPFESpace.jl")
 
 export TransientTrialPFESpace
 export TransientMultiFieldPFESpace
 export TransientMultiFieldTrialPFESpace
 include("TransientTrialPFESpace.jl")
+
+export PCellField
+export SingleFieldPFEFunction
+export MultiFieldPFEFunction
+include("PCellField.jl")
+
+include("PAssemblers.jl")
 
 export TransientPFEOperator
 export TransientPFEOperatorFromWeakForm
@@ -148,7 +147,7 @@ include("TransientPFEOperator.jl")
 
 export PTNonlinearOperator
 export PTAlgebraicOperator
-export update_algebraic_operator
+export update_method_operator
 include("PTAlgebraicOperator.jl")
 
 export PODESolution
@@ -158,8 +157,8 @@ export get_stencil_times
 export _check_convergence
 include("PTSolvers.jl")
 
-export PTThetaMethodOperator
-export PTAffineThetaMethodOperator
+export PThetaMethodOperator
+export AffinePThetaMethodOperator
 include("PThetaMethod.jl")
 
 export get_order

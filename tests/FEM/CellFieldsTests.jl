@@ -40,7 +40,7 @@ for np in 1:nparams
 end
 
 u = ones(num_free_dofs(test))
-ptu = PTArray([copy(u) for _ = 1:ntimes*nparams])
+ptu = PArray([copy(u) for _ = 1:ntimes*nparams])
 xh = compute_xh(feop,params,times,(ptu,ptu))
 cf_vec = aμt(params,times)*∇(dv)⋅∇(xh)
 cfx_vec = cf_vec(x)

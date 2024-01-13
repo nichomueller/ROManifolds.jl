@@ -12,20 +12,37 @@ struct TransientPRealization{P,T} <: Realization
 end
 
 get_times(r::TransientPRealization) = r.times
+get_initial_time(r::TransientPRealization) = first(get_times(r))
+get_midpoint_time(r::TransientPRealization) = (get_initial_time(r) + get_final_time(r)) / 2
+get_final_time(r::TransientPRealization) = last(get_times(r))
+get_delta_time(r::TransientPRealization) = r.times[2] - r.times[1]
 
-function change_times!(
+function get_at_time(r::TransientPRealization,time=:initial)
+  params = get_parameters(r)
+  if time == :initial
+    TransientPRealization(params,get_initial_time(r))
+  elseif time == :midpoint
+    TransientPRealization(params,get_midpoint_time(r))
+  elseif time == :final
+    TransientPRealization(params,get_final_time(r))
+  else
+    @notimplemented
+  end
+end
+
+function change_time!(
   r::TransientPRealization{P,T} where P,
-  times::T
+  time::T
   ) where T
 
-  r.times .= times
+  r.times .= time
 end
 
 abstract type SamplingStyle end
 struct UniformSampling <: SamplingStyle end
 struct NormalSampling <: SamplingStyle end
 
-abstract type AbstractParametricSpace end
+abstract type AbstractParametricSpace <: Set{Realization} end
 
 struct ParametricSpace <: AbstractParametricSpace
   parametric_domain::AbstractVector

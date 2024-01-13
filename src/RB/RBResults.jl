@@ -1,4 +1,4 @@
-function TransientFETools.allocate_cache(op::PTAlgebraicOperator,rbspace)
+function TransientFETools.allocate_cache(op::NonlinearOperator,rbspace)
   T = eltype(get_vector_type(rbspace))
   N = length(op.μ)
   b = allocate_residual(op,op.u0)
@@ -6,15 +6,15 @@ function TransientFETools.allocate_cache(op::PTAlgebraicOperator,rbspace)
   mat = zeros(T,1,1)
   cmat = CachedArray(mat)
   coeff = CachedArray(mat)
-  ptcoeff = CachedArray(ptzeros(mat,N))
+  ptcoeff = CachedArray(pzeros(mat,N))
 
   res_contrib_cache = return_cache(RBVecContributionMap(),op.u0)
   jac_contrib_cache = return_cache(RBMatContributionMap(),op.u0)
 
   rb_ndofs = num_rb_ndofs(rbspace)
 
-  rhs_solve_cache = ptzeros(zeros(T,rb_ndofs),N)
-  lhs_solve_cache = ptzeros(zeros(T,rb_ndofs,rb_ndofs),N)
+  rhs_solve_cache = pzeros(zeros(T,rb_ndofs),N)
+  lhs_solve_cache = pzeros(zeros(T,rb_ndofs,rb_ndofs),N)
 
   res_cache = ((b,cmat),(coeff,ptcoeff)),res_contrib_cache
   jac_cache = ((A,cmat),(coeff,ptcoeff)),jac_contrib_cache
@@ -25,7 +25,7 @@ function rb_solver(rbinfo,feop::TransientPFEOperator{Affine},fesolver,rbspace,rb
   println("Solving linear RB problems")
   nsnaps_test = rbinfo.nsnaps_test
   snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
-  op = get_algebraic_operator(fesolver,feop,snaps_test,params_test)
+  op = get_method_operator(fesolver,feop,snaps_test,params_test)
   cache,(_,lhs) = allocate_cache(op,rbspace)
   stats = @timed begin
     rhs,(_lhs,_lhs_t) = collect_rhs_lhs_contributions!(cache,rbinfo,op,rbres,rbjacs,rbspace)
@@ -42,8 +42,8 @@ function rb_solver(rbinfo,feop_lin,feop_nlin,fesolver,rbspace,rbres,rbjacs,snaps
   snaps_train,params_train = snaps[1:nsnaps_test],params[1:nsnaps_test]
   snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
   x = nearest_neighbor(snaps_train,params_train,params_test)
-  op_lin = get_algebraic_operator(fesolver,feop_lin,snaps_test,params_test)
-  op_nlin = get_algebraic_operator(fesolver,feop_nlin,snaps_test,params_test)
+  op_lin = get_method_operator(fesolver,feop_lin,snaps_test,params_test)
+  op_nlin = get_method_operator(fesolver,feop_nlin,snaps_test,params_test)
   xrb = space_time_projection(x,rbspace)
   dxrb = similar(xrb)
   cache,(rhs,lhs) = allocate_cache(op,rbspace)
@@ -56,7 +56,7 @@ function rb_solver(rbinfo,feop_lin,feop_nlin,fesolver,rbspace,rbres,rbjacs,snaps
     rhs_lin,(lhs_lin,lhs_t) = collect_rhs_lhs_contributions!(cache,rbinfo,op_lin,rbrhs_lin,rblhs_lin,rbspace)
     for iter in 1:fesolver.nls.max_nliters
       x = recenter(x,uh0_test;θ=fesolver.θ)
-      op_nlin = update_algebraic_operator(op_nlin,x)
+      op_nlin = update_method_operator(op_nlin,x)
       rhs_nlin,(lhs_nlin,) = collect_rhs_lhs_contributions!(cache,rbinfo,op_nlin,rbrhs_nlin,rblhs_nlin,rbspace)
       @. lhs = lhs_lin+lhs_t+lhs_nlin
       @. rhs = rhs_lin+rhs_nlin+(lhs_lin+lhs_t)*xrb
@@ -74,7 +74,7 @@ function rb_solver(rbinfo,feop_lin,feop_nlin,fesolver,rbspace,rbres,rbjacs,snaps
   post_process(rbinfo,feop,snaps_test,x,params_test,stats)
 end
 
-function rb_solve(ls::LinearSolver,rhs::PTArray,lhs::PTArray)
+function rb_solve(ls::LinearSolver,rhs::PArray,lhs::PArray)
   x = copy(rhs)
   cache = nothing
   rb_solve!(x,ls,rhs,lhs,cache)
@@ -82,10 +82,10 @@ function rb_solve(ls::LinearSolver,rhs::PTArray,lhs::PTArray)
 end
 
 function rb_solve!(
-  x::PTArray,
+  x::PArray,
   ls::LinearSolver,
-  rhs::PTArray,
-  lhs::PTArray,
+  rhs::PArray,
+  lhs::PArray,
   ::Nothing)
 
   ss = symbolic_setup(ls,testitem(lhs))
@@ -95,10 +95,10 @@ function rb_solve!(
 end
 
 function rb_solve!(
-  x::PTArray,
+  x::PArray,
   ::LinearSolver,
-  rhs::PTArray,
-  lhs::PTArray,
+  rhs::PArray,
+  lhs::PArray,
   ns)
 
   numerical_setup!(ns,lhs)
@@ -106,7 +106,7 @@ function rb_solve!(
   return ns
 end
 
-function _rb_loop_solve!(x::PTArray,ns,b::PTArray)
+function _rb_loop_solve!(x::PArray,ns,b::PArray)
   @inbounds for k in eachindex(x)
     solve!(x[k],ns[k],-b[k])
   end
@@ -114,7 +114,7 @@ function _rb_loop_solve!(x::PTArray,ns,b::PTArray)
 end
 
 function nearest_neighbor(
-  sols_train::PTArray{T},
+  sols_train::PArray{T},
   params_train::Table,
   params_test::Table) where T
 
@@ -128,7 +128,7 @@ function nearest_neighbor(
     idxn = idx[n]
     array[(n-1)*ntimes+1:n*ntimes] = sols_train[(idxn-1)*ntimes+1:idxn*ntimes]
   end
-  PTArray(array)
+  PArray(array)
 end
 
 struct RBResults{T}
@@ -143,8 +143,8 @@ end
 
 function RBResults(
   params::Table,
-  sol::PTArray,
-  sol_approx::PTArray,
+  sol::PArray,
+  sol_approx::PArray,
   fem_stats::ComputationInfo,
   rb_stats::ComputationInfo,
   args...;
@@ -198,8 +198,8 @@ end
 function post_process(
   rbinfo::RBInfo,
   feop::TransientPFEOperator,
-  sol::PTArray,
-  sol_approx::PTArray,
+  sol::PArray,
+  sol_approx::PArray,
   params::Table,
   stats::NamedTuple;
   show_results=true)
@@ -216,8 +216,8 @@ function post_process(
 end
 
 function compute_relative_error(
-  sol::AbstractVector{<:PTArray},
-  sol_approx::AbstractVector{<:PTArray},
+  sol::AbstractVector{<:PArray},
+  sol_approx::AbstractVector{<:PArray},
   args...)
 
   @assert length(sol) == length(sol_approx)
