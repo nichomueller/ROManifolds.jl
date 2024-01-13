@@ -52,7 +52,7 @@ end
 
 function collect_solutions(
   rbinfo::BlockRBInfo,
-  fesolver::PODESolver,
+  fesolver::ODESolver,
   feop::TransientPFEOperator)
 
   nparams = rbinfo.nsnaps_state+rbinfo.nsnaps_test
@@ -240,8 +240,8 @@ function add_time_supremizers(basis_u::Matrix,basis_p::Matrix;ttol=1e-2)
   basis_u
 end
 
-function TransientFETools.get_algebraic_operator(
-  fesolver::PODESolver,
+function FESpaces.get_algebraic_operator(
+  fesolver::ODESolver,
   feop::TransientPFEOperator,
   rbspace::BlockRBSpace{T},
   params::Table;

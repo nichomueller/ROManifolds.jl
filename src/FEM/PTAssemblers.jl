@@ -1,119 +1,20 @@
-abstract type PTBuilder end
-
-Algebra.LoopStyle(::Type{<:PTBuilder}) = Loop()
-
-struct SparsePTMatrixBuilder{B} <: PTBuilder
-  builder::B
-  length::Integer
+struct PTSparseMatrixAssember <: Assembler
+  assem::SparseMatrixAssembler
 end
 
-struct PTArrayBuilder{B} <: PTBuilder
-  builder::B
-  length::Integer
+function PTSparseMatrixAssember(trial::TrialPFESpace,test::FESpace)
+  trial0 = trial(nothing)
+  PTSparseMatrixAssember(PTSparseMatrixAssember(trial0,test))
 end
 
-struct PTCounter{C}
-  counter::C
-  length::Integer
+function PTSparseMatrixAssember(trial::TransientTrialPFESpace,test::FESpace)
+  trial0 = trial(nothing,nothing)
+  PTSparseMatrixAssember(PTSparseMatrixAssember(trial0,test))
 end
 
-Algebra.LoopStyle(::Type{<:PTCounter}) = Loop()
+function Algebra.allocate_vector(a::PTSparseMatrixAssember,vecdata)
 
-struct PTInserter{I}
-  inserters::PTArray{I}
-  function PTInserter(inserter::I,len::Integer) where I
-    array = Vector{I}(undef,len)
-    for i = 1:len
-      array[i] = copy(inserter)
-    end
-    new{I}(PTArray(array))
-  end
-end
-
-Algebra.LoopStyle(::Type{<:PTInserter}) = Loop()
-
-function PTSparseMatrixAssembler(assem::SparseMatrixAssembler,μ,t)
-  len = _length(μ,t)
-  GenericSparseMatrixAssembler(
-    SparsePTMatrixBuilder(assem.matrix_builder,len),
-    PTArrayBuilder(assem.vector_builder,len),
-    assem.rows,
-    assem.cols,
-    assem.strategy)
-end
-
-function Algebra.nz_counter(b::PTBuilder,args...)
-  counter = nz_counter(b.builder,args...)
-  PTCounter(counter,b.length)
-end
-
-function Algebra.nz_allocation(c::PTCounter)
-  inserter = nz_allocation(c.counter)
-  PTInserter(inserter,c.length)
-end
-
-@inline function Algebra.add_entry!(f::Function,c::PTCounter,args...)
-  add_entry!(f,c.counter,args...)
-end
-
-function Algebra.create_from_nz(i::PTInserter)
-  A = create_from_nz(first(i.inserters))
-  array = Vector{typeof(A)}(undef,length(i.inserters))
-  for j = eachindex(i.inserters)
-    array[j] = copy(A)
-  end
-  PTArray(array)
-end
-
-function Base.copy(i::Algebra.InserterCSC)
-  Algebra.InserterCSC(
-    copy(i.nrows),
-    copy(i.ncols),
-    copy(i.colptr),
-    copy(i.colnnz),
-    copy(i.rowval),
-    copy(i.nzval))
-end
-
-@inline function Algebra.add_entry!(f::Function,i::PTInserter,args...)
-  for inserter in i.inserters
-    add_entry!(f,inserter,args...)
-  end
-end
-
-@inline function Algebra.add_entry!(f::Function,i::PTInserter,v::PTArray,args...)
-  for (inserter,value) in zip(i.inserters,v.array)
-    add_entry!(f,inserter,value,args...)
-  end
-end
-
-function Algebra.nz_allocation(c::PTCounter{<:Algebra.CounterCOO})
-  allocation = nz_allocation(c.counter)
-  PTAllocationCOO(allocation,c.length)
-end
-
-struct PTAllocationCOO{T,A,B,C}
-  allocation::Algebra.AllocationCOO{T,A,B,C}
-  length::Integer
-end
-
-Algebra.LoopStyle(::Type{<:PTAllocationCOO}) = Loop()
-
-@inline function Algebra.add_entry!(f::Function,a::PTAllocationCOO,args...)
-  add_entry!(f,a.allocation,args...)
-end
-
-@inline function Algebra.add_entry!(f::Function,a::PTAllocationCOO,v::PTArray,args...)
-  @notimplemented
-end
-
-function Algebra.create_from_nz(a::PTAllocationCOO)
-  A = create_from_nz(a.allocation)
-  array = Vector{typeof(A)}(undef,a.length)
-  for j = 1:a.length
-    array[j] = copy(A)
-  end
-  PTArray(array)
+  data = first()
 end
 
 function FESpaces.collect_cell_vector(

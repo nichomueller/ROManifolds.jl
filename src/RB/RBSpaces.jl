@@ -115,7 +115,7 @@ function project_recast(snap::PTArray,rb::RBSpace)
   PTArray(array)
 end
 
-function TransientFETools.get_algebraic_operator(
+function FESpaces.get_algebraic_operator(
   fesolver::PThetaMethod,
   feop::TransientPFEOperator,
   rbspace::RBSpace{T},

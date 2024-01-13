@@ -60,7 +60,7 @@ reffe = ReferenceFE(lagrangian,T,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = TransientTrialPFESpace(test,g)
 trial0 = trial(nothing,nothing)
-pspace = PSpace(fill([1.,10.],3))
+pspace = ParametricSpace(fill([1.,10.],3))
 dv = get_fe_basis(test)
 du = get_trial_fe_basis(trial0)
 

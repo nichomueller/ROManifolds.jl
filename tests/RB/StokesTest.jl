@@ -13,7 +13,7 @@ dΩ = Measure(Ω,degree)
 
 ranges = fill([1.,10.],3)
 sampling = UniformSampling()
-pspace = PSpace(ranges,sampling)
+pspace = ParametricSpace(ranges,sampling)
 
 a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
 a(μ,t) = x->a(x,μ,t)

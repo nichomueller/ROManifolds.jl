@@ -92,7 +92,7 @@ export project_recast
 
 include("PTArray.jl")
 include("Primitives.jl")
-include("Algebra.jl")
+# include("Algebra.jl")
 include("FESpaces.jl")
 include("MultiField.jl")
 include("PTCellData.jl")

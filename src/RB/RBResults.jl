@@ -245,7 +245,7 @@ end
 function plot_results(
   rbinfo::RBInfo,
   feop::TransientPFEOperator,
-  fesolver::PODESolver,
+  fesolver::ODESolver,
   results::RBResults;
   entry=1)
 

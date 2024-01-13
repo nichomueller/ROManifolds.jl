@@ -79,7 +79,7 @@ end
 struct MultiFieldPTFEFunction{T<:MultiFieldCellField} <: PTCellField
   single_fe_functions::Vector{<:SingleFieldPTFEFunction}
   free_values::AbstractArray
-  fe_space::MultiFieldFESpace
+  fe_space::MultiFieldPFESpace
   multi_cell_field::T
 
   function MultiFieldPTFEFunction(

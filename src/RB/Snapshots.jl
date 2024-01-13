@@ -43,7 +43,7 @@ end
 
 function collect_solutions(
   rbinfo::RBInfo,
-  fesolver::PODESolver,
+  fesolver::ODESolver,
   feop::TransientPFEOperator)
 
   nparams = rbinfo.nsnaps_state+rbinfo.nsnaps_test

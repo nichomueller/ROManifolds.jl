@@ -127,7 +127,7 @@ function main(ranks)
   reffe = ReferenceFE(lagrangian,T,order)
   test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6])
   trial = TransientTrialPFESpace(test,g)
-  pspace = PSpace(fill([1.,10.],3))
+  pspace = ParametricSpace(fill([1.,10.],3))
 
   res(μ,t,u,v) = ∫(v*∂ₚt(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
   jac(μ,t,u,du,v) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ

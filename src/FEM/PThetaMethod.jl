@@ -46,7 +46,7 @@ struct PTThetaMethodOperator{P,T} <: PTAlgebraicOperator{Nonlinear}
   vθ::AbstractVector
 end
 
-function TransientFETools.get_algebraic_operator(
+function FESpaces.get_algebraic_operator(
   feop::TransientPFEOperator,
   μ,
   t,
@@ -176,7 +176,7 @@ struct PTAffineThetaMethodOperator{P,T} <: PTAlgebraicOperator{Affine}
   vθ::AbstractVector
 end
 
-function TransientFETools.get_algebraic_operator(
+function FESpaces.get_algebraic_operator(
   feop::TransientPFEOperator{Affine},
   μ,
   t,

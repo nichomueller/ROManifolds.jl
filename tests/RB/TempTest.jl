@@ -25,9 +25,6 @@ degree = 2*order
 dΩ = Measure(Ω,degree)
 dΓn = Measure(Γn,degree)
 
-ranges = fill([1.,10.],3)
-pspace = PSpace(ranges)
-
 a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
 a(μ,t) = x->a(x,μ,t)
 aμt(μ,t) = PTFunction(a,μ,t)
@@ -51,12 +48,16 @@ res(μ,t,u,v) = ∫(v*∂ₚt(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(
 jac(μ,t,u,du,v) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
 jac_t(μ,t,u,dut,v) = ∫(v*dut)dΩ
 
+pranges = fill([1.,10.],3)
+t0,tf,dt,θ = 0.,0.3,0.005,0.5
+tdomain = t0:dt:tf
+ptspace = TransientParametricSpace(pranges,tdomain)
+
 T = Float
 reffe = ReferenceFE(lagrangian,T,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = TransientTrialPFESpace(test,g)
-feop = AffineTransientPFEOperator(res,jac,jac_t,pspace,trial,test)
-t0,tf,dt,θ = 0.,0.3,0.005,0.5
+feop = AffineTransientPFEOperator(res,jac,jac_t,ptspace,trial,test)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = PThetaMethod(LUSolver(),uh0μ,θ,dt,t0,tf)
 

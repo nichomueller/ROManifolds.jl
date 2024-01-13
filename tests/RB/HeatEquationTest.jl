@@ -14,7 +14,7 @@ dΩ = Measure(Ω,degree)
 dΓn = Measure(Γn,degree)
 
 ranges = fill([1.,10.],3)
-pspace = PSpace(ranges)
+pspace = ParametricSpace(ranges)
 
 a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
 a(μ,t) = x->a(x,μ,t)

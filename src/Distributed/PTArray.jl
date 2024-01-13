@@ -36,13 +36,6 @@ function Base.collect(v::PVector{<:PTArray})
   end |> getany
 end
 
-function Algebra.LinearSolverCache(
-  A::PSparseMatrix{<:PTArray},
-  b::PVector{<:PTArray},
-  ns::NumericalSetup)
-  FEM.PTLinearSolverCache(A,b,ns)
-end
-
 function PartitionedArrays.allocate_local_values(
   a::PTArray,
   ::Type{T},

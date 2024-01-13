@@ -91,11 +91,13 @@ import PartitionedArrays: tuple_of_arrays
 export Table
 export Affine
 
-export PSpace
+export ParametricSpace
+export TransientParametricSpace
 export UniformSampling
 export NormalSampling
+export Realization
 export realization
-include("PSpace.jl")
+include("ParametricSpace.jl")
 
 export ∂ₚt
 export ∂ₚtt
@@ -128,20 +130,13 @@ export SingleFieldPTFEFunction
 export MultiFieldPTFEFunction
 include("PTCellFields.jl")
 
-export PTBuilder
-export SparsePTMatrixBuilder
-export PTArrayBuilder
-export PTCounter
-export PTInserter
-export PTSparseMatrixAssembler
-export PTAllocationCOO
-export get_assembler
+export PTSparseMatrixAssember
 include("PTAssemblers.jl")
 
 export TransientTrialPFESpace
 export TransientMultiFieldPFESpace
 export TransientMultiFieldTrialPFESpace
-include("PTFESpaces.jl")
+include("TransientTrialPFESpace.jl")
 
 export TransientPFEOperator
 export TransientPFEOperatorFromWeakForm
@@ -156,8 +151,6 @@ export PTAlgebraicOperator
 export update_algebraic_operator
 include("PTAlgebraicOperator.jl")
 
-export PODESolver
-export PThetaMethod
 export PODESolution
 export num_time_dofs
 export get_times

@@ -27,7 +27,7 @@ using Mabla.FEM
 
 export Table
 export Affine
-export PSpace
+export ParametricSpace
 export UniformSampling
 export NormalSampling
 export realization
@@ -50,14 +50,6 @@ export PTFunction
 export PTCellField
 export SingleFieldPTFEFunction
 export MultiFieldPTFEFunction
-export PTBuilder
-export SparsePTMatrixBuilder
-export PTArrayBuilder
-export PTCounter
-export PTInserter
-export PTSparseMatrixAssembler
-export PTAllocationCOO
-export get_assembler
 export TransientTrialPFESpace
 export TransientMultiFieldPFESpace
 export TransientMultiFieldTrialPFESpace
@@ -71,8 +63,6 @@ export PTNonlinearOperator
 export PTAlgebraicOperator
 export update_algebraic_operator
 export _check_convergence
-export PODESolver
-export PThetaMethod
 export PODESolution
 export num_time_dofs
 export get_times

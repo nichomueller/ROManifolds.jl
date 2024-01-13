@@ -37,7 +37,7 @@ function NnzMatrix(val::PTArray{<:AbstractVector{T}};nparams=length(val),kwargs.
   vals = get_array(val)
   nonzero_idx,nonzero_val = compress_array(stack(vals))
   nrows = size(testitem(val),1)
-  NnzMatrix(Nonaffine(),nonzero_val,nonzero_idx,nrows,nparams)
+  NnzMatrix(Nonlinear(),nonzero_val,nonzero_idx,nrows,nparams)
 end
 
 function NnzMatrix(val::PTArray{<:NnzVector{T}};nparams=length(val),kwargs...) where T
@@ -45,7 +45,7 @@ function NnzMatrix(val::PTArray{<:NnzVector{T}};nparams=length(val),kwargs...) w
   nonzero_idx = get_nonzero_idx(first(vals))
   nonzero_val = stack(map(get_nonzero_val,vals))
   nrows = get_nrows(first(vals))
-  NnzMatrix(Nonaffine(),nonzero_val,nonzero_idx,nrows,nparams)
+  NnzMatrix(Nonlinear(),nonzero_val,nonzero_idx,nrows,nparams)
 end
 
 function NnzMatrix(val::AbstractVector{T};ntimes=1,kwargs...) where T

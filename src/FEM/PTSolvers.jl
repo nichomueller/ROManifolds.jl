@@ -1,36 +1,5 @@
-abstract type PODESolver <: ODESolver end
-
-struct PThetaMethod <: PODESolver
-  nls::NonlinearSolver
-  uh0::Function
-  θ::Float
-  dt::Float
-  t0::Real
-  tf::Real
-end
-
-function num_time_dofs(fesolver::PThetaMethod)
-  dt = fesolver.dt
-  t0 = fesolver.t0
-  tf = fesolver.tf
-  floor(Int,(tf-t0)/dt)
-end
-
-function get_times(fesolver::PThetaMethod)
-  dt = fesolver.dt
-  t0 = fesolver.t0
-  tf = fesolver.tf
-  collect(t0:dt:tf-dt)
-end
-
-function get_stencil_times(fesolver::PThetaMethod)
-  θ = fesolver.θ
-  dt = fesolver.dt
-  get_times(fesolver) .+ dt*θ
-end
-
-function TransientFETools.get_algebraic_operator(
-  fesolver::PODESolver,
+function FESpaces.get_algebraic_operator(
+  fesolver::ODESolver,
   feop::TransientPFEOperator,
   sols::PTArray,
   params::Table)
@@ -44,7 +13,7 @@ function TransientFETools.get_algebraic_operator(
 end
 
 struct PODESolution
-  solver::PODESolver
+  solver::ODESolver
   op::TransientPFEOperator
   μ::AbstractVector
   u0::AbstractVector
@@ -93,78 +62,6 @@ Algebra.symbolic_setup(s::BackslashSolver,mat::AbstractArray{<:PTArray}) = symbo
 Algebra.symbolic_setup(s::LUSolver,mat::PTArray) = symbolic_setup(s,testitem(mat))
 
 Algebra.symbolic_setup(s::LUSolver,mat::AbstractArray{<:PTArray}) = symbolic_setup(s,testitem(mat))
-
-struct PTAffineOperator <: PTNonlinearOperator
-  matrix::AbstractArray
-  vector::AbstractVector
-end
-
-function Algebra.solve!(
-  x::AbstractVector,
-  ls::LinearSolver,
-  op::PTAffineOperator,
-  ::Nothing)
-
-  A,b = op.matrix,op.vector
-  ss = symbolic_setup(ls,A)
-  ns = numerical_setup(ss,A)
-  solve!(x,ns,b)
-  ns
-end
-
-function Algebra.solve!(
-  x::AbstractVector,
-  ::LinearSolver,
-  op::PTAffineOperator,
-  ns)
-
-  A,b = op.matrix,op.vector
-  numerical_setup!(ns,A)
-  solve!(x,ns,b)
-  ns
-end
-
-struct PTLinearSolverCache <: GridapType
-  A::AbstractMatrix
-  b::AbstractVector
-  ns::NumericalSetup
-end
-
-function Algebra.solve!(
-  x::AbstractVector,
-  ls::LinearSolver,
-  op::PTNonlinearOperator,
-  cache::Nothing)
-
-  b = residual(op,x)
-  A = jacobian(op,x)
-  ss = symbolic_setup(ls,A)
-  ns = numerical_setup(ss,A)
-  rmul!(b,-1)
-  solve!(x,ns,b)
-  Algebra.LinearSolverCache(A,b,ns)
-end
-
-function Algebra.solve!(
-  x::AbstractVector,
-  ls::LinearSolver,
-  op::PTNonlinearOperator,
-  cache::PTLinearSolverCache)
-
-  b = cache.b
-  A = cache.A
-  ns = cache.ns
-  residual!(b,op,x)
-  jacobian!(A,op,x)
-  numerical_setup!(ns,A)
-  rmul!(b,-1)
-  solve!(x,ns,b)
-  cache
-end
-
-function Algebra.LinearSolverCache(A::PTArray,b::PTArray,ns::NumericalSetup)
-  PTLinearSolverCache(A,b,ns)
-end
 
 function Algebra._check_convergence(nls,b::PTArray,m0)
   m = maximum(abs,b)
