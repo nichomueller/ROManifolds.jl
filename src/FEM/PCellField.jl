@@ -24,10 +24,10 @@ struct SingleFieldPFEFunction{T<:CellField} <: PCellField
   fe_space::SingleFieldFESpace
 end
 
+Base.length(f::SingleFieldPFEFunction) = length(f.free_values)
 CellData.get_data(f::SingleFieldPFEFunction) = get_data(f.cell_field)
 FESpaces.get_triangulation(f::SingleFieldPFEFunction) = get_triangulation(f.cell_field)
 CellData.DomainStyle(::Type{SingleFieldPFEFunction{T}}) where T = DomainStyle(T)
-
 FESpaces.get_free_dof_values(f::SingleFieldPFEFunction) = f.free_values
 FESpaces.get_cell_dof_values(f::SingleFieldPFEFunction) = f.cell_dof_values
 FESpaces.get_fe_space(f::SingleFieldPFEFunction) = f.fe_space
@@ -37,37 +37,6 @@ function FESpaces.FEFunction(
   cell_vals = scatter_free_and_dirichlet_values(fs,free_values,dirichlet_values)
   cell_field = CellField(fs,cell_vals)
   SingleFieldPFEFunction(cell_field,cell_vals,free_values,dirichlet_values,fs)
-end
-
-function Base.iterate(f::SingleFieldPFEFunction)
-  state = 1
-
-  data = getindex.(get_data(f),state)
-  cell_field = GenericCellField(data,get_triangulation(f),DomainStyle(f))
-  cell_dof_values = getindex.(f.cell_dof_values,state)
-  free_values = f.free_values[state]
-  dirichlet_values = f.dirichlet_values[state]
-  fe_space = TrialFESpace(dirichlet_values,f.fe_space.space)
-  sf = SingleFieldFEFunction(cell_field,cell_dof_values,free_values,dirichlet_values,fe_space)
-
-  (sf,state),state
-end
-
-function Base.iterate(f::SingleFieldPFEFunction,state)
-  if state >= length(f.free_values)
-    return nothing
-  end
-  state += 1
-
-  data = getindex.(get_data(f),state)
-  cell_field = GenericCellField(data,get_triangulation(f),DomainStyle(f))
-  cell_dof_values = getindex.(f.cell_dof_values,state)
-  free_values = f.free_values[state]
-  dirichlet_values = f.dirichlet_values[state]
-  fe_space = TrialFESpace(dirichlet_values,f.fe_space.space)
-  sf = SingleFieldFEFunction(cell_field,cell_dof_values,free_values,dirichlet_values,fe_space)
-
-  (sf,state),state
 end
 
 function TransientFETools.TransientCellField(single_field::SingleFieldPFEFunction,derivatives::Tuple)
@@ -82,7 +51,7 @@ struct MultiFieldPFEFunction{T<:MultiFieldCellField} <: PCellField
 
   function MultiFieldPFEFunction(
     free_values::AbstractVector,
-    space::MultiFieldFESpace,
+    space::MultiFieldPFESpace,
     single_fe_functions::Vector{<:SingleFieldPFEFunction})
 
     multi_cell_field = MultiFieldCellField(map(i->i.cell_field,single_fe_functions))
@@ -96,6 +65,7 @@ struct MultiFieldPFEFunction{T<:MultiFieldCellField} <: PCellField
   end
 end
 
+Base.length(f::MultiFieldPFEFunction) = length(f.free_values)
 CellData.get_data(f::MultiFieldPFEFunction) = get_data(f.multi_cell_field)
 FESpaces.get_triangulation(f::MultiFieldPFEFunction) = get_triangulation(f.multi_cell_field)
 CellData.DomainStyle(::Type{MultiFieldPFEFunction{T}}) where T = DomainStyle(T)
@@ -148,4 +118,41 @@ end
 function TransientFETools.TransientCellField(multi_field::MultiFieldPFEFunction,derivatives::Tuple)
   transient_single_fields = TransientFETools._to_transient_single_fields(multi_field,derivatives)
   TransientMultiFieldCellField(multi_field,derivatives,transient_single_fields)
+end
+
+# for visualization purposes
+function _fespace_i(f::TrialPFESpace,i::Integer)
+  dv = f.dirichlet_values[i]
+  TrialFESpace(dv,f.space)
+end
+
+function _cellfield_i(f::GenericCellField,i::Integer)
+  data = get_data(f)
+  trian = get_triangulation(f)
+  DS = DomainStyle(f)
+  di = getindex.(data,i)
+  GenericCellField(di,trian,DS)
+end
+
+function _cellfield_i(f::SingleFieldPFEFunction,i::Integer)
+  cf = _cellfield_i(f.cell_field,i)
+  fs = _fespace_i(f.fe_space,i)
+  cv = f.cell_dof_values[i]
+  fv = f.free_values[i]
+  dv = f.dirichlet_values[i]
+  SingleFieldFEFunction(cf,cv,fv,dv,fs)
+end
+
+function _cellfield_i(f::MultiFieldPFEFunction,i::Integer)
+  fv = f.free_values[i]
+  mfs,sff = map(f.single_fe_functions,f.fe_space) do ff,fs
+    _fespace_i(fs,i),_cellfield_i(ff,i)
+  end |> tuple_of_arrays
+  MultiFieldPFEFunction(fv,mfs,sff)
+end
+
+function _to_vector_cellfields(f)
+  map(1:length(f)) do i
+    _cellfield_i(f,i)
+  end
 end

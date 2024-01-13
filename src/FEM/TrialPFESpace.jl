@@ -527,7 +527,7 @@ function FESpaces.interpolate!(objects,free_values::PArray,fe::MultiFieldPFESpac
     uhi = interpolate!(object,free_values_i,U)
     push!(blocks,uhi)
   end
-  PTMultiFieldFEFunction(free_values,fe,blocks)
+  MultiFieldPFEFunction(free_values,fe,blocks)
 end
 
 function FESpaces.interpolate_everywhere(objects,fe::MultiFieldPFESpace)
@@ -539,7 +539,7 @@ function FESpaces.interpolate_everywhere(objects,fe::MultiFieldPFESpace)
     uhi = interpolate_everywhere!(object,free_values_i,dirichlet_values_i,U)
     push!(blocks,uhi)
   end
-  PTMultiFieldFEFunction(free_values,fe,blocks)
+  MultiFieldPFEFunction(free_values,fe,blocks)
 end
 
 function FESpaces.interpolate_dirichlet(objects,fe::MultiFieldPFESpace)
@@ -551,7 +551,7 @@ function FESpaces.interpolate_dirichlet(objects,fe::MultiFieldPFESpace)
     uhi = interpolate_dirichlet!(object,free_values_i,dirichlet_values_i,U)
     push!(blocks,uhi)
   end
-  PTMultiFieldFEFunction(free_values,fe,blocks)
+  MultiFieldPFEFunction(free_values,fe,blocks)
 end
 
 function FESpaces.EvaluationFunction(fe::MultiFieldPFESpace,free_values::PArray)
@@ -561,7 +561,7 @@ function FESpaces.EvaluationFunction(fe::MultiFieldPFESpace,free_values::PArray)
     free_values_i,fe_function_i
   end |> tuple_of_arrays
   free_values = vcat(free_values...)
-  PTMultiFieldFEFunction(free_values,fe,fe_functions)
+  MultiFieldPFEFunction(free_values,fe,fe_functions)
 end
 
 function Arrays.testitem(f::MultiFieldPFESpace)

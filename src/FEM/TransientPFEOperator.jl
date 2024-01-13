@@ -228,7 +228,7 @@ function ODETools.jacobians!(
 end
 
 function TransientFETools.fill_initial_jacobians(
-  op::TransientFEOperatorsFromWeakForm,
+  op::TransientPFEOperatorFromWeakForm,
   r::Realization,
   xh::T) where T
 

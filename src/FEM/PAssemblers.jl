@@ -1,5 +1,5 @@
 function Algebra.allocate_vector(
-  a::SparseMatrixAssember,
+  a::SparseMatrixAssembler,
   vecdata::Tuple{<:AbstractVector{<:PArray},Any})
 
   cellvec,cellidsrows = vecdata
@@ -10,7 +10,7 @@ function Algebra.allocate_vector(
 end
 
 function Algebra.allocate_matrix(
-  a::SparseMatrixAssember,
+  a::SparseMatrixAssembler,
   matdata::Tuple{<:AbstractVector{<:PArray},Any,Any})
 
   cellmat,cellidsrows,cellidscols = matdata

@@ -14,6 +14,7 @@ using Gridap.CellData
 using Gridap.MultiField
 using Gridap.ODEs.ODETools
 using Gridap.ODEs.TransientFETools
+using Gridap.Visualization
 
 import Base: inv
 import Base: abs
@@ -145,10 +146,13 @@ export residual_for_trian!
 export jacobian_for_trian!
 include("TransientPFEOperator.jl")
 
-export PTNonlinearOperator
-export PTAlgebraicOperator
-export update_method_operator
-include("PTAlgebraicOperator.jl")
+export PODEOperator
+export ConstantPODEOperator
+export ConstantMatrixPODEOperator
+export AffinePODEOperator
+export NonlinearPODEOperator
+export PODEOpFromFEOp
+include("PODEOperatorInterface.jl")
 
 export PODESolution
 export num_time_dofs
@@ -160,6 +164,8 @@ include("PTSolvers.jl")
 export PThetaMethodOperator
 export AffinePThetaMethodOperator
 include("PThetaMethod.jl")
+
+include("PVisualization.jl")
 
 export get_order
 export get_L2_norm_matrix

@@ -7,8 +7,6 @@ struct GenericPODESolution
   r::Realization
 end
 
-# Base.length(sol::PODESolution) = Int((sol.tf-sol.t0)/sol.solver.dt)
-
 function Base.iterate(sol::PODESolution)
   uf = copy(sol.u0)
   u0 = copy(sol.u0)

@@ -42,7 +42,7 @@ abstract type SamplingStyle end
 struct UniformSampling <: SamplingStyle end
 struct NormalSampling <: SamplingStyle end
 
-abstract type AbstractParametricSpace <: Set{Realization} end
+abstract type AbstractParametricSpace <: AbstractSet{Realization} end
 
 struct ParametricSpace <: AbstractParametricSpace
   parametric_domain::AbstractVector
@@ -57,7 +57,7 @@ end
 
 function generate_parameter(p::ParametricSpace)
   _value(d,::UniformSampling) = rand(Uniform(first(d),last(d)))
-  _value(d,::UniformSampling) = rand(Normal(first(d),last(d)))
+  _value(d,::NormalSampling) = rand(Normal(first(d),last(d)))
   [_value(d,p.sampling_style) for d = p.parametric_domain]
 end
 
