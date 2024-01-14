@@ -165,6 +165,8 @@ export PThetaMethodOperator
 export AffinePThetaMethodOperator
 include("PThetaMethod.jl")
 
+export PString
+export PVisualizationData
 include("PVisualization.jl")
 
 export get_order

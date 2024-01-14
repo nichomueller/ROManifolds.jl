@@ -55,6 +55,11 @@ struct ParametricSpace <: AbstractParametricSpace
   end
 end
 
+function Base.show(io::IO,::MIME"text/plain",p::ParametricSpace)
+  msg = "Set of parameters in $(p.parametric_domain), sampled with $(p.sampling_style)"
+  println(io,msg)
+end
+
 function generate_parameter(p::ParametricSpace)
   _value(d,::UniformSampling) = rand(Uniform(first(d),last(d)))
   _value(d,::NormalSampling) = rand(Normal(first(d),last(d)))
@@ -77,6 +82,11 @@ function TransientParametricSpace(
 
   pspace = ParametricSpace(parametric_domain,args...)
   TransientParametricSpace(pspace,temporal_domain)
+end
+
+function Base.show(io::IO,::MIME"text/plain",p::TransientParametricSpace)
+  msg = "Set of tuples (p,t) in $(p.pspace.parametric_domain) × $(p.temporal_domain)"
+  println(io,msg)
 end
 
 function shift_temporal_domain!(p::TransientParametricSpace,δ::Number)

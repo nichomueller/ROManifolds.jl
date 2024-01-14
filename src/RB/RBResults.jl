@@ -56,7 +56,7 @@ function rb_solver(rbinfo,feop_lin,feop_nlin,fesolver,rbspace,rbres,rbjacs,snaps
     rhs_lin,(lhs_lin,lhs_t) = collect_rhs_lhs_contributions!(cache,rbinfo,op_lin,rbrhs_lin,rblhs_lin,rbspace)
     for iter in 1:fesolver.nls.max_nliters
       x = recenter(x,uh0_test;θ=fesolver.θ)
-      op_nlin = update_method_operator(op_nlin,x)
+      # op_nlin = update_method_operator(op_nlin,x)
       rhs_nlin,(lhs_nlin,) = collect_rhs_lhs_contributions!(cache,rbinfo,op_nlin,rbrhs_nlin,rblhs_nlin,rbspace)
       @. lhs = lhs_lin+lhs_t+lhs_nlin
       @. rhs = rhs_lin+rhs_nlin+(lhs_lin+lhs_t)*xrb

@@ -59,12 +59,10 @@ export AffineTransientPFEOperator
 export NonlinearTransientPFEOperator
 export residual_for_trian!
 export jacobian_for_trian!
-export update_method_operator
-export _check_convergence
 export PODESolution
-export num_time_dofs
-export get_times
-export get_stencil_times
+# export num_time_dofs
+# export get_times
+# export get_stencil_times
 export collect_solutions
 export collect_residuals_for_trian
 export collect_jacobians_for_trian
@@ -73,7 +71,9 @@ export PThetaMethodOperator
 export get_order
 export get_L2_norm_matrix
 export get_H1_norm_matrix
-export ReducedMeasure
+# export ReducedMeasure
+export PString
+export PVisualizationData
 
 # include("RB/RB.jl")
 # using Mabla.RB
