@@ -111,9 +111,9 @@ export get_at_offsets
 export recenter
 include("PArray.jl")
 
-export AbstractPTFunction
+export AbstractPFunction
 export PFunction
-export PTFunction
+export TransientPFunction
 export PField
 export PGenericField
 include("PField.jl")
@@ -164,6 +164,13 @@ include("PTSolvers.jl")
 export PThetaMethodOperator
 export AffinePThetaMethodOperator
 include("PThetaMethod.jl")
+
+export PODESolution
+export GenericPODESolution
+include("PODESolution.jl")
+
+export TransientPFESolution
+include("TransientPFESolution.jl")
 
 export PString
 export PVisualizationData

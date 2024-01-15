@@ -475,7 +475,7 @@ function check_touched_jacobians(op::NonlinearOperator;i=1)
   end
   xh1 = TransientCellField(uh1,dxh1)
   dv = get_fe_basis(test)
-  du = get_trial_fe_basis(trial(nothing,nothing))
+  du = get_trial_fe_basis(trial(nothing))
   int = feop.jac[i](μ1,t1,xh1,du,dv)
   return !isnothing(int)
 end

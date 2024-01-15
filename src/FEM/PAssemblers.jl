@@ -1,6 +1,6 @@
 function Algebra.allocate_vector(
   a::SparseMatrixAssembler,
-  vecdata::Tuple{<:AbstractVector{<:PArray},Any})
+  vecdata::Tuple{<:AbstractVector{<:AbstractVector{<:PArray}},Any})
 
   cellvec,cellidsrows = vecdata
   cellvec1 = first.(cellvec)
@@ -11,7 +11,7 @@ end
 
 function Algebra.allocate_matrix(
   a::SparseMatrixAssembler,
-  matdata::Tuple{<:AbstractVector{<:PArray},Any,Any})
+  matdata::Tuple{<:AbstractVector{<:AbstractVector{<:PArray}},Any,Any})
 
   cellmat,cellidsrows,cellidscols = matdata
   cellmat1 = first.(cellmat)
@@ -20,32 +20,22 @@ function Algebra.allocate_matrix(
   parray(mat,n)
 end
 
-function FESpaces.collect_cell_vector(
+function FESpaces.collect_cell_matrix(
+  trial::FESpace,
   test::FESpace,
-  a::DomainContribution,
-  strian::Triangulation)
+  a::DomainContribution)
 
-  w = []
-  r = []
-  scell_vec = get_contribution(a,strian)
-  cell_vec,trian = move_contributions(scell_vec,strian)
-  @assert ndims(eltype(cell_vec)) == 1
-  cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
-  rows = get_cell_dof_ids(test,trian)
-  push!(w,cell_vec_r)
-  push!(r,rows)
-  (w,r)
+  map([get_domains(a)...]) do strian
+    collect_cell_matrix_for_trian(trial,test,a,strian)
+  end |> tuple_of_arrays
 end
 
-function FESpaces.collect_cell_matrix(
+function collect_cell_matrix_for_trian(
   trial::FESpace,
   test::FESpace,
   a::DomainContribution,
   strian::Triangulation)
 
-  w = []
-  r = []
-  c = []
   scell_mat = get_contribution(a,strian)
   cell_mat,trian = move_contributions(scell_mat,strian)
   @assert ndims(eltype(cell_mat)) == 2
@@ -53,19 +43,35 @@ function FESpaces.collect_cell_matrix(
   cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
   rows = get_cell_dof_ids(test,trian)
   cols = get_cell_dof_ids(trial,trian)
-  push!(w,cell_mat_rc)
-  push!(r,rows)
-  push!(c,cols)
-  (w,r,c)
+  [cell_mat_rc],[rows],[cols]
+end
+
+function FESpaces.collect_cell_vector(test::FESpace,a::DomainContribution)
+  map([get_domains(a)...]) do strian
+    collect_cell_vector_for_trian(test,a,strian)
+  end |> tuple_of_arrays
+end
+
+function collect_cell_vector_for_trian(
+  test::FESpace,
+  a::DomainContribution,
+  strian::Triangulation)
+
+  scell_vec = get_contribution(a,strian)
+  cell_vec,trian = move_contributions(scell_vec,strian)
+  @assert ndims(eltype(cell_vec)) == 1
+  cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
+  rows = get_cell_dof_ids(test,trian)
+  [cell_vec_r],[rows]
 end
 
 Algebra.create_from_nz(a::PArray) = a
 
 @inline function Algebra._add_entries!(
   combine::Function,
-  A::AbstractMatrix{T},
+  A::AbstractMatrix{<:AbstractArray},
   vs,
-  is,js) where T<:AbstractArray
+  is,js)
 
   for (lj,j) in enumerate(js)
     if j>0
@@ -84,9 +90,9 @@ end
 
 @inline function Algebra._add_entries!(
   combine::Function,
-  A::AbstractMatrix{T},
+  A::AbstractMatrix{<:AbstractArray},
   vs::Nothing,
-  is,js) where T<:AbstractArray
+  is,js)
 
   for (lj,j) in enumerate(js)
     if j>0
@@ -104,9 +110,9 @@ end
 
 @inline function Algebra._add_entries!(
   combine::Function,
-  A::AbstractMatrix{T},
+  A::AbstractMatrix{<:AbstractArray},
   vs::PArray,
-  is,js) where T<:AbstractArray
+  is,js)
 
   for (lj,j) in enumerate(js)
     if j>0
@@ -125,9 +131,9 @@ end
 
 @inline function Algebra._add_entries!(
   combine::Function,
-  A::AbstractVector{T},
+  A::AbstractVector{<:AbstractArray},
   vs::Nothing,
-  is) where T<:AbstractArray
+  is)
 
   for (li,i) in enumerate(is)
     if i>0
@@ -141,9 +147,9 @@ end
 
 @inline function Algebra._add_entries!(
   combine::Function,
-  A::AbstractVector{T},
+  A::AbstractVector{<:AbstractArray},
   vs,
-  is) where T<:AbstractArray
+  is)
 
   for (li,i) in enumerate(is)
     if i>0
@@ -158,9 +164,9 @@ end
 
 @inline function Algebra._add_entries!(
   combine::Function,
-  A::AbstractVector{T},
+  A::AbstractVector{<:AbstractArray},
   vs::PArray,
-  is) where T<:AbstractArray
+  is)
 
   for (li,i) in enumerate(is)
     if i>0

@@ -109,13 +109,13 @@ function main(ranks)
 
   a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
   a(μ,t) = x->a(x,μ,t)
-  aμt(μ,t) = PTFunction(a,μ,t)
+  aμt(μ,t) = TransientPFunction(a,μ,t)
   f(x,μ,t) = 1.
   f(μ,t) = x->f(x,μ,t)
-  fμt(μ,t) = PTFunction(f,μ,t)
+  fμt(μ,t) = TransientPFunction(f,μ,t)
   h(x,μ,t) = abs(cos(t/μ[3]))
   h(μ,t) = x->h(x,μ,t)
-  hμt(μ,t) = PTFunction(h,μ,t)
+  hμt(μ,t) = TransientPFunction(h,μ,t)
   g(x,μ,t) = μ[1]*exp(-x[1]/μ[2])*abs(sin(t/μ[3]))
   g(μ,t) = x->g(x,μ,t)
   u0(x,μ) = 0

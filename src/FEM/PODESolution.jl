@@ -1,8 +1,8 @@
 abstract type PODESolution <: ODESolution end
 
-struct GenericPODESolution
+struct GenericPODESolution <: PODESolution
   solver::ODESolver
-  op::TransientPFEOperator
+  op::PODEOperator
   u0::AbstractVector
   r::Realization
 end
@@ -36,11 +36,11 @@ function Base.iterate(sol::PODESolution,state)
   return (uf,rf),state
 end
 
-function solve(
+function Algebra.solve(
   solver::ODESolver,
   op::PODEOperator,
   u0::T,
-  r::Realization)
+  r::Realization) where T
 
-  GenericODESolution(solver,op,u0,r)
+  GenericPODESolution(solver,op,u0,r)
 end

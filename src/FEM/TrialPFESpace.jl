@@ -213,7 +213,7 @@ function FESpaces._free_and_dirichlet_values_fill!(
 end
 
 function FESpaces.interpolate!(
-  object::AbstractPTFunction,
+  object::AbstractPFunction,
   free_values::PArray,
   fs::TrialPFESpace)
 
@@ -225,7 +225,7 @@ function FESpaces.interpolate!(
 end
 
 function FESpaces.interpolate_everywhere!(
-  object::AbstractPTFunction,
+  object::AbstractPFunction,
   free_values::PArray,
   dirichlet_values::PArray,
   fs::TrialPFESpace)
@@ -238,7 +238,7 @@ function FESpaces.interpolate_everywhere!(
 end
 
 function FESpaces.interpolate_dirichlet!(
-  object::AbstractPTFunction,
+  object::AbstractPFunction,
   free_values::PArray,
   dirichlet_values::PArray,
   fs::TrialPFESpace)

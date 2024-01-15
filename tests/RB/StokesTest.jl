@@ -17,7 +17,7 @@ pspace = ParametricSpace(ranges,sampling)
 
 a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
 a(μ,t) = x->a(x,μ,t)
-aμt(μ,t) = PTFunction(a,μ,t)
+aμt(μ,t) = TransientPFunction(a,μ,t)
 
 g(x,μ,t) = VectorValue(μ[1]*exp(-x[2]/μ[2])*abs(sin(μ[3]*t)),0)
 g(μ,t) = x->g(x,μ,t)

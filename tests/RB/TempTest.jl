@@ -26,22 +26,22 @@ dΓn = Measure(Γn,degree)
 
 a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
 a(μ,t) = x->a(x,μ,t)
-aμt(μ,t) = PTFunction(a,μ,t)
+aμt(μ,t) = 𝑓ₚₜ(a,μ,t)
 
 f(x,μ,t) = 1.
 f(μ,t) = x->f(x,μ,t)
-fμt(μ,t) = PTFunction(f,μ,t)
+fμt(μ,t) = 𝑓ₚₜ(f,μ,t)
 
 h(x,μ,t) = abs(cos(t/μ[3]))
 h(μ,t) = x->h(x,μ,t)
-hμt(μ,t) = PTFunction(h,μ,t)
+hμt(μ,t) = 𝑓ₚₜ(h,μ,t)
 
 g(x,μ,t) = μ[1]*exp(-x[1]/μ[2])*abs(sin(t/μ[3]))
 g(μ,t) = x->g(x,μ,t)
 
 u0(x,μ) = 0
 u0(μ) = x->u0(x,μ)
-u0μ(μ) = PFunction(u0,μ)
+u0μ(μ) = 𝑓ₚ(u0,μ)
 
 res(μ,t,u,v) = ∫(v*∂ₚt(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
 jac(μ,t,u,du,v) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
@@ -50,21 +50,58 @@ jac_t(μ,t,u,dut,v) = ∫(v*dut)dΩ
 pranges = fill([1.,10.],3)
 t0,tf,dt,θ = 0.,0.3,0.005,0.5
 tdomain = t0:dt:tf
-ptspace = TransientParametricSpace(pranges,tdomain)
+tpspace = TransientParametricSpace(pranges,tdomain)
 
 T = Float
 reffe = ReferenceFE(lagrangian,T,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = TransientTrialPFESpace(test,g)
-feop = AffineTransientPFEOperator(res,jac,jac_t,ptspace,trial,test)
+feop = AffineTransientPFEOperator(res,jac,jac_t,tpspace,trial,test)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),θ,dt)
 
-r = realization(ptspace,nparams=10)
-r1 = realization(ptspace,nparams=10,time_locations=1)
+r = realization(tpspace,nparams=10)
+r1 = realization(tpspace,nparams=10,time_locations=1)
 FEM.change_time!(r1,dt)
 
-uht = solve(fesolver,feop,uh0μ,t0,tf)
+uht = solve(fesolver,feop,uh0μ)
+
+for (u,t) in uht
+  println(typeof(u))
+end
+
+v = get_fe_basis(test)
+du = get_trial_fe_basis(trial(nothing))
+u = du
+dc = jac(rand(3),[dt,2dt],u,du,v)
+
+md = collect_cell_matrix(trial(nothing),test,dc)
+
+mdata = ciaooo(trial(nothing),test,dc)
+
+function ciaooo(trial::FESpace,test::FESpace,a::DomainContribution)
+  map([get_domains(a)...]) do strian
+    scell_mat = get_contribution(a,strian)
+    cell_mat, trian = move_contributions(scell_mat,strian)
+    @assert ndims(eltype(cell_mat)) == 2
+    cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
+    cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
+    rows = get_cell_dof_ids(test,trian)
+    cols = get_cell_dof_ids(trial,trian)
+    cell_mat_rc,rows,cols
+  end |> tuple_of_arrays
+end
+
+function ciaooo(test::FESpace,a::DomainContribution)
+  map([get_domains(a)...]) do strian
+    scell_vec = get_contribution(a,strian)
+    cell_vec, trian = move_contributions(scell_vec,strian)
+    @assert ndims(eltype(cell_vec)) == 1
+    cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
+    rows = get_cell_dof_ids(test,trian)
+    cell_vec_r,rows
+  end |> tuple_of_arrays
+end
 
 ϵ = 1e-4
 load_solutions = false
@@ -108,7 +145,7 @@ boh[Ω]
   end
 end
 
-trial0 = trial(nothing,nothing)
+trial0 = trial(nothing)
 @time begin
   μ = rand(3)
   A = assemble_matrix((φᵢ,φⱼ)->∫(a(μ,dt)*∇(φᵢ)⋅∇(φⱼ))dΩ,trial0,test)

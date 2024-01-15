@@ -9,19 +9,19 @@ struct PODEOpFromFEOp{C} <: PODEOperator{C}
   feop::TransientPFEOperator{C}
 end
 
-TransientFETools.get_order(op::PODEOpFromFEOp) = get_order(op.feop)
+ReferenceFEs.get_order(op::PODEOpFromFEOp) = get_order(op.feop)
 
 function TransientFETools.allocate_cache(
   op::PODEOpFromFEOp,
   r::Realization)
 
-  Ut = get_trial(op.feop)
-  U = allocate_trial_space(Ut,get_parameters(r),get_times(r))
-  Uts = (Ut,)
+  Upt = get_trial(op.feop)
+  U = allocate_trial_space(Upt,r)
+  Uts = (Upt,)
   Us = (U,)
   for i in 1:get_order(op)
     Uts = (Uts...,∂ₚt(Uts[i]))
-    Us = (Us...,allocate_trial_space(Uts[i+1],get_parameters(r),get_times(r)))
+    Us = (Us...,allocate_trial_space(Uts[i+1],r))
   end
   fecache = allocate_cache(op.feop)
   Us,Uts,fecache
@@ -35,7 +35,7 @@ function TransientFETools.update_cache!(
   _Us,Uts,fecache = ode_cache
   Us = ()
   for i in 1:get_order(op)+1
-    Us = (Us...,evaluate!(_Us[i],Uts[i],get_parameters(r),get_times(r)))
+    Us = (Us...,evaluate!(_Us[i],Uts[i],r))
   end
   fecache = allocate_cache(op.feop)
   Us,Uts,fecache

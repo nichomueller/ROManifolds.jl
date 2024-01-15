@@ -1,18 +1,8 @@
 abstract type PCellField <: CellField end
 
-function CellData.CellField(f::AbstractPTFunction,trian::Triangulation,::DomainStyle)
+function CellData.CellField(f::AbstractPFunction,trian::Triangulation,::DomainStyle)
   s = size(get_cell_map(trian))
   cell_field = Fill(PGenericField(f),s)
-  GenericCellField(cell_field,trian,PhysicalDomain())
-end
-
-function CellData.CellField(
-  f::AbstractPTFunction{<:AbstractVector{<:Number},<:Union{Real,Nothing}},
-  trian::Triangulation,
-  ::DomainStyle)
-
-  s = size(get_cell_map(trian))
-  cell_field = Fill(get_fields(f),s)
   GenericCellField(cell_field,trian,PhysicalDomain())
 end
 

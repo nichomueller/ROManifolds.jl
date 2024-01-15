@@ -44,9 +44,9 @@ export HomogeneousTrialPFESpace
 export MultiFieldPFESpace
 export split_fields
 export field_offsets
-export AbstractPTFunction
+export AbstractPFunction
 export PFunction
-export PTFunction
+export TransientPFunction
 export PCellField
 export SingleFieldPFEFunction
 export MultiFieldPFEFunction

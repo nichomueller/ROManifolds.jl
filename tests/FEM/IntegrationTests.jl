@@ -67,8 +67,8 @@ for np in 1:nparams
   feop_t = get_feoperator_gridap(feop,params[np])
   μ = params[np]
   for nt in 1:ntimes
-    @check feop.trials[1].dirichlet_μt(x,μ,t) ≈ feop_t.trials[1].dirichlet_t(x,t) "(np,nt) = ($np,$nt)"
-    @check feop.trials[2].dirichlet_μt(x,μ,t) ≈ feop_t.trials[2].dirichlet_t(x,t) "(np,nt) = ($np,$nt)"
+    @check feop.trials[1].dirichlet_pt(x,μ,t) ≈ feop_t.trials[1].dirichlet_t(x,t) "(np,nt) = ($np,$nt)"
+    @check feop.trials[2].dirichlet_pt(x,μ,t) ≈ feop_t.trials[2].dirichlet_t(x,t) "(np,nt) = ($np,$nt)"
     @check feop.trials[1](μ,t).dirichlet_values ≈ feop_t.trials[1](t).dirichlet_values
     @check feop.trials[2](μ,t).dirichlet_values ≈ feop_t.trials[2](t).dirichlet_values
   end

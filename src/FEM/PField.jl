@@ -1,76 +1,16 @@
-abstract type AbstractPTFunction{P,T} <: Function end
-
-struct PFunction{P} <: AbstractPTFunction{P,Nothing}
-  f::Function
-  params::P
-end
-
-Base.length(pf::PFunction) = length(pf.params)
-Base.length(pf::PFunction{<:AbstractVector{<:Real}}) = 1
-Base.eachindex(pf::PFunction) = Base.OneTo(length(pf))
-_length(μ::Vector{<:Number}) = 1
-_length(μ) = length(μ)
-
-function Base.getindex(pf::PFunction,i::Int)
-  pf.f(pf.params[i])
-end
-
-function Base.getindex(pf::PFunction{<:AbstractVector{<:Real}},i::Int)
-  @assert i == 1
-  pf.f(pf.params)
-end
-
-struct PTFunction{P,T} <: AbstractPTFunction{P,T}
-  f::Function
-  params::P
-  times::T
-end
-
-Base.length(ptf::PTFunction) = length(ptf.params)*length(ptf.times)
-Base.length(ptf::PTFunction{<:AbstractVector{<:Real},<:AbstractVector{<:Real}}) = length(ptf.times)
-Base.length(ptf::PTFunction{<:AbstractVector{<:Real},<:Real}) = 1
-Base.eachindex(ptf::PTFunction) = Base.OneTo(length(ptf))
-_length(μ::Vector{<:Number},t) = length(t)
-_length(μ,t) = length(μ)*length(t)
-
-function Base.getindex(ptf::PTFunction,i::Int)
-  nt = length(ptf.times)
-  ptf.f(ptf.params[slow_idx(i,nt)],ptf.times[fast_idx(i,nt)])
-end
-
-function Base.getindex(ptf::PTFunction{<:AbstractVector{<:Real},<:AbstractVector{<:Real}},i::Int)
-  ptf.f(ptf.params,ptf.times[i])
-end
-
-function Base.getindex(ptf::PTFunction{<:AbstractVector{<:Real},<:Real},i::Int)
-  @assert i == 1
-  ptf.f(ptf.params,ptf.times)
-end
-
-function get_fields(ptf::AbstractPTFunction)
-  n = length(ptf)
-  fields = Vector{GenericField}(undef,n)
-  @inbounds for k = eachindex(ptf)
-    fields[k] = GenericField(ptf[k])
-  end
-  fields
-end
-
 abstract type PField <: Field end
 
 struct PGenericField <: PField
   fields::AbstractVector{GenericField}
-  function PGenericField(f::AbstractPTFunction)
-    fields = get_fields(f)
-    new(fields)
-  end
 end
 
-Base.size(a::PGenericField) = size(a.fields)
-Base.length(a::PGenericField) = length(a.fields)
-Base.eachindex(a::PGenericField) = eachindex(a.fields)
+PGenericField(f::AbstractPFunction) = PGenericField(get_fields(f))
+
+Base.size(f::PGenericField) = size(f.fields)
+Base.length(f::PGenericField) = length(f.fields)
+Base.eachindex(f::PGenericField) = eachindex(f.fields)
 Base.IndexStyle(::Type{<:PGenericField}) = IndexLinear()
-Base.getindex(a::PGenericField,i::Integer) = GenericField(a.fields[i])
+Base.getindex(f::PGenericField,i::Integer) = GenericField(f.fields[i])
 
 function Arrays.testitem(f::PGenericField)
   f[1]

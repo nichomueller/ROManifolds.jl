@@ -4,7 +4,7 @@ A parametric version of the `Gridap` `TransientFEOperator`
 abstract type TransientPFEOperator{T<:OperatorType} <: GridapType end
 
 function FESpaces.get_algebraic_operator(feop::TransientPFEOperator{C}) where C
-  ODEOpFromFEOp{C}(feop)
+  PODEOpFromFEOp{C}(feop)
 end
 
 function TransientFETools.allocate_cache(op::TransientPFEOperator)
@@ -22,24 +22,24 @@ struct TransientPFEOperatorFromWeakForm{T<:OperatorType} <: TransientPFEOperator
   res::Function
   jacs::Tuple{Vararg{Function}}
   assem::Assembler
-  ptspace::TransientParametricSpace
+  tpspace::TransientParametricSpace
   trials::Tuple{Vararg{Any}}
   test::FESpace
   order::Integer
 end
 
 function AffineTransientPFEOperator(
-  res::Function,jac::Function,jac_t::Function,ptspace,trial,test)
+  res::Function,jac::Function,jac_t::Function,tpspace,trial,test)
   assem = SparseMatrixAssembler(trial,test)
   TransientPFEOperatorFromWeakForm{Affine}(
-    res,(jac,jac_t),assem,ptspace,(trial,∂ₚt(trial)),test,1)
+    res,(jac,jac_t),assem,tpspace,(trial,∂ₚt(trial)),test,1)
 end
 
 function TransientPFEOperator(
-  res::Function,jac::Function,jac_t::Function,ptspace,trial,test)
+  res::Function,jac::Function,jac_t::Function,tpspace,trial,test)
   assem = SparseMatrixAssembler(trial,test)
   TransientPFEOperatorFromWeakForm{Nonlinear}(
-    res,(jac,jac_t),assem,ptspace,(trial,∂ₚt(trial)),test,1)
+    res,(jac,jac_t),assem,tpspace,(trial,∂ₚt(trial)),test,1)
 end
 
 struct NonlinearTransientPFEOperator <: TransientPFEOperator{Nonlinear}
@@ -47,7 +47,7 @@ struct NonlinearTransientPFEOperator <: TransientPFEOperator{Nonlinear}
   jacs::Tuple{Vararg{Function}}
   nl::Tuple{Vararg{Function}}
   assem::Assembler
-  ptspace::ParametricSpace
+  tpspace::ParametricSpace
   trials::Tuple{Vararg{Any}}
   test::FESpace
   order::Integer
@@ -74,7 +74,7 @@ for (AFF,OP) in zip((:Affine,:Nonlinear),(:AffineTransientPFEOperator,:Transient
         res(μ,t,u,dv) = op.res(μ,t,sf(u,col),sf(dv,row))
         jac(μ,t,u,du,dv) = op.jacs[1](μ,t,sf(u,col),sf(du,col),sf(dv,row))
         jac_t(μ,t,u,dut,dv) = op.jacs[2](μ,t,sf(u,col),sf(dut,col),sf(dv,row))
-        return $OP(res,jac,jac_t,op.ptspace,trials_col,test_row)
+        return $OP(res,jac,jac_t,op.tpspace,trials_col,test_row)
       else
         return op
       end
@@ -92,7 +92,7 @@ function Base.getindex(op::NonlinearTransientPFEOperator,row,col)
     jac_t(μ,t,u,dut,dv) = op.jacs[2](μ,t,sf(u,col),sf(dut,col),sf(dv,row))
     nl(μ,t,u,dut,dv) = op.nl[1](μ,t,sf(u,col),sf(dut,col),sf(dv,row))
     dnl(μ,t,u,dut,dv) = op.nl[2](μ,t,sf(u,col),sf(dut,col),sf(dv,row))
-    return TransientPFEOperator(res,jac,jac_t,(nl,dnl),op.ptspace,trials_col,test_row)
+    return TransientPFEOperator(res,jac,jac_t,(nl,dnl),op.tpspace,trials_col,test_row)
   else
     return op
   end
@@ -101,7 +101,13 @@ end
 FESpaces.get_test(op::TransientPFEOperatorFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientPFEOperatorFromWeakForm) = op.trials[1]
 ReferenceFEs.get_order(op::TransientPFEOperatorFromWeakForm) = op.order
-realization(op::TransientPFEOperatorFromWeakForm,args...) = realization(op.ptspace,args...)
+realization(op::TransientPFEOperatorFromWeakForm,args...) = realization(op.tpspace,args...)
+
+function FESpaces.SparseMatrixAssembler(
+  trial::TransientTrialPFESpace,
+  test::FESpace)
+  SparseMatrixAssembler(trial(nothing),test)
+end
 
 function Algebra.allocate_residual(
   op::TransientPFEOperatorFromWeakForm,
@@ -118,6 +124,7 @@ function Algebra.allocate_residual(
   xh = TransientCellField(uh,dxh)
   dc = op.res(get_parameters(r),get_times(r),xh,v)
   vecdata = collect_cell_vector(test,dc)
+  println(typeof(vecdata))
   allocate_vector(op.assem,vecdata)
 end
 
@@ -133,7 +140,7 @@ function Algebra.allocate_jacobian(
 end
 
 function Algebra.allocate_jacobian(
-  op::TransientPFEOperator,
+  op::TransientPFEOperatorFromWeakForm,
   r::Realization,
   uh::CellField,
   i::Integer)
@@ -143,7 +150,7 @@ function Algebra.allocate_jacobian(
     dxh = (dxh...,uh)
   end
   xh = TransientCellField(uh,dxh)
-  trial = evaluate(get_trial(op),nothing,nothing)
+  trial = evaluate(get_trial(op),nothing)
   test = get_test(op)
   u = get_trial_fe_basis(trial)
   v = get_fe_basis(test)
@@ -205,7 +212,7 @@ function jacobian_for_trian!(
   cache,
   args...) where T
 
-  trial = evaluate(get_trial(op),nothing,nothing)
+  trial = evaluate(get_trial(op),nothing)
   test = get_test(op)
   u = get_trial_fe_basis(trial)
   v = get_fe_basis(test)
@@ -272,7 +279,7 @@ function TransientFETools._matdata_jacobian(
   i::Integer,
   γᵢ::Real) where T
 
-  trial = evaluate(get_trial(op),nothing,nothing)
+  trial = evaluate(get_trial(op),nothing)
   test = get_test(op)
   u = get_trial_fe_basis(trial)
   v = get_fe_basis(test)
@@ -303,7 +310,7 @@ function assemble_separate_matrix_add!(
   dc::DomainContribution)
 
   test = get_test(op)
-  trial = get_trial(op)(nothing,nothing)
+  trial = get_trial(op)(nothing)
   trian = get_domains(dc)
   Avec = Vector{typeof(A)}(undef,num_domains(dc))
   for (n,t) in enumerate(trian)

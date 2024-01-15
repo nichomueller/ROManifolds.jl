@@ -1,5 +1,5 @@
 struct TransientPFESolution
-  sol::PODESolution
+  odesol::PODESolution
   trial::TransientTrialPFESpace
 end
 
@@ -9,7 +9,7 @@ function TransientPFESolution(
   uh0;
   kwargs...)
 
-  r = realization(op.ptspace;kwargs...)
+  r = realization(op.tpspace;kwargs...)
   TransientPFESolution(solver,op,uh0,r)
 end
 
@@ -19,10 +19,10 @@ function TransientPFESolution(
   uh0,
   r::Realization)
 
-  @unpack params,times = r
+  params = get_parameters(r)
   ode_op = get_algebraic_operator(op)
-  u0 = get_free_dof_values(uh0)(params)
-  ode_sol = solve(solver,ode_op,u0,params,times)
+  u0 = get_free_dof_values(uh0(params))
+  ode_sol = solve(solver,ode_op,u0,r)
   trial = get_trial(op)
 
   TransientPFESolution(ode_sol,trial)
@@ -63,5 +63,5 @@ function Algebra.solve(
   op::TransientPFEOperator,
   uh0;
   kwargs...)
-  TransientFESolution(solver,op,uh0)
+  TransientPFESolution(solver,op,uh0)
 end
