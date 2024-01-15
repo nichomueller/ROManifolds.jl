@@ -121,12 +121,12 @@ function TransientFETools.TransientCellField(multi_field::MultiFieldPFEFunction,
 end
 
 # for visualization purposes
-function Base.getindex(f::TrialPFESpace,i::Integer)
+function _get_at_index(f::TrialPFESpace,i::Integer)
   dv = f.dirichlet_values[i]
   TrialFESpace(dv,f.space)
 end
 
-function Base.getindex(f::GenericCellField,i::Integer)
+function _get_at_index(f::GenericCellField,i::Integer)
   data = get_data(f)
   trian = get_triangulation(f)
   DS = DomainStyle(f)
@@ -134,25 +134,25 @@ function Base.getindex(f::GenericCellField,i::Integer)
   GenericCellField(di,trian,DS)
 end
 
-function Base.getindex(f::SingleFieldPFEFunction,i::Integer)
-  cf = getindex(f.cell_field,i)
-  fs = getindex(f.fe_space,i)
+function _get_at_index(f::SingleFieldPFEFunction,i::Integer)
+  cf = _get_at_index(f.cell_field,i)
+  fs = _get_at_index(f.fe_space,i)
   cv = f.cell_dof_values[i]
   fv = f.free_values[i]
   dv = f.dirichlet_values[i]
   SingleFieldFEFunction(cf,cv,fv,dv,fs)
 end
 
-function Base.getindex(f::MultiFieldPFEFunction,i::Integer)
+function _get_at_index(f::MultiFieldPFEFunction,i::Integer)
   fv = f.free_values[i]
   mfs,sff = map(f.single_fe_functions,f.fe_space) do ff,fs
-    getindex(fs,i),getindex(ff,i)
+    _get_at_index(fs,i),_get_at_index(ff,i)
   end |> tuple_of_arrays
   MultiFieldPFEFunction(fv,mfs,sff)
 end
 
 function _to_vector_cellfields(f)
   map(1:length(f)) do i
-    getindex(f,i)
+    _get_at_index(f,i)
   end
 end

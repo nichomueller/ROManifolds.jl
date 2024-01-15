@@ -5,7 +5,7 @@ end
 
 function TransientPFESolution(
   solver::ODESolver,
-  op::TransientFEOperator,
+  op::TransientPFEOperator,
   uh0;
   kwargs...)
 
@@ -15,7 +15,7 @@ end
 
 function TransientPFESolution(
   solver::ODESolver,
-  op::TransientFEOperator,
+  op::TransientPFEOperator,
   uh0,
   r::Realization)
 
@@ -60,7 +60,7 @@ end
 
 function Algebra.solve(
   solver::ODESolver,
-  op::TransientFEOperator,
+  op::TransientPFEOperator,
   uh0;
   kwargs...)
   TransientFESolution(solver,op,uh0)

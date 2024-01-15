@@ -60,6 +60,12 @@ feop = AffineTransientPFEOperator(res,jac,jac_t,ptspace,trial,test)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),θ,dt)
 
+r = realization(ptspace,nparams=10)
+r1 = realization(ptspace,nparams=10,time_locations=1)
+FEM.change_time!(r1,dt)
+
+uht = solve(fesolver,feop,uh0μ,t0,tf)
+
 ϵ = 1e-4
 load_solutions = false
 save_solutions = true
