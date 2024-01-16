@@ -4,7 +4,7 @@ A parametric version of the `Gridap` `TransientFEOperator`
 abstract type TransientPFEOperator{T<:OperatorType} <: GridapType end
 
 function FESpaces.get_algebraic_operator(feop::TransientPFEOperator{C}) where C
-  PODEOpFromFEOp{C}(feop)
+  ODEPOpFromFEOp{C}(feop)
 end
 
 function TransientFETools.allocate_cache(op::TransientPFEOperator)
@@ -111,7 +111,7 @@ end
 
 function Algebra.allocate_residual(
   op::TransientPFEOperatorFromWeakForm,
-  r::Realization,
+  r::TransientPRealization,
   uh::T,
   cache) where T
 
@@ -124,13 +124,12 @@ function Algebra.allocate_residual(
   xh = TransientCellField(uh,dxh)
   dc = op.res(get_parameters(r),get_times(r),xh,v)
   vecdata = collect_cell_vector(test,dc)
-  println(typeof(vecdata))
   allocate_vector(op.assem,vecdata)
 end
 
 function Algebra.allocate_jacobian(
   op::TransientPFEOperatorFromWeakForm,
-  r::Realization,
+  r::TransientPRealization,
   uh::CellField,
   cache)
 
@@ -141,7 +140,7 @@ end
 
 function Algebra.allocate_jacobian(
   op::TransientPFEOperatorFromWeakForm,
-  r::Realization,
+  r::TransientPRealization,
   uh::CellField,
   i::Integer)
 
@@ -162,7 +161,7 @@ end
 function Algebra.residual!(
   b::AbstractVector,
   op::TransientPFEOperatorFromWeakForm,
-  r::Realization,
+  r::TransientPRealization,
   xh::T,
   cache) where T
 
@@ -177,7 +176,7 @@ end
 function residual_for_trian!(
   b::AbstractVector,
   op::TransientPFEOperatorFromWeakForm,
-  r::Realization,
+  r::TransientPRealization,
   xh::T,
   cache,
   args...) where T
@@ -191,7 +190,7 @@ end
 function Algebra.jacobian!(
   A::AbstractMatrix,
   op::TransientPFEOperatorFromWeakForm,
-  r::Realization,
+  r::TransientPRealization,
   xh::T,
   i::Integer,
   γᵢ::Real,
@@ -205,7 +204,7 @@ end
 function jacobian_for_trian!(
   A::AbstractMatrix,
   op::TransientPFEOperatorFromWeakForm,
-  r::Realization,
+  r::TransientPRealization,
   xh::T,
   i::Integer,
   γᵢ::Real,
@@ -223,7 +222,7 @@ end
 function ODETools.jacobians!(
   A::AbstractMatrix,
   op::TransientPFEOperatorFromWeakForm,
-  r::Realization,
+  r::TransientPRealization,
   xh::T,
   γ::Tuple{Vararg{Real}},
   cache) where T
@@ -236,7 +235,7 @@ end
 
 function TransientFETools.fill_initial_jacobians(
   op::TransientPFEOperatorFromWeakForm,
-  r::Realization,
+  r::TransientPRealization,
   xh::T) where T
 
   dxh = ()
@@ -256,7 +255,7 @@ end
 
 function TransientFETools.fill_jacobians(
   op::TransientPFEOperatorFromWeakForm,
-  r::Realization,
+  r::TransientPRealization,
   xh::T,
   γ::Tuple{Vararg{Real}}) where T
 
@@ -274,7 +273,7 @@ end
 
 function TransientFETools._matdata_jacobian(
   op::TransientPFEOperatorFromWeakForm,
-  r::Realization,
+  r::TransientPRealization,
   xh::T,
   i::Integer,
   γᵢ::Real) where T

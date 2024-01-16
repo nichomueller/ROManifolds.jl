@@ -33,7 +33,7 @@ params = realization(feop,nparams)
 
 fesolver = ThetaMethod(LUSolver(),θ,dt)
 w = get_free_dof_values(uh0μ(params))
-sol = PODESolution(fesolver,feop,params,w,t0,tf)
+sol = ODEPSolution(fesolver,feop,params,w,t0,tf)
 
 results = []
 for (uh,t) in sol
@@ -136,7 +136,7 @@ function main(ranks)
   feop = AffineTransientPFEOperator(res,jac,jac_t,pspace,trial,test)
   fesolver = ThetaMethod(LUSolver(),θ,dt)
   w = get_free_dof_values(uh0μ(params))
-  sol = PODESolution(fesolver,feop,params,w,t0,tf)
+  sol = ODEPSolution(fesolver,feop,params,w,t0,tf)
 
   results = []
   for (uh,t) in sol

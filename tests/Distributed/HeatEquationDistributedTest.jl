@@ -85,7 +85,7 @@ fesolver = ThetaMethod(LUSolver(),θ,dt)
 params = realization(feop,nsnaps_state+nsnaps_test)
 w0 = get_free_dof_values(fesolver.uh0(params))
 time_ndofs = num_time_dofs(fesolver)
-uμt = PODESolution(fesolver,feop,params,w0,fesolver.t0,fesolver.tf)
+uμt = ODEPSolution(fesolver,feop,params,w0,fesolver.t0,fesolver.tf)
 println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
 stats = @timed begin
   snaps = map(uμt) do (snap,n)
@@ -212,7 +212,7 @@ end
 
 w0 = get_free_dof_values(fesolver.uh0(params))
 time_ndofs = num_time_dofs(fesolver)
-uμt = PODESolution(fesolver,feop,params,w0,fesolver.t0,fesolver.tf)
+uμt = ODEPSolution(fesolver,feop,params,w0,fesolver.t0,fesolver.tf)
 println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
 stats = @timed begin
   _snaps = map(uμt) do (snap,n)

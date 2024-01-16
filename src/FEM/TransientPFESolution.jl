@@ -1,5 +1,5 @@
 struct TransientPFESolution
-  odesol::PODESolution
+  odesol::ODEPSolution
   trial::TransientTrialPFESpace
 end
 
@@ -17,7 +17,7 @@ function TransientPFESolution(
   solver::ODESolver,
   op::TransientPFEOperator,
   uh0,
-  r::Realization)
+  r::TransientPRealization)
 
   params = get_parameters(r)
   ode_op = get_algebraic_operator(op)

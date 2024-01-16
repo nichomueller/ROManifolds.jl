@@ -92,11 +92,12 @@ import PartitionedArrays: tuple_of_arrays
 export Table
 export Affine
 
-export ParametricSpace
-export TransientParametricSpace
+export PRealization
+export TransientPRealization
 export UniformSampling
 export NormalSampling
-export Realization
+export ParametricSpace
+export TransientParametricSpace
 export realization
 include("ParametricSpace.jl")
 
@@ -111,7 +112,6 @@ export get_at_offsets
 export recenter
 include("PArray.jl")
 
-export AbstractPFunction
 export PFunction, 𝑓ₚ
 export TransientPFunction, 𝑓ₚₜ
 export PField
@@ -147,15 +147,15 @@ export residual_for_trian!
 export jacobian_for_trian!
 include("TransientPFEOperator.jl")
 
-export PODEOperator
-export ConstantPODEOperator
-export ConstantMatrixPODEOperator
-export AffinePODEOperator
-export NonlinearPODEOperator
-export PODEOpFromFEOp
-include("PODEOperatorInterface.jl")
+export ODEPOperator
+export ConstantODEPOperator
+export ConstantMatrixODEPOperator
+export AffineODEPOperator
+export NonlinearODEPOperator
+export ODEPOpFromFEOp
+include("ODEPOperatorInterface.jl")
 
-export PODESolution
+export ODEPSolution
 export num_time_dofs
 export get_times
 export get_stencil_times
@@ -166,9 +166,9 @@ export PThetaMethodOperator
 export AffinePThetaMethodOperator
 include("PThetaMethod.jl")
 
-export PODESolution
-export GenericPODESolution
-include("PODESolution.jl")
+export ODEPSolution
+export GenericODEPSolution
+include("ODEPSolution.jl")
 
 export TransientPFESolution
 include("TransientPFESolution.jl")

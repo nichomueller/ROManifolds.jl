@@ -2,8 +2,8 @@
 function ODETools.solve_step!(
   uf::AbstractVector,
   solver::ThetaMethod,
-  op::PODEOperator,
-  r::Realization,
+  op::ODEPOperator,
+  r::TransientPRealization,
   u0::AbstractVector,
   cache)
 
@@ -37,8 +37,8 @@ function ODETools.solve_step!(
 end
 
 struct PThetaMethodOperator <: NonlinearOperator
-  op::PODEOperator
-  r::Realization
+  op::ODEPOperator
+  r::TransientPRealization
   dtθ::Float
   u0::AbstractVector
   ode_cache
@@ -46,8 +46,8 @@ struct PThetaMethodOperator <: NonlinearOperator
 end
 
 function get_method_operator(
-  op::PODEOperator,
-  r::Realization,
+  op::ODEPOperator,
+  r::TransientPRealization,
   dtθ::Float,
   u0::AbstractVector,
   ode_cache,
@@ -129,8 +129,8 @@ end
 function ODETools.solve_step!(
   uf::AbstractVector,
   solver::ThetaMethod,
-  op::AffinePODEOperator,
-  r::Realization,
+  op::AffineODEPOperator,
+  r::TransientPRealization,
   u0::AbstractVector,
   cache)
 
@@ -170,8 +170,8 @@ function ODETools.solve_step!(
 end
 
 struct AffinePThetaMethodOperator <: NonlinearOperator
-  op::AffinePODEOperator
-  r::Realization
+  op::AffineODEPOperator
+  r::TransientPRealization
   dtθ::Float
   u0::AbstractVector
   ode_cache
@@ -179,8 +179,8 @@ struct AffinePThetaMethodOperator <: NonlinearOperator
 end
 
 function get_method_operator(
-  op::AffinePODEOperator,
-  r::Realization,
+  op::AffineODEPOperator,
+  r::TransientPRealization,
   dtθ::Float,
   u0::AbstractVector,
   ode_cache,

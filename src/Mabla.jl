@@ -57,7 +57,7 @@ export AffineTransientPFEOperator
 export NonlinearTransientPFEOperator
 export residual_for_trian!
 export jacobian_for_trian!
-export PODESolution
+export ODEPSolution
 # export num_time_dofs
 # export get_times
 # export get_stencil_times

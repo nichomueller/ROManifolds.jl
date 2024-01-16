@@ -21,18 +21,12 @@ Allocate the space to be used as first argument in evaluate!
 """
 
 function TransientFETools.allocate_trial_space(
-  U::TransientTrialPFESpace,
-  params,
-  times)
-
-  _length(a) = length(a)
-  _length(a::AbstractVector{<:Number}) = 1
-  HomogeneousTrialPFESpace(U.space,Val(_length(params)*length(times)))
+  U::TransientTrialPFESpace,params,times)
+  HomogeneousTrialPFESpace(U.space,Val(length(params)*length(times)))
 end
 
 function TransientFETools.allocate_trial_space(
-  U::TransientTrialPFESpace,
-  r::Realization)
+  U::TransientTrialPFESpace,r::TransientPRealization)
   allocate_trial_space(U,get_parameters(r),get_times(r))
 end
 
@@ -66,7 +60,7 @@ function Arrays.evaluate!(
   evaluate!(Upt,U,[params],times)
 end
 
-function Arrays.evaluate!(Upt::T,U::TransientTrialPFESpace,r::Realization) where T
+function Arrays.evaluate!(Upt::T,U::TransientTrialPFESpace,r::TransientPRealization) where T
   evaluate!(Upt,U,get_parameters(r),get_times(r))
 end
 
@@ -115,9 +109,9 @@ FESpaces.get_vector_type(f::TransientTrialPFESpace) = get_vector_type(f.space)
 # Define the TransientTrialFESpace interface for stationary spaces
 
 Arrays.evaluate!(Upt::FESpace,U::FESpace,params,times) = U
-Arrays.evaluate!(Upt::FESpace,U::FESpace,r::Realization) = U
+Arrays.evaluate!(Upt::FESpace,U::FESpace,r::TransientPRealization) = U
 Arrays.evaluate(U::FESpace,params,times) = U
-Arrays.evaluate(U::FESpace,r::Realization) = U
+Arrays.evaluate(U::FESpace,r::TransientPRealization) = U
 
 # Define the interface for MultiField
 
