@@ -77,7 +77,7 @@ function Algebra.allocate_in_domain(::Type{<:PArray},matrix)
   end
 end
 
-function Algebra.allocate_in_domain(matrix:::PArray{<:AbstractMatrix})
+function Algebra.allocate_in_domain(matrix::PArray{<:AbstractMatrix})
   map(matrix) do matrix
     allocate_in_domain(matrix)
   end

@@ -112,29 +112,30 @@ export recenter
 include("PArray.jl")
 
 export AbstractPFunction
-export PFunction
-export TransientPFunction
+export PFunction, 𝑓ₚ
+export TransientPFunction, 𝑓ₚₜ
 export PField
 export PGenericField
 include("PField.jl")
-
-export TrialPFESpace
-export TrialPFESpace!
-export HomogeneousTrialPFESpace
-export MultiFieldPFESpace
-export split_fields
-export field_offsets
-include("TrialPFESpace.jl")
-
-export TransientTrialPFESpace
-export TransientMultiFieldPFESpace
-export TransientMultiFieldTrialPFESpace
-include("TransientTrialPFESpace.jl")
 
 export PCellField
 export SingleFieldPFEFunction
 export MultiFieldPFEFunction
 include("PCellField.jl")
+
+export TrialPFESpace
+export TrialPFESpace!
+export HomogeneousTrialPFESpace
+include("TrialPFESpace.jl")
+
+export MultiFieldPFESpace
+export MultiFieldPFEFunction
+include("MultiFieldPFESpaces.jl")
+
+export TransientTrialPFESpace
+export TransientMultiFieldPFESpace
+export TransientMultiFieldTrialPFESpace
+include("TransientTrialPFESpace.jl")
 
 include("PAssemblers.jl")
 

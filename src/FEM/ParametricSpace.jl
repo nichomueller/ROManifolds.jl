@@ -56,13 +56,13 @@ function change_time!(
   r.times[] = time
 end
 
-struct TrivialPRealization <: PRealization{<:AbstractVector{<:Number}}
+struct TrivialPRealization <: PRealization{AbstractVector{<:Number}}
   params::AbstractVector
 end
 
 PRealization(p::AbstractVector{<:Number}) = TrivialPRealization(p)
 
-struct TrivialTransientPRealization <: TransientPRealization{<:AbstractVector{<:Number},<:Number}
+struct TrivialTransientPRealization <: TransientPRealization{AbstractVector{<:Number},Number}
   params::AbstractVector
   times::Number
 end
@@ -151,8 +151,8 @@ end
 
 const 𝑓ₚ = PFunction
 
-PFunction(f,p::AbstractVector{<:Number}) = f(p)
-PFunction(f,r::TrivialPRealization) = f(get_parameters(r))
+PFunction(f::Function,p::AbstractVector{<:Number}) = f(p)
+PFunction(f::Function,r::TrivialPRealization) = f(get_parameters(r))
 
 struct TransientPFunction{P,T} <: AbstractPFunction{P}
   fun::Function
@@ -162,9 +162,9 @@ end
 
 const 𝑓ₚₜ = TransientPFunction
 
-TransientPFunction(f,p::AbstractVector{<:Number},t::Number) = f(p,t)
-TransientPFunction(f,t::Number,p::AbstractVector{<:Number}) = f(p,t)
-TransientPFunction(f,r::GenericTransientPRealization) = f(get_parameters(r),get_times(r))
+TransientPFunction(f::Function,p::AbstractVector{<:Number},t::Number) = f(p,t)
+TransientPFunction(f::Function,t::Number,p::AbstractVector{<:Number}) = f(p,t)
+TransientPFunction(f::Function,r::GenericTransientPRealization) = f(get_parameters(r),get_times(r))
 
 get_parameters(f::AbstractPFunction) = f.params
 num_parameters(f::AbstractPFunction) = num_parameters(get_parameters(f))

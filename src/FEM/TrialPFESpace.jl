@@ -32,6 +32,11 @@ function TrialPFESpace!(space::TrialPFESpace,objects)
   space
 end
 
+function TrialPFESpace!(space::SingleFieldFESpace,objects)
+  @assert length(objects) == 1
+  TrialFESpace!(space,objects)
+end
+
 # Allow do-block syntax
 
 function TrialPFESpace(f::Function,space::SingleFieldFESpace)
@@ -46,10 +51,18 @@ function TrialPFESpace!(f::Function,space::TrialPFESpace)
   TrialPFESpace!(space,f)
 end
 
-function HomogeneousTrialPFESpace(U::SingleFieldFESpace,n::Int)
+function HomogeneousTrialPFESpace(U::SingleFieldFESpace,::Val{N}) where N
   dv = zero_dirichlet_values(U)
-  dirichlet_values = parray(dv,n)
+  dirichlet_values = parray(dv,N)
   TrialPFESpace(dirichlet_values,U)
+end
+
+function HomogeneousTrialPFESpace(U::SingleFieldFESpace,::Val{1})
+  HomogeneousTrialFESpace(U)
+end
+
+function HomogeneousTrialPFESpace(U::TrialFESpace,::Val{1})
+  HomogeneousTrialFESpace(U.space)
 end
 
 function HomogeneousTrialPFESpace!(dirichlet_values::PArray,U::SingleFieldFESpace,args...)
@@ -184,16 +197,16 @@ function FESpaces._free_and_dirichlet_values_fill!(
   dirichlet_vals::PArray,
   cache_vals,
   cache_dofs,
-  cell_vals::PArray,
-  cell_dofs::PArray,
+  cell_vals,
+  cell_dofs,
   cells)
 
   for cell in cells
     vals = getindex!(cache_vals,cell_vals,cell)
     dofs = getindex!(cache_dofs,cell_dofs,cell)
-    for (i,dof) in enumerate(dofs)
-      for k in eachindex(vals)
-        val = vals[k][i]
+    map(vals,free_vals,dirichlet_vals) do vals,free_vals,dirichlet_vals
+      for (i,dof) in enumerate(dofs)
+        val = vals[i]
         if dof > 0
           free_vals[dof] = val
         elseif dof < 0
@@ -207,48 +220,9 @@ function FESpaces._free_and_dirichlet_values_fill!(
 
 end
 
-function FESpaces._cell_vals(fs::TrialPFESpace,object)
-  s = get_fe_dof_basis(fs)
-  trian = get_triangulation(s)
-  f = CellField(object,trian,DomainStyle(s))
-  cell_vals = s(f)
+# for visualization purposes
+
+function _get_at_index(f::TrialPFESpace,i::Integer)
+  dv = f.dirichlet_values[i]
+  TrialFESpace(dv,f.space)
 end
-
-# function FESpaces.interpolate!(
-#   object::AbstractPFunction,
-#   free_values::PArray,
-#   fs::TrialPFESpace)
-
-#   for k in eachindex(object)
-#     cell_vals = FESpaces._cell_vals(fs,object[k])
-#     gather_free_values!(free_values[k],fs,cell_vals)
-#   end
-#   FEFunction(fs,free_values)
-# end
-
-# function FESpaces.interpolate_everywhere!(
-#   object::AbstractPFunction,
-#   free_values::PArray,
-#   dirichlet_values::PArray,
-#   fs::TrialPFESpace)
-
-#   for k in eachindex(object)
-#     cell_vals = FESpaces._cell_vals(fs,object[k])
-#     gather_free_and_dirichlet_values!(free_values[k],dirichlet_values[k],fs,cell_vals)
-#   end
-#   FEFunction(fs,free_values,dirichlet_values)
-# end
-
-# function FESpaces.interpolate_dirichlet!(
-#   object::AbstractPFunction,
-#   free_values::PArray,
-#   dirichlet_values::PArray,
-#   fs::TrialPFESpace)
-
-#   for k in eachindex(object)
-#     cell_vals = FESpaces._cell_vals(fs,object[k])
-#     gather_dirichlet_values!(dirichlet_values[k],fs,cell_vals)
-#     fill!(free_values[k],zero(eltype(free_values[k])))
-#   end
-#   FEFunction(fs,free_values,dirichlet_values)
-# end

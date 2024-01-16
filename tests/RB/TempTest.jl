@@ -39,7 +39,7 @@ hμt(μ,t) = 𝑓ₚₜ(h,μ,t)
 g(x,μ,t) = μ[1]*exp(-x[1]/μ[2])*abs(sin(t/μ[3]))
 g(μ,t) = x->g(x,μ,t)
 
-u0(x,μ) = 0
+u0(x,μ) = 0.0
 u0(μ) = x->u0(x,μ)
 u0μ(μ) = 𝑓ₚ(u0,μ)
 
@@ -60,6 +60,49 @@ feop = AffineTransientPFEOperator(res,jac,jac_t,tpspace,trial,test)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),θ,dt)
 
+μ = [rand(3),rand(3)]
+γ(x,μ) = μ[1]*exp(-x[1]/μ[2])*abs(sin(1/μ[3]))
+γ(μ) = x->γ(x,μ)
+γμ(μ) = 𝑓ₚ(γ,μ)
+γμh = interpolate_everywhere(γμ(μ),trial(μ,t0))
+
+μ1 = μ[1]
+η(x) = γ(x,μ1)
+ηh = interpolate_everywhere(η,trial(μ1,t0))
+
+
+μ = [rand(3),rand(3)]
+fs = trial(μ,t0)
+object = u0μ(μ) # g(μ,t0) #
+free_values = zero_free_values(fs)
+dirichlet_values = zero_dirichlet_values(fs)
+cell_vals = FESpaces._cell_vals(fs,object)
+cell_dofs = get_cell_dof_ids(fs)
+cache_vals = array_cache(cell_vals)
+cache_dofs = array_cache(cell_dofs)
+cells = 1:length(cell_vals)
+vals = getindex!(cache_vals,cell_vals,1)
+dofs = getindex!(cache_dofs,cell_dofs,1)
+for (i,dof) in enumerate(dofs)
+  for k in eachindex(vals)
+    val = vals[k][i]
+    if dof > 0
+      free_values[dof] = val
+    elseif dof < 0
+      dirichlet_vals[-dof] = val
+    else
+      error("dof ids either positive or negative, not zero")
+    end
+  end
+end
+
+kk = g(rand(3),dt)
+fe = trial(rand(3),dt)
+interpolate_everywhere(kk,test)
+interpolate_everywhere(u0μ(rand(3)),fe)
+
+_cv = FESpaces._cell_vals(fe,u0μ(rand(3)))
+
 r = realization(tpspace,nparams=10)
 r1 = realization(tpspace,nparams=10,time_locations=1)
 FEM.change_time!(r1,dt)
@@ -70,37 +113,32 @@ for (u,t) in uht
   println(typeof(u))
 end
 
-v = get_fe_basis(test)
-du = get_trial_fe_basis(trial(nothing))
-u = du
-dc = jac(rand(3),[dt,2dt],u,du,v)
+function FESpaces._free_and_dirichlet_values_fill!(
+  free_vals::PArray,
+  dirichlet_vals::PArray,
+  cache_vals,
+  cache_dofs,
+  cell_vals,
+  cell_dofs,
+  cells)
 
-md = collect_cell_matrix(trial(nothing),test,dc)
+  for cell in cells
+    vals = getindex!(cache_vals,cell_vals,cell)
+    dofs = getindex!(cache_dofs,cell_dofs,cell)
+    map(vals,free_vals,dirichlet_vals) do vals,free_vals,dirichlet_vals
+      for (i,dof) in enumerate(dofs)
+        val = vals[i]
+        if dof > 0
+          free_vals[dof] = val
+        elseif dof < 0
+          dirichlet_vals[-dof] = val
+        else
+          error()
+        end
+      end
+    end
+  end
 
-mdata = ciaooo(trial(nothing),test,dc)
-
-function ciaooo(trial::FESpace,test::FESpace,a::DomainContribution)
-  map([get_domains(a)...]) do strian
-    scell_mat = get_contribution(a,strian)
-    cell_mat, trian = move_contributions(scell_mat,strian)
-    @assert ndims(eltype(cell_mat)) == 2
-    cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
-    cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
-    rows = get_cell_dof_ids(test,trian)
-    cols = get_cell_dof_ids(trial,trian)
-    cell_mat_rc,rows,cols
-  end |> tuple_of_arrays
-end
-
-function ciaooo(test::FESpace,a::DomainContribution)
-  map([get_domains(a)...]) do strian
-    scell_vec = get_contribution(a,strian)
-    cell_vec, trian = move_contributions(scell_vec,strian)
-    @assert ndims(eltype(cell_vec)) == 1
-    cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
-    rows = get_cell_dof_ids(test,trian)
-    cell_vec_r,rows
-  end |> tuple_of_arrays
 end
 
 ϵ = 1e-4

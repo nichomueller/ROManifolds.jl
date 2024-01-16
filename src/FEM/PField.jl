@@ -39,3 +39,41 @@ for T in (:Point,:(AbstractArray{<:Point}))
     end
   end
 end
+
+function Arrays.return_value(
+  b::LagrangianDofBasis,
+  field::OperationField{<:PGenericField})
+
+  f1 = OperationField(testitem(field.op),field.fields)
+  v1 = return_value(b,f1)
+  parray(v1,length(field.op))
+end
+
+function Arrays.return_cache(
+  b::LagrangianDofBasis,
+  field::OperationField{<:PGenericField})
+
+  f1 = OperationField(field.op[1],field.fields)
+  c1 = return_cache(b,f1)
+  a1 = evaluate!(c1,b,f1)
+  cache = Vector{typeof(c1)}(undef,length(field.op))
+  array = Vector{typeof(a1)}(undef,length(field.op))
+  for i = eachindex(cache)
+    fi = OperationField(field.op[i],field.fields)
+    cache[i] = return_cache(b,fi)
+  end
+  cache,PArray(array)
+end
+
+function Arrays.evaluate!(
+  cache,
+  b::LagrangianDofBasis,
+  field::OperationField{<:PGenericField})
+
+  cf,array = cache
+  @inbounds for i = eachindex(array)
+    fi = OperationField(field.op[i],field.fields)
+    array[i] = evaluate!(cf[i],b,fi)
+  end
+  array
+end
