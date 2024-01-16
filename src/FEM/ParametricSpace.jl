@@ -13,13 +13,14 @@ struct GenericPRealization{P} <: PRealization{P}
   params::P
 end
 
+PRealization(params::P) where P = GenericPRealization(params)
+
 struct GenericTransientPRealization{P,T} <: TransientPRealization{P,T}
   params::P
   times::Base.RefValue{T}
-  function GenericTransientPRealization(params::P,times::T) where {P,T}
-    new{P,T}(params,Ref(times))
-  end
 end
+
+TransientPRealization(params::P,times::T) where {P,T} = TransientPRealization(params,Ref(times))
 
 function get_initial_time(r::GenericTransientPRealization{P,T} where P) where T<:AbstractVector
   first(get_times(r))
@@ -37,11 +38,11 @@ end
 function get_at_time(r::GenericTransientPRealization,time=:initial)
   params = get_parameters(r)
   if time == :initial
-    GenericTransientPRealization(params,get_initial_time(r))
+    TransientPRealization(params,get_initial_time(r))
   elseif time == :midpoint
-    GenericTransientPRealization(params,get_midpoint_time(r))
+    TransientPRealization(params,get_midpoint_time(r))
   elseif time == :final
-    GenericTransientPRealization(params,get_final_time(r))
+    TransientPRealization(params,get_final_time(r))
   else
     @notimplemented
   end
@@ -55,24 +56,26 @@ function change_time!(
   r.times[] = time
 end
 
-struct GenericTrivialPRealization <: PRealization{<:AbstractVector{<:Number}}
+struct TrivialPRealization <: PRealization{<:AbstractVector{<:Number}}
   params::AbstractVector
 end
 
-GenericPRealization(p::AbstractVector{<:Number}) = GenericTrivialPRealization(p)
+PRealization(p::AbstractVector{<:Number}) = TrivialPRealization(p)
 
 struct TrivialTransientPRealization <: TransientPRealization{<:AbstractVector{<:Number},<:Number}
   params::AbstractVector
   times::Number
 end
 
-function GenericTransientPRealization(p::TrivialTransientPRealization,t::Number)
+function TransientPRealization(p::AbstractVector{<:Number},t::Number)
   TrivialTransientPRealization(p,t)
 end
 
-num_parameters(r::GenericTrivialPRealization) = 1
+num_parameters(r::TrivialPRealization) = 1
 get_times(r::TrivialTransientPRealization) = r.times
 num_times(r::TrivialTransientPRealization) = 1
+
+const TrivialRealization = Union{TrivialPRealization,TrivialTransientPRealization}
 
 abstract type SamplingStyle end
 struct UniformSampling <: SamplingStyle end
@@ -103,7 +106,7 @@ function generate_parameter(p::ParametricSpace)
 end
 
 function realization(p::ParametricSpace;nparams=1)
-  GenericPRealization([generate_parameter(p) for i = 1:nparams])
+  PRealization([generate_parameter(p) for i = 1:nparams])
 end
 
 struct TransientParametricSpace <: AbstractParametricSpace{GenericTransientPRealization}
@@ -132,7 +135,7 @@ function realization(
   pspace = ParametricSpace(p.parametric_domain,p.realization)
   params = [generate_parameter(pspace) for i = 1:nparams]
   times = p.temporal_domain[time_locations]
-  GenericTransientPRealization(params,times)
+  TransientPRealization(params,times)
 end
 
 function shift_temporal_domain!(p::TransientParametricSpace,δ::Number)
@@ -149,7 +152,7 @@ end
 const 𝑓ₚ = PFunction
 
 PFunction(f,p::AbstractVector{<:Number}) = f(p)
-PFunction(f,r::GenericTrivialPRealization) = f(get_parameters(r))
+PFunction(f,r::TrivialPRealization) = f(get_parameters(r))
 
 struct TransientPFunction{P,T} <: AbstractPFunction{P}
   fun::Function

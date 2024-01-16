@@ -1049,6 +1049,43 @@ function Arrays.evaluate!(
   array
 end
 
+function Arrays.return_value(
+  f::Broadcasting{typeof(MultiField._sum_if_first_positive)},
+  dofs::PArray{<:VectorBlock},
+  o)
+
+  v1 = return_value(f,dofs[1],o)
+  parray(v1,length(dofs))
+end
+
+function Arrays.return_cache(
+  f::Broadcasting{typeof(MultiField._sum_if_first_positive)},
+  dofs::PArray{<:VectorBlock},
+  o)
+
+  c1 = return_cache(f,dofs[1],o)
+  b1 = evaluate!(c1,f,dofs[1],o)
+  cache = Vector{typeof(c1)}(undef,length(dofs))
+  array = Vector{typeof(b1)}(undef,length(dofs))
+  for i = eachindex(dofs)
+    cache[i] = return_cache(f,dofs[i],o)
+  end
+  cache,PArray(array)
+end
+
+function Arrays.evaluate!(
+  cache,
+  f::Broadcasting{typeof(MultiField._sum_if_first_positive)},
+  dofs::PArray{<:VectorBlock},
+  o)
+
+  cx,array = cache
+  @inbounds for i = eachindex(array)
+    array[i] = evaluate!(cx[i],f,dofs[i],o)
+  end
+  array
+end
+
 function Utils.recenter(a::PArray{T},a0::PArray{T};kwargs...) where T
   n = length(a)
   n0 = length(a0)

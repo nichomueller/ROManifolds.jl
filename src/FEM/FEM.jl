@@ -2,6 +2,7 @@ module FEM
 using Mabla.Utils
 
 using LinearAlgebra
+using BlockArrays
 using SparseArrays
 using Gridap
 using Gridap.Algebra
@@ -33,7 +34,6 @@ import LinearAlgebra: tr
 import LinearAlgebra: cross
 import LinearAlgebra: dot
 import LinearAlgebra: fillstored!
-import BlockArrays: blockedrange
 import FillArrays: Fill
 import FillArrays: fill
 import Distributions: Uniform

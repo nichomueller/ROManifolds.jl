@@ -65,6 +65,24 @@ function collect_cell_vector_for_trian(
   [cell_vec_r],[rows]
 end
 
+function Algebra.allocate_in_range(matrix::PArray{<:AbstractMatrix})
+  map(matrix) do matrix
+    allocate_in_range(matrix)
+  end
+end
+
+function Algebra.allocate_in_domain(::Type{<:PArray},matrix)
+  map(matrix) do matrix
+    allocate_in_domain(matrix)
+  end
+end
+
+function Algebra.allocate_in_domain(matrix:::PArray{<:AbstractMatrix})
+  map(matrix) do matrix
+    allocate_in_domain(matrix)
+  end
+end
+
 Algebra.create_from_nz(a::PArray) = a
 
 @inline function Algebra._add_entries!(

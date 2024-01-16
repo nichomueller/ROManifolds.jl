@@ -97,6 +97,14 @@ function FESpaces.FEFunction(fe::MultiFieldPFESpace,free_values::PArray)
   MultiFieldPFEFunction(free_values,fe,blocks)
 end
 
+function FESpaces.EvaluationFunction(fe::MultiFieldPFESpace,free_values::PArray)
+  blocks = map(1:length(fe.spaces)) do i
+    free_values_i = restrict_to_field(fe,free_values,i)
+    EvaluationFunction(fe.spaces[i],free_values_i)
+  end
+  MultiFieldFEFunction(free_values,fe,blocks)
+end
+
 function CellData.CellField(fe::MultiFieldPFESpace,cell_values)
   single_fields = map(1:length(fe.spaces)) do i
     cell_values_field = lazy_map(a->a.array[i],cell_values)
