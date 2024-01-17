@@ -20,6 +20,8 @@ struct MultiFieldPFESpace{MS<:MultiFieldStyle,CS<:ConstraintStyle,V} <: FESpace
   end
 end
 
+const PFESpace = Union{TrialPFESpace,MultiFieldPFESpace}
+
 function MultiFieldPFESpace(spaces::Vector{<:TrialPFESpace})
   Ts = map(get_dof_value_type,spaces)
   T = typeof(*(map(zero,Ts)...))

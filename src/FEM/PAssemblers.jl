@@ -1,68 +1,6 @@
-function Algebra.allocate_vector(
-  a::SparseMatrixAssembler,
-  vecdata::Tuple{<:AbstractVector{<:AbstractVector{<:PArray}},Any})
-
-  cellvec,cellidsrows = vecdata
-  cellvec1 = first.(cellvec)
-  n = length(first(cellvec))
-  vec = allocate_vector(a,(cellvec1,cellidsrows))
-  parray(vec,n)
-end
-
-function Algebra.allocate_matrix(
-  a::SparseMatrixAssembler,
-  matdata::Tuple{<:AbstractVector{<:AbstractVector{<:PArray}},Any,Any})
-
-  cellmat,cellidsrows,cellidscols = matdata
-  cellmat1 = first.(cellmat)
-  n = length(first(cellmat))
-  mat = allocate_matrix(a,(cellmat1,cellidsrows,cellidscols))
-  parray(mat,n)
-end
-
-function FESpaces.collect_cell_matrix(
-  trial::FESpace,
-  test::FESpace,
-  a::DomainContribution)
-
-  map([get_domains(a)...]) do strian
-    collect_cell_matrix_for_trian(trial,test,a,strian)
-  end |> tuple_of_arrays
-end
-
-function collect_cell_matrix_for_trian(
-  trial::FESpace,
-  test::FESpace,
-  a::DomainContribution,
-  strian::Triangulation)
-
-  scell_mat = get_contribution(a,strian)
-  cell_mat,trian = move_contributions(scell_mat,strian)
-  @assert ndims(eltype(cell_mat)) == 2
-  cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
-  cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
-  rows = get_cell_dof_ids(test,trian)
-  cols = get_cell_dof_ids(trial,trian)
-  [cell_mat_rc],[rows],[cols]
-end
-
-function FESpaces.collect_cell_vector(test::FESpace,a::DomainContribution)
-  map([get_domains(a)...]) do strian
-    collect_cell_vector_for_trian(test,a,strian)
-  end |> tuple_of_arrays
-end
-
-function collect_cell_vector_for_trian(
-  test::FESpace,
-  a::DomainContribution,
-  strian::Triangulation)
-
-  scell_vec = get_contribution(a,strian)
-  cell_vec,trian = move_contributions(scell_vec,strian)
-  @assert ndims(eltype(cell_vec)) == 1
-  cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
-  rows = get_cell_dof_ids(test,trian)
-  [cell_vec_r],[rows]
+function Algebra.allocate_vector(::Type{V},n::Integer) where V<:PArray
+  T = eltype(V)
+  zeros(T,n)
 end
 
 function Algebra.allocate_in_range(matrix::PArray{<:AbstractMatrix})
@@ -83,7 +21,114 @@ function Algebra.allocate_in_domain(matrix::PArray{<:AbstractMatrix})
   end
 end
 
-Algebra.create_from_nz(a::PArray) = a
+struct SparseMatrixPAssembler{M<:PArray,V<:PArray} <: SparseMatrixAssembler
+  matrix_builder::M
+  vector_builder::V
+  rows::AbstractUnitRange
+  cols::AbstractUnitRange
+  strategy::AssemblyStrategy
+end
+
+function SparseMatrixPAssembler(
+  mat,vec,
+  trial::PFESpace,
+  test::FESpace,
+  strategy::AssemblyStrategy=FESpaces.DefaultAssemblyStrategy())
+
+  rows = get_free_dof_ids(test)
+  cols = get_free_dof_ids(trial)
+  SparseMatrixPAssembler(
+    SparseMatrixBuilder(mat),
+    ArrayBuilder(vec),
+    rows,
+    cols,
+    strategy)
+end
+
+function FESpaces.SparseMatrixAssembler(
+  mat,vec,
+  trial::PFESpace
+  test::FESpace,
+  strategy::AssemblyStrategy=DefaultAssemblyStrategy())
+
+  SparseMatrixPAssembler(mat,vec,trial,test,strategy)
+end
+
+function FESpaces.SparseMatrixAssembler(mat,trial::PFESpace,test::FESpace)
+  mat_builder = SparseMatrixBuilder(mat)
+  T = eltype(get_array_type(mat_builder))
+  N = length_free_values(trial)
+  vector_type = Vector{T}
+  pvector_type = PArray{vector_type}(undef,N)
+  SparseMatrixAssembler(mat_builder,pvector_type,trial,test)
+end
+
+function FESpaces.SparseMatrixAssembler(trial::PFESpace,test::FESpace)
+  T = get_dof_value_type(trial)
+  N = length_free_values(trial)
+  matrix_type = SparseMatrixCSC{T,Int}
+  pmatrix_type = PArray{matrix_type}(undef,N)
+  vector_type = Vector{T}
+  pvector_type = PArray{vector_type}(undef,N)
+  SparseMatrixAssembler(matrix_type,vector_type,trial,test)
+end
+
+FESpaces.get_rows(a::SparseMatrixPAssembler) = a.rows
+
+FESpaces.get_cols(a::SparseMatrixPAssembler) = a.cols
+
+FESpaces.get_matrix_builder(a::SparseMatrixPAssembler) = a.matrix_builder
+
+FESpaces.get_vector_builder(a::SparseMatrixPAssembler) = a.vector_builder
+
+FESpaces.get_assembly_strategy(a::SparseMatrixPAssembler) = a.strategy
+
+function Algebra.nz_counter(builder::PArray,axes)
+  map(builder) do builder
+    Algebra.nz_counter(builder,axes)
+  end
+end
+
+function Algebra.nz_allocation(a::PArray)
+  map(a) do a
+    Algebra.nz_allocation(a)
+  end
+end
+
+function Algebra.create_from_nz(a::PArray)
+  map(a) do a
+    Algebra.create_from_nz(a)
+  end
+end
+
+function collect_cell_matrix_for_trian(
+  trial::FESpace,
+  test::FESpace,
+  a::DomainContribution,
+  strian::Triangulation)
+
+  scell_mat = get_contribution(a,strian)
+  cell_mat,trian = move_contributions(scell_mat,strian)
+  @assert ndims(eltype(cell_mat)) == 2
+  cell_mat_c = attach_constraints_cols(trial,cell_mat,trian)
+  cell_mat_rc = attach_constraints_rows(test,cell_mat_c,trian)
+  rows = get_cell_dof_ids(test,trian)
+  cols = get_cell_dof_ids(trial,trian)
+  [cell_mat_rc],[rows],[cols]
+end
+
+function collect_cell_vector_for_trian(
+  test::FESpace,
+  a::DomainContribution,
+  strian::Triangulation)
+
+  scell_vec = get_contribution(a,strian)
+  cell_vec,trian = move_contributions(scell_vec,strian)
+  @assert ndims(eltype(cell_vec)) == 1
+  cell_vec_r = attach_constraints_rows(test,cell_vec,trian)
+  rows = get_cell_dof_ids(test,trian)
+  [cell_vec_r],[rows]
+end
 
 @inline function Algebra._add_entries!(
   combine::Function,

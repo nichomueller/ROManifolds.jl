@@ -12,6 +12,11 @@ struct PArray{T,N,A} <: AbstractArray{T,N}
   end
 end
 
+function PArray{T}(::UndefInitializer,N::Integer) where T
+  array = Vector{T}(undef,N)
+  PArray(array)
+end
+
 Arrays.get_array(a::PArray) = a.array
 Arrays.testitem(a::PArray) = testitem(get_array(a))
 Base.size(a::PArray,i...) = size(testitem(a),i...)
@@ -65,13 +70,15 @@ function Base.zeros(a::PArray)
 end
 
 function parray(a::AbstractArray,N::Integer)
-  PArray([copy(a) for _ = 1:N])
+  error("DEPRECATED")
+  # PArray([copy(a) for _ = 1:N])
 end
 
 function pzeros(a::AbstractArray{T},N::Integer) where T
-  b = similar(a)
-  fill!(b,zero(T))
-  PArray([copy(b) for _ = 1:N])
+  error("DEPRECATED")
+  # b = similar(a)
+  # fill!(b,zero(T))
+  # PArray([copy(b) for _ = 1:N])
 end
 
 function Base.sum(a::PArray)

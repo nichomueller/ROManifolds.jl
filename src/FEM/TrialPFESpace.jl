@@ -70,13 +70,20 @@ function HomogeneousTrialPFESpace!(dirichlet_values::PArray,U::SingleFieldFESpac
   TrialPFESpace(dirichlet_values,U)
 end
 
+function length_dirichlet_values end
+length_dirichlet_values(f::FESpace) = @abstractmethod
+length_dirichlet_values(f::TrialPFESpace) = length(f.dirichlet_values)
+
+function length_free_values end
+length_free_values(f::FESpace) = length_dirichlet_values(f)
+
 FESpaces.get_free_dof_ids(f::TrialPFESpace) = get_free_dof_ids(f.space)
+
+FESpaces.zero_free_values(f::TrialPFESpace) = zero_free_values(f.space)
 
 FESpaces.get_triangulation(f::TrialPFESpace) = get_triangulation(f.space)
 
 FESpaces.get_dof_value_type(f::TrialPFESpace) = get_dof_value_type(f.space)
-
-FESpaces.get_vector_type(f::TrialPFESpace) = get_vector_type(f.space)
 
 FESpaces.get_cell_dof_ids(f::TrialPFESpace) = get_cell_dof_ids(f.space)
 
@@ -96,6 +103,8 @@ FESpaces.get_dirichlet_dof_ids(f::TrialPFESpace) = get_dirichlet_dof_ids(f.space
 
 FESpaces.get_cell_is_dirichlet(f::TrialPFESpace) = get_cell_is_dirichlet(f.space)
 
+FESpaces.zero_dirichlet_values(f::TrialPFESpace) = zero_dirichlet_values(f.space)
+
 FESpaces.num_dirichlet_tags(f::TrialPFESpace) = num_dirichlet_tags(f.space)
 
 FESpaces.get_dirichlet_dof_tag(f::TrialPFESpace) = get_dirichlet_dof_tag(f.space)
@@ -104,25 +113,11 @@ FESpaces.get_dirichlet_dof_values(f::TrialPFESpace) = f.dirichlet_values
 
 FESpaces.scatter_free_and_dirichlet_values(f::TrialPFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
 
-# These functions allow us to pass from cell-wise PArray(s) to global PArray(s)
-function FESpaces.zero_free_values(f::TrialPFESpace)
-  fv = zero_free_values(f.space)
-  n = length(f.dirichlet_values)
-  array = Vector{typeof(fv)}(undef,n)
-  @inbounds for i in eachindex(array)
-    array[i] = copy(fv)
-  end
-  PArray(array)
-end
-
-function FESpaces.zero_dirichlet_values(f::TrialPFESpace)
-  zdv = zero_dirichlet_values(f.space)
-  n = length(f.dirichlet_values)
-  array = Vector{typeof(zdv)}(undef,n)
-  @inbounds for i in eachindex(array)
-    array[i] = copy(zdv)
-  end
-  PArray(array)
+# These functions allow us to use global PArray(s)
+function FESpaces.get_vector_type(f::TrialPFESpace)
+  V = get_vector_type(f.space)
+  N = length_free_values(f)
+  PArray{V}(undef,N)
 end
 
 function FESpaces.compute_dirichlet_values_for_tags!(
@@ -221,8 +216,8 @@ function FESpaces._free_and_dirichlet_values_fill!(
 end
 
 # for visualization purposes
-
 function _get_at_index(f::TrialPFESpace,i::Integer)
+  @assert i ≤ length_free_values(f)
   dv = f.dirichlet_values[i]
   TrialFESpace(dv,f.space)
 end
