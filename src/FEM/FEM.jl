@@ -17,76 +17,23 @@ using Gridap.ODEs.ODETools
 using Gridap.ODEs.TransientFETools
 using Gridap.Visualization
 
-import Base: inv
-import Base: abs
-import Base: abs2
-import Base: *
-import Base: +
-import Base: -
-import Base: /
-import Base: adjoint
-import Base: transpose
-import Base: real
-import Base: imag
-import Base: conj
-import LinearAlgebra: det
-import LinearAlgebra: tr
-import LinearAlgebra: cross
-import LinearAlgebra: dot
-import LinearAlgebra: fillstored!
-import FillArrays: Fill
-import FillArrays: fill
-import Distributions: Uniform
-import Distributions: Normal
+import Base: inv,abs,abs2,*,+,-,/,adjoint,transpose,real,imag,conj
+import LinearAlgebra: det,tr,cross,dot,fillstored!
+import FillArrays: Fill,fill
 import ForwardDiff: derivative
+import Distributions: Uniform,Normal
 import UnPack: @unpack
-import Gridap.Helpers: @abstractmethod
-import Gridap.Helpers: @check
-import Gridap.Helpers: @notimplemented
-import Gridap.Helpers: @unreachable
-import Gridap.Algebra: InserterCSC
-import Gridap.CellData: CellField
-import Gridap.CellData: GenericMeasure
-import Gridap.CellData: CompositeMeasure
-import Gridap.CellData: DomainStyle
-import Gridap.CellData: OperationCellField
-import Gridap.CellData: change_domain
-import Gridap.CellData: similar_cell_field
-import Gridap.CellData: _get_cell_points
-import Gridap.CellData: _operate_cellfields
-import Gridap.CellData: _to_common_domain
-import Gridap.Fields: OperationField
-import Gridap.Fields: BroadcastOpFieldArray
-import Gridap.Fields: BroadcastingFieldOpMap
-import Gridap.Fields: LinearCombinationField
-import Gridap.Fields: LinearCombinationMap
-import Gridap.FESpaces: FEFunction
-import Gridap.FESpaces: SparseMatrixAssembler
-import Gridap.FESpaces: EvaluationFunction
-import Gridap.FESpaces: _pair_contribution_when_possible
-import Gridap.MultiField: MultiFieldFEBasisComponent
-import Gridap.ReferenceFEs: get_order
-import Gridap.ODEs.ODETools: residual!
-import Gridap.ODEs.ODETools: jacobian!
+import Gridap.Helpers: @abstractmethod,@check,@notimplemented,@unreachable
+import Gridap.Algebra: residual!,jacobian!
+import Gridap.Fields: OperationField,BroadcastOpFieldArray,BroadcastingFieldOpMap,LinearCombinationField,LinearCombinationMap
+import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 import Gridap.ODEs.ODETools: jacobians!
-import Gridap.ODEs.ODETools: _allocate_matrix_and_vector
-import Gridap.ODEs.TransientFETools: ODESolver
-import Gridap.ODEs.TransientFETools: ODEOperator
-import Gridap.ODEs.TransientFETools: OperatorType
 import Gridap.ODEs.TransientFETools: TransientCellField
-import Gridap.ODEs.TransientFETools: TransientSingleFieldCellField
-import Gridap.ODEs.TransientFETools: TransientMultiFieldCellField
-import Gridap.ODEs.TransientFETools: TransientFEBasis
-import Gridap.ODEs.TransientFETools: SingleFieldTypes
-import Gridap.ODEs.TransientFETools: MultiFieldTypes
 import Gridap.ODEs.TransientFETools: allocate_trial_space
 import Gridap.ODEs.TransientFETools: fill_jacobians
 import Gridap.ODEs.TransientFETools: _matdata_jacobian
-import Gridap.ODEs.TransientFETools: _vcat_matdata
-import Gridap.TensorValues: inner
-import Gridap.TensorValues: outer
-import Gridap.TensorValues: double_contraction
-import Gridap.TensorValues: symmetric_part
+import Gridap.ReferenceFEs: get_order
+import Gridap.TensorValues: inner,outer,double_contraction,symmetric_part
 import PartitionedArrays: tuple_of_arrays
 
 export Table
@@ -98,6 +45,8 @@ export UniformSampling
 export NormalSampling
 export ParametricSpace
 export TransientParametricSpace
+export PFunction, 𝑓ₚ
+export TransientPFunction, 𝑓ₚₜ
 export realization
 include("ParametricSpace.jl")
 
@@ -106,14 +55,12 @@ export ∂ₚtt
 include("PDiffOperators.jl")
 
 export PArray
-export parray
-export pzeros
+export allocate_parray
+export zero_parray
 export get_at_offsets
 export recenter
 include("PArray.jl")
 
-export PFunction, 𝑓ₚ
-export TransientPFunction, 𝑓ₚₜ
 export PField
 export PGenericField
 include("PField.jl")

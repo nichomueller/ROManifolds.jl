@@ -2,18 +2,15 @@ struct PRealization{P<:AbstractVector}
   params::P
 end
 
-const TrivialPRealization = PRealization{AbstractVector{<:Number}}
+const TrivialPRealization = PRealization{<:AbstractVector{<:Number}}
 
-get_parameters(r::PRealization) = r
-num_parameters(r::PRealization) = length(r.params)
+get_parameters(r::PRealization) = r # we only want to deal with a PRealization type
+_get_parameters(r::PRealization) = r.params # this function should stay local
+num_parameters(r::PRealization) = length(_get_parameters(r))
 num_parameters(r::TrivialPRealization) = 1
 Base.length(r::PRealization) = num_parameters(r)
 Base.size(r::PRealization) = (length(r),)
-Base.iterate(r::PRealization,iter...) = iterate(r.params,iter...)
-
-function Base.convert(::Type{<:PRealization},p::TrivialPRealization)
-  PRealization([p.params])
-end
+Base.iterate(r::PRealization,iter...) = iterate(_get_parameters(r),iter...)
 
 struct TransientPRealization{P<:PRealization,T}
   params::P
@@ -24,22 +21,18 @@ function TransientPRealization(params::PRealization,times::Union{Number,Abstract
   TransientPRealization(params,Ref(times))
 end
 
-const TrivialTransientPRealization = TransientPRealization{TrivialPRealization,Number}
+const TrivialTransientPRealization = TransientPRealization{<:TrivialPRealization,<:Number}
 
 get_parameters(r::TransientPRealization) = get_parameters(r.params)
+_get_parameters(r::TransientPRealization) = _get_parameters(r.params)
 num_parameters(r::TransientPRealization) = num_parameters(r.params)
 get_times(r::TransientPRealization) = r.times[]
 num_times(r::TransientPRealization) = length(get_times(r))
 Base.length(r::TransientPRealization) = num_parameters(r)*num_times(r)
 Base.size(r::TransientPRealization) = (length(r),)
-Base.iterate(r::TransientPRealization,iter...) = iterate(Iterators.product(r.times,r.params),iter...)
 
-function Base.convert(
-  ::Type{<:TransientPRealization},
-  p::TrivialTransientPRealization)
-
-  params = convert(PRealization,p.params)
-  TransientPRealization(params,p.times)
+function Base.iterate(r::TransientPRealization,iter...)
+  iterate(Iterators.product(get_times(r),_get_parameters(r)),iter...)
 end
 
 function get_initial_time(r::TransientPRealization)
@@ -139,6 +132,8 @@ end
 
 abstract type AbstractPFunction{P<:PRealization} <: Function end
 
+_get_parameters(f::AbstractPFunction) = _get_parameters(f.params)
+
 struct PFunction{P} <: AbstractPFunction{P}
   f::Function
   params::P
@@ -151,7 +146,7 @@ function PFunction(f::Function,p::AbstractArray)
 end
 
 function PFunction(f::Function,r::TrivialPRealization)
-  f(r.params)
+  f(_get_parameters(r))
 end
 
 struct TransientPFunction{P,T} <: AbstractPFunction{P}
@@ -160,32 +155,80 @@ struct TransientPFunction{P,T} <: AbstractPFunction{P}
   times::T
 end
 
+get_times(f::TransientPFunction) = f.times
+
 const 𝑓ₚₜ = TransientPFunction
 
 function TransientPFunction(f::Function,p::AbstractArray,t)
   @notimplemented "Use a PRealization as a parameter input"
 end
 
-function TransientPFunction(f::Function,p::TrivialPRealization,t::Number)
-  f(p.params,t)
+function TransientPFunction(f::Function,r::TrivialPRealization,t::Number)
+  f(_get_parameters(r),t)
 end
 
-function TransientPFunction(f::Function,p::TrivialPRealization,t)
-  TransientPFunction(f,convert(PRealization,p),t)
+function TransientPFunction(f::Function,r::TrivialPRealization,t)
+  p = PRealization([_get_parameters(r)])
+  TransientPFunction(f,p,t)
 end
 
 function get_fields(f::PFunction)
   fields = GenericField[]
-  for p = f.params.params
-    push!(fields,GenericField(f.f(p)))
+  for p = _get_parameters(f)
+    push!(fields,GenericField(f.fun(p)))
   end
   fields
 end
 
 function get_fields(f::TransientPFunction)
   fields = GenericField[]
-  for (t,p) = Iterators.product(f.times,f.params.params)
-    push!(fields,GenericField(f.f(p,t)))
+  for (t,p) = Iterators.product(get_times(f),_get_parameters(f))
+    push!(fields,GenericField(f.fun(p,t)))
   end
   fields
+end
+
+function Arrays.evaluate!(cache,f::AbstractPFunction,x...)
+  map(g->g(x...),get_fields(f))
+end
+
+(f::AbstractPFunction)(x...) = evaluate(f,x...)
+
+function test_parametric_space()
+  α = PRealization(rand(10))
+  β = PRealization([rand(10)])
+  @check isa(α,TrivialPRealization)
+  @check isa(α,PRealization{Vector{Float64}})
+  @check isa(β,PRealization{Vector{Vector{Float64}}})
+  γ = TransientPRealization(α,1)
+  δ = TransientPRealization(α,1:10)
+  ϵ = TransientPRealization(β,1:10)
+  @check isa(γ,TrivialTransientPRealization)
+  @check isa(δ,TransientPRealization{<:TrivialPRealization,UnitRange{Int}})
+  @check isa(ϵ,TransientPRealization{PRealization{Vector{Vector{Float64}}},UnitRange{Int}})
+  @check length(γ) == 1 && length(δ) == 10 && length(ϵ) == 10
+  change_time!(ϵ,11:20)
+  @check get_times(get_at_time(ϵ,:final)) == 20
+  parametric_domain = [[1,10],[11,20]]
+  p = ParametricSpace(parametric_domain)
+  t = 1:10
+  pt = TransientParametricSpace(parametric_domain,t)
+  μ = realization(p)
+  μt = realization(pt)
+  @check isa(μ,PRealization) && isa(μt,TransientPRealization)
+  a(x,μ,t) = sum(x)*sum(μ)*t
+  a(μ,t) = x -> a(x,μ,t)
+  da = ∂ₚt(a)
+  aμt = 𝑓ₚₜ(a,get_parameters(μt),get_times(μt))
+  daμt = ∂ₚt(aμt)
+  @check isa(𝑓ₚₜ(a,α,t),Function)
+  @check isa(aμt,AbstractPFunction)
+  @check isa(daμt,AbstractPFunction)
+  x = Point(1,2)
+  Aμt = aμt(x)
+  DAμt = daμt(x)
+  for (i,(t,μ)) in enumerate(μt)
+    @check Aμt[i] == a(μ,t)(x)
+    @check DAμt[i] == da(μ,t)(x)
+  end
 end

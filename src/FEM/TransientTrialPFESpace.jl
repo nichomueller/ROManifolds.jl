@@ -51,15 +51,6 @@ function Arrays.evaluate!(
   Upt
 end
 
-function Arrays.evaluate!(
-  Upt::T,
-  U::TransientTrialPFESpace,
-  params::AbstractVector{<:Number},
-  times) where T
-
-  evaluate!(Upt,U,[params],times)
-end
-
 function Arrays.evaluate!(Upt::T,U::TransientTrialPFESpace,r::TransientPRealization) where T
   evaluate!(Upt,U,get_parameters(r),get_times(r))
 end
@@ -76,13 +67,13 @@ end
 """
 We can evaluate at `nothing` when we do not care about the Dirichlet vals
 """
-Arrays.evaluate(U::TransientTrialPFESpace,::Nothing,::Nothing) = U.Ud0
-Arrays.evaluate(U::TransientTrialPFESpace,::Nothing) = U.Ud0
+Arrays.evaluate(U::TransientTrialPFESpace,params::Nothing,times::Nothing) = U.Ud0
+Arrays.evaluate(U::TransientTrialPFESpace,r::Nothing) = U.Ud0
 
 """
 Functor-like evaluation. It allocates Dirichlet vals in general.
 """
-(U::TransientTrialPFESpace)(p,t) = evaluate(U,p,t)
+(U::TransientTrialPFESpace)(params,times) = evaluate(U,params,times)
 (U::TransientTrialPFESpace)(r) = evaluate(U,r)
 
 """

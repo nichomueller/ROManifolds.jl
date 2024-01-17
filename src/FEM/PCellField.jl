@@ -29,8 +29,25 @@ function FESpaces.FEFunction(
   SingleFieldPFEFunction(cell_field,cell_vals,free_values,dirichlet_values,fs)
 end
 
+function FESpaces.test_fe_function(f::SingleFieldPFEFunction)
+  trian = get_triangulation(f)
+  free_values = get_free_dof_values(f)
+  fe_space = get_fe_space(f)
+  cell_values = get_cell_dof_values(f,trian)
+  dirichlet_values = f.dirichlet_values
+  map(1:length(f)) do i
+    fe_space_i = _get_at_index(fe_space,i)
+    free_values_i = free_values[i]
+    fi = FEFunction(fe_space_i,free_values_i)
+    test_fe_function(fi)
+    @test free_values[i] == get_free_dof_values(fi)
+    @test cell_values[i] == get_cell_dof_values(fi,trian)
+    @test dirichlet_values[i] == fi.dirichlet_values
+  end
+end
+
 function TransientFETools.TransientCellField(single_field::SingleFieldPFEFunction,derivatives::Tuple)
-  TransientSingleFieldCellField(single_field,derivatives)
+  TransientFETools.TransientSingleFieldCellField(single_field,derivatives)
 end
 
 # for visualization purposes

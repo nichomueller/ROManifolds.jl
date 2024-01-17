@@ -38,6 +38,7 @@ hμt(μ,t) = 𝑓ₚₜ(h,μ,t)
 
 g(x,μ,t) = μ[1]*exp(-x[1]/μ[2])*abs(sin(t/μ[3]))
 g(μ,t) = x->g(x,μ,t)
+gμt(μ,t) = 𝑓ₚₜ(g,μ,t)
 
 u0(x,μ) = 0.0
 u0(μ) = x->u0(x,μ)
@@ -55,7 +56,7 @@ tpspace = TransientParametricSpace(pranges,tdomain)
 T = Float
 reffe = ReferenceFE(lagrangian,T,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-trial = TransientTrialPFESpace(test,g)
+trial = TransientTrialPFESpace(test,gμt)
 feop = AffineTransientPFEOperator(res,jac,jac_t,tpspace,trial,test)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),θ,dt)
@@ -187,3 +188,5 @@ vb = get_fe_basis(Yb)
 bdata = collect_cell_matrix_and_vector(Xb,Yb,biform(ub,vb),liform(vb))
 bmatdata = collect_cell_matrix(Xb,Yb,biform(ub,vb))
 bvecdata = collect_cell_vector(Yb,liform(vb))
+
+FEM.test_parametric_space()

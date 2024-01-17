@@ -12,7 +12,7 @@ function PartitionedArrays.allocate_gather_impl(
     ptrs = length_to_ptrs!(pushfirst!(l,one(eltype(l))))
     ndata = ptrs[end]-1
     data = Vector{elT}(undef,ndata)
-    ptdata = parray(data,length(snd))
+    ptdata = allocate_parray(data,length(snd))
     PTJaggedArray{Vector{elT},Int32}(ptdata,ptrs)
   end
   if isa(destination,Integer)
@@ -20,7 +20,7 @@ function PartitionedArrays.allocate_gather_impl(
       elT = eltype(snd)
       ptrs = Vector{Int32}(undef,1)
       data = Vector{elT}(undef,0)
-      ptdata = parray(data,length(snd))
+      ptdata = allocate_parray(data,length(snd))
       PTJaggedArray(ptdata,ptrs)
     end
     rcv = map_main(f,l_dest,snd;otherwise=g,main=destination)
@@ -65,7 +65,7 @@ function PartitionedArrays.allocate_scatter_impl(
   S = eltype(T)
   map(snd,counts_scat) do snd,count
     data = Vector{S}(undef,count)
-    parray(data,length(snd))
+    allocate_parray(data,length(snd))
   end
 end
 
@@ -96,7 +96,7 @@ function PartitionedArrays.allocate_emit_impl(
   S = eltype(T)
   map(n_all,snd) do n,snd
     data = Vector{S}(undef,n)
-    parray(data,length(snd))
+    allocate_parray(data,length(snd))
   end
 end
 
@@ -177,7 +177,7 @@ function PartitionedArrays.allocate_exchange_impl(
     length_to_ptrs!(ptrs)
     n_data = ptrs[end]-1
     data = Vector{S}(undef,n_data)
-    ptdata = parray(data,N)
+    ptdata = allocate_parray(data,N)
     JaggedArray(ptdata,ptrs)
   end
   rcv

@@ -34,8 +34,8 @@ export realization
 export ∂ₚt
 export ∂ₚtt
 export PArray
-export parray
-export pzeros
+export allocate_parray
+export zero_parray
 export get_at_offsets
 export recenter
 export TrialPFESpace

@@ -1,6 +1,9 @@
-function Algebra.allocate_vector(::Type{V},n::Integer) where V<:PArray
-  T = eltype(V)
-  zeros(T,n)
+function Algebra.allocate_vector(
+  ::Type{PArray{T,N,A,L}},
+  n::Integer) where {T,N,A,L}
+
+  vector = zeros(T,n)
+  allocate_parray(vector,L)
 end
 
 function Algebra.allocate_in_range(matrix::PArray{<:AbstractMatrix})
@@ -47,7 +50,7 @@ end
 
 function FESpaces.SparseMatrixAssembler(
   mat,vec,
-  trial::PFESpace
+  trial::PFESpace,
   test::FESpace,
   strategy::AssemblyStrategy=DefaultAssemblyStrategy())
 

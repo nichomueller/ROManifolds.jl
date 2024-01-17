@@ -46,7 +46,7 @@ function Arrays.return_value(
 
   f1 = OperationField(testitem(field.op),field.fields)
   v1 = return_value(b,f1)
-  parray(v1,length(field.op))
+  allocate_parray(v1,length(field.op))
 end
 
 function Arrays.return_cache(

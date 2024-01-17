@@ -2,7 +2,7 @@ function Base.materialize(b::PBroadcasted{<:AbstractArray{<:PTBroadcasted}})
   own_values_out = map(Base.materialize,b.own_values)
   T = eltype(eltype(own_values_out))
   vector_partition = map(b.own_values,b.index_partition) do values,indices
-    pta = parray(zeros(T,length(indices)),length(values.array))
+    pta = allocate_parray(zeros(T,length(indices)),length(values.array))
     allocate_local_values(pta,T,indices)
   end
   a = PVector(vector_partition,b.index_partition)
@@ -26,7 +26,7 @@ function Base.collect(v::PVector{<:PArray})
   T = eltype(v)
   map(vals,ids) do myvals,myids
     u = Vector{T}(undef,n)
-    ptu = parray(u,length(first(myvals)))
+    ptu = allocate_parray(u,length(first(myvals)))
     for (a,b) in zip(myvals,myids)
       for k = eachindex(a)
         ptu[k][b] = a[k]
@@ -239,11 +239,11 @@ function PartitionedArrays.assembly_buffers(
   N = length(values)
   ptrs = local_indices_snd.ptrs
   data = zeros(T,ptrs[end]-1)
-  ptdata = pzeros(data,N)
+  ptdata = zero_parray(data,N)
   buffer_snd = JaggedArray(ptdata,ptrs)
   ptrs = local_indices_rcv.ptrs
   data = zeros(T,ptrs[end]-1)
-  ptdata = pzeros(data,N)
+  ptdata = zero_parray(data,N)
   buffer_rcv = JaggedArray(ptdata,ptrs)
   buffer_snd,buffer_rcv
 end
@@ -316,7 +316,7 @@ function PartitionedArrays.to_trivial_partition(
     end
     myI = zeros(Int,n)
     myJ = zeros(Int,n)
-    myV = pzeros(zeros(Ta,n),length(a))
+    myV = zero_parray(zeros(Ta,n),length(a))
     n = 0
     for (i,j,v) in nziterator(a)
       if local_row_to_owner[i] == owner
@@ -379,7 +379,7 @@ function PartitionedArrays.assemble_coo!(
     gi_snd_data = zeros(eltype(k_gi),ptrs[end]-1)
     gj_snd_data = zeros(eltype(k_gj),ptrs[end]-1)
     snd_data = zeros(eltype(k_v),ptrs[end]-1)
-    v_snd_data = pzeros(snd_data,length(k_v))
+    v_snd_data = zero_parray(snd_data,length(k_v))
     for k in 1:length(k_gi)
       gi = k_gi[k]
       li = global_to_local_row[gi]

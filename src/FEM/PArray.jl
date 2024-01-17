@@ -1,19 +1,27 @@
-struct PArray{T,N,A} <: AbstractArray{T,N}
+struct PArray{T,N,A,L} <: AbstractArray{T,N}
   array::A
-  function PArray(array::AbstractVector{T}) where T<:AbstractArray
+  indices::L
+  function PArray(array::AbstractVector{T},indices::L) where {T<:AbstractArray,L}
     N = ndims(T)
     A = typeof(array)
-    new{T,N,A}(array)
+    new{T,N,A,L}(array,indices)
   end
-  function PArray(array::A) where A
+  function PArray(array::A,indices::L) where {A,L}
     T = eltype(array)
     N = 1
-    new{T,N,A}(array)
+    new{T,N,A,L}(array,indices)
   end
 end
 
-function PArray{T}(::UndefInitializer,N::Integer) where T
-  array = Vector{T}(undef,N)
+const AffinePArray{T,N,A} = PArray{T,N,A,1}
+
+function PArray(array)
+  indices = ntuple(i->true,Val(length(array)))
+  PArray(array,indices)
+end
+
+function PArray{T}(::UndefInitializer,L::Integer) where T
+  array = Vector{T}(undef,L)
   PArray(array)
 end
 
@@ -25,14 +33,14 @@ Base.eltype(::PArray{T}) where T = eltype(T)
 Base.ndims(::PArray{T,N} where T) where N = N
 Base.ndims(::Type{<:PArray{T,N}} where T) where N = N
 Base.first(a::PArray) = testitem(a)
-Base.length(a::PArray) = length(get_array(a))
-Base.eachindex(a::PArray) = eachindex(get_array(a))
-Base.lastindex(a::PArray) = lastindex(get_array(a))
+Base.length(::PArray{T,N,A,L} where {T,N,A}) where L = L
+Base.eachindex(::PArray{T,N,A,L} where {T,N,A}) where L = Base.OneTo(L)
+Base.lastindex(::PArray{T,N,A,L} where {T,N,A}) where L = L
 Base.getindex(a::PArray,i...) = get_array(a)[i...]
 Base.setindex!(a::PArray,v,i...) = get_array(a)[i...] = v
 
-function Base.show(io::IO,::MIME"text/plain",a::PArray{T}) where T
-  println(io, "PArray with eltype $T and elements")
+function Base.show(io::IO,::MIME"text/plain",a::PArray{T,N,A,L}) where {T,N,A,L}
+  println(io, "PArray of length $L and elements of type $T:")
   for i in eachindex(a)
     println(io,"  ",a[i])
   end
@@ -69,16 +77,14 @@ function Base.zeros(a::PArray)
   get_array(zero(a))
 end
 
-function parray(a::AbstractArray,N::Integer)
-  error("DEPRECATED")
-  # PArray([copy(a) for _ = 1:N])
+function allocate_parray(a::AbstractArray,N::Integer)
+  PArray([copy(a) for _ = 1:N])
 end
 
-function pzeros(a::AbstractArray{T},N::Integer) where T
-  error("DEPRECATED")
-  # b = similar(a)
-  # fill!(b,zero(T))
-  # PArray([copy(b) for _ = 1:N])
+function zero_parray(a::AbstractArray{T},N::Integer) where T
+  b = similar(a)
+  fill!(b,zero(T))
+  PArray([copy(b) for _ = 1:N])
 end
 
 function Base.sum(a::PArray)
@@ -254,6 +260,12 @@ function LinearAlgebra.lu!(a::PArray,b::PArray)
   end
 end
 
+function SparseArrays.resize!(a::PArray,args...)
+  map(a) do ai
+    resize!(ai,args...)
+  end
+end
+
 function Arrays.CachedArray(a::PArray)
   ai = testitem(a)
   ci = CachedArray(ai)
@@ -270,12 +282,6 @@ function Arrays.setsize!(
 
   @inbounds for i in eachindex(a)
     setsize!(a.array[i],s)
-  end
-end
-
-function SparseArrays.resize!(a::PArray,args...)
-  map(a) do ai
-    resize!(ai,args...)
   end
 end
 
@@ -1062,7 +1068,7 @@ function Arrays.return_value(
   o)
 
   v1 = return_value(f,dofs[1],o)
-  parray(v1,length(dofs))
+  allocate_parray(v1,length(dofs))
 end
 
 function Arrays.return_cache(

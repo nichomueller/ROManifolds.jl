@@ -134,7 +134,7 @@ function Algebra.allocate_jacobian(
   cache)
 
   _matdata_jacobians = fill_initial_jacobians(op,r,uh,cache)
-  matdata = _vcat_matdata(_matdata_jacobians)
+  matdata = TransientFETools._vcat_matdata(_matdata_jacobians)
   allocate_matrix(op.assem,matdata)
 end
 
@@ -227,8 +227,8 @@ function ODETools.jacobians!(
   γ::Tuple{Vararg{Real}},
   cache) where T
 
-  _matdata_jacobians = fill_jacobians(op,r,xh,γ)
-  matdata = _vcat_matdata(_matdata_jacobians)
+  _matdata_jacobians = TransientFETools.fill_jacobians(op,r,xh,γ)
+  matdata = TransientFETools._vcat_matdata(_matdata_jacobians)
   assemble_matrix_add!(A,op.assem,matdata)
   A
 end

@@ -32,11 +32,6 @@ function TrialPFESpace!(space::TrialPFESpace,objects)
   space
 end
 
-function TrialPFESpace!(space::SingleFieldFESpace,objects)
-  @assert length(objects) == 1
-  TrialFESpace!(space,objects)
-end
-
 # Allow do-block syntax
 
 function TrialPFESpace(f::Function,space::SingleFieldFESpace)
@@ -53,16 +48,8 @@ end
 
 function HomogeneousTrialPFESpace(U::SingleFieldFESpace,::Val{N}) where N
   dv = zero_dirichlet_values(U)
-  dirichlet_values = parray(dv,N)
+  dirichlet_values = allocate_parray(dv,N)
   TrialPFESpace(dirichlet_values,U)
-end
-
-function HomogeneousTrialPFESpace(U::SingleFieldFESpace,::Val{1})
-  HomogeneousTrialFESpace(U)
-end
-
-function HomogeneousTrialPFESpace(U::TrialFESpace,::Val{1})
-  HomogeneousTrialFESpace(U.space)
 end
 
 function HomogeneousTrialPFESpace!(dirichlet_values::PArray,U::SingleFieldFESpace,args...)
@@ -78,8 +65,6 @@ function length_free_values end
 length_free_values(f::FESpace) = length_dirichlet_values(f)
 
 FESpaces.get_free_dof_ids(f::TrialPFESpace) = get_free_dof_ids(f.space)
-
-FESpaces.zero_free_values(f::TrialPFESpace) = zero_free_values(f.space)
 
 FESpaces.get_triangulation(f::TrialPFESpace) = get_triangulation(f.space)
 
@@ -103,7 +88,7 @@ FESpaces.get_dirichlet_dof_ids(f::TrialPFESpace) = get_dirichlet_dof_ids(f.space
 
 FESpaces.get_cell_is_dirichlet(f::TrialPFESpace) = get_cell_is_dirichlet(f.space)
 
-FESpaces.zero_dirichlet_values(f::TrialPFESpace) = zero_dirichlet_values(f.space)
+FESpaces.num_dirichlet_dofs(f::TrialPFESpace) = num_dirichlet_dofs(f.space)
 
 FESpaces.num_dirichlet_tags(f::TrialPFESpace) = num_dirichlet_tags(f.space)
 
@@ -118,6 +103,16 @@ function FESpaces.get_vector_type(f::TrialPFESpace)
   V = get_vector_type(f.space)
   N = length_free_values(f)
   PArray{V}(undef,N)
+end
+
+function FESpaces.zero_free_values(f::TrialPFESpace)
+  V = get_vector_type(f)
+  allocate_vector(V,num_dirichlet_dofs(f))
+end
+
+function FESpaces.zero_dirichlet_values(f::TrialPFESpace)
+  V = get_vector_type(f)
+  allocate_vector(V,num_dirichlet_dofs(f))
 end
 
 function FESpaces.compute_dirichlet_values_for_tags!(
@@ -220,4 +215,62 @@ function _get_at_index(f::TrialPFESpace,i::Integer)
   @assert i ≤ length_free_values(f)
   dv = f.dirichlet_values[i]
   TrialFESpace(dv,f.space)
+end
+
+function FESpaces.test_single_field_fe_space(f::TrialPFESpace,pred=(==))
+  fe_basis = get_fe_basis(f)
+  @test isa(fe_basis,CellField)
+  test_fe_space(f)
+  cell_dofs = get_cell_dof_ids(f)
+  dirichlet_values = zero_dirichlet_values(f)
+  @test length(dirichlet_values) == num_dirichlet_dofs(f)
+  free_values = zero_free_values(f)
+  cell_vals = scatter_free_and_dirichlet_values(f,free_values,dirichlet_values)
+  fv, dv = gather_free_and_dirichlet_values(f,cell_vals)
+  @test pred(fv,free_values)
+  @test pred(dv,dirichlet_values)
+  gather_free_and_dirichlet_values!(fv,dv,f,cell_vals)
+  @test pred(fv,free_values)
+  @test pred(dv,dirichlet_values)
+  fv, dv = gather_free_and_dirichlet_values!(fv,dv,f,cell_vals)
+  @test pred(fv,free_values)
+  @test pred(dv,dirichlet_values)
+  fe_function = FEFunction(f,free_values,dirichlet_values)
+  @test isa(fe_function,SingleFieldPFEFunction)
+  test_fe_function(fe_function)
+  ddof_to_tag = get_dirichlet_dof_tag(f)
+  @test length(ddof_to_tag) == num_dirichlet_dofs(f)
+  if length(get_dirichlet_dof_tag(f)) != 0
+    @test maximum(get_dirichlet_dof_tag(f)) <= num_dirichlet_tags(f)
+  end
+  cell_dof_basis = get_fe_dof_basis(f)
+  @test isa(cell_dof_basis,CellDof)
+end
+
+function test_trial_p_fe_space()
+  domain =(0,1,0,1,0,1)
+  partition = (3,3,3)
+  model = CartesianDiscreteModel(domain,partition)
+
+  order = 2
+  reffe = ReferenceFE(lagrangian,Float64,order)
+  V = FESpace(model,reffe,dirichlet_tags=["tag_01","tag_10"])
+
+  g(x,μ) = exp(-sum(x)/sum(μ))
+  g(μ) = x->g(x,μ)
+
+  params = [rand(3),rand(3),rand(3)]
+  μ = PRealization(params)
+  gμ = 𝑓ₚ(g,μ)
+  U = TrialPFESpace(V,gμ)
+  dirichlet_values = get_dirichlet_dof_values(U)
+
+  @test length_dirichlet_values(U) == length(μ) == 3
+
+  map(1:length_dirichlet_values(U)) do i
+    gμi = g(params[i])
+    Ui = TrialFESpace(V,gμi)
+    test_single_field_fe_space(_get_at_index(U,i))
+    @test dirichlet_values[i] == get_dirichlet_dof_values(Ui)
+  end
 end

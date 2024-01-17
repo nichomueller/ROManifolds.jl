@@ -22,12 +22,6 @@ end
 
 const PFESpace = Union{TrialPFESpace,MultiFieldPFESpace}
 
-function MultiFieldPFESpace(spaces::Vector{<:TrialPFESpace})
-  Ts = map(get_dof_value_type,spaces)
-  T = typeof(*(map(zero,Ts)...))
-  MultiFieldPFESpace(Vector{T},spaces,ConsecutiveMultiFieldStyle())
-end
-
 function MultiFieldPFESpace(
   spaces::Vector{<:TrialPFESpace};
   style = ConsecutiveMultiFieldStyle())
@@ -126,11 +120,11 @@ FESpaces.ConstraintStyle(::Type{MultiFieldPFESpace{S,B,V}}) where {S,B,V} = B()
 
 function FESpaces.get_fe_basis(f::MultiFieldPFESpace)
   nfields = length(f.spaces)
-  all_febases = MultiFieldFEBasisComponent[]
+  all_febases = MultiField.MultiFieldFEBasisComponent[]
   for field_i in 1:nfields
     dv_i = get_fe_basis(f.spaces[field_i])
     @assert BasisStyle(dv_i) == FESpaces.TestBasis()
-    dv_i_b = MultiFieldFEBasisComponent(dv_i,field_i,nfields)
+    dv_i_b = MultiField.MultiFieldFEBasisComponent(dv_i,field_i,nfields)
     push!(all_febases,dv_i_b)
   end
   MultiFieldCellField(all_febases)
@@ -138,11 +132,11 @@ end
 
 function FESpaces.get_trial_fe_basis(f::MultiFieldPFESpace)
   nfields = length(f.spaces)
-  all_febases = MultiFieldFEBasisComponent[]
+  all_febases = MultiField.MultiFieldFEBasisComponent[]
   for field_i in 1:nfields
     du_i = get_trial_fe_basis(f.spaces[field_i])
     @assert BasisStyle(du_i) == FESpaces.TrialBasis()
-    du_i_b = MultiFieldFEBasisComponent(du_i,field_i,nfields)
+    du_i_b = MultiField.MultiFieldFEBasisComponent(du_i,field_i,nfields)
     push!(all_febases,du_i_b)
   end
   MultiFieldCellField(all_febases)
@@ -434,7 +428,7 @@ end
 
 function TransientFETools.TransientCellField(multi_field::MultiFieldPFEFunction,derivatives::Tuple)
   transient_single_fields = TransientFETools._to_transient_single_fields(multi_field,derivatives)
-  TransientMultiFieldCellField(multi_field,derivatives,transient_single_fields)
+  TransientFETools.TransientMultiFieldCellField(multi_field,derivatives,transient_single_fields)
 end
 
 function FESpaces.interpolate(objects,fe::MultiFieldPFESpace)
