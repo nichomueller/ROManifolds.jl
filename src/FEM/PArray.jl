@@ -1,12 +1,12 @@
 struct PArray{T,N,A,L} <: AbstractArray{T,N}
   array::A
-  indices::L
-  function PArray(array::AbstractVector{T},indices::L) where {T<:AbstractArray,L}
+  indices::NTuple{L,Bool}
+  function PArray(array::AbstractVector{T},indices::NTuple{L,Bool}) where {T<:AbstractArray,L}
     N = ndims(T)
     A = typeof(array)
     new{T,N,A,L}(array,indices)
   end
-  function PArray(array::A,indices::L) where {A,L}
+  function PArray(array::A,indices::NTuple{L,Bool}) where {A,L}
     T = eltype(array)
     N = 1
     new{T,N,A,L}(array,indices)
@@ -41,9 +41,7 @@ Base.setindex!(a::PArray,v,i...) = get_array(a)[i...] = v
 
 function Base.show(io::IO,::MIME"text/plain",a::PArray{T,N,A,L}) where {T,N,A,L}
   println(io, "PArray of length $L and elements of type $T:")
-  for i in eachindex(a)
-    println(io,"  ",a[i])
-  end
+  println(io,a)
 end
 
 function Base.copy(a::PArray{T}) where T
@@ -298,6 +296,7 @@ function Base.map(f,a::PArray...)
 end
 
 function Base.map(f,a::PArray,b::AbstractArray...)
+  @warn "Would like to deprecate this"
   f1 = f(a[1],b...)
   array = Vector{typeof(f1)}(undef,length(a))
   @inbounds for i = eachindex(a)

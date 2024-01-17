@@ -2,7 +2,8 @@ function Algebra.allocate_vector(
   ::Type{PArray{T,N,A,L}},
   n::Integer) where {T,N,A,L}
 
-  vector = zeros(T,n)
+  S = eltype(T)
+  vector = zeros(S,n)
   allocate_parray(vector,L)
 end
 

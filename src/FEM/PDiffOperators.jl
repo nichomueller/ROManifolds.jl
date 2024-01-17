@@ -14,7 +14,7 @@ function p_time_derivative(f::TransientPFunction)
 end
 
 function _p_time_derivative_f(f,x,μ,t,::Any)
-  ForwardDiff.derivative(t->f(μ,t)(x),t)
+  derivative(t->f(μ,t)(x),t)
 end
 
 function _p_time_derivative_f(f,x,μ,t,::VectorValue)

@@ -14,8 +14,14 @@ function TrialPFESpace(dirichlet_values::AbstractVector,space::SingleFieldFESpac
   @notimplemented
 end
 
-function TrialPFESpace(space::SingleFieldFESpace,objects)
-  dirichlet_values = compute_dirichlet_values_for_tags(space,objects)
+function TrialPFESpace(dirichlet_values::AbstractVector{<:AbstractVector},space::SingleFieldFESpace)
+  TrialPFESpace(PArray(dirichlet_values),space)
+end
+
+function TrialPFESpace(space::SingleFieldFESpace,objects::PFunction)
+  dirichlet_values = map(objects) do object
+    compute_dirichlet_values_for_tags(space,object)
+  end
   TrialPFESpace(dirichlet_values,space)
 end
 
@@ -102,7 +108,7 @@ FESpaces.scatter_free_and_dirichlet_values(f::TrialPFESpace,fv,dv) = scatter_fre
 function FESpaces.get_vector_type(f::TrialPFESpace)
   V = get_vector_type(f.space)
   N = length_free_values(f)
-  PArray{V}(undef,N)
+  typeof(PArray{V}(undef,N))
 end
 
 function FESpaces.zero_free_values(f::TrialPFESpace)
@@ -116,16 +122,18 @@ function FESpaces.zero_dirichlet_values(f::TrialPFESpace)
 end
 
 function FESpaces.compute_dirichlet_values_for_tags!(
-  dirichlet_values::PArray{T},
-  dirichlet_values_scratch::PArray{T},
+  dirichlet_values::PArray{T,N,A,L},
+  dirichlet_values_scratch::PArray{T,N,A,L},
   f::TrialPFESpace,
-  tag_to_object) where T
+  tag_to_object) where {T,N,A,L}
 
+  @assert length(tag_to_object) == L
   dirichlet_dof_to_tag = get_dirichlet_dof_tag(f)
-  @inbounds for n in eachindex(dirichlet_values)
+  @inbounds for n in 1:L
     dv = dirichlet_values[n]
     dvs = dirichlet_values_scratch[n]
-    _tag_to_object = FESpaces._convert_to_collectable(tag_to_object[n],num_dirichlet_tags(f))
+    tto = tag_to_object[n]
+    _tag_to_object = FESpaces._convert_to_collectable(tto,num_dirichlet_tags(f))
     fill!(dvs,zero(eltype(T)))
     for (tag,object) in enumerate(_tag_to_object)
       cell_vals = FESpaces._cell_vals(f,object)

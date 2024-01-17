@@ -22,6 +22,7 @@ import LinearAlgebra: det,tr,cross,dot,fillstored!
 import FillArrays: Fill,fill
 import ForwardDiff: derivative
 import Distributions: Uniform,Normal
+import Test: @test
 import UnPack: @unpack
 import Gridap.Helpers: @abstractmethod,@check,@notimplemented,@unreachable
 import Gridap.Algebra: residual!,jacobian!

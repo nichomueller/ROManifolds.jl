@@ -50,7 +50,7 @@ jac_t(μ,t,u,dut,v) = ∫(v*dut)dΩ
 
 pranges = fill([1.,10.],3)
 t0,tf,dt,θ = 0.,0.3,0.005,0.5
-tdomain = t0:dt:tf
+tdomain = dt:dt:tf
 tpspace = TransientParametricSpace(pranges,tdomain)
 
 T = Float
@@ -60,6 +60,19 @@ trial = TransientTrialPFESpace(test,gμt)
 feop = AffineTransientPFEOperator(res,jac,jac_t,tpspace,trial,test)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),θ,dt)
+
+μt = realization(tpspace,nparams=10)
+trialpt = trial(μt)
+FEM.test_trial_p_fe_space()
+
+function FESpaces.compute_dirichlet_values_for_tags(f::SingleFieldFESpace,tag_to_object)
+  dirichlet_values = zero_dirichlet_values(f)
+  dirichlet_values_scratch = zero_dirichlet_values(f)
+  println(typeof(dirichlet_values))
+  println(typeof(dirichlet_values))
+  println(typeof(dirichlet_values_scratch))
+  compute_dirichlet_values_for_tags!(dirichlet_values,dirichlet_values_scratch,f,tag_to_object)
+end
 
 solve(fesolver,feop,uh0μ)
 
@@ -92,8 +105,6 @@ struct ReducedSingleFieldFESpace{F,R} <: ReducedFESpace
   fe::F
   reduced_basis::R
 end
-
-
 
 w = (u*v)
 cache = return_cache(w,x)
@@ -190,3 +201,7 @@ bmatdata = collect_cell_matrix(Xb,Yb,biform(ub,vb))
 bvecdata = collect_cell_vector(Yb,liform(vb))
 
 FEM.test_parametric_space()
+
+for (i,(t,μ)) in enumerate(μt)
+  println(i)
+end
