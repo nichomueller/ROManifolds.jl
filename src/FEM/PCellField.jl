@@ -35,8 +35,7 @@ function FESpaces.test_fe_function(f::SingleFieldPFEFunction)
   fe_space = get_fe_space(f)
   cell_values = get_cell_dof_values(f,trian)
   dirichlet_values = f.dirichlet_values
-  map(1:length(f)) do i
-    fe_space_i = _get_at_index(fe_space,i)
+  for fe_space_i in fe_space
     free_values_i = free_values[i]
     fi = FEFunction(fe_space_i,free_values_i)
     test_fe_function(fi)
@@ -50,27 +49,40 @@ function TransientFETools.TransientCellField(single_field::SingleFieldPFEFunctio
   TransientFETools.TransientSingleFieldCellField(single_field,derivatives)
 end
 
-# for visualization purposes
+# for visualization/testing purposes
 
-function _get_at_index(f::GenericCellField,i::Integer)
+function Base.iterate(f::GenericCellField)
   data = get_data(f)
   trian = get_triangulation(f)
   DS = DomainStyle(f)
-  di = getindex.(data,i)
-  GenericCellField(di,trian,DS)
+  index = 1
+  final_index = length(first.(data))
+  di = getindex.(data,index)
+  state = (index,final_index,data,trian,DS)
+  GenericCellField(di,trian,DS),state
 end
 
-function _get_at_index(f::SingleFieldPFEFunction,i::Integer)
-  cf = _get_at_index(f.cell_field,i)
-  fs = _get_at_index(f.fe_space,i)
-  cv = f.cell_dof_values[i]
-  fv = f.free_values[i]
-  dv = f.dirichlet_values[i]
-  SingleFieldFEFunction(cf,cv,fv,dv,fs)
-end
-
-function _to_vector_cellfields(f)
-  map(1:length(f)) do i
-    _get_at_index(f,i)
+function Base.iterate(f::GenericCellField,state)
+  index,final_index,data,trian,DS = state
+  index += 1
+  if index > final_index
+    return nothing
   end
+  di = getindex.(data,index)
+  GenericCellField(di,trian,DS),state
+end
+
+function Base.iterate(f::SingleFieldPFEFunction,state...)
+  citer = iterate(f.cell_field,state...)
+  fiter = iterate(f.fe_space,state...)
+  if isnothing(citer) && isnothing(fiter)
+    return nothing
+  end
+  cf,cstate = citer
+  fs,fstate = fiter
+  index, = fstate
+  cv = f.cell_dof_values[index]
+  fv = f.free_values[index]
+  dv = f.dirichlet_values[index]
+  SingleFieldFEFunction(cf,cv,fv,dv,fs),(cstate,fstate)
 end

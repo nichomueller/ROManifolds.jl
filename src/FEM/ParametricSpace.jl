@@ -11,15 +11,16 @@ num_parameters(r::TrivialPRealization) = 1
 Base.length(r::PRealization) = num_parameters(r)
 Base.size(r::PRealization) = (length(r),)
 
-function Base.iterate(r::PRealization)
+# when iterating over a PRealization{P}, we return return eltype(P) ∀ index i
+function Base.iterate(r::TrivialPRealization)
   state = 1
-  rstate = PRealization(_get_parameters(r)[state])
+  rstate = _get_parameters(r)
   return rstate, state
 end
 
-function Base.iterate(r::TrivialPRealization)
+function Base.iterate(r::PRealization)
   state = 1
-  rstate = PRealization(_get_parameters(r))
+  rstate = _get_parameters(r)[state]
   return rstate, state
 end
 
@@ -28,7 +29,7 @@ function Base.iterate(r::PRealization,state)
   if state > length(r)
     return nothing
   end
-  rstate = PRealization(_get_parameters(r)[state])
+  rstate = _get_parameters(r)[state]
   return rstate, state
 end
 
@@ -57,9 +58,9 @@ function Base.iterate(r::TransientPRealization)
   if isnothing(iternext)
     return nothing
   end
-  rstate,itstate = iternext
+  (tstate,pstate),itstate = iternext
   state = (iterator,itstate)
-  rstate,state
+  (pstate,tstate),state
 end
 
 function Base.iterate(r::TransientPRealization,state)
@@ -68,9 +69,9 @@ function Base.iterate(r::TransientPRealization,state)
   if isnothing(iternext)
     return nothing
   end
-  rstate,itstate = iternext
+  (tstate,pstate),itstate = iternext
   state = (iterator,itstate)
-  rstate,state
+  (pstate,tstate),state
 end
 
 function get_initial_time(r::TransientPRealization)
@@ -181,25 +182,14 @@ num_parameters(f::PFunction) = length(_get_parameters(f))
 Base.length(f::PFunction) = num_parameters(f)
 Base.size(f::PFunction) = (length(f),)
 
-function Base.iterate(f::PFunction)
-  riter = iterate(get_parameters(f))
+# when iterating over a PFunction{P}, we return return f(eltype(P)) ∀ index i
+function Base.iterate(f::PFunction,state...)
+  riter = iterate(get_parameters(f),state...)
   if isnothing(riter)
     return nothing
   end
-  rstate,state = riter
-  fstate = PFunction(f.fun,rstate)
-  return fstate,state
-end
-
-function Base.iterate(f::PFunction,state)
-  state += 1
-  riter = iterate(get_parameters(f),state)
-  if isnothing(riter)
-    return nothing
-  end
-  rstate,state = riter
-  fstate = PFunction(f.fun,rstate)
-  return fstate,state
+  rstate,statenext = riter
+  return f.fun(rstate),statenext
 end
 
 const 𝑓ₚ = PFunction
@@ -227,13 +217,13 @@ Base.length(f::TransientPFunction) = num_parameters(f)*num_times(f)
 Base.size(f::TransientPFunction) = (length(f),)
 
 function Base.iterate(f::TransientPFunction)
-  iterator = Iterators.product(get_times(r),get_parameters(r))
+  iterator = Iterators.product(get_times(f),get_parameters(f))
   (tstate,pstate),state = iterate(iterator)
   iterstatenext = iterator,state
-  TransientPFunction(f.fun,pstate,tstate),iterstatenext
+  f.fun(pstate,tstate),iterstatenext
 end
 
-function Base.iterate(r::TransientPFunction,iterstate)
+function Base.iterate(f::TransientPFunction,iterstate)
   iterator,state = iterstate
   statenext = iterate(iterator,state)
   if isnothing(statenext)
@@ -241,7 +231,7 @@ function Base.iterate(r::TransientPFunction,iterstate)
   end
   (tstate,pstate),state = statenext
   iterstatenext = iterator,state
-  TransientPFunction(f.fun,pstate,tstate),iterstatenext
+  f.fun(pstate,tstate),iterstatenext
 end
 
 const 𝑓ₚₜ = TransientPFunction
@@ -259,18 +249,10 @@ function TransientPFunction(f::Function,r::TrivialPRealization,t)
   TransientPFunction(f,p,t)
 end
 
-function get_fields(f::PFunction)
+function get_fields(f::AbstractPFunction)
   fields = GenericField[]
-  for p = _get_parameters(f)
-    push!(fields,GenericField(f.fun(p)))
-  end
-  fields
-end
-
-function get_fields(f::TransientPFunction)
-  fields = GenericField[]
-  for (t,p) = Iterators.product(get_times(f),_get_parameters(f))
-    push!(fields,GenericField(f.fun(p,t)))
+  for fi = f
+    push!(fields,GenericField(fi))
   end
   fields
 end
@@ -314,18 +296,21 @@ function test_parametric_space()
   x = Point(1,2)
   aμtx = aμt(x)
   daμtx = daμt(x)
-  for (i,(t,μ)) in enumerate(μt)
+  for (i,(μ,t)) in enumerate(μt)
     @test aμtx[i] == a(μ,t)(x)
     @test daμtx[i] == da(μ,t)(x)
   end
   b(x,μ) = sum(x)*sum(μ)
   b(μ) = x -> b(x,μ)
-  bμ = 𝑓ₚₜ(a,get_parameters(μ))
+  bμ = 𝑓ₚ(b,get_parameters(μ))
   bμx = bμ(x)
   for (i,bμi) in enumerate(bμ)
     @test bμi(x) == bμx[i]
   end
   for (i,aμti) in enumerate(aμt)
-    @test aμti(x) == daμtx[i]
+    @test aμti(x) == aμtx[i]
+  end
+  for (i,daμti) in enumerate(daμt)
+    @test daμti(x) == daμtx[i]
   end
 end

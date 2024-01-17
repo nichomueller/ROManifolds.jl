@@ -61,18 +61,8 @@ feop = AffineTransientPFEOperator(res,jac,jac_t,tpspace,trial,test)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),θ,dt)
 
-μt = realization(tpspace,nparams=10)
-trialpt = trial(μt)
+FEM.test_parametric_space()
 FEM.test_trial_p_fe_space()
-
-function FESpaces.compute_dirichlet_values_for_tags(f::SingleFieldFESpace,tag_to_object)
-  dirichlet_values = zero_dirichlet_values(f)
-  dirichlet_values_scratch = zero_dirichlet_values(f)
-  println(typeof(dirichlet_values))
-  println(typeof(dirichlet_values))
-  println(typeof(dirichlet_values_scratch))
-  compute_dirichlet_values_for_tags!(dirichlet_values,dirichlet_values_scratch,f,tag_to_object)
-end
 
 solve(fesolver,feop,uh0μ)
 
@@ -199,9 +189,3 @@ vb = get_fe_basis(Yb)
 bdata = collect_cell_matrix_and_vector(Xb,Yb,biform(ub,vb),liform(vb))
 bmatdata = collect_cell_matrix(Xb,Yb,biform(ub,vb))
 bvecdata = collect_cell_vector(Yb,liform(vb))
-
-FEM.test_parametric_space()
-
-for (i,(t,μ)) in enumerate(μt)
-  println(i)
-end

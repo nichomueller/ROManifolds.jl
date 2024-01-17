@@ -39,13 +39,10 @@ function Arrays.evaluate!(
   params,
   times) where T
 
-  objects_at_pt = []
-  for p in params, t in times
-    if isa(U.dirichlet_pt,Vector)
-      push!(objects_at_pt,map(o->o(p,t),U.dirichlet_pt))
-    else
-      push!(objects_at_pt,U.dirichlet_pt(p,t))
-    end
+  if isa(U.dirichlet_pt,Vector)
+    objects_at_pt = map(o->o(params,times),U.dirichlet_pt)
+  else
+    objects_at_pt = U.dirichlet_pt(params,times)
   end
   TrialPFESpace!(Upt,objects_at_pt)
   Upt

@@ -481,13 +481,26 @@ end
 # end
 
 # for visualization purposes
+function Base.iterate(f::MultiFieldPFEFunction)
+  mfs,states = map(iterate,f.single_fe_functions) |> tuple_of_arrays
+  sff,statef = map(iterate,f.fe_space) |> tuple_of_arrays
+  index = first(first.(statef))
+  fv = f.free_values[index]
+  MultiFieldPFEFunction(fv,mfs,sff),(states,statef)
+end
 
-function _get_at_index(f::MultiFieldPFEFunction,i::Integer)
-  fv = f.free_values[i]
-  mfs,sff = map(f.single_fe_functions,f.fe_space) do ff,fs
-    _get_at_index(fs,i),_get_at_index(ff,i)
-  end |> tuple_of_arrays
-  MultiFieldPFEFunction(fv,mfs,sff)
+function Base.iterate(f::MultiFieldPFEFunction,state)
+  states,statef = state
+  iters = map(f->iterate(f.single_fe_functions,states))
+  iterf = map(f->iterate(f.fe_space,statef))
+  if isnothing(iters) && isnothing(iterf)
+    return nothing
+  end
+  mfs,states = iters |> tuple_of_arrays
+  sff,statef = iterf |> tuple_of_arrays
+  index = first(first.(statef))
+  fv = f.free_values[index]
+  MultiFieldPFEFunction(fv,mfs,sff),(states,statef)
 end
 
 function Arrays.testitem(f::MultiFieldPFESpace)

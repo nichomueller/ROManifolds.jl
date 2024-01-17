@@ -18,7 +18,7 @@ function TrialPFESpace(dirichlet_values::AbstractVector{<:AbstractVector},space:
   TrialPFESpace(PArray(dirichlet_values),space)
 end
 
-function TrialPFESpace(space::SingleFieldFESpace,objects::PFunction)
+function TrialPFESpace(space::SingleFieldFESpace,objects::AbstractPFunction)
   dirichlet_values = map(objects) do object
     compute_dirichlet_values_for_tags(space,object)
   end
@@ -125,23 +125,27 @@ function FESpaces.compute_dirichlet_values_for_tags!(
   dirichlet_values::PArray{T,N,A,L},
   dirichlet_values_scratch::PArray{T,N,A,L},
   f::TrialPFESpace,
-  tag_to_object) where {T,N,A,L}
+  tag_to_object::AbstractPFunction) where {T,N,A,L}
 
-  @assert length(tag_to_object) == L
+  _tag_to_object = FESpaces._convert_to_collectable(tag_to_object,num_dirichlet_tags(f))
   dirichlet_dof_to_tag = get_dirichlet_dof_tag(f)
-  @inbounds for n in 1:L
-    dv = dirichlet_values[n]
-    dvs = dirichlet_values_scratch[n]
-    tto = tag_to_object[n]
-    _tag_to_object = FESpaces._convert_to_collectable(tto,num_dirichlet_tags(f))
+  map(dirichlet_values,dirichlet_values_scratch,_tag_to_object) do dv,dvs,tto
     fill!(dvs,zero(eltype(T)))
-    for (tag,object) in enumerate(_tag_to_object)
+    for (tag,object) in enumerate(tto)
       cell_vals = FESpaces._cell_vals(f,object)
       gather_dirichlet_values!(dvs,f.space,cell_vals)
       FESpaces._fill_dirichlet_values_for_tag!(dv,dvs,tag,dirichlet_dof_to_tag)
     end
   end
   dirichlet_values
+end
+
+function FESpaces._convert_to_collectable(object::AbstractPFunction,ntags)
+  objects = map(object) do o
+    @assert typeof(o) <: Function
+    FESpaces._convert_to_collectable(Fill(o,ntags),ntags)
+  end
+  PArray(objects)
 end
 
 function FESpaces.gather_free_and_dirichlet_values!(
@@ -218,11 +222,28 @@ function FESpaces._free_and_dirichlet_values_fill!(
 
 end
 
-# for visualization purposes
+# for visualization/testing purposes
+
 function _get_at_index(f::TrialPFESpace,i::Integer)
   @assert i ≤ length_free_values(f)
   dv = f.dirichlet_values[i]
   TrialFESpace(dv,f.space)
+end
+
+function Base.iterate(f::TrialPFESpace)
+  index = 1
+  final_index = length(f.dirichlet_values)
+  state = (index,final_index)
+  TrialFESpace(dv,f.space),state
+end
+
+function Base.iterate(f::TrialPFESpace,state)
+  index,final_index = state
+  index += 1
+  if index > final_index
+    return nothing
+  end
+  TrialFESpace(dv,f.space),state
 end
 
 function FESpaces.test_single_field_fe_space(f::TrialPFESpace,pred=(==))
@@ -253,32 +274,4 @@ function FESpaces.test_single_field_fe_space(f::TrialPFESpace,pred=(==))
   end
   cell_dof_basis = get_fe_dof_basis(f)
   @test isa(cell_dof_basis,CellDof)
-end
-
-function test_trial_p_fe_space()
-  domain =(0,1,0,1,0,1)
-  partition = (3,3,3)
-  model = CartesianDiscreteModel(domain,partition)
-
-  order = 2
-  reffe = ReferenceFE(lagrangian,Float64,order)
-  V = FESpace(model,reffe,dirichlet_tags=["tag_01","tag_10"])
-
-  g(x,μ) = exp(-sum(x)/sum(μ))
-  g(μ) = x->g(x,μ)
-
-  params = [rand(3),rand(3),rand(3)]
-  μ = PRealization(params)
-  gμ = 𝑓ₚ(g,μ)
-  U = TrialPFESpace(V,gμ)
-  dirichlet_values = get_dirichlet_dof_values(U)
-
-  @test length_dirichlet_values(U) == length(μ) == 3
-
-  map(1:length_dirichlet_values(U)) do i
-    gμi = g(params[i])
-    Ui = TrialFESpace(V,gμi)
-    test_single_field_fe_space(_get_at_index(U,i))
-    @test dirichlet_values[i] == get_dirichlet_dof_values(Ui)
-  end
 end

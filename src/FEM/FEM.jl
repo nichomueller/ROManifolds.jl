@@ -49,6 +49,9 @@ export TransientParametricSpace
 export PFunction, 𝑓ₚ
 export TransientPFunction, 𝑓ₚₜ
 export realization
+export get_parameters
+export get_times
+export get_fields
 include("ParametricSpace.jl")
 
 export ∂ₚt
@@ -74,6 +77,8 @@ include("PCellField.jl")
 export TrialPFESpace
 export TrialPFESpace!
 export HomogeneousTrialPFESpace
+export length_dirichlet_values
+export length_free_values
 include("TrialPFESpace.jl")
 
 export MultiFieldPFESpace
