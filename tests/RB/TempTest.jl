@@ -62,7 +62,6 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),θ,dt)
 
 FEM.test_parametric_space()
-FEM.test_trial_p_fe_space()
 
 solve(fesolver,feop,uh0μ)
 

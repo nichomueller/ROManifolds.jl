@@ -224,16 +224,11 @@ end
 
 # for visualization/testing purposes
 
-function _get_at_index(f::TrialPFESpace,i::Integer)
-  @assert i ≤ length_free_values(f)
-  dv = f.dirichlet_values[i]
-  TrialFESpace(dv,f.space)
-end
-
 function Base.iterate(f::TrialPFESpace)
   index = 1
   final_index = length(f.dirichlet_values)
   state = (index,final_index)
+  dv = f.dirichlet_values[index]
   TrialFESpace(dv,f.space),state
 end
 
@@ -243,6 +238,8 @@ function Base.iterate(f::TrialPFESpace,state)
   if index > final_index
     return nothing
   end
+  state = (index,final_index)
+  dv = f.dirichlet_values[index]
   TrialFESpace(dv,f.space),state
 end
 

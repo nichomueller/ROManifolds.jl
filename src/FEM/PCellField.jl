@@ -69,6 +69,7 @@ function Base.iterate(f::GenericCellField,state)
     return nothing
   end
   di = getindex.(data,index)
+  state = (index,final_index,data,trian,DS)
   GenericCellField(di,trian,DS),state
 end
 

@@ -90,6 +90,7 @@ export TransientMultiFieldPFESpace
 export TransientMultiFieldTrialPFESpace
 include("TransientTrialPFESpace.jl")
 
+export SparseMatrixPAssembler
 include("PAssemblers.jl")
 
 export TransientPFEOperator

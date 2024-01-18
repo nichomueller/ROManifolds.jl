@@ -398,8 +398,8 @@ function FESpaces.get_cell_dof_values(f::MultiFieldPFEFunction,trian::Triangulat
 end
 
 MultiField.num_fields(m::MultiFieldPFEFunction) = length(m.single_fe_functions)
-Base.iterate(m::MultiFieldPFEFunction) = iterate(m.single_fe_functions)
-Base.iterate(m::MultiFieldPFEFunction,state) = iterate(m.single_fe_functions,state)
+# Base.iterate(m::MultiFieldPFEFunction) = iterate(m.single_fe_functions)
+# Base.iterate(m::MultiFieldPFEFunction,state) = iterate(m.single_fe_functions,state)
 Base.getindex(m::MultiFieldPFEFunction,field_id::Integer) = m.single_fe_functions[field_id]
 
 function FESpaces.FEFunction(fe::MultiFieldPFESpace,free_values::PArray)

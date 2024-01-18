@@ -27,7 +27,8 @@ end
 
 Arrays.get_array(a::PArray) = a.array
 Arrays.testitem(a::PArray) = testitem(get_array(a))
-Base.size(a::PArray,i...) = size(testitem(a),i...)
+Base.size(a::PArray{T},i...) where {T<:AbstractArray} = size(testitem(a),i...)
+Base.size(a::PArray) = (length(a),)
 Base.eltype(::Type{<:PArray{T}}) where T = eltype(T)
 Base.eltype(::PArray{T}) where T = eltype(T)
 Base.ndims(::PArray{T,N} where T) where N = N
@@ -115,6 +116,14 @@ end
 
 function Base.:*(a::Number,b::PArray)
   b*a
+end
+
+function Base.:\(a::PArray{<:AbstractMatrix},b::PArray{<:AbstractVector})
+  c = allocate_in_range(a)
+  @inbounds for i = eachindex(a)
+    c[i] = a[i] \ b[i]
+  end
+  c
 end
 
 function Base.:≈(a::PArray,b::PArray)

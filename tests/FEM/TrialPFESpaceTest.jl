@@ -27,9 +27,9 @@ dirichlet_values = get_dirichlet_dof_values(U)
 
 @test length_dirichlet_values(U) == length(μ) == 3
 
-for Ũi in U
+for (i,Ũi) in enumerate(U)
   test_single_field_fe_space(Ũi)
-  Ui = TrialFESpace(V,γ)
+  Ui = TrialFESpace(V,g(params[i]))
   @test dirichlet_values[i] == get_dirichlet_dof_values(Ui)
   @test dirichlet_values[i] == get_dirichlet_dof_values(Ũi)
 end

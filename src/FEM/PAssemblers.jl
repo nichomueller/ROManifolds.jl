@@ -63,7 +63,7 @@ function FESpaces.SparseMatrixAssembler(mat,trial::PFESpace,test::FESpace)
   T = eltype(get_array_type(mat_builder))
   N = length_free_values(trial)
   vector_type = Vector{T}
-  pvector_type = PArray{vector_type}(undef,N)
+  pvector_type = typeof(PArray{vector_type}(undef,N))
   SparseMatrixAssembler(mat_builder,pvector_type,trial,test)
 end
 
@@ -71,10 +71,10 @@ function FESpaces.SparseMatrixAssembler(trial::PFESpace,test::FESpace)
   T = get_dof_value_type(trial)
   N = length_free_values(trial)
   matrix_type = SparseMatrixCSC{T,Int}
-  pmatrix_type = PArray{matrix_type}(undef,N)
+  pmatrix_type = typeof(PArray{matrix_type}(undef,N))
   vector_type = Vector{T}
-  pvector_type = PArray{vector_type}(undef,N)
-  SparseMatrixAssembler(matrix_type,vector_type,trial,test)
+  pvector_type = typeof(PArray{vector_type}(undef,N))
+  SparseMatrixAssembler(pmatrix_type,pvector_type,trial,test)
 end
 
 FESpaces.get_rows(a::SparseMatrixPAssembler) = a.rows
@@ -86,6 +86,22 @@ FESpaces.get_matrix_builder(a::SparseMatrixPAssembler) = a.matrix_builder
 FESpaces.get_vector_builder(a::SparseMatrixPAssembler) = a.vector_builder
 
 FESpaces.get_assembly_strategy(a::SparseMatrixPAssembler) = a.strategy
+
+function FESpaces.SparseMatrixBuilder(::Type{PArray{T,N,A,L}},args...) where {T,N,A,L}
+  builders = map(1:L) do i
+    SparseMatrixBuilder(T,args...)
+  end
+  PArray(builders)
+end
+
+function FESpaces.ArrayBuilder(::Type{PArray{T,N,A,L}},args...) where {T,N,A,L}
+  builders = map(1:L) do i
+    ArrayBuilder(T,args...)
+  end
+  PArray(builders)
+end
+
+Algebra.LoopStyle(a::Type{PArray{T,N,A,L}}) where {T,N,A,L} = LoopStyle(T)
 
 function Algebra.nz_counter(builder::PArray,axes)
   map(builder) do builder
@@ -134,12 +150,7 @@ function collect_cell_vector_for_trian(
   [cell_vec_r],[rows]
 end
 
-@inline function Algebra._add_entries!(
-  combine::Function,
-  A::AbstractMatrix{<:AbstractArray},
-  vs,
-  is,js)
-
+@inline function Algebra._add_entries!(combine::Function,A::PTArray,vs,is,js)
   for (lj,j) in enumerate(js)
     if j>0
       for (li,i) in enumerate(is)
@@ -155,12 +166,7 @@ end
   A
 end
 
-@inline function Algebra._add_entries!(
-  combine::Function,
-  A::AbstractMatrix{<:AbstractArray},
-  vs::Nothing,
-  is,js)
-
+@inline function Algebra._add_entries!(combine::Function,A::PTArray,vs::Nothing,is,js)
   for (lj,j) in enumerate(js)
     if j>0
       for (li,i) in enumerate(is)
@@ -175,12 +181,7 @@ end
   A
 end
 
-@inline function Algebra._add_entries!(
-  combine::Function,
-  A::AbstractMatrix{<:AbstractArray},
-  vs::PArray,
-  is,js)
-
+@inline function Algebra._add_entries!(combine::Function,A::PTArray,vs::PTArray,is,js)
   for (lj,j) in enumerate(js)
     if j>0
       for (li,i) in enumerate(is)
@@ -196,12 +197,7 @@ end
   A
 end
 
-@inline function Algebra._add_entries!(
-  combine::Function,
-  A::AbstractVector{<:AbstractArray},
-  vs::Nothing,
-  is)
-
+@inline function Algebra._add_entries!(combine::Function,A::PTArray,vs::Nothing,is)
   for (li,i) in enumerate(is)
     if i>0
       for Ak in A
@@ -212,12 +208,7 @@ end
   A
 end
 
-@inline function Algebra._add_entries!(
-  combine::Function,
-  A::AbstractVector{<:AbstractArray},
-  vs,
-  is)
-
+@inline function Algebra._add_entries!(combine::Function,A::PTArray,vs,is)
   for (li,i) in enumerate(is)
     if i>0
       for Ak in A
@@ -229,12 +220,7 @@ end
   A
 end
 
-@inline function Algebra._add_entries!(
-  combine::Function,
-  A::AbstractVector{<:AbstractArray},
-  vs::PArray,
-  is)
-
+@inline function Algebra._add_entries!(combine::Function,A::PTArray,vs::PTArray,is)
   for (li,i) in enumerate(is)
     if i>0
       for (Ak,vsk) in zip(A,vs)
