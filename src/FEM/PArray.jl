@@ -20,6 +20,10 @@ function PArray(array)
   PArray(array,indices)
 end
 
+function PArray(array::AbstractVector{T}) where {T<:Number}
+  array
+end
+
 function PArray{T}(::UndefInitializer,L::Integer) where T
   array = Vector{T}(undef,L)
   PArray(array)
@@ -39,6 +43,7 @@ Base.eachindex(::PArray{T,N,A,L} where {T,N,A}) where L = Base.OneTo(L)
 Base.lastindex(::PArray{T,N,A,L} where {T,N,A}) where L = L
 Base.getindex(a::PArray,i...) = get_array(a)[i...]
 Base.setindex!(a::PArray,v,i...) = get_array(a)[i...] = v
+Base.iterate(a::PArray,i...) = iterate(a.array,i...)
 
 function Base.show(io::IO,::MIME"text/plain",a::PArray{T,N,A,L}) where {T,N,A,L}
   println(io, "PArray of length $L and elements of type $T:")
@@ -54,14 +59,14 @@ function Base.copy(a::PArray{T}) where T
 end
 
 function Base.similar(
-  a::PArray,
-  type::Type{T}=eltype(testitem(a)),
-  ndim::Union{Integer,AbstractUnitRange}=length(testitem(a))) where T
+  a::PArray{T,N,A,L},
+  element_type::Type{S}=eltype(a),
+  dims::Tuple{Int,Vararg{Int}}=size(a)) where {T,N,A,L,S}
 
-  elb = similar(testitem(a),type,ndim)
+  elb = similar(testitem(a),element_type,dims)
   b = Vector{typeof(elb)}(undef,length(a))
   @inbounds for i = eachindex(a)
-    b[i] = similar(a[i],type,ndim)
+    b[i] = similar(a[i],element_type,dims)
   end
   PArray(b)
 end
@@ -295,17 +300,11 @@ end
 Arrays.get_array(a::PArray{<:CachedArray}) = map(x->x.array,a.array)
 
 function Base.map(f,a::PArray...)
-  fa1 = f(map(testitem,a)...)
-  array = Vector{typeof(fa1)}(undef,length(first(a)))
-  @inbounds for i = eachindex(first(a))
-    ai = map(x->getindex(x,i),a)
-    array[i] = f(ai...)
-  end
-  PArray(array)
+  PArray(map(f,map(get_array,a)...))
 end
 
 function Base.map(f,a::PArray,b::AbstractArray...)
-  @warn "Would like to deprecate this"
+  error("DEPRECATED")
   f1 = f(a[1],b...)
   array = Vector{typeof(f1)}(undef,length(a))
   @inbounds for i = eachindex(a)

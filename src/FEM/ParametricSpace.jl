@@ -249,12 +249,22 @@ function TransientPFunction(f::Function,r::TrivialPRealization,t)
   TransientPFunction(f,p,t)
 end
 
-function get_fields(f::AbstractPFunction)
-  fields = GenericField[]
-  for fi = f
-    push!(fields,GenericField(fi))
+function get_fields(f::AbstractPFunction,type=:GenericField;N=1)
+  if type == :GenericField
+    map(f) do fi
+      GenericField(fi)
+    end
+  elseif type == :ZeroField
+    map(f) do fi
+      ZeroField(fi)
+    end
+  elseif type == :FieldGradient
+    map(f) do fi
+      FieldGradient{N}(fi)
+    end
+  else
+    @notimplemented
   end
-  fields
 end
 
 function Arrays.evaluate!(cache,f::AbstractPFunction,x...)

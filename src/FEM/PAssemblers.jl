@@ -150,14 +150,29 @@ function collect_cell_vector_for_trian(
   [cell_vec_r],[rows]
 end
 
-@inline function Algebra._add_entries!(combine::Function,A::PTArray,vs,is,js)
+@inline function Algebra._add_entries!(combine::Function,A::PArray,vs::Nothing,is,js)
   for (lj,j) in enumerate(js)
     if j>0
       for (li,i) in enumerate(is)
         if i>0
-          for Ak in A
+          map(A) do A
+            add_entry!(combine,A,nothing,i,j)
+          end
+        end
+      end
+    end
+  end
+  A
+end
+
+@inline function Algebra._add_entries!(combine::Function,A::PArray,vs::PArray,is,js)
+  for (lj,j) in enumerate(js)
+    if j>0
+      for (li,i) in enumerate(is)
+        if i>0
+          map(A,vs) do A,vs
             vij = vs[li,lj]
-            add_entry!(combine,Ak,vij,i,j)
+            add_entry!(combine,A,vij,i,j)
           end
         end
       end
@@ -166,66 +181,23 @@ end
   A
 end
 
-@inline function Algebra._add_entries!(combine::Function,A::PTArray,vs::Nothing,is,js)
-  for (lj,j) in enumerate(js)
-    if j>0
-      for (li,i) in enumerate(is)
-        if i>0
-          for Ak in A
-            add_entry!(combine,Ak,nothing,i,j)
-          end
-        end
-      end
-    end
-  end
-  A
-end
-
-@inline function Algebra._add_entries!(combine::Function,A::PTArray,vs::PTArray,is,js)
-  for (lj,j) in enumerate(js)
-    if j>0
-      for (li,i) in enumerate(is)
-        if i>0
-          for (Ak,vsk) in zip(A,vs)
-            vijk = vsk[li,lj]
-            add_entry!(combine,Ak,vijk,i,j)
-          end
-        end
-      end
-    end
-  end
-  A
-end
-
-@inline function Algebra._add_entries!(combine::Function,A::PTArray,vs::Nothing,is)
+@inline function Algebra._add_entries!(combine::Function,A::PArray,vs::Nothing,is)
   for (li,i) in enumerate(is)
     if i>0
-      for Ak in A
-        add_entry!(Ak,nothing,i)
+      map(A) do A
+        add_entry!(A,nothing,i)
       end
     end
   end
   A
 end
 
-@inline function Algebra._add_entries!(combine::Function,A::PTArray,vs,is)
+@inline function Algebra._add_entries!(combine::Function,A::PArray,vs::PArray,is)
   for (li,i) in enumerate(is)
     if i>0
-      for Ak in A
+      map(A,vs) do A,vs
         vi = vs[li]
-        add_entry!(Ak,vi,i)
-      end
-    end
-  end
-  A
-end
-
-@inline function Algebra._add_entries!(combine::Function,A::PTArray,vs::PTArray,is)
-  for (li,i) in enumerate(is)
-    if i>0
-      for (Ak,vsk) in zip(A,vs)
-        vik = vsk[li]
-        add_entry!(Ak,vik,i)
+        add_entry!(A,vi,i)
       end
     end
   end

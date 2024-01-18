@@ -66,7 +66,9 @@ export recenter
 include("PArray.jl")
 
 export PField
+export PFieldGradient
 export PGenericField
+export PZeroField
 include("PField.jl")
 
 export PCellField

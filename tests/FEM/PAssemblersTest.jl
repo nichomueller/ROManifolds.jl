@@ -1,4 +1,4 @@
-# module SparseMatrixAssemblers
+module SparseMatrixAssemblers
 
 using Test
 using Gridap.Arrays
@@ -94,7 +94,7 @@ mtypes = [
   SymSparseMatrixCSR{0,Float64,Int},
   SymSparseMatrixCSR{1,Float64,Int}]
 
-# for T in mtypes
+for T in mtypes
   T = SparseMatrixCSC{Float64,Int}
   pmatrix_type = typeof(PArray{T}(undef,3))
   pvector_type = typeof(PArray{Vector{Float64}}(undef,3))
@@ -107,39 +107,6 @@ mtypes = [
   assem = SparseMatrixAssembler(pmatrix_type,pvector_type,U,V)
   @test isa(assem,SparseMatrixPAssembler)
   test_sparse_matrix_assembler(assem,matdata,vecdata,data)
-
-  @inline function Algebra._add_entries!(combine::Function,A,vs::Nothing,is,js)
-    println(typeof(A))
-    for (lj,j) in enumerate(js)
-      if j>0
-        for (li,i) in enumerate(is)
-          if i>0
-            add_entry!(combine,A,nothing,i,j)
-          end
-        end
-      end
-    end
-    A
-  end
-
-  # A = allocate_matrix(assem,matdata)
-  m1 = nz_counter(get_matrix_builder(assem),(get_rows(assem),get_cols(assem)))
-  symbolic_loop_matrix!(m1,assem,matdata)
-  m2 = nz_allocation(m1)
-  symbolic_loop_matrix!(m2,assem,matdata)
-  m3 = create_from_nz(m2)
-
-  getter(a) = map(first,a.array)
-  lazy_getter(a) = lazy_map(getter,a)
-  A = SparseMatrixAssembler(T,Vector{Float64},V,V)
-  terms = [lazy_getter(cellmat_rc), lazy_getter(bcellmat_rc), b0cellmat_rc]
-  mdata = (terms,term_to_rows,term_to_cols)
-
-  n1 = nz_counter(get_matrix_builder(A),(get_rows(A),get_cols(A)))
-  symbolic_loop_matrix!(n1,A,mdata)
-  n2 = nz_allocation(n1)
-  symbolic_loop_matrix!(n2,A,mdata)
-  n3 = create_from_nz(n2)
 
   strategy = GenericAssemblyStrategy(row->row,col->col,row->true,col->true)
 
@@ -163,6 +130,7 @@ mtypes = [
   @test typeof(x) == typeof(x2) == typeof(vec) == pvector_type
 
   for (i,μi) = enumerate(μ)
+    μi = sum(μi)
     @test vec[i] ≈ [0.0625, 0.125, 0.0625]*μi
     @test mat[i][1, 1]  ≈  1.333333333333333*μi
     @test mat[i][2, 1]  ≈ -0.33333333333333*μi
@@ -179,6 +147,7 @@ mtypes = [
   assemble_matrix_and_vector!(mat,vec,assem,data)
 
   for (i,μi) = enumerate(μ)
+    μi = sum(μi)
     @test vec[i] ≈ [0.0625, 0.125, 0.0625]*μi
     @test mat[i][1, 1]  ≈  1.333333333333333*μi
     @test mat[i][2, 1]  ≈ -0.33333333333333*μi
@@ -193,6 +162,7 @@ mtypes = [
   @test x ≈ x4
 
   for (i,μi) = enumerate(μ)
+    μi = sum(μi)
     @test vec[i] ≈ [0.0625, 0.125, 0.0625]*μi
     @test mat[i][1, 1]  ≈  1.333333333333333*μi
     @test mat[i][2, 1]  ≈ -0.33333333333333*μi
@@ -204,10 +174,11 @@ mtypes = [
   @test x ≈ x4
 
   for (i,μi) = enumerate(μ)
+    μi = sum(μi)
     @test vec[i] ≈ [0.0625, 0.125, 0.0625]*μi
     @test mat[i][1, 1]  ≈  1.333333333333333*μi
     @test mat[i][2, 1]  ≈ -0.33333333333333*μi
   end
-# end
+end
 
-# end
+end

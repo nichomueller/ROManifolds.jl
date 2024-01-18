@@ -1,11 +1,5 @@
 abstract type PCellField <: CellField end
 
-function CellData.CellField(f::AbstractPFunction,trian::Triangulation,::DomainStyle)
-  s = size(get_cell_map(trian))
-  cell_field = Fill(PGenericField(f),s)
-  GenericCellField(cell_field,trian,PhysicalDomain())
-end
-
 struct SingleFieldPFEFunction{T<:CellField} <: PCellField
   cell_field::T
   cell_dof_values::AbstractArray{<:PArray{<:AbstractVector{<:Number}}}
@@ -56,7 +50,7 @@ function Base.iterate(f::GenericCellField)
   trian = get_triangulation(f)
   DS = DomainStyle(f)
   index = 1
-  final_index = length(first.(data))
+  final_index = length(first(data))
   di = getindex.(data,index)
   state = (index,final_index,data,trian,DS)
   GenericCellField(di,trian,DS),state

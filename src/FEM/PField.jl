@@ -1,24 +1,32 @@
-abstract type PField <: Field end
-
-struct PGenericField <: PField
-  fields::AbstractVector{GenericField}
+struct PField{F} <: Field
+  fields::AbstractVector{F}
 end
 
-PGenericField(f::AbstractPFunction) = PGenericField(get_fields(f))
+const PFieldGradient = PField{FieldGradient{N,F}} where {N,F}
+const PGenericField = PField{GenericField{T}} where T
+const PZeroField = PField{ZeroField{F}} where F
 
-Base.size(f::PGenericField) = size(f.fields)
-Base.length(f::PGenericField) = length(f.fields)
-Base.eachindex(f::PGenericField) = eachindex(f.fields)
-Base.IndexStyle(::Type{<:PGenericField}) = IndexLinear()
-Base.getindex(f::PGenericField,i::Integer) = GenericField(f.fields[i])
+CellData.FieldGradient{N}(f::PField) where N = PField(FieldGradient{N}.(f.fields))
+CellData.FieldGradient{N}(f::AbstractPFunction) where N = PField(get_fields(f,:FieldGradient;N))
+CellData.GenericField(f::AbstractPFunction) = PField(get_fields(f,:GenericField))
+CellData.ZeroField(f::AbstractPFunction) = PField(get_fields(f,:ZeroField))
 
-function Arrays.testitem(f::PGenericField)
-  f[1]
-end
+Fields.gradient(f::PField) = FieldGradient{1}(f)
+
+Base.size(f::PField) = size(f.fields)
+Base.length(f::PField) = length(f.fields)
+Base.eachindex(f::PField) = eachindex(f.fields)
+Base.IndexStyle(::Type{<:PField}) = IndexLinear()
+Base.getindex(f::PFieldGradient{N,F} where F,i::Integer) where N = f.fields[i]
+Base.getindex(f::PGenericField,i::Integer) = f.fields[i]
+Base.getindex(f::PZeroField,i::Integer) = f.fields[i]
+Arrays.testitem(f::PField) = f[1]
 
 for T in (:Point,:(AbstractArray{<:Point}))
   @eval begin
-    function Arrays.return_cache(f::PGenericField,x::$T)
+    Arrays.testargs(f::PField,x::$T) = testargs(f[1],x)
+
+    function Arrays.return_cache(f::PField,x::$T)
       fi = testitem(f)
       li = return_cache(fi,x)
       fix = evaluate!(li,fi,x)
@@ -30,7 +38,7 @@ for T in (:Point,:(AbstractArray{<:Point}))
       PArray(g),l
     end
 
-    function Arrays.evaluate!(cache,f::PGenericField,x::$T)
+    function Arrays.evaluate!(cache,f::PField,x::$T)
       g,l = cache
       for i in eachindex(f.fields)
         g.array[i] = evaluate!(l[i],f.fields[i],x)
@@ -42,7 +50,7 @@ end
 
 function Arrays.return_value(
   b::LagrangianDofBasis,
-  field::OperationField{<:PGenericField})
+  field::OperationField{<:PField})
 
   f1 = OperationField(testitem(field.op),field.fields)
   v1 = return_value(b,f1)
@@ -51,7 +59,7 @@ end
 
 function Arrays.return_cache(
   b::LagrangianDofBasis,
-  field::OperationField{<:PGenericField})
+  field::OperationField{<:PField})
 
   f1 = OperationField(field.op[1],field.fields)
   c1 = return_cache(b,f1)
@@ -68,7 +76,7 @@ end
 function Arrays.evaluate!(
   cache,
   b::LagrangianDofBasis,
-  field::OperationField{<:PGenericField})
+  field::OperationField{<:PField})
 
   cf,array = cache
   @inbounds for i = eachindex(array)
