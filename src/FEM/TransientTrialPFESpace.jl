@@ -76,18 +76,12 @@ Functor-like evaluation. It allocates Dirichlet vals in general.
 """
 Time derivative of the Dirichlet functions
 """
-∂ₚt(U::TransientTrialPFESpace) = TransientTrialPFESpace(U.space,∂ₚt.(U.dirichlet_pt))
-∂ₚt(U::SingleFieldFESpace) = HomogeneousTrialFESpace(U)
-∂ₚt(U::MultiFieldFESpace) = MultiFieldFESpace(∂t.(U.spaces))
-∂ₚt(t::T) where T<:Number = zero(T)
+ODETools.∂t(U::TransientTrialPFESpace) = TransientTrialPFESpace(U.space,∂t.(U.dirichlet_pt))
 
 """
 Time 2nd derivative of the Dirichlet functions
 """
-∂ₚtt(U::TransientTrialPFESpace) = TransientTrialPFESpace(U.space,∂ₚtt.(U.dirichlet_pt))
-∂ₚtt(U::SingleFieldFESpace) = HomogeneousTrialFESpace(U)
-∂ₚtt(U::MultiFieldFESpace) = MultiFieldFESpace(∂tt.(U.spaces))
-∂ₚtt(t::T) where T<:Number = zero(T)
+ODETools.∂tt(U::TransientTrialPFESpace) = TransientTrialPFESpace(U.space,∂tt.(U.dirichlet_pt))
 
 FESpaces.zero_free_values(f::TransientTrialPFESpace) = zero_free_values(f.space)
 FESpaces.has_constraints(f::TransientTrialPFESpace) = has_constraints(f.space)
@@ -192,10 +186,12 @@ end
 (U::TransientMultiFieldTrialPFESpace)(p,t) = evaluate(U,p,t)
 (U::TransientMultiFieldTrialPFESpace)(r) = evaluate(U,r)
 
-function ∂ₚt(U::TransientMultiFieldTrialPFESpace)
-  spaces = ∂ₚt.(U.spaces)
+function ODETools.∂t(U::TransientMultiFieldTrialPFESpace)
+  spaces = ∂t.(U.spaces)
   TransientMultiFieldPFESpace(spaces;style=style=MultiFieldStyle(U))
 end
+
+ODETools.∂tt(U::TransientMultiFieldTrialPFESpace) = ∂t(∂t(U))
 
 function FESpaces.zero_free_values(
   f::TransientMultiFieldTrialPFESpace{<:BlockMultiFieldStyle{NB,SB,P}}) where {NB,SB,P}

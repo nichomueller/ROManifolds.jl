@@ -1,34 +1,22 @@
-function p_time_derivative(f::Function)
-  function p_time_derivative_f(x,μ,t)
-    fxt = zero(return_type(f,x,μ,t))
-    _p_time_derivative_f(f,x,μ,t,fxt)
-  end
-  p_time_derivative_f(x::VectorValue) = (μ,t) -> p_time_derivative_f(x,μ,t)
-  p_time_derivative_f(μ,t) = x -> p_time_derivative_f(x,μ,t)
-end
-
-function p_time_derivative(f::TransientPFunction)
+function ODETools.∂t(f::TransientPFunction)
   @unpack fun,params,times = f
-  dft = p_time_derivative(fun)
-  TransientPFunction(dft,params,times)
+  function ∂ₚt(x,μ,t)
+    fxt = zero(return_type(fun,x,μ,t))
+    _∂ₚt(fun,x,μ,t,fxt)
+  end
+  ∂ₚt(x::VectorValue) = (μ,t) -> ∂ₚt(x,μ,t)
+  ∂ₚt(μ,t) = x -> ∂ₚt(x,μ,t)
+  return TransientPFunction(∂ₚt,params,times)
 end
 
-function _p_time_derivative_f(f,x,μ,t,::Any)
+function _∂ₚt(f,x,μ,t,::Any)
   derivative(t->f(μ,t)(x),t)
 end
 
-function _p_time_derivative_f(f,x,μ,t,::VectorValue)
+function _∂ₚt(f,x,μ,t,::VectorValue)
   VectorValue(derivative(t->get_array(f(μ,t)(x)),t))
 end
 
-function _p_time_derivative_f(f,x,μ,t,::TensorValue)
+function _∂ₚt(f,x,μ,t,::TensorValue)
   TensorValue(derivative(t->get_array(f(μ,t)(x)),t))
 end
-
-const ∂ₚt = p_time_derivative
-
-∂ₚtt(f::Function) = ∂ₚt(∂ₚt(f))
-
-# Default
-∂ₚt(f) = ∂t(f)
-∂ₚtt(f) = ∂tt(f)

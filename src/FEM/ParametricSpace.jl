@@ -10,6 +10,7 @@ num_parameters(r::PRealization) = length(_get_parameters(r))
 num_parameters(r::TrivialPRealization) = 1
 Base.length(r::PRealization) = num_parameters(r)
 Base.size(r::PRealization) = (length(r),)
+# Base.getindex(r::PRealization,index) = getindex(_get_parameters(r),index)
 
 # when iterating over a PRealization{P}, we return return eltype(P) ∀ index i
 function Base.iterate(r::TrivialPRealization)
@@ -51,6 +52,12 @@ get_times(r::TransientPRealization) = r.times[]
 num_times(r::TransientPRealization) = length(get_times(r))
 Base.length(r::TransientPRealization) = num_parameters(r)*num_times(r)
 Base.size(r::TransientPRealization) = (length(r),)
+
+# function Base.getindex(r::TransientPRealization,index)
+#   times_params = Iterators.product(get_times(r),get_parameters(r)) |> collect
+#   times,params = times_params[index] |> tuple_of_arrays
+#   params,times
+# end
 
 function Base.iterate(r::TransientPRealization)
   iterator = Iterators.product(get_times(r),get_parameters(r))
@@ -181,6 +188,8 @@ _get_parameters(f::PFunction) = _get_parameters(f.params)
 num_parameters(f::PFunction) = length(_get_parameters(f))
 Base.length(f::PFunction) = num_parameters(f)
 Base.size(f::PFunction) = (length(f),)
+# Base.getindex(f::PFunction,index::Integer) = f.fun(get_parameters(r)[index])
+# Base.getindex(f::PFunction,index::AbstractVector) = map(f.fun,get_parameters(r)[index])
 
 # when iterating over a PFunction{P}, we return return f(eltype(P)) ∀ index i
 function Base.iterate(f::PFunction,state...)
@@ -215,6 +224,16 @@ get_times(f::TransientPFunction) = f.times
 num_times(f::TransientPFunction) = length(get_times(f))
 Base.length(f::TransientPFunction) = num_parameters(f)*num_times(f)
 Base.size(f::TransientPFunction) = (length(f),)
+
+# function Base.getindex(f::TransientPFunction,index)
+#   times_params = Iterators.product(get_times(f),get_parameters(f)) |> collect
+#   times,params = times_params[index] |> tuple_of_arrays
+#   if isa(index,Integer)
+#     f.fun(params,times)
+#   else
+#     map(f.fun,(params,times))
+#   end
+# end
 
 function Base.iterate(f::TransientPFunction)
   iterator = Iterators.product(get_times(f),get_parameters(f))
@@ -295,11 +314,13 @@ function test_parametric_space()
   μ = realization(p)
   μt = realization(pt)
   @test isa(μ,PRealization) && isa(μt,TransientPRealization)
-  a(x,μ,t) = sum(x)*sum(μ)*t
-  a(μ,t) = x -> a(x,μ,t)
-  da = ∂ₚt(a)
-  aμt = 𝑓ₚₜ(a,get_parameters(μt),get_times(μt))
-  daμt = ∂ₚt(aμt)
+  a(x,t) = sum(x)*t^2*sin(t)
+  a(t) = x -> a(x,t)
+  da = ∂t(a)
+  aμ(x,μ,t) = sum(μ)*a(x,t)
+  aμ(μ,t) = x -> aμ(x,μ,t)
+  aμt = 𝑓ₚₜ(aμ,get_parameters(μt),get_times(μt))
+  daμt = ∂t(aμt)
   @test isa(𝑓ₚₜ(a,α,t),Function)
   @test isa(aμt,AbstractPFunction)
   @test isa(daμt,AbstractPFunction)
@@ -307,8 +328,8 @@ function test_parametric_space()
   aμtx = aμt(x)
   daμtx = daμt(x)
   for (i,(μ,t)) in enumerate(μt)
-    @test aμtx[i] == a(μ,t)(x)
-    @test daμtx[i] == da(μ,t)(x)
+    @test aμtx[i] == a(t)(x)*sum(μ)
+    @test daμtx[i] == da(t)(x)*sum(μ)
   end
   b(x,μ) = sum(x)*sum(μ)
   b(μ) = x -> b(x,μ)

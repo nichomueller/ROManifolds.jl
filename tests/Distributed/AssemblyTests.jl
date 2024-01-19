@@ -96,7 +96,7 @@ end
 u = zero_free_values(trial(params,times))
 u .= one(Float64)
 xh = compute_xh(feop,params,times,(u,u))
-int_vec = ∫(dv*∂ₚt(xh))dΩ + ∫(aμt(params,times)*∇(dv)⋅∇(xh))dΩ
+int_vec = ∫(dv*∂t(xh))dΩ + ∫(aμt(params,times)*∇(dv)⋅∇(xh))dΩ
 vecdata = collect_cell_vector(test,int_vec)
 b = zero_free_values(trial(params,times))
 assemble_vector_add!(b,feop.assem,vecdata)

@@ -6,18 +6,9 @@ end
 function TransientPFESolution(
   solver::ODESolver,
   op::TransientPFEOperator,
-  uh0;
-  kwargs...)
-
-  r = realization(op.tpspace;kwargs...)
-  TransientPFESolution(solver,op,uh0,r)
-end
-
-function TransientPFESolution(
-  solver::ODESolver,
-  op::TransientPFEOperator,
   uh0,
-  r::TransientPRealization)
+  r = realization(op.tpspace;kwargs...);
+  kwargs...)
 
   params = get_parameters(r)
   ode_op = get_algebraic_operator(op)
@@ -61,7 +52,8 @@ end
 function Algebra.solve(
   solver::ODESolver,
   op::TransientPFEOperator,
-  uh0;
+  uh0,
+  args...;
   kwargs...)
-  TransientPFESolution(solver,op,uh0)
+  TransientPFESolution(solver,op,uh0,args...;kwargs...)
 end

@@ -249,7 +249,7 @@ function Arrays.CachedArray(a::PArray)
   ci = CachedArray(ai)
   array = Vector{typeof(ci)}(undef,length(a))
   @inbounds for i in eachindex(a)
-    array[i] = CachedArray(a.array[i])
+    array[i] = CachedArray(a[i])
   end
   PArray(array)
 end
@@ -259,7 +259,7 @@ function Arrays.setsize!(
   s::NTuple{N,Int}) where {T,N}
 
   map(a) do a
-    setsize!(a.array[i],s)
+    setsize!(a[i],s)
   end
 end
 

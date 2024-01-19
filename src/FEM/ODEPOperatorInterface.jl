@@ -20,7 +20,7 @@ function TransientFETools.allocate_cache(
   Uts = (Upt,)
   Us = (U,)
   for i in 1:get_order(op)
-    Uts = (Uts...,∂ₚt(Uts[i]))
+    Uts = (Uts...,∂t(Uts[i]))
     Us = (Us...,allocate_trial_space(Uts[i+1],r))
   end
   fecache = allocate_cache(op.feop)

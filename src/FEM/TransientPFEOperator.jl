@@ -32,14 +32,14 @@ function AffineTransientPFEOperator(
   res::Function,jac::Function,jac_t::Function,tpspace,trial,test)
   assem = SparseMatrixAssembler(trial,test)
   TransientPFEOperatorFromWeakForm{Affine}(
-    res,(jac,jac_t),assem,tpspace,(trial,∂ₚt(trial)),test,1)
+    res,(jac,jac_t),assem,tpspace,(trial,∂t(trial)),test,1)
 end
 
 function TransientPFEOperator(
   res::Function,jac::Function,jac_t::Function,tpspace,trial,test)
   assem = SparseMatrixAssembler(trial,test)
   TransientPFEOperatorFromWeakForm{Nonlinear}(
-    res,(jac,jac_t),assem,tpspace,(trial,∂ₚt(trial)),test,1)
+    res,(jac,jac_t),assem,tpspace,(trial,∂t(trial)),test,1)
 end
 
 struct NonlinearTransientPFEOperator <: TransientPFEOperator{Nonlinear}
@@ -101,7 +101,7 @@ end
 FESpaces.get_test(op::TransientPFEOperatorFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientPFEOperatorFromWeakForm) = op.trials[1]
 ReferenceFEs.get_order(op::TransientPFEOperatorFromWeakForm) = op.order
-realization(op::TransientPFEOperatorFromWeakForm,args...) = realization(op.tpspace,args...)
+realization(op::TransientPFEOperatorFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
 
 function FESpaces.SparseMatrixAssembler(
   trial::TransientTrialPFESpace,

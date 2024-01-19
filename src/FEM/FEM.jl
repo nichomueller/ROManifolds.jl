@@ -54,8 +54,6 @@ export get_times
 export get_fields
 include("ParametricSpace.jl")
 
-export ∂ₚt
-export ∂ₚtt
 include("PDiffOperators.jl")
 
 export PArray

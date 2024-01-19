@@ -31,8 +31,6 @@ export ParametricSpace
 export UniformSampling
 export NormalSampling
 export realization
-export ∂ₚt
-export ∂ₚtt
 export PArray
 export allocate_parray
 export zero_parray

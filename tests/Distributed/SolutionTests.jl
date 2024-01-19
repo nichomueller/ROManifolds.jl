@@ -129,7 +129,7 @@ function main(ranks)
   trial = TransientTrialPFESpace(test,g)
   pspace = ParametricSpace(fill([1.,10.],3))
 
-  res(μ,t,u,v) = ∫(v*∂ₚt(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
+  res(μ,t,u,v) = ∫(v*∂t(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
   jac(μ,t,u,du,v) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
   jac_t(μ,t,u,dut,v) = ∫(v*dut)dΩ
 

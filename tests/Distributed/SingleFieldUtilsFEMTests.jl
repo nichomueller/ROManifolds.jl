@@ -70,7 +70,7 @@ pspace = ParametricSpace(fill([1.,10.],3))
 dv = get_fe_basis(test)
 du = get_trial_fe_basis(trial0)
 
-res(μ,t,u,v) = ∫(v*∂ₚt(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
+res(μ,t,u,v) = ∫(v*∂t(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
 jac(μ,t,u,du,v) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
 jac_t(μ,t,u,dut,v) = ∫(v*dut)dΩ
 
