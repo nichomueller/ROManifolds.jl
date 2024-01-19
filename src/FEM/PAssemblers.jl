@@ -165,6 +165,22 @@ end
   A
 end
 
+@inline function Algebra._add_entries!(combine::Function,A::PArray,vs,is,js)
+  for (lj,j) in enumerate(js)
+    if j>0
+      for (li,i) in enumerate(is)
+        if i>0
+          map(A) do A
+            vij = vs[li,lj]
+            add_entry!(combine,A,vij,i,j)
+          end
+        end
+      end
+    end
+  end
+  A
+end
+
 @inline function Algebra._add_entries!(combine::Function,A::PArray,vs::PArray,is,js)
   for (lj,j) in enumerate(js)
     if j>0
@@ -186,6 +202,18 @@ end
     if i>0
       map(A) do A
         add_entry!(A,nothing,i)
+      end
+    end
+  end
+  A
+end
+
+@inline function Algebra._add_entries!(combine::Function,A::PArray,vs,is)
+  for (li,i) in enumerate(is)
+    if i>0
+      map(A) do A
+        vi = vs[li]
+        add_entry!(A,vi,i)
       end
     end
   end

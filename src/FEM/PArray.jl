@@ -75,6 +75,7 @@ function Base.zero(a::PArray)
   T = eltype(a)
   b = similar(a)
   b .= zero(T)
+  b
 end
 
 function Base.zeros(a::PArray)
@@ -95,28 +96,20 @@ function Base.sum(a::PArray)
   sum(get_array(a))
 end
 
-for op in (:+,:-)
-  @eval begin
-    function ($op)(a::PArray{T},b::PArray{T}) where T
-      array = ($op)(get_array(a),get_array(b))
-      PArray(array)
-    end
+function Base.:+(a::T,b::T) where {T<:PArray}
+  map(a,b) do a,b
+    a+b
+  end
+end
 
-    function ($op)(a::PArray{T},b::AbstractArray{T}) where T
-      array = ($op)(get_array(a),b)
-      PArray(array)
-    end
-
-    function ($op)(a::AbstractArray{T},b::PArray{T}) where T
-      array = ($op)(a,get_array(b))
-      PArray(array)
-    end
+function Base.:-(a::T,b::T) where {T<:PArray}
+  map(a,b) do a,b
+    a-b
   end
 end
 
 function Base.:*(a::PArray,b::Number)
-  array = get_array(a)*b
-  PArray(array)
+  PArray(get_array(a)*b)
 end
 
 function Base.:*(a::Number,b::PArray)
@@ -124,71 +117,51 @@ function Base.:*(a::Number,b::PArray)
 end
 
 function Base.:\(a::PArray{<:AbstractMatrix},b::PArray{<:AbstractVector})
-  c = allocate_in_range(a)
-  @inbounds for i = eachindex(a)
-    c[i] = a[i] \ b[i]
+  map(a,b) do a,b
+    a\b
   end
-  c
 end
 
 function Base.:≈(a::PArray,b::PArray)
-  @assert size(a) == size(b)
-  for i in eachindex(a)
-    if !(a[i] ≈ b[i])
-      return false
-    end
+  bools = map(a,b) do a,b
+    a ≈ b
   end
-  true
+  all(bools)
 end
 
 function Base.:(==)(a::PArray,b::PArray)
-  @assert size(a) == size(b)
-  for i in eachindex(a)
-    if !(a[i] == b[i])
-      return false
-    end
+  bools = map(a,b) do a,b
+    a == b
   end
-  true
+  all(bools)
 end
 
 function Base.transpose(a::PArray)
   map(transpose,a)
 end
 
-function Base.hcat(a::PArray...)
-  n = length(first(a))
-  harray = map(1:n) do j
-    arrays = ()
-    @inbounds for i = eachindex(a)
-      arrays = (arrays...,a[i][j])
-    end
-    hcat(arrays...)
+function Base.stack(a::Tuple{Vararg{PArray{T,N,A,L}}}) where {T,N,A,L}
+  arrays = map(get_array,a)
+  array = map(1:L) do i
+    stack(map(b->getindex(b,i),arrays))
   end
-  PArray(harray)
+  PArray(array)
 end
 
-function Base.vcat(a::PArray...)
-  n = length(first(a))
-  varray = map(1:n) do j
-    arrays = ()
-    @inbounds for i = eachindex(a)
-      arrays = (arrays...,a[i][j])
-    end
-    vcat(arrays...)
+function Base.hcat(a::PArray{T,N,A,L}...) where {T,N,A,L}
+  arrays = map(get_array,a)
+  array = map(1:L) do i
+    hcat(map(b->getindex(b,i),arrays)...)
   end
-  PArray(varray)
+  PArray(array)
 end
 
-function Base.stack(a::PArray...)
-  n = length(first(a))
-  harray = map(1:n) do j
-    arrays = ()
-    @inbounds for i = eachindex(a)
-      arrays = (arrays...,a[i][j])
-    end
-    stack(arrays)
+function Base.vcat(a::PArray{T,N,A,L}...) where {T,N,A,L}
+  arrays = map(get_array,a)
+  array = map(1:L) do i
+    vcat(map(b->getindex(b,i),arrays)...)
   end
-  PArray(harray)
+  PArray(array)
 end
 
 function Base.hvcat(nblocks::Int,a::PArray...)
@@ -196,33 +169,30 @@ function Base.hvcat(nblocks::Int,a::PArray...)
   varray = map(1:nrows) do row
     vcat(a[(row-1)*nblocks+1:row*nblocks]...)
   end
-  hvarray = hcat(varray...)
-  hvarray
+  stack(varray)
 end
 
 function Base.fill!(a::PArray,z)
-  @inbounds for i = eachindex(a)
-    ai = a[i]
-    fill!(ai,z)
+  map(a) do a
+    fill!(a,z)
   end
 end
 
 function Base.maximum(f,a::PArray)
-  map(a) do ai
-    maximum(f,ai)
+  map(a) do a
+    maximum(f,a)
   end
 end
 
 function Base.minimum(f,a::PArray)
-  map(a) do ai
-    minimum(f,ai)
+  map(a) do a
+    minimum(f,a)
   end
 end
 
 function LinearAlgebra.fillstored!(a::PArray,z)
-  @inbounds for i = eachindex(a)
-    ai = a[i]
-    fillstored!(ai,z)
+  map(a) do a
+    fillstored!(a,z)
   end
 end
 
@@ -232,49 +202,45 @@ function LinearAlgebra.mul!(
   b::PArray,
   α::Number,β::Number)
 
-  @inbounds for i = eachindex(a)
-    ci,ai,bi = c[i],a[i],b[i]
-    mul!(ci,ai,bi,α,β)
+  map(c,a,b) do c,a,b
+    mul!(c,a,b,α,β)
   end
 end
 
 function LinearAlgebra.ldiv!(a::PArray,m::LU,b::PArray)
-  @inbounds for i = eachindex(a)
-    ai,bi = a[i],b[i]
-    ldiv!(ai,m,bi)
+  map(a,b) do a,b
+    ldiv!(a,m,b)
   end
 end
 
 function LinearAlgebra.ldiv!(a::PArray,m::AbstractArray,b::PArray)
-  @inbounds for i = eachindex(a)
-    ai,mi,bi = a[i],m[i],b[i]
-    ldiv!(ai,mi,bi)
+  @assert length(a) == length(m) == length(b)
+  map(a,m,b) do a,m,b
+    ldiv!(a,m,b)
   end
 end
 
 function LinearAlgebra.rmul!(a::PArray,b::Number)
-  @inbounds for i = eachindex(a)
-    ai = a[i]
-    rmul!(ai,b)
+  map(a) do a
+    rmul!(a,b)
   end
 end
 
 function LinearAlgebra.lu(a::PArray)
-  map(a) do ai
-    lu(ai)
+  map(a) do a
+    lu(a)
   end
 end
 
 function LinearAlgebra.lu!(a::PArray,b::PArray)
-  @inbounds for i = eachindex(a)
-    ai,bi = a[i],b[i]
-    lu!(ai,bi)
+  map(a,b) do a,b
+    lu!(a,b)
   end
 end
 
 function SparseArrays.resize!(a::PArray,args...)
-  map(a) do ai
-    resize!(ai,args...)
+  map(a) do a
+    resize!(a,args...)
   end
 end
 
@@ -292,7 +258,7 @@ function Arrays.setsize!(
   a::PArray{<:CachedArray{T,N}},
   s::NTuple{N,Int}) where {T,N}
 
-  @inbounds for i in eachindex(a)
+  map(a) do a
     setsize!(a.array[i],s)
   end
 end
@@ -303,60 +269,56 @@ function Base.map(f,a::PArray...)
   PArray(map(f,map(get_array,a)...))
 end
 
-function Base.map(f,a::PArray,b::AbstractArray...)
-  error("DEPRECATED")
-  f1 = f(a[1],b...)
-  array = Vector{typeof(f1)}(undef,length(a))
-  @inbounds for i = eachindex(a)
-    array[i] = f(a[i],b...)
-  end
-  PArray(array)
+struct PBroadcast{D}
+  dest::D
+end
+Arrays.get_array(a::PBroadcast) = a.dest
+
+function Base.broadcasted(f,args::Union{PArray,PBroadcast}...)
+  arrays = map(get_array,args)
+  g = (x...) -> map(f,(x...))
+  fargs = map((x...)->Base.broadcasted(g,x...),arrays...)
+  PBroadcast(fargs)
 end
 
-struct PTBroadcasted{T}
-  array::PArray{T}
-end
-_get_pta(a::PArray) = a
-_get_pta(a::PTBroadcasted) = a.array
-
-function Base.broadcasted(f,a::Union{PArray,PTBroadcasted}...)
-  pta = map(_get_pta,a)
-  PTBroadcasted(map(f,pta...))
+function Base.broadcasted(f,a::Number,b::Union{PArray,PBroadcast})
+  barray = get_array(b)
+  fab = map(x->Base.broadcasted(f,a,x),barray)
+  PBroadcast(fab)
 end
 
-function Base.broadcasted(f,a::Number,b::Union{PArray,PTBroadcasted})
-  PTBroadcasted(map(x->f(a,x),_get_pta(b)))
-end
-
-function Base.broadcasted(f,a::Union{PArray,PTBroadcasted},b::Number)
-  PTBroadcasted(map(x->f(x,b),_get_pta(a)))
+function Base.broadcasted(f,a::Union{PArray,PBroadcast},b::Number)
+  aarray = get_array(a)
+  fab = map(x->Base.broadcasted(f,x,b),aarray)
+  PBroadcast(fab)
 end
 
 function Base.broadcasted(
-  f,a::Union{PArray,PTBroadcasted},
-  b::Broadcast.Broadcasted{Broadcast.DefaultArrayStyle{0}})
+  f,
+  a::Union{PArray,PBroadcast},
+  b::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{0}})
   Base.broadcasted(f,a,Base.materialize(b))
 end
 
 function Base.broadcasted(
-  f,a::Broadcast.Broadcasted{Broadcast.DefaultArrayStyle{0}},
-  b::Union{PArray,PTBroadcasted})
+  f,
+  a::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{0}},
+  b::Union{PArray,PBroadcast})
   Base.broadcasted(f,Base.materialize(a),b)
 end
 
-function Base.materialize(b::PTBroadcasted{T}) where T
-  a = similar(b.array)
-  Base.materialize!(a,b)
-  a
+function Base.materialize(b::PBroadcast)
+  barray = get_array(b)
+  dest = map(Base.materialize,barray)
+  T = eltype(dest)
+  L = length(dest)
+  a = Vector{T}(undef,L)
+  Base.materialize!(a,dest)
+  PArray(a)
 end
 
-function Base.materialize!(a::PArray,b::Broadcast.Broadcasted)
-  map(x->Base.materialize!(x,b),a)
-  a
-end
-
-function Base.materialize!(a::PArray,b::PTBroadcasted)
-  map(Base.materialize!,a,b.array)
+function Base.materialize!(a::PArray,b::PBroadcast)
+  map(Base.materialize!,get_array(a),get_array(b))
   a
 end
 

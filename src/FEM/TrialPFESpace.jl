@@ -113,7 +113,7 @@ end
 
 function FESpaces.zero_free_values(f::TrialPFESpace)
   V = get_vector_type(f)
-  allocate_vector(V,num_dirichlet_dofs(f))
+  allocate_vector(V,num_free_dofs(f))
 end
 
 function FESpaces.zero_dirichlet_values(f::TrialPFESpace)
