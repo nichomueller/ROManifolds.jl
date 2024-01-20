@@ -990,6 +990,47 @@ end
 function Arrays.return_value(
   f::IntegrationMap,
   a::PArray,
+  w)
+
+  v1 = return_value(f,a[1],w)
+  array = Vector{typeof(v1)}(undef,length(a))
+  for i = eachindex(a)
+    array[i] = return_value(f,a[i],w)
+  end
+  PArray(array)
+end
+
+function Arrays.return_cache(
+  f::IntegrationMap,
+  a::PArray,
+  w)
+
+  c1 = return_cache(f,a[1],w)
+  b1 = evaluate!(c1,f,a[1],w)
+  cache = Vector{typeof(c1)}(undef,length(a))
+  array = Vector{typeof(b1)}(undef,length(a))
+  for i = eachindex(a)
+    cache[i] = return_cache(f,a[i],w)
+  end
+  cache,PArray(array)
+end
+
+function Arrays.evaluate!(
+  cache,
+  f::IntegrationMap,
+  a::PArray,
+  w)
+
+  cx,array = cache
+  @inbounds for i = eachindex(array)
+    array[i] = evaluate!(cx[i],f,a[i],w)
+  end
+  array
+end
+
+function Arrays.return_value(
+  f::IntegrationMap,
+  a::PArray,
   w,
   j::AbstractVector)
 

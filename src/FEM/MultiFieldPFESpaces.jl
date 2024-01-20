@@ -493,7 +493,7 @@ function Base.iterate(f::MultiFieldPFEFunction,state)
   states,statef = state
   iters = map(f->iterate(f.single_fe_functions,states))
   iterf = map(f->iterate(f.fe_space,statef))
-  if isnothing(iters) && isnothing(iterf)
+  if all(isnothing.(iters)) && all(isnothing.(iterf))
     return nothing
   end
   mfs,states = iters |> tuple_of_arrays

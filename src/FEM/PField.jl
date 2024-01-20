@@ -1,116 +1,250 @@
-# struct PField{F} <: Field
-#   fields::AbstractVector{F}
-# end
-
-# const PFieldGradient = PField{FieldGradient{N,F}} where {N,F}
-# const PGenericField = PField{GenericField{T}} where T
-# const PZeroField = PField{ZeroField{F}} where F
-
-# CellData.FieldGradient{N}(f::PField) where N = PField(FieldGradient{N}.(f.fields))
-# CellData.FieldGradient{N}(f::AbstractVector{<:PField}) where N = PField(FieldGradient{N}.(f.fields))
-# CellData.FieldGradient{N}(f::AbstractPFunction) where N = PField(get_fields(f,:FieldGradient;N))
-# CellData.GenericField(f::AbstractPFunction) = PField(get_fields(f,:GenericField))
-# CellData.ZeroField(f::AbstractPFunction) = PField(get_fields(f,:ZeroField))
-
-# Fields.gradient(f::PField) = FieldGradient{1}(f)
-# Fields.gradient(f::PFieldGradient{N}) where N = FieldGradient{N+1}(f.fields)
-
-# Base.size(f::PField) = size(f.fields)
-# Base.length(f::PField) = length(f.fields)
-# Base.eachindex(f::PField) = eachindex(f.fields)
-# Base.IndexStyle(::Type{<:PField}) = IndexLinear()
-# Base.getindex(f::PFieldGradient{N,F} where F,i::Integer) where N = f.fields[i]
-# Base.getindex(f::PGenericField,i::Integer) = f.fields[i]
-# Base.getindex(f::PZeroField,i::Integer) = f.fields[i]
-# Arrays.testitem(f::PField) = f[1]
-
-# for T in (:Point,:(AbstractArray{<:Point}))
-#   @eval begin
-#     Arrays.testargs(f::PField,x::$T) = testargs(f[1],x)
-
-#     function Arrays.return_cache(f::PField,x::$T)
-#       fi = testitem(f)
-#       li = return_cache(fi,x)
-#       fix = evaluate!(li,fi,x)
-#       l = Vector{typeof(li)}(undef,size(f.fields))
-#       g = Vector{typeof(fix)}(undef,size(f.fields))
-#       for i in eachindex(f.fields)
-#         l[i] = return_cache(f.fields[i],x)
-#       end
-#       PArray(g),l
-#     end
-
-#     function Arrays.evaluate!(cache,f::PField,x::$T)
-#       g,l = cache
-#       for i in eachindex(f.fields)
-#         g[i] = evaluate!(l[i],f.fields[i],x)
-#       end
-#       g
-#     end
-#   end
-# end
-
-# function Arrays.return_value(
-#   b::LagrangianDofBasis,
-#   field::OperationField{<:PField})
-
-#   f1 = OperationField(testitem(field.op),field.fields)
-#   v1 = return_value(b,f1)
-#   allocate_parray(v1,length(field.op))
-# end
-
-# function Arrays.return_cache(
-#   b::LagrangianDofBasis,
-#   field::OperationField{<:PField})
-
-#   f1 = OperationField(field.op[1],field.fields)
-#   c1 = return_cache(b,f1)
-#   a1 = evaluate!(c1,b,f1)
-#   cache = Vector{typeof(c1)}(undef,length(field.op))
-#   array = Vector{typeof(a1)}(undef,length(field.op))
-#   for i = eachindex(cache)
-#     fi = OperationField(field.op[i],field.fields)
-#     cache[i] = return_cache(b,fi)
-#   end
-#   cache,PArray(array)
-# end
-
-# function Arrays.evaluate!(
-#   cache,
-#   b::LagrangianDofBasis,
-#   field::OperationField{<:PField})
-
-#   cf,array = cache
-#   @inbounds for i = eachindex(array)
-#     fi = OperationField(field.op[i],field.fields)
-#     array[i] = evaluate!(cf[i],b,fi)
-#   end
-#   array
-# end
 abstract type PField <: Field end
 
-Base.length(f::PField) = 1
-Base.size(f::PField) = ()
-Base.axes(f::PField) = ()
-Base.IteratorSize(::Type{<:Field}) = Base.HasShape{0}()
-Base.eltype(::Type{T}) where T<:Field = T
-Base.iterate(af::PField) = (a,nothing)
-Base.iterate(af::PField,::Nothing) = nothing
-Base.getindex(af::PField,i::Integer) =  (@check i == 1; a)
-
-struct PGenericField{T<:AbstractPFunction} <: PField
+struct GenericPField{T<:AbstractPFunction} <: PField
   object::T
 end
 
-CellData.GenericField(f::AbstractPFunction) = PField(f)
+Fields.GenericField(f::AbstractPFunction) = GenericPField(f)
+Base.length(f::GenericPField) = length(f.object)
+Arrays.testitem(f::GenericPField) = GenericField(testitem(f.object))
 
-Base.length(f::PGenericField) = length(f.object)
-Base.size(f::PGenericField) = (length(f),)
-Base.iterate(f::PGenericField,it...) = iterate(f.object,it...)
-Base.testitem(f::PGenericField) =
+function Base.iterate(f::GenericPField,oldstate...)
+  it = iterate(f.object,oldstate...)
+  if isnothing(it)
+    return nothing
+  end
+  fit,nextstate = it
+  GenericField(fit),nextstate
+end
 
-CellData.FieldGradient{N}(f::PField) where N = PField(FieldGradient{N}.(f.fields))
-CellData.FieldGradient{N}(f::AbstractVector{<:PField}) where N = PField(FieldGradient{N}.(f.fields))
-CellData.FieldGradient{N}(f::AbstractPFunction) where N = PField(get_fields(f,:FieldGradient;N))
+struct PFieldGradient{N,F} <: PField
+  object::F
+  PFieldGradient{N}(object::F) where {N,F} = new{N,F}(object)
+end
 
-CellData.ZeroField(f::AbstractPFunction) = PField(get_fields(f,:ZeroField))
+Fields.FieldGradient{N}(f::PField) where N = PFieldGradient{N}(f)
+Fields.FieldGradient{N}(f::PFieldGradient{N}) where N = PFieldGradient{N+1}(f.object)
+Base.length(f::PFieldGradient) = length(f.object)
+Arrays.testitem(f::PFieldGradient{N}) where N = FieldGradient{N}(testitem(f.object))
+Arrays.testvalue(::Type{PFieldGradient{N,T}}) where {N,T} = PFieldGradient{N}(testvalue(T))
+
+function Base.iterate(f::PFieldGradient{N},oldstate...) where N
+  it = iterate(f.object,oldstate...)
+  if isnothing(it)
+    return nothing
+  end
+  fit,nextstate = it
+  FieldGradient{N}(fit),nextstate
+end
+
+struct ZeroPField{F} <: PField
+  field::F
+end
+
+Base.zero(f::PField) = ZeroPField(f)
+Fields.ZeroField(f::PField) = ZeroPField(f)
+Base.length(f::ZeroPField) = length(f.field)
+Arrays.testitem(f::ZeroPField) = ZeroField(testitem(f.field))
+Arrays.testvalue(::Type{ZeroPField{F}}) where F = ZeroPField(testvalue(F))
+Fields.gradient(f::ZeroPField) = ZeroPField(gradient(f.field))
+
+function Base.iterate(f::ZeroPField,oldstate...)
+  it = iterate(f.field,oldstate...)
+  if isnothing(it)
+    return nothing
+  end
+  fit,nextstate = it
+  ZeroField(fit),nextstate
+end
+
+struct ConstantPField{T<:Number} <: PField
+  value::AbstractVector{T}
+end
+
+Fields.ConstantField(a::AbstractVector{T}) where T<:Number = ConstantPField(a)
+Base.zero(::Type{ConstantPField{T}}) where T = ConstantField(zero.(T))
+Base.length(f::ConstantPField) = length(f.value)
+Arrays.testitem(f::ConstantPField) = ConstantField(testitem(f.value))
+
+function Base.iterate(f::ConstantPField,oldstate...)
+  it = iterate(f.value,oldstate...)
+  if isnothing(it)
+    return nothing
+  end
+  fit,nextstate = it
+  ConstantField(fit),nextstate
+end
+
+struct OperationPField{O,F} <: PField
+  op::O
+  fields::F
+end
+
+Fields.OperationField(op,fields::Tuple{Vararg{PField}}) = OperationPField(op,fields)
+function Base.length(f::OperationPField)
+  L = map(length,f.fields)
+  @check all(L .== first(L))
+  first(L)
+end
+Arrays.testitem(f::OperationPField) = Fields.OperationField(f.op,map(testitem,f.fields))
+
+function Base.iterate(f::OperationPField,oldstate...)
+  it = iterate.(f.fields,oldstate...)
+  if all(isnothing.(it))
+    return nothing
+  end
+  fit,nextstate = it |> tuple_of_arrays
+  Fields.OperationField(f.op,fit),nextstate
+end
+
+for op in (:+,:-)
+  @eval begin
+    function Fields.gradient(a::OperationPField{typeof($op)})
+      f = a.fields
+      g = map(gradient,f)
+      $op(g...)
+    end
+  end
+end
+
+for op in (:*,:⋅)
+  @eval begin
+     function Fields.product_rule(::typeof($op),args::AbstractVector{<:Number}...)
+       map((x...) -> Fields.product_rule($op,x...),args...)
+     end
+  end
+end
+
+for op in (:*,:⋅,:⊙,:⊗)
+  @eval begin
+    function Fields.gradient(a::OperationPField{typeof($op)})
+      f = a.fields
+      @notimplementedif length(f) != 2
+      f1,f2 = f
+      g1,g2 = map(gradient,f)
+      k(F1,F2,G1,G2) = Fields.product_rule($op,F1,F2,G1,G2)
+      Operation(k)(f1,f2,g1,g2)
+    end
+  end
+end
+
+function Fields.gradient(f::OperationPField{<:Field})
+  a = f.op
+  @notimplementedif length(f.fields) != 1
+  b, = f.fields
+  x = ∇(a)∘b
+  y = ∇(b)
+  y⋅x
+end
+
+struct VoidPField{F} <: PField
+  field::F
+  isvoid::Bool
+end
+
+Fields.VoidField(field::PField,isvoid::Bool) = VoidPField(field,isvoid)
+Base.length(f::VoidPField) = length(f.field)
+Arrays.testitem(f::VoidPField) = VoidField(testitem(f.field),f.isvoid)
+Fields.gradient(f::VoidPField) = VoidPField(gradient(f.field),f.isvoid)
+
+function Base.iterate(f::VoidPField,oldstate...)
+  it = iterate(f.field,oldstate...)
+  if isnothing(it)
+    return nothing
+  end
+  fit,nextstate = it
+  VoidField(fit,f.isvoid),nextstate
+end
+
+# common functions among PFields
+Base.size(f::PField) = (length(f),)
+Base.eltype(f::PField) = typeof(testitem(f))
+
+function Base.map(f::PField,x::AbstractArray{<:Point})
+  fi = testitem(f)
+  vi = map(fi,x)
+  array = Vector{typeof(vi)}(undef,length(f))
+  for (i,fi) in enumerate(f)
+    array[i] = map(fi,x)
+  end
+  PArray(array)
+end
+
+Base.broadcasted(f::PField,x::AbstractArray{<:Point}) = map(f,x)
+
+for T in (:Point,:(AbstractArray{<:Point}))
+  @eval begin
+    Arrays.testargs(f::PField,x::$T) = testargs(testitem(f),x)
+
+    function Arrays.return_value(f::PField,x::$T)
+      fi = testitem(f)
+      vi = return_value(fi,x)
+      array = Vector{typeof(vi)}(undef,length(f))
+      for (i,fi) in enumerate(f)
+        array[i] = return_value(fi,x)
+      end
+      PArray(array)
+    end
+
+    function Arrays.return_cache(f::PField,x::$T)
+      fi = testitem(f)
+      li = return_cache(fi,x)
+      fix = evaluate!(li,fi,x)
+      l = Vector{typeof(li)}(undef,length(f))
+      g = Vector{typeof(fix)}(undef,length(f))
+      for (i,fi) in enumerate(f)
+        l[i] = return_cache(fi,x)
+      end
+      l,PArray(g)
+    end
+
+    function Arrays.evaluate!(cache,f::PField,x::$T)
+      l,g = cache
+      for (i,fi) in enumerate(f)
+        g[i] = evaluate!(l[i],fi,x)
+      end
+      g
+    end
+  end
+end
+
+function Arrays.return_value(
+  b::LagrangianDofBasis,
+  field::OperationField{<:PField})
+
+  @error "deprecate"
+  f1 = OperationField(testitem(field.op),field.fields)
+  v1 = return_value(b,f1)
+  allocate_parray(v1,length(field.op))
+end
+
+function Arrays.return_cache(
+  b::LagrangianDofBasis,
+  field::OperationField{<:PField})
+
+  @error "deprecate"
+  f1 = OperationField(field.op[1],field.fields)
+  c1 = return_cache(b,f1)
+  a1 = evaluate!(c1,b,f1)
+  cache = Vector{typeof(c1)}(undef,length(field.op))
+  array = Vector{typeof(a1)}(undef,length(field.op))
+  for (i,opi) = enumerate(field.op)
+    fi = OperationField(opi,field.fields)
+    cache[i] = return_cache(b,fi)
+  end
+  cache,PArray(array)
+end
+
+function Arrays.evaluate!(
+  cache,
+  b::LagrangianDofBasis,
+  field::OperationField{<:PField})
+
+  @error "deprecate"
+  cf,array = cache
+  @inbounds for (i,opi) = enumerate(field.op)
+    fi = OperationField(opi,field.fields)
+    array[i] = evaluate!(cf[i],b,fi)
+  end
+  array
+end

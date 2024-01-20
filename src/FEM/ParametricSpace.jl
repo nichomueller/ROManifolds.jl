@@ -10,7 +10,7 @@ num_parameters(r::PRealization) = length(_get_parameters(r))
 num_parameters(r::TrivialPRealization) = 1
 Base.length(r::PRealization) = num_parameters(r)
 Base.size(r::PRealization) = (length(r),)
-# Base.getindex(r::PRealization,index) = getindex(_get_parameters(r),index)
+Arrays.testitem(r::PRealization) = testitem(_get_parameters(r))
 
 # when iterating over a PRealization{P}, we return return eltype(P) ∀ index i
 function Base.iterate(r::TrivialPRealization)
@@ -52,12 +52,7 @@ get_times(r::TransientPRealization) = r.times[]
 num_times(r::TransientPRealization) = length(get_times(r))
 Base.length(r::TransientPRealization) = num_parameters(r)*num_times(r)
 Base.size(r::TransientPRealization) = (length(r),)
-
-# function Base.getindex(r::TransientPRealization,index)
-#   times_params = Iterators.product(get_times(r),get_parameters(r)) |> collect
-#   times,params = times_params[index] |> tuple_of_arrays
-#   params,times
-# end
+Arrays.testitem(r::TransientPRealization) = testitem(get_parameters(r)),testitem(get_times(r))
 
 function Base.iterate(r::TransientPRealization)
   iterator = Iterators.product(get_times(r),get_parameters(r))
@@ -188,8 +183,15 @@ _get_parameters(f::PFunction) = _get_parameters(f.params)
 num_parameters(f::PFunction) = length(_get_parameters(f))
 Base.length(f::PFunction) = num_parameters(f)
 Base.size(f::PFunction) = (length(f),)
-# Base.getindex(f::PFunction,index::Integer) = f.fun(get_parameters(r)[index])
-# Base.getindex(f::PFunction,index::AbstractVector) = map(f.fun,get_parameters(r)[index])
+Arrays.testitem(f::PFunction) = f.fun(testitem(f.params))
+
+function Fields.gradient(f::PFunction)
+  function _gradient(x,μ)
+    gradient(f.fun(μ))(x)
+  end
+  _gradient(μ) = x -> _gradient(x,μ)
+  PFunction(_gradient,f.params)
+end
 
 # when iterating over a PFunction{P}, we return return f(eltype(P)) ∀ index i
 function Base.iterate(f::PFunction,state...)
@@ -224,16 +226,15 @@ get_times(f::TransientPFunction) = f.times
 num_times(f::TransientPFunction) = length(get_times(f))
 Base.length(f::TransientPFunction) = num_parameters(f)*num_times(f)
 Base.size(f::TransientPFunction) = (length(f),)
+Arrays.testitem(f::TransientPFunction) = f.fun(testitem(f.params),testitem(f.times))
 
-# function Base.getindex(f::TransientPFunction,index)
-#   times_params = Iterators.product(get_times(f),get_parameters(f)) |> collect
-#   times,params = times_params[index] |> tuple_of_arrays
-#   if isa(index,Integer)
-#     f.fun(params,times)
-#   else
-#     map(f.fun,(params,times))
-#   end
-# end
+function Fields.gradient(f::TransientPFunction)
+  function _gradient(x,μ,t)
+    gradient(f.fun(μ,t))(x)
+  end
+  _gradient(μ,t) = x -> _gradient(x,μ,t)
+  TransientPFunction(_gradient,f.params,f.times)
+end
 
 function Base.iterate(f::TransientPFunction)
   iterator = Iterators.product(get_times(f),get_parameters(f))
@@ -287,7 +288,7 @@ function get_fields(f::AbstractPFunction,type=:GenericField;N=1)
 end
 
 function Arrays.evaluate!(cache,f::AbstractPFunction,x...)
-  map(g->g(x...),get_fields(f))
+  map(g->g(x...),f)# map(g->g(x...),get_fields(f))
 end
 
 (f::AbstractPFunction)(x...) = evaluate(f,x...)

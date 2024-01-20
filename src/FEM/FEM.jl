@@ -16,6 +16,7 @@ using Gridap.MultiField
 using Gridap.ODEs.ODETools
 using Gridap.ODEs.TransientFETools
 using Gridap.Visualization
+using Gridap.Helpers
 
 import Base: inv,abs,abs2,*,+,-,/,adjoint,transpose,real,imag,conj
 import LinearAlgebra: det,tr,cross,dot,fillstored!
@@ -24,15 +25,11 @@ import ForwardDiff: derivative
 import Distributions: Uniform,Normal
 import Test: @test
 import UnPack: @unpack
-import Gridap.Helpers: @abstractmethod,@check,@notimplemented,@unreachable
 import Gridap.Algebra: residual!,jacobian!
 import Gridap.Fields: OperationField,BroadcastOpFieldArray,BroadcastingFieldOpMap,LinearCombinationField,LinearCombinationMap
 import Gridap.FESpaces: FEFunction,SparseMatrixAssembler,EvaluationFunction
 import Gridap.ODEs.ODETools: jacobians!
-import Gridap.ODEs.TransientFETools: TransientCellField
-import Gridap.ODEs.TransientFETools: allocate_trial_space
-import Gridap.ODEs.TransientFETools: fill_jacobians
-import Gridap.ODEs.TransientFETools: _matdata_jacobian
+import Gridap.ODEs.TransientFETools: TransientCellField,allocate_trial_space,fill_jacobians,_matdata_jacobian
 import Gridap.ReferenceFEs: get_order
 import Gridap.TensorValues: inner,outer,double_contraction,symmetric_part
 import PartitionedArrays: tuple_of_arrays
@@ -65,8 +62,10 @@ include("PArray.jl")
 
 export PField
 export PFieldGradient
-export PGenericField
-export PZeroField
+export GenericPField
+export ZeroPField
+export ConstantPField
+export OperationPField
 include("PField.jl")
 
 export PCellField
