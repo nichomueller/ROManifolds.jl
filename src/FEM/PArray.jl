@@ -320,283 +320,283 @@ function Base.materialize!(a::PArray,b::PBroadcast)
   a
 end
 
-function Base.length(
-  a::BroadcastOpFieldArray{O,T,N,<:Tuple{Vararg{Union{Any,PArray}}}}
-  ) where {O,T,N}
-  pta = filter(x->isa(x,PArray),a.args)
-  l = map(length,pta)
-  @assert all(l .== first(l))
-  return first(l)
-end
+# function Base.length(
+#   a::BroadcastOpFieldArray{O,T,N,<:Tuple{Vararg{Union{Any,PArray}}}}
+#   ) where {O,T,N}
+#   pta = filter(x->isa(x,PArray),a.args)
+#   l = map(length,pta)
+#   @assert all(l .== first(l))
+#   return first(l)
+# end
 
-function Base.size(
-  a::BroadcastOpFieldArray{O,T,N,<:Tuple{Vararg{Union{Any,PArray}}}}
-  ) where {O,T,N}
-  return (length(a),)
-end
+# function Base.size(
+#   a::BroadcastOpFieldArray{O,T,N,<:Tuple{Vararg{Union{Any,PArray}}}}
+#   ) where {O,T,N}
+#   return (length(a),)
+# end
 
-function Base.getindex(
-  a::BroadcastOpFieldArray{O,T,N,<:Tuple{PArray,Any}},
-  i::Integer) where {O,T,N}
+# function Base.getindex(
+#   a::BroadcastOpFieldArray{O,T,N,<:Tuple{PArray,Any}},
+#   i::Integer) where {O,T,N}
 
-  ai = a.args[1][i]
-  Operation(a.op)(ai,a.args[2])
-end
+#   ai = a.args[1][i]
+#   Operation(a.op)(ai,a.args[2])
+# end
 
-function Base.getindex(
-  a::BroadcastOpFieldArray{O,T,N,<:Tuple{Any,PArray}},
-  i::Integer) where {O,T,N}
+# function Base.getindex(
+#   a::BroadcastOpFieldArray{O,T,N,<:Tuple{Any,PArray}},
+#   i::Integer) where {O,T,N}
 
-  ai = a.args[2][i]
-  Operation(a.op)(a.args[1],ai)
-end
+#   ai = a.args[2][i]
+#   Operation(a.op)(a.args[1],ai)
+# end
 
-function Arrays.return_value(f::Broadcasting{typeof(∘)},a::PArray{<:Field},b::Field)
-  args = map(x->return_value(f,x,b),a)
-  data = map(x->getproperty(x,:fields),args)
-  OperationField(∘,data)
-end
+# function Arrays.return_value(f::Broadcasting{typeof(∘)},a::PArray{<:Field},b::Field)
+#   args = map(x->return_value(f,x,b),a)
+#   data = map(x->getproperty(x,:fields),args)
+#   OperationField(∘,data)
+# end
 
-function Arrays.return_value(f::Broadcasting{typeof(∘)},a::Field,b::PArray{<:Field})
-  args = map(x->return_value(f,a,x),b)
-  data = map(x->getproperty(x,:fields),args)
-  OperationField(∘,data)
-end
+# function Arrays.return_value(f::Broadcasting{typeof(∘)},a::Field,b::PArray{<:Field})
+#   args = map(x->return_value(f,a,x),b)
+#   data = map(x->getproperty(x,:fields),args)
+#   OperationField(∘,data)
+# end
 
-for op in (:+,:-,:*)
-  @eval begin
-    function Arrays.return_value(
-      f::Broadcasting{typeof($op)},
-      a::PArray)
+# for op in (:+,:-,:*)
+#   @eval begin
+#     function Arrays.return_value(
+#       f::Broadcasting{typeof($op)},
+#       a::PArray)
 
-      v1 = return_value(f,a[1])
-      array = Vector{typeof(v1)}(undef,length(a))
-      for i = eachindex(a)
-        array[i] = return_value(f,a[i])
-      end
-      PArray(array)
-    end
+#       v1 = return_value(f,a[1])
+#       array = Vector{typeof(v1)}(undef,length(a))
+#       for i = eachindex(a)
+#         array[i] = return_value(f,a[i])
+#       end
+#       PArray(array)
+#     end
 
-    function Arrays.return_cache(
-      f::Broadcasting{typeof($op)},
-      a::PArray)
+#     function Arrays.return_cache(
+#       f::Broadcasting{typeof($op)},
+#       a::PArray)
 
-      c1 = return_cache(f,a[1])
-      b1 = evaluate!(c1,f,a[1])
-      cache = Vector{typeof(c1)}(undef,length(a))
-      array = Vector{typeof(b1)}(undef,length(a))
-      for i = eachindex(a)
-        cache[i] = return_cache(f,a[i])
-      end
-      cache,PArray(array)
-    end
+#       c1 = return_cache(f,a[1])
+#       b1 = evaluate!(c1,f,a[1])
+#       cache = Vector{typeof(c1)}(undef,length(a))
+#       array = Vector{typeof(b1)}(undef,length(a))
+#       for i = eachindex(a)
+#         cache[i] = return_cache(f,a[i])
+#       end
+#       cache,PArray(array)
+#     end
 
-    function Arrays.evaluate!(
-      cache,
-      f::Broadcasting{typeof($op)},
-      a::PArray)
+#     function Arrays.evaluate!(
+#       cache,
+#       f::Broadcasting{typeof($op)},
+#       a::PArray)
 
-      cx,array = cache
-      @inbounds for i = eachindex(array)
-        array[i] = evaluate!(cx[i],f,a[i])
-      end
-      array
-    end
-  end
-end
+#       cx,array = cache
+#       @inbounds for i = eachindex(array)
+#         array[i] = evaluate!(cx[i],f,a[i])
+#       end
+#       array
+#     end
+#   end
+# end
 
-for op in (:+,:-,:*)
-  @eval begin
-    function Arrays.return_value(
-      f::Broadcasting{typeof($op)},
-      a::PArray,
-      b::AbstractArray)
+# for op in (:+,:-,:*)
+#   @eval begin
+#     function Arrays.return_value(
+#       f::Broadcasting{typeof($op)},
+#       a::PArray,
+#       b::AbstractArray)
 
-      v1 = return_value(f,a[1],b)
-      array = Vector{typeof(v1)}(undef,length(a))
-      for i = eachindex(a)
-        array[i] = return_value(f,a[i],b)
-      end
-      PArray(array)
-    end
+#       v1 = return_value(f,a[1],b)
+#       array = Vector{typeof(v1)}(undef,length(a))
+#       for i = eachindex(a)
+#         array[i] = return_value(f,a[i],b)
+#       end
+#       PArray(array)
+#     end
 
-    function Arrays.return_value(
-      f::Broadcasting{typeof($op)},
-      a::AbstractArray,
-      b::PArray)
+#     function Arrays.return_value(
+#       f::Broadcasting{typeof($op)},
+#       a::AbstractArray,
+#       b::PArray)
 
-      v1 = return_value(f,a,b[1])
-      array = Vector{typeof(v1)}(undef,length(b))
-      for i = eachindex(b)
-        array[i] = return_value(f,a,b[i])
-      end
-      PArray(array)
-    end
+#       v1 = return_value(f,a,b[1])
+#       array = Vector{typeof(v1)}(undef,length(b))
+#       for i = eachindex(b)
+#         array[i] = return_value(f,a,b[i])
+#       end
+#       PArray(array)
+#     end
 
-    function Arrays.return_value(
-      f::Broadcasting{typeof($op)},
-      a::PArray,
-      b::PArray)
+#     function Arrays.return_value(
+#       f::Broadcasting{typeof($op)},
+#       a::PArray,
+#       b::PArray)
 
-      v1 = return_value(f,a[1],b[1])
-      array = Vector{typeof(v1)}(undef,length(a))
-      for i = eachindex(a)
-        array[i] = return_value(f,a[i],b[i])
-      end
-      PArray(array)
-    end
+#       v1 = return_value(f,a[1],b[1])
+#       array = Vector{typeof(v1)}(undef,length(a))
+#       for i = eachindex(a)
+#         array[i] = return_value(f,a[i],b[i])
+#       end
+#       PArray(array)
+#     end
 
-    function Arrays.return_cache(
-      f::Broadcasting{typeof($op)},
-      a::PArray,
-      b::AbstractArray)
+#     function Arrays.return_cache(
+#       f::Broadcasting{typeof($op)},
+#       a::PArray,
+#       b::AbstractArray)
 
-      c1 = return_cache(f,a[1],b)
-      b1 = evaluate!(c1,f,a[1],b)
-      cache = Vector{typeof(c1)}(undef,length(a))
-      array = Vector{typeof(b1)}(undef,length(a))
-      for i = eachindex(a)
-        cache[i] = return_cache(f,a[i],b)
-      end
-      cache,PArray(array)
-    end
+#       c1 = return_cache(f,a[1],b)
+#       b1 = evaluate!(c1,f,a[1],b)
+#       cache = Vector{typeof(c1)}(undef,length(a))
+#       array = Vector{typeof(b1)}(undef,length(a))
+#       for i = eachindex(a)
+#         cache[i] = return_cache(f,a[i],b)
+#       end
+#       cache,PArray(array)
+#     end
 
-    function Arrays.return_cache(
-      f::Broadcasting{typeof($op)},
-      a::AbstractArray,
-      b::PArray)
+#     function Arrays.return_cache(
+#       f::Broadcasting{typeof($op)},
+#       a::AbstractArray,
+#       b::PArray)
 
-      c1 = return_cache(f,a,b[1])
-      b1 = evaluate!(c1,f,a,b[1])
-      cache = Vector{typeof(c1)}(undef,length(b))
-      array = Vector{typeof(b1)}(undef,length(b))
-      for i = eachindex(b)
-        cache[i] = return_cache(f,a,b[i])
-      end
-      cache,PArray(array)
-    end
+#       c1 = return_cache(f,a,b[1])
+#       b1 = evaluate!(c1,f,a,b[1])
+#       cache = Vector{typeof(c1)}(undef,length(b))
+#       array = Vector{typeof(b1)}(undef,length(b))
+#       for i = eachindex(b)
+#         cache[i] = return_cache(f,a,b[i])
+#       end
+#       cache,PArray(array)
+#     end
 
-    function Arrays.return_cache(
-      f::Broadcasting{typeof($op)},
-      a::PArray,
-      b::PArray)
+#     function Arrays.return_cache(
+#       f::Broadcasting{typeof($op)},
+#       a::PArray,
+#       b::PArray)
 
-      c1 = return_cache(f,a[1],b[1])
-      b1 = evaluate!(c1,f,a[1],b[1])
-      cache = Vector{typeof(c1)}(undef,length(a))
-      array = Vector{typeof(b1)}(undef,length(a))
-      for i = eachindex(a)
-        cache[i] = return_cache(f,a[i],b[i])
-      end
-      cache,PArray(array)
-    end
+#       c1 = return_cache(f,a[1],b[1])
+#       b1 = evaluate!(c1,f,a[1],b[1])
+#       cache = Vector{typeof(c1)}(undef,length(a))
+#       array = Vector{typeof(b1)}(undef,length(a))
+#       for i = eachindex(a)
+#         cache[i] = return_cache(f,a[i],b[i])
+#       end
+#       cache,PArray(array)
+#     end
 
-    function Arrays.evaluate!(
-      cache,
-      f::Broadcasting{typeof($op)},
-      a::PArray,
-      b::AbstractArray)
+#     function Arrays.evaluate!(
+#       cache,
+#       f::Broadcasting{typeof($op)},
+#       a::PArray,
+#       b::AbstractArray)
 
-      cx,array = cache
-      @inbounds for i = eachindex(array)
-        array[i] = evaluate!(cx[i],f,a[i],b)
-      end
-      array
-    end
+#       cx,array = cache
+#       @inbounds for i = eachindex(array)
+#         array[i] = evaluate!(cx[i],f,a[i],b)
+#       end
+#       array
+#     end
 
-    function Arrays.evaluate!(
-      cache,
-      f::Broadcasting{typeof($op)},
-      a::AbstractArray,
-      b::PArray)
+#     function Arrays.evaluate!(
+#       cache,
+#       f::Broadcasting{typeof($op)},
+#       a::AbstractArray,
+#       b::PArray)
 
-      cx,array = cache
-      @inbounds for i = eachindex(array)
-        array[i] = evaluate!(cx[i],f,a,b[i])
-      end
-      array
-    end
+#       cx,array = cache
+#       @inbounds for i = eachindex(array)
+#         array[i] = evaluate!(cx[i],f,a,b[i])
+#       end
+#       array
+#     end
 
-    function Arrays.evaluate!(
-      cache,
-      f::Broadcasting{typeof($op)},
-      a::PArray,
-      b::PArray)
+#     function Arrays.evaluate!(
+#       cache,
+#       f::Broadcasting{typeof($op)},
+#       a::PArray,
+#       b::PArray)
 
-      cx,array = cache
-      @inbounds for i = eachindex(array)
-        array[i] = evaluate!(cx[i],f,a[i],b[i])
-      end
-      array
-    end
-  end
-end
+#       cx,array = cache
+#       @inbounds for i = eachindex(array)
+#         array[i] = evaluate!(cx[i],f,a[i],b[i])
+#       end
+#       array
+#     end
+#   end
+# end
 
-function Arrays.return_value(
-  f::Broadcasting{typeof(*)},
-  a::PArray,
-  b::Number)
+# function Arrays.return_value(
+#   f::Broadcasting{typeof(*)},
+#   a::PArray,
+#   b::Number)
 
-  v1 = return_value(f,a[1],b)
-  array = Vector{typeof(v1)}(undef,length(a))
-  for i = eachindex(a)
-    array[i] = return_value(f,a[i],b)
-  end
-  PArray(array)
-end
+#   v1 = return_value(f,a[1],b)
+#   array = Vector{typeof(v1)}(undef,length(a))
+#   for i = eachindex(a)
+#     array[i] = return_value(f,a[i],b)
+#   end
+#   PArray(array)
+# end
 
-function Arrays.return_cache(
-  f::Broadcasting{typeof(*)},
-  a::PArray,
-  b::Number)
+# function Arrays.return_cache(
+#   f::Broadcasting{typeof(*)},
+#   a::PArray,
+#   b::Number)
 
-  c1 = return_cache(f,a[1],b)
-  b1 = evaluate!(c1,f,a[1],b)
-  cache = Vector{typeof(c1)}(undef,length(a))
-  array = Vector{typeof(b1)}(undef,length(a))
-  for i = eachindex(a)
-    cache[i] = return_cache(f,a[i],b)
-  end
-  cache,PArray(array)
-end
+#   c1 = return_cache(f,a[1],b)
+#   b1 = evaluate!(c1,f,a[1],b)
+#   cache = Vector{typeof(c1)}(undef,length(a))
+#   array = Vector{typeof(b1)}(undef,length(a))
+#   for i = eachindex(a)
+#     cache[i] = return_cache(f,a[i],b)
+#   end
+#   cache,PArray(array)
+# end
 
-function Arrays.evaluate!(
-  cache,
-  f::Broadcasting{typeof(*)},
-  a::PArray,
-  b::Number)
+# function Arrays.evaluate!(
+#   cache,
+#   f::Broadcasting{typeof(*)},
+#   a::PArray,
+#   b::Number)
 
-  cx,array = cache
-  @inbounds for i = eachindex(array)
-    array[i] = evaluate!(cx[i],f,a[i],b)
-  end
-  array
-end
+#   cx,array = cache
+#   @inbounds for i = eachindex(array)
+#     array[i] = evaluate!(cx[i],f,a[i],b)
+#   end
+#   array
+# end
 
-function Arrays.return_value(
-  f::Broadcasting{typeof(*)},
-  a::Number,
-  b::PArray)
+# function Arrays.return_value(
+#   f::Broadcasting{typeof(*)},
+#   a::Number,
+#   b::PArray)
 
-  return_value(f,b,a)
-end
+#   return_value(f,b,a)
+# end
 
-function Arrays.return_cache(
-  f::Broadcasting{typeof(*)},
-  a::Number,
-  b::PArray)
+# function Arrays.return_cache(
+#   f::Broadcasting{typeof(*)},
+#   a::Number,
+#   b::PArray)
 
-  return_cache(f,b,a)
-end
+#   return_cache(f,b,a)
+# end
 
-function Arrays.evaluate!(
-  cache,
-  f::Broadcasting{typeof(*)},
-  a::Number,
-  b::PArray)
+# function Arrays.evaluate!(
+#   cache,
+#   f::Broadcasting{typeof(*)},
+#   a::Number,
+#   b::PArray)
 
-  evaluate!(cache,f,b,a)
-end
+#   evaluate!(cache,f,b,a)
+# end
 
 function Arrays.return_value(
   f::BroadcastingFieldOpMap,

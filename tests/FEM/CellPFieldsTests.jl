@@ -32,26 +32,6 @@ funμ = 𝑓ₚ(fun,μ)
 f = CellField(funμ,trian)
 fx = f(x)
 
-f1 = get_data(f)[1]
-x1 = get_data(x)[1]
-f1(x1)
-
-trian = get_triangulation(model)
-cell_map = get_cell_map(trian)
-cell_field_phys = get_data(f)
-cell_field_ref = lazy_map(Broadcasting(∘),cell_field_phys,cell_map)
-
-α,β = cell_field_phys[1],cell_map[1]
-@which (∘)(α,β)
-@which evaluate(Operation(α),β)
-
-cache = return_cache(Operation(α),β)
-evaluate!(cache,Operation(α),β)
-Fields.OperationField(α,β)
-
-c = return_cache(f,x...)
-y = evaluate!(c,f,x...)
-
 for (i,μ) in enumerate(μ)
   gfun(x) = 2*x[1]*sum(μ)
   g = CellField(gfun,trian)
@@ -110,62 +90,35 @@ k = VectorValue(1.0,2.0)
 ∇kfx = ((∇+k)(f))(x)
 test_array(∇kfx,collect(∇kfx))
 
+α = CellField(x->2*x,trian)
 βfun(x,μ) = sum(μ)*2*x[1]
 βfun(μ) = x -> βfun(x,μ)
 βμ = 𝑓ₚ(βfun,μ)
 β1(x) = 2*x[1]
 first.((βμ*α)(x)) == (β1*α)(x)
-α = CellField(x->2*x,trian)
 ax = ((∇+k)(βμ*α))(x)
 test_array(ax,collect(ax))
 
-################
-s = (∇+k)
-ξ = βμ*α
-gradient(ξ)
-# op,fields = ((a,b)->a+s.v⊗b),(gradient(ξ),ξ)
-# gradient(ξ)
-# cell_∇a = lazy_map(Broadcasting(∇),get_data(ξ))
-a = map(get_data,ξ.args)
-lazy_map(Broadcasting(ξ.op),a...)
-
-Operation(*)(βμ,α)
-
-ai = map(testitem,a)
-return_value(Broadcasting(ξ.op),ai...)
-
-ξ1 = β1*α
-@which return_value(Broadcasting(ξ1.op),ξ1)
-
-################
-
-@which return_value(Broadcasting(*),(∇+k))
-
-β(x) = 2*x[1]
-α = CellField(x->2*x,trian)
-ax = ((∇+k)(βμ*α))(x)
+β = CellField(βμ,trian)
+ax =((∇-k)⋅β)(x)
 test_array(ax,collect(ax))
 
-ν = CellField(x->2*x,trian)
-ax =((∇-k)⋅ν)(x)
+ax =((∇-k)×β)(x)
 test_array(ax,collect(ax))
 
-ax =((∇-k)×ν)(x)
+ax =((∇-k)⊗β)(x)
 test_array(ax,collect(ax))
 
-ax =((∇-k)⊗ν)(x)
+ax =(∇.*β)(x)
 test_array(ax,collect(ax))
 
-ax =(∇.*ν)(x)
+ax =(β.*β)(x)
 test_array(ax,collect(ax))
 
-ax =(ν.*ν)(x)
+ax =((∇-k).*β)(x)
 test_array(ax,collect(ax))
 
-ax =((∇-k).*ν)(x)
-test_array(ax,collect(ax))
-
-ax =(ν⊗(∇-k))(x)
+ax =(β⊗(∇-k))(x)
 test_array(ax,collect(ax))
 
 σ(x) = diagonal_tensor(VectorValue(1*x[1],2*x[2]))

@@ -145,8 +145,6 @@ function ODETools.solve_step!(
     vθ .= 0.0
     l_cache = nothing
     A,b = ODETools._allocate_matrix_and_vector(op,r,u0,ode_cache)
-    println(typeof(A))
-    println(typeof(b))
   else
     ode_cache,vθ,A,b,l_cache = cache
   end

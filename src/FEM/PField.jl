@@ -75,9 +75,6 @@ function Base.iterate(f::ConstantPField,oldstate...)
   ConstantField(fit),nextstate
 end
 
-# const POperation = Operation{T} where T<:Union{AbstractPFunction,PField}
-# Base.length(op::POperation) = length(op.op)
-
 struct OperationPField{O,F} <: PField
   op::O
   fields::F
@@ -86,16 +83,17 @@ end
 Fields.OperationField(op,fields::Tuple{Vararg{PField}}) = OperationPField(op,fields)
 Fields.OperationField(op::PField,fields::Tuple{Vararg{Field}}) = OperationPField(op,FieldToPField.(fields,length(op)))
 function Fields.OperationField(op,fields::Tuple{Vararg{Field}})
-  if any(isa.(fields,PField))
-    OperationPField(op,fields)
-  else
+  pfields = filter(x->isa(x,PField),fields)
+  if isempty(pfields)
     OperationField{typeof(op),typeof(fields)}(op,fields)
+  else
+    L = length.(pfields)
+    @check all(L .== first(L))
+    OperationPField(op,FieldToPField.(fields,L))
   end
 end
-# Fields.OperationField(op::POperation,fields::Field...) = OperationPField(op,FieldToPField.(fields,length(op)))
 function Base.length(f::OperationPField)
   L = map(length,f.fields)
-  @check all(L .== first(L))
   first(L)
 end
 Arrays.testitem(f::OperationPField) = Fields.OperationField(f.op,map(testitem,f.fields))
@@ -173,45 +171,35 @@ function Fields.gradient(f::OperationPField{<:Field})
   y⋅x
 end
 
-function Arrays.return_value(k::Broadcasting{typeof(∘)},f::PField,g::PField)
-  fi,gi = map(testitem,(f,g))
-  vi = return_value(k,fi,gi)
-  array = Vector{typeof(vi)}(undef,length(f))
-  for (i,(fi,gi)) in enumerate(zip(f,g))
-    array[i] = return_value(k,fi,gi)
-  end
-  PArray(array)
-end
-function Arrays.return_value(k::Broadcasting{typeof(∘)},f::PField,g::Field)
-  return_value(k,f,FieldToPField(g,length(f)))
-end
-function Arrays.return_value(k::Broadcasting{typeof(∘)},f::Field,g::PField)
-  return_value(k,FieldToPField(f,length(g)),g)
-end
-function Arrays.return_value(k::Broadcasting{<:Operation},f::PField,g::PField)
-  fi,gi = map(testitem,(f,g))
-  vi = return_value(k,fi,gi)
-  array = Vector{typeof(vi)}(undef,length(f))
-  for (i,(fi,gi)) in enumerate(zip(f,g))
-    array[i] = return_value(k,fi,gi)
-  end
-  PArray(array)
-end
-function Arrays.return_value(k::Broadcasting{<:Operation},f::PField,g::Field)
-  return_value(k,f,FieldToPField(g,length(f)))
-end
-function Arrays.return_value(k::Broadcasting{<:Operation},f::Field,g::PField)
-  return_value(k,FieldToPField(f,length(g)),g)
-end
-
-# function Arrays.evaluate!(cache,k::Broadcasting{typeof(∘)},f::PField,g::PField)
-#   f∘g
+# function Arrays.return_value(k::Broadcasting{typeof(∘)},f::PField,g::PField)
+#   fi,gi = map(testitem,(f,g))
+#   vi = return_value(k,fi,gi)
+#   array = Vector{typeof(vi)}(undef,length(f))
+#   for (i,(fi,gi)) in enumerate(zip(f,g))
+#     array[i] = return_value(k,fi,gi)
+#   end
+#   PArray(array)
 # end
-# function Arrays.evaluate!(cache,k::Broadcasting{typeof(∘)},f::PField,g::Field)
-#   evaluate!(cache,k,f,FieldToPField(g,length(f)))
+# function Arrays.return_value(k::Broadcasting{typeof(∘)},f::PField,g::Field)
+#   return_value(k,f,FieldToPField(g,length(f)))
 # end
-# function Arrays.evaluate!(cache,k::Broadcasting{typeof(∘)},f::Field,g::PField)
-#   evaluate!(cache,k,FieldToPField(f,length(g)),g)
+# function Arrays.return_value(k::Broadcasting{typeof(∘)},f::Field,g::PField)
+#   return_value(k,FieldToPField(f,length(g)),g)
+# end
+# function Arrays.return_value(k::Broadcasting{<:Operation},f::PField,g::PField)
+#   fi,gi = map(testitem,(f,g))
+#   vi = return_value(k,fi,gi)
+#   array = Vector{typeof(vi)}(undef,length(f))
+#   for (i,(fi,gi)) in enumerate(zip(f,g))
+#     array[i] = return_value(k,fi,gi)
+#   end
+#   PArray(array)
+# end
+# function Arrays.return_value(k::Broadcasting{<:Operation},f::PField,g::Field)
+#   return_value(k,f,FieldToPField(g,length(f)))
+# end
+# function Arrays.return_value(k::Broadcasting{<:Operation},f::Field,g::PField)
+#   return_value(k,FieldToPField(f,length(g)),g)
 # end
 
 struct VoidPField{F} <: PField
@@ -258,7 +246,7 @@ struct FieldToPField{F,L} <: PField
 end
 
 FieldToPField(f::Field,L::Integer) = FieldToPField(f,Val(L))
-FieldToPField(f::PField,args...) = f
+FieldToPField(f::PField,L::Integer) = f
 Base.length(f::FieldToPField{F,L} where F) where L = L
 Arrays.testitem(f::FieldToPField) = f.field
 
@@ -266,7 +254,7 @@ function Base.iterate(f::FieldToPField)
   f.field,1
 end
 function Base.iterate(f::FieldToPField{F,L} where F,it) where L
-  if it > L
+  if it >= L
     return nothing
   end
   f.field,it+1
@@ -287,6 +275,8 @@ function Base.map(f::PField,x::AbstractArray{<:Point})
 end
 
 Base.broadcasted(f::PField,x::AbstractArray{<:Point}) = map(f,x)
+
+Arrays.return_value(b::Broadcasting{<:Function},f::PField,x...) = evaluate(b.f,f,x...)
 
 for T in (:Point,:(AbstractArray{<:Point}))
   @eval begin
@@ -337,7 +327,6 @@ function Arrays.return_cache(
   b::LagrangianDofBasis,
   field::OperationPField)
 
-  @error "deprecate"
   f1 = OperationField(testitem(field.op),field.fields)
   c1 = return_cache(b,f1)
   a1 = evaluate!(c1,b,f1)
@@ -355,7 +344,6 @@ function Arrays.evaluate!(
   b::LagrangianDofBasis,
   field::OperationPField)
 
-  @error "deprecate"
   cf,array = cache
   @inbounds for (i,opi) = enumerate(field.op)
     fi = OperationField(opi,field.fields)
