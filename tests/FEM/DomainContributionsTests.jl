@@ -1,4 +1,4 @@
-module DomainContributionsTests
+# module DomainContributionsTests
 
 using Test
 using FillArrays
@@ -36,6 +36,11 @@ f(x,μ) = 1+sum(μ)
 f(μ) = x -> f(x,μ)
 fμ = 𝑓ₚ(f,μ)
 fμ₀ = 𝑓ₚ(f,μ₀)
+
+cf = CellField(fμ,Ω)
+cf*u
+get_data(cf)
+fμ*u
 
 a = ∫(fμ*u*v)*dΩ + ∫(fμ*u*v)*dΓ + ∫(fμ*∇(u)⋅∇(v))*dΩ
 @test num_domains(a) == 2
@@ -95,4 +100,4 @@ dΩ = Measure(Ω,quad)
 s = ∫(fμ₀)dΩ
 @test all(sum(s) .≈ 1)
 
-end # module
+# end # module

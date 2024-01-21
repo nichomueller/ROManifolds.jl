@@ -346,16 +346,16 @@ Base.getindex(m::MultiFieldPFESpace,field_id::Integer) = m.spaces[field_id]
 Base.length(m::MultiFieldPFESpace) = length(m.spaces)
 
 
-struct MultiFieldPFEFunction{T<:MultiFieldCellField} <: PCellField
-  single_fe_functions::Vector{<:SingleFieldPFEFunction}
+struct MultiFieldFEPFunction{T<:MultiFieldCellField} <: CellPField
+  single_fe_functions::Vector{<:SingleFieldFEPFunction}
   free_values::AbstractArray
   fe_space::MultiFieldPFESpace
   multi_cell_field::T
 
-  function MultiFieldPFEFunction(
+  function MultiFieldFEPFunction(
     free_values::AbstractVector,
     space::MultiFieldPFESpace,
-    single_fe_functions::Vector{<:SingleFieldPFEFunction})
+    single_fe_functions::Vector{<:SingleFieldFEPFunction})
 
     multi_cell_field = MultiFieldCellField(map(i->i.cell_field,single_fe_functions))
     T = typeof(multi_cell_field)
@@ -368,14 +368,14 @@ struct MultiFieldPFEFunction{T<:MultiFieldCellField} <: PCellField
   end
 end
 
-Base.length(f::MultiFieldPFEFunction) = length(f.free_values)
-CellData.get_data(f::MultiFieldPFEFunction) = get_data(f.multi_cell_field)
-FESpaces.get_triangulation(f::MultiFieldPFEFunction) = get_triangulation(f.multi_cell_field)
-CellData.DomainStyle(::Type{MultiFieldPFEFunction{T}}) where T = DomainStyle(T)
-FESpaces.get_free_dof_values(f::MultiFieldPFEFunction) = f.free_values
-FESpaces.get_fe_space(f::MultiFieldPFEFunction) = f.fe_space
+Base.length(f::MultiFieldFEPFunction) = length(f.free_values)
+CellData.get_data(f::MultiFieldFEPFunction) = get_data(f.multi_cell_field)
+FESpaces.get_triangulation(f::MultiFieldFEPFunction) = get_triangulation(f.multi_cell_field)
+CellData.DomainStyle(::Type{MultiFieldFEPFunction{T}}) where T = DomainStyle(T)
+FESpaces.get_free_dof_values(f::MultiFieldFEPFunction) = f.free_values
+FESpaces.get_fe_space(f::MultiFieldFEPFunction) = f.fe_space
 
-function FESpaces.get_cell_dof_values(f::MultiFieldPFEFunction)
+function FESpaces.get_cell_dof_values(f::MultiFieldFEPFunction)
   msg = """\n
   This method does not make sense for multi-field
   since each field can be defined on a different triangulation.
@@ -388,7 +388,7 @@ function FESpaces.get_cell_dof_values(f::MultiFieldPFEFunction)
   get_cell_dof_values(f,trian)
 end
 
-function FESpaces.get_cell_dof_values(f::MultiFieldPFEFunction,trian::Triangulation)
+function FESpaces.get_cell_dof_values(f::MultiFieldFEPFunction,trian::Triangulation)
   uhs = f.single_fe_functions
   blockmask = [is_change_possible(get_triangulation(uh),trian) for uh in uhs]
   active_block_ids = findall(blockmask)
@@ -397,17 +397,17 @@ function FESpaces.get_cell_dof_values(f::MultiFieldPFEFunction,trian::Triangulat
   lazy_map(BlockMap(nblocks,active_block_ids),active_block_data...)
 end
 
-MultiField.num_fields(m::MultiFieldPFEFunction) = length(m.single_fe_functions)
-# Base.iterate(m::MultiFieldPFEFunction) = iterate(m.single_fe_functions)
-# Base.iterate(m::MultiFieldPFEFunction,state) = iterate(m.single_fe_functions,state)
-Base.getindex(m::MultiFieldPFEFunction,field_id::Integer) = m.single_fe_functions[field_id]
+MultiField.num_fields(m::MultiFieldFEPFunction) = length(m.single_fe_functions)
+# Base.iterate(m::MultiFieldFEPFunction) = iterate(m.single_fe_functions)
+# Base.iterate(m::MultiFieldFEPFunction,state) = iterate(m.single_fe_functions,state)
+Base.getindex(m::MultiFieldFEPFunction,field_id::Integer) = m.single_fe_functions[field_id]
 
 function FESpaces.FEFunction(fe::MultiFieldPFESpace,free_values::PArray)
   blocks = map(1:length(fe.spaces)) do i
     free_values_i = restrict_to_field(fe,free_values,i)
     FEFunction(fe.spaces[i],free_values_i)
   end
-  MultiFieldPFEFunction(free_values,fe,blocks)
+  MultiFieldFEPFunction(free_values,fe,blocks)
 end
 
 function FESpaces.EvaluationFunction(fe::MultiFieldPFESpace,free_values::PArray)
@@ -426,7 +426,7 @@ function CellData.CellField(fe::MultiFieldPFESpace,cell_values)
   MultiFieldCellField(single_fields)
 end
 
-function TransientFETools.TransientCellField(multi_field::MultiFieldPFEFunction,derivatives::Tuple)
+function TransientFETools.TransientCellField(multi_field::MultiFieldFEPFunction,derivatives::Tuple)
   transient_single_fields = TransientFETools._to_transient_single_fields(multi_field,derivatives)
   TransientFETools.TransientMultiFieldCellField(multi_field,derivatives,transient_single_fields)
 end
@@ -438,36 +438,36 @@ end
 
 function FESpaces.interpolate!(objects,free_values::PArray,fe::MultiFieldPFESpace)
   block_free_values = block_zero_free_values(fe)
-  blocks = SingleFieldPFEFunction[]
+  blocks = SingleFieldFEPFunction[]
   for (free_values_i,U,object) in zip(block_free_values,fe.spaces,objects)
     uhi = interpolate!(object,free_values_i,U)
     push!(blocks,uhi)
   end
-  MultiFieldPFEFunction(free_values,fe,blocks)
+  MultiFieldFEPFunction(free_values,fe,blocks)
 end
 
 function FESpaces.interpolate_everywhere(objects,fe::MultiFieldPFESpace)
   free_values = zero_free_values(fe)
   block_free_values = block_zero_free_values(fe)
-  blocks = SingleFieldPFEFunction[]
+  blocks = SingleFieldFEPFunction[]
   for (free_values_i,U,object) in zip(block_free_values,fe.spaces,objects)
     dirichlet_values_i = zero_dirichlet_values(U)
     uhi = interpolate_everywhere!(object,free_values_i,dirichlet_values_i,U)
     push!(blocks,uhi)
   end
-  MultiFieldPFEFunction(free_values,fe,blocks)
+  MultiFieldFEPFunction(free_values,fe,blocks)
 end
 
 function FESpaces.interpolate_dirichlet(objects,fe::MultiFieldPFESpace)
   free_values = zero_free_values(fe)
   block_free_values = block_zero_free_values(fe)
-  blocks = SingleFieldPFEFunction[]
+  blocks = SingleFieldFEPFunction[]
   for (free_values_i,U,object) in zip(block_free_values,fe.spaces,objects)
     dirichlet_values_i = zero_dirichlet_values(U)
     uhi = interpolate_dirichlet!(object,free_values_i,dirichlet_values_i,U)
     push!(blocks,uhi)
   end
-  MultiFieldPFEFunction(free_values,fe,blocks)
+  MultiFieldFEPFunction(free_values,fe,blocks)
 end
 
 # function FESpaces.EvaluationFunction(fe::MultiFieldPFESpace,free_values::PArray)
@@ -477,19 +477,19 @@ end
 #     free_values_i,fe_function_i
 #   end |> tuple_of_arrays
 #   free_values = vcat(free_values...)
-#   MultiFieldPFEFunction(free_values,fe,fe_functions)
+#   MultiFieldFEPFunction(free_values,fe,fe_functions)
 # end
 
 # for visualization purposes
-function Base.iterate(f::MultiFieldPFEFunction)
+function Base.iterate(f::MultiFieldFEPFunction)
   mfs,states = map(iterate,f.single_fe_functions) |> tuple_of_arrays
   sff,statef = map(iterate,f.fe_space) |> tuple_of_arrays
   index = first(first.(statef))
   fv = f.free_values[index]
-  MultiFieldPFEFunction(fv,mfs,sff),(states,statef)
+  MultiFieldFEPFunction(fv,mfs,sff),(states,statef)
 end
 
-function Base.iterate(f::MultiFieldPFEFunction,state)
+function Base.iterate(f::MultiFieldFEPFunction,state)
   states,statef = state
   iters = map(f->iterate(f.single_fe_functions,states))
   iterf = map(f->iterate(f.fe_space,statef))
@@ -500,7 +500,7 @@ function Base.iterate(f::MultiFieldPFEFunction,state)
   sff,statef = iterf |> tuple_of_arrays
   index = first(first.(statef))
   fv = f.free_values[index]
-  MultiFieldPFEFunction(fv,mfs,sff),(states,statef)
+  MultiFieldFEPFunction(fv,mfs,sff),(states,statef)
 end
 
 function Arrays.testitem(f::MultiFieldPFESpace)

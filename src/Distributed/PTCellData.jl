@@ -1,5 +1,5 @@
 # function Base.iterate(
-#   f::DistributedCellField{<:Vector{<:SingleFieldPFEFunction}}
+#   f::DistributedCellField{<:Vector{<:SingleFieldFEPFunction}}
 #   )
 
 #   fit,nit = map(local_views(f)) do f
@@ -9,7 +9,7 @@
 # end
 
 # function Base.iterate(
-#   f::DistributedCellField{<:Vector{<:SingleFieldPFEFunction}},
+#   f::DistributedCellField{<:Vector{<:SingleFieldFEPFunction}},
 #   state)
 
 #   fn = map(local_views(f)) do f

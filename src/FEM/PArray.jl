@@ -1,23 +1,21 @@
 struct PArray{T,N,A,L} <: AbstractArray{T,N}
   array::A
-  indices::NTuple{L,Bool}
-  function PArray(array::AbstractVector{T},indices::NTuple{L,Bool}) where {T<:AbstractArray,L}
+  function PArray(array::AbstractVector{T},::Val{L}) where {T<:AbstractArray,L}
     N = ndims(T)
     A = typeof(array)
-    new{T,N,A,L}(array,indices)
+    new{T,N,A,L}(array)
   end
-  function PArray(array::A,indices::NTuple{L,Bool}) where {A,L}
+  function PArray(array::A,::Val{L}) where {A,L}
     T = eltype(array)
     N = 1
-    new{T,N,A,L}(array,indices)
+    new{T,N,A,L}(array)
   end
 end
 
 const AffinePArray{T,N,A} = PArray{T,N,A,1}
 
 function PArray(array)
-  indices = ntuple(i->true,Val(length(array)))
-  PArray(array,indices)
+  PArray(array,Val(length(array)))
 end
 
 function PArray(array::AbstractVector{T}) where {T<:Number}

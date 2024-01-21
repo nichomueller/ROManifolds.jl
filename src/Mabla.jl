@@ -43,9 +43,9 @@ export MultiFieldPFESpace
 export AbstractPFunction
 export PFunction, 𝑓ₚ
 export TransientPFunction, 𝑓ₚₜ
-export PCellField
-export SingleFieldPFEFunction
-export MultiFieldPFEFunction
+export CellPField
+export SingleFieldFEPFunction
+export MultiFieldFEPFunction
 export TransientTrialPFESpace
 export TransientMultiFieldPFESpace
 export TransientMultiFieldTrialPFESpace

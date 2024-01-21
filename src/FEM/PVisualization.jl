@@ -87,7 +87,7 @@ function Visualization.visualization_data(
   (PVisualizationData(visgrid,filebase;celldata=cdata,nodaldata=pdata),)
 end
 
-function _lengths(cellfields::Dict{String,<:PCellField})
+function _lengths(cellfields::Dict{String,<:CellPField})
   lengths = []
   for (k,v) in cellfields
     push!(lengths,length(v))
@@ -97,7 +97,7 @@ function _lengths(cellfields::Dict{String,<:PCellField})
   return L
 end
 
-function Visualization._prepare_pdata(trian,cellfields::Dict{String,<:PCellField},samplingpoints)
+function Visualization._prepare_pdata(trian,cellfields::Dict{String,<:CellPField},samplingpoints)
   L = _lengths(cellfields)
   x = CellPoint(samplingpoints,trian,ReferenceDomain())
   pdata = map(1:L) do i

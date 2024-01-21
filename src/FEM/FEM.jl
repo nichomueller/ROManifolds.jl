@@ -68,10 +68,10 @@ export ConstantPField
 export OperationPField
 include("PField.jl")
 
-export PCellField
-export SingleFieldPFEFunction
-export MultiFieldPFEFunction
-include("PCellField.jl")
+export CellPField
+export SingleFieldFEPFunction
+export MultiFieldFEPFunction
+include("CellPField.jl")
 
 export TrialPFESpace
 export TrialPFESpace!
@@ -81,7 +81,7 @@ export length_free_values
 include("TrialPFESpace.jl")
 
 export MultiFieldPFESpace
-export MultiFieldPFEFunction
+export MultiFieldFEPFunction
 include("MultiFieldPFESpaces.jl")
 
 export TransientTrialPFESpace

@@ -288,7 +288,7 @@ function get_fields(f::AbstractPFunction,type=:GenericField;N=1)
 end
 
 function Arrays.evaluate!(cache,f::AbstractPFunction,x...)
-  map(g->g(x...),f)# map(g->g(x...),get_fields(f))
+  map(g->g(x...),f)
 end
 
 (f::AbstractPFunction)(x...) = evaluate(f,x...)
