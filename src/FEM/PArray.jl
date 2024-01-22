@@ -44,8 +44,8 @@ Base.setindex!(a::PArray,v,i...) = get_array(a)[i...] = v
 Base.iterate(a::PArray,i...) = iterate(a.array,i...)
 
 function Base.show(io::IO,::MIME"text/plain",a::PArray{T,N,A,L}) where {T,N,A,L}
-  println(io, "PArray of length $L and elements of type $T:")
-  println(io,a)
+  println(io, "PArray{T = $T, L = $L} with entries:")
+  show(io,a.array)
 end
 
 function Base.copy(a::PArray{T}) where T
@@ -94,17 +94,43 @@ function Base.sum(a::PArray)
   sum(get_array(a))
 end
 
-function Base.:+(a::T,b::T) where {T<:PArray}
+function Base.:+(a::T,b::T) where T<:PArray
   map(a,b) do a,b
     a+b
   end
 end
 
-function Base.:-(a::T,b::T) where {T<:PArray}
+function Base.:-(a::T,b::T) where T<:PArray
   map(a,b) do a,b
     a-b
   end
 end
+
+function Base.:+(a::PArray{T},b::T) where T<:AbstractArray
+  map(a) do a
+    a+b
+  end
+end
+
+function Base.:+(a::T,b::PArray{T}) where T<:AbstractArray
+  map(b) do b
+    a+b
+  end
+end
+
+function Base.:-(a::PArray{T},b::T) where T<:AbstractArray
+  map(a) do a
+    a-b
+  end
+end
+
+function Base.:-(a::T,b::PArray{T}) where T<:AbstractArray
+  map(b) do b
+    a-b
+  end
+end
+
+(Base.:-)(a::PArray) = a .* -1
 
 function Base.:*(a::PArray,b::Number)
   PArray(get_array(a)*b)
@@ -112,6 +138,12 @@ end
 
 function Base.:*(a::Number,b::PArray)
   b*a
+end
+
+function Base.:*(a::PArray{<:AbstractMatrix},b::PArray{<:AbstractVector})
+  map(a,b) do a,b
+    a*b
+  end
 end
 
 function Base.:\(a::PArray{<:AbstractMatrix},b::PArray{<:AbstractVector})
@@ -257,11 +289,11 @@ function Arrays.setsize!(
   s::NTuple{N,Int}) where {T,N}
 
   map(a) do a
-    setsize!(a[i],s)
+    setsize!(a,s)
   end
 end
 
-Arrays.get_array(a::PArray{<:CachedArray}) = map(x->x.array,a.array)
+# Arrays.get_array(a::PArray{<:CachedArray}) = map(x->x.array,a.array)
 
 function Base.map(f,a::PArray...)
   PArray(map(f,map(get_array,a)...))
@@ -910,79 +942,6 @@ function Fields.linear_combination(a::PArray,b::AbstractArray)
     c[i] = linear_combination(a[i],b)
   end
   PArray(c)
-end
-
-function Base.getindex(k::Broadcasting{<:PosNegReindex{<:PArray,<:PArray}},i::Int)
-  fi = PosNegReindex(k.f.values_pos[i],k.f.values_neg[i])
-  Broadcasting(fi)
-end
-
-function Arrays.return_value(
-  k::Broadcasting{<:PosNegReindex{<:PArray,<:PArray}},
-  x::Union{Number,AbstractArray{<:Number}}...)
-
-  npos = length(k.f.values_pos)
-  nneg = length(k.f.values_neg)
-  @assert npos == nneg
-  v1 = return_value(k[1],x...)
-  array = Vector{typeof(v1)}(undef,npos)
-  for i = 1:npos
-    array[i] = return_value(k[i],x...)
-  end
-  PArray(array)
-end
-
-function Arrays.return_cache(
-  k::Broadcasting{<:PosNegReindex{<:PArray,<:PArray}},
-  x::Union{Number,AbstractArray{<:Number}}...)
-
-  npos = length(k.f.values_pos)
-  nneg = length(k.f.values_neg)
-  @assert npos == nneg
-  c1 = return_cache(k[1],x...)
-  b1 = evaluate!(c1,k[1],x...)
-  cache = Vector{typeof(c1)}(undef,npos)
-  array = Vector{typeof(b1)}(undef,npos)
-  for i = 1:npos
-    cache[i] = return_cache(k[i],x...)
-  end
-  cache,PArray(array)
-end
-
-function Arrays.evaluate!(
-  cache,
-  k::Broadcasting{<:PosNegReindex{<:PArray,<:PArray}},
-  x::Union{Number,AbstractArray{<:Number}}...)
-
-  cx,array = cache
-  @inbounds for i = eachindex(array)
-    array[i] = evaluate!(cx[i],k[i],x...)
-  end
-  array
-end
-
-function Arrays.evaluate!(
-  cache,
-  k::Broadcasting{<:PosNegReindex{<:PArray,<:PArray}},
-  x::AbstractArray{<:Number})
-
-  cx,array = cache
-  @inbounds for i = eachindex(array)
-    array[i] = evaluate!(cx[i],k[i],x)
-  end
-  array
-end
-
-function Arrays.evaluate!(
-  cache,
-  k::Broadcasting{<:PosNegReindex{<:PArray,<:PArray}},
-  x::Number...)
-
-  cx,array = cache
-  @inbounds for i = eachindex(array)
-    array[i] = evaluate!(cx[i],k[i],x...)
-  end
-  array
 end
 
 function Arrays.return_value(

@@ -25,6 +25,22 @@ function Algebra.allocate_in_domain(matrix::PArray{<:AbstractMatrix})
   end
 end
 
+function get_passembler(a::SparseMatrixAssembler,r::Union{PRealization,TransientPRealization})
+  vec = get_vector_builder(a)
+  vector_type = get_array_type(vec)
+  pvector_type = typeof(PArray{vector_type}(undef,length(r)))
+  mat = get_matrix_builder(a)
+  matrix_type = get_array_type(mat)
+  pmatrix_type = typeof(PArray{matrix_type}(undef,length(r)))
+  rows = FESpaces.get_rows(a)
+  cols = FESpaces.get_cols(a)
+  strategy = FESpaces.get_assembly_strategy(a)
+  SparseMatrixPAssembler(
+    SparseMatrixBuilder(pmatrix_type),
+    ArrayBuilder(pvector_type),
+    rows,cols,strategy)
+end
+
 struct SparseMatrixPAssembler{M<:PArray,V<:PArray} <: SparseMatrixAssembler
   matrix_builder::M
   vector_builder::V

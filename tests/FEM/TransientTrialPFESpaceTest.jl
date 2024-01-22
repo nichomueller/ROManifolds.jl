@@ -1,4 +1,4 @@
-# module TransientTrialPFESpaceTest
+module TransientTrialPFESpaceTest
 using Test
 using Gridap.Arrays
 using Gridap.ReferenceFEs
@@ -17,13 +17,13 @@ function fast_idx(kst::Int,ns::Int)
   ks == 0 ? ns : ks
 end
 
-domain = (0,1,0,1,0,1)
-partition = (3,3,3)
+domain = (0,1,0,1)
+partition = (2,2)
 model = CartesianDiscreteModel(domain,partition)
 
 order = 2
 reffe = ReferenceFE(lagrangian,Float64,order)
-V = FESpace(model,reffe,dirichlet_tags=["tag_01","tag_10"])
+V = FESpace(model,reffe,conformity=:H1,dirichlet_tags="boundary")
 
 g(x,μ,t) = exp(-sum(x)*t/sum(μ))
 g(μ,t) = x->g(x,μ,t)
@@ -45,4 +45,4 @@ for (i,Ũi) in enumerate(U)
   @test dirichlet_values[i] == get_dirichlet_dof_values(Ui)
   @test dirichlet_values[i] == get_dirichlet_dof_values(Ũi)
 end
-# end
+end

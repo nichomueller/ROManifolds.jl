@@ -24,14 +24,14 @@ function Base.iterate(sol::TransientPFESolution)
   if odesolnext === nothing
     return nothing
   end
-  (uf,tf),odesolstate = odesolnext
+  (uf,rf),odesolstate = odesolnext
 
-  Uh = allocate_trial_space(sol.trial)
-  Uh = evaluate!(Uh,sol.trial,tf)
+  Uh = allocate_trial_space(sol.trial,rf)
+  Uh = evaluate!(Uh,sol.trial,rf)
   uh = FEFunction(Uh,uf)
 
   state = Uh,odesolstate
-  (uh,tf),state
+  (uh,rf),state
 end
 
 function Base.iterate(sol::TransientPFESolution,state)
@@ -40,13 +40,13 @@ function Base.iterate(sol::TransientPFESolution,state)
   if odesolnext === nothing
     return nothing
   end
-  (uf,tf),odesolstate = odesolnext
+  (uf,rf),odesolstate = odesolnext
 
-  Uh = evaluate!(Uh,sol.trial,tf)
+  Uh = evaluate!(Uh,sol.trial,rf)
   uh = FEFunction(Uh,uf)
 
   state = Uh,odesolstate
-  (uh,tf),state
+  (uh,rf),state
 end
 
 function Algebra.solve(
@@ -56,4 +56,18 @@ function Algebra.solve(
   args...;
   kwargs...)
   TransientPFESolution(solver,op,uh0,args...;kwargs...)
+end
+
+function TransientFETools.test_transient_fe_solver(
+  solver::ODESolver,
+  op::TransientPFEOperator,
+  u0,
+  r)
+
+  solution = solve(solver,op,u0,r)
+  for (uhn,rn) in solution
+    @test isa(uhn,CellPField)
+    @test isa(rn,TransientPRealization)
+  end
+  true
 end

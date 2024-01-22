@@ -1,4 +1,4 @@
-function FEM.get_assembler(
+function FEM.get_passembler(
   a::DistributedSparseMatrixAssembler,dc::DomainContribution,μ,t)
   @unpack (
     strategy,
@@ -8,7 +8,7 @@ function FEM.get_assembler(
     test_dofs_gids_prange,
     trial_dofs_gids_prange) = a
   _assems = map(assems) do assem
-    get_assembler(assem,dc,μ,t)
+    get_passembler(assem,dc,μ,t)
   end
   return DistributedSparseMatrixAssembler(
     strategy,

@@ -18,7 +18,7 @@ function Base.iterate(sol::ODEPSolution)
   u0 .= uf
   state = (uf,u0,rf,cache)
 
-  return (uf,tf),state
+  return (uf,rf),state
 end
 
 function Base.iterate(sol::ODEPSolution,state)
@@ -43,4 +43,12 @@ function Algebra.solve(
   r::TransientPRealization) where T
 
   GenericODEPSolution(solver,op,u0,r)
+end
+
+function ODETools.test_ode_solution(sol::ODEPSolution)
+  for (u_n,r_n) in sol
+    @test isa(r_n,TransientPRealization)
+    @test isa(u_n,PArray{<:AbstractVector})
+  end
+  true
 end

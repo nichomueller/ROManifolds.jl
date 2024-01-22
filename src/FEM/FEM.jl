@@ -60,6 +60,10 @@ export get_at_offsets
 export recenter
 include("PArray.jl")
 
+export PReindex
+export PosNegPReindex
+include("PReindex.jl")
+
 export PField
 export PFieldGradient
 export GenericPField
@@ -72,6 +76,8 @@ export CellPField
 export SingleFieldFEPFunction
 export MultiFieldFEPFunction
 include("CellPField.jl")
+
+include("LagrangianPDofBases.jl")
 
 export TrialPFESpace
 export TrialPFESpace!
@@ -108,9 +114,9 @@ export NonlinearODEPOperator
 export ODEPOpFromFEOp
 include("ODEPOperatorInterface.jl")
 
-export PThetaMethodOperator
-export AffinePThetaMethodOperator
-include("PThetaMethod.jl")
+export ThetaMethodPOperator
+export AffineThetaMethodPOperator
+include("ThetaMethod.jl")
 
 export ODEPSolution
 export GenericODEPSolution

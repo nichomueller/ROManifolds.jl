@@ -23,7 +23,7 @@ function ODETools.solve_step!(
 
   ode_cache = update_cache!(ode_cache,op,r)
 
-  nlop = PThetaMethodOperator(op,r,dtθ,u0,ode_cache,vθ)
+  nlop = ThetaMethodPOperator(op,r,dtθ,u0,ode_cache,vθ)
 
   nl_cache = solve!(uf,solver.nls,nlop,nl_cache)
 
@@ -36,8 +36,8 @@ function ODETools.solve_step!(
   return (uf,r,cache)
 end
 
-struct PThetaMethodOperator <: NonlinearOperator
-  op::ODEPOperator
+struct ThetaMethodPOperator <: NonlinearOperator
+  odeop::ODEPOperator
   r::TransientPRealization
   dtθ::Float
   u0::AbstractVector
@@ -46,19 +46,33 @@ struct PThetaMethodOperator <: NonlinearOperator
 end
 
 function get_method_operator(
-  op::ODEPOperator,
+  odeop::ODEPOperator,
   r::TransientPRealization,
   dtθ::Float,
   u0::AbstractVector,
   ode_cache,
   vθ::AbstractVector)
 
-  PThetaMethodOperator(op,r,dtθ,u0,ode_cache,vθ)
+  ThetaMethodPOperator(odeop,r,dtθ,u0,ode_cache,vθ)
+end
+
+function Algebra.allocate_residual(op::ThetaMethodPOperator,x::AbstractVector)
+  allocate_residual(op.odeop,op.r,x,op.ode_cache)
+end
+
+function Algebra.allocate_jacobian(op::ThetaMethodPOperator,x::AbstractVector)
+  allocate_jacobian(op.odeop,op.r,x,op.ode_cache)
+end
+
+function Algebra.zero_initial_guess(op::ThetaMethodPOperator)
+  x0 = similar(op.u0)
+  fill!(x0,zero(eltype(x0)))
+  x0
 end
 
 function Algebra.residual!(
   b::AbstractVector,
-  op::PThetaMethodOperator,
+  op::ThetaMethodPOperator,
   x::AbstractVector)
 
   uF = x
@@ -71,7 +85,7 @@ end
 
 function residual_for_trian!(
   b::AbstractVector,
-  op::PThetaMethodOperator,
+  op::ThetaMethodPOperator,
   x::AbstractVector,
   args...)
 
@@ -84,7 +98,7 @@ end
 
 function Algebra.jacobian!(
   A::AbstractMatrix,
-  op::PThetaMethodOperator,
+  op::ThetaMethodPOperator,
   x::AbstractVector)
 
   uF = x
@@ -97,7 +111,7 @@ end
 
 function Algebra.jacobian!(
   A::AbstractMatrix,
-  op::PThetaMethodOperator,
+  op::ThetaMethodPOperator,
   x::AbstractVector,
   i::Int)
 
@@ -112,7 +126,7 @@ end
 
 function jacobian_for_trian!(
   A::AbstractMatrix,
-  op::PThetaMethodOperator,
+  op::ThetaMethodPOperator,
   x::AbstractVector,
   i::Int,
   args...)
@@ -167,8 +181,8 @@ function ODETools.solve_step!(
   return (uf,r,cache)
 end
 
-struct AffinePThetaMethodOperator <: NonlinearOperator
-  op::AffineODEPOperator
+struct AffineThetaMethodPOperator <: NonlinearOperator
+  odeop::AffineODEPOperator
   r::TransientPRealization
   dtθ::Float
   u0::AbstractVector
@@ -177,19 +191,19 @@ struct AffinePThetaMethodOperator <: NonlinearOperator
 end
 
 function get_method_operator(
-  op::AffineODEPOperator,
+  odeop::AffineODEPOperator,
   r::TransientPRealization,
   dtθ::Float,
   u0::AbstractVector,
   ode_cache,
   vθ::AbstractVector)
 
-  AffinePThetaMethodOperator(op,r,dtθ,u0,ode_cache,vθ)
+  AffineThetaMethodPOperator(odeop,r,dtθ,u0,ode_cache,vθ)
 end
 
 function Algebra.residual!(
   b::AbstractVector,
-  op::AffinePThetaMethodOperator,
+  op::AffineThetaMethodPOperator,
   x::AbstractVector)
 
   uF = op.u0
@@ -201,7 +215,7 @@ end
 
 function residual_for_trian!(
   b::AbstractVector,
-  op::AffinePThetaMethodOperator,
+  op::AffineThetaMethodPOperator,
   x::AbstractVector,
   args...)
 
@@ -213,7 +227,7 @@ end
 
 function Algebra.jacobian!(
   A::AbstractMatrix,
-  op::AffinePThetaMethodOperator,
+  op::AffineThetaMethodPOperator,
   x::AbstractVector)
 
   vθ = op.vθ
@@ -224,7 +238,7 @@ end
 
 function Algebra.jacobian!(
   A::AbstractMatrix,
-  op::AffinePThetaMethodOperator,
+  op::AffineThetaMethodPOperator,
   x::AbstractVector,
   i::Int)
 
@@ -237,7 +251,7 @@ end
 
 function jacobian_for_trian!(
   A::AbstractMatrix,
-  op::AffinePThetaMethodOperator,
+  op::AffineThetaMethodPOperator,
   x::AbstractVector,
   i::Int,
   args...)

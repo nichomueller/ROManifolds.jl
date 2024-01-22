@@ -80,53 +80,61 @@ struct OperationPField{O,F} <: PField
   fields::F
 end
 
-Fields.OperationField(op,fields::Tuple{Vararg{PField}}) = OperationPField(op,fields)
-Fields.OperationField(op::PField,fields::Tuple{Vararg{Field}}) = OperationPField(op,FieldToPField.(fields,length(op)))
 function Fields.OperationField(op,fields::Tuple{Vararg{Field}})
-  pfields = filter(x->isa(x,PField),fields)
-  if isempty(pfields)
-    OperationField{typeof(op),typeof(fields)}(op,fields)
+  if any(isa.(fields,PField)) || isa(op,PField)
+    pfields = filter(x->isa(x,PField),fields)
+    if isempty(pfields)
+      @check isa(op,PField)
+      L = length(op)
+    else
+      L = length.(pfields)
+      @check all(L .== first(L))
+      L = first(L)
+      if isa(op,PField)
+        @check length(op) == L
+      end
+    end
+    OperationPField(FieldToPField(op,L),FieldToPField.(fields,L))
   else
-    L = length.(pfields)
-    @check all(L .== first(L))
-    OperationPField(op,FieldToPField.(fields,L))
+    OperationField{typeof(op),typeof(fields)}(op,fields)
   end
 end
+
 function Base.length(f::OperationPField)
   L = map(length,f.fields)
   first(L)
 end
 Arrays.testitem(f::OperationPField) = Fields.OperationField(f.op,map(testitem,f.fields))
-Arrays.testitem(f::OperationPField{<:PField}) = Fields.OperationField(map(testitem,f.op),map(testitem,f.fields))
+Arrays.testitem(f::OperationPField{<:Field}) = Fields.OperationField(testitem(f.op),map(testitem,f.fields))
 
 function Base.iterate(f::OperationPField,oldstate...)
-  it = iterate.(f.fields,oldstate...)
-  if all(isnothing.(it))
+  itf = iterate.(f.fields,oldstate...)
+  if all(isnothing.(itf))
     return nothing
   end
-  fit,nextstate = it |> tuple_of_arrays
+  fit,nextstate = itf |> tuple_of_arrays
   Fields.OperationField(f.op,fit),nextstate
 end
 
 function Base.iterate(f::OperationPField{<:PField})
-  ito = iterate.(f.op)
+  ito = iterate(f.op)
   itf = iterate.(f.fields)
-  if all(isnothing.(ito)) && all(isnothing.(itf))
+  if isnothing(ito) && all(isnothing.(itf))
     return nothing
   end
-  oit,nextstateo = ito |> tuple_of_arrays
+  oit,nextstateo = ito
   fit,nextstatef = itf |> tuple_of_arrays
   Fields.OperationField(oit,fit),(nextstateo,nextstatef)
 end
 
 function Base.iterate(f::OperationPField{<:PField},oldstate)
   oldstateo,oldstatef = oldstate
-  ito = iterate.(f.op,oldstateo)
+  ito = iterate(f.op,oldstateo)
   itf = iterate.(f.fields,oldstatef)
-  if all(isnothing.(ito)) && all(isnothing.(itf))
+  if isnothing(ito) && all(isnothing.(itf))
     return nothing
   end
-  oit,nextstateo = ito |> tuple_of_arrays
+  oit,nextstateo = ito
   fit,nextstatef = itf |> tuple_of_arrays
   Fields.OperationField(oit,fit),(nextstateo,nextstatef)
 end
@@ -171,35 +179,42 @@ function Fields.gradient(f::OperationPField{<:Field})
   y⋅x
 end
 
-# function Arrays.return_value(k::Broadcasting{typeof(∘)},f::PField,g::PField)
-#   fi,gi = map(testitem,(f,g))
-#   vi = return_value(k,fi,gi)
-#   array = Vector{typeof(vi)}(undef,length(f))
-#   for (i,(fi,gi)) in enumerate(zip(f,g))
-#     array[i] = return_value(k,fi,gi)
+# function Arrays.return_value(
+#   b::LagrangianDofBasis,
+#   field::OperationPField)
+
+#   f1 = OperationField(testitem(field.op),field.fields)
+#   v1 = return_value(b,f1)
+#   allocate_parray(v1,length(field.op))
+# end
+
+# function Arrays.return_cache(
+#   b::LagrangianDofBasis,
+#   field::OperationPField)
+
+#   f1 = OperationField(testitem(field.op),field.fields)
+#   c1 = return_cache(b,f1)
+#   a1 = evaluate!(c1,b,f1)
+#   cache = Vector{typeof(c1)}(undef,length(field.op))
+#   array = Vector{typeof(a1)}(undef,length(field.op))
+#   for (i,opi) = enumerate(field.op)
+#     fi = OperationField(opi,field.fields)
+#     cache[i] = return_cache(b,fi)
 #   end
-#   PArray(array)
+#   cache,PArray(array)
 # end
-# function Arrays.return_value(k::Broadcasting{typeof(∘)},f::PField,g::Field)
-#   return_value(k,f,FieldToPField(g,length(f)))
-# end
-# function Arrays.return_value(k::Broadcasting{typeof(∘)},f::Field,g::PField)
-#   return_value(k,FieldToPField(f,length(g)),g)
-# end
-# function Arrays.return_value(k::Broadcasting{<:Operation},f::PField,g::PField)
-#   fi,gi = map(testitem,(f,g))
-#   vi = return_value(k,fi,gi)
-#   array = Vector{typeof(vi)}(undef,length(f))
-#   for (i,(fi,gi)) in enumerate(zip(f,g))
-#     array[i] = return_value(k,fi,gi)
+
+# function Arrays.evaluate!(
+#   cache,
+#   b::LagrangianDofBasis,
+#   field::OperationPField)
+
+#   cf,array = cache
+#   @inbounds for (i,opi) = enumerate(field.op)
+#     fi = OperationField(opi,field.fields)
+#     array[i] = evaluate!(cf[i],b,fi)
 #   end
-#   PArray(array)
-# end
-# function Arrays.return_value(k::Broadcasting{<:Operation},f::PField,g::Field)
-#   return_value(k,f,FieldToPField(g,length(f)))
-# end
-# function Arrays.return_value(k::Broadcasting{<:Operation},f::Field,g::PField)
-#   return_value(k,FieldToPField(f,length(g)),g)
+#   array
 # end
 
 struct VoidPField{F} <: PField
@@ -247,6 +262,7 @@ end
 
 FieldToPField(f::Field,L::Integer) = FieldToPField(f,Val(L))
 FieldToPField(f::PField,L::Integer) = f
+FieldToPField(f,args...) = f
 Base.length(f::FieldToPField{F,L} where F) where L = L
 Arrays.testitem(f::FieldToPField) = f.field
 
@@ -312,42 +328,4 @@ for T in (:Point,:(AbstractArray{<:Point}))
       g
     end
   end
-end
-
-function Arrays.return_value(
-  b::LagrangianDofBasis,
-  field::OperationPField)
-
-  f1 = OperationField(testitem(field.op),field.fields)
-  v1 = return_value(b,f1)
-  allocate_parray(v1,length(field.op))
-end
-
-function Arrays.return_cache(
-  b::LagrangianDofBasis,
-  field::OperationPField)
-
-  f1 = OperationField(testitem(field.op),field.fields)
-  c1 = return_cache(b,f1)
-  a1 = evaluate!(c1,b,f1)
-  cache = Vector{typeof(c1)}(undef,length(field.op))
-  array = Vector{typeof(a1)}(undef,length(field.op))
-  for (i,opi) = enumerate(field.op)
-    fi = OperationField(opi,field.fields)
-    cache[i] = return_cache(b,fi)
-  end
-  cache,PArray(array)
-end
-
-function Arrays.evaluate!(
-  cache,
-  b::LagrangianDofBasis,
-  field::OperationPField)
-
-  cf,array = cache
-  @inbounds for (i,opi) = enumerate(field.op)
-    fi = OperationField(opi,field.fields)
-    array[i] = evaluate!(cf[i],b,fi)
-  end
-  array
 end

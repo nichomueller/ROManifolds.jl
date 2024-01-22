@@ -67,9 +67,25 @@ function Base.iterate(f::GenericCellField,state)
   GenericCellField(di,trian,DS),state
 end
 
-function Base.iterate(f::SingleFieldFEPFunction,state...)
-  citer = iterate(f.cell_field,state...)
-  fiter = iterate(f.fe_space,state...)
+function Base.iterate(f::SingleFieldFEPFunction)
+  citer = iterate(f.cell_field)
+  fiter = iterate(f.fe_space)
+  if isnothing(citer) && isnothing(fiter)
+    return nothing
+  end
+  cf,cstate = citer
+  fs,fstate = fiter
+  index, = fstate
+  cv = f.cell_dof_values[index]
+  fv = f.free_values[index]
+  dv = f.dirichlet_values[index]
+  SingleFieldFEFunction(cf,cv,fv,dv,fs),(cstate,fstate)
+end
+
+function Base.iterate(f::SingleFieldFEPFunction,state)
+  cstate,fstate = state
+  citer = iterate(f.cell_field,cstate)
+  fiter = iterate(f.fe_space,fstate)
   if isnothing(citer) && isnothing(fiter)
     return nothing
   end

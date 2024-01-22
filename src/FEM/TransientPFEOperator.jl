@@ -123,8 +123,9 @@ function Algebra.allocate_residual(
   end
   xh = TransientCellField(uh,dxh)
   dc = op.res(get_parameters(r),get_times(r),xh,v)
+  assem = get_passembler(op.assem,r)
   vecdata = collect_cell_vector(test,dc)
-  allocate_vector(op.assem,vecdata)
+  allocate_vector(assem,vecdata)
 end
 
 function Algebra.allocate_jacobian(
@@ -133,9 +134,10 @@ function Algebra.allocate_jacobian(
   uh::CellField,
   cache)
 
-  _matdata_jacobians = fill_initial_jacobians(op,r,uh,cache)
+  _matdata_jacobians = TransientFETools.fill_initial_jacobians(op,r,uh)
   matdata = TransientFETools._vcat_matdata(_matdata_jacobians)
-  allocate_matrix(op.assem,matdata)
+  assem = get_passembler(op.assem,r)
+  allocate_matrix(assem,matdata)
 end
 
 function Algebra.allocate_jacobian(
@@ -155,7 +157,8 @@ function Algebra.allocate_jacobian(
   v = get_fe_basis(test)
   dc = op.jacs[i](get_parameters(r),get_times(r),xh,u,v)
   matdata = collect_cell_matrix(trial,test,dc)
-  allocate_matrix(op.assem,matdata)
+  assem = get_passembler(op.assem,r)
+  allocate_matrix(assem,matdata)
 end
 
 function Algebra.residual!(
@@ -169,7 +172,8 @@ function Algebra.residual!(
   v = get_fe_basis(test)
   dc = op.res(get_parameters(r),get_times(r),xh,v)
   vecdata = collect_cell_vector(test,dc)
-  assemble_vector_add!(b,op.assem,vecdata)
+  assem = get_passembler(op.assem,r)
+  assemble_vector_add!(b,assem,vecdata)
   b
 end
 
@@ -197,7 +201,8 @@ function Algebra.jacobian!(
   cache) where T
 
   matdata = _matdata_jacobian(op,r,xh,i,γᵢ)
-  assemble_matrix_add!(A,op.assem,matdata)
+  assem = get_passembler(op.assem,r)
+  assemble_matrix_add!(A,assem,matdata)
   A
 end
 
@@ -229,14 +234,15 @@ function ODETools.jacobians!(
 
   _matdata_jacobians = TransientFETools.fill_jacobians(op,r,xh,γ)
   matdata = TransientFETools._vcat_matdata(_matdata_jacobians)
-  assemble_matrix_add!(A,op.assem,matdata)
+  assem = get_passembler(op.assem,r)
+  assemble_matrix_add!(A,assem,matdata)
   A
 end
 
 function TransientFETools.fill_initial_jacobians(
   op::TransientPFEOperatorFromWeakForm,
   r::TransientPRealization,
-  xh::T) where T
+  uh::T) where T
 
   dxh = ()
   for i in 1:get_order(op)
@@ -293,11 +299,12 @@ function assemble_separate_vector_add!(
 
   test = get_test(op)
   trian = get_domains(dc)
+  assem = get_passembler(op.assem,r)
   bvec = Vector{typeof(b)}(undef,num_domains(dc))
   for (n,t) in enumerate(trian)
     vecdata = collect_cell_vector(test,dc,t)
     fill!(b,zero(eltype(b)))
-    assemble_vector_add!(b,op.assem,vecdata)
+    assemble_vector_add!(b,assem,vecdata)
     bvec[n] = copy(b)
   end
   bvec,trian
@@ -311,12 +318,40 @@ function assemble_separate_matrix_add!(
   test = get_test(op)
   trial = get_trial(op)(nothing)
   trian = get_domains(dc)
+  assem = get_passembler(op.assem,r)
   Avec = Vector{typeof(A)}(undef,num_domains(dc))
   for (n,t) in enumerate(trian)
     matdata = collect_cell_matrix(trial,test,dc,t)
     fillstored!(A,zero(eltype(A)))
-    assemble_matrix_add!(A,op.assem,matdata)
+    assemble_matrix_add!(A,assem,matdata)
     Avec[n] = copy(A)
   end
   Avec,trian
+end
+
+
+function TransientFETools.test_transient_fe_operator(op::TransientPFEOperator,uh,μt)
+  odeop = get_algebraic_operator(op)
+  @test isa(odeop,ODEPOperator)
+  cache = allocate_cache(op)
+  V = get_test(op)
+  @test isa(V,FESpace)
+  U = get_trial(op)
+  U0 = U(μt)
+  @test isa(U0,TrialPFESpace)
+  r = allocate_residual(op,μt,uh,cache)
+  @test isa(r,PArray{<:AbstractVector})
+  xh = TransientCellField(uh,(uh,))
+  residual!(r,op,μt,xh,cache)
+  @test isa(r,PArray{<:AbstractVector})
+  J = allocate_jacobian(op,μt,uh,cache)
+  @test isa(J,PArray{<:AbstractMatrix})
+  jacobian!(J,op,μt,xh,1,1.0,cache)
+  @test isa(J,PArray{<:AbstractMatrix})
+  jacobian!(J,op,μt,xh,2,1.0,cache)
+  @test isa(J,PArray{<:AbstractMatrix})
+  jacobians!(J,op,μt,xh,(1.0,1.0),cache)
+  @test isa(J,PArray{<:AbstractMatrix})
+  cache = update_cache!(cache,op,μt)
+  true
 end

@@ -62,8 +62,8 @@ export ODEPSolution
 export collect_solutions
 export collect_residuals_for_trian
 export collect_jacobians_for_trian
-export AffinePThetaMethodOperator
-export PThetaMethodOperator
+export AffineThetaMethodPOperator
+export ThetaMethodPOperator
 export get_order
 export get_L2_norm_matrix
 export get_H1_norm_matrix

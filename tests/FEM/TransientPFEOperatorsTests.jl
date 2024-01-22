@@ -150,7 +150,7 @@ change_time!(rθ,dtθ)
 ode_cache = update_cache!(ode_cache,odeop,rθ)
 
 using Gridap.ODEs.ODETools: ThetaMethodNonlinearOperator
-nlop = PThetaMethodOperator(odeop,rθ,dtθ,u0,ode_cache,vθ)
+nlop = ThetaMethodPOperator(odeop,rθ,dtθ,u0,ode_cache,vθ)
 
 nl_cache = solve!(uf,ode_solver.nls,nlop,nl_cache)
 

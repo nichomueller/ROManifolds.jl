@@ -227,3 +227,19 @@ function FESpaces.SparseMatrixAssembler(
     ArrayBuilder(vec),
     strategy)
 end
+
+function TransientFETools.test_transient_trial_fe_space(Uh,μ)
+  UhX = evaluate(Uh,nothing)
+  @test isa(UhX,FESpace)
+  Uh0 = allocate_trial_space(Uh,μ,0.0)
+  Uh0 = evaluate!(Uh0,Uh,μ,0.0)
+  @test isa(Uh0,FESpace)
+  Uh0 = evaluate(Uh,μ,0.0)
+  @test isa(Uh0,FESpace)
+  Uh0 = Uh(μ,0.0)
+  @test isa(Uh0,FESpace)
+  Uht=∂t(Uh)
+  Uht0=Uht(μ,0.0)
+  @test isa(Uht0,FESpace)
+  true
+end

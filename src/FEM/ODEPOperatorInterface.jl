@@ -60,7 +60,7 @@ function Algebra.allocate_jacobian(
 
   Us,Uts,fecache = ode_cache
   xh = EvaluationFunction(Us[1],x)
-  allocate_residual(op.feop,r,xh,fecache)
+  allocate_jacobian(op.feop,r,xh,fecache)
 end
 
 function Algebra.allocate_jacobian(
