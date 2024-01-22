@@ -83,10 +83,10 @@ Time 2nd derivative of the Dirichlet functions
 """
 ODETools.∂tt(U::TransientTrialPFESpace) = TransientTrialPFESpace(U.space,∂tt.(U.dirichlet_pt))
 
-FESpaces.zero_free_values(f::TransientTrialPFESpace) = zero_free_values(f.space)
+FESpaces.zero_free_values(f::TransientTrialPFESpace) = @notimplemented
 FESpaces.has_constraints(f::TransientTrialPFESpace) = has_constraints(f.space)
 FESpaces.get_dof_value_type(f::TransientTrialPFESpace) = get_dof_value_type(f.space)
-FESpaces.get_vector_type(f::TransientTrialPFESpace) = get_vector_type(f.space)
+FESpaces.get_vector_type(f::TransientTrialPFESpace) = @notimplemented
 
 # Define the TransientTrialFESpace interface for stationary spaces
 
@@ -195,17 +195,11 @@ ODETools.∂tt(U::TransientMultiFieldTrialPFESpace) = ∂t(∂t(U))
 
 function FESpaces.zero_free_values(
   f::TransientMultiFieldTrialPFESpace{<:BlockMultiFieldStyle{NB,SB,P}}) where {NB,SB,P}
-  block_ranges   = get_block_ranges(NB,SB,P)
-  block_num_dofs = map(range->sum(map(num_free_dofs,f.spaces[range])),block_ranges)
-  block_vtypes   = map(range->get_vector_type(first(f.spaces[range])),block_ranges)
-  array = map(1:length(first(f.spaces).dirichlet_values)) do i
-    mortar(map(allocate_vector,block_vtypes,block_num_dofs))
-  end
-  return array
+  @notimplemented
 end
 
 FESpaces.get_dof_value_type(f::TransientMultiFieldTrialPFESpace{MS,CS,V}) where {MS,CS,V} = eltype(V)
-FESpaces.get_vector_type(f::TransientMultiFieldTrialPFESpace) = f.vector_type
+FESpaces.get_vector_type(f::TransientMultiFieldTrialPFESpace) = @notimplemented
 FESpaces.ConstraintStyle(::Type{TransientMultiFieldTrialPFESpace{S,B,V}}) where {S,B,V} = B()
 FESpaces.ConstraintStyle(::TransientMultiFieldTrialPFESpace) = ConstraintStyle(typeof(f))
 MultiField.MultiFieldStyle(::Type{TransientMultiFieldTrialPFESpace{S,B,V}}) where {S,B,V} = S()

@@ -1,11 +1,11 @@
 struct MultiFieldPFESpace{MS<:MultiFieldStyle,CS<:ConstraintStyle,V} <: FESpace
   vector_type::Type{V}
-  spaces::Vector{<:TrialPFESpace}
+  spaces::Vector{<:SingleFieldFESpace}
   multi_field_style::MS
   constraint_style::CS
   function MultiFieldPFESpace(
     ::Type{V},
-    spaces::Vector{<:TrialPFESpace},
+    spaces::Vector{<:SingleFieldFESpace},
     multi_field_style::MultiFieldStyle) where V
     @assert length(spaces) > 0
 
@@ -20,37 +20,45 @@ struct MultiFieldPFESpace{MS<:MultiFieldStyle,CS<:ConstraintStyle,V} <: FESpace
   end
 end
 
-const PFESpace = Union{TrialPFESpace,MultiFieldPFESpace}
+function _find_length(spaces)
+  pspaces = filter(x->isa(x,SingleFieldPFESpace),spaces)
+  L = length_free_values.(pspaces)
+  @check all(L .== first(L))
+  return first(L)
+end
 
 function MultiFieldPFESpace(
-  spaces::Vector{<:TrialPFESpace};
+  spaces::Vector{<:SingleFieldPFESpace};
   style = ConsecutiveMultiFieldStyle())
 
-  Ts = map(get_dof_value_type,spaces)
-  T  = typeof(*(map(zero,Ts)...))
+  T = get_vector_type(first(spaces))
+  @check all(map(get_vector_type,spaces) .== T)
   if isa(style,BlockMultiFieldStyle)
     style = BlockMultiFieldStyle(style,spaces)
-    V = map(spaces) do space
-      zero_free_values(space.space)
-    end
-    VT = typeof(mortar(V))
+    VT = typeof(mortar(map(zero_free_values,spaces)))
   else
-    VT = Vector{T}
+    VT = T
   end
   MultiFieldPFESpace(VT,spaces,style)
 end
 
-function MultiFieldPFESpace(::Type{V},spaces::Vector{<:TrialPFESpace}) where V
-  MultiFieldPFESpace(V,spaces,ConsecutiveMultiFieldStyle())
-end
+function MultiFieldPFESpace(
+  spaces::Vector{<:SingleFieldFESpace};
+  style = ConsecutiveMultiFieldStyle())
 
-function MultiFieldPFESpace(spaces::Vector{<:SingleFieldFESpace};kwargs...)
-  @notimplemented
+  if any(isa.(spaces,SingleFieldPFESpace))
+    L = _find_length(spaces)
+    MultiFieldPFESpace(FESpaceToPFESpace.(spaces,L),style=style)
+  else
+    MultiFieldFESpace(spaces,style=style)
+  end
 end
 
 function MultiFieldPFESpace(::Type{V},spaces::Vector{<:SingleFieldFESpace}) where V
-  @notimplemented
+  MultiFieldPFESpace(V,spaces,ConsecutiveMultiFieldStyle())
 end
+
+const PFESpace = Union{SingleFieldPFESpace,MultiFieldPFESpace}
 
 MultiField.MultiFieldStyle(::Type{MultiFieldPFESpace{S,B,V}}) where {S,B,V} = S()
 MultiField.MultiFieldStyle(f::MultiFieldPFESpace) = MultiFieldStyle(typeof(f))
@@ -92,14 +100,15 @@ function FESpaces.get_free_dof_ids(f::MultiFieldPFESpace,::BlockMultiFieldStyle{
   return BlockArrays.blockedrange(block_num_dofs)
 end
 
-function block_zero_free_values(f::MultiFieldPFESpace)
-  map(f.spaces) do fe
-    zero_free_values(fe)
-  end
-end
+# function block_zero_free_values(f::MultiFieldPFESpace)
+#   map(f.spaces) do fe
+#     zero_free_values(fe)
+#   end
+# end
 
 function FESpaces.zero_free_values(f::MultiFieldPFESpace)
-  vcat(block_zero_free_values(f)...)
+  V = get_vector_type(f)
+  allocate_vector(V,num_free_dofs(f))
 end
 
 function FESpaces.zero_free_values(f::MultiFieldPFESpace{<:BlockMultiFieldStyle{NB,SB,P}}) where {NB,SB,P}
@@ -142,53 +151,18 @@ function FESpaces.get_trial_fe_basis(f::MultiFieldPFESpace)
   MultiFieldCellField(all_febases)
 end
 
-function split_fields(fe::Union{MultiFieldPFESpace,MultiFieldFESpace},free_values::PArray)
-  offsets = compute_field_offsets(fe)
-  fields = map(1:length(fe.spaces)) do field
-    pini = offsets[field] + 1
-    pend = offsets[field] + num_free_dofs(fe.spaces[field])
-    map(x->getindex(x,pini:pend),free_values)
-  end
-  fields
-end
+# function split_fields(fe::Union{MultiFieldPFESpace,MultiFieldFESpace},free_values::PArray)
+#   offsets = compute_field_offsets(fe)
+#   fields = map(1:length(fe.spaces)) do field
+#     pini = offsets[field] + 1
+#     pend = offsets[field] + num_free_dofs(fe.spaces[field])
+#     map(x->getindex(x,pini:pend),free_values)
+#   end
+#   fields
+# end
 
-function MultiField.restrict_to_field(f::MultiFieldPFESpace,free_values::PArray,field::Integer)
+function MultiField.restrict_to_field(f::MultiFieldPFESpace,free_values::AbstractVector,field::Integer)
   MultiField._restrict_to_field(f,MultiFieldStyle(f),free_values,field)
-end
-
-function MultiField._restrict_to_field(
-  f::MultiFieldPFESpace,
-  ::Union{<:ConsecutiveMultiFieldStyle,<:BlockMultiFieldStyle},
-  free_values::PArray,
-  field::Integer)
-
-  offsets = compute_field_offsets(f)
-  U = f.spaces
-  pini = offsets[field] + 1
-  pend = offsets[field] + num_free_dofs(U[field])
-  map(fv -> SubVector(fv,pini,pend),free_values)
-end
-
-function MultiField._restrict_to_field(
-  f,
-  mfs::BlockMultiFieldStyle{NB,SB,P},
-  free_values::PArray{<:BlockVector},
-  field) where {NB,SB,P}
-
-  U = f.spaces
-
-  block_ranges = get_block_ranges(NB,SB,P)
-  block_idx    = findfirst(range -> field ∈ range, block_ranges)
-
-  offsets = compute_field_offsets(f,mfs)
-  pini = offsets[field] + 1
-  pend = offsets[field] + num_free_dofs(U[field])
-
-  map(free_values) do free_values
-    @check blocklength(free_values) == NB
-    block_free_values = free_values[Block(block_idx)]
-    SubVector(block_free_values,pini,pend)
-  end
 end
 
 function MultiField.compute_field_offsets(f::MultiFieldPFESpace)
@@ -436,39 +410,73 @@ function FESpaces.interpolate(objects,fe::MultiFieldPFESpace)
   interpolate!(objects,free_values,fe)
 end
 
-function FESpaces.interpolate!(objects,free_values::PArray,fe::MultiFieldPFESpace)
-  block_free_values = block_zero_free_values(fe)
-  blocks = SingleFieldFEPFunction[]
-  for (free_values_i,U,object) in zip(block_free_values,fe.spaces,objects)
-    uhi = interpolate!(object,free_values_i,U)
+function FESpaces.interpolate!(objects,free_values::AbstractVector,fe::MultiFieldPFESpace)
+  blocks = SingleFieldFEFunction[]
+  for (field, (U,object)) in enumerate(zip(fe.spaces,objects))
+    free_values_i = restrict_to_field(fe,free_values,field)
+    uhi = interpolate!(object, free_values_i,U)
     push!(blocks,uhi)
   end
-  MultiFieldFEPFunction(free_values,fe,blocks)
+  MultiFieldFEFunction(free_values,fe,blocks)
 end
 
 function FESpaces.interpolate_everywhere(objects,fe::MultiFieldPFESpace)
   free_values = zero_free_values(fe)
-  block_free_values = block_zero_free_values(fe)
-  blocks = SingleFieldFEPFunction[]
-  for (free_values_i,U,object) in zip(block_free_values,fe.spaces,objects)
+  blocks = SingleFieldFEFunction[]
+  for (field, (U,object)) in enumerate(zip(fe.spaces,objects))
+    free_values_i = restrict_to_field(fe,free_values,field)
     dirichlet_values_i = zero_dirichlet_values(U)
-    uhi = interpolate_everywhere!(object,free_values_i,dirichlet_values_i,U)
+    uhi = interpolate_everywhere!(object, free_values_i,dirichlet_values_i,U)
     push!(blocks,uhi)
   end
-  MultiFieldFEPFunction(free_values,fe,blocks)
+  MultiFieldFEFunction(free_values,fe,blocks)
 end
 
 function FESpaces.interpolate_dirichlet(objects,fe::MultiFieldPFESpace)
   free_values = zero_free_values(fe)
-  block_free_values = block_zero_free_values(fe)
   blocks = SingleFieldFEPFunction[]
-  for (free_values_i,U,object) in zip(block_free_values,fe.spaces,objects)
+  for (field,(U,object)) in enumerate(zip(fe.spaces,objects))
+    free_values_i = restrict_to_field(fe,free_values,field)
     dirichlet_values_i = zero_dirichlet_values(U)
     uhi = interpolate_dirichlet!(object,free_values_i,dirichlet_values_i,U)
     push!(blocks,uhi)
   end
   MultiFieldFEPFunction(free_values,fe,blocks)
 end
+
+# function FESpaces.interpolate!(objects,free_values::PArray,fe::MultiFieldPFESpace)
+#   block_free_values = block_zero_free_values(fe)
+#   blocks = SingleFieldFEPFunction[]
+#   for (free_values_i,U,object) in zip(block_free_values,fe.spaces,objects)
+#     uhi = interpolate!(object,free_values_i,U)
+#     push!(blocks,uhi)
+#   end
+#   MultiFieldFEPFunction(free_values,fe,blocks)
+# end
+
+# function FESpaces.interpolate_everywhere(objects,fe::MultiFieldPFESpace)
+#   free_values = zero_free_values(fe)
+#   block_free_values = block_zero_free_values(fe)
+#   blocks = SingleFieldFEPFunction[]
+#   for (free_values_i,U,object) in zip(block_free_values,fe.spaces,objects)
+#     dirichlet_values_i = zero_dirichlet_values(U)
+#     uhi = interpolate_everywhere!(object,free_values_i,dirichlet_values_i,U)
+#     push!(blocks,uhi)
+#   end
+#   MultiFieldFEPFunction(free_values,fe,blocks)
+# end
+
+# function FESpaces.interpolate_dirichlet(objects,fe::MultiFieldPFESpace)
+#   free_values = zero_free_values(fe)
+#   block_free_values = block_zero_free_values(fe)
+#   blocks = SingleFieldFEPFunction[]
+#   for (free_values_i,U,object) in zip(block_free_values,fe.spaces,objects)
+#     dirichlet_values_i = zero_dirichlet_values(U)
+#     uhi = interpolate_dirichlet!(object,free_values_i,dirichlet_values_i,U)
+#     push!(blocks,uhi)
+#   end
+#   MultiFieldFEPFunction(free_values,fe,blocks)
+# end
 
 # function FESpaces.EvaluationFunction(fe::MultiFieldPFESpace,free_values::PArray)
 #   free_values,fe_functions = map(eachindex(fe.spaces)) do i
@@ -503,12 +511,10 @@ function Base.iterate(f::MultiFieldFEPFunction,state)
   MultiFieldFEPFunction(fv,mfs,sff),(states,statef)
 end
 
-function Arrays.testitem(f::MultiFieldPFESpace)
-  error("DEPRECADED")
-  MultiFieldFESpace(f.vector_type,map(testitem,f.spaces),f.multi_field_style)
-end
+# function Arrays.testitem(f::MultiFieldPFESpace)
+#   MultiFieldFESpace(f.vector_type,map(testitem,f.spaces),f.multi_field_style)
+# end
 
-function field_offsets(f::Union{MultiFieldFESpace,MultiFieldPFESpace})
-  error("DEPRECADED")
-  [compute_field_offsets(f)...,num_free_dofs(f)]
-end
+# function field_offsets(f::Union{MultiFieldFESpace,MultiFieldPFESpace})
+#   [compute_field_offsets(f)...,num_free_dofs(f)]
+# end

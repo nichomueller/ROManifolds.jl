@@ -80,20 +80,25 @@ struct OperationPField{O,F} <: PField
   fields::F
 end
 
+function _find_length(op,fields)
+  pfields = filter(x->isa(x,PField),fields)
+  if isempty(pfields)
+    @check isa(op,PField)
+    L = length(op)
+  else
+    L = length.(pfields)
+    @check all(L .== first(L))
+    L = first(L)
+    if isa(op,PField)
+      @check length(op) == L
+    end
+  end
+  return L
+end
+
 function Fields.OperationField(op,fields::Tuple{Vararg{Field}})
   if any(isa.(fields,PField)) || isa(op,PField)
-    pfields = filter(x->isa(x,PField),fields)
-    if isempty(pfields)
-      @check isa(op,PField)
-      L = length(op)
-    else
-      L = length.(pfields)
-      @check all(L .== first(L))
-      L = first(L)
-      if isa(op,PField)
-        @check length(op) == L
-      end
-    end
+    L = _find_length(op,fields)
     OperationPField(FieldToPField(op,L),FieldToPField.(fields,L))
   else
     OperationField{typeof(op),typeof(fields)}(op,fields)
@@ -178,44 +183,6 @@ function Fields.gradient(f::OperationPField{<:Field})
   y = ∇(b)
   y⋅x
 end
-
-# function Arrays.return_value(
-#   b::LagrangianDofBasis,
-#   field::OperationPField)
-
-#   f1 = OperationField(testitem(field.op),field.fields)
-#   v1 = return_value(b,f1)
-#   allocate_parray(v1,length(field.op))
-# end
-
-# function Arrays.return_cache(
-#   b::LagrangianDofBasis,
-#   field::OperationPField)
-
-#   f1 = OperationField(testitem(field.op),field.fields)
-#   c1 = return_cache(b,f1)
-#   a1 = evaluate!(c1,b,f1)
-#   cache = Vector{typeof(c1)}(undef,length(field.op))
-#   array = Vector{typeof(a1)}(undef,length(field.op))
-#   for (i,opi) = enumerate(field.op)
-#     fi = OperationField(opi,field.fields)
-#     cache[i] = return_cache(b,fi)
-#   end
-#   cache,PArray(array)
-# end
-
-# function Arrays.evaluate!(
-#   cache,
-#   b::LagrangianDofBasis,
-#   field::OperationPField)
-
-#   cf,array = cache
-#   @inbounds for (i,opi) = enumerate(field.op)
-#     fi = OperationField(opi,field.fields)
-#     array[i] = evaluate!(cf[i],b,fi)
-#   end
-#   array
-# end
 
 struct VoidPField{F} <: PField
   field::F

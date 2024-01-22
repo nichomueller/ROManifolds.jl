@@ -79,16 +79,19 @@ include("CellPField.jl")
 
 include("LagrangianPDofBases.jl")
 
+export SingleFieldPFESpace
+export FESpaceToPFESpace
+export length_dirichlet_values
+export length_free_values
+include("PFESpaceInterface.jl")
+
+export MultiFieldPFESpace
+include("MultiFieldPFESpaces.jl")
+
 export TrialPFESpace
 export TrialPFESpace!
 export HomogeneousTrialPFESpace
-export length_dirichlet_values
-export length_free_values
 include("TrialPFESpace.jl")
-
-export MultiFieldPFESpace
-export MultiFieldFEPFunction
-include("MultiFieldPFESpaces.jl")
 
 export TransientTrialPFESpace
 export TransientMultiFieldPFESpace
