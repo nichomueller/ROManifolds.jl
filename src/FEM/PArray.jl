@@ -787,34 +787,34 @@ function Arrays.evaluate!(cache::PArray,f::Fields.ZeroBlockMap,a,b::PArray)
   map(_get_array,cache)
 end
 
-function Arrays.return_cache(
-  f::Broadcasting{typeof(MultiField._sum_if_first_positive)},
-  dofs::PArray,
-  o)
+# function Arrays.return_cache(
+#   f::Broadcasting{typeof(MultiField._sum_if_first_positive)},
+#   dofs::PArray,
+#   o)
 
-  dofsi = testitem(dofs)
-  ci = return_cache(f,dofsi,o)
-  bi = evaluate!(ci,f,dofsi,o)
-  cache = Vector{typeof(ci)}(undef,length(dofs))
-  array = Vector{typeof(bi)}(undef,length(dofs))
-  for i = eachindex(dofs)
-    cache[i] = return_cache(f,dofs[i],o)
-  end
-  cache,PArray(array)
-end
+#   dofsi = testitem(dofs)
+#   ci = return_cache(f,dofsi,o)
+#   bi = evaluate!(ci,f,dofsi,o)
+#   cache = Vector{typeof(ci)}(undef,length(dofs))
+#   array = Vector{typeof(bi)}(undef,length(dofs))
+#   for i = eachindex(dofs)
+#     cache[i] = return_cache(f,dofs[i],o)
+#   end
+#   cache,PArray(array)
+# end
 
-function Arrays.evaluate!(
-  cache,
-  f::Broadcasting{typeof(MultiField._sum_if_first_positive)},
-  dofs::PArray,
-  o)
+# function Arrays.evaluate!(
+#   cache,
+#   f::Broadcasting{typeof(MultiField._sum_if_first_positive)},
+#   dofs::PArray,
+#   o)
 
-  cx,array = cache
-  @inbounds for i = eachindex(dofs)
-    array[i] = evaluate!(cx[i],f,dofs[i],o)
-  end
-  array
-end
+#   cx,array = cache
+#   @inbounds for i = eachindex(dofs)
+#     array[i] = evaluate!(cx[i],f,dofs[i],o)
+#   end
+#   array
+# end
 
 function Utils.recenter(a::PArray{T},a0::PArray{T};kwargs...) where T
   n = length(a)

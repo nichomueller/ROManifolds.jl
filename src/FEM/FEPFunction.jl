@@ -30,6 +30,7 @@ end
 # for visualization/testing purposes
 
 function FESpaces.test_fe_function(f::SingleFieldFEPFunction)
+  lazy_getter(a,i=1) = lazy_map(x->getindex(x.array,i),a)
   trian = get_triangulation(f)
   free_values = get_free_dof_values(f)
   fe_space = get_fe_space(f)
@@ -40,7 +41,7 @@ function FESpaces.test_fe_function(f::SingleFieldFEPFunction)
     fi = FEFunction(fe_space_i,free_values[i])
     test_fe_function(fi)
     @test free_values[i] == get_free_dof_values(fi)
-    @test cell_values[i] == get_cell_dof_values(fi,trian)
+    @test lazy_getter(cell_values,i) == get_cell_dof_values(fi,trian)
     @test dirichlet_values[i] == fi.dirichlet_values
   end
 end
@@ -129,6 +130,10 @@ function TransientFETools.TransientCellField(multi_field::MultiFieldFEPFunction,
 end
 
 # for visualization/testing purposes
+
+function FESpaces.test_fe_function(f::MultiFieldFEPFunction)
+  map(test_fe_function,f.single_fe_functions)
+end
 
 _length(f::MultiFieldFEPFunction) = _length(first(f.single_fe_functions))
 

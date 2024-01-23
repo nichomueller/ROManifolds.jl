@@ -95,16 +95,10 @@ function FESpaces.get_free_dof_ids(f::MultiFieldPFESpace,::ConsecutiveMultiField
 end
 
 function FESpaces.get_free_dof_ids(f::MultiFieldPFESpace,::BlockMultiFieldStyle{NB,SB,P}) where {NB,SB,P}
-  block_ranges   = get_block_ranges(NB,SB,P)
+  block_ranges   = MultiField.get_block_ranges(NB,SB,P)
   block_num_dofs = map(range->sum(map(num_free_dofs,f.spaces[range])),block_ranges)
   return BlockArrays.blockedrange(block_num_dofs)
 end
-
-# function block_zero_free_values(f::MultiFieldPFESpace)
-#   map(f.spaces) do fe
-#     zero_free_values(fe)
-#   end
-# end
 
 function FESpaces.zero_free_values(f::MultiFieldPFESpace)
   V = get_vector_type(f)
@@ -112,13 +106,10 @@ function FESpaces.zero_free_values(f::MultiFieldPFESpace)
 end
 
 function FESpaces.zero_free_values(f::MultiFieldPFESpace{<:BlockMultiFieldStyle{NB,SB,P}}) where {NB,SB,P}
-  block_ranges   = get_block_ranges(NB,SB,P)
+  block_ranges   = MultiField.get_block_ranges(NB,SB,P)
   block_num_dofs = map(range->sum(map(num_free_dofs,f.spaces[range])),block_ranges)
   block_vtypes   = map(range->get_vector_type(first(f.spaces[range])),block_ranges)
-  array = map(1:length(first(f.spaces).dirichlet_values)) do i
-    mortar(map(allocate_vector,block_vtypes,block_num_dofs))
-  end
-  return array
+  return mortar(map(allocate_vector,block_vtypes,block_num_dofs))
 end
 
 FESpaces.get_dof_value_type(::MultiFieldPFESpace{MS,CS,V}) where {MS,CS,V} = eltype(V)
@@ -179,7 +170,7 @@ end
 
 function MultiField.compute_field_offsets(f::MultiFieldPFESpace,::BlockMultiFieldStyle{NB,SB,P}) where {NB,SB,P}
   U = f.spaces
-  block_ranges  = get_block_ranges(NB,SB,P)
+  block_ranges  = MultiField.get_block_ranges(NB,SB,P)
   block_offsets = vcat(map(range->MultiField._compute_field_offsets(U[range]),block_ranges)...)
   offsets = map(p->block_offsets[p],P)
   return offsets
@@ -289,7 +280,11 @@ function FESpaces.get_cell_dof_ids(::MultiFieldPFESpace,::Triangulation,::MultiF
   @notimplemented
 end
 
-function FESpaces.get_cell_dof_ids(f::MultiFieldPFESpace,trian::Triangulation,::ConsecutiveMultiFieldStyle)
+function FESpaces.get_cell_dof_ids(
+  f::MultiFieldPFESpace,
+  trian::Triangulation,
+  ::Union{<:ConsecutiveMultiFieldStyle,<:BlockMultiFieldStyle})
+
   offsets = compute_field_offsets(f)
   nfields = length(f.spaces)
   blockmask = [is_change_possible(get_triangulation(Vi),trian) for Vi in f.spaces]
@@ -318,8 +313,9 @@ Base.iterate(m::MultiFieldPFESpace,state) = iterate(m.spaces,state)
 Base.getindex(m::MultiFieldPFESpace,::Colon) = m
 Base.getindex(m::MultiFieldPFESpace,field_id::Integer) = m.spaces[field_id]
 Base.length(m::MultiFieldPFESpace) = length(m.spaces)
+length_dirichlet_values(m::MultiFieldPFESpace) = length_dirichlet_values(first(m.spaces))
 
-function FESpaces.FEFunction(fe::MultiFieldPFESpace,free_values::PArray)
+function FESpaces.FEFunction(fe::MultiFieldPFESpace,free_values)
   blocks = map(1:length(fe.spaces)) do i
     free_values_i = restrict_to_field(fe,free_values,i)
     FEFunction(fe.spaces[i],free_values_i)
@@ -327,7 +323,7 @@ function FESpaces.FEFunction(fe::MultiFieldPFESpace,free_values::PArray)
   MultiFieldFEPFunction(free_values,fe,blocks)
 end
 
-function FESpaces.EvaluationFunction(fe::MultiFieldPFESpace,free_values::PArray)
+function FESpaces.EvaluationFunction(fe::MultiFieldPFESpace,free_values)
   blocks = map(1:length(fe.spaces)) do i
     free_values_i = restrict_to_field(fe,free_values,i)
     EvaluationFunction(fe.spaces[i],free_values_i)
@@ -349,25 +345,25 @@ function FESpaces.interpolate(objects,fe::MultiFieldPFESpace)
 end
 
 function FESpaces.interpolate!(objects,free_values::AbstractVector,fe::MultiFieldPFESpace)
-  blocks = SingleFieldFEFunction[]
-  for (field, (U,object)) in enumerate(zip(fe.spaces,objects))
+  blocks = SingleFieldFEPFunction[]
+  for (field,(U,object)) in enumerate(zip(fe.spaces,objects))
     free_values_i = restrict_to_field(fe,free_values,field)
     uhi = interpolate!(object, free_values_i,U)
     push!(blocks,uhi)
   end
-  MultiFieldFEFunction(free_values,fe,blocks)
+  MultiFieldFEPFunction(free_values,fe,blocks)
 end
 
 function FESpaces.interpolate_everywhere(objects,fe::MultiFieldPFESpace)
   free_values = zero_free_values(fe)
-  blocks = SingleFieldFEFunction[]
-  for (field, (U,object)) in enumerate(zip(fe.spaces,objects))
+  blocks = SingleFieldFEPFunction[]
+  for (field,(U,object)) in enumerate(zip(fe.spaces,objects))
     free_values_i = restrict_to_field(fe,free_values,field)
     dirichlet_values_i = zero_dirichlet_values(U)
     uhi = interpolate_everywhere!(object, free_values_i,dirichlet_values_i,U)
     push!(blocks,uhi)
   end
-  MultiFieldFEFunction(free_values,fe,blocks)
+  MultiFieldFEPFunction(free_values,fe,blocks)
 end
 
 function FESpaces.interpolate_dirichlet(objects,fe::MultiFieldPFESpace)
@@ -433,3 +429,25 @@ end
 # function field_offsets(f::Union{MultiFieldFESpace,MultiFieldPFESpace})
 #   [compute_field_offsets(f)...,num_free_dofs(f)]
 # end
+
+function FESpaces.test_fe_space(f::PFESpace)
+  trian = get_triangulation(f)
+  @test isa(trian,Triangulation)
+  free_values = zero_free_values(f)
+  if isa(free_values,BlockVector)
+    @test sum(map(length,map(first,free_values.blocks))) == num_free_dofs(f)
+  else
+    @test length(testitem(free_values)) == num_free_dofs(f)
+  end
+  V = get_vector_type(f)
+  @test typeof(free_values) == V
+  fe_function = FEFunction(f,free_values)
+  test_fe_function(fe_function)
+  fe_basis = get_fe_basis(f)
+  @test isa(has_constraints(f),Bool)
+  @test isa(has_constraints(typeof(f)),Bool)
+  @test length(get_cell_dof_ids(f,trian)) == num_cells(fe_basis)
+  @test length(get_cell_constraints(f,trian)) == num_cells(fe_basis)
+  @test length(get_cell_isconstrained(f,trian)) == num_cells(fe_basis)
+  @test CellField(f,get_cell_dof_ids(f,trian)) != nothing
+end

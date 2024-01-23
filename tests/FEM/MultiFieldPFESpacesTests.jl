@@ -1,4 +1,4 @@
-# module MultiFieldPFESpacesTests
+module MultiFieldPFESpacesTests
 
 using FillArrays
 using Gridap.Arrays
@@ -65,32 +65,9 @@ cellmatvec = pair_arrays(cellmat,cellvec)
 
 free_values = allocate_parray(rand(num_free_dofs(X)),length(gμ))
 xh = FEFunction(X,free_values)
-
+test_fe_function(xh)
 uh,ph = xh
-
-###########
-f = uh
-trian = get_triangulation(f)
-free_values = get_free_dof_values(f)
-fe_space = get_fe_space(f)
-cell_values = get_cell_dof_values(f,trian)
-dirichlet_values = f.dirichlet_values
-i = 1
-# for i in 1:length_dirichlet_values(fe_space)
-  fe_space_i = FEM._getindex(fe_space,i)
-  fi = FEFunction(fe_space_i,free_values[i])
-  test_fe_function(fi)
-  @test free_values[i] == get_free_dof_values(fi)
-  @test cell_values[i] == get_cell_dof_values(fi,trian)
-  @test dirichlet_values[i] == fi.dirichlet_values
-# end
-###########
-
-test_fe_function(ph)
-map(test_fe_function,xh.single_fe_functions)
-
 @test isa(xh,FEPFunction)
-uh, ph = xh
 @test isa(uh,FEPFunction)
 @test isa(ph,FEPFunction)
 
@@ -112,9 +89,8 @@ test_fe_space(Y,cellmatvec,cellmat,cellvec,trian)
 #using Gridap.Visualization
 #writevtk(trian,"trian";nsubcells=30,cellfields=["uh" => uh, "ph"=> ph])
 
-f(x) = sin(4*pi*(x[1]-x[2]^2))+1
-fh = interpolate([f,f],X)
-fh = interpolate_everywhere([f,f],X)
-fh = interpolate_dirichlet([f,f],X)
+fh = interpolate([gμ,gμ],X)
+fh = interpolate_everywhere([gμ,gμ],X)
+fh = interpolate_dirichlet([gμ,gμ],X)
 
-# end # module
+end # module

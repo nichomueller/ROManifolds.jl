@@ -72,11 +72,6 @@ export ConstantPField
 export OperationPField
 include("PField.jl")
 
-export FEPFunction
-export SingleFieldFEPFunction
-export MultiFieldFEPFunction
-include("FEPFunction.jl")
-
 include("LagrangianPDofBases.jl")
 
 export SingleFieldPFESpace
@@ -92,6 +87,11 @@ export TrialPFESpace
 export TrialPFESpace!
 export HomogeneousTrialPFESpace
 include("TrialPFESpace.jl")
+
+export FEPFunction
+export SingleFieldFEPFunction
+export MultiFieldFEPFunction
+include("FEPFunction.jl")
 
 export TransientTrialPFESpace
 export TransientMultiFieldPFESpace

@@ -4,6 +4,10 @@ length_dirichlet_values(f::FESpace) = @abstractmethod
 function length_free_values end
 length_free_values(f::FESpace) = length_dirichlet_values(f)
 
+function get_dirichlet_cells end
+get_dirichlet_cells(f::FESpace) = @abstractmethod
+get_dirichlet_cells(f::UnconstrainedFESpace) = f.dirichlet_cells
+
 abstract type SingleFieldPFESpace{S} <: SingleFieldFESpace end
 
 FESpaces.get_free_dof_ids(f::SingleFieldPFESpace) = get_free_dof_ids(f.space)
@@ -37,6 +41,8 @@ FESpaces.num_dirichlet_tags(f::SingleFieldPFESpace) = num_dirichlet_tags(f.space
 FESpaces.get_dirichlet_dof_tag(f::SingleFieldPFESpace) = get_dirichlet_dof_tag(f.space)
 
 FESpaces.scatter_free_and_dirichlet_values(f::SingleFieldPFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
+
+get_dirichlet_cells(f::SingleFieldPFESpace) = get_dirichlet_cells(f.space)
 
 function FESpaces.compute_dirichlet_values_for_tags!(
   dirichlet_values,
@@ -97,7 +103,7 @@ function FESpaces.gather_dirichlet_values!(
   cache_vals = array_cache(cell_vals)
   cache_dofs = array_cache(cell_dofs)
   free_vals = zero_free_values(f)
-  cells = f.dirichlet_cells
+  cells = get_dirichlet_cells(f)
 
   FESpaces._free_and_dirichlet_values_fill!(
     free_vals,
@@ -176,7 +182,6 @@ function FESpaces.test_single_field_fe_space(f::SingleFieldPFESpace,pred=(==))
   fe_basis = get_fe_basis(f)
   @test isa(fe_basis,CellField)
   test_fe_space(f)
-  cell_dofs = get_cell_dof_ids(f)
   dirichlet_values = zero_dirichlet_values(f)
   @test length(dirichlet_values) == num_dirichlet_dofs(f)
   free_values = zero_free_values(f)
@@ -203,5 +208,5 @@ function FESpaces.test_single_field_fe_space(f::SingleFieldPFESpace,pred=(==))
 end
 
 function _getindex(f::FESpaceToPFESpace,index)
-  f
+  f.space
 end
