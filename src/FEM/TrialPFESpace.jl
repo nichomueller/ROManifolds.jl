@@ -67,21 +67,7 @@ length_dirichlet_values(f::TrialPFESpace) = length(f.dirichlet_values)
 
 # for visualization/testing purposes
 
-function Base.iterate(f::TrialPFESpace)
-  index = 1
-  final_index = length(f.dirichlet_values)
-  state = (index,final_index)
+function _getindex(f::TrialPFESpace,index)
   dv = f.dirichlet_values[index]
-  TrialFESpace(dv,f.space),state
-end
-
-function Base.iterate(f::TrialPFESpace,state)
-  index,final_index = state
-  index += 1
-  if index > final_index
-    return nothing
-  end
-  state = (index,final_index)
-  dv = f.dirichlet_values[index]
-  TrialFESpace(dv,f.space),state
+  TrialFESpace(dv,f.space)
 end

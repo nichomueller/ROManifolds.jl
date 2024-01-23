@@ -170,6 +170,8 @@ FESpaceToPFESpace(f::SingleFieldPFESpace,L::Integer) = f
 
 length_dirichlet_values(f::FESpaceToPFESpace{S,L}) where {S,L} = L
 
+# for visualization/testing purposes
+
 function FESpaces.test_single_field_fe_space(f::SingleFieldPFESpace,pred=(==))
   fe_basis = get_fe_basis(f)
   @test isa(fe_basis,CellField)
@@ -198,4 +200,8 @@ function FESpaces.test_single_field_fe_space(f::SingleFieldPFESpace,pred=(==))
   end
   cell_dof_basis = get_fe_dof_basis(f)
   @test isa(cell_dof_basis,CellDof)
+end
+
+function _getindex(f::FESpaceToPFESpace,index)
+  f
 end

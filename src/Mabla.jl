@@ -43,7 +43,7 @@ export MultiFieldPFESpace
 export AbstractPFunction
 export PFunction, 𝑓ₚ
 export TransientPFunction, 𝑓ₚₜ
-export CellPField
+export FEPFunction
 export SingleFieldFEPFunction
 export MultiFieldFEPFunction
 export TransientTrialPFESpace

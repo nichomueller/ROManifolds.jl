@@ -72,10 +72,10 @@ export ConstantPField
 export OperationPField
 include("PField.jl")
 
-export CellPField
+export FEPFunction
 export SingleFieldFEPFunction
 export MultiFieldFEPFunction
-include("CellPField.jl")
+include("FEPFunction.jl")
 
 include("LagrangianPDofBases.jl")
 

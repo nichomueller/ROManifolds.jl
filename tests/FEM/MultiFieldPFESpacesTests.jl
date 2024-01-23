@@ -45,6 +45,7 @@ X = MultiFieldPFESpace([U,P],style=multi_field_style)
 @test num_free_dofs(X) == num_free_dofs(U) + num_free_dofs(P)
 @test num_free_dofs(X) == num_free_dofs(Y)
 @test length(X) == 2
+@test typeof(zero_free_values(X)) <: PArray{Vector{Float64},1,Vector{Vector{Float64}},3}
 
 dy = get_fe_basis(Y)
 dv, dq = dy
@@ -52,23 +53,46 @@ dv, dq = dy
 dx = get_trial_fe_basis(X)
 du, dp = dx
 
-cellmat = integrate(dv*du,quad)
-cellvec = integrate(dv*2,quad)
+cellmat = integrate(gμ*dv*du,quad)
+cellvec = integrate(gμ*dv*2,quad)
 cellmatvec = pair_arrays(cellmat,cellvec)
-@test isa(cellmat[end],ArrayBlock)
+@test isa(cellmat[end],ArrayBlock{<:PArray})
 @test cellmat[1][1,1] != nothing
 @test cellmat[1][1,2] == nothing
-@test isa(cellvec[end], ArrayBlock)
+@test isa(cellvec[end], ArrayBlock{<:PArray})
 @test cellvec[1][1] != nothing
 @test cellvec[1][2] == nothing
 
-free_values = rand(num_free_dofs(X))
+free_values = allocate_parray(rand(num_free_dofs(X)),length(gμ))
 xh = FEFunction(X,free_values)
-test_fe_function(xh)
-@test isa(xh,FEFunction)
+
+uh,ph = xh
+
+###########
+f = uh
+trian = get_triangulation(f)
+free_values = get_free_dof_values(f)
+fe_space = get_fe_space(f)
+cell_values = get_cell_dof_values(f,trian)
+dirichlet_values = f.dirichlet_values
+i = 1
+# for i in 1:length_dirichlet_values(fe_space)
+  fe_space_i = FEM._getindex(fe_space,i)
+  fi = FEFunction(fe_space_i,free_values[i])
+  test_fe_function(fi)
+  @test free_values[i] == get_free_dof_values(fi)
+  @test cell_values[i] == get_cell_dof_values(fi,trian)
+  @test dirichlet_values[i] == fi.dirichlet_values
+# end
+###########
+
+test_fe_function(ph)
+map(test_fe_function,xh.single_fe_functions)
+
+@test isa(xh,FEPFunction)
 uh, ph = xh
-@test isa(uh,FEFunction)
-@test isa(ph,FEFunction)
+@test isa(uh,FEPFunction)
+@test isa(ph,FEPFunction)
 
 cell_isconstr = get_cell_isconstrained(X,trian)
 @test cell_isconstr == Fill(false,num_cells(model))
