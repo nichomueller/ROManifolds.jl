@@ -1,12 +1,12 @@
-function ReferenceFEs._lagr_dof_cache(node_to_val::PArray,ndofs)
+function ReferenceFEs._lagr_dof_cache(node_to_val::ParamArray,ndofs)
   map(node_to_val) do node_to_val
     ReferenceFEs._lagr_dof_cache(node_to_val,ndofs)
   end
 end
 
 function ReferenceFEs._evaluate_lagr_dof!(
-  c::PArray{<:AbstractVector},
-  node_comp_to_val::PArray{<:AbstractVector},
+  c::ParamVector,
+  node_comp_to_val::ParamVector,
   node_and_comp_to_dof,
   ndofs,
   ncomps)
@@ -17,8 +17,8 @@ function ReferenceFEs._evaluate_lagr_dof!(
 end
 
 function ReferenceFEs._evaluate_lagr_dof!(
-  c::PArray{<:AbstractMatrix},
-  node_pdof_comp_to_val::PArray{<:AbstractMatrix},
+  c::ParamMatrix,
+  node_pdof_comp_to_val::ParamMatrix,
   node_and_comp_to_dof,
   ndofs,
   ncomps)

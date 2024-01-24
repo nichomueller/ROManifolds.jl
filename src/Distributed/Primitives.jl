@@ -1,5 +1,5 @@
 function PartitionedArrays.allocate_gather_impl(
-  snd::AbstractVector{<:PArray},
+  snd::AbstractVector{<:ParamArray},
   destination,
   ::Type{T}) where T<:AbstractVector
 
@@ -33,7 +33,7 @@ end
 
 function PartitionedArrays.gather_impl!(
   rcv::AbstractVector{<:PTJaggedArray},
-  snd::AbstractVector{<:PArray},
+  snd::AbstractVector{<:ParamArray},
   destination,
   ::Type{T}) where T
 
@@ -54,7 +54,7 @@ function PartitionedArrays.gather_impl!(
 end
 
 function PartitionedArrays.allocate_scatter_impl(
-  snd::AbstractVector{<:PArray},
+  snd::AbstractVector{<:ParamArray},
   source,
   ::Type{T}) where T <:AbstractVector
 
@@ -70,8 +70,8 @@ function PartitionedArrays.allocate_scatter_impl(
 end
 
 function PartitionedArrays.scatter_impl!(
-  rcv::AbstractVector{<:PArray},
-  snd::AbstractVector{<:PArray},
+  rcv::AbstractVector{<:ParamArray},
+  snd::AbstractVector{<:ParamArray},
   source,
   ::Type{T}) where T
 
@@ -84,7 +84,7 @@ function PartitionedArrays.scatter_impl!(
 end
 
 function PartitionedArrays.allocate_emit_impl(
-  snd::AbstractVector{<:PArray},
+  snd::AbstractVector{<:ParamArray},
   source,
   ::Type{T}) where T<:AbstractVector
 
@@ -101,8 +101,8 @@ function PartitionedArrays.allocate_emit_impl(
 end
 
 function PartitionedArrays.emit_impl!(
-  rcv::AbstractVector{<:PArray},
-  snd::AbstractVector{<:PArray},
+  rcv::AbstractVector{<:ParamArray},
+  snd::AbstractVector{<:ParamArray},
   source,
   ::Type{T}) where T
 

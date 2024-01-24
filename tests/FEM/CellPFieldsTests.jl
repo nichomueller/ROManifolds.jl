@@ -99,6 +99,7 @@ first.((βμ*α)(x)) == (β1*α)(x)
 ax = ((∇+k)(βμ*α))(x)
 test_array(ax,collect(ax))
 
+# work in progress
 β = CellField(βμ,trian)
 ax =((∇-k)⋅β)(x)
 test_array(ax,collect(ax))

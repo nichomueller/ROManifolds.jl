@@ -132,13 +132,13 @@ end
 
 # ConstantField
 
-v = PArray([1.0*VectorValue(1.0,1.0),2.0*VectorValue(1.0,1.0)])
+v = ParamArray([1.0*VectorValue(1.0,1.0),2.0*VectorValue(1.0,1.0)])
 f = ConstantField(v)
 @test isa(f,ConstantPField)
 
 fp = v
-∇fp = PArray([zero(TensorValue{2,2,Float64}),zero(TensorValue{2,2,Float64})])
-∇∇fp = PArray([zero(ThirdOrderTensorValue{2,2,2,Float64,6}),zero(ThirdOrderTensorValue{2,2,2,Float64,6})])
+∇fp = ParamArray([zero(TensorValue{2,2,Float64}),zero(TensorValue{2,2,Float64})])
+∇∇fp = ParamArray([zero(ThirdOrderTensorValue{2,2,2,Float64,6}),zero(ThirdOrderTensorValue{2,2,2,Float64,6})])
 test_field(f,p,fp)
 test_field(f,p,fp,grad=∇fp)
 test_field(f,p,fp,grad=∇fp,gradgrad=∇∇fp)

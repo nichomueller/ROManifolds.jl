@@ -13,12 +13,12 @@ function ReferenceFEs.get_order(test::SingleFieldFESpace)
   end
 end
 
-function Utils.recenter(a::PArray,ah0::FEFunction;kwargs...)
+function Utils.recenter(a::ParamArray,ah0::FEFunction;kwargs...)
   a0 = get_free_dof_values(ah0)
   recenter(a,a0;kwargs...)
 end
 
-function Utils.recenter(a::Vector{<:PArray},ah0::FEFunction;kwargs...)
+function Utils.recenter(a::Vector{<:ParamArray},ah0::FEFunction;kwargs...)
   map(eachindex(a)) do i
     ai = a[i]
     ai0 = get_free_dof_values(ah0[i])

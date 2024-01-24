@@ -40,12 +40,12 @@ X = MultiFieldPFESpace([U,P],style=multi_field_style)
 @test isa(Y,MultiFieldFESpace)
 @test isa(X,MultiFieldPFESpace)
 @test isa(X.spaces,Vector{<:SingleFieldPFESpace})
-@test get_vector_type(X) <: PArray
+@test get_vector_type(X) <: ParamArray
 
 @test num_free_dofs(X) == num_free_dofs(U) + num_free_dofs(P)
 @test num_free_dofs(X) == num_free_dofs(Y)
 @test length(X) == 2
-@test typeof(zero_free_values(X)) <: PArray{Vector{Float64},1,Vector{Vector{Float64}},3}
+@test typeof(zero_free_values(X)) <: ParamArray{Vector{Float64},1,Vector{Vector{Float64}},3}
 
 dy = get_fe_basis(Y)
 dv, dq = dy
@@ -56,20 +56,20 @@ du, dp = dx
 cellmat = integrate(gμ*dv*du,quad)
 cellvec = integrate(gμ*dv*2,quad)
 cellmatvec = pair_arrays(cellmat,cellvec)
-@test isa(cellmat[end],ArrayBlock{<:PArray})
+@test isa(cellmat[end],ArrayBlock{<:ParamArray})
 @test cellmat[1][1,1] != nothing
 @test cellmat[1][1,2] == nothing
-@test isa(cellvec[end], ArrayBlock{<:PArray})
+@test isa(cellvec[end], ArrayBlock{<:ParamArray})
 @test cellvec[1][1] != nothing
 @test cellvec[1][2] == nothing
 
 free_values = allocate_parray(rand(num_free_dofs(X)),length(gμ))
 xh = FEFunction(X,free_values)
-test_fe_function(xh)
+test_fe_pfunction(xh)
 uh,ph = xh
-@test isa(xh,FEPFunction)
-@test isa(uh,FEPFunction)
-@test isa(ph,FEPFunction)
+@test isa(xh,FEFunction)
+@test isa(uh,FEFunction)
+@test isa(ph,FEFunction)
 
 cell_isconstr = get_cell_isconstrained(X,trian)
 @test cell_isconstr == Fill(false,num_cells(model))

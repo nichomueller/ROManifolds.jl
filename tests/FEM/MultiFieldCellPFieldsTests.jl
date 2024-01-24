@@ -67,8 +67,8 @@ n = VectorValue(1,2)
 
 cellmat = integrate( u1μ*(n⋅dv)*dp + dq*dp, quad)
 cellvec = integrate( u1μ*(n⋅dv), quad)
-@test isa(cellvec[end],ArrayBlock{<:PArray})
-@test isa(cellmat[end],ArrayBlock{<:PArray})
+@test isa(cellvec[end],ArrayBlock{<:ParamArray})
+@test isa(cellmat[end],ArrayBlock{<:ParamArray})
 
 cellmat1 = integrate( u1μ*((n⋅dv) - dq)*((n⋅du) + dp), quad)
 cellmat2 = integrate( u1μ*(n⋅dv)*(n⋅du) + u1μ*(n⋅dv)*dp - u1μ*dq*(n⋅du) - u1μ*dq*dp, quad)

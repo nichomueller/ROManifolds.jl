@@ -48,7 +48,7 @@ end
 function ODETools.test_ode_solution(sol::ODEPSolution)
   for (u_n,r_n) in sol
     @test isa(r_n,TransientPRealization)
-    @test isa(u_n,PArray{<:AbstractVector})
+    @test isa(u_n,ParamVector)
   end
   true
 end

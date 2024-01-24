@@ -14,7 +14,7 @@ get_blocks(b) = b.blocks
 struct BlockSnapshots{T} <: RBBlock{T,1}
   blocks::Vector{Snapshots{T}}
 
-  function BlockSnapshots(snaps::Vector{<:AbstractVector{<:PArray}})
+  function BlockSnapshots(snaps::Vector{<:AbstractVector{<:ParamArray}})
     nblocks = length(testitem(snaps))
     block_snaps = map(1:nblocks) do i
       Snapshots(getindex.(snaps,i))
@@ -47,7 +47,7 @@ end
 
 function Utils.load(rbinfo::BlockRBInfo,::Type{BlockSnapshots{T}}) where T
   path = joinpath(rbinfo.fe_path,"fesnaps")
-  load(path,BlockSnapshots{AbstractVector{<:PArray{T}}})
+  load(path,BlockSnapshots{AbstractVector{<:ParamArray{T}}})
 end
 
 function collect_solutions(
@@ -118,7 +118,7 @@ function num_rb_ndofs(rb::BlockRBSpace)
   ndofs
 end
 
-function recast(x::PArray,rb::BlockRBSpace)
+function recast(x::ParamArray,rb::BlockRBSpace)
   nblocks = length(rb)
   offsets = rb_offsets(rb)
   blocks = map(1:nblocks) do row
@@ -129,7 +129,7 @@ function recast(x::PArray,rb::BlockRBSpace)
   return vcat(blocks...)
 end
 
-function space_time_projection(x::PArray,rb::BlockRBSpace)
+function space_time_projection(x::ParamArray,rb::BlockRBSpace)
   nblocks = length(rb)
   offsets = fe_offsets(rb)
   blocks = map(1:nblocks) do row
@@ -488,7 +488,7 @@ function collect_rhs_contributions!(
   rbspace::BlockRBSpace{T}) where T
 
   nblocks = length(rbres)
-  blocks = Vector{PArray{Vector{T}}}(undef,nblocks)
+  blocks = Vector{ParamArray{Vector{T}}}(undef,nblocks)
   for row = 1:nblocks
     cache_row = cache_at_index(cache,rbspace,row)
     op_row_col = op[row,:]
@@ -514,10 +514,10 @@ function collect_lhs_contributions!(
 
   njacs = length(rbjacs)
   nblocks = length(testitem(rbjacs))
-  rb_jacs_contribs = Vector{PArray{Matrix{T}}}(undef,njacs)
+  rb_jacs_contribs = Vector{ParamArray{Matrix{T}}}(undef,njacs)
   for i = 1:njacs
     rb_jac_i = rbjacs[i]
-    blocks = Matrix{PArray{Matrix{T}}}(undef,nblocks,nblocks)
+    blocks = Matrix{ParamArray{Matrix{T}}}(undef,nblocks,nblocks)
     for (row,col) = index_pairs(nblocks,nblocks)
       cache_row_col = cache_at_index(cache,rbspace,row,col)
       op_row_col = op[row,col]
@@ -562,8 +562,8 @@ end
 function post_process(
   rbinfo::BlockRBInfo,
   feop::TransientPFEOperator,
-  sol::PArray,
-  sol_approx::PArray,
+  sol::ParamArray,
+  sol_approx::ParamArray,
   params::Table,
   stats::NamedTuple;
   show_results=true)

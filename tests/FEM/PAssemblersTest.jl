@@ -122,7 +122,7 @@ for T in mtypes
 
   @test x ≈ x2
   @test length(x) == length(x2) == length(vec) == length(mat) == 3
-  @test typeof(x) == typeof(x2) == typeof(vec) == pvector_type
+  @test typeof(x) == typeof(x2) == typeof(vec) <: ParamVector{Float64,3}
 
   for (i,μi) = enumerate(μ)
     μi = sum(μi)

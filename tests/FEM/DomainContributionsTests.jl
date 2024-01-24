@@ -41,7 +41,7 @@ a = ∫(fμ*u*v)*dΩ + ∫(fμ*u*v)*dΓ + ∫(fμ*∇(u)⋅∇(v))*dΩ
 @test num_domains(a) == 2
 @test Ω in get_domains(a)
 @test Γ in get_domains(a)
-@test isa(get_contribution(a,Ω),LazyArray{<:Any,<:PArray})
+@test isa(get_contribution(a,Ω),LazyArray{<:Any,<:ParamArray})
 @test length(lazy_getter(get_contribution(a,Ω))) == num_cells(Ω)
 @test length(first(get_contribution(a,Ω))) == 3
 b = ∫(u*v)*dΩ + ∫(u*v)*dΓ + ∫(∇(u)⋅∇(v))*dΩ

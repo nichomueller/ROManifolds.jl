@@ -254,7 +254,7 @@ function Base.map(f::PField,x::AbstractArray{<:Point})
   for (i,fi) in enumerate(f)
     array[i] = map(fi,x)
   end
-  PArray(array)
+  ParamArray(array)
 end
 
 Base.broadcasted(f::PField,x::AbstractArray{<:Point}) = map(f,x)
@@ -272,7 +272,7 @@ for T in (:Point,:(AbstractArray{<:Point}))
       for (i,fi) in enumerate(f)
         array[i] = return_value(fi,x)
       end
-      PArray(array)
+      ParamArray(array)
     end
 
     function Arrays.return_cache(f::PField,x::$T)
@@ -284,7 +284,7 @@ for T in (:Point,:(AbstractArray{<:Point}))
       for (i,fi) in enumerate(f)
         l[i] = return_cache(fi,x)
       end
-      l,PArray(g)
+      l,ParamArray(g)
     end
 
     function Arrays.evaluate!(cache,f::PField,x::$T)

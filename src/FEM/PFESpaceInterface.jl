@@ -68,7 +68,7 @@ function FESpaces._convert_to_collectable(object::AbstractPFunction,ntags)
     @assert typeof(o) <: Function
     FESpaces._convert_to_collectable(Fill(o,ntags),ntags)
   end
-  PArray(objects)
+  ParamArray(objects)
 end
 
 function FESpaces.gather_free_and_dirichlet_values!(
@@ -118,8 +118,8 @@ function FESpaces.gather_dirichlet_values!(
 end
 
 function FESpaces._free_and_dirichlet_values_fill!(
-  free_vals::PArray,
-  dirichlet_vals::PArray,
+  free_vals::ParamArray,
+  dirichlet_vals::ParamArray,
   cache_vals,
   cache_dofs,
   cell_vals,
@@ -145,26 +145,16 @@ function FESpaces._free_and_dirichlet_values_fill!(
 
 end
 
-# These functions allow us to use global PArray(s)
+# This function allows us to use global ParamArrays
 
 function FESpaces.get_vector_type(f::SingleFieldPFESpace)
   V = get_vector_type(f.space)
   N = length_free_values(f)
-  typeof(PArray{V}(undef,N))
+  typeof(ParamVector{V}(undef,N))
 end
 
-# function FESpaces.zero_free_values(f::SingleFieldPFESpace)
-#   V = get_vector_type(f)
-#   allocate_vector(V,num_free_dofs(f))
-# end
-
-# function FESpaces.zero_dirichlet_values(f::SingleFieldPFESpace)
-#   V = get_vector_type(f)
-#   allocate_vector(V,num_dirichlet_dofs(f))
-# end
-
 # This artifact aims to make a FESpace behave like a PFESpace with free and
-# dirichlet values being PArrays of length L
+# dirichlet values being ParamArrays of length L
 
 struct FESpaceToPFESpace{S,L} <: SingleFieldPFESpace{S}
   space::S
@@ -176,7 +166,7 @@ FESpaceToPFESpace(f::SingleFieldPFESpace,L::Integer) = f
 
 length_dirichlet_values(f::FESpaceToPFESpace{S,L}) where {S,L} = L
 
-# for visualization/testing purposes
+# for testing purposes
 
 function FESpaces.test_single_field_fe_space(f::SingleFieldPFESpace,pred=(==))
   fe_basis = get_fe_basis(f)
@@ -196,8 +186,8 @@ function FESpaces.test_single_field_fe_space(f::SingleFieldPFESpace,pred=(==))
   @test pred(fv,free_values)
   @test pred(dv,dirichlet_values)
   fe_function = FEFunction(f,free_values,dirichlet_values)
-  @test isa(fe_function,SingleFieldFEPFunction)
-  test_fe_function(fe_function)
+  @test isa(fe_function,SingleFieldFEFunction)
+  test_fe_pfunction(fe_function)
   ddof_to_tag = get_dirichlet_dof_tag(f)
   @test length(ddof_to_tag) == num_dirichlet_dofs(f)
   if length(get_dirichlet_dof_tag(f)) != 0
@@ -207,6 +197,23 @@ function FESpaces.test_single_field_fe_space(f::SingleFieldPFESpace,pred=(==))
   @test isa(cell_dof_basis,CellDof)
 end
 
-function _getindex(f::FESpaceToPFESpace,index)
-  f.space
+function test_fe_pfunction(f::SingleFieldFEFunction)
+  lazy_getter(a,i=1) = lazy_map(x->getindex(x.array,i),a)
+  trian = get_triangulation(f)
+  free_values = get_free_dof_values(f)
+  fe_space = get_fe_space(f)
+  cell_values = get_cell_dof_values(f,trian)
+  dirichlet_values = f.dirichlet_values
+  for i in 1:length_dirichlet_values(fe_space)
+    fe_space_i = _getindex(fe_space,i)
+    fi = FEFunction(fe_space_i,free_values[i])
+    test_fe_function(fi)
+    @test free_values[i] == get_free_dof_values(fi)
+    @test lazy_getter(cell_values,i) == get_cell_dof_values(fi,trian)
+    @test dirichlet_values[i] == fi.dirichlet_values
+  end
+end
+
+function test_fe_pfunction(f::MultiFieldFEFunction)
+  map(test_fe_pfunction,f.single_fe_functions)
 end

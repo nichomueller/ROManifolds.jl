@@ -53,12 +53,17 @@ include("ParametricSpace.jl")
 
 include("PDiffOperators.jl")
 
-export PArray
+export ParamContainer
+include("ParamContainer.jl")
+
+export ParamArray
+export ParamVector
+export ParamMatrix
 export allocate_parray
 export zero_parray
 export get_at_offsets
 export recenter
-include("PArray.jl")
+include("ParamArray.jl")
 
 export PReindex
 export PosNegPReindex
@@ -87,11 +92,6 @@ export TrialPFESpace
 export TrialPFESpace!
 export HomogeneousTrialPFESpace
 include("TrialPFESpace.jl")
-
-export FEPFunction
-export SingleFieldFEPFunction
-export MultiFieldFEPFunction
-include("FEPFunction.jl")
 
 export TransientTrialPFESpace
 export TransientMultiFieldPFESpace

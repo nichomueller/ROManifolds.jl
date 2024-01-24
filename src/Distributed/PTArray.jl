@@ -10,14 +10,14 @@ function Base.materialize(b::PBroadcasted{<:AbstractArray{<:PBroadcast}})
   a
 end
 
-function Base.copy(a::PVector{<:PArray})
+function Base.copy(a::PVector{<:ParamArray})
   values = map(local_views(a)) do v
     copy(v)
   end
   PVector(values,a.index_partition)
 end
 
-function Base.collect(v::PVector{<:PArray})
+function Base.collect(v::PVector{<:ParamArray})
   own_values_v = own_values(v)
   own_to_global_v = map(own_to_global,partition(axes(v,1)))
   vals = gather(own_values_v,destination=:all)
@@ -37,7 +37,7 @@ function Base.collect(v::PVector{<:PArray})
 end
 
 function PartitionedArrays.allocate_local_values(
-  a::PArray,
+  a::ParamArray,
   ::Type{T},
   indices) where T
 
@@ -46,34 +46,34 @@ function PartitionedArrays.allocate_local_values(
   end
 end
 
-function PartitionedArrays.allocate_local_values(::Type{<:PArray},indices)
-  @notimplemented "The length of the PArray is needed"
+function PartitionedArrays.allocate_local_values(::Type{<:ParamArray},indices)
+  @notimplemented "The length of the ParamArray is needed"
 end
 
-function PartitionedArrays.own_values(values::PArray,indices)
+function PartitionedArrays.own_values(values::ParamArray,indices)
   map(a->own_values(a,indices),values)
 end
 
-function PartitionedArrays.ghost_values(values::PArray,indices)
+function PartitionedArrays.ghost_values(values::ParamArray,indices)
   map(a->ghost_values(a,indices),values)
 end
 
-function PartitionedArrays.nziterator(a::PArray{<:AbstractSparseMatrixCSC},args...)
+function PartitionedArrays.nziterator(a::ParamArray{<:AbstractSparseMatrixCSC},args...)
   NZIteratorCSC(a)
 end
 
-function PartitionedArrays.nziterator(a::PArray{<:SparseMatrixCSR},args...)
+function PartitionedArrays.nziterator(a::ParamArray{<:SparseMatrixCSR},args...)
   NZIteratorCSR(a)
 end
 
-function PartitionedArrays.nzindex(a::PArray{<:AbstractSparseMatrix},args...)
+function PartitionedArrays.nzindex(a::ParamArray{<:AbstractSparseMatrix},args...)
   nzindex(testitem(a),args...)
 end
 
-Base.first(a::NZIteratorCSC{<:PArray}) = first(a.matrix)
-Base.length(a::NZIteratorCSC{<:PArray}) = length(first(a))
+Base.first(a::NZIteratorCSC{<:ParamArray}) = first(a.matrix)
+Base.length(a::NZIteratorCSC{<:ParamArray}) = length(first(a))
 
-@inline function Base.iterate(a::NZIteratorCSC{<:PArray})
+@inline function Base.iterate(a::NZIteratorCSC{<:ParamArray})
   if nnz(first(a)) == 0
     return nothing
   end
@@ -93,7 +93,7 @@ Base.length(a::NZIteratorCSC{<:PArray}) = length(first(a))
   (i,j,v),(col,kstate)
 end
 
-@inline function Base.iterate(a::NZIteratorCSC{<:PArray},state)
+@inline function Base.iterate(a::NZIteratorCSC{<:ParamArray},state)
   col,kstate = state
   ks = nzrange(first(a),col)
   knext = iterate(ks,kstate)
@@ -116,10 +116,10 @@ end
   (i,j,v),(col,kstate)
 end
 
-Base.first(a::NZIteratorCSR{<:PArray}) = first(a.matrix)
-Base.length(a::NZIteratorCSR{<:PArray}) = length(first(a))
+Base.first(a::NZIteratorCSR{<:ParamArray}) = first(a.matrix)
+Base.length(a::NZIteratorCSR{<:ParamArray}) = length(first(a))
 
-@inline function Base.iterate(a::NZIteratorCSR{<:PArray})
+@inline function Base.iterate(a::NZIteratorCSR{<:ParamArray})
   if nnz(first(a)) == 0
     return nothing
   end
@@ -139,7 +139,7 @@ Base.length(a::NZIteratorCSR{<:PArray}) = length(first(a))
   (i,j,v),(row,kstate)
 end
 
-@inline function Base.iterate(a::NZIteratorCSR{<:PArray},state)
+@inline function Base.iterate(a::NZIteratorCSR{<:ParamArray},state)
   row,kstate = state
   ks = nzrange(a.matrix,row)
   knext = iterate(ks,kstate)
@@ -163,7 +163,7 @@ end
 end
 
 function PartitionedArrays.p_sparse_matrix_cache_impl(
-  ::Type{<:PArray},
+  ::Type{<:ParamArray},
   matrix_partition,
   row_partition,
   col_partition)
@@ -231,7 +231,7 @@ function PartitionedArrays.p_sparse_matrix_cache_impl(
 end
 
 function PartitionedArrays.assembly_buffers(
-  values::PArray,
+  values::ParamArray,
   local_indices_snd,
   local_indices_rcv)
 
@@ -249,7 +249,7 @@ function PartitionedArrays.assembly_buffers(
 end
 
 function PartitionedArrays.from_trivial_partition!(
-  c::PVector{<:PArray},c_in_main::PVector{<:PArray})
+  c::PVector{<:ParamArray},c_in_main::PVector{<:ParamArray})
 
   destination = 1
   consistent!(c_in_main) |> wait
@@ -267,7 +267,7 @@ function PartitionedArrays.from_trivial_partition!(
 end
 
 function PartitionedArrays.to_trivial_partition(
-  b::PVector{<:PArray},
+  b::PVector{<:ParamArray},
   row_partition_in_main)
 
   destination = 1
@@ -293,7 +293,7 @@ function PartitionedArrays.to_trivial_partition(
 end
 
 function PartitionedArrays.to_trivial_partition(
-  a::PSparseMatrix{<:PArray{M}},
+  a::PSparseMatrix{<:ParamArray{M}},
   row_partition_in_main=trivial_partition(partition(axes(a,1))),
   col_partition_in_main=trivial_partition(partition(axes(a,2)))) where M
 
@@ -358,7 +358,7 @@ end
 function PartitionedArrays.assemble_coo!(
   I,
   J,
-  V::AbstractVector{<:PArray},
+  V::AbstractVector{<:ParamArray},
   row_partition)
 
   function setup_snd(part,parts_snd,row_lids,coo_values)
@@ -437,26 +437,26 @@ function PartitionedArrays.assemble_coo!(
 end
 
 struct PTJaggedArray{T,Ti} <: AbstractVector{SubArray{T,1,Vector{T},Tuple{UnitRange{Ti}},true}}
-  data::PArray{T}
+  data::ParamArray{T}
   ptrs::Vector{Ti}
 
-  function PTJaggedArray(data::PArray{T},ptrs::Vector{Ti}) where {T,Ti}
+  function PTJaggedArray(data::ParamArray{T},ptrs::Vector{Ti}) where {T,Ti}
     new{T,Ti}(data,ptrs)
   end
-  function PTJaggedArray{T,Ti}(data::PArray{T},ptrs::Vector) where {T,Ti}
+  function PTJaggedArray{T,Ti}(data::ParamArray{T},ptrs::Vector) where {T,Ti}
     new{T,Ti}(data,convert(Vector{Ti},ptrs))
   end
 end
 
-function PartitionedArrays.JaggedArray(data::PArray,ptrs)
+function PartitionedArrays.JaggedArray(data::ParamArray,ptrs)
   PTJaggedArray(data,ptrs)
 end
 
-PartitionedArrays.JaggedArray(a::AbstractArray{<:PArray{T}}) where T = JaggedArray{T,Int32}(a)
+PartitionedArrays.JaggedArray(a::AbstractArray{<:ParamArray{T}}) where T = JaggedArray{T,Int32}(a)
 PartitionedArrays.JaggedArray(a::PTJaggedArray) = a
 PartitionedArrays.JaggedArray{T,Ti}(a::PTJaggedArray{T,Ti}) where {T,Ti} = a
 
-function PartitionedArrays.JaggedArray{T,Ti}(a::AbstractArray{<:PArray{T}}) where {T,Ti}
+function PartitionedArrays.JaggedArray{T,Ti}(a::AbstractArray{<:ParamArray{T}}) where {T,Ti}
   n = length(a)
   ptrs = Vector{Ti}(undef,n+1)
   u = one(eltype(ptrs))
@@ -492,7 +492,7 @@ function Base.setindex!(a::PTJaggedArray,v,i::Int)
   @notimplemented "Iterate over the inner jagged arrays instead"
 end
 
-PartitionedArrays.jagged_array(data::PArray,ptrs::Vector) = PTJaggedArray(data,ptrs)
+PartitionedArrays.jagged_array(data::ParamArray,ptrs::Vector) = PTJaggedArray(data,ptrs)
 
 struct PTVectorAssemblyCache{T}
   neighbors_snd::Vector{Int32}
@@ -557,19 +557,19 @@ end
 Base.reverse(a::PTSparseMatrixAssemblyCache) = PTSparseMatrixAssemblyCache(reverse(a.cache))
 PartitionedArrays.copy_cache(a::PTSparseMatrixAssemblyCache) = PTSparseMatrixAssemblyCache(copy_cache(a.cache))
 
-Base.length(a::LocalView{T,N,<:PArray}) where {T,N} = length(a.plids_to_value)
-Base.size(a::LocalView{T,N,<:PArray}) where {T,N} = (length(a),)
+Base.length(a::LocalView{T,N,<:ParamArray}) where {T,N} = length(a.plids_to_value)
+Base.size(a::LocalView{T,N,<:ParamArray}) where {T,N} = (length(a),)
 
-function Base.getindex(a::LocalView{T,N,<:PArray},i::Integer...) where {T,N}
+function Base.getindex(a::LocalView{T,N,<:ParamArray},i::Integer...) where {T,N}
   LocalView(a.plids_to_value[i...],a.d_to_lid_to_plid)
 end
 
 struct PTSubSparseMatrix{T,A,B,C}
-  array::PArray{SubSparseMatrix{T,A,B,C},2,Vector{SubSparseMatrix{T,A,B,C}}}
+  array::ParamArray{SubSparseMatrix{T,A,B,C},2,Vector{SubSparseMatrix{T,A,B,C}}}
 end
 
 function PartitionedArrays.SubSparseMatrix(
-  parent::PArray{<:AbstractSparseMatrix},
+  parent::ParamArray{<:AbstractSparseMatrix},
   indices::Tuple,
   inv_indices::Tuple)
 
@@ -590,7 +590,7 @@ function Base.getindex(a::PTSubSparseMatrix,i::Integer,j::Integer)
   end
 end
 Base.first(a::PTSubSparseMatrix) = a.array[1]
-function LinearAlgebra.mul!(c::PArray,a::PTSubSparseMatrix,args...)
+function LinearAlgebra.mul!(c::ParamArray,a::PTSubSparseMatrix,args...)
   map(c,a) do ci,ai
     mul!(ci,ai,args...)
   end

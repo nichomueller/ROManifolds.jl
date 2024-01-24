@@ -10,7 +10,7 @@ function Arrays.lazy_map(k::Reindex{<:CompressedArray},::Type{T},j_to_i::Abstrac
   CompressedArray(values,ptrs)
 end
 
-function Arrays.lazy_map(k::Reindex{<:PArray},j_to_i::AbstractArray)
+function Arrays.lazy_map(k::Reindex{<:ParamArray},j_to_i::AbstractArray)
   map(value -> lazy_map(Reindex(value),j_to_i),k.values)
 end
 
@@ -18,7 +18,7 @@ struct RBIntegrationMap <: Map
   cell_to_parent_cell::Vector{Int}
 end
 
-for T in (:AbstractArray,:PArray)
+for T in (:AbstractArray,:ParamArray)
   @eval begin
     function Arrays.lazy_map(
       k::RBIntegrationMap,

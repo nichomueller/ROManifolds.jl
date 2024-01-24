@@ -1,7 +1,7 @@
 function get_method_operator(
   fesolver::ODESolver,
   feop::TransientPFEOperator,
-  sols::PArray,
+  sols::ParamArray,
   params::Table)
 
   dtθ = fesolver.θ == 0.0 ? fesolver.dt : fesolver.dt*fesolver.θ
@@ -12,15 +12,15 @@ function get_method_operator(
   get_method_operator(feop,params,times,dtθ,sols,ode_cache,sols_cache)
 end
 
-Algebra.symbolic_setup(s::BackslashSolver,mat::PArray) = symbolic_setup(s,testitem(mat))
+Algebra.symbolic_setup(s::BackslashSolver,mat::ParamArray) = symbolic_setup(s,testitem(mat))
 
-Algebra.symbolic_setup(s::BackslashSolver,mat::AbstractArray{<:PArray}) = symbolic_setup(s,testitem(mat))
+Algebra.symbolic_setup(s::BackslashSolver,mat::AbstractArray{<:ParamArray}) = symbolic_setup(s,testitem(mat))
 
-Algebra.symbolic_setup(s::LUSolver,mat::PArray) = symbolic_setup(s,testitem(mat))
+Algebra.symbolic_setup(s::LUSolver,mat::ParamArray) = symbolic_setup(s,testitem(mat))
 
-Algebra.symbolic_setup(s::LUSolver,mat::AbstractArray{<:PArray}) = symbolic_setup(s,testitem(mat))
+Algebra.symbolic_setup(s::LUSolver,mat::AbstractArray{<:ParamArray}) = symbolic_setup(s,testitem(mat))
 
-function Algebra._check_convergence(nls,b::PArray,m0)
+function Algebra._check_convergence(nls,b::ParamArray,m0)
   m = maximum(abs,b)
   return all(m .< nls.tol * m0)
 end

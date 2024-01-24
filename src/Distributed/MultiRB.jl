@@ -1,7 +1,7 @@
 struct DistributedBlockSnapshots{T}
-  snaps::Vector{PVector{Vector{PArray{T}}}}
+  snaps::Vector{PVector{Vector{ParamArray{T}}}}
 end
 
-function RB.BlockSnapshots(snaps::Vector{<:PVector{<:Vector{<:PArray{T}}}}) where T
+function RB.BlockSnapshots(snaps::Vector{<:PVector{<:Vector{<:ParamArray{T}}}}) where T
   DistributedBlockSnapshots(snaps)
 end

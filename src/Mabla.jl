@@ -31,7 +31,7 @@ export ParametricSpace
 export UniformSampling
 export NormalSampling
 export realization
-export PArray
+export ParamArray
 export allocate_parray
 export zero_parray
 export get_at_offsets
@@ -43,9 +43,6 @@ export MultiFieldPFESpace
 export AbstractPFunction
 export PFunction, 𝑓ₚ
 export TransientPFunction, 𝑓ₚₜ
-export FEPFunction
-export SingleFieldFEPFunction
-export MultiFieldFEPFunction
 export TransientTrialPFESpace
 export TransientMultiFieldPFESpace
 export TransientMultiFieldTrialPFESpace

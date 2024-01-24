@@ -66,7 +66,7 @@ function TransientFETools.test_transient_fe_solver(
 
   solution = solve(solver,op,u0,r)
   for (uhn,rn) in solution
-    @test isa(uhn,FEPFunction)
+    @test isa(uhn,FEFunction)
     @test isa(rn,TransientPRealization)
   end
   true

@@ -1,4 +1,4 @@
-const PReindex = Reindex{A} where A<:PArray
+const PReindex = Reindex{A} where A<:ParamArray
 
 function Base.length(k::PReindex)
   length(k.values)
@@ -17,7 +17,7 @@ function Base.iterate(k::PReindex,oldstate...)
   Reindex(vit),nextstate
 end
 
-const PosNegPReindex = PosNegReindex{A,B} where {A<:PArray,B<:PArray}
+const PosNegPReindex = PosNegReindex{A,B} where {A<:ParamArray,B<:ParamArray}
 
 function Base.length(k::PosNegPReindex)
   @assert length(k.values_pos) == length(k.values_neg)
@@ -61,7 +61,7 @@ function Arrays.return_value(
   for (i,fi) = enumerate(f.f)
     array[i] = return_value(Broadcasting(fi),x...)
   end
-  PArray(array)
+  ParamArray(array)
 end
 
 function Arrays.return_cache(
@@ -75,7 +75,7 @@ function Arrays.return_cache(
   for (i,fi) = enumerate(f.f)
     cache[i] = return_cache(Broadcasting(fi),x...)
   end
-  cache,PArray(array)
+  cache,ParamArray(array)
 end
 
 function Arrays.evaluate!(
@@ -122,7 +122,7 @@ for T in (:PReindex,:PosNegPReindex)
       for (i,ki) = enumerate(k)
         array[i] = return_value(ki,j)
       end
-      PArray(array)
+      ParamArray(array)
     end
 
     function Arrays.return_cache(k::$T,j::Integer)
@@ -133,7 +133,7 @@ for T in (:PReindex,:PosNegPReindex)
       for (i,ki) = enumerate(k)
         cache[i] = return_cache(ki,j)
       end
-      cache,PArray(array)
+      cache,ParamArray(array)
     end
 
     function Arrays.evaluate!(cache,k::$T,j::Integer)
@@ -148,7 +148,7 @@ for T in (:PReindex,:PosNegPReindex)
       array = map(k) do ki
         evaluate(ki,j)
       end
-      PArray(array)
+      ParamArray(array)
     end
   end
 end

@@ -74,7 +74,7 @@ function rb_solver(rbinfo,feop_lin,feop_nlin,fesolver,rbspace,rbres,rbjacs,snaps
   post_process(rbinfo,feop,snaps_test,x,params_test,stats)
 end
 
-function rb_solve(ls::LinearSolver,rhs::PArray,lhs::PArray)
+function rb_solve(ls::LinearSolver,rhs::ParamArray,lhs::ParamArray)
   x = copy(rhs)
   cache = nothing
   rb_solve!(x,ls,rhs,lhs,cache)
@@ -82,10 +82,10 @@ function rb_solve(ls::LinearSolver,rhs::PArray,lhs::PArray)
 end
 
 function rb_solve!(
-  x::PArray,
+  x::ParamArray,
   ls::LinearSolver,
-  rhs::PArray,
-  lhs::PArray,
+  rhs::ParamArray,
+  lhs::ParamArray,
   ::Nothing)
 
   ss = symbolic_setup(ls,testitem(lhs))
@@ -95,10 +95,10 @@ function rb_solve!(
 end
 
 function rb_solve!(
-  x::PArray,
+  x::ParamArray,
   ::LinearSolver,
-  rhs::PArray,
-  lhs::PArray,
+  rhs::ParamArray,
+  lhs::ParamArray,
   ns)
 
   numerical_setup!(ns,lhs)
@@ -106,7 +106,7 @@ function rb_solve!(
   return ns
 end
 
-function _rb_loop_solve!(x::PArray,ns,b::PArray)
+function _rb_loop_solve!(x::ParamArray,ns,b::ParamArray)
   @inbounds for k in eachindex(x)
     solve!(x[k],ns[k],-b[k])
   end
@@ -114,7 +114,7 @@ function _rb_loop_solve!(x::PArray,ns,b::PArray)
 end
 
 function nearest_neighbor(
-  sols_train::PArray{T},
+  sols_train::ParamArray{T},
   params_train::Table,
   params_test::Table) where T
 
@@ -128,7 +128,7 @@ function nearest_neighbor(
     idxn = idx[n]
     array[(n-1)*ntimes+1:n*ntimes] = sols_train[(idxn-1)*ntimes+1:idxn*ntimes]
   end
-  PArray(array)
+  ParamArray(array)
 end
 
 struct RBResults{T}
@@ -143,8 +143,8 @@ end
 
 function RBResults(
   params::Table,
-  sol::PArray,
-  sol_approx::PArray,
+  sol::ParamArray,
+  sol_approx::ParamArray,
   fem_stats::ComputationInfo,
   rb_stats::ComputationInfo,
   args...;
@@ -198,8 +198,8 @@ end
 function post_process(
   rbinfo::RBInfo,
   feop::TransientPFEOperator,
-  sol::PArray,
-  sol_approx::PArray,
+  sol::ParamArray,
+  sol_approx::ParamArray,
   params::Table,
   stats::NamedTuple;
   show_results=true)
@@ -216,8 +216,8 @@ function post_process(
 end
 
 function compute_relative_error(
-  sol::AbstractVector{<:PArray},
-  sol_approx::AbstractVector{<:PArray},
+  sol::AbstractVector{<:ParamArray},
+  sol_approx::AbstractVector{<:ParamArray},
   args...)
 
   @assert length(sol) == length(sol_approx)

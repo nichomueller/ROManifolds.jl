@@ -33,14 +33,14 @@ struct NnzMatrix{T,A} <: NnzArray{T,2}
   nparams::Int
 end
 
-function NnzMatrix(val::PArray{<:AbstractVector{T}};nparams=length(val),kwargs...) where T
+function NnzMatrix(val::ParamArray{<:AbstractVector{T}};nparams=length(val),kwargs...) where T
   vals = get_array(val)
   nonzero_idx,nonzero_val = compress_array(stack(vals))
   nrows = size(testitem(val),1)
   NnzMatrix(Nonlinear(),nonzero_val,nonzero_idx,nrows,nparams)
 end
 
-function NnzMatrix(val::PArray{<:NnzVector{T}};nparams=length(val),kwargs...) where T
+function NnzMatrix(val::ParamArray{<:NnzVector{T}};nparams=length(val),kwargs...) where T
   vals = get_array(val)
   nonzero_idx = get_nonzero_idx(first(vals))
   nonzero_val = stack(map(get_nonzero_val,vals))

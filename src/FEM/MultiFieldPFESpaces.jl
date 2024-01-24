@@ -142,7 +142,7 @@ function FESpaces.get_trial_fe_basis(f::MultiFieldPFESpace)
   MultiFieldCellField(all_febases)
 end
 
-# function split_fields(fe::Union{MultiFieldPFESpace,MultiFieldFESpace},free_values::PArray)
+# function split_fields(fe::Union{MultiFieldPFESpace,MultiFieldFESpace},free_values::ParamArray)
 #   offsets = compute_field_offsets(fe)
 #   fields = map(1:length(fe.spaces)) do field
 #     pini = offsets[field] + 1
@@ -320,7 +320,7 @@ function FESpaces.FEFunction(fe::MultiFieldPFESpace,free_values)
     free_values_i = restrict_to_field(fe,free_values,i)
     FEFunction(fe.spaces[i],free_values_i)
   end
-  MultiFieldFEPFunction(free_values,fe,blocks)
+  MultiFieldFEFunction(free_values,fe,blocks)
 end
 
 function FESpaces.EvaluationFunction(fe::MultiFieldPFESpace,free_values)
@@ -345,40 +345,40 @@ function FESpaces.interpolate(objects,fe::MultiFieldPFESpace)
 end
 
 function FESpaces.interpolate!(objects,free_values::AbstractVector,fe::MultiFieldPFESpace)
-  blocks = SingleFieldFEPFunction[]
+  blocks = SingleFieldFEFunction[]
   for (field,(U,object)) in enumerate(zip(fe.spaces,objects))
     free_values_i = restrict_to_field(fe,free_values,field)
     uhi = interpolate!(object, free_values_i,U)
     push!(blocks,uhi)
   end
-  MultiFieldFEPFunction(free_values,fe,blocks)
+  MultiFieldFEFunction(free_values,fe,blocks)
 end
 
 function FESpaces.interpolate_everywhere(objects,fe::MultiFieldPFESpace)
   free_values = zero_free_values(fe)
-  blocks = SingleFieldFEPFunction[]
+  blocks = SingleFieldFEFunction[]
   for (field,(U,object)) in enumerate(zip(fe.spaces,objects))
     free_values_i = restrict_to_field(fe,free_values,field)
     dirichlet_values_i = zero_dirichlet_values(U)
     uhi = interpolate_everywhere!(object, free_values_i,dirichlet_values_i,U)
     push!(blocks,uhi)
   end
-  MultiFieldFEPFunction(free_values,fe,blocks)
+  MultiFieldFEFunction(free_values,fe,blocks)
 end
 
 function FESpaces.interpolate_dirichlet(objects,fe::MultiFieldPFESpace)
   free_values = zero_free_values(fe)
-  blocks = SingleFieldFEPFunction[]
+  blocks = SingleFieldFEFunction[]
   for (field,(U,object)) in enumerate(zip(fe.spaces,objects))
     free_values_i = restrict_to_field(fe,free_values,field)
     dirichlet_values_i = zero_dirichlet_values(U)
     uhi = interpolate_dirichlet!(object,free_values_i,dirichlet_values_i,U)
     push!(blocks,uhi)
   end
-  MultiFieldFEPFunction(free_values,fe,blocks)
+  MultiFieldFEFunction(free_values,fe,blocks)
 end
 
-# function FESpaces.interpolate!(objects,free_values::PArray,fe::MultiFieldPFESpace)
+# function FESpaces.interpolate!(objects,free_values::ParamArray,fe::MultiFieldPFESpace)
 #   block_free_values = block_zero_free_values(fe)
 #   blocks = SingleFieldFEPFunction[]
 #   for (free_values_i,U,object) in zip(block_free_values,fe.spaces,objects)
@@ -412,7 +412,7 @@ end
 #   MultiFieldFEPFunction(free_values,fe,blocks)
 # end
 
-# function FESpaces.EvaluationFunction(fe::MultiFieldPFESpace,free_values::PArray)
+# function FESpaces.EvaluationFunction(fe::MultiFieldPFESpace,free_values::ParamArray)
 #   free_values,fe_functions = map(eachindex(fe.spaces)) do i
 #     free_values_i = restrict_to_field(fe,free_values,i)
 #     fe_function_i = EvaluationFunction(fe.spaces[i],free_values_i)
@@ -442,7 +442,7 @@ function FESpaces.test_fe_space(f::PFESpace)
   V = get_vector_type(f)
   @test typeof(free_values) == V
   fe_function = FEFunction(f,free_values)
-  test_fe_function(fe_function)
+  test_fe_pfunction(fe_function)
   fe_basis = get_fe_basis(f)
   @test isa(has_constraints(f),Bool)
   @test isa(has_constraints(typeof(f)),Bool)

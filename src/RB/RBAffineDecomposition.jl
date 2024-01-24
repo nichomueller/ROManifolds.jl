@@ -17,19 +17,19 @@ end
 
 function get_at_time_integration_domain(
   i::Vector{RBIntegrationDomain},
-  afull::PArray,
+  afull::ParamArray,
   nparams::Int)
 
   idx_time = common_time_integration_domain(i)
   time_ndofs = Int(length(afull)/nparams)
   ptidx = vec(transpose(collect(0:nparams-1)*time_ndofs .+ idx_time'))
-  acomm = PArray(afull[ptidx])
+  acomm = ParamArray(afull[ptidx])
   return acomm
 end
 
 function get_at_time_integration_domain(
   i::RBIntegrationDomain,
-  acomm::PArray,
+  acomm::ParamArray,
   icomm::Vector{Int})
 
   idx_time = get_idx_time(i)
@@ -42,7 +42,7 @@ function get_at_time_integration_domain(
     end
   end
   ptidx = vec(transpose(collect(0:nparams-1)*comm_time_ndofs .+ idx_comm_to_idx_time'))
-  acomm = PArray(acomm[ptidx])
+  acomm = ParamArray(acomm[ptidx])
   return acomm
 end
 
@@ -58,16 +58,16 @@ function get_at_time_integration_domain(
   end
   red_times = op.t[idx_time]
   ptidx = vec(transpose(collect(0:nparams-1)*time_ndofs .+ idx_time'))
-  u0_idx = PArray(op.u0[ptidx])
+  u0_idx = ParamArray(op.u0[ptidx])
   _Us,Uts,fecache = op.ode_cache
   Us = ()
   for j in eachindex(_Us)
     spacei = _Us[j].space
-    dvi = PArray(_Us[j].dirichlet_values[ptidx])
+    dvi = ParamArray(_Us[j].dirichlet_values[ptidx])
     Us = (Us...,TrialPFESpace(dvi,spacei))
   end
   ode_cache_idx = Us,Uts,fecache
-  vθ_idx = PArray(op.vθ[ptidx])
+  vθ_idx = ParamArray(op.vθ[ptidx])
   get_method_operator(op.feop,op.μ,red_times,op.dtθ,u0_idx,ode_cache_idx,vθ_idx)
 end
 
@@ -249,7 +249,7 @@ function get_reduced_cells(idx::Vector{Int},cell_dof_ids::Table)
 end
 
 function _get_at_matching_trian(
-  q::Vector{<:PArray},
+  q::Vector{<:ParamArray},
   trians::Base.KeySet{Triangulation},
   trian::Triangulation)
 
@@ -375,7 +375,7 @@ end
 function rb_coefficient!(cache,::TrivialRBAffineDecomposition,args...;kwargs...)
   _,ptcache = cache
   setsize!(ptcache,(1,1))
-  PArray(get_array(ptcache))
+  ParamArray(get_array(ptcache))
 end
 
 function mdeim_solve!(cache::CachedArray,mdeim_interpolation::LU,q::Matrix)
@@ -386,7 +386,7 @@ function mdeim_solve!(cache::CachedArray,mdeim_interpolation::LU,q::Matrix)
 end
 
 function recast_coefficient!(
-  cache::PArray{<:CachedArray},
+  cache::ParamArray{<:CachedArray},
   coeff::AbstractMatrix)
 
   Qs = Int(size(coeff,1))
@@ -399,11 +399,11 @@ function recast_coefficient!(
     array[n] = coeff[:,(n-1)*Nt+1:n*Nt]'
   end
 
-  PArray(array)
+  ParamArray(array)
 end
 
 function recast_coefficient!(
-  cache::PArray{<:CachedArray},
+  cache::ParamArray{<:CachedArray},
   basis_time::AbstractMatrix,
   coeff::AbstractMatrix)
 
@@ -421,20 +421,20 @@ function recast_coefficient!(
     end
   end
 
-  PArray(array)
+  ParamArray(array)
 end
 
 abstract type RBContributionMap <: Map end
 struct RBVecContributionMap <: RBContributionMap end
 struct RBMatContributionMap <: RBContributionMap end
 
-function Arrays.return_cache(::RBVecContributionMap,snaps::PArray{Vector{T}}) where T
+function Arrays.return_cache(::RBVecContributionMap,snaps::ParamArray{Vector{T}}) where T
   array_coeff = zeros(T,1)
   array_proj = zeros(T,1)
   CachedArray(array_coeff),CachedArray(array_proj),CachedArray(array_proj)
 end
 
-function Arrays.return_cache(::RBMatContributionMap,snaps::PArray{Vector{T}}) where T
+function Arrays.return_cache(::RBMatContributionMap,snaps::ParamArray{Vector{T}}) where T
   array_coeff = zeros(T,1,1)
   array_proj = zeros(T,1,1)
   CachedArray(array_coeff),CachedArray(array_proj),CachedArray(array_proj)
@@ -512,7 +512,7 @@ function rb_contribution!(
   cache,
   k::RBContributionMap,
   a::RBAffineDecomposition,
-  coeff::PArray)
+  coeff::ParamArray)
 
   basis_space_proj = a.basis_space
   basis_time = last(a.basis_time)
@@ -525,10 +525,10 @@ function rb_contribution!(
   cache,
   k::RBContributionMap,
   a::TrivialRBAffineDecomposition,
-  coeff::PArray)
+  coeff::ParamArray)
 
   array = [a.projection for _ = eachindex(coeff)]
-  PArray(array)
+  ParamArray(array)
 end
 
 function zero_rb_contribution(

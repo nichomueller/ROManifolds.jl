@@ -203,11 +203,11 @@ feop = AffineTransientPFEOperator(res,jac,jac_t,pspace,trial,test)
 t0,tf,dt,θ = 0.,0.1,0.01,0.5
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
-function _project_recast(snap::PArray,rb::RBSpace)
+function _project_recast(snap::ParamArray,rb::RBSpace)
   mat = stack(snap.array)
   rb_proj = space_time_projection(mat,rb)
   array = recast(rb_proj,rb)
-  PArray(array)
+  ParamArray(array)
 end
 
 w0 = get_free_dof_values(fesolver.uh0(params))

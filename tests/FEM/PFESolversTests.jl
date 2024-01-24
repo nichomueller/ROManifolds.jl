@@ -59,7 +59,7 @@ uh = solve(solver,op)
 uh = solve(op)
 @test get_free_dof_values(uh) ≈ x
 
-# This is not supported for PArrays: have to use an algebraic solver
+# This is not supported for ParamArrays: have to use an algebraic solver
 # solver = NonlinearFESolver()
 # test_fe_solver(solver,op,x0,x)
 # uh = solve(solver,op)

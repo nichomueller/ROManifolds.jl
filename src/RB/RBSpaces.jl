@@ -54,21 +54,21 @@ function recast(x::AbstractVector,rb::RBSpace)
   return xrb
 end
 
-function recast(x::PArray,rb::RBSpace)
+function recast(x::ParamArray,rb::RBSpace)
   array = map(eachindex(x)) do xi
     recast(xi,rb)
   end
-  PArray(array...)
+  ParamArray(array...)
 end
 
-function space_time_projection(x::PArray,rb::RBSpace)
+function space_time_projection(x::ParamArray,rb::RBSpace)
   time_ndofs = num_time_dofs(rb)
   nparams = Int(length(x)/time_ndofs)
   array = map(1:nparams) do np
     x_np = stack(x[(np-1)*time_ndofs+1:np*time_ndofs])
     space_time_projection(x_np,rb)
   end
-  PArray(array)
+  ParamArray(array)
 end
 
 function space_time_projection(mat::AbstractMatrix,rb::RBSpace)
@@ -108,11 +108,11 @@ function space_time_projection(
   return st_proj_mat
 end
 
-function project_recast(snap::PArray,rb::RBSpace)
+function project_recast(snap::ParamArray,rb::RBSpace)
   mat = stack(snap.array)
   rb_proj = space_time_projection(mat,rb)
   array = recast(rb_proj,rb)
-  PArray(array)
+  ParamArray(array)
 end
 
 function get_method_operator(
@@ -134,7 +134,7 @@ function get_method_operator(
     col = mod(n,ns) == 0 ? ns : mod(n,ns)
     array[n] = bs[:,col]
   end
-  sols = PArray(array)
+  sols = ParamArray(array)
   sols_cache = zero(sols)
   get_method_operator(feop,params,times,dtθ,sols,ode_cache,sols_cache)
 end

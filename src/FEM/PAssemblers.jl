@@ -1,25 +1,24 @@
 function Algebra.allocate_vector(
-  ::Type{PArray{T,N,A,L}},
-  n::Integer) where {T,N,A,L}
+  ::Type{<:ParamVector{T,L}},
+  n::Integer) where {T,L}
 
-  S = eltype(T)
-  vector = zeros(S,n)
+  vector = zeros(T,n)
   allocate_parray(vector,L)
 end
 
-function Algebra.allocate_in_range(matrix::PArray{<:AbstractMatrix})
+function Algebra.allocate_in_range(matrix::ParamMatrix)
   map(matrix) do matrix
     allocate_in_range(matrix)
   end
 end
 
-function Algebra.allocate_in_domain(::Type{<:PArray},matrix)
+function Algebra.allocate_in_domain(::Type{<:ParamArray},matrix)
   map(matrix) do matrix
     allocate_in_domain(matrix)
   end
 end
 
-function Algebra.allocate_in_domain(matrix::PArray{<:AbstractMatrix})
+function Algebra.allocate_in_domain(matrix::ParamMatrix)
   map(matrix) do matrix
     allocate_in_domain(matrix)
   end
@@ -28,10 +27,10 @@ end
 function get_passembler(a::SparseMatrixAssembler,r::Union{PRealization,TransientPRealization})
   vec = get_vector_builder(a)
   vector_type = get_array_type(vec)
-  pvector_type = typeof(PArray{vector_type}(undef,length(r)))
+  pvector_type = typeof(ParamVector{vector_type}(undef,length(r)))
   mat = get_matrix_builder(a)
   matrix_type = get_array_type(mat)
-  pmatrix_type = typeof(PArray{matrix_type}(undef,length(r)))
+  pmatrix_type = typeof(ParamMatrix{matrix_type}(undef,length(r)))
   rows = FESpaces.get_rows(a)
   cols = FESpaces.get_cols(a)
   strategy = FESpaces.get_assembly_strategy(a)
@@ -49,8 +48,8 @@ function FESpaces.SparseMatrixAssembler(
   strategy::AssemblyStrategy=DefaultAssemblyStrategy())
 
   N = length_free_values(trial)
-  pmat = typeof(PArray{mat}(undef,N))
-  pvec = typeof(PArray{vec}(undef,N))
+  pmat = typeof(ParamMatrix{mat}(undef,N))
+  pvec = typeof(ParamVector{vec}(undef,N))
   rows = get_free_dof_ids(test)
   cols = get_free_dof_ids(trial)
   GenericSparseMatrixAssembler(
@@ -69,11 +68,9 @@ function FESpaces.SparseMatrixAssembler(
   strategy::AssemblyStrategy=DefaultAssemblyStrategy()
   ) where MS <: BlockMultiFieldStyle
 
-  println(mat)
-  println(vec)
   N = length_free_values(trial)
-  pmat = typeof(PArray{mat}(undef,N))
-  pvec = typeof(PArray{vec}(undef,N))
+  pmat = typeof(ParamMatrix{mat}(undef,N))
+  pvec = typeof(ParamVector{vec}(undef,N))
   mfs = MultiFieldStyle(test)
   MultiField.BlockSparseMatrixAssembler(
     mfs,
@@ -84,38 +81,41 @@ function FESpaces.SparseMatrixAssembler(
     strategy)
 end
 
-function FESpaces.SparseMatrixBuilder(::Type{PArray{T,N,A,L}},args...) where {T,N,A,L}
-  builders = map(1:L) do i
-    SparseMatrixBuilder(T,args...)
+function FESpaces.SparseMatrixBuilder(::Type{ParamArray{T,2,A,L}} where T,args...) where {A,L}
+  builder = map(1:L) do i
+    SparseMatrixBuilder(eltype(A),args...)
   end
-  PArray(builders)
+  ParamContainer(builder)
 end
 
-function FESpaces.ArrayBuilder(::Type{PArray{T,N,A,L}},args...) where {T,N,A,L}
-  builders = map(1:L) do i
-    ArrayBuilder(T,args...)
+function FESpaces.ArrayBuilder(::Type{ParamArray{T,1,A,L}} where T,args...) where {A,L}
+  builder = map(1:L) do i
+    ArrayBuilder(eltype(A),args...)
   end
-  PArray(builders)
+  ParamContainer(builder)
 end
 
-Algebra.LoopStyle(a::Type{PArray{T,N,A,L}}) where {T,N,A,L} = LoopStyle(T)
+Algebra.LoopStyle(a::Type{<:ParamContainer{T,L}}) where {T,L} = LoopStyle(T)
 
-function Algebra.nz_counter(builder::PArray,axes)
-  map(builder) do builder
+function Algebra.nz_counter(builder::ParamContainer,axes)
+  counter = map(builder) do builder
     Algebra.nz_counter(builder,axes)
   end
+  ParamContainer(counter)
 end
 
-function Algebra.nz_allocation(a::PArray)
-  map(a) do a
+function Algebra.nz_allocation(a::ParamContainer)
+  inserter = map(a) do a
     Algebra.nz_allocation(a)
   end
+  ParamContainer(inserter)
 end
 
-function Algebra.create_from_nz(a::PArray)
-  map(a) do a
+function Algebra.create_from_nz(a::ParamContainer)
+  array = map(a) do a
     Algebra.create_from_nz(a)
   end
+  ParamArray(array)
 end
 
 function collect_cell_matrix_for_trian(
@@ -147,7 +147,8 @@ function collect_cell_vector_for_trian(
   [cell_vec_r],[rows]
 end
 
-@inline function Algebra._add_entries!(combine::Function,A::PArray,vs::Nothing,is,js)
+@inline function Algebra._add_entries!(
+  combine::Function,A::AbstractParamContainer,vs::Nothing,is,js)
   for (lj,j) in enumerate(js)
     if j>0
       for (li,i) in enumerate(is)
@@ -162,7 +163,8 @@ end
   A
 end
 
-@inline function Algebra._add_entries!(combine::Function,A::PArray,vs,is,js)
+@inline function Algebra._add_entries!(
+  combine::Function,A::AbstractParamContainer,vs,is,js)
   for (lj,j) in enumerate(js)
     if j>0
       for (li,i) in enumerate(is)
@@ -178,7 +180,8 @@ end
   A
 end
 
-@inline function Algebra._add_entries!(combine::Function,A::PArray,vs::PArray,is,js)
+@inline function Algebra._add_entries!(
+  combine::Function,A::AbstractParamContainer,vs::AbstractParamContainer,is,js)
   for (lj,j) in enumerate(js)
     if j>0
       for (li,i) in enumerate(is)
@@ -194,7 +197,8 @@ end
   A
 end
 
-@inline function Algebra._add_entries!(combine::Function,A::PArray,vs::Nothing,is)
+@inline function Algebra._add_entries!(
+  combine::Function,A::AbstractParamContainer,vs::Nothing,is)
   for (li,i) in enumerate(is)
     if i>0
       map(A) do A
@@ -205,7 +209,8 @@ end
   A
 end
 
-@inline function Algebra._add_entries!(combine::Function,A::PArray,vs,is)
+@inline function Algebra._add_entries!(
+  combine::Function,A::AbstractParamContainer,vs,is)
   for (li,i) in enumerate(is)
     if i>0
       map(A) do A
@@ -217,7 +222,8 @@ end
   A
 end
 
-@inline function Algebra._add_entries!(combine::Function,A::PArray,vs::PArray,is)
+@inline function Algebra._add_entries!(
+  combine::Function,A::AbstractParamContainer,vs::ParamArray,is)
   for (li,i) in enumerate(is)
     if i>0
       map(A,vs) do A,vs
