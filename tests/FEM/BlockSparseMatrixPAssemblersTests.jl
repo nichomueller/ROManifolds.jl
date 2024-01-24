@@ -65,6 +65,10 @@ assem_blocks = SparseMatrixAssembler(Xb,Yb)
 test_sparse_matrix_assembler(assem_blocks,bmatdata,bvecdata,bdata)
 
 m1 = nz_counter(get_matrix_builder(assem_blocks),(get_rows(assem_blocks),get_cols(assem_blocks)))
+symbolic_loop_matrix!(m1,assem_blocks,bmatdata)
+m2 = nz_allocation(m1)
+
+m1 = nz_counter(get_matrix_builder(assem_blocks),(get_rows(assem_blocks),get_cols(assem_blocks)))
 symbolic_loop_matrix!(m1,a,matdata)
 m2 = nz_allocation(m1)
 

@@ -1,4 +1,4 @@
-module SparseMatrixAssemblers
+module PAssemblersTests
 
 using Test
 using Gridap.Arrays
@@ -95,22 +95,17 @@ mtypes = [
   SymSparseMatrixCSR{1,Float64,Int}]
 
 for T in mtypes
-  T = SparseMatrixCSC{Float64,Int}
-  pmatrix_type = typeof(PArray{T}(undef,3))
-  pvector_type = typeof(PArray{Vector{Float64}}(undef,3))
-
   matvecdata = ( term_to_cellmatvec , term_to_rows, term_to_cols)
   matdata = (term_to_cellmat,term_to_rows,term_to_cols)
   vecdata = (term_to_cellvec,term_to_rows)
   data = (matvecdata,matdata,vecdata)
 
-  assem = SparseMatrixAssembler(pmatrix_type,pvector_type,U,V)
-  @test isa(assem,SparseMatrixPAssembler)
+  assem = SparseMatrixAssembler(T,Vector{Float64},U,V)
   test_sparse_matrix_assembler(assem,matdata,vecdata,data)
 
   strategy = GenericAssemblyStrategy(row->row,col->col,row->true,col->true)
 
-  assem2 = SparseMatrixAssembler(pmatrix_type,pvector_type,U,V,strategy)
+  assem2 = SparseMatrixAssembler(T,Vector{Float64},U,V,strategy)
   test_sparse_matrix_assembler(assem2,matdata,vecdata,data)
 
   matdata = ([cellmat],[rows],[cols])

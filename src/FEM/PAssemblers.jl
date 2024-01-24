@@ -35,73 +35,54 @@ function get_passembler(a::SparseMatrixAssembler,r::Union{PRealization,Transient
   rows = FESpaces.get_rows(a)
   cols = FESpaces.get_cols(a)
   strategy = FESpaces.get_assembly_strategy(a)
-  SparseMatrixPAssembler(
+  SparseMatrixAssembler(
     SparseMatrixBuilder(pmatrix_type),
     ArrayBuilder(pvector_type),
     rows,cols,strategy)
 end
 
-struct SparseMatrixPAssembler{M<:PArray,V<:PArray} <: SparseMatrixAssembler
-  matrix_builder::M
-  vector_builder::V
-  rows::AbstractUnitRange
-  cols::AbstractUnitRange
-  strategy::AssemblyStrategy
-end
-
-function SparseMatrixPAssembler(
-  mat,vec,
+function FESpaces.SparseMatrixAssembler(
+  mat,
+  vec,
   trial::PFESpace,
   test::FESpace,
-  strategy::AssemblyStrategy=FESpaces.DefaultAssemblyStrategy())
+  strategy::AssemblyStrategy=DefaultAssemblyStrategy())
 
+  N = length_free_values(trial)
+  pmat = typeof(PArray{mat}(undef,N))
+  pvec = typeof(PArray{vec}(undef,N))
   rows = get_free_dof_ids(test)
   cols = get_free_dof_ids(trial)
-  SparseMatrixPAssembler(
-    SparseMatrixBuilder(mat),
-    ArrayBuilder(vec),
+  GenericSparseMatrixAssembler(
+    SparseMatrixBuilder(pmat),
+    ArrayBuilder(pvec),
     rows,
     cols,
     strategy)
 end
 
 function FESpaces.SparseMatrixAssembler(
-  mat,vec,
-  trial::PFESpace,
-  test::FESpace,
-  strategy::AssemblyStrategy=DefaultAssemblyStrategy())
+  mat,
+  vec,
+  trial::MultiFieldPFESpace{MS},
+  test::MultiFieldFESpace{MS},
+  strategy::AssemblyStrategy=DefaultAssemblyStrategy()
+  ) where MS <: BlockMultiFieldStyle
 
-  SparseMatrixPAssembler(mat,vec,trial,test,strategy)
-end
-
-function FESpaces.SparseMatrixAssembler(mat,trial::PFESpace,test::FESpace)
-  mat_builder = SparseMatrixBuilder(mat)
-  T = eltype(get_array_type(mat_builder))
+  println(mat)
+  println(vec)
   N = length_free_values(trial)
-  vector_type = Vector{T}
-  pvector_type = typeof(PArray{vector_type}(undef,N))
-  SparseMatrixAssembler(mat_builder,pvector_type,trial,test)
+  pmat = typeof(PArray{mat}(undef,N))
+  pvec = typeof(PArray{vec}(undef,N))
+  mfs = MultiFieldStyle(test)
+  MultiField.BlockSparseMatrixAssembler(
+    mfs,
+    trial,
+    test,
+    SparseMatrixBuilder(pmat),
+    ArrayBuilder(pvec),
+    strategy)
 end
-
-function FESpaces.SparseMatrixAssembler(trial::PFESpace,test::FESpace)
-  T = get_dof_value_type(trial)
-  N = length_free_values(trial)
-  matrix_type = SparseMatrixCSC{T,Int}
-  pmatrix_type = typeof(PArray{matrix_type}(undef,N))
-  vector_type = Vector{T}
-  pvector_type = typeof(PArray{vector_type}(undef,N))
-  SparseMatrixAssembler(pmatrix_type,pvector_type,trial,test)
-end
-
-FESpaces.get_rows(a::SparseMatrixPAssembler) = a.rows
-
-FESpaces.get_cols(a::SparseMatrixPAssembler) = a.cols
-
-FESpaces.get_matrix_builder(a::SparseMatrixPAssembler) = a.matrix_builder
-
-FESpaces.get_vector_builder(a::SparseMatrixPAssembler) = a.vector_builder
-
-FESpaces.get_assembly_strategy(a::SparseMatrixPAssembler) = a.strategy
 
 function FESpaces.SparseMatrixBuilder(::Type{PArray{T,N,A,L}},args...) where {T,N,A,L}
   builders = map(1:L) do i
