@@ -1,13 +1,13 @@
-abstract type ODEPSolution <: ODESolution end
+abstract type ODEParamSolution <: ODESolution end
 
-struct GenericODEPSolution <: ODEPSolution
+struct GenericODEParamSolution <: ODEParamSolution
   solver::ODESolver
-  op::ODEPOperator
+  op::ODEParamOperator
   u0::AbstractVector
-  r::TransientPRealization
+  r::TransientParamRealization
 end
 
-function Base.iterate(sol::ODEPSolution)
+function Base.iterate(sol::ODEParamSolution)
   uf = copy(sol.u0)
   u0 = copy(sol.u0)
   r0 = get_at_time(sol.r,:initial)
@@ -21,7 +21,7 @@ function Base.iterate(sol::ODEPSolution)
   return (uf,rf),state
 end
 
-function Base.iterate(sol::ODEPSolution,state)
+function Base.iterate(sol::ODEParamSolution,state)
   uf,u0,r0,cache = state
 
   if get_times(r0) >= 100*eps()*get_final_time(sol.r)
@@ -38,16 +38,16 @@ end
 
 function Algebra.solve(
   solver::ODESolver,
-  op::ODEPOperator,
+  op::ODEParamOperator,
   u0::T,
-  r::TransientPRealization) where T
+  r::TransientParamRealization) where T
 
-  GenericODEPSolution(solver,op,u0,r)
+  GenericODEParamSolution(solver,op,u0,r)
 end
 
-function ODETools.test_ode_solution(sol::ODEPSolution)
+function ODETools.test_ode_solution(sol::ODEParamSolution)
   for (u_n,r_n) in sol
-    @test isa(r_n,TransientPRealization)
+    @test isa(r_n,TransientParamRealization)
     @test isa(u_n,ParamVector)
   end
   true

@@ -1,12 +1,12 @@
 """
 A single field FE space with parametric, transient Dirichlet data.
 """
-struct TransientTrialPFESpace{S,B}
+struct TransientTrialParamFESpace{S,B}
   space::S
   dirichlet_pt::Union{Function,Vector{<:Function}}
   Ud0::B
 
-  function TransientTrialPFESpace(
+  function TransientTrialParamFESpace(
     space::S,
     dirichlet_pt::Union{Function,Vector{<:Function}}) where S
 
@@ -21,12 +21,12 @@ Allocate the space to be used as first argument in evaluate!
 """
 
 function TransientFETools.allocate_trial_space(
-  U::TransientTrialPFESpace,params,times)
-  HomogeneousTrialPFESpace(U.space,Val(length(params)*length(times)))
+  U::TransientTrialParamFESpace,params,times)
+  HomogeneousTrialParamFESpace(U.space,Val(length(params)*length(times)))
 end
 
 function TransientFETools.allocate_trial_space(
-  U::TransientTrialPFESpace,r::TransientPRealization)
+  U::TransientTrialParamFESpace,r::TransientParamRealization)
   allocate_trial_space(U,get_parameters(r),get_times(r))
 end
 
@@ -35,7 +35,7 @@ Parameter, time evaluation without allocating Dirichlet vals (returns a TrialFES
 """
 function Arrays.evaluate!(
   Upt::T,
-  U::TransientTrialPFESpace,
+  U::TransientTrialParamFESpace,
   params,
   times) where T
 
@@ -44,18 +44,18 @@ function Arrays.evaluate!(
   else
     objects_at_pt = U.dirichlet_pt(params,times)
   end
-  TrialPFESpace!(Upt,objects_at_pt)
+  TrialParamFESpace!(Upt,objects_at_pt)
   Upt
 end
 
-function Arrays.evaluate!(Upt::T,U::TransientTrialPFESpace,r::TransientPRealization) where T
+function Arrays.evaluate!(Upt::T,U::TransientTrialParamFESpace,r::TransientParamRealization) where T
   evaluate!(Upt,U,get_parameters(r),get_times(r))
 end
 
 """
 Parameter, time evaluation allocating Dirichlet vals
 """
-function Arrays.evaluate(U::TransientTrialPFESpace,args...)
+function Arrays.evaluate(U::TransientTrialParamFESpace,args...)
   Upt = allocate_trial_space(U,args...)
   evaluate!(Upt,U,args...)
   Upt
@@ -64,45 +64,45 @@ end
 """
 We can evaluate at `nothing` when we do not care about the Dirichlet vals
 """
-Arrays.evaluate(U::TransientTrialPFESpace,params::Nothing,times::Nothing) = U.Ud0
-Arrays.evaluate(U::TransientTrialPFESpace,r::Nothing) = U.Ud0
+Arrays.evaluate(U::TransientTrialParamFESpace,params::Nothing,times::Nothing) = U.Ud0
+Arrays.evaluate(U::TransientTrialParamFESpace,r::Nothing) = U.Ud0
 
 """
 Functor-like evaluation. It allocates Dirichlet vals in general.
 """
-(U::TransientTrialPFESpace)(params,times) = evaluate(U,params,times)
-(U::TransientTrialPFESpace)(r) = evaluate(U,r)
+(U::TransientTrialParamFESpace)(params,times) = evaluate(U,params,times)
+(U::TransientTrialParamFESpace)(r) = evaluate(U,r)
 
 """
 Time derivative of the Dirichlet functions
 """
-ODETools.∂t(U::TransientTrialPFESpace) = TransientTrialPFESpace(U.space,∂t.(U.dirichlet_pt))
+ODETools.∂t(U::TransientTrialParamFESpace) = TransientTrialParamFESpace(U.space,∂t.(U.dirichlet_pt))
 
 """
 Time 2nd derivative of the Dirichlet functions
 """
-ODETools.∂tt(U::TransientTrialPFESpace) = TransientTrialPFESpace(U.space,∂tt.(U.dirichlet_pt))
+ODETools.∂tt(U::TransientTrialParamFESpace) = TransientTrialParamFESpace(U.space,∂tt.(U.dirichlet_pt))
 
-FESpaces.zero_free_values(f::TransientTrialPFESpace) = @notimplemented
-FESpaces.has_constraints(f::TransientTrialPFESpace) = has_constraints(f.space)
-FESpaces.get_dof_value_type(f::TransientTrialPFESpace) = get_dof_value_type(f.space)
-FESpaces.get_vector_type(f::TransientTrialPFESpace) = @notimplemented
+FESpaces.zero_free_values(f::TransientTrialParamFESpace) = @notimplemented
+FESpaces.has_constraints(f::TransientTrialParamFESpace) = has_constraints(f.space)
+FESpaces.get_dof_value_type(f::TransientTrialParamFESpace) = get_dof_value_type(f.space)
+FESpaces.get_vector_type(f::TransientTrialParamFESpace) = @notimplemented
 
 # Define the TransientTrialFESpace interface for stationary spaces
 
 Arrays.evaluate!(Upt::FESpace,U::FESpace,params,times) = U
-Arrays.evaluate!(Upt::FESpace,U::FESpace,r::TransientPRealization) = U
+Arrays.evaluate!(Upt::FESpace,U::FESpace,r::TransientParamRealization) = U
 Arrays.evaluate(U::FESpace,params,times) = U
-Arrays.evaluate(U::FESpace,r::TransientPRealization) = U
+Arrays.evaluate(U::FESpace,r::TransientParamRealization) = U
 
 # Define the interface for MultiField
 
-struct TransientMultiFieldTrialPFESpace{MS<:MultiFieldStyle,CS<:ConstraintStyle,V}
+struct TransientMultiFieldTrialParamFESpace{MS<:MultiFieldStyle,CS<:ConstraintStyle,V}
   vector_type::Type{V}
   spaces::Vector
   multi_field_style::MS
   constraint_style::CS
-  function TransientMultiFieldTrialPFESpace(
+  function TransientMultiFieldTrialParamFESpace(
     ::Type{V},
     spaces::Vector,
     multi_field_style::MultiFieldStyle) where V
@@ -120,7 +120,7 @@ struct TransientMultiFieldTrialPFESpace{MS<:MultiFieldStyle,CS<:ConstraintStyle,
 end
 
 # Default constructors
-function TransientMultiFieldPFESpace(
+function TransientMultiFieldParamFESpace(
   spaces::Vector;style = ConsecutiveMultiFieldStyle())
   Ts = map(get_dof_value_type,spaces)
   T  = typeof(*(map(zero,Ts)...))
@@ -133,83 +133,83 @@ function TransientMultiFieldPFESpace(
   else
     VT = Vector{T}
   end
-  TransientMultiFieldTrialPFESpace(VT,spaces,style)
+  TransientMultiFieldTrialParamFESpace(VT,spaces,style)
 end
 
-function TransientMultiFieldPFESpace(::Type{V},spaces::Vector) where V
-  TransientMultiFieldTrialPFESpace(V,spaces,ConsecutiveMultiFieldStyle())
+function TransientMultiFieldParamFESpace(::Type{V},spaces::Vector) where V
+  TransientMultiFieldTrialParamFESpace(V,spaces,ConsecutiveMultiFieldStyle())
 end
 
-function TransientMultiFieldPFESpace(
+function TransientMultiFieldParamFESpace(
   spaces::Vector{<:SingleFieldFESpace};style = ConsecutiveMultiFieldStyle())
   MultiFieldFESpace(spaces,style=style)
 end
 
-function TransientMultiFieldPFESpace(
+function TransientMultiFieldParamFESpace(
   ::Type{V},spaces::Vector{<:SingleFieldFESpace}) where V
   MultiFieldFESpace(V,spaces,ConsecutiveMultiFieldStyle())
 end
 
-Base.iterate(m::TransientMultiFieldTrialPFESpace) = iterate(m.spaces)
-Base.iterate(m::TransientMultiFieldTrialPFESpace,state) = iterate(m.spaces,state)
-Base.getindex(m::TransientMultiFieldTrialPFESpace,field_id::Integer) = m.spaces[field_id]
-Base.length(m::TransientMultiFieldTrialPFESpace) = length(m.spaces)
+Base.iterate(m::TransientMultiFieldTrialParamFESpace) = iterate(m.spaces)
+Base.iterate(m::TransientMultiFieldTrialParamFESpace,state) = iterate(m.spaces,state)
+Base.getindex(m::TransientMultiFieldTrialParamFESpace,field_id::Integer) = m.spaces[field_id]
+Base.length(m::TransientMultiFieldTrialParamFESpace) = length(m.spaces)
 
 function TransientFETools.allocate_trial_space(
-  U::TransientMultiFieldTrialPFESpace,args...)
+  U::TransientMultiFieldTrialParamFESpace,args...)
   spaces = map(fe->allocate_trial_space(fe,args...),U.spaces)
-  return MultiFieldPFESpace(spaces;style=MultiFieldStyle(U))
+  return MultiFieldParamFESpace(spaces;style=MultiFieldStyle(U))
 end
 
 function Arrays.evaluate!(
-  Upt::T,U::TransientMultiFieldTrialPFESpace,args...) where T
+  Upt::T,U::TransientMultiFieldTrialParamFESpace,args...) where T
   spaces_at_r = [evaluate!(Upti,Ui,args...) for (Upti,Ui) in zip(Upt,U)]
-  return MultiFieldPFESpace(spaces_at_r;style=MultiFieldStyle(U))
+  return MultiFieldParamFESpace(spaces_at_r;style=MultiFieldStyle(U))
 end
 
-function Arrays.evaluate(U::TransientMultiFieldTrialPFESpace,args...)
+function Arrays.evaluate(U::TransientMultiFieldTrialParamFESpace,args...)
   Upt = allocate_trial_space(U)
   evaluate!(Upt,U,r)
   return Upt
 end
 
-function Arrays.evaluate(U::TransientMultiFieldTrialPFESpace,::Nothing,::Nothing)
+function Arrays.evaluate(U::TransientMultiFieldTrialParamFESpace,::Nothing,::Nothing)
   spaces = [evaluate(fesp,nothing,nothing) for fesp in U.spaces]
   MultiFieldFESpace(spaces;style=style=MultiFieldStyle(U))
 end
 
-function Arrays.evaluate(U::TransientMultiFieldTrialPFESpace,::Nothing)
+function Arrays.evaluate(U::TransientMultiFieldTrialParamFESpace,::Nothing)
   spaces = [evaluate(fesp,nothing) for fesp in U.spaces]
   MultiFieldFESpace(spaces;style=style=MultiFieldStyle(U))
 end
 
-(U::TransientMultiFieldTrialPFESpace)(p,t) = evaluate(U,p,t)
-(U::TransientMultiFieldTrialPFESpace)(r) = evaluate(U,r)
+(U::TransientMultiFieldTrialParamFESpace)(p,t) = evaluate(U,p,t)
+(U::TransientMultiFieldTrialParamFESpace)(r) = evaluate(U,r)
 
-function ODETools.∂t(U::TransientMultiFieldTrialPFESpace)
+function ODETools.∂t(U::TransientMultiFieldTrialParamFESpace)
   spaces = ∂t.(U.spaces)
-  TransientMultiFieldPFESpace(spaces;style=style=MultiFieldStyle(U))
+  TransientMultiFieldParamFESpace(spaces;style=style=MultiFieldStyle(U))
 end
 
-ODETools.∂tt(U::TransientMultiFieldTrialPFESpace) = ∂t(∂t(U))
+ODETools.∂tt(U::TransientMultiFieldTrialParamFESpace) = ∂t(∂t(U))
 
 function FESpaces.zero_free_values(
-  f::TransientMultiFieldTrialPFESpace{<:BlockMultiFieldStyle{NB,SB,P}}) where {NB,SB,P}
+  f::TransientMultiFieldTrialParamFESpace{<:BlockMultiFieldStyle{NB,SB,P}}) where {NB,SB,P}
   @notimplemented
 end
 
-FESpaces.get_dof_value_type(f::TransientMultiFieldTrialPFESpace{MS,CS,V}) where {MS,CS,V} = eltype(V)
-FESpaces.get_vector_type(f::TransientMultiFieldTrialPFESpace) = @notimplemented
-FESpaces.ConstraintStyle(::Type{TransientMultiFieldTrialPFESpace{S,B,V}}) where {S,B,V} = B()
-FESpaces.ConstraintStyle(::TransientMultiFieldTrialPFESpace) = ConstraintStyle(typeof(f))
-MultiField.MultiFieldStyle(::Type{TransientMultiFieldTrialPFESpace{S,B,V}}) where {S,B,V} = S()
-MultiField.MultiFieldStyle(f::TransientMultiFieldTrialPFESpace) = MultiFieldStyle(typeof(f))
+FESpaces.get_dof_value_type(f::TransientMultiFieldTrialParamFESpace{MS,CS,V}) where {MS,CS,V} = eltype(V)
+FESpaces.get_vector_type(f::TransientMultiFieldTrialParamFESpace) = @notimplemented
+FESpaces.ConstraintStyle(::Type{TransientMultiFieldTrialParamFESpace{S,B,V}}) where {S,B,V} = B()
+FESpaces.ConstraintStyle(::TransientMultiFieldTrialParamFESpace) = ConstraintStyle(typeof(f))
+MultiField.MultiFieldStyle(::Type{TransientMultiFieldTrialParamFESpace{S,B,V}}) where {S,B,V} = S()
+MultiField.MultiFieldStyle(f::TransientMultiFieldTrialParamFESpace) = MultiFieldStyle(typeof(f))
 
 function FESpaces.SparseMatrixAssembler(
   mat,
   vec,
-  trial::TransientMultiFieldTrialPFESpace{MS},
-  test::TransientMultiFieldTrialPFESpace{MS},
+  trial::TransientMultiFieldTrialParamFESpace{MS},
+  test::TransientMultiFieldTrialParamFESpace{MS},
   strategy::AssemblyStrategy=DefaultAssemblyStrategy()
   ) where MS <: BlockMultiFieldStyle
 

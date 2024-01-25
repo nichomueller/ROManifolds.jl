@@ -37,21 +37,21 @@ import PartitionedArrays: tuple_of_arrays
 export Table
 export Affine
 
-export PRealization
-export TransientPRealization
+export ParamRealization
+export TransientParamRealization
 export UniformSampling
 export NormalSampling
-export ParametricSpace
-export TransientParametricSpace
-export PFunction, 𝑓ₚ
-export TransientPFunction, 𝑓ₚₜ
+export ParamSpace
+export TransientParamSpace
+export ParamFunction, 𝑓ₚ
+export TransientParamFunction, 𝑓ₚₜ
 export realization
 export get_parameters
 export get_times
 export get_fields
-include("ParametricSpace.jl")
+include("ParamSpace.jl")
 
-include("PDiffOperators.jl")
+include("DiffOperators.jl")
 
 export ParamContainer
 include("ParamContainer.jl")
@@ -68,78 +68,78 @@ include("ParamArray.jl")
 export ParamBlockArray
 include("ParamBlockArray.jl")
 
-export PReindex
-export PosNegPReindex
-include("PReindex.jl")
+export ParamReindex
+export PosNegParamReindex
+include("ParamReindex.jl")
 
-export PField
-export PFieldGradient
-export GenericPField
-export ZeroPField
-export ConstantPField
-export OperationPField
-include("PField.jl")
+export ParamField
+export ParamFieldGradient
+export GenericParamField
+export ZeroParamField
+export ConstantParamField
+export OperationParamField
+include("ParamField.jl")
 
-include("LagrangianPDofBases.jl")
+include("LagrangianDofBases.jl")
 
-export SingleFieldPFESpace
-export FESpaceToPFESpace
+export SingleFieldParamFESpace
+export FESpaceToParamFESpace
 export length_dirichlet_values
 export length_free_values
-include("PFESpaceInterface.jl")
+include("ParamFESpaceInterface.jl")
 
-export MultiFieldPFESpace
-include("MultiFieldPFESpaces.jl")
+export MultiFieldParamFESpace
+include("MultiFieldParamFESpaces.jl")
 
-export TrialPFESpace
-export TrialPFESpace!
-export HomogeneousTrialPFESpace
-include("TrialPFESpace.jl")
+export TrialParamFESpace
+export TrialParamFESpace!
+export HomogeneousTrialParamFESpace
+include("TrialParamFESpace.jl")
 
-export FEPFunction
-export SingleFieldFEPFunction
-export MultiFieldFEPFunction
-include("FEPFunction.jl")
+export ParamFEFunction
+export SingleFieldParamFEFunction
+export MultiFieldParamFEFunction
+include("ParamFEFunction.jl")
 
-export TransientTrialPFESpace
-export TransientMultiFieldPFESpace
-export TransientMultiFieldTrialPFESpace
-include("TransientTrialPFESpace.jl")
+export TransientTrialParamFESpace
+export TransientMultiFieldParamFESpace
+export TransientMultiFieldTrialParamFESpace
+include("TransientTrialParamFESpace.jl")
 
-include("PAssemblers.jl")
+include("ParamAssemblers.jl")
 
-include("PBlockAssemblers.jl")
+include("BlockParamAssemblers.jl")
 
-export TransientPFEOperator
-export TransientPFEOperatorFromWeakForm
-export AffineTransientPFEOperator
-export NonlinearTransientPFEOperator
+export TransientParamFEOperator
+export TransientParamFEOperatorFromWeakForm
+export AffineTransientParamFEOperator
+export NonlinearTransientParamFEOperator
 export residual_for_trian!
 export jacobian_for_trian!
-include("TransientPFEOperator.jl")
+include("TransientParamFEOperator.jl")
 
-export ODEPOperator
-export ConstantODEPOperator
-export ConstantMatrixODEPOperator
-export AffineODEPOperator
-export NonlinearODEPOperator
-export ODEPOpFromFEOp
-include("ODEPOperatorInterface.jl")
+export ODEParamOperator
+export ConstantODEParamOperator
+export ConstantMatrixODEParamOperator
+export AffineODEParamOperator
+export NonlinearODEParamOperator
+export ODEParamOpFromFEOp
+include("ODEParamOperatorInterface.jl")
 
-export ThetaMethodPOperator
-export AffineThetaMethodPOperator
+export ThetaMethodParamOperator
+export AffineThetaMethodParamOperator
 include("ThetaMethod.jl")
 
-export ODEPSolution
-export GenericODEPSolution
-include("ODEPSolution.jl")
+export ODEParamSolution
+export GenericODEParamSolution
+include("ODEParamSolution.jl")
 
-export TransientPFESolution
-include("TransientPFESolution.jl")
+export TransientParamFESolution
+include("TransientParamFESolution.jl")
 
-export PString
-export PVisualizationData
-include("PVisualization.jl")
+export ParamString
+export ParamVisualizationData
+include("ParamVisualization.jl")
 
 export get_order
 export get_L2_norm_matrix

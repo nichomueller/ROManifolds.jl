@@ -27,7 +27,7 @@ using Mabla.FEM
 
 export Table
 export Affine
-export ParametricSpace
+export ParamSpace
 export UniformSampling
 export NormalSampling
 export realization
@@ -36,37 +36,37 @@ export allocate_param_array
 export zero_param_array
 export get_at_offsets
 export recenter
-export TrialPFESpace
-export TrialPFESpace!
-export HomogeneousTrialPFESpace
-export MultiFieldPFESpace
-export AbstractPFunction
-export PFunction, 𝑓ₚ
-export TransientPFunction, 𝑓ₚₜ
-export TransientTrialPFESpace
-export TransientMultiFieldPFESpace
-export TransientMultiFieldTrialPFESpace
-export TransientPFEOperator
-export TransientPFEOperatorFromWeakForm
-export AffineTransientPFEOperator
-export NonlinearTransientPFEOperator
+export TrialParamFESpace
+export TrialParamFESpace!
+export HomogeneousTrialParamFESpace
+export MultiFieldParamFESpace
+export AbstractParamFunction
+export ParamFunction, 𝑓ₚ
+export TransientParamFunction, 𝑓ₚₜ
+export TransientTrialParamFESpace
+export TransientMultiFieldParamFESpace
+export TransientMultiFieldTrialParamFESpace
+export TransientParamFEOperator
+export TransientParamFEOperatorFromWeakForm
+export AffineTransientParamFEOperator
+export NonlinearTransientParamFEOperator
 export residual_for_trian!
 export jacobian_for_trian!
-export ODEPSolution
+export ODEParamSolution
 # export num_time_dofs
 # export get_times
 # export get_stencil_times
 export collect_solutions
 export collect_residuals_for_trian
 export collect_jacobians_for_trian
-export AffineThetaMethodPOperator
-export ThetaMethodPOperator
+export AffineThetaMethodParamOperator
+export ThetaMethodParamOperator
 export get_order
 export get_L2_norm_matrix
 export get_H1_norm_matrix
 # export ReducedMeasure
-export PString
-export PVisualizationData
+export ParamString
+export ParamVisualizationData
 
 # include("RB/RB.jl")
 # using Mabla.RB

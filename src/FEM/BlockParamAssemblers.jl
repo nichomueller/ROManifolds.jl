@@ -20,7 +20,7 @@ end
 function FESpaces.SparseMatrixAssembler(
   mat,
   vec,
-  trial::MultiFieldPFESpace{MS},
+  trial::MultiFieldParamFESpace{MS},
   test::MultiFieldFESpace{MS},
   strategy::AssemblyStrategy=DefaultAssemblyStrategy()
   ) where MS <: BlockMultiFieldStyle

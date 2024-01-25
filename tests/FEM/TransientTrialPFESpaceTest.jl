@@ -1,4 +1,4 @@
-module TransientTrialPFESpaceTest
+module TransientTrialParamFESpaceTest
 using Test
 using Gridap.Arrays
 using Gridap.ReferenceFEs
@@ -30,10 +30,10 @@ g(μ,t) = x->g(x,μ,t)
 gμt(μ,t) = 𝑓ₚₜ(g,μ,t)
 
 params = [rand(3),rand(3),rand(3)]
-μ = PRealization(params)
+μ = ParamRealization(params)
 t = 1:3
-μt = TransientPRealization(μ,t)
-Uμt = TransientTrialPFESpace(V,gμt)
+μt = TransientParamRealization(μ,t)
+Uμt = TransientTrialParamFESpace(V,gμt)
 U = Uμt(μt)
 dirichlet_values = get_dirichlet_dof_values(U)
 

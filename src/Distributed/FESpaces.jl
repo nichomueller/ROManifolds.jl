@@ -1,38 +1,38 @@
-function FEM.TrialPFESpace(f::DistributedSingleFieldFESpace)
-  spaces = map(TrialPFESpace,f.spaces)
+function FEM.TrialParamFESpace(f::DistributedSingleFieldFESpace)
+  spaces = map(TrialParamFESpace,f.spaces)
   DistributedSingleFieldFESpace(spaces,f.gids,f.vector_type)
 end
 
-function FEM.TrialPFESpace(f::DistributedSingleFieldFESpace,fun)
+function FEM.TrialParamFESpace(f::DistributedSingleFieldFESpace,fun)
   spaces = map(f.spaces) do s
-    TrialPFESpace(s,fun)
+    TrialParamFESpace(s,fun)
   end
   DistributedSingleFieldFESpace(spaces,f.gids,f.vector_type)
 end
 
-function FEM.TrialPFESpace(fun,f::DistributedSingleFieldFESpace)
+function FEM.TrialParamFESpace(fun,f::DistributedSingleFieldFESpace)
   spaces = map(f.spaces) do s
-    TrialPFESpace(fun,s)
+    TrialParamFESpace(fun,s)
   end
   DistributedSingleFieldFESpace(spaces,f.gids,f.vector_type)
 end
 
-function FEM.TrialPFESpace!(f::DistributedSingleFieldFESpace,fun)
+function FEM.TrialParamFESpace!(f::DistributedSingleFieldFESpace,fun)
   spaces = map(f.spaces) do s
-    TrialPFESpace!(s,fun)
+    TrialParamFESpace!(s,fun)
   end
   DistributedSingleFieldFESpace(spaces,f.gids,f.vector_type)
 end
 
-function FEM.HomogeneousTrialPFESpace(f::DistributedSingleFieldFESpace,args...)
+function FEM.HomogeneousTrialParamFESpace(f::DistributedSingleFieldFESpace,args...)
   spaces = map(f.spaces) do s
-    HomogeneousTrialPFESpace(s,args...)
+    HomogeneousTrialParamFESpace(s,args...)
   end
   DistributedSingleFieldFESpace(spaces,f.gids,f.vector_type)
 end
 
 function FESpaces.zero_free_values(
-  f::DistributedSingleFieldFESpace{<:AbstractArray{<:TrialPFESpace}})
+  f::DistributedSingleFieldFESpace{<:AbstractArray{<:TrialParamFESpace}})
 
   index_partition = partition(f.gids)
   vector_partition = map(local_views(f)) do fi

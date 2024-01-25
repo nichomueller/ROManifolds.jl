@@ -53,13 +53,13 @@ end
 function collect_solutions(
   rbinfo::BlockRBInfo,
   fesolver::ODESolver,
-  feop::TransientPFEOperator)
+  feop::TransientParamFEOperator)
 
   nparams = rbinfo.nsnaps_state+rbinfo.nsnaps_test
   params = realization(feop,nparams)
   u0 = get_free_dof_values(fesolver.uh0(params))
   time_ndofs = num_time_dofs(fesolver)
-  uμt = ODEPSolution(fesolver,feop,params,u0,fesolver.t0,fesolver.tf)
+  uμt = ODEParamSolution(fesolver,feop,params,u0,fesolver.t0,fesolver.tf)
   println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
   stats = @timed begin
     snaps = map(uμt) do (snap,n)
@@ -142,7 +142,7 @@ end
 
 function reduced_basis(
   rbinfo::BlockRBInfo,
-  feop::TransientPFEOperator,
+  feop::TransientParamFEOperator,
   snaps::BlockSnapshots)
 
   nblocks = length(snaps)
@@ -161,7 +161,7 @@ end
 
 function add_space_supremizers(
   rbinfo::BlockRBInfo,
-  feop::TransientPFEOperator,
+  feop::TransientParamFEOperator,
   blocks::Vector{RBSpace{T}}) where T
 
   bs_primal,bs_dual... = map(get_basis_space,blocks)
@@ -177,7 +177,7 @@ function add_space_supremizers(
   return [bs_primal,bs_dual...]
 end
 
-function space_supremizers(basis_space::Matrix,feop::TransientPFEOperator)
+function space_supremizers(basis_space::Matrix,feop::TransientParamFEOperator)
   μ = realization(feop)
   u = zero(feop.test)
   t = 0.
@@ -242,7 +242,7 @@ end
 
 function get_method_operator(
   fesolver::ODESolver,
-  feop::TransientPFEOperator,
+  feop::TransientParamFEOperator,
   rbspace::BlockRBSpace{T},
   params::Table;
   kwargs...) where T
@@ -561,7 +561,7 @@ end
 
 function post_process(
   rbinfo::BlockRBInfo,
-  feop::TransientPFEOperator,
+  feop::TransientParamFEOperator,
   sol::ParamArray,
   sol_approx::ParamArray,
   params::Table,

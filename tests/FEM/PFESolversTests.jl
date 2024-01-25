@@ -19,7 +19,7 @@ order = 2
 degree = 4
 quad = CellQuadrature(trian,degree)
 
-μ = PRealization([[1],[2],[3]])
+μ = ParamRealization([[1],[2],[3]])
 f(x,μ) = sum(μ)*x[1]
 f(μ) = x -> f(x,μ)
 fμ = 𝑓ₚ(f,μ)
@@ -30,7 +30,7 @@ biform(u,v) = fμ*∇(v)⊙∇(u)
 
 reffe = ReferenceFE(lagrangian,Float64,order)
 V = FESpace(model,reffe,dirichlet_tags=[1,10])
-U = TrialPFESpace(V,fμ)
+U = TrialParamFESpace(V,fμ)
 
 v = get_fe_basis(V)
 u = get_trial_fe_basis(U)

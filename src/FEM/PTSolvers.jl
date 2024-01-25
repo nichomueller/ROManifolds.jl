@@ -1,6 +1,6 @@
 function get_method_operator(
   fesolver::ODESolver,
-  feop::TransientPFEOperator,
+  feop::TransientParamFEOperator,
   sols::ParamArray,
   params::Table)
 

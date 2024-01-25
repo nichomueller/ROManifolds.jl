@@ -28,7 +28,7 @@ end
 
 for f in (:get_L2_norm_matrix,:get_H1_norm_matrix)
   @eval begin
-    function $f(op::TransientPFEOperator)
+    function $f(op::TransientParamFEOperator)
       μ,t = realization(op),0.
       test = op.test
       trial = get_trial(op)

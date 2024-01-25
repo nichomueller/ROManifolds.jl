@@ -51,13 +51,13 @@ jac_t(μ,t,u,dut,v) = ∫(v*dut)dΩ
 pranges = fill([1.,10.],3)
 t0,tf,dt,θ = 0.,0.3,0.005,0.5
 tdomain = dt:dt:tf
-tpspace = TransientParametricSpace(pranges,tdomain)
+tpspace = TransientParamSpace(pranges,tdomain)
 
 T = Float
 reffe = ReferenceFE(lagrangian,T,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-trial = TransientTrialPFESpace(test,gμt)
-feop = AffineTransientPFEOperator(res,jac,jac_t,tpspace,trial,test)
+trial = TransientTrialParamFESpace(test,gμt)
+feop = AffineTransientParamFEOperator(res,jac,jac_t,tpspace,trial,test)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),θ,dt)
 

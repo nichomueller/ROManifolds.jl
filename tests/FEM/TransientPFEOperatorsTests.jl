@@ -1,4 +1,4 @@
-# module TransientPFEOperatorsTests
+# module TransientParamFEOperatorsTests
 
 using Gridap
 using ForwardDiff
@@ -20,7 +20,7 @@ dt = 0.1
 # transient parametric space
 pranges = fill([1.,10.],3)
 tdomain = dt:dt:tf
-tpspace = TransientParametricSpace(pranges,tdomain)
+tpspace = TransientParamSpace(pranges,tdomain)
 
 # Analytical functions
 u(x,μ,t) = (1.0-x[1])*x[1]*(1.0-x[2])*x[2]*(t+3.0)*sum(μ)
@@ -62,7 +62,7 @@ V0 = FESpace(
   reffe,
   conformity=:H1,
   dirichlet_tags="boundary")
-U = TransientTrialPFESpace(V0,u)
+U = TransientTrialParamFESpace(V0,u)
 Ω = Triangulation(model)
 # Γ = BoundaryTriangulation(model,tags="boundary")
 degree = 2*order
@@ -82,7 +82,7 @@ irhs(μ,t,u,v) = b(μ,t,v) - a(u,v)#∫( -1.0*(∇(v)⊙∇(u)))dΩ
 erhs(μ,t,u,v) = ∫( 0.0*(∇(v)⊙∇(u)))dΩ#b(v,t)
 jac(μ,t,u,du,v) = a(du,v)
 jac_t(μ,t,u,dut,v) = m(dut,v)
-op = TransientPFEOperator(res,jac,jac_t,tpspace,U,V0)
+op = TransientParamFEOperator(res,jac,jac_t,tpspace,U,V0)
 # opRK = TransientRungeKuttaFEOperator(lhs,rhs,jac,jac_t,U,V0)
 # opIMEXRK = TransientIMEXRungeKuttaFEOperator(lhs,irhs,erhs,jac,jac_t,U,V0)
 
@@ -150,7 +150,7 @@ change_time!(rθ,dtθ)
 ode_cache = update_cache!(ode_cache,odeop,rθ)
 
 using Gridap.ODEs.ODETools: ThetaMethodNonlinearOperator
-nlop = ThetaMethodPOperator(odeop,rθ,dtθ,u0,ode_cache,vθ)
+nlop = ThetaMethodParamOperator(odeop,rθ,dtθ,u0,ode_cache,vθ)
 
 nl_cache = solve!(uf,ode_solver.nls,nlop,nl_cache)
 

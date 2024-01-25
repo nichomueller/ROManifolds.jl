@@ -1,4 +1,4 @@
-module MultiFieldPFESpacesTests
+module MultiFieldParamFESpacesTests
 
 using FillArrays
 using Gridap.Arrays
@@ -11,7 +11,7 @@ using Gridap.MultiField
 using Mabla.FEM
 using Test
 
-μ = PRealization([[1],[2],[3]])
+μ = ParamRealization([[1],[2],[3]])
 g(x,μ) = 1+sum(μ)
 g(μ) = x -> g(x,μ)
 gμ = 𝑓ₚ(g,μ)
@@ -29,17 +29,17 @@ quad = CellQuadrature(trian,degree)
 V = TestFESpace(model,ReferenceFE(lagrangian,Float64,order);conformity=:H1)
 Q = TestFESpace(model,ReferenceFE(lagrangian,Float64,order-1),conformity=:L2)
 
-U = TrialPFESpace(V,gμ)
-P = TrialPFESpace(Q)
+U = TrialParamFESpace(V,gμ)
+P = TrialParamFESpace(Q)
 
 multi_field_style = ConsecutiveMultiFieldStyle()
 
-Y = MultiFieldPFESpace([V,Q],style=multi_field_style)
-X = MultiFieldPFESpace([U,P],style=multi_field_style)
+Y = MultiFieldParamFESpace([V,Q],style=multi_field_style)
+X = MultiFieldParamFESpace([U,P],style=multi_field_style)
 
 @test isa(Y,MultiFieldFESpace)
-@test isa(X,MultiFieldPFESpace)
-@test isa(X.spaces,Vector{<:SingleFieldPFESpace})
+@test isa(X,MultiFieldParamFESpace)
+@test isa(X.spaces,Vector{<:SingleFieldParamFESpace})
 @test get_vector_type(X) <: ParamArray
 
 @test num_free_dofs(X) == num_free_dofs(U) + num_free_dofs(P)

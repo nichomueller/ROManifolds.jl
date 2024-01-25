@@ -15,7 +15,7 @@ dt = 0.1
 
 pranges = fill([0,1],3)
 tdomain = 0:dt:1
-ptspace = TransientParametricSpace(pranges,tdomain)
+ptspace = TransientParamSpace(pranges,tdomain)
 μt = realization(ptspace,nparams=3)
 μt0 = FEM.get_at_time(μt,:initial)
 μtf = FEM.get_at_time(μt,:final)
@@ -51,7 +51,7 @@ V0 = TestFESpace(
   dirichlet_tags="boundary"
 )
 
-U = TransientTrialPFESpace(V0,uμt)
+U = TransientTrialParamFESpace(V0,uμt)
 @test test_transient_trial_fe_space(U,μ)
 
 U0 = U(μ,1.0)
@@ -87,7 +87,7 @@ jac_t(μ,t,u,dut,v) = ∫(dut*v)dΩ
 
 using Gridap.FESpaces: allocate_residual, allocate_jacobian, residual!, jacobian!
 
-op = TransientPFEOperator(res,jac,jac_t,ptspace,U,V0)
+op = TransientParamFEOperator(res,jac,jac_t,ptspace,U,V0)
 odeop = get_algebraic_operator(op)
 cache = allocate_cache(odeop,μt)
 
@@ -144,7 +144,7 @@ cache = nothing
 uf = copy(v0)
 update_cache!(ode_cache,odeop,μtf)
 vf = copy(v0)
-nlop = ThetaMethodPOperator(odeop,μtf,dt,v0,ode_cache,vf)
+nlop = ThetaMethodParamOperator(odeop,μtf,dt,v0,ode_cache,vf)
 
 x = copy(nlop.u0)
 

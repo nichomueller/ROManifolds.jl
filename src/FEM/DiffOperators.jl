@@ -1,4 +1,4 @@
-function ODETools.∂t(f::TransientPFunction)
+function ODETools.∂t(f::TransientParamFunction)
   @unpack fun,params,times = f
   function ∂ₚt(x,μ,t)
     fxt = zero(return_type(fun,x,μ,t))
@@ -6,7 +6,7 @@ function ODETools.∂t(f::TransientPFunction)
   end
   ∂ₚt(x::VectorValue) = (μ,t) -> ∂ₚt(x,μ,t)
   ∂ₚt(μ,t) = x -> ∂ₚt(x,μ,t)
-  return TransientPFunction(∂ₚt,params,times)
+  return TransientParamFunction(∂ₚt,params,times)
 end
 
 function _∂ₚt(f,x,μ,t,::Any)

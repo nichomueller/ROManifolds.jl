@@ -1,11 +1,11 @@
-struct TransientPFESolution
-  odesol::ODEPSolution
-  trial::TransientTrialPFESpace
+struct TransientParamFESolution
+  odesol::ODEParamSolution
+  trial::TransientTrialParamFESpace
 end
 
-function TransientPFESolution(
+function TransientParamFESolution(
   solver::ODESolver,
-  op::TransientPFEOperator,
+  op::TransientParamFEOperator,
   uh0,
   r = realization(op.tpspace;kwargs...);
   kwargs...)
@@ -16,10 +16,10 @@ function TransientPFESolution(
   ode_sol = solve(solver,ode_op,u0,r)
   trial = get_trial(op)
 
-  TransientPFESolution(ode_sol,trial)
+  TransientParamFESolution(ode_sol,trial)
 end
 
-function Base.iterate(sol::TransientPFESolution)
+function Base.iterate(sol::TransientParamFESolution)
   odesolnext = iterate(sol.odesol)
   if odesolnext === nothing
     return nothing
@@ -34,7 +34,7 @@ function Base.iterate(sol::TransientPFESolution)
   (uh,rf),state
 end
 
-function Base.iterate(sol::TransientPFESolution,state)
+function Base.iterate(sol::TransientParamFESolution,state)
   Uh,odesolstate = state
   odesolnext = iterate(sol.odesol,odesolstate)
   if odesolnext === nothing
@@ -51,23 +51,23 @@ end
 
 function Algebra.solve(
   solver::ODESolver,
-  op::TransientPFEOperator,
+  op::TransientParamFEOperator,
   uh0,
   args...;
   kwargs...)
-  TransientPFESolution(solver,op,uh0,args...;kwargs...)
+  TransientParamFESolution(solver,op,uh0,args...;kwargs...)
 end
 
 function TransientFETools.test_transient_fe_solver(
   solver::ODESolver,
-  op::TransientPFEOperator,
+  op::TransientParamFEOperator,
   u0,
   r)
 
   solution = solve(solver,op,u0,r)
   for (uhn,rn) in solution
     @test isa(uhn,FEFunction)
-    @test isa(rn,TransientPRealization)
+    @test isa(rn,TransientParamRealization)
   end
   true
 end

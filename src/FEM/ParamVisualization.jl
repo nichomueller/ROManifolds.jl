@@ -1,33 +1,33 @@
-struct PString{S<:AbstractVector{<:AbstractString}}
+struct ParamString{S<:AbstractVector{<:AbstractString}}
   strings::S
 end
 
-function PString(filebase::String,n::Integer)
+function ParamString(filebase::String,n::Integer)
   filebases = map(1:n) do i
     f = joinpath(filebase,"param_$i")
     create_dir(f)
     f
   end
-  PString(filebases)
+  ParamString(filebases)
 end
 
-Base.length(s::PString) = length(s.strings)
-Base.iterate(s::PString) = iterate(s.strings)
-Base.iterate(s::PString,i::Integer) = iterate(s.strings,i)
+Base.length(s::ParamString) = length(s.strings)
+Base.iterate(s::ParamString) = iterate(s.strings)
+Base.iterate(s::ParamString,i::Integer) = iterate(s.strings,i)
 
-function Base.show(io::IO,::MIME"text/plain",s::PString)
+function Base.show(io::IO,::MIME"text/plain",s::ParamString)
   for string in s.strings
     show(string); print("\n")
   end
 end
 
-struct PVisualizationData{A<:AbstractArray}
+struct ParamVisualizationData{A<:AbstractArray}
   visdata::A
 end
 
-function PVisualizationData(
+function ParamVisualizationData(
   grid::Grid,
-  filebase::PString;
+  filebase::ParamString;
   celldata=Dict(),
   nodaldata=Dict())
 
@@ -35,10 +35,10 @@ function PVisualizationData(
   visdata = map(filebase,nodaldata) do filebase,nodaldata
     VisualizationData(grid,filebase;celldata,nodaldata)
   end
-  PVisualizationData(visdata)
+  ParamVisualizationData(visdata)
 end
 
-function Base.getproperty(x::PVisualizationData,sym::Symbol)
+function Base.getproperty(x::ParamVisualizationData,sym::Symbol)
   if sym == :grid
     x.visdata[1].grid
   elseif sym == :filebase
@@ -52,20 +52,20 @@ function Base.getproperty(x::PVisualizationData,sym::Symbol)
   end
 end
 
-function Base.propertynames(x::PVisualizationData,private::Bool=false)
+function Base.propertynames(x::ParamVisualizationData,private::Bool=false)
   (fieldnames(typeof(x))...,:grid,:filebase,:celldata,:nodaldata)
 end
 
 function Visualization.visualization_data(
   grid::Grid,
-  filebase::PString;
+  filebase::ParamString;
   celldata=Dict(),nodaldata=Dict())
-  (PVisualizationData(grid,filebase;celldata=celldata,nodaldata=nodaldata),)
+  (ParamVisualizationData(grid,filebase;celldata=celldata,nodaldata=nodaldata),)
 end
 
 function Visualization.visualization_data(
   trian::Triangulation,
-  filebase::PString;
+  filebase::ParamString;
   order=-1,nsubcells=-1,celldata=Dict(),cellfields=Dict())
 
   if order == -1 && nsubcells == -1
@@ -84,10 +84,10 @@ function Visualization.visualization_data(
   cdata = Visualization._prepare_cdata(celldata,visgrid.sub_cell_to_cell)
   pdata = Visualization._prepare_pdata(trian,cellfields,visgrid.cell_to_refpoints)
 
-  (PVisualizationData(visgrid,filebase;celldata=cdata,nodaldata=pdata),)
+  (ParamVisualizationData(visgrid,filebase;celldata=cdata,nodaldata=pdata),)
 end
 
-function _lengths(cellfields::Dict{String,<:FEPFunction})
+function _lengths(cellfields::Dict{String,<:ParamFEFunction})
   lengths = []
   for (k,v) in cellfields
     push!(lengths,length(v))
@@ -97,7 +97,7 @@ function _lengths(cellfields::Dict{String,<:FEPFunction})
   return L
 end
 
-function Visualization._prepare_pdata(trian,cellfields::Dict{String,<:FEPFunction},samplingpoints)
+function Visualization._prepare_pdata(trian,cellfields::Dict{String,<:ParamFEFunction},samplingpoints)
   L = _lengths(cellfields)
   x = CellPoint(samplingpoints,trian,ReferenceDomain())
   pdata = map(1:L) do i

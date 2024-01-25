@@ -56,7 +56,7 @@ struct DistributedRBSpace{T<:AbstractVector{<:RBSpace}}
   rbspace::T
 end
 
-function RB.reduced_basis(rbinfo::RBInfo,feop::TransientPFEOperator,s::DistributedSnapshots)
+function RB.reduced_basis(rbinfo::RBInfo,feop::TransientParamFEOperator,s::DistributedSnapshots)
   rbspace = map(s.snaps) do snaps
     reduced_basis(rbinfo,feop,snaps)
   end

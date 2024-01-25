@@ -8,7 +8,7 @@ using Mabla.FEM
 
 ############################################################################################
 parametric = true
-μ = PRealization([[1],[2],[3]])
+μ = ParamRealization([[1],[2],[3]])
 sol(x,μ) = (1+sum(μ))*sum(x)
 sol(μ) = x -> sol(x,μ)
 solμ = 𝑓ₚ(sol,μ)
@@ -23,7 +23,7 @@ reffe = LagrangianRefFE(Float64,QUAD,1)
 V = FESpace(Ω,reffe;dirichlet_tags="boundary")
 
 if parametric
-  U = TrialPFESpace(V,solμ)
+  U = TrialParamFESpace(V,solμ)
   biform((u1,u2),(v1,v2)) = ∫(solμ*∇(u1)⋅∇(v1) + u2⋅v2 - u1⋅v2)*dΩ
   liform((v1,v2)) = ∫(solμ*v1 - v2)*dΩ
 else
@@ -35,8 +35,8 @@ end
 ############################################################################################
 # Normal assembly
 
-Y = MultiFieldPFESpace(fill(V,2))
-X = MultiFieldPFESpace(fill(U,2))
+Y = MultiFieldParamFESpace(fill(V,2))
+X = MultiFieldParamFESpace(fill(U,2))
 
 u = get_trial_fe_basis(X)
 v = get_fe_basis(Y)
@@ -53,8 +53,8 @@ A2,b2 = assemble_matrix_and_vector(assem,data)
 ############################################################################################
 # Block MultiFieldStyle
 
-Yb = MultiFieldPFESpace(fill(V,2);style=BlockMultiFieldStyle())
-Xb = MultiFieldPFESpace(fill(U,2);style=BlockMultiFieldStyle())
+Yb = MultiFieldParamFESpace(fill(V,2);style=BlockMultiFieldStyle())
+Xb = MultiFieldParamFESpace(fill(U,2);style=BlockMultiFieldStyle())
 test_fe_space(Yb)
 test_fe_space(Xb)
 

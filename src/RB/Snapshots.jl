@@ -44,13 +44,13 @@ end
 function collect_solutions(
   rbinfo::RBInfo,
   fesolver::ODESolver,
-  feop::TransientPFEOperator)
+  feop::TransientParamFEOperator)
 
   nparams = rbinfo.nsnaps_state+rbinfo.nsnaps_test
   params = realization(feop,nparams)
   u0 = get_free_dof_values(fesolver.uh0(params))
   time_ndofs = num_time_dofs(fesolver)
-  uμt = ODEPSolution(fesolver,feop,params,u0,fesolver.t0,fesolver.tf)
+  uμt = ODEParamSolution(fesolver,feop,params,u0,fesolver.t0,fesolver.tf)
   println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
   stats = @timed begin
     snaps = map(uμt) do (snap,n)

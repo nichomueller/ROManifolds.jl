@@ -1,4 +1,4 @@
-module PFieldTests
+module ParamFieldTests
 
 using Gridap.Fields
 using Gridap.TensorValues
@@ -8,7 +8,7 @@ using Test
 
 # Parametric information
 
-μ = PRealization([[1.0],[2.0],[3.0]])
+μ = ParamRealization([[1.0],[2.0],[3.0]])
 fun(x,μ) = sum(μ)
 fun(μ) = x -> fun(x,μ)
 funμ = 𝑓ₚ(fun,μ)
@@ -21,9 +21,9 @@ p = Point(1.0,2.0)
 f = GenericField(funμ)
 df = ∇(f)
 ddf = ∇∇(f)
-@test typeof(f) <: GenericPField
-@test typeof(df) <: PFieldGradient{1}
-@test typeof(ddf) <: PFieldGradient{2}
+@test typeof(f) <: GenericParamField
+@test typeof(df) <: ParamFieldGradient{1}
+@test typeof(ddf) <: ParamFieldGradient{2}
 fp = f(p)
 dfp = df(p)
 ddfp = ddf(p)
@@ -112,7 +112,7 @@ end
 # ZeroField
 
 f = zero(f)
-@test isa(f,ZeroPField)
+@test isa(f,ZeroParamField)
 
 map(f,df,ddf,μ) do f,df,ddf,μ
   test_field(f,p,0*q(μ)(p))
@@ -134,7 +134,7 @@ end
 
 v = ParamArray([1.0*VectorValue(1.0,1.0),2.0*VectorValue(1.0,1.0)])
 f = ConstantField(v)
-@test isa(f,ConstantPField)
+@test isa(f,ConstantParamField)
 
 fp = v
 ∇fp = ParamArray([zero(TensorValue{2,2,Float64}),zero(TensorValue{2,2,Float64})])
@@ -168,7 +168,7 @@ li = return_cache(fi,x)
 fix = evaluate!(li,fi,x)
 
 f = Operation(*)(a,b)
-@test isa(f,OperationPField)
+@test isa(f,OperationParamField)
 cp = aμ(p) .* bμ(p)
 ∇cp = ∇(aμ)(p) .* bμ(p) .+ aμ(p) .* ∇(bμ)(p)
 test_field(f,p,cp)
@@ -224,7 +224,7 @@ m = GenericField(mfun)
 g = GenericField(gμ)
 
 f = m∘g
-@test isa(f,OperationPField)
+@test isa(f,OperationParamField)
 fp = m(g(p))
 ∇fp = ∇(g)(p).⋅∇(m)(g(p))
 test_field(f,p,fp)

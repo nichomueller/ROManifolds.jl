@@ -47,26 +47,26 @@ dΩ = Measure(Ω,degree)
 dΓn = Measure(Γn,degree)
 
 ranges = fill([1.,10.],3)
-pspace = ParametricSpace(ranges)
+pspace = ParamSpace(ranges)
 
 a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
 a(μ,t) = x->a(x,μ,t)
-aμt(μ,t) = TransientPFunction(a,μ,t)
+aμt(μ,t) = TransientParamFunction(a,μ,t)
 
 f(x,μ,t) = 1.
 f(μ,t) = x->f(x,μ,t)
-fμt(μ,t) = TransientPFunction(f,μ,t)
+fμt(μ,t) = TransientParamFunction(f,μ,t)
 
 h(x,μ,t) = abs(cos(t/μ[3]))
 h(μ,t) = x->h(x,μ,t)
-hμt(μ,t) = TransientPFunction(h,μ,t)
+hμt(μ,t) = TransientParamFunction(h,μ,t)
 
 g(x,μ,t) = μ[1]*exp(-x[1]/μ[2])*abs(sin(t/μ[3]))
 g(μ,t) = x->g(x,μ,t)
 
 u0(x,μ) = 0
 u0(μ) = x->u0(x,μ)
-u0μ(μ) = PFunction(u0,μ)
+u0μ(μ) = ParamFunction(u0,μ)
 
 res(μ,t,u,v) = ∫(v*∂t(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
 jac(μ,t,u,du,v) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
@@ -75,8 +75,8 @@ jac_t(μ,t,u,dut,v) = ∫(v*dut)dΩ
 T = Float64
 reffe = ReferenceFE(lagrangian,T,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6])
-trial = TransientTrialPFESpace(test,g)
-feop = AffineTransientPFEOperator(res,jac,jac_t,pspace,trial,test)
+trial = TransientTrialParamFESpace(test,g)
+feop = AffineTransientParamFEOperator(res,jac,jac_t,pspace,trial,test)
 t0,tf,dt,θ = 0.,0.1,0.01,0.5
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),θ,dt)
@@ -85,7 +85,7 @@ fesolver = ThetaMethod(LUSolver(),θ,dt)
 params = realization(feop,nsnaps_state+nsnaps_test)
 w0 = get_free_dof_values(fesolver.uh0(params))
 time_ndofs = num_time_dofs(fesolver)
-uμt = ODEPSolution(fesolver,feop,params,w0,fesolver.t0,fesolver.tf)
+uμt = ODEParamSolution(fesolver,feop,params,w0,fesolver.t0,fesolver.tf)
 println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
 stats = @timed begin
   snaps = map(uμt) do (snap,n)
@@ -198,8 +198,8 @@ dΩ = Measure(Ω,degree)
 dΓn = Measure(Γn,degree)
 
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6])
-trial = TransientTrialPFESpace(test,g)
-feop = AffineTransientPFEOperator(res,jac,jac_t,pspace,trial,test)
+trial = TransientTrialParamFESpace(test,g)
+feop = AffineTransientParamFEOperator(res,jac,jac_t,pspace,trial,test)
 t0,tf,dt,θ = 0.,0.1,0.01,0.5
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 
@@ -212,7 +212,7 @@ end
 
 w0 = get_free_dof_values(fesolver.uh0(params))
 time_ndofs = num_time_dofs(fesolver)
-uμt = ODEPSolution(fesolver,feop,params,w0,fesolver.t0,fesolver.tf)
+uμt = ODEParamSolution(fesolver,feop,params,w0,fesolver.t0,fesolver.tf)
 println("Computing fe solution: time marching across $time_ndofs instants, for $nparams parameters")
 stats = @timed begin
   _snaps = map(uμt) do (snap,n)

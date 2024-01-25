@@ -21,7 +21,7 @@ function TransientFETools.allocate_cache(op::NonlinearOperator,rbspace)
   (res_cache,jac_cache),(rhs_solve_cache,lhs_solve_cache)
 end
 
-function rb_solver(rbinfo,feop::TransientPFEOperator{Affine},fesolver,rbspace,rbres,rbjacs,snaps,params)
+function rb_solver(rbinfo,feop::TransientParamFEOperator{Affine},fesolver,rbspace,rbres,rbjacs,snaps,params)
   println("Solving linear RB problems")
   nsnaps_test = rbinfo.nsnaps_test
   snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
@@ -197,7 +197,7 @@ end
 
 function post_process(
   rbinfo::RBInfo,
-  feop::TransientPFEOperator,
+  feop::TransientParamFEOperator,
   sol::ParamArray,
   sol_approx::ParamArray,
   params::Table,
@@ -244,7 +244,7 @@ end
 
 function plot_results(
   rbinfo::RBInfo,
-  feop::TransientPFEOperator,
+  feop::TransientParamFEOperator,
   fesolver::ODESolver,
   results::RBResults;
   entry=1)

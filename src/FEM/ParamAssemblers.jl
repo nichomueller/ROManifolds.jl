@@ -13,7 +13,7 @@ function Algebra.allocate_in_domain(matrix::ParamMatrix{T,A,L}) where {T,A,L}
   allocate_in_domain(V,matrix)
 end
 
-function get_passembler(a::SparseMatrixAssembler,r::Union{PRealization,TransientPRealization})
+function get_passembler(a::SparseMatrixAssembler,r::Union{ParamRealization,TransientParamRealization})
   L = length(r)
   vec = get_vector_builder(a)
   vector_type = get_array_type(vec)
@@ -33,7 +33,7 @@ end
 function FESpaces.SparseMatrixAssembler(
   mat,
   vec,
-  trial::PFESpace,
+  trial::ParamFESpace,
   test::FESpace,
   strategy::AssemblyStrategy=DefaultAssemblyStrategy())
 

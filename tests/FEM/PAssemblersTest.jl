@@ -1,4 +1,4 @@
-module PAssemblersTests
+module ParamAssemblersTests
 
 using Test
 using Gridap.Arrays
@@ -19,8 +19,8 @@ partition = (2,2)
 model = CartesianDiscreteModel(domain,partition)
 
 params = [1],[2],[3]
-μ = PRealization([[1],[2],[3]])
-μ₀ = PRealization([[0],[0],[0]])
+μ = ParamRealization([[1],[2],[3]])
+μ₀ = ParamRealization([[0],[0],[0]])
 f(x,μ) = sum(μ)
 f(μ) = x -> f(x,μ)
 fμ(μ) = 𝑓ₚ(f,μ)
@@ -32,7 +32,7 @@ liform1(v) = fμ(μ)*v*3
 
 reffe = ReferenceFE(lagrangian,Float64,1)
 V = FESpace(model,reffe,dirichlet_tags=[1,2,3,4,6,5])
-U = TrialPFESpace(V,fμ(μ₀))
+U = TrialParamFESpace(V,fμ(μ₀))
 
 v = get_fe_basis(V)
 u = get_trial_fe_basis(U)

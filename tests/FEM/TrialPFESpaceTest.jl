@@ -1,4 +1,4 @@
-module TrialPFESpaceTest
+module TrialParamFESpaceTest
 using Test
 using Gridap.Arrays
 using Gridap.ReferenceFEs
@@ -20,9 +20,9 @@ g(x,μ) = exp(-sum(x)/sum(μ))
 g(μ) = x->g(x,μ)
 
 params = [rand(3),rand(3),rand(3)]
-μ = PRealization(params)
+μ = ParamRealization(params)
 gμ = 𝑓ₚ(g,μ)
-U = TrialPFESpace(V,gμ)
+U = TrialParamFESpace(V,gμ)
 dirichlet_values = get_dirichlet_dof_values(U)
 
 @test length_dirichlet_values(U) == length(μ) == 3

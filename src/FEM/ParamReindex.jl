@@ -1,14 +1,14 @@
-const PReindex = Reindex{A} where A<:ParamArray
+const ParamReindex = Reindex{A} where A<:ParamArray
 
-function Base.length(k::PReindex)
+function Base.length(k::ParamReindex)
   length(k.values)
 end
 
-Arrays.testitem(k::PReindex) = Reindex(testitem(k.values))
-Arrays.testargs(k::PReindex,i::Integer...) = testargs(testitem(k),i...)
-Arrays.testargs(k::PReindex,i...) = testargs(testitem(k),i...)
+Arrays.testitem(k::ParamReindex) = Reindex(testitem(k.values))
+Arrays.testargs(k::ParamReindex,i::Integer...) = testargs(testitem(k),i...)
+Arrays.testargs(k::ParamReindex,i...) = testargs(testitem(k),i...)
 
-function Base.iterate(k::PReindex,oldstate...)
+function Base.iterate(k::ParamReindex,oldstate...)
   it = iterate(k.values,oldstate...)
   if isnothing(it)
     return nothing
@@ -17,17 +17,17 @@ function Base.iterate(k::PReindex,oldstate...)
   Reindex(vit),nextstate
 end
 
-const PosNegPReindex = PosNegReindex{A,B} where {A<:ParamArray,B<:ParamArray}
+const PosNegParamReindex = PosNegReindex{A,B} where {A<:ParamArray,B<:ParamArray}
 
-function Base.length(k::PosNegPReindex)
+function Base.length(k::PosNegParamReindex)
   @assert length(k.values_pos) == length(k.values_neg)
   length(k.values_pos)
 end
 
-Arrays.testitem(k::PosNegPReindex) = PosNegReindex(testitem(k.values_pos),testitem(k.values_neg))
-Arrays.testargs(k::PosNegPReindex,i::Integer) = testargs(testitem(k),i)
+Arrays.testitem(k::PosNegParamReindex) = PosNegReindex(testitem(k.values_pos),testitem(k.values_neg))
+Arrays.testargs(k::PosNegParamReindex,i::Integer) = testargs(testitem(k),i)
 
-function Base.iterate(k::PosNegPReindex)
+function Base.iterate(k::PosNegParamReindex)
   itpos = iterate(k.values_pos)
   itneg = iterate(k.values_neg)
   if isnothing(itpos) && isnothing(itneg)
@@ -39,7 +39,7 @@ function Base.iterate(k::PosNegPReindex)
   PosNegReindex(vitpos,vitneg),nextstate
 end
 
-function Base.iterate(k::PosNegPReindex,oldstate)
+function Base.iterate(k::PosNegParamReindex,oldstate)
   oldstatepos,oldstatneg = oldstate
   itpos = iterate(k.values_pos,oldstatepos)
   itneg = iterate(k.values_neg,oldstatneg)
@@ -53,7 +53,7 @@ function Base.iterate(k::PosNegPReindex,oldstate)
 end
 
 function Arrays.return_value(
-  f::Broadcasting{<:PosNegPReindex},
+  f::Broadcasting{<:PosNegParamReindex},
   x::Union{Number,AbstractArray{<:Number}}...)
 
   v = return_value(Broadcasting(testitem(f.f)),x...)
@@ -65,7 +65,7 @@ function Arrays.return_value(
 end
 
 function Arrays.return_cache(
-  f::Broadcasting{<:PosNegPReindex},
+  f::Broadcasting{<:PosNegParamReindex},
   x::Union{Number,AbstractArray{<:Number}}...)
 
   c = return_cache(Broadcasting(testitem(f.f)),x...)
@@ -80,7 +80,7 @@ end
 
 function Arrays.evaluate!(
   cache,
-  f::Broadcasting{<:PosNegPReindex},
+  f::Broadcasting{<:PosNegParamReindex},
   x::Union{Number,AbstractArray{<:Number}}...)
 
   cx,array = cache
@@ -92,7 +92,7 @@ end
 
 function Arrays.evaluate!(
   cache,
-  f::Broadcasting{<:PosNegPReindex},
+  f::Broadcasting{<:PosNegParamReindex},
   x::AbstractArray{<:Number})
 
   cx,array = cache
@@ -104,7 +104,7 @@ end
 
 function Arrays.evaluate!(
   cache,
-  f::Broadcasting{<:PosNegPReindex},
+  f::Broadcasting{<:PosNegParamReindex},
   x::Number...)
 
   cx,array = cache
@@ -114,7 +114,7 @@ function Arrays.evaluate!(
   array
 end
 
-for T in (:PReindex,:PosNegPReindex)
+for T in (:ParamReindex,:PosNegParamReindex)
   @eval begin
     function Arrays.return_value(k::$T,j::Integer)
       v = return_value(testitem(k),j)

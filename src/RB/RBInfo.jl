@@ -41,7 +41,7 @@ function RBInfo(
     nsnaps_mdeim,nsnaps_test,st_mdeim)
 end
 
-function get_norm_matrix(rbinfo::RBInfo,feop::TransientPFEOperator)
+function get_norm_matrix(rbinfo::RBInfo,feop::TransientParamFEOperator)
   norm_style = rbinfo.norm_style
   try
     T = get_vector_type(feop.test)

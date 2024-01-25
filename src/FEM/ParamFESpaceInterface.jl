@@ -8,46 +8,46 @@ function get_dirichlet_cells end
 get_dirichlet_cells(f::FESpace) = @abstractmethod
 get_dirichlet_cells(f::UnconstrainedFESpace) = f.dirichlet_cells
 
-abstract type SingleFieldPFESpace{S} <: SingleFieldFESpace end
+abstract type SingleFieldParamFESpace{S} <: SingleFieldFESpace end
 
-FESpaces.get_free_dof_ids(f::SingleFieldPFESpace) = get_free_dof_ids(f.space)
+FESpaces.get_free_dof_ids(f::SingleFieldParamFESpace) = get_free_dof_ids(f.space)
 
-FESpaces.get_triangulation(f::SingleFieldPFESpace) = get_triangulation(f.space)
+FESpaces.get_triangulation(f::SingleFieldParamFESpace) = get_triangulation(f.space)
 
-FESpaces.get_dof_value_type(f::SingleFieldPFESpace) = get_dof_value_type(f.space)
+FESpaces.get_dof_value_type(f::SingleFieldParamFESpace) = get_dof_value_type(f.space)
 
-FESpaces.get_cell_dof_ids(f::SingleFieldPFESpace) = get_cell_dof_ids(f.space)
+FESpaces.get_cell_dof_ids(f::SingleFieldParamFESpace) = get_cell_dof_ids(f.space)
 
-FESpaces.get_fe_basis(f::SingleFieldPFESpace) = get_fe_basis(f.space)
+FESpaces.get_fe_basis(f::SingleFieldParamFESpace) = get_fe_basis(f.space)
 
-FESpaces.get_trial_fe_basis(f::SingleFieldPFESpace) = get_trial_fe_basis(f.space)
+FESpaces.get_trial_fe_basis(f::SingleFieldParamFESpace) = get_trial_fe_basis(f.space)
 
-FESpaces.get_fe_dof_basis(f::SingleFieldPFESpace) = get_fe_dof_basis(f.space)
+FESpaces.get_fe_dof_basis(f::SingleFieldParamFESpace) = get_fe_dof_basis(f.space)
 
-FESpaces.ConstraintStyle(::Type{<:SingleFieldPFESpace{S}}) where S = ConstraintStyle(S)
+FESpaces.ConstraintStyle(::Type{<:SingleFieldParamFESpace{S}}) where S = ConstraintStyle(S)
 
-FESpaces.get_cell_isconstrained(f::SingleFieldPFESpace) = get_cell_isconstrained(f.space)
+FESpaces.get_cell_isconstrained(f::SingleFieldParamFESpace) = get_cell_isconstrained(f.space)
 
-FESpaces.get_cell_constraints(f::SingleFieldPFESpace) = get_cell_constraints(f.space)
+FESpaces.get_cell_constraints(f::SingleFieldParamFESpace) = get_cell_constraints(f.space)
 
-FESpaces.get_dirichlet_dof_ids(f::SingleFieldPFESpace) = get_dirichlet_dof_ids(f.space)
+FESpaces.get_dirichlet_dof_ids(f::SingleFieldParamFESpace) = get_dirichlet_dof_ids(f.space)
 
-FESpaces.get_cell_is_dirichlet(f::SingleFieldPFESpace) = get_cell_is_dirichlet(f.space)
+FESpaces.get_cell_is_dirichlet(f::SingleFieldParamFESpace) = get_cell_is_dirichlet(f.space)
 
-FESpaces.num_dirichlet_dofs(f::SingleFieldPFESpace) = num_dirichlet_dofs(f.space)
+FESpaces.num_dirichlet_dofs(f::SingleFieldParamFESpace) = num_dirichlet_dofs(f.space)
 
-FESpaces.num_dirichlet_tags(f::SingleFieldPFESpace) = num_dirichlet_tags(f.space)
+FESpaces.num_dirichlet_tags(f::SingleFieldParamFESpace) = num_dirichlet_tags(f.space)
 
-FESpaces.get_dirichlet_dof_tag(f::SingleFieldPFESpace) = get_dirichlet_dof_tag(f.space)
+FESpaces.get_dirichlet_dof_tag(f::SingleFieldParamFESpace) = get_dirichlet_dof_tag(f.space)
 
-FESpaces.scatter_free_and_dirichlet_values(f::SingleFieldPFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
+FESpaces.scatter_free_and_dirichlet_values(f::SingleFieldParamFESpace,fv,dv) = scatter_free_and_dirichlet_values(f.space,fv,dv)
 
-get_dirichlet_cells(f::SingleFieldPFESpace) = get_dirichlet_cells(f.space)
+get_dirichlet_cells(f::SingleFieldParamFESpace) = get_dirichlet_cells(f.space)
 
 function FESpaces.compute_dirichlet_values_for_tags!(
   dirichlet_values,
   dirichlet_values_scratch,
-  f::SingleFieldPFESpace,
+  f::SingleFieldParamFESpace,
   tag_to_object)
 
   dirichlet_dof_to_tag = get_dirichlet_dof_tag(f)
@@ -63,7 +63,7 @@ function FESpaces.compute_dirichlet_values_for_tags!(
   dirichlet_values
 end
 
-function FESpaces._convert_to_collectable(object::AbstractPFunction,ntags)
+function FESpaces._convert_to_collectable(object::AbstractParamFunction,ntags)
   objects = map(object) do o
     @assert typeof(o) <: Function
     FESpaces._convert_to_collectable(Fill(o,ntags),ntags)
@@ -74,7 +74,7 @@ end
 function FESpaces.gather_free_and_dirichlet_values!(
   free_vals,
   dirichlet_vals,
-  f::SingleFieldPFESpace,
+  f::SingleFieldParamFESpace,
   cell_vals)
 
   cell_dofs = get_cell_dof_ids(f)
@@ -96,7 +96,7 @@ end
 
 function FESpaces.gather_dirichlet_values!(
   dirichlet_vals,
-  f::SingleFieldPFESpace,
+  f::SingleFieldParamFESpace,
   cell_vals)
 
   cell_dofs = get_cell_dof_ids(f)
@@ -149,33 +149,33 @@ function FESpaces.FEFunction(
   fs::SingleFieldFESpace,free_values::ParamArray,dirichlet_values::ParamArray)
   cell_vals = scatter_free_and_dirichlet_values(fs,free_values,dirichlet_values)
   cell_field = CellField(fs,cell_vals)
-  SingleFieldFEPFunction(cell_field,cell_vals,free_values,dirichlet_values,fs)
+  SingleFieldParamFEFunction(cell_field,cell_vals,free_values,dirichlet_values,fs)
 end
 
 # This function allows us to use global ParamArrays
 
-function FESpaces.get_vector_type(f::SingleFieldPFESpace)
+function FESpaces.get_vector_type(f::SingleFieldParamFESpace)
   V = get_vector_type(f.space)
   N = length_free_values(f)
   typeof(ParamVector{V}(undef,N))
 end
 
-# This artifact aims to make a FESpace behave like a PFESpace with free and
+# This artifact aims to make a FESpace behave like a ParamFESpace with free and
 # dirichlet values being ParamArrays of length L
 
-struct FESpaceToPFESpace{S,L} <: SingleFieldPFESpace{S}
+struct FESpaceToParamFESpace{S,L} <: SingleFieldParamFESpace{S}
   space::S
-  FESpaceToPFESpace(space::S,::Val{L}) where {S,L} = new{S,L}(space)
+  FESpaceToParamFESpace(space::S,::Val{L}) where {S,L} = new{S,L}(space)
 end
 
-FESpaceToPFESpace(f::SingleFieldFESpace,L::Integer) = FESpaceToPFESpace(f,Val(L))
-FESpaceToPFESpace(f::SingleFieldPFESpace,L::Integer) = f
+FESpaceToParamFESpace(f::SingleFieldFESpace,L::Integer) = FESpaceToParamFESpace(f,Val(L))
+FESpaceToParamFESpace(f::SingleFieldParamFESpace,L::Integer) = f
 
-length_dirichlet_values(f::FESpaceToPFESpace{S,L}) where {S,L} = L
+length_dirichlet_values(f::FESpaceToParamFESpace{S,L}) where {S,L} = L
 
 # for testing purposes
 
-function FESpaces.test_single_field_fe_space(f::SingleFieldPFESpace,pred=(==))
+function FESpaces.test_single_field_fe_space(f::SingleFieldParamFESpace,pred=(==))
   fe_basis = get_fe_basis(f)
   @test isa(fe_basis,CellField)
   test_fe_space(f)
@@ -193,7 +193,7 @@ function FESpaces.test_single_field_fe_space(f::SingleFieldPFESpace,pred=(==))
   @test pred(fv,free_values)
   @test pred(dv,dirichlet_values)
   fe_function = FEFunction(f,free_values,dirichlet_values)
-  @test isa(fe_function,SingleFieldFEPFunction)
+  @test isa(fe_function,SingleFieldParamFEFunction)
   test_fe_function(fe_function)
   ddof_to_tag = get_dirichlet_dof_tag(f)
   @test length(ddof_to_tag) == num_dirichlet_dofs(f)
@@ -204,6 +204,6 @@ function FESpaces.test_single_field_fe_space(f::SingleFieldPFESpace,pred=(==))
   @test isa(cell_dof_basis,CellDof)
 end
 
-function _getindex(f::FESpaceToPFESpace,index)
+function _getindex(f::FESpaceToParamFESpace,index)
   f.space
 end

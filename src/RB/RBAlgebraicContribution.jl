@@ -126,7 +126,7 @@ function Utils.load(rbinfo::RBInfo,::Type{NTuple{2,Vector{RBMatAlgebraicContribu
   end |> tuple_of_arrays
 end
 
-function collect_compress_rhs_lhs(rbinfo,feop::TransientPFEOperator{Affine},fesolver,rbspace,params)
+function collect_compress_rhs_lhs(rbinfo,feop::TransientParamFEOperator{Affine},fesolver,rbspace,params)
   μ = params[1:rbinfo.nsnaps_mdeim]
   op = get_method_operator(fesolver,feop,rbspace,μ)
 

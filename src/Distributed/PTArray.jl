@@ -605,7 +605,7 @@ end
 
 function ODETools.jacobians!(
   A::AbstractMatrix,
-  op::TransientPFEOperator,
+  op::TransientParamFEOperator,
   μ::AbstractVector,
   t::T,
   xh::TransientDistributedCellField,

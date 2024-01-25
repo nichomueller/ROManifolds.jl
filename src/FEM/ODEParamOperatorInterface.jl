@@ -1,19 +1,19 @@
-abstract type ODEPOperator{C<:OperatorType} <: ODEOperator{C} end
+abstract type ODEParamOperator{C<:OperatorType} <: ODEOperator{C} end
 
-const ConstantODEPOperator = ODEPOperator{Constant}
-const ConstantMatrixODEPOperator = ODEPOperator{ConstantMatrix}
-const AffineODEPOperator = ODEPOperator{Affine}
-const NonlinearODEPOperator = ODEPOperator{Nonlinear}
+const ConstantODEParamOperator = ODEParamOperator{Constant}
+const ConstantMatrixODEParamOperator = ODEParamOperator{ConstantMatrix}
+const AffineODEParamOperator = ODEParamOperator{Affine}
+const NonlinearODEParamOperator = ODEParamOperator{Nonlinear}
 
-struct ODEPOpFromFEOp{C} <: ODEPOperator{C}
-  feop::TransientPFEOperator{C}
+struct ODEParamOpFromFEOp{C} <: ODEParamOperator{C}
+  feop::TransientParamFEOperator{C}
 end
 
-ReferenceFEs.get_order(op::ODEPOpFromFEOp) = get_order(op.feop)
+ReferenceFEs.get_order(op::ODEParamOpFromFEOp) = get_order(op.feop)
 
 function TransientFETools.allocate_cache(
-  op::ODEPOpFromFEOp,
-  r::TransientPRealization)
+  op::ODEParamOpFromFEOp,
+  r::TransientParamRealization)
 
   Upt = get_trial(op.feop)
   U = allocate_trial_space(Upt,r)
@@ -29,8 +29,8 @@ end
 
 function TransientFETools.update_cache!(
   ode_cache,
-  op::ODEPOpFromFEOp,
-  r::TransientPRealization)
+  op::ODEParamOpFromFEOp,
+  r::TransientParamRealization)
 
   _Us,Uts,fecache = ode_cache
   Us = ()
@@ -42,8 +42,8 @@ function TransientFETools.update_cache!(
 end
 
 function Algebra.allocate_residual(
-  op::ODEPOpFromFEOp,
-  r::TransientPRealization,
+  op::ODEParamOpFromFEOp,
+  r::TransientParamRealization,
   x::AbstractVector,
   ode_cache)
 
@@ -53,8 +53,8 @@ function Algebra.allocate_residual(
 end
 
 function Algebra.allocate_jacobian(
-  op::ODEPOpFromFEOp,
-  r::TransientPRealization,
+  op::ODEParamOpFromFEOp,
+  r::TransientParamRealization,
   x::AbstractVector,
   ode_cache)
 
@@ -64,8 +64,8 @@ function Algebra.allocate_jacobian(
 end
 
 function Algebra.allocate_jacobian(
-  op::ODEPOpFromFEOp,
-  r::TransientPRealization,
+  op::ODEParamOpFromFEOp,
+  r::TransientParamRealization,
   x::AbstractVector,
   i::Integer,
   ode_cache)
@@ -77,8 +77,8 @@ end
 
 function Algebra.residual!(
   b::AbstractVector,
-  op::ODEPOpFromFEOp,
-  r::TransientPRealization,
+  op::ODEParamOpFromFEOp,
+  r::TransientParamRealization,
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
 
@@ -93,8 +93,8 @@ end
 
 function residual_for_trian!(
   b::AbstractVector,
-  op::ODEPOpFromFEOp,
-  r::TransientPRealization,
+  op::ODEParamOpFromFEOp,
+  r::TransientParamRealization,
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
 
@@ -109,8 +109,8 @@ end
 
 function Algebra.jacobian!(
   A::AbstractMatrix,
-  op::ODEPOpFromFEOp,
-  r::TransientPRealization,
+  op::ODEParamOpFromFEOp,
+  r::TransientParamRealization,
   xhF::Tuple{Vararg{AbstractVector}},
   i::Integer,
   γᵢ::Real,
@@ -127,8 +127,8 @@ end
 
 function jacobian_for_trian!(
   A::AbstractMatrix,
-  op::ODEPOpFromFEOp,
-  r::TransientPRealization,
+  op::ODEParamOpFromFEOp,
+  r::TransientParamRealization,
   xhF::Tuple{Vararg{AbstractVector}},
   i::Integer,
   γᵢ::Real,
@@ -145,8 +145,8 @@ end
 
 function ODETools.jacobians!(
   A::AbstractMatrix,
-  op::ODEPOpFromFEOp,
-  r::TransientPRealization,
+  op::ODEParamOpFromFEOp,
+  r::TransientParamRealization,
   xhF::Tuple{Vararg{AbstractVector}},
   γ::Tuple{Vararg{Real}},
   ode_cache)
