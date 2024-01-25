@@ -1,36 +1,45 @@
+function Algebra.allocate_vector(::Type{V},n::Integer) where V<:AbstractParamContainer
+  vector = zeros(eltype(V),n)
+  allocate_param_array(vector,length(V))
+end
+
 function Algebra.allocate_vector(
-  ::Type{<:ParamVector{T,L}},
-  n::Integer) where {T,L}
+  ::Type{<:ParamBlockVector{T,V}},
+  indices::BlockedUnitRange) where {T,V}
 
-  vector = zeros(T,n)
-  allocate_parray(vector,L)
+  mortar(map(ids -> allocate_vector(V,ids),blocks(indices)))
 end
 
-function Algebra.allocate_in_range(matrix::ParamMatrix)
-  map(matrix) do matrix
-    allocate_in_range(matrix)
-  end
+function Algebra.allocate_in_range(matrix::ParamMatrix{T,A,L}) where {T,A,L}
+  V = ParamVector{T,Vector{eltype(A)},L}
+  allocate_in_range(V,matrix)
 end
 
-function Algebra.allocate_in_domain(::Type{<:ParamArray},matrix)
-  map(matrix) do matrix
-    allocate_in_domain(matrix)
-  end
+function Algebra.allocate_in_range(matrix::ParamBlockMatrix{T,A,L}) where {T,A,L}
+  BV = BlockVector{T,Vector{ParamVector{T,Vector{eltype(A)},L}}}
+  V = ParamBlockVector{T,Vector{eltype(A)},L,BV}
+  allocate_in_range(V,matrix)
 end
 
-function Algebra.allocate_in_domain(matrix::ParamMatrix)
-  map(matrix) do matrix
-    allocate_in_domain(matrix)
-  end
+function Algebra.allocate_in_domain(matrix::ParamMatrix{T,A,L}) where {T,A,L}
+  V = ParamVector{T,Vector{eltype(A)},L}
+  allocate_in_domain(V,matrix)
+end
+
+function Algebra.allocate_in_domain(matrix::ParamBlockMatrix{T,A,L}) where {T,A,L}
+  BV = BlockVector{T,Vector{ParamVector{T,Vector{eltype(A)},L}}}
+  V = ParamBlockVector{T,Vector{eltype(A)},L,BV}
+  allocate_in_domain(V,matrix)
 end
 
 function get_passembler(a::SparseMatrixAssembler,r::Union{PRealization,TransientPRealization})
+  L = length(r)
   vec = get_vector_builder(a)
   vector_type = get_array_type(vec)
-  pvector_type = typeof(ParamVector{vector_type}(undef,length(r)))
+  pvector_type = ParamVector{vector_type,Vector{vector_type},L}
   mat = get_matrix_builder(a)
   matrix_type = get_array_type(mat)
-  pmatrix_type = typeof(ParamMatrix{matrix_type}(undef,length(r)))
+  pmatrix_type = ParamMatrix{matrix_type,Vector{matrix_type},L}
   rows = FESpaces.get_rows(a)
   cols = FESpaces.get_cols(a)
   strategy = FESpaces.get_assembly_strategy(a)
@@ -233,4 +242,31 @@ end
     end
   end
   A
+end
+
+function test_passembler(a::Assembler,matdata,vecdata,data)
+  A = allocate_matrix(a,matdata)
+  @test FESpaces.num_cols(a) == size(A,2)
+  @test FESpaces.num_rows(a) == size(A,1)
+  assemble_matrix!(A,a,matdata)
+  assemble_matrix_add!(A,a,matdata)
+  A = assemble_matrix(a,matdata)
+  @test FESpaces.num_cols(a) == size(A,2)
+  @test FESpaces.num_rows(a) == size(A,1)
+  b = allocate_vector(a,vecdata)
+  @test length(testitem(b)) == FESpaces.num_rows(a)
+  assemble_vector!(b,a,vecdata)
+  assemble_vector_add!(b,a,vecdata)
+  b = assemble_vector(a,vecdata)
+  @test length(testitem(b)) == FESpaces.num_rows(a)
+  A, b = allocate_matrix_and_vector(a,data)
+  assemble_matrix_and_vector!(A,b,a,data)
+  assemble_matrix_and_vector_add!(A,b,a,data)
+  @test FESpaces.num_cols(a) == size(A,2)
+  @test FESpaces.num_rows(a) == size(A,1)
+  @test length(testitem(b)) == FESpaces.num_rows(a)
+  A, b = assemble_matrix_and_vector(a,data)
+  @test FESpaces.num_cols(a) == size(A,2)
+  @test FESpaces.num_rows(a) == size(A,1)
+  @test length(testitem(b)) == FESpaces.num_rows(a)
 end

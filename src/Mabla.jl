@@ -32,8 +32,8 @@ export UniformSampling
 export NormalSampling
 export realization
 export ParamArray
-export allocate_parray
-export zero_parray
+export allocate_param_array
+export zero_param_array
 export get_at_offsets
 export recenter
 export TrialPFESpace

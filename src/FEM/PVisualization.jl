@@ -1,43 +1,3 @@
-function _getindex(f::GenericCellField,index)
-  data = get_data(f)
-  trian = get_triangulation(f)
-  DS = DomainStyle(f)
-  di = getindex.(data,index)
-  GenericCellField(di,trian,DS)
-end
-
-function _getindex(f::TrialPFESpace,index)
-  dv = f.dirichlet_values[index]
-  TrialFESpace(dv,f.space)
-end
-
-function _getindex(f::FESpaceToPFESpace,index)
-  f.space
-end
-
-function _length(f::SingleFieldFEFunction)
-  @assert length_dirichlet_values(f.fe_space) == length(f.dirichlet_values)
-  length(f.dirichlet_values)
-end
-
-function _getindex(f::SingleFieldFEFunction,index)
-  cf = _getindex(f.cell_field,index)
-  fs = _getindex(f.fe_space,index)
-  cv = f.cell_dof_values[index]
-  fv = f.free_values[index]
-  dv = f.dirichlet_values[index]
-  SingleFieldFEFunction(cf,cv,fv,dv,fs)
-end
-
-_length(f::MultiFieldFEFunction) = _length(first(f.single_fe_functions))
-
-function _getindex(f::MultiFieldFEFunction,index)
-  mfs = map(_getindex,f.single_fe_functions)
-  sff = map(_getindex,f.fe_space)
-  fv = f.free_values[index]
-  MultiFieldFEFunction(fv,mfs,sff)
-end
-
 struct PString{S<:AbstractVector{<:AbstractString}}
   strings::S
 end
@@ -126,8 +86,6 @@ function Visualization.visualization_data(
 
   (PVisualizationData(visgrid,filebase;celldata=cdata,nodaldata=pdata),)
 end
-
-abstract type FEPFunction end
 
 function _lengths(cellfields::Dict{String,<:FEPFunction})
   lengths = []

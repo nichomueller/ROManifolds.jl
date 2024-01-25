@@ -145,6 +145,13 @@ function FESpaces._free_and_dirichlet_values_fill!(
 
 end
 
+function FESpaces.FEFunction(
+  fs::SingleFieldFESpace,free_values::ParamArray,dirichlet_values::ParamArray)
+  cell_vals = scatter_free_and_dirichlet_values(fs,free_values,dirichlet_values)
+  cell_field = CellField(fs,cell_vals)
+  SingleFieldFEPFunction(cell_field,cell_vals,free_values,dirichlet_values,fs)
+end
+
 # This function allows us to use global ParamArrays
 
 function FESpaces.get_vector_type(f::SingleFieldPFESpace)
@@ -186,8 +193,8 @@ function FESpaces.test_single_field_fe_space(f::SingleFieldPFESpace,pred=(==))
   @test pred(fv,free_values)
   @test pred(dv,dirichlet_values)
   fe_function = FEFunction(f,free_values,dirichlet_values)
-  @test isa(fe_function,SingleFieldFEFunction)
-  test_fe_pfunction(fe_function)
+  @test isa(fe_function,SingleFieldFEPFunction)
+  test_fe_function(fe_function)
   ddof_to_tag = get_dirichlet_dof_tag(f)
   @test length(ddof_to_tag) == num_dirichlet_dofs(f)
   if length(get_dirichlet_dof_tag(f)) != 0
@@ -197,23 +204,6 @@ function FESpaces.test_single_field_fe_space(f::SingleFieldPFESpace,pred=(==))
   @test isa(cell_dof_basis,CellDof)
 end
 
-function test_fe_pfunction(f::SingleFieldFEFunction)
-  lazy_getter(a,i=1) = lazy_map(x->getindex(x.array,i),a)
-  trian = get_triangulation(f)
-  free_values = get_free_dof_values(f)
-  fe_space = get_fe_space(f)
-  cell_values = get_cell_dof_values(f,trian)
-  dirichlet_values = f.dirichlet_values
-  for i in 1:length_dirichlet_values(fe_space)
-    fe_space_i = _getindex(fe_space,i)
-    fi = FEFunction(fe_space_i,free_values[i])
-    test_fe_function(fi)
-    @test free_values[i] == get_free_dof_values(fi)
-    @test lazy_getter(cell_values,i) == get_cell_dof_values(fi,trian)
-    @test dirichlet_values[i] == fi.dirichlet_values
-  end
-end
-
-function test_fe_pfunction(f::MultiFieldFEFunction)
-  map(test_fe_pfunction,f.single_fe_functions)
+function _getindex(f::FESpaceToPFESpace,index)
+  f.space
 end

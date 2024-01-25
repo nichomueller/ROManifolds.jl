@@ -6,15 +6,15 @@ function TransientFETools.allocate_cache(op::NonlinearOperator,rbspace)
   mat = zeros(T,1,1)
   cmat = CachedArray(mat)
   coeff = CachedArray(mat)
-  ptcoeff = CachedArray(zero_parray(mat,N))
+  ptcoeff = CachedArray(zero_param_array(mat,N))
 
   res_contrib_cache = return_cache(RBVecContributionMap(),op.u0)
   jac_contrib_cache = return_cache(RBMatContributionMap(),op.u0)
 
   rb_ndofs = num_rb_ndofs(rbspace)
 
-  rhs_solve_cache = zero_parray(zeros(T,rb_ndofs),N)
-  lhs_solve_cache = zero_parray(zeros(T,rb_ndofs,rb_ndofs),N)
+  rhs_solve_cache = zero_param_array(zeros(T,rb_ndofs),N)
+  lhs_solve_cache = zero_param_array(zeros(T,rb_ndofs,rb_ndofs),N)
 
   res_cache = ((b,cmat),(coeff,ptcoeff)),res_contrib_cache
   jac_cache = ((A,cmat),(coeff,ptcoeff)),jac_contrib_cache

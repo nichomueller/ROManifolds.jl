@@ -156,6 +156,28 @@ function MultiField.restrict_to_field(f::MultiFieldPFESpace,free_values::Abstrac
   MultiField._restrict_to_field(f,MultiFieldStyle(f),free_values,field)
 end
 
+function MultiField._restrict_to_field(
+  f,
+  mfs::BlockMultiFieldStyle{NB,SB,P},
+  free_values::ParamBlockVector,
+  field) where {NB,SB,P}
+
+  @check blocklength(free_values) == NB
+  U = f.spaces
+
+  block_ranges = MultiField.get_block_ranges(NB,SB,P)
+  block_idx    = findfirst(range -> field ∈ range, block_ranges)
+  block_free_values = map(free_values) do free_values
+    free_values[Block(block_idx)]
+  end
+  pblock_free_values = ParamArray(block_free_values)
+
+  offsets = compute_field_offsets(f,mfs)
+  pini = offsets[field] + 1
+  pend = offsets[field] + num_free_dofs(U[field])
+  return SubVector(pblock_free_values,pini,pend)
+end
+
 function MultiField.compute_field_offsets(f::MultiFieldPFESpace)
   compute_field_offsets(f,MultiFieldStyle(f))
 end
@@ -320,15 +342,7 @@ function FESpaces.FEFunction(fe::MultiFieldPFESpace,free_values)
     free_values_i = restrict_to_field(fe,free_values,i)
     FEFunction(fe.spaces[i],free_values_i)
   end
-  MultiFieldFEFunction(free_values,fe,blocks)
-end
-
-function FESpaces.EvaluationFunction(fe::MultiFieldPFESpace,free_values)
-  blocks = map(1:length(fe.spaces)) do i
-    free_values_i = restrict_to_field(fe,free_values,i)
-    EvaluationFunction(fe.spaces[i],free_values_i)
-  end
-  MultiFieldFEFunction(free_values,fe,blocks)
+  MultiFieldFEPFunction(free_values,fe,blocks)
 end
 
 function CellData.CellField(fe::MultiFieldPFESpace,cell_values)
@@ -345,37 +359,37 @@ function FESpaces.interpolate(objects,fe::MultiFieldPFESpace)
 end
 
 function FESpaces.interpolate!(objects,free_values::AbstractVector,fe::MultiFieldPFESpace)
-  blocks = SingleFieldFEFunction[]
+  blocks = SingleFieldFEPFunction[]
   for (field,(U,object)) in enumerate(zip(fe.spaces,objects))
     free_values_i = restrict_to_field(fe,free_values,field)
     uhi = interpolate!(object, free_values_i,U)
     push!(blocks,uhi)
   end
-  MultiFieldFEFunction(free_values,fe,blocks)
+  MultiFieldFEPFunction(free_values,fe,blocks)
 end
 
 function FESpaces.interpolate_everywhere(objects,fe::MultiFieldPFESpace)
   free_values = zero_free_values(fe)
-  blocks = SingleFieldFEFunction[]
+  blocks = SingleFieldFEPFunction[]
   for (field,(U,object)) in enumerate(zip(fe.spaces,objects))
     free_values_i = restrict_to_field(fe,free_values,field)
     dirichlet_values_i = zero_dirichlet_values(U)
     uhi = interpolate_everywhere!(object, free_values_i,dirichlet_values_i,U)
     push!(blocks,uhi)
   end
-  MultiFieldFEFunction(free_values,fe,blocks)
+  MultiFieldFEPFunction(free_values,fe,blocks)
 end
 
 function FESpaces.interpolate_dirichlet(objects,fe::MultiFieldPFESpace)
   free_values = zero_free_values(fe)
-  blocks = SingleFieldFEFunction[]
+  blocks = SingleFieldFEPFunction[]
   for (field,(U,object)) in enumerate(zip(fe.spaces,objects))
     free_values_i = restrict_to_field(fe,free_values,field)
     dirichlet_values_i = zero_dirichlet_values(U)
     uhi = interpolate_dirichlet!(object,free_values_i,dirichlet_values_i,U)
     push!(blocks,uhi)
   end
-  MultiFieldFEFunction(free_values,fe,blocks)
+  MultiFieldFEPFunction(free_values,fe,blocks)
 end
 
 # function FESpaces.interpolate!(objects,free_values::ParamArray,fe::MultiFieldPFESpace)
@@ -434,15 +448,11 @@ function FESpaces.test_fe_space(f::PFESpace)
   trian = get_triangulation(f)
   @test isa(trian,Triangulation)
   free_values = zero_free_values(f)
-  if isa(free_values,BlockVector)
-    @test sum(map(length,map(first,free_values.blocks))) == num_free_dofs(f)
-  else
-    @test length(testitem(free_values)) == num_free_dofs(f)
-  end
+  @test length(testitem(free_values)) == num_free_dofs(f)
   V = get_vector_type(f)
   @test typeof(free_values) == V
   fe_function = FEFunction(f,free_values)
-  test_fe_pfunction(fe_function)
+  test_fe_function(fe_function)
   fe_basis = get_fe_basis(f)
   @test isa(has_constraints(f),Bool)
   @test isa(has_constraints(typeof(f)),Bool)

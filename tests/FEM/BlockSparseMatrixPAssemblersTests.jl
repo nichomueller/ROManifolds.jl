@@ -2,26 +2,35 @@
 using Test, BlockArrays, SparseArrays, LinearAlgebra
 
 using Gridap
-using Gridap.FESpaces, Gridap.ReferenceFEs, Gridap.MultiField
+using Gridap.Algebra, Gridap.FESpaces, Gridap.ReferenceFEs, Gridap.MultiField
 
 using Mabla.FEM
 
 ############################################################################################
+parametric = true
 μ = PRealization([[1],[2],[3]])
 sol(x,μ) = (1+sum(μ))*sum(x)
 sol(μ) = x -> sol(x,μ)
 solμ = 𝑓ₚ(sol,μ)
 
+f(x) = sum(x)
+
 model = CartesianDiscreteModel((0.0,1.0,0.0,1.0),(5,5))
 Ω = Triangulation(model)
+dΩ = Measure(Ω, 2)
 
 reffe = LagrangianRefFE(Float64,QUAD,1)
 V = FESpace(Ω,reffe;dirichlet_tags="boundary")
-U = TrialPFESpace(V,solμ)
 
-dΩ = Measure(Ω, 2)
-biform((u1,u2),(v1,v2)) = ∫(solμ*∇(u1)⋅∇(v1) + u2⋅v2 - u1⋅v2)*dΩ
-liform((v1,v2)) = ∫(solμ*v1 - v2)*dΩ
+if parametric
+  U = TrialPFESpace(V,solμ)
+  biform((u1,u2),(v1,v2)) = ∫(solμ*∇(u1)⋅∇(v1) + u2⋅v2 - u1⋅v2)*dΩ
+  liform((v1,v2)) = ∫(solμ*v1 - v2)*dΩ
+else
+  U = TrialFESpace(V,f)
+  biform((u1,u2),(v1,v2)) = ∫(∇(u1)⋅∇(v1) + u2⋅v2 - u1⋅v2)*dΩ
+  liform((v1,v2)) = ∫(v1 - v2)*dΩ
+end
 
 ############################################################################################
 # Normal assembly
@@ -62,20 +71,14 @@ test_fe_space(Yb,bdata[1][1][1],bmatdata[1][1],bvecdata[1][1],Ω)
 # Block Assembly
 
 assem_blocks = SparseMatrixAssembler(Xb,Yb)
-test_sparse_matrix_assembler(assem_blocks,bmatdata,bvecdata,bdata)
-
-m1 = nz_counter(get_matrix_builder(assem_blocks),(get_rows(assem_blocks),get_cols(assem_blocks)))
-symbolic_loop_matrix!(m1,assem_blocks,bmatdata)
-m2 = nz_allocation(m1)
-
-m1 = nz_counter(get_matrix_builder(assem_blocks),(get_rows(assem_blocks),get_cols(assem_blocks)))
-symbolic_loop_matrix!(m1,a,matdata)
-m2 = nz_allocation(m1)
+FEM.test_passembler(assem_blocks,bmatdata,bvecdata,bdata)
 
 A1_blocks = assemble_matrix(assem_blocks,bmatdata)
 b1_blocks = assemble_vector(assem_blocks,bvecdata)
-@test A1 ≈ A1_blocks
-@test b1 ≈ b1_blocks
+for i = 1:length(solμ)
+  @test A1[i] ≈ A1_blocks[i]#mortar(getindex.(A1_blocks.blocks,i))
+  @test b1[i] ≈ b1_blocks[i]#mortar(getindex.(b1_blocks.blocks,i))
+end
 
 y1_blocks = similar(b1_blocks)
 mul!(y1_blocks,A1_blocks,b1_blocks)
@@ -108,3 +111,50 @@ block_op = AffineFEOperator(biform,liform,Xb,Yb)
 @test get_vector(op) ≈ get_vector(block_op)
 
 # end # module
+
+############
+#typeof(A1_blocks) <: BlockMatrix{Float64,<:AbstractMatrix{<:ParamMatrix{Float64, 3}}}
+
+# const ParamBlockMatrix{T,L} = BlockMatrix{T,<:AbstractMatrix{<:ParamMatrix{Float64,L}}}
+# const ParamBlockVector{T,L} = BlockVector{T,<:AbstractVector{<:ParamVector{Float64,L}}}
+
+# Base.getindex(a::ParamBlockMatrix{T,N},i::Vararg{Integer,N}) = hvcat(map(a->getindex(blocks(a),i),a)...)
+# Base.getindex(a::ParamBlockVector,i...) = vcat(getindex.(blocks(a),i...)...)
+
+# @assert typeof(A1_blocks) <: ParamBlockMatrix{Float64,3}
+# @assert typeof(b1_blocks) <: ParamBlockVector{Float64,3}
+
+# _dio(a,i) = map(a->getindex(blocks(a),i),a)
+# _dio(A1_blocks,1)
+
+function Base.length(
+  a::BlockArray{T,N,<:AbstractArray{ParamArray{T,N,A,L}}}
+  ) where {T,N,A,L,BS}
+  length(first(blocks(a)))
+end
+
+function Base.getindex(
+  a::BlockArray{T,N,<:AbstractArray{ParamArray{T,N,A,L}},BS},
+  i::Integer) where {T,N,A,L,BS}
+  # blocksi = map(blocks(a)) do block
+  #   block[i]
+  # end
+  blocksi = getindex.(blocks(a),i)
+  mortar(blocksi)
+end
+
+A1_blocks[1]
+
+m = sparse(rand(3,3))
+mm = Matrix{typeof(m)}(undef,2,2)
+mm[1] = m; mm[2] = m; mm[3] = m; mm[4] = m;
+A = ParamArray(mm)
+AA = mortar(mm)
+
+v = rand(3)
+vv = [v,v]
+bb = Vector{typeof(vv)}(undef,2)
+bb[1] = vv; bb[2] = vv
+b = mortar(bb)
+
+A*b

@@ -50,7 +50,7 @@ end
 
 function HomogeneousTrialPFESpace(U::SingleFieldFESpace,::Val{N}) where N
   dv = zero_dirichlet_values(U)
-  dirichlet_values = allocate_parray(dv,N)
+  dirichlet_values = allocate_param_array(dv,N)
   TrialPFESpace(dirichlet_values,U)
 end
 
@@ -64,3 +64,8 @@ end
 FESpaces.get_dirichlet_dof_values(f::TrialPFESpace) = f.dirichlet_values
 
 length_dirichlet_values(f::TrialPFESpace) = length(f.dirichlet_values)
+
+function _getindex(f::TrialPFESpace,index)
+  dv = f.dirichlet_values[index]
+  TrialFESpace(dv,f.space)
+end

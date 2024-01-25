@@ -5,12 +5,12 @@ struct ParamArray{T,N,A<:AbstractVector{<:AbstractArray{T,N}},L} <: AbstractPara
   end
 end
 
-const ParamVector{T,L} = ParamArray{T,1,<:AbstractVector{<:AbstractVector{T}},L}
-const ParamMatrix{T,L} = ParamArray{T,2,<:AbstractVector{<:AbstractMatrix{T}},L}
+const ParamVector{T,A,L} = ParamArray{T,1,A,L}
+const ParamMatrix{T,A,L} = ParamArray{T,2,A,L}
 
 const AffineParamArray{T,N,A} = ParamArray{T,N,A,1}
-const AffineParamVector{T} = ParamVector{T,1}
-const AffineParamMatrix{T} = ParamMatrix{T,1}
+const AffineParamVector{T,A} = ParamVector{T,A,1}
+const AffineParamMatrix{T,A} = ParamMatrix{T,A,1}
 
 function ParamArray(array)
   ParamArray(array,Val(length(array)))
@@ -32,15 +32,17 @@ end
 
 Arrays.get_array(a::ParamArray) = a.array
 Arrays.testitem(a::ParamArray) = testitem(get_array(a))
+Base.length(::ParamArray{T,N,A,L}) where {T,N,A,L} = L
+Base.length(::Type{ParamArray{T,N,A,L}}) where {T,N,A,L} = L
 Base.size(a::ParamArray,i...) = size(testitem(a),i...)
-Base.eltype(::ParamArray{T}) where T = T
-Base.eltype(::Type{<:ParamArray{T}}) where T = T
-Base.ndims(::ParamArray{T,N} where T) where N = N
-Base.ndims(::Type{<:ParamArray{T,N}} where T) where N = N
+Base.axes(a::ParamArray,i...) = axes(testitem(a))
+Base.eltype(::ParamArray{T,N,A,L}) where {T,N,A,L} = T
+Base.eltype(::Type{ParamArray{T,N,A,L}}) where {T,N,A,L} = T
+Base.ndims(::ParamArray{T,N,A,L}) where {T,N,A,L} = N
+Base.ndims(::Type{ParamArray{T,N,A,L}}) where {T,N,A,L} = N
 Base.first(a::ParamArray) = testitem(a)
-Base.length(::ParamArray{T,N,A,L} where {T,N,A}) where L = L
-Base.eachindex(::ParamArray{T,N,A,L} where {T,N,A}) where L = Base.OneTo(L)
-Base.lastindex(::ParamArray{T,N,A,L} where {T,N,A}) where L = L
+Base.eachindex(::ParamArray{T,N,A,L}) where {T,N,A,L} = Base.OneTo(L)
+Base.lastindex(::ParamArray{T,N,A,L}) where {T,N,A,L} = L
 Base.getindex(a::ParamArray,i...) = get_array(a)[i...]
 Base.setindex!(a::ParamArray,v,i...) = get_array(a)[i...] = v
 Base.iterate(a::ParamArray,i...) = iterate(get_array(a),i...)
@@ -50,8 +52,9 @@ function Base.show(io::IO,::MIME"text/plain",a::ParamArray{T,N,A,L}) where {T,N,
   show(io,a.array)
 end
 
-function Base.copy(a::ParamArray{T}) where T
-  b = Vector{T}(undef,length(a))
+function Base.copy(a::ParamArray)
+  ai = testitem(a)
+  b = Vector{typeof(ai)}(undef,length(a))
   @inbounds for i = eachindex(a)
     b[i] = copy(a[i])
   end
@@ -89,11 +92,11 @@ function Arrays.testvalue(::Type{ParamArray{T,N,A,L}}) where {T,N,A,L}
   ParamArray(array,Val(L))
 end
 
-function allocate_parray(a::AbstractArray,L::Integer)
+function allocate_param_array(a::AbstractArray,L::Integer)
   ParamArray([copy(a) for _ = 1:L])
 end
 
-function zero_parray(a::AbstractArray{T},L::Integer) where T
+function zero_param_array(a::AbstractArray{T},L::Integer) where T
   b = similar(a)
   fill!(b,zero(T))
   ParamArray([copy(b) for _ = 1:L])
@@ -816,7 +819,7 @@ function Arrays.evaluate!(
 end
 
 function Arrays.return_cache(::Fields.ZeroBlockMap,a::AbstractArray,b::ParamArray)
-  _a = allocate_parray(a,length(b))
+  _a = allocate_param_array(a,length(b))
   CachedArray(similar(_a,eltype(a),size(b)))
 end
 
