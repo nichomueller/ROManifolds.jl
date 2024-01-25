@@ -213,7 +213,7 @@ function FESpaces.SparseMatrixAssembler(
   strategy::AssemblyStrategy=DefaultAssemblyStrategy()
   ) where MS <: BlockMultiFieldStyle
 
-  return BlockSparseMatrixAssembler(
+  return MultiField.BlockSparseMatrixAssembler(
     MultiFieldStyle(test),
     trial,
     test,

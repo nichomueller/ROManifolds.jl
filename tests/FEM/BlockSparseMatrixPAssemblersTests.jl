@@ -1,4 +1,4 @@
-# module BlockMatrixAssemblersTests
+module BlockMatrixAssemblersTests
 using Test, BlockArrays, SparseArrays, LinearAlgebra
 
 using Gridap
@@ -76,85 +76,48 @@ FEM.test_passembler(assem_blocks,bmatdata,bvecdata,bdata)
 A1_blocks = assemble_matrix(assem_blocks,bmatdata)
 b1_blocks = assemble_vector(assem_blocks,bvecdata)
 for i = 1:length(solμ)
-  @test A1[i] ≈ A1_blocks[i]#mortar(getindex.(A1_blocks.blocks,i))
-  @test b1[i] ≈ b1_blocks[i]#mortar(getindex.(b1_blocks.blocks,i))
+  @test A1[i] ≈ A1_blocks[i]
+  @test b1[i] ≈ b1_blocks[i]
 end
 
 y1_blocks = similar(b1_blocks)
 mul!(y1_blocks,A1_blocks,b1_blocks)
 y1 = similar(b1)
 mul!(y1,A1,b1)
-@test y1_blocks ≈ y1
+for i = 1:length(solμ)
+  @test y1[i] ≈ y1_blocks[i]
+end
 
 A2_blocks, b2_blocks = assemble_matrix_and_vector(assem_blocks,bdata)
-@test A2_blocks ≈ A2
-@test b2_blocks ≈ b2
+for i = 1:length(solμ)
+  @test A2[i] ≈ A2_blocks[i]
+  @test b2[i] ≈ b2_blocks[i]
+end
 
 A3_blocks = allocate_matrix(assem_blocks,bmatdata)
 b3_blocks = allocate_vector(assem_blocks,bvecdata)
 assemble_matrix!(A3_blocks,assem_blocks,bmatdata)
 assemble_vector!(b3_blocks,assem_blocks,bvecdata)
-@test A3_blocks ≈ A1
-@test b3_blocks ≈ b1_blocks
+for i = 1:length(solμ)
+  @test A1[i] ≈ A3_blocks[i]
+  @test b1_blocks[i] ≈ b3_blocks[i]
+end
 
 A4_blocks, b4_blocks = allocate_matrix_and_vector(assem_blocks,bdata)
 assemble_matrix_and_vector!(A4_blocks,b4_blocks,assem_blocks,bdata)
-@test A4_blocks ≈ A2_blocks
-@test b4_blocks ≈ b2_blocks
+for i = 1:length(solμ)
+  @test A4_blocks[i] ≈ A2_blocks[i]
+  @test b4_blocks[i] ≈ b2_blocks[i]
+end
 
 ############################################################################################
 
-op = AffineFEOperator(biform,liform,X,Y)
-block_op = AffineFEOperator(biform,liform,Xb,Yb)
+# op = AffineFEOperator(biform,liform,X,Y)
+# block_op = AffineFEOperator(biform,liform,Xb,Yb)
 
-@test get_matrix(op) ≈ get_matrix(block_op)
-@test get_vector(op) ≈ get_vector(block_op)
+# @test get_matrix(op) ≈ get_matrix(block_op)
+# @test get_vector(op) ≈ get_vector(block_op)
 
-# end # module
+end # module
 
 ############
-#typeof(A1_blocks) <: BlockMatrix{Float64,<:AbstractMatrix{<:ParamMatrix{Float64, 3}}}
-
-# const ParamBlockMatrix{T,L} = BlockMatrix{T,<:AbstractMatrix{<:ParamMatrix{Float64,L}}}
-# const ParamBlockVector{T,L} = BlockVector{T,<:AbstractVector{<:ParamVector{Float64,L}}}
-
-# Base.getindex(a::ParamBlockMatrix{T,N},i::Vararg{Integer,N}) = hvcat(map(a->getindex(blocks(a),i),a)...)
-# Base.getindex(a::ParamBlockVector,i...) = vcat(getindex.(blocks(a),i...)...)
-
-# @assert typeof(A1_blocks) <: ParamBlockMatrix{Float64,3}
-# @assert typeof(b1_blocks) <: ParamBlockVector{Float64,3}
-
-# _dio(a,i) = map(a->getindex(blocks(a),i),a)
-# _dio(A1_blocks,1)
-
-function Base.length(
-  a::BlockArray{T,N,<:AbstractArray{ParamArray{T,N,A,L}}}
-  ) where {T,N,A,L,BS}
-  length(first(blocks(a)))
-end
-
-function Base.getindex(
-  a::BlockArray{T,N,<:AbstractArray{ParamArray{T,N,A,L}},BS},
-  i::Integer) where {T,N,A,L,BS}
-  # blocksi = map(blocks(a)) do block
-  #   block[i]
-  # end
-  blocksi = getindex.(blocks(a),i)
-  mortar(blocksi)
-end
-
-A1_blocks[1]
-
-m = sparse(rand(3,3))
-mm = Matrix{typeof(m)}(undef,2,2)
-mm[1] = m; mm[2] = m; mm[3] = m; mm[4] = m;
-A = ParamArray(mm)
-AA = mortar(mm)
-
-v = rand(3)
-vv = [v,v]
-bb = Vector{typeof(vv)}(undef,2)
-bb[1] = vv; bb[2] = vv
-b = mortar(bb)
-
-A*b

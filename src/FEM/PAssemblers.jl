@@ -3,32 +3,13 @@ function Algebra.allocate_vector(::Type{V},n::Integer) where V<:AbstractParamCon
   allocate_param_array(vector,length(V))
 end
 
-function Algebra.allocate_vector(
-  ::Type{<:ParamBlockVector{T,V}},
-  indices::BlockedUnitRange) where {T,V}
-
-  mortar(map(ids -> allocate_vector(V,ids),blocks(indices)))
-end
-
 function Algebra.allocate_in_range(matrix::ParamMatrix{T,A,L}) where {T,A,L}
   V = ParamVector{T,Vector{eltype(A)},L}
   allocate_in_range(V,matrix)
 end
 
-function Algebra.allocate_in_range(matrix::ParamBlockMatrix{T,A,L}) where {T,A,L}
-  BV = BlockVector{T,Vector{ParamVector{T,Vector{eltype(A)},L}}}
-  V = ParamBlockVector{T,Vector{eltype(A)},L,BV}
-  allocate_in_range(V,matrix)
-end
-
 function Algebra.allocate_in_domain(matrix::ParamMatrix{T,A,L}) where {T,A,L}
   V = ParamVector{T,Vector{eltype(A)},L}
-  allocate_in_domain(V,matrix)
-end
-
-function Algebra.allocate_in_domain(matrix::ParamBlockMatrix{T,A,L}) where {T,A,L}
-  BV = BlockVector{T,Vector{ParamVector{T,Vector{eltype(A)},L}}}
-  V = ParamBlockVector{T,Vector{eltype(A)},L,BV}
   allocate_in_domain(V,matrix)
 end
 
@@ -66,27 +47,6 @@ function FESpaces.SparseMatrixAssembler(
     ArrayBuilder(pvec),
     rows,
     cols,
-    strategy)
-end
-
-function FESpaces.SparseMatrixAssembler(
-  mat,
-  vec,
-  trial::MultiFieldPFESpace{MS},
-  test::MultiFieldFESpace{MS},
-  strategy::AssemblyStrategy=DefaultAssemblyStrategy()
-  ) where MS <: BlockMultiFieldStyle
-
-  N = length_free_values(trial)
-  pmat = typeof(ParamMatrix{mat}(undef,N))
-  pvec = typeof(ParamVector{vec}(undef,N))
-  mfs = MultiFieldStyle(test)
-  MultiField.BlockSparseMatrixAssembler(
-    mfs,
-    trial,
-    test,
-    SparseMatrixBuilder(pmat),
-    ArrayBuilder(pvec),
     strategy)
 end
 
@@ -232,7 +192,7 @@ end
 end
 
 @inline function Algebra._add_entries!(
-  combine::Function,A::AbstractParamContainer,vs::ParamArray,is)
+  combine::Function,A::AbstractParamContainer,vs::AbstractParamContainer,is)
   for (li,i) in enumerate(is)
     if i>0
       map(A,vs) do A,vs

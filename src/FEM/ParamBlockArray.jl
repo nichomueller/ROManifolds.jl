@@ -29,6 +29,7 @@ Arrays.get_array(a::ParamBlockArray) = a.blockarrays
 Arrays.testitem(a::ParamBlockArray) = first(a)
 BlockArrays.blocks(a::ParamBlockArray) = blocks(get_array(a))
 BlockArrays.blocklength(a::ParamBlockArray) = blocklength(get_array(a))
+BlockArrays.blocksize(a::ParamBlockArray) = blocksize(get_array(a))
 Base.length(a::ParamBlockArray) = length(first(blocks(a)))
 Base.size(a::ParamBlockArray) = map(length,axes(a))
 Base.axes(a::ParamBlockArray) = axes(get_array(a))
@@ -43,7 +44,7 @@ function Base.getindex(a::ParamBlockArray,i::Integer)
   BlockArrays._BlockArray(blocksi,axes(a))
 end
 
-# doesn't work properly...why?
+# iterate doesn't work properly for ParamBlockArrays...why?
 # function Base.iterate(a::ParamBlockArray)
 #   state = 1
 #   astate = getindex(a,state)
@@ -85,7 +86,7 @@ end
 function Base.similar(
   a::ParamBlockArray{T},
   element_type::Type{S}=T,
-  dims::Tuple{Int,Vararg{Int}}=size(a)) where {T,S}
+  dims::Tuple{Int,Vararg{Int}}=size(first(blocks(a)))) where {T,S}
 
   b = map(blocks(a)) do block
     similar(block,element_type,dims)
@@ -96,4 +97,57 @@ end
 
 function LinearAlgebra.fillstored!(a::ParamBlockMatrix,v)
   map(ai->LinearAlgebra.fillstored!(ai,v),a)
+end
+
+function Base.fill!(a::ParamBlockVector,v)
+  map(ai->fill!(ai,v),a)
+end
+
+function LinearAlgebra.mul!(
+  c::ParamBlockArray,
+  a::ParamBlockArray,
+  b::ParamBlockArray,
+  α::Number,β::Number)
+
+  @assert length(a) == length(b) == length(c)
+  @inbounds for i = 1:length(a)
+    mul!(c[i],a[i],b[i],α,β)
+  end
+  c
+end
+
+function LinearAlgebra.ldiv!(a::ParamBlockArray,m::LU,b::ParamBlockArray)
+  @assert length(a) == length(b)
+  @inbounds for i = 1:length(a)
+    ldiv!(a[i],m,b[i])
+  end
+  a
+end
+
+function LinearAlgebra.ldiv!(a::ParamBlockArray,m::AbstractArray,b::ParamBlockArray)
+  @assert length(a) == length(m) == length(b)
+  @inbounds for i = 1:length(a)
+    ldiv!(a[i],m[i],b[i])
+  end
+  a
+end
+
+function LinearAlgebra.rmul!(a::ParamBlockArray,b::Number)
+  map(a) do a
+    rmul!(a,b)
+  end
+end
+
+function LinearAlgebra.lu(a::ParamBlockArray)
+  map(a) do a
+    lu(a)
+  end
+end
+
+function LinearAlgebra.lu!(a::ParamBlockArray,b::ParamBlockArray)
+  @assert length(a) == length(b)
+  @inbounds for i = 1:length(a)
+    lu!(a[i],b[i])
+  end
+  a
 end

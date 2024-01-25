@@ -108,6 +108,8 @@ include("TransientTrialPFESpace.jl")
 
 include("PAssemblers.jl")
 
+include("PBlockAssemblers.jl")
+
 export TransientPFEOperator
 export TransientPFEOperatorFromWeakForm
 export AffineTransientPFEOperator
