@@ -20,13 +20,6 @@ struct MultiFieldParamFESpace{MS<:MultiFieldStyle,CS<:ConstraintStyle,V} <: FESp
   end
 end
 
-function _find_length(spaces)
-  pspaces = filter(x->isa(x,SingleFieldParamFESpace),spaces)
-  L = length_free_values.(pspaces)
-  @check all(L .== first(L))
-  return first(L)
-end
-
 function MultiFieldParamFESpace(
   spaces::Vector{<:SingleFieldParamFESpace};
   style = ConsecutiveMultiFieldStyle())
@@ -40,6 +33,13 @@ function MultiFieldParamFESpace(
     VT = T
   end
   MultiFieldParamFESpace(VT,spaces,style)
+end
+
+function _find_length(spaces)
+  pspaces = filter(x->isa(x,SingleFieldParamFESpace),spaces)
+  L = length_free_values.(pspaces)
+  @check all(L .== first(L))
+  return first(L)
 end
 
 function MultiFieldParamFESpace(
@@ -141,16 +141,6 @@ function FESpaces.get_trial_fe_basis(f::MultiFieldParamFESpace)
   end
   MultiFieldCellField(all_febases)
 end
-
-# function split_fields(fe::Union{MultiFieldParamFESpace,MultiFieldFESpace},free_values::ParamArray)
-#   offsets = compute_field_offsets(fe)
-#   fields = map(1:length(fe.spaces)) do field
-#     pini = offsets[field] + 1
-#     pend = offsets[field] + num_free_dofs(fe.spaces[field])
-#     map(x->getindex(x,pini:pend),free_values)
-#   end
-#   fields
-# end
 
 function MultiField.restrict_to_field(f::MultiFieldParamFESpace,free_values::AbstractVector,field::Integer)
   MultiField._restrict_to_field(f,MultiFieldStyle(f),free_values,field)
@@ -391,58 +381,6 @@ function FESpaces.interpolate_dirichlet(objects,fe::MultiFieldParamFESpace)
   end
   MultiFieldParamFEFunction(free_values,fe,blocks)
 end
-
-# function FESpaces.interpolate!(objects,free_values::ParamArray,fe::MultiFieldParamFESpace)
-#   block_free_values = block_zero_free_values(fe)
-#   blocks = SingleFieldParamFEFunction[]
-#   for (free_values_i,U,object) in zip(block_free_values,fe.spaces,objects)
-#     uhi = interpolate!(object,free_values_i,U)
-#     push!(blocks,uhi)
-#   end
-#   MultiFieldParamFEFunction(free_values,fe,blocks)
-# end
-
-# function FESpaces.interpolate_everywhere(objects,fe::MultiFieldParamFESpace)
-#   free_values = zero_free_values(fe)
-#   block_free_values = block_zero_free_values(fe)
-#   blocks = SingleFieldParamFEFunction[]
-#   for (free_values_i,U,object) in zip(block_free_values,fe.spaces,objects)
-#     dirichlet_values_i = zero_dirichlet_values(U)
-#     uhi = interpolate_everywhere!(object,free_values_i,dirichlet_values_i,U)
-#     push!(blocks,uhi)
-#   end
-#   MultiFieldParamFEFunction(free_values,fe,blocks)
-# end
-
-# function FESpaces.interpolate_dirichlet(objects,fe::MultiFieldParamFESpace)
-#   free_values = zero_free_values(fe)
-#   block_free_values = block_zero_free_values(fe)
-#   blocks = SingleFieldParamFEFunction[]
-#   for (free_values_i,U,object) in zip(block_free_values,fe.spaces,objects)
-#     dirichlet_values_i = zero_dirichlet_values(U)
-#     uhi = interpolate_dirichlet!(object,free_values_i,dirichlet_values_i,U)
-#     push!(blocks,uhi)
-#   end
-#   MultiFieldParamFEFunction(free_values,fe,blocks)
-# end
-
-# function FESpaces.EvaluationFunction(fe::MultiFieldParamFESpace,free_values::ParamArray)
-#   free_values,fe_functions = map(eachindex(fe.spaces)) do i
-#     free_values_i = restrict_to_field(fe,free_values,i)
-#     fe_function_i = EvaluationFunction(fe.spaces[i],free_values_i)
-#     free_values_i,fe_function_i
-#   end |> tuple_of_arrays
-#   free_values = vcat(free_values...)
-#   MultiFieldParamFEFunction(free_values,fe,fe_functions)
-# end
-
-# function Arrays.testitem(f::MultiFieldParamFESpace)
-#   MultiFieldFESpace(f.vector_type,map(testitem,f.spaces),f.multi_field_style)
-# end
-
-# function field_offsets(f::Union{MultiFieldFESpace,MultiFieldParamFESpace})
-#   [compute_field_offsets(f)...,num_free_dofs(f)]
-# end
 
 function FESpaces.test_fe_space(f::ParamFESpace)
   trian = get_triangulation(f)

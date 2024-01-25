@@ -59,6 +59,7 @@ function FESpaces.compute_dirichlet_values_for_tags!(
       gather_dirichlet_values!(dvs,f.space,cell_vals)
       FESpaces._fill_dirichlet_values_for_tag!(dv,dvs,tag,dirichlet_dof_to_tag)
     end
+    dv
   end
   dirichlet_values
 end

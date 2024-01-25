@@ -1,130 +1,73 @@
-using LinearAlgebra
-using SparseArrays
 using Gridap
-using Gridap.Algebra
 using Gridap.FESpaces
-using Gridap.ReferenceFEs
-using Gridap.Arrays
-using Gridap.Geometry
-using Gridap.Fields
-using Gridap.CellData
-using Gridap.MultiField
-using Gridap.ODEs.ODETools
-using Gridap.ODEs.TransientFETools
-using Mabla
+using ForwardDiff
+using LinearAlgebra
+using Test
+using Gridap.FESpaces: get_algebraic_operator
 using Mabla.FEM
 
-root = pwd()
-model = DiscreteModelFromFile(joinpath(root,"models/elasticity_3cyl2D.json"))
-test_path = "$root/results/HeatEquation/elasticity_3cyl2D"
-order = 1
-degree = 2*order
-Ω = Triangulation(model)
-Γn = BoundaryTriangulation(model,tags=["neumann"])
-dΩ = Measure(Ω,degree)
-dΓn = Measure(Γn,degree)
+θ = 0.2
+dt = 0.1
+t0 = 0.0
+tf = 1.0
 
-a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
-a(μ,t) = x->a(x,μ,t)
-aμt(μ,t) = 𝑓ₚₜ(a,μ,t)
+pranges = fill([0,1],3)
+tdomain = t0:dt:tf
+ptspace = TransientParamSpace(pranges,tdomain)
+μt = realization(ptspace,nparams=3)
+μ = get_parameters(μt)
 
-f(x,μ,t) = 1.
-f(μ,t) = x->f(x,μ,t)
+u(x,μ,t) = (1.0-x[1])*x[1]*(1.0-x[2])*x[2]*t*sum(μ)
+u(μ,t) = x -> u(x,μ,t)
+uμt(μ,t) = 𝑓ₚₜ(u,μ,t)
+f(μ,t) = x -> ∂t(uμt)(x,μ,t)-Δ(uμt(μ,t))(x)
 fμt(μ,t) = 𝑓ₚₜ(f,μ,t)
 
-h(x,μ,t) = abs(cos(t/μ[3]))
-h(μ,t) = x->h(x,μ,t)
-hμt(μ,t) = 𝑓ₚₜ(h,μ,t)
+domain = (0,1,0,1)
+partition = (2,2)
+model = CartesianDiscreteModel(domain,partition)
 
-g(x,μ,t) = μ[1]*exp(-x[1]/μ[2])*abs(sin(t/μ[3]))
-g(μ,t) = x->g(x,μ,t)
-gμt(μ,t) = 𝑓ₚₜ(g,μ,t)
+order = 2
 
-u0(x,μ) = 0.0
-u0(μ) = x->u0(x,μ)
-u0μ(μ) = 𝑓ₚ(u0,μ)
+reffe = ReferenceFE(lagrangian,Float64,order)
+V0 = FESpace(model,reffe,conformity=:H1,dirichlet_tags="boundary")
+U = TransientTrialParamFESpace(V0,uμt)
 
-res(μ,t,u,v) = ∫(v*∂t(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
-jac(μ,t,u,du,v) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
-jac_t(μ,t,u,dut,v) = ∫(v*dut)dΩ
+Ω = Triangulation(model)
+degree = 2*order
+dΩ = Measure(Ω,degree)
 
-pranges = fill([1.,10.],3)
-t0,tf,dt,θ = 0.,0.3,0.005,0.5
-tdomain = dt:dt:tf
-tpspace = TransientParamSpace(pranges,tdomain)
+a(u,v) = ∫(∇(v)⋅∇(u))dΩ
+b(μ,t,v) = ∫(v*fμt(μ,t))dΩ
 
-T = Float
-reffe = ReferenceFE(lagrangian,T,order)
-test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
-trial = TransientTrialParamFESpace(test,gμt)
-feop = AffineTransientParamFEOperator(res,jac,jac_t,tpspace,trial,test)
-uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
-fesolver = ThetaMethod(LUSolver(),θ,dt)
+res(μ,t,u,v) = a(u,v) + ∫(∂t(u)*v)dΩ - b(μ,t,v)
+jac(μ,t,u,du,v) = a(du,v)
+jac_t(μ,t,u,dut,v) = ∫(dut*v)dΩ
 
-FEM.test_parametric_space()
+op = TransientParamFEOperator(res,jac,jac_t,ptspace,U,V0)
 
-solve(fesolver,feop,uh0μ)
+uh0(μ) = interpolate_everywhere(uμt(μ,t0),U(μ,t0))
 
-r = realization(feop.tpspace;nparams=1)
-params = FEM.get_parameters(r)
-ode_op = get_algebraic_operator(feop)
-uu0 = get_free_dof_values(uh0μ(params))
-ode_sol = solve(solver,ode_op,uu0,r)
+ls = LUSolver()
+using Gridap.Algebra: NewtonRaphsonSolver
+tol = 1.0
+maxiters = 20
+nls = NewtonRaphsonSolver(ls,tol,maxiters)
+ode_solver = ThetaMethod(ls,dt,θ)
 
-ϵ = 1e-4
-load_solutions = false
-save_solutions = true
-load_structures = false
-save_structures = true
-postprocess = true
-norm_style = :l2
-nsnaps_state = 50
-nsnaps_mdeim = 20
-nsnaps_test = 10
-st_mdeim = false
-rbinfo = RBInfo(test_path;ϵ,norm_style,nsnaps_state,nsnaps_mdeim,nsnaps_test,st_mdeim)
+sol_t = solve(ode_solver,op,uh0,t0,tf)
 
-sols,params,stats = collect_solutions(rbinfo,fesolver,feop)
-rbspace = reduced_basis(rbinfo,feop,sols)
+l2(w) = w*w
 
+tol = 1.0e-6
+_t_n = t0
 
-
-abstract type ReducedFESpace <: FESpace end
-struct ReducedSingleFieldFESpace{F,R} <: ReducedFESpace
-  fe::F
-  reduced_basis::R
-end
-
-w = (u*v)
-cache = return_cache(w,x)
-@which evaluate!(cache,w,x)
-u(x)
-
-boh = ∫(a(rand(3),dt)*∇(φ)⋅∇(φ))dΩ
-boh[Ω]
-
-φᵢ = FEFunction(test,bs1)
-φⱼ = FEFunction(test,bs1)
-@time for bsi in eachcol(bs)
-  for bsj in eachcol(bs)
-    ∫(a(rand(3),dt)*∇(φᵢ)⋅∇(φⱼ))dΩ
-  end
-end
-
-trial0 = trial(nothing)
-@time begin
-  μ = rand(3)
-  A = assemble_matrix((φᵢ,φⱼ)->∫(a(μ,dt)*∇(φᵢ)⋅∇(φⱼ))dΩ,trial0,test)
-  bs'*A*bs
-end
-
-(φᵢ*φᵢ)(x)
-fs,free_values,dirichlet_values = test,bs1,get_dirichlet_dof_values(test)
-cell_vals = scatter_free_and_dirichlet_values(fs,free_values,dirichlet_values)
-cell_field = CellField(fs,cell_vals)
-SingleFieldFEFunction(cell_field,cell_vals,free_values,dirichlet_values,fs)
-
-struct DummyFunction
+for (uh_tn, tn) in sol_t
+  global _t_n
+  _t_n += dt
+  e = u(tn) - uh_tn
+  el2 = sqrt(sum( ∫(l2(e))dΩ ))
+  @test el2 < tol
 end
 
 #############################

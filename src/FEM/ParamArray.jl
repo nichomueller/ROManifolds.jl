@@ -107,39 +107,51 @@ function Base.sum(a::ParamArray)
 end
 
 function Base.:+(a::T,b::T) where T<:ParamArray
-  map(a,b) do a,b
-    a+b
+  c = similar(a)
+  @inbounds for i = eachindex(a)
+    c[i] = a[i] + b[i]
   end
+  c
 end
 
 function Base.:-(a::T,b::T) where T<:ParamArray
-  map(a,b) do a,b
-    a-b
+  c = similar(a)
+  @inbounds for i = eachindex(a)
+    c[i] = a[i] - b[i]
   end
+  c
 end
 
 function Base.:+(a::ParamArray{T},b::S) where {T,S<:AbstractArray{T}}
-  map(a) do a
-    a+b
+  c = similar(a)
+  @inbounds for i = eachindex(a)
+    c[i] = a[i] + b
   end
+  c
 end
 
 function Base.:+(a::S,b::ParamArray{T}) where {T,S<:AbstractArray{T}}
-  map(b) do b
-    a+b
+  c = similar(b)
+  @inbounds for i = eachindex(b)
+    c[i] = a + b[i]
   end
+  c
 end
 
 function Base.:-(a::ParamArray{T},b::S) where {T,S<:AbstractArray{T}}
-  map(a) do a
-    a-b
+  c = similar(a)
+  @inbounds for i = eachindex(a)
+    c[i] = a[i] - b
   end
+  c
 end
 
 function Base.:-(a::S,b::ParamArray{T}) where {T,S<:AbstractArray{T}}
-  map(b) do b
-    a-b
+  c = similar(b)
+  @inbounds for i = eachindex(b)
+    c[i] = a - b[i]
   end
+  c
 end
 
 (Base.:-)(a::ParamArray) = a .* -1
@@ -153,15 +165,21 @@ function Base.:*(a::Number,b::ParamArray)
 end
 
 function Base.:*(a::ParamMatrix,b::ParamVector)
-  map(a,b) do a,b
-    a*b
+  ci = testitem(a)*testitem(b)
+  c = Vector{typeof(ci)}(undef,length(a))
+  @inbounds for i = eachindex(a)
+    c[i] = a[i] * b[i]
   end
+  ParamArray(c)
 end
 
 function Base.:\(a::ParamMatrix,b::ParamVector)
-  map(a,b) do a,b
-    a\b
+  ci = testitem(a)*testitem(b)
+  c = Vector{typeof(ci)}(undef,length(a))
+  @inbounds for i = eachindex(a)
+    c[i] = a[i] \ b[i]
   end
+  ParamArray(c)
 end
 
 function Base.:≈(a::ParamArray,b::ParamArray)
@@ -179,7 +197,8 @@ function Base.:(==)(a::ParamArray,b::ParamArray)
 end
 
 function Base.transpose(a::ParamArray)
-  map(transpose,a)
+  at = map(transpose,a)
+  ParamArray(at)
 end
 
 function Base.stack(a::Tuple{Vararg{ParamArray{T,N,A,L}}}) where {T,N,A,L}
@@ -221,15 +240,17 @@ function Base.fill!(a::ParamArray,z)
 end
 
 function Base.maximum(f,a::ParamArray)
-  map(a) do a
+  maxa = map(a) do a
     maximum(f,a)
   end
+  ParamArray(maxa)
 end
 
 function Base.minimum(f,a::ParamArray)
-  map(a) do a
+  mina = map(a) do a
     minimum(f,a)
   end
+  ParamArray(mina)
 end
 
 function LinearAlgebra.fillstored!(a::ParamArray,z)
@@ -287,9 +308,10 @@ function SparseArrays.resize!(a::ParamArray,args...)
 end
 
 function Arrays.CachedArray(a::ParamArray)
-  map(a) do a
+  cache = map(a) do a
     CachedArray(a)
   end
+  ParamArray(cache)
 end
 
 function Arrays.setsize!(
@@ -302,13 +324,10 @@ function Arrays.setsize!(
 end
 
 function Arrays.SubVector(a::ParamArray,pini::Int,pend::Int)
-  map(a) do vector
+  svector = map(a) do vector
     SubVector(vector,pini,pend)
   end
-end
-
-function Base.map(f,a::ParamArray...)
-  ParamArray(map(f,map(get_array,a)...))
+  ParamArray(svector)
 end
 
 struct PBroadcast{D}
@@ -641,98 +660,6 @@ function Arrays.evaluate!(cache,k::Broadcasting{typeof(*)},a::Number,b::ParamArr
   evaluate!(cache,k,b,a)
 end
 
-# function Base.getindex(k::LinearCombinationField{<:ParamArray},i::Int)
-#   LinearCombinationField(k.values[i],k.fields,k.column)
-# end
-
-# for T in (:(Point),:(AbstractVector{<:Point}))
-#   @eval begin
-#     function Arrays.return_value(a::LinearCombinationField{<:ParamArray},x::$T)
-#       vi = return_value(testitem(a),x)
-#       array = Vector{typeof(vi)}(undef,length(a.values))
-#       for i = eachindex(a.values)
-#         array[i] = return_value(a[i],x)
-#       end
-#       ParamArray(array)
-#     end
-
-#     function Arrays.return_cache(a::LinearCombinationField{<:ParamArray},x::$T)
-#       ci = return_cache(testitem(a),x)
-#       bi = evaluate!(ci,testitem(a),x)
-#       cache = Vector{typeof(ci)}(undef,length(a.values))
-#       array = Vector{typeof(bi)}(undef,length(a.values))
-#       for i = eachindex(a.values)
-#         cache[i] = return_cache(a[i],x)
-#       end
-#       cache,ParamArray(array)
-#     end
-
-#     function Arrays.evaluate!(cache,a::LinearCombinationField{<:ParamArray},x::$T)
-#       cx,array = cache
-#       @inbounds for i = eachindex(array)
-#         array[i] = evaluate!(cx[i],a[i],x)
-#       end
-#       array
-#     end
-#   end
-# end
-
-# for S in (:AbstractVector,:AbstractMatrix,:AbstractArray)
-#   for T in (:AbstractVector,:AbstractMatrix,:AbstractArray)
-#     @eval begin
-#       function Arrays.return_value(
-#         k::LinearCombinationMap{<:Integer},
-#         v::ParamArray{<:$S},
-#         fx::$T)
-
-#         vi = return_value(k,testitem(v),fx)
-#         array = Vector{typeof(vi)}(undef,length(v))
-#         for i = eachindex(v)
-#           array[i] = return_value(k,v[i],fx)
-#         end
-#         ParamArray(array)
-#       end
-
-#       function Arrays.return_cache(
-#         k::LinearCombinationMap{<:Integer},
-#         v::ParamArray{<:$S},
-#         fx::$T)
-
-#         ci = return_cache(k,testitem(v),fx)
-#         bi = evaluate!(ci,k,testitem(v),fx)
-#         cache = Vector{typeof(ci)}(undef,length(v))
-#         array = Vector{typeof(bi)}(undef,length(v))
-#         for i = eachindex(v)
-#           cache[i] = return_cache(k,v[i],fx)
-#         end
-#         cache,ParamArray(array)
-#       end
-
-#       function Arrays.evaluate!(
-#         cache,
-#         k::LinearCombinationMap{<:Integer},
-#         v::ParamArray{<:$S},
-#         fx::$T)
-
-#         cx,array = cache
-#         @inbounds for i = eachindex(array)
-#           array[i] = evaluate!(cx[i],k,v[i],fx)
-#         end
-#         array
-#       end
-#     end
-#   end
-# end
-
-# function Fields.linear_combination(a::ParamArray,b::AbstractArray)
-#   abi = linear_combination(testitem(a),b)
-#   c = Vector{typeof(abi)}(undef,length(a))
-#   for i in eachindex(a)
-#     c[i] = linear_combination(a[i],b)
-#   end
-#   ParamArray(c)
-# end
-
 function Arrays.return_value(
   f::IntegrationMap,
   a::ParamArray,
@@ -842,35 +769,6 @@ function Arrays.evaluate!(cache::ParamArray,f::Fields.ZeroBlockMap,a,b::ParamArr
   end
   map(_get_array,cache)
 end
-
-# function Arrays.return_cache(
-#   f::Broadcasting{typeof(MultiField._sum_if_first_positive)},
-#   dofs::ParamArray,
-#   o)
-
-#   dofsi = testitem(dofs)
-#   ci = return_cache(f,dofsi,o)
-#   bi = evaluate!(ci,f,dofsi,o)
-#   cache = Vector{typeof(ci)}(undef,length(dofs))
-#   array = Vector{typeof(bi)}(undef,length(dofs))
-#   for i = eachindex(dofs)
-#     cache[i] = return_cache(f,dofs[i],o)
-#   end
-#   cache,ParamArray(array)
-# end
-
-# function Arrays.evaluate!(
-#   cache,
-#   f::Broadcasting{typeof(MultiField._sum_if_first_positive)},
-#   dofs::ParamArray,
-#   o)
-
-#   cx,array = cache
-#   @inbounds for i = eachindex(dofs)
-#     array[i] = evaluate!(cx[i],f,dofs[i],o)
-#   end
-#   array
-# end
 
 # function Utils.recenter(a::ParamArray{T},a0::ParamArray{T};kwargs...) where T
 #   n = length(a)

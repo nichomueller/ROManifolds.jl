@@ -1,7 +1,8 @@
 function ReferenceFEs._lagr_dof_cache(node_to_val::ParamArray,ndofs)
-  map(node_to_val) do node_to_val
+  cache = map(node_to_val) do node_to_val
     ReferenceFEs._lagr_dof_cache(node_to_val,ndofs)
   end
+  ParamArray(cache)
 end
 
 function ReferenceFEs._evaluate_lagr_dof!(
@@ -11,9 +12,10 @@ function ReferenceFEs._evaluate_lagr_dof!(
   ndofs,
   ncomps)
 
-  map(c,node_comp_to_val) do c,node_comp_to_val
+  dof = map(c,node_comp_to_val) do c,node_comp_to_val
     ReferenceFEs._evaluate_lagr_dof!(c,node_comp_to_val,node_and_comp_to_dof,ndofs,ncomps)
   end
+  ParamArray(dof)
 end
 
 function ReferenceFEs._evaluate_lagr_dof!(
@@ -23,7 +25,8 @@ function ReferenceFEs._evaluate_lagr_dof!(
   ndofs,
   ncomps)
 
-  map(c,node_pdof_comp_to_val) do c,node_pdof_comp_to_val
+  dof = map(c,node_pdof_comp_to_val) do c,node_pdof_comp_to_val
     ReferenceFEs._evaluate_lagr_dof!(c,node_pdof_comp_to_val,node_and_comp_to_dof,ndofs,ncomps)
   end
+  ParamArray(dof)
 end
