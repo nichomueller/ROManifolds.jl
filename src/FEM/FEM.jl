@@ -46,9 +46,8 @@ export TransientParamSpace
 export ParamFunction, 𝑓ₚ
 export TransientParamFunction, 𝑓ₚₜ
 export realization
-export get_parameters
+export get_params
 export get_times
-export get_fields
 include("ParamSpace.jl")
 
 include("DiffOperators.jl")

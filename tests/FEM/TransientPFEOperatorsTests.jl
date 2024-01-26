@@ -33,7 +33,7 @@ fμt(μ,t) = 𝑓ₚₜ(f,μ,t)
 
 # temp test
 r = realization(tpspace;nparams=2)
-μ,t = get_parameters(r),get_times(r)
+μ,t = get_params(r),get_times(r)
 𝑢 = uμt(μ,t)
 𝑑𝑢 = ∇(uμt(μ,t))
 
@@ -130,7 +130,7 @@ end
 #
 
 r = realization(tpspace;nparams=2)
-μ = get_parameters(r)
+μ = get_params(r)
 u0 = get_free_dof_values(uh0(μ))
 uf = get_free_dof_values(uh0(μ))
 
@@ -162,7 +162,7 @@ h = nl_cache.b
 change_time!(rθ,dt*(1-θ))
 Utf = U(rθ)
 # fst(x) = -Δ(u(tf))(x)
-fθ(x) = f(get_parameters(rθ),get_times(rθ))(x)
+fθ(x) = f(get_params(rθ),get_times(rθ))(x)
 
 function extract_matrix_vector(a,fst)
   btf(v) = ∫(v*fst)dΩ

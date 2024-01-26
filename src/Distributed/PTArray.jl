@@ -1,4 +1,4 @@
-function Base.materialize(b::PBroadcasted{<:AbstractArray{<:PBroadcast}})
+function Base.materialize(b::PBroadcasted{<:AbstractArray{<:ParamBroadcast}})
   own_values_out = map(Base.materialize,b.own_values)
   T = eltype(eltype(own_values_out))
   vector_partition = map(b.own_values,b.index_partition) do values,indices

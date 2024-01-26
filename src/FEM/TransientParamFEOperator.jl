@@ -122,8 +122,8 @@ function Algebra.allocate_residual(
     dxh = (dxh...,uh)
   end
   xh = TransientCellField(uh,dxh)
-  dc = op.res(get_parameters(r),get_times(r),xh,v)
-  assem = get_passembler(op.assem,r)
+  dc = op.res(get_params(r),get_times(r),xh,v)
+  assem = get_param_assembler(op.assem,r)
   vecdata = collect_cell_vector(test,dc)
   allocate_vector(assem,vecdata)
 end
@@ -136,7 +136,7 @@ function Algebra.allocate_jacobian(
 
   _matdata_jacobians = TransientFETools.fill_initial_jacobians(op,r,uh)
   matdata = TransientFETools._vcat_matdata(_matdata_jacobians)
-  assem = get_passembler(op.assem,r)
+  assem = get_param_assembler(op.assem,r)
   allocate_matrix(assem,matdata)
 end
 
@@ -155,9 +155,9 @@ function Algebra.allocate_jacobian(
   test = get_test(op)
   u = get_trial_fe_basis(trial)
   v = get_fe_basis(test)
-  dc = op.jacs[i](get_parameters(r),get_times(r),xh,u,v)
+  dc = op.jacs[i](get_params(r),get_times(r),xh,u,v)
   matdata = collect_cell_matrix(trial,test,dc)
-  assem = get_passembler(op.assem,r)
+  assem = get_param_assembler(op.assem,r)
   allocate_matrix(assem,matdata)
 end
 
@@ -170,9 +170,9 @@ function Algebra.residual!(
 
   test = get_test(op)
   v = get_fe_basis(test)
-  dc = op.res(get_parameters(r),get_times(r),xh,v)
+  dc = op.res(get_params(r),get_times(r),xh,v)
   vecdata = collect_cell_vector(test,dc)
-  assem = get_passembler(op.assem,r)
+  assem = get_param_assembler(op.assem,r)
   assemble_vector_add!(b,assem,vecdata)
   b
 end
@@ -187,7 +187,7 @@ function residual_for_trian!(
 
   test = get_test(op)
   v = get_fe_basis(test)
-  dc = op.res(get_parameters(r),get_times(r),xh,v,args...)
+  dc = op.res(get_params(r),get_times(r),xh,v,args...)
   assemble_separate_vector_add!(b,op,dc)
 end
 
@@ -201,7 +201,7 @@ function Algebra.jacobian!(
   cache) where T
 
   matdata = _matdata_jacobian(op,r,xh,i,γᵢ)
-  assem = get_passembler(op.assem,r)
+  assem = get_param_assembler(op.assem,r)
   assemble_matrix_add!(A,assem,matdata)
   A
 end
@@ -220,7 +220,7 @@ function jacobian_for_trian!(
   test = get_test(op)
   u = get_trial_fe_basis(trial)
   v = get_fe_basis(test)
-  dc = γᵢ*op.jacs[i](get_parameters(r),get_times(r),xh,u,v,args...)
+  dc = γᵢ*op.jacs[i](get_params(r),get_times(r),xh,u,v,args...)
   assemble_separate_matrix_add!(A,op,dc)
 end
 
@@ -234,7 +234,7 @@ function ODETools.jacobians!(
 
   _matdata_jacobians = TransientFETools.fill_jacobians(op,r,xh,γ)
   matdata = TransientFETools._vcat_matdata(_matdata_jacobians)
-  assem = get_passembler(op.assem,r)
+  assem = get_param_assembler(op.assem,r)
   assemble_matrix_add!(A,assem,matdata)
   A
 end
@@ -288,7 +288,7 @@ function TransientFETools._matdata_jacobian(
   test = get_test(op)
   u = get_trial_fe_basis(trial)
   v = get_fe_basis(test)
-  dc = γᵢ*op.jacs[i](get_parameters(r),get_times(r),xh,u,v)
+  dc = γᵢ*op.jacs[i](get_params(r),get_times(r),xh,u,v)
   collect_cell_matrix(trial,test,dc)
 end
 
@@ -299,7 +299,7 @@ function assemble_separate_vector_add!(
 
   test = get_test(op)
   trian = get_domains(dc)
-  assem = get_passembler(op.assem,r)
+  assem = get_param_assembler(op.assem,r)
   bvec = Vector{typeof(b)}(undef,num_domains(dc))
   for (n,t) in enumerate(trian)
     vecdata = collect_cell_vector(test,dc,t)
@@ -318,7 +318,7 @@ function assemble_separate_matrix_add!(
   test = get_test(op)
   trial = get_trial(op)(nothing)
   trian = get_domains(dc)
-  assem = get_passembler(op.assem,r)
+  assem = get_param_assembler(op.assem,r)
   Avec = Vector{typeof(A)}(undef,num_domains(dc))
   for (n,t) in enumerate(trian)
     matdata = collect_cell_matrix(trial,test,dc,t)

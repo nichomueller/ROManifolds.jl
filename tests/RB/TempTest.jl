@@ -15,7 +15,7 @@ pranges = fill([0,1],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 μt = realization(ptspace,nparams=3)
-μ = get_parameters(μt)
+μ = get_params(μt)
 
 u(x,μ,t) = (1.0-x[1])*x[1]*(1.0-x[2])*x[2]*t*sum(μ)
 u(μ,t) = x -> u(x,μ,t)

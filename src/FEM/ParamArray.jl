@@ -330,34 +330,34 @@ function Arrays.SubVector(a::ParamArray,pini::Int,pend::Int)
   ParamArray(svector)
 end
 
-struct PBroadcast{D}
+struct ParamBroadcast{D}
   dest::D
 end
 
-Arrays.get_array(a::PBroadcast) = a.dest
+Arrays.get_array(a::ParamBroadcast) = a.dest
 
-function Base.broadcasted(f,args::Union{ParamArray,PBroadcast}...)
+function Base.broadcasted(f,args::Union{ParamArray,ParamBroadcast}...)
   arrays = map(get_array,args)
   g = (x...) -> map(f,(x...))
   fargs = map((x...)->Base.broadcasted(g,x...),arrays...)
-  PBroadcast(fargs)
+  ParamBroadcast(fargs)
 end
 
-function Base.broadcasted(f,a::Number,b::Union{ParamArray,PBroadcast})
+function Base.broadcasted(f,a::Number,b::Union{ParamArray,ParamBroadcast})
   barray = get_array(b)
   fab = map(x->Base.broadcasted(f,a,x),barray)
-  PBroadcast(fab)
+  ParamBroadcast(fab)
 end
 
-function Base.broadcasted(f,a::Union{ParamArray,PBroadcast},b::Number)
+function Base.broadcasted(f,a::Union{ParamArray,ParamBroadcast},b::Number)
   aarray = get_array(a)
   fab = map(x->Base.broadcasted(f,x,b),aarray)
-  PBroadcast(fab)
+  ParamBroadcast(fab)
 end
 
 function Base.broadcasted(
   f,
-  a::Union{ParamArray,PBroadcast},
+  a::Union{ParamArray,ParamBroadcast},
   b::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{0}})
   Base.broadcasted(f,a,Base.materialize(b))
 end
@@ -365,11 +365,11 @@ end
 function Base.broadcasted(
   f,
   a::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{0}},
-  b::Union{ParamArray,PBroadcast})
+  b::Union{ParamArray,ParamBroadcast})
   Base.broadcasted(f,Base.materialize(a),b)
 end
 
-function Base.materialize(b::PBroadcast)
+function Base.materialize(b::ParamBroadcast)
   barray = get_array(b)
   dest = map(Base.materialize,barray)
   T = eltype(dest)
@@ -379,9 +379,13 @@ function Base.materialize(b::PBroadcast)
   ParamArray(a)
 end
 
-function Base.materialize!(a::ParamArray,b::PBroadcast)
+function Base.materialize!(a::ParamArray,b::ParamBroadcast)
   map(Base.materialize!,get_array(a),get_array(b))
   a
+end
+
+function Base.map(f,a::ParamArray...)
+  map(f,get_array.(a)...)
 end
 
 function Arrays.return_value(
@@ -658,6 +662,60 @@ end
 
 function Arrays.evaluate!(cache,k::Broadcasting{typeof(*)},a::Number,b::ParamArray)
   evaluate!(cache,k,b,a)
+end
+
+function Fields.linear_combination(a::ParamArray,b::AbstractVector{<:Field})
+  abi = linear_combination(testitem(a),b)
+  c = Vector{typeof(abi)}(undef,length(a))
+  for i in eachindex(a)
+    c[i] = linear_combination(a[i],b)
+  end
+  ParamContainer(c)
+end
+
+for T in (:AbstractVector,:AbstractMatrix,:AbstractArray)
+  @eval begin
+    function Arrays.return_value(
+      k::LinearCombinationMap{<:Integer},
+      v::ParamArray,
+      fx::$T)
+
+      vi = return_value(k,testitem(v),fx)
+      array = Vector{typeof(vi)}(undef,length(v))
+      for i = eachindex(v)
+        array[i] = return_value(k,v[i],fx)
+      end
+      ParamArray(array)
+    end
+
+    function Arrays.return_cache(
+      k::LinearCombinationMap{<:Integer},
+      v::ParamArray,
+      fx::$T)
+
+      ci = return_cache(k,testitem(v),fx)
+      bi = evaluate!(ci,k,testitem(v),fx)
+      cache = Vector{typeof(ci)}(undef,length(v))
+      array = Vector{typeof(bi)}(undef,length(v))
+      for i = eachindex(v)
+        cache[i] = return_cache(k,v[i],fx)
+      end
+      cache,ParamArray(array)
+    end
+
+    function Arrays.evaluate!(
+      cache,
+      k::LinearCombinationMap{<:Integer},
+      v::ParamArray,
+      fx::$T)
+
+      cx,array = cache
+      @inbounds for i = eachindex(array)
+        array[i] = evaluate!(cx[i],k,v[i],fx)
+      end
+      array
+    end
+  end
 end
 
 function Arrays.return_value(

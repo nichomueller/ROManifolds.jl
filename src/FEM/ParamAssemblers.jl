@@ -13,21 +13,40 @@ function Algebra.allocate_in_domain(matrix::ParamMatrix{T,A,L}) where {T,A,L}
   allocate_in_domain(V,matrix)
 end
 
-function get_passembler(a::SparseMatrixAssembler,r::Union{ParamRealization,TransientParamRealization})
+function get_param_matrix_builder(
+  a::SparseMatrixAssembler,
+  r::Union{ParamRealization,TransientParamRealization})
+
+  L = length(r)
+  mat = get_matrix_builder(a)
+  M = get_array_type(mat)
+  elM = eltype(M)
+  pmatrix_type = ParamMatrix{elM,Vector{M},L}
+  SparseMatrixBuilder(pmatrix_type)
+end
+
+function get_param_vector_builder(
+  a::SparseMatrixAssembler,
+  r::Union{ParamRealization,TransientParamRealization})
+
   L = length(r)
   vec = get_vector_builder(a)
-  vector_type = get_array_type(vec)
-  pvector_type = ParamVector{vector_type,Vector{vector_type},L}
-  mat = get_matrix_builder(a)
-  matrix_type = get_array_type(mat)
-  pmatrix_type = ParamMatrix{matrix_type,Vector{matrix_type},L}
+  V = get_array_type(vec)
+  elV = eltype(V)
+  pvector_type = ParamVector{elV,Vector{V},L}
+  ArrayBuilder(pvector_type)
+end
+
+function get_param_assembler(
+  a::SparseMatrixAssembler,
+  r::Union{ParamRealization,TransientParamRealization})
+
+  matrix_builder = get_param_matrix_builder(a,r)
+  vector_builder = get_param_vector_builder(a,r)
   rows = FESpaces.get_rows(a)
   cols = FESpaces.get_cols(a)
   strategy = FESpaces.get_assembly_strategy(a)
-  SparseMatrixAssembler(
-    SparseMatrixBuilder(pmatrix_type),
-    ArrayBuilder(pvector_type),
-    rows,cols,strategy)
+  GenericSparseMatrixAssembler(matrix_builder,vector_builder,rows,cols,strategy)
 end
 
 function FESpaces.SparseMatrixAssembler(

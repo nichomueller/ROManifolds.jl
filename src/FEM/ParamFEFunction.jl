@@ -55,7 +55,7 @@ end
 function _getindex(f::SingleFieldParamFEFunction,index)
   cf = _getindex(f.cell_field,index)
   fs = _getindex(f.fe_space,index)
-  cv = f.cell_dof_values[index]
+  cv = lazy_map(x->getindex(x,index),f.cell_dof_values)
   fv = f.free_values[index]
   dv = f.dirichlet_values[index]
   SingleFieldFEFunction(cf,cv,fv,dv,fs)

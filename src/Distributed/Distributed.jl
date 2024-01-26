@@ -32,7 +32,7 @@ import Gridap.Helpers: @check
 import Gridap.Helpers: @notimplemented
 import Gridap.Helpers: @unreachable
 
-import Mabla.FEM: PBroadcast
+import Mabla.FEM: ParamBroadcast
 
 import PartitionedArrays: SubSparseMatrix
 import PartitionedArrays: EltypeVector

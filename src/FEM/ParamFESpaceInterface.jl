@@ -59,14 +59,12 @@ function FESpaces.compute_dirichlet_values_for_tags!(
       gather_dirichlet_values!(dvs,f.space,cell_vals)
       FESpaces._fill_dirichlet_values_for_tag!(dv,dvs,tag,dirichlet_dof_to_tag)
     end
-    dv
   end
-  dirichlet_values
+  ParamArray(dirichlet_values)
 end
 
 function FESpaces._convert_to_collectable(object::AbstractParamFunction,ntags)
   objects = map(object) do o
-    @assert typeof(o) <: Function
     FESpaces._convert_to_collectable(Fill(o,ntags),ntags)
   end
   ParamArray(objects)
@@ -147,7 +145,7 @@ function FESpaces._free_and_dirichlet_values_fill!(
 end
 
 function FESpaces.FEFunction(
-  fs::SingleFieldFESpace,free_values::ParamArray,dirichlet_values::ParamArray)
+  fs::SingleFieldParamFESpace,free_values::ParamArray,dirichlet_values::ParamArray)
   cell_vals = scatter_free_and_dirichlet_values(fs,free_values,dirichlet_values)
   cell_field = CellField(fs,cell_vals)
   SingleFieldParamFEFunction(cell_field,cell_vals,free_values,dirichlet_values,fs)

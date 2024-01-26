@@ -10,7 +10,7 @@ function TransientParamFESolution(
   r = realization(op.tpspace;kwargs...);
   kwargs...)
 
-  params = get_parameters(r)
+  params = get_params(r)
   ode_op = get_algebraic_operator(op)
   u0 = get_free_dof_values(uh0(params))
   ode_sol = solve(solver,ode_op,u0,r)

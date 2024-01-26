@@ -4,7 +4,7 @@ end
 
 const TrivialParamRealization = ParamRealization{<:AbstractVector{<:Number}}
 
-get_parameters(r::ParamRealization) = r # we only want to deal with a ParamRealization type
+get_params(r::ParamRealization) = r # we only want to deal with a ParamRealization type
 _get_parameters(r::ParamRealization) = r.params # this function should stay local
 num_parameters(r::ParamRealization) = length(_get_parameters(r))
 num_parameters(r::TrivialParamRealization) = 1
@@ -45,17 +45,17 @@ end
 
 const TrivialTransientParamRealization = TransientParamRealization{<:TrivialParamRealization,<:Number}
 
-get_parameters(r::TransientParamRealization) = get_parameters(r.params)
+get_params(r::TransientParamRealization) = get_params(r.params)
 _get_parameters(r::TransientParamRealization) = _get_parameters(r.params)
 num_parameters(r::TransientParamRealization) = num_parameters(r.params)
 get_times(r::TransientParamRealization) = r.times[]
 num_times(r::TransientParamRealization) = length(get_times(r))
 Base.length(r::TransientParamRealization) = num_parameters(r)*num_times(r)
 Base.size(r::TransientParamRealization) = (length(r),)
-Arrays.testitem(r::TransientParamRealization) = testitem(get_parameters(r)),testitem(get_times(r))
+Arrays.testitem(r::TransientParamRealization) = testitem(get_params(r)),testitem(get_times(r))
 
 function Base.iterate(r::TransientParamRealization)
-  iterator = Iterators.product(get_times(r),get_parameters(r))
+  iterator = Iterators.product(get_times(r),get_params(r))
   iternext = iterate(iterator)
   if isnothing(iternext)
     return nothing
@@ -93,7 +93,7 @@ function get_delta_time(r::TransientParamRealization)
 end
 
 function get_at_time(r::TransientParamRealization,time=:initial)
-  params = get_parameters(r)
+  params = get_params(r)
   if time == :initial
     TransientParamRealization(params,get_initial_time(r))
   elseif time == :midpoint
@@ -178,7 +178,7 @@ struct ParamFunction{P} <: AbstractParamFunction{P}
   params::P
 end
 
-get_parameters(f::ParamFunction) = get_parameters(f.params)
+get_params(f::ParamFunction) = get_params(f.params)
 _get_parameters(f::ParamFunction) = _get_parameters(f.params)
 num_parameters(f::ParamFunction) = length(_get_parameters(f))
 Base.length(f::ParamFunction) = num_parameters(f)
@@ -195,7 +195,7 @@ end
 
 # when iterating over a ParamFunction{P}, we return return f(eltype(P)) ∀ index i
 function Base.iterate(f::ParamFunction,state...)
-  riter = iterate(get_parameters(f),state...)
+  riter = iterate(get_params(f),state...)
   if isnothing(riter)
     return nothing
   end
@@ -219,7 +219,7 @@ struct TransientParamFunction{P,T} <: AbstractParamFunction{P}
   times::T
 end
 
-get_parameters(f::TransientParamFunction) = get_parameters(f.params)
+get_params(f::TransientParamFunction) = get_params(f.params)
 _get_parameters(f::TransientParamFunction) = _get_parameters(f.params)
 num_parameters(f::TransientParamFunction) = length(_get_parameters(f))
 get_times(f::TransientParamFunction) = f.times
@@ -237,7 +237,7 @@ function Fields.gradient(f::TransientParamFunction)
 end
 
 function Base.iterate(f::TransientParamFunction)
-  iterator = Iterators.product(get_times(f),get_parameters(f))
+  iterator = Iterators.product(get_times(f),get_params(f))
   (tstate,pstate),state = iterate(iterator)
   iterstatenext = iterator,state
   f.fun(pstate,tstate),iterstatenext
@@ -267,24 +267,6 @@ end
 function TransientParamFunction(f::Function,r::TrivialParamRealization,t)
   p = ParamRealization([_get_parameters(r)])
   TransientParamFunction(f,p,t)
-end
-
-function get_fields(f::AbstractParamFunction,type=:GenericField;N=1)
-  if type == :GenericField
-    map(f) do fi
-      GenericField(fi)
-    end
-  elseif type == :ZeroField
-    map(f) do fi
-      ZeroField(fi)
-    end
-  elseif type == :FieldGradient
-    map(f) do fi
-      FieldGradient{N}(fi)
-    end
-  else
-    @notimplemented
-  end
 end
 
 function Arrays.evaluate!(cache,f::AbstractParamFunction,x...)
@@ -320,7 +302,7 @@ function test_parametric_space()
   da = ∂t(a)
   aμ(x,μ,t) = sum(μ)*a(x,t)
   aμ(μ,t) = x -> aμ(x,μ,t)
-  aμt = 𝑓ₚₜ(aμ,get_parameters(μt),get_times(μt))
+  aμt = 𝑓ₚₜ(aμ,get_params(μt),get_times(μt))
   daμt = ∂t(aμt)
   @test isa(𝑓ₚₜ(a,α,t),Function)
   @test isa(aμt,AbstractParamFunction)
@@ -334,7 +316,7 @@ function test_parametric_space()
   end
   b(x,μ) = sum(x)*sum(μ)
   b(μ) = x -> b(x,μ)
-  bμ = 𝑓ₚ(b,get_parameters(μ))
+  bμ = 𝑓ₚ(b,get_params(μ))
   bμx = bμ(x)
   for (i,bμi) in enumerate(bμ)
     @test bμi(x) == bμx[i]

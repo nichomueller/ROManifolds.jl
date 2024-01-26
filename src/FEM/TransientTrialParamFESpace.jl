@@ -27,7 +27,7 @@ end
 
 function TransientFETools.allocate_trial_space(
   U::TransientTrialParamFESpace,r::TransientParamRealization)
-  allocate_trial_space(U,get_parameters(r),get_times(r))
+  allocate_trial_space(U,get_params(r),get_times(r))
 end
 
 """
@@ -49,7 +49,7 @@ function Arrays.evaluate!(
 end
 
 function Arrays.evaluate!(Upt::T,U::TransientTrialParamFESpace,r::TransientParamRealization) where T
-  evaluate!(Upt,U,get_parameters(r),get_times(r))
+  evaluate!(Upt,U,get_params(r),get_times(r))
 end
 
 """

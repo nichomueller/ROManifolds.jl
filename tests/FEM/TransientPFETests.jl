@@ -9,6 +9,7 @@ using Gridap.ODEs.ODETools
 using Gridap.ODEs.TransientFETools
 using Gridap.FESpaces: get_algebraic_operator
 using Mabla.FEM
+import PartitionedArrays: tuple_of_arrays
 
 θ = 1.0
 dt = 0.1
@@ -19,7 +20,7 @@ ptspace = TransientParamSpace(pranges,tdomain)
 μt = realization(ptspace,nparams=3)
 μt0 = FEM.get_at_time(μt,:initial)
 μtf = FEM.get_at_time(μt,:final)
-μ = get_parameters(μt)
+μ = get_params(μt)
 
 u(x,μ,t) = (x[1] + x[2])*t*sum(μ)
 u(μ,t) = x -> u(x,μ,t)
@@ -105,15 +106,18 @@ residual!(r,op,μt0,xh,cache)
 jacobian!(J,op,μt0,xh,1,1.0,cache)
 jacobian!(J,op,μt0,xh,2,10.0,cache)
 
-map(μ,U0,uh,r,J) do μ,U0,uh,r,J
+_U0,_uh = map(1:length(μ)) do i
+  FEM._getindex(U0,i),FEM._getindex(uh,i)
+end |> tuple_of_arrays
+map(μ,_U0,_uh,r,J) do μ,_U0,_uh,r,J
   _res(u,v) = a(u,v) + 10.0*∫(u*v)dΩ - b(v,μ,0.0)
   _jac(u,du,v) = a(du,v) + 10.0*∫(du*v)dΩ
-  _op = FEOperator(_res,_jac,U0,V0)
+  _op = FEOperator(_res,_jac,_U0,V0)
 
-  _r = allocate_residual(_op,uh)
-  _J = allocate_jacobian(_op,uh)
-  residual!(_r,_op,uh)
-  jacobian!(_J,_op,uh)
+  _r = allocate_residual(_op,_uh)
+  _J = allocate_jacobian(_op,_uh)
+  residual!(_r,_op,_uh)
+  jacobian!(_J,_op,_uh)
   @test all(r.≈_r)
   @test all(J.≈_J)
 end
