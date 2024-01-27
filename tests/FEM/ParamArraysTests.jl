@@ -369,14 +369,9 @@ ptspace = TransientParamSpace(pranges,tdomain)
 r = realization(ptspace,nparams=3)
 μ = FEM._get_params(r)[1]
 
-T = Float64
-order = 1
-degree = 2*order
 domain = (0,1,0,1)
 partition = (2,2)
 model = CartesianDiscreteModel(domain,partition)
-Ω = Triangulation(model)
-dΩ = Measure(Ω,degree)
 
 ########################## HEAT EQUATION ############################
 
@@ -404,6 +399,10 @@ b(μ,t,v) = ∫(fμt(μ,t)*v)dΩ + ∫(hμt(μ,t)*v)dΓn
 a(μ,t,du,v) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
 m(μ,t,dut,v) = ∫(v*dut)dΩ
 
+order = 1
+degree = 2*order
+Ω = Triangulation(model)
+dΩ = Measure(Ω,degree)
 Γn = BoundaryTriangulation(model,tags=[7,8])
 dΓn = Measure(Γn,degree)
 
@@ -450,80 +449,93 @@ for ((uh,rt),(_uh,_t)) in zip(sol,_sol)
   @check uh1.dirichlet_values ≈ _uh.dirichlet_values
 end
 
-for ((uh,rt),(_uh,_t)) in zip(sol.odesol,_sol.odesol)
+########################## STOKES ############################
+
+a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
+a(μ,t) = x->a(x,μ,t)
+aμt(μ,t) = TransientParamFunction(a,μ,t)
+
+f(x,μ,t) = VectorValue(0.0,0.0)
+f(μ,t) = x->f(x,μ,t)
+fμt(μ,t) = TransientParamFunction(f,μ,t)
+
+g(x,μ,t) = VectorValue(μ[1]*exp(-x[2]/μ[2])*abs(sin(μ[3]*t)),0.0)
+g(μ,t) = x->g(x,μ,t)
+gμt(μ,t) = TransientParamFunction(g,μ,t)
+
+u0(x,μ) = VectorValue(0.0,0.0)
+u0(μ) = x->u0(x,μ)
+u0μ(μ) = ParamFunction(u0,μ)
+p0(x,μ) = 0.0
+p0(μ) = x->p0(x,μ)
+p0μ(μ) = ParamFunction(p0,μ)
+
+b(μ,t,(v,q)) = ∫(fμt(μ,t)⋅v)dΩ
+a(μ,t,(du,dp),(v,q)) = ∫(aμt(μ,t)*∇(v)⊙∇(du))dΩ - ∫(dp*(∇⋅(v)))dΩ - ∫(q*(∇⋅(du)))dΩ
+m(μ,t,(dut,dpt),(v,q)) = ∫(v⋅dut)dΩ
+
+order = 2
+degree = 2*order
+Ω = Triangulation(model)
+dΩ = Measure(Ω,degree)
+Γn = BoundaryTriangulation(model,tags=[7,8])
+dΓn = Measure(Γn,degree)
+
+reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
+test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6])
+trial_u = TransientTrialParamFESpace(test_u,gμt)
+reffe_p = ReferenceFE(lagrangian,Float64,order-1)
+test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
+trial_p = TrialFESpace(test_p)
+test = TransientMultiFieldParamFESpace([test_u,test_p])
+trial = TransientMultiFieldParamFESpace([trial_u,trial_p])
+feop = AffineTransientParamFEOperator(m,a,b,ptspace,trial,test)
+
+xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
+fesolver = ThetaMethod(LUSolver(),θ,dt)
+
+sol = solve(fesolver,feop,xh0μ,r)
+iterate(sol)
+
+# gridap
+
+_a(x,t) = a(x,μ,t)
+_a(t) = x->_a(x,t)
+
+_f(x,t) = f(x,μ,t)
+_f(t) = x->_f(x,t)
+
+_g(x,t) = g(x,μ,t)
+_g(t) = x->_g(x,t)
+
+_b(t,(v,q)) = ∫(_f(t)⋅v)dΩ
+_a(t,(du,dp),(v,q)) = ∫(_a(t)*∇(v)⊙∇(du))dΩ - ∫(dp*(∇⋅(v)))dΩ - ∫(q*(∇⋅(du)))dΩ
+_m(t,(dut,dpt),(v,q)) = ∫(v⋅dut)dΩ
+
+_trial_u = TransientTrialFESpace(test_u,_g)
+_trial = TransientMultiFieldFESpace([_trial_u,trial_p])
+_feop = TransientAffineFEOperator(_m,_a,_b,_trial,test)
+_x0 = interpolate_everywhere([u0(μ),p0(μ)],_trial(0.0))
+
+_sol = solve(fesolver,_feop,_x0,t0,tf)
+iterate(_sol)
+
+for ((xh,rt),(_xh,_t)) in zip(sol,_sol)
+  uh,ph = xh
+  uh1 = FEM._getindex(uh,1)
+  ph1 = FEM._getindex(ph,1)
+  _uh,_ph = _xh
   t = get_times(rt)
   @check t == _t "$t != $_t"
-  println("time $t")
-  @check uh[1] ≈ _uh "difference at t = $t"
+  @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh)
+  @check get_free_dof_values(ph1) ≈ get_free_dof_values(_ph)
+  @check uh1.dirichlet_values ≈ _uh.dirichlet_values
 end
 
-# step 1
-odesol = sol.odesol
-wf = copy(odesol.u0)
-w0 = copy(odesol.u0)
-r0 = FEM.get_at_time(odesol.r,:initial)
-cache = nothing
-wf,rf,cache = solve_step!(wf,odesol.solver,odesol.op,r0,w0,cache)
-w0 .= wf
-# wf,rf,cache = solve_step!(wf,odesol.solver,odesol.op,r0,w0,cache)
-# w0 .= wf
-θ == 0.0 ? dtθ = dt : dtθ = dt*θ
-FEM.shift_time!(rf,dtθ)
-ode_cache,vθ,A,bb,l_cache = cache
-ode_cache = TransientFETools.update_cache!(ode_cache,odesol.op,r)
-# ODETools._matrix_and_vector!(A,bb,odesol.op,rf,dtθ,w0,ode_cache,vθ)
-# afop = Gridap.FESpaces.AffineOperator(A,bb)
-# newmatrix = true
-# l_cache = ODETools.solve!(uf,solver.nls,afop,l_cache,newmatrix)
-Xh, = ode_cache
-dxh = (EvaluationFunction(Xh[2],vθ),)
-xh=TransientCellField(EvaluationFunction(Xh[1],w0),dxh)
-v = get_fe_basis(test)
-dc = feop.res(get_params(rf),get_times(rf),xh,v)
-dcΩ = dc[Ω]
-dcΓn = dc[Γn]
-vecdata = collect_cell_vector(test,dc)
-assem = FEM.get_param_assembler(feop.assem,rf)
-assemble_vector_add!(bb,assem,vecdata)
-
-_odesol = _sol.odesol
-_uf = copy(_odesol.u0)
-_u0 = copy(_odesol.u0)
-t0 = _odesol.t0
-_uf,tf,_cache = solve_step!(_uf,_odesol.solver,_odesol.op,_u0,t0)
-_u0 .= _uf
-# _uf,tf,cache = solve_step!(_uf,_odesol.solver,_odesol.op,_u0,t0)
-# _u0 .= _uf
-tθ = tf+dtθ
-_ode_cache, _vθ, _A, _bb, _l_cache = _cache
-_ode_cache = update_cache!(_ode_cache,_odesol.op,tθ)
-# ODETools._matrix_and_vector!(_A,_bb,_odesol.op,tθ,dtθ,_u0,_ode_cache,_vθ)
-# _afop = Gridap.FESpaces.AffineOperator(_A,_bb)
-# newmatrix = true
-# _l_cache = ODETools.solve!(_uf,solver.nls,_afop,_l_cache,newmatrix)
-_Xh, = _ode_cache
-_dxh = (EvaluationFunction(_Xh[2],_vθ),)
-_xh=TransientCellField(EvaluationFunction(_Xh[1],_u0),_dxh)
-_dc = _feop.res(tθ,_xh,v)
-_dcΩ = _dc[Ω]
-_dcΓn = _dc[Γn]
-_vecdata = collect_cell_vector(test,_dc)
-assemble_vector!(_bb,_feop.assem_t,_vecdata)
-
-lazy_map(x->getindex(x,1),dcΩ) ≈ _dcΩ
-lazy_map(x->getindex(x,1),dcΓn) ≈ _dcΓn
-dcΩ ≈ _dcΩ
-dcΓn ≈ _dcΓn
-
-dtrial = ∂t(trial)
-U = dtrial(r)
-
-_dtrial = ∂t(_trial)
-_U0 = _dtrial(0.0)
-_U1 = _dtrial(0.1)
-_U2 = _dtrial(0.2)
-
-U.dirichlet_values[1] ≈ _U0.dirichlet_values
-U.dirichlet_values[2] ≈ _U1.dirichlet_values
-U.dirichlet_values[3] ≈ _U2.dirichlet_values
-########################## STOKES ############################
+for ((xh,rt),(_xh,_t)) in zip(sol.odesol,_sol.odesol)
+  uh,ph = xh
+  _uh,_ph = _xh
+  t = get_times(rt)
+  @check t == _t "$t != $_t"
+  @check ph[1] ≈ _ph "$(ph[1]) != $_ph"
+end

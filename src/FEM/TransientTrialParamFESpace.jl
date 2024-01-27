@@ -72,7 +72,8 @@ Functor-like evaluation. It allocates Dirichlet vals in general.
 """
 (U::TransientTrialParamFESpace)(params,times) = evaluate(U,params,times)
 (U::TransientTrialParamFESpace)(r) = evaluate(U,r)
-
+(U::TrialFESpace)(params,times) = U
+(U::ZeroMeanFESpace)(params,times) = U
 """
 Time derivative of the Dirichlet functions
 """
@@ -100,6 +101,7 @@ Arrays.evaluate!(Upt::FESpace,U::FESpace,params,times) = U
 Arrays.evaluate!(Upt::FESpace,U::FESpace,r::TransientParamRealization) = U
 Arrays.evaluate(U::FESpace,params,times) = U
 Arrays.evaluate(U::FESpace,r::TransientParamRealization) = U
+TransientFETools.allocate_trial_space(U::FESpace,args...) = U
 
 # Define the interface for MultiField
 
@@ -174,8 +176,8 @@ function Arrays.evaluate!(
 end
 
 function Arrays.evaluate(U::TransientMultiFieldTrialParamFESpace,args...)
-  Upt = allocate_trial_space(U)
-  evaluate!(Upt,U,r)
+  Upt = allocate_trial_space(U,args...)
+  evaluate!(Upt,U,args...)
   return Upt
 end
 

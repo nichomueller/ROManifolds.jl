@@ -53,7 +53,7 @@ ReferenceFEs.get_order(op::TransientParamFEOperatorFromWeakForm) = op.order
 realization(op::TransientParamFEOperatorFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
 
 function FESpaces.SparseMatrixAssembler(
-  trial::TransientTrialParamFESpace,
+  trial::Union{TransientTrialParamFESpace,TransientMultiFieldTrialParamFESpace},
   test::FESpace)
   SparseMatrixAssembler(trial(nothing),test)
 end

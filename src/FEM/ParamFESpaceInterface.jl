@@ -159,6 +159,51 @@ function FESpaces.get_vector_type(f::SingleFieldParamFESpace)
   typeof(ParamVector{V}(undef,N))
 end
 
+# Extend some of Gridap's functions when needed
+
+function FESpaces.scatter_free_and_dirichlet_values(
+  f::FESpaceWithConstantFixed{FESpaces.FixConstant},
+  fv::ParamArray,
+  dv::ParamArray)
+
+  _dv,_fv = map(fv,dv) do fv,dv
+    @assert length(dv) == 1
+    _dv = similar(dv,eltype(dv),0)
+    _fv = FESpaces.VectorWithEntryInserted(fv,f.dof_to_fix,dv[1])
+    _dv,_fv
+  end |> tuple_of_arrays
+  scatter_free_and_dirichlet_values(f.space,ParamArray(_fv),ParamArray(_dv))
+end
+
+function FESpaces.gather_free_and_dirichlet_values(
+  f::FESpaceWithConstantFixed{FESpaces.FixConstant},
+  cv::LazyArray{<:Any,<:ParamArray})
+
+  _fv,_dv = gather_free_and_dirichlet_values(f.space,cv)
+  fv,dv = map(_fv,_dv) do _fv,_dv
+    @assert length(_dv) == 0
+    fv = FESpaces.VectorWithEntryRemoved(_fv,f.dof_to_fix)
+    dv = _fv[f.dof_to_fix:f.dof_to_fix]
+    fv,dv
+  end |> tuple_of_arrays
+  ParamArray(fv),ParamArray(dv)
+end
+
+function FESpaces.gather_free_and_dirichlet_values!(
+  fv::ParamArray,
+  dv::ParamArray,
+  f::FESpaceWithConstantFixed{FESpaces.FixConstant},
+  cv::LazyArray{<:Any,<:ParamArray})
+
+  _fv,_dv = gather_free_and_dirichlet_values(f.space,cv)
+  fv,dv = map(fv,dv,_fv,_dv) do fv,dv,_fv,_dv
+    @assert length(_dv) == 0
+    fv    .= FESpaces.VectorWithEntryRemoved(_fv,f.dof_to_fix)
+    dv[1]  = _fv[f.dof_to_fix]
+  end |> tuple_of_arrays
+  ParamArray(fv),ParamArray(dv)
+end
+
 # This artifact aims to make a FESpace behave like a ParamFESpace with free and
 # dirichlet values being ParamArrays of length L
 

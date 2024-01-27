@@ -1,6 +1,6 @@
 struct TransientParamFESolution
   odesol::ODEParamSolution
-  trial::TransientTrialParamFESpace
+  trial
 end
 
 function TransientParamFESolution(
