@@ -21,35 +21,15 @@ dt = 0.1
 pranges = fill([1.,10.],3)
 tdomain = dt:dt:tf
 tpspace = TransientParamSpace(pranges,tdomain)
-
-# Analytical functions
-u(x,μ,t) = (1.0-x[1])*x[1]*(1.0-x[2])*x[2]*(t+3.0)*sum(μ)
-u(μ,t) = x -> u(x,μ,t)
-uμt(μ,t) = 𝑓ₚₜ(u,μ,t)
-f(μ,t) = x -> ∂t(u)(x,μ,t)-Δ(u(μ,t))(x)
-fμt(μ,t) = 𝑓ₚₜ(f,μ,t)
-∂tu(x,μ,t) = ∂t(uμt(μ,t))(x)
-∂tu(μ,t) = x -> ∂tu(x,μ,t)
-
-# temp test
 r = realization(tpspace;nparams=2)
 μ,t = get_params(r),get_times(r)
-𝑢 = uμt(μ,t)
-𝑑𝑢 = ∇(uμt(μ,t))
 
-uh = interpolate(𝑢,U(μ,t))
-
-myf(x) = (1.0-x[1])*x[1]*(1.0-x[2])*x[2]
-(myf*v)(x)
-(∇(myf)⊙∇(v))(x)
-
-x = get_cell_points(Ω)
-v = get_fe_basis(V0)
-(𝑢*v)(x)
-(𝑑𝑢⊙∇(v))(x)
-
-cf = CellField(𝑑𝑢,Ω,ReferenceDomain())
-cf(x)
+# Analytical functions
+sol(x,μ,t) = (1.0-x[1])*x[1]*(1.0-x[2])*x[2]*(t+3.0)*sum(μ)
+sol(μ,t) = x -> sol(x,μ,t)
+u(μ,t) = 𝑓ₚₜ(sol,μ,t)
+f(μ,t) = x -> ∂t(u(μ,t))(x)-Δ(u(μ,t))(x)
+∂tu(μ,t) = ∂t(u(μ,t))
 
 # Domain and triangulations
 domain = (0,1,0,1)
@@ -57,11 +37,7 @@ partition = (2,2)
 model = CartesianDiscreteModel(domain,partition)
 order = 2
 reffe = ReferenceFE(lagrangian,Float64,order)
-V0 = FESpace(
-  model,
-  reffe,
-  conformity=:H1,
-  dirichlet_tags="boundary")
+V0 = FESpace(model,reffe,conformity=:H1,dirichlet_tags="boundary")
 U = TransientTrialParamFESpace(V0,u)
 Ω = Triangulation(model)
 # Γ = BoundaryTriangulation(model,tags="boundary")
@@ -74,7 +50,7 @@ dΩ = Measure(Ω,degree)
 # Affine FE operator
 a(u,v) = ∫(∇(v)⊙∇(u))dΩ #- ∫(0.0*v⋅(nΓ⋅∇(u))  + u⋅(nΓ⋅∇(v)) - 10/h*(v⋅u))dΓ
 m(u,v) = ∫(v*u)dΩ
-b(μ,t,v) = ∫(v*fμt(μ,t))dΩ #- ∫(u(t)⋅(nΓ⋅∇(v)) - 10/h*(v⋅u(t)) )dΓ
+b(μ,t,v) = ∫(v*f(μ,t))dΩ #- ∫(u(t)⋅(nΓ⋅∇(v)) - 10/h*(v⋅u(t)) )dΓ
 res(μ,t,u,v) = a(u,v) + m(∂t(u),v) - b(μ,t,v)
 lhs(μ,t,u,v) = m(∂t(u),v)
 rhs(μ,t,u,v) = b(μ,t,v) - a(u,v)
@@ -146,7 +122,7 @@ nl_cache = nothing
 ode_solver = ThetaMethod(ls,dt,θ)
 ode_solver.θ == 0.0 ? dtθ = dt : dtθ = dt*ode_solver.θ
 rθ = get_at_time(r,:initial)
-change_time!(rθ,dtθ)
+shift_time!(rθ,dtθ)
 ode_cache = update_cache!(ode_cache,odeop,rθ)
 
 using Gridap.ODEs.ODETools: ThetaMethodNonlinearOperator
@@ -159,7 +135,7 @@ h = nl_cache.b
 
 # Steady version of the problem to extract the Laplacian and mass matrices
 # tf = 0.1
-change_time!(rθ,dt*(1-θ))
+shift_time!(rθ,dt*(1-θ))
 Utf = U(rθ)
 # fst(x) = -Δ(u(tf))(x)
 fθ(x) = f(get_params(rθ),get_times(rθ))(x)
@@ -200,3 +176,23 @@ h
 
 
 # end #module
+
+
+_b(x,μ,t) = sum(μ)*sum(x)*t
+_b(μ,t) = x -> _b(x,μ,t)
+bb = 𝑓ₚₜ(_b,μ,t)
+dbb = ∂t(bb)
+
+bb(x)
+dbb(x)
+
+_c(x,μ,t) = sum(μ)*sum(x)*t
+_c(μ,t) = x -> _c(x,μ,t)
+# cc(μ,t) = 𝑓ₚₜ(_c(μ,t),μ,t)
+cc(μ,t) = 𝑓ₚₜ(_c,μ,t)
+dcc(μ,t) = ∂t(cc(μ,t))
+
+
+_U = TransientTrialParamFESpace(V0,cc)
+interpolate_everywhere(cc(μ,0.0),_U(μ,0.0))
+interpolate_everywhere(dcc(μ,0.0),_U(μ,0.0))

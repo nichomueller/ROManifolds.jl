@@ -20,6 +20,7 @@ Transient FE operator that is defined by a transient Weak form
 """
 struct TransientParamFEOperatorFromWeakForm{T<:OperatorType} <: TransientParamFEOperator{T}
   res::Function
+  rhs::Function
   jacs::Tuple{Vararg{Function}}
   assem::Assembler
   tpspace::TransientParamSpace
@@ -29,73 +30,21 @@ struct TransientParamFEOperatorFromWeakForm{T<:OperatorType} <: TransientParamFE
 end
 
 function AffineTransientParamFEOperator(
-  res::Function,jac::Function,jac_t::Function,tpspace,trial,test)
+  m::Function,a::Function,b::Function,tpspace,trial,test)
+  res(μ,t,u,v) = m(μ,t,∂t(u),v) + a(μ,t,u,v) - b(μ,t,v)
+  rhs(μ,t,u,v) = b(μ,t,v) - a(μ,t,u,v)
+  jac(μ,t,u,du,v) = a(μ,t,du,v)
+  jac_t(μ,t,u,dut,v) = m(μ,t,dut,v)
   assem = SparseMatrixAssembler(trial,test)
   TransientParamFEOperatorFromWeakForm{Affine}(
-    res,(jac,jac_t),assem,tpspace,(trial,∂t(trial)),test,1)
+    res,rhs,(jac,jac_t),assem,tpspace,(trial,∂t(trial)),test,1)
 end
 
 function TransientParamFEOperator(
   res::Function,jac::Function,jac_t::Function,tpspace,trial,test)
   assem = SparseMatrixAssembler(trial,test)
   TransientParamFEOperatorFromWeakForm{Nonlinear}(
-    res,(jac,jac_t),assem,tpspace,(trial,∂t(trial)),test,1)
-end
-
-struct NonlinearTransientParamFEOperator <: TransientParamFEOperator{Nonlinear}
-  res::Function
-  jacs::Tuple{Vararg{Function}}
-  nl::Tuple{Vararg{Function}}
-  assem::Assembler
-  tpspace::ParamSpace
-  trials::Tuple{Vararg{Any}}
-  test::FESpace
-  order::Integer
-end
-
-function single_field(op::TransientParamFEOperatorFromWeakForm,q,idx::Int)
-  vq = Vector{Any}(undef,num_free_dofs(get_test(op)))
-  fill!(vq,nothing)
-  vq[idx] = q
-  vq
-end
-
-function single_field(::TransientParamFEOperatorFromWeakForm,q,::Colon)
-  q
-end
-
-for (AFF,OP) in zip((:Affine,:Nonlinear),(:AffineTransientParamFEOperator,:TransientParamFEOperator))
-  @eval begin
-    function Base.getindex(op::TransientParamFEOperatorFromWeakForm{$AFF},row,col)
-      if isa(get_test(op),MultiFieldFESpace)
-        trials_col = get_trial(op)[col]
-        test_row = op.test[row]
-        sf(q,idx) = single_field(op,q,idx)
-        res(μ,t,u,dv) = op.res(μ,t,sf(u,col),sf(dv,row))
-        jac(μ,t,u,du,dv) = op.jacs[1](μ,t,sf(u,col),sf(du,col),sf(dv,row))
-        jac_t(μ,t,u,dut,dv) = op.jacs[2](μ,t,sf(u,col),sf(dut,col),sf(dv,row))
-        return $OP(res,jac,jac_t,op.tpspace,trials_col,test_row)
-      else
-        return op
-      end
-    end
-  end
-end
-
-function Base.getindex(op::NonlinearTransientParamFEOperator,row,col)
-  if isa(get_test(op),MultiFieldFESpace)
-    trials_col = get_trial(op)[col]
-    test_row = op.test[row]
-    sf(q,idx) = single_field(op,q,idx)
-    res(μ,t,u,dv) = op.res(μ,t,sf(u,col),sf(dv,row))
-    jac(μ,t,u,du,dv) = op.jacs[1](μ,t,sf(u,col),sf(du,col),sf(dv,row))
-    jac_t(μ,t,u,dut,dv) = op.jacs[2](μ,t,sf(u,col),sf(dut,col),sf(dv,row))
-    nl(μ,t,u,dut,dv) = op.nl[1](μ,t,sf(u,col),sf(dut,col),sf(dv,row))
-    dnl(μ,t,u,dut,dv) = op.nl[2](μ,t,sf(u,col),sf(dut,col),sf(dv,row))
-    return TransientParamFEOperator(res,jac,jac_t,(nl,dnl),op.tpspace,trials_col,test_row)
-  else
-    return op
-  end
+    res,TransientFETools.rhs_error,(jac,jac_t),assem,tpspace,(trial,∂t(trial)),test,1)
 end
 
 FESpaces.get_test(op::TransientParamFEOperatorFromWeakForm) = op.test
@@ -107,6 +56,12 @@ function FESpaces.SparseMatrixAssembler(
   trial::TransientTrialParamFESpace,
   test::FESpace)
   SparseMatrixAssembler(trial(nothing),test)
+end
+
+function TransientFETools.rhs_error(μ,t,xh,v)
+  error("The \"rhs\" function is not defined for this TransientFEOperator.
+  Please, try to use another type of TransientFEOperator that supports this
+  functionality.")
 end
 
 function Algebra.allocate_residual(
@@ -173,7 +128,7 @@ function Algebra.residual!(
   dc = op.res(get_params(r),get_times(r),xh,v)
   vecdata = collect_cell_vector(test,dc)
   assem = get_param_assembler(op.assem,r)
-  assemble_vector_add!(b,assem,vecdata)
+  assemble_vector!(b,assem,vecdata)
   b
 end
 
@@ -303,8 +258,7 @@ function assemble_separate_vector_add!(
   bvec = Vector{typeof(b)}(undef,num_domains(dc))
   for (n,t) in enumerate(trian)
     vecdata = collect_cell_vector(test,dc,t)
-    fill!(b,zero(eltype(b)))
-    assemble_vector_add!(b,assem,vecdata)
+    assemble_vector!(b,assem,vecdata)
     bvec[n] = copy(b)
   end
   bvec,trian

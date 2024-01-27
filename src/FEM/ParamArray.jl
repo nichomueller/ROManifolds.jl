@@ -35,7 +35,7 @@ Arrays.testitem(a::ParamArray) = testitem(get_array(a))
 Base.length(::ParamArray{T,N,A,L}) where {T,N,A,L} = L
 Base.length(::Type{ParamArray{T,N,A,L}}) where {T,N,A,L} = L
 Base.size(a::ParamArray,i...) = size(testitem(a),i...)
-Base.axes(a::ParamArray,i...) = axes(testitem(a))
+Base.axes(a::ParamArray,i...) = axes(testitem(a),i...)
 Base.eltype(::ParamArray{T,N,A,L}) where {T,N,A,L} = T
 Base.eltype(::Type{ParamArray{T,N,A,L}}) where {T,N,A,L} = T
 Base.ndims(::ParamArray{T,N,A,L}) where {T,N,A,L} = N
@@ -59,6 +59,16 @@ function Base.copy(a::ParamArray)
     b[i] = copy(a[i])
   end
   ParamArray(b)
+end
+
+function Base.copy!(a::ParamArray,b::ParamArray)
+  @assert length(a) == length(b)
+  copyto!(a,b)
+end
+
+function Base.copyto!(a::ParamArray,b::ParamArray)
+  map(copy!,get_array(a),get_array(b))
+  a
 end
 
 function Base.similar(
@@ -237,6 +247,7 @@ function Base.fill!(a::ParamArray,z)
   map(a) do a
     fill!(a,z)
   end
+  return a
 end
 
 function Base.maximum(f,a::ParamArray)
@@ -257,6 +268,7 @@ function LinearAlgebra.fillstored!(a::ParamArray,z)
   map(a) do a
     fillstored!(a,z)
   end
+  return a
 end
 
 function LinearAlgebra.mul!(
@@ -268,12 +280,14 @@ function LinearAlgebra.mul!(
   map(c,a,b) do c,a,b
     mul!(c,a,b,α,β)
   end
+  return c
 end
 
 function LinearAlgebra.ldiv!(a::ParamArray,m::LU,b::ParamArray)
   map(a,b) do a,b
     ldiv!(a,m,b)
   end
+  return a
 end
 
 function LinearAlgebra.ldiv!(a::ParamArray,m::AbstractArray,b::ParamArray)
@@ -281,30 +295,35 @@ function LinearAlgebra.ldiv!(a::ParamArray,m::AbstractArray,b::ParamArray)
   map(a,m,b) do a,m,b
     ldiv!(a,m,b)
   end
+  return a
 end
 
 function LinearAlgebra.rmul!(a::ParamArray,b::Number)
   map(a) do a
     rmul!(a,b)
   end
+  return a
 end
 
 function LinearAlgebra.lu(a::ParamArray)
-  map(a) do a
+  lua = map(a) do a
     lu(a)
   end
+  ParamContainer(lua)
 end
 
 function LinearAlgebra.lu!(a::ParamArray,b::ParamArray)
   map(a,b) do a,b
     lu!(a,b)
   end
+  return a
 end
 
 function SparseArrays.resize!(a::ParamArray,args...)
   map(a) do a
     resize!(a,args...)
   end
+  return a
 end
 
 function Arrays.CachedArray(a::ParamArray)
@@ -321,6 +340,7 @@ function Arrays.setsize!(
   map(a) do a
     setsize!(a,s)
   end
+  return a
 end
 
 function Arrays.SubVector(a::ParamArray,pini::Int,pend::Int)
@@ -331,32 +351,27 @@ function Arrays.SubVector(a::ParamArray,pini::Int,pend::Int)
 end
 
 struct ParamBroadcast{D}
-  dest::D
+  array::D
 end
 
-Arrays.get_array(a::ParamBroadcast) = a.dest
+Arrays.get_array(a::ParamBroadcast) = a.array
 
-function Base.broadcasted(f,args::Union{ParamArray,ParamBroadcast}...)
-  arrays = map(get_array,args)
-  g = (x...) -> map(f,(x...))
-  fargs = map((x...)->Base.broadcasted(g,x...),arrays...)
-  ParamBroadcast(fargs)
-end
-
-function Base.broadcasted(f,a::Number,b::Union{ParamArray,ParamBroadcast})
-  barray = get_array(b)
-  fab = map(x->Base.broadcasted(f,a,x),barray)
-  ParamBroadcast(fab)
+function Base.broadcasted(f,a::Union{ParamArray,ParamBroadcast}...)
+  bc = map((x...)->Base.broadcasted(f,x...),map(get_array,a)...)
+  ParamBroadcast(bc)
 end
 
 function Base.broadcasted(f,a::Union{ParamArray,ParamBroadcast},b::Number)
-  aarray = get_array(a)
-  fab = map(x->Base.broadcasted(f,x,b),aarray)
-  ParamBroadcast(fab)
+  bc = map(a->Base.broadcasted(f,a,b),a.array)
+  ParamBroadcast(bc)
 end
 
-function Base.broadcasted(
-  f,
+function Base.broadcasted(f,a::Number,b::Union{ParamArray,ParamBroadcast})
+  bc = map(b->Base.broadcasted(f,a,b),b.array)
+  ParamBroadcast(bc)
+end
+
+function Base.broadcasted(f,
   a::Union{ParamArray,ParamBroadcast},
   b::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{0}})
   Base.broadcasted(f,a,Base.materialize(b))
@@ -370,17 +385,17 @@ function Base.broadcasted(
 end
 
 function Base.materialize(b::ParamBroadcast)
-  barray = get_array(b)
-  dest = map(Base.materialize,barray)
-  T = eltype(dest)
-  L = length(dest)
-  a = Vector{T}(undef,L)
-  Base.materialize!(a,dest)
+  a = map(Base.materialize,b.array)
   ParamArray(a)
 end
 
+function Base.materialize!(a::ParamArray,b::Broadcast.Broadcasted)
+  map(x->Base.materialize!(x,b),a.array)
+  a
+end
+
 function Base.materialize!(a::ParamArray,b::ParamBroadcast)
-  map(Base.materialize!,get_array(a),get_array(b))
+  map(Base.materialize!,a.array,b.array)
   a
 end
 
@@ -608,6 +623,254 @@ for S in (:AbstractVector,:AbstractMatrix)
   end
 end
 
+function Arrays.return_value(f::BroadcastingFieldOpMap,a::ParamArray...)
+  evaluate(f,a...)
+end
+
+function Arrays.return_cache(f::BroadcastingFieldOpMap,a::ParamArray...)
+  ai = first(a)
+  @notimplementedif any(x->length(x)!=length(ai),a)
+  ci = return_cache(f,map(testitem,a)...)
+  bi = evaluate!(ci,f,map(testitem,a)...)
+  cache = Vector{typeof(ci)}(undef,length(ai))
+  array = allocate_param_array(bi,length(ai))
+  for i = eachindex(ai)
+    ai = map(x->x[i],a)
+    cache[i] = return_cache(f,ai...)
+  end
+  cache,array
+end
+
+function Arrays.evaluate!(cache,f::BroadcastingFieldOpMap,a::ParamArray...)
+  ai = first(a)
+  @notimplementedif any(x->length(x)!=length(ai),a)
+  cx,array = cache
+  @inbounds for i = eachindex(array)
+    ai = map(x->x[i],a)
+    array[i] = evaluate!(cx[i],f,ai...)
+  end
+  array
+end
+
+# cannot write Union{ParamArray,AbstractArray}... because of undesidered overloading;
+# instead, writing a few mixed cases
+for S in (:ParamArray,:AbstractArray), T in (:ParamArray,:AbstractArray)
+  if S == T
+    U = first(setdiff((:ParamArray,:AbstractArray),(S,)))
+    @eval begin
+      function Arrays.return_value(f::BroadcastingFieldOpMap,a::$S,b::$T,c::$U)
+        args = a,b,c
+        evaluate(f,args...)
+      end
+
+      function Arrays.return_cache(f::BroadcastingFieldOpMap,a::$S,b::$T,c::$U)
+        function _to_param_array(a::ParamArray,b::AbstractArray)
+          array = Vector{typeof(b)}(undef,length(a))
+          for i = eachindex(a)
+            array[i] = b
+          end
+          ParamArray(array)
+        end
+        function _to_param_array(a::ParamArray,b::ParamArray)
+          b
+        end
+
+        args = a,b,c
+        inds = findall(ai->isa(ai,ParamArray),args)
+        @notimplementedif length(inds) == 0
+        ai = args[first(inds)]
+        d = map(x->_to_param_array(ai,x),args)
+        cx = return_cache(f,d...)
+        cx,d
+      end
+
+      function Arrays.evaluate!(cache,f::BroadcastingFieldOpMap,a::$S,b::$T,c::$U)
+        function _to_param_array!(a::ParamArray,b::AbstractArray)
+          for i = eachindex(a)
+            a[i] = b
+          end
+          a
+        end
+        function _to_param_array!(a::ParamArray,b::ParamArray)
+          b
+        end
+
+        args = a,b,c
+        inds = findall(ai->isa(ai,ParamArray),args)
+        @notimplementedif length(inds) == 0
+        cx,array = cache
+        d = map(_to_param_array!,array,args)
+        evaluate!(cx,f,d...)
+      end
+    end
+  else
+    for U in (:ParamArray,:AbstractArray)
+      @eval begin
+        function Arrays.return_value(f::BroadcastingFieldOpMap,a::$S,b::$T,c::$U)
+          args = a,b,c
+          evaluate(f,args...)
+        end
+
+        function Arrays.return_cache(f::BroadcastingFieldOpMap,a::$S,b::$T,c::$U)
+          function _to_param_array(a::ParamArray,b::AbstractArray)
+            array = Vector{typeof(b)}(undef,length(a))
+            for i = eachindex(a)
+              array[i] = b
+            end
+            ParamArray(array)
+          end
+          function _to_param_array(a::ParamArray,b::ParamArray)
+            b
+          end
+
+          args = a,b,c
+          inds = findall(ai->isa(ai,ParamArray),args)
+          @notimplementedif length(inds) == 0
+          ai = args[first(inds)]
+          d = map(x->_to_param_array(ai,x),args)
+          cx = return_cache(f,d...)
+          cx,d
+        end
+
+        function Arrays.evaluate!(cache,f::BroadcastingFieldOpMap,a::$S,b::$T,c::$U)
+          function _to_param_array!(a::ParamArray,b::AbstractArray)
+            for i = eachindex(a)
+              a[i] = b
+            end
+            a
+          end
+          function _to_param_array!(a::ParamArray,b::ParamArray)
+            b
+          end
+
+          args = a,b,c
+          inds = findall(ai->isa(ai,ParamArray),args)
+          @notimplementedif length(inds) == 0
+          cx,array = cache
+          d = map(_to_param_array!,array,args)
+          evaluate!(cx,f,d...)
+        end
+      end
+    end
+  end
+end
+
+function Arrays.return_value(f::Broadcasting,a::ParamArray)
+  vi = return_value(f,testitem(a))
+  array = Vector{typeof(vi)}(undef,length(a))
+  for i = eachindex(a)
+    array[i] = return_value(f,a[i])
+  end
+  ParamArray(array)
+end
+
+function Arrays.return_cache(f::Broadcasting,a::ParamArray)
+  ci = return_cache(f,testitem(a))
+  bi = evaluate!(ci,f,testitem(a))
+  cache = Vector{typeof(ci)}(undef,length(a))
+  array = Vector{typeof(bi)}(undef,length(a))
+  for i = eachindex(a)
+    cache[i] = return_cache(f,a[i])
+  end
+  cache,ParamArray(array)
+end
+
+function Arrays.evaluate!(cache,f::Broadcasting,a::ParamArray)
+  cx,array = cache
+  @inbounds for i = eachindex(array)
+    array[i] = evaluate!(cx[i],f,a[i])
+  end
+  array
+end
+
+function Arrays.return_value(f::Broadcasting{typeof(∘)},a::ParamArray,b::Field)
+  vi = return_value(f,testitem(a),b)
+  array = Vector{typeof(vi)}(undef,length(a),b)
+  for i = eachindex(a)
+    array[i] = return_value(f,a[i],b)
+  end
+  ParamArray(array)
+end
+
+function Arrays.return_cache(f::Broadcasting{typeof(∘)},a::ParamArray,b::Field)
+  ci = return_cache(f,testitem(a),b)
+  bi = evaluate!(ci,f,testitem(a),b)
+  cache = Vector{typeof(ci)}(undef,length(a))
+  array = Vector{typeof(bi)}(undef,length(a))
+  for i = eachindex(a)
+    cache[i] = return_cache(f,a[i],b)
+  end
+  cache,ParamArray(array)
+end
+
+function Arrays.evaluate!(cache,f::Broadcasting{typeof(∘)},a::ParamArray,b::Field)
+  cx,array = cache
+  @inbounds for i = eachindex(array)
+    array[i] = evaluate!(cx[i],f,a[i],b)
+  end
+  array
+end
+
+function Arrays.return_value(f::Broadcasting{<:Operation},a::ParamArray,b::Field)
+  vi = return_value(f,testitem(a),b)
+  array = Vector{typeof(vi)}(undef,length(a),b)
+  for i = eachindex(a)
+    array[i] = return_value(f,a[i],b)
+  end
+  ParamArray(array)
+end
+
+function Arrays.return_cache(f::Broadcasting{<:Operation},a::ParamArray,b::Field)
+  ci = return_cache(f,testitem(a),b)
+  bi = evaluate!(ci,f,testitem(a),b)
+  cache = Vector{typeof(ci)}(undef,length(a))
+  array = Vector{typeof(bi)}(undef,length(a))
+  for i = eachindex(a)
+    cache[i] = return_cache(f,a[i],b)
+  end
+  cache,ParamArray(array)
+end
+
+function Arrays.evaluate!(cache,f::Broadcasting{<:Operation},a::ParamArray,b::Field)
+  cx,array = cache
+  @inbounds for i = eachindex(array)
+    array[i] = evaluate!(cx[i],f,a[i],b)
+  end
+  array
+end
+
+function Arrays.return_value(f::Broadcasting{<:Operation},a::Field,b::ParamArray)
+  vi = return_value(f,a,testitem(b))
+  array = Vector{typeof(vi)}(undef,a,length(b))
+  for i = eachindex(b)
+    array[i] = return_value(f,a,b[i])
+  end
+  ParamArray(array)
+end
+
+function Arrays.return_cache(f::Broadcasting{<:Operation},a::Field,b::ParamArray)
+  ci = return_cache(f,a,testitem(b))
+  bi = evaluate!(ci,f,a,testitem(b))
+  cache = Vector{typeof(ci)}(undef,length(b))
+  array = Vector{typeof(bi)}(undef,length(b))
+  for i = eachindex(b)
+    cache[i] = return_cache(f,a,b[i])
+  end
+  cache,ParamArray(array)
+end
+
+function Arrays.evaluate!(cache,f::Broadcasting{<:Operation},a::Field,b::ParamArray)
+  cx,array = cache
+  @inbounds for i = eachindex(array)
+    array[i] = evaluate!(cx[i],f,a,b[i])
+  end
+  array
+end
+
+function Arrays.return_value(k::Broadcasting{<:Operation},a::ParamArray,b::ParamArray)
+  evaluate(k,a,b)
+end
+
 for op in (:+,:-,:*)
   @eval begin
     function Arrays.return_value(f::Broadcasting{typeof($op)},a::ParamArray,b::ParamArray)
@@ -817,7 +1080,7 @@ function Arrays.evaluate!(cache::ParamArray,f::Fields.ZeroBlockMap,a,b::Abstract
   @inbounds for i = eachindex(cache)
     evaluate!(cache[i],f,a,b)
   end
-  map(_get_array,cache)
+  ParamArray(map(_get_array,cache))
 end
 
 function Arrays.evaluate!(cache::ParamArray,f::Fields.ZeroBlockMap,a,b::ParamArray)
@@ -825,7 +1088,7 @@ function Arrays.evaluate!(cache::ParamArray,f::Fields.ZeroBlockMap,a,b::ParamArr
   @inbounds for i = eachindex(cache)
     evaluate!(cache[i],f,a,b[i])
   end
-  map(_get_array,cache)
+  ParamArray(map(_get_array,cache))
 end
 
 # function Utils.recenter(a::ParamArray{T},a0::ParamArray{T};kwargs...) where T

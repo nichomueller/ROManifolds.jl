@@ -6,9 +6,8 @@ end
 function TransientParamFESolution(
   solver::ODESolver,
   op::TransientParamFEOperator,
-  uh0,
-  r = realization(op.tpspace;kwargs...);
-  kwargs...)
+  uh0::Function,
+  r::TransientParamRealization)
 
   params = get_params(r)
   ode_op = get_algebraic_operator(op)
@@ -52,10 +51,20 @@ end
 function Algebra.solve(
   solver::ODESolver,
   op::TransientParamFEOperator,
-  uh0,
-  args...;
+  uh0::Function,
+  r::TransientParamRealization)
+
+  TransientParamFESolution(solver,op,uh0,r)
+end
+
+function Algebra.solve(
+  solver::ODESolver,
+  op::TransientParamFEOperator,
+  uh0::Function;
   kwargs...)
-  TransientParamFESolution(solver,op,uh0,args...;kwargs...)
+
+  r = realization(op.tpspace;kwargs...)
+  solve(solver,op,uh0,r)
 end
 
 function TransientFETools.test_transient_fe_solver(

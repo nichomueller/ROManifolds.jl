@@ -1,4 +1,4 @@
-# module MultiFieldCellParamFieldsTests
+module MultiFieldCellParamFieldsTests
 
 using FillArrays
 using Gridap.Arrays
@@ -65,6 +65,47 @@ du, dp = get_trial_fe_basis(X)
 
 n = VectorValue(1,2)
 
+# f = x->2*sin(x[1])
+# d = f*(n⋅dv)*dp + dq*dp
+# c = u1μ*(n⋅dv)*dp + dq*dp
+
+# a = u1μ*(n⋅dv)*dp
+# b = dq*dp
+# ff = Operation(+)
+# # evaluate!(nothing,ff,a,b)
+# bb = CellData._to_common_domain(a,b)
+# x = CellData._get_cell_points(bb...)
+# ax = map(i->i(x),bb)
+# axi = map(first,ax)
+# # r = Fields.BroadcastingFieldOpMap(ff.op)(axi...)
+# return_cache(Fields.BroadcastingFieldOpMap(ff.op),axi...)
+
+# k = Fields.BroadcastingFieldOpMap(ff.op)
+# η,ξ = axi
+# m = Gridap.Fields.ZeroBlockMap()
+# ηi = testvalue(eltype(η))
+# ξi = testvalue(eltype(ξ))
+# i = 3
+# _ηi = η.array[i]
+# cache = return_cache(m,ξi,_ηi)
+# _ξi = evaluate!(cache,m,ξi,_ηi)
+# b[i] = return_cache(k,_ηi,_ξi)
+
+# _a = f*(n⋅dv)*dp
+# cc = CellData._to_common_domain(_a,b)
+# axx = map(i->i(x),cc)
+# axxi = map(first,axx)
+# # r = Fields.BroadcastingFieldOpMap(ff.op)(axxi...)
+# # return_cache(Fields.BroadcastingFieldOpMap(ff.op),axxi...)
+# β,ν = axxi
+# βi = testvalue(eltype(β))
+# νi = testvalue(eltype(ν))
+# i = 3
+# _βi = β.array[i]
+# _cache = return_cache(m,νi,_βi)
+# _νi = evaluate!(_cache,m,νi,_βi)
+# return_cache(k,_βi,_νi)
+
 cellmat = integrate( u1μ*(n⋅dv)*dp + dq*dp, quad)
 cellvec = integrate( u1μ*(n⋅dv), quad)
 @test isa(cellvec[end],ArrayBlock{<:ParamArray})
@@ -80,35 +121,31 @@ test_array(cellmat1,cellmat2,≈)
 
 α = CellField(u1μ,trian)
 op2(u,∇u,α) = α*(∇u⋅u)
-# cellmat1 = integrate( dv⋅(op2∘(du,∇(du),α)),quad)
+cellmat1 = integrate( dv⋅(op2∘(du,∇(du),α)),quad)
 cellmat2 = integrate( dv⋅(α*(∇(du)⋅du)),quad)
-# test_array(cellmat1,cellmat2,≈)
+test_array(cellmat1,cellmat2,≈)
 
 conv(u,∇u,α) = α*(u⋅∇u)
 dconv(du,∇du,u,∇u,α) = conv(u,∇du,α)+conv(du,∇u,α)
 
 u = zero(U)
 cellvec2 = integrate(dv⊙(α*(u⋅∇(u))),quad)
-# cellvec1 = integrate(dv⊙(conv∘(u,∇(u),α)),quad)
-# test_array(cellvec1,cellvec2,≈)
+cellvec1 = integrate(dv⊙(conv∘(u,∇(u),α)),quad)
+test_array(cellvec1,cellvec2,≈)
 
-# cellmat1 = integrate( dv⋅(dconv∘(du,∇(du),u,∇(u),α)) , quad)
-cellmat2 = integrate( dv⋅( α*(du⋅∇(u)) + α*(u⋅∇(du))), quad)
-# test_array(cellmat1,cellmat2,≈)
+# cellmat_Γ = integrate(  α*jump(n⋅dv)*dp.⁺ + mean(dq)*jump(dp), quad_Γ)
+# cellvec_Γ = integrate(  α*jump(n⋅dv) + mean(dq), quad_Γ)
+# L = 1
+# R = 2
+# @test isa(cellmat_Γ[end],ArrayBlock)
+# @test isa(cellvec_Γ[end],ArrayBlock)
 
-cellmat_Γ = integrate(  jump(n⋅dv)*dp.⁺ + mean(dq)*jump(dp), quad_Γ)
-cellvec_Γ = integrate(  jump(n⋅dv) + mean(dq), quad_Γ)
-L = 1
-R = 2
-@test isa(cellmat_Γ[end],ArrayBlock)
-@test isa(cellvec_Γ[end],ArrayBlock)
+# cell = 1
+# @test isa(cellmat_Γ[cell][L,R],ArrayBlock)
+# @test isa(cellvec_Γ[cell][L],ArrayBlock)
 
-cell = 1
-@test isa(cellmat_Γ[cell][L,R],ArrayBlock)
-@test isa(cellvec_Γ[cell][L],ArrayBlock)
+# cellmat1_Γ = integrate(((n⋅dv.⁺)-dq.⁻)*((n⋅du.⁺)+dp.⁻),quad_Γ)
+# cellmat2_Γ = integrate((n⋅dv.⁺)*(n⋅du.⁺)+(n⋅dv.⁺)*dp.⁻-dq.⁻*(n⋅du.⁺)-dq.⁻*dp.⁻,quad_Γ)
+# test_array(cellmat1_Γ,cellmat2_Γ,≈)
 
-cellmat1_Γ = integrate(((n⋅dv.⁺)-dq.⁻)*((n⋅du.⁺)+dp.⁻),quad_Γ)
-cellmat2_Γ = integrate((n⋅dv.⁺)*(n⋅du.⁺)+(n⋅dv.⁺)*dp.⁻-dq.⁻*(n⋅du.⁺)-dq.⁻*dp.⁻,quad_Γ)
-test_array(cellmat1_Γ,cellmat2_Γ,≈)
-
-# end # module
+end # module

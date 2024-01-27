@@ -5,23 +5,23 @@ end
 const TrivialParamRealization = ParamRealization{<:AbstractVector{<:Number}}
 
 get_params(r::ParamRealization) = r # we only want to deal with a ParamRealization type
-_get_parameters(r::ParamRealization) = r.params # this function should stay local
-num_parameters(r::ParamRealization) = length(_get_parameters(r))
+_get_params(r::ParamRealization) = r.params # this function should stay local
+num_parameters(r::ParamRealization) = length(_get_params(r))
 num_parameters(r::TrivialParamRealization) = 1
 Base.length(r::ParamRealization) = num_parameters(r)
 Base.size(r::ParamRealization) = (length(r),)
-Arrays.testitem(r::ParamRealization) = testitem(_get_parameters(r))
+Arrays.testitem(r::ParamRealization) = testitem(_get_params(r))
 
 # when iterating over a ParamRealization{P}, we return return eltype(P) ∀ index i
 function Base.iterate(r::TrivialParamRealization)
   state = 1
-  rstate = _get_parameters(r)
+  rstate = _get_params(r)
   return rstate, state
 end
 
 function Base.iterate(r::ParamRealization)
   state = 1
-  rstate = _get_parameters(r)[state]
+  rstate = _get_params(r)[state]
   return rstate, state
 end
 
@@ -30,7 +30,7 @@ function Base.iterate(r::ParamRealization,state)
   if state > length(r)
     return nothing
   end
-  rstate = _get_parameters(r)[state]
+  rstate = _get_params(r)[state]
   return rstate, state
 end
 
@@ -46,7 +46,7 @@ end
 const TrivialTransientParamRealization = TransientParamRealization{<:TrivialParamRealization,<:Number}
 
 get_params(r::TransientParamRealization) = get_params(r.params)
-_get_parameters(r::TransientParamRealization) = _get_parameters(r.params)
+_get_params(r::TransientParamRealization) = _get_params(r.params)
 num_parameters(r::TransientParamRealization) = num_parameters(r.params)
 get_times(r::TransientParamRealization) = r.times[]
 num_times(r::TransientParamRealization) = length(get_times(r))
@@ -107,6 +107,10 @@ end
 
 function change_time!(r::TransientParamRealization{P,T} where P,time::T) where T
   r.times[] = time
+end
+
+function shift_time!(r::TransientParamRealization,δ::Number)
+  r.times[] = r.times[] + δ
 end
 
 abstract type SamplingStyle end
@@ -179,8 +183,8 @@ struct ParamFunction{P} <: AbstractParamFunction{P}
 end
 
 get_params(f::ParamFunction) = get_params(f.params)
-_get_parameters(f::ParamFunction) = _get_parameters(f.params)
-num_parameters(f::ParamFunction) = length(_get_parameters(f))
+_get_params(f::ParamFunction) = _get_params(f.params)
+num_parameters(f::ParamFunction) = length(_get_params(f))
 Base.length(f::ParamFunction) = num_parameters(f)
 Base.size(f::ParamFunction) = (length(f),)
 Arrays.testitem(f::ParamFunction) = f.fun(testitem(f.params))
@@ -191,6 +195,38 @@ function Fields.gradient(f::ParamFunction)
   end
   _gradient(μ) = x -> _gradient(x,μ)
   ParamFunction(_gradient,f.params)
+end
+
+function Fields.symmetric_gradient(f::ParamFunction)
+  function _symmetric_gradient(x,μ)
+    symmetric_gradient(f.fun(μ))(x)
+  end
+  _symmetric_gradient(μ) = x -> _symmetric_gradient(x,μ)
+  ParamFunction(_symmetric_gradient,f.params)
+end
+
+function Fields.divergence(f::ParamFunction)
+  function _divergence(x,μ)
+    divergence(f.fun(μ))(x)
+  end
+  _divergence(μ) = x -> _divergence(x,μ)
+  ParamFunction(_divergence,f.params)
+end
+
+function Fields.curl(f::ParamFunction)
+  function _curl(x,μ)
+    curl(f.fun(μ))(x)
+  end
+  _curl(μ) = x -> _curl(x,μ)
+  ParamFunction(_curl,f.params)
+end
+
+function Fields.laplacian(f::ParamFunction)
+  function _laplacian(x,μ)
+    laplacian(f.fun(μ))(x)
+  end
+  _laplacian(μ) = x -> _laplacian(x,μ)
+  ParamFunction(_laplacian,f.params)
 end
 
 # when iterating over a ParamFunction{P}, we return return f(eltype(P)) ∀ index i
@@ -210,7 +246,7 @@ function ParamFunction(f::Function,p::AbstractArray)
 end
 
 function ParamFunction(f::Function,r::TrivialParamRealization)
-  f(_get_parameters(r))
+  f(_get_params(r))
 end
 
 struct TransientParamFunction{P,T} <: AbstractParamFunction{P}
@@ -220,8 +256,8 @@ struct TransientParamFunction{P,T} <: AbstractParamFunction{P}
 end
 
 get_params(f::TransientParamFunction) = get_params(f.params)
-_get_parameters(f::TransientParamFunction) = _get_parameters(f.params)
-num_parameters(f::TransientParamFunction) = length(_get_parameters(f))
+_get_params(f::TransientParamFunction) = _get_params(f.params)
+num_parameters(f::TransientParamFunction) = length(_get_params(f))
 get_times(f::TransientParamFunction) = f.times
 num_times(f::TransientParamFunction) = length(get_times(f))
 Base.length(f::TransientParamFunction) = num_parameters(f)*num_times(f)
@@ -234,6 +270,38 @@ function Fields.gradient(f::TransientParamFunction)
   end
   _gradient(μ,t) = x -> _gradient(x,μ,t)
   TransientParamFunction(_gradient,f.params,f.times)
+end
+
+function Fields.symmetric_gradient(f::TransientParamFunction)
+  function _symmetric_gradient(x,μ,t)
+    symmetric_gradient(f.fun(μ,t))(x)
+  end
+  _symmetric_gradient(μ,t) = x -> _symmetric_gradient(x,μ,t)
+  TransientParamFunction(_symmetric_gradient,f.params,f.times)
+end
+
+function Fields.divergence(f::TransientParamFunction)
+  function _divergence(x,μ,t)
+    divergence(f.fun(μ,t))(x)
+  end
+  _divergence(μ,t) = x -> _divergence(x,μ,t)
+  TransientParamFunction(_divergence,f.params,f.times)
+end
+
+function Fields.curl(f::TransientParamFunction)
+  function _curl(x,μ,t)
+    curl(f.fun(μ,t))(x)
+  end
+  _curl(μ,t) = x -> _curl(x,μ,t)
+  TransientParamFunction(_curl,f.params,f.times)
+end
+
+function Fields.laplacian(f::TransientParamFunction)
+  function _laplacian(x,μ,t)
+    laplacian(f.fun(μ,t))(x)
+  end
+  _laplacian(μ,t) = x -> _laplacian(x,μ,t)
+  TransientParamFunction(_laplacian,f.params,f.times)
 end
 
 function Base.iterate(f::TransientParamFunction)
@@ -261,11 +329,11 @@ function TransientParamFunction(f::Function,p::AbstractArray,t)
 end
 
 function TransientParamFunction(f::Function,r::TrivialParamRealization,t::Number)
-  f(_get_parameters(r),t)
+  f(_get_params(r),t)
 end
 
 function TransientParamFunction(f::Function,r::TrivialParamRealization,t)
-  p = ParamRealization([_get_parameters(r)])
+  p = ParamRealization([_get_params(r)])
   TransientParamFunction(f,p,t)
 end
 

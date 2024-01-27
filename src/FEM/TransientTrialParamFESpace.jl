@@ -76,12 +76,18 @@ Functor-like evaluation. It allocates Dirichlet vals in general.
 """
 Time derivative of the Dirichlet functions
 """
-ODETools.∂t(U::TransientTrialParamFESpace) = TransientTrialParamFESpace(U.space,∂t.(U.dirichlet_pt))
+function ODETools.∂t(U::TransientTrialParamFESpace)
+  ∂tdir(μ,t) = ∂t.(U.dirichlet_pt(μ,t))
+  TransientTrialParamFESpace(U.space,∂tdir)
+end
 
 """
 Time 2nd derivative of the Dirichlet functions
 """
-ODETools.∂tt(U::TransientTrialParamFESpace) = TransientTrialParamFESpace(U.space,∂tt.(U.dirichlet_pt))
+function ODETools.∂tt(U::TransientTrialParamFESpace)
+  ∂ttdir(μ,t) = ∂tt.(U.dirichlet_pt(μ,t))
+  TransientTrialParamFESpace(U.space,∂ttdir)
+end
 
 FESpaces.zero_free_values(f::TransientTrialParamFESpace) = @notimplemented
 FESpaces.has_constraints(f::TransientTrialParamFESpace) = has_constraints(f.space)

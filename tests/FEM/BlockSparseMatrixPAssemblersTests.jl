@@ -1,4 +1,4 @@
-module BlockMatrixAssemblersTests
+# module BlockMatrixAssemblersTests
 using Test, BlockArrays, SparseArrays, LinearAlgebra
 
 using Gridap
@@ -118,6 +118,6 @@ end
 # @test get_matrix(op) ≈ get_matrix(block_op)
 # @test get_vector(op) ≈ get_vector(block_op)
 
-end # module
+# end # module
 
 ############

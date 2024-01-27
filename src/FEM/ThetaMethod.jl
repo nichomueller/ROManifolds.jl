@@ -10,7 +10,7 @@ function ODETools.solve_step!(
   dt = solver.dt
   θ = solver.θ
   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
-  change_time!(r,dtθ)
+  shift_time!(r,dtθ)
 
   if isnothing(cache)
     ode_cache = allocate_cache(op,r)
@@ -32,7 +32,7 @@ function ODETools.solve_step!(
   end
 
   cache = (ode_cache,vθ,nl_cache)
-  change_time!(r,dt*(1-θ))
+  shift_time!(r,dt*(1-θ))
   return (uf,r,cache)
 end
 
@@ -78,8 +78,6 @@ function Algebra.residual!(
   uF = x
   vθ = op.vθ
   @. vθ = (x-op.u0)/op.dtθ
-  z = zero(eltype(b))
-  fill!(b,z)
   residual!(b,op.odeop,op.r,(uF,vθ),op.ode_cache)
 end
 
@@ -151,7 +149,7 @@ function ODETools.solve_step!(
   dt = solver.dt
   θ = solver.θ
   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
-  change_time!(r,dtθ)
+  shift_time!(r,dtθ)
 
   if isnothing(cache)
     ode_cache = allocate_cache(op,r)
@@ -177,7 +175,7 @@ function ODETools.solve_step!(
   end
 
   cache = (ode_cache,vθ,A,b,l_cache)
-  change_time!(r,dt*(1-θ))
+  shift_time!(r,dt*(1-θ))
   return (uf,r,cache)
 end
 
@@ -208,8 +206,6 @@ function Algebra.residual!(
 
   uF = op.u0
   vθ = op.vθ
-  z = zero(eltype(b))
-  fill!(b,z)
   residual!(b,op.odeop,op.r,(uF,vθ),op.ode_cache)
 end
 

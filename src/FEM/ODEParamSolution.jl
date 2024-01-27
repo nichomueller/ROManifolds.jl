@@ -24,7 +24,7 @@ end
 function Base.iterate(sol::ODEParamSolution,state)
   uf,u0,r0,cache = state
 
-  if get_times(r0) >= 100*eps()*get_final_time(sol.r)
+  if get_times(r0) >= get_final_time(sol.r) - 100*eps()
     return nothing
   end
 

@@ -200,6 +200,7 @@ cache = solve!(uf,solver.nls,nlop)
 @test all(uf ≈ x)
 
 using Gridap.FESpaces: get_algebraic_operator
+ω = get_free_dof_values(ic(get_params(μt)))
 odeop = get_algebraic_operator(op)
 sol_ode_t = solve(ode_solver,odeop,ω,μt)
 

@@ -99,29 +99,34 @@ first.((βμ*α)(x)) == (β1*α)(x)
 ax = ((∇+k)(βμ*α))(x)
 test_array(ax,collect(ax))
 
-# work in progress
 β = CellField(βμ,trian)
 ax =((∇-k)⋅β)(x)
 test_array(ax,collect(ax))
 
-ax =((∇-k)×β)(x)
+ξfun(x,μ) = sum(μ)*2*x
+ξfun(μ) = x -> ξfun(x,μ)
+ξμ = 𝑓ₚ(ξfun,μ)
+ξ = CellField(ξμ,trian)
+ν = CellField(x->2*x,trian)
+ax =((∇-k)×ξ)(x)
 test_array(ax,collect(ax))
 
-ax =((∇-k)⊗β)(x)
+ax =((∇-k)⊗ξ)(x)
 test_array(ax,collect(ax))
 
-ax =(∇.*β)(x)
+ax =(∇.*ξ)(x)
 test_array(ax,collect(ax))
 
-ax =(β.*β)(x)
+ax =(ξ.*ξ)(x)
 test_array(ax,collect(ax))
 
-ax =((∇-k).*β)(x)
+ax =((∇-k).*ξ)(x)
 test_array(ax,collect(ax))
 
-ax =(β⊗(∇-k))(x)
+ax =(ξ⊗(∇-k))(x)
 test_array(ax,collect(ax))
 
+# work in progress
 σ(x) = diagonal_tensor(VectorValue(1*x[1],2*x[2]))
 Fields.gradient(::typeof(σ)) = x-> ThirdOrderTensorValue{2,2,2,Float64}(1,0,0,0,0,0,0,2)
 ax = ((∇+k)(σ⋅α))(x)
