@@ -527,15 +527,154 @@ for ((xh,rt),(_xh,_t)) in zip(sol,_sol)
   _uh,_ph = _xh
   t = get_times(rt)
   @check t == _t "$t != $_t"
-  @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh)
-  @check get_free_dof_values(ph1) ≈ get_free_dof_values(_ph)
+  @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "failed at time $t"
+  @check get_free_dof_values(ph1) ≈ get_free_dof_values(_ph) "failed at time $t"
   @check uh1.dirichlet_values ≈ _uh.dirichlet_values
 end
 
 for ((xh,rt),(_xh,_t)) in zip(sol.odesol,_sol.odesol)
-  uh,ph = xh
-  _uh,_ph = _xh
   t = get_times(rt)
   @check t == _t "$t != $_t"
-  @check ph[1] ≈ _ph "$(ph[1]) != $_ph"
+  @check xh[1] ≈ _xh "$(xh[1]) != $_xh"
 end
+
+Np = test_p.space.space.nfree
+x = [rand(Np-1) for _ = 1:33]
+ptx = ParamArray(x)
+trialu,trialp = trial(r)
+ff = FEFunction(trialp,ptx)
+
+_trialu,_trialp = _trial(t0)
+_ff = FEFunction(_trialp,x[1])
+
+(xh,rt),state = iterate(sol.odesol,state)
+M1 = state[1]
+S1 = M1.spaces[2]
+S1.space
+(_xh,_t),_state = iterate(_sol.odesol,_state)
+M2 = _state[1]
+S2 = M2.spaces[2]
+
+S1.space.vol == S2.vol && S1.space.vol_i == S2.vol_i
+
+for f in propertynames(S2.space.space)
+  fi = getproperty(S2.space.space,f)
+  gi = getproperty(S1.space.space.space,f)
+  @assert fi == gi
+end
+
+(x,rf),state = iterate(sol.odesol)
+# (x,rf),state = iterate(sol.odesol)
+Uh = TransientFETools.allocate_trial_space(sol.trial,rf)
+Uh = evaluate!(Uh,sol.trial,rf)
+j = FEFunction(Uh,x)
+
+free_values_1 = MultiField.restrict_to_field(Uh,x,1)
+free_values_2 = MultiField.restrict_to_field(Uh,x,2)
+# FEFunction(Uh.spaces[2],free_values_2)
+diri_values = get_dirichlet_dof_values(Uh.spaces[2])
+cell_vals = scatter_free_and_dirichlet_values(Uh.spaces[2],free_values_2,diri_values)
+
+(y,t),state = iterate(_sol.odesol)
+# (x,rt),state = iterate(sol.odesol)
+_Uh = TransientFETools.allocate_trial_space(_sol.trial)
+_Uh = evaluate!(_Uh,_sol.trial,t)
+k = FEFunction(_Uh,y)
+
+_free_values_1 = MultiField.restrict_to_field(_Uh,y,1)
+_free_values_2 = MultiField.restrict_to_field(_Uh,y,2)
+# FEFunction(_Uh.spaces[2],_free_values_2)
+_diri_values = get_dirichlet_dof_values(_Uh.spaces[2])
+_cell_vals = scatter_free_and_dirichlet_values(_Uh.spaces[2],_free_values_2,_diri_values)
+
+@assert free_values_1[1] ≈ _free_values_1
+@assert free_values_2[1] ≈ _free_values_2
+@assert diri_values[1] ≈ _diri_values
+@assert _getter(cell_vals) ≈ _cell_vals
+
+k.single_fe_functions[2].cell_dof_values ≈ _getter(j.single_fe_functions[2].cell_dof_values)
+_getter(x) = lazy_map(y->getindex(y,1),x)
+
+##########################################################################
+# step 1
+odesol = sol.odesol
+wf = copy(odesol.u0)
+w0 = copy(odesol.u0)
+r0 = FEM.get_at_time(odesol.r,:initial)
+cache = nothing
+wf,rf,cache = solve_step!(wf,odesol.solver,odesol.op,r0,w0,cache)
+w0 .= wf
+# wf,rf,cache = solve_step!(wf,odesol.solver,odesol.op,r0,w0,cache)
+# w0 .= wf
+θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+FEM.shift_time!(rf,dtθ)
+ode_cache,vθ,A,bb,l_cache = cache
+ode_cache = TransientFETools.update_cache!(ode_cache,odesol.op,rf)
+# ODETools._matrix_and_vector!(A,bb,odesol.op,rf,dtθ,w0,ode_cache,vθ)
+# afop = Gridap.FESpaces.AffineOperator(A,bb)
+# newmatrix = true
+# l_cache = ODETools.solve!(uf,solver.nls,afop,l_cache,newmatrix)
+Xh, = ode_cache
+dxh = (EvaluationFunction(Xh[2],vθ),)
+xh=TransientCellField(EvaluationFunction(Xh[1],w0),dxh)
+v = get_fe_basis(test)
+dc = feop.res(get_params(rf),get_times(rf),xh,v)
+dcΩ = dc[Ω]
+dcΓn = dc[Γn]
+vecdata = collect_cell_vector(test,dc)
+assem = FEM.get_param_assembler(feop.assem,rf)
+assemble_vector_add!(bb,assem,vecdata)
+
+_odesol = _sol.odesol
+_uf = copy(_odesol.u0)
+_u0 = copy(_odesol.u0)
+t0 = _odesol.t0
+_uf,tf,_cache = solve_step!(_uf,_odesol.solver,_odesol.op,_u0,t0)
+_u0 .= _uf
+# _uf,tf,cache = solve_step!(_uf,_odesol.solver,_odesol.op,_u0,t0)
+# _u0 .= _uf
+tθ = tf+dtθ
+_ode_cache, _vθ, _A, _bb, _l_cache = _cache
+_ode_cache = update_cache!(_ode_cache,_odesol.op,tθ)
+# ODETools._matrix_and_vector!(_A,_bb,_odesol.op,tθ,dtθ,_u0,_ode_cache,_vθ)
+# _afop = Gridap.FESpaces.AffineOperator(_A,_bb)
+# newmatrix = true
+# _l_cache = ODETools.solve!(_uf,solver.nls,_afop,_l_cache,newmatrix)
+_Xh, = _ode_cache
+_dxh = (EvaluationFunction(_Xh[2],_vθ),)
+_xh=TransientCellField(EvaluationFunction(_Xh[1],_u0),_dxh)
+_dc = _feop.res(tθ,_xh,v)
+_dcΩ = _dc[Ω]
+_dcΓn = _dc[Γn]
+_vecdata = collect_cell_vector(test,_dc)
+assemble_vector!(_bb,_feop.assem_t,_vecdata)
+
+# EvaluationFunction(Xh[1],w0)
+fv = MultiField.restrict_to_field(Xh[1],w0,2)
+# EvaluationFunction(Xh[1].spaces[2],fv)
+fe = Xh[1].spaces[2]
+dv = get_dirichlet_dof_values(fe)
+ffe = FESpaceToParamFESpace(fe.space.space.space,Val(3))
+# cv = scatter_free_and_dirichlet_values(ffe,fv,dv)
+# cf = CellField(ffe,cv)
+cell_dof_ids = get_cell_dof_ids(ffe.space)
+# lazy_map(Broadcasting(PosNegReindex(fv,dv)),cell_dof_ids)
+k = Broadcasting(PosNegReindex(fv,dv))
+x = cell_dof_ids
+c = return_cache(Broadcasting(testitem(k.f)),x[4])
+# a = evaluate!(c,Broadcasting(testitem(k.f)),x[4])
+
+_k = Broadcasting(PosNegReindex(_fv,_dv))
+lazy_map(_k,x)
+_cache = return_cache(_k,x[4])
+evaluate!(_cache,_k,x[1])
+
+testitem(k.f).values_neg == _k.f.values_neg
+testitem(k.f).values_pos == _k.f.values_pos
+# CLAIM: return_cache(Broadcasting(testitem(k.f)),x[4]) == return_cache(_k,x[4])
+# CLAIM: evaluate!(cache,Broadcasting(testitem(k.f)),x[4]) == evaluate!(_cache,_k,x[4])
+
+# EvaluationFunction(_Xh[1],_u0)
+_fv = MultiField.restrict_to_field(_Xh[1],_u0,2)
+_fe = _Xh[1].spaces[2]
+_dv = get_dirichlet_dof_values(_fe)
