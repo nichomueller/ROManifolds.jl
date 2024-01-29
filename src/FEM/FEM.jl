@@ -107,7 +107,7 @@ include("TransientTrialParamFESpace.jl")
 
 include("ParamAssemblers.jl")
 
-include("BlockParamAssemblers.jl")
+include("ParamBlockAssemblers.jl")
 
 export TransientParamFEOperator
 export TransientParamFEOperatorFromWeakForm

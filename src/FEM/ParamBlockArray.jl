@@ -33,38 +33,16 @@ BlockArrays.blocksize(a::ParamBlockArray) = blocksize(get_array(a))
 Base.length(a::ParamBlockArray) = length(first(blocks(a)))
 Base.size(a::ParamBlockArray) = map(length,axes(a))
 Base.axes(a::ParamBlockArray) = axes(get_array(a))
-Base.eltype(a::ParamBlockArray{T}) where T = T
-Base.eltype(a::Type{<:ParamBlockArray{T}}) where T = T
-Base.ndims(a::ParamBlockArray{T,N} where T) where N = N
-Base.ndims(a::Type{<:ParamBlockArray{T,N}} where T) where N = N
+Base.eltype(::ParamBlockArray{T}) where T = T
+Base.eltype(::Type{<:ParamBlockArray{T}}) where T = T
+Base.ndims(::ParamBlockArray{T,N} where T) where N = N
+Base.ndims(::Type{<:ParamBlockArray{T,N}} where T) where N = N
+Base.eachindex(::ParamBlockArray{T,N,A,L}) where {T,N,A,L} = Base.OneTo(L)
 Base.first(a::ParamBlockArray) = getindex(a,1)
 
 function Base.getindex(a::ParamBlockArray,i::Integer)
   blocksi = getindex.(blocks(a),i)
   BlockArrays._BlockArray(blocksi,axes(a))
-end
-
-# iterate doesn't work properly for ParamBlockArrays...why?
-# function Base.iterate(a::ParamBlockArray)
-#   state = 1
-#   astate = getindex(a,state)
-#   astate,state
-# end
-
-# function Base.iterate(a::ParamBlockArray,state)
-#   if state >= length(a)
-#     return nothing
-#   end
-#   state += 1
-#   astate = getindex(a,state)
-#   astate,state
-# end
-
-#sadly, must force map function
-function Base.map(f,a::ParamBlockArray)
-  map(1:length(a)) do i
-    f(a[i])
-  end
 end
 
 function Base.show(io::IO,::MIME"text/plain",a::ParamBlockArray{T,N,A,L}) where {T,N,A,L}
@@ -95,12 +73,28 @@ function Base.similar(
   ParamBlockArray(blockarrays)
 end
 
+function Base.:+(a::T,b::T) where T<:ParamBlockArray
+  c = map(blocks(a),blocks(b)) do blocka,blockb
+    blocka+blockb
+  end
+  blockarrays = BlockArrays._BlockArray(c,axes(a))
+  ParamBlockArray(blockarrays)
+end
+
+function Base.:-(a::T,b::T) where T<:ParamBlockArray
+  c = map(blocks(a),blocks(b)) do blocka,blockb
+    blocka-blockb
+  end
+  blockarrays = BlockArrays._BlockArray(c,axes(a))
+  ParamBlockArray(blockarrays)
+end
+
 function LinearAlgebra.fillstored!(a::ParamBlockMatrix,v)
-  map(ai->LinearAlgebra.fillstored!(ai,v),a)
+  map(ai->LinearAlgebra.fillstored!(ai,v),blocks(a))
 end
 
 function Base.fill!(a::ParamBlockVector,v)
-  map(ai->fill!(ai,v),a)
+  map(ai->fill!(ai,v),blocks(a))
 end
 
 function LinearAlgebra.mul!(
@@ -110,44 +104,98 @@ function LinearAlgebra.mul!(
   α::Number,β::Number)
 
   @assert length(a) == length(b) == length(c)
-  @inbounds for i = 1:length(a)
-    mul!(c[i],a[i],b[i],α,β)
+  map(blocks(c),blocks(a),blocks(b)) do c,a,b
+    mul!(c,a,b,α,β)
   end
   c
 end
 
 function LinearAlgebra.ldiv!(a::ParamBlockArray,m::LU,b::ParamBlockArray)
   @assert length(a) == length(b)
-  @inbounds for i = 1:length(a)
-    ldiv!(a[i],m,b[i])
+  map(blocks(a),blocks(b)) do a,b
+    ldiv!(a,m,b)
   end
   a
 end
 
 function LinearAlgebra.ldiv!(a::ParamBlockArray,m::AbstractArray,b::ParamBlockArray)
   @assert length(a) == length(m) == length(b)
-  @inbounds for i = 1:length(a)
-    ldiv!(a[i],m[i],b[i])
+  map(blocks(a),m,blocks(b)) do a,m,b
+    ldiv!(a,m,b)
   end
   a
 end
 
 function LinearAlgebra.rmul!(a::ParamBlockArray,b::Number)
-  map(a) do a
+  map(a) do blocks(a)
     rmul!(a,b)
   end
 end
 
 function LinearAlgebra.lu(a::ParamBlockArray)
-  map(a) do a
+  lua = map(a) do blocks(a)
     lu(a)
   end
+  ParamContainer(lua)
 end
 
 function LinearAlgebra.lu!(a::ParamBlockArray,b::ParamBlockArray)
   @assert length(a) == length(b)
-  @inbounds for i = 1:length(a)
-    lu!(a[i],b[i])
+  map(blocks(a),blocks(b)) do a,b
+    lu!(a,b)
   end
   a
+end
+
+struct ParamBlockBroadcast{D}
+  array::D
+end
+
+BlockArrays.blocks(a::ParamBlockBroadcast{<:ParamBlockArray}) = a.array
+
+function Base.broadcasted(f,a::Union{ParamBlockArray,ParamBlockBroadcast}...)
+  bc = map((x...)->Base.broadcasted(f,x...),map(blocks,a)...)
+  ParamBlockBroadcast(bc)
+end
+
+function Base.broadcasted(f,a::Union{ParamBlockArray,ParamBlockBroadcast},b::Number)
+  bc = map(a->Base.broadcasted(f,a,b),blocks(a))
+  ParamBlockBroadcast(bc)
+end
+
+function Base.broadcasted(f,a::Number,b::Union{ParamBlockArray,ParamBlockBroadcast})
+  bc = map(b->Base.broadcasted(f,a,b),blocks(b))
+  ParamBlockBroadcast(bc)
+end
+
+function Base.broadcasted(f,
+  a::Union{ParamBlockArray,ParamBlockBroadcast},
+  b::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{0}})
+  Base.broadcasted(f,a,Base.materialize(b))
+end
+
+function Base.broadcasted(
+  f,
+  a::Base.Broadcast.Broadcasted{Base.Broadcast.DefaultArrayStyle{0}},
+  b::Union{ParamBlockArray,ParamBlockBroadcast})
+  Base.broadcasted(f,Base.materialize(a),b)
+end
+
+function Base.materialize(b::ParamBlockBroadcast)
+  a = map(Base.materialize,blocks(b))
+  mortar(a)
+end
+
+function Base.materialize!(a::ParamBlockArray,b::Broadcast.Broadcasted)
+  map(x->Base.materialize!(x,b),blocks(a))
+  a
+end
+
+function Base.materialize!(a::ParamBlockArray,b::ParamBlockBroadcast)
+  map(Base.materialize!,blocks(a),blocks(b))
+  a
+end
+
+function Base.map(f,a::ParamBlockArray)
+  map(i->f(a[i]),eachindex(a))
 end

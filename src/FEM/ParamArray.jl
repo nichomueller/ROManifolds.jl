@@ -362,12 +362,12 @@ function Base.broadcasted(f,a::Union{ParamArray,ParamBroadcast}...)
 end
 
 function Base.broadcasted(f,a::Union{ParamArray,ParamBroadcast},b::Number)
-  bc = map(a->Base.broadcasted(f,a,b),a.array)
+  bc = map(a->Base.broadcasted(f,a,b),get_array(a))
   ParamBroadcast(bc)
 end
 
 function Base.broadcasted(f,a::Number,b::Union{ParamArray,ParamBroadcast})
-  bc = map(b->Base.broadcasted(f,a,b),b.array)
+  bc = map(b->Base.broadcasted(f,a,b),get_array(b))
   ParamBroadcast(bc)
 end
 
@@ -385,17 +385,17 @@ function Base.broadcasted(
 end
 
 function Base.materialize(b::ParamBroadcast)
-  a = map(Base.materialize,b.array)
+  a = map(Base.materialize,get_array(b))
   ParamArray(a)
 end
 
 function Base.materialize!(a::ParamArray,b::Broadcast.Broadcasted)
-  map(x->Base.materialize!(x,b),a.array)
+  map(x->Base.materialize!(x,b),get_array(a))
   a
 end
 
 function Base.materialize!(a::ParamArray,b::ParamBroadcast)
-  map(Base.materialize!,a.array,b.array)
+  map(Base.materialize!,get_array(a),get_array(b))
   a
 end
 

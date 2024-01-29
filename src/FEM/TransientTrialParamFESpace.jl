@@ -213,23 +213,6 @@ FESpaces.ConstraintStyle(::TransientMultiFieldTrialParamFESpace) = ConstraintSty
 MultiField.MultiFieldStyle(::Type{TransientMultiFieldTrialParamFESpace{S,B,V}}) where {S,B,V} = S()
 MultiField.MultiFieldStyle(f::TransientMultiFieldTrialParamFESpace) = MultiFieldStyle(typeof(f))
 
-function FESpaces.SparseMatrixAssembler(
-  mat,
-  vec,
-  trial::TransientMultiFieldTrialParamFESpace{MS},
-  test::TransientMultiFieldTrialParamFESpace{MS},
-  strategy::AssemblyStrategy=DefaultAssemblyStrategy()
-  ) where MS <: BlockMultiFieldStyle
-
-  return MultiField.BlockSparseMatrixAssembler(
-    MultiFieldStyle(test),
-    trial,
-    test,
-    SparseMatrixBuilder(mat),
-    ArrayBuilder(vec),
-    strategy)
-end
-
 function TransientFETools.test_transient_trial_fe_space(Uh,μ)
   UhX = evaluate(Uh,nothing)
   @test isa(UhX,FESpace)
