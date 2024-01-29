@@ -45,6 +45,12 @@ function Base.getindex(a::ParamBlockArray,i::Integer)
   BlockArrays._BlockArray(blocksi,axes(a))
 end
 
+function Base.setindex!(a::ParamBlockArray,v::BlockArray,i::Integer)
+  blocksi = getindex.(blocks(a),i)
+  setindex!(blocksi,v,i)
+  a
+end
+
 function Base.show(io::IO,::MIME"text/plain",a::ParamBlockArray{T,N,A,L}) where {T,N,A,L}
   s = size(blocks(a))
   _nice_size(s::Tuple{Int}) = "$(s[1]) - "
@@ -73,6 +79,14 @@ function Base.similar(
   ParamBlockArray(blockarrays)
 end
 
+function LinearAlgebra.fillstored!(a::ParamBlockMatrix,v)
+  map(ai->LinearAlgebra.fillstored!(ai,v),a)
+end
+
+function Base.fill!(a::ParamBlockVector,v)
+  map(ai->fill!(ai,v),a)
+end
+
 function Base.:+(a::T,b::T) where T<:ParamBlockArray
   c = map(blocks(a),blocks(b)) do blocka,blockb
     blocka+blockb
@@ -89,12 +103,16 @@ function Base.:-(a::T,b::T) where T<:ParamBlockArray
   ParamBlockArray(blockarrays)
 end
 
-function LinearAlgebra.fillstored!(a::ParamBlockMatrix,v)
-  map(ai->LinearAlgebra.fillstored!(ai,v),blocks(a))
+function Base.:*(a::ParamBlockArray,b::Number)
+  c = map(blocks(a)) do blocka
+    blocka*b
+  end
+  blockarrays = BlockArrays._BlockArray(c,axes(a))
+  ParamBlockArray(blockarrays)
 end
 
-function Base.fill!(a::ParamBlockVector,v)
-  map(ai->fill!(ai,v),blocks(a))
+function Base.:*(a::Number,b::ParamBlockArray)
+  b*a
 end
 
 function LinearAlgebra.mul!(
@@ -104,7 +122,7 @@ function LinearAlgebra.mul!(
   α::Number,β::Number)
 
   @assert length(a) == length(b) == length(c)
-  map(blocks(c),blocks(a),blocks(b)) do c,a,b
+  map(c,a,b) do c,a,b
     mul!(c,a,b,α,β)
   end
   c
@@ -112,7 +130,7 @@ end
 
 function LinearAlgebra.ldiv!(a::ParamBlockArray,m::LU,b::ParamBlockArray)
   @assert length(a) == length(b)
-  map(blocks(a),blocks(b)) do a,b
+  map(a,b) do a,b
     ldiv!(a,m,b)
   end
   a
@@ -120,20 +138,20 @@ end
 
 function LinearAlgebra.ldiv!(a::ParamBlockArray,m::AbstractArray,b::ParamBlockArray)
   @assert length(a) == length(m) == length(b)
-  map(blocks(a),m,blocks(b)) do a,m,b
-    ldiv!(a,m,b)
+  @inbounds for i = eachindex(a)
+    ldiv!(a[i],m[i],b[i])
   end
   a
 end
 
 function LinearAlgebra.rmul!(a::ParamBlockArray,b::Number)
-  map(a) do blocks(a)
+  map(a) do a
     rmul!(a,b)
   end
 end
 
 function LinearAlgebra.lu(a::ParamBlockArray)
-  lua = map(a) do blocks(a)
+  lua = map(a) do a
     lu(a)
   end
   ParamContainer(lua)
@@ -151,20 +169,21 @@ struct ParamBlockBroadcast{D}
   array::D
 end
 
-BlockArrays.blocks(a::ParamBlockBroadcast{<:ParamBlockArray}) = a.array
+_get_array(a::ParamBlockBroadcast) = a.array
+_get_array(a::ParamBlockArray) = a
 
 function Base.broadcasted(f,a::Union{ParamBlockArray,ParamBlockBroadcast}...)
-  bc = map((x...)->Base.broadcasted(f,x...),map(blocks,a)...)
+  bc = map((x...)->Base.broadcasted(f,x...),map(_get_array,a)...)
   ParamBlockBroadcast(bc)
 end
 
 function Base.broadcasted(f,a::Union{ParamBlockArray,ParamBlockBroadcast},b::Number)
-  bc = map(a->Base.broadcasted(f,a,b),blocks(a))
+  bc = map(a->Base.broadcasted(f,a,b),_get_array(a))
   ParamBlockBroadcast(bc)
 end
 
 function Base.broadcasted(f,a::Number,b::Union{ParamBlockArray,ParamBlockBroadcast})
-  bc = map(b->Base.broadcasted(f,a,b),blocks(b))
+  bc = map(b->Base.broadcasted(f,a,b),_get_array(b))
   ParamBlockBroadcast(bc)
 end
 
@@ -182,17 +201,17 @@ function Base.broadcasted(
 end
 
 function Base.materialize(b::ParamBlockBroadcast)
-  a = map(Base.materialize,blocks(b))
+  a = map(Base.materialize,_get_array(b))
   mortar(a)
 end
 
 function Base.materialize!(a::ParamBlockArray,b::Broadcast.Broadcasted)
-  map(x->Base.materialize!(x,b),blocks(a))
+  map(x->Base.materialize!(x,b),_get_array(a))
   a
 end
 
 function Base.materialize!(a::ParamBlockArray,b::ParamBlockBroadcast)
-  map(Base.materialize!,blocks(a),blocks(b))
+  map(i->Base.materialize!(_get_array(a)[i],_get_array(b)[i]),eachindex(a))
   a
 end
 

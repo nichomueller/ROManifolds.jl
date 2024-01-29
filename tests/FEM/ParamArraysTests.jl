@@ -552,12 +552,13 @@ cache = nothing
 # w0 .= wf
 θ == 0.0 ? dtθ = dt : dtθ = dt*θ
 if isnothing(cache)
-  FEM.shift_time!(r0,dtθ)
-  ode_cache = allocate_cache(odesol.op,r0)
+  rf = r0
+  FEM.shift_time!(rf,dtθ)
+  ode_cache = allocate_cache(odesol.op,rf)
   vθ = similar(w0)
   vθ .= 0.0
   l_cache = nothing
-  A,bb = ODETools._allocate_matrix_and_vector(odesol.op,r0,w0,ode_cache)
+  A,bb = ODETools._allocate_matrix_and_vector(odesol.op,rf,w0,ode_cache)
 else
   FEM.shift_time!(rf,dtθ)
   ode_cache,vθ,A,bb,l_cache = cache
@@ -576,25 +577,26 @@ _odesol = _sol.odesol
 _uf = copy(_odesol.u0)
 _u0 = copy(_odesol.u0)
 t0 = _odesol.t0
-_uf,tf,_cache = solve_step!(_uf,_odesol.solver,_odesol.op,_u0,t0)
-_u0 .= _uf
+_cache = nothing
+# _uf,tf,_cache = solve_step!(_uf,_odesol.solver,_odesol.op,_u0,t0)
+# _u0 .= _uf
 # _uf,tf,cache = solve_step!(_uf,_odesol.solver,_odesol.op,_u0,t0)
 # _u0 .= _uf
-tθ = tf+dtθ
-_ode_cache, _vθ, _A, _bb, _l_cache = _cache
+tθ = t0+dtθ
+if isnothing(_cache)
+  _ode_cache = allocate_cache(_odesol.op)
+  _vθ = similar(_u0)
+  _vθ .= 0.0
+  _l_cache = nothing
+  _A,_bb = ODETools._allocate_matrix_and_vector(_odesol.op,tθ,_u0,_ode_cache)
+else
+  ode_cache,_vθ,_A,_bb,_l_cache = _cache
+end
 _ode_cache = update_cache!(_ode_cache,_odesol.op,tθ)
-# ODETools._matrix_and_vector!(_A,_bb,_odesol.op,tθ,dtθ,_u0,_ode_cache,_vθ)
-# _afop = Gridap.FESpaces.AffineOperator(_A,_bb)
-# newmatrix = true
-# _l_cache = ODETools.solve!(_uf,solver.nls,_afop,_l_cache,newmatrix)
-_Xh, = _ode_cache
-_dxh = (EvaluationFunction(_Xh[2],_vθ),)
-_xh=TransientCellField(EvaluationFunction(_Xh[1],_u0),_dxh)
-_dc = _feop.res(tθ,_xh,v)
-_dcΩ = _dc[Ω]
-_dcΓn = _dc[Γn]
-_vecdata = collect_cell_vector(test,_dc)
-assemble_vector!(_bb,_feop.assem_t,_vecdata)
+ODETools._matrix_and_vector!(_A,_bb,_odesol.op,tθ,dtθ,_u0,_ode_cache,_vθ)
+_afop = Gridap.FESpaces.AffineOperator(_A,_bb)
+newmatrix = true
+_l_cache = ODETools.solve!(_uf,_odesol.solver.nls,_afop,_l_cache,newmatrix)
 
 # EvaluationFunction(Xh[1],w0)
 fv = MultiField.restrict_to_field(Xh[1],w0,2)
@@ -627,11 +629,22 @@ _fe = _Xh[1].spaces[2]
 _dv = get_dirichlet_dof_values(_fe)
 
 
-# vθ .= 0.0
-bc = Base.broadcasted(Base.identity,0.0)
-Base.materialize!(vθ,bc)
-
-s = similar(vθ)
+# vθ .= pi
+# s = similar(vθ)
 # s .= vθ
-bc = Base.broadcasted(Base.identity,vθ)
-Base.materialize!(s,bc)
+# @. s = s*(1.0/θ)-vθ*((1-θ)/θ)
+
+# a1,b1 = s*(1.0/θ),vθ*((1-θ)/θ)
+# @. s = s*(1.0/θ)-vθ*((1-θ)/θ)
+
+
+# ODETools.solve!(wf,odesol.solver.nls,afop,l_cache,newmatrix)
+ss = Algebra.LUSymbolicSetup()
+ns = numerical_setup(ss,A)
+lua=lu(A)
+
+# ldiv!(x,ns.factors,b)
+map(wf,lua,bb) do x,a,b
+  typeof(a)
+  typeof(b)
+end
