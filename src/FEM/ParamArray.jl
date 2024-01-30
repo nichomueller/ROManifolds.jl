@@ -43,8 +43,8 @@ Base.ndims(::Type{ParamArray{T,N,A,L}}) where {T,N,A,L} = N
 Base.first(a::ParamArray) = testitem(a)
 Base.eachindex(::ParamArray{T,N,A,L}) where {T,N,A,L} = Base.OneTo(L)
 Base.lastindex(::ParamArray{T,N,A,L}) where {T,N,A,L} = L
-Base.getindex(a::ParamArray,i...) = get_array(a)[i...]
-Base.setindex!(a::ParamArray,v,i...) = get_array(a)[i...] = v
+Base.getindex(a::ParamArray,i...) = getindex(get_array(a),i...)
+Base.setindex!(a::ParamArray,v,i...) = setindex!(get_array(a),v,i...)
 Base.iterate(a::ParamArray,i...) = iterate(get_array(a),i...)
 
 function Base.show(io::IO,::MIME"text/plain",a::ParamArray{T,N,A,L}) where {T,N,A,L}
@@ -82,6 +82,14 @@ function Base.similar(
     b[i] = similar(a[i],element_type,dims)
   end
   ParamArray(b)
+end
+
+function Base.similar(::Type{ParamArray{T,N,A,L}},n::Integer...) where {T,N,A,L}
+  array = Vector{eltype(A)}(undef,L)
+  @inbounds for i = eachindex(array)
+    array[i] = zeros(T,n)
+  end
+  ParamArray(array)
 end
 
 function Base.zero(a::ParamArray)
@@ -403,6 +411,26 @@ function Base.map(f,a::ParamArray...)
   map(f,get_array.(a)...)
 end
 
+function _to_param_array(a::ParamArray,b::AbstractArray)
+  array = Vector{typeof(b)}(undef,length(a))
+  for i = eachindex(a)
+    array[i] = b
+  end
+  ParamArray(array)
+end
+function _to_param_array(a::ParamArray,b::ParamArray)
+  b
+end
+function _to_param_array!(a::ParamArray,b::AbstractArray)
+  for i = eachindex(a)
+    a[i] = b
+  end
+  a
+end
+function _to_param_array!(a::ParamArray,b::ParamArray)
+  b
+end
+
 function Arrays.return_value(
   f::BroadcastingFieldOpMap,
   a::ParamArray,
@@ -652,107 +680,77 @@ function Arrays.evaluate!(cache,f::BroadcastingFieldOpMap,a::ParamArray...)
   array
 end
 
+################################################################################
 # cannot write Union{ParamArray,AbstractArray}... because of undesidered overloading;
 # instead, writing a few mixed cases
-for S in (:ParamArray,:AbstractArray), T in (:ParamArray,:AbstractArray)
-  if S == T
-    U = first(setdiff((:ParamArray,:AbstractArray),(S,)))
-    @eval begin
-      function Arrays.return_value(f::BroadcastingFieldOpMap,a::$S,b::$T,c::$U)
-        args = a,b,c
-        evaluate(f,args...)
-      end
+function _return_value(f::BroadcastingFieldOpMap,args::Union{ParamArray,AbstractArray}...)
+  evaluate(f,args...)
+end
 
-      function Arrays.return_cache(f::BroadcastingFieldOpMap,a::$S,b::$T,c::$U)
-        function _to_param_array(a::ParamArray,b::AbstractArray)
-          array = Vector{typeof(b)}(undef,length(a))
-          for i = eachindex(a)
-            array[i] = b
-          end
-          ParamArray(array)
-        end
-        function _to_param_array(a::ParamArray,b::ParamArray)
-          b
-        end
+function _return_cache(f::BroadcastingFieldOpMap,args::Union{ParamArray,AbstractArray}...)
+  inds = findall(ai->isa(ai,ParamArray),args)
+  @notimplementedif length(inds) == 0
+  ai = args[first(inds)]
+  d = map(x->_to_param_array(ai,x),args)
+  cx = return_cache(f,d...)
+  cx,d
+end
 
-        args = a,b,c
-        inds = findall(ai->isa(ai,ParamArray),args)
-        @notimplementedif length(inds) == 0
-        ai = args[first(inds)]
-        d = map(x->_to_param_array(ai,x),args)
-        cx = return_cache(f,d...)
-        cx,d
-      end
+function _evaluate!(cache,f::BroadcastingFieldOpMap,args::Union{ParamArray,AbstractArray}...)
+  inds = findall(ai->isa(ai,ParamArray),args)
+  @notimplementedif length(inds) == 0
+  cx,array = cache
+  d = map(_to_param_array!,array,args)
+  evaluate!(cx,f,d...)
+end
 
-      function Arrays.evaluate!(cache,f::BroadcastingFieldOpMap,a::$S,b::$T,c::$U)
-        function _to_param_array!(a::ParamArray,b::AbstractArray)
-          for i = eachindex(a)
-            a[i] = b
-          end
-          a
-        end
-        function _to_param_array!(a::ParamArray,b::ParamArray)
-          b
-        end
+function Arrays.return_value(f::BroadcastingFieldOpMap,a::ParamArray,b::AbstractArray...)
+  _return_value(f,a,b...)
+end
 
-        args = a,b,c
-        inds = findall(ai->isa(ai,ParamArray),args)
-        @notimplementedif length(inds) == 0
-        cx,array = cache
-        d = map(_to_param_array!,array,args)
-        evaluate!(cx,f,d...)
-      end
-    end
-  else
-    for U in (:ParamArray,:AbstractArray)
-      @eval begin
-        function Arrays.return_value(f::BroadcastingFieldOpMap,a::$S,b::$T,c::$U)
-          args = a,b,c
-          evaluate(f,args...)
-        end
+function Arrays.return_value(f::BroadcastingFieldOpMap,a::AbstractArray,b::ParamArray,c::AbstractArray...)
+  _return_value(f,a,b,c...)
+end
 
-        function Arrays.return_cache(f::BroadcastingFieldOpMap,a::$S,b::$T,c::$U)
-          function _to_param_array(a::ParamArray,b::AbstractArray)
-            array = Vector{typeof(b)}(undef,length(a))
-            for i = eachindex(a)
-              array[i] = b
-            end
-            ParamArray(array)
-          end
-          function _to_param_array(a::ParamArray,b::ParamArray)
-            b
-          end
+function Arrays.return_value(f::BroadcastingFieldOpMap,a::AbstractArray,b::AbstractArray,c::ParamArray,d::AbstractArray...)
+  _return_value(f,a,b,c,d...)
+end
 
-          args = a,b,c
-          inds = findall(ai->isa(ai,ParamArray),args)
-          @notimplementedif length(inds) == 0
-          ai = args[first(inds)]
-          d = map(x->_to_param_array(ai,x),args)
-          cx = return_cache(f,d...)
-          cx,d
-        end
+function Arrays.return_cache(f::BroadcastingFieldOpMap,a::ParamArray,b::AbstractArray...)
+  _return_cache(f,a,b...)
+end
 
-        function Arrays.evaluate!(cache,f::BroadcastingFieldOpMap,a::$S,b::$T,c::$U)
-          function _to_param_array!(a::ParamArray,b::AbstractArray)
-            for i = eachindex(a)
-              a[i] = b
-            end
-            a
-          end
-          function _to_param_array!(a::ParamArray,b::ParamArray)
-            b
-          end
+function Arrays.return_cache(f::BroadcastingFieldOpMap,a::AbstractArray,b::ParamArray,c::AbstractArray...)
+  _return_cache(f,a,b,c...)
+end
 
-          args = a,b,c
-          inds = findall(ai->isa(ai,ParamArray),args)
-          @notimplementedif length(inds) == 0
-          cx,array = cache
-          d = map(_to_param_array!,array,args)
-          evaluate!(cx,f,d...)
-        end
-      end
-    end
+function Arrays.return_cache(f::BroadcastingFieldOpMap,a::AbstractArray,b::AbstractArray,c::ParamArray,d::AbstractArray...)
+  _return_cache(f,a,b,c,d...)
+end
+
+function Arrays.evaluate!(cache,f::BroadcastingFieldOpMap,a::ParamArray,b::AbstractArray...)
+  _evaluate!(cache,f,a,b...)
+end
+
+function Arrays.evaluate!(cache,f::BroadcastingFieldOpMap,a::AbstractArray,b::ParamArray,c::AbstractArray...)
+  _evaluate!(cache,f,a,b,c...)
+end
+
+function Arrays.evaluate!(cache,f::BroadcastingFieldOpMap,a::AbstractArray,b::AbstractArray,c::ParamArray,d::AbstractArray...)
+  _evaluate!(cache,f,a,b,c,d...)
+end
+################################################################################
+
+function Arrays.return_value(
+  ::typeof(*),
+  a::ParamMatrix{T,A,L},
+  b::ParamVector{S,B,L}
+  ) where {T,A,S,B,L}
+  array = Vector{eltype(B)}(undef,L)
+  @inbounds for i = 1:L
+    array[i] = return_value(*,a[i],b[i])
   end
+  ParamArray(array)
 end
 
 function Arrays.return_value(f::Broadcasting,a::ParamArray)
@@ -1089,6 +1087,74 @@ function Arrays.evaluate!(cache::ParamArray,f::Fields.ZeroBlockMap,a,b::ParamArr
     evaluate!(cache[i],f,a,b[i])
   end
   ParamArray(map(_get_array,cache))
+end
+
+function Fields.unwrap_cached_array(a::ParamArray)
+  cache = return_cache(unwrap_cached_array,a)
+  evaluate!(cache,unwrap_cached_array,a)
+end
+
+function Arrays.return_cache(::typeof(Fields.unwrap_cached_array),a::ParamArray)
+  ai = testitem(a)
+  ci = return_cache(Fields.unwrap_cached_array,ai)
+  ri = evaluate!(ci,Fields.unwrap_cached_array,ai)
+  cache = Vector{typeof(ci)}(undef,length(a))
+  array = Vector{typeof(ri)}(undef,length(a))
+  for i in eachindex(a)
+    cache[i] = return_cache(Fields.unwrap_cached_array,a[i])
+  end
+  cache,ParamArray(array)
+end
+
+function Arrays.evaluate!(cache,::typeof(Fields.unwrap_cached_array),a::ParamArray)
+  cx,array = cache
+  @inbounds for i = eachindex(array)
+    array[i] = evaluate!(cx[i],Fields.unwrap_cached_array,a[i])
+  end
+  array
+end
+
+function Fields._setsize_as!(d,a::ParamArray)
+  @check size(d) == size(a)
+  for i in eachindex(a)
+    Fields._setsize_as!(d.array[i],a.array[i])
+  end
+  d
+end
+
+function Fields._setsize_mul!(c,a::ParamArray,b::ParamArray)
+  @inbounds for i = eachindex(a)
+    Fields._setsize_mul!(c[i],a[i],b[i])
+  end
+end
+
+function  Fields._setsize_mul!(c,args::Union{ParamArray,AbstractArray}...)
+  inds = findall(ai->isa(ai,ParamArray),args)
+  @notimplementedif length(inds) == 0
+  ai = args[first(inds)]
+  b = map(x->_to_param_array(ai,x),args)
+  Fields._setsize_mul!(c,b...)
+end
+
+function Arrays.return_value(k::MulAddMap,a::ParamArray,b::ParamArray,c::ParamArray)
+  x = return_value(*,a,b)
+  return_value(+,x,c)
+end
+
+function Arrays.return_cache(k::MulAddMap,a::ParamArray,b::ParamArray,c::ParamArray)
+  c1 = CachedArray(a*b+c)
+  c2 = return_cache(Fields.unwrap_cached_array,c1)
+  (c1,c2)
+end
+
+function Arrays.evaluate!(cache,k::MulAddMap,a::ParamArray,b::ParamArray,c::ParamArray)
+  c1,c2 = cache
+  Fields._setsize_as!(c1,c)
+  Fields._setsize_mul!(c1,a,b)
+  d = evaluate!(c2,Fields.unwrap_cached_array,c1)
+  copyto!(d,c)
+  mul!(d,a,b,k.α,k.β)
+  d
 end
 
 # function Utils.recenter(a::ParamArray{T},a0::ParamArray{T};kwargs...) where T

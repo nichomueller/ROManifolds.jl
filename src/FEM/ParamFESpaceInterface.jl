@@ -220,35 +220,14 @@ function FESpaces.scatter_free_and_dirichlet_values(
   scatter_free_and_dirichlet_values(fs.space,ParamArray(_fv),ParamArray(_dv))
 end
 
-function FESpaces.gather_free_and_dirichlet_values(
-  f::FESpaceToParamFESpace{<:FESpaceWithConstantFixed{FESpaces.FixConstant}},
-  cv::LazyArray{<:Any,<:ParamArray})
-
-  fs = f.space
-  _fv,_dv = gather_free_and_dirichlet_values(fs.space,cv)
-  fv,dv = map(_fv,_dv) do _fv,_dv
-    @assert length(_dv) == 0
-    fv = FESpaces.VectorWithEntryRemoved(_fv,fs.dof_to_fix)
-    dv = _fv[fs.dof_to_fix:fs.dof_to_fix]
-    fv,dv
-  end |> tuple_of_arrays
-  ParamArray(fv),ParamArray(dv)
-end
-
-function FESpaces.gather_free_and_dirichlet_values!(
+function FESpaces.scatter_free_and_dirichlet_values(
+  f::FESpaceToParamFESpace{<:FESpaceWithConstantFixed{<:FESpaces.DoNotFixConstant}},
   fv::ParamArray,
-  dv::ParamArray,
-  f::FESpaceWithConstantFixed{FESpaces.FixConstant},
-  cv::LazyArray{<:Any,<:ParamArray})
+  dv::ParamArray)
 
   fs = f.space
-  _fv,_dv = gather_free_and_dirichlet_values(fs.space,cv)
-  fv,dv = map(fv,dv,_fv,_dv) do fv,dv,_fv,_dv
-    @assert length(_dv) == 0
-    fv    .= FESpaces.VectorWithEntryRemoved(_fv,fs.dof_to_fix)
-    dv[1]  = _fv[fs.dof_to_fix]
-  end |> tuple_of_arrays
-  ParamArray(fv),ParamArray(dv)
+  @assert all(length.(dv) .== 0)
+  scatter_free_and_dirichlet_values(fs.space,ParamArray(fv),ParamArray(dv))
 end
 
 # for testing purposes

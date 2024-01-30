@@ -539,112 +539,90 @@ for ((xh,rt),(_xh,_t)) in zip(sol.odesol,_sol.odesol)
   @check xh[1] ≈ _xh "$(xh[1]) != $_xh"
 end
 
-##########################################################################
-# step 1
-odesol = sol.odesol
-wf = copy(odesol.u0)
-w0 = copy(odesol.u0)
-r0 = FEM.get_at_time(odesol.r,:initial)
-cache = nothing
-# wf,rf,cache = solve_step!(wf,odesol.solver,odesol.op,r0,w0,cache)
-# w0 .= wf
-# wf,rf,cache = solve_step!(wf,odesol.solver,odesol.op,r0,w0,cache)
-# w0 .= wf
-θ == 0.0 ? dtθ = dt : dtθ = dt*θ
-if isnothing(cache)
-  rf = r0
-  FEM.shift_time!(rf,dtθ)
-  ode_cache = allocate_cache(odesol.op,rf)
-  vθ = similar(w0)
-  vθ .= 0.0
-  l_cache = nothing
-  A,bb = ODETools._allocate_matrix_and_vector(odesol.op,rf,w0,ode_cache)
-else
-  FEM.shift_time!(rf,dtθ)
-  ode_cache,vθ,A,bb,l_cache = cache
-end
-ode_cache = TransientFETools.update_cache!(ode_cache,odesol.op,rf)
-ODETools._matrix_and_vector!(A,bb,odesol.op,rf,dtθ,w0,ode_cache,vθ)
-afop = Gridap.FESpaces.AffineOperator(A,bb)
-newmatrix = true
-l_cache = ODETools.solve!(wf,odesol.solver.nls,afop,l_cache,newmatrix)
-α = wf + w0
-if 0.0 < θ < 1.0
-  @. wf = wf*(1.0/θ)-w0*((1-θ)/θ)
-end
+############################# NAVIER STOKES ###################################
 
-_odesol = _sol.odesol
-_uf = copy(_odesol.u0)
-_u0 = copy(_odesol.u0)
-t0 = _odesol.t0
-_cache = nothing
-# _uf,tf,_cache = solve_step!(_uf,_odesol.solver,_odesol.op,_u0,t0)
-# _u0 .= _uf
-# _uf,tf,cache = solve_step!(_uf,_odesol.solver,_odesol.op,_u0,t0)
-# _u0 .= _uf
-tθ = t0+dtθ
-if isnothing(_cache)
-  _ode_cache = allocate_cache(_odesol.op)
-  _vθ = similar(_u0)
-  _vθ .= 0.0
-  _l_cache = nothing
-  _A,_bb = ODETools._allocate_matrix_and_vector(_odesol.op,tθ,_u0,_ode_cache)
-else
-  ode_cache,_vθ,_A,_bb,_l_cache = _cache
-end
-_ode_cache = update_cache!(_ode_cache,_odesol.op,tθ)
-ODETools._matrix_and_vector!(_A,_bb,_odesol.op,tθ,dtθ,_u0,_ode_cache,_vθ)
-_afop = Gridap.FESpaces.AffineOperator(_A,_bb)
-newmatrix = true
-_l_cache = ODETools.solve!(_uf,_odesol.solver.nls,_afop,_l_cache,newmatrix)
+a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
+a(μ,t) = x->a(x,μ,t)
+aμt(μ,t) = TransientParamFunction(a,μ,t)
 
-# EvaluationFunction(Xh[1],w0)
-fv = MultiField.restrict_to_field(Xh[1],w0,2)
-# EvaluationFunction(Xh[1].spaces[2],fv)
-fe = Xh[1].spaces[2]
-dv = get_dirichlet_dof_values(fe)
-ffe = FESpaceToParamFESpace(fe.space.space.space,Val(3))
-# cv = scatter_free_and_dirichlet_values(ffe,fv,dv)
-# cf = CellField(ffe,cv)
-cell_dof_ids = get_cell_dof_ids(ffe.space)
-# lazy_map(Broadcasting(PosNegReindex(fv,dv)),cell_dof_ids)
-k = Broadcasting(PosNegReindex(fv,dv))
-x = cell_dof_ids
-c = return_cache(Broadcasting(testitem(k.f)),x[4])
-# a = evaluate!(c,Broadcasting(testitem(k.f)),x[4])
+f(x,μ,t) = VectorValue(0.0,0.0)
+f(μ,t) = x->f(x,μ,t)
+fμt(μ,t) = TransientParamFunction(f,μ,t)
 
-_k = Broadcasting(PosNegReindex(_fv,_dv))
-lazy_map(_k,x)
-_cache = return_cache(_k,x[4])
-evaluate!(_cache,_k,x[1])
+g(x,μ,t) = VectorValue(μ[1]*exp(-x[2]/μ[2])*abs(sin(μ[3]*t)),0.0)
+g(μ,t) = x->g(x,μ,t)
+gμt(μ,t) = TransientParamFunction(g,μ,t)
 
-testitem(k.f).values_neg == _k.f.values_neg
-testitem(k.f).values_pos == _k.f.values_pos
-# CLAIM: return_cache(Broadcasting(testitem(k.f)),x[4]) == return_cache(_k,x[4])
-# CLAIM: evaluate!(cache,Broadcasting(testitem(k.f)),x[4]) == evaluate!(_cache,_k,x[4])
+conv(u,∇u) = (∇u')⋅u
+dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
+c(u,v) = ∫( v⊙(conv∘(u,∇(u))) )dΩ
+dc(u,du,v) = ∫( v⊙(dconv∘(du,∇(du),u,∇(u))) )dΩ
 
-# EvaluationFunction(_Xh[1],_u0)
-_fv = MultiField.restrict_to_field(_Xh[1],_u0,2)
-_fe = _Xh[1].spaces[2]
-_dv = get_dirichlet_dof_values(_fe)
+u0(x,μ) = VectorValue(0.0,0.0)
+u0(μ) = x->u0(x,μ)
+u0μ(μ) = ParamFunction(u0,μ)
+p0(x,μ) = 0.0
+p0(μ) = x->p0(x,μ)
+p0μ(μ) = ParamFunction(p0,μ)
 
+form(μ,t,(u,p),(v,q)) = ∫(aμt(μ,t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ - ∫(q*(∇⋅(u)))dΩ
+res(μ,t,(u,p),(v,q)) = ∫(v⋅∂t(u))dΩ + form(μ,t,(u,p),(v,q)) + c(u,v)
+jac(μ,t,(u,p),(du,dp),(v,q)) = form(μ,t,(du,dp),(v,q)) + dc(u,du,v)
+jac_t(μ,t,(u,p),(dut,dpt),(v,q)) = ∫(v⋅dut)dΩ
 
-# vθ .= pi
-# s = similar(vθ)
-# s .= vθ
-# @. s = s*(1.0/θ)-vθ*((1-θ)/θ)
+order = 2
+degree = 2*order
+Ω = Triangulation(model)
+dΩ = Measure(Ω,degree)
+Γn = BoundaryTriangulation(model,tags=[7,8])
+dΓn = Measure(Γn,degree)
 
-# a1,b1 = s*(1.0/θ),vθ*((1-θ)/θ)
-# @. s = s*(1.0/θ)-vθ*((1-θ)/θ)
+reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
+test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6])
+trial_u = TransientTrialParamFESpace(test_u,gμt)
+reffe_p = ReferenceFE(lagrangian,Float64,order-1)
+test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
+trial_p = TrialFESpace(test_p)
+test = TransientMultiFieldParamFESpace([test_u,test_p])
+trial = TransientMultiFieldParamFESpace([trial_u,trial_p])
+feop = TransientParamFEOperator(res,jac,jac_t,ptspace,trial,test)
 
+xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
+nls = Gridap.Algebra.NewtonRaphsonSolver(LUSolver(),1e-10,20)
+fesolver = ThetaMethod(nls,θ,dt)
 
-# ODETools.solve!(wf,odesol.solver.nls,afop,l_cache,newmatrix)
-ss = Algebra.LUSymbolicSetup()
-ns = numerical_setup(ss,A)
-lua=lu(A)
+sol = solve(fesolver,feop,xh0μ,r)
+iterate(sol)
 
-# ldiv!(x,ns.factors,b)
-map(wf,lua,bb) do x,a,b
-  typeof(a)
-  typeof(b)
+# gridap
+
+_a(x,t) = a(x,μ,t)
+_a(t) = x->_a(x,t)
+
+_g(x,t) = g(x,μ,t)
+_g(t) = x->_g(x,t)
+
+_form(t,(u,p),(v,q)) = ∫(_a(t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ - ∫(q*(∇⋅(u)))dΩ
+_res(t,(u,p),(v,q)) = ∫(v⋅∂t(u))dΩ + _form(t,(u,p),(v,q)) + c(u,v)
+_jac(t,(u,p),(du,dp),(v,q)) = _form(t,(du,dp),(v,q)) + dc(u,du,v)
+_jac_t(t,(u,p),(dut,dpt),(v,q)) = ∫(v⋅dut)dΩ
+
+_trial_u = TransientTrialFESpace(test_u,_g)
+_trial = TransientMultiFieldFESpace([_trial_u,trial_p])
+_feop = TransientFEOperator(_res,_jac,_jac_t,_trial,test)
+_x0 = interpolate_everywhere([u0(μ),p0(μ)],_trial(0.0))
+
+_sol = solve(fesolver,_feop,_x0,t0,tf)
+iterate(_sol)
+
+for ((xh,rt),(_xh,_t)) in zip(sol,_sol)
+  uh,ph = xh
+  uh1 = FEM._getindex(uh,1)
+  ph1 = FEM._getindex(ph,1)
+  _uh,_ph = _xh
+  t = get_times(rt)
+  @check t == _t "$t != $_t"
+  @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "failed at time $t"
+  @check get_free_dof_values(ph1) ≈ get_free_dof_values(_ph) "failed at time $t"
+  @check uh1.dirichlet_values ≈ _uh.dirichlet_values
 end

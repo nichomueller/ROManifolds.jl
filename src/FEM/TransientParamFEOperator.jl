@@ -206,10 +206,7 @@ function TransientFETools.fill_initial_jacobians(
   xh = TransientCellField(uh,dxh)
   _matdata = ()
   for i in 1:get_order(op)+1
-    _data = _matdata_jacobian(op,r,xh,i,0.0)
-    if !isnothing(_data)
-      _matdata = (_matdata...,_data)
-    end
+    _matdata = (_matdata...,_matdata_jacobian(op,r,xh,i,0.0))
   end
   return _matdata
 end
@@ -223,10 +220,7 @@ function TransientFETools.fill_jacobians(
   _matdata = ()
   for i in 1:get_order(op)+1
     if (γ[i] > 0.0)
-      _data = _matdata_jacobian(op,r,xh,i,γ[i])
-      if !isnothing(_data)
-        _matdata = (_matdata...,_data)
-      end
+      _matdata = (_matdata...,_matdata_jacobian(op,r,xh,i,γ[i]))
     end
   end
   return _matdata

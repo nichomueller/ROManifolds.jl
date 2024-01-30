@@ -23,6 +23,10 @@ uμt(μ,t) = 𝑓ₚₜ(u,μ,t)
 f(μ,t) = x -> ∂t(uμt)(x,μ,t)-Δ(uμt(μ,t))(x)
 fμt(μ,t) = 𝑓ₚₜ(f,μ,t)
 
+g(x,μ,t) = sum(μ)
+g(μ,t) = x -> g(x,μ,t)
+gμt(μ,t) = 𝑓ₚₜ(g,μ,t)
+
 domain = (0,1,0,1)
 partition = (2,2)
 model = CartesianDiscreteModel(domain,partition)
@@ -36,9 +40,6 @@ U = TransientTrialParamFESpace(V0,uμt)
 Ω = Triangulation(model)
 degree = 2*order
 dΩ = Measure(Ω,degree)
-
-a(u,v) = ∫(∇(v)⋅∇(u))dΩ
-b(μ,t,v) = ∫(v*fμt(μ,t))dΩ
 
 res(μ,t,u,v) = a(u,v) + ∫(∂t(u)*v)dΩ - b(μ,t,v)
 jac(μ,t,u,du,v) = a(du,v)

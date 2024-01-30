@@ -13,7 +13,7 @@ function PartitionedArrays.allocate_gather_impl(
     ndata = ptrs[end]-1
     data = Vector{elT}(undef,ndata)
     ptdata = allocate_param_array(data,length(snd))
-    PTJaggedArray{Vector{elT},Int32}(ptdata,ptrs)
+    ParamJaggedArray{Vector{elT},Int32}(ptdata,ptrs)
   end
   if isa(destination,Integer)
     function g(l,snd)
@@ -21,7 +21,7 @@ function PartitionedArrays.allocate_gather_impl(
       ptrs = Vector{Int32}(undef,1)
       data = Vector{elT}(undef,0)
       ptdata = allocate_param_array(data,length(snd))
-      PTJaggedArray(ptdata,ptrs)
+      ParamJaggedArray(ptdata,ptrs)
     end
     rcv = map_main(f,l_dest,snd;otherwise=g,main=destination)
   else
@@ -32,7 +32,7 @@ function PartitionedArrays.allocate_gather_impl(
 end
 
 function PartitionedArrays.gather_impl!(
-  rcv::AbstractVector{<:PTJaggedArray},
+  rcv::AbstractVector{<:ParamJaggedArray},
   snd::AbstractVector{<:ParamArray},
   destination,
   ::Type{T}) where T
@@ -117,7 +117,7 @@ function PartitionedArrays.assemble_impl!(
   f,
   vector_partition,
   cache,
-  ::Type{<:PTVectorAssemblyCache})
+  ::Type{<:ParamVectorAssemblyCache})
 
   buffer_snd = map(vector_partition,cache) do values,cache
     local_indices_snd = cache.local_indices_snd
@@ -152,7 +152,7 @@ function PartitionedArrays.assemble_impl!(
   f,
   matrix_partition,
   cache,
-  ::Type{<:PTSparseMatrixAssemblyCache})
+  ::Type{<:ParamSparseMatrixAssemblyCache})
 
   vcache = map(i->i.cache,cache)
   data = map(matrix_partition) do matrix_partition
@@ -162,7 +162,7 @@ function PartitionedArrays.assemble_impl!(
 end
 
 function PartitionedArrays.allocate_exchange_impl(
-  snd::AbstractVector{<:PTJaggedArray},
+  snd::AbstractVector{<:ParamJaggedArray},
   graph,
   ::Type{T}) where T<:AbstractVector
 
@@ -184,8 +184,8 @@ function PartitionedArrays.allocate_exchange_impl(
 end
 
 function PartitionedArrays.exchange_impl!(
-  rcv::AbstractVector{<:PTJaggedArray},
-  snd::AbstractVector{<:PTJaggedArray},
+  rcv::AbstractVector{<:ParamJaggedArray},
+  snd::AbstractVector{<:ParamJaggedArray},
   graph,
   ::Type{T}) where T<:AbstractVector
 

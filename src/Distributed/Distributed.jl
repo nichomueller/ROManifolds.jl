@@ -1,7 +1,7 @@
 module Distributed
 using Mabla.Utils
 using Mabla.FEM
-using Mabla.RB
+# using Mabla.RB
 
 using LinearAlgebra
 using SparseArrays
@@ -84,17 +84,17 @@ const OPTIONS_MUMPS = "-pc_type lu -ksp_type preonly -ksp_converged_reason -pc_f
 const OPTIONS_MINRES = "-ksp_type minres -ksp_converged_reason -ksp_rtol 1.0e-10"
 
 export OPTIONS_CG_JACOBI,OPTIONS_CG_AMG,OPTIONS_MUMPS,OPTIONS_NEUTON_MUMPS,OPTIONS_MINRES
-export PTJaggedArray
-export PTVectorAssemblyCache
+export ParamJaggedArray
+export ParamVectorAssemblyCache
 export DistributedSnapshots
 export DistributedRBSpace
 export project_recast
 
+include("ParamJaggedArray.jl")
+include("ParamSparseUtils.jl")
 include("ParamArray.jl")
 include("Primitives.jl")
-# include("Algebra.jl")
-include("FESpaces.jl")
+include("ParamFESpaces.jl")
 include("MultiField.jl")
-include("PTCellData.jl")
-include("SingleRB.jl")
+# include("SingleRB.jl")
 end

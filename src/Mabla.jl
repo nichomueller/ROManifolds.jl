@@ -143,6 +143,6 @@ export ParamVisualizationData
 # export add_space_supremizers
 # export add_time_supremizers
 
-# include("Distributed/Distributed.jl")
-# using Mabla.Distributed
+include("Distributed/Distributed.jl")
+using Mabla.Distributed
 end # module
