@@ -20,7 +20,7 @@ model = CartesianDiscreteModel(ranks,parts,domain,cells)
 
 pranges = fill([0,1],3)
 pspace = ParamSpace(pranges)
-μ = realization(pspace,nparams=3)
+μ = ParamRealization([[1.0],[1.0],[1.0]])
 
 f(x,μ) = sum(μ)
 f(μ) = x->f(x,μ)
@@ -137,14 +137,28 @@ assemble_tests(das,dΓ,dΓass,U,V0)
   # Assembly
   dv = get_fe_basis(V0)
   du = get_trial_fe_basis(U)
-  _a(μ,u,v) = ∫( f(μ)*∇(v)⋅∇(u) )dΩa
   a(u,v) = ∫( fμ*∇(v)⋅∇(u) )dΩa
-  l(v) = ∫( fμ*dv )dΩa
+  l(v) = ∫( fμ*v )dΩa
   assem = SparseMatrixAssembler(U,V0,das)
   zh = zero(U)
-
   data = collect_cell_matrix_and_vector(U,V0,a(du,dv),l(dv),zh)
   A1,b1 = assemble_matrix_and_vector(assem,data)
+
+  _a(u,v) = ∫( ∇(v)⋅∇(u) )dΩa
+  _l(v) = ∫( v )dΩa
+  _U = TrialFESpace(u([1.0]),V0)
+  _assem = SparseMatrixAssembler(_U,V0,das)
+  _zh = zero(_U)
+  _data = collect_cell_matrix_and_vector(_U,V0,_a(du,dv),_l(dv),_zh)
+  _A1,_b1 = assemble_matrix_and_vector(_assem,_data)
+
+  map(local_views(A),local_views(_A),local_views(b),local_views(_b)) do A,_A,b,_b
+    for i = eachindex(A)
+      @assert A[i] ≈ _A
+      @assert b[i] ≈ _b
+    end
+  end
+
   x1 = A1\b1
   r1 = A1*x1 -b1
   uh1 = FEFunction(U,x1)

@@ -76,7 +76,6 @@ import GridapDistributed: DistributedMultiFieldFEFunction
 import GridapDistributed: TransientDistributedCellField
 import GridapDistributed: change_axes
 import GridapDistributed: local_views
-import GridapDistributed: _rhs_callback
 
 const OPTIONS_CG_JACOBI = "-pc_type jacobi -ksp_type cg -ksp_converged_reason -ksp_rtol 1.0e-10"
 const OPTIONS_CG_AMG = "-pc_type gamg -ksp_type cg -ksp_converged_reason -ksp_rtol 1.0e-10"

@@ -240,6 +240,67 @@ function Algebra.create_from_nz(
   return A,b
 end
 
+const DistributedParamAllocationVector = Union{
+  PVectorAllocationTrackOnlyValues{A,B,C},
+  PVectorAllocationTrackTouchedAndValues{A,B,C}
+} where {A,B<:AbstractVector{<:AbstractParamContainer},C}
+
+function GridapDistributed._rhs_callback(
+  row_partitioned_vector_partition::DistributedParamAllocationVector,
+  rows)
+  # The ghost values in row_partitioned_vector_partition are
+  # aligned with the FESpace but not with the ghost values in the rows of A
+  b_fespace = PVector(row_partitioned_vector_partition.values,
+                      partition(row_partitioned_vector_partition.test_dofs_gids_prange))
+
+  # This one is aligned with the rows of A
+  b = similar(b_fespace,eltype(b_fespace),(rows,))
+
+  # First transfer owned values
+  b .= b_fespace
+
+  # Now transfer ghost
+  function transfer_ghost(b,b_fespace,ids,ids_fespace)
+    num_ghosts_vec = ghost_length(ids)
+    gho_to_loc_vec = ghost_to_local(ids)
+    loc_to_glo_vec = local_to_global(ids)
+    gid_to_lid_fe  = global_to_local(ids_fespace)
+    for ghost_lid_vec in 1:num_ghosts_vec
+      lid_vec     = gho_to_loc_vec[ghost_lid_vec]
+      gid         = loc_to_glo_vec[lid_vec]
+      lid_fespace = gid_to_lid_fe[gid]
+      for i = eachindex(b)
+        b[i][lid_vec] = b_fespace[i][lid_fespace]
+      end
+    end
+  end
+  map(
+    transfer_ghost,
+    partition(b),
+    partition(b_fespace),
+    b.index_partition,
+    b_fespace.index_partition)
+
+  return b
+end
+
+function Algebra.create_from_nz(
+  a::DistributedParamAllocationCOO{<:SubAssembledRows},
+  c_fespace::PVectorAllocationTrackOnlyValues{<:SubAssembledRows})
+
+  function callback(rows)
+    GridapDistributed._rhs_callback(c_fespace,rows)
+  end
+
+  function async_callback(b)
+    # now we can assemble contributions
+    assemble!(b)
+  end
+
+  A,b = GridapDistributed._sa_create_from_nz_with_callback(callback,async_callback,a)
+  return A,b
+end
+
 function PartitionedArrays.assemble_coo!(
   I::AbstractArray{<:AbstractParamContainer},
   J::AbstractArray{<:AbstractParamContainer},
