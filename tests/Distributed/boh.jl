@@ -1,59 +1,20 @@
-matdata = collect_cell_matrix(U,V0,a(du,dv))
 m1 = nz_counter(get_matrix_builder(assem),(get_rows(assem),get_cols(assem)))
-symbolic_loop_matrix!(m1,assem,matdata)
-m2 = nz_allocation(m1)
-numeric_loop_matrix!(m2,assem,matdata)
+v1 = nz_counter(get_vector_builder(assem),(get_rows(assem),))
+symbolic_loop_matrix_and_vector!(m1,v1,assem,data)
+m2,v2 = nz_allocation(m1,v1)
+numeric_loop_matrix_and_vector!(m2,v2,assem,data)
+create_from_nz(m2,v2)
 
-I,J,V = GridapDistributed.get_allocations(m2)
-test_dofs_gids_prange = GridapDistributed.get_test_gids(m2)
-trial_dofs_gids_prange = GridapDistributed.get_trial_gids(m2)
-GridapDistributed.to_global_indices!(I,test_dofs_gids_prange;ax=:rows)
-GridapDistributed.to_global_indices!(J,trial_dofs_gids_prange;ax=:cols)
-rows = GridapDistributed._setup_prange(test_dofs_gids_prange,I;ax=:rows)
-Jo = GridapDistributed.get_gid_owners(J,trial_dofs_gids_prange;ax=:cols)
-t  = GridapDistributed._assemble_coo!(I,J,V,rows;owners=Jo)
-wait(t)
-cols = GridapDistributed._setup_prange(trial_dofs_gids_prange,J;ax=:cols,owners=Jo)
-#################################
-
-ω((x,y)) = x+y
-U1 = TrialFESpace(ω,V)
-a1 = SparseMatrixAssembler(U1,V,das)
-a11(u,v) = ∫( ∇(v)⋅∇(u) )dΩa
-l1(v) = ∫( dv )dΩa
-zh1 = zero(U1)
-data1 = collect_cell_matrix_and_vector(U1,V,a11(du,dv),l1(dv),zh1)
-# A11,b11 = assemble_matrix_and_vector(a1,data1)
-
-m11 = nz_counter(get_matrix_builder(a1),(get_rows(a1),get_cols(a1)))
-v11 = nz_counter(get_vector_builder(assem),(get_rows(a1),))
-symbolic_loop_matrix_and_vector!(m11,v11,a1,data1)
-m12,v12 = nz_allocation(m11,v11)
-numeric_loop_matrix_and_vector!(m12,v12,a1,data1)
-I,J,V1 = GridapDistributed.get_allocations(m12)
-test_dofs_gids_prange = GridapDistributed.get_test_gids(m12)
-trial_dofs_gids_prange = GridapDistributed.get_trial_gids(m12)
-GridapDistributed.to_global_indices!(I,test_dofs_gids_prange;ax=:rows)
-GridapDistributed.to_global_indices!(J,trial_dofs_gids_prange;ax=:cols)
-rows = GridapDistributed._setup_prange(test_dofs_gids_prange,I;ax=:rows)
-Jo = GridapDistributed.get_gid_owners(J,trial_dofs_gids_prange;ax=:cols)
-t  = GridapDistributed._assemble_coo!(I,J,V1,rows;owners=Jo)
-wait(t)
-cols = GridapDistributed._setup_prange(trial_dofs_gids_prange,J;ax=:cols,owners=Jo)
-GridapDistributed.to_local_indices!(I,rows;ax=:rows)
-GridapDistributed.to_local_indices!(J,cols;ax=:cols)
-asys = GridapDistributed.change_axes(m12,(rows,cols))
-values = map(create_from_nz,local_views(asys))
-ASYS=asys
-
-map(local_views(asys),local_views(ASYS)) do a,A
-  a1 = a[1]
-  @assert a1.I == A.I
-  @assert a1.J == A.J
-  # @assert a1.V == A.V
-  @assert a1.counter.nnz == A.counter.nnz
-  @assert a1.counter.axes == A.counter.axes
-  end
+_U = TrialFESpace(u(rand(3)),V0)
+_assem = SparseMatrixAssembler(_U,V0,das)
+_data = collect_cell_matrix_and_vector(_U,V0,_a(du,dv),_l(dv),zero(_U))
+# A1,b1 = assemble_matrix_and_vector(_assem,_data)
+  _m1 = nz_counter(get_matrix_builder(_assem),(get_rows(_assem),get_cols(_assem)))
+  _v1 = nz_counter(get_vector_builder(_assem),(get_rows(_assem),))
+  symbolic_loop_matrix_and_vector!(_m1,_v1,_assem,_data)
+  _m2,_v2 = nz_allocation(_m1,_v1)
+  numeric_loop_matrix_and_vector!(_m2,_v2,_assem,_data)
+  create_from_nz(_m2,_v2)
 #############################################################
 
 function my_check(a,b;i=1)
@@ -367,3 +328,62 @@ function GridapDistributed.assemble_coo_with_column_owner!(I,J,V,row_partition,J
       I,J,Jown,V
   end
 end
+
+######################
+@inline function Algebra._add_entries!(combine::Function,A,vs,is,js)
+  println(typeof(A))
+  println(typeof(vs))
+  for (lj,j) in enumerate(js)
+    if j>0
+      for (li,i) in enumerate(is)
+        if i>0
+          vij = vs[li,lj]
+          Algebra.add_entry!(combine,A,vij,i,j)
+        end
+      end
+    end
+  end
+  A
+end
+
+# test_sparse_matrix_assembler(assem,matdata,vecdata,data)
+# A = allocate_matrix(assem,matdata)
+A = nz_counter(get_matrix_builder(assem),(get_rows(assem),get_cols(assem)))
+symbolic_loop_matrix!(A,assem,matdata)
+strategy = FESpaces.get_assembly_strategy(assem)
+cellmat,_cellidsrows,_cellidscols = matdata[1][1],matdata[2][1],matdata[3][1]
+cellidsrows = FESpaces.map_cell_rows(strategy,_cellidsrows)
+cellidscols = FESpaces.map_cell_cols(strategy,_cellidscols)
+@assert length(cellidscols) == length(cellidsrows)
+rows_cache = array_cache(cellidsrows)
+cols_cache = array_cache(cellidscols)
+get_mat(a::Tuple) = a[1]
+get_mat(a) = a
+mat1 = get_mat(first(cellmat))
+rows1 = getindex!(rows_cache,cellidsrows,1)
+cols1 = getindex!(cols_cache,cellidscols,1)
+touch! = TouchEntriesMap()
+touch_cache = return_cache(touch!,A,mat1,rows1,cols1)
+# FESpaces._symbolic_loop_matrix!(A,caches,cellidsrows,cellidscols,mat1)
+rows = getindex!(rows_cache,cellidsrows,1)
+cols = getindex!(cols_cache,cellidscols,1)
+# evaluate!(touch_cache,touch!,A,mat1,rows,cols)
+# add_entries!(+,A,nothing,rows,cols)
+# Algebra._add_entries!(+,A,nothing,rows,cols)
+for (lj,j) in enumerate(js)
+  if j>0
+    for (li,i) in enumerate(is)
+      if i>0
+        add_entry!(combine,A,nothing,i,j)
+      end
+    end
+  end
+end
+
+dΩ = Measure(trian,degree)
+form(u,v) = ∫(u*v)dΩ
+matdata1 = collect_cell_matrix(V,V,form(u,v))
+assem1 = SparseMatrixAssembler(T,Vector{Float64},V,V)
+m11 = nz_counter(get_matrix_builder(assem1),(get_rows(assem1),get_cols(assem1)))
+symbolic_loop_matrix!(m11,assem1,matdata1)
+A1 = nz_allocation(m11)

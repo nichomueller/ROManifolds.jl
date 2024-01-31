@@ -152,7 +152,7 @@ assemble_tests(das,dΓ,dΓass,U,V0)
   _data = collect_cell_matrix_and_vector(_U,V0,_a(du,dv),_l(dv),_zh)
   _A1,_b1 = assemble_matrix_and_vector(_assem,_data)
 
-  map(local_views(A),local_views(_A),local_views(b),local_views(_b)) do A,_A,b,_b
+  map(local_views(A1),local_views(_A1),local_views(b1),local_views(_b1)) do A,_A,b,_b
     for i = eachindex(A)
       @assert A[i] ≈ _A
       @assert b[i] ≈ _b

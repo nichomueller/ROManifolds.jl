@@ -1,33 +1,3 @@
-function Base.collect(v::PVector{ParamArray{T,N,A,L}}) where {T,N,A,L}
-  own_values_v = own_values(v)
-  own_to_global_v = map(own_to_global,partition(axes(v,1)))
-  vals = gather(own_values_v,destination=:all)
-  ids = gather(own_to_global_v,destination=:all)
-  n = length(v)
-  map(vals,ids) do myvals,myids
-    u = Vector{T}(undef,n)
-    ptu = allocate_param_array(u,L)
-    for (a,b) in zip(myvals,myids)
-      ptu[:][b] .= a
-    end
-    ptu
-  end |> getany
-end
-
-# function PartitionedArrays.allocate_local_values(
-#   a::ParamArray,
-#   ::Type{T},
-#   indices) where T
-
-#   map(a) do ai
-#     similar(ai,T,local_length(indices))
-#   end
-# end
-
-# function PartitionedArrays.allocate_local_values(::Type{<:ParamArray},indices)
-#   @notimplemented "The length of the ParamArray is needed"
-# end
-
 function PartitionedArrays.own_values(values::ParamArray,indices)
   o = map(a->own_values(a,indices),values)
   ParamArray(o)

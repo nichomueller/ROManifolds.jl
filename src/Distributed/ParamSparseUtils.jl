@@ -221,3 +221,98 @@ function LinearAlgebra.fillstored!(a::ParamSubSparseMatrix,v)
   end
   ParamSubSparseMatrix(av)
 end
+
+function PartitionedArrays.from_trivial_partition!(
+  c::PVector{<:ParamArray},
+  c_in_main::PVector{<:ParamArray})
+
+  destination = 1
+  consistent!(c_in_main) |> wait
+  map(own_values(c),partition(c_in_main),partition(axes(c,1))) do cown,my_c_in_main,indices
+    part = part_id(indices)
+    map(cown,my_c_in_main) do cown,my_c_in_main
+      if part == destination
+        cown .= view(my_c_in_main,own_to_global(indices))
+      else
+        cown .= my_c_in_main
+      end
+    end
+  end
+  c
+end
+
+function PartitionedArrays.to_trivial_partition(
+  b::PVector{<:ParamArray},
+  row_partition_in_main)
+
+  destination = 1
+  T = eltype(b)
+  b_in_main = similar(b,T,PRange(row_partition_in_main))
+  fill!(b_in_main,zero(T))
+  map(own_values(b),partition(b_in_main),partition(axes(b,1))) do bown,my_b_in_main,indices
+    part = part_id(indices)
+    map(my_b_in_main,bown) do my_b_in_main,bown
+      if part == destination
+        my_b_in_main[own_to_global(indices)] .= bown
+      else
+        my_b_in_main .= bown
+      end
+    end
+  end
+  assemble!(b_in_main) |> wait
+  b_in_main
+end
+
+function PartitionedArrays.to_trivial_partition(
+  a::PSparseMatrix{<:ParamArray{M}},
+  row_partition_in_main=trivial_partition(partition(axes(a,1))),
+  col_partition_in_main=trivial_partition(partition(axes(a,2)))) where M
+
+  destination = 1
+  Ta = eltype(a)
+  I,J,V = map(partition(a),partition(axes(a,1)),partition(axes(a,2))) do a,row_indices,col_indices
+    n = 0
+    local_row_to_owner = local_to_owner(row_indices)
+    owner = part_id(row_indices)
+    local_to_global_row = local_to_global(row_indices)
+    local_to_global_col = local_to_global(col_indices)
+    for (i,j,v) in nziterator(a)
+      if local_row_to_owner[i] == owner
+        n += 1
+      end
+    end
+    myI = zeros(Int,n)
+    myJ = zeros(Int,n)
+    myV = zero_param_array(zeros(Ta,n),length(a))
+    n = 0
+    for (i,j,v) in nziterator(a)
+      if local_row_to_owner[i] == owner
+        n += 1
+        myI[n] = local_to_global_row[i]
+        myJ[n] = local_to_global_col[j]
+        for k in eachindex(a)
+          myV[k][n] = v[k]
+        end
+      end
+    end
+    myI,myJ,myV
+  end |> tuple_of_arrays
+  assemble_coo!(I,J,V,row_partition_in_main) |> wait
+  I,J,V = map(partition(axes(a,1)),I,J,V) do row_indices,myI,myJ,myV
+    owner = part_id(row_indices)
+    if owner == destination
+      myI,myJ,myV
+    else
+      similar(myI,eltype(myI),0),similar(myJ,eltype(myJ),0),similar(myV,eltype(myV),0)
+    end
+  end |> tuple_of_arrays
+  values = map(I,J,V,row_partition_in_main,col_partition_in_main) do myI,myJ,myV,row_indices,col_indices
+    m = local_length(row_indices)
+    n = local_length(col_indices)
+    v = map(myV) do myV
+      compresscoo(M,myI,myJ,myV,m,n)
+    end
+    ParamArray(v)
+  end
+  PSparseMatrix(values,row_partition_in_main,col_partition_in_main)
+end

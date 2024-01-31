@@ -107,6 +107,11 @@ export TransientMultiFieldParamFESpace
 export TransientMultiFieldTrialParamFESpace
 include("TransientTrialParamFESpace.jl")
 
+export ParamCounter
+export ParamInserterCSC
+export ParamCSSR
+include("ParamAlgebra.jl")
+
 include("ParamAssemblers.jl")
 
 include("ParamBlockAssemblers.jl")

@@ -69,42 +69,42 @@ function FESpaces.SparseMatrixAssembler(
     strategy)
 end
 
-function FESpaces.SparseMatrixBuilder(::Type{ParamArray{T,2,A,L}} where T,args...) where {A,L}
-  builder = map(1:L) do i
-    SparseMatrixBuilder(eltype(A),args...)
-  end
-  ParamContainer(builder)
-end
+# function FESpaces.SparseMatrixBuilder(::Type{ParamArray{T,2,A,L}} where T,args...) where {A,L}
+#   builder = map(1:L) do i
+#     SparseMatrixBuilder(eltype(A),args...)
+#   end
+#   ParamContainer(builder)
+# end
 
-function FESpaces.ArrayBuilder(::Type{ParamArray{T,1,A,L}} where T,args...) where {A,L}
-  builder = map(1:L) do i
-    ArrayBuilder(eltype(A),args...)
-  end
-  ParamContainer(builder)
-end
+# function FESpaces.ArrayBuilder(::Type{ParamArray{T,1,A,L}} where T,args...) where {A,L}
+#   builder = map(1:L) do i
+#     ArrayBuilder(eltype(A),args...)
+#   end
+#   ParamContainer(builder)
+# end
 
-Algebra.LoopStyle(a::Type{<:ParamContainer{T,L}}) where {T,L} = LoopStyle(T)
+# Algebra.LoopStyle(a::Type{<:ParamContainer{T,L}}) where {T,L} = LoopStyle(T)
 
-function Algebra.nz_counter(builder::ParamContainer,axes)
-  counter = map(builder) do builder
-    Algebra.nz_counter(builder,axes)
-  end
-  ParamContainer(counter)
-end
+# function Algebra.nz_counter(builder::ParamContainer,axes)
+#   counter = map(builder) do builder
+#     Algebra.nz_counter(builder,axes)
+#   end
+#   ParamContainer(counter)
+# end
 
-function Algebra.nz_allocation(a::ParamContainer)
-  inserter = map(a) do a
-    Algebra.nz_allocation(a)
-  end
-  ParamContainer(inserter)
-end
+# function Algebra.nz_allocation(a::ParamContainer)
+#   inserter = map(a) do a
+#     Algebra.nz_allocation(a)
+#   end
+#   ParamContainer(inserter)
+# end
 
-function Algebra.create_from_nz(a::ParamContainer)
-  array = map(a) do a
-    Algebra.create_from_nz(a)
-  end
-  ParamArray(array)
-end
+# function Algebra.create_from_nz(a::ParamContainer)
+#   array = map(a) do a
+#     Algebra.create_from_nz(a)
+#   end
+#   ParamArray(array)
+# end
 
 function collect_cell_matrix_for_trian(
   trial::FESpace,
@@ -135,32 +135,46 @@ function collect_cell_vector_for_trian(
   [cell_vec_r],[rows]
 end
 
-@inline function Algebra._add_entries!(
-  combine::Function,A::AbstractParamContainer,vs::Nothing,is,js)
-  for (lj,j) in enumerate(js)
-    if j>0
-      for (li,i) in enumerate(is)
-        if i>0
-          map(A) do A
-            add_entry!(combine,A,nothing,i,j)
-          end
-        end
-      end
-    end
-  end
-  A
-end
+# @inline function Algebra._add_entries!(
+#   combine::Function,A::AbstractParamContainer,vs::Nothing,is,js)
+#   for (lj,j) in enumerate(js)
+#     if j>0
+#       for (li,i) in enumerate(is)
+#         if i>0
+#           map(A) do A
+#             add_entry!(combine,A,nothing,i,j)
+#           end
+#         end
+#       end
+#     end
+#   end
+#   A
+# end
 
+# @inline function Algebra._add_entries!(
+#   combine::Function,A::AbstractParamContainer,vs,is,js)
+#   for (lj,j) in enumerate(js)
+#     if j>0
+#       for (li,i) in enumerate(is)
+#         if i>0
+#           map(A) do A
+#             vij = vs[li,lj]
+#             add_entry!(combine,A,vij,i,j)
+#           end
+#         end
+#       end
+#     end
+#   end
+#   A
+# end
 @inline function Algebra._add_entries!(
-  combine::Function,A::AbstractParamContainer,vs,is,js)
+  combine::Function,A,vs::AbstractParamContainer,is,js)
   for (lj,j) in enumerate(js)
     if j>0
       for (li,i) in enumerate(is)
         if i>0
-          map(A) do A
-            vij = vs[li,lj]
-            add_entry!(combine,A,vij,i,j)
-          end
+          vij = ParamContainer(map(x->x[li,lj],vs))
+          add_entry!(combine,A,vij,i,j)
         end
       end
     end
@@ -174,9 +188,9 @@ end
     if j>0
       for (li,i) in enumerate(is)
         if i>0
-          map(A,vs) do A,vs
-            vij = vs[li,lj]
-            add_entry!(combine,A,vij,i,j)
+          for k = eachindex(vs)
+            vij = vs[k][li,lj]
+            add_entry!(combine,A[k],vij,i,j)
           end
         end
       end
@@ -185,26 +199,36 @@ end
   A
 end
 
-@inline function Algebra._add_entries!(
-  combine::Function,A::AbstractParamContainer,vs::Nothing,is)
-  for (li,i) in enumerate(is)
-    if i>0
-      map(A) do A
-        add_entry!(A,nothing,i)
-      end
-    end
-  end
-  A
-end
+# @inline function Algebra._add_entries!(
+#   combine::Function,A::AbstractParamContainer,vs::Nothing,is)
+#   for (li,i) in enumerate(is)
+#     if i>0
+#       map(A) do A
+#         add_entry!(A,nothing,i)
+#       end
+#     end
+#   end
+#   A
+# end
 
+# @inline function Algebra._add_entries!(
+#   combine::Function,A::AbstractParamContainer,vs,is)
+#   for (li,i) in enumerate(is)
+#     if i>0
+#       map(A) do A
+#         vi = vs[li]
+#         add_entry!(A,vi,i)
+#       end
+#     end
+#   end
+#   A
+# end
 @inline function Algebra._add_entries!(
-  combine::Function,A::AbstractParamContainer,vs,is)
+  combine::Function,A,vs::AbstractParamContainer,is)
   for (li,i) in enumerate(is)
     if i>0
-      map(A) do A
-        vi = vs[li]
-        add_entry!(A,vi,i)
-      end
+      vi = ParamContainer(map(x->x[li],vs))
+      add_entry!(combine,A,vi,i)
     end
   end
   A
@@ -214,9 +238,9 @@ end
   combine::Function,A::AbstractParamContainer,vs::AbstractParamContainer,is)
   for (li,i) in enumerate(is)
     if i>0
-      map(A,vs) do A,vs
-        vi = vs[li]
-        add_entry!(A,vi,i)
+      for k = eachindex(vs)
+        vi = vs[k][li]
+        add_entry!(combine,A[k],vi,i)
       end
     end
   end
