@@ -8,18 +8,16 @@ function PartitionedArrays.allocate_gather_impl(
   end
   l_dest = gather(l;destination)
   function f(l,snd)
-    elT = eltype(snd)
     ptrs = length_to_ptrs!(pushfirst!(l,one(eltype(l))))
     ndata = ptrs[end]-1
-    data = Vector{elT}(undef,ndata)
+    data = Vector{eltype(snd)}(undef,ndata)
     ptdata = allocate_param_array(data,length(snd))
-    ParamJaggedArray{Vector{elT},Int32}(ptdata,ptrs)
+    ParamJaggedArray{eltype(snd),Int32}(ptdata,ptrs)
   end
   if isa(destination,Integer)
     function g(l,snd)
-      elT = eltype(snd)
       ptrs = Vector{Int32}(undef,1)
-      data = Vector{elT}(undef,0)
+      data = Vector{eltype(snd)}(undef,0)
       ptdata = allocate_param_array(data,length(snd))
       ParamJaggedArray(ptdata,ptrs)
     end
@@ -155,29 +153,29 @@ function PartitionedArrays.assemble_impl!(
   ::Type{<:ParamSparseMatrixAssemblyCache})
 
   vcache = map(i->i.cache,cache)
-  data = map(matrix_partition) do matrix_partition
-    map(nonzeros,matrix_partition)
-  end
+  println(typeof(matrix_partition))
+  error("stop here")
+  data = map(nonzeros,matrix_partition)
   assemble!(f,data,vcache)
 end
 
 function PartitionedArrays.allocate_exchange_impl(
-  snd::AbstractVector{<:ParamJaggedArray},
+  snd::AbstractVector{ParamJaggedArray{T,Ti,A,L}},
   graph,
-  ::Type{T}) where T<:AbstractVector
+  ::Type{<:AbstractVector}) where {T,Ti,A,L}
 
-  N,n_snd = map(snd) do snd
-    length(snd.data),map(length,snd.data.array)
-  end |> tuple_of_arrays
+  n_snd = map(snd) do snd
+    map(length,first(snd))
+  end
   n_rcv = exchange_fetch(n_snd,graph)
   S = eltype(eltype(eltype(eltype(snd))))
-  rcv = map(N,n_rcv) do N,n_rcv
+  rcv = map(n_rcv) do n_rcv
     ptrs = zeros(Int32,length(n_rcv)+1)
     ptrs[2:end] = n_rcv
     length_to_ptrs!(ptrs)
     n_data = ptrs[end]-1
     data = Vector{S}(undef,n_data)
-    ptdata = allocate_param_array(data,N)
+    ptdata = allocate_param_array(data,L)
     JaggedArray(ptdata,ptrs)
   end
   rcv
@@ -192,11 +190,10 @@ function PartitionedArrays.exchange_impl!(
   @assert is_consistent(graph)
   snd_ids = graph.snd
   rcv_ids = graph.rcv
-  @assert typeof(rcv) == typeof(snd)
   @assert length(rcv_ids) == length(rcv)
   @assert length(rcv_ids) == length(snd)
   for rcv_id in 1:length(rcv_ids)
-    for (i, snd_id) in enumerate(rcv_ids[rcv_id])
+    for (i,snd_id) in enumerate(rcv_ids[rcv_id])
       snd_snd_id = JaggedArray(snd[snd_id])
       j = first(findall(k->k==rcv_id,snd_ids[snd_id]))
       ptrs_rcv = rcv[rcv_id].ptrs

@@ -334,6 +334,13 @@ function SparseArrays.resize!(a::ParamArray,args...)
   return a
 end
 
+SparseArrays.nnz(a::ParamMatrix) = nnz(first(a))
+SparseArrays.nzrange(a::ParamMatrix,col::Int) = nzrange(first(a),col)
+SparseArrays.rowvals(a::ParamMatrix) = rowvals(first(a))
+SparseArrays.nonzeros(a::ParamMatrix) = ParamArray(map(nonzeros,a))
+SparseMatricesCSR.colvals(a::ParamMatrix) = colvals(first(a))
+SparseMatricesCSR.getoffset(a::ParamMatrix) = getoffset(first(a))
+
 function Arrays.CachedArray(a::ParamArray)
   cache = map(a) do a
     CachedArray(a)

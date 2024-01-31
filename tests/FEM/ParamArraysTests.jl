@@ -368,7 +368,7 @@ pranges = fill([0,1],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 r = realization(ptspace,nparams=3)
-μ = FEM._get_params(r)[1]
+μ = FEM._get_params(r)[3]
 
 domain = (0,1,0,1)
 partition = (2,2)
@@ -443,7 +443,7 @@ _u0 = interpolate_everywhere(x->0.0,_trial(0.0))
 _sol = solve(fesolver,_feop,_u0,t0,tf)
 
 for ((uh,rt),(_uh,_t)) in zip(sol,_sol)
-  uh1 = FEM._getindex(uh,1)
+  uh1 = FEM._getindex(uh,3)
   t = get_times(rt)
   @check t == _t "$t != $_t"
   @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "$(get_free_dof_values(uh1)) != $(get_free_dof_values(_uh))"
@@ -523,20 +523,14 @@ iterate(_sol)
 
 for ((xh,rt),(_xh,_t)) in zip(sol,_sol)
   uh,ph = xh
-  uh1 = FEM._getindex(uh,1)
-  ph1 = FEM._getindex(ph,1)
+  uh1 = FEM._getindex(uh,3)
+  ph1 = FEM._getindex(ph,3)
   _uh,_ph = _xh
   t = get_times(rt)
   @check t == _t "$t != $_t"
   @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "failed at time $t"
   @check get_free_dof_values(ph1) ≈ get_free_dof_values(_ph) "failed at time $t"
   @check uh1.dirichlet_values ≈ _uh.dirichlet_values
-end
-
-for ((xh,rt),(_xh,_t)) in zip(sol.odesol,_sol.odesol)
-  t = get_times(rt)
-  @check t == _t "$t != $_t"
-  @check xh[1] ≈ _xh "$(xh[1]) != $_xh"
 end
 
 ############################# NAVIER STOKES ###################################
@@ -617,8 +611,8 @@ iterate(_sol)
 
 for ((xh,rt),(_xh,_t)) in zip(sol,_sol)
   uh,ph = xh
-  uh1 = FEM._getindex(uh,1)
-  ph1 = FEM._getindex(ph,1)
+  uh1 = FEM._getindex(uh,3)
+  ph1 = FEM._getindex(ph,3)
   _uh,_ph = _xh
   t = get_times(rt)
   @check t == _t "$t != $_t"

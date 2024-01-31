@@ -90,6 +90,7 @@ export DistributedSnapshots
 export DistributedRBSpace
 export project_recast
 
+include("Algebra.jl")
 include("ParamJaggedArray.jl")
 include("ParamSparseUtils.jl")
 include("ParamArray.jl")

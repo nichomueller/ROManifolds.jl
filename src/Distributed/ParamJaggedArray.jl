@@ -1,5 +1,4 @@
-
-struct ParamJaggedArray{T,Ti,A,L} <: AbstractVector{SubArray{T,1,ParamVector{T,A,L},Tuple{UnitRange{Ti}},true}}
+struct ParamJaggedArray{T,Ti,A,L} <: AbstractParamContainer{JaggedArray{T,Ti},1}
   data::ParamVector{T,A,L}
   ptrs::Vector{Ti}
 
@@ -19,41 +18,39 @@ PartitionedArrays.JaggedArray(a::AbstractArray{<:ParamArray{T}}) where T = Jagge
 PartitionedArrays.JaggedArray(a::ParamJaggedArray) = a
 PartitionedArrays.JaggedArray{T,Ti}(a::ParamJaggedArray{T,Ti}) where {T,Ti} = a
 
-function PartitionedArrays.JaggedArray{T,Ti}(a::AbstractArray{<:ParamArray{T}}) where {T,Ti}
-  n = length(a)
-  ptrs = Vector{Ti}(undef,n+1)
-  u = one(eltype(ptrs))
-  @inbounds for i in 1:n
-    ai = a[i]
-    ptrs[i+1] = length(ai)
-  end
-  length_to_ptrs!(ptrs)
-  ndata = ptrs[end]-u
-  data = Vector{T}(undef,ndata)
-  p = 1
-  @inbounds for i in 1:n
-    ai = a[i]
-    for j in eachindex(ai)
-      aij = ai[j]
-      data[p] = aij
-      p += 1
-    end
-  end
-  ParamJaggedArray(data,ptrs)
-end
-
-
+Base.length(a::ParamJaggedArray) = length(a.data)
 Base.size(a::ParamJaggedArray) = (length(a.ptrs)-1,)
 
-function Base.getindex(a::ParamJaggedArray,i::Int)
-  map(a.data) do data
-    getindex(JaggedArray(data,a.ptrs),i)
-  end
+function Base.getindex(a::ParamJaggedArray,index::Int)
+  JaggedArray(a.data[index],a.ptrs)
 end
 
-function Base.setindex!(a::ParamJaggedArray,v,i::Int)
-  @notimplemented "Iterate over the inner jagged arrays instead"
+function Base.setindex!(a::ParamJaggedArray,v,index::Int)
+  @assert size(a) == size(v)
+  setindex!(a.data,v,index)
 end
+
+# function Base.getindex(a::ParamJaggedArray{T,Ti,A,L},index::Int) where {T,Ti,A,L}
+#   u = one(Ti)
+#   pini = a.ptrs[index]
+#   pend = a.ptrs[index+1]-u
+#   ai = view(a.data[1],pini:pini)
+#   b = Vector{typeof(ai)}(undef,L)
+#   @inbounds for i = 1:L
+#     b[i] = view(a.data[i],pini:pend)
+#   end
+#   ParamContainer(b)
+# end
+
+# function Base.setindex!(a::ParamJaggedArray{T,Ti,A,L},v,index::Int) where {T,Ti,A,L}
+#   @assert length(a.data) == length(v)
+#   u = one(Ti)
+#   pini = a.ptrs[index]
+#   pend = a.ptrs[index+1]-u
+#   @inbounds for i = 1:L
+#     a.data[i][pini:pend] = v[i]
+#   end
+# end
 
 PartitionedArrays.jagged_array(data::ParamArray,ptrs::Vector) = ParamJaggedArray(data,ptrs)
 

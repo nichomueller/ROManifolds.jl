@@ -4,6 +4,7 @@ using Mabla.Utils
 using LinearAlgebra
 using BlockArrays
 using SparseArrays
+using SparseMatricesCSR
 using Gridap
 using Gridap.Algebra
 using Gridap.FESpaces
@@ -52,6 +53,7 @@ include("ParamSpace.jl")
 
 include("DiffOperators.jl")
 
+export AbstractParamContainer
 export ParamContainer
 include("ParamContainer.jl")
 

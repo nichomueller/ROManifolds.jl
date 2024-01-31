@@ -98,11 +98,9 @@ function FESpaces.SparseMatrixAssembler(
   test::DistributedFESpace,
   par_strategy=SubAssembledRows())
 
-  Tv = PartitionedArrays.getany(map(get_vector_type,local_views(trial)))
-  T  = eltype(Tv)
+  Tpv = PartitionedArrays.getany(map(get_vector_type,local_views(trial)))
+  T  = eltype(Tpv)
   Tm = SparseMatrixCSC{T,Int}
-  L = length_free_values(trial)
-  Tpm = typeof(ParamMatrix{Tm}(undef,L))
-  Tpv = typeof(ParamVector{Tv}(undef,L))
+  Tpm = typeof(ParamMatrix{Tm}(undef,length_free_values(trial)))
   SparseMatrixAssembler(Tpm,Tpv,trial,test,par_strategy)
 end

@@ -29,17 +29,17 @@ u(x,μ) = (x[1]+x[2])*sum(μ)
 u(μ) = x->u(x,μ)
 uμ = ParamFunction(u,μ)
 reffe = ReferenceFE(lagrangian,Float64,1)
-V = TestFESpace(model,reffe,dirichlet_tags="boundary")
-U = TrialParamFESpace(uμ,V)
+V0 = TestFESpace(model,reffe,dirichlet_tags="boundary")
+U = TrialParamFESpace(uμ,V0)
 @test isa(U,Distributed.DistributedSingleFieldParamFESpace)
 @test get_vector_type(U) <: PVector{<:ParamArray}
 
-free_values_partition = map(partition(V.gids)) do indices
+free_values_partition = map(partition(V0.gids)) do indices
   v = ones(Float64,local_length(indices))
   allocate_param_array(v,length(μ))
 end
 
-free_values = PVector(free_values_partition,partition(V.gids))
+free_values = PVector(free_values_partition,partition(V0.gids))
 fh = FEFunction(U,free_values)
 @assert isa(fh,Distributed.DistributedSingleFieldParamFEFunction)
 zh = zero(U)
@@ -84,7 +84,7 @@ cont4  = ∫( abs2(eh4) )dΩ
 das = SubAssembledRows() #FullyAssembledRows()
 Ωass  = Triangulation(das,model)
 dΩa = Measure(Ωass,3)
-assemble_tests(das,dΩ,dΩa,U,V)
+assemble_tests(das,dΩ,dΩa,U,V0)
 
 u2((x,y)) = 2*(x+y)
 TrialFESpace!(U,u2)
@@ -128,21 +128,22 @@ D     = num_cell_dims(model)
 Γass  = Triangulation(das,ReferenceFE{D-1},model)
 dΓ    = Measure(Γ,3)
 dΓass = Measure(Γass,3)
-V = TestFESpace(Γ,reffe,dirichlet_tags="boundary")
-U = TrialFESpace(u,V)
-assemble_tests(das,dΓ,dΓass,U,V)
+V0 = TestFESpace(Γ,reffe,dirichlet_tags="boundary")
+U = TrialFESpace(u,V0)
+assemble_tests(das,dΓ,dΓass,U,V0)
 
 
-# function assemble_tests(das,dΩ,dΩa,U,V)
+# function assemble_tests(das,dΩ,dΩa,U,V0)
   # Assembly
-  dv = get_fe_basis(V)
+  dv = get_fe_basis(V0)
   du = get_trial_fe_basis(U)
+  _a(μ,u,v) = ∫( f(μ)*∇(v)⋅∇(u) )dΩa
   a(u,v) = ∫( fμ*∇(v)⋅∇(u) )dΩa
   l(v) = ∫( fμ*dv )dΩa
-  assem = SparseMatrixAssembler(U,V,das)
+  assem = SparseMatrixAssembler(U,V0,das)
   zh = zero(U)
 
-  data = collect_cell_matrix_and_vector(U,V,a(du,dv),l(dv),zh)
+  data = collect_cell_matrix_and_vector(U,V0,a(du,dv),l(dv),zh)
   A1,b1 = assemble_matrix_and_vector(assem,data)
   x1 = A1\b1
   r1 = A1*x1 -b1
@@ -162,13 +163,13 @@ assemble_tests(das,dΓ,dΓass,U,V)
   eh2 = u - uh
   sqrt(sum(∫( abs2(eh2) )dΩ)) < 1.0e-9
 
-  op = AffineFEOperator(a,l,U,V,das)
+  op = AffineFEOperator(a,l,U,V0,das)
   solver = LinearFESolver(BackslashSolver())
   uh = solve(solver,op)
   eh = u - uh
   @test sqrt(sum(∫( abs2(eh) )dΩ)) < 1.0e-9
 
-  data = collect_cell_matrix(U,V,a(du,dv))
+  data = collect_cell_matrix(U,V0,a(du,dv))
   A3 = assemble_matrix(assem,data)
   x3 = A3\op.op.vector
   uh = FEFunction(U,x3)
@@ -182,10 +183,10 @@ assemble_tests(das,dΓ,dΓass,U,V)
   eh4 = u - uh
   sqrt(sum(∫( abs2(eh4) )dΩ)) < 1.0e-9
 
-  dv = get_fe_basis(V)
+  dv = get_fe_basis(V0)
   l=∫(1*dv)dΩa
-  vecdata=collect_cell_vector(V,l)
-  assem = SparseMatrixAssembler(U,V,das)
+  vecdata=collect_cell_vector(V0,l)
+  assem = SparseMatrixAssembler(U,V0,das)
   b1=assemble_vector(assem,vecdata)
   @test abs(sum(b1)-length(b1)) < 1.0e-12
 

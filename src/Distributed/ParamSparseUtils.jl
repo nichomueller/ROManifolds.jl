@@ -1,87 +1,84 @@
-
-function PartitionedArrays.nziterator(a::ParamArray{<:AbstractSparseMatrixCSC},args...)
-  NZIteratorCSC(a)
+function PartitionedArrays.nziterator(a::ParamMatrix{T,A}) where {T,A}
+  if eltype(A) <: SparseMatrixCSR
+    PartitionedArrays.NZIteratorCSR(a)
+  else
+    PartitionedArrays.NZIteratorCSC(a)
+  end
 end
 
-function PartitionedArrays.nziterator(a::ParamArray{<:SparseMatrixCSR},args...)
-  NZIteratorCSR(a)
+function PartitionedArrays.nzindex(a::ParamArray,args...)
+  PartitionedArrays.nzindex(first(a),args...)
 end
 
-function PartitionedArrays.nzindex(a::ParamArray{<:AbstractSparseMatrix},args...)
-  nzindex(testitem(a),args...)
-end
-
-Base.first(a::NZIteratorCSC{<:ParamArray}) = first(a.matrix)
-Base.length(a::NZIteratorCSC{<:ParamArray}) = length(first(a))
-
-@inline function Base.iterate(a::NZIteratorCSC{<:ParamArray})
-  if nnz(first(a)) == 0
-    return nothing
+@inline function Base.iterate(a::NZIteratorCSC{<:ParamMatrix})
+  if nnz(a.matrix) == 0
+      return nothing
   end
   col = 0
   knext = nothing
   while knext === nothing
     col += 1
-    ks = nzrange(first(a),col)
+    ks = nzrange(a.matrix,col)
     knext = iterate(ks)
   end
-  k,kstate = knext
-  i = Int(rowvals(first(a))[k])
+  k, kstate = knext
+  i = Int(rowvals(a.matrix)[k])
   j = col
   v = map(a.matrix) do matrix
     nonzeros(matrix)[k]
   end
-  (i,j,v),(col,kstate)
+  pv = ParamArray(v)
+  (i,j,pv),(col,kstate)
 end
 
-@inline function Base.iterate(a::NZIteratorCSC{<:ParamArray},state)
-  col,kstate = state
-  ks = nzrange(first(a),col)
+@inline function Base.iterate(a::NZIteratorCSC{<:ParamMatrix},state)
+  col, kstate = state
+  ks = nzrange(a.matrix,col)
   knext = iterate(ks,kstate)
   if knext === nothing
     while knext === nothing
-      if col == size(first(a),2)
-        return nothing
+      if col == size(a.matrix,2)
+          return nothing
       end
       col += 1
-      ks = nzrange(first(a),col)
+      ks = nzrange(a.matrix,col)
       knext = iterate(ks)
     end
   end
-  k,kstate = knext
-  i = Int(rowvals(first(a))[k])
+  k, kstate = knext
+  i = Int(rowvals(a.matrix)[k])
   j = col
   v = map(a.matrix) do matrix
     nonzeros(matrix)[k]
   end
-  (i,j,v),(col,kstate)
+  pv = ParamArray(v)
+  (i,j,pv),(col,kstate)
 end
 
-Base.first(a::NZIteratorCSR{<:ParamArray}) = first(a.matrix)
-Base.length(a::NZIteratorCSR{<:ParamArray}) = length(first(a))
-
-@inline function Base.iterate(a::NZIteratorCSR{<:ParamArray})
-  if nnz(first(a)) == 0
+@inline function Base.iterate(a::NZIteratorCSR{<:ParamMatrix})
+  if nnz(a.matrix) == 0
     return nothing
   end
   row = 0
+  ptrs = a.matrix.rowptr
   knext = nothing
   while knext === nothing
     row += 1
-    ks = nzrange(first(a),row)
+    ks = nzrange(a.matrix,row)
     knext = iterate(ks)
   end
   k, kstate = knext
   i = row
-  j = Int(colvals(first(a))[k]+getoffset(first(a)))
+  j = Int(colvals(a.matrix)[k]+getoffset(a.matrix))
   v = map(a.matrix) do matrix
     nonzeros(matrix)[k]
   end
-  (i,j,v),(row,kstate)
+  pv = ParamArray(v)
+  (i,j,pv),(row,kstate)
 end
 
-@inline function Base.iterate(a::NZIteratorCSR{<:ParamArray},state)
-  row,kstate = state
+@inline function Base.iterate(a::NZIteratorCSR{<:ParamMatrix},state)
+  row, kstate = state
   ks = nzrange(a.matrix,row)
   knext = iterate(ks,kstate)
   if knext === nothing
@@ -100,7 +97,8 @@ end
   v = map(a.matrix) do matrix
     nonzeros(matrix)[k]
   end
-  (i,j,v),(row,kstate)
+  pv = ParamArray(v)
+  (i,j,pv),(row,kstate)
 end
 
 function PartitionedArrays.p_sparse_matrix_cache_impl(
@@ -118,7 +116,7 @@ function PartitionedArrays.p_sparse_matrix_cache_impl(
     for (li,lj,v) in nziterator(values)
       owner = local_row_to_owner[li]
       if owner != part
-          ptrs[owner_to_i[owner]+1] +=1
+        ptrs[owner_to_i[owner]+1] +=1
       end
     end
     length_to_ptrs!(ptrs)
@@ -128,11 +126,11 @@ function PartitionedArrays.p_sparse_matrix_cache_impl(
     for (k,(li,lj,v)) in enumerate(nziterator(values))
       owner = local_row_to_owner[li]
       if owner != part
-          p = ptrs[owner_to_i[owner]]
-          k_snd_data[p] = k
-          gi_snd_data[p] = local_to_global_row[li]
-          gj_snd_data[p] = local_to_global_col[lj]
-          ptrs[owner_to_i[owner]] += 1
+        p = ptrs[owner_to_i[owner]]
+        k_snd_data[p] = k
+        gi_snd_data[p] = local_to_global_row[li]
+        gj_snd_data[p] = local_to_global_col[lj]
+        ptrs[owner_to_i[owner]] += 1
       end
     end
     rewind_ptrs!(ptrs)

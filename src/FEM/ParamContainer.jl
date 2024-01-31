@@ -10,12 +10,30 @@ end
 ParamContainer(array::AbstractVector{T}) where T = ParamContainer(array,Val(length(array)))
 ParamContainer(array::AbstractVector{T}) where T<:AbstractArray = ParamArray(array,Val(length(array)))
 
+Arrays.get_array(a::ParamContainer) = a.array
+Arrays.testitem(c::ParamContainer) = testitem(get_array(c))
 Base.length(c::ParamContainer{T,L}) where {T,L} = L
 Base.size(c::ParamContainer) = (length(c),)
 Base.eachindex(c::ParamContainer) = Base.OneTo(length(c))
-Base.getindex(c::ParamContainer,i::Integer) = c.array[i]
-Base.iterate(c::ParamContainer,i...) = iterate(c.array,i...)
-Arrays.testitem(c::ParamContainer) = testitem(c.array)
+Base.getindex(c::ParamContainer,i...) = getindex(get_array(c),i...)
+Base.setindex!(c::ParamContainer,v,i...) = setindex!(get_array(c),v,i...)
+Base.iterate(c::ParamContainer,i...) = iterate(get_array(c),i...)
+
+function Base.:+(a::T,b::T) where T<:ParamContainer
+  c = similar(a.array)
+  @inbounds for i = eachindex(a)
+    c[i] = a[i] + b[i]
+  end
+  ParamContainer(c)
+end
+
+function Base.:-(a::T,b::T) where T<:ParamContainer
+  c = similar(a.array)
+  @inbounds for i = eachindex(a)
+    c[i] = a[i] - b[i]
+  end
+  ParamContainer(c)
+end
 
 for T in (:(Point),:(AbstractVector{<:Point}))
   @eval begin
