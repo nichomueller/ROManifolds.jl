@@ -10,6 +10,20 @@ function PartitionedArrays.nzindex(a::ParamArray,args...)
   PartitionedArrays.nzindex(first(a),args...)
 end
 
+function PartitionedArrays.compresscoo(
+  ::Type{ParamMatrix{T,A,L}},
+  I::AbstractVector,
+  J::AbstractVector,
+  V::ParamArray,
+  args...) where {T,A,L}
+
+  elA = eltype(A)
+  v = map(V) do V
+    compresscoo(elA,I,J,V,args...)
+  end
+  ParamArray(v)
+end
+
 @inline function Base.iterate(a::NZIteratorCSC{<:ParamMatrix})
   if nnz(a.matrix) == 0
       return nothing
@@ -183,43 +197,58 @@ function Base.getindex(a::LocalView{T,N,<:ParamArray},i::Integer...) where {T,N}
   LocalView(a.plids_to_value[i...],a.d_to_lid_to_plid)
 end
 
-struct ParamSubSparseMatrix{T,A,B,C}
-  array::ParamArray{SubSparseMatrix{T,A,B,C},2,Vector{SubSparseMatrix{T,A,B,C}}}
+struct ParamSubSparseMatrix{T,A,B,C} <: AbstractParamContainer{T,2}
+  parent::A
+  indices::B
+  inv_indices::C
+  function ParamSubSparseMatrix(
+    parent::ParamMatrix{T},
+    indices::Tuple,
+    inv_indices::Tuple) where T
+
+    A = typeof(parent)
+    B = typeof(indices)
+    C = typeof(inv_indices)
+    new{T,A,B,C}(parent,indices,inv_indices)
+  end
 end
 
 function PartitionedArrays.SubSparseMatrix(
-  parent::ParamArray{<:AbstractSparseMatrix},
+  parent::ParamMatrix,
   indices::Tuple,
   inv_indices::Tuple)
 
-  array = map(a -> SubSparseMatrix(a,indices,inv_indices),parent)
-  ParamSubSparseMatrix(array)
+  ParamSubSparseMatrix(parent,indices,inv_indices)
 end
 
-Base.size(a::ParamSubSparseMatrix) = size(first(a))
-Base.length(a::ParamSubSparseMatrix) = length(a.array)
-Base.eltype(::ParamSubSparseMatrix{T}) where T = T
-Base.eltype(::Type{<:ParamSubSparseMatrix{T}}) where T = T
-Base.ndims(::ParamSubSparseMatrix) = 2
-Base.ndims(::Type{<:ParamSubSparseMatrix}) = 2
-Base.IndexStyle(::Type{<:ParamSubSparseMatrix}) = IndexCartesian()
-function Base.getindex(a::ParamSubSparseMatrix,i::Integer,j::Integer)
-  map(a.array) do ai
-    getindex(ai,i,j)
-  end
+Base.size(a::ParamSubSparseMatrix) = map(length,a.indices)
+Base.length(a::ParamSubSparseMatrix) = length(a.parent)
+Base.eachindex(a::ParamSubSparseMatrix) = Base.OneTo(length(a))
+# Base.eltype(::ParamSubSparseMatrix{T}) where T = T
+# Base.eltype(::Type{<:ParamSubSparseMatrix{T}}) where T = T
+# Base.ndims(::ParamSubSparseMatrix) = 2
+# Base.ndims(::Type{<:ParamSubSparseMatrix}) = 2
+# Base.IndexStyle(::Type{<:ParamSubSparseMatrix}) = IndexCartesian()
+
+function Base.getindex(a::ParamSubSparseMatrix,index::Int)
+  PartitionedArrays.SubSparseMatrix(a.parent[index],a.indices,a.inv_indices)
 end
-Base.first(a::ParamSubSparseMatrix) = a.array[1]
-function LinearAlgebra.mul!(c::ParamArray,a::ParamSubSparseMatrix,args...)
-  map(c,a) do ci,ai
-    mul!(ci,ai,args...)
+
+function LinearAlgebra.mul!(
+  c::ParamVector,
+  a::ParamSubSparseMatrix,
+  b::ParamVector,
+  α::Number,
+  β::Number)
+
+  @inbounds for k = eachindex(a)
+    mul!(c[k],a[k],b[k],α,β)
   end
-  c
 end
 function LinearAlgebra.fillstored!(a::ParamSubSparseMatrix,v)
-  av = map(a.array) do ai
-    fillstored!(ai,v)
+  @inbounds for k = eachindex(a)
+    LinearAlgebra.fillstored!(a[k],v)
   end
-  ParamSubSparseMatrix(av)
 end
 
 function PartitionedArrays.from_trivial_partition!(
@@ -264,9 +293,9 @@ function PartitionedArrays.to_trivial_partition(
 end
 
 function PartitionedArrays.to_trivial_partition(
-  a::PSparseMatrix{<:ParamArray{M}},
+  a::PSparseMatrix{M},
   row_partition_in_main=trivial_partition(partition(axes(a,1))),
-  col_partition_in_main=trivial_partition(partition(axes(a,2)))) where M
+  col_partition_in_main=trivial_partition(partition(axes(a,2)))) where M<:ParamArray
 
   destination = 1
   Ta = eltype(a)
@@ -309,10 +338,39 @@ function PartitionedArrays.to_trivial_partition(
   values = map(I,J,V,row_partition_in_main,col_partition_in_main) do myI,myJ,myV,row_indices,col_indices
     m = local_length(row_indices)
     n = local_length(col_indices)
-    v = map(myV) do myV
-      compresscoo(M,myI,myJ,myV,m,n)
-    end
-    ParamArray(v)
+    compresscoo(M,myI,myJ,myV,m,n)
   end
   PSparseMatrix(values,row_partition_in_main,col_partition_in_main)
+end
+
+function Base.:\(
+  a::PSparseMatrix{<:ParamMatrix{Ta,A,L}},
+  b::PVector{<:ParamVector{Tb,B,L}}
+  ) where {Ta,Tb,A,B,L}
+
+  T = typeof(one(Ta)\one(Tb)+one(Ta)\one(Tb))
+  PT = typeof(ParamVector{Vector{T}}(undef,L))
+  c = PVector{PT}(undef,partition(axes(a,2)))
+  fill!(c,zero(T))
+  a_in_main = to_trivial_partition(a)
+  b_in_main = to_trivial_partition(b,partition(axes(a_in_main,1)))
+  c_in_main = to_trivial_partition(c,partition(axes(a_in_main,2)))
+  map_main(partition(c_in_main),partition(a_in_main),partition(b_in_main)) do myc, mya, myb
+    myc .= mya\myb
+    nothing
+  end
+  PartitionedArrays.from_trivial_partition!(c,c_in_main)
+  c
+end
+
+function Base.:*(
+  a::PSparseMatrix{<:ParamMatrix{Ta,A,L}},
+  b::PVector{<:ParamVector{Tb,B,L}}
+  ) where {Ta,Tb,A,B,L}
+
+  T = typeof(zero(Ta)*zero(Tb)+zero(Ta)*zero(Tb))
+  PT = typeof(ParamVector{Vector{T}}(undef,L))
+  c = PVector{PT}(undef,partition(axes(a,1)))
+  mul!(c,a,b)
+  c
 end

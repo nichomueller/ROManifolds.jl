@@ -1,15 +1,84 @@
+function Algebra.allocate_vector(::Type{V},n::Integer) where V<:AbstractParamContainer
+  vector = zeros(eltype(V),n)
+  allocate_param_array(vector,length(V))
+end
+
+function Algebra.allocate_in_range(matrix::ParamMatrix{T,A,L}) where {T,A,L}
+  V = ParamVector{T,Vector{eltype(A)},L}
+  allocate_in_range(V,matrix)
+end
+
+function Algebra.allocate_in_domain(matrix::ParamMatrix{T,A,L}) where {T,A,L}
+  V = ParamVector{T,Vector{eltype(A)},L}
+  allocate_in_domain(V,matrix)
+end
+
+function Algebra.allocate_vector(
+  ::Type{<:ParamBlockVector{T,V}},
+  indices::BlockedUnitRange) where {T,V}
+
+  mortar(map(ids -> allocate_vector(V,ids),blocks(indices)))
+end
+
+function Algebra.allocate_in_range(matrix::ParamBlockMatrix{T,A,L}) where {T,A,L}
+  BV = BlockVector{T,Vector{ParamVector{T,Vector{eltype(A)},L}}}
+  V = ParamBlockVector{T,Vector{eltype(A)},L,BV}
+  allocate_in_range(V,matrix)
+end
+
+function Algebra.allocate_in_domain(matrix::ParamBlockMatrix{T,A,L}) where {T,A,L}
+  BV = BlockVector{T,Vector{ParamVector{T,Vector{eltype(A)},L}}}
+  V = ParamBlockVector{T,Vector{eltype(A)},L,BV}
+  allocate_in_domain(V,matrix)
+end
+
 function Algebra.nz_allocation(a::Algebra.ArrayCounter{<:ParamVector{T,A,L}}) where {T,A,L}
   elA = eltype(A)
   v = fill!(similar(elA,map(length,a.axes)),zero(T))
   allocate_param_array(v,L)
 end
 
-function Algebra.is_entry_stored(::Type{<:ParamMatrix{T,A,L}},i::Int,j::Int) where {T,A,L}
+@inline function Algebra.add_entry!(combine::Function,A::ParamVector,v::Number,i)
+  for k = eachindex(A)
+    ai = A[k][i]
+    A[k][i] = combine(ai,v)
+  end
+  A
+end
+
+function Algebra.is_entry_stored(::Type{<:ParamMatrix{T,A,L}},i,j) where {T,A,L}
   is_entry_stored(eltype(A),i,j)
 end
 
-function Algebra.add_entry!(combine::Function,A::ParamMatrix,v::Number,i,j)
-  @notimplemented
+@inline function Algebra.add_entry!(combine::Function,A::ParamMatrix,v::Number,i,j)
+  for k = eachindex(A)
+    aij = A[k][i,j]
+    A[k][i,j] = combine(aij,v)
+  end
+  A
+end
+
+@inline function Algebra.add_entry!(::typeof(+),a::Algebra.AllocationCOO{T},::Nothing,i,j) where T<:ParamMatrix
+  if Algebra.is_entry_stored(T,i,j)
+    a.counter.nnz = a.counter.nnz + 1
+    k = a.counter.nnz
+    a.I[k] = i
+    a.J[k] = j
+  end
+  nothing
+end
+
+@inline function Algebra.add_entry!(::typeof(+),a::Algebra.AllocationCOO{T},v,i,j) where T<:ParamMatrix
+  if Algebra.is_entry_stored(T,i,j)
+    a.counter.nnz = a.counter.nnz + 1
+    k = a.counter.nnz
+    a.I[k] = i
+    a.J[k] = j
+    for l = 1:length(T)
+      a.V[l][k] = v[l]
+    end
+  end
+  nothing
 end
 
 function Algebra.copy_entries!(
@@ -23,7 +92,7 @@ function Algebra.copy_entries!(
 end
 
 function Algebra.allocate_coo_vectors(
-  ::Type{<:ParamMatrix{Tv,Vector{<:AbstractSparseMatrix{Tv,Ti}},L}},
+  ::Type{<:ParamMatrix{Tv,<:Vector{<:AbstractSparseMatrix{Tv,Ti}},L}},
   n::Integer) where {Tv,Ti,L}
   I = zeros(Ti,n)
   J = zeros(Ti,n)

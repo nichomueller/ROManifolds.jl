@@ -1,7 +1,7 @@
 function PartitionedArrays.allocate_gather_impl(
-  snd::AbstractVector{<:ParamArray},
+  snd::AbstractVector{ParamArray{T,A,L}},
   destination,
-  ::Type{T}) where T<:AbstractVector
+  ::Type{T}) where {T,A,L}
 
   l = map(snd) do snd
     length(first(snd))
@@ -10,15 +10,15 @@ function PartitionedArrays.allocate_gather_impl(
   function f(l,snd)
     ptrs = length_to_ptrs!(pushfirst!(l,one(eltype(l))))
     ndata = ptrs[end]-1
-    data = Vector{eltype(snd)}(undef,ndata)
-    ptdata = allocate_param_array(data,length(snd))
-    ParamJaggedArray{eltype(snd),Int32}(ptdata,ptrs)
+    data = Vector{T}(undef,ndata)
+    ptdata = allocate_param_array(data,L)
+    ParamJaggedArray{T,Int32}(ptdata,ptrs)
   end
   if isa(destination,Integer)
     function g(l,snd)
       ptrs = Vector{Int32}(undef,1)
-      data = Vector{eltype(snd)}(undef,0)
-      ptdata = allocate_param_array(data,length(snd))
+      data = Vector{T}(undef,0)
+      ptdata = allocate_param_array(data,L)
       ParamJaggedArray(ptdata,ptrs)
     end
     rcv = map_main(f,l_dest,snd;otherwise=g,main=destination)
@@ -52,18 +52,17 @@ function PartitionedArrays.gather_impl!(
 end
 
 function PartitionedArrays.allocate_scatter_impl(
-  snd::AbstractVector{<:ParamArray},
+  snd::AbstractVector{ParamArray{T,A,L}},
   source,
-  ::Type{T}) where T <:AbstractVector
+  ::Type{T}) where {T,A,L}
 
   counts = map(snd) do snd
     map(length,first(snd))
   end
   counts_scat = scatter(counts;source)
-  S = eltype(T)
-  map(snd,counts_scat) do snd,count
-    data = Vector{S}(undef,count)
-    allocate_param_array(data,length(snd))
+  map(counts_scat) do count
+    data = Vector{T}(undef,count)
+    allocate_param_array(data,L)
   end
 end
 
@@ -71,7 +70,7 @@ function PartitionedArrays.scatter_impl!(
   rcv::AbstractVector{<:ParamArray},
   snd::AbstractVector{<:ParamArray},
   source,
-  ::Type{T}) where T
+  ::Type)
 
   @assert source !== :all "Scatter all not implemented"
   @assert length(snd[source]) == length(rcv)
@@ -82,19 +81,18 @@ function PartitionedArrays.scatter_impl!(
 end
 
 function PartitionedArrays.allocate_emit_impl(
-  snd::AbstractVector{<:ParamArray},
+  snd::AbstractVector{ParamArray{T,A,L}},
   source,
-  ::Type{T}) where T<:AbstractVector
+  ::Type) where {T,A,L}
 
   @assert source !== :all "Scatter all not implemented"
   n = map(snd) do snd
     length(first(snd))
   end
   n_all = emit(n;source)
-  S = eltype(T)
-  map(n_all,snd) do n,snd
-    data = Vector{S}(undef,n)
-    allocate_param_array(data,length(snd))
+  map(n_all) do n
+    data = Vector{T}(undef,n)
+    allocate_param_array(data,L)
   end
 end
 
@@ -102,7 +100,7 @@ function PartitionedArrays.emit_impl!(
   rcv::AbstractVector{<:ParamArray},
   snd::AbstractVector{<:ParamArray},
   source,
-  ::Type{T}) where T
+  ::Type)
 
   @assert source !== :all "Emit all not implemented"
   for i in eachindex(rcv)
@@ -153,16 +151,14 @@ function PartitionedArrays.assemble_impl!(
   ::Type{<:ParamSparseMatrixAssemblyCache})
 
   vcache = map(i->i.cache,cache)
-  println(typeof(matrix_partition))
-  error("stop here")
   data = map(nonzeros,matrix_partition)
   assemble!(f,data,vcache)
 end
 
 function PartitionedArrays.allocate_exchange_impl(
-  snd::AbstractVector{ParamJaggedArray{T,Ti,A,L}},
+  snd::AbstractVector{ParamJaggedArray{T,Ti,A}},
   graph,
-  ::Type{<:AbstractVector}) where {T,Ti,A,L}
+  ::Type) where {T,Ti,A}
 
   n_snd = map(snd) do snd
     map(length,first(snd))
@@ -175,7 +171,7 @@ function PartitionedArrays.allocate_exchange_impl(
     length_to_ptrs!(ptrs)
     n_data = ptrs[end]-1
     data = Vector{S}(undef,n_data)
-    ptdata = allocate_param_array(data,L)
+    ptdata = allocate_param_array(data,length(A))
     JaggedArray(ptdata,ptrs)
   end
   rcv
@@ -185,7 +181,7 @@ function PartitionedArrays.exchange_impl!(
   rcv::AbstractVector{<:ParamJaggedArray},
   snd::AbstractVector{<:ParamJaggedArray},
   graph,
-  ::Type{T}) where T<:AbstractVector
+  ::Type)
 
   @assert is_consistent(graph)
   snd_ids = graph.snd

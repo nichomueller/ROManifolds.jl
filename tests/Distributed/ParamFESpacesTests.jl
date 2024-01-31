@@ -162,7 +162,8 @@ assemble_tests(das,dΓ,dΓass,U,V0)
   x1 = A1\b1
   r1 = A1*x1 -b1
   uh1 = FEFunction(U,x1)
-  eh1 = u - uh1
+  eh1 = uμ - uh1
+  @test all(sqrt.(sum(cont4)) .< 1.0e-9)
   @test sqrt(sum(∫( abs2(eh1) )dΩ)) < 1.0e-9
 
   map(A1.matrix_partition, A1.row_partition, A1.col_partition) do mat, rows, cols
@@ -174,27 +175,27 @@ assemble_tests(das,dΓ,dΓass,U,V0)
   x2 = A2\b2
   r2 = A2*x2 -b2
   uh = FEFunction(U,x2)
-  eh2 = u - uh
+  eh2 = uμ - uh
   sqrt(sum(∫( abs2(eh2) )dΩ)) < 1.0e-9
 
   op = AffineFEOperator(a,l,U,V0,das)
   solver = LinearFESolver(BackslashSolver())
   uh = solve(solver,op)
-  eh = u - uh
+  eh = uμ - uh
   @test sqrt(sum(∫( abs2(eh) )dΩ)) < 1.0e-9
 
   data = collect_cell_matrix(U,V0,a(du,dv))
   A3 = assemble_matrix(assem,data)
   x3 = A3\op.op.vector
   uh = FEFunction(U,x3)
-  eh3 = u - uh
+  eh3 = uμ - uh
   sqrt(sum(∫( abs2(eh3) )dΩ)) < 1.0e-9
 
   A4 = allocate_matrix(assem,data)
   assemble_matrix!(A4,assem,data)
   x4 = A4\op.op.vector
   uh = FEFunction(U,x4)
-  eh4 = u - uh
+  eh4 = uμ - uh
   sqrt(sum(∫( abs2(eh4) )dΩ)) < 1.0e-9
 
   dv = get_fe_basis(V0)

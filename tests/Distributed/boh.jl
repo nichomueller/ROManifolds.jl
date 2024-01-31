@@ -329,61 +329,18 @@ function GridapDistributed.assemble_coo_with_column_owner!(I,J,V,row_partition,J
   end
 end
 
-######################
-@inline function Algebra._add_entries!(combine::Function,A,vs,is,js)
-  println(typeof(A))
-  println(typeof(vs))
-  for (lj,j) in enumerate(js)
-    if j>0
-      for (li,i) in enumerate(is)
-        if i>0
-          vij = vs[li,lj]
-          Algebra.add_entry!(combine,A,vij,i,j)
-        end
-      end
-    end
-  end
-  A
-end
+###########
 
-# test_sparse_matrix_assembler(assem,matdata,vecdata,data)
-# A = allocate_matrix(assem,matdata)
-A = nz_counter(get_matrix_builder(assem),(get_rows(assem),get_cols(assem)))
-symbolic_loop_matrix!(A,assem,matdata)
-strategy = FESpaces.get_assembly_strategy(assem)
-cellmat,_cellidsrows,_cellidscols = matdata[1][1],matdata[2][1],matdata[3][1]
-cellidsrows = FESpaces.map_cell_rows(strategy,_cellidsrows)
-cellidscols = FESpaces.map_cell_cols(strategy,_cellidscols)
-@assert length(cellidscols) == length(cellidsrows)
-rows_cache = array_cache(cellidsrows)
-cols_cache = array_cache(cellidscols)
-get_mat(a::Tuple) = a[1]
-get_mat(a) = a
-mat1 = get_mat(first(cellmat))
-rows1 = getindex!(rows_cache,cellidsrows,1)
-cols1 = getindex!(cols_cache,cellidscols,1)
-touch! = TouchEntriesMap()
-touch_cache = return_cache(touch!,A,mat1,rows1,cols1)
-# FESpaces._symbolic_loop_matrix!(A,caches,cellidsrows,cellidscols,mat1)
-rows = getindex!(rows_cache,cellidsrows,1)
-cols = getindex!(cols_cache,cellidscols,1)
-# evaluate!(touch_cache,touch!,A,mat1,rows,cols)
-# add_entries!(+,A,nothing,rows,cols)
-# Algebra._add_entries!(+,A,nothing,rows,cols)
-for (lj,j) in enumerate(js)
-  if j>0
-    for (li,i) in enumerate(is)
-      if i>0
-        add_entry!(combine,A,nothing,i,j)
-      end
-    end
-  end
+Ta = eltype(A1)
+Tb = eltype(b1)
+T = typeof(one(Ta)\one(Tb)+one(Ta)\one(Tb))
+PT = typeof(ParamVector{Vector{T}}(undef,N))
+c = PVector{Vector{T}}(undef,partition(axes(A1,2)))
+fill!(c,zero(T))
+a_in_main = to_trivial_partition(A1)
+b_in_main = to_trivial_partition(b1,partition(axes(a_in_main,1)))
+c_in_main = to_trivial_partition(c,partition(axes(a_in_main,2)))
+map_main(partition(c_in_main),partition(a_in_main),partition(b_in_main)) do myc, mya, myb
+    myc .= mya\myb
+    nothing
 end
-
-dΩ = Measure(trian,degree)
-form(u,v) = ∫(u*v)dΩ
-matdata1 = collect_cell_matrix(V,V,form(u,v))
-assem1 = SparseMatrixAssembler(T,Vector{Float64},V,V)
-m11 = nz_counter(get_matrix_builder(assem1),(get_rows(assem1),get_cols(assem1)))
-symbolic_loop_matrix!(m11,assem1,matdata1)
-A1 = nz_allocation(m11)

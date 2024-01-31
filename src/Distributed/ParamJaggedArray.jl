@@ -1,12 +1,24 @@
-struct ParamJaggedArray{T,Ti,A,L} <: AbstractParamContainer{JaggedArray{T,Ti},1}
-  data::ParamVector{T,A,L}
+# struct ParamJaggedArray{T,Ti,A,L} <: AbstractParamContainer{JaggedArray{T,Ti},1}
+#   data::ParamVector{T,A,L}
+#   ptrs::Vector{Ti}
+
+#   function ParamJaggedArray(data::ParamVector{T,A,L},ptrs::Vector{Ti}) where {T,Ti,A,L}
+#     new{T,Ti,A,L}(data,ptrs)
+#   end
+#   function ParamJaggedArray{T,Ti}(data::ParamVector{T,A,L},ptrs::Vector) where {T,Ti,A,L}
+#     new{T,Ti,A,L}(data,convert(Vector{Ti},ptrs))
+#   end
+# end
+struct ParamJaggedArray{T,Ti,A<:ParamVector{T}} <: AbstractParamContainer{T,1}
+  data::A
   ptrs::Vector{Ti}
 
-  function ParamJaggedArray(data::ParamVector{T,A,L},ptrs::Vector{Ti}) where {T,Ti,A,L}
-    new{T,Ti,A,L}(data,ptrs)
+  function ParamJaggedArray(data::A,ptrs::Vector{Ti}) where {Ti,A<:ParamVector}
+    T = eltype(data)
+    new{T,Ti,A}(data,ptrs)
   end
-  function ParamJaggedArray{T,Ti}(data::ParamVector{T,A,L},ptrs::Vector) where {T,Ti,A,L}
-    new{T,Ti,A,L}(data,convert(Vector{Ti},ptrs))
+  function ParamJaggedArray{T,Ti}(data::A,ptrs::Vector) where {T,Ti,A<:ParamVector}
+    new{T,Ti,A}(data,convert(Vector{Ti},ptrs))
   end
 end
 
@@ -14,7 +26,7 @@ function PartitionedArrays.JaggedArray(data::ParamArray,ptrs)
   ParamJaggedArray(data,ptrs)
 end
 
-PartitionedArrays.JaggedArray(a::AbstractArray{<:ParamArray{T}}) where T = JaggedArray{T,Int32}(a)
+PartitionedArrays.JaggedArray(a::ParamArray{T}) where T = ParamJaggedArray{T,Int32}(a)
 PartitionedArrays.JaggedArray(a::ParamJaggedArray) = a
 PartitionedArrays.JaggedArray{T,Ti}(a::ParamJaggedArray{T,Ti}) where {T,Ti} = a
 
@@ -29,28 +41,6 @@ function Base.setindex!(a::ParamJaggedArray,v,index::Int)
   @assert size(a) == size(v)
   setindex!(a.data,v,index)
 end
-
-# function Base.getindex(a::ParamJaggedArray{T,Ti,A,L},index::Int) where {T,Ti,A,L}
-#   u = one(Ti)
-#   pini = a.ptrs[index]
-#   pend = a.ptrs[index+1]-u
-#   ai = view(a.data[1],pini:pini)
-#   b = Vector{typeof(ai)}(undef,L)
-#   @inbounds for i = 1:L
-#     b[i] = view(a.data[i],pini:pend)
-#   end
-#   ParamContainer(b)
-# end
-
-# function Base.setindex!(a::ParamJaggedArray{T,Ti,A,L},v,index::Int) where {T,Ti,A,L}
-#   @assert length(a.data) == length(v)
-#   u = one(Ti)
-#   pini = a.ptrs[index]
-#   pend = a.ptrs[index+1]-u
-#   @inbounds for i = 1:L
-#     a.data[i][pini:pend] = v[i]
-#   end
-# end
 
 PartitionedArrays.jagged_array(data::ParamArray,ptrs::Vector) = ParamJaggedArray(data,ptrs)
 
