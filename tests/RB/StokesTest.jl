@@ -49,7 +49,7 @@ t0,tf,dt,θ = 0.,0.3,0.005,0.5
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial_u(μ,t0))
 ph0μ(μ) = interpolate_everywhere(p0μ(μ),trial_p(μ,t0))
 xh0μ(μ) = interpolate_everywhere([uh0μ(μ),ph0μ(μ)],trial(μ,t0))
-fesolver = ThetaMethod(LUSolver(),θ,dt)
+fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 ϵ = 1e-4
 load_solutions = true

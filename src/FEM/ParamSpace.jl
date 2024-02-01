@@ -6,9 +6,9 @@ const TrivialParamRealization = ParamRealization{<:AbstractVector{<:Number}}
 
 get_params(r::ParamRealization) = r # we only want to deal with a ParamRealization type
 _get_params(r::ParamRealization) = r.params # this function should stay local
-num_parameters(r::ParamRealization) = length(_get_params(r))
-num_parameters(r::TrivialParamRealization) = 1
-Base.length(r::ParamRealization) = num_parameters(r)
+num_params(r::ParamRealization) = length(_get_params(r))
+num_params(r::TrivialParamRealization) = 1
+Base.length(r::ParamRealization) = num_params(r)
 Base.size(r::ParamRealization) = (length(r),)
 Arrays.testitem(r::ParamRealization) = testitem(_get_params(r))
 
@@ -47,10 +47,10 @@ const TrivialTransientParamRealization = TransientParamRealization{<:TrivialPara
 
 get_params(r::TransientParamRealization) = get_params(r.params)
 _get_params(r::TransientParamRealization) = _get_params(r.params)
-num_parameters(r::TransientParamRealization) = num_parameters(r.params)
+num_params(r::TransientParamRealization) = num_params(r.params)
 get_times(r::TransientParamRealization) = r.times[]
 num_times(r::TransientParamRealization) = length(get_times(r))
-Base.length(r::TransientParamRealization) = num_parameters(r)*num_times(r)
+Base.length(r::TransientParamRealization) = num_params(r)*num_times(r)
 Base.size(r::TransientParamRealization) = (length(r),)
 Arrays.testitem(r::TransientParamRealization) = testitem(get_params(r)),testitem(get_times(r))
 
@@ -113,51 +113,55 @@ function shift_time!(r::TransientParamRealization,δ::Number)
   r.times[] = r.times[] + δ
 end
 
+const AbstractParamRealization = Union{ParamRealization,TransientParamRealization}
+const AbstractTrivialParamRealization = Union{TrivialParamRealization,TrivialTransientParamRealization}
+############
+
 abstract type SamplingStyle end
 struct UniformSampling <: SamplingStyle end
 struct NormalSampling <: SamplingStyle end
 
 struct ParamSpace <: AbstractSet{ParamRealization}
-  parametric_domain::AbstractVector
+  param_domain::AbstractVector
   sampling_style::SamplingStyle
   function ParamSpace(
-    parametric_domain::AbstractVector{<:AbstractVector},
+    param_domain::AbstractVector{<:AbstractVector},
     sampling=UniformSampling())
 
-    new(parametric_domain,sampling)
+    new(param_domain,sampling)
   end
 end
 
 function Base.show(io::IO,::MIME"text/plain",p::ParamSpace)
-  msg = "Set of parameters in $(p.parametric_domain), sampled with $(p.sampling_style)"
+  msg = "Set of parameters in $(p.param_domain), sampled with $(p.sampling_style)"
   println(io,msg)
 end
 
-function generate_parameter(p::ParamSpace)
+function generate_param(p::ParamSpace)
   _value(d,::UniformSampling) = rand(Uniform(first(d),last(d)))
   _value(d,::NormalSampling) = rand(Normal(first(d),last(d)))
-  [_value(d,p.sampling_style) for d = p.parametric_domain]
+  [_value(d,p.sampling_style) for d = p.param_domain]
 end
 
 function realization(p::ParamSpace;nparams=1)
-  ParamRealization([generate_parameter(p) for i = 1:nparams])
+  ParamRealization([generate_param(p) for i = 1:nparams])
 end
 
 struct TransientParamSpace <: AbstractSet{TransientParamRealization}
   parametric_space::ParamSpace
   temporal_domain::AbstractVector
   function TransientParamSpace(
-    parametric_domain::AbstractVector{<:AbstractVector},
+    param_domain::AbstractVector{<:AbstractVector},
     temporal_domain::AbstractVector{<:Number},
     sampling=UniformSampling())
 
-    parametric_space = ParamSpace(parametric_domain,sampling)
+    parametric_space = ParamSpace(param_domain,sampling)
     new(parametric_space,temporal_domain)
   end
 end
 
 function Base.show(io::IO,::MIME"text/plain",p::TransientParamSpace)
-  msg = "Set of tuples (p,t) in $(p.parametric_space.parametric_domain) × $(p.temporal_domain)"
+  msg = "Set of tuples (p,t) in $(p.parametric_space.param_domain) × $(p.temporal_domain)"
   println(io,msg)
 end
 
@@ -184,8 +188,8 @@ end
 
 get_params(f::ParamFunction) = get_params(f.params)
 _get_params(f::ParamFunction) = _get_params(f.params)
-num_parameters(f::ParamFunction) = length(_get_params(f))
-Base.length(f::ParamFunction) = num_parameters(f)
+num_params(f::ParamFunction) = length(_get_params(f))
+Base.length(f::ParamFunction) = num_params(f)
 Base.size(f::ParamFunction) = (length(f),)
 Arrays.testitem(f::ParamFunction) = f.fun(testitem(f.params))
 
@@ -257,10 +261,10 @@ end
 
 get_params(f::TransientParamFunction) = get_params(f.params)
 _get_params(f::TransientParamFunction) = _get_params(f.params)
-num_parameters(f::TransientParamFunction) = length(_get_params(f))
+num_params(f::TransientParamFunction) = length(_get_params(f))
 get_times(f::TransientParamFunction) = f.times
 num_times(f::TransientParamFunction) = length(get_times(f))
-Base.length(f::TransientParamFunction) = num_parameters(f)*num_times(f)
+Base.length(f::TransientParamFunction) = num_params(f)*num_times(f)
 Base.size(f::TransientParamFunction) = (length(f),)
 Arrays.testitem(f::TransientParamFunction) = f.fun(testitem(f.params),testitem(f.times))
 
@@ -358,10 +362,10 @@ function test_parametric_space()
   @test length(γ) == 1 && length(δ) == 10 && length(ϵ) == 10
   change_time!(ϵ,11:20)
   @test get_times(get_at_time(ϵ,:final)) == 20
-  parametric_domain = [[1,10],[11,20]]
-  p = ParamSpace(parametric_domain)
+  param_domain = [[1,10],[11,20]]
+  p = ParamSpace(param_domain)
   t = 1:10
-  pt = TransientParamSpace(parametric_domain,t)
+  pt = TransientParamSpace(param_domain,t)
   μ = realization(p)
   μt = realization(pt)
   @test isa(μ,ParamRealization) && isa(μt,TransientParamRealization)

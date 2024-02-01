@@ -1,6 +1,6 @@
 function get_param_matrix_builder(
   a::SparseMatrixAssembler,
-  r::Union{ParamRealization,TransientParamRealization})
+  r::AbstractParamRealization)
 
   L = length(r)
   mat = get_matrix_builder(a)
@@ -12,7 +12,7 @@ end
 
 function get_param_vector_builder(
   a::SparseMatrixAssembler,
-  r::Union{ParamRealization,TransientParamRealization})
+  r::AbstractParamRealization)
 
   L = length(r)
   vec = get_vector_builder(a)
@@ -24,7 +24,7 @@ end
 
 function get_param_assembler(
   a::SparseMatrixAssembler,
-  r::Union{ParamRealization,TransientParamRealization})
+  r::AbstractParamRealization)
 
   matrix_builder = get_param_matrix_builder(a,r)
   vector_builder = get_param_vector_builder(a,r)

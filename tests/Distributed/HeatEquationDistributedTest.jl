@@ -79,7 +79,7 @@ trial = TransientTrialParamFESpace(test,g)
 feop = AffineTransientParamFEOperator(res,jac,jac_t,pspace,trial,test)
 t0,tf,dt,θ = 0.,0.1,0.01,0.5
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
-fesolver = ThetaMethod(LUSolver(),θ,dt)
+fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 # sols,params,stats = collect_solutions(rbinfo,fesolver,feop)
 params = realization(feop,nsnaps_state+nsnaps_test)

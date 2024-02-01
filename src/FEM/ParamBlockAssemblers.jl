@@ -1,6 +1,6 @@
 function get_param_matrix_builder(
   a::MultiField.BlockSparseMatrixAssembler,
-  r::Union{ParamRealization,TransientParamRealization})
+  r::AbstractParamRealization)
 
   assem = first(a.block_assemblers)
   get_param_matrix_builder(assem,r)
@@ -8,7 +8,7 @@ end
 
 function get_param_vector_builder(
   a::MultiField.BlockSparseMatrixAssembler,
-  r::Union{ParamRealization,TransientParamRealization})
+  r::AbstractParamRealization)
 
   assem = first(a.block_assemblers)
   get_param_vector_builder(assem,r)
@@ -16,7 +16,7 @@ end
 
 function get_param_assembler(
   a::MultiField.BlockSparseMatrixAssembler{NB,NV,SB,P},
-  r::Union{ParamRealization,TransientParamRealization}) where {NB,NV,SB,P}
+  r::AbstractParamRealization) where {NB,NV,SB,P}
 
   matrix_builder = get_param_matrix_builder(a,r)
   vector_builder = get_param_vector_builder(a,r)

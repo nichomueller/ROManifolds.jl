@@ -224,11 +224,6 @@ end
 Base.size(a::ParamSubSparseMatrix) = map(length,a.indices)
 Base.length(a::ParamSubSparseMatrix) = length(a.parent)
 Base.eachindex(a::ParamSubSparseMatrix) = Base.OneTo(length(a))
-# Base.eltype(::ParamSubSparseMatrix{T}) where T = T
-# Base.eltype(::Type{<:ParamSubSparseMatrix{T}}) where T = T
-# Base.ndims(::ParamSubSparseMatrix) = 2
-# Base.ndims(::Type{<:ParamSubSparseMatrix}) = 2
-# Base.IndexStyle(::Type{<:ParamSubSparseMatrix}) = IndexCartesian()
 
 function Base.getindex(a::ParamSubSparseMatrix,index::Int)
   PartitionedArrays.SubSparseMatrix(a.parent[index],a.indices,a.inv_indices)

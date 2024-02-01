@@ -70,6 +70,6 @@ trial = TransientTrialParamFESpace(test,gμt)
 feop = AffineTransientParamFEOperator(m,a,b,ptspace,trial,test)
 
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
-fesolver = ThetaMethod(LUSolver(),θ,dt)
+fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 sol = solve(fesolver,feop,uh0μ,r)

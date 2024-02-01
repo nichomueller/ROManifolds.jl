@@ -31,7 +31,7 @@ tf = ntimes*dt
 nparams = 50
 ntests = 10
 
-fesolver = ThetaMethod(LUSolver(),θ,dt)
+fesolver = ThetaMethod(LUSolver(),dt,θ)
 times = get_stencil_times(fesolver)
 
 ϵ = 1e-4

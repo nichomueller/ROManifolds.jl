@@ -5,6 +5,7 @@ using LinearAlgebra
 using BlockArrays
 using SparseArrays
 using SparseMatricesCSR
+using WriteVTK
 using Gridap
 using Gridap.Algebra
 using Gridap.FESpaces
