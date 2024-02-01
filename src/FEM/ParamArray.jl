@@ -124,52 +124,30 @@ function Base.sum(a::ParamArray)
   sum(get_array(a))
 end
 
-function Base.:+(a::T,b::T) where T<:ParamArray
-  c = similar(a)
-  @inbounds for i = eachindex(a)
-    c[i] = a[i] + b[i]
+for op in (:+,:-)
+  @eval begin
+    function Base.:($op)(a::T,b::T) where T<:ParamArray
+      c = similar(a)
+      @inbounds for i = eachindex(a)
+        c[i] = ($op)(a[i],b[i])
+      end
+      c
+    end
+    function Base.:($op)(a::ParamArray{T},b::S) where {T,S<:AbstractArray{T}}
+      c = similar(a)
+      @inbounds for i = eachindex(a)
+        c[i] = ($op)(a[i],b)
+      end
+      c
+    end
+    function Base.:($op)(a::S,b::ParamArray{T}) where {T,S<:AbstractArray{T}}
+      c = similar(b)
+      @inbounds for i = eachindex(b)
+        c[i] = ($op)(a,b[i])
+      end
+      c
+    end
   end
-  c
-end
-
-function Base.:-(a::T,b::T) where T<:ParamArray
-  c = similar(a)
-  @inbounds for i = eachindex(a)
-    c[i] = a[i] - b[i]
-  end
-  c
-end
-
-function Base.:+(a::ParamArray{T},b::S) where {T,S<:AbstractArray{T}}
-  c = similar(a)
-  @inbounds for i = eachindex(a)
-    c[i] = a[i] + b
-  end
-  c
-end
-
-function Base.:+(a::S,b::ParamArray{T}) where {T,S<:AbstractArray{T}}
-  c = similar(b)
-  @inbounds for i = eachindex(b)
-    c[i] = a + b[i]
-  end
-  c
-end
-
-function Base.:-(a::ParamArray{T},b::S) where {T,S<:AbstractArray{T}}
-  c = similar(a)
-  @inbounds for i = eachindex(a)
-    c[i] = a[i] - b
-  end
-  c
-end
-
-function Base.:-(a::S,b::ParamArray{T}) where {T,S<:AbstractArray{T}}
-  c = similar(b)
-  @inbounds for i = eachindex(b)
-    c[i] = a - b[i]
-  end
-  c
 end
 
 (Base.:-)(a::ParamArray) = a .* -1

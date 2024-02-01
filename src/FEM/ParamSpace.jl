@@ -10,28 +10,17 @@ num_params(r::ParamRealization) = length(_get_params(r))
 num_params(r::TrivialParamRealization) = 1
 Base.length(r::ParamRealization) = num_params(r)
 Base.size(r::ParamRealization) = (length(r),)
-Arrays.testitem(r::ParamRealization) = testitem(_get_params(r))
+Base.getindex(r::ParamRealization,i) = getindex(_get_params(r),i)
+Base.getindex(r::TrivialParamRealization,i) = i == 1 ? _get_params(r) : throw(BoundsError())
+Arrays.testitem(r::ParamRealization) = getindex(r,1)
 
-# when iterating over a ParamRealization{P}, we return return eltype(P) ∀ index i
-function Base.iterate(r::TrivialParamRealization)
-  state = 1
-  rstate = _get_params(r)
-  return rstate, state
-end
-
-function Base.iterate(r::ParamRealization)
-  state = 1
-  rstate = _get_params(r)[state]
-  return rstate, state
-end
-
-function Base.iterate(r::ParamRealization,state)
-  state += 1
+# when iterating over a ParamRealization{P}, we return eltype(P) ∀ index i
+function Base.iterate(r::ParamRealization,state=1)
   if state > length(r)
     return nothing
   end
-  rstate = _get_params(r)[state]
-  return rstate, state
+  rstate = r[state]
+  return rstate, state+1
 end
 
 struct TransientParamRealization{P<:ParamRealization,T}
@@ -52,6 +41,8 @@ get_times(r::TransientParamRealization) = r.times[]
 num_times(r::TransientParamRealization) = length(get_times(r))
 Base.length(r::TransientParamRealization) = num_params(r)*num_times(r)
 Base.size(r::TransientParamRealization) = (length(r),)
+Base.getindex(r::TransientParamRealization,i) = TransientParamRealization(getindex(get_params(r),i),r.times)
+Base.getindex(r::TransientParamRealization,i,j) = TransientParamRealization(getindex(get_params(r),i),getindex(get_times(r),j))
 Arrays.testitem(r::TransientParamRealization) = testitem(get_params(r)),testitem(get_times(r))
 
 function Base.iterate(r::TransientParamRealization)
@@ -115,7 +106,6 @@ end
 
 const AbstractParamRealization = Union{ParamRealization,TransientParamRealization}
 const AbstractTrivialParamRealization = Union{TrivialParamRealization,TrivialTransientParamRealization}
-############
 
 abstract type SamplingStyle end
 struct UniformSampling <: SamplingStyle end
