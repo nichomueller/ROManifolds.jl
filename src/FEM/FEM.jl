@@ -36,9 +36,6 @@ import Gridap.ReferenceFEs: get_order
 import Gridap.TensorValues: inner,outer,double_contraction,symmetric_part
 import PartitionedArrays: tuple_of_arrays
 
-export Table
-export Affine
-
 export ParamRealization
 export TransientParamRealization
 export UniformSampling
@@ -152,7 +149,4 @@ export get_order
 export get_L2_norm_matrix
 export get_H1_norm_matrix
 include("FEUtils.jl")
-
-export ReducedMeasure
-include("ReducedMeasure.jl")
 end # module

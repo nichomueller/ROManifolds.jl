@@ -126,21 +126,21 @@ end
 
 for op in (:+,:-)
   @eval begin
-    function Base.:($op)(a::T,b::T) where T<:ParamArray
+    function ($op)(a::T,b::T) where T<:ParamArray
       c = similar(a)
       @inbounds for i = eachindex(a)
         c[i] = ($op)(a[i],b[i])
       end
       c
     end
-    function Base.:($op)(a::ParamArray{T},b::S) where {T,S<:AbstractArray{T}}
+    function ($op)(a::ParamArray{T},b::S) where {T,S<:AbstractArray{T}}
       c = similar(a)
       @inbounds for i = eachindex(a)
         c[i] = ($op)(a[i],b)
       end
       c
     end
-    function Base.:($op)(a::S,b::ParamArray{T}) where {T,S<:AbstractArray{T}}
+    function ($op)(a::S,b::ParamArray{T}) where {T,S<:AbstractArray{T}}
       c = similar(b)
       @inbounds for i = eachindex(b)
         c[i] = ($op)(a,b[i])

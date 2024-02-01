@@ -28,9 +28,7 @@ import SparseMatricesCSR: SparseMatrixCSR
 import SparseMatricesCSR: getoffset
 import UnPack: @unpack
 
-import Gridap.Helpers: @check
-import Gridap.Helpers: @notimplemented
-import Gridap.Helpers: @unreachable
+import Gridap.Helpers: @check,@notimplemented,@unreachable
 
 import Mabla.FEM: ParamBroadcast
 

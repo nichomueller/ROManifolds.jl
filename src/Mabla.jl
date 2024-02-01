@@ -25,123 +25,95 @@ export orth_projection
 include("FEM/FEM.jl")
 using Mabla.FEM
 
-export Table
-export Affine
-export ParamSpace
+export ParamRealization
+export TransientParamRealization
 export UniformSampling
 export NormalSampling
+export ParamSpace
+export TransientParamSpace
+export ParamFunction, 𝑓ₚ
+export TransientParamFunction, 𝑓ₚₜ
 export realization
+export get_params
+export get_times
+
+export AbstractParamContainer
+export ParamContainer
+
 export ParamArray
+export ParamVector
+export ParamMatrix
 export allocate_param_array
 export zero_param_array
 export get_at_offsets
 export recenter
+
+export ParamBlockArray
+
+export ParamReindex
+export PosNegParamReindex
+
+export ParamField
+export ParamFieldGradient
+export GenericParamField
+export ZeroParamField
+export ConstantParamField
+export OperationParamField
+
+export SingleFieldParamFESpace
+export FESpaceToParamFESpace
+export length_dirichlet_values
+export length_free_values
+
+export MultiFieldParamFESpace
+
 export TrialParamFESpace
 export TrialParamFESpace!
 export HomogeneousTrialParamFESpace
-export MultiFieldParamFESpace
-export AbstractParamFunction
-export ParamFunction, 𝑓ₚ
-export TransientParamFunction, 𝑓ₚₜ
+
+export ParamFEFunction
+export SingleFieldParamFEFunction
+export MultiFieldParamFEFunction
+
 export TransientTrialParamFESpace
 export TransientMultiFieldParamFESpace
 export TransientMultiFieldTrialParamFESpace
+
+export ParamCounter
+export ParamInserterCSC
+export ParamCSSR
+
 export TransientParamFEOperator
 export TransientParamFEOperatorFromWeakForm
 export AffineTransientParamFEOperator
 export NonlinearTransientParamFEOperator
 export residual_for_trian!
 export jacobian_for_trian!
-export ODEParamSolution
-# export num_time_dofs
-# export get_times
-# export get_stencil_times
-export collect_solutions
-export collect_residuals_for_trian
-export collect_jacobians_for_trian
-export AffineThetaMethodParamOperator
+
+export ODEParamOperator
+export ConstantODEParamOperator
+export ConstantMatrixODEParamOperator
+export AffineODEParamOperator
+export NonlinearODEParamOperator
+export ODEParamOpFromFEOp
+
 export ThetaMethodParamOperator
-export get_order
-export get_L2_norm_matrix
-export get_H1_norm_matrix
-# export ReducedMeasure
+export AffineThetaMethodParamOperator
+
+export ODEParamSolution
+export GenericODEParamSolution
+
+export TransientParamFESolution
+
 export ParamString
 export ParamVisualizationData
 
-# include("RB/RB.jl")
-# using Mabla.RB
+export get_order
+export get_L2_norm_matrix
+export get_H1_norm_matrix
 
-# export RBInfo
-# export BlockRBInfo
-# export ComputationInfo
-# export get_norm_matrix
-# export Snapshots
-# export num_space_dofs
-# export num_time_dofs
-# export num_params
-# export NnzArray
-# export NnzVector
-# export NnzMatrix
-# export get_nonzero_val
-# export get_nonzero_idx
-# export get_nrows
-# export recast
-# export compress
-# export RBSpace
-# export reduced_basis
-# export get_basis_space
-# export get_basis_time
-# export num_rb_space_ndofs
-# export num_rb_time_ndofs
-# export num_rb_ndofs
-# export space_time_projection
-# export RBAffineDecomposition
-# export RBVecAffineDecomposition
-# export RBMatAffineDecomposition
-# export GenericRBAffineDecomposition
-# export TrivialRBAffineDecomposition
-# export RBIntegrationDomain
-# export RBContributionMap
-# export RBVecContributionMap
-# export RBMatContributionMap
-# export get_interpolation_idx
-# export project_space
-# export project_time
-# export project_space_time
-# export get_reduced_cells
-# export collect_reduced_residuals!
-# export collect_reduced_jacobians!
-# export rb_coefficient!
-# export rb_contribution!
-# export zero_rb_contribution
-# export RBAlgebraicContribution
-# export RBVecAlgebraicContribution
-# export RBMatAlgebraicContribution
-# export collect_compress_rhs
-# export collect_compress_lhs
-# export collect_compress_rhs_lhs
-# export compress_component
-# export collect_rhs_contributions!
-# export collect_lhs_contributions!
-# export collect_rhs_lhs_contributions!
-# export RBResults
-# export rb_solver
-# export post_process
-# export plot_results
-# export compute_relative_error
-# export nearest_neighbor
-# export RBBlock
-# export BlockSnapshots
-# export BlockRBSpace
-# export BlockRBAlgebraicContribution
-# export BlockRBVecAlgebraicContribution
-# export BlockRBMatAlgebraicContribution
-# export BlockRBResults
-# export get_blocks
-# export fe_offsets
-# export rb_offsets
-# export add_space_supremizers
-# export add_time_supremizers
+include("RBNew/RB.jl")
+using Mabla.RB
 
 include("Distributed/Distributed.jl")
 using Mabla.Distributed
