@@ -1,11 +1,3 @@
-abstract type RBSpace <: FESpace end
-
-struct SingleFieldRBSpace{S<:SingleFieldFESpace,M<:AbstractMatrix} <: RBSpace
-  space::S
-  basis::M
-end
-
-
 function reduced_basis(
   rbinfo::RBInfo,
   feop::TransientParamFEOperator,
@@ -23,18 +15,27 @@ function reduced_basis(
   nsnaps_state=50,
   kwargs...)
 
+  flag = false
   if size(s,1) < size(s,2)
     s = change_mode!(s)
+    flag = true
   end
   sview = view(s,:,1:nsnaps_state)
   b1 = tpod(sview,norm_matrix;kwargs...)
-  compressed_sview = b1'*sview
-  change_mode!(compressed_sview)
+  compressed_sview = compress(b1,sview)
+  compressed_sview = change_mode!(compressed_sview)
   b2 = tpod(compressed_sview;kwargs...)
-  if get_mode(s) == Mode1Axis()
-    basis_space,basis_time = b1,b2
-  else
+  if flag
     basis_space,basis_time = b2,b1
+  else
+    basis_space,basis_time = b1,b2
   end
   return basis_space,basis_time
+end
+
+abstract type RBSpace <: FESpace end
+
+struct SingleFieldRBSpace{S<:SingleFieldFESpace,M<:AbstractMatrix} <: RBSpace
+  space::S
+  basis::M
 end

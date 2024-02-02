@@ -129,11 +129,10 @@ end
 
 function Base.view(
   s::TransientSnapshotsWithInitialValues,
-  rowrange::Colon,
-  colrange::UnitRange{Ti}) where Ti
+  timerange::Colon,
+  paramrange::UnitRange{Ti}) where Ti
 
-  # colrange refers exclusively to the parameter
-  rrange = s.realization[colrange,:]
+  rrange = s.realization[paramrange,timerange]
   TransientSnapshotsWithInitialValues(s.mode,s.values,s.initial_values,rrange)
 end
 
@@ -191,16 +190,16 @@ end
 
 function Base.view(
   s::TransientSnapshots,
-  rowrange::Colon,
-  colrange::UnitRange{Ti}) where Ti
+  timerange::Colon,
+  paramrange::UnitRange{Ti}) where Ti
 
-  # colrange refers exclusively to the parameter
-  rrange = s.realization[colrange,:]
+  rrange = s.realization[paramrange,timerange]
   TransientSnapshots(s.mode,s.values,rrange)
 end
 
-struct CompressedTransientSnapshots{M,T,R} <: AbstractTransientSnapshots{M,T}
-  mode::M
+struct CompressedTransientSnapshots{M,N,T,R} <: AbstractTransientSnapshots{M,T}
+  current_mode::M
+  initial_mode::N
   values::AbstractMatrix{T}
   realization::R
 end
@@ -211,25 +210,35 @@ function Snapshots(
   mode::M=Mode1Axis()
   ) where {M,T,R}
 
-  CompressedTransientSnapshots(mode,values,realization)
+  CompressedTransientSnapshots(mode,mode,values,realization)
 end
 
-num_space_dofs(s::CompressedTransientSnapshots{Mode1Axis}) = size(s.values,1)
-num_space_dofs(s::CompressedTransientSnapshots{Mode2Axis}) = Int(size(s.values,2) / num_params(s))
+num_space_dofs(s::CompressedTransientSnapshots{Mode1Axis,Mode1Axis}) = size(s.values,1)
+num_space_dofs(s::CompressedTransientSnapshots{Mode2Axis,Mode1Axis}) = size(s.values,1)
+num_space_dofs(s::CompressedTransientSnapshots{Mode1Axis,Mode2Axis}) = Int(size(s.values,2) / num_params(s))
+num_space_dofs(s::CompressedTransientSnapshots{Mode2Axis,Mode2Axis}) = Int(size(s.values,2) / num_params(s))
 
 function change_mode!(s::CompressedTransientSnapshots{Mode1Axis})
-  CompressedTransientSnapshots(s.values,s.realization,Mode2Axis())
+  CompressedTransientSnapshots(Mode2Axis(),Mode1Axis(),s.values,s.realization)
 end
 
 function change_mode!(s::CompressedTransientSnapshots{Mode2Axis})
-  CompressedTransientSnapshots(s.values,s.realization,Mode1Axis())
+  CompressedTransientSnapshots(Mode1Axis(),Mode2Axis(),s.values,s.realization)
 end
 
-function tensor_getindex(s::CompressedTransientSnapshots{Mode1Axis},ispace,itime,iparam)
+function tensor_getindex(
+  s::CompressedTransientSnapshots{M,Mode1Axis},
+  ispace,itime,iparam
+  ) where M
+
   np = num_params(s)
   s.values[ispace,(itime-1)*np+iparam]
 end
-function tensor_getindex(s::CompressedTransientSnapshots{Mode2Axis},ispace,itime,iparam)
+function tensor_getindex(
+  s::CompressedTransientSnapshots{M,Mode2Axis},
+  ispace,itime,iparam
+  ) where M
+
   np = num_params(s)
   s.values[itime,(ispace-1)*np+iparam]
 end

@@ -12,11 +12,10 @@ function GridapDistributed._find_vector_type(
 end
 
 function FEM.TrialParamFESpace(f::DistributedSingleFieldFESpace)
-  spaces,vector_types = map(f.spaces) do s
-    space = TrialParamFESpace(s)
-    vector_type = get_vector_type(space)
-    space,vector_type
-  end |> tuple_of_arrays
+  spaces = map(f.spaces) do s
+    TrialParamFESpace(s)
+  end
+  vector_types = GridapDistributed._find_vector_type(spaces,f.gids)
   DistributedSingleFieldFESpace(spaces,f.gids,vector_types)
 end
 
@@ -37,29 +36,26 @@ function FEM.TrialParamFESpace(fun,f::DistributedSingleFieldFESpace)
 end
 
 function FEM.TrialParamFESpace!(f::DistributedSingleFieldFESpace,fun)
-  spaces,vector_types = map(f.spaces) do s
-    space = TrialParamFESpace!(s,fun)
-    vector_type = get_vector_type(space)
-    space,vector_type
-  end |> tuple_of_arrays
+  spaces = map(f.spaces) do s
+    TrialParamFESpace!(s,fun)
+  end
+  vector_types = GridapDistributed._find_vector_type(spaces,f.gids)
   DistributedSingleFieldFESpace(spaces,f.gids,vector_types)
 end
 
 function FEM.HomogeneousTrialParamFESpace(f::DistributedSingleFieldFESpace,args...)
-  spaces,vector_types = map(f.spaces) do s
-    space = HomogeneousTrialParamFESpace(s,args...)
-    vector_type = get_vector_type(space)
-    space,vector_type
-  end |> tuple_of_arrays
+  spaces = map(f.spaces) do s
+    HomogeneousTrialParamFESpace(s,args...)
+  end
+  vector_types = GridapDistributed._find_vector_type(spaces,f.gids)
   DistributedSingleFieldFESpace(spaces,f.gids,vector_types)
 end
 
 function FEM.FESpaceToParamFESpace(f::DistributedSingleFieldFESpace,args...)
-  spaces,vector_types = map(f.spaces) do s
-    space = FESpaceToParamFESpace(s,args...)
-    vector_type = get_vector_type(space)
-    space,vector_type
-  end |> tuple_of_arrays
+  spaces = map(f.spaces) do s
+    FESpaceToParamFESpace(s,args...)
+  end
+  vector_types = GridapDistributed._find_vector_type(spaces,f.gids)
   DistributedSingleFieldFESpace(spaces,f.gids,vector_types)
 end
 
@@ -103,6 +99,36 @@ function FESpaces.SparseMatrixAssembler(
   Tm = SparseMatrixCSC{T,Int}
   Tpm = typeof(ParamMatrix{Tm}(undef,length_free_values(trial)))
   SparseMatrixAssembler(Tpm,Tpv,trial,test,par_strategy)
+end
+
+function FEM.get_param_vector_builder(
+  a::DistributedSparseMatrixAssembler,
+  r::FEM.AbstractParamRealization)
+
+  L = length(r)
+  vec = get_vector_builder(a)
+  V = get_array_type(vec)
+  elV = eltype(V)
+  pvector_type = ParamVector{elV,Vector{V},L}
+  ArrayBuilder(pvector_type)
+end
+
+function FEM.get_param_assembler(
+  a::DistributedSparseMatrixAssembler,
+  r::FEM.AbstractParamRealization)
+
+  rows = FESpaces.get_rows(a)
+  cols = FESpaces.get_cols(a)
+  assems = map(local_views(a)) do assem
+    FEM.get_param_assembler(assem,r)
+  end
+  assem = PartitionedArrays.getany(assems)
+  local_mat_type = FESpaces.get_matrix_type(assem)
+  local_vec_type = FESpaces.get_vector_type(assem)
+  par_strategy = FESpaces.get_assembly_strategy(a)
+  matrix_builder = PSparseMatrixBuilderCOO(local_mat_type,par_strategy)
+  vector_builder = PVectorBuilder(local_vec_type,par_strategy)
+  DistributedSparseMatrixAssembler(par_strategy,assems,matrix_builder,vector_builder,rows,cols)
 end
 
 const DistributedMultiFieldParamFESpace = GridapDistributed.DistributedMultiFieldFESpace{MS,<:AbstractVector{<:MultiFieldParamFESpace},B,C,D} where {MS,B,C,D}

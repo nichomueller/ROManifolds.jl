@@ -32,6 +32,22 @@ function Base.getindex(a::ParamArrayLocalView,index::Integer)
   GridapDistributed.LocalView(a.plids_to_value[index],a.d_to_lid_to_plid)
 end
 
+@inline function Algebra.add_entry!(combine::Function,A::ParamMatrixLocalView,v::Number,i,j)
+  for k = eachindex(A)
+    aij = A[k][i,j]
+    A[k][i,j] = combine(aij,v)
+  end
+  A
+end
+
+@inline function Algebra.add_entry!(combine::Function,A::ParamVectorLocalView,v::Number,i)
+  for k = eachindex(A)
+    ai = A[k][i]
+    A[k][i] = combine(ai,v)
+  end
+  A
+end
+
 @inline function Algebra._add_entries!(
   combine::Function,A::ParamMatrixLocalView,vs::AbstractParamContainer,is,js)
   for (lj,j) in enumerate(js)
@@ -69,17 +85,4 @@ function Base.materialize(
   a = PVector{PT}(undef,b.index_partition)
   Base.materialize!(a,b)
   a
-end
-
-function ODETools.jacobians!(
-  A::AbstractMatrix,
-  op::TransientParamFEOperator,
-  r::TransientParamRealization,
-  xh::TransientDistributedCellField,
-  γ::Tuple{Vararg{Real}})
-
-  _matdata_jacobians = TransientFETools.fill_jacobians(op,μ,t,xh,γ)
-  matdata = GridapDistributed._vcat_distributed_matdata(_matdata_jacobians)
-  assemble_matrix_add!(A,op.assem,matdata)
-  A
 end

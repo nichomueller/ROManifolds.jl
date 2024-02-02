@@ -1,3 +1,18 @@
+const PVectorParamCounter = GridapDistributed.PVectorCounter{A,B,C} where {
+  A,B<:AbstractVector{<:Algebra.ArrayCounter{<:AbstractParamContainer}},C}
+
+function Arrays.nz_allocation(a::PVectorParamCounter{<:SubAssembledRows})
+  dofs = a.test_dofs_gids_prange
+  values = map(nz_allocation,a.counters)
+  touched = map(values) do values
+    fill!(Vector{Bool}(undef,length(first(values))),false)
+  end
+  allocations = map(values,touched) do values,touched
+    GridapDistributed.ArrayAllocationTrackTouchedAndValues(touched,values)
+  end
+  return GridapDistributed.PVectorAllocationTrackTouchedAndValues(allocations,values,dofs)
+end
+
 const DistributedParamAllocationVector = Union{
   PVectorAllocationTrackOnlyValues{A,B,C},
   PVectorAllocationTrackTouchedAndValues{A,B,C}

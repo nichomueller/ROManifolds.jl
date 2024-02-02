@@ -73,11 +73,16 @@ dir = datadir(joinpath("heateq","toy_mesh"))
 rbinfo = RBInfo(dir;nsnaps_state=5,nsnaps_test=5)
 
 snaps,comp = RB.collect_solutions(rbinfo,fesolver,feop,uh0μ)
-reduced_basis(rbinfo,feop,snaps)
+bs,bt = reduced_basis(rbinfo,feop,snaps)
 
-if size(snaps,1) < size(snaps,2)
-  _snaps = RB.change_mode!(snaps)
+x1 = ParamArray(RB.tensor_getindex(snaps,:,:,1))
+r1 = snaps.realization[1,:]
+trial1 = trial(r1)
+x1h = FEFunction(trial1,x1)
+
+create_dir(dir)
+for (k,(μ,t)) in enumerate(r1)
+  x1hk = FEM._getindex(x1h,k)
+  file = joinpath(dir,"solution_$t"*".vtu")
+  writevtk(Ω,file,cellfields=["u"=>x1hk])
 end
-sview = view(_snaps,:,1:5)
-b1 = tpod(sview,nothing;ϵ=1e-4)
-compressed_sview = RB.compress(b1,sview)

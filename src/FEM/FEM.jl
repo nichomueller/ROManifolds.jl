@@ -141,6 +141,9 @@ include("TransientParamFESolution.jl")
 
 export ParamString
 export ParamVisualizationData
+export create_dir
+export get_parent_dir
+export correct_path
 include("ParamVisualization.jl")
 
 export get_order

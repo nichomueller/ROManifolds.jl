@@ -23,9 +23,6 @@ import Gridap.Algebra: allocate_matrix,allocate_vector,solve
 import PartitionedArrays: tuple_of_arrays
 
 export RBInfo
-export get_parent_dir
-export create_dir
-export correct_path
 include("RBInfo.jl")
 
 export tpod
