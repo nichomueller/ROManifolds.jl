@@ -1,5 +1,4 @@
 module Distributed
-using Mabla.Utils
 using Mabla.FEM
 # using Mabla.RB
 

@@ -39,7 +39,7 @@ res(μ,t,u,v) = ∫ₚ(v*∂t(u),dΩ) + ∫ₚ(aμt(μ,t)*∇(v)⋅∇(u),dΩ) -
 jac(μ,t,u,du,v) = ∫ₚ(aμt(μ,t)*∇(v)⋅∇(du),dΩ)
 jac_t(μ,t,u,dut,v) = ∫ₚ(v*dut,dΩ)
 
-T = Float
+T = Float64
 reffe = ReferenceFE(lagrangian,T,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = TransientTrialParamFESpace(test,g)

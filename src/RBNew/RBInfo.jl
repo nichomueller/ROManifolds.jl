@@ -1,3 +1,30 @@
+function get_parent_dir(dir::String;nparent=1)
+  dir = dir[1:findall(x->x=='/',dir)[end]-1]
+  for _ = 1:nparent-1
+    dir = dir[1:findall(x->x=='/',dir)[end]-1]
+  end
+  dir
+end
+
+"""Get a full list of subdirectories at a given root directory"""
+function get_all_subdirectories(path::String)
+  filter(isdir,readdir(path,join=true))
+end
+
+"""Get a full list of subdirectories at a given root directory"""
+function get_all_subfiles(path::String)
+  filter(isfile,readdir(correct_path(path),join=true))
+end
+
+"""Create a directory at the given path"""
+function create_dir(path::String)
+  if !isdir(path)
+    create_dir(get_parent_dir(path))
+    mkdir(path)
+  end
+  return
+end
+
 function get_fe_path(tpath::String)
   fepath = joinpath(tpath,"fem")
   create_dir(fepath)
@@ -14,7 +41,7 @@ function get_rb_path(tpath::String,ϵ;st_mdeim=false)
 end
 
 struct RBInfo
-  ϵ::Float
+  ϵ::Float64
   fe_path::String
   rb_path::String
   norm_style::Symbol
@@ -39,6 +66,12 @@ function RBInfo(
     nsnaps_mdeim,nsnaps_test,st_mdeim)
 end
 
+num_snaps_offline(rbinfo::RBInfo) = rbinfo.nsnaps_state
+num_snaps_online(rbinfo::RBInfo) = rbinfo.nsnaps_test
+num_snaps(rbinfo::RBInfo) = num_snaps_offline(rbinfo) + num_snaps_online(rbinfo)
+num_snaps_mdeim(rbinfo::RBInfo) = rbinfo.nsnaps_mdeim
+get_tol(rbinfo::RBInfo) = rbinfo.ϵ
+
 function get_norm_matrix(rbinfo::RBInfo,feop::TransientParamFEOperator)
   norm_style = rbinfo.norm_style
   try
@@ -58,7 +91,7 @@ function get_norm_matrix(rbinfo::RBInfo,feop::TransientParamFEOperator)
 end
 
 struct BlockRBInfo
-  ϵ::Float
+  ϵ::Float64
   fe_path::String
   rb_path::String
   norm_style::Vector{Symbol}
@@ -92,8 +125,8 @@ function Base.getindex(rbinfo::BlockRBInfo,i::Int)
 end
 
 struct ComputationInfo
-  avg_time::Float
-  avg_nallocs::Float
+  avg_time::Float64
+  avg_nallocs::Float64
   function ComputationInfo(stats::NamedTuple,nruns::Int)
     avg_time = stats[:time] / nruns
     avg_nallocs = stats[:bytes] / (1e6*nruns)

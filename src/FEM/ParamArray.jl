@@ -104,8 +104,9 @@ function Base.zeros(a::ParamArray)
 end
 
 function Arrays.testvalue(::Type{ParamArray{T,N,A,L}}) where {T,N,A,L}
-  array = map(1:L) do i
-    testvalue(eltype(A))
+  array = Vector{testvalue(eltype(A))}(undef,L)
+  @inbounds for k = eachindex(array)
+    array[k] = testvalue(eltype(A))
   end
   ParamArray(array,Val(L))
 end
@@ -276,9 +277,9 @@ function LinearAlgebra.ldiv!(a::ParamArray,m::LU,b::ParamArray)
   return a
 end
 
-function LinearAlgebra.ldiv!(a::ParamArray,m::AbstractArray,b::ParamArray)
+function LinearAlgebra.ldiv!(a::ParamArray,m::ParamContainer,b::ParamArray)
   @assert length(a) == length(m) == length(b)
-  map(a,m,b) do a,m,b
+  map(a.array,m.array,b.array) do a,m,b
     ldiv!(a,m,b)
   end
   return a
@@ -1141,22 +1142,3 @@ function Arrays.evaluate!(cache,k::MulAddMap,a::ParamArray,b::ParamArray,c::Para
   mul!(d,a,b,k.α,k.β)
   d
 end
-
-# function Utils.recenter(a::ParamArray{T},a0::ParamArray{T};kwargs...) where T
-#   n = length(a)
-#   n0 = length(a0)
-#   ndiff = Int(n/n0)
-#   array = Vector{T}(undef,n)
-#   @inbounds for i = 1:n0
-#     array[(i-1)*ndiff+1:i*ndiff] = recenter(a[(i-1)*ndiff+1:i*ndiff],a0[i];kwargs...)
-#   end
-#   ParamArray(array)
-# end
-
-# function get_at_offsets(x::ParamVector,offsets::Vector{Int},row::Int)
-#   map(y->y[offsets[row]+1:offsets[row+1]],x)
-# end
-
-# function get_at_offsets(x::ParamMatrix,offsets::Vector{Int},row::Int,col::Int)
-#   map(y->y[offsets[row]+1:offsets[row+1],offsets[col]+1:offsets[col+1]],x)
-# end

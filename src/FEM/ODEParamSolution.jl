@@ -36,6 +36,18 @@ function Base.iterate(sol::ODEParamSolution,state)
   return (uf,rf),state
 end
 
+function Base.collect(sol::ODEParamSolution)
+  ntimes = num_times(sol.r)
+
+  initial_values = sol.u0
+  V = typeof(initial_values)
+  free_values = Vector{V}(undef,ntimes)
+  for (k,(ut,rt)) in enumerate(sol)
+    free_values[k] = copy(ut)
+  end
+  return free_values,initial_values
+end
+
 function Algebra.solve(
   solver::ODESolver,
   op::ODEParamOperator,

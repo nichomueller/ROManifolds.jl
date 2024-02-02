@@ -39,7 +39,7 @@ end
 struct ThetaMethodParamOperator <: NonlinearOperator
   odeop::ODEParamOperator
   r::TransientParamRealization
-  dtθ::Float
+  dtθ::Float64
   u0::AbstractVector
   ode_cache
   vθ::AbstractVector
@@ -48,7 +48,7 @@ end
 function get_method_operator(
   odeop::ODEParamOperator,
   r::TransientParamRealization,
-  dtθ::Float,
+  dtθ::Float64,
   u0::AbstractVector,
   ode_cache,
   vθ::AbstractVector)
@@ -182,7 +182,7 @@ end
 struct AffineThetaMethodParamOperator <: NonlinearOperator
   odeop::AffineODEParamOperator
   r::TransientParamRealization
-  dtθ::Float
+  dtθ::Float64
   u0::AbstractVector
   ode_cache
   vθ::AbstractVector
@@ -191,7 +191,7 @@ end
 function get_method_operator(
   odeop::AffineODEParamOperator,
   r::TransientParamRealization,
-  dtθ::Float,
+  dtθ::Float64,
   u0::AbstractVector,
   ode_cache,
   vθ::AbstractVector)

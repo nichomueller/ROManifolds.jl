@@ -13,27 +13,12 @@ function ReferenceFEs.get_order(test::SingleFieldFESpace)
   end
 end
 
-function Utils.recenter(a::ParamArray,ah0::FEFunction;kwargs...)
-  a0 = get_free_dof_values(ah0)
-  recenter(a,a0;kwargs...)
-end
-
-function Utils.recenter(a::Vector{<:ParamArray},ah0::FEFunction;kwargs...)
-  map(eachindex(a)) do i
-    ai = a[i]
-    ai0 = get_free_dof_values(ah0[i])
-    recenter(ai,ai0;kwargs...)
-  end
-end
-
 for f in (:get_L2_norm_matrix,:get_H1_norm_matrix)
   @eval begin
     function $f(op::TransientParamFEOperator)
-      μ,t = realization(op),0.
       test = op.test
-      trial = get_trial(op)
-      trial_hom = allocate_trial_space(trial,μ,t)
-      $f(trial_hom,test)
+      trial = evaluate(get_trial(op),nothing)
+      $f(trial,test)
     end
 
     function $f(

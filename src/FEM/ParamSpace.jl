@@ -10,19 +10,22 @@ num_params(r::ParamRealization) = length(_get_params(r))
 num_params(r::TrivialParamRealization) = 1
 Base.length(r::ParamRealization) = num_params(r)
 Base.size(r::ParamRealization) = (length(r),)
-Base.getindex(r::ParamRealization,i) = getindex(_get_params(r),i)
+Base.getindex(r::ParamRealization,i) = ParamRealization(getindex(_get_params(r),i))
 Base.getindex(r::TrivialParamRealization,i) = i == 1 ? _get_params(r) : throw(BoundsError())
-Arrays.testitem(r::ParamRealization) = getindex(r,1)
+Arrays.testitem(r::ParamRealization) = testitem(_get_params(r))
+Arrays.testitem(r::TrivialParamRealization) = _get_params(r)
 
 # when iterating over a ParamRealization{P}, we return eltype(P) ∀ index i
 function Base.iterate(r::ParamRealization,state=1)
   if state > length(r)
     return nothing
   end
-  rstate = r[state]
+  rstate = _get_params(r)[state]
   return rstate, state+1
 end
 
+# Convention: t0 = times[1] is the initial time step, which we disregard in
+# unsteady FEM applications given that the value of the solution at t0 is given
 struct TransientParamRealization{P<:ParamRealization,T}
   params::P
   times::Base.RefValue{T}
@@ -37,16 +40,17 @@ const TrivialTransientParamRealization = TransientParamRealization{<:TrivialPara
 get_params(r::TransientParamRealization) = get_params(r.params)
 _get_params(r::TransientParamRealization) = _get_params(r.params)
 num_params(r::TransientParamRealization) = num_params(r.params)
-get_times(r::TransientParamRealization) = r.times[]
+_get_times(r::TransientParamRealization) = r.times[]
+get_times(r::TransientParamRealization) = r.times[][2:end]
+get_times(r::TransientParamRealization{<:ParamRealization,<:Number}) = _get_times(r)
 num_times(r::TransientParamRealization) = length(get_times(r))
 Base.length(r::TransientParamRealization) = num_params(r)*num_times(r)
 Base.size(r::TransientParamRealization) = (length(r),)
-Base.getindex(r::TransientParamRealization,i) = TransientParamRealization(getindex(get_params(r),i),r.times)
-Base.getindex(r::TransientParamRealization,i,j) = TransientParamRealization(getindex(get_params(r),i),getindex(get_times(r),j))
+Base.getindex(r::TransientParamRealization,i,j) = TransientParamRealization(getindex(get_params(r),i),getindex(_get_times(r),j))
 Arrays.testitem(r::TransientParamRealization) = testitem(get_params(r)),testitem(get_times(r))
 
 function Base.iterate(r::TransientParamRealization)
-  iterator = Iterators.product(get_times(r),get_params(r))
+  iterator = Iterators.product(_get_times(r),_get_params(r))
   iternext = iterate(iterator)
   if isnothing(iternext)
     return nothing
@@ -67,21 +71,10 @@ function Base.iterate(r::TransientParamRealization,state)
   (pstate,tstate),state
 end
 
-function get_initial_time(r::TransientParamRealization)
-  first(get_times(r))
-end
-
-function get_final_time(r::TransientParamRealization)
-  last(get_times(r))
-end
-
-function get_midpoint_time(r::TransientParamRealization)
-  (get_final_time(r) + get_initial_time(r)) / 2
-end
-
-function get_delta_time(r::TransientParamRealization)
-  (get_final_time(r) - get_initial_time(r)) / num_times(r)
-end
+get_initial_time(r::TransientParamRealization) = first(_get_times(r))
+get_final_time(r::TransientParamRealization) = last(_get_times(r))
+get_midpoint_time(r::TransientParamRealization) = (get_final_time(r) + get_initial_time(r)) / 2
+get_delta_time(r::TransientParamRealization) = (get_final_time(r) - get_initial_time(r)) / num_times(r)
 
 function get_at_time(r::TransientParamRealization,time=:initial)
   params = get_params(r)
@@ -349,7 +342,7 @@ function test_parametric_space()
   @test isa(γ,TrivialTransientParamRealization)
   @test isa(δ,TransientParamRealization{<:TrivialParamRealization,UnitRange{Int}})
   @test isa(ϵ,TransientParamRealization{ParamRealization{Vector{Vector{Float64}}},UnitRange{Int}})
-  @test length(γ) == 1 && length(δ) == 10 && length(ϵ) == 10
+  @test length(γ) == 1 && length(δ) == 9 && length(ϵ) == 9
   change_time!(ϵ,11:20)
   @test get_times(get_at_time(ϵ,:final)) == 20
   param_domain = [[1,10],[11,20]]

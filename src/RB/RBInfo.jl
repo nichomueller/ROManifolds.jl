@@ -16,7 +16,7 @@ function get_rb_path(tpath::String,ϵ;st_mdeim=false)
 end
 
 struct RBInfo
-  ϵ::Float
+  ϵ::Float64
   fe_path::String
   rb_path::String
   norm_style::Symbol
@@ -60,7 +60,7 @@ function get_norm_matrix(rbinfo::RBInfo,feop::TransientParamFEOperator)
 end
 
 struct BlockRBInfo
-  ϵ::Float
+  ϵ::Float64
   fe_path::String
   rb_path::String
   norm_style::Vector{Symbol}
@@ -126,8 +126,8 @@ for Ti in (:RBInfo,:BlockRBInfo)
 end
 
 struct ComputationInfo
-  avg_time::Float
-  avg_nallocs::Float
+  avg_time::Float64
+  avg_nallocs::Float64
   function ComputationInfo(stats::NamedTuple,nruns::Int)
     avg_time = stats[:time] / nruns
     avg_nallocs = stats[:bytes] / (1e6*nruns)

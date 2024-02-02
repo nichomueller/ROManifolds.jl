@@ -5,19 +5,15 @@ function collect_solutions(
   uh0::Function;
   kwargs...)
 
-  nparams = rbinfo.nsnaps
+  nparams = num_snaps(rbinfo)
   sol = solve(solver,op,uh0;nparams)
-  iv = sol.odesol.u0
-  r = sol.odesol.r
+  odesol = sol.odesol
+  realization = odesol.r
 
-  trial = evaluate(get_trial(op),r)
-  V = get_vector_type(trial)
-  fv = V[]
-
-  stats = @timed for (uht,rt) in sol
-    push!(fv,uht.free_values)
+  stats = @timed begin
+    values,initial_values = collect(odesol)
   end
-  snaps = Snapshots(fv,iv,r)
+  snaps = Snapshots(values,initial_values,realization)
   cinfo = ComputationInfo(stats,nparams)
 
   return snaps,cinfo
@@ -43,9 +39,8 @@ Base.ndims(::AbstractTransientSnapshots) = 2
 Base.ndims(::Type{<:AbstractTransientSnapshots}) = 2
 Base.IndexStyle(::Type{<:AbstractTransientSnapshots}) = IndexLinear()
 
-num_space_dofs(s::AbstractTransientSnapshots) = length(first(first(s.values)))
-num_times(::AbstractTransientSnapshots) = num_times(s.realization)
-num_params(::AbstractTransientSnapshots) = num_params(s.realization)
+FEM.num_times(s::AbstractTransientSnapshots) = num_times(s.realization)
+FEM.num_params(s::AbstractTransientSnapshots) = num_params(s.realization)
 get_mode(s::AbstractTransientSnapshots) = s.mode
 row_size(s::AbstractTransientSnapshots{Mode1Axis}) = num_space_dofs(s)
 row_size(s::AbstractTransientSnapshots{Mode2Axis}) = num_times(s)
@@ -58,9 +53,9 @@ Base.axes(s::AbstractTransientSnapshots) = Base.OneTo.(size(s))
 Base.eltype(::AbstractTransientSnapshots{M,T}) where {M,T} = T
 Base.eltype(::Type{<:AbstractTransientSnapshots{M,T}}) where {M,T} = T
 
-function Base.show(io::IO,::MIME"text/plain",s::AbstractTransientSnapshots{M}) where M
-  println(io, "Transient snapshot matrix of size $(size(s)) ordered in $M representation")
-end
+# function Base.show(io::IO,::MIME"text/plain",s::AbstractTransientSnapshots{M}) where M
+#   println(io, "Transient snapshot matrix of size $(size(s)) ordered in $M representation")
+# end
 
 function Base.getindex(s::AbstractTransientSnapshots{Mode1Axis},ispace::Int,j::Int)
   np = num_params(s)
@@ -71,36 +66,50 @@ end
 
 function Base.getindex(s::AbstractTransientSnapshots{Mode2Axis},itime::Int,j::Int)
   np = num_params(s)
-  ispace = mod(j-1,np) + 1
-  iparam = Int(floor((j-1)/np) + 1)
+  ispace = Int(floor((j-1)/np) + 1)
+  iparam = mod(j-1,np) + 1
   tensor_getindex(s,ispace,itime,iparam)
 end
 
-struct TransientSnapshotsWithInitialValues{M,T,R} <: AbstractTransientSnapshots{M,T}
+function compress(a::AbstractMatrix,s::AbstractTransientSnapshots{Mode1Axis})
+  @fastmath compressed_values = a'*s
+  Snapshots(compressed_values,s.realization,Mode1Axis())
+end
+
+function compress(a::AbstractMatrix,s::AbstractTransientSnapshots{Mode2Axis})
+  @fastmath compressed_values = a'*s
+  compressed_realization = s.realization[:,axes(a,2)]
+  Snapshots(compressed_values,compressed_realization,Mode2Axis())
+end
+
+struct TransientSnapshotsWithInitialValues{M,T,P,R} <: AbstractTransientSnapshots{M,T}
   mode::M
-  values::AbstractVector{T}
-  initial_values::T
+  values::AbstractVector{P}
+  initial_values::P
   realization::R
   function TransientSnapshotsWithInitialValues(
     mode::M,
-    values::AbstractVector{T},
-    initial_values::T,
+    values::AbstractVector{P},
+    initial_values::P,
     realization::R
-    ) where {M,T<:AbstractParamContainer,R<:TransientParamRealization}
+    ) where {M,P<:AbstractParamContainer,R<:TransientParamRealization}
 
-    new{M,T,R}(mode,values,initial_values,realization)
+    T = eltype(P)
+    new{M,T,P,R}(mode,values,initial_values,realization)
   end
 end
 
 function Snapshots(
-  values::AbstractVector{T},
-  initial_values::T,
+  values::AbstractVector{P},
+  initial_values::P,
   realization::R,
   mode::M=Mode1Axis()
-  ) where {M,T,R}
+  ) where {M,P,R}
 
   TransientSnapshotsWithInitialValues(mode,values,initial_values,realization)
 end
+
+num_space_dofs(s::TransientSnapshotsWithInitialValues) = length(first(s.initial_values))
 
 function change_mode!(s::TransientSnapshotsWithInitialValues{Mode1Axis})
   TransientSnapshotsWithInitialValues(Mode2Axis(),s.values,s.initial_values,s.realization)
@@ -120,11 +129,11 @@ end
 
 function Base.view(
   s::TransientSnapshotsWithInitialValues,
-  rowrange::Base.Slice{Base.OneTo{Ti}},
+  rowrange::Colon,
   colrange::UnitRange{Ti}) where Ti
 
   # colrange refers exclusively to the parameter
-  rrange = s.realization[colrange]
+  rrange = s.realization[colrange,:]
   TransientSnapshotsWithInitialValues(s.mode,s.values,s.initial_values,rrange)
 end
 
@@ -138,28 +147,31 @@ function FEM.shift_time!(s::TransientSnapshotsWithInitialValues,dt::Number,θ::N
   TransientSnapshots(mode,v_middle,r)
 end
 
-struct TransientSnapshots{M,T,R} <: AbstractTransientSnapshots{M,T}
+struct TransientSnapshots{M,T,P,R} <: AbstractTransientSnapshots{M,T}
   mode::M
-  values::AbstractVector{T}
+  values::AbstractVector{P}
   realization::R
   function TransientSnapshots(
     mode::M,
-    values::AbstractVector{T},
+    values::AbstractVector{P},
     realization::R
-    ) where {M,T<:AbstractParamContainer,R<:TransientParamRealization}
+    ) where {M,P<:AbstractParamContainer,R<:TransientParamRealization}
 
-    new{M,T,R}(mode,values,realization)
+    T = eltype(P)
+    new{M,T,P,R}(mode,values,realization)
   end
 end
 
 function Snapshots(
-  values::AbstractVector{T},
+  values::AbstractVector{P},
   realization::R,
   mode::M=Mode1Axis()
-  ) where {M,T,R}
+  ) where {M,P,R}
 
   TransientSnapshots(mode,values,realization)
 end
+
+num_space_dofs(s::TransientSnapshots) = length(first(first(s.values)))
 
 function change_mode!(s::TransientSnapshots{Mode1Axis})
   TransientSnapshots(s.values,s.realization,Mode2Axis())
@@ -179,10 +191,45 @@ end
 
 function Base.view(
   s::TransientSnapshots,
-  rowrange::Base.Slice{Base.OneTo{Ti}},
+  rowrange::Colon,
   colrange::UnitRange{Ti}) where Ti
 
   # colrange refers exclusively to the parameter
-  rrange = s.realization[colrange]
+  rrange = s.realization[colrange,:]
   TransientSnapshots(s.mode,s.values,rrange)
+end
+
+struct CompressedTransientSnapshots{M,T,R} <: AbstractTransientSnapshots{M,T}
+  mode::M
+  values::AbstractMatrix{T}
+  realization::R
+end
+
+function Snapshots(
+  values::AbstractMatrix{T},
+  realization::R,
+  mode::M=Mode1Axis()
+  ) where {M,T,R}
+
+  CompressedTransientSnapshots(mode,values,realization)
+end
+
+num_space_dofs(s::CompressedTransientSnapshots{Mode1Axis}) = size(s.values,1)
+num_space_dofs(s::CompressedTransientSnapshots{Mode2Axis}) = Int(size(s.values,2) / num_params(s))
+
+function change_mode!(s::CompressedTransientSnapshots{Mode1Axis})
+  CompressedTransientSnapshots(s.values,s.realization,Mode2Axis())
+end
+
+function change_mode!(s::CompressedTransientSnapshots{Mode2Axis})
+  CompressedTransientSnapshots(s.values,s.realization,Mode1Axis())
+end
+
+function tensor_getindex(s::CompressedTransientSnapshots{Mode1Axis},ispace,itime,iparam)
+  np = num_params(s)
+  s.values[ispace,(itime-1)*np+iparam]
+end
+function tensor_getindex(s::CompressedTransientSnapshots{Mode2Axis},ispace,itime,iparam)
+  np = num_params(s)
+  s.values[itime,(ispace-1)*np+iparam]
 end

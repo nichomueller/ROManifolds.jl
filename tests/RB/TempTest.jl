@@ -70,19 +70,14 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 dir = datadir(joinpath("heateq","toy_mesh"))
-rbinfo = RBInfo(dir)
+rbinfo = RBInfo(dir;nsnaps_state=5,nsnaps_test=5)
 
-nparams = 50
-sol = solve(fesolver,feop,uh0μ;nparams)
-iv = sol.odesol.u0
-r = sol.odesol.r
+snaps,comp = RB.collect_solutions(rbinfo,fesolver,feop,uh0μ)
+reduced_basis(rbinfo,feop,snaps)
 
-U = evaluate(get_trial(feop),r)
-V = get_vector_type(U)
-fv = V[]
-
-stats = @timed for (uht,rt) in sol
-  push!(fv,uht.free_values)
+if size(snaps,1) < size(snaps,2)
+  _snaps = RB.change_mode!(snaps)
 end
-snaps = Snapshots(fv,iv,r)
-cinfo = ComputationInfo(stats,nparams)
+sview = view(_snaps,:,1:5)
+b1 = tpod(sview,nothing;ϵ=1e-4)
+compressed_sview = RB.compress(b1,sview)

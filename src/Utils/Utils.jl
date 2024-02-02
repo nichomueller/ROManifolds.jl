@@ -6,9 +6,9 @@ using Serialization
 import Gridap.Helpers.@check
 import Gridap.Arrays.LazyArray
 
-const Float = Float64
+const Float64 = Float64
 
-export Float
+export Float64
 export get_parent_dir
 export create_dir
 export correct_path

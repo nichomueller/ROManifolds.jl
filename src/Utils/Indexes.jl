@@ -55,8 +55,3 @@ function idx_batches_for_id(v::AbstractArray)
   idx = idx_batches(v)
   idx[id]+1:idx[id+1]
 end
-
-function Base.argmax(v::Vector,nval::Int)
-  s = sort(v,rev=true)
-  Int.(indexin(s,v))[1:nval]
-end

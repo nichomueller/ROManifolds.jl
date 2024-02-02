@@ -1,6 +1,4 @@
 module FEM
-using Mabla.Utils
-
 using LinearAlgebra
 using BlockArrays
 using SparseArrays
@@ -47,6 +45,8 @@ export TransientParamFunction, 𝑓ₚₜ
 export realization
 export get_params
 export get_times
+export num_params
+export num_times
 include("ParamSpace.jl")
 
 include("DiffOperators.jl")
@@ -60,8 +60,6 @@ export ParamVector
 export ParamMatrix
 export allocate_param_array
 export zero_param_array
-export get_at_offsets
-export recenter
 include("ParamArray.jl")
 
 export ParamBlockArray

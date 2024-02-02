@@ -44,7 +44,7 @@ res(μ,t,(u,p),(v,q)) = res_lin(μ,t,(u,p),(v,q)) + c(μ,t,(u,p),(v,q))
 jac(μ,t,(u,p),(du,dp),(v,q)) = jac_lin(μ,t,(u,p),(du,dp),(v,q)) + dc(μ,t,(u,p),(du,dp),(v,q))
 jac_t = jac_lin_t
 
-T = Float
+T = Float64
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,T},order)
 reffe_p = ReferenceFE(lagrangian,T,order-1)
 test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["noslip","inlet"])
