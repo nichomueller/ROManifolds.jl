@@ -37,7 +37,7 @@ abstract type AbstractTransientSnapshots{M,T} <: AbstractParamContainer{T,2} end
 
 Base.ndims(::AbstractTransientSnapshots) = 2
 Base.ndims(::Type{<:AbstractTransientSnapshots}) = 2
-Base.IndexStyle(::Type{<:AbstractTransientSnapshots}) = IndexLinear()
+Base.IndexStyle(::Type{<:AbstractTransientSnapshots}) = IndexCartesian()
 
 FEM.num_times(s::AbstractTransientSnapshots) = num_times(s.realization)
 FEM.num_params(s::AbstractTransientSnapshots) = num_params(s.realization)
@@ -53,22 +53,37 @@ Base.axes(s::AbstractTransientSnapshots) = Base.OneTo.(size(s))
 Base.eltype(::AbstractTransientSnapshots{M,T}) where {M,T} = T
 Base.eltype(::Type{<:AbstractTransientSnapshots{M,T}}) where {M,T} = T
 
-# function Base.show(io::IO,::MIME"text/plain",s::AbstractTransientSnapshots{M}) where M
-#   println(io, "Transient snapshot matrix of size $(size(s)) ordered in $M representation")
-# end
+slow_index(i,N::Int) = Int.(floor.((i .- 1) ./ N) .+ 1)
+slow_index(i::Colon,::Int) = i
+fast_index(i,N::Int) = mod.(i .- 1,N) .+ 1
+fast_index(i::Colon,::Int) = i
 
-function Base.getindex(s::AbstractTransientSnapshots{Mode1Axis},ispace::Int,j::Int)
+function Base.getindex(s::AbstractTransientSnapshots{Mode1Axis},ispace,j)
   np = num_params(s)
-  itime = Int(floor((j-1)/np) + 1)
-  iparam = mod(j-1,np) + 1
+  itime = slow_index(j,np)
+  iparam = fast_index(j,np)
   tensor_getindex(s,ispace,itime,iparam)
 end
 
-function Base.getindex(s::AbstractTransientSnapshots{Mode2Axis},itime::Int,j::Int)
+function Base.getindex(s::AbstractTransientSnapshots{Mode2Axis},itime,j)
   np = num_params(s)
-  ispace = Int(floor((j-1)/np) + 1)
-  iparam = mod(j-1,np) + 1
+  ispace = slow_index(j,np)
+  iparam = fast_index(j,np)
   tensor_getindex(s,ispace,itime,iparam)
+end
+
+function Base.setindex!(s::AbstractTransientSnapshots{Mode1Axis},v,ispace,j)
+  np = num_params(s)
+  itime = slow_index(j,np)
+  iparam = fast_index(j,np)
+  tensor_setindex!(s,v,ispace,itime,iparam)
+end
+
+function Base.setindex!(s::AbstractTransientSnapshots{Mode2Axis},v,itime,j)
+  np = num_params(s)
+  ispace = slow_index(j,np)
+  iparam = fast_index(j,np)
+  tensor_setindex!(s,v,ispace,itime,iparam)
 end
 
 function compress(a::AbstractMatrix,s::AbstractTransientSnapshots{Mode1Axis})
@@ -80,6 +95,21 @@ function compress(a::AbstractMatrix,s::AbstractTransientSnapshots{Mode2Axis})
   @fastmath compressed_values = a'*s
   compressed_realization = s.realization[:,axes(a,2)]
   Snapshots(compressed_values,compressed_realization,Mode2Axis())
+end
+
+function FESpaces.FEFunction(
+  fs::SingleFieldParamFESpace,s::AbstractTransientSnapshots{Mode1Axis})
+  @assert FEM.length_free_values(fs) == length(s.realization)
+  free_values = _to_param_array(s.values)
+  diri_values = get_dirichlet_dof_values(fs)
+  FEFunction(fs,free_values,diri_values)
+end
+
+function FESpaces.FEFunction(
+  fs::SingleFieldParamFESpace,s2::AbstractTransientSnapshots{Mode2Axis})
+  @warn "This snapshot has a mode-2 representation, the resulting FEFunction(s) might be incorrect"
+  s = change_mode!(s2)
+  FEFunction(fs,s)
 end
 
 struct TransientSnapshotsWithInitialValues{M,T,P,R} <: AbstractTransientSnapshots{M,T}
@@ -109,6 +139,14 @@ function Snapshots(
   TransientSnapshotsWithInitialValues(mode,values,initial_values,realization)
 end
 
+function Base.copy(s::TransientSnapshotsWithInitialValues)
+  TransientSnapshotsWithInitialValues(
+    copy(s.mode),
+    copy(s.values),
+    copy(s.initial_values),
+    copy(s.realization))
+end
+
 num_space_dofs(s::TransientSnapshotsWithInitialValues) = length(first(s.initial_values))
 
 function change_mode!(s::TransientSnapshotsWithInitialValues{Mode1Axis})
@@ -127,10 +165,18 @@ function tensor_getindex(s::TransientSnapshotsWithInitialValues,ispace,itime,ipa
   end
 end
 
+function tensor_setindex!(s::TransientSnapshotsWithInitialValues,v,ispace,itime,iparam)
+  if itime == 0
+    s.initial_values[iparam][ispace] = v
+  else
+    s.values[itime][iparam][ispace] = v
+  end
+end
+
 function Base.view(
   s::TransientSnapshotsWithInitialValues,
-  timerange::Colon,
-  paramrange::UnitRange{Ti}) where Ti
+  timerange,
+  paramrange)
 
   rrange = s.realization[paramrange,timerange]
   TransientSnapshotsWithInitialValues(s.mode,s.values,s.initial_values,rrange)
@@ -170,6 +216,13 @@ function Snapshots(
   TransientSnapshots(mode,values,realization)
 end
 
+function Base.copy(s::TransientSnapshots)
+  TransientSnapshots(
+    copy(s.mode),
+    copy(s.values),
+    copy(s.realization))
+end
+
 num_space_dofs(s::TransientSnapshots) = length(first(first(s.values)))
 
 function change_mode!(s::TransientSnapshots{Mode1Axis})
@@ -188,10 +241,18 @@ function tensor_getindex(s::TransientSnapshots,ispace,itime,iparam)
   end
 end
 
+function tensor_setindex!(s::TransientSnapshotsWithInitialValues,v,ispace,itime,iparam)
+  if itime == 0
+    @notimplemented
+  else
+    s.values[itime][iparam][ispace] = v
+  end
+end
+
 function Base.view(
   s::TransientSnapshots,
-  timerange::Colon,
-  paramrange::UnitRange{Ti}) where Ti
+  timerange,
+  paramrange)
 
   rrange = s.realization[paramrange,timerange]
   TransientSnapshots(s.mode,s.values,rrange)
@@ -213,6 +274,14 @@ function Snapshots(
   CompressedTransientSnapshots(mode,mode,values,realization)
 end
 
+function Base.copy(s::CompressedTransientSnapshots)
+  CompressedTransientSnapshots(
+    copy(s.current_mode),
+    copy(s.initial_mode),
+    copy(s.values),
+    copy(s.realization))
+end
+
 num_space_dofs(s::CompressedTransientSnapshots{Mode1Axis,Mode1Axis}) = size(s.values,1)
 num_space_dofs(s::CompressedTransientSnapshots{Mode2Axis,Mode1Axis}) = size(s.values,1)
 num_space_dofs(s::CompressedTransientSnapshots{Mode1Axis,Mode2Axis}) = Int(size(s.values,2) / num_params(s))
@@ -226,19 +295,93 @@ function change_mode!(s::CompressedTransientSnapshots{Mode2Axis})
   CompressedTransientSnapshots(Mode1Axis(),Mode2Axis(),s.values,s.realization)
 end
 
+column_index(a,b,Na,Nb) = (a .- 1) .* Nb .+ b
+column_index(a::Colon,b,Na,Nb) = b:Nb:Na*Nb
+column_index(a,b::Colon,Na,Nb) = a:Na:Na*Nb
+column_index(a::Colon,b::Colon,Na,Nb) = a
+
 function tensor_getindex(
   s::CompressedTransientSnapshots{M,Mode1Axis},
   ispace,itime,iparam
   ) where M
 
+  nt = num_times(s)
   np = num_params(s)
-  s.values[ispace,(itime-1)*np+iparam]
+  icolumn = column_index(itime,iparam,nt,np)
+  s.values[ispace,icolumn]
 end
 function tensor_getindex(
   s::CompressedTransientSnapshots{M,Mode2Axis},
   ispace,itime,iparam
   ) where M
 
+  ns = num_space_dofs(s)
   np = num_params(s)
-  s.values[itime,(ispace-1)*np+iparam]
+  icolumn = column_index(ispace,iparam,ns,np)
+  s.values[itime,icolumn]
+end
+
+function tensor_setindex!(
+  s::CompressedTransientSnapshots{M,Mode1Axis},
+  v,ispace,itime,iparam
+  ) where M
+
+  nt = num_times(s)
+  np = num_params(s)
+  icolumn = column_index(itime,iparam,nt,np)
+  s.values[ispace,icolumn] = v
+end
+function tensor_setindex!(
+  s::CompressedTransientSnapshots{M,Mode2Axis},
+  v,ispace,itime,iparam
+  ) where M
+
+  ns = num_space_dofs(s)
+  np = num_params(s)
+  icolumn = column_index(ispace,iparam,ns,np)
+  s.values[itime,icolumn] = v
+end
+
+# convert to vector of ParamArrays
+function as_param_arrays(s::CompressedTransientSnapshots,values::AbstractMatrix{T}) where T
+  np = num_params(s)
+  nt = num_times(s)
+  map(1:nt) do it
+    param_idx = (it-1)*np+1:it*np
+    array = Vector{Vector{T}}(undef,np)
+    for (i,itp) = enumerate(param_idx)
+      array[i] = values[:,itp]
+    end
+    ParamArray(array)
+  end
+end
+
+function recast(a::AbstractMatrix,s::CompressedTransientSnapshots{Mode1Axis})
+  @fastmath recast_values = a*s
+  param_array_values = as_param_arrays(s,recast_values)
+  Snapshots(param_array_values,s.realization,Mode1Axis())
+end
+
+function recast_compress(a::AbstractMatrix,s::AbstractTransientSnapshots{Mode1Axis})
+  s_compress = compress(a,s)
+  s_recast_compress = recast(a,s_compress)
+  s_recast_compress
+end
+
+# for testing / visualization purposes
+function _plot(trial::TransientTrialParamFESpace,s::AbstractTransientSnapshots;dir=pwd(),varname="u")
+  r = s.realization
+  r0 = FEM.get_at_time(r,:initial)
+  times = get_times(r)
+  createpvd(r0,dir) do pvd
+    for (it,t) = enumerate(times)
+      rt = FEM.get_at_time(r,t)
+      free_values = s.values[it]
+      sht = FEFunction(trial(rt),free_values)
+      files = ParamString(dir,rt)
+      trian = get_triangulation(sht)
+      vtk = createvtk(trian,files,cellfields=[varname=>sht])
+      pvd[rt] = vtk
+    end
+  end
 end

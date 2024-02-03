@@ -120,7 +120,7 @@ function Visualization.create_pvtk_file(
 end
 
 function Visualization.createpvd(
-  r::TransientParamRealization,
+  r::TransientParamRealizationAt,
   args...;kwargs...)
 
   map(r) do ri
@@ -130,7 +130,7 @@ end
 
 function Visualization.createpvd(
   parts::Union{Nothing,AbstractArray},
-  r::TransientParamRealization,
+  r::TransientParamRealizationAt,
   args...;kwargs...)
 
   map(r) do ri
@@ -140,7 +140,7 @@ end
 
 function Visualization.createpvd(
   f,
-  r::TransientParamRealization,
+  r::TransientParamRealizationAt,
   args...;kwargs...)
 
   pvd = Visualization.createpvd(r,args...;kwargs...)
@@ -154,7 +154,7 @@ end
 function Visualization.createpvd(
   f,
   parts::Union{Nothing,AbstractArray},
-  r::TransientParamRealization,
+  r::TransientParamRealizationAt,
   args...;kwargs...)
 
   pvd = Visualization.createpvd(parts,r,args...;kwargs...)
@@ -174,7 +174,7 @@ end
 function Base.setindex!(
   pvd::Vector{<:WriteVTK.CollectionFile},
   pvtk::AbstractArray,
-  r::TransientParamRealization)
+  r::TransientParamRealizationAt)
 
   time = get_times(r)
   map(vtk_save,pvtk)

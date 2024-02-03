@@ -3,8 +3,8 @@ function reduced_basis(
   feop::TransientParamFEOperator,
   s::AbstractTransientSnapshots)
 
-  ϵ = rbinfo.ϵ
-  nsnaps_state = rbinfo.nsnaps_state
+  ϵ = get_tol(rbinfo)
+  nsnaps_state = num_snaps_offline(rbinfo)
   norm_matrix = get_norm_matrix(rbinfo,feop)
   return reduced_basis(s,norm_matrix;ϵ,nsnaps_state)
 end

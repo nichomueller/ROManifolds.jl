@@ -128,6 +128,8 @@ function Base.getindex(r::TransientParamRealizationAt,i,j)
   TransientParamRealizationAt(new_param,r.t)
 end
 
+Base.iterate(r::TransientParamRealizationAt,i...) = iterate(r.params,i...)
+
 function change_time!(r::TransientParamRealizationAt{P,T} where P,time::T) where T
   r.t[] = time
 end

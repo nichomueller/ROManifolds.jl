@@ -16,58 +16,66 @@ function FEM.get_H1_norm_matrix(
   end
 end
 
-struct DistributedSnapshots{T<:AbstractVector{<:Snapshots}}
+struct DistributedTransientSnapshots{T<:AbstractVector{<:RB.AbstractTransientSnapshots}}
   snaps::T
 end
 
-function RB.Snapshots(snaps::Vector{<:PVector{<:ParamArray}})
-  _type(a::PVector{V}) where V = V
-  # snap_parts = map(parts) do part
-  #   snap_part = map(snaps) do si
-  #     local_views(si)[part]
-  #   end
-  #   Snapshots(snap_part)
-  # end
-  s1 = first(snaps)
-  T = _type(s1)
-  parts = map(part_id,s1.index_partition)
-  snap_parts = map(parts) do part
-    cache = T[]
-    for si in snaps
-      map(local_views(si),si.index_partition) do sij,j
-        if j == part
-          push!(cache,sij)
+function DistributedSnapshots(snaps::AbstractVector{<:RB.AbstractTransientSnapshots})
+  DistributedTransientSnapshots(snaps)
+end
+
+GridapDistributed.local_views(s::DistributedTransientSnapshots) = s.snaps
+
+function RB.Snapshots(
+  values::AbstractVector{<:PVector{V}},
+  initial_values::PVector{V},
+  args...) where V
+
+  snaps = map(local_views(initial_values),initial_values.index_partition) do ival_part,iip
+    part = part_id(iip)
+    vals_part = Vector{V}(undef,length(values))
+    for (k,v) in enumerate(values)
+      map(local_views(v),v.index_partition) do val,ip
+        if part_id(ip) == part
+          vals_part[k] = val
         end
-        cache
       end
     end
-    Snapshots(snap_part)
+    Snapshots(vals_part,ival_part,args...)
   end
-  DistributedSnapshots(snap_parts)
+  DistributedTransientSnapshots(snaps)
 end
 
-function Base.getindex(s::DistributedSnapshots,idx)
-  map(s.snaps) do snaps
-    getindex(snaps,idx)
+function RB.Snapshots(
+  values::AbstractVector{<:PVector{V}},
+  args...) where V
+
+  item = first(values)
+  parts = map(part_id,item.index_partition)
+  snaps = map(parts) do part
+    vals_part = Vector{V}(undef,length(values))
+    for (k,v) in enumerate(values)
+      map(local_views(v),v.index_partition) do val,ip
+        if part_id(ip) == part
+          vals_part[k] = val
+        end
+      end
+    end
+    Snapshots(vals_part,args...)
   end
+  DistributedSnapshots(snaps)
 end
 
-struct DistributedRBSpace{T<:AbstractVector{<:RBSpace}}
-  rbspace::T
-end
+function RB.reduced_basis(
+  rbinfo::RBInfo,
+  feop::TransientParamFEOperator,
+  s::DistributedTransientSnapshots)
 
-function RB.reduced_basis(rbinfo::RBInfo,feop::TransientParamFEOperator,s::DistributedSnapshots)
-  rbspace = map(s.snaps) do snaps
-    reduced_basis(rbinfo,feop,snaps)
-  end
-  DistributedRBSpace(rbspace)
-end
-
-function RB.project_recast(snap::AbstractVector{<:ParamArray},rb::DistributedRBSpace)
-  map(snap,rb.rbspace) do s,rb
-    mat = stack(s.array)
-    rb_proj = space_time_projection(mat,rb)
-    array = recast(rb_proj,rb)
-    ParamArray(array)
-  end
+  ϵ = RB.get_tol(rbinfo)
+  nsnaps_state = RB.num_snaps_offline(rbinfo)
+  norm_matrix = RB.get_norm_matrix(rbinfo,feop)
+  basis_space,basis_time = map(local_views(s)) do s
+    reduced_basis(s,norm_matrix;ϵ,nsnaps_state)
+  end |> tuple_of_arrays
+  return basis_space,basis_time
 end

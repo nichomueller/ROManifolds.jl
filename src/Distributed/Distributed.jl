@@ -1,6 +1,6 @@
 module Distributed
 using Mabla.FEM
-# using Mabla.RB
+using Mabla.RB
 
 using LinearAlgebra
 using SparseArrays
@@ -94,5 +94,5 @@ include("Primitives.jl")
 include("ParamFESpaces.jl")
 include("TransientParamFESpaces.jl")
 include("MultiField.jl")
-# include("SingleRB.jl")
+include("SingleRB.jl")
 end

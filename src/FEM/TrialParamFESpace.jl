@@ -11,7 +11,7 @@ function TrialParamFESpace(U::SingleFieldFESpace)
 end
 
 function TrialParamFESpace(dirichlet_values::AbstractVector,space::SingleFieldFESpace)
-  @notimplemented
+  TrialFESpace(dirichlet_values,space)
 end
 
 function TrialParamFESpace(space::SingleFieldFESpace,objects)
