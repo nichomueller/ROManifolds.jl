@@ -75,7 +75,6 @@ export NonlinearODEParamOperator
 export ODEParamOpFromFEOp
 
 export ThetaMethodParamOperator
-export AffineThetaMethodParamOperator
 
 export ODEParamSolution
 export GenericODEParamSolution

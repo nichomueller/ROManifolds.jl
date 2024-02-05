@@ -108,7 +108,7 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 dir = datadir("distr_toy_heateq")
 rbinfo = RBInfo(dir;nsnaps_state=5,nsnaps_test=0)
 
-# nparams = RB.num_snaps(rbinfo)
+# nparams = RB.num_params(rbinfo)
 # sol = solve(fesolver,feop,uh0μ;nparams)
 # odesol = sol.odesol
 # r = odesol.r

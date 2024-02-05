@@ -241,6 +241,8 @@ function TransientFETools._matdata_jacobian(
   collect_cell_matrix(trial,test,dc)
 end
 
+# interface to accommodate the separation of terms depending on the triangulation
+
 function assemble_separate_vector_add!(
   b::AbstractVector,
   op::TransientParamFEOperatorFromWeakForm,

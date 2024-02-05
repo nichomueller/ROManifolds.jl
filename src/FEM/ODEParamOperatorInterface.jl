@@ -9,6 +9,8 @@ struct ODEParamOpFromFEOp{C} <: ODEParamOperator{C}
   feop::TransientParamFEOperator{C}
 end
 
+realization(op::ODEParamOpFromFEOp;kwargs...) = realization(op.feop;kwargs...)
+
 ReferenceFEs.get_order(op::ODEParamOpFromFEOp) = get_order(op.feop)
 
 function TransientFETools.allocate_cache(

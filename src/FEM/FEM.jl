@@ -129,7 +129,6 @@ export ODEParamOpFromFEOp
 include("ODEParamOperatorInterface.jl")
 
 export ThetaMethodParamOperator
-export AffineThetaMethodParamOperator
 include("ThetaMethod.jl")
 
 export ODEParamSolution

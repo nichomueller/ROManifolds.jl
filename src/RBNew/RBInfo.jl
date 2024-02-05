@@ -39,10 +39,10 @@ function RBInfo(
     nsnaps_mdeim,nsnaps_test,st_mdeim)
 end
 
-num_snaps_offline(rbinfo::RBInfo) = rbinfo.nsnaps_state
-num_snaps_online(rbinfo::RBInfo) = rbinfo.nsnaps_test
-num_snaps(rbinfo::RBInfo) = num_snaps_offline(rbinfo) + num_snaps_online(rbinfo)
-num_snaps_mdeim(rbinfo::RBInfo) = rbinfo.nsnaps_mdeim
+num_offline_params(rbinfo::RBInfo) = rbinfo.nsnaps_state
+num_online_params(rbinfo::RBInfo) = rbinfo.nsnaps_test
+FEM.num_params(rbinfo::RBInfo) = num_offline_params(rbinfo) + num_online_params(rbinfo)
+num_mdeim_params(rbinfo::RBInfo) = rbinfo.nsnaps_mdeim
 get_tol(rbinfo::RBInfo) = rbinfo.ϵ
 
 function get_norm_matrix(rbinfo::RBInfo,feop::TransientParamFEOperator)

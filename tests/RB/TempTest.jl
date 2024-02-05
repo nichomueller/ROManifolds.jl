@@ -86,3 +86,15 @@ for (k,(μ,t)) in enumerate(r1)
   file = joinpath(dir,"solution_$t"*".vtu")
   writevtk(Ω,file,cellfields=["u"=>x1hk])
 end
+
+########
+
+rbsolver = RB.RBSolver(rbinfo,fesolver)
+
+rb_test = RB.TestRBSpace(test,bs,bt)
+rb_trial = RB.TrialRBSpace(trial,bs,bt)
+
+ode_cache =
+ODETools.jacobians!(A,op,r,xhF,γ,ode_cache)
+
+J = jacobians()

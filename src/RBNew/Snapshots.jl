@@ -5,7 +5,7 @@ function collect_solutions(
   uh0::Function;
   kwargs...)
 
-  nparams = num_snaps(rbinfo)
+  nparams = num_params(rbinfo)
   sol = solve(solver,op,uh0;nparams)
   odesol = sol.odesol
   realization = odesol.r
@@ -241,7 +241,7 @@ function tensor_getindex(s::TransientSnapshots,ispace,itime,iparam)
   end
 end
 
-function tensor_setindex!(s::TransientSnapshotsWithInitialValues,v,ispace,itime,iparam)
+function tensor_setindex!(s::TransientSnapshots,v,ispace,itime,iparam)
   if itime == 0
     @notimplemented
   else
@@ -366,6 +366,116 @@ function recast_compress(a::AbstractMatrix,s::AbstractTransientSnapshots{Mode1Ax
   s_compress = compress(a,s)
   s_recast_compress = recast(a,s_compress)
   s_recast_compress
+end
+
+struct TransientSnapshotsWithDirichletValues{M,T,P,S} <: AbstractTransientSnapshots{M,T}
+  snaps::S
+  dirichlet_values::P
+  function TransientSnapshotsWithDirichletValues(
+    snaps::AbstractTransientSnapshots{M,T},
+    dirichlet_values::P
+    ) where {M,T,P<:AbstractParamContainer}
+
+    S = typeof(snaps)
+    new{M,T,P,S}(snaps,dirichlet_values)
+  end
+end
+
+function Base.copy(s::TransientSnapshotsWithDirichletValues)
+  TransientSnapshotsWithDirichletValues(
+    copy(s.snaps),
+    copy(s.dirichlet_values))
+end
+
+num_space_dofs(s::TransientSnapshotsWithDirichletValues) = num_space_free_dofs(s.snaps) + num_space_dirichlet_dofs(s)
+num_space_free_dofs(s::TransientSnapshotsWithDirichletValues) = num_space_dofs(s.snaps)
+num_space_dirichlet_dofs(s::TransientSnapshotsWithDirichletValues) = length(first(s.dirichlet_values))
+
+function change_mode!(s::TransientSnapshotsWithDirichletValues)
+  TransientSnapshotsWithDirichletValues(change_mode!(s.snaps),s.dirichlet_values)
+end
+
+function tensor_getindex(s::TransientSnapshotsWithDirichletValues,ispace::Int,itime,iparam)
+  if ispace > num_space_free_dofs(s)
+    s.dirichlet_values[itime][iparam][ispace-num_space_free_dofs(s)]
+  else
+    tensor_getindex(s.snaps,ispace,itime,iparam)
+  end
+end
+
+function tensor_setindex!(s::TransientSnapshotsWithDirichletValues,v,ispace,itime,iparam)
+  if ispace > num_space_free_dofs(s)
+    s.dirichlet_values[itime][iparam][ispace-num_space_free_dofs(s)] = v
+  else
+    tensor_setindex!(s.snaps,v,ispace,itime,iparam)
+  end
+end
+
+function Base.view(
+  s::TransientSnapshotsWithDirichletValues,
+  timerange,
+  paramrange)
+
+  TransientSnapshotsWithDirichletValues(
+    view(s.snaps,timerange,paramrange),
+    s.dirichlet_values)
+end
+
+struct NnzTransientSnapshots{M,T,P,R} <: AbstractTransientSnapshots{M,T}
+  mode::M
+  values::AbstractVector{P}
+  realization::R
+  function NnzTransientSnapshots(
+    mode::M,
+    values::AbstractVector{P},
+    realization::R
+    ) where {M,P<:ParamArray{<:AbstractSparseMatrix},R<:TransientParamRealization}
+
+    T = eltype(P)
+    new{M,T,P,R}(mode,values,realization)
+  end
+end
+
+function Base.copy(s::NnzTransientSnapshots)
+  NnzTransientSnapshots(
+    copy(s.mode),
+    copy(s.values),
+    copy(s.realization))
+end
+
+num_space_dofs(s::NnzTransientSnapshots) = nnz(first(first(s.values)))
+
+function change_mode!(s::NnzTransientSnapshots{Mode1Axis})
+  NnzTransientSnapshots(s.values,s.realization,Mode2Axis())
+end
+
+function change_mode!(s::NnzTransientSnapshots{Mode2Axis})
+  NnzTransientSnapshots(s.values,s.realization,Mode1Axis())
+end
+
+function tensor_getindex(s::NnzTransientSnapshots,ispace,itime,iparam)
+  if itime == 0
+    @notimplemented
+  else
+    nonzeros(s.values[itime][iparam])[ispace]
+  end
+end
+
+function tensor_setindex!(s::NnzTransientSnapshots,v,ispace,itime,iparam)
+  if itime == 0
+    @notimplemented
+  else
+    nonzeros(s.values[itime][iparam])[ispace] = v
+  end
+end
+
+function Base.view(
+  s::NnzTransientSnapshots,
+  timerange,
+  paramrange)
+
+  rrange = s.realization[paramrange,timerange]
+  NnzTransientSnapshots(s.mode,s.values,rrange)
 end
 
 # for testing / visualization purposes

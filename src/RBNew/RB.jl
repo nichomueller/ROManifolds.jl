@@ -34,11 +34,21 @@ include("BasisConstruction.jl")
 export AbstractTransientSnapshots
 export TransientSnapshotsWithInitialValues
 export TransientSnapshots
+export TransientSnapshotsWithDirichletValues
+export CompressedTransientSnapshots
+export NnzTransientSnapshots
 export Snapshots
 include("Snapshots.jl")
 
-export reduced_basis
 export RBSpace
-export SingleFieldRBSpace
+export TestRBSpace
+export TrialRBSpace
+export reduced_basis
 include("RBSpace.jl")
+
+include("RBAffineDecomposition.jl")
+
+include("RBOperator.jl")
+
+include("RBSolver.jl")
 end # module

@@ -72,7 +72,7 @@ function RB.reduced_basis(
   s::DistributedTransientSnapshots)
 
   ϵ = RB.get_tol(rbinfo)
-  nsnaps_state = RB.num_snaps_offline(rbinfo)
+  nsnaps_state = RB.num_offline_params(rbinfo)
   norm_matrix = RB.get_norm_matrix(rbinfo,feop)
   basis_space,basis_time = map(local_views(s)) do s
     reduced_basis(s,norm_matrix;ϵ,nsnaps_state)

@@ -1,16 +1,16 @@
-function tpod(mat::AbstractMatrix,args...;ϵ=1e-4)
+function tpod(mat::AbstractMatrix,args...;kwargs...)
   cmat = mat'*mat
   _,s2,V = svd(cmat)
   s = sqrt.(s2)
-  n = truncation(s,ϵ)
-  U = mat*V[:,1:n]
+  rank = truncation(s;kwargs...)
+  U = mat*V[:,1:rank]
   for i = axes(U,2)
     U[:,i] /= s[i]+eps()
   end
   U
 end
 
-function tpod(mat::AbstractMatrix,X::AbstractMatrix;ϵ=1e-4)
+function tpod(mat::AbstractMatrix,X::AbstractMatrix;kwargs...)
   C = cholesky(X)
   L = sparse(C.L)
   Xmat = L'*mat[C.p,:]
@@ -18,17 +18,22 @@ function tpod(mat::AbstractMatrix,X::AbstractMatrix;ϵ=1e-4)
   cmat = Xmat'*Xmat
   _,s2,V = svd(cmat)
   s = sqrt.(s2)
-  n = truncation(s,ϵ)
-  U = Xmat*V[:,1:n]
+  rank = truncation(s;kwargs...)
+  U = Xmat*V[:,1:rank]
   for i = axes(U,2)
     U[:,i] /= s[i]+eps()
   end
-  (L'\U[:,1:n])[invperm(C.p),:]
+  (L'\U[:,1:rank])[invperm(C.p),:]
 end
 
-function truncation(s::AbstractVector,ϵ::Real)
-  energies = cumsum(s.^2;dims=1)
-  findfirst(x->x ≥ (1-ϵ^2)*energies[end],energies)
+function truncation(s::AbstractVector;ϵ=1e-4,rank=nothing)
+  if isnothing(rank)
+    energies = cumsum(s.^2;dims=1)
+    findfirst(x->x ≥ (1-ϵ^2)*energies[end],energies)
+  else
+    @check isa(rank,Integer)
+    rank
+  end
 end
 
 function orth_projection(
