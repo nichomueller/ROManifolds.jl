@@ -12,6 +12,8 @@ end
 realization(op::ODEParamOpFromFEOp;kwargs...) = realization(op.feop;kwargs...)
 
 ReferenceFEs.get_order(op::ODEParamOpFromFEOp) = get_order(op.feop)
+FESpaces.get_test(op::ODEParamOpFromFEOp) = get_test(op.feop)
+FESpaces.get_trial(op::ODEParamOpFromFEOp) = get_trial(op.feop)
 
 function TransientFETools.allocate_cache(
   op::ODEParamOpFromFEOp,
@@ -65,20 +67,8 @@ function Algebra.allocate_jacobian(
   allocate_jacobian(op.feop,r,xh,fecache)
 end
 
-function Algebra.allocate_jacobian(
-  op::ODEParamOpFromFEOp,
-  r::TransientParamRealization,
-  x::AbstractVector,
-  i::Integer,
-  ode_cache)
-
-  Us,Uts,fecache = ode_cache
-  xh = EvaluationFunction(Us[1],x)
-  allocate_residual(op.feop,r,xh,i)
-end
-
 function Algebra.residual!(
-  b::AbstractVector,
+  b,
   op::ODEParamOpFromFEOp,
   r::TransientParamRealization,
   xhF::Tuple{Vararg{AbstractVector}},
@@ -93,24 +83,8 @@ function Algebra.residual!(
   residual!(b,op.feop,r,xh,ode_cache)
 end
 
-function residual_for_trian!(
-  b::AbstractVector,
-  op::ODEParamOpFromFEOp,
-  r::TransientParamRealization,
-  xhF::Tuple{Vararg{AbstractVector}},
-  ode_cache)
-
-  Xh, = ode_cache
-  dxh = ()
-  for i in 2:get_order(op)+1
-    dxh = (dxh...,EvaluationFunction(Xh[i],xhF[i]))
-  end
-  xh=TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
-  residual_for_trian!(b,op.feop,r,xh,ode_cache)
-end
-
 function Algebra.jacobian!(
-  A::AbstractMatrix,
+  A,
   op::ODEParamOpFromFEOp,
   r::TransientParamRealization,
   xhF::Tuple{Vararg{AbstractVector}},
@@ -127,26 +101,8 @@ function Algebra.jacobian!(
   jacobian!(A,op.feop,r,xh,i,γᵢ,ode_cache)
 end
 
-function jacobian_for_trian!(
-  A::AbstractMatrix,
-  op::ODEParamOpFromFEOp,
-  r::TransientParamRealization,
-  xhF::Tuple{Vararg{AbstractVector}},
-  i::Integer,
-  γᵢ::Real,
-  ode_cache)
-
-  Xh, = ode_cache
-  dxh = ()
-  for i in 2:get_order(op)+1
-    dxh = (dxh...,EvaluationFunction(Xh[i],xhF[i]))
-  end
-  xh=TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
-  jacobian_for_trian!(A,op.feop,r,xh,i,γᵢ,ode_cache)
-end
-
 function ODETools.jacobians!(
-  A::AbstractMatrix,
+  A,
   op::ODEParamOpFromFEOp,
   r::TransientParamRealization,
   xhF::Tuple{Vararg{AbstractVector}},

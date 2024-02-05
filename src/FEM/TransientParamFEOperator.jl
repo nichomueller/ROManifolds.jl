@@ -95,27 +95,6 @@ function Algebra.allocate_jacobian(
   allocate_matrix(assem,matdata)
 end
 
-function Algebra.allocate_jacobian(
-  op::TransientParamFEOperatorFromWeakForm,
-  r::TransientParamRealization,
-  uh::CellField,
-  i::Integer)
-
-  dxh = ()
-  for i in 1:get_order(op)
-    dxh = (dxh...,uh)
-  end
-  xh = TransientCellField(uh,dxh)
-  trial = evaluate(get_trial(op),nothing)
-  test = get_test(op)
-  u = get_trial_fe_basis(trial)
-  v = get_fe_basis(test)
-  dc = op.jacs[i](get_params(r),get_times(r),xh,u,v)
-  matdata = collect_cell_matrix(trial,test,dc)
-  assem = get_param_assembler(op.assem,r)
-  allocate_matrix(assem,matdata)
-end
-
 function Algebra.residual!(
   b::AbstractVector,
   op::TransientParamFEOperatorFromWeakForm,
@@ -132,20 +111,6 @@ function Algebra.residual!(
   b
 end
 
-function residual_for_trian!(
-  b::AbstractVector,
-  op::TransientParamFEOperatorFromWeakForm,
-  r::TransientParamRealization,
-  xh::T,
-  cache,
-  args...) where T
-
-  test = get_test(op)
-  v = get_fe_basis(test)
-  dc = op.res(get_params(r),get_times(r),xh,v,args...)
-  assemble_separate_vector_add!(b,op,dc)
-end
-
 function Algebra.jacobian!(
   A::AbstractMatrix,
   op::TransientParamFEOperatorFromWeakForm,
@@ -159,24 +124,6 @@ function Algebra.jacobian!(
   assem = get_param_assembler(op.assem,r)
   assemble_matrix_add!(A,assem,matdata)
   A
-end
-
-function jacobian_for_trian!(
-  A::AbstractMatrix,
-  op::TransientParamFEOperatorFromWeakForm,
-  r::TransientParamRealization,
-  xh::T,
-  i::Integer,
-  γᵢ::Real,
-  cache,
-  args...) where T
-
-  trial = evaluate(get_trial(op),nothing)
-  test = get_test(op)
-  u = get_trial_fe_basis(trial)
-  v = get_fe_basis(test)
-  dc = γᵢ*op.jacs[i](get_params(r),get_times(r),xh,u,v,args...)
-  assemble_separate_matrix_add!(A,op,dc)
 end
 
 function ODETools.jacobians!(
@@ -242,43 +189,149 @@ function TransientFETools._matdata_jacobian(
 end
 
 # interface to accommodate the separation of terms depending on the triangulation
-
-function assemble_separate_vector_add!(
-  b::AbstractVector,
-  op::TransientParamFEOperatorFromWeakForm,
-  dc::DomainContribution)
-
-  test = get_test(op)
-  trian = get_domains(dc)
-  assem = get_param_assembler(op.assem,r)
-  bvec = Vector{typeof(b)}(undef,num_domains(dc))
-  for (n,t) in enumerate(trian)
-    vecdata = collect_cell_vector(test,dc,t)
-    assemble_vector!(b,assem,vecdata)
-    bvec[n] = copy(b)
-  end
-  bvec,trian
+struct TransientParamFEOperatorWithTrian{T<:OperatorType,A,B} <: TransientParamFEOperator{T}
+  op::TransientParamFEOperatorFromWeakForm{T}
+  trian_res::A
+  trian_jacs::B
 end
 
-function assemble_separate_matrix_add!(
-  A::AbstractMatrix,
-  op::TransientParamFEOperatorFromWeakForm,
-  dc::DomainContribution)
-
-  test = get_test(op)
-  trial = get_trial(op)(nothing)
-  trian = get_domains(dc)
-  assem = get_param_assembler(op.assem,r)
-  Avec = Vector{typeof(A)}(undef,num_domains(dc))
-  for (n,t) in enumerate(trian)
-    matdata = collect_cell_matrix(trial,test,dc,t)
-    fillstored!(A,zero(eltype(A)))
-    assemble_matrix_add!(A,assem,matdata)
-    Avec[n] = copy(A)
-  end
-  Avec,trian
+function AffineTransientParamFEOperator(
+  m::Function,a::Function,b::Function,tpspace,trial,test,trian_res,trian_jacs)
+  op = AffineTransientParamFEOperator(m,a,b,tpspace,trial,test)
+  TransientParamFEOperatorWithTrian(op,trian_res,trian_jacs)
 end
 
+function TransientParamFEOperator(
+  res::Function,jac::Function,jac_t::Function,tpspace,trial,test,trian_res,trian_jacs)
+  op = TransientParamFEOperator(res,jac,jac_t,tpspace,trial,test)
+  TransientParamFEOperatorWithTrian(op,trian_res,trian_jacs)
+end
+
+FESpaces.get_test(op::TransientParamFEOperatorWithTrian) = get_test(op.op)
+FESpaces.get_trial(op::TransientParamFEOperatorWithTrian) = get_trial(op.op)
+ReferenceFEs.get_order(op::TransientParamFEOperatorWithTrian) = get_order(op.op)
+realization(op::TransientParamFEOperatorWithTrian;kwargs...) = realization(op.op;kwargs...)
+
+function Algebra.allocate_residual(
+  op::TransientParamFEOperatorWithTrian,
+  r::TransientParamRealization,
+  uh::T,
+  cache) where T
+
+  test = get_test(op)
+  v = get_fe_basis(test)
+  dxh = ()
+  for i in 1:get_order(op)
+    dxh = (dxh...,uh)
+  end
+  xh = TransientCellField(uh,dxh)
+  dc = op.op.res(get_params(r),get_times(r),xh,v)
+  assem = get_param_assembler(op.op.assem,r)
+  b = AlgebraicContribution()
+  for trian in op.trian_res
+    vecdata = collect_cell_vector(test,dc)
+    b[trian] = allocate_vector(assem,vecdata)
+  end
+  b
+end
+
+function Algebra.allocate_jacobian(
+  op::TransientParamFEOperatorWithTrian,
+  r::TransientParamRealization,
+  uh::CellField,
+  cache)
+
+  dxh = ()
+  for i in 1:get_order(op)
+    dxh = (dxh...,uh)
+  end
+  xh = TransientCellField(uh,dxh)
+  trial = evaluate(get_trial(op),nothing)
+  test = get_test(op)
+  u = get_trial_fe_basis(trial)
+  v = get_fe_basis(test)
+  assem = get_param_assembler(op.op.assem,r)
+
+  A = ()
+  for i = 1:get_order(op)+1
+    Ai = AlgebraicContribution()
+    dc = op.op.jacs[i](get_params(r),get_times(r),xh,u,v)
+    for trian in op.trian_jacs[i]
+      matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
+      Ai[trian] = allocate_matrix(assem,matdata)
+    end
+    A = (A...,Ai)
+  end
+  A
+end
+
+function Algebra.residual!(
+  b::AlgebraicContribution,
+  op::TransientParamFEOperatorWithTrian,
+  r::TransientParamRealization,
+  xh::T,
+  cache) where T
+
+  test = get_test(op)
+  v = get_fe_basis(test)
+  dc = op.op.res(get_params(r),get_times(r),xh,v)
+  assem = get_param_assembler(op.op.assem,r)
+  for trian in op.trian_res
+    btrian = b[trian]
+    vecdata = collect_cell_vector_for_trian(test,dc,trian)
+    assemble_vector!(btrian,assem,vecdata)
+  end
+  b
+end
+
+function Algebra.jacobian!(
+  A::AlgebraicContribution,
+  op::TransientParamFEOperatorWithTrian,
+  r::TransientParamRealization,
+  xh::T,
+  i::Integer,
+  γᵢ::Real,
+  cache) where T
+
+  trial = evaluate(get_trial(op),nothing)
+  test = get_test(op)
+  u = get_trial_fe_basis(trial)
+  v = get_fe_basis(test)
+  assem = get_param_assembler(op.assem,r)
+  dc = γᵢ*op.jacs[i](get_params(r),get_times(r),xh,u,v)
+  for trian in op.trian_jacs[i]
+    Atrian = A[trian]
+    matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
+    assemble_matrix_add!(Atrian,assem,matdata)
+  end
+  A
+end
+
+function TransientFETools.jacobians!(
+  A::Tuple{Vararg{AlgebraicContribution}},
+  op::TransientParamFEOperatorWithTrian,
+  r::TransientParamRealization,
+  xh::T,
+  γ::Tuple{Vararg{Real}},
+  cache) where T
+
+  trial = evaluate(get_trial(op),nothing)
+  test = get_test(op)
+  u = get_trial_fe_basis(trial)
+  v = get_fe_basis(test)
+  assem = get_param_assembler(op.op.assem,r)
+
+  for i = 1:get_order(op)+1
+    Ai = A[i]
+    dc = γ[i]*op.op.jacs[i](get_params(r),get_times(r),xh,u,v)
+    for trian in op.trian_jacs[i]
+      Atrian = Ai[trian]
+      matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
+      assemble_matrix_add!(Atrian,assem,matdata)
+    end
+  end
+  A
+end
 
 function TransientFETools.test_transient_fe_operator(op::TransientParamFEOperator,uh,μt)
   odeop = get_algebraic_operator(op)

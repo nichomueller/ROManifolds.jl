@@ -65,6 +65,9 @@ include("ParamArray.jl")
 export ParamBlockArray
 include("ParamBlockArray.jl")
 
+export AlgebraicContribution
+include("AlgebraicContribution.jl")
+
 export ParamReindex
 export PosNegParamReindex
 include("ParamReindex.jl")

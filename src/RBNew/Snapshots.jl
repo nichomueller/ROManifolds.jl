@@ -108,8 +108,126 @@ end
 function FESpaces.FEFunction(
   fs::SingleFieldParamFESpace,s2::AbstractTransientSnapshots{Mode2Axis})
   @warn "This snapshot has a mode-2 representation, the resulting FEFunction(s) might be incorrect"
-  s = change_mode!(s2)
+  s = change_mode(s2)
   FEFunction(fs,s)
+end
+
+struct BasicSnapshots{M,T,P,R} <: AbstractTransientSnapshots{M,T}
+  mode::M
+  values::P
+  realization::R
+  function BasicSnapshots(
+    mode::M,
+    values::P,
+    realization::R
+    ) where {M,P<:AbstractParamContainer,R}
+
+    T = eltype(P)
+    new{M,T,P,R}(mode,values,realization)
+  end
+end
+
+function Snapshots(
+  values::P,
+  realization::R,
+  mode::M=Mode1Axis()
+  ) where {M,P<:AbstractParamContainer,R}
+
+  BasicSnapshots(mode,values,realization)
+end
+
+num_space_dofs(s::BasicSnapshots) = length(first(s.values))
+
+function change_mode(s::BasicSnapshots{Mode1Axis})
+  BasicSnapshots(Mode2Axis(),s.values,s.realization)
+end
+
+function change_mode(s::BasicSnapshots{Mode2Axis})
+  BasicSnapshots(Mode1Axis(),s.values,s.realization)
+end
+
+function tensor_getindex(s::BasicSnapshots,ispace,itime,iparam)
+  if itime == 0
+    @notimplemented
+  else
+    s.values[iparam+(itime-1)*num_params(s)][ispace]
+  end
+end
+
+function tensor_setindex!(s::BasicSnapshots,v,ispace,itime,iparam)
+  if itime == 0
+    @notimplemented
+  else
+    s.values[iparam+(itime-1)*num_params(s)][ispace] = v
+  end
+end
+
+function Base.view(
+  s::TransientSnapshots,
+  timerange,
+  paramrange)
+
+  rrange = s.realization[paramrange,timerange]
+  TransientSnapshots(s.mode,s.values,rrange)
+end
+
+struct TransientSnapshots{M,T,P,R} <: AbstractTransientSnapshots{M,T}
+  mode::M
+  values::AbstractVector{P}
+  realization::R
+  function TransientSnapshots(
+    mode::M,
+    values::AbstractVector{P},
+    realization::R
+    ) where {M,P<:AbstractParamContainer,R<:TransientParamRealization}
+
+    T = eltype(P)
+    new{M,T,P,R}(mode,values,realization)
+  end
+end
+
+function Snapshots(
+  values::AbstractVector{P},
+  realization::R,
+  mode::M=Mode1Axis()
+  ) where {M,P<:AbstractParamContainer,R}
+
+  TransientSnapshots(mode,values,realization)
+end
+
+num_space_dofs(s::TransientSnapshots) = length(first(first(s.values)))
+
+function change_mode(s::TransientSnapshots{Mode1Axis})
+  TransientSnapshots(Mode2Axis(),s.values,s.realization)
+end
+
+function change_mode(s::TransientSnapshots{Mode2Axis})
+  TransientSnapshots(Mode1Axis(),s.values,s.realization)
+end
+
+function tensor_getindex(s::TransientSnapshots,ispace,itime,iparam)
+  if itime == 0
+    @notimplemented
+  else
+    s.values[itime][iparam][ispace]
+  end
+end
+
+function tensor_setindex!(s::TransientSnapshots,v,ispace,itime,iparam)
+  if itime == 0
+    @notimplemented
+  else
+    s.values[itime][iparam][ispace] = v
+  end
+end
+
+function Base.view(
+  s::TransientSnapshots,
+  timerange,
+  paramrange)
+
+  rrange = s.realization[paramrange,timerange]
+  TransientSnapshots(s.mode,s.values,rrange)
 end
 
 struct TransientSnapshotsWithInitialValues{M,T,P,R} <: AbstractTransientSnapshots{M,T}
@@ -134,26 +252,18 @@ function Snapshots(
   initial_values::P,
   realization::R,
   mode::M=Mode1Axis()
-  ) where {M,P,R}
+  ) where {M,P<:AbstractParamContainer,R}
 
   TransientSnapshotsWithInitialValues(mode,values,initial_values,realization)
 end
 
-function Base.copy(s::TransientSnapshotsWithInitialValues)
-  TransientSnapshotsWithInitialValues(
-    copy(s.mode),
-    copy(s.values),
-    copy(s.initial_values),
-    copy(s.realization))
-end
-
 num_space_dofs(s::TransientSnapshotsWithInitialValues) = length(first(s.initial_values))
 
-function change_mode!(s::TransientSnapshotsWithInitialValues{Mode1Axis})
+function change_mode(s::TransientSnapshotsWithInitialValues{Mode1Axis})
   TransientSnapshotsWithInitialValues(Mode2Axis(),s.values,s.initial_values,s.realization)
 end
 
-function change_mode!(s::TransientSnapshotsWithInitialValues{Mode2Axis})
+function change_mode(s::TransientSnapshotsWithInitialValues{Mode2Axis})
   TransientSnapshotsWithInitialValues(Mode1Axis(),s.values,s.initial_values,s.realization)
 end
 
@@ -192,72 +302,6 @@ function FEM.shift_time!(s::TransientSnapshotsWithInitialValues,dt::Number,θ::N
   TransientSnapshots(mode,v_middle,r)
 end
 
-struct TransientSnapshots{M,T,P,R} <: AbstractTransientSnapshots{M,T}
-  mode::M
-  values::AbstractVector{P}
-  realization::R
-  function TransientSnapshots(
-    mode::M,
-    values::AbstractVector{P},
-    realization::R
-    ) where {M,P<:AbstractParamContainer,R<:TransientParamRealization}
-
-    T = eltype(P)
-    new{M,T,P,R}(mode,values,realization)
-  end
-end
-
-function Snapshots(
-  values::AbstractVector{P},
-  realization::R,
-  mode::M=Mode1Axis()
-  ) where {M,P,R}
-
-  TransientSnapshots(mode,values,realization)
-end
-
-function Base.copy(s::TransientSnapshots)
-  TransientSnapshots(
-    copy(s.mode),
-    copy(s.values),
-    copy(s.realization))
-end
-
-num_space_dofs(s::TransientSnapshots) = length(first(first(s.values)))
-
-function change_mode!(s::TransientSnapshots{Mode1Axis})
-  TransientSnapshots(s.values,s.realization,Mode2Axis())
-end
-
-function change_mode!(s::TransientSnapshots{Mode2Axis})
-  TransientSnapshots(s.values,s.realization,Mode1Axis())
-end
-
-function tensor_getindex(s::TransientSnapshots,ispace,itime,iparam)
-  if itime == 0
-    @notimplemented
-  else
-    s.values[itime][iparam][ispace]
-  end
-end
-
-function tensor_setindex!(s::TransientSnapshots,v,ispace,itime,iparam)
-  if itime == 0
-    @notimplemented
-  else
-    s.values[itime][iparam][ispace] = v
-  end
-end
-
-function Base.view(
-  s::TransientSnapshots,
-  timerange,
-  paramrange)
-
-  rrange = s.realization[paramrange,timerange]
-  TransientSnapshots(s.mode,s.values,rrange)
-end
-
 struct CompressedTransientSnapshots{M,N,T,R} <: AbstractTransientSnapshots{M,T}
   current_mode::M
   initial_mode::N
@@ -274,24 +318,16 @@ function Snapshots(
   CompressedTransientSnapshots(mode,mode,values,realization)
 end
 
-function Base.copy(s::CompressedTransientSnapshots)
-  CompressedTransientSnapshots(
-    copy(s.current_mode),
-    copy(s.initial_mode),
-    copy(s.values),
-    copy(s.realization))
-end
-
 num_space_dofs(s::CompressedTransientSnapshots{Mode1Axis,Mode1Axis}) = size(s.values,1)
 num_space_dofs(s::CompressedTransientSnapshots{Mode2Axis,Mode1Axis}) = size(s.values,1)
 num_space_dofs(s::CompressedTransientSnapshots{Mode1Axis,Mode2Axis}) = Int(size(s.values,2) / num_params(s))
 num_space_dofs(s::CompressedTransientSnapshots{Mode2Axis,Mode2Axis}) = Int(size(s.values,2) / num_params(s))
 
-function change_mode!(s::CompressedTransientSnapshots{Mode1Axis})
+function change_mode(s::CompressedTransientSnapshots{Mode1Axis})
   CompressedTransientSnapshots(Mode2Axis(),Mode1Axis(),s.values,s.realization)
 end
 
-function change_mode!(s::CompressedTransientSnapshots{Mode2Axis})
+function change_mode(s::CompressedTransientSnapshots{Mode2Axis})
   CompressedTransientSnapshots(Mode1Axis(),Mode2Axis(),s.values,s.realization)
 end
 
@@ -381,18 +417,12 @@ struct TransientSnapshotsWithDirichletValues{M,T,P,S} <: AbstractTransientSnapsh
   end
 end
 
-function Base.copy(s::TransientSnapshotsWithDirichletValues)
-  TransientSnapshotsWithDirichletValues(
-    copy(s.snaps),
-    copy(s.dirichlet_values))
-end
-
 num_space_dofs(s::TransientSnapshotsWithDirichletValues) = num_space_free_dofs(s.snaps) + num_space_dirichlet_dofs(s)
 num_space_free_dofs(s::TransientSnapshotsWithDirichletValues) = num_space_dofs(s.snaps)
 num_space_dirichlet_dofs(s::TransientSnapshotsWithDirichletValues) = length(first(s.dirichlet_values))
 
-function change_mode!(s::TransientSnapshotsWithDirichletValues)
-  TransientSnapshotsWithDirichletValues(change_mode!(s.snaps),s.dirichlet_values)
+function change_mode(s::TransientSnapshotsWithDirichletValues)
+  TransientSnapshotsWithDirichletValues(change_mode(s.snaps),s.dirichlet_values)
 end
 
 function tensor_getindex(s::TransientSnapshotsWithDirichletValues,ispace::Int,itime,iparam)
@@ -421,39 +451,31 @@ function Base.view(
     s.dirichlet_values)
 end
 
-struct NnzTransientSnapshots{M,T,P,R} <: AbstractTransientSnapshots{M,T}
-  mode::M
-  values::AbstractVector{P}
-  realization::R
-  function NnzTransientSnapshots(
-    mode::M,
-    values::AbstractVector{P},
-    realization::R
-    ) where {M,P<:ParamArray{<:AbstractSparseMatrix},R<:TransientParamRealization}
+const BasicNnzSnapshots = BasicSnapshots{M,T,P,R} where {M,T,P<:AbstractSparseMatrix,R}
+const TransientNnzSnapshots = TransientSnapshots{M,T,P,R} where {M,T,P<:AbstractSparseMatrix,R}
+# const NnzSnapshots = Union{BasicNnzSnapshots{M,T,P,R},TransientNnzSnapshots{M,T,P,R}} where {M,T,P,R}
 
-    T = eltype(P)
-    new{M,T,P,R}(mode,values,realization)
+num_space_dofs(s::BasicNnzSnapshots) = nnz(first(s.values))
+
+function tensor_getindex(s::BasicNnzSnapshots,ispace,itime,iparam)
+  if itime == 0
+    @notimplemented
+  else
+    nonzeros(s.values[iparam+(itime-1)*num_params(s)])[ispace]
   end
 end
 
-function Base.copy(s::NnzTransientSnapshots)
-  NnzTransientSnapshots(
-    copy(s.mode),
-    copy(s.values),
-    copy(s.realization))
+function tensor_setindex!(s::BasicNnzSnapshots,v,ispace,itime,iparam)
+  if itime == 0
+    @notimplemented
+  else
+    nonzeros(s.values[iparam+(itime-1)*num_params(s)])[ispace] = v
+  end
 end
 
-num_space_dofs(s::NnzTransientSnapshots) = nnz(first(first(s.values)))
+num_space_dofs(s::TransientNnzSnapshots) = nnz(first(first(s.values)))
 
-function change_mode!(s::NnzTransientSnapshots{Mode1Axis})
-  NnzTransientSnapshots(s.values,s.realization,Mode2Axis())
-end
-
-function change_mode!(s::NnzTransientSnapshots{Mode2Axis})
-  NnzTransientSnapshots(s.values,s.realization,Mode1Axis())
-end
-
-function tensor_getindex(s::NnzTransientSnapshots,ispace,itime,iparam)
+function tensor_getindex(s::TransientNnzSnapshots,ispace,itime,iparam)
   if itime == 0
     @notimplemented
   else
@@ -461,7 +483,7 @@ function tensor_getindex(s::NnzTransientSnapshots,ispace,itime,iparam)
   end
 end
 
-function tensor_setindex!(s::NnzTransientSnapshots,v,ispace,itime,iparam)
+function tensor_setindex!(s::TransientNnzSnapshots,v,ispace,itime,iparam)
   if itime == 0
     @notimplemented
   else
@@ -469,13 +491,39 @@ function tensor_setindex!(s::NnzTransientSnapshots,v,ispace,itime,iparam)
   end
 end
 
+struct TransientSnapshotsWithTrian{M,T,S} <: AbstractTransientSnapshots{M,T}
+  snaps::AbstractTransientSnapshots{M,T}
+  trian::S
+end
+
+function Snapshots(a::AlgebraicContribution,args...)
+  b = AlgebraicContribution()
+  for (trian,values) in a.dict
+    b[trian] = Snapshots(values,args...)
+  end
+  b
+end
+
+num_space_dofs(s::TransientSnapshotsWithTrian) = num_space_dofs(s.snaps)
+
+function change_mode(s::TransientSnapshotsWithTrian)
+  TransientSnapshotsWithTrian(change_mode(s.snaps),s.trian)
+end
+
+function tensor_getindex(s::TransientSnapshotsWithTrian,ispace,itime,iparam)
+  tensor_getindex(s.snaps,ispace,itime,iparam)
+end
+
+function tensor_setindex!(s::TransientSnapshotsWithTrian,v,ispace,itime,iparam)
+  tensor_setindex!(s.snaps,v,ispace,itime,iparam)
+end
+
 function Base.view(
-  s::NnzTransientSnapshots,
+  s::TransientSnapshotsWithTrian,
   timerange,
   paramrange)
 
-  rrange = s.realization[paramrange,timerange]
-  NnzTransientSnapshots(s.mode,s.values,rrange)
+  TransientSnapshotsWithTrian(view(s.snaps,timerange,paramrange),s.trian)
 end
 
 # for testing / visualization purposes

@@ -46,9 +46,13 @@ export TrialRBSpace
 export reduced_basis
 include("RBSpace.jl")
 
-include("RBAffineDecomposition.jl")
-
+export RBOperator
+export collect_residuals_and_jacobians
 include("RBOperator.jl")
 
+export RBSolver
 include("RBSolver.jl")
+
+export AffineDecomposition
+include("AffineDecomposition.jl")
 end # module

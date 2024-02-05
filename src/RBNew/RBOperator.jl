@@ -1,11 +1,13 @@
 
 struct RBOperator{T} <: ODEOperator{T}
-  feop::ODEOperator{T}
-  test::TestRBSpace
+  feop::ODEParamOperator{T}
   trial::TrialRBSpace
+  test::TestRBSpace
 end
 
 ReferenceFEs.get_order(op::RBOperator) = get_order(op.feop)
+FESpaces.get_test(op::RBOperator) = get_test(op.op)
+FESpaces.get_trial(op::RBOperator) = get_trial(op.op)
 
 function TransientFETools.allocate_cache(
   op::RBOperator,
@@ -40,16 +42,6 @@ function Algebra.allocate_jacobian(
   allocate_jacobian(op.feop,r,x,ode_cache)
 end
 
-function Algebra.allocate_jacobian(
-  op::RBOperator,
-  r::TransientParamRealization,
-  x::AbstractVector,
-  i::Integer,
-  ode_cache)
-
-  allocate_jacobian(op.feop,r,x,i,ode_cache)
-end
-
 function Algebra.residual!(
   b::AbstractVector,
   op::RBOperator,
@@ -82,18 +74,6 @@ function Algebra.jacobian!(
   jacobian!(A,op.feop,r,xhF,i,γᵢ,ode_cache)
 end
 
-function jacobian_for_trian!(
-  A::AbstractMatrix,
-  op::RBOperator,
-  r::TransientParamRealization,
-  xhF::Tuple{Vararg{AbstractVector}},
-  i::Integer,
-  γᵢ::Real,
-  ode_cache)
-
-  jacobian_for_trian!(A,op.feop,r,xhF,i,γᵢ,ode_cache)
-end
-
 function ODETools.jacobians!(
   A::AbstractMatrix,
   op::RBOperator,
@@ -122,35 +102,4 @@ function _init_free_values(op::RBOperator,r::TransientParamRealization)
   x = random_free_values(trial)
   y = zero_free_values(trial)
   return x,y
-end
-
-function FEM.get_method_operator(
-  solver::RBSolver{ThetaMethod},
-  op::RBOperator,
-  r::TransientParamRealization)
-
-  fesolver = get_fe_solver(solver)
-  dt = fesolver.dt
-  θ = fesolver.θ
-  θ == 0.0 ? dtθ = dt : dtθ = dt*θ
-
-  x,y = _init_free_values(op,r)
-
-  ode_cache = allocate_cache(op,r)
-  ode_cache = update_cache!(ode_cache,op,r)
-
-  get_method_operator(odeop,r,dtθ,x,ode_cache,y)
-end
-
-function collect_residuals_and_jacobians(solver::RBSolver,op::RBOperator)
-  nparams = num_mdeim_params(solver.info)
-  r = realization(op.feop;nparams)
-
-  nlop = get_method_operator(solver,op,r)
-  x = nlop.u0
-
-  b = residual_for_trian(nlop,x)
-  A = jacobian_for_trian(nlop,x)
-
-  return b,A
 end

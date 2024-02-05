@@ -60,7 +60,7 @@ function Algebra.zero_initial_guess(op::ThetaMethodParamOperator)
 end
 
 function Algebra.residual!(
-  b::AbstractVector,
+  b,
   op::ThetaMethodParamOperator,
   x::AbstractVector)
 
@@ -71,7 +71,7 @@ function Algebra.residual!(
 end
 
 function Algebra.jacobian!(
-  A::AbstractMatrix,
+  A,
   op::ThetaMethodParamOperator,
   x::AbstractVector)
 
@@ -84,7 +84,7 @@ function Algebra.jacobian!(
 end
 
 function Algebra.jacobian!(
-  A::AbstractMatrix,
+  A,
   op::ThetaMethodParamOperator,
   x::AbstractVector,
   i::Int)
@@ -141,7 +141,7 @@ function ODETools.solve_step!(
 end
 
 function Algebra.residual!(
-  b::AbstractVector,
+  b,
   op::ThetaMethodParamOperator{<:Affine},
   x::AbstractVector)
 
@@ -151,7 +151,7 @@ function Algebra.residual!(
 end
 
 function Algebra.jacobian!(
-  A::AbstractMatrix,
+  A,
   op::ThetaMethodParamOperator{<:Affine},
   x::AbstractVector)
 
@@ -162,7 +162,7 @@ function Algebra.jacobian!(
 end
 
 function Algebra.jacobian!(
-  A::AbstractMatrix,
+  A,
   op::ThetaMethodParamOperator{<:Affine},
   x::AbstractVector,
   i::Int)
@@ -172,64 +172,4 @@ function Algebra.jacobian!(
   fillstored!(A,z)
   γ = (1.0,1/op.dtθ)
   jacobian!(A,op.odeop,op.r,(vθ,vθ),i,γ[i],op.ode_cache)
-end
-
-# interface to deal with the separation of terms with the triangulation
-
-function allocate_residual_for_trian(op::ThetaMethodParamOperator,x::AbstractVector)
-  allocate_residual(op.odeop,op.r,x,op.ode_cache)
-end
-
-function Algebra.allocate_jacobian(op::ThetaMethodParamOperator,x::AbstractVector)
-  allocate_jacobian(op.odeop,op.r,x,op.ode_cache)
-end
-
-function residual_for_trian!(
-  b::AbstractVector,
-  op::ThetaMethodParamOperator,
-  x::AbstractVector,
-  args...)
-
-  uF = x
-  vθ = op.vθ
-  residual_for_trian!(b,op.odeop,op.r,(uF,vθ),op.ode_cache,args...)
-end
-
-function jacobian_for_trian!(
-  A::AbstractMatrix,
-  op::ThetaMethodParamOperator,
-  x::AbstractVector,
-  i::Int,
-  args...)
-
-  uF = x
-  vθ = op.vθ
-  z = zero(eltype(A))
-  fillstored!(A,z)
-  γ = (1.0,1/op.dtθ)
-  jacobian_for_trian!(A,op.odeop,op.r,(uF,vθ),i,γ[i],op.ode_cache,args...)
-end
-
-function residual_for_trian!(
-  b::AbstractVector,
-  op::ThetaMethodParamOperator{<:Affine},
-  x::AbstractVector,
-  args...)
-
-  vθ = op.vθ
-  residual_for_trian!(b,op.odeop,op.r,(vθ,vθ),op.ode_cache,args...)
-end
-
-function jacobian_for_trian!(
-  A::AbstractMatrix,
-  op::ThetaMethodParamOperator{<:Affine},
-  x::AbstractVector,
-  i::Int,
-  args...)
-
-  vθ = op.vθ
-  z = zero(eltype(A))
-  fillstored!(A,z)
-  γ = (1.0,1/op.dtθ)
-  jacobian_for_trian!(A,op.odeop,op.r,(vθ,vθ),i,γ[i],op.ode_cache,args...)
 end

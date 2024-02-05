@@ -3,6 +3,7 @@ using Gridap.FESpaces
 using ForwardDiff
 using LinearAlgebra
 using Test
+using Gridap.Algebra
 using Gridap.ODEs
 using Gridap.ODEs.TransientFETools
 using Gridap.ODEs.ODETools
@@ -94,7 +95,25 @@ rbsolver = RB.RBSolver(rbinfo,fesolver)
 rb_test = RB.TestRBSpace(test,bs,bt)
 rb_trial = RB.TrialRBSpace(trial,bs,bt)
 
-ode_cache =
-ODETools.jacobians!(A,op,r,xhF,γ,ode_cache)
+# op = RBOperator(get_algebraic_operator(feop),rb_trial,rb_test)
+# nparams = RB.num_mdeim_params(rbsolver.info)
+# r = realization(op.feop;nparams)
+# nlop = RB.get_method_operator(rbsolver,op,r)
+# x = nlop.u0
+# bb = Algebra.residual(nlop,x)
+# AA = Algebra.jacobian(nlop,x)
 
-J = jacobians()
+trian_res = [Ω]
+trian_jac = ([Ω],[Ω])
+feop_trian = AffineTransientParamFEOperator(m,a,b,ptspace,trial,test,trian_res,trian_jac)
+
+op = RBOperator(get_algebraic_operator(feop_trian),rb_trial,rb_test)
+nparams = RB.num_mdeim_params(rbsolver.info)
+r = realization(op.feop;nparams)
+nlop = RB.get_method_operator(rbsolver,op,r)
+x = nlop.u0
+bb = Algebra.residual(nlop,x)
+AA = Algebra.jacobian(nlop,x)
+
+snapb = Snapshots(bb,r)
+snapA = Snapshots.(AA,r)
