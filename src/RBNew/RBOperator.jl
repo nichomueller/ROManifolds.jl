@@ -6,8 +6,8 @@ struct RBOperator{T} <: ODEOperator{T}
 end
 
 ReferenceFEs.get_order(op::RBOperator) = get_order(op.feop)
-FESpaces.get_test(op::RBOperator) = get_test(op.op)
-FESpaces.get_trial(op::RBOperator) = get_trial(op.op)
+FESpaces.get_test(op::RBOperator) = get_test(op.feop)
+FESpaces.get_trial(op::RBOperator) = get_trial(op.feop)
 
 function TransientFETools.allocate_cache(
   op::RBOperator,

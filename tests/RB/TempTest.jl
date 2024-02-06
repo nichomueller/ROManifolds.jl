@@ -116,4 +116,22 @@ bb = Algebra.residual(nlop,x)
 AA = Algebra.jacobian(nlop,x)
 
 snapb = Snapshots(bb,r)
-snapA = Snapshots.(AA,r)
+snapA = map(AA) do AA
+  Snapshots(AA,r)
+end
+
+# data = AffineDecomposition[]
+# for (trian,values) in snapb.dict
+#   push!(data,RB.reduced_vector_form(rbinfo,op,values,trian))
+# end
+X = vals
+np = num_params(X)
+itime = RB.slow_index(21,np)
+iparam = RB.fast_index(4,np)
+
+trian = Ω
+vals = snapb[trian]
+basis_space,basis_time = RB.compute_bases(snapsb;ϵ=RB.get_tol(rbinfo))
+lu_interp,integration_domain = compute_mdeim(rbinfo,op,basis_space,basis_time)
+proj_basis_space = project_basis_space(basis_space,test)
+comb_basis_time = combine_basis_time(test;kwargs...)

@@ -150,7 +150,8 @@ function tensor_getindex(s::BasicSnapshots,ispace,itime,iparam)
   if itime == 0
     @notimplemented
   else
-    s.values[iparam+(itime-1)*num_params(s)][ispace]
+    # s.values[iparam+(itime-1)*num_params(s)][ispace]
+    s.values[itime+(iparam-1)*num_times(s)][ispace]
   end
 end
 
@@ -491,39 +492,12 @@ function tensor_setindex!(s::TransientNnzSnapshots,v,ispace,itime,iparam)
   end
 end
 
-struct TransientSnapshotsWithTrian{M,T,S} <: AbstractTransientSnapshots{M,T}
-  snaps::AbstractTransientSnapshots{M,T}
-  trian::S
-end
-
 function Snapshots(a::AlgebraicContribution,args...)
   b = AlgebraicContribution()
   for (trian,values) in a.dict
     b[trian] = Snapshots(values,args...)
   end
   b
-end
-
-num_space_dofs(s::TransientSnapshotsWithTrian) = num_space_dofs(s.snaps)
-
-function change_mode(s::TransientSnapshotsWithTrian)
-  TransientSnapshotsWithTrian(change_mode(s.snaps),s.trian)
-end
-
-function tensor_getindex(s::TransientSnapshotsWithTrian,ispace,itime,iparam)
-  tensor_getindex(s.snaps,ispace,itime,iparam)
-end
-
-function tensor_setindex!(s::TransientSnapshotsWithTrian,v,ispace,itime,iparam)
-  tensor_setindex!(s.snaps,v,ispace,itime,iparam)
-end
-
-function Base.view(
-  s::TransientSnapshotsWithTrian,
-  timerange,
-  paramrange)
-
-  TransientSnapshotsWithTrian(view(s.snaps,timerange,paramrange),s.trian)
 end
 
 # for testing / visualization purposes
