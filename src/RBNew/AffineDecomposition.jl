@@ -1,32 +1,74 @@
-struct ReducedIntegrationDomain{Ms,Mt}
-  measure_space::Ms
-  measure_time::Mt
+function get_method_operator(
+  solver::RBThetaMethod,
+  op::RBOperator,
+  r::TransientParamRealization)
+
+  fesolver = get_fe_solver(solver)
+  dt = fesolver.dt
+  θ = fesolver.θ
+  θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+
+  x,y = _init_free_values(op,r)
+
+  ode_cache = allocate_cache(op,r)
+  ode_cache = update_cache!(ode_cache,op,r)
+
+  ThetaMethodParamOperator(op.feop,r,dtθ,x,ode_cache,y)
+end
+
+function collect_matrices_vectors(solver::RBSolver,op::RBOperator)
+  nparams = num_mdeim_params(solver.info)
+  r = realization(op;nparams)
+
+  nlop = get_method_operator(solver,op,r)
+  x = nlop.u0
+
+  A = jacobian(nlop,x)
+  sA = map(A) do A
+    Snapshots(A,r)
+  end
+  b = residual(nlop,x)
+  sb = Snapshots(b,r)
+
+  return sA,sb
 end
 
 function get_mdeim_indices(A::AbstractMatrix{T}) where T
   m,n = size(A)
   proj = zeros(T,m)
   res = zeros(T,m)
-  idx = zeros(Int,n)
-  idx[1] = argmax(abs.(A[:,1]))
+  I = zeros(Int,n)
+  I[1] = argmax(abs.(A[:,1]))
 
   if n > 1
     @inbounds for i = 2:n
-      proj .= A[:,1:i-1]*(A[idx[1:i-1],1:i-1] \ A[idx[1:i-1],i])
+      Bi = view(A,:,1:i-1)
+      Ci = view(A,I[1:i-1],1:i-1)
+      Di = view(A,I[1:i-1],i)
+      proj .= Bi*(Ci \ Di)
       res .= A[:,i] - proj
-      idx[i] = argmax(abs.(res))
+      I[i] = argmax(abs.(res))
     end
   end
 
-  return idx
+  return I
 end
 
-function reduce_triangulation(test,trian,snaps,indices_space)
-  cell_dof_ids = get_cell_dof_ids(test,trian)
-  recast_indices_space = recast_indices(snaps,indices_space)
-  red_integr_cells = get_reduced_cells(recast_indices_space,cell_dof_ids)
-  red_trian = view(trian,red_integr_cells)
-  return red_trian
+function recast_indices_space(a::AbstractArray,indices_space)
+  return indices_space
+end
+
+function recast_indices_space(a::NnzSnapshots,indices_space)
+  aitem = first(a.values)
+  rows,cols, = findnz(aitem)
+  rc = (cols .- 1)*aitem.m .+ rows
+  return rc[indices_space]
+end
+
+function vector_to_matrix_indices(vec_indices,nrows)
+  icol = slow_index(vec_indices,nrows)
+  irow = fast_index(vec_indices,nrows)
+  return irow,icol
 end
 
 function get_reduced_cells(idx::AbstractVector{T},cell_dof_ids) where T
@@ -37,10 +79,23 @@ function get_reduced_cells(idx::AbstractVector{T},cell_dof_ids) where T
       append!(cells,cell)
     end
   end
-  unique(cells)
+  return unique(cells)
 end
 
-function project_basis_space(A::AbstractVector,test::RBSpace,args...)
+function reduce_triangulation(
+  op::RBOperator,
+  trian::Triangulation,
+  indices_space::AbstractVector)
+
+  test = get_test(op)
+  cell_dof_ids = get_cell_dof_ids(test,trian)
+  indices_space_rows = slow_index(indices_space,num_free_dofs(test))
+  red_integr_cells = get_reduced_cells(indices_space_rows,cell_dof_ids)
+  red_trian = view(trian,red_integr_cells)
+  return red_trian
+end
+
+function project_basis_space(A::AbstractMatrix,test::RBSpace)
   basis_test = get_basis_space(test)
   map(A) do a
     basis_test'*a
@@ -49,10 +104,9 @@ end
 
 function project_basis_space(A::AbstractMatrix,trial::RBSpace,test::RBSpace)
   basis_test = get_basis_space(test)
-  basis_trial = get_basis_trial(trial)
-  Asparse = recast(A)
-  map(eachcol(Asparse)) do asparse
-    basis_test'*asparse*basis_trial
+  basis_trial = get_basis_space(trial)
+  map(A.values) do A
+    basis_test'*A*basis_trial
   end
 end
 
@@ -71,6 +125,7 @@ function combine_basis_time(
   nt_test = size(test_basis,2)
   nt_trial = size(trial_basis,2)
 
+  T = eltype(get_vector_type(test))
   bt_proj = zeros(T,time_ndofs,nt_test,nt_trial)
   bt_proj_shift = copy(bt_proj)
   @inbounds for jt = 1:nt_trial, it = 1:nt_test
@@ -81,18 +136,34 @@ function combine_basis_time(
   combine(bt_proj,bt_proj_shift)
 end
 
-struct AffineDecomposition{T,N,I}
-  basis_space::AbstractMatrix{T}
-  basis_time::AbstractArray{T,N}
+struct ReducedIntegrationDomain{T}
+  indices_space::AbstractVector{T}
+  indices_time::AbstractVector{T}
+end
+
+get_indices_space(i::ReducedIntegrationDomain) = i.indices_space
+get_indices_time(i::ReducedIntegrationDomain) = i.indices_time
+get_all_indices_time(i::ReducedIntegrationDomain...) = union(map(get_indices_time,i))
+get_common_indices_time(i::ReducedIntegrationDomain...) = intersect(map(get_indices_time,i))
+
+struct AffineDecomposition{A,B,C}
+  basis_space::A
+  basis_time::B
   mdeim_interpolation::LU
-  integration_domain::I
+  integration_domain::C
 end
 
-struct TrivialAffineDecomposition{T,N}
-  projection::AbstractArray{T,N}
-end
+const AffineContribution = Contribution{AffineDecomposition}
 
-function compute_mdeim(rbinfo,op,trian,basis_space,basis_time)
+affine_contribution() = Contribution(IdDict{Triangulation,AffineDecomposition}())
+
+function mdeim(
+  rbinfo::RBInfo,
+  op::RBOperator,
+  trian::Triangulation,
+  basis_space::AbstractMatrix,
+  basis_time::AbstractMatrix)
+
   indices_space = get_mdeim_indices(basis_space)
   interp_basis_space = view(basis_space,indices_space,:)
   if rbinfo.st_mdeim
@@ -104,45 +175,91 @@ function compute_mdeim(rbinfo,op,trian,basis_space,basis_time)
     indices_time = axes(basis_time,1)
     lu_interp = lu(interp_basis_space)
   end
-  test = get_test(op)
-  red_trian = reduce_triangulation(test,trian,basis_space,indices_space)
-  integration_domain = ReducedIntegrationDomain(red_trian,indices_time)
-  return lu_interp,integration_domain
+  rindices_space = recast_indices_space(basis_space,indices_space)
+  red_trian = reduce_triangulation(op,trian,indices_space)
+  integration_domain = ReducedIntegrationDomain(rindices_space,indices_time)
+  return lu_interp,red_trian,integration_domain
 end
 
-function reduced_vector_form(rbinfo,op,snaps::AlgebraicContribution;kwargs...)
-  data = AffineDecomposition[]
-  for (trian,values) in snaps.dict
-    push!(data,reduced_vector_form(rbinfo,op,values,trian;kwargs...))
-  end
-  return data
-end
+function reduced_vector_form!(
+  a::AffineContribution,
+  rbinfo::RBInfo,
+  op::RBOperator,
+  s::AbstractTransientSnapshots,
+  trian::Triangulation)
 
-function reduced_vector_form(rbinfo,op,snaps,trian;kwargs...)
-  test = get_test(op)
-  basis_space,basis_time = compute_bases(snaps;ϵ=get_tol(rbinfo))
-  lu_interp,integration_domain = compute_mdeim(rbinfo,op,trian,basis_space,basis_time)
+  test = op.test
+  basis_space,basis_time = compute_bases(s;ϵ=get_tol(rbinfo))
+  lu_interp,red_trian,integration_domain = mdeim(rbinfo,op,trian,basis_space,basis_time)
   proj_basis_space = project_basis_space(basis_space,test)
-  comb_basis_time = combine_basis_time(test;kwargs...)
-  return AffineDecomposition(proj_basis_space,comb_basis_time,lu_interp,integration_domain)
+  comb_basis_time = combine_basis_time(test)
+  a[red_trian] = AffineDecomposition(proj_basis_space,comb_basis_time,lu_interp,integration_domain)
+  return a
 end
 
-function reduced_vector_form(rbinfo,op,snaps::AlgebraicContribution;kwargs...)
-  data = AffineDecomposition[]
-  for (trian,values) in snaps.dict
-    push!(data,reduced_matrix_form(rbinfo,op,values,trian;kwargs...))
-  end
-  return data
-end
+function reduced_matrix_form!(
+  a::AffineContribution,
+  rbinfo::RBInfo,
+  op::RBOperator,
+  s::AbstractTransientSnapshots,
+  trian::Triangulation;
+  kwargs...)
 
-function reduced_matrix_form(rbinfo,op,snaps,trian;kwargs...)
-  trial = get_trial(op)
-  test = get_test(op)
-  basis_space,basis_time = compute_bases(snaps;ϵ=get_tol(rbinfo))
-  lu_interp,integration_domain = compute_mdeim(rbinfo,op,trian,basis_space,basis_time)
+  trial = op.trial
+  test = op.test
+  basis_space,basis_time = compute_bases(s;ϵ=get_tol(rbinfo))
+  lu_interp,red_trian,integration_domain = mdeim(rbinfo,op,trian,basis_space,basis_time)
   proj_basis_space = project_basis_space(basis_space,trial,test)
   comb_basis_time = combine_basis_time(trial,test;kwargs...)
-  return AffineDecomposition(proj_basis_space,comb_basis_time,lu_interp,integration_domain)
+  a[red_trian] = AffineDecomposition(proj_basis_space,comb_basis_time,lu_interp,integration_domain)
+  return a
+end
+
+function reduced_vector_form(
+  solver::RBSolver,
+  op::RBOperator,
+  c::ArrayContribution)
+
+  rbinfo = get_info(solver)
+  a = affine_contribution()
+  for (trian,values) in c.dict
+    reduced_vector_form!(a,rbinfo,op,values,trian)
+  end
+  return a
+end
+
+function reduced_matrix_form(
+  solver::RBSolver,
+  op::RBOperator,
+  c::ArrayContribution;
+  kwargs...)
+
+  rbinfo = get_info(solver)
+  a = affine_contribution()
+  for (trian,values) in c.dict
+    reduced_matrix_form!(a,rbinfo,op,values,trian;kwargs...)
+  end
+  return a
+end
+
+function reduced_matrix_form(
+  solver::RBThetaMethod,
+  op::RBOperator,
+  contribs::Tuple{Vararg{ArrayContribution}})
+
+  fesolver = get_fe_solver(solver)
+  θ = fesolver.θ
+  map(enumerate(contribs)) do (i,c)
+    combine = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*(x-y)
+    reduced_matrix_form(solver,op,c;combine)
+  end
+end
+
+function reduced_matrix_vector_form(solver::RBSolver,op::RBOperator)
+  contribs_mat,contribs_vec = collect_matrices_vectors(solver,op)
+  red_mat = reduced_matrix_form(solver,op,contribs_mat)
+  red_vec = reduced_vector_form(solver,op,contribs_vec)
+  return red_mat,red_vec
 end
 
 function mdeim_solve!(cache,a::AffineDecomposition,b::AbstractArray)
@@ -288,16 +405,6 @@ function rb_contribution!(
   map(coeff) do cn
     copy(evaluate!(k,cache,basis_space_proj,basis_time,cn))
   end
-end
-
-function rb_contribution!(
-  cache,
-  k::RBContributionMap,
-  a::TrivialAffineDecomposition,
-  coeff::ParamArray)
-
-  array = [a.projection for _ = eachindex(coeff)]
-  ParamArray(array)
 end
 
 function zero_rb_contribution(

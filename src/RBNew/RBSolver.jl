@@ -3,6 +3,8 @@ struct RBSolver{S}
   fesolver::S
 end
 
+const RBThetaMethod = RBSolver{ThetaMethod}
+
 get_fe_solver(s::RBSolver) = s.fesolver
 get_info(s::RBSolver) = s.info
 
@@ -11,35 +13,14 @@ function RBSolver(fesolver,dir;kwargs...)
   RBSolver(info,fesolver)
 end
 
-function get_method_operator(
-  solver::RBSolver{ThetaMethod},
-  op::RBOperator,
-  r::TransientParamRealization)
-
-  fesolver = get_fe_solver(solver)
-  dt = fesolver.dt
-  θ = fesolver.θ
-  θ == 0.0 ? dtθ = dt : dtθ = dt*θ
-
-  x,y = _init_free_values(op,r)
-
-  ode_cache = allocate_cache(op,r)
-  ode_cache = update_cache!(ode_cache,op,r)
-
-  ThetaMethodParamOperator(op.feop,r,dtθ,x,ode_cache,y)
-end
-
-function collect_residuals_and_jacobians(solver::RBSolver,op::RBOperator)
-  nparams = num_mdeim_params(solver.info)
-  r = realization(op.feop;nparams)
-
-  nlop = get_method_operator(solver,op,r)
-  x = nlop.u0
-
-  b = residual(nlop,x)
-  A = jacobian(nlop,x)
-
-  return b,A
+function reduced_operator(solver::RBSolver,op::RBOperator)
+  red_mat,red_vec = reduced_matrix_vector_form(solver,op)
+  trians_mat = map(red_mat) do m
+    collect(keys(m))
+  end
+  trians_vec = collect(keys(red_vec))
+  red_op = reduced_operator(op,trians_mat,trians_vec)
+  return red_op
 end
 
 function Algebra.solve(solver::RBSolver,op::RBOperator{<:LinearSolver},r::ParamRealization)

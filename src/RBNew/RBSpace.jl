@@ -20,7 +20,7 @@ function reduced_basis(
   ϵ = get_tol(rbinfo)
   nsnaps_offline = num_offline_params(rbinfo)
   norm_matrix = get_norm_matrix(rbinfo,feop)
-  soffline = view(s,:,1:nsnaps_offline)
+  soffline = select_params(s,1:nsnaps_offline)
   basis_space,basis_time = compute_bases(soffline,norm_matrix;ϵ)
   return basis_space,basis_time
 end
@@ -33,7 +33,7 @@ function reduced_basis(
   ϵ = get_tol(rbinfo)
   nsnaps_offline = num_offline_params(rbinfo)
   norm_matrix = get_norm_matrix(rbinfo,feop)
-  soff = view(s,:,1:nsnaps_offline)
+  soff = select_params(s,1:nsnaps_offline)
   soff_free = get_free_dof_values(soff)
   basis_space,basis_time = compute_bases(soff_free,norm_matrix;ϵ)
   ranks = size(basis_space,2),size(basis_time,2)
@@ -48,7 +48,7 @@ function _return_flag(s)
     s = change_mode(s)
     flag = true
   end
-  flag
+  flag,s
 end
 
 function _return_bases(flag,b1,b2)
@@ -60,12 +60,22 @@ function _return_bases(flag,b1,b2)
   basis_space,basis_time
 end
 
-function compute_bases(
+function compute_bases(s::AbstractTransientSnapshots,args...;kwargs...)
+  _compute_bases(s,args...;kwargs...)
+end
+
+function compute_bases(s::NnzSnapshots,args...;kwargs...)
+  basis_space,basis_time = _compute_bases(s,args...;kwargs...)
+  sparse_basis_space = recast(basis_space,s)
+  return sparse_basis_space,basis_time
+end
+
+function _compute_bases(
   s::AbstractTransientSnapshots,
   norm_matrix=nothing;
   kwargs...)
 
-  flag = _return_flag(s)
+  flag,s = _return_flag(s)
   b1 = tpod(s,norm_matrix;kwargs...)
   compressed_s = compress(b1,s)
   compressed_s = change_mode(compressed_s)

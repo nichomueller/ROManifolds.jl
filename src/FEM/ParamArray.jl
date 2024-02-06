@@ -7,6 +7,7 @@ end
 
 const ParamVector{T,A,L} = ParamArray{T,1,A,L}
 const ParamMatrix{T,A,L} = ParamArray{T,2,A,L}
+const SparseParamMatrix = ParamArray{T,2,A,L} where {T,A<:AbstractVector{<:AbstractSparseMatrix},L}
 
 const AffineParamArray{T,N,A} = ParamArray{T,N,A,1}
 const AffineParamVector{T,A} = ParamVector{T,A,1}
@@ -104,7 +105,8 @@ function Base.zeros(a::ParamArray)
 end
 
 function Arrays.testvalue(::Type{ParamArray{T,N,A,L}}) where {T,N,A,L}
-  array = Vector{testvalue(eltype(A))}(undef,L)
+  tv = testvalue(eltype(A))
+  array = Vector{typeof(tv)}(undef,L)
   @inbounds for k = eachindex(array)
     array[k] = testvalue(eltype(A))
   end

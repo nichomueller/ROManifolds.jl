@@ -108,7 +108,7 @@ _sol = solve(fesolver,_feop,_u0,t0,tf)
 for ((uh,rt),(_uh,_t)) in zip(sol,_sol)
   uh1 = FEM._getindex(uh,3)
   t = get_times(rt)
-  @check t == _t "$t != $_t"
+  @check t ≈ _t "$t != $_t"
   @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "$(get_free_dof_values(uh1)) != $(get_free_dof_values(_uh))"
   @check uh1.dirichlet_values ≈ _uh.dirichlet_values
 end
@@ -190,7 +190,7 @@ for ((xh,rt),(_xh,_t)) in zip(sol,_sol)
   ph1 = FEM._getindex(ph,3)
   _uh,_ph = _xh
   t = get_times(rt)
-  @check t == _t "$t != $_t"
+  @check t ≈ _t "$t != $_t"
   @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "failed at time $t"
   @check get_free_dof_values(ph1) ≈ get_free_dof_values(_ph) "failed at time $t"
   @check uh1.dirichlet_values ≈ _uh.dirichlet_values

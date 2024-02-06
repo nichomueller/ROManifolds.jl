@@ -9,11 +9,11 @@ struct ODEParamOpFromFEOp{C} <: ODEParamOperator{C}
   feop::TransientParamFEOperator{C}
 end
 
-realization(op::ODEParamOpFromFEOp;kwargs...) = realization(op.feop;kwargs...)
-
 ReferenceFEs.get_order(op::ODEParamOpFromFEOp) = get_order(op.feop)
 FESpaces.get_test(op::ODEParamOpFromFEOp) = get_test(op.feop)
 FESpaces.get_trial(op::ODEParamOpFromFEOp) = get_trial(op.feop)
+realization(op::ODEParamOpFromFEOp;kwargs...) = realization(op.feop;kwargs...)
+get_fe_operator(op::ODEParamOpFromFEOp) = get_fe_operator(op.feop)
 
 function TransientFETools.allocate_cache(
   op::ODEParamOpFromFEOp,

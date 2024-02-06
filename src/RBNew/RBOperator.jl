@@ -8,6 +8,8 @@ end
 ReferenceFEs.get_order(op::RBOperator) = get_order(op.feop)
 FESpaces.get_test(op::RBOperator) = get_test(op.feop)
 FESpaces.get_trial(op::RBOperator) = get_trial(op.feop)
+FEM.realization(op::RBOperator;kwargs...) = realization(op.feop;kwargs...)
+FEM.get_fe_operator(op::RBOperator) = FEM.get_fe_operator(op.feop)
 
 function TransientFETools.allocate_cache(
   op::RBOperator,
@@ -102,4 +104,11 @@ function _init_free_values(op::RBOperator,r::TransientParamRealization)
   x = random_free_values(trial)
   y = zero_free_values(trial)
   return x,y
+end
+
+function reduced_operator(op::RBOperator,trians_mat,trians_vec)
+  full_feop = FEM.get_fe_operator(op)
+  reduced_feop = TransientParamFEOperatorWithTrian(full_feop,trians_mat,trians_vec)
+  reduced_odeop = get_algebraic_operator(reduced_feop)
+  RBOperator(reduced_odeop,op.trial,op.test)
 end

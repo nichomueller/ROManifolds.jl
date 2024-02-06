@@ -63,26 +63,9 @@ function Base.getindex(r::GenericTransientParamRealization,i,j)
     r.t0)
 end
 
-function Base.iterate(r::GenericTransientParamRealization)
-  iterator = Iterators.product(get_times(r),_get_params(r))
-  iternext = iterate(iterator)
-  if isnothing(iternext)
-    return nothing
-  end
-  (tstate,pstate),itstate = iternext
-  state = (iterator,itstate)
-  (pstate,tstate),state
-end
-
-function Base.iterate(r::GenericTransientParamRealization,state)
-  iterator,itstate = state
-  iternext = iterate(iterator,itstate)
-  if isnothing(iternext)
-    return nothing
-  end
-  (tstate,pstate),itstate = iternext
-  state = (iterator,itstate)
-  (pstate,tstate),state
+function Base.iterate(r::GenericTransientParamRealization,state...)
+  iterator = Iterators.product(_get_params(r),get_times(r))
+  iterate(iterator,state...)
 end
 
 get_final_time(r::GenericTransientParamRealization) = last(get_times(r))
@@ -332,8 +315,8 @@ function Fields.laplacian(f::TransientParamFunction)
 end
 
 function Base.iterate(f::TransientParamFunction)
-  iterator = Iterators.product(get_times(f),_get_params(f))
-  (tstate,pstate),state = iterate(iterator)
+  iterator = Iterators.product(_get_params(f),get_times(f))
+  (pstate,tstate),state = iterate(iterator)
   iterstatenext = iterator,state
   f.fun(pstate,tstate),iterstatenext
 end
@@ -344,7 +327,7 @@ function Base.iterate(f::TransientParamFunction,iterstate)
   if isnothing(statenext)
     return nothing
   end
-  (tstate,pstate),state = statenext
+  (pstate,tstate),state = statenext
   iterstatenext = iterator,state
   f.fun(pstate,tstate),iterstatenext
 end

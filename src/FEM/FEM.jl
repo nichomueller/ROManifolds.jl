@@ -58,6 +58,7 @@ include("ParamContainer.jl")
 export ParamArray
 export ParamVector
 export ParamMatrix
+export SparseParamMatrix
 export allocate_param_array
 export zero_param_array
 include("ParamArray.jl")
@@ -65,8 +66,10 @@ include("ParamArray.jl")
 export ParamBlockArray
 include("ParamBlockArray.jl")
 
-export AlgebraicContribution
-include("AlgebraicContribution.jl")
+export Contribution
+export ArrayContribution
+export array_contribution
+include("Contribution.jl")
 
 export ParamReindex
 export PosNegParamReindex
@@ -119,6 +122,7 @@ export TransientParamFEOperator
 export TransientParamFEOperatorFromWeakForm
 export AffineTransientParamFEOperator
 export NonlinearTransientParamFEOperator
+export TransientParamFEOperatorWithTrian
 export residual_for_trian!
 export jacobian_for_trian!
 include("TransientParamFEOperator.jl")

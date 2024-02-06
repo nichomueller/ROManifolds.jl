@@ -51,6 +51,7 @@ FESpaces.get_test(op::TransientParamFEOperatorFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientParamFEOperatorFromWeakForm) = op.trials[1]
 ReferenceFEs.get_order(op::TransientParamFEOperatorFromWeakForm) = op.order
 realization(op::TransientParamFEOperatorFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
+get_fe_operator(op::TransientParamFEOperatorFromWeakForm) = op
 
 function FESpaces.SparseMatrixAssembler(
   trial::Union{TransientTrialParamFESpace,TransientMultiFieldTrialParamFESpace},
@@ -211,6 +212,7 @@ FESpaces.get_test(op::TransientParamFEOperatorWithTrian) = get_test(op.op)
 FESpaces.get_trial(op::TransientParamFEOperatorWithTrian) = get_trial(op.op)
 ReferenceFEs.get_order(op::TransientParamFEOperatorWithTrian) = get_order(op.op)
 realization(op::TransientParamFEOperatorWithTrian;kwargs...) = realization(op.op;kwargs...)
+get_fe_operator(op::TransientParamFEOperatorWithTrian) = op.op
 
 function Algebra.allocate_residual(
   op::TransientParamFEOperatorWithTrian,
@@ -227,7 +229,7 @@ function Algebra.allocate_residual(
   xh = TransientCellField(uh,dxh)
   dc = op.op.res(get_params(r),get_times(r),xh,v)
   assem = get_param_assembler(op.op.assem,r)
-  b = AlgebraicContribution()
+  b = array_contribution()
   for trian in op.trian_res
     vecdata = collect_cell_vector(test,dc)
     b[trian] = allocate_vector(assem,vecdata)
@@ -254,7 +256,7 @@ function Algebra.allocate_jacobian(
 
   A = ()
   for i = 1:get_order(op)+1
-    Ai = AlgebraicContribution()
+    Ai = array_contribution()
     dc = op.op.jacs[i](get_params(r),get_times(r),xh,u,v)
     for trian in op.trian_jacs[i]
       matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
@@ -266,7 +268,7 @@ function Algebra.allocate_jacobian(
 end
 
 function Algebra.residual!(
-  b::AlgebraicContribution,
+  b::ArrayContribution,
   op::TransientParamFEOperatorWithTrian,
   r::TransientParamRealization,
   xh::T,
@@ -285,7 +287,7 @@ function Algebra.residual!(
 end
 
 function Algebra.jacobian!(
-  A::AlgebraicContribution,
+  A::ArrayContribution,
   op::TransientParamFEOperatorWithTrian,
   r::TransientParamRealization,
   xh::T,
@@ -308,7 +310,7 @@ function Algebra.jacobian!(
 end
 
 function TransientFETools.jacobians!(
-  A::Tuple{Vararg{AlgebraicContribution}},
+  A::Tuple{Vararg{ArrayContribution}},
   op::TransientParamFEOperatorWithTrian,
   r::TransientParamRealization,
   xh::T,
