@@ -50,9 +50,9 @@ u0(x,μ) = 0
 u0(μ) = x->u0(x,μ)
 u0μ(μ) = ParamFunction(u0,μ)
 
-b(μ,t,v) = ∫(fμt(μ,t)*v)dΩ + ∫(hμt(μ,t)*v)dΓn
-a(μ,t,du,v) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
-m(μ,t,dut,v) = ∫(v*dut)dΩ
+b(μ,t,v,dΩ,dΓn) = ∫(fμt(μ,t)*v)dΩ + ∫(hμt(μ,t)*v)dΓn
+a(μ,t,du,v,dΩ) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
+m(μ,t,dut,v,dΩ) = ∫(v*dut)dΩ
 
 order = 1
 degree = 2*order

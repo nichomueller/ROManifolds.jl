@@ -39,8 +39,10 @@ Base.ndims(::AbstractTransientSnapshots) = 2
 Base.ndims(::Type{<:AbstractTransientSnapshots}) = 2
 Base.IndexStyle(::Type{<:AbstractTransientSnapshots}) = IndexCartesian()
 
-FEM.num_times(s::AbstractTransientSnapshots) = num_times(s.realization)
-FEM.num_params(s::AbstractTransientSnapshots) = num_params(s.realization)
+get_realization(s::AbstractTransientSnapshots) = s.realization
+
+FEM.num_times(s::AbstractTransientSnapshots) = num_times(get_realization(s))
+FEM.num_params(s::AbstractTransientSnapshots) = num_params(get_realization(s))
 get_mode(s::AbstractTransientSnapshots) = s.mode
 row_size(s::AbstractTransientSnapshots{Mode1Axis}) = num_space_dofs(s)
 row_size(s::AbstractTransientSnapshots{Mode2Axis}) = num_times(s)
@@ -147,23 +149,15 @@ function change_mode(s::BasicSnapshots{Mode2Axis})
 end
 
 function tensor_getindex(s::BasicSnapshots,ispace,itime,iparam)
-  if itime == 0
-    @notimplemented
-  else
-    s.values[iparam.+(itime.-1)*num_params(s)][ispace]
-  end
+  s.values[iparam.+(itime.-1)*num_params(s)][ispace]
 end
 
 function tensor_setindex!(s::BasicSnapshots,v,ispace,itime,iparam)
-  if itime == 0
-    @notimplemented
-  else
-    s.values[iparam.+(itime.-1)*num_params(s)][ispace] = v
-  end
+  s.values[iparam.+(itime.-1)*num_params(s)][ispace] = v
 end
 
-function select_params(s::BasicSnapshots,paramrange)
-  BasicSnapshots(s.mode,s.values,s.realization[paramrange,:])
+function select_snapshots(s::BasicSnapshots,paramrange,timerange=:)
+  BasicSnapshots(s.mode,s.values,s.realization[paramrange,timerange])
 end
 
 struct TransientSnapshots{M,T,P,R} <: AbstractTransientSnapshots{M,T}
@@ -201,23 +195,15 @@ function change_mode(s::TransientSnapshots{Mode2Axis})
 end
 
 function tensor_getindex(s::TransientSnapshots,ispace,itime,iparam)
-  if itime == 0
-    @notimplemented
-  else
-    s.values[itime][iparam][ispace]
-  end
+  s.values[itime][iparam][ispace]
 end
 
 function tensor_setindex!(s::TransientSnapshots,v,ispace,itime,iparam)
-  if itime == 0
-    @notimplemented
-  else
-    s.values[itime][iparam][ispace] = v
-  end
+  s.values[itime][iparam][ispace] = v
 end
 
-function select_params(s::TransientSnapshots,paramrange)
-  TransientSnapshots(s.mode,s.values,s.realization[paramrange,:])
+function select_snapshots(s::TransientSnapshots,paramrange,timerange=:)
+  TransientSnapshots(s.mode,s.values,s.realization[paramrange,timerange])
 end
 
 struct TransientSnapshotsWithInitialValues{M,T,P,R} <: AbstractTransientSnapshots{M,T}
@@ -273,8 +259,12 @@ function tensor_setindex!(s::TransientSnapshotsWithInitialValues,v,ispace,itime,
   end
 end
 
-function select_params(s::TransientSnapshotsWithInitialValues,paramrange)
-  TransientSnapshotsWithInitialValues(s.mode,s.values,s.initial_values,s.realization[paramrange,:])
+function select_snapshots(s::TransientSnapshotsWithInitialValues,paramrange,timerange=:)
+  TransientSnapshotsWithInitialValues(
+    s.mode,
+    s.values,
+    s.initial_values,
+    s.realization[paramrange,timerange])
 end
 
 function FEM.shift_time!(s::TransientSnapshotsWithInitialValues,dt::Number,θ::Number)
@@ -424,8 +414,10 @@ function tensor_setindex!(s::TransientSnapshotsWithDirichletValues,v,ispace,itim
   end
 end
 
-function select_params(s::TransientSnapshotsWithDirichletValues,paramrange)
-  TransientSnapshotsWithDirichletValues(select_params(s.snaps,paramrange),s.dirichlet_values)
+function select_snapshots(s::TransientSnapshotsWithDirichletValues,paramrange,timerange=:)
+  TransientSnapshotsWithDirichletValues(
+    select_snapshots(s.snaps,paramrange,timerange),
+    s.dirichlet_values)
 end
 
 const BasicNnzSnapshots = BasicSnapshots{M,T,P,R} where {M,T,P<:SparseParamMatrix,R}
@@ -435,37 +427,21 @@ const NnzSnapshots = Union{BasicNnzSnapshots{M,T},TransientNnzSnapshots{M,T}} wh
 num_space_dofs(s::BasicNnzSnapshots) = nnz(first(s.values))
 
 function tensor_getindex(s::BasicNnzSnapshots,ispace,itime,iparam)
-  if itime == 0
-    @notimplemented
-  else
-    nonzeros(s.values[iparam.+(itime.-1)*num_params(s)])[ispace]
-  end
+  nonzeros(s.values[iparam.+(itime.-1)*num_params(s)])[ispace]
 end
 
 function tensor_setindex!(s::BasicNnzSnapshots,v,ispace,itime,iparam)
-  if itime == 0
-    @notimplemented
-  else
-    nonzeros(s.values[iparam.+(itime.-1)*num_params(s)])[ispace] = v
-  end
+  nonzeros(s.values[iparam.+(itime.-1)*num_params(s)])[ispace] = v
 end
 
 num_space_dofs(s::TransientNnzSnapshots) = nnz(first(first(s.values)))
 
 function tensor_getindex(s::TransientNnzSnapshots,ispace,itime,iparam)
-  if itime == 0
-    @notimplemented
-  else
-    nonzeros(s.values[itime][iparam])[ispace]
-  end
+  nonzeros(s.values[itime][iparam])[ispace]
 end
 
 function tensor_setindex!(s::TransientNnzSnapshots,v,ispace,itime,iparam)
-  if itime == 0
-    @notimplemented
-  else
-    nonzeros(s.values[itime][iparam])[ispace] = v
-  end
+  nonzeros(s.values[itime][iparam])[ispace] = v
 end
 
 function recast(a::AbstractMatrix,s::NnzSnapshots{Mode1Axis})

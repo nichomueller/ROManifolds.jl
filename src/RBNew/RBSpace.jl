@@ -20,7 +20,7 @@ function reduced_basis(
   ϵ = get_tol(rbinfo)
   nsnaps_offline = num_offline_params(rbinfo)
   norm_matrix = get_norm_matrix(rbinfo,feop)
-  soffline = select_params(s,1:nsnaps_offline)
+  soffline = select_snapshots(s,1:nsnaps_offline)
   basis_space,basis_time = compute_bases(soffline,norm_matrix;ϵ)
   return basis_space,basis_time
 end
@@ -33,7 +33,7 @@ function reduced_basis(
   ϵ = get_tol(rbinfo)
   nsnaps_offline = num_offline_params(rbinfo)
   norm_matrix = get_norm_matrix(rbinfo,feop)
-  soff = select_params(s,1:nsnaps_offline)
+  soff = select_snapshots(s,1:nsnaps_offline)
   soff_free = get_free_dof_values(soff)
   basis_space,basis_time = compute_bases(soff_free,norm_matrix;ϵ)
   ranks = size(basis_space,2),size(basis_time,2)

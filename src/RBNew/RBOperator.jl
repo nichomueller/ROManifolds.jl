@@ -54,16 +54,6 @@ function Algebra.residual!(
   residual!(b,op.feop,r,xhF,ode_cache)
 end
 
-function residual_for_trian!(
-  b::AbstractVector,
-  op::RBOperator,
-  r::TransientParamRealization,
-  xhF::Tuple{Vararg{AbstractVector}},
-  ode_cache)
-
-  residual_for_trian!(b,op.feop,r,xhF,ode_cache)
-end
-
 function Algebra.jacobian!(
   A::AbstractMatrix,
   op::RBOperator,
@@ -92,23 +82,38 @@ function Algebra.zero_initial_guess(op::RBOperator,r::TransientParamRealization)
   allocate_param_array(x0,length(r))
 end
 
-function _init_free_values(op::RBOperator{Affine},r::TransientParamRealization)
-  trial = evaluate(get_trial(op.feop),r)
-  x = zero_free_values(trial)
-  y = zero_free_values(trial)
-  return x,y
+function ODETools._allocate_matrix_and_vector(op::RBOperator,r,u0,ode_cache)
+  A = allocate_jacobian(op,r,u0,ode_cache)
+  b = allocate_residual(op,r,u0,ode_cache)
+  return A,b
 end
 
-function _init_free_values(op::RBOperator,r::TransientParamRealization)
-  trial = evaluate(get_trial(op.feop),r)
-  x = random_free_values(trial)
-  y = zero_free_values(trial)
-  return x,y
+function ODETools._matrix_and_vector!(A,b,op::RBOperator,r,dtθ,u0,ode_cache,vθ)
+  sA = ODETools._matrix!(A,odeop,r,dtθ,u0,ode_cache,vθ)
+  sb = ODETools._vector!(b,odeop,r,dtθ,u0,ode_cache,vθ)
+  return sA,sb
 end
 
-function reduced_operator(op::RBOperator,trians_mat,trians_vec)
+function ODETools._matrix!(A,op::RBOperator,r,dtθ,u0,ode_cache,vθ)
+  z = zero(eltype(A))
+  fillstored!(A,z)
+  jacobians!(A,op.feop,r,(vθ,vθ),(1.0,1/dtθ),ode_cache)
+  sA = map(A) do A
+    Snapshots(A,r)
+  end
+  return sA
+end
+
+function ODETools._vector!(b,op::RBOperator,r,dtθ,u0,ode_cache,vθ)
+  residual!(b,op.feop,r,(u0,vθ),ode_cache)
+  b .*= -1.0
+  sb = Snapshots(b,r)
+  return sb
+end
+
+function reduced_operator(op::RBOperator,trians_vec,trians_mat,trians_mat_t)
   full_feop = FEM.get_fe_operator(op)
-  reduced_feop = TransientParamFEOperatorWithTrian(full_feop,trians_mat,trians_vec)
+  reduced_feop = change_triangulation(full_feop,trians_vec,trians_mat,trians_mat_t)
   reduced_odeop = get_algebraic_operator(reduced_feop)
   RBOperator(reduced_odeop,op.trial,op.test)
 end

@@ -1,37 +1,4 @@
-function get_method_operator(
-  solver::RBThetaMethod,
-  op::RBOperator,
-  r::TransientParamRealization)
-
-  fesolver = get_fe_solver(solver)
-  dt = fesolver.dt
-  θ = fesolver.θ
-  θ == 0.0 ? dtθ = dt : dtθ = dt*θ
-
-  x,y = _init_free_values(op,r)
-
-  ode_cache = allocate_cache(op,r)
-  ode_cache = update_cache!(ode_cache,op,r)
-
-  ThetaMethodParamOperator(op.feop,r,dtθ,x,ode_cache,y)
-end
-
-function collect_matrices_vectors(solver::RBSolver,op::RBOperator)
-  nparams = num_mdeim_params(solver.info)
-  r = realization(op;nparams)
-
-  nlop = get_method_operator(solver,op,r)
-  x = nlop.u0
-
-  A = jacobian(nlop,x)
-  sA = map(A) do A
-    Snapshots(A,r)
-  end
-  b = residual(nlop,x)
-  sb = Snapshots(b,r)
-
-  return sA,sb
-end
+# OFFLINE PHASE
 
 function get_mdeim_indices(A::AbstractMatrix{T}) where T
   m,n = size(A)
@@ -153,6 +120,11 @@ struct AffineDecomposition{A,B,C}
   integration_domain::C
 end
 
+get_integration_domain(a::AffineDecomposition) = a.integration_domain
+get_indices_space(a::AffineDecomposition) = get_indices_space(get_integration_domain(a))
+get_indices_time(a::AffineDecomposition) = get_indices_time(get_integration_domain(a))
+get_all_indices_time(a::AffineDecomposition...) = union(map(get_indices_time,a))
+
 const AffineContribution = Contribution{AffineDecomposition}
 
 affine_contribution() = Contribution(IdDict{Triangulation,AffineDecomposition}())
@@ -255,11 +227,38 @@ function reduced_matrix_form(
   end
 end
 
-function reduced_matrix_vector_form(solver::RBSolver,op::RBOperator)
-  contribs_mat,contribs_vec = collect_matrices_vectors(solver,op)
+function reduced_matrix_vector_form(
+  solver::RBSolver,
+  op::RBOperator,
+  s::AbstractTransientSnapshots)
+
+  contribs_mat,contribs_vec, = collect_matrices_vectors(solver,op,s)
   red_mat = reduced_matrix_form(solver,op,contribs_mat)
   red_vec = reduced_vector_form(solver,op,contribs_vec)
   return red_mat,red_vec
+end
+
+# ONLINE PHASE
+
+function collect_matrices_vectors!(
+  solver::ThetaRBSolver{Affine},
+  op::RBOperator,
+  amat::Tuple{Vararg{AffineDecomposition}},
+  amat_t::Tuple{Vararg{AffineDecomposition}},
+  avec::Tuple{Vararg{AffineDecomposition}},
+  s::AbstractTransientSnapshots,
+  cache)
+
+  mat_tids = map(get_indices_time,amat)
+  mat_t_tids = map(get_indices_time,amat_t)
+  vec_tids = map(get_indices_time,avec)
+  all_tids = get_all_indices_time(mat_tids...,mat_t_tids...,vec_tids...)
+  s_tids = select_snapshots(s,:,all_tids)
+  (smat,smat_t),svec = collect_matrices_vectors!(solver,op,s_tids,cache)
+  red_smat = tensor_getindex(smat,get_indices_space(amat),indexin(all_tids,mat_tids),:)
+  red_smat_t = tensor_getindex(smat_t,get_indices_space(amat_t),indexin(all_tids,mat_t_tids),:)
+  red_svec = tensor_getindex(svec,get_indices_space(avec),indexin(all_tids,vec_tids),:)
+  return red_smat,red_smat_t,red_svec
 end
 
 function mdeim_solve!(cache,a::AffineDecomposition,b::AbstractArray)

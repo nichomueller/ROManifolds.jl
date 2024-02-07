@@ -7,7 +7,8 @@ Base.iterate(a::Contribution,i...) = iterate(a.dict,i...)
 Base.values(a::Contribution) = values(a.dict)
 Base.keys(a::Contribution) = keys(a.dict)
 CellData.num_domains(a::Contribution) = length(a)
-CellData.get_domains(a::Contribution) = keys(a)
+CellData.get_domains(a::Contribution) = collect(keys(a))
+get_values(a::Contribution) = collect(values(a))
 
 function CellData.get_contribution(a::T,trian::Triangulation) where T<:Contribution
   if haskey(a.dict,trian)
