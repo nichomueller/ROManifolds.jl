@@ -226,7 +226,7 @@ function collect_matrices_vectors!(
     vθ .= 0.0
     A,b = ODETools._allocate_matrix_and_vector(op,r,vθ,ode_cache)
   else
-    A,b,ode_cache = cache
+    A,b,ode_cache,vθ = cache
   end
 
   ode_cache = update_cache!(ode_cache,op.feop,r)
@@ -267,4 +267,13 @@ function collect_matrices_vectors!(
   cache = A,b,ode_cache,vθ
 
   return sA,sb,cache
+end
+
+function FEM.change_triangulation(
+  op::GalerkinProjectionOperator,trians_lhs,trians_rhs)
+
+  feop = FEM.get_fe_operator(op)
+  new_feop = FEM.change_triangulation(feop,trians_lhs,trians_rhs)
+  new_odeop = get_algebraic_operator(new_feop)
+  GalerkinProjectionOperator(new_odeop,op.trial,op.test)
 end

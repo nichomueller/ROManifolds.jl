@@ -119,6 +119,8 @@ struct AffineDecomposition{A,B,C}
   integration_domain::C
 end
 
+Base.eltype(a::AffineDecomposition) = eltype(a.basis_space)
+
 get_integration_domain(a::AffineDecomposition) = a.integration_domain
 get_indices_space(a::AffineDecomposition) = get_indices_space(get_integration_domain(a))
 get_indices_time(a::AffineDecomposition) = get_indices_time(get_integration_domain(a))
@@ -219,10 +221,12 @@ function reduced_matrix_form(
 
   fesolver = get_fe_solver(solver)
   θ = fesolver.θ
-  map(enumerate(contribs)) do (i,c)
+  a = ()
+  for (i,c) in enumerate(contribs)
     combine = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*(x-y)
-    reduced_matrix_form(solver,op,c;combine)
+    a = (a...,reduced_matrix_form(solver,op,c;combine))
   end
+  return a
 end
 
 function reduced_matrix_vector_form(
@@ -240,25 +244,44 @@ end
 
 # ONLINE PHASE
 
+function allocate_mdeim_coefficient(a::AffineContribution,r::AbstractParamRealization)
+  np = num_params(r)
+  cache_solve = array_contribution()
+  cache_recast = array_contribution()
+  for (trian,values) in a.dict
+    T = eltype(values)
+    Nt = num_times(values)
+    nt = num_reduced_times(values)
+    ns = num_reduced_space_dofs(values)
+    cache_solve[trian] = allocate_param_array(zeros(T,nt*ns),np)
+    cache_recast[trian] = allocate_param_array(zeros(T,Nt,ns),np)
+  end
+  return cache_solve,cache_recast
+end
+
+function allocate_mdeim_coefficient(
+  mat::Tuple{Vararg{AffineContribution}},
+  vec::AffineContribution,
+  r::AbstractParamRealization)
+
+  mat_cache = ()
+  for mati in mat
+    mat_cache = (mat_cache...,allocate_mdeim_coefficient(mati,r))
+  end
+  vec_cache = allocate_mdeim_coefficient(vec,r)
+  return mat_cache,vec_cache
+end
+
 function mdeim_coefficient!(cache,a::AffineDecomposition,b::AbstractArray)
-  cache_solve,cache_recast = cache
-
+  coeff,cache_recast = cache
   mdeim_interpolation = a.mdeim_interpolation
-  setsize!(cache_solve,size(b))
-  coeff = cache_solve.array
   ldiv!(coeff,mdeim_interpolation,b)
-
   recast_coefficient!(cache_recast,a,coeff)
 end
 
-function recast_coefficient!(cache_recast,a::AffineDecomposition,coeff::AbstractMatrix)
-  Nt = num_times(a)
-  ns = num_reduced_space_dofs(a)
-  setsize!(cache_recast,(Nt,ns))
-  array = get_array(cache_recast)
-
-  @inbounds for n = eachindex(array)
-    array[n] = coeff[:,(n-1)*Nt+1:n*Nt]'
+function recast_coefficient!(new_coeff,a::AffineDecomposition,coeff::AbstractMatrix)
+  @inbounds for i = eachindex(array)
+    new_coeff[i] = coeff[:,(i-1)*Nt+1:i*Nt]'
   end
 
   ParamArray(array)

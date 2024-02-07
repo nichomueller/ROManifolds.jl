@@ -13,7 +13,7 @@ ReferenceFEs.get_order(op::ODEParamOpFromFEOp) = get_order(op.feop)
 FESpaces.get_test(op::ODEParamOpFromFEOp) = get_test(op.feop)
 FESpaces.get_trial(op::ODEParamOpFromFEOp) = get_trial(op.feop)
 realization(op::ODEParamOpFromFEOp;kwargs...) = realization(op.feop;kwargs...)
-get_fe_operator(op::ODEParamOpFromFEOp) = get_fe_operator(op.feop)
+get_fe_operator(op::ODEParamOpFromFEOp) = op.feop
 
 function TransientFETools.allocate_cache(
   op::ODEParamOpFromFEOp,

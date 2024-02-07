@@ -51,7 +51,6 @@ FESpaces.get_test(op::TransientParamFEOperatorFromWeakForm) = op.test
 FESpaces.get_trial(op::TransientParamFEOperatorFromWeakForm) = op.trials[1]
 ReferenceFEs.get_order(op::TransientParamFEOperatorFromWeakForm) = op.order
 realization(op::TransientParamFEOperatorFromWeakForm;kwargs...) = realization(op.tpspace;kwargs...)
-get_fe_operator(op::TransientParamFEOperatorFromWeakForm) = op
 
 function FESpaces.SparseMatrixAssembler(
   trial::Union{TransientTrialParamFESpace,TransientMultiFieldTrialParamFESpace},
@@ -196,11 +195,9 @@ struct TransientParamFEOperatorWithTrian{T<:OperatorType,A,B} <: TransientParamF
   trian_jacs::B
 end
 
-function AffineTransientParamFEOperator(
-  m::Function,a::Function,b::Function,tpspace,trial,test,trian_m,trian_a,trian_b)
-
-  order = get_polynomial_order(test)
+function _affine_set_triangulation(m,a,b,trian_m,trian_a,trian_b,order)
   degree = 2*order
+
   meas_m = Measure.(trian_m,degree)
   meas_a = Measure.(trian_a,degree)
   meas_b = Measure.(trian_b,degree)
@@ -213,6 +210,32 @@ function AffineTransientParamFEOperator(
   newa(μ,t,du,v) = newa(μ,t,du,v,meas_a...)
   newb(μ,t,v) = newb(μ,t,v,meas_b...)
 
+  return newm,newa,newb
+end
+
+function _set_triangulation(res,jac,jac_t,trian_res,trian_jac,trian_jac_t,order)
+  degree = 2*order
+
+  meas_res = Measure.(trian_res,degree)
+  meas_jac = Measure.(trian_jac,degree)
+  meas_jac_t = Measure.(trian_jac_t,degree)
+
+  newres(μ,t,u,v,args...) = res(μ,t,u,v,args...)
+  newjac(μ,t,u,du,v,args...) = jac(μ,t,u,du,v,args...)
+  newjac_t(μ,t,u,dut,v,args...) = jac_t(μ,t,u,dut,v,args...)
+
+  newres(μ,t,u,v) = newres(μ,t,u,v,meas_res...)
+  newjac(μ,t,u,du,v) = newjac(μ,t,u,du,v,meas_jac...)
+  newjac_t(μ,t,u,dut,v) = newjac_t(μ,t,u,dut,v,meas_jac_t...)
+
+  return newres,newjac,newjac_t
+end
+
+function AffineTransientParamFEOperator(
+  m::Function,a::Function,b::Function,tpspace,trial,test,trian_m,trian_a,trian_b)
+
+  order = get_polynomial_order(test)
+  newm,newa,newb = _affine_set_triangulation(m,a,b,trian_m,trian_a,trian_b,order)
   op = AffineTransientParamFEOperator(newm,newa,newb,tpspace,trial,test)
   TransientParamFEOperatorWithTrian(op,trian_b,(trian_a,trian_m))
 end
@@ -221,20 +244,8 @@ function TransientParamFEOperator(
   res::Function,jac::Function,jac_t::Function,tpspace,trial,test,trian_res,trian_jac,trian_jac_t)
 
   order = get_polynomial_order(test)
-  degree = 2*order
-  meas_res = Measure.(trian_res,degree)
-  meas_jac = Measure.(trian_jac,degree)
-  meas_jac_t = Measure.(trian_jac_t,degree)
-
-  newres(μ,t,u,v,args...) = res(μ,t,u,v,args...)
-  newjac(μ,t,u,du,v,args...) = jac(μ,t,u,du,v)
-  newjac_t(μ,t,u,dut,v,args...) = jac_t(μ,t,u,dut,v,args...)
-
-  newres(μ,t,u,v) = newres(μ,t,u,v,meas_res...)
-  newjac(μ,t,u,du,v) = newjac(μ,t,u,du,v,meas_jac...)
-  newjac_t(μ,t,u,dut,v) = newjac_t(μ,t,u,dut,v,meas_jac_t...)
-
-  op = TransientParamFEOperator(res,jac,jac_t,tpspace,trial,test)
+  newres,newjac,newjac_t = _set_triangulation(res,jac,jac_t,trian_res,trian_jac,trian_jac_t,order)
+  op = TransientParamFEOperator(newres,newjac,newjac_t,tpspace,trial,test)
   TransientParamFEOperatorWithTrian(op,trian_res,(trian_jac,trian_jac_t))
 end
 
@@ -242,7 +253,6 @@ FESpaces.get_test(op::TransientParamFEOperatorWithTrian) = get_test(op.op)
 FESpaces.get_trial(op::TransientParamFEOperatorWithTrian) = get_trial(op.op)
 ReferenceFEs.get_order(op::TransientParamFEOperatorWithTrian) = get_order(op.op)
 realization(op::TransientParamFEOperatorWithTrian;kwargs...) = realization(op.op;kwargs...)
-get_fe_operator(op::TransientParamFEOperatorWithTrian) = op.op
 
 # needed to retrieve measures
 function get_polynomial_order(basis,::DiscreteModel)
@@ -263,19 +273,29 @@ get_polynomial_order(fs::MultiFieldFESpace) = maximum(map(get_polynomial_order,f
 
 # change triangulation
 function change_triangulation(
-  op::TransientParamFEOperatorWithTrian{Affine},
-  newtrian_b,newtrian_a,newtrian_m)
+  op::TransientParamFEOperatorWithTrian{T},
+  trian_jacs,
+  trian_res) where T
 
-  @unpack res,jac,jac_t,tpspace,trial,test,trian_res,trian_jac = op
-  AffineTransientParamFEOperator(res,jac,jac_t,tpspace,trial,test,newtrian_m,newtrian_a,newtrian_b)
-end
-
-function change_triangulation(
-  op::TransientParamFEOperatorWithTrian,
-  newtrian_res,newtrian_jac,newtrian_jac_t)
-
-  @unpack res,jac,jac_t,tpspace,trial,test,trian_res,trian_jac = op
-  TransientParamFEOperator(res,jac,jac_t,tpspace,trial,test,newtrian_res,newtrian_jac,newtrian_jac_t)
+  trian_jac,trian_jac_t = trian_jacs
+  newtrian_res = ()
+  newtrian_jac = ()
+  newtrian_jac_t = ()
+  for tr = trian_res
+    newtrian_res = (newtrian_res...,tr)
+  end
+  for tj = trian_jac
+    newtrian_jac = (newtrian_jac...,tj)
+  end
+  for tj_t = trian_jac_t
+    newtrian_jac_t = (newtrian_jac_t...,tj_t)
+  end
+  @unpack res,rhs,jacs,assem,tpspace,trials,test,order = op.op
+  jac,jac_t = jacs
+  porder = get_polynomial_order(test)
+  newres,newjacs... = _set_triangulation(res,jac,jac_t,trian_res,trian_jac,trian_jac_t,porder)
+  feop = TransientParamFEOperatorFromWeakForm{T}(newres,rhs,newjacs,assem,tpspace,trials,test,order)
+  TransientParamFEOperatorWithTrian(feop,newtrian_res,(newtrian_jac,newtrian_jac_t))
 end
 
 function Algebra.allocate_residual(

@@ -1,12 +1,12 @@
 function reduced_operator(
   pop::GalerkinProjectionOperator,
-  lhs_contribs::Vector{AffineContribution},
+  lhs_contribs::Tuple{Vararg{AffineContribution}},
   rhs_contribs::AffineContribution)
 
   trians_lhs = map(get_domains,lhs_contribs)
   trians_rhs = get_domains(rhs_contribs)
 
-  new_pop = change_triangulation(pop,trians_lhs,trians_rhs)
+  new_pop = FEM.change_triangulation(pop,trians_lhs,trians_rhs)
 
   lhs = map(FEM.get_values,lhs_contribs)
   rhs = FEM.get_values(rhs_contribs)
@@ -126,7 +126,26 @@ function reduced_zero_initial_guess(op::ReducedOperator,r::TransientParamRealiza
   @abstractmethod
 end
 
-function ODETools._matrix_and_vector!(
+function allocate_reduced_matrix_and_vector(
+  solver::RBThetaMethod,
+  op::ReducedOperator,
+  s::AbstractTransientSnapshots)
+
+  r = get_realization(s)
+
+  vθ = zero_initial_guess(op,r)
+  ode_cache = allocate_cache(op,r)
+  A,b = ODETools._allocate_matrix_and_vector(op,r,vθ,ode_cache)
+  matvec_cache = A,b,ode_cache,vθ
+
+  coeff_cache = allocate_mdeim_coefficient(op.lhs,op.rhs,r)
+
+  lincomb_cache = allocate_mdeim_lincomb(op.lhs,op.rhs,r)
+
+  return matvec_cache,coeff_cache,lincomb_cache
+end
+
+function reduced_matrix_and_vector!(
   solver::RBThetaMethod,
   op::ReducedOperator,
   s::AbstractTransientSnapshots,
@@ -143,10 +162,8 @@ function ODETools._matrix_and_vector!(
     reduced_matrix!(lincomb_A_cache,lhs,A_coeff)
   end
 
-  b_red = map(op.rhs) do rhs
-    b_coeff = mdeim_coefficient!(coeff_b_cache,rhs,b)
-    reduced_matrix!(lincomb_b_cache,rhs,b_coeff)
-  end
+  b_coeff = mdeim_coefficient!(coeff_b_cache,op.rhs,b)
+  b_red = reduced_vector!(lincomb_b_cache,rhs,b_coeff)
 
   return A_red,b_red
 end
@@ -178,24 +195,3 @@ function collect_matrices_vectors!(
   end |> tuple_of_arrays
   return A,b
 end
-
-# function collect_matrices_vectors!(
-#   solver::RBThetaMethod,
-#   op::ReducedOperator,
-#   amat::Tuple{Vararg{AffineDecomposition}},
-#   amat_t::Tuple{Vararg{AffineDecomposition}},
-#   avec::Tuple{Vararg{AffineDecomposition}},
-#   s::AbstractTransientSnapshots,
-#   cache)
-
-#   mat_tids = map(get_indices_time,amat)
-#   mat_t_tids = map(get_indices_time,amat_t)
-#   vec_tids = map(get_indices_time,avec)
-#   all_tids = union_indices_time(mat_tids...,mat_t_tids...,vec_tids...)
-#   s_tids = select_snapshots(s,:,all_tids)
-#   (smat,smat_t),svec = collect_matrices_vectors!(solver,op,s_tids,cache)
-#   red_smat = tensor_getindex(smat,get_indices_space(amat),indexin(all_tids,mat_tids),:)
-#   red_smat_t = tensor_getindex(smat_t,get_indices_space(amat_t),indexin(all_tids,mat_t_tids),:)
-#   red_svec = tensor_getindex(svec,get_indices_space(avec),indexin(all_tids,vec_tids),:)
-#   return red_smat,red_smat_t,red_svec
-# end

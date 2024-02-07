@@ -81,4 +81,8 @@ rbsolver = RBSolver(rbinfo,fesolver)
 
 snaps,comp = RB.collect_solutions(rbinfo,fesolver,feop,uh0μ)
 red_trial,red_test = reduced_fe_space(rbinfo,feop,snaps)
+
 odeop = get_algebraic_operator(feop)
+pop = GalerkinProjectionOperator(odeop,red_trial,red_test)
+red_lhs,red_rhs = RB.reduced_matrix_vector_form(rbsolver,pop,snaps)
+red_op = reduced_operator(pop,red_lhs,red_rhs)

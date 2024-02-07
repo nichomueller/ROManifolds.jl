@@ -89,8 +89,7 @@ function Algebra.solve(
   uh0::Function;
   kwargs...)
 
-  feop = get_fe_operator(op)
-  solve(solver,feop,uh0;kwargs...)
+  solve(solver,op.op,uh0;kwargs...)
 end
 
 function TransientFETools.test_transient_fe_solver(
