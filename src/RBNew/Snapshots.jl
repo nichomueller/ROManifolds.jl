@@ -206,6 +206,22 @@ function select_snapshots(s::TransientSnapshots,paramrange,timerange=:)
   TransientSnapshots(s.mode,s.values,s.realization[paramrange,timerange])
 end
 
+function TransientToBasicSnapshots(
+  s::TransientSnapshots{M,T,<:ParamArray{T,N,A}}
+  ) where {M,T,N,A}
+
+  nt = num_times(s)
+  np = num_params(s)
+  array = Vector{eltype(A)}(undef,nt*np)
+  @inbounds for i = 1:nt*np
+    it = slow_index(i,np)
+    ip = fast_index(i,np)
+    array[i] = s.values[it][ip]
+  end
+  basic_values = ParamArray(array)
+  BasicSnapshots(s.mode,basic_values,s.realization)
+end
+
 struct TransientSnapshotsWithInitialValues{M,T,P,R} <: AbstractTransientSnapshots{M,T}
   mode::M
   values::AbstractVector{P}
@@ -273,8 +289,9 @@ function FEM.shift_time!(s::TransientSnapshotsWithInitialValues,dt::Number,θ::N
   v_backward = [s.initial_values,s.values[1:end-1]...]
   v_middle = θ*v_forward + (1-θ)*v_backward
   r = s.realization
-  shift_time!(r,dt*θ)
-  TransientSnapshots(mode,v_middle,r)
+  FEM.shift_time!(r,dt*θ)
+  sshift = TransientSnapshots(mode,v_middle,r)
+  TransientToBasicSnapshots(sshift)
 end
 
 struct CompressedTransientSnapshots{M,N,T,R} <: AbstractTransientSnapshots{M,T}

@@ -1,45 +1,50 @@
-function reduce_fe_space(
+function reduced_fe_space(
   rbinfo::RBInfo,
   feop::TransientParamFEOperator,
   s::AbstractTransientSnapshots)
 
   trial = get_trial(feop)
   test = get_test(feop)
-  basis_space,basis_time = reduced_basis(rbinfo,feop,s)
-
-  reduced_trial = TestRBSpace(trial,basis_space,basis_time)
-  reduced_test = TrialRBSpace(test,basis_space,basis_time)
-  return reduced_trial,reduced_test
-end
-
-function reduced_basis(
-  rbinfo::RBInfo,
-  feop::TransientParamFEOperator,
-  s::AbstractTransientSnapshots)
-
-  ϵ = get_tol(rbinfo)
-  nsnaps_offline = num_offline_params(rbinfo)
-  norm_matrix = get_norm_matrix(rbinfo,feop)
-  soffline = select_snapshots(s,1:nsnaps_offline)
-  basis_space,basis_time = compute_bases(soffline,norm_matrix;ϵ)
-  return basis_space,basis_time
-end
-
-function reduced_basis(
-  rbinfo::RBInfo,
-  feop::TransientParamFEOperator,
-  s::TransientSnapshotsWithDirichletValues)
-
   ϵ = get_tol(rbinfo)
   nsnaps_offline = num_offline_params(rbinfo)
   norm_matrix = get_norm_matrix(rbinfo,feop)
   soff = select_snapshots(s,1:nsnaps_offline)
-  soff_free = get_free_dof_values(soff)
-  basis_space,basis_time = compute_bases(soff_free,norm_matrix;ϵ)
-  ranks = size(basis_space,2),size(basis_time,2)
-  soff_dir = get_free_dof_values(soff)
-  basis_space_dir,basis_time_dir = compute_bases(soff_dir,norm_matrix;ranks)
+  basis_space,basis_time = reduced_basis(soff,norm_matrix;ϵ)
+  reduced_trial = TrialRBSpace(trial,basis_space,basis_time)
+  reduced_test = TestRBSpace(test,basis_space,basis_time)
+  return reduced_trial,reduced_test
+end
+
+function reduced_basis(s::AbstractTransientSnapshots,args...;kwargs...)
+  basis_space,basis_time = compute_bases(s,args...;kwargs...)
   return basis_space,basis_time
+end
+
+function reduced_basis(s::TransientSnapshotsWithDirichletValues,args...;kwargs...)
+  basis_space,basis_time = compute_bases(soff_free,args...;kwargs...)
+  ranks = size(basis_space,2),size(basis_time,2)
+  sdir = get_dirichlet_values(s)
+  basis_space_dir,basis_time_dir = compute_bases(sdir,args...;ranks)
+  return basis_space,basis_time
+end
+
+function reduced_basis(s::NnzSnapshots,args...;kwargs...)
+  basis_space,basis_time = compute_bases(s,args...;kwargs...)
+  sparse_basis_space = recast(basis_space,s)
+  return sparse_basis_space,basis_time
+end
+
+function compute_bases(
+  s::AbstractTransientSnapshots,
+  norm_matrix=nothing;
+  kwargs...)
+
+  flag,s = _return_flag(s)
+  b1 = tpod(s,norm_matrix;kwargs...)
+  compressed_s = compress(b1,s)
+  compressed_s = change_mode(compressed_s)
+  b2 = tpod(compressed_s;kwargs...)
+  _return_bases(flag,b1,b2)
 end
 
 function _return_flag(s)
@@ -58,29 +63,6 @@ function _return_bases(flag,b1,b2)
     basis_space,basis_time = b1,b2
   end
   basis_space,basis_time
-end
-
-function compute_bases(s::AbstractTransientSnapshots,args...;kwargs...)
-  _compute_bases(s,args...;kwargs...)
-end
-
-function compute_bases(s::NnzSnapshots,args...;kwargs...)
-  basis_space,basis_time = _compute_bases(s,args...;kwargs...)
-  sparse_basis_space = recast(basis_space,s)
-  return sparse_basis_space,basis_time
-end
-
-function _compute_bases(
-  s::AbstractTransientSnapshots,
-  norm_matrix=nothing;
-  kwargs...)
-
-  flag,s = _return_flag(s)
-  b1 = tpod(s,norm_matrix;kwargs...)
-  compressed_s = compress(b1,s)
-  compressed_s = change_mode(compressed_s)
-  b2 = tpod(compressed_s;kwargs...)
-  _return_bases(flag,b1,b2)
 end
 
 abstract type RBSpace{S} <: FESpace end

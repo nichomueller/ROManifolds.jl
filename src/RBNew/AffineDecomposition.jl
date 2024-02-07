@@ -110,8 +110,7 @@ end
 
 get_indices_space(i::ReducedIntegrationDomain) = i.indices_space
 get_indices_time(i::ReducedIntegrationDomain) = i.indices_time
-get_all_indices_time(i::ReducedIntegrationDomain...) = union(map(get_indices_time,i))
-get_common_indices_time(i::ReducedIntegrationDomain...) = intersect(map(get_indices_time,i))
+union_indices_time(i::ReducedIntegrationDomain...) = union(map(get_indices_time,i))
 
 struct AffineDecomposition{A,B,C}
   basis_space::A
@@ -123,7 +122,6 @@ end
 get_integration_domain(a::AffineDecomposition) = a.integration_domain
 get_indices_space(a::AffineDecomposition) = get_indices_space(get_integration_domain(a))
 get_indices_time(a::AffineDecomposition) = get_indices_time(get_integration_domain(a))
-get_all_indices_time(a::AffineDecomposition...) = union(map(get_indices_time,a))
 
 const AffineContribution = Contribution{AffineDecomposition}
 
@@ -161,7 +159,7 @@ function reduced_vector_form!(
   trian::Triangulation)
 
   test = op.test
-  basis_space,basis_time = compute_bases(s;ϵ=get_tol(rbinfo))
+  basis_space,basis_time = reduced_basis(s;ϵ=get_tol(rbinfo))
   lu_interp,red_trian,integration_domain = mdeim(rbinfo,op,trian,basis_space,basis_time)
   proj_basis_space = project_basis_space(basis_space,test)
   comb_basis_time = combine_basis_time(test)
@@ -179,7 +177,7 @@ function reduced_matrix_form!(
 
   trial = op.trial
   test = op.test
-  basis_space,basis_time = compute_bases(s;ϵ=get_tol(rbinfo))
+  basis_space,basis_time = reduced_basis(s;ϵ=get_tol(rbinfo))
   lu_interp,red_trian,integration_domain = mdeim(rbinfo,op,trian,basis_space,basis_time)
   proj_basis_space = project_basis_space(basis_space,trial,test)
   comb_basis_time = combine_basis_time(trial,test;kwargs...)
@@ -232,7 +230,9 @@ function reduced_matrix_vector_form(
   op::RBOperator,
   s::AbstractTransientSnapshots)
 
-  contribs_mat,contribs_vec, = collect_matrices_vectors(solver,op,s)
+  nparams = num_mdeim_params(solver.info)
+  smdeim = select_snapshots(s,Base.OneTo(nparams))
+  contribs_mat,contribs_vec, = collect_matrices_vectors!(solver,op,smdeim,nothing)
   red_mat = reduced_matrix_form(solver,op,contribs_mat)
   red_vec = reduced_vector_form(solver,op,contribs_vec)
   return red_mat,red_vec
@@ -240,28 +240,7 @@ end
 
 # ONLINE PHASE
 
-function collect_matrices_vectors!(
-  solver::ThetaRBSolver{Affine},
-  op::RBOperator,
-  amat::Tuple{Vararg{AffineDecomposition}},
-  amat_t::Tuple{Vararg{AffineDecomposition}},
-  avec::Tuple{Vararg{AffineDecomposition}},
-  s::AbstractTransientSnapshots,
-  cache)
-
-  mat_tids = map(get_indices_time,amat)
-  mat_t_tids = map(get_indices_time,amat_t)
-  vec_tids = map(get_indices_time,avec)
-  all_tids = get_all_indices_time(mat_tids...,mat_t_tids...,vec_tids...)
-  s_tids = select_snapshots(s,:,all_tids)
-  (smat,smat_t),svec = collect_matrices_vectors!(solver,op,s_tids,cache)
-  red_smat = tensor_getindex(smat,get_indices_space(amat),indexin(all_tids,mat_tids),:)
-  red_smat_t = tensor_getindex(smat_t,get_indices_space(amat_t),indexin(all_tids,mat_t_tids),:)
-  red_svec = tensor_getindex(svec,get_indices_space(avec),indexin(all_tids,vec_tids),:)
-  return red_smat,red_smat_t,red_svec
-end
-
-function mdeim_solve!(cache,a::AffineDecomposition,b::AbstractArray)
+function mdeim_coefficient!(cache,a::AffineDecomposition,b::AbstractArray)
   cache_solve,cache_recast = cache
 
   mdeim_interpolation = a.mdeim_interpolation
@@ -306,7 +285,7 @@ end
 
 # cache for mdeim:
 # 1) compute reduced matrices and vectors on the reduced integration domain
-# 2) execute the mdeim_solve!, which includes the solve! and the recast_coefficient!
+# 2) execute the mdeim_coefficient!, which includes the solve! and the recast_coefficient!
 # 3) sum of the reduced contributions (i.e. the Kronecker products)
 
 abstract type RBContributionMap <: Map end

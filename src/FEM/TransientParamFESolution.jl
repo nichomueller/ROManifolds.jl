@@ -79,8 +79,18 @@ function Algebra.solve(
   uh0::Function;
   kwargs...)
 
-  r = realization(op.tpspace;kwargs...)
+  r = realization(op;kwargs...)
   solve(solver,op,uh0,r)
+end
+
+function Algebra.solve(
+  solver::ODESolver,
+  op::TransientParamFEOperatorWithTrian,
+  uh0::Function;
+  kwargs...)
+
+  feop = get_fe_operator(op)
+  solve(solver,feop,uh0;kwargs...)
 end
 
 function TransientFETools.test_transient_fe_solver(

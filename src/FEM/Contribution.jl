@@ -24,7 +24,7 @@ Base.getindex(a::Contribution,trian::Triangulation) = get_contribution(a,trian)
 
 function CellData.add_contribution!(a::Contribution{T},b::T,trian::Triangulation) where T
   if haskey(a.dict,trian)
-    @notimplemented
+    a.dict[trian] += b
   else
     a.dict[trian] = b
   end
@@ -36,6 +36,34 @@ Base.setindex!(a::Contribution,b,trian::Triangulation) = add_contribution!(a,b,t
 const ArrayContribution = Contribution{AbstractArray}
 
 array_contribution() = Contribution(IdDict{Triangulation,AbstractArray}())
+
+struct ContributionBroadcast{D}
+  contrib::D
+end
+
+function Base.broadcasted(f,a::ArrayContribution,b::Number)
+  c = Contribution(IdDict{Triangulation,ParamBroadcast}())
+  for (trian,values) in a.dict
+    c[trian] = Base.broadcasted(f,values,b)
+  end
+  ContributionBroadcast(c)
+end
+
+function Base.materialize(c::ContributionBroadcast)
+  a = array_contribution()
+  for (trian,b) in c.contrib.dict
+    a[trian] = Base.materialize(b)
+  end
+  a
+end
+
+function Base.materialize!(a::ArrayContribution,c::ContributionBroadcast)
+  for (trian,b) in c.contrib.dict
+    val = a[trian]
+    Base.materialize!(val,b)
+  end
+  a
+end
 
 Base.eltype(a::ArrayContribution) = eltype(first(values(a.dict)))
 Base.eltype(a::Tuple{Vararg{ArrayContribution}}) = eltype(first(a))

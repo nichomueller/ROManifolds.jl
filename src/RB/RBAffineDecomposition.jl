@@ -363,10 +363,10 @@ function rb_coefficient!(cache,a::GenericRBAffineDecomposition,b::Matrix;st_mdei
   time_ndofs = length(a.integration_domain.times)
   nparams = Int(size(b,2)/time_ndofs)
   coeff = if st_mdeim
-    _coeff = mdeim_solve!(csolve,a.mdeim_interpolation,reshape(b,:,nparams))
+    _coeff = mdeim_coefficient!(csolve,a.mdeim_interpolation,reshape(b,:,nparams))
     recast_coefficient!(crecast,first(a.basis_time),_coeff)
   else
-    _coeff = mdeim_solve!(csolve,a.mdeim_interpolation,b)
+    _coeff = mdeim_coefficient!(csolve,a.mdeim_interpolation,b)
     recast_coefficient!(crecast,_coeff)
   end
   return coeff
@@ -378,7 +378,7 @@ function rb_coefficient!(cache,::TrivialRBAffineDecomposition,args...;kwargs...)
   ParamArray(get_array(ptcache))
 end
 
-function mdeim_solve!(cache::CachedArray,mdeim_interpolation::LU,q::Matrix)
+function mdeim_coefficient!(cache::CachedArray,mdeim_interpolation::LU,q::Matrix)
   setsize!(cache,size(q))
   x = cache.array
   ldiv!(x,mdeim_interpolation,q)

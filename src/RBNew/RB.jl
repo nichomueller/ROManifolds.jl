@@ -17,13 +17,16 @@ using Gridap.ODEs.TransientFETools
 
 import StaticArrays: SVector
 import UnPack: @unpack
-import Gridap.Helpers: @check,@notimplemented,@unreachable
+import Gridap.Helpers: @abstractmethod,@check,@notimplemented,@unreachable
 import Gridap.Arrays: evaluate!
 import Gridap.Algebra: allocate_matrix,allocate_vector,solve
 import PartitionedArrays: tuple_of_arrays
 
 export RBInfo
 include("RBInfo.jl")
+
+export RBSolver
+include("RBSolver.jl")
 
 export tpod
 export gram_schmidt!
@@ -43,16 +46,19 @@ include("Snapshots.jl")
 export RBSpace
 export TestRBSpace
 export TrialRBSpace
+export reduced_fe_space
 export reduced_basis
 include("RBSpace.jl")
 
 export RBOperator
-export collect_residuals_and_jacobians
-include("RBOperator.jl")
-
-export RBSolver
-include("RBSolver.jl")
+export GalerkinProjectionOperator
+export reduced_operator
+export collect_matrices_vectors!
+include("GalerkinProjectionOperator.jl")
 
 export AffineDecomposition
 include("AffineDecomposition.jl")
+
+export ReducedOperator
+include("ReducedOperator.jl")
 end # module
