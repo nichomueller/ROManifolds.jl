@@ -57,19 +57,19 @@ u0(x,μ) = 0
 u0(μ) = x->u0(x,μ)
 u0μ(μ) = ParamFunction(u0,μ)
 
-b(μ,t,v,dΩ,dΓn) = ∫(fμt(μ,t)*v)dΩ + ∫(hμt(μ,t)*v)dΓn
-a(μ,t,du,v,dΩ) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
-m(μ,t,dut,v,dΩ) = ∫(v*dut)dΩ
+res(μ,t,u,v,dΩ,dΓn) = ∫(v*∂t(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
+jac(μ,t,u,du,v,dΩ) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
+jac_t(μ,t,u,dut,v,dΩ) = ∫(v*dut)dΩ
 
-trian_b = (Ω,Γn)
-trian_a = (Ω,)
-trian_m = (Ω,)
+trian_res = (Ω,Γn)
+trian_jac = (Ω,)
+trian_jac_t = (Ω,)
 
 T = Float64
 reffe = ReferenceFE(lagrangian,T,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6])
 trial = TransientTrialParamFESpace(test,gμt)
-feop = AffineTransientParamFEOperator(m,a,b,ptspace,trial,test,trian_m,trian_a,trian_b)
+feop = AffineTransientParamFEOperator(res,jac,jac_t,ptspace,trial,test,trian_res,trian_jac,trian_jac_t)
 
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
@@ -86,3 +86,10 @@ odeop = get_algebraic_operator(feop)
 pop = GalerkinProjectionOperator(odeop,red_trial,red_test)
 red_lhs,red_rhs = RB.reduced_matrix_vector_form(rbsolver,pop,snaps)
 red_op = reduced_operator(pop,red_lhs,red_rhs)
+
+s = RB.select_snapshots(snaps,1)
+cache = RB.allocate_reduced_matrix_and_vector(rbsolver,red_op,s)
+matvec_cache,coeff_cache,lincomb_cache = cache
+A,b = RB.collect_matrices_vectors!(solver,op,s,matvec_cache)
+A_coeff,b_coeff = RB.mdeim_coeff!(coeff_cache,op.lhs,op.rhs,A,b)
+A_red,b_red = RB.mdeim_lincomb!(lincomb_cache,op.lhs,op.rhs,A_coeff,b_coeff)

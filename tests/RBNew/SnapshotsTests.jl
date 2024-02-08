@@ -107,17 +107,3 @@ A = hcat(v...)
 s = S1(v)
 
 @time view(s,1:2,2:3)
-
-struct S2{T} <: AbstractMatrix{T}
-  f::Vector{<:AbstractVector{T}}
-end
-Base.eltype(::S2{T}) where T = T
-Base.eltype(::Type{S2{T}}) where T = T
-Base.length(s::S2) = length(s.f)*length(first(s.f))
-Base.size(s::S2,i...) = (length(first(s.f)),length(s.f))
-Base.IndexStyle(::Type{S2{T}}) where T = IndexCartesian()
-Base.getindex(s::S2,i,j) = s.f[i][j]
-
-s2 = S2(v)
-
-@time view(s2,1:2,2:3)

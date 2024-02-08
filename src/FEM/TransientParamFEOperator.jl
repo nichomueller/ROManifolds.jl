@@ -30,14 +30,10 @@ struct TransientParamFEOperatorFromWeakForm{T<:OperatorType} <: TransientParamFE
 end
 
 function AffineTransientParamFEOperator(
-  m::Function,a::Function,b::Function,tpspace,trial,test)
-  res(μ,t,u,v) = m(μ,t,∂t(u),v) + a(μ,t,u,v) - b(μ,t,v)
-  rhs(μ,t,u,v) = b(μ,t,v) - a(μ,t,u,v)
-  jac(μ,t,u,du,v) = a(μ,t,du,v)
-  jac_t(μ,t,u,dut,v) = m(μ,t,dut,v)
+  res::Function,jac::Function,jac_t::Function,tpspace,trial,test)
   assem = SparseMatrixAssembler(trial,test)
   TransientParamFEOperatorFromWeakForm{Affine}(
-    res,rhs,(jac,jac_t),assem,tpspace,(trial,∂t(trial)),test,1)
+    res,TransientFETools.rhs_error,(jac,jac_t),assem,tpspace,(trial,∂t(trial)),test,1)
 end
 
 function TransientParamFEOperator(
@@ -58,7 +54,7 @@ function FESpaces.SparseMatrixAssembler(
   SparseMatrixAssembler(trial(nothing),test)
 end
 
-function TransientFETools.rhs_error(μ,t,xh,v)
+function TransientFETools.rhs_error(μ,t,u,v)
   error("The \"rhs\" function is not defined for this TransientFEOperator.
   Please, try to use another type of TransientFEOperator that supports this
   functionality.")
@@ -232,12 +228,12 @@ function _set_triangulation(res,jac,jac_t,trian_res,trian_jac,trian_jac_t,order)
 end
 
 function AffineTransientParamFEOperator(
-  m::Function,a::Function,b::Function,tpspace,trial,test,trian_m,trian_a,trian_b)
+  res::Function,jac::Function,jac_t::Function,tpspace,trial,test,trian_res,trian_jac,trian_jac_t)
 
   order = get_polynomial_order(test)
-  newm,newa,newb = _affine_set_triangulation(m,a,b,trian_m,trian_a,trian_b,order)
-  op = AffineTransientParamFEOperator(newm,newa,newb,tpspace,trial,test)
-  TransientParamFEOperatorWithTrian(op,trian_b,(trian_a,trian_m))
+  newres,newjac,newjac_t = _set_triangulation(res,jac,jac_t,trian_res,trian_jac,trian_jac_t,order)
+  op = AffineTransientParamFEOperator(newres,newjac,newjac_t,tpspace,trial,test)
+  TransientParamFEOperatorWithTrian(op,trian_res,(trian_jac,trian_jac_t))
 end
 
 function TransientParamFEOperator(

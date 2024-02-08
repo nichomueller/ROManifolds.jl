@@ -79,8 +79,10 @@ struct TrialRBSpace{S,B} <: RBSpace{S}
   basis_time::B
 end
 
-(trial::TrialRBSpace)(r) = TrialRBSpace(trial.space(r),r.basis_space,r.basis_time)
-(trial::TrialRBSpace)(μ,t) = TrialRBSpace(trial.space(μ,t),r.basis_space,r.basis_time)
+(test::TrialRBSpace)(r) = TrialRBSpace(test.space(r),test.basis_space,test.basis_time)
+(test::TrialRBSpace)(μ,t) = TrialRBSpace(test.space(μ,t),test.basis_space,test.basis_time)
+(trial::TrialRBSpace)(r) = TrialRBSpace(trial.space(r),trial.basis_space,trial.basis_time)
+(trial::TrialRBSpace)(μ,t) = TrialRBSpace(trial.space(μ,t),trial.basis_space,trial.basis_time)
 
 function get_basis_space end
 get_basis_space(r::RBSpace) = r.basis_space

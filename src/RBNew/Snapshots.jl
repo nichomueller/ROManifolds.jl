@@ -37,7 +37,7 @@ abstract type AbstractTransientSnapshots{M,T} <: AbstractParamContainer{T,2} end
 
 Base.ndims(::AbstractTransientSnapshots) = 2
 Base.ndims(::Type{<:AbstractTransientSnapshots}) = 2
-Base.IndexStyle(::Type{<:AbstractTransientSnapshots}) = IndexCartesian()
+Base.IndexStyle(::Type{<:AbstractTransientSnapshots}) = IndexLinear()
 
 get_realization(s::AbstractTransientSnapshots) = s.realization
 
@@ -60,6 +60,15 @@ slow_index(i::Colon,::Int) = i
 fast_index(i,N::Int) = mod.(i .- 1,N) .+ 1
 fast_index(i::Colon,::Int) = i
 
+const StridedIndex = Union{AbstractVector,Colon}
+
+function Base.getindex(s::AbstractTransientSnapshots,i)
+  ncol = col_size(s)
+  irow = slow_index(i,ncol)
+  icol = fast_index(i,ncol)
+  getindex(s,irow,icol)
+end
+
 function Base.getindex(s::AbstractTransientSnapshots{Mode1Axis},ispace,j)
   np = num_params(s)
   itime = slow_index(j,np)
@@ -72,6 +81,13 @@ function Base.getindex(s::AbstractTransientSnapshots{Mode2Axis},itime,j)
   ispace = slow_index(j,np)
   iparam = fast_index(j,np)
   tensor_getindex(s,ispace,itime,iparam)
+end
+
+function Base.setindex!(s::AbstractTransientSnapshots,v,i)
+  ncol = col_size(s)
+  irow = slow_index(i,ncol)
+  icol = fast_index(i,ncol)
+  setindex!(s,v,irow,icol)
 end
 
 function Base.setindex!(s::AbstractTransientSnapshots{Mode1Axis},v,ispace,j)
@@ -97,21 +113,6 @@ function compress(a::AbstractMatrix,s::AbstractTransientSnapshots{Mode2Axis})
   @fastmath compressed_values = a'*s
   compressed_realization = s.realization[:,axes(a,2)]
   Snapshots(compressed_values,compressed_realization,Mode2Axis())
-end
-
-function FESpaces.FEFunction(
-  fs::SingleFieldParamFESpace,s::AbstractTransientSnapshots{Mode1Axis})
-  @assert FEM.length_free_values(fs) == length(s.realization)
-  free_values = _to_param_array(s.values)
-  diri_values = get_dirichlet_dof_values(fs)
-  FEFunction(fs,free_values,diri_values)
-end
-
-function FESpaces.FEFunction(
-  fs::SingleFieldParamFESpace,s2::AbstractTransientSnapshots{Mode2Axis})
-  @warn "This snapshot has a mode-2 representation, the resulting FEFunction(s) might be incorrect"
-  s = change_mode(s2)
-  FEFunction(fs,s)
 end
 
 struct BasicSnapshots{M,T,P,R} <: AbstractTransientSnapshots{M,T}
@@ -149,11 +150,11 @@ function change_mode(s::BasicSnapshots{Mode2Axis})
 end
 
 function tensor_getindex(s::BasicSnapshots,ispace,itime,iparam)
-  s.values[iparam.+(itime.-1)*num_params(s)][ispace]
-end
-
-function tensor_getindex(s::BasicSnapshots,ispace::AbstractVector,itime,iparam)
-  s.values[iparam.+(itime.-1)*num_params(s)][ispace]
+  try
+    s.values[iparam.+(itime.-1)*num_params(s)][ispace]
+  catch
+    view(s,ispace,itime,iparam)
+  end
 end
 
 function tensor_setindex!(s::BasicSnapshots,v,ispace,itime,iparam)
@@ -199,7 +200,11 @@ function change_mode(s::TransientSnapshots{Mode2Axis})
 end
 
 function tensor_getindex(s::TransientSnapshots,ispace,itime,iparam)
-  s.values[itime][iparam][ispace]
+  try
+    s.values[itime][iparam][ispace]
+  catch
+    view(s,ispace,itime,iparam)
+  end
 end
 
 function tensor_setindex!(s::TransientSnapshots,v,ispace,itime,iparam)
@@ -264,10 +269,18 @@ function change_mode(s::TransientSnapshotsWithInitialValues{Mode2Axis})
 end
 
 function tensor_getindex(s::TransientSnapshotsWithInitialValues,ispace,itime,iparam)
-  if itime == 0
-    s.initial_values[iparam][ispace]
-  else
-    s.values[itime][iparam][ispace]
+  try
+    if itime == 0
+      s.initial_values[iparam][ispace]
+    else
+      s.values[itime][iparam][ispace]
+    end
+  catch
+    if itime == 0
+      view(s.initial_values,iparam,ispace)
+    else
+      view(s.values,itime,iparam,ispace)
+    end
   end
 end
 
@@ -421,7 +434,12 @@ end
 
 function tensor_getindex(s::TransientSnapshotsWithDirichletValues,ispace::Int,itime,iparam)
   if ispace > num_space_free_dofs(s)
-    s.dirichlet_values[itime][iparam][ispace-num_space_free_dofs(s)]
+    ispace_dir = ispace-num_space_free_dofs(s)
+    try
+      s.dirichlet_values[itime][iparam][ispace_dir]
+    catch
+      view(s.dirichlet_values,itime,iparam,ispace_dir)
+    end
   else
     tensor_getindex(s.snaps,ispace,itime,iparam)
   end
@@ -526,7 +544,11 @@ function Base.setindex!(s::InnerTimeOuterParamTransientSnapshots,v,ispace,j)
 end
 
 function tensor_getindex(s::InnerTimeOuterParamTransientSnapshots,ispace,itime,iparam)
-  s.values[iparam][itime][ispace]
+  try
+    s.values[iparam][itime][ispace]
+  catch
+    view(s.values,iparam,itime,ispace)
+  end
 end
 
 function tensor_setindex!(s::InnerTimeOuterParamTransientSnapshots,v,ispace,itime,iparam)
@@ -544,7 +566,11 @@ const NnzSnapshots = Union{BasicNnzSnapshots{M,T},TransientNnzSnapshots{M,T}} wh
 num_space_dofs(s::BasicNnzSnapshots) = nnz(first(s.values))
 
 function tensor_getindex(s::BasicNnzSnapshots,ispace,itime,iparam)
-  nonzeros(s.values[iparam.+(itime.-1)*num_params(s)])[ispace]
+  try
+    nonzeros(s.values[iparam.+(itime.-1)*num_params(s)])[ispace]
+  catch
+    view(s.values,ispace,itime,iparam)
+  end
 end
 
 function tensor_setindex!(s::BasicNnzSnapshots,v,ispace,itime,iparam)
@@ -554,7 +580,11 @@ end
 num_space_dofs(s::TransientNnzSnapshots) = nnz(first(first(s.values)))
 
 function tensor_getindex(s::TransientNnzSnapshots,ispace,itime,iparam)
-  nonzeros(s.values[itime][iparam])[ispace]
+  try
+    nonzeros(s.values[itime][iparam])[ispace]
+  catch
+    view(s.values,itime,iparam,ispace)
+  end
 end
 
 function tensor_setindex!(s::TransientNnzSnapshots,v,ispace,itime,iparam)
@@ -581,6 +611,21 @@ function Snapshots(a::ArrayContribution,args...)
 end
 
 # for testing / visualization purposes
+function FESpaces.FEFunction(
+  fs::SingleFieldParamFESpace,s::AbstractTransientSnapshots{Mode1Axis})
+  @assert FEM.length_free_values(fs) == length(s.realization)
+  free_values = _to_param_array(s.values)
+  diri_values = get_dirichlet_dof_values(fs)
+  FEFunction(fs,free_values,diri_values)
+end
+
+function FESpaces.FEFunction(
+  fs::SingleFieldParamFESpace,s2::AbstractTransientSnapshots{Mode2Axis})
+  @warn "This snapshot has a mode-2 representation, the resulting FEFunction(s) might be incorrect"
+  s = change_mode(s2)
+  FEFunction(fs,s)
+end
+
 function _plot(trial::TransientTrialParamFESpace,s::AbstractTransientSnapshots;dir=pwd(),varname="u")
   r = s.realization
   r0 = FEM.get_at_time(r,:initial)

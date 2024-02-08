@@ -161,6 +161,16 @@ function reduced_matrix_and_vector!(
   return A_red,b_red
 end
 
+function reduced_matrix_and_vector(
+  solver::RBThetaMethod,
+  op::ReducedOperator,
+  s::AbstractTransientSnapshots)
+
+  cache = allocate_reduced_matrix_and_vector(solver,op,s)
+  A_red,b_red = reduced_matrix_and_vector!(solver,op,s,cache)
+  return A_red,b_red
+end
+
 function _common_reduced_times(op::ReducedOperator)
   ilhs = map(get_integration_domain,op.lhs)
   irhs = map(get_integration_domain,op.rhs)

@@ -111,8 +111,8 @@ function ODETools.jacobians!(
 end
 
 function Algebra.zero_initial_guess(op::GalerkinProjectionOperator,r::TransientParamRealization)
-  x0 = zero_initial_guess(op.feop)
-  allocate_param_array(x0,length(r))
+  trial = op.trial(r)
+  zero_free_reduced_values(trial)
 end
 
 function ODETools._allocate_matrix_and_vector(op::GalerkinProjectionOperator,r,u0,ode_cache)

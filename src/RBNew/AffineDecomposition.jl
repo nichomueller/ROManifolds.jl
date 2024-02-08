@@ -9,12 +9,9 @@ function get_mdeim_indices(A::AbstractMatrix{T}) where T
 
   if n > 1
     @inbounds for i = 2:n
-      # Bi = view(A,:,1:i-1)
-      # Ci = view(A,I[1:i-1],1:i-1)
-      # Di = view(A,I[1:i-1],i)
-      Bi = A[:,1:i-1]
-      Ci = A[I[1:i-1],1:i-1]
-      Di = A[I[1:i-1],i]
+      Bi = view(A,:,1:i-1)
+      Ci = view(A,I[1:i-1],1:i-1)
+      Di = view(A,I[1:i-1],i)
       proj .= Bi*(Ci \ Di)
       res .= A[:,i] - proj
       I[i] = argmax(abs.(res))
@@ -132,24 +129,6 @@ num_space_dofs(a::AffineDecomposition) = @notimplemented
 FEM.num_times(a::AffineDecomposition) = size(a.basis_time,1)
 num_reduced_space_dofs(a::AffineDecomposition) = length(get_indices_space(a))
 num_reduced_times(a::AffineDecomposition) = length(get_indices_time(a))
-
-function Algebra.allocate_in_range(
-  a::AffineDecomposition{SpaceOnlyMDEIM},
-  r::AbstractParamRealization)
-
-  matrix = get_interp_matrix(a).factors
-  v = allocate_in_range(matrix)
-  allocate_param_array(v,num_params(r)*num_times(a))
-end
-
-function Algebra.allocate_in_range(
-  a::AffineDecomposition{SpaceTimeMDEIM},
-  r::AbstractParamRealization)
-
-  matrix = get_interp_matrix(a).factors
-  v = allocate_in_range(matrix)
-  allocate_param_array(v,num_params(r))
-end
 
 function _time_indices_and_interp_matrix(::SpaceTimeMDEIM,interp_basis_space,basis_time)
   indices_time = get_mdeim_indices(basis_time)
@@ -288,20 +267,48 @@ end
 
 # ONLINE PHASE
 
-function allocate_coeff_matrix(a::AffineDecomposition,r::AbstractParamRealization)
+function Algebra.allocate_matrix(::Type{V},m::Integer,n::Integer) where V
+  T = eltype(V)
+  zeros(T,m,n)
+end
+
+function allocate_coeff_matrix(
+  a::AffineDecomposition{SpaceOnlyMDEIM},
+  r::AbstractParamRealization)
+
   T = eltype(get_interp_matrix(a).factors)
-  Nt = num_times(a)
-  ns = num_reduced_space_dofs(a)
-  m = zeros(T,Nt,ns)
-  allocate_param_array(m,num_params(r))
+  m = num_reduced_space_dofs(a)
+  n = num_params(r)*num_times(a)
+  allocate_matrix(Vector{T},m,n)
+end
+
+function allocate_coeff_matrix(
+  a::AffineDecomposition{SpaceTimeMDEIM},
+  r::AbstractParamRealization)
+
+  T = eltype(get_interp_matrix(a).factors)
+  m = num_reduced_space_dofs(a)*num_reduced_times(a)
+  n = num_params(r)
+  allocate_matrix(Vector{T},m,n)
+end
+
+function allocate_param_coeff_matrix(
+  a::AffineDecomposition,
+  r::AbstractParamRealization)
+
+  T = eltype(get_interp_matrix(a).factors)
+  m = num_times(a)
+  n = num_reduced_space_dofs(a)
+  mat = allocate_matrix(Vector{T},m,n)
+  allocate_param_array(mat,num_params(r))
 end
 
 function allocate_mdeim_coeff(a::AffineContribution,r::AbstractParamRealization)
   cache_solve = array_contribution()
   cache_recast = array_contribution()
   for (trian,values) in a.dict
-    cache_solve[trian] = allocate_in_range(values,r)
-    cache_recast[trian] = allocate_coeff_matrix(values,r)
+    cache_solve[trian] = allocate_coeff_matrix(values,r)
+    cache_recast[trian] = allocate_param_coeff_matrix(values,r)
   end
   return cache_solve,cache_recast
 end
@@ -322,28 +329,34 @@ end
 function mdeim_coeff!(
   cache,
   a::AffineDecomposition{SpaceOnlyMDEIM},
-  b::ParamVector)
+  b::AbstractMatrix)
 
   coeff,coeff_recast = cache
   mdeim_interpolation = a.mdeim_interpolation
   ldiv!(coeff,mdeim_interpolation,b)
-  coeff_recast .= transpose(coeff)
+  nt = num_times(a)
+  @inbounds for i = eachindex(coeff_recast)
+    coeff_recast[i] = transpose(coeff[:,(i-1)*nt+1:i*nt])
+  end
 end
 
 function mdeim_coeff!(
   cache,
   a::AffineDecomposition{SpaceTimeMDEIM},
-  b::ParamVector)
+  b::AbstractMatrix)
 
   coeff,coeff_recast = cache
   mdeim_interpolation = a.mdeim_interpolation
-  ldiv!(coeff,mdeim_interpolation,b)
   ns = num_reduced_space_dofs(a)
   nt = num_reduced_times(a)
+  np = length(coeff_recast)
+
+  bvec = reshape(b,:,np)
+  ldiv!(coeff,mdeim_interpolation,bvec)
   for j in 1:ns
     sorted_idx = [(i-1)*ns+j for i = 1:nt]
-    @inbounds for i = eachindex(new_coeff)
-      coeff_recast[i][:,j] = a.basis_time*coeff[i][sorted_idx]
+    @inbounds for i = eachindex(coeff_recast)
+      coeff_recast[i][:,j] = a.basis_time*coeff[sorted_idx,:]
     end
   end
 end
@@ -389,11 +402,6 @@ function mdeim_coeff!(
   coeff_mat = map(last,cache_mat)
   coeff_vec = last(cache_vec)
   return coeff_mat,coeff_vec
-end
-
-function Algebra.allocate_matrix(::Type{V},m::Integer,n::Integer) where V
-  T = eltype(V)
-  zeros(T,m,n)
 end
 
 function allocate_mdeim_lincomb(
@@ -477,8 +485,8 @@ end
 
 function mdeim_lincomb!(
   cache,
-  a::AffineDecomposition{A,B,C,<:AbstractMatrix},
-  coeff::ParamMatrix) where {A,B,C}
+  a::AffineDecomposition{M,A,B,C,<:AbstractMatrix},
+  coeff::ParamMatrix) where {M,A,B,C}
 
   time_prod_cache,kron_prod_cache,lincomb_cache = cache
   basis_time = a.metadata
@@ -497,8 +505,8 @@ end
 
 function mdeim_lincomb!(
   cache,
-  a::AffineDecomposition{A,B,C,<:AbstractArray},
-  coeff::ParamMatrix) where {A,B,C}
+  a::AffineDecomposition{M,A,B,C,<:AbstractArray},
+  coeff::ParamMatrix) where {M,A,B,C}
 
   time_prod_cache,kron_prod_cache,lincomb_cache = cache
   basis_time = a.metadata
@@ -548,7 +556,7 @@ function mdeim_lincomb!(
   map(cache_mat,A,mat) do cache_mat,A,mat
     mdeim_lincomb!(cache_mat,A,mat)
   end
-  red_mat = map(last,cache_mat)
-  red_vec = last(cache_vec)
+  red_mat = sum(map(last,cache_mat))
+  red_vec = sum(last(cache_vec))
   return red_mat,red_vec
 end
