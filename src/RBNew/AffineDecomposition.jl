@@ -21,17 +21,6 @@ function get_mdeim_indices(A::AbstractMatrix{T}) where T
   return I
 end
 
-function recast_indices_space(a::AbstractArray,indices_space)
-  return indices_space
-end
-
-function recast_indices_space(a::NnzSnapshots,indices_space)
-  aitem = first(a.values)
-  rows,cols, = findnz(aitem)
-  rc = (cols .- 1)*aitem.m .+ rows
-  return rc[indices_space]
-end
-
 function vector_to_matrix_indices(vec_indices,nrows)
   icol = slow_index(vec_indices,nrows)
   irow = fast_index(vec_indices,nrows)
@@ -62,14 +51,14 @@ function reduce_triangulation(
   return red_trian
 end
 
-function project_basis_space(A::AbstractMatrix,test::RBSpace)
+function compress_basis_space(A::AbstractMatrix,test::RBSpace)
   basis_test = get_basis_space(test)
   map(eachcol(A)) do a
     basis_test'*a
   end
 end
 
-function project_basis_space(A::NnzSnapshots,trial::RBSpace,test::RBSpace)
+function compress_basis_space(A::NnzSnapshots,trial::RBSpace,test::RBSpace)
   basis_test = get_basis_space(test)
   basis_trial = get_basis_space(trial)
   map(A.values) do A
@@ -110,7 +99,7 @@ end
 
 get_indices_space(i::ReducedIntegrationDomain) = i.indices_space
 get_indices_time(i::ReducedIntegrationDomain) = i.indices_time
-union_indices_time(i::ReducedIntegrationDomain...) = union(map(get_indices_time,i))
+union_indices_time(i::ReducedIntegrationDomain...) = union(map(get_indices_time,i)...)
 
 struct AffineDecomposition{M,A,B,C,D}
   mdeim_style::M
@@ -154,9 +143,8 @@ function mdeim(
   indices_space = get_mdeim_indices(basis_space)
   interp_basis_space = view(basis_space,indices_space,:)
   indices_time,lu_interp = _time_indices_and_interp_matrix(rbinfo.mdeim_style,interp_basis_space,basis_time)
-  rindices_space = recast_indices_space(basis_space,indices_space)
   red_trian = reduce_triangulation(op,trian,indices_space)
-  integration_domain = ReducedIntegrationDomain(rindices_space,indices_time)
+  integration_domain = ReducedIntegrationDomain(indices_space,indices_time)
   return lu_interp,red_trian,integration_domain
 end
 
@@ -174,7 +162,7 @@ function reduced_vector_form!(
   test = op.test
   basis_space,basis_time = reduced_basis(s;ϵ=get_tol(rbinfo))
   lu_interp,red_trian,integration_domain = mdeim(rbinfo,op,trian,basis_space,basis_time)
-  proj_basis_space = project_basis_space(basis_space,test)
+  proj_basis_space = compress_basis_space(basis_space,test)
   comb_basis_time = combine_basis_time(test)
   a[red_trian] = AffineDecomposition(
     rbinfo.mdeim_style,
@@ -198,7 +186,7 @@ function reduced_matrix_form!(
   test = op.test
   basis_space,basis_time = reduced_basis(s;ϵ=get_tol(rbinfo))
   lu_interp,red_trian,integration_domain = mdeim(rbinfo,op,trian,basis_space,basis_time)
-  proj_basis_space = project_basis_space(basis_space,trial,test)
+  proj_basis_space = compress_basis_space(basis_space,trial,test)
   comb_basis_time = combine_basis_time(trial,test;kwargs...)
   a[red_trian] = AffineDecomposition(
     rbinfo.mdeim_style,
@@ -303,19 +291,21 @@ function allocate_param_coeff_matrix(
   allocate_param_array(mat,num_params(r))
 end
 
-function allocate_mdeim_coeff(a::AffineContribution,r::AbstractParamRealization)
-  cache_solve = array_contribution()
-  cache_recast = array_contribution()
-  for (trian,values) in a.dict
-    cache_solve[trian] = allocate_coeff_matrix(values,r)
-    cache_recast[trian] = allocate_param_coeff_matrix(values,r)
-  end
+function allocate_mdeim_coeff(a::AffineDecomposition,r::AbstractParamRealization)
+  cache_solve = allocate_coeff_matrix(a,r)
+  cache_recast = allocate_param_coeff_matrix(a,r)
   return cache_solve,cache_recast
 end
 
+function allocate_mdeim_coeff(a::Vector{AffineDecomposition},r::AbstractParamRealization)
+  map(a) do a
+    allocate_mdeim_coeff(a,r)
+  end |> tuple_of_arrays
+end
+
 function allocate_mdeim_coeff(
-  mat::Tuple{Vararg{AffineContribution}},
-  vec::AffineContribution,
+  mat::Tuple{Vararg{Vector{AffineDecomposition}}},
+  vec::Vector{AffineDecomposition},
   r::AbstractParamRealization)
 
   mat_cache = ()
@@ -389,8 +379,8 @@ end
 
 function mdeim_coeff!(
   cache,
-  mat::Tuple{Vararg{AffineContribution}},
-  vec::AffineContribution,
+  mat::Tuple{Vararg{Vector{AffineDecomposition}}},
+  vec::Vector{AffineDecomposition},
   A::Tuple{Vararg{ArrayContribution}},
   b::ArrayContribution)
 
@@ -435,44 +425,30 @@ end
 
 function allocate_mdeim_lincomb(
   test::RBSpace,
-  a::AffineContribution,
+  a::Vector{AffineDecomposition},
   r::AbstractParamRealization)
 
-  time_prod_cache = array_contribution()
-  kron_prod_cache = array_contribution()
-  lincomb_cache = array_contribution()
-  for (trian,values) in a.dict
-    ct,ck,cl = allocate_mdeim_lincomb(test,r)
-    time_prod_cache[trian] = ct
-    kron_prod_cache[trian] = ck
-    lincomb_cache[trian] = cl
-  end
-  return time_prod_cache,kron_prod_cache,lincomb_cache
+  map(a) do a
+    allocate_mdeim_lincomb(test,r)
+  end |> tuple_of_arrays
 end
 
 function allocate_mdeim_lincomb(
   trial::RBSpace,
   test::RBSpace,
-  a::AffineContribution,
+  a::Vector{AffineDecomposition},
   r::AbstractParamRealization)
 
-  time_prod_cache = array_contribution()
-  kron_prod_cache = array_contribution()
-  lincomb_cache = array_contribution()
-  for (trian,values) in a.dict
-    ct,ck,cl = allocate_mdeim_lincomb(trial,test,r)
-    time_prod_cache[trian] = ct
-    kron_prod_cache[trian] = ck
-    lincomb_cache[trian] = cl
-  end
-  return time_prod_cache,kron_prod_cache,lincomb_cache
+  map(a) do a
+    allocate_mdeim_lincomb(trial,test,r)
+  end |> tuple_of_arrays
 end
 
 function allocate_mdeim_lincomb(
   trial::RBSpace,
   test::RBSpace,
-  mat::Tuple{Vararg{AffineContribution}},
-  vec::AffineContribution,
+  mat::Tuple{Vararg{Vector{AffineDecomposition}}},
+  vec::Vector{AffineDecomposition},
   r::AbstractParamRealization)
 
   mat_cache = ()

@@ -79,8 +79,8 @@ struct TrialRBSpace{S,B} <: RBSpace{S}
   basis_time::B
 end
 
-(test::TrialRBSpace)(r) = TrialRBSpace(test.space(r),test.basis_space,test.basis_time)
-(test::TrialRBSpace)(μ,t) = TrialRBSpace(test.space(μ,t),test.basis_space,test.basis_time)
+(test::TestRBSpace)(r) = test
+(test::TestRBSpace)(μ,t) = test
 (trial::TrialRBSpace)(r) = TrialRBSpace(trial.space(r),trial.basis_space,trial.basis_time)
 (trial::TrialRBSpace)(μ,t) = TrialRBSpace(trial.space(μ,t),trial.basis_space,trial.basis_time)
 
@@ -160,3 +160,51 @@ FESpaces.gather_free_values!(fv,r::RBSpace,cv) = gather_free_values!(fv,r.space,
 #   cell_field = CellField(fs,cell_vals)
 #   SingleFieldParamFEFunction(cell_field,cell_vals,free_values,dirichlet_values,fs)
 # end
+
+function compress(r::RBSpace,xmat::AbstractMatrix)
+  basis_space = get_basis_space(r)
+  basis_time = get_basis_time(r)
+
+  red_xmat = (basis_space'*xmat)*basis_time
+  x = vec(red_xmat')
+  return x
+end
+
+function compress(
+  trial::TrialRBSpace,
+  test::TestRBSpace,
+  xmat::AbstractMatrix{T};
+  combine=(x,y)->x) where T
+
+  basis_space_test = get_basis_space(test)
+  basis_time_test = get_basis_time(test)
+  basis_space_trial = get_basis_space(trial)
+  basis_time_trial = get_basis_time(trial)
+  ns_test,ns_trial = size(basis_space_test,2),size(basis_space_trial,2)
+  nt_test,nt_trial = size(basis_time_test,2),size(basis_time_trial,2)
+
+  red_xvec = compress_basis_space(xmat,trial,test)
+  red_xmat = stack(vec.(red_xvec))'  # Nt x ns_test*ns_trial
+  st_proj = zeros(T,nt_test,nt_trial,ns_test*ns_trial)
+  st_proj_shift = zeros(T,nt_test,nt_trial,ns_test*ns_trial)
+  @inbounds for ins = 1:ns_test*ns_trial, jt = 1:nt_trial, it = 1:nt_test
+    st_proj[it,jt,ins] = sum(basis_time_test[:,it].*basis_time_trial[:,jt].*red_xmat[:,ins])
+    st_proj_shift[it,jt,ins] = sum(basis_time_test[2:end,it].*basis_time_trial[1:end-1,jt].*red_xmat[2:end,ins])
+  end
+  st_proj = combine(st_proj,st_proj_shift)
+  st_proj_mat = zeros(T,ns_test*nt_test,ns_trial*nt_trial)
+  @inbounds for i = 1:ns_trial, j = 1:ns_test
+    st_proj_mat[1+(j-1)*nt_test:j*nt_test,1+(i-1)*nt_trial:i*nt_trial] = st_proj[:,:,(i-1)*ns_test+j]
+  end
+  return st_proj_mat
+end
+
+function recast(r::RBSpace,x::AbstractVector)
+  basis_space = get_basis_space(r)
+  basis_time = get_basis_time(r)
+  ns = num_reduced_space_dofs(rb)
+  nt = num_reduced_times(rb)
+
+  xmat = reshape(x,nt,ns)
+  return basis_space*(basis_time*xmat)'
+end

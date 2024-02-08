@@ -148,6 +148,46 @@ function allocate_reduced_matrix_and_vector(
   return matvec_cache,coeff_cache,lincomb_cache
 end
 
+function _common_reduced_times(op::ReducedOperator)
+  ilhs = ()
+  for lhs in op.lhs
+    ilhs = (ilhs...,map(get_integration_domain,lhs)...)
+  end
+  irhs = map(get_integration_domain,op.rhs)
+  union_indices_time(ilhs...,irhs...)
+end
+
+function _select_snapshots_at_space_time_locations(s,a,ids_all_time)
+  ids_space = get_indices_space(a)
+  ids_time = get_indices_time(a)
+  corresponding_ids_time = filter(!isnothing,indexin(ids_all_time,ids_time))
+  cols = col_index(s,corresponding_ids_time,1:num_params(s))
+  getindex(s,ids_space,cols)
+end
+
+function _select_snapshots_at_space_time_locations(s::AbstractVector,a::AbstractVector,ids_all_time)
+  map((s,a)->_select_snapshots_at_space_time_locations(s,a,ids_all_time),s,a)
+end
+
+function collect_matrices_vectors!(
+  solver::RBThetaMethod,
+  op::ReducedOperator,
+  s::AbstractTransientSnapshots,
+  cache)
+
+  ids_all_time = _common_reduced_times(op)
+  sids = select_snapshots(s,:,ids_all_time)
+  A,b = collect_matrices_vectors!(solver,op.pop,sids,cache)
+  Aval = map(FEM.get_values,A)
+  bval = FEM.get_values(b)
+  Aids = ()
+  for (s,a) in zip(Aval,op.lhs)
+    Aids = (Aids...,_select_snapshots_at_space_time_locations(s,a,ids_all_time))
+  end
+  bids = _select_snapshots_at_space_time_locations(bval,op.rhs,ids_all_time)
+  return Aids,bids
+end
+
 function reduced_matrix_and_vector!(
   solver::RBThetaMethod,
   op::ReducedOperator,
@@ -169,32 +209,4 @@ function reduced_matrix_and_vector(
   cache = allocate_reduced_matrix_and_vector(solver,op,s)
   A_red,b_red = reduced_matrix_and_vector!(solver,op,s,cache)
   return A_red,b_red
-end
-
-function _common_reduced_times(op::ReducedOperator)
-  ilhs = map(get_integration_domain,op.lhs)
-  irhs = map(get_integration_domain,op.rhs)
-  union_indices_time(ilhs...,irhs...)
-end
-
-function _select_snapshots_at_space_time_locations(s,a,ids_all_time)
-  ids_space = get_indices_space(a)
-  ids_time = get_indices_space(a)
-  corresponding_ids_time = indexin(ids_all_time,ids_time)
-  tensor_getindex(s,ids_space,corresponding_ids_time,:)
-end
-
-function collect_matrices_vectors!(
-  solver::RBThetaMethod,
-  op::ReducedOperator,
-  s::AbstractTransientSnapshots,
-  cache)
-
-  ids_all_time = _common_reduced_times(op)
-  sids = select_snapshots(s,:,ids_all_time)
-  Aids,bids = collect_matrices_vectors!(solver,op.pop,sids,cache)
-  A,b = map(zip(Aids,bids),zip(op.lhs,op.rhs)) do s,a
-    _select_snapshots_at_space_time_locations(s,a,ids_all_time)
-  end |> tuple_of_arrays
-  return A,b
 end

@@ -90,6 +90,21 @@ red_op = reduced_operator(pop,red_lhs,red_rhs)
 s = RB.select_snapshots(snaps,1)
 cache = RB.allocate_reduced_matrix_and_vector(rbsolver,red_op,s)
 matvec_cache,coeff_cache,lincomb_cache = cache
-A,b = RB.collect_matrices_vectors!(solver,op,s,matvec_cache)
+A,b = RB.collect_matrices_vectors!(rbsolver,red_op,s,matvec_cache)
 A_coeff,b_coeff = RB.mdeim_coeff!(coeff_cache,op.lhs,op.rhs,A,b)
 A_red,b_red = RB.mdeim_lincomb!(lincomb_cache,op.lhs,op.rhs,A_coeff,b_coeff)
+
+
+ids_all_time = RB._common_reduced_times(red_op)
+sids = RB.select_snapshots(s,:,ids_all_time)
+A,b = collect_matrices_vectors!(rbsolver,red_op.pop,sids,matvec_cache)
+Aval = map(FEM.get_values,A)
+
+aa = red_op.lhs[1][1]
+ss = Aval[1][1]
+ids_space = RB.get_indices_space(aa)
+ids_time = RB.get_indices_time(aa)
+corresponding_ids_time = filter(!isnothing,indexin(ids_all_time,ids_time))
+# RB.tensor_getindex(ss,[1,7,4],corresponding_ids_time,1:num_params(s))
+cols = RB.col_index(ss,corresponding_ids_time,1:num_params(ss))
+getindex(s,ids_space,cols)

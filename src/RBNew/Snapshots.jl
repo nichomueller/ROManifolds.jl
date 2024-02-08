@@ -37,7 +37,7 @@ abstract type AbstractTransientSnapshots{M,T} <: AbstractParamContainer{T,2} end
 
 Base.ndims(::AbstractTransientSnapshots) = 2
 Base.ndims(::Type{<:AbstractTransientSnapshots}) = 2
-Base.IndexStyle(::Type{<:AbstractTransientSnapshots}) = IndexLinear()
+Base.IndexStyle(::Type{<:AbstractTransientSnapshots}) = IndexCartesian() #IndexLinear()
 
 get_realization(s::AbstractTransientSnapshots) = s.realization
 
@@ -60,14 +60,22 @@ slow_index(i::Colon,::Int) = i
 fast_index(i,N::Int) = mod.(i .- 1,N) .+ 1
 fast_index(i::Colon,::Int) = i
 
-const StridedIndex = Union{AbstractVector,Colon}
-
-function Base.getindex(s::AbstractTransientSnapshots,i)
-  ncol = col_size(s)
-  irow = slow_index(i,ncol)
-  icol = fast_index(i,ncol)
-  getindex(s,irow,icol)
+function col_index(s::AbstractTransientSnapshots,mode2_index,param_index)
+  (mode2_index.-1)*num_params(s) .+ param_index
 end
+function col_index(s::AbstractTransientSnapshots{Mode1Axis},::Colon,param_index)
+  col_index(s,1:num_times(s),param_index)
+end
+function col_index(s::AbstractTransientSnapshots{Mode2Axis},::Colon,param_index)
+  col_index(s,1:num_space_dofs(s),param_index)
+end
+
+# function Base.getindex(s::AbstractTransientSnapshots,i)
+#   ncol = col_size(s)
+#   irow = slow_index(i,ncol)
+#   icol = fast_index(i,ncol)
+#   getindex(s,irow,icol)
+# end
 
 function Base.getindex(s::AbstractTransientSnapshots{Mode1Axis},ispace,j)
   np = num_params(s)
@@ -153,7 +161,7 @@ function tensor_getindex(s::BasicSnapshots,ispace,itime,iparam)
   try
     s.values[iparam.+(itime.-1)*num_params(s)][ispace]
   catch
-    view(s,ispace,itime,iparam)
+    view(s,ispace,col_index(s,itime,iparam))
   end
 end
 
@@ -203,7 +211,7 @@ function tensor_getindex(s::TransientSnapshots,ispace,itime,iparam)
   try
     s.values[itime][iparam][ispace]
   catch
-    view(s,ispace,itime,iparam)
+    view(s,ispace,col_index(s,itime,iparam))
   end
 end
 
@@ -276,11 +284,7 @@ function tensor_getindex(s::TransientSnapshotsWithInitialValues,ispace,itime,ipa
       s.values[itime][iparam][ispace]
     end
   catch
-    if itime == 0
-      view(s.initial_values,iparam,ispace)
-    else
-      view(s.values,itime,iparam,ispace)
-    end
+    view(s,ispace,col_index(s,itime,iparam))
   end
 end
 
@@ -435,11 +439,7 @@ end
 function tensor_getindex(s::TransientSnapshotsWithDirichletValues,ispace::Int,itime,iparam)
   if ispace > num_space_free_dofs(s)
     ispace_dir = ispace-num_space_free_dofs(s)
-    try
-      s.dirichlet_values[itime][iparam][ispace_dir]
-    catch
-      view(s.dirichlet_values,itime,iparam,ispace_dir)
-    end
+    s.dirichlet_values[itime][iparam][ispace_dir]
   else
     tensor_getindex(s.snaps,ispace,itime,iparam)
   end
@@ -547,7 +547,7 @@ function tensor_getindex(s::InnerTimeOuterParamTransientSnapshots,ispace,itime,i
   try
     s.values[iparam][itime][ispace]
   catch
-    view(s.values,iparam,itime,ispace)
+    view(s.values,ispace,col_index(s,itime,iparam))
   end
 end
 
@@ -569,7 +569,7 @@ function tensor_getindex(s::BasicNnzSnapshots,ispace,itime,iparam)
   try
     nonzeros(s.values[iparam.+(itime.-1)*num_params(s)])[ispace]
   catch
-    view(s.values,ispace,itime,iparam)
+    view(s,ispace,col_index(s,itime,iparam))
   end
 end
 
@@ -583,7 +583,7 @@ function tensor_getindex(s::TransientNnzSnapshots,ispace,itime,iparam)
   try
     nonzeros(s.values[itime][iparam])[ispace]
   catch
-    view(s.values,itime,iparam,ispace)
+    view(s,ispace,col_index(s,itime,iparam))
   end
 end
 
