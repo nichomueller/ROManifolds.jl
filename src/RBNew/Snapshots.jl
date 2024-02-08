@@ -152,6 +152,10 @@ function tensor_getindex(s::BasicSnapshots,ispace,itime,iparam)
   s.values[iparam.+(itime.-1)*num_params(s)][ispace]
 end
 
+function tensor_getindex(s::BasicSnapshots,ispace::AbstractVector,itime,iparam)
+  s.values[iparam.+(itime.-1)*num_params(s)][ispace]
+end
+
 function tensor_setindex!(s::BasicSnapshots,v,ispace,itime,iparam)
   s.values[iparam.+(itime.-1)*num_params(s)][ispace] = v
 end
@@ -435,6 +439,102 @@ function select_snapshots(s::TransientSnapshotsWithDirichletValues,paramrange,ti
   TransientSnapshotsWithDirichletValues(
     select_snapshots(s.snaps,paramrange,timerange),
     s.dirichlet_values)
+end
+
+#= mode-1 representation of a snapshot of type InnerTimeOuterParamTransientSnapshots
+   [ [u(x1,t1,μ1) ⋯ u(x1,tT,μ1)] [u(x1,t1,μ2) ⋯ u(x1,tT,μ2)] [u(x1,t1,μ3) ⋯] [⋯] [u(x1,t1,μP) ⋯ u(x1,tT,μP)] ]
+         ⋮             ⋮          ⋮            ⋮           ⋮              ⋮             ⋮
+   [ [u(xN,t1,μ1) ⋯ u(xN,tT,μ1)] [u(xN,t1,μ2) ⋯ u(xN,tT,μ2)] [u(xN,t1,μ3) ⋯] [⋯] [u(xN,t1,μP) ⋯ u(xN,tT,μP)] ]
+=#
+#= mode-2 representation of a snapshot of type InnerTimeOuterParamTransientSnapshots
+   [ [u(x1,t1,μ1) ⋯ u(xN,t1,μ1)] [u(x1,t1,μ2) ⋯ u(xN,t1,μ2)] [u(x1,t1,μ3) ⋯] [⋯] [u(x1,t1,μP) ⋯ u(xN,t1,μP)] ]
+         ⋮             ⋮          ⋮            ⋮           ⋮              ⋮             ⋮
+   [ [u(x1,tT,μ1) ⋯ u(xN,tT,μ1)] [u(x1,tT,μ2) ⋯ u(xN,tT,μ2)] [u(x1,tT,μ3) ⋯] [⋯] [u(x1,tT,μP) ⋯ u(xN,tT,μP)] ]
+=#
+
+struct InnerTimeOuterParamTransientSnapshots{M,T,P,R} <: AbstractTransientSnapshots{M,T}
+  mode::M
+  values::AbstractVector{P}
+  realization::R
+  function InnerTimeOuterParamTransientSnapshots(
+    mode::M,
+    values::AbstractVector{P},
+    realization::R
+    ) where {M,P<:AbstractParamContainer,R<:TransientParamRealization}
+
+    @check isa(mode,Mode1Axis)
+    T = eltype(P)
+    new{M,T,P,R}(mode,values,realization)
+  end
+end
+
+function InnerTimeOuterParamTransientSnapshots(s::AbstractTransientSnapshots)
+  @abstractmethod
+end
+
+function InnerTimeOuterParamTransientSnapshots(s::InnerTimeOuterParamTransientSnapshots)
+  s
+end
+
+function InnerTimeOuterParamTransientSnapshots(
+  s::BasicSnapshots{Mode1Axis,T,<:ParamArray{T,N,A}}
+  ) where {T,N,A}
+
+  nt = num_times(s)
+  np = num_params(s)
+  P = ParamArray{T,N,A,nt}
+  array = Vector{P}(undef,np)
+  @inbounds for ip = 1:np
+    it = ip:np:nt*np
+    array[ip] = ParamArray(map(i->s.values[i],it))
+  end
+  InnerTimeOuterParamTransientSnapshots(s.mode,array,s.realization)
+end
+
+function InnerTimeOuterParamTransientSnapshots(
+  s::TransientSnapshots{Mode1Axis,T,<:ParamArray{T,N,A}}
+  ) where {T,N,A}
+
+  nt = num_times(s)
+  np = num_params(s)
+  P = ParamArray{T,N,A,nt}
+  array = Vector{P}(undef,np)
+  @inbounds for ip = 1:np
+    array[ip] = ParamArray(map(i->s.values[i][ip],1:nt))
+  end
+  InnerTimeOuterParamTransientSnapshots(s.mode,array,s.realization)
+end
+
+num_space_dofs(s::InnerTimeOuterParamTransientSnapshots) = length(first(first(s.values)))
+
+function change_mode(s::InnerTimeOuterParamTransientSnapshots)
+  TransientSnapshots(Mode2Axis(),s.values,s.realization)
+end
+
+function Base.getindex(s::InnerTimeOuterParamTransientSnapshots,ispace,j)
+  nt = num_times(s)
+  iparam = slow_index(j,nt)
+  itime = fast_index(j,nt)
+  tensor_getindex(s,ispace,itime,iparam)
+end
+
+function Base.setindex!(s::InnerTimeOuterParamTransientSnapshots,v,ispace,j)
+  nt = num_times(s)
+  iparam = slow_index(j,nt)
+  itime = fast_index(j,nt)
+  tensor_setindex!(s,v,ispace,itime,iparam)
+end
+
+function tensor_getindex(s::InnerTimeOuterParamTransientSnapshots,ispace,itime,iparam)
+  s.values[iparam][itime][ispace]
+end
+
+function tensor_setindex!(s::InnerTimeOuterParamTransientSnapshots,v,ispace,itime,iparam)
+  s.values[iparam][itime][ispace] = v
+end
+
+function select_snapshots(s::InnerTimeOuterParamTransientSnapshots,paramrange,timerange=:)
+  TransientSnapshots(s.mode,s.values,s.realization[paramrange,timerange])
 end
 
 const BasicNnzSnapshots = BasicSnapshots{M,T,P,R} where {M,T,P<:SparseParamMatrix,R}

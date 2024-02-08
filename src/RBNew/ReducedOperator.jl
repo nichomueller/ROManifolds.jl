@@ -35,6 +35,8 @@ FESpaces.get_test(op::ReducedOperator) = get_test(op.pop)
 FESpaces.get_trial(op::ReducedOperator) = get_trial(op.pop)
 FEM.realization(op::ReducedOperator;kwargs...) = realization(op.pop;kwargs...)
 FEM.get_fe_operator(op::ReducedOperator) = FEM.get_fe_operator(op.pop)
+get_reduced_trial(op::ReducedOperator) = get_reduced_trial(op.pop)
+get_reduced_test(op::ReducedOperator) = get_reduced_test(op.pop)
 
 function TransientFETools.allocate_cache(
   op::ReducedOperator,
@@ -138,9 +140,10 @@ function allocate_reduced_matrix_and_vector(
   A,b = ODETools._allocate_matrix_and_vector(op,r,vθ,ode_cache)
   matvec_cache = A,b,ode_cache,vθ
 
-  coeff_cache = allocate_mdeim_coefficient(op.lhs,op.rhs,r)
-
-  lincomb_cache = allocate_mdeim_lincomb(op.lhs,op.rhs,r)
+  trial = get_reduced_trial(op)
+  test = get_reduced_test(op)
+  coeff_cache = allocate_mdeim_coeff(op.lhs,op.rhs,r)
+  lincomb_cache = allocate_mdeim_lincomb(trial,test,op.lhs,op.rhs,r)
 
   return matvec_cache,coeff_cache,lincomb_cache
 end
@@ -152,19 +155,9 @@ function reduced_matrix_and_vector!(
   cache)
 
   matvec_cache,coeff_cache,lincomb_cache = cache
-  coeff_A_cache,coeff_b_cache = coeff_cache
-  lincomb_A_cache,lincomb_b_cache = lincomb_cache
-
   A,b = collect_matrices_vectors!(solver,op,s,matvec_cache)
-
-  A_red = map(op.lhs) do lhs
-    A_coeff = mdeim_coefficient!(coeff_A_cache,lhs,A)
-    reduced_matrix!(lincomb_A_cache,lhs,A_coeff)
-  end
-
-  b_coeff = mdeim_coefficient!(coeff_b_cache,op.rhs,b)
-  b_red = reduced_vector!(lincomb_b_cache,rhs,b_coeff)
-
+  A_coeff,b_coeff = mdeim_coeff!(coeff_cache,op.lhs,op.rhs,A,b)
+  A_red,b_red = mdeim_lincomb!(lincomb_cache,op.lhs,op.rhs,A_coeff,b_coeff)
   return A_red,b_red
 end
 

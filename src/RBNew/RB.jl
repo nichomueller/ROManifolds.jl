@@ -23,8 +23,6 @@ import Gridap.Algebra: allocate_matrix,allocate_vector,solve
 import PartitionedArrays: tuple_of_arrays
 
 export RBInfo
-include("RBInfo.jl")
-
 export RBSolver
 include("RBSolver.jl")
 

@@ -22,74 +22,11 @@ end
 
 abstract type RBOperator{T} <: ODEParamOperator{T} end
 
-function allocate_reduced_residual(
-  op::RBOperator,
-  r::TransientParamRealization,
-  x::AbstractVector,
-  ode_cache)
-
+function get_reduced_trial(op::RBOperator)
   @abstractmethod
 end
 
-function allocate_reduced_jacobian(
-  op::RBOperator,
-  r::TransientParamRealization,
-  x::AbstractVector,
-  ode_cache)
-
-  @abstractmethod
-end
-
-function reduced_residual!(
-  b::ArrayContribution,
-  op::RBOperator,
-  r::TransientParamRealization,
-  xhF::Tuple{Vararg{AbstractVector}},
-  ode_cache)
-
-  @abstractmethod
-end
-
-function reduced_jacobian!(
-  A::ArrayContribution,
-  op::RBOperator,
-  r::TransientParamRealization,
-  xhF::Tuple{Vararg{AbstractVector}},
-  i::Integer,
-  γᵢ::Real,
-  ode_cache)
-
-  @abstractmethod
-end
-
-function reduced_jacobians!(
-  A::ArrayContribution,
-  op::RBOperator,
-  r::TransientParamRealization,
-  xhF::Tuple{Vararg{AbstractVector}},
-  γ::Tuple{Vararg{Real}},
-  ode_cache)
-
-  @abstractmethod
-end
-
-function reduced_zero_initial_guess(op::RBOperator,r::TransientParamRealization)
-  @abstractmethod
-end
-
-function _allocate_reduced_matrix_and_vector(op::RBOperator,r,u0,ode_cache)
-  @abstractmethod
-end
-
-function reduced__matrix_and_vector!(A,b,op::RBOperator,r,dtθ,u0,ode_cache,vθ)
-  @abstractmethod
-end
-
-function _reduced_matrix!(A,op::RBOperator,r,dtθ,u0,ode_cache,vθ)
-  @abstractmethod
-end
-
-function _reduced_vector!(b,op::RBOperator,r,dtθ,u0,ode_cache,vθ)
+function get_reduced_test(op::RBOperator)
   @abstractmethod
 end
 
@@ -104,6 +41,8 @@ FESpaces.get_test(op::GalerkinProjectionOperator) = get_test(op.feop)
 FESpaces.get_trial(op::GalerkinProjectionOperator) = get_trial(op.feop)
 FEM.realization(op::GalerkinProjectionOperator;kwargs...) = realization(op.feop;kwargs...)
 FEM.get_fe_operator(op::GalerkinProjectionOperator) = FEM.get_fe_operator(op.feop)
+get_reduced_trial(op::GalerkinProjectionOperator) = op.trial
+get_reduced_test(op::GalerkinProjectionOperator) = op.test
 
 function TransientFETools.allocate_cache(
   op::GalerkinProjectionOperator,

@@ -34,6 +34,7 @@ import Gridap.ReferenceFEs: get_order
 import Gridap.TensorValues: inner,outer,double_contraction,symmetric_part
 import PartitionedArrays: tuple_of_arrays
 
+export AbstractParamRealization
 export ParamRealization
 export TransientParamRealization
 export UniformSampling
