@@ -489,7 +489,11 @@ end
 
 const BasicNnzSnapshots = BasicSnapshots{M,T,P,R} where {M,T,P<:SparseParamMatrix,R}
 const TransientNnzSnapshots = TransientSnapshots{M,T,P,R} where {M,T,P<:SparseParamMatrix,R}
-const NnzSnapshots = Union{BasicNnzSnapshots{M,T},TransientNnzSnapshots{M,T}} where {M,T}
+const InnerTimeOuterParamTransientNnzSnapshots = InnerTimeOuterParamTransientSnapshots{M,T,P,R} where {M,T,P<:SparseParamMatrix,R}
+const NnzSnapshots = Union{
+  BasicNnzSnapshots{M,T},
+  TransientNnzSnapshots{M,T},
+  InnerTimeOuterParamTransientNnzSnapshots{M,T}} where {M,T}
 
 num_space_dofs(s::BasicNnzSnapshots) = nnz(first(s.values))
 
@@ -517,6 +521,20 @@ end
 
 function tensor_setindex!(s::TransientNnzSnapshots,v,ispace,itime,iparam)
   nonzeros(s.values[itime][iparam])[ispace] = v
+end
+
+num_space_dofs(s::InnerTimeOuterParamTransientNnzSnapshots) = nnz(first(first(s.values)))
+
+function tensor_getindex(s::InnerTimeOuterParamTransientNnzSnapshots,ispace,itime,iparam)
+  try
+    nonzeros(s.values[iparam][itime])[ispace]
+  catch
+    view(s.values,ispace,col_index(s,itime,iparam))
+  end
+end
+
+function tensor_setindex!(s::InnerTimeOuterParamTransientNnzSnapshots,v,ispace,itime,iparam)
+  nonzeros(s.values[iparam][itime])[ispace] = v
 end
 
 function recast(a::AbstractMatrix,s::NnzSnapshots{Mode1Axis})

@@ -340,28 +340,15 @@ end
 
 function mdeim_coeff!(
   cache,
-  a::AffineDecomposition{SpaceTimeMDEIM},
-  s::AbstractTransientSnapshots)
-
-  snew = InnerTimeOuterParamTransientSnapshots(s)
-  mdeim_coeff!(cache,a,snew.values)
-end
-
-function mdeim_coeff!(
-  cache,
-  a::AffineContribution,
-  b::ArrayContribution)
+  a::Vector{AffineDecomposition},
+  b::AbstractVector)
 
   coeff,coeff_recast = cache
-  trians = get_domains(a)
-  @check trians == get_domains(coeff) == get_domains(coeff_recast) == get_domains(b)
-
-  for trian in trians
-    cache_trian = coeff[trian],coeff_recast[trian]
-    a_trian = a[trian]
-    b_trian = b[trian]
-    mdeim_coeff!(cache_trian,a_trian,b_trian)
+  for i = eachindex(a)
+    cachei = coeff[i],coeff_recast[i]
+    mdeim_coeff!(cachei,a[i],b[i])
   end
+  return last(cache)
 end
 
 function allocate_mdeim_lincomb(
@@ -391,27 +378,6 @@ function allocate_mdeim_lincomb(
   kron_prod_cache = allocate_matrix(V,ns_trial*nt_trial,ns_test*nt_test)
   lincomb_cache = allocate_param_array(kron_prod_cache,num_params(r))
   return time_prod_cache,kron_prod_cache,lincomb_cache
-end
-
-function allocate_mdeim_lincomb(
-  test::RBSpace,
-  a::Vector{AffineDecomposition},
-  r::AbstractParamRealization)
-
-  map(a) do a
-    allocate_mdeim_lincomb(test,r)
-  end |> tuple_of_arrays
-end
-
-function allocate_mdeim_lincomb(
-  trial::RBSpace,
-  test::RBSpace,
-  a::Vector{AffineDecomposition},
-  r::AbstractParamRealization)
-
-  map(a) do a
-    allocate_mdeim_lincomb(trial,test,r)
-  end |> tuple_of_arrays
 end
 
 function mdeim_lincomb!(
@@ -449,7 +415,7 @@ function mdeim_lincomb!(
     for j = axes(coeff,2)
       for col in axes(basis_time,3)
         for row in axes(basis_time,2)
-          @fastmath time_prod_cache[row,col] = sum(basis_time[:,row,col].*ci[:,j])
+          time_prod_cache[row,col] = sum(basis_time[:,row,col].*ci[:,j])
         end
       end
       LinearAlgebra.kron!(kron_prod_cache,basis_space[j],time_prod_cache)
@@ -463,12 +429,9 @@ function mdeim_lincomb!(
   a::Vector{AffineDecomposition},
   b::AbstractVector)
 
-  ct,ck,cl = cache
   for i in eachindex(a)
-    cachei = ct[i],ck[i],cl[i]
     ai = a[i]
     bi = b[i]
-    mdeim_lincomb!(cachei,ai,bi)
+    mdeim_lincomb!(cache,ai,bi)
   end
-  return cl
 end

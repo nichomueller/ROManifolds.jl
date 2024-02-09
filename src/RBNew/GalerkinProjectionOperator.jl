@@ -76,10 +76,11 @@ function fe_matrix_and_vector(
 end
 
 function Algebra.solve(
-  x::AbstractVector,
   solver::RBThetaMethod,
   op::RBOperator,
   r::TransientParamRealization)
+
+  x = zero_free_values(op,r)
 
   fesolver = get_fe_solver(solver)
   dt = fesolver.dt
@@ -87,8 +88,7 @@ function Algebra.solve(
   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
 
   ode_cache = allocate_cache(op,r)
-  y = similar(x)
-  y .= 0.0
+  y = zero_free_values(get_fe_trial(op)(r))
   nl_cache = nothing
 
   ode_cache = update_cache!(ode_cache,op,r)
@@ -101,10 +101,11 @@ function Algebra.solve(
 end
 
 function Algebra.solve(
-  x::AbstractVector,
   solver::RBThetaMethod,
   op::AffineRBOperator,
   r::TransientParamRealization)
+
+  x = zero_initial_guess(op)
 
   fesolver = get_fe_solver(solver)
   dt = fesolver.dt
@@ -112,8 +113,7 @@ function Algebra.solve(
   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
 
   ode_cache = allocate_cache(op,r)
-  y = similar(x)
-  y .= 0.0
+  y = zero_free_values(get_fe_trial(op)(r))
   mat_cache,vec_cache = ODETools._allocate_matrix_and_vector(op,r,y,ode_cache)
 
   ode_cache = update_cache!(ode_cache,op,r)
@@ -163,6 +163,8 @@ function TransientFETools.update_cache!(
   update_cache!(ode_cache,op.feop,r)
 end
 
+# convention: when computing full order matrices / vectors, we view them as snapshots
+
 function allocate_fe_vector(
   op::GalerkinProjectionOperator,
   r::TransientParamRealization,
@@ -182,17 +184,18 @@ function allocate_fe_matrix(
 end
 
 function fe_vector!(
-  b::AbstractVector,
+  b,
   op::GalerkinProjectionOperator,
   r::TransientParamRealization,
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
 
   residual!(b,op.feop,r,xhF,ode_cache)
+  Snapshots(b,r)
 end
 
 function fe_matrix!(
-  A::AbstractMatrix,
+  A,
   op::GalerkinProjectionOperator,
   r::TransientParamRealization,
   xhF::Tuple{Vararg{AbstractVector}},
@@ -201,10 +204,11 @@ function fe_matrix!(
   ode_cache)
 
   jacobian!(A,op.feop,r,xhF,i,γᵢ,ode_cache)
+  Snapshots(A,r)
 end
 
 function fe_matrix!(
-  A::AbstractMatrix,
+  A,
   op::GalerkinProjectionOperator,
   r::TransientParamRealization,
   xhF::Tuple{Vararg{AbstractVector}},
@@ -212,6 +216,9 @@ function fe_matrix!(
   ode_cache)
 
   ODETools.jacobians!(A,op.feop,r,xhF,γ,ode_cache)
+  map(A) do A
+    Snapshots(A,r)
+  end
 end
 
 function allocate_fe_matrix_and_vector(op::GalerkinProjectionOperator,r,u0,ode_cache)
@@ -220,7 +227,11 @@ function allocate_fe_matrix_and_vector(op::GalerkinProjectionOperator,r,u0,ode_c
   return A,b
 end
 
-# convention: when computing full order matrices / vectors, we view them as snapshots
+function fe_matrix_and_vector!(A,b,op::GalerkinProjectionOperator{Affine},r,dtθ,u0,ode_cache,vθ)
+  sA = fe_matrix!(A,op,r,dtθ,vθ,ode_cache,vθ)
+  sb = fe_vector!(b,op,r,dtθ,vθ,ode_cache,vθ)
+  return sA,sb
+end
 
 function fe_matrix_and_vector!(A,b,op::GalerkinProjectionOperator,r,dtθ,u0,ode_cache,vθ)
   sA = fe_matrix!(A,op,r,dtθ,u0,ode_cache,vθ)

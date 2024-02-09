@@ -57,8 +57,6 @@ end
 # 1) cache to assemble residuals/jacobians on reduced integration domain
 # 2) cache to compute the mdeim coefficient
 # 3) cache to perform the kronecker product between basis and coefficient
-# 4) cache to store the sum of the various affine contributions
-# 5) (for jacobian) cache to store the sum of number 4) for all the jacobians
 
 function Algebra.allocate_residual(
   op::ReducedOperator,
@@ -69,9 +67,8 @@ function Algebra.allocate_residual(
   test = get_test(op)
   fe_b = allocate_fe_vector(op.pop,r,x,ode_cache)
   coeff_cache = allocate_mdeim_coeff(op.rhs,r)
-  lincomb_cache = allocate_mdeim_lincomb(test,op.rhs,r)
-  sum_cache = copy(last(lincomb_cache))
-  return fe_b,coeff_cache,lincomb_cache,sum_cache
+  lincomb_cache = allocate_mdeim_lincomb(test,r)
+  return fe_b,coeff_cache,lincomb_cache
 end
 
 function Algebra.allocate_jacobian(
@@ -84,16 +81,11 @@ function Algebra.allocate_jacobian(
   test = get_test(op)
   fe_A = allocate_fe_matrix(op.pop,r,x,ode_cache)
   coeff_cache = ()
-  lincomb_cache = ()
-  inner_sum_cache = ()
-  for i = get_order(op)+1
+  for i = 1:get_order(op)+1
     coeff_cache = (coeff_cache...,allocate_mdeim_coeff(op.lhs[i],r))
-    li = allocate_mdeim_lincomb(trial,test,op.lhs[i],r)
-    lincomb_cache = (lincomb_cache...,li)
-    inner_sum_cache = (inner_sum_cache...,copy(last(li)))
   end
-  outer_sum_cache = copy(last(inner_sum_cache))
-  return fe_A,coeff_cache,lincomb_cache,inner_sum_cache,outer_sum_cache
+  lincomb_cache = allocate_mdeim_lincomb(trial,test,r)
+  return fe_A,coeff_cache,lincomb_cache
 end
 
 function Algebra.residual!(
@@ -103,12 +95,12 @@ function Algebra.residual!(
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
 
-  fe_b,coeff_cache,lincomb_cache,sum_cache = cache
+  fe_b,coeff_cache,lincomb_cache = cache
   fe_sb = fe_vector!(fe_b,op,r,xhF,ode_cache)
   b_coeff = mdeim_coeff!(coeff_cache,op.rhs,fe_sb)
-  b = mdeim_lincomb!(lincomb_cache,op.rhs,b_coeff)
-  sum!(sum_cache,b)
-  return sum_cache
+  mdeim_lincomb!(lincomb_cache,op.rhs,b_coeff)
+  b = last(lincomb_cache)
+  return b
 end
 
 function Algebra.jacobian!(
@@ -118,29 +110,30 @@ function Algebra.jacobian!(
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
 
-  fe_A,coeff_cache,lincomb_cache,inner_sum_cache,outer_sum_cache = cache
+  fe_A,coeff_cache,lincomb_cache = cache
   fe_sA = fe_matrix!(fe_A,op,r,xhF,ode_cache)
   for i = 1:get_order(op)+1
-    A_coeff = mdeim_coeff!(coeff_cache,op.lhs[i],fe_sA[i])
-    A = mdeim_lincomb!(lincomb_cache,op.lhs[i],A_coeff)
-    sum(inner_sum_cache[i],A)
+    A_coeff = mdeim_coeff!(coeff_cache[i],op.lhs[i],fe_sA[i])
+    mdeim_lincomb!(lincomb_cache,op.lhs[i],A_coeff)
   end
-  sum!(outer_sum_cache,inner_sum_cache)
-  return outer_sum_cache
+  A = last(lincomb_cache)
+  return A
+end
+
+function ODETools._matrix_and_vector!(cache_mat,cache_vec,op::ReducedOperator,r,dtθ,u0,ode_cache,vθ)
+  A = ODETools._matrix!(cache_mat,op,r,dtθ,u0,ode_cache,vθ)
+  b = ODETools._vector!(cache_vec,op,r,dtθ,u0,ode_cache,vθ)
+  return A,b
 end
 
 function ODETools._matrix!(cache,op::ReducedOperator,r,dtθ,u0,ode_cache,vθ)
-  fe_A,coeff_cache,lincomb_cache,inner_sum_cache,outer_sum_cache = cache
+  fe_A,coeff_cache,lincomb_cache = cache
   LinearAlgebra.fillstored!(fe_A,zero(eltype(fe_A)))
-  map(x->fill!(x,zero(eltype(x))),inner_sum_cache)
-  fill!(outer_sum_cache,zero(eltype(outer_sum_cache)))
   A = jacobian!(cache,op,r,(u0,vθ),ode_cache)
   return A
 end
 
 function ODETools._vector!(cache,op::ReducedOperator,r,dtθ,u0,ode_cache,vθ)
-  fe_b,coeff_cache,lincomb_cache,sum_cache = cache
-  fill!(sum_cache,zero(eltype(sum_cache)))
   b = residual!(cache,op,r,(u0,vθ),ode_cache)
   b .*= -1.0
   return b
@@ -156,10 +149,11 @@ function _union_reduced_times(op::ReducedOperator)
 end
 
 function _select_snapshots_at_space_time_locations(s,a,ids_all_time)
+  snew = InnerTimeOuterParamTransientSnapshots(s)
   ids_space = get_indices_space(a)
   ids_time = get_indices_time(a)
   corresponding_ids_time = filter(!isnothing,indexin(ids_all_time,ids_time))
-  cols = col_index(s,corresponding_ids_time,1:num_params(s))
+  cols = col_index(snew,corresponding_ids_time,1:num_params(s))
   view(s,ids_space,cols)
 end
 
@@ -175,20 +169,21 @@ function fe_matrix!(
   ode_cache)
 
   ids_all_time = _union_reduced_times(op)
-  A = fe_matrix!(cache,op.pop,xhF,r,ode_cache)
-  Ai = _select_snapshots_at_space_time_locations(A,op.lhs,ids_all_time)
-  return Ai
+  A = fe_matrix!(cache,op.pop,r,xhF,(1,1),ode_cache)
+  map(A,op.lhs) do A,lhs
+    _select_snapshots_at_space_time_locations(get_values(A),lhs,ids_all_time)
+  end
 end
 
 function fe_vector!(
-  cache::RBThetaMethod,
+  cache,
   op::ReducedOperator,
   r::TransientParamRealization,
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
 
   ids_all_time = _union_reduced_times(op)
-  b = fe_vector!(cache,op.pop,xhF,r,ode_cache)
-  bi = _select_snapshots_at_space_time_locations(b,op.lhs,ids_all_time)
+  b = fe_vector!(cache,op.pop,r,xhF,ode_cache)
+  bi = _select_snapshots_at_space_time_locations(get_values(b),op.rhs,ids_all_time)
   return bi
 end

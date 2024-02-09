@@ -87,7 +87,7 @@ pop = GalerkinProjectionOperator(odeop,red_trial,red_test)
 red_lhs,red_rhs = RB.reduced_matrix_vector_form(rbsolver,pop,snaps)
 red_op = reduced_operator(pop,red_lhs,red_rhs)
 
-snaps_on = RB.select_snapshots(snaps,:,10)
+snaps_on = RB.select_snapshots(snaps,10,:)
 r_on = snaps_on.realization
 
 x = zero_free_values(trial(r_on))
@@ -103,8 +103,11 @@ ode_cache = update_cache!(ode_cache,red_op,r_on)
 
 A,b = ODETools._matrix_and_vector!(mat_cache,vec_cache,red_op,r_on,dtθ,y,ode_cache,y)
 
-fe_A,coeff_cache,lincomb_cache,inner_sum_cache,outer_sum_cache = mat_cache
+fe_A,coeff_cache,lincomb_cache = mat_cache
 LinearAlgebra.fillstored!(fe_A,zero(eltype(fe_A)))
-map(x->fill!(x,zero(eltype(x))),inner_sum_cache)
-
-fe_b,coeff_cache,lincomb_cache,sum_cache = vec_cache
+fe_sA = RB.fe_matrix!(fe_A,red_op,r_on,(y,y),ode_cache)
+for i = 1:get_order(red_op)+1
+  A_coeff = RB.mdeim_coeff!(coeff_cache[i],red_op.lhs[i],fe_sA[i])
+  RB.mdeim_lincomb!(lincomb_cache,red_op.lhs[i],A_coeff)
+end
+A = last(lincomb_cache)
