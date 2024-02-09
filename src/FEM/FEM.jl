@@ -70,6 +70,7 @@ include("ParamBlockArray.jl")
 export Contribution
 export ArrayContribution
 export array_contribution
+export get_values
 include("Contribution.jl")
 
 export ParamReindex
@@ -124,8 +125,7 @@ export TransientParamFEOperatorFromWeakForm
 export AffineTransientParamFEOperator
 export NonlinearTransientParamFEOperator
 export TransientParamFEOperatorWithTrian
-export residual_for_trian!
-export jacobian_for_trian!
+export change_triangulation
 include("TransientParamFEOperator.jl")
 
 export ODEParamOperator

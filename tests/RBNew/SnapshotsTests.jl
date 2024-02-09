@@ -73,7 +73,7 @@ s2 = RB.InnerTimeOuterParamTransientSnapshots(s1)
 
 s3 = Snapshots([ParamArray(vv[1:2]),ParamArray(vv[3:4])],r)
 
-s4 = RB.TransientToBasicSnapshots(s3)
+s4 = BasicSnapshots(s3)
 @test s4 ≈ s3 ≈ s1
 
 s5 = RB.InnerTimeOuterParamTransientSnapshots(s3)

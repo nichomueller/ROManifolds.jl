@@ -138,6 +138,10 @@ struct BasicSnapshots{M,T,P,R} <: AbstractTransientSnapshots{M,T}
   end
 end
 
+function BasicSnapshots(s::BasicSnapshots)
+  s
+end
+
 function Snapshots(
   values::P,
   realization::R,
@@ -223,7 +227,7 @@ function select_snapshots(s::TransientSnapshots,paramrange,timerange=:)
   TransientSnapshots(s.mode,s.values,s.realization[paramrange,timerange])
 end
 
-function TransientToBasicSnapshots(
+function BasicSnapshots(
   s::TransientSnapshots{M,T,<:ParamArray{T,N,A}}
   ) where {M,T,N,A}
 
@@ -312,7 +316,7 @@ function FEM.shift_time!(s::TransientSnapshotsWithInitialValues,dt::Number,θ::N
   r = s.realization
   FEM.shift_time!(r,dt*θ)
   sshift = TransientSnapshots(mode,v_middle,r)
-  TransientToBasicSnapshots(sshift)
+  BasicSnapshots(sshift)
 end
 
 struct CompressedTransientSnapshots{M,N,T,R} <: AbstractTransientSnapshots{M,T}

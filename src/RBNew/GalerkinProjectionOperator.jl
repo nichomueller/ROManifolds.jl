@@ -51,6 +51,30 @@ function fe_jacobians!(op::RBOperator)
   @abstractmethod
 end
 
+function fe_matrix_and_vector(
+  solver::RBSolver,
+  op::RBOperator,
+  s::AbstractTransientSnapshots)
+
+  fesolver = get_fe_solver(solver)
+  dt = fesolver.dt
+  θ = fesolver.θ
+  θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+
+  nparams = num_mdeim_params(solver.info)
+  smdeim = select_snapshots(s,Base.OneTo(nparams))
+  x = BasicSnapshots(smdeim).values
+
+  y = similar(x)
+  y .= 0.0
+  r = get_realization(smdeim)
+  ode_cache = allocate_cache(op,r)
+  A,b = allocate_fe_matrix_and_vector(op,r,x,ode_cache)
+
+  ode_cache = update_cache!(ode_cache,op,r)
+  fe_matrix_and_vector!(A,b,op,r,dtθ,x,ode_cache,y)
+end
+
 function Algebra.solve(
   x::AbstractVector,
   solver::RBThetaMethod,

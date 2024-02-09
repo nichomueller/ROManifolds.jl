@@ -6,10 +6,10 @@ function reduced_operator(
   trians_lhs = map(get_domains,lhs_contribs)
   trians_rhs = get_domains(rhs_contribs)
 
-  new_pop = FEM.change_triangulation(pop,trians_lhs,trians_rhs)
+  new_pop = change_triangulation(pop,trians_lhs,trians_rhs)
 
-  lhs = map(FEM.get_values,lhs_contribs)
-  rhs = FEM.get_values(rhs_contribs)
+  lhs = map(get_values,lhs_contribs)
+  rhs = get_values(rhs_contribs)
 
   ReducedOperator(new_pop,lhs,rhs)
 end
@@ -113,26 +113,6 @@ function Algebra.jacobian!(
   return A
 end
 
-# function allocate_reduced_matrix_and_vector(
-#   solver::RBThetaMethod,
-#   op::ReducedOperator,
-#   s::AbstractTransientSnapshots)
-
-#   r = get_realization(s)
-
-#   vθ = zero_initial_guess(op,r)
-#   ode_cache = allocate_cache(op,r)
-#   A,b = ODETools._allocate_matrix_and_vector(op,r,vθ,ode_cache)
-#   matvec_cache = A,b,ode_cache,vθ
-
-#   trial = get_reduced_trial(op)
-#   test = get_reduced_test(op)
-#   coeff_cache = allocate_mdeim_coeff(op.lhs,op.rhs,r)
-#   lincomb_cache = allocate_mdeim_lincomb(trial,test,op.lhs,op.rhs,r)
-
-#   return matvec_cache,coeff_cache,lincomb_cache
-# end
-
 function _union_reduced_times(op::ReducedOperator)
   ilhs = ()
   for lhs in op.lhs
@@ -189,45 +169,3 @@ function fe_vectors!(
   bi = _select_snapshots_at_space_time_locations(b,op.lhs,ids_all_time)
   return bi
 end
-
-# function fe_matrices_and_vectors!(
-#   solver::RBThetaMethod,
-#   op::ReducedOperator,
-#   s::AbstractTransientSnapshots,
-#   cache)
-
-#   ids_all_time = _union_reduced_times(op)
-#   sids = select_snapshots(s,:,ids_all_time)
-#   A,b = fe_matrices_and_vectors!(solver,op.pop,sids,cache)
-#   Aval = map(FEM.get_values,A)
-#   bval = FEM.get_values(b)
-#   Aids = ()
-#   for (s,a) in zip(Aval,op.lhs)
-#     Aids = (Aids...,_select_snapshots_at_space_time_locations(s,a,ids_all_time))
-#   end
-#   bids = _select_snapshots_at_space_time_locations(bval,op.rhs,ids_all_time)
-#   return Aids,bids
-# end
-
-# function reduced_matrix_and_vector!(
-#   solver::RBThetaMethod,
-#   op::ReducedOperator,
-#   s::AbstractTransientSnapshots,
-#   cache)
-
-#   matvec_cache,coeff_cache,lincomb_cache = cache
-#   A,b = fe_matrices_and_vectors!(solver,op,s,matvec_cache)
-#   A_coeff,b_coeff = mdeim_coeff!(coeff_cache,op.lhs,op.rhs,A,b)
-#   A_red,b_red = mdeim_lincomb!(lincomb_cache,op.lhs,op.rhs,A_coeff,b_coeff)
-#   return A_red,b_red
-# end
-
-# function reduced_matrix_and_vector(
-#   solver::RBThetaMethod,
-#   op::ReducedOperator,
-#   s::AbstractTransientSnapshots)
-
-#   cache = allocate_reduced_matrix_and_vector(solver,op,s)
-#   A_red,b_red = reduced_matrix_and_vector!(solver,op,s,cache)
-#   return A_red,b_red
-# end

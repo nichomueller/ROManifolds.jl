@@ -228,10 +228,11 @@ end
 function reduced_matrix_form(
   solver::RBThetaMethod,
   op::RBOperator,
-  contribs::Tuple{Vararg{ArrayContribution}})
+  s::AbstractTransientSnapshots)
 
   fesolver = get_fe_solver(solver)
   θ = fesolver.θ
+  contribs_mat = fe_matrices(solver,op,s)
   a = ()
   for (i,c) in enumerate(contribs)
     combine = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*(x-y)
@@ -247,7 +248,7 @@ function reduced_matrix_vector_form(
 
   nparams = num_mdeim_params(solver.info)
   smdeim = select_snapshots(s,Base.OneTo(nparams))
-  contribs_mat,contribs_vec, = fe_matrices_and_vectors!(solver,op,smdeim,nothing)
+  contribs_mat,contribs_vec = fe_matrix_and_vector(solver,op,smdeim)
   red_mat = reduced_matrix_form(solver,op,contribs_mat)
   red_vec = reduced_vector_form(solver,op,contribs_vec)
   return red_mat,red_vec
@@ -302,19 +303,6 @@ function allocate_mdeim_coeff(a::Vector{AffineDecomposition},r::AbstractParamRea
     allocate_mdeim_coeff(a,r)
   end |> tuple_of_arrays
 end
-
-# function allocate_mdeim_coeff(
-#   mat::Tuple{Vararg{Vector{AffineDecomposition}}},
-#   vec::Vector{AffineDecomposition},
-#   r::AbstractParamRealization)
-
-#   mat_cache = ()
-#   for mati in mat
-#     mat_cache = (mat_cache...,allocate_mdeim_coeff(mati,r))
-#   end
-#   vec_cache = allocate_mdeim_coeff(vec,r)
-#   return mat_cache,vec_cache
-# end
 
 function mdeim_coeff!(
   cache,
@@ -377,23 +365,6 @@ function mdeim_coeff!(
   end
 end
 
-# function mdeim_coeff!(
-#   cache,
-#   mat::Tuple{Vararg{Vector{AffineDecomposition}}},
-#   vec::Vector{AffineDecomposition},
-#   A::Tuple{Vararg{ArrayContribution}},
-#   b::ArrayContribution)
-
-#   cache_mat,cache_vec = cache
-#   mdeim_coeff!(cache_vec,vec,b)
-#   map(cache_mat,A,mat) do cache_mat,A,mat
-#     mdeim_coeff!(cache_mat,A,mat)
-#   end
-#   coeff_mat = map(last,cache_mat)
-#   coeff_vec = last(cache_vec)
-#   return coeff_mat,coeff_vec
-# end
-
 function allocate_mdeim_lincomb(
   test::RBSpace,
   r::AbstractParamRealization)
@@ -443,21 +414,6 @@ function allocate_mdeim_lincomb(
     allocate_mdeim_lincomb(trial,test,r)
   end |> tuple_of_arrays
 end
-
-# function allocate_mdeim_lincomb(
-#   trial::RBSpace,
-#   test::RBSpace,
-#   mat::Tuple{Vararg{Vector{AffineDecomposition}}},
-#   vec::Vector{AffineDecomposition},
-#   r::AbstractParamRealization)
-
-#   mat_cache = ()
-#   for mati in mat
-#     mat_cache = (mat_cache...,allocate_mdeim_lincomb(trial,test,mati,r))
-#   end
-#   vec_cache = allocate_mdeim_lincomb(test,vec,r)
-#   return mat_cache,vec_cache
-# end
 
 function mdeim_lincomb!(
   cache,
@@ -519,20 +475,3 @@ function mdeim_lincomb!(
     mdeim_lincomb!(cache_trian,a_trian,b_trian)
   end
 end
-
-# function mdeim_lincomb!(
-#   cache,
-#   mat::Tuple{Vararg{AffineContribution}},
-#   vec::AffineContribution,
-#   A::Tuple{Vararg{ArrayContribution}},
-#   b::ArrayContribution)
-
-#   cache_mat,cache_vec = cache
-#   mdeim_lincomb!(cache_vec,vec,b)
-#   map(cache_mat,A,mat) do cache_mat,A,mat
-#     mdeim_lincomb!(cache_mat,A,mat)
-#   end
-#   red_mat = sum(map(last,cache_mat))
-#   red_vec = sum(last(cache_vec))
-#   return red_mat,red_vec
-# end
