@@ -247,7 +247,7 @@ function reduced_matrix_vector_form(
 
   nparams = num_mdeim_params(solver.info)
   smdeim = select_snapshots(s,Base.OneTo(nparams))
-  contribs_mat,contribs_vec, = collect_matrices_vectors!(solver,op,smdeim,nothing)
+  contribs_mat,contribs_vec, = fe_matrices_and_vectors!(solver,op,smdeim,nothing)
   red_mat = reduced_matrix_form(solver,op,contribs_mat)
   red_vec = reduced_vector_form(solver,op,contribs_vec)
   return red_mat,red_vec
@@ -303,18 +303,18 @@ function allocate_mdeim_coeff(a::Vector{AffineDecomposition},r::AbstractParamRea
   end |> tuple_of_arrays
 end
 
-function allocate_mdeim_coeff(
-  mat::Tuple{Vararg{Vector{AffineDecomposition}}},
-  vec::Vector{AffineDecomposition},
-  r::AbstractParamRealization)
+# function allocate_mdeim_coeff(
+#   mat::Tuple{Vararg{Vector{AffineDecomposition}}},
+#   vec::Vector{AffineDecomposition},
+#   r::AbstractParamRealization)
 
-  mat_cache = ()
-  for mati in mat
-    mat_cache = (mat_cache...,allocate_mdeim_coeff(mati,r))
-  end
-  vec_cache = allocate_mdeim_coeff(vec,r)
-  return mat_cache,vec_cache
-end
+#   mat_cache = ()
+#   for mati in mat
+#     mat_cache = (mat_cache...,allocate_mdeim_coeff(mati,r))
+#   end
+#   vec_cache = allocate_mdeim_coeff(vec,r)
+#   return mat_cache,vec_cache
+# end
 
 function mdeim_coeff!(
   cache,
@@ -377,22 +377,22 @@ function mdeim_coeff!(
   end
 end
 
-function mdeim_coeff!(
-  cache,
-  mat::Tuple{Vararg{Vector{AffineDecomposition}}},
-  vec::Vector{AffineDecomposition},
-  A::Tuple{Vararg{ArrayContribution}},
-  b::ArrayContribution)
+# function mdeim_coeff!(
+#   cache,
+#   mat::Tuple{Vararg{Vector{AffineDecomposition}}},
+#   vec::Vector{AffineDecomposition},
+#   A::Tuple{Vararg{ArrayContribution}},
+#   b::ArrayContribution)
 
-  cache_mat,cache_vec = cache
-  mdeim_coeff!(cache_vec,vec,b)
-  map(cache_mat,A,mat) do cache_mat,A,mat
-    mdeim_coeff!(cache_mat,A,mat)
-  end
-  coeff_mat = map(last,cache_mat)
-  coeff_vec = last(cache_vec)
-  return coeff_mat,coeff_vec
-end
+#   cache_mat,cache_vec = cache
+#   mdeim_coeff!(cache_vec,vec,b)
+#   map(cache_mat,A,mat) do cache_mat,A,mat
+#     mdeim_coeff!(cache_mat,A,mat)
+#   end
+#   coeff_mat = map(last,cache_mat)
+#   coeff_vec = last(cache_vec)
+#   return coeff_mat,coeff_vec
+# end
 
 function allocate_mdeim_lincomb(
   test::RBSpace,
@@ -444,20 +444,20 @@ function allocate_mdeim_lincomb(
   end |> tuple_of_arrays
 end
 
-function allocate_mdeim_lincomb(
-  trial::RBSpace,
-  test::RBSpace,
-  mat::Tuple{Vararg{Vector{AffineDecomposition}}},
-  vec::Vector{AffineDecomposition},
-  r::AbstractParamRealization)
+# function allocate_mdeim_lincomb(
+#   trial::RBSpace,
+#   test::RBSpace,
+#   mat::Tuple{Vararg{Vector{AffineDecomposition}}},
+#   vec::Vector{AffineDecomposition},
+#   r::AbstractParamRealization)
 
-  mat_cache = ()
-  for mati in mat
-    mat_cache = (mat_cache...,allocate_mdeim_lincomb(trial,test,mati,r))
-  end
-  vec_cache = allocate_mdeim_lincomb(test,vec,r)
-  return mat_cache,vec_cache
-end
+#   mat_cache = ()
+#   for mati in mat
+#     mat_cache = (mat_cache...,allocate_mdeim_lincomb(trial,test,mati,r))
+#   end
+#   vec_cache = allocate_mdeim_lincomb(test,vec,r)
+#   return mat_cache,vec_cache
+# end
 
 function mdeim_lincomb!(
   cache,
@@ -520,19 +520,19 @@ function mdeim_lincomb!(
   end
 end
 
-function mdeim_lincomb!(
-  cache,
-  mat::Tuple{Vararg{AffineContribution}},
-  vec::AffineContribution,
-  A::Tuple{Vararg{ArrayContribution}},
-  b::ArrayContribution)
+# function mdeim_lincomb!(
+#   cache,
+#   mat::Tuple{Vararg{AffineContribution}},
+#   vec::AffineContribution,
+#   A::Tuple{Vararg{ArrayContribution}},
+#   b::ArrayContribution)
 
-  cache_mat,cache_vec = cache
-  mdeim_lincomb!(cache_vec,vec,b)
-  map(cache_mat,A,mat) do cache_mat,A,mat
-    mdeim_lincomb!(cache_mat,A,mat)
-  end
-  red_mat = sum(map(last,cache_mat))
-  red_vec = sum(last(cache_vec))
-  return red_mat,red_vec
-end
+#   cache_mat,cache_vec = cache
+#   mdeim_lincomb!(cache_vec,vec,b)
+#   map(cache_mat,A,mat) do cache_mat,A,mat
+#     mdeim_lincomb!(cache_mat,A,mat)
+#   end
+#   red_mat = sum(map(last,cache_mat))
+#   red_vec = sum(last(cache_vec))
+#   return red_mat,red_vec
+# end

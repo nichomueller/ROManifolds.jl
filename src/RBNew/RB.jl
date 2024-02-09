@@ -51,7 +51,7 @@ include("RBSpace.jl")
 export RBOperator
 export GalerkinProjectionOperator
 export reduced_operator
-export collect_matrices_vectors!
+export fe_matrices_and_vectors!
 include("GalerkinProjectionOperator.jl")
 
 export AffineDecomposition
