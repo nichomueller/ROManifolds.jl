@@ -11,9 +11,9 @@ function collect_solutions(
   realization = odesol.r
 
   stats = @timed begin
-    values,initial_values = collect(odesol)
+    values = collect(odesol)
   end
-  snaps = Snapshots(values,initial_values,realization)
+  snaps = Snapshots(values,realization)
   cinfo = ComputationInfo(stats,nparams)
 
   return snaps,cinfo
@@ -241,82 +241,6 @@ function BasicSnapshots(
   end
   basic_values = ParamArray(array)
   BasicSnapshots(s.mode,basic_values,s.realization)
-end
-
-struct TransientSnapshotsWithInitialValues{M,T,P,R} <: AbstractTransientSnapshots{M,T}
-  mode::M
-  values::AbstractVector{P}
-  initial_values::P
-  realization::R
-  function TransientSnapshotsWithInitialValues(
-    mode::M,
-    values::AbstractVector{P},
-    initial_values::P,
-    realization::R
-    ) where {M,P<:AbstractParamContainer,R<:TransientParamRealization}
-
-    T = eltype(P)
-    new{M,T,P,R}(mode,values,initial_values,realization)
-  end
-end
-
-function Snapshots(
-  values::AbstractVector{P},
-  initial_values::P,
-  realization::R,
-  mode::M=Mode1Axis()
-  ) where {M,P<:AbstractParamContainer,R}
-
-  TransientSnapshotsWithInitialValues(mode,values,initial_values,realization)
-end
-
-num_space_dofs(s::TransientSnapshotsWithInitialValues) = length(first(s.initial_values))
-
-function change_mode(s::TransientSnapshotsWithInitialValues{Mode1Axis})
-  TransientSnapshotsWithInitialValues(Mode2Axis(),s.values,s.initial_values,s.realization)
-end
-
-function change_mode(s::TransientSnapshotsWithInitialValues{Mode2Axis})
-  TransientSnapshotsWithInitialValues(Mode1Axis(),s.values,s.initial_values,s.realization)
-end
-
-function tensor_getindex(s::TransientSnapshotsWithInitialValues,ispace,itime,iparam)
-  try
-    if itime == 0
-      s.initial_values[iparam][ispace]
-    else
-      s.values[itime][iparam][ispace]
-    end
-  catch
-    view(s,ispace,col_index(s,itime,iparam))
-  end
-end
-
-function tensor_setindex!(s::TransientSnapshotsWithInitialValues,v,ispace,itime,iparam)
-  if itime == 0
-    s.initial_values[iparam][ispace] = v
-  else
-    s.values[itime][iparam][ispace] = v
-  end
-end
-
-function select_snapshots(s::TransientSnapshotsWithInitialValues,paramrange,timerange=:)
-  TransientSnapshotsWithInitialValues(
-    s.mode,
-    s.values,
-    s.initial_values,
-    s.realization[paramrange,timerange])
-end
-
-function FEM.shift_time!(s::TransientSnapshotsWithInitialValues,dt::Number,θ::Number)
-  mode = get_mode(s)
-  v_forward = s.values
-  v_backward = [s.initial_values,s.values[1:end-1]...]
-  v_middle = θ*v_forward + (1-θ)*v_backward
-  r = s.realization
-  FEM.shift_time!(r,dt*θ)
-  sshift = TransientSnapshots(mode,v_middle,r)
-  BasicSnapshots(sshift)
 end
 
 struct CompressedTransientSnapshots{M,N,T,R} <: AbstractTransientSnapshots{M,T}

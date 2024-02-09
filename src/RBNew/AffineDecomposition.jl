@@ -43,7 +43,7 @@ function reduce_triangulation(
   trian::Triangulation,
   indices_space::AbstractVector)
 
-  test = get_test(op)
+  test = get_fe_test(op)
   cell_dof_ids = get_cell_dof_ids(test,trian)
   indices_space_rows = slow_index(indices_space,num_free_dofs(test))
   red_integr_cells = get_reduced_cells(indices_space_rows,cell_dof_ids)
@@ -228,11 +228,10 @@ end
 function reduced_matrix_form(
   solver::RBThetaMethod,
   op::RBOperator,
-  s::AbstractTransientSnapshots)
+  contribs::Tuple{Vararg{ArrayContribution}})
 
   fesolver = get_fe_solver(solver)
   θ = fesolver.θ
-  contribs_mat = fe_matrices(solver,op,s)
   a = ()
   for (i,c) in enumerate(contribs)
     combine = (x,y) -> i == 1 ? θ*x+(1-θ)*y : θ*(x-y)
@@ -461,17 +460,15 @@ end
 
 function mdeim_lincomb!(
   cache,
-  a::AffineContribution,
-  b::ArrayContribution)
+  a::Vector{AffineDecomposition},
+  b::AbstractVector)
 
   ct,ck,cl = cache
-  trians = get_domains(a)
-  @check trians == get_domains(ct) == get_domains(ck) == get_domains(cl) == get_domains(b)
-
-  for trian in trians
-    cache_trian = ct[trian],ck[trian],cl[trian]
-    a_trian = a[trian]
-    b_trian = b[trian]
-    mdeim_lincomb!(cache_trian,a_trian,b_trian)
+  for i in eachindex(a)
+    cachei = ct[i],ck[i],cl[i]
+    ai = a[i]
+    bi = b[i]
+    mdeim_lincomb!(cachei,ai,bi)
   end
+  return cl
 end

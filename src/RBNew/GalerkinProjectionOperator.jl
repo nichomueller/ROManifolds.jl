@@ -31,23 +31,23 @@ function get_fe_test(op::RBOperator)
   @abstractmethod
 end
 
-function allocate_fe_residual(op::RBOperator)
+function allocate_fe_vector(op::RBOperator)
   @abstractmethod
 end
 
-function allocate_fe_jacobian(op::RBOperator)
+function allocate_fe_matrix(op::RBOperator)
   @abstractmethod
 end
 
-function fe_residual!(op::RBOperator)
+function fe_vector!(op::RBOperator)
   @abstractmethod
 end
 
-function fe_jacobian!(op::RBOperator)
+function fe_matrix!(op::RBOperator)
   @abstractmethod
 end
 
-function fe_jacobians!(op::RBOperator)
+function fe_matrix!(op::RBOperator)
   @abstractmethod
 end
 
@@ -163,7 +163,7 @@ function TransientFETools.update_cache!(
   update_cache!(ode_cache,op.feop,r)
 end
 
-function allocate_fe_residual(
+function allocate_fe_vector(
   op::GalerkinProjectionOperator,
   r::TransientParamRealization,
   x::AbstractVector,
@@ -172,7 +172,7 @@ function allocate_fe_residual(
   allocate_residual(op.feop,r,x,ode_cache)
 end
 
-function allocate_fe_jacobian(
+function allocate_fe_matrix(
   op::GalerkinProjectionOperator,
   r::TransientParamRealization,
   x::AbstractVector,
@@ -181,7 +181,7 @@ function allocate_fe_jacobian(
   allocate_jacobian(op.feop,r,x,ode_cache)
 end
 
-function fe_residual!(
+function fe_vector!(
   b::AbstractVector,
   op::GalerkinProjectionOperator,
   r::TransientParamRealization,
@@ -191,7 +191,7 @@ function fe_residual!(
   residual!(b,op.feop,r,xhF,ode_cache)
 end
 
-function fe_jacobian!(
+function fe_matrix!(
   A::AbstractMatrix,
   op::GalerkinProjectionOperator,
   r::TransientParamRealization,
@@ -203,7 +203,7 @@ function fe_jacobian!(
   jacobian!(A,op.feop,r,xhF,i,γᵢ,ode_cache)
 end
 
-function fe_jacobians!(
+function fe_matrix!(
   A::AbstractMatrix,
   op::GalerkinProjectionOperator,
   r::TransientParamRealization,
@@ -215,26 +215,30 @@ function fe_jacobians!(
 end
 
 function allocate_fe_matrix_and_vector(op::GalerkinProjectionOperator,r,u0,ode_cache)
-  A = allocate_jacobian(op,r,u0,ode_cache)
-  b = allocate_residual(op,r,u0,ode_cache)
+  A = allocate_fe_matrix(op,r,u0,ode_cache)
+  b = allocate_fe_vector(op,r,u0,ode_cache)
   return A,b
 end
 
+# convention: when computing full order matrices / vectors, we view them as snapshots
+
 function fe_matrix_and_vector!(A,b,op::GalerkinProjectionOperator,r,dtθ,u0,ode_cache,vθ)
-  fe_matrix!(A,op,r,dtθ,u0,ode_cache,vθ)
-  fe_vector!(b,op,r,dtθ,u0,ode_cache,vθ)
-  return A,b
+  sA = fe_matrix!(A,op,r,dtθ,u0,ode_cache,vθ)
+  sb = fe_vector!(b,op,r,dtθ,u0,ode_cache,vθ)
+  return sA,sb
 end
 
 function fe_matrix!(A,op::GalerkinProjectionOperator,r,dtθ,u0,ode_cache,vθ)
   z = zero(eltype(A))
   LinearAlgebra.fillstored!(A,z)
   ODETools.jacobians!(A,op.feop,r,(vθ,vθ),(1.0,1/dtθ),ode_cache)
-  return A
+  map(A) do A
+    Snapshots(A,r)
+  end
 end
 
 function fe_vector!(b,op::GalerkinProjectionOperator,r,dtθ,u0,ode_cache,vθ)
   residual!(b,op.feop,r,(u0,vθ),ode_cache)
   b .*= -1.0
-  return b
+  Snapshots(b,r)
 end

@@ -45,7 +45,7 @@ function Base.collect(sol::ODEParamSolution)
   for (k,(ut,rt)) in enumerate(sol)
     free_values[k] = copy(ut)
   end
-  return free_values,initial_values
+  return free_values
 end
 
 function Algebra.solve(

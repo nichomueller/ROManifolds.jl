@@ -55,13 +55,11 @@ function Base.collect(sol::TransientParamFESolution)
   initial_values = odesol.u0
   V = typeof(initial_values)
   free_values = Vector{V}(undef,ntimes)
-  dirichlet_values = Vector{V}(undef,ntimes)
   for (uht,rt) in sol
     copyto!(free_values[k],uht.free_values)
-    copyto!(dirichlet_values[k],uht.dirichlet_values)
   end
 
-  return free_values,dirichlet_values,initial_values
+  return free_values,initial_values
 end
 
 function Algebra.solve(

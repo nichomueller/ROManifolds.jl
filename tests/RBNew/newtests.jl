@@ -87,6 +87,24 @@ pop = GalerkinProjectionOperator(odeop,red_trial,red_test)
 red_lhs,red_rhs = RB.reduced_matrix_vector_form(rbsolver,pop,snaps)
 red_op = reduced_operator(pop,red_lhs,red_rhs)
 
-nparams = RB.num_mdeim_params(rbinfo)
-smdeim = RB.select_snapshots(snaps,Base.OneTo(nparams))
-x = RB.BasicSnapshots(smdeim).values
+snaps_on = RB.select_snapshots(snaps,:,10)
+r_on = snaps_on.realization
+
+x = zero_free_values(trial(r_on))
+solve(x,rbsolver,red_op,r_on)
+
+θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+ode_cache = allocate_cache(red_op,r_on)
+y = similar(x)
+y .= 0.0
+mat_cache,vec_cache = ODETools._allocate_matrix_and_vector(red_op,r_on,y,ode_cache)
+
+ode_cache = update_cache!(ode_cache,red_op,r_on)
+
+A,b = ODETools._matrix_and_vector!(mat_cache,vec_cache,red_op,r_on,dtθ,y,ode_cache,y)
+
+fe_A,coeff_cache,lincomb_cache,inner_sum_cache,outer_sum_cache = mat_cache
+LinearAlgebra.fillstored!(fe_A,zero(eltype(fe_A)))
+map(x->fill!(x,zero(eltype(x))),inner_sum_cache)
+
+fe_b,coeff_cache,lincomb_cache,sum_cache = vec_cache
