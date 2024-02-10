@@ -245,8 +245,7 @@ function reduced_matrix_vector_form(
   op::RBOperator,
   s::AbstractTransientSnapshots)
 
-  nparams = num_mdeim_params(solver.info)
-  smdeim = select_snapshots(s,Base.OneTo(nparams))
+  smdeim = select_snapshots(s,mdeim_params(solver.info))
   contribs_mat,contribs_vec = fe_matrix_and_vector(solver,op,smdeim)
   red_mat = reduced_matrix_form(solver,op,contribs_mat)
   red_vec = reduced_vector_form(solver,op,contribs_vec)

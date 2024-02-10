@@ -6,9 +6,8 @@ function reduced_fe_space(
   trial = get_trial(feop)
   test = get_test(feop)
   ϵ = get_tol(rbinfo)
-  nsnaps_offline = num_offline_params(rbinfo)
   norm_matrix = get_norm_matrix(rbinfo,feop)
-  soff = select_snapshots(s,1:nsnaps_offline)
+  soff = select_snapshots(s,offline_params(rbinfo))
   basis_space,basis_time = reduced_basis(soff,norm_matrix;ϵ)
   reduced_trial = TrialRBSpace(trial,basis_space,basis_time)
   reduced_test = TestRBSpace(test,basis_space,basis_time)
@@ -100,8 +99,6 @@ FESpaces.num_free_dofs(r::RBSpace) = num_reduced_space_dofs(r)*num_reduced_times
 
 FESpaces.get_free_dof_ids(r::RBSpace) = Base.OneTo(num_free_dofs(r))
 
-FESpaces.get_vector_type(r::RBSpace) = get_vector_type(r.space)
-
 FESpaces.get_dirichlet_dof_ids(r::RBSpace) = get_dirichlet_dof_ids(r.space)
 
 FESpaces.num_dirichlet_dofs(r::RBSpace) = num_dirichlet_dofs(r.space)
@@ -109,6 +106,15 @@ FESpaces.num_dirichlet_dofs(r::RBSpace) = num_dirichlet_dofs(r.space)
 FESpaces.num_dirichlet_tags(r::RBSpace) = num_dirichlet_tags(r.space)
 
 FESpaces.get_dirichlet_dof_tag(r::RBSpace) = get_dirichlet_dof_tag(r.space)
+
+FESpaces.get_vector_type(r::RBSpace) = get_vector_type(r.space)
+
+function FESpaces.get_vector_type(r::TrialRBSpace{<:FEM.ParamFESpace})
+  change_length(::Type{ParamVector{T,A,L}}) where {T,A,L} = ParamVector{T,A,Int(L/num_times(r))}
+  V = get_vector_type(r.space)
+  newV = change_length(V)
+  return newV
+end
 
 # function FESpaces.FEFunction(
 #   fs::RBSpace,free_values::ParamArray,dirichlet_values::ParamArray)
@@ -155,12 +161,20 @@ function compress(
   return st_proj_mat
 end
 
-function recast(r::RBSpace,x::AbstractVector)
+function recast(r::RBSpace,red_x::AbstractVector)
   basis_space = get_basis_space(r)
   basis_time = get_basis_time(r)
-  ns = num_reduced_space_dofs(rb)
-  nt = num_reduced_times(rb)
+  ns = num_reduced_space_dofs(r)
+  nt = num_reduced_times(r)
 
-  xmat = reshape(x,nt,ns)
-  return basis_space*(basis_time*xmat)'
+  red_xmat = reshape(red_x,nt,ns)
+  xmat = basis_space*(basis_time*red_xmat)'
+  x = eachcol(xmat) |> collect
+  ParamArray(x)
+end
+
+function recast(r::RBSpace,red_x::ParamVector)
+  map(red_x) do red_x
+    recast(r,red_x)
+  end
 end

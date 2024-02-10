@@ -1,12 +1,13 @@
 function collect_solutions(
-  rbinfo::RBInfo,
-  solver::ODESolver,
+  solver::RBSolver,
   op::TransientParamFEOperator,
   uh0::Function;
   kwargs...)
 
-  nparams = num_params(rbinfo)
-  sol = solve(solver,op,uh0;nparams)
+  info = get_info(solver)
+  fesolver = get_fe_solver(solver)
+  nparams = num_params(info)
+  sol = solve(fesolver,op,uh0;nparams)
   odesol = sol.odesol
   realization = odesol.r
 
@@ -173,9 +174,25 @@ function tensor_setindex!(s::BasicSnapshots,v,ispace,itime,iparam)
   s.values[iparam.+(itime.-1)*num_params(s)][ispace] = v
 end
 
-function select_snapshots(s::BasicSnapshots,paramrange,timerange=:)
-  BasicSnapshots(s.mode,s.values,s.realization[paramrange,timerange])
-end
+# function select_snapshots(s::BasicSnapshots,paramrange,timerange::Colon)
+#   BasicSnapshots(s.mode,s.values,realization[paramrange,timerange])
+# end
+
+# function select_snapshots(
+#   s::BasicSnapshots{M,T,<:ParamArray{T,N,A}},
+#   paramrange,
+#   timerange) where {M,T,N,A}
+
+#   np = num_params(s)
+#   realization = s.realization[paramrange,timerange]
+#   values = Vector{eltype(A)}(undef,length(realization))
+#   @inbounds for i = 1:length(realization)
+#     it = slow_index(i,np)
+#     ip = fast_index(i,np)
+#     values[i] = s.values[(it-1)*np+ip]
+#   end
+#   BasicSnapshots(s.mode,ParamArray(values),realization)
+# end
 
 struct TransientSnapshots{M,T,P,R} <: AbstractTransientSnapshots{M,T}
   mode::M
@@ -223,9 +240,21 @@ function tensor_setindex!(s::TransientSnapshots,v,ispace,itime,iparam)
   s.values[itime][iparam][ispace] = v
 end
 
-function select_snapshots(s::TransientSnapshots,paramrange,timerange=:)
-  TransientSnapshots(s.mode,s.values,s.realization[paramrange,timerange])
-end
+# function select_snapshots(
+#   s::TransientSnapshots{M,T,<:ParamArray{T,N,A}},
+#   paramrange,
+#   timerange=:) where {M,T,N,A}
+
+#   realization = s.realization[paramrange,timerange]
+#   L = length(realization)
+#   P = ParamArray{T,N,A,L}
+#   values = Vector{P}(undef,L)
+#   @inbounds for ip = 1:num_params(s)
+#     it = ip:np:nt*np
+#     array[ip] = ParamArray(map(i->s.values[i],it))
+#   end
+#   TransientSnapshots(s.mode,ParamArray(values),realization)
+# end
 
 function BasicSnapshots(
   s::TransientSnapshots{M,T,<:ParamArray{T,N,A}}
@@ -381,11 +410,11 @@ function tensor_setindex!(s::TransientSnapshotsWithDirichletValues,v,ispace,itim
   end
 end
 
-function select_snapshots(s::TransientSnapshotsWithDirichletValues,paramrange,timerange=:)
-  TransientSnapshotsWithDirichletValues(
-    select_snapshots(s.snaps,paramrange,timerange),
-    s.dirichlet_values)
-end
+# function select_snapshots(s::TransientSnapshotsWithDirichletValues,paramrange,timerange=:)
+#   TransientSnapshotsWithDirichletValues(
+#     select_snapshots(s.snaps,paramrange,timerange),
+#     s.dirichlet_values)
+# end
 
 #= mode-1 representation of a snapshot of type InnerTimeOuterParamTransientSnapshots
    [ [u(x1,t1,μ1) ⋯ u(x1,tT,μ1)] [u(x1,t1,μ2) ⋯ u(x1,tT,μ2)] [u(x1,t1,μ3) ⋯] [⋯] [u(x1,t1,μP) ⋯ u(x1,tT,μP)] ]
@@ -412,6 +441,15 @@ struct InnerTimeOuterParamTransientSnapshots{M,T,P,R} <: AbstractTransientSnapsh
     T = eltype(P)
     new{M,T,P,R}(mode,values,realization)
   end
+end
+
+function InnerTimeOuterParamTransientSnapshots(
+  values::AbstractVector{P},
+  realization::R,
+  mode::M=Mode1Axis()
+  ) where {M,P<:AbstractParamContainer,R}
+
+  InnerTimeOuterParamTransientSnapshots(mode,values,realization)
 end
 
 function InnerTimeOuterParamTransientSnapshots(s::AbstractTransientSnapshots)
@@ -453,6 +491,10 @@ end
 
 num_space_dofs(s::InnerTimeOuterParamTransientSnapshots) = length(first(first(s.values)))
 
+function col_index(s::InnerTimeOuterParamTransientSnapshots,time_index,param_index)
+  (param_index.-1)*num_times(s) .+ time_index
+end
+
 function change_mode(s::InnerTimeOuterParamTransientSnapshots)
   TransientSnapshots(Mode2Axis(),s.values,s.realization)
 end
@@ -483,8 +525,77 @@ function tensor_setindex!(s::InnerTimeOuterParamTransientSnapshots,v,ispace,itim
   s.values[iparam][itime][ispace] = v
 end
 
-function select_snapshots(s::InnerTimeOuterParamTransientSnapshots,paramrange,timerange=:)
-  TransientSnapshots(s.mode,s.values,s.realization[paramrange,timerange])
+# function select_snapshots(
+#   s::InnerTimeOuterParamTransientSnapshots{M,T,<:ParamArray{T,N,A}},
+#   paramrange,
+#   timerange=:) where {M,T,N,A}
+
+#   nt = num_times(s)
+#   realization = s.realization[paramrange,timerange]
+#   values = Vector{eltype(A)}(undef,length(realization))
+#   @inbounds for i = 1:length(realization)
+#     it = fast_index(i,nt)
+#     ip = slow_index(i,nt)
+#     values[i] = s.values[ip][it]
+#   end
+#   InnerTimeOuterParamTransientSnapshots(s.mode,ParamArray(values),realization)
+# end
+
+struct SelectedSnapshotsAtIndices{M,T,S,I} <: AbstractTransientSnapshots{M,T}
+  snaps::S
+  selected_indices::I
+  function SelectedSnapshotsAtIndices(
+    snaps::AbstractTransientSnapshots{M,T},
+    selected_indices::NTuple{3,AbstractUnitRange}
+    ) where {M,T}
+
+    S = typeof(snaps)
+    I = typeof(selected_indices)
+    new{M,T,S,I}(snaps,selected_indices)
+  end
+end
+
+function select_snapshots(s::AbstractTransientSnapshots,spacerange,timerange,paramrange)
+  srange = isa(spacerange,Colon) ? Base.OneTo(num_space_dofs(s)) : spacerange
+  trange = isa(timerange,Colon) ? Base.OneTo(num_times(s)) : timerange
+  prange = isa(paramrange,Colon) ? Base.OneTo(num_params(s)) : paramrange
+  selected_indices = (srange,trange,prange)
+  SelectedSnapshotsAtIndices(s,selected_indices)
+end
+
+function select_snapshots(s::AbstractTransientSnapshots,paramrange;spacerange=:,timerange=:)
+  select_snapshots(s,spacerange,timerange,paramrange)
+end
+
+space_indices(s::SelectedSnapshotsAtIndices) = s.selected_indices[1]
+time_indices(s::SelectedSnapshotsAtIndices) = s.selected_indices[2]
+space_indices(s::SelectedSnapshotsAtIndices{Mode1Axis}) = s.selected_indices[2]
+time_indices(s::SelectedSnapshotsAtIndices{Mode1Axis}) = s.selected_indices[1]
+param_indices(s::SelectedSnapshotsAtIndices) = s.selected_indices[3]
+num_space_dofs(s::SelectedSnapshotsAtIndices) = length(space_indices(s))
+num_times(s::SelectedSnapshotsAtIndices) = length(time_indices(s))
+num_params(s::SelectedSnapshotsAtIndices) = length(param_indices(s))
+
+function change_mode(s::SelectedSnapshotsAtIndices{Mode1Axis})
+  SelectedSnapshotsAtIndices(Mode2Axis(),s.selected_indices)
+end
+
+function change_mode(s::SelectedSnapshotsAtIndices{Mode2Axis})
+  SelectedSnapshotsAtIndices(Mode1Axis(),s.selected_indices)
+end
+
+function tensor_getindex(s::SelectedSnapshotsAtIndices,ispace,itime,iparam)
+  is = space_indices(s)[ispace]
+  it = time_indices(s)[itime]
+  ip = param_indices(s)[iparam]
+  tensor_getindex(s.snaps,is,it,ip)
+end
+
+function tensor_setindex!(s::SelectedSnapshotsAtIndices,v,ispace,itime,iparam)
+  is = space_indices(s)[ispace]
+  it = time_indices(s)[itime]
+  ip = param_indices(s)[iparam]
+  tensor_setindex!(s.snaps,v,is,it,ip)
 end
 
 const BasicNnzSnapshots = BasicSnapshots{M,T,P,R} where {M,T,P<:SparseParamMatrix,R}
@@ -573,7 +684,7 @@ function FESpaces.FEFunction(
 end
 
 function _plot(trial::TransientTrialParamFESpace,s::AbstractTransientSnapshots;dir=pwd(),varname="u")
-  r = s.realization
+  r = get_realization(s)
   r0 = FEM.get_at_time(r,:initial)
   times = get_times(r)
   createpvd(r0,dir) do pvd

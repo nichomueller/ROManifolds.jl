@@ -44,9 +44,12 @@ function RBInfo(
 end
 
 num_offline_params(rbinfo::RBInfo) = rbinfo.nsnaps_state
+offline_params(rbinfo::RBInfo) = 1:num_offline_params(rbinfo)
 num_online_params(rbinfo::RBInfo) = rbinfo.nsnaps_test
+online_params(rbinfo::RBInfo) = 1:num_online_params(rbinfo)
 FEM.num_params(rbinfo::RBInfo) = num_offline_params(rbinfo) + num_online_params(rbinfo)
 num_mdeim_params(rbinfo::RBInfo) = rbinfo.nsnaps_mdeim
+mdeim_params(rbinfo::RBInfo) = 1:num_offline_params(rbinfo)
 get_tol(rbinfo::RBInfo) = rbinfo.ϵ
 
 function get_norm_matrix(rbinfo::RBInfo,feop::TransientParamFEOperator)
@@ -128,4 +131,14 @@ get_info(s::RBSolver) = s.info
 function RBSolver(fesolver,dir;kwargs...)
   info = RBInfo(dir;kwargs...)
   RBSolver(info,fesolver)
+end
+
+function Algebra.solve(
+  solver::RBSolver,
+  feop::TransientParamFEOperator,
+  uh0::Function)
+
+  snaps,comp = collect_solutions(solver,feop,uh0)
+  rbop = reduced_operator(solver,feop,snaps)
+  solve(solver,rbop,snaps)
 end

@@ -22,7 +22,6 @@ pranges = fill([0,1],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 r = realization(ptspace,nparams=3)
-μ = FEM._get_params(r)[3]
 
 domain = (0,1,0,1)
 partition = (2,2)
@@ -79,7 +78,7 @@ rbinfo = RBInfo(dir;nsnaps_state=5,nsnaps_test=5,nsnaps_mdeim=5)
 
 rbsolver = RBSolver(rbinfo,fesolver)
 
-snaps,comp = RB.collect_solutions(rbinfo,fesolver,feop,uh0μ)
+snaps,comp = RB.collect_solutions(rbsolver,feop,uh0μ)
 red_trial,red_test = reduced_fe_space(rbinfo,feop,snaps)
 
 odeop = get_algebraic_operator(feop)
@@ -87,27 +86,50 @@ pop = GalerkinProjectionOperator(odeop,red_trial,red_test)
 red_lhs,red_rhs = RB.reduced_matrix_vector_form(rbsolver,pop,snaps)
 red_op = reduced_operator(pop,red_lhs,red_rhs)
 
-snaps_on = RB.select_snapshots(snaps,10,:)
+snaps_on = RB.select_snapshots(snaps,9:10,:)
 r_on = snaps_on.realization
 
-x = zero_free_values(trial(r_on))
-solve(x,rbsolver,red_op,r_on)
+solve(rbsolver,red_op,r_on)
 
 θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+rb_trial = get_trial(red_op)(r_on)
+fe_trial = RB.get_fe_trial(red_op)(r_on)
+red_x = zero_free_values(rb_trial)
+y = zero_free_values(fe_trial)
+z = similar(y)
+z .= 0.0
+
 ode_cache = allocate_cache(red_op,r_on)
-y = similar(x)
-y .= 0.0
 mat_cache,vec_cache = ODETools._allocate_matrix_and_vector(red_op,r_on,y,ode_cache)
 
 ode_cache = update_cache!(ode_cache,red_op,r_on)
 
-A,b = ODETools._matrix_and_vector!(mat_cache,vec_cache,red_op,r_on,dtθ,y,ode_cache,y)
-
+# A,b = ODETools._matrix_and_vector!(mat_cache,vec_cache,red_op,r_on,dtθ,y,ode_cache,y)
 fe_A,coeff_cache,lincomb_cache = mat_cache
 LinearAlgebra.fillstored!(fe_A,zero(eltype(fe_A)))
-fe_sA = RB.fe_matrix!(fe_A,red_op,r_on,(y,y),ode_cache)
-for i = 1:get_order(red_op)+1
-  A_coeff = RB.mdeim_coeff!(coeff_cache[i],red_op.lhs[i],fe_sA[i])
-  RB.mdeim_lincomb!(lincomb_cache,red_op.lhs[i],A_coeff)
-end
-A = last(lincomb_cache)
+ids_all_time = RB._union_reduced_times(red_op)
+A = RB.fe_matrix!(fe_A,red_op.pop,r_on,(y,y),(1,1),ode_cache)
+E = RB.get_values(A[1])[1]
+LHS = red_op.lhs[1][1]
+RB._select_snapshots_at_space_time_locations(E,LHS,ids_all_time)
+snew = RB.InnerTimeOuterParamTransientSnapshots(E)
+ids_space = RB.get_indices_space(LHS)
+ids_time = RB.get_indices_time(LHS)
+corresponding_ids_time = filter(!isnothing,indexin(ids_all_time,ids_time))
+cols = RB.col_index(snew,corresponding_ids_time,1:num_params(E))
+map(x->(corresponding_ids_time.-1)*2 .+ x,1:num_params(E))
+(corresponding_ids_time.-1)*2 .+ param_index
+(1:num_params(E).-1)*num_times(snew) .+ corresponding_ids_time
+
+afop = AffineOperator(A,b)
+solve!(x,fesolver.nls,afop)
+
+xrb = solve(rbsolver,feop,uh0μ)
+
+snaps,comp = RB.collect_solutions(rbsolver,feop,uh0μ)
+rbop = RB.reduced_operator(rbsolver,feop,snaps)
+xrb = solve(rbsolver,rbop,snaps)
+
+x = RB.select_snapshots(snaps,RB.online_params(rbinfo))
+
+x - xrb

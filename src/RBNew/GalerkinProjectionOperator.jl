@@ -61,8 +61,7 @@ function fe_matrix_and_vector(
   θ = fesolver.θ
   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
 
-  nparams = num_mdeim_params(solver.info)
-  smdeim = select_snapshots(s,Base.OneTo(nparams))
+  smdeim = select_snapshots(s,mdeim_params(solver.info))
   x = BasicSnapshots(smdeim).values
 
   y = similar(x)
@@ -78,26 +77,43 @@ end
 function Algebra.solve(
   solver::RBThetaMethod,
   op::RBOperator,
-  r::TransientParamRealization)
+  s::AbstractTransientSnapshots)
 
-  x = zero_free_values(op,r)
+  info = get_info(solver)
+  son = select_snapshots(s,online_params(info))
+  ron = get_realization(son)
+  solve(solver,op,ron)
+end
+
+function Algebra.solve(
+  solver::RBThetaMethod,
+  op::RBOperator,
+  r::TransientParamRealization)
 
   fesolver = get_fe_solver(solver)
   dt = fesolver.dt
   θ = fesolver.θ
   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
 
+  trial = get_trial(op)(r)
+  fe_trial = get_fe_trial(op)(r)
+  red_x = zero_free_values(trial)
+  y = zero_free_values(fe_trial)
+  z = similar(y)
+  z .= 0.0
+
   ode_cache = allocate_cache(op,r)
-  y = zero_free_values(get_fe_trial(op)(r))
   nl_cache = nothing
 
-  ode_cache = update_cache!(ode_cache,op,r)
+  stats = @timed begin
+    ode_cache = update_cache!(ode_cache,op,r)
+    nlop = ThetaMethodParamOperator(op,r,dtθ,y,ode_cache,z)
+    solve!(red_x,fesolver.nls,nlop,nl_cache)
+  end
 
-  nlop = ThetaMethodParamOperator(op,r,dtθ,x,ode_cache,y)
-
-  solve!(x,fesolver.nls,nlop,nl_cache)
-
-  return x
+  x = recast(trial,red_x)
+  s = InnerTimeOuterParamTransientSnapshots(x,r)
+  return s
 end
 
 function Algebra.solve(
@@ -105,24 +121,31 @@ function Algebra.solve(
   op::AffineRBOperator,
   r::TransientParamRealization)
 
-  x = zero_initial_guess(op)
-
   fesolver = get_fe_solver(solver)
   dt = fesolver.dt
   θ = fesolver.θ
   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
 
+  trial = get_trial(op)(r)
+  fe_trial = get_fe_trial(op)(r)
+  red_x = zero_free_values(trial)
+  y = zero_free_values(fe_trial)
+  z = similar(y)
+  z .= 0.0
+
   ode_cache = allocate_cache(op,r)
-  y = zero_free_values(get_fe_trial(op)(r))
   mat_cache,vec_cache = ODETools._allocate_matrix_and_vector(op,r,y,ode_cache)
 
-  ode_cache = update_cache!(ode_cache,op,r)
+  stats = @timed begin
+    ode_cache = update_cache!(ode_cache,op,r)
+    A,b = ODETools._matrix_and_vector!(mat_cache,vec_cache,op,r,dtθ,y,ode_cache,z)
+    afop = AffineOperator(A,b)
+    solve!(red_x,fesolver.nls,afop)
+  end
 
-  A,b = ODETools._matrix_and_vector!(mat_cache,vec_cache,op,r,dtθ,y,ode_cache,y)
-  afop = AffineOperator(A,b)
-  solve!(x,fesolver.nls,afop)
-
-  return x
+  x = recast(trial,red_x)
+  s = InnerTimeOuterParamTransientSnapshots(x,r)
+  return s
 end
 
 struct GalerkinProjectionOperator{T} <: RBOperator{T}

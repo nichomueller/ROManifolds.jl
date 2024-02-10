@@ -153,8 +153,8 @@ function _select_snapshots_at_space_time_locations(s,a,ids_all_time)
   ids_space = get_indices_space(a)
   ids_time = get_indices_time(a)
   corresponding_ids_time = filter(!isnothing,indexin(ids_all_time,ids_time))
-  cols = col_index(snew,corresponding_ids_time,1:num_params(s))
-  view(s,ids_space,cols)
+  scols = select_snapshots(snew,Base.OneTo(num_params(s)),corresponding_ids_time)
+  view(scols,ids_space,:)
 end
 
 function _select_snapshots_at_space_time_locations(s::AbstractVector,a::AbstractVector,ids_all_time)
