@@ -13,7 +13,7 @@ using DrWatson
 using Mabla.FEM
 using Mabla.RB
 
-θ = 0.5
+θ = 1
 dt = 0.1
 t0 = 0.0
 tf = 1.0
@@ -86,50 +86,76 @@ pop = GalerkinProjectionOperator(odeop,red_trial,red_test)
 red_lhs,red_rhs = RB.reduced_matrix_vector_form(rbsolver,pop,snaps)
 red_op = reduced_operator(pop,red_lhs,red_rhs)
 
-snaps_on = RB.select_snapshots(snaps,9:10,:)
-r_on = snaps_on.realization
+# snaps_on = RB.select_snapshots(snaps,9:10,:)
+# r_on = snaps_on.realization
 
-solve(rbsolver,red_op,r_on)
+# solve(rbsolver,red_op,r_on)
 
+# θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+# rb_trial = get_trial(red_op)(r_on)
+# fe_trial = RB.get_fe_trial(red_op)(r_on)
+# red_x = zero_free_values(rb_trial)
+# y = zero_free_values(fe_trial)
+# z = similar(y)
+# z .= 0.0
+
+# ode_cache = allocate_cache(red_op,r_on)
+# mat_cache,vec_cache = ODETools._allocate_matrix_and_vector(red_op,r_on,y,ode_cache)
+
+# ode_cache = update_cache!(ode_cache,red_op,r_on)
+
+# # A,b = ODETools._matrix_and_vector!(mat_cache,vec_cache,red_op,r_on,dtθ,y,ode_cache,y)
+# fe_A,coeff_cache,lincomb_cache = mat_cache
+# LinearAlgebra.fillstored!(fe_A,zero(eltype(fe_A)))
+# ids_all_time = RB._union_reduced_times(red_op)
+# A = RB.fe_matrix!(fe_A,red_op.pop,r_on,(y,y),(1,1),ode_cache)
+# E = RB.get_values(A[1])[1]
+# LHS = red_op.lhs[1][1]
+# RB._select_snapshots_at_space_time_locations(E,LHS,ids_all_time)
+# snew = RB.InnerTimeOuterParamTransientSnapshots(E)
+# ids_space = RB.get_indices_space(LHS)
+# ids_time = RB.get_indices_time(LHS)
+# corresponding_ids_time = filter(!isnothing,indexin(ids_all_time,ids_time))
+# cols = RB.col_index(snew,corresponding_ids_time,1:num_params(E))
+# map(x->(corresponding_ids_time.-1)*2 .+ x,1:num_params(E))
+# (corresponding_ids_time.-1)*2 .+ param_index
+# (1:num_params(E).-1)*num_times(snew) .+ corresponding_ids_time
+
+# afop = AffineOperator(A,b)
+# solve!(x,fesolver.nls,afop)
+
+# xrb = solve(rbsolver,feop,uh0μ)
+
+# snaps,comp = RB.collect_solutions(rbsolver,feop,uh0μ)
+# rbop = RB.reduced_operator(rbsolver,feop,snaps)
+# xrb = solve(rbsolver,rbop,snaps)
+
+# x = RB.select_snapshots(snaps,RB.online_params(rbinfo))
+
+# x - xrb
+son = select_snapshots(snaps,6)
+ron = get_realization(son)
 θ == 0.0 ? dtθ = dt : dtθ = dt*θ
-rb_trial = get_trial(red_op)(r_on)
-fe_trial = RB.get_fe_trial(red_op)(r_on)
-red_x = zero_free_values(rb_trial)
+
+red_test = get_test(red_op)
+red_trial = get_trial(red_op)(ron)
+fe_trial = trial(ron)
+red_x = zero_free_values(red_trial)
 y = zero_free_values(fe_trial)
 z = similar(y)
 z .= 0.0
 
-ode_cache = allocate_cache(red_op,r_on)
-mat_cache,vec_cache = ODETools._allocate_matrix_and_vector(red_op,r_on,y,ode_cache)
+ode_cache = allocate_cache(red_op,ron)
+nl_cache = nothing
+ode_cache = allocate_cache(red_op,ron)
+mat_cache,vec_cache = ODETools._allocate_matrix_and_vector(red_op,ron,y,ode_cache)
+ode_cache = update_cache!(ode_cache,red_op,ron)
+A,b = ODETools._matrix_and_vector!(mat_cache,vec_cache,red_op,ron,dtθ,y,ode_cache,z)
 
-ode_cache = update_cache!(ode_cache,red_op,r_on)
-
-# A,b = ODETools._matrix_and_vector!(mat_cache,vec_cache,red_op,r_on,dtθ,y,ode_cache,y)
-fe_A,coeff_cache,lincomb_cache = mat_cache
-LinearAlgebra.fillstored!(fe_A,zero(eltype(fe_A)))
-ids_all_time = RB._union_reduced_times(red_op)
-A = RB.fe_matrix!(fe_A,red_op.pop,r_on,(y,y),(1,1),ode_cache)
-E = RB.get_values(A[1])[1]
-LHS = red_op.lhs[1][1]
-RB._select_snapshots_at_space_time_locations(E,LHS,ids_all_time)
-snew = RB.InnerTimeOuterParamTransientSnapshots(E)
-ids_space = RB.get_indices_space(LHS)
-ids_time = RB.get_indices_time(LHS)
-corresponding_ids_time = filter(!isnothing,indexin(ids_all_time,ids_time))
-cols = RB.col_index(snew,corresponding_ids_time,1:num_params(E))
-map(x->(corresponding_ids_time.-1)*2 .+ x,1:num_params(E))
-(corresponding_ids_time.-1)*2 .+ param_index
-(1:num_params(E).-1)*num_times(snew) .+ corresponding_ids_time
-
-afop = AffineOperator(A,b)
-solve!(x,fesolver.nls,afop)
-
-xrb = solve(rbsolver,feop,uh0μ)
-
-snaps,comp = RB.collect_solutions(rbsolver,feop,uh0μ)
-rbop = RB.reduced_operator(rbsolver,feop,snaps)
-xrb = solve(rbsolver,rbop,snaps)
-
-x = RB.select_snapshots(snaps,RB.online_params(rbinfo))
-
-x - xrb
+trial0 = trial(nothing)
+pA = ParamArray([assemble_matrix((u,v)->∫(a(μ,t)*∇(v)⋅∇(u))dΩ,trial0,test) for (μ,t) in ron])
+pM = ParamArray([assemble_matrix((u,v)->∫(v*u)dΩ,trial0,test) for (μ,t) in ron])
+snapsA = Snapshots(pA,ron)
+snapsM = Snapshots(pM,ron)
+Arb = RB.compress(red_trial,red_test,snapsA)
+Mrb = RB.compress(red_trial,red_test,snapsM;combine=(x,y) -> θ*(x-y))

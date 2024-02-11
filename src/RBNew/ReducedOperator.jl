@@ -148,17 +148,18 @@ function _union_reduced_times(op::ReducedOperator)
   union_indices_time(ilhs...,irhs...)
 end
 
-function _select_snapshots_at_space_time_locations(s,a,ids_all_time)
+function _select_snapshots_at_space_time_locations(s,a,red_times)
   snew = InnerTimeOuterParamTransientSnapshots(s)
   ids_space = get_indices_space(a)
-  ids_time = get_indices_time(a)
-  corresponding_ids_time = filter(!isnothing,indexin(ids_all_time,ids_time))
-  scols = select_snapshots(snew,Base.OneTo(num_params(s)),corresponding_ids_time)
-  view(scols,ids_space,:)
+  ids_time = filter(!isnothing,indexin(red_times,get_indices_time(a)))
+  ids_param = Base.OneTo(num_params(s))
+  sids = select_snapshots(snew,ids_space,ids_time,ids_param)
+  #view(scols,ids_space,:)
+  sids
 end
 
-function _select_snapshots_at_space_time_locations(s::AbstractVector,a::AbstractVector,ids_all_time)
-  map((s,a)->_select_snapshots_at_space_time_locations(s,a,ids_all_time),s,a)
+function _select_snapshots_at_space_time_locations(s::AbstractVector,a::AbstractVector,red_times)
+  map((s,a)->_select_snapshots_at_space_time_locations(s,a,red_times),s,a)
 end
 
 function fe_matrix!(
@@ -168,10 +169,11 @@ function fe_matrix!(
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
 
-  ids_all_time = _union_reduced_times(op)
-  A = fe_matrix!(cache,op.pop,r,xhF,(1,1),ode_cache)
+  red_times = _union_reduced_times(op)
+  red_r = r[:,red_times]
+  A = fe_matrix!(cache,op.pop,red_r,xhF,(1,1),ode_cache)
   map(A,op.lhs) do A,lhs
-    _select_snapshots_at_space_time_locations(get_values(A),lhs,ids_all_time)
+    _select_snapshots_at_space_time_locations(get_values(A),lhs,red_times)
   end
 end
 

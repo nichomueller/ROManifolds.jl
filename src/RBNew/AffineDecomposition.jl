@@ -61,7 +61,7 @@ end
 function compress_basis_space(A::NnzSnapshots,trial::RBSpace,test::RBSpace)
   basis_test = get_basis_space(test)
   basis_trial = get_basis_space(trial)
-  map(A.values) do A
+  map(get_values(A)) do A
     basis_test'*A*basis_trial
   end
 end

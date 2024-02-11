@@ -47,10 +47,6 @@ function fe_matrix!(op::RBOperator)
   @abstractmethod
 end
 
-function fe_matrix!(op::RBOperator)
-  @abstractmethod
-end
-
 function fe_matrix_and_vector(
   solver::RBSolver,
   op::RBOperator,
@@ -62,11 +58,11 @@ function fe_matrix_and_vector(
   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
 
   smdeim = select_snapshots(s,mdeim_params(solver.info))
-  x = BasicSnapshots(smdeim).values
+  x = flatten(smdeim)
+  r = get_realization(smdeim)
 
   y = similar(x)
   y .= 0.0
-  r = get_realization(smdeim)
   ode_cache = allocate_cache(op,r)
   A,b = allocate_fe_matrix_and_vector(op,r,x,ode_cache)
 

@@ -191,24 +191,6 @@ struct TransientParamFEOperatorWithTrian{T<:OperatorType,A,B} <: TransientParamF
   trian_jacs::B
 end
 
-function _affine_set_triangulation(m,a,b,trian_m,trian_a,trian_b,order)
-  degree = 2*order
-
-  meas_m = Measure.(trian_m,degree)
-  meas_a = Measure.(trian_a,degree)
-  meas_b = Measure.(trian_b,degree)
-
-  newm(μ,t,dut,v,args...) = m(μ,t,dut,v,args...)
-  newa(μ,t,du,v,args...) = a(μ,t,du,v,args...)
-  newb(μ,t,v,args...) = b(μ,t,v,args...)
-
-  newm(μ,t,dut,v) = newm(μ,t,dut,v,meas_m...)
-  newa(μ,t,du,v) = newa(μ,t,du,v,meas_a...)
-  newb(μ,t,v) = newb(μ,t,v,meas_b...)
-
-  return newm,newa,newb
-end
-
 function _set_triangulation(res,jac,jac_t,trian_res,trian_jac,trian_jac_t,order)
   degree = 2*order
 
@@ -268,30 +250,64 @@ get_polynomial_order(fs::SingleFieldFESpace) = get_polynomial_order(get_fe_basis
 get_polynomial_order(fs::MultiFieldFESpace) = maximum(map(get_polynomial_order,fs.spaces))
 
 # change triangulation
+function _is_parent(tparent::Triangulation,tchild::Triangulation)
+  false
+end
+
+function _is_parent(tparent::BodyFittedTriangulation,tchild::BodyFittedTriangulation)
+  tparent.grid === tchild.grid.parent
+end
+
+function _is_parent(tparent::BoundaryTriangulation,tchild::Geometry.TriangulationView)
+  tparent === tchild.parent
+end
+
+function _find_child(tparent::Triangulation,trian)
+  for t in trian
+    if _is_parent(tparent,t)
+      return t
+    end
+  end
+  @unreachable
+end
+
+function _order_triangulations(old_trian,trian)
+  @check length(old_trian) == length(trian)
+  new_trian = ()
+  for t in old_trian
+    new_trian = (new_trian...,_find_child(t,trian))
+  end
+  return new_trian
+end
+
 function change_triangulation(
   op::TransientParamFEOperatorWithTrian{T},
   trian_jacs,
   trian_res) where T
 
-  trian_jac,trian_jac_t = trian_jacs
-  newtrian_res = ()
-  newtrian_jac = ()
-  newtrian_jac_t = ()
-  for tr = trian_res
-    newtrian_res = (newtrian_res...,tr)
-  end
-  for tj = trian_jac
-    newtrian_jac = (newtrian_jac...,tj)
-  end
-  for tj_t = trian_jac_t
-    newtrian_jac_t = (newtrian_jac_t...,tj_t)
-  end
+  # trian_jac,trian_jac_t = trian_jacs
+  # old_trian_res = op.trian_res
+  # old_trian_trian_jac,old_trian_jac_t = op.trian_jacs
+  newtrian_res = _order_triangulations(op.trian_res,trian_res)
+  newtrian_jacs = _order_triangulations.(op.trian_jacs,trian_jacs)
+  # newtrian_res = ()
+  # newtrian_jac = ()
+  # newtrian_jac_t = ()
+  # for tr = trian_res
+  #   newtrian_res = (newtrian_res...,tr)
+  # end
+  # for tj = trian_jac
+  #   newtrian_jac = (newtrian_jac...,tj)
+  # end
+  # for tj_t = trian_jac_t
+  #   newtrian_jac_t = (newtrian_jac_t...,tj_t)
+  # end
   @unpack res,rhs,jacs,assem,tpspace,trials,test,order = op.op
   jac,jac_t = jacs
   porder = get_polynomial_order(test)
   newres,newjacs... = _set_triangulation(res,jac,jac_t,trian_res,trian_jac,trian_jac_t,porder)
   feop = TransientParamFEOperatorFromWeakForm{T}(newres,rhs,newjacs,assem,tpspace,trials,test,order)
-  TransientParamFEOperatorWithTrian(feop,newtrian_res,(newtrian_jac,newtrian_jac_t))
+  TransientParamFEOperatorWithTrian(feop,newtrian_res,newtrian_jacs)
 end
 
 function Algebra.allocate_residual(

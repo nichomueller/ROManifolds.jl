@@ -33,7 +33,7 @@ tdomain = 0:1:2
 ptspace = TransientParamSpace(pranges,tdomain)
 q = realization(ptspace,nparams=np)
 
-s1 = Snapshots(a1,q)
+s1 = Snapshots(ParamArray(vv),q)
 @test norm(s1 - stack(vv)) ≈ 0
 
 vv = [[1 2 3 4 5 6];[7 8 9 10 11 12]]
@@ -52,10 +52,19 @@ s4[:,2] = ones(Int,6)
 @test norm(s4 - stack([collect(1:6),ones(Int,6)])) ≈ 0
 
 s5 = RB.select_snapshots(s1,1,1)
-@test norm(s5 - vv[1]) ≈ 0
+@test norm(s5 - collect(1:6)) ≈ 0
+s6 = RB.select_snapshots(s1,1,1,1)
+@test norm(s6 .- 1) ≈ 0
+s7 = RB.select_snapshots(s1,1:2,1:2,1)
+@test norm(s7 - [[1 7];[2 8]]) ≈ 0
+s8 = RB.select_snapshots(s7,1:2,2,1)
+@test norm(s8 - [7,8]) ≈ 0
 
-s6 = RB.InnerTimeOuterParamTransientSnapshots(s1)
-@test norm(s5 - vv[1]) ≈ 0
+s9 = RB.InnerTimeOuterParamTransientSnapshots(s1)
+@test norm(s9 - vv') ≈ 0
+
+s10 = RB.InnerTimeOuterParamTransientSnapshots(s8)
+@test norm(s10 - [7,8]) ≈ 0
 
 ns = 2
 nt = 2
@@ -73,37 +82,21 @@ s2 = RB.InnerTimeOuterParamTransientSnapshots(s1)
 
 s3 = Snapshots([ParamArray(vv[1:2]),ParamArray(vv[3:4])],r)
 
-s4 = BasicSnapshots(s3)
+s4 = RB.BasicSnapshots(s3)
 @test s4 ≈ s3 ≈ s1
 
 s5 = RB.InnerTimeOuterParamTransientSnapshots(s3)
 @test s5 ≈ s2
 
-# s snapshot
-ispace = 1
-itime = 1:2
-iparam = 1
+ns = 3
+nt = 2
 np = 2
+pranges = fill([0,1],3)
+tdomain = 0:1:2
+ptspace = TransientParamSpace(pranges,tdomain)
+r = realization(ptspace,nparams=np)
 
-s.values[iparam .+ (itime.-1)*num_params(s)][ispace]
-
-struct S1{T} <: AbstractMatrix{T}
-  f::Vector{<:AbstractVector{T}}
-end
-Base.eltype(::S1{T}) where T = T
-Base.eltype(::Type{S1{T}}) where T = T
-Base.length(s::S1) = length(s.f)*length(first(s.f))
-Base.size(s::S1,i...) = (length(first(s.f)),length(s.f))
-Base.IndexStyle(::Type{S1{T}}) where T = IndexLinear()
-_slow_index(s::S1,::Colon) = axes(s,2)
-_fast_index(s::S1,::Colon) = axes(s,1)
-_slow_index(s::S1,i) = Int.(floor.((i .- 1) ./ length(s)) .+ 1)
-_fast_index(s::S1,i) = mod.(i .- 1,length(s)) .+ 1
-Base.getindex(s::S1,i) = getindex(s,_fast_index(s,i),_slow_index(s,i))
-Base.getindex(s::S1,i,j) = s.f[i][j]
-
-v = [rand(3) for _ = 1:3]
-A = hcat(v...)
-s = S1(v)
-
-@time view(s,1:2,2:3)
+vv = [[1,2,3],[4,5,6],[7,8,9],[10,11,12]]
+s1 = Snapshots(ParamArray(vv),r)
+s2 = RB.select_snapshots(s1,1:2,1:2,1:2)
+s3 = RB.InnerTimeOuterParamTransientSnapshots(s2)
