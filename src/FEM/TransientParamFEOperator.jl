@@ -285,29 +285,14 @@ function change_triangulation(
   trian_jacs,
   trian_res) where T
 
-  # trian_jac,trian_jac_t = trian_jacs
-  # old_trian_res = op.trian_res
-  # old_trian_trian_jac,old_trian_jac_t = op.trian_jacs
   newtrian_res = _order_triangulations(op.trian_res,trian_res)
-  newtrian_jacs = _order_triangulations.(op.trian_jacs,trian_jacs)
-  # newtrian_res = ()
-  # newtrian_jac = ()
-  # newtrian_jac_t = ()
-  # for tr = trian_res
-  #   newtrian_res = (newtrian_res...,tr)
-  # end
-  # for tj = trian_jac
-  #   newtrian_jac = (newtrian_jac...,tj)
-  # end
-  # for tj_t = trian_jac_t
-  #   newtrian_jac_t = (newtrian_jac_t...,tj_t)
-  # end
+  newtrian_jac,newtrian_jac_t = _order_triangulations.(op.trian_jacs,trian_jacs)
   @unpack res,rhs,jacs,assem,tpspace,trials,test,order = op.op
   jac,jac_t = jacs
   porder = get_polynomial_order(test)
-  newres,newjacs... = _set_triangulation(res,jac,jac_t,trian_res,trian_jac,trian_jac_t,porder)
+  newres,newjacs... = _set_triangulation(res,jac,jac_t,newtrian_res,newtrian_jac,newtrian_jac_t,porder)
   feop = TransientParamFEOperatorFromWeakForm{T}(newres,rhs,newjacs,assem,tpspace,trials,test,order)
-  TransientParamFEOperatorWithTrian(feop,newtrian_res,newtrian_jacs)
+  TransientParamFEOperatorWithTrian(feop,newtrian_res,(newtrian_jac,newtrian_jac_t))
 end
 
 function Algebra.allocate_residual(

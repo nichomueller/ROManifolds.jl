@@ -159,3 +159,21 @@ snapsA = Snapshots(pA,ron)
 snapsM = Snapshots(pM,ron)
 Arb = RB.compress(red_trial,red_test,snapsA)
 Mrb = RB.compress(red_trial,red_test,snapsM;combine=(x,y) -> θ*(x-y))
+
+errA = norm(A[1] - AMrb)
+
+xh = TransientCellField(zero(trial0),(zero(trial0),))
+R(μ,t,u,v) = ∫(v*∂t(u))dΩ + ∫(a(μ,t)*∇(v)⋅∇(u))dΩ - ∫(f(μ,t)*v)dΩ - ∫(h(μ,t)*v)dΓn
+pR = ParamArray([assemble_vector(v->R(μ,t,xh,v),test) for (μ,t) in ron])
+snapsR = Snapshots(pR,ron)
+Rrb = RB.compress(red_test,snapsR)
+
+errb = norm(b[1] - Rrb)
+
+
+#residual!(vec_cache,red_op,ron,(y,z),ode_cache)
+fe_b,coeff_cache,lincomb_cache = vec_cache
+fe_sb = fe_vector!(fe_b,red_op,ron,(y,z),ode_cache)
+b_coeff = mdeim_coeff!(coeff_cache,red_op.rhs,fe_sb)
+mdeim_lincomb!(lincomb_cache,red_op.rhs,b_coeff)
+b = last(lincomb_cache)
