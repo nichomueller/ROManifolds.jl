@@ -35,7 +35,8 @@ order = 1
 degree = 2*order
 Ω = Triangulation(model)
 dΩ = Measure(Ω,degree)
-Γn = BoundaryTriangulation(model,tags=["neumann"])
+Γn = BoundaryTriangulation(model,tags=[7,8])
+# Γn = BoundaryTriangulation(model,tags=["neumann"])
 dΓn = Measure(Γn,degree)
 
 a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
@@ -68,7 +69,8 @@ trian_jac_t = (Ω,)
 
 T = Float64
 reffe = ReferenceFE(lagrangian,T,order)
-test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
+test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6])
+# test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = TransientTrialParamFESpace(test,gμt)
 feop = AffineTransientParamFEOperator(res,jac,jac_t,ptspace,trial,test,trian_res,trian_jac,trian_jac_t)
 
@@ -86,3 +88,5 @@ son = select_snapshots(snaps,RB.online_params(info))
 ron = get_realization(son)
 xrb = solve(rbsolver,red_op,ron)
 son_rev = reverse_snapshots(son)
+
+results = solve(rbsolver,feop,uh0μ)

@@ -3,6 +3,7 @@ using Mabla.FEM
 using LinearAlgebra
 using SparseArrays
 using DrWatson
+using Serialization
 using Gridap
 using Gridap.Algebra
 using Gridap.FESpaces
@@ -21,10 +22,6 @@ import Gridap.Helpers: @abstractmethod,@check,@notimplemented,@unreachable
 import Gridap.Arrays: evaluate!
 import Gridap.Algebra: allocate_matrix,allocate_vector,solve
 import PartitionedArrays: tuple_of_arrays
-
-export RBInfo
-export RBSolver
-include("RBSolver.jl")
 
 export tpod
 export gram_schmidt!
@@ -54,6 +51,10 @@ export get_realization
 export compress
 export flatten
 include("Snapshots.jl")
+
+export RBInfo
+export RBSolver
+include("RBSolver.jl")
 
 export RBSpace
 export TestRBSpace
@@ -99,4 +100,11 @@ include("AffineDecomposition.jl")
 
 export ReducedOperator
 include("ReducedOperator.jl")
+
+export ComputationalStats
+export RBResults
+export rb_results
+export load_solve
+export generate_plots
+include("PostProcess.jl")
 end # module

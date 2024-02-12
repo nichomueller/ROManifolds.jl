@@ -1,26 +1,3 @@
-function fe_solutions(
-  solver::RBSolver,
-  op::TransientParamFEOperator,
-  uh0::Function;
-  kwargs...)
-
-  info = get_info(solver)
-  fesolver = get_fe_solver(solver)
-  nparams = num_params(info)
-  sol = solve(fesolver,op,uh0;nparams)
-  odesol = sol.odesol
-  realization = odesol.r
-
-  stats = @timed begin
-    values = collect(odesol)
-  end
-  snaps = Snapshots(values,realization)
-  cinfo = ComputationalStats(stats,nparams)
-  save(solver,(snaps,cinfo))
-
-  return snaps,cinfo
-end
-
 #= mode-1 representation of a snapshot tensor (default)
    [ [u(x1,t1,μ1) ⋯ u(x1,t1,μP)] [u(x1,t2,μ1) ⋯ u(x1,t2,μP)] [u(x1,t3,μ1) ⋯] [⋯] [u(x1,tT,μ1) ⋯ u(x1,tT,μP)] ]
          ⋮             ⋮          ⋮            ⋮           ⋮              ⋮             ⋮
@@ -801,45 +778,4 @@ function recast(a::AbstractMatrix,s::NnzSnapshots{Mode1Axis})
     sparse(i,j,v,m,n)
   end
   return Snapshots(ParamArray(asparse),r1,s.mode)
-end
-
-# for testing / visualization purposes
-
-get_snapshots_dir(info::RBInfo) = info.dir * "snapshots"
-
-function DrWatson.save(info::RBInfo,s::AbstractTransientSnapshots)
-  wsave(get_snapshots_dir(info),s)
-end
-
-function FESpaces.FEFunction(
-  fs::SingleFieldParamFESpace,s::AbstractTransientSnapshots{Mode1Axis})
-  r = get_realization(s)
-  @assert FEM.length_free_values(fs) == length(r)
-  free_values = _to_param_array(s.values)
-  diri_values = get_dirichlet_dof_values(fs)
-  FEFunction(fs,free_values,diri_values)
-end
-
-function FESpaces.FEFunction(
-  fs::SingleFieldParamFESpace,s2::AbstractTransientSnapshots{Mode2Axis})
-  @warn "This snapshot has a mode-2 representation, the resulting FEFunction(s) might be incorrect"
-  s = change_mode(s2)
-  FEFunction(fs,s)
-end
-
-function _plot(trial::TransientTrialParamFESpace,s::AbstractTransientSnapshots;dir=pwd(),varname="u")
-  r = get_realization(s)
-  r0 = FEM.get_at_time(r,:initial)
-  times = get_times(r)
-  createpvd(r0,dir) do pvd
-    for (it,t) = enumerate(times)
-      rt = FEM.get_at_time(r,t)
-      free_values = s.values[it]
-      sht = FEFunction(trial(rt),free_values)
-      files = ParamString(dir,rt)
-      trian = get_triangulation(sht)
-      vtk = createvtk(trian,files,cellfields=[varname=>sht])
-      pvd[rt] = vtk
-    end
-  end
 end
