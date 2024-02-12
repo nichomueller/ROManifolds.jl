@@ -98,15 +98,16 @@ function Algebra.residual!(
   return b
 end
 
-function Algebra.jacobian!(
+function ODETools.jacobians!(
   cache,
   op::ReducedOperator,
   r::TransientParamRealization,
   xhF::Tuple{Vararg{AbstractVector}},
+  γ::Tuple{Vararg{Real}},
   ode_cache)
 
   fe_A,coeff_cache,lincomb_cache = cache
-  fe_sA = fe_matrix!(fe_A,op,r,xhF,ode_cache)
+  fe_sA = fe_matrix!(fe_A,op,r,xhF,γ,ode_cache)
   for i = 1:get_order(op)+1
     A_coeff = mdeim_coeff!(coeff_cache[i],op.lhs[i],fe_sA[i])
     mdeim_lincomb!(lincomb_cache,op.lhs[i],A_coeff)
@@ -124,7 +125,7 @@ end
 function ODETools._matrix!(cache,op::ReducedOperator,r,dtθ,u0,ode_cache,vθ)
   fe_A,coeff_cache,lincomb_cache = cache
   LinearAlgebra.fillstored!(fe_A,zero(eltype(fe_A)))
-  A = jacobian!(cache,op,r,(u0,vθ),ode_cache)
+  A = ODETools.jacobians!(cache,op,r,(u0,vθ),(1.0,1/dtθ),ode_cache)
   return A
 end
 
@@ -170,11 +171,12 @@ function fe_matrix!(
   op::ReducedOperator,
   r::TransientParamRealization,
   xhF::Tuple{Vararg{AbstractVector}},
+  γ::Tuple{Vararg{Real}},
   ode_cache)
 
   red_times = _union_reduced_times(op)
   red_r = r[:,red_times]
-  A = fe_matrix!(cache,op.pop,red_r,xhF,(1,1),ode_cache)
+  A = fe_matrix!(cache,op.pop,red_r,xhF,γ,ode_cache)
   map(A,op.lhs) do A,lhs
     _select_snapshots_at_space_time_locations(A,lhs,red_times)
   end
