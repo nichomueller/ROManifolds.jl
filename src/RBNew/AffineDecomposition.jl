@@ -21,17 +21,21 @@ function get_mdeim_indices(A::AbstractMatrix{T}) where T
   return I
 end
 
-function vector_to_matrix_indices(vec_indices,nrows)
-  icol = slow_index(vec_indices,nrows)
-  irow = fast_index(vec_indices,nrows)
-  return irow,icol
+function recast_indices(A::AbstractMatrix,indices::AbstractVector{Int})
+  return indices
 end
 
-function get_reduced_cells(idx::AbstractVector{T},cell_dof_ids) where T
+function recast_indices(A::NnzSnapshots,indices::AbstractVector{Int})
+  nonzero_indices = get_nonzero_indices(A)
+  entire_indices = nonzero_indices[indices]
+  return entire_indices
+end
+
+function get_reduced_cells(indices::AbstractVector{T},cell_dof_ids) where T
   cells = T[]
   for cell = eachindex(cell_dof_ids)
     dofs = cell_dof_ids[cell]
-    if !isempty(intersect(idx,dofs))
+    if !isempty(intersect(indices,dofs))
       append!(cells,cell)
     end
   end
@@ -45,7 +49,7 @@ function reduce_triangulation(
 
   test = get_fe_test(op)
   cell_dof_ids = get_cell_dof_ids(test,trian)
-  indices_space_rows = slow_index(indices_space,num_free_dofs(test))
+  indices_space_rows = fast_index(indices_space,num_free_dofs(test))
   red_integr_cells = get_reduced_cells(indices_space_rows,cell_dof_ids)
   red_trian = view(trian,red_integr_cells)
   return red_trian
@@ -143,8 +147,9 @@ function mdeim(
   indices_space = get_mdeim_indices(basis_space)
   interp_basis_space = view(basis_space,indices_space,:)
   indices_time,lu_interp = _time_indices_and_interp_matrix(rbinfo.mdeim_style,interp_basis_space,basis_time)
-  red_trian = reduce_triangulation(op,trian,indices_space)
-  integration_domain = ReducedIntegrationDomain(indices_space,indices_time)
+  recast_indices_space = recast_indices(basis_space,indices_space)
+  red_trian = reduce_triangulation(op,trian,recast_indices_space)
+  integration_domain = ReducedIntegrationDomain(recast_indices_space,indices_time)
   return lu_interp,red_trian,integration_domain
 end
 
@@ -296,10 +301,15 @@ function allocate_mdeim_coeff(a::AffineDecomposition,r::AbstractParamRealization
   return cache_solve,cache_recast
 end
 
-function allocate_mdeim_coeff(a::Vector{AffineDecomposition},r::AbstractParamRealization)
-  map(a) do a
-    allocate_mdeim_coeff(a,r)
-  end |> tuple_of_arrays
+function allocate_mdeim_coeff(a::AffineContribution,r::AbstractParamRealization)
+  cache_solve = array_contribution()
+  cache_recast = array_contribution()
+  for (trian,values) in a.dict
+    cs,cr = allocate_mdeim_coeff(values,r)
+    cache_solve[trian] = cs
+    cache_recast[trian] = cr
+  end
+  return cache_solve,cache_recast
 end
 
 function mdeim_coeff!(
@@ -339,15 +349,16 @@ end
 
 function mdeim_coeff!(
   cache,
-  a::Vector{AffineDecomposition},
-  b::AbstractVector)
+  a::AffineContribution,
+  b::ArrayContribution)
 
   coeff,coeff_recast = cache
-  for i = eachindex(a)
-    cachei = coeff[i],coeff_recast[i]
-    mdeim_coeff!(cachei,a[i],b[i])
+  for (trian,atrian) in a.dict
+    cache_trian = coeff[trian],coeff_recast[trian]
+    btrian = b[trian]
+    mdeim_coeff!(cache_trian,atrian,btrian)
   end
-  return last(cache)
+  return coeff_recast
 end
 
 function allocate_mdeim_lincomb(
@@ -425,12 +436,10 @@ end
 
 function mdeim_lincomb!(
   cache,
-  a::Vector{AffineDecomposition},
-  b::AbstractVector)
+  a::AffineContribution,
+  b::ArrayContribution)
 
-  for i in eachindex(a)
-    ai = a[i]
-    bi = b[i]
-    mdeim_lincomb!(cache,ai,bi)
+  for (trian,atrian) in a.dict
+    mdeim_lincomb!(cache,atrian,b[trian])
   end
 end

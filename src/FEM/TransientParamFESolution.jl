@@ -73,21 +73,21 @@ end
 
 function Algebra.solve(
   solver::ODESolver,
+  op::TransientParamFEOperatorWithTrian,
+  uh0::Function,
+  r::TransientParamRealization)
+
+  TransientParamFESolution(solver,op.op,uh0,r)
+end
+
+function Algebra.solve(
+  solver::ODESolver,
   op::TransientParamFEOperator,
   uh0::Function;
   kwargs...)
 
   r = realization(op;kwargs...)
   solve(solver,op,uh0,r)
-end
-
-function Algebra.solve(
-  solver::ODESolver,
-  op::TransientParamFEOperatorWithTrian,
-  uh0::Function;
-  kwargs...)
-
-  solve(solver,op.op,uh0;kwargs...)
 end
 
 function TransientFETools.test_transient_fe_solver(

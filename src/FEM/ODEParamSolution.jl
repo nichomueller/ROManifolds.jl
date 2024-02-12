@@ -57,10 +57,30 @@ function Algebra.solve(
   GenericODEParamSolution(solver,op,u0,r)
 end
 
+# for testing purposes
+
 function ODETools.test_ode_solution(sol::ODEParamSolution)
   for (u_n,r_n) in sol
     @test isa(r_n,TransientParamRealization)
     @test isa(u_n,ParamVector)
   end
   true
+end
+
+function get_residual_jacobian(sol::ODEParamSolution)
+  uf = copy(sol.u0)
+  u0 = copy(sol.u0)
+  r = get_at_time(sol.r,:initial)
+  cache = nothing
+
+  A = []
+  b = []
+  while get_times(r) < get_final_time(sol.r) - 100*eps()
+    uf,r,cache = solve_step!(uf,sol.solver,sol.op,r,u0,cache)
+    u0 .= uf
+    ode_cache,vθ,Ar,br,l_cache = cache
+    push!(A,Ar)
+    push!(b,br)
+  end
+  return A,b
 end

@@ -1,16 +1,11 @@
 function reduced_operator(
   pop::GalerkinProjectionOperator,
-  lhs_contribs::Tuple{Vararg{AffineContribution}},
-  rhs_contribs::AffineContribution)
+  lhs::Tuple{Vararg{AffineContribution}},
+  rhs::AffineContribution)
 
-  trians_lhs = map(get_domains,lhs_contribs)
-  trians_rhs = get_domains(rhs_contribs)
-
+  trians_lhs = map(get_domains,lhs)
+  trians_rhs = get_domains(rhs)
   new_pop = change_triangulation(pop,trians_lhs,trians_rhs)
-
-  lhs = map(get_values,lhs_contribs)
-  rhs = get_values(rhs_contribs)
-
   ReducedOperator(new_pop,lhs,rhs)
 end
 
@@ -142,24 +137,32 @@ end
 function _union_reduced_times(op::ReducedOperator)
   ilhs = ()
   for lhs in op.lhs
-    ilhs = (ilhs...,map(get_integration_domain,lhs)...)
+    for (trian,values) in lhs.dict
+      ilhs = (ilhs...,get_integration_domain(values))
+    end
   end
-  irhs = map(get_integration_domain,op.rhs)
+  irhs = ()
+  for (trian,values) in op.rhs.dict
+    irhs = (irhs...,get_integration_domain(values))
+  end
   union_indices_time(ilhs...,irhs...)
 end
 
 function _select_snapshots_at_space_time_locations(s,a,red_times)
-  snew = InnerTimeOuterParamTransientSnapshots(s)
   ids_space = get_indices_space(a)
   ids_time = filter(!isnothing,indexin(red_times,get_indices_time(a)))
   ids_param = Base.OneTo(num_params(s))
-  sids = select_snapshots(snew,ids_space,ids_time,ids_param)
-  #view(scols,ids_space,:)
-  sids
+  snew = reverse_snapshots_at_indices(s,ids_space)
+  select_snapshots(snew,ids_time,ids_param)
 end
 
-function _select_snapshots_at_space_time_locations(s::AbstractVector,a::AbstractVector,red_times)
-  map((s,a)->_select_snapshots_at_space_time_locations(s,a,red_times),s,a)
+function _select_snapshots_at_space_time_locations(
+  s::ArrayContribution,a::AffineContribution,red_times)
+  b = array_contribution()
+  for (trian,values) in s.dict
+    b[trian] = _select_snapshots_at_space_time_locations(values,a[trian],red_times)
+  end
+  b
 end
 
 function fe_matrix!(
@@ -173,7 +176,7 @@ function fe_matrix!(
   red_r = r[:,red_times]
   A = fe_matrix!(cache,op.pop,red_r,xhF,(1,1),ode_cache)
   map(A,op.lhs) do A,lhs
-    _select_snapshots_at_space_time_locations(get_values(A),lhs,red_times)
+    _select_snapshots_at_space_time_locations(A,lhs,red_times)
   end
 end
 
@@ -184,8 +187,9 @@ function fe_vector!(
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
 
-  ids_all_time = _union_reduced_times(op)
-  b = fe_vector!(cache,op.pop,r,xhF,ode_cache)
-  bi = _select_snapshots_at_space_time_locations(get_values(b),op.rhs,ids_all_time)
+  red_times = _union_reduced_times(op)
+  red_r = r[:,red_times]
+  b = fe_vector!(cache,op.pop,red_r,xhF,ode_cache)
+  bi = _select_snapshots_at_space_time_locations(b,op.rhs,red_times)
   return bi
 end

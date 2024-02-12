@@ -140,6 +140,14 @@ function flatten(s::AbstractTransientSnapshots)
   get_values(BasicSnapshots(s))
 end
 
+function Snapshots(a::ArrayContribution,args...)
+  b = array_contribution()
+  for (trian,values) in a.dict
+    b[trian] = Snapshots(values,args...)
+  end
+  b
+end
+
 struct BasicSnapshots{M,T,P,R} <: AbstractTransientSnapshots{M,T}
   mode::M
   values::P
@@ -415,7 +423,7 @@ function select_snapshots(s::AbstractTransientSnapshots,spacerange,timerange,par
   SelectedSnapshotsAtIndices(s,selected_indices)
 end
 
-function select_snapshots(s::AbstractTransientSnapshots,paramrange,timerange;spacerange=:)
+function select_snapshots(s::AbstractTransientSnapshots,timerange,paramrange;spacerange=:)
   select_snapshots(s,spacerange,timerange,paramrange)
 end
 
@@ -550,21 +558,28 @@ struct InnerTimeOuterParamTransientSnapshots{T,P,R} <: TransientSnapshotsSwapped
   end
 end
 
-function InnerTimeOuterParamTransientSnapshots(s::AbstractTransientSnapshots)
+function reverse_snapshots(s::AbstractTransientSnapshots)
   @abstractmethod
 end
 
-function InnerTimeOuterParamTransientSnapshots(s::InnerTimeOuterParamTransientSnapshots)
+function reverse_snapshots(s::InnerTimeOuterParamTransientSnapshots)
   s
 end
 
-function InnerTimeOuterParamTransientSnapshots(s::SelectedSnapshotsAtIndices)
+function reverse_snapshots(s::SelectedSnapshotsAtIndices)
   SelectedInnerTimeOuterParamTransientSnapshots(s)
 end
 
-function InnerTimeOuterParamTransientSnapshots(
-  s::BasicSnapshots{M,T,<:ParamArray{T,N,A}}
-  ) where {M,T,N,A}
+function reverse_snapshots(a::ArrayContribution,args...)
+  b = array_contribution()
+  for (trian,values) in a.dict
+    b[trian] = reverse_snapshots(values,args...)
+  end
+  b
+end
+
+function reverse_snapshots(
+  s::BasicSnapshots{M,T,<:ParamArray{T,N,A}}) where {M,T,N,A}
 
   nt = num_times(s)
   np = num_params(s)
@@ -577,9 +592,8 @@ function InnerTimeOuterParamTransientSnapshots(
   InnerTimeOuterParamTransientSnapshots(array,s.realization)
 end
 
-function InnerTimeOuterParamTransientSnapshots(
-  s::TransientSnapshots{M,T,<:ParamArray{T,N,A}}
-  ) where {M,T,N,A}
+function reverse_snapshots(
+  s::TransientSnapshots{M,T,<:ParamArray{T,N,A}}) where {M,T,N,A}
 
   nt = num_times(s)
   np = num_params(s)
@@ -587,6 +601,35 @@ function InnerTimeOuterParamTransientSnapshots(
   array = Vector{P}(undef,np)
   @inbounds for ip = 1:np
     array[ip] = ParamArray(map(i->s.values[i][ip],1:nt))
+  end
+  InnerTimeOuterParamTransientSnapshots(array,s.realization)
+end
+
+function reverse_snapshots_at_indices(
+  s::BasicSnapshots{M,T,<:ParamArray{T}},
+  indices_space::AbstractVector) where {M,T}
+
+  nt = num_times(s)
+  np = num_params(s)
+  P = ParamVector{T,Vector{Vector{T}},nt}
+  array = Vector{P}(undef,np)
+  @inbounds for ip = 1:np
+    it = ip:np:nt*np
+    array[ip] = ParamArray(map(i->collect(s.values[i][indices_space]),it))
+  end
+  InnerTimeOuterParamTransientSnapshots(array,s.realization)
+end
+
+function reverse_snapshots_at_indices(
+  s::TransientSnapshots{M,T,<:ParamArray{T}},
+  indices_space::AbstractVector) where {M,T}
+
+  nt = num_times(s)
+  np = num_params(s)
+  P = ParamVector{T,Vector{Vector{T}},nt}
+  array = Vector{P}(undef,np)
+  @inbounds for ip = 1:np
+    array[ip] = ParamArray(map(i->collect(s.values[i][ip][indices_space]),1:nt))
   end
   InnerTimeOuterParamTransientSnapshots(array,s.realization)
 end
@@ -622,7 +665,7 @@ struct SelectedInnerTimeOuterParamTransientSnapshots{T,S,I} <: TransientSnapshot
 end
 
 function SelectedInnerTimeOuterParamTransientSnapshots(s::SelectedSnapshotsAtIndices)
-  sswap = InnerTimeOuterParamTransientSnapshots(s.snaps)
+  sswap = reverse_snapshots(s.snaps)
   SelectedInnerTimeOuterParamTransientSnapshots(sswap,s.selected_indices)
 end
 
@@ -741,6 +784,12 @@ function tensor_setindex!(
   tensor_setindex!(snaps,v,is,it,ip)
 end
 
+function get_nonzero_indices(s::NnzSnapshots)
+  v = first(get_values(s))
+  i,j, = findnz(v)
+  return i .+ (j .- 1)*v.m
+end
+
 function recast(a::AbstractMatrix,s::NnzSnapshots{Mode1Axis})
   s1 = first(s.values)
   r = get_realization(s)
@@ -751,14 +800,6 @@ function recast(a::AbstractMatrix,s::NnzSnapshots{Mode1Axis})
     sparse(i,j,v,m,n)
   end
   return Snapshots(ParamArray(asparse),r1,s.mode)
-end
-
-function Snapshots(a::ArrayContribution,args...)
-  b = array_contribution()
-  for (trian,values) in a.dict
-    b[trian] = Snapshots(values,args...)
-  end
-  b
 end
 
 # for testing / visualization purposes

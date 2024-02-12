@@ -254,7 +254,9 @@ function _is_parent(tparent::Triangulation,tchild::Triangulation)
   false
 end
 
-function _is_parent(tparent::BodyFittedTriangulation,tchild::BodyFittedTriangulation)
+function _is_parent(
+  tparent::BodyFittedTriangulation,
+  tchild::BodyFittedTriangulation{Dt,Dp,A,<:Geometry.GridView}) where {Dt,Dp,A}
   tparent.grid === tchild.grid.parent
 end
 
@@ -264,7 +266,7 @@ end
 
 function _find_child(tparent::Triangulation,trian)
   for t in trian
-    if _is_parent(tparent,t)
+    if _is_parent(tparent,t) || tparent === t
       return t
     end
   end
