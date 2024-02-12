@@ -23,7 +23,6 @@ tf = 1.0
 pranges = fill([0,1],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
-r = realization(ptspace,nparams=3)
 
 domain = (0,1,0,1)
 partition = (2,2)
@@ -91,31 +90,69 @@ z .= 0.0
 odeop = get_algebraic_operator(feop)
 ode_cache = allocate_cache(odeop,r)
 A_fe,b_fe = ODETools._allocate_matrix_and_vector(odeop,r,y,ode_cache)
+ode_cache = update_cache!(ode_cache,odeop,r)
 ODETools._matrix_and_vector!(A_fe,b_fe,odeop,r,dtθ,y,ode_cache,z)
-
-# case 1
-red_trial = red_op.pop.trial
-red_test = red_op.pop.test
-op1 = GalerkinProjectionOperator(odeop,red_trial,red_test)
-
-ode_cache = allocate_cache(op1,r)
-ode_cache = update_cache!(ode_cache,op1,r)
-A,b = allocate_fe_matrix_and_vector(op1,r,y,ode_cache)
-A,b = RB.fe_matrix_and_vector!(A,b,op1,r,dtθ,y,ode_cache,z)
-
-map(A,A_fe) do A,A_fe
-  vA,vA_fe = get_values(A)[1],get_values(A_fe)[1]
-  @test vA ≈ stack(nonzeros.(vA_fe.array))
+sA_fe = map(A_fe) do A_fe
+  Snapshots(A_fe,r)
 end
-@test sum(get_values(b)) ≈ stack(sum(get_values(b_fe)).array)
+sb_fe = Snapshots(b_fe,r)
+
+# # case 1 works
+# red_trial = red_op.pop.trial
+# red_test = red_op.pop.test
+# op1 = GalerkinProjectionOperator(odeop,red_trial,red_test)
+
+# ode_cache = allocate_cache(op1,r)
+# A,b = allocate_fe_matrix_and_vector(op1,r,y,ode_cache)
+# ode_cache = update_cache!(ode_cache,op1,r)
+# sA,sb = RB.fe_matrix_and_vector!(A,b,op1,r,dtθ,y,ode_cache,z)
+
+# map(sA,sA_fe) do sA,sA_fe
+#   vA,vA_fe = get_values(sA),get_values(sA_fe)
+#   for i = eachindex(vA)
+#     @test vA[i] ≈ vA_fe[i]
+#   end
+# end
+# vb,vb_fe = get_values(sb),get_values(sb_fe)
+# for i = eachindex(vb)
+#   @test vb[i] ≈ vb_fe[i]
+# end
 
 # case 2
 op2 = red_op.pop
 
 ode_cache = allocate_cache(op2,r)
+A,b = allocate_fe_matrix_and_vector(op2,r,y,ode_cache)
 ode_cache = update_cache!(ode_cache,op2,r)
-A,b = ODETools._allocate_matrix_and_vector(op2,r,y,ode_cache)
-A,b = fe_matrix_and_vector!(A,b,op2,r,dtθ,y,ode_cache,z)
+sA,sb = RB.fe_matrix_and_vector!(A,b,op2,r,dtθ,y,ode_cache,z)
 
-@test sum(get_values(A))[indices_space,:] ≈ A_fe[indices_space,:]
-@test sum(get_values(b)) ≈ b_fe
+# vAA = get_values(red_op.lhs[1])
+# intdom = RB.get_integration_domain(vAA[1])
+# ids_space,ids_time = intdom.indices_space,intdom.indices_time
+# vA,vA_fe = get_values(sA[1]),get_values(sA_fe[1])
+# vA[i][ids_space,ids_time] ≈ vA_fe[i][ids_space,ids_time]
+
+map(sA,sA_fe,red_op.lhs) do sA,sA_fe,lhs
+  A = get_values(lhs)
+  vA,vA_fe = get_values(sA),get_values(sA_fe)
+  for i = eachindex(vA)
+    intdom = RB.get_integration_domain(A[i])
+    ids_space,ids_time = intdom.indices_space,intdom.indices_time
+    @test vA[i][ids_space,ids_time] ≈ vA_fe[i][ids_space,ids_time]
+  end
+end
+vb,vb_fe = get_values(sb),get_values(sb_fe)
+for i = eachindex(vb)
+  @test vb[i] ≈ vb_fe[i]
+end
+
+# conclusions: the contribution relative to view(Γn,ids) is wrong
+
+μ1 = FEM._get_params(r)[1]
+pH = ParamArray([assemble_vector(v->∫(h(μ1,t)*v)dΓn,test) for t = dt:dt:tf])
+sH = Snapshots(pH,r)
+
+Γn_red = get_domains(sb)[2]
+dΓn_red = Measure(Γn_red,2)
+_pH = ParamArray([assemble_vector(v->∫(h(μ1,t)*v)dΓn_red,test) for t = dt:dt:tf])
+_sH = Snapshots(_pH,r)

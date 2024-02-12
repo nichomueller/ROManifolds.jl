@@ -80,9 +80,10 @@ rbsolver = RBSolver(rbinfo,fesolver)
 
 snaps,comp = RB.collect_solutions(rbsolver,feop,uh0μ)
 red_op = reduced_operator(rbsolver,feop,snaps)
-son = select_snapshots(snaps,6)
+son = select_snapshots(snaps,RB.mdeim_params(rbinfo))
 ron = get_realization(son)
-# xrb = solve(rbsolver,red_op,ron)
+xrb = solve(rbsolver,red_op,ron)
+son_rev = reverse_snapshots(son)
 
 θ == 0.0 ? dtθ = dt : dtθ = dt*θ
 
@@ -101,6 +102,15 @@ ode_cache = update_cache!(ode_cache,red_op,ron)
 A,b = ODETools._matrix_and_vector!(mat_cache,vec_cache,red_op,ron,dtθ,y,ode_cache,z)
 afop = AffineOperator(A,b)
 solve!(red_x,fesolver.nls,afop)
+
+#
+# A = ODETools._matrix!(mat_cache,red_op,ron,dtθ,y,ode_cache,z)
+fe_A,coeff_cache,lincomb_cache = mat_cache
+red_times = RB._union_reduced_times(red_op)
+red_r = ron[:,red_times]
+fe_sA = fe_matrix!(fe_A,red_op.pop,ron,(y,z),(1.0,1/dtθ),ode_cache)
+A1 = get_values(fe_sA[1])[1]
+A1rev = RB.reverse_snapshots_at_indices(A1,[4,9,1])
 
 xproj = compress(red_trial,son)
 
