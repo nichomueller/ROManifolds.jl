@@ -37,11 +37,11 @@ times = get_stencil_times(fesolver)
 ϵ = 1e-4
 norm_style = :l2
 st_mdeim = false
-rbinfo = RBInfo(pwd();ϵ,norm_style,nsnaps_state=nparams,nsnaps_mdeim=nparams,
+info = RBInfo(pwd();ϵ,norm_style,nsnaps_state=nparams,nsnaps_mdeim=nparams,
   nsnaps_test=ntests,st_mdeim)
 
-sols,params, = collect_solutions(rbinfo,fesolver,feop)
-rbspace = reduced_basis(rbinfo,feop,sols)
+sols,params, = collect_solutions(info,fesolver,feop)
+rbspace = reduced_basis(info,feop,sols)
 
 nzm = NnzMatrix(sols[1:nparams];nparams)
 space_values = recast(nzm)
@@ -52,7 +52,7 @@ if norm_style == :l2
   dnorm = norm(space_values)
   @check nnorm / dnorm <= ϵ*10
 else
-  norm_matrix = get_norm_matrix(rbinfo,feop)
+  norm_matrix = get_norm_matrix(info,feop)
   nnorm = norm(space_values - rbspace.basis_space*rbspace.basis_space'*norm_matrix*space_values)
   dnorm = norm(space_values,norm_matrix)
   @check nnorm / dnorm <= ϵ*10
@@ -158,7 +158,7 @@ ress_online,trians = collect_residuals_for_trian(op_online)
 jacs1_online,trians1 = collect_jacobians_for_trian(op_online;i=1)
 jacs2_online,trians2 = collect_jacobians_for_trian(op_online;i=2)
 
-rbrhs,rblhs = collect_compress_rhs_lhs(rbinfo,feop,fesolver,rbspace,params[1:nparams])
+rbrhs,rblhs = collect_compress_rhs_lhs(info,feop,fesolver,rbspace,params[1:nparams])
 
 (rhs_cache,lhs_cache), = allocate_cache(op_online,rbspace)
 rhs_mdeim_cache,rhs_rb_cache = rhs_cache

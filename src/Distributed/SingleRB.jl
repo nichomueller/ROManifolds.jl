@@ -67,13 +67,13 @@ function RB.Snapshots(
 end
 
 function RB.reduced_basis(
-  rbinfo::RBInfo,
+  info::RBInfo,
   feop::TransientParamFEOperator,
   s::DistributedTransientSnapshots)
 
-  ϵ = RB.get_tol(rbinfo)
-  nsnaps_state = RB.num_offline_params(rbinfo)
-  norm_matrix = RB.get_norm_matrix(rbinfo,feop)
+  ϵ = RB.get_tol(info)
+  nsnaps_state = RB.num_offline_params(info)
+  norm_matrix = RB.get_norm_matrix(info,feop)
   basis_space,basis_time = map(local_views(s)) do s
     reduced_basis(s,norm_matrix;ϵ,nsnaps_state)
   end |> tuple_of_arrays

@@ -29,7 +29,7 @@ nsnaps_state = 10
 nsnaps_mdeim = 2
 nsnaps_test = 2
 st_mdeim = true
-rbinfo = RBInfo(test_path;ϵ,norm_style,nsnaps_state,nsnaps_mdeim,nsnaps_test,st_mdeim)
+info = RBInfo(test_path;ϵ,norm_style,nsnaps_state,nsnaps_mdeim,nsnaps_test,st_mdeim)
 
 domain = (0,1,0,1)
 mesh_partition = (2,2)
@@ -81,7 +81,7 @@ t0,tf,dt,θ = 0.,0.1,0.01,0.5
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
-# sols,params,stats = collect_solutions(rbinfo,fesolver,feop)
+# sols,params,stats = collect_solutions(info,fesolver,feop)
 params = realization(feop,nsnaps_state+nsnaps_test)
 w0 = get_free_dof_values(fesolver.uh0(params))
 time_ndofs = num_time_dofs(fesolver)
@@ -110,7 +110,7 @@ snap_parts = map(parts) do part
   Snapshots(cache)
 end
 DistributedSnapshots(snap_parts)
-rbspace = reduced_basis(rbinfo,feop,sols)
+rbspace = reduced_basis(info,feop,sols)
 x = sols[1]
 xrec = project_recast(x,rbspace)
 err = map(x,xrec) do x,xrec
@@ -220,7 +220,7 @@ stats = @timed begin
   end
 end
 _sols = Snapshots(_snaps)
-_rbspace = reduced_basis(rbinfo,feop,_sols)
+_rbspace = reduced_basis(info,feop,_sols)
 _x = _sols[1]
 _xrec = _project_recast(_x,_rbspace)
 _err = _x - _xrec

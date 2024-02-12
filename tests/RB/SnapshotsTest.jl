@@ -62,9 +62,9 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 dir = datadir("toy_heateq")
-rbinfo = RBInfo(dir;nsnaps_state=5,nsnaps_test=0)
+info = RBInfo(dir;nsnaps_state=5,nsnaps_test=0)
 
-snaps,comp = RB.collect_solutions(rbinfo,fesolver,feop,uh0μ)
+snaps,comp = RB.collect_solutions(info,fesolver,feop,uh0μ)
 
 values = snaps.values
 vecs = map(eachindex(values)) do i
@@ -77,6 +77,6 @@ U1 = tpod(snaps)
 U2 = tpod(M)
 @assert U1 ≈ U2
 s̃ = RB.recast_compress(U1,snaps)
-@assert norm(s̃ - snaps) / norm(snaps) < 10*RB.get_tol(rbinfo)
+@assert norm(s̃ - snaps) / norm(snaps) < 10*RB.get_tol(info)
 
 RB._plot(trial,s̃,dir=dir)

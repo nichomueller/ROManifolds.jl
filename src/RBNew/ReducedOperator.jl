@@ -16,6 +16,7 @@ function reduced_operator(
 
   red_lhs,red_rhs = reduced_matrix_vector_form(solver,op,s)
   red_op = reduced_operator(op,red_lhs,red_rhs)
+  save(solver,red_op)
   return red_op
 end
 
@@ -194,4 +195,17 @@ function fe_vector!(
   b = fe_vector!(cache,op.pop,red_r,xhF,ode_cache)
   bi = _select_snapshots_at_space_time_locations(b,op.rhs,red_times)
   return bi
+end
+
+# for testing / visualization purposes
+
+get_reduced_operator_dir(info::RBInfo) = info.dir * "operator"
+
+function DrWatson.save(info::RBInfo,op::ReducedOperator)
+  wsave(get_reduced_operator_dir(info),op)
+end
+
+function rb_results(solver,op,args...;kwargs...)
+  feop = FEM.get_fe_operator(op)
+  rb_results(solver,feop,args...;kwargs...)
 end

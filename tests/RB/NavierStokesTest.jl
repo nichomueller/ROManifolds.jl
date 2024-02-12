@@ -75,32 +75,32 @@ nsnaps_state = 50
 nsnaps_mdeim = 30
 nsnaps_test = 10
 st_mdeim = false
-rbinfo = BlockRBInfo(test_path;ϵ,norm_style,compute_supremizers,nsnaps_state,
+info = BlockRBInfo(test_path;ϵ,norm_style,compute_supremizers,nsnaps_state,
   nsnaps_mdeim,nsnaps_test,st_mdeim)
 
 # Offline phase
 printstyled("OFFLINE PHASE\n";bold=true,underline=true)
 if load_solutions
-  sols,params = load(rbinfo,(BlockSnapshots{Vector{T}},Table))
+  sols,params = load(info,(BlockSnapshots{Vector{T}},Table))
 else
-  sols,params,stats = collect_solutions(rbinfo,fesolver,feop)
+  sols,params,stats = collect_solutions(info,fesolver,feop)
   if save_solutions
-    save(rbinfo,(sols,params,stats))
+    save(info,(sols,params,stats))
   end
 end
 if load_structures
-  rbspace = load(rbinfo,BlockRBSpace{T})
-  rbrhs,rblhs = load(rbinfo,(NTuple{2,BlockRBVecAlgebraicContribution{T}},
+  rbspace = load(info,BlockRBSpace{T})
+  rbrhs,rblhs = load(info,(NTuple{2,BlockRBVecAlgebraicContribution{T}},
     NTuple{3,Vector{BlockRBMatAlgebraicContribution{T}}}),Ω)
 else
-  rbspace = reduced_basis(rbinfo,feop,sols)
-  rbrhs,rblhs = collect_compress_rhs_lhs(rbinfo,feop_lin,feop_nlin,fesolver,rbspace,params)
+  rbspace = reduced_basis(info,feop,sols)
+  rbrhs,rblhs = collect_compress_rhs_lhs(info,feop_lin,feop_nlin,fesolver,rbspace,params)
   if save_structures
-    save(rbinfo,(rbspace,rbrhs,rblhs))
+    save(info,(rbspace,rbrhs,rblhs))
   end
 end
 
 # Online phase
 printstyled("ONLINE PHASE\n";bold=true,underline=true)
-rb_solver(rbinfo,feop_lin,feop_nlin,fesolver,rbspace,rbrhs,rblhs,sols,params)
+rb_solver(info,feop_lin,feop_nlin,fesolver,rbspace,rbrhs,rblhs,sols,params)
 end

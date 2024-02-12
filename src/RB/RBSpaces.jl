@@ -12,21 +12,21 @@ num_rb_time_ndofs(rb::RBSpace) = size(rb.basis_time,2)
 num_rb_ndofs(rb::RBSpace) = num_rb_time_ndofs(rb)*num_rb_space_ndofs(rb)
 FESpaces.get_vector_type(::RBSpace{T}) where T = Vector{T}
 
-function Utils.save(rbinfo::RBInfo,rb::RBSpace)
-  path = joinpath(rbinfo.rb_path,"rb")
+function Utils.save(info::RBInfo,rb::RBSpace)
+  path = joinpath(info.rb_path,"rb")
   save(path,rb)
 end
 
-function Utils.load(rbinfo::RBInfo,T::Type{RBSpace{S}}) where S
-  path = joinpath(rbinfo.rb_path,"rb")
+function Utils.load(info::RBInfo,T::Type{RBSpace{S}}) where S
+  path = joinpath(info.rb_path,"rb")
   load(path,T)
 end
 
-function reduced_basis(rbinfo::RBInfo,feop::TransientParamFEOperator,snaps::Snapshots)
+function reduced_basis(info::RBInfo,feop::TransientParamFEOperator,snaps::Snapshots)
   println("Computing RB space")
-  ϵ = rbinfo.ϵ
-  nsnaps_state = rbinfo.nsnaps_state
-  norm_matrix = get_norm_matrix(rbinfo,feop)
+  ϵ = info.ϵ
+  nsnaps_state = info.nsnaps_state
+  norm_matrix = get_norm_matrix(info,feop)
   return reduced_basis(snaps,norm_matrix;ϵ,nsnaps_state)
 end
 

@@ -109,7 +109,7 @@ function Algebra.solve(
 
   x = recast(trial,red_x)
   s = InnerTimeOuterParamTransientSnapshots(x,r)
-  return s
+  return s,stats
 end
 
 function Algebra.solve(
@@ -141,7 +141,7 @@ function Algebra.solve(
 
   x = recast(trial,red_x)
   s = InnerTimeOuterParamTransientSnapshots(x,r)
-  return s
+  return s,stats
 end
 
 struct GalerkinProjectionOperator{T} <: RBOperator{T}

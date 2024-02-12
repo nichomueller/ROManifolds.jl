@@ -17,7 +17,6 @@ end
 
 struct RBInfo
   ϵ::Float64
-  fe_path::String
   rb_path::String
   norm_style::Symbol
   nsnaps_state::Int
@@ -41,11 +40,11 @@ function RBInfo(
     nsnaps_mdeim,nsnaps_test,st_mdeim)
 end
 
-function get_norm_matrix(rbinfo::RBInfo,feop::TransientParamFEOperator)
-  norm_style = rbinfo.norm_style
+function get_norm_matrix(info::RBInfo,feop::TransientParamFEOperator)
+  norm_style = info.norm_style
   try
     T = get_vector_type(feop.test)
-    load(rbinfo,SparseMatrixCSC{eltype(T),Int};norm_style)
+    load(info,SparseMatrixCSC{eltype(T),Int};norm_style)
   catch
     if norm_style == :l2
       nothing
@@ -87,39 +86,39 @@ function BlockRBInfo(
     nsnaps_mdeim,nsnaps_test,st_mdeim)
 end
 
-function Base.getindex(rbinfo::BlockRBInfo,i::Int)
-  norm_style_i = rbinfo.norm_style[i]
-  RBInfo(rbinfo.ϵ,rbinfo.fe_path,rbinfo.rb_path,norm_style_i,
-    rbinfo.nsnaps_state,rbinfo.nsnaps_mdeim,rbinfo.nsnaps_test,rbinfo.st_mdeim)
+function Base.getindex(info::BlockRBInfo,i::Int)
+  norm_style_i = info.norm_style[i]
+  RBInfo(info.ϵ,info.fe_path,info.rb_path,norm_style_i,
+    info.nsnaps_state,info.nsnaps_mdeim,info.nsnaps_test,info.st_mdeim)
 end
 
 for Ti in (:RBInfo,:BlockRBInfo)
   @eval begin
-    function Utils.save(rbinfo::$Ti,objs::Tuple,args...;kwargs...)
-      map(obj->save(rbinfo,obj,args...;kwargs...),objs)
+    function Utils.save(info::$Ti,objs::Tuple,args...;kwargs...)
+      map(obj->save(info,obj,args...;kwargs...),objs)
     end
 
-    function Utils.load(rbinfo::$Ti,types::Tuple,args...;kwargs...)
-      map(type->load(rbinfo,type,args...;kwargs...),types)
+    function Utils.load(info::$Ti,types::Tuple,args...;kwargs...)
+      map(type->load(info,type,args...;kwargs...),types)
     end
 
-    function Utils.save(rbinfo::$Ti,params::Table)
-      path = joinpath(rbinfo.fe_path,"params")
+    function Utils.save(info::$Ti,params::Table)
+      path = joinpath(info.fe_path,"params")
       save(path,params)
     end
 
-    function Utils.load(rbinfo::$Ti,T::Type{Table})
-      path = joinpath(rbinfo.fe_path,"params")
+    function Utils.load(info::$Ti,T::Type{Table})
+      path = joinpath(info.fe_path,"params")
       load(path,T)
     end
 
-    function Utils.save(rbinfo::$Ti,norm_matrix::SparseMatrixCSC{T,Int};norm_style=:l2) where T
-      path = joinpath(rbinfo.fe_path,"$(norm_style)_norm_matrix")
+    function Utils.save(info::$Ti,norm_matrix::SparseMatrixCSC{T,Int};norm_style=:l2) where T
+      path = joinpath(info.fe_path,"$(norm_style)_norm_matrix")
       save(path,norm_matrix)
     end
 
-    function Utils.load(rbinfo::$Ti,T::Type{SparseMatrixCSC{S,Int}};norm_style=:l2) where S
-      path = joinpath(rbinfo.fe_path,"$(norm_style)_norm_matrix")
+    function Utils.load(info::$Ti,T::Type{SparseMatrixCSC{S,Int}};norm_style=:l2) where S
+      path = joinpath(info.fe_path,"$(norm_style)_norm_matrix")
       load(path,T)
     end
   end
@@ -140,13 +139,13 @@ get_avg_nallocs(cinfo::ComputationInfo) = cinfo.avg_nallocs
 
 for Ti in (:RBInfo,:BlockRBInfo)
   @eval begin
-    function Utils.save(rbinfo::$Ti,cinfo::ComputationInfo)
-      path = joinpath(rbinfo.fe_path,"stats")
+    function Utils.save(info::$Ti,cinfo::ComputationInfo)
+      path = joinpath(info.fe_path,"stats")
       save(path,cinfo)
     end
 
-    function Utils.load(rbinfo::$Ti,T::Type{ComputationInfo})
-      path = joinpath(rbinfo.fe_path,"stats")
+    function Utils.load(info::$Ti,T::Type{ComputationInfo})
+      path = joinpath(info.fe_path,"stats")
       load(path,T)
     end
   end

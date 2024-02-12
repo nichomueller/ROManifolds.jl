@@ -106,9 +106,9 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 # end
 
 dir = datadir("distr_toy_heateq")
-rbinfo = RBInfo(dir;nsnaps_state=5,nsnaps_test=0)
+info = RBInfo(dir;nsnaps_state=5,nsnaps_test=0)
 
-# nparams = RB.num_params(rbinfo)
+# nparams = RB.num_params(info)
 # sol = solve(fesolver,feop,uh0μ;nparams)
 # odesol = sol.odesol
 # r = odesol.r
@@ -130,8 +130,8 @@ rbinfo = RBInfo(dir;nsnaps_state=5,nsnaps_test=0)
 #   Snapshots(vals_part,ival_part,r)
 # end
 
-snaps,comp = RB.collect_solutions(rbinfo,fesolver,feop,uh0μ)
-bs,bt = reduced_basis(rbinfo,feop,snaps)
+snaps,comp = RB.collect_solutions(info,fesolver,feop,uh0μ)
+bs,bt = reduced_basis(info,feop,snaps)
 
 s1,s̃1 = map(local_views(snaps),local_views(bs)) do snaps,bs
   values = snaps.values
@@ -145,7 +145,7 @@ s1,s̃1 = map(local_views(snaps),local_views(bs)) do snaps,bs
   U2 = tpod(M)
   @assert U1 ≈ U2
   s̃ = RB.recast_compress(U1,snaps)
-  @assert norm(s̃ - snaps) / norm(snaps) < 10*RB.get_tol(rbinfo)
+  @assert norm(s̃ - snaps) / norm(snaps) < 10*RB.get_tol(info)
 
   s1 = ParamArray([snaps[:,k] for k = 1:num_params(snaps):size(snaps,2)])
   s̃1 = ParamArray([s̃[:,k] for k = 1:num_params(s̃):size(s̃,2)])

@@ -1,4 +1,4 @@
-function collect_solutions(
+function fe_solutions(
   solver::RBSolver,
   op::TransientParamFEOperator,
   uh0::Function;
@@ -15,7 +15,8 @@ function collect_solutions(
     values = collect(odesol)
   end
   snaps = Snapshots(values,realization)
-  cinfo = ComputationInfo(stats,nparams)
+  cinfo = ComputationalStats(stats,nparams)
+  save(solver,(snaps,cinfo))
 
   return snaps,cinfo
 end
@@ -803,6 +804,13 @@ function recast(a::AbstractMatrix,s::NnzSnapshots{Mode1Axis})
 end
 
 # for testing / visualization purposes
+
+get_snapshots_dir(info::RBInfo) = info.dir * "snapshots"
+
+function DrWatson.save(info::RBInfo,s::AbstractTransientSnapshots)
+  wsave(get_snapshots_dir(info),s)
+end
+
 function FESpaces.FEFunction(
   fs::SingleFieldParamFESpace,s::AbstractTransientSnapshots{Mode1Axis})
   r = get_realization(s)

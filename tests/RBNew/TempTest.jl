@@ -71,10 +71,10 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 dir = datadir(joinpath("heateq","toy_mesh"))
-rbinfo = RBInfo(dir;nsnaps_state=5,nsnaps_test=5)
+info = RBInfo(dir;nsnaps_state=5,nsnaps_test=5)
 
-snaps,comp = RB.collect_solutions(rbinfo,fesolver,feop,uh0μ)
-bs,bt = reduced_basis(rbinfo,feop,snaps)
+snaps,comp = RB.fe_solutions(info,fesolver,feop,uh0μ)
+bs,bt = reduced_basis(info,feop,snaps)
 
 x1 = ParamArray(RB.tensor_getindex(snaps,:,:,1))
 r1 = snaps.realization[1,:]
@@ -90,7 +90,7 @@ end
 
 ########
 
-rbsolver = RB.RBSolver(rbinfo,fesolver)
+rbsolver = RB.RBSolver(info,fesolver)
 
 rb_test = RB.TestRBSpace(test,bs,bt)
 rb_trial = RB.TrialRBSpace(trial,bs,bt)

@@ -31,22 +31,22 @@ function Base.vcat(s::Snapshots...)
   Snapshots(vsnaps)
 end
 
-function Utils.save(rbinfo::RBInfo,s::Snapshots)
-  path = joinpath(rbinfo.fe_path,"fesnaps")
+function Utils.save(info::RBInfo,s::Snapshots)
+  path = joinpath(info.fe_path,"fesnaps")
   save(path,s)
 end
 
-function Utils.load(rbinfo::RBInfo,::Type{Snapshots{T}}) where T
-  path = joinpath(rbinfo.fe_path,"fesnaps")
+function Utils.load(info::RBInfo,::Type{Snapshots{T}}) where T
+  path = joinpath(info.fe_path,"fesnaps")
   load(path,Snapshots{AbstractVector{<:ParamArray{T}}})
 end
 
 function collect_solutions(
-  rbinfo::RBInfo,
+  info::RBInfo,
   fesolver::ODESolver,
   feop::TransientParamFEOperator)
 
-  nparams = rbinfo.nsnaps_state+rbinfo.nsnaps_test
+  nparams = info.nsnaps_state+info.nsnaps_test
   params = realization(feop,nparams)
   u0 = get_free_dof_values(fesolver.uh0(params))
   time_ndofs = num_time_dofs(fesolver)

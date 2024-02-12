@@ -123,7 +123,7 @@ num_rb_ndofs(a::TrivialRBAffineDecomposition) = size(get_projection(a),1)
 ReducedMeasure(a::TrivialRBAffineDecomposition,args...) = a
 
 function RBAffineDecomposition(
-  rbinfo::RBInfo,
+  info::RBInfo,
   op::NonlinearOperator,
   nzm::NnzMatrix,
   trian::Triangulation,
@@ -132,11 +132,11 @@ function RBAffineDecomposition(
 
   test = op.feop.test
   meas = Measure(trian,2*get_order(test))
-  basis_space,basis_time = compress(nzm;ϵ=rbinfo.ϵ)
+  basis_space,basis_time = compress(nzm;ϵ=info.ϵ)
   proj_bs,proj_bt = project_space_time(basis_space,basis_time,args...;kwargs...)
   interp_idx_space = get_interpolation_idx(basis_space)
   interp_bs = basis_space[interp_idx_space,:]
-  if rbinfo.st_mdeim
+  if info.st_mdeim
     interp_idx_time = get_interpolation_idx(basis_time)
     interp_bt = basis_time[interp_idx_time,:]
     interp_bst = LinearAlgebra.kron(interp_bt,interp_bs)
@@ -156,7 +156,7 @@ function RBAffineDecomposition(
 end
 
 function RBAffineDecomposition(
-  rbinfo::RBInfo,
+  info::RBInfo,
   op::NonlinearOperator,
   nzm::NnzMatrix{T,Affine} where T,
   trian::Triangulation,
@@ -533,20 +533,20 @@ end
 
 function zero_rb_contribution(
   ::RBVecContributionMap,
-  rbinfo::RBInfo,
+  info::RBInfo,
   rbspace::RBSpace{T}) where T
 
   nrow = num_rb_ndofs(rbspace)
-  [zeros(T,nrow) for _ = 1:rbinfo.nsnaps_test]
+  [zeros(T,nrow) for _ = 1:info.nsnaps_test]
 end
 
 function zero_rb_contribution(
   ::RBMatContributionMap,
-  rbinfo::RBInfo,
+  info::RBInfo,
   rbspace_row::RBSpace{T},
   rbspace_col::RBSpace{T}) where T
 
   nrow = num_rb_ndofs(rbspace_row)
   ncol = num_rb_ndofs(rbspace_col)
-  [zeros(T,nrow,ncol) for _ = 1:rbinfo.nsnaps_test]
+  [zeros(T,nrow,ncol) for _ = 1:info.nsnaps_test]
 end

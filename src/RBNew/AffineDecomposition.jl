@@ -138,7 +138,7 @@ function _time_indices_and_interp_matrix(::SpaceOnlyMDEIM,interp_basis_space,bas
 end
 
 function mdeim(
-  rbinfo::RBInfo,
+  info::RBInfo,
   op::RBOperator,
   trian::Triangulation,
   basis_space::AbstractMatrix,
@@ -146,7 +146,7 @@ function mdeim(
 
   indices_space = get_mdeim_indices(basis_space)
   interp_basis_space = view(basis_space,indices_space,:)
-  indices_time,lu_interp = _time_indices_and_interp_matrix(rbinfo.mdeim_style,interp_basis_space,basis_time)
+  indices_time,lu_interp = _time_indices_and_interp_matrix(info.mdeim_style,interp_basis_space,basis_time)
   recast_indices_space = recast_indices(basis_space,indices_space)
   red_trian = reduce_triangulation(op,trian,recast_indices_space)
   integration_domain = ReducedIntegrationDomain(recast_indices_space,indices_time)
@@ -159,18 +159,18 @@ affine_contribution() = Contribution(IdDict{Triangulation,AffineDecomposition}()
 
 function reduced_vector_form!(
   a::AffineContribution,
-  rbinfo::RBInfo,
+  info::RBInfo,
   op::RBOperator,
   s::AbstractTransientSnapshots,
   trian::Triangulation)
 
   test = op.test
-  basis_space,basis_time = reduced_basis(s;ϵ=get_tol(rbinfo))
-  lu_interp,red_trian,integration_domain = mdeim(rbinfo,op,trian,basis_space,basis_time)
+  basis_space,basis_time = reduced_basis(s;ϵ=get_tol(info))
+  lu_interp,red_trian,integration_domain = mdeim(info,op,trian,basis_space,basis_time)
   proj_basis_space = compress_basis_space(basis_space,test)
   comb_basis_time = combine_basis_time(test)
   a[red_trian] = AffineDecomposition(
-    rbinfo.mdeim_style,
+    info.mdeim_style,
     proj_basis_space,
     basis_time,
     lu_interp,
@@ -181,7 +181,7 @@ end
 
 function reduced_matrix_form!(
   a::AffineContribution,
-  rbinfo::RBInfo,
+  info::RBInfo,
   op::RBOperator,
   s::AbstractTransientSnapshots,
   trian::Triangulation;
@@ -189,12 +189,12 @@ function reduced_matrix_form!(
 
   trial = op.trial
   test = op.test
-  basis_space,basis_time = reduced_basis(s;ϵ=get_tol(rbinfo))
-  lu_interp,red_trian,integration_domain = mdeim(rbinfo,op,trian,basis_space,basis_time)
+  basis_space,basis_time = reduced_basis(s;ϵ=get_tol(info))
+  lu_interp,red_trian,integration_domain = mdeim(info,op,trian,basis_space,basis_time)
   proj_basis_space = compress_basis_space(basis_space,trial,test)
   comb_basis_time = combine_basis_time(trial,test;kwargs...)
   a[red_trian] = AffineDecomposition(
-    rbinfo.mdeim_style,
+    info.mdeim_style,
     proj_basis_space,
     basis_time,
     lu_interp,
@@ -208,10 +208,10 @@ function reduced_vector_form(
   op::RBOperator,
   c::ArrayContribution)
 
-  rbinfo = get_info(solver)
+  info = get_info(solver)
   a = affine_contribution()
   for (trian,values) in c.dict
-    reduced_vector_form!(a,rbinfo,op,values,trian)
+    reduced_vector_form!(a,info,op,values,trian)
   end
   return a
 end
@@ -222,10 +222,10 @@ function reduced_matrix_form(
   c::ArrayContribution;
   kwargs...)
 
-  rbinfo = get_info(solver)
+  info = get_info(solver)
   a = affine_contribution()
   for (trian,values) in c.dict
-    reduced_matrix_form!(a,rbinfo,op,values,trian;kwargs...)
+    reduced_matrix_form!(a,info,op,values,trian;kwargs...)
   end
   return a
 end

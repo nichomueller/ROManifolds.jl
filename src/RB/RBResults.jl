@@ -21,24 +21,24 @@ function TransientFETools.allocate_cache(op::NonlinearOperator,rbspace)
   (res_cache,jac_cache),(rhs_solve_cache,lhs_solve_cache)
 end
 
-function rb_solver(rbinfo,feop::TransientParamFEOperator{Affine},fesolver,rbspace,rbres,rbjacs,snaps,params)
+function rb_solver(info,feop::TransientParamFEOperator{Affine},fesolver,rbspace,rbres,rbjacs,snaps,params)
   println("Solving linear RB problems")
-  nsnaps_test = rbinfo.nsnaps_test
+  nsnaps_test = info.nsnaps_test
   snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
   op = get_method_operator(fesolver,feop,snaps_test,params_test)
   cache,(_,lhs) = allocate_cache(op,rbspace)
   stats = @timed begin
-    rhs,(_lhs,_lhs_t) = collect_rhs_lhs_contributions!(cache,rbinfo,op,rbres,rbjacs,rbspace)
+    rhs,(_lhs,_lhs_t) = collect_rhs_lhs_contributions!(cache,info,op,rbres,rbjacs,rbspace)
     @. lhs = _lhs+_lhs_t
     rb_snaps_test = rb_solve(fesolver.nls,rhs,lhs)
   end
   approx_snaps_test = recast(rb_snaps_test,rbspace)
-  post_process(rbinfo,feop,snaps_test,approx_snaps_test,params_test,stats)
+  post_process(info,feop,snaps_test,approx_snaps_test,params_test,stats)
 end
 
-function rb_solver(rbinfo,feop_lin,feop_nlin,fesolver,rbspace,rbres,rbjacs,snaps,params;tol=rbinfo.ϵ)
+function rb_solver(info,feop_lin,feop_nlin,fesolver,rbspace,rbres,rbjacs,snaps,params;tol=info.ϵ)
   println("Solving nonlinear RB problems with Newton iterations")
-  nsnaps_test = rbinfo.nsnaps_test
+  nsnaps_test = info.nsnaps_test
   snaps_train,params_train = snaps[1:nsnaps_test],params[1:nsnaps_test]
   snaps_test,params_test = snaps[end-nsnaps_test+1:end],params[end-nsnaps_test+1:end]
   x = nearest_neighbor(snaps_train,params_train,params_test)
@@ -53,11 +53,11 @@ function rb_solver(rbinfo,feop_lin,feop_nlin,fesolver,rbspace,rbres,rbjacs,snaps
   rbrhs_lin,rbrhs_nlin = rbres
   rblhs_lin,rblhs_nlin = rbjacs
   stats = @timed begin
-    rhs_lin,(lhs_lin,lhs_t) = collect_rhs_lhs_contributions!(cache,rbinfo,op_lin,rbrhs_lin,rblhs_lin,rbspace)
+    rhs_lin,(lhs_lin,lhs_t) = collect_rhs_lhs_contributions!(cache,info,op_lin,rbrhs_lin,rblhs_lin,rbspace)
     for iter in 1:fesolver.nls.max_nliters
       x = recenter(x,uh0_test;θ=fesolver.θ)
       # op_nlin = update_method_operator(op_nlin,x)
-      rhs_nlin,(lhs_nlin,) = collect_rhs_lhs_contributions!(cache,rbinfo,op_nlin,rbrhs_nlin,rblhs_nlin,rbspace)
+      rhs_nlin,(lhs_nlin,) = collect_rhs_lhs_contributions!(cache,info,op_nlin,rbrhs_nlin,rblhs_nlin,rbspace)
       @. lhs = lhs_lin+lhs_t+lhs_nlin
       @. rhs = rhs_lin+rhs_nlin+(lhs_lin+lhs_t)*xrb
       newt_cache = rb_solve!(dxrb,fesolver.nls.ls,rhs,lhs,newt_cache)
@@ -71,7 +71,7 @@ function rb_solver(rbinfo,feop_lin,feop_nlin,fesolver,rbspace,rbres,rbjacs,snaps
       end
     end
   end
-  post_process(rbinfo,feop,snaps_test,x,params_test,stats)
+  post_process(info,feop,snaps_test,x,params_test,stats)
 end
 
 function rb_solve(ls::LinearSolver,rhs::ParamArray,lhs::ParamArray)
@@ -184,19 +184,19 @@ function show_speedup(io::IO,r::RBResults)
   print(io,"FEM/RB memory speedup: $speedup_memory\n")
 end
 
-function Utils.save(rbinfo::RBInfo,r::RBResults)
+function Utils.save(info::RBInfo,r::RBResults)
   name = get_name(r)
-  path = joinpath(rbinfo.rb_path,"results_$name")
+  path = joinpath(info.rb_path,"results_$name")
   save(path,r)
 end
 
-function Utils.load(rbinfo::RBInfo,T::Type{RBResults};name=:vel)
-  path = joinpath(rbinfo.rb_path,"results_$name")
+function Utils.load(info::RBInfo,T::Type{RBResults};name=:vel)
+  path = joinpath(info.rb_path,"results_$name")
   load(path,T)
 end
 
 function post_process(
-  rbinfo::RBInfo,
+  info::RBInfo,
   feop::TransientParamFEOperator,
   sol::ParamArray,
   sol_approx::ParamArray,
@@ -205,8 +205,8 @@ function post_process(
   show_results=true)
 
   nparams = length(params)
-  norm_matrix = get_norm_matrix(rbinfo,feop)
-  fem_stats = load(rbinfo,ComputationInfo)
+  norm_matrix = get_norm_matrix(info,feop)
+  fem_stats = load(info,ComputationInfo)
   rb_stats = ComputationInfo(stats,nparams)
   results = RBResults(params,sol,sol_approx,fem_stats,rb_stats,norm_matrix)
   if show_results
@@ -234,7 +234,7 @@ function compute_relative_error(
 end
 
 function compute_relative_error!(cache,sol,sol_approx,norm_matrix=nothing)
-  ncache,dcache = cache
+ncache,dcache = cache
   @inbounds for i = axes(sol,2)
     ncache[i] = norm(sol[:,i]-sol_approx[:,i],norm_matrix)
     dcache[i] = norm(sol[:,i],norm_matrix)
@@ -243,7 +243,7 @@ function compute_relative_error!(cache,sol,sol_approx,norm_matrix=nothing)
 end
 
 function plot_results(
-  rbinfo::RBInfo,
+  info::RBInfo,
   feop::TransientParamFEOperator,
   fesolver::ODESolver,
   results::RBResults;
@@ -265,7 +265,7 @@ function plot_results(
   fsol_approx = FEFunction(trialμt,sol_approx)
   ferr = FEFunction(trialμt,pointwise_err)
 
-  plt_dir = joinpath(rbinfo.rb_path,"plots")
+  plt_dir = joinpath(info.rb_path,"plots")
   create_dir(plt_dir)
 
   _plot(plt_dir,"$name",trian,fsol)

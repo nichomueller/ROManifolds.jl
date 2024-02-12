@@ -75,10 +75,10 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 dir = datadir(joinpath("heateq","toy_mesh"))
-rbinfo = RBInfo(dir;nsnaps_state=5,nsnaps_test=5,nsnaps_mdeim=5)
+info = RBInfo(dir;nsnaps_state=5,nsnaps_test=5,nsnaps_mdeim=5)
 
-rbsolver = RBSolver(rbinfo,fesolver)
-snaps,comp = RB.collect_solutions(rbsolver,feop,uh0μ)
+rbsolver = RBSolver(info,fesolver)
+snaps,comp = RB.fe_solutions(rbsolver,feop,uh0μ)
 red_op = reduced_operator(rbsolver,feop,snaps)
 
 s = select_snapshots(snaps,1)
