@@ -1,18 +1,20 @@
 function FEM.get_L2_norm_matrix(
+  info::RBInfo,
   trial::DistributedSingleFieldFESpace,
   test::DistributedSingleFieldFESpace)
 
   map(local_views(trial),local_views(test)) do trial,test
-    get_L2_norm_matrix(trial,test)
+    get_L2_norm_matrix(info,trial,test)
   end
 end
 
 function FEM.get_H1_norm_matrix(
+  info::RBInfo,
   trial::DistributedSingleFieldFESpace,
   test::DistributedSingleFieldFESpace)
 
   map(local_views(trial),local_views(test)) do trial,test
-    get_H1_norm_matrix(trial,test)
+    get_H1_norm_matrix(info,trial,test)
   end
 end
 
@@ -28,54 +30,96 @@ GridapDistributed.local_views(s::DistributedTransientSnapshots) = s.snaps
 
 function RB.Snapshots(
   values::AbstractVector{<:PVector{V}},
-  initial_values::PVector{V},
   args...) where V
 
-  snaps = map(local_views(initial_values),initial_values.index_partition) do ival_part,iip
-    part = part_id(iip)
-    vals_part = Vector{V}(undef,length(values))
-    for (k,v) in enumerate(values)
-      map(local_views(v),v.index_partition) do val,ip
-        if part_id(ip) == part
-          vals_part[k] = val
-        end
-      end
-    end
-    Snapshots(vals_part,ival_part,args...)
-  end
-  DistributedTransientSnapshots(snaps)
-end
-
-function RB.Snapshots(
-  values::AbstractVector{<:PVector{V}},
-  args...) where V
-
-  item = first(values)
-  parts = map(part_id,item.index_partition)
+  index_partition = first(values).index_partition
+  parts = map(part_id,index_partition)
   snaps = map(parts) do part
     vals_part = Vector{V}(undef,length(values))
     for (k,v) in enumerate(values)
-      map(local_views(v),v.index_partition) do val,ip
+      vector_partition = map(local_views(v),index_partition) do val,ip
         if part_id(ip) == part
           vals_part[k] = val
         end
       end
+      PVector(vector_partition,index_partition)
     end
     Snapshots(vals_part,args...)
   end
   DistributedSnapshots(snaps)
 end
 
-function RB.reduced_basis(
+struct DistributedRBSpace{T<:AbstractVector{<:RBSpace}}
+  spaces::T
+end
+
+GridapDistributed.local_views(a::DistributedRBSpace) = a.spaces
+
+function RB.reduced_fe_space(
   info::RBInfo,
   feop::TransientParamFEOperator,
   s::DistributedTransientSnapshots)
 
-  ϵ = RB.get_tol(info)
-  nsnaps_state = RB.num_offline_params(info)
-  norm_matrix = RB.get_norm_matrix(info,feop)
-  basis_space,basis_time = map(local_views(s)) do s
-    reduced_basis(s,norm_matrix;ϵ,nsnaps_state)
+  trial = get_trial(feop)
+  test = get_test(feop)
+  ϵ = get_tol(info)
+  norm_matrix = get_norm_matrix(info,feop)
+  reduced_trial,reduced_test = map(
+    local_views(trial),
+    local_views(test),
+    local_views(s),
+    local_views(norm_matrix)
+    ) do trial,test,s,norm_matrix
+
+    soff = select_snapshots(s,offline_params(info))
+    basis_space,basis_time = reduced_basis(soff,norm_matrix;ϵ)
+    reduced_trial = TrialRBSpace(trial,basis_space,basis_time)
+    reduced_test = TestRBSpace(test,basis_space,basis_time)
+    reduced_trial,reduced_test
   end |> tuple_of_arrays
-  return basis_space,basis_time
+
+  dtrial = DistributedRBSpace(reduced_trial)
+  dtest = DistributedRBSpace(reduced_test)
+  return dtrial,dtest
+end
+
+function GridapDistributed._find_vector_type(
+  spaces::AbstractVector{<:RBSpace},gids)
+  T = get_vector_type(PartitionedArrays.getany(spaces))
+  if isa(gids,PRange)
+    vector_type = typeof(PVector{T}(undef,partition(gids)))
+  else
+    vector_type = typeof(BlockPVector{T}(undef,gids))
+  end
+  return vector_type
+end
+
+function RB.compress(r::DistributedRBSpace,xmat::ParamVector{<:AbstractMatrix})
+  partition = xmat.index_partition
+  vector_partition = map(local_views(r),local_views(xmat)) do r,xmat
+    compress(r,xmat)
+  end
+  PVector(vector_partition,partition)
+end
+
+function RB.compress(
+  trial::DistributedRBSpace,
+  test::DistributedRBSpace,
+  xmat::ParamVector{<:AbstractMatrix};
+  kwargs...)
+
+  partition = xmat.index_partition
+  vector_partition = map(local_views(trial),local_views(test),local_views(xmat)
+    ) do trial,test,xmat
+    compress(trial,test,xmat;kwargs...)
+  end
+  PVector(vector_partition,partition)
+end
+
+function recast(r::RBSpace,red_x::ParamVector{<:AbstractMatrix})
+  partition = red_x.index_partition
+  vector_partition = map(red_x) do red_x
+    recast(r,red_x)
+  end
+  PVector(vector_partition,partition)
 end

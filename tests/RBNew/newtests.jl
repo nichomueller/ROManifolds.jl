@@ -110,27 +110,5 @@ odeop = get_algebraic_operator(feop)
 χ = rand(647,500)
 @time svd(χ)
 @time svd(soff)
-# basis_space,basis_time = reduced_basis(soff,norm_matrix;ϵ)
-flag,s = RB._return_flag(soff)
-b1 = tpod(soff,norm_matrix;ϵ)
-compressed_s = compress(b1,s)
-compressed_s = change_mode(compressed_s)
-b2 = tpod(compressed_s;ϵ)
-RB._return_bases(flag,b1,b2)
 
-struct S1{T,F} <: AbstractMatrix{T}
-  f::F
-  S1(f::F) where F = new{eltype(f),F}(f)
-end
-Base.size(s::S1) = size(s.f)
-Base.eltype(::S1{T}) where T = T
-Base.eltype(::Type{S1{T}}) where T = T
-Base.@propagate_inbounds Base.getindex(s::S1,i...) = getindex(s.f,i...)
-Base.@propagate_inbounds Base.getindex(s::S1,i) = getindex(s.f,i)
-Base.@propagate_inbounds Base.getindex(s::S1,i,j) = getindex(s.f,i,j)
-Base.IndexStyle(::Type{<:S1}) = IndexLinear() #IndexCartesian()
-
-t = rand(1000,100)
-s = S1(t)
-@btime $s'*$s
-@btime $t'*$t
+soff' * soff

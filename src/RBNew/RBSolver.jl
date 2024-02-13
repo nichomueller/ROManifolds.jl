@@ -46,21 +46,46 @@ mdeim_params(info::RBInfo) = 1:num_offline_params(info)
 get_tol(info::RBInfo) = info.ϵ
 
 function get_norm_matrix(info::RBInfo,feop::TransientParamFEOperator)
+  trial = get_trial(feop)(nothing)
+  test = get_test(feop)
+  get_norm_matrix(info,trial,test)
+end
+
+function get_norm_matrix(info::RBInfo,trial::FESpace,test::FESpace)
   norm_style = info.norm_style
-  try
-    T = get_vector_type(feop.test)
-    load(info,SparseMatrixCSC{eltype(T),Int};norm_style)
-  catch
-    if norm_style == :l2
-      nothing
-    elseif norm_style == :L2
-      get_L2_norm_matrix(feop)
-    elseif norm_style == :H1
-      get_H1_norm_matrix(feop)
-    else
-      @unreachable
-    end
+  if norm_style == :l2
+    nothing
+  elseif norm_style == :L2
+    get_L2_norm_matrix(trial,test)
+  elseif norm_style == :H1
+    get_H1_norm_matrix(trial,test)
+  else
+    @unreachable
   end
+end
+
+function get_L2_norm_matrix(trial::TrialFESpace,test::FESpace)
+  trian = get_triangulation(test)
+  order = FEM.get_polynomial_order(test)
+  dΩ = Measure(trian,2*order)
+  L2_form(u,v) = ∫(v⋅u)dΩ
+  assemble_matrix(L2_form,trial,test)
+end
+
+function get_H1_norm_matrix(trial::TrialFESpace,test::FESpace)
+  trian = get_triangulation(test)
+  order = FEM.get_polynomial_order(test)
+  dΩ = Measure(trian,2*order)
+  H1_form(u,v) = ∫(∇(v)⊙∇(u))dΩ + ∫(v⋅u)dΩ
+  assemble_matrix(H1_form,trial,test)
+end
+
+function get_L2_norm_matrix(trial::MultiFieldParamFESpace,test::MultiFieldFESpace)
+  mortar(map(get_L2_norm_matrix,trial.spaces,test.spaces))
+end
+
+function get_H1_norm_matrix(trial::MultiFieldParamFESpace,test::MultiFieldFESpace)
+  mortar(map(get_H1_norm_matrix,trial.spaces,test.spaces))
 end
 
 struct RBSolver{S}

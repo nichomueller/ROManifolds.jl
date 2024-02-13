@@ -9,9 +9,9 @@ function get_mdeim_indices(A::AbstractMatrix{T}) where T
 
   if n > 1
     @inbounds for i = 2:n
-      Bi = view(A,:,1:i-1)
-      Ci = view(A,I[1:i-1],1:i-1)
-      Di = view(A,I[1:i-1],i)
+      Bi = A[:,1:i-1]
+      Ci = A[I[1:i-1],1:i-1]
+      Di = A[I[1:i-1],i]
       proj .= Bi*(Ci \ Di)
       res .= A[:,i] - proj
       I[i] = argmax(abs.(res))
@@ -19,6 +19,10 @@ function get_mdeim_indices(A::AbstractMatrix{T}) where T
   end
 
   return I
+end
+
+function get_mdeim_indices(A::NnzSnapshots)
+  get_mdeim_indices(collect(A))
 end
 
 function recast_indices(A::AbstractMatrix,indices::AbstractVector{Int})

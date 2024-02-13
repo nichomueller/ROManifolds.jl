@@ -52,6 +52,8 @@ export compress
 export flatten
 include("Snapshots.jl")
 
+# include("SnapshotsOperations.jl")
+
 export RBInfo
 export RBSolver
 export fe_solutions

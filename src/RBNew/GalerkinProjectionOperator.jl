@@ -73,7 +73,7 @@ end
 function Algebra.solve(
   solver::RBThetaMethod,
   op::RBOperator,
-  s::AbstractTransientSnapshots)
+  s::AbstractMatrix)
 
   info = get_info(solver)
   son = select_snapshots(s,online_params(info))
@@ -148,8 +148,8 @@ end
 
 struct GalerkinProjectionOperator{T} <: RBOperator{T}
   feop::ODEParamOperator{T}
-  trial::TrialRBSpace
-  test::TestRBSpace
+  trial::RBSpace
+  test::RBSpace
 end
 
 ReferenceFEs.get_order(op::GalerkinProjectionOperator) = get_order(op.feop)

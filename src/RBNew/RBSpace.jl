@@ -5,10 +5,9 @@ function reduced_fe_space(
 
   trial = get_trial(feop)
   test = get_test(feop)
-  ϵ = get_tol(info)
   norm_matrix = get_norm_matrix(info,feop)
   soff = select_snapshots(s,offline_params(info))
-  basis_space,basis_time = reduced_basis(soff,norm_matrix;ϵ)
+  basis_space,basis_time = reduced_basis(soff,norm_matrix;ϵ=get_tol(info))
   reduced_trial = TrialRBSpace(trial,basis_space,basis_time)
   reduced_test = TestRBSpace(test,basis_space,basis_time)
   return reduced_trial,reduced_test
