@@ -1,28 +1,15 @@
 function tpod(mat::AbstractMatrix,args...;kwargs...)
-  cmat = mat'*mat
-  _,s2,V = svd(cmat)
-  s = sqrt.(s2)
-  rank = truncation(s;kwargs...)
-  U = mat*V[:,1:rank]
-  for i = axes(U,2)
-    U[:,i] /= s[i]+eps()
-  end
-  U
+  U,Σ,V = svd(mat)
+  rank = truncation(Σ;kwargs...)
+  U[:,1:rank]
 end
 
 function tpod(mat::AbstractMatrix,X::AbstractMatrix;kwargs...)
   C = cholesky(X)
   L = sparse(C.L)
   Xmat = L'*mat[C.p,:]
-
-  cmat = Xmat'*Xmat
-  _,s2,V = svd(cmat)
-  s = sqrt.(s2)
-  rank = truncation(s;kwargs...)
-  U = Xmat*V[:,1:rank]
-  for i = axes(U,2)
-    U[:,i] /= s[i]+eps()
-  end
+  U,Σ,V = svd(Xmat)
+  rank = truncation(Σ;kwargs...)
   (L'\U[:,1:rank])[invperm(C.p),:]
 end
 

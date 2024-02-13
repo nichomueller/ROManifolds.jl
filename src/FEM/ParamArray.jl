@@ -233,8 +233,8 @@ function Base.hvcat(nblocks::Int,a::ParamArray...)
 end
 
 function Base.fill!(a::ParamArray,z)
-  map(a) do a
-    fill!(a,z)
+  for ai in a
+    fill!(ai,z)
   end
   return a
 end
@@ -254,8 +254,8 @@ function Base.minimum(f,a::ParamArray)
 end
 
 function LinearAlgebra.fillstored!(a::ParamArray,z)
-  map(a) do a
-    fillstored!(a,z)
+  for ai in a
+    fillstored!(ai,z)
   end
   return a
 end
@@ -266,30 +266,30 @@ function LinearAlgebra.mul!(
   b::ParamArray,
   α::Number,β::Number)
 
-  map(c,a,b) do c,a,b
-    mul!(c,a,b,α,β)
+  for i in eachindex(a)
+    mul!(c[i],a[i],b[i],α,β)
   end
   return c
 end
 
 function LinearAlgebra.ldiv!(a::ParamArray,m::LU,b::ParamArray)
-  map(a,b) do a,b
-    ldiv!(a,m,b)
+  for i in eachindex(a)
+    ldiv!(a[i],m,b[i])
   end
   return a
 end
 
 function LinearAlgebra.ldiv!(a::ParamArray,m::ParamContainer,b::ParamArray)
   @assert length(a) == length(m) == length(b)
-  map(a.array,m.array,b.array) do a,m,b
-    ldiv!(a,m,b)
+  for i in eachindex(a)
+    ldiv!(a[i],m[i],b[i])
   end
   return a
 end
 
 function LinearAlgebra.rmul!(a::ParamArray,b::Number)
-  map(a) do a
-    rmul!(a,b)
+  for ai in a
+    rmul!(ai,b)
   end
   return a
 end
@@ -302,15 +302,15 @@ function LinearAlgebra.lu(a::ParamArray)
 end
 
 function LinearAlgebra.lu!(a::ParamArray,b::ParamArray)
-  map(a,b) do a,b
-    lu!(a,b)
+  for i in eachindex(a)
+    lu!(a[i],b[i])
   end
   return a
 end
 
 function SparseArrays.resize!(a::ParamArray,args...)
-  map(a) do a
-    resize!(a,args...)
+  for ai in a
+    resize!(ai,args...)
   end
   return a
 end
@@ -333,8 +333,8 @@ function Arrays.setsize!(
   a::ParamArray{T,N,AbstractVector{CachedArray{T,N}}},
   s::NTuple{N,Int}) where {T,N}
 
-  map(a) do a
-    setsize!(a,s)
+  for ai in a
+    setsize!(ai,s)
   end
   return a
 end
@@ -401,7 +401,7 @@ end
 
 function _to_param_array(a::ParamArray,b::AbstractArray)
   array = Vector{typeof(b)}(undef,length(a))
-  for i = eachindex(a)
+  @inbounds for i = eachindex(a)
     array[i] = b
   end
   ParamArray(array)
@@ -410,7 +410,7 @@ function _to_param_array(a::ParamArray,b::ParamArray)
   b
 end
 function _to_param_array!(a::ParamArray,b::AbstractArray)
-  for i = eachindex(a)
+  @inbounds for i = eachindex(a)
     a[i] = b
   end
   a
@@ -426,7 +426,7 @@ function Arrays.return_value(
 
   vi = return_value(f,testitem(a),b)
   array = Vector{typeof(vi)}(undef,length(a))
-  for i = eachindex(a)
+  @inbounds for i = eachindex(a)
     array[i] = return_value(f,a[i],b)
   end
   ParamArray(array)
@@ -439,7 +439,7 @@ function Arrays.return_value(
 
   vi = return_value(f,a,testitem(b))
   array = Vector{typeof(vi)}(undef,length(b))
-  for i = eachindex(b)
+  @inbounds for i = eachindex(b)
     array[i] = return_value(f,a,b[i])
   end
   ParamArray(array)
@@ -452,7 +452,7 @@ function Arrays.return_value(
 
   vi = return_value(f,testitem(a),testitem(b))
   array = Vector{typeof(vi)}(undef,length(a))
-  for i = eachindex(a)
+  @inbounds for i = eachindex(a)
     array[i] = return_value(f,a[i],b[i])
   end
   ParamArray(array)
@@ -467,7 +467,7 @@ function Arrays.return_cache(
   bi = evaluate!(ci,f,testitem(a),b)
   cache = Vector{typeof(ci)}(undef,length(a))
   array = Vector{typeof(bi)}(undef,length(a))
-  for i = eachindex(a)
+  @inbounds for i = eachindex(a)
     cache[i] = return_cache(f,a[i],b)
   end
   cache,ParamArray(array)
@@ -482,7 +482,7 @@ function Arrays.return_cache(
   bi = evaluate!(ci,f,a,testitem(b))
   cache = Vector{typeof(ci)}(undef,length(b))
   array = Vector{typeof(bi)}(undef,length(b))
-  for i = eachindex(b)
+  @inbounds for i = eachindex(b)
     cache[i] = return_cache(f,a,b[i])
   end
   cache,ParamArray(array)
@@ -497,7 +497,7 @@ function Arrays.return_cache(
   bi = evaluate!(ci,f,testitem(a),testitem(b))
   cache = Vector{typeof(ci)}(undef,length(a))
   array = Vector{typeof(bi)}(undef,length(a))
-  for i = eachindex(a)
+  @inbounds for i = eachindex(a)
     cache[i] = return_cache(f,a[i],b[i])
   end
   cache,ParamArray(array)
@@ -650,7 +650,7 @@ function Arrays.return_cache(f::BroadcastingFieldOpMap,a::ParamArray...)
   bi = evaluate!(ci,f,map(testitem,a)...)
   cache = Vector{typeof(ci)}(undef,length(ai))
   array = allocate_param_array(bi,length(ai))
-  for i = eachindex(ai)
+  @inbounds for i = eachindex(ai)
     ai = map(x->x[i],a)
     cache[i] = return_cache(f,ai...)
   end
@@ -744,7 +744,7 @@ end
 function Arrays.return_value(f::Broadcasting,a::ParamArray)
   vi = return_value(f,testitem(a))
   array = Vector{typeof(vi)}(undef,length(a))
-  for i = eachindex(a)
+  @inbounds for i = eachindex(a)
     array[i] = return_value(f,a[i])
   end
   ParamArray(array)
@@ -755,7 +755,7 @@ function Arrays.return_cache(f::Broadcasting,a::ParamArray)
   bi = evaluate!(ci,f,testitem(a))
   cache = Vector{typeof(ci)}(undef,length(a))
   array = Vector{typeof(bi)}(undef,length(a))
-  for i = eachindex(a)
+  @inbounds for i = eachindex(a)
     cache[i] = return_cache(f,a[i])
   end
   cache,ParamArray(array)
@@ -772,7 +772,7 @@ end
 function Arrays.return_value(f::Broadcasting{typeof(∘)},a::ParamArray,b::Field)
   vi = return_value(f,testitem(a),b)
   array = Vector{typeof(vi)}(undef,length(a),b)
-  for i = eachindex(a)
+  @inbounds for i = eachindex(a)
     array[i] = return_value(f,a[i],b)
   end
   ParamArray(array)
@@ -783,7 +783,7 @@ function Arrays.return_cache(f::Broadcasting{typeof(∘)},a::ParamArray,b::Field
   bi = evaluate!(ci,f,testitem(a),b)
   cache = Vector{typeof(ci)}(undef,length(a))
   array = Vector{typeof(bi)}(undef,length(a))
-  for i = eachindex(a)
+  @inbounds for i = eachindex(a)
     cache[i] = return_cache(f,a[i],b)
   end
   cache,ParamArray(array)
@@ -800,7 +800,7 @@ end
 function Arrays.return_value(f::Broadcasting{<:Operation},a::ParamArray,b::Field)
   vi = return_value(f,testitem(a),b)
   array = Vector{typeof(vi)}(undef,length(a),b)
-  for i = eachindex(a)
+  @inbounds for i = eachindex(a)
     array[i] = return_value(f,a[i],b)
   end
   ParamArray(array)
@@ -811,7 +811,7 @@ function Arrays.return_cache(f::Broadcasting{<:Operation},a::ParamArray,b::Field
   bi = evaluate!(ci,f,testitem(a),b)
   cache = Vector{typeof(ci)}(undef,length(a))
   array = Vector{typeof(bi)}(undef,length(a))
-  for i = eachindex(a)
+  @inbounds for i = eachindex(a)
     cache[i] = return_cache(f,a[i],b)
   end
   cache,ParamArray(array)
@@ -828,7 +828,7 @@ end
 function Arrays.return_value(f::Broadcasting{<:Operation},a::Field,b::ParamArray)
   vi = return_value(f,a,testitem(b))
   array = Vector{typeof(vi)}(undef,a,length(b))
-  for i = eachindex(b)
+  @inbounds for i = eachindex(b)
     array[i] = return_value(f,a,b[i])
   end
   ParamArray(array)
@@ -839,7 +839,7 @@ function Arrays.return_cache(f::Broadcasting{<:Operation},a::Field,b::ParamArray
   bi = evaluate!(ci,f,a,testitem(b))
   cache = Vector{typeof(ci)}(undef,length(b))
   array = Vector{typeof(bi)}(undef,length(b))
-  for i = eachindex(b)
+  @inbounds for i = eachindex(b)
     cache[i] = return_cache(f,a,b[i])
   end
   cache,ParamArray(array)
@@ -876,7 +876,7 @@ end
 function Arrays.return_value(f::Broadcasting{typeof(*)},a::ParamArray,b::Number)
   vi = return_value(f,testitem(a),b)
   array = Vector{typeof(vi)}(undef,length(a))
-  for i = eachindex(a)
+  @inbounds for i = eachindex(a)
     array[i] = return_value(f,a[i],b)
   end
   ParamArray(array)
@@ -887,7 +887,7 @@ function Arrays.return_cache(f::Broadcasting{typeof(*)},a::ParamArray,b::Number)
   bi = evaluate!(ci,f,testitem(a),b)
   cache = Vector{typeof(ci)}(undef,length(a))
   array = Vector{typeof(bi)}(undef,length(a))
-  for i = eachindex(a)
+  @inbounds for i = eachindex(a)
     cache[i] = return_cache(f,a[i],b)
   end
   cache,ParamArray(array)
@@ -916,7 +916,7 @@ end
 function Fields.linear_combination(a::ParamArray,b::AbstractVector{<:Field})
   abi = linear_combination(testitem(a),b)
   c = Vector{typeof(abi)}(undef,length(a))
-  for i in eachindex(a)
+  @inbounds for i in eachindex(a)
     c[i] = linear_combination(a[i],b)
   end
   ParamContainer(c)
@@ -931,7 +931,7 @@ for T in (:AbstractVector,:AbstractMatrix,:AbstractArray)
 
       vi = return_value(k,testitem(v),fx)
       array = Vector{typeof(vi)}(undef,length(v))
-      for i = eachindex(v)
+      @inbounds for i = eachindex(v)
         array[i] = return_value(k,v[i],fx)
       end
       ParamArray(array)
@@ -946,7 +946,7 @@ for T in (:AbstractVector,:AbstractMatrix,:AbstractArray)
       bi = evaluate!(ci,k,testitem(v),fx)
       cache = Vector{typeof(ci)}(undef,length(v))
       array = Vector{typeof(bi)}(undef,length(v))
-      for i = eachindex(v)
+      @inbounds for i = eachindex(v)
         cache[i] = return_cache(k,v[i],fx)
       end
       cache,ParamArray(array)
@@ -974,7 +974,7 @@ function Arrays.return_value(
 
   vi = return_value(f,testitem(a),w)
   array = Vector{typeof(vi)}(undef,length(a))
-  for i = eachindex(a)
+  @inbounds for i = eachindex(a)
     array[i] = return_value(f,a[i],w)
   end
   ParamArray(array)
@@ -989,7 +989,7 @@ function Arrays.return_cache(
   bi = evaluate!(ci,f,testitem(a),w)
   cache = Vector{typeof(ci)}(undef,length(a))
   array = Vector{typeof(bi)}(undef,length(a))
-  for i = eachindex(a)
+  @inbounds for i = eachindex(a)
     cache[i] = return_cache(f,a[i],w)
   end
   cache,ParamArray(array)
@@ -1016,7 +1016,7 @@ function Arrays.return_value(
 
   vi = return_value(f,testitem(a),w,j)
   array = Vector{typeof(vi)}(undef,length(a))
-  for i = eachindex(a)
+  @inbounds for i = eachindex(a)
     array[i] = return_value(f,a[i],w,j)
   end
   ParamArray(array)
@@ -1032,7 +1032,7 @@ function Arrays.return_cache(
   bi = evaluate!(ci,f,testitem(a),w,j)
   cache = Vector{typeof(ci)}(undef,length(a))
   array = Vector{typeof(bi)}(undef,length(a))
-  for i = eachindex(a)
+  @inbounds for i = eachindex(a)
     cache[i] = return_cache(f,a[i],w,j)
   end
   cache,ParamArray(array)
@@ -1088,7 +1088,7 @@ function Arrays.return_cache(::typeof(Fields.unwrap_cached_array),a::ParamArray)
   ri = evaluate!(ci,Fields.unwrap_cached_array,ai)
   cache = Vector{typeof(ci)}(undef,length(a))
   array = Vector{typeof(ri)}(undef,length(a))
-  for i in eachindex(a)
+  @inbounds for i in eachindex(a)
     cache[i] = return_cache(Fields.unwrap_cached_array,a[i])
   end
   cache,ParamArray(array)

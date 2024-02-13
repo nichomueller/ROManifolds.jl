@@ -4,9 +4,10 @@ function load_solve(
   args...;
   kwargs...)
 
-  snaps = deserialize(get_snapshots_dir(solver))
-  fem_stats = deserialize(get_stats_dir(solver))
-  rbop = deserialize(get_reduced_operator_dir(solver))
+  info = get_info(solver)
+  snaps = deserialize(get_snapshots_dir(info))
+  fem_stats = deserialize(get_stats_dir(info))
+  rbop = deserialize(get_reduced_operator_dir(info))
   rb_sol,rb_stats = solve(solver,rbop,snaps)
   results = rb_results(solver,rbop,snaps,rb_sol,fem_stats,rb_stats;kwargs...)
   return results

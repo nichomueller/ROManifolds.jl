@@ -183,8 +183,8 @@ function PartitionedArrays.p_sparse_matrix_cache_impl(
   map(ParamSparseMatrixAssemblyCache,cache)
 end
 
-struct ParamSparseMatrixAssemblyCache
-  cache::ParamVectorAssemblyCache
+struct ParamSparseMatrixAssemblyCache{T}
+  cache::ParamVectorAssemblyCache{T}
 end
 
 Base.reverse(a::ParamSparseMatrixAssemblyCache) = ParamSparseMatrixAssemblyCache(reverse(a.cache))

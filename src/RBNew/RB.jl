@@ -54,6 +54,7 @@ include("Snapshots.jl")
 
 export RBInfo
 export RBSolver
+export fe_solutions
 include("RBSolver.jl")
 
 export RBSpace

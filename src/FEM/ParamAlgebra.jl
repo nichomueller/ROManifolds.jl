@@ -165,23 +165,24 @@ function ParamInserter(inserter::Algebra.InserterCSC,L::Integer)
   ParamInserterCSC(inserter,Val(L))
 end
 
-struct ParamInserterCSC{Tv,Ti,L}
+struct ParamInserterCSC{Tv,Ti,P}
   nrows::Int
   ncols::Int
   colptr::Vector{Ti}
   colnnz::Vector{Ti}
   rowval::Vector{Ti}
-  nzval::ParamVector{Tv}
+  nzval::P
   function ParamInserterCSC(inserter::Algebra.InserterCSC{Tv,Ti},::Val{L}) where {Tv,Ti,L}
     @unpack nrows,ncols,colptr,colnnz,rowval,nzval = inserter
     pnzval = allocate_param_array(nzval,L)
-    new{Tv,Ti,L}(nrows,ncols,colptr,colnnz,rowval,pnzval)
+    P = typeof(pnzval)
+    new{Tv,Ti,P}(nrows,ncols,colptr,colnnz,rowval,pnzval)
   end
 end
 
 Algebra.LoopStyle(::Type{<:ParamInserterCSC}) = Loop()
 
-@inline function Algebra.add_entry!(::typeof(+),a::ParamInserterCSC{Tv,Ti,L},v::Nothing,i,j)  where {Tv,Ti,L}
+@inline function Algebra.add_entry!(::typeof(+),a::ParamInserterCSC{Tv,Ti},v::Nothing,i,j)  where {Tv,Ti}
   pini = Int(a.colptr[j])
   pend = pini + Int(a.colnnz[j]) - 1
   p = searchsortedfirst(a.rowval,i,pini,pend,Base.Order.Forward)
@@ -204,7 +205,7 @@ Algebra.LoopStyle(::Type{<:ParamInserterCSC}) = Loop()
 end
 
 @noinline function Algebra.add_entry!(
-  ::typeof(+),a::ParamInserterCSC{Tv,Ti,L},v::AbstractParamContainer{Tv},i,j) where {Tv,Ti,L}
+  ::typeof(+),a::ParamInserterCSC{Tv,Ti,P},v::AbstractParamContainer{Tv},i,j) where {Tv,Ti,P}
   pini = Int(a.colptr[j])
   pend = pini + Int(a.colnnz[j]) - 1
   p = searchsortedfirst(a.rowval,i,pini,pend,Base.Order.Forward)
@@ -212,7 +213,7 @@ end
     # add new entry
     a.colnnz[j] += 1
     a.rowval[p] = i
-    @inbounds for l = 1:L
+    @inbounds for l = 1:length(P)
       a.nzval[l][p] = v[l]
     end
   elseif a.rowval[p] != i
@@ -221,32 +222,32 @@ end
     for k in pend:-1:p
       o = k + 1
       a.rowval[o] = a.rowval[k]
-      @inbounds for l = 1:L
+      @inbounds for l = 1:length(P)
         a.nzval[l][o] = a.nzval[l][k]
       end
     end
     # add new entry
     a.colnnz[j] += 1
     a.rowval[p] = i
-    @inbounds for l = 1:L
+    @inbounds for l = 1:length(P)
       a.nzval[l][p] = v[l]
     end
   else
     # update existing entry
-    @inbounds for l = 1:L
+    @inbounds for l = 1:length(P)
       a.nzval[l][p] += v[l]
     end
   end
   nothing
 end
 
-function Algebra.create_from_nz(a::ParamInserterCSC{Tv,Ti,L}) where {Tv,Ti,L}
+function Algebra.create_from_nz(a::ParamInserterCSC{Tv,Ti,P}) where {Tv,Ti,P}
   k = 1
   for j in 1:a.ncols
     pini = Int(a.colptr[j])
     pend = pini + Int(a.colnnz[j]) - 1
     for p in pini:pend
-      @inbounds for l = 1:L
+      @inbounds for l = 1:length(P)
         a.nzval[l][k] = a.nzval[l][p]
       end
       a.rowval[k] = a.rowval[p]
@@ -260,7 +261,7 @@ function Algebra.create_from_nz(a::ParamInserterCSC{Tv,Ti,L}) where {Tv,Ti,L}
   nnz = a.colptr[end]-1
   resize!(a.rowval,nnz)
   resize!(a.nzval,nnz)
-  csc = map(1:L) do l
+  csc = map(1:length(P)) do l
     SparseMatrixCSC(a.nrows,a.ncols,a.colptr,a.rowval,a.nzval[l])
   end
   ParamArray(csc)
@@ -272,7 +273,7 @@ function ParamInserter(inserter::Algebra.CSRR,L::Integer)
   ParamCSSR(inserter,Val(L))
 end
 
-struct ParamCSSR{Tv,Ti,L}
+struct ParamCSSR{Tv,Ti,P}
   nrows::Int
   ncols::Int
   colptr::Vector{Ti}
@@ -283,13 +284,14 @@ struct ParamCSSR{Tv,Ti,L}
   function ParamCSSR(inserter::Algebra.CSRR{Tv,Ti},::Val{L}) where {Tv,Ti,L}
     @unpack nrows,ncols,colptr,colnnz,rowval,nzval,work = inserter
     pnzval = allocate_param_array(nzval,L)
-    new{Tv,Ti,L}(nrows,ncols,colptr,colnnz,rowval,pnzval,work)
+    P = typeof(pnzval)
+    new{Tv,Ti,P}(nrows,ncols,colptr,colnnz,rowval,pnzval,work)
   end
 end
 
 Algebra.LoopStyle(::Type{<:ParamCSSR}) = Loop()
 
-@inline function Algebra.add_entry!(::typeof(+),a::ParamCSSR{Tv,Ti,L},v::Nothing,i,j) where {Tv,Ti,L}
+@inline function Algebra.add_entry!(::typeof(+),a::ParamCSSR{Tv,Ti},v::Nothing,i,j) where {Tv,Ti}
   p = a.rowptrs[i]
   a.colvals[p] = j
   a.rowptrs[i] = p+Ti(1)
@@ -297,23 +299,23 @@ Algebra.LoopStyle(::Type{<:ParamCSSR}) = Loop()
 end
 
 @inline function Algebra.add_entry!(
-  ::typeof(+),a::ParamCSSR{Tv,Ti,L},v::AbstractParamContainer{Tv},i,j) where {Tv,Ti,L}
+  ::typeof(+),a::ParamCSSR{Tv,Ti,P},v::AbstractParamContainer{Tv},i,j) where {Tv,Ti,P}
   p = a.rowptrs[i]
   a.colvals[p] = j
-  @inbounds for l = 1:L
+  @inbounds for l = 1:length(P)
     a.nzvals[l][p] = v[l]
   end
   a.rowptrs[i] = p+Ti(1)
   nothing
 end
 
-function Algebra.create_from_nz(a::ParamCSSR{Tv,Ti,L}) where {Tv,Ti,L}
+function Algebra.create_from_nz(a::ParamCSSR{Tv,Ti,P}) where {Tv,Ti,P}
   rewind_ptrs!(a.rowptrs)
   colptrs = Vector{Ti}(undef,a.ncols+1)
   cscnnz = Algebra._csrr_to_csc_count!(colptrs,a.rowptrs,a.colvals,a.nzvals,a.work)
   rowvals = Vector{Ti}(undef,cscnnz)
   nzvalscsc = Vector{Tv}(undef,cscnnz)
-  pnzvalscsc = allocate_param_array(nzvalscsc,L)
+  pnzvalscsc = allocate_param_array(nzvalscsc,length(P))
   Algebra._csrr_to_csc_fill!(colptrs,rowvals,pnzvalscsc,a.rowptrs,a.colvals,a.nzvals)
   SparseMatrixCSC(a.nrows,a.ncols,colptrs,rowvals,pnzvalscsc)
 end

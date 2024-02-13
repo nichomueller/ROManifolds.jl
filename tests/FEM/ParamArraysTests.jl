@@ -50,9 +50,9 @@ u0(x,μ) = 0
 u0(μ) = x->u0(x,μ)
 u0μ(μ) = ParamFunction(u0,μ)
 
-b(μ,t,v) = ∫(fμt(μ,t)*v)dΩ + ∫(hμt(μ,t)*v)dΓn
-a(μ,t,du,v) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
-m(μ,t,dut,v) = ∫(v*dut)dΩ
+res(μ,t,u,v) = ∫(v*∂t(u))dΩ + ∫(aμt(μ,t)*∇(v)⋅∇(u))dΩ - ∫(fμt(μ,t)*v)dΩ - ∫(hμt(μ,t)*v)dΓn
+jac(μ,t,u,du,v) = ∫(aμt(μ,t)*∇(v)⋅∇(du))dΩ
+jac_t(μ,t,u,dut,v) = ∫(v*dut)dΩ
 
 order = 1
 degree = 2*order
@@ -65,7 +65,7 @@ T = Float64
 reffe = ReferenceFE(lagrangian,T,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6])
 trial = TransientTrialParamFESpace(test,gμt)
-feop = AffineTransientParamFEOperator(m,a,b,ptspace,trial,test)
+feop = AffineTransientParamFEOperator(res,jac,jac_t,ptspace,trial,test)
 
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
@@ -119,10 +119,6 @@ a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
 a(μ,t) = x->a(x,μ,t)
 aμt(μ,t) = TransientParamFunction(a,μ,t)
 
-f(x,μ,t) = VectorValue(0.0,0.0)
-f(μ,t) = x->f(x,μ,t)
-fμt(μ,t) = TransientParamFunction(f,μ,t)
-
 g(x,μ,t) = VectorValue(μ[1]*exp(-x[2]/μ[2])*abs(sin(μ[3]*t)),0.0)
 g(μ,t) = x->g(x,μ,t)
 gμt(μ,t) = TransientParamFunction(g,μ,t)
@@ -134,9 +130,9 @@ p0(x,μ) = 0.0
 p0(μ) = x->p0(x,μ)
 p0μ(μ) = ParamFunction(p0,μ)
 
-b(μ,t,(v,q)) = ∫(fμt(μ,t)⋅v)dΩ
-a(μ,t,(du,dp),(v,q)) = ∫(aμt(μ,t)*∇(v)⊙∇(du))dΩ - ∫(dp*(∇⋅(v)))dΩ - ∫(q*(∇⋅(du)))dΩ
-m(μ,t,(dut,dpt),(v,q)) = ∫(v⋅dut)dΩ
+res(μ,t,(u,p),(v,q)) = ∫(v⋅∂t(u))dΩ + ∫(aμt(μ,t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ + ∫(q*(∇⋅(u)))dΩ
+jac(μ,t,u,(du,dp),(v,q)) = ∫(aμt(μ,t)*∇(v)⊙∇(du))dΩ - ∫(dp*(∇⋅(v)))dΩ + ∫(q*(∇⋅(du)))dΩ
+jac_t(μ,t,u,(dut,dpt),(v,q)) = ∫(v⋅dut)dΩ
 
 order = 2
 degree = 2*order
@@ -153,7 +149,7 @@ test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
 trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
-feop = AffineTransientParamFEOperator(m,a,b,ptspace,trial,test)
+feop = AffineTransientParamFEOperator(res,jac,jac_t,ptspace,trial,test)
 
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
@@ -166,7 +162,7 @@ iterate(sol)
 _a(x,t) = a(x,μ,t)
 _a(t) = x->_a(x,t)
 
-_f(x,t) = f(x,μ,t)
+_f(x,t) = VectorValue(0.0,0.0)
 _f(t) = x->_f(x,t)
 
 _g(x,t) = g(x,μ,t)

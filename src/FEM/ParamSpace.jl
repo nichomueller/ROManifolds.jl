@@ -33,9 +33,9 @@ _get_params(r::TransientParamRealization) = _get_params(r.params)
 num_params(r::TransientParamRealization) = num_params(r.params)
 num_times(r::TransientParamRealization) = length(get_times(r))
 
-struct GenericTransientParamRealization{P,T} <: TransientParamRealization{P,T}
+struct GenericTransientParamRealization{P,T,A} <: TransientParamRealization{P,T}
   params::P
-  times::AbstractVector{T}
+  times::A
   t0::T
 end
 
@@ -127,14 +127,15 @@ abstract type SamplingStyle end
 struct UniformSampling <: SamplingStyle end
 struct NormalSampling <: SamplingStyle end
 
-struct ParamSpace <: AbstractSet{ParamRealization}
-  param_domain::AbstractVector
-  sampling_style::SamplingStyle
+struct ParamSpace{P,S} <: AbstractSet{ParamRealization}
+  param_domain::P
+  sampling_style::S
   function ParamSpace(
-    param_domain::AbstractVector{<:AbstractVector},
-    sampling=UniformSampling())
+    param_domain::P,
+    sampling::S=UniformSampling()
+    ) where {P<:AbstractVector{<:AbstractVector},S}
 
-    new(param_domain,sampling)
+    new{P,S}(param_domain,sampling)
   end
 end
 
@@ -153,17 +154,18 @@ function realization(p::ParamSpace;nparams=1)
   ParamRealization([generate_param(p) for i = 1:nparams])
 end
 
-struct TransientParamSpace <: AbstractSet{TransientParamRealization}
-  parametric_space::ParamSpace
-  temporal_domain::AbstractVector
-  function TransientParamSpace(
-    param_domain::AbstractVector{<:AbstractVector},
-    temporal_domain::AbstractVector{<:Real},
-    sampling=UniformSampling())
+struct TransientParamSpace{P,T} <: AbstractSet{TransientParamRealization}
+  parametric_space::P
+  temporal_domain::T
+end
 
-    parametric_space = ParamSpace(param_domain,sampling)
-    new(parametric_space,temporal_domain)
-  end
+function TransientParamSpace(
+  param_domain::AbstractVector{<:AbstractVector},
+  temporal_domain::AbstractVector{<:Real},
+  sampling=UniformSampling())
+
+  parametric_space = ParamSpace(param_domain,sampling)
+  TransientParamSpace(parametric_space,temporal_domain)
 end
 
 function Base.show(io::IO,::MIME"text/plain",p::TransientParamSpace)

@@ -16,11 +16,11 @@ function FEM.get_H1_norm_matrix(
   end
 end
 
-struct DistributedTransientSnapshots{T<:AbstractVector{<:RB.AbstractTransientSnapshots}}
+struct DistributedTransientSnapshots{T<:AbstractVector{<:AbstractTransientSnapshots}}
   snaps::T
 end
 
-function DistributedSnapshots(snaps::AbstractVector{<:RB.AbstractTransientSnapshots})
+function DistributedSnapshots(snaps::AbstractVector{<:AbstractTransientSnapshots})
   DistributedTransientSnapshots(snaps)
 end
 

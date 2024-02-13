@@ -1,9 +1,10 @@
 abstract type AbstractParamContainer{T,N} <: AbstractArray{T,N} end
 
-struct ParamContainer{T,L} <: AbstractParamContainer{T,1}
-  array::AbstractVector{T}
+struct ParamContainer{T,A,L} <: AbstractParamContainer{T,1}
+  array::A
   function ParamContainer(array::AbstractVector{T},::Val{L}) where {T,L}
-    new{T,L}(array)
+    A = typeof(array)
+    new{T,A,L}(array)
   end
 end
 
@@ -12,7 +13,7 @@ ParamContainer(array::AbstractVector{T}) where T<:AbstractArray = ParamArray(arr
 
 Arrays.get_array(a::ParamContainer) = a.array
 Arrays.testitem(c::ParamContainer) = testitem(get_array(c))
-Base.length(c::ParamContainer{T,L}) where {T,L} = L
+Base.length(c::ParamContainer{T,A,L}) where {T,A,L} = L
 Base.size(c::ParamContainer) = (length(c),)
 Base.eachindex(c::ParamContainer) = Base.OneTo(length(c))
 Base.getindex(c::ParamContainer,i...) = getindex(get_array(c),i...)

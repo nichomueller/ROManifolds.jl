@@ -97,8 +97,8 @@ function combine_basis_time(
 end
 
 struct ReducedIntegrationDomain{T}
-  indices_space::AbstractVector{T}
-  indices_time::AbstractVector{T}
+  indices_space::Vector{T}
+  indices_time::Vector{T}
 end
 
 get_indices_space(i::ReducedIntegrationDomain) = i.indices_space

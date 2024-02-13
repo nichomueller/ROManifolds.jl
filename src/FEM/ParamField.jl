@@ -57,12 +57,16 @@ function Base.iterate(f::ZeroParamField,oldstate...)
   ZeroField(fit),nextstate
 end
 
-struct ConstantParamField{T<:Number} <: ParamField
+struct ConstantParamField{T<:Number,V} <: ParamField
   value::AbstractVector{T}
+  function ConstantParamField(value::AbstractVector{T}) where T
+    V = typeof(value)
+    new{T,V}(value)
+  end
 end
 
 Fields.ConstantField(a::AbstractVector{T}) where T<:Number = ConstantParamField(a)
-Base.zero(::Type{ConstantParamField{T}}) where T = ConstantField(zero.(T))
+Base.zero(::Type{<:ConstantParamField{T}}) where T = ConstantField(zero.(T))
 Base.length(f::ConstantParamField) = length(f.value)
 Arrays.testitem(f::ConstantParamField) = ConstantField(testitem(f.value))
 
