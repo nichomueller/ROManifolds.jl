@@ -342,7 +342,7 @@ function mdeim_coeff!(
   for j in 1:ns
     sorted_idx = [(i-1)*ns+j for i = 1:nt]
     @inbounds for i = eachindex(coeff_recast)
-      coeff_recast[i][:,j] = a.basis_time*coeff[sorted_idx,:]
+      coeff_recast[i][:,j] = a.basis_time*coeff[sorted_idx,i]
     end
   end
 end

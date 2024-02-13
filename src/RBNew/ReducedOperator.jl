@@ -136,23 +136,43 @@ function ODETools._vector!(cache,op::ReducedOperator,r,dtθ,u0,ode_cache,vθ)
   return b
 end
 
-function _union_reduced_times(op::ReducedOperator)
+function _union_reduced_times_mat(op::ReducedOperator)
   ilhs = ()
   for lhs in op.lhs
     for (trian,values) in lhs.dict
       ilhs = (ilhs...,get_integration_domain(values))
     end
   end
+  union_indices_time(ilhs...)
+end
+
+function _union_reduced_times_vec(op::ReducedOperator)
   irhs = ()
   for (trian,values) in op.rhs.dict
     irhs = (irhs...,get_integration_domain(values))
   end
-  union_indices_time(ilhs...,irhs...)
+  union_indices_time(irhs...)
+end
+
+function _select_fe_quantities_at_time_locations(xhF,ode_cache,r,red_times)
+  nparams = num_params(r)
+  pt_indices = vec(transpose((red_times.-1)*nparams .+ collect(1:nparams)'))
+  Us,Uts,fecache = ode_cache
+  new_xhF = ()
+  new_Us = ()
+  for i = eachindex(xhF)
+    spacei = Us[i].space
+    dvi = ParamArray(Us[i].dirichlet_values[pt_indices])
+    new_Us = (new_Us...,TrialParamFESpace(dvi,spacei))
+    new_xhF = (new_xhF...,ParamArray(xhF[i][pt_indices]))
+  end
+  new_ode_cache = new_Us,Uts,fecache
+  return new_xhF,new_ode_cache
 end
 
 function _select_snapshots_at_space_time_locations(s,a,red_times)
   ids_space = get_indices_space(a)
-  ids_time = filter(!isnothing,indexin(red_times,get_indices_time(a)))
+  ids_time = filter(!isnothing,indexin(get_indices_time(a),red_times))
   ids_param = Base.OneTo(num_params(s))
   snew = reverse_snapshots_at_indices(s,ids_space)
   select_snapshots(snew,ids_time,ids_param)
@@ -175,9 +195,10 @@ function fe_matrix!(
   γ::Tuple{Vararg{Real}},
   ode_cache)
 
-  red_times = _union_reduced_times(op)
+  red_times = _union_reduced_times_mat(op)
   red_r = r[:,red_times]
-  A = fe_matrix!(cache,op.pop,red_r,xhF,γ,ode_cache)
+  red_xhF,red_ode_cache = _select_fe_quantities_at_time_locations(xhF,ode_cache,r,red_times)
+  A = fe_matrix!(cache,op.pop,red_r,red_xhF,γ,red_ode_cache)
   map(A,op.lhs) do A,lhs
     _select_snapshots_at_space_time_locations(A,lhs,red_times)
   end
@@ -190,9 +211,10 @@ function fe_vector!(
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
 
-  red_times = _union_reduced_times(op)
+  red_times = _union_reduced_times_vec(op)
+  red_xhF,red_ode_cache = _select_fe_quantities_at_time_locations(xhF,ode_cache,r,red_times)
   red_r = r[:,red_times]
-  b = fe_vector!(cache,op.pop,red_r,xhF,ode_cache)
+  b = fe_vector!(cache,op.pop,red_r,red_xhF,red_ode_cache)
   bi = _select_snapshots_at_space_time_locations(b,op.rhs,red_times)
   return bi
 end
