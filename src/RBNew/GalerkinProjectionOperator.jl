@@ -73,7 +73,7 @@ end
 function Algebra.solve(
   solver::RBThetaMethod,
   op::RBOperator,
-  s::AbstractMatrix)
+  s::AbstractTransientSnapshots)
 
   info = get_info(solver)
   son = select_snapshots(s,online_params(info))

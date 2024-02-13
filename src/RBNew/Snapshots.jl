@@ -40,19 +40,11 @@ slow_index(i::Colon,::Int) = i
 fast_index(i,N::Int) = mod.(i .- 1,N) .+ 1
 fast_index(i::Colon,::Int) = i
 
-function col_index(s::AbstractTransientSnapshots,mode2_index::Integer,param_index::Integer)
-  (mode2_index-1)*num_params(s)+param_index
-end
-function col_index(s::AbstractTransientSnapshots,mode2_index::Integer,param_index::AbstractVector)
-  map(i->col_index(s,mode2_index,i),param_index)
-end
-function col_index(s::AbstractTransientSnapshots,mode2_index::AbstractVector,param_index::Integer)
-  map(i->col_index(s,i,param_index),mode2_index)
+function col_index(s::AbstractTransientSnapshots,mode2_index,param_index)
+  (mode2_index .- 1)*num_params(s) .+ param_index
 end
 function col_index(s::AbstractTransientSnapshots,mode2_index::AbstractVector,param_index::AbstractVector)
-  map(mode2_index,param_index) do i,j
-    col_index(s,i,j)
-  end
+  vec(transpose((mode2_index.-1)*num_params(s) .+ collect(param_index)'))
 end
 function col_index(s::AbstractTransientSnapshots{Mode1Axis},::Colon,param_index)
   col_index(s,1:num_times(s),param_index)
@@ -60,11 +52,17 @@ end
 function col_index(s::AbstractTransientSnapshots{Mode2Axis},::Colon,param_index)
   col_index(s,1:num_space_dofs(s),param_index)
 end
+function col_index(s::AbstractTransientSnapshots{Mode1Axis},::Colon,::Colon)
+  col_index(s,1:num_times(s),1:num_params(s))
+end
+function col_index(s::AbstractTransientSnapshots{Mode2Axis},::Colon,::Colon)
+  col_index(s,1:num_space_dofs(s),1:num_params(s))
+end
 
 function Base.getindex(s::AbstractTransientSnapshots,i)
-  ncol = num_cols(s)
-  irow = slow_index(i,ncol)
-  icol = fast_index(i,ncol)
+  nrow = num_rows(s)
+  irow = fast_index(i,nrow)
+  icol = slow_index(i,nrow)
   getindex(s,irow,icol)
 end
 
@@ -91,12 +89,17 @@ function tensor_getindex(s::AbstractTransientSnapshots,ispace,itime,iparam)
   view(s,ispace,col_index(s,itime,iparam))
 end
 
-# function Base.setindex!(s::AbstractTransientSnapshots,v,i)
-#   ncol = num_cols(s)
-#   irow = slow_index(i,ncol)
-#   icol = fast_index(i,ncol)
-#   setindex!(s,v,irow,icol)
-# end
+function Base.setindex!(s::AbstractTransientSnapshots,v,i)
+  nrow = num_rows(s)
+  irow = fast_index(i,nrow)
+  icol = slow_index(i,nrow)
+  setindex!(s,v,irow,icol)
+end
+
+function Base.setindex!(s::AbstractTransientSnapshots,v,k::CartesianIndex)
+  ispace,j = k.I
+  setindex!(s,v,ispace,j)
+end
 
 function Base.setindex!(s::AbstractTransientSnapshots{Mode1Axis},v,ispace,j)
   np = num_params(s)

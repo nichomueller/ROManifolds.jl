@@ -68,13 +68,14 @@ function LinearAlgebra.mul!(
   b::A) where A<:BasicSnapshots
 
   np = num_params(b)
-  for i = axes(a,2)
+  for i = axes(a,1)
     for j = axes(b,2)
-      jt = RB.slow_index(j,np)
-      jp = RB.fast_index(j,np)
-      @inbounds c[i,j] = dot(a.parent.values[:,i],b.values[jp+(jt-1)*ns])
+      jt = slow_index(j,np)
+      jp = fast_index(j,np)
+      @inbounds c[i,j] = dot(a[i,:],b.values[jp+(jt-1)*np])
     end
   end
+  return c
 end
 
 function LinearAlgebra.mul!(
@@ -83,15 +84,16 @@ function LinearAlgebra.mul!(
   b::B) where {A<:BasicSnapshots,B<:BasicSnapshots,T}
 
   np = num_params(b)
-  for i = axes(a,2)
-    it = RB.slow_index(i,np)
-    ip = RB.fast_index(i,np)
+  for i = axes(a,1)
+    it = slow_index(i,np)
+    ip = fast_index(i,np)
     for j = axes(b,2)
-      jt = RB.slow_index(j,np)
-      jp = RB.fast_index(j,np)
-      @inbounds c[i,j] = dot(a.parent.values[ip][it],b.values[jp+(jt-1)*ns])
+      jt = slow_index(j,np)
+      jp = fast_index(j,np)
+      @inbounds c[i,j] = dot(a.parent.values[ip+(it-1)*np],b.values[jp+(jt-1)*np])
     end
   end
+  return c
 end
 
 function LinearAlgebra.mul!(
@@ -101,16 +103,17 @@ function LinearAlgebra.mul!(
 
   nt = num_params(b)
   np = num_params(b)
-  for i = axes(a,2)
-    it = RB.slow_index(i,np)
-    ip = RB.fast_index(i,np)
+  for i = axes(a,1)
+    it = slow_index(i,np)
+    ip = fast_index(i,np)
     icolumn = column_index(it,ip,nt,np)
     for j = axes(b,2)
-      jt = RB.slow_index(j,np)
-      jp = RB.fast_index(j,np)
-      @inbounds c[i,j] = dot(a.parent.values[:,icolumn],b.values[jp+(jt-1)*ns])
+      jt = slow_index(j,np)
+      jp = fast_index(j,np)
+      @inbounds c[i,j] = dot(a.parent.values[:,icolumn],b.values[jp+(jt-1)*np])
     end
   end
+  return c
 end
 
 function LinearAlgebra.mul!(
@@ -119,13 +122,14 @@ function LinearAlgebra.mul!(
   b::A) where A<:TransientSnapshots
 
   np = num_params(b)
-  for i = axes(a,2)
+  for i = axes(a,1)
     for j = axes(b,2)
-      jt = RB.slow_index(j,np)
-      jp = RB.fast_index(j,np)
-      @inbounds c[i,j] = dot(a.parent.values[:,i],b.values[jt][jp])
+      jt = slow_index(j,np)
+      jp = fast_index(j,np)
+      @inbounds c[i,j] = dot(a[i,:],b.values[jt][jp])
     end
   end
+  return c
 end
 
 function LinearAlgebra.mul!(
@@ -134,15 +138,16 @@ function LinearAlgebra.mul!(
   b::B) where {A<:TransientSnapshots,B<:TransientSnapshots,T}
 
   np = num_params(b)
-  for i = axes(a,2)
-    it = RB.slow_index(i,np)
-    ip = RB.fast_index(i,np)
+  for i = axes(a,1)
+    it = slow_index(i,np)
+    ip = fast_index(i,np)
     for j = axes(b,2)
-      jt = RB.slow_index(j,np)
-      jp = RB.fast_index(j,np)
-      @inbounds c[i,j] = dot(a.parent.values[ip][it],b.values[jt][jp])
+      jt = slow_index(j,np)
+      jp = fast_index(j,np)
+      @inbounds c[i,j] = dot(a.parent.values[it][ip],b.values[jt][jp])
     end
   end
+  return c
 end
 
 function LinearAlgebra.mul!(
@@ -152,16 +157,17 @@ function LinearAlgebra.mul!(
 
   nt = num_params(b)
   np = num_params(b)
-  for i = axes(a,2)
-    it = RB.slow_index(i,np)
-    ip = RB.fast_index(i,np)
+  for i = axes(a,1)
+    it = slow_index(i,np)
+    ip = fast_index(i,np)
     icolumn = column_index(it,ip,nt,np)
     for j = axes(b,2)
-      jt = RB.slow_index(j,np)
-      jp = RB.fast_index(j,np)
+      jt = slow_index(j,np)
+      jp = fast_index(j,np)
       @inbounds c[i,j] = dot(a.parent.values[:,icolumn],b.values[jt][jp])
     end
   end
+  return c
 end
 
 function LinearAlgebra.mul!(
@@ -173,13 +179,14 @@ function LinearAlgebra.mul!(
   Jt = time_indices(b)
   Jp = param_indices(b)
   np = num_params(b)
-  for i = axes(a,2)
+  for i = axes(a,1)
     for j = axes(b,2)
-      jt = RB.slow_index(j,np)
-      jp = RB.fast_index(j,np)
-      @inbounds c[i,j] = dot(a.values[:,i],b.values[Jt[jt]][Jp[jp]][Js])
+      jt = slow_index(j,np)
+      jp = fast_index(j,np)
+      @inbounds c[i,j] = dot(a[i,:],b.values[Jt[jt]][Jp[jp]][Js])
     end
   end
+  return c
 end
 
 function LinearAlgebra.mul!(
@@ -195,14 +202,15 @@ function LinearAlgebra.mul!(
   Jp = param_indices(b)
   np = num_params(b)
   for i = axes(a,2)
-    it = RB.slow_index(i,np)
-    ip = RB.fast_index(i,np)
+    it = slow_index(i,np)
+    ip = fast_index(i,np)
     for j = axes(b,2)
-      jt = RB.slow_index(j,np)
-      jp = RB.fast_index(j,np)
+      jt = slow_index(j,np)
+      jp = fast_index(j,np)
       @inbounds c[i,j] = dot(a.values[It[it]][Ip[ip]][Is],b.values[Jt[jt]][Jp[jp]][Js])
     end
   end
+  return c
 end
 
 function LinearAlgebra.mul!(
@@ -217,15 +225,16 @@ function LinearAlgebra.mul!(
   Jt = time_indices(b)
   Jp = param_indices(b)
   np = num_params(b)
-  for i = axes(a,2)
-    it = RB.slow_index(i,np)
-    ip = RB.fast_index(i,np)
+  for i = axes(a,1)
+    it = slow_index(i,np)
+    ip = fast_index(i,np)
     for j = axes(b,2)
-      jt = RB.slow_index(j,np)
-      jp = RB.fast_index(j,np)
-      @inbounds c[i,j] = dot(a.parent.snaps.values[Ip[ip]][It[it]][Is],b.snaps.values[Jt[jt]][Jp[jp]][Js])
+      jt = slow_index(j,np)
+      jp = fast_index(j,np)
+      @inbounds c[i,j] = dot(a.parent.snaps.values[It[it]][Ip[ip]][Is],b.snaps.values[Jt[jt]][Jp[jp]][Js])
     end
   end
+  return c
 end
 
 function LinearAlgebra.mul!(
@@ -234,13 +243,14 @@ function LinearAlgebra.mul!(
   b::A) where A<:InnerTimeOuterParamTransientSnapshots
 
   nt = num_times(b)
-  for i = axes(a,2)
+  for i = axes(a,1)
     for j = axes(b,2)
-      jt = RB.fast_index(j,nt)
-      jp = RB.slow_index(j,nt)
-      @inbounds c[i,j] = dot(a.parent.values[:,i],b.values[jp][jt])
+      jt = fast_index(j,nt)
+      jp = slow_index(j,nt)
+      @inbounds c[i,j] = dot(a[i,:],b.values[jp][jt])
     end
   end
+  return c
 end
 
 function LinearAlgebra.mul!(
@@ -249,15 +259,16 @@ function LinearAlgebra.mul!(
   b::B) where {A<:InnerTimeOuterParamTransientSnapshots,B<:InnerTimeOuterParamTransientSnapshots,T}
 
   nt = num_times(b)
-  for i = axes(a,2)
-    it = RB.fast_index(i,nt)
-    ip = RB.slow_index(i,nt)
+  for i = axes(a,1)
+    it = fast_index(i,nt)
+    ip = slow_index(i,nt)
     for j = axes(b,2)
-      jt = RB.fast_index(j,nt)
-      jp = RB.slow_index(j,nt)
-      @inbounds c[i,j] = dot(a.parent.values[it][ip],b.values[jp][jt])
+      jt = fast_index(j,nt)
+      jp = slow_index(j,nt)
+      @inbounds c[i,j] = dot(a.parent.values[ip][it],b.values[jp][jt])
     end
   end
+  return c
 end
 
 function LinearAlgebra.mul!(
@@ -267,16 +278,17 @@ function LinearAlgebra.mul!(
 
   nt = num_params(b)
   np = num_params(b)
-  for i = axes(a,2)
-    it = RB.fast_index(i,nt)
-    ip = RB.slow_index(i,nt)
+  for i = axes(a,1)
+    it = fast_index(i,nt)
+    ip = slow_index(i,nt)
     icolumn = column_index(it,ip,nt,np)
     for j = axes(b,2)
-      jt = RB.fast_index(j,nt)
-      jp = RB.slow_index(j,nt)
+      jt = fast_index(j,nt)
+      jp = slow_index(j,nt)
       @inbounds c[i,j] = dot(a.parent.values[:,icolumn],b.values[jp][jt])
     end
   end
+  return c
 end
 
 function LinearAlgebra.mul!(
@@ -288,13 +300,14 @@ function LinearAlgebra.mul!(
   Jt = time_indices(b)
   Jp = param_indices(b)
   np = num_params(b)
-  for i = axes(a,2)
+  for i = axes(a,1)
     for j = axes(b,2)
-      jt = RB.slow_index(j,np)
-      jp = RB.fast_index(j,np)
-      @inbounds c[i,j] = dot(a.values[:,i],b.values[Jp[jp]][Jt[jt]][Js])
+      jt = slow_index(j,np)
+      jp = fast_index(j,np)
+      @inbounds c[i,j] = dot(a[i,:],b.values[Jp[jp]][Jt[jt]][Js])
     end
   end
+  return c
 end
 
 function LinearAlgebra.mul!(
@@ -310,14 +323,15 @@ function LinearAlgebra.mul!(
   Jp = param_indices(b)
   np = num_params(b)
   for i = axes(a,2)
-    it = RB.slow_index(i,np)
-    ip = RB.fast_index(i,np)
+    it = slow_index(i,np)
+    ip = fast_index(i,np)
     for j = axes(b,2)
-      jt = RB.slow_index(j,np)
-      jp = RB.fast_index(j,np)
+      jt = slow_index(j,np)
+      jp = fast_index(j,np)
       @inbounds c[i,j] = dot(a.values[Ip[ip]][It[it]][Is],b.values[Jp[jp]][Jt[jt]][Js])
     end
   end
+  return c
 end
 
 function LinearAlgebra.mul!(
@@ -332,13 +346,14 @@ function LinearAlgebra.mul!(
   Jt = time_indices(b)
   Jp = param_indices(b)
   np = num_params(b)
-  for i = axes(a,2)
-    it = RB.slow_index(i,np)
-    ip = RB.fast_index(i,np)
+  for i = axes(a,1)
+    it = slow_index(i,np)
+    ip = fast_index(i,np)
     for j = axes(b,2)
-      jt = RB.slow_index(j,np)
-      jp = RB.fast_index(j,np)
+      jt = slow_index(j,np)
+      jp = fast_index(j,np)
       @inbounds c[i,j] = dot(a.parent.values[Ip[ip]][It[it]][Is],b.values[Jp[jp]][Jt[jt]][Js])
     end
   end
+  return c
 end
