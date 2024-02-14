@@ -96,6 +96,6 @@ struct ParamJaggedArrayAssemblyCache{T}
   cache::ParamVectorAssemblyCache{T}
 end
 
-function JaggedArrayAssemblyCache(cache::ParamVectorAssemblyCache{T}) where T
+function PartitionedArrays.JaggedArrayAssemblyCache(cache::ParamVectorAssemblyCache{T}) where T
   ParamJaggedArrayAssemblyCache(cache)
 end

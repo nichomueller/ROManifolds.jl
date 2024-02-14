@@ -1,8 +1,8 @@
 function load_solve(solver::RBSolver,args...;kwargs...)
   info = get_info(solver)
-  snaps = deserialize(get_snapshots_dir(info))
-  fem_stats = deserialize(get_stats_dir(info))
-  rbop = deserialize(get_reduced_operator_dir(info))
+  snaps = deserialize(get_snapshots_filename(info))
+  fem_stats = deserialize(get_stats_filename(info))
+  rbop = deserialize(get_op_filename(info))
   rb_sol,rb_stats = solve(solver,rbop,snaps)
   results = rb_results(solver,rbop,snaps,rb_sol,fem_stats,rb_stats;kwargs...)
   return results
@@ -18,16 +18,16 @@ function DrWatson.save(info::RBInfo,args::Tuple)
   end
 end
 
-get_snapshots_dir(info::RBInfo) = info.dir * "/snapshots.jld"
+get_snapshots_filename(info::RBInfo) = info.dir * "/snapshots.jld"
 
 function DrWatson.save(info::RBInfo,s::AbstractTransientSnapshots)
-  serialize(get_snapshots_dir(info),s)
+  serialize(get_snapshots_filename(info),s)
 end
 
-get_reduced_operator_dir(info::RBInfo) = info.dir * "/operator.jld"
+get_op_filename(info::RBInfo) = info.dir * "/operator.jld"
 
 function DrWatson.save(info::RBInfo,op::ReducedOperator)
-  serialize(get_reduced_operator_dir(info),op)
+  serialize(get_op_filename(info),op)
 end
 
 struct ComputationalStats
@@ -43,10 +43,10 @@ end
 get_avg_time(c::ComputationalStats) = c.avg_time
 get_avg_nallocs(c::ComputationalStats) = c.avg_nallocs
 
-get_stats_dir(info::RBInfo) = info.dir * "/stats.jld"
+get_stats_filename(info::RBInfo) = info.dir * "/stats.jld"
 
 function DrWatson.save(info::RBInfo,c::ComputationalStats)
-  serialize(get_stats_dir(info),c)
+  serialize(get_stats_filename(info),c)
 end
 
 struct RBResults
@@ -81,10 +81,10 @@ function rb_results(solver,op::ReducedOperator,args...;kwargs...)
   rb_results(solver,feop,args...;kwargs...)
 end
 
-get_results_dir(info::RBInfo) = info.dir * "/results.jld"
+get_results_filename(info::RBInfo) = info.dir * "/results.jld"
 
 function DrWatson.save(info::RBInfo,r::RBResults)
-  serialize(get_results_dir(info),r)
+  serialize(get_results_filename(info),r)
 end
 
 function speedup(fem_stats::ComputationalStats,rb_stats::ComputationalStats)

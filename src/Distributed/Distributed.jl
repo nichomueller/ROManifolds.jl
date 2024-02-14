@@ -4,7 +4,8 @@ using Mabla.RB
 
 using LinearAlgebra
 using SparseArrays
-using PartitionedArrays
+using Serialization
+using DrWatson
 using Gridap
 using Gridap.Algebra
 using Gridap.FESpaces
@@ -87,12 +88,34 @@ export DistributedRBSpace
 export project_recast
 
 include("DistributedUtils.jl")
+
+export PVectorParamCounter
+export DistributedParamAllocationVector
 include("Algebra.jl")
+
+export ParamJaggedArray
+export ParamVectorAssemblyCache
+export ParamJaggedArrayAssemblyCache
 include("ParamJaggedArray.jl")
+
+export ParamSubSparseMatrix
 include("ParamSparseUtils.jl")
+
 include("Primitives.jl")
+
+export DistributedSingleFieldParamFESpace
+export DistributedSingleFieldParamFEFunction
 include("ParamFESpaces.jl")
+
 include("TransientParamFESpaces.jl")
+
+export DistributedMultiFieldParamFESpace
+export DistributedMultiFieldParamFEFunction
+export DistributedParamFESpace
 include("MultiField.jl")
+
+export DistributedTransientSnapshots
+export DistributedSnapshots
+export DistributedRBSpace
 include("SingleRB.jl")
 end

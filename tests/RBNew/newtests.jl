@@ -14,18 +14,13 @@ using Mabla.FEM
 using Mabla.RB
 
 θ = 0.5
-dt = 0.1
+dt = 0.01
 t0 = 0.0
-tf = 1.0
+tf = 0.1
 
 pranges = fill([1,10],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
-r = realization(ptspace,nparams=3)
-
-# domain = (0,1,0,1)
-# partition = (2,2)
-# model = CartesianDiscreteModel(domain,partition)
 model_dir = datadir(joinpath("models","elasticity_3cyl2D.json"))
 model = DiscreteModelFromFile(model_dir)
 
@@ -35,7 +30,6 @@ order = 1
 degree = 2*order
 Ω = Triangulation(model)
 dΩ = Measure(Ω,degree)
-# Γn = BoundaryTriangulation(model,tags=[7,8])
 Γn = BoundaryTriangulation(model,tags=["neumann"])
 dΓn = Measure(Γn,degree)
 
@@ -69,7 +63,6 @@ trian_jac_t = (Ω,)
 
 T = Float64
 reffe = ReferenceFE(lagrangian,T,order)
-# test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6])
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = TransientTrialParamFESpace(test,gμt)
 feop = AffineTransientParamFEOperator(res,jac,jac_t,ptspace,trial,test,trian_res,trian_jac,trian_jac_t)

@@ -282,11 +282,11 @@ using Mabla.FEM
 using Mabla.RB
 
 θ = 0.5
-dt = 0.1
+dt = 0.01
 t0 = 0.0
-tf = 1.0
+tf = 0.1
 
-pranges = fill([1,5],3)
+pranges = fill([1,10],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 
@@ -301,7 +301,7 @@ degree = 2*order
 dΩ = Measure(Ω,degree)
 Γn = BoundaryTriangulation(model,tags=["neumann"])
 dΓn = Measure(Γn,degree)
-a(x,μ,t) = 1+(sin(t)+cos(t))*x[1]/sum(μ)
+a(x,μ,t) = 1+exp(-sin(t)^2*x[1]/sum(μ))
 a(μ,t) = x->a(x,μ,t)
 aμt(μ,t) = TransientParamFunction(a,μ,t)
 
@@ -317,7 +317,7 @@ g(x,μ,t) = μ[1]*exp(-x[1]/μ[2])*abs(sin(t/μ[3]))
 g(μ,t) = x->g(x,μ,t)
 gμt(μ,t) = TransientParamFunction(g,μ,t)
 
-u0(x,μ) = 0
+u0(x,μ) = 0.0
 u0(μ) = x->u0(x,μ)
 u0μ(μ) = ParamFunction(u0,μ)
 
@@ -340,7 +340,7 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 dir = datadir(joinpath("heateq","toy_mesh"))
-info = RBInfo(dir;nsnaps_state=20,nsnaps_test=5,nsnaps_mdeim=20)
+info = RBInfo(dir;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 
 rbsolver = RBSolver(info,fesolver)
 
@@ -413,44 +413,3 @@ A,b = ODETools._matrix_and_vector!(mat_cache,vec_cache,red_op,r_on,dtθ,y,ode_ca
 # errors
 errA = norm(A[1] - AMrb)
 errb = norm(b[1] + Rrb)
-
-
-# res
-mat_cache,vec_cache = ODETools._allocate_matrix_and_vector(red_op,r_on,y,ode_cache)
-fe_b,coeff_cache,lincomb_cache = vec_cache
-fe_sb = fe_vector!(fe_b,red_op,r_on,(y,z),ode_cache)
-
-LURHS = get_values(red_op.rhs)[1].mdeim_interpolation
-LULHS = get_values(red_op.lhs[1])[1].mdeim_interpolation
-
-smdeim = select_snapshots(snaps,RB.mdeim_params(rbsolver.info))
-contribs_mat,contribs_vec = fe_matrix_and_vector(rbsolver,pop,smdeim)
-contribs_vec1 = get_values(contribs_vec)[1]
-basis_space,basis_time = reduced_basis(contribs_vec1;ϵ=1e-4)
-norm(basis_space'*basis_space)^2
-norm(basis_time'*basis_time)^2
-
-indices_space,zio = RB.get_mdeim_indices(basis_space)
-interp_basis_space = view(basis_space,indices_space,:)
-ids,zio=RB.get_mdeim_indices(basis_time)
-
-# create SDP matrix
-A = rand(100,20)
-AA = A'*A
-ids,ress=RB.get_mdeim_indices(AA)
-
-_R(t,u,v) = ∫(v*∂t(u))dΩ + ∫(a(μ_on,t)*∇(v)⋅∇(u))dΩ - ∫(f(μ_on,t)*v)dΩ
-function _get_res(t)
-  fs = fs_t(t)
-  dfs = dfs_t(t)
-  x0 = zeros(ns)
-  xh = TransientCellField(EvaluationFunction(fs,x0),(EvaluationFunction(dfs,x0),))
-  assemble_vector(v->_R(t,xh,v),test)
-end
-rmdeim = get_realization(smdeim)
-A = Snapshots(ParamArray([_get_res(t) for (μ,t) in rmdeim]),rmdeim)
-U,_,_ = svd(A)
-U5 = U[:,1:12]
-ids,ress=RB.get_mdeim_indices(U5)
-check_det(U5,ids)
-check_det(A,ids) = sqrt(det(A[ids,:]'*A[ids,:]))

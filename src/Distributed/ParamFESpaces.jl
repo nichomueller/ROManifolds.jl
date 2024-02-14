@@ -134,3 +134,7 @@ end
 const DistributedMultiFieldParamFESpace = GridapDistributed.DistributedMultiFieldFESpace{MS,<:AbstractVector{<:MultiFieldParamFESpace},B,C,D} where {MS,B,C,D}
 const DistributedMultiFieldParamFEFunction = GridapDistributed.DistributedMultiFieldFEFunction{<:AbstractVector{<:SingleFieldParamFEFunction},B,C} where {B,C}
 const DistributedParamFESpace = Union{DistributedSingleFieldParamFESpace,DistributedMultiFieldParamFESpace}
+
+function FEM.get_polynomial_order(f::DistributedFESpace)
+  FEM.get_polynomial_order(PartitionedArrays.getany(local_views(f)))
+end
