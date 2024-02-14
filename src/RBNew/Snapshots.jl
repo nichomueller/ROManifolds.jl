@@ -813,3 +813,126 @@ function recast(a::AbstractMatrix,s::NnzSnapshots{Mode1Axis})
   end
   return Snapshots(ParamArray(asparse),r1,s.mode)
 end
+
+const AbstractSubTransientSnapshots = Union{
+  AbstractTransientSnapshots{M,T},
+  SubArray{T,2,AbstractTransientSnapshots{M,T}}
+  } where {M,T}
+
+# function LinearAlgebra.mul!(
+#   c::AbstractMatrix,
+#   a::A,
+#   b::AbstractMatrix,
+#   α::Number,β::Number
+#   ) where {A<:AbstractSubTransientSnapshots}
+
+#   mul!(c,collect(a),b,α,β)
+# end
+
+# function LinearAlgebra.mul!(
+#   c::AbstractMatrix,
+#   a::AbstractMatrix,
+#   b::B,
+#   α::Number,β::Number
+#   ) where {B<:AbstractSubTransientSnapshots}
+
+#   mul!(c,a,collect(b),α,β)
+# end
+
+# function LinearAlgebra.mul!(
+#   c::AbstractMatrix,
+#   a::A,
+#   b::B,
+#   α::Number,β::Number
+#   ) where {A<:AbstractSubTransientSnapshots,B<:AbstractSubTransientSnapshots}
+
+#   mul!(c,collect(a),collect(b),α,β)
+# end
+
+# function LinearAlgebra.mul!(
+#   c::AbstractMatrix,
+#   a::Adjoint{T,A},
+#   b::AbstractMatrix,
+#   α::Number,β::Number
+#   ) where {T,A<:AbstractSubTransientSnapshots}
+
+#   mul!(c,collect(a),b,α,β)
+# end
+
+# function LinearAlgebra.mul!(
+#   c::AbstractMatrix,
+#   a::Adjoint{T,A},
+#   b::B,
+#   α::Number,β::Number
+#   ) where {T,A<:AbstractSubTransientSnapshots,B<:AbstractSubTransientSnapshots}
+
+#   mul!(c,collect(a),collect(b),α,β)
+# end
+
+function (*)(
+  a::Adjoint{<:Any,<:AbstractTransientSnapshots},
+  b::AbstractMatrix
+  )
+
+  (*)(collect(a),b)
+end
+
+function (*)(
+  a::Adjoint{<:Any,<:AbstractVecOrMat},
+  b::AbstractTransientSnapshots
+  )
+
+  (*)(a,collect(b))
+end
+
+function (*)(
+  a::Adjoint{<:Any,<:AbstractTransientSnapshots},
+  b::AbstractTransientSnapshots
+  )
+
+  (*)(collect(a),collect(b))
+end
+
+function (*)(
+  a::Adjoint{<:Any,<:AbstractTransientSnapshots},
+  b::Diagonal
+  )
+
+  (*)(collect(a),b)
+end
+
+function (*)(
+  a::Diagonal,
+  b::AbstractTransientSnapshots
+  )
+
+  (*)(a,collect(b))
+end
+
+for op in (:*,:\)
+  @eval begin
+    function ($op)(
+      a::A,
+      b::AbstractMatrix
+      ) where A<:AbstractSubTransientSnapshots
+
+      ($op)(a,collect(b))
+    end
+
+    function ($op)(
+      a::AbstractMatrix,
+      b::A
+      ) where A<:AbstractSubTransientSnapshots
+
+      ($op)(a,collect(b))
+    end
+
+    function ($op)(
+      a::A,
+      b::B
+      ) where {A<:AbstractSubTransientSnapshots,B<:AbstractSubTransientSnapshots}
+
+      ($op)(collect(a),collect(b))
+    end
+  end
+end

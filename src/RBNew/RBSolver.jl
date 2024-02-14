@@ -42,7 +42,7 @@ num_online_params(info::RBInfo) = info.nsnaps_test
 online_params(info::RBInfo) = 1+num_offline_params(info):num_online_params(info)+num_offline_params(info)
 FEM.num_params(info::RBInfo) = num_offline_params(info) + num_online_params(info)
 num_mdeim_params(info::RBInfo) = info.nsnaps_mdeim
-mdeim_params(info::RBInfo) = 1:num_offline_params(info)
+mdeim_params(info::RBInfo) = 1:num_mdeim_params(info)
 get_tol(info::RBInfo) = info.ϵ
 
 function get_norm_matrix(info::RBInfo,feop::TransientParamFEOperator)

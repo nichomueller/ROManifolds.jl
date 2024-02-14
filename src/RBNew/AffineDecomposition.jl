@@ -2,18 +2,15 @@
 
 function get_mdeim_indices(A::AbstractMatrix{T}) where T
   m,n = size(A)
-  proj = zeros(T,m)
   res = zeros(T,m)
   I = zeros(Int,n)
   I[1] = argmax(abs.(A[:,1]))
-
   if n > 1
     @inbounds for i = 2:n
       Bi = A[:,1:i-1]
       Ci = A[I[1:i-1],1:i-1]
       Di = A[I[1:i-1],i]
-      proj .= Bi*(Ci \ Di)
-      res .= A[:,i] - proj
+      res .= A[:,i] - Bi*(Ci \ Di)
       I[i] = argmax(abs.(res))
     end
   end
@@ -100,9 +97,9 @@ function combine_basis_time(
   combine(bt_proj,bt_proj_shift)
 end
 
-struct ReducedIntegrationDomain{T}
-  indices_space::Vector{T}
-  indices_time::Vector{T}
+struct ReducedIntegrationDomain{S<:AbstractVector,T<:AbstractVector}
+  indices_space::S
+  indices_time::T
 end
 
 get_indices_space(i::ReducedIntegrationDomain) = i.indices_space

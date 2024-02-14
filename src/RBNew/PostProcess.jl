@@ -1,9 +1,4 @@
-function load_solve(
-  solver::RBSolver,
-  feop::TransientParamFEOperator,
-  args...;
-  kwargs...)
-
+function load_solve(solver::RBSolver,args...;kwargs...)
   info = get_info(solver)
   snaps = deserialize(get_snapshots_dir(info))
   fem_stats = deserialize(get_stats_dir(info))

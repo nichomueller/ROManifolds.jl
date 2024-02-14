@@ -13,21 +13,21 @@ using DrWatson
 using Mabla.FEM
 using Mabla.RB
 
-θ = 1
+θ = 0.5
 dt = 0.1
 t0 = 0.0
 tf = 1.0
 
-pranges = fill([0,1],3)
+pranges = fill([1,10],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 r = realization(ptspace,nparams=3)
 
-domain = (0,1,0,1)
-partition = (2,2)
-model = CartesianDiscreteModel(domain,partition)
-# model_dir = datadir(joinpath("models","elasticity_3cyl2D.json"))
-# model = DiscreteModelFromFile(model_dir)
+# domain = (0,1,0,1)
+# partition = (2,2)
+# model = CartesianDiscreteModel(domain,partition)
+model_dir = datadir(joinpath("models","elasticity_3cyl2D.json"))
+model = DiscreteModelFromFile(model_dir)
 
 ########################## HEAT EQUATION ############################
 
@@ -35,11 +35,11 @@ order = 1
 degree = 2*order
 Ω = Triangulation(model)
 dΩ = Measure(Ω,degree)
-Γn = BoundaryTriangulation(model,tags=[7,8])
-# Γn = BoundaryTriangulation(model,tags=["neumann"])
+# Γn = BoundaryTriangulation(model,tags=[7,8])
+Γn = BoundaryTriangulation(model,tags=["neumann"])
 dΓn = Measure(Γn,degree)
 
-a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
+a(x,μ,t) = 1+exp(-sin(t)^2*x[1]/sum(μ))
 a(μ,t) = x->a(x,μ,t)
 aμt(μ,t) = TransientParamFunction(a,μ,t)
 
@@ -69,8 +69,8 @@ trian_jac_t = (Ω,)
 
 T = Float64
 reffe = ReferenceFE(lagrangian,T,order)
-test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6])
-# test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
+# test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6])
+test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = TransientTrialParamFESpace(test,gμt)
 feop = AffineTransientParamFEOperator(res,jac,jac_t,ptspace,trial,test,trian_res,trian_jac,trian_jac_t)
 
@@ -89,26 +89,47 @@ son = select_snapshots(snaps,RB.online_params(info))
 ron = get_realization(son)
 xrb, = solve(rbsolver,red_op,ron)
 son_rev = reverse_snapshots(son)
-norm(xrb - son_rev)
+RB.space_time_error(son_rev,xrb,nothing)
 
 info_space = RBInfo(dir;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 rbsolver_space = RBSolver(info_space,fesolver)
 red_op_space = reduced_operator(rbsolver_space,feop,snaps)
 xrb_space, = solve(rbsolver_space,red_op_space,ron)
-norm(xrb_space - son_rev)
+RB.space_time_error(son_rev,xrb_space,nothing)
 
-xrb_loaded = load_solve(rbsolver,feop)
-xrb_space_loaded = load_solve(rbsolver_space,feop)
+xrb_loaded = load_solve(rbsolver)
+xrb_space_loaded = load_solve(rbsolver_space)
 
 #
-# red_trial,red_test = reduced_fe_space(info,feop,snaps)
-ϵ = RB.get_tol(info)
-norm_matrix = RB.get_norm_matrix(info,feop)
-soff = select_snapshots(snaps,RB.offline_params(info))
-odeop = get_algebraic_operator(feop)
+r = realization(ptspace,nparams=3)
+μ = FEM._get_params(r)[3]
 
-χ = rand(647,500)
-@time svd(χ)
-@time svd(soff)
+_a(x,t) = a(x,μ,t)
+_a(t) = x->_a(x,t)
 
-soff' * soff
+_f(x,t) = f(x,μ,t)
+_f(t) = x->_f(x,t)
+
+_g(x,t) = g(x,μ,t)
+_g(t) = x->_g(x,t)
+
+_h(x,t) = h(x,μ,t)
+_h(t) = x->_h(x,t)
+
+_b(t,v) = ∫(_f(t)*v)dΩ + ∫(_h(t)*v)dΓn
+_a(t,du,v) = ∫(_a(t)*∇(v)⋅∇(du))dΩ
+_m(t,dut,v) = ∫(v*dut)dΩ
+
+_trial = TransientTrialFESpace(test,_g)
+_feop = TransientAffineFEOperator(_m,_a,_b,_trial,test)
+_u0 = interpolate_everywhere(x->0.0,_trial(0.0))
+
+_sol = solve(fesolver,_feop,_u0,t0,tf)
+
+dir = datadir("sol_CN")
+createpvd(dir) do pvd
+  for (uh,t) in _sol
+    vtk = createvtk(Ω,dir*"sol_$(t).vtu",cellfields=["u"=>uh])
+    pvd[t] = vtk
+  end
+end
