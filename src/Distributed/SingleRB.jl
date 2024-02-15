@@ -8,24 +8,47 @@ function RB.get_norm_matrix(
   end
 end
 
-struct DistributedTransientSnapshots{T<:PVector{<:AbstractTransientSnapshots}}
+struct DistributedTransientSnapshots{T}
   snaps::T
 end
 
-function DistributedSnapshots(snaps::PVector{<:AbstractTransientSnapshots})
-  DistributedTransientSnapshots(snaps)
-end
+DistributedSnapshots(snaps) = DistributedTransientSnapshots(snaps)
 
 GridapDistributed.local_views(s::DistributedTransientSnapshots) = local_views(s.snaps)
 
 function RB.Snapshots(
-  values::AbstractVector{<:PVector{V}},
-  args...) where V
+  values::PVector{P},
+  args...) where {P<:AbstractParamContainer}
+
+  index_partition = values.index_partition
+  snaps = map(local_views(values)) do values
+    Snapshots(values,args...)
+  end
+  psnaps = PVector(snaps,index_partition)
+  DistributedSnapshots(psnaps)
+end
+
+function RB.Snapshots(
+  values::PSparseMatrix{P},
+  args...) where {P<:AbstractParamContainer}
+
+  row_partition = values.row_partition
+  col_partition = values.col_partition
+  snaps = map(local_views(values)) do values
+    Snapshots(values,args...)
+  end
+  psnaps = PSparseMatrix(snaps,row_partition,col_partition)
+  DistributedSnapshots(psnaps)
+end
+
+function RB.Snapshots(
+  values::AbstractVector{<:PVector{P}},
+  args...) where {P<:AbstractParamContainer}
 
   index_partition = first(values).index_partition
   parts = map(part_id,index_partition)
   snaps = map(parts) do part
-    vals_part = Vector{V}(undef,length(values))
+    vals_part = Vector{P}(undef,length(values))
     for (k,v) in enumerate(values)
       map(local_views(v),index_partition) do val,ip
         if part_id(ip) == part
@@ -37,6 +60,14 @@ function RB.Snapshots(
   end
   psnaps = PVector(snaps,index_partition)
   DistributedSnapshots(psnaps)
+end
+
+function RB.Snapshots(a::DistributedArrayContribution,args...)
+  b = GenericContribution(IdDict{DistributedTriangulation,DistributedTransientSnapshots}())
+  for (trian,values) in a.dict
+    b[trian] = Snapshots(values,args...)
+  end
+  b
 end
 
 function RB.get_values(s::DistributedTransientSnapshots)
@@ -164,42 +195,42 @@ function RB.recast(r::DistributedRBSpace,red_x::PVector)
   PVector(vector_partition,partition)
 end
 
-struct DistributedContribution{T<:AbstractVector{<:Contribution}} <: FEM.AbstractContribution
-  contribs::T
-end
+function RB.reduced_vector_form!(
+  a::DistributedAffineContribution,
+  info::RBInfo,
+  op::RBOperator,
+  s::DistributedTransientSnapshots,
+  trian::DistributedTriangulation)
 
-GridapDistributed.local_views(c::DistributedContribution) = c.contributions
-
-CellData.get_domains(c::DistributedContribution) = map(get_domains,local_values(c))
-FEM.get_values(c::DistributedContribution) = map(get_values,local_values(c))
-
-function CellData.get_contribution(c::DistributedContribution,trian::DistributedTriangulation)
-  map(local_views(c),local_views(trian)) do c,trian
-    get_contribution(c,trian)
+  map(local_views(a),local_views(s),local_views(trian)) do a,s,trian
+    reduced_vector_form!(a,info,op,s,trian)
   end
 end
 
-function CellData.add_contribution!(c::DistributedContribution,b,trian::DistributedTriangulation)
-  map(local_views(c),local_views(b),local_views(trian)) do c,b,trian
-    add_contribution!(c,b,trian)
+function RB.reduced_matrix_form!(
+  a::DistributedAffineContribution,
+  info::RBInfo,
+  op::RBOperator,
+  s::DistributedTransientSnapshots,
+  trian::DistributedTriangulation;
+  kwargs...)
+
+  map(local_views(a),local_views(s),local_views(trian)) do a,s,trian
+    reduced_matrix_form!(a,info,op,s,trian;kwargs...)
   end
 end
-
-const DistributedArrayContribution = DistributedContribution{T} where {T<:AbstractVector{<:ArrayContribution}}
-
-parray_contribution() =
-
-const DistributedAffineContribution = DistributedContribution{T} where {T<:AbstractVector{<:AffineContribution}}
 
 function RB.reduced_vector_form(
   solver::RBSolver,
   op::RBOperator,
   c::DistributedArrayContribution)
 
-  a = map(local_views(c)) do c
-    reduced_vector_form(solver,op,c)
+  info = get_info(solver)
+  a = distributed_affine_contribution()
+  for (trian,values) in c.dict
+    RB.reduced_vector_form!(a,info,op,values,trian)
   end
-  DistributedContribution(a)
+  return a
 end
 
 function RB.reduced_matrix_form(
@@ -208,10 +239,12 @@ function RB.reduced_matrix_form(
   c::DistributedArrayContribution;
   kwargs...)
 
-  a = map(local_views(c)) do c
-    reduced_matrix_form(solver,op,c;kwargs...)
+  info = get_info(solver)
+  a = distributed_affine_contribution()
+  for (trian,values) in c.dict
+    RB.reduced_matrix_form!(a,info,op,values,trian;kwargs...)
   end
-  DistributedContribution(a)
+  return a
 end
 
 # post process

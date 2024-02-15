@@ -303,6 +303,17 @@ function Algebra.allocate_residual(
   uh::T,
   cache) where T
 
+  b = array_contribution()
+  _allocate_residual(b,op,r,uh,cache)
+end
+
+function _allocate_residual(
+  b::GenericContribution,
+  op::TransientParamFEOperatorWithTrian,
+  r::TransientParamRealization,
+  uh::T,
+  cache) where T
+
   test = get_test(op)
   v = get_fe_basis(test)
   dxh = ()
@@ -312,9 +323,8 @@ function Algebra.allocate_residual(
   xh = TransientCellField(uh,dxh)
   dc = op.op.res(get_params(r),get_times(r),xh,v)
   assem = get_param_assembler(op.op.assem,r)
-  b = array_contribution()
   for trian in op.trian_res
-    vecdata = collect_cell_vector(test,dc)
+    vecdata = collect_cell_vector_for_trian(test,dc,trian)
     b[trian] = allocate_vector(assem,vecdata)
   end
   b
@@ -323,8 +333,23 @@ end
 function Algebra.allocate_jacobian(
   op::TransientParamFEOperatorWithTrian,
   r::TransientParamRealization,
-  uh::CellField,
-  cache)
+  uh::T,
+  cache) where T
+
+  A = ()
+  for i = 1:get_order(op)+1
+    Ai = array_contribution()
+    A = (A...,Ai)
+  end
+  _allocate_jacobian(A,op,r,uh,cache)
+end
+
+function _allocate_jacobian(
+  A::Tuple{Vararg{GenericContribution}},
+  op::TransientParamFEOperatorWithTrian,
+  r::TransientParamRealization,
+  uh::T,
+  cache) where T
 
   dxh = ()
   for i in 1:get_order(op)
@@ -336,22 +361,19 @@ function Algebra.allocate_jacobian(
   u = get_trial_fe_basis(trial)
   v = get_fe_basis(test)
   assem = get_param_assembler(op.op.assem,r)
-
-  A = ()
   for i = 1:get_order(op)+1
-    Ai = array_contribution()
+    Ai = A[i]
     dc = op.op.jacs[i](get_params(r),get_times(r),xh,u,v)
     for trian in op.trian_jacs[i]
       matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
       Ai[trian] = allocate_matrix(assem,matdata)
     end
-    A = (A...,Ai)
   end
   A
 end
 
 function Algebra.residual!(
-  b::AbstractContribution,
+  b::GenericContribution,
   op::TransientParamFEOperatorWithTrian,
   r::TransientParamRealization,
   xh::T,
@@ -370,7 +392,7 @@ function Algebra.residual!(
 end
 
 function Algebra.jacobian!(
-  A::AbstractContribution,
+  A::GenericContribution,
   op::TransientParamFEOperatorWithTrian,
   r::TransientParamRealization,
   xh::T,
@@ -393,7 +415,7 @@ function Algebra.jacobian!(
 end
 
 function ODETools.jacobians!(
-  A::Tuple{Vararg{AbstractContribution}},
+  A::Tuple{Vararg{GenericContribution}},
   op::TransientParamFEOperatorWithTrian,
   r::TransientParamRealization,
   xh::T,

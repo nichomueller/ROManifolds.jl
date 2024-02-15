@@ -81,7 +81,7 @@ export allocate_fe_matrix
 export allocate_fe_matrix_and_vector
 export fe_vector!
 export fe_matrix!
-export fe_matrices_and_vectors!
+export fe_matrix_and_vector!
 export fe_matrix_and_vector
 include("GalerkinProjectionOperator.jl")
 

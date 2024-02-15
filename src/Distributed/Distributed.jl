@@ -114,6 +114,12 @@ export DistributedMultiFieldParamFEFunction
 export DistributedParamFESpace
 include("MultiField.jl")
 
+export DistributedContribution
+export DistributedArrayContribution
+export DistributedAffineContribution
+export distributed_array_contribution
+include("DistributedContribution.jl")
+
 export DistributedTransientSnapshots
 export DistributedSnapshots
 export DistributedRBSpace

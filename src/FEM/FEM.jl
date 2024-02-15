@@ -67,6 +67,7 @@ include("ParamArray.jl")
 export ParamBlockArray
 include("ParamBlockArray.jl")
 
+export GenericContribution
 export Contribution
 export ArrayContribution
 export array_contribution

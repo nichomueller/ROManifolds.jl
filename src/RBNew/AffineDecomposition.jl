@@ -156,7 +156,7 @@ end
 
 const AffineContribution = Contribution{AffineDecomposition}
 
-affine_contribution() = Contribution(IdDict{Triangulation,AffineDecomposition}())
+affine_contribution() = GenericContribution(IdDict{Triangulation,AffineDecomposition}())
 
 function reduced_vector_form!(
   a::AffineContribution,

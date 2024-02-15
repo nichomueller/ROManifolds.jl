@@ -29,64 +29,26 @@ function ODETools.jacobians!(
   A
 end
 
-# function Algebra.allocate_residual(
-#   op::TransientParamFEOperatorWithTrian,
-#   r::TransientParamRealization,
-#   duh::Union{GridapDistributed.DistributedCellField,GridapDistributed.DistributedMultiFieldFEFunction},
-#   cache)
+function Algebra.allocate_residual(
+  op::TransientParamFEOperatorWithTrian,
+  r::TransientParamRealization,
+  duh::Union{GridapDistributed.DistributedCellField,GridapDistributed.DistributedMultiFieldFEFunction},
+  cache)
 
-#   test = get_test(op)
-#   v = get_fe_basis(test)
-#   dxh = ()
-#   for i in 1:get_order(op)
-#     dxh = (dxh...,duh)
-#   end
-#   xh = TransientCellField(duh,dxh)
-#   dc = op.op.res(get_params(r),get_times(r),xh,v)
-#   assem = FEM.get_param_assembler(op.op.assem,r)
-#   map(local_views(test),local_views(assem),local_views(dc),local_views.(op.trian_res)...
-#   ) do test,assem,dc,(trians...)
-#     b = array_contribution()
-#     for trian in trians
-#       vecdata = FEM.collect_cell_vector_for_trian(test,dc,trian)
-#       b[trian] = allocate_vector(assem,vecdata)
-#     end
-#     b
-#   end
-# end
+  b = distributed_array_contribution()
+  FEM._allocate_residual(b,op,r,duh,cache)
+end
 
-# function Algebra.allocate_jacobian(
-#   op::TransientParamFEOperatorWithTrian,
-#   r::TransientParamRealization,
-#   duh::Union{GridapDistributed.DistributedCellField,GridapDistributed.DistributedMultiFieldFEFunction},
-#   cache)
+function Algebra.allocate_jacobian(
+  op::TransientParamFEOperatorWithTrian,
+  r::TransientParamRealization,
+  duh::Union{GridapDistributed.DistributedCellField,GridapDistributed.DistributedMultiFieldFEFunction},
+  cache)
 
-#   dxh = ()
-#   for i in 1:get_order(op)
-#     dxh = (dxh...,duh)
-#   end
-#   xh = TransientCellField(duh,dxh)
-#   trial = evaluate(get_trial(op),nothing)
-#   test = get_test(op)
-#   u = get_trial_fe_basis(trial)
-#   v = get_fe_basis(test)
-#   assem = FEM.get_param_assembler(op.op.assem,r)
-
-#   A = ()
-#   for i = 1:get_order(op)+1
-#     Ai = array_contribution()
-#     dc = op.op.jacs[i](get_params(r),get_times(r),xh,u,v)
-#     triani = op.trian_jacs[i]
-#     Ai = map(local_views(trial),local_views(test),local_views(assem),local_views(dc),local_views.(triani)...
-#     ) do trial,test,assem,dc,(trians...)
-#       Ai = array_contribution()
-#       for trian in trians
-#         matdata = FEM.collect_cell_matrix_for_trian(trial,test,dc,trian)
-#         Ai[trian] = allocate_matrix(assem,matdata)
-#       end
-#       Ai
-#     end
-#     A = (A...,Ai)
-#   end
-#   A
-# end
+  A = ()
+  for i = 1:get_order(op)+1
+    Ai = distributed_array_contribution()
+    A = (A...,Ai)
+  end
+  FEM._allocate_jacobian(A,op,r,duh,cache)
+end

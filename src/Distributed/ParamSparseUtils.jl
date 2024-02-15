@@ -10,6 +10,14 @@ function PartitionedArrays.nzindex(a::ParamArray,args...)
   PartitionedArrays.nzindex(first(a),args...)
 end
 
+function PartitionedArrays.nziterator(a::RB.BasicNnzSnapshots)
+  PartitionedArrays.nziterator(first(get_values(a)))
+end
+
+function PartitionedArrays.nzindex(a::RB.BasicNnzSnapshots,args...)
+  PartitionedArrays.nzindex(first(get_values(a)),args...)
+end
+
 function PartitionedArrays.compresscoo(
   ::Type{ParamMatrix{T,A,L}},
   I::AbstractVector,

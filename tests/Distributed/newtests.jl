@@ -109,22 +109,5 @@ y .= 0.0
 ode_cache = allocate_cache(pop,r)
 A,b = allocate_fe_matrix_and_vector(pop,r,x,ode_cache)
 
-# ode_cache = update_cache!(ode_cache,op,r)
-# RB.fe_matrix_and_vector!(A,b,pop,r,dtθ,x,ode_cache,y)
-
-trialr = evaluate(trial,r)
-dxh = ()
-for i in 1:get_order(feop)
-  dxh = (dxh...,EvaluationFunction(trialr,y))
-end
-xh = TransientCellField(EvaluationFunction(trialr,y),dxh)
-trial0 = evaluate(trial,nothing)
-u = get_trial_fe_basis(trial0)
-v = get_fe_basis(test)
-assem = FEM.get_param_assembler(feop.op.assem,r)
-
-i = 1
-dc = feop.op.jacs[i](get_params(r),get_times(r),xh,u,v)
-trian = first(feop.trian_jacs[i])
-matdata = FEM.collect_cell_matrix_for_trian(trial0,test,dc,trian)
-AA = allocate_matrix(assem,matdata)
+ode_cache = update_cache!(ode_cache,pop,r)
+fe_matrix_and_vector!(A,b,pop,r,dtθ,x,ode_cache,y)

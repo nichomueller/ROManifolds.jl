@@ -1,45 +1,53 @@
-abstract type AbstractContribution end
-
-Base.getindex(a::AbstractContribution,trian::Triangulation) = get_contribution(a,trian)
-Base.setindex!(a::AbstractContribution,b,trian::Triangulation) = add_contribution!(a,b,trian)
-CellData.num_domains(a::AbstractContribution) = length(a.dict)
-
-struct Contribution{T} <: AbstractContribution
-  dict::IdDict{Triangulation,T}
+struct GenericContribution{K,V} <: AbstractDict{K,V}
+  dict::IdDict{K,V}
 end
 
-CellData.get_domains(a::Contribution) = collect(keys(a.dict))
-get_values(a::Contribution) = collect(values(a.dict))
+Base.length(a::GenericContribution) = length(a.dict)
+Base.iterate(a::GenericContribution,i...) = iterate(a.dict,i...)
+Base.getindex(a::GenericContribution{K},key::K) where K = get_contribution(a,key)
+Base.setindex!(a::GenericContribution,val::V,key::K) where {K,V} = add_contribution!(a,val,key)
+CellData.num_domains(a::GenericContribution) = length(a.dict)
+CellData.get_domains(a::GenericContribution) = collect(keys(a.dict))
+get_values(a::GenericContribution) = collect(values(a.dict))
 
-function CellData.get_contribution(a::T,trian::Triangulation) where T<:Contribution
-  if haskey(a.dict,trian)
-     return a.dict[trian]
+function CellData.get_contribution(
+  a::GenericContribution{K},
+  key::K) where K
+
+  if haskey(a.dict,key)
+     return a.dict[key]
   else
     @unreachable """\n
-    There is not contribution associated with the given mesh in this $T object.
+    There is not contribution associated with the given mesh in this $(typeof(a)) object.
     """
   end
 end
 
-function CellData.add_contribution!(a::Contribution{T},b::T,trian::Triangulation) where T
-  if haskey(a.dict,trian)
-    a.dict[trian] += b
+function CellData.add_contribution!(
+  a::GenericContribution{K,V},
+  val::V,
+  key::K) where {K,V}
+
+  if haskey(a.dict,key)
+    a.dict[key] += val
   else
-    a.dict[trian] = b
+    a.dict[key] = val
   end
   a
 end
 
+const Contribution{V} = GenericContribution{Triangulation,V}
+
 const ArrayContribution = Contribution{AbstractArray}
 
-array_contribution() = Contribution(IdDict{Triangulation,AbstractArray}())
+array_contribution() = GenericContribution(IdDict{Triangulation,AbstractArray}())
 
 struct ContributionBroadcast{D}
   contrib::D
 end
 
 function Base.broadcasted(f,a::ArrayContribution,b::Number)
-  c = Contribution(IdDict{Triangulation,ParamBroadcast}())
+  c = GenericContribution(IdDict{Triangulation,ParamBroadcast}())
   for (trian,values) in a.dict
     c[trian] = Base.broadcasted(f,values,b)
   end
