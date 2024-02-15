@@ -1,14 +1,15 @@
-struct Contribution{T} <: AbstractDict{Triangulation,T}
+abstract type AbstractContribution end
+
+Base.getindex(a::AbstractContribution,trian::Triangulation) = get_contribution(a,trian)
+Base.setindex!(a::AbstractContribution,b,trian::Triangulation) = add_contribution!(a,b,trian)
+CellData.num_domains(a::AbstractContribution) = length(a.dict)
+
+struct Contribution{T} <: AbstractContribution
   dict::IdDict{Triangulation,T}
 end
 
-Base.length(a::Contribution) = length(a.dict)
-Base.iterate(a::Contribution,i...) = iterate(a.dict,i...)
-Base.values(a::Contribution) = values(a.dict)
-Base.keys(a::Contribution) = keys(a.dict)
-CellData.num_domains(a::Contribution) = length(a)
-CellData.get_domains(a::Contribution) = collect(keys(a))
-get_values(a::Contribution) = collect(values(a))
+CellData.get_domains(a::Contribution) = collect(keys(a.dict))
+get_values(a::Contribution) = collect(values(a.dict))
 
 function CellData.get_contribution(a::T,trian::Triangulation) where T<:Contribution
   if haskey(a.dict,trian)
@@ -20,8 +21,6 @@ function CellData.get_contribution(a::T,trian::Triangulation) where T<:Contribut
   end
 end
 
-Base.getindex(a::Contribution,trian::Triangulation) = get_contribution(a,trian)
-
 function CellData.add_contribution!(a::Contribution{T},b::T,trian::Triangulation) where T
   if haskey(a.dict,trian)
     a.dict[trian] += b
@@ -30,8 +29,6 @@ function CellData.add_contribution!(a::Contribution{T},b::T,trian::Triangulation
   end
   a
 end
-
-Base.setindex!(a::Contribution,b,trian::Triangulation) = add_contribution!(a,b,trian)
 
 const ArrayContribution = Contribution{AbstractArray}
 

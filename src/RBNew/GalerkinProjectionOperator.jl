@@ -146,10 +146,10 @@ function Algebra.solve(
   return s,cs
 end
 
-struct GalerkinProjectionOperator{T} <: RBOperator{T}
+struct GalerkinProjectionOperator{T,A,B} <: RBOperator{T}
   feop::ODEParamOperator{T}
-  trial::RBSpace
-  test::RBSpace
+  trial::A
+  test::B
 end
 
 ReferenceFEs.get_order(op::GalerkinProjectionOperator) = get_order(op.feop)

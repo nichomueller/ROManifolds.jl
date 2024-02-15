@@ -74,7 +74,7 @@ uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 dir = datadir("distr_toy_heateq")
-info = RBInfo(dir;nsnaps_state=10,nsnaps_test=5,save_structures=false)
+info = RBInfo(dir;nsnaps_state=10,nsnaps_mdeim=5,nsnaps_test=5,save_structures=false)
 
 rbsolver = RBSolver(info,fesolver)
 
@@ -94,3 +94,37 @@ pk_rb = compress(red_test,sk)
 pk_rec = recast(red_test,pk_rb)
 
 norm(pk_rec - pk) / norm(pk)
+
+odeop = get_algebraic_operator(feop)
+pop = GalerkinProjectionOperator(odeop,red_trial,red_test)
+# red_lhs,red_rhs = reduced_matrix_vector_form(rbsolver,pop,snaps)
+
+θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+smdeim = select_snapshots(snaps,RB.mdeim_params(info))
+x = get_values(smdeim)
+r = get_realization(smdeim)
+
+y = similar(x)
+y .= 0.0
+ode_cache = allocate_cache(pop,r)
+A,b = allocate_fe_matrix_and_vector(pop,r,x,ode_cache)
+
+# ode_cache = update_cache!(ode_cache,op,r)
+# RB.fe_matrix_and_vector!(A,b,pop,r,dtθ,x,ode_cache,y)
+
+trialr = evaluate(trial,r)
+dxh = ()
+for i in 1:get_order(feop)
+  dxh = (dxh...,EvaluationFunction(trialr,y))
+end
+xh = TransientCellField(EvaluationFunction(trialr,y),dxh)
+trial0 = evaluate(trial,nothing)
+u = get_trial_fe_basis(trial0)
+v = get_fe_basis(test)
+assem = FEM.get_param_assembler(feop.op.assem,r)
+
+i = 1
+dc = feop.op.jacs[i](get_params(r),get_times(r),xh,u,v)
+trian = first(feop.trian_jacs[i])
+matdata = FEM.collect_cell_matrix_for_trian(trial0,test,dc,trian)
+AA = allocate_matrix(assem,matdata)

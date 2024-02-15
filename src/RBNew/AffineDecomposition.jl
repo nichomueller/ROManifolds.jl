@@ -234,7 +234,7 @@ end
 function reduced_matrix_form(
   solver::RBThetaMethod,
   op::RBOperator,
-  contribs::Tuple{Vararg{ArrayContribution}})
+  contribs::Tuple{Vararg{C}}) where C
 
   fesolver = get_fe_solver(solver)
   θ = fesolver.θ
@@ -249,7 +249,7 @@ end
 function reduced_matrix_vector_form(
   solver::RBSolver,
   op::RBOperator,
-  s::AbstractTransientSnapshots)
+  s::S) where S
 
   smdeim = select_snapshots(s,mdeim_params(solver.info))
   contribs_mat,contribs_vec = fe_matrix_and_vector(solver,op,smdeim)

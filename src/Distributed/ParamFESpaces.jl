@@ -79,7 +79,7 @@ function FEM.collect_cell_matrix_for_trian(
   a::DistributedDomainContribution,
   trian::DistributedTriangulation)
   map(
-    collect_cell_matrix,
+    FEM.collect_cell_matrix_for_trian,
     local_views(trial),
     local_views(test),
     local_views(a),
@@ -91,7 +91,7 @@ function FEM.collect_cell_vector_for_trian(
   a::DistributedDomainContribution,
   trian::DistributedTriangulation)
   map(
-    collect_cell_vector,
+    FEM.collect_cell_vector_for_trian,
     local_views(test),
     local_views(a),
     local_views(trian))

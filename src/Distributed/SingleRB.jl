@@ -48,21 +48,13 @@ function RB.get_values(s::DistributedTransientSnapshots)
 end
 
 function RB.get_realization(s::DistributedTransientSnapshots)
-  get_realization(PartitionedArrays.getany(s.snaps))
+  s1 = PartitionedArrays.getany(local_views(s.snaps))
+  get_realization(s1)
 end
 
 function RB.select_snapshots(s::DistributedTransientSnapshots,args...;kwargs...)
   snaps = map(local_views(s)) do s
     select_snapshots(s,args...;kwargs...)
-  end
-  index_partition = s.snaps.index_partition
-  psnaps = PVector(snaps,index_partition)
-  DistributedSnapshots(psnaps)
-end
-
-function RB.reverse_snapshots(s::DistributedTransientSnapshots)
-  snaps = map(local_views(s)) do s
-    reverse_snapshots(s)
   end
   index_partition = s.snaps.index_partition
   psnaps = PVector(snaps,index_partition)
@@ -170,6 +162,56 @@ function RB.recast(r::DistributedRBSpace,red_x::PVector)
     recast(r,red_x)
   end
   PVector(vector_partition,partition)
+end
+
+struct DistributedContribution{T<:AbstractVector{<:Contribution}} <: FEM.AbstractContribution
+  contribs::T
+end
+
+GridapDistributed.local_views(c::DistributedContribution) = c.contributions
+
+CellData.get_domains(c::DistributedContribution) = map(get_domains,local_values(c))
+FEM.get_values(c::DistributedContribution) = map(get_values,local_values(c))
+
+function CellData.get_contribution(c::DistributedContribution,trian::DistributedTriangulation)
+  map(local_views(c),local_views(trian)) do c,trian
+    get_contribution(c,trian)
+  end
+end
+
+function CellData.add_contribution!(c::DistributedContribution,b,trian::DistributedTriangulation)
+  map(local_views(c),local_views(b),local_views(trian)) do c,b,trian
+    add_contribution!(c,b,trian)
+  end
+end
+
+const DistributedArrayContribution = DistributedContribution{T} where {T<:AbstractVector{<:ArrayContribution}}
+
+parray_contribution() =
+
+const DistributedAffineContribution = DistributedContribution{T} where {T<:AbstractVector{<:AffineContribution}}
+
+function RB.reduced_vector_form(
+  solver::RBSolver,
+  op::RBOperator,
+  c::DistributedArrayContribution)
+
+  a = map(local_views(c)) do c
+    reduced_vector_form(solver,op,c)
+  end
+  DistributedContribution(a)
+end
+
+function RB.reduced_matrix_form(
+  solver::RBSolver,
+  op::RBOperator,
+  c::DistributedArrayContribution;
+  kwargs...)
+
+  a = map(local_views(c)) do c
+    reduced_matrix_form(solver,op,c;kwargs...)
+  end
+  DistributedContribution(a)
 end
 
 # post process
