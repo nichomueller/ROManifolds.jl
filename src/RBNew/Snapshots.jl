@@ -133,10 +133,6 @@ function compress(a::AbstractMatrix,s::AbstractTransientSnapshots{Mode2Axis})
   Snapshots(compressed_values,compressed_realization,Mode2Axis())
 end
 
-function flatten(s::AbstractTransientSnapshots)
-  get_values(BasicSnapshots(s))
-end
-
 function Snapshots(a::ArrayContribution,args...)
   b = array_contribution()
   for (trian,values) in a.dict
@@ -248,6 +244,10 @@ function BasicSnapshots(
   end
   basic_values = ParamArray(array)
   BasicSnapshots(s.mode,basic_values,s.realization)
+end
+
+function FEM.get_values(s::TransientSnapshots)
+  get_values(BasicSnapshots(s))
 end
 
 struct CompressedTransientSnapshots{M,N,T,R,V} <: AbstractTransientSnapshots{M,T}
@@ -480,14 +480,8 @@ function FEM.get_values(s::SelectedSnapshotsAtIndices{Mode1Axis,T,<:BasicSnapsho
   ParamArray(array)
 end
 
-function FEM.get_values(s::SelectedSnapshotsAtIndices{Mode1Axis,T,<:TransientSnapshots}) where T
-  @check space_indices(s) == Base.OneTo(num_space_dofs(s))
-  v = get_values(s.snaps)
-  values = Vector{typeof(first(v))}(undef,num_times(s))
-  @inbounds for (i,it) in enumerate(time_indices(s))
-    values[i] = ParamArray([v[it][jp] for jp in num_params(s)])
-  end
-  values
+function FEM.get_values(s::SelectedSnapshotsAtIndices{M,T,<:TransientSnapshots}) where {M,T}
+  get_values(BasicSnapshots(s))
 end
 
 function get_realization(s::SelectedSnapshotsAtIndices)
@@ -501,12 +495,12 @@ function BasicSnapshots(s::SelectedSnapshotsAtIndices{Mode1Axis,T,<:BasicSnapsho
   values = get_values(s)
   r = get_realization(s)
   mode = s.snaps.mode
-  BasicSnapshots(values,r,mode)
+  BasicSnapshots(mode,values,r)
 end
 
 function BasicSnapshots(s::SelectedSnapshotsAtIndices{Mode1Axis,T,<:TransientSnapshots}) where T
   @check space_indices(s) == Base.OneTo(num_space_dofs(s))
-  v = get_values(s.snaps)
+  v = s.snaps.values
   basic_values = Vector{typeof(first(first(v)))}(undef,num_cols(s))
   @inbounds for (i,it) in enumerate(time_indices(s))
     for (j,jp) in enumerate(param_indices(s))
@@ -514,15 +508,16 @@ function BasicSnapshots(s::SelectedSnapshotsAtIndices{Mode1Axis,T,<:TransientSna
     end
   end
   r = get_realization(s)
-  BasicSnapshots(s.snaps.mode,ParamArray(basic_values),r)
+  mode = s.snaps.mode
+  BasicSnapshots(mode,ParamArray(basic_values),r)
 end
 
-#= mode-1 representation of a snapshot of type InnerTimeOuterParamTransientSnapshots
+#= mode-1 representation of a snapshot of type TransientSnapshotsSwappedColumns
    [ [u(x1,t1,μ1) ⋯ u(x1,tT,μ1)] [u(x1,t1,μ2) ⋯ u(x1,tT,μ2)] [u(x1,t1,μ3) ⋯] [⋯] [u(x1,t1,μP) ⋯ u(x1,tT,μP)] ]
          ⋮             ⋮          ⋮            ⋮           ⋮              ⋮             ⋮
    [ [u(xN,t1,μ1) ⋯ u(xN,tT,μ1)] [u(xN,t1,μ2) ⋯ u(xN,tT,μ2)] [u(xN,t1,μ3) ⋯] [⋯] [u(xN,t1,μP) ⋯ u(xN,tT,μP)] ]
 =#
-#= mode-2 representation of a snapshot of type InnerTimeOuterParamTransientSnapshots
+#= mode-2 representation of a snapshot of type TransientSnapshotsSwappedColumns
    [ [u(x1,t1,μ1) ⋯ u(xN,t1,μ1)] [u(x1,t1,μ2) ⋯ u(xN,t1,μ2)] [u(x1,t1,μ3) ⋯] [⋯] [u(x1,t1,μP) ⋯ u(xN,t1,μP)] ]
          ⋮             ⋮          ⋮            ⋮           ⋮              ⋮             ⋮
    [ [u(x1,tT,μ1) ⋯ u(xN,tT,μ1)] [u(x1,tT,μ2) ⋯ u(xN,tT,μ2)] [u(x1,tT,μ3) ⋯] [⋯] [u(x1,tT,μP) ⋯ u(xN,tT,μP)] ]
@@ -578,6 +573,13 @@ end
 
 function reverse_snapshots(s::SelectedSnapshotsAtIndices)
   SelectedInnerTimeOuterParamTransientSnapshots(s)
+end
+
+function reverse_snapshots(
+  values::AbstractVector{P},
+  r::TransientParamRealization
+  ) where P<:AbstractParamContainer
+  InnerTimeOuterParamTransientSnapshots(values,r)
 end
 
 function reverse_snapshots(a::ArrayContribution,args...)
@@ -797,7 +799,7 @@ function tensor_setindex!(
 end
 
 function get_nonzero_indices(s::NnzSnapshots)
-  v = first(get_values(s))
+  v = isa(s,BasicSnapshots) ? first(s.values) : first(first(s.values))
   i,j, = findnz(v)
   return i .+ (j .- 1)*v.m
 end

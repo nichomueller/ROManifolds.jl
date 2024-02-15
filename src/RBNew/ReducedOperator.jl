@@ -12,7 +12,7 @@ end
 function reduced_operator(
   solver::RBSolver,
   op::GalerkinProjectionOperator,
-  s::AbstractTransientSnapshots)
+  s::S) where S
 
   red_lhs,red_rhs = reduced_matrix_vector_form(solver,op,s)
   red_op = reduced_operator(op,red_lhs,red_rhs)

@@ -50,7 +50,6 @@ export select_snapshots
 export reverse_snapshots
 export get_realization
 export compress
-export flatten
 include("Snapshots.jl")
 
 # include("SnapshotsOperations.jl")

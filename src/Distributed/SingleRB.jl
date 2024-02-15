@@ -1,20 +1,10 @@
-function FEM.get_L2_norm_matrix(
+function RB.get_norm_matrix(
   info::RBInfo,
   trial::DistributedSingleFieldFESpace,
   test::DistributedSingleFieldFESpace)
 
   map(local_views(trial),local_views(test)) do trial,test
-    get_L2_norm_matrix(info,trial,test)
-  end
-end
-
-function FEM.get_H1_norm_matrix(
-  info::RBInfo,
-  trial::DistributedSingleFieldFESpace,
-  test::DistributedSingleFieldFESpace)
-
-  map(local_views(trial),local_views(test)) do trial,test
-    get_H1_norm_matrix(info,trial,test)
+    RB.get_norm_matrix(info,trial,test)
   end
 end
 
@@ -49,11 +39,69 @@ function RB.Snapshots(
   DistributedSnapshots(psnaps)
 end
 
-struct DistributedRBSpace{T<:AbstractVector{<:RBSpace}}
+function RB.get_values(s::DistributedTransientSnapshots)
+  snaps = map(local_views(s)) do s
+    get_values(s)
+  end
+  index_partition = s.snaps.index_partition
+  PVector(snaps,index_partition)
+end
+
+function RB.get_realization(s::DistributedTransientSnapshots)
+  get_realization(PartitionedArrays.getany(s.snaps))
+end
+
+function RB.select_snapshots(s::DistributedTransientSnapshots,args...;kwargs...)
+  snaps = map(local_views(s)) do s
+    select_snapshots(s,args...;kwargs...)
+  end
+  index_partition = s.snaps.index_partition
+  psnaps = PVector(snaps,index_partition)
+  DistributedSnapshots(psnaps)
+end
+
+function RB.reverse_snapshots(s::DistributedTransientSnapshots)
+  snaps = map(local_views(s)) do s
+    reverse_snapshots(s)
+  end
+  index_partition = s.snaps.index_partition
+  psnaps = PVector(snaps,index_partition)
+  DistributedSnapshots(psnaps)
+end
+
+function RB.reverse_snapshots(s::DistributedTransientSnapshots)
+  snaps = map(local_views(s)) do s
+    reverse_snapshots(s)
+  end
+  index_partition = s.snaps.index_partition
+  psnaps = PVector(snaps,index_partition)
+  DistributedSnapshots(psnaps)
+end
+
+struct DistributedRBSpace{T<:AbstractVector{<:RBSpace}} <: DistributedFESpace
   spaces::T
 end
 
 GridapDistributed.local_views(a::DistributedRBSpace) = a.spaces
+
+function Arrays.evaluate(
+  U::DistributedRBSpace{<:AbstractVector{<:TrialRBSpace}},args...)
+  spaces = map(U->evaluate(U,args...),local_views(U))
+  DistributedRBSpace(spaces)
+end
+
+(U::DistributedRBSpace)(r) = evaluate(U,r)
+(U::DistributedRBSpace)(μ,t) = evaluate(U,μ,t)
+
+function ODETools.∂t(U::DistributedRBSpace{<:AbstractVector{<:TrialRBSpace}})
+  spaces = map(U->∂t(U),local_views(U))
+  DistributedRBSpace(spaces)
+end
+
+function ODETools.∂tt(U::DistributedRBSpace{<:AbstractVector{<:TrialRBSpace}})
+  spaces = map(U->∂tt(U),local_views(U))
+  DistributedRBSpace(spaces)
+end
 
 function RB.reduced_fe_space(
   info::RBInfo,
@@ -61,18 +109,18 @@ function RB.reduced_fe_space(
   s::DistributedTransientSnapshots)
 
   trial = get_trial(feop)
+  dtrial = _to_distributed_fe_space(trial)
   test = get_test(feop)
-  ϵ = get_tol(info)
-  norm_matrix = get_norm_matrix(info,feop)
+  norm_matrix = RB.get_norm_matrix(info,feop)
   reduced_trial,reduced_test = map(
-    local_views(trial),
+    local_views(dtrial),
     local_views(test),
     local_views(s),
     local_views(norm_matrix)
     ) do trial,test,s,norm_matrix
 
-    soff = select_snapshots(s,offline_params(info))
-    basis_space,basis_time = reduced_basis(soff,norm_matrix;ϵ)
+    soff = select_snapshots(s,RB.offline_params(info))
+    basis_space,basis_time = reduced_basis(soff,norm_matrix;ϵ=RB.get_tol(info))
     reduced_trial = TrialRBSpace(trial,basis_space,basis_time)
     reduced_test = TestRBSpace(test,basis_space,basis_time)
     reduced_trial,reduced_test
@@ -94,10 +142,10 @@ function GridapDistributed._find_vector_type(
   return vector_type
 end
 
-function RB.compress(r::DistributedRBSpace,xmat::ParamVector{<:AbstractMatrix})
-  partition = xmat.index_partition
-  vector_partition = map(local_views(r),local_views(xmat)) do r,xmat
-    compress(r,xmat)
+function RB.compress(r::DistributedRBSpace,s::DistributedTransientSnapshots)
+  partition = s.snaps.index_partition
+  vector_partition = map(local_views(r),local_views(s)) do r,s
+    compress(r,s)
   end
   PVector(vector_partition,partition)
 end
@@ -105,7 +153,7 @@ end
 function RB.compress(
   trial::DistributedRBSpace,
   test::DistributedRBSpace,
-  xmat::ParamVector{<:AbstractMatrix};
+  xmat::ParamVector;
   kwargs...)
 
   partition = xmat.index_partition
@@ -116,9 +164,9 @@ function RB.compress(
   PVector(vector_partition,partition)
 end
 
-function RB.recast(r::RBSpace,red_x::ParamVector{<:AbstractMatrix})
+function RB.recast(r::DistributedRBSpace,red_x::PVector)
   partition = red_x.index_partition
-  vector_partition = map(red_x) do red_x
+  vector_partition = map(local_views(r),local_views(red_x)) do r,red_x
     recast(r,red_x)
   end
   PVector(vector_partition,partition)
@@ -154,26 +202,6 @@ function DrWatson.save(info::RBInfo,s::DistributedTransientSnapshots)
   end
 end
 
-# function get_dir_parts(dir::AbstractString)
-#   _path, = splitext(dir)
-#   path, = splitdir(_path)
-#   parts = Int[]
-#   for p in readdir(path,join=true)
-#     ppath, = splitext(p)
-#     if ppath[end-1] == '_'
-#       try
-#         i = parse(Int,ppath[end])
-#         push!(parts,i)
-#       catch
-#       end
-#     end
-#   end
-#   sort!(parts)
-#   map(parts) do part
-#     get_dir_part(dir,part)
-#   end
-# end
-
 function load_distributed_snapshots(distribute,info::RBInfo)
   i_filename = get_ind_part_filename(info)
   s_filename = RB.get_snapshots_filename(info)
@@ -185,5 +213,6 @@ function load_distributed_snapshots(distribute,info::RBInfo)
   end |> tuple_of_arrays
   index_partition = distribute(i_parts)
   snaps_partition = distribute(s_parts)
-  PVector(snaps_partition,index_partition)
+  psnaps = PVector(snaps_partition,index_partition)
+  DistributedSnapshots(psnaps)
 end

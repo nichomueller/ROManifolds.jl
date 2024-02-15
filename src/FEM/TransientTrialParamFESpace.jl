@@ -98,10 +98,8 @@ FESpaces.get_vector_type(f::TransientTrialParamFESpace) = @notimplemented
 # Define the TransientTrialFESpace interface for stationary spaces
 
 Arrays.evaluate!(Upt::FESpace,U::FESpace,params,times) = U
-Arrays.evaluate!(Upt::FESpace,U::FESpace,r::TransientParamRealization) = U
 Arrays.evaluate(U::FESpace,params,times) = U
-Arrays.evaluate(U::FESpace,r::TransientParamRealization) = U
-TransientFETools.allocate_trial_space(U::FESpace,args...) = U
+TransientFETools.allocate_trial_space(U::FESpace,params,times) = U
 
 # Define the interface for MultiField
 
@@ -188,7 +186,7 @@ end
 
 function Arrays.evaluate(U::TransientMultiFieldTrialParamFESpace,::Nothing)
   spaces = [evaluate(fesp,nothing) for fesp in U.spaces]
-  MultiFieldFESpace(spaces;style=style=MultiFieldStyle(U))
+  MultiFieldFESpace(spaces;style=MultiFieldStyle(U))
 end
 
 (U::TransientMultiFieldTrialParamFESpace)(p,t) = evaluate(U,p,t)
@@ -196,7 +194,7 @@ end
 
 function ODETools.∂t(U::TransientMultiFieldTrialParamFESpace)
   spaces = ∂t.(U.spaces)
-  TransientMultiFieldParamFESpace(spaces;style=style=MultiFieldStyle(U))
+  TransientMultiFieldParamFESpace(spaces;style=MultiFieldStyle(U))
 end
 
 ODETools.∂tt(U::TransientMultiFieldTrialParamFESpace) = ∂t(∂t(U))

@@ -78,64 +78,19 @@ info = RBInfo(dir;nsnaps_state=10,nsnaps_test=5,save_structures=false)
 
 rbsolver = RBSolver(info,fesolver)
 
-snaps,comp = fe_solutions(rbsolver,feop,uh0μ)
+# snaps,comp = fe_solutions(rbsolver,feop,uh0μ)
 
-function load_distributed_snapshots(info::RBInfo)
-  i_filename = Distributed.get_ind_part_filename(info)
-  s_filename = RB.get_snapshots_filename(info)
-  map(readdir(info.dir;join=true)) do dir
-    part = parse(Int,dir[end])
-    i_part_filename = Distributed.get_part_filename(i_filename,part)
-    s_part_filename = Distributed.get_part_filename(s_filename,part)
-    deserialize(i_part_filename),deserialize(s_part_filename)
-  end |> tuple_of_arrays
+snaps = with_debug() do distribute
+  load_distributed_snapshots(distribute,info)
 end
-
-aa,bb=load_distributed_snapshots(info)
-
-ip = with_debug() do distribute
-  i_filename = Distributed.get_ind_part_filename(info)
-  ip = map(readdir(info.dir;join=true)) do dir
-    part = parse(Int,dir[end])
-    i_part_filename = Distributed.get_part_filename(i_filename,part)
-    deserialize(i_part_filename)
-  end
-  distribute(ip)
-end
-
-_s = with_debug() do distribute
-  Distributed.load_distributed_snapshots(distribute,info)
-end
-STOP
-# nparams = num_params(info)
-# sol = solve(fesolver,feop,uh0μ;nparams)
-# odesol = sol.odesol
-# r = odesol.r
-
-# stats = @timed begin
-#   vals = collect(odesol)
-# end
-# # snaps = Snapshots(vals,r)
-# getV(::AbstractVector{<:PVector{V}}) where V = V
-# index_partition = first(vals).index_partition
-# parts = map(part_id,index_partition)
-# snaps = map(parts) do part
-#   vals_part = Vector{getV(vals)}(undef,length(vals))
-#   for (k,v) in enumerate(vals)
-#     map(local_views(v),index_partition) do val,ip
-#       if part_id(ip) == part
-#         vals_part[k] = val
-#       end
-#     end
-#   end
-#   Snapshots(vals_part,r)
-# end
-# ciao = PVector(snaps,index_partition)
-# DistributedSnapshots(ciao)
-
-# map(local_views(ciao)) do boh
-#   typeof(boh)
-# end
 
 # red_op = reduced_operator(rbsolver,feop,snaps)
 red_trial,red_test = reduced_fe_space(info,feop,snaps)
+
+sk = select_snapshots(snaps,15)
+pk = get_values(sk)
+
+pk_rb = compress(red_test,sk)
+pk_rec = recast(red_test,pk_rb)
+
+norm(pk_rec - pk) / norm(pk)

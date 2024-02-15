@@ -63,6 +63,16 @@ function FEM.length_dirichlet_values(f::DistributedSingleFieldFESpace)
   length_dirichlet_values(PartitionedArrays.getany(local_views(f)))
 end
 
+function FEM.get_polynomial_order(f::DistributedFESpace)
+  FEM.get_polynomial_order(PartitionedArrays.getany(local_views(f)))
+end
+
+function _to_distributed_fe_space(trial::TransientTrialParamFESpace{<:DistributedSingleFieldFESpace})
+  map(local_views(trial.space)) do space
+    TransientTrialParamFESpace(space,trial.dirichlet_pt)
+  end
+end
+
 function FEM.collect_cell_matrix_for_trian(
   trial::DistributedFESpace,
   test::DistributedFESpace,
@@ -134,7 +144,3 @@ end
 const DistributedMultiFieldParamFESpace = GridapDistributed.DistributedMultiFieldFESpace{MS,<:AbstractVector{<:MultiFieldParamFESpace},B,C,D} where {MS,B,C,D}
 const DistributedMultiFieldParamFEFunction = GridapDistributed.DistributedMultiFieldFEFunction{<:AbstractVector{<:SingleFieldParamFEFunction},B,C} where {B,C}
 const DistributedParamFESpace = Union{DistributedSingleFieldParamFESpace,DistributedMultiFieldParamFESpace}
-
-function FEM.get_polynomial_order(f::DistributedFESpace)
-  FEM.get_polynomial_order(PartitionedArrays.getany(local_views(f)))
-end

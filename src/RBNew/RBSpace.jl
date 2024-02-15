@@ -77,10 +77,16 @@ struct TrialRBSpace{S,B} <: RBSpace{S}
   basis_time::B
 end
 
-(test::TestRBSpace)(r) = test
-(test::TestRBSpace)(μ,t) = test
-(trial::TrialRBSpace)(r) = TrialRBSpace(trial.space(r),trial.basis_space,trial.basis_time)
-(trial::TrialRBSpace)(μ,t) = TrialRBSpace(trial.space(μ,t),trial.basis_space,trial.basis_time)
+function Arrays.evaluate(U::TrialRBSpace,args...)
+  space = evaluate(U.space,args...)
+  TrialRBSpace(space,U.basis_space,U.basis_time)
+end
+
+(U::RBSpace)(r) = evaluate(U,r)
+(U::RBSpace)(μ,t) = evaluate(U,μ,t)
+
+ODETools.∂t(U::TrialRBSpace) = TrialRBSpace(∂t(U),U.basis_space,U.basis_time)
+ODETools.∂tt(U::TrialRBSpace) = TrialRBSpace(∂tt(U),U.basis_space,U.basis_time)
 
 function get_basis_space end
 get_basis_space(r::RBSpace) = r.basis_space

@@ -1,7 +1,7 @@
 function reduced_operator(
   solver::RBSolver,
   feop::TransientParamFEOperator,
-  s::AbstractTransientSnapshots)
+  s::S) where S
 
   info = get_info(solver)
   red_trial,red_test = reduced_fe_space(info,feop,s)
@@ -14,7 +14,7 @@ function reduced_operator(
   odeop::ODEParamOperator,
   trial::TrialRBSpace,
   test::TestRBSpace,
-  s::AbstractTransientSnapshots)
+  s::S) where S
 
   pop = GalerkinProjectionOperator(odeop,trial,test)
   reduced_operator(solver,pop,s)
@@ -50,7 +50,7 @@ end
 function fe_matrix_and_vector(
   solver::RBSolver,
   op::RBOperator,
-  s::AbstractTransientSnapshots)
+  s::S) where S
 
   fesolver = get_fe_solver(solver)
   dt = fesolver.dt
@@ -58,7 +58,7 @@ function fe_matrix_and_vector(
   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
 
   smdeim = select_snapshots(s,mdeim_params(solver.info))
-  x = flatten(smdeim)
+  x = get_values(smdeim)
   r = get_realization(smdeim)
 
   y = similar(x)
@@ -73,7 +73,7 @@ end
 function Algebra.solve(
   solver::RBThetaMethod,
   op::RBOperator,
-  s::AbstractTransientSnapshots)
+  s::S) where S
 
   info = get_info(solver)
   son = select_snapshots(s,online_params(info))
@@ -108,7 +108,7 @@ function Algebra.solve(
   end
 
   x = recast(trial,red_x)
-  s = InnerTimeOuterParamTransientSnapshots(x,r)
+  s = reverse_snapshots(x,r)
   cs = ComputationalStats(stats,num_params(r))
   return s,cs
 end
@@ -141,7 +141,7 @@ function Algebra.solve(
   end
 
   x = recast(trial,red_x)
-  s = InnerTimeOuterParamTransientSnapshots(x,r)
+  s = reverse_snapshots(x,r)
   cs = ComputationalStats(stats,num_params(r))
   return s,cs
 end

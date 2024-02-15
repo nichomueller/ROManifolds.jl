@@ -117,5 +117,6 @@ include("MultiField.jl")
 export DistributedTransientSnapshots
 export DistributedSnapshots
 export DistributedRBSpace
+export load_distributed_snapshots
 include("SingleRB.jl")
 end
