@@ -168,7 +168,7 @@ function reduced_form(
   basis_space,basis_time = reduced_basis(s;ϵ=get_tol(info))
   lu_interp,red_trian,integration_domain = mdeim(info,fs,trian,basis_space,basis_time)
   proj_basis_space = compress_basis_space(basis_space,args...)
-  comb_basis_time = combine_basis_time(args...)
+  comb_basis_time = combine_basis_time(args...;kwargs...)
   ad = AffineDecomposition(
     info.mdeim_style,
     proj_basis_space,

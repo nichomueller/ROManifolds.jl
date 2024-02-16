@@ -12,8 +12,8 @@ end
 function reduced_operator(
   solver::RBSolver,
   odeop::ODEParamOperator,
-  trial::TrialRBSpace,
-  test::TestRBSpace,
+  trial::RBSpace,
+  test::RBSpace,
   s::S) where S
 
   pop = GalerkinProjectionOperator(odeop,trial,test)
@@ -59,7 +59,8 @@ function fe_matrix_and_vector(
 
   smdeim = select_snapshots(s,mdeim_params(solver.info))
   x = get_values(smdeim)
-  r = get_realization(smdeim)
+  r = copy(get_realization(smdeim))
+  FEM.shift_time!(r,dt*(θ-1))
 
   y = similar(x)
   y .= 0.0
@@ -84,12 +85,15 @@ end
 function Algebra.solve(
   solver::RBThetaMethod,
   op::RBOperator,
-  r::TransientParamRealization)
+  _r::TransientParamRealization)
 
   fesolver = get_fe_solver(solver)
   dt = fesolver.dt
   θ = fesolver.θ
   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+
+  r = copy(_r)
+  FEM.shift_time!(r,dt*(θ-1))
 
   trial = get_trial(op)(r)
   fe_trial = get_fe_trial(op)(r)
@@ -116,12 +120,15 @@ end
 function Algebra.solve(
   solver::RBThetaMethod,
   op::AffineRBOperator,
-  r::TransientParamRealization)
+  _r::TransientParamRealization)
 
   fesolver = get_fe_solver(solver)
   dt = fesolver.dt
   θ = fesolver.θ
   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+
+  r = copy(_r)
+  FEM.shift_time!(r,dt*(θ-1))
 
   trial = get_trial(op)(r)
   fe_trial = get_fe_trial(op)(r)

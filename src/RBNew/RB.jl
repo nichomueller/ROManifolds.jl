@@ -59,8 +59,6 @@ export ode_solutions
 include("RBSolver.jl")
 
 export RBSpace
-export TestRBSpace
-export TrialRBSpace
 export reduced_fe_space
 export reduced_basis
 export get_basis_space

@@ -94,6 +94,12 @@ xrb_loaded = load_solve(rbsolver)
 xrb_space_loaded = load_solve(rbsolver_space)
 
 #
+son1 = select_snapshots(snaps,first(RB.online_params(info)))
+ron1 = get_realization(son1)
+son1_recast = Snapshots(recast(get_test(red_op),compress(get_test(red_op),son1)),ron1)
+norm(son1 - son1_recast,Inf)
+#
+
 r = realization(ptspace,nparams=3)
 μ = FEM._get_params(r)[3]
 

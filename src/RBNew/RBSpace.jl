@@ -8,8 +8,8 @@ function reduced_fe_space(
   norm_matrix = get_norm_matrix(info,feop)
   soff = select_snapshots(s,offline_params(info))
   basis_space,basis_time = reduced_basis(soff,norm_matrix;ϵ=get_tol(info))
-  reduced_trial = TrialRBSpace(trial,basis_space,basis_time)
-  reduced_test = TestRBSpace(test,basis_space,basis_time)
+  reduced_trial = RBSpace(trial,basis_space,basis_time)
+  reduced_test = RBSpace(test,basis_space,basis_time)
   return reduced_trial,reduced_test
 end
 
@@ -63,30 +63,22 @@ function _return_bases(flag,b1,b2)
   basis_space,basis_time
 end
 
-abstract type RBSpace{S} <: FESpace end
-
-struct TestRBSpace{S,B} <: RBSpace{S}
+struct RBSpace{S,BS,BT} <: FESpace
   space::S
-  basis_space::B
-  basis_time::B
+  basis_space::BS
+  basis_time::BT
 end
 
-struct TrialRBSpace{S,B} <: RBSpace{S}
-  space::S
-  basis_space::B
-  basis_time::B
-end
-
-function Arrays.evaluate(U::TrialRBSpace,args...)
+function Arrays.evaluate(U::RBSpace,args...)
   space = evaluate(U.space,args...)
-  TrialRBSpace(space,U.basis_space,U.basis_time)
+  RBSpace(space,U.basis_space,U.basis_time)
 end
 
 (U::RBSpace)(r) = evaluate(U,r)
 (U::RBSpace)(μ,t) = evaluate(U,μ,t)
 
-ODETools.∂t(U::TrialRBSpace) = TrialRBSpace(∂t(U),U.basis_space,U.basis_time)
-ODETools.∂tt(U::TrialRBSpace) = TrialRBSpace(∂tt(U),U.basis_space,U.basis_time)
+ODETools.∂t(U::RBSpace) = RBSpace(∂t(U),U.basis_space,U.basis_time)
+ODETools.∂tt(U::RBSpace) = RBSpace(∂tt(U),U.basis_space,U.basis_time)
 
 function get_basis_space end
 get_basis_space(r::RBSpace) = r.basis_space
@@ -114,7 +106,7 @@ FESpaces.get_dirichlet_dof_tag(r::RBSpace) = get_dirichlet_dof_tag(r.space)
 
 FESpaces.get_vector_type(r::RBSpace) = get_vector_type(r.space)
 
-function FESpaces.get_vector_type(r::TrialRBSpace{<:FEM.ParamFESpace})
+function FESpaces.get_vector_type(r::RBSpace{<:FEM.ParamFESpace})
   change_length(::Type{ParamVector{T,A,L}}) where {T,A,L} = ParamVector{T,A,Int(L/num_times(r))}
   V = get_vector_type(r.space)
   newV = change_length(V)
@@ -138,8 +130,8 @@ function compress(r::RBSpace,xmat::AbstractMatrix)
 end
 
 function compress(
-  trial::TrialRBSpace,
-  test::TestRBSpace,
+  trial::RBSpace,
+  test::RBSpace,
   xmat::AbstractMatrix{T};
   combine=(x,y)->x) where T
 

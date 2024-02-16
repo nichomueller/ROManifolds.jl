@@ -11,6 +11,7 @@ num_params(r::ParamRealization) = length(_get_params(r))
 Base.length(r::ParamRealization) = num_params(r)
 Base.size(r::ParamRealization) = (length(r),)
 Base.getindex(r::ParamRealization,i) = ParamRealization(getindex(_get_params(r),i))
+Base.copy(r::ParamRealization) = ParamRealization(copy(_get_params(r)))
 Arrays.testitem(r::ParamRealization) = testitem(_get_params(r))
 
 # when iterating over a ParamRealization{P}, we return eltype(P) ∀ index i
@@ -54,6 +55,7 @@ end
 
 get_initial_time(r::GenericTransientParamRealization) = r.t0
 get_times(r::GenericTransientParamRealization) = r.times
+Base.copy(r::GenericTransientParamRealization) = GenericTransientParamRealization(copy(r.params),copy(r.times),copy(r.t0))
 Arrays.testitem(r::GenericTransientParamRealization) = testitem(get_params(r)),r.t0
 
 function Base.getindex(r::GenericTransientParamRealization,i,j)
@@ -103,6 +105,7 @@ end
 
 get_initial_time(r::TransientParamRealizationAt) = @notimplemented
 get_times(r::TransientParamRealizationAt) = r.t[]
+Base.copy(r::TransientParamRealizationAt) = TransientParamRealizationAt(copy(r.params),copy(r.t))
 Arrays.testitem(r::TransientParamRealizationAt) = testitem(get_params(r)),r.t[]
 
 function Base.getindex(r::TransientParamRealizationAt,i,j)

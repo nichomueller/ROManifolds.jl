@@ -92,8 +92,8 @@ end
 
 rbsolver = RB.RBSolver(info,fesolver)
 
-rb_test = RB.TestRBSpace(test,bs,bt)
-rb_trial = RB.TrialRBSpace(trial,bs,bt)
+rb_test = RBSpace(test,bs,bt)
+rb_trial = RBSpace(trial,bs,bt)
 
 # op = RBOperator(get_algebraic_operator(feop),rb_trial,rb_test)
 # nparams = RB.num_mdeim_params(rbsolver.info)
