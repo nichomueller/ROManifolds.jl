@@ -29,19 +29,6 @@ function RB.Snapshots(
 end
 
 function RB.Snapshots(
-  values::PSparseMatrix{P},
-  args...) where {P<:AbstractParamContainer}
-
-  row_partition = values.row_partition
-  col_partition = values.col_partition
-  snaps = map(local_views(values)) do values
-    Snapshots(values,args...)
-  end
-  psnaps = PSparseMatrix(snaps,row_partition,col_partition)
-  DistributedSnapshots(psnaps)
-end
-
-function RB.Snapshots(
   values::AbstractVector{<:PVector{P}},
   args...) where {P<:AbstractParamContainer}
 
@@ -70,17 +57,17 @@ function RB.Snapshots(a::DistributedArrayContribution,args...)
   b
 end
 
+function RB.get_realization(s::DistributedTransientSnapshots)
+  s1 = PartitionedArrays.getany(local_views(s.snaps))
+  get_realization(s1)
+end
+
 function RB.get_values(s::DistributedTransientSnapshots)
   snaps = map(local_views(s)) do s
     get_values(s)
   end
   index_partition = s.snaps.index_partition
   PVector(snaps,index_partition)
-end
-
-function RB.get_realization(s::DistributedTransientSnapshots)
-  s1 = PartitionedArrays.getany(local_views(s.snaps))
-  get_realization(s1)
 end
 
 function RB.select_snapshots(s::DistributedTransientSnapshots,args...;kwargs...)
@@ -98,6 +85,51 @@ function RB.reverse_snapshots(s::DistributedTransientSnapshots)
   end
   index_partition = s.snaps.index_partition
   psnaps = PVector(snaps,index_partition)
+  DistributedSnapshots(psnaps)
+end
+
+const DistributedTransientNnzSnapshots = DistributedTransientSnapshots{T} where {
+  T<:Union{<:PSparseMatrix,AbstractVector{<:PSparseMatrix}}}
+
+function RB.Snapshots(
+  values::PSparseMatrix{P},
+  args...) where {P<:AbstractParamContainer}
+
+  row_partition = values.row_partition
+  col_partition = values.col_partition
+  snaps = map(local_views(values)) do values
+    Snapshots(values,args...)
+  end
+  psnaps = PSparseMatrix(snaps,row_partition,col_partition)
+  DistributedSnapshots(psnaps)
+end
+
+function RB.get_values(s::DistributedTransientNnzSnapshots)
+  snaps = map(local_views(s)) do s
+    get_values(s)
+  end
+  row_partition = s.snaps.row_partition
+  col_partition = s.snaps.col_partition
+  PSparseMatrix(snaps,row_partition,col_partition)
+end
+
+function RB.select_snapshots(s::DistributedTransientNnzSnapshots,args...;kwargs...)
+  snaps = map(local_views(s)) do s
+    select_snapshots(s,args...;kwargs...)
+  end
+  row_partition = s.snaps.row_partition
+  col_partition = s.snaps.col_partition
+  psnaps = PSparseMatrix(snaps,row_partition,col_partition)
+  DistributedSnapshots(psnaps)
+end
+
+function RB.reverse_snapshots(s::DistributedTransientNnzSnapshots)
+  snaps = map(local_views(s)) do s
+    reverse_snapshots(s)
+  end
+  row_partition = s.snaps.row_partition
+  col_partition = s.snaps.col_partition
+  psnaps = PSparseMatrix(snaps,row_partition,col_partition)
   DistributedSnapshots(psnaps)
 end
 
@@ -196,37 +228,63 @@ function RB.recast(r::DistributedRBSpace,red_x::PVector)
 end
 
 function RB.reduced_vector_form!(
-  a::DistributedAffineContribution,
+  a::DistributedContribution,
   info::RBInfo,
   op::RBOperator,
   s::DistributedTransientSnapshots,
   trian::DistributedTriangulation)
 
-  map(local_views(a),local_views(s),local_views(trian)) do a,s,trian
-    reduced_vector_form!(a,info,op,s,trian)
-  end
+  test = get_test(op)
+  fe_test = get_fe_test(op)
+
+  ad,red_trians = map(
+    local_views(s),
+    local_views(trian),
+    local_views(test),
+    local_views(fe_test)
+    ) do s,trian,test,fe_test
+
+    RB.reduced_form(info,fe_test,s,trian,test)
+  end |> tuple_of_arrays
+
+  red_trian = DistributedTriangulation(red_trians)
+  a[red_trian] = ad
 end
 
 function RB.reduced_matrix_form!(
-  a::DistributedAffineContribution,
+  a::DistributedContribution,
   info::RBInfo,
   op::RBOperator,
   s::DistributedTransientSnapshots,
   trian::DistributedTriangulation;
   kwargs...)
 
-  map(local_views(a),local_views(s),local_views(trian)) do a,s,trian
-    reduced_matrix_form!(a,info,op,s,trian;kwargs...)
-  end
+  trial = get_trial(op)
+  test = get_test(op)
+  fe_test = get_fe_test(op)
+
+  ad,red_trians = map(
+    local_views(s),
+    local_views(trian),
+    local_views(trial),
+    local_views(test),
+    local_views(fe_test)
+    ) do s,trian,trial,test,fe_test
+
+    RB.reduced_form(info,fe_test,s,trian,trial,test;kwargs...)
+  end |> tuple_of_arrays
+
+  red_trian = DistributedTriangulation(red_trians)
+  a[red_trian] = ad
 end
 
 function RB.reduced_vector_form(
   solver::RBSolver,
   op::RBOperator,
-  c::DistributedArrayContribution)
+  c::GenericContribution{DistributedTriangulation})
 
-  info = get_info(solver)
-  a = distributed_affine_contribution()
+  info = RB.get_info(solver)
+  a = distributed_array_contribution()
   for (trian,values) in c.dict
     RB.reduced_vector_form!(a,info,op,values,trian)
   end
@@ -236,11 +294,11 @@ end
 function RB.reduced_matrix_form(
   solver::RBSolver,
   op::RBOperator,
-  c::DistributedArrayContribution;
+  c::GenericContribution{DistributedTriangulation};
   kwargs...)
 
-  info = get_info(solver)
-  a = distributed_affine_contribution()
+  info = RB.get_info(solver)
+  a = distributed_array_contribution()
   for (trian,values) in c.dict
     RB.reduced_matrix_form!(a,info,op,values,trian;kwargs...)
   end

@@ -52,11 +52,10 @@ export get_realization
 export compress
 include("Snapshots.jl")
 
-# include("SnapshotsOperations.jl")
-
 export RBInfo
 export RBSolver
 export fe_solutions
+export ode_solutions
 include("RBSolver.jl")
 
 export RBSpace

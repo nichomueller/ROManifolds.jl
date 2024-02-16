@@ -44,13 +44,12 @@ function get_reduced_cells(indices::AbstractVector{T},cell_dof_ids) where T
 end
 
 function reduce_triangulation(
-  op::RBOperator,
+  fs::FESpace,
   trian::Triangulation,
   indices_space::AbstractVector)
 
-  test = get_fe_test(op)
-  cell_dof_ids = get_cell_dof_ids(test,trian)
-  indices_space_rows = fast_index(indices_space,num_free_dofs(test))
+  cell_dof_ids = get_cell_dof_ids(fs,trian)
+  indices_space_rows = fast_index(indices_space,num_free_dofs(fs))
   red_integr_cells = get_reduced_cells(indices_space_rows,cell_dof_ids)
   red_trian = view(trian,red_integr_cells)
   return red_trian
@@ -140,7 +139,7 @@ end
 
 function mdeim(
   info::RBInfo,
-  op::RBOperator,
+  fs::FESpace,
   trian::Triangulation,
   basis_space::AbstractMatrix,
   basis_time::AbstractMatrix)
@@ -149,7 +148,7 @@ function mdeim(
   interp_basis_space = view(basis_space,indices_space,:)
   indices_time,lu_interp = _time_indices_and_interp_matrix(info.mdeim_style,interp_basis_space,basis_time)
   recast_indices_space = recast_indices(basis_space,indices_space)
-  red_trian = reduce_triangulation(op,trian,recast_indices_space)
+  red_trian = reduce_triangulation(fs,trian,recast_indices_space)
   integration_domain = ReducedIntegrationDomain(recast_indices_space,indices_time)
   return lu_interp,red_trian,integration_domain
 end
@@ -158,6 +157,28 @@ const AffineContribution = Contribution{AffineDecomposition}
 
 affine_contribution() = GenericContribution(IdDict{Triangulation,AffineDecomposition}())
 
+function reduced_form(
+  info::RBInfo,
+  fs::FESpace,
+  s::AbstractTransientSnapshots,
+  trian::Triangulation,
+  args...;
+  kwargs...)
+
+  basis_space,basis_time = reduced_basis(s;ϵ=get_tol(info))
+  lu_interp,red_trian,integration_domain = mdeim(info,fs,trian,basis_space,basis_time)
+  proj_basis_space = compress_basis_space(basis_space,args...)
+  comb_basis_time = combine_basis_time(args...)
+  ad = AffineDecomposition(
+    info.mdeim_style,
+    proj_basis_space,
+    basis_time,
+    lu_interp,
+    integration_domain,
+    comb_basis_time)
+  return ad,red_trian
+end
+
 function reduced_vector_form!(
   a::AffineContribution,
   info::RBInfo,
@@ -165,19 +186,10 @@ function reduced_vector_form!(
   s::AbstractTransientSnapshots,
   trian::Triangulation)
 
-  test = op.test
-  basis_space,basis_time = reduced_basis(s;ϵ=get_tol(info))
-  lu_interp,red_trian,integration_domain = mdeim(info,op,trian,basis_space,basis_time)
-  proj_basis_space = compress_basis_space(basis_space,test)
-  comb_basis_time = combine_basis_time(test)
-  a[red_trian] = AffineDecomposition(
-    info.mdeim_style,
-    proj_basis_space,
-    basis_time,
-    lu_interp,
-    integration_domain,
-    comb_basis_time)
-  return a
+  test = get_test(op)
+  fe_test = get_fe_test(op)
+  ad,red_trian = reduced_form(info,fe_test,s,trian,test)
+  a[red_trian] = ad
 end
 
 function reduced_matrix_form!(
@@ -188,20 +200,11 @@ function reduced_matrix_form!(
   trian::Triangulation;
   kwargs...)
 
-  trial = op.trial
-  test = op.test
-  basis_space,basis_time = reduced_basis(s;ϵ=get_tol(info))
-  lu_interp,red_trian,integration_domain = mdeim(info,op,trian,basis_space,basis_time)
-  proj_basis_space = compress_basis_space(basis_space,trial,test)
-  comb_basis_time = combine_basis_time(trial,test;kwargs...)
-  a[red_trian] = AffineDecomposition(
-    info.mdeim_style,
-    proj_basis_space,
-    basis_time,
-    lu_interp,
-    integration_domain,
-    comb_basis_time)
-  return a
+  trial = get_trial(op)
+  test = get_test(op)
+  fe_test = get_fe_test(op)
+  ad,red_trian = reduced_form(info,fe_test,s,trian,trial,test;kwargs...)
+  a[red_trian] = ad
 end
 
 function reduced_vector_form(

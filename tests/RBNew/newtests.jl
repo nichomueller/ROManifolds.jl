@@ -75,7 +75,7 @@ info = RBInfo(dir;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20,st_mdeim=true)
 
 rbsolver = RBSolver(info,fesolver)
 
-snaps,comp = RB.fe_solutions(rbsolver,feop,uh0μ)
+snaps,comp = ode_solutions(rbsolver,feop,uh0μ)
 red_op = reduced_operator(rbsolver,feop,snaps)
 
 son = select_snapshots(snaps,RB.online_params(info))

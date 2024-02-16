@@ -821,56 +821,6 @@ const AbstractSubTransientSnapshots = Union{
   SubArray{T,2,AbstractTransientSnapshots{M,T}}
   } where {M,T}
 
-# function LinearAlgebra.mul!(
-#   c::AbstractMatrix,
-#   a::A,
-#   b::AbstractMatrix,
-#   α::Number,β::Number
-#   ) where {A<:AbstractSubTransientSnapshots}
-
-#   mul!(c,collect(a),b,α,β)
-# end
-
-# function LinearAlgebra.mul!(
-#   c::AbstractMatrix,
-#   a::AbstractMatrix,
-#   b::B,
-#   α::Number,β::Number
-#   ) where {B<:AbstractSubTransientSnapshots}
-
-#   mul!(c,a,collect(b),α,β)
-# end
-
-# function LinearAlgebra.mul!(
-#   c::AbstractMatrix,
-#   a::A,
-#   b::B,
-#   α::Number,β::Number
-#   ) where {A<:AbstractSubTransientSnapshots,B<:AbstractSubTransientSnapshots}
-
-#   mul!(c,collect(a),collect(b),α,β)
-# end
-
-# function LinearAlgebra.mul!(
-#   c::AbstractMatrix,
-#   a::Adjoint{T,A},
-#   b::AbstractMatrix,
-#   α::Number,β::Number
-#   ) where {T,A<:AbstractSubTransientSnapshots}
-
-#   mul!(c,collect(a),b,α,β)
-# end
-
-# function LinearAlgebra.mul!(
-#   c::AbstractMatrix,
-#   a::Adjoint{T,A},
-#   b::B,
-#   α::Number,β::Number
-#   ) where {T,A<:AbstractSubTransientSnapshots,B<:AbstractSubTransientSnapshots}
-
-#   mul!(c,collect(a),collect(b),α,β)
-# end
-
 function (*)(
   a::Adjoint{<:Any,<:AbstractTransientSnapshots},
   b::AbstractMatrix

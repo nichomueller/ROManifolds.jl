@@ -28,7 +28,7 @@ function RBInfo(
   nsnaps_state=50,
   nsnaps_mdeim=20,
   nsnaps_test=10,
-  save_structures=true)
+  save_structures=false)
 
   mdeim_style = st_mdeim == true ? SpaceTimeMDEIM() : SpaceOnlyMDEIM()
   dir = get_test_dir(test_path,ϵ;st_mdeim)
@@ -104,6 +104,29 @@ function RBSolver(fesolver,dir;kwargs...)
 end
 
 function fe_solutions(
+  solver::RBSolver,
+  op::TransientParamFEOperator,
+  uh0::Function;
+  kwargs...)
+
+  info = get_info(solver)
+  fesolver = get_fe_solver(solver)
+  nparams = num_params(info)
+  sol = solve(fesolver,op,uh0;nparams)
+  odesol = sol.odesol
+  realization = odesol.r
+
+  stats = @timed begin
+    values = collect(sol)
+  end
+  snaps = Snapshots(values,realization)
+  cs = ComputationalStats(stats,nparams)
+  save(solver,(snaps,cs))
+
+  return snaps,cs
+end
+
+function ode_solutions(
   solver::RBSolver,
   op::TransientParamFEOperator,
   uh0::Function;

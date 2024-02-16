@@ -248,6 +248,7 @@ function LinearAlgebra.mul!(
     mul!(c[k],a[k],b[k],α,β)
   end
 end
+
 function LinearAlgebra.fillstored!(a::ParamSubSparseMatrix,v)
   @inbounds for k = eachindex(a)
     LinearAlgebra.fillstored!(a[k],v)

@@ -89,6 +89,10 @@ export project_recast
 
 include("DistributedUtils.jl")
 
+export PMatrix
+export MatrixAssemblyCache
+include("PMatrix.jl")
+
 export PVectorParamCounter
 export DistributedParamAllocationVector
 include("Algebra.jl")

@@ -110,4 +110,13 @@ ode_cache = allocate_cache(pop,r)
 A,b = allocate_fe_matrix_and_vector(pop,r,x,ode_cache)
 
 ode_cache = update_cache!(ode_cache,pop,r)
-fe_matrix_and_vector!(A,b,pop,r,dtθ,x,ode_cache,y)
+contribs_mat,contribs_vec = fe_matrix_and_vector!(A,b,pop,r,dtθ,x,ode_cache,y)
+
+red_mat = RB.reduced_matrix_form(rbsolver,pop,contribs_mat)
+red_vec = RB.reduced_vector_form(rbsolver,pop,contribs_vec)
+
+s = contribs_vec[Ω]
+
+basis_space = map(local_views(pop.test)) do test
+  test.basis_space
+end
