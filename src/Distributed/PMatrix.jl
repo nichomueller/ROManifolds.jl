@@ -74,66 +74,66 @@ function p_matrix_cache(matrix_partition,row_partition,col_partition)
   p_matrix_cache_impl(eltype(matrix_partition),matrix_partition,row_partition,col_partition)
 end
 
-function p_matrix_cache_impl(::Type,matrix_partition,row_partition,col_partition)
-  function setup_snd(part,parts_snd,row_indices,col_indices,values)
-    local_row_to_owner = local_to_owner(row_indices)
-    local_to_global_row = local_to_global(row_indices)
-    local_to_global_col = local_to_global(col_indices)
-    owner_to_i = Dict(( owner=>i for (i,owner) in enumerate(parts_snd) ))
-    ptrs = zeros(Int32,length(parts_snd)+1)
-    for li in axes(values,1)
-      owner = local_row_to_owner[li]
-      if owner != part
-        ptrs[owner_to_i[owner]+1] +=1
-      end
-    end
-    length_to_ptrs!(ptrs)
-    k_snd_data = zeros(Int32,ptrs[end]-1)
-    gi_snd_data = zeros(Int,ptrs[end]-1)
-    gj_snd_data = zeros(Int,ptrs[end]-1)
-    for (k,(li,lj)) in Iterators.product(axes(values)...)
-      owner = local_row_to_owner[li]
-      if owner != part
-        p = ptrs[owner_to_i[owner]]
-        k_snd_data[p] = k
-        gi_snd_data[p] = local_to_global_row[li]
-        gj_snd_data[p] = local_to_global_col[lj]
-        ptrs[owner_to_i[owner]] += 1
-      end
-    end
-    rewind_ptrs!(ptrs)
-    k_snd = JaggedArray(k_snd_data,ptrs)
-    gi_snd = JaggedArray(gi_snd_data,ptrs)
-    gj_snd = JaggedArray(gj_snd_data,ptrs)
-    k_snd, gi_snd, gj_snd
-  end
-  function setup_rcv(part,row_indices,col_indices,gi_rcv,gj_rcv,values)
-    global_to_local_row = global_to_local(row_indices)
-    global_to_local_col = global_to_local(col_indices)
-    ptrs = gi_rcv.ptrs
-    k_rcv_data = zeros(Int32,ptrs[end]-1)
-    for p in 1:length(gi_rcv.data)
-      gi = gi_rcv.data[p]
-      gj = gj_rcv.data[p]
-      li = global_to_local_row[gi]
-      lj = global_to_local_col[gj]
-      k = li+(lj-1)*size(values,1)
-      k_rcv_data[p] = k
-    end
-    k_rcv = JaggedArray(k_rcv_data,ptrs)
-    k_rcv
-  end
-  part = linear_indices(row_partition)
-  parts_snd,parts_rcv = assembly_neighbors(row_partition)
-  k_snd,gi_snd,gj_snd = map(setup_snd,part,parts_snd,row_partition,col_partition,matrix_partition) |> tuple_of_arrays
-  graph = ExchangeGraph(parts_snd,parts_rcv)
-  gi_rcv = exchange_fetch(gi_snd,graph)
-  gj_rcv = exchange_fetch(gj_snd,graph)
-  k_rcv = map(setup_rcv,part,row_partition,col_partition,gi_rcv,gj_rcv,matrix_partition)
-  buffers = map(assembly_buffers,matrix_partition,k_snd,k_rcv) |> tuple_of_arrays
-  cache = map(VectorAssemblyCache,parts_snd,parts_rcv,k_snd,k_rcv,buffers...)
-  map(SparseMatrixAssemblyCache,cache)
-end
+# function p_matrix_cache_impl(::Type,matrix_partition,row_partition,col_partition)
+#   function setup_snd(part,parts_snd,row_indices,col_indices,values)
+#     local_row_to_owner = local_to_owner(row_indices)
+#     local_to_global_row = local_to_global(row_indices)
+#     local_to_global_col = local_to_global(col_indices)
+#     owner_to_i = Dict(( owner=>i for (i,owner) in enumerate(parts_snd) ))
+#     ptrs = zeros(Int32,length(parts_snd)+1)
+#     for li in axes(values,1)
+#       owner = local_row_to_owner[li]
+#       if owner != part
+#         ptrs[owner_to_i[owner]+1] +=1
+#       end
+#     end
+#     length_to_ptrs!(ptrs)
+#     k_snd_data = zeros(Int32,ptrs[end]-1)
+#     gi_snd_data = zeros(Int,ptrs[end]-1)
+#     gj_snd_data = zeros(Int,ptrs[end]-1)
+#     for (k,(li,lj)) in enumerate(Iterators.product(axes(values)...))
+#       owner = local_row_to_owner[li]
+#       if owner != part
+#         p = ptrs[owner_to_i[owner]]
+#         k_snd_data[p] = k
+#         gi_snd_data[p] = local_to_global_row[li]
+#         gj_snd_data[p] = local_to_global_col[lj]
+#         ptrs[owner_to_i[owner]] += 1
+#       end
+#     end
+#     rewind_ptrs!(ptrs)
+#     k_snd = JaggedArray(k_snd_data,ptrs)
+#     gi_snd = JaggedArray(gi_snd_data,ptrs)
+#     gj_snd = JaggedArray(gj_snd_data,ptrs)
+#     k_snd, gi_snd, gj_snd
+#   end
+#   function setup_rcv(part,row_indices,col_indices,gi_rcv,gj_rcv,values)
+#     global_to_local_row = global_to_local(row_indices)
+#     global_to_local_col = global_to_local(col_indices)
+#     ptrs = gi_rcv.ptrs
+#     k_rcv_data = zeros(Int32,ptrs[end]-1)
+#     for p in 1:length(gi_rcv.data)
+#       gi = gi_rcv.data[p]
+#       gj = gj_rcv.data[p]
+#       li = global_to_local_row[gi]
+#       lj = global_to_local_col[gj]
+#       k = li+(lj-1)*size(values,1)
+#       k_rcv_data[p] = k
+#     end
+#     k_rcv = JaggedArray(k_rcv_data,ptrs)
+#     k_rcv
+#   end
+#   part = linear_indices(row_partition)
+#   parts_snd,parts_rcv = assembly_neighbors(row_partition)
+#   k_snd,gi_snd,gj_snd = map(setup_snd,part,parts_snd,row_partition,col_partition,matrix_partition) |> tuple_of_arrays
+#   graph = ExchangeGraph(parts_snd,parts_rcv)
+#   gi_rcv = exchange_fetch(gi_snd,graph)
+#   gj_rcv = exchange_fetch(gj_snd,graph)
+#   k_rcv = map(setup_rcv,part,row_partition,col_partition,gi_rcv,gj_rcv,matrix_partition)
+#   buffers = map(assembly_buffers,matrix_partition,k_snd,k_rcv) |> tuple_of_arrays
+#   cache = map(VectorAssemblyCache,parts_snd,parts_rcv,k_snd,k_rcv,buffers...)
+#   map(SparseMatrixAssemblyCache,cache)
+# end
 
 function PMatrix{V}(::UndefInitializer,row_partition,col_partition) where V
   matrix_partition = map(row_partition,col_partition) do row_indices,col_indices

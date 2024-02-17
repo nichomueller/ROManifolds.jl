@@ -144,7 +144,7 @@ function RB.reduced_fe_space(
   dtrial = _to_distributed_fe_space(trial)
   test = get_test(feop)
   norm_matrix = RB.get_norm_matrix(info,feop)
-  reduced_trial,reduced_test = map(
+  basis_space,basis_time = map(
     local_views(dtrial),
     local_views(test),
     local_views(s),
@@ -152,15 +152,15 @@ function RB.reduced_fe_space(
     ) do trial,test,s,norm_matrix
 
     soff = select_snapshots(s,RB.offline_params(info))
-    basis_space,basis_time = reduced_basis(soff,norm_matrix;ϵ=RB.get_tol(info))
-    reduced_trial = RBSpace(trial,basis_space,basis_time)
-    reduced_test = RBSpace(test,basis_space,basis_time)
-    reduced_trial,reduced_test
+    reduced_basis(soff,norm_matrix;ϵ=RB.get_tol(info))
   end |> tuple_of_arrays
 
-  dtrial = DistributedRBSpace(reduced_trial)
-  dtest = DistributedRBSpace(reduced_test)
-  return dtrial,dtest
+  row_partition = s.snaps.index_partition
+  col_partition = s.snaps.index_partition
+  p_basis_space = PMatrix(basis_space,row_partition,col_partition)
+  reduced_trial = RBSpace(trial,p_basis_space,basis_time)
+  reduced_test = RBSpace(test,p_basis_space,basis_time)
+  return reduced_trial,reduced_test
 end
 
 function GridapDistributed._find_vector_type(
@@ -174,35 +174,39 @@ function GridapDistributed._find_vector_type(
   return vector_type
 end
 
-# function RB.compress(r::DistributedRBSpace,s::DistributedTransientSnapshots)
-#   partition = s.snaps.index_partition
-#   vector_partition = map(local_views(r),local_views(s)) do r,s
-#     compress(r,s)
-#   end
-#   PVector(vector_partition,partition)
-# end
+function GridapDistributed.local_views(r::DistributedRBSpace)
+  map(
+    local_views(r.space),
+    local_views(get_basis_space(r)),
+    local_views(get_basis_time(r))
+    ) do space,basis_space,basis_time
 
-# function RB.compress(
-#   trial::DistributedRBSpace,
-#   test::DistributedRBSpace,
-#   xmat::ParamVector;
-#   kwargs...)
+    RBSpace(space,basis_space,basis_time)
+  end
+end
 
-#   partition = xmat.index_partition
-#   vector_partition = map(local_views(trial),local_views(test),local_views(xmat)
-#     ) do trial,test,xmat
-#     compress(trial,test,xmat;kwargs...)
-#   end
-#   PVector(vector_partition,partition)
-# end
+function RB.compress(r::DistributedRBSpace,s::DistributedTransientSnapshots)
+  map(local_views(r),local_views(s)) do r,s
+    compress(r,s)
+  end
+end
 
-# function RB.recast(r::DistributedRBSpace,red_x::PVector)
-#   partition = red_x.index_partition
-#   vector_partition = map(local_views(r),local_views(red_x)) do r,red_x
-#     recast(r,red_x)
-#   end
-#   PVector(vector_partition,partition)
-# end
+function RB.compress(
+  trial::DistributedRBSpace,
+  test::DistributedRBSpace,
+  s::DistributedTransientSnapshots;
+  kwargs...)
+
+  map(local_views(trial),local_views(test),local_views(s)) do trial,test,s
+    compress(trial,test,s;kwargs...)
+  end
+end
+
+function RB.recast(r::DistributedRBSpace,red_x::PVector)
+  map(local_views(r),local_views(red_x)) do r,red_x
+    recast(r,red_x)
+  end
+end
 
 function RB.reduced_vector_form!(
   a::DistributedContribution,
