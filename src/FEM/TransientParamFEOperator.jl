@@ -308,7 +308,7 @@ function Algebra.allocate_residual(
 end
 
 function _allocate_residual(
-  b::GenericContribution,
+  b::Contribution,
   op::TransientParamFEOperatorWithTrian,
   r::TransientParamRealization,
   uh::T,
@@ -345,7 +345,7 @@ function Algebra.allocate_jacobian(
 end
 
 function _allocate_jacobian(
-  A::Tuple{Vararg{GenericContribution}},
+  A::Tuple{Vararg{Contribution}},
   op::TransientParamFEOperatorWithTrian,
   r::TransientParamRealization,
   uh::T,
@@ -373,7 +373,7 @@ function _allocate_jacobian(
 end
 
 function Algebra.residual!(
-  b::GenericContribution,
+  b::Contribution,
   op::TransientParamFEOperatorWithTrian,
   r::TransientParamRealization,
   xh::T,
@@ -392,7 +392,7 @@ function Algebra.residual!(
 end
 
 function Algebra.jacobian!(
-  A::GenericContribution,
+  A::Contribution,
   op::TransientParamFEOperatorWithTrian,
   r::TransientParamRealization,
   xh::T,
@@ -415,7 +415,7 @@ function Algebra.jacobian!(
 end
 
 function ODETools.jacobians!(
-  A::Tuple{Vararg{GenericContribution}},
+  A::Tuple{Vararg{Contribution}},
   op::TransientParamFEOperatorWithTrian,
   r::TransientParamRealization,
   xh::T,

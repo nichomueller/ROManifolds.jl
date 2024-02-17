@@ -62,7 +62,7 @@ function compress_basis_space(A::AbstractMatrix,test::RBSpace)
   end
 end
 
-function compress_basis_space(A::NnzSnapshots,trial::RBSpace,test::RBSpace)
+function compress_basis_space(A::AbstractMatrix,trial::RBSpace,test::RBSpace)
   basis_test = get_basis_space(test)
   basis_trial = get_basis_space(trial)
   map(get_values(A)) do A
@@ -153,17 +153,17 @@ function mdeim(
   return lu_interp,red_trian,integration_domain
 end
 
-const AffineContribution = Contribution{AffineDecomposition}
+const AffineContribution = Contribution{Triangulation,AffineDecomposition}
 
-affine_contribution() = GenericContribution(IdDict{Triangulation,AffineDecomposition}())
+affine_contribution() = Contribution(IdDict{Triangulation,AffineDecomposition}())
 
 function reduced_form(
   info::RBInfo,
   fs::FESpace,
-  s::AbstractTransientSnapshots,
-  trian::Triangulation,
+  s::S,
+  trian::T,
   args...;
-  kwargs...)
+  kwargs...) where {S,T}
 
   basis_space,basis_time = reduced_basis(s;ϵ=get_tol(info))
   lu_interp,red_trian,integration_domain = mdeim(info,fs,trian,basis_space,basis_time)
@@ -180,11 +180,11 @@ function reduced_form(
 end
 
 function reduced_vector_form!(
-  a::AffineContribution,
+  a::Contribution,
   info::RBInfo,
   op::RBOperator,
-  s::AbstractTransientSnapshots,
-  trian::Triangulation)
+  s::S,
+  trian::T) where {S,T}
 
   test = get_test(op)
   fe_test = get_fe_test(op)
@@ -196,9 +196,9 @@ function reduced_matrix_form!(
   a::AffineContribution,
   info::RBInfo,
   op::RBOperator,
-  s::AbstractTransientSnapshots,
-  trian::Triangulation;
-  kwargs...)
+  s::S,
+  trian::T;
+  kwargs...) where {S,T}
 
   trial = get_trial(op)
   test = get_test(op)

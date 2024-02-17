@@ -50,7 +50,7 @@ function RB.Snapshots(
 end
 
 function RB.Snapshots(a::DistributedArrayContribution,args...)
-  b = GenericContribution(IdDict{DistributedTriangulation,DistributedTransientSnapshots}())
+  b = Contribution(IdDict{DistributedTriangulation,DistributedTransientSnapshots}())
   for (trian,values) in a.dict
     b[trian] = Snapshots(values,args...)
   end
@@ -155,12 +155,20 @@ function RB.reduced_fe_space(
     reduced_basis(soff,norm_matrix;ϵ=RB.get_tol(info))
   end |> tuple_of_arrays
 
-  row_partition = s.snaps.index_partition
-  col_partition = s.snaps.index_partition
-  p_basis_space = PMatrix(basis_space,row_partition,col_partition)
+  index_partition = s.snaps.index_partition
+  p_basis_space = PMatrix(basis_space,index_partition)
   reduced_trial = RBSpace(trial,p_basis_space,basis_time)
   reduced_test = RBSpace(test,p_basis_space,basis_time)
   return reduced_trial,reduced_test
+end
+
+function RB.reduced_basis(s::DistributedTransientSnapshots,args...;kwargs...)
+  basis_space,basis_time = map(local_views(s)) do s
+    reduced_basis(s,args...;kwargs...)
+  end |> tuple_of_arrays
+  index_partition = s.snaps.index_partition
+  p_basis_space = PMatrix(basis_space,index_partition)
+  return p_basis_space,basis_time
 end
 
 function GridapDistributed._find_vector_type(
@@ -202,67 +210,59 @@ function RB.compress(
   end
 end
 
-function RB.recast(r::DistributedRBSpace,red_x::PVector)
-  map(local_views(r),local_views(red_x)) do r,red_x
+function RB.recast(r::DistributedRBSpace,red_x::AbstractVector)
+  vector_partition = map(local_views(r),local_views(red_x)) do r,red_x
     recast(r,red_x)
+  end
+  index_partition = partition(r.space.gids)
+  PVector(vector_partition,index_partition)
+end
+
+function RB.compress_basis_space(A::PMatrix,test::RBSpace)
+  basis_test = get_basis_space(test)
+  map(eachcol(A)) do a
+    basis_test'*a
   end
 end
 
-function RB.reduced_vector_form!(
-  a::DistributedContribution,
-  info::RBInfo,
-  op::RBOperator,
-  s::DistributedTransientSnapshots,
-  trian::DistributedTriangulation)
-
-  test = get_test(op)
-  fe_test = get_fe_test(op)
-
-  ad,red_trians = map(
-    local_views(s),
-    local_views(trian),
-    local_views(test),
-    local_views(fe_test)
-    ) do s,trian,test,fe_test
-
-    RB.reduced_form(info,fe_test,s,trian,test)
-  end |> tuple_of_arrays
-
-  red_trian = DistributedTriangulation(red_trians)
-  a[red_trian] = ad
+function RB.compress_basis_space(A::PMatrix,trial::RBSpace,test::RBSpace)
+  basis_test = get_basis_space(test)
+  basis_trial = get_basis_space(trial)
+  map(get_values(A)) do A
+    basis_test'*A*basis_trial
+  end
 end
 
-function RB.reduced_matrix_form!(
-  a::DistributedContribution,
-  info::RBInfo,
-  op::RBOperator,
-  s::DistributedTransientSnapshots,
-  trian::DistributedTriangulation;
+function RB.combine_basis_time(
+  trial::DistributedRBSpace,
+  test::DistributedRBSpace;
   kwargs...)
 
-  trial = get_trial(op)
-  test = get_test(op)
-  fe_test = get_fe_test(op)
+  map(local_views(trial),local_views(test)) do trial,test
+    RB.combine_basis_time(trial,test;kwargs...)
+  end
+end
 
-  ad,red_trians = map(
-    local_views(s),
-    local_views(trian),
-    local_views(trial),
-    local_views(test),
-    local_views(fe_test)
-    ) do s,trian,trial,test,fe_test
+function RB.mdeim(
+  info::RBInfo,
+  fs::DistributedFESpace,
+  trian::DistributedTriangulation,
+  basis_space::AbstractMatrix,
+  basis_time::AbstractMatrix)
 
-    RB.reduced_form(info,fe_test,s,trian,trial,test;kwargs...)
+  lu_interp,red_trian,integration_domain = map(
+    local_views(fs),local_views(trian),local_views(basis_space),local_views(basis_time)
+    ) do fs,trian,basis_space,basis_time
+    mdeim(info,fs,trian,basis_space,basis_time)
   end |> tuple_of_arrays
-
-  red_trian = DistributedTriangulation(red_trians)
-  a[red_trian] = ad
+  d_red_trian = DistributedTriangulation(red_trian)
+  return lu_interp,d_red_trian,integration_domain
 end
 
 function RB.reduced_vector_form(
   solver::RBSolver,
   op::RBOperator,
-  c::GenericContribution{DistributedTriangulation})
+  c::Contribution{DistributedTriangulation})
 
   info = RB.get_info(solver)
   a = distributed_array_contribution()
@@ -275,7 +275,7 @@ end
 function RB.reduced_matrix_form(
   solver::RBSolver,
   op::RBOperator,
-  c::GenericContribution{DistributedTriangulation};
+  c::Contribution{DistributedTriangulation};
   kwargs...)
 
   info = RB.get_info(solver)

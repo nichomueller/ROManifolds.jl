@@ -12,6 +12,7 @@ using Gridap.ODEs.TransientFETools
 using Gridap.ODEs.ODETools
 using Gridap.Helpers
 using Gridap.Algebra
+using Gridap.CellData
 using GridapDistributed
 using PartitionedArrays
 using DrWatson
@@ -112,77 +113,81 @@ A,b = allocate_fe_matrix_and_vector(pop,r,x,ode_cache)
 ode_cache = update_cache!(ode_cache,pop,r)
 contribs_mat,contribs_vec = fe_matrix_and_vector!(A,b,pop,r,dtθ,x,ode_cache,y)
 
-red_mat = RB.reduced_matrix_form(rbsolver,pop,contribs_mat)
-red_vec = RB.reduced_vector_form(rbsolver,pop,contribs_vec)
+# red_mat = RB.reduced_matrix_form(rbsolver,pop,contribs_mat)
+# red_vec = RB.reduced_vector_form(rbsolver,pop,contribs_vec)
 
-s = contribs_vec[Ω]
+c = distributed_array_contribution()
+trian,vals = get_domains(contribs_vec)[1],get_values(contribs_vec)[1]
+# RB.reduced_vector_form!(c,info,pop,values,trian)
+basis_space,basis_time = reduced_basis(vals;ϵ=RB.get_tol(info))
+# lu_interp,red_trian,integration_domain = mdeim(info,fs,trian,basis_space,basis_time)
+lu_interp,red_trian,integration_domain = map(
+    local_views(test),
+    local_views(trian),
+    local_views(basis_space),
+    local_views(basis_time)) do fs,trian,basis_space,basis_time
 
-basis_space = map(local_views(pop.test)) do test
-  test.basis_space
-end
+  mdeim(info,fs,trian,basis_space,basis_time)
+end |> tuple_of_arrays
+# proj_basis_space = compress_basis_space(basis_space,red_test)
+basis_test = get_basis_space(red_test)
+basis_test'*basis_space
+comb_basis_time = combine_basis_time(red_test)
 
-########
-function PartitionedArrays.p_sparse_matrix_cache_impl(
-  ::Type,matrix_partition,row_partition,col_partition)
 
-  function setup_snd(part,parts_snd,row_indices,col_indices,values)
-      local_row_to_owner = local_to_owner(row_indices)
-      local_to_global_row = local_to_global(row_indices)
-      local_to_global_col = local_to_global(col_indices)
-      owner_to_i = Dict(( owner=>i for (i,owner) in enumerate(parts_snd) ))
-      ptrs = zeros(Int32,length(parts_snd)+1)
-      for (li,lj,v) in PartitionedArrays.nziterator(values)
-          owner = local_row_to_owner[li]
-          if owner != part
-              ptrs[owner_to_i[owner]+1] +=1
-          end
-      end
-      Algebra.length_to_ptrs!(ptrs)
-      println(ptrs)
-      k_snd_data = zeros(Int32,ptrs[end]-1)
-      gi_snd_data = zeros(Int,ptrs[end]-1)
-      gj_snd_data = zeros(Int,ptrs[end]-1)
-      for (k,(li,lj,v)) in enumerate(nziterator(values))
-          owner = local_row_to_owner[li]
-          if owner != part
-              p = ptrs[owner_to_i[owner]]
-              k_snd_data[p] = k
-              gi_snd_data[p] = local_to_global_row[li]
-              gj_snd_data[p] = local_to_global_col[lj]
-              ptrs[owner_to_i[owner]] += 1
-          end
-      end
-      Algebra.rewind_ptrs!(ptrs)
-      k_snd = JaggedArray(k_snd_data,ptrs)
-      gi_snd = JaggedArray(gi_snd_data,ptrs)
-      gj_snd = JaggedArray(gj_snd_data,ptrs)
-      k_snd, gi_snd, gj_snd
+# dummy test for online phase, no mdeim
+son = select_snapshots(snaps,first(RB.online_params(info)))
+x = get_values(son)
+ron = get_realization(son)
+odeop = get_algebraic_operator(feop.op)
+ode_cache = allocate_cache(odeop,ron)
+ode_cache = update_cache!(ode_cache,odeop,ron)
+x0 = get_free_dof_values(zero(trial(ron)))
+y0 = similar(x0)
+y0 .= 0.0
+nlop = ThetaMethodParamOperator(odeop,ron,dt*θ,x0,ode_cache,y0)
+A = allocate_jacobian(nlop,x0)
+jacobian!(A,nlop,x0,1)
+Asnap = Snapshots(A,ron)
+M = allocate_jacobian(nlop,x0)
+jacobian!(M,nlop,x0,2)
+Msnap = Snapshots(M,ron)
+b = allocate_residual(nlop,x0)
+residual!(b,nlop,x0)
+bsnap = Snapshots(b,ron)
+_b = PMatrix(bsnap.snaps.vector_partition,b.index_partition)
+
+b_rb = compress(red_test,_b)
+A_rb = compress(red_trial,red_test,A;combine=(x,y)->θ*x+(1-θ)*y)
+M_rb = compress(red_trial,red_test,M;combine=(x,y)->θ*(x-y))
+AM_rb = A_rb+M_rb
+
+x_rb = AM_rb \ b_rb
+
+x_rec = recast(red_trial,x_rb)
+norm(x_rec - x) / norm(x)
+
+# b_rb = compress(red_test,_b)
+basis_space = get_basis_space(red_test)
+# basis_space'*_b
+A,B = basis_space',_b
+Ta = eltype(A)
+Tb = eltype(B)
+T = typeof(zero(Ta)*zero(Tb)+zero(Ta)*zero(Tb))
+c = PMatrix{Matrix{T}}(undef,partition(axes(A,1)),partition(axes(B,2)))
+fill!(c,zero(T))
+# a_in_main = PartitionedArrays.to_trivial_partition(A)
+row_partition_in_main=PartitionedArrays.trivial_partition(partition(axes(A,1)))
+col_partition_in_main=PartitionedArrays.trivial_partition(partition(axes(A,2)))
+destination = 1
+T = eltype(A)
+a_in_main = similar(A,T,PRange(row_partition_in_main),PRange(col_partition_in_main))
+fill!(a_in_main,zero(T))
+map(own_values(A.parent),partition(a_in_main),partition(axes(A,1)),partition(axes(A,2))) do aown,my_a_in_main,row_indices,col_indices
+  if part_id(row_indices) == part_id(col_indices) == destination
+    my_a_in_main[own_to_global(row_indices),own_to_global(col_indices)] .= aown'
+  else
+    my_a_in_main .= aown'
   end
-  function setup_rcv(part,row_indices,col_indices,gi_rcv,gj_rcv,values)
-      global_to_local_row = global_to_local(row_indices)
-      global_to_local_col = global_to_local(col_indices)
-      ptrs = gi_rcv.ptrs
-      k_rcv_data = zeros(Int32,ptrs[end]-1)
-      for p in 1:length(gi_rcv.data)
-          gi = gi_rcv.data[p]
-          gj = gj_rcv.data[p]
-          li = global_to_local_row[gi]
-          lj = global_to_local_col[gj]
-          k = PartitionedArrays.nzindex(values,li,lj)
-          @boundscheck @assert k > 0 "The sparsity pattern of the ghost layer is inconsistent"
-          k_rcv_data[p] = k
-      end
-      k_rcv = JaggedArray(k_rcv_data,ptrs)
-      k_rcv
-  end
-  part = linear_indices(row_partition)
-  parts_snd, parts_rcv = assembly_neighbors(row_partition)
-  k_snd, gi_snd, gj_snd = map(setup_snd,part,parts_snd,row_partition,col_partition,matrix_partition) |> tuple_of_arrays
-  graph = ExchangeGraph(parts_snd,parts_rcv)
-  gi_rcv = PartitionedArrays.exchange_fetch(gi_snd,graph)
-  gj_rcv = PartitionedArrays.exchange_fetch(gj_snd,graph)
-  k_rcv = map(setup_rcv,part,row_partition,col_partition,gi_rcv,gj_rcv,matrix_partition)
-  buffers = map(PartitionedArrays.assembly_buffers,matrix_partition,k_snd,k_rcv) |> tuple_of_arrays
-  cache = map(PartitionedArrays.VectorAssemblyCache,parts_snd,parts_rcv,k_snd,k_rcv,buffers...)
-  map(PartitionedArrays.SparseMatrixAssemblyCache,cache)
 end
+# assemble!(a_in_main)

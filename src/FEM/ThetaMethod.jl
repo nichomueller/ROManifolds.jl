@@ -59,43 +59,51 @@ function Algebra.zero_initial_guess(op::ThetaMethodParamOperator)
   x0
 end
 
-function Algebra.residual!(
-  b,
-  op::ThetaMethodParamOperator,
-  x::AbstractVector)
+for T in (:AbstractVector,:Contribution)
+  @eval begin
+    function Algebra.residual!(
+      b::$T,
+      op::ThetaMethodParamOperator,
+      x::AbstractVector)
 
-  uF = x
-  vθ = op.vθ
-  @. vθ = (x-op.u0)/op.dtθ
-  residual!(b,op.odeop,op.r,(uF,vθ),op.ode_cache)
+      uF = x
+      vθ = op.vθ
+      @. vθ = (x-op.u0)/op.dtθ
+      residual!(b,op.odeop,op.r,(uF,vθ),op.ode_cache)
+    end
+  end
 end
 
-function Algebra.jacobian!(
-  A,
-  op::ThetaMethodParamOperator,
-  x::AbstractVector)
+for T in (:AbstractMatrix,:(Tuple{Vararg{Contribution}}))
+  @eval begin
+    function Algebra.jacobian!(
+      A::$T,
+      op::ThetaMethodParamOperator,
+      x::AbstractVector)
 
-  uF = x
-  vθ = op.vθ
-  @. vθ = (x-op.u0)/op.dtθ
-  z = zero(eltype(A))
-  fillstored!(A,z)
-  jacobians!(A,op.odeop,op.r,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)
-end
+      uF = x
+      vθ = op.vθ
+      @. vθ = (x-op.u0)/op.dtθ
+      z = zero(eltype(A))
+      fillstored!(A,z)
+      jacobians!(A,op.odeop,op.r,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)
+    end
 
-function Algebra.jacobian!(
-  A,
-  op::ThetaMethodParamOperator,
-  x::AbstractVector,
-  i::Int)
+    function Algebra.jacobian!(
+      A::$T,
+      op::ThetaMethodParamOperator,
+      x::AbstractVector,
+      i::Int)
 
-  uF = x
-  vθ = op.vθ
-  @. vθ = (x-op.u0)/op.dtθ
-  z = zero(eltype(A))
-  fillstored!(A,z)
-  γ = (1.0,1/op.dtθ)
-  jacobian!(A,op.odeop,op.r,(uF,vθ),i,γ[i],op.ode_cache)
+      uF = x
+      vθ = op.vθ
+      @. vθ = (x-op.u0)/op.dtθ
+      z = zero(eltype(A))
+      fillstored!(A,z)
+      γ = (1.0,1/op.dtθ)
+      jacobian!(A,op.odeop,op.r,(uF,vθ),i,γ[i],op.ode_cache)
+    end
+  end
 end
 
 # specializations for affine case
@@ -140,36 +148,44 @@ function ODETools.solve_step!(
   return (uf,r,cache)
 end
 
-function Algebra.residual!(
-  b,
-  op::ThetaMethodParamOperator{<:Affine},
-  x::AbstractVector)
+for T in (:AbstractVector,:Contribution)
+  @eval begin
+    function Algebra.residual!(
+      b::$T,
+      op::ThetaMethodParamOperator{<:Affine},
+      x::AbstractVector)
 
-  uF = op.u0
-  vθ = op.vθ
-  residual!(b,op.odeop,op.r,(uF,vθ),op.ode_cache)
+      uF = op.u0
+      vθ = op.vθ
+      residual!(b,op.odeop,op.r,(uF,vθ),op.ode_cache)
+    end
+  end
 end
 
-function Algebra.jacobian!(
-  A,
-  op::ThetaMethodParamOperator{<:Affine},
-  x::AbstractVector)
+for T in (:AbstractMatrix,:(Tuple{Vararg{Contribution}}))
+  @eval begin
+    function Algebra.jacobian!(
+      A::$T,
+      op::ThetaMethodParamOperator{<:Affine},
+      x::AbstractVector)
 
-  vθ = op.vθ
-  z = zero(eltype(A))
-  fillstored!(A,z)
-  jacobians!(A,op.odeop,op.r,(vθ,vθ),(1.0,1/op.dtθ),op.ode_cache)
-end
+      vθ = op.vθ
+      z = zero(eltype(A))
+      fillstored!(A,z)
+      jacobians!(A,op.odeop,op.r,(vθ,vθ),(1.0,1/op.dtθ),op.ode_cache)
+    end
 
-function Algebra.jacobian!(
-  A,
-  op::ThetaMethodParamOperator{<:Affine},
-  x::AbstractVector,
-  i::Int)
+    function Algebra.jacobian!(
+      A::$T,
+      op::ThetaMethodParamOperator{<:Affine},
+      x::AbstractVector,
+      i::Int)
 
-  vθ = op.vθ
-  z = zero(eltype(A))
-  fillstored!(A,z)
-  γ = (1.0,1/op.dtθ)
-  jacobian!(A,op.odeop,op.r,(vθ,vθ),i,γ[i],op.ode_cache)
+      vθ = op.vθ
+      z = zero(eltype(A))
+      fillstored!(A,z)
+      γ = (1.0,1/op.dtθ)
+      jacobian!(A,op.odeop,op.r,(vθ,vθ),i,γ[i],op.ode_cache)
+    end
+  end
 end

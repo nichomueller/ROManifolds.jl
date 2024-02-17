@@ -1,8 +1,8 @@
-const DistributedContribution{V} = GenericContribution{DistributedTriangulation,V}
+const DistributedContribution{V} = Contribution{DistributedTriangulation,V}
 
 const DistributedArrayContribution = DistributedContribution{T} where {T<:AbstractArray}
 
-distributed_array_contribution() = GenericContribution(IdDict{DistributedTriangulation,AbstractArray}())
+distributed_array_contribution() = Contribution(IdDict{DistributedTriangulation,AbstractArray}())
 
 struct DistributedContributionBroadcast{D}
   contrib::D
@@ -10,7 +10,7 @@ end
 
 function Base.broadcasted(f,a::DistributedArrayContribution,b::Number)
   BT = PartitionedArrays.PBroadcasted{<:AbstractArray{<:FEM.ParamBroadcast}}
-  c = GenericContribution(IdDict{DistributedTriangulation,BT}())
+  c = Contribution(IdDict{DistributedTriangulation,BT}())
   for (trian,values) in a.dict
     c[trian] = Base.broadcasted(f,values,b)
   end
@@ -51,4 +51,4 @@ end
 
 const DistributedAffineContribution = DistributedContribution{T} where {T<:AbstractVector{<:AffineContribution}}
 
-distributed_affine_contribution() = GenericContribution(IdDict{DistributedTriangulation,AffineDecomposition}())
+distributed_affine_contribution() = Contribution(IdDict{DistributedTriangulation,AffineDecomposition}())

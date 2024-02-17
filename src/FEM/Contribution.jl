@@ -1,17 +1,17 @@
-struct GenericContribution{K,V} <: AbstractDict{K,V}
+struct Contribution{K,V} <: AbstractDict{K,V}
   dict::IdDict{K,V}
 end
 
-Base.length(a::GenericContribution) = length(a.dict)
-Base.iterate(a::GenericContribution,i...) = iterate(a.dict,i...)
-Base.getindex(a::GenericContribution{K},key::K) where K = get_contribution(a,key)
-Base.setindex!(a::GenericContribution,val::V,key::K) where {K,V} = add_contribution!(a,val,key)
-CellData.num_domains(a::GenericContribution) = length(a.dict)
-CellData.get_domains(a::GenericContribution) = collect(keys(a.dict))
-get_values(a::GenericContribution) = collect(values(a.dict))
+Base.length(a::Contribution) = length(a.dict)
+Base.iterate(a::Contribution,i...) = iterate(a.dict,i...)
+Base.getindex(a::Contribution{K},key::K) where K = get_contribution(a,key)
+Base.setindex!(a::Contribution,val::V,key::K) where {K,V} = add_contribution!(a,val,key)
+CellData.num_domains(a::Contribution) = length(a.dict)
+CellData.get_domains(a::Contribution) = collect(keys(a.dict))
+get_values(a::Contribution) = collect(values(a.dict))
 
 function CellData.get_contribution(
-  a::GenericContribution{K},
+  a::Contribution{K},
   key::K) where K
 
   if haskey(a.dict,key)
@@ -24,7 +24,7 @@ function CellData.get_contribution(
 end
 
 function CellData.add_contribution!(
-  a::GenericContribution{K,V},
+  a::Contribution{K,V},
   val::V,
   key::K) where {K,V}
 
@@ -36,18 +36,16 @@ function CellData.add_contribution!(
   a
 end
 
-const Contribution{V} = GenericContribution{Triangulation,V}
+const ArrayContribution = Contribution{Triangulation,AbstractArray}
 
-const ArrayContribution = Contribution{AbstractArray}
-
-array_contribution() = GenericContribution(IdDict{Triangulation,AbstractArray}())
+array_contribution() = Contribution(IdDict{Triangulation,AbstractArray}())
 
 struct ContributionBroadcast{D}
   contrib::D
 end
 
 function Base.broadcasted(f,a::ArrayContribution,b::Number)
-  c = GenericContribution(IdDict{Triangulation,ParamBroadcast}())
+  c = Contribution(IdDict{Triangulation,ParamBroadcast}())
   for (trian,values) in a.dict
     c[trian] = Base.broadcasted(f,values,b)
   end
