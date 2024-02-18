@@ -94,7 +94,7 @@ num_reduced_times(r::RBSpace) = size(get_basis_time(r),2)
 
 FESpaces.num_free_dofs(r::RBSpace) = num_reduced_space_dofs(r)*num_reduced_times(r)
 
-FESpaces.get_free_dof_ids(r::RBSpace) = get_free_dof_ids(r.space)
+FESpaces.get_free_dof_ids(r::RBSpace) = Base.OneTo(num_free_dofs(r))
 
 FESpaces.get_dirichlet_dof_ids(r::RBSpace) = get_dirichlet_dof_ids(r.space)
 

@@ -88,7 +88,9 @@ end
 # red_op = reduced_operator(rbsolver,feop,snaps)
 red_trial,red_test = reduced_fe_space(info,feop,snaps)
 
-sk = select_snapshots(snaps,15)
+new_trial,new_test = Distributed.new_reduced_fe_space(info,feop,snaps)
+
+sk = select_snapshots(snaps,first(RB.online_params(info)))
 pk = get_values(sk)
 
 pk_rb = compress(red_test,sk)
@@ -155,62 +157,90 @@ Msnap = Snapshots(M,ron)
 b = allocate_residual(nlop,x0)
 residual!(b,nlop,x0)
 bsnap = Snapshots(b,ron)
-_b = PMatrix(bsnap.snaps.vector_partition,b.index_partition)
 
-b_rb = compress(red_test,_b)
-A_rb = compress(red_trial,red_test,A;combine=(x,y)->θ*x+(1-θ)*y)
-M_rb = compress(red_trial,red_test,M;combine=(x,y)->θ*(x-y))
-AM_rb = A_rb+M_rb
+b_rb = compress(red_test,bsnap)
+A_rb = compress(red_trial(ron),red_test,Asnap;combine=(x,y)->θ*x+(1-θ)*y) # see below
+M_rb = compress(red_trial(ron),red_test,Msnap;combine=(x,y)->θ*(x-y))  # see below
+AM_rb = map(+,A_rb,M_rb)
 
-x_rb = AM_rb \ b_rb
+x_rb = map(\,AM_rb,b_rb)
 
-x_rec = recast(red_trial,x_rb)
-norm(x_rec - x) / norm(x)
+x_rec = recast(red_trial(ron),x_rb)
+norm(x_rec + x) / norm(x)
 
-# b_rb = compress(red_test,_b)
-basis_space = get_basis_space(red_test)
-# basis_space'*_b
-A,B = basis_space',_b
-Ta = eltype(A)
-Tb = eltype(B)
-T = typeof(zero(Ta)*zero(Tb)+zero(Ta)*zero(Tb))
-c = PMatrix{Matrix{T}}(undef,partition(axes(A,1)),partition(axes(B,2)))
-fill!(c,zero(T))
-# a_in_main = PartitionedArrays.to_trivial_partition(A)
-row_partition_in_main=PartitionedArrays.trivial_partition(partition(axes(A,1)))
-col_partition_in_main=PartitionedArrays.trivial_partition(partition(axes(A,2)))
-destination = 1
-T = eltype(A)
-a_in_main = similar(A,T,PRange(row_partition_in_main),PRange(col_partition_in_main))
-fill!(a_in_main,zero(T))
-map(own_values(A),partition(a_in_main),partition(axes(A,1)),partition(axes(A,2))) do aown,my_a_in_main,row_indices,col_indices
-  println(col_indices)
-  # println(size(my_a_in_main[own_to_global(row_indices),own_to_global(col_indices)]))
-  # println(size(aown))
-  if part_id(row_indices) == part_id(col_indices) == destination
-    my_a_in_main[own_to_global(row_indices),own_to_global(col_indices)] .= aown
-  else
-    my_a_in_main .= aown
+
+function RB.compress_basis_space(A::AbstractMatrix,trial::RBSpace,test::RBSpace)
+  basis_test = get_basis_space(test)
+  basis_trial = get_basis_space(trial)
+  vals = vec(get_values(A))
+  map(vals) do A
+    println(size(basis_test))
+    println(size(A))
+    println(size(basis_trial))
+    basis_test'*A*basis_trial
   end
 end
-# assemble!(a_in_main)
-partition(A)
-partition(axes(A,1))
-partition(axes(A,2))
 
-M = assemble_matrix((u,v)->∫(u*v)dΩ,trial(nothing),test)
-F = assemble_vector(v->∫(v)dΩ,test)
-# X = M \ F
-partition(M)
-partition(axes(M,1))
-partition(axes(M,2))
-Mnew = PartitionedArrays.to_trivial_partition(M)
-PartitionedArrays.to_trivial_partition(Mnew)
-
-sol = solve(fesolver,feop,uh0μ;nparams=2)
-odesol = sol.odesol
-
-stats = @timed begin
-  vals = collect(odesol)
+function _norm_space_time(x::PVector,xrb::PVector)
+  err_norm_contribs,sol_norm_contribs = map(own_values(x),own_values(xrb)) do x,xrb
+    norm(x-xrb)^2,norm(x)^2
+  end |> tuple_of_arrays
+  err_norm = reduce(+,err_norm_contribs;init=zero(eltype(err_norm_contribs)))^(1/2)
+  sol_norm = reduce(+,sol_norm_contribs;init=zero(eltype(sol_norm_contribs)))^(1/2)
+  norm(err_norm)/norm(sol_norm)
 end
-sss = Snapshots(vals,odesol.r)
+
+# try with ghost values
+function ghost_reduced_fe_space(
+  info::RBInfo,
+  feop::TransientParamFEOperator,
+  s::DistributedTransientSnapshots)
+
+  trial = get_trial(feop)
+  # dtrial = _to_distributed_fe_space(trial)
+  test = get_test(feop)
+  # norm_matrix = RB.get_norm_matrix(info,feop)
+  soff = select_snapshots(s,RB.offline_params(info))
+  basis_space,basis_time = map(ghost_values(soff)) do s
+    reduced_basis(s,nothing;ϵ=RB.get_tol(info))
+  end |> tuple_of_arrays
+
+  reduced_trial = RBSpace(trial,basis_space,basis_time)
+  reduced_test = RBSpace(test,basis_space,basis_time)
+  return reduced_trial,reduced_test
+end
+# function ghost_compress(r::DistributedRBSpace,s::DistributedTransientSnapshots)
+#   map(local_views(r),ghost_values(s)) do r,s
+#     compress(r,s)
+#   end
+# end
+# function ghost_compress(
+#   trial::DistributedRBSpace,
+#   test::DistributedRBSpace,
+#   s::DistributedTransientSnapshots;
+#   kwargs...)
+
+#   map(local_views(trial),local_views(test),ghost_values(s)) do trial,test,s
+#     compress(trial,test,s;kwargs...)
+#   end
+# end
+
+ghost_red_trial,ghost_red_test = ghost_reduced_fe_space(info,feop,snaps)
+
+function own_ghost_compress(
+  trial::DistributedRBSpace,
+  test::DistributedRBSpace,
+  s::DistributedTransientSnapshots;
+  kwargs...)
+
+  map(local_views(trial),local_views(test),own_ghost_values(s)) do trial,test,s
+    compress(trial,test,s;kwargs...)
+  end
+end
+
+ghost_A_rb = own_ghost_compress(red_trial(ron),ghost_red_test,Asnap;combine=(x,y)->θ*x+(1-θ)*y)
+ghost_M_rb = own_ghost_compress(red_trial(ron),ghost_red_test,Msnap;combine=(x,y)->θ*(x-y))
+
+AA = Asnap.snaps.matrix_partition.items[1]
+basis_space_test = ghost_red_test.basis_space.items[1]
+basis_space_trial = red_trial.basis_space.items[1]

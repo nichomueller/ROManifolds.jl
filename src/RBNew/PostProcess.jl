@@ -97,7 +97,7 @@ function speedup(r::RBResults)
   speedup(r.fem_stats,r.rb_stats)
 end
 
-function space_time_error(sol,sol_approx,norm_matrix)
+function space_time_error(sol,sol_approx,norm_matrix=nothing)
   _norm(v::AbstractVector,::Nothing) = norm(v)
   _norm(v::AbstractVector,X::AbstractMatrix) = sqrt(v'*X*v)
   err_norm = []

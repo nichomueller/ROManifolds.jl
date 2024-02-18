@@ -16,14 +16,14 @@ function PartitionedArrays.local_values(s::DistributedTransientSnapshots)
   local_values(s.snaps)
 end
 
-function PartitionedArrays.own_values(a::DistributedTransientSnapshots)
-  map(partition(a),partition(axes(a,1))) do values,indices_rows
+function PartitionedArrays.own_values(s::DistributedTransientSnapshots)
+  map(partition(s),partition(axes(s,1))) do values,indices_rows
     select_snapshots(values,spacerange=own_to_local(indices_rows))
   end
 end
 
-function PartitionedArrays.ghost_values(a::DistributedTransientSnapshots)
-  map(partition(a),partition(axes(a,1))) do values,indices_rows
+function PartitionedArrays.ghost_values(s::DistributedTransientSnapshots)
+  map(partition(s),partition(axes(s,1))) do values,indices_rows
     select_snapshots(values,spacerange=ghost_to_local(indices_rows))
   end
 end
@@ -102,6 +102,47 @@ end
 
 const DistributedTransientNnzSnapshots = DistributedTransientSnapshots{T} where {
   T<:Union{<:PSparseMatrix,AbstractVector{<:PSparseMatrix}}}
+
+function RB.Snapshots(
+  values::PSparseMatrix{P},
+  args...) where {P<:AbstractParamContainer}
+
+  row_partition = values.row_partition
+  col_partition = values.col_partition
+  snaps = map(local_views(values)) do values
+    Snapshots(values,args...)
+  end
+  psnaps = PSparseMatrix(snaps,row_partition,col_partition)
+  DistributedSnapshots(psnaps)
+end
+
+function PartitionedArrays.own_values(s::DistributedTransientNnzSnapshots{<:PSparseMatrix})
+  map(partition(s),partition(axes(s,1)),partition(axes(s,2))) do v,indices_rows,indices_cols
+    ovals = own_values(v.values,indices_rows,indices_cols)
+    Snapshots(ovals,get_realization(s))
+  end
+end
+
+function PartitionedArrays.ghost_values(s::DistributedTransientNnzSnapshots{<:PSparseMatrix})
+  map(partition(s),partition(axes(s,1)),partition(axes(s,2))) do v,indices_rows,indices_cols
+    gvals = ghost_values(v.values,indices_rows,indices_cols)
+    Snapshots(gvals,get_realization(s))
+  end
+end
+
+function PartitionedArrays.own_ghost_values(s::DistributedTransientNnzSnapshots{<:PSparseMatrix})
+  map(partition(s),partition(axes(s,1)),partition(axes(s,2))) do v,indices_rows,indices_cols
+    gvals = own_ghost_values(v.values,indices_rows,indices_cols)
+    Snapshots(gvals,get_realization(s))
+  end
+end
+
+function PartitionedArrays.ghost_own_values(s::DistributedTransientNnzSnapshots{<:PSparseMatrix})
+  map(partition(s),partition(axes(s,1)),partition(axes(s,2))) do v,indices_rows,indices_cols
+    gvals = ghost_own_values(v.values,indices_rows,indices_cols)
+    Snapshots(gvals,get_realization(s))
+  end
+end
 
 function RB.get_values(s::DistributedTransientNnzSnapshots)
   snaps = map(local_views(s)) do s

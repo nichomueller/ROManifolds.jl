@@ -232,6 +232,7 @@ end
 Base.size(a::ParamSubSparseMatrix) = map(length,a.indices)
 Base.length(a::ParamSubSparseMatrix) = length(a.parent)
 Base.eachindex(a::ParamSubSparseMatrix) = Base.OneTo(length(a))
+Base.IndexStyle(::ParamSubSparseMatrix) = IndexLinear()
 
 function Base.getindex(a::ParamSubSparseMatrix,index::Int)
   PartitionedArrays.SubSparseMatrix(a.parent[index],a.indices,a.inv_indices)

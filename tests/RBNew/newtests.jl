@@ -82,53 +82,47 @@ son = select_snapshots(snaps,RB.online_params(info))
 ron = get_realization(son)
 xrb, = solve(rbsolver,red_op,ron)
 son_rev = reverse_snapshots(son)
-RB.space_time_error(son_rev,xrb,nothing)
+RB.space_time_error(son_rev,xrb)
 
 info_space = RBInfo(dir;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
 rbsolver_space = RBSolver(info_space,fesolver)
 red_op_space = reduced_operator(rbsolver_space,feop,snaps)
 xrb_space, = solve(rbsolver_space,red_op_space,ron)
-RB.space_time_error(son_rev,xrb_space,nothing)
+RB.space_time_error(son_rev,xrb_space)
 
 xrb_loaded = load_solve(rbsolver)
 xrb_space_loaded = load_solve(rbsolver_space)
 
 #
-son1 = select_snapshots(snaps,first(RB.online_params(info)))
-ron1 = get_realization(son1)
-son1_recast = Snapshots(recast(get_test(red_op),compress(get_test(red_op),son1)),ron1)
-norm(son1 - son1_recast,Inf)
-#
+# dummy test for online phase, no mdeim (θ == 1 !!)
+son = select_snapshots(snaps,first(RB.online_params(info)))
+x = get_values(son)
+ron = get_realization(son)
+odeop = get_algebraic_operator(feop.op)
+ode_cache = allocate_cache(odeop,ron)
+ode_cache = update_cache!(ode_cache,odeop,ron)
+x0 = get_free_dof_values(zero(trial(ron)))
+y0 = similar(x0)
+y0 .= 0.0
+nlop = ThetaMethodParamOperator(odeop,ron,dt*θ,x0,ode_cache,y0)
+A = allocate_jacobian(nlop,x0)
+jacobian!(A,nlop,x0,1)
+Asnap = Snapshots(A,ron)
+M = allocate_jacobian(nlop,x0)
+jacobian!(M,nlop,x0,2)
+Msnap = Snapshots(M,ron)
+b = allocate_residual(nlop,x0)
+residual!(b,nlop,x0)
+bsnap = Snapshots(b,ron)
 
-r = realization(ptspace,nparams=3)
-μ = FEM._get_params(r)[3]
+b_rb = compress(red_test,bsnap)
+A_rb = compress(red_trial(ron),red_test,Asnap;combine=(x,y)->θ*x+(1-θ)*y)
+M_rb = compress(red_trial(ron),red_test,Msnap;combine=(x,y)->θ*(x-y))
+AM_rb = A_rb + M_rb
 
-_a(x,t) = a(x,μ,t)
-_a(t) = x->_a(x,t)
+x_rb = AM_rb \ b_rb
 
-_f(x,t) = f(x,μ,t)
-_f(t) = x->_f(x,t)
-
-_g(x,t) = g(x,μ,t)
-_g(t) = x->_g(x,t)
-
-_h(x,t) = h(x,μ,t)
-_h(t) = x->_h(x,t)
-
-_b(t,v) = ∫(_f(t)*v)dΩ + ∫(_h(t)*v)dΓn
-_a(t,du,v) = ∫(_a(t)*∇(v)⋅∇(du))dΩ
-_m(t,dut,v) = ∫(v*dut)dΩ
-
-_trial = TransientTrialFESpace(test,_g)
-_feop = TransientAffineFEOperator(_m,_a,_b,_trial,test)
-_u0 = interpolate_everywhere(x->0.0,_trial(0.0))
-
-_sol = solve(fesolver,_feop,_u0,t0,tf)
-
-dir = datadir("sol_CN")
-createpvd(dir) do pvd
-  for (uh,t) in _sol
-    vtk = createvtk(Ω,dir*"sol_$(t).vtu",cellfields=["u"=>uh])
-    pvd[t] = vtk
-  end
-end
+x_rec = recast(red_trial(ron),x_rb)
+s = Snapshots(x,ron)
+srec = -Snapshots(x_rec,ron)
+RB.space_time_error(s,srec)

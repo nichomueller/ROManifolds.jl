@@ -16,18 +16,23 @@ function RB.num_space_dofs(r::DistributedRBSpace)
   Ns = map(RB.num_space_dofs,local_views(r))
   PartitionedArrays.getany(Ns)
 end
+
 function RB.num_reduced_space_dofs(r::DistributedRBSpace)
   ns = map(RB.num_reduced_space_dofs,local_views(r))
   PartitionedArrays.getany(ns)
 end
+
 function FEM.num_times(r::DistributedRBSpace)
   Nt = map(num_times,local_views(r))
   PartitionedArrays.getany(Nt)
 end
+
 function RB.num_reduced_times(r::DistributedRBSpace)
   nt = map(RB.num_reduced_times,local_views(r))
   PartitionedArrays.getany(nt)
 end
+
+FESpaces.get_free_dof_ids(r::DistributedRBSpace) = get_free_dof_ids(r.space)
 
 function RB.reduced_fe_space(
   info::RBInfo,
@@ -45,6 +50,28 @@ function RB.reduced_fe_space(
 
   reduced_trial = RBSpace(trial,basis_space,basis_time)
   reduced_test = RBSpace(test,basis_space,basis_time)
+  return reduced_trial,reduced_test
+end
+
+function new_reduced_fe_space(
+  info::RBInfo,
+  feop::TransientParamFEOperator,
+  s::DistributedTransientSnapshots)
+
+  T = eltype(s.snaps)
+  trial = get_trial(feop)
+  test = get_test(feop)
+  soff = select_snapshots(s,RB.offline_params(info))
+  row_partition = s.snaps.row_partition
+  basis_space,basis_time = map(own_values(soff)) do s
+    reduced_basis(s,nothing;ϵ=RB.get_tol(info))
+  end |> tuple_of_arrays
+  col_partition = get_col_partition(basis_space,row_partition)
+  p_basis_space = PMatrix{Matrix{T}}(undef,row_partition,col_partition)
+  map(copy!,own_values(p_basis_space),basis_space)
+  consistent!(p_basis_space) |> wait
+  reduced_trial = RBSpace(trial,p_basis_space,basis_time)
+  reduced_test = RBSpace(test,p_basis_space,basis_time)
   return reduced_trial,reduced_test
 end
 

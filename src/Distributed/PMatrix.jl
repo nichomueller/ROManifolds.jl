@@ -41,14 +41,6 @@ function PartitionedArrays.ghost_values(a::PMatrix)
   end
 end
 
-function PartitionedArrays.own_ghost_values(a::PMatrix)
-  map(own_ghost_values,partition(a),partition(axes(a,1)),partition(axes(a,2)))
-end
-
-function PartitionedArrays.ghost_own_values(a::PMatrix)
-  map(ghost_own_values,partition(a),partition(axes(a,1)),partition(axes(a,2)))
-end
-
 Base.size(a::PMatrix) = map(length,axes(a))
 Base.IndexStyle(::Type{<:PMatrix}) = IndexCartesian()
 
@@ -230,9 +222,9 @@ function PartitionedArrays.assemble!(o,a::PMatrix)
   end
 end
 
-function PMatrix{V}(::UndefInitializer,row_partition,col_partition) where V
+function PMatrix{M}(::UndefInitializer,row_partition,col_partition) where M
   matrix_partition = map(row_partition,col_partition) do row_indices,col_indices
-    PartitionedArrays.allocate_local_values(V,row_indices,col_indices)
+    PartitionedArrays.allocate_local_values(M,row_indices,col_indices)
   end
   PMatrix(matrix_partition,row_partition,col_partition)
 end
@@ -245,10 +237,10 @@ function Base.similar(a::PMatrix,::Type{T},inds::Tuple{<:PRange,<:PRange}) where
   PMatrix(matrix_partition,partition(rows),partition(cols))
 end
 
-function Base.similar(::Type{<:PMatrix{V}},inds::Tuple{<:PRange,<:PRange}) where V
+function Base.similar(::Type{<:PMatrix{M}},inds::Tuple{<:PRange,<:PRange}) where M
   rows,cols = inds
   matrix_partition = map(partition(rows),partition(cols)) do row_indices,col_indices
-    allocate_local_values(V,row_indices,col_indices)
+    allocate_local_values(M,row_indices,col_indices)
   end
   PMatrix(matrix_partition,partition(rows),partition(cols))
 end
