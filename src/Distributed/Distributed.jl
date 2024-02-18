@@ -52,6 +52,7 @@ import PartitionedArrays: to_trivial_partition
 import PartitionedArrays: length_to_ptrs!
 import PartitionedArrays: rewind_ptrs!
 
+import GridapDistributed: BlockPVector
 import GridapDistributed: DistributedDiscreteModel
 import GridapDistributed: LocalView
 import GridapDistributed: PSparseMatrixBuilderCOO
@@ -126,7 +127,11 @@ include("DistributedContribution.jl")
 
 export DistributedTransientSnapshots
 export DistributedSnapshots
+include("DistributedSnapshots.jl")
+
 export DistributedRBSpace
-export load_distributed_snapshots
 include("SingleRB.jl")
+
+export load_distributed_snapshots
+include("DistributedPostProcess.jl")
 end

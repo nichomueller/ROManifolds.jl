@@ -1,11 +1,3 @@
-function PartitionedArrays.own_values(values::AbstractMatrix,indices_rows,indices_cols)
-  view(values,own_to_local(indices_rows),indices_cols)
-end
-
-function PartitionedArrays.ghost_values(values::AbstractMatrix,indices_rows,indices_cols)
-  view(values,ghost_to_local(indices_rows),indices_cols)
-end
-
 struct PMatrix{V,A,B,C,D,T} <: AbstractMatrix{T}
   matrix_partition::A
   row_partition::B
@@ -38,11 +30,15 @@ function PartitionedArrays.local_values(a::PMatrix)
 end
 
 function PartitionedArrays.own_values(a::PMatrix)
-  map(own_values,partition(a),partition(axes(a,1)),partition(axes(a,2)))
+  map(partition(a),partition(axes(a,1)),partition(axes(a,2))) do values,indices_rows,indices_cols
+    view(values,own_to_local(indices_rows),own_to_local(indices_cols))
+  end
 end
 
 function PartitionedArrays.ghost_values(a::PMatrix)
-  map(ghost_values,partition(a),partition(axes(a,1)),partition(axes(a,2)))
+  map(partition(a),partition(axes(a,1)),partition(axes(a,2))) do values,indices_rows,indices_cols
+    view(values,ghost_to_local(indices_rows),ghost_to_local(indices_cols))
+  end
 end
 
 function PartitionedArrays.own_ghost_values(a::PMatrix)
@@ -103,15 +99,15 @@ function PartitionedArrays.global_to_own(a::CommonColIndices)
 end
 
 function PartitionedArrays.ghost_to_global(a::CommonColIndices)
-  @notimplemented
+  a.indices
 end
 
 function PartitionedArrays.ghost_to_owner(a::CommonColIndices)
-  @notimplemented
+  a.indices
 end
 
 function PartitionedArrays.global_to_ghost(a::CommonColIndices)
-  @notimplemented
+  a.indices
 end
 
 function PartitionedArrays.own_to_local(a::CommonColIndices)
@@ -119,7 +115,7 @@ function PartitionedArrays.own_to_local(a::CommonColIndices)
 end
 
 function PartitionedArrays.ghost_to_local(a::CommonColIndices)
-  @notimplemented
+  a.indices
 end
 
 function PartitionedArrays.local_to_own(a::CommonColIndices)
@@ -127,7 +123,7 @@ function PartitionedArrays.local_to_own(a::CommonColIndices)
 end
 
 function PartitionedArrays.local_to_ghost(a::CommonColIndices)
-  @notimplemented
+  a.indices
 end
 
 function PartitionedArrays.global_to_local(a::CommonColIndices)
@@ -257,12 +253,14 @@ function Base.similar(::Type{<:PMatrix{V}},inds::Tuple{<:PRange,<:PRange}) where
   PMatrix(matrix_partition,partition(rows),partition(cols))
 end
 
-function Base.similar(a::Adjoint{<:Any,<:PMatrix},::Type{T},inds::Tuple{<:PRange,<:PRange}) where T
-  rows,cols = inds
-  matrix_partition = map(partition(a.parent),partition(rows),partition(cols)) do values,row_indices,col_indices
-    allocate_local_values(values',T,row_indices,col_indices)
+function Base.adjoint(a::PMatrix)
+  matrix_partition = map(partition(a)) do values
+    adjoint(values)
   end
-  PMatrix(matrix_partition,partition(rows),partition(cols))
+  row_partition = copy(a.col_partition)
+  col_partition = copy(a.row_partition)
+  cache = copy(a.cache)
+  PMatrix(matrix_partition,row_partition,col_partition,cache)
 end
 
 function Base.copy!(a::PMatrix,b::PMatrix)
@@ -336,42 +334,6 @@ function Base.:*(a::PMatrix,b::PMatrix)
   c
 end
 
-# Not efficient, just for convenience and debugging purposes
-function Base.:*(a::Adjoint{<:Any,<:PMatrix},b::PVector)
-  Ta = eltype(a)
-  Tb = eltype(b)
-  T = typeof(zero(Ta)*zero(Tb)+zero(Ta)*zero(Tb))
-  c = PMatrix{Matrix{T}}(undef,partition(axes(a,1)),partition(axes(b,2)))
-  fill!(c,zero(T))
-  a_in_main = to_trivial_partition(a)
-  b_in_main = to_trivial_partition(b,partition(axes(a_in_main,1)))
-  c_in_main = to_trivial_partition(c,partition(axes(a_in_main,2)))
-  map_main(partition(c_in_main),partition(a_in_main),partition(b_in_main)) do myc,mya,myb
-    myc .= mya*myb
-    nothing
-  end
-  from_trivial_partition!(c,c_in_main)
-  c
-end
-
-# Not efficient, just for convenience and debugging purposes
-function Base.:*(a::Adjoint{<:Any,<:PMatrix},b::PMatrix)
-  Ta = eltype(a)
-  Tb = eltype(b)
-  T = typeof(zero(Ta)*zero(Tb)+zero(Ta)*zero(Tb))
-  c = PMatrix{Matrix{T}}(undef,partition(axes(a,1)),partition(axes(b,2)))
-  fill!(c,zero(T))
-  a_in_main = to_trivial_partition(a)
-  b_in_main = to_trivial_partition(b,partition(axes(a_in_main,1)))
-  c_in_main = to_trivial_partition(c,partition(axes(a_in_main,2)))
-  map_main(partition(c_in_main),partition(a_in_main),partition(b_in_main)) do myc,mya,myb
-    myc .= mya*myb
-    nothing
-  end
-  from_trivial_partition!(c,c_in_main)
-  c
-end
-
 for op in (:+,:-)
   @eval begin
     function Base.$op(a::PMatrix)
@@ -394,30 +356,14 @@ function PartitionedArrays.to_trivial_partition(
   a_in_main = similar(a,T,PRange(row_partition_in_main),PRange(col_partition_in_main))
   fill!(a_in_main,zero(T))
   map(own_values(a),partition(a_in_main),partition(axes(a,1)),partition(axes(a,2))) do aown,my_a_in_main,row_indices,col_indices
+    println(own_to_global(row_indices))
+    println(own_to_global(col_indices))
+    println(size(my_a_in_main))
+    println(size(aown))
     if part_id(row_indices) == part_id(col_indices) == destination
       my_a_in_main[own_to_global(row_indices),own_to_global(col_indices)] .= aown
     else
       my_a_in_main .= aown
-    end
-  end
-  assemble!(a_in_main) |> wait
-  a_in_main
-end
-
-function PartitionedArrays.to_trivial_partition(
-  a::Adjoint{<:Any,<:PMatrix},
-  row_partition_in_main=PartitionedArrays.trivial_partition(partition(axes(a,1))),
-  col_partition_in_main=PartitionedArrays.trivial_partition(partition(axes(a,2))))
-
-  destination = 1
-  T = eltype(a)
-  a_in_main = similar(a,T,PRange(row_partition_in_main),PRange(col_partition_in_main))
-  fill!(a_in_main,zero(T))
-  map(own_values(a.parent),partition(a_in_main),partition(axes(a,1)),partition(axes(a,2))) do aown,my_a_in_main,row_indices,col_indices
-    if part_id(row_indices) == part_id(col_indices) == destination
-      my_a_in_main[own_to_global(row_indices),own_to_global(col_indices)] .= aown'
-    else
-      my_a_in_main .= aown'
     end
   end
   assemble!(a_in_main) |> wait

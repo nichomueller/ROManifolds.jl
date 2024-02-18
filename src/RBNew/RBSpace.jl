@@ -94,7 +94,7 @@ num_reduced_times(r::RBSpace) = size(get_basis_time(r),2)
 
 FESpaces.num_free_dofs(r::RBSpace) = num_reduced_space_dofs(r)*num_reduced_times(r)
 
-FESpaces.get_free_dof_ids(r::RBSpace) = Base.OneTo(num_free_dofs(r))
+FESpaces.get_free_dof_ids(r::RBSpace) = get_free_dof_ids(r.space)
 
 FESpaces.get_dirichlet_dof_ids(r::RBSpace) = get_dirichlet_dof_ids(r.space)
 
@@ -104,9 +104,8 @@ FESpaces.num_dirichlet_tags(r::RBSpace) = num_dirichlet_tags(r.space)
 
 FESpaces.get_dirichlet_dof_tag(r::RBSpace) = get_dirichlet_dof_tag(r.space)
 
-FESpaces.get_vector_type(r::RBSpace) = get_vector_type(r.space)
-
-function FESpaces.get_vector_type(r::RBSpace{<:FEM.ParamFESpace})
+function FESpaces.get_vector_type(r::RBSpace)
+  change_length(x) = x
   change_length(::Type{ParamVector{T,A,L}}) where {T,A,L} = ParamVector{T,A,Int(L/num_times(r))}
   V = get_vector_type(r.space)
   newV = change_length(V)

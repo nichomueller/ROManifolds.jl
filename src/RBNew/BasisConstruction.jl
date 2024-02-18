@@ -1,16 +1,51 @@
-function tpod(mat::AbstractMatrix,args...;kwargs...)
+function tpod(mat::AbstractMatrix,args...;nested=false,kwargs...)
+  if nested
+    _nested_tpod(mat,args...;kwargs...)
+  else
+    _tpod(mat,args...;kwargs...)
+  end
+end
+
+function _tpod(mat::AbstractMatrix,args...;kwargs...)
   U,Σ,V = svd(mat)
   rank = truncation(Σ;kwargs...)
   U[:,1:rank]
 end
 
-function tpod(mat::AbstractMatrix,X::AbstractMatrix;kwargs...)
+function _tpod(mat::AbstractMatrix,X::AbstractMatrix;kwargs...)
   C = cholesky(X)
   L = sparse(C.L)
   Xmat = L'*mat[C.p,:]
   U,Σ,V = svd(Xmat)
   rank = truncation(Σ;kwargs...)
   (L'\U[:,1:rank])[invperm(C.p),:]
+end
+
+function _nested_tpod(mat::AbstractMatrix,args...;kwargs...)
+  U,Σ,V = svd(mat)
+  rank = truncation(Σ;kwargs...)
+  U_rank = U[:,1:rank]
+  for i = axes(V,2)
+    V[:,i] .*= Σ[i]
+  end
+  ΣV_rank = ΣV[:,1:rank]
+  UΣV_rank, = svd(ΣV_rank)
+  U_rank*UΣV_rank
+end
+
+function _nested_tpod(mat::AbstractMatrix,X::AbstractMatrix;kwargs...)
+  C = cholesky(X)
+  L = sparse(C.L)
+  Xmat = L'*mat[C.p,:]
+  U,Σ,V = svd(Xmat)
+  rank = truncation(Σ;kwargs...)
+  U_rank = U[:,1:rank]
+  for i = axes(V,2)
+    V[:,i] .*= Σ[i]
+  end
+  ΣV_rank = ΣV[:,1:rank]
+  UΣV_rank, = svd(ΣV_rank)
+  (L'\U_rank*UΣV_rank)[invperm(C.p),:]
 end
 
 function truncation(s::AbstractVector;ϵ=1e-4,rank=nothing)

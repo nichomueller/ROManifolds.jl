@@ -65,6 +65,7 @@ export zero_param_array
 include("ParamArray.jl")
 
 export ParamBlockArray
+export ParamBlockVector
 include("ParamBlockArray.jl")
 
 export Contribution

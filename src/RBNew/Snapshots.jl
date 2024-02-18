@@ -438,6 +438,11 @@ function select_snapshots(s::AbstractTransientSnapshots,paramrange;spacerange=:,
   select_snapshots(s,spacerange,timerange,paramrange)
 end
 
+function select_snapshots(s::AbstractTransientSnapshots;kwargs...)
+  paramrange = isa(s,SelectedSnapshotsAtIndices) ? last(s.selected_indices) : Colon()
+  select_snapshots(s,paramrange;kwargs...)
+end
+
 space_indices(s::SelectedSnapshotsAtIndices) = s.selected_indices[1]
 time_indices(s::SelectedSnapshotsAtIndices) = s.selected_indices[2]
 param_indices(s::SelectedSnapshotsAtIndices) = s.selected_indices[3]

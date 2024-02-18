@@ -92,7 +92,7 @@ sk = select_snapshots(snaps,15)
 pk = get_values(sk)
 
 pk_rb = compress(red_test,sk)
-pk_rec = recast(red_test,pk_rb)
+pk_rec = recast(red_trial(get_realization(sk)),pk_rb)
 
 norm(pk_rec - pk) / norm(pk)
 
@@ -183,11 +183,34 @@ destination = 1
 T = eltype(A)
 a_in_main = similar(A,T,PRange(row_partition_in_main),PRange(col_partition_in_main))
 fill!(a_in_main,zero(T))
-map(own_values(A.parent),partition(a_in_main),partition(axes(A,1)),partition(axes(A,2))) do aown,my_a_in_main,row_indices,col_indices
+map(own_values(A),partition(a_in_main),partition(axes(A,1)),partition(axes(A,2))) do aown,my_a_in_main,row_indices,col_indices
+  println(col_indices)
+  # println(size(my_a_in_main[own_to_global(row_indices),own_to_global(col_indices)]))
+  # println(size(aown))
   if part_id(row_indices) == part_id(col_indices) == destination
-    my_a_in_main[own_to_global(row_indices),own_to_global(col_indices)] .= aown'
+    my_a_in_main[own_to_global(row_indices),own_to_global(col_indices)] .= aown
   else
-    my_a_in_main .= aown'
+    my_a_in_main .= aown
   end
 end
 # assemble!(a_in_main)
+partition(A)
+partition(axes(A,1))
+partition(axes(A,2))
+
+M = assemble_matrix((u,v)->∫(u*v)dΩ,trial(nothing),test)
+F = assemble_vector(v->∫(v)dΩ,test)
+# X = M \ F
+partition(M)
+partition(axes(M,1))
+partition(axes(M,2))
+Mnew = PartitionedArrays.to_trivial_partition(M)
+PartitionedArrays.to_trivial_partition(Mnew)
+
+sol = solve(fesolver,feop,uh0μ;nparams=2)
+odesol = sol.odesol
+
+stats = @timed begin
+  vals = collect(odesol)
+end
+sss = Snapshots(vals,odesol.r)
