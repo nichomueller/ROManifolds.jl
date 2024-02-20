@@ -216,7 +216,7 @@ rbsolver = RBSolver(info,fesolver)
 snaps,comp = RB.fe_solutions(rbsolver,feop,uh0μ)
 red_trial,red_test = reduced_fe_space(info,feop,snaps)
 odeop = get_algebraic_operator(feop)
-pop = GalerkinProjectionOperator(odeop,red_trial,red_test)
+op = RBOperator(odeop,red_trial,red_test)
 
 ns = num_free_dofs(test)
 
@@ -263,14 +263,14 @@ end
 
 s_mdeim = select_snapshots(snaps,RB.mdeim_params(rbsolver.info))
 r_mdeim = RB.get_realization(s_mdeim)
-contribs_mat,contribs_vec = fe_matrix_and_vector(rbsolver,pop,s_mdeim)
+contribs_mat,contribs_vec = fe_matrix_and_vector(rbsolver,op,s_mdeim)
 snapsA,snapsM,snapsR = get_fe_snaps(r_mdeim)
 @check contribs_mat[1][Ω] ≈ snapsA
 @check contribs_mat[2][Ω] ≈ snapsM
 @check contribs_vec[Ω] + contribs_vec[Γn] ≈ -snapsR
 
-red_lhs,red_rhs = RB.reduced_matrix_vector_form(rbsolver,pop,snaps)
-red_op = reduced_operator(pop,red_lhs,red_rhs)
+red_lhs,red_rhs = RB.reduced_matrix_vector_form(rbsolver,op,snaps)
+red_op = reduced_operator(op,red_lhs,red_rhs)
 
 snaps_on = RB.select_snapshots(snaps,1)
 r_on = RB.get_realization(snaps_on)

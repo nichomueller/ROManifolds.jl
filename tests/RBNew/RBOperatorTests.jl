@@ -98,9 +98,9 @@ end
 sb_fe = Snapshots(b_fe,r)
 
 # # case 1 works
-# red_trial = red_op.pop.trial
-# red_test = red_op.pop.test
-# op1 = GalerkinProjectionOperator(odeop,red_trial,red_test)
+# red_trial = red_op.op.trial
+# red_test = red_op.op.test
+# op1 = RBOperator(odeop,red_trial,red_test)
 
 # ode_cache = allocate_cache(op1,r)
 # A,b = allocate_fe_matrix_and_vector(op1,r,y,ode_cache)
@@ -119,7 +119,7 @@ sb_fe = Snapshots(b_fe,r)
 # end
 
 # case 2
-op2 = red_op.pop
+op2 = red_op.op
 
 ode_cache = allocate_cache(op2,r)
 A,b = allocate_fe_matrix_and_vector(op2,r,y,ode_cache)

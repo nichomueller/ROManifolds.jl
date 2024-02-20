@@ -476,8 +476,8 @@ function Base.setindex!(a::BlockAffineContribution,v,i...)
 end
 
 function reduced_vector_form(
-  solver::BlockRBSolver,
-  op::RBOperator,
+  solver::RBSolver,
+  op::BlockRBOperator,
   c::ArrayContribution)
 
   info = get_info(solver)
@@ -490,8 +490,8 @@ function reduced_vector_form(
 end
 
 function reduced_matrix_form(
-  solver::BlockRBSolver,
-  op::RBOperator,
+  solver::RBSolver,
+  op::BlockRBOperator,
   c::ArrayContribution;
   kwargs...)
 
@@ -524,17 +524,9 @@ function mdeim_coeff!(
 end
 
 function allocate_mdeim_lincomb(
-  trial::RBSpace,
-  test::RBSpace,
+  trial::BlockRBSpace,
+  test::BlockRBSpace,
   r::AbstractParamRealization)
 
-  V = get_vector_type(test)
-  ns_trial = num_reduced_space_dofs(trial)
-  nt_trial = num_reduced_times(trial)
-  ns_test = num_reduced_space_dofs(test)
-  nt_test = num_reduced_times(test)
-  time_prod_cache = allocate_matrix(V,nt_trial,nt_test)
-  kron_prod_cache = allocate_matrix(V,ns_trial*nt_trial,ns_test*nt_test)
-  lincomb_cache = allocate_param_array(kron_prod_cache,num_params(r))
-  return time_prod_cache,kron_prod_cache,lincomb_cache
+
 end

@@ -1,17 +1,17 @@
 function reduced_operator(
-  pop::GalerkinProjectionOperator,
+  op::RBOperator,
   lhs::Tuple{Vararg{A}},
   rhs::A) where A
 
   trians_lhs = map(get_domains,lhs)
   trians_rhs = get_domains(rhs)
-  new_pop = change_triangulation(pop,trians_lhs,trians_rhs)
-  ReducedOperator(new_pop,lhs,rhs)
+  new_pop = change_triangulation(op,trians_lhs,trians_rhs)
+  RBNonlinearOperator(new_pop,lhs,rhs)
 end
 
 function reduced_operator(
   solver::RBSolver,
-  op::GalerkinProjectionOperator,
+  op::RBOperator,
   s::S) where S
 
   red_lhs,red_rhs = reduced_matrix_vector_form(solver,op,s)
@@ -20,33 +20,29 @@ function reduced_operator(
   return red_op
 end
 
-struct ReducedOperator{T,L,R} <: RBOperator{T}
-  pop::GalerkinProjectionOperator{T}
-  lhs::L
-  rhs::R
-end
+abstract type RBNonlinearOperator{T} <: NonlinearOperator end
 
-ReferenceFEs.get_order(op::ReducedOperator) = get_order(op.pop)
-FESpaces.get_trial(op::ReducedOperator) = get_trial(op.pop)
-FESpaces.get_test(op::ReducedOperator) = get_test(op.pop)
-FEM.realization(op::ReducedOperator;kwargs...) = realization(op.pop;kwargs...)
-FEM.get_fe_operator(op::ReducedOperator) = FEM.get_fe_operator(op.pop)
-get_fe_trial(op::ReducedOperator) = get_fe_trial(op.pop)
-get_fe_test(op::ReducedOperator) = get_fe_test(op.pop)
+ReferenceFEs.get_order(op::RBNonlinearOperator) = get_order(op.op)
+FESpaces.get_trial(op::RBNonlinearOperator) = get_trial(op.op)
+FESpaces.get_test(op::RBNonlinearOperator) = get_test(op.op)
+FEM.realization(op::RBNonlinearOperator;kwargs...) = realization(op.op;kwargs...)
+FEM.get_fe_operator(op::RBNonlinearOperator) = FEM.get_fe_operator(op.op)
+get_fe_trial(op::RBNonlinearOperator) = get_fe_trial(op.op)
+get_fe_test(op::RBNonlinearOperator) = get_fe_test(op.op)
 
 function TransientFETools.allocate_cache(
-  op::ReducedOperator,
+  op::RBNonlinearOperator,
   r::TransientParamRealization)
 
-  allocate_cache(op.pop,r)
+  allocate_cache(op.op,r)
 end
 
 function TransientFETools.update_cache!(
   ode_cache,
-  op::ReducedOperator,
+  op::RBNonlinearOperator,
   r::TransientParamRealization)
 
-  update_cache!(ode_cache,op.pop,r)
+  update_cache!(ode_cache,op.op,r)
 end
 
 # cache for residual/jacobians includes:
@@ -55,27 +51,27 @@ end
 # 3) cache to perform the kronecker product between basis and coefficient
 
 function Algebra.allocate_residual(
-  op::ReducedOperator,
+  op::RBNonlinearOperator,
   r::TransientParamRealization,
   x::AbstractVector,
   ode_cache)
 
   test = get_test(op)
-  fe_b = allocate_fe_vector(op.pop,r,x,ode_cache)
+  fe_b = allocate_fe_vector(op.op,r,x,ode_cache)
   coeff_cache = allocate_mdeim_coeff(op.rhs,r)
   lincomb_cache = allocate_mdeim_lincomb(test,r)
   return fe_b,coeff_cache,lincomb_cache
 end
 
 function Algebra.allocate_jacobian(
-  op::ReducedOperator,
+  op::RBNonlinearOperator,
   r::TransientParamRealization,
   x::AbstractVector,
   ode_cache)
 
   trial = get_trial(op)
   test = get_test(op)
-  fe_A = allocate_fe_matrix(op.pop,r,x,ode_cache)
+  fe_A = allocate_fe_matrix(op.op,r,x,ode_cache)
   coeff_cache = ()
   for i = 1:get_order(op)+1
     coeff_cache = (coeff_cache...,allocate_mdeim_coeff(op.lhs[i],r))
@@ -86,7 +82,7 @@ end
 
 function Algebra.residual!(
   cache,
-  op::ReducedOperator,
+  op::RBNonlinearOperator,
   r::TransientParamRealization,
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
@@ -101,7 +97,7 @@ end
 
 function ODETools.jacobians!(
   cache,
-  op::ReducedOperator,
+  op::RBNonlinearOperator,
   r::TransientParamRealization,
   xhF::Tuple{Vararg{AbstractVector}},
   γ::Tuple{Vararg{Real}},
@@ -117,26 +113,7 @@ function ODETools.jacobians!(
   return A
 end
 
-function ODETools._matrix_and_vector!(cache_mat,cache_vec,op::ReducedOperator,r,dtθ,u0,ode_cache,vθ)
-  A = ODETools._matrix!(cache_mat,op,r,dtθ,u0,ode_cache,vθ)
-  b = ODETools._vector!(cache_vec,op,r,dtθ,u0,ode_cache,vθ)
-  return A,b
-end
-
-function ODETools._matrix!(cache,op::ReducedOperator,r,dtθ,u0,ode_cache,vθ)
-  fe_A,coeff_cache,lincomb_cache = cache
-  LinearAlgebra.fillstored!(fe_A,zero(eltype(fe_A)))
-  A = ODETools.jacobians!(cache,op,r,(u0,vθ),(1.0,1/dtθ),ode_cache)
-  return A
-end
-
-function ODETools._vector!(cache,op::ReducedOperator,r,dtθ,u0,ode_cache,vθ)
-  b = residual!(cache,op,r,(u0,vθ),ode_cache)
-  b .*= -1.0
-  return b
-end
-
-function _union_reduced_times_mat(op::ReducedOperator)
+function _union_reduced_times_mat(op::RBNonlinearOperator)
   ilhs = ()
   for lhs in op.lhs
     for (trian,values) in lhs.dict
@@ -146,7 +123,7 @@ function _union_reduced_times_mat(op::ReducedOperator)
   union_indices_time(ilhs...)
 end
 
-function _union_reduced_times_vec(op::ReducedOperator)
+function _union_reduced_times_vec(op::RBNonlinearOperator)
   irhs = ()
   for (trian,values) in op.rhs.dict
     irhs = (irhs...,get_integration_domain(values))
@@ -189,7 +166,7 @@ end
 
 function fe_matrix!(
   cache,
-  op::ReducedOperator,
+  op::RBNonlinearOperator,
   r::TransientParamRealization,
   xhF::Tuple{Vararg{AbstractVector}},
   γ::Tuple{Vararg{Real}},
@@ -198,7 +175,7 @@ function fe_matrix!(
   red_times = _union_reduced_times_mat(op)
   red_r = r[:,red_times]
   red_xhF,red_ode_cache = _select_fe_quantities_at_time_locations(xhF,ode_cache,r,red_times)
-  A = fe_matrix!(cache,op.pop,red_r,red_xhF,γ,red_ode_cache)
+  A = fe_matrix!(cache,op.op,red_r,red_xhF,γ,red_ode_cache)
   map(A,op.lhs) do A,lhs
     _select_snapshots_at_space_time_locations(A,lhs,red_times)
   end
@@ -206,7 +183,7 @@ end
 
 function fe_vector!(
   cache,
-  op::ReducedOperator,
+  op::RBNonlinearOperator,
   r::TransientParamRealization,
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
@@ -214,7 +191,116 @@ function fe_vector!(
   red_times = _union_reduced_times_vec(op)
   red_xhF,red_ode_cache = _select_fe_quantities_at_time_locations(xhF,ode_cache,r,red_times)
   red_r = r[:,red_times]
-  b = fe_vector!(cache,op.pop,red_r,red_xhF,red_ode_cache)
+  b = fe_vector!(cache,op.op,red_r,red_xhF,red_ode_cache)
   bi = _select_snapshots_at_space_time_locations(b,op.rhs,red_times)
   return bi
+end
+
+struct ThetaMethodNonlinearOperator{T,L,R} <: RBNonlinearOperator{T}
+  op::RBOperator{T}
+  lhs::L
+  rhs::R
+end
+
+const AffineThetaMethodNonlinearOperator = ThetaMethodNonlinearOperator{T,L,R} where {T<:Affine}
+
+function Algebra.solve(
+  solver::RBSolver,
+  op::ThetaMethodNonlinearOperator,
+  s::S) where S
+
+  info = get_info(solver)
+  son = select_snapshots(s,online_params(info))
+  ron = get_realization(son)
+  solve(solver,op,ron)
+end
+
+function Algebra.solve(
+  solver::RBThetaMethod,
+  op::ThetaMethodNonlinearOperator,
+  _r::TransientParamRealization)
+
+  fesolver = get_fe_solver(solver)
+  dt = fesolver.dt
+  θ = fesolver.θ
+  θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+
+  r = copy(_r)
+  FEM.shift_time!(r,dt*(θ-1))
+
+  trial = get_trial(op)(r)
+  fe_trial = get_fe_trial(op)(r)
+  red_x = zero_free_values(trial)
+  y = zero_free_values(fe_trial)
+  z = similar(y)
+  z .= 0.0
+
+  ode_cache = allocate_cache(op,r)
+  nl_cache = nothing
+
+  stats = @timed begin
+    ode_cache = update_cache!(ode_cache,op,r)
+    nlop = ThetaMethodParamOperator(op,r,dtθ,y,ode_cache,z)
+    solve!(red_x,fesolver.nls,nlop,nl_cache)
+  end
+
+  x = recast(trial,red_x)
+  s = reverse_snapshots(x,r)
+  cs = ComputationalStats(stats,num_params(r))
+  return s,cs
+end
+
+function Algebra.solve(
+  solver::RBThetaMethod,
+  op::AffineThetaMethodNonlinearOperator,
+  _r::TransientParamRealization)
+
+  fesolver = get_fe_solver(solver)
+  dt = fesolver.dt
+  θ = fesolver.θ
+  θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+
+  r = copy(_r)
+  FEM.shift_time!(r,dt*(θ-1))
+
+  trial = get_trial(op)(r)
+  fe_trial = get_fe_trial(op)(r)
+  red_x = zero_free_values(trial)
+  y = zero_free_values(fe_trial)
+  z = similar(y)
+  z .= 0.0
+
+  ode_cache = allocate_cache(op,r)
+  mat_cache,vec_cache = ODETools._allocate_matrix_and_vector(op,r,y,ode_cache)
+
+  stats = @timed begin
+    ode_cache = update_cache!(ode_cache,op,r)
+    A,b = ODETools._matrix_and_vector!(mat_cache,vec_cache,op,r,dtθ,y,ode_cache,z)
+    afop = AffineOperator(A,b)
+    solve!(red_x,fesolver.nls,afop)
+  end
+
+  x = recast(trial,red_x)
+  s = reverse_snapshots(x,r)
+  cs = ComputationalStats(stats,num_params(r))
+  return s,cs
+end
+
+function ODETools._matrix_and_vector!(cache_mat,cache_vec,op::ThetaMethodNonlinearOperator,r,dtθ,u0,ode_cache,vθ)
+  A = ODETools._matrix!(cache_mat,op,r,dtθ,u0,ode_cache,vθ)
+  b = ODETools._vector!(cache_vec,op,r,dtθ,u0,ode_cache,vθ)
+  return A,b
+end
+
+function ODETools._matrix!(cache,op::ThetaMethodNonlinearOperator,r,dtθ,u0,ode_cache,vθ)
+  fe_A,coeff_cache,lincomb_cache = cache
+  LinearAlgebra.fillstored!(fe_A,zero(eltype(fe_A)))
+  A = ODETools.jacobians!(cache,op,r,(u0,vθ),(1.0,1/dtθ),ode_cache)
+  return A
+end
+
+function ODETools._vector!(cache,op::ThetaMethodNonlinearOperator,r,dtθ,u0,ode_cache,vθ)
+  b = residual!(cache,op,r,(u0,vθ),ode_cache)
+  b .*= -1.0
+  return b
 end

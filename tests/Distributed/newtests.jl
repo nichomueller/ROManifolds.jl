@@ -99,8 +99,8 @@ pk_rec = recast(red_trial(get_realization(sk)),pk_rb)
 norm(pk_rec - pk) / norm(pk)
 
 odeop = get_algebraic_operator(feop)
-pop = GalerkinProjectionOperator(odeop,red_trial,red_test)
-# red_lhs,red_rhs = reduced_matrix_vector_form(rbsolver,pop,snaps)
+op = RBOperator(odeop,red_trial,red_test)
+# red_lhs,red_rhs = reduced_matrix_vector_form(rbsolver,op,snaps)
 
 θ == 0.0 ? dtθ = dt : dtθ = dt*θ
 smdeim = select_snapshots(snaps,RB.mdeim_params(info))
@@ -109,18 +109,18 @@ r = get_realization(smdeim)
 
 y = similar(x)
 y .= 0.0
-ode_cache = allocate_cache(pop,r)
-A,b = allocate_fe_matrix_and_vector(pop,r,x,ode_cache)
+ode_cache = allocate_cache(op,r)
+A,b = allocate_fe_matrix_and_vector(op,r,x,ode_cache)
 
-ode_cache = update_cache!(ode_cache,pop,r)
-contribs_mat,contribs_vec = fe_matrix_and_vector!(A,b,pop,r,dtθ,x,ode_cache,y)
+ode_cache = update_cache!(ode_cache,op,r)
+contribs_mat,contribs_vec = fe_matrix_and_vector!(A,b,op,r,dtθ,x,ode_cache,y)
 
-# red_mat = RB.reduced_matrix_form(rbsolver,pop,contribs_mat)
-# red_vec = RB.reduced_vector_form(rbsolver,pop,contribs_vec)
+# red_mat = RB.reduced_matrix_form(rbsolver,op,contribs_mat)
+# red_vec = RB.reduced_vector_form(rbsolver,op,contribs_vec)
 
 c = distributed_array_contribution()
 trian,vals = get_domains(contribs_vec)[1],get_values(contribs_vec)[1]
-# RB.reduced_vector_form!(c,info,pop,values,trian)
+# RB.reduced_vector_form!(c,info,op,values,trian)
 basis_space,basis_time = reduced_basis(vals;ϵ=RB.get_tol(info))
 # lu_interp,red_trian,integration_domain = mdeim(info,fs,trian,basis_space,basis_time)
 lu_interp,red_trian,integration_domain = map(

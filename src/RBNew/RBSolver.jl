@@ -112,13 +112,12 @@ function get_norm_matrix(info::BlockRBInfo,feop::TransientParamFEOperator)
   map(i->get_norm_matrix(info[i],trial.spaces[i],test.spaces[i]),1:num_fields(test))
 end
 
-struct RBSolver{I,S}
-  info::I
+struct RBSolver{S}
+  info::RBInfo
   fesolver::S
 end
 
-const BlockRBSolver = RBSolver{BlockRBInfo,S} where S
-const RBThetaMethod = RBSolver{I,ThetaMethod} where I
+const RBThetaMethod = RBSolver{ThetaMethod}
 
 get_fe_solver(s::RBSolver) = s.fesolver
 get_info(s::RBSolver) = s.info
