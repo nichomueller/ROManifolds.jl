@@ -1,7 +1,7 @@
 function reduced_operator(
   pop::GalerkinProjectionOperator,
-  lhs::Tuple{Vararg{AffineContribution}},
-  rhs::AffineContribution)
+  lhs::Tuple{Vararg{A}},
+  rhs::A) where A
 
   trians_lhs = map(get_domains,lhs)
   trians_rhs = get_domains(rhs)

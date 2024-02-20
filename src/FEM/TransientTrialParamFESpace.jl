@@ -98,8 +98,11 @@ FESpaces.get_vector_type(f::TransientTrialParamFESpace) = @notimplemented
 # Define the TransientTrialFESpace interface for stationary spaces
 
 Arrays.evaluate!(Upt::FESpace,U::FESpace,params,times) = U
+Arrays.evaluate!(Upt::FESpace,U::FESpace,r) = U
 Arrays.evaluate(U::FESpace,params,times) = U
+Arrays.evaluate(U::FESpace,r) = U
 TransientFETools.allocate_trial_space(U::FESpace,params,times) = U
+TransientFETools.allocate_trial_space(U::FESpace,r) = U
 
 # Define the interface for MultiField
 

@@ -45,7 +45,7 @@ struct ContributionBroadcast{D}
 end
 
 function Base.broadcasted(f,a::ArrayContribution,b::Number)
-  c = Contribution(IdDict{Triangulation,ParamBroadcast}())
+  c = Contribution(IdDict{Triangulation,FEM.AbstractParamBroadcast}())
   for (trian,values) in a.dict
     c[trian] = Base.broadcasted(f,values,b)
   end

@@ -16,7 +16,7 @@ abstract type AbstractTransientSnapshots{M,T} <: AbstractParamContainer{T,2} end
 
 Base.ndims(::AbstractTransientSnapshots) = 2
 Base.ndims(::Type{<:AbstractTransientSnapshots}) = 2
-Base.IndexStyle(::Type{<:AbstractTransientSnapshots}) = IndexLinear() #IndexCartesian() #
+Base.IndexStyle(::Type{<:AbstractTransientSnapshots}) = IndexLinear()
 
 FEM.get_values(s::AbstractTransientSnapshots) = s.values
 get_realization(s::AbstractTransientSnapshots) = s.realization
@@ -819,6 +819,125 @@ function recast(a::AbstractMatrix,s::NnzSnapshots{Mode1Axis})
     sparse(i,j,v,m,n)
   end
   return Snapshots(ParamArray(asparse),r1,s.mode)
+end
+
+const BasicBlockSnapshots = BasicSnapshots{M,T,P,R} where {M,T,P<:ParamBlockArray,R}
+const TransientBlockSnapshots = TransientSnapshots{M,T,P,R} where {M,T,P<:ParamBlockArray,R}
+const SelectedBlockSnapshotsAtIndices = SelectedSnapshotsAtIndices{M,T,S,I} where {M,T,S<:Union{BasicBlockSnapshots,TransientBlockSnapshots},I}
+const GenericBlockSnapshots = Union{
+  BasicBlockSnapshots{M,T},
+  TransientBlockSnapshots{M,T},
+  SelectedBlockSnapshotsAtIndices{M,T}} where {M,T}
+
+const InnerTimeOuterParamTransientBlockSnapshots = InnerTimeOuterParamTransientSnapshots{T,P,R} where {T,P<:ParamBlockArray,R}
+const SelectedInnerTimeOuterParamTransientBlockSnapshots = SelectedInnerTimeOuterParamTransientSnapshots{T,S} where {T,S<:InnerTimeOuterParamTransientBlockSnapshots}
+const BlockSnapshotsSwappedColumns = Union{
+  InnerTimeOuterParamTransientBlockSnapshots{T},
+  SelectedInnerTimeOuterParamTransientBlockSnapshots{T}
+} where T
+
+const BlockSnapshots = Union{
+  GenericBlockSnapshots{M,T},
+  BlockSnapshotsSwappedColumns{T}} where {M,T}
+
+BlockArrays.blocklength(s::BlockSnapshots) = blocklength(_get_values(s))
+
+_get_values(s::BlockSnapshots) = s.values # just here as a helper
+_get_snaps(s::BlockSnapshots) = s.snaps # just here as a helper
+function _get_offsets(blocks::AbstractArray) # just here as a helper
+  offsets = zeros(Int,length(blocks))
+  for (n,block) in enumerate(blocks[2:end])
+    offsets[n+1] = offsets[n] + num_space_dofs(block[n])
+  end
+  return offsets
+end
+function _get_selected_indices(blocks::AbstractArray{<:AbstractTransientSnapshots}) # just here as a helper
+  s1 = first(blocks)
+  _,ids_time,ids_param = s1.selected_indices
+  offsets = _get_offsets(blocks)
+  ids_space = map(blocks,offsets) do s,offset
+    _ids_space,_ids_time,_ids_param = s.selected_indices
+    @check ids_time == _ids_time
+    @check ids_param == _ids_param
+    _ids_space .+ offset
+  end
+  ids_space,ids_time,ids_param
+end
+function _get_selected_indices(s::BlockSnapshots) # just here as a helper
+  get_blocks(s::BasicSnapshots) = blocks(first(s.values))
+  get_blocks(s::TransientSnapshots) = blocks(first(first(s.values)))
+  val_blocks = get_blocks(s.snaps)
+  ax = map(x->axes(x,1),val_blocks)
+  offsets = zeros(Int,length(val_blocks))
+  for (n,block) in enumerate(val_blocks[2:end])
+    offsets[n+1] = offsets[n] + size(block[n],1)
+  end
+  _ids_space,ids_time,ids_param = s.selected_indices
+  map(ax,offsets) do axis,offset
+    ids_space = intersect(axis,_ids_space .- offset)
+    ids_space,ids_time,ids_param
+  end
+end
+
+function BlockArrays.blocks(s::BasicBlockSnapshots)
+  map(blocks(s.values)) do values
+    BasicSnapshots(s.mode,values,s.realization)
+  end
+end
+
+function BlockArrays.mortar(blocks::AbstractArray{<:BasicSnapshots})
+  s1 = first(blocks)
+  BasicSnapshots(mortar(map(_get_values,blocks)),s1.realization,s1.mode)
+end
+
+function BlockArrays.blocks(s::TransientBlockSnapshots)
+  block_values = map(blocks,s.values)
+  nblocks = blocklength(first(s.values))
+  map(1:nblocks) do i
+    TransientSnapshots(s.mode,map(x->getindex(x,i),block_values),s.realization)
+  end
+end
+
+function BlockArrays.mortar(blocks::AbstractArray{<:TransientSnapshots})
+  s1 = first(blocks)
+  TransientSnapshots(map(mortar,map(_get_values,blocks)),s1.realization,s1.mode)
+end
+
+function BlockArrays.blocks(s::SelectedBlockSnapshotsAtIndices)
+  selected_indices = _get_selected_indices(s)
+  map(blocks(s.snaps),selected_indices) do snaps,selected_indices
+    SelectedSnapshotsAtIndices(snaps,selected_indices)
+  end
+end
+
+function BlockArrays.mortar(blocks::AbstractArray{<:SelectedSnapshotsAtIndices})
+  selected_indices = _get_selected_indices(blocks)
+  SelectedSnapshotsAtIndices(mortar(map(_get_snaps,blocks)),selected_indices)
+end
+
+function BlockArrays.blocks(s::InnerTimeOuterParamTransientBlockSnapshots{T,<:ParamBlockArray}) where T
+  block_values = map(blocks,s.values)
+  nblocks = blocklength(first(s.values))
+  map(1:nblocks) do i
+    InnerTimeOuterParamTransientSnapshots(map(x->getindex(x,i),block_values),s.realization)
+  end
+end
+
+function BlockArrays.mortar(blocks::AbstractArray{<:InnerTimeOuterParamTransientSnapshots})
+  s1 = first(blocks)
+  InnerTimeOuterParamTransientSnapshots(map(mortar,map(_get_values,blocks)),s1.realization)
+end
+
+function BlockArrays.blocks(s::SelectedInnerTimeOuterParamTransientBlockSnapshots)
+  selected_indices = _get_selected_indices(s)
+  map(blocks(s.snaps),selected_indices) do snaps,selected_indices
+    SelectedInnerTimeOuterParamTransientSnapshots(snaps,selected_indices)
+  end
+end
+
+function BlockArrays.mortar(blocks::AbstractArray{<:SelectedInnerTimeOuterParamTransientSnapshots})
+  selected_indices = _get_selected_indices(blocks)
+  SelectedInnerTimeOuterParamTransientSnapshots(mortar(map(_get_snaps,blocks)),selected_indices)
 end
 
 const AbstractSubTransientSnapshots = Union{

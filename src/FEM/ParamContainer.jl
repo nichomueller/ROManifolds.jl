@@ -1,4 +1,5 @@
 abstract type AbstractParamContainer{T,N} <: AbstractArray{T,N} end
+abstract type AbstractParamBroadcast end
 
 struct ParamContainer{T,A,L} <: AbstractParamContainer{T,1}
   array::A

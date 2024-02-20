@@ -1,6 +1,7 @@
 module RB
 using Mabla.FEM
 using LinearAlgebra
+using BlockArrays
 using SparseArrays
 using DrWatson
 using Serialization

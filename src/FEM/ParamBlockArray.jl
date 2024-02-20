@@ -165,7 +165,7 @@ function LinearAlgebra.lu!(a::ParamBlockArray,b::ParamBlockArray)
   a
 end
 
-struct ParamBlockBroadcast{D}
+struct ParamBlockBroadcast{D} <: AbstractParamBroadcast
   array::D
 end
 

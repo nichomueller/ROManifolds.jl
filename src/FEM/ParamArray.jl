@@ -346,7 +346,7 @@ function Arrays.SubVector(a::ParamArray,pini::Int,pend::Int)
   ParamArray(svector)
 end
 
-struct ParamBroadcast{D}
+struct ParamBroadcast{D} <: AbstractParamBroadcast
   array::D
 end
 

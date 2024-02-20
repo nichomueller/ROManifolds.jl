@@ -9,10 +9,11 @@ end
 struct SpaceOnlyMDEIM end
 struct SpaceTimeMDEIM end
 
-struct RBInfo{M}
+struct RBInfo{M,N}
   ϵ::Float64
   mdeim_style::M
-  norm_style::Symbol
+  norm_style::N
+  compute_supremizers::Bool
   dir::String
   nsnaps_state::Int
   nsnaps_mdeim::Int
@@ -28,11 +29,12 @@ function RBInfo(
   nsnaps_state=50,
   nsnaps_mdeim=20,
   nsnaps_test=10,
-  save_structures=false)
+  save_structures=false,
+  compute_supremizers=false)
 
   mdeim_style = st_mdeim == true ? SpaceTimeMDEIM() : SpaceOnlyMDEIM()
   dir = get_test_dir(test_path,ϵ;st_mdeim)
-  RBInfo(ϵ,mdeim_style,norm_style,dir,nsnaps_state,
+  RBInfo(ϵ,mdeim_style,norm_style,compute_supremizers,dir,nsnaps_state,
     nsnaps_mdeim,nsnaps_test,save_structures)
 end
 
@@ -80,20 +82,43 @@ function get_H1_norm_matrix(trial::TrialFESpace,test::FESpace)
   assemble_matrix(H1_form,trial,test)
 end
 
-function get_L2_norm_matrix(trial::MultiFieldParamFESpace,test::MultiFieldFESpace)
-  mortar(map(get_L2_norm_matrix,trial.spaces,test.spaces))
+function compute_supremizer_operator(feop::TransientParamFEOperator)
+  trial = get_trial(feop)(nothing)
+  test = get_test(feop)
+  compute_supremizer_operator(trial,test)
 end
 
-function get_H1_norm_matrix(trial::MultiFieldParamFESpace,test::MultiFieldFESpace)
-  mortar(map(get_H1_norm_matrix,trial.spaces,test.spaces))
+function compute_supremizer_operator(trial::FESpace,test::FESpace)
+  trian = get_triangulation(test)
+  order = FEM.get_polynomial_order(test)
+  dΩ = Measure(trian,2*order)
+  supr_form((u,p),(v,q)) = ∫(p*(∇⋅(v)))dΩ
+  supr = assemble_matrix(supr_form,trial,test)
+  supr[Block(1,2)]
 end
 
-struct RBSolver{S}
-  info::RBInfo
+const BlockRBInfo = RBInfo{M,Vector{Symbol}} where M
+
+function Base.getindex(info::BlockRBInfo,i::Integer)
+  @unpack ϵ,mdeim_style,norm_style,compute_supremizers,dir,nsnaps_state,
+    nsnaps_mdeim,nsnaps_test,save_structures = info
+  RBInfo(ϵ,mdeim_style,norm_style[i],compute_supremizers,dir,nsnaps_state,
+    nsnaps_mdeim,nsnaps_test,save_structures)
+end
+
+function get_norm_matrix(info::BlockRBInfo,feop::TransientParamFEOperator)
+  trial = get_trial(feop)(nothing)
+  test = get_test(feop)
+  map(i->get_norm_matrix(info[i],trial.spaces[i],test.spaces[i]),1:num_fields(test))
+end
+
+struct RBSolver{I,S}
+  info::I
   fesolver::S
 end
 
-const RBThetaMethod = RBSolver{ThetaMethod}
+const BlockRBSolver = RBSolver{BlockRBInfo,S} where S
+const RBThetaMethod = RBSolver{I,ThetaMethod} where I
 
 get_fe_solver(s::RBSolver) = s.fesolver
 get_info(s::RBSolver) = s.info

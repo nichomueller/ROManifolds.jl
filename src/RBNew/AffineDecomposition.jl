@@ -447,3 +447,94 @@ function mdeim_lincomb!(
     mdeim_lincomb!(cache,atrian,b[trian])
   end
 end
+
+# multi field interface
+
+struct BlockAffineContribution{A,N}
+  array::Array{A,N}
+  touched::Array{Bool,N}
+end
+
+const VectorBlockAffineContribution = BlockAffineContribution{A,1} where A
+const MatrixBlockAffineContribution = BlockAffineContribution{A,2} where A
+
+Base.size(a::BlockAffineContribution) = size(a.array)
+Base.length(a::BlockAffineContribution) = length(a.array)
+Base.eltype(::Type{<:BlockAffineContribution{A}}) where A = A
+Base.eltype(a::BlockAffineContribution{A}) where A = A
+Base.ndims(a::BlockAffineContribution{A,N}) where {A,N} = N
+Base.ndims(::Type{BlockAffineContribution{A,N}}) where {A,N} = N
+function Base.getindex(a::BlockAffineContribution,i...)
+  if !b.touched[i...]
+    return nothing
+  end
+  a.array[i...]
+end
+function Base.setindex!(a::BlockAffineContribution,v,i...)
+  @check a.touched[i...] "Only touched entries can be set"
+  a.array[i...] = v
+end
+
+function reduced_vector_form(
+  solver::BlockRBSolver,
+  op::RBOperator,
+  c::ArrayContribution)
+
+  info = get_info(solver)
+  cblock = BlockContribution(c)
+  array = map(cblock.array) do block
+    reduced_vector_form(info,op,block)
+  end
+  touched = cblock.touched
+  BlockAffineContribution(array,touched)
+end
+
+function reduced_matrix_form(
+  solver::BlockRBSolver,
+  op::RBOperator,
+  c::ArrayContribution;
+  kwargs...)
+
+  info = get_info(solver)
+  cblock = BlockContribution(c)
+  array = map(cblock.array) do block
+    reduced_matrix_form(info,op,block;kwargs...)
+  end
+  touched = cblock.touched
+  BlockAffineContribution(array,touched)
+end
+
+function allocate_mdeim_coeff(a::BlockAffineContribution,r::AbstractParamRealization)
+  map(a.array,a.touched) do block,touched
+    if touched
+      allocate_mdeim_coeff(block,r)
+    end
+  end |> filter(!isnothing)
+end
+
+function mdeim_coeff!(
+  cache,
+  a::BlockAffineContribution,
+  b::ArrayContribution)
+
+  bblock = BlockContribution(b)
+  map(cache,a.array,bblock) do cache,a,b
+    mdeim_coeff!(cache,a,b)
+  end
+end
+
+function allocate_mdeim_lincomb(
+  trial::RBSpace,
+  test::RBSpace,
+  r::AbstractParamRealization)
+
+  V = get_vector_type(test)
+  ns_trial = num_reduced_space_dofs(trial)
+  nt_trial = num_reduced_times(trial)
+  ns_test = num_reduced_space_dofs(test)
+  nt_test = num_reduced_times(test)
+  time_prod_cache = allocate_matrix(V,nt_trial,nt_test)
+  kron_prod_cache = allocate_matrix(V,ns_trial*nt_trial,ns_test*nt_test)
+  lincomb_cache = allocate_param_array(kron_prod_cache,num_params(r))
+  return time_prod_cache,kron_prod_cache,lincomb_cache
+end

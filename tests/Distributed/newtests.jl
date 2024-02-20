@@ -168,15 +168,27 @@ x_rb = map(\,AM_rb,b_rb)
 x_rec = recast(red_trial(ron),x_rb)
 norm(x_rec + x) / norm(x)
 
+# b_rec = recast(red_trial(ron),b_rb)
+# norm(b_rec + b) / norm(b)
+
+x_rec = map(own_values(b),own_values(A),own_values(M),local_views(red_test)) do b,A,M,test
+  basis_space,basis_time = test.basis_space,test.basis_time
+  bsnap = Snapshots(b,ron)
+  Asnap = Snapshots(A,ron)
+  Msnap = Snapshots(M,ron)
+  b_rb = compress(test,bsnap)
+  A_rb = compress(test,test,Asnap;combine=(x,y)->θ*x+(1-θ)*y) # see below
+  M_rb = compress(test,test,Msnap;combine=(x,y)->θ*(x-y))
+  AM_rb = A_rb+M_rb
+  x_rb = -AM_rb \ b_rb
+  recast(test,x_rb)
+end
 
 function RB.compress_basis_space(A::AbstractMatrix,trial::RBSpace,test::RBSpace)
   basis_test = get_basis_space(test)
   basis_trial = get_basis_space(trial)
   vals = vec(get_values(A))
   map(vals) do A
-    println(size(basis_test))
-    println(size(A))
-    println(size(basis_trial))
     basis_test'*A*basis_trial
   end
 end
@@ -244,3 +256,55 @@ ghost_M_rb = own_ghost_compress(red_trial(ron),ghost_red_test,Msnap;combine=(x,y
 AA = Asnap.snaps.matrix_partition.items[1]
 basis_space_test = ghost_red_test.basis_space.items[1]
 basis_space_trial = red_trial.basis_space.items[1]
+
+#############################
+
+function _reduced_fe_space(
+  info::RBInfo,
+  feop::TransientParamFEOperator,
+  s::DistributedTransientSnapshots)
+
+  trial = get_trial(feop)
+  test = get_test(feop)
+  soff = select_snapshots(s,RB.offline_params(info))
+  basis_space,basis_time = map(local_values(soff)) do s
+    reduced_basis(s,nothing;ϵ=RB.get_tol(info))
+  end |> tuple_of_arrays
+
+  reduced_trial = RBSpace(trial,basis_space,basis_time)
+  reduced_test = RBSpace(test,basis_space,basis_time)
+  return reduced_trial,reduced_test
+end
+
+function _change_ghost(a::PMatrix{T},ids::PRange;is_consistent=false,make_consistent=true) where T
+  same_partition = (a.row_partition === partition(ids))
+  a_new = same_partition ? a : _change_ghost(T,a,ids)
+  if make_consistent && (!same_partition || !is_consistent)
+    _consistent!(a_new) |> wait
+  end
+  return a_new
+end
+
+function _change_ghost(::Type{<:AbstractMatrix},a::PMatrix,ids::PRange)
+  a_new = similar(a,eltype(a),(ids,PRange(a.col_partition)))
+  # Equivalent to copy!(a_new,a) but does not check that owned indices match
+  map(copy!,own_values(a_new),own_values(a))
+  return a_new
+end
+
+function _consistent!(a::PMatrix)
+  insert(a,b) = b
+  cache = map(reverse,a.cache)
+  t = PartitionedArrays.assemble!(insert,partition(a),cache)
+  @async begin
+    wait(t)
+    a
+  end
+end
+
+new_basis_space,new_basis_time = new_test.basis_space,new_test.basis_time
+Bsnap = _change_ghost(bsnap.snaps,test.gids)
+
+map(local_views(Bsnap),new_basis_space) do b,bs
+  norm(b - bs*bs'*b) / norm(b)
+end
