@@ -1,21 +1,13 @@
 function reduced_operator(
-  op::RBOperator,
-  lhs::Tuple{Vararg{A}},
-  rhs::A) where A
-
-  trians_lhs = map(get_domains,lhs)
-  trians_rhs = get_domains(rhs)
-  new_pop = change_triangulation(op,trians_lhs,trians_rhs)
-  RBNonlinearOperator(new_pop,lhs,rhs)
-end
-
-function reduced_operator(
   solver::RBSolver,
   op::RBOperator,
   s::S) where S
 
   red_lhs,red_rhs = reduced_matrix_vector_form(solver,op,s)
-  red_op = reduced_operator(op,red_lhs,red_rhs)
+  trians_lhs = map(get_domains,red_lhs)
+  trians_rhs = get_domains(red_rhs)
+  new_op = change_triangulation(op,trians_lhs,trians_rhs)
+  red_op = RBNonlinearOperator(solver,new_op,red_lhs,red_rhs)
   save(solver,red_op)
   return red_op
 end
@@ -202,7 +194,16 @@ struct ThetaMethodNonlinearOperator{T,L,R} <: RBNonlinearOperator{T}
   rhs::R
 end
 
-const AffineThetaMethodNonlinearOperator = ThetaMethodNonlinearOperator{T,L,R} where {T<:Affine}
+const AffineThetaMethodNonlinearOperator = ThetaMethodNonlinearOperator{T,L,R} where {T<:Affine,L,R}
+
+function RBNonlinearOperator(
+  ::RBThetaMethod,
+  op::RBOperator,
+  lhs::Tuple{Vararg{A}},
+  rhs::A) where A
+
+  ThetaMethodNonlinearOperator(op,lhs,rhs)
+end
 
 function Algebra.solve(
   solver::RBSolver,

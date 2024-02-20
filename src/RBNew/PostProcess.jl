@@ -26,7 +26,7 @@ end
 
 get_op_filename(info::RBInfo) = info.dir * "/operator.jld"
 
-function DrWatson.save(info::RBInfo,op::ReducedNonlinearOperator)
+function DrWatson.save(info::RBInfo,op::RBNonlinearOperator)
   serialize(get_op_filename(info),op)
 end
 
@@ -76,7 +76,7 @@ function rb_results(
   return results
 end
 
-function rb_results(solver,op::ReducedNonlinearOperator,args...;kwargs...)
+function rb_results(solver,op::RBNonlinearOperator,args...;kwargs...)
   feop = FEM.get_fe_operator(op)
   rb_results(solver,feop,args...;kwargs...)
 end

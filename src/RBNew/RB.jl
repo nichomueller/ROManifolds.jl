@@ -70,6 +70,7 @@ export recast
 include("RBSpace.jl")
 
 export RBOperator
+export RBOperator
 export reduced_operator
 export get_fe_trial
 export get_fe_test
@@ -98,8 +99,9 @@ export allocate_mdeim_lincomb
 export mdeim_lincomb!
 include("AffineDecomposition.jl")
 
-export ReducedOperator
-include("ReducedOperator.jl")
+export RBNonlinearOperator
+export ThetaMethodNonlinearOperator
+include("RBNonlinearOperator.jl")
 
 export ComputationalStats
 export RBResults
