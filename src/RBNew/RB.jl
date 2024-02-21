@@ -86,6 +86,7 @@ include("RBOperator.jl")
 export ReducedIntegrationDomain
 export AffineDecomposition
 export AffineContribution
+export BlockAffineContribution
 export affine_contribution
 export mdeim
 export get_mdeim_indices

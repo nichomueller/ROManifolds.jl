@@ -78,7 +78,7 @@ snaps,comp = ode_solutions(rbsolver,feop,xh0μ)
 
 red_trial,red_test = reduced_fe_space(info,feop,snaps)
 odeop = get_algebraic_operator(feop)
-# reduced_operator(solver,odeop,red_trial,red_test,s)
+# reduced_operator(rbsolver,odeop,red_trial,red_test,snaps)
 op = RBOperator(odeop,red_trial,red_test)
 # red_lhs,red_rhs = reduced_matrix_vector_form(rbsolver,op,snaps)
 smdeim = select_snapshots(snaps,RB.mdeim_params(info))

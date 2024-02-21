@@ -450,43 +450,79 @@ end
 
 # multi field interface
 
-struct BlockAffineContribution{A,N}
+struct BlockContribution{A,N}
   array::Array{A,N}
   touched::Array{Bool,N}
 end
 
-const VectorBlockAffineContribution = BlockAffineContribution{A,1} where A
-const MatrixBlockAffineContribution = BlockAffineContribution{A,2} where A
+function _init_array_blocks(a::Array{A,N}) where {A,N}
+  array = Array{ArrayContribution,N}(undef,size(a))
+  touched = map(!iszero,a)
+  BlockContribution(array,touched)
+end
 
-Base.size(a::BlockAffineContribution) = size(a.array)
-Base.length(a::BlockAffineContribution) = length(a.array)
-Base.eltype(::Type{<:BlockAffineContribution{A}}) where A = A
-Base.eltype(a::BlockAffineContribution{A}) where A = A
-Base.ndims(a::BlockAffineContribution{A,N}) where {A,N} = N
-Base.ndims(::Type{BlockAffineContribution{A,N}}) where {A,N} = N
-function Base.getindex(a::BlockAffineContribution,i...)
-  if !b.touched[i...]
+function _init_affine_blocks(a::Array{A,N}) where {A,N}
+  array = Array{AffineContribution,N}(undef,size(a))
+  touched = map(!iszero,a)
+  BlockContribution(array,touched)
+end
+
+function BlockArrays.blocks(a::ArrayContribution)
+  values = get_values(a)
+  block_values = map(blocks,values)
+  block_contrib = _init_array_blocks(first(block_values))
+  for i = eachindex(block_contrib)
+    if block_contrib.touched[i]
+      b = array_contribution()
+      for (k,trian) in enumerate(keys(a))
+        b[trian] = block_values[k][i]
+      end
+      block_contrib.array[i] = b
+    end
+  end
+  return block_contrib
+end
+
+Base.size(a::BlockContribution) = size(a.array)
+Base.length(a::BlockContribution) = length(a.array)
+Base.eltype(::Type{<:BlockContribution{A}}) where A = A
+Base.eltype(a::BlockContribution{A}) where A = A
+Base.ndims(a::BlockContribution{A,N}) where {A,N} = N
+Base.ndims(::Type{BlockContribution{A,N}}) where {A,N} = N
+Base.copy(a::BlockContribution) = BlockContribution(copy(a.array),copy(a.touched))
+Base.eachindex(a::BlockContribution) = eachindex(a.array)
+function Base.getindex(a::BlockContribution,i...)
+  if !a.touched[i...]
     return nothing
   end
   a.array[i...]
 end
-function Base.setindex!(a::BlockAffineContribution,v,i...)
+function Base.setindex!(a::BlockContribution,v,i...)
   @check a.touched[i...] "Only touched entries can be set"
   a.array[i...] = v
 end
+function Base.similar(a::BlockContribution{A,N}) where {A,N}
+  array = Array{A,N}(undef,size(a))
+  touched = a.touched
+  BlockContribution(array,touched)
+end
+
+const BlockArrayContribution = BlockContribution{A,N} where {A<:ArrayContribution,N}
+const BlockAffineContribution = BlockContribution{A,N} where {A<:AffineContribution,N}
 
 function reduced_vector_form(
   solver::RBSolver,
   op::BlockRBOperator,
   c::ArrayContribution)
 
-  info = get_info(solver)
-  cblock = BlockContribution(c)
-  array = map(cblock.array) do block
-    reduced_vector_form(info,op,block)
+  cblock = blocks(c)
+  block_contrib = similar(cblock)
+  for i = eachindex(cblock)
+    if cblock.touched[i]
+      block_contrib.array[i] = reduced_vector_form(solver,op[i],cblock.array[i])
+    end
   end
-  touched = cblock.touched
-  BlockAffineContribution(array,touched)
+  return block_contrib
 end
 
 function reduced_matrix_form(
@@ -495,21 +531,27 @@ function reduced_matrix_form(
   c::ArrayContribution;
   kwargs...)
 
-  info = get_info(solver)
-  cblock = BlockContribution(c)
-  array = map(cblock.array) do block
-    reduced_matrix_form(info,op,block;kwargs...)
+  cblock = blocks(c)
+  block_contrib = similar(cblock)
+  for i = eachindex(cblock)
+    if cblock.touched[i]
+      block_contrib.array[i] = reduced_matrix_form(solver,op[i],cblock.array[i];kwargs...)
+    end
   end
-  touched = cblock.touched
-  BlockAffineContribution(array,touched)
+  return block_contrib
 end
 
-function allocate_mdeim_coeff(a::BlockAffineContribution,r::AbstractParamRealization)
-  map(a.array,a.touched) do block,touched
-    if touched
-      allocate_mdeim_coeff(block,r)
+function allocate_mdeim_coeff(a::BlockAffineContribution{A,N},r::AbstractParamRealization) where {A,N}
+  cache_solve = similar(a)
+  cache_recast = similar(a)
+  for i = eachindex(a)
+    if a.touched[i]
+      cache_solve_i,cache_recast_i = allocate_mdeim_coeff(a,r)
+      cache_solve[i] = cache_solve_i
+      cache_recast[i] = cache_recast_i
     end
-  end |> filter(!isnothing)
+  end
+  return cache_solve,cache_recast
 end
 
 function mdeim_coeff!(
@@ -517,10 +559,26 @@ function mdeim_coeff!(
   a::BlockAffineContribution,
   b::ArrayContribution)
 
-  bblock = BlockContribution(b)
-  map(cache,a.array,bblock) do cache,a,b
-    mdeim_coeff!(cache,a,b)
+  cache_solve,cache_recast = cache
+  bblock = blocks(b)
+  for i = eachindex(a)
+    if a.touched[i]
+      ci = cache_solve[i],cache_recast[i]
+      mdeim_coeff!(ci,a,bblock[i])
+    end
   end
+end
+
+function allocate_mdeim_lincomb(
+  test::BlockRBSpace,
+  r::AbstractParamRealization)
+
+  caches = map(blocks(test)) do test
+    allocate_mdeim_lincomb(test,r)
+  end
+  lincomb_caches = copy.(last.(caches))
+  lincomb_blocks_cache = mortar(lincomb_caches)
+  return caches,lincomb_blocks_cache
 end
 
 function allocate_mdeim_lincomb(
@@ -528,5 +586,26 @@ function allocate_mdeim_lincomb(
   test::BlockRBSpace,
   r::AbstractParamRealization)
 
+  caches = map(blocks(trial),blocks(test)) do trial,test
+    allocate_mdeim_lincomb(trial,test,r)
+  end
+  lincomb_caches = copy.(last.(caches))
+  lincomb_blocks_cache = mortar(lincomb_caches)
+  return caches,lincomb_blocks_cache
+end
 
+function mdeim_lincomb!(
+  cache,
+  a::BlockAffineContribution,
+  b::BlockArrayContribution)
+
+  @check a.touched == b.touched
+  caches,lincomb_blocks_cache = cache
+  for i = eachindex(a)
+    if a.touched[i]
+      ci = caches[i]
+      mdeim_lincomb!(ci,a.array[i],b.array[i])
+      lincomb_blocks_cache[i] = last(ci)
+    end
+  end
 end

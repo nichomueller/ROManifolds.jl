@@ -88,7 +88,7 @@ end
 # red_op = reduced_operator(rbsolver,feop,snaps)
 red_trial,red_test = reduced_fe_space(info,feop,snaps)
 
-new_trial,new_test = Distributed.new_reduced_fe_space(info,feop,snaps)
+# new_trial,new_test = Distributed.new_reduced_fe_space(info,feop,snaps)
 
 sk = select_snapshots(snaps,first(RB.online_params(info)))
 pk = get_values(sk)

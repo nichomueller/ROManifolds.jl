@@ -170,7 +170,18 @@ end
 
 # multi field interface
 const BlockRBSpace = RBSpace{S,BS,BT} where {
-  S,BS<:AbstractVector{<:AbstractMatrix},BT<:AbstractVector{<:AbstractMatrix}}
+  S,BS<:Tuple{Vararg{AbstractMatrix}},BT<:Tuple{Vararg{AbstractMatrix}}}
+
+function BlockArrays.blocks(r::BlockRBSpace)
+  if isa(r.space,MultiFieldFESpace)
+    spaces = r.space.spaces
+  else
+    spaces = r.space(nothing).spaces
+  end
+  map(spaces,r.basis_space,r.basis_time) do fs,bs,bt
+    RBSpace(fs,bs,bt)
+  end
+end
 
 function reduced_fe_space(
   info::BlockRBInfo,
@@ -246,12 +257,6 @@ function add_time_supremizers(basis_primal,basis_dual;tol=1e-2)
   end
 
   basis_primal
-end
-
-function BlockArrays.blocks(r::BlockRBSpace)
-  map(r.space.spaces,r.basis_space,r.basis_time) do fs,bs,bt
-    RBSpace(fs,bs,bt)
-  end
 end
 
 function recast(r::BlockRBSpace,red_x::ParamBlockVector)

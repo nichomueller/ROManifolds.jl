@@ -72,9 +72,8 @@ function fe_matrix_and_vector(
   θ = fesolver.θ
   θ == 0.0 ? dtθ = dt : dtθ = dt*θ
 
-  smdeim = select_snapshots(s,mdeim_params(solver.info))
-  x = get_values(smdeim)
-  r = copy(get_realization(smdeim))
+  x = get_values(s)
+  r = copy(get_realization(s))
   FEM.shift_time!(r,dt*(θ-1))
 
   y = similar(x)
@@ -175,3 +174,31 @@ end
 # multi field interface
 
 const BlockRBOperator = RBOperator{T,A,B} where {T,A<:BlockRBSpace,B<:BlockRBSpace}
+
+struct TransientFEOperatorInBlock{T<:OperatorType} <: TransientParamFEOperator{T}
+  assem::Assembler
+  trials::Tuple{Vararg{FESpace}}
+  test::FESpace
+end
+
+function BlockArrays.blocks(op::BlockRBOperator)
+  feop = FEM.get_fe_operator(op)
+  fe_test_blocks = feop.test
+  fe_trial_blocks,fe_trial_t_blocks = map(feop.trials) do fe_trial
+    fe_trial(nothing)
+  end
+  map(
+    fe_trial_blocks.spaces,
+    fe_trial_t_blocks.spaces,
+    fe_test_blocks.spaces,
+    block(op.trial),
+    block(op.test)) do fe_trial,fe_trial_t,fe_test,trial,test
+    assem = SparseMatrixAssembler(fe_trial,fe_test)
+    feop = TransientFEOperatorInBlock(assem,(fe_trial,fe_trial_t),fe_test)
+    RBOperator(feop,trial,test)
+  end
+end
+
+function Base.getindex(op::BlockRBOperator,i::Integer)
+  RBOperator(op.feop,op.trial[i],op.test[i])
+end
