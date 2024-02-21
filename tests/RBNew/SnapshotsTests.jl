@@ -41,7 +41,7 @@ s2 = RB.change_mode(s1)
 @test norm(s2 - stack(vv)) ≈ 0
 
 b = [[1 0];[0 0]]
-s3 = RB.compress(b,s2)
+s3 = RB.compress(s2,b)
 @test typeof(s3) <: RB.CompressedTransientSnapshots{RB.Mode2Axis}
 @test norm(s3 - [[1 2 3 4 5 6];[0 0 0 0 0 0]]) ≈ 0
 

@@ -115,9 +115,9 @@ b = allocate_residual(nlop,x0)
 residual!(b,nlop,x0)
 bsnap = Snapshots(b,ron)
 
-b_rb = compress(red_test,bsnap)
-A_rb = compress(red_trial(ron),red_test,Asnap;combine=(x,y)->θ*x+(1-θ)*y)
-M_rb = compress(red_trial(ron),red_test,Msnap;combine=(x,y)->θ*(x-y))
+b_rb = compress(bsnap,red_test)
+A_rb = compress(Asnap,red_trial(ron),red_test;combine=(x,y)->θ*x+(1-θ)*y)
+M_rb = compress(Msnap,red_trial(ron),red_test;combine=(x,y)->θ*(x-y))
 AM_rb = A_rb + M_rb
 
 x_rb = AM_rb \ b_rb

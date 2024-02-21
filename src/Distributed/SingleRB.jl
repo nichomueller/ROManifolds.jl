@@ -102,26 +102,26 @@ function GridapDistributed.local_views(r::DistributedRBSpace)
   end
 end
 
-function RB.compress(r::DistributedRBSpace,s::DistributedTransientSnapshots)
-  map(local_views(r),own_values(s)) do r,s
-    compress(r,s)
+function RB.compress(s::DistributedTransientSnapshots,r::DistributedRBSpace)
+  map(own_values(s),local_views(r)) do s,r
+    compress(s,r)
   end
 end
 
 function RB.compress(
+  s::DistributedTransientSnapshots,
   trial::DistributedRBSpace,
-  test::DistributedRBSpace,
-  s::DistributedTransientSnapshots;
+  test::DistributedRBSpace;
   kwargs...)
 
-  map(local_views(trial),local_views(test),own_values(s)) do trial,test,s
-    compress(trial,test,s;kwargs...)
+  map(own_values(s),local_views(trial),local_views(test)) do s,trial,test
+    compress(s,trial,test;kwargs...)
   end
 end
 
-function RB.recast(r::DistributedRBSpace,red_x::AbstractVector)
-  own_vals = map(local_views(r),local_views(red_x)) do r,red_x
-    recast(r,red_x)
+function RB.recast(red_x::AbstractVector,r::DistributedRBSpace)
+  own_vals = map(local_views(red_x),local_views(r)) do red_x,r
+    recast(red_x,r)
   end
   x = zero_free_values(r.space)
   map(copy!,own_values(x),own_vals)

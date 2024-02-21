@@ -28,7 +28,7 @@ end
 
 function reduced_basis(s::NnzSnapshots,args...;kwargs...)
   basis_space,basis_time = compute_bases(s,args...;kwargs...)
-  sparse_basis_space = recast(basis_space,s)
+  sparse_basis_space = recast(s,basis_space)
   return sparse_basis_space,basis_time
 end
 
@@ -39,7 +39,7 @@ function compute_bases(
 
   flag,s = _return_flag(s)
   b1 = tpod(s,norm_matrix;kwargs...)
-  compressed_s = compress(b1,s)
+  compressed_s = compress(s,b1)
   compressed_s = change_mode(compressed_s)
   b2 = tpod(compressed_s;kwargs...)
   _return_bases(flag,b1,b2)
@@ -112,7 +112,48 @@ function FESpaces.get_vector_type(r::RBSpace)
   return newV
 end
 
-function compress(r::RBSpace,xmat::AbstractMatrix)
+function compress_basis_space(A::AbstractMatrix,test::RBSpace)
+  basis_test = get_basis_space(test)
+  map(eachcol(A)) do a
+    basis_test'*a
+  end
+end
+
+function compress_basis_space(A::AbstractMatrix,trial::RBSpace,test::RBSpace)
+  basis_test = get_basis_space(test)
+  basis_trial = get_basis_space(trial)
+  map(get_values(A)) do A
+    basis_test'*A*basis_trial
+  end
+end
+
+function combine_basis_time(test::RBSpace;kwargs...)
+  get_basis_time(test)
+end
+
+function combine_basis_time(
+  trial::RBSpace,
+  test::RBSpace;
+  combine=(x,y)->x)
+
+  test_basis = get_basis_time(test)
+  trial_basis = get_basis_time(trial)
+  time_ndofs = size(test_basis,1)
+  nt_test = size(test_basis,2)
+  nt_trial = size(trial_basis,2)
+
+  T = eltype(get_vector_type(test))
+  bt_proj = zeros(T,time_ndofs,nt_test,nt_trial)
+  bt_proj_shift = copy(bt_proj)
+  @inbounds for jt = 1:nt_trial, it = 1:nt_test
+    bt_proj[:,it,jt] .= test_basis[:,it].*trial_basis[:,jt]
+    bt_proj_shift[2:end,it,jt] .= test_basis[2:end,it].*trial_basis[1:end-1,jt]
+  end
+
+  combine(bt_proj,bt_proj_shift)
+end
+
+function compress(xmat::AbstractMatrix,r::RBSpace)
   basis_space = get_basis_space(r)
   basis_time = get_basis_time(r)
 
@@ -121,12 +162,7 @@ function compress(r::RBSpace,xmat::AbstractMatrix)
   return x
 end
 
-function compress(
-  trial::RBSpace,
-  test::RBSpace,
-  xmat::AbstractMatrix{T};
-  combine=(x,y)->x) where T
-
+function compress(xmat::AbstractMatrix{T},trial::RBSpace,test::RBSpace;combine=(x,y)->x) where T
   basis_space_test = get_basis_space(test)
   basis_time_test = get_basis_time(test)
   basis_space_trial = get_basis_space(trial)
@@ -150,7 +186,7 @@ function compress(
   return st_proj_mat
 end
 
-function recast(r::RBSpace,red_x::AbstractVector)
+function recast(red_x::AbstractVector,r::RBSpace)
   basis_space = get_basis_space(r)
   basis_time = get_basis_time(r)
   ns = num_reduced_space_dofs(r)
@@ -162,15 +198,15 @@ function recast(r::RBSpace,red_x::AbstractVector)
   ParamArray(x)
 end
 
-function recast(r::RBSpace,red_x::ParamVector)
+function recast(red_x::ParamVector,r::RBSpace)
   map(red_x) do red_x
-    recast(r,red_x)
+    recast(red_x,r)
   end
 end
 
 # multi field interface
 const BlockRBSpace = RBSpace{S,BS,BT} where {
-  S,BS<:Tuple{Vararg{AbstractMatrix}},BT<:Tuple{Vararg{AbstractMatrix}}}
+  S,BS<:AbstractVector{<:AbstractMatrix},BT<:AbstractVector{<:AbstractMatrix}}
 
 function BlockArrays.blocks(r::BlockRBSpace)
   if isa(r.space,MultiFieldFESpace)
@@ -207,23 +243,17 @@ end
 
 function add_space_supremizers(basis_space,supr_op,norm_matrix)
   @check length(basis_space) == 2 "Have to extend this if dealing with more than 2 equations"
-  basis_space_primal,basis_space_dual = basis_space
+  basis_primal,basis_dual = basis_space
   norm_matrix_primal = first(norm_matrix)
-  supr_i = supr_op * basis_space_dual
-  gram_schmidt!(supr_i,basis_space_primal,norm_matrix_primal)
-  basis_space_primal = hcat(basis_space_primal,supr_i)
-  return basis_space_primal,basis_space_dual
+  supr_i = supr_op * basis_dual
+  gram_schmidt!(supr_i,basis_primal,norm_matrix_primal)
+  basis_primal = hcat(basis_primal,supr_i)
+  return [basis_primal,basis_dual]
 end
 
-function add_time_supremizers(basis_time;kwargs...)
-  basis_time_primal,basis_time_dual... = basis_time
-  for bdual in basis_time_dual
-    basis_time_primal = add_time_supremizers(basis_time_primal,bdual;kwargs...)
-  end
-  return basis_time_primal,basis_time_dual...
-end
-
-function add_time_supremizers(basis_primal,basis_dual;tol=1e-2)
+function add_time_supremizers(basis_time;tol=1e-2)
+  @check length(basis_time) == 2 "Have to extend this if dealing with more than 2 equations"
+  basis_primal,basis_dual = basis_time
   basis_pd = basis_primal'*basis_dual
 
   function enrich(basis_primal,basis_pd,v)
@@ -259,9 +289,21 @@ function add_time_supremizers(basis_primal,basis_dual;tol=1e-2)
   basis_primal
 end
 
+function compress_basis_space(A::Vector{<:AbstractMatrix},r::BlockRBSpace...)
+  map(A,blocks.(r)...) do A,r...
+    compress_basis_space(A,r...)
+  end
+end
+
+function combine_basis_time(trial::BlockRBSpace,test::BlockRBSpace;kwargs...)
+  map(blocks(trial),blocks(test)) do trial,test
+    combine_basis_time(trial,test;kwargs...)
+  end
+end
+
 function recast(r::BlockRBSpace,red_x::ParamBlockVector)
-  block_red_x = map(blocks(r),blocks(red_x)) do r,red_x
-    recast(r,red_x)
+  block_red_x = map(blocks(red_x),blocks(r)) do red_x,r
+    recast(red_x,r)
   end
   mortar(block_red_x)
 end

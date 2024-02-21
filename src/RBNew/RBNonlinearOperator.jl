@@ -245,7 +245,7 @@ function Algebra.solve(
     solve!(red_x,fesolver.nls,nlop,nl_cache)
   end
 
-  x = recast(trial,red_x)
+  x = recast(red_x,trial)
   s = reverse_snapshots(x,r)
   cs = ComputationalStats(stats,num_params(r))
   return s,cs
@@ -281,7 +281,7 @@ function Algebra.solve(
     solve!(red_x,fesolver.nls,afop)
   end
 
-  x = recast(trial,red_x)
+  x = recast(red_x,trial)
   s = reverse_snapshots(x,r)
   cs = ComputationalStats(stats,num_params(r))
   return s,cs

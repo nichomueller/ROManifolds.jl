@@ -55,47 +55,6 @@ function reduce_triangulation(
   return red_trian
 end
 
-function compress_basis_space(A::AbstractMatrix,test::RBSpace)
-  basis_test = get_basis_space(test)
-  map(eachcol(A)) do a
-    basis_test'*a
-  end
-end
-
-function compress_basis_space(A::AbstractMatrix,trial::RBSpace,test::RBSpace)
-  basis_test = get_basis_space(test)
-  basis_trial = get_basis_space(trial)
-  map(get_values(A)) do A
-    basis_test'*A*basis_trial
-  end
-end
-
-function combine_basis_time(test::RBSpace;kwargs...)
-  get_basis_time(test)
-end
-
-function combine_basis_time(
-  trial::RBSpace,
-  test::RBSpace;
-  combine=(x,y)->x)
-
-  test_basis = get_basis_time(test)
-  trial_basis = get_basis_time(trial)
-  time_ndofs = size(test_basis,1)
-  nt_test = size(test_basis,2)
-  nt_trial = size(trial_basis,2)
-
-  T = eltype(get_vector_type(test))
-  bt_proj = zeros(T,time_ndofs,nt_test,nt_trial)
-  bt_proj_shift = copy(bt_proj)
-  @inbounds for jt = 1:nt_trial, it = 1:nt_test
-    bt_proj[:,it,jt] .= test_basis[:,it].*trial_basis[:,jt]
-    bt_proj_shift[2:end,it,jt] .= test_basis[2:end,it].*trial_basis[1:end-1,jt]
-  end
-
-  combine(bt_proj,bt_proj_shift)
-end
-
 struct ReducedIntegrationDomain{S<:AbstractVector,T<:AbstractVector}
   indices_space::S
   indices_time::T
@@ -105,14 +64,17 @@ get_indices_space(i::ReducedIntegrationDomain) = i.indices_space
 get_indices_time(i::ReducedIntegrationDomain) = i.indices_time
 union_indices_time(i::ReducedIntegrationDomain...) = union(map(get_indices_time,i)...)
 
-struct AffineDecomposition{M,A,B,C,D}
+struct AffineDecomposition{M,A,B,C,D,E}
   mdeim_style::M
   basis_space::A
   basis_time::B
-  mdeim_interpolation::LU
-  integration_domain::C
-  metadata::D
+  mdeim_interpolation::C
+  integration_domain::D
+  metadata::E
 end
+
+const VectorAffineDecomposition = AffineDecomposition{M,A,B,C,D,E} where {M,A,B,C,D,E<:AbstractMatrix}
+const MatrixAffineDecomposition = AffineDecomposition{M,A,B,C,D,E} where {M,A,B,C,D,E<:AbstractArray}
 
 get_integration_domain(a::AffineDecomposition) = a.integration_domain
 get_interp_matrix(a::AffineDecomposition) = a.mdeim_interpolation
@@ -396,8 +358,8 @@ end
 
 function mdeim_lincomb!(
   cache,
-  a::AffineDecomposition{M,A,B,C,<:AbstractMatrix},
-  coeff::ParamMatrix) where {M,A,B,C}
+  a::VectorAffineDecomposition,
+  coeff::ParamMatrix)
 
   time_prod_cache,kron_prod_cache,lincomb_cache = cache
   basis_time = a.metadata
@@ -416,8 +378,8 @@ end
 
 function mdeim_lincomb!(
   cache,
-  a::AffineDecomposition{M,A,B,C,<:AbstractArray},
-  coeff::ParamMatrix) where {M,A,B,C}
+  a::MatrixAffineDecomposition,
+  coeff::ParamMatrix)
 
   time_prod_cache,kron_prod_cache,lincomb_cache = cache
   basis_time = a.metadata
@@ -450,162 +412,41 @@ end
 
 # multi field interface
 
-struct BlockContribution{A,N}
-  array::Array{A,N}
-  touched::Array{Bool,N}
-end
+function reduce_triangulation(
+  fs::MultiFieldFESpace,
+  trian::Triangulation,
+  indices_space::BlockVector)
 
-function _init_array_blocks(a::Array{A,N}) where {A,N}
-  array = Array{ArrayContribution,N}(undef,size(a))
-  touched = map(!iszero,a)
-  BlockContribution(array,touched)
-end
-
-function _init_affine_blocks(a::Array{A,N}) where {A,N}
-  array = Array{AffineContribution,N}(undef,size(a))
-  touched = map(!iszero,a)
-  BlockContribution(array,touched)
-end
-
-function BlockArrays.blocks(a::ArrayContribution)
-  values = get_values(a)
-  block_values = map(blocks,values)
-  block_contrib = _init_array_blocks(first(block_values))
-  for i = eachindex(block_contrib)
-    if block_contrib.touched[i]
-      b = array_contribution()
-      for (k,trian) in enumerate(keys(a))
-        b[trian] = block_values[k][i]
-      end
-      block_contrib.array[i] = b
-    end
+  red_integr_cells_block = map(fs.spaces,blocks(indices_space)) do fs,indices_space
+    cell_dof_ids = get_cell_dof_ids(fs,trian)
+    indices_space_rows = fast_index(indices_space,num_free_dofs(fs))
+    get_reduced_cells(indices_space_rows,cell_dof_ids)
   end
-  return block_contrib
+  red_integr_cells = unique(mortar(red_integr_cells_block))
+  red_trian = view(trian,red_integr_cells)
+  return red_trian
 end
 
-Base.size(a::BlockContribution) = size(a.array)
-Base.length(a::BlockContribution) = length(a.array)
-Base.eltype(::Type{<:BlockContribution{A}}) where A = A
-Base.eltype(a::BlockContribution{A}) where A = A
-Base.ndims(a::BlockContribution{A,N}) where {A,N} = N
-Base.ndims(::Type{BlockContribution{A,N}}) where {A,N} = N
-Base.copy(a::BlockContribution) = BlockContribution(copy(a.array),copy(a.touched))
-Base.eachindex(a::BlockContribution) = eachindex(a.array)
-function Base.getindex(a::BlockContribution,i...)
-  if !a.touched[i...]
-    return nothing
-  end
-  a.array[i...]
-end
-function Base.setindex!(a::BlockContribution,v,i...)
-  @check a.touched[i...] "Only touched entries can be set"
-  a.array[i...] = v
-end
-function Base.similar(a::BlockContribution{A,N}) where {A,N}
-  array = Array{A,N}(undef,size(a))
-  touched = a.touched
-  BlockContribution(array,touched)
-end
+function mdeim(
+  info::RBInfo,
+  fs::FESpace,
+  trian::Triangulation,
+  block_basis_space::Array{<:AbstractMatrix,N},
+  block_basis_time::Array{<:AbstractMatrix,N}) where N
 
-const BlockArrayContribution = BlockContribution{A,N} where {A<:ArrayContribution,N}
-const BlockAffineContribution = BlockContribution{A,N} where {A<:AffineContribution,N}
+  block_ispace,block_itime,block_lu_interp = map(
+    block_basis_space,block_basis_time) do basis_space,basis_time
 
-function reduced_vector_form(
-  solver::RBSolver,
-  op::BlockRBOperator,
-  c::ArrayContribution)
+    indices_space = get_mdeim_indices(basis_space)
+    recast_indices_space = recast_indices(basis_space,indices_space)
+    interp_basis_space = view(basis_space,indices_space,:)
+    indices_time,lu_interp = _time_indices_and_interp_matrix(info.mdeim_style,interp_basis_space,basis_time)
+    recast_indices_space,indices_time,lu_interp
+  end |> tuple_of_arrays
 
-  cblock = blocks(c)
-  block_contrib = similar(cblock)
-  for i = eachindex(cblock)
-    if cblock.touched[i]
-      block_contrib.array[i] = reduced_vector_form(solver,op[i],cblock.array[i])
-    end
-  end
-  return block_contrib
-end
-
-function reduced_matrix_form(
-  solver::RBSolver,
-  op::BlockRBOperator,
-  c::ArrayContribution;
-  kwargs...)
-
-  cblock = blocks(c)
-  block_contrib = similar(cblock)
-  for i = eachindex(cblock)
-    if cblock.touched[i]
-      block_contrib.array[i] = reduced_matrix_form(solver,op[i],cblock.array[i];kwargs...)
-    end
-  end
-  return block_contrib
-end
-
-function allocate_mdeim_coeff(a::BlockAffineContribution{A,N},r::AbstractParamRealization) where {A,N}
-  cache_solve = similar(a)
-  cache_recast = similar(a)
-  for i = eachindex(a)
-    if a.touched[i]
-      cache_solve_i,cache_recast_i = allocate_mdeim_coeff(a,r)
-      cache_solve[i] = cache_solve_i
-      cache_recast[i] = cache_recast_i
-    end
-  end
-  return cache_solve,cache_recast
-end
-
-function mdeim_coeff!(
-  cache,
-  a::BlockAffineContribution,
-  b::ArrayContribution)
-
-  cache_solve,cache_recast = cache
-  bblock = blocks(b)
-  for i = eachindex(a)
-    if a.touched[i]
-      ci = cache_solve[i],cache_recast[i]
-      mdeim_coeff!(ci,a,bblock[i])
-    end
-  end
-end
-
-function allocate_mdeim_lincomb(
-  test::BlockRBSpace,
-  r::AbstractParamRealization)
-
-  caches = map(blocks(test)) do test
-    allocate_mdeim_lincomb(test,r)
-  end
-  lincomb_caches = copy.(last.(caches))
-  lincomb_blocks_cache = mortar(lincomb_caches)
-  return caches,lincomb_blocks_cache
-end
-
-function allocate_mdeim_lincomb(
-  trial::BlockRBSpace,
-  test::BlockRBSpace,
-  r::AbstractParamRealization)
-
-  caches = map(blocks(trial),blocks(test)) do trial,test
-    allocate_mdeim_lincomb(trial,test,r)
-  end
-  lincomb_caches = copy.(last.(caches))
-  lincomb_blocks_cache = mortar(lincomb_caches)
-  return caches,lincomb_blocks_cache
-end
-
-function mdeim_lincomb!(
-  cache,
-  a::BlockAffineContribution,
-  b::BlockArrayContribution)
-
-  @check a.touched == b.touched
-  caches,lincomb_blocks_cache = cache
-  for i = eachindex(a)
-    if a.touched[i]
-      ci = caches[i]
-      mdeim_lincomb!(ci,a.array[i],b.array[i])
-      lincomb_blocks_cache[i] = last(ci)
-    end
-  end
+  recast_indices_space = mortar(block_ispace)
+  indices_time = mortar(block_itime)
+  red_trian = reduce_triangulation(fs,trian,recast_indices_space)
+  integration_domain = ReducedIntegrationDomain(recast_indices_space,indices_time)
+  return block_lu_interp,red_trian,integration_domain
 end

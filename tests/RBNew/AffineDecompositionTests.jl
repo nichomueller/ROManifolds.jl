@@ -99,7 +99,7 @@ _,coeff_mat = coeff_cache
 RB.mdeim_lincomb!(lincomb_cache,A,coeff_mat)
 _,_,mat_red = lincomb_cache
 
-red_mat_snaps = RB.compress(red_trial,red_test,snaps_biform_online)
+red_mat_snaps = RB.compress(snaps_biform_online,red_trial,red_test)
 err = red_mat_snaps - mat_red[1]
 
 @check norm(err)/sqrt(length(err)) ≤ 1e-12
@@ -143,7 +143,7 @@ _,coeff_vec = coeff_cache
 RB.mdeim_lincomb!(lincomb_cache,b,coeff_vec)
 _,_,vec_red = lincomb_cache
 
-red_vec_snaps = RB.compress(red_test,snaps_liform_online)
+red_vec_snaps = RB.compress(snaps_liform_online,red_test)
 err = red_vec_snaps - vec_red[1]
 
 @check norm(err)/sqrt(length(err)) ≤ 1e-12
@@ -276,13 +276,13 @@ snaps_on = RB.select_snapshots(snaps,1)
 r_on = RB.get_realization(snaps_on)
 snapsA,snapsM,snapsR = get_fe_snaps(r_on)
 
-Arb = RB.compress(red_trial,red_test,snapsA;combine=(x,y)->θ*x+(1-θ)*y)
-Mrb = RB.compress(red_trial,red_test,snapsM;combine=(x,y)->θ*(x-y))
+Arb = RB.compress(snapsA,red_trial,red_test;combine=(x,y)->θ*x+(1-θ)*y)
+Mrb = RB.compress(snapsM,red_trial,red_test;combine=(x,y)->θ*(x-y))
 AMrb = Arb + Mrb
 
-Rrb = RB.compress(red_test,snapsR)
+Rrb = RB.compress(snapsR,red_test)
 
-xrb = compress(get_test(red_op),snaps_on)
+xrb = compress(snaps_on,get_test(red_op))
 man_xrb = AMrb \ Rrb
 
 # rb matrix/vector

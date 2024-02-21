@@ -120,13 +120,13 @@ function tensor_setindex!(s::AbstractTransientSnapshots,v,ispace,itime,iparam)
   si = v
 end
 
-function compress(a::AbstractMatrix,s::AbstractTransientSnapshots{Mode1Axis})
+function compress(s::AbstractTransientSnapshots{Mode1Axis},a::AbstractMatrix)
   @fastmath compressed_values = a'*s
   r = get_realization(s)
   Snapshots(compressed_values,r,Mode1Axis())
 end
 
-function compress(a::AbstractMatrix,s::AbstractTransientSnapshots{Mode2Axis})
+function compress(s::AbstractTransientSnapshots{Mode2Axis},a::AbstractMatrix)
   @fastmath compressed_values = a'*s
   r = get_realization(s)
   compressed_realization = r[:,axes(a,2)]
@@ -347,15 +347,15 @@ function as_param_arrays(s::CompressedTransientSnapshots,values::AbstractMatrix{
   end
 end
 
-function recast(a::AbstractMatrix,s::CompressedTransientSnapshots{Mode1Axis})
+function recast(s::CompressedTransientSnapshots{Mode1Axis},a::AbstractMatrix)
   @fastmath recast_values = a*s
   param_array_values = as_param_arrays(s,recast_values)
   Snapshots(param_array_values,s.realization,Mode1Axis())
 end
 
-function recast_compress(a::AbstractMatrix,s::AbstractTransientSnapshots{Mode1Axis})
-  s_compress = compress(a,s)
-  s_recast_compress = recast(a,s_compress)
+function recast_compress(s::AbstractTransientSnapshots{Mode1Axis},a::AbstractMatrix)
+  s_compress = compress(s,a)
+  s_recast_compress = recast(s_compress,a)
   s_recast_compress
 end
 
@@ -809,7 +809,7 @@ function get_nonzero_indices(s::NnzSnapshots)
   return i .+ (j .- 1)*v.m
 end
 
-function recast(a::AbstractMatrix,s::NnzSnapshots{Mode1Axis})
+function recast(s::NnzSnapshots{Mode1Axis},a::AbstractMatrix)
   s1 = first(s.values)
   r = get_realization(s)
   r1 = r[1,axes(a,2)]
