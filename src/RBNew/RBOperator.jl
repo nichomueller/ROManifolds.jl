@@ -174,8 +174,3 @@ end
 # multi field interface
 
 const BlockRBOperator = RBOperator{T,A,B} where {T,A<:BlockRBSpace,B<:BlockRBSpace}
-
-FESpaces.get_trial(op::BlockRBOperator) = blocks(op.trial)
-FESpaces.get_test(op::BlockRBOperator) = blocks(op.test)
-get_fe_trial(op::BlockRBOperator) = get_trial(op.feop).spaces
-get_fe_test(op::BlockRBOperator) = get_test(op.feop).spaces

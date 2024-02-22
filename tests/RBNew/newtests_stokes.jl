@@ -75,25 +75,32 @@ info = RBInfo(dir;norm_style=[:l2,:l2],nsnaps_state=50,nsnaps_test=10,nsnaps_mde
 rbsolver = RBSolver(info,fesolver)
 
 snaps,comp = ode_solutions(rbsolver,feop,xh0μ)
-# red_op = reduced_operator(rbsolver,feop,snaps)
+red_op = reduced_operator(rbsolver,feop,snaps)
 
-red_trial,red_test = reduced_fe_space(info,feop,snaps)
-odeop = get_algebraic_operator(feop)
-# reduced_operator(rbsolver,odeop,red_trial,red_test,snaps)
-op = RBOperator(odeop,red_trial,red_test)
-# red_lhs,red_rhs = reduced_matrix_vector_form(rbsolver,op,snaps)
-smdeim = select_snapshots(snaps,RB.mdeim_params(info))
-contribs_mat,contribs_vec = fe_matrix_and_vector(rbsolver,op,smdeim)
-red_mat = RB.reduced_matrix_form(rbsolver,op,contribs_mat)
-red_vec = RB.reduced_vector_form(rbsolver,op,contribs_vec)
+son = select_snapshots(snaps,RB.online_params(info))
+ron = get_realization(son)
+xrb, = solve(rbsolver,red_op,ron)
+son_rev = reverse_snapshots(son)
+RB.space_time_error(son_rev,xrb)
 
-using PartitionedArrays
-v = get_values(contribs_vec)[1]
-test = get_test(op)
-fe_test = get_fe_test(op)
-touched = smdeim.touched
-ads,red_trians = map(findall(touched)) do i
-  RB.reduced_form(info,fe_test[i],smdeim.array[i],Ω,test[i])
+θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+
+r = copy(ron)
+FEM.shift_time!(r,dt*(θ-1))
+
+red_trial = get_trial(red_op)(r)
+fe_trial = get_fe_trial(red_op)(r)
+red_x = zero_free_values(red_trial)
+y = zero_free_values(fe_trial)
+z = similar(y)
+z .= 0.0
+
+ode_cache = allocate_cache(red_op,r)
+mat_cache,vec_cache = ODETools._allocate_matrix_and_vector(red_op,r,y,ode_cache)
+
+red_test = get_test(red_op)
+# RB.allocate_mdeim_lincomb(red_trial,red_test,r)
+block_tc,block_kc,block_lc = map(blocks(red_trial),blocks(red_test)) do trial,test
+  allocate_mdeim_lincomb(trial,test,r)
 end |> tuple_of_arrays
-
-ad1 = ads[1]
+lc = mortar(block_lc)

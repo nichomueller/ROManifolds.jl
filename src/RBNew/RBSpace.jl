@@ -97,7 +97,7 @@ FEM.num_times(r::RBSpace) = size(get_basis_time(r),1)
 function num_reduced_times end
 num_reduced_times(r::RBSpace) = size(get_basis_time(r),2)
 
-FESpaces.num_free_dofs(r::RBSpace) = num_reduced_space_dofs(r)*num_reduced_times(r)
+FESpaces.num_free_dofs(r::RBSpace) = dot(num_reduced_space_dofs(r),num_reduced_times(r))
 
 FESpaces.get_free_dof_ids(r::RBSpace) = Base.OneTo(num_free_dofs(r))
 
@@ -112,6 +112,7 @@ FESpaces.get_dirichlet_dof_tag(r::RBSpace) = get_dirichlet_dof_tag(r.space)
 function FESpaces.get_vector_type(r::RBSpace)
   change_length(x) = x
   change_length(::Type{ParamVector{T,A,L}}) where {T,A,L} = ParamVector{T,A,Int(L/num_times(r))}
+  change_length(::Type{ParamBlockVector{T,A,L}}) where {T,A,L} = ParamBlockVector{T,A,Int(L/num_times(r))}
   V = get_vector_type(r.space)
   newV = change_length(V)
   return newV
@@ -212,7 +213,19 @@ end
 # multi field interface
 const BlockRBSpace = RBSpace{S,BS,BT} where {S,BS<:ArrayBlock,BT<:ArrayBlock}
 
-function BlockArrays.blocks(r::BlockRBSpace)
+function Base.getindex(r::BlockRBSpace,i...)
+  @unpack space,basis_space,basis_time = r
+  @check basis_space.touched == basis_time.touched
+  @check basis_space.touched[i...]
+  if isa(space,MultiFieldFESpace)
+    fs = space
+  else
+    fs = evaluate(space,nothing)
+  end
+  return RBSpace(fs.spaces[i...],basis_space[i...],basis_time[i...])
+end
+
+function Base.iterate(r::BlockRBSpace)
   @unpack space,basis_space,basis_time = r
   @check basis_space.touched == basis_time.touched
   if isa(space,MultiFieldFESpace)
@@ -220,9 +233,69 @@ function BlockArrays.blocks(r::BlockRBSpace)
   else
     fs = evaluate(space,nothing)
   end
-  map(findall(basis_space.touched)) do i
-    RBSpace(fs.spaces[i],basis_space[i],basis_time[i])
+  i = 1
+  ri = RBSpace(fs.spaces[i],basis_space[i],basis_time[i])
+  state = i+1,fs
+  return ri,state
+end
+
+function Base.iterate(r::BlockRBSpace,state)
+  i,fs = state
+  if i > length(fs.spaces)
+    return nothing
   end
+  ri = RBSpace(fs.spaces[i],r.basis_space[i],r.basis_time[i])
+  state = i+1,fs
+  return ri,state
+end
+
+MultiField.MultiFieldStyle(r::BlockRBSpace) = MultiFieldStyle(r.space)
+
+function FESpaces.get_free_dof_ids(r::BlockRBSpace)
+  get_free_dof_ids(r,MultiFieldStyle(r))
+end
+
+function FESpaces.get_free_dof_ids(r::BlockRBSpace,::ConsecutiveMultiFieldStyle)
+  @notimplemented
+end
+
+function FESpaces.get_free_dof_ids(r::BlockRBSpace,::BlockMultiFieldStyle{NB}) where NB
+  block_num_dofs = map(range->num_free_dofs(r[range]),1:NB)
+  return BlockArrays.blockedrange(block_num_dofs)
+end
+
+function FESpaces.zero_free_values(
+  r::BlockRBSpace{<:MultiFieldParamFESpace{<:BlockMultiFieldStyle{NB}}}) where NB
+  block_num_dofs = map(range->num_free_dofs(r[range]),1:NB)
+  block_vtypes = map(range->get_vector_type(r.space[range]),1:NB)
+  return mortar(map(allocate_vector,block_vtypes,block_num_dofs))
+end
+
+function BlockArrays.blocks(r::BlockRBSpace)
+  touched = r.basis_space.touched
+  map(findall(touched)) do i
+    getindex(r,i)
+  end
+end
+
+BlockArrays.blocksize(r::BlockRBSpace) = size(r.basis_space)
+
+function num_reduced_space_dofs(r::BlockRBSpace)
+  dofs = Int[]
+  for ri in r
+    push!(dofs,num_reduced_space_dofs(ri))
+  end
+  return dofs
+end
+
+FEM.num_times(r::BlockRBSpace) = num_times(first(r))
+
+function num_reduced_times(r::BlockRBSpace)
+  dofs = Int[]
+  for ri in r
+    push!(dofs,num_reduced_times(ri))
+  end
+  return dofs
 end
 
 function reduced_basis(s::BlockSnapshots;kwargs...)
@@ -291,66 +364,6 @@ function add_time_supremizers(basis_time;tol=1e-2)
 
   return ArrayBlock([basis_primal,basis_dual],basis_time.touched)
 end
-
-# function compress_basis_space(
-#   A::BlockVector{T},
-#   r::BlockRBSpace{S,BS}
-#   ) where {T,S,BS}
-
-#   rblock = blocks(r)
-#   Tp = T*eltype(BS)
-#   array = Vector{Tp}(undef,size(A))
-#   touched = A.touched
-#   for i = eachindex(array)
-#     if touched[i]
-#       array[i] = compress_basis_space(A[i],rblock[i])
-#     end
-#   end
-#   BlockArray(array,touched)
-# end
-
-# function compress_basis_space(
-#   A::BlockMatrix{T},
-#   trial::BlockRBSpace{S,BS},
-#   test::BlockRBSpace{S,BS}
-#   ) where {T,S,BS}
-
-#   trialblock = blocks(trial)
-#   testblock = blocks(test)
-#   nblocks = length(trialblock)
-#   Tp = T*eltype(BS)
-#   array = Matrix{Tp}(undef,size(A))
-#   touched = A.touched
-#   for i = eachindex(array)
-#     if touched[i]
-#       itrial = fast_index(i,nblocks)
-#       itest = slow_index(i,nblocks)
-#       array[i] = compress_basis_space(A[i],trialblock[itrial],testblock[itest])
-#     end
-#   end
-#   BlockMatrix(array,touched)
-# end
-
-# function combine_basis_time(
-#   A::BlockMatrix{T},
-#   trial::BlockRBSpace{S,BS,BT},
-#   test::BlockRBSpace{S,BS,BT};
-#   kwargs...) where {S,BS,BT}
-
-#   trialblock = blocks(trial)
-#   testblock = blocks(test)
-#   nblocks = length(trialblock)
-#   Tp = eltype(BT)*eltype(BT)
-#   array = Matrix{Tp}(undef,size(A))
-#   touched = A.touched
-#   for i = eachindex(array)
-#     if touched[i]
-#       itrial = fast_index(i,nblocks)
-#       itest = slow_index(i,nblocks)
-#       array[i] = combine_basis_time(A[i],trialblock[itrial],testblock[itest];kwargs...)
-#     end
-#   end
-# end
 
 function recast(r::BlockRBSpace,red_x::ParamBlockVector)
   block_red_x = map(blocks(red_x),blocks(r)) do red_x,r
