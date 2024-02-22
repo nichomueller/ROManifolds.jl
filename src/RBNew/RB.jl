@@ -31,7 +31,7 @@ export orth_complement!
 export orth_projection
 include("BasisConstruction.jl")
 
-export AbstractTransientSnapshots
+export AbstractSnapshots
 export BasicSnapshots
 export TransientSnapshots
 export TransientSnapshotsWithDirichletValues

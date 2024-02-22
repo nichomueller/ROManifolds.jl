@@ -20,7 +20,7 @@ end
 
 get_snapshots_filename(info::RBInfo) = info.dir * "/snapshots.jld"
 
-function DrWatson.save(info::RBInfo,s::AbstractTransientSnapshots)
+function DrWatson.save(info::RBInfo,s::AbstractSnapshots)
   serialize(get_snapshots_filename(info),s)
 end
 
@@ -61,7 +61,7 @@ end
 function rb_results(
   solver::RBSolver,
   feop::TransientParamFEOperator,
-  s::AbstractTransientSnapshots,
+  s::AbstractSnapshots,
   son_approx::TransientSnapshotsSwappedColumns,
   fem_stats::ComputationalStats,
   rb_stats::ComputationalStats,
@@ -123,7 +123,7 @@ end
 # plots
 
 function FESpaces.FEFunction(
-  fs::SingleFieldParamFESpace,s::AbstractTransientSnapshots{Mode1Axis})
+  fs::SingleFieldParamFESpace,s::AbstractSnapshots{Mode1Axis})
   r = get_realization(s)
   @assert FEM.length_free_values(fs) == length(r)
   free_values = _to_param_array(s.values)
@@ -132,7 +132,7 @@ function FESpaces.FEFunction(
 end
 
 function FESpaces.FEFunction(
-  fs::SingleFieldParamFESpace,s2::AbstractTransientSnapshots{Mode2Axis})
+  fs::SingleFieldParamFESpace,s2::AbstractSnapshots{Mode2Axis})
   @warn "This snapshot has a mode-2 representation, the resulting FEFunction(s) might be incorrect"
   s = change_mode(s2)
   FEFunction(fs,s)
@@ -140,7 +140,7 @@ end
 
 function _plot(
   trial::TransientTrialParamFESpace,
-  s::AbstractTransientSnapshots;
+  s::AbstractSnapshots;
   dir=pwd(),
   varname="u")
 

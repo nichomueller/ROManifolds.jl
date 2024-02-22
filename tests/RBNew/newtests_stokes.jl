@@ -10,6 +10,7 @@ using Gridap.ODEs.TransientFETools
 using Gridap.ODEs.ODETools
 using Gridap.Helpers
 using Gridap.MultiField
+using BlockArrays
 using DrWatson
 using Mabla.FEM
 using Mabla.RB
@@ -83,3 +84,12 @@ op = RBOperator(odeop,red_trial,red_test)
 # red_lhs,red_rhs = reduced_matrix_vector_form(rbsolver,op,snaps)
 smdeim = select_snapshots(snaps,RB.mdeim_params(info))
 contribs_mat,contribs_vec = fe_matrix_and_vector(rbsolver,op,smdeim)
+
+# x = get_values(smdeim)
+selected_indices = RB._get_selected_indices(smdeim)
+# SelectedSnapshotsAtIndices(mortar(smdeim.array),selected_indices)
+# mortar(smdeim.array)
+BlockArrays.sizes_from_blocks(first.(smdeim.array))
+
+ciao = map(get_values,smdeim.array)
+mortar(ciao)

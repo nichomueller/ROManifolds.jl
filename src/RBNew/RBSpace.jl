@@ -1,19 +1,24 @@
 function reduced_fe_space(
   info::RBInfo,
   feop::TransientParamFEOperator,
-  s::AbstractTransientSnapshots)
+  s::S) where S
 
   trial = get_trial(feop)
   test = get_test(feop)
   norm_matrix = get_norm_matrix(info,feop)
   soff = select_snapshots(s,offline_params(info))
   basis_space,basis_time = reduced_basis(soff,norm_matrix;ϵ=get_tol(info))
+  if info.compute_supremizers
+    supr_op = compute_supremizer_operator(feop)
+    basis_space = add_space_supremizers(basis_space,supr_op,norm_matrix)
+    basis_time = add_time_supremizers(basis_time)
+  end
   reduced_trial = RBSpace(trial,basis_space,basis_time)
   reduced_test = RBSpace(test,basis_space,basis_time)
   return reduced_trial,reduced_test
 end
 
-function reduced_basis(s::AbstractTransientSnapshots,args...;kwargs...)
+function reduced_basis(s::AbstractSnapshots,args...;kwargs...)
   basis_space,basis_time = compute_bases(s,args...;kwargs...)
   return basis_space,basis_time
 end
@@ -33,7 +38,7 @@ function reduced_basis(s::NnzSnapshots,args...;kwargs...)
 end
 
 function compute_bases(
-  s::AbstractTransientSnapshots,
+  s::AbstractSnapshots,
   norm_matrix=nothing;
   kwargs...)
 
@@ -210,35 +215,50 @@ const BlockRBSpace = RBSpace{S,BS,BT} where {
 
 function BlockArrays.blocks(r::BlockRBSpace)
   if isa(r.space,MultiFieldFESpace)
-    spaces = r.space.spaces
+    spaces = r.space
   else
-    spaces = r.space(nothing).spaces
+    spaces = evaluate(r.space,nothing)
   end
-  map(spaces,r.basis_space,r.basis_time) do fs,bs,bt
+  map(spaces.spaces,r.basis_space,r.basis_time) do fs,bs,bt
     RBSpace(fs,bs,bt)
   end
 end
 
-function reduced_fe_space(
-  info::BlockRBInfo,
-  feop::TransientParamFEOperator,
-  s::BlockSnapshots)
+function _allocate_basis_space(s::BlockSnapshots{S,N}) where {S,N}
+  Vector{Matrix{eltype(S)}}(undef,size(s,1))
+end
 
-  trial = get_trial(feop)
-  test = get_test(feop)
-  norm_matrix = get_norm_matrix(info,feop)
-  soff = select_snapshots(s,offline_params(info))
-  basis_space,basis_time = map(blocks(soff),norm_matrix) do soff,norm_matrix
-    reduced_basis(soff,norm_matrix;ϵ=get_tol(info))
-  end |> tuple_of_arrays
-  if info.compute_supremizers
-    supr_op = compute_supremizer_operator(feop)
-    basis_space = add_space_supremizers(basis_space,supr_op,norm_matrix)
-    basis_time = add_time_supremizers(basis_time)
+function _allocate_basis_space(s::AbstractSnapshots{M,T},ncols=1) where {M,T}
+  zeros(T,num_space_dofs(s),ncols)
+end
+
+function _allocate_basis_time(s::BlockSnapshots{S,N}) where {S,N}
+  Vector{Matrix{eltype(S)}}(undef,size(s,1))
+end
+
+function _allocate_basis_time(s::AbstractSnapshots{M,T},ncols=1) where {M,T}
+  zeros(T,num_times(s),ncols)
+end
+
+function reduced_basis(s::BlockSnapshots;kwargs...)
+  norm_matrix = ntuple(i->nothing,size(s,1))
+  reduced_basis(s,norm_matrix;kwargs...)
+end
+
+function reduced_basis(s::BlockSnapshots,norm_matrix;kwargs...)
+  basis_space = _allocate_basis_space(s)
+  basis_time = _allocate_basis_time(s)
+  for i = eachindex(s)
+    if s.touched[i]
+      bs,bt = reduced_basis(s.array[i],norm_matrix[i];kwargs...)
+    else
+      bs = _allocate_basis_space(s.array[i])
+      bt = _allocate_basis_time(s.array[i])
+    end
+    basis_space[i] = bs
+    basis_time[i] = bt
   end
-  reduced_trial = RBSpace(trial,basis_space,basis_time)
-  reduced_test = RBSpace(test,basis_space,basis_time)
-  return reduced_trial,reduced_test
+  return basis_space,basis_time
 end
 
 function add_space_supremizers(basis_space,supr_op,norm_matrix)

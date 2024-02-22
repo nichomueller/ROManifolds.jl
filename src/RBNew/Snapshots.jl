@@ -12,121 +12,121 @@
 struct Mode1Axis end
 struct Mode2Axis end
 
-abstract type AbstractTransientSnapshots{M,T} <: AbstractParamContainer{T,2} end
+abstract type AbstractSnapshots{M,T} <: AbstractParamContainer{T,2} end
 
-Base.ndims(::AbstractTransientSnapshots) = 2
-Base.ndims(::Type{<:AbstractTransientSnapshots}) = 2
-Base.IndexStyle(::Type{<:AbstractTransientSnapshots}) = IndexLinear()
+Base.ndims(::AbstractSnapshots) = 2
+Base.ndims(::Type{<:AbstractSnapshots}) = 2
+Base.IndexStyle(::Type{<:AbstractSnapshots}) = IndexLinear()
 
-FEM.get_values(s::AbstractTransientSnapshots) = s.values
-get_realization(s::AbstractTransientSnapshots) = s.realization
-get_mode(s::AbstractTransientSnapshots) = s.mode
+FEM.get_values(s::AbstractSnapshots) = s.values
+get_realization(s::AbstractSnapshots) = s.realization
+get_mode(s::AbstractSnapshots) = s.mode
 
-FEM.num_times(s::AbstractTransientSnapshots) = num_times(get_realization(s))
-FEM.num_params(s::AbstractTransientSnapshots) = num_params(get_realization(s))
-num_rows(s::AbstractTransientSnapshots{Mode1Axis}) = num_space_dofs(s)
-num_rows(s::AbstractTransientSnapshots{Mode2Axis}) = num_times(s)
-num_cols(s::AbstractTransientSnapshots{Mode1Axis}) = num_times(s)*num_params(s)
-num_cols(s::AbstractTransientSnapshots{Mode2Axis}) = num_space_dofs(s)*num_params(s)
+FEM.num_times(s::AbstractSnapshots) = num_times(get_realization(s))
+FEM.num_params(s::AbstractSnapshots) = num_params(get_realization(s))
+num_rows(s::AbstractSnapshots{Mode1Axis}) = num_space_dofs(s)
+num_rows(s::AbstractSnapshots{Mode2Axis}) = num_times(s)
+num_cols(s::AbstractSnapshots{Mode1Axis}) = num_times(s)*num_params(s)
+num_cols(s::AbstractSnapshots{Mode2Axis}) = num_space_dofs(s)*num_params(s)
 
-Base.length(s::AbstractTransientSnapshots) = num_rows(s)*num_cols(s)
-Base.size(s::AbstractTransientSnapshots) = (num_rows(s),num_cols(s))
-Base.axes(s::AbstractTransientSnapshots) = Base.OneTo.(size(s))
-Base.eltype(::AbstractTransientSnapshots{M,T}) where {M,T} = T
-Base.eltype(::Type{<:AbstractTransientSnapshots{M,T}}) where {M,T} = T
+Base.length(s::AbstractSnapshots) = num_rows(s)*num_cols(s)
+Base.size(s::AbstractSnapshots) = (num_rows(s),num_cols(s))
+Base.axes(s::AbstractSnapshots) = Base.OneTo.(size(s))
+Base.eltype(::AbstractSnapshots{M,T}) where {M,T} = T
+Base.eltype(::Type{<:AbstractSnapshots{M,T}}) where {M,T} = T
 
 slow_index(i,N::Int) = Int.(floor.((i .- 1) ./ N) .+ 1)
 slow_index(i::Colon,::Int) = i
 fast_index(i,N::Int) = mod.(i .- 1,N) .+ 1
 fast_index(i::Colon,::Int) = i
 
-function col_index(s::AbstractTransientSnapshots,mode2_index,param_index)
+function col_index(s::AbstractSnapshots,mode2_index,param_index)
   (mode2_index .- 1)*num_params(s) .+ param_index
 end
-function col_index(s::AbstractTransientSnapshots,mode2_index::AbstractVector,param_index::AbstractVector)
+function col_index(s::AbstractSnapshots,mode2_index::AbstractVector,param_index::AbstractVector)
   vec(transpose((mode2_index.-1)*num_params(s) .+ collect(param_index)'))
 end
-function col_index(s::AbstractTransientSnapshots{Mode1Axis},::Colon,param_index)
+function col_index(s::AbstractSnapshots{Mode1Axis},::Colon,param_index)
   col_index(s,1:num_times(s),param_index)
 end
-function col_index(s::AbstractTransientSnapshots{Mode2Axis},::Colon,param_index)
+function col_index(s::AbstractSnapshots{Mode2Axis},::Colon,param_index)
   col_index(s,1:num_space_dofs(s),param_index)
 end
-function col_index(s::AbstractTransientSnapshots{Mode1Axis},::Colon,::Colon)
+function col_index(s::AbstractSnapshots{Mode1Axis},::Colon,::Colon)
   col_index(s,1:num_times(s),1:num_params(s))
 end
-function col_index(s::AbstractTransientSnapshots{Mode2Axis},::Colon,::Colon)
+function col_index(s::AbstractSnapshots{Mode2Axis},::Colon,::Colon)
   col_index(s,1:num_space_dofs(s),1:num_params(s))
 end
 
-function Base.getindex(s::AbstractTransientSnapshots,i)
+function Base.getindex(s::AbstractSnapshots,i)
   nrow = num_rows(s)
   irow = fast_index(i,nrow)
   icol = slow_index(i,nrow)
   getindex(s,irow,icol)
 end
 
-function Base.getindex(s::AbstractTransientSnapshots,k::CartesianIndex)
+function Base.getindex(s::AbstractSnapshots,k::CartesianIndex)
   ispace,j = k.I
   getindex(s,ispace,j)
 end
 
-function Base.getindex(s::AbstractTransientSnapshots{Mode1Axis},ispace,j)
+function Base.getindex(s::AbstractSnapshots{Mode1Axis},ispace,j)
   np = num_params(s)
   itime = slow_index(j,np)
   iparam = fast_index(j,np)
   tensor_getindex(s,ispace,itime,iparam)
 end
 
-function Base.getindex(s::AbstractTransientSnapshots{Mode2Axis},itime,j)
+function Base.getindex(s::AbstractSnapshots{Mode2Axis},itime,j)
   np = num_params(s)
   ispace = slow_index(j,np)
   iparam = fast_index(j,np)
   tensor_getindex(s,ispace,itime,iparam)
 end
 
-function tensor_getindex(s::AbstractTransientSnapshots,ispace,itime,iparam)
+function tensor_getindex(s::AbstractSnapshots,ispace,itime,iparam)
   view(s,ispace,col_index(s,itime,iparam))
 end
 
-function Base.setindex!(s::AbstractTransientSnapshots,v,i)
+function Base.setindex!(s::AbstractSnapshots,v,i)
   nrow = num_rows(s)
   irow = fast_index(i,nrow)
   icol = slow_index(i,nrow)
   setindex!(s,v,irow,icol)
 end
 
-function Base.setindex!(s::AbstractTransientSnapshots,v,k::CartesianIndex)
+function Base.setindex!(s::AbstractSnapshots,v,k::CartesianIndex)
   ispace,j = k.I
   setindex!(s,v,ispace,j)
 end
 
-function Base.setindex!(s::AbstractTransientSnapshots{Mode1Axis},v,ispace,j)
+function Base.setindex!(s::AbstractSnapshots{Mode1Axis},v,ispace,j)
   np = num_params(s)
   itime = slow_index(j,np)
   iparam = fast_index(j,np)
   tensor_setindex!(s,v,ispace,itime,iparam)
 end
 
-function Base.setindex!(s::AbstractTransientSnapshots{Mode2Axis},v,itime,j)
+function Base.setindex!(s::AbstractSnapshots{Mode2Axis},v,itime,j)
   np = num_params(s)
   ispace = slow_index(j,np)
   iparam = fast_index(j,np)
   tensor_setindex!(s,v,ispace,itime,iparam)
 end
 
-function tensor_setindex!(s::AbstractTransientSnapshots,v,ispace,itime,iparam)
+function tensor_setindex!(s::AbstractSnapshots,v,ispace,itime,iparam)
   si = view(s,ispace,col_index(s,itime,iparam))
   si = v
 end
 
-function compress(s::AbstractTransientSnapshots{Mode1Axis},a::AbstractMatrix)
+function compress(s::AbstractSnapshots{Mode1Axis},a::AbstractMatrix)
   @fastmath compressed_values = a'*s
   r = get_realization(s)
   Snapshots(compressed_values,r,Mode1Axis())
 end
 
-function compress(s::AbstractTransientSnapshots{Mode2Axis},a::AbstractMatrix)
+function compress(s::AbstractSnapshots{Mode2Axis},a::AbstractMatrix)
   @fastmath compressed_values = a'*s
   r = get_realization(s)
   compressed_realization = r[:,axes(a,2)]
@@ -141,14 +141,14 @@ function Snapshots(a::ArrayContribution,args...)
   b
 end
 
-struct BasicSnapshots{M,T,P,R} <: AbstractTransientSnapshots{M,T}
+struct BasicSnapshots{M,T,P,R} <: AbstractSnapshots{M,T}
   mode::M
   values::P
   realization::R
   function BasicSnapshots(
-    mode::M,
     values::P,
-    realization::R
+    realization::R,
+    mode::M=Mode1Axis(),
     ) where {M,P<:AbstractParamContainer,R}
 
     T = eltype(P)
@@ -160,23 +160,18 @@ function BasicSnapshots(s::BasicSnapshots)
   s
 end
 
-function Snapshots(
-  values::P,
-  realization::R,
-  mode::M=Mode1Axis()
-  ) where {M,P<:AbstractParamContainer,R}
-
-  BasicSnapshots(mode,values,realization)
+function Snapshots(values::AbstractParamContainer,args...)
+  BasicSnapshots(values,args...)
 end
 
 num_space_dofs(s::BasicSnapshots) = length(first(s.values))
 
 function change_mode(s::BasicSnapshots{Mode1Axis})
-  BasicSnapshots(Mode2Axis(),s.values,s.realization)
+  BasicSnapshots(s.values,s.realization,Mode2Axis())
 end
 
 function change_mode(s::BasicSnapshots{Mode2Axis})
-  BasicSnapshots(Mode1Axis(),s.values,s.realization)
+  BasicSnapshots(s.values,s.realization,Mode1Axis())
 end
 
 function tensor_getindex(s::BasicSnapshots,ispace::Integer,itime::Integer,iparam::Integer)
@@ -187,14 +182,14 @@ function tensor_setindex!(s::BasicSnapshots,v,ispace::Integer,itime::Integer,ipa
   s.values[iparam+(itime-1)*num_params(s)][ispace] = v
 end
 
-struct TransientSnapshots{M,T,P,R,V} <: AbstractTransientSnapshots{M,T}
+struct TransientSnapshots{M,T,P,R,V} <: AbstractSnapshots{M,T}
   mode::M
   values::V
   realization::R
   function TransientSnapshots(
-    mode::M,
     values::AbstractVector{P},
-    realization::R
+    realization::R,
+    mode::M=Mode1Axis(),
     ) where {M,P<:AbstractParamContainer,R<:TransientParamRealization}
 
     V = typeof(values)
@@ -203,23 +198,18 @@ struct TransientSnapshots{M,T,P,R,V} <: AbstractTransientSnapshots{M,T}
   end
 end
 
-function Snapshots(
-  values::AbstractVector{P},
-  realization::R,
-  mode::M=Mode1Axis()
-  ) where {M,P<:AbstractParamContainer,R}
-
-  TransientSnapshots(mode,values,realization)
+function Snapshots(values::AbstractVector{P},args...) where P
+  TransientSnapshots(values,args...)
 end
 
 num_space_dofs(s::TransientSnapshots) = length(first(first(s.values)))
 
 function change_mode(s::TransientSnapshots{Mode1Axis})
-  TransientSnapshots(Mode2Axis(),s.values,s.realization)
+  TransientSnapshots(s.values,s.realization,Mode2Axis())
 end
 
 function change_mode(s::TransientSnapshots{Mode2Axis})
-  TransientSnapshots(Mode1Axis(),s.values,s.realization)
+  TransientSnapshots(s.values,s.realization,Mode1Axis())
 end
 
 function tensor_getindex(s::TransientSnapshots,ispace::Integer,itime::Integer,iparam::Integer)
@@ -243,47 +233,42 @@ function BasicSnapshots(
     array[i] = s.values[it][ip]
   end
   basic_values = ParamArray(array)
-  BasicSnapshots(s.mode,basic_values,s.realization)
+  BasicSnapshots(basic_values,s.realization,s.mode)
 end
 
 function FEM.get_values(s::TransientSnapshots)
   get_values(BasicSnapshots(s))
 end
 
-struct CompressedTransientSnapshots{M,N,T,R,V} <: AbstractTransientSnapshots{M,T}
+struct CompressedTransientSnapshots{M,N,T,R,V} <: AbstractSnapshots{M,T}
   current_mode::M
   initial_mode::N
   values::V
   realization::R
   function CompressedTransientSnapshots(
-    current_mode::M,
-    initial_mode::N,
     values::AbstractMatrix{T},
-    realization::R) where {M,N,T,R}
+    realization::R,
+    current_mode::M=Mode1Axis(),
+    initial_mode::N=Mode1Axis()) where {M,N,T,R}
 
     V = typeof(values)
     new{M,N,T,R,V}(current_mode,initial_mode,values,realization)
   end
 end
 
-function Snapshots(
-  values::AbstractMatrix{T},
-  realization::R,
-  mode::M=Mode1Axis()
-  ) where {M,T,R}
-
-  CompressedTransientSnapshots(mode,mode,values,realization)
+function Snapshots(values::AbstractMatrix{T},args...) where T
+  CompressedTransientSnapshots(values,args...)
 end
 
 num_space_dofs(s::CompressedTransientSnapshots{M,Mode1Axis}) where M = size(s.values,1)
 num_space_dofs(s::CompressedTransientSnapshots{M,Mode2Axis}) where M = Int(size(s.values,2) / num_params(s))
 
 function change_mode(s::CompressedTransientSnapshots{Mode1Axis})
-  CompressedTransientSnapshots(Mode2Axis(),Mode1Axis(),s.values,s.realization)
+  CompressedTransientSnapshots(s.values,s.realization,Mode2Axis(),Mode1Axis())
 end
 
 function change_mode(s::CompressedTransientSnapshots{Mode2Axis})
-  CompressedTransientSnapshots(Mode1Axis(),Mode2Axis(),s.values,s.realization)
+  CompressedTransientSnapshots(s.values,s.realization,Mode1Axis(),Mode2Axis())
 end
 
 column_index(a,b,Na,Nb) = (a-1)*Nb+b
@@ -353,17 +338,17 @@ function recast(s::CompressedTransientSnapshots{Mode1Axis},a::AbstractMatrix)
   Snapshots(param_array_values,s.realization,Mode1Axis())
 end
 
-function recast_compress(s::AbstractTransientSnapshots{Mode1Axis},a::AbstractMatrix)
+function recast_compress(s::AbstractSnapshots{Mode1Axis},a::AbstractMatrix)
   s_compress = compress(s,a)
   s_recast_compress = recast(s_compress,a)
   s_recast_compress
 end
 
-struct TransientSnapshotsWithDirichletValues{M,T,P,S} <: AbstractTransientSnapshots{M,T}
+struct TransientSnapshotsWithDirichletValues{M,T,P,S} <: AbstractSnapshots{M,T}
   snaps::S
   dirichlet_values::P
   function TransientSnapshotsWithDirichletValues(
-    snaps::AbstractTransientSnapshots{M,T},
+    snaps::AbstractSnapshots{M,T},
     dirichlet_values::P
     ) where {M,T,P<:AbstractParamContainer}
 
@@ -397,11 +382,11 @@ function tensor_setindex!(s::TransientSnapshotsWithDirichletValues,v,ispace,itim
   end
 end
 
-struct SelectedSnapshotsAtIndices{M,T,S,I} <: AbstractTransientSnapshots{M,T}
+struct SelectedSnapshotsAtIndices{M,T,S,I} <: AbstractSnapshots{M,T}
   snaps::S
   selected_indices::I
   function SelectedSnapshotsAtIndices(
-    snaps::AbstractTransientSnapshots{M,T},
+    snaps::AbstractSnapshots{M,T},
     selected_indices::I
     ) where {M,T,I}
 
@@ -419,7 +404,7 @@ function SelectedSnapshotsAtIndices(s::SelectedSnapshotsAtIndices,selected_indic
   SelectedSnapshotsAtIndices(s.snaps,selected_indices)
 end
 
-function select_snapshots(s::AbstractTransientSnapshots,spacerange,timerange,paramrange)
+function select_snapshots(s::AbstractSnapshots,spacerange,timerange,paramrange)
   srange = isa(spacerange,Colon) ? Base.OneTo(num_space_dofs(s)) : spacerange
   srange = isa(srange,Integer) ? [srange] : srange
   trange = isa(timerange,Colon) ? Base.OneTo(num_times(s)) : timerange
@@ -430,15 +415,15 @@ function select_snapshots(s::AbstractTransientSnapshots,spacerange,timerange,par
   SelectedSnapshotsAtIndices(s,selected_indices)
 end
 
-function select_snapshots(s::AbstractTransientSnapshots,timerange,paramrange;spacerange=:)
+function select_snapshots(s::AbstractSnapshots,timerange,paramrange;spacerange=:)
   select_snapshots(s,spacerange,timerange,paramrange)
 end
 
-function select_snapshots(s::AbstractTransientSnapshots,paramrange;spacerange=:,timerange=:)
+function select_snapshots(s::AbstractSnapshots,paramrange;spacerange=:,timerange=:)
   select_snapshots(s,spacerange,timerange,paramrange)
 end
 
-function select_snapshots(s::AbstractTransientSnapshots;kwargs...)
+function select_snapshots(s::AbstractSnapshots;kwargs...)
   paramrange = isa(s,SelectedSnapshotsAtIndices) ? last(s.selected_indices) : Colon()
   select_snapshots(s,paramrange;kwargs...)
 end
@@ -500,7 +485,7 @@ function BasicSnapshots(s::SelectedSnapshotsAtIndices{Mode1Axis,T,<:BasicSnapsho
   values = get_values(s)
   r = get_realization(s)
   mode = s.snaps.mode
-  BasicSnapshots(mode,values,r)
+  BasicSnapshots(values,r,mode)
 end
 
 function BasicSnapshots(s::SelectedSnapshotsAtIndices{Mode1Axis,T,<:TransientSnapshots}) where T
@@ -514,7 +499,7 @@ function BasicSnapshots(s::SelectedSnapshotsAtIndices{Mode1Axis,T,<:TransientSna
   end
   r = get_realization(s)
   mode = s.snaps.mode
-  BasicSnapshots(mode,ParamArray(basic_values),r)
+  BasicSnapshots(ParamArray(basic_values),r,mode)
 end
 
 #= mode-1 representation of a snapshot of type TransientSnapshotsSwappedColumns
@@ -528,7 +513,7 @@ end
    [ [u(x1,tT,μ1) ⋯ u(xN,tT,μ1)] [u(x1,tT,μ2) ⋯ u(xN,tT,μ2)] [u(x1,tT,μ3) ⋯] [⋯] [u(x1,tT,μP) ⋯ u(xN,tT,μP)] ]
 =#
 
-abstract type TransientSnapshotsSwappedColumns{T} <: AbstractTransientSnapshots{Mode1Axis,T} end
+abstract type TransientSnapshotsSwappedColumns{T} <: AbstractSnapshots{Mode1Axis,T} end
 
 num_space_dofs(s::TransientSnapshotsSwappedColumns) = length(first(first(s.values)))
 
@@ -568,7 +553,7 @@ struct InnerTimeOuterParamTransientSnapshots{T,P,R,V} <: TransientSnapshotsSwapp
   end
 end
 
-function reverse_snapshots(s::AbstractTransientSnapshots)
+function reverse_snapshots(s::AbstractSnapshots)
   @abstractmethod
 end
 
@@ -821,132 +806,161 @@ function recast(s::NnzSnapshots{Mode1Axis},a::AbstractMatrix)
   return Snapshots(ParamArray(asparse),r1,s.mode)
 end
 
-const BasicBlockSnapshots = BasicSnapshots{M,T,P,R} where {M,T,P<:ParamBlockArray,R}
-const TransientBlockSnapshots = TransientSnapshots{M,T,P,R} where {M,T,P<:ParamBlockArray,R}
-const SelectedBlockSnapshotsAtIndices = SelectedSnapshotsAtIndices{M,T,S,I} where {M,T,S<:Union{BasicBlockSnapshots,TransientBlockSnapshots},I}
-const GenericBlockSnapshots = Union{
-  BasicBlockSnapshots{M,T},
-  TransientBlockSnapshots{M,T},
-  SelectedBlockSnapshotsAtIndices{M,T}} where {M,T}
+struct BlockSnapshots{S,N}
+  array::Array{S,N}
+  touched::Array{Bool,N}
+  function BlockSnapshots(
+    array::Array{S,N},
+    touched::Array{Bool,N}) where {S<:AbstractSnapshots,N}
 
-const InnerTimeOuterParamTransientBlockSnapshots = InnerTimeOuterParamTransientSnapshots{T,P,R} where {T,P<:ParamBlockArray,R}
-const SelectedInnerTimeOuterParamTransientBlockSnapshots = SelectedInnerTimeOuterParamTransientSnapshots{T,S} where {T,S<:InnerTimeOuterParamTransientBlockSnapshots}
-const BlockSnapshotsSwappedColumns = Union{
-  InnerTimeOuterParamTransientBlockSnapshots{T},
-  SelectedInnerTimeOuterParamTransientBlockSnapshots{T}
-} where T
+    @check size(array) == size(touched)
+    new{S,N}(array,touched)
+  end
+end
 
-const BlockSnapshots = Union{
-  GenericBlockSnapshots{M,T},
-  BlockSnapshotsSwappedColumns{T}} where {M,T}
+function Snapshots(values::ParamBlockArray,args...)
+  block_values = blocks(values)
+  touched = map(!iszero,block_values)
+  array = map(eachindex(touched)) do i
+    if touched[i]
+      Snapshots(block_values[i],args...)
+    end
+  end
+  BlockSnapshots(array,touched)
+end
 
-BlockArrays.blocklength(s::BlockSnapshots) = blocklength(_get_values(s))
+function Snapshots(values::AbstractVector{<:ParamBlockArray},args...)
+  block_values = map(blocks,values)
+  touched = map(!iszero,blocks(first(values)))
+  array = map(eachindex(touched)) do i
+    if touched[i]
+      block_i = map(x->getindex(x,i),block_values)
+      Snapshots(block_i,args...)
+    end
+  end
+  BlockSnapshots(array,touched)
+end
 
-_get_values(s::BlockSnapshots) = s.values # just here as a helper
-_get_snaps(s::BlockSnapshots) = s.snaps # just here as a helper
-function _get_offsets(blocks::AbstractArray) # just here as a helper
-  offsets = zeros(Int,length(blocks))
-  for (n,block) in enumerate(blocks[2:end])
-    offsets[n+1] = offsets[n] + num_space_dofs(block[n])
+Base.size(s::BlockSnapshots,i...) = size(s.array,i...)
+Base.length(s::BlockSnapshots) = length(s.array)
+Base.eltype(::Type{<:BlockSnapshots{S}}) where S = S
+Base.eltype(s::BlockSnapshots{S}) where S = S
+Base.ndims(s::BlockSnapshots{S,N}) where {S,N} = N
+Base.ndims(::Type{BlockSnapshots{S,N}}) where {S,N} = N
+Base.copy(s::BlockSnapshots) = BlockSnapshots(copy(s.array),copy(s.touched))
+Base.eachindex(s::BlockSnapshots) = eachindex(s.array)
+function Base.getindex(s::BlockSnapshots,i...)
+  if !a.touched[i...]
+    return nothing
+  end
+  s.array[i...]
+end
+function Base.setindex!(s::BlockSnapshots,v,i...)
+  @check s.touched[i...] "Only touched entries can be set"
+  s.array[i...] = v
+end
+
+function Arrays.testitem(s::BlockSnapshots)
+  i = findall(s.touched)
+  if length(i) != 0
+    s.array[i[1]]
+  else
+    error("This block snapshots structure is empty")
+  end
+end
+
+function get_values(s::BlockSnapshots)
+  map(get_values,s.array) |> mortar
+end
+
+function get_realization(s::BlockSnapshots)
+  get_realization(testitem(s))
+end
+
+function get_mode(s::BlockSnapshots)
+  get_mode(testitem(s))
+end
+
+function select_snapshots(s::BlockSnapshots{<:Any,N},args...;kwargs...) where N
+  S = typeof(select_snapshots(testitem(s),args...;kwargs...))
+  array = Array{S,N}(undef,size(s))
+  touched = s.touched
+  for i = eachindex(array)
+    if touched[i]
+      array[i] = select_snapshots(s.array[i],args...;kwargs...)
+    end
+  end
+  BlockSnapshots(array,touched)
+end
+
+function reverse_snapshots(s::BlockSnapshots{<:Any,N}) where N
+  S = typeof(reverse_snapshots(testitem(s)))
+  array = Array{S,N}(undef,size(s))
+  touched = s.touched
+  for i = eachindex(array)
+    if touched[i]
+      array[i] = reverse_snapshots(s.array[i])
+    end
+  end
+  BlockSnapshots(array,touched)
+end
+
+# implement mortar
+
+function _get_offsets(s::BlockSnapshots) # just here as a helper for selected snapshots
+  n = size(s.array,1)
+  offsets = zeros(Int,n)
+  for i = 1:n-1
+    offsets[i+1] = offsets[i] + num_space_dofs(s.array[i])
   end
   return offsets
 end
-function _get_selected_indices(blocks::AbstractArray{<:AbstractTransientSnapshots}) # just here as a helper
-  s1 = first(blocks)
+
+function _get_selected_indices(s::BlockSnapshots) # just here as a helper for selected snapshots
+  s1 = testitem(s)
   _,ids_time,ids_param = s1.selected_indices
-  offsets = _get_offsets(blocks)
-  ids_space = map(blocks,offsets) do s,offset
-    _ids_space,_ids_time,_ids_param = s.selected_indices
+  offsets = _get_offsets(s)
+  ids_space = map(enumerate(offsets)) do (i,offset)
+    _ids_space,_ids_time,_ids_param = s.array[i].selected_indices
     @check ids_time == _ids_time
     @check ids_param == _ids_param
     _ids_space .+ offset
   end
-  ids_space,ids_time,ids_param
-end
-function _get_selected_indices(s::BlockSnapshots) # just here as a helper
-  get_blocks(s::BasicSnapshots) = blocks(first(s.values))
-  get_blocks(s::TransientSnapshots) = blocks(first(first(s.values)))
-  val_blocks = get_blocks(s.snaps)
-  ax = map(x->axes(x,1),val_blocks)
-  offsets = zeros(Int,length(val_blocks))
-  for (n,block) in enumerate(val_blocks[2:end])
-    offsets[n+1] = offsets[n] + size(block[n],1)
-  end
-  _ids_space,ids_time,ids_param = s.selected_indices
-  map(ax,offsets) do axis,offset
-    ids_space = intersect(axis,_ids_space .- offset)
-    ids_space,ids_time,ids_param
-  end
+  vcat(ids_space...),ids_time,ids_param
 end
 
-function BlockArrays.blocks(s::BasicBlockSnapshots)
-  map(blocks(s.values)) do values
-    BasicSnapshots(s.mode,values,s.realization)
-  end
+function BlockArrays.mortar(s::BlockSnapshots)
+  values = get_values(s)
+  r = get_realization(s)
+  mode = get_mode(s)
+  Snapshots(values,r,mode)
 end
 
-function BlockArrays.mortar(blocks::AbstractArray{<:BasicSnapshots})
-  s1 = first(blocks)
-  BasicSnapshots(mortar(map(_get_values,blocks)),s1.realization,s1.mode)
-end
-
-function BlockArrays.blocks(s::TransientBlockSnapshots)
-  block_values = map(blocks,s.values)
-  nblocks = blocklength(first(s.values))
-  map(1:nblocks) do i
-    TransientSnapshots(s.mode,map(x->getindex(x,i),block_values),s.realization)
-  end
-end
-
-function BlockArrays.mortar(blocks::AbstractArray{<:TransientSnapshots})
-  s1 = first(blocks)
-  TransientSnapshots(map(mortar,map(_get_values,blocks)),s1.realization,s1.mode)
-end
-
-function BlockArrays.blocks(s::SelectedBlockSnapshotsAtIndices)
+function BlockArrays.mortar(s::BlockSnapshots{<:SelectedSnapshotsAtIndices})
+  values = get_values(s)
   selected_indices = _get_selected_indices(s)
-  map(blocks(s.snaps),selected_indices) do snaps,selected_indices
-    SelectedSnapshotsAtIndices(snaps,selected_indices)
-  end
+  SelectedSnapshotsAtIndices(values,selected_indices)
 end
 
-function BlockArrays.mortar(blocks::AbstractArray{<:SelectedSnapshotsAtIndices})
-  selected_indices = _get_selected_indices(blocks)
-  SelectedSnapshotsAtIndices(mortar(map(_get_snaps,blocks)),selected_indices)
+function BlockArrays.mortar(s::BlockSnapshots{<:InnerTimeOuterParamTransientSnapshots})
+  values = get_values(s)
+  r = get_realization(s)
+  InnerTimeOuterParamTransientSnapshots(values,r)
 end
 
-function BlockArrays.blocks(s::InnerTimeOuterParamTransientBlockSnapshots{T,<:ParamBlockArray}) where T
-  block_values = map(blocks,s.values)
-  nblocks = blocklength(first(s.values))
-  map(1:nblocks) do i
-    InnerTimeOuterParamTransientSnapshots(map(x->getindex(x,i),block_values),s.realization)
-  end
-end
-
-function BlockArrays.mortar(blocks::AbstractArray{<:InnerTimeOuterParamTransientSnapshots})
-  s1 = first(blocks)
-  InnerTimeOuterParamTransientSnapshots(map(mortar,map(_get_values,blocks)),s1.realization)
-end
-
-function BlockArrays.blocks(s::SelectedInnerTimeOuterParamTransientBlockSnapshots)
+function BlockArrays.mortar(s::BlockSnapshots{<:SelectedInnerTimeOuterParamTransientSnapshots})
+  values = get_values(s)
   selected_indices = _get_selected_indices(s)
-  map(blocks(s.snaps),selected_indices) do snaps,selected_indices
-    SelectedInnerTimeOuterParamTransientSnapshots(snaps,selected_indices)
-  end
-end
-
-function BlockArrays.mortar(blocks::AbstractArray{<:SelectedInnerTimeOuterParamTransientSnapshots})
-  selected_indices = _get_selected_indices(blocks)
-  SelectedInnerTimeOuterParamTransientSnapshots(mortar(map(_get_snaps,blocks)),selected_indices)
+  SelectedInnerTimeOuterParamTransientSnapshots(values,selected_indices)
 end
 
 const AbstractSubTransientSnapshots = Union{
-  AbstractTransientSnapshots{M,T},
-  SubArray{T,2,AbstractTransientSnapshots{M,T}}
+  AbstractSnapshots{M,T},
+  SubArray{T,2,AbstractSnapshots{M,T}}
   } where {M,T}
 
 function (*)(
-  a::Adjoint{<:Any,<:AbstractTransientSnapshots},
+  a::Adjoint{<:Any,<:AbstractSnapshots},
   b::AbstractMatrix
   )
 
@@ -955,22 +969,22 @@ end
 
 function (*)(
   a::Adjoint{<:Any,<:AbstractVecOrMat},
-  b::AbstractTransientSnapshots
+  b::AbstractSnapshots
   )
 
   (*)(a,collect(b))
 end
 
 function (*)(
-  a::Adjoint{<:Any,<:AbstractTransientSnapshots},
-  b::AbstractTransientSnapshots
+  a::Adjoint{<:Any,<:AbstractSnapshots},
+  b::AbstractSnapshots
   )
 
   (*)(collect(a),collect(b))
 end
 
 function (*)(
-  a::Adjoint{<:Any,<:AbstractTransientSnapshots},
+  a::Adjoint{<:Any,<:AbstractSnapshots},
   b::Diagonal
   )
 
@@ -979,7 +993,7 @@ end
 
 function (*)(
   a::Diagonal,
-  b::AbstractTransientSnapshots
+  b::AbstractSnapshots
   )
 
   (*)(a,collect(b))
