@@ -154,8 +154,6 @@ export get_parent_dir
 export correct_path
 include("ParamVisualization.jl")
 
-export get_order
-export get_L2_norm_matrix
-export get_H1_norm_matrix
-include("FEUtils.jl")
+export get_parent
+include("TriangulationParents.jl")
 end # module

@@ -84,12 +84,16 @@ op = RBOperator(odeop,red_trial,red_test)
 # red_lhs,red_rhs = reduced_matrix_vector_form(rbsolver,op,snaps)
 smdeim = select_snapshots(snaps,RB.mdeim_params(info))
 contribs_mat,contribs_vec = fe_matrix_and_vector(rbsolver,op,smdeim)
+red_mat = RB.reduced_matrix_form(rbsolver,op,contribs_mat)
+red_vec = RB.reduced_vector_form(rbsolver,op,contribs_vec)
 
-# x = get_values(smdeim)
-selected_indices = RB._get_selected_indices(smdeim)
-# SelectedSnapshotsAtIndices(mortar(smdeim.array),selected_indices)
-# mortar(smdeim.array)
-BlockArrays.sizes_from_blocks(first.(smdeim.array))
+using PartitionedArrays
+v = get_values(contribs_vec)[1]
+test = get_test(op)
+fe_test = get_fe_test(op)
+touched = smdeim.touched
+ads,red_trians = map(findall(touched)) do i
+  RB.reduced_form(info,fe_test[i],smdeim.array[i],Ω,test[i])
+end |> tuple_of_arrays
 
-ciao = map(get_values,smdeim.array)
-mortar(ciao)
+ad1 = ads[1]

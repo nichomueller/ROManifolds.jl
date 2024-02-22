@@ -440,6 +440,12 @@ function ODETools.jacobians!(
   A
 end
 
+# interface to accommodate the separation of terms depending on the linearity/nonlinearity
+struct LinearNonlinearTransientParamFEOperator{T<:OperatorType} <: TransientParamFEOperator{T}
+  op_linear::TransientParamFEOperator{T}
+  op_nonlinear::TransientParamFEOperator{T}
+end
+
 function TransientFETools.test_transient_fe_operator(op::TransientParamFEOperator,uh,μt)
   odeop = get_algebraic_operator(op)
   @test isa(odeop,ODEParamOperator)

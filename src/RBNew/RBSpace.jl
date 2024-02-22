@@ -210,70 +210,53 @@ function recast(red_x::ParamVector,r::RBSpace)
 end
 
 # multi field interface
-const BlockRBSpace = RBSpace{S,BS,BT} where {
-  S,BS<:AbstractVector{<:AbstractMatrix},BT<:AbstractVector{<:AbstractMatrix}}
+const BlockRBSpace = RBSpace{S,BS,BT} where {S,BS<:ArrayBlock,BT<:ArrayBlock}
 
 function BlockArrays.blocks(r::BlockRBSpace)
-  if isa(r.space,MultiFieldFESpace)
-    spaces = r.space
+  @unpack space,basis_space,basis_time = r
+  @check basis_space.touched == basis_time.touched
+  if isa(space,MultiFieldFESpace)
+    fs = space
   else
-    spaces = evaluate(r.space,nothing)
+    fs = evaluate(space,nothing)
   end
-  map(spaces.spaces,r.basis_space,r.basis_time) do fs,bs,bt
-    RBSpace(fs,bs,bt)
+  map(findall(basis_space.touched)) do i
+    RBSpace(fs.spaces[i],basis_space[i],basis_time[i])
   end
-end
-
-function _allocate_basis_space(s::BlockSnapshots{S,N}) where {S,N}
-  Vector{Matrix{eltype(S)}}(undef,size(s,1))
-end
-
-function _allocate_basis_space(s::AbstractSnapshots{M,T},ncols=1) where {M,T}
-  zeros(T,num_space_dofs(s),ncols)
-end
-
-function _allocate_basis_time(s::BlockSnapshots{S,N}) where {S,N}
-  Vector{Matrix{eltype(S)}}(undef,size(s,1))
-end
-
-function _allocate_basis_time(s::AbstractSnapshots{M,T},ncols=1) where {M,T}
-  zeros(T,num_times(s),ncols)
 end
 
 function reduced_basis(s::BlockSnapshots;kwargs...)
-  norm_matrix = ntuple(i->nothing,size(s,1))
+  norm_matrix = ntuple(i->nothing,length(s))
   reduced_basis(s,norm_matrix;kwargs...)
 end
 
 function reduced_basis(s::BlockSnapshots,norm_matrix;kwargs...)
-  basis_space = _allocate_basis_space(s)
-  basis_time = _allocate_basis_time(s)
+  s2 = change_mode(s)
+  basis_space = allocate_in_range(s)
+  basis_time = allocate_in_range(s2)
   for i = eachindex(s)
     if s.touched[i]
       bs,bt = reduced_basis(s.array[i],norm_matrix[i];kwargs...)
-    else
-      bs = _allocate_basis_space(s.array[i])
-      bt = _allocate_basis_time(s.array[i])
+      basis_space.array[i] = bs
+      basis_time.array[i] = bt
     end
-    basis_space[i] = bs
-    basis_time[i] = bt
   end
   return basis_space,basis_time
 end
 
 function add_space_supremizers(basis_space,supr_op,norm_matrix)
   @check length(basis_space) == 2 "Have to extend this if dealing with more than 2 equations"
-  basis_primal,basis_dual = basis_space
+  basis_primal,basis_dual = basis_space.array
   norm_matrix_primal = first(norm_matrix)
   supr_i = supr_op * basis_dual
   gram_schmidt!(supr_i,basis_primal,norm_matrix_primal)
   basis_primal = hcat(basis_primal,supr_i)
-  return [basis_primal,basis_dual]
+  return ArrayBlock([basis_primal,basis_dual],basis_space.touched)
 end
 
 function add_time_supremizers(basis_time;tol=1e-2)
   @check length(basis_time) == 2 "Have to extend this if dealing with more than 2 equations"
-  basis_primal,basis_dual = basis_time
+  basis_primal,basis_dual = basis_time.array
   basis_pd = basis_primal'*basis_dual
 
   function enrich(basis_primal,basis_pd,v)
@@ -306,20 +289,68 @@ function add_time_supremizers(basis_time;tol=1e-2)
     ntp += 1
   end
 
-  basis_primal
+  return ArrayBlock([basis_primal,basis_dual],basis_time.touched)
 end
 
-function compress_basis_space(A::Vector{<:AbstractMatrix},r::BlockRBSpace...)
-  map(A,blocks.(r)...) do A,r...
-    compress_basis_space(A,r...)
-  end
-end
+# function compress_basis_space(
+#   A::BlockVector{T},
+#   r::BlockRBSpace{S,BS}
+#   ) where {T,S,BS}
 
-function combine_basis_time(trial::BlockRBSpace,test::BlockRBSpace;kwargs...)
-  map(blocks(trial),blocks(test)) do trial,test
-    combine_basis_time(trial,test;kwargs...)
-  end
-end
+#   rblock = blocks(r)
+#   Tp = T*eltype(BS)
+#   array = Vector{Tp}(undef,size(A))
+#   touched = A.touched
+#   for i = eachindex(array)
+#     if touched[i]
+#       array[i] = compress_basis_space(A[i],rblock[i])
+#     end
+#   end
+#   BlockArray(array,touched)
+# end
+
+# function compress_basis_space(
+#   A::BlockMatrix{T},
+#   trial::BlockRBSpace{S,BS},
+#   test::BlockRBSpace{S,BS}
+#   ) where {T,S,BS}
+
+#   trialblock = blocks(trial)
+#   testblock = blocks(test)
+#   nblocks = length(trialblock)
+#   Tp = T*eltype(BS)
+#   array = Matrix{Tp}(undef,size(A))
+#   touched = A.touched
+#   for i = eachindex(array)
+#     if touched[i]
+#       itrial = fast_index(i,nblocks)
+#       itest = slow_index(i,nblocks)
+#       array[i] = compress_basis_space(A[i],trialblock[itrial],testblock[itest])
+#     end
+#   end
+#   BlockMatrix(array,touched)
+# end
+
+# function combine_basis_time(
+#   A::BlockMatrix{T},
+#   trial::BlockRBSpace{S,BS,BT},
+#   test::BlockRBSpace{S,BS,BT};
+#   kwargs...) where {S,BS,BT}
+
+#   trialblock = blocks(trial)
+#   testblock = blocks(test)
+#   nblocks = length(trialblock)
+#   Tp = eltype(BT)*eltype(BT)
+#   array = Matrix{Tp}(undef,size(A))
+#   touched = A.touched
+#   for i = eachindex(array)
+#     if touched[i]
+#       itrial = fast_index(i,nblocks)
+#       itest = slow_index(i,nblocks)
+#       array[i] = combine_basis_time(A[i],trialblock[itrial],testblock[itest];kwargs...)
+#     end
+#   end
+# end
 
 function recast(r::BlockRBSpace,red_x::ParamBlockVector)
   block_red_x = map(blocks(red_x),blocks(r)) do red_x,r

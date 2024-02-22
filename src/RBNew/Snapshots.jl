@@ -133,6 +133,14 @@ function compress(s::AbstractSnapshots{Mode2Axis},a::AbstractMatrix)
   Snapshots(compressed_values,compressed_realization,Mode2Axis())
 end
 
+function Algebra.allocate_in_range(s::AbstractSnapshots{Mode1Axis,T}) where T
+  zeros(T,num_space_dofs(s),1)
+end
+
+function Algebra.allocate_in_range(s::AbstractSnapshots{Mode2Axis,T}) where T
+  zeros(T,num_times(s),1)
+end
+
 function Snapshots(a::ArrayContribution,args...)
   b = array_contribution()
   for (trian,values) in a.dict
@@ -806,7 +814,7 @@ function recast(s::NnzSnapshots{Mode1Axis},a::AbstractMatrix)
   return Snapshots(ParamArray(asparse),r1,s.mode)
 end
 
-struct BlockSnapshots{S,N}
+struct BlockSnapshots{S,N} <: AbstractParamContainer{S,N}
   array::Array{S,N}
   touched::Array{Bool,N}
   function BlockSnapshots(
@@ -818,25 +826,39 @@ struct BlockSnapshots{S,N}
   end
 end
 
+function _allocate_snap_blocks(values::ParamBlockArray,args...)
+  vitem = first(blocks(values))
+  sitem = Snapshots(vitem,args...)
+  array = Array{typeof(sitem),ndims(values)}(undef,blocksize(values))
+  touched = Array{Bool,ndims(values)}(undef,blocksize(values))
+  return array,touched
+end
+
+function _allocate_snap_blocks(values::AbstractVector{<:ParamBlockArray},args...)
+  vitem = first.(blocks.(values))
+  sitem = Snapshots(vitem,args...)
+  array = Array{typeof(sitem),ndims(first(values))}(undef,blocksize(first(values)))
+  touched = Array{Bool,ndims(first(values))}(undef,blocksize(first(values)))
+  return array,touched
+end
+
 function Snapshots(values::ParamBlockArray,args...)
+  array,touched = _allocate_snap_blocks(values,args...)
   block_values = blocks(values)
-  touched = map(!iszero,block_values)
-  array = map(eachindex(touched)) do i
-    if touched[i]
-      Snapshots(block_values[i],args...)
-    end
+  for i = eachindex(array)
+    array[i] = Snapshots(block_values[i],args...)
+    touched[i] = !iszero(array[i])
   end
   BlockSnapshots(array,touched)
 end
 
 function Snapshots(values::AbstractVector{<:ParamBlockArray},args...)
+  array,touched = _allocate_snap_blocks(values,args...)
   block_values = map(blocks,values)
-  touched = map(!iszero,blocks(first(values)))
-  array = map(eachindex(touched)) do i
-    if touched[i]
-      block_i = map(x->getindex(x,i),block_values)
-      Snapshots(block_i,args...)
-    end
+  for i = eachindex(array)
+    block_i = map(x->getindex(x,i),block_values)
+    array[i] = Snapshots(block_i,args...)
+    touched[i] = !iszero(array[i])
   end
   BlockSnapshots(array,touched)
 end
@@ -850,7 +872,7 @@ Base.ndims(::Type{BlockSnapshots{S,N}}) where {S,N} = N
 Base.copy(s::BlockSnapshots) = BlockSnapshots(copy(s.array),copy(s.touched))
 Base.eachindex(s::BlockSnapshots) = eachindex(s.array)
 function Base.getindex(s::BlockSnapshots,i...)
-  if !a.touched[i...]
+  if !s.touched[i...]
     return nothing
   end
   s.array[i...]
@@ -869,7 +891,7 @@ function Arrays.testitem(s::BlockSnapshots)
   end
 end
 
-function get_values(s::BlockSnapshots)
+function FEM.get_values(s::BlockSnapshots)
   map(get_values,s.array) |> mortar
 end
 
@@ -879,6 +901,24 @@ end
 
 function get_mode(s::BlockSnapshots)
   get_mode(testitem(s))
+end
+
+function Algebra.allocate_in_range(s::BlockSnapshots{S,N}) where {S,N}
+  array = Array{Matrix{eltype(S)},N}(undef,size(s))
+  touched = s.touched
+  ArrayBlock(array,touched)
+end
+
+function change_mode(s::BlockSnapshots{<:Any,N},args...;kwargs...) where N
+  S = typeof(change_mode(testitem(s),args...;kwargs...))
+  array = Array{S,N}(undef,size(s))
+  touched = s.touched
+  for i = eachindex(array)
+    if touched[i]
+      array[i] = change_mode(s.array[i],args...;kwargs...)
+    end
+  end
+  BlockSnapshots(array,touched)
 end
 
 function select_snapshots(s::BlockSnapshots{<:Any,N},args...;kwargs...) where N

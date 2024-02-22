@@ -62,6 +62,7 @@ end
 
 get_indices_space(i::ReducedIntegrationDomain) = i.indices_space
 get_indices_time(i::ReducedIntegrationDomain) = i.indices_time
+union_indices_space(i::ReducedIntegrationDomain...) = union(map(get_indices_space,i)...)
 union_indices_time(i::ReducedIntegrationDomain...) = union(map(get_indices_time,i)...)
 
 struct AffineDecomposition{M,A,B,C,D,E}
@@ -142,7 +143,7 @@ function reduced_form(
 end
 
 function reduced_vector_form!(
-  a::Contribution,
+  a::AffineContribution,
   info::RBInfo,
   op::RBOperator,
   s::S,
@@ -412,41 +413,72 @@ end
 
 # multi field interface
 
-function reduce_triangulation(
-  fs::MultiFieldFESpace,
-  trian::Triangulation,
-  indices_space::BlockVector)
-
-  red_integr_cells_block = map(fs.spaces,blocks(indices_space)) do fs,indices_space
-    cell_dof_ids = get_cell_dof_ids(fs,trian)
-    indices_space_rows = fast_index(indices_space,num_free_dofs(fs))
-    get_reduced_cells(indices_space_rows,cell_dof_ids)
+function merge_contributions(a::AbstractVector{A},touched::Array{Bool,N}) where {A,N}
+  type = typeof(first(a))
+  @assert isconcretetype(type)
+  fnames = fieldnames(type)
+  fields = map(fnames) do field
+    vf = getproperty.(a,field)
+    merge_field(vf,touched)
   end
-  red_integr_cells = unique(mortar(red_integr_cells_block))
-  red_trian = view(trian,red_integr_cells)
-  return red_trian
+  AffineDecomposition(fields...)
 end
 
-function mdeim(
+function merge_field(a::AbstractVector{A},touched::Array{Bool,N}) where {A,N}
+  array = Array{A,N}(undef,size(touched))
+  t2t = findall(touched)
+  for i = eachindex(a)
+    array[t2t[i]] = a[i]
+  end
+  ArrayBlock(array,touched)
+end
+
+function merge_triangulations(
+  a::AbstractVector{A},
+  red_trians::AbstractVector{T}
+  ) where {A,T<:Triangulation}
+
+  parent = get_parent(red_trians)
+  int_dom = map(get_integration_domain,a)
+  uindices = union_indices_space(int_dom...) |> unique
+  red_parent = view(parent,uindices)
+  return red_parent
+end
+
+function reduced_vector_form!(
+  a::AffineContribution,
   info::RBInfo,
-  fs::FESpace,
-  trian::Triangulation,
-  block_basis_space::Array{<:AbstractMatrix,N},
-  block_basis_time::Array{<:AbstractMatrix,N}) where N
+  op::RBOperator,
+  s::BlockSnapshots{S,N},
+  trian::T) where {S,T,N}
 
-  block_ispace,block_itime,block_lu_interp = map(
-    block_basis_space,block_basis_time) do basis_space,basis_time
-
-    indices_space = get_mdeim_indices(basis_space)
-    recast_indices_space = recast_indices(basis_space,indices_space)
-    interp_basis_space = view(basis_space,indices_space,:)
-    indices_time,lu_interp = _time_indices_and_interp_matrix(info.mdeim_style,interp_basis_space,basis_time)
-    recast_indices_space,indices_time,lu_interp
+  test = get_test(op)
+  fe_test = get_fe_test(op)
+  touched = s.touched
+  ads,red_trians = map(findall(touched)) do i
+    reduced_form(info,fe_test[i],s.array[i],trian,test[i])
   end |> tuple_of_arrays
+  ad = merge_contributions(ads,touched)
+  red_trian = merge_triangulations(ads,red_trians)
+  a[red_trian] = ad
+end
 
-  recast_indices_space = mortar(block_ispace)
-  indices_time = mortar(block_itime)
-  red_trian = reduce_triangulation(fs,trian,recast_indices_space)
-  integration_domain = ReducedIntegrationDomain(recast_indices_space,indices_time)
-  return block_lu_interp,red_trian,integration_domain
+function reduced_matrix_form!(
+  a::AffineContribution,
+  info::RBInfo,
+  op::RBOperator,
+  s::BlockSnapshots{S,N},
+  trian::T;
+  kwargs...) where {S,T,N}
+
+  trial = get_trial(op)
+  test = get_test(op)
+  fe_test = get_fe_test(op)
+  touched = s.touched
+  ads,red_trians = map(Tuple.(findall(touched))) do (irow,icol)
+    reduced_form(info,fe_test[irow],s.array[irow,icol],trian,trial[icol],test[irow];kwargs...)
+  end |> tuple_of_arrays
+  ad = merge_contributions(ads,touched)
+  red_trian = merge_triangulations(ads,red_trians)
+  a[red_trian] = ad
 end
