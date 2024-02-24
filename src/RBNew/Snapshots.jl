@@ -886,7 +886,8 @@ function get_mode(s::BlockSnapshots)
 end
 
 function get_touched_blocks(s::BlockSnapshots)
-  isa(s.touched,CartesianIndex) ? Tuple.(findall(s.touched)) : findall(s.touched)
+  touched = s.touched
+  isa(touched,CartesianIndex) ? Tuple.(findall(touched)) : findall(touched)
 end
 
 function change_mode(s::BlockSnapshots{<:Any,N},args...;kwargs...) where N

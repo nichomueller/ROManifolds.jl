@@ -18,11 +18,6 @@ function get_mdeim_indices(A::AbstractMatrix{T}) where T
   return I
 end
 
-# to deprecate
-function get_mdeim_indices(A::NnzSnapshots)
-  get_mdeim_indices(collect(A))
-end
-
 function recast_indices(A::AbstractMatrix,indices::AbstractVector{Int})
   return indices
 end
@@ -87,16 +82,14 @@ FEM.num_times(a::AffineDecomposition) = size(a.basis_time,1)
 num_reduced_space_dofs(a::AffineDecomposition) = length(get_indices_space(a))
 num_reduced_times(a::AffineDecomposition) = length(get_indices_time(a))
 
-# to deprecate
 function _time_indices_and_interp_matrix(::SpaceTimeMDEIM,interp_basis_space,basis_time)
   indices_time = get_mdeim_indices(basis_time)
   interp_basis_time = view(basis_time,indices_time,:)
-  interp_basis_space_time = LinearAlgebra.kron(interp_basis_time,interp_basis_space)
+  interp_basis_space_time = kronecker(interp_basis_time,interp_basis_space)
   lu_interp = lu(interp_basis_space_time)
   return indices_time,lu_interp
 end
 
-# to deprecate
 function _time_indices_and_interp_matrix(::SpaceOnlyMDEIM,interp_basis_space,basis_time)
   indices_time = axes(basis_time,1)
   lu_interp = lu(interp_basis_space)
@@ -317,10 +310,9 @@ function mdeim_coeff!(
 
   bvec = reshape(b,:,np)
   ldiv!(coeff,mdeim_interpolation,bvec)
-  for j in 1:ns
-    sorted_idx = [(i-1)*ns+j for i = 1:nt]
-    @inbounds for i = eachindex(coeff_recast)
-      coeff_recast[i][:,j] = a.basis_time*coeff[sorted_idx,i]
+  @inbounds for i = eachindex(coeff_recast)
+    for j in 1:ns
+      coeff_recast[i][:,j] = a.basis_time*coeff[j:ns:ns*nt,i]
     end
   end
 end
@@ -347,9 +339,9 @@ function allocate_mdeim_lincomb(
   ns_test = num_reduced_space_dofs(test)
   nt_test = num_reduced_times(test)
   time_prod_cache = allocate_vector(V,nt_test)
-  kron_prod_cache = allocate_vector(V,ns_test*nt_test)
-  lincomb_cache = allocate_param_array(kron_prod_cache,num_params(r))
-  return time_prod_cache,kron_prod_cache,lincomb_cache
+  kron_prod = allocate_vector(V,ns_test*nt_test)
+  lincomb_cache = allocate_param_array(kron_prod,num_params(r))
+  return time_prod_cache,lincomb_cache
 end
 
 function allocate_mdeim_lincomb(
@@ -363,9 +355,9 @@ function allocate_mdeim_lincomb(
   ns_test = num_reduced_space_dofs(test)
   nt_test = num_reduced_times(test)
   time_prod_cache = allocate_matrix(V,nt_trial,nt_test)
-  kron_prod_cache = allocate_matrix(V,ns_trial*nt_trial,ns_test*nt_test)
-  lincomb_cache = allocate_param_array(kron_prod_cache,num_params(r))
-  return time_prod_cache,kron_prod_cache,lincomb_cache
+  kron_prod = allocate_matrix(V,ns_trial*nt_trial,ns_test*nt_test)
+  lincomb_cache = allocate_param_array(kron_prod,num_params(r))
+  return time_prod_cache,lincomb_cache
 end
 
 function mdeim_lincomb!(
@@ -373,7 +365,7 @@ function mdeim_lincomb!(
   a::VectorAffineDecomposition,
   coeff::ParamMatrix)
 
-  time_prod_cache,kron_prod_cache,lincomb_cache = cache
+  time_prod_cache,lincomb_cache = cache
   basis_time = a.metadata
   basis_space = a.basis_space
 
@@ -382,8 +374,7 @@ function mdeim_lincomb!(
     ci = coeff[i]
     for j = axes(coeff,2)
       time_prod_cache .= basis_time'*ci[:,j]
-      LinearAlgebra.kron!(kron_prod_cache,basis_space[j],time_prod_cache)
-      lci .+= kron_prod_cache
+      lci .+= kronecker(basis_space[j],time_prod_cache)
     end
   end
 end
@@ -393,7 +384,7 @@ function mdeim_lincomb!(
   a::MatrixAffineDecomposition,
   coeff::ParamMatrix)
 
-  time_prod_cache,kron_prod_cache,lincomb_cache = cache
+  time_prod_cache,lincomb_cache = cache
   basis_time = a.metadata
   basis_space = a.basis_space
 
@@ -406,8 +397,7 @@ function mdeim_lincomb!(
           time_prod_cache[row,col] = sum(basis_time[:,row,col].*ci[:,j])
         end
       end
-      LinearAlgebra.kron!(kron_prod_cache,basis_space[j],time_prod_cache)
-      lci .+= kron_prod_cache
+      lci .+= kronecker(basis_space[j],time_prod_cache)
     end
   end
 end
@@ -425,80 +415,74 @@ end
 
 # multi field interface
 
-function merge_contributions(a::AbstractVector{A},touched::Array{Bool,N}) where {A,N}
-  type = typeof(first(a))
-  @assert isconcretetype(type)
-  fnames = fieldnames(type)
-  fields = map(fnames) do field
-    vf = getproperty.(a,field)
-    merge_field(vf,touched)
-  end
-  AffineDecomposition(fields...)
-end
+# function merge_contributions(a::AbstractVector{A},touched::Array{Bool,N}) where {A,N}
+#   type = typeof(first(a))
+#   @assert isconcretetype(type)
+#   fnames = fieldnames(type)
+#   fields = map(fnames) do field
+#     vf = getproperty.(a,field)
+#     merge_field(vf,touched)
+#   end
+#   AffineDecomposition(fields...)
+# end
 
-function merge_field(a::AbstractVector{A},touched::Array{Bool,N}) where {A,N}
-  array = Array{A,N}(undef,size(touched))
-  t2t = findall(touched)
-  for i = eachindex(a)
-    array[t2t[i]] = a[i]
-  end
-  ArrayBlock(array,touched)
-end
+# function merge_field(a::AbstractVector{A},touched::Array{Bool,N}) where {A,N}
+#   array = Array{A,N}(undef,size(touched))
+#   t2t = findall(touched)
+#   for i = eachindex(a)
+#     array[t2t[i]] = a[i]
+#   end
+#   ArrayBlock(array,touched)
+# end
 
-function merge_triangulations(red_trians::AbstractVector{<:Triangulation})
-  parent = get_parent(red_trians)
-  uindices = FEM.get_union_indices(red_trians)
-  red_parent = view(parent,uindices)
-  return red_parent
-end
-
-function reduced_vector_form!(
-  a::AffineContribution,
+# function merge_triangulations(red_trians::AbstractVector{<:Triangulation})
+#   parent = get_parent(red_trians)
+#   uindices = FEM.get_union_indices(red_trians)
+#   red_parent = view(parent,uindices)
+#   return red_parent
+# end
+function reduced_vector_form(
   info::RBInfo,
   op::RBOperator,
-  s::BlockSnapshots{S,N},
-  trian::T) where {S,T,N}
+  s::BlockSnapshots,
+  trian::T) where {S,T}
 
   test = get_test(op)
   fe_test = get_fe_test(op)
-  touched = s.touched
-  ads,red_trians = map(findall(touched)) do i
-    reduced_form(info,fe_test[i],s.array[i],trian,test[i])
-  end |> tuple_of_arrays
-  ad = merge_contributions(ads,touched)
-  red_trian = merge_triangulations(red_trians)
-  a[red_trian] = ad
+  reduced_form(info,fe_test,s,trian,test)
 end
 
-function reduced_matrix_form!(
-  a::AffineContribution,
-  info::RBInfo,
-  op::RBOperator,
-  s::BlockSnapshots{S,N},
-  trian::T;
-  kwargs...) where {S,T,N}
-
-  trial = get_trial(op)
-  test = get_test(op)
-  fe_test = get_fe_test(op)
-  touched = s.touched
-  ads,red_trians = map(Tuple.(findall(touched))) do (irow,icol)
-    reduced_form(info,fe_test[irow],s.array[irow,icol],trian,trial[icol],test[irow];kwargs...)
-  end |> tuple_of_arrays
-  ad = merge_contributions(ads,touched)
-  red_trian = merge_triangulations(red_trians)
-  a[red_trian] = ad
+function FEM.Contribution(v::Tuple{Vararg{ArrayBlock{<:AffineDecomposition}}},t::Tuple{Vararg{Triangulation}})
+  BlockAffineContribution(v,t)
 end
 
-const BlockAffineDecomposition{M,A,B,C,D,E} = AffineDecomposition{M,A,B,C,D,E} where {
-  M<:ArrayBlock,A<:ArrayBlock,B<:ArrayBlock,C<:ArrayBlock,D<:ArrayBlock,E<:ArrayBlock
-}
-const BlockVectorAffineDecomposition{M,A,B,C,D,E} = AffineDecomposition{M,A,B,C,D,E} where {
-  M<:VectorBlock,A<:VectorBlock,B<:VectorBlock,C<:VectorBlock,D<:VectorBlock,E<:VectorBlock
-}
-const BlockMatrixAffineDecomposition{M,A,B,C,D,E} = AffineDecomposition{M,A,B,C,D,E} where {
-  M<:MatrixBlock,A<:MatrixBlock,B<:MatrixBlock,C<:MatrixBlock,D<:MatrixBlock,E<:MatrixBlock
-}
+struct BlockAffineContribution{A,N,V,K} <: Contribution
+  values::V
+  trians::K
+  function BlockAffineContribution(
+    values::V,
+    trians::K
+    ) where {A<:AffineDecomposition,N,V<:Tuple{Vararg{ArrayBlock{A,N}}},K<:Tuple{Vararg{Triangulation}}}
+
+    @check length(values) == length(trians)
+    @check !any([t === first(trians) for t = trians[2:end]])
+    new{V,K}(values,trians)
+  end
+end
+
+AffineContribution(v::Tuple{Vararg{ArrayBlock}},t::Triangulation) = BlockAffineContribution((v,),(t,))
+
+ArrayBlockContribution(v::V,t::Triangulation) where V = ArrayBlockContribution((v,),(t,))
+
+function BlockSnapshots(k::BlockMap{N},a::S...) where {S<:AbstractSnapshots,N}
+  array = Array{S,N}(undef,k.size)
+  touched = fill(false,k.size)
+  for (t,i) in enumerate(k.indices)
+    array[i] = a[t]
+    touched[i] = true
+  end
+  BlockSnapshots(array,touched)
+end
 
 function get_contributions(a::BlockAffineDecomposition,i...)
   type = typeof(a)

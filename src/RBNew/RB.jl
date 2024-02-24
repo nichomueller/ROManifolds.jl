@@ -4,6 +4,7 @@ using LinearAlgebra
 using BlockArrays
 using SparseArrays
 using DrWatson
+using Kronecker
 using Serialization
 using Gridap
 using Gridap.Algebra
