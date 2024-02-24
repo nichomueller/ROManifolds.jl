@@ -106,7 +106,7 @@ function ODETools.jacobians!(
 end
 
 function _union_reduced_times(a::Tuple{Vararg{Contribution}})
-  union([_union_reduced_times(ai) for ai in a])
+  union([_union_reduced_times(ai) for ai in a]...)
 end
 
 function _union_reduced_times(a::Contribution)
@@ -140,7 +140,7 @@ function _select_fe_quantities_at_time_locations(a,r,xhF,ode_cache)
   red_r = r[:,red_times]
   indices = _select_indices_at_time_locations(red_times;nparams=num_params(r))
   red_xhF,red_ode_cache = _select_cache_at_time_locations(xhF,ode_cache,indices)
-  return red_r,red_xhF,red_ode_cache
+  return red_r,red_times,red_xhF,red_ode_cache
 end
 
 function _select_snapshots_at_space_time_locations(s,a,red_times)
@@ -166,7 +166,7 @@ function fe_matrix!(
   γ::Tuple{Vararg{Real}},
   ode_cache)
 
-  red_r,red_xhF,red_ode_cache = _select_fe_quantities_at_time_locations(op.lhs,r,xhF,ode_cache)
+  red_r,red_times,red_xhF,red_ode_cache = _select_fe_quantities_at_time_locations(op.lhs,r,xhF,ode_cache)
   A = fe_matrix!(cache,op.op,red_r,red_xhF,γ,red_ode_cache)
   map(A,op.lhs) do A,lhs
     _select_snapshots_at_space_time_locations(A,lhs,red_times)
@@ -180,8 +180,7 @@ function fe_vector!(
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
 
-  red_r,red_xhF,red_ode_cache = _select_fe_quantities_at_time_locations(op.rhs,r,xhF,ode_cache)
-  red_r = r[:,red_times]
+  red_r,red_times,red_xhF,red_ode_cache = _select_fe_quantities_at_time_locations(op.rhs,r,xhF,ode_cache)
   b = fe_vector!(cache,op.op,red_r,red_xhF,red_ode_cache)
   bi = _select_snapshots_at_space_time_locations(b,op.rhs,red_times)
   return bi
@@ -195,12 +194,7 @@ end
 
 const AffineThetaMethodNonlinearOperator = ThetaMethodNonlinearOperator{T,L,R} where {T<:Affine,L,R}
 
-function RBNonlinearOperator(
-  ::RBThetaMethod,
-  op::RBOperator,
-  lhs::Tuple{Vararg{A}},
-  rhs::A) where A
-
+function RBNonlinearOperator(::RBThetaMethod,op::RBOperator,lhs,rhs)
   ThetaMethodNonlinearOperator(op,lhs,rhs)
 end
 
@@ -294,7 +288,9 @@ end
 
 function ODETools._matrix!(cache,op::ThetaMethodNonlinearOperator,r,dtθ,u0,ode_cache,vθ)
   fe_A,coeff_cache,lincomb_cache = cache
-  LinearAlgebra.fillstored!(fe_A,zero(eltype(fe_A)))
+  for i = eachindex(fe_A)
+    LinearAlgebra.fillstored!(fe_A[i],zero(eltype(fe_A[i])))
+  end
   A = ODETools.jacobians!(cache,op,r,(u0,vθ),(1.0,1/dtθ),ode_cache)
   return A
 end

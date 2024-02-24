@@ -364,8 +364,8 @@ function Algebra.jacobian!(
   test = get_test(op)
   u = get_trial_fe_basis(trial)
   v = get_fe_basis(test)
-  assem = get_param_assembler(op.assem,r)
-  dc = γᵢ*op.jacs[i](get_params(r),get_times(r),xh,u,v)
+  assem = get_param_assembler(op.op.assem,r)
+  dc = γᵢ*op.op.jacs[i](get_params(r),get_times(r),xh,u,v)
   map(A.values,op.trian_jacs[i]) do Atrian,trian
     matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
     assemble_matrix_add!(Atrian,assem,matdata)

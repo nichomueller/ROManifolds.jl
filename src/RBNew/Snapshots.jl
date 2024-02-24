@@ -133,14 +133,6 @@ function compress(s::AbstractSnapshots{Mode2Axis},a::AbstractMatrix)
   Snapshots(compressed_values,compressed_realization,Mode2Axis())
 end
 
-# function Algebra.allocate_in_range(s::AbstractSnapshots{Mode1Axis,T}) where T
-#   zeros(T,num_space_dofs(s),1)
-# end
-
-# function Algebra.allocate_in_range(s::AbstractSnapshots{Mode2Axis,T}) where T
-#   zeros(T,num_times(s),1)
-# end
-
 function Snapshots(a::ArrayContribution,args...)
   contribution(a.trians) do trian
     Snapshots(a[trian],args...)
@@ -896,12 +888,6 @@ end
 function get_touched_blocks(s::BlockSnapshots)
   isa(s.touched,CartesianIndex) ? Tuple.(findall(s.touched)) : findall(s.touched)
 end
-
-# function Algebra.allocate_in_range(s::BlockSnapshots{S,N}) where {S,N}
-#   array = Array{Matrix{eltype(S)},N}(undef,size(s))
-#   touched = s.touched
-#   ArrayBlock(array,touched)
-# end
 
 function change_mode(s::BlockSnapshots{<:Any,N},args...;kwargs...) where N
   active_block_ids = get_touched_blocks(s)

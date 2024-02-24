@@ -144,8 +144,8 @@ function fe_matrix!(
   ode_cache)
 
   map(eachindex(A)) do i
-    fe_matrix!(A[i],op,r,xhF[i],i,γ[i],ode_cache)
-  end
+    fe_matrix!(A[i],op,r,xhF,i,γ[i],ode_cache)
+  end |> Tuple
 end
 
 function fe_matrix!(A,op::RBOperator,r,dtθ,u0,ode_cache,vθ)

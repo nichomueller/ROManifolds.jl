@@ -11,6 +11,7 @@ Base.eachindex(a::Contribution) = eachindex(a.values)
 
 @inline function contribution(f,trians)
   values = map(f,trians)
+  @check typeof(trians) <: Tuple{Vararg{Triangulation}}  "$(typeof(trians))"
   Contribution(values,trians)
 end
 
@@ -22,15 +23,22 @@ function contribution!(a,f,trians)
   contribution!(a,map(f,trians))
 end
 
-Contribution(v::Vector{<:AbstractArray},t::Vector{<:Triangulation}) = ArrayContribution(v,t)
+function Base.getindex(a::Contribution,trian::Triangulation...)
+  perm = FEM.find_permutation(trian,a.trians)
+  getindex(a,perm...)
+end
+
+function Contribution(v::Tuple{Vararg{AbstractArray}},t::Tuple{Vararg{Triangulation}})
+  ArrayContribution(v,t)
+end
 
 struct ArrayContribution{T,V,K} <: Contribution
-  values::Vector{V}
-  trians::Vector{K}
+  values::V
+  trians::K
   function ArrayContribution(
-    values::Vector{V},
-    trians::Vector{K}
-    ) where {T,V<:AbstractArray{T},K<:Triangulation}
+    values::V,
+    trians::K
+    ) where {T,V<:Tuple{Vararg{AbstractArray{T}}},K<:Tuple{Vararg{Triangulation}}}
 
     @check length(values) == length(trians)
     @check !any([t === first(trians) for t = trians[2:end]])
@@ -38,16 +46,11 @@ struct ArrayContribution{T,V,K} <: Contribution
   end
 end
 
-ArrayContribution(v::V,t::Triangulation) where V = ArrayContribution([v],[t])
+ArrayContribution(v::V,t::Triangulation) where V = ArrayContribution((v,),(t,))
 
 Base.eltype(::ArrayContribution{T}) where T = T
 Base.eltype(::Type{<:ArrayContribution{T}}) where T = T
 Base.copy(a::ArrayContribution) = ArrayContribution(copy(a.values),a.trians)
-
-function Base.getindex(a::ArrayContribution,trian::Triangulation...)
-  perm = FEM.find_permutation(a.trian,trian...)
-  getindex(a,perm...)
-end
 
 struct ContributionBroadcast{D,T}
   contrib::D

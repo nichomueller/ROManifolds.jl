@@ -119,17 +119,17 @@ function mdeim(
   return lu_interp,red_trian,integration_domain
 end
 
-function FEM.Contribution(v::Vector{<:AffineDecomposition},t::Vector{<:Triangulation})
+function FEM.Contribution(v::Tuple{Vararg{AffineDecomposition}},t::Tuple{Vararg{Triangulation}})
   AffineContribution(v,t)
 end
 
 struct AffineContribution{V,K} <: Contribution
-  values::Vector{V}
-  trians::Vector{K}
+  values::V
+  trians::K
   function AffineContribution(
-    values::Vector{V},
-    trians::Vector{K}
-    ) where {V<:AffineDecomposition,K<:Triangulation}
+    values::V,
+    trians::K
+    ) where {V<:Tuple{Vararg{AffineDecomposition}},K<:Tuple{Vararg{Triangulation}}}
 
     @check length(values) == length(trians)
     @check !any([t === first(trians) for t = trians[2:end]])
@@ -137,7 +137,7 @@ struct AffineContribution{V,K} <: Contribution
   end
 end
 
-AffineContribution(v::V,t::Triangulation) where V = AffineContribution([v],[t])
+AffineContribution(v::V,t::Triangulation) where V = AffineContribution((v,),(t,))
 
 function reduced_form(
   info::RBInfo,
@@ -285,8 +285,8 @@ function allocate_mdeim_coeff(a::AffineContribution,r::AbstractParamRealization)
   vals_cache_solve,vals_cache_recast = map(a.values,a.trians) do values,trian
     allocate_mdeim_coeff(values,r)
   end |> tuple_of_arrays
-  cache_solve = Contribution(vals_cache_solve,trians)
-  cache_recast = Contribution(vals_cache_recast,trians)
+  cache_solve = Contribution(vals_cache_solve,a.trians)
+  cache_recast = Contribution(vals_cache_recast,a.trians)
   return cache_solve,cache_recast
 end
 
