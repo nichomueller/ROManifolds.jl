@@ -18,6 +18,7 @@ function get_mdeim_indices(A::AbstractMatrix{T}) where T
   return I
 end
 
+# to deprecate
 function get_mdeim_indices(A::NnzSnapshots)
   get_mdeim_indices(collect(A))
 end
@@ -86,6 +87,7 @@ FEM.num_times(a::AffineDecomposition) = size(a.basis_time,1)
 num_reduced_space_dofs(a::AffineDecomposition) = length(get_indices_space(a))
 num_reduced_times(a::AffineDecomposition) = length(get_indices_time(a))
 
+# to deprecate
 function _time_indices_and_interp_matrix(::SpaceTimeMDEIM,interp_basis_space,basis_time)
   indices_time = get_mdeim_indices(basis_time)
   interp_basis_time = view(basis_time,indices_time,:)
@@ -94,6 +96,7 @@ function _time_indices_and_interp_matrix(::SpaceTimeMDEIM,interp_basis_space,bas
   return indices_time,lu_interp
 end
 
+# to deprecate
 function _time_indices_and_interp_matrix(::SpaceOnlyMDEIM,interp_basis_space,basis_time)
   indices_time = axes(basis_time,1)
   lu_interp = lu(interp_basis_space)
@@ -116,9 +119,25 @@ function mdeim(
   return lu_interp,red_trian,integration_domain
 end
 
-const AffineContribution = Contribution{Triangulation,AffineDecomposition}
+function FEM.Contribution(v::Vector{<:AffineDecomposition},t::Vector{<:Triangulation})
+  AffineContribution(v,t)
+end
 
-affine_contribution() = Contribution(IdDict{Triangulation,AffineDecomposition}())
+struct AffineContribution{V,K} <: Contribution
+  values::Vector{V}
+  trians::Vector{K}
+  function AffineContribution(
+    values::Vector{V},
+    trians::Vector{K}
+    ) where {V<:AffineDecomposition,K<:Triangulation}
+
+    @check length(values) == length(trians)
+    @check !any([t === first(trians) for t = trians[2:end]])
+    new{V,K}(values,trians)
+  end
+end
+
+AffineContribution(v::V,t::Triangulation) where V = AffineContribution([v],[t])
 
 function reduced_form(
   info::RBInfo,
@@ -142,8 +161,7 @@ function reduced_form(
   return ad,red_trian
 end
 
-function reduced_vector_form!(
-  a::AffineContribution,
+function reduced_vector_form(
   info::RBInfo,
   op::RBOperator,
   s::S,
@@ -151,12 +169,10 @@ function reduced_vector_form!(
 
   test = get_test(op)
   fe_test = get_fe_test(op)
-  ad,red_trian = reduced_form(info,fe_test,s,trian,test)
-  a[red_trian] = ad
+  reduced_form(info,fe_test,s,trian,test)
 end
 
-function reduced_matrix_form!(
-  a::AffineContribution,
+function reduced_matrix_form(
   info::RBInfo,
   op::RBOperator,
   s::S,
@@ -166,8 +182,7 @@ function reduced_matrix_form!(
   trial = get_trial(op)
   test = get_test(op)
   fe_test = get_fe_test(op)
-  ad,red_trian = reduced_form(info,fe_test,s,trian,trial,test;kwargs...)
-  a[red_trian] = ad
+  reduced_form(info,fe_test,s,trian,trial,test;kwargs...)
 end
 
 function reduced_vector_form(
@@ -176,11 +191,10 @@ function reduced_vector_form(
   c::ArrayContribution)
 
   info = get_info(solver)
-  a = affine_contribution()
-  for (trian,values) in c.dict
-    reduced_vector_form!(a,info,op,values,trian)
-  end
-  return a
+  a,trians = map(get_domains(c),get_values(c)) do trian,values
+    reduced_vector_form(info,op,values,trian)
+  end |> tuple_of_arrays
+  return AffineContribution(a,trians)
 end
 
 function reduced_matrix_form(
@@ -190,11 +204,10 @@ function reduced_matrix_form(
   kwargs...)
 
   info = get_info(solver)
-  a = affine_contribution()
-  for (trian,values) in c.dict
-    reduced_matrix_form!(a,info,op,values,trian;kwargs...)
-  end
-  return a
+  a,trians = map(get_domains(c),get_values(c)) do trian,values
+    reduced_matrix_form(info,op,values,trian;kwargs...)
+  end |> tuple_of_arrays
+  return AffineContribution(a,trians)
 end
 
 function reduced_matrix_form(
@@ -269,13 +282,11 @@ function allocate_mdeim_coeff(a::AffineDecomposition,r::AbstractParamRealization
 end
 
 function allocate_mdeim_coeff(a::AffineContribution,r::AbstractParamRealization)
-  cache_solve = array_contribution()
-  cache_recast = array_contribution()
-  for (trian,values) in a.dict
-    cs,cr = allocate_mdeim_coeff(values,r)
-    cache_solve[trian] = cs
-    cache_recast[trian] = cr
-  end
+  vals_cache_solve,vals_cache_recast = map(a.values,a.trians) do values,trian
+    allocate_mdeim_coeff(values,r)
+  end |> tuple_of_arrays
+  cache_solve = Contribution(vals_cache_solve,trians)
+  cache_recast = Contribution(vals_cache_recast,trians)
   return cache_solve,cache_recast
 end
 
@@ -319,11 +330,11 @@ function mdeim_coeff!(
   a::AffineContribution,
   b::ArrayContribution)
 
+  @assert length(a) == length(b)
   coeff,coeff_recast = cache
-  for (trian,atrian) in a.dict
-    cache_trian = coeff[trian],coeff_recast[trian]
-    btrian = b[trian]
-    mdeim_coeff!(cache_trian,atrian,btrian)
+  for i = eachindex(a)
+    cachei = coeff[i],coeff_recast[i]
+    mdeim_coeff!(cachei,a[i],b[i])
   end
   return coeff_recast
 end
@@ -406,8 +417,9 @@ function mdeim_lincomb!(
   a::AffineContribution,
   b::ArrayContribution)
 
-  for (trian,atrian) in a.dict
-    mdeim_lincomb!(cache,atrian,b[trian])
+  @assert length(a) == length(b)
+  for i = eachindex(a)
+    mdeim_lincomb!(cache,a[i],b[i])
   end
 end
 

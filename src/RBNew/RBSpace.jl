@@ -5,7 +5,7 @@ function reduced_fe_space(
 
   norm_matrix = get_norm_matrix(info,feop)
   soff = select_snapshots(s,offline_params(info))
-  bases = reduced_basis(soff,norm_matrix;ϵ=get_tol(info),format=get_format(info))
+  bases = reduced_basis(soff,norm_matrix;ϵ=get_tol(info))#,format=get_format(info))
   if info.compute_supremizers
     bases = enrich_basis(feop,bases,norm_matrix)
   end
@@ -55,7 +55,7 @@ function _return_bases(flag,b1,b2)
   basis_space,basis_time
 end
 
-function reduced_fe_space(space::FESpace,bases...)
+function reduced_fe_space(space,bases...)
   RBSpace(space,bases...)
 end
 

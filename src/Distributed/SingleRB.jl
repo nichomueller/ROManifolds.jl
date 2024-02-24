@@ -170,29 +170,29 @@ function RB.mdeim(
   return lu_interp,d_red_trian,integration_domain
 end
 
-function RB.reduced_vector_form(
-  solver::RBSolver,
-  op::RBOperator,
-  c::Contribution{DistributedTriangulation})
+# function RB.reduced_vector_form(
+#   solver::RBSolver,
+#   op::RBOperator,
+#   c::Contribution{DistributedTriangulation})
 
-  info = RB.get_info(solver)
-  a = distributed_array_contribution()
-  for (trian,values) in c.dict
-    RB.reduced_vector_form!(a,info,op,values,trian)
-  end
-  return a
-end
+#   info = RB.get_info(solver)
+#   a = distributed_array_contribution()
+#   for (trian,values) in c.dict
+#     RB.reduced_vector_form!(a,info,op,values,trian)
+#   end
+#   return a
+# end
 
-function RB.reduced_matrix_form(
-  solver::RBSolver,
-  op::RBOperator,
-  c::Contribution{DistributedTriangulation};
-  kwargs...)
+# function RB.reduced_matrix_form(
+#   solver::RBSolver,
+#   op::RBOperator,
+#   c::Contribution{DistributedTriangulation};
+#   kwargs...)
 
-  info = RB.get_info(solver)
-  a = distributed_array_contribution()
-  for (trian,values) in c.dict
-    RB.reduced_matrix_form!(a,info,op,values,trian;kwargs...)
-  end
-  return a
-end
+#   info = RB.get_info(solver)
+#   a = distributed_array_contribution()
+#   for (trian,values) in c.dict
+#     RB.reduced_matrix_form!(a,info,op,values,trian;kwargs...)
+#   end
+#   return a
+# end

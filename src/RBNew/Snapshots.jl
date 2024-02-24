@@ -18,7 +18,7 @@ Base.ndims(::AbstractSnapshots) = 2
 Base.ndims(::Type{<:AbstractSnapshots}) = 2
 Base.IndexStyle(::Type{<:AbstractSnapshots}) = IndexLinear()
 
-get_values(s::AbstractSnapshots) = s.values
+FEM.get_values(s::AbstractSnapshots) = s.values
 get_realization(s::AbstractSnapshots) = s.realization
 get_mode(s::AbstractSnapshots) = s.mode
 
@@ -142,11 +142,9 @@ end
 # end
 
 function Snapshots(a::ArrayContribution,args...)
-  b = array_contribution()
-  for (trian,values) in a.dict
-    b[trian] = Snapshots(values,args...)
+  contribution(a.trians) do trian
+    Snapshots(a[trian],args...)
   end
-  b
 end
 
 struct BasicSnapshots{M,T,P,R} <: AbstractSnapshots{M,T}
@@ -244,7 +242,7 @@ function BasicSnapshots(
   BasicSnapshots(basic_values,s.realization,s.mode)
 end
 
-function get_values(s::TransientSnapshots)
+function FEM.get_values(s::TransientSnapshots)
   get_values(BasicSnapshots(s))
 end
 
@@ -466,7 +464,7 @@ function tensor_setindex!(
   tensor_setindex!(s.snaps,v,is,it,ip)
 end
 
-function get_values(s::SelectedSnapshotsAtIndices{Mode1Axis,T,<:BasicSnapshots}) where T
+function FEM.get_values(s::SelectedSnapshotsAtIndices{Mode1Axis,T,<:BasicSnapshots}) where T
   @check space_indices(s) == Base.OneTo(num_space_dofs(s))
   v = get_values(s.snaps)
   array = Vector{typeof(first(v))}(undef,num_cols(s))
@@ -478,7 +476,7 @@ function get_values(s::SelectedSnapshotsAtIndices{Mode1Axis,T,<:BasicSnapshots})
   ParamArray(array)
 end
 
-function get_values(s::SelectedSnapshotsAtIndices{M,T,<:TransientSnapshots}) where {M,T}
+function FEM.get_values(s::SelectedSnapshotsAtIndices{M,T,<:TransientSnapshots}) where {M,T}
   get_values(BasicSnapshots(s))
 end
 
@@ -581,11 +579,9 @@ function reverse_snapshots(
 end
 
 function reverse_snapshots(a::ArrayContribution,args...)
-  b = array_contribution()
-  for (trian,values) in a.dict
-    b[trian] = reverse_snapshots(values,args...)
+  contribution(a.trians) do trian
+    reverse_snapshots(a[trian],args...)
   end
-  b
 end
 
 function reverse_snapshots(
@@ -704,7 +700,7 @@ function tensor_setindex!(
   tensor_setindex!(s.snaps,v,is,it,ip)
 end
 
-function get_values(s::SelectedInnerTimeOuterParamTransientSnapshots)
+function FEM.get_values(s::SelectedInnerTimeOuterParamTransientSnapshots)
   @check space_indices(s) == Base.OneTo(num_space_dofs(s))
   v = get_values(s.snaps)
   values = Vector{typeof(first(v))}(undef,num_params(s))
@@ -885,7 +881,7 @@ function Arrays.testitem(s::BlockSnapshots)
   end
 end
 
-function get_values(s::BlockSnapshots)
+function FEM.get_values(s::BlockSnapshots)
   map(get_values,s.array) |> mortar
 end
 

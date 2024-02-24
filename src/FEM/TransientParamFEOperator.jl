@@ -323,9 +323,8 @@ function _allocate_jacobian(
   assem = get_param_assembler(op.op.assem,r)
   A = ()
   for i = 1:get_order(op)+1
-    Ai = A[i]
     dc = op.op.jacs[i](get_params(r),get_times(r),xh,u,v)
-    Ai = contribution(op.trian_res) do trian
+    Ai = contribution(op.trian_jacs[i]) do trian
       matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
       allocate_matrix(assem,matdata)
     end

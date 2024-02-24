@@ -105,38 +105,42 @@ function ODETools.jacobians!(
   return A
 end
 
-function _union_reduced_times_mat(op::RBNonlinearOperator)
-  ilhs = ()
-  for lhs in op.lhs
-    for (trian,values) in lhs.dict
-      ilhs = (ilhs...,get_integration_domain(values))
-    end
-  end
-  union_indices_time(ilhs...)
+function _union_reduced_times(a::Tuple{Vararg{Contribution}})
+  union([_union_reduced_times(ai) for ai in a])
 end
 
-function _union_reduced_times_vec(op::RBNonlinearOperator)
-  irhs = ()
-  for (trian,values) in op.rhs.dict
-    irhs = (irhs...,get_integration_domain(values))
+function _union_reduced_times(a::Contribution)
+  idom = ()
+  for values in get_values(a)
+    idom = (idom...,get_integration_domain(values))
   end
-  union_indices_time(irhs...)
+  union_indices_time(idom...)
 end
 
-function _select_fe_quantities_at_time_locations(xhF,ode_cache,r,red_times)
-  nparams = num_params(r)
-  pt_indices = vec(transpose((red_times.-1)*nparams .+ collect(1:nparams)'))
+function _select_cache_at_time_locations(xhF,ode_cache,indices)
   Us,Uts,fecache = ode_cache
   new_xhF = ()
   new_Us = ()
   for i = eachindex(xhF)
     spacei = Us[i].space
-    dvi = ParamArray(Us[i].dirichlet_values[pt_indices])
+    dvi = ParamArray(Us[i].dirichlet_values[indices])
     new_Us = (new_Us...,TrialParamFESpace(dvi,spacei))
-    new_xhF = (new_xhF...,ParamArray(xhF[i][pt_indices]))
+    new_xhF = (new_xhF...,ParamArray(xhF[i][indices]))
   end
   new_ode_cache = new_Us,Uts,fecache
   return new_xhF,new_ode_cache
+end
+
+function _select_indices_at_time_locations(red_times;nparams=1)
+  vec(transpose((red_times.-1)*nparams .+ collect(1:nparams)'))
+end
+
+function _select_fe_quantities_at_time_locations(a,r,xhF,ode_cache)
+  red_times = _union_reduced_times(a)
+  red_r = r[:,red_times]
+  indices = _select_indices_at_time_locations(red_times;nparams=num_params(r))
+  red_xhF,red_ode_cache = _select_cache_at_time_locations(xhF,ode_cache,indices)
+  return red_r,red_xhF,red_ode_cache
 end
 
 function _select_snapshots_at_space_time_locations(s,a,red_times)
@@ -149,11 +153,9 @@ end
 
 function _select_snapshots_at_space_time_locations(
   s::ArrayContribution,a::AffineContribution,red_times)
-  b = array_contribution()
-  for (trian,values) in s.dict
-    b[trian] = _select_snapshots_at_space_time_locations(values,a[trian],red_times)
+  contribution(s.trians) do trian
+    _select_snapshots_at_space_time_locations(s[trian],a[trian],red_times)
   end
-  b
 end
 
 function fe_matrix!(
@@ -164,9 +166,7 @@ function fe_matrix!(
   γ::Tuple{Vararg{Real}},
   ode_cache)
 
-  red_times = _union_reduced_times_mat(op)
-  red_r = r[:,red_times]
-  red_xhF,red_ode_cache = _select_fe_quantities_at_time_locations(xhF,ode_cache,r,red_times)
+  red_r,red_xhF,red_ode_cache = _select_fe_quantities_at_time_locations(op.lhs,r,xhF,ode_cache)
   A = fe_matrix!(cache,op.op,red_r,red_xhF,γ,red_ode_cache)
   map(A,op.lhs) do A,lhs
     _select_snapshots_at_space_time_locations(A,lhs,red_times)
@@ -180,8 +180,7 @@ function fe_vector!(
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
 
-  red_times = _union_reduced_times_vec(op)
-  red_xhF,red_ode_cache = _select_fe_quantities_at_time_locations(xhF,ode_cache,r,red_times)
+  red_r,red_xhF,red_ode_cache = _select_fe_quantities_at_time_locations(op.rhs,r,xhF,ode_cache)
   red_r = r[:,red_times]
   b = fe_vector!(cache,op.op,red_r,red_xhF,red_ode_cache)
   bi = _select_snapshots_at_space_time_locations(b,op.rhs,red_times)

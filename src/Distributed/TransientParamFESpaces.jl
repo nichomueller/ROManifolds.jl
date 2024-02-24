@@ -35,7 +35,6 @@ function Algebra.allocate_residual(
   duh::Union{GridapDistributed.DistributedCellField,GridapDistributed.DistributedMultiFieldFEFunction},
   cache)
 
-  b = distributed_array_contribution()
   FEM._allocate_residual(b,op,r,duh,cache)
 end
 
@@ -45,10 +44,5 @@ function Algebra.allocate_jacobian(
   duh::Union{GridapDistributed.DistributedCellField,GridapDistributed.DistributedMultiFieldFEFunction},
   cache)
 
-  A = ()
-  for i = 1:get_order(op)+1
-    Ai = distributed_array_contribution()
-    A = (A...,Ai)
-  end
   FEM._allocate_jacobian(A,op,r,duh,cache)
 end

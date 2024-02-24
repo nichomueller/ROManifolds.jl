@@ -61,13 +61,13 @@ function RB.Snapshots(
   DistributedSnapshots(psnaps)
 end
 
-function RB.Snapshots(a::DistributedArrayContribution,args...)
-  b = Contribution(IdDict{DistributedTriangulation,DistributedTransientSnapshots}())
-  for (trian,values) in a.dict
-    b[trian] = Snapshots(values,args...)
-  end
-  b
-end
+# function RB.Snapshots(a::DistributedArrayContribution,args...)
+#   b = Contribution(IdDict{DistributedTriangulation,DistributedTransientSnapshots}())
+#   for (trian,values) in a.dict
+#     b[trian] = Snapshots(values,args...)
+#   end
+#   b
+# end
 
 function RB.get_realization(s::DistributedTransientSnapshots)
   s1 = PartitionedArrays.getany(local_views(s.snaps))
