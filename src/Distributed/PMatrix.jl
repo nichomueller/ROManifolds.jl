@@ -9,7 +9,6 @@ struct PMatrix{V,A,B,C,D,T} <: AbstractMatrix{T}
     row_partition,
     col_partition=get_col_partition(matrix_partition,row_partition),
     cache=PartitionedArrays.p_vector_cache(matrix_partition,row_partition))
-    # cache=p_matrix_cache(matrix_partition,row_partition,col_partition))
 
     V = eltype(matrix_partition)
     T = eltype(V)
@@ -67,6 +66,14 @@ function get_col_partition(matrix_partition,row_partition)
     owner = part_id(rows)
     indices = axes(values,2)
     CommonColIndices(Int32.(owner),indices)
+  end
+end
+
+function get_col_partition(a::PVector,b::PVector)
+  ranks = get_parts(a)
+  map(partition(a),partition(b),ranks) do a,b,rank
+    indices = Base.OneTo(length(a)*length(b))
+    CommonColIndices(Int32.(rank),indices)
   end
 end
 
@@ -240,39 +247,100 @@ function Base.:*(b::PMatrix,a::Number)
   a*b
 end
 
-# Not efficient, just for convenience and debugging purposes
-function Base.:*(a::PMatrix,b::PVector)
-  Ta = eltype(a)
-  Tb = eltype(b)
-  T = typeof(zero(Ta)*zero(Tb)+zero(Ta)*zero(Tb))
-  c = PVector{Vector{T}}(undef,partition(axes(a,1)))
-  fill!(c,zero(T))
-  a_in_main = to_trivial_partition(a)
-  b_in_main = to_trivial_partition(b,partition(axes(a_in_main,1)))
-  c_in_main = to_trivial_partition(c,partition(axes(a_in_main,2)))
-  map_main(partition(c_in_main),partition(a_in_main),partition(b_in_main)) do myc,mya,myb
-    myc .= mya*myb
-    nothing
-  end
-  from_trivial_partition!(c,c_in_main)
+function Base.:*(a::PMatrix,b::PVector{V}) where V
+  @check eltype(a) == eltype(a)
+  c = PVector{V}(undef,partition(axes(a,1)))
+  mul!(c,a,b)
   c
 end
 
-# Not efficient, just for convenience and debugging purposes
-function Base.:*(a::PMatrix,b::PMatrix)
-  Ta = eltype(a)
-  Tb = eltype(b)
-  T = typeof(zero(Ta)*zero(Tb)+zero(Ta)*zero(Tb))
-  c = PMatrix{Matrix{T}}(undef,partition(axes(a,1)),partition(axes(b,2)))
-  fill!(c,zero(T))
-  a_in_main = to_trivial_partition(a)
-  b_in_main = to_trivial_partition(b,partition(axes(a_in_main,1)))
-  c_in_main = to_trivial_partition(c,partition(axes(a_in_main,2)))
-  map_main(partition(c_in_main),partition(a_in_main),partition(b_in_main)) do myc,mya,myb
-    myc .= mya*myb
-    nothing
+function Base.:*(a::PMatrix,b::PMatrix{M}) where M
+  @check eltype(a) == eltype(a)
+  c = PMatrix{M}(undef,partition(axes(a,1)),partition(axes(b,2)))
+  mul!(c,a,b)
+  c
+end
+
+function Base.:*(a::PMatrix{M},b::PSparseMatrix) where M
+  @check eltype(a) == eltype(a)
+  c = PMatrix{M}(undef,partition(axes(a,1)),partition(axes(b,2)))
+  mul!(c,a,b)
+  c
+end
+
+function Base.:*(a::PSparseMatrix,b::PMatrix{M}) where M
+  @check eltype(a) == eltype(a)
+  c = PMatrix{M}(undef,partition(axes(a,1)),partition(axes(b,2)))
+  mul!(c,a,b)
+  c
+end
+
+function _compatibility_check(c::AbstractMatrix,a::AbstractMatrix,b::AbstractMatrix)
+  @boundscheck @assert PartitionedArrays.matching_own_indices(axes(c,1),axes(a,1))
+  @boundscheck @assert PartitionedArrays.matching_own_indices(axes(a,2),axes(b,1))
+  @boundscheck @assert PartitionedArrays.matching_ghost_indices(axes(a,2),axes(b,1))
+end
+
+function _compatibility_check(c::AbstractVector,a::AbstractMatrix,b::AbstractVector)
+  @boundscheck @assert PartitionedArrays.matching_own_indices(axes(c,1),axes(a,1))
+  @boundscheck @assert PartitionedArrays.matching_own_indices(axes(a,2),axes(b,1))
+end
+
+function LinearAlgebra.mul!(c::PVector,a::PMatrix,b::PVector,α::Number,β::Number)
+  _compatibility_check(c,a,b)
+  t = consistent!(b)
+  map(own_values(c),own_values(a),own_values(b)) do co,aoo,bo
+    if β != 1
+      β != 0 ? rmul!(co, β) : fill!(co,zero(eltype(co)))
+    end
+    mul!(co,aoo,bo,α,1)
   end
-  from_trivial_partition!(c,c_in_main)
+  wait(t)
+  c
+end
+
+function LinearAlgebra.mul!(c::PMatrix,a::PMatrix,b::PMatrix,α::Number,β::Number)
+  _compatibility_check(c,a,b)
+  t = consistent!(b)
+  map(own_values(c),own_values(a),own_values(b)) do co,ao,bo
+    if β != 1
+      β != 0 ? rmul!(co, β) : fill!(co,zero(eltype(co)))
+    end
+    mul!(co,ao,bo,α,1)
+  end
+  wait(t)
+  c
+end
+
+function LinearAlgebra.mul!(c::PMatrix,a::PSparseMatrix,b::PMatrix,α::Number,β::Number)
+  _compatibility_check(c,a,b)
+  t = consistent!(b)
+  map(own_values(c),own_values(a),own_values(b)) do co,aoo,bo
+    if β != 1
+      β != 0 ? rmul!(co, β) : fill!(co,zero(eltype(co)))
+    end
+    mul!(co,aoo,bo,α,1)
+  end
+  wait(t)
+  map(own_values(c),own_ghost_values(a),ghost_values(b)) do co,aoh,bh
+    mul!(co,aoh,bh,α,1)
+  end
+  c
+end
+
+function LinearAlgebra.mul!(c::PMatrix,a::PMatrix,b::PSparseMatrix,α::Number,β::Number)
+  _compatibility_check(c,a,b)
+  t = consistent!(b)
+  map(own_values(c),own_values(a),own_values(b)) do co,ao,boo
+    if β != 1
+      β != 0 ? rmul!(co, β) : fill!(co,zero(eltype(co)))
+    end
+    mul!(co,ao,boo,α,1)
+  end
+  wait(t)
+  map(own_values(c),ghost_values(a),ghost_own_values(b)) do co,ah,bho
+    mul!(co,ah,bho,α,1)
+  end
   c
 end
 
@@ -298,10 +366,6 @@ function PartitionedArrays.to_trivial_partition(
   a_in_main = similar(a,T,PRange(row_partition_in_main),PRange(col_partition_in_main))
   fill!(a_in_main,zero(T))
   map(own_values(a),partition(a_in_main),partition(axes(a,1)),partition(axes(a,2))) do aown,my_a_in_main,row_indices,col_indices
-    println(own_to_global(row_indices))
-    println(own_to_global(col_indices))
-    println(size(my_a_in_main))
-    println(size(aown))
     if part_id(row_indices) == part_id(col_indices) == destination
       my_a_in_main[own_to_global(row_indices),own_to_global(col_indices)] .= aown
     else

@@ -104,6 +104,8 @@ export ParamJaggedArrayAssemblyCache
 include("ParamJaggedArray.jl")
 
 export ParamSubSparseMatrix
+export AdjointPVector
+export AdjointSubSparseMatrix
 include("ParamSparseUtils.jl")
 
 include("Primitives.jl")

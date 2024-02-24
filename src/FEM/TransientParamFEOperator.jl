@@ -191,7 +191,7 @@ struct TransientParamFEOperatorWithTrian{T<:OperatorType,A,B} <: TransientParamF
   trian_jacs::B
 end
 
-function _set_triangulation(res,jac,jac_t,trian_res,trian_jac,trian_jac_t,order)
+function set_triangulation(res,jac,jac_t,trian_res,trian_jac,trian_jac_t,order)
   degree = 2*order
 
   meas_res = Measure.(trian_res,degree)
@@ -213,7 +213,7 @@ function AffineTransientParamFEOperator(
   res::Function,jac::Function,jac_t::Function,tpspace,trial,test,trian_res,trian_jac,trian_jac_t)
 
   order = get_polynomial_order(test)
-  newres,newjac,newjac_t = _set_triangulation(res,jac,jac_t,trian_res,trian_jac,trian_jac_t,order)
+  newres,newjac,newjac_t = set_triangulation(res,jac,jac_t,trian_res,trian_jac,trian_jac_t,order)
   op = AffineTransientParamFEOperator(newres,newjac,newjac_t,tpspace,trial,test)
   TransientParamFEOperatorWithTrian(op,trian_res,(trian_jac,trian_jac_t))
 end
@@ -222,7 +222,7 @@ function TransientParamFEOperator(
   res::Function,jac::Function,jac_t::Function,tpspace,trial,test,trian_res,trian_jac,trian_jac_t)
 
   order = get_polynomial_order(test)
-  newres,newjac,newjac_t = _set_triangulation(res,jac,jac_t,trian_res,trian_jac,trian_jac_t,order)
+  newres,newjac,newjac_t = set_triangulation(res,jac,jac_t,trian_res,trian_jac,trian_jac_t,order)
   op = TransientParamFEOperator(newres,newjac,newjac_t,tpspace,trial,test)
   TransientParamFEOperatorWithTrian(op,trian_res,(trian_jac,trian_jac_t))
 end
@@ -250,49 +250,17 @@ get_polynomial_order(fs::SingleFieldFESpace) = get_polynomial_order(get_fe_basis
 get_polynomial_order(fs::MultiFieldFESpace) = maximum(map(get_polynomial_order,fs.spaces))
 
 # change triangulation
-function _is_parent(tparent::Triangulation,tchild::Triangulation)
-  false
-end
-
-function _is_parent(
-  tparent::BodyFittedTriangulation,
-  tchild::BodyFittedTriangulation{Dt,Dp,A,<:Geometry.GridView}) where {Dt,Dp,A}
-  tparent.grid === tchild.grid.parent
-end
-
-function _is_parent(tparent::BoundaryTriangulation,tchild::Geometry.TriangulationView)
-  tparent === tchild.parent
-end
-
-function _find_child(tparent::Triangulation,trian)
-  for t in trian
-    if _is_parent(tparent,t) || tparent === t
-      return t
-    end
-  end
-  @unreachable
-end
-
-function _order_triangulations(old_trian,trian)
-  @check length(old_trian) == length(trian)
-  new_trian = ()
-  for t in old_trian
-    new_trian = (new_trian...,_find_child(t,trian))
-  end
-  return new_trian
-end
-
 function change_triangulation(
   op::TransientParamFEOperatorWithTrian{T},
   trian_jacs,
   trian_res) where T
 
-  newtrian_res = _order_triangulations(op.trian_res,trian_res)
-  newtrian_jac,newtrian_jac_t = _order_triangulations.(op.trian_jacs,trian_jacs)
+  newtrian_res = order_triangulations(op.trian_res,trian_res)
+  newtrian_jac,newtrian_jac_t = order_triangulations.(op.trian_jacs,trian_jacs)
   @unpack res,rhs,jacs,assem,tpspace,trials,test,order = op.op
   jac,jac_t = jacs
   porder = get_polynomial_order(test)
-  newres,newjacs... = _set_triangulation(res,jac,jac_t,newtrian_res,newtrian_jac,newtrian_jac_t,porder)
+  newres,newjacs... = set_triangulation(res,jac,jac_t,newtrian_res,newtrian_jac,newtrian_jac_t,porder)
   feop = TransientParamFEOperatorFromWeakForm{T}(newres,rhs,newjacs,assem,tpspace,trials,test,order)
   TransientParamFEOperatorWithTrian(feop,newtrian_res,(newtrian_jac,newtrian_jac_t))
 end
@@ -303,12 +271,10 @@ function Algebra.allocate_residual(
   uh::T,
   cache) where T
 
-  b = array_contribution()
-  _allocate_residual(b,op,r,uh,cache)
+  _allocate_residual(op,r,uh,cache)
 end
 
 function _allocate_residual(
-  b::Contribution,
   op::TransientParamFEOperatorWithTrian,
   r::TransientParamRealization,
   uh::T,
@@ -323,9 +289,9 @@ function _allocate_residual(
   xh = TransientCellField(uh,dxh)
   dc = op.op.res(get_params(r),get_times(r),xh,v)
   assem = get_param_assembler(op.op.assem,r)
-  for trian in op.trian_res
+  b = contribution(op.trian_res) do trian
     vecdata = collect_cell_vector_for_trian(test,dc,trian)
-    b[trian] = allocate_vector(assem,vecdata)
+    allocate_vector(assem,vecdata)
   end
   b
 end
@@ -336,16 +302,10 @@ function Algebra.allocate_jacobian(
   uh::T,
   cache) where T
 
-  A = ()
-  for i = 1:get_order(op)+1
-    Ai = array_contribution()
-    A = (A...,Ai)
-  end
-  _allocate_jacobian(A,op,r,uh,cache)
+  _allocate_jacobian(op,r,uh,cache)
 end
 
 function _allocate_jacobian(
-  A::Tuple{Vararg{Contribution}},
   op::TransientParamFEOperatorWithTrian,
   r::TransientParamRealization,
   uh::T,
@@ -361,13 +321,15 @@ function _allocate_jacobian(
   u = get_trial_fe_basis(trial)
   v = get_fe_basis(test)
   assem = get_param_assembler(op.op.assem,r)
+  A = ()
   for i = 1:get_order(op)+1
     Ai = A[i]
     dc = op.op.jacs[i](get_params(r),get_times(r),xh,u,v)
-    for trian in op.trian_jacs[i]
+    Ai = contribution(op.trian_res) do trian
       matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
-      Ai[trian] = allocate_matrix(assem,matdata)
+      allocate_matrix(assem,matdata)
     end
+    A = (A...,Ai)
   end
   A
 end
@@ -383,8 +345,7 @@ function Algebra.residual!(
   v = get_fe_basis(test)
   dc = op.op.res(get_params(r),get_times(r),xh,v)
   assem = get_param_assembler(op.op.assem,r)
-  for trian in op.trian_res
-    btrian = b[trian]
+  map(b.values,op.trian_res) do btrian,trian
     vecdata = collect_cell_vector_for_trian(test,dc,trian)
     assemble_vector!(btrian,assem,vecdata)
   end
@@ -406,8 +367,7 @@ function Algebra.jacobian!(
   v = get_fe_basis(test)
   assem = get_param_assembler(op.assem,r)
   dc = γᵢ*op.jacs[i](get_params(r),get_times(r),xh,u,v)
-  for trian in op.trian_jacs[i]
-    Atrian = A[trian]
+  map(A.values,op.trian_jacs[i]) do Atrian,trian
     matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
     assemble_matrix_add!(Atrian,assem,matdata)
   end
@@ -431,8 +391,7 @@ function ODETools.jacobians!(
   for i = 1:get_order(op)+1
     Ai = A[i]
     dc = γ[i]*op.op.jacs[i](get_params(r),get_times(r),xh,u,v)
-    for trian in op.trian_jacs[i]
-      Atrian = Ai[trian]
+    map(Ai.values,op.trian_jacs[i]) do Atrian,trian
       matdata = collect_cell_matrix_for_trian(trial,test,dc,trian)
       assemble_matrix_add!(Atrian,assem,matdata)
     end

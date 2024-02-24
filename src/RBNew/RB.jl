@@ -49,6 +49,7 @@ export tensor_getindex
 export tensor_setindex!
 export select_snapshots
 export reverse_snapshots
+export get_values
 export get_realization
 export compress
 include("Snapshots.jl")

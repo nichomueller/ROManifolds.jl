@@ -143,11 +143,8 @@ function fe_matrix!(
   γ::Tuple{Vararg{Real}},
   ode_cache)
 
-  z = zero(eltype(A))
-  LinearAlgebra.fillstored!(A,z)
-  ODETools.jacobians!(A,op.feop,r,xhF,γ,ode_cache)
-  map(A) do A
-    Snapshots(A,r)
+  map(eachindex(A)) do i
+    fe_matrix!(A[i],op,r,xhF[i],i,γ[i],ode_cache)
   end
 end
 

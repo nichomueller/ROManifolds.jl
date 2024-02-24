@@ -18,7 +18,7 @@ Base.ndims(::AbstractSnapshots) = 2
 Base.ndims(::Type{<:AbstractSnapshots}) = 2
 Base.IndexStyle(::Type{<:AbstractSnapshots}) = IndexLinear()
 
-FEM.get_values(s::AbstractSnapshots) = s.values
+get_values(s::AbstractSnapshots) = s.values
 get_realization(s::AbstractSnapshots) = s.realization
 get_mode(s::AbstractSnapshots) = s.mode
 
@@ -133,13 +133,13 @@ function compress(s::AbstractSnapshots{Mode2Axis},a::AbstractMatrix)
   Snapshots(compressed_values,compressed_realization,Mode2Axis())
 end
 
-function Algebra.allocate_in_range(s::AbstractSnapshots{Mode1Axis,T}) where T
-  zeros(T,num_space_dofs(s),1)
-end
+# function Algebra.allocate_in_range(s::AbstractSnapshots{Mode1Axis,T}) where T
+#   zeros(T,num_space_dofs(s),1)
+# end
 
-function Algebra.allocate_in_range(s::AbstractSnapshots{Mode2Axis,T}) where T
-  zeros(T,num_times(s),1)
-end
+# function Algebra.allocate_in_range(s::AbstractSnapshots{Mode2Axis,T}) where T
+#   zeros(T,num_times(s),1)
+# end
 
 function Snapshots(a::ArrayContribution,args...)
   b = array_contribution()
@@ -244,7 +244,7 @@ function BasicSnapshots(
   BasicSnapshots(basic_values,s.realization,s.mode)
 end
 
-function FEM.get_values(s::TransientSnapshots)
+function get_values(s::TransientSnapshots)
   get_values(BasicSnapshots(s))
 end
 
@@ -466,7 +466,7 @@ function tensor_setindex!(
   tensor_setindex!(s.snaps,v,is,it,ip)
 end
 
-function FEM.get_values(s::SelectedSnapshotsAtIndices{Mode1Axis,T,<:BasicSnapshots}) where T
+function get_values(s::SelectedSnapshotsAtIndices{Mode1Axis,T,<:BasicSnapshots}) where T
   @check space_indices(s) == Base.OneTo(num_space_dofs(s))
   v = get_values(s.snaps)
   array = Vector{typeof(first(v))}(undef,num_cols(s))
@@ -478,7 +478,7 @@ function FEM.get_values(s::SelectedSnapshotsAtIndices{Mode1Axis,T,<:BasicSnapsho
   ParamArray(array)
 end
 
-function FEM.get_values(s::SelectedSnapshotsAtIndices{M,T,<:TransientSnapshots}) where {M,T}
+function get_values(s::SelectedSnapshotsAtIndices{M,T,<:TransientSnapshots}) where {M,T}
   get_values(BasicSnapshots(s))
 end
 
@@ -704,7 +704,7 @@ function tensor_setindex!(
   tensor_setindex!(s.snaps,v,is,it,ip)
 end
 
-function FEM.get_values(s::SelectedInnerTimeOuterParamTransientSnapshots)
+function get_values(s::SelectedInnerTimeOuterParamTransientSnapshots)
   @check space_indices(s) == Base.OneTo(num_space_dofs(s))
   v = get_values(s.snaps)
   values = Vector{typeof(first(v))}(undef,num_params(s))
@@ -819,48 +819,42 @@ struct BlockSnapshots{S,N} <: AbstractParamContainer{S,N}
   touched::Array{Bool,N}
   function BlockSnapshots(
     array::Array{S,N},
-    touched::Array{Bool,N}) where {S<:AbstractSnapshots,N}
+    touched::Array{Bool,N}
+    ) where {S<:AbstractSnapshots,N}
 
     @check size(array) == size(touched)
     new{S,N}(array,touched)
   end
 end
 
-function _allocate_snap_blocks(values::ParamBlockArray,args...)
-  vitem = first(blocks(values))
-  sitem = Snapshots(vitem,args...)
-  array = Array{typeof(sitem),ndims(values)}(undef,blocksize(values))
-  touched = Array{Bool,ndims(values)}(undef,blocksize(values))
-  return array,touched
-end
-
-function _allocate_snap_blocks(values::AbstractVector{<:ParamBlockArray},args...)
-  vitem = first.(blocks.(values))
-  sitem = Snapshots(vitem,args...)
-  array = Array{typeof(sitem),ndims(first(values))}(undef,blocksize(first(values)))
-  touched = Array{Bool,ndims(first(values))}(undef,blocksize(first(values)))
-  return array,touched
+function BlockSnapshots(k::BlockMap{N},a::S...) where {S<:AbstractSnapshots,N}
+  array = Array{S,N}(undef,k.size)
+  touched = fill(false,k.size)
+  for (t,i) in enumerate(k.indices)
+    array[i] = a[t]
+    touched[i] = true
+  end
+  BlockSnapshots(array,touched)
 end
 
 function Snapshots(values::ParamBlockArray,args...)
-  array,touched = _allocate_snap_blocks(values,args...)
   block_values = blocks(values)
-  for i = eachindex(array)
-    array[i] = Snapshots(block_values[i],args...)
-    touched[i] = !iszero(array[i])
-  end
-  BlockSnapshots(array,touched)
+  nblocks = blocklength(values)
+  active_block_ids = findall(!iszero,block_values)
+  block_map = BlockMap(nblocks,active_block_ids)
+  active_block_snaps = Any[Snapshots(block_values[i],args...) for i in active_block_ids]
+  BlockSnapshots(block_map,active_block_snaps...)
 end
 
 function Snapshots(values::AbstractVector{<:ParamBlockArray},args...)
-  array,touched = _allocate_snap_blocks(values,args...)
-  block_values = map(blocks,values)
-  for i = eachindex(array)
-    block_i = map(x->getindex(x,i),block_values)
-    array[i] = Snapshots(block_i,args...)
-    touched[i] = !iszero(array[i])
-  end
-  BlockSnapshots(array,touched)
+  vals = first(values)
+  block_vals = blocks(vals)
+  nblocks = blocklength(vals)
+  active_block_ids = findall(!iszero,block_vals)
+  block_map = BlockMap(nblocks,active_block_ids)
+  vec_block_values = map(blocks,values)
+  active_block_snaps = Any[Snapshots(map(x->x[i],vec_block_values),args...) for i in active_block_ids]
+  BlockSnapshots(block_map,active_block_snaps...)
 end
 
 Base.size(s::BlockSnapshots,i...) = size(s.array,i...)
@@ -891,7 +885,7 @@ function Arrays.testitem(s::BlockSnapshots)
   end
 end
 
-function FEM.get_values(s::BlockSnapshots)
+function get_values(s::BlockSnapshots)
   map(get_values,s.array) |> mortar
 end
 
@@ -903,46 +897,32 @@ function get_mode(s::BlockSnapshots)
   get_mode(testitem(s))
 end
 
-function Algebra.allocate_in_range(s::BlockSnapshots{S,N}) where {S,N}
-  array = Array{Matrix{eltype(S)},N}(undef,size(s))
-  touched = s.touched
-  ArrayBlock(array,touched)
+function get_touched_blocks(s::BlockSnapshots)
+  isa(s.touched,CartesianIndex) ? Tuple.(findall(s.touched)) : findall(s.touched)
 end
 
+# function Algebra.allocate_in_range(s::BlockSnapshots{S,N}) where {S,N}
+#   array = Array{Matrix{eltype(S)},N}(undef,size(s))
+#   touched = s.touched
+#   ArrayBlock(array,touched)
+# end
+
 function change_mode(s::BlockSnapshots{<:Any,N},args...;kwargs...) where N
-  S = typeof(change_mode(testitem(s),args...;kwargs...))
-  array = Array{S,N}(undef,size(s))
-  touched = s.touched
-  for i = eachindex(array)
-    if touched[i]
-      array[i] = change_mode(s.array[i],args...;kwargs...)
-    end
-  end
-  BlockSnapshots(array,touched)
+  active_block_ids = get_touched_blocks(s)
+  active_block_snaps = Any[change_mode(s.array[i],args...;kwargs...) for i in active_block_ids]
+  BlockSnapshots(block_map,active_block_snaps...)
 end
 
 function select_snapshots(s::BlockSnapshots{<:Any,N},args...;kwargs...) where N
-  S = typeof(select_snapshots(testitem(s),args...;kwargs...))
-  array = Array{S,N}(undef,size(s))
-  touched = s.touched
-  for i = eachindex(array)
-    if touched[i]
-      array[i] = select_snapshots(s.array[i],args...;kwargs...)
-    end
-  end
-  BlockSnapshots(array,touched)
+  active_block_ids = get_touched_blocks(s)
+  active_block_snaps = Any[select_snapshots(s.array[i],args...;kwargs...) for i in active_block_ids]
+  BlockSnapshots(block_map,active_block_snaps...)
 end
 
 function reverse_snapshots(s::BlockSnapshots{<:Any,N}) where N
-  S = typeof(reverse_snapshots(testitem(s)))
-  array = Array{S,N}(undef,size(s))
-  touched = s.touched
-  for i = eachindex(array)
-    if touched[i]
-      array[i] = reverse_snapshots(s.array[i])
-    end
-  end
-  BlockSnapshots(array,touched)
+  active_block_ids = get_touched_blocks(s)
+  active_block_snaps = Any[reverse_snapshots(s.array[i],args...;kwargs...) for i in active_block_ids]
+  BlockSnapshots(block_map,active_block_snaps...)
 end
 
 # implement mortar

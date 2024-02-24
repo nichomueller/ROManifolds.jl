@@ -69,9 +69,6 @@ export ParamBlockVector
 include("ParamBlockArray.jl")
 
 export Contribution
-export ArrayContribution
-export array_contribution
-export get_values
 include("Contribution.jl")
 
 export ParamReindex

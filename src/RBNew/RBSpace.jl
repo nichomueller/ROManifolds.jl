@@ -3,31 +3,19 @@ function reduced_fe_space(
   feop::TransientParamFEOperator,
   s::S) where S
 
-  trial = get_trial(feop)
-  test = get_test(feop)
   norm_matrix = get_norm_matrix(info,feop)
   soff = select_snapshots(s,offline_params(info))
-  basis_space,basis_time = reduced_basis(soff,norm_matrix;ϵ=get_tol(info))
+  bases = reduced_basis(soff,norm_matrix;ϵ=get_tol(info),format=get_format(info))
   if info.compute_supremizers
-    supr_op = compute_supremizer_operator(feop)
-    basis_space = add_space_supremizers(basis_space,supr_op,norm_matrix)
-    basis_time = add_time_supremizers(basis_time)
+    bases = enrich_basis(feop,bases,norm_matrix)
   end
-  reduced_trial = RBSpace(trial,basis_space,basis_time)
-  reduced_test = RBSpace(test,basis_space,basis_time)
+  reduced_trial = reduced_fe_space(get_trial(feop),bases...)
+  reduced_test = reduced_fe_space(get_test(feop),bases...)
   return reduced_trial,reduced_test
 end
 
 function reduced_basis(s::AbstractSnapshots,args...;kwargs...)
   basis_space,basis_time = compute_bases(s,args...;kwargs...)
-  return basis_space,basis_time
-end
-
-function reduced_basis(s::TransientSnapshotsWithDirichletValues,args...;kwargs...)
-  basis_space,basis_time = compute_bases(soff_free,args...;kwargs...)
-  ranks = size(basis_space,2),size(basis_time,2)
-  sdir = get_dirichlet_values(s)
-  basis_space_dir,basis_time_dir = compute_bases(sdir,args...;ranks)
   return basis_space,basis_time
 end
 
@@ -44,8 +32,7 @@ function compute_bases(
 
   flag,s = _return_flag(s)
   b1 = tpod(s,norm_matrix;kwargs...)
-  compressed_s = compress(s,b1)
-  compressed_s = change_mode(compressed_s)
+  compressed_s = compress(s,b1) |> change_mode
   b2 = tpod(compressed_s;kwargs...)
   _return_bases(flag,b1,b2)
 end
@@ -66,6 +53,10 @@ function _return_bases(flag,b1,b2)
     basis_space,basis_time = b1,b2
   end
   basis_space,basis_time
+end
+
+function reduced_fe_space(space::FESpace,bases...)
+  RBSpace(space,bases...)
 end
 
 struct RBSpace{S,BS,BT} <: FESpace
@@ -211,6 +202,7 @@ function recast(red_x::ParamVector,r::RBSpace)
 end
 
 # multi field interface
+
 const BlockRBSpace = RBSpace{S,BS,BT} where {S,BS<:ArrayBlock,BT<:ArrayBlock}
 
 function Base.getindex(r::BlockRBSpace,i...)
@@ -271,15 +263,6 @@ function FESpaces.zero_free_values(
   return mortar(map(allocate_vector,block_vtypes,block_num_dofs))
 end
 
-function BlockArrays.blocks(r::BlockRBSpace)
-  touched = r.basis_space.touched
-  map(findall(touched)) do i
-    getindex(r,i)
-  end
-end
-
-BlockArrays.blocksize(r::BlockRBSpace) = size(r.basis_space)
-
 function num_reduced_space_dofs(r::BlockRBSpace)
   dofs = Int[]
   for ri in r
@@ -304,16 +287,16 @@ function reduced_basis(s::BlockSnapshots;kwargs...)
 end
 
 function reduced_basis(s::BlockSnapshots,norm_matrix;kwargs...)
-  s2 = change_mode(s)
-  basis_space = allocate_in_range(s)
-  basis_time = allocate_in_range(s2)
-  for i = eachindex(s)
-    if s.touched[i]
-      bs,bt = reduced_basis(s.array[i],norm_matrix[i];kwargs...)
-      basis_space.array[i] = bs
-      basis_time.array[i] = bt
-    end
-  end
+  active_block_ids = get_touched_blocks(s)
+  bases = Any[reduced_basis(s.array[i],norm_matrix[i];kwargs...) for i in active_block_ids]
+  tuple_of_arrays(bases)
+end
+
+function enrich_basis(feop::TransientFEOperator,bases,norm_matrix)
+  _basis_space,_basis_time = bases
+  supr_op = compute_supremizer_operator(feop)
+  basis_space = add_space_supremizers(_basis_space,supr_op,norm_matrix)
+  basis_time = add_time_supremizers(_basis_time)
   return basis_space,basis_time
 end
 

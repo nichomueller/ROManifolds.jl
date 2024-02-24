@@ -45,12 +45,12 @@ function RB.Snapshots(
   args...) where {P<:AbstractParamContainer}
 
   index_partition = first(values).index_partition
-  parts = map(part_id,index_partition)
+  parts = get_parts(first(values))
   snaps = map(parts) do part
     vals_part = Vector{P}(undef,length(values))
     for (k,v) in enumerate(values)
-      map(local_views(v),index_partition) do val,ip
-        if part_id(ip) == part
+      map(local_views(v),get_parts(v)) do val,inner_part
+        if inner_part == part
           vals_part[k] = val
         end
       end
