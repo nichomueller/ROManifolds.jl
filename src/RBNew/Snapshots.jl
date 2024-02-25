@@ -878,6 +878,9 @@ function Arrays.testitem(s::BlockSnapshots)
   end
 end
 
+FEM.num_times(s::BlockSnapshots) = num_times(testitem(s))
+FEM.num_params(s::BlockSnapshots) = num_params(testitem(s))
+
 function FEM.get_values(s::BlockSnapshots)
   map(get_values,s.array) |> mortar
 end
@@ -892,6 +895,11 @@ end
 
 function get_touched_blocks(s::BlockSnapshots)
   findall(s.touched)
+end
+
+function get_touched_linear_blocks(s::BlockSnapshots)
+  ids = get_touched_blocks(s)
+  isa(first(ids),CartesianIndex) ? Tuple.(ids) : ids
 end
 
 function change_mode(s::BlockSnapshots{<:Any,N},args...;kwargs...) where N
@@ -911,7 +919,17 @@ end
 function reverse_snapshots(s::BlockSnapshots{<:Any,N}) where N
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
-  active_block_snaps = Any[reverse_snapshots(s[i],args...;kwargs...) for i in active_block_ids]
+  active_block_snaps = Any[reverse_snapshots(s[i]) for i in active_block_ids]
+  BlockSnapshots(block_map,active_block_snaps...)
+end
+
+function reverse_snapshots_at_indices(
+  s::BlockSnapshots{<:Any,N},
+  indices_space::ArrayBlock{<:Any,N}) where N
+
+  active_block_ids = get_touched_blocks(s)
+  block_map = BlockMap(size(s),active_block_ids)
+  active_block_snaps = Any[reverse_snapshots_at_indices(s[i],indices_space[i]) for i in active_block_ids]
   BlockSnapshots(block_map,active_block_snaps...)
 end
 

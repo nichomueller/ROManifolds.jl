@@ -151,7 +151,7 @@ end
 function MultiField._restrict_to_field(
   f,
   mfs::BlockMultiFieldStyle{NB,SB,P},
-  free_values::ParamBlockVector,
+  free_values::Union{<:ParamBlockVector,<:ParamBlockVectorView},
   field) where {NB,SB,P}
 
   @check blocklength(free_values) == NB

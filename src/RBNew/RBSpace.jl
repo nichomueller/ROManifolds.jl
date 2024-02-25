@@ -103,7 +103,7 @@ FESpaces.get_dirichlet_dof_tag(r::RBSpace) = get_dirichlet_dof_tag(r.space)
 function FESpaces.get_vector_type(r::RBSpace)
   change_length(x) = x
   change_length(::Type{ParamVector{T,A,L}}) where {T,A,L} = ParamVector{T,A,Int(L/num_times(r))}
-  change_length(::Type{ParamBlockVector{T,A,L}}) where {T,A,L} = ParamBlockVector{T,A,Int(L/num_times(r))}
+  change_length(::Type{<:ParamBlockVector{T,A,L}}) where {T,A,L} = ParamBlockVector{T,A,Int(L/num_times(r))}
   V = get_vector_type(r.space)
   newV = change_length(V)
   return newV
@@ -259,8 +259,10 @@ end
 function FESpaces.zero_free_values(
   r::BlockRBSpace{<:MultiFieldParamFESpace{<:BlockMultiFieldStyle{NB}}}) where NB
   block_num_dofs = map(range->num_free_dofs(r[range]),1:NB)
-  block_vtypes = map(range->get_vector_type(r.space[range]),1:NB)
-  return mortar(map(allocate_vector,block_vtypes,block_num_dofs))
+  block_vtypes = map(range->get_vector_type(r[range]),1:NB)
+  values = mortar(map(allocate_vector,block_vtypes,block_num_dofs))
+  fill!(values,zero(eltype(values)))
+  return values
 end
 
 function num_reduced_space_dofs(r::BlockRBSpace)
@@ -355,9 +357,14 @@ function add_time_supremizers(basis_time;tol=1e-2)
   return ArrayBlock([basis_primal,basis_dual],basis_time.touched)
 end
 
-function recast(r::BlockRBSpace,red_x::ParamBlockVector)
-  block_red_x = map(blocks(red_x),blocks(r)) do red_x,r
-    recast(red_x,r)
+function recast(red_x::ParamBlockVector,r::BlockRBSpace)
+  # block_red_x = [recast(red_x[Block(i)],r[i]) for i = eachblock(red_x)]
+  # mortar(block_red_x)
+  block_red_x = map(eachblock(red_x)) do i
+    red_x_i = red_x[Block(i)]
+    r_i = r[i]
+    array = [recast(red_x_i[j],r_i) for j = eachindex(red_x_i)]
+    ParamArray(array)
   end
-  mortar(block_red_x)
+  block_red_x = [recast(red_x[][Block(i)],r[i]) for i = (red_x)]
 end

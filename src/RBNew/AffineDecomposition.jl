@@ -483,21 +483,25 @@ function get_touched_blocks(a::BlockAffineDecomposition)
 end
 
 function get_integration_domain(a::BlockAffineDecomposition)
-  union_indices_space = get_indices_space(a)
+  active_block_ids = get_touched_blocks(a)
+  block_indices_space = get_indices_space(a)
+  union_indices_space = union([block_indices_space[i] for i in active_block_ids]...)
   union_indices_time = get_indices_time(a)
   ReducedIntegrationDomain(union_indices_space,union_indices_time)
 end
 
 function get_interp_matrix(a::BlockAffineDecomposition)
-  active_block_ids = get_touched_blocks(s)
+  active_block_ids = get_touched_blocks(a)
   block_map = BlockMap(size(a),active_block_ids)
   mdeim_interp = Any[get_interp_matrix(a[i]) for i = active_block_ids(a)]
   return_cache(block_map,mdeim_interp...)
 end
 
 function get_indices_space(a::BlockAffineDecomposition)
+  active_block_ids = get_touched_blocks(a)
+  block_map = BlockMap(size(a),active_block_ids)
   indices_space = Any[get_indices_space(a[i]) for i = get_touched_blocks(a)]
-  union(indices_space...)
+  return_cache(block_map,indices_space...)
 end
 
 function get_indices_time(a::BlockAffineDecomposition)
@@ -566,8 +570,10 @@ end
 function mdeim_coeff!(cache,a::BlockAffineDecomposition,b::BlockSnapshots)
   @check get_touched_blocks(a) == get_touched_blocks(b)
   active_block_ids = get_touched_blocks(a)
-  for i = eachindex(cache)
-    mdeim_coeff!(cache[i],a[active_block_ids[i]],b[active_block_ids[i]])
+  coeff,coeff_recast = cache
+  for (i,acti) = enumerate(active_block_ids)
+    cachei = coeff[i],coeff_recast[i]
+    mdeim_coeff!(cachei,a[acti],b[acti])
   end
 end
 

@@ -97,14 +97,16 @@ z = similar(y)
 z .= 0.0
 
 ode_cache = allocate_cache(red_op,r)
-# mat_cache,vec_cache = ODETools._allocate_matrix_and_vector(red_op,r,y,ode_cache)
+mat_cache,vec_cache = ODETools._allocate_matrix_and_vector(red_op,r,y,ode_cache)
 
-red_test = get_test(red_op)
-# RB.allocate_mdeim_lincomb(red_trial,red_test,r)
-active_block_ids = Iterators.product(RB.get_touched_blocks(red_test),RB.get_touched_blocks(red_trial))
-block_lincomb = Any[RB.allocate_mdeim_lincomb(red_trial[j],red_test[i],r) for (i,j) in active_block_ids]
-block_tc,block_lc = PartitionedArrays.tuple_of_arrays(block_lincomb)
-lc = mortar(block_lc)
+ode_cache = update_cache!(ode_cache,red_op,r)
+A,b = ODETools._matrix_and_vector!(mat_cache,vec_cache,red_op,r,dtθ,y,ode_cache,z)
+afop = AffineOperator(A,b)
+solve!(red_x,fesolver.nls,afop)
 
-ziocan = Any[RB.allocate_mdeim_lincomb(red_trial[j],red_test[i],r)[2] for (i,j) in active_block_ids]
-ziocan[3]
+# x = recast(red_x,red_trial)
+block_red_x = [recast(red_x[Block(i)],red_trial[i]) for i = eachblock(red_x)]
+mortar(block_red_x)
+
+num_free_dofs(red_trial[1])
+num_free_dofs(red_trial[2])

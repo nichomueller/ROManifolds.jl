@@ -105,15 +105,22 @@ function ODETools.jacobians!(
   return A
 end
 
+function _select_fe_space_at_time_locations(fs,indices)
+  fs
+end
+
+function _select_fe_space_at_time_locations(fs::TrialParamFESpace,indices)
+  dvi = ParamArray(fs.dirichlet_values[indices])
+  TrialParamFESpace(dvi,fs.space)
+end
+
 function _select_cache_at_time_locations(xhF::Tuple{Vararg{ParamVector}},ode_cache,indices)
   Us,Uts,fecache = ode_cache
   new_xhF = ()
   new_Us = ()
   for i = eachindex(xhF)
-    spacei = Us[i].space
-    dvi = ParamArray(Us[i].dirichlet_values[indices])
-    new_Us = (new_Us...,TrialParamFESpace(dvi,spacei))
-    new_xhF = (new_xhF...,ParamArray(xhF[i][indices]))
+    new_Us = (new_Us...,_select_fe_space_at_time_locations(Us[i],indices))
+    new_xhF = (new_xhF...,xhF[i][indices])
   end
   new_ode_cache = new_Us,Uts,fecache
   return new_xhF,new_ode_cache
@@ -124,9 +131,11 @@ function _select_cache_at_time_locations(xhF::Tuple{Vararg{ParamBlockVector}},od
   new_xhF = ()
   new_Us = ()
   for i = eachindex(xhF)
-    spacei = Us[i].space
-    dvi = ParamArray(Us[i].dirichlet_values[indices])
-    new_Us = (new_Us...,TrialParamFESpace(dvi,spacei))
+    spacei = Us[i]
+    VT = spacei.vector_type
+    style = spacei.multi_field_style
+    spacesi = [_select_fe_space_at_time_locations(spaceij,indices) for spaceij in spacei]
+    new_Us = (new_Us...,MultiFieldParamFESpace(VT,spacesi,style))
     new_xhF = (new_xhF...,ParamArray(xhF[i][indices]))
   end
   new_ode_cache = new_Us,Uts,fecache

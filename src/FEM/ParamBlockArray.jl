@@ -228,6 +228,9 @@ function ParamBlockArrayView(a::ParamBlockArray,ind::Integer)
   mymortar(a,ind)
 end
 
+const ParamBlockVectorView{T,A,I} = ParamBlockArrayView{T,1,A,I}
+const ParamBlockMatrixView{T,A,I} = ParamBlockArrayView{T,2,A,I}
+
 Base.eltype(a::ParamBlockArrayView) = eltype(a.param_blocks)
 Base.ndims(a::ParamBlockArrayView) = ndims(a.param_blocks)
 Base.size(a::ParamBlockArrayView) = size(a.param_blocks)
@@ -236,10 +239,23 @@ Base.length(a::ParamBlockArrayView) = length(a.inds)
 
 function Base.getindex(a::ParamBlockArrayView,i...)
   blockarrays = get_array(a.param_blocks)
-  blocks = [block[i...] for block in blockarrays]
+  ind = map(j -> getindex(a.inds,j),i)
+  blocks = [block[ind] for block in blockarrays]
   ParamBlockArray(blocks,axes(a))
 end
 
-function Base.getindex(a::ParamBlockArrayView,ind::Integer)
-  mymortar(a.param_blocks,ind)
+function Base.getindex(a::ParamBlockArrayView,i::Integer)
+  mymortar(a.param_blocks,a.inds[i])
+end
+
+function Base.getindex(a::ParamBlockArrayView{T},nb::Block{1}) where T
+  blockarrays = get_array(a.param_blocks)
+  block = blockarrays[nb.n...]
+  block[a.inds]
+end
+
+function Base.getindex(a::ParamBlockArrayView{T},nb::Block{N}) where {T,N}
+  blockarrays = get_array(a.param_blocks)
+  block = blockarrays[nb.n...]
+  block[a.inds]
 end
