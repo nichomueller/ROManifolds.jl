@@ -890,11 +890,6 @@ function get_mode(s::BlockSnapshots)
   get_mode(testitem(s))
 end
 
-# _as_iterable_index(i) = i
-# _as_iterable_index(i::CartesianIndex) = Tuple(i)
-# _as_iterable_index(i::Vector{<:CartesianIndex}) = Tuple.(i)
-# _as_iterable_index(i::Tuple{Vararg{CartesianIndex}}) = Tuple.(i)
-
 function get_touched_blocks(s::BlockSnapshots)
   findall(s.touched)
 end
