@@ -1,52 +1,46 @@
-struct ParamBlockArray{T,N,A,L,B} <: AbstractParamContainer{T,N}
+struct ParamBlockArray{T,N,A,L,B,BS} <: AbstractParamContainer{T,N}
   blockarrays::B
+  axes::BS
   function ParamBlockArray(
-    blockarrays::BlockArray{T,N,<:AbstractArray{ParamArray{T,N,A,L}}}
-    ) where {T,N,A,L}
+    blockarrays::AbstractArray{ParamArray{T,N,A,L}},
+    axes::BS
+    ) where {T,N,A,L,BS}
     B = typeof(blockarrays)
-    new{T,N,A,L,B}(blockarrays)
+    new{T,N,A,L,B,BS}(blockarrays,axes)
   end
 end
 
 const ParamBlockVector{T,A,L,B} = ParamBlockArray{T,1,A,L,B}
 const ParamBlockMatrix{T,A,L,B} = ParamBlockArray{T,2,A,L,B}
 
-@inline function BlockArrays._BlockArray(
-  blocks::AbstractArray{<:AbstractParamContainer},
-  block_sizes::Vararg{AbstractVector{<:Integer},N}
-  ) where N
-
-  blockarrays = BlockArrays._BlockArray(blocks,map(blockedrange,block_sizes))
-  ParamBlockArray(blockarrays)
-end
-
 function BlockArrays.mortar(blocks::AbstractArray{<:AbstractParamContainer})
-  s = BlockArrays.sizes_from_blocks(first.(blocks))
-  BlockArrays._BlockArray(blocks,s...)
+  block_sizes = BlockArrays.sizes_from_blocks(first.(blocks))
+  block_axes = map(blockedrange,block_sizes)
+  ParamBlockArray(blocks,block_axes)
 end
 
 Arrays.get_array(a::ParamBlockArray) = a.blockarrays
-Arrays.testitem(a::ParamBlockArray) = first(a)
-BlockArrays.blocks(a::ParamBlockArray) = blocks(get_array(a))
-BlockArrays.blocklength(a::ParamBlockArray) = blocklength(get_array(a))
-BlockArrays.blocksize(a::ParamBlockArray) = blocksize(get_array(a))
-Base.length(a::ParamBlockArray) = length(first(blocks(a)))
+BlockArrays.blocks(a::ParamBlockArray) = get_array(a)
+BlockArrays.blocksize(a::ParamBlockArray,i...) = size(get_array(a),i...)
+BlockArrays.blocklength(a::ParamBlockArray) = length(get_array(a))
+BlockArrays.eachblock(a::ParamBlockArray) = Base.OneTo(blocklength(a))
+Base.length(a::ParamBlockArray{T,N,A,L}) where {T,N,A,L} = L
 Base.size(a::ParamBlockArray) = map(length,axes(a))
-Base.axes(a::ParamBlockArray) = axes(get_array(a))
+Base.axes(a::ParamBlockArray) = a.axes
 Base.eltype(::ParamBlockArray{T}) where T = T
 Base.eltype(::Type{<:ParamBlockArray{T}}) where T = T
 Base.ndims(::ParamBlockArray{T,N} where T) where N = N
 Base.ndims(::Type{<:ParamBlockArray{T,N}} where T) where N = N
 Base.eachindex(::ParamBlockArray{T,N,A,L}) where {T,N,A,L} = Base.OneTo(L)
+
+Arrays.testitem(a::ParamBlockArray) = first(a)
 Base.first(a::ParamBlockArray) = getindex(a,1)
+Base.getindex(a::ParamBlockArray,i...) = ParamBlockArrayView(a,i...)
+Base.getindex(a::ParamBlockArray{T},nb::Block{1}) where T = get_array(a)[nb.n...]
+Base.getindex(a::ParamBlockArray{T},nb::Block{N}) where {T,N} = get_array(a)[nb.n...]
 
-function Base.getindex(a::ParamBlockArray,i::Integer)
-  blocksi = getindex.(blocks(a),i)
-  BlockArrays._BlockArray(blocksi,axes(a))
-end
-
-function Base.setindex!(a::ParamBlockArray,v::BlockArray,i::Integer)
-  blocksi = getindex.(blocks(a),i)
+function Base.setindex!(a::ParamBlockArray,v::BlockArray,i...)
+  blocksi = getindex(a,i...)
   setindex!(blocksi,v,i)
   a
 end
@@ -60,11 +54,7 @@ function Base.show(io::IO,::MIME"text/plain",a::ParamBlockArray{T,N,A,L}) where 
 end
 
 function Base.copy(a::ParamBlockArray)
-  b = map(blocks(a)) do block
-    copy(block)
-  end
-  blockarrays = BlockArrays._BlockArray(b,axes(a))
-  ParamBlockArray(blockarrays)
+  ParamBlockArray(copy.(get_array(a)),a.axes)
 end
 
 function Base.similar(
@@ -72,43 +62,44 @@ function Base.similar(
   element_type::Type{S}=T,
   dims::Tuple{Int,Vararg{Int}}=size(first(blocks(a)))) where {T,S}
 
-  b = map(blocks(a)) do block
-    similar(block,element_type,dims)
-  end
-  blockarrays = BlockArrays._BlockArray(b,axes(a))
-  ParamBlockArray(blockarrays)
+  ParamBlockArray(similar.(get_array(a),element_type,dims),a.axes)
 end
 
 function LinearAlgebra.fillstored!(a::ParamBlockMatrix,v)
-  map(ai->LinearAlgebra.fillstored!(ai,v),a)
+  for i = eachblock(a)
+    LinearAlgebra.fillstored!(a.blockarrays[i],v)
+  end
+  a
 end
 
 function Base.fill!(a::ParamBlockVector,v)
-  map(ai->fill!(ai,v),a)
+  for i = eachblock(a)
+    fill!(a.blockarrays[i],v)
+  end
+  a
 end
 
 function Base.:+(a::T,b::T) where T<:ParamBlockArray
-  c = map(blocks(a),blocks(b)) do blocka,blockb
-    blocka+blockb
+  @assert a.axes == b.axes
+  c = map(get_array(a),get_array(b)) do a,b
+    a+b
   end
-  blockarrays = BlockArrays._BlockArray(c,axes(a))
-  ParamBlockArray(blockarrays)
+  ParamBlockArray(c,a.axes)
 end
 
 function Base.:-(a::T,b::T) where T<:ParamBlockArray
-  c = map(blocks(a),blocks(b)) do blocka,blockb
-    blocka-blockb
+  @assert a.axes == b.axes
+  c = map(get_array(a),get_array(b)) do a,b
+    a-b
   end
-  blockarrays = BlockArrays._BlockArray(c,axes(a))
-  ParamBlockArray(blockarrays)
+  ParamBlockArray(c,a.axes)
 end
 
 function Base.:*(a::ParamBlockArray,b::Number)
-  c = map(blocks(a)) do blocka
-    blocka*b
+  c = map(get_array(a)) do a
+    a*b
   end
-  blockarrays = BlockArrays._BlockArray(c,axes(a))
-  ParamBlockArray(blockarrays)
+  ParamBlockArray(c,a.axes)
 end
 
 function Base.:*(a::Number,b::ParamBlockArray)
@@ -122,16 +113,16 @@ function LinearAlgebra.mul!(
   α::Number,β::Number)
 
   @assert length(a) == length(b) == length(c)
-  map(c,a,b) do c,a,b
-    mul!(c,a,b,α,β)
+  @inbounds for i = eachindex(a)
+    mul!(c[i],a[i],b[i],α,β)
   end
   c
 end
 
 function LinearAlgebra.ldiv!(a::ParamBlockArray,m::LU,b::ParamBlockArray)
   @assert length(a) == length(b)
-  map(a,b) do a,b
-    ldiv!(a,m,b)
+  @inbounds for i = eachindex(a)
+    ldiv!(a[i],m,b[i])
   end
   a
 end
@@ -145,22 +136,20 @@ function LinearAlgebra.ldiv!(a::ParamBlockArray,m::AbstractArray,b::ParamBlockAr
 end
 
 function LinearAlgebra.rmul!(a::ParamBlockArray,b::Number)
-  map(a) do a
+  map(get_array(a)) do a
     rmul!(a,b)
   end
 end
 
 function LinearAlgebra.lu(a::ParamBlockArray)
-  lua = map(a) do a
-    lu(a)
-  end
+  lua = [lu(a[i]) for i = eachindex(a)]
   ParamContainer(lua)
 end
 
 function LinearAlgebra.lu!(a::ParamBlockArray,b::ParamBlockArray)
   @assert length(a) == length(b)
-  map(blocks(a),blocks(b)) do a,b
-    lu!(a,b)
+  @inbounds for i = eachindex(a)
+    lu!(a[i],b[i])
   end
   a
 end
@@ -169,8 +158,9 @@ struct ParamBlockBroadcast{D} <: AbstractParamBroadcast
   array::D
 end
 
-_get_array(a::ParamBlockBroadcast) = a.array
-_get_array(a::ParamBlockArray) = a
+_get_array(a::ParamBlockBroadcast) = _get_array(a.array)
+_get_array(a::ParamBlockArray) = get_array(a)
+_get_array(a) = a
 
 function Base.broadcasted(f,a::Union{ParamBlockArray,ParamBlockBroadcast}...)
   bc = map((x...)->Base.broadcasted(f,x...),map(_get_array,a)...)
@@ -211,10 +201,45 @@ function Base.materialize!(a::ParamBlockArray,b::Broadcast.Broadcasted)
 end
 
 function Base.materialize!(a::ParamBlockArray,b::ParamBlockBroadcast)
-  map(i->Base.materialize!(_get_array(a)[i],_get_array(b)[i]),eachindex(a))
+  map(i->Base.materialize!(_get_array(a)[i],_get_array(b)[i]),eachblock(a))
   a
 end
 
 function Base.map(f,a::ParamBlockArray)
-  map(i->f(a[i]),eachindex(a))
+  map(i->f(get_array(a)[i]),eachblock(a))
+end
+
+function mymortar(a::ParamBlockArray,ind::Integer)
+  BlockArrays._BlockArray([block[ind] for block in get_array(a)],axes(a))
+end
+
+struct ParamBlockArrayView{T,N,A,I} <: AbstractParamContainer{T,N}
+  param_blocks::A
+  inds::I
+  function ParamBlockArrayView(
+    param_blocks::A,
+    inds::I
+    ) where {T,N,A<:ParamBlockArray{T,N},I<:AbstractVector}
+    new{T,N,A,I}(param_blocks,inds)
+  end
+end
+
+function ParamBlockArrayView(a::ParamBlockArray,ind::Integer)
+  mymortar(a,ind)
+end
+
+Base.eltype(a::ParamBlockArrayView) = eltype(a.param_blocks)
+Base.ndims(a::ParamBlockArrayView) = ndims(a.param_blocks)
+Base.size(a::ParamBlockArrayView) = size(a.param_blocks)
+Base.axes(a::ParamBlockArrayView) = axes(a.param_blocks)
+Base.length(a::ParamBlockArrayView) = length(a.inds)
+
+function Base.getindex(a::ParamBlockArrayView,i...)
+  blockarrays = get_array(a.param_blocks)
+  blocks = [block[i...] for block in blockarrays]
+  ParamBlockArray(blocks,axes(a))
+end
+
+function Base.getindex(a::ParamBlockArrayView,ind::Integer)
+  mymortar(a.param_blocks,ind)
 end

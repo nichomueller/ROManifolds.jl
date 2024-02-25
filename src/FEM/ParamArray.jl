@@ -17,7 +17,7 @@ function ParamArray(array)
   ParamArray(array,Val(length(array)))
 end
 
-function ParamArray(array::AbstractVector{T}) where {T<:Number}
+function ParamArray(array::AbstractArray{T}) where {T<:Number}
   array
 end
 
@@ -44,7 +44,7 @@ Base.ndims(::Type{ParamArray{T,N,A,L}}) where {T,N,A,L} = N
 Base.first(a::ParamArray) = testitem(a)
 Base.eachindex(::ParamArray{T,N,A,L}) where {T,N,A,L} = Base.OneTo(L)
 Base.lastindex(::ParamArray{T,N,A,L}) where {T,N,A,L} = L
-Base.getindex(a::ParamArray,i...) = getindex(get_array(a),i...)
+Base.getindex(a::ParamArray,i...) = ParamArray(getindex(get_array(a),i...))
 Base.setindex!(a::ParamArray,v,i...) = setindex!(get_array(a),v,i...)
 Base.iterate(a::ParamArray,i...) = iterate(get_array(a),i...)
 

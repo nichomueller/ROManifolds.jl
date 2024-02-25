@@ -109,7 +109,9 @@ function FESpaces.zero_free_values(f::MultiFieldParamFESpace{<:BlockMultiFieldSt
   block_ranges   = MultiField.get_block_ranges(NB,SB,P)
   block_num_dofs = map(range->sum(map(num_free_dofs,f.spaces[range])),block_ranges)
   block_vtypes   = map(range->get_vector_type(first(f.spaces[range])),block_ranges)
-  return mortar(map(allocate_vector,block_vtypes,block_num_dofs))
+  values = mortar(map(allocate_vector,block_vtypes,block_num_dofs))
+  fill!(values,zero(eltype(values)))
+  return values
 end
 
 FESpaces.get_dof_value_type(::MultiFieldParamFESpace{MS,CS,V}) where {MS,CS,V} = eltype(V)
@@ -157,15 +159,12 @@ function MultiField._restrict_to_field(
 
   block_ranges = MultiField.get_block_ranges(NB,SB,P)
   block_idx    = findfirst(range -> field ∈ range, block_ranges)
-  block_free_values = map(free_values) do free_values
-    free_values[Block(block_idx)]
-  end
-  pblock_free_values = ParamArray(block_free_values)
+  block_free_values = free_values[Block(block_idx)]
 
   offsets = compute_field_offsets(f,mfs)
   pini = offsets[field] + 1
   pend = offsets[field] + num_free_dofs(U[field])
-  return SubVector(pblock_free_values,pini,pend)
+  return SubVector(block_free_values,pini,pend)
 end
 
 function MultiField.compute_field_offsets(f::MultiFieldParamFESpace)
