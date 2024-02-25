@@ -825,9 +825,14 @@ function BlockSnapshots(k::BlockMap{N},a::S...) where {S<:AbstractSnapshots,N}
   BlockSnapshots(array,touched)
 end
 
+function Fields.BlockMap(s::NTuple,inds::Vector{<:Integer})
+  cis = [CartesianIndex((i,)) for i in inds]
+  BlockMap(s,cis)
+end
+
 function Snapshots(values::ParamBlockArray,args...)
   block_values = blocks(values)
-  nblocks = blocklength(values)
+  nblocks = blocksize(values)
   active_block_ids = findall(!iszero,block_values)
   block_map = BlockMap(nblocks,active_block_ids)
   active_block_snaps = Any[Snapshots(block_values[i],args...) for i in active_block_ids]
@@ -837,7 +842,7 @@ end
 function Snapshots(values::AbstractVector{<:ParamBlockArray},args...)
   vals = first(values)
   block_vals = blocks(vals)
-  nblocks = blocklength(vals)
+  nblocks = blocksize(vals)
   active_block_ids = findall(!iszero,block_vals)
   block_map = BlockMap(nblocks,active_block_ids)
   vec_block_values = map(blocks,values)
@@ -885,26 +890,33 @@ function get_mode(s::BlockSnapshots)
   get_mode(testitem(s))
 end
 
+# _as_iterable_index(i) = i
+# _as_iterable_index(i::CartesianIndex) = Tuple(i)
+# _as_iterable_index(i::Vector{<:CartesianIndex}) = Tuple.(i)
+# _as_iterable_index(i::Tuple{Vararg{CartesianIndex}}) = Tuple.(i)
+
 function get_touched_blocks(s::BlockSnapshots)
-  touched = s.touched
-  isa(touched,CartesianIndex) ? Tuple.(findall(touched)) : findall(touched)
+  findall(s.touched)
 end
 
 function change_mode(s::BlockSnapshots{<:Any,N},args...;kwargs...) where N
   active_block_ids = get_touched_blocks(s)
-  active_block_snaps = Any[change_mode(s.array[i],args...;kwargs...) for i in active_block_ids]
+  block_map = BlockMap(size(s),active_block_ids)
+  active_block_snaps = Any[change_mode(s[i],args...;kwargs...) for i in active_block_ids]
   BlockSnapshots(block_map,active_block_snaps...)
 end
 
 function select_snapshots(s::BlockSnapshots{<:Any,N},args...;kwargs...) where N
   active_block_ids = get_touched_blocks(s)
-  active_block_snaps = Any[select_snapshots(s.array[i],args...;kwargs...) for i in active_block_ids]
+  block_map = BlockMap(size(s),active_block_ids)
+  active_block_snaps = Any[select_snapshots(s[i],args...;kwargs...) for i in active_block_ids]
   BlockSnapshots(block_map,active_block_snaps...)
 end
 
 function reverse_snapshots(s::BlockSnapshots{<:Any,N}) where N
   active_block_ids = get_touched_blocks(s)
-  active_block_snaps = Any[reverse_snapshots(s.array[i],args...;kwargs...) for i in active_block_ids]
+  block_map = BlockMap(size(s),active_block_ids)
+  active_block_snaps = Any[reverse_snapshots(s[i],args...;kwargs...) for i in active_block_ids]
   BlockSnapshots(block_map,active_block_snaps...)
 end
 

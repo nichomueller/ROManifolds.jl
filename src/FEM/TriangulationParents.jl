@@ -48,31 +48,16 @@ function get_view_indices(t::Geometry.TriangulationView)
   t.cell_to_parent_cell
 end
 
-function get_union_indices(t::AbstractVector{<:Triangulation})
-  indices = map(get_view_indices,t)
+function get_union_indices(trians)
+  indices = map(get_view_indices,trians)
   union(indices...) |> unique
 end
 
-# function find_child(tparent::Triangulation,tchildren::AbstractVector{<:Triangulation})
-#   for t in tchildren
-#     if is_parent(tparent,t) || tparent === t
-#       return t
-#     end
-#   end
-#   @unreachable
-# end
-
-# function order_triangulations(
-#   tparents::AbstractVector{<:Triangulation},
-#   tchildren::AbstractVector{<:Triangulation})
-
-#   @check length(tparents) == length(tchildren)
-#   sorted_children = ()
-#   for t in tparents
-#     sorted_children = (sorted_children...,find_child(t,tchildren))
-#   end
-#   return sorted_children
-# end
+function merge_triangulations(trians)
+  parent = get_parent(trians)
+  uindices = FEM.get_union_indices(trians)
+  view(parent,uindices)
+end
 
 function find_permutation(a,b)
   compare(a,b) = a == b || is_parent(a,b)

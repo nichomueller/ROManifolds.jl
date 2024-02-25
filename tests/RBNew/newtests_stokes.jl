@@ -97,11 +97,14 @@ z = similar(y)
 z .= 0.0
 
 ode_cache = allocate_cache(red_op,r)
-mat_cache,vec_cache = ODETools._allocate_matrix_and_vector(red_op,r,y,ode_cache)
+# mat_cache,vec_cache = ODETools._allocate_matrix_and_vector(red_op,r,y,ode_cache)
 
 red_test = get_test(red_op)
 # RB.allocate_mdeim_lincomb(red_trial,red_test,r)
-block_tc,block_kc,block_lc = map(blocks(red_trial),blocks(red_test)) do trial,test
-  allocate_mdeim_lincomb(trial,test,r)
-end |> tuple_of_arrays
+active_block_ids = Iterators.product(RB.get_touched_blocks(red_test),RB.get_touched_blocks(red_trial))
+block_lincomb = Any[RB.allocate_mdeim_lincomb(red_trial[j],red_test[i],r) for (i,j) in active_block_ids]
+block_tc,block_lc = PartitionedArrays.tuple_of_arrays(block_lincomb)
 lc = mortar(block_lc)
+
+ziocan = Any[RB.allocate_mdeim_lincomb(red_trial[j],red_test[i],r)[2] for (i,j) in active_block_ids]
+ziocan[3]

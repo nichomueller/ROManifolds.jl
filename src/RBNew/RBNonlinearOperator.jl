@@ -105,18 +105,6 @@ function ODETools.jacobians!(
   return A
 end
 
-function _union_reduced_times(a::Tuple{Vararg{Contribution}})
-  union([_union_reduced_times(ai) for ai in a]...)
-end
-
-function _union_reduced_times(a::Contribution)
-  idom = ()
-  for values in get_values(a)
-    idom = (idom...,get_integration_domain(values))
-  end
-  union_indices_time(idom...)
-end
-
 function _select_cache_at_time_locations(xhF,ode_cache,indices)
   Us,Uts,fecache = ode_cache
   new_xhF = ()
@@ -136,7 +124,7 @@ function _select_indices_at_time_locations(red_times;nparams=1)
 end
 
 function _select_fe_quantities_at_time_locations(a,r,xhF,ode_cache)
-  red_times = _union_reduced_times(a)
+  red_times = union_reduced_times(a)
   red_r = r[:,red_times]
   indices = _select_indices_at_time_locations(red_times;nparams=num_params(r))
   red_xhF,red_ode_cache = _select_cache_at_time_locations(xhF,ode_cache,indices)

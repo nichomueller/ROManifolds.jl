@@ -281,18 +281,25 @@ function num_reduced_times(r::BlockRBSpace)
   return dofs
 end
 
+function get_touched_blocks(r::BlockRBSpace)
+  fs = r.space
+  1:length(fs.spaces)
+end
+
 function reduced_basis(s::BlockSnapshots;kwargs...)
-  norm_matrix = ntuple(i->nothing,length(s))
+  norm_matrix = fill(nothing,size(s))
   reduced_basis(s,norm_matrix;kwargs...)
 end
 
 function reduced_basis(s::BlockSnapshots,norm_matrix;kwargs...)
   active_block_ids = get_touched_blocks(s)
-  bases = Any[reduced_basis(s.array[i],norm_matrix[i];kwargs...) for i in active_block_ids]
-  tuple_of_arrays(bases)
+  block_map = BlockMap(size(s),active_block_ids)
+  bases = Any[reduced_basis(s[i],norm_matrix[i];kwargs...) for i in active_block_ids]
+  bases_space,bases_time = tuple_of_arrays(bases)
+  return_cache(block_map,bases_space...),return_cache(block_map,bases_time...)
 end
 
-function enrich_basis(feop::TransientFEOperator,bases,norm_matrix)
+function enrich_basis(feop::TransientParamFEOperator,bases,norm_matrix)
   _basis_space,_basis_time = bases
   supr_op = compute_supremizer_operator(feop)
   basis_space = add_space_supremizers(_basis_space,supr_op,norm_matrix)

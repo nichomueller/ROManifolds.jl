@@ -71,7 +71,6 @@ export recast
 include("RBSpace.jl")
 
 export RBOperator
-export RBOperator
 export reduced_operator
 export get_fe_trial
 export get_fe_test
@@ -87,8 +86,7 @@ include("RBOperator.jl")
 export ReducedIntegrationDomain
 export AffineDecomposition
 export AffineContribution
-export BlockAffineContribution
-export affine_contribution
+export BlockAffineDecomposition
 export mdeim
 export get_mdeim_indices
 export reduce_triangulation
