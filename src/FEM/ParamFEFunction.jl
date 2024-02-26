@@ -16,8 +16,8 @@ FESpaces.get_free_dof_values(f::SingleFieldParamFEFunction) = f.free_values
 FESpaces.get_cell_dof_values(f::SingleFieldParamFEFunction) = f.cell_dof_values
 FESpaces.get_fe_space(f::SingleFieldParamFEFunction) = f.fe_space
 
-function TransientFETools.TransientCellField(single_field::SingleFieldParamFEFunction,derivatives::Tuple)
-  TransientFETools.TransientSingleFieldCellField(single_field,derivatives)
+function TransientFETools.TransientCellField(f::SingleFieldParamFEFunction,derivatives::Tuple)
+  TransientFETools.TransientSingleFieldCellField(f,derivatives)
 end
 
 # for visualization/testing purposes
@@ -37,6 +37,20 @@ function FESpaces.test_fe_function(f::SingleFieldParamFEFunction)
     @test lazy_getter(cell_values,i) == get_cell_dof_values(fi,trian)
     @test dirichlet_values[i] == fi.dirichlet_values
   end
+end
+
+function Base.iterate(f::SingleFieldParamFEFunction)
+  state = 1
+  fstate = _getindex(f,state)
+  return fstate,state+1
+end
+
+function Base.iterate(f::SingleFieldParamFEFunction,state)
+  if state > _length(f)
+    return nothing
+  end
+  fstate = _getindex(f,state)
+  return fstate,state+1
 end
 
 function _getindex(f::GenericCellField,index)

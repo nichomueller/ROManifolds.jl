@@ -8,14 +8,6 @@ function create_dir(dir::String)
   return
 end
 
-# function get_parent_dir(dir::String;nparent=1)
-#   dir = dir[1:findall(x->x=='/',dir)[end]-1]
-#   for _ = 1:nparent-1
-#     dir = dir[1:findall(x->x=='/',dir)[end]-1]
-#   end
-#   dir
-# end
-
 """Get a full list of subdirectories at a given root directory"""
 function get_all_subdirectories(path::String)
   filter(isdir,readdir(path,join=true))

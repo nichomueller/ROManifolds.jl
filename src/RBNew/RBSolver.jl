@@ -9,7 +9,7 @@ end
 struct SpaceOnlyMDEIM end
 struct SpaceTimeMDEIM end
 
-struct RBInfo{M,N}
+struct RBInfo{M,N,V}
   ϵ::Float64
   mdeim_style::M
   norm_style::N
@@ -19,6 +19,7 @@ struct RBInfo{M,N}
   nsnaps_mdeim::Int
   nsnaps_test::Int
   save_structures::Bool
+  variable_name::V
 end
 
 function RBInfo(
@@ -30,12 +31,13 @@ function RBInfo(
   nsnaps_mdeim=20,
   nsnaps_test=10,
   save_structures=false,
-  compute_supremizers=false)
+  compute_supremizers=false,
+  variable_name=:vel)
 
   mdeim_style = st_mdeim == true ? SpaceTimeMDEIM() : SpaceOnlyMDEIM()
   dir = get_test_dir(test_path,ϵ;st_mdeim)
   RBInfo(ϵ,mdeim_style,norm_style,compute_supremizers,dir,nsnaps_state,
-    nsnaps_mdeim,nsnaps_test,save_structures)
+    nsnaps_mdeim,nsnaps_test,save_structures,variable_name)
 end
 
 num_offline_params(info::RBInfo) = info.nsnaps_state
@@ -101,9 +103,9 @@ const BlockRBInfo = RBInfo{M,Vector{Symbol}} where M
 
 function Base.getindex(info::BlockRBInfo,i::Integer)
   @unpack ϵ,mdeim_style,norm_style,compute_supremizers,dir,nsnaps_state,
-    nsnaps_mdeim,nsnaps_test,save_structures = info
+    nsnaps_mdeim,nsnaps_test,save_structures,variable_name = info
   RBInfo(ϵ,mdeim_style,norm_style[i],compute_supremizers,dir,nsnaps_state,
-    nsnaps_mdeim,nsnaps_test,save_structures)
+    nsnaps_mdeim,nsnaps_test,save_structures,variable_name[i])
 end
 
 function get_norm_matrix(info::BlockRBInfo,feop::TransientParamFEOperator)

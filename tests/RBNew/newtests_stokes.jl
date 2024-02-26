@@ -71,7 +71,7 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 dir = datadir(joinpath("stokes","toy_mesh"))
 info = RBInfo(dir;norm_style=[:l2,:l2],nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20,
-  st_mdeim=true,compute_supremizers=true)
+  st_mdeim=true,compute_supremizers=true,variable_name=(:vel,:press))
 
 rbsolver = RBSolver(info,fesolver)
 
@@ -80,33 +80,12 @@ red_op = reduced_operator(rbsolver,feop,snaps)
 
 son = select_snapshots(snaps,RB.online_params(info))
 ron = get_realization(son)
-xrb, = solve(rbsolver,red_op,ron)
+xrb,comprb = solve(rbsolver,red_op,ron)
 son_rev = reverse_snapshots(son)
 RB.space_time_error(son_rev,xrb)
 
-θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+results = rb_results(rbsolver,red_op,snaps,xrb,comp,comprb)
+# results = solve(rbsolver,feop,xh0μ)
+generate_plots(rbsolver,feop,results)
 
-r = copy(ron)
-FEM.shift_time!(r,dt*(θ-1))
-
-red_trial = get_trial(red_op)(r)
-fe_trial = get_fe_trial(red_op)(r)
-red_x = zero_free_values(red_trial)
-y = zero_free_values(fe_trial)
-z = similar(y)
-z .= 0.0
-
-ode_cache = allocate_cache(red_op,r)
-mat_cache,vec_cache = ODETools._allocate_matrix_and_vector(red_op,r,y,ode_cache)
-
-ode_cache = update_cache!(ode_cache,red_op,r)
-A,b = ODETools._matrix_and_vector!(mat_cache,vec_cache,red_op,r,dtθ,y,ode_cache,z)
-afop = AffineOperator(A,b)
-solve!(red_x,fesolver.nls,afop)
-
-# x = recast(red_x,red_trial)
-block_red_x = [recast(red_x[Block(i)],red_trial[i]) for i = eachblock(red_x)]
-mortar(block_red_x)
-
-num_free_dofs(red_trial[1])
-num_free_dofs(red_trial[2])
+fv = get_values(s)

@@ -49,36 +49,35 @@ function DrWatson.save(info::RBInfo,c::ComputationalStats)
   serialize(get_stats_filename(info),c)
 end
 
-struct RBResults
-  name::Symbol
-  sol::TransientSnapshotsSwappedColumns
-  sol_approx::TransientSnapshotsSwappedColumns
-  fem_stats::ComputationalStats
-  rb_stats::ComputationalStats
-  norm_matrix
+struct RBResults{A,B,BA,C,D}
+  name::A
+  sol::B
+  sol_approx::BA
+  fem_stats::C
+  rb_stats::C
+  norm_matrix::D
 end
 
 function rb_results(
-  solver::RBSolver,
+  info::RBInfo,
   feop::TransientParamFEOperator,
-  s::AbstractSnapshots,
-  son_approx::TransientSnapshotsSwappedColumns,
-  fem_stats::ComputationalStats,
-  rb_stats::ComputationalStats,
-  name=:vel)
+  s,
+  son_approx,
+  fem_stats,
+  rb_stats;
+  name=info.variable_name)
 
-  info = get_info(solver)
   X = get_norm_matrix(info,feop)
-  son = select_snapshots(s,online_params(info))
-  son_rev = reverse_snapshots(son)
-  results = RBResults(name,son_rev,son_approx,fem_stats,rb_stats,X)
-  save(solver,results)
+  son = select_snapshots(s,online_params(info)) |> reverse_snapshots
+  results = RBResults(name,son,son_approx,fem_stats,rb_stats,X)
+  save(info,results)
   return results
 end
 
-function rb_results(solver,op::RBNonlinearOperator,args...;kwargs...)
+function rb_results(solver::RBSolver,op::RBNonlinearOperator,args...;kwargs...)
+  info = get_info(solver)
   feop = FEM.get_fe_operator(op)
-  rb_results(solver,feop,args...;kwargs...)
+  rb_results(info,feop,args...;kwargs...)
 end
 
 get_results_filename(info::RBInfo) = info.dir * "/results.jld"
@@ -116,6 +115,17 @@ function space_time_error(sol,sol_approx,norm_matrix=nothing)
   return avg_error
 end
 
+function space_time_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm_matrix)
+  @check get_touched_blocks(sol) == get_touched_blocks(sol_approx)
+  space_time_error.(sol,sol_approx,norm_matrix)
+end
+
+function space_time_error(sol::BlockSnapshots,sol_approx::BlockSnapshots)
+  @check get_touched_blocks(sol) == get_touched_blocks(sol_approx)
+  norm_matrix = fill(nothing,size(sol))
+  space_time_error(sol,sol_approx,norm_matrix)
+end
+
 function space_time_error(r::RBResults)
   space_time_error(r.sol,r.sol_approx,r.norm_matrix)
 end
@@ -138,25 +148,34 @@ function FESpaces.FEFunction(
   FEFunction(fs,s)
 end
 
-function _plot(
-  trial::TransientTrialParamFESpace,
-  s::AbstractSnapshots;
-  dir=pwd(),
-  varname="u")
-
-  r = get_realization(s)
+function _plot(solh::SingleFieldParamFEFunction,r::TransientParamRealization;dir=pwd(),varname=:vel)
+  trian = get_triangulation(solh_t)
   r0 = FEM.get_at_time(r,:initial)
-  times = get_times(r)
   createpvd(r0,dir) do pvd
-    for (it,t) = enumerate(times)
+    for solh_t = solh
       rt = FEM.get_at_time(r,t)
-      free_values = s.values[it]
-      sht = FEFunction(trial(rt),free_values)
       files = ParamString(dir,rt)
-      trian = get_triangulation(sht)
-      vtk = createvtk(trian,files,cellfields=[varname=>sht])
+      vtk = createvtk(trian,files,cellfields=[varname=>solh_t])
       pvd[rt] = vtk
     end
+  end
+end
+
+function _plot(trial,s;kwargs...)
+  free_values = get_values(s)
+  r = get_realization(s)
+  sh = FEFunction(trial(r),free_values)
+  _plot(sh,r,)
+end
+
+function _plot(trial::TransientMultiFieldTrialFESpace,s::BlockSnapshots;varname=(:vel,:press),kwargs...)
+  free_values = get_values(s)
+  r = get_realization(s)
+  trials = trial(r)
+  sh = FEFunction(trials,free_values)
+  nfields = length(trials.spaces)
+  for n in 1:nfields
+    _plot(sh[n],s[n],varname=varname[n];kwargs...)
   end
 end
 

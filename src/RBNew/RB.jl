@@ -24,6 +24,7 @@ import UnPack: @unpack
 import Gridap.Helpers: @abstractmethod,@check,@notimplemented,@unreachable
 import Gridap.Arrays: evaluate!
 import Gridap.Algebra: allocate_matrix,allocate_vector,solve
+import LinearSolve: UMFPACKFactorization
 import PartitionedArrays: tuple_of_arrays
 
 export tpod

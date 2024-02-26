@@ -25,34 +25,27 @@ function reduced_basis(s::NnzSnapshots,args...;kwargs...)
   return sparse_basis_space,basis_time
 end
 
-function compute_bases(
-  s::AbstractSnapshots,
-  norm_matrix=nothing;
-  kwargs...)
-
-  flag,s = _return_flag(s)
-  b1 = tpod(s,norm_matrix;kwargs...)
-  compressed_s = compress(s,b1) |> change_mode
-  b2 = tpod(compressed_s;kwargs...)
-  _return_bases(flag,b1,b2)
-end
-
-function _return_flag(s)
-  flag = false
+function compute_bases(s::AbstractSnapshots,args...;kwargs...)
   if size(s,1) < size(s,2)
-    s = change_mode(s)
-    flag = true
+    compute_bases_time_space(s,args...;kwargs...)
+  else
+    compute_bases_space_time(s,args...;kwargs...)
   end
-  flag,s
 end
 
-function _return_bases(flag,b1,b2)
-  if flag
-    basis_space,basis_time = b2,b1
-  else
-    basis_space,basis_time = b1,b2
-  end
-  basis_space,basis_time
+function compute_bases_space_time(s::AbstractSnapshots,norm_matrix=nothing;kwargs...)
+  basis_space = tpod(s,norm_matrix;kwargs...)
+  compressed_s2 = compress(s,basis_space,norm_matrix) |> change_mode
+  basis_time = tpod(compressed_s2;kwargs...)
+  return basis_space,basis_time
+end
+
+function compute_bases_time_space(s::AbstractSnapshots,norm_matrix=nothing;kwargs...)
+  s2 = change_mode(s)
+  basis_time = tpod(s2;kwargs...)
+  compressed_s = compress(s2,basis_time) |> change_mode
+  basis_space = tpod(compressed_s,norm_matrix;kwargs...)
+  return basis_space,basis_time
 end
 
 function reduced_fe_space(space,bases...)
@@ -309,12 +302,25 @@ function enrich_basis(feop::TransientParamFEOperator,bases,norm_matrix)
   return basis_space,basis_time
 end
 
-function add_space_supremizers(basis_space,supr_op,norm_matrix)
+function add_space_supremizers(basis_space,supr_op,args...)
   @check length(basis_space) == 2 "Have to extend this if dealing with more than 2 equations"
   basis_primal,basis_dual = basis_space.array
-  norm_matrix_primal = first(norm_matrix)
   supr_i = supr_op * basis_dual
-  gram_schmidt!(supr_i,basis_primal,norm_matrix_primal)
+  gram_schmidt!(supr_i,basis_primal)
+  basis_primal = hcat(basis_primal,supr_i)
+  return ArrayBlock([basis_primal,basis_dual],basis_space.touched)
+end
+
+function add_space_supremizers(basis_space,supr_op,norm_matrix::AbstractVector{<:AbstractMatrix})
+  @check length(basis_space) == 2 "Have to extend this if dealing with more than 2 equations"
+  println(typeof(norm_matrix))
+  basis_primal,basis_dual = basis_space.array
+  A = first(norm_matrix)
+  b = supr_op * basis_dual
+  alg = UMFPACKFactorization()
+  prob = LinearProblem(A,b)
+  supr_i = solve(prob,alg)
+  gram_schmidt!(supr_i,basis_primal,A)
   basis_primal = hcat(basis_primal,supr_i)
   return ArrayBlock([basis_primal,basis_dual],basis_space.touched)
 end
@@ -332,39 +338,37 @@ function add_time_supremizers(basis_time;tol=1e-2)
   end
 
   count = 0
-  ntp_minus_ntu = size(basis_dual,2) - size(basis_primal,2)
-  if ntp_minus_ntu > 0
-    for ntp = 1:ntp_minus_ntu
-      basis_primal,basis_pd = enrich(basis_primal,basis_pd,basis_dual[:,ntp])
+  ntd_minus_ntp = size(basis_dual,2) - size(basis_primal,2)
+  if ntd_minus_ntp > 0
+    for ntd = 1:ntd_minus_ntp
+      basis_primal,basis_pd = enrich(basis_primal,basis_pd,basis_dual[:,ntd])
       count += 1
     end
   end
 
-  ntp = 1
-  while ntp ≤ size(basis_pd,2)
-    proj = ntp == 1 ? zeros(size(basis_pd[:,1])) : orth_projection(basis_pd[:,ntp],basis_pd[:,1:ntp-1])
+  ntd = 1
+  while ntd ≤ size(basis_pd,2)
+    proj = ntd == 1 ? zeros(size(basis_pd,1)) : orth_projection(basis_pd[:,ntd],basis_pd[:,1:ntd-1])
     dist = norm(basis_pd[:,1]-proj)
     if dist ≤ tol
-      basis_primal,basis_pd = enrich(basis_primal,basis_pd,basis_dual[:,ntp])
+      basis_primal,basis_pd = enrich(basis_primal,basis_pd,basis_dual[:,ntd])
       count += 1
-      ntp = 0
+      ntd = 0
     else
-      basis_pd[:,ntp] .-= proj
+      basis_pd[:,ntd] .-= proj
     end
-    ntp += 1
+    ntd += 1
   end
 
   return ArrayBlock([basis_primal,basis_dual],basis_time.touched)
 end
 
 function recast(red_x::ParamBlockVector,r::BlockRBSpace)
-  # block_red_x = [recast(red_x[Block(i)],r[i]) for i = eachblock(red_x)]
-  # mortar(block_red_x)
-  block_red_x = map(eachblock(red_x)) do i
-    red_x_i = red_x[Block(i)]
-    r_i = r[i]
-    array = [recast(red_x_i[j],r_i) for j = eachindex(red_x_i)]
-    ParamArray(array)
+  map(eachindex(red_x)) do i
+    red_xi = red_x[i]
+    block_xi = map(1:blocklength(red_xi)) do j
+      recast(red_xi[Block(j)],r[j])
+    end
+    mortar(block_xi)
   end
-  block_red_x = [recast(red_x[][Block(i)],r[i]) for i = (red_x)]
 end

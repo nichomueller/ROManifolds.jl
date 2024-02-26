@@ -120,14 +120,19 @@ function tensor_setindex!(s::AbstractSnapshots,v,ispace,itime,iparam)
   si = v
 end
 
-function compress(s::AbstractSnapshots{Mode1Axis},a::AbstractMatrix)
-  @fastmath compressed_values = a'*s
+_compress(s,a,X::AbstractMatrix) = a'*X*s
+_compress(s,a,args...) = a'*s
+
+# spatial compression: can input a norm matrix if needed
+function compress(s::AbstractSnapshots{Mode1Axis},a::AbstractMatrix,args...)
+  compressed_values = _compress(s,a,args...)
   r = get_realization(s)
   Snapshots(compressed_values,r,Mode1Axis())
 end
 
+# temporal compression: it doesn't make sense to provide a norm matrix
 function compress(s::AbstractSnapshots{Mode2Axis},a::AbstractMatrix)
-  @fastmath compressed_values = a'*s
+  compressed_values = _compress(s,a)
   r = get_realization(s)
   compressed_realization = r[:,axes(a,2)]
   Snapshots(compressed_values,compressed_realization,Mode2Axis())
@@ -649,6 +654,18 @@ function SelectedSnapshotsAtIndices(
   SelectedInnerTimeOuterParamTransientSnapshots(s,selected_indices)
 end
 
+# function FEM.get_values(s::InnerTimeOuterParamTransientSnapshots)
+#   @check space_indices(s) == Base.OneTo(num_space_dofs(s))
+#   v = s.values
+#   values = Vector{typeof(first(v))}(undef,num_cols(s))
+#   @inbounds for (i,ip) in enumerate(param_indices(s))
+#     for (j,jt) in enumerate(time_indices(s))
+#       values[(i-1)*num_times(s)+j] = v[ip][jt]
+#     end
+#   end
+#   return values
+# end
+
 struct SelectedInnerTimeOuterParamTransientSnapshots{T,S,I} <: TransientSnapshotsSwappedColumns{T}
   snaps::S
   selected_indices::I
@@ -882,7 +899,14 @@ FEM.num_times(s::BlockSnapshots) = num_times(testitem(s))
 FEM.num_params(s::BlockSnapshots) = num_params(testitem(s))
 
 function FEM.get_values(s::BlockSnapshots)
-  map(get_values,s.array) |> mortar
+  # map(get_values,s.array) |> mortar
+  map(eachindex(s)) do i
+    si = s[i]
+    block_si = map(1:blocklength(si)) do j
+      get_values(red_xi[Block(j)],r[j])
+    end
+    mortar(block_si)
+  end
 end
 
 function get_realization(s::BlockSnapshots)
@@ -923,6 +947,21 @@ function reverse_snapshots(s::BlockSnapshots{<:Any,N}) where N
   BlockSnapshots(block_map,active_block_snaps...)
 end
 
+function reverse_snapshots(
+  values::AbstractVector{P},
+  r::TransientParamRealization
+  ) where P<:ParamBlockArray
+
+  vals = first(values)
+  block_vals = blocks(vals)
+  nblocks = blocksize(vals)
+  active_block_ids = findall(!iszero,block_vals)
+  block_map = BlockMap(nblocks,active_block_ids)
+  vec_block_values = map(blocks,values)
+  active_block_snaps = Any[InnerTimeOuterParamTransientSnapshots(map(x->x[i],vec_block_values),r) for i in active_block_ids]
+  BlockSnapshots(block_map,active_block_snaps...)
+end
+
 function reverse_snapshots_at_indices(
   s::BlockSnapshots{<:Any,N},
   indices_space::ArrayBlock{<:Any,N}) where N
@@ -933,53 +972,58 @@ function reverse_snapshots_at_indices(
   BlockSnapshots(block_map,active_block_snaps...)
 end
 
-# implement mortar
+# # implement mortar
 
-function _get_offsets(s::BlockSnapshots) # just here as a helper for selected snapshots
-  n = size(s.array,1)
-  offsets = zeros(Int,n)
-  for i = 1:n-1
-    offsets[i+1] = offsets[i] + num_space_dofs(s.array[i])
-  end
-  return offsets
-end
+# function _get_offsets(s::BlockSnapshots) # just here as a helper for selected snapshots
+#   n = size(s.array,1)
+#   offsets = zeros(Int,n)
+#   for i = 1:n-1
+#     offsets[i+1] = offsets[i] + num_space_dofs(s.array[i])
+#   end
+#   return offsets
+# end
 
-function _get_selected_indices(s::BlockSnapshots) # just here as a helper for selected snapshots
-  s1 = testitem(s)
-  _,ids_time,ids_param = s1.selected_indices
-  offsets = _get_offsets(s)
-  ids_space = map(enumerate(offsets)) do (i,offset)
-    _ids_space,_ids_time,_ids_param = s.array[i].selected_indices
-    @check ids_time == _ids_time
-    @check ids_param == _ids_param
-    _ids_space .+ offset
-  end
-  vcat(ids_space...),ids_time,ids_param
-end
+# function _get_selected_indices(s::BlockSnapshots) # just here as a helper for selected snapshots
+#   s1 = testitem(s)
+#   _,ids_time,ids_param = s1.selected_indices
+#   offsets = _get_offsets(s)
+#   ids_space = map(enumerate(offsets)) do (i,offset)
+#     _ids_space,_ids_time,_ids_param = s.array[i].selected_indices
+#     @check ids_time == _ids_time
+#     @check ids_param == _ids_param
+#     _ids_space .+ offset
+#   end
+#   vcat(ids_space...),ids_time,ids_param
+# end
 
-function BlockArrays.mortar(s::BlockSnapshots)
-  values = get_values(s)
-  r = get_realization(s)
-  mode = get_mode(s)
-  Snapshots(values,r,mode)
-end
+# function BlockArrays.mortar(s::BlockSnapshots)
+#   values = get_values(s)
+#   r = get_realization(s)
+#   mode = get_mode(s)
+#   Snapshots(values,r,mode)
+# end
 
-function BlockArrays.mortar(s::BlockSnapshots{<:SelectedSnapshotsAtIndices})
-  values = get_values(s)
-  selected_indices = _get_selected_indices(s)
-  SelectedSnapshotsAtIndices(values,selected_indices)
-end
+# function BlockArrays.mortar(s::BlockSnapshots{<:SelectedSnapshotsAtIndices})
+#   values = get_values(s)
+#   selected_indices = _get_selected_indices(s)
+#   SelectedSnapshotsAtIndices(values,selected_indices)
+# end
 
-function BlockArrays.mortar(s::BlockSnapshots{<:InnerTimeOuterParamTransientSnapshots})
-  values = get_values(s)
-  r = get_realization(s)
-  InnerTimeOuterParamTransientSnapshots(values,r)
-end
+# function BlockArrays.mortar(s::BlockSnapshots{<:InnerTimeOuterParamTransientSnapshots})
+#   values = get_values(s)
+#   r = get_realization(s)
+#   InnerTimeOuterParamTransientSnapshots(values,r)
+# end
 
-function BlockArrays.mortar(s::BlockSnapshots{<:SelectedInnerTimeOuterParamTransientSnapshots})
-  values = get_values(s)
-  selected_indices = _get_selected_indices(s)
-  SelectedInnerTimeOuterParamTransientSnapshots(values,selected_indices)
+# function BlockArrays.mortar(s::BlockSnapshots{<:SelectedInnerTimeOuterParamTransientSnapshots})
+#   values = get_values(s)
+#   selected_indices = _get_selected_indices(s)
+#   SelectedInnerTimeOuterParamTransientSnapshots(values,selected_indices)
+# end
+
+struct TensorTrainSnapshots{S,R}
+  snaps::S
+  ranks::R
 end
 
 const AbstractSubTransientSnapshots = Union{

@@ -249,3 +249,10 @@ vo = basis'*Ao*basisc
 vog = basis'*Aog*basisgc
 _Ao = basis*vo*basisc'
 _Aog = basis*vog*basisgc'
+
+
+_coeff_A = map(local_values(Φ),local_values(A),local_values(Φc)) do Φ,A,Φc
+  basis = hcat(Φ...)
+  basisc = hcat(Φc...)
+  basis'*A*basisc
+end
