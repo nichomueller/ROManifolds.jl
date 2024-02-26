@@ -654,17 +654,17 @@ function SelectedSnapshotsAtIndices(
   SelectedInnerTimeOuterParamTransientSnapshots(s,selected_indices)
 end
 
-# function FEM.get_values(s::InnerTimeOuterParamTransientSnapshots)
-#   @check space_indices(s) == Base.OneTo(num_space_dofs(s))
-#   v = s.values
-#   values = Vector{typeof(first(v))}(undef,num_cols(s))
-#   @inbounds for (i,ip) in enumerate(param_indices(s))
-#     for (j,jt) in enumerate(time_indices(s))
-#       values[(i-1)*num_times(s)+j] = v[ip][jt]
-#     end
-#   end
-#   return values
-# end
+function FEM.get_values(s::InnerTimeOuterParamTransientSnapshots)
+  nt = num_times(s)
+  np = num_params(s)
+  array = Vector{typeof(first(first(s.values)))}(undef,nt*np)
+  @inbounds for i = 1:nt*np
+    it = fast_index(i,nt)
+    ip = slow_index(i,nt)
+    array[i] = s.values[ip][it]
+  end
+  return ParamArray(array)
+end
 
 struct SelectedInnerTimeOuterParamTransientSnapshots{T,S,I} <: TransientSnapshotsSwappedColumns{T}
   snaps::S
@@ -712,11 +712,13 @@ end
 function FEM.get_values(s::SelectedInnerTimeOuterParamTransientSnapshots)
   @check space_indices(s) == Base.OneTo(num_space_dofs(s))
   v = get_values(s.snaps)
-  values = Vector{typeof(first(v))}(undef,num_params(s))
-  @inbounds for (i,ip) in enumerate(param_indices(s))
-    values[i] = ParamArray([v[ip][jt] for jt in time_indices(s)])
+  values = Vector{typeof(first(v))}(undef,num_cols(s))
+  for (i,ip) in enumerate(param_indices(s))
+    for (j,jt) in enumerate(time_indices(s))
+      @inbounds values[(i-1)*num_times(s)+j] = v[(ip-1)*num_times(s)+jt]
+    end
   end
-  values
+  ParamArray(values)
 end
 
 function get_realization(s::SelectedInnerTimeOuterParamTransientSnapshots)
@@ -899,14 +901,7 @@ FEM.num_times(s::BlockSnapshots) = num_times(testitem(s))
 FEM.num_params(s::BlockSnapshots) = num_params(testitem(s))
 
 function FEM.get_values(s::BlockSnapshots)
-  # map(get_values,s.array) |> mortar
-  map(eachindex(s)) do i
-    si = s[i]
-    block_si = map(1:blocklength(si)) do j
-      get_values(red_xi[Block(j)],r[j])
-    end
-    mortar(block_si)
-  end
+  map(get_values,s.array) |> mortar
 end
 
 function get_realization(s::BlockSnapshots)

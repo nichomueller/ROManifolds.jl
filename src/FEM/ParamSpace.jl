@@ -70,6 +70,10 @@ function Base.iterate(r::GenericTransientParamRealization,state...)
   iterate(iterator,state...)
 end
 
+function get_at_param(r::GenericTransientParamRealization,i=1)
+  GenericTransientParamRealization(get_params(r)[i],get_times(r),get_initial_time(r))
+end
+
 get_final_time(r::GenericTransientParamRealization) = last(get_times(r))
 get_midpoint_time(r::GenericTransientParamRealization) = (get_final_time(r) + get_initial_time(r)) / 2
 get_delta_time(r::GenericTransientParamRealization) = (get_final_time(r) - get_initial_time(r)) / num_times(r)
@@ -115,6 +119,10 @@ function Base.getindex(r::TransientParamRealizationAt,i,j)
 end
 
 Base.iterate(r::TransientParamRealizationAt,i...) = iterate(r.params,i...)
+
+function get_at_param(r::TransientParamRealizationAt,i=1)
+  TransientParamRealizationAt(get_params(r)[i],r.times)
+end
 
 function change_time!(r::TransientParamRealizationAt{P,T} where P,time::T) where T
   r.t[] = time

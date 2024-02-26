@@ -148,34 +148,40 @@ function FESpaces.FEFunction(
   FEFunction(fs,s)
 end
 
-function _plot(solh::SingleFieldParamFEFunction,r::TransientParamRealization;dir=pwd(),varname=:vel)
-  trian = get_triangulation(solh_t)
-  r0 = FEM.get_at_time(r,:initial)
-  createpvd(r0,dir) do pvd
-    for solh_t = solh
-      rt = FEM.get_at_time(r,t)
-      files = ParamString(dir,rt)
-      vtk = createvtk(trian,files,cellfields=[varname=>solh_t])
-      pvd[rt] = vtk
+function _plot(solh::SingleFieldParamFEFunction,r::TransientParamRealization;dir=pwd(),varname="vel")
+  trian = get_triangulation(solh)
+  create_dir(dir)
+  createpvd(dir) do pvd
+    for (i,t) in enumerate(get_times(r))
+      solh_t = FEM._getindex(solh,i)
+      vtk = createvtk(trian,dir,cellfields=[varname=>solh_t])
+      pvd[t] = vtk
     end
   end
 end
 
-function _plot(trial,s;kwargs...)
-  free_values = get_values(s)
+# for the time being, plot only first param
+function _get_at_first_param(trial,s)
   r = get_realization(s)
-  sh = FEFunction(trial(r),free_values)
-  _plot(sh,r,)
+  r1 = FEM.get_at_param(r)
+  free_values = get_values(s)
+  free_values1 = free_values[1:num_times(r)]
+  r1,FEFunction(trial(r1),free_values1)
 end
 
-function _plot(trial::TransientMultiFieldTrialFESpace,s::BlockSnapshots;varname=(:vel,:press),kwargs...)
+function _plot(trial,s;kwargs...)
+  r,sh = _get_at_first_param(trial,s)
+  _plot(sh,r;kwargs...)
+end
+
+function _plot(trial::TransientMultiFieldTrialParamFESpace,s::BlockSnapshots;varname=("vel","press"),kwargs...)
   free_values = get_values(s)
   r = get_realization(s)
   trials = trial(r)
   sh = FEFunction(trials,free_values)
   nfields = length(trials.spaces)
   for n in 1:nfields
-    _plot(sh[n],s[n],varname=varname[n];kwargs...)
+    _plot(sh[n],r,varname=varname[n];kwargs...)
   end
 end
 

@@ -32,7 +32,7 @@ function RBInfo(
   nsnaps_test=10,
   save_structures=false,
   compute_supremizers=false,
-  variable_name=:vel)
+  variable_name="vel")
 
   mdeim_style = st_mdeim == true ? SpaceTimeMDEIM() : SpaceOnlyMDEIM()
   dir = get_test_dir(test_path,ϵ;st_mdeim)

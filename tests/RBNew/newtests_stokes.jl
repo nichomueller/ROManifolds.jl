@@ -71,7 +71,7 @@ fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 dir = datadir(joinpath("stokes","toy_mesh"))
 info = RBInfo(dir;norm_style=[:l2,:l2],nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20,
-  st_mdeim=true,compute_supremizers=true,variable_name=(:vel,:press))
+  st_mdeim=true,compute_supremizers=true,variable_name=("vel","press"))
 
 rbsolver = RBSolver(info,fesolver)
 
@@ -88,4 +88,23 @@ results = rb_results(rbsolver,red_op,snaps,xrb,comp,comprb)
 # results = solve(rbsolver,feop,xh0μ)
 generate_plots(rbsolver,feop,results)
 
-fv = get_values(s)
+
+# generate_plots(rbsolver,feop,results)
+plt_dir = joinpath(info.dir,"plots")
+fe_plt_dir = joinpath(plt_dir,"fe_solution")
+# _plot(trial,sol;dir=fe_plt_dir,varname=r.name)
+free_values = get_values(sol)
+r = get_realization(sol)
+trials = trial(r)
+sh = FEFunction(trials,free_values)
+nfields = length(trials.spaces)
+# _plot(sh[1],r,varname=:vel)
+trian = get_triangulation(sh[1])
+rt = FEM.get_at_time(r,:initial)
+dt = FEM.get_delta_time(r)
+create_dir(dir)
+createpvd(rt,dir)
+FEM.shift_time!(rt,dt)
+files = ParamString(dir,rt)
+solh_t = FEM._getindex(sh[1],1)
+vtk = createvtk(trian,files,cellfields=["vel"=>solh_t])
