@@ -398,11 +398,168 @@ function ODETools.jacobians!(
   A
 end
 
+# interface to include the spaces' induced norm
+struct NormedTransientParamFEOperator{T<:OperatorType} <: TransientParamFEOperator{T}
+  op::TransientParamFEOperator{T}
+  induced_norm::Function
+end
+
+FESpaces.get_test(op::NormedTransientParamFEOperator) = get_test(op.op)
+FESpaces.get_trial(op::NormedTransientParamFEOperator) = get_trial(op.op)
+ReferenceFEs.get_order(op::NormedTransientParamFEOperator) = get_order(op.op)
+realization(op::NormedTransientParamFEOperator;kwargs...) = realization(op.op;kwargs...)
+
+function compute_induced_norm_matrix(op::NormedTransientParamFEOperator)
+  test = get_test(op)
+  trial = evalute(get_trial(op),(nothing))
+  assemble_matrix(op.induced_norm,trial,test)
+end
+
+function Algebra.allocate_residual(
+  op::NormedTransientParamFEOperator,
+  r::TransientParamRealization,
+  uh::T,
+  cache) where T
+
+  allocate_residual(op.op,r,uh,cache)
+end
+
+function Algebra.allocate_jacobian(
+  op::NormedTransientParamFEOperator,
+  r::TransientParamRealization,
+  uh::CellField,
+  cache)
+
+  allocate_jacobian(op.op,r,uh,cache)
+end
+
+function Algebra.residual!(b,op::NormedTransientParamFEOperator,args...)
+  residual!(b,op.op,args...)
+end
+
+function Algebra.jacobian!(A,op::NormedTransientParamFEOperator,args...)
+  jacobian!(A,op.op,args...)
+end
+
+function ODETools.jacobians!(A,op::NormedTransientParamFEOperator,args...)
+  jacobians!(A,op.op,args...)
+end
+
+# interface to deal with the inf-sup stability condition of saddle point problems
+struct SaddlePointTransientParamFEOperator{T<:OperatorType} <: TransientParamFEOperator{T}
+  op::TransientParamFEOperator{T}
+  coupling::Function
+end
+
+FESpaces.get_test(op::SaddlePointTransientParamFEOperator) = get_test(op.op)
+FESpaces.get_trial(op::SaddlePointTransientParamFEOperator) = get_trial(op.op)
+ReferenceFEs.get_order(op::SaddlePointTransientParamFEOperator) = get_order(op.op)
+realization(op::SaddlePointTransientParamFEOperator;kwargs...) = realization(op.op;kwargs...)
+
+function compute_coupling_matrix(op::SaddlePointTransientParamFEOperator)
+  test = get_test(op)
+  trial = evalute(get_trial(op),(nothing))
+  assemble_matrix(op.coupling,trial,test)
+end
+
+function Algebra.allocate_residual(
+  op::SaddlePointTransientParamFEOperator,
+  r::TransientParamRealization,
+  uh::T,
+  cache) where T
+
+  allocate_residual(op.op,r,uh,cache)
+end
+
+function Algebra.allocate_jacobian(
+  op::SaddlePointTransientParamFEOperator,
+  r::TransientParamRealization,
+  uh::CellField,
+  cache)
+
+  allocate_jacobian(op.op,r,uh,cache)
+end
+
+function Algebra.residual!(b,op::SaddlePointTransientParamFEOperator,args...)
+  residual!(b,op.op,args...)
+end
+
+function Algebra.jacobian!(A,op::SaddlePointTransientParamFEOperator,args...)
+  jacobian!(A,op.op,args...)
+end
+
+function ODETools.jacobians!(A,op::SaddlePointTransientParamFEOperator,args...)
+  jacobians!(A,op.op,args...)
+end
+
+# self explanatory
+struct NormedSaddlePointTransientParamFEOperator{T<:OperatorType} <: TransientParamFEOperator{T}
+  op::TransientParamFEOperator{T}
+  coupling::Function
+  induced_norm::Function
+end
+
+FESpaces.get_test(op::NormedSaddlePointTransientParamFEOperator) = get_test(op.op)
+FESpaces.get_trial(op::NormedSaddlePointTransientParamFEOperator) = get_trial(op.op)
+ReferenceFEs.get_order(op::NormedSaddlePointTransientParamFEOperator) = get_order(op.op)
+realization(op::NormedSaddlePointTransientParamFEOperator;kwargs...) = realization(op.op;kwargs...)
+
+function compute_coupling_matrix(op::NormedSaddlePointTransientParamFEOperator)
+  test = get_test(op)
+  trial = evalute(get_trial(op),(nothing))
+  assemble_matrix(op.coupling,trial,test)
+end
+
+function compute_induced_norm_matrix(op::NormedSaddlePointTransientParamFEOperator)
+  test = get_test(op)
+  trial = evalute(get_trial(op),(nothing))
+  assemble_matrix(op.induced_norm,trial,test)
+end
+
+function Algebra.allocate_residual(
+  op::NormedSaddlePointTransientParamFEOperator,
+  r::TransientParamRealization,
+  uh::T,
+  cache) where T
+
+  allocate_residual(op.op,r,uh,cache)
+end
+
+function Algebra.allocate_jacobian(
+  op::NormedSaddlePointTransientParamFEOperator,
+  r::TransientParamRealization,
+  uh::CellField,
+  cache)
+
+  allocate_jacobian(op.op,r,uh,cache)
+end
+
+function Algebra.residual!(b,op::NormedSaddlePointTransientParamFEOperator,args...)
+  residual!(b,op.op,args...)
+end
+
+function Algebra.jacobian!(A,op::NormedSaddlePointTransientParamFEOperator,args...)
+  jacobian!(A,op.op,args...)
+end
+
+function ODETools.jacobians!(A,op::NormedSaddlePointTransientParamFEOperator,args...)
+  jacobians!(A,op.op,args...)
+end
+
+# add other normed spaces!
+const AbstractNormedTransientParamFEOperator = Union{
+  NormedTransientParamFEOperator,
+  NormedSaddlePointTransientParamFEOperator
+}
+
 # interface to accommodate the separation of terms depending on the linearity/nonlinearity
 struct LinearNonlinearTransientParamFEOperator{T<:OperatorType} <: TransientParamFEOperator{T}
   op_linear::TransientParamFEOperator{T}
   op_nonlinear::TransientParamFEOperator{T}
 end
+
+get_linear_operator(op::LinearNonlinearTransientParamFEOperator) = op.op_linear
+get_nonlinear_operator(op::LinearNonlinearTransientParamFEOperator) = op.op_nonlinear
 
 function TransientFETools.test_transient_fe_operator(op::TransientParamFEOperator,uh,μt)
   odeop = get_algebraic_operator(op)

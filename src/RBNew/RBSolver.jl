@@ -1,132 +1,47 @@
-function get_test_dir(path::String,ϵ;st_mdeim=false)
-  keyword = st_mdeim ? "st" : "standard"
-  outer_path = joinpath(path,keyword)
-  dir = joinpath(outer_path,"$ϵ")
-  FEM.create_dir(dir)
-  dir
-end
+abstract type RBSolver{S} end
+const ThetaMethodRBSolver = RBSolver{ThetaMethod}
+
+get_fe_solver(s::RBSolver) = s.fesolver
 
 struct SpaceOnlyMDEIM end
 struct SpaceTimeMDEIM end
 
-struct RBInfo{M,N,V}
+struct PODMDEIMSolver{S,M} <: RBSolver{S}
+  fesolver::S
   ϵ::Float64
   mdeim_style::M
-  norm_style::N
-  compute_supremizers::Bool
-  dir::String
   nsnaps_state::Int
   nsnaps_mdeim::Int
   nsnaps_test::Int
-  save_structures::Bool
-  variable_name::V
-end
-
-function RBInfo(
-  test_path::String;
-  ϵ=1e-4,
-  st_mdeim=false,
-  norm_style=:l2,
-  nsnaps_state=50,
-  nsnaps_mdeim=20,
-  nsnaps_test=10,
-  save_structures=false,
-  compute_supremizers=false,
-  variable_name="vel")
-
-  mdeim_style = st_mdeim == true ? SpaceTimeMDEIM() : SpaceOnlyMDEIM()
-  dir = get_test_dir(test_path,ϵ;st_mdeim)
-  RBInfo(ϵ,mdeim_style,norm_style,compute_supremizers,dir,nsnaps_state,
-    nsnaps_mdeim,nsnaps_test,save_structures,variable_name)
-end
-
-num_offline_params(info::RBInfo) = info.nsnaps_state
-offline_params(info::RBInfo) = 1:num_offline_params(info)
-num_online_params(info::RBInfo) = info.nsnaps_test
-online_params(info::RBInfo) = 1+num_offline_params(info):num_online_params(info)+num_offline_params(info)
-FEM.num_params(info::RBInfo) = num_offline_params(info) + num_online_params(info)
-num_mdeim_params(info::RBInfo) = info.nsnaps_mdeim
-mdeim_params(info::RBInfo) = 1:num_mdeim_params(info)
-get_tol(info::RBInfo) = info.ϵ
-
-function get_norm_matrix(info::RBInfo,feop::TransientParamFEOperator)
-  trial = get_trial(feop)(nothing)
-  test = get_test(feop)
-  get_norm_matrix(info,trial,test)
-end
-
-function get_norm_matrix(info::RBInfo,trial::FESpace,test::FESpace)
-  norm_style = info.norm_style
-  if norm_style == :l2
-    nothing
-  elseif norm_style == :L2
-    get_L2_norm_matrix(trial,test)
-  elseif norm_style == :H1
-    get_H1_norm_matrix(trial,test)
-  else
-    @unreachable
+  function PODMDEIMSolver(
+    fesolver::S,
+    ϵ::Float64,
+    mdeim_style::M;
+    nsnaps_state=50,
+    nsnaps_mdeim=20,
+    nsnaps_test=10) where {S,M}
+    new{S,M}(fesolver,ϵ,mdeim_style,nsnaps_state,nsnaps_mdeim,nsnaps_test)
   end
 end
 
-function get_L2_norm_matrix(trial::TrialFESpace,test::FESpace)
-  trian = get_triangulation(test)
-  order = FEM.get_polynomial_order(test)
-  dΩ = Measure(trian,2*order)
-  L2_form(u,v) = ∫(v⋅u)dΩ
-  assemble_matrix(L2_form,trial,test)
+function RBSolver(fesolver,ϵ=1e-4,st_mdeim=SpaceTimeMDEIM();kwargs...)
+  PODMDEIMSolver(fesolver,ϵ,st_mdeim;kwargs...)
 end
 
-function get_H1_norm_matrix(trial::TrialFESpace,test::FESpace)
-  trian = get_triangulation(test)
-  order = FEM.get_polynomial_order(test)
-  dΩ = Measure(trian,2*order)
-  H1_form(u,v) = ∫(∇(v)⊙∇(u))dΩ + ∫(v⋅u)dΩ
-  assemble_matrix(H1_form,trial,test)
-end
+num_offline_params(solver::PODMDEIMSolver) = solver.nsnaps_state
+offline_params(solver::PODMDEIMSolver) = 1:num_offline_params(solver)
+num_online_params(solver::PODMDEIMSolver) = solver.nsnaps_test
+online_params(solver::PODMDEIMSolver) = 1+num_offline_params(solver):num_online_params(solver)+num_offline_params(solver)
+FEM.num_params(solver::PODMDEIMSolver) = num_offline_params(solver) + num_online_params(solver)
+num_mdeim_params(solver::PODMDEIMSolver) = solver.nsnaps_mdeim
+mdeim_params(solver::PODMDEIMSolver) = 1:num_mdeim_params(solver)
+get_tol(solver::PODMDEIMSolver) = solver.ϵ
 
-function compute_supremizer_operator(feop::TransientParamFEOperator)
-  trial = get_trial(feop)(nothing)
-  test = get_test(feop)
-  compute_supremizer_operator(trial,test)
-end
-
-function compute_supremizer_operator(trial::FESpace,test::FESpace)
-  trian = get_triangulation(test)
-  order = FEM.get_polynomial_order(test)
-  dΩ = Measure(trian,2*order)
-  supr_form((u,p),(v,q)) = ∫(p*(∇⋅(v)))dΩ
-  supr = assemble_matrix(supr_form,trial,test)
-  supr[Block(1,2)]
-end
-
-const BlockRBInfo = RBInfo{M,Vector{Symbol}} where M
-
-function Base.getindex(info::BlockRBInfo,i::Integer)
-  @unpack ϵ,mdeim_style,norm_style,compute_supremizers,dir,nsnaps_state,
-    nsnaps_mdeim,nsnaps_test,save_structures,variable_name = info
-  RBInfo(ϵ,mdeim_style,norm_style[i],compute_supremizers,dir,nsnaps_state,
-    nsnaps_mdeim,nsnaps_test,save_structures,variable_name[i])
-end
-
-function get_norm_matrix(info::BlockRBInfo,feop::TransientParamFEOperator)
-  trial = get_trial(feop)(nothing)
-  test = get_test(feop)
-  map(i->get_norm_matrix(info[i],trial.spaces[i],test.spaces[i]),1:num_fields(test))
-end
-
-struct RBSolver{S}
-  info::RBInfo
-  fesolver::S
-end
-
-const RBThetaMethod = RBSolver{ThetaMethod}
-
-get_fe_solver(s::RBSolver) = s.fesolver
-get_info(s::RBSolver) = s.info
-
-function RBSolver(fesolver,dir;kwargs...)
-  info = RBInfo(dir;kwargs...)
-  RBSolver(info,fesolver)
+function get_test_directory(solver::PODMDEIMSolver;dir=datadir())
+  keyword = solver.mdeim_style == SpaceOnlyMDEIM() ? "space_only_mdeim" : "space_time_mdeim"
+  test_dir = joinpath(dir,keyword * "$(solver.ϵ)")
+  FEM.create_dir(test_dir)
+  test_dir
 end
 
 function fe_solutions(
@@ -135,9 +50,8 @@ function fe_solutions(
   uh0::Function;
   kwargs...)
 
-  info = get_info(solver)
   fesolver = get_fe_solver(solver)
-  nparams = num_params(info)
+  nparams = num_params(solver)
   sol = solve(fesolver,op,uh0;nparams)
   odesol = sol.odesol
   realization = odesol.r
@@ -147,8 +61,6 @@ function fe_solutions(
   end
   snaps = Snapshots(values,realization)
   cs = ComputationalStats(stats,nparams)
-  save(solver,(snaps,cs))
-
   return snaps,cs
 end
 
@@ -158,9 +70,8 @@ function ode_solutions(
   uh0::Function;
   kwargs...)
 
-  info = get_info(solver)
   fesolver = get_fe_solver(solver)
-  nparams = num_params(info)
+  nparams = num_params(solver)
   sol = solve(fesolver,op,uh0;nparams)
   odesol = sol.odesol
   realization = odesol.r
@@ -170,8 +81,6 @@ function ode_solutions(
   end
   snaps = Snapshots(values,realization)
   cs = ComputationalStats(stats,nparams)
-  save(solver,(snaps,cs))
-
   return snaps,cs
 end
 

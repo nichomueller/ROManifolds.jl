@@ -3,8 +3,7 @@ function reduced_operator(
   feop::TransientParamFEOperator,
   s::S) where S
 
-  info = get_info(solver)
-  red_trial,red_test = reduced_fe_space(info,feop,s)
+  red_trial,red_test = reduced_fe_space(solver,feop,s)
   odeop = get_algebraic_operator(feop)
   reduced_operator(solver,odeop,red_trial,red_test,s)
 end
@@ -63,7 +62,7 @@ end
 # convention: when computing full order matrices / vectors, we view them as snapshots
 
 function fe_matrix_and_vector(
-  solver::RBThetaMethod,
+  solver::ThetaMethodRBSolver,
   op::RBOperator,
   s::S) where S
 

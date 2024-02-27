@@ -1,13 +1,3 @@
-function RB.get_norm_matrix(
-  info::RBInfo,
-  trial::DistributedSingleFieldFESpace,
-  test::DistributedSingleFieldFESpace)
-
-  map(local_views(trial),local_views(test)) do trial,test
-    RB.get_norm_matrix(info,trial,test)
-  end
-end
-
 # takes into account only owned values
 
 const DistributedRBSpace = RBSpace{S,BS,BT} where {S<:DistributedFESpace,BS,BT}
@@ -35,17 +25,16 @@ end
 FESpaces.get_free_dof_ids(r::DistributedRBSpace) = get_free_dof_ids(r.space)
 
 function RB.reduced_fe_space(
-  info::RBInfo,
+  solver::RBSolver,
   feop::TransientParamFEOperator,
   s::DistributedTransientSnapshots)
 
   trial = get_trial(feop)
   # dtrial = _to_distributed_fe_space(trial)
   test = get_test(feop)
-  # norm_matrix = RB.get_norm_matrix(info,feop)
-  soff = select_snapshots(s,RB.offline_params(info))
+  soff = select_snapshots(s,RB.offline_params(solver))
   basis_space,basis_time = map(own_values(soff)) do s
-    reduced_basis(s,nothing;ϵ=RB.get_tol(info))
+    reduced_basis(s,nothing;ϵ=RB.get_tol(solver))
   end |> tuple_of_arrays
 
   reduced_trial = RBSpace(trial,basis_space,basis_time)
@@ -54,17 +43,17 @@ function RB.reduced_fe_space(
 end
 
 function new_reduced_fe_space(
-  info::RBInfo,
+  solver::RBSolver,
   feop::TransientParamFEOperator,
   s::DistributedTransientSnapshots)
 
   T = eltype(s.snaps)
   trial = get_trial(feop)
   test = get_test(feop)
-  soff = select_snapshots(s,RB.offline_params(info))
+  soff = select_snapshots(s,RB.offline_params(solver))
   row_partition = s.snaps.row_partition
   basis_space,basis_time = map(own_values(soff)) do s
-    reduced_basis(s,nothing;ϵ=RB.get_tol(info))
+    reduced_basis(s,nothing;ϵ=RB.get_tol(solver))
   end |> tuple_of_arrays
   col_partition = get_col_partition(basis_space,row_partition)
   p_basis_space = PMatrix{Matrix{T}}(undef,row_partition,col_partition)
@@ -155,7 +144,7 @@ function RB.combine_basis_time(
 end
 
 function RB.mdeim(
-  info::RBInfo,
+  solver::RBSolver,
   fs::DistributedFESpace,
   trian::DistributedTriangulation,
   basis_space::AbstractMatrix,
@@ -164,7 +153,7 @@ function RB.mdeim(
   lu_interp,red_trian,integration_domain = map(
     local_views(fs),local_views(trian),local_views(basis_space),local_views(basis_time)
     ) do fs,trian,basis_space,basis_time
-    mdeim(info,fs,trian,basis_space,basis_time)
+    mdeim(solver,fs,trian,basis_space,basis_time)
   end |> tuple_of_arrays
   d_red_trian = DistributedTriangulation(red_trian)
   return lu_interp,d_red_trian,integration_domain

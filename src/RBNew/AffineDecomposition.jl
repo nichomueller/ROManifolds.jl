@@ -97,7 +97,7 @@ function _time_indices_and_interp_matrix(::SpaceOnlyMDEIM,interp_basis_space,bas
 end
 
 function mdeim(
-  info::RBInfo,
+  solver::RBSolver,
   fs::FESpace,
   trian::Triangulation,
   basis_space::AbstractMatrix,
@@ -105,7 +105,7 @@ function mdeim(
 
   indices_space = get_mdeim_indices(basis_space)
   interp_basis_space = view(basis_space,indices_space,:)
-  indices_time,lu_interp = _time_indices_and_interp_matrix(info.mdeim_style,interp_basis_space,basis_time)
+  indices_time,lu_interp = _time_indices_and_interp_matrix(solver.mdeim_style,interp_basis_space,basis_time)
   recast_indices_space = recast_indices(basis_space,indices_space)
   red_trian = reduce_triangulation(fs,trian,recast_indices_space)
   integration_domain = ReducedIntegrationDomain(recast_indices_space,indices_time)
@@ -145,19 +145,19 @@ function union_reduced_times(a::NTuple)
 end
 
 function reduced_form(
-  info::RBInfo,
+  solver::RBSolver,
   fs::FESpace,
   s::S,
   trian::T,
   args...;
   kwargs...) where {S,T}
 
-  basis_space,basis_time = reduced_basis(s;ϵ=get_tol(info))
-  lu_interp,red_trian,integration_domain = mdeim(info,fs,trian,basis_space,basis_time)
+  basis_space,basis_time = reduced_basis(s;ϵ=get_tol(solver))
+  lu_interp,red_trian,integration_domain = mdeim(solver,fs,trian,basis_space,basis_time)
   proj_basis_space = compress_basis_space(basis_space,args...)
   comb_basis_time = combine_basis_time(args...;kwargs...)
   ad = AffineDecomposition(
-    info.mdeim_style,
+    solver.mdeim_style,
     proj_basis_space,
     basis_time,
     lu_interp,
@@ -167,18 +167,18 @@ function reduced_form(
 end
 
 function reduced_vector_form(
-  info::RBInfo,
+  solver::RBSolver,
   op::RBOperator,
   s::S,
   trian::T) where {S,T}
 
   test = get_test(op)
   fe_test = get_fe_test(op)
-  reduced_form(info,fe_test,s,trian,test)
+  reduced_form(solver,fe_test,s,trian,test)
 end
 
 function reduced_matrix_form(
-  info::RBInfo,
+  solver::RBSolver,
   op::RBOperator,
   s::S,
   trian::T;
@@ -187,7 +187,7 @@ function reduced_matrix_form(
   trial = get_trial(op)
   test = get_test(op)
   fe_test = get_fe_test(op)
-  reduced_form(info,fe_test,s,trian,trial,test;kwargs...)
+  reduced_form(solver,fe_test,s,trian,trial,test;kwargs...)
 end
 
 function reduced_vector_form(
@@ -195,9 +195,8 @@ function reduced_vector_form(
   op::RBOperator,
   c::ArrayContribution)
 
-  info = get_info(solver)
   a,trians = map(get_domains(c),get_values(c)) do trian,values
-    reduced_vector_form(info,op,values,trian)
+    reduced_vector_form(solver,op,values,trian)
   end |> tuple_of_arrays
   return AffineContribution(a,trians)
 end
@@ -208,15 +207,14 @@ function reduced_matrix_form(
   c::ArrayContribution;
   kwargs...)
 
-  info = get_info(solver)
   a,trians = map(get_domains(c),get_values(c)) do trian,values
-    reduced_matrix_form(info,op,values,trian;kwargs...)
+    reduced_matrix_form(solver,op,values,trian;kwargs...)
   end |> tuple_of_arrays
   return AffineContribution(a,trians)
 end
 
 function reduced_matrix_form(
-  solver::RBThetaMethod,
+  solver::ThetaMethodRBSolver,
   op::RBOperator,
   contribs::Tuple{Vararg{C}}) where C
 
@@ -235,7 +233,7 @@ function reduced_matrix_vector_form(
   op::RBOperator,
   s::S) where S
 
-  smdeim = select_snapshots(s,mdeim_params(solver.info))
+  smdeim = select_snapshots(s,mdeim_params(solver))
   contribs_mat,contribs_vec = fe_matrix_and_vector(solver,op,smdeim)
   red_mat = reduced_matrix_form(solver,op,contribs_mat)
   red_vec = reduced_vector_form(solver,op,contribs_vec)
@@ -524,7 +522,7 @@ function num_reduced_times(a::BlockAffineDecomposition)
 end
 
 function reduced_vector_form(
-  info::RBInfo,
+  solver::RBSolver,
   op::RBOperator,
   s::BlockSnapshots,
   trian::T) where T
@@ -534,7 +532,7 @@ function reduced_vector_form(
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
   ads,red_trians = Any[
-    reduced_form(info,fe_test[i],s[i],trian,test[i])
+    reduced_form(solver,fe_test[i],s[i],trian,test[i])
     for i in active_block_ids] |> tuple_of_arrays
   red_trian = FEM.merge_triangulations(red_trians)
   ad = BlockAffineDecomposition(block_map,ads...)
@@ -542,7 +540,7 @@ function reduced_vector_form(
 end
 
 function reduced_matrix_form(
-  info::RBInfo,
+  solver::RBSolver,
   op::RBOperator,
   s::BlockSnapshots,
   trian::T;
@@ -554,7 +552,7 @@ function reduced_matrix_form(
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
   ads,red_trians = Any[
-    reduced_form(info,fe_test[i],s[i,j],trian,trial[j],test[i];kwargs...)
+    reduced_form(solver,fe_test[i],s[i,j],trian,trial[j],test[i];kwargs...)
     for (i,j) in Tuple.(active_block_ids)] |> tuple_of_arrays
   red_trian = FEM.merge_triangulations(red_trians)
   ad = BlockAffineDecomposition(block_map,ads...)

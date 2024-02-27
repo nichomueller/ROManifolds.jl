@@ -126,7 +126,12 @@ export TransientParamFEOperatorFromWeakForm
 export AffineTransientParamFEOperator
 export NonlinearTransientParamFEOperator
 export TransientParamFEOperatorWithTrian
+export NormedTransientParamFEOperator
+export SaddlePointTransientParamFEOperator
+export LinearNonlinearTransientParamFEOperator
 export change_triangulation
+export compute_induced_norm_matrix
+export compute_coupling_matrix
 include("TransientParamFEOperator.jl")
 
 export ODEParamOperator

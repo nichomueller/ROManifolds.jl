@@ -1,33 +1,26 @@
-function load_solve(solver::RBSolver,args...;kwargs...)
-  info = get_info(solver)
-  snaps = deserialize(get_snapshots_filename(info))
-  fem_stats = deserialize(get_stats_filename(info))
-  rbop = deserialize(get_op_filename(info))
+function load_solve(solver;dir=pwd(),kwargs...)
+  snaps = deserialize(get_snapshots_filename(dir))
+  fem_stats = deserialize(get_stats_filename(dir))
+  rbop = deserialize(get_op_filename(dir))
   rb_sol,rb_stats = solve(solver,rbop,snaps)
   results = rb_results(solver,rbop,snaps,rb_sol,fem_stats,rb_stats;kwargs...)
   return results
 end
 
-function DrWatson.save(s::RBSolver,args...)
-  save(get_info(s),args...)
+function DrWatson.save(dir,args::Tuple)
+  map(a->save(dir,a),args)
 end
 
-function DrWatson.save(info::RBInfo,args::Tuple)
-  if info.save_structures
-    map(a->save(info,a),args)
-  end
+get_snapshots_filename(dir) = dir * "/snapshots.jld"
+
+function DrWatson.save(dir,s::Union{AbstractSnapshots,BlockSnapshots})
+  serialize(get_snapshots_filename(dir),s)
 end
 
-get_snapshots_filename(info::RBInfo) = info.dir * "/snapshots.jld"
+get_op_filename(dir) = dir * "/operator.jld"
 
-function DrWatson.save(info::RBInfo,s::Union{AbstractSnapshots,BlockSnapshots})
-  serialize(get_snapshots_filename(info),s)
-end
-
-get_op_filename(info::RBInfo) = info.dir * "/operator.jld"
-
-function DrWatson.save(info::RBInfo,op::RBNonlinearOperator)
-  serialize(get_op_filename(info),op)
+function DrWatson.save(dir,op::RBNonlinearOperator)
+  serialize(get_op_filename(dir),op)
 end
 
 struct ComputationalStats
@@ -43,10 +36,10 @@ end
 get_avg_time(c::ComputationalStats) = c.avg_time
 get_avg_nallocs(c::ComputationalStats) = c.avg_nallocs
 
-get_stats_filename(info::RBInfo) = info.dir * "/stats.jld"
+get_stats_filename(dir) = dir * "/stats.jld"
 
-function DrWatson.save(info::RBInfo,c::ComputationalStats)
-  serialize(get_stats_filename(info),c)
+function DrWatson.save(dir,c::ComputationalStats)
+  serialize(get_stats_filename(dir),c)
 end
 
 struct RBResults{A,B,BA,C,D}
@@ -59,31 +52,41 @@ struct RBResults{A,B,BA,C,D}
 end
 
 function rb_results(
-  info::RBInfo,
   feop::TransientParamFEOperator,
+  solver::RBSolver,
   s,
   son_approx,
   fem_stats,
   rb_stats;
-  name=info.variable_name)
+  name="vel")
 
-  X = get_norm_matrix(info,feop)
-  son = select_snapshots(s,online_params(info)) |> reverse_snapshots
-  results = RBResults(name,son,son_approx,fem_stats,rb_stats,X)
-  save(info,results)
-  return results
+  son = select_snapshots(s,online_params(solver)) |> reverse_snapshots
+  RBResults(name,son,son_approx,fem_stats,rb_stats,nothing)
+end
+
+function rb_results(
+  feop::FEM.AbstractNormedTransientParamFEOperator,
+  solver::RBSolver,
+  s,
+  son_approx,
+  fem_stats,
+  rb_stats;
+  name="vel")
+
+  X = get_norm_matrix(feop)
+  son = select_snapshots(s,online_params(solver)) |> reverse_snapshots
+  RBResults(name,son,son_approx,fem_stats,rb_stats,X)
 end
 
 function rb_results(solver::RBSolver,op::RBNonlinearOperator,args...;kwargs...)
-  info = get_info(solver)
   feop = FEM.get_fe_operator(op)
-  rb_results(info,feop,args...;kwargs...)
+  rb_results(solver,feop,args...;kwargs...)
 end
 
-get_results_filename(info::RBInfo) = info.dir * "/results.jld"
+get_results_filename(dir) = dir * "/results.jld"
 
-function DrWatson.save(info::RBInfo,r::RBResults)
-  serialize(get_results_filename(info),r)
+function DrWatson.save(dir,r::RBResults)
+  serialize(get_results_filename(dir),r)
 end
 
 function speedup(fem_stats::ComputationalStats,rb_stats::ComputationalStats)
@@ -176,15 +179,10 @@ function _plot(trial::TransientMultiFieldTrialParamFESpace,s::BlockSnapshots;var
   end
 end
 
-function generate_plots(
-  solver::RBSolver,
-  feop::TransientParamFEOperator,
-  r::RBResults)
-
+function generate_plots(feop::TransientParamFEOperator,r::RBResults;dir=pwd())
   sol,sol_approx = r.sol,r.sol_approx
   trial = get_trial(feop)
-  info = get_info(solver)
-  plt_dir = joinpath(info.dir,"plots")
+  plt_dir = joinpath(dir,"plots")
   fe_plt_dir = joinpath(plt_dir,"fe_solution")
   _plot(trial,sol;dir=fe_plt_dir,varname=r.name)
   rb_plt_dir = joinpath(plt_dir,"rb_solution")

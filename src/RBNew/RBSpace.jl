@@ -1,17 +1,33 @@
 function reduced_fe_space(
-  info::RBInfo,
+  solver::RBSolver,
   feop::TransientParamFEOperator,
   s::S) where S
 
-  norm_matrix = get_norm_matrix(info,feop)
-  soff = select_snapshots(s,offline_params(info))
-  bases = reduced_basis(soff,norm_matrix;ϵ=get_tol(info))#,format=get_format(info))
-  if info.compute_supremizers
-    bases = enrich_basis(feop,bases,norm_matrix)
-  end
+  soff = select_snapshots(s,offline_params(solver))
+  bases = reduced_basis(feop,soff;ϵ=get_tol(solver))
   reduced_trial = reduced_fe_space(get_trial(feop),bases...)
   reduced_test = reduced_fe_space(get_test(feop),bases...)
   return reduced_trial,reduced_test
+end
+
+function reduced_basis(feop::TransientParamFEOperator,s::S;kwargs...) where S
+  reduced_basis(s;kwargs...)
+end
+
+function reduced_basis(feop::NormedTransientParamFEOperator,s::S;kwargs...) where S
+  norm_matrix = compute_induced_norm_matrix(feop)
+  reduced_basis(s,norm_matrix;kwargs...)
+end
+
+function reduced_basis(feop::SaddlePointTransientParamFEOperator,s::S;kwargs...) where S
+  bases = reduced_basis(feop.op,s;kwargs...)
+  enrich_basis(feop,bases,nothing)
+end
+
+function reduced_basis(feop::NormedSaddlePointTransientParamFEOperator,s::S;kwargs...) where S
+  norm_matrix = compute_induced_norm_matrix(feop)
+  bases = reduced_basis(feop.op,s,norm_matrix;kwargs...)
+  enrich_basis(feop,bases,norm_matrix)
 end
 
 function reduced_basis(s::AbstractSnapshots,args...;kwargs...)
@@ -302,26 +318,27 @@ function enrich_basis(feop::TransientParamFEOperator,bases,norm_matrix)
   return basis_space,basis_time
 end
 
-function add_space_supremizers(basis_space,supr_op,args...)
-  @check length(basis_space) == 2 "Have to extend this if dealing with more than 2 equations"
-  basis_primal,basis_dual = basis_space.array
-  supr_i = supr_op * basis_dual
-  gram_schmidt!(supr_i,basis_primal)
-  basis_primal = hcat(basis_primal,supr_i)
+function add_space_supremizers(basis_space,supr_op::MatrixBlock)
+  basis_primal,basis_dual... = basis_space.array
+  for i = eachindex(basis_dual)
+    supr_i = supr_op[Block(1,i+1)] * basis_dual[i]
+    gram_schmidt!(supr_i,basis_primal)
+    basis_primal = hcat(basis_primal,supr_i)
+  end
   return ArrayBlock([basis_primal,basis_dual],basis_space.touched)
 end
 
-function add_space_supremizers(basis_space,supr_op,norm_matrix::AbstractVector{<:AbstractMatrix})
-  @check length(basis_space) == 2 "Have to extend this if dealing with more than 2 equations"
-  println(typeof(norm_matrix))
-  basis_primal,basis_dual = basis_space.array
-  A = first(norm_matrix)
-  b = supr_op * basis_dual
-  alg = UMFPACKFactorization()
-  prob = LinearProblem(A,b)
-  supr_i = solve(prob,alg)
-  gram_schmidt!(supr_i,basis_primal,A)
-  basis_primal = hcat(basis_primal,supr_i)
+function add_space_supremizers(basis_space,supr_op::MatrixBlock,norm_matrix::MatrixBlock)
+  basis_primal,basis_dual... = basis_space.array
+  A = norm_matrix[Block(1,1)]
+  for i = eachindex(basis_dual)
+    b_i = supr_op[Block(1,i+1)] * basis_dual[i]
+    alg = UMFPACKFactorization()
+    prob = LinearProblem(A,b_i)
+    supr_i = solve(prob,alg)
+    gram_schmidt!(supr_i,basis_primal)
+    basis_primal = hcat(basis_primal,supr_i)
+  end
   return ArrayBlock([basis_primal,basis_dual],basis_space.touched)
 end
 

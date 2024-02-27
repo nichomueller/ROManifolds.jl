@@ -7,9 +7,7 @@ function reduced_operator(
   trians_lhs = map(get_domains,red_lhs)
   trians_rhs = get_domains(red_rhs)
   new_op = change_triangulation(op,trians_lhs,trians_rhs)
-  red_op = RBNonlinearOperator(solver,new_op,red_lhs,red_rhs)
-  save(solver,red_op)
-  return red_op
+  RBNonlinearOperator(solver,new_op,red_lhs,red_rhs)
 end
 
 abstract type RBNonlinearOperator{T} <: NonlinearOperator end
@@ -209,7 +207,7 @@ end
 
 const AffineThetaMethodNonlinearOperator = ThetaMethodNonlinearOperator{T,L,R} where {T<:Affine,L,R}
 
-function RBNonlinearOperator(::RBThetaMethod,op::RBOperator,lhs,rhs)
+function RBNonlinearOperator(::ThetaMethodRBSolver,op::RBOperator,lhs,rhs)
   ThetaMethodNonlinearOperator(op,lhs,rhs)
 end
 
@@ -218,14 +216,13 @@ function Algebra.solve(
   op::ThetaMethodNonlinearOperator,
   s::S) where S
 
-  info = get_info(solver)
-  son = select_snapshots(s,online_params(info))
+  son = select_snapshots(s,online_params(solver))
   ron = get_realization(son)
   solve(solver,op,ron)
 end
 
 function Algebra.solve(
-  solver::RBThetaMethod,
+  solver::ThetaMethodRBSolver,
   op::ThetaMethodNonlinearOperator,
   _r::TransientParamRealization)
 
@@ -260,7 +257,7 @@ function Algebra.solve(
 end
 
 function Algebra.solve(
-  solver::RBThetaMethod,
+  solver::ThetaMethodRBSolver,
   op::AffineThetaMethodNonlinearOperator,
   _r::TransientParamRealization)
 

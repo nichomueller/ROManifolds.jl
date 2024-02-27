@@ -211,7 +211,6 @@ function ghost_reduced_fe_space(
   trial = get_trial(feop)
   # dtrial = _to_distributed_fe_space(trial)
   test = get_test(feop)
-  # norm_matrix = RB.get_norm_matrix(info,feop)
   soff = select_snapshots(s,RB.offline_params(info))
   basis_space,basis_time = map(ghost_values(soff)) do s
     reduced_basis(s,nothing;ϵ=RB.get_tol(info))

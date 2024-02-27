@@ -70,59 +70,27 @@ feop = AffineTransientParamFEOperator(res,jac,jac_t,ptspace,trial,test,trian_res
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
-dir = datadir(joinpath("heateq","toy_mesh"))
-info = RBInfo(dir;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20,st_mdeim=true)
+ϵ = 1e-4
+rbsolver = RBSolver(fesolver,ϵ,mdeim_style=RB.SpaceTimeMDEIM();nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","toy_mesh")))
 
-rbsolver = RBSolver(info,fesolver)
+# we can load & solve directly, if the offline structures have been previously saved to file
+# load_solve(rbsolver,dir=test_dir)
 
-snaps,comp = ode_solutions(rbsolver,feop,uh0μ)
-red_op = reduced_operator(rbsolver,feop,snaps)
+fesnaps,festats = ode_solutions(rbsolver,feop,uh0μ)
+rbop = reduced_operator(rbsolver,feop,fem_snaps)
+rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
+results = rb_results(feop,rbsolver,fesnaps,rbsnaps,festats,rbstats)
 
-son = select_snapshots(snaps,RB.online_params(info))
-ron = get_realization(son)
-xrb, = solve(rbsolver,red_op,ron)
-son_rev = reverse_snapshots(son)
-RB.space_time_error(son_rev,xrb)
+println(RB.space_time_error(results))
+save(test_dir,fesnaps)
+save(test_dir,rbop)
+save(test_dir,results)
 
-info_space = RBInfo(dir;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
-rbsolver_space = RBSolver(info_space,fesolver)
-red_op_space = reduced_operator(rbsolver_space,feop,snaps)
-xrb_space, = solve(rbsolver_space,red_op_space,ron)
-RB.space_time_error(son_rev,xrb_space)
+ϵ = 1e-4
+rbsolver_space = RBSolver(fesolver,ϵ,mdeim_style=RB.SpaceOnlyMDEIM();nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+test_dir_space = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","toy_mesh")))
 
-xrb_loaded = load_solve(rbsolver)
-xrb_space_loaded = load_solve(rbsolver_space)
-
-#
-# dummy test for online phase, no mdeim (θ == 1 !!)
-son = select_snapshots(snaps,first(RB.online_params(info)))
-x = get_values(son)
-ron = get_realization(son)
-odeop = get_algebraic_operator(feop.op)
-ode_cache = allocate_cache(odeop,ron)
-ode_cache = update_cache!(ode_cache,odeop,ron)
-x0 = get_free_dof_values(zero(trial(ron)))
-y0 = similar(x0)
-y0 .= 0.0
-nlop = ThetaMethodParamOperator(odeop,ron,dt*θ,x0,ode_cache,y0)
-A = allocate_jacobian(nlop,x0)
-jacobian!(A,nlop,x0,1)
-Asnap = Snapshots(A,ron)
-M = allocate_jacobian(nlop,x0)
-jacobian!(M,nlop,x0,2)
-Msnap = Snapshots(M,ron)
-b = allocate_residual(nlop,x0)
-residual!(b,nlop,x0)
-bsnap = Snapshots(b,ron)
-
-b_rb = compress(bsnap,red_test)
-A_rb = compress(Asnap,red_trial(ron),red_test;combine=(x,y)->θ*x+(1-θ)*y)
-M_rb = compress(Msnap,red_trial(ron),red_test;combine=(x,y)->θ*(x-y))
-AM_rb = A_rb + M_rb
-
-x_rb = AM_rb \ b_rb
-
-x_rec = recast(red_trial(ron),x_rb)
-s = Snapshots(x,ron)
-srec = -Snapshots(x_rec,ron)
-RB.space_time_error(s,srec)
+rbop_space = reduced_operator(rbsolver_space,feop,fesnaps)
+rbsnaps_space,rbstats_space = solve(rbsolver_space,rbop,fesnaps)
+results_space = rb_results(feop,rbsolver_space,fesnaps,rbsnaps_space,festats,rbstats_space)
