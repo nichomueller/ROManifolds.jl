@@ -105,11 +105,15 @@ function ODETools.jacobians!(
   return A
 end
 
-function _select_fe_space_at_time_locations(fs,indices)
-  fs
+function _select_fe_space_at_time_locations(fs::FESpace,indices)
+  @notimplemented
 end
 
-function _select_fe_space_at_time_locations(fs::TrialParamFESpace,indices)
+function _select_fe_space_at_time_locations(fs::FESpaceToParamFESpace,indices)
+  FESpaceToParamFESpace(fs.space,Val(length(indices)))
+end
+
+function _select_fe_space_at_time_locations(fs::SingleFieldParamFESpace,indices)
   dvi = ParamArray(fs.dirichlet_values[indices])
   TrialParamFESpace(dvi,fs.space)
 end

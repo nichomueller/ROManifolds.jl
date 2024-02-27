@@ -173,7 +173,6 @@ FESpaceToParamFESpace(f::SingleFieldParamFESpace,L::Integer) = f
 length_dirichlet_values(f::FESpaceToParamFESpace{S,L}) where {S,L} = L
 
 # Extend some of Gridap's functions when needed
-
 function FESpaces.FEFunction(
   f::FESpaceToParamFESpace{<:ZeroMeanFESpace,L},
   free_values::ParamArray,
@@ -194,15 +193,6 @@ function FESpaces.EvaluationFunction(
   f::FESpaceToParamFESpace{<:ZeroMeanFESpace,L},
   free_values) where L
   FEFunction(FESpaceToParamFESpace(f.space.space,Val(L)),free_values)
-end
-
-function FESpaces.scatter_free_and_dirichlet_values(
-  f::FESpaceToParamFESpace{<:FESpace,L},
-  fv::ParamArray,
-  dv::ParamArray) where L
-
-  fs = f.space.space
-  scatter_free_and_dirichlet_values(FESpaceToParamFESpace(fs,Val(L)),fv,dv)
 end
 
 function FESpaces.scatter_free_and_dirichlet_values(

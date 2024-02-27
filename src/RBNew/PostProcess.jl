@@ -20,7 +20,7 @@ end
 
 get_snapshots_filename(info::RBInfo) = info.dir * "/snapshots.jld"
 
-function DrWatson.save(info::RBInfo,s::AbstractSnapshots)
+function DrWatson.save(info::RBInfo,s::Union{AbstractSnapshots,BlockSnapshots})
   serialize(get_snapshots_filename(info),s)
 end
 
@@ -158,15 +158,6 @@ function _plot(solh::SingleFieldParamFEFunction,r::TransientParamRealization;dir
       pvd[t] = vtk
     end
   end
-end
-
-# for the time being, plot only first param
-function _get_at_first_param(trial,s)
-  r = get_realization(s)
-  r1 = FEM.get_at_param(r)
-  free_values = get_values(s)
-  free_values1 = free_values[1:num_times(r)]
-  r1,FEFunction(trial(r1),free_values1)
 end
 
 function _plot(trial,s;kwargs...)

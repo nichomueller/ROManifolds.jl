@@ -1,5 +1,6 @@
 using Gridap
 using Gridap.FESpaces
+using GridapGmsh
 using ForwardDiff
 using BlockArrays
 using LinearAlgebra
@@ -24,9 +25,8 @@ tf = 0.1
 pranges = fill([1,10],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
-domain = (0,1,0,1)
-partition = (2,2)
-model = CartesianDiscreteModel(domain,partition)
+model_dir = datadir(joinpath("meshes","perforated_plate.json"))
+model = DiscreteModelFromFile(model_dir)
 
 order = 2
 degree = 2*order
@@ -57,10 +57,10 @@ trian_jac = (Ω,)
 trian_jac_t = (Ω,)
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
-test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=[1,2,3,4,5,6])
+test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["inlet","walls","cylinder"])
 trial_u = TransientTrialParamFESpace(test_u,gμt)
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
-test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
+test_p = TestFESpace(model,reffe_p;conformity=:C0)
 trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
@@ -69,7 +69,7 @@ feop = AffineTransientParamFEOperator(res,jac,jac_t,ptspace,trial,test,trian_res
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
-dir = datadir(joinpath("stokes","toy_mesh"))
+dir = datadir(joinpath("stokes","perforated_plate"))
 info = RBInfo(dir;norm_style=[:l2,:l2],nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20,
   st_mdeim=true,compute_supremizers=true,variable_name=("vel","press"))
 
@@ -83,6 +83,13 @@ ron = get_realization(son)
 xrb,comprb = solve(rbsolver,red_op,ron)
 son_rev = reverse_snapshots(son)
 RB.space_time_error(son_rev,xrb)
+
+info_space = RBInfo(dir;norm_style=[:l2,:l2],nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20,
+  compute_supremizers=true,variable_name=("vel","press"))
+rbsolver_space = RBSolver(info_space,fesolver)
+red_op_space = reduced_operator(rbsolver_space,feop,snaps)
+xrb_space, = solve(rbsolver_space,red_op_space,ron)
+RB.space_time_error(son_rev,xrb_space)
 
 results = rb_results(rbsolver,red_op,snaps,xrb,comp,comprb)
 # results = solve(rbsolver,feop,xh0μ)
@@ -108,3 +115,9 @@ FEM.shift_time!(rt,dt)
 files = ParamString(dir,rt)
 solh_t = FEM._getindex(sh[1],1)
 vtk = createvtk(trian,files,cellfields=["vel"=>solh_t])
+
+bs,bt = red_op.op.trial.basis_space[2],red_op.op.trial.basis_time[2]
+
+M = select_snapshots(son[2],51) |> collect
+errs = norm(M - bs*bs'*M) / norm(M)
+errt = norm(M' - bt*bt'*M') / norm(M')

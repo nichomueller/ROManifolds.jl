@@ -90,10 +90,11 @@ function ODETools.∂tt(U::TransientTrialParamFESpace)
   TransientTrialParamFESpace(U.space,∂ttdir)
 end
 
-FESpaces.zero_free_values(f::TransientTrialParamFESpace) = @notimplemented
+# careful: this will be a BlockVector, not a ParamBlockVector
+FESpaces.zero_free_values(f::TransientTrialParamFESpace) = zero_free_values(f.space)
 FESpaces.has_constraints(f::TransientTrialParamFESpace) = has_constraints(f.space)
 FESpaces.get_dof_value_type(f::TransientTrialParamFESpace) = get_dof_value_type(f.space)
-FESpaces.get_vector_type(f::TransientTrialParamFESpace) = @notimplemented
+FESpaces.get_vector_type(f::TransientTrialParamFESpace) = get_vector_type(f.space)
 
 # Define the TransientTrialFESpace interface for stationary spaces
 
@@ -135,10 +136,7 @@ function TransientMultiFieldParamFESpace(
   T  = typeof(*(map(zero,Ts)...))
   if isa(style,BlockMultiFieldStyle)
     style = BlockMultiFieldStyle(style,spaces)
-    V = map(spaces) do space
-      zero_free_values(space.space)
-    end
-    VT = typeof(mortar(V))
+    VT = typeof(mortar(map(zero_free_values,spaces)))
   else
     VT = Vector{T}
   end
@@ -202,13 +200,19 @@ end
 
 ODETools.∂tt(U::TransientMultiFieldTrialParamFESpace) = ∂t(∂t(U))
 
+# careful: this will be a BlockVector, not a ParamBlockVector
 function FESpaces.zero_free_values(
   f::TransientMultiFieldTrialParamFESpace{<:BlockMultiFieldStyle{NB,SB,P}}) where {NB,SB,P}
-  @notimplemented
+  block_ranges   = get_block_ranges(NB,SB,P)
+  block_num_dofs = map(range->sum(map(num_free_dofs,f.spaces[range])),block_ranges)
+  block_vtypes   = map(range->get_vector_type(first(f.spaces[range])),block_ranges)
+  values = mortar(map(allocate_vector,block_vtypes,block_num_dofs))
+  fill!(values,zero(eltype(values)))
+  return values
 end
 
 FESpaces.get_dof_value_type(f::TransientMultiFieldTrialParamFESpace{MS,CS,V}) where {MS,CS,V} = eltype(V)
-FESpaces.get_vector_type(f::TransientMultiFieldTrialParamFESpace) = @notimplemented
+FESpaces.get_vector_type(f::TransientMultiFieldTrialParamFESpace) = f.vector_type
 FESpaces.ConstraintStyle(::Type{TransientMultiFieldTrialParamFESpace{S,B,V}}) where {S,B,V} = B()
 FESpaces.ConstraintStyle(::TransientMultiFieldTrialParamFESpace) = ConstraintStyle(typeof(f))
 MultiField.MultiFieldStyle(::Type{TransientMultiFieldTrialParamFESpace{S,B,V}}) where {S,B,V} = S()
