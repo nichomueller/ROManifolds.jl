@@ -209,16 +209,16 @@ function fe_vector!(
   return bi
 end
 
-struct ThetaMethodNonlinearOperator{T,L,R} <: RBNonlinearOperator{T}
+struct ThetaMethodRBNonlinearOperator{T,L,R} <: RBNonlinearOperator{T}
   op::RBOperator{T}
   lhs::L
   rhs::R
 end
 
-const AffineThetaMethodNonlinearOperator = ThetaMethodNonlinearOperator{T,L,R} where {T<:Affine,L,R}
+const AffineThetaMethodRBNonlinearOperator = ThetaMethodRBNonlinearOperator{T,L,R} where {T<:Affine,L,R}
 
 function RBNonlinearOperator(::ThetaMethodRBSolver,op::RBOperator,lhs,rhs)
-  ThetaMethodNonlinearOperator(op,lhs,rhs)
+  ThetaMethodRBNonlinearOperator(op,lhs,rhs)
 end
 
 function Algebra.solve(
@@ -233,7 +233,7 @@ end
 
 function Algebra.solve(
   solver::ThetaMethodRBSolver,
-  op::ThetaMethodNonlinearOperator,
+  op::ThetaMethodRBNonlinearOperator,
   _r::TransientParamRealization)
 
   fesolver = get_fe_solver(solver)
@@ -268,7 +268,7 @@ end
 
 function Algebra.solve(
   solver::ThetaMethodRBSolver,
-  op::AffineThetaMethodNonlinearOperator,
+  op::AffineThetaMethodRBNonlinearOperator,
   _r::TransientParamRealization)
 
   fesolver = get_fe_solver(solver)
@@ -302,13 +302,13 @@ function Algebra.solve(
   return s,cs
 end
 
-function ODETools._matrix_and_vector!(cache_mat,cache_vec,op::ThetaMethodNonlinearOperator,r,dtθ,u0,ode_cache,vθ)
+function ODETools._matrix_and_vector!(cache_mat,cache_vec,op::ThetaMethodRBNonlinearOperator,r,dtθ,u0,ode_cache,vθ)
   A = ODETools._matrix!(cache_mat,op,r,dtθ,u0,ode_cache,vθ)
   b = ODETools._vector!(cache_vec,op,r,dtθ,u0,ode_cache,vθ)
   return A,b
 end
 
-function ODETools._matrix!(cache,op::ThetaMethodNonlinearOperator,r,dtθ,u0,ode_cache,vθ)
+function ODETools._matrix!(cache,op::ThetaMethodRBNonlinearOperator,r,dtθ,u0,ode_cache,vθ)
   fe_A,coeff_cache,lincomb_cache = cache
   for i = eachindex(fe_A)
     LinearAlgebra.fillstored!(fe_A[i],zero(eltype(fe_A[i])))
@@ -317,15 +317,15 @@ function ODETools._matrix!(cache,op::ThetaMethodNonlinearOperator,r,dtθ,u0,ode_
   return A
 end
 
-function ODETools._vector!(cache,op::ThetaMethodNonlinearOperator,r,dtθ,u0,ode_cache,vθ)
+function ODETools._vector!(cache,op::ThetaMethodRBNonlinearOperator,r,dtθ,u0,ode_cache,vθ)
   b = residual!(cache,op,r,(u0,vθ),ode_cache)
   b .*= -1.0
   return b
 end
 
-struct LinearNonlinearRBNonlinearOperator{T,L,R} <: RBNonlinearOperator{Nonlinear}
-  op_linear::RBNonlinearOperator{Linear}
-  op_nonlinear::RBNonlinearOperator{Noninear}
+struct LinearNonlinearRBNonlinearOperator <: RBNonlinearOperator{Nonlinear}
+  op_linear::RBNonlinearOperator{Affine}
+  op_nonlinear::RBNonlinearOperator{Nonlinear}
 end
 
 FEM.get_linear_operator(op::LinearNonlinearRBNonlinearOperator) = op.op_linear

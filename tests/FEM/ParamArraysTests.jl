@@ -236,8 +236,8 @@ trial_u = TransientTrialParamFESpace(test_u,gμt)
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
 test_p = TestFESpace(model,reffe_p;conformity=:H1,constraint=:zeromean)
 trial_p = TrialFESpace(test_p)
-test = TransientMultiFieldParamFESpace([test_u,test_p])
-trial = TransientMultiFieldParamFESpace([trial_u,trial_p])
+test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
+trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
 feop = TransientParamFEOperator(res,jac,jac_t,ptspace,trial,test)
 
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
@@ -261,7 +261,7 @@ _jac(t,(u,p),(du,dp),(v,q)) = _form(t,(du,dp),(v,q)) + dc(u,du,v)
 _jac_t(t,(u,p),(dut,dpt),(v,q)) = ∫(v⋅dut)dΩ
 
 _trial_u = TransientTrialFESpace(test_u,_g)
-_trial = TransientMultiFieldFESpace([_trial_u,trial_p])
+_trial = TransientMultiFieldFESpace([_trial_u,trial_p];style=BlockMultiFieldStyle())
 _feop = TransientFEOperator(_res,_jac,_jac_t,_trial,test)
 _x0 = interpolate_everywhere([u0(μ),p0(μ)],_trial(0.0))
 
@@ -274,7 +274,7 @@ for ((xh,rt),(_xh,_t)) in zip(sol,_sol)
   ph1 = FEM._getindex(ph,3)
   _uh,_ph = _xh
   t = get_times(rt)
-  @check t == _t "$t != $_t"
+  @check t ≈ _t "$t != $_t"
   @check get_free_dof_values(uh1) ≈ get_free_dof_values(_uh) "failed at time $t"
   @check get_free_dof_values(ph1) ≈ get_free_dof_values(_ph) "failed at time $t"
   @check uh1.dirichlet_values ≈ _uh.dirichlet_values

@@ -57,26 +57,44 @@ function Base.copy(a::ParamBlockArray)
   ParamBlockArray(copy.(get_array(a)),a.axes)
 end
 
-function Base.similar(
-  a::ParamBlockArray{T},
-  element_type::Type{S}=T,
-  dims::Tuple{Int,Vararg{Int}}=size(first(blocks(a)))) where {T,S}
+# function Base.similar(
+#   a::ParamBlockArray{T},
+#   element_type::Type{S}=eltype.(blocks(a)),
+#   dims::Tuple{Int,Vararg{Int}}=size.(blocks(a))) where {T,S}
 
-  ParamBlockArray(similar.(get_array(a),element_type,dims),a.axes)
+#   ParamBlockArray(map(similar,get_array(a),element_type,dims),a.axes)
+# end
+
+function Base.similar(a::ParamBlockArray{T}) where T
+  ParamBlockArray(map(similar,get_array(a)),a.axes)
 end
 
-function LinearAlgebra.fillstored!(a::ParamBlockMatrix,v)
+function Base.fill!(a::ParamBlockArray,v)
+  for i = eachblock(a)
+    fill!(a.blockarrays[i],v)
+  end
+  a
+end
+
+function LinearAlgebra.fillstored!(a::ParamBlockArray,v)
   for i = eachblock(a)
     LinearAlgebra.fillstored!(a.blockarrays[i],v)
   end
   a
 end
 
-function Base.fill!(a::ParamBlockVector,v)
-  for i = eachblock(a)
-    fill!(a.blockarrays[i],v)
+function Base.maximum(f,a::ParamBlockArray)
+  maxa = map(get_array(a)) do a
+    maximum(f,a)
   end
-  a
+  maximum(f,maxa)
+end
+
+function Base.minimum(f,a::ParamBlockArray)
+  mina = map(get_array(a)) do a
+    minimum(f,a)
+  end
+  minimum(f,mina)
 end
 
 function Base.:+(a::T,b::T) where T<:ParamBlockArray
@@ -104,6 +122,10 @@ end
 
 function Base.:*(a::Number,b::ParamBlockArray)
   b*a
+end
+
+function Base.:/(a::ParamBlockArray,b::Number)
+  a*(1/b)
 end
 
 function LinearAlgebra.mul!(
@@ -201,12 +223,12 @@ function Base.materialize!(a::ParamBlockArray,b::Broadcast.Broadcasted)
 end
 
 function Base.materialize!(a::ParamBlockArray,b::ParamBlockBroadcast)
-  map(i->Base.materialize!(_get_array(a)[i],_get_array(b)[i]),eachblock(a))
+  map(Base.materialize!,_get_array(a),_get_array(b))
   a
 end
 
-function Base.map(f,a::ParamBlockArray)
-  map(i->f(get_array(a)[i]),eachblock(a))
+function Base.map(f,a::ParamBlockArray...)
+  error("don't call map on a ParamBlockArray")
 end
 
 function mymortar(a::ParamBlockArray,ind::Integer)

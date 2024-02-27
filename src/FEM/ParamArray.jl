@@ -163,6 +163,10 @@ function Base.:*(a::Number,b::ParamArray)
   b*a
 end
 
+function Base.:/(a::ParamArray,b::Number)
+  a*(1/b)
+end
+
 function Base.:*(a::ParamMatrix,b::ParamVector)
   ci = testitem(a)*testitem(b)
   c = Vector{typeof(ci)}(undef,length(a))
@@ -200,36 +204,18 @@ function Base.transpose(a::ParamArray)
   ParamArray(at)
 end
 
-function Base.stack(a::Tuple{Vararg{ParamArray{T,N,A,L}}}) where {T,N,A,L}
-  arrays = map(get_array,a)
-  array = map(1:L) do i
-    stack(map(b->getindex(b,i),arrays))
+function Base.maximum(f,a::ParamArray)
+  maxa = map(a) do a
+    maximum(f,a)
   end
-  ParamArray(array)
+  maximum(f,maxa)
 end
 
-function Base.hcat(a::ParamArray{T,N,A,L}...) where {T,N,A,L}
-  arrays = map(get_array,a)
-  array = map(1:L) do i
-    hcat(map(b->getindex(b,i),arrays)...)
+function Base.minimum(f,a::ParamArray)
+  mina = map(a) do a
+    minimum(f,a)
   end
-  ParamArray(array)
-end
-
-function Base.vcat(a::ParamArray{T,N,A,L}...) where {T,N,A,L}
-  arrays = map(get_array,a)
-  array = map(1:L) do i
-    vcat(map(b->getindex(b,i),arrays)...)
-  end
-  ParamArray(array)
-end
-
-function Base.hvcat(nblocks::Int,a::ParamArray...)
-  nrows = Int(length(a)/nblocks)
-  varray = map(1:nrows) do row
-    vcat(a[(row-1)*nblocks+1:row*nblocks]...)
-  end
-  stack(varray)
+  minimum(f,mina)
 end
 
 function Base.fill!(a::ParamArray,z)
@@ -237,20 +223,6 @@ function Base.fill!(a::ParamArray,z)
     fill!(ai,z)
   end
   return a
-end
-
-function Base.maximum(f,a::ParamArray)
-  maxa = map(a) do a
-    maximum(f,a)
-  end
-  ParamArray(maxa)
-end
-
-function Base.minimum(f,a::ParamArray)
-  mina = map(a) do a
-    minimum(f,a)
-  end
-  ParamArray(mina)
 end
 
 function LinearAlgebra.fillstored!(a::ParamArray,z)

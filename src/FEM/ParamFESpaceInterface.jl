@@ -63,12 +63,12 @@ function FESpaces.compute_dirichlet_values_for_tags!(
   ParamArray(dirichlet_values)
 end
 
-function FESpaces._convert_to_collectable(object::AbstractParamFunction,ntags)
-  objects = map(object) do o
-    FESpaces._convert_to_collectable(Fill(o,ntags),ntags)
-  end
-  ParamArray(objects)
-end
+# function FESpaces._convert_to_collectable(object::AbstractParamFunction,ntags)
+#   objects = map(object) do o
+#     FESpaces._convert_to_collectable(Fill(o,ntags),ntags)
+#   end
+#   ParamArray(objects)
+# end
 
 function FESpaces.gather_free_and_dirichlet_values!(
   free_vals,
