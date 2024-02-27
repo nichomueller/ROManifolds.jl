@@ -553,13 +553,72 @@ const AbstractNormedTransientParamFEOperator = Union{
 }
 
 # interface to accommodate the separation of terms depending on the linearity/nonlinearity
-struct LinearNonlinearTransientParamFEOperator{T<:OperatorType} <: TransientParamFEOperator{T}
-  op_linear::TransientParamFEOperator{T}
-  op_nonlinear::TransientParamFEOperator{T}
+struct LinearNonlinearTransientParamFEOperator{A,B} <: TransientParamFEOperator{Nonlinear}
+  op_linear::A
+  op_nonlinear::B
 end
 
 get_linear_operator(op::LinearNonlinearTransientParamFEOperator) = op.op_linear
 get_nonlinear_operator(op::LinearNonlinearTransientParamFEOperator) = op.op_nonlinear
+
+function FESpaces.get_test(op::LinearNonlinearTransientParamFEOperator)
+  @check get_test(op.op_linear) === get_test(op.op_nonlinear)
+  get_test(op.op_linear)
+end
+
+function FESpaces.get_trial(op::LinearNonlinearTransientParamFEOperator)
+  @check get_trial(op.op_linear) === get_trial(op.op_nonlinear)
+  get_trial(op.op_linear)
+end
+
+function FESpaces.get_order(op::LinearNonlinearTransientParamFEOperator)
+  @check get_order(op.op_linear) === get_order(op.op_nonlinear)
+  get_order(op.op_linear)
+end
+
+function realization(op::LinearNonlinearTransientParamFEOperator;kwargs...)
+  realization(op.op_linear;kwargs...)
+end
+
+function join_operators(
+  op::LinearNonlinearTransientParamFEOperator{A,B}
+  ) where {A<:TransientParamFEOperatorFromWeakForm,B<:TransientParamFEOperatorFromWeakForm}
+
+  op_lin = get_linear_operator(op)
+  op_nlin = get_nonlinear_operator(op)
+  @check op_lin.op.tpspace === op_nlin.op.tpspace
+
+  res(μ,t,u,v) = op_lin.res(μ,t,u,v) + op_nlin.res(μ,t,u,v)
+  jac(μ,t,u,du,v) = op_lin.jacs[1](μ,t,u,du,v) + op_lin.jacs[1](μ,t,u,du,v)
+  jac_t(μ,t,u,dut,v) = op_nlin.jacs[2](μ,t,u,dut,v) + op_nlin.jacs[2](μ,t,u,dut,v)
+
+  TransientParamFEOperator(res,jac,jac_t,op_lin.tpspace,get_trial(op),get_trial(op))
+end
+
+function join_operators(
+  op::LinearNonlinearTransientParamFEOperator{A,B}
+  ) where {A<:TransientParamFEOperatorWithTrian,B<:TransientParamFEOperatorWithTrian}
+
+  op_lin = get_linear_operator(op)
+  op_nlin = get_nonlinear_operator(op)
+  trial = get_trial(op)
+  test = get_test(op)
+  @check op_lin.op.tpspace === op_nlin.op.tpspace
+  tpspace = op_lin.op.tpspace
+
+  newop_lin = AffineTransientParamFEOperator(
+    op_lin.op.res,op_lin.op.jacs[1],op_lin.op.jacs[2],tpspace,
+    trial,test,op_lin.trian_res,op_lin.trian_jacs...)
+  newop_nlin = TransientParamFEOperator(
+    op_nlin.op.res,op_nlin.op.jacs[1],op_nlin.op.jacs[2],tpspace,
+    trial,test,op_nlin.trian_res,op_nlin.trian_jacs...)
+
+  res(μ,t,u,v) = newop_lin.op.res(μ,t,u,v) + newop_nlin.op.res(μ,t,u,v)
+  jac(μ,t,u,du,v) = newop_lin.op.jacs[1](μ,t,u,du,v) + op_lin.op.jacs[1](μ,t,u,du,v)
+  jac_t(μ,t,u,dut,v) = newop_nlin.op.jacs[2](μ,t,u,dut,v) + newop_nlin.op.jacs[2](μ,t,u,dut,v)
+
+  TransientParamFEOperator(res,jac,jac_t,newop_lin.op.tpspace,trial,test)
+end
 
 function TransientFETools.test_transient_fe_operator(op::TransientParamFEOperator,uh,μt)
   odeop = get_algebraic_operator(op)

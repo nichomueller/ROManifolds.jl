@@ -11,13 +11,18 @@ function DrWatson.save(dir,args::Tuple)
   map(a->save(dir,a),args)
 end
 
-get_snapshots_filename(dir) = dir * "/snapshots.jld"
+function get_snapshots_filename(dir)
+  parent_dir, = splitdir(dir)
+  parent_dir * "/snapshots.jld"
+end
 
 function DrWatson.save(dir,s::Union{AbstractSnapshots,BlockSnapshots})
   serialize(get_snapshots_filename(dir),s)
 end
 
-get_op_filename(dir) = dir * "/operator.jld"
+function get_op_filename(dir)
+  dir * "/operator.jld"
+end
 
 function DrWatson.save(dir,op::RBNonlinearOperator)
   serialize(get_op_filename(dir),op)
@@ -36,7 +41,9 @@ end
 get_avg_time(c::ComputationalStats) = c.avg_time
 get_avg_nallocs(c::ComputationalStats) = c.avg_nallocs
 
-get_stats_filename(dir) = dir * "/stats.jld"
+function get_stats_filename(dir)
+  dir * "/stats.jld"
+end
 
 function DrWatson.save(dir,c::ComputationalStats)
   serialize(get_stats_filename(dir),c)
@@ -83,7 +90,9 @@ function rb_results(solver::RBSolver,op::RBNonlinearOperator,args...;kwargs...)
   rb_results(solver,feop,args...;kwargs...)
 end
 
-get_results_filename(dir) = dir * "/results.jld"
+function get_results_filename(dir)
+  dir * "/results.jld"
+end
 
 function DrWatson.save(dir,r::RBResults)
   serialize(get_results_filename(dir),r)

@@ -10,6 +10,16 @@ function reduced_operator(
   RBNonlinearOperator(solver,new_op,red_lhs,red_rhs)
 end
 
+function reduced_operator(
+  solver::RBSolver,
+  op::RBOperator{Nonlinear},
+  s::S) where S
+
+  red_op_lin = reduced_operator(solver,get_linear_operator(op),s)
+  red_op_nlin = reduced_operator(solver,get_nonlinear_operator(op),s)
+  LinearNonlinearRBNonlinearOperator(red_op_lin,red_op_nlin)
+end
+
 abstract type RBNonlinearOperator{T} <: NonlinearOperator end
 
 ReferenceFEs.get_order(op::RBNonlinearOperator) = get_order(op.op)
@@ -213,7 +223,7 @@ end
 
 function Algebra.solve(
   solver::RBSolver,
-  op::ThetaMethodNonlinearOperator,
+  op::RBNonlinearOperator,
   s::S) where S
 
   son = select_snapshots(s,online_params(solver))
@@ -312,3 +322,11 @@ function ODETools._vector!(cache,op::ThetaMethodNonlinearOperator,r,dtθ,u0,ode_
   b .*= -1.0
   return b
 end
+
+struct LinearNonlinearRBNonlinearOperator{T,L,R} <: RBNonlinearOperator{Nonlinear}
+  op_linear::RBNonlinearOperator{Linear}
+  op_nonlinear::RBNonlinearOperator{Noninear}
+end
+
+FEM.get_linear_operator(op::LinearNonlinearRBNonlinearOperator) = op.op_linear
+FEM.get_nonlinear_operator(op::LinearNonlinearRBNonlinearOperator) = op.op_nonlinear

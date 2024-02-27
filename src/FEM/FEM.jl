@@ -128,10 +128,14 @@ export NonlinearTransientParamFEOperator
 export TransientParamFEOperatorWithTrian
 export NormedTransientParamFEOperator
 export SaddlePointTransientParamFEOperator
+export NormedSaddlePointTransientParamFEOperator
 export LinearNonlinearTransientParamFEOperator
 export change_triangulation
 export compute_induced_norm_matrix
 export compute_coupling_matrix
+export get_linear_operator
+export get_nonlinear_operator
+export join_operators
 include("TransientParamFEOperator.jl")
 
 export ODEParamOperator

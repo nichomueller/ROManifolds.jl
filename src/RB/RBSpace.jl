@@ -30,6 +30,10 @@ function reduced_basis(feop::NormedSaddlePointTransientParamFEOperator,s::S;kwar
   enrich_basis(feop,bases,norm_matrix)
 end
 
+function reduced_basis(feop::LinearNonlinearTransientParamFEOperator,s::S;kwargs...) where S
+  reduced_basis(join_operators(feop),s;kwargs...)
+end
+
 function reduced_basis(s::AbstractSnapshots,args...;kwargs...)
   basis_space,basis_time = compute_bases(s,args...;kwargs...)
   return basis_space,basis_time

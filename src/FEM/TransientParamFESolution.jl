@@ -83,6 +83,15 @@ end
 
 function Algebra.solve(
   solver::ODESolver,
+  op::LinearNonlinearTransientParamFEOperator,
+  uh0::Function,
+  r::TransientParamRealization)
+
+  TransientParamFESolution(solver,join_operators(op),uh0,r)
+end
+
+function Algebra.solve(
+  solver::ODESolver,
   op::TransientParamFEOperator,
   uh0::Function;
   kwargs...)

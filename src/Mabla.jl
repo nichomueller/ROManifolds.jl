@@ -88,7 +88,7 @@ export get_order
 export get_L2_norm_matrix
 export get_H1_norm_matrix
 
-include("RBNew/RB.jl")
+include("RB/RB.jl")
 using Mabla.RB
 
 include("Distributed/Distributed.jl")

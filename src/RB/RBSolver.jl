@@ -39,7 +39,7 @@ get_tol(solver::PODMDEIMSolver) = solver.ϵ
 
 function get_test_directory(solver::PODMDEIMSolver;dir=datadir())
   keyword = solver.mdeim_style == SpaceOnlyMDEIM() ? "space_only_mdeim" : "space_time_mdeim"
-  test_dir = joinpath(dir,keyword * "$(solver.ϵ)")
+  test_dir = joinpath(dir,keyword * "_$(solver.ϵ)")
   FEM.create_dir(test_dir)
   test_dir
 end

@@ -57,6 +57,7 @@ include("Snapshots.jl")
 
 export RBInfo
 export RBSolver
+export get_test_directory
 export fe_solutions
 export ode_solutions
 include("RBSolver.jl")
