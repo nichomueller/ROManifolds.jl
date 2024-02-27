@@ -27,19 +27,31 @@ tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
 model_dir = datadir(joinpath("meshes","perforated_plate.json"))
 model = DiscreteModelFromFile(model_dir)
+# domain = (0,1,0,1)
+# partition = (20,20)
+# model = CartesianDiscreteModel(domain, partition)
+# labels = get_face_labeling(model)
+# add_tag_from_tags!(labels,"diri1",[7])
 
 order = 2
 degree = 2*order
 Ω = Triangulation(model)
 dΩ = Measure(Ω,degree)
 
-a(x,μ,t) = exp((sin(t)+cos(t))*x[1]/sum(μ))
+a(x,μ,t) = 1+exp(-sin(2π*t/tf)^2*(1-x[2])/sum(μ))
 a(μ,t) = x->a(x,μ,t)
 aμt(μ,t) = TransientParamFunction(a,μ,t)
 
-g(x,μ,t) = VectorValue(μ[1]*exp(-x[2]/μ[2])*abs(sin(μ[3]*t)),0.0)
-g(μ,t) = x->g(x,μ,t)
-gμt(μ,t) = TransientParamFunction(g,μ,t)
+inflow(μ,t) = 1-cos(2π*t/tf)+sin(μ[2]*2π*t/tf)/μ[1]
+g_in(x,μ,t) = VectorValue(-x[2]*(1-x[2])*inflow(μ,t),0.0)
+g_in(μ,t) = x->g_in(x,μ,t)
+gμt_in(μ,t) = TransientParamFunction(g_in,μ,t)
+g_w(x,μ,t) = VectorValue(0.0,0.0)
+g_w(μ,t) = x->g_w(x,μ,t)
+gμt_w(μ,t) = TransientParamFunction(g_w,μ,t)
+g_c(x,μ,t) = VectorValue(0.0,0.0)
+g_c(μ,t) = x->g_c(x,μ,t)
+gμt_c(μ,t) = TransientParamFunction(g_c,μ,t)
 
 u0(x,μ) = VectorValue(0.0,0.0)
 u0(μ) = x->u0(x,μ)
@@ -58,7 +70,9 @@ trian_jac_t = (Ω,)
 
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
 test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["inlet","walls","cylinder"])
-trial_u = TransientTrialParamFESpace(test_u,gμt)
+# test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["diri1"])
+# trial_u = TransientTrialParamFESpace(test_u,gμt)
+trial_u = TransientTrialParamFESpace(test_u,[gμt_in,gμt_w,gμt_c])
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
 test_p = TestFESpace(model,reffe_p;conformity=:C0)
 trial_p = TrialFESpace(test_p)
@@ -121,3 +135,46 @@ bs,bt = red_op.op.trial.basis_space[2],red_op.op.trial.basis_time[2]
 M = select_snapshots(son[2],51) |> collect
 errs = norm(M - bs*bs'*M) / norm(M)
 errt = norm(M' - bt*bt'*M') / norm(M')
+
+B = assemble_matrix((p,v) -> ∫(p*(∇⋅(v)))dΩ,trial_p,test_u)
+Bs,Bt = red_op.op.trial.basis_space[1],red_op.op.trial.basis_time[1]
+
+C = Bs'*B*bs
+sqrt(det(C'*C))
+
+soff = select_snapshots(snaps,RB.offline_params(info))
+bases = reduced_basis(soff;ϵ=RB.get_tol(info))
+basis_space = bases[1]
+basis_primal,basis_dual = basis_space.array
+supr_i = B * basis_dual
+gram_schmidt!(supr_i,basis_primal)
+supr_basis_primal = hcat(basis_primal,supr_i)
+
+cc = supr_basis_primal'*B*basis_dual
+sqrt(det(C'*C))
+Uc,Sc,Vc = svd(C)
+
+dd = supr_i'*B*basis_dual
+det(dd)
+
+for i = axes(basis_primal,2)
+  C = basis_primal[:,i]'*B*basis_dual
+  println(sqrt(abs(det(C'*C))))
+end
+for i = axes(supr_i,2)
+  C = supr_i[:,i]'*B*basis_dual
+  println(sqrt(abs(det(C'*C))))
+end
+
+r = get_realization(snaps)
+tr = trial_u(r)
+dr = tr.dirichlet_values
+
+gh = interpolate_dirichlet(gμt(get_params(r),get_times(r)),tr)
+x = get_cell_points(Ω)
+dghdx = (∇⋅(gh))(x)
+for i = eachindex(dghdx)
+  if sum(sum(dghdx[i])) != 0.0
+    println(i)
+  end
+end

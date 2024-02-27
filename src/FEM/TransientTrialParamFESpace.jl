@@ -39,12 +39,9 @@ function Arrays.evaluate!(
   params,
   times) where T
 
-  if isa(U.dirichlet_pt,Vector)
-    objects_at_pt = map(o->o(params,times),U.dirichlet_pt)
-  else
-    objects_at_pt = U.dirichlet_pt(params,times)
-  end
-  TrialParamFESpace!(Upt,objects_at_pt)
+  dir(f) = f(params,times)
+  dir(f::Vector) = dir.(f)
+  TrialParamFESpace!(Upt,dir(U.dirichlet_pt))
   Upt
 end
 
@@ -78,8 +75,9 @@ Functor-like evaluation. It allocates Dirichlet vals in general.
 Time derivative of the Dirichlet functions
 """
 function ODETools.∂t(U::TransientTrialParamFESpace)
-  ∂tdir(μ,t) = ∂t.(U.dirichlet_pt(μ,t))
-  TransientTrialParamFESpace(U.space,∂tdir)
+  ∂tdir(f) = (μ,t) -> ∂t(f(μ,t))
+  ∂tdir(f::Vector) = ∂tdir.(f)
+  TransientTrialParamFESpace(U.space,∂tdir(U.dirichlet_pt))
 end
 
 """

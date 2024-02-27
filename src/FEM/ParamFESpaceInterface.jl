@@ -52,10 +52,10 @@ function FESpaces.compute_dirichlet_values_for_tags!(
 
   dirichlet_dof_to_tag = get_dirichlet_dof_tag(f)
   _tag_to_object = FESpaces._convert_to_collectable(tag_to_object,num_dirichlet_tags(f))
-  map(dirichlet_values,dirichlet_values_scratch,_tag_to_object) do dv,dvs,tto
-    fill!(dvs,zero(eltype(dirichlet_values_scratch)))
-    for (tag,object) in enumerate(tto)
-      cell_vals = FESpaces._cell_vals(f,object)
+  for (tag,object) in enumerate(_tag_to_object)
+    fill!(dirichlet_values_scratch,zero(eltype(dirichlet_values_scratch)))
+    map(dirichlet_values,dirichlet_values_scratch,object) do dv,dvs,o
+      cell_vals = FESpaces._cell_vals(f,o)
       gather_dirichlet_values!(dvs,f.space,cell_vals)
       FESpaces._fill_dirichlet_values_for_tag!(dv,dvs,tag,dirichlet_dof_to_tag)
     end
@@ -193,6 +193,20 @@ function FESpaces.EvaluationFunction(
   f::FESpaceToParamFESpace{<:ZeroMeanFESpace,L},
   free_values) where L
   FEFunction(FESpaceToParamFESpace(f.space.space,Val(L)),free_values)
+end
+
+function FESpaces.scatter_free_and_dirichlet_values(
+  f::FESpaceToParamFESpace{<:TrialFESpace,L},
+  fv::ParamArray,
+  dv::ParamArray) where L
+  scatter_free_and_dirichlet_values(FESpaceToParamFESpace(f.space.space,Val(L)),fv,dv)
+end
+
+function FESpaces.scatter_free_and_dirichlet_values(
+  f::FESpaceToParamFESpace{<:ZeroMeanFESpace,L},
+  fv::ParamArray,
+  dv::ParamArray) where L
+  scatter_free_and_dirichlet_values(FESpaceToParamFESpace(f.space.space,Val(L)),fv,dv)
 end
 
 function FESpaces.scatter_free_and_dirichlet_values(
