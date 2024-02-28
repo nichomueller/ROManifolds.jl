@@ -144,13 +144,6 @@ function Snapshots(a::ArrayContribution,args...)
   end
 end
 
-# trivial case of all zero entries
-struct EmptySnapshots{T} <: AbstractSnapshots{Mode1Axis,T}
-  EmptySnapshots(values::T = testvalue(Float64)) where T = new{T}()
-end
-Base.size(s::EmptySnapshots) = (0,0)
-Base.getindex(s::EmptySnapshots{T},i...) where T = throw(BoundsError("attempt to access 0×0 EmptySnapshots{$T} at index $i"))
-
 struct BasicSnapshots{M,T,P,R} <: AbstractSnapshots{M,T}
   mode::M
   values::P
@@ -841,13 +834,6 @@ struct BlockSnapshots{S,N} <: AbstractParamContainer{S,N}
   end
 end
 
-function BlockSnapshots(k::BlockMap{N}) where N
-  S = typeof(EmptySnapshots())
-  array = Array{S,N}(undef,k.size)
-  touched = fill(false,k.size)
-  BlockSnapshots(array,touched)
-end
-
 function BlockSnapshots(k::BlockMap{N},a::S...) where {S<:AbstractSnapshots,N}
   array = Array{S,N}(undef,k.size)
   touched = fill(false,k.size)
@@ -980,55 +966,6 @@ function reverse_snapshots_at_indices(
   active_block_snaps = Any[reverse_snapshots_at_indices(s[i],indices_space[i]) for i in active_block_ids]
   BlockSnapshots(block_map,active_block_snaps...)
 end
-
-# # implement mortar
-
-# function _get_offsets(s::BlockSnapshots) # just here as a helper for selected snapshots
-#   n = size(s.array,1)
-#   offsets = zeros(Int,n)
-#   for i = 1:n-1
-#     offsets[i+1] = offsets[i] + num_space_dofs(s.array[i])
-#   end
-#   return offsets
-# end
-
-# function _get_selected_indices(s::BlockSnapshots) # just here as a helper for selected snapshots
-#   s1 = testitem(s)
-#   _,ids_time,ids_param = s1.selected_indices
-#   offsets = _get_offsets(s)
-#   ids_space = map(enumerate(offsets)) do (i,offset)
-#     _ids_space,_ids_time,_ids_param = s.array[i].selected_indices
-#     @check ids_time == _ids_time
-#     @check ids_param == _ids_param
-#     _ids_space .+ offset
-#   end
-#   vcat(ids_space...),ids_time,ids_param
-# end
-
-# function BlockArrays.mortar(s::BlockSnapshots)
-#   values = get_values(s)
-#   r = get_realization(s)
-#   mode = get_mode(s)
-#   Snapshots(values,r,mode)
-# end
-
-# function BlockArrays.mortar(s::BlockSnapshots{<:SelectedSnapshotsAtIndices})
-#   values = get_values(s)
-#   selected_indices = _get_selected_indices(s)
-#   SelectedSnapshotsAtIndices(values,selected_indices)
-# end
-
-# function BlockArrays.mortar(s::BlockSnapshots{<:InnerTimeOuterParamTransientSnapshots})
-#   values = get_values(s)
-#   r = get_realization(s)
-#   InnerTimeOuterParamTransientSnapshots(values,r)
-# end
-
-# function BlockArrays.mortar(s::BlockSnapshots{<:SelectedInnerTimeOuterParamTransientSnapshots})
-#   values = get_values(s)
-#   selected_indices = _get_selected_indices(s)
-#   SelectedInnerTimeOuterParamTransientSnapshots(values,selected_indices)
-# end
 
 struct TensorTrainSnapshots{S,R}
   snaps::S

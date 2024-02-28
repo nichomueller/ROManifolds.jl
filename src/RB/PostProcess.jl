@@ -67,19 +67,6 @@ function rb_results(
   rb_stats;
   name="vel")
 
-  son = select_snapshots(s,online_params(solver)) |> reverse_snapshots
-  RBResults(name,son,son_approx,fem_stats,rb_stats,nothing)
-end
-
-function rb_results(
-  feop::FEM.AbstractNormedTransientParamFEOperator,
-  solver::RBSolver,
-  s,
-  son_approx,
-  fem_stats,
-  rb_stats;
-  name="vel")
-
   X = get_norm_matrix(feop)
   son = select_snapshots(s,online_params(solver)) |> reverse_snapshots
   RBResults(name,son,son_approx,fem_stats,rb_stats,X)

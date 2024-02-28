@@ -14,23 +14,23 @@ function reduced_basis(feop::TransientParamFEOperator,s::S;kwargs...) where S
   reduced_basis(s;kwargs...)
 end
 
-function reduced_basis(feop::NormedTransientParamFEOperator,s::S;kwargs...) where S
-  norm_matrix = compute_induced_norm_matrix(feop)
+function reduced_basis(feop::TransientParamNormedFEOperator,s::S;kwargs...) where S
+  norm_matrix = assemble_norm_matrix(feop)
   reduced_basis(s,norm_matrix;kwargs...)
 end
 
-function reduced_basis(feop::SaddlePointTransientParamFEOperator,s::S;kwargs...) where S
+function reduced_basis(feop::TransientParamSaddlePointFEOperator,s::S;kwargs...) where S
   bases = reduced_basis(feop.op,s;kwargs...)
   enrich_basis(feop,bases,nothing)
 end
 
-function reduced_basis(feop::NormedSaddlePointTransientParamFEOperator,s::S;kwargs...) where S
-  norm_matrix = compute_induced_norm_matrix(feop)
+function reduced_basis(feop::TransientParamNormedSaddlePointFEOperator,s::S;kwargs...) where S
+  norm_matrix = assemble_norm_matrix(feop)
   bases = reduced_basis(feop.op,s,norm_matrix;kwargs...)
   enrich_basis(feop,bases,norm_matrix)
 end
 
-function reduced_basis(feop::LinearNonlinearTransientParamFEOperator,s::S;kwargs...) where S
+function reduced_basis(feop::TransientParamLinearNonlinearFEOperator,s::S;kwargs...) where S
   reduced_basis(join_operators(feop),s;kwargs...)
 end
 

@@ -83,7 +83,7 @@ end
 
 function Algebra.solve(
   solver::ODESolver,
-  op::LinearNonlinearTransientParamFEOperator,
+  op::TransientParamLinearNonlinearFEOperator,
   uh0::Function,
   r::TransientParamRealization)
 

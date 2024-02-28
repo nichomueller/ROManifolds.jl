@@ -125,18 +125,23 @@ export TransientParamFEOperator
 export TransientParamFEOperatorFromWeakForm
 export AffineTransientParamFEOperator
 export NonlinearTransientParamFEOperator
-export TransientParamFEOperatorWithTrian
-export NormedTransientParamFEOperator
-export SaddlePointTransientParamFEOperator
-export NormedSaddlePointTransientParamFEOperator
-export LinearNonlinearTransientParamFEOperator
-export change_triangulation
-export compute_induced_norm_matrix
+export assemble_norm_matrix
+include("TransientParamFEOperator.jl")
+
+export TransientParamSaddlePointFEOperator
+export TransientParamNormedSaddlePointFEOperator
 export compute_coupling_matrix
+include("TransientParamSaddlePointFEOperator.jl")
+
+export TransientParamFEOperatorWithTrian
+export change_triangulation
+include("TransientParamFEOperatorWithTrian.jl")
+
+export TransientParamLinearNonlinearFEOperator
 export get_linear_operator
 export get_nonlinear_operator
 export join_operators
-include("TransientParamFEOperator.jl")
+include("TransientParamLinearNonlinearFEOperator.jl")
 
 export ODEParamOperator
 export ODEParamOpFromFEOp

@@ -1,0 +1,129 @@
+using Gridap
+using Gridap.FESpaces
+using GridapGmsh
+using ForwardDiff
+using BlockArrays
+using LinearAlgebra
+using Test
+using Gridap.Algebra
+using Gridap.ODEs
+using Gridap.ODEs.TransientFETools
+using Gridap.ODEs.ODETools
+using Gridap.Helpers
+using Gridap.Fields
+using Gridap.MultiField
+using BlockArrays
+using DrWatson
+using Mabla.FEM
+using Mabla.RB
+
+
+θ = 1
+dt = 0.01
+t0 = 0.0
+tf = 0.1
+
+pranges = fill([1,10],3)
+tdomain = t0:dt:tf
+ptspace = TransientParamSpace(pranges,tdomain)
+
+n = 10
+domain = (0,1,0,1)
+partition = (n,n)
+model = CartesianDiscreteModel(domain, partition)
+
+labels = get_face_labeling(model)
+add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
+
+order = 2
+degree = 2*order
+Ω = Triangulation(model)
+dΩ = Measure(Ω,degree)
+
+a(x,μ,t) = 1+exp(-sin(2π*t/tf)^2*(1-x[2])/sum(μ))
+a(μ,t) = x->a(x,μ,t)
+aμt(μ,t) = TransientParamFunction(a,μ,t)
+
+inflow(μ,t) = 1-cos(2π*t/tf)+sin(μ[2]*2π*t/tf)/μ[1]
+g(x,μ,t) = VectorValue(-x[2]*(1-x[2])*inflow(μ,t),0.0)
+g(μ,t) = x->g(x,μ,t)
+gμt(μ,t) = TransientParamFunction(g,μ,t)
+
+u0(x,μ) = VectorValue(0.0,0.0)
+u0(μ) = x->u0(x,μ)
+u0μ(μ) = ParamFunction(u0,μ)
+p0(x,μ) = 0.0
+p0(μ) = x->p0(x,μ)
+p0μ(μ) = ParamFunction(p0,μ)
+
+const Re = 100.0
+conv(u,∇u) = Re*(∇u')⋅u
+dconv(du,∇du,u,∇u) = conv(u,∇du)+conv(du,∇u)
+c(u,v,dΩ) = ∫( v⊙(conv∘(u,∇(u))) )dΩ
+dc(u,du,v,dΩ) = ∫( v⊙(dconv∘(du,∇(du),u,∇(u))) )dΩ
+
+res_lin(μ,t,(u,p),(v,q),dΩ) = ∫(v⋅∂t(u))dΩ + ∫(aμt(μ,t)*∇(v)⊙∇(u))dΩ - ∫(p*(∇⋅(v)))dΩ + ∫(q*(∇⋅(u)))dΩ
+jac_lin(μ,t,(u,p),(du,dp),(v,q),dΩ) = ∫(aμt(μ,t)*∇(v)⊙∇(du))dΩ - ∫(dp*(∇⋅(v)))dΩ + ∫(q*(∇⋅(du)))dΩ
+jac_t_lin(μ,t,(u,p),(dut,dpt),(v,q),dΩ) = ∫(v⋅dut)dΩ
+
+res_nlin(μ,t,(u,p),(v,q),dΩ) = c(u,v,dΩ)
+jac_nlin(μ,t,(u,p),(du,dp),(v,q),dΩ) = dc(u,du,v,dΩ)
+
+trian_res = (Ω,)
+trian_jac = (Ω,)
+trian_jac_t = (Ω,)
+
+reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
+test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
+trial_u = TransientTrialParamFESpace(test_u,gμt)
+reffe_p = ReferenceFE(lagrangian,Float64,order-1)
+test_p = TestFESpace(model,reffe_p;conformity=:C0)
+trial_p = TrialFESpace(test_p)
+test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
+trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
+feop_lin = AffineTransientParamFEOperator(res_lin,jac_lin,jac_t_lin,ptspace,trial,test,trian_res,trian_jac,trian_jac_t)
+feop_nlin = TransientParamFEOperator(res_nlin,jac_nlin,ptspace,trial,test,trian_res,trian_jac)
+feop = TransientParamLinearNonlinearFEOperator(feop_lin,feop_nlin)
+
+xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
+fesolver = ThetaMethod(LUSolver(),dt,θ)
+
+ϵ = 1e-4
+rbsolver = RBSolver(fesolver,ϵ,RB.SpaceTimeMDEIM();nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("navier_stokes","toy_mesh")))
+
+fesnaps,festats = ode_solutions(rbsolver,feop,xh0μ)
+rbop = reduced_operator(rbsolver,feop,fesnaps)
+rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
+results = rb_results(feop,rbsolver,fesnaps,rbsnaps,festats,rbstats)
+
+println(RB.space_time_error(results))
+save(test_dir,fesnaps)
+save(test_dir,rbop)
+save(test_dir,results)
+
+ϵ = 1e-4
+rbsolver = RBSolver(fesolver,ϵ,RB.SpaceOnlyMDEIM();nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
+test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("navier_stokes","toy_mesh")))
+
+# we can load & solve directly, if the offline structures have been previously saved to file
+# load_solve(rbsolver_space,dir=test_dir_space)
+
+rbop_space = reduced_operator(rbsolver_space,feop,fesnaps)
+rbsnaps_space,rbstats_space = solve(rbsolver_space,rbop,fesnaps)
+results_space = rb_results(feop,rbsolver_space,fesnaps,rbsnaps_space,festats,rbstats_space)
+
+println(RB.space_time_error(results_space))
+save(test_dir,rbop_space)
+save(test_dir,results_space)
+
+# reduced_operator(rbsolver,feop,fesnaps)
+red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
+odeop = get_algebraic_operator(feop)
+pop = RBOperator(odeop,red_trial,red_test)
+nlop = get_nonlinear_operator(pop)
+# red_op_nlin = reduced_operator(rbsolver,nlop,fesnaps)
+# red_lhs,red_rhs = reduced_matrix_vector_form(rbsolver,nlop,fesnaps)
+smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
+contribs_mat,contribs_vec = fe_matrix_and_vector(rbsolver,nlop,smdeim)
+# red_mat = RB.reduced_matrix_form(rbsolver,nlop,contribs_mat)
