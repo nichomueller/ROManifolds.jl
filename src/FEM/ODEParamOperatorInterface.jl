@@ -1,9 +1,6 @@
 abstract type ODEParamOperator{C<:OperatorType} <: ODEOperator{C} end
 
-const ConstantODEParamOperator = ODEParamOperator{Constant}
-const ConstantMatrixODEParamOperator = ODEParamOperator{ConstantMatrix}
 const AffineODEParamOperator = ODEParamOperator{Affine}
-const NonlinearODEParamOperator = ODEParamOperator{Nonlinear}
 
 struct ODEParamOpFromFEOp{C} <: ODEParamOperator{C}
   feop::TransientParamFEOperator{C}
@@ -14,6 +11,8 @@ FESpaces.get_test(op::ODEParamOpFromFEOp) = get_test(op.feop)
 FESpaces.get_trial(op::ODEParamOpFromFEOp) = get_trial(op.feop)
 realization(op::ODEParamOpFromFEOp;kwargs...) = realization(op.feop;kwargs...)
 get_fe_operator(op::ODEParamOpFromFEOp) = op.feop
+get_linear_operator(op::ODEParamOpFromFEOp) = ODEParamOpFromFEOp(get_linear_operator(op.feop))
+get_nonlinear_operator(op::ODEParamOpFromFEOp) = ODEParamOpFromFEOp(get_nonlinear_operator(op.feop))
 
 function TransientFETools.allocate_cache(
   op::ODEParamOpFromFEOp,

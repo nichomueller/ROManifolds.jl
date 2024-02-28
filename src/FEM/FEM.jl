@@ -139,10 +139,6 @@ export join_operators
 include("TransientParamFEOperator.jl")
 
 export ODEParamOperator
-export ConstantODEParamOperator
-export ConstantMatrixODEParamOperator
-export AffineODEParamOperator
-export NonlinearODEParamOperator
 export ODEParamOpFromFEOp
 include("ODEParamOperatorInterface.jl")
 

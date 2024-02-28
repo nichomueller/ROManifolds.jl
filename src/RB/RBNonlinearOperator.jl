@@ -12,7 +12,7 @@ end
 
 function reduced_operator(
   solver::RBSolver,
-  op::RBOperator{Nonlinear},
+  op::RBOperator{FEM.LinearNonlinear},
   s::S) where S
 
   red_op_lin = reduced_operator(solver,get_linear_operator(op),s)
@@ -44,11 +44,6 @@ function TransientFETools.update_cache!(
 
   update_cache!(ode_cache,op.op,r)
 end
-
-# cache for residual/jacobians includes:
-# 1) cache to assemble residuals/jacobians on reduced integration domain
-# 2) cache to compute the mdeim coefficient
-# 3) cache to perform the kronecker product between basis and coefficient
 
 function Algebra.allocate_residual(
   op::RBNonlinearOperator,
@@ -93,6 +88,23 @@ function Algebra.residual!(
   mdeim_lincomb!(lincomb_cache,op.rhs,b_coeff)
   b = last(lincomb_cache)
   return b
+end
+
+function Algebra.jacobian!(
+  cache,
+  op::RBNonlinearOperator,
+  r::TransientParamRealization,
+  xhF::Tuple{Vararg{AbstractVector}},
+  i::Integer,
+  γᵢ::Real,
+  ode_cache)
+
+  fe_A,coeff_cache,lincomb_cache = cache
+  fe_sA = fe_matrix!(fe_A,op,r,xhF,γᵢ,ode_cache)
+  A_coeff = mdeim_coeff!(coeff_cache[i],op.lhs[i],fe_sA[i])
+  mdeim_lincomb!(lincomb_cache,op.lhs[i],A_coeff)
+  A = last(lincomb_cache)
+  return A
 end
 
 function ODETools.jacobians!(
@@ -236,34 +248,7 @@ function Algebra.solve(
   op::ThetaMethodRBNonlinearOperator,
   _r::TransientParamRealization)
 
-  fesolver = get_fe_solver(solver)
-  dt = fesolver.dt
-  θ = fesolver.θ
-  θ == 0.0 ? dtθ = dt : dtθ = dt*θ
-
-  r = copy(_r)
-  FEM.shift_time!(r,dt*(θ-1))
-
-  trial = get_trial(op)(r)
-  fe_trial = get_fe_trial(op)(r)
-  red_x = zero_free_values(trial)
-  y = zero_free_values(fe_trial)
-  z = similar(y)
-  z .= 0.0
-
-  ode_cache = allocate_cache(op,r)
-  nl_cache = nothing
-
-  stats = @timed begin
-    ode_cache = update_cache!(ode_cache,op,r)
-    nlop = ThetaMethodParamOperator(op,r,dtθ,y,ode_cache,z)
-    solve!(red_x,fesolver.nls,nlop,nl_cache)
-  end
-
-  x = recast(red_x,trial)
-  s = reverse_snapshots(x,r)
-  cs = ComputationalStats(stats,num_params(r))
-  return s,cs
+  @notimplemented "Split affine from nonlinear operator when running the RB solve"
 end
 
 function Algebra.solve(
@@ -323,10 +308,163 @@ function ODETools._vector!(cache,op::ThetaMethodRBNonlinearOperator,r,dtθ,u0,od
   return b
 end
 
-struct LinearNonlinearRBNonlinearOperator <: RBNonlinearOperator{Nonlinear}
-  op_linear::RBNonlinearOperator{Affine}
-  op_nonlinear::RBNonlinearOperator{Nonlinear}
+struct LinearNonlinearRBNonlinearOperator{A,B} <: RBNonlinearOperator{FEM.LinearNonlinear}
+  op_linear::A
+  op_nonlinear::B
+  function LinearNonlinearRBNonlinearOperator(op_linear::A,op_nonlinear::B) where {A,B}
+    @check isa(op_linear,RBNonlinearOperator{Affine})
+    @check isa(op_nonlinear,RBNonlinearOperator{Nonlinear})
+    new{A,B}(op_linear,op_nonlinear)
+  end
 end
 
 FEM.get_linear_operator(op::LinearNonlinearRBNonlinearOperator) = op.op_linear
 FEM.get_nonlinear_operator(op::LinearNonlinearRBNonlinearOperator) = op.op_nonlinear
+
+function FESpaces.get_test(op::LinearNonlinearRBNonlinearOperator)
+  @check get_test(op.op_linear) === get_test(op.op_nonlinear)
+  get_test(op.op_linear)
+end
+
+function FESpaces.get_trial(op::LinearNonlinearRBNonlinearOperator)
+  @check get_trial(op.op_linear) === get_trial(op.op_nonlinear)
+  get_trial(op.op_linear)
+end
+
+function FESpaces.get_order(op::LinearNonlinearRBNonlinearOperator)
+  @check get_order(op.op_linear) === get_order(op.op_nonlinear)
+  get_order(op.op_linear)
+end
+
+function FEM.realization(op::LinearNonlinearRBNonlinearOperator;kwargs...)
+  realization(op.op_linear;kwargs...)
+end
+
+function FEM.get_fe_operator(op::LinearNonlinearRBNonlinearOperator)
+  FEM.get_fe_operator(op.op_linear),FEM.get_fe_operator(op.op_nonlinear)
+end
+
+function get_fe_trial(op::LinearNonlinearRBNonlinearOperator)
+  @check get_fe_trial(op.op_linear) === get_fe_trial(op.op_nonlinear)
+  get_fe_trial(op.op_linear)
+end
+
+function get_fe_test(op::LinearNonlinearRBNonlinearOperator)
+  @check get_fe_test(op.op_linear) === get_fe_test(op.op_nonlinear)
+  get_fe_test(op.op_linear)
+end
+
+function TransientFETools.allocate_cache(
+  op::LinearNonlinearRBNonlinearOperator,
+  r::TransientParamRealization)
+
+  allocate_cache(op.op_linear,r)
+end
+
+function TransientFETools.update_cache!(
+  ode_cache,
+  op::LinearNonlinearRBNonlinearOperator,
+  r::TransientParamRealization)
+
+  update_cache!(ode_cache,op.op_linear,r)
+end
+
+function Algebra.allocate_residual(
+  op::LinearNonlinearRBNonlinearOperator,
+  r::TransientParamRealization,
+  x::AbstractVector,
+  ode_cache)
+
+  cache_lin = allocate_residual(op.op_linear,r,x,ode_cache)
+  cache_nlin = allocate_residual(op.op_nonlinear,r,x,ode_cache)
+  return cache_lin,cache_nlin
+end
+
+function Algebra.allocate_jacobian(
+  op::LinearNonlinearRBNonlinearOperator,
+  r::TransientParamRealization,
+  x::AbstractVector,
+  ode_cache)
+
+  cache_lin = allocate_jacobian(op.op_linear,r,x,ode_cache)
+  cache_nlin = allocate_jacobian(op.op_nonlinear,r,x,ode_cache)
+  return cache_lin,cache_nlin
+end
+
+# we assume that the linear components have already been computed, and have been
+# passed along with the cache
+function Algebra.residual!(
+  cache,
+  op::LinearNonlinearRBNonlinearOperator,
+  r::TransientParamRealization,
+  xhF::Tuple{Vararg{AbstractVector}},
+  ode_cache)
+
+  b_lin,cache_nl... = cache
+  b_nlin = residual!(cache_nl,op.op_nonlinear,r,xhF,ode_cache)
+  @. b_nlin = b_nlin + b_lin
+  return b_nlin
+end
+
+function Algebra.jacobian!(
+  cache,
+  op::LinearNonlinearRBNonlinearOperator,
+  r::TransientParamRealization,
+  xhF::Tuple{Vararg{AbstractVector}},
+  i::Integer,
+  γᵢ::Real,
+  ode_cache)
+
+  A_lin,cache_nl... = cache
+  A_nlin = jacobian!(cache_nl,op.op_nonlinear,r,xhF,i,γᵢ,ode_cache)
+  @. A_nlin = A_nlin + A_lin
+  return A_nlin
+end
+
+function ODETools.jacobians!(
+  cache,
+  op::LinearNonlinearRBNonlinearOperator,
+  r::TransientParamRealization,
+  xhF::Tuple{Vararg{AbstractVector}},
+  γ::Tuple{Vararg{Real}},
+  ode_cache)
+
+  A_lin,cache_nl... = cache
+  A_nlin = jacobians!(cache_nl,op.op_nonlinear,r,xhF,γ,ode_cache)
+  @. A_nlin = A_nlin + A_lin
+  return A_nlin
+end
+
+function Algebra.solve(
+  solver::ThetaMethodRBSolver,
+  op::LinearNonlinearRBNonlinearOperator,
+  _r::TransientParamRealization)
+
+  fesolver = get_fe_solver(solver)
+  dt = fesolver.dt
+  θ = fesolver.θ
+  θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+
+  r = copy(_r)
+  FEM.shift_time!(r,dt*(θ-1))
+
+  trial = get_trial(op)(r)
+  fe_trial = get_fe_trial(op)(r)
+  red_x = zero_free_values(trial)
+  y = zero_free_values(fe_trial)
+  z = similar(y)
+  z .= 0.0
+
+  ode_cache = allocate_cache(op,r)
+  nl_cache = nothing
+
+  stats = @timed begin
+    ode_cache = update_cache!(ode_cache,op,r)
+    solve!(red_x,fesolver.nls,op,nl_cache)
+  end
+
+  x = recast(red_x,trial)
+  s = reverse_snapshots(x,r)
+  cs = ComputationalStats(stats,num_params(r))
+  return s,cs
+end

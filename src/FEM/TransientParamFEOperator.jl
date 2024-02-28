@@ -553,12 +553,21 @@ const AbstractNormedTransientParamFEOperator = Union{
 }
 
 # interface to accommodate the separation of terms depending on the linearity/nonlinearity
-struct LinearNonlinearTransientParamFEOperator{A,B} <: TransientParamFEOperator{Nonlinear}
+struct LinearNonlinear <: OperatorType end
+
+struct LinearNonlinearTransientParamFEOperator{A,B} <: TransientParamFEOperator{LinearNonlinear}
   op_linear::A
   op_nonlinear::B
+  function LinearNonlinearTransientParamFEOperator(op_linear::A,op_nonlinear::B) where {A,B}
+    @check isa(op_linear,TransientParamFEOperator{Affine})
+    @check isa(op_nonlinear,TransientParamFEOperator{Nonlinear})
+    new{A,B}(op_linear,op_nonlinear)
+  end
 end
 
+get_linear_operator(op) = @abstractmethod
 get_linear_operator(op::LinearNonlinearTransientParamFEOperator) = op.op_linear
+get_nonlinear_operator(op) = @abstractmethod
 get_nonlinear_operator(op::LinearNonlinearTransientParamFEOperator) = op.op_nonlinear
 
 function FESpaces.get_test(op::LinearNonlinearTransientParamFEOperator)
@@ -589,8 +598,8 @@ function join_operators(
   @check op_lin.op.tpspace === op_nlin.op.tpspace
 
   res(μ,t,u,v) = op_lin.res(μ,t,u,v) + op_nlin.res(μ,t,u,v)
-  jac(μ,t,u,du,v) = op_lin.jacs[1](μ,t,u,du,v) + op_lin.jacs[1](μ,t,u,du,v)
-  jac_t(μ,t,u,dut,v) = op_nlin.jacs[2](μ,t,u,dut,v) + op_nlin.jacs[2](μ,t,u,dut,v)
+  jac(μ,t,u,du,v) = op_lin.jacs[1](μ,t,u,du,v) + op_nlin.jacs[1](μ,t,u,du,v)
+  jac_t(μ,t,u,dut,v) = op_lin.jacs[2](μ,t,u,dut,v) + op_nlin.jacs[2](μ,t,u,dut,v)
 
   TransientParamFEOperator(res,jac,jac_t,op_lin.tpspace,get_trial(op),get_trial(op))
 end
@@ -614,8 +623,8 @@ function join_operators(
     trial,test,op_nlin.trian_res,op_nlin.trian_jacs...)
 
   res(μ,t,u,v) = newop_lin.op.res(μ,t,u,v) + newop_nlin.op.res(μ,t,u,v)
-  jac(μ,t,u,du,v) = newop_lin.op.jacs[1](μ,t,u,du,v) + op_lin.op.jacs[1](μ,t,u,du,v)
-  jac_t(μ,t,u,dut,v) = newop_nlin.op.jacs[2](μ,t,u,dut,v) + newop_nlin.op.jacs[2](μ,t,u,dut,v)
+  jac(μ,t,u,du,v) = newop_lin.op.jacs[1](μ,t,u,du,v) + newop_nlin.op.jacs[1](μ,t,u,du,v)
+  jac_t(μ,t,u,dut,v) = newop_lin.op.jacs[2](μ,t,u,dut,v) + newop_nlin.op.jacs[2](μ,t,u,dut,v)
 
   TransientParamFEOperator(res,jac,jac_t,newop_lin.op.tpspace,trial,test)
 end

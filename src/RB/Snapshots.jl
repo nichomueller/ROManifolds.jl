@@ -144,6 +144,13 @@ function Snapshots(a::ArrayContribution,args...)
   end
 end
 
+# trivial case of all zero entries
+struct EmptySnapshots{T} <: AbstractSnapshots{Mode1Axis,T}
+  EmptySnapshots(values::T = testvalue(Float64)) where T = new{T}()
+end
+Base.size(s::EmptySnapshots) = (0,0)
+Base.getindex(s::EmptySnapshots{T},i...) where T = throw(BoundsError("attempt to access 0×0 EmptySnapshots{$T} at index $i"))
+
 struct BasicSnapshots{M,T,P,R} <: AbstractSnapshots{M,T}
   mode::M
   values::P
@@ -832,6 +839,13 @@ struct BlockSnapshots{S,N} <: AbstractParamContainer{S,N}
     @check size(array) == size(touched)
     new{S,N}(array,touched)
   end
+end
+
+function BlockSnapshots(k::BlockMap{N}) where N
+  S = typeof(EmptySnapshots())
+  array = Array{S,N}(undef,k.size)
+  touched = fill(false,k.size)
+  BlockSnapshots(array,touched)
 end
 
 function BlockSnapshots(k::BlockMap{N},a::S...) where {S<:AbstractSnapshots,N}

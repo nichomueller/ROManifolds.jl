@@ -61,7 +61,12 @@ get_indices_time(i::ReducedIntegrationDomain) = i.indices_time
 union_indices_space(i::ReducedIntegrationDomain...) = union(map(get_indices_space,i)...)
 union_indices_time(i::ReducedIntegrationDomain...) = union(map(get_indices_time,i)...)
 
-struct AffineDecomposition{M,A,B,C,D,E}
+abstract type AbstractAffineDecomposition end
+
+# trivial case of all zero entries
+struct EmptyAffineDecomposition <: AbstractAffineDecomposition end
+
+struct AffineDecomposition{M,A,B,C,D,E} <: AbstractAffineDecomposition
   mdeim_style::M
   basis_space::A
   basis_time::B
@@ -216,7 +221,7 @@ end
 function reduced_matrix_form(
   solver::ThetaMethodRBSolver,
   op::RBOperator,
-  contribs::Tuple{Vararg{C}}) where C
+  contribs::Tuple{Vararg{Any}})
 
   fesolver = get_fe_solver(solver)
   θ = fesolver.θ
@@ -431,11 +436,20 @@ struct BlockAffineDecomposition{A,N}
   function BlockAffineDecomposition(
     array::Array{A,N},
     touched::Array{Bool,N}
-    ) where {A<:AffineDecomposition,N}
+    ) where {A<:AbstractAffineDecomposition,N}
 
     @check size(array) == size(touched)
     new{A,N}(array,touched)
   end
+end
+
+const BlockEmptyAffineDecomposition = BlockAffineDecomposition{A,N} where {A<:EmptyAffineDecomposition,N}
+
+function BlockAffineDecomposition(k::BlockMap{N}) where N
+  A = typeof(EmptyAffineDecomposition())
+  array = Array{A,N}(undef,k.size)
+  touched = fill(false,k.size)
+  BlockAffineDecomposition(array,touched)
 end
 
 function BlockAffineDecomposition(k::BlockMap{N},a::A...) where {A<:AffineDecomposition,N}
@@ -565,6 +579,10 @@ function allocate_mdeim_coeff(a::BlockAffineDecomposition,r::AbstractParamRealiz
   tuple_of_arrays(active_block_coeff)
 end
 
+function allocate_mdeim_coeff(a::BlockEmptyAffineDecomposition,r::AbstractParamRealization)
+  return nothing
+end
+
 function mdeim_coeff!(cache,a::BlockAffineDecomposition,b::BlockSnapshots)
   @check get_touched_blocks(a) == get_touched_blocks(b)
   active_block_ids = get_touched_blocks(a)
@@ -573,6 +591,10 @@ function mdeim_coeff!(cache,a::BlockAffineDecomposition,b::BlockSnapshots)
     cachei = coeff[i],coeff_recast[i]
     mdeim_coeff!(cachei,a[acti],b[acti])
   end
+end
+
+function mdeim_coeff!(cache,a::BlockEmptyAffineDecomposition,b::BlockSnapshots)
+  return cache
 end
 
 function allocate_mdeim_lincomb(
@@ -611,4 +633,13 @@ function mdeim_lincomb!(
     cachei = time_prod_cache[i],lincomb_cache[Block(i)]
     mdeim_lincomb!(cachei,a[active_block_ids[i]],coeff[i])
   end
+end
+
+function mdeim_lincomb!(
+  cache,
+  a::BlockEmptyAffineDecomposition,
+  coeff)
+
+  time_prod_cache,lincomb_cache = cache
+  lincomb_cache
 end

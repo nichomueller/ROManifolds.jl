@@ -32,6 +32,8 @@ FESpaces.get_trial(op::RBOperator) = op.trial
 FESpaces.get_test(op::RBOperator) = op.test
 FEM.realization(op::RBOperator;kwargs...) = realization(op.feop;kwargs...)
 FEM.get_fe_operator(op::RBOperator) = FEM.get_fe_operator(op.feop)
+FEM.get_linear_operator(op::RBOperator) = RBOperator(get_linear_operator(op.feop),op.trial,op.test)
+FEM.get_nonlinear_operator(op::RBOperator) = RBOperator(get_nonlinear_operator(op.feop),op.trial,op.test)
 get_fe_trial(op::RBOperator) = get_trial(op.feop)
 get_fe_test(op::RBOperator) = get_test(op.feop)
 
@@ -166,7 +168,3 @@ function fe_matrix_and_vector!(A,b,op::RBOperator,r,dtθ,u0,ode_cache,vθ)
   sb = fe_vector!(b,op,r,dtθ,u0,ode_cache,vθ)
   return sA,sb
 end
-
-# multi field interface
-
-const BlockRBOperator = RBOperator{T,A,B} where {T,A<:BlockRBSpace,B<:BlockRBSpace}

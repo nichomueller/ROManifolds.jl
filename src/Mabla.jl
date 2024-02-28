@@ -68,10 +68,6 @@ export residual_for_trian!
 export jacobian_for_trian!
 
 export ODEParamOperator
-export ConstantODEParamOperator
-export ConstantMatrixODEParamOperator
-export AffineODEParamOperator
-export NonlinearODEParamOperator
 export ODEParamOpFromFEOp
 
 export ThetaMethodParamOperator
