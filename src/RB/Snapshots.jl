@@ -978,7 +978,7 @@ const AbstractSubTransientSnapshots = Union{
   } where {M,T}
 
 function (*)(
-  a::Adjoint{<:Any,<:AbstractSnapshots},
+  a::Adjoint{<:Any,<:AbstractSubTransientSnapshots},
   b::AbstractMatrix
   )
 
@@ -987,22 +987,22 @@ end
 
 function (*)(
   a::Adjoint{<:Any,<:AbstractVecOrMat},
-  b::AbstractSnapshots
+  b::AbstractSubTransientSnapshots
   )
 
   (*)(a,collect(b))
 end
 
 function (*)(
-  a::Adjoint{<:Any,<:AbstractSnapshots},
-  b::AbstractSnapshots
+  a::Adjoint{<:Any,<:AbstractSubTransientSnapshots},
+  b::AbstractSubTransientSnapshots
   )
 
   (*)(collect(a),collect(b))
 end
 
 function (*)(
-  a::Adjoint{<:Any,<:AbstractSnapshots},
+  a::Adjoint{<:Any,<:AbstractSubTransientSnapshots},
   b::Diagonal
   )
 
@@ -1011,7 +1011,7 @@ end
 
 function (*)(
   a::Diagonal,
-  b::AbstractSnapshots
+  b::AbstractSubTransientSnapshots
   )
 
   (*)(a,collect(b))

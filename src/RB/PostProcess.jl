@@ -119,7 +119,7 @@ function space_time_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm_ma
   active_block_ids = get_touched_blocks(sol)
   block_map = BlockMap(size(sol),active_block_ids)
   errors = Any[space_time_error(sol[i],sol_approx[i],norm_matrix[Block(i,i)]) for i in active_block_ids]
-  return_cache(block_map,errors)
+  return_cache(block_map,errors...)
 end
 
 function space_time_error(r::RBResults)

@@ -13,27 +13,9 @@ struct TransientParamFEOperatorWithTrian{T<:OperatorType,A,B,C} <: TransientPara
   end
 end
 
-function FEOperatorWithTrian(
-  op::TransientParamFEOperatorFromWeakForm{T},
-  trian_res,
-  trian_jacs...) where T
-
-  polyn_order = get_polynomial_order(op.test)
-  newres,newjacs... = set_triangulation(op.res,op.jacs,trian_res,trian_jacs,polyn_order)
-  newop = TransientParamFEOperatorFromWeakForm{T}(
-    newres,op.rhs,newjacs,op.induced_norm,op.assem,
-    op.tpspace,op.trials,op.test,op.order)
+function FEOperatorWithTrian(op::TransientParamFEOperator,trian_res,trian_jacs...)
+  newop = set_triangulation(op,trian_res,trian_jacs)
   TransientParamFEOperatorWithTrian(newop,trian_res,trian_jacs)
-end
-
-function FEOperatorWithTrian(
-  op::TransientParamSaddlePointFEOperator,
-  trian_res,
-  trian_jacs...)
-
-  newop = FEOperatorWithTrian(op.op,trian_res,trian_jacs...)
-  newop_saddle_point = TransientParamSaddlePointFEOperator(newop.op,op.coupling)
-  TransientParamFEOperatorWithTrian(newop_saddle_point,trian_res,trian_jacs)
 end
 
 function set_triangulation(res,jacs::NTuple{1,Function},trian_res,trian_jacs,order)
@@ -110,15 +92,32 @@ get_polynomial_order(basis,trian::Triangulation) = get_polynomial_order(basis,ge
 get_polynomial_order(fs::SingleFieldFESpace) = get_polynomial_order(get_fe_basis(fs),get_triangulation(fs))
 get_polynomial_order(fs::MultiFieldFESpace) = maximum(map(get_polynomial_order,fs.spaces))
 
-# change triangulation
-function change_triangulation(
-  op::TransientParamFEOperatorWithTrian{T},
-  trian_jacs,
-  trian_res) where T
+function set_triangulation(op::TransientParamFEOperatorFromWeakForm{T},trian_res,trian_jacs) where T
+  polyn_order = get_polynomial_order(op.test)
+  newres,newjacs... = set_triangulation(op.res,op.jacs,trian_res,trian_jacs,polyn_order)
+  TransientParamFEOperatorFromWeakForm{T}(
+    newres,op.rhs,newjacs,op.induced_norm,op.assem,
+    op.tpspace,op.trials,op.test,op.order)
+end
 
+function set_triangulation(op::TransientParamSaddlePointFEOperator,trian_res,trian_jacs)
+  newop = set_triangulation(op.op,trian_res,trian_jacs)
+  TransientParamSaddlePointFEOperator(newop,op.coupling)
+end
+
+function set_triangulation(
+  op::TransientParamFEOperatorWithTrian,
+  trian_res=op.trian_res,
+  trian_jacs=op.trian_jacs)
+
+  set_triangulation(op.op,trian_res,trian_jacs)
+end
+
+function change_triangulation(op::TransientParamFEOperatorWithTrian,trian_res,trian_jacs)
   newtrian_res = order_triangulations(op.trian_res,trian_res)
   newtrian_jacs = order_triangulations.(op.trian_jacs,trian_jacs)
-  FEOperatorWithTrian(op.op,newtrian_res,newtrian_jacs...)
+  newop = set_triangulation(op,newtrian_res,newtrian_jacs...)
+  TransientParamFEOperatorWithTrian(newop,args...)
 end
 
 function Algebra.allocate_residual(

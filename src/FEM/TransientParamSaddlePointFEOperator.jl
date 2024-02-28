@@ -44,7 +44,7 @@ end
 
 function assemble_coupling_matrix(op::TransientParamSaddlePointFEOperator)
   test = get_test(op)
-  trial = evaluate(get_trial(op),(nothing))
+  trial = evaluate(get_trial(op),nothing)
   assemble_matrix(op.coupling,trial,test)
 end
 

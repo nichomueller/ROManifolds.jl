@@ -12,7 +12,7 @@ function _tpod(mat::AbstractMatrix,args...;kwargs...)
   U[:,1:rank]
 end
 
-function _tpod(mat::AbstractMatrix,X::AbstractMatrix;kwargs...)
+function _tpod(mat::Matrix,X::AbstractMatrix;kwargs...)
   C = cholesky(X)
   L = sparse(C.L)
   Xmat = L'*mat[C.p,:]
@@ -33,7 +33,7 @@ function _nested_tpod(mat::AbstractMatrix,args...;kwargs...)
   U_rank*UΣV_rank
 end
 
-function _nested_tpod(mat::AbstractMatrix,X::AbstractMatrix;kwargs...)
+function _nested_tpod(mat::Matrix,X::AbstractMatrix;kwargs...)
   C = cholesky(X)
   L = sparse(C.L)
   Xmat = L'*mat[C.p,:]

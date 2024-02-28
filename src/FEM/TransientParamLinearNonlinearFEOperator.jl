@@ -36,52 +36,68 @@ end
 
 function assemble_norm_matrix(op::TransientParamLinearNonlinearFEOperator)
   test = get_test(op)
-  trial = evaluate(get_trial(op),(nothing))
+  trial = evaluate(get_trial(op),nothing)
   assemble_matrix(op.op_linear.induced_norm,trial,test)
 end
 
 function assemble_coupling_matrix(op::TransientParamLinearNonlinearFEOperator)
   test = get_test(op)
-  trial = evaluate(get_trial(op),(nothing))
+  trial = evaluate(get_trial(op),nothing)
   assemble_matrix(op.op_linear.coupling,trial,test)
 end
 
-function join_operators(op::TransientParamLinearNonlinearFEOperator)
-  op_lin = get_linear_operator(op)
-  op_nlin = get_nonlinear_operator(op)
+function join_operators(
+  op::TransientParamLinearNonlinearFEOperator,
+  op_lin::TransientParamFEOperatorFromWeakForm,
+  op_nlin::TransientParamFEOperatorFromWeakForm)
+
   trial = get_trial(op)
   test = get_test(op)
-  @check op_lin.op.tpspace === op_nlin.op.tpspace
+  @check op_lin.tpspace === op_nlin.tpspace
 
   res(μ,t,u,v) = op_lin.res(μ,t,u,v) + op_nlin.res(μ,t,u,v)
 
-  order_lin = get_order(newop_lin)
-  order_nlin = get_order(newop_nlin)
+  order_lin = get_order(op_lin)
+  order_nlin = get_order(op_nlin)
 
   jacs = ()
-  for i = 1:get_order(op)
+  for i = 1:get_order(op)+1
     function jac_i(μ,t,u,du,v)
-      if i > order_lin
-        newop_nlin.op.jacs[i](μ,t,u,du,v)
-      elseif i > order_nlin
-        newop_lin.op.jacs[i](μ,t,u,du,v)
-      else
-        newop_lin.op.jacs[i](μ,t,u,du,v) + newop_nlin.op.jacs[i](μ,t,u,du,v)
+      if i <= order_lin+1 && i <= order_nlin+1
+        op_lin.jacs[i](μ,t,u,du,v) + op_nlin.jacs[i](μ,t,u,du,v)
+      elseif i <= order_lin+1
+        op_lin.jacs[i](μ,t,u,du,v)
+      else i <= order_nlin+1
+        op_nlin.jacs[i](μ,t,u,du,v)
       end
     end
     jacs = (jacs...,jac_i)
   end
 
-  if isa(op_lin,TransientParamSaddlePointFEOperator)
-    TransientParamFEOperator(res,jacs...,op_lin.op.induced_norm,op_lin.tpspace,trial,test,op_lin.op.coupling)
-  else
-    TransientParamFEOperator(res,jacs...,op_lin.op.induced_norm,op_lin.tpspace,trial,test)
-  end
+  TransientParamFEOperator(res,jacs...,op_lin.induced_norm,op_lin.tpspace,trial,test)
 end
 
 function join_operators(
-  op::TransientParamLinearNonlinearFEOperator{A,B}
-  ) where {A<:TransientParamFEOperatorWithTrian,B<:TransientParamFEOperatorWithTrian}
+  op::TransientParamLinearNonlinearFEOperator,
+  op_lin::TransientParamSaddlePointFEOperator,
+  op_nlin::TransientParamFEOperator)
 
-  join_operators(op.op)
+  jop = join_operators(op,op_lin.op,op_nlin)
+  TransientParamSaddlePointFEOperator(jop,op_lin.coupling)
+end
+
+function join_operators(
+  op::TransientParamLinearNonlinearFEOperator,
+  op_lin::TransientParamFEOperatorWithTrian,
+  op_nlin::TransientParamFEOperatorWithTrian)
+
+  set_op_lin = set_triangulation(op_lin)
+  set_op_nlin = set_triangulation(op_nlin)
+  join_operators(op,set_op_lin,set_op_nlin)
+end
+
+function join_operators(op::TransientParamLinearNonlinearFEOperator)
+  op_lin = get_linear_operator(op)
+  op_nlin = get_nonlinear_operator(op)
+  join_operators(op,op_lin,op_nlin)
 end
