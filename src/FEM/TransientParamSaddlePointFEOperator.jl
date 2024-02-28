@@ -42,7 +42,7 @@ function assemble_norm_matrix(op::TransientParamSaddlePointFEOperator)
   assemble_norm_matrix(op.op)
 end
 
-function compute_coupling_matrix(op::TransientParamSaddlePointFEOperator)
+function assemble_coupling_matrix(op::TransientParamSaddlePointFEOperator)
   test = get_test(op)
   trial = evaluate(get_trial(op),(nothing))
   assemble_matrix(op.coupling,trial,test)

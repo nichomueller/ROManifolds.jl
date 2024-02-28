@@ -114,15 +114,12 @@ function space_time_error(sol,sol_approx,norm_matrix=nothing)
   return avg_error
 end
 
-function space_time_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm_matrix)
+function space_time_error(sol::BlockSnapshots,sol_approx::BlockSnapshots,norm_matrix::BlockMatrix)
   @check get_touched_blocks(sol) == get_touched_blocks(sol_approx)
-  space_time_error.(sol,sol_approx,norm_matrix)
-end
-
-function space_time_error(sol::BlockSnapshots,sol_approx::BlockSnapshots)
-  @check get_touched_blocks(sol) == get_touched_blocks(sol_approx)
-  norm_matrix = fill(nothing,size(sol))
-  space_time_error(sol,sol_approx,norm_matrix)
+  active_block_ids = get_touched_blocks(sol)
+  block_map = BlockMap(size(sol),active_block_ids)
+  errors = Any[space_time_error(sol[i],sol_approx[i],norm_matrix[Block(i,i)]) for i in active_block_ids]
+  return_cache(block_map,errors)
 end
 
 function space_time_error(r::RBResults)

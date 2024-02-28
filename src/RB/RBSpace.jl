@@ -18,8 +18,13 @@ end
 
 function reduced_basis(
   feop::TransientParamSaddlePointFEOperator,s::S,norm_matrix;kwargs...) where S
-  bases = reduced_basis(feop.op,s;kwargs...)
+  bases = reduced_basis(feop.op,s,norm_matrix;kwargs...)
   enrich_basis(feop,bases,norm_matrix)
+end
+
+function reduced_basis(
+  feop::TransientParamFEOperatorWithTrian,s::S,norm_matrix;kwargs...) where S
+  reduced_basis(feop.op,s,norm_matrix;kwargs...)
 end
 
 function reduced_basis(
@@ -39,7 +44,7 @@ function reduced_basis(s::NnzSnapshots,args...;kwargs...)
 end
 
 function compute_bases(s::AbstractSnapshots,args...;kwargs...)
-  if size(s,1) < size(s,2)
+  if num_space_dofs(s) < num_times(s)
     compute_bases_time_space(s,args...;kwargs...)
   else
     compute_bases_space_time(s,args...;kwargs...)
@@ -302,41 +307,30 @@ end
 function reduced_basis(s::BlockSnapshots,norm_matrix;kwargs...)
   active_block_ids = get_touched_blocks(s)
   block_map = BlockMap(size(s),active_block_ids)
-  bases = Any[reduced_basis(s[i],norm_matrix[i];kwargs...) for i in active_block_ids]
+  bases = Any[reduced_basis(s[i],norm_matrix[Block(i,i)];kwargs...) for i in active_block_ids]
   bases_space,bases_time = tuple_of_arrays(bases)
   return_cache(block_map,bases_space...),return_cache(block_map,bases_time...)
 end
 
 function enrich_basis(feop::TransientParamFEOperator,bases,norm_matrix)
   _basis_space,_basis_time = bases
-  supr_op = compute_supremizer_operator(feop)
+  supr_op = assemble_coupling_matrix(feop)
   basis_space = add_space_supremizers(_basis_space,supr_op,norm_matrix)
   basis_time = add_time_supremizers(_basis_time)
   return basis_space,basis_time
 end
 
-function add_space_supremizers(basis_space,supr_op::MatrixBlock)
-  basis_primal,basis_dual... = basis_space.array
-  for i = eachindex(basis_dual)
-    supr_i = supr_op[Block(1,i+1)] * basis_dual[i]
-    gram_schmidt!(supr_i,basis_primal)
-    basis_primal = hcat(basis_primal,supr_i)
-  end
-  return ArrayBlock([basis_primal,basis_dual],basis_space.touched)
-end
-
-function add_space_supremizers(basis_space,supr_op::MatrixBlock,norm_matrix::MatrixBlock)
+function add_space_supremizers(basis_space,supr_op::BlockMatrix,norm_matrix::BlockMatrix)
   basis_primal,basis_dual... = basis_space.array
   A = norm_matrix[Block(1,1)]
+  Chol = cholesky(A)
   for i = eachindex(basis_dual)
     b_i = supr_op[Block(1,i+1)] * basis_dual[i]
-    alg = UMFPACKFactorization()
-    prob = LinearProblem(A,b_i)
-    supr_i = solve(prob,alg)
-    gram_schmidt!(supr_i,basis_primal)
+    supr_i = Chol \ b_i
+    gram_schmidt!(supr_i,basis_primal,A)
     basis_primal = hcat(basis_primal,supr_i)
   end
-  return ArrayBlock([basis_primal,basis_dual],basis_space.touched)
+  return ArrayBlock([basis_primal,basis_dual...],basis_space.touched)
 end
 
 function add_time_supremizers(basis_time;tol=1e-2)

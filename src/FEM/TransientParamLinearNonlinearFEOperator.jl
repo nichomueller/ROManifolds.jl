@@ -40,7 +40,7 @@ function assemble_norm_matrix(op::TransientParamLinearNonlinearFEOperator)
   assemble_matrix(op.op_linear.induced_norm,trial,test)
 end
 
-function compute_coupling_matrix(op::TransientParamLinearNonlinearFEOperator)
+function assemble_coupling_matrix(op::TransientParamLinearNonlinearFEOperator)
   test = get_test(op)
   trial = evaluate(get_trial(op),(nothing))
   assemble_matrix(op.op_linear.coupling,trial,test)

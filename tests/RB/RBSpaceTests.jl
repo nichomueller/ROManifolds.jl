@@ -152,7 +152,7 @@ bases = reduced_basis(soff,norm_matrix;ϵ=RB.get_tol(info))
 
 # RB.enrich_basis(feop,bases,norm_matrix)
 _basis_space,_basis_time = bases
-supr_op = RB.compute_supremizer_operator(feop)
+supr_op = RB.assemble_coupling_matrix(feop)
 # basis_space = add_space_supremizers(_basis_space,supr_op,norm_matrix)
 basis_primal,basis_dual = _basis_space.array
 norm_matrix_primal = first(norm_matrix)

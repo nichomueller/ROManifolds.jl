@@ -73,6 +73,9 @@ trian_res = (Ω,)
 trian_jac = (Ω,)
 trian_jac_t = (Ω,)
 
+coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
+induced_norm((du,dp),(v,q)) = ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
+
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
 test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial_u = TransientTrialParamFESpace(test_u,gμt)
@@ -81,8 +84,10 @@ test_p = TestFESpace(model,reffe_p;conformity=:C0)
 trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
-feop_lin = AffineTransientParamFEOperator(res_lin,jac_lin,jac_t_lin,ptspace,trial,test,trian_res,trian_jac,trian_jac_t)
-feop_nlin = TransientParamFEOperator(res_nlin,jac_nlin,ptspace,trial,test,trian_res,trian_jac)
+_feop_lin = AffineTransientParamFEOperator(res_lin,jac_lin,jac_t_lin,induced_norm,ptspace,trial,test,coupling)
+feop_lin = FEOperatorWithTrian(_feop_lin,trian_res,trian_jac,trian_jac_t)
+_feop_nlin = TransientParamFEOperator(res_nlin,jac_nlin,induced_norm,ptspace,trial,test)
+feop_nlin = FEOperatorWithTrian(_feop_nlin,trian_res,trian_jac)
 feop = TransientParamLinearNonlinearFEOperator(feop_lin,feop_nlin)
 
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))

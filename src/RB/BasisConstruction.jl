@@ -59,12 +59,11 @@ function truncation(s::AbstractVector;ϵ=1e-4,rank=nothing)
 end
 
 function orth_projection(
-  v::AbstractVector{T},
-  basis::AbstractMatrix{T},
-  args...) where T
+  v::AbstractVector,
+  basis::AbstractMatrix)
 
   proj = similar(v)
-  proj .= zero(T)
+  fill!(proj,zero(eltype(proj)))
   @inbounds for b = eachcol(basis)
     proj += b*sum(v'*b)/sum(b'*b)
   end
@@ -72,12 +71,12 @@ function orth_projection(
 end
 
 function orth_projection(
-  v::AbstractVector{T},
-  basis::AbstractMatrix{T},
-  X::SparseMatrixCSC) where T
+  v::AbstractVector,
+  basis::AbstractMatrix,
+  X::AbstractMatrix)
 
   proj = similar(v)
-  proj .= zero(T)
+  fill!(proj,zero(eltype(proj)))
   @inbounds for b = eachcol(basis)
     proj += b*sum(v'*X*b)/sum(b'*X*b)
   end
@@ -85,17 +84,20 @@ function orth_projection(
 end
 
 function orth_complement!(
-  v::AbstractVector{T},
-  basis::AbstractMatrix{T},
-  args...) where T
+  v::AbstractVector,
+  basis::AbstractMatrix,
+  args...)
 
   v .= v-orth_projection(v,basis,args...)
 end
 
 function gram_schmidt!(
-  mat::AbstractMatrix{T},
-  basis::AbstractMatrix{T},
-  args...) where T
+  mat::AbstractMatrix,
+  basis::AbstractMatrix,
+  args...)
+
+  _norm(v::AbstractVector) = norm(v)
+  _norm(v::AbstractVector,X::AbstractMatrix) = sqrt(v'*X*v)
 
   @inbounds for i = axes(mat,2)
     mat_i = mat[:,i]
@@ -103,7 +105,7 @@ function gram_schmidt!(
     if i > 1
       orth_complement!(mat_i,mat[:,1:i-1],args...)
     end
-    mat_i /= norm(mat_i)
+    mat_i /= _norm(mat_i,args...)
     mat[:,i] .= mat_i
   end
 end

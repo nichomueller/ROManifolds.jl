@@ -1,6 +1,7 @@
 using Gridap
 using Test
 using DrWatson
+using Gridap.MultiField
 using Mabla.FEM
 using Mabla.RB
 
@@ -12,8 +13,16 @@ tf = 0.1
 pranges = fill([1,10],3)
 tdomain = t0:dt:tf
 ptspace = TransientParamSpace(pranges,tdomain)
-model_dir = datadir(joinpath("meshes","perforated_plate.json"))
-model = DiscreteModelFromFile(model_dir)
+# model_dir = datadir(joinpath("meshes","perforated_plate.json"))
+# model = DiscreteModelFromFile(model_dir)
+
+n = 10
+domain = (0,1,0,1)
+partition = (n,n)
+model = CartesianDiscreteModel(domain, partition)
+
+labels = get_face_labeling(model)
+add_tag_from_tags!(labels,"dirichlet",[1,2,3,4,5,6,8])
 
 order = 2
 degree = 2*order
@@ -50,22 +59,29 @@ trian_res = (Ω,)
 trian_jac = (Ω,)
 trian_jac_t = (Ω,)
 
+coupling((du,dp),(v,q)) = ∫(dp*(∇⋅(v)))dΩ
+induced_norm((du,dp),(v,q)) = ∫(∇(v)⊙∇(du))dΩ + ∫(dp*q)dΩ
+
 reffe_u = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
-test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["inlet","walls","cylinder"])
-trial_u = TransientTrialParamFESpace(test_u,[gμt_in,gμt_w,gμt_c])
+# test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["inlet","walls","cylinder"])
+# trial_u = TransientTrialParamFESpace(test_u,[gμt_in,gμt_w,gμt_c])
+test_u = TestFESpace(model,reffe_u;conformity=:H1,dirichlet_tags=["dirichlet"])
+trial_u = TransientTrialParamFESpace(test_u,gμt_in)
 reffe_p = ReferenceFE(lagrangian,Float64,order-1)
 test_p = TestFESpace(model,reffe_p;conformity=:C0)
 trial_p = TrialFESpace(test_p)
 test = TransientMultiFieldParamFESpace([test_u,test_p];style=BlockMultiFieldStyle())
 trial = TransientMultiFieldParamFESpace([trial_u,trial_p];style=BlockMultiFieldStyle())
-feop = AffineTransientParamFEOperator(res,jac,jac_t,ptspace,trial,test,trian_res,trian_jac,trian_jac_t)
+_feop = AffineTransientParamFEOperator(res,jac,jac_t,induced_norm,ptspace,trial,test,coupling)
+feop = FEOperatorWithTrian(_feop,trian_res,trian_jac,trian_jac_t)
 
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 ϵ = 1e-4
 rbsolver = RBSolver(fesolver,ϵ,RB.SpaceTimeMDEIM();nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
-test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","perforated_plate")))
+# test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","perforated_plate")))
+test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h1")))
 
 fesnaps,festats = ode_solutions(rbsolver,feop,xh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
@@ -91,3 +107,44 @@ results_space = rb_results(feop,rbsolver_space,fesnaps,rbsnaps_space,festats,rbs
 println(RB.space_time_error(results_space))
 save(test_dir,rbop_space)
 save(test_dir,results_space)
+
+# reduced_fe_space(rbsolver,feop,fesnaps)
+soff = select_snapshots(fesnaps,RB.offline_params(rbsolver))
+norm_matrix = assemble_norm_matrix(feop)
+# bases = reduced_basis(feop,soff,norm_matrix;ϵ=RB.get_tol(rbsolver))
+bases = reduced_basis(feop.op.op,soff,norm_matrix;ϵ=RB.get_tol(rbsolver))
+ebases = RB.enrich_basis(feop,bases,norm_matrix)
+
+# RB.space_time_error(results)
+s1 = soff[1]
+basis_space,basis_time = bases
+ebasis_space,ebasis_time = ebases
+
+using BlockArrays
+bs1 = basis_space[1]
+bt1 = basis_time[1]
+ebs1 = ebasis_space[1]
+ebt1 = ebasis_time[1]
+
+es1 = norm(s1 - bs1*bs1'*s1) / norm(s1)
+ees1 = norm(s1 - ebs1*ebs1'*norm_matrix[Block(1,1)]*s1) / norm(s1)
+
+s2 = soff[2]
+
+using LinearAlgebra
+B = assemble_coupling_matrix(feop)
+A = norm_matrix[Block(1,1)]
+Chol = cholesky(A)
+basis_primal,basis_dual = basis_space.array
+b_i = B[Block(1,2)] * basis_dual
+supr_i = Chol \ b_i
+S = copy(supr_i)
+gram_schmidt!(S,basis_primal,A)
+
+S'*A*S
+BBB = hcat(basis_primal,S)
+
+BBB'*A*BBB
+
+# reduced_basis(feop.op.op,soff,norm_matrix;ϵ=RB.get_tol(rbsolver))
+# reduced_basis(soff,norm_matrix;ϵ=RB.get_tol(rbsolver))

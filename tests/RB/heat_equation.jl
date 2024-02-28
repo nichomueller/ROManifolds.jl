@@ -56,9 +56,8 @@ T = Float64
 reffe = ReferenceFE(lagrangian,T,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = TransientTrialParamFESpace(test,gμt)
-feop = AffineTransientParamFEOperator(
-  res,jac,jac_t,induced_norm,ptspace,trial,test,trian_res,trian_jac,trian_jac_t)
-
+_feop = AffineTransientParamFEOperator(res,jac,jac_t,induced_norm,ptspace,trial,test)
+feop = FEOperatorWithTrian(_feop,trian_res,trian_jac,trian_jac_t)
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 

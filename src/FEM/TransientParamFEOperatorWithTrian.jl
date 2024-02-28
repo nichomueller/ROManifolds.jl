@@ -1,64 +1,39 @@
-function AffineTransientParamFEOperator(
-  res::Function,jac::Function,induced_norm::Function,
-  tpspace::TransientParamSpace,trial,test,trian_res,trian_jac)
-
-  jacs = (jac,)
-  trian_jacs = (trian_jac,)
-  order = get_polynomial_order(test)
-  newres,newjac = set_triangulation(res,jacs,trian_res,trian_jacs,order)
-  op = AffineTransientParamFEOperator(newres,newjac,induced_norm,tpspace,trial,test)
-  TransientParamFEOperatorWithTrian(op,trian_res,trian_jacs)
-end
-
-function AffineTransientParamFEOperator(
-  res::Function,jac::Function,jac_t::Function,induced_norm::Function,
-  tpspace::TransientParamSpace,trial,test,trian_res,trian_jac,trian_jac_t)
-
-  jacs = (jac,jac_t)
-  trian_jacs = (trian_jac,trian_jac_t)
-  order = get_polynomial_order(test)
-  newres,newjac,newjac_t = set_triangulation(res,jacs,trian_res,trian_jacs,order)
-  op = AffineTransientParamFEOperator(newres,newjac,newjac_t,induced_norm,tpspace,trial,test)
-  TransientParamFEOperatorWithTrian(op,trian_res,trian_jacs)
-end
-
-function TransientParamFEOperator(
-  res::Function,jac::Function,induced_norm::Function,
-  tpspace,trial,test,trian_res,trian_jac)
-
-  jacs = (jac,)
-  trian_jacs = (trian_jac,)
-  order = get_polynomial_order(test)
-  newres,newjac = set_triangulation(res,jacs,trian_res,trian_jacs,order)
-  op = TransientParamFEOperator(newres,newjac,induced_norm,tpspace,trial,test)
-  TransientParamFEOperatorWithTrian(op,trian_res,trian_jacs)
-end
-
-function TransientParamFEOperator(
-  res::Function,jac::Function,jac_t::Function,induced_norm::Function,
-  tpspace,trial,test,trian_res,trian_jac,trian_jac_t)
-
-  jacs = (jac,jac_t)
-  trian_jacs = (trian_jac,trian_jac_t)
-  order = get_polynomial_order(test)
-  newres,newjac,newjac_t = set_triangulation(res,jacs,trian_res,trian_jacs,order)
-  op = TransientParamFEOperator(newres,newjac,newjac_t,induced_norm,tpspace,trial,test)
-  TransientParamFEOperatorWithTrian(op,trian_res,trian_jacs)
-end
-
 # interface to accommodate the separation of terms depending on the triangulation
 struct TransientParamFEOperatorWithTrian{T<:OperatorType,A,B,C} <: TransientParamFEOperator{T}
   op::A
   trian_res::B
   trian_jacs::C
   function TransientParamFEOperatorWithTrian(
-    op::TransientParamFEOperatorFromWeakForm{T},
+    op::TransientParamFEOperator{T},
     trian_res::B,
     trian_jacs::C) where {T,B,C}
 
     A = typeof(op)
     new{T,A,B,C}(op,trian_res,trian_jacs)
   end
+end
+
+function FEOperatorWithTrian(
+  op::TransientParamFEOperatorFromWeakForm{T},
+  trian_res,
+  trian_jacs...) where T
+
+  polyn_order = get_polynomial_order(op.test)
+  newres,newjacs... = set_triangulation(op.res,op.jacs,trian_res,trian_jacs,polyn_order)
+  newop = TransientParamFEOperatorFromWeakForm{T}(
+    newres,op.rhs,newjacs,op.induced_norm,op.assem,
+    op.tpspace,op.trials,op.test,op.order)
+  TransientParamFEOperatorWithTrian(newop,trian_res,trian_jacs)
+end
+
+function FEOperatorWithTrian(
+  op::TransientParamSaddlePointFEOperator,
+  trian_res,
+  trian_jacs...)
+
+  newop = FEOperatorWithTrian(op.op,trian_res,trian_jacs...)
+  newop_saddle_point = TransientParamSaddlePointFEOperator(newop.op,op.coupling)
+  TransientParamFEOperatorWithTrian(newop_saddle_point,trian_res,trian_jacs)
 end
 
 function set_triangulation(res,jacs::NTuple{1,Function},trian_res,trian_jacs,order)
@@ -108,10 +83,14 @@ function assemble_norm_matrix(op::TransientParamFEOperatorWithTrian)
 end
 
 const TransientParamSaddlePointFEOperatorWithTrian = TransientParamFEOperatorWithTrian{T,A
-  } where {T,A<:TransientParamSaddlePointFEOperator}
+  } where {T<:OperatorType,A<:TransientParamSaddlePointFEOperator{T}}
 
-function compute_coupling_matrix(op::TransientParamSaddlePointFEOperatorWithTrian)
-  compute_coupling_matrix(op.op)
+function assemble_coupling_matrix(op::TransientParamSaddlePointFEOperatorWithTrian)
+  assemble_coupling_matrix(op.op)
+end
+
+function _remove_saddle_point_operator(op::TransientParamSaddlePointFEOperatorWithTrian)
+  TransientParamFEOperatorWithTrian(op.op.op,op.trian_res,op.trian_jacs)
 end
 
 # needed to retrieve measures
@@ -139,12 +118,17 @@ function change_triangulation(
 
   newtrian_res = order_triangulations(op.trian_res,trian_res)
   newtrian_jacs = order_triangulations.(op.trian_jacs,trian_jacs)
-  @unpack res,rhs,jacs,induced_norm,assem,tpspace,trials,test,order = op.op
+  FEOperatorWithTrian(op.op,newtrian_res,newtrian_jacs...)
+end
 
-  porder = get_polynomial_order(test)
-  newres,newjacs... = set_triangulation(res,jacs,newtrian_res,newtrian_jacs,porder)
-  feop = TransientParamFEOperatorFromWeakForm{T}(newres,rhs,newjacs,induced_norm,assem,tpspace,trials,test,order)
-  TransientParamFEOperatorWithTrian(feop,newtrian_res,newtrian_jacs)
+function Algebra.allocate_residual(
+  op::TransientParamSaddlePointFEOperatorWithTrian,
+  r::TransientParamRealization,
+  uh::T,
+  cache) where T
+
+  newop = _remove_saddle_point_operator(op)
+  allocate_residual(newop,r,uh,cache)
 end
 
 function Algebra.allocate_residual(
@@ -176,6 +160,16 @@ function _allocate_residual(
     allocate_vector(assem,vecdata)
   end
   b
+end
+
+function Algebra.allocate_jacobian(
+  op::TransientParamSaddlePointFEOperatorWithTrian,
+  r::TransientParamRealization,
+  uh::T,
+  cache) where T
+
+  newop = _remove_saddle_point_operator(op)
+  _allocate_jacobian(newop,r,uh,cache)
 end
 
 function Algebra.allocate_jacobian(
@@ -217,6 +211,17 @@ end
 
 function Algebra.residual!(
   b::Contribution,
+  op::TransientParamSaddlePointFEOperatorWithTrian,
+  r::TransientParamRealization,
+  xh::T,
+  cache) where T
+
+  newop = _remove_saddle_point_operator(op)
+  residual!(b,newop,r,xh,cache)
+end
+
+function Algebra.residual!(
+  b::Contribution,
   op::TransientParamFEOperatorWithTrian,
   r::TransientParamRealization,
   xh::T,
@@ -231,6 +236,19 @@ function Algebra.residual!(
     assemble_vector!(btrian,assem,vecdata)
   end
   b
+end
+
+function Algebra.jacobian!(
+  A::Contribution,
+  op::TransientParamSaddlePointFEOperatorWithTrian,
+  r::TransientParamRealization,
+  xh::T,
+  i::Integer,
+  γᵢ::Real,
+  cache) where T
+
+  newop = _remove_saddle_point_operator(op)
+  jacobian!(A,newop,r,xh,i,γᵢ,cache)
 end
 
 function Algebra.jacobian!(
@@ -253,6 +271,18 @@ function Algebra.jacobian!(
     assemble_matrix_add!(Atrian,assem,matdata)
   end
   A
+end
+
+function ODETools.jacobians!(
+  A::Contribution,
+  op::TransientParamSaddlePointFEOperatorWithTrian,
+  r::TransientParamRealization,
+  xh::T,
+  γ::Tuple{Vararg{Real}},
+  cache) where T
+
+  newop = _remove_saddle_point_operator(op)
+  jacobians!(A,newop,r,xh,γ,cache)
 end
 
 function ODETools.jacobians!(
