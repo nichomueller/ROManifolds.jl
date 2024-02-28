@@ -1,6 +1,6 @@
 function AffineTransientParamFEOperator(
   res::Function,jac::Function,induced_norm::Function,
-  tpspace,trial,test,trian_res,trian_jac)
+  tpspace::TransientParamSpace,trial,test,trian_res,trian_jac)
 
   jacs = (jac,)
   trian_jacs = (trian_jac,)
@@ -12,7 +12,7 @@ end
 
 function AffineTransientParamFEOperator(
   res::Function,jac::Function,jac_t::Function,induced_norm::Function,
-  tpspace,trial,test,trian_res,trian_jac,trian_jac_t)
+  tpspace::TransientParamSpace,trial,test,trian_res,trian_jac,trian_jac_t)
 
   jacs = (jac,jac_t)
   trian_jacs = (trian_jac,trian_jac_t)
@@ -47,17 +47,17 @@ function TransientParamFEOperator(
 end
 
 # interface to accommodate the separation of terms depending on the triangulation
-struct TransientParamFEOperatorWithTrian{T<:OperatorType,A} <: TransientParamFEOperator{T}
+struct TransientParamFEOperatorWithTrian{T<:OperatorType,A,B,C} <: TransientParamFEOperator{T}
   op::A
-  trian_res::Triangulation
-  trian_jacs::Tuple{Vararg{Triangulation}}
+  trian_res::B
+  trian_jacs::C
   function TransientParamFEOperatorWithTrian(
     op::TransientParamFEOperatorFromWeakForm{T},
-    trian_res::Triangulation,
-    trian_jacs::Tuple{Vararg{Triangulation}}) where T
+    trian_res::B,
+    trian_jacs::C) where {T,B,C}
 
     A = typeof(op)
-    new{T,A}(op,trian_res,trian_jacs)
+    new{T,A,B,C}(op,trian_res,trian_jacs)
   end
 end
 
@@ -107,8 +107,8 @@ function assemble_norm_matrix(op::TransientParamFEOperatorWithTrian)
   assemble_norm_matrix(op.op)
 end
 
-const TransientParamSaddlePointFEOperatorWithTrian = TransientParamFEOperatorWithTrian{
-  T<:OperatorType,A} where {T,A<:TransientParamSaddlePointFEOperator}
+const TransientParamSaddlePointFEOperatorWithTrian = TransientParamFEOperatorWithTrian{T,A
+  } where {T,A<:TransientParamSaddlePointFEOperator}
 
 function compute_coupling_matrix(op::TransientParamSaddlePointFEOperatorWithTrian)
   compute_coupling_matrix(op.op)
@@ -139,11 +139,11 @@ function change_triangulation(
 
   newtrian_res = order_triangulations(op.trian_res,trian_res)
   newtrian_jacs = order_triangulations.(op.trian_jacs,trian_jacs)
-  @unpack res,rhs,jacs,assem,tpspace,trials,test,order = op.op
+  @unpack res,rhs,jacs,induced_norm,assem,tpspace,trials,test,order = op.op
 
   porder = get_polynomial_order(test)
   newres,newjacs... = set_triangulation(res,jacs,newtrian_res,newtrian_jacs,porder)
-  feop = TransientParamFEOperatorFromWeakForm{T}(newres,rhs,newjacs,assem,tpspace,trials,test,order)
+  feop = TransientParamFEOperatorFromWeakForm{T}(newres,rhs,newjacs,induced_norm,assem,tpspace,trials,test,order)
   TransientParamFEOperatorWithTrian(feop,newtrian_res,newtrian_jacs)
 end
 

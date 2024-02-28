@@ -1,28 +1,28 @@
 # interface to deal with the inf-sup stability condition of saddle point problems
 
 function AffineTransientParamFEOperator(
-  res::Function,jac::Function,induced_norm::Function,coupling::Function,tpspace,trial,test)
+  res::Function,jac::Function,induced_norm::Function,tpspace,trial,test,coupling::Function)
 
   op = AffineTransientParamFEOperator(res,jac,induced_norm,tpspace,trial,test)
   TransientParamSaddlePointFEOperator(op,coupling)
 end
 
 function AffineTransientParamFEOperator(
-  res::Function,jac::Function,jac_t::Function,induced_norm::Function,tpspace,trial,test)
+  res::Function,jac::Function,jac_t::Function,induced_norm::Function,tpspace,trial,test,coupling::Function)
 
   op = AffineTransientParamFEOperator(res,jac,jac_t,induced_norm,tpspace,trial,test)
   TransientParamSaddlePointFEOperator(op,coupling)
 end
 
 function TransientParamFEOperator(
-  res::Function,jac::Function,induced_norm::Function,tpspace,trial,test)
+  res::Function,jac::Function,induced_norm::Function,tpspace,trial,test,coupling::Function)
 
   op = TransientParamFEOperator(res,jac,induced_norm,tpspace,trial,test)
   TransientParamSaddlePointFEOperator(op,coupling)
 end
 
 function TransientParamFEOperator(
-  res::Function,jac::Function,jac_t::Function,induced_norm::Function,tpspace,trial,test)
+  res::Function,jac::Function,jac_t::Function,induced_norm::Function,tpspace,trial,test,coupling::Function)
 
   op = TransientParamFEOperator(res,jac,jac_t,induced_norm,tpspace,trial,test)
   TransientParamSaddlePointFEOperator(op,coupling)
@@ -44,7 +44,7 @@ end
 
 function compute_coupling_matrix(op::TransientParamSaddlePointFEOperator)
   test = get_test(op)
-  trial = evalute(get_trial(op),(nothing))
+  trial = evaluate(get_trial(op),(nothing))
   assemble_matrix(op.coupling,trial,test)
 end
 

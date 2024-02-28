@@ -129,7 +129,6 @@ export assemble_norm_matrix
 include("TransientParamFEOperator.jl")
 
 export TransientParamSaddlePointFEOperator
-export TransientParamNormedSaddlePointFEOperator
 export compute_coupling_matrix
 include("TransientParamSaddlePointFEOperator.jl")
 

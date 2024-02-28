@@ -4,34 +4,27 @@ function reduced_fe_space(
   s::S) where S
 
   soff = select_snapshots(s,offline_params(solver))
-  bases = reduced_basis(feop,soff;ϵ=get_tol(solver))
+  norm_matrix = assemble_norm_matrix(feop)
+  bases = reduced_basis(feop,soff,norm_matrix;ϵ=get_tol(solver))
   reduced_trial = reduced_fe_space(get_trial(feop),bases...)
   reduced_test = reduced_fe_space(get_test(feop),bases...)
   return reduced_trial,reduced_test
 end
 
-function reduced_basis(feop::TransientParamFEOperator,s::S;kwargs...) where S
-  reduced_basis(s;kwargs...)
-end
-
-function reduced_basis(feop::TransientParamNormedFEOperator,s::S;kwargs...) where S
-  norm_matrix = assemble_norm_matrix(feop)
+function reduced_basis(
+  feop::TransientParamFEOperator,s::S,norm_matrix;kwargs...) where S
   reduced_basis(s,norm_matrix;kwargs...)
 end
 
-function reduced_basis(feop::TransientParamSaddlePointFEOperator,s::S;kwargs...) where S
+function reduced_basis(
+  feop::TransientParamSaddlePointFEOperator,s::S,norm_matrix;kwargs...) where S
   bases = reduced_basis(feop.op,s;kwargs...)
-  enrich_basis(feop,bases,nothing)
-end
-
-function reduced_basis(feop::TransientParamNormedSaddlePointFEOperator,s::S;kwargs...) where S
-  norm_matrix = assemble_norm_matrix(feop)
-  bases = reduced_basis(feop.op,s,norm_matrix;kwargs...)
   enrich_basis(feop,bases,norm_matrix)
 end
 
-function reduced_basis(feop::TransientParamLinearNonlinearFEOperator,s::S;kwargs...) where S
-  reduced_basis(join_operators(feop),s;kwargs...)
+function reduced_basis(
+  feop::TransientParamLinearNonlinearFEOperator,s::S,norm_matrix;kwargs...) where S
+  reduced_basis(join_operators(feop),s,norm_matrix;kwargs...)
 end
 
 function reduced_basis(s::AbstractSnapshots,args...;kwargs...)

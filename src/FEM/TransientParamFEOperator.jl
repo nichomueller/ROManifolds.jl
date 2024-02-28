@@ -77,7 +77,7 @@ realization(op::TransientParamFEOperatorFromWeakForm;kwargs...) = realization(op
 
 function assemble_norm_matrix(op::TransientParamFEOperatorFromWeakForm)
   test = get_test(op)
-  trial = evalute(get_trial(op),(nothing))
+  trial = evaluate(get_trial(op),(nothing))
   assemble_matrix(op.induced_norm,trial,test)
 end
 

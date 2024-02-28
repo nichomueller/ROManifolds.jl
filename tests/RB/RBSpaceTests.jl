@@ -146,7 +146,7 @@ rbsolver = RBSolver(info,fesolver)
 
 snaps,comp = ode_solutions(rbsolver,feop,xh0μ)
 
-norm_matrix = RB.get_norm_matrix(info,feop)
+norm_matrix = RB.assemble_norm_matrix(feop)
 soff = select_snapshots(snaps,RB.offline_params(info))
 bases = reduced_basis(soff,norm_matrix;ϵ=RB.get_tol(info))
 

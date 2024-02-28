@@ -67,7 +67,7 @@ function rb_results(
   rb_stats;
   name="vel")
 
-  X = get_norm_matrix(feop)
+  X = assemble_norm_matrix(feop)
   son = select_snapshots(s,online_params(solver)) |> reverse_snapshots
   RBResults(name,son,son_approx,fem_stats,rb_stats,X)
 end

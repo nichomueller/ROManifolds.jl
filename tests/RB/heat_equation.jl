@@ -50,18 +50,21 @@ trian_res = (Ω,Γn)
 trian_jac = (Ω,)
 trian_jac_t = (Ω,)
 
+induced_norm(du,v) = ∫(∇(v)⋅∇(du))dΩ
+
 T = Float64
 reffe = ReferenceFE(lagrangian,T,order)
 test = TestFESpace(model,reffe;conformity=:H1,dirichlet_tags=["dirichlet"])
 trial = TransientTrialParamFESpace(test,gμt)
-feop = AffineTransientParamFEOperator(res,jac,jac_t,ptspace,trial,test,trian_res,trian_jac,trian_jac_t)
+feop = AffineTransientParamFEOperator(
+  res,jac,jac_t,induced_norm,ptspace,trial,test,trian_res,trian_jac,trian_jac_t)
 
 uh0μ(μ) = interpolate_everywhere(u0μ(μ),trial(μ,t0))
 fesolver = ThetaMethod(LUSolver(),dt,θ)
 
 ϵ = 1e-4
 rbsolver = RBSolver(fesolver,ϵ;nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
-test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity")))
+test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("heateq","elasticity_h1")))
 
 # we can load & solve directly, if the offline structures have been previously saved to file
 # load_solve(rbsolver,dir=test_dir)
