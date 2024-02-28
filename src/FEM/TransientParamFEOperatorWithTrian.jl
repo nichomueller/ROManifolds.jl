@@ -116,8 +116,8 @@ end
 function change_triangulation(op::TransientParamFEOperatorWithTrian,trian_res,trian_jacs)
   newtrian_res = order_triangulations(op.trian_res,trian_res)
   newtrian_jacs = order_triangulations.(op.trian_jacs,trian_jacs)
-  newop = set_triangulation(op,newtrian_res,newtrian_jacs...)
-  TransientParamFEOperatorWithTrian(newop,args...)
+  newop = set_triangulation(op,newtrian_res,newtrian_jacs)
+  TransientParamFEOperatorWithTrian(newop,newtrian_res,newtrian_jacs)
 end
 
 function Algebra.allocate_residual(

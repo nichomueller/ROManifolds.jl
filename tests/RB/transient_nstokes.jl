@@ -91,7 +91,8 @@ feop_nlin = FEOperatorWithTrian(_feop_nlin,trian_res,trian_jac)
 feop = TransientParamLinearNonlinearFEOperator(feop_lin,feop_nlin)
 
 xh0μ(μ) = interpolate_everywhere([u0μ(μ),p0μ(μ)],trial(μ,t0))
-fesolver = ThetaMethod(LUSolver(),dt,θ)
+nls = NewtonRaphsonSolver(LUSolver(),1e-10,20)
+fesolver = ThetaMethod(nls,dt,θ)
 
 ϵ = 1e-4
 rbsolver = RBSolver(fesolver,ϵ,RB.SpaceTimeMDEIM();nsnaps_state=50,nsnaps_test=10,nsnaps_mdeim=20)
@@ -122,13 +123,22 @@ println(RB.space_time_error(results_space))
 save(test_dir,rbop_space)
 save(test_dir,results_space)
 
-# reduced_operator(rbsolver,feop,fesnaps)
-red_trial,red_test = reduced_fe_space(rbsolver,feop,fesnaps)
-odeop = get_algebraic_operator(feop)
-pop = RBOperator(odeop,red_trial,red_test)
-nlop = get_nonlinear_operator(pop)
-# red_op_nlin = reduced_operator(rbsolver,nlop,fesnaps)
-# red_lhs,red_rhs = reduced_matrix_vector_form(rbsolver,nlop,fesnaps)
-smdeim = select_snapshots(fesnaps,RB.mdeim_params(rbsolver))
-contribs_mat,contribs_vec = fe_matrix_and_vector(rbsolver,nlop,smdeim)
-# red_mat = RB.reduced_matrix_form(rbsolver,nlop,contribs_mat)
+son = select_snapshots(fesnaps,RB.online_params(rbsolver))
+ron = get_realization(son)
+θ == 0.0 ? dtθ = dt : dtθ = dt*θ
+
+r = copy(ron)
+FEM.shift_time!(r,dt*(θ-1))
+
+rb_trial = get_trial(rbop)(r)
+fe_trial = get_fe_trial(rbop)(r)
+red_x = zero_free_values(rb_trial)
+y = zero_free_values(fe_trial)
+z = similar(y)
+z .= 0.0
+
+ode_cache = allocate_cache(rbop,r)
+nl_cache = nothing
+
+ode_cache = update_cache!(ode_cache,rbop,r)
+solve!(red_x,fesolver.nls,rbop,nl_cache)

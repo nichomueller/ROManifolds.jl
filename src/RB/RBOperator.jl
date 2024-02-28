@@ -38,10 +38,10 @@ get_fe_trial(op::RBOperator) = get_trial(op.feop)
 get_fe_test(op::RBOperator) = get_test(op.feop)
 
 function FEM.change_triangulation(
-  op::RBOperator,trians_lhs,trians_rhs)
+  op::RBOperator,trians_rhs,trians_lhs)
 
   feop = FEM.get_fe_operator(op)
-  new_feop = FEM.change_triangulation(feop,trians_lhs,trians_rhs)
+  new_feop = FEM.change_triangulation(feop,trians_rhs,trians_lhs)
   new_odeop = get_algebraic_operator(new_feop)
   RBOperator(new_odeop,op.trial,op.test)
 end

@@ -35,15 +35,15 @@ function realization(op::TransientParamLinearNonlinearFEOperator;kwargs...)
 end
 
 function assemble_norm_matrix(op::TransientParamLinearNonlinearFEOperator)
-  test = get_test(op)
-  trial = evaluate(get_trial(op),nothing)
-  assemble_matrix(op.op_linear.induced_norm,trial,test)
+  @check get_test(op.op_linear) === get_test(op.op_nonlinear)
+  @check get_trial(op.op_linear) === get_trial(op.op_nonlinear)
+  assemble_norm_matrix(op.op_linear)
 end
 
 function assemble_coupling_matrix(op::TransientParamLinearNonlinearFEOperator)
-  test = get_test(op)
-  trial = evaluate(get_trial(op),nothing)
-  assemble_matrix(op.op_linear.coupling,trial,test)
+  @check get_test(op.op_linear) === get_test(op.op_nonlinear)
+  @check get_trial(op.op_linear) === get_trial(op.op_nonlinear)
+  assemble_coupling_matrix(op.op_linear)
 end
 
 function join_operators(

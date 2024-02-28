@@ -4,9 +4,9 @@ function reduced_operator(
   s::S) where S
 
   red_lhs,red_rhs = reduced_matrix_vector_form(solver,op,s)
-  trians_lhs = map(get_domains,red_lhs)
   trians_rhs = get_domains(red_rhs)
-  new_op = change_triangulation(op,trians_lhs,trians_rhs)
+  trians_lhs = map(get_domains,red_lhs)
+  new_op = change_triangulation(op,trians_rhs,trians_lhs)
   RBNonlinearOperator(solver,new_op,red_lhs,red_rhs)
 end
 
@@ -467,4 +467,19 @@ function Algebra.solve(
   s = reverse_snapshots(x,r)
   cs = ComputationalStats(stats,num_params(r))
   return s,cs
+end
+
+function Algebra.solve!(
+  x::AbstractVector,
+  nls::NewtonRaphsonSolver,
+  op::LinearNonlinearRBNonlinearOperator,
+  cache::Nothing)
+
+  b = residual(op, x)
+  A = jacobian(op, x)
+  dx = similar(b)
+  ss = symbolic_setup(nls.ls, A)
+  ns = numerical_setup(ss,A)
+  _solve_nr!(x,A,b,dx,ns,nls,op)
+  NewtonRaphsonCache(A,b,dx,ns)
 end
