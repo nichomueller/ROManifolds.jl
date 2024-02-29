@@ -75,14 +75,17 @@ export RBOperator
 export reduced_operator
 export get_fe_trial
 export get_fe_test
-export allocate_fe_vector
-export allocate_fe_matrix
-export allocate_fe_matrix_and_vector
-export fe_vector!
-export fe_matrix!
-export fe_matrix_and_vector!
-export fe_matrix_and_vector
-include("RBOperator.jl")
+export allocate_fe_residual
+export allocate_fe_jacobian
+export allocate_fe_jacobian_and_residual
+export fe_residual
+export fe_residual!
+export fe_jacobian
+export fe_jacobian!
+export fe_jacobians!
+export fe_jacobian_and_residual!
+export fe_jacobian_and_residual
+include("PODOperator.jl")
 
 export ReducedIntegrationDomain
 export AffineDecomposition
@@ -100,8 +103,12 @@ export allocate_mdeim_lincomb
 export mdeim_lincomb!
 include("AffineDecomposition.jl")
 
+export PODMDEIMOperator
+export LinearNonlinearPODMDEIMOperator
+include("PODMDEIMOperator.jl")
+
 export RBNonlinearOperator
-export ThetaMethodNonlinearOperator
+export RBThetaMethodParamOperator
 include("RBNonlinearOperator.jl")
 
 export ComputationalStats

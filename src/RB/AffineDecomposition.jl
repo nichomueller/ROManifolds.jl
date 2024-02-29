@@ -236,7 +236,7 @@ function reduced_matrix_vector_form(
   s::S) where S
 
   smdeim = select_snapshots(s,mdeim_params(solver))
-  contribs_mat,contribs_vec = fe_matrix_and_vector(solver,op,smdeim)
+  contribs_mat,contribs_vec = fe_jacobian_and_residual(solver,op,smdeim)
   red_mat = reduced_matrix_form(solver,op,contribs_mat)
   red_vec = reduced_vector_form(solver,op,contribs_vec)
   return red_mat,red_vec

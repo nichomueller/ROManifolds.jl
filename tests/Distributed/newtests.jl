@@ -110,10 +110,10 @@ r = get_realization(smdeim)
 y = similar(x)
 y .= 0.0
 ode_cache = allocate_cache(op,r)
-A,b = allocate_fe_matrix_and_vector(op,r,x,ode_cache)
+A,b = allocate_fe_jacobian_and_residual(op,r,x,ode_cache)
 
 ode_cache = update_cache!(ode_cache,op,r)
-contribs_mat,contribs_vec = fe_matrix_and_vector!(A,b,op,r,dtθ,x,ode_cache,y)
+contribs_mat,contribs_vec = fe_jacobian_and_residual!(A,b,op,r,dtθ,x,ode_cache,y)
 
 # red_mat = RB.reduced_matrix_form(rbsolver,op,contribs_mat)
 # red_vec = RB.reduced_vector_form(rbsolver,op,contribs_vec)

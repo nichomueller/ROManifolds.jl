@@ -103,9 +103,9 @@ sb_fe = Snapshots(b_fe,r)
 # op1 = RBOperator(odeop,red_trial,red_test)
 
 # ode_cache = allocate_cache(op1,r)
-# A,b = allocate_fe_matrix_and_vector(op1,r,y,ode_cache)
+# A,b = allocate_fe_jacobian_and_residual(op1,r,y,ode_cache)
 # ode_cache = update_cache!(ode_cache,op1,r)
-# sA,sb = RB.fe_matrix_and_vector!(A,b,op1,r,dtθ,y,ode_cache,z)
+# sA,sb = RB.fe_jacobian_and_residual!(A,b,op1,r,dtθ,y,ode_cache,z)
 
 # map(sA,sA_fe) do sA,sA_fe
 #   vA,vA_fe = get_values(sA),get_values(sA_fe)
@@ -122,9 +122,9 @@ sb_fe = Snapshots(b_fe,r)
 op2 = red_op.op
 
 ode_cache = allocate_cache(op2,r)
-A,b = allocate_fe_matrix_and_vector(op2,r,y,ode_cache)
+A,b = allocate_fe_jacobian_and_residual(op2,r,y,ode_cache)
 ode_cache = update_cache!(ode_cache,op2,r)
-sA,sb = RB.fe_matrix_and_vector!(A,b,op2,r,dtθ,y,ode_cache,z)
+sA,sb = RB.fe_jacobian_and_residual!(A,b,op2,r,dtθ,y,ode_cache,z)
 
 # vAA = get_values(red_op.lhs[1])
 # intdom = RB.get_integration_domain(vAA[1])

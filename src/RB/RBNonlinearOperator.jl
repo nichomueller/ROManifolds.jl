@@ -1,485 +1,107 @@
-function reduced_operator(
-  solver::RBSolver,
-  op::RBOperator,
-  s::S) where S
-
-  red_lhs,red_rhs = reduced_matrix_vector_form(solver,op,s)
-  trians_rhs = get_domains(red_rhs)
-  trians_lhs = map(get_domains,red_lhs)
-  new_op = change_triangulation(op,trians_rhs,trians_lhs)
-  RBNonlinearOperator(solver,new_op,red_lhs,red_rhs)
-end
-
-function reduced_operator(
-  solver::RBSolver,
-  op::RBOperator{FEM.LinearNonlinear},
-  s::S) where S
-
-  red_op_lin = reduced_operator(solver,get_linear_operator(op),s)
-  red_op_nlin = reduced_operator(solver,get_nonlinear_operator(op),s)
-  LinearNonlinearRBNonlinearOperator(red_op_lin,red_op_nlin)
-end
-
 abstract type RBNonlinearOperator{T} <: NonlinearOperator end
 
-ReferenceFEs.get_order(op::RBNonlinearOperator) = get_order(op.op)
-FESpaces.get_trial(op::RBNonlinearOperator) = get_trial(op.op)
-FESpaces.get_test(op::RBNonlinearOperator) = get_test(op.op)
-FEM.realization(op::RBNonlinearOperator;kwargs...) = realization(op.op;kwargs...)
-FEM.get_fe_operator(op::RBNonlinearOperator) = FEM.get_fe_operator(op.op)
-get_fe_trial(op::RBNonlinearOperator) = get_fe_trial(op.op)
-get_fe_test(op::RBNonlinearOperator) = get_fe_test(op.op)
+# θ-Method specialization
 
-function TransientFETools.allocate_cache(
-  op::RBNonlinearOperator,
-  r::TransientParamRealization)
-
-  allocate_cache(op.op,r)
+struct RBThetaMethodParamOperator{C} <: NonlinearOperator
+  odeop::PODMDEIMOperator{C}
+  r::TransientParamRealization
+  dtθ::Float64
+  u0::AbstractVector
+  ode_cache
+  vθ::AbstractVector
 end
 
-function TransientFETools.update_cache!(
-  ode_cache,
-  op::RBNonlinearOperator,
-  r::TransientParamRealization)
-
-  update_cache!(ode_cache,op.op,r)
+function Algebra.allocate_residual(op::RBThetaMethodParamOperator,x::AbstractVector)
+  allocate_residual(op.odeop,op.r,x,op.ode_cache)
 end
 
-function Algebra.allocate_residual(
-  op::RBNonlinearOperator,
-  r::TransientParamRealization,
-  x::AbstractVector,
-  ode_cache)
-
-  test = get_test(op)
-  fe_b = allocate_fe_vector(op.op,r,x,ode_cache)
-  coeff_cache = allocate_mdeim_coeff(op.rhs,r)
-  lincomb_cache = allocate_mdeim_lincomb(test,r)
-  return fe_b,coeff_cache,lincomb_cache
+function Algebra.allocate_jacobian(op::RBThetaMethodParamOperator,x::AbstractVector)
+  allocate_jacobian(op.odeop,op.r,x,op.ode_cache)
 end
 
-function Algebra.allocate_jacobian(
-  op::RBNonlinearOperator,
-  r::TransientParamRealization,
-  x::AbstractVector,
-  ode_cache)
-
-  trial = get_trial(op)
-  test = get_test(op)
-  fe_A = allocate_fe_matrix(op.op,r,x,ode_cache)
-  coeff_cache = ()
-  for i = 1:get_order(op)+1
-    coeff_cache = (coeff_cache...,allocate_mdeim_coeff(op.lhs[i],r))
-  end
-  lincomb_cache = allocate_mdeim_lincomb(trial,test,r)
-  return fe_A,coeff_cache,lincomb_cache
+function Algebra.zero_initial_guess(op::RBThetaMethodParamOperator)
+  x0 = similar(op.u0)
+  fill!(x0,zero(eltype(x0)))
+  x0
 end
 
 function Algebra.residual!(
-  cache,
-  op::RBNonlinearOperator,
-  r::TransientParamRealization,
-  xhF::Tuple{Vararg{AbstractVector}},
-  ode_cache)
+  cache::Tuple,
+  op::RBThetaMethodParamOperator,
+  x::AbstractVector)
 
-  fe_b,coeff_cache,lincomb_cache = cache
-  fe_sb = fe_vector!(fe_b,op,r,xhF,ode_cache)
-  b_coeff = mdeim_coeff!(coeff_cache,op.rhs,fe_sb)
-  mdeim_lincomb!(lincomb_cache,op.rhs,b_coeff)
-  b = last(lincomb_cache)
-  return b
+  uF = x
+  vθ = op.vθ
+  @. vθ = (x-op.u0)/op.dtθ
+  residual!(cache,op.odeop,op.r,(uF,vθ),op.ode_cache)
 end
 
 function Algebra.jacobian!(
-  cache,
-  op::RBNonlinearOperator,
-  r::TransientParamRealization,
-  xhF::Tuple{Vararg{AbstractVector}},
-  i::Integer,
-  γᵢ::Real,
-  ode_cache)
+  cache::Tuple,
+  op::RBThetaMethodParamOperator,
+  x::AbstractVector)
 
-  fe_A,coeff_cache,lincomb_cache = cache
-  fe_sA = fe_matrix!(fe_A,op,r,xhF,γᵢ,ode_cache)
-  A_coeff = mdeim_coeff!(coeff_cache[i],op.lhs[i],fe_sA[i])
-  mdeim_lincomb!(lincomb_cache,op.lhs[i],A_coeff)
-  A = last(lincomb_cache)
-  return A
-end
-
-function ODETools.jacobians!(
-  cache,
-  op::RBNonlinearOperator,
-  r::TransientParamRealization,
-  xhF::Tuple{Vararg{AbstractVector}},
-  γ::Tuple{Vararg{Real}},
-  ode_cache)
-
-  fe_A,coeff_cache,lincomb_cache = cache
-  fe_sA = fe_matrix!(fe_A,op,r,xhF,γ,ode_cache)
-  for i = 1:get_order(op)+1
-    A_coeff = mdeim_coeff!(coeff_cache[i],op.lhs[i],fe_sA[i])
-    mdeim_lincomb!(lincomb_cache,op.lhs[i],A_coeff)
-  end
-  A = last(lincomb_cache)
-  return A
-end
-
-function _select_fe_space_at_time_locations(fs::FESpace,indices)
-  @notimplemented
-end
-
-function _select_fe_space_at_time_locations(fs::FESpaceToParamFESpace,indices)
-  FESpaceToParamFESpace(fs.space,Val(length(indices)))
-end
-
-function _select_fe_space_at_time_locations(fs::SingleFieldParamFESpace,indices)
-  dvi = ParamArray(fs.dirichlet_values[indices])
-  TrialParamFESpace(dvi,fs.space)
-end
-
-function _select_cache_at_time_locations(xhF::Tuple{Vararg{ParamVector}},ode_cache,indices)
-  Us,Uts,fecache = ode_cache
-  new_xhF = ()
-  new_Us = ()
-  for i = eachindex(xhF)
-    new_Us = (new_Us...,_select_fe_space_at_time_locations(Us[i],indices))
-    new_xhF = (new_xhF...,xhF[i][indices])
-  end
-  new_ode_cache = new_Us,Uts,fecache
-  return new_xhF,new_ode_cache
-end
-
-function _select_cache_at_time_locations(xhF::Tuple{Vararg{ParamBlockVector}},ode_cache,indices)
-  Us,Uts,fecache = ode_cache
-  new_xhF = ()
-  new_Us = ()
-  for i = eachindex(xhF)
-    spacei = Us[i]
-    VT = spacei.vector_type
-    style = spacei.multi_field_style
-    spacesi = [_select_fe_space_at_time_locations(spaceij,indices) for spaceij in spacei]
-    new_Us = (new_Us...,MultiFieldParamFESpace(VT,spacesi,style))
-    new_xhF = (new_xhF...,ParamArray(xhF[i][indices]))
-  end
-  new_ode_cache = new_Us,Uts,fecache
-  return new_xhF,new_ode_cache
-end
-
-function _select_indices_at_time_locations(red_times;nparams=1)
-  vec(transpose((red_times.-1)*nparams .+ collect(1:nparams)'))
-end
-
-function _select_fe_quantities_at_time_locations(a,r,xhF,ode_cache)
-  red_times = union_reduced_times(a)
-  red_r = r[:,red_times]
-  indices = _select_indices_at_time_locations(red_times;nparams=num_params(r))
-  red_xhF,red_ode_cache = _select_cache_at_time_locations(xhF,ode_cache,indices)
-  return red_r,red_times,red_xhF,red_ode_cache
-end
-
-function _select_snapshots_at_space_time_locations(s,a,red_times)
-  ids_space = get_indices_space(a)
-  ids_time = filter(!isnothing,indexin(get_indices_time(a),red_times))
-  ids_param = Base.OneTo(num_params(s))
-  snew = reverse_snapshots_at_indices(s,ids_space)
-  select_snapshots(snew,ids_time,ids_param)
-end
-
-function _select_snapshots_at_space_time_locations(
-  s::ArrayContribution,a::AffineContribution,red_times)
-  contribution(s.trians) do trian
-    _select_snapshots_at_space_time_locations(s[trian],a[trian],red_times)
-  end
-end
-
-function fe_matrix!(
-  cache,
-  op::RBNonlinearOperator,
-  r::TransientParamRealization,
-  xhF::Tuple{Vararg{AbstractVector}},
-  γ::Tuple{Vararg{Real}},
-  ode_cache)
-
-  red_r,red_times,red_xhF,red_ode_cache = _select_fe_quantities_at_time_locations(op.lhs,r,xhF,ode_cache)
-  A = fe_matrix!(cache,op.op,red_r,red_xhF,γ,red_ode_cache)
-  map(A,op.lhs) do A,lhs
-    _select_snapshots_at_space_time_locations(A,lhs,red_times)
-  end
-end
-
-function fe_vector!(
-  cache,
-  op::RBNonlinearOperator,
-  r::TransientParamRealization,
-  xhF::Tuple{Vararg{AbstractVector}},
-  ode_cache)
-
-  red_r,red_times,red_xhF,red_ode_cache = _select_fe_quantities_at_time_locations(op.rhs,r,xhF,ode_cache)
-  b = fe_vector!(cache,op.op,red_r,red_xhF,red_ode_cache)
-  bi = _select_snapshots_at_space_time_locations(b,op.rhs,red_times)
-  return bi
-end
-
-struct ThetaMethodRBNonlinearOperator{T,L,R} <: RBNonlinearOperator{T}
-  op::RBOperator{T}
-  lhs::L
-  rhs::R
-end
-
-const AffineThetaMethodRBNonlinearOperator = ThetaMethodRBNonlinearOperator{T,L,R} where {T<:Affine,L,R}
-
-function RBNonlinearOperator(::ThetaMethodRBSolver,op::RBOperator,lhs,rhs)
-  ThetaMethodRBNonlinearOperator(op,lhs,rhs)
-end
-
-function Algebra.solve(
-  solver::RBSolver,
-  op::RBNonlinearOperator,
-  s::S) where S
-
-  son = select_snapshots(s,online_params(solver))
-  ron = get_realization(son)
-  solve(solver,op,ron)
-end
-
-function Algebra.solve(
-  solver::ThetaMethodRBSolver,
-  op::ThetaMethodRBNonlinearOperator,
-  _r::TransientParamRealization)
-
-  @notimplemented "Split affine from nonlinear operator when running the RB solve"
-end
-
-function Algebra.solve(
-  solver::ThetaMethodRBSolver,
-  op::AffineThetaMethodRBNonlinearOperator,
-  _r::TransientParamRealization)
-
-  fesolver = get_fe_solver(solver)
-  dt = fesolver.dt
-  θ = fesolver.θ
-  θ == 0.0 ? dtθ = dt : dtθ = dt*θ
-
-  r = copy(_r)
-  FEM.shift_time!(r,dt*(θ-1))
-
-  trial = get_trial(op)(r)
-  fe_trial = get_fe_trial(op)(r)
-  red_x = zero_free_values(trial)
-  y = zero_free_values(fe_trial)
-  z = similar(y)
-  z .= 0.0
-
-  ode_cache = allocate_cache(op,r)
-  mat_cache,vec_cache = ODETools._allocate_matrix_and_vector(op,r,y,ode_cache)
-
-  stats = @timed begin
-    ode_cache = update_cache!(ode_cache,op,r)
-    A,b = ODETools._matrix_and_vector!(mat_cache,vec_cache,op,r,dtθ,y,ode_cache,z)
-    afop = AffineOperator(A,b)
-    solve!(red_x,fesolver.nls,afop)
-  end
-
-  x = recast(red_x,trial)
-  s = reverse_snapshots(x,r)
-  cs = ComputationalStats(stats,num_params(r))
-  return s,cs
-end
-
-function ODETools._matrix_and_vector!(cache_mat,cache_vec,op::ThetaMethodRBNonlinearOperator,r,dtθ,u0,ode_cache,vθ)
-  A = ODETools._matrix!(cache_mat,op,r,dtθ,u0,ode_cache,vθ)
-  b = ODETools._vector!(cache_vec,op,r,dtθ,u0,ode_cache,vθ)
-  return A,b
-end
-
-function ODETools._matrix!(cache,op::ThetaMethodRBNonlinearOperator,r,dtθ,u0,ode_cache,vθ)
-  fe_A,coeff_cache,lincomb_cache = cache
-  for i = eachindex(fe_A)
-    LinearAlgebra.fillstored!(fe_A[i],zero(eltype(fe_A[i])))
-  end
-  A = ODETools.jacobians!(cache,op,r,(u0,vθ),(1.0,1/dtθ),ode_cache)
-  return A
-end
-
-function ODETools._vector!(cache,op::ThetaMethodRBNonlinearOperator,r,dtθ,u0,ode_cache,vθ)
-  b = residual!(cache,op,r,(u0,vθ),ode_cache)
-  b .*= -1.0
-  return b
-end
-
-struct LinearNonlinearRBNonlinearOperator{A,B} <: RBNonlinearOperator{FEM.LinearNonlinear}
-  op_linear::A
-  op_nonlinear::B
-  function LinearNonlinearRBNonlinearOperator(op_linear::A,op_nonlinear::B) where {A,B}
-    @check isa(op_linear,RBNonlinearOperator{Affine})
-    @check isa(op_nonlinear,RBNonlinearOperator{Nonlinear})
-    new{A,B}(op_linear,op_nonlinear)
-  end
-end
-
-FEM.get_linear_operator(op::LinearNonlinearRBNonlinearOperator) = op.op_linear
-FEM.get_nonlinear_operator(op::LinearNonlinearRBNonlinearOperator) = op.op_nonlinear
-
-function FESpaces.get_test(op::LinearNonlinearRBNonlinearOperator)
-  @check get_test(op.op_linear) === get_test(op.op_nonlinear)
-  get_test(op.op_linear)
-end
-
-function FESpaces.get_trial(op::LinearNonlinearRBNonlinearOperator)
-  @check get_trial(op.op_linear) === get_trial(op.op_nonlinear)
-  get_trial(op.op_linear)
-end
-
-function FESpaces.get_order(op::LinearNonlinearRBNonlinearOperator)
-  @check get_order(op.op_linear) === get_order(op.op_nonlinear)
-  get_order(op.op_linear)
-end
-
-function FEM.realization(op::LinearNonlinearRBNonlinearOperator;kwargs...)
-  realization(op.op_linear;kwargs...)
-end
-
-function FEM.get_fe_operator(op::LinearNonlinearRBNonlinearOperator)
-  FEM.get_fe_operator(op.op_linear),FEM.get_fe_operator(op.op_nonlinear)
-end
-
-function get_fe_trial(op::LinearNonlinearRBNonlinearOperator)
-  @check get_fe_trial(op.op_linear) === get_fe_trial(op.op_nonlinear)
-  get_fe_trial(op.op_linear)
-end
-
-function get_fe_test(op::LinearNonlinearRBNonlinearOperator)
-  @check get_fe_test(op.op_linear) === get_fe_test(op.op_nonlinear)
-  get_fe_test(op.op_linear)
-end
-
-function TransientFETools.allocate_cache(
-  op::LinearNonlinearRBNonlinearOperator,
-  r::TransientParamRealization)
-
-  allocate_cache(op.op_linear,r)
-end
-
-function TransientFETools.update_cache!(
-  ode_cache,
-  op::LinearNonlinearRBNonlinearOperator,
-  r::TransientParamRealization)
-
-  update_cache!(ode_cache,op.op_linear,r)
-end
-
-function Algebra.allocate_residual(
-  op::LinearNonlinearRBNonlinearOperator,
-  r::TransientParamRealization,
-  x::AbstractVector,
-  ode_cache)
-
-  cache_lin = allocate_residual(op.op_linear,r,x,ode_cache)
-  cache_nlin = allocate_residual(op.op_nonlinear,r,x,ode_cache)
-  return cache_lin,cache_nlin
-end
-
-function Algebra.allocate_jacobian(
-  op::LinearNonlinearRBNonlinearOperator,
-  r::TransientParamRealization,
-  x::AbstractVector,
-  ode_cache)
-
-  cache_lin = allocate_jacobian(op.op_linear,r,x,ode_cache)
-  cache_nlin = allocate_jacobian(op.op_nonlinear,r,x,ode_cache)
-  return cache_lin,cache_nlin
-end
-
-# we assume that the linear components have already been computed, and have been
-# passed along with the cache
-function Algebra.residual!(
-  cache,
-  op::LinearNonlinearRBNonlinearOperator,
-  r::TransientParamRealization,
-  xhF::Tuple{Vararg{AbstractVector}},
-  ode_cache)
-
-  b_lin,cache_nl... = cache
-  b_nlin = residual!(cache_nl,op.op_nonlinear,r,xhF,ode_cache)
-  @. b_nlin = b_nlin + b_lin
-  return b_nlin
+  uF = x
+  vθ = op.vθ
+  @. vθ = (x-op.u0)/op.dtθ
+  z = zero(eltype(A))
+  fillstored!(A,z)
+  jacobians!(cache,op.odeop,op.r,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)
 end
 
 function Algebra.jacobian!(
-  cache,
-  op::LinearNonlinearRBNonlinearOperator,
-  r::TransientParamRealization,
-  xhF::Tuple{Vararg{AbstractVector}},
-  i::Integer,
-  γᵢ::Real,
-  ode_cache)
+  cache::Tuple,
+  op::RBThetaMethodParamOperator,
+  x::AbstractVector,
+  i::Int)
 
-  A_lin,cache_nl... = cache
-  A_nlin = jacobian!(cache_nl,op.op_nonlinear,r,xhF,i,γᵢ,ode_cache)
-  @. A_nlin = A_nlin + A_lin
-  return A_nlin
-end
-
-function ODETools.jacobians!(
-  cache,
-  op::LinearNonlinearRBNonlinearOperator,
-  r::TransientParamRealization,
-  xhF::Tuple{Vararg{AbstractVector}},
-  γ::Tuple{Vararg{Real}},
-  ode_cache)
-
-  A_lin,cache_nl... = cache
-  A_nlin = jacobians!(cache_nl,op.op_nonlinear,r,xhF,γ,ode_cache)
-  @. A_nlin = A_nlin + A_lin
-  return A_nlin
-end
-
-function Algebra.solve(
-  solver::ThetaMethodRBSolver,
-  op::LinearNonlinearRBNonlinearOperator,
-  _r::TransientParamRealization)
-
-  fesolver = get_fe_solver(solver)
-  dt = fesolver.dt
-  θ = fesolver.θ
-  θ == 0.0 ? dtθ = dt : dtθ = dt*θ
-
-  r = copy(_r)
-  FEM.shift_time!(r,dt*(θ-1))
-
-  trial = get_trial(op)(r)
-  fe_trial = get_fe_trial(op)(r)
-  red_x = zero_free_values(trial)
-  y = zero_free_values(fe_trial)
-  z = similar(y)
-  z .= 0.0
-
-  ode_cache = allocate_cache(op,r)
-  nl_cache = nothing
-
-  stats = @timed begin
-    ode_cache = update_cache!(ode_cache,op,r)
-    solve!(red_x,fesolver.nls,op,nl_cache)
+  uF = x
+  vθ = op.vθ
+  @. vθ = (x-op.u0)/op.dtθ
+  fecache, = cache
+  for i = eachindex(fecache)
+    LinearAlgebra.fillstored!(fecache[i],zero(eltype(fecache[i])))
   end
-
-  x = recast(red_x,trial)
-  s = reverse_snapshots(x,r)
-  cs = ComputationalStats(stats,num_params(r))
-  return s,cs
+  γ = (1.0,1/op.dtθ)
+  jacobian!(cache,op.odeop,op.r,(uF,vθ),i,γ[i],op.ode_cache)
 end
 
 function Algebra.solve!(
   x::AbstractVector,
   nls::NewtonRaphsonSolver,
-  op::LinearNonlinearRBNonlinearOperator,
+  op::RBNonlinearOperator,
   cache::Nothing)
 
-  b = residual(op, x)
-  A = jacobian(op, x)
+  b = residual(op,x)
+  A = jacobian(op,x)
   dx = similar(b)
-  ss = symbolic_setup(nls.ls, A)
+  fex = similar(op.u0)
+  ss = symbolic_setup(nls.ls,A)
   ns = numerical_setup(ss,A)
-  _solve_nr!(x,A,b,dx,ns,nls,op)
+  _solve_rb_nr!(x,fex,A,b,dx,ns,nls,op)
   NewtonRaphsonCache(A,b,dx,ns)
+end
+
+function _solve_rb_nr!(x,fex,A,b,dx,ns,nls,op)
+  trial = get_trial(op)
+  isconv, conv0 = Algebra._check_convergence(nls,b)
+  if isconv; return; end
+
+  for nliter in 1:nls.max_nliters
+    rmul!(b,-1)
+    solve!(dx,ns,b)
+    x .+= dx
+    fex .= recast(x,trial)
+
+    residual!(b,op,fex)
+    isconv = Algebra._check_convergence(nls,b,conv0)
+    if isconv; return; end
+
+    if nliter == nls.max_nliters
+      @unreachable
+    end
+
+    jacobian!(A,op,fex)
+    numerical_setup!(ns,A)
+  end
 end
