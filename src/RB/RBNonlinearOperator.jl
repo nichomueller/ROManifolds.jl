@@ -2,8 +2,8 @@ abstract type RBNonlinearOperator{T} <: NonlinearOperator end
 
 # θ-Method specialization
 
-struct RBThetaMethodParamOperator{C} <: NonlinearOperator
-  odeop::PODMDEIMOperator{C}
+struct RBThetaMethodParamOperator{T} <: RBNonlinearOperator{T}
+  odeop::RBOperator{T}
   r::TransientParamRealization
   dtθ::Float64
   u0::AbstractVector
@@ -32,7 +32,6 @@ function Algebra.residual!(
 
   uF = x
   vθ = op.vθ
-  @. vθ = (x-op.u0)/op.dtθ
   residual!(cache,op.odeop,op.r,(uF,vθ),op.ode_cache)
 end
 
@@ -43,9 +42,6 @@ function Algebra.jacobian!(
 
   uF = x
   vθ = op.vθ
-  @. vθ = (x-op.u0)/op.dtθ
-  z = zero(eltype(A))
-  fillstored!(A,z)
   jacobians!(cache,op.odeop,op.r,(uF,vθ),(1.0,1/op.dtθ),op.ode_cache)
 end
 
@@ -57,11 +53,6 @@ function Algebra.jacobian!(
 
   uF = x
   vθ = op.vθ
-  @. vθ = (x-op.u0)/op.dtθ
-  fecache, = cache
-  for i = eachindex(fecache)
-    LinearAlgebra.fillstored!(fecache[i],zero(eltype(fecache[i])))
-  end
   γ = (1.0,1/op.dtθ)
   jacobian!(cache,op.odeop,op.r,(uF,vθ),i,γ[i],op.ode_cache)
 end
@@ -69,22 +60,33 @@ end
 function Algebra.solve!(
   x::AbstractVector,
   nls::NewtonRaphsonSolver,
-  op::RBNonlinearOperator,
-  cache::Nothing)
+  op::RBNonlinearOperator{LinearNonlinear},
+  cache)
 
-  b = residual(op,x)
-  A = jacobian(op,x)
-  dx = similar(b)
   fex = similar(op.u0)
+  (cache_jac_lin,cache_res_lin),(cache_jac_nlin,cache_res_nlin) = cache
+
+  # linear res/jac, now they are treated as cache
+  lop = op.odeop.op_linear
+  A_lin,b_lin = ODETools._matrix_and_vector!(
+    cache_jac_lin,cache_res_lin,lop,op.r,op.dtθ,op.u0,op.ode_cache,op.vθ)
+  cache_jac = A_lin,cache_jac_nlin
+  cache_res = b_lin,cache_res_nlin
+  cache = cache_jac,cache_res
+
+  # initial nonlinear res/jac
+  b = residual!(cache_res,op,fex)
+  A = jacobian!(cache_jac,op,fex)
+  dx = similar(b)
   ss = symbolic_setup(nls.ls,A)
   ns = numerical_setup(ss,A)
-  _solve_rb_nr!(x,fex,A,b,dx,ns,nls,op)
-  NewtonRaphsonCache(A,b,dx,ns)
+  _solve_rb_nr!(x,fex,A,b,dx,ns,nls,op,cache)
 end
 
-function _solve_rb_nr!(x,fex,A,b,dx,ns,nls,op)
+function _solve_rb_nr!(x,fex,A,b,dx,ns,nls,op,cache)
+  jac_cache,res_cache = cache
   trial = get_trial(op)
-  isconv, conv0 = Algebra._check_convergence(nls,b)
+  isconv, conv0 = _check_convergence(nls,b)
   if isconv; return; end
 
   for nliter in 1:nls.max_nliters
@@ -93,7 +95,7 @@ function _solve_rb_nr!(x,fex,A,b,dx,ns,nls,op)
     x .+= dx
     fex .= recast(x,trial)
 
-    residual!(b,op,fex)
+    b = residual!(res_cache,op,fex)
     isconv = Algebra._check_convergence(nls,b,conv0)
     if isconv; return; end
 
@@ -101,7 +103,7 @@ function _solve_rb_nr!(x,fex,A,b,dx,ns,nls,op)
       @unreachable
     end
 
-    jacobian!(A,op,fex)
+    A = jacobian!(jac_cache,op,fex)
     numerical_setup!(ns,A)
   end
 end

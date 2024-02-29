@@ -13,7 +13,6 @@ function _tpod(mat::AbstractMatrix,args...;kwargs...)
 end
 
 function _tpod(mat::AbstractMatrix,X::AbstractMatrix;kwargs...)
-  println("ciao")
   C = cholesky(X)
   L = sparse(C.L)
   Xmat = L'*mat[C.p,:]

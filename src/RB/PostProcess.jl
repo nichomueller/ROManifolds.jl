@@ -24,7 +24,7 @@ function get_op_filename(dir)
   dir * "/operator.jld"
 end
 
-function DrWatson.save(dir,op::RBNonlinearOperator)
+function DrWatson.save(dir,op::RBOperator)
   serialize(get_op_filename(dir),op)
 end
 
@@ -72,7 +72,7 @@ function rb_results(
   RBResults(name,son,son_approx,fem_stats,rb_stats,X)
 end
 
-function rb_results(solver::RBSolver,op::RBNonlinearOperator,args...;kwargs...)
+function rb_results(solver::RBSolver,op::RBOperator,args...;kwargs...)
   feop = FEM.get_fe_operator(op)
   rb_results(solver,feop,args...;kwargs...)
 end

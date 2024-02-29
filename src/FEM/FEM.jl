@@ -137,6 +137,7 @@ export TransientParamFEOperatorWithTrian
 export change_triangulation
 include("TransientParamFEOperatorWithTrian.jl")
 
+export LinearNonlinear
 export TransientParamLinearNonlinearFEOperator
 export get_linear_operator
 export get_nonlinear_operator

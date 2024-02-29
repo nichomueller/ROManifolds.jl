@@ -103,6 +103,8 @@ rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(feop,rbsolver,fesnaps,rbsnaps,festats,rbstats)
 
+# fesnaps = Serialization.deserialize(RB.get_snapshots_filename(test_dir))
+
 println(RB.space_time_error(results))
 save(test_dir,fesnaps)
 save(test_dir,rbop)
@@ -138,7 +140,56 @@ z = similar(y)
 z .= 0.0
 
 ode_cache = allocate_cache(rbop,r)
-nl_cache = nothing
+cache_lin = ODETools._allocate_matrix_and_vector(rbop.op_linear,r,y,ode_cache)
+cache_nlin = ODETools._allocate_matrix_and_vector(rbop.op_nonlinear,r,y,ode_cache)
+cache = cache_lin,cache_nlin
 
 ode_cache = update_cache!(ode_cache,rbop,r)
-solve!(red_x,fesolver.nls,rbop,nl_cache)
+nlop = RBThetaMethodParamOperator(rbop,r,dtθ,y,ode_cache,z)
+# solve!(red_x,fesolver.nls,nlop,nl_cache)
+
+fex = similar(nlop.u0)
+fex .= 0.0
+(cache_jac_lin,cache_res_lin),(cache_jac_nlin,cache_res_nlin) = cache
+
+# linear res/jac, now they are treated as cache
+lop = nlop.odeop.op_linear
+A_lin,b_lin = ODETools._matrix_and_vector!(cache_jac_lin,cache_res_lin,lop,r,dtθ,y,ode_cache,z)
+cache_jac = A_lin,cache_jac_nlin
+cache_res = b_lin,cache_res_nlin
+cache = cache_jac,cache_res
+
+# # initial nonlinear res/jac
+# b = residual!(cache_res,nlop,fex)
+# A = jacobian!(cache_jac,nlop,fex)
+# dx = similar(b)
+# ss = symbolic_setup(LUSolver(),A)
+# ns = numerical_setup(ss,A)
+
+# opnl = feop.op_nonlinear.op
+# odeopopnl = get_algebraic_operator(opnl)
+# nopnl = ThetaMethodParamOperator(odeopopnl,r,dtθ,y,ode_cache,z)
+# J = jacobian(nopnl,y)
+
+# rbopnl = rbop.op_nonlinear
+# LHS1 = rbopnl.lhs[1]
+# RHS1 = rbopnl.rhs
+
+# dC = LHS1[1]
+# C = RHS1[1]
+
+# dC1 = dC[1]
+
+# jacobian!(cache_jac,nlop,fex)
+uF = fex
+vθ = nlop.vθ
+# ODETools.jacobians!(cache_jac,nlop.odeop,nlop.r,(uF,vθ),(1.0,1/nlop.dtθ),nlop.ode_cache)
+A_lin,cache_nl = cache_jac
+fecache_nl, = cache_nl
+for i = eachindex(fecache_nl)
+  LinearAlgebra.fillstored!(fecache_nl[i],zero(eltype(fecache_nl[i])))
+end
+# A_nlin = ODETools.jacobians!(cache_nl,nlop.odeop.op_nonlinear,nlop.r,(uF,vθ),(1.0,1/nlop.dtθ),ode_cache)
+op,r,xhF,γ = nlop.odeop.op_nonlinear,nlop.r,(uF,vθ),(1.0,1/nlop.dtθ)
+fe_A,coeff_cache,lincomb_cache = cache_nl
+fe_sA = fe_jacobians!(fe_A,op,r,xhF,γ,ode_cache)

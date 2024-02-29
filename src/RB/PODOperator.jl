@@ -33,8 +33,8 @@ FESpaces.get_trial(op::PODOperator) = op.trial
 FESpaces.get_test(op::PODOperator) = op.test
 FEM.realization(op::PODOperator;kwargs...) = realization(op.feop;kwargs...)
 FEM.get_fe_operator(op::PODOperator) = FEM.get_fe_operator(op.feop)
-FEM.get_linear_operator(op::PODOperator{FEM.LinearNonlinear}) = PODOperator(get_linear_operator(op.feop),op.trial,op.test)
-FEM.get_nonlinear_operator(op::PODOperator{FEM.LinearNonlinear}) = PODOperator(get_nonlinear_operator(op.feop),op.trial,op.test)
+FEM.get_linear_operator(op::PODOperator{LinearNonlinear}) = PODOperator(get_linear_operator(op.feop),op.trial,op.test)
+FEM.get_nonlinear_operator(op::PODOperator{LinearNonlinear}) = PODOperator(get_nonlinear_operator(op.feop),op.trial,op.test)
 get_fe_trial(op::PODOperator) = get_trial(op.feop)
 get_fe_test(op::PODOperator) = get_test(op.feop)
 
@@ -152,18 +152,20 @@ function fe_jacobian_and_residual(
   fe_jacobian_and_residual!(A,b,op,r,dtθ,x,ode_cache,y)
 end
 
-function fe_jacobians!(A,op::RBOperator,r,dtθ,u0,ode_cache,vθ)
+function fe_jacobians!(A,op::AffineRBOperator,r,dtθ,u0,ode_cache,vθ)
   fe_jacobians!(A,op,r,(vθ,vθ),(1.0,1/dtθ),ode_cache)
+end
+
+function fe_jacobians!(A,op::RBOperator,r,dtθ,u0,ode_cache,vθ)
+  fe_jacobians!(A,op,r,(u0,vθ),(1.0,1/dtθ),ode_cache)
+end
+
+function fe_residual!(b,op::AffineRBOperator,r,dtθ,u0,ode_cache,vθ)
+  fe_residual!(b,op,r,(vθ,vθ),ode_cache)
 end
 
 function fe_residual!(b,op::RBOperator,r,dtθ,u0,ode_cache,vθ)
   fe_residual!(b,op,r,(u0,vθ),ode_cache)
-end
-
-function fe_jacobian_and_residual!(A,b,op::AffineRBOperator,r,dtθ,u0,ode_cache,vθ)
-  sA = fe_jacobians!(A,op,r,dtθ,vθ,ode_cache,vθ)
-  sb = fe_residual!(b,op,r,dtθ,vθ,ode_cache,vθ)
-  return sA,sb
 end
 
 function fe_jacobian_and_residual!(A,b,op::RBOperator,r,dtθ,u0,ode_cache,vθ)

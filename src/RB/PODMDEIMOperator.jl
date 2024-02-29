@@ -12,7 +12,7 @@ end
 
 function reduced_operator(
   solver::RBSolver,
-  op::PODOperator{FEM.LinearNonlinear},
+  op::PODOperator{LinearNonlinear},
   s::S) where S
 
   red_op_lin = reduced_operator(solver,get_linear_operator(op),s)
@@ -225,7 +225,7 @@ function fe_residual!(
   return bi
 end
 
-struct LinearNonlinearPODMDEIMOperator{A,B} <: RBOperator{FEM.LinearNonlinear}
+struct LinearNonlinearPODMDEIMOperator{A,B} <: RBOperator{LinearNonlinear}
   op_linear::A
   op_nonlinear::B
   function LinearNonlinearPODMDEIMOperator(op_linear::A,op_nonlinear::B) where {A,B}
@@ -308,8 +308,8 @@ function Algebra.allocate_jacobian(
   return cache_lin,cache_nlin
 end
 
-# we assume that the linear components have already been computed, and have been
-# passed along with the cache
+# we assume that the linear components have already been computed during the
+# first call to residual() and jacobian() (first iteration of the Newton solver)
 function Algebra.residual!(
   cache,
   op::LinearNonlinearPODMDEIMOperator,
@@ -317,7 +317,7 @@ function Algebra.residual!(
   xhF::Tuple{Vararg{AbstractVector}},
   ode_cache)
 
-  b_lin,cache_nl... = cache
+  b_lin,cache_nl = cache
   b_nlin = residual!(cache_nl,op.op_nonlinear,r,xhF,ode_cache)
   @. b_nlin = b_nlin + b_lin
   return b_nlin
@@ -332,7 +332,11 @@ function Algebra.jacobian!(
   γᵢ::Real,
   ode_cache)
 
-  A_lin,cache_nl... = cache
+  A_lin,cache_nl = cache
+  fecache_nl, = cache_nl
+  for i = eachindex(fecache_nl)
+    LinearAlgebra.fillstored!(fecache_nl[i],zero(eltype(fecache_nl[i])))
+  end
   A_nlin = jacobian!(cache_nl,op.op_nonlinear,r,xhF,i,γᵢ,ode_cache)
   @. A_nlin = A_nlin + A_lin
   return A_nlin
@@ -346,7 +350,11 @@ function ODETools.jacobians!(
   γ::Tuple{Vararg{Real}},
   ode_cache)
 
-  A_lin,cache_nl... = cache
+  A_lin,cache_nl = cache
+  fecache_nl, = cache_nl
+  for i = eachindex(fecache_nl)
+    LinearAlgebra.fillstored!(fecache_nl[i],zero(eltype(fecache_nl[i])))
+  end
   A_nlin = jacobians!(cache_nl,op.op_nonlinear,r,xhF,γ,ode_cache)
   @. A_nlin = A_nlin + A_lin
   return A_nlin
@@ -356,7 +364,7 @@ end
 
 function Algebra.solve(
   solver::RBSolver,
-  op::PODMDEIMOperator,
+  op::RBOperator,
   s::S) where S
 
   son = select_snapshots(s,online_params(solver))
@@ -366,7 +374,7 @@ end
 
 function Algebra.solve(
   solver::RBSolver,
-  op::PODMDEIMOperator{Nonlinear},
+  op::RBOperator{Nonlinear},
   s::S) where S
 
   @notimplemented "Split affine from nonlinear operator when running the RB solve"
@@ -437,7 +445,7 @@ end
 
 function Algebra.solve(
   solver::ThetaMethodRBSolver,
-  op::PODMDEIMOperator{FEM.LinearNonlinear},
+  op::LinearNonlinearPODMDEIMOperator,
   _r::TransientParamRealization)
 
   fesolver = get_fe_solver(solver)
@@ -456,12 +464,14 @@ function Algebra.solve(
   z .= 0.0
 
   ode_cache = allocate_cache(op,r)
-  nl_cache = nothing
+  cache_lin = ODETools._allocate_matrix_and_vector(op.op_linear,r,y,ode_cache)
+  cache_nlin = ODETools._allocate_matrix_and_vector(op.op_nonlinear,r,y,ode_cache)
+  cache = cache_lin,cache_nlin
 
   stats = @timed begin
     ode_cache = update_cache!(ode_cache,op,r)
     nlop = RBThetaMethodParamOperator(op,r,dtθ,y,ode_cache,z)
-    solve!(red_x,fesolver.nls,nlop,nl_cache)
+    solve!(red_x,fesolver.nls,nlop,cache)
   end
 
   x = recast(red_x,trial)
