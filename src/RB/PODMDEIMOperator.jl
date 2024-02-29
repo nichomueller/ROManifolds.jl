@@ -469,3 +469,12 @@ function Algebra.solve(
   cs = ComputationalStats(stats,num_params(r))
   return s,cs
 end
+
+# for testing/visualization purposes
+
+function projection_error(op::PODMDEIMOperator,s::AbstractArray)
+  sol_err = projection_error(op.op,s)
+  # res_err = projection_error(op.rhs,s)
+  # jac_err = projection_error(op.lhs,s)
+  # return sol_err,res_err,jac_err
+end

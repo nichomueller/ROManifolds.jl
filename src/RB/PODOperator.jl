@@ -171,3 +171,12 @@ function fe_jacobian_and_residual!(A,b,op::RBOperator,r,dtθ,u0,ode_cache,vθ)
   sb = fe_residual!(b,op,r,dtθ,u0,ode_cache,vθ)
   return sA,sb
 end
+
+# for testing/visualization purposes
+
+function projection_error(op::RBOperator,s::AbstractArray)
+  feop = FEM.get_fe_operator(op)
+  trial = get_trial(op)
+  norm_matrix = assemble_norm_matrix(feop)
+  projection_error(trial,s,norm_matrix)
+end

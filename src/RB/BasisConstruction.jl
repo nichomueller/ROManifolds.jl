@@ -12,7 +12,8 @@ function _tpod(mat::AbstractMatrix,args...;kwargs...)
   U[:,1:rank]
 end
 
-function _tpod(mat::Matrix,X::AbstractMatrix;kwargs...)
+function _tpod(mat::AbstractMatrix,X::AbstractMatrix;kwargs...)
+  println("ciao")
   C = cholesky(X)
   L = sparse(C.L)
   Xmat = L'*mat[C.p,:]
@@ -33,7 +34,7 @@ function _nested_tpod(mat::AbstractMatrix,args...;kwargs...)
   U_rank*UΣV_rank
 end
 
-function _nested_tpod(mat::Matrix,X::AbstractMatrix;kwargs...)
+function _nested_tpod(mat::AbstractMatrix,X::AbstractMatrix;kwargs...)
   C = cholesky(X)
   L = sparse(C.L)
   Xmat = L'*mat[C.p,:]
@@ -63,9 +64,9 @@ function orth_projection(
   basis::AbstractMatrix)
 
   proj = similar(v)
-  fill!(proj,zero(eltype(proj)))
+  proj .= zero(eltype(proj))
   @inbounds for b = eachcol(basis)
-    proj += b*sum(v'*b)/sum(b'*b)
+    proj += b*dot(v,b)/dot(b,b)
   end
   proj
 end
@@ -76,9 +77,9 @@ function orth_projection(
   X::AbstractMatrix)
 
   proj = similar(v)
-  fill!(proj,zero(eltype(proj)))
+  proj .= zero(eltype(proj))
   @inbounds for b = eachcol(basis)
-    proj += b*sum(v'*X*b)/sum(b'*X*b)
+    proj += b*dot(v,X,b)/dot(b,X,b)
   end
   proj
 end
@@ -91,13 +92,13 @@ function orth_complement!(
   v .= v-orth_projection(v,basis,args...)
 end
 
+_norm(v::AbstractVector,args...) = norm(v)
+_norm(v::AbstractVector,X::AbstractMatrix) = sqrt(v'*X*v)
+
 function gram_schmidt!(
   mat::AbstractMatrix,
   basis::AbstractMatrix,
   args...)
-
-  _norm(v::AbstractVector) = norm(v)
-  _norm(v::AbstractVector,X::AbstractMatrix) = sqrt(v'*X*v)
 
   @inbounds for i = axes(mat,2)
     mat_i = mat[:,i]

@@ -614,3 +614,65 @@ function mdeim_lincomb!(
     mdeim_lincomb!(cachei,a[active_block_ids[i]],coeff[i])
   end
 end
+
+# for testing/visualization purposes
+
+function compress(A::AbstractMatrix,r::RBSpace)
+  basis_space = get_basis_space(r)
+  basis_time = get_basis_time(r)
+
+  a = (basis_space'*A)*basis_time
+  v = vec(a')
+  return v
+end
+
+function compress(A::AbstractMatrix{T},trial::RBSpace,test::RBSpace;combine=(x,y)->x) where T
+  basis_space_test = get_basis_space(test)
+  basis_time_test = get_basis_time(test)
+  basis_space_trial = get_basis_space(trial)
+  basis_time_trial = get_basis_time(trial)
+  ns_test,ns_trial = size(basis_space_test,2),size(basis_space_trial,2)
+  nt_test,nt_trial = size(basis_time_test,2),size(basis_time_trial,2)
+
+  red_xvec = compress_basis_space(A,trial,test)
+  a = stack(vec.(red_xvec))'  # Nt x ns_test*ns_trial
+  st_proj = zeros(T,nt_test,nt_trial,ns_test*ns_trial)
+  st_proj_shift = zeros(T,nt_test,nt_trial,ns_test*ns_trial)
+  @inbounds for ins = 1:ns_test*ns_trial, jt = 1:nt_trial, it = 1:nt_test
+    st_proj[it,jt,ins] = sum(basis_time_test[:,it].*basis_time_trial[:,jt].*a[:,ins])
+    st_proj_shift[it,jt,ins] = sum(basis_time_test[2:end,it].*basis_time_trial[1:end-1,jt].*a[2:end,ins])
+  end
+  st_proj = combine(st_proj,st_proj_shift)
+  st_proj_a = zeros(T,ns_test*nt_test,ns_trial*nt_trial)
+  @inbounds for i = 1:ns_trial, j = 1:ns_test
+    st_proj_a[1+(j-1)*nt_test:j*nt_test,1+(i-1)*nt_trial:i*nt_trial] = st_proj[:,:,(i-1)*ns_test+j]
+  end
+  return st_proj_a
+end
+
+function projection_error(test::RBSpace,a::AffineContribution,s::ArrayContribution)
+  srb = compress(s,test)
+  r = get_realization(s)
+  coeff_cache = allocate_mdeim_coeff(a,r)
+  coeff = mdeim_coeff!(coeff_cache,a,s)
+  lincomb_cache = allocate_mdeim_lincomb(test,r)
+  lincomb = mdeim_lincomb!(lincomb_cache,a,coeff)
+  norm(srb - lincomb) / norm(srb)
+end
+
+function projection_error(trial::RBSpace,test::RBSpace,a::AffineContribution,s::ArrayContribution;kwargs...)
+  srb = compress(s,trial,test;kwargs...)
+  r = get_realization(s)
+  coeff_cache = allocate_mdeim_coeff(a,r)
+  coeff = mdeim_coeff!(coeff_cache,a,s)
+  lincomb_cache = allocate_mdeim_lincomb(test,r)
+  lincomb = mdeim_lincomb!(lincomb_cache,a,coeff)
+  norm(srb - lincomb) / norm(srb)
+end
+
+# function ()
+#   contribs_mat,contribs_vec = fe_jacobian_and_residual(solver,op,s)
+#   mat_err = projection_error(lhs,contribs_mat)
+#   vec_err = projection_error(rhs,contribs_vec)
+#   Dict("err_space_jac"=>err_space,"err_time"=>err_time)
+# end

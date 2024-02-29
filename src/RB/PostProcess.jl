@@ -96,8 +96,6 @@ function speedup(r::RBResults)
 end
 
 function space_time_error(sol,sol_approx,norm_matrix=nothing)
-  _norm(v::AbstractVector,::Nothing) = norm(v)
-  _norm(v::AbstractVector,X::AbstractMatrix) = sqrt(v'*X*v)
   err_norm = []
   sol_norm = []
   space_time_norm = []

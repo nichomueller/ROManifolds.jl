@@ -161,39 +161,6 @@ function combine_basis_time(
   combine(bt_proj,bt_proj_shift)
 end
 
-function compress(xmat::AbstractMatrix,r::RBSpace)
-  basis_space = get_basis_space(r)
-  basis_time = get_basis_time(r)
-
-  red_xmat = (basis_space'*xmat)*basis_time
-  x = vec(red_xmat')
-  return x
-end
-
-function compress(xmat::AbstractMatrix{T},trial::RBSpace,test::RBSpace;combine=(x,y)->x) where T
-  basis_space_test = get_basis_space(test)
-  basis_time_test = get_basis_time(test)
-  basis_space_trial = get_basis_space(trial)
-  basis_time_trial = get_basis_time(trial)
-  ns_test,ns_trial = size(basis_space_test,2),size(basis_space_trial,2)
-  nt_test,nt_trial = size(basis_time_test,2),size(basis_time_trial,2)
-
-  red_xvec = compress_basis_space(xmat,trial,test)
-  red_xmat = stack(vec.(red_xvec))'  # Nt x ns_test*ns_trial
-  st_proj = zeros(T,nt_test,nt_trial,ns_test*ns_trial)
-  st_proj_shift = zeros(T,nt_test,nt_trial,ns_test*ns_trial)
-  @inbounds for ins = 1:ns_test*ns_trial, jt = 1:nt_trial, it = 1:nt_test
-    st_proj[it,jt,ins] = sum(basis_time_test[:,it].*basis_time_trial[:,jt].*red_xmat[:,ins])
-    st_proj_shift[it,jt,ins] = sum(basis_time_test[2:end,it].*basis_time_trial[1:end-1,jt].*red_xmat[2:end,ins])
-  end
-  st_proj = combine(st_proj,st_proj_shift)
-  st_proj_mat = zeros(T,ns_test*nt_test,ns_trial*nt_trial)
-  @inbounds for i = 1:ns_trial, j = 1:ns_test
-    st_proj_mat[1+(j-1)*nt_test:j*nt_test,1+(i-1)*nt_trial:i*nt_trial] = st_proj[:,:,(i-1)*ns_test+j]
-  end
-  return st_proj_mat
-end
-
 function recast(red_x::AbstractVector,r::RBSpace)
   basis_space = get_basis_space(r)
   basis_time = get_basis_time(r)
@@ -379,4 +346,22 @@ function recast(red_x::ParamBlockVector,r::BlockRBSpace)
     end
     mortar(block_xi)
   end
+end
+
+# for testing/visualization purposes
+
+function projection_error(r::RBSpace,s::AbstractSnapshots,norm_matrix::AbstractMatrix)
+  s2 = change_mode(s)
+  basis_space = get_basis_space(r)
+  basis_time = get_basis_time(r)
+  err_space = norm(s - basis_space*basis_space'*norm_matrix*s) / norm(s)
+  err_time = norm(s2 - basis_time*basis_time'*s2) / norm(s2)
+  Dict("err_space"=>err_space,"err_time"=>err_time)
+end
+
+function projection_error(r::BlockRBSpace,s::BlockSnapshots,norm_matrix::BlockMatrix)
+  active_block_ids = get_touched_blocks(s)
+  block_map = BlockMap(size(s),active_block_ids)
+  errors = Any[projection_error(r[i],s[i],norm_matrix[Block(i,i)]) for i in active_block_ids]
+  return_cache(block_map,errors...)
 end

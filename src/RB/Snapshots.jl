@@ -972,10 +972,7 @@ struct TensorTrainSnapshots{S,R}
   ranks::R
 end
 
-const AbstractSubTransientSnapshots = Union{
-  AbstractSnapshots{M,T},
-  SubArray{T,2,AbstractSnapshots{M,T}}
-  } where {M,T}
+const AbstractSubTransientSnapshots = Union{A,SubArray{T,2,A}} where {M,T,A<:AbstractSnapshots{M,T}}
 
 function (*)(
   a::Adjoint{<:Any,<:AbstractSubTransientSnapshots},
