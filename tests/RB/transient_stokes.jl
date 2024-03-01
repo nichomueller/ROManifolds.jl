@@ -5,7 +5,7 @@ using Gridap.MultiField
 using Mabla.FEM
 using Mabla.RB
 
-θ = 1
+θ = 0.5
 dt = 0.01
 t0 = 0.0
 tf = 0.1
@@ -16,7 +16,7 @@ ptspace = TransientParamSpace(pranges,tdomain)
 # model_dir = datadir(joinpath("meshes","perforated_plate.json"))
 # model = DiscreteModelFromFile(model_dir)
 
-n = 10
+n = 20
 domain = (0,1,0,1)
 partition = (n,n)
 model = CartesianDiscreteModel(domain, partition)
@@ -87,8 +87,9 @@ fesnaps,festats = ode_solutions(rbsolver,feop,xh0μ)
 rbop = reduced_operator(rbsolver,feop,fesnaps)
 rbsnaps,rbstats = solve(rbsolver,rbop,fesnaps)
 results = rb_results(feop,rbsolver,fesnaps,rbsnaps,festats,rbstats)
+err = RB.space_time_error(results)
 
-println(RB.space_time_error(results))
+println(err)
 save(test_dir,fesnaps)
 save(test_dir,rbop)
 save(test_dir,results)
@@ -106,7 +107,8 @@ test_dir = get_test_directory(rbsolver,dir=datadir(joinpath("stokes","toy_mesh_h
 rbop_space = reduced_operator(rbsolver_space,feop,fesnaps)
 rbsnaps_space,rbstats_space = solve(rbsolver_space,rbop,fesnaps)
 results_space = rb_results(feop,rbsolver_space,fesnaps,rbsnaps_space,festats,rbstats_space)
+err_space = RB.space_time_error(results_space)
 
-println(RB.space_time_error(results_space))
+println(err_space)
 save(test_dir,rbop_space)
 save(test_dir,results_space)

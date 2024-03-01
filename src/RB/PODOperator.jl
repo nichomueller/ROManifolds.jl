@@ -161,7 +161,6 @@ function ODETools.jacobians!(A,op::RBOperator,r,dtθ,u0,ode_cache,vθ)
 end
 
 function Algebra.residual!(b,op::AffineRBOperator,r,dtθ,u0,ode_cache,vθ)
-  println(typeof(vθ))
   residual!(b,op,r,(vθ,vθ),ode_cache)
 end
 

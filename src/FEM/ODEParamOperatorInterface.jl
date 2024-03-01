@@ -78,7 +78,7 @@ function Algebra.residual!(
   for i in 2:get_order(op)+1
     dxh = (dxh...,EvaluationFunction(Xh[i],xhF[i]))
   end
-  xh=TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
+  xh = TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
   residual!(b,op.feop,r,xh,ode_cache)
 end
 
@@ -96,7 +96,7 @@ function Algebra.jacobian!(
   for i in 2:get_order(op)+1
     dxh = (dxh...,EvaluationFunction(Xh[i],xhF[i]))
   end
-  xh=TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
+  xh = TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
   jacobian!(A,op.feop,r,xh,i,γᵢ,ode_cache)
 end
 
@@ -113,6 +113,6 @@ function ODETools.jacobians!(
   for i in 2:get_order(op)+1
     dxh = (dxh...,EvaluationFunction(Xh[i],xhF[i]))
   end
-  xh=TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
+  xh = TransientCellField(EvaluationFunction(Xh[1],xhF[1]),dxh)
   jacobians!(A,op.feop,r,xh,γ,ode_cache)
 end
